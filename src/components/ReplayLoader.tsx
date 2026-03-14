@@ -14,47 +14,56 @@ export function ReplayLoader({ onLoad, onTeamLoad, loading, error, teamLoaded }:
   const [teamText, setTeamText] = useState('');
 
   return (
-    <div className="bg-[#16213e] rounded-xl p-6 mb-6">
-      <h2 className="text-xl font-bold mb-4">Load Replay</h2>
-      <div className="flex gap-3 mb-4">
+    <div className="ps-panel" style={{ marginBottom: 8 }}>
+      <div style={{ fontSize: 13, fontWeight: 'bold', marginBottom: 8 }}>Load Replay</div>
+
+      <div style={{ display: 'flex', gap: 6, marginBottom: 8 }}>
         <input
           type="text"
           value={url}
           onChange={e => setUrl(e.target.value)}
           placeholder="Replay URL or ID"
-          className="flex-1 bg-[#0f3460] border border-[#1a1a5e] rounded-lg px-4 py-2 text-white placeholder-gray-500 focus:outline-none focus:border-[#e94560]"
+          className="ps-input"
+          style={{ flex: 1 }}
         />
         <button
+          type="button"
           onClick={() => onLoad(url)}
           disabled={loading}
-          className="bg-[#e94560] hover:bg-[#d63851] disabled:opacity-50 px-6 py-2 rounded-lg font-semibold transition-colors"
+          className="ps-btn ps-btn-red"
         >
-          {loading ? 'Loading...' : 'Load'}
+          {loading ? 'Loading…' : 'Load'}
         </button>
       </div>
 
-      <details className="mb-2">
-        <summary className="cursor-pointer text-gray-400 hover:text-white text-sm">
+      <details>
+        <summary style={{ cursor: 'pointer', fontSize: 11, color: '#8899aa' }}>
           Paste your team (for branching with full movesets)
-          {teamLoaded && <span className="ml-2 text-green-400 text-xs">Team loaded</span>}
+          {teamLoaded && <span style={{ marginLeft: 6, color: '#6c6', fontSize: 10 }}>Team loaded</span>}
         </summary>
         <textarea
           value={teamText}
           onChange={e => setTeamText(e.target.value)}
           placeholder="Paste PS team export here (supports German stat names)"
-          rows={8}
-          className="w-full mt-2 bg-[#0f3460] border border-[#1a1a5e] rounded-lg px-4 py-2 text-white text-sm font-mono placeholder-gray-500 focus:outline-none focus:border-[#e94560] resize-y"
+          rows={6}
+          className="ps-input"
+          style={{ width: '100%', marginTop: 6, fontFamily: 'Consolas, monospace', fontSize: 11, resize: 'vertical' }}
         />
         <button
+          type="button"
           onClick={() => onTeamLoad(parseTeamText(teamText))}
-          className="mt-2 bg-[#0f3460] hover:bg-[#1a1a5e] px-4 py-1.5 rounded text-sm transition-colors"
+          className="ps-btn"
+          style={{ marginTop: 4, fontSize: 10 }}
         >
           Save Team
         </button>
       </details>
 
       {error && (
-        <div className="mt-3 text-[#e94560] text-sm bg-[#e9456020] rounded-lg px-4 py-2">
+        <div style={{
+          marginTop: 8, fontSize: 11, color: '#f88',
+          background: 'rgba(255,80,80,0.1)', borderRadius: 4, padding: '6px 10px',
+        }}>
           {error}
         </div>
       )}

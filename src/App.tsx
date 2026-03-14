@@ -1,85 +1,67 @@
 import { useState, useCallback, useMemo } from 'react';
 import { useReplay } from './hooks/useReplay';
-import { useTimeline } from './hooks/useTimeline';
 import { useBranch } from './hooks/useBranch';
 import { ReplayLoader } from './components/ReplayLoader';
-import { Timeline } from './components/Timeline';
-import { BattleView } from './components/BattleView';
+import { PSReplayFrame } from './components/PSReplayFrame';
 import { BranchPanel } from './components/BranchPanel';
 import { OpponentEditor } from './components/OpponentEditor';
 import { parseTeamText } from './lib/team-parser';
-import { Teams } from '@pkmn/sim';
+import { buildTeamsFromReplay } from './lib/team-builder';
 import type { OpponentTeamInfo } from './types';
 
 function App() {
   const { loading, error, replayData, snapshots, opponentInfo, loadReplay } = useReplay();
-  const maxTurn = snapshots.length > 0 ? snapshots.length : 1;
-  const { currentTurn, goToTurn, nextTurn, prevTurn } = useTimeline(maxTurn);
-  const { branching, simState, startBranch, makeChoice, stopBranch } = useBranch();
+  const { branching, simState, startBranch, setChoice, executeTurn, stopBranch } = useBranch();
 
   const [teamText, setTeamText] = useState('');
   const [showOpponentEditor, setShowOpponentEditor] = useState(false);
   const [editedOpponentInfo, setEditedOpponentInfo] = useState<OpponentTeamInfo | null>(null);
+  const [branchTurn, setBranchTurn] = useState(1);
 
-  const currentSnapshot = useMemo(() => {
-    if (snapshots.length === 0) return null;
-    const idx = Math.min(currentTurn - 1, snapshots.length - 1);
-    return snapshots[idx];
-  }, [snapshots, currentTurn]);
+  // Total turns from parsed snapshots
+  const maxTurn = snapshots.length > 0 ? snapshots.length : 1;
 
   const handleTeamLoad = useCallback((rawText: string) => {
     const processed = parseTeamText(rawText);
     setTeamText(processed);
   }, []);
 
+  // Get the snapshot at the chosen branch turn
+  const branchSnapshot = useMemo(() => {
+    if (snapshots.length === 0) return null;
+    const idx = Math.min(branchTurn - 1, snapshots.length - 1);
+    return snapshots[idx];
+  }, [snapshots, branchTurn]);
+
   const handleBranch = useCallback(async () => {
-    if (!currentSnapshot || !replayData) return;
+    if (!replayData) return;
 
-    // Parse user's team if provided
-    let p1Team = teamText ? Teams.import(teamText) : null;
-    if (!p1Team || p1Team.length === 0) {
-      // Build a minimal team from snapshot data
-      p1Team = currentSnapshot.p1.pokemon.map(p => ({
-        name: p.name,
-        species: p.speciesForme,
-        item: p.item || '',
-        ability: p.ability || '',
-        moves: p.moves.length > 0 ? p.moves : ['Tackle'],
-        nature: 'Hardy' as const,
-        evs: { hp: 0, atk: 0, def: 0, spa: 0, spd: 0, spe: 0 },
-        ivs: { hp: 31, atk: 31, def: 31, spa: 31, spd: 31, spe: 31 },
-        level: p.level || 100,
-        gender: (p.gender || '') as '' | 'M' | 'F',
-      }));
-    }
-
-    // Build opponent team from inferred/edited info
-    const oppInfo = editedOpponentInfo || opponentInfo;
-    const p2Team = oppInfo ? oppInfo.pokemon.map(p => ({
-      name: p.species,
-      species: p.species,
-      item: p.item.includes('(') ? '' : p.item || '',
-      ability: p.ability || '',
-      moves: p.moves.length > 0 ? p.moves : ['Tackle'],
-      nature: 'Hardy' as const,
-      evs: { hp: 252, atk: 252, def: 0, spa: 0, spd: 4, spe: 0 },
-      ivs: { hp: 31, atk: 31, def: 31, spa: 31, spd: 31, spe: 31 },
-      level: p.level || 100,
-      gender: (p.gender || '') as '' | 'M' | 'F',
-    })) : [];
+    // Build teams from the replay's actual pokemon, augmented with
+    // user's pasted team (for p1 full movesets/EVs) and common sets (for p2)
+    const { p1Team, p2Team } = buildTeamsFromReplay(
+      replayData.log,
+      teamText || undefined,
+    );
 
     if (p1Team.length > 0 && p2Team.length > 0) {
       await startBranch(
         replayData.formatid || 'gen9ou',
         p1Team,
         p2Team,
+        replayData.log,
+        branchTurn,
+        branchSnapshot,
       );
     }
-  }, [currentSnapshot, replayData, teamText, editedOpponentInfo, opponentInfo, startBranch]);
+  }, [replayData, teamText, branchTurn, branchSnapshot, startBranch]);
 
-  const handleMakeChoice = useCallback(async (choice: string) => {
-    await makeChoice(choice);
-  }, [makeChoice]);
+  const handleSetChoice = useCallback((side: 'p1' | 'p2', choice: string) => {
+    setChoice(side, choice);
+  }, [setChoice]);
+
+  const handleExecuteTurn = useCallback(async () => {
+    await executeTurn();
+  }, [executeTurn]);
 
   const handleSaveOpponent = useCallback((info: OpponentTeamInfo) => {
     setEditedOpponentInfo(info);
@@ -89,11 +71,14 @@ function App() {
   const effectiveOpponentInfo = editedOpponentInfo || opponentInfo;
 
   return (
-    <div className="max-w-4xl mx-auto px-4 py-6">
-      <header className="mb-6">
-        <h1 className="text-2xl font-bold">PS Replay Interceptor</h1>
-        <p className="text-sm text-gray-400">Load a replay, view any turn, branch off with different moves</p>
-      </header>
+    <div style={{ maxWidth: 1200, margin: '0 auto', padding: '0 12px 24px' }}>
+      {/* Header */}
+      <div className="ps-app-header" style={{ marginBottom: 10, borderRadius: '0 0 5px 5px' }}>
+        <h1>PS Replay Interceptor</h1>
+        <span style={{ fontSize: 10, color: '#aabbcc' }}>
+          Load a replay · branch off with different moves
+        </span>
+      </div>
 
       <ReplayLoader
         onLoad={loadReplay}
@@ -103,58 +88,93 @@ function App() {
         teamLoaded={teamText.length > 0}
       />
 
-      {snapshots.length > 0 && (
+      {replayData && (
         <>
-          {replayData && (
-            <div className="flex items-center gap-4 mb-4 text-sm">
-              <span className="px-2 py-1 bg-[#0f3460] rounded text-xs">{replayData.format}</span>
-              <span className="text-gray-400">
-                {replayData.players[0]} vs {replayData.players[1]}
+          {/* Match info bar */}
+          <div className="ps-panel" style={{
+            marginBottom: 10, padding: '6px 12px',
+            display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <span style={{
+                fontSize: 10, padding: '2px 8px', borderRadius: 3,
+                background: 'rgba(100,140,200,0.3)', color: '#aac',
+              }}>
+                {replayData.format}
               </span>
+              <span style={{ fontSize: 11, color: '#8ac' }}>{replayData.players[0]}</span>
+              <span style={{ fontSize: 10, color: '#556' }}>vs</span>
+              <span style={{ fontSize: 11, color: '#c8a' }}>{replayData.players[1]}</span>
+            </div>
+            <button
+              type="button"
+              onClick={() => setShowOpponentEditor(true)}
+              className="ps-btn"
+              style={{ padding: '2px 10px', fontSize: 10 }}
+            >
+              Edit Opponent
+            </button>
+          </div>
+
+          {/* Replay iframe */}
+          <div style={{ borderRadius: 8, overflow: 'hidden', border: '2px solid #5a7aac', marginBottom: 10 }}>
+            <PSReplayFrame
+              log={replayData.log}
+              format={replayData.format}
+              p1={replayData.players[0]}
+              p2={replayData.players[1]}
+              height={540}
+            />
+          </div>
+
+          {/* Branch turn selector */}
+          <div className="ps-panel" style={{ marginBottom: 10 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+              <div style={{ fontSize: 13, fontWeight: 'bold', whiteSpace: 'nowrap' }}>Branch Point</div>
               <button
                 type="button"
-                onClick={() => setShowOpponentEditor(true)}
-                className="ml-auto text-xs text-gray-400 hover:text-[#e94560] transition-colors"
+                onClick={() => setBranchTurn(t => Math.max(1, t - 1))}
+                disabled={branchTurn <= 1}
+                className="ps-btn"
+                style={{ padding: '4px 10px', fontSize: 14, lineHeight: 1 }}
               >
-                Edit Opponent Team
+                &#9664;
               </button>
-            </div>
-          )}
-
-          <Timeline
-            currentTurn={currentTurn}
-            maxTurn={maxTurn}
-            onTurnChange={goToTurn}
-            onPrev={prevTurn}
-            onNext={nextTurn}
-          />
-
-          {currentSnapshot && (
-            <>
-              <BattleView snapshot={currentSnapshot} />
-              <BranchPanel
-                currentTurn={currentTurn}
-                onBranch={handleBranch}
-                branching={branching}
-                simState={simState}
-                onMakeChoice={handleMakeChoice}
-                onStopBranch={stopBranch}
+              <input
+                type="range"
+                min={1}
+                max={maxTurn}
+                value={branchTurn}
+                onChange={e => setBranchTurn(parseInt(e.target.value, 10))}
+                aria-label="Branch turn selector"
+                style={{ flex: 1 }}
               />
-            </>
-          )}
+              <button
+                type="button"
+                onClick={() => setBranchTurn(t => Math.min(maxTurn, t + 1))}
+                disabled={branchTurn >= maxTurn}
+                className="ps-btn"
+                style={{ padding: '4px 10px', fontSize: 14, lineHeight: 1 }}
+              >
+                &#9654;
+              </button>
+              <span style={{ fontSize: 11, color: '#aab', minWidth: 80, textAlign: 'center' }}>
+                Turn <strong style={{ color: '#fff' }}>{branchTurn}</strong> / {maxTurn}
+              </span>
+            </div>
+          </div>
 
-          {currentSnapshot && (
-            <details className="mt-4">
-              <summary className="cursor-pointer text-sm text-gray-400 hover:text-white">
-                Turn {currentSnapshot.turn} Protocol Log
-              </summary>
-              <div className="mt-2 bg-[#16213e] rounded-xl p-4 max-h-60 overflow-y-auto">
-                <pre className="text-[11px] text-gray-300 whitespace-pre-wrap font-mono">
-                  {currentSnapshot.log.filter(l => l.trim()).join('\n')}
-                </pre>
-              </div>
-            </details>
-          )}
+          {/* Branch panel (controls + sim iframe) */}
+          <BranchPanel
+            currentTurn={branchTurn}
+            onBranch={handleBranch}
+            branching={branching}
+            simState={simState}
+            onSetChoice={handleSetChoice}
+            onExecuteTurn={handleExecuteTurn}
+            onStopBranch={stopBranch}
+            replayData={replayData}
+          />
         </>
       )}
 

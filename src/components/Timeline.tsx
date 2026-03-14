@@ -8,37 +8,40 @@ interface Props {
 
 export function Timeline({ currentTurn, maxTurn, onTurnChange, onPrev, onNext }: Props) {
   return (
-    <div className="bg-[#16213e] rounded-xl p-4 mb-6">
-      <div className="flex items-center gap-4">
+    <div className="ps-panel" style={{ marginBottom: 8 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
         <button
+          type="button"
           onClick={onPrev}
           disabled={currentTurn <= 1}
-          className="px-3 py-1.5 bg-[#0f3460] hover:bg-[#1a1a5e] disabled:opacity-30 rounded-lg transition-colors text-lg"
+          className="ps-btn"
+          style={{ padding: '4px 10px', fontSize: 14, lineHeight: 1 }}
         >
-          {'<'}
+          &#9664;
         </button>
 
-        <div className="flex-1 flex items-center gap-3">
-          <input
-            type="range"
-            min={1}
-            max={maxTurn}
-            value={currentTurn}
-            onChange={e => onTurnChange(parseInt(e.target.value, 10))}
-            className="flex-1 accent-[#e94560]"
-          />
-        </div>
+        <input
+          type="range"
+          min={1}
+          max={maxTurn}
+          value={currentTurn}
+          onChange={e => onTurnChange(parseInt(e.target.value, 10))}
+          aria-label="Turn selector"
+          style={{ flex: 1 }}
+        />
 
         <button
+          type="button"
           onClick={onNext}
           disabled={currentTurn >= maxTurn}
-          className="px-3 py-1.5 bg-[#0f3460] hover:bg-[#1a1a5e] disabled:opacity-30 rounded-lg transition-colors text-lg"
+          className="ps-btn"
+          style={{ padding: '4px 10px', fontSize: 14, lineHeight: 1 }}
         >
-          {'>'}
+          &#9654;
         </button>
 
-        <span className="text-sm text-gray-400 min-w-[80px] text-center">
-          Turn <span className="text-white font-bold">{currentTurn}</span> / {maxTurn}
+        <span style={{ fontSize: 11, color: '#aab', minWidth: 80, textAlign: 'center' }}>
+          Turn <strong style={{ color: '#fff' }}>{currentTurn}</strong> / {maxTurn}
         </span>
       </div>
     </div>
