@@ -22,7 +22,7 @@ const TYPE_BG: Record<string, string> = {
 function typeBg(type: string) { return TYPE_BG[type] || '#68A090'; }
 
 function spriteUrl(species: string) {
-  const id = species.toLowerCase().replace(/[^a-z0-9]/g, '');
+  const id = species.toLowerCase().replace(/[^a-z0-9-]/g, '');
   return `https://play.pokemonshowdown.com/sprites/gen5/${id}.png`;
 }
 
@@ -192,10 +192,10 @@ export function BranchPanel({ simState, onSetChoice, onExecuteTurn }: Props) {
   const isForceSwitch = simState.p1ForceSwitch || simState.p2ForceSwitch;
 
   return (
-    <div style={{ marginTop: 10 }}>
+    <div>
       {/* Controls — stacked vertically for P1 + P2 selection */}
       {!simState.ended && (
-        <div style={{ borderRadius: 8, overflow: 'hidden', border: '2px solid #555' }}>
+        <div style={{ borderRadius: 5, overflow: 'hidden', border: '1px solid rgba(255,255,255,0.1)' }}>
           <SideControls
             label="P1"
             activeName={simState.p1Active?.name || '???'}

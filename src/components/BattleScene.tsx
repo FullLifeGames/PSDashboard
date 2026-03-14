@@ -46,7 +46,7 @@ interface Props {
 }
 
 function spriteUrl(species: string, back?: boolean) {
-  const id = species.toLowerCase().replace(/[^a-z0-9]/g, '');
+  const id = species.toLowerCase().replace(/[^a-z0-9-]/g, '');
   const dir = back ? 'gen5-back' : 'gen5';
   return `https://play.pokemonshowdown.com/sprites/${dir}/${id}.png`;
 }

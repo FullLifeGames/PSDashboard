@@ -17,7 +17,7 @@ const TYPE_BG: Record<string, string> = {
 };
 
 function spriteUrl(species: string) {
-  const id = species.toLowerCase().replace(/[^a-z0-9]/g, '');
+  const id = species.toLowerCase().replace(/[^a-z0-9-]/g, '');
   return `https://play.pokemonshowdown.com/sprites/gen5/${id}.png`;
 }
 

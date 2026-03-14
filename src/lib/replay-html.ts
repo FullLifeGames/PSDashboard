@@ -38,6 +38,7 @@ body{padding:12px 0;background:#344b6c;}
 .subtle {color:#3A4A66;}
 .wrapper {max-width:1180px;margin:0 auto;}
 </style>
+<script>window.BattleSound = false;</script>
 <div class="wrapper replay-wrapper">
 <input type="hidden" name="replayid" value="branch-sim" />
 <div class="battle"></div><div class="battle-log"></div><div class="replay-controls"></div><div class="replay-controls-2"></div>

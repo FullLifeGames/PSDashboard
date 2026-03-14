@@ -80,6 +80,7 @@ export function PSReplayFrame({ log, format, p1, p2, title, height = 400, seekTu
         border: 'none',
         borderRadius: 5,
         background: '#344b6c',
+        marginTop: '-22px',
       }}
       sandbox="allow-scripts allow-same-origin"
       title={title || 'PS Replay'}
