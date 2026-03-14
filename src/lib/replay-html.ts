@@ -12,8 +12,9 @@ export function generateReplayHtml(opts: {
   title?: string;
   seekTurn?: number;
   autoPlay?: boolean;
+  reportTurn?: boolean;
 }): string {
-  const { log, format = '', p1 = 'Player 1', p2 = 'Player 2', title, seekTurn, autoPlay = true } = opts;
+  const { log, format = '', p1 = 'Player 1', p2 = 'Player 2', title, seekTurn, autoPlay = true, reportTurn = false } = opts;
   const displayTitle = title || `${format ? `[${format}] ` : ''}${p1} vs. ${p2}`;
   // Escape forward slashes for the script tag content (PS format)
   const escapedLog = log.replace(/<\//g, '<\\/');
@@ -57,6 +58,20 @@ document.write('<script src="https://play.pokemonshowdown.com/js/replay-embed.js
   }
   Replays.battle.seekTurn(${seekTurn});
   ${autoPlay ? 'Replays.battle.play();' : 'Replays.battle.pause();'}
+})();
+</script>` : ''}${reportTurn ? `
+<script>
+(function trackTurn() {
+  var lastTurn = -1;
+  setInterval(function() {
+    if (typeof Replays !== 'undefined' && Replays.battle) {
+      var t = Replays.battle.turn;
+      if (t !== lastTurn) {
+        lastTurn = t;
+        parent.postMessage({ type: 'ps-turn', turn: t }, '*');
+      }
+    }
+  }, 200);
 })();
 </script>` : ''}`;
 }

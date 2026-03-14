@@ -10,6 +10,7 @@ interface Props {
   height?: number;
   seekTurn?: number;
   autoPlay?: boolean;
+  onTurnChange?: (turn: number) => void;
 }
 
 /**
@@ -19,10 +20,12 @@ interface Props {
  *
  * When seekTurn is set, the replay automatically seeks to that turn.
  * autoPlay controls whether the replay plays or pauses after seeking.
+ * onTurnChange fires when the user scrubs/plays to a different turn.
  */
-export function PSReplayFrame({ log, format, p1, p2, title, height = 400, seekTurn, autoPlay }: Props) {
+export function PSReplayFrame({ log, format, p1, p2, title, height = 400, seekTurn, autoPlay, onTurnChange }: Props) {
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const [blobUrl, setBlobUrl] = useState<string | null>(null);
+  const reportTurn = !!onTurnChange;
 
   useEffect(() => {
     if (!log.trim()) {
@@ -30,12 +33,26 @@ export function PSReplayFrame({ log, format, p1, p2, title, height = 400, seekTu
       return;
     }
 
-    const html = generateReplayHtml({ log, format, p1, p2, title, seekTurn, autoPlay });
+    const html = generateReplayHtml({ log, format, p1, p2, title, seekTurn, autoPlay, reportTurn });
     const url = createBlobUrl(html);
     setBlobUrl(url);
 
     return () => revokeBlobUrl(url);
-  }, [log, format, p1, p2, title, seekTurn, autoPlay]);
+  }, [log, format, p1, p2, title, seekTurn, autoPlay, reportTurn]);
+
+  // Listen for turn change messages from the iframe
+  useEffect(() => {
+    if (!onTurnChange) return;
+
+    const handler = (e: MessageEvent) => {
+      if (e.data && e.data.type === 'ps-turn' && typeof e.data.turn === 'number') {
+        onTurnChange(e.data.turn);
+      }
+    };
+
+    window.addEventListener('message', handler);
+    return () => window.removeEventListener('message', handler);
+  }, [onTurnChange]);
 
   if (!blobUrl) {
     return (

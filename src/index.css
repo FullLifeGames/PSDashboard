@@ -424,3 +424,111 @@ input[type="range"]::-webkit-slider-thumb {
 .ps-log::-webkit-scrollbar { width: 6px; }
 .ps-log::-webkit-scrollbar-track { background: transparent; }
 .ps-log::-webkit-scrollbar-thumb { background: #555; border-radius: 3px; }
+
+/* ── Battle Stats Panel ── */
+.ps-stats-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.ps-stats-team {
+  background: rgba(0,0,0,0.2);
+  border-radius: 5px;
+  padding: 8px;
+}
+
+.ps-stats-header {
+  font-size: 12px;
+  font-weight: bold;
+  color: #cde;
+  margin-bottom: 8px;
+  padding-bottom: 4px;
+  border-bottom: 1px solid rgba(255,255,255,0.1);
+}
+
+.ps-stats-label {
+  font-size: 9px;
+  padding: 1px 6px;
+  border-radius: 3px;
+  background: rgba(100,140,200,0.3);
+  color: #aac;
+  margin-right: 6px;
+  font-weight: bold;
+}
+
+.ps-stats-pokemon {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 6px 0;
+  border-bottom: 1px solid rgba(255,255,255,0.05);
+}
+.ps-stats-pokemon:last-child { border-bottom: none; }
+
+.ps-stats-sprite {
+  width: 40px;
+  height: 40px;
+  image-rendering: pixelated;
+  object-fit: contain;
+  flex-shrink: 0;
+}
+
+.ps-stats-details {
+  flex: 1;
+  min-width: 0;
+}
+
+.ps-stats-species {
+  font-size: 12px;
+  font-weight: bold;
+  color: #fff;
+}
+
+.ps-stats-level {
+  font-size: 10px;
+  color: #aab;
+  font-weight: normal;
+}
+
+.ps-stats-gender {
+  font-size: 11px;
+  font-weight: normal;
+}
+
+.ps-stats-moves {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 3px;
+  margin-top: 3px;
+}
+
+.ps-stats-move {
+  font-size: 10px;
+  padding: 1px 6px;
+  border-radius: 3px;
+  background: rgba(255,255,255,0.1);
+  color: #ccc;
+  white-space: nowrap;
+}
+
+.ps-stats-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 3px;
+  margin-top: 3px;
+}
+
+.ps-stats-tag {
+  font-size: 9px;
+  padding: 1px 5px;
+  border-radius: 3px;
+  background: rgba(100,140,200,0.25);
+  color: #99b;
+  white-space: nowrap;
+}
+
+.ps-stats-tag-item {
+  background: rgba(200,160,80,0.25);
+  color: #ca8;
+}

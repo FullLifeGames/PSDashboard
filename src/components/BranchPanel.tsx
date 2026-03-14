@@ -1,18 +1,11 @@
-import { useState, useMemo, useRef } from 'react';
+import { useState, useMemo } from 'react';
 import type { BranchSimState, BranchMoveOption, BranchSwitchOption } from '../hooks/useBranch';
-import type { ReplayData } from '../types';
-import { PSReplayFrame } from './PSReplayFrame';
 import { calcDamageRanges, type DamageResult } from '../lib/damage-calc';
 
 interface Props {
-  currentTurn: number;
-  onBranch: () => void;
-  branching: boolean;
   simState: BranchSimState | null;
   onSetChoice: (side: 'p1' | 'p2', choice: string) => void;
   onExecuteTurn: () => void;
-  onStopBranch: () => void;
-  replayData?: ReplayData;
 }
 
 /* ── PS type colors ── */
@@ -174,23 +167,14 @@ function SideControls({ label, activeName, moves, switches, forceSwitch, pending
   );
 }
 
-/* ── Main BranchPanel ── */
-export function BranchPanel({ currentTurn, onBranch, branching, simState, onSetChoice, onExecuteTurn, onStopBranch, replayData }: Props) {
+/* ── Main BranchPanel (controls only, no iframe) ── */
+export function BranchPanel({ simState, onSetChoice, onExecuteTurn }: Props) {
   const [showLog, setShowLog] = useState(false);
-  const [execCount, setExecCount] = useState(0);
-
-  // Reset exec count when branching stops
-  const prevBranching = useRef(branching);
-  if (prevBranching.current && !branching) {
-    setExecCount(0);
-  }
-  prevBranching.current = branching;
 
   const p1Active = simState?.p1Active ?? null;
   const p2Active = simState?.p2Active ?? null;
   const p1Moves = simState?.p1Moves ?? [];
   const p2Moves = simState?.p2Moves ?? [];
-  const simLog_raw = simState?.log ?? [];
 
   const p1Dmg = useMemo(() => {
     if (!p1Active || !p2Active || p1Moves.length === 0) return [];
@@ -202,93 +186,16 @@ export function BranchPanel({ currentTurn, onBranch, branching, simState, onSetC
     return calcDamageRanges(p2Active, p1Active, p2Moves);
   }, [p2Active, p1Active, p2Moves]);
 
-  // Build a clean protocol log for the PS replay iframe
-  const simLog = useMemo(() => {
-    if (simLog_raw.length === 0) return '';
-    return simLog_raw
-      .filter(l => l && !l.startsWith('|split|') && !l.startsWith('|c|'))
-      .join('\n');
-  }, [simLog_raw]);
+  if (!simState) return null;
 
-  // Count actual |turn| markers in the log for reliable seeking
-  const logTurnCount = useMemo(() => {
-    return (simLog.match(/\|turn\|/g) || []).length;
-  }, [simLog]);
-
-  // Initial branch: seek to end (current turn), paused. After executing: seek to prev turn, play.
-  const seekTurn = execCount === 0 ? logTurnCount : logTurnCount - 1;
-  const autoPlay = execCount > 0;
-
-  const handleExecuteTurn = () => {
-    setExecCount(c => c + 1);
-    onExecuteTurn();
-  };
-
-  /* ── Pre-branch state ── */
-  if (!branching) {
-    return (
-      <div className="ps-panel">
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          <div>
-            <div style={{ fontSize: 13, fontWeight: 'bold' }}>Branch from Turn {currentTurn}</div>
-            <div style={{ fontSize: 11, color: '#8899aa', marginTop: 2 }}>Try different moves from this point</div>
-          </div>
-          <button type="button" className="ps-btn ps-btn-red" onClick={onBranch}>
-            Branch Here
-          </button>
-        </div>
-      </div>
-    );
-  }
-
-  const bothChosen = !!(simState?.p1Choice && simState?.p2Choice);
-  const isForceSwitch = simState?.p1ForceSwitch || simState?.p2ForceSwitch;
+  const bothChosen = !!(simState.p1Choice && simState.p2Choice);
+  const isForceSwitch = simState.p1ForceSwitch || simState.p2ForceSwitch;
 
   return (
-    <div style={{ borderRadius: 8, overflow: 'hidden', border: '2px solid #8aa' }}>
-      {/* Header bar */}
-      <div style={{
-        background: 'linear-gradient(180deg, #4a6a9c 0%, #3a5a8c 100%)',
-        padding: '6px 12px',
-        display: 'flex',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-      }}>
-        <div style={{ fontSize: 12, fontWeight: 'bold', color: '#fff' }}>
-          Branching {simState ? `— Turn ${simState.turnNumber}` : '…'}
-        </div>
-        <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
-          {simState?.ended && (
-            <span style={{
-              fontSize: 11, padding: '2px 8px', borderRadius: 4,
-              background: '#1b5e20', color: '#a5d6a7', fontWeight: 'bold',
-            }}>
-              {simState.winner ? `${simState.winner} wins!` : 'Battle ended'}
-            </span>
-          )}
-          <button type="button" className="ps-btn" onClick={onStopBranch} style={{ padding: '3px 10px', fontSize: 10 }}>
-            Reset
-          </button>
-        </div>
-      </div>
-
-      {/* PS Replay iframe showing the sim battle */}
-      {simLog && (
-        <PSReplayFrame
-          log={simLog}
-          format={replayData?.format}
-          p1={replayData?.players[0] || 'Player 1'}
-          p2={replayData?.players[1] || 'Player 2'}
-          title="Branch Simulation"
-          height={360}
-          seekTurn={seekTurn}
-          autoPlay={autoPlay}
-        />
-      )}
-
+    <div style={{ marginTop: 10 }}>
       {/* Controls — stacked vertically for P1 + P2 selection */}
-      {simState && !simState.ended && (
-        <div>
+      {!simState.ended && (
+        <div style={{ borderRadius: 8, overflow: 'hidden', border: '2px solid #555' }}>
           <SideControls
             label="P1"
             activeName={simState.p1Active?.name || '???'}
@@ -312,29 +219,29 @@ export function BranchPanel({ currentTurn, onBranch, branching, simState, onSetC
             onMove={(s) => onSetChoice('p2', `move ${s}`)}
             onSwitch={(s) => onSetChoice('p2', `switch ${s}`)}
           />
-        </div>
-      )}
 
-      {/* Execute turn button */}
-      {simState && !simState.ended && !isForceSwitch && (
-        <div style={{ background: '#333', padding: '0 12px 10px' }}>
-          <button
-            type="button"
-            onClick={handleExecuteTurn}
-            disabled={!bothChosen}
-            className="ps-execute-btn"
-            style={{ background: bothChosen ? '#cc4455' : '#555' }}
-          >
-            {bothChosen
-              ? 'Execute Turn'
-              : `Select ${!simState.p1Choice ? 'P1' : ''}${!simState.p1Choice && !simState.p2Choice ? ' & ' : ''}${!simState.p2Choice ? 'P2' : ''} choice`
-            }
-          </button>
+          {/* Execute turn button */}
+          {!isForceSwitch && (
+            <div style={{ background: '#333', padding: '0 12px 10px' }}>
+              <button
+                type="button"
+                onClick={onExecuteTurn}
+                disabled={!bothChosen}
+                className="ps-execute-btn"
+                style={{ background: bothChosen ? '#cc4455' : '#555' }}
+              >
+                {bothChosen
+                  ? 'Execute Turn'
+                  : `Select ${!simState.p1Choice ? 'P1' : ''}${!simState.p1Choice && !simState.p2Choice ? ' & ' : ''}${!simState.p2Choice ? 'P2' : ''} choice`
+                }
+              </button>
+            </div>
+          )}
         </div>
       )}
 
       {/* Raw battle log toggle */}
-      <div style={{ background: '#2a3a5c', padding: '6px 12px' }}>
+      <div style={{ marginTop: 8 }}>
         <button
           type="button"
           onClick={() => setShowLog(!showLog)}
@@ -345,7 +252,7 @@ export function BranchPanel({ currentTurn, onBranch, branching, simState, onSetC
         >
           {showLog ? 'Hide' : 'Show'} Raw Protocol Log
         </button>
-        {showLog && simState && (
+        {showLog && (
           <div className="ps-log" style={{ marginTop: 6 }}>
             {simState.log
               .filter(l => l && !l.startsWith('|split|') && !l.startsWith('|c|') && !l.startsWith('|t:|'))

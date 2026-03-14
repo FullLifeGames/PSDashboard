@@ -9,6 +9,7 @@ export interface ReplayState {
   error: string | null;
   replayData: ReplayData | null;
   snapshots: TurnSnapshot[];
+  p1Info: OpponentTeamInfo | null;
   opponentInfo: OpponentTeamInfo | null;
 }
 
@@ -18,6 +19,7 @@ export function useReplay() {
     error: null,
     replayData: null,
     snapshots: [],
+    p1Info: null,
     opponentInfo: null,
   });
 
@@ -26,6 +28,7 @@ export function useReplay() {
     try {
       const data = await fetchReplay(urlOrId);
       const snapshots = parseReplayLog(data.log);
+      const p1Info = inferOpponentTeam(data.log, 'p1');
       const opponentInfo = inferOpponentTeam(data.log, 'p2');
 
       setState({
@@ -33,6 +36,7 @@ export function useReplay() {
         error: null,
         replayData: data,
         snapshots,
+        p1Info,
         opponentInfo,
       });
     } catch (err) {
