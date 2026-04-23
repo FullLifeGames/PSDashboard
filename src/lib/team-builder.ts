@@ -1,7 +1,7 @@
 import type { PokemonSet } from '@pkmn/sim';
 import { Teams } from '@pkmn/sim';
 import { inferOpponentTeam } from './opponent-inferrer';
-import { getCommonSet, fillDefaultMoves, getDefaultItem } from './common-sets';
+import { getCommonSet, fillDefaultMoves } from './common-sets';
 import type { RevealedPokemonInfo } from '../types';
 
 function toId(name: string): string {
@@ -68,7 +68,7 @@ function buildSet(info: RevealedPokemonInfo, userTeam: PokemonSet[] | null): Pok
     item: cleanItem(info.item, common?.item || ''),
     ability: info.ability || common?.ability || '',
     moves: moves.length > 0 ? moves : ['Tackle'],
-    nature: (common?.nature || 'Hardy') as any,
+    nature: (common?.nature || 'Hardy') as PokemonSet['nature'],
     evs: common?.evs || { hp: 252, atk: 252, def: 0, spa: 0, spd: 4, spe: 0 },
     ivs: { hp: 31, atk: 31, def: 31, spa: 31, spd: 31, spe: 31 },
     level: info.level || 100,

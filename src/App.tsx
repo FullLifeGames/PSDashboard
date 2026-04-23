@@ -1,4 +1,4 @@
-import { useState, useCallback, useMemo, useEffect, useRef } from 'react';
+import { useState, useCallback, useMemo } from 'react';
 import { useReplay } from './hooks/useReplay';
 import { useBranch } from './hooks/useBranch';
 import { ReplayLoader } from './components/ReplayLoader';
@@ -20,14 +20,6 @@ function App() {
   const [branchTurn, setBranchTurn] = useState(1);
   const [execCount, setExecCount] = useState(0);
 
-  const prevBranching = useRef(branching);
-  useEffect(() => {
-    if (prevBranching.current && !branching) {
-      setExecCount(0);
-    }
-    prevBranching.current = branching;
-  }, [branching]);
-
   const maxTurn = snapshots.length > 0 ? snapshots.length : 1;
 
   const handleTeamLoad = useCallback((rawText: string) => {
@@ -45,6 +37,7 @@ function App() {
     if (!replayData) return;
     const { p1Team, p2Team } = buildTeamsFromReplay(replayData.log, teamText || undefined);
     if (p1Team.length > 0 && p2Team.length > 0) {
+      setExecCount(0);
       await startBranch(replayData.formatid || 'gen9ou', p1Team, p2Team, replayData.log, branchTurn, branchSnapshot);
     }
   }, [replayData, teamText, branchTurn, branchSnapshot, startBranch]);
@@ -57,6 +50,11 @@ function App() {
     setExecCount(c => c + 1);
     await executeTurn();
   }, [executeTurn]);
+
+  const handleStopBranch = useCallback(() => {
+    setExecCount(0);
+    stopBranch();
+  }, [stopBranch]);
 
   const handleSaveOpponent = useCallback((info: OpponentTeamInfo) => {
     setEditedOpponentInfo(info);
@@ -127,7 +125,7 @@ function App() {
                         {simState.winner ? `${simState.winner} wins!` : 'Ended'}
                       </span>
                     )}
-                    <button type="button" className="ps-btn" onClick={stopBranch} style={{ padding: '2px 8px', fontSize: 10 }}>
+                    <button type="button" className="ps-btn" onClick={handleStopBranch} style={{ padding: '2px 8px', fontSize: 10 }}>
                       Back
                     </button>
                   </>

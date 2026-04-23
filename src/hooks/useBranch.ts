@@ -3,6 +3,10 @@ import { BattleStreams, Dex, Teams } from '@pkmn/sim';
 import type { PokemonSet } from '@pkmn/sim';
 import type { TurnSnapshot } from '../types';
 
+type SimBattle = NonNullable<BattleStreams.BattleStream['battle']>;
+type SimSide = SimBattle['sides'][number];
+type SimPokemon = SimSide['pokemon'][number];
+
 /* ── Public interfaces ── */
 
 export interface BranchMoveOption {
@@ -133,7 +137,7 @@ function reorderForLead(team: PokemonSet[], leadSpecies: string): PokemonSet[] {
 }
 
 /** Find the switch slot for a species in the sim's current team order. */
-function findSlotBySpecies(battle: any, sideIdx: number, species: string): number {
+function findSlotBySpecies(battle: SimBattle, sideIdx: number, species: string): number {
   const side = battle.sides[sideIdx];
   const speciesId = toId(species);
 
@@ -160,7 +164,7 @@ function findSlotBySpecies(battle: any, sideIdx: number, species: string): numbe
  * Moves appear as |move|pXa: ...|MoveName|.
  * U-turn/Flip Turn switches have [from] and are NOT main choices.
  */
-function getMainChoice(events: string[], side: 'p1' | 'p2', battle: any): string {
+function getMainChoice(events: string[], side: 'p1' | 'p2', battle: SimBattle): string {
   const sideIdx = side === 'p1' ? 0 : 1;
 
   for (const line of events) {
@@ -212,13 +216,13 @@ function collectForcedSwitchSpecies(
  * After replaying, correct HP values to match the original snapshot.
  * This compensates for RNG differences (damage rolls, crits).
  */
-function correctHpFromSnapshot(battle: any, snapshot: TurnSnapshot) {
+function correctHpFromSnapshot(battle: SimBattle, snapshot: TurnSnapshot) {
   for (let si = 0; si < 2; si++) {
     const snapSide = si === 0 ? snapshot.p1 : snapshot.p2;
     const simSide = battle.sides[si];
 
     for (const snapPoke of snapSide.pokemon) {
-      const simPoke = simSide.pokemon.find((p: any) =>
+      const simPoke = simSide.pokemon.find((p: SimPokemon) =>
         toId(p.species?.name || '') === toId(snapPoke.speciesForme) ||
         toId(p.name || '') === toId(snapPoke.name)
       );
@@ -230,7 +234,7 @@ function correctHpFromSnapshot(battle: any, snapshot: TurnSnapshot) {
           simPoke.fainted = true;
         }
         if (snapPoke.status && snapPoke.status !== '') {
-          simPoke.status = snapPoke.status;
+          simPoke.status = snapPoke.status as SimPokemon['status'];
         }
       }
     }
@@ -248,8 +252,8 @@ export function useBranch() {
   const p1ChoiceRef = useRef<string | null>(null);
   const p2ChoiceRef = useRef<string | null>(null);
 
-  const extractPokemonInfo = (side: any): SimPokemonInfo[] => {
-    return side.pokemon.map((p: any) => ({
+  const extractPokemonInfo = (side: SimSide): SimPokemonInfo[] => {
+    return side.pokemon.map((p): SimPokemonInfo => ({
       name: p.name,
       species: p.species.name,
       hp: p.hp,
@@ -258,7 +262,10 @@ export function useBranch() {
       status: p.status || '',
       fainted: p.fainted,
       isActive: p.isActive,
-      moves: p.moveSlots.map((m: any) => ({ name: m.move, type: m.type || '' })),
+      moves: p.moveSlots.map(m => ({
+        name: m.move,
+        type: Dex.moves.get(m.id || m.move)?.type || '',
+      })),
       ability: p.ability || '',
       item: p.item || '',
       stats: {
@@ -295,9 +302,9 @@ export function useBranch() {
     const p1ForceSwitch = battle.sides[0].activeRequest?.forceSwitch?.[0] ?? false;
     const p2ForceSwitch = battle.sides[1].activeRequest?.forceSwitch?.[0] ?? false;
 
-    const makeMoves = (active: any, forceSwitch: boolean): BranchMoveOption[] => {
+    const makeMoves = (active: SimPokemon | null | undefined, forceSwitch: boolean): BranchMoveOption[] => {
       if (!active || active.fainted || forceSwitch) return [];
-      return active.moveSlots.map((m: any, i: number) => {
+      return active.moveSlots.map((m, i): BranchMoveOption => {
         const moveData = Dex.moves.get(m.id || m.move);
         return {
           name: m.move, slot: i + 1, pp: m.pp, maxpp: m.maxpp,
@@ -306,25 +313,28 @@ export function useBranch() {
       });
     };
 
-    const makeSwitches = (side: any, active: any): BranchSwitchOption[] => {
+    const makeSwitches = (side: SimSide, active: SimPokemon | null | undefined): BranchSwitchOption[] => {
       return side.pokemon
-        .map((p: any, i: number) => ({
+        .map((p, i): BranchSwitchOption => ({
           name: p.name, species: p.species.name, slot: i + 1,
           hp: `${p.maxhp > 0 ? Math.round(p.hp / p.maxhp * 100) : 0}%`,
           hpPercent: p.maxhp > 0 ? Math.round(p.hp / p.maxhp * 100) : 0,
           fainted: p.fainted,
         }))
-        .filter((p: BranchSwitchOption) => !p.fainted && p.name !== active?.name);
+        .filter(p => !p.fainted && p.name !== active?.name);
     };
 
-    const makeActiveInfo = (active: any): SimPokemonInfo | null => {
+    const makeActiveInfo = (active: SimPokemon | null | undefined): SimPokemonInfo | null => {
       if (!active) return null;
       return {
         name: active.name, species: active.species.name,
         hp: active.hp, maxhp: active.maxhp,
         hpPercent: active.maxhp > 0 ? Math.round(active.hp / active.maxhp * 100) : 0,
         status: active.status || '', fainted: active.fainted, isActive: true,
-        moves: active.moveSlots.map((m: any) => ({ name: m.move, type: m.type || '' })),
+        moves: active.moveSlots.map(m => ({
+          name: m.move,
+          type: Dex.moves.get(m.id || m.move)?.type || '',
+        })),
         ability: active.ability || '', item: active.item || '',
         stats: {
           atk: active.storedStats?.atk || 0, def: active.storedStats?.def || 0,

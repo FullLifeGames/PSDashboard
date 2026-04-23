@@ -70,7 +70,7 @@ export function reconstructChoicesFromLog(
         p1ActiveSpecies = details.split(',')[0].trim();
       }
       if (turnStarted && !currentTurnP1Choice) {
-        const switchSlot = findSwitchSlot(p1ActiveSpecies, p1Team, []);
+        const switchSlot = findSwitchSlot(p1ActiveSpecies, p1Team);
         if (switchSlot >= 0) {
           currentTurnP1Choice = `switch ${switchSlot + 1}`;
         }
@@ -83,7 +83,7 @@ export function reconstructChoicesFromLog(
         p2ActiveSpecies = details.split(',')[0].trim();
       }
       if (turnStarted && !currentTurnP2Choice) {
-        const switchSlot = findSwitchSlot(p2ActiveSpecies, p2Team, []);
+        const switchSlot = findSwitchSlot(p2ActiveSpecies, p2Team);
         if (switchSlot >= 0) {
           currentTurnP2Choice = `switch ${switchSlot + 1}`;
         }
@@ -145,7 +145,7 @@ function findMoveSlot(moveName: string, activeSpecies: string, team: PokemonSet[
   return idx >= 0 ? idx : 0;
 }
 
-function findSwitchSlot(species: string, team: PokemonSet[], _order: number[]): number {
+function findSwitchSlot(species: string, team: PokemonSet[]): number {
   const idx = team.findIndex(p => {
     return p.species === species ||
            p.species.split('-')[0] === species.split('-')[0] ||

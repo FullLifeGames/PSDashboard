@@ -1,5 +1,5 @@
 {
-  "name": "temp-scaffold",
+  "name": "ps-replay-interceptor",
   "private": true,
   "version": "0.0.0",
   "type": "module",
@@ -7,6 +7,7 @@
     "dev": "vite",
     "build": "tsc -b && vite build",
     "lint": "eslint .",
+    "test:e2e": "playwright test",
     "preview": "vite preview"
   },
   "dependencies": {

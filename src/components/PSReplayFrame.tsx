@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef } from 'react';
 import { generateReplayHtml, createBlobUrl, revokeBlobUrl } from '../lib/replay-html';
 
 interface Props {
@@ -24,21 +24,21 @@ interface Props {
  */
 export function PSReplayFrame({ log, format, p1, p2, title, height = 400, seekTurn, autoPlay, onTurnChange }: Props) {
   const iframeRef = useRef<HTMLIFrameElement>(null);
-  const [blobUrl, setBlobUrl] = useState<string | null>(null);
   const reportTurn = !!onTurnChange;
 
-  useEffect(() => {
+  const blobUrl = useMemo(() => {
     if (!log.trim()) {
-      setBlobUrl(null);
-      return;
+      return null;
     }
 
     const html = generateReplayHtml({ log, format, p1, p2, title, seekTurn, autoPlay, reportTurn });
-    const url = createBlobUrl(html);
-    setBlobUrl(url);
-
-    return () => revokeBlobUrl(url);
+    return createBlobUrl(html);
   }, [log, format, p1, p2, title, seekTurn, autoPlay, reportTurn]);
+
+  useEffect(() => {
+    if (!blobUrl) return;
+    return () => revokeBlobUrl(blobUrl);
+  }, [blobUrl]);
 
   // Listen for turn change messages from the iframe
   useEffect(() => {

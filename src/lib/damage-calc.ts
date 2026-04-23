@@ -2,6 +2,9 @@ import { Generations, Pokemon, Move, Field, calculate } from '@smogon/calc';
 import type { SimPokemonInfo, BranchMoveOption } from '../hooks/useBranch';
 
 const gen = Generations.get(9);
+type CalcPokemonOptions = ConstructorParameters<typeof Pokemon>[2];
+type CalcBoosts = NonNullable<CalcPokemonOptions>['boosts'];
+type CalcStatus = NonNullable<CalcPokemonOptions>['status'];
 
 export interface DamageResult {
   moveName: string;
@@ -20,23 +23,25 @@ export function calcDamageRanges(
   moves: BranchMoveOption[],
 ): DamageResult[] {
   try {
-    const atkPoke = new Pokemon(gen, attacker.species, {
+    const atkOptions: CalcPokemonOptions = {
       level: attacker.level,
       ability: attacker.ability || undefined,
       item: attacker.item || undefined,
-      boosts: attacker.boosts as any,
+      boosts: attacker.boosts as CalcBoosts,
       curHP: attacker.hp,
-      status: (attacker.status || undefined) as any,
-    });
+      status: (attacker.status || undefined) as CalcStatus,
+    };
+    const atkPoke = new Pokemon(gen, attacker.species, atkOptions);
 
-    const defPoke = new Pokemon(gen, defender.species, {
+    const defOptions: CalcPokemonOptions = {
       level: defender.level,
       ability: defender.ability || undefined,
       item: defender.item || undefined,
-      boosts: defender.boosts as any,
+      boosts: defender.boosts as CalcBoosts,
       curHP: defender.hp,
-      status: (defender.status || undefined) as any,
-    });
+      status: (defender.status || undefined) as CalcStatus,
+    };
+    const defPoke = new Pokemon(gen, defender.species, defOptions);
 
     const field = new Field();
 

@@ -18,6 +18,7 @@ const TYPE_BG: Record<string, string> = {
   Dark:     '#705848', Steel:    '#B8B8D0', Fairy:    '#EE99AC',
   Stellar:  '#40B5A5', '???':    '#68A090',
 };
+const EMPTY_MOVES: BranchMoveOption[] = [];
 
 function typeBg(type: string) { return TYPE_BG[type] || '#68A090'; }
 
@@ -173,8 +174,8 @@ export function BranchPanel({ simState, onSetChoice, onExecuteTurn }: Props) {
 
   const p1Active = simState?.p1Active ?? null;
   const p2Active = simState?.p2Active ?? null;
-  const p1Moves = simState?.p1Moves ?? [];
-  const p2Moves = simState?.p2Moves ?? [];
+  const p1Moves = simState?.p1Moves ?? EMPTY_MOVES;
+  const p2Moves = simState?.p2Moves ?? EMPTY_MOVES;
 
   const p1Dmg = useMemo(() => {
     if (!p1Active || !p2Active || p1Moves.length === 0) return [];
