@@ -7,9 +7,10 @@ interface Props {
   loading: boolean;
   error: string | null;
   teamLoaded: boolean;
+  showGuide?: boolean;
 }
 
-export function ReplayLoader({ onLoad, onTeamLoad, loading, error, teamLoaded }: Props) {
+export function ReplayLoader({ onLoad, onTeamLoad, loading, error, teamLoaded, showGuide = false }: Props) {
   const [url, setUrl] = useState('https://replay.pokemonshowdown.com/gen9draft-2298735122');
   const [teamText, setTeamText] = useState('');
 
@@ -35,6 +36,26 @@ export function ReplayLoader({ onLoad, onTeamLoad, loading, error, teamLoaded }:
           {loading ? 'Loading…' : 'Load'}
         </button>
       </div>
+
+      {showGuide && (
+        <div className="ps-loader-guide" aria-label="Replay branching workflow">
+          <div className="ps-guide-step">
+            <span>1</span>
+            <strong>Pick a branch turn</strong>
+            <small>Scrub the real Showdown replay to the exact decision point.</small>
+          </div>
+          <div className="ps-guide-step">
+            <span>2</span>
+            <strong>Choose both sides</strong>
+            <small>Use recommendations, custom choices, switches, or edited team data.</small>
+          </div>
+          <div className="ps-guide-step">
+            <span>3</span>
+            <strong>Compare outcomes</strong>
+            <small>Inspect the original line beside your alternate branch history.</small>
+          </div>
+        </div>
+      )}
 
       <details>
         <summary style={{ cursor: 'pointer', fontSize: 11, color: '#8899aa' }}>

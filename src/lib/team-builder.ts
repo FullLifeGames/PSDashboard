@@ -1,8 +1,9 @@
 import type { PokemonSet } from '@pkmn/sim';
 import { Teams } from '@pkmn/sim';
 import { inferOpponentTeam } from './opponent-inferrer';
-import { getCommonSet, fillDefaultMoves } from './common-sets';
-import type { RevealedPokemonInfo } from '../types';
+import { getSpeciesUsageSet, type SmogonUsageStats, type UsageProbability } from './smogon-stats';
+import { getSpeciesSetAssumption, type SetAssumption, type SmogonSetAssumptions } from './smogon-sets';
+import type { OpponentTeamInfo, RevealedPokemonInfo } from '../types';
 
 function toId(name: string): string {
   return name.toLowerCase().replace(/[^a-z0-9]/g, '');
@@ -10,69 +11,86 @@ function toId(name: string): string {
 
 /**
  * Build PokemonSet arrays for both sides from a replay's protocol log.
- * p1 is augmented with the user's pasted team (full moveset, EVs, nature).
- * p2 is augmented with common competitive sets.
+ * Pasted teams take precedence for the user's side; otherwise hidden data can
+ * be filled from Smogon usage probabilities when those stats are available.
  */
 export function buildTeamsFromReplay(
   log: string,
-  userTeamText?: string,
+  options?: {
+    userTeamText?: string;
+    p1Info?: OpponentTeamInfo | null;
+    p2Info?: OpponentTeamInfo | null;
+    usageStats?: SmogonUsageStats | null;
+    setAssumptions?: SmogonSetAssumptions | null;
+  },
 ): { p1Team: PokemonSet[]; p2Team: PokemonSet[] } {
-  const p1Info = inferOpponentTeam(log, 'p1');
-  const p2Info = inferOpponentTeam(log, 'p2');
+  const p1Info = options?.p1Info || inferOpponentTeam(log, 'p1');
+  const p2Info = options?.p2Info || inferOpponentTeam(log, 'p2');
+  const embeddedTeams = extractEmbeddedShowteamExports(log);
 
   let userTeam: PokemonSet[] | null = null;
-  if (userTeamText?.trim()) {
-    const imported = Teams.import(userTeamText);
+  if (options?.userTeamText?.trim()) {
+    const imported = Teams.import(options.userTeamText);
     if (imported && imported.length > 0) {
       userTeam = imported;
     }
   }
 
-  const p1Team = p1Info.pokemon.map(p => buildSet(p, userTeam));
-  const p2Team = p2Info.pokemon.map(p => buildSet(p, null));
+  const p1KnownTeam = userTeam || embeddedTeams.p1 || null;
+  const p2KnownTeam = embeddedTeams.p2 || null;
+  const p1Team = p1Info.pokemon.map(pokemon => buildSet(pokemon, p1KnownTeam, options?.usageStats, options?.setAssumptions));
+  const p2Team = p2Info.pokemon.map(pokemon => buildSet(pokemon, p2KnownTeam, options?.usageStats, options?.setAssumptions));
 
   return { p1Team, p2Team };
 }
 
-function buildSet(info: RevealedPokemonInfo, userTeam: PokemonSet[] | null): PokemonSet {
-  // Try to find a matching entry in the user's pasted team
-  const userMatch = userTeam?.find(u => {
-    const uId = toId(u.species);
+function buildSet(
+  info: RevealedPokemonInfo,
+  userTeam: PokemonSet[] | null,
+  usageStats?: SmogonUsageStats | null,
+  setAssumptions?: SmogonSetAssumptions | null,
+): PokemonSet {
+  const userMatch = userTeam?.find(candidate => {
+    const candidateId = toId(candidate.species);
     const infoId = toId(info.species);
-    return uId === infoId ||
-      toId(u.name || '') === infoId ||
-      uId === toId(info.species.split('-')[0]) ||
-      infoId === toId(u.species.split('-')[0]);
+    return candidateId === infoId ||
+      toId(candidate.name || '') === infoId ||
+      candidateId === toId(info.species.split('-')[0]) ||
+      infoId === toId(candidate.species.split('-')[0]);
   });
 
   if (userMatch) {
-    // Merge: keep user's full data, overlay replay-observed info
-    const moves = mergeMoveLists(info.moves, userMatch.moves);
+    const moves = mergeMoveLists(info.moves.map(move => move.name), userMatch.moves);
     return {
       ...userMatch,
       moves: moves.length > 0 ? moves : userMatch.moves,
-      ability: info.ability || userMatch.ability,
-      item: cleanItem(info.item, userMatch.item),
+      ability: info.ability.value || userMatch.ability,
+      item: cleanItem(info.item.value, userMatch.item),
+      teraType: info.teraType.value || userMatch.teraType,
       level: info.level || userMatch.level || 100,
       gender: (info.gender || userMatch.gender || '') as '' | 'M' | 'F',
     };
   }
 
-  // No user match — use common sets to fill gaps
-  const common = getCommonSet(info.species);
-  const moves = fillDefaultMoves(info.species, info.moves);
+  const usageSet = getSpeciesUsageSet(usageStats, info.species);
+  const smogonSet = getSpeciesSetAssumption(setAssumptions, info.species);
+  const usageMoves = mergeUsageMoves(info.moves.map(move => move.name), usageSet?.moves ?? []);
+  const moves = mergeSetMoves(usageMoves, smogonSet?.moves ?? []);
+  const spread = usageSet?.spread;
+  const setSpread = smogonSet?.spread;
 
   return {
     name: info.species,
     species: info.species,
-    item: cleanItem(info.item, common?.item || ''),
-    ability: info.ability || common?.ability || '',
+    item: cleanItem(info.item.value, usageSet?.item?.value || smogonSet?.item?.value || ''),
+    ability: info.ability.value || usageSet?.ability?.value || smogonSet?.ability?.value || '',
     moves: moves.length > 0 ? moves : ['Tackle'],
-    nature: (common?.nature || 'Hardy') as PokemonSet['nature'],
-    evs: common?.evs || { hp: 252, atk: 252, def: 0, spa: 0, spd: 4, spe: 0 },
+    nature: (spread?.nature || setSpread?.nature || 'Hardy') as PokemonSet['nature'],
+    evs: spread?.evs || setSpread?.evs || { hp: 252, atk: 252, def: 0, spa: 0, spd: 4, spe: 0 },
     ivs: { hp: 31, atk: 31, def: 31, spa: 31, spd: 31, spe: 31 },
     level: info.level || 100,
     gender: (info.gender || '') as '' | 'M' | 'F',
+    teraType: info.teraType.value || undefined,
   };
 }
 
@@ -86,11 +104,85 @@ function cleanItem(replayItem: string, fallback: string): string {
 function mergeMoveLists(observed: string[], full: string[]): string[] {
   const result = [...full];
   for (const move of observed) {
-    if (!result.some(m => toId(m) === toId(move))) {
+    if (!result.some(existing => toId(existing) === toId(move))) {
       if (result.length < 4) {
         result.push(move);
       }
     }
   }
   return result.slice(0, 4);
+}
+
+function mergeUsageMoves(observed: string[], usageMoves: UsageProbability[]): string[] {
+  const result = [...observed];
+  for (const move of usageMoves) {
+    if (result.length >= 4) break;
+    if (!result.some(existing => toId(existing) === toId(move.value))) {
+      result.push(move.value);
+    }
+  }
+  return result.slice(0, 4);
+}
+
+function mergeSetMoves(observed: string[], setMoves: SetAssumption[]): string[] {
+  const result = [...observed];
+  for (const move of setMoves) {
+    if (result.length >= 4) break;
+    if (!result.some(existing => toId(existing) === toId(move.value))) {
+      result.push(move.value);
+    }
+  }
+  return result.slice(0, 4);
+}
+
+function extractEmbeddedShowteamExports(log: string): { p1: PokemonSet[] | null; p2: PokemonSet[] | null } {
+  const playerByName = new Map<string, 'p1' | 'p2'>();
+  const result: { p1: PokemonSet[] | null; p2: PokemonSet[] | null } = { p1: null, p2: null };
+  const unassigned: PokemonSet[][] = [];
+
+  for (const line of log.split('\n')) {
+    const playerMatch = line.match(/^\|player\|(p[12])\|([^|]+)/);
+    if (playerMatch) {
+      playerByName.set(toId(playerMatch[2]), playerMatch[1] as 'p1' | 'p2');
+      continue;
+    }
+
+    const chatMatch = line.match(/^\|c\|([^|]+)\|\/raw\s+([\s\S]+)$/);
+    if (!chatMatch || !chatMatch[2].includes('<summary>View team</summary>')) continue;
+
+    const imported = Teams.import(showteamHtmlToText(chatMatch[2]));
+    if (!imported || imported.length === 0) continue;
+
+    const side = playerByName.get(toId(chatMatch[1]));
+    if (side) {
+      result[side] = imported;
+    } else {
+      unassigned.push(imported);
+    }
+  }
+
+  if (!result.p1 && unassigned[0]) result.p1 = unassigned[0];
+  if (!result.p2 && unassigned[1]) result.p2 = unassigned[1];
+  return result;
+}
+
+function showteamHtmlToText(html: string): string {
+  const match = html.match(/<summary>View team<\/summary>([\s\S]*?)<\/details>/i);
+  const teamHtml = match?.[1] ?? html;
+  return decodeHtmlEntities(teamHtml)
+    .replace(/<br\s*\/?>/gi, '\n')
+    .replace(/<[^>]+>/g, '')
+    .replace(/\u00a0/g, ' ')
+    .trim();
+}
+
+function decodeHtmlEntities(text: string): string {
+  return text
+    .replace(/&#x([0-9a-f]+);/gi, (_, value: string) => String.fromCharCode(parseInt(value, 16)))
+    .replace(/&#(\d+);/g, (_, value: string) => String.fromCharCode(parseInt(value, 10)))
+    .replace(/&quot;/g, '"')
+    .replace(/&apos;/g, "'")
+    .replace(/&amp;/g, '&')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>');
 }

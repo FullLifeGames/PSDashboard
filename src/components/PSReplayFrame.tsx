@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { generateReplayHtml, createBlobUrl, revokeBlobUrl } from '../lib/replay-html';
 
 interface Props {
@@ -10,6 +10,8 @@ interface Props {
   height?: number;
   seekTurn?: number;
   autoPlay?: boolean;
+  liveUpdates?: boolean;
+  reloadKey?: string;
   onTurnChange?: (turn: number) => void;
 }
 
@@ -18,22 +20,59 @@ interface Props {
  * The iframe loads replay-embed.js from play.pokemonshowdown.com
  * which provides the full battle scene, animations, and playback controls.
  *
- * When seekTurn is set, the replay automatically seeks to that turn.
- * autoPlay controls whether the replay plays or pauses after seeking.
+ * When seekTurn is set, the replay is asked to seek in-place via postMessage
+ * so changing turns does not rebuild the iframe.
  * onTurnChange fires when the user scrubs/plays to a different turn.
  */
-export function PSReplayFrame({ log, format, p1, p2, title, height = 400, seekTurn, autoPlay, onTurnChange }: Props) {
+interface DocumentProps extends Props {
+  documentLog: string;
+}
+
+export function PSReplayFrame(props: Props) {
+  const key = props.liveUpdates
+    ? `live:${props.reloadKey ?? 'default'}`
+    : `static:${props.reloadKey ?? props.log.length}`;
+  return <PSReplayFrameDocument key={key} {...props} documentLog={props.log} />;
+}
+
+function PSReplayFrameDocument({
+  log,
+  documentLog: initialDocumentLog,
+  format,
+  p1,
+  p2,
+  title,
+  height = 400,
+  seekTurn,
+  autoPlay,
+  liveUpdates = false,
+  reloadKey = 'default',
+  onTurnChange,
+}: DocumentProps) {
   const iframeRef = useRef<HTMLIFrameElement>(null);
+  const sentLogRef = useRef<{ key: string; blobUrl: string; lines: string[] } | null>(null);
+  const didInitialLiveSeekRef = useRef(false);
   const reportTurn = !!onTurnChange;
+  const [documentLog] = useState(initialDocumentLog);
+  const [initialSeek] = useState(() => ({ seekTurn, autoPlay }));
 
   const blobUrl = useMemo(() => {
-    if (!log.trim()) {
+    if (!documentLog.trim()) {
       return null;
     }
 
-    const html = generateReplayHtml({ log, format, p1, p2, title, seekTurn, autoPlay, reportTurn });
+    const html = generateReplayHtml({
+      log: documentLog,
+      format,
+      p1,
+      p2,
+      title,
+      seekTurn: initialSeek.seekTurn,
+      autoPlay: initialSeek.autoPlay,
+      reportTurn,
+    });
     return createBlobUrl(html);
-  }, [log, format, p1, p2, title, seekTurn, autoPlay, reportTurn]);
+  }, [documentLog, format, p1, p2, title, initialSeek, reportTurn]);
 
   useEffect(() => {
     if (!blobUrl) return;
@@ -53,6 +92,53 @@ export function PSReplayFrame({ log, format, p1, p2, title, height = 400, seekTu
     window.addEventListener('message', handler);
     return () => window.removeEventListener('message', handler);
   }, [onTurnChange]);
+
+  useEffect(() => {
+    if (seekTurn == null) return;
+    if (liveUpdates && didInitialLiveSeekRef.current) return;
+    const sendSeek = () => iframeRef.current?.contentWindow?.postMessage({
+      type: 'ps-seek-turn',
+      turn: seekTurn,
+      autoPlay: !!autoPlay,
+    }, '*');
+    didInitialLiveSeekRef.current = true;
+    sendSeek();
+    const retry = window.setInterval(sendSeek, 200);
+    const stopRetry = window.setTimeout(() => window.clearInterval(retry), 1200);
+
+    const handler = (event: MessageEvent) => {
+      if (event.data?.type === 'ps-replay-ready') sendSeek();
+    };
+    window.addEventListener('message', handler);
+    return () => {
+      window.clearInterval(retry);
+      window.clearTimeout(stopRetry);
+      window.removeEventListener('message', handler);
+    };
+  }, [seekTurn, autoPlay, blobUrl, liveUpdates]);
+
+  useEffect(() => {
+    if (!liveUpdates || !blobUrl) return;
+
+    const lines = log.split('\n').filter(Boolean);
+    const previous = sentLogRef.current;
+    if (!previous || previous.key !== reloadKey || previous.blobUrl !== blobUrl) {
+      sentLogRef.current = { key: reloadKey, blobUrl, lines };
+      return;
+    }
+
+    const canAppend = previous.lines.length <= lines.length &&
+      previous.lines.every((line, index) => line === lines[index]);
+    if (canAppend && lines.length > previous.lines.length) {
+      iframeRef.current?.contentWindow?.postMessage({
+        type: 'ps-append-log',
+        lines: lines.slice(previous.lines.length),
+        seekTurn,
+        followEnd: true,
+      }, '*');
+    }
+    sentLogRef.current = { key: reloadKey, blobUrl, lines };
+  }, [liveUpdates, reloadKey, blobUrl, log, seekTurn]);
 
   if (!blobUrl) {
     return (
@@ -74,13 +160,21 @@ export function PSReplayFrame({ log, format, p1, p2, title, height = 400, seekTu
     <iframe
       ref={iframeRef}
       src={blobUrl}
+      onLoad={() => {
+        if (seekTurn == null) return;
+        iframeRef.current?.contentWindow?.postMessage({
+          type: 'ps-seek-turn',
+          turn: seekTurn,
+          autoPlay: !!autoPlay,
+        }, '*');
+      }}
       style={{
         width: '100%',
         height,
         border: 'none',
         borderRadius: 5,
         background: '#344b6c',
-        marginTop: '-22px',
+        marginTop: 0,
       }}
       sandbox="allow-scripts allow-same-origin"
       title={title || 'PS Replay'}

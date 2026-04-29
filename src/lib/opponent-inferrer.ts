@@ -1,4 +1,14 @@
 import type { OpponentTeamInfo, RevealedPokemonInfo } from '../types';
+import { revealedField, unknownField } from './team-info';
+
+const BATTLE_ONLY_FORME_SUFFIXES = ['-Terastal', '-Stellar', '-Tera'];
+
+function normalizeBattleOnlyForme(species: string): string {
+  for (const suffix of BATTLE_ONLY_FORME_SUFFIXES) {
+    if (species.endsWith(suffix)) return species.slice(0, -suffix.length);
+  }
+  return species;
+}
 
 /**
  * Extracts revealed information about the opponent's team from the replay log.
@@ -19,9 +29,9 @@ export function inferOpponentTeam(log: string, opponentSide: 'p1' | 'p2' = 'p2')
         pokemonMap.set(parsed.species, {
           species: parsed.species,
           moves: [],
-          ability: '',
-          item: hasItem ? '(has item)' : '',
-          teraType: '',
+          ability: unknownField(),
+          item: hasItem ? revealedField('(has item)') : unknownField(),
+          teraType: unknownField(),
           level: parsed.level,
           gender: parsed.gender,
         });
@@ -37,9 +47,9 @@ export function inferOpponentTeam(log: string, opponentSide: 'p1' | 'p2' = 'p2')
         pokemonMap.set(parsed.species, {
           species: parsed.species,
           moves: [],
-          ability: '',
-          item: '',
-          teraType: '',
+          ability: unknownField(),
+          item: unknownField(),
+          teraType: unknownField(),
           level: parsed.level,
           gender: parsed.gender,
         });
@@ -55,8 +65,8 @@ export function inferOpponentTeam(log: string, opponentSide: 'p1' | 'p2' = 'p2')
 
       // Find which pokemon this is by looking at current active
       const pokemon = findPokemonByNickname(pokemonMap, nickname, lines, opponentSide);
-      if (pokemon && !pokemon.moves.includes(moveName)) {
-        pokemon.moves.push(moveName);
+      if (pokemon && !pokemon.moves.some(move => move.name === moveName)) {
+        pokemon.moves.push({ name: moveName, source: 'revealed' });
       }
     }
 
@@ -67,8 +77,8 @@ export function inferOpponentTeam(log: string, opponentSide: 'p1' | 'p2' = 'p2')
       const nickname = identParts[1];
       const abilityName = parts[3];
       const pokemon = findPokemonByNickname(pokemonMap, nickname, lines, opponentSide);
-      if (pokemon && !pokemon.ability) {
-        pokemon.ability = abilityName;
+      if (pokemon && !pokemon.ability.value) {
+        pokemon.ability = revealedField(abilityName);
       }
     }
 
@@ -80,7 +90,7 @@ export function inferOpponentTeam(log: string, opponentSide: 'p1' | 'p2' = 'p2')
       const itemName = parts[3];
       const pokemon = findPokemonByNickname(pokemonMap, nickname, lines, opponentSide);
       if (pokemon) {
-        pokemon.item = itemName;
+        pokemon.item = revealedField(itemName);
       }
     }
 
@@ -91,8 +101,8 @@ export function inferOpponentTeam(log: string, opponentSide: 'p1' | 'p2' = 'p2')
       const nickname = identParts[1];
       const itemName = parts[3];
       const pokemon = findPokemonByNickname(pokemonMap, nickname, lines, opponentSide);
-      if (pokemon && !pokemon.item) {
-        pokemon.item = `${itemName} (consumed)`;
+      if (pokemon && !pokemon.item.value) {
+        pokemon.item = revealedField(`${itemName} (consumed)`);
       }
     }
 
@@ -104,7 +114,7 @@ export function inferOpponentTeam(log: string, opponentSide: 'p1' | 'p2' = 'p2')
       const teraType = parts[3];
       const pokemon = findPokemonByNickname(pokemonMap, nickname, lines, opponentSide);
       if (pokemon) {
-        pokemon.teraType = teraType;
+        pokemon.teraType = revealedField(teraType);
       }
     }
   }
@@ -115,7 +125,7 @@ export function inferOpponentTeam(log: string, opponentSide: 'p1' | 'p2' = 'p2')
 function parseDetails(details: string): { species: string; level: number; gender: string } | null {
   if (!details) return null;
   const parts = details.split(', ');
-  const species = parts[0].trim();
+  const species = normalizeBattleOnlyForme(parts[0].trim());
   let level = 100;
   let gender = '';
   for (const part of parts.slice(1)) {

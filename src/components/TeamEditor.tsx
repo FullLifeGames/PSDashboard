@@ -1,37 +1,45 @@
 import { useState } from 'react';
 import type { OpponentTeamInfo, RevealedPokemonInfo } from '../types';
-import { getDefaultAbility, getDefaultItem, fillDefaultMoves } from '../lib/common-sets';
+import { manualField, manualMove } from '../lib/team-info';
 
 interface Props {
-  opponentInfo: OpponentTeamInfo;
+  title: string;
+  teamInfo: OpponentTeamInfo;
   onSave: (updatedInfo: OpponentTeamInfo) => void;
   onClose: () => void;
 }
 
-export function OpponentEditor({ opponentInfo, onSave, onClose }: Props) {
-  const [pokemon, setPokemon] = useState<RevealedPokemonInfo[]>(
-    opponentInfo.pokemon.map(p => ({
-      ...p,
-      ability: p.ability || getDefaultAbility(p.species),
-      item: p.item.includes('(') ? getDefaultItem(p.species) || '' : p.item || getDefaultItem(p.species),
-      moves: fillDefaultMoves(p.species, p.moves),
-    }))
-  );
+function sourceLabel(source: RevealedPokemonInfo['ability']['source'], probability?: number) {
+  const suffix = probability === undefined ? '' : ` ${Math.round(probability * 1000) / 10}%`;
+  return `${source.toUpperCase()}${suffix}`;
+}
 
-  const updatePokemon = (index: number, field: keyof RevealedPokemonInfo, value: string) => {
+export function TeamEditor({ title, teamInfo, onSave, onClose }: Props) {
+  const [pokemon, setPokemon] = useState<RevealedPokemonInfo[]>(teamInfo.pokemon);
+
+  const updateField = (
+    index: number,
+    field: 'ability' | 'item' | 'teraType',
+    value: string,
+  ) => {
     setPokemon(prev => {
       const updated = [...prev];
-      updated[index] = { ...updated[index], [field]: value };
+      updated[index] = { ...updated[index], [field]: manualField(value) };
       return updated;
     });
   };
 
   const addMove = (index: number, move: string) => {
-    if (!move.trim()) return;
+    const trimmed = move.trim();
+    if (!trimmed) return;
+
     setPokemon(prev => {
       const updated = [...prev];
-      if (updated[index].moves.length < 4 && !updated[index].moves.includes(move)) {
-        updated[index] = { ...updated[index], moves: [...updated[index].moves, move] };
+      if (updated[index].moves.length < 4 && !updated[index].moves.some(entry => entry.name === trimmed)) {
+        updated[index] = {
+          ...updated[index],
+          moves: [...updated[index].moves, manualMove(trimmed)],
+        };
       }
       return updated;
     });
@@ -58,7 +66,7 @@ export function OpponentEditor({ opponentInfo, onSave, onClose }: Props) {
         padding: 20, maxWidth: 640, width: '100%', maxHeight: '80vh', overflowY: 'auto',
       }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-          <div style={{ fontSize: 14, fontWeight: 'bold' }}>Edit Opponent Team</div>
+          <div style={{ fontSize: 14, fontWeight: 'bold' }}>{title}</div>
           <button
             type="button"
             onClick={onClose}
@@ -71,40 +79,46 @@ export function OpponentEditor({ opponentInfo, onSave, onClose }: Props) {
           </button>
         </div>
         <div style={{ fontSize: 10, color: '#8899aa', marginBottom: 12 }}>
-          Unknown fields auto-filled from common competitive sets.
+          Revealed, guessed, and manual values are shown separately. Editing a field marks it as manual.
         </div>
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-          {pokemon.map((p, i) => (
-            <div key={p.species} className="ps-panel" style={{ padding: 10 }}>
+          {pokemon.map((entry, i) => (
+            <div key={entry.species} className="ps-panel" style={{ padding: 10 }}>
               <div style={{ fontSize: 12, fontWeight: 'bold', marginBottom: 6 }}>
-                {p.species} <span style={{ fontSize: 10, color: '#8899aa' }}>Lv.{p.level}</span>
+                {entry.species} <span style={{ fontSize: 10, color: '#8899aa' }}>Lv.{entry.level}</span>
               </div>
 
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6, marginBottom: 6 }}>
                 <div>
-                  <div style={{ fontSize: 9, color: '#8899aa', marginBottom: 2 }}>Ability</div>
+                  <div style={{ fontSize: 9, color: '#8899aa', marginBottom: 2 }}>
+                    Ability ({sourceLabel(entry.ability.source, entry.ability.probability)})
+                  </div>
                   <input
-                    value={p.ability}
-                    onChange={e => updatePokemon(i, 'ability', e.target.value)}
+                    value={entry.ability.value}
+                    onChange={e => updateField(i, 'ability', e.target.value)}
                     className="ps-input"
                     style={{ width: '100%' }}
                   />
                 </div>
                 <div>
-                  <div style={{ fontSize: 9, color: '#8899aa', marginBottom: 2 }}>Item</div>
+                  <div style={{ fontSize: 9, color: '#8899aa', marginBottom: 2 }}>
+                    Item ({sourceLabel(entry.item.source, entry.item.probability)})
+                  </div>
                   <input
-                    value={p.item}
-                    onChange={e => updatePokemon(i, 'item', e.target.value)}
+                    value={entry.item.value}
+                    onChange={e => updateField(i, 'item', e.target.value)}
                     className="ps-input"
                     style={{ width: '100%' }}
                   />
                 </div>
                 <div>
-                  <div style={{ fontSize: 9, color: '#8899aa', marginBottom: 2 }}>Tera Type</div>
+                  <div style={{ fontSize: 9, color: '#8899aa', marginBottom: 2 }}>
+                    Tera Type ({sourceLabel(entry.teraType.source, entry.teraType.probability)})
+                  </div>
                   <input
-                    value={p.teraType}
-                    onChange={e => updatePokemon(i, 'teraType', e.target.value)}
+                    value={entry.teraType.value}
+                    onChange={e => updateField(i, 'teraType', e.target.value)}
                     placeholder="Unknown"
                     className="ps-input"
                     style={{ width: '100%' }}
@@ -113,17 +127,25 @@ export function OpponentEditor({ opponentInfo, onSave, onClose }: Props) {
               </div>
 
               <div>
-                <div style={{ fontSize: 9, color: '#8899aa', marginBottom: 2 }}>Moves ({p.moves.length}/4)</div>
+                <div style={{ fontSize: 9, color: '#8899aa', marginBottom: 2 }}>Moves ({entry.moves.length}/4)</div>
                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginBottom: 4 }}>
-                  {p.moves.map((m, mi) => (
-                    <span key={m} style={{
-                      fontSize: 10, padding: '1px 6px', borderRadius: 3,
-                      background: 'rgba(0,0,0,0.3)', display: 'flex', alignItems: 'center', gap: 4,
+                  {entry.moves.map((move, moveIndex) => (
+                    <span key={`${move.name}-${move.source}-${moveIndex}`} style={{
+                      fontSize: 10,
+                      padding: '1px 6px',
+                      borderRadius: 3,
+                      background: 'rgba(0,0,0,0.3)',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 4,
                     }}>
-                      {m}
+                      {move.name}
+                      <span style={{ color: '#9fb5d9', fontSize: 9 }}>
+                        {sourceLabel(move.source, move.probability)}
+                      </span>
                       <button
                         type="button"
-                        onClick={() => removeMove(i, mi)}
+                        onClick={() => removeMove(i, moveIndex)}
                         style={{
                           background: 'none', border: 'none', color: '#f88', cursor: 'pointer',
                           fontSize: 12, padding: 0, fontFamily: 'inherit',
@@ -134,9 +156,9 @@ export function OpponentEditor({ opponentInfo, onSave, onClose }: Props) {
                     </span>
                   ))}
                 </div>
-                {p.moves.length < 4 && (
+                {entry.moves.length < 4 && (
                   <input
-                    placeholder="Add move…"
+                    placeholder="Add move..."
                     onKeyDown={e => {
                       if (e.key === 'Enter') {
                         addMove(i, (e.target as HTMLInputElement).value);

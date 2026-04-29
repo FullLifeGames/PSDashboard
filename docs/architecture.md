@@ -6,7 +6,7 @@ This document describes how the current prototype works internally and where its
 
 ### 1. Replay loading
 
-The app starts in [`src/components/ReplayLoader.tsx`](/abs/path/placeholder), where the user provides:
+The app starts in [`src/components/ReplayLoader.tsx`](../src/components/ReplayLoader.tsx), where the user provides:
 
 - a replay URL or replay ID
 - optionally a pasted team export
@@ -20,10 +20,10 @@ The app starts in [`src/components/ReplayLoader.tsx`](/abs/path/placeholder), wh
 
 Relevant files:
 
-- [`src/hooks/useReplay.ts`](/abs/path/placeholder)
-- [`src/lib/replay-fetcher.ts`](/abs/path/placeholder)
-- [`src/lib/protocol-parser.ts`](/abs/path/placeholder)
-- [`src/lib/opponent-inferrer.ts`](/abs/path/placeholder)
+- [`src/hooks/useReplay.ts`](../src/hooks/useReplay.ts)
+- [`src/lib/replay-fetcher.ts`](../src/lib/replay-fetcher.ts)
+- [`src/lib/protocol-parser.ts`](../src/lib/protocol-parser.ts)
+- [`src/lib/opponent-inferrer.ts`](../src/lib/opponent-inferrer.ts)
 
 ### 2. Snapshot creation
 
@@ -46,19 +46,22 @@ The current precedence is:
 
 1. revealed information from the replay
 2. the user's pasted team for `p1`, when provided
-3. common-set fallbacks for anything still unknown
+3. Smogon usage-stat guesses for anything still unknown, when monthly stats can be fetched
+4. `@pkmn/smogon` set assumptions for remaining gaps
 
 This is the most important approximation point in the current implementation. The branch engine can only be as accurate as the reconstructed teams.
 
 Relevant files:
 
-- [`src/lib/team-builder.ts`](/abs/path/placeholder)
-- [`src/lib/common-sets.ts`](/abs/path/placeholder)
-- [`src/lib/team-parser.ts`](/abs/path/placeholder)
+- [`src/lib/team-builder.ts`](../src/lib/team-builder.ts)
+- [`src/lib/team-info.ts`](../src/lib/team-info.ts)
+- [`src/lib/smogon-stats.ts`](../src/lib/smogon-stats.ts)
+- [`src/lib/smogon-sets.ts`](../src/lib/smogon-sets.ts)
+- [`src/lib/team-parser.ts`](../src/lib/team-parser.ts)
 
 ### 4. Branch reconstruction
 
-`useBranch` is the core of the prototype.
+`src/lib/branch-engine.ts` is the core reconstruction module. `useBranch` wraps it with React state for the UI.
 
 When `startBranch` runs, it:
 
@@ -71,15 +74,18 @@ When `startBranch` runs, it:
 7. corrects HP and status from the selected snapshot
 8. exposes the resulting simulator state to the UI
 
+For doubles, the branch state includes slot-indexed active Pokemon, move lists, legal target options, switch lists, force-switch flags, and pending choices. The legacy single-active fields still point at slot 0 so the singles UI/tests remain compatible. Reconstruction also uses protocol `switch` and `drag` lines to correct active slots when simulator randomness would otherwise choose a different phazing target.
+
 After branch entry, the user can choose actions for both sides and `executeTurn` submits them to the live simulator.
 
-Relevant file:
+Relevant files:
 
-- [`src/hooks/useBranch.ts`](/abs/path/placeholder)
+- [`src/hooks/useBranch.ts`](../src/hooks/useBranch.ts)
+- [`src/lib/branch-engine.ts`](../src/lib/branch-engine.ts)
 
 ## UI Structure
 
-The main application surface in [`src/App.tsx`](/abs/path/placeholder) has two modes:
+The main application surface in [`src/App.tsx`](../src/App.tsx) has two modes:
 
 - original replay mode
 - branch mode
@@ -93,17 +99,20 @@ The main application surface in [`src/App.tsx`](/abs/path/placeholder) has two m
 ### Branch mode
 
 - `PSReplayFrame` renders the branch simulator log instead of the original replay log.
-- `BranchPanel` shows move and switch controls for both sides.
+- `BranchPanel` shows move, target, and switch controls for both sides.
+- `BranchHistoryPanel` compares executed branch turns against the original replay line.
+- `BranchSaveSharePanel` saves compact branch reports to localStorage and creates URL-hash share payloads.
 - `BattleStatsPanel` stays visible to show inferred team information.
-- `OpponentEditor` lets the user override inferred opponent fields before branching.
+- `TeamEditor` lets the user override inferred fields for either player before branching.
 
 Relevant files:
 
-- [`src/components/PSReplayFrame.tsx`](/abs/path/placeholder)
-- [`src/lib/replay-html.ts`](/abs/path/placeholder)
-- [`src/components/BranchPanel.tsx`](/abs/path/placeholder)
-- [`src/components/BattleStatsPanel.tsx`](/abs/path/placeholder)
-- [`src/components/OpponentEditor.tsx`](/abs/path/placeholder)
+- [`src/components/PSReplayFrame.tsx`](../src/components/PSReplayFrame.tsx)
+- [`src/lib/replay-html.ts`](../src/lib/replay-html.ts)
+- [`src/components/BranchPanel.tsx`](../src/components/BranchPanel.tsx)
+- [`src/components/BranchHistoryPanel.tsx`](../src/components/BranchHistoryPanel.tsx)
+- [`src/components/BattleStatsPanel.tsx`](../src/components/BattleStatsPanel.tsx)
+- [`src/components/TeamEditor.tsx`](../src/components/TeamEditor.tsx)
 
 ## Approximation Points
 
@@ -118,9 +127,24 @@ The replay log does not expose every relevant battle input. Unknown values are c
 - unrevealed items and abilities
 - some tera details before reveal
 
+The UI keeps these categories separate:
+
+- `revealed`: directly observed in the replay protocol
+- `guessed`: filled from Smogon usage probabilities or `@pkmn/smogon` set assumptions
+- `manual`: edited by the user
+- `unknown`: not known and not guessed
+
 ### Replay choice reconstruction
 
-The branch engine reconstructs prior choices from protocol lines such as `|move|` and `|switch|`. This works for the covered happy path, but complex edge cases can still break reconstruction.
+The branch engine reconstructs prior choices from protocol lines such as `|move|` and `|switch|`. For targetable doubles moves, it translates protocol targets like `p2b:` into the simulator's relative target locations such as `+2`. Regression fixtures now cover redirection, retargeting after a fainted target, and protocol-guided phazing correction. Complex edge cases can still break reconstruction, especially unusual targeting effects or volatile state that is not represented in the replay snapshot.
+
+### Save/share
+
+Branch share payloads are intentionally compact. They include replay identity, format, players, branch turn, executed choices, and the final branch protocol log. They are useful for reporting and comparing a branch, but they are not yet a full deterministic branch restore mechanism.
+
+### Bundle splitting
+
+The initial app path avoids importing the heaviest simulator modules directly. Replay parsing, Smogon stats, team building, branch reconstruction, and damage calculation are loaded with dynamic imports when the user reaches those workflows. The build still emits large async Pokemon data chunks for dex/learnsets, but they are no longer part of the initial entry chunk.
 
 ### Partial state correction
 
@@ -137,26 +161,27 @@ The current codebase has been validated with:
 - `npm run lint`
 - `npm run build`
 - `npx playwright test`
+- `npm run test:regression`
 
-The Playwright suite covers the main browser flow with a mocked replay fixture, but it does not yet serve as a replay-accuracy benchmark.
+The regression suite covers pure Smogon-stat parsing/enrichment, branch save/share encoding, target-specific damage previews, basic doubles branch state, redirection/retargeting/phazing fixtures, stable checkpoints from a mocked fixture, and stable checkpoints from a saved real replay. Two deeper checkpoints are marked `fixme` to document known divergence rather than hiding it.
 
 ## Unused Or Alternate Code Paths
 
 A few files are present but are not part of the current app path:
 
-- [`src/components/BattleView.tsx`](/abs/path/placeholder)
-- [`src/components/BattleScene.tsx`](/abs/path/placeholder)
-- [`src/hooks/useTimeline.ts`](/abs/path/placeholder)
-- [`src/lib/battle-simulator.ts`](/abs/path/placeholder)
+- [`src/components/BattleView.tsx`](../src/components/BattleView.tsx)
+- [`src/components/BattleScene.tsx`](../src/components/BattleScene.tsx)
+- [`src/hooks/useTimeline.ts`](../src/hooks/useTimeline.ts)
+- [`src/lib/battle-simulator.ts`](../src/lib/battle-simulator.ts)
 
 These look like earlier or alternate directions. They may still be useful, but they currently increase maintenance surface without contributing to the live app flow.
 
 ## Recommended Refactor Direction
 
-If the project continues, the cleanest next architectural move would be to split the system into three separately testable layers:
+If the project continues, the cleanest next architectural move would be to keep tightening the three separately testable layers:
 
 1. replay ingestion and inference
 2. deterministic branch reconstruction
 3. UI rendering and controls
 
-That would make it much easier to measure reconstruction accuracy, build replay regression tests, and keep the frontend moving without coupling it to simulator internals.
+That makes it much easier to measure reconstruction accuracy, expand replay regression tests, and keep the frontend moving without coupling it to simulator internals.

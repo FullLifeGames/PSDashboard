@@ -1,7 +1,5 @@
 import { useState, useCallback } from 'react';
 import { fetchReplay } from '../lib/replay-fetcher';
-import { parseReplayLog } from '../lib/protocol-parser';
-import { inferOpponentTeam } from '../lib/opponent-inferrer';
 import type { ReplayData, TurnSnapshot, OpponentTeamInfo } from '../types';
 
 export interface ReplayState {
@@ -27,6 +25,10 @@ export function useReplay() {
     setState(prev => ({ ...prev, loading: true, error: null }));
     try {
       const data = await fetchReplay(urlOrId);
+      const [{ parseReplayLog }, { inferOpponentTeam }] = await Promise.all([
+        import('../lib/protocol-parser'),
+        import('../lib/opponent-inferrer'),
+      ]);
       const snapshots = parseReplayLog(data.log);
       const p1Info = inferOpponentTeam(data.log, 'p1');
       const opponentInfo = inferOpponentTeam(data.log, 'p2');

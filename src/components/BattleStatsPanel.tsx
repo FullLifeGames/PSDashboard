@@ -1,4 +1,11 @@
-import type { ReplayData, OpponentTeamInfo, RevealedPokemonInfo } from '../types';
+import type {
+  KnowledgeSource,
+  OpponentTeamInfo,
+  PokemonFieldInfo,
+  PokemonMoveInfo,
+  ReplayData,
+  RevealedPokemonInfo,
+} from '../types';
 
 interface Props {
   replayData: ReplayData;
@@ -7,18 +14,119 @@ interface Props {
 }
 
 const TYPE_BG: Record<string, string> = {
-  Normal:   '#A8A878', Fire:     '#F08030', Water:    '#6890F0',
-  Electric: '#F8D030', Grass:    '#78C850', Ice:      '#98D8D8',
-  Fighting: '#C03028', Poison:   '#A040A0', Ground:   '#E0C068',
-  Flying:   '#A890F0', Psychic:  '#F85888', Bug:      '#A8B820',
-  Rock:     '#B8A038', Ghost:    '#705898', Dragon:   '#7038F8',
-  Dark:     '#705848', Steel:    '#B8B8D0', Fairy:    '#EE99AC',
-  Stellar:  '#40B5A5', '???':    '#68A090',
+  Normal: '#A8A878',
+  Fire: '#F08030',
+  Water: '#6890F0',
+  Electric: '#F8D030',
+  Grass: '#78C850',
+  Ice: '#98D8D8',
+  Fighting: '#C03028',
+  Poison: '#A040A0',
+  Ground: '#E0C068',
+  Flying: '#A890F0',
+  Psychic: '#F85888',
+  Bug: '#A8B820',
+  Rock: '#B8A038',
+  Ghost: '#705898',
+  Dragon: '#7038F8',
+  Dark: '#705848',
+  Steel: '#B8B8D0',
+  Fairy: '#EE99AC',
+  Stellar: '#40B5A5',
+  '???': '#68A090',
 };
 
 function spriteUrl(species: string) {
   const id = species.toLowerCase().replace(/[^a-z0-9-]/g, '');
   return `https://play.pokemonshowdown.com/sprites/gen5/${id}.png`;
+}
+
+function sourceAccent(source: KnowledgeSource): string {
+  switch (source) {
+    case 'revealed':
+      return '#6cc2ff';
+    case 'guessed':
+      return '#f3c969';
+    case 'manual':
+      return '#78df9b';
+    default:
+      return '#8899aa';
+  }
+}
+
+function formatProbability(probability: number | undefined): string {
+  if (probability === undefined) return '';
+  return `${Math.round(probability * 1000) / 10}%`;
+}
+
+function sourceLabel(source: KnowledgeSource, probability?: number): string {
+  switch (source) {
+    case 'revealed':
+      return 'revealed';
+    case 'guessed':
+      return probability === undefined ? 'guessed' : `guessed ${formatProbability(probability)}`;
+    case 'manual':
+      return 'manual';
+    default:
+      return 'unknown';
+  }
+}
+
+function formatFieldValue(field: PokemonFieldInfo): string {
+  if (!field.value) return '';
+  if (field.value === '(has item)') return 'Has item';
+  return field.value;
+}
+
+function MetaTag({
+  field,
+  className,
+  children,
+  background,
+}: {
+  field: PokemonFieldInfo;
+  className?: string;
+  children?: string;
+  background?: string;
+}) {
+  const value = children || formatFieldValue(field);
+  if (!value) return null;
+
+  return (
+    <span
+      className={className}
+      style={{
+        background: background || undefined,
+        color: background ? '#fff' : undefined,
+        border: `1px solid ${sourceAccent(field.source)}`,
+        boxShadow: 'inset 0 0 0 1px rgba(0,0,0,0.15)',
+      }}
+      title={field.sourceDetail || sourceLabel(field.source, field.probability)}
+    >
+      {value}
+      <span style={{ marginLeft: 6, color: sourceAccent(field.source), fontSize: 9, textTransform: 'uppercase' }}>
+        {sourceLabel(field.source, field.probability)}
+      </span>
+    </span>
+  );
+}
+
+function MoveTag({ move }: { move: PokemonMoveInfo }) {
+  return (
+    <span
+      className="ps-stats-move"
+      style={{
+        border: `1px solid ${sourceAccent(move.source)}`,
+        boxShadow: 'inset 0 0 0 1px rgba(0,0,0,0.12)',
+      }}
+      title={move.sourceDetail || sourceLabel(move.source, move.probability)}
+    >
+      {move.name}
+      <span style={{ marginLeft: 6, color: sourceAccent(move.source), fontSize: 9, textTransform: 'uppercase' }}>
+        {sourceLabel(move.source, move.probability)}
+      </span>
+    </span>
+  );
 }
 
 function PokemonEntry({ poke }: { poke: RevealedPokemonInfo }) {
@@ -37,23 +145,22 @@ function PokemonEntry({ poke }: { poke: RevealedPokemonInfo }) {
         </div>
         {poke.moves.length > 0 && (
           <div className="ps-stats-moves">
-            {poke.moves.map(m => (
-              <span key={m} className="ps-stats-move">{m}</span>
+            {poke.moves.map(move => (
+              <MoveTag key={`${move.name}-${move.source}`} move={move} />
             ))}
           </div>
         )}
         <div className="ps-stats-meta">
-          {poke.ability && <span className="ps-stats-tag">{poke.ability}</span>}
-          {poke.item && !poke.item.startsWith('(') && (
-            <span className="ps-stats-tag ps-stats-tag-item">{poke.item}</span>
-          )}
-          {poke.teraType && (
-            <span
+          <MetaTag field={poke.ability} className="ps-stats-tag" />
+          <MetaTag field={poke.item} className="ps-stats-tag ps-stats-tag-item" />
+          {poke.teraType.value && (
+            <MetaTag
+              field={poke.teraType}
               className="ps-stats-tag"
-              style={{ background: TYPE_BG[poke.teraType] || '#68A090', color: '#fff' }}
+              background={TYPE_BG[poke.teraType.value] || '#68A090'}
             >
-              Tera {poke.teraType}
-            </span>
+              {`Tera ${poke.teraType.value}`}
+            </MetaTag>
           )}
         </div>
       </div>

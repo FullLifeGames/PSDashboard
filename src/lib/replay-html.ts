@@ -14,7 +14,7 @@ export function generateReplayHtml(opts: {
   autoPlay?: boolean;
   reportTurn?: boolean;
 }): string {
-  const { log, format = '', p1 = 'Player 1', p2 = 'Player 2', title, seekTurn, autoPlay = true, reportTurn = false } = opts;
+  const { log, format = '', p1 = 'Player 1', p2 = 'Player 2', title, seekTurn, autoPlay = false, reportTurn = false } = opts;
   const displayTitle = title || `${format ? `[${format}] ` : ''}${p1} vs. ${p2}`;
   // Escape forward slashes for the script tag content (PS format)
   const escapedLog = log.replace(/<\//g, '<\\/');
@@ -38,7 +38,49 @@ body{padding:12px 0;background:#344b6c;}
 .subtle {color:#3A4A66;}
 .wrapper {max-width:1180px;margin:0 auto;}
 </style>
-<script>window.BattleSound = false;</script>
+<script>
+window.Config = Object.assign({}, window.Config || {}, {sound: false, mute: true});
+window.__psMakeSilentMedia = function makeSilentMediaHandle() {
+  return {
+    autoplay: false,
+    loop: false,
+    muted: true,
+    paused: true,
+    volume: 0,
+    pause: function(){},
+    play: function(){ return Promise.resolve(); },
+    stop: function(){},
+    destroy: function(){},
+    setVolume: function(){},
+    addEventListener: function(){},
+    removeEventListener: function(){},
+  };
+};
+window.__psPatchBattleSound = function patchBattleSound() {
+  var makeSilent = window.__psMakeSilentMedia;
+  var sound = (window.BattleSound && typeof window.BattleSound === 'object') ? window.BattleSound : {};
+  sound.muted = true;
+  sound.disabled = true;
+  sound.loadBgm = function(){ return makeSilent(); };
+  sound.playBgm = function(){};
+  sound.pauseBgm = function(){};
+  sound.stopBgm = function(){};
+  sound.setMute = function(){};
+  sound.setVolume = function(){};
+  window.BattleSound = sound;
+};
+window.__psPatchBattleSound();
+window.Audio = function SilentAudio() {
+  return window.__psMakeSilentMedia();
+};
+if (window.HTMLMediaElement && window.HTMLMediaElement.prototype) {
+  window.HTMLMediaElement.prototype.play = function silentPlay() {
+    this.muted = true;
+    this.pause();
+    return Promise.resolve();
+  };
+}
+</script>
 <div class="wrapper replay-wrapper">
 <input type="hidden" name="replayid" value="branch-sim" />
 <div class="battle"></div><div class="battle-log"></div><div class="replay-controls"></div><div class="replay-controls-2"></div>
@@ -50,27 +92,101 @@ ${escapedLog}
 <script>
 let daily = Math.floor(Date.now()/1000/60/60/24);
 document.write('<script src="https://play.pokemonshowdown.com/js/replay-embed.js?version'+daily+'"></'+'script>');
-</script>${seekTurn != null ? `
+</script>
 <script>
-(function autoSeek() {
-  if (typeof Replays === 'undefined' || !Replays.battle) {
-    setTimeout(autoSeek, 150);
-    return;
+(function replayBridge() {
+  var pendingSeek = ${seekTurn != null ? `{ turn: ${seekTurn}, autoPlay: ${autoPlay ? 'true' : 'false'} }` : 'null'};
+
+  function silenceAudio() {
+    window.Config = Object.assign({}, window.Config || {}, {sound: false, mute: true});
+    if (window.__psPatchBattleSound) window.__psPatchBattleSound();
+    if (typeof Replays !== 'undefined' && Replays.battle && Replays.battle.sound) {
+      Replays.battle.sound.muted = true;
+      if (Replays.battle.sound.pause) Replays.battle.sound.pause();
+    }
+    if (typeof Replays !== 'undefined' && Replays.battle && Replays.battle.scene && Replays.battle.scene.bgm) {
+      Replays.battle.scene.bgm.muted = true;
+      if (Replays.battle.scene.bgm.pause) Replays.battle.scene.bgm.pause();
+    }
   }
-  Replays.battle.seekTurn(${seekTurn});
-  ${autoPlay ? 'Replays.battle.play();' : 'Replays.battle.pause();'}
+
+  function applySeek() {
+    silenceAudio();
+    if (!pendingSeek) return;
+    if (typeof Replays === 'undefined' || !Replays.battle) {
+      setTimeout(applySeek, 150);
+      return;
+    }
+    Replays.battle.seekTurn(pendingSeek.turn);
+    if (pendingSeek.autoPlay) {
+      Replays.battle.play();
+      silenceAudio();
+    } else {
+      Replays.battle.pause();
+    }
+    pendingSeek = null;
+  }
+
+  function queueSeek(turn, shouldPlay) {
+    pendingSeek = { turn: turn, autoPlay: !!shouldPlay };
+    applySeek();
+  }
+
+  function appendLogLines(lines) {
+    if (!Array.isArray(lines)) return false;
+    if (typeof Replays === 'undefined' || !Replays.battle) return false;
+    lines.forEach(function(line) {
+      if (line) Replays.battle.add(line);
+    });
+    silenceAudio();
+    return true;
+  }
+
+  function appendAndFollow(data) {
+    if (!appendLogLines(data.lines)) {
+      setTimeout(function() { appendAndFollow(data); }, 150);
+      return;
+    }
+    if (data.followEnd) {
+      queueSeek(Infinity, false);
+    } else if (typeof data.seekTurn === 'number') {
+      queueSeek(data.seekTurn, false);
+    }
+  }
+
+  window.addEventListener('message', function(event) {
+    var data = event.data || {};
+    if (data.type === 'ps-seek-turn' && typeof data.turn === 'number') {
+      queueSeek(data.turn, !!data.autoPlay);
+    } else if (data.type === 'ps-append-log') {
+      appendAndFollow(data);
+    }
+  });
+
+  setInterval(silenceAudio, 500);
+  applySeek();
+  (function notifyReady() {
+    silenceAudio();
+    if (typeof Replays === 'undefined' || !Replays.battle) {
+      setTimeout(notifyReady, 150);
+      return;
+    }
+    parent.postMessage({ type: 'ps-replay-ready' }, '*');
+    applySeek();
+  })();
 })();
-</script>` : ''}${reportTurn ? `
+</script>${reportTurn ? `
 <script>
 (function trackTurn() {
   var lastTurn = -1;
   setInterval(function() {
-    if (typeof Replays !== 'undefined' && Replays.battle) {
-      var t = Replays.battle.turn;
-      if (t !== lastTurn) {
-        lastTurn = t;
-        parent.postMessage({ type: 'ps-turn', turn: t }, '*');
-      }
+  if (typeof Replays === 'undefined' || !Replays.battle) {
+    return;
+  }
+    var t = Replays.battle.turn;
+    if (t !== lastTurn) {
+      lastTurn = t;
+      parent.postMessage({ type: 'ps-turn', turn: t }, '*');
     }
   }, 200);
 })();
