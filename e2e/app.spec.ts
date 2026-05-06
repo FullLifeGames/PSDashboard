@@ -237,6 +237,7 @@ test.describe('PS Replay Interceptor', () => {
     await page.locator('button', { hasText: 'Branch Here' }).click();
     await expect(page.getByText(/Branching.*Turn/)).toBeVisible({ timeout: 15000 });
     await expect(page.locator('.ps-movebtn').first()).toBeVisible({ timeout: 5000 });
+    await expect(page.locator('.ps-movebtn', { hasText: 'Earthquake' })).toContainText('69.8% - 82.2%', { timeout: 10000 });
   });
 
   test('branch simulation can pick recommended moves without Smogon stats', async ({ page }) => {

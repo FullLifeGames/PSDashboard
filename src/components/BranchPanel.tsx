@@ -344,16 +344,19 @@ export function BranchPanel({ simState, onSetChoice, onExecuteTurn }: Props) {
         p1: new Map(p1ActiveSlots.map((active, index) => [`p1:${index}`, active])),
         p2: new Map(p2ActiveSlots.map((active, index) => [`p2:${index}`, active])),
       };
+      const damageContext = {
+        gameType: p1ActiveSlots.length > 1 || p2ActiveSlots.length > 1 ? 'Doubles' as const : 'Singles' as const,
+      };
 
       const p1Default = p1ActiveSlots.map((active, slot) => {
         const moves = p1MovesBySlot[slot] ?? EMPTY_MOVES;
         if (!active || !firstP1Target || moves.length === 0) return [];
-        return calcDamageRanges(active, firstP1Target, moves);
+        return calcDamageRanges(active, firstP1Target, moves, damageContext);
       });
       const p2Default = p2ActiveSlots.map((active, slot) => {
         const moves = p2MovesBySlot[slot] ?? EMPTY_MOVES;
         if (!active || !firstP2Target || moves.length === 0) return [];
-        return calcDamageRanges(active, firstP2Target, moves);
+        return calcDamageRanges(active, firstP2Target, moves, damageContext);
       });
 
       const makeTargetDamage = (
@@ -367,7 +370,7 @@ export function BranchPanel({ simState, onSetChoice, onExecuteTurn }: Props) {
           for (const target of move.targetOptions) {
             const defender = targetBySideSlot[target.side].get(`${target.side}:${target.activeSlot}`);
             if (defender) {
-              entries.push([`${move.slot}:${target.targetLoc}`, calcSingleDamageRange(active, defender, move)]);
+              entries.push([`${move.slot}:${target.targetLoc}`, calcSingleDamageRange(active, defender, move, damageContext)]);
             }
           }
         }

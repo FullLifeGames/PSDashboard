@@ -6,6 +6,15 @@ type SimBattle = NonNullable<BattleStreams.BattleStream['battle']>;
 type SimSide = SimBattle['sides'][number];
 type SimPokemon = SimSide['pokemon'][number];
 
+export interface PokemonStatTable {
+  hp: number;
+  atk: number;
+  def: number;
+  spa: number;
+  spd: number;
+  spe: number;
+}
+
 export interface BranchMoveOption {
   name: string;
   activeSlot: number;
@@ -53,6 +62,11 @@ export interface SimPokemonInfo {
   ability: string;
   item: string;
   stats: { atk: number; def: number; spa: number; spd: number; spe: number };
+  nature?: string;
+  evs?: PokemonStatTable;
+  ivs?: PokemonStatTable;
+  gender?: string;
+  teraType?: string;
   boosts: Record<string, number>;
   level: number;
   types: string[];
@@ -554,6 +568,23 @@ function syncLogActivesFromBattle(log: string[], battle: SimBattle, targetTurn: 
   return corrections;
 }
 
+function statTableWithDefaults(
+  value: Partial<PokemonStatTable> | undefined,
+  fallback: PokemonStatTable,
+): PokemonStatTable {
+  return {
+    hp: value?.hp ?? fallback.hp,
+    atk: value?.atk ?? fallback.atk,
+    def: value?.def ?? fallback.def,
+    spa: value?.spa ?? fallback.spa,
+    spd: value?.spd ?? fallback.spd,
+    spe: value?.spe ?? fallback.spe,
+  };
+}
+
+const DEFAULT_EVS: PokemonStatTable = { hp: 0, atk: 0, def: 0, spa: 0, spd: 0, spe: 0 };
+const DEFAULT_IVS: PokemonStatTable = { hp: 31, atk: 31, def: 31, spa: 31, spd: 31, spe: 31 };
+
 function makePokemonInfo(
   pokemon: SimPokemon,
   isActive = pokemon.isActive,
@@ -582,6 +613,11 @@ function makePokemonInfo(
       spd: pokemon.storedStats?.spd || 0,
       spe: pokemon.storedStats?.spe || 0,
     },
+    nature: pokemon.set.nature || 'Hardy',
+    evs: statTableWithDefaults(pokemon.set.evs, DEFAULT_EVS),
+    ivs: statTableWithDefaults(pokemon.set.ivs, DEFAULT_IVS),
+    gender: pokemon.gender || pokemon.set.gender || '',
+    teraType: pokemon.terastallized || '',
     boosts: { ...pokemon.boosts },
     level: pokemon.level || 100,
     types: pokemon.types ? [...pokemon.types] : [],
