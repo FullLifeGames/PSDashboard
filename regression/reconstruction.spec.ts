@@ -333,12 +333,13 @@ test.describe('Replay reconstruction regression suite', () => {
 
     expect(state.p1Active?.species).toBe('Gliscor');
     expect(state.p1Moves.map(move => move.name)).toContain('Toxic');
+    expect(runtime.log.join('\n')).toMatch(/\|switch\|p1a: Gliscor\|Gliscor(?:, [MF])?\|/);
   });
 
   test('branch runtime exposes one live append-only protocol log after alternate choices', async () => {
     const fixture = loadFixtureReplay();
     const snapshots = parseReplayLog(fixture.log);
-    const snapshot = snapshots.find(entry => entry.turn === 2);
+    const snapshot = snapshots.find(entry => entry.turn === 1);
     const { p1Team, p2Team } = buildTeamsFromReplay(fixture.log);
 
     const runtime = await reconstructBranchRuntime({
@@ -346,17 +347,17 @@ test.describe('Replay reconstruction regression suite', () => {
       p1Team,
       p2Team,
       replayLog: fixture.log,
-      targetTurn: 2,
+      targetTurn: 1,
       snapshot,
     });
 
     const initialLength = runtime.log.length;
     const initialStartCount = runtime.log.filter(line => line === '|start').length;
 
-    void runtime.streams.omniscient.write('>p1 move 1\n>p2 move 2');
+    void runtime.streams.omniscient.write('>p1 move 1\n>p2 move 1');
 
     await waitForBranchLog(runtime, log =>
-      log.length > initialLength && log.some(line => line === '|faint|p2a: Kingambit')
+      log.length > initialLength && log.some(line => line.startsWith('|move|p1a: Garchomp|'))
     );
 
     expect(runtime.log.filter(line => line === '|start')).toHaveLength(initialStartCount);

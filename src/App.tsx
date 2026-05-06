@@ -1,6 +1,7 @@
 import { useEffect, useState, useCallback, useMemo, useRef } from 'react';
 import { useReplay } from './hooks/useReplay';
 import { useBranch } from './hooks/useBranch';
+import type { BranchHistoryEntry } from './hooks/useBranch';
 import { useSmogonUsageStats } from './hooks/useSmogonUsageStats';
 import { useSmogonSetAssumptions } from './hooks/useSmogonSetAssumptions';
 import { ReplayLoader } from './components/ReplayLoader';
@@ -124,6 +125,9 @@ function App() {
   const [pendingBranchRefresh, setPendingBranchRefresh] = useState<{
     p1Info: OpponentTeamInfo;
     p2Info: OpponentTeamInfo;
+    history: BranchHistoryEntry[];
+    p1Choices: (string | null)[];
+    p2Choices: (string | null)[];
   } | null>(null);
 
   const maxTurn = snapshots.length > 0 ? snapshots.length : 1;
@@ -218,7 +222,11 @@ function App() {
         });
         if (!cancelled && p1Team.length > 0 && p2Team.length > 0) {
           setBranchSession(session => session + 1);
-          await startBranch(activeReplay.formatid || 'gen9ou', p1Team, p2Team, activeReplay.log, branchTurn, branchSnapshot);
+          await startBranch(activeReplay.formatid || 'gen9ou', p1Team, p2Team, activeReplay.log, branchTurn, branchSnapshot, {
+            replayHistory: refreshRequest.history,
+            p1Choices: refreshRequest.p1Choices,
+            p2Choices: refreshRequest.p2Choices,
+          });
           branchWindowOpenRef.current = true;
         }
       } finally {
@@ -269,9 +277,15 @@ function App() {
     setEditorSide(null);
 
     if ((branchWindowOpenRef.current || simState) && nextP1Info && nextP2Info) {
-      setPendingBranchRefresh({ p1Info: nextP1Info, p2Info: nextP2Info });
+      setPendingBranchRefresh({
+        p1Info: nextP1Info,
+        p2Info: nextP2Info,
+        history: [...history],
+        p1Choices: [...(simState?.p1Choices ?? [])],
+        p2Choices: [...(simState?.p2Choices ?? [])],
+      });
     }
-  }, [effectiveP1Info, effectiveP2Info, simState]);
+  }, [effectiveP1Info, effectiveP2Info, history, simState]);
 
   const clearSharedBranch = useCallback(() => {
     window.history.replaceState(null, '', `${window.location.pathname}${window.location.search}`);

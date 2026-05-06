@@ -20,6 +20,12 @@ type BattleStream = BattleStreams.BattleStream;
 type PlayerStreams = ReturnType<typeof BattleStreams.getPlayerStreams>;
 type BranchEngineModule = typeof import('../lib/branch-engine');
 
+interface StartBranchOptions {
+  replayHistory?: BranchHistoryEntry[];
+  p1Choices?: (string | null)[];
+  p2Choices?: (string | null)[];
+}
+
 export interface BranchHistoryEntry {
   turnNumber: number;
   p1Choice: string;
@@ -71,6 +77,25 @@ async function waitForLogAppend(logRef: RefObject<string[]>, previousLength: num
   }
 }
 
+function makeHistoryEntry(
+  turnNumber: number,
+  p1Choice: string,
+  p2Choice: string,
+  nextState: BranchSimState,
+): BranchHistoryEntry {
+  return {
+    turnNumber,
+    p1Choice,
+    p2Choice,
+    p1Active: nextState.p1Active,
+    p1ActiveSlots: nextState.p1ActiveSlots,
+    p2Active: nextState.p2Active,
+    p2ActiveSlots: nextState.p2ActiveSlots,
+    p1Pokemon: nextState.p1Pokemon,
+    p2Pokemon: nextState.p2Pokemon,
+  };
+}
+
 export function useBranch() {
   const [branching, setBranching] = useState(false);
   const [simState, setSimState] = useState<BranchSimState | null>(null);
@@ -101,6 +126,28 @@ export function useBranch() {
     p2ChoicesRef.current = [];
   }, []);
 
+  const applyChoicePair = useCallback(async (
+    streams: PlayerStreams,
+    battleStream: BattleStream,
+    branchEngine: BranchEngineModule,
+    p1Choice: string,
+    p2Choice: string,
+  ): Promise<BranchHistoryEntry | null> => {
+    const battle = battleStream.battle;
+    if (!battle) return null;
+
+    const turnNumber = battle.turn ?? 0;
+    const previousLogLength = logRef.current.length;
+    void streams.omniscient.write(`>p1 ${p1Choice}\n>p2 ${p2Choice}`);
+    await waitForLogAppend(logRef, previousLogLength);
+
+    const nextState = branchEngine.createBranchState(battleStream, logRef.current, {
+      p1Choices: p1ChoicesRef.current,
+      p2Choices: p2ChoicesRef.current,
+    });
+    return makeHistoryEntry(turnNumber, p1Choice, p2Choice, nextState);
+  }, []);
+
   const executeTurn = useCallback(async () => {
     const streams = streamsRef.current;
     const battleStream = battleStreamRef.current;
@@ -115,29 +162,16 @@ export function useBranch() {
     const previousLogLength = logRef.current.length;
     const p1 = sideCommand(battle, 'p1', p1ChoicesRef.current);
     const p2 = sideCommand(battle, 'p2', p2ChoicesRef.current);
-    void streams.omniscient.write(`>p1 ${p1}\n>p2 ${p2}`);
     clearChoices();
 
+    void streams.omniscient.write(`>p1 ${p1}\n>p2 ${p2}`);
     await waitForLogAppend(logRef, previousLogLength);
 
     const nextState = branchEngine.createBranchState(battleStream, logRef.current, {
       p1Choices: p1ChoicesRef.current,
       p2Choices: p2ChoicesRef.current,
     });
-    setHistory(prev => [
-      ...prev,
-      {
-        turnNumber: currentTurn,
-        p1Choice: p1,
-        p2Choice: p2,
-        p1Active: nextState.p1Active,
-        p1ActiveSlots: nextState.p1ActiveSlots,
-        p2Active: nextState.p2Active,
-        p2ActiveSlots: nextState.p2ActiveSlots,
-        p1Pokemon: nextState.p1Pokemon,
-        p2Pokemon: nextState.p2Pokemon,
-      },
-    ]);
+    setHistory(prev => [...prev, makeHistoryEntry(currentTurn, p1, p2, nextState)]);
     setSimState(nextState);
   }, [clearChoices]);
 
@@ -196,10 +230,10 @@ export function useBranch() {
     replayLog: string,
     targetTurn: number,
     snapshot?: TurnSnapshot | null,
+    options?: StartBranchOptions,
   ) => {
     logRef.current = [];
     clearChoices();
-    setHistory([]);
 
     const branchEngine = await loadBranchEngine();
     const runtime = await branchEngine.reconstructBranchRuntime({
@@ -214,9 +248,19 @@ export function useBranch() {
     logRef.current = runtime.log;
     battleStreamRef.current = runtime.battleStream;
     streamsRef.current = runtime.streams;
+
+    const replayedHistory: BranchHistoryEntry[] = [];
+    for (const entry of options?.replayHistory ?? []) {
+      const replayedEntry = await applyChoicePair(runtime.streams, runtime.battleStream, branchEngine, entry.p1Choice, entry.p2Choice);
+      if (replayedEntry) replayedHistory.push(replayedEntry);
+    }
+
+    p1ChoicesRef.current = [...(options?.p1Choices ?? [])];
+    p2ChoicesRef.current = [...(options?.p2Choices ?? [])];
     setBranching(true);
+    setHistory(replayedHistory);
     updateState(runtime.battleStream);
-  }, [clearChoices, loadBranchEngine, updateState]);
+  }, [applyChoicePair, clearChoices, loadBranchEngine, updateState]);
 
   const stopBranch = useCallback(() => {
     setBranching(false);

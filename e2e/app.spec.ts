@@ -291,6 +291,40 @@ test.describe('PS Replay Interceptor', () => {
     await expect(reopenedEditor.getByLabel('Garchomp HP EVs')).toHaveValue('252');
   });
 
+  test('saving player edits mid-branch preserves branch progress and pending choices', async ({ page }) => {
+    await page.locator('button', { hasText: 'Load' }).click();
+    await page.locator('button', { hasText: 'Branch Here' }).click();
+    await expect(page.getByText(/Branching.*Turn 1/)).toBeVisible({ timeout: 15000 });
+
+    await page.locator('button', { hasText: /Use Recommended/i }).nth(0).click();
+    await page.locator('button', { hasText: /Use Recommended/i }).nth(1).click();
+    await page.locator('button', { hasText: 'Execute Turn' }).click();
+    await expect(page.getByText(/Branching.*Turn 2/)).toBeVisible({ timeout: 15000 });
+    await expect(page.locator('.ps-panel', { hasText: 'Branch History' })).toContainText('Turn 1');
+
+    const p2Controls = page.locator('.ps-branch-side-column').nth(1);
+    await page.locator('button', { hasText: /Use Recommended/i }).nth(1).click();
+    await expect(p2Controls).toContainText(/\[move \d+\]/);
+
+    await page.locator('button', { hasText: 'Edit Player' }).click();
+    const editor = page.getByRole('dialog', { name: 'Edit Player Team' });
+    const garchompCard = editor.locator('.ps-panel').filter({ hasText: 'Garchomp' }).first();
+    await garchompCard.getByLabel('Remove Earthquake from Garchomp').click();
+    await garchompCard.getByPlaceholder('Add move...').fill('Brave Bird');
+    await garchompCard.getByPlaceholder('Add move...').press('Enter');
+    await editor.locator('button', { hasText: /^Save$/ }).click();
+
+    const p1Controls = page.locator('.ps-branch-side-column').first();
+    await expect(page.getByText(/Branching.*Turn 2/)).toBeVisible({ timeout: 15000 });
+    await expect(page.locator('.ps-panel', { hasText: 'Branch History' })).toContainText('Turn 1');
+    await expect(p1Controls).toContainText('Brave Bird');
+    await expect(p1Controls).not.toContainText('Earthquake');
+    await expect(p2Controls).toContainText(/\[move \d+\]/);
+
+    await p1Controls.locator('.ps-movebtn', { hasText: 'Brave Bird' }).click();
+    await expect(page.locator('button', { hasText: 'Execute Turn' })).toBeEnabled();
+  });
+
   test('clicking Branch Here gives immediate preparation feedback', async ({ page }) => {
     await page.locator('button', { hasText: 'Load' }).click();
     await expect(page.locator('button', { hasText: 'Branch Here' })).toBeVisible({ timeout: 10000 });
