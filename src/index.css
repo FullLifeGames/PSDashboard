@@ -327,10 +327,17 @@ body {
 .ps-movebtn-pp { font-size: 9px; opacity: 0.75; }
 .ps-movebtn-dmg { font-size: 9px; margin-top: 2px; opacity: 0.9; }
 .ps-movebtn-ko { font-weight: bold; color: #ffe066; text-shadow: 0 0 4px rgba(255,200,0,0.5); }
+.ps-movebtn-target {
+  margin-top: 4px;
+  font-size: 10px;
+  font-weight: bold;
+  line-height: 1.2;
+  color: #fff7c7;
+}
 
 .ps-target-row {
-  display: flex;
-  flex-wrap: wrap;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(116px, 1fr));
   gap: 4px;
   margin-top: 4px;
 }
@@ -338,13 +345,18 @@ body {
 .ps-target-btn {
   background: rgba(0,0,0,0.26);
   border: 1px solid rgba(255,255,255,0.22);
-  border-radius: 999px;
+  border-radius: 6px;
   color: #f5f5f5;
   cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
   font-family: inherit;
   font-size: 9px;
   font-weight: bold;
-  padding: 2px 7px;
+  min-height: 38px;
+  padding: 5px 7px;
+  text-align: left;
 }
 
 .ps-target-btn:hover:not(:disabled) {
@@ -352,9 +364,42 @@ body {
   border-color: rgba(124,183,232,0.45);
 }
 
+.ps-target-btn-selected {
+  background: rgba(124,183,232,0.36);
+  border-color: #d8f0ff;
+  box-shadow:
+    0 0 0 2px rgba(124,183,232,0.35),
+    inset 0 1px 0 rgba(255,255,255,0.18);
+}
+
 .ps-target-btn:disabled {
   cursor: not-allowed;
   opacity: 0.45;
+}
+
+.ps-target-main {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  min-width: 0;
+}
+
+.ps-target-slot {
+  color: #a9d7ff;
+  flex: 0 0 auto;
+  font-size: 9px;
+}
+
+.ps-target-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ps-target-meta {
+  color: #c9d4e6;
+  font-size: 8px;
+  line-height: 1.2;
 }
 
 /* Switch buttons */

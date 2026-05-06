@@ -297,13 +297,14 @@ test.describe('PS Replay Interceptor', () => {
     await page.locator('button', { hasText: 'Branch Here' }).click();
     await expect(page.getByText(/Branching.*Turn 1/)).toBeVisible({ timeout: 15000 });
 
-    await page.locator('button', { hasText: /Use Recommended/i }).nth(0).click();
-    await page.locator('button', { hasText: /Use Recommended/i }).nth(1).click();
+    const p1Controls = page.locator('.ps-branch-side-column').first();
+    const p2Controls = page.locator('.ps-branch-side-column').nth(1);
+    await p1Controls.locator('.ps-movebtn', { hasText: 'Swords Dance' }).click();
+    await p2Controls.locator('button', { hasText: /Use Recommended/i }).click();
     await page.locator('button', { hasText: 'Execute Turn' }).click();
     await expect(page.getByText(/Branching.*Turn 2/)).toBeVisible({ timeout: 15000 });
     await expect(page.locator('.ps-panel', { hasText: 'Branch History' })).toContainText('Turn 1');
 
-    const p2Controls = page.locator('.ps-branch-side-column').nth(1);
     await page.locator('button', { hasText: /Use Recommended/i }).nth(1).click();
     await expect(p2Controls).toContainText(/\[move \d+\]/);
 
@@ -315,7 +316,6 @@ test.describe('PS Replay Interceptor', () => {
     await garchompCard.getByPlaceholder('Add move...').press('Enter');
     await editor.locator('button', { hasText: /^Save$/ }).click();
 
-    const p1Controls = page.locator('.ps-branch-side-column').first();
     await expect(page.getByText(/Branching.*Turn 2/)).toBeVisible({ timeout: 15000 });
     await expect(page.locator('.ps-panel', { hasText: 'Branch History' })).toContainText('Turn 1');
     await expect(p1Controls).toContainText('Brave Bird');
@@ -583,6 +583,27 @@ test.describe('PS Replay Interceptor', () => {
 
     await controls.nth(0).locator('.ps-switchbtn').first().click();
     await expect(controls.nth(1).locator('.ps-switchbtn').first()).toBeDisabled();
+  });
+
+  test('doubles target buttons identify and highlight the selected target', async ({ page }) => {
+    await page.locator('input[type="text"]').fill('gen9doubles-test');
+    await page.locator('button', { hasText: 'Load' }).click();
+    await expect(page.getByText('Alice', { exact: true }).first()).toBeVisible({ timeout: 10000 });
+    await page.locator('button', { hasText: 'Branch Here' }).click();
+    await expect(page.getByText(/Branching.*Turn/)).toBeVisible({ timeout: 15000 });
+
+    const pikachuControls = page.locator('.ps-side-controls').first();
+    const bulbasaurTarget = pikachuControls.locator('.ps-target-btn[title^="Thunderbolt into Bulbasaur"]');
+    const charmanderTarget = pikachuControls.locator('.ps-target-btn[title^="Thunderbolt into Charmander"]');
+    await expect(bulbasaurTarget).toBeVisible();
+    await expect(charmanderTarget).toBeVisible();
+    await expect(bulbasaurTarget).toContainText('P2A Bulbasaur');
+    await expect(charmanderTarget).toContainText('P2B Charmander');
+
+    await charmanderTarget.click();
+    await expect(charmanderTarget).toHaveClass(/ps-target-btn-selected/);
+    await expect(pikachuControls).toContainText('Targeting P2B Charmander');
+    await expect(bulbasaurTarget).not.toHaveClass(/ps-target-btn-selected/);
   });
 
   test('Back button returns to original replay', async ({ page }) => {

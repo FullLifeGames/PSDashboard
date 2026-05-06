@@ -307,6 +307,24 @@ function shouldAppendTargetLoc(
   return battle.actions.targetTypeChoices(targetType) && battle.validTargetLoc(targetLoc, active, targetType);
 }
 
+function targetLocSuffixForChoice(
+  battle: SimBattle,
+  active: SimPokemon | null | undefined,
+  moveName: string,
+  protocolTargetLoc: number,
+): string {
+  if (shouldAppendTargetLoc(battle, active, moveName, protocolTargetLoc)) {
+    return ` ${formatTargetLoc(protocolTargetLoc)}`;
+  }
+
+  if (!active || active.side.active.length < 2) return '';
+  const targetType = targetTypeForMove(active, moveName);
+  if (!battle.actions.targetTypeChoices(targetType)) return '';
+
+  const fallbackTargetLoc = firstLegalTargetLoc(battle, active, targetType);
+  return fallbackTargetLoc ? ` ${formatTargetLoc(fallbackTargetLoc)}` : '';
+}
+
 function firstLegalTargetLoc(battle: SimBattle, active: SimPokemon, targetType: string): number | null {
   if (active.side.active.length < 2 || !battle.actions.targetTypeChoices(targetType)) return null;
   for (let loc = 1; loc <= battle.activePerHalf; loc++) {
@@ -360,12 +378,12 @@ function getChoiceForSlot(
       const moveName = line.split('|')[3];
       const active = battle.sides[sideIdx].active[activeSlot];
       const targetLoc = protocolTargetLoc(battle, side, activeSlot, line.split('|')[4]);
-      const suffix = shouldAppendTargetLoc(
+      const suffix = targetLocSuffixForChoice(
         battle,
         active,
         moveName,
         targetLoc,
-      ) ? ` ${formatTargetLoc(targetLoc)}` : '';
+      );
       return `${moveChoiceForActive(active, moveName)}${suffix}`;
     }
   }
@@ -473,16 +491,106 @@ function correctHpFromSnapshot(battle: SimBattle, snapshot: TurnSnapshot) {
       if (battlePokemon && snapshotPokemon.maxhp > 0) {
         const ratio = snapshotPokemon.hpPercent / 100;
         battlePokemon.hp = Math.max(0, Math.round(ratio * battlePokemon.maxhp));
-        if (snapshotPokemon.fainted) {
-          battlePokemon.hp = 0;
-          battlePokemon.fainted = true;
+        battlePokemon.fainted = snapshotPokemon.fainted;
+        battlePokemon.faintQueued = snapshotPokemon.fainted;
+        if (snapshotPokemon.fainted) battlePokemon.hp = 0;
+        if (!snapshotPokemon.fainted && battlePokemon.hp <= 0 && snapshotPokemon.hpPercent > 0) {
+          battlePokemon.hp = 1;
         }
-        if (snapshotPokemon.status && snapshotPokemon.status !== '') {
-          battlePokemon.status = snapshotPokemon.status as SimPokemon['status'];
+        battlePokemon.status = (snapshotPokemon.status || '') as SimPokemon['status'];
+        for (const stat of ['atk', 'def', 'spa', 'spd', 'spe', 'accuracy', 'evasion'] as const) {
+          battlePokemon.boosts[stat] = snapshotPokemon.boosts[stat] ?? 0;
         }
       }
     }
   }
+}
+
+function snapshotConditionDuration(value: unknown): number | undefined {
+  if (!value || typeof value !== 'object') return undefined;
+  const maybeDuration = value as { minDuration?: unknown; maxDuration?: unknown; duration?: unknown };
+  for (const duration of [maybeDuration.duration, maybeDuration.minDuration, maybeDuration.maxDuration]) {
+    if (typeof duration === 'number' && Number.isFinite(duration) && duration > 0) return duration;
+  }
+  return undefined;
+}
+
+function syncEffectTableFromSnapshot(
+  table: Record<string, { id?: string; duration?: number; effectOrder?: number }>,
+  snapshotTable: Record<string, unknown>,
+) {
+  const desiredIds = new Set(Object.keys(snapshotTable).map(key => toId(key)));
+  for (const key of Object.keys(table)) {
+    if (!desiredIds.has(toId(key))) delete table[key];
+  }
+
+  for (const [key, value] of Object.entries(snapshotTable)) {
+    const id = toId(key);
+    const duration = snapshotConditionDuration(value);
+    table[id] = {
+      ...(table[id] ?? {}),
+      id,
+      effectOrder: table[id]?.effectOrder ?? 0,
+      ...(duration ? { duration } : {}),
+    };
+  }
+}
+
+function terrainIdFromSnapshot(terrain: string): string {
+  if (!terrain) return '';
+  const terrainCondition = Dex.conditions.get(`${terrain} Terrain`);
+  return terrainCondition.exists ? terrainCondition.id : toId(terrain);
+}
+
+function weatherIdFromSnapshot(weather: string): string {
+  if (!weather) return '';
+  const weatherCondition = Dex.conditions.get(weather);
+  return weatherCondition.exists ? weatherCondition.id : toId(weather);
+}
+
+function correctFieldFromSnapshot(battle: SimBattle, snapshot: TurnSnapshot) {
+  battle.turn = snapshot.turn;
+  battle.field.weather = weatherIdFromSnapshot(snapshot.field.weather) as SimBattle['field']['weather'];
+  battle.field.terrain = terrainIdFromSnapshot(snapshot.field.terrain) as SimBattle['field']['terrain'];
+  syncEffectTableFromSnapshot(
+    battle.field.pseudoWeather as Record<string, { id?: string; duration?: number; effectOrder?: number }>,
+    snapshot.field.pseudoWeather,
+  );
+  syncEffectTableFromSnapshot(
+    battle.sides[0].sideConditions as Record<string, { id?: string; duration?: number; effectOrder?: number }>,
+    snapshot.p1.sideConditions,
+  );
+  syncEffectTableFromSnapshot(
+    battle.sides[1].sideConditions as Record<string, { id?: string; duration?: number; effectOrder?: number }>,
+    snapshot.p2.sideConditions,
+  );
+}
+
+function replayLogPrefixThroughTurn(replayLog: string, targetTurn: number): string[] {
+  const prefix: string[] = [];
+  let foundTargetTurn = false;
+
+  for (const rawLine of replayLog.split('\n')) {
+    const line = rawLine.replace(/\r$/, '');
+    if (!line.trim()) continue;
+    prefix.push(line);
+    if (line === `|turn|${targetTurn}`) {
+      foundTargetTurn = true;
+      break;
+    }
+  }
+
+  if (!foundTargetTurn) prefix.push(`|turn|${targetTurn}`);
+  return prefix;
+}
+
+function replaceLogWithReplayPrefix(log: string[], replayLog: string, targetTurn: number) {
+  log.splice(0, log.length, ...replayLogPrefixThroughTurn(replayLog, targetTurn));
+}
+
+function correctBattleFromSnapshot(battle: SimBattle, snapshot: TurnSnapshot) {
+  correctHpFromSnapshot(battle, snapshot);
+  correctFieldFromSnapshot(battle, snapshot);
 }
 
 interface LoggedActive {
@@ -852,6 +960,22 @@ export async function reconstructBranchRuntime(params: {
     }
   };
 
+  const waitForLogIdle = async (idleMs = 50, timeoutMs = 500) => {
+    const startedAt = Date.now();
+    let lastLength = collectedLog.length;
+    let stableSince = Date.now();
+
+    while (Date.now() - startedAt < timeoutMs) {
+      await sleep(10);
+      if (collectedLog.length !== lastLength) {
+        lastLength = collectedLog.length;
+        stableSince = Date.now();
+      } else if (Date.now() - stableSince >= idleMs) {
+        return;
+      }
+    }
+  };
+
   void streams.omniscient.write(
     `>start {"formatid":"${format}"}\n>player p1 {"name":"Player 1","team":"${p1Packed}"}\n>player p2 {"name":"Player 2","team":"${p2Packed}"}`
   );
@@ -936,10 +1060,6 @@ export async function reconstructBranchRuntime(params: {
     }
   }
 
-  if (snapshot && battleStream.battle) {
-    correctHpFromSnapshot(battleStream.battle, snapshot);
-  }
-
   await waitForBattle(
     battle => battle.ended || !!battle.requestState || !!battle.sides[0].activeRequest || !!battle.sides[1].activeRequest,
     500,
@@ -948,6 +1068,12 @@ export async function reconstructBranchRuntime(params: {
     log => log.some(line => line === `|turn|${targetTurn}`) || !!battleStream.battle?.ended,
     1000,
   );
+  await waitForLogIdle();
+
+  if (snapshot && battleStream.battle) {
+    correctBattleFromSnapshot(battleStream.battle, snapshot);
+    replaceLogWithReplayPrefix(collectedLog, replayLog, targetTurn);
+  }
 
   if (battleStream.battle) {
     const correctionLines = syncLogActivesFromBattle(collectedLog, battleStream.battle, targetTurn);

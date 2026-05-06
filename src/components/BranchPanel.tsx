@@ -80,15 +80,29 @@ function hpBarClass(pct: number) {
   return 'ps-hpbar-red';
 }
 
+function parsePendingMoveChoice(choice: string | null): { slot: number; targetLoc?: number } | null {
+  const match = choice?.trim().match(/^move\s+(\d+)(?:\s+([+-]?\d+))?$/i);
+  if (!match) return null;
+  return {
+    slot: parseInt(match[1], 10),
+    targetLoc: match[2] ? parseInt(match[2], 10) : undefined,
+  };
+}
+
 /* ── Move button ── */
-function MoveBtn({ move, dmg, targetDamage, selected, onClick }: {
+function MoveBtn({ move, dmg, targetDamage, pendingChoice, onClick }: {
   move: BranchMoveOption;
   dmg?: DamageResult;
   targetDamage: Record<number, DamageResult | undefined>;
-  selected: boolean;
+  pendingChoice: string | null;
   onClick: (targetLoc?: number) => void;
 }) {
   const bg = typeBg(move.type);
+  const pendingMove = parsePendingMoveChoice(pendingChoice);
+  const selected = pendingMove?.slot === move.slot;
+  const selectedTarget = selected
+    ? move.targetOptions.find(target => target.targetLoc === pendingMove.targetLoc)
+    : null;
   return (
     <div>
       <button
@@ -109,22 +123,39 @@ function MoveBtn({ move, dmg, targetDamage, selected, onClick }: {
             {dmg.koChance && <span className="ps-movebtn-ko"> ({dmg.koChance})</span>}
           </div>
         )}
+        {selectedTarget && (
+          <div className="ps-movebtn-target">
+            Targeting {selectedTarget.label} {selectedTarget.name}
+          </div>
+        )}
       </button>
       {move.targetOptions.length > 0 && (
         <div className="ps-target-row">
-          {move.targetOptions.map(target => (
-            <button
-              key={target.targetLoc}
-              type="button"
-              onClick={() => onClick(target.targetLoc)}
-              disabled={move.disabled}
-              className="ps-target-btn"
-              title={`${move.name} into ${target.name} (${target.hpPercent}%)`}
-            >
-              {target.label}
-              {targetDamage[target.targetLoc]?.maxPercent ? ` ${targetDamage[target.targetLoc]?.range}` : ''}
-            </button>
-          ))}
+          {move.targetOptions.map(target => {
+            const damage = targetDamage[target.targetLoc];
+            const targetSelected = selected && pendingMove?.targetLoc === target.targetLoc;
+            return (
+              <button
+                key={target.targetLoc}
+                type="button"
+                onClick={() => onClick(target.targetLoc)}
+                disabled={move.disabled}
+                className={`ps-target-btn ${targetSelected ? 'ps-target-btn-selected' : ''}`}
+                title={`${move.name} into ${target.name} (${target.hpPercent}%)`}
+                aria-pressed={targetSelected}
+              >
+                <span className="ps-target-main">
+                  <span className="ps-target-slot">{target.label}</span>
+                  {' '}
+                  <span className="ps-target-name">{target.name}</span>
+                </span>
+                <span className="ps-target-meta">
+                  {target.hpPercent}% HP
+                  {damage?.maxPercent ? ` · ${damage.range}` : ''}
+                </span>
+              </button>
+            );
+          })}
         </div>
       )}
     </div>
@@ -243,7 +274,7 @@ function SideControls({ label, activeName, moves, switches, forceSwitch, pending
                     targetDamageResults[`${m.slot}:${target.targetLoc}`],
                   ]),
                 )}
-                selected={pending?.startsWith(`move ${m.slot}`) ?? false}
+                pendingChoice={pending}
                 onClick={(targetLoc) => onMove(m.slot, targetLoc)}
               />
             ))}
