@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback, useMemo } from 'react';
+import { useEffect, useState, useCallback, useMemo, useRef } from 'react';
 import { useReplay } from './hooks/useReplay';
 import { useBranch } from './hooks/useBranch';
 import { useSmogonUsageStats } from './hooks/useSmogonUsageStats';
@@ -102,6 +102,7 @@ function SharedBranchView({
 function App() {
   const { loading, error, replayData, snapshots, opponentInfo, p1Info, loadReplay } = useReplay();
   const { branching, simState, history, startBranch, setChoice, executeTurn, stopBranch } = useBranch();
+  const branchWindowOpenRef = useRef(false);
   const usageStats = useSmogonUsageStats(replayData?.formatid);
   const revealedSpecies = useMemo(() => {
     const p1 = p1Info?.pokemon.map(pokemon => pokemon.species) ?? [];
@@ -117,8 +118,13 @@ function App() {
   const [branchTurn, setBranchTurn] = useState(1);
   const [branchPreparing, setBranchPreparing] = useState(false);
   const [branchSession, setBranchSession] = useState(0);
+  const [animateBranchTurns, setAnimateBranchTurns] = useState(true);
   const [sharedBranch, setSharedBranch] = useState<BranchSharePayload | null>(null);
   const [sharedBranchError, setSharedBranchError] = useState<string | null>(null);
+  const [pendingBranchRefresh, setPendingBranchRefresh] = useState<{
+    p1Info: OpponentTeamInfo;
+    p2Info: OpponentTeamInfo;
+  } | null>(null);
 
   const maxTurn = snapshots.length > 0 ? snapshots.length : 1;
 
@@ -183,11 +189,60 @@ function App() {
       if (p1Team.length > 0 && p2Team.length > 0) {
         setBranchSession(session => session + 1);
         await startBranch(replayData.formatid || 'gen9ou', p1Team, p2Team, replayData.log, branchTurn, branchSnapshot);
+        branchWindowOpenRef.current = true;
       }
     } finally {
       setBranchPreparing(false);
     }
   }, [replayData, branchPreparing, teamText, branchTurn, branchSnapshot, effectiveP1Info, effectiveP2Info, usageStats.stats, setAssumptions.assumptions, startBranch]);
+
+  useEffect(() => {
+    if (!pendingBranchRefresh || !replayData) return;
+
+    let cancelled = false;
+    const refreshRequest = pendingBranchRefresh;
+    const activeReplay = replayData;
+
+    async function refreshBranch() {
+      setBranchPreparing(true);
+      await new Promise(resolve => setTimeout(resolve, 0));
+
+      try {
+        const { buildTeamsFromReplay } = await import('./lib/team-builder');
+        const { p1Team, p2Team } = buildTeamsFromReplay(activeReplay.log, {
+          userTeamText: teamText || undefined,
+          p1Info: refreshRequest.p1Info,
+          p2Info: refreshRequest.p2Info,
+          usageStats: usageStats.stats,
+          setAssumptions: setAssumptions.assumptions,
+        });
+        if (!cancelled && p1Team.length > 0 && p2Team.length > 0) {
+          setBranchSession(session => session + 1);
+          await startBranch(activeReplay.formatid || 'gen9ou', p1Team, p2Team, activeReplay.log, branchTurn, branchSnapshot);
+          branchWindowOpenRef.current = true;
+        }
+      } finally {
+        if (!cancelled) {
+          setBranchPreparing(false);
+          setPendingBranchRefresh(null);
+        }
+      }
+    }
+
+    void refreshBranch();
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    pendingBranchRefresh,
+    replayData,
+    teamText,
+    branchTurn,
+    branchSnapshot,
+    usageStats.stats,
+    setAssumptions.assumptions,
+    startBranch,
+  ]);
 
   const handleSetChoice = useCallback((side: 'p1' | 'p2', choice: string, activeSlot?: number) => {
     setChoice(side, choice, activeSlot);
@@ -198,17 +253,25 @@ function App() {
   }, [executeTurn]);
 
   const handleStopBranch = useCallback(() => {
+    branchWindowOpenRef.current = false;
     stopBranch();
   }, [stopBranch]);
 
   const handleSaveTeam = useCallback((side: 'p1' | 'p2', info: OpponentTeamInfo) => {
+    const nextP1Info = side === 'p1' ? info : effectiveP1Info;
+    const nextP2Info = side === 'p2' ? info : effectiveP2Info;
+
     if (side === 'p1') {
       setEditedP1Info(info);
     } else {
       setEditedP2Info(info);
     }
     setEditorSide(null);
-  }, []);
+
+    if ((branchWindowOpenRef.current || simState) && nextP1Info && nextP2Info) {
+      setPendingBranchRefresh({ p1Info: nextP1Info, p2Info: nextP2Info });
+    }
+  }, [effectiveP1Info, effectiveP2Info, simState]);
 
   const clearSharedBranch = useCallback(() => {
     window.history.replaceState(null, '', `${window.location.pathname}${window.location.search}`);
@@ -232,6 +295,7 @@ function App() {
     if (raw.length === 0) return '';
     return raw.filter(l => l && !l.startsWith('|split|') && !l.startsWith('|c|')).join('\n');
   }, [simState?.log]);
+  const latestBranchHistoryEntry = history.length > 0 ? history[history.length - 1] : null;
 
   const showBranch = branching && simLog.length > 0;
 
@@ -313,6 +377,14 @@ function App() {
                         {simState.winner ? `${simState.winner} wins!` : 'Ended'}
                       </span>
                     )}
+                    <label style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 10, color: '#aabbcc' }}>
+                      <input
+                        type="checkbox"
+                        checked={animateBranchTurns}
+                        onChange={event => setAnimateBranchTurns(event.target.checked)}
+                      />
+                      Animate branch turns
+                    </label>
                     <button type="button" className="ps-btn" onClick={handleStopBranch} style={{ padding: '2px 8px', fontSize: 10 }}>
                       Back
                     </button>
@@ -351,6 +423,8 @@ function App() {
                   seekTurn={simState?.turnNumber ?? branchTurn}
                   autoPlay={false}
                   liveUpdates
+                  liveAppendMode={animateBranchTurns ? 'play' : 'follow-end'}
+                  liveAppendTurn={latestBranchHistoryEntry?.turnNumber ?? null}
                   reloadKey={`${branchSession}:${branchTurn}`}
                 />
               ) : (

@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { enrichTeamInfo } from '../src/lib/team-info';
+import { enrichTeamInfo, unknownEvs } from '../src/lib/team-info';
 import {
   buildSmogonStatsUrls,
   fetchSmogonUsageStats,
@@ -149,6 +149,7 @@ test.describe('Smogon usage stat enrichment', () => {
         ability: { value: '', source: 'unknown' },
         item: { value: '(has item)', source: 'revealed' },
         teraType: { value: '', source: 'unknown' },
+        evs: unknownEvs(),
         level: 100,
         gender: '',
       }],

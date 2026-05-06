@@ -49,6 +49,7 @@ window.__psMakeSilentMedia = function makeSilentMediaHandle() {
     volume: 0,
     pause: function(){},
     play: function(){ return Promise.resolve(); },
+    resume: function(){ return Promise.resolve(); },
     stop: function(){},
     destroy: function(){},
     setVolume: function(){},
@@ -61,6 +62,8 @@ window.__psPatchBattleSound = function patchBattleSound() {
   var sound = (window.BattleSound && typeof window.BattleSound === 'object') ? window.BattleSound : {};
   sound.muted = true;
   sound.disabled = true;
+  if (!sound.bgm || typeof sound.bgm !== 'object') sound.bgm = makeSilent();
+  if (typeof sound.bgm.resume !== 'function') sound.bgm.resume = function(){ return Promise.resolve(); };
   sound.loadBgm = function(){ return makeSilent(); };
   sound.playBgm = function(){};
   sound.pauseBgm = function(){};
@@ -147,7 +150,9 @@ document.write('<script src="https://play.pokemonshowdown.com/js/replay-embed.js
       setTimeout(function() { appendAndFollow(data); }, 150);
       return;
     }
-    if (data.followEnd) {
+    if (typeof data.playFromTurn === 'number') {
+      queueSeek(data.playFromTurn, true);
+    } else if (data.followEnd) {
       queueSeek(Infinity, false);
     } else if (typeof data.seekTurn === 'number') {
       queueSeek(data.seekTurn, false);

@@ -11,6 +11,41 @@ const fixtureReplay = JSON.parse(
   readFileSync(join(__dirname, 'fixtures', 'replay.json'), 'utf-8'),
 );
 
+const doublesReplay = {
+  id: 'gen9doubles-test',
+  format: '[Gen 9] Doubles OU',
+  formatid: 'gen9doublesou',
+  players: ['Alice', 'Bob'],
+  uploadtime: 0,
+  views: 0,
+  log: [
+    '|player|p1|Alice|',
+    '|player|p2|Bob|',
+    '|gametype|doubles',
+    '|gen|9',
+    '|tier|[Gen 9] Doubles OU',
+    '|clearpoke',
+    '|poke|p1|Pikachu, L50|item',
+    '|poke|p1|Eevee, L50|item',
+    '|poke|p1|Raichu, L50|',
+    '|poke|p1|Jolteon, L50|',
+    '|poke|p2|Bulbasaur, L50|item',
+    '|poke|p2|Charmander, L50|item',
+    '|poke|p2|Squirtle, L50|',
+    '|poke|p2|Ivysaur, L50|',
+    '|c| Alice|/raw <div class="infobox"><details><summary>View team</summary>Pikachu @ Light Ball<br />Ability: Static<br />EVs: 4 HP &#x2f; 252 SpA &#x2f; 252 Spe<br />Timid Nature<br />- Thunderbolt<br />- Quick Attack<br />- Protect<br /><br />Eevee @ Eviolite<br />Ability: Adaptability<br />EVs: 252 Atk &#x2f; 4 SpD &#x2f; 252 Spe<br />Jolly Nature<br />- Tackle<br />- Quick Attack<br />- Protect<br /><br />Raichu<br />Ability: Static<br />- Thunderbolt<br />- Protect<br /><br />Jolteon<br />Ability: Volt Absorb<br />- Thunderbolt<br />- Protect<br /></details></div>',
+    '|c| Bob|/raw <div class="infobox"><details><summary>View team</summary>Bulbasaur @ Eviolite<br />Ability: Overgrow<br />- Vine Whip<br />- Protect<br /><br />Charmander @ Eviolite<br />Ability: Blaze<br />- Ember<br />- Protect<br /><br />Squirtle<br />Ability: Torrent<br />- Water Gun<br />- Protect<br /><br />Ivysaur<br />Ability: Overgrow<br />- Vine Whip<br />- Protect<br /></details></div>',
+    '|teampreview',
+    '|',
+    '|start',
+    '|switch|p1a: Pikachu|Pikachu, L50|100/100',
+    '|switch|p1b: Eevee|Eevee, L50|100/100',
+    '|switch|p2a: Bulbasaur|Bulbasaur, L50|100/100',
+    '|switch|p2b: Charmander|Charmander, L50|100/100',
+    '|turn|1',
+  ].join('\n'),
+};
+
 const sharedBranchPayload: BranchSharePayload = {
   version: 1,
   replayId: fixtureReplay.id,
@@ -31,15 +66,17 @@ type ReplayWindow = Window & {
       paused?: boolean;
     };
   };
+  __psPostedMessages?: unknown[];
 };
 
 test.describe('PS Replay Interceptor', () => {
   test.beforeEach(async ({ page }) => {
     await page.route('**/replay.pokemonshowdown.com/**', (route) => {
+      const replay = route.request().url().includes(doublesReplay.id) ? doublesReplay : fixtureReplay;
       route.fulfill({
         status: 200,
         contentType: 'application/json',
-        body: JSON.stringify(fixtureReplay),
+        body: JSON.stringify(replay),
       });
     });
     await page.route('https://data.pkmn.cc/**', (route) => {
@@ -141,7 +178,7 @@ test.describe('PS Replay Interceptor', () => {
   test('branch replay iframe keeps the same fixed visible height', async ({ page }) => {
     await page.locator('button', { hasText: 'Load' }).click();
     await page.locator('button', { hasText: 'Branch Here' }).click();
-    await expect(page.locator('text=Branching')).toBeVisible({ timeout: 15000 });
+    await expect(page.getByText(/Branching.*Turn/)).toBeVisible({ timeout: 15000 });
 
     const branchIframe = page.locator('iframe[title="Branch Simulation"]');
     await expect(branchIframe).toBeVisible({ timeout: 10000 });
@@ -176,7 +213,7 @@ test.describe('PS Replay Interceptor', () => {
     await expect(page.locator('button', { hasText: 'Branch Here' })).toBeVisible({ timeout: 10000 });
     await page.locator('button', { hasText: 'Branch Here' }).click();
 
-    await expect(page.locator('text=Branching')).toBeVisible({ timeout: 15000 });
+    await expect(page.getByText(/Branching.*Turn/)).toBeVisible({ timeout: 15000 });
     await expect(page.locator('button', { hasText: 'Back' })).toBeVisible();
 
     await expect(page.locator('iframe[title="Branch Simulation"]')).toBeVisible({ timeout: 10000 });
@@ -188,7 +225,7 @@ test.describe('PS Replay Interceptor', () => {
     await expect(page.locator('button', { hasText: 'Branch Here' })).toBeVisible({ timeout: 10000 });
     await page.locator('button', { hasText: 'Branch Here' }).click();
 
-    await expect(page.locator('text=Branching')).toBeVisible({ timeout: 15000 });
+    await expect(page.getByText(/Branching.*Turn/)).toBeVisible({ timeout: 15000 });
     await expect(page.getByText('P1', { exact: true }).first()).toBeVisible();
     await expect(page.getByText('P2', { exact: true }).first()).toBeVisible();
     await expect(page.locator('button', { hasText: 'Fight' }).first()).toBeVisible();
@@ -198,7 +235,7 @@ test.describe('PS Replay Interceptor', () => {
     await page.locator('button', { hasText: 'Load' }).click();
     await expect(page.locator('button', { hasText: 'Branch Here' })).toBeVisible({ timeout: 10000 });
     await page.locator('button', { hasText: 'Branch Here' }).click();
-    await expect(page.locator('text=Branching')).toBeVisible({ timeout: 15000 });
+    await expect(page.getByText(/Branching.*Turn/)).toBeVisible({ timeout: 15000 });
     await expect(page.locator('.ps-movebtn').first()).toBeVisible({ timeout: 5000 });
   });
 
@@ -206,7 +243,7 @@ test.describe('PS Replay Interceptor', () => {
     await page.locator('button', { hasText: 'Load' }).click();
     await expect(page.locator('button', { hasText: 'Branch Here' })).toBeVisible({ timeout: 10000 });
     await page.locator('button', { hasText: 'Branch Here' }).click();
-    await expect(page.locator('text=Branching')).toBeVisible({ timeout: 15000 });
+    await expect(page.getByText(/Branching.*Turn/)).toBeVisible({ timeout: 15000 });
 
     const recommendation = page.locator('button', { hasText: /Use Recommended/i }).first();
     await expect(recommendation).toBeVisible({ timeout: 5000 });
@@ -218,7 +255,7 @@ test.describe('PS Replay Interceptor', () => {
   test('branch simulation accepts custom move choices', async ({ page }) => {
     await page.locator('button', { hasText: 'Load' }).click();
     await page.locator('button', { hasText: 'Branch Here' }).click();
-    await expect(page.locator('text=Branching')).toBeVisible({ timeout: 15000 });
+    await expect(page.getByText(/Branching.*Turn/)).toBeVisible({ timeout: 15000 });
 
     const customInputs = page.locator('input[aria-label^="Custom move choice"]');
     await expect(customInputs.first()).toBeVisible({ timeout: 5000 });
@@ -226,6 +263,32 @@ test.describe('PS Replay Interceptor', () => {
     await page.locator('button', { hasText: 'Use Custom' }).first().click();
 
     await expect(page.locator('text=/\\[move 1\\]/').first()).toBeVisible({ timeout: 5000 });
+  });
+
+  test('saving player edits refreshes the active branch and exposes EV controls', async ({ page }) => {
+    await page.locator('button', { hasText: 'Load' }).click();
+    await page.locator('button', { hasText: 'Branch Here' }).click();
+    await expect(page.getByText(/Branching.*Turn/)).toBeVisible({ timeout: 15000 });
+
+    await page.locator('button', { hasText: 'Edit Player' }).click();
+    const editor = page.getByRole('dialog', { name: 'Edit Player Team' });
+    await expect(editor).toBeVisible();
+    await expect(editor.getByLabel('Garchomp HP EVs')).toBeVisible();
+    await editor.getByLabel('Garchomp HP EVs').fill('252');
+    await editor.getByLabel('Garchomp Atk EVs').fill('252');
+    await editor.getByLabel('Garchomp Spe EVs').fill('4');
+    const garchompCard = editor.locator('.ps-panel').filter({ hasText: 'Garchomp' }).first();
+    await garchompCard.getByLabel(/Remove .* from Garchomp/).first().click();
+    await garchompCard.getByPlaceholder('Add move...').fill('Dragon Claw');
+    await garchompCard.getByPlaceholder('Add move...').press('Enter');
+    await editor.locator('button', { hasText: /^Save$/ }).click();
+
+    await expect(page.locator('.ps-branch-side-column').first()).toContainText('Dragon Claw', { timeout: 15000 });
+    await expect(page.locator('.ps-main-right')).toContainText('252 HP / 252 Atk / 4 Spe EVs');
+
+    await page.locator('button', { hasText: 'Edit Player' }).click();
+    const reopenedEditor = page.getByRole('dialog', { name: 'Edit Player Team' });
+    await expect(reopenedEditor.getByLabel('Garchomp HP EVs')).toHaveValue('252');
   });
 
   test('clicking Branch Here gives immediate preparation feedback', async ({ page }) => {
@@ -238,7 +301,7 @@ test.describe('PS Replay Interceptor', () => {
   test('executing a branch turn keeps the branch replay iframe mounted', async ({ page }) => {
     await page.locator('button', { hasText: 'Load' }).click();
     await page.locator('button', { hasText: 'Branch Here' }).click();
-    await expect(page.locator('text=Branching')).toBeVisible({ timeout: 15000 });
+    await expect(page.getByText(/Branching.*Turn/)).toBeVisible({ timeout: 15000 });
 
     await page.locator('button', { hasText: /Use Recommended/i }).nth(0).click();
     await page.locator('button', { hasText: /Use Recommended/i }).nth(1).click();
@@ -287,6 +350,46 @@ test.describe('PS Replay Interceptor', () => {
     ).toContain('The opposing Kingambit fainted!');
   });
 
+  test('branch execution defaults to animating the appended turn', async ({ page }) => {
+    await page.locator('button', { hasText: 'Load' }).click();
+    await expect(page.locator('button', { hasText: 'Branch Here' })).toBeVisible({ timeout: 10000 });
+    await page.locator('input[type="range"]').fill('2');
+    await page.locator('button', { hasText: 'Branch Here' }).click();
+    await expect(page.getByText(/Branching.*Turn 2/)).toBeVisible({ timeout: 15000 });
+
+    const animateToggle = page.getByLabel('Animate branch turns');
+    await expect(animateToggle).toBeVisible();
+    await expect(animateToggle).toBeChecked();
+
+    const iframeHandle = await page.locator('iframe[title="Branch Simulation"]').elementHandle({ timeout: 10000 });
+    const frame = await iframeHandle?.contentFrame();
+    expect(frame).toBeTruthy();
+    await iframeHandle!.evaluate((iframe: HTMLIFrameElement) => {
+      const targetWindow = iframe.contentWindow as ReplayWindow | null;
+      if (!targetWindow || targetWindow.__psPostedMessages) return;
+      const originalPostMessage = targetWindow.postMessage.bind(targetWindow);
+      targetWindow.__psPostedMessages = [];
+      targetWindow.postMessage = ((message: unknown, targetOrigin: string, transfer?: Transferable[]) => {
+        targetWindow.__psPostedMessages?.push(message);
+        return originalPostMessage(message, targetOrigin, transfer as never);
+      }) as Window['postMessage'];
+    });
+
+    await page.locator('button', { hasText: /Use Recommended/i }).nth(0).click();
+    await page.locator('button', { hasText: /Use Recommended/i }).nth(1).click();
+    await page.locator('button', { hasText: 'Execute Turn' }).click();
+
+    await expect.poll(async () => frame!.evaluate(() =>
+      (window as ReplayWindow).__psPostedMessages?.some(message => {
+        const data = message as { type?: string; playFromTurn?: number };
+        return data.type === 'ps-append-log' && data.playFromTurn === 2;
+      }) ?? false
+    )).toBe(true);
+    await expect.poll(async () => frame!.evaluate(() =>
+      (window as ReplayWindow).Replays?.battle?.turn ?? -1
+    )).toBe(2);
+  });
+
   test('branch replay play controls stay muted without audio errors', async ({ page }) => {
     const pageErrors: string[] = [];
     page.on('pageerror', error => pageErrors.push(error.message));
@@ -308,13 +411,13 @@ test.describe('PS Replay Interceptor', () => {
     await expect.poll(async () =>
       frame!.evaluate(() => Boolean((window as ReplayWindow).Replays?.battle && !(window as ReplayWindow).Replays?.battle?.paused))
     ).toBe(true);
-    expect(pageErrors.filter(message => message.includes('BattleSound'))).toHaveLength(0);
+    expect(pageErrors).toHaveLength(0);
   });
 
   test('branch replay iframe does not shrink as history grows', async ({ page }) => {
     await page.locator('button', { hasText: 'Load' }).click();
     await page.locator('button', { hasText: 'Branch Here' }).click();
-    await expect(page.locator('text=Branching')).toBeVisible({ timeout: 15000 });
+    await expect(page.getByText(/Branching.*Turn/)).toBeVisible({ timeout: 15000 });
 
     const branchIframe = page.locator('iframe[title="Branch Simulation"]');
     const initialBox = await branchIframe.boundingBox();
@@ -337,7 +440,7 @@ test.describe('PS Replay Interceptor', () => {
     await page.locator('button', { hasText: 'Load' }).click();
     await page.locator('input[type="range"]').fill('2');
     await page.locator('button', { hasText: 'Branch Here' }).click();
-    await expect(page.locator('text=Branching')).toBeVisible({ timeout: 15000 });
+    await expect(page.getByText(/Branching.*Turn/)).toBeVisible({ timeout: 15000 });
 
     const p1Controls = page.locator('.ps-branch-side-column').nth(0);
     const p2Controls = page.locator('.ps-branch-side-column').nth(1);
@@ -355,7 +458,7 @@ test.describe('PS Replay Interceptor', () => {
 
     await page.locator('button', { hasText: 'Load' }).click();
     await page.locator('button', { hasText: 'Branch Here' }).click();
-    await expect(page.locator('text=Branching')).toBeVisible({ timeout: 15000 });
+    await expect(page.getByText(/Branching.*Turn/)).toBeVisible({ timeout: 15000 });
 
     const leftColumn = page.locator('.ps-main-left');
     const statsColumn = page.locator('.ps-main-right');
@@ -375,7 +478,7 @@ test.describe('PS Replay Interceptor', () => {
   test('move buttons keep a readable fixed size', async ({ page }) => {
     await page.locator('button', { hasText: 'Load' }).click();
     await page.locator('button', { hasText: 'Branch Here' }).click();
-    await expect(page.locator('text=Branching')).toBeVisible({ timeout: 15000 });
+    await expect(page.getByText(/Branching.*Turn/)).toBeVisible({ timeout: 15000 });
 
     const box = await page.locator('.ps-movebtn').first().boundingBox();
     expect(box?.height).toBeGreaterThanOrEqual(58);
@@ -386,7 +489,7 @@ test.describe('PS Replay Interceptor', () => {
     await page.locator('button', { hasText: 'Load' }).click();
     await expect(page.locator('button', { hasText: 'Branch Here' })).toBeVisible({ timeout: 10000 });
     await page.locator('button', { hasText: 'Branch Here' }).click();
-    await expect(page.locator('text=Branching')).toBeVisible({ timeout: 15000 });
+    await expect(page.getByText(/Branching.*Turn/)).toBeVisible({ timeout: 15000 });
 
     await page.locator('button', { hasText: 'Pokémon' }).first().click();
     await expect(page.locator('.ps-switchbtn').first()).toBeVisible({ timeout: 5000 });
@@ -396,7 +499,7 @@ test.describe('PS Replay Interceptor', () => {
     await page.locator('button', { hasText: 'Load' }).click();
     await expect(page.locator('button', { hasText: 'Branch Here' })).toBeVisible({ timeout: 10000 });
     await page.locator('button', { hasText: 'Branch Here' }).click();
-    await expect(page.locator('text=Branching')).toBeVisible({ timeout: 15000 });
+    await expect(page.getByText(/Branching.*Turn/)).toBeVisible({ timeout: 15000 });
 
     const moveBtns = page.locator('.ps-movebtn');
     await expect(moveBtns.first()).toBeVisible({ timeout: 5000 });
@@ -417,18 +520,41 @@ test.describe('PS Replay Interceptor', () => {
     await page.locator('button', { hasText: 'Load' }).click();
     await expect(page.locator('button', { hasText: 'Branch Here' })).toBeVisible({ timeout: 10000 });
     await page.locator('button', { hasText: 'Branch Here' }).click();
-    await expect(page.locator('text=Branching')).toBeVisible({ timeout: 15000 });
+    await expect(page.getByText(/Branching.*Turn/)).toBeVisible({ timeout: 15000 });
 
     await expect(page.locator('button', { hasText: 'Save Branch' })).toBeVisible({ timeout: 5000 });
     await page.locator('button', { hasText: 'Copy Share Link' }).click();
     await expect(page.locator('input[aria-label="Branch share link"]')).toHaveValue(/#branch=/);
   });
 
+  test('doubles branch shows slot controls and blocks duplicate simultaneous switches', async ({ page }) => {
+    await page.locator('input[type="text"]').fill('gen9doubles-test');
+    await page.locator('button', { hasText: 'Load' }).click();
+    await expect(page.getByText('Alice', { exact: true }).first()).toBeVisible({ timeout: 10000 });
+    await page.locator('button', { hasText: 'Branch Here' }).click();
+    await expect(page.getByText(/Branching.*Turn/)).toBeVisible({ timeout: 15000 });
+
+    const controls = page.locator('.ps-side-controls');
+    await expect(controls).toHaveCount(4);
+    await expect(controls.nth(0)).toContainText('P1A');
+    await expect(controls.nth(1)).toContainText('P1B');
+    await expect(controls.nth(2)).toContainText('P2A');
+    await expect(controls.nth(3)).toContainText('P2B');
+
+    await controls.nth(0).locator('.ps-controls-tab').nth(1).click();
+    await controls.nth(1).locator('.ps-controls-tab').nth(1).click();
+    await expect(controls.nth(0).locator('.ps-switchbtn').first()).toBeVisible({ timeout: 5000 });
+    await expect(controls.nth(1).locator('.ps-switchbtn').first()).toBeVisible();
+
+    await controls.nth(0).locator('.ps-switchbtn').first().click();
+    await expect(controls.nth(1).locator('.ps-switchbtn').first()).toBeDisabled();
+  });
+
   test('Back button returns to original replay', async ({ page }) => {
     await page.locator('button', { hasText: 'Load' }).click();
     await expect(page.locator('button', { hasText: 'Branch Here' })).toBeVisible({ timeout: 10000 });
     await page.locator('button', { hasText: 'Branch Here' }).click();
-    await expect(page.locator('text=Branching')).toBeVisible({ timeout: 15000 });
+    await expect(page.getByText(/Branching.*Turn/)).toBeVisible({ timeout: 15000 });
 
     await page.locator('button', { hasText: 'Back' }).click();
     await expect(page.locator('button', { hasText: 'Branch Here' })).toBeVisible({ timeout: 5000 });

@@ -3,7 +3,7 @@ import { Teams } from '@pkmn/sim';
 import { inferOpponentTeam } from './opponent-inferrer';
 import { getSpeciesUsageSet, type SmogonUsageStats, type UsageProbability } from './smogon-stats';
 import { getSpeciesSetAssumption, type SetAssumption, type SmogonSetAssumptions } from './smogon-sets';
-import type { OpponentTeamInfo, RevealedPokemonInfo } from '../types';
+import type { OpponentTeamInfo, PokemonEvs, RevealedPokemonInfo } from '../types';
 
 function toId(name: string): string {
   return name.toLowerCase().replace(/[^a-z0-9]/g, '');
@@ -50,6 +50,9 @@ function buildSet(
   usageStats?: SmogonUsageStats | null,
   setAssumptions?: SmogonSetAssumptions | null,
 ): PokemonSet {
+  const editedEvs = info.evs?.source === 'manual' || info.evs?.source === 'revealed'
+    ? sanitizeEvs(info.evs.value)
+    : null;
   const userMatch = userTeam?.find(candidate => {
     const candidateId = toId(candidate.species);
     const infoId = toId(info.species);
@@ -67,6 +70,7 @@ function buildSet(
       ability: info.ability.value || userMatch.ability,
       item: cleanItem(info.item.value, userMatch.item),
       teraType: info.teraType.value || userMatch.teraType,
+      evs: editedEvs || userMatch.evs,
       level: info.level || userMatch.level || 100,
       gender: (info.gender || userMatch.gender || '') as '' | 'M' | 'F',
     };
@@ -86,11 +90,27 @@ function buildSet(
     ability: info.ability.value || usageSet?.ability?.value || smogonSet?.ability?.value || '',
     moves: moves.length > 0 ? moves : ['Tackle'],
     nature: (spread?.nature || setSpread?.nature || 'Hardy') as PokemonSet['nature'],
-    evs: spread?.evs || setSpread?.evs || { hp: 252, atk: 252, def: 0, spa: 0, spd: 4, spe: 0 },
+    evs: editedEvs || spread?.evs || setSpread?.evs || { hp: 252, atk: 252, def: 0, spa: 0, spd: 4, spe: 0 },
     ivs: { hp: 31, atk: 31, def: 31, spa: 31, spd: 31, spe: 31 },
     level: info.level || 100,
     gender: (info.gender || '') as '' | 'M' | 'F',
     teraType: info.teraType.value || undefined,
+  };
+}
+
+function sanitizeEv(value: number | undefined): number {
+  if (!Number.isFinite(value)) return 0;
+  return Math.min(252, Math.max(0, Math.round(value ?? 0)));
+}
+
+function sanitizeEvs(evs: PokemonEvs): PokemonEvs {
+  return {
+    hp: sanitizeEv(evs.hp),
+    atk: sanitizeEv(evs.atk),
+    def: sanitizeEv(evs.def),
+    spa: sanitizeEv(evs.spa),
+    spd: sanitizeEv(evs.spd),
+    spe: sanitizeEv(evs.spe),
   };
 }
 

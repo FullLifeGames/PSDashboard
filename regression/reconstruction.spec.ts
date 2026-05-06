@@ -1,5 +1,6 @@
 import { test, expect } from '@playwright/test';
 import { readFileSync } from 'fs';
+import type { PokemonSet } from '@pkmn/sim';
 import { buildTeamsFromReplay } from '../src/lib/team-builder';
 import { reconstructBranchRuntime, createBranchState } from '../src/lib/branch-engine';
 import { parseReplayLog } from '../src/lib/protocol-parser';
@@ -255,6 +256,83 @@ test.describe('Replay reconstruction regression suite', () => {
     expect(runtime.log.join('\n')).toContain('|move|p1a: Klolovor|Stone Axe|p2a: Scizor');
     expect(runtime.log.join('\n')).toContain('|move|p2a: Scizor|U-turn|p1a: Klolovor');
     expect(runtime.log.join('\n')).not.toContain('|move|p2a: Scizor|Bullet Punch|p1a: Klolovor');
+  });
+
+  test('corrects active Pokémon from protocol switch effects the simulator cannot reproduce', async () => {
+    const p1Team: PokemonSet[] = [
+      {
+        name: 'Decidueye',
+        species: 'Decidueye',
+        item: '',
+        ability: 'Overgrow',
+        moves: ['Leaf Blade', 'Protect'],
+        nature: 'Adamant',
+        evs: { hp: 252, atk: 252, def: 0, spa: 0, spd: 4, spe: 0 },
+        ivs: { hp: 31, atk: 31, def: 31, spa: 31, spd: 31, spe: 31 },
+        level: 100,
+      },
+      {
+        name: 'Gliscor',
+        species: 'Gliscor',
+        item: 'Toxic Orb',
+        ability: 'Poison Heal',
+        moves: ['Toxic', 'Protect'],
+        nature: 'Impish',
+        evs: { hp: 244, atk: 0, def: 252, spa: 0, spd: 12, spe: 0 },
+        ivs: { hp: 31, atk: 31, def: 31, spa: 31, spd: 31, spe: 31 },
+        level: 100,
+      },
+    ];
+    const p2Team: PokemonSet[] = [{
+      name: 'Rotom',
+      species: 'Rotom',
+      item: '',
+      ability: 'Levitate',
+      moves: ['Thunderbolt', 'Protect'],
+      nature: 'Timid',
+      evs: { hp: 0, atk: 0, def: 0, spa: 252, spd: 4, spe: 252 },
+      ivs: { hp: 31, atk: 31, def: 31, spa: 31, spd: 31, spe: 31 },
+      level: 100,
+    }];
+    const log = [
+      '|gametype|singles',
+      '|player|p1|Alice||',
+      '|player|p2|Bob||',
+      '|gen|9',
+      '|tier|[Gen 9] OU',
+      '|clearpoke',
+      '|poke|p1|Decidueye, M|',
+      '|poke|p1|Gliscor, M|',
+      '|poke|p2|Rotom|',
+      '|start',
+      '|switch|p1a: Decidueye|Decidueye, M|100/100',
+      '|switch|p2a: Rotom|Rotom|100/100',
+      '|turn|1',
+      '|move|p1a: Decidueye|Leaf Blade|p2a: Rotom',
+      '|-damage|p2a: Rotom|80/100',
+      '|move|p2a: Rotom|Thunderbolt|p1a: Decidueye',
+      '|-damage|p1a: Decidueye|70/100',
+      '|switch|p1a: Gliscor|Gliscor, M|100/100|[from] item: Eject Button',
+      '|upkeep',
+      '|turn|2',
+      '|move|p1a: Gliscor|Toxic|p2a: Rotom',
+      '|-status|p2a: Rotom|tox',
+    ].join('\n');
+
+    const runtime = await reconstructBranchRuntime({
+      format: 'gen9ou',
+      p1Team,
+      p2Team,
+      replayLog: log,
+      targetTurn: 2,
+    });
+    const state = createBranchState(runtime.battleStream, runtime.log, {
+      p1Choice: null,
+      p2Choice: null,
+    });
+
+    expect(state.p1Active?.species).toBe('Gliscor');
+    expect(state.p1Moves.map(move => move.name)).toContain('Toxic');
   });
 
   test('branch runtime exposes one live append-only protocol log after alternate choices', async () => {

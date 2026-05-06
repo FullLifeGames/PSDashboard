@@ -1,6 +1,7 @@
 import type {
   KnowledgeSource,
   OpponentTeamInfo,
+  PokemonEvsInfo,
   PokemonFieldInfo,
   PokemonMoveInfo,
   ReplayData,
@@ -78,6 +79,20 @@ function formatFieldValue(field: PokemonFieldInfo): string {
   return field.value;
 }
 
+function formatEvs(evs: PokemonEvsInfo): string {
+  const labels = [
+    ['HP', evs.value.hp],
+    ['Atk', evs.value.atk],
+    ['Def', evs.value.def],
+    ['SpA', evs.value.spa],
+    ['SpD', evs.value.spd],
+    ['Spe', evs.value.spe],
+  ] as const;
+  const nonZero = labels.filter(([, value]) => value > 0);
+  if (nonZero.length === 0) return '0 EVs';
+  return `${nonZero.map(([label, value]) => `${value} ${label}`).join(' / ')} EVs`;
+}
+
 function MetaTag({
   field,
   className,
@@ -153,6 +168,19 @@ function PokemonEntry({ poke }: { poke: RevealedPokemonInfo }) {
         <div className="ps-stats-meta">
           <MetaTag field={poke.ability} className="ps-stats-tag" />
           <MetaTag field={poke.item} className="ps-stats-tag ps-stats-tag-item" />
+          <span
+            className="ps-stats-tag"
+            style={{
+              border: `1px solid ${sourceAccent(poke.evs.source)}`,
+              boxShadow: 'inset 0 0 0 1px rgba(0,0,0,0.15)',
+            }}
+            title={poke.evs.sourceDetail || sourceLabel(poke.evs.source, poke.evs.probability)}
+          >
+            {formatEvs(poke.evs)}
+            <span style={{ marginLeft: 6, color: sourceAccent(poke.evs.source), fontSize: 9, textTransform: 'uppercase' }}>
+              {sourceLabel(poke.evs.source, poke.evs.probability)}
+            </span>
+          </span>
           {poke.teraType.value && (
             <MetaTag
               field={poke.teraType}

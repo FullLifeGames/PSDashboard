@@ -50,6 +50,8 @@ export interface TurnSnapshot {
 }
 
 export type KnowledgeSource = 'revealed' | 'guessed' | 'manual' | 'unknown';
+export type StatId = 'hp' | 'atk' | 'def' | 'spa' | 'spd' | 'spe';
+export type PokemonEvs = Record<StatId, number>;
 
 export interface PokemonMoveInfo {
   name: string;
@@ -67,12 +69,21 @@ export interface PokemonFieldInfo {
   detail?: string;
 }
 
+export interface PokemonEvsInfo {
+  value: PokemonEvs;
+  source: KnowledgeSource;
+  probability?: number;
+  sourceDetail?: string;
+  detail?: string;
+}
+
 export interface RevealedPokemonInfo {
   species: string;
   moves: PokemonMoveInfo[];
   ability: PokemonFieldInfo;
   item: PokemonFieldInfo;
   teraType: PokemonFieldInfo;
+  evs: PokemonEvsInfo;
   level: number;
   gender: string;
 }

@@ -1,6 +1,6 @@
 import { useState } from 'react';
-import type { OpponentTeamInfo, RevealedPokemonInfo } from '../types';
-import { manualField, manualMove } from '../lib/team-info';
+import type { OpponentTeamInfo, PokemonEvs, StatId, RevealedPokemonInfo } from '../types';
+import { EMPTY_EVS, manualEvs, manualField, manualMove } from '../lib/team-info';
 
 interface Props {
   title: string;
@@ -14,6 +14,21 @@ function sourceLabel(source: RevealedPokemonInfo['ability']['source'], probabili
   return `${source.toUpperCase()}${suffix}`;
 }
 
+const EV_STATS: { id: StatId; label: string }[] = [
+  { id: 'hp', label: 'HP' },
+  { id: 'atk', label: 'Atk' },
+  { id: 'def', label: 'Def' },
+  { id: 'spa', label: 'SpA' },
+  { id: 'spd', label: 'SpD' },
+  { id: 'spe', label: 'Spe' },
+];
+
+function clampEv(value: string): number {
+  const parsed = Number.parseInt(value, 10);
+  if (!Number.isFinite(parsed)) return 0;
+  return Math.min(252, Math.max(0, parsed));
+}
+
 export function TeamEditor({ title, teamInfo, onSave, onClose }: Props) {
   const [pokemon, setPokemon] = useState<RevealedPokemonInfo[]>(teamInfo.pokemon);
 
@@ -25,6 +40,19 @@ export function TeamEditor({ title, teamInfo, onSave, onClose }: Props) {
     setPokemon(prev => {
       const updated = [...prev];
       updated[index] = { ...updated[index], [field]: manualField(value) };
+      return updated;
+    });
+  };
+
+  const updateEv = (index: number, stat: StatId, value: string) => {
+    setPokemon(prev => {
+      const updated = [...prev];
+      const current = updated[index].evs?.value ?? EMPTY_EVS;
+      const nextEvs: PokemonEvs = {
+        ...current,
+        [stat]: clampEv(value),
+      };
+      updated[index] = { ...updated[index], evs: manualEvs(nextEvs) };
       return updated;
     });
   };
@@ -64,7 +92,7 @@ export function TeamEditor({ title, teamInfo, onSave, onClose }: Props) {
       <div style={{
         background: '#2a3a5c', border: '2px solid #8aa', borderRadius: 8,
         padding: 20, maxWidth: 640, width: '100%', maxHeight: '80vh', overflowY: 'auto',
-      }}>
+      }} role="dialog" aria-modal="true" aria-label={title}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
           <div style={{ fontSize: 14, fontWeight: 'bold' }}>{title}</div>
           <button
@@ -126,6 +154,30 @@ export function TeamEditor({ title, teamInfo, onSave, onClose }: Props) {
                 </div>
               </div>
 
+              <div style={{ marginBottom: 6 }}>
+                <div style={{ fontSize: 9, color: '#8899aa', marginBottom: 2 }}>
+                  EVs ({sourceLabel(entry.evs.source, entry.evs.probability)})
+                </div>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(6, minmax(0, 1fr))', gap: 4 }}>
+                  {EV_STATS.map(stat => (
+                    <label key={stat.id} style={{ display: 'flex', flexDirection: 'column', gap: 2, fontSize: 9, color: '#8899aa' }}>
+                      {stat.label}
+                      <input
+                        type="number"
+                        min={0}
+                        max={252}
+                        step={4}
+                        aria-label={`${entry.species} ${stat.label} EVs`}
+                        value={entry.evs.value[stat.id]}
+                        onChange={e => updateEv(i, stat.id, e.target.value)}
+                        className="ps-input"
+                        style={{ width: '100%', fontSize: 10, padding: '3px 4px' }}
+                      />
+                    </label>
+                  ))}
+                </div>
+              </div>
+
               <div>
                 <div style={{ fontSize: 9, color: '#8899aa', marginBottom: 2 }}>Moves ({entry.moves.length}/4)</div>
                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginBottom: 4 }}>
@@ -146,6 +198,7 @@ export function TeamEditor({ title, teamInfo, onSave, onClose }: Props) {
                       <button
                         type="button"
                         onClick={() => removeMove(i, moveIndex)}
+                        aria-label={`Remove ${move.name} from ${entry.species}`}
                         style={{
                           background: 'none', border: 'none', color: '#f88', cursor: 'pointer',
                           fontSize: 12, padding: 0, fontFamily: 'inherit',

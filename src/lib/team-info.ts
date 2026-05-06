@@ -1,6 +1,8 @@
-import { getSpeciesUsageSet, type SmogonUsageStats, type UsageProbability } from './smogon-stats';
-import { getSpeciesSetAssumption, type SetAssumption, type SmogonSetAssumptions } from './smogon-sets';
-import type { OpponentTeamInfo, PokemonFieldInfo, PokemonMoveInfo, RevealedPokemonInfo } from '../types';
+import { getSpeciesUsageSet, type SmogonUsageStats, type UsageProbability, type UsageSpread } from './smogon-stats';
+import { getSpeciesSetAssumption, type SetAssumption, type SetSpreadAssumption, type SmogonSetAssumptions } from './smogon-sets';
+import type { OpponentTeamInfo, PokemonEvs, PokemonEvsInfo, PokemonFieldInfo, PokemonMoveInfo, RevealedPokemonInfo } from '../types';
+
+export const EMPTY_EVS: PokemonEvs = { hp: 0, atk: 0, def: 0, spa: 0, spd: 0, spe: 0 };
 
 export function unknownField(): PokemonFieldInfo {
   return { value: '', source: 'unknown' };
@@ -15,6 +17,18 @@ export function guessedField(value: string, probability?: number, sourceDetail?:
 }
 
 export function manualField(value: string): PokemonFieldInfo {
+  return { value, source: 'manual' };
+}
+
+export function unknownEvs(): PokemonEvsInfo {
+  return { value: { ...EMPTY_EVS }, source: 'unknown' };
+}
+
+export function guessedEvs(value: PokemonEvs, probability?: number, sourceDetail?: string): PokemonEvsInfo {
+  return { value, source: 'guessed', probability, sourceDetail };
+}
+
+export function manualEvs(value: PokemonEvs): PokemonEvsInfo {
   return { value, source: 'manual' };
 }
 
@@ -59,6 +73,17 @@ function normalizeAbilityField(
   if (!fallback && setFallback) return guessedField(setFallback.value, undefined, setFallback.sourceDetail);
   if (!fallback) return ability;
   return guessedField(fallback.value, fallback.probability, fallback.sourceDetail);
+}
+
+function normalizeEvsField(
+  evs: PokemonEvsInfo | undefined,
+  fallback: UsageSpread | undefined,
+  setFallback?: SetSpreadAssumption,
+): PokemonEvsInfo {
+  if (evs && evs.source !== 'unknown') return evs;
+  if (!fallback && setFallback?.evs) return guessedEvs(setFallback.evs, undefined, setFallback.sourceDetail);
+  if (!fallback?.evs) return evs ?? unknownEvs();
+  return guessedEvs(fallback.evs, fallback.probability, fallback.sourceDetail);
 }
 
 function fillUsageMoves(
@@ -106,6 +131,7 @@ export function enrichPokemonInfo(
     ...pokemon,
     ability: normalizeAbilityField(pokemon.ability, usageSet?.ability, smogonSet?.ability),
     item: normalizeItemField(pokemon.item, usageSet?.item, smogonSet?.item),
+    evs: normalizeEvsField(pokemon.evs, usageSet?.spread, smogonSet?.spread),
     moves: smogonSet ? fillSetMoves(usageFilledMoves, smogonSet.moves) : usageFilledMoves,
   };
 }

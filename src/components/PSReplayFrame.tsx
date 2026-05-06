@@ -11,6 +11,8 @@ interface Props {
   seekTurn?: number;
   autoPlay?: boolean;
   liveUpdates?: boolean;
+  liveAppendMode?: 'play' | 'follow-end';
+  liveAppendTurn?: number | null;
   reloadKey?: string;
   onTurnChange?: (turn: number) => void;
 }
@@ -46,6 +48,8 @@ function PSReplayFrameDocument({
   seekTurn,
   autoPlay,
   liveUpdates = false,
+  liveAppendMode = 'follow-end',
+  liveAppendTurn = null,
   reloadKey = 'default',
   onTurnChange,
 }: DocumentProps) {
@@ -130,15 +134,17 @@ function PSReplayFrameDocument({
     const canAppend = previous.lines.length <= lines.length &&
       previous.lines.every((line, index) => line === lines[index]);
     if (canAppend && lines.length > previous.lines.length) {
+      const shouldPlayAppend = liveAppendMode === 'play' && typeof liveAppendTurn === 'number';
       iframeRef.current?.contentWindow?.postMessage({
         type: 'ps-append-log',
         lines: lines.slice(previous.lines.length),
         seekTurn,
-        followEnd: true,
+        followEnd: !shouldPlayAppend,
+        playFromTurn: shouldPlayAppend ? liveAppendTurn : undefined,
       }, '*');
     }
     sentLogRef.current = { key: reloadKey, blobUrl, lines };
-  }, [liveUpdates, reloadKey, blobUrl, log, seekTurn]);
+  }, [liveUpdates, reloadKey, blobUrl, log, seekTurn, liveAppendMode, liveAppendTurn]);
 
   if (!blobUrl) {
     return (

@@ -107,6 +107,11 @@ interface TurnBlock {
   postUpkeep: string[];
 }
 
+interface PokemonIdent {
+  name: string;
+  species: string;
+}
+
 function sleep(ms: number) {
   return new Promise(resolve => setTimeout(resolve, ms));
 }
@@ -159,44 +164,50 @@ function parseTurnBlocks(log: string): { preGame: string[]; turns: TurnBlock[] }
   return { preGame, turns };
 }
 
-function extractLeads(log: string): { p1Leads: string[]; p2Leads: string[] } {
-  const p1Leads: string[] = [];
-  const p2Leads: string[] = [];
+function extractLeads(log: string): { p1Leads: PokemonIdent[]; p2Leads: PokemonIdent[] } {
+  const p1Leads: PokemonIdent[] = [];
+  const p2Leads: PokemonIdent[] = [];
 
   for (const line of log.split('\n')) {
     if (line.startsWith('|turn|')) break;
 
-    const match = line.match(/^\|switch\|(p[12])[a-d]:[^|]*\|([^,|]+)/);
+    const match = line.match(/^\|switch\|(p[12])[a-d]:\s*([^|]*)\|([^,|]+)/);
     if (!match) continue;
 
     const side = match[1];
-    const species = match[2].trim();
+    const name = match[2].trim();
+    const species = match[3].trim();
     const target = side === 'p1' ? p1Leads : p2Leads;
-    if (!target.some(existing => toId(existing) === toId(species))) {
-      target.push(species);
+    if (!target.some(existing => toId(existing.name) === toId(name) && toId(existing.species) === toId(species))) {
+      target.push({ name, species });
     }
   }
 
   return { p1Leads, p2Leads };
 }
 
-function reorderForLeads(team: PokemonSet[], leadSpecies: string[]): PokemonSet[] {
-  if (leadSpecies.length === 0) return [...team];
+function reorderForLeads(team: PokemonSet[], leads: PokemonIdent[]): PokemonSet[] {
+  if (leads.length === 0) return [...team];
 
   const remaining = [...team];
-  const leads: PokemonSet[] = [];
-  for (const species of leadSpecies) {
-    const idx = remaining.findIndex(pokemon =>
-      toId(pokemon.species) === toId(species) ||
-      toId(pokemon.name || '') === toId(species)
-    );
+  const orderedLeads: PokemonSet[] = [];
+  for (const lead of leads) {
+    const leadNameId = toId(lead.name);
+    const leadSpeciesId = toId(lead.species);
+    let idx = remaining.findIndex(pokemon => toId(pokemon.name || '') === leadNameId);
+    if (idx < 0) {
+      idx = remaining.findIndex(pokemon =>
+        toId(pokemon.species) === leadSpeciesId ||
+        toId(pokemon.name || '') === leadSpeciesId
+      );
+    }
     if (idx >= 0) {
-      const [lead] = remaining.splice(idx, 1);
-      leads.push(lead);
+      const [pokemon] = remaining.splice(idx, 1);
+      orderedLeads.push(pokemon);
     }
   }
 
-  return [...leads, ...remaining];
+  return [...orderedLeads, ...remaining];
 }
 
 function findSlotBySpecies(battle: SimBattle, sideIdx: number, species: string): number {
@@ -382,7 +393,7 @@ function collectForcedSwitchSpecies(
 function correctActivesFromProtocol(battle: SimBattle, events: string[]) {
   for (const line of events) {
     const match = line.match(/^\|(switch|drag)\|(p[12])([a-d]):[^|]*\|([^,|]+)/);
-    if (!match || line.includes('[from]')) continue;
+    if (!match) continue;
 
     const sideIdx = match[2] === 'p1' ? 0 : 1;
     const activeSlot = match[3].charCodeAt(0) - 'a'.charCodeAt(0);

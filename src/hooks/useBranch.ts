@@ -2,6 +2,11 @@ import { useState, useCallback, useRef, type RefObject } from 'react';
 import type { BattleStreams, PokemonSet } from '@pkmn/sim';
 import type { TurnSnapshot } from '../types';
 import type { BranchSimState, SimPokemonInfo } from '../lib/branch-engine';
+import {
+  branchSideChoicesReady,
+  buildBranchSideCommand,
+  requiredChoicesForActiveSlots,
+} from '../lib/branch-choices';
 
 export type {
   BranchMoveOption,
@@ -39,8 +44,7 @@ function forceSwitches(battle: NonNullable<BattleStreams.BattleStream['battle']>
 function requiredChoices(battle: NonNullable<BattleStreams.BattleStream['battle']>, side: SideId): boolean[] {
   const sideState = battle.sides[sideIndex(side)];
   const forced = forceSwitches(battle, side);
-  if (forced.some(Boolean)) return forced;
-  return sideState.active.map(active => !!active && !active.fainted);
+  return requiredChoicesForActiveSlots(sideState.active, forced);
 }
 
 function hasAllChoices(
@@ -48,7 +52,7 @@ function hasAllChoices(
   side: SideId,
   choices: (string | null)[],
 ): boolean {
-  return requiredChoices(battle, side).every((required, index) => !required || !!choices[index]);
+  return branchSideChoicesReady(choices, requiredChoices(battle, side));
 }
 
 function sideCommand(
@@ -56,9 +60,7 @@ function sideCommand(
   side: SideId,
   choices: (string | null)[],
 ): string {
-  return requiredChoices(battle, side)
-    .map((required, index) => required ? choices[index] || 'pass' : 'pass')
-    .join(', ');
+  return buildBranchSideCommand(choices, requiredChoices(battle, side));
 }
 
 async function waitForLogAppend(logRef: RefObject<string[]>, previousLength: number) {

@@ -1,5 +1,5 @@
 import type { OpponentTeamInfo, RevealedPokemonInfo } from '../types';
-import { revealedField, unknownField } from './team-info';
+import { revealedField, unknownEvs, unknownField } from './team-info';
 
 const BATTLE_ONLY_FORME_SUFFIXES = ['-Terastal', '-Stellar', '-Tera'];
 
@@ -32,6 +32,7 @@ export function inferOpponentTeam(log: string, opponentSide: 'p1' | 'p2' = 'p2')
           ability: unknownField(),
           item: hasItem ? revealedField('(has item)') : unknownField(),
           teraType: unknownField(),
+          evs: unknownEvs(),
           level: parsed.level,
           gender: parsed.gender,
         });
@@ -50,6 +51,7 @@ export function inferOpponentTeam(log: string, opponentSide: 'p1' | 'p2' = 'p2')
           ability: unknownField(),
           item: unknownField(),
           teraType: unknownField(),
+          evs: unknownEvs(),
           level: parsed.level,
           gender: parsed.gender,
         });

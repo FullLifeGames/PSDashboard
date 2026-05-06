@@ -18,6 +18,7 @@ test.describe('Replay iframe HTML', () => {
 
     expect(html).toContain('window.__psPatchBattleSound');
     expect(html).toContain('sound.loadBgm = function(){ return makeSilent(); };');
+    expect(html).toContain('resume: function(){ return Promise.resolve(); }');
     expect(html).toContain('window.Config');
     expect(html).toContain('sound');
   });
@@ -27,6 +28,13 @@ test.describe('Replay iframe HTML', () => {
 
     expect(html).toContain("type === 'ps-append-log'");
     expect(html).toContain('Replays.battle.add(line)');
+  });
+
+  test('can play appended branch turns from the executed turn', () => {
+    const html = generateReplayHtml({ log });
+
+    expect(html).toContain('data.playFromTurn');
+    expect(html).toContain('queueSeek(data.playFromTurn, true)');
   });
 
   test('announces readiness so the parent can replay missed seek commands', () => {

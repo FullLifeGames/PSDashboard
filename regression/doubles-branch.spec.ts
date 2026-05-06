@@ -90,6 +90,42 @@ const p2Team: PokemonSet[] = [
   },
 ];
 
+const duplicateSpeciesP1Team: PokemonSet[] = [
+  {
+    name: 'Alpha',
+    species: 'Eevee',
+    item: 'Eviolite',
+    ability: 'Adaptability',
+    moves: ['Tackle', 'Protect'],
+    nature: 'Jolly',
+    evs: { hp: 0, atk: 252, def: 0, spa: 0, spd: 4, spe: 252 },
+    ivs: { hp: 31, atk: 31, def: 31, spa: 31, spd: 31, spe: 31 },
+    level: 50,
+  },
+  {
+    name: 'Beta',
+    species: 'Eevee',
+    item: 'Silk Scarf',
+    ability: 'Run Away',
+    moves: ['Swift', 'Protect'],
+    nature: 'Timid',
+    evs: { hp: 0, atk: 0, def: 0, spa: 252, spd: 4, spe: 252 },
+    ivs: { hp: 31, atk: 31, def: 31, spa: 31, spd: 31, spe: 31 },
+    level: 50,
+  },
+  {
+    name: 'Gamma',
+    species: 'Raichu',
+    item: '',
+    ability: 'Static',
+    moves: ['Thunderbolt', 'Protect'],
+    nature: 'Timid',
+    evs: { hp: 0, atk: 0, def: 0, spa: 252, spd: 4, spe: 252 },
+    ivs: { hp: 31, atk: 31, def: 31, spa: 31, spd: 31, spe: 31 },
+    level: 50,
+  },
+];
+
 const p2RedirectionTeam: PokemonSet[] = [
   {
     name: 'Amoonguss',
@@ -140,6 +176,29 @@ const doublesLog = [
   '|start',
   '|switch|p1a: Pikachu|Pikachu, L50|100/100',
   '|switch|p1b: Eevee|Eevee, L50|100/100',
+  '|switch|p2a: Bulbasaur|Bulbasaur, L50|100/100',
+  '|switch|p2b: Charmander|Charmander, L50|100/100',
+  '|turn|1',
+].join('\n');
+
+const duplicateSpeciesDoublesLeadLog = [
+  '|player|p1|Alice|',
+  '|player|p2|Bob|',
+  '|gametype|doubles',
+  '|gen|9',
+  '|tier|[Gen 9] Doubles OU',
+  '|clearpoke',
+  '|poke|p1|Eevee, L50|item',
+  '|poke|p1|Eevee, L50|item',
+  '|poke|p1|Raichu, L50|',
+  '|poke|p2|Bulbasaur, L50|item',
+  '|poke|p2|Charmander, L50|item',
+  '|poke|p2|Squirtle, L50|',
+  '|teampreview',
+  '|',
+  '|start',
+  '|switch|p1a: Beta|Eevee, L50|100/100',
+  '|switch|p1b: Gamma|Raichu, L50|100/100',
   '|switch|p2a: Bulbasaur|Bulbasaur, L50|100/100',
   '|switch|p2b: Charmander|Charmander, L50|100/100',
   '|turn|1',
@@ -320,6 +379,26 @@ const phazingLog = [
 ].join('\n');
 
 test.describe('Doubles branch reconstruction', () => {
+  test('uses replay nicknames to reconstruct duplicate-species doubles leads', async () => {
+    const logLines: string[] = [];
+    const runtime = await reconstructBranchRuntime({
+      format: 'gen9doublesou',
+      p1Team: duplicateSpeciesP1Team,
+      p2Team,
+      replayLog: duplicateSpeciesDoublesLeadLog,
+      targetTurn: 1,
+      onLogLines: lines => logLines.push(...lines),
+    });
+
+    const state = createBranchState(runtime.battleStream, logLines, {
+      p1Choices: [null, null],
+      p2Choices: [null, null],
+    });
+
+    expect(state.p1ActiveSlots.map(active => active?.name)).toEqual(['Beta', 'Gamma']);
+    expect(state.p1MovesBySlot[0].map(move => move.name)).toContain('Swift');
+  });
+
   test('exposes controls for every active slot at the branch turn', async () => {
     const logLines: string[] = [];
     const runtime = await reconstructBranchRuntime({

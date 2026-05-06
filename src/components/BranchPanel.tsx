@@ -1,6 +1,11 @@
 import { useEffect, useState, useMemo } from 'react';
 import type { BranchSimState, BranchMoveOption, BranchSwitchOption } from '../hooks/useBranch';
 import type { DamageResult } from '../lib/damage-calc';
+import {
+  branchSideChoicesReady,
+  requiredChoicesForActiveSlots,
+  switchTarget,
+} from '../lib/branch-choices';
 
 interface Props {
   simState: BranchSimState | null;
@@ -127,14 +132,14 @@ function MoveBtn({ move, dmg, targetDamage, selected, onClick }: {
 }
 
 /* ── Switch button ── */
-function SwitchBtn({ sw, selected, onClick }: {
-  sw: BranchSwitchOption; selected: boolean; onClick: () => void;
+function SwitchBtn({ sw, selected, disabled, onClick }: {
+  sw: BranchSwitchOption; selected: boolean; disabled: boolean; onClick: () => void;
 }) {
   return (
     <button
       type="button"
       onClick={onClick}
-      disabled={sw.fainted}
+      disabled={sw.fainted || disabled}
       className={`ps-switchbtn ${selected ? 'ps-switchbtn-selected' : ''}`}
     >
       <img src={spriteUrl(sw.species)} alt={sw.name} />
@@ -152,13 +157,14 @@ function SwitchBtn({ sw, selected, onClick }: {
 }
 
 /* ── Controls for one side (moves/switches) ── */
-function SideControls({ label, activeName, moves, switches, forceSwitch, pending, dmgResults, targetDamageResults, onMove, onSwitch, onRawChoice }: {
+function SideControls({ label, activeName, moves, switches, forceSwitch, pending, blockedSwitchSlots, dmgResults, targetDamageResults, onMove, onSwitch, onRawChoice }: {
   label: string;
   activeName: string;
   moves: BranchMoveOption[];
   switches: BranchSwitchOption[];
   forceSwitch: boolean;
   pending: string | null;
+  blockedSwitchSlots: Set<number>;
   dmgResults: DamageResult[];
   targetDamageResults: Record<string, DamageResult | undefined>;
   onMove: (slot: number, targetLoc?: number) => void;
@@ -270,6 +276,7 @@ function SideControls({ label, activeName, moves, switches, forceSwitch, pending
               key={sw.slot}
               sw={sw}
               selected={pending === `switch ${sw.slot}`}
+              disabled={blockedSwitchSlots.has(sw.slot) && pending !== `switch ${sw.slot}`}
               onClick={() => onSwitch(sw.slot)}
             />
           ))}
@@ -383,13 +390,23 @@ export function BranchPanel({ simState, onSetChoice, onExecuteTurn }: Props) {
 
   if (!simState) return null;
 
-  const sideComplete = (choices: (string | null)[], activeSlots: typeof p1ActiveSlots) =>
-    activeSlots.length > 0 && activeSlots.every((active, slot) => !active || active.fainted || !!choices[slot]);
-  const bothChosen = sideComplete(simState.p1Choices, p1ActiveSlots) && sideComplete(simState.p2Choices, p2ActiveSlots);
   const isForceSwitch = simState.p1ForceSwitch || simState.p2ForceSwitch;
   const isMultiActive = p1ActiveSlots.length > 1 || p2ActiveSlots.length > 1;
   const moveChoice = (slot: number, targetLoc?: number) =>
     targetLoc ? `move ${slot} ${targetLoc > 0 ? '+' : ''}${targetLoc}` : `move ${slot}`;
+  const p1RequiredChoices = requiredChoicesForActiveSlots(p1ActiveSlots, simState.p1ForceSwitches);
+  const p2RequiredChoices = requiredChoicesForActiveSlots(p2ActiveSlots, simState.p2ForceSwitches);
+  const bothChosen = branchSideChoicesReady(simState.p1Choices, p1RequiredChoices) &&
+    branchSideChoicesReady(simState.p2Choices, p2RequiredChoices);
+  const blockedSwitchSlots = (choices: (string | null)[], activeSlot: number) => {
+    const blocked = new Set<number>();
+    choices.forEach((choice, index) => {
+      if (index === activeSlot) return;
+      const target = switchTarget(choice);
+      if (target !== null) blocked.add(target);
+    });
+    return blocked;
+  };
   const pendingLabel = bothChosen
     ? 'Execute Turn'
     : isMultiActive
@@ -412,6 +429,7 @@ export function BranchPanel({ simState, onSetChoice, onExecuteTurn }: Props) {
                   switches={p1SwitchesBySlot[slot] ?? EMPTY_SWITCHES}
                   forceSwitch={simState.p1ForceSwitches[slot] ?? false}
                   pending={simState.p1Choices[slot] ?? null}
+                  blockedSwitchSlots={blockedSwitchSlots(simState.p1Choices, slot)}
                   dmgResults={damageBySide.p1.default[slot] ?? []}
                   targetDamageResults={damageBySide.p1.targets[slot] ?? {}}
                   onMove={(s, targetLoc) => onSetChoice('p1', moveChoice(s, targetLoc), slot)}
@@ -431,6 +449,7 @@ export function BranchPanel({ simState, onSetChoice, onExecuteTurn }: Props) {
                   switches={p2SwitchesBySlot[slot] ?? EMPTY_SWITCHES}
                   forceSwitch={simState.p2ForceSwitches[slot] ?? false}
                   pending={simState.p2Choices[slot] ?? null}
+                  blockedSwitchSlots={blockedSwitchSlots(simState.p2Choices, slot)}
                   dmgResults={damageBySide.p2.default[slot] ?? []}
                   targetDamageResults={damageBySide.p2.targets[slot] ?? {}}
                   onMove={(s, targetLoc) => onSetChoice('p2', moveChoice(s, targetLoc), slot)}

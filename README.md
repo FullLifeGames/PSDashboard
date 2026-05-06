@@ -17,8 +17,9 @@ The current implementation is a working prototype, not a fully accurate replay r
 - Edit reconstructed information for both players before branching.
 - Select a turn and branch from that point into a controllable simulator.
 - Pick moves or switches for both players and advance the branch turn by turn.
-- Use slot-aware and target-aware controls for doubles battles.
+- Use slot-aware and target-aware controls for doubles battles, including blocking duplicate simultaneous switch targets.
 - View lightweight damage estimates for currently available moves, including per-target previews in doubles.
+- Animate newly executed branch turns, or disable animation to jump straight to the result.
 - Compare branch history against the original replay line after executing alternate turns.
 - Save branch summaries locally and create share links containing the replay id, branch turn, branch choices, and final branch log.
 - Show a battle statistics panel for both teams.
@@ -29,8 +30,8 @@ As of the current repository state:
 
 - `npm run lint` passes.
 - `npm run build` succeeds.
-- `npx playwright test` passes with 15 browser tests.
-- `npm run test:regression` runs replay reconstruction, save/share, damage-preview, and pure-engine regression tests.
+- `npx playwright test` passes with 35 browser tests.
+- `npm run test:regression` runs replay reconstruction, save/share, damage-preview, branch choice, and pure-engine regression tests.
 
 The browser test suite validates the main happy path with a mocked replay fixture:
 

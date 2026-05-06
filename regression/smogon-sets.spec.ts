@@ -1,6 +1,6 @@
 import { test, expect } from '@playwright/test';
 import { fetchSmogonSetAssumptions } from '../src/lib/smogon-sets';
-import { enrichPokemonInfo } from '../src/lib/team-info';
+import { enrichPokemonInfo, unknownEvs } from '../src/lib/team-info';
 import type { RevealedPokemonInfo } from '../src/types';
 
 const sampleInfo: RevealedPokemonInfo = {
@@ -9,6 +9,7 @@ const sampleInfo: RevealedPokemonInfo = {
   ability: { value: '', source: 'unknown' },
   item: { value: '', source: 'unknown' },
   teraType: { value: '', source: 'unknown' },
+  evs: unknownEvs(),
   level: 100,
   gender: '',
 };
