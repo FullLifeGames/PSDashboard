@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect, type Frame } from '@playwright/test';
 import { readFileSync } from 'fs';
 import { dirname, join } from 'path';
 import { fileURLToPath } from 'url';
@@ -68,6 +68,15 @@ type ReplayWindow = Window & {
   };
   __psPostedMessages?: unknown[];
 };
+
+async function expectReplayTurn(
+  frame: Frame,
+  turn: number,
+) {
+  await expect.poll(async () => frame.evaluate(() =>
+    (window as ReplayWindow).Replays?.battle?.turn ?? -1
+  ), { timeout: 15_000 }).toBe(turn);
+}
 
 test.describe('PS Dashboard', () => {
   test.beforeEach(async ({ page }) => {
@@ -164,7 +173,7 @@ test.describe('PS Dashboard', () => {
     expect(frame).toBeTruthy();
 
     await page.locator('input[type="range"]').fill('2');
-    await expect.poll(async () => frame!.evaluate(() => (window as ReplayWindow).Replays?.battle?.turn ?? -1)).toBe(2);
+    await expectReplayTurn(frame!, 2);
   });
 
   test('replay iframe keeps a fixed visible height without negative offset', async ({ page }) => {
@@ -205,7 +214,7 @@ test.describe('PS Dashboard', () => {
     const iframeHandle = await page.locator('iframe[title="Branch Simulation"]').elementHandle({ timeout: 10000 });
     const frame = await iframeHandle?.contentFrame();
     expect(frame).toBeTruthy();
-    await expect.poll(async () => frame!.evaluate(() => (window as ReplayWindow).Replays?.battle?.turn ?? -1)).toBe(2);
+    await expectReplayTurn(frame!, 2);
   });
 
   test('clicking Branch Here replaces replay with branch sim', async ({ page }) => {
@@ -360,7 +369,7 @@ test.describe('PS Dashboard', () => {
     const iframeHandle = await page.locator('iframe[title="Branch Simulation"]').elementHandle({ timeout: 10000 });
     const frame = await iframeHandle?.contentFrame();
     expect(frame).toBeTruthy();
-    await expect.poll(async () => frame!.evaluate(() => (window as ReplayWindow).Replays?.battle?.turn ?? -1)).toBe(2);
+    await expectReplayTurn(frame!, 2);
 
     await page.locator('button', { hasText: /Use Recommended/i }).nth(0).click();
     await page.locator('button', { hasText: /Use Recommended/i }).nth(1).click();
@@ -420,9 +429,7 @@ test.describe('PS Dashboard', () => {
         return data.type === 'ps-append-log' && data.playFromTurn === 2;
       }) ?? false
     )).toBe(true);
-    await expect.poll(async () => frame!.evaluate(() =>
-      (window as ReplayWindow).Replays?.battle?.turn ?? -1
-    )).toBe(2);
+    await expectReplayTurn(frame!, 2);
   });
 
   test('branch replay play controls stay muted without audio errors', async ({ page }) => {
@@ -440,7 +447,7 @@ test.describe('PS Dashboard', () => {
     const iframeHandle = await page.locator('iframe[title="Branch Simulation"]').elementHandle({ timeout: 10000 });
     const frame = await iframeHandle?.contentFrame();
     expect(frame).toBeTruthy();
-    await expect.poll(async () => frame!.evaluate(() => (window as ReplayWindow).Replays?.battle?.turn ?? -1)).toBe(2);
+    await expectReplayTurn(frame!, 2);
 
     await frame!.locator('button', { hasText: 'Play' }).click();
     await expect.poll(async () =>

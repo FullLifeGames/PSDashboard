@@ -1,4 +1,7 @@
 import type { ReplayData } from '../types';
+import { inferReplayFormatId } from './replay-format';
+
+type ReplayResponse = Omit<ReplayData, 'formatid'> & Partial<Pick<ReplayData, 'formatid'>>;
 
 export function parseReplayUrl(input: string): string {
   const trimmed = input.trim();
@@ -18,5 +21,9 @@ export async function fetchReplay(urlOrId: string): Promise<ReplayData> {
   if (!res.ok) {
     throw new Error(`Failed to fetch replay: ${res.status} ${res.statusText}`);
   }
-  return res.json();
+  const data = await res.json() as ReplayResponse;
+  return {
+    ...data,
+    formatid: inferReplayFormatId(data),
+  };
 }

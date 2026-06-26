@@ -15,6 +15,7 @@ import { parseTeamText } from './lib/team-parser';
 import { enrichTeamInfo } from './lib/team-info';
 import type { OpponentTeamInfo } from './types';
 import { decodeBranchShare, type BranchSharePayload } from './lib/branch-share';
+import { getBranchSimulatorFormat } from './lib/replay-format';
 
 function SharedBranchView({
   branch,
@@ -192,7 +193,7 @@ function App() {
       });
       if (p1Team.length > 0 && p2Team.length > 0) {
         setBranchSession(session => session + 1);
-        await startBranch(replayData.formatid || 'gen9ou', p1Team, p2Team, replayData.log, branchTurn, branchSnapshot);
+        await startBranch(getBranchSimulatorFormat(replayData), p1Team, p2Team, replayData.log, branchTurn, branchSnapshot);
         branchWindowOpenRef.current = true;
       }
     } finally {
@@ -222,7 +223,7 @@ function App() {
         });
         if (!cancelled && p1Team.length > 0 && p2Team.length > 0) {
           setBranchSession(session => session + 1);
-          await startBranch(activeReplay.formatid || 'gen9ou', p1Team, p2Team, activeReplay.log, branchTurn, branchSnapshot, {
+          await startBranch(getBranchSimulatorFormat(activeReplay), p1Team, p2Team, activeReplay.log, branchTurn, branchSnapshot, {
             replayHistory: refreshRequest.history,
             p1Choices: refreshRequest.p1Choices,
             p2Choices: refreshRequest.p2Choices,
