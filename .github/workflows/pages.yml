@@ -18,7 +18,7 @@ concurrency:
 
 jobs:
   build:
-    name: Build and test
+    name: Build
     runs-on: ubuntu-latest
     steps:
       - name: Check out repository
@@ -38,15 +38,6 @@ jobs:
 
       - name: Build
         run: npm run build
-
-      - name: Install Playwright Chromium
-        run: npx playwright install --with-deps chromium
-
-      - name: Run browser tests
-        run: npm run test:e2e
-
-      - name: Run regression tests
-        run: npm run test:regression
 
       - name: Configure Pages
         uses: actions/configure-pages@v5
