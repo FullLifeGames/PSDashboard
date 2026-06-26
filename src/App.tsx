@@ -317,7 +317,7 @@ function App() {
     <div className="ps-app-root">
       {/* Header */}
       <div className="ps-app-header" style={{ borderRadius: '0 0 5px 5px' }}>
-        <h1>PS Replay Interceptor</h1>
+        <h1>PS Dashboard</h1>
         <span style={{ fontSize: 10, color: '#aabbcc' }}>
           Load a replay · branch off with different moves
         </span>

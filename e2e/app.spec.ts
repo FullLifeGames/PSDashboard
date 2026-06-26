@@ -69,7 +69,7 @@ type ReplayWindow = Window & {
   __psPostedMessages?: unknown[];
 };
 
-test.describe('PS Replay Interceptor', () => {
+test.describe('PS Dashboard', () => {
   test.beforeEach(async ({ page }) => {
     await page.route('**/replay.pokemonshowdown.com/**', (route) => {
       const replay = route.request().url().includes(doublesReplay.id) ? doublesReplay : fixtureReplay;
@@ -90,7 +90,7 @@ test.describe('PS Replay Interceptor', () => {
   });
 
   test('renders the app header', async ({ page }) => {
-    await expect(page.locator('h1')).toHaveText('PS Replay Interceptor');
+    await expect(page.locator('h1')).toHaveText('PS Dashboard');
   });
 
   test('shows replay loader with URL input and load button', async ({ page }) => {
