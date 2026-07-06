@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { readFileSync } from 'fs';
+import { existsSync, readFileSync } from 'fs';
 import type { PokemonSet } from '@pkmn/sim';
 import { buildTeamsFromReplay } from '../src/lib/team-builder';
 import { reconstructBranchRuntime, createBranchState } from '../src/lib/branch-engine';
@@ -15,6 +15,9 @@ function loadFixtureReplay() {
     log: string;
   };
 }
+
+// Saved from a real battle; gitignored (Gen9Draft-*), so tests using it skip when absent.
+const SAVED_REPLAY_HTML = 'Gen9Draft-2026-01-06-2shy2shine-calleddxnnis.html';
 
 function loadHtmlReplayLog(path: string): string {
   const html = readFileSync(path, 'utf-8');
@@ -130,7 +133,8 @@ test.describe('Replay reconstruction regression suite', () => {
   });
 
   test('reconstructs stable checkpoints from a real saved replay', async () => {
-    const log = loadHtmlReplayLog('Gen9Draft-2026-01-06-2shy2shine-calleddxnnis.html');
+    test.skip(!existsSync(SAVED_REPLAY_HTML), 'local saved replay HTML is gitignored and not present');
+    const log = loadHtmlReplayLog(SAVED_REPLAY_HTML);
     for (const targetTurn of [3, 5]) {
       await expectReplayCheckpointToReconstruct({
         format: 'gen9draft',
@@ -150,7 +154,8 @@ test.describe('Replay reconstruction regression suite', () => {
   });
 
   test.fixme('documents a known deeper-turn divergence in the saved replay', async () => {
-    const log = loadHtmlReplayLog('Gen9Draft-2026-01-06-2shy2shine-calleddxnnis.html');
+    test.skip(!existsSync(SAVED_REPLAY_HTML), 'local saved replay HTML is gitignored and not present');
+    const log = loadHtmlReplayLog(SAVED_REPLAY_HTML);
     await expectReplayCheckpointToReconstruct({
       format: 'gen9draft',
       log,
