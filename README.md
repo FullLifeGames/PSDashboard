@@ -2,7 +2,7 @@
 
 PS Dashboard is an early-stage web app for replay-based "what if?" analysis on Pokemon Showdown battles. It loads a Showdown replay, reconstructs the battle state up to a chosen turn, and then lets you branch from that point by selecting alternative moves or switches for both sides.
 
-Published app: https://fulllifegames.github.io/PSDashboard/
+Published app: [https://fulllifegames.github.io/PSDashboard/](https://fulllifegames.github.io/PSDashboard/)
 
 The current implementation is a working prototype, not a fully accurate replay recreation engine yet. It is best treated as an exploratory simulator built from replay evidence plus inferred hidden information.
 
@@ -32,7 +32,7 @@ As of the current repository state:
 
 - `npm run lint` passes.
 - `npm run build` succeeds.
-- `npx playwright test` passes with 35 browser tests.
+- `npx playwright test` passes with 39 browser tests.
 - `npm run test:regression` runs replay reconstruction, save/share, damage-preview, branch choice, and pure-engine regression tests.
 
 The browser test suite validates the main happy path with a mocked replay fixture:
@@ -136,7 +136,6 @@ npm run test:regression
 
 ## Notes For Contributors
 
-- This repository still contains a few unused or experimental files from earlier UI directions.
 - The current app path uses the Showdown iframe viewer plus the `useBranch` simulator hook.
 - The production bundle is large because the simulator and learnset data are included client-side.
 

@@ -165,17 +165,6 @@ The current codebase has been validated with:
 
 The regression suite covers pure Smogon-stat parsing/enrichment, branch save/share encoding, target-specific damage previews, basic doubles branch state, redirection/retargeting/phazing fixtures, stable checkpoints from a mocked fixture, and stable checkpoints from a saved real replay. Two deeper checkpoints are marked `fixme` to document known divergence rather than hiding it.
 
-## Unused Or Alternate Code Paths
-
-A few files are present but are not part of the current app path:
-
-- [`src/components/BattleView.tsx`](./src/components/BattleView.tsx)
-- [`src/components/BattleScene.tsx`](./src/components/BattleScene.tsx)
-- [`src/hooks/useTimeline.ts`](./src/hooks/useTimeline.ts)
-- [`src/lib/battle-simulator.ts`](./src/lib/battle-simulator.ts)
-
-These look like earlier or alternate directions. They may still be useful, but they currently increase maintenance surface without contributing to the live app flow.
-
 ## Recommended Refactor Direction
 
 If the project continues, the cleanest next architectural move would be to keep tightening the three separately testable layers:
