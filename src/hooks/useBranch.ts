@@ -1,11 +1,16 @@
-import { useState, useCallback, useRef, type RefObject } from 'react';
+import { useState, useCallback, useRef } from 'react';
 import type { BattleStreams, PokemonSet } from '@pkmn/sim';
 import type { TurnSnapshot } from '../types';
-import type { BranchSimState, SimPokemonInfo } from '../lib/branch-engine';
+import type {
+  BranchChoiceErrorLog,
+  BranchRuntime,
+  BranchSimState,
+  SimPokemonInfo,
+} from '../lib/branch-engine';
 import {
   branchSideChoicesReady,
-  buildBranchSideCommand,
   requiredChoicesForActiveSlots,
+  type BranchSlotChoice,
 } from '../lib/branch-choices';
 
 export type {
@@ -22,12 +27,22 @@ type BranchEngineModule = typeof import('../lib/branch-engine');
 
 interface StartBranchOptions {
   replayHistory?: BranchHistoryEntry[];
-  p1Choices?: (string | null)[];
-  p2Choices?: (string | null)[];
+  p1Choices?: (BranchSlotChoice | null)[];
+  p2Choices?: (BranchSlotChoice | null)[];
+  playerNames?: [string, string];
+  onProgress?: (turn: number, targetTurn: number) => void;
+  abort?: AbortSignal;
 }
 
 export interface BranchHistoryEntry {
   turnNumber: number;
+  /** 'forced' entries record single-side forced-switch interludes (B15). */
+  kind?: 'turn' | 'forced';
+  forcedSide?: SideId;
+  /** Identity-based choices used to replay this entry after a team edit (B1). */
+  p1SlotChoices?: (BranchSlotChoice | null)[];
+  p2SlotChoices?: (BranchSlotChoice | null)[];
+  /** The resolved commands actually sent to the sim (display/share only). */
   p1Choice: string;
   p2Choice: string;
   p1Active: SimPokemonInfo | null;
@@ -56,25 +71,9 @@ function requiredChoices(battle: NonNullable<BattleStreams.BattleStream['battle'
 function hasAllChoices(
   battle: NonNullable<BattleStreams.BattleStream['battle']>,
   side: SideId,
-  choices: (string | null)[],
+  choices: (BranchSlotChoice | null)[],
 ): boolean {
   return branchSideChoicesReady(choices, requiredChoices(battle, side));
-}
-
-function sideCommand(
-  battle: NonNullable<BattleStreams.BattleStream['battle']>,
-  side: SideId,
-  choices: (string | null)[],
-): string {
-  return buildBranchSideCommand(choices, requiredChoices(battle, side));
-}
-
-async function waitForLogAppend(logRef: RefObject<string[]>, previousLength: number) {
-  const deadline = Date.now() + 1500;
-  while (Date.now() < deadline) {
-    if (logRef.current.length > previousLength) return;
-    await new Promise(resolve => setTimeout(resolve, 25));
-  }
 }
 
 function makeHistoryEntry(
@@ -96,16 +95,100 @@ function makeHistoryEntry(
   };
 }
 
+type ReplayEntryOutcome =
+  | { ok: true; entry: BranchHistoryEntry }
+  | { ok: false; error: string };
+
+/**
+ * Re-applies one recorded history entry against a freshly rebuilt runtime.
+ * Choices are re-resolved by identity against the current request, so a team
+ * edit can never silently replay the wrong move — mismatches abort with a
+ * visible error instead (B1).
+ */
+async function replayHistoryEntry(
+  runtime: BranchRuntime,
+  branchEngine: BranchEngineModule,
+  entry: BranchHistoryEntry,
+): Promise<ReplayEntryOutcome> {
+  const battle = runtime.battleStream.battle;
+  if (!battle || battle.ended) {
+    return { ok: false, error: 'The rebuilt battle ended before this turn.' };
+  }
+
+  const turnNumber = battle.turn ?? 0;
+  let commands: { side: SideId; command: string }[];
+  let p1Command = entry.p1Choice;
+  let p2Command = entry.p2Choice;
+
+  if (entry.kind === 'forced' && entry.forcedSide) {
+    const side = entry.forcedSide;
+    const slotChoices = side === 'p1' ? entry.p1SlotChoices : entry.p2SlotChoices;
+    if (!slotChoices) return { ok: false, error: 'Missing forced-switch data in the branch history.' };
+    const resolved = branchEngine.resolveSideChoices(battle, side, slotChoices, requiredChoices(battle, side));
+    if (!resolved.ok) return resolved;
+    commands = [{ side, command: resolved.command }];
+    p1Command = side === 'p1' ? resolved.command : '—';
+    p2Command = side === 'p2' ? resolved.command : '—';
+  } else if (entry.p1SlotChoices && entry.p2SlotChoices) {
+    const p1 = branchEngine.resolveSideChoices(battle, 'p1', entry.p1SlotChoices, requiredChoices(battle, 'p1'));
+    if (!p1.ok) return p1;
+    const p2 = branchEngine.resolveSideChoices(battle, 'p2', entry.p2SlotChoices, requiredChoices(battle, 'p2'));
+    if (!p2.ok) return p2;
+    commands = [
+      { side: 'p1', command: p1.command },
+      { side: 'p2', command: p2.command },
+    ];
+    p1Command = p1.command;
+    p2Command = p2.command;
+  } else {
+    // Entries recorded before identity-based choices existed: replay verbatim.
+    commands = [
+      { side: 'p1', command: entry.p1Choice },
+      { side: 'p2', command: entry.p2Choice },
+    ];
+  }
+
+  const result = await branchEngine.executeBranchChoices({
+    streams: runtime.streams,
+    log: runtime.log,
+    choiceErrors: runtime.choiceErrors,
+    commands,
+  });
+  if (!result.ok) return result;
+
+  const nextState = branchEngine.createBranchState(runtime.battleStream, runtime.log, {
+    p1Choices: [],
+    p2Choices: [],
+  });
+  return {
+    ok: true,
+    entry: {
+      ...makeHistoryEntry(turnNumber, p1Command, p2Command, nextState),
+      kind: entry.kind ?? 'turn',
+      ...(entry.forcedSide ? { forcedSide: entry.forcedSide } : {}),
+      ...(entry.p1SlotChoices ? { p1SlotChoices: entry.p1SlotChoices } : {}),
+      ...(entry.p2SlotChoices ? { p2SlotChoices: entry.p2SlotChoices } : {}),
+    },
+  };
+}
+
 export function useBranch() {
   const [branching, setBranching] = useState(false);
   const [simState, setSimState] = useState<BranchSimState | null>(null);
   const [history, setHistory] = useState<BranchHistoryEntry[]>([]);
+  const [executeError, setExecuteError] = useState<string | null>(null);
+  const [executing, setExecuting] = useState(false);
+  // Concurrent sim writes commit unintended extra turns and desync the UI
+  // from the battle (double clicks, rapid forced-switch clicks) — one execute
+  // may run at a time.
+  const executingRef = useRef(false);
   const branchEngineRef = useRef<BranchEngineModule | null>(null);
   const streamsRef = useRef<PlayerStreams | null>(null);
   const battleStreamRef = useRef<BattleStream | null>(null);
   const logRef = useRef<string[]>([]);
-  const p1ChoicesRef = useRef<(string | null)[]>([]);
-  const p2ChoicesRef = useRef<(string | null)[]>([]);
+  const choiceErrorsRef = useRef<BranchChoiceErrorLog | null>(null);
+  const p1ChoicesRef = useRef<(BranchSlotChoice | null)[]>([]);
+  const p2ChoicesRef = useRef<(BranchSlotChoice | null)[]>([]);
 
   const loadBranchEngine = useCallback(async () => {
     branchEngineRef.current ??= await import('../lib/branch-engine');
@@ -126,84 +209,143 @@ export function useBranch() {
     p2ChoicesRef.current = [];
   }, []);
 
-  const applyChoicePair = useCallback(async (
-    streams: PlayerStreams,
-    battleStream: BattleStream,
-    branchEngine: BranchEngineModule,
-    p1Choice: string,
-    p2Choice: string,
-  ): Promise<BranchHistoryEntry | null> => {
-    const battle = battleStream.battle;
-    if (!battle) return null;
-
-    const turnNumber = battle.turn ?? 0;
-    const previousLogLength = logRef.current.length;
-    void streams.omniscient.write(`>p1 ${p1Choice}\n>p2 ${p2Choice}`);
-    await waitForLogAppend(logRef, previousLogLength);
-
-    const nextState = branchEngine.createBranchState(battleStream, logRef.current, {
-      p1Choices: p1ChoicesRef.current,
-      p2Choices: p2ChoicesRef.current,
-    });
-    return makeHistoryEntry(turnNumber, p1Choice, p2Choice, nextState);
-  }, []);
-
   const executeTurn = useCallback(async () => {
     const streams = streamsRef.current;
     const battleStream = battleStreamRef.current;
     const branchEngine = branchEngineRef.current;
+    const choiceErrors = choiceErrorsRef.current;
     const battle = battleStream?.battle;
-    if (!streams || !battleStream || !branchEngine || !battle) return;
+    if (!streams || !battleStream || !branchEngine || !choiceErrors || !battle) return;
+    if (executingRef.current) return;
     if (!hasAllChoices(battle, 'p1', p1ChoicesRef.current) || !hasAllChoices(battle, 'p2', p2ChoicesRef.current)) {
       return;
     }
 
-    const currentTurn = battle.turn ?? 0;
-    const previousLogLength = logRef.current.length;
-    const p1 = sideCommand(battle, 'p1', p1ChoicesRef.current);
-    const p2 = sideCommand(battle, 'p2', p2ChoicesRef.current);
-    clearChoices();
+    executingRef.current = true;
+    setExecuting(true);
+    try {
+      const currentTurn = battle.turn ?? 0;
+      const p1 = branchEngine.resolveSideChoices(battle, 'p1', p1ChoicesRef.current, requiredChoices(battle, 'p1'));
+      if (!p1.ok) {
+        setExecuteError(p1.error);
+        return;
+      }
+      const p2 = branchEngine.resolveSideChoices(battle, 'p2', p2ChoicesRef.current, requiredChoices(battle, 'p2'));
+      if (!p2.ok) {
+        setExecuteError(p2.error);
+        return;
+      }
 
-    void streams.omniscient.write(`>p1 ${p1}\n>p2 ${p2}`);
-    await waitForLogAppend(logRef, previousLogLength);
+      const result = await branchEngine.executeBranchChoices({
+        streams,
+        log: logRef.current,
+        choiceErrors,
+        commands: [
+          { side: 'p1', command: p1.command },
+          { side: 'p2', command: p2.command },
+        ],
+      });
 
-    const nextState = branchEngine.createBranchState(battleStream, logRef.current, {
-      p1Choices: p1ChoicesRef.current,
-      p2Choices: p2ChoicesRef.current,
-    });
-    setHistory(prev => [...prev, makeHistoryEntry(currentTurn, p1, p2, nextState)]);
-    setSimState(nextState);
+      if (!result.ok) {
+        setExecuteError(result.error);
+        return;
+      }
+
+      setExecuteError(null);
+      const p1SlotChoices = [...p1ChoicesRef.current];
+      const p2SlotChoices = [...p2ChoicesRef.current];
+      clearChoices();
+      const nextState = branchEngine.createBranchState(battleStream, logRef.current, {
+        p1Choices: p1ChoicesRef.current,
+        p2Choices: p2ChoicesRef.current,
+      });
+      setHistory(prev => [...prev, {
+        ...makeHistoryEntry(currentTurn, p1.command, p2.command, nextState),
+        kind: 'turn' as const,
+        p1SlotChoices,
+        p2SlotChoices,
+      }]);
+      setSimState(nextState);
+    } finally {
+      executingRef.current = false;
+      setExecuting(false);
+    }
   }, [clearChoices]);
 
-  const executeForcedSide = useCallback((side: SideId, choice: string) => {
+  const executeForcedSide = useCallback(async (
+    side: SideId,
+    command: string,
+    slotChoices: (BranchSlotChoice | null)[],
+  ) => {
     const streams = streamsRef.current;
     const battleStream = battleStreamRef.current;
-    if (!streams || !battleStream) return;
+    const branchEngine = branchEngineRef.current;
+    const choiceErrors = choiceErrorsRef.current;
+    if (!streams || !battleStream || !branchEngine || !choiceErrors) return;
+    if (executingRef.current) return;
 
-    void streams.omniscient.write(`>${side} ${choice}`);
-    if (side === 'p1') p1ChoicesRef.current = [];
-    if (side === 'p2') p2ChoicesRef.current = [];
-    setTimeout(() => updateState(battleStream), 200);
-  }, [updateState]);
+    executingRef.current = true;
+    setExecuting(true);
+    try {
+      const turnNumber = battleStream.battle?.turn ?? 0;
+      const result = await branchEngine.executeBranchChoices({
+        streams,
+        log: logRef.current,
+        choiceErrors,
+        commands: [{ side, command }],
+      });
 
-  const setChoice = useCallback((side: SideId, choice: string, activeSlot = 0) => {
+      if (!result.ok) {
+        setExecuteError(result.error);
+        return;
+      }
+
+      setExecuteError(null);
+      if (side === 'p1') p1ChoicesRef.current = [];
+      if (side === 'p2') p2ChoicesRef.current = [];
+      const nextState = branchEngine.createBranchState(battleStream, logRef.current, {
+        p1Choices: p1ChoicesRef.current,
+        p2Choices: p2ChoicesRef.current,
+      });
+      setHistory(prev => [...prev, {
+        ...makeHistoryEntry(turnNumber, side === 'p1' ? command : '—', side === 'p2' ? command : '—', nextState),
+        kind: 'forced' as const,
+        forcedSide: side,
+        ...(side === 'p1' ? { p1SlotChoices: slotChoices } : { p2SlotChoices: slotChoices }),
+      }]);
+      setSimState(nextState);
+    } finally {
+      executingRef.current = false;
+      setExecuting(false);
+    }
+  }, []);
+
+  const setChoice = useCallback((side: SideId, choice: BranchSlotChoice, activeSlot = 0) => {
+    if (executingRef.current) return;
     const ref = side === 'p1' ? p1ChoicesRef : p2ChoicesRef;
     ref.current = [...ref.current];
     ref.current[activeSlot] = choice;
+    setExecuteError(null);
 
     const battleStream = battleStreamRef.current;
+    const branchEngine = branchEngineRef.current;
     const battle = battleStream?.battle;
-    if (!battle) return;
+    if (!battle || !branchEngine) return;
 
     const p1Forced = forceSwitches(battle, 'p1').some(Boolean);
     const p2Forced = forceSwitches(battle, 'p2').some(Boolean);
 
-    if (p1Forced && !p2Forced && side === 'p1' && hasAllChoices(battle, 'p1', p1ChoicesRef.current)) {
-      executeForcedSide('p1', sideCommand(battle, 'p1', p1ChoicesRef.current));
-      return;
-    }
-    if (p2Forced && !p1Forced && side === 'p2' && hasAllChoices(battle, 'p2', p2ChoicesRef.current)) {
-      executeForcedSide('p2', sideCommand(battle, 'p2', p2ChoicesRef.current));
+    for (const forcedSide of ['p1', 'p2'] as const) {
+      const isForced = forcedSide === 'p1' ? p1Forced && !p2Forced : p2Forced && !p1Forced;
+      const choicesRef = forcedSide === 'p1' ? p1ChoicesRef : p2ChoicesRef;
+      if (!isForced || side !== forcedSide || !hasAllChoices(battle, forcedSide, choicesRef.current)) continue;
+
+      const resolved = branchEngine.resolveSideChoices(battle, forcedSide, choicesRef.current, requiredChoices(battle, forcedSide));
+      if (!resolved.ok) {
+        setExecuteError(resolved.error);
+        return;
+      }
+      void executeForcedSide(forcedSide, resolved.command, [...choicesRef.current]);
       return;
     }
 
@@ -234,6 +376,7 @@ export function useBranch() {
   ) => {
     logRef.current = [];
     clearChoices();
+    setExecuteError(null);
 
     const branchEngine = await loadBranchEngine();
     const runtime = await branchEngine.reconstructBranchRuntime({
@@ -243,34 +386,51 @@ export function useBranch() {
       replayLog,
       targetTurn,
       snapshot,
+      playerNames: options?.playerNames,
+      onProgress: options?.onProgress,
+      abort: options?.abort,
     });
+
+    if (options?.abort?.aborted) return;
 
     logRef.current = runtime.log;
     battleStreamRef.current = runtime.battleStream;
     streamsRef.current = runtime.streams;
+    choiceErrorsRef.current = runtime.choiceErrors;
+
+    let branchError = branchEngine.validateBranchRuntime(runtime);
 
     const replayedHistory: BranchHistoryEntry[] = [];
-    for (const entry of options?.replayHistory ?? []) {
-      const replayedEntry = await applyChoicePair(runtime.streams, runtime.battleStream, branchEngine, entry.p1Choice, entry.p2Choice);
-      if (replayedEntry) replayedHistory.push(replayedEntry);
+    if (!branchError) {
+      for (const entry of options?.replayHistory ?? []) {
+        const outcome = await replayHistoryEntry(runtime, branchEngine, entry);
+        if (!outcome.ok) {
+          branchError = `Rebuild stopped before branch turn ${entry.turnNumber}: ${outcome.error}`;
+          break;
+        }
+        replayedHistory.push(outcome.entry);
+      }
     }
 
-    p1ChoicesRef.current = [...(options?.p1Choices ?? [])];
-    p2ChoicesRef.current = [...(options?.p2Choices ?? [])];
+    p1ChoicesRef.current = branchError ? [] : [...(options?.p1Choices ?? [])];
+    p2ChoicesRef.current = branchError ? [] : [...(options?.p2Choices ?? [])];
     setBranching(true);
     setHistory(replayedHistory);
+    setExecuteError(branchError);
     updateState(runtime.battleStream);
-  }, [applyChoicePair, clearChoices, loadBranchEngine, updateState]);
+  }, [clearChoices, loadBranchEngine, updateState]);
 
   const stopBranch = useCallback(() => {
     setBranching(false);
     setSimState(null);
     setHistory([]);
+    setExecuteError(null);
     streamsRef.current = null;
     battleStreamRef.current = null;
     logRef.current = [];
+    choiceErrorsRef.current = null;
     clearChoices();
   }, [clearChoices]);
 
-  return { branching, simState, history, startBranch, setChoice, executeTurn, stopBranch };
+  return { branching, simState, history, executeError, executing, startBranch, setChoice, executeTurn, stopBranch };
 }

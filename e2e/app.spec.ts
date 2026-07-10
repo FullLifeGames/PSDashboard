@@ -73,13 +73,44 @@ async function expectReplayTurn(
   frame: Frame,
   turn: number,
 ) {
+  // The embed script loads from play.pokemonshowdown.com; under full-suite
+  // load it can take a while before Replays.battle exists at all — wait for
+  // readiness first so slow CDN responses don't eat the turn timeout (G25).
+  await expect.poll(async () => frame.evaluate(() =>
+    !!(window as ReplayWindow).Replays?.battle
+  ), { timeout: 30_000 }).toBe(true);
   await expect.poll(async () => frame.evaluate(() =>
     (window as ReplayWindow).Replays?.battle?.turn ?? -1
   ), { timeout: 15_000 }).toBe(turn);
 }
 
+// The embed script is fetched from play.pokemonshowdown.com by every test's
+// iframe; occasional CDN stalls were the root of the flaky `Replays.battle`
+// timeouts (G25). Fetch it once per run and serve all tests from memory.
+let replayEmbedCache: Buffer | null = null;
+
+test.beforeAll(async () => {
+  try {
+    const response = await fetch('https://play.pokemonshowdown.com/js/replay-embed.js');
+    if (response.ok) replayEmbedCache = Buffer.from(await response.arrayBuffer());
+  } catch {
+    // Fall through — tests then hit the CDN directly like before.
+  }
+});
+
 test.describe('PS Dashboard', () => {
   test.beforeEach(async ({ page }) => {
+    await page.route('**/play.pokemonshowdown.com/js/replay-embed.js*', async (route) => {
+      if (replayEmbedCache) {
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/javascript',
+          body: replayEmbedCache,
+        });
+        return;
+      }
+      await route.continue().catch(() => {});
+    });
     await page.route('**/replay.pokemonshowdown.com/**', (route) => {
       const replay = route.request().url().includes(doublesReplay.id) ? doublesReplay : fixtureReplay;
       route.fulfill({
@@ -267,12 +298,12 @@ test.describe('PS Dashboard', () => {
     await page.locator('button', { hasText: 'Branch Here' }).click();
     await expect(page.getByText(/Branching.*Turn/)).toBeVisible({ timeout: 15000 });
 
-    const customInputs = page.locator('input[aria-label^="Custom move choice"]');
-    await expect(customInputs.first()).toBeVisible({ timeout: 5000 });
-    await customInputs.first().fill('move 1');
-    await page.locator('button', { hasText: 'Use Custom' }).first().click();
+    const pickers = page.locator('select[aria-label^="Choice picker"]');
+    await expect(pickers.first()).toBeVisible({ timeout: 5000 });
+    await pickers.first().selectOption({ index: 1 });
 
-    await expect(page.locator('text=/\\[move 1\\]/').first()).toBeVisible({ timeout: 5000 });
+    // Pending chips now show the move identity instead of the grid slot (B1).
+    await expect(page.locator('text=/\\[move .+\\]/').first()).toBeVisible({ timeout: 5000 });
   });
 
   test('saving player edits refreshes the active branch and exposes EV controls', async ({ page }) => {
@@ -315,7 +346,8 @@ test.describe('PS Dashboard', () => {
     await expect(page.locator('.ps-panel', { hasText: 'Branch History' })).toContainText('Turn 1');
 
     await page.locator('button', { hasText: /Use Recommended/i }).nth(1).click();
-    await expect(p2Controls).toContainText(/\[move \d+\]/);
+    // Pending chips show the move identity instead of the grid slot (B1).
+    await expect(p2Controls).toContainText(/\[move .+\]/);
 
     await page.locator('button', { hasText: 'Edit Player' }).click();
     const editor = page.getByRole('dialog', { name: 'Edit Player Team' });
@@ -329,7 +361,7 @@ test.describe('PS Dashboard', () => {
     await expect(page.locator('.ps-panel', { hasText: 'Branch History' })).toContainText('Turn 1');
     await expect(p1Controls).toContainText('Brave Bird');
     await expect(p1Controls).not.toContainText('Earthquake');
-    await expect(p2Controls).toContainText(/\[move \d+\]/);
+    await expect(p2Controls).toContainText(/\[move .+\]/);
 
     await p1Controls.locator('.ps-movebtn', { hasText: 'Brave Bird' }).click();
     await expect(page.locator('button', { hasText: 'Execute Turn' })).toBeEnabled();

@@ -502,7 +502,67 @@ body {
   padding: 5px 8px;
 }
 
-/* Execute turn button */
+/* Battle gimmick toggles (Tera/Mega/Z/Ultra, G7) */
+.ps-modifier-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 7px;
+}
+.ps-modifier-toggle {
+  background: rgba(0,0,0,0.25);
+  border: 1px solid rgba(255,255,255,0.18);
+  border-radius: 999px;
+  color: #cde;
+  cursor: pointer;
+  font-family: inherit;
+  font-size: 10px;
+  font-weight: bold;
+  padding: 4px 10px;
+  transition: background 0.15s, border-color 0.15s;
+}
+.ps-modifier-toggle:hover { border-color: rgba(255,255,255,0.4); }
+.ps-modifier-toggle-active {
+  background: linear-gradient(180deg, #8a5fd0 0%, #6a3fb0 100%);
+  border-color: rgba(210,180,255,0.6);
+  color: #fff;
+}
+.ps-movebtn-zmove {
+  font-size: 10px;
+  font-weight: bold;
+  color: #ffe9a8;
+  text-shadow: 0 1px 1px rgba(0,0,0,0.5);
+}
+
+/* Per-target ranges for untargeted (spread) moves in doubles */
+.ps-movebtn-spread-target {
+  display: inline-block;
+  margin-right: 6px;
+  white-space: nowrap;
+}
+.ps-movebtn-spread-target:last-child { margin-right: 0; }
+
+/* Rejected choice / failed execute feedback */
+.ps-choice-error {
+  background: rgba(224,102,112,0.12);
+  border: 1px solid rgba(224,102,112,0.35);
+  border-radius: 5px;
+  color: #f3a6a6;
+  font-size: 11px;
+  margin-top: 6px;
+  padding: 6px 8px;
+}
+.ps-execute-error {
+  font-weight: bold;
+}
+
+/* Execute turn button — sticky so the CTA never hides below the fold (G14) */
+.ps-execute-wrap {
+  position: sticky;
+  bottom: 8px;
+  z-index: 5;
+}
+
 .ps-execute-btn {
   width: 100%;
   padding: 10px;
@@ -764,6 +824,11 @@ body {
   min-height: 480px;
 }
 
+.ps-branch-bar input[type="range"] {
+  flex: 1;
+  min-width: 0;
+}
+
 .ps-branch-bar {
   flex: 0 0 auto;
   display: flex;
@@ -778,7 +843,30 @@ body {
   box-shadow: 0 6px 16px rgba(6,12,24,0.16);
 }
 
-@media (max-width: 900px) {
+/* Modal close button — comfortable pointer/touch target (B18/G20) */
+.ps-modal-close {
+  background: none;
+  border: none;
+  color: #889;
+  cursor: pointer;
+  font-size: 20px;
+  font-family: inherit;
+  line-height: 1;
+  min-width: 32px;
+  min-height: 32px;
+  border-radius: 5px;
+}
+.ps-modal-close:hover { color: #fff; background: rgba(255,255,255,0.08); }
+
+/* EV inputs in the team editor (3×2 on narrow screens, B20) */
+.ps-ev-grid {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 4px;
+}
+
+/* The 900px breakpoint left 901–1050px cramped (G22) — stack earlier. */
+@media (max-width: 1050px) {
   .ps-app-root {
     height: auto;
     min-height: 100vh;
@@ -843,8 +931,32 @@ body {
   .ps-topbar > div {
     flex-wrap: wrap;
   }
+  /* Branch bar wraps: controls stay on top, the slider gets its own
+     full-width row with a real touch target (B18). */
   .ps-branch-bar input[type="range"] {
-    flex: 1 1 180px;
+    flex: 1 1 100%;
+    order: 10;
+    min-height: 28px;
+  }
+  .ps-branch-bar .ps-btn {
+    min-height: 40px;
+    min-width: 40px;
+  }
+  /* The Showdown embed keeps its desktop layout; a scrollable container with
+     a minimum width keeps the battle log reachable on phones (B9b). */
+  .ps-iframe-wrap {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+  .ps-iframe-wrap iframe {
+    min-width: 640px;
+  }
+  .ps-ev-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+  .ps-modal-close {
+    min-width: 40px;
+    min-height: 40px;
   }
   .ps-movegrid,
   .ps-switchgrid {

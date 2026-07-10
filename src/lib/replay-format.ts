@@ -32,20 +32,39 @@ export function getReplayGameType(log: string | undefined): string | null {
   return raw ? toId(raw) : null;
 }
 
+/**
+ * Smogtours replay ids prefix the real format (`smogtours-gen3ou-56583`) and
+ * sometimes drop the gen entirely (`smogtours-ubers`) — stripping the prefix
+ * and re-adding the generation yields the format usage stats and the branch
+ * simulator actually understand (B13).
+ */
+function normalizeInferredFormatId(id: string, source: ReplayFormatSource): string {
+  let normalized = id.replace(/^smogtours/, '');
+  if (normalized && !/^gen\d/.test(normalized)) {
+    normalized = `gen${extractGen(source)}${normalized}`;
+  }
+  return normalized || id;
+}
+
 export function inferReplayFormatId(source: ReplayFormatSource): string {
   const explicit = toId(source.formatid);
-  if (explicit) return explicit;
+  if (explicit) return normalizeInferredFormatId(explicit, source);
 
   const fromReplayId = toId(stripReplayNumber(source.id));
-  if (fromReplayId) return fromReplayId;
+  if (fromReplayId) return normalizeInferredFormatId(fromReplayId, source);
 
   const fromTier = toId(extractTier(source.log));
-  if (fromTier) return fromTier;
+  if (fromTier) return normalizeInferredFormatId(fromTier, source);
 
   const fromFormat = toId(source.format);
-  if (fromFormat) return fromFormat;
+  if (fromFormat) return normalizeInferredFormatId(fromFormat, source);
 
   return `gen${extractGen(source)}ou`;
+}
+
+export function getReplayGeneration(source: ReplayFormatSource): number {
+  const formatid = inferReplayFormatId(source);
+  return parseInt(extractGen({ ...source, formatid }), 10) || 9;
 }
 
 export function getBranchSimulatorFormat(source: ReplayFormatSource): string {

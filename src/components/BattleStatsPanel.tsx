@@ -7,6 +7,7 @@ import type {
   ReplayData,
   RevealedPokemonInfo,
 } from '../types';
+import { spriteUrl } from '../lib/sprite-url';
 
 interface Props {
   replayData: ReplayData;
@@ -37,10 +38,6 @@ const TYPE_BG: Record<string, string> = {
   '???': '#68A090',
 };
 
-function spriteUrl(species: string) {
-  const id = species.toLowerCase().replace(/[^a-z0-9-]/g, '');
-  return `https://play.pokemonshowdown.com/sprites/gen5/${id}.png`;
-}
 
 function sourceAccent(source: KnowledgeSource): string {
   switch (source) {
@@ -79,7 +76,7 @@ function formatFieldValue(field: PokemonFieldInfo): string {
   return field.value;
 }
 
-function formatEvs(evs: PokemonEvsInfo): string {
+function formatEvs(evs: PokemonEvsInfo, isRandomFormat: boolean): string {
   const labels = [
     ['HP', evs.value.hp],
     ['Atk', evs.value.atk],
@@ -89,7 +86,12 @@ function formatEvs(evs: PokemonEvsInfo): string {
     ['Spe', evs.value.spe],
   ] as const;
   const nonZero = labels.filter(([, value]) => value > 0);
-  if (nonZero.length === 0) return '0 EVs';
+  if (nonZero.length === 0) {
+    // Random sets run fixed 85 EVs across the board; "0 EVs" would be
+    // misleading for unknown spreads too (G21).
+    if (isRandomFormat && evs.source === 'unknown') return '85 EVs each (random set)';
+    return evs.source === 'unknown' ? 'EVs ?' : '0 EVs';
+  }
   return `${nonZero.map(([label, value]) => `${value} ${label}`).join(' / ')} EVs`;
 }
 
@@ -144,7 +146,7 @@ function MoveTag({ move }: { move: PokemonMoveInfo }) {
   );
 }
 
-function PokemonEntry({ poke }: { poke: RevealedPokemonInfo }) {
+function PokemonEntry({ poke, isRandomFormat }: { poke: RevealedPokemonInfo; isRandomFormat: boolean }) {
   return (
     <div className="ps-stats-pokemon">
       <img
@@ -176,7 +178,7 @@ function PokemonEntry({ poke }: { poke: RevealedPokemonInfo }) {
             }}
             title={poke.evs.sourceDetail || sourceLabel(poke.evs.source, poke.evs.probability)}
           >
-            {formatEvs(poke.evs)}
+            {formatEvs(poke.evs, isRandomFormat)}
             <span style={{ marginLeft: 6, color: sourceAccent(poke.evs.source), fontSize: 9, textTransform: 'uppercase' }}>
               {sourceLabel(poke.evs.source, poke.evs.probability)}
             </span>
@@ -196,18 +198,34 @@ function PokemonEntry({ poke }: { poke: RevealedPokemonInfo }) {
   );
 }
 
-function TeamColumn({ label, playerName, info }: {
+function TeamColumn({ label, playerName, info, isRandomFormat }: {
   label: string;
   playerName: string;
   info: OpponentTeamInfo;
+  isRandomFormat: boolean;
 }) {
+  // Random battles always run six Pokémon — show the not-yet-revealed slots
+  // instead of implying the team is complete (G21).
+  const hiddenSlots = isRandomFormat ? Math.max(0, 6 - info.pokemon.length) : 0;
+
   return (
     <div className="ps-stats-team">
       <div className="ps-stats-header">
         <span className="ps-stats-label">{label}</span> {playerName}
       </div>
       {info.pokemon.map(p => (
-        <PokemonEntry key={p.species} poke={p} />
+        <PokemonEntry key={p.species} poke={p} isRandomFormat={isRandomFormat} />
+      ))}
+      {Array.from({ length: hiddenSlots }, (_, index) => (
+        <div key={`hidden-${index}`} className="ps-stats-pokemon" style={{ opacity: 0.55 }}>
+          <div className="ps-stats-sprite" aria-hidden="true" style={{
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            fontSize: 18, color: '#8899aa',
+          }}>?</div>
+          <div className="ps-stats-details">
+            <div className="ps-stats-species" style={{ color: '#8899aa' }}>Not yet revealed</div>
+          </div>
+        </div>
       ))}
     </div>
   );
@@ -215,16 +233,17 @@ function TeamColumn({ label, playerName, info }: {
 
 export function BattleStatsPanel({ replayData, p1Info, p2Info }: Props) {
   if (!p1Info && !p2Info) return null;
+  const isRandomFormat = (replayData.formatid || '').includes('random');
 
   return (
     <div className="ps-panel" style={{ marginTop: 10 }}>
       <div style={{ fontSize: 13, fontWeight: 'bold', marginBottom: 8 }}>Battle Statistics</div>
       <div className="ps-stats-grid">
         {p1Info && (
-          <TeamColumn label="P1" playerName={replayData.players[0]} info={p1Info} />
+          <TeamColumn label="P1" playerName={replayData.players[0]} info={p1Info} isRandomFormat={isRandomFormat} />
         )}
         {p2Info && (
-          <TeamColumn label="P2" playerName={replayData.players[1]} info={p2Info} />
+          <TeamColumn label="P2" playerName={replayData.players[1]} info={p2Info} isRandomFormat={isRandomFormat} />
         )}
       </div>
     </div>

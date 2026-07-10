@@ -1,6 +1,14 @@
 import { BattleStreams, Dex, Teams } from '@pkmn/sim';
 import type { PokemonSet } from '@pkmn/sim';
 import type { TurnSnapshot } from '../types';
+import type { BranchSlotChoice } from './branch-choices';
+
+// @pkmn/sim's random-format rulesets reference Node's `global` object (e.g.
+// `global.Config?.potd` in rulesets), which doesn't exist in browsers and made
+// every Random Battle branch die with an uncaught ReferenceError (B2).
+if (typeof (globalThis as Record<string, unknown>).global === 'undefined') {
+  (globalThis as Record<string, unknown>).global = globalThis;
+}
 
 type SimBattle = NonNullable<BattleStreams.BattleStream['battle']>;
 type SimSide = SimBattle['sides'][number];
@@ -72,6 +80,22 @@ export interface SimPokemonInfo {
   types: string[];
 }
 
+export interface BranchFieldState {
+  weather: string;
+  terrain: string;
+  p1SideConditions: string[];
+  p2SideConditions: string[];
+}
+
+/** Per-active-slot availability of battle gimmicks (Tera/Mega/Z/Ultra, G7). */
+export interface BranchSlotModifiers {
+  teraType: string | null;
+  canMegaEvo: boolean;
+  canUltraBurst: boolean;
+  /** Z-move name per move slot (index 0 = move slot 1), null when the move has no Z option. */
+  zMoves: (string | null)[];
+}
+
 export interface BranchSimState {
   p1Moves: BranchMoveOption[];
   p1MovesBySlot: BranchMoveOption[][];
@@ -87,6 +111,9 @@ export interface BranchSimState {
   p1ActiveSlots: (SimPokemonInfo | null)[];
   p2Active: SimPokemonInfo | null;
   p2ActiveSlots: (SimPokemonInfo | null)[];
+  p1ModifiersBySlot: BranchSlotModifiers[];
+  p2ModifiersBySlot: BranchSlotModifiers[];
+  field: BranchFieldState;
   log: string[];
   ended: boolean;
   winner: string | null;
@@ -96,23 +123,39 @@ export interface BranchSimState {
   p1ForceSwitches: boolean[];
   p2ForceSwitch: boolean;
   p2ForceSwitches: boolean[];
-  p1Choice: string | null;
-  p1Choices: (string | null)[];
-  p2Choice: string | null;
-  p2Choices: (string | null)[];
+  p1Choice: BranchSlotChoice | null;
+  p1Choices: (BranchSlotChoice | null)[];
+  p2Choice: BranchSlotChoice | null;
+  p2Choices: (BranchSlotChoice | null)[];
 }
 
 export interface BranchRuntime {
   battleStream: BattleStreams.BattleStream;
   streams: ReturnType<typeof BattleStreams.getPlayerStreams>;
   log: string[];
+  choiceErrors: BranchChoiceErrorLog;
+  /** True when the overall reconstruction deadline was hit before the target turn (B17). */
+  timedOut: boolean;
 }
 
+/**
+ * Choice rejections arrive as `|error|` sideupdates on the per-player streams,
+ * never on the omniscient stream — this collects them so executes can fail loudly.
+ */
+export interface BranchChoiceErrorLog {
+  count: number;
+  last: string | null;
+}
+
+export type BranchExecuteResult =
+  | { ok: true }
+  | { ok: false; error: string };
+
 interface BranchChoices {
-  p1Choice?: string | null;
-  p2Choice?: string | null;
-  p1Choices?: (string | null)[];
-  p2Choices?: (string | null)[];
+  p1Choice?: BranchSlotChoice | null;
+  p2Choice?: BranchSlotChoice | null;
+  p1Choices?: (BranchSlotChoice | null)[];
+  p2Choices?: (BranchSlotChoice | null)[];
 }
 
 interface TurnBlock {
@@ -593,6 +636,28 @@ function correctBattleFromSnapshot(battle: SimBattle, snapshot: TurnSnapshot) {
   correctFieldFromSnapshot(battle, snapshot);
 }
 
+/**
+ * After snapshot/active corrections the emitted request can go stale: it still
+ * demands a forced switch although no active Pokémon carries a switchFlag
+ * anymore (B7 — the gen3 "phantom forced switch" deadlock). The battle itself
+ * is consistent, so regenerating the request from the live state repairs it.
+ */
+function hasStaleForcedSwitchRequest(battle: SimBattle): boolean {
+  if (battle.ended) return false;
+  return battle.sides.some(side =>
+    side.activeRequest?.forceSwitch?.some((forced, index) => forced && !side.active[index]?.switchFlag)
+  );
+}
+
+function repairStaleForcedSwitchRequest(battle: SimBattle) {
+  if (!hasStaleForcedSwitchRequest(battle)) return;
+  try {
+    battle.makeRequest('move');
+  } catch {
+    // Leave the wedged state to validateBranchRuntime to report.
+  }
+}
+
 interface LoggedActive {
   side: 'p1' | 'p2';
   activeSlot: number;
@@ -712,8 +777,11 @@ function makePokemonInfo(
       name: move.move,
       type: Dex.moves.get(move.id || move.move)?.type || '',
     })),
-    ability: pokemon.ability || '',
-    item: pokemon.item || '',
+    // Display names, not sim ids: @smogon/calc matches abilities/items by
+    // display name ('Technician'), so ids ('technician') silently disable
+    // every ability/item damage modifier (B6).
+    ability: pokemon.ability ? (Dex.abilities.get(pokemon.ability)?.name || pokemon.ability) : '',
+    item: pokemon.item ? (Dex.items.get(pokemon.item)?.name || pokemon.item) : '',
     stats: {
       atk: pokemon.storedStats?.atk || 0,
       def: pokemon.storedStats?.def || 0,
@@ -793,6 +861,31 @@ function buildTargetOptions(
     .filter((target): target is BranchTargetOption => !!target);
 }
 
+const EMPTY_SLOT_MODIFIERS: BranchSlotModifiers = {
+  teraType: null,
+  canMegaEvo: false,
+  canUltraBurst: false,
+  zMoves: [],
+};
+
+function makeSlotModifiers(battle: SimBattle, active: SimPokemon | null | undefined): BranchSlotModifiers {
+  if (!active || active.fainted) return EMPTY_SLOT_MODIFIERS;
+
+  // The sim maintains once-per-battle availability on the Pokémon itself
+  // (consumed gimmicks are nulled there); Z availability is a dynamic check.
+  const teraType = active.canTerastallize || null;
+  const canMegaEvo = !!active.canMegaEvo;
+  const canUltraBurst = !!active.canUltraBurst;
+  let zMoves: (string | null)[] = [];
+  try {
+    zMoves = (battle.actions.canZMove(active) ?? []).map(option => option?.move ?? null);
+  } catch {
+    zMoves = [];
+  }
+
+  return { teraType, canMegaEvo, canUltraBurst, zMoves };
+}
+
 function makeSwitches(side: SimSide, activeSlot: number): BranchSwitchOption[] {
   const activeNames = new Set(side.active.filter(Boolean).map(active => active.name));
   return side.pokemon
@@ -809,10 +902,10 @@ function makeSwitches(side: SimSide, activeSlot: number): BranchSwitchOption[] {
 }
 
 function normalizeChoices(
-  choices: (string | null)[] | undefined,
-  legacyChoice: string | null | undefined,
+  choices: (BranchSlotChoice | null)[] | undefined,
+  legacyChoice: BranchSlotChoice | null | undefined,
   activeCount: number,
-): (string | null)[] {
+): (BranchSlotChoice | null)[] {
   const normalized = Array.from({ length: Math.max(activeCount, 1) }, (_, index) => choices?.[index] ?? null);
   if (!choices && legacyChoice) normalized[0] = legacyChoice;
   return normalized;
@@ -837,6 +930,9 @@ function emptyState(log: string[], choices: BranchChoices): BranchSimState {
     p1ActiveSlots: [],
     p2Active: null,
     p2ActiveSlots: [],
+    p1ModifiersBySlot: [],
+    p2ModifiersBySlot: [],
+    field: { weather: '', terrain: '', p1SideConditions: [], p2SideConditions: [] },
     log,
     ended: false,
     winner: null,
@@ -892,6 +988,14 @@ export function createBranchState(
     p1ActiveSlots,
     p2Active: p2ActiveSlots[0] ?? null,
     p2ActiveSlots,
+    p1ModifiersBySlot: battle.sides[0].active.map(active => makeSlotModifiers(battle, active)),
+    p2ModifiersBySlot: battle.sides[1].active.map(active => makeSlotModifiers(battle, active)),
+    field: {
+      weather: battle.field.weather || '',
+      terrain: battle.field.terrain || '',
+      p1SideConditions: Object.keys(battle.sides[0].sideConditions),
+      p2SideConditions: Object.keys(battle.sides[1].sideConditions),
+    },
     log: [...effectiveLog],
     ended: battle.ended,
     winner: battle.winner || null,
@@ -915,9 +1019,19 @@ export async function reconstructBranchRuntime(params: {
   replayLog: string;
   targetTurn: number;
   snapshot?: TurnSnapshot | null;
+  /** Real replay player names — sim sides and the winner line use them (G10). */
+  playerNames?: [string, string];
   onLogLines?: (lines: string[]) => void;
+  /** Reports replay progress while rebuilding towards the target turn (B17). */
+  onProgress?: (turn: number, targetTurn: number) => void;
+  /** Aborts the turn-replay loop early (Cancel button, B17). */
+  abort?: AbortSignal;
+  /** Overall replay deadline; a wedged reconstruction stops instead of hanging. */
+  deadlineMs?: number;
 }): Promise<BranchRuntime> {
-  const { format, p1Team, p2Team, replayLog, targetTurn, snapshot, onLogLines } = params;
+  const { format, p1Team, p2Team, replayLog, targetTurn, snapshot, onLogLines, onProgress, abort } = params;
+  const overallDeadline = Date.now() + (params.deadlineMs ?? 60_000);
+  let timedOut = false;
   const { p1Leads, p2Leads } = extractLeads(replayLog);
   const orderedP1 = reorderForLeads(p1Team, p1Leads);
   const orderedP2 = reorderForLeads(p2Team, p2Leads);
@@ -925,6 +1039,7 @@ export async function reconstructBranchRuntime(params: {
   const battleStream = new BattleStreams.BattleStream();
   const streams = BattleStreams.getPlayerStreams(battleStream);
   const collectedLog: string[] = [];
+  const choiceErrors: BranchChoiceErrorLog = { count: 0, last: null };
 
   void (async () => {
     for await (const chunk of streams.omniscient) {
@@ -933,6 +1048,20 @@ export async function reconstructBranchRuntime(params: {
       onLogLines?.(lines);
     }
   })();
+
+  for (const sideStream of [streams.p1, streams.p2]) {
+    void (async () => {
+      for await (const chunk of sideStream) {
+        for (const line of chunk.split('\n')) {
+          if (!line.startsWith('|error|')) continue;
+          choiceErrors.count += 1;
+          choiceErrors.last = line
+            .slice('|error|'.length)
+            .replace(/^\[(?:Invalid|Unavailable) choice\]\s*/, '');
+        }
+      }
+    })();
+  }
 
   const p1Packed = Teams.pack(orderedP1);
   const p2Packed = Teams.pack(orderedP2);
@@ -976,8 +1105,10 @@ export async function reconstructBranchRuntime(params: {
     }
   };
 
+  const p1Name = JSON.stringify(params.playerNames?.[0]?.trim() || 'Player 1');
+  const p2Name = JSON.stringify(params.playerNames?.[1]?.trim() || 'Player 2');
   void streams.omniscient.write(
-    `>start {"formatid":"${format}"}\n>player p1 {"name":"Player 1","team":"${p1Packed}"}\n>player p2 {"name":"Player 2","team":"${p2Packed}"}`
+    `>start {"formatid":"${format}"}\n>player p1 {"name":${p1Name},"team":"${p1Packed}"}\n>player p2 {"name":${p2Name},"team":"${p2Packed}"}`
   );
   await waitForBattle(battle => !!battle.sides[0] && !!battle.sides[1], 1000);
 
@@ -1006,20 +1137,30 @@ export async function reconstructBranchRuntime(params: {
 
   for (const turnBlock of turns) {
     if (turnBlock.turn >= targetTurn) break;
+    if (abort?.aborted) break;
+    if (Date.now() > overallDeadline) {
+      timedOut = true;
+      break;
+    }
 
     const battle = battleStream.battle;
     if (!battle || battle.ended) break;
+    onProgress?.(turnBlock.turn, targetTurn);
     const turnBeforeChoice = battle.turn;
 
     const p1Choice = getMainChoice(turnBlock.preUpkeep, 'p1', battle);
     const p2Choice = getMainChoice(turnBlock.preUpkeep, 'p2', battle);
 
+    // Waking up on choice rejections keeps wedged turns from burning the full
+    // wait timeout on every retry (B17 — 30-60s "Preparing branch…" hangs).
+    const mainChoiceErrors = choiceErrors.count;
     void streams.omniscient.write(`>p1 ${p1Choice}\n>p2 ${p2Choice}`);
     await waitForBattle(currentBattle =>
       currentBattle.ended ||
       currentBattle.turn > turnBeforeChoice ||
       hasForceSwitch(currentBattle, 0) ||
-      hasForceSwitch(currentBattle, 1),
+      hasForceSwitch(currentBattle, 1) ||
+      choiceErrors.count > mainChoiceErrors,
     );
 
     const p1Forced = collectForcedSwitchSpecies(turnBlock.preUpkeep, turnBlock.postUpkeep, 'p1');
@@ -1043,12 +1184,15 @@ export async function reconstructBranchRuntime(params: {
       if (p2ForcedChoice) commands.push(`>p2 ${p2ForcedChoice}`);
 
       if (commands.length === 0) break;
+      const forcedChoiceErrors = choiceErrors.count;
       void streams.omniscient.write(commands.join('\n'));
       await waitForBattle(currentBattle =>
         currentBattle.ended ||
         currentBattle.turn > turnBeforeChoice ||
-        (!hasForceSwitch(currentBattle, 0) && !hasForceSwitch(currentBattle, 1)),
+        (!hasForceSwitch(currentBattle, 0) && !hasForceSwitch(currentBattle, 1)) ||
+        choiceErrors.count > forcedChoiceErrors,
       );
+      if (choiceErrors.count > forcedChoiceErrors) break;
     }
 
     const latestBattle = battleStream.battle;
@@ -1076,6 +1220,7 @@ export async function reconstructBranchRuntime(params: {
   }
 
   if (battleStream.battle) {
+    repairStaleForcedSwitchRequest(battleStream.battle);
     const correctionLines = syncLogActivesFromBattle(collectedLog, battleStream.battle, targetTurn);
     if (correctionLines.length > 0) onLogLines?.(correctionLines);
   }
@@ -1084,5 +1229,178 @@ export async function reconstructBranchRuntime(params: {
     battleStream,
     streams,
     log: collectedLog,
+    choiceErrors,
+    timedOut,
   };
+}
+
+/**
+ * Post-reconstruction sanity check (B7): detects wedged states — no pending
+ * request on a live battle, or a forced switch that has no eligible switch-in —
+ * so the UI can offer a way out instead of silently dead-ending.
+ */
+export function validateBranchRuntime(runtime: BranchRuntime): string | null {
+  if (runtime.timedOut) {
+    return 'Reconstruction timed out before reaching this turn. Try branching from a nearby turn.';
+  }
+
+  const battle = runtime.battleStream.battle;
+  if (!battle) return 'The simulator could not start this battle.';
+  if (battle.ended) return null;
+
+  if (!battle.requestState) {
+    return 'The simulator got stuck while rebuilding this turn. Try branching from a nearby turn.';
+  }
+
+  if (hasStaleForcedSwitchRequest(battle)) {
+    return 'The simulator demands a switch that no longer matches the battle state — the reconstruction diverged at this turn. Try a nearby turn.';
+  }
+
+  for (const side of battle.sides) {
+    const needsSwitch = side.activeRequest?.forceSwitch?.some(Boolean);
+    if (!needsSwitch) continue;
+    const hasBench = side.pokemon.some(pokemon => !pokemon.isActive && !pokemon.fainted);
+    if (!hasBench) {
+      return `${side.name} must switch but has no healthy Pokémon left to send in — the reconstruction diverged at this turn. Try a nearby turn.`;
+    }
+  }
+
+  return null;
+}
+
+export type ResolvedSideCommand =
+  | { ok: true; command: string }
+  | { ok: false; error: string };
+
+function resolveMoveSlotChoice(
+  battle: SimBattle,
+  side: 'p1' | 'p2',
+  activeSlot: number,
+  choice: Extract<BranchSlotChoice, { kind: 'move' }>,
+): ResolvedSideCommand {
+  const sideIdx = side === 'p1' ? 0 : 1;
+  const active = battle.sides[sideIdx].active[activeSlot];
+  if (!active || active.fainted) {
+    return { ok: false, error: `No active Pokémon in ${side.toUpperCase()}${slotLetter(activeSlot).toUpperCase()} can use ${choice.moveName}.` };
+  }
+
+  const requestMoves = active.getMoveRequestData().moves;
+  const requestIndex = requestMoves.findIndex(move =>
+    move.id === choice.moveId || toId(move.move) === choice.moveId
+  );
+  if (requestIndex < 0) {
+    return { ok: false, error: `${active.name} no longer knows ${choice.moveName}.` };
+  }
+  if (requestMoves[requestIndex].disabled) {
+    return { ok: false, error: `${choice.moveName} is disabled for ${active.name} right now.` };
+  }
+
+  const suffix = targetLocSuffixForChoice(battle, active, choice.moveName, choice.targetLoc ?? 0);
+  const modifier = choice.modifier ? ` ${choice.modifier}` : '';
+  return { ok: true, command: `move ${requestIndex + 1}${suffix}${modifier}` };
+}
+
+function resolveSwitchSlotChoice(
+  battle: SimBattle,
+  side: 'p1' | 'p2',
+  choice: Extract<BranchSlotChoice, { kind: 'switch' }>,
+): ResolvedSideCommand {
+  const sideIdx = side === 'p1' ? 0 : 1;
+  const bench = battle.sides[sideIdx].pokemon;
+  const nameId = toId(choice.pokemonName);
+
+  let speciesMatch = -1;
+  for (let index = 0; index < bench.length; index++) {
+    const pokemon = bench[index];
+    if (pokemon.isActive || pokemon.fainted) continue;
+    const benchSpecies = normalizeBattleOnlyFormeId(toId(pokemon.species?.name || ''));
+    if (benchSpecies !== choice.speciesId && toId(pokemon.name || '') !== choice.speciesId) continue;
+    if (toId(pokemon.name || '') === nameId) {
+      return { ok: true, command: `switch ${index + 1}` };
+    }
+    if (speciesMatch < 0) speciesMatch = index;
+  }
+
+  if (speciesMatch >= 0) return { ok: true, command: `switch ${speciesMatch + 1}` };
+  return { ok: false, error: `${choice.pokemonName} is no longer available to switch in.` };
+}
+
+/**
+ * Resolves identity-based slot choices (move ids, switch species) into the
+ * position-index commands the sim expects — always against the live request,
+ * so rebuilt teams or forced-switch interludes can never make a stored index
+ * point at the wrong move (B1).
+ */
+export function resolveSideChoices(
+  battle: SimBattle,
+  side: 'p1' | 'p2',
+  choices: (BranchSlotChoice | null)[],
+  required: boolean[],
+): ResolvedSideCommand {
+  const fragments: string[] = [];
+
+  for (let slot = 0; slot < Math.max(required.length, 1); slot++) {
+    if (!required[slot]) {
+      fragments.push('pass');
+      continue;
+    }
+    const choice = choices[slot];
+    if (!choice) {
+      return { ok: false, error: `Missing choice for ${side.toUpperCase()}${slotLetter(slot).toUpperCase()}.` };
+    }
+    const resolved = choice.kind === 'move'
+      ? resolveMoveSlotChoice(battle, side, slot, choice)
+      : resolveSwitchSlotChoice(battle, side, choice);
+    if (!resolved.ok) return resolved;
+    fragments.push(resolved.command);
+  }
+
+  return { ok: true, command: fragments.join(', ') };
+}
+
+/**
+ * Writes side commands to the sim and waits for the outcome. Succeeds when the
+ * omniscient log grows (the sim committed and simulated); fails when the sim
+ * rejects a choice (`|error|` sideupdate) or never responds within the timeout,
+ * so callers can keep the user's choices and surface the message instead of
+ * failing silently.
+ */
+export async function executeBranchChoices(params: {
+  streams: BranchRuntime['streams'];
+  log: string[];
+  choiceErrors: BranchChoiceErrorLog;
+  commands: { side: 'p1' | 'p2'; command: string }[];
+  timeoutMs?: number;
+}): Promise<BranchExecuteResult> {
+  const { streams, log, choiceErrors, commands, timeoutMs = 1500 } = params;
+  const previousLogLength = log.length;
+  const previousErrorCount = choiceErrors.count;
+
+  void streams.omniscient.write(
+    commands.map(({ side, command }) => `>${side} ${command}`).join('\n'),
+  );
+
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    if (choiceErrors.count > previousErrorCount) {
+      return { ok: false, error: choiceErrors.last || 'The simulator rejected this choice.' };
+    }
+    if (log.length > previousLogLength) {
+      // Wait for the log to go quiet so end-of-turn residuals (poison faints,
+      // weather) are included before the caller snapshots state/log.
+      let lastLength = log.length;
+      let stableSince = Date.now();
+      while (Date.now() - stableSince < 60 && Date.now() < deadline) {
+        await sleep(15);
+        if (log.length !== lastLength) {
+          lastLength = log.length;
+          stableSince = Date.now();
+        }
+      }
+      return { ok: true };
+    }
+    await sleep(25);
+  }
+
+  return { ok: false, error: 'The simulator did not respond to this choice.' };
 }

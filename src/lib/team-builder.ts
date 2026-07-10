@@ -62,22 +62,27 @@ function buildSet(
       infoId === toId(candidate.species.split('-')[0]);
   });
 
+  const usageSet = getSpeciesUsageSet(usageStats, info.species);
+  const smogonSet = getSpeciesSetAssumption(setAssumptions, info.species);
+
   if (userMatch) {
     const moves = mergeMoveLists(info.moves.map(move => move.name), userMatch.moves);
+    // Open Team Sheets omit EVs/nature — fall back to usage spreads instead of
+    // simulating an all-zero spread (B3/B6).
+    const fallbackSpread = usageSet?.spread || smogonSet?.spread || null;
+    const matchEvs = hasNonZeroEvs(userMatch.evs) ? userMatch.evs : fallbackSpread?.evs || userMatch.evs;
     return {
       ...userMatch,
       moves: moves.length > 0 ? moves : userMatch.moves,
       ability: info.ability.value || userMatch.ability,
       item: cleanItem(info.item.value, userMatch.item),
       teraType: info.teraType.value || userMatch.teraType,
-      evs: editedEvs || userMatch.evs,
+      nature: (userMatch.nature || fallbackSpread?.nature || 'Hardy') as PokemonSet['nature'],
+      evs: editedEvs || matchEvs,
       level: info.level || userMatch.level || 100,
       gender: (info.gender || userMatch.gender || '') as '' | 'M' | 'F',
     };
   }
-
-  const usageSet = getSpeciesUsageSet(usageStats, info.species);
-  const smogonSet = getSpeciesSetAssumption(setAssumptions, info.species);
   const usageMoves = mergeUsageMoves(info.moves.map(move => move.name), usageSet?.moves ?? []);
   const moves = mergeSetMoves(usageMoves, smogonSet?.moves ?? []);
   const spread = usageSet?.spread;
@@ -96,6 +101,10 @@ function buildSet(
     gender: (info.gender || '') as '' | 'M' | 'F',
     teraType: info.teraType.value || undefined,
   };
+}
+
+function hasNonZeroEvs(evs: PokemonSet['evs'] | undefined): boolean {
+  return !!evs && Object.values(evs).some(value => (value ?? 0) > 0);
 }
 
 function sanitizeEv(value: number | undefined): number {
@@ -157,13 +166,26 @@ function mergeSetMoves(observed: string[], setMoves: SetAssumption[]): string[] 
 
 function extractEmbeddedShowteamExports(log: string): { p1: PokemonSet[] | null; p2: PokemonSet[] | null } {
   const playerByName = new Map<string, 'p1' | 'p2'>();
-  const result: { p1: PokemonSet[] | null; p2: PokemonSet[] | null } = { p1: null, p2: null };
+  const fromShowteam: { p1: PokemonSet[] | null; p2: PokemonSet[] | null } = { p1: null, p2: null };
+  const fromChat: { p1: PokemonSet[] | null; p2: PokemonSet[] | null } = { p1: null, p2: null };
   const unassigned: PokemonSet[][] = [];
 
-  for (const line of log.split('\n')) {
+  for (const rawLine of log.split('\n')) {
+    const line = rawLine.replace(/\r$/, '');
     const playerMatch = line.match(/^\|player\|(p[12])\|([^|]+)/);
     if (playerMatch) {
       playerByName.set(toId(playerMatch[2]), playerMatch[1] as 'p1' | 'p2');
+      continue;
+    }
+
+    // Open Team Sheets: |showteam|p1|<packed team, pipes included> (B3)
+    const showteamMatch = line.match(/^\|showteam\|(p[12])\|([\s\S]+)$/);
+    if (showteamMatch) {
+      const side = showteamMatch[1] as 'p1' | 'p2';
+      if (!fromShowteam[side]) {
+        const unpacked = Teams.unpack(showteamMatch[2]);
+        if (unpacked && unpacked.length > 0) fromShowteam[side] = unpacked;
+      }
       continue;
     }
 
@@ -175,15 +197,18 @@ function extractEmbeddedShowteamExports(log: string): { p1: PokemonSet[] | null;
 
     const side = playerByName.get(toId(chatMatch[1]));
     if (side) {
-      result[side] = imported;
+      fromChat[side] = imported;
     } else {
       unassigned.push(imported);
     }
   }
 
-  if (!result.p1 && unassigned[0]) result.p1 = unassigned[0];
-  if (!result.p2 && unassigned[1]) result.p2 = unassigned[1];
-  return result;
+  if (!fromChat.p1 && unassigned[0]) fromChat.p1 = unassigned[0];
+  if (!fromChat.p2 && unassigned[1]) fromChat.p2 = unassigned[1];
+  return {
+    p1: fromShowteam.p1 || fromChat.p1,
+    p2: fromShowteam.p2 || fromChat.p2,
+  };
 }
 
 function showteamHtmlToText(html: string): string {

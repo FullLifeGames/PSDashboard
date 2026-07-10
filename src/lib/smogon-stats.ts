@@ -59,7 +59,6 @@ interface PkmnStatsPayload {
   pokemon?: Record<string, PkmnPokemonStats>;
 }
 
-const MONTHS_TO_TRY = 8;
 const usageCache = new Map<string, Promise<SmogonUsageStats | null>>();
 
 function toId(name: string): string {
@@ -77,16 +76,6 @@ function dataPkmnStatsUrl(format: string): string {
 function lookupDisplayName(kind: 'abilities' | 'items' | 'moves' | 'species', value: string): string {
   void kind;
   return value.trim();
-}
-
-function monthKey(date: Date): string {
-  const year = date.getUTCFullYear();
-  const month = String(date.getUTCMonth() + 1).padStart(2, '0');
-  return `${year}-${month}`;
-}
-
-function addMonths(date: Date, offset: number): Date {
-  return new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth() + offset, 1));
 }
 
 function roundProbability(value: number): number {
@@ -284,34 +273,27 @@ export function parseSmogonChaosStats(
 }
 
 export function getSmogonStatsFormat(formatId: string | undefined): string {
-  const id = toId(formatId || 'gen9ou');
+  const id = toId(formatId || 'gen9ou').replace(/^smogtours/, '');
   if (id.includes('nationaldexdoubles')) return 'gen9nationaldexdoubles';
   if (id.includes('doubles') || id.includes('vgc')) return 'gen9doublesou';
   if (/^gen\d+draft/.test(id)) return id.replace(/draft.*$/, 'ou');
   return id || 'gen9ou';
 }
 
+/**
+ * Only the data.pkmn.cc mirror sends CORS headers — the historical
+ * www.smogon.com fallback months could never succeed in a browser and only
+ * produced 16+ console errors per load (B14), so they are gone.
+ */
 export function buildSmogonStatsUrls(
   formatId: string | undefined,
-  now = new Date(),
 ): { month: string; format: string; url: string }[] {
   const format = getSmogonStatsFormat(formatId);
-  const urls: { month: string; format: string; url: string }[] = [{
+  return [{
     month: 'latest',
     format,
     url: dataPkmnStatsUrl(format),
   }];
-
-  for (let offset = -1; offset >= -MONTHS_TO_TRY; offset--) {
-    const month = monthKey(addMonths(now, offset));
-    urls.push({
-      month,
-      format,
-      url: `https://www.smogon.com/stats/${month}/chaos/${format}-0.json`,
-    });
-  }
-
-  return urls;
 }
 
 export async function fetchSmogonUsageStats(
@@ -325,7 +307,7 @@ export async function fetchSmogonUsageStats(
 
   const fetcher = options?.fetcher ?? fetch;
   const request = (async () => {
-    for (const candidate of buildSmogonStatsUrls(formatId, options?.now)) {
+    for (const candidate of buildSmogonStatsUrls(formatId)) {
       try {
         const response = await fetcher(candidate.url, { signal: options?.signal });
         if (!response.ok) continue;

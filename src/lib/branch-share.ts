@@ -85,3 +85,10 @@ export function saveBranchPayload(payload: BranchSharePayload): BranchSharePaylo
   localStorage.setItem(savedBranchKey(payload.replayId), JSON.stringify(next));
   return next;
 }
+
+export function deleteSavedBranch(payload: BranchSharePayload): BranchSharePayload[] {
+  const next = loadSavedBranches(payload.replayId)
+    .filter(entry => !(entry.createdAt === payload.createdAt && entry.branchTurn === payload.branchTurn));
+  localStorage.setItem(savedBranchKey(payload.replayId), JSON.stringify(next));
+  return next;
+}

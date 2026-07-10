@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { fetchReplay } from '../src/lib/replay-fetcher';
+import { fetchReplay, parseReplayUrl } from '../src/lib/replay-fetcher';
 import {
   getBranchSimulatorFormat,
   getReplayGameType,
@@ -45,6 +45,24 @@ test.describe('replay format inference', () => {
     expect(getReplayGameType(vgcReplay.log)).toBe('doubles');
   });
 
+  test('normalizes smogtours replay ids to real format ids (B13)', () => {
+    expect(inferReplayFormatId({
+      id: 'smogtours-gen3ou-56583',
+      log: '|gen|3\n|tier|[Gen 3] OU',
+    })).toBe('gen3ou');
+
+    // Smogtours ids can omit the generation entirely — it comes from the log.
+    expect(inferReplayFormatId({
+      id: 'smogtours-ubers-54583',
+      log: '|gen|6\n|tier|[Gen 6] Ubers',
+    })).toBe('gen6ubers');
+
+    expect(getBranchSimulatorFormat({
+      id: 'smogtours-gen3ou-56583',
+      log: '|gametype|singles\n|gen|3\n|tier|[Gen 3] OU',
+    })).toBe('gen3ou');
+  });
+
   test('maps custom VGC replay formats to a supported doubles simulator format', () => {
     expect(getBranchSimulatorFormat(vgcReplay)).toBe('gen9doublesou');
   });
@@ -57,6 +75,43 @@ test.describe('replay format inference', () => {
       formatid: 'gen9ou',
       log: vgcReplay.log.replace('|gametype|doubles', '|gametype|singles'),
     })).toBe('gen9ou');
+  });
+
+  test('parseReplayUrl accepts URL variants and rejects non-replay input (G2)', () => {
+    expect(parseReplayUrl('https://replay.pokemonshowdown.com/gen9ou-123?p2')).toBe('gen9ou-123');
+    expect(parseReplayUrl('http://replay.pokemonshowdown.com/gen9ou-123.json')).toBe('gen9ou-123');
+    expect(parseReplayUrl('  gen9ou-123 ')).toBe('gen9ou-123');
+    expect(parseReplayUrl('gen9ou-123.json')).toBe('gen9ou-123');
+
+    expect(parseReplayUrl('')).toBeNull();
+    expect(parseReplayUrl('   ')).toBeNull();
+    expect(parseReplayUrl('https://example.com/foo')).toBeNull();
+    expect(parseReplayUrl('not a replay!')).toBeNull();
+  });
+
+  test('fetchReplay rejects non-replay input with a clear message (G1/G2)', async () => {
+    await expect(fetchReplay('https://example.com/foo')).rejects.toThrow(/replay link or id/i);
+    await expect(fetchReplay('')).rejects.toThrow(/replay link or id/i);
+  });
+
+  test('fetchReplay adds the generation to display formats that omit it (G5)', async () => {
+    const originalFetch = globalThis.fetch;
+    globalThis.fetch = (async () => new Response(JSON.stringify({
+      id: 'smogtours-ubers-54583',
+      format: 'Ubers',
+      players: ['A', 'B'],
+      log: '|gen|6\n|tier|[Gen 6] Ubers',
+      uploadtime: 0,
+      views: 0,
+    }), { status: 200, headers: { 'content-type': 'application/json' } })) as typeof fetch;
+
+    try {
+      const replay = await fetchReplay('smogtours-ubers-54583');
+      expect(replay.format).toBe('[Gen 6] Ubers');
+      expect(replay.formatid).toBe('gen6ubers');
+    } finally {
+      globalThis.fetch = originalFetch;
+    }
   });
 
   test('fetchReplay normalizes replay JSON that omits formatid', async () => {

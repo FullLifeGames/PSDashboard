@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
 import type { BranchHistoryEntry } from '../hooks/useBranch';
 import {
+  deleteSavedBranch,
   encodeBranchShare,
   loadSavedBranches,
   makeBranchSharePayload,
@@ -49,6 +50,16 @@ export function BranchSaveSharePanel({ replayData, branchTurn, history, finalLog
     setSaved(saveBranchPayload(payload));
   };
 
+  // Opening a saved branch reuses the share-link flow: setting the hash
+  // triggers the app's hashchange handler and shows the read-only view (G16).
+  const openSaved = (entry: BranchSharePayload) => {
+    window.location.assign(`#branch=${encodeBranchShare(entry)}`);
+  };
+
+  const removeSaved = (entry: BranchSharePayload) => {
+    setSaved(deleteSavedBranch(entry));
+  };
+
   return (
     <div className="ps-panel" style={{ marginTop: 8 }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, alignItems: 'center' }}>
@@ -92,13 +103,14 @@ export function BranchSaveSharePanel({ replayData, branchTurn, history, finalLog
       )}
 
       {saved.length > 0 && (
-        <div style={{ marginTop: 8, display: 'flex', flexDirection: 'column', gap: 4 }}>
-          {saved.slice(0, 5).map(entry => (
+        <div style={{ marginTop: 8, display: 'flex', flexDirection: 'column', gap: 4, maxHeight: 180, overflowY: 'auto' }}>
+          {saved.map(entry => (
             <div
               key={`${entry.createdAt}-${entry.branchTurn}`}
               style={{
                 display: 'flex',
                 justifyContent: 'space-between',
+                alignItems: 'center',
                 gap: 8,
                 fontSize: 10,
                 color: '#b8c7dc',
@@ -106,8 +118,29 @@ export function BranchSaveSharePanel({ replayData, branchTurn, history, finalLog
                 paddingTop: 4,
               }}
             >
-              <span>Turn {entry.branchTurn} branch, {entry.choices.length} choices</span>
-              <span>{new Date(entry.createdAt).toLocaleString()}</span>
+              <span style={{ flex: 1, minWidth: 0 }}>
+                Turn {entry.branchTurn} branch, {entry.choices.length} choices
+                <span style={{ marginLeft: 6, color: '#8899aa' }}>{new Date(entry.createdAt).toLocaleString()}</span>
+              </span>
+              <span style={{ display: 'flex', gap: 4, flex: '0 0 auto' }}>
+                <button
+                  type="button"
+                  className="ps-btn"
+                  onClick={() => openSaved(entry)}
+                  style={{ padding: '2px 8px', fontSize: 10 }}
+                >
+                  Open
+                </button>
+                <button
+                  type="button"
+                  className="ps-btn"
+                  onClick={() => removeSaved(entry)}
+                  aria-label={`Delete saved branch from turn ${entry.branchTurn}`}
+                  style={{ padding: '2px 8px', fontSize: 10 }}
+                >
+                  Delete
+                </button>
+              </span>
             </div>
           ))}
         </div>

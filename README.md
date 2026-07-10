@@ -8,23 +8,25 @@ The current implementation is a working prototype, not a fully accurate replay r
 
 ## Current Capabilities
 
-- Load a Pokemon Showdown replay from a replay URL or replay ID.
-- Render the original replay inside an embedded Pokemon Showdown replay viewer.
+- Load a Pokemon Showdown replay from a replay URL or replay ID, with input validation and readable error messages. Smogtours ids are normalized to their real formats (`smogtours-gen3ou-…` → `gen3ou`).
+- Render the original replay inside an embedded Pokemon Showdown replay viewer with two-way turn sync (playback runs through without self-pausing; the end position is labelled `End`).
 - Parse the replay protocol into per-turn snapshots.
-- Infer both teams from replay data, including revealed moves, items, abilities, levels, gender, and tera type when shown.
-- Accept a pasted player team export to improve reconstruction accuracy.
-- Normalize German stat abbreviations in pasted team exports.
-- Fetch optional Smogon usage stats and `@pkmn/smogon` set assumptions for unrevealed abilities, items, moves, natures, and EV spreads.
+- Infer both teams from replay data, including revealed moves, items, abilities, levels, gender, and tera type when shown — plus ability reveals from effect attributions (e.g. Poison Heal heals), item reveals from heal messages and mega stones, and a Heavy-Duty Boots inference for Pokemon that switch into Stealth Rock without taking damage.
+- Parse Open Team Sheets (`|showteam|`) and embedded "View team" chat exports as revealed team data.
+- Accept a pasted player team export (validated, shown as manual data in the stats panel, persisted across reloads). German stat abbreviations are normalized.
+- Fetch optional usage stats (via the CORS-safe `data.pkmn.cc` mirror) and `@pkmn/smogon` set assumptions for unrevealed abilities, items, moves, natures, and EV spreads.
 - Display whether team data is revealed from the replay, guessed from usage stats, or manually edited.
-- Edit reconstructed information for both players before branching.
-- Select a turn and branch from that point into a controllable simulator.
-- Pick moves or switches for both players and advance the branch turn by turn.
-- Use slot-aware and target-aware controls for doubles battles, including blocking duplicate simultaneous switch targets.
-- View lightweight damage estimates for currently available moves, including per-target previews in doubles.
+- Edit reconstructed information for both players before or during branching (edits rebuild the branch and replay its history).
+- Select a turn and branch from that point into a controllable simulator — including Random Battle replays and older generations.
+- Pick moves or switches for both players and advance the branch turn by turn. Choices are stored by move identity, so forced-switch interludes and team edits can never execute a different move than the one clicked.
+- Use Tera / Mega Evolution / Ultra Burst / Z-Move toggles where the format and the reconstructed sets allow them.
+- Use slot-aware and target-aware controls for doubles battles, including blocking duplicate simultaneous switch targets, plus a dropdown listing every legal choice.
+- View damage estimates computed with the replay's generation, the exact reconstructed sets (abilities, items, EVs), and field conditions — including per-target previews for targeted and spread moves in doubles.
+- Get loud, actionable errors: invalid choices are rejected with messages, failed turns keep your selections, and stuck reconstructions explain themselves instead of dead-ending.
 - Animate newly executed branch turns, or disable animation to jump straight to the result.
-- Compare branch history against the original replay line after executing alternate turns.
-- Save branch summaries locally and create share links containing the replay id, branch turn, branch choices, and final branch log.
-- Show a battle statistics panel for both teams.
+- Compare branch history (including forced replacements) against the original replay line.
+- Save branches locally (open and delete them again) and create share links that also work in an already-open tab.
+- Show a battle statistics panel for both teams, with placeholders for unrevealed Random Battle slots.
 
 ## What "Works" Today
 
@@ -32,8 +34,8 @@ As of the current repository state:
 
 - `npm run lint` passes.
 - `npm run build` succeeds.
-- `npx playwright test` passes with 39 browser tests.
-- `npm run test:regression` runs replay reconstruction, save/share, damage-preview, branch choice, and pure-engine regression tests.
+- `npm run test:e2e` passes with 39 browser tests (the replay JSON and the Showdown embed script are served from fixtures/cache, so the suite is CDN-independent).
+- `npm run test:regression` passes with 96 tests (plus 2 documented known-divergence skips) covering replay reconstruction, identity-based choice resolution, execute error paths, gimmick availability, damage-calc generation/set alignment, team sheets, team paste, stats parsing, save/share, and inference quality.
 
 The browser test suite validates the main happy path with a mocked replay fixture:
 
@@ -57,11 +59,12 @@ This project is not yet a frame-perfect recreation of the original battle. The c
 That means branch outcomes can diverge from the original replay when hidden information matters. Important limitations today:
 
 - Hidden moves, EVs, IVs, natures, and some items/abilities can be guessed when they were not revealed in the replay.
-- Probability-backed guesses come from Smogon monthly `chaos` usage stats when they can be fetched. If usage stats are unavailable or incomplete, `@pkmn/smogon` set data can provide non-probability set assumptions before the app falls back to unknown/default simulator values.
-- HP and status are corrected from the snapshot at branch start, but other hidden or volatile state may still differ.
+- Probability-backed guesses come from the `data.pkmn.cc` usage-stat mirror (the only endpoint that sends CORS headers in a browser). When it has no data for a format, `@pkmn/smogon` set data provides non-probability set assumptions before the app falls back to unknown/default simulator values.
+- HP and status are corrected from the snapshot at branch start, but other hidden or volatile state may still differ. Reconstructions that end up in an unplayable state are detected and reported instead of dead-ending.
+- Damage previews match the sim's generation and sets, but an *armed* Tera toggle is not pre-applied to the preview numbers — they update once the terastallized turn executes.
 - Doubles battles have multi-active reconstruction, explicit target reconstruction, redirection/retargeting fixtures, and protocol correction for `switch`/`drag` active-slot evidence, but unusual targeting effects and some volatile state can still diverge.
 - Save/share links are compact branch reports today; they do not yet fully restore and replay an alternate line from scratch.
-- Replay viewing and sprite rendering depend on Pokemon Showdown-hosted assets.
+- Replay viewing and sprite rendering depend on Pokemon Showdown-hosted assets. On phones the embed keeps its desktop layout inside a horizontally scrollable container.
 - The automated tests use a mocked replay response and do not yet cover a large replay corpus or difficult edge cases.
 
 ## Local Development
@@ -123,6 +126,9 @@ npm run test:regression
 - [`src/lib/smogon-stats.ts`](./src/lib/smogon-stats.ts) fetches and normalizes Smogon monthly usage probabilities.
 - [`src/lib/smogon-sets.ts`](./src/lib/smogon-sets.ts) fetches normalized fallback set assumptions through `@pkmn/smogon`.
 - [`src/lib/team-info.ts`](./src/lib/team-info.ts) enriches revealed team data while preserving revealed/guessed/manual source labels.
+- [`src/lib/branch-choices.ts`](./src/lib/branch-choices.ts) defines the identity-based choice model shared by the UI and the engine.
+- [`src/lib/damage-calc.ts`](./src/lib/damage-calc.ts) computes damage previews with `@smogon/calc` using the replay generation, sim sets, and field state.
+- [`src/lib/team-paste.ts`](./src/lib/team-paste.ts) parses pasted Showdown exports and overlays them as manual knowledge.
 - [`src/components/PSReplayFrame.tsx`](./src/components/PSReplayFrame.tsx) renders the Showdown replay viewer in an iframe.
 - [`src/components/BranchPanel.tsx`](./src/components/BranchPanel.tsx) renders move and switch controls for the active branch.
 - [`src/components/BranchSaveSharePanel.tsx`](./src/components/BranchSaveSharePanel.tsx) saves branch summaries locally and creates compact share links.
@@ -142,6 +148,7 @@ npm run test:regression
 ## Next Priorities
 
 - Turn branch share links into full replayable branch restores.
+- Pre-apply an armed Tera toggle to the damage previews.
 - Improve reconstruction fidelity for unusual targeting effects and volatile hidden battle state.
 - Expand the replay regression suite with many more real replays and expected snapshots.
 - Continue reducing async chunk size for `@pkmn/dex`, learnsets, and protocol parsing.

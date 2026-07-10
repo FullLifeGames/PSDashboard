@@ -1,13 +1,15 @@
 import { Generations, Pokemon, Move, Field, calculate } from '@smogon/calc';
 import type { SimPokemonInfo, BranchMoveOption } from '../hooks/useBranch';
 
-const gen = Generations.get(9);
 type CalcPokemonOptions = ConstructorParameters<typeof Pokemon>[2];
 type CalcBoosts = NonNullable<CalcPokemonOptions>['boosts'];
 type CalcStatus = NonNullable<CalcPokemonOptions>['status'];
 type CalcStats = NonNullable<CalcPokemonOptions>['evs'];
 type CalcGender = NonNullable<CalcPokemonOptions>['gender'];
 type CalcTeraType = NonNullable<CalcPokemonOptions>['teraType'];
+type CalcFieldOptions = ConstructorParameters<typeof Field>[0];
+type CalcWeather = NonNullable<CalcFieldOptions>['weather'];
+type CalcTerrain = NonNullable<CalcFieldOptions>['terrain'];
 
 export interface DamageResult {
   moveName: string;
@@ -19,6 +21,60 @@ export interface DamageResult {
 
 export interface DamageCalcContext {
   gameType?: 'Singles' | 'Doubles';
+  /** Generation of the replay — the calc must match the sim's gen (B5). */
+  gen?: number;
+  /** Sim condition ids, mapped onto the calc field (e.g. 'raindance'). */
+  weather?: string;
+  terrain?: string;
+  attackerSideConditions?: string[];
+  defenderSideConditions?: string[];
+}
+
+function toConditionId(value: string | undefined): string {
+  return (value || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+}
+
+const WEATHER_BY_ID: Record<string, NonNullable<CalcWeather>> = {
+  raindance: 'Rain',
+  primordialsea: 'Heavy Rain',
+  sunnyday: 'Sun',
+  desolateland: 'Harsh Sunshine',
+  sandstorm: 'Sand',
+  hail: 'Hail',
+  snow: 'Snow',
+  snowscape: 'Snow',
+  deltastream: 'Strong Winds',
+};
+
+const TERRAIN_BY_ID: Record<string, NonNullable<CalcTerrain>> = {
+  electricterrain: 'Electric',
+  grassyterrain: 'Grassy',
+  psychicterrain: 'Psychic',
+  mistyterrain: 'Misty',
+};
+
+function calcGeneration(context: DamageCalcContext) {
+  const genNumber = context.gen && context.gen >= 1 && context.gen <= 9 ? context.gen : 9;
+  return Generations.get(genNumber as 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9);
+}
+
+function sideOptions(conditions: string[] | undefined) {
+  const ids = new Set((conditions ?? []).map(toConditionId));
+  return {
+    isReflect: ids.has('reflect'),
+    isLightScreen: ids.has('lightscreen'),
+    isAuroraVeil: ids.has('auroraveil'),
+  };
+}
+
+function calcField(context: DamageCalcContext): Field {
+  return new Field({
+    gameType: context.gameType ?? 'Singles',
+    weather: WEATHER_BY_ID[toConditionId(context.weather)],
+    terrain: TERRAIN_BY_ID[toConditionId(context.terrain)],
+    attackerSide: sideOptions(context.attackerSideConditions),
+    defenderSide: sideOptions(context.defenderSideConditions),
+  });
 }
 
 export function calcSingleDamageRange(
@@ -28,6 +84,7 @@ export function calcSingleDamageRange(
   context: DamageCalcContext = {},
 ): DamageResult {
   try {
+    const gen = calcGeneration(context);
     const atkPoke = new Pokemon(gen, attacker.species, {
       level: attacker.level,
       ability: attacker.ability || undefined,
@@ -61,7 +118,7 @@ export function calcSingleDamageRange(
       atkPoke,
       defPoke,
       new Move(gen, moveOption.name),
-      new Field({ gameType: context.gameType ?? 'Singles' }),
+      calcField(context),
     );
     const dmg = result.damage;
     const flat = Array.isArray(dmg) ? dmg.flat().map(Number) : [Number(dmg)];

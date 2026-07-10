@@ -1,10 +1,27 @@
 import { test, expect } from '@playwright/test';
 import {
   branchSideChoicesReady,
-  buildBranchSideCommand,
+  choiceId,
   conflictingSwitchTargets,
+  describeSlotChoice,
   requiredChoicesForActiveSlots,
+  switchChoiceKey,
+  switchOptionKey,
+  type BranchSlotChoice,
 } from '../src/lib/branch-choices';
+
+function switchTo(species: string, name = species): BranchSlotChoice {
+  return { kind: 'switch', speciesId: choiceId(species), pokemonName: name };
+}
+
+function moveBy(name: string, targetLoc?: number): BranchSlotChoice {
+  return {
+    kind: 'move',
+    moveId: choiceId(name),
+    moveName: name,
+    ...(targetLoc !== undefined ? { targetLoc } : {}),
+  };
+}
 
 test.describe('branch choice helpers', () => {
   test('requires every live active slot unless a force switch request narrows the choice set', () => {
@@ -17,14 +34,29 @@ test.describe('branch choice helpers', () => {
   });
 
   test('rejects duplicate switch targets across simultaneous doubles slots', () => {
-    expect(branchSideChoicesReady(['switch 3', 'switch 3'], [true, true])).toBe(false);
-    expect(conflictingSwitchTargets(['switch 3', 'switch 3'], [true, true])).toEqual([3]);
-    expect(branchSideChoicesReady(['switch 3', 'switch 4'], [true, true])).toBe(true);
+    expect(branchSideChoicesReady([switchTo('Raichu'), switchTo('Raichu')], [true, true])).toBe(false);
+    expect(conflictingSwitchTargets([switchTo('Raichu'), switchTo('Raichu')], [true, true]))
+      .toEqual(['raichu|raichu']);
+    expect(branchSideChoicesReady([switchTo('Raichu'), switchTo('Squirtle')], [true, true])).toBe(true);
   });
 
-  test('builds pass placeholders only for slots that do not require choices', () => {
-    expect(buildBranchSideCommand(['switch 3', null], [true, false])).toBe('switch 3, pass');
-    expect(branchSideChoicesReady(['switch 3', null], [true, false])).toBe(true);
-    expect(branchSideChoicesReady(['switch 3', null], [true, true])).toBe(false);
+  test('allows same-species switches to different nicknamed team members', () => {
+    expect(branchSideChoicesReady([switchTo('Eevee', 'Alpha'), switchTo('Eevee', 'Beta')], [true, true]))
+      .toBe(true);
+    expect(switchChoiceKey(switchTo('Eevee', 'Alpha')))
+      .toBe(switchOptionKey({ species: 'Eevee', name: 'Alpha' }));
+  });
+
+  test('treats missing choices as not ready only for required slots', () => {
+    expect(branchSideChoicesReady([switchTo('Raichu'), null], [true, false])).toBe(true);
+    expect(branchSideChoicesReady([switchTo('Raichu'), null], [true, true])).toBe(false);
+  });
+
+  test('describes slot choices with move names and targets', () => {
+    expect(describeSlotChoice(moveBy('Blizzard'))).toBe('move Blizzard');
+    expect(describeSlotChoice(moveBy('Icy Wind', 1))).toBe('move Icy Wind +1');
+    expect(describeSlotChoice(moveBy('Flamethrower', -2))).toBe('move Flamethrower -2');
+    expect(describeSlotChoice(switchTo('Skarmory'))).toBe('switch Skarmory');
+    expect(describeSlotChoice(null)).toBe('');
   });
 });

@@ -154,6 +154,12 @@ After replaying turns inside the simulator, the code corrects HP and status from
 
 The replay viewer and sprite assets are loaded from Pokemon Showdown-hosted resources. The app is not fully self-contained today.
 
+### iframe sandbox
+
+The replay viewer iframe is rendered with `sandbox="allow-scripts allow-same-origin"`. This combination effectively disables the sandbox for the blob document — and that is a deliberate choice: the two-way turn synchronization (`ps-seek-turn` / `ps-turn` postMessages, live log appends) and the e2e assertions need script execution plus same-origin access to the embedded `Replays` object. The document only ever contains our generated wrapper plus `replay-embed.js` from play.pokemonshowdown.com, so the trust boundary is the same as loading that script directly.
+
+On narrow screens the embed keeps its desktop layout; the app wraps it in a horizontally scrollable container with a 640px minimum width so the battle log stays reachable instead of being cut off.
+
 ## Validation Status
 
 The current codebase has been validated with:

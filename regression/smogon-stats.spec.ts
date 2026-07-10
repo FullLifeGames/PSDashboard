@@ -46,15 +46,19 @@ const usageStats: SmogonUsageStats = {
 };
 
 test.describe('Smogon usage stat enrichment', () => {
-  test('prefers the client-safe data.pkmn.cc usage endpoint before historical Smogon URLs', () => {
-    const urls = buildSmogonStatsUrls('gen9ou', new Date('2026-04-28T00:00:00Z'));
+  test('only queries the client-safe data.pkmn.cc endpoint (smogon.com never sends CORS headers)', () => {
+    const urls = buildSmogonStatsUrls('gen9ou');
 
-    expect(urls[0]).toEqual({
+    expect(urls).toEqual([{
       format: 'gen9ou',
       month: 'latest',
       url: 'https://data.pkmn.cc/stats/gen9ou.json',
-    });
-    expect(urls.some(candidate => candidate.url.includes('www.smogon.com/stats/2026-03'))).toBe(true);
+    }]);
+  });
+
+  test('strips the smogtours prefix before querying usage stats', () => {
+    const urls = buildSmogonStatsUrls('smogtoursgen3ou');
+    expect(urls[0].url).toBe('https://data.pkmn.cc/stats/gen3ou.json');
   });
 
   test('parses data.pkmn.cc usage stats as fractional probabilities', () => {
@@ -82,7 +86,7 @@ test.describe('Smogon usage stat enrichment', () => {
     expect(parsed.pokemon.garchomp.spreads[0].probability).toBe(0.318);
   });
 
-  test('fetches and parses client-safe usage stats before falling back to legacy Smogon chaos JSON', async () => {
+  test('fetches and parses client-safe usage stats', async () => {
     const requestedUrls: string[] = [];
     const fetcher = (async (input: RequestInfo | URL) => {
       requestedUrls.push(String(input));

@@ -27,7 +27,14 @@ export function useSmogonUsageStats(formatid: string | undefined): SmogonUsageSt
       .then(({ fetchSmogonUsageStats }) => fetchSmogonUsageStats(formatid, { signal: controller.signal }))
       .then(stats => {
         if (!active) return;
-        setState({ formatid, stats, loading: false, error: null });
+        // A null result means every stats source failed — surface it so the
+        // "Smogon stats unavailable" badge can actually appear (B14).
+        setState({
+          formatid,
+          stats,
+          loading: false,
+          error: stats ? null : 'No Smogon usage stats found for this format',
+        });
       })
       .catch(error => {
         if (!active || controller.signal.aborted) return;

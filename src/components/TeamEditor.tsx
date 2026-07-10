@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { OpponentTeamInfo, PokemonEvs, StatId, RevealedPokemonInfo } from '../types';
 import { EMPTY_EVS, manualEvs, manualField, manualMove } from '../lib/team-info';
 
@@ -31,6 +31,38 @@ function clampEv(value: string): number {
 
 export function TeamEditor({ title, teamInfo, onSave, onClose }: Props) {
   const [pokemon, setPokemon] = useState<RevealedPokemonInfo[]>(teamInfo.pokemon);
+  const dialogRef = useRef<HTMLDivElement>(null);
+
+  // WAI-ARIA dialog behaviour (G20): move focus into the dialog on open and
+  // hand it back to the trigger on close.
+  useEffect(() => {
+    const previouslyFocused = document.activeElement as HTMLElement | null;
+    dialogRef.current?.focus();
+    return () => previouslyFocused?.focus();
+  }, []);
+
+  const handleDialogKeyDown = (event: React.KeyboardEvent) => {
+    if (event.key === 'Escape') {
+      event.stopPropagation();
+      onClose();
+      return;
+    }
+    if (event.key !== 'Tab') return;
+
+    const focusables = dialogRef.current?.querySelectorAll<HTMLElement>(
+      'button, input, select, textarea, [href], [tabindex]:not([tabindex="-1"])',
+    );
+    if (!focusables || focusables.length === 0) return;
+    const first = focusables[0];
+    const last = focusables[focusables.length - 1];
+    if (event.shiftKey && document.activeElement === first) {
+      event.preventDefault();
+      last.focus();
+    } else if (!event.shiftKey && document.activeElement === last) {
+      event.preventDefault();
+      first.focus();
+    }
+  };
 
   const updateField = (
     index: number,
@@ -85,23 +117,34 @@ export function TeamEditor({ title, teamInfo, onSave, onClose }: Props) {
   };
 
   return (
-    <div style={{
-      position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.7)',
-      display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 50, padding: 16,
-    }}>
-      <div style={{
-        background: '#2a3a5c', border: '2px solid #8aa', borderRadius: 8,
-        padding: 20, maxWidth: 640, width: '100%', maxHeight: '80vh', overflowY: 'auto',
-      }} role="dialog" aria-modal="true" aria-label={title}>
+    <div
+      style={{
+        position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.7)',
+        display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 50, padding: 16,
+      }}
+      onMouseDown={event => {
+        if (event.target === event.currentTarget) onClose();
+      }}
+      onKeyDown={handleDialogKeyDown}
+    >
+      <div
+        ref={dialogRef}
+        tabIndex={-1}
+        style={{
+          background: '#2a3a5c', border: '2px solid #8aa', borderRadius: 8,
+          padding: 20, maxWidth: 640, width: '100%', maxHeight: '80vh', overflowY: 'auto', outline: 'none',
+        }}
+        role="dialog"
+        aria-modal="true"
+        aria-label={title}
+      >
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
           <div style={{ fontSize: 14, fontWeight: 'bold' }}>{title}</div>
           <button
             type="button"
             onClick={onClose}
-            style={{
-              background: 'none', border: 'none', color: '#889', cursor: 'pointer',
-              fontSize: 18, fontFamily: 'inherit',
-            }}
+            aria-label="Close team editor"
+            className="ps-modal-close"
           >
             &times;
           </button>
@@ -158,7 +201,7 @@ export function TeamEditor({ title, teamInfo, onSave, onClose }: Props) {
                 <div style={{ fontSize: 9, color: '#8899aa', marginBottom: 2 }}>
                   EVs ({sourceLabel(entry.evs.source, entry.evs.probability)})
                 </div>
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(6, minmax(0, 1fr))', gap: 4 }}>
+                <div className="ps-ev-grid">
                   {EV_STATS.map(stat => (
                     <label key={stat.id} style={{ display: 'flex', flexDirection: 'column', gap: 2, fontSize: 9, color: '#8899aa' }}>
                       {stat.label}

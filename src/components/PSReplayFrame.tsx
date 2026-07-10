@@ -56,6 +56,7 @@ function PSReplayFrameDocument({
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const sentLogRef = useRef<{ key: string; blobUrl: string; lines: string[] } | null>(null);
   const didInitialLiveSeekRef = useRef(false);
+  const lastReportedTurnRef = useRef<number | null>(null);
   const reportTurn = !!onTurnChange;
   const [documentLog] = useState(initialDocumentLog);
   const [initialSeek] = useState(() => ({ seekTurn, autoPlay }));
@@ -89,6 +90,7 @@ function PSReplayFrameDocument({
 
     const handler = (e: MessageEvent) => {
       if (e.data && e.data.type === 'ps-turn' && typeof e.data.turn === 'number') {
+        lastReportedTurnRef.current = e.data.turn;
         onTurnChange(e.data.turn);
       }
     };
@@ -98,8 +100,16 @@ function PSReplayFrameDocument({
   }, [onTurnChange]);
 
   useEffect(() => {
+    lastReportedTurnRef.current = null;
+  }, [blobUrl]);
+
+  useEffect(() => {
     if (seekTurn == null) return;
     if (liveUpdates && didInitialLiveSeekRef.current) return;
+    // When the seekTurn change is just the echo of a turn the iframe itself
+    // reported (user pressed Play/Next inside the embed), re-seeking would
+    // pause playback after every turn (B9a) — skip it.
+    if (!liveUpdates && lastReportedTurnRef.current === seekTurn) return;
     const sendSeek = () => iframeRef.current?.contentWindow?.postMessage({
       type: 'ps-seek-turn',
       turn: seekTurn,

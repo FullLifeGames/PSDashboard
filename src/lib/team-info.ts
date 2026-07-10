@@ -86,6 +86,16 @@ function normalizeEvsField(
   return guessedEvs(fallback.evs, fallback.probability, fallback.sourceDetail);
 }
 
+/**
+ * Dedup key for move fills: "Hidden Power" and "Hidden Power Grass" describe
+ * the same slot — a guessed typed variant must not join a revealed generic
+ * one (G12).
+ */
+function moveDedupKey(name: string): string {
+  const id = name.toLowerCase().replace(/[^a-z0-9]/g, '');
+  return id.startsWith('hiddenpower') ? 'hiddenpower' : id;
+}
+
 function fillUsageMoves(
   knownMoves: PokemonMoveInfo[],
   fallbackMoves: UsageProbability[],
@@ -94,7 +104,7 @@ function fillUsageMoves(
 
   for (const move of fallbackMoves) {
     if (result.length >= 4) break;
-    if (!result.some(entry => entry.name.toLowerCase() === move.value.toLowerCase())) {
+    if (!result.some(entry => moveDedupKey(entry.name) === moveDedupKey(move.value))) {
       result.push(guessedMove(move));
     }
   }
@@ -110,7 +120,7 @@ function fillSetMoves(
 
   for (const move of fallbackMoves) {
     if (result.length >= 4) break;
-    if (!result.some(entry => entry.name.toLowerCase() === move.value.toLowerCase())) {
+    if (!result.some(entry => moveDedupKey(entry.name) === moveDedupKey(move.value))) {
       result.push(guessedMoveFromSet(move));
     }
   }

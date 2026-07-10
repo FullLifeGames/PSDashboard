@@ -13,9 +13,13 @@ import { BattleStatsPanel } from './components/BattleStatsPanel';
 import { TeamEditor } from './components/TeamEditor';
 import { parseTeamText } from './lib/team-parser';
 import { enrichTeamInfo } from './lib/team-info';
+import { applyPastedTeam, countMatchingSpecies, parsePastedTeam, type PastedSet } from './lib/team-paste';
 import type { OpponentTeamInfo } from './types';
 import { decodeBranchShare, type BranchSharePayload } from './lib/branch-share';
-import { getBranchSimulatorFormat } from './lib/replay-format';
+import { getBranchSimulatorFormat, getReplayGeneration } from './lib/replay-format';
+import type { BranchSlotChoice } from './lib/branch-choices';
+
+const TEAM_PASTE_STORAGE_KEY = 'ps-replay-interceptor:team-paste';
 
 function SharedBranchView({
   branch,
@@ -103,7 +107,7 @@ function SharedBranchView({
 
 function App() {
   const { loading, error, replayData, snapshots, opponentInfo, p1Info, loadReplay } = useReplay();
-  const { branching, simState, history, startBranch, setChoice, executeTurn, stopBranch } = useBranch();
+  const { branching, simState, history, executeError, executing, startBranch, setChoice, executeTurn, stopBranch } = useBranch();
   const branchWindowOpenRef = useRef(false);
   const usageStats = useSmogonUsageStats(replayData?.formatid);
   const revealedSpecies = useMemo(() => {
@@ -114,11 +118,15 @@ function App() {
   const setAssumptions = useSmogonSetAssumptions(replayData?.formatid, revealedSpecies);
 
   const [teamText, setTeamText] = useState('');
+  const [pastedSets, setPastedSets] = useState<PastedSet[] | null>(null);
+  const [teamPasteError, setTeamPasteError] = useState<string | null>(null);
   const [editorSide, setEditorSide] = useState<'p1' | 'p2' | null>(null);
   const [editedP1Info, setEditedP1Info] = useState<OpponentTeamInfo | null>(null);
   const [editedP2Info, setEditedP2Info] = useState<OpponentTeamInfo | null>(null);
   const [branchTurn, setBranchTurn] = useState(1);
   const [branchPreparing, setBranchPreparing] = useState(false);
+  const [branchProgress, setBranchProgress] = useState<{ turn: number; target: number } | null>(null);
+  const branchAbortRef = useRef<AbortController | null>(null);
   const [branchSession, setBranchSession] = useState(0);
   const [animateBranchTurns, setAnimateBranchTurns] = useState(true);
   const [sharedBranch, setSharedBranch] = useState<BranchSharePayload | null>(null);
@@ -127,15 +135,66 @@ function App() {
     p1Info: OpponentTeamInfo;
     p2Info: OpponentTeamInfo;
     history: BranchHistoryEntry[];
-    p1Choices: (string | null)[];
-    p2Choices: (string | null)[];
+    p1Choices: (BranchSlotChoice | null)[];
+    p2Choices: (BranchSlotChoice | null)[];
   } | null>(null);
 
   const maxTurn = snapshots.length > 0 ? snapshots.length : 1;
+  const replayGen = useMemo(() => replayData ? getReplayGeneration(replayData) : 9, [replayData]);
+
+  // The last snapshot is the post-battle end state when it holds the final
+  // turn's residue instead of starting a new |turn| — it is labelled "End",
+  // kept stable against iframe echoes, and blocked as a branch target
+  // (B10/B12/G23).
+  const endSnapshotTurn = useMemo(() => {
+    if (snapshots.length < 2) return null;
+    const last = snapshots[snapshots.length - 1];
+    return last.log.some(line => line.startsWith('|turn|')) ? null : last.turn;
+  }, [snapshots]);
+  const atEndPosition = endSnapshotTurn !== null && branchTurn >= endSnapshotTurn;
+
+  // A freshly loaded replay must start at turn 1 — keeping the previous
+  // replay's slider position spoils the new game (B11).
+  useEffect(() => {
+    setBranchTurn(1);
+  }, [replayData?.id]);
 
   const handleTeamLoad = useCallback((rawText: string) => {
     const processed = parseTeamText(rawText);
+    if (!processed.trim()) {
+      setTeamText('');
+      setPastedSets(null);
+      setTeamPasteError(null);
+      localStorage.removeItem(TEAM_PASTE_STORAGE_KEY);
+      return;
+    }
+
+    // Reject pastes that contain no recognizable sets instead of silently
+    // showing "Team loaded" for garbage input (G15).
+    const sets = parsePastedTeam(processed);
+    if (sets.length === 0) {
+      setTeamPasteError('Could not read any Pokémon sets from the paste — expected the Showdown export format.');
+      return;
+    }
+
     setTeamText(processed);
+    setPastedSets(sets);
+    setTeamPasteError(null);
+    try {
+      localStorage.setItem(TEAM_PASTE_STORAGE_KEY, processed);
+    } catch {
+      // Storage full/blocked — the paste still works for this session.
+    }
+  }, []);
+
+  // A paste should survive a reload (G15).
+  useEffect(() => {
+    const saved = localStorage.getItem(TEAM_PASTE_STORAGE_KEY);
+    if (!saved?.trim()) return;
+    const sets = parsePastedTeam(saved);
+    if (sets.length === 0) return;
+    setTeamText(saved);
+    setPastedSets(sets);
   }, []);
 
   const branchSnapshot = useMemo(() => {
@@ -146,8 +205,13 @@ function App() {
 
   const effectiveP1Info = useMemo(() => {
     if (editedP1Info) return editedP1Info;
-    return p1Info ? enrichTeamInfo(p1Info, usageStats.stats, setAssumptions.assumptions) : null;
-  }, [editedP1Info, p1Info, usageStats.stats, setAssumptions.assumptions]);
+    const base = p1Info ? enrichTeamInfo(p1Info, usageStats.stats, setAssumptions.assumptions) : null;
+    // A pasted team overlays the player's side as green "manual" data (G15).
+    if (base && pastedSets && pastedSets.length > 0) {
+      return applyPastedTeam(base, pastedSets).info;
+    }
+    return base;
+  }, [editedP1Info, p1Info, usageStats.stats, setAssumptions.assumptions, pastedSets]);
 
   const effectiveP2Info = useMemo(() => {
     if (editedP2Info) return editedP2Info;
@@ -160,26 +224,43 @@ function App() {
     void import('./lib/branch-engine');
   }, [replayData]);
 
+  // Share links must also work in an already-open tab (G17) — listen for
+  // hash changes instead of only parsing on the initial load.
   useEffect(() => {
-    const match = window.location.hash.match(/^#branch=(.+)$/);
-    if (!match) return;
-
-    try {
-      const decoded = decodeBranchShare(match[1]);
-      if (decoded.version !== 1 || !decoded.finalLog || !decoded.replayId) {
-        throw new Error('Unsupported branch share payload');
+    const applyHash = () => {
+      const match = window.location.hash.match(/^#branch=(.+)$/);
+      if (!match) {
+        setSharedBranch(null);
+        return;
       }
-      setSharedBranch(decoded);
-      setSharedBranchError(null);
-    } catch (error) {
-      setSharedBranch(null);
-      setSharedBranchError(error instanceof Error ? error.message : 'Unable to open shared branch');
-    }
+
+      try {
+        const decoded = decodeBranchShare(match[1]);
+        if (decoded.version !== 1 || !decoded.finalLog || !decoded.replayId) {
+          throw new Error('unsupported payload');
+        }
+        setSharedBranch(decoded);
+        setSharedBranchError(null);
+      } catch {
+        // A damaged link gets a readable message instead of a raw JSON parse
+        // error, and the broken hash leaves the URL (G18).
+        setSharedBranch(null);
+        setSharedBranchError('This share link is invalid or damaged. Ask for a fresh link.');
+        window.history.replaceState(null, '', `${window.location.pathname}${window.location.search}`);
+      }
+    };
+
+    applyHash();
+    window.addEventListener('hashchange', applyHash);
+    return () => window.removeEventListener('hashchange', applyHash);
   }, []);
 
   const handleBranch = useCallback(async () => {
     if (!replayData || branchPreparing) return;
+    const abortController = new AbortController();
+    branchAbortRef.current = abortController;
     setBranchPreparing(true);
+    setBranchProgress(null);
     await new Promise(resolve => setTimeout(resolve, 0));
 
     try {
@@ -193,13 +274,25 @@ function App() {
       });
       if (p1Team.length > 0 && p2Team.length > 0) {
         setBranchSession(session => session + 1);
-        await startBranch(getBranchSimulatorFormat(replayData), p1Team, p2Team, replayData.log, branchTurn, branchSnapshot);
-        branchWindowOpenRef.current = true;
+        await startBranch(getBranchSimulatorFormat(replayData), p1Team, p2Team, replayData.log, branchTurn, branchSnapshot, {
+          playerNames: [replayData.players[0], replayData.players[1]],
+          onProgress: (turn, target) => setBranchProgress({ turn, target }),
+          abort: abortController.signal,
+        });
+        if (!abortController.signal.aborted) {
+          branchWindowOpenRef.current = true;
+        }
       }
     } finally {
       setBranchPreparing(false);
+      setBranchProgress(null);
+      branchAbortRef.current = null;
     }
   }, [replayData, branchPreparing, teamText, branchTurn, branchSnapshot, effectiveP1Info, effectiveP2Info, usageStats.stats, setAssumptions.assumptions, startBranch]);
+
+  const handleCancelBranchPreparation = useCallback(() => {
+    branchAbortRef.current?.abort();
+  }, []);
 
   useEffect(() => {
     if (!pendingBranchRefresh || !replayData) return;
@@ -209,7 +302,10 @@ function App() {
     const activeReplay = replayData;
 
     async function refreshBranch() {
+      const abortController = new AbortController();
+      branchAbortRef.current = abortController;
       setBranchPreparing(true);
+      setBranchProgress(null);
       await new Promise(resolve => setTimeout(resolve, 0));
 
       try {
@@ -227,14 +323,21 @@ function App() {
             replayHistory: refreshRequest.history,
             p1Choices: refreshRequest.p1Choices,
             p2Choices: refreshRequest.p2Choices,
+            playerNames: [activeReplay.players[0], activeReplay.players[1]],
+            onProgress: (turn, target) => setBranchProgress({ turn, target }),
+            abort: abortController.signal,
           });
-          branchWindowOpenRef.current = true;
+          if (!abortController.signal.aborted) {
+            branchWindowOpenRef.current = true;
+          }
         }
       } finally {
         if (!cancelled) {
           setBranchPreparing(false);
+          setBranchProgress(null);
           setPendingBranchRefresh(null);
         }
+        branchAbortRef.current = null;
       }
     }
 
@@ -253,7 +356,7 @@ function App() {
     startBranch,
   ]);
 
-  const handleSetChoice = useCallback((side: 'p1' | 'p2', choice: string, activeSlot?: number) => {
+  const handleSetChoice = useCallback((side: 'p1' | 'p2', choice: BranchSlotChoice, activeSlot?: number) => {
     setChoice(side, choice, activeSlot);
   }, [setChoice]);
 
@@ -300,15 +403,35 @@ function App() {
   }, [clearSharedBranch, loadReplay]);
 
   const handleReplayTurn = useCallback((turn: number) => {
-    if (!branching && turn >= 1) {
-      setBranchTurn(turn);
-    }
-  }, [branching]);
+    if (branching || turn < 1) return;
+    setBranchTurn(current => {
+      // The embed can only report real turns; when the end position is
+      // selected its echo (last turn) must not knock the slider back (B12).
+      if (endSnapshotTurn !== null && current >= endSnapshotTurn && turn >= endSnapshotTurn - 1) {
+        return current;
+      }
+      return turn;
+    });
+  }, [branching, endSnapshotTurn]);
+
+  const teamPasteStatus = useMemo(() => {
+    if (!pastedSets || pastedSets.length === 0) return null;
+    if (!p1Info) return `Team loaded (${pastedSets.length} Pokémon)`;
+    const matched = countMatchingSpecies(p1Info, pastedSets);
+    return `Team loaded (${pastedSets.length} Pokémon, ${matched} match this replay)`;
+  }, [pastedSets, p1Info]);
+  const teamPasteMismatch = useMemo(() => {
+    if (!pastedSets || pastedSets.length === 0 || !p1Info) return null;
+    return countMatchingSpecies(p1Info, pastedSets) === 0
+      ? 'None of the pasted Pokémon appear in this replay — the paste will be ignored for branching.'
+      : null;
+  }, [pastedSets, p1Info]);
 
   const simLog = useMemo(() => {
     const raw = simState?.log ?? [];
     if (raw.length === 0) return '';
-    return raw.filter(l => l && !l.startsWith('|split|') && !l.startsWith('|c|')).join('\n');
+    // |debug| lines would render as "[DEBUG] …" in the embed's battle log (G13).
+    return raw.filter(l => l && !l.startsWith('|split|') && !l.startsWith('|c|') && !l.startsWith('|debug|')).join('\n');
   }, [simState?.log]);
   const latestBranchHistoryEntry = history.length > 0 ? history[history.length - 1] : null;
 
@@ -324,7 +447,13 @@ function App() {
         </span>
       </div>
 
-      {!replayData && sharedBranch && (
+      {sharedBranchError && !sharedBranch && (
+        <div className="ps-panel" role="alert" style={{ marginTop: 8, color: '#f3a6a6', fontSize: 11 }}>
+          Unable to open shared branch: {sharedBranchError}
+        </div>
+      )}
+
+      {sharedBranch && (
         <SharedBranchView
           branch={sharedBranch}
           onLoadOriginal={handleLoadSharedOriginal}
@@ -339,18 +468,14 @@ function App() {
             onTeamLoad={handleTeamLoad}
             loading={loading}
             error={error}
-            teamLoaded={teamText.length > 0}
+            teamStatus={teamPasteStatus}
+            teamError={teamPasteError || teamPasteMismatch}
             showGuide
           />
-          {sharedBranchError && (
-            <div className="ps-panel" style={{ marginTop: 8, color: '#f3a6a6', fontSize: 11 }}>
-              Unable to open shared branch: {sharedBranchError}
-            </div>
-          )}
         </div>
       )}
 
-      {replayData && (
+      {replayData && !sharedBranch && (
         <div className="ps-main-layout">
           {/* Left column: iframe */}
           <div className="ps-main-left">
@@ -378,9 +503,20 @@ function App() {
               </div>
               <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
                 {branchPreparing && (
-                  <span style={{ fontSize: 11, fontWeight: 'bold', color: '#fd6' }}>
-                    Preparing branch...
-                  </span>
+                  <>
+                    <span style={{ fontSize: 11, fontWeight: 'bold', color: '#fd6' }}>
+                      Preparing branch...
+                      {branchProgress ? ` (turn ${branchProgress.turn}/${branchProgress.target})` : ''}
+                    </span>
+                    <button
+                      type="button"
+                      className="ps-btn"
+                      onClick={handleCancelBranchPreparation}
+                      style={{ padding: '2px 8px', fontSize: 10 }}
+                    >
+                      Cancel
+                    </button>
+                  </>
                 )}
                 {showBranch && !branchPreparing && (
                   <>
@@ -476,7 +612,6 @@ function App() {
                   value={branchTurn}
                   onChange={e => setBranchTurn(parseInt(e.target.value, 10))}
                   aria-label="Branch turn selector"
-                  style={{ flex: 1 }}
                 />
                 <button
                   type="button"
@@ -486,13 +621,20 @@ function App() {
                   style={{ padding: '2px 8px', fontSize: 12, lineHeight: 1 }}
                 >&#9654;</button>
                 <span style={{ fontSize: 11, color: '#aab', minWidth: 60, textAlign: 'center' }}>
-                  T<strong style={{ color: '#fff' }}>{branchTurn}</strong>/{maxTurn}
+                  {atEndPosition ? (
+                    <strong style={{ color: '#fff' }}>End</strong>
+                  ) : (
+                    <>
+                      T<strong style={{ color: '#fff' }}>{branchTurn}</strong>/{endSnapshotTurn !== null ? endSnapshotTurn - 1 : maxTurn}
+                    </>
+                  )}
                 </span>
                 <button
                   type="button"
                   className="ps-btn ps-btn-red"
                   onClick={handleBranch}
-                  disabled={branchPreparing}
+                  disabled={branchPreparing || atEndPosition}
+                  title={atEndPosition ? 'The battle is already over at the end position — pick a turn to branch from.' : undefined}
                   style={{ padding: '3px 12px', fontSize: 11 }}
                 >
                   {branchPreparing ? 'Preparing...' : 'Branch Here'}
@@ -504,6 +646,9 @@ function App() {
               <>
                 <BranchPanel
                   simState={simState}
+                  executeError={executeError}
+                  executing={executing}
+                  gen={replayGen}
                   onSetChoice={handleSetChoice}
                   onExecuteTurn={handleExecuteTurn}
                 />
@@ -526,7 +671,8 @@ function App() {
                   onTeamLoad={handleTeamLoad}
                   loading={loading}
                   error={error}
-                  teamLoaded={teamText.length > 0}
+                  teamStatus={teamPasteStatus}
+                  teamError={teamPasteError || teamPasteMismatch}
                 />
               </>
             )}
