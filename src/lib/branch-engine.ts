@@ -465,7 +465,7 @@ function collectForcedSwitchSpecies(
   return species;
 }
 
-function correctActivesFromProtocol(battle: SimBattle, events: string[]) {
+export function correctActivesFromProtocol(battle: SimBattle, events: string[]) {
   for (const line of events) {
     const match = line.match(/^\|(switch|drag)\|(p[12])([a-d]):[^|]*\|([^,|]+)/);
     if (!match) continue;
@@ -483,6 +483,19 @@ function correctActivesFromProtocol(battle: SimBattle, events: string[]) {
     const duplicateActiveSlot = side.active.findIndex(active => active === target);
     if (duplicateActiveSlot >= 0 && duplicateActiveSlot !== activeSlot && previous) {
       side.active[duplicateActiveSlot] = previous;
+      previous.isActive = true;
+    }
+
+    // Mirror BattleActions#switchIn's array swap: the sim keeps
+    // side.pokemon[i] === side.active[i], and its next real switch swaps via
+    // the position fields. Repointing active without reordering side.pokemon
+    // makes that swap duplicate one team member and erase another.
+    const targetIndex = side.pokemon.indexOf(target);
+    if (targetIndex >= 0 && targetIndex !== activeSlot) {
+      const occupant = side.pokemon[activeSlot];
+      side.pokemon[targetIndex] = occupant;
+      if (occupant) occupant.position = targetIndex;
+      side.pokemon[activeSlot] = target;
     }
 
     target.isActive = true;
