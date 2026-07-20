@@ -598,15 +598,41 @@ function terrainIdFromSnapshot(terrain: string): string {
   return terrainCondition.exists ? terrainCondition.id : toId(terrain);
 }
 
+/**
+ * @pkmn/client snapshots report weather by display name (its WEATHERS map:
+ * "Sand", "Sun", …) — the sim only knows condition ids. Writing an untranslated
+ * name into the sim silently disables every weather residual (the gen 3
+ * Sandstorm-does-no-damage report).
+ */
+const CLIENT_WEATHER_IDS: Record<string, string> = {
+  sand: 'sandstorm',
+  sun: 'sunnyday',
+  rain: 'raindance',
+  hail: 'hail',
+  snow: 'snowscape',
+  harshsunshine: 'desolateland',
+  heavyrain: 'primordialsea',
+  strongwinds: 'deltastream',
+};
+
 function weatherIdFromSnapshot(weather: string): string {
   if (!weather) return '';
+  const mapped = CLIENT_WEATHER_IDS[toId(weather)];
+  if (mapped) return mapped;
   const weatherCondition = Dex.conditions.get(weather);
   return weatherCondition.exists ? weatherCondition.id : toId(weather);
 }
 
 function correctFieldFromSnapshot(battle: SimBattle, snapshot: TurnSnapshot) {
   battle.turn = snapshot.turn;
-  battle.field.weather = weatherIdFromSnapshot(snapshot.field.weather) as SimBattle['field']['weather'];
+  const weather = weatherIdFromSnapshot(snapshot.field.weather);
+  if ((battle.field.weather as string) !== weather) {
+    // Only touch weather the sim disagrees about — matching weather keeps its
+    // reconstructed weatherState (source, remaining duration) untouched.
+    battle.field.weather = weather as SimBattle['field']['weather'];
+    battle.field.weatherState.id = weather as typeof battle.field.weatherState.id;
+    delete battle.field.weatherState.duration;
+  }
   battle.field.terrain = terrainIdFromSnapshot(snapshot.field.terrain) as SimBattle['field']['terrain'];
   syncEffectTableFromSnapshot(
     battle.field.pseudoWeather as Record<string, { id?: string; duration?: number; effectOrder?: number }>,
