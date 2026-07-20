@@ -53,6 +53,35 @@ test.describe('Smogon set assumptions', () => {
     });
   });
 
+  test('resolves Custom Game set assumptions from the generation OU', async () => {
+    const payload = {
+      Metagross: {
+        'Choice Band': {
+          ability: 'Clear Body',
+          item: 'Choice Band',
+          nature: 'Adamant',
+          evs: { hp: 252, atk: 252, def: 0, spa: 0, spd: 4, spe: 0 },
+          moves: ['Meteor Mash', 'Earthquake', 'Explosion', 'Rock Slide'],
+        },
+      },
+    };
+
+    const assumptions = await fetchSmogonSetAssumptions({
+      formatId: 'gen3customgame',
+      species: ['Metagross'],
+      fetcher: async () => ({
+        json: async () => payload,
+      }),
+    });
+
+    expect(assumptions?.format).toBe('gen3ou');
+    expect(assumptions?.pokemon.metagross).toMatchObject({
+      species: 'Metagross',
+      ability: { value: 'Clear Body' },
+      item: { value: 'Choice Band' },
+    });
+  });
+
   test('uses set assumptions after revealed data and before unknown defaults', () => {
     const enriched = enrichPokemonInfo(sampleInfo, null, {
       format: 'gen9ou',

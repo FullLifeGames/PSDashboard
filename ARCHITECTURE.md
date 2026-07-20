@@ -9,19 +9,23 @@ This document describes how the current prototype works internally and where its
 The app starts in [`src/components/ReplayLoader.tsx`](./src/components/ReplayLoader.tsx), where the user provides:
 
 - a replay URL or replay ID
+- or a locally exported replay file (a "Download replay" `.html` export or a raw protocol log), via drag & drop or the file picker
 - optionally a pasted team export
 
 `useReplay` then:
 
-1. normalizes the replay input in `parseReplayUrl`
-2. fetches `https://replay.pokemonshowdown.com/<id>.json`
-3. parses the replay log into snapshots
-4. infers visible team information for both sides
+1. normalizes the replay input in `parseReplayUrl` and fetches `https://replay.pokemonshowdown.com/<id>.json` — or, for files, parses the export in `parseExportedReplay` (the export wraps the log in a `text/plain` script with `/` escaped as `\/`; the replay id comes from the hidden `replayid` input, never from the file name, so arbitrary file names cannot corrupt format inference)
+2. parses the replay log into snapshots
+3. infers visible team information for both sides
+
+The app can also be driven from outside ([`src/hooks/useEmbedHost.ts`](./src/hooks/useEmbedHost.ts)): `?replay=<id|url>` auto-loads a replay on startup, `?embed=1` hides the chrome for iframe embedding, and a host page can post `{ type: 'ps-load-replay', replay }` (id, URL, raw log, or exported HTML content). The app answers with `ps-embed-ready` / `ps-replay-loaded` / `ps-replay-error`; these types are disjoint from the internal viewer-iframe protocol below.
 
 Relevant files:
 
 - [`src/hooks/useReplay.ts`](./src/hooks/useReplay.ts)
+- [`src/hooks/useEmbedHost.ts`](./src/hooks/useEmbedHost.ts)
 - [`src/lib/replay-fetcher.ts`](./src/lib/replay-fetcher.ts)
+- [`src/lib/replay-file.ts`](./src/lib/replay-file.ts)
 - [`src/lib/protocol-parser.ts`](./src/lib/protocol-parser.ts)
 - [`src/lib/opponent-inferrer.ts`](./src/lib/opponent-inferrer.ts)
 
@@ -46,8 +50,8 @@ The current precedence is:
 
 1. revealed information from the replay
 2. the user's pasted team for `p1`, when provided
-3. Smogon usage-stat guesses for anything still unknown, when monthly stats can be fetched
-4. `@pkmn/smogon` set assumptions for remaining gaps
+3. Smogon usage-stat guesses for anything still unknown, when monthly stats can be fetched — formats without a stats file (Custom Game, niche metas) fall back to the generation's OU stats
+4. `@pkmn/smogon` set assumptions for remaining gaps (Custom Game also maps to the generation's OU here)
 
 This is the most important approximation point in the current implementation. The branch engine can only be as accurate as the reconstructed teams.
 
@@ -169,7 +173,7 @@ The current codebase has been validated with:
 - `npx playwright test`
 - `npm run test:regression`
 
-The regression suite covers pure Smogon-stat parsing/enrichment, branch save/share encoding, target-specific damage previews, basic doubles branch state, redirection/retargeting/phazing fixtures, stable checkpoints from a mocked fixture, and stable checkpoints from a saved real replay. Two deeper checkpoints are marked `fixme` to document known divergence rather than hiding it.
+The regression suite covers pure Smogon-stat parsing/enrichment (including the Custom Game → OU fallback), exported replay file parsing, branch save/share encoding, target-specific damage previews, basic doubles branch state, redirection/retargeting/phazing fixtures, stable checkpoints from a mocked fixture, and stable checkpoints from a saved real replay. Two deeper checkpoints are marked `fixme` to document known divergence rather than hiding it.
 
 ## Recommended Refactor Direction
 

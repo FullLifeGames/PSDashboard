@@ -1,8 +1,9 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { parseTeamText } from '../lib/team-parser';
 
 interface Props {
   onLoad: (url: string) => void;
+  onLoadFile: (content: string, fileName?: string) => void;
   onTeamLoad: (teamText: string) => void;
   loading: boolean;
   error: string | null;
@@ -11,12 +12,37 @@ interface Props {
   showGuide?: boolean;
 }
 
-export function ReplayLoader({ onLoad, onTeamLoad, loading, error, teamStatus = null, teamError = null, showGuide = false }: Props) {
-  const [url, setUrl] = useState('https://replay.pokemonshowdown.com/gen9draft-2298735122');
+export function ReplayLoader({ onLoad, onLoadFile, onTeamLoad, loading, error, teamStatus = null, teamError = null, showGuide = false }: Props) {
+  const [url, setUrl] = useState('https://replay.pokemonshowdown.com/gen3customgame-2115579570');
   const [teamText, setTeamText] = useState('');
+  const [dragActive, setDragActive] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const readReplayFile = (file: File | null | undefined) => {
+    if (!file || loading) return;
+    void file.text().then(content => onLoadFile(content, file.name));
+  };
 
   return (
-    <div className="ps-panel" style={{ marginBottom: 8 }}>
+    <div
+      className="ps-panel"
+      style={{
+        marginBottom: 8,
+        outline: dragActive ? '2px dashed #8cf' : 'none',
+        outlineOffset: -2,
+      }}
+      onDragOver={event => {
+        if (!event.dataTransfer.types.includes('Files')) return;
+        event.preventDefault();
+        setDragActive(true);
+      }}
+      onDragLeave={() => setDragActive(false)}
+      onDrop={event => {
+        event.preventDefault();
+        setDragActive(false);
+        readReplayFile(event.dataTransfer.files?.[0]);
+      }}
+    >
       <div style={{ fontSize: 13, fontWeight: 'bold', marginBottom: 8 }}>Load Replay</div>
 
       <form
@@ -43,6 +69,31 @@ export function ReplayLoader({ onLoad, onTeamLoad, loading, error, teamStatus = 
           {loading ? 'Loading…' : 'Load'}
         </button>
       </form>
+
+      <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 8, fontSize: 11, color: '#8899aa' }}>
+        <span>… or drop an exported replay (.html) anywhere in this panel</span>
+        <button
+          type="button"
+          className="ps-btn"
+          disabled={loading}
+          onClick={() => fileInputRef.current?.click()}
+          style={{ padding: '2px 8px', fontSize: 10 }}
+        >
+          Browse file
+        </button>
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept=".html,.htm,.log,.txt"
+          aria-label="Load exported replay file"
+          style={{ display: 'none' }}
+          onChange={event => {
+            readReplayFile(event.target.files?.[0]);
+            // Allow picking the same file again after an error.
+            event.target.value = '';
+          }}
+        />
+      </div>
 
       {error && (
         <div

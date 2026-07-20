@@ -1,0 +1,69 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>PS Dashboard embed demo</title>
+    <style>
+      body { font-family: Verdana, sans-serif; margin: 0; padding: 16px; background: #16212f; color: #cde; }
+      h1 { font-size: 16px; }
+      .controls { display: flex; gap: 8px; align-items: center; margin-bottom: 10px; flex-wrap: wrap; }
+      iframe { width: 100%; height: 850px; border: 1px solid #3a4a66; border-radius: 6px; background: #1a2a4c; }
+      #status { font-size: 12px; color: #8ac; }
+    </style>
+  </head>
+  <body>
+    <h1>Host page embedding PS Dashboard</h1>
+    <div class="controls">
+      <label>
+        Exported replay (.html):
+        <input type="file" id="replay-file" accept=".html,.htm,.log,.txt" />
+      </label>
+      <button id="load-demo" type="button">Load demo replay id</button>
+      <span id="status">Waiting for the dashboard…</span>
+    </div>
+
+    <!-- Point src at the deployed app for production use. -->
+    <iframe id="dashboard" src="../?embed=1" title="PS Dashboard"></iframe>
+
+    <script>
+      const dashboard = document.getElementById('dashboard');
+      const status = document.getElementById('status');
+      let ready = false;
+
+      function send(replay) {
+        if (!ready) {
+          status.textContent = 'Dashboard not ready yet…';
+          return;
+        }
+        dashboard.contentWindow.postMessage({ type: 'ps-load-replay', replay }, '*');
+        status.textContent = 'Replay sent…';
+      }
+
+      window.addEventListener('message', (event) => {
+        const data = event.data;
+        if (!data || typeof data.type !== 'string') return;
+        if (data.type === 'ps-embed-ready') {
+          ready = true;
+          status.textContent = 'Dashboard ready — pick an exported replay file.';
+        } else if (data.type === 'ps-replay-loaded') {
+          status.textContent = `Loaded ${data.id} (${data.format})`;
+        } else if (data.type === 'ps-replay-error') {
+          status.textContent = `Error: ${data.message}`;
+        }
+      });
+
+      document.getElementById('replay-file').addEventListener('change', (event) => {
+        const file = event.target.files && event.target.files[0];
+        if (!file) return;
+        // The exported replay HTML (or a raw log) is sent as plain text.
+        file.text().then(send);
+        event.target.value = '';
+      });
+
+      document.getElementById('load-demo').addEventListener('click', () => {
+        send('gen3customgame-2115579570');
+      });
+    </script>
+  </body>
+</html>

@@ -61,6 +61,44 @@ test.describe('Smogon usage stat enrichment', () => {
     expect(urls[0].url).toBe('https://data.pkmn.cc/stats/gen3ou.json');
   });
 
+  test('maps Custom Game formats straight to the generation OU stats', () => {
+    expect(buildSmogonStatsUrls('gen3customgame')).toEqual([{
+      format: 'gen3ou',
+      month: 'latest',
+      url: 'https://data.pkmn.cc/stats/gen3ou.json',
+    }]);
+  });
+
+  test('adds the generation OU as fallback for formats missing from the stats', () => {
+    const urls = buildSmogonStatsUrls('gen5nichemeta');
+    expect(urls.map(candidate => candidate.format)).toEqual(['gen5nichemeta', 'gen5ou']);
+    expect(urls[1].url).toBe('https://data.pkmn.cc/stats/gen5ou.json');
+  });
+
+  test('fetchSmogonUsageStats assumes OU when the format has no stats file', async () => {
+    const requestedUrls: string[] = [];
+    const fetcher = (async (input: RequestInfo | URL) => {
+      requestedUrls.push(String(input));
+      if (String(input).includes('gen4nichemeta')) {
+        return new Response('not found', { status: 404 });
+      }
+      return new Response(JSON.stringify({
+        pokemon: {
+          Metagross: { count: 10, moves: { 'Meteor Mash': 0.9 } },
+        },
+      }), { status: 200, headers: { 'content-type': 'application/json' } });
+    }) as typeof fetch;
+
+    const stats = await fetchSmogonUsageStats('gen4nichemeta', { fetcher });
+
+    expect(requestedUrls).toEqual([
+      'https://data.pkmn.cc/stats/gen4nichemeta.json',
+      'https://data.pkmn.cc/stats/gen4ou.json',
+    ]);
+    expect(stats?.format).toBe('gen4ou');
+    expect(stats?.pokemon.metagross.moves[0].value).toBe('Meteor Mash');
+  });
+
   test('parses data.pkmn.cc usage stats as fractional probabilities', () => {
     const parsed = parseSmogonChaosStats({
       battles: 12_345,

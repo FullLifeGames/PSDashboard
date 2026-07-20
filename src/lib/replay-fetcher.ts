@@ -1,5 +1,5 @@
 import type { ReplayData } from '../types';
-import { getReplayGeneration, inferReplayFormatId } from './replay-format';
+import { getReplayDisplayFormat, inferReplayFormatId } from './replay-format';
 
 type ReplayResponse = Omit<ReplayData, 'formatid'> & Partial<Pick<ReplayData, 'formatid'>>;
 
@@ -17,15 +17,6 @@ export function parseReplayUrl(input: string): string | null {
   if (/^[a-z0-9-]+$/i.test(bare)) return bare.toLowerCase();
 
   return null;
-}
-
-/** Prefixes the generation when the display format omits it ("Ubers" → "[Gen 6] Ubers", G5). */
-function displayFormat(data: ReplayResponse, formatid: string): string {
-  const format = (data.format || '').trim();
-  if (!format) return formatid;
-  if (/gen\s*\d/i.test(format)) return format;
-  const gen = getReplayGeneration({ ...data, formatid });
-  return `[Gen ${gen}] ${format}`;
 }
 
 export async function fetchReplay(urlOrId: string): Promise<ReplayData> {
@@ -56,6 +47,6 @@ export async function fetchReplay(urlOrId: string): Promise<ReplayData> {
   return {
     ...data,
     formatid,
-    format: displayFormat(data, formatid),
+    format: getReplayDisplayFormat(data, formatid),
   };
 }

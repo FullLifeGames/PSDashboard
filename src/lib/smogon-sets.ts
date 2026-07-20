@@ -54,6 +54,9 @@ function normalizeFormat(formatId: string | undefined): string {
   if (id.includes('nationaldexdoubles')) return 'gen9nationaldexdoubles';
   if (id.includes('doubles') || id.includes('vgc')) return 'gen9doublesou';
   if (/^gen\d+draft/.test(id)) return id.replace(/draft.*$/, 'ou');
+  // Custom Game has no published sets — assume the generation's OU.
+  const customGame = id.match(/^(gen\d+)customgame$/);
+  if (customGame) return `${customGame[1]}ou`;
   return id || 'gen9ou';
 }
 

@@ -62,6 +62,15 @@ export function inferReplayFormatId(source: ReplayFormatSource): string {
   return `gen${extractGen(source)}ou`;
 }
 
+/** Prefixes the generation when the display format omits it ("Ubers" → "[Gen 6] Ubers", G5). */
+export function getReplayDisplayFormat(source: ReplayFormatSource, formatid: string): string {
+  const format = (source.format || '').trim();
+  if (!format) return formatid;
+  if (/gen\s*\d/i.test(format)) return format;
+  const gen = getReplayGeneration({ ...source, formatid });
+  return `[Gen ${gen}] ${format}`;
+}
+
 export function getReplayGeneration(source: ReplayFormatSource): number {
   const formatid = inferReplayFormatId(source);
   return parseInt(extractGen({ ...source, formatid }), 10) || 9;

@@ -1,5 +1,6 @@
 import { useState, useCallback } from 'react';
 import { fetchReplay } from '../lib/replay-fetcher';
+import { parseExportedReplay } from '../lib/replay-file';
 import type { ReplayData, TurnSnapshot, OpponentTeamInfo } from '../types';
 
 export interface ReplayState {
@@ -9,6 +10,12 @@ export interface ReplayState {
   snapshots: TurnSnapshot[];
   p1Info: OpponentTeamInfo | null;
   opponentInfo: OpponentTeamInfo | null;
+}
+
+/** Load outcome for callers that need to react (embed host responses). */
+export interface LoadReplayResult {
+  data: ReplayData | null;
+  error: string | null;
 }
 
 export function useReplay() {
@@ -21,10 +28,10 @@ export function useReplay() {
     opponentInfo: null,
   });
 
-  const loadReplay = useCallback(async (urlOrId: string) => {
+  const runLoad = useCallback(async (task: () => Promise<ReplayData>): Promise<LoadReplayResult> => {
     setState(prev => ({ ...prev, loading: true, error: null }));
     try {
-      const data = await fetchReplay(urlOrId);
+      const data = await task();
       const [{ parseReplayLog }, { inferOpponentTeam }] = await Promise.all([
         import('../lib/protocol-parser'),
         import('../lib/opponent-inferrer'),
@@ -41,14 +48,23 @@ export function useReplay() {
         p1Info,
         opponentInfo,
       });
+      return { data, error: null };
     } catch (err) {
-      setState(prev => ({
-        ...prev,
-        loading: false,
-        error: err instanceof Error ? err.message : 'Unknown error',
-      }));
+      const message = err instanceof Error ? err.message : 'Unknown error';
+      setState(prev => ({ ...prev, loading: false, error: message }));
+      return { data: null, error: message };
     }
   }, []);
 
-  return { ...state, loadReplay };
+  const loadReplay = useCallback(
+    (urlOrId: string) => runLoad(() => fetchReplay(urlOrId)),
+    [runLoad],
+  );
+
+  const loadReplayFile = useCallback(
+    (content: string, fileName?: string) => runLoad(async () => parseExportedReplay(content, fileName)),
+    [runLoad],
+  );
+
+  return { ...state, loadReplay, loadReplayFile };
 }

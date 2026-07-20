@@ -140,6 +140,56 @@ test.describe('PS Dashboard', () => {
     await expect(page.locator('button', { hasText: 'Load' })).toBeVisible();
   });
 
+  test('defaults to the Gen 3 Custom Game replay', async ({ page }) => {
+    await expect(page.locator('input[type="text"]')).toHaveValue(/gen3customgame-2115579570/);
+  });
+
+  test('loads an exported replay HTML file from disk', async ({ page }) => {
+    await page.locator('input[aria-label="Load exported replay file"]')
+      .setInputFiles(join(__dirname, 'fixtures', 'exported-replay.html'));
+
+    await expect(page.getByText('Alpha', { exact: true }).first()).toBeVisible({ timeout: 10000 });
+    await expect(page.getByText('Beta', { exact: true }).first()).toBeVisible();
+    await expect(page.locator('text=[Gen 9] Draft')).toBeVisible();
+    await expect(page.locator('iframe[title="PS Replay"]')).toBeVisible({ timeout: 10000 });
+    await expect(page.locator('button', { hasText: 'Branch Here' })).toBeVisible();
+  });
+
+  test('auto-loads a replay from the ?replay query parameter', async ({ page }) => {
+    await page.goto('/?replay=gen9ou-test-123');
+    await expect(page.getByText('TestPlayer1', { exact: true }).first()).toBeVisible({ timeout: 10000 });
+    await expect(page.locator('iframe[title="PS Replay"]')).toBeVisible({ timeout: 10000 });
+  });
+
+  test('embed mode hides the app chrome and waits for a host replay', async ({ page }) => {
+    await page.goto('/?embed=1');
+    await expect(page.getByText(/waiting for a replay/i)).toBeVisible();
+    await expect(page.locator('h1')).toHaveCount(0);
+  });
+
+  test('embed mode loads replays posted by the host page', async ({ page }) => {
+    await page.goto('/?embed=1');
+    await expect(page.getByText(/waiting for a replay/i)).toBeVisible();
+    await page.evaluate(() => window.postMessage({ type: 'ps-load-replay', replay: 'gen9ou-test-123' }, '*'));
+
+    await expect(page.getByText('TestPlayer1', { exact: true }).first()).toBeVisible({ timeout: 10000 });
+    await expect(page.locator('iframe[title="PS Replay"]')).toBeVisible({ timeout: 10000 });
+    await expect(page.locator('h1')).toHaveCount(0);
+  });
+
+  test('a replay injected while branching replaces the branch cleanly', async ({ page }) => {
+    await page.locator('button', { hasText: 'Load' }).click();
+    await page.locator('button', { hasText: 'Branch Here' }).click();
+    await expect(page.getByText(/Branching.*Turn/)).toBeVisible({ timeout: 15000 });
+
+    await page.evaluate(() => window.postMessage({ type: 'ps-load-replay', replay: 'gen9doubles-test' }, '*'));
+
+    await expect(page.getByText('Alice', { exact: true }).first()).toBeVisible({ timeout: 10000 });
+    await expect(page.getByText(/Branching/)).toHaveCount(0);
+    await expect(page.locator('iframe[title="PS Replay"]')).toBeVisible({ timeout: 10000 });
+    await expect(page.locator('button', { hasText: 'Branch Here' })).toBeVisible();
+  });
+
   test('landing screen explains the replay branching workflow', async ({ page }) => {
     await expect(page.getByText('Pick a branch turn')).toBeVisible();
     await expect(page.getByText('Choose both sides')).toBeVisible();
@@ -496,10 +546,14 @@ test.describe('PS Dashboard', () => {
     const branchIframe = page.locator('iframe[title="Branch Simulation"]');
     const initialBox = await branchIframe.boundingBox();
 
+    // P1 clicks Swords Dance instead of the recommendation — a recommended
+    // Earthquake can crit-KO Kingambit on turn 1, which turns P2's controls
+    // into a forced-switch prompt and strands the second Use Recommended wait.
+    const p1Controls = page.locator('.ps-branch-side-column').first();
+    const p2Controls = page.locator('.ps-branch-side-column').nth(1);
     for (let i = 0; i < 2; i++) {
-      const recs = page.locator('button', { hasText: /Use Recommended/i });
-      await recs.nth(0).click();
-      await recs.nth(1).click();
+      await p1Controls.locator('.ps-movebtn', { hasText: 'Swords Dance' }).click();
+      await p2Controls.locator('button', { hasText: /Use Recommended/i }).click();
       await page.locator('button', { hasText: 'Execute Turn' }).click();
       await expect(page.locator('.ps-panel', { hasText: 'Branch History' })).toContainText(`Turn ${i + 1}`, { timeout: 10000 });
     }

@@ -1,5 +1,6 @@
 import { useEffect, useState, useCallback, useMemo, useRef } from 'react';
 import { useReplay } from './hooks/useReplay';
+import { useEmbedHost } from './hooks/useEmbedHost';
 import { useBranch } from './hooks/useBranch';
 import type { BranchHistoryEntry } from './hooks/useBranch';
 import { useSmogonUsageStats } from './hooks/useSmogonUsageStats';
@@ -106,7 +107,8 @@ function SharedBranchView({
 }
 
 function App() {
-  const { loading, error, replayData, snapshots, opponentInfo, p1Info, loadReplay } = useReplay();
+  const { loading, error, replayData, snapshots, opponentInfo, p1Info, loadReplay, loadReplayFile } = useReplay();
+  const { embed, requestedReplay } = useEmbedHost({ loadReplay, loadReplayFile });
   const { branching, simState, history, executeError, executing, startBranch, setChoice, executeTurn, stopBranch } = useBranch();
   const branchWindowOpenRef = useRef(false);
   const usageStats = useSmogonUsageStats(replayData?.formatid);
@@ -153,11 +155,18 @@ function App() {
   }, [snapshots]);
   const atEndPosition = endSnapshotTurn !== null && branchTurn >= endSnapshotTurn;
 
-  // A freshly loaded replay must start at turn 1 — keeping the previous
-  // replay's slider position spoils the new game (B11).
+  // A freshly loaded replay must start clean: slider at turn 1 (B11), no live
+  // branch, and no team edits carried over from the previous replay. Host
+  // pages can inject replays repeatedly via ps-load-replay, so the previous
+  // game's state must never leak into the next one.
   useEffect(() => {
     setBranchTurn(1);
-  }, [replayData?.id]);
+    branchWindowOpenRef.current = false;
+    stopBranch();
+    setEditedP1Info(null);
+    setEditedP2Info(null);
+    setEditorSide(null);
+  }, [replayData?.id, stopBranch]);
 
   const handleTeamLoad = useCallback((rawText: string) => {
     const processed = parseTeamText(rawText);
@@ -439,13 +448,15 @@ function App() {
 
   return (
     <div className="ps-app-root">
-      {/* Header */}
-      <div className="ps-app-header" style={{ borderRadius: '0 0 5px 5px' }}>
-        <h1>PS Dashboard</h1>
-        <span style={{ fontSize: 10, color: '#aabbcc' }}>
-          Load a replay · branch off with different moves
-        </span>
-      </div>
+      {/* Header (hidden when framed by a host site) */}
+      {!embed && (
+        <div className="ps-app-header" style={{ borderRadius: '0 0 5px 5px' }}>
+          <h1>PS Dashboard</h1>
+          <span style={{ fontSize: 10, color: '#aabbcc' }}>
+            Load a replay · branch off with different moves
+          </span>
+        </div>
+      )}
 
       {sharedBranchError && !sharedBranch && (
         <div className="ps-panel" role="alert" style={{ marginTop: 8, color: '#f3a6a6', fontSize: 11 }}>
@@ -461,10 +472,22 @@ function App() {
         />
       )}
 
-      {!replayData && !sharedBranch && (
+      {!replayData && !sharedBranch && (embed ? (
+        // The host page provides the replay — no loader chrome in embed mode.
+        <div className="ps-panel" style={{ marginTop: 8, fontSize: 12, color: '#aebdd0' }}>
+          {error ? (
+            <span role="alert" style={{ color: '#f3a6a6' }}>{error}</span>
+          ) : loading || requestedReplay ? (
+            'Loading replay…'
+          ) : (
+            'Waiting for a replay from the host page…'
+          )}
+        </div>
+      ) : (
         <div style={{ marginTop: 8 }}>
           <ReplayLoader
             onLoad={loadReplay}
+            onLoadFile={loadReplayFile}
             onTeamLoad={handleTeamLoad}
             loading={loading}
             error={error}
@@ -473,7 +496,7 @@ function App() {
             showGuide
           />
         </div>
-      )}
+      ))}
 
       {replayData && !sharedBranch && (
         <div className="ps-main-layout">
@@ -664,10 +687,11 @@ function App() {
                   finalLog={simLog}
                 />
               </>
-            ) : (
+            ) : !embed ? (
               <>
                 <ReplayLoader
                   onLoad={loadReplay}
+                  onLoadFile={loadReplayFile}
                   onTeamLoad={handleTeamLoad}
                   loading={loading}
                   error={error}
@@ -675,7 +699,7 @@ function App() {
                   teamError={teamPasteError || teamPasteMismatch}
                 />
               </>
-            )}
+            ) : null}
           </div>
 
           {/* Right column: controls + stats */}

@@ -277,6 +277,9 @@ export function getSmogonStatsFormat(formatId: string | undefined): string {
   if (id.includes('nationaldexdoubles')) return 'gen9nationaldexdoubles';
   if (id.includes('doubles') || id.includes('vgc')) return 'gen9doublesou';
   if (/^gen\d+draft/.test(id)) return id.replace(/draft.*$/, 'ou');
+  // Custom Game is never in the usage stats — assume the generation's OU.
+  const customGame = id.match(/^(gen\d+)customgame$/);
+  if (customGame) return `${customGame[1]}ou`;
   return id || 'gen9ou';
 }
 
@@ -284,16 +287,22 @@ export function getSmogonStatsFormat(formatId: string | undefined): string {
  * Only the data.pkmn.cc mirror sends CORS headers — the historical
  * www.smogon.com fallback months could never succeed in a browser and only
  * produced 16+ console errors per load (B14), so they are gone.
+ *
+ * Formats without a stats file (custom rulesets, niche metas) fall back to
+ * the generation's OU so the app still has usage-based assumptions.
  */
 export function buildSmogonStatsUrls(
   formatId: string | undefined,
 ): { month: string; format: string; url: string }[] {
   const format = getSmogonStatsFormat(formatId);
-  return [{
+  const candidates = [format];
+  const gen = format.match(/^gen\d+/)?.[0];
+  if (gen && `${gen}ou` !== format) candidates.push(`${gen}ou`);
+  return candidates.map(candidate => ({
     month: 'latest',
-    format,
-    url: dataPkmnStatsUrl(format),
-  }];
+    format: candidate,
+    url: dataPkmnStatsUrl(candidate),
+  }));
 }
 
 export async function fetchSmogonUsageStats(

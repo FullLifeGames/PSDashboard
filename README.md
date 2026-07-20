@@ -9,6 +9,9 @@ The current implementation is a working prototype, not a fully accurate replay r
 ## Current Capabilities
 
 - Load a Pokemon Showdown replay from a replay URL or replay ID, with input validation and readable error messages. Smogtours ids are normalized to their real formats (`smogtours-gen3ou-…` → `gen3ou`).
+- Load a locally exported replay by dropping a "Download replay" `.html` file (or a raw protocol log) onto the loader panel or picking it via `Browse file` — every feature (stats, branching, sharing) works on file-based replays.
+- Formats without usage stats (Custom Game, niche metas) automatically fall back to the generation's OU stats and sets for hidden-information guesses.
+- Deep-link and embed support: `?replay=<id|url>` auto-loads a replay on startup, and `?embed=1` hides the app chrome so the dashboard can run inside another site's iframe (see "Embedding" below).
 - Render the original replay inside an embedded Pokemon Showdown replay viewer with two-way turn sync (playback runs through without self-pausing; the end position is labelled `End`).
 - Parse the replay protocol into per-turn snapshots.
 - Infer both teams from replay data, including revealed moves, items, abilities, levels, gender, and tera type when shown — plus ability reveals from effect attributions (e.g. Poison Heal heals), item reveals from heal messages and mega stones, and a Heavy-Duty Boots inference for Pokemon that switch into Stealth Rock without taking damage.
@@ -34,8 +37,8 @@ As of the current repository state:
 
 - `npm run lint` passes.
 - `npm run build` succeeds.
-- `npm run test:e2e` passes with 39 browser tests (the replay JSON and the Showdown embed script are served from fixtures/cache, so the suite is CDN-independent).
-- `npm run test:regression` passes with 96 tests (plus 2 documented known-divergence skips) covering replay reconstruction, identity-based choice resolution, execute error paths, gimmick availability, damage-calc generation/set alignment, team sheets, team paste, stats parsing, save/share, and inference quality.
+- `npm run test:e2e` passes with 44 browser tests (the replay JSON and the Showdown embed script are served from fixtures/cache, so the suite is CDN-independent).
+- `npm run test:regression` passes with 108 tests (plus 2 documented known-divergence skips) covering replay reconstruction, identity-based choice resolution, execute error paths, gimmick availability, damage-calc generation/set alignment, team sheets, team paste, stats parsing, exported replay file parsing, save/share, and inference quality.
 
 The browser test suite validates the main happy path with a mocked replay fixture:
 
@@ -103,9 +106,36 @@ npm run test:e2e
 npm run test:regression
 ```
 
+## Embedding
+
+The app can be included in another site and handed a replay to render:
+
+- **Deep link:** `https://…/?replay=gen3customgame-2115579570` auto-loads that replay on startup (works standalone and inside an iframe).
+- **Embed mode:** add `?embed=1` to hide the header and loader chrome — combined: `?embed=1&replay=<id>`.
+- **postMessage handoff** for replays that are not hosted (exported HTML files, raw logs):
+
+  ```html
+  <iframe id="dashboard" src="https://…/?embed=1"></iframe>
+  <script>
+    window.addEventListener('message', (event) => {
+      if (event.data?.type === 'ps-embed-ready') {
+        // A replay id/URL, a raw protocol log, or a full exported replay HTML document:
+        document.getElementById('dashboard').contentWindow
+          .postMessage({ type: 'ps-load-replay', replay: 'gen3customgame-2115579570' }, '*');
+      }
+      if (event.data?.type === 'ps-replay-loaded') console.log('loaded', event.data.id);
+      if (event.data?.type === 'ps-replay-error') console.warn(event.data.message);
+    });
+  </script>
+  ```
+
+  The app posts `ps-embed-ready` to its parent once it can receive replays, and answers every `ps-load-replay` with `ps-replay-loaded` (`id`, `format`) or `ps-replay-error` (`message`).
+
+  A runnable host-page demo lives in [`examples/embed-host.html`](./examples/embed-host.html) — with the dev server running, open `http://localhost:5173/examples/embed-host.html`, pick an exported replay file (or click the demo button), and the embedded dashboard renders it.
+
 ## How To Use The Prototype
 
-1. Paste a replay URL or replay ID into the loader.
+1. Paste a replay URL or replay ID into the loader, or drop an exported replay `.html` file onto the loader panel.
 2. Optionally expand the team section and paste your own exported team to improve reconstruction.
 3. Load the replay.
 4. Scrub to a turn using the replay viewer or the branch slider.
@@ -117,7 +147,9 @@ npm run test:regression
 ## Repository Map
 
 - [`src/App.tsx`](./src/App.tsx) hosts the main application flow.
-- [`src/hooks/useReplay.ts`](./src/hooks/useReplay.ts) loads the replay and derives snapshots plus inferred team data.
+- [`src/hooks/useReplay.ts`](./src/hooks/useReplay.ts) loads the replay (fetched or file-based) and derives snapshots plus inferred team data.
+- [`src/hooks/useEmbedHost.ts`](./src/hooks/useEmbedHost.ts) implements `?replay=`/`?embed=1` and the host-page postMessage protocol.
+- [`src/lib/replay-file.ts`](./src/lib/replay-file.ts) parses exported replay HTML files and raw protocol logs into replay data.
 - [`src/hooks/useBranch.ts`](./src/hooks/useBranch.ts) manages React state for the live branch simulator.
 - [`src/lib/branch-engine.ts`](./src/lib/branch-engine.ts) reconstructs the battle up to a selected turn in a pure, directly testable module.
 - [`src/lib/protocol-parser.ts`](./src/lib/protocol-parser.ts) converts replay protocol logs into turn snapshots.
