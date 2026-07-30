@@ -533,6 +533,39 @@ function buildForcedSwitchChoice(
   return choices.join(', ');
 }
 
+/**
+ * Status residuals read their state from `statusState` (Toxic damage is
+ * `stage * maxhp/16`, sleep counts down `time`) — a bare `status` assignment
+ * leaves that state empty, so corrected Toxic dealt NaN (= no) damage for the
+ * rest of the branch. Mirror Pokemon#setStatus instead, and only when the
+ * snapshot disagrees, so a matching reconstruction keeps its own toxic stage
+ * and sleep counter.
+ */
+function correctStatusFromSnapshot(battlePokemon: SimPokemon, snapshotStatus: string) {
+  const status = snapshotStatus as SimPokemon['status'];
+  if (battlePokemon.status === status) return;
+
+  battlePokemon.status = status;
+  const statusState = battlePokemon.statusState as {
+    id: string;
+    target?: unknown;
+    stage?: number;
+    time?: number;
+    startTime?: number;
+  };
+  statusState.id = status;
+  statusState.target = battlePokemon;
+  delete statusState.stage;
+  delete statusState.time;
+  delete statusState.startTime;
+  if (status === 'tox') statusState.stage = 0;
+  if (status === 'slp') {
+    // The snapshot does not carry remaining sleep turns — use the average.
+    statusState.startTime = 3;
+    statusState.time = 3;
+  }
+}
+
 function correctHpFromSnapshot(battle: SimBattle, snapshot: TurnSnapshot) {
   for (let sideIndex = 0; sideIndex < 2; sideIndex++) {
     const snapshotSide = sideIndex === 0 ? snapshot.p1 : snapshot.p2;
@@ -553,7 +586,7 @@ function correctHpFromSnapshot(battle: SimBattle, snapshot: TurnSnapshot) {
         if (!snapshotPokemon.fainted && battlePokemon.hp <= 0 && snapshotPokemon.hpPercent > 0) {
           battlePokemon.hp = 1;
         }
-        battlePokemon.status = (snapshotPokemon.status || '') as SimPokemon['status'];
+        correctStatusFromSnapshot(battlePokemon, snapshotPokemon.status || '');
         for (const stat of ['atk', 'def', 'spa', 'spd', 'spe', 'accuracy', 'evasion'] as const) {
           battlePokemon.boosts[stat] = snapshotPokemon.boosts[stat] ?? 0;
         }
