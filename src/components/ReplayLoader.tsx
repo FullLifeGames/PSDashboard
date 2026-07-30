@@ -13,7 +13,7 @@ interface Props {
 }
 
 export function ReplayLoader({ onLoad, onLoadFile, onTeamLoad, loading, error, teamStatus = null, teamError = null, showGuide = false }: Props) {
-  const [url, setUrl] = useState('https://replay.pokemonshowdown.com/gen3customgame-2115579570');
+  const [url, setUrl] = useState('https://replay.pokemonshowdown.com/gen9draft-2058494320');
   const [teamText, setTeamText] = useState('');
   const [dragActive, setDragActive] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);

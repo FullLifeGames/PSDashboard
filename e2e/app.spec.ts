@@ -140,8 +140,8 @@ test.describe('PS Dashboard', () => {
     await expect(page.locator('button', { hasText: 'Load' })).toBeVisible();
   });
 
-  test('defaults to the Gen 3 Custom Game replay', async ({ page }) => {
-    await expect(page.locator('input[type="text"]')).toHaveValue(/gen3customgame-2115579570/);
+  test('defaults to the featured draft replay', async ({ page }) => {
+    await expect(page.locator('input[type="text"]')).toHaveValue(/gen9draft-2058494320/);
   });
 
   test('loads an exported replay HTML file from disk', async ({ page }) => {
