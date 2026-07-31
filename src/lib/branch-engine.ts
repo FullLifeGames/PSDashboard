@@ -1177,6 +1177,30 @@ export async function reconstructBranchRuntime(params: {
     }
   };
 
+  // A rejected replay choice (a team edit can remove the very move the
+  // protocol used) must not abandon the turn half-chosen: the sim keeps the
+  // other side's accepted choice pending, and the next write would commit the
+  // turn with that stale choice — the branch then plays the user's choices one
+  // commit late and a leftover switch fails with "A switch failed because the
+  // Pokémon trying to switch in is already in." (gen9draft-2058494320 turn 4).
+  // Answering the rejected sides with `default` commits the turn and keeps the
+  // replay in lockstep; the snapshot corrections repair the aftermath.
+  const commitRejectedChoicesWithDefaults = async (turnBeforeChoice: number) => {
+    const battle = battleStream.battle;
+    if (!battle || battle.ended || battle.turn > turnBeforeChoice) return;
+    const pendingSides = battle.sides.filter(side => side.requestState && !side.isChoiceDone());
+    if (pendingSides.length === 0) return;
+    const retryErrors = choiceErrors.count;
+    void streams.omniscient.write(pendingSides.map(side => `>${side.id} default`).join('\n'));
+    await waitForBattle(currentBattle =>
+      currentBattle.ended ||
+      currentBattle.turn > turnBeforeChoice ||
+      hasForceSwitch(currentBattle, 0) ||
+      hasForceSwitch(currentBattle, 1) ||
+      choiceErrors.count > retryErrors,
+    );
+  };
+
   const p1Name = JSON.stringify(params.playerNames?.[0]?.trim() || 'Player 1');
   const p2Name = JSON.stringify(params.playerNames?.[1]?.trim() || 'Player 2');
   void streams.omniscient.write(
@@ -1235,6 +1259,13 @@ export async function reconstructBranchRuntime(params: {
       choiceErrors.count > mainChoiceErrors,
     );
 
+    if (choiceErrors.count > mainChoiceErrors) {
+      const battleAfterChoice = battleStream.battle;
+      if (battleAfterChoice && !hasForceSwitch(battleAfterChoice, 0) && !hasForceSwitch(battleAfterChoice, 1)) {
+        await commitRejectedChoicesWithDefaults(turnBeforeChoice);
+      }
+    }
+
     const p1Forced = collectForcedSwitchSpecies(turnBlock.preUpkeep, turnBlock.postUpkeep, 'p1');
     const p2Forced = collectForcedSwitchSpecies(turnBlock.preUpkeep, turnBlock.postUpkeep, 'p2');
     const p1ForceIndex = { current: 0 };
@@ -1264,7 +1295,10 @@ export async function reconstructBranchRuntime(params: {
         (!hasForceSwitch(currentBattle, 0) && !hasForceSwitch(currentBattle, 1)) ||
         choiceErrors.count > forcedChoiceErrors,
       );
-      if (choiceErrors.count > forcedChoiceErrors) break;
+      if (choiceErrors.count > forcedChoiceErrors) {
+        await commitRejectedChoicesWithDefaults(turnBeforeChoice);
+        break;
+      }
     }
 
     const latestBattle = battleStream.battle;
