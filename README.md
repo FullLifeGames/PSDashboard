@@ -20,7 +20,7 @@ The current implementation is a working prototype, not a fully accurate replay r
 - Fetch optional usage stats (via the CORS-safe `data.pkmn.cc` mirror) and `@pkmn/smogon` set assumptions for unrevealed abilities, items, moves, natures, and EV spreads.
 - Display whether team data is revealed from the replay, guessed from usage stats, or manually edited.
 - Edit reconstructed information for both players before or during branching (edits rebuild the branch and replay its history).
-- Edit teams with legal dropdown pools: species-legal moves (learnset-based, prevo chain included), gen-legal items, the species' real abilities, tera types (gen 9), and natures — with validation against the pools.
+- Edit teams with legal dropdown pools: species-legal moves (learnset-based, prevo chain included), gen-legal items, the species' real abilities, tera types (gen 9), and natures. Moves and items use a filterable combobox — click an option to select it, arrow keys + Enter for keyboard use — validated against the pools.
 - Export both teams' current sets as text (Showdown format under `=== p1 ===` / `=== p2 ===` headers) and import corrected sets back — imported values apply as green manual knowledge, rebuild a live branch in place, and persist per replay for repeated perfect-information "what if I did a, b, or c" analysis. Natures, IVs, and levels round-trip.
 - Try hypothetical moves while branching ("What if it had Flamethrower?") — picked from the legal move pool, loaded into the set (adding or replacing a move), and pre-selected as that slot's pending choice with damage previews included.
 - Select a turn and branch from that point into a controllable simulator — including Random Battle replays and older generations.

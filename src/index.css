@@ -990,6 +990,56 @@ body {
   outline: none;
   transition: border-color 0.2s;
 }
+
+/* Filterable dropdown with real commit-on-click (replaces <datalist>) */
+.ps-combobox {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+}
+.ps-combobox > .ps-input {
+  width: 100%;
+}
+.ps-combobox-pop {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  z-index: 40;
+  margin: 2px 0 0;
+  padding: 3px;
+  list-style: none;
+  max-height: 190px;
+  overflow-y: auto;
+  background: #1e2738;
+  border: 1px solid #56789a;
+  border-radius: 5px;
+  box-shadow: 0 6px 16px rgba(0,0,0,0.5);
+}
+.ps-combobox-option {
+  padding: 4px 8px;
+  font-size: 11px;
+  color: #cde;
+  border-radius: 3px;
+  cursor: pointer;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.ps-combobox-option-active {
+  background: #3a5a8c;
+  color: #fff;
+}
+.ps-combobox-more {
+  color: #8899aa;
+  font-size: 10px;
+  cursor: default;
+}
+.ps-combobox-empty {
+  padding: 5px 8px;
+  font-size: 11px;
+  color: #8899aa;
+}
 .ps-input:focus { border-color: var(--ps-accent); box-shadow: 0 0 0 2px rgba(124,183,232,0.14); }
 
 .ps-btn {

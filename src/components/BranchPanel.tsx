@@ -14,6 +14,7 @@ import {
 } from '../lib/branch-choices';
 import { pickRecommendedMove } from '../lib/recommendation';
 import { spriteUrl } from '../lib/sprite-url';
+import { ComboBox } from './ComboBox';
 
 interface Props {
   simState: BranchSimState | null;
@@ -383,19 +384,14 @@ function SideControls({ side, label, activeName, activeSpecies, activeFainted, m
             {/* Shares the picker's row — a second row pushed Execute Turn below the fold. */}
             {movePool.length > 0 && (
               <>
-                <input
-                  className="ps-input"
-                  list={`ps-whatif-${label}`}
-                  placeholder="What if it had…"
-                  aria-label={`Hypothetical move for ${label}`}
+                <ComboBox
+                  options={movePool.filter(name => !moves.some(known => choiceId(known.name) === choiceId(name)))}
                   value={whatIfMove}
-                  onChange={event => setWhatIfMove(event.target.value)}
+                  onChange={setWhatIfMove}
+                  onSelect={setWhatIfMove}
+                  placeholder="What if it had…"
+                  ariaLabel={`Hypothetical move for ${label}`}
                 />
-                <datalist id={`ps-whatif-${label}`}>
-                  {movePool
-                    .filter(name => !moves.some(known => choiceId(known.name) === choiceId(name)))
-                    .map(name => <option key={name} value={name} />)}
-                </datalist>
                 {moves.length >= 4 && (
                   <select
                     className="ps-input"

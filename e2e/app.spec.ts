@@ -240,14 +240,16 @@ test.describe('PS Dashboard', () => {
     // Nature select carries the 25 natures.
     await garchompCard.getByLabel('Garchomp nature').selectOption('Adamant');
 
-    // Illegal move is rejected; a legal one is accepted.
+    // Illegal move is rejected; a legal one is picked by CLICKING the
+    // combobox option — no Enter required.
     const moveInput = garchompCard.getByPlaceholder('Add move...');
     await garchompCard.getByLabel(/Remove .* from Garchomp/).first().click();
     await moveInput.fill('Spore');
+    await expect(garchompCard.getByText('No matching option')).toBeVisible();
     await moveInput.press('Enter');
     await expect(garchompCard.getByRole('alert')).toContainText('not in Garchomp');
-    await moveInput.fill('Flamethrower');
-    await moveInput.press('Enter');
+    await moveInput.fill('Flame');
+    await garchompCard.getByRole('option', { name: 'Flamethrower' }).click();
     await expect(garchompCard).toContainText('Flamethrower');
 
     await editor.locator('button', { hasText: /^Save$/ }).click();
@@ -272,9 +274,12 @@ test.describe('PS Dashboard', () => {
     const whatIf = p1Controls.getByLabel('Hypothetical move for P1');
 
     // Garchomp knows 3 moves — the hypothetical simply becomes the 4th.
+    // Picking from the combobox popup fills the field without pressing Enter.
     await expect(whatIf).toBeVisible({ timeout: 15000 });
     await expect(p1Controls.getByLabel('Replaced move for P1')).toHaveCount(0);
-    await whatIf.fill('Flamethrower');
+    await whatIf.fill('Flamethr');
+    await p1Controls.getByRole('option', { name: 'Flamethrower' }).click();
+    await expect(whatIf).toHaveValue('Flamethrower');
     await p1Controls.locator('button', { hasText: 'Load move' }).click();
 
     // The branch rebuilds with the move in the set and pre-selected as pending.

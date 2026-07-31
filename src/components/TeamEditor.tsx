@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import type { OpponentTeamInfo, PokemonEvs, StatId, RevealedPokemonInfo } from '../types';
 import { EMPTY_EVS, itemSetValue, manualEvs, manualField, manualMove } from '../lib/team-info';
+import { ComboBox } from './ComboBox';
 
 interface Props {
   title: string;
@@ -48,6 +49,7 @@ export function TeamEditor({ title, teamInfo, gen, onSave, onClose }: Props) {
   const [pools, setPools] = useState<EditorPools | null>(null);
   const [moveError, setMoveError] = useState<Record<number, string | null>>({});
   const [itemWarning, setItemWarning] = useState<Record<number, string | null>>({});
+  const [moveDraft, setMoveDraft] = useState<Record<number, string>>({});
   const dialogRef = useRef<HTMLDivElement>(null);
 
   // Legal pools load lazily — the editor stays usable as free text until then.
@@ -250,21 +252,23 @@ export function TeamEditor({ title, teamInfo, gen, onSave, onClose }: Props) {
                   <div style={{ fontSize: 9, color: '#8899aa', marginBottom: 2 }}>
                     Item ({sourceLabel(entry.item.source, entry.item.probability)})
                   </div>
-                  <input
+                  <ComboBox
+                    options={pools?.items ?? []}
                     // Annotations like "(consumed)" are battle knowledge, not
                     // part of the set — the editor works on the plain item.
                     value={entry.item.source === 'manual' ? entry.item.value : itemSetValue(entry.item.value)}
-                    onChange={e => updateField(i, 'item', e.target.value)}
-                    onBlur={e => {
-                      const value = e.target.value.trim();
+                    onChange={value => updateField(i, 'item', value)}
+                    onSelect={value => {
+                      updateField(i, 'item', value);
+                      setItemWarning(prev => ({ ...prev, [i]: null }));
+                    }}
+                    onBlur={() => {
+                      const value = (entry.item.source === 'manual' ? entry.item.value : itemSetValue(entry.item.value)).trim();
                       const known = !value || !pools || pools.items.length === 0 ||
                         pools.items.some(name => toId(name) === toId(value));
                       setItemWarning(prev => ({ ...prev, [i]: known ? null : `"${value}" is not a known item.` }));
                     }}
-                    list="ps-item-pool"
-                    aria-label={`${entry.species} item`}
-                    className="ps-input"
-                    style={{ width: '100%' }}
+                    ariaLabel={`${entry.species} item`}
                   />
                 </div>
                 {gen >= 9 && (
@@ -388,26 +392,20 @@ export function TeamEditor({ title, teamInfo, gen, onSave, onClose }: Props) {
                   ))}
                 </div>
                 {entry.moves.length < 4 && (
-                  <>
-                    <input
-                      placeholder="Add move..."
-                      list={`ps-move-pool-${i}`}
-                      onKeyDown={e => {
-                        if (e.key === 'Enter') {
-                          if (addMove(i, (e.target as HTMLInputElement).value)) {
-                            (e.target as HTMLInputElement).value = '';
-                          }
-                        }
-                      }}
-                      className="ps-input"
-                      style={{ width: '100%', fontSize: 10 }}
-                    />
-                    <datalist id={`ps-move-pool-${i}`}>
-                      {(pools?.movesBySpecies[entry.species] ?? [])
-                        .filter(name => !entry.moves.some(known => toId(known.name) === toId(name)))
-                        .map(name => <option key={name} value={name} />)}
-                    </datalist>
-                  </>
+                  <ComboBox
+                    options={(pools?.movesBySpecies[entry.species] ?? [])
+                      .filter(name => !entry.moves.some(known => toId(known.name) === toId(name)))}
+                    value={moveDraft[i] ?? ''}
+                    onChange={value => setMoveDraft(prev => ({ ...prev, [i]: value }))}
+                    onSelect={option => {
+                      if (addMove(i, option)) setMoveDraft(prev => ({ ...prev, [i]: '' }));
+                    }}
+                    onEnterFreeText={text => {
+                      if (addMove(i, text)) setMoveDraft(prev => ({ ...prev, [i]: '' }));
+                    }}
+                    placeholder="Add move..."
+                    inputStyle={{ fontSize: 10 }}
+                  />
                 )}
                 {moveError[i] && (
                   <div role="alert" style={{ fontSize: 10, color: '#f3a6a6', marginTop: 4 }}>
@@ -418,10 +416,6 @@ export function TeamEditor({ title, teamInfo, gen, onSave, onClose }: Props) {
             </div>
           ))}
         </div>
-
-        <datalist id="ps-item-pool">
-          {(pools?.items ?? []).map(name => <option key={name} value={name} />)}
-        </datalist>
 
         <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
           <button type="button" className="ps-btn ps-btn-red" style={{ flex: 1 }} onClick={() => onSave({ pokemon })}>
