@@ -2,7 +2,7 @@ import { test, expect } from '@playwright/test';
 import { Battle, State, Teams, toID } from '@pkmn/sim';
 type DeserializeFn = typeof State.deserializeBattle;
 import type { PokemonSet } from '@pkmn/sim';
-import { searchPosition } from '../src/lib/eval/search';
+import { searchPosition, subSearchDepth1 } from '../src/lib/eval/search';
 import type { EvalResult, SearchProgress } from '../src/lib/eval/types';
 
 function makeSet(name: string, species: string, moves: string[], level = 50): PokemonSet {
@@ -115,6 +115,53 @@ test.describe('depth-1 search', () => {
       const cells = 2 * 3; // 2 p1 options x 3 p2 options
       expect(forks).toBeGreaterThan(1 + cells);       // some cells multi-sampled
       expect(forks).toBeLessThan(1 + cells * 3);      // but not all of them
+    } finally {
+      State.deserializeBattle = original;
+    }
+  });
+
+  test('the score-focused depth-1 sub-search matches the full search exactly', () => {
+    const fixtures = [
+      serialize(makeBattle(
+        [makeSet('Machamp', 'Machamp', ['Seismic Toss', 'Protect', 'Growl'], 100)],
+        [makeSet('Chansey', 'Chansey', ['Seismic Toss', 'Protect'], 100), makeSet('Eevee', 'Eevee', ['Protect'], 100)],
+      )),
+      serialize(makeBattle(
+        [makeSet('Pikachu', 'Pikachu', ['Tackle', 'Growl'], 30), makeSet('Blissey', 'Blissey', ['Protect'], 100)],
+        [makeSet('Machamp', 'Machamp', ['Seismic Toss'], 100)],
+      )),
+    ];
+    for (const root of fixtures) {
+      const full = searchPosition(root, { depth: 1, samples: 1, tera: false });
+      const focused = subSearchDepth1(root, { depth: 1, samples: 1, tera: false });
+      expect(focused.score).toBe(full.score);
+      expect(focused.interval).toBe(full.interval);
+      expect(focused.perSide.p1[0].choice).toBe(full.perSide.p1[0].choice);
+      expect(focused.perSide.p1[0].worstCase).toBe(full.perSide.p1[0].worstCase);
+      expect(focused.perSide.p1[0].punishedBy).toBe(full.perSide.p1[0].punishedBy);
+      expect(focused.perSide.p2[0].choice).toBe(full.perSide.p2[0].choice);
+      expect(focused.perSide.p2[0].worstCase).toBe(full.perSide.p2[0].worstCase);
+    }
+  });
+
+  test('the score-focused sub-search prunes dominated rows', () => {
+    const original = State.deserializeBattle;
+    let forks = 0;
+    State.deserializeBattle = ((serialized: Parameters<DeserializeFn>[0]) => {
+      forks += 1;
+      return original.call(State, serialized);
+    }) as DeserializeFn;
+    try {
+      const root = serialize(makeBattle(
+        [makeSet('Machamp', 'Machamp', ['Seismic Toss', 'Protect', 'Growl'], 100)],
+        [makeSet('Chansey', 'Chansey', ['Seismic Toss', 'Protect'], 100), makeSet('Eevee', 'Eevee', ['Protect'], 100)],
+      ));
+      forks = 0;
+      searchPosition(root, { depth: 1, samples: 1, tera: false });
+      const fullForks = forks;
+      forks = 0;
+      subSearchDepth1(root, { depth: 1, samples: 1, tera: false });
+      expect(forks).toBeLessThan(fullForks);
     } finally {
       State.deserializeBattle = original;
     }

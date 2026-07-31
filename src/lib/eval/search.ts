@@ -9,7 +9,7 @@ import {
   type PvStep, type Ranked, type ValueMatrix,
 } from './rank';
 import type { CellValue, SearchExecutor } from './orchestrator';
-import type { EvalResult, EvalSettings, SearchProgress } from './types';
+import type { EvalResult, EvalSettings, RankedChoice, SearchProgress } from './types';
 
 export interface SearchCallbacks {
   onProgress?(progress: SearchProgress): void;
@@ -92,6 +92,119 @@ function buildMatrix(
   return { p1Options, p2Options, values, ended, children };
 }
 
+/**
+ * Score-focused depth-1 search: deepening sub-searches only consume the
+ * score, the interval, and each side's top choice — so maximin permits
+ * exact alpha/beta row and column cutoffs over an on-demand cell memo.
+ * Results match `searchPosition` for those fields (ties resolve identically:
+ * first encounter wins, matching the stable sort). The `expected` of the
+ * returned tops approximates as the guarantee value; rankings beyond [0]
+ * are not produced.
+ */
+export function subSearchDepth1(
+  serializedBattle: string,
+  settings: EvalSettings,
+  matchupCache: MatchupCache = createMatchupCache(),
+): EvalResult {
+  const root = createRootPosition(serializedBattle);
+  const battle = positionBattle(root);
+  if (battle.ended) {
+    return { score: evaluatePosition(battle, matchupCache), interval: 0, depthCompleted: settings.depth, perSide: { p1: [], p2: [] } };
+  }
+  const tera = settings.tera ?? true;
+  const p1Options = legalChoices(root, 'p1', { tera });
+  const p2Options = legalChoices(root, 'p2', { tera });
+  if (p1Options.length === 0 || p2Options.length === 0) {
+    return searchPosition(serializedBattle, settings, undefined, matchupCache);
+  }
+
+  const rootFainted = countFainted(battle);
+  const cellMemo = new Map<number, number>();
+  const cellValue = (i: number, j: number): number => {
+    const key = cellKey(i, j);
+    let value = cellMemo.get(key);
+    if (value === undefined) {
+      value = sampleCell(root, rootFainted, p1Options[i].choice, p2Options[j].choice, settings.samples, matchupCache).value;
+      cellMemo.set(key, value);
+    }
+    return value;
+  };
+
+  // Pass A: v1 = max_i min_j with alpha cutoffs.
+  let v1 = -Infinity;
+  let bestI = 0;
+  let bestIPunish = 0;
+  for (let i = 0; i < p1Options.length; i++) {
+    let rowMin = Infinity;
+    let punish = 0;
+    let cut = false;
+    for (let j = 0; j < p2Options.length; j++) {
+      const value = cellValue(i, j);
+      if (value < rowMin) {
+        rowMin = value;
+        punish = j;
+      }
+      if (rowMin < v1) {
+        cut = true;
+        break;
+      }
+    }
+    if (!cut && rowMin > v1) {
+      v1 = rowMin;
+      bestI = i;
+      bestIPunish = punish;
+    }
+  }
+
+  // Pass B: v2 = min_j max_i with beta cutoffs, reusing the memo.
+  let v2 = Infinity;
+  let bestJ = 0;
+  let bestJPunish = 0;
+  for (let j = 0; j < p2Options.length; j++) {
+    let colMax = -Infinity;
+    let punish = 0;
+    let cut = false;
+    for (let i = 0; i < p1Options.length; i++) {
+      const value = cellValue(i, j);
+      if (value > colMax) {
+        colMax = value;
+        punish = i;
+      }
+      if (colMax > v2) {
+        cut = true;
+        break;
+      }
+    }
+    if (!cut && colMax < v2) {
+      v2 = colMax;
+      bestJ = j;
+      bestJPunish = punish;
+    }
+  }
+
+  const p1Top: RankedChoice = {
+    choice: p1Options[bestI].choice, label: p1Options[bestI].label,
+    worstCase: v1, expected: v1, punishedBy: p2Options[bestIPunish].label,
+  };
+  const p2Top: RankedChoice = {
+    choice: p2Options[bestJ].choice, label: p2Options[bestJ].label,
+    worstCase: -v2, expected: -v2, punishedBy: p1Options[bestJPunish].label,
+  };
+  return {
+    score: (v1 + v2) / 2,
+    interval: Math.max(0, v2 - v1),
+    depthCompleted: 1,
+    perSide: { p1: [p1Top], p2: [p2Top] },
+  };
+}
+
+/** Dispatches deepening sub-searches: depth-1 leaves take the pruned path. */
+function subSearch(serializedBattle: string, settings: EvalSettings, matchupCache: MatchupCache): EvalResult {
+  return settings.depth === 1
+    ? subSearchDepth1(serializedBattle, settings, matchupCache)
+    : searchPosition(serializedBattle, settings, undefined, matchupCache);
+}
+
 export function searchPosition(
   serializedBattle: string,
   settings: EvalSettings,
@@ -142,7 +255,7 @@ export function searchPosition(
         // sample (the child is seed-specific); its midpoint score replaces
         // the cell's static value.
         const child = matrix.children[i][j];
-        const sub = searchPosition(child.serialized, { ...settings, depth: (depth - 1) as 1 | 2, samples: 1 }, undefined, matchupCache);
+        const sub = subSearch(child.serialized, { ...settings, depth: (depth - 1) as 1 | 2, samples: 1 }, matchupCache);
         matrix.values[i][j] = sub.score;
         expandedThisLevel.add(cellKey(i, j));
         const subTopP1 = sub.perSide.p1[0];
@@ -201,7 +314,7 @@ export function createLocalExecutor(serializedBattle: string): SearchExecutor {
     },
     async subSearch(job) {
       const child = advancePosition(root, job.p1Choice, job.p2Choice, SEARCH_SEEDS[0]);
-      return searchPosition(child.serialized, job.settings, undefined, matchupCache);
+      return subSearch(child.serialized, job.settings, matchupCache);
     },
   };
 }
