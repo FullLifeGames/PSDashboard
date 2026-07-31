@@ -380,55 +380,54 @@ function SideControls({ side, label, activeName, activeSpecies, activeFainted, m
                 </optgroup>
               )}
             </select>
-          </div>
-          {movePool.length > 0 && (
-            <div className="ps-custom-choice" style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
-              <input
-                className="ps-input"
-                list={`ps-whatif-${label}`}
-                placeholder="What if it had…"
-                aria-label={`Hypothetical move for ${label}`}
-                value={whatIfMove}
-                onChange={event => setWhatIfMove(event.target.value)}
-                style={{ flex: 1, fontSize: 10 }}
-              />
-              <datalist id={`ps-whatif-${label}`}>
-                {movePool
-                  .filter(name => !moves.some(known => choiceId(known.name) === choiceId(name)))
-                  .map(name => <option key={name} value={name} />)}
-              </datalist>
-              {moves.length >= 4 && (
-                <select
+            {/* Shares the picker's row — a second row pushed Execute Turn below the fold. */}
+            {movePool.length > 0 && (
+              <>
+                <input
                   className="ps-input"
-                  aria-label={`Replaced move for ${label}`}
-                  value={whatIfReplace ?? moves[moves.length - 1].name}
-                  onChange={event => setWhatIfReplace(event.target.value)}
-                  style={{ fontSize: 10 }}
+                  list={`ps-whatif-${label}`}
+                  placeholder="What if it had…"
+                  aria-label={`Hypothetical move for ${label}`}
+                  value={whatIfMove}
+                  onChange={event => setWhatIfMove(event.target.value)}
+                />
+                <datalist id={`ps-whatif-${label}`}>
+                  {movePool
+                    .filter(name => !moves.some(known => choiceId(known.name) === choiceId(name)))
+                    .map(name => <option key={name} value={name} />)}
+                </datalist>
+                {moves.length >= 4 && (
+                  <select
+                    className="ps-input"
+                    aria-label={`Replaced move for ${label}`}
+                    value={whatIfReplace ?? moves[moves.length - 1].name}
+                    onChange={event => setWhatIfReplace(event.target.value)}
+                    style={{ flex: '0 1 110px' }}
+                  >
+                    {moves.map(known => <option key={known.slot} value={known.name}>{known.name}</option>)}
+                  </select>
+                )}
+                <button
+                  type="button"
+                  className="ps-btn"
+                  disabled={
+                    !whatIfMove.trim() ||
+                    !movePool.some(name => choiceId(name) === choiceId(whatIfMove))
+                  }
+                  onClick={() => {
+                    onHypotheticalMove({
+                      species: activeSpecies,
+                      move: movePool.find(name => choiceId(name) === choiceId(whatIfMove)) ?? whatIfMove.trim(),
+                      replace: moves.length >= 4 ? (whatIfReplace ?? moves[moves.length - 1].name) : null,
+                    });
+                    setWhatIfMove('');
+                  }}
                 >
-                  {moves.map(known => <option key={known.slot} value={known.name}>{known.name}</option>)}
-                </select>
-              )}
-              <button
-                type="button"
-                className="ps-btn"
-                style={{ fontSize: 10, padding: '2px 8px' }}
-                disabled={
-                  !whatIfMove.trim() ||
-                  !movePool.some(name => choiceId(name) === choiceId(whatIfMove))
-                }
-                onClick={() => {
-                  onHypotheticalMove({
-                    species: activeSpecies,
-                    move: movePool.find(name => choiceId(name) === choiceId(whatIfMove)) ?? whatIfMove.trim(),
-                    replace: moves.length >= 4 ? (whatIfReplace ?? moves[moves.length - 1].name) : null,
-                  });
-                  setWhatIfMove('');
-                }}
-              >
-                Load move
-              </button>
-            </div>
-          )}
+                  Load move
+                </button>
+              </>
+            )}
+          </div>
         </>
       )}
 

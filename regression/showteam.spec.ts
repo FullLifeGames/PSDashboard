@@ -67,6 +67,26 @@ test.describe('open team sheets (|showteam|) parsing (B3)', () => {
     expect(froslass?.item).toBe('Focus Sash');
   });
 
+  test('manual move edits beat a full team sheet set (Kyurem/Draco Meteor report)', () => {
+    const p1Info = inferOpponentTeam(showteamLog, 'p1');
+    const edited = {
+      pokemon: p1Info.pokemon.map(pokemon => pokemon.species !== 'Swampert' ? pokemon : {
+        ...pokemon,
+        moves: [
+          ...pokemon.moves.filter(move => move.name !== 'Ice Punch'),
+          { name: 'Earthquake', source: 'manual' as const },
+        ],
+      }),
+    };
+
+    const { p1Team } = buildTeamsFromReplay(showteamLog, { p1Info: edited });
+    const swampert = p1Team.find(set => set.species === 'Swampert');
+
+    expect(swampert?.moves).toContain('Earthquake');
+    expect(swampert?.moves).not.toContain('Ice Punch');
+    expect(swampert?.moves).toHaveLength(4);
+  });
+
   test('team sheet EVs fall back to usage spreads instead of all-zero spreads', () => {
     const usageStats: SmogonUsageStats = {
       format: 'gen9vgc2026',

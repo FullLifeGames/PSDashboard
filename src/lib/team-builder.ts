@@ -3,6 +3,7 @@ import { Teams } from '@pkmn/sim';
 import { inferOpponentTeam } from './opponent-inferrer';
 import { getSpeciesUsageSet, type SmogonUsageStats, type UsageProbability } from './smogon-stats';
 import { getSpeciesSetAssumption, type SetAssumption, type SmogonSetAssumptions } from './smogon-sets';
+import { itemSetValue } from './team-info';
 import type { OpponentTeamInfo, PokemonEvs, RevealedPokemonInfo } from '../types';
 
 function toId(name: string): string {
@@ -70,7 +71,14 @@ function buildSet(
   const smogonSet = getSpeciesSetAssumption(setAssumptions, info.species);
 
   if (userMatch) {
-    const moves = mergeMoveLists(info.moves.map(move => move.name), userMatch.moves);
+    // A full team sheet normally defines the moveset — but a manual edit
+    // (team editor, sets import, hypothetical move) must beat the sheet, or
+    // "load Draco Meteor on Kyurem" silently vanishes on sheet replays.
+    const hasManualMoves = info.moves.some(move => move.source === 'manual');
+    const infoMoveNames = info.moves.map(move => move.name);
+    const moves = hasManualMoves
+      ? mergeMoveLists(userMatch.moves, infoMoveNames)
+      : mergeMoveLists(infoMoveNames, userMatch.moves);
     // Open Team Sheets omit EVs/nature — fall back to usage spreads instead of
     // simulating an all-zero spread (B3/B6).
     const fallbackSpread = usageSet?.spread || smogonSet?.spread || null;
@@ -129,15 +137,13 @@ function sanitizeEvs(evs: PokemonEvs): PokemonEvs {
 }
 
 function cleanItem(replayItem: string, fallback: string): string {
-  if (!replayItem) return fallback;
-  if (replayItem === '(has item)' || replayItem.startsWith('(')) return fallback;
-  if (replayItem.includes('(consumed)')) return replayItem.replace(/\s*\(consumed\)/, '').trim();
-  return replayItem;
+  return itemSetValue(replayItem) || fallback;
 }
 
-function mergeMoveLists(observed: string[], full: string[]): string[] {
-  const result = [...full];
-  for (const move of observed) {
+/** `primary` defines the set; `fill` only tops it up to four moves. */
+function mergeMoveLists(fill: string[], primary: string[]): string[] {
+  const result = [...primary];
+  for (const move of fill) {
     if (!result.some(existing => toId(existing) === toId(move))) {
       if (result.length < 4) {
         result.push(move);
