@@ -92,13 +92,18 @@ export function EvalPanel({
         <label style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 10, color: '#aabbcc' }}>
           Depth
           <select
-            value={prefs.depth}
-            onChange={event => onPrefsChange({ ...prefs, depth: parseInt(event.target.value, 10) as EvalPreferences['depth'] })}
+            value={prefs.mode === 'mcts' ? 'mcts' : String(prefs.depth)}
+            onChange={event => {
+              const value = event.target.value;
+              if (value === 'mcts') onPrefsChange({ ...prefs, mode: 'mcts' });
+              else onPrefsChange({ ...prefs, mode: 'matrix', depth: parseInt(value, 10) as EvalPreferences['depth'] });
+            }}
             disabled={running}
           >
-            <option value={1}>1</option>
-            <option value={2}>2</option>
-            <option value={3}>3</option>
+            <option value="1">1</option>
+            <option value="2">2</option>
+            <option value="3">3</option>
+            <option value="mcts">MCTS</option>
           </select>
         </label>
         <label style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 10, color: '#aabbcc' }}>
@@ -106,7 +111,7 @@ export function EvalPanel({
           <select
             value={prefs.samples}
             onChange={event => onPrefsChange({ ...prefs, samples: parseInt(event.target.value, 10) as EvalPreferences['samples'] })}
-            disabled={running}
+            disabled={running || prefs.mode === 'mcts'}
           >
             <option value={1}>1</option>
             <option value={3}>3</option>

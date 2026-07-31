@@ -18,7 +18,7 @@ export interface EvaluateParams {
 }
 
 const PREFS_KEY = 'ps-replay-interceptor:eval-prefs';
-const DEFAULT_PREFS: EvalPreferences = { depth: 2, samples: 3, auto: false, tera: 'auto' };
+const DEFAULT_PREFS: EvalPreferences = { depth: 2, samples: 3, mode: 'matrix', auto: false, tera: 'auto' };
 
 function loadPrefs(): EvalPreferences {
   try {
@@ -28,6 +28,7 @@ function loadPrefs(): EvalPreferences {
     return {
       depth: parsed.depth === 1 || parsed.depth === 3 ? parsed.depth : 2,
       samples: parsed.samples === 1 || parsed.samples === 5 ? parsed.samples : 3,
+      mode: parsed.mode === 'mcts' ? 'mcts' : 'matrix',
       auto: !!parsed.auto,
       tera: parsed.tera === 'on' || parsed.tera === 'off' ? parsed.tera : 'auto',
     };
@@ -40,6 +41,7 @@ interface CachedEval {
   result: EvalResult;
   depth: EvalPreferences['depth'];
   samples: EvalPreferences['samples'];
+  mode: EvalPreferences['mode'];
   tera: boolean;
 }
 
@@ -96,10 +98,10 @@ export function useEvaluation() {
   }, []);
 
   const evaluate = useCallback((params: EvaluateParams) => {
-    const { depth, samples } = prefsRef.current;
+    const { depth, samples, mode } = prefsRef.current;
     if (params.cacheKey) {
       const hit = cacheRef.current.get(params.cacheKey);
-      if (hit && hit.depth === depth && hit.samples === samples && hit.tera === params.tera) {
+      if (hit && hit.depth === depth && hit.samples === samples && hit.mode === mode && hit.tera === params.tera) {
         runRef.current += 1;
         setResult(hit.result);
         setStatus('done');
@@ -127,7 +129,7 @@ export function useEvaluation() {
         setReconstructProgress(null);
 
         clientRef.current ??= new EvalWorkerClient();
-        const final = await clientRef.current.evaluate(serialized, { depth, samples, tera: params.tera }, {
+        const final = await clientRef.current.evaluate(serialized, { depth, samples, mode, tera: params.tera }, {
           onProgress: update => {
             if (runRef.current === runId) setProgress(update);
           },
@@ -139,7 +141,7 @@ export function useEvaluation() {
         setResult(final);
         setStatus('done');
         setProgress(null);
-        if (params.cacheKey) cacheRef.current.set(params.cacheKey, { result: final, depth, samples, tera: params.tera });
+        if (params.cacheKey) cacheRef.current.set(params.cacheKey, { result: final, depth, samples, mode, tera: params.tera });
       } catch (err) {
         if (runRef.current !== runId) return;
         if (err instanceof Error && err.message === 'cancelled') return;
@@ -154,6 +156,7 @@ export function useEvaluation() {
   const setPrefs = useCallback((next: EvalPreferences) => {
     const changed = next.depth !== prefsRef.current.depth ||
       next.samples !== prefsRef.current.samples ||
+      next.mode !== prefsRef.current.mode ||
       next.tera !== prefsRef.current.tera;
     setPrefsState(next);
     try {
@@ -179,7 +182,7 @@ export function useEvaluation() {
   const runGraphSweep = useCallback((params: GraphSweepParams) => {
     cancel();
     const runId = ++runRef.current;
-    const { depth, samples } = prefsRef.current;
+    const { depth, samples, mode } = prefsRef.current;
     const scores: (number | null)[] = new Array(params.turns).fill(null);
     setGraph({ scores: [...scores], running: true, progress: { done: 0, total: params.turns } });
 
@@ -188,16 +191,16 @@ export function useEvaluation() {
         if (runRef.current !== runId) return;
         const key = params.cacheKeyFor(turn);
         const hit = cacheRef.current.get(key);
-        if (hit && hit.depth === depth && hit.samples === samples && hit.tera === params.tera) {
+        if (hit && hit.depth === depth && hit.samples === samples && hit.mode === mode && hit.tera === params.tera) {
           scores[turn - 1] = hit.result.score;
         } else {
           try {
             const serialized = await params.acquireFor(turn)(() => {});
             if (runRef.current !== runId) return;
             clientRef.current ??= new EvalWorkerClient();
-            const result = await clientRef.current.evaluate(serialized, { depth, samples, tera: params.tera });
+            const result = await clientRef.current.evaluate(serialized, { depth, samples, mode, tera: params.tera });
             if (runRef.current !== runId) return;
-            cacheRef.current.set(key, { result, depth, samples, tera: params.tera });
+            cacheRef.current.set(key, { result, depth, samples, mode, tera: params.tera });
             scores[turn - 1] = result.score;
           } catch (err) {
             if (runRef.current !== runId) return;

@@ -8,9 +8,16 @@ export interface EvalRunHandlers {
   onPartial?(result: EvalResult): void;
 }
 
+interface PendingEntry {
+  resolve(response: EvalWorkerResponse): void;
+  reject(error: Error): void;
+  /** Streaming responses (progress/partial) that must not settle the RPC. */
+  onStream?(response: EvalWorkerResponse): void;
+}
+
 interface WorkerHandle {
   worker: Worker;
-  pending: Map<number, { resolve(response: EvalWorkerResponse): void; reject(error: Error): void }>;
+  pending: Map<number, PendingEntry>;
 }
 
 /** Omit that distributes over a discriminated union (plain Omit collapses it). */
@@ -48,10 +55,12 @@ export class EvalWorkerClient {
       const handle: WorkerHandle = { worker, pending: new Map() };
       worker.onmessage = (event: MessageEvent<EvalWorkerResponse>) => {
         const response = event.data;
-        // progress/partial interleave only on the legacy 'search' path, which
-        // the pooled client does not use — every RPC has one final response.
         const entry = handle.pending.get(response.id);
         if (!entry) return;
+        if ((response.type === 'progress' || response.type === 'partial') && entry.onStream) {
+          entry.onStream(response);
+          return;
+        }
         handle.pending.delete(response.id);
         if (response.type === 'error') entry.reject(new Error(response.message));
         else entry.resolve(response);
@@ -118,6 +127,28 @@ export class EvalWorkerClient {
     this.cancel();
     const generation = ++this.generation;
     const live = () => generation === this.generation;
+
+    if (settings.mode === 'mcts') {
+      // The tree search is inherently sequential — one worker, streaming.
+      const handle = this.ensureWorkers()[0];
+      const id = this.nextId++;
+      return new Promise<EvalResult>((resolve, reject) => {
+        handle.pending.set(id, {
+          resolve: response => {
+            if (response.type === 'result') resolve(response.result);
+            else reject(new Error('unexpected worker response'));
+          },
+          reject,
+          onStream: response => {
+            if (!live()) return;
+            if (response.type === 'progress') handlers?.onProgress?.(response.progress);
+            else if (response.type === 'partial') handlers?.onPartial?.(response.result);
+          },
+        });
+        handle.worker.postMessage({ type: 'search', id, serializedBattle, settings });
+      });
+    }
+
     const executor = this.createPooledExecutor(serializedBattle);
     return searchOrchestrated(executor, settings, {
       onProgress: progress => {

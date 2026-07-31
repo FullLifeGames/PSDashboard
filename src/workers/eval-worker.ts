@@ -1,4 +1,5 @@
 /// <reference lib="webworker" />
+import { mctsSearch } from '../lib/eval/mcts';
 import type { SearchExecutor } from '../lib/eval/orchestrator';
 import { createLocalExecutor, searchPosition } from '../lib/eval/search';
 import type { EvalWorkerRequest, EvalWorkerResponse } from '../lib/eval/types';
@@ -24,7 +25,8 @@ scope.onmessage = async (event: MessageEvent<EvalWorkerRequest>) => {
   const message = event.data;
   try {
     if (message.type === 'search') {
-      const result = searchPosition(message.serializedBattle, message.settings, {
+      const run = message.settings.mode === 'mcts' ? mctsSearch : searchPosition;
+      const result = run(message.serializedBattle, message.settings, {
         onProgress: progress => post({ type: 'progress', id: message.id, progress }),
         onPartial: partial => post({ type: 'partial', id: message.id, result: partial }),
       });

@@ -216,6 +216,25 @@ test.describe('PS Dashboard', () => {
     await expect(panel.getByText(/worst vs/).first()).toBeVisible();
   });
 
+  test('evaluates a position with the MCTS mode', async ({ page }) => {
+    test.setTimeout(180_000);
+    await page.evaluate(() => {
+      localStorage.setItem('ps-replay-interceptor:eval-pool', '2');
+      localStorage.setItem('ps-replay-interceptor:eval-prefs',
+        JSON.stringify({ depth: 1, samples: 1, mode: 'mcts', auto: false, tera: 'auto' }));
+    });
+    await page.reload();
+    await page.locator('button', { hasText: 'Load' }).click();
+    await expect(page.getByText('TestPlayer1', { exact: true }).first()).toBeVisible({ timeout: 10000 });
+
+    await page.locator('button', { hasText: 'Eval' }).click();
+    const panel = page.locator('.ps-main-right .ps-eval-panel');
+    await expect(panel.locator('select').first()).toHaveValue('mcts');
+    await panel.locator('button', { hasText: 'Evaluate' }).click();
+    await expect(panel.locator('.ps-eval-bar')).toBeVisible({ timeout: 120_000 });
+    await expect(panel.locator('.ps-eval-bar-p1')).toContainText('%');
+  });
+
   test('analyzes the whole game into an eval graph', async ({ page }) => {
     test.setTimeout(240_000);
     await page.evaluate(() => {

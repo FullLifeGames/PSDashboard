@@ -2,6 +2,7 @@ import { test } from '@playwright/test';
 import { Battle, State, Teams, toID } from '@pkmn/sim';
 import type { PokemonSet } from '@pkmn/sim';
 import { advancePosition, createRootPosition } from '../src/lib/eval/forward-model';
+import { mctsSearch } from '../src/lib/eval/mcts';
 import { searchPosition } from '../src/lib/eval/search';
 
 function makeSet(name: string, species: string, moves: string[], level = 50): PokemonSet {
@@ -79,10 +80,14 @@ test.describe('eval engine benchmark', () => {
     const forkMs = performance.now() - forkStart;
     console.log(`advancePosition: ${(forks / (forkMs / 1000)).toFixed(1)} forks/sec (${(forkMs / forks).toFixed(1)} ms each)`);
 
-    for (const settings of [{ depth: 1, samples: 1 }, { depth: 1, samples: 3 }, { depth: 2, samples: 1 }] as const) {
+    for (const settings of [{ depth: 1, samples: 1 }, { depth: 1, samples: 3 }, { depth: 2, samples: 1 }, { depth: 2, samples: 3 }] as const) {
       const start = performance.now();
       searchPosition(root.serialized, settings);
       console.log(`search depth=${settings.depth} samples=${settings.samples}: ${((performance.now() - start) / 1000).toFixed(1)}s`);
     }
+
+    const mctsStart = performance.now();
+    mctsSearch(root.serialized, { depth: 1, samples: 1, mode: 'mcts' });
+    console.log(`mcts (600 iterations): ${((performance.now() - mctsStart) / 1000).toFixed(1)}s`);
   });
 });

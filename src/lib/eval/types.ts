@@ -6,12 +6,16 @@ export interface EvalSettings {
   samples: 1 | 3 | 5;
   /** Enumerate Terastallize move variants (default true). */
   tera?: boolean;
+  /** 'mcts' runs the DUCT tree search instead of the fixed-depth matrix. */
+  mode?: 'matrix' | 'mcts';
 }
 
 /** Panel preferences persisted in localStorage (worker only sees EvalSettings). */
 export interface EvalPreferences {
   depth: 1 | 2 | 3;
   samples: 1 | 3 | 5;
+  /** 'mcts' runs the DUCT tree search; depth/samples then don't apply. */
+  mode: 'matrix' | 'mcts';
   /** Re-run automatically after each executed branch turn. */
   auto: boolean;
   /** Tera enumeration: 'auto' = on only when the replay actually terastallized. */
