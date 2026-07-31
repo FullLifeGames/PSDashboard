@@ -102,6 +102,41 @@ test.describe('evaluatePosition', () => {
     expect(evaluatePosition(battle)).toBe(evaluatePosition(battle));
   });
 
+  test('type dominance shows before any damage is dealt', () => {
+    // Flamethrower hits Venusaur for 2x with STAB; Vine Whip is resisted to
+    // 0.25x by Charizard — the fire side dominates every matchup at full HP.
+    const battle = makeBattle(
+      [makeSet('A', 'Charizard', ['Flamethrower']), makeSet('B', 'Charizard', ['Flamethrower'])],
+      [makeSet('C', 'Venusaur', ['Vine Whip']), makeSet('D', 'Venusaur', ['Vine Whip'])],
+    );
+    expect(evaluatePosition(battle)).toBeGreaterThan(0.1);
+  });
+
+  test('damage taken lowers a matchup advantage without flipping it', () => {
+    const full = makeBattle(
+      [makeSet('A', 'Charizard', ['Flamethrower']), makeSet('B', 'Charizard', ['Flamethrower'])],
+      [makeSet('C', 'Venusaur', ['Vine Whip']), makeSet('D', 'Venusaur', ['Vine Whip'])],
+    );
+    const fullScore = evaluatePosition(full);
+    const hurt = makeBattle(
+      [makeSet('A', 'Charizard', ['Flamethrower']), makeSet('B', 'Charizard', ['Flamethrower'])],
+      [makeSet('C', 'Venusaur', ['Vine Whip']), makeSet('D', 'Venusaur', ['Vine Whip'])],
+    );
+    const chip = hurt.sides[0].pokemon[1];
+    chip.hp = Math.floor(chip.maxhp / 2);
+    const hurtScore = evaluatePosition(hurt);
+    expect(hurtScore).toBeLessThan(fullScore);
+    expect(hurtScore).toBeGreaterThan(0);
+  });
+
+  test('a strictly better twin wins the matchup', () => {
+    const battle = makeBattle(
+      [makeSet('A', 'Pikachu', ['Tackle'], 100)],
+      [makeSet('B', 'Pikachu', ['Tackle'], 95)],
+    );
+    expect(evaluatePosition(battle)).toBeGreaterThan(0);
+  });
+
   test('a one-mon deficit reads clearly through the score scaling', () => {
     const five = ['A', 'B', 'C', 'D', 'E'].map(name => makeSet(name, 'Snorlax', VANILLA));
     const six = ['F', 'G', 'H', 'I', 'J', 'K'].map(name => makeSet(name, 'Snorlax', VANILLA));

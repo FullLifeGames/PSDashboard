@@ -23,6 +23,8 @@ export const EVAL_WEIGHTS = {
   trickRoom: 10,
   /** Steepness of the tanh score mapping (a one-mon lead in a 6v6 ≈ ±0.4). */
   scale: 2.5,
+  /** Weight of the aggregated 1v1 matchup term (full dominance ≈ 0.6 mons). */
+  matchup: 120,
 } as const;
 
 const SCREENS = ['reflect', 'lightscreen', 'auroraveil'];
@@ -58,6 +60,59 @@ function sideScore(side: Side): number {
   return score;
 }
 
+/**
+ * Best expected damage (as a fraction of the defender's max HP) among the
+ * attacker's actual moves — standard damage formula with STAB and the type
+ * chart, no rolls. Status and fixed-damage moves are invisible to this proxy.
+ */
+function bestMoveFraction(attacker: Pokemon, defender: Pokemon, battle: Battle): number {
+  let best = 0;
+  for (const slot of attacker.moveSlots) {
+    const move = battle.dex.moves.get(slot.id);
+    if (!move.exists || move.category === 'Status' || !move.basePower) continue;
+    if (!battle.dex.getImmunity(move.type, defender.types)) continue;
+    const typeMult = Math.pow(2, battle.dex.getEffectiveness(move.type, defender.types));
+    const stab = attacker.types.includes(move.type) ? 1.5 : 1;
+    const [atk, def] = move.category === 'Physical'
+      ? [attacker.storedStats.atk, defender.storedStats.def]
+      : [attacker.storedStats.spa, defender.storedStats.spd];
+    const damage = (((2 * attacker.level / 5 + 2) * move.basePower * atk / def) / 50 + 2) * stab * typeMult;
+    best = Math.max(best, damage / defender.maxhp);
+  }
+  return best;
+}
+
+/**
+ * Aggregated 1v1 threat estimate in [-1, +1] from p1's perspective: for every
+ * living pair, whoever KOs first (against current HP) wins the pair, speed
+ * breaking ties; pairs are weighted by both sides' HP fractions.
+ */
+function matchupScore(battle: Battle): number {
+  const living = (index: 0 | 1) =>
+    battle.sides[index].pokemon.filter(pokemon => !pokemon.fainted && pokemon.hp > 0);
+  const p1Living = living(0);
+  const p2Living = living(1);
+  if (p1Living.length === 0 || p2Living.length === 0) return 0;
+
+  let sum = 0;
+  for (const a of p1Living) {
+    for (const b of p2Living) {
+      const fracA = bestMoveFraction(a, b, battle);
+      const fracB = bestMoveFraction(b, a, battle);
+      const turnsA = fracA > 0 ? Math.ceil(b.hp / b.maxhp / fracA) : Infinity;
+      const turnsB = fracB > 0 ? Math.ceil(a.hp / a.maxhp / fracB) : Infinity;
+      let sign = 0;
+      if (turnsA < turnsB) sign = 1;
+      else if (turnsB < turnsA) sign = -1;
+      else if (turnsA !== Infinity) {
+        sign = Math.sign(a.storedStats.spe - b.storedStats.spe);
+      }
+      sum += sign * (a.hp / a.maxhp) * (b.hp / b.maxhp);
+    }
+  }
+  return sum / (p1Living.length * p2Living.length);
+}
+
 /** Static positional eval from p1's perspective in [-1, +1]; ±1 for ended battles. */
 export function evaluatePosition(battle: Battle): number {
   if (battle.ended) {
@@ -76,5 +131,6 @@ export function evaluatePosition(battle: Battle): number {
 
   const teamSize = Math.max(battle.sides[0].pokemon.length, battle.sides[1].pokemon.length, 1);
   const normalizer = teamSize * (EVAL_WEIGHTS.alive + EVAL_WEIGHTS.hp);
-  return Math.tanh(((p1 - p2) / normalizer) * EVAL_WEIGHTS.scale);
+  const diff = (p1 - p2) + matchupScore(battle) * EVAL_WEIGHTS.matchup;
+  return Math.tanh((diff / normalizer) * EVAL_WEIGHTS.scale);
 }
