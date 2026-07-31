@@ -896,23 +896,6 @@ function App() {
               </div>
             )}
 
-            {evaluation.panelOpen && evalAvailable && replayData && (
-              <EvalPanel
-                playerNames={[replayData.players[0], replayData.players[1]]}
-                status={evaluation.status}
-                result={evaluation.result}
-                progress={evaluation.progress}
-                reconstructProgress={evaluation.reconstructProgress}
-                error={evaluation.error}
-                prefs={evaluation.prefs}
-                onPrefsChange={evaluation.setPrefs}
-                onEvaluate={handleEvaluate}
-                onCancel={evaluation.cancel}
-                onPickChoice={branching ? handlePickEvalChoice : undefined}
-                showAuto={branching}
-              />
-            )}
-
             {branching ? (
               <>
                 <BranchPanel
@@ -951,8 +934,25 @@ function App() {
             ) : null}
           </div>
 
-          {/* Right column: controls + stats */}
+          {/* Right column: evaluation beside the battle (chess-style), then stats */}
           <div className="ps-main-right">
+            {evaluation.panelOpen && evalAvailable && (
+              <EvalPanel
+                playerNames={[replayData.players[0], replayData.players[1]]}
+                status={evaluation.status}
+                result={evaluation.result}
+                progress={evaluation.progress}
+                reconstructProgress={evaluation.reconstructProgress}
+                error={evaluation.error}
+                prefs={evaluation.prefs}
+                onPrefsChange={evaluation.setPrefs}
+                onEvaluate={handleEvaluate}
+                onCancel={evaluation.cancel}
+                onPickChoice={branching ? handlePickEvalChoice : undefined}
+                showAuto={branching}
+                showTera={replayGen === 9}
+              />
+            )}
             <BattleStatsPanel
               replayData={replayData}
               p1Info={effectiveP1Info}

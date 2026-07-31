@@ -16,6 +16,8 @@ interface EvalPanelProps {
   onPickChoice?: (side: 'p1' | 'p2', choice: RankedChoice) => void;
   /** Branch mode: hides the auto checkbox on the replay view. */
   showAuto: boolean;
+  /** Gen 9 only — other gens have no Tera to gate. */
+  showTera: boolean;
 }
 
 const signed = (value: number) => `${value >= 0 ? '+' : ''}${value.toFixed(2)}`;
@@ -32,11 +34,18 @@ function ChoiceList({
       {choices.slice(0, 3).map(choice => {
         const detail = (
           <>
-            <span style={{ color: '#cde' }}>{choice.label}</span>
-            <span style={{ color: '#aab', whiteSpace: 'nowrap' }}>
-              {signed(choice.worstCase)} / {signed(choice.expected)}
-              {choice.punishedBy ? <span style={{ color: '#778' }}> · worst vs {choice.punishedBy}</span> : null}
+            <span className="ps-eval-choice-main">
+              <span style={{ color: '#cde' }}>{choice.label}</span>
+              <span style={{ color: '#aab', whiteSpace: 'nowrap' }}>
+                {signed(choice.worstCase)} / {signed(choice.expected)}
+                {choice.punishedBy ? <span style={{ color: '#778' }}> · worst vs {choice.punishedBy}</span> : null}
+              </span>
             </span>
+            {choice.line && choice.line.length > 0 && (
+              <span className="ps-eval-line">
+                then {choice.line.map(step => `${step.p1} · ${step.p2}`).join(' → ')}
+              </span>
+            )}
           </>
         );
         return onPickChoice ? (
@@ -61,7 +70,7 @@ function ChoiceList({
 
 export function EvalPanel({
   playerNames, status, result, progress, reconstructProgress, error,
-  prefs, onPrefsChange, onEvaluate, onCancel, onPickChoice, showAuto,
+  prefs, onPrefsChange, onEvaluate, onCancel, onPickChoice, showAuto, showTera,
 }: EvalPanelProps) {
   const running = status === 'searching' || status === 'reconstructing';
   const p1Pct = result ? Math.round(50 + 50 * result.score) : 50;
@@ -96,6 +105,20 @@ export function EvalPanel({
             <option value={5}>5</option>
           </select>
         </label>
+        {showTera && (
+          <label style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 10, color: '#aabbcc' }}>
+            Tera
+            <select
+              value={prefs.tera}
+              onChange={event => onPrefsChange({ ...prefs, tera: event.target.value as EvalPreferences['tera'] })}
+              disabled={running}
+            >
+              <option value="auto">Auto</option>
+              <option value="on">On</option>
+              <option value="off">Off</option>
+            </select>
+          </label>
+        )}
         {showAuto && (
           <label style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 10, color: '#aabbcc' }}>
             <input
@@ -145,13 +168,13 @@ export function EvalPanel({
 
       {result && (
         <div className={status === 'stale' ? 'ps-eval-stale' : undefined}>
+          <div className="ps-eval-labels">
+            <span className="ps-eval-bar-p1">{playerNames[0]} {p1Pct}%</span>
+            <span className="ps-eval-bar-p2">{playerNames[1]} {100 - p1Pct}%</span>
+          </div>
           <div className="ps-eval-bar" role="img" aria-label={`Advantage estimate: ${playerNames[0]} ${p1Pct}%, ${playerNames[1]} ${100 - p1Pct}%`}>
-            <div className="ps-eval-bar-p1" style={{ width: `${Math.max(8, Math.min(92, p1Pct))}%` }}>
-              {playerNames[0]} {p1Pct}%
-            </div>
-            <div className="ps-eval-bar-p2">
-              {playerNames[1]} {100 - p1Pct}%
-            </div>
+            <div className="ps-eval-bar-fill" style={{ width: `${p1Pct}%` }} />
+            <div className="ps-eval-bar-tick" />
           </div>
           <div style={{ fontSize: 10, color: '#778', marginTop: 2 }}>depth {result.depthCompleted}</div>
           <div className="ps-eval-columns">

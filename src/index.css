@@ -1212,35 +1212,48 @@ input[type="range"]::-webkit-slider-thumb {
 .ps-eval-panel {
   margin-top: 8px;
 }
-.ps-eval-bar {
+.ps-eval-labels {
   display: flex;
-  height: 22px;
-  border-radius: 3px;
-  overflow: hidden;
+  justify-content: space-between;
+  gap: 8px;
   font-size: 11px;
   font-weight: bold;
-  background: #7a3550;
+  margin-bottom: 3px;
 }
 .ps-eval-bar-p1 {
-  background: #35507a;
-  color: #cde;
-  display: flex;
-  align-items: center;
-  padding: 0 6px;
+  color: #8ac;
   min-width: 0;
   white-space: nowrap;
   overflow: hidden;
+  text-overflow: ellipsis;
 }
 .ps-eval-bar-p2 {
-  color: #edc;
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
-  padding: 0 6px;
-  margin-left: auto;
+  color: #c8a;
   min-width: 0;
   white-space: nowrap;
   overflow: hidden;
+  text-overflow: ellipsis;
+  text-align: right;
+}
+.ps-eval-bar {
+  position: relative;
+  height: 10px;
+  border-radius: 3px;
+  overflow: hidden;
+  background: #7a3550;
+}
+.ps-eval-bar-fill {
+  height: 100%;
+  background: #35507a;
+  transition: width 0.3s;
+}
+.ps-eval-bar-tick {
+  position: absolute;
+  left: 50%;
+  top: 0;
+  bottom: 0;
+  width: 1px;
+  background: rgba(255, 255, 255, 0.45);
 }
 .ps-eval-columns {
   display: flex;
@@ -1256,14 +1269,23 @@ input[type="range"]::-webkit-slider-thumb {
   gap: 3px;
 }
 .ps-eval-choice {
-  display: flex;
-  justify-content: space-between;
-  align-items: baseline;
-  gap: 8px;
+  display: block;
   width: 100%;
   text-align: left;
   font-size: 11px;
   padding: 3px 6px;
+}
+.ps-eval-choice-main {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 8px;
+}
+.ps-eval-line {
+  display: block;
+  font-size: 10px;
+  color: #778;
+  margin-top: 1px;
 }
 .ps-eval-stale {
   opacity: 0.5;
