@@ -126,6 +126,40 @@ function toResult(ranked: Ranked, depthCompleted: number): EvalResult {
   };
 }
 
+/**
+ * The cells that decide the ranking: each side's top choices paired with
+ * their punishing replies, deduped, capped. Cells whose child battle already
+ * ended are exact and never worth deepening.
+ */
+function selectExpansionCells(matrix: Matrix, ranked: Ranked, cap: number): [number, number][] {
+  const { p1Options, p2Options } = matrix;
+  const byChoiceP1 = new Map(p1Options.map((option, index) => [option.choice, index]));
+  const byChoiceP2 = new Map(p2Options.map((option, index) => [option.choice, index]));
+  const byLabelP1 = new Map(p1Options.map((option, index) => [option.label, index]));
+  const byLabelP2 = new Map(p2Options.map((option, index) => [option.label, index]));
+
+  const cells: [number, number][] = [];
+  const seen = new Set<number>();
+  const push = (i: number | undefined, j: number | undefined) => {
+    if (i === undefined || j === undefined || cells.length >= cap) return;
+    const key = i * 10_000 + j;
+    if (seen.has(key)) return;
+    seen.add(key);
+    if (positionBattle(matrix.children[i][j][0]).ended) return;
+    cells.push([i, j]);
+  };
+
+  for (const choice of ranked.p1.slice(0, 3)) {
+    if (choice.punishedBy === null) continue;
+    push(byChoiceP1.get(choice.choice), byLabelP2.get(choice.punishedBy));
+  }
+  for (const choice of ranked.p2.slice(0, 3)) {
+    if (choice.punishedBy === null) continue;
+    push(byLabelP1.get(choice.punishedBy), byChoiceP2.get(choice.choice));
+  }
+  return cells;
+}
+
 export function searchPosition(
   serializedBattle: string,
   settings: EvalSettings,
@@ -144,9 +178,34 @@ export function searchPosition(
   const progress = { done: 0, total: Math.max(p1Count * p2Count, 1) };
 
   const matrix = buildMatrix(root, settings.samples, 1, callbacks, progress);
-  const ranked = rankFromMatrix(matrix, rootValue);
-  const result = toResult(ranked, 1);
+  let ranked = rankFromMatrix(matrix, rootValue);
+  let result = toResult(ranked, 1);
   callbacks?.onPartial?.(result);
-  // Task 4 adds deepening here.
+
+  let stopped = false;
+  for (let depth = 2; depth <= settings.depth && !stopped; depth++) {
+    if (callbacks?.shouldStop?.()) break;
+
+    const cells = selectExpansionCells(matrix, ranked, TOP_EXPANSION);
+    const cellProgress = { done: 0, total: Math.max(cells.length, 1) };
+    for (const [i, j] of cells) {
+      if (callbacks?.shouldStop?.()) {
+        stopped = true;
+        break;
+      }
+      // Deepen the first-seed child one level shallower; its midpoint score
+      // replaces the cell's static value.
+      const child = matrix.children[i][j][0];
+      const sub = searchPosition(child.serialized, { ...settings, depth: (depth - 1) as 1 | 2 });
+      matrix.values[i][j] = sub.score;
+      cellProgress.done += 1;
+      callbacks?.onProgress?.({ done: cellProgress.done, total: cellProgress.total, depth });
+    }
+    if (stopped) break;
+
+    ranked = rankFromMatrix(matrix, rootValue);
+    result = toResult(ranked, depth);
+    callbacks?.onPartial?.(result);
+  }
   return result;
 }

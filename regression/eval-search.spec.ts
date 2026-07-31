@@ -86,3 +86,35 @@ test.describe('depth-1 search', () => {
     expect(last.done).toBe(last.total);
   });
 });
+
+test.describe('iterative deepening', () => {
+  // p2 has two level-30 Pokémon, each KO'd by one level-100 Seismic Toss.
+  // Depth 1 sees one KO; depth 2 sees the full win and must raise the score.
+  const twoTurnWin = () => serialize(makeBattle(
+    [makeSet('Machamp', 'Machamp', ['Seismic Toss', 'Protect'], 100)],
+    [makeSet('Pikachu', 'Pikachu', ['Tackle', 'Growl'], 30), makeSet('Eevee', 'Eevee', ['Tackle', 'Growl'], 30)],
+  ));
+
+  test('depth 2 refines the score above depth 1', () => {
+    const depth1 = searchPosition(twoTurnWin(), { depth: 1, samples: 1 });
+    const depth2 = searchPosition(twoTurnWin(), { depth: 2, samples: 1 });
+    expect(depth2.depthCompleted).toBe(2);
+    expect(depth2.score).toBeGreaterThan(depth1.score);
+    expect(depth2.perSide.p1[0].choice).toBe('move seismictoss');
+  });
+
+  test('one partial result per completed depth, deterministic', () => {
+    const partials: EvalResult[] = [];
+    const first = searchPosition(twoTurnWin(), { depth: 3, samples: 1 }, { onPartial: r => partials.push(r) });
+    expect(partials.map(partial => partial.depthCompleted)).toEqual([1, 2, 3]);
+    expect(first.depthCompleted).toBe(3);
+    const second = searchPosition(twoTurnWin(), { depth: 3, samples: 1 });
+    expect(first).toEqual(second);
+  });
+
+  test('shouldStop halts deepening but returns the depth-1 result', () => {
+    const result = searchPosition(twoTurnWin(), { depth: 3, samples: 1 }, { shouldStop: () => true });
+    expect(result.depthCompleted).toBe(1);
+    expect(result.perSide.p1.length).toBeGreaterThan(0);
+  });
+});
