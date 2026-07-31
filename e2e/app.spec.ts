@@ -192,13 +192,19 @@ test.describe('PS Dashboard', () => {
 
   test('evaluates a replay position from the replay view', async ({ page }) => {
     test.setTimeout(180_000);
+    // Depth 1 / 1 sample keeps the search light under full-suite CPU load;
+    // depth-2 behavior is covered deterministically by the regression suite.
+    await page.evaluate(() => localStorage.setItem('ps-replay-interceptor:eval-prefs',
+      JSON.stringify({ depth: 1, samples: 1, auto: false, tera: 'auto' })));
+    await page.reload();
     await page.locator('button', { hasText: 'Load' }).click();
     await expect(page.getByText('TestPlayer1', { exact: true }).first()).toBeVisible({ timeout: 10000 });
 
     await page.locator('button', { hasText: 'Eval' }).click();
-    const panel = page.locator('.ps-eval-panel');
+    // The panel lives beside the battle in the right column (chess-style).
+    const panel = page.locator('.ps-main-right .ps-eval-panel');
     await expect(panel).toBeVisible();
-    // Reconstruction + depth-1 search on the small fixture replay.
+    // Reconstruction + search on the small fixture replay.
     await panel.locator('button', { hasText: 'Evaluate' }).click();
     await expect(panel.locator('.ps-eval-bar')).toBeVisible({ timeout: 120_000 });
     await expect(panel.locator('.ps-eval-bar-p1')).toContainText('%');
@@ -208,6 +214,9 @@ test.describe('PS Dashboard', () => {
 
   test('branch mode: picking both recommendations arms Execute Turn', async ({ page }) => {
     test.setTimeout(180_000);
+    await page.evaluate(() => localStorage.setItem('ps-replay-interceptor:eval-prefs',
+      JSON.stringify({ depth: 1, samples: 1, auto: false, tera: 'auto' })));
+    await page.reload();
     await page.locator('button', { hasText: 'Load' }).click();
     await page.locator('button', { hasText: 'Branch Here' }).click();
     await expect(page.getByText(/Branching.*Turn/)).toBeVisible({ timeout: 15000 });
