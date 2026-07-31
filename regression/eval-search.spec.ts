@@ -167,6 +167,30 @@ test.describe('depth-1 search', () => {
     }
   });
 
+  test('candidate restriction caps wide sub-matrices but keeps every base move', () => {
+    const battle = makeBattle(
+      [
+        makeSet('Machamp', 'Machamp', ['Seismic Toss', 'Close Combat', 'Protect', 'Growl'], 100),
+        makeSet('B', 'Snorlax', ['Protect'], 100),
+        makeSet('C', 'Chansey', ['Protect'], 100),
+      ],
+      [makeSet('Pikachu', 'Pikachu', ['Tackle', 'Growl'], 30), makeSet('Eevee', 'Eevee', ['Tackle'], 30)],
+    );
+    const root = serialize(battle);
+    // Unrestricted: 4 moves + 4 tera variants + 2 switches = 10 p1 options.
+    const full = searchPosition(root, { depth: 1, samples: 1 });
+    expect(full.perSide.p1.length).toBeGreaterThan(8);
+
+    const restricted = searchPosition(root, { depth: 1, samples: 1 }, undefined, undefined, true);
+    expect(restricted.perSide.p1.length).toBeLessThanOrEqual(8);
+    // Every base move survives — restriction only trims tera variants/switches.
+    for (const move of ['move seismictoss', 'move closecombat', 'move protect', 'move growl']) {
+      expect(restricted.perSide.p1.map(choice => choice.choice)).toContain(move);
+    }
+    // The maximin guarantee is preserved on this fixture.
+    expect(restricted.perSide.p1[0].worstCase).toBe(full.perSide.p1[0].worstCase);
+  });
+
   test('progress covers the full matrix and results are deterministic', () => {
     const root = serialize(makeBattle(
       [makeSet('Snorlax', 'Snorlax', ['Protect', 'Substitute'])],

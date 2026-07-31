@@ -1,8 +1,10 @@
 import type { PRNGSeed } from '@pkmn/sim';
-import { createMatchupCache, evaluatePosition, type MatchupCache } from './eval-function';
+import {
+  createMatchupCache, evaluatePosition, pairThreat, singleMoveFraction, type MatchupCache,
+} from './eval-function';
 import {
   advancePosition, createRootPosition, legalChoices, positionBattle,
-  type SimPosition,
+  type ChoiceOption, type SimPosition,
 } from './forward-model';
 import {
   attachLines, cellKey, rankFromMatrix, selectExpansionCells, toResult, TOP_EXPANSION,
@@ -59,17 +61,59 @@ function sampleCell(
   return { value: sum / draws, ended, firstChild };
 }
 
+/** Sub-matrix cap for candidate restriction (base moves always survive). */
+export const RESTRICT_K = 8;
+
+/**
+ * Caps a wide option list for deep sub-searches: every base move is kept
+ * (cheap insurance against proxy blind spots like fixed-damage moves), and
+ * Tera variants plus switches compete for the remaining slots by static
+ * threat hints. Deterministic; an approximation by design — never applied
+ * to the top-level matrix the user sees.
+ */
+function restrictOptions(position: SimPosition, side: 'p1' | 'p2', options: ChoiceOption[]): ChoiceOption[] {
+  if (options.length <= RESTRICT_K) return options;
+  const battle = positionBattle(position);
+  const sideState = battle.sides[side === 'p1' ? 0 : 1];
+  const opponent = battle.sides[side === 'p1' ? 1 : 0].active[0];
+  const active = sideState.active[0];
+
+  const isBaseMove = (option: ChoiceOption) =>
+    option.choice.startsWith('move ') && !option.choice.endsWith(' terastallize');
+  const baseMoves = options.filter(isBaseMove);
+  const rest = options.filter(option => !isBaseMove(option));
+
+  const hint = (option: ChoiceOption): number => {
+    if (!opponent || opponent.fainted) return 0;
+    if (option.choice.startsWith('move ')) {
+      if (!active || active.fainted) return 0;
+      return singleMoveFraction(active, opponent, option.choice.split(' ')[1], battle);
+    }
+    const slot = parseInt(option.choice.split(' ')[1], 10);
+    const candidate = sideState.pokemon[slot - 1];
+    if (!candidate) return 0;
+    return pairThreat(candidate, opponent, battle).fraction - pairThreat(opponent, candidate, battle).fraction;
+  };
+
+  const kept = rest
+    .map((option, index) => ({ option, index, value: hint(option) }))
+    .sort((a, b) => b.value - a.value || a.index - b.index)
+    .slice(0, Math.max(0, RESTRICT_K - baseMoves.length))
+    .sort((a, b) => a.index - b.index)
+    .map(entry => entry.option);
+  return [...baseMoves, ...kept];
+}
+
 function buildMatrix(
   position: SimPosition,
+  p1Options: ChoiceOption[],
+  p2Options: ChoiceOption[],
   samples: number,
-  tera: boolean,
   depth: number,
   callbacks: SearchCallbacks | undefined,
   progress: { done: number; total: number },
   matchupCache: MatchupCache,
 ): Matrix {
-  const p1Options = legalChoices(position, 'p1', { tera });
-  const p2Options = legalChoices(position, 'p2', { tera });
   const rootFainted = countFainted(positionBattle(position));
   const values: number[][] = [];
   const ended: boolean[][] = [];
@@ -198,11 +242,15 @@ export function subSearchDepth1(
   };
 }
 
-/** Dispatches deepening sub-searches: depth-1 leaves take the pruned path. */
+/**
+ * Dispatches deepening sub-searches: depth-1 leaves take the pruned path,
+ * deeper sub-searches run full-rank but with restricted candidates (their
+ * cost is quadratic in the option count and they only feed cell values).
+ */
 function subSearch(serializedBattle: string, settings: EvalSettings, matchupCache: MatchupCache): EvalResult {
   return settings.depth === 1
     ? subSearchDepth1(serializedBattle, settings, matchupCache)
-    : searchPosition(serializedBattle, settings, undefined, matchupCache);
+    : searchPosition(serializedBattle, settings, undefined, matchupCache, true);
 }
 
 export function searchPosition(
@@ -210,6 +258,7 @@ export function searchPosition(
   settings: EvalSettings,
   callbacks?: SearchCallbacks,
   matchupCache: MatchupCache = createMatchupCache(),
+  restrictCandidates = false,
 ): EvalResult {
   const root = createRootPosition(serializedBattle);
   const battle = positionBattle(root);
@@ -220,11 +269,15 @@ export function searchPosition(
 
   const rootValue = evaluatePosition(battle, matchupCache);
   const tera = settings.tera ?? true;
-  const p1Count = legalChoices(root, 'p1', { tera }).length;
-  const p2Count = legalChoices(root, 'p2', { tera }).length;
-  const progress = { done: 0, total: Math.max(p1Count * p2Count, 1) };
+  let p1Options = legalChoices(root, 'p1', { tera });
+  let p2Options = legalChoices(root, 'p2', { tera });
+  if (restrictCandidates) {
+    p1Options = restrictOptions(root, 'p1', p1Options);
+    p2Options = restrictOptions(root, 'p2', p2Options);
+  }
+  const progress = { done: 0, total: Math.max(p1Options.length * p2Options.length, 1) };
 
-  const matrix = buildMatrix(root, settings.samples, tera, 1, callbacks, progress, matchupCache);
+  const matrix = buildMatrix(root, p1Options, p2Options, settings.samples, 1, callbacks, progress, matchupCache);
   let ranked: Ranked = rankFromMatrix(matrix, rootValue);
   let result = toResult(ranked, 1);
   callbacks?.onPartial?.(result);

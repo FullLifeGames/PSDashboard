@@ -105,37 +105,45 @@ const ABILITY_IMMUNITIES: Record<string, string[]> = {
  * chart, and the big item/ability modifiers. Status and fixed-damage moves
  * are invisible to this proxy.
  */
-function pairThreat(attacker: Pokemon, defender: Pokemon, battle: Battle): PairThreat {
+/**
+ * Expected damage of one specific move as a fraction of the defender's max
+ * HP under the proxy's rules — 0 for status/fixed-damage/immune moves.
+ */
+export function singleMoveFraction(attacker: Pokemon, defender: Pokemon, moveId: string, battle: Battle): number {
+  const move = battle.dex.moves.get(moveId);
+  if (!move.exists || move.category === 'Status' || !move.basePower) return 0;
   const blanked = ABILITY_IMMUNITIES[defender.ability] ?? [];
+  if (blanked.includes(move.type)) return 0;
+  if (!battle.dex.getImmunity(move.type, defender.types)) return 0;
+  const typeMult = Math.pow(2, battle.dex.getEffectiveness(move.type, defender.types));
+  const stab = attacker.types.includes(move.type) ? 1.5 : 1;
+
+  let offense = 1;
+  if (attacker.item === 'lifeorb') offense *= 1.3;
+  if (attacker.item === 'choiceband' && move.category === 'Physical') offense *= 1.5;
+  if (attacker.item === 'choicespecs' && move.category === 'Special') offense *= 1.5;
+  if (defender.ability === 'thickfat' && (move.type === 'Fire' || move.type === 'Ice')) offense *= 0.5;
+
+  let bulk = 1;
+  if (defender.item === 'eviolite' && defender.species.nfe) bulk *= 1.5;
+  if (defender.item === 'assaultvest' && move.category === 'Special') bulk *= 1.5;
+
+  const [atk, def] = move.category === 'Physical'
+    ? [attacker.storedStats.atk, defender.storedStats.def]
+    : [attacker.storedStats.spa, defender.storedStats.spd];
+  const damage = (((2 * attacker.level / 5 + 2) * move.basePower * atk / def) / 50 + 2) *
+    stab * typeMult * offense / bulk;
+  return damage / defender.maxhp;
+}
+
+export function pairThreat(attacker: Pokemon, defender: Pokemon, battle: Battle): PairThreat {
   let fraction = 0;
   let priority = false;
   for (const slot of attacker.moveSlots) {
-    const move = battle.dex.moves.get(slot.id);
-    if (!move.exists || move.category === 'Status' || !move.basePower) continue;
-    if (blanked.includes(move.type)) continue;
-    if (!battle.dex.getImmunity(move.type, defender.types)) continue;
-    const typeMult = Math.pow(2, battle.dex.getEffectiveness(move.type, defender.types));
-    const stab = attacker.types.includes(move.type) ? 1.5 : 1;
-
-    let offense = 1;
-    if (attacker.item === 'lifeorb') offense *= 1.3;
-    if (attacker.item === 'choiceband' && move.category === 'Physical') offense *= 1.5;
-    if (attacker.item === 'choicespecs' && move.category === 'Special') offense *= 1.5;
-    if (defender.ability === 'thickfat' && (move.type === 'Fire' || move.type === 'Ice')) offense *= 0.5;
-
-    let bulk = 1;
-    if (defender.item === 'eviolite' && defender.species.nfe) bulk *= 1.5;
-    if (defender.item === 'assaultvest' && move.category === 'Special') bulk *= 1.5;
-
-    const [atk, def] = move.category === 'Physical'
-      ? [attacker.storedStats.atk, defender.storedStats.def]
-      : [attacker.storedStats.spa, defender.storedStats.spd];
-    const damage = (((2 * attacker.level / 5 + 2) * move.basePower * atk / def) / 50 + 2) *
-      stab * typeMult * offense / bulk;
-    const moveFraction = damage / defender.maxhp;
+    const moveFraction = singleMoveFraction(attacker, defender, slot.id, battle);
     if (moveFraction > 0) {
       fraction = Math.max(fraction, moveFraction);
-      if (move.priority > 0) priority = true;
+      if (battle.dex.moves.get(slot.id).priority > 0) priority = true;
     }
   }
   return { fraction, priority };
