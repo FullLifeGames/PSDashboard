@@ -789,6 +789,7 @@ function App() {
         <TeamEditor
           title="Edit Player Team"
           teamInfo={effectiveP1Info}
+          gen={replayGen}
           onSave={(info) => handleSaveTeam('p1', info)}
           onClose={() => setEditorSide(null)}
         />
@@ -798,6 +799,7 @@ function App() {
         <TeamEditor
           title="Edit Opponent Team"
           teamInfo={effectiveP2Info}
+          gen={replayGen}
           onSave={(info) => handleSaveTeam('p2', info)}
           onClose={() => setEditorSide(null)}
         />

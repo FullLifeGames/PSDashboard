@@ -224,6 +224,36 @@ test.describe('PS Dashboard', () => {
     await expect(page.locator('.ps-main-right')).toContainText('Choice Band', { timeout: 10000 });
   });
 
+  test('team editor offers legal dropdown pools and validates moves', async ({ page }) => {
+    await page.locator('button', { hasText: 'Load' }).click();
+    await expect(page.getByText('TestPlayer1', { exact: true }).first()).toBeVisible({ timeout: 10000 });
+    await page.locator('button', { hasText: 'Edit Player' }).click();
+    const editor = page.getByRole('dialog', { name: 'Edit Player Team' });
+    const garchompCard = editor.locator('.ps-panel').filter({ hasText: 'Garchomp' }).first();
+
+    // Ability is a select restricted to the species' real abilities.
+    const abilitySelect = garchompCard.getByLabel('Garchomp ability');
+    await expect(abilitySelect.locator('option', { hasText: 'Rough Skin' })).toHaveCount(1, { timeout: 10000 });
+    await expect(abilitySelect.locator('option', { hasText: 'Sand Veil' })).toHaveCount(1);
+    await expect(abilitySelect.locator('option', { hasText: 'Intimidate' })).toHaveCount(0);
+
+    // Nature select carries the 25 natures.
+    await garchompCard.getByLabel('Garchomp nature').selectOption('Adamant');
+
+    // Illegal move is rejected; a legal one is accepted.
+    const moveInput = garchompCard.getByPlaceholder('Add move...');
+    await garchompCard.getByLabel(/Remove .* from Garchomp/).first().click();
+    await moveInput.fill('Spore');
+    await moveInput.press('Enter');
+    await expect(garchompCard.getByRole('alert')).toContainText('not in Garchomp');
+    await moveInput.fill('Flamethrower');
+    await moveInput.press('Enter');
+    await expect(garchompCard).toContainText('Flamethrower');
+
+    await editor.locator('button', { hasText: /^Save$/ }).click();
+    await expect(page.locator('.ps-main-right')).toContainText('Flamethrower');
+  });
+
   test('rejects an import without side headers', async ({ page }) => {
     await page.locator('button', { hasText: 'Load' }).click();
     await page.locator('button', { hasText: 'Import/Export Sets' }).click();

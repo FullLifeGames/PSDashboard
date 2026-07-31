@@ -5,8 +5,22 @@ import { EMPTY_EVS, manualEvs, manualField, manualMove } from '../lib/team-info'
 interface Props {
   title: string;
   teamInfo: OpponentTeamInfo;
+  /** Replay generation — decides which pools exist (abilities gen 3+, tera gen 9). */
+  gen: number;
   onSave: (updatedInfo: OpponentTeamInfo) => void;
   onClose: () => void;
+}
+
+interface EditorPools {
+  items: string[];
+  teraTypes: string[];
+  natures: readonly string[];
+  movesBySpecies: Record<string, string[]>;
+  abilitiesBySpecies: Record<string, string[]>;
+}
+
+function toId(name: string): string {
+  return name.toLowerCase().replace(/[^a-z0-9]/g, '');
 }
 
 function sourceLabel(source: RevealedPokemonInfo['ability']['source'], probability?: number) {
@@ -29,9 +43,37 @@ function clampEv(value: string): number {
   return Math.min(252, Math.max(0, parsed));
 }
 
-export function TeamEditor({ title, teamInfo, onSave, onClose }: Props) {
+export function TeamEditor({ title, teamInfo, gen, onSave, onClose }: Props) {
   const [pokemon, setPokemon] = useState<RevealedPokemonInfo[]>(teamInfo.pokemon);
+  const [pools, setPools] = useState<EditorPools | null>(null);
+  const [moveError, setMoveError] = useState<Record<number, string | null>>({});
+  const [itemWarning, setItemWarning] = useState<Record<number, string | null>>({});
   const dialogRef = useRef<HTMLDivElement>(null);
+
+  // Legal pools load lazily — the editor stays usable as free text until then.
+  useEffect(() => {
+    let active = true;
+    void (async () => {
+      const options = await import('../lib/pokemon-options');
+      const movesBySpecies: Record<string, string[]> = {};
+      const abilitiesBySpecies: Record<string, string[]> = {};
+      await Promise.all(teamInfo.pokemon.map(async entry => {
+        movesBySpecies[entry.species] = await options.getMovePool(entry.species, gen);
+        abilitiesBySpecies[entry.species] = options.getAbilityPool(entry.species, gen);
+      }));
+      if (!active) return;
+      setPools({
+        items: options.getItemPool(gen),
+        teraTypes: options.getTeraTypePool(gen),
+        natures: options.NATURES,
+        movesBySpecies,
+        abilitiesBySpecies,
+      });
+    })();
+    return () => {
+      active = false;
+    };
+  }, [teamInfo.pokemon, gen]);
 
   // WAI-ARIA dialog behaviour (G20): move focus into the dialog on open and
   // hand it back to the trigger on close.
@@ -66,7 +108,7 @@ export function TeamEditor({ title, teamInfo, onSave, onClose }: Props) {
 
   const updateField = (
     index: number,
-    field: 'ability' | 'item' | 'teraType',
+    field: 'ability' | 'item' | 'teraType' | 'nature',
     value: string,
   ) => {
     setPokemon(prev => {
@@ -89,20 +131,30 @@ export function TeamEditor({ title, teamInfo, onSave, onClose }: Props) {
     });
   };
 
-  const addMove = (index: number, move: string) => {
+  const addMove = (index: number, move: string): boolean => {
     const trimmed = move.trim();
-    if (!trimmed) return;
+    if (!trimmed) return false;
 
+    const species = pokemon[index]?.species ?? '';
+    const pool = pools?.movesBySpecies[species];
+    if (pool && pool.length > 0 && !pool.some(name => toId(name) === toId(trimmed))) {
+      setMoveError(prev => ({ ...prev, [index]: `${trimmed} is not in ${species}'s legal moves for this generation.` }));
+      return false;
+    }
+    const canonical = pool?.find(name => toId(name) === toId(trimmed)) ?? trimmed;
+
+    setMoveError(prev => ({ ...prev, [index]: null }));
     setPokemon(prev => {
       const updated = [...prev];
-      if (updated[index].moves.length < 4 && !updated[index].moves.some(entry => entry.name === trimmed)) {
+      if (updated[index].moves.length < 4 && !updated[index].moves.some(entry => toId(entry.name) === toId(canonical))) {
         updated[index] = {
           ...updated[index],
-          moves: [...updated[index].moves, manualMove(trimmed)],
+          moves: [...updated[index].moves, manualMove(canonical)],
         };
       }
       return updated;
     });
+    return true;
   };
 
   const removeMove = (pokemonIndex: number, moveIndex: number) => {
@@ -161,17 +213,39 @@ export function TeamEditor({ title, teamInfo, onSave, onClose }: Props) {
               </div>
 
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6, marginBottom: 6 }}>
-                <div>
-                  <div style={{ fontSize: 9, color: '#8899aa', marginBottom: 2 }}>
-                    Ability ({sourceLabel(entry.ability.source, entry.ability.probability)})
+                {gen >= 3 && (
+                  <div>
+                    <div style={{ fontSize: 9, color: '#8899aa', marginBottom: 2 }}>
+                      Ability ({sourceLabel(entry.ability.source, entry.ability.probability)})
+                    </div>
+                    {pools && (pools.abilitiesBySpecies[entry.species]?.length ?? 0) > 0 ? (
+                      <select
+                        value={entry.ability.value}
+                        onChange={e => updateField(i, 'ability', e.target.value)}
+                        aria-label={`${entry.species} ability`}
+                        className="ps-input"
+                        style={{ width: '100%' }}
+                      >
+                        <option value="">Unknown</option>
+                        {pools.abilitiesBySpecies[entry.species].map(name => (
+                          <option key={name} value={name}>{name}</option>
+                        ))}
+                        {entry.ability.value &&
+                          !pools.abilitiesBySpecies[entry.species].includes(entry.ability.value) && (
+                          <option value={entry.ability.value}>{entry.ability.value}</option>
+                        )}
+                      </select>
+                    ) : (
+                      <input
+                        value={entry.ability.value}
+                        onChange={e => updateField(i, 'ability', e.target.value)}
+                        aria-label={`${entry.species} ability`}
+                        className="ps-input"
+                        style={{ width: '100%' }}
+                      />
+                    )}
                   </div>
-                  <input
-                    value={entry.ability.value}
-                    onChange={e => updateField(i, 'ability', e.target.value)}
-                    className="ps-input"
-                    style={{ width: '100%' }}
-                  />
-                </div>
+                )}
                 <div>
                   <div style={{ fontSize: 9, color: '#8899aa', marginBottom: 2 }}>
                     Item ({sourceLabel(entry.item.source, entry.item.probability)})
@@ -179,23 +253,82 @@ export function TeamEditor({ title, teamInfo, onSave, onClose }: Props) {
                   <input
                     value={entry.item.value}
                     onChange={e => updateField(i, 'item', e.target.value)}
+                    onBlur={e => {
+                      const value = e.target.value.trim();
+                      const known = !value || !pools || pools.items.length === 0 ||
+                        pools.items.some(name => toId(name) === toId(value));
+                      setItemWarning(prev => ({ ...prev, [i]: known ? null : `"${value}" is not a known item.` }));
+                    }}
+                    list="ps-item-pool"
+                    aria-label={`${entry.species} item`}
                     className="ps-input"
                     style={{ width: '100%' }}
                   />
                 </div>
+                {gen >= 9 && (
+                  <div>
+                    <div style={{ fontSize: 9, color: '#8899aa', marginBottom: 2 }}>
+                      Tera Type ({sourceLabel(entry.teraType.source, entry.teraType.probability)})
+                    </div>
+                    {pools && pools.teraTypes.length > 0 ? (
+                      <select
+                        value={entry.teraType.value}
+                        onChange={e => updateField(i, 'teraType', e.target.value)}
+                        aria-label={`${entry.species} tera type`}
+                        className="ps-input"
+                        style={{ width: '100%' }}
+                      >
+                        <option value="">Unknown</option>
+                        {pools.teraTypes.map(name => (
+                          <option key={name} value={name}>{name}</option>
+                        ))}
+                      </select>
+                    ) : (
+                      <input
+                        value={entry.teraType.value}
+                        onChange={e => updateField(i, 'teraType', e.target.value)}
+                        placeholder="Unknown"
+                        aria-label={`${entry.species} tera type`}
+                        className="ps-input"
+                        style={{ width: '100%' }}
+                      />
+                    )}
+                  </div>
+                )}
                 <div>
                   <div style={{ fontSize: 9, color: '#8899aa', marginBottom: 2 }}>
-                    Tera Type ({sourceLabel(entry.teraType.source, entry.teraType.probability)})
+                    Nature ({sourceLabel(entry.nature?.source ?? 'unknown', entry.nature?.probability)})
                   </div>
-                  <input
-                    value={entry.teraType.value}
-                    onChange={e => updateField(i, 'teraType', e.target.value)}
-                    placeholder="Unknown"
-                    className="ps-input"
-                    style={{ width: '100%' }}
-                  />
+                  {pools ? (
+                    <select
+                      value={entry.nature?.value ?? ''}
+                      onChange={e => updateField(i, 'nature', e.target.value)}
+                      aria-label={`${entry.species} nature`}
+                      className="ps-input"
+                      style={{ width: '100%' }}
+                    >
+                      <option value="">Unknown</option>
+                      {pools.natures.map(name => (
+                        <option key={name} value={name}>{name}</option>
+                      ))}
+                    </select>
+                  ) : (
+                    <input
+                      value={entry.nature?.value ?? ''}
+                      onChange={e => updateField(i, 'nature', e.target.value)}
+                      placeholder="Unknown"
+                      aria-label={`${entry.species} nature`}
+                      className="ps-input"
+                      style={{ width: '100%' }}
+                    />
+                  )}
                 </div>
               </div>
+              {itemWarning[i] && (
+                <div role="alert" style={{ fontSize: 10, color: '#f3a6a6', marginBottom: 6 }}>
+                  {itemWarning[i]}
+                </div>
+              )}
 
               <div style={{ marginBottom: 6 }}>
                 <div style={{ fontSize: 9, color: '#8899aa', marginBottom: 2 }}>
@@ -253,22 +386,40 @@ export function TeamEditor({ title, teamInfo, onSave, onClose }: Props) {
                   ))}
                 </div>
                 {entry.moves.length < 4 && (
-                  <input
-                    placeholder="Add move..."
-                    onKeyDown={e => {
-                      if (e.key === 'Enter') {
-                        addMove(i, (e.target as HTMLInputElement).value);
-                        (e.target as HTMLInputElement).value = '';
-                      }
-                    }}
-                    className="ps-input"
-                    style={{ width: '100%', fontSize: 10 }}
-                  />
+                  <>
+                    <input
+                      placeholder="Add move..."
+                      list={`ps-move-pool-${i}`}
+                      onKeyDown={e => {
+                        if (e.key === 'Enter') {
+                          if (addMove(i, (e.target as HTMLInputElement).value)) {
+                            (e.target as HTMLInputElement).value = '';
+                          }
+                        }
+                      }}
+                      className="ps-input"
+                      style={{ width: '100%', fontSize: 10 }}
+                    />
+                    <datalist id={`ps-move-pool-${i}`}>
+                      {(pools?.movesBySpecies[entry.species] ?? [])
+                        .filter(name => !entry.moves.some(known => toId(known.name) === toId(name)))
+                        .map(name => <option key={name} value={name} />)}
+                    </datalist>
+                  </>
+                )}
+                {moveError[i] && (
+                  <div role="alert" style={{ fontSize: 10, color: '#f3a6a6', marginTop: 4 }}>
+                    {moveError[i]}
+                  </div>
                 )}
               </div>
             </div>
           ))}
         </div>
+
+        <datalist id="ps-item-pool">
+          {(pools?.items ?? []).map(name => <option key={name} value={name} />)}
+        </datalist>
 
         <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
           <button type="button" className="ps-btn ps-btn-red" style={{ flex: 1 }} onClick={() => onSave({ pokemon })}>
