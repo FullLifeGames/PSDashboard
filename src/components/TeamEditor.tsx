@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import type { OpponentTeamInfo, PokemonEvs, StatId, RevealedPokemonInfo } from '../types';
-import { EMPTY_EVS, manualEvs, manualField, manualMove } from '../lib/team-info';
+import { EMPTY_EVS, itemSetValue, manualEvs, manualField, manualMove } from '../lib/team-info';
 
 interface Props {
   title: string;
@@ -251,7 +251,9 @@ export function TeamEditor({ title, teamInfo, gen, onSave, onClose }: Props) {
                     Item ({sourceLabel(entry.item.source, entry.item.probability)})
                   </div>
                   <input
-                    value={entry.item.value}
+                    // Annotations like "(consumed)" are battle knowledge, not
+                    // part of the set — the editor works on the plain item.
+                    value={entry.item.source === 'manual' ? entry.item.value : itemSetValue(entry.item.value)}
                     onChange={e => updateField(i, 'item', e.target.value)}
                     onBlur={e => {
                       const value = e.target.value.trim();

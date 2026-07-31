@@ -36,6 +36,19 @@ export function manualMove(name: string): PokemonMoveInfo {
   return { name, source: 'manual' };
 }
 
+/**
+ * Item values carry display annotations ("Sitrus Berry (consumed)",
+ * "(has item)") that describe battle knowledge, not the set. This strips them
+ * down to the set's item name — '' when there is no real item name at all.
+ * Every boundary that needs a plain item (sets export/import, editor fields,
+ * simulator teams) must go through this instead of the raw value.
+ */
+export function itemSetValue(value: string): string {
+  const trimmed = (value || '').trim();
+  if (!trimmed || trimmed.startsWith('(')) return '';
+  return trimmed.replace(/\s*\(consumed\)\s*$/i, '').trim();
+}
+
 function guessedMove(move: UsageProbability): PokemonMoveInfo {
   return {
     name: move.value,

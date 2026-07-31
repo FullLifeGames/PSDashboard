@@ -1,4 +1,5 @@
 import type { OpponentTeamInfo, PokemonEvs, RevealedPokemonInfo, StatId } from '../types';
+import { itemSetValue } from './team-info';
 import { parsePastedTeam, type PastedSet } from './team-paste';
 
 /**
@@ -28,7 +29,7 @@ function knownValue(field: { value: string } | undefined): string {
 
 function exportSet(pokemon: RevealedPokemonInfo): string {
   const gender = pokemon.gender === 'M' || pokemon.gender === 'F' ? ` (${pokemon.gender})` : '';
-  const item = knownValue(pokemon.item);
+  const item = itemSetValue(pokemon.item?.value ?? '');
   const lines = [`${pokemon.species}${gender}${item ? ` @ ${item}` : ''}`];
 
   const ability = knownValue(pokemon.ability);

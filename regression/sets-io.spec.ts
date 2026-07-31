@@ -66,6 +66,28 @@ test.describe('sets import/export', () => {
     expect(parsed.p2[0]).toMatchObject({ species: 'Kingambit', level: 78 });
   });
 
+  test('strips the "(consumed)" annotation from exported items', () => {
+    const consumedInfo: OpponentTeamInfo = {
+      pokemon: [{
+        species: 'Sneasler',
+        moves: [{ name: 'Close Combat', source: 'revealed' }],
+        ability: { value: 'Unburden', source: 'revealed' },
+        item: { value: 'Heavy-Duty Boots (consumed)', source: 'revealed' },
+        teraType: { value: '', source: 'unknown' },
+        evs: { value: { hp: 0, atk: 0, def: 0, spa: 0, spd: 0, spe: 0 }, source: 'unknown' },
+        level: 100,
+        gender: 'M',
+      }],
+    };
+    const text = buildSetsExport({ p1Name: 'A', p2Name: 'B', p1Info: consumedInfo, p2Info: null });
+
+    expect(text).toContain('Sneasler (M) @ Heavy-Duty Boots');
+    expect(text).not.toContain('(consumed)');
+
+    const parsed = parseSetsImport(text);
+    expect(parsed.p1[0].item).toBe('Heavy-Duty Boots');
+  });
+
   test('accepts a one-sided import and rejects headerless text with guidance', () => {
     const oneSided = parseSetsImport('=== p2 ===\n\nKingambit @ Leftovers\n- Sucker Punch');
     expect(oneSided.p1).toHaveLength(0);

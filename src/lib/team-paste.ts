@@ -1,5 +1,5 @@
 import type { OpponentTeamInfo, PokemonEvs } from '../types';
-import { EMPTY_EVS, manualEvs, manualField, manualMove } from './team-info';
+import { EMPTY_EVS, itemSetValue, manualEvs, manualField, manualMove } from './team-info';
 
 /**
  * Lightweight Showdown-export parser for pasted teams (G15). Deliberately
@@ -68,7 +68,7 @@ function parseHeader(header: string): { species: string; nickname?: string; item
   }
   if (!working) return null;
 
-  return { species: working, nickname, item: itemSide || undefined };
+  return { species: working, nickname, item: itemSide ? itemSetValue(itemSide) || undefined : undefined };
 }
 
 export function parsePastedTeam(teamText: string): PastedSet[] {

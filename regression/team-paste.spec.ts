@@ -91,6 +91,15 @@ test.describe('team paste pipeline (G15)', () => {
     expect(applied.pokemon[0].level).toBe(78);
   });
 
+  test('strips "(consumed)" annotations from pasted item lines', () => {
+    const sets = parsePastedTeam('Sneasler @ Heavy-Duty Boots (consumed)\n- Close Combat');
+    expect(sets[0].item).toBe('Heavy-Duty Boots');
+
+    // A pure placeholder never becomes a set item.
+    const placeholder = parsePastedTeam('Sneasler @ (has item)\n- Close Combat');
+    expect(placeholder[0].item).toBeUndefined();
+  });
+
   test('parses Showdown exports including nicknames, items, and EVs', () => {
     const sets = parsePastedTeam(showdownExport);
     expect(sets).toHaveLength(2);
