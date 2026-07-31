@@ -93,6 +93,8 @@ test.describe('sim forward model', () => {
     const a = advancePosition(root, 'move dracometeor', 'move substitute', '1,2,3,4');
     const b = advancePosition(root, 'move dracometeor', 'move substitute', '1,2,3,4');
     expect(a.serialized).toBe(b.serialized);
+    // Wall-clock timestamp lines would break identity across second boundaries.
+    expect(a.serialized).not.toContain('|t:|');
   });
 
   test('a mid-turn KO auto-resolves the forced switch, avoiding a replacement that dies on entry', () => {

@@ -9,6 +9,17 @@ export interface ChoiceOption {
 }
 
 /**
+ * Serializes without the sim's wall-clock `|t:|` log lines — they made two
+ * identical advances straddling a second boundary serialize differently,
+ * breaking position-identity determinism.
+ */
+export function serializeBattleStable(battle: Battle): string {
+  const state = State.serializeBattle(battle) as { log?: string[] };
+  if (Array.isArray(state.log)) state.log = state.log.filter(line => !line.startsWith('|t:|'));
+  return JSON.stringify(state);
+}
+
+/**
  * An immutable battle position. The serialized string is the identity, but it
  * is computed lazily — depth-1 leaf children are only ever evaluated, and
  * serializing them would double the cost of every fork for nothing.
@@ -27,7 +38,7 @@ class Position implements SimPosition {
   }
 
   get serialized(): string {
-    this.serializedCache ??= JSON.stringify(State.serializeBattle(this.battleCache!));
+    this.serializedCache ??= serializeBattleStable(this.battleCache!);
     return this.serializedCache;
   }
 
@@ -159,7 +170,7 @@ function resolveForcedSwitches(battle: Battle, seed: PRNGSeed): void {
       .filter(side => side.requestState === 'switch' && !side.isChoiceDone());
     if (pending.length === 0) return;
 
-    const midTurn = JSON.stringify(State.serializeBattle(battle));
+    const midTurn = serializeBattleStable(battle);
     for (const side of pending) {
       const replacements = side.pokemon
         .map((pokemon, index) => ({ pokemon, slot: index + 1 }))
