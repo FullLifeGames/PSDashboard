@@ -18,7 +18,16 @@ type DistributiveOmit<T, K extends PropertyKey> = T extends unknown ? Omit<T, K>
 
 function poolSize(): number {
   const cores = typeof navigator !== 'undefined' ? navigator.hardwareConcurrency ?? 4 : 4;
-  return Math.max(1, Math.min(cores - 2, 6));
+  const size = Math.max(1, Math.min(cores - 2, 6));
+  try {
+    // Optional cap (used by the e2e suite, where many pages run in parallel).
+    const raw = typeof localStorage !== 'undefined' ? localStorage.getItem('ps-replay-interceptor:eval-pool') : null;
+    const cap = raw ? parseInt(raw, 10) : NaN;
+    if (Number.isFinite(cap) && cap >= 1) return Math.min(cap, size);
+  } catch {
+    // Storage unavailable — use the computed size.
+  }
+  return size;
 }
 
 /**

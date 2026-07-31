@@ -1,5 +1,6 @@
 import type { EvalPreferences, EvalResult, RankedChoice, SearchProgress } from '../lib/eval/types';
-import type { EvalStatus } from '../hooks/useEvaluation';
+import type { EvalGraphState, EvalStatus } from '../hooks/useEvaluation';
+import { EvalGraph } from './EvalGraph';
 
 interface EvalPanelProps {
   playerNames: [string, string];
@@ -18,6 +19,11 @@ interface EvalPanelProps {
   showAuto: boolean;
   /** Gen 9 only — other gens have no Tera to gate. */
   showTera: boolean;
+  graph: EvalGraphState;
+  /** Replay view only — starts the whole-game background sweep. */
+  onAnalyzeGame?: () => void;
+  onSelectTurn?: (turn: number) => void;
+  currentTurn: number;
 }
 
 const signed = (value: number) => `${value >= 0 ? '+' : ''}${value.toFixed(2)}`;
@@ -71,8 +77,10 @@ function ChoiceList({
 export function EvalPanel({
   playerNames, status, result, progress, reconstructProgress, error,
   prefs, onPrefsChange, onEvaluate, onCancel, onPickChoice, showAuto, showTera,
+  graph, onAnalyzeGame, onSelectTurn, currentTurn,
 }: EvalPanelProps) {
   const running = status === 'searching' || status === 'reconstructing';
+  const hasGraph = graph.scores.some(score => score !== null);
   const p1Pct = result ? Math.round(50 + 50 * result.score) : 50;
 
   return (
@@ -163,6 +171,43 @@ export function EvalPanel({
       {status === 'stale' && (
         <div style={{ fontSize: 11, color: '#b6a46a', marginBottom: 4 }}>
           Position changed — re-evaluate.
+        </div>
+      )}
+
+      {onAnalyzeGame && (
+        <div style={{ margin: '6px 0' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 10, color: '#aabbcc' }}>
+            <span style={{ fontWeight: 'bold', fontSize: 11, color: '#cde' }}>Game graph</span>
+            {graph.running ? (
+              <>
+                <span style={{ color: '#fd6' }}>
+                  analyzing… turn {graph.progress?.done ?? 0}/{graph.progress?.total ?? '?'}
+                </span>
+                <button type="button" className="ps-btn" onClick={onCancel} style={{ padding: '1px 6px', fontSize: 10 }}>
+                  Cancel
+                </button>
+              </>
+            ) : (
+              <button
+                type="button"
+                className="ps-btn"
+                onClick={onAnalyzeGame}
+                disabled={running}
+                title="Evaluate every turn of the game in the background — the line dips where the game swung."
+                style={{ padding: '1px 6px', fontSize: 10 }}
+              >
+                {hasGraph ? 'Re-analyze' : 'Analyze game'}
+              </button>
+            )}
+          </div>
+          {hasGraph && (
+            <EvalGraph
+              scores={graph.scores}
+              playerNames={playerNames}
+              currentTurn={currentTurn}
+              onSelectTurn={onSelectTurn}
+            />
+          )}
         </div>
       )}
 

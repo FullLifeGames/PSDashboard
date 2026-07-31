@@ -1290,6 +1290,14 @@ input[type="range"]::-webkit-slider-thumb {
 .ps-eval-stale {
   opacity: 0.5;
 }
+.ps-eval-graph {
+  width: 100%;
+  height: 64px;
+  display: block;
+  margin-top: 4px;
+  background: rgba(0, 0, 0, 0.25);
+  border-radius: 3px;
+}
 .ps-eval-progress {
   height: 6px;
   background: #223;

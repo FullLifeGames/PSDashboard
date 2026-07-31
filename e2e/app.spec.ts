@@ -192,10 +192,14 @@ test.describe('PS Dashboard', () => {
 
   test('evaluates a replay position from the replay view', async ({ page }) => {
     test.setTimeout(180_000);
-    // Depth 1 / 1 sample keeps the search light under full-suite CPU load;
+    // Depth 1 / 1 sample and a 2-worker pool keep the search light under
+    // full-suite CPU load (many parallel pages each spawn an eval pool);
     // depth-2 behavior is covered deterministically by the regression suite.
-    await page.evaluate(() => localStorage.setItem('ps-replay-interceptor:eval-prefs',
-      JSON.stringify({ depth: 1, samples: 1, auto: false, tera: 'auto' })));
+    await page.evaluate(() => {
+      localStorage.setItem('ps-replay-interceptor:eval-pool', '2');
+      localStorage.setItem('ps-replay-interceptor:eval-prefs',
+        JSON.stringify({ depth: 1, samples: 1, auto: false, tera: 'auto' }));
+    });
     await page.reload();
     await page.locator('button', { hasText: 'Load' }).click();
     await expect(page.getByText('TestPlayer1', { exact: true }).first()).toBeVisible({ timeout: 10000 });
@@ -212,10 +216,33 @@ test.describe('PS Dashboard', () => {
     await expect(panel.getByText(/worst vs/).first()).toBeVisible();
   });
 
+  test('analyzes the whole game into an eval graph', async ({ page }) => {
+    test.setTimeout(240_000);
+    await page.evaluate(() => {
+      localStorage.setItem('ps-replay-interceptor:eval-pool', '2');
+      localStorage.setItem('ps-replay-interceptor:eval-prefs',
+        JSON.stringify({ depth: 1, samples: 1, auto: false, tera: 'auto' }));
+    });
+    await page.reload();
+    await page.locator('button', { hasText: 'Load' }).click();
+    await expect(page.getByText('TestPlayer1', { exact: true }).first()).toBeVisible({ timeout: 10000 });
+
+    await page.locator('button', { hasText: 'Eval' }).click();
+    const panel = page.locator('.ps-main-right .ps-eval-panel');
+    await panel.locator('button', { hasText: 'Analyze game' }).click();
+    await expect(panel.locator('.ps-eval-graph')).toBeVisible({ timeout: 180_000 });
+    expect(await panel.locator('.ps-eval-graph circle').count()).toBeGreaterThan(0);
+    // The sweep finishes and offers a re-run.
+    await expect(panel.locator('button', { hasText: 'Re-analyze' })).toBeVisible({ timeout: 60_000 });
+  });
+
   test('branch mode: picking both recommendations arms Execute Turn', async ({ page }) => {
     test.setTimeout(180_000);
-    await page.evaluate(() => localStorage.setItem('ps-replay-interceptor:eval-prefs',
-      JSON.stringify({ depth: 1, samples: 1, auto: false, tera: 'auto' })));
+    await page.evaluate(() => {
+      localStorage.setItem('ps-replay-interceptor:eval-pool', '2');
+      localStorage.setItem('ps-replay-interceptor:eval-prefs',
+        JSON.stringify({ depth: 1, samples: 1, auto: false, tera: 'auto' }));
+    });
     await page.reload();
     await page.locator('button', { hasText: 'Load' }).click();
     await page.locator('button', { hasText: 'Branch Here' }).click();

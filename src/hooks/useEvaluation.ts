@@ -43,6 +43,22 @@ interface CachedEval {
   tera: boolean;
 }
 
+export interface GraphSweepParams {
+  /** Number of turns to analyze (1..turns). */
+  turns: number;
+  /** Resolved Tera enumeration flag. */
+  tera: boolean;
+  cacheKeyFor(turn: number): string;
+  acquireFor(turn: number): (report: (turn: number, target: number) => void) => Promise<string>;
+}
+
+export interface EvalGraphState {
+  /** scores[t-1] = score at turn t; null = not evaluated (gap). */
+  scores: (number | null)[];
+  running: boolean;
+  progress: { done: number; total: number } | null;
+}
+
 export function useEvaluation() {
   const [panelOpen, setPanelOpen] = useState(false);
   const [prefs, setPrefsState] = useState<EvalPreferences>(loadPrefs);
@@ -51,6 +67,7 @@ export function useEvaluation() {
   const [progress, setProgress] = useState<SearchProgress | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [reconstructProgress, setReconstructProgress] = useState<{ turn: number; target: number } | null>(null);
+  const [graph, setGraph] = useState<EvalGraphState>({ scores: [], running: false, progress: null });
 
   const clientRef = useRef<EvalWorkerClient | null>(null);
   const cacheRef = useRef(new Map<string, CachedEval>());
@@ -75,6 +92,7 @@ export function useEvaluation() {
       if (prev !== 'searching' && prev !== 'reconstructing') return prev;
       return resultRef.current ? 'stale' : 'idle';
     });
+    setGraph(prev => (prev.running ? { ...prev, running: false, progress: null } : prev));
   }, []);
 
   const evaluate = useCallback((params: EvaluateParams) => {
@@ -157,6 +175,48 @@ export function useEvaluation() {
     setError(null);
   }, [cancel]);
 
+  /** Sequential background sweep evaluating every turn for the game graph. */
+  const runGraphSweep = useCallback((params: GraphSweepParams) => {
+    cancel();
+    const runId = ++runRef.current;
+    const { depth, samples } = prefsRef.current;
+    const scores: (number | null)[] = new Array(params.turns).fill(null);
+    setGraph({ scores: [...scores], running: true, progress: { done: 0, total: params.turns } });
+
+    void (async () => {
+      for (let turn = 1; turn <= params.turns; turn++) {
+        if (runRef.current !== runId) return;
+        const key = params.cacheKeyFor(turn);
+        const hit = cacheRef.current.get(key);
+        if (hit && hit.depth === depth && hit.samples === samples && hit.tera === params.tera) {
+          scores[turn - 1] = hit.result.score;
+        } else {
+          try {
+            const serialized = await params.acquireFor(turn)(() => {});
+            if (runRef.current !== runId) return;
+            clientRef.current ??= new EvalWorkerClient();
+            const result = await clientRef.current.evaluate(serialized, { depth, samples, tera: params.tera });
+            if (runRef.current !== runId) return;
+            cacheRef.current.set(key, { result, depth, samples, tera: params.tera });
+            scores[turn - 1] = result.score;
+          } catch (err) {
+            if (runRef.current !== runId) return;
+            if (err instanceof Error && err.message === 'cancelled') return;
+            // This turn failed (e.g. reconstruction wedge) — leave a gap.
+          }
+        }
+        setGraph({ scores: [...scores], running: true, progress: { done: turn, total: params.turns } });
+      }
+      if (runRef.current === runId) {
+        setGraph(prev => ({ ...prev, running: false, progress: null }));
+      }
+    })();
+  }, [cancel]);
+
+  const clearGraph = useCallback(() => {
+    setGraph({ scores: [], running: false, progress: null });
+  }, []);
+
   const togglePanel = useCallback(() => {
     setPanelOpen(open => {
       if (open) cancel();
@@ -169,5 +229,6 @@ export function useEvaluation() {
     prefs, setPrefs,
     status, result, progress, error, reconstructProgress,
     evaluate, markStale, reset, cancel,
+    graph, runGraphSweep, clearGraph,
   };
 }

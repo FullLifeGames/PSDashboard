@@ -405,35 +405,38 @@ function App() {
     return serializeLiveBattle(battle);
   }, [getBattle]);
 
-  const acquireReplayPosition = useCallback(async (reportReconstruct: (turn: number, target: number) => void) => {
-    if (!replayData) throw new Error('Load a replay first.');
-    const { buildTeamsFromReplay } = await import('./lib/team-builder');
-    const branchEngine = await import('./lib/branch-engine');
-    const { serializeLiveBattle } = await import('./lib/eval/serialize');
-    const { p1Team, p2Team } = buildTeamsFromReplay(replayData.log, {
-      userTeamText: teamText || undefined,
-      p1Info: effectiveP1Info,
-      p2Info: effectiveP2Info,
-      usageStats: usageStats.stats,
-      setAssumptions: setAssumptions.assumptions,
-    });
-    if (p1Team.length === 0 || p2Team.length === 0) throw new Error('Could not build both teams for this replay.');
-    const runtime = await branchEngine.reconstructBranchRuntime({
-      format: getBranchSimulatorFormat(replayData),
-      p1Team,
-      p2Team,
-      replayLog: replayData.log,
-      targetTurn: branchTurn,
-      snapshot: branchSnapshot,
-      playerNames: [replayData.players[0], replayData.players[1]],
-      onProgress: reportReconstruct,
-    });
-    const invalid = branchEngine.validateBranchRuntime(runtime);
-    if (invalid) throw new Error(invalid);
-    const battle = runtime.battleStream.battle;
-    if (!battle) throw new Error('Reconstruction produced no battle.');
-    return serializeLiveBattle(battle);
-  }, [replayData, teamText, effectiveP1Info, effectiveP2Info, usageStats.stats, setAssumptions.assumptions, branchTurn, branchSnapshot]);
+  const makeReplayAcquire = useCallback((turn: number) =>
+    async (reportReconstruct: (turn: number, target: number) => void) => {
+      if (!replayData) throw new Error('Load a replay first.');
+      const { buildTeamsFromReplay } = await import('./lib/team-builder');
+      const branchEngine = await import('./lib/branch-engine');
+      const { serializeLiveBattle } = await import('./lib/eval/serialize');
+      const { p1Team, p2Team } = buildTeamsFromReplay(replayData.log, {
+        userTeamText: teamText || undefined,
+        p1Info: effectiveP1Info,
+        p2Info: effectiveP2Info,
+        usageStats: usageStats.stats,
+        setAssumptions: setAssumptions.assumptions,
+      });
+      if (p1Team.length === 0 || p2Team.length === 0) throw new Error('Could not build both teams for this replay.');
+      const runtime = await branchEngine.reconstructBranchRuntime({
+        format: getBranchSimulatorFormat(replayData),
+        p1Team,
+        p2Team,
+        replayLog: replayData.log,
+        targetTurn: turn,
+        snapshot: snapshots.length > 0 ? snapshots[Math.min(turn - 1, snapshots.length - 1)] : null,
+        playerNames: [replayData.players[0], replayData.players[1]],
+        onProgress: reportReconstruct,
+      });
+      const invalid = branchEngine.validateBranchRuntime(runtime);
+      if (invalid) throw new Error(invalid);
+      const battle = runtime.battleStream.battle;
+      if (!battle) throw new Error('Reconstruction produced no battle.');
+      return serializeLiveBattle(battle);
+    }, [replayData, teamText, effectiveP1Info, effectiveP2Info, usageStats.stats, setAssumptions.assumptions, snapshots]);
+
+  const acquireReplayPosition = useMemo(() => makeReplayAcquire(branchTurn), [makeReplayAcquire, branchTurn]);
 
   const handleEvaluate = useCallback(() => {
     if (!replayData) return;
@@ -471,8 +474,20 @@ function App() {
     }
   }, [simState, handleSetChoice]);
 
+  const analyzableTurns = endSnapshotTurn !== null ? Math.max(1, endSnapshotTurn - 1) : maxTurn;
+
+  const handleAnalyzeGame = useCallback(() => {
+    if (!replayData) return;
+    evaluation.runGraphSweep({
+      turns: analyzableTurns,
+      tera: effectiveTera,
+      cacheKeyFor: turn => `${replayData.id}:${turn}:${setsFingerprint}`,
+      acquireFor: makeReplayAcquire,
+    });
+  }, [replayData, evaluation, analyzableTurns, effectiveTera, setsFingerprint, makeReplayAcquire]);
+
   // Any position change invalidates a displayed result.
-  const { markStale: markEvalStale, reset: resetEval } = evaluation;
+  const { markStale: markEvalStale, reset: resetEval, clearGraph } = evaluation;
   useEffect(() => {
     markEvalStale();
   }, [branchTurn, history.length, editedP1Info, editedP2Info, markEvalStale]);
@@ -481,6 +496,11 @@ function App() {
   useEffect(() => {
     resetEval();
   }, [replayData?.id, branching, resetEval]);
+
+  // The graph is tied to a specific replay + set knowledge + Tera mode.
+  useEffect(() => {
+    clearGraph();
+  }, [replayData?.id, setsFingerprint, effectiveTera, clearGraph]);
 
   // Opt-in: keep the branch evaluation fresh after each executed turn.
   useEffect(() => {
@@ -951,6 +971,10 @@ function App() {
                 onPickChoice={branching ? handlePickEvalChoice : undefined}
                 showAuto={branching}
                 showTera={replayGen === 9}
+                graph={evaluation.graph}
+                onAnalyzeGame={!branching ? handleAnalyzeGame : undefined}
+                onSelectTurn={!branching ? handleReplayTurn : undefined}
+                currentTurn={branching ? (simState?.turnNumber ?? branchTurn) : branchTurn}
               />
             )}
             <BattleStatsPanel
