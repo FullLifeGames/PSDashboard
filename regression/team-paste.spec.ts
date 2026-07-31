@@ -49,6 +49,48 @@ const baseInfo: OpponentTeamInfo = {
 };
 
 test.describe('team paste pipeline (G15)', () => {
+  test('parses nature, IVs, and level lines (perfect-information import)', () => {
+    const sets = parsePastedTeam([
+      'Garchomp @ Loaded Dice',
+      'Ability: Rough Skin',
+      'Level: 78',
+      'Tera Type: Steel',
+      'EVs: 252 Atk / 4 SpD / 252 Spe',
+      'Jolly Nature',
+      'IVs: 0 SpA / 29 Spe',
+      '- Earthquake',
+      '- Scale Shot',
+    ].join('\n'));
+
+    expect(sets).toHaveLength(1);
+    expect(sets[0].nature).toBe('Jolly');
+    expect(sets[0].level).toBe(78);
+    expect(sets[0].ivs).toEqual({ hp: 31, atk: 31, def: 31, spa: 0, spd: 31, spe: 29 });
+  });
+
+  test('overlays nature, IVs, and level as manual knowledge', () => {
+    const info: OpponentTeamInfo = {
+      pokemon: [{
+        species: 'Garchomp',
+        moves: [],
+        ability: { value: '', source: 'unknown' },
+        item: { value: '', source: 'unknown' },
+        teraType: { value: '', source: 'unknown' },
+        evs: { value: { hp: 0, atk: 0, def: 0, spa: 0, spd: 0, spe: 0 }, source: 'unknown' },
+        level: 100,
+        gender: '',
+      }],
+    };
+    const sets = parsePastedTeam('Garchomp\nJolly Nature\nLevel: 78\nIVs: 0 Atk\n- Earthquake');
+
+    const { info: applied } = applyPastedTeam(info, sets);
+
+    expect(applied.pokemon[0].nature).toEqual({ value: 'Jolly', source: 'manual' });
+    expect(applied.pokemon[0].ivs?.source).toBe('manual');
+    expect(applied.pokemon[0].ivs?.value.atk).toBe(0);
+    expect(applied.pokemon[0].level).toBe(78);
+  });
+
   test('parses Showdown exports including nicknames, items, and EVs', () => {
     const sets = parsePastedTeam(showdownExport);
     expect(sets).toHaveLength(2);

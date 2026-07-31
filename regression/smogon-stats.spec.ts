@@ -206,6 +206,12 @@ test.describe('Smogon usage stat enrichment', () => {
       probability: 0.924,
       sourceDetail: 'Smogon gen9ou 2026-03',
     });
+    expect(garchomp.nature).toEqual({
+      value: 'Jolly',
+      source: 'guessed',
+      probability: 0.318,
+      sourceDetail: 'Smogon gen9ou 2026-03',
+    });
     expect(garchomp.item).toEqual({
       value: 'Rocky Helmet',
       source: 'guessed',

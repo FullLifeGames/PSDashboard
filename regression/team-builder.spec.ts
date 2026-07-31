@@ -28,6 +28,28 @@ const baseLog = [
 ].join('\n');
 
 test.describe('team builder edited assumptions', () => {
+  test('manual nature and IVs reach the simulator set', () => {
+    const p1Info: OpponentTeamInfo = {
+      pokemon: [{
+        species: 'Garchomp',
+        moves: [{ name: 'Earthquake', source: 'revealed' }],
+        ability: { value: 'Rough Skin', source: 'revealed' },
+        item: { value: '', source: 'unknown' },
+        teraType: { value: '', source: 'unknown' },
+        evs: { value: { hp: 0, atk: 252, def: 0, spa: 0, spd: 4, spe: 252 }, source: 'manual' },
+        nature: { value: 'Jolly', source: 'manual' },
+        ivs: { value: { hp: 31, atk: 31, def: 31, spa: 0, spd: 31, spe: 31 }, source: 'manual' },
+        level: 100,
+        gender: 'M',
+      }],
+    };
+
+    const { p1Team } = buildTeamsFromReplay(baseLog, { p1Info });
+
+    expect(p1Team[0].nature).toBe('Jolly');
+    expect(p1Team[0].ivs.spa).toBe(0);
+  });
+
   test('uses manually edited EVs when building branch simulator teams', () => {
     const p1Info = {
       pokemon: [{

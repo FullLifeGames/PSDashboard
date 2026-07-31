@@ -13,6 +13,9 @@ export interface PastedSet {
   ability?: string;
   teraType?: string;
   evs?: PokemonEvs;
+  nature?: string;
+  ivs?: PokemonEvs;
+  level?: number;
   moves: string[];
 }
 
@@ -36,6 +39,20 @@ function parseEvLine(line: string): PokemonEvs | undefined {
     any = true;
   }
   return any ? evs : undefined;
+}
+
+function parseIvLine(line: string): PokemonEvs | undefined {
+  const ivs: PokemonEvs = { hp: 31, atk: 31, def: 31, spa: 31, spd: 31, spe: 31 };
+  let any = false;
+  for (const part of line.replace(/^IVs:/i, '').split('/')) {
+    const match = part.trim().match(/^(\d+)\s+(HP|Atk|Def|SpA|SpD|Spe)$/i);
+    if (!match) continue;
+    const key = STAT_KEYS[match[2].toLowerCase()];
+    if (!key) continue;
+    ivs[key] = Math.min(31, Math.max(0, parseInt(match[1], 10)));
+    any = true;
+  }
+  return any ? ivs : undefined;
 }
 
 function parseHeader(header: string): { species: string; nickname?: string; item?: string } | null {
@@ -76,12 +93,18 @@ export function parsePastedTeam(teamText: string): PastedSet[] {
     const abilityLine = lines.find(line => /^Ability:/i.test(line));
     const teraLine = lines.find(line => /^Tera Type:/i.test(line));
     const evLine = lines.find(line => /^EVs:/i.test(line));
+    const natureLine = lines.find(line => /^[A-Za-z]+\s+Nature$/i.test(line));
+    const ivLine = lines.find(line => /^IVs:/i.test(line));
+    const levelLine = lines.find(line => /^Level:\s*\d+$/i.test(line));
 
     sets.push({
       ...header,
       ability: abilityLine?.replace(/^Ability:/i, '').trim() || undefined,
       teraType: teraLine?.replace(/^Tera Type:/i, '').trim() || undefined,
       evs: evLine ? parseEvLine(evLine) : undefined,
+      nature: natureLine?.replace(/\s+Nature$/i, '').trim() || undefined,
+      ivs: ivLine ? parseIvLine(ivLine) : undefined,
+      level: levelLine ? parseInt(levelLine.replace(/^Level:/i, '').trim(), 10) : undefined,
       moves: moves.slice(0, 4),
     });
   }
@@ -115,6 +138,9 @@ export function applyPastedTeam(
       item: set.item ? manualField(set.item) : entry.item,
       teraType: set.teraType ? manualField(set.teraType) : entry.teraType,
       evs: set.evs ? manualEvs(set.evs) : entry.evs,
+      nature: set.nature ? manualField(set.nature) : entry.nature,
+      ivs: set.ivs ? manualEvs(set.ivs) : entry.ivs,
+      level: set.level ?? entry.level,
     };
   });
 

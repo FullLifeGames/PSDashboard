@@ -84,6 +84,9 @@ export interface RevealedPokemonInfo {
   item: PokemonFieldInfo;
   teraType: PokemonFieldInfo;
   evs: PokemonEvsInfo;
+  nature?: PokemonFieldInfo;
+  /** IV values 0–31; import/export passthrough, no editor UI. */
+  ivs?: PokemonEvsInfo;
   level: number;
   gender: string;
 }

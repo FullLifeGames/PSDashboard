@@ -86,6 +86,17 @@ function normalizeEvsField(
   return guessedEvs(fallback.evs, fallback.probability, fallback.sourceDetail);
 }
 
+function normalizeNatureField(
+  nature: PokemonFieldInfo | undefined,
+  fallback: UsageSpread | undefined,
+  setFallback?: SetSpreadAssumption,
+): PokemonFieldInfo | undefined {
+  if (nature && nature.source !== 'unknown' && nature.value) return nature;
+  if (!fallback && setFallback?.nature) return guessedField(setFallback.nature, undefined, setFallback.sourceDetail);
+  if (!fallback?.nature) return nature;
+  return guessedField(fallback.nature, fallback.probability, fallback.sourceDetail);
+}
+
 /**
  * Dedup key for move fills: "Hidden Power" and "Hidden Power Grass" describe
  * the same slot — a guessed typed variant must not join a revealed generic
@@ -142,6 +153,7 @@ export function enrichPokemonInfo(
     ability: normalizeAbilityField(pokemon.ability, usageSet?.ability, smogonSet?.ability),
     item: normalizeItemField(pokemon.item, usageSet?.item, smogonSet?.item),
     evs: normalizeEvsField(pokemon.evs, usageSet?.spread, smogonSet?.spread),
+    nature: normalizeNatureField(pokemon.nature, usageSet?.spread, smogonSet?.spread),
     moves: smogonSet ? fillSetMoves(usageFilledMoves, smogonSet.moves) : usageFilledMoves,
   };
 }

@@ -53,6 +53,10 @@ function buildSet(
   const editedEvs = info.evs?.source === 'manual' || info.evs?.source === 'revealed'
     ? sanitizeEvs(info.evs.value)
     : null;
+  const editedNature = info.nature?.value ? (info.nature.value as PokemonSet['nature']) : null;
+  const editedIvs = info.ivs?.source === 'manual' || info.ivs?.source === 'revealed'
+    ? info.ivs.value
+    : null;
   const userMatch = userTeam?.find(candidate => {
     const candidateId = toId(candidate.species);
     const infoId = toId(info.species);
@@ -77,8 +81,9 @@ function buildSet(
       ability: info.ability.value || userMatch.ability,
       item: cleanItem(info.item.value, userMatch.item),
       teraType: info.teraType.value || userMatch.teraType,
-      nature: (userMatch.nature || fallbackSpread?.nature || 'Hardy') as PokemonSet['nature'],
+      nature: (editedNature || userMatch.nature || fallbackSpread?.nature || 'Hardy') as PokemonSet['nature'],
       evs: editedEvs || matchEvs,
+      ivs: editedIvs || userMatch.ivs,
       level: info.level || userMatch.level || 100,
       gender: (info.gender || userMatch.gender || '') as '' | 'M' | 'F',
     };
@@ -94,9 +99,9 @@ function buildSet(
     item: cleanItem(info.item.value, usageSet?.item?.value || smogonSet?.item?.value || ''),
     ability: info.ability.value || usageSet?.ability?.value || smogonSet?.ability?.value || '',
     moves: moves.length > 0 ? moves : ['Tackle'],
-    nature: (spread?.nature || setSpread?.nature || 'Hardy') as PokemonSet['nature'],
+    nature: (editedNature || spread?.nature || setSpread?.nature || 'Hardy') as PokemonSet['nature'],
     evs: editedEvs || spread?.evs || setSpread?.evs || { hp: 252, atk: 252, def: 0, spa: 0, spd: 4, spe: 0 },
-    ivs: { hp: 31, atk: 31, def: 31, spa: 31, spd: 31, spe: 31 },
+    ivs: editedIvs || { hp: 31, atk: 31, def: 31, spa: 31, spd: 31, spe: 31 },
     level: info.level || 100,
     gender: (info.gender || '') as '' | 'M' | 'F',
     teraType: info.teraType.value || undefined,
