@@ -190,6 +190,38 @@ test.describe('PS Dashboard', () => {
     await expect(page.locator('button', { hasText: 'Branch Here' })).toBeVisible();
   });
 
+  test('evaluates a replay position from the replay view', async ({ page }) => {
+    test.setTimeout(180_000);
+    await page.locator('button', { hasText: 'Load' }).click();
+    await expect(page.getByText('TestPlayer1', { exact: true }).first()).toBeVisible({ timeout: 10000 });
+
+    await page.locator('button', { hasText: 'Eval' }).click();
+    const panel = page.locator('.ps-eval-panel');
+    await expect(panel).toBeVisible();
+    // Reconstruction + depth-1 search on the small fixture replay.
+    await panel.locator('button', { hasText: 'Evaluate' }).click();
+    await expect(panel.locator('.ps-eval-bar')).toBeVisible({ timeout: 120_000 });
+    await expect(panel.locator('.ps-eval-bar-p1')).toContainText('%');
+    expect(await panel.locator('.ps-eval-column').count()).toBe(2);
+    await expect(panel.getByText(/worst vs/).first()).toBeVisible();
+  });
+
+  test('branch mode: picking both recommendations arms Execute Turn', async ({ page }) => {
+    test.setTimeout(180_000);
+    await page.locator('button', { hasText: 'Load' }).click();
+    await page.locator('button', { hasText: 'Branch Here' }).click();
+    await expect(page.getByText(/Branching.*Turn/)).toBeVisible({ timeout: 15000 });
+
+    await page.locator('button', { hasText: 'Eval' }).click();
+    const panel = page.locator('.ps-eval-panel');
+    await panel.locator('button', { hasText: 'Evaluate' }).click();
+    await expect(panel.locator('.ps-eval-bar')).toBeVisible({ timeout: 120_000 });
+
+    await panel.locator('.ps-eval-column').nth(0).locator('.ps-eval-choice').first().click();
+    await panel.locator('.ps-eval-column').nth(1).locator('.ps-eval-choice').first().click();
+    await expect(page.locator('button', { hasText: 'Execute Turn' })).toBeEnabled();
+  });
+
   test('exports both sides and applies an imported set as manual data (Import/Export Sets)', async ({ page }) => {
     await page.locator('button', { hasText: 'Load' }).click();
     await expect(page.getByText('TestPlayer1', { exact: true }).first()).toBeVisible({ timeout: 10000 });

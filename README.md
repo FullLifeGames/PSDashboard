@@ -23,6 +23,7 @@ The current implementation is a working prototype, not a fully accurate replay r
 - Edit teams with legal dropdown pools: species-legal moves (learnset-based, prevo chain included), gen-legal items, the species' real abilities, tera types (gen 9), and natures. Moves and items use a filterable combobox — click an option to select it, arrow keys + Enter for keyboard use — validated against the pools.
 - Export both teams' current sets as text (Showdown format under `=== p1 ===` / `=== p2 ===` headers) and import corrected sets back — imported values apply as green manual knowledge, rebuild a live branch in place, and persist per replay for repeated perfect-information "what if I did a, b, or c" analysis. Natures, IVs, and levels round-trip.
 - Try hypothetical moves while branching ("What if it had Flamethrower?") — picked from the legal move pool, loaded into the set (adding or replacing a move), and pre-selected as that slot's pending choice with damage previews included.
+- Toggle a chess-style position evaluation (`Eval`) on the replay view or inside a branch: a sim-backed maximin search plays out every legal choice pair on forked battles (depth 1–3, deterministic fixed-seed sampling) and shows an advantage bar plus the safest choices for both sides, each with worst case, expected value, and the punishing reply. In branch mode a recommendation click pre-fills the choice picker, and an opt-in auto mode re-evaluates after every executed turn. The score is a heuristic estimate for spotting swings and blunders — not an oracle.
 - Select a turn and branch from that point into a controllable simulator — including Random Battle replays and older generations.
 - Pick moves or switches for both players and advance the branch turn by turn. Choices are stored by move identity, so forced-switch interludes and team edits can never execute a different move than the one clicked.
 - Use Tera / Mega Evolution / Ultra Burst / Z-Move toggles where the format and the reconstructed sets allow them.
@@ -40,8 +41,8 @@ As of the current repository state:
 
 - `npm run lint` passes.
 - `npm run build` succeeds.
-- `npm run test:e2e` passes with 50 browser tests (the replay JSON and the Showdown embed script are served from fixtures/cache, so the suite is CDN-independent).
-- `npm run test:regression` passes with 121 tests (plus 2 documented known-divergence skips) covering replay reconstruction, identity-based choice resolution, execute error paths, gimmick availability, damage-calc generation/set alignment, team sheets, team paste (including natures, IVs, and levels), sets import/export round-trips, legal option pools, stats parsing, exported replay file parsing, save/share, and inference quality.
+- `npm run test:e2e` passes with 52 browser tests (the replay JSON and the Showdown embed script are served from fixtures/cache, so the suite is CDN-independent).
+- `npm run test:regression` passes with 148 tests (plus 2 documented known-divergence skips and an opt-in `EVAL_BENCH=1` throughput benchmark) covering replay reconstruction, identity-based choice resolution, execute error paths, gimmick availability, damage-calc generation/set alignment, team sheets, team paste (including natures, IVs, and levels), sets import/export round-trips, legal option pools, position evaluation (static eval, forward model, maximin search with deepening), stats parsing, exported replay file parsing, save/share, and inference quality.
 
 The browser test suite validates the main happy path with a mocked replay fixture:
 
