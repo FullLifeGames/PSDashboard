@@ -8,31 +8,55 @@ export interface ChoiceOption {
   label: string;
 }
 
-/** An immutable battle position. The serialized string is the identity. */
+/**
+ * An immutable battle position. The serialized string is the identity, but it
+ * is computed lazily — depth-1 leaf children are only ever evaluated, and
+ * serializing them would double the cost of every fork for nothing.
+ */
 export interface SimPosition {
-  serialized: string;
+  readonly serialized: string;
 }
 
-const battleCache = new WeakMap<SimPosition, Battle>();
+class Position implements SimPosition {
+  private serializedCache: string | null;
+  private battleCache: Battle | null;
+
+  constructor(serialized: string | null, battle: Battle | null) {
+    this.serializedCache = serialized;
+    this.battleCache = battle;
+  }
+
+  get serialized(): string {
+    this.serializedCache ??= JSON.stringify(State.serializeBattle(this.battleCache!));
+    return this.serializedCache;
+  }
+
+  getBattle(): Battle {
+    this.battleCache ??= State.deserializeBattle(this.serializedCache!);
+    return this.battleCache;
+  }
+}
+
+/** Fallback cache for foreign `{ serialized }` literals. */
+const foreignBattleCache = new WeakMap<SimPosition, Battle>();
 
 export function createRootPosition(serializedBattle: string): SimPosition {
-  return { serialized: serializedBattle };
+  return new Position(serializedBattle, null);
 }
 
 /** Cached read-only deserialization — never mutate the returned battle. */
 export function positionBattle(position: SimPosition): Battle {
-  let battle = battleCache.get(position);
+  if (position instanceof Position) return position.getBattle();
+  let battle = foreignBattleCache.get(position);
   if (!battle) {
     battle = State.deserializeBattle(position.serialized);
-    battleCache.set(position, battle);
+    foreignBattleCache.set(position, battle);
   }
   return battle;
 }
 
 function toPosition(battle: Battle): SimPosition {
-  const position: SimPosition = { serialized: JSON.stringify(State.serializeBattle(battle)) };
-  battleCache.set(position, battle);
-  return position;
+  return new Position(null, battle);
 }
 
 const choiceKey = (name: string) => name.toLowerCase().replace(/[^a-z0-9]/g, '');

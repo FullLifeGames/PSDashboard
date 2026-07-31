@@ -141,6 +141,30 @@ test.describe('sim forward model', () => {
       .toThrow(/dracometeor|doesn't have/i);
   });
 
+  test('leaf children are not serialized until the string is needed', () => {
+    const root = createRootPosition(serialize(makeBattle(
+      [makeSet('Snorlax', 'Snorlax', ['Protect', 'Substitute'])],
+      [makeSet('Pikachu', 'Pikachu', ['Protect', 'Substitute'])],
+    )));
+    const original = State.serializeBattle;
+    let calls = 0;
+    State.serializeBattle = (battle: Parameters<typeof State.serializeBattle>[0]) => {
+      calls += 1;
+      return original.call(State, battle);
+    };
+    try {
+      const child = advancePosition(root, 'move protect', 'move protect', '1,2,3,4');
+      // The evaluation path (depth-1 leaves) must not pay for serialization.
+      expect(calls).toBe(0);
+      void child.serialized;
+      expect(calls).toBe(1);
+      void child.serialized;
+      expect(calls).toBe(1); // cached after first access
+    } finally {
+      State.serializeBattle = original;
+    }
+  });
+
   test('round-trip: a serialized mid-request battle keeps its open request', () => {
     const root = createRootPosition(serialize(makeBattle(
       [makeSet('Snorlax', 'Snorlax', ['Protect'])],
