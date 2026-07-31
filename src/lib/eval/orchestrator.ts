@@ -1,8 +1,10 @@
 import {
   attachLines, cellKey, rankFromMatrix, selectExpansionCells, toResult, TOP_EXPANSION,
-  type PvStep, type Ranked, type RankOption, type ValueMatrix,
+  type PvStep, type Ranked, type ValueMatrix,
 } from './rank';
-import type { EvalResult, EvalSettings, SearchProgress } from './types';
+import type {
+  EvalCellJob, EvalCellValue, EvalChoicesInfo, EvalResult, EvalSettings, EvalSubSearchJob, SearchProgress,
+} from './types';
 
 /**
  * Async search orchestration over an abstract executor. Pure — no @pkmn/sim
@@ -12,39 +14,10 @@ import type { EvalResult, EvalSettings, SearchProgress } from './types';
  * this module to `searchPosition`'s exact behavior.
  */
 
-export interface ChoicesInfo {
-  p1: RankOption[];
-  p2: RankOption[];
-  /** Static eval of the root (±1 when the battle already ended). */
-  rootValue: number;
-  rootEnded: boolean;
-}
-
-export interface CellJob {
-  i: number;
-  j: number;
-  p1Choice: string;
-  p2Choice: string;
-  /** Number of fixed seeds to average. */
-  samples: number;
-}
-
-export interface CellValue {
-  i: number;
-  j: number;
-  value: number;
-  /** The first-seed child is terminal. */
-  ended: boolean;
-}
-
-export interface SubSearchJob {
-  i: number;
-  j: number;
-  p1Choice: string;
-  p2Choice: string;
-  /** Sub-search settings (depth already reduced, samples fixed to 1). */
-  settings: EvalSettings;
-}
+export type ChoicesInfo = EvalChoicesInfo;
+export type CellJob = EvalCellJob;
+export type CellValue = EvalCellValue;
+export type SubSearchJob = EvalSubSearchJob;
 
 export interface SearchExecutor {
   choices(tera: boolean): Promise<ChoicesInfo>;

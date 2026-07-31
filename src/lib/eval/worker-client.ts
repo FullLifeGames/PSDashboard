@@ -1,60 +1,139 @@
-import type { EvalResult, EvalSettings, EvalWorkerResponse, SearchProgress } from './types';
+import { searchOrchestrated, type SearchExecutor } from './orchestrator';
+import type {
+  EvalCellValue, EvalResult, EvalSettings, EvalWorkerRequest, EvalWorkerResponse, SearchProgress,
+} from './types';
 
 export interface EvalRunHandlers {
   onProgress?(progress: SearchProgress): void;
   onPartial?(result: EvalResult): void;
 }
 
+interface WorkerHandle {
+  worker: Worker;
+  pending: Map<number, { resolve(response: EvalWorkerResponse): void; reject(error: Error): void }>;
+}
+
+/** Omit that distributes over a discriminated union (plain Omit collapses it). */
+type DistributiveOmit<T, K extends PropertyKey> = T extends unknown ? Omit<T, K> : never;
+
+function poolSize(): number {
+  const cores = typeof navigator !== 'undefined' ? navigator.hardwareConcurrency ?? 4 : 4;
+  return Math.max(1, Math.min(cores - 2, 6));
+}
+
 /**
- * One search at a time. Cancellation terminates the worker outright — a
- * synchronous search never yields to onmessage, so termination is the only
- * reliable stop — and the next evaluate() builds a fresh one.
+ * Coordinates the evaluation on the main thread (pure orchestrator + rank
+ * math — no sim) and fans the sim work out to a pool of workers. One search
+ * at a time; cancellation terminates the whole pool — a worker's synchronous
+ * search never yields to onmessage, so termination is the only reliable stop
+ * — and the next evaluate() rebuilds it.
  */
 export class EvalWorkerClient {
-  private worker: Worker | null = null;
+  private workers: WorkerHandle[] = [];
   private nextId = 1;
-  private pending: { id: number; reject(error: Error): void } | null = null;
+  private generation = 0;
 
-  private ensureWorker(): Worker {
-    this.worker ??= new Worker(new URL('../../workers/eval-worker.ts', import.meta.url), { type: 'module' });
-    return this.worker;
+  private ensureWorkers(): WorkerHandle[] {
+    while (this.workers.length < poolSize()) {
+      const worker = new Worker(new URL('../../workers/eval-worker.ts', import.meta.url), { type: 'module' });
+      const handle: WorkerHandle = { worker, pending: new Map() };
+      worker.onmessage = (event: MessageEvent<EvalWorkerResponse>) => {
+        const response = event.data;
+        // progress/partial interleave only on the legacy 'search' path, which
+        // the pooled client does not use — every RPC has one final response.
+        const entry = handle.pending.get(response.id);
+        if (!entry) return;
+        handle.pending.delete(response.id);
+        if (response.type === 'error') entry.reject(new Error(response.message));
+        else entry.resolve(response);
+      };
+      worker.onerror = event => {
+        const error = new Error(event.message || 'evaluation worker crashed');
+        for (const entry of handle.pending.values()) entry.reject(error);
+        handle.pending.clear();
+      };
+      this.workers.push(handle);
+    }
+    return this.workers;
+  }
+
+  private rpc(handle: WorkerHandle, request: DistributiveOmit<EvalWorkerRequest, 'id'>): Promise<EvalWorkerResponse> {
+    const id = this.nextId++;
+    return new Promise((resolve, reject) => {
+      handle.pending.set(id, { resolve, reject });
+      handle.worker.postMessage({ ...request, id });
+    });
+  }
+
+  private createPooledExecutor(serializedBattle: string): SearchExecutor {
+    let roundRobin = 0;
+    return {
+      choices: async tera => {
+        const response = await this.rpc(this.ensureWorkers()[0], { type: 'choices', serializedBattle, tera });
+        if (response.type !== 'choicesResult') throw new Error('unexpected worker response');
+        return response.info;
+      },
+      evalCells: async (jobs, onDone) => {
+        const workers = this.ensureWorkers();
+        const chunkSize = Math.max(1, Math.ceil(jobs.length / (workers.length * 3)));
+        const chunks: typeof jobs[] = [];
+        for (let start = 0; start < jobs.length; start += chunkSize) {
+          chunks.push(jobs.slice(start, start + chunkSize));
+        }
+        const values: EvalCellValue[] = [];
+        let completed = 0;
+        let next = 0;
+        await Promise.all(workers.map(async handle => {
+          while (next < chunks.length) {
+            const chunk = chunks[next++];
+            const response = await this.rpc(handle, { type: 'cells', serializedBattle, jobs: chunk });
+            if (response.type !== 'cellsResult') throw new Error('unexpected worker response');
+            values.push(...response.values);
+            completed += chunk.length;
+            onDone?.(completed);
+          }
+        }));
+        return values;
+      },
+      subSearch: async job => {
+        const workers = this.ensureWorkers();
+        const handle = workers[roundRobin++ % workers.length];
+        const response = await this.rpc(handle, { type: 'subsearch', serializedBattle, job });
+        if (response.type !== 'result') throw new Error('unexpected worker response');
+        return response.result;
+      },
+    };
   }
 
   evaluate(serializedBattle: string, settings: EvalSettings, handlers?: EvalRunHandlers): Promise<EvalResult> {
     this.cancel();
-    const worker = this.ensureWorker();
-    const id = this.nextId++;
-
-    return new Promise<EvalResult>((resolve, reject) => {
-      this.pending = { id, reject };
-      worker.onmessage = (event: MessageEvent<EvalWorkerResponse>) => {
-        const message = event.data;
-        if (message.id !== id) return;
-        if (message.type === 'progress') handlers?.onProgress?.(message.progress);
-        else if (message.type === 'partial') handlers?.onPartial?.(message.result);
-        else if (message.type === 'result') { this.pending = null; resolve(message.result); }
-        else if (message.type === 'error') { this.pending = null; reject(new Error(message.message)); }
-      };
-      worker.onerror = event => {
-        this.pending = null;
-        reject(new Error(event.message || 'evaluation worker crashed'));
-      };
-      worker.postMessage({ type: 'search', id, serializedBattle, settings });
+    const generation = ++this.generation;
+    const live = () => generation === this.generation;
+    const executor = this.createPooledExecutor(serializedBattle);
+    return searchOrchestrated(executor, settings, {
+      onProgress: progress => {
+        if (live()) handlers?.onProgress?.(progress);
+      },
+      onPartial: partial => {
+        if (live()) handlers?.onPartial?.(partial);
+      },
+      shouldStop: () => !live(),
     });
   }
 
   cancel(): void {
-    if (!this.pending) return;
-    this.worker?.terminate();
-    this.worker = null;
-    const pending = this.pending;
-    this.pending = null;
-    pending.reject(new Error('cancelled'));
+    this.generation += 1;
+    if (this.workers.length === 0) return;
+    const cancelled = new Error('cancelled');
+    for (const handle of this.workers) {
+      handle.worker.terminate();
+      for (const entry of handle.pending.values()) entry.reject(cancelled);
+      handle.pending.clear();
+    }
+    this.workers = [];
   }
 
   dispose(): void {
     this.cancel();
-    this.worker?.terminate();
-    this.worker = null;
   }
 }

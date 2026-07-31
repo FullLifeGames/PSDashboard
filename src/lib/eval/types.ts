@@ -55,11 +55,55 @@ export interface SearchProgress {
   depth: number;
 }
 
+export interface EvalChoiceOption {
+  choice: string;
+  label: string;
+}
+
+export interface EvalChoicesInfo {
+  p1: EvalChoiceOption[];
+  p2: EvalChoiceOption[];
+  /** Static eval of the root (±1 when the battle already ended). */
+  rootValue: number;
+  rootEnded: boolean;
+}
+
+export interface EvalCellJob {
+  i: number;
+  j: number;
+  p1Choice: string;
+  p2Choice: string;
+  /** Number of fixed seeds to average. */
+  samples: number;
+}
+
+export interface EvalCellValue {
+  i: number;
+  j: number;
+  value: number;
+  /** The first-seed child is terminal. */
+  ended: boolean;
+}
+
+export interface EvalSubSearchJob {
+  i: number;
+  j: number;
+  p1Choice: string;
+  p2Choice: string;
+  /** Sub-search settings (depth already reduced, samples fixed to 1). */
+  settings: EvalSettings;
+}
+
 export type EvalWorkerRequest =
-  | { type: 'search'; id: number; serializedBattle: string; settings: EvalSettings };
+  | { type: 'search'; id: number; serializedBattle: string; settings: EvalSettings }
+  | { type: 'choices'; id: number; serializedBattle: string; tera: boolean }
+  | { type: 'cells'; id: number; serializedBattle: string; jobs: EvalCellJob[] }
+  | { type: 'subsearch'; id: number; serializedBattle: string; job: EvalSubSearchJob };
 
 export type EvalWorkerResponse =
   | { type: 'progress'; id: number; progress: SearchProgress }
   | { type: 'partial'; id: number; result: EvalResult }
   | { type: 'result'; id: number; result: EvalResult }
+  | { type: 'choicesResult'; id: number; info: EvalChoicesInfo }
+  | { type: 'cellsResult'; id: number; values: EvalCellValue[] }
   | { type: 'error'; id: number; message: string };
