@@ -1,5 +1,6 @@
 import { test, expect } from '@playwright/test';
 import { Battle, State, Teams, toID } from '@pkmn/sim';
+type DeserializeFn = typeof State.deserializeBattle;
 import type { PokemonSet } from '@pkmn/sim';
 import { searchPosition } from '../src/lib/eval/search';
 import type { EvalResult, SearchProgress } from '../src/lib/eval/types';
@@ -83,6 +84,39 @@ test.describe('depth-1 search', () => {
     for (const side of ['p1', 'p2'] as const) {
       expect(result.perSide[side].length).toBeGreaterThan(0);
       expect(result.perSide[side].some(choice => choice.choice.includes('terastallize'))).toBe(false);
+    }
+  });
+
+  test('roll grouping: quiet cells sample once, KO cells get the seed spread', () => {
+    const original = State.deserializeBattle;
+    let forks = 0;
+    State.deserializeBattle = ((serialized: Parameters<DeserializeFn>[0]) => {
+      forks += 1;
+      return original.call(State, serialized);
+    }) as DeserializeFn;
+    try {
+      // 2x2 all-quiet matrix (Protect/Substitute): every cell needs one sim.
+      const quiet = serialize(makeBattle(
+        [makeSet('A', 'Snorlax', ['Protect', 'Substitute'])],
+        [makeSet('B', 'Chansey', ['Protect', 'Substitute'])],
+      ));
+      forks = 0;
+      searchPosition(quiet, { depth: 1, samples: 3, tera: false });
+      expect(forks).toBe(1 + 4); // root + 4 cells x 1 draw
+
+      // Toss KOs Pikachu (bench Eevee continues the game): those cells are
+      // roll-sensitive and take the full spread; quiet cells still take one.
+      const violent = serialize(makeBattle(
+        [makeSet('Machamp', 'Machamp', ['Seismic Toss', 'Protect'], 100)],
+        [makeSet('Pikachu', 'Pikachu', ['Tackle', 'Growl'], 30), makeSet('Eevee', 'Eevee', ['Tackle', 'Growl'], 30)],
+      ));
+      forks = 0;
+      searchPosition(violent, { depth: 1, samples: 3, tera: false });
+      const cells = 2 * 3; // 2 p1 options x 3 p2 options
+      expect(forks).toBeGreaterThan(1 + cells);       // some cells multi-sampled
+      expect(forks).toBeLessThan(1 + cells * 3);      // but not all of them
+    } finally {
+      State.deserializeBattle = original;
     }
   });
 

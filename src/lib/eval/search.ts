@@ -24,8 +24,39 @@ export const SEARCH_SEEDS: readonly PRNGSeed[] = [
 ];
 
 interface Matrix extends ValueMatrix {
-  /** children[i][j][s]: child position for seed s (kept for deepening). */
-  children: SimPosition[][][];
+  /** children[i][j]: first-seed child position (kept for deepening). */
+  children: SimPosition[][];
+}
+
+function countFainted(battle: ReturnType<typeof positionBattle>): number {
+  return battle.sides[0].pokemon.filter(p => p.fainted).length +
+    battle.sides[1].pokemon.filter(p => p.fainted).length;
+}
+
+/**
+ * Damage-roll grouping (foul-play style): a cell where nothing fainted is
+ * roll-insensitive — one sim suffices. Only cells where a KO happened get
+ * the full seed spread, because that's where rolls change the outcome. An
+ * already-ended child is exact (±1) and also samples once.
+ */
+function sampleCell(
+  root: SimPosition,
+  rootFainted: number,
+  p1Choice: string,
+  p2Choice: string,
+  samples: number,
+  matchupCache: MatchupCache,
+): { value: number; ended: boolean; firstChild: SimPosition } {
+  const firstChild = advancePosition(root, p1Choice, p2Choice, SEARCH_SEEDS[0]);
+  const firstBattle = positionBattle(firstChild);
+  const ended = firstBattle.ended;
+  let sum = evaluatePosition(firstBattle, matchupCache);
+  const draws = !ended && countFainted(firstBattle) > rootFainted ? samples : 1;
+  for (let s = 1; s < draws; s++) {
+    const child = advancePosition(root, p1Choice, p2Choice, SEARCH_SEEDS[s]);
+    sum += evaluatePosition(positionBattle(child), matchupCache);
+  }
+  return { value: sum / draws, ended, firstChild };
 }
 
 function buildMatrix(
@@ -39,25 +70,20 @@ function buildMatrix(
 ): Matrix {
   const p1Options = legalChoices(position, 'p1', { tera });
   const p2Options = legalChoices(position, 'p2', { tera });
+  const rootFainted = countFainted(positionBattle(position));
   const values: number[][] = [];
   const ended: boolean[][] = [];
-  const children: SimPosition[][][] = [];
+  const children: SimPosition[][] = [];
 
   for (let i = 0; i < p1Options.length; i++) {
     values.push([]);
     ended.push([]);
     children.push([]);
     for (let j = 0; j < p2Options.length; j++) {
-      let sum = 0;
-      const cellChildren: SimPosition[] = [];
-      for (let s = 0; s < samples; s++) {
-        const child = advancePosition(position, p1Options[i].choice, p2Options[j].choice, SEARCH_SEEDS[s]);
-        cellChildren.push(child);
-        sum += evaluatePosition(positionBattle(child), matchupCache);
-      }
-      values[i].push(sum / samples);
-      ended[i].push(positionBattle(cellChildren[0]).ended);
-      children[i].push(cellChildren);
+      const cell = sampleCell(position, rootFainted, p1Options[i].choice, p2Options[j].choice, samples, matchupCache);
+      values[i].push(cell.value);
+      ended[i].push(cell.ended);
+      children[i].push(cell.firstChild);
       progress.done += 1;
       callbacks?.onProgress?.({ done: progress.done, total: progress.total, depth });
     }
@@ -115,7 +141,7 @@ export function searchPosition(
         // Deepen the first-seed child one level shallower with a single
         // sample (the child is seed-specific); its midpoint score replaces
         // the cell's static value.
-        const child = matrix.children[i][j][0];
+        const child = matrix.children[i][j];
         const sub = searchPosition(child.serialized, { ...settings, depth: (depth - 1) as 1 | 2, samples: 1 }, undefined, matchupCache);
         matrix.values[i][j] = sub.score;
         expandedThisLevel.add(cellKey(i, j));
@@ -163,16 +189,11 @@ export function createLocalExecutor(serializedBattle: string): SearchExecutor {
     },
     async evalCells(jobs, onDone) {
       const out: CellValue[] = [];
+      const rootFainted = countFainted(positionBattle(root));
       let completed = 0;
       for (const job of jobs) {
-        let sum = 0;
-        let endedFlag = false;
-        for (let s = 0; s < job.samples; s++) {
-          const child = advancePosition(root, job.p1Choice, job.p2Choice, SEARCH_SEEDS[s]);
-          if (s === 0) endedFlag = positionBattle(child).ended;
-          sum += evaluatePosition(positionBattle(child), matchupCache);
-        }
-        out.push({ i: job.i, j: job.j, value: sum / job.samples, ended: endedFlag });
+        const cell = sampleCell(root, rootFainted, job.p1Choice, job.p2Choice, job.samples, matchupCache);
+        out.push({ i: job.i, j: job.j, value: cell.value, ended: cell.ended });
         completed += 1;
         onDone?.(completed);
       }
