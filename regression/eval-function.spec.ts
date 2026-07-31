@@ -3,9 +3,15 @@ import { Battle, Teams, toID } from '@pkmn/sim';
 import type { PokemonSet } from '@pkmn/sim';
 import { createMatchupCache, evaluatePosition } from '../src/lib/eval/eval-function';
 
-function makeSet(name: string, species: string, moves: string[], level = 50): PokemonSet {
+function makeSet(
+  name: string,
+  species: string,
+  moves: string[],
+  level = 50,
+  extras: { item?: string; ability?: string } = {},
+): PokemonSet {
   return {
-    name, species, item: '', ability: 'No Ability', moves,
+    name, species, item: extras.item ?? '', ability: extras.ability ?? 'No Ability', moves,
     nature: 'Hardy',
     evs: { hp: 252, atk: 252, def: 0, spa: 0, spd: 4, spe: 0 },
     ivs: { hp: 31, atk: 31, def: 31, spa: 31, spd: 31, spe: 31 },
@@ -135,6 +141,67 @@ test.describe('evaluatePosition', () => {
       [makeSet('B', 'Pikachu', ['Tackle'], 95)],
     );
     expect(evaluatePosition(battle)).toBeGreaterThan(0);
+  });
+
+  test('a Choice Band flips an otherwise dead-even race', () => {
+    // A Tackle mirror is a 7-turn race both ways — perfectly even. The band
+    // turns one side's 7HKO into a 5HKO.
+    const plain = makeBattle(
+      [makeSet('A', 'Snorlax', ['Tackle'])],
+      [makeSet('B', 'Snorlax', ['Tackle'])],
+    );
+    expect(evaluatePosition(plain)).toBe(0);
+    const banded = makeBattle(
+      [makeSet('A', 'Snorlax', ['Tackle'], 50, { item: 'Choice Band' })],
+      [makeSet('B', 'Snorlax', ['Tackle'])],
+    );
+    expect(evaluatePosition(banded)).toBeGreaterThan(0);
+  });
+
+  test('Eviolite bulk flips a dead-even race toward the NFE holder', () => {
+    // A Chansey Swift mirror is perfectly even; the Eviolite's 1.5x special
+    // bulk on one side stretches the race against it beyond the other's.
+    const plain = makeBattle(
+      [makeSet('A', 'Chansey', ['Swift'])],
+      [makeSet('B', 'Chansey', ['Swift'])],
+    );
+    expect(evaluatePosition(plain)).toBe(0);
+    const eviolite = makeBattle(
+      [makeSet('A', 'Chansey', ['Swift'])],
+      [makeSet('B', 'Chansey', ['Swift'], 50, { item: 'Eviolite' })],
+    );
+    expect(evaluatePosition(eviolite)).toBeLessThan(0);
+  });
+
+  test('an immunity ability blanks the attacking type', () => {
+    // Earthquake is Golem's only move; Levitate makes the matchup threatless.
+    const plain = makeBattle(
+      [makeSet('A', 'Golem', ['Earthquake'])],
+      [makeSet('B', 'Weezing', ['Sludge Bomb'], 50, { ability: 'Neutralizing Gas' })],
+    );
+    const levitating = makeBattle(
+      [makeSet('A', 'Golem', ['Earthquake'])],
+      [makeSet('B', 'Weezing', ['Sludge Bomb'], 50, { ability: 'Levitate' })],
+    );
+    expect(evaluatePosition(levitating)).toBeLessThan(evaluatePosition(plain));
+  });
+
+  test('priority breaks an otherwise even race', () => {
+    // Same species, same base power (40), same speed — Quick Attack's
+    // priority is the only difference.
+    const battle = makeBattle(
+      [makeSet('A', 'Pikachu', ['Quick Attack'])],
+      [makeSet('B', 'Pikachu', ['Tackle'])],
+    );
+    expect(evaluatePosition(battle)).toBeGreaterThan(0);
+  });
+
+  test('a healer walls an attacker that cannot 2HKO', () => {
+    // The weak attacker 5HKOs at best; Soft-Boiled outheals that forever.
+    const attacker = makeSet('A', 'Pikachu', ['Tackle'], 30);
+    const noHeal = makeBattle([attacker], [makeSet('B', 'Blissey', ['Protect'], 100)]);
+    const healer = makeBattle([attacker], [makeSet('B', 'Blissey', ['Soft-Boiled'], 100)]);
+    expect(evaluatePosition(healer)).toBeLessThan(evaluatePosition(noHeal));
   });
 
   test('a shared matchup cache never changes scores, even as HP changes', () => {

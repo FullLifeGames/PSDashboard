@@ -60,42 +60,85 @@ function sideScore(side: Side): number {
   return score;
 }
 
+/** HP-independent threat estimate of one attacker→defender direction. */
+export interface PairThreat {
+  /** Best expected damage as a fraction of the defender's max HP. */
+  fraction: number;
+  /** The attacker carries a usable damaging priority move. */
+  priority: boolean;
+}
+
 /**
  * Memo for the HP-independent part of the matchup term. One cache spans one
- * search: the memoized fraction depends only on species/level/moveset stats,
+ * search: the memoized threat depends only on species/level/set properties,
  * which are constant across every forked position of the same battle.
  */
-export type MatchupCache = Map<string, number>;
+export type MatchupCache = Map<string, PairThreat>;
 
 export function createMatchupCache(): MatchupCache {
   return new Map();
 }
 
 function pairKey(attacker: Pokemon, defender: Pokemon): string {
-  return `${attacker.side.id}:${attacker.name}:${attacker.species.id}:${attacker.level}>` +
-    `${defender.side.id}:${defender.name}:${defender.species.id}:${defender.level}`;
+  return `${attacker.side.id}:${attacker.name}:${attacker.species.id}:${attacker.level}:${attacker.item}:${attacker.ability}>` +
+    `${defender.side.id}:${defender.name}:${defender.species.id}:${defender.level}:${defender.item}:${defender.ability}`;
 }
+
+/** Defender abilities that blank (or halve) incoming move types in the proxy. */
+const ABILITY_IMMUNITIES: Record<string, string[]> = {
+  levitate: ['Ground'],
+  flashfire: ['Fire'],
+  wellbakedbody: ['Fire'],
+  waterabsorb: ['Water'],
+  dryskin: ['Water'],
+  stormdrain: ['Water'],
+  voltabsorb: ['Electric'],
+  lightningrod: ['Electric'],
+  motordrive: ['Electric'],
+  sapsipper: ['Grass'],
+  eartheater: ['Ground'],
+};
 
 /**
  * Best expected damage (as a fraction of the defender's max HP) among the
- * attacker's actual moves — standard damage formula with STAB and the type
- * chart, no rolls. Status and fixed-damage moves are invisible to this proxy.
+ * attacker's actual moves — standard damage formula with STAB, the type
+ * chart, and the big item/ability modifiers. Status and fixed-damage moves
+ * are invisible to this proxy.
  */
-function bestMoveFraction(attacker: Pokemon, defender: Pokemon, battle: Battle): number {
-  let best = 0;
+function pairThreat(attacker: Pokemon, defender: Pokemon, battle: Battle): PairThreat {
+  const blanked = ABILITY_IMMUNITIES[defender.ability] ?? [];
+  let fraction = 0;
+  let priority = false;
   for (const slot of attacker.moveSlots) {
     const move = battle.dex.moves.get(slot.id);
     if (!move.exists || move.category === 'Status' || !move.basePower) continue;
+    if (blanked.includes(move.type)) continue;
     if (!battle.dex.getImmunity(move.type, defender.types)) continue;
     const typeMult = Math.pow(2, battle.dex.getEffectiveness(move.type, defender.types));
     const stab = attacker.types.includes(move.type) ? 1.5 : 1;
+
+    let offense = 1;
+    if (attacker.item === 'lifeorb') offense *= 1.3;
+    if (attacker.item === 'choiceband' && move.category === 'Physical') offense *= 1.5;
+    if (attacker.item === 'choicespecs' && move.category === 'Special') offense *= 1.5;
+    if (defender.ability === 'thickfat' && (move.type === 'Fire' || move.type === 'Ice')) offense *= 0.5;
+
+    let bulk = 1;
+    if (defender.item === 'eviolite' && defender.species.nfe) bulk *= 1.5;
+    if (defender.item === 'assaultvest' && move.category === 'Special') bulk *= 1.5;
+
     const [atk, def] = move.category === 'Physical'
       ? [attacker.storedStats.atk, defender.storedStats.def]
       : [attacker.storedStats.spa, defender.storedStats.spd];
-    const damage = (((2 * attacker.level / 5 + 2) * move.basePower * atk / def) / 50 + 2) * stab * typeMult;
-    best = Math.max(best, damage / defender.maxhp);
+    const damage = (((2 * attacker.level / 5 + 2) * move.basePower * atk / def) / 50 + 2) *
+      stab * typeMult * offense / bulk;
+    const moveFraction = damage / defender.maxhp;
+    if (moveFraction > 0) {
+      fraction = Math.max(fraction, moveFraction);
+      if (move.priority > 0) priority = true;
+    }
   }
-  return best;
+  return { fraction, priority };
 }
 
 /**
@@ -110,13 +153,23 @@ function matchupScore(battle: Battle, cache?: MatchupCache): number {
   const p2Living = living(1);
   if (p1Living.length === 0 || p2Living.length === 0) return 0;
 
-  const fraction = (attacker: Pokemon, defender: Pokemon): number => {
-    if (!cache) return bestMoveFraction(attacker, defender, battle);
+  const threat = (attacker: Pokemon, defender: Pokemon): PairThreat => {
+    if (!cache) return pairThreat(attacker, defender, battle);
     const key = pairKey(attacker, defender);
     let value = cache.get(key);
     if (value === undefined) {
-      value = bestMoveFraction(attacker, defender, battle);
+      value = pairThreat(attacker, defender, battle);
       cache.set(key, value);
+    }
+    return value;
+  };
+
+  const healers = new Map<Pokemon, boolean>();
+  const heals = (pokemon: Pokemon): boolean => {
+    let value = healers.get(pokemon);
+    if (value === undefined) {
+      value = pokemon.moveSlots.some(slot => !!battle.dex.moves.get(slot.id).flags['heal']);
+      healers.set(pokemon, value);
     }
     return value;
   };
@@ -124,15 +177,19 @@ function matchupScore(battle: Battle, cache?: MatchupCache): number {
   let sum = 0;
   for (const a of p1Living) {
     for (const b of p2Living) {
-      const fracA = fraction(a, b);
-      const fracB = fraction(b, a);
+      const threatA = threat(a, b);
+      const threatB = threat(b, a);
+      // A defender that can heal ~50% per turn walls anything short of a 2HKO.
+      const fracA = threatA.fraction <= 0.5 && heals(b) ? 0 : threatA.fraction;
+      const fracB = threatB.fraction <= 0.5 && heals(a) ? 0 : threatB.fraction;
       const turnsA = fracA > 0 ? Math.ceil(b.hp / b.maxhp / fracA) : Infinity;
       const turnsB = fracB > 0 ? Math.ceil(a.hp / a.maxhp / fracB) : Infinity;
       let sign = 0;
       if (turnsA < turnsB) sign = 1;
       else if (turnsB < turnsA) sign = -1;
       else if (turnsA !== Infinity) {
-        sign = Math.sign(a.storedStats.spe - b.storedStats.spe);
+        if (threatA.priority !== threatB.priority) sign = threatA.priority ? 1 : -1;
+        else sign = Math.sign(a.storedStats.spe - b.storedStats.spe);
       }
       sum += sign * (a.hp / a.maxhp) * (b.hp / b.maxhp);
     }
