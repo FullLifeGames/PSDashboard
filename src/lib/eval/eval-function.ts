@@ -61,6 +61,22 @@ function sideScore(side: Side): number {
 }
 
 /**
+ * Memo for the HP-independent part of the matchup term. One cache spans one
+ * search: the memoized fraction depends only on species/level/moveset stats,
+ * which are constant across every forked position of the same battle.
+ */
+export type MatchupCache = Map<string, number>;
+
+export function createMatchupCache(): MatchupCache {
+  return new Map();
+}
+
+function pairKey(attacker: Pokemon, defender: Pokemon): string {
+  return `${attacker.side.id}:${attacker.name}:${attacker.species.id}:${attacker.level}>` +
+    `${defender.side.id}:${defender.name}:${defender.species.id}:${defender.level}`;
+}
+
+/**
  * Best expected damage (as a fraction of the defender's max HP) among the
  * attacker's actual moves — standard damage formula with STAB and the type
  * chart, no rolls. Status and fixed-damage moves are invisible to this proxy.
@@ -87,18 +103,29 @@ function bestMoveFraction(attacker: Pokemon, defender: Pokemon, battle: Battle):
  * living pair, whoever KOs first (against current HP) wins the pair, speed
  * breaking ties; pairs are weighted by both sides' HP fractions.
  */
-function matchupScore(battle: Battle): number {
+function matchupScore(battle: Battle, cache?: MatchupCache): number {
   const living = (index: 0 | 1) =>
     battle.sides[index].pokemon.filter(pokemon => !pokemon.fainted && pokemon.hp > 0);
   const p1Living = living(0);
   const p2Living = living(1);
   if (p1Living.length === 0 || p2Living.length === 0) return 0;
 
+  const fraction = (attacker: Pokemon, defender: Pokemon): number => {
+    if (!cache) return bestMoveFraction(attacker, defender, battle);
+    const key = pairKey(attacker, defender);
+    let value = cache.get(key);
+    if (value === undefined) {
+      value = bestMoveFraction(attacker, defender, battle);
+      cache.set(key, value);
+    }
+    return value;
+  };
+
   let sum = 0;
   for (const a of p1Living) {
     for (const b of p2Living) {
-      const fracA = bestMoveFraction(a, b, battle);
-      const fracB = bestMoveFraction(b, a, battle);
+      const fracA = fraction(a, b);
+      const fracB = fraction(b, a);
       const turnsA = fracA > 0 ? Math.ceil(b.hp / b.maxhp / fracA) : Infinity;
       const turnsB = fracB > 0 ? Math.ceil(a.hp / a.maxhp / fracB) : Infinity;
       let sign = 0;
@@ -114,7 +141,7 @@ function matchupScore(battle: Battle): number {
 }
 
 /** Static positional eval from p1's perspective in [-1, +1]; ±1 for ended battles. */
-export function evaluatePosition(battle: Battle): number {
+export function evaluatePosition(battle: Battle, cache?: MatchupCache): number {
   if (battle.ended) {
     if (!battle.winner) return 0;
     if (battle.winner === battle.sides[0].name) return 1;
@@ -131,6 +158,6 @@ export function evaluatePosition(battle: Battle): number {
 
   const teamSize = Math.max(battle.sides[0].pokemon.length, battle.sides[1].pokemon.length, 1);
   const normalizer = teamSize * (EVAL_WEIGHTS.alive + EVAL_WEIGHTS.hp);
-  const diff = (p1 - p2) + matchupScore(battle) * EVAL_WEIGHTS.matchup;
+  const diff = (p1 - p2) + matchupScore(battle, cache) * EVAL_WEIGHTS.matchup;
   return Math.tanh((diff / normalizer) * EVAL_WEIGHTS.scale);
 }

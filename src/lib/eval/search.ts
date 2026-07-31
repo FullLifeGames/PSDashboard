@@ -1,5 +1,5 @@
 import type { PRNGSeed } from '@pkmn/sim';
-import { evaluatePosition } from './eval-function';
+import { createMatchupCache, evaluatePosition, type MatchupCache } from './eval-function';
 import {
   advancePosition, createRootPosition, legalChoices, positionBattle,
   type ChoiceOption, type SimPosition,
@@ -43,6 +43,7 @@ function buildMatrix(
   depth: number,
   callbacks: SearchCallbacks | undefined,
   progress: { done: number; total: number },
+  matchupCache: MatchupCache,
 ): Matrix {
   const p1Options = legalChoices(position, 'p1', { tera });
   const p2Options = legalChoices(position, 'p2', { tera });
@@ -58,7 +59,7 @@ function buildMatrix(
       for (let s = 0; s < samples; s++) {
         const child = advancePosition(position, p1Options[i].choice, p2Options[j].choice, SEARCH_SEEDS[s]);
         cellChildren.push(child);
-        sum += evaluatePosition(positionBattle(child));
+        sum += evaluatePosition(positionBattle(child), matchupCache);
       }
       values[i].push(sum / samples);
       children[i].push(cellChildren);
@@ -195,21 +196,22 @@ export function searchPosition(
   serializedBattle: string,
   settings: EvalSettings,
   callbacks?: SearchCallbacks,
+  matchupCache: MatchupCache = createMatchupCache(),
 ): EvalResult {
   const root = createRootPosition(serializedBattle);
   const battle = positionBattle(root);
   if (battle.ended) {
-    const score = evaluatePosition(battle);
+    const score = evaluatePosition(battle, matchupCache);
     return { score, depthCompleted: settings.depth, perSide: { p1: [], p2: [] } };
   }
 
-  const rootValue = evaluatePosition(battle);
+  const rootValue = evaluatePosition(battle, matchupCache);
   const tera = settings.tera ?? true;
   const p1Count = legalChoices(root, 'p1', { tera }).length;
   const p2Count = legalChoices(root, 'p2', { tera }).length;
   const progress = { done: 0, total: Math.max(p1Count * p2Count, 1) };
 
-  const matrix = buildMatrix(root, settings.samples, tera, 1, callbacks, progress);
+  const matrix = buildMatrix(root, settings.samples, tera, 1, callbacks, progress, matchupCache);
   let ranked = rankFromMatrix(matrix, rootValue);
   let result = toResult(ranked, 1);
   callbacks?.onPartial?.(result);
@@ -240,7 +242,7 @@ export function searchPosition(
         // sample (the child is seed-specific); its midpoint score replaces
         // the cell's static value.
         const child = matrix.children[i][j][0];
-        const sub = searchPosition(child.serialized, { ...settings, depth: (depth - 1) as 1 | 2, samples: 1 });
+        const sub = searchPosition(child.serialized, { ...settings, depth: (depth - 1) as 1 | 2, samples: 1 }, undefined, matchupCache);
         matrix.values[i][j] = sub.score;
         expandedThisLevel.add(cellKey(i, j));
         const subTopP1 = sub.perSide.p1[0];

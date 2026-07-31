@@ -1,7 +1,7 @@
 import { test, expect } from '@playwright/test';
 import { Battle, Teams, toID } from '@pkmn/sim';
 import type { PokemonSet } from '@pkmn/sim';
-import { evaluatePosition } from '../src/lib/eval/eval-function';
+import { createMatchupCache, evaluatePosition } from '../src/lib/eval/eval-function';
 
 function makeSet(name: string, species: string, moves: string[], level = 50): PokemonSet {
   return {
@@ -135,6 +135,21 @@ test.describe('evaluatePosition', () => {
       [makeSet('B', 'Pikachu', ['Tackle'], 95)],
     );
     expect(evaluatePosition(battle)).toBeGreaterThan(0);
+  });
+
+  test('a shared matchup cache never changes scores, even as HP changes', () => {
+    const battle = makeBattle(
+      [makeSet('A', 'Charizard', ['Flamethrower']), makeSet('B', 'Charizard', ['Flamethrower'])],
+      [makeSet('C', 'Venusaur', ['Vine Whip']), makeSet('D', 'Venusaur', ['Vine Whip'])],
+    );
+    const cache = createMatchupCache();
+    expect(evaluatePosition(battle, cache)).toBe(evaluatePosition(battle));
+
+    // The memo must only cover the HP-independent part: after damage, the
+    // cached path still tracks the fresh computation exactly.
+    const active = battle.sides[1].active[0]!;
+    active.hp = Math.floor(active.maxhp / 2);
+    expect(evaluatePosition(battle, cache)).toBe(evaluatePosition(battle));
   });
 
   test('a one-mon deficit reads clearly through the score scaling', () => {
