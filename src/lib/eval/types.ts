@@ -29,6 +29,12 @@ export interface RankedChoice {
   expected: number;
   /** Label of the opponent reply achieving worstCase; null when the opponent has no choices. */
   punishedBy: string | null;
+  /**
+   * Principal variation after the punishing reply: each step is the next
+   * turn's best pair of labels. Present only on choices the deepening search
+   * expanded (depth ≥ 2).
+   */
+  line?: { p1: string; p2: string }[];
 }
 
 export interface EvalResult {

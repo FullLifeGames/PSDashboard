@@ -129,4 +129,32 @@ test.describe('iterative deepening', () => {
     expect(result.depthCompleted).toBe(1);
     expect(result.perSide.p1.length).toBeGreaterThan(0);
   });
+
+  // Three fodder mons: the win is three tosses deep, so followup lines can
+  // extend beyond one step without hitting a terminal child.
+  const threeTurnWin = () => serialize(makeBattle(
+    [makeSet('Machamp', 'Machamp', ['Seismic Toss', 'Protect'], 100)],
+    [
+      makeSet('Pikachu', 'Pikachu', ['Tackle', 'Growl'], 30),
+      makeSet('Eevee', 'Eevee', ['Tackle', 'Growl'], 30),
+      makeSet('Vulpix', 'Vulpix', ['Tackle', 'Growl'], 30),
+    ],
+  ));
+
+  test('followup lines surface on expanded top choices', () => {
+    // tera:false keeps each row narrow enough for the expansion budget to
+    // chase the shifting worst-case cell to convergence — the draft-league
+    // shape this feature exists for.
+    const depth1 = searchPosition(threeTurnWin(), { depth: 1, samples: 1, tera: false });
+    expect(depth1.perSide.p1[0].line).toBeUndefined();
+
+    const depth2 = searchPosition(threeTurnWin(), { depth: 2, samples: 1, tera: false });
+    expect(depth2.perSide.p1[0].line).toHaveLength(1);
+
+    const depth3 = searchPosition(threeTurnWin(), { depth: 3, samples: 1, tera: false });
+    expect(depth3.perSide.p1[0].line).toHaveLength(2);
+
+    const again = searchPosition(threeTurnWin(), { depth: 3, samples: 1, tera: false });
+    expect(again.perSide.p1[0].line).toEqual(depth3.perSide.p1[0].line);
+  });
 });

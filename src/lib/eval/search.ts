@@ -127,6 +127,36 @@ function toResult(ranked: Ranked, depthCompleted: number): EvalResult {
   };
 }
 
+const cellKey = (i: number, j: number) => i * 10_000 + j;
+
+/**
+ * Attaches captured principal-variation lines to every ranked entry whose
+ * worst-case cell was expanded by the deepening search.
+ */
+function attachLines(matrix: Matrix, ranked: Ranked, pvByCell: Map<number, { p1: string; p2: string }[]>): void {
+  const byChoiceP1 = new Map(matrix.p1Options.map((option, index) => [option.choice, index]));
+  const byChoiceP2 = new Map(matrix.p2Options.map((option, index) => [option.choice, index]));
+  const byLabelP1 = new Map(matrix.p1Options.map((option, index) => [option.label, index]));
+  const byLabelP2 = new Map(matrix.p2Options.map((option, index) => [option.label, index]));
+
+  for (const entry of ranked.p1) {
+    if (entry.punishedBy === null) continue;
+    const i = byChoiceP1.get(entry.choice);
+    const j = byLabelP2.get(entry.punishedBy);
+    if (i === undefined || j === undefined) continue;
+    const line = pvByCell.get(cellKey(i, j));
+    if (line) entry.line = line;
+  }
+  for (const entry of ranked.p2) {
+    if (entry.punishedBy === null) continue;
+    const i = byLabelP1.get(entry.punishedBy);
+    const j = byChoiceP2.get(entry.choice);
+    if (i === undefined || j === undefined) continue;
+    const line = pvByCell.get(cellKey(i, j));
+    if (line) entry.line = line;
+  }
+}
+
 /**
  * The cells that decide the ranking: each side's top choices paired with
  * their punishing replies, deduped, capped. Cells whose child battle already
@@ -185,27 +215,52 @@ export function searchPosition(
   callbacks?.onPartial?.(result);
 
   let stopped = false;
+  const pvByCell = new Map<number, { p1: string; p2: string }[]>();
   for (let depth = 2; depth <= settings.depth && !stopped; depth++) {
     if (callbacks?.shouldStop?.()) break;
 
-    const cells = selectExpansionCells(matrix, ranked, TOP_EXPANSION);
-    const cellProgress = { done: 0, total: Math.max(cells.length, 1) };
-    for (const [i, j] of cells) {
-      if (callbacks?.shouldStop?.()) {
-        stopped = true;
-        break;
+    // Deepening a cell usually moves its value, which shifts a row's worst
+    // case onto a sibling that is still shallow — so expansion iterates:
+    // re-rank, chase the current punishing cells, repeat under a budget.
+    // Cells are re-expanded per level (deeper sub-searches overwrite).
+    const expandedThisLevel = new Set<number>();
+    const budget = TOP_EXPANSION * 2;
+    let used = 0;
+    while (used < budget && !stopped) {
+      const wanted = selectExpansionCells(matrix, ranked, budget - used)
+        .filter(([i, j]) => !expandedThisLevel.has(cellKey(i, j)));
+      if (wanted.length === 0) break;
+
+      for (const [i, j] of wanted) {
+        if (callbacks?.shouldStop?.()) {
+          stopped = true;
+          break;
+        }
+        // Deepen the first-seed child one level shallower with a single
+        // sample (the child is seed-specific); its midpoint score replaces
+        // the cell's static value.
+        const child = matrix.children[i][j][0];
+        const sub = searchPosition(child.serialized, { ...settings, depth: (depth - 1) as 1 | 2, samples: 1 });
+        matrix.values[i][j] = sub.score;
+        expandedThisLevel.add(cellKey(i, j));
+        const subTopP1 = sub.perSide.p1[0];
+        const subTopP2 = sub.perSide.p2[0];
+        if (subTopP1 || subTopP2) {
+          pvByCell.set(cellKey(i, j), [
+            { p1: subTopP1?.label ?? '—', p2: subTopP2?.label ?? '—' },
+            ...(subTopP1?.line ?? []),
+          ]);
+        }
+        used += 1;
+        callbacks?.onProgress?.({ done: used, total: budget, depth });
       }
-      // Deepen the first-seed child one level shallower; its midpoint score
-      // replaces the cell's static value.
-      const child = matrix.children[i][j][0];
-      const sub = searchPosition(child.serialized, { ...settings, depth: (depth - 1) as 1 | 2 });
-      matrix.values[i][j] = sub.score;
-      cellProgress.done += 1;
-      callbacks?.onProgress?.({ done: cellProgress.done, total: cellProgress.total, depth });
+      if (stopped) break;
+      ranked = rankFromMatrix(matrix, rootValue);
     }
     if (stopped) break;
 
     ranked = rankFromMatrix(matrix, rootValue);
+    attachLines(matrix, ranked, pvByCell);
     result = toResult(ranked, depth);
     callbacks?.onPartial?.(result);
   }
