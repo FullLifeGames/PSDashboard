@@ -420,6 +420,9 @@ export function useBranch() {
     updateState(runtime.battleStream);
   }, [clearChoices, loadBranchEngine, updateState]);
 
+  /** Live sim battle of the current branch (null outside an active branch). */
+  const getBattle = useCallback(() => battleStreamRef.current?.battle ?? null, []);
+
   const stopBranch = useCallback(() => {
     setBranching(false);
     setSimState(null);
@@ -432,5 +435,5 @@ export function useBranch() {
     clearChoices();
   }, [clearChoices]);
 
-  return { branching, simState, history, executeError, executing, startBranch, setChoice, executeTurn, stopBranch };
+  return { branching, simState, history, executeError, executing, startBranch, setChoice, executeTurn, stopBranch, getBattle };
 }
