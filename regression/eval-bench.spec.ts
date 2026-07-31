@@ -60,6 +60,18 @@ test.describe('eval engine benchmark', () => {
     const root = createRootPosition(serialize(makeSixVsSix()));
 
     const forks = 50;
+
+    // Stage split: where does a fork's time actually go?
+    const serialized = root.serialized;
+    const deserializeStart = performance.now();
+    for (let i = 0; i < forks; i++) State.deserializeBattle(serialized);
+    console.log(`deserialize only: ${((performance.now() - deserializeStart) / forks).toFixed(1)} ms each`);
+
+    const stageBattle = State.deserializeBattle(serialized);
+    const serializeStart = performance.now();
+    for (let i = 0; i < forks; i++) JSON.stringify(State.serializeBattle(stageBattle));
+    console.log(`serialize only: ${((performance.now() - serializeStart) / forks).toFixed(1)} ms each`);
+
     const forkStart = performance.now();
     for (let i = 0; i < forks; i++) {
       advancePosition(root, 'move 1', 'move 1', '1,2,3,4');
