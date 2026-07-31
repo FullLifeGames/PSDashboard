@@ -176,7 +176,14 @@ export function EvalPanel({
             <div className="ps-eval-bar-fill" style={{ width: `${p1Pct}%` }} />
             <div className="ps-eval-bar-tick" />
           </div>
-          <div style={{ fontSize: 10, color: '#778', marginTop: 2 }}>depth {result.depthCompleted}</div>
+          <div style={{ display: 'flex', gap: 8, alignItems: 'baseline', fontSize: 10, color: '#778', marginTop: 2 }}>
+            <span>depth {result.depthCompleted}</span>
+            {result.interval > 0.25 && (
+              <span style={{ color: '#b6a46a' }} title="No safe line exists — the outcome hinges on out-predicting the opponent.">
+                toss-up: prediction battle
+              </span>
+            )}
+          </div>
           <div className="ps-eval-columns">
             <ChoiceList side="p1" choices={result.perSide.p1} onPickChoice={onPickChoice} />
             <ChoiceList side="p2" choices={result.perSide.p2} onPickChoice={onPickChoice} />

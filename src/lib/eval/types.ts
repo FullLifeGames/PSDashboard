@@ -44,6 +44,12 @@ export interface RankedChoice {
 export interface EvalResult {
   /** [-1, +1] from p1's perspective: midpoint of the two sides' maximin guarantees. */
   score: number;
+  /**
+   * Width of the [v1, v2] interval the true game value lies in. Near 0 = a
+   * stable line exists; wide = the turn hinges on out-predicting the
+   * opponent (a genuine toss-up).
+   */
+  interval: number;
   depthCompleted: number;
   perSide: { p1: RankedChoice[]; p2: RankedChoice[] };
 }

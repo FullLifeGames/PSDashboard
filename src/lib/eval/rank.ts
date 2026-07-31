@@ -85,6 +85,7 @@ export function rankFromMatrix(matrix: ValueMatrix, rootValue: number): Ranked {
 export function toResult(ranked: Ranked, depthCompleted: number): EvalResult {
   return {
     score: (ranked.v1 + ranked.v2) / 2,
+    interval: Math.max(0, ranked.v2 - ranked.v1),
     depthCompleted,
     perSide: { p1: ranked.p1, p2: ranked.p2 },
   };

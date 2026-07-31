@@ -76,7 +76,7 @@ export function searchPosition(
   const battle = positionBattle(root);
   if (battle.ended) {
     const score = evaluatePosition(battle, matchupCache);
-    return { score, depthCompleted: settings.depth, perSide: { p1: [], p2: [] } };
+    return { score, interval: 0, depthCompleted: settings.depth, perSide: { p1: [], p2: [] } };
   }
 
   const rootValue = evaluatePosition(battle, matchupCache);

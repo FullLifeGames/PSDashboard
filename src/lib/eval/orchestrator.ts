@@ -41,7 +41,7 @@ export async function searchOrchestrated(
   const tera = settings.tera ?? true;
   const info = await executor.choices(tera);
   if (info.rootEnded) {
-    return { score: info.rootValue, depthCompleted: settings.depth, perSide: { p1: [], p2: [] } };
+    return { score: info.rootValue, interval: 0, depthCompleted: settings.depth, perSide: { p1: [], p2: [] } };
   }
 
   const { p1, p2, rootValue } = info;

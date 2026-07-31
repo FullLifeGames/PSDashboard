@@ -44,6 +44,8 @@ test.describe('depth-1 search', () => {
     expect(result.perSide.p1[0].worstCase).toBe(1);
     expect(result.score).toBeGreaterThan(0.5);
     expect(result.depthCompleted).toBe(1);
+    // A dominant winning line has no prediction uncertainty.
+    expect(result.interval).toBe(0);
   });
 
   test('when staying in dies, the saving switch ranks first', () => {

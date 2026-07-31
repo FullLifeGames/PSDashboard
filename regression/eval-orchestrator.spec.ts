@@ -88,6 +88,7 @@ test.describe('search orchestrator', () => {
         // Deepening confirms the static value exactly, so iteration converges.
         return {
           score: values[`${job.i},${job.j}`],
+          interval: 0,
           depthCompleted: job.settings.depth,
           perSide: {
             p1: [{ choice: 'move next', label: 'Next', worstCase: 0, expected: 0, punishedBy: null }],
@@ -102,5 +103,7 @@ test.describe('search orchestrator', () => {
     expect(result.perSide.p1[0].choice).toBe('move a'); // maximin: worst(a)=0.2 > worst(b)=-0.5
     expect(result.perSide.p1[0].line).toEqual([{ p1: 'Next', p2: 'Reply' }]);
     expect(subSearches.length).toBeGreaterThan(0);
+    // Game value lies in [v1, v2] = [0.2, 0.3] — the prediction interval.
+    expect(result.interval).toBeCloseTo(0.1, 10);
   });
 });
