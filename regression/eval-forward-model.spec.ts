@@ -165,6 +165,25 @@ test.describe('sim forward model', () => {
     }
   });
 
+  test('a fainted active under a stale move request is repaired by auto-replacement', () => {
+    // Snapshot corrections can faint an active without updating the request
+    // (rare diverged reconstructions) — the sim then auto-passes the dead
+    // slot and rejects every choice with "more choices than unfainted".
+    const battle = makeBattle(
+      [makeSet('Snorlax', 'Snorlax', ['Protect'])],
+      [makeSet('Pikachu', 'Pikachu', ['Protect']), makeSet('Eevee', 'Eevee', ['Protect'])],
+    );
+    const active = battle.sides[1].active[0]!;
+    active.hp = 0;
+    active.fainted = true;
+    const root = createRootPosition(serialize(battle));
+
+    expect(positionBattle(root).sides[1].active[0]!.name).toBe('Eevee');
+    expect(legalChoices(root, 'p2').map(option => option.choice)).toContain('move protect');
+    const child = advancePosition(root, 'move protect', 'move protect', '1,2,3,4');
+    expect(positionBattle(child).turn).toBe(positionBattle(root).turn + 1);
+  });
+
   test('round-trip: a serialized mid-request battle keeps its open request', () => {
     const root = createRootPosition(serialize(makeBattle(
       [makeSet('Snorlax', 'Snorlax', ['Protect'])],

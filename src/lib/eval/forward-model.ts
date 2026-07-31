@@ -32,7 +32,10 @@ class Position implements SimPosition {
   }
 
   getBattle(): Battle {
-    this.battleCache ??= State.deserializeBattle(this.serializedCache!);
+    if (!this.battleCache) {
+      this.battleCache = State.deserializeBattle(this.serializedCache!);
+      repairFaintedActives(this.battleCache);
+    }
     return this.battleCache;
   }
 }
@@ -104,6 +107,27 @@ export function legalChoices(
   return options;
 }
 
+const REPAIR_SEED: PRNGSeed = '1,2,3,4';
+
+/**
+ * Snapshot corrections can faint an active without updating the request
+ * (rare diverged reconstructions). The sim then auto-passes the dead slot
+ * and rejects every choice with "more choices than unfainted Pokémon".
+ * Repair: flag the corpse for replacement, regenerate a proper switch
+ * request, and greedily resolve it to a clean turn boundary. Deterministic,
+ * so every fork of the same serialized string repairs identically.
+ */
+function repairFaintedActives(battle: Battle): void {
+  if (battle.ended) return;
+  const stale = battle.sides
+    .slice(0, 2)
+    .filter(side => side.requestState === 'move' && side.active[0]?.fainted);
+  if (stale.length === 0) return;
+  for (const side of stale) side.active[0]!.switchFlag = true;
+  battle.makeRequest('switch');
+  resolveForcedSwitches(battle, REPAIR_SEED);
+}
+
 /**
  * Deserializes a fresh copy of the position and seeds its PRNG so the
  * advance is reproducible.
@@ -111,6 +135,7 @@ export function legalChoices(
 function forkBattle(position: SimPosition, seed: PRNGSeed): Battle {
   const battle = State.deserializeBattle(position.serialized);
   battle.prng = new PRNG(seed);
+  repairFaintedActives(battle);
   return battle;
 }
 
