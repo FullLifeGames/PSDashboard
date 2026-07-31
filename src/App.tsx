@@ -394,6 +394,10 @@ function App() {
     [editedP1Info, editedP2Info, teamText],
   );
 
+  // 'auto' Tera: a finished game that never terastallized treats it as banned.
+  const teraSeen = useMemo(() => !!replayData && replayData.log.includes('terastallize'), [replayData]);
+  const effectiveTera = evaluation.prefs.tera === 'auto' ? teraSeen : evaluation.prefs.tera === 'on';
+
   const acquireBranchPosition = useCallback(async () => {
     const battle = getBattle();
     if (!battle) throw new Error('No live branch battle to evaluate.');
@@ -434,14 +438,15 @@ function App() {
   const handleEvaluate = useCallback(() => {
     if (!replayData) return;
     if (branching) {
-      evaluation.evaluate({ cacheKey: null, acquire: acquireBranchPosition });
+      evaluation.evaluate({ cacheKey: null, tera: effectiveTera, acquire: acquireBranchPosition });
     } else {
       evaluation.evaluate({
         cacheKey: `${replayData.id}:${branchTurn}:${setsFingerprint}`,
+        tera: effectiveTera,
         acquire: acquireReplayPosition,
       });
     }
-  }, [replayData, branching, evaluation, acquireBranchPosition, acquireReplayPosition, branchTurn, setsFingerprint]);
+  }, [replayData, branching, evaluation, effectiveTera, acquireBranchPosition, acquireReplayPosition, branchTurn, setsFingerprint]);
 
   // Clicking a recommended choice pre-fills the branch pickers.
   const handlePickEvalChoice = useCallback((side: 'p1' | 'p2', ranked: RankedChoice) => {

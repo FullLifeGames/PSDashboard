@@ -7,6 +7,8 @@ export type EvalStatus = 'idle' | 'reconstructing' | 'searching' | 'done' | 'sta
 export interface EvaluateParams {
   /** Cache key for replay-view positions; null disables caching (branch mode). */
   cacheKey: string | null;
+  /** Resolved Tera enumeration flag (the 'auto' pref resolved against the replay). */
+  tera: boolean;
   /**
    * Produces the serialized position. A reconstruction-based acquire calls
    * reportReconstruct(turn, target) as it replays turns; the hook surfaces
@@ -16,7 +18,7 @@ export interface EvaluateParams {
 }
 
 const PREFS_KEY = 'ps-replay-interceptor:eval-prefs';
-const DEFAULT_PREFS: EvalPreferences = { depth: 1, samples: 3, auto: false };
+const DEFAULT_PREFS: EvalPreferences = { depth: 2, samples: 3, auto: false, tera: 'auto' };
 
 function loadPrefs(): EvalPreferences {
   try {
@@ -24,9 +26,10 @@ function loadPrefs(): EvalPreferences {
     if (!raw) return DEFAULT_PREFS;
     const parsed = JSON.parse(raw) as Partial<EvalPreferences>;
     return {
-      depth: parsed.depth === 2 || parsed.depth === 3 ? parsed.depth : 1,
+      depth: parsed.depth === 1 || parsed.depth === 3 ? parsed.depth : 2,
       samples: parsed.samples === 1 || parsed.samples === 5 ? parsed.samples : 3,
       auto: !!parsed.auto,
+      tera: parsed.tera === 'on' || parsed.tera === 'off' ? parsed.tera : 'auto',
     };
   } catch {
     return DEFAULT_PREFS;
@@ -37,6 +40,7 @@ interface CachedEval {
   result: EvalResult;
   depth: EvalPreferences['depth'];
   samples: EvalPreferences['samples'];
+  tera: boolean;
 }
 
 export function useEvaluation() {
@@ -77,7 +81,7 @@ export function useEvaluation() {
     const { depth, samples } = prefsRef.current;
     if (params.cacheKey) {
       const hit = cacheRef.current.get(params.cacheKey);
-      if (hit && hit.depth === depth && hit.samples === samples) {
+      if (hit && hit.depth === depth && hit.samples === samples && hit.tera === params.tera) {
         runRef.current += 1;
         setResult(hit.result);
         setStatus('done');
@@ -105,7 +109,7 @@ export function useEvaluation() {
         setReconstructProgress(null);
 
         clientRef.current ??= new EvalWorkerClient();
-        const final = await clientRef.current.evaluate(serialized, { depth, samples }, {
+        const final = await clientRef.current.evaluate(serialized, { depth, samples, tera: params.tera }, {
           onProgress: update => {
             if (runRef.current === runId) setProgress(update);
           },
@@ -117,7 +121,7 @@ export function useEvaluation() {
         setResult(final);
         setStatus('done');
         setProgress(null);
-        if (params.cacheKey) cacheRef.current.set(params.cacheKey, { result: final, depth, samples });
+        if (params.cacheKey) cacheRef.current.set(params.cacheKey, { result: final, depth, samples, tera: params.tera });
       } catch (err) {
         if (runRef.current !== runId) return;
         if (err instanceof Error && err.message === 'cancelled') return;
@@ -130,7 +134,9 @@ export function useEvaluation() {
   }, []);
 
   const setPrefs = useCallback((next: EvalPreferences) => {
-    const changed = next.depth !== prefsRef.current.depth || next.samples !== prefsRef.current.samples;
+    const changed = next.depth !== prefsRef.current.depth ||
+      next.samples !== prefsRef.current.samples ||
+      next.tera !== prefsRef.current.tera;
     setPrefsState(next);
     try {
       localStorage.setItem(PREFS_KEY, JSON.stringify(next));
