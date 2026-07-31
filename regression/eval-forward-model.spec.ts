@@ -50,6 +50,18 @@ test.describe('sim forward model', () => {
     expect(p1.find(option => option.choice === 'switch 2')?.label).toBe('→ Chansey');
   });
 
+  test('tera variants can be disabled', () => {
+    const root = createRootPosition(serialize(makeBattle(
+      [makeSet('Snorlax', 'Snorlax', ['Protect'])],
+      [makeSet('Pikachu', 'Pikachu', ['Protect'])],
+    )));
+    const withTera = legalChoices(root, 'p1').map(option => option.choice);
+    expect(withTera).toContain('move protect terastallize');
+    const withoutTera = legalChoices(root, 'p1', { tera: false }).map(option => option.choice);
+    expect(withoutTera).toContain('move protect');
+    expect(withoutTera.some(choice => choice.includes('terastallize'))).toBe(false);
+  });
+
   test('a fainted bench Pokémon never appears as a switch', () => {
     const battle = makeBattle(
       [makeSet('Snorlax', 'Snorlax', ['Protect']), makeSet('Chansey', 'Chansey', ['Protect'])],

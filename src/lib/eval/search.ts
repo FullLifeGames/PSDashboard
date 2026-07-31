@@ -39,12 +39,13 @@ interface Ranked {
 function buildMatrix(
   position: SimPosition,
   samples: number,
+  tera: boolean,
   depth: number,
   callbacks: SearchCallbacks | undefined,
   progress: { done: number; total: number },
 ): Matrix {
-  const p1Options = legalChoices(position, 'p1');
-  const p2Options = legalChoices(position, 'p2');
+  const p1Options = legalChoices(position, 'p1', { tera });
+  const p2Options = legalChoices(position, 'p2', { tera });
   const values: number[][] = [];
   const children: SimPosition[][][] = [];
 
@@ -173,11 +174,12 @@ export function searchPosition(
   }
 
   const rootValue = evaluatePosition(battle);
-  const p1Count = legalChoices(root, 'p1').length;
-  const p2Count = legalChoices(root, 'p2').length;
+  const tera = settings.tera ?? true;
+  const p1Count = legalChoices(root, 'p1', { tera }).length;
+  const p2Count = legalChoices(root, 'p2', { tera }).length;
   const progress = { done: 0, total: Math.max(p1Count * p2Count, 1) };
 
-  const matrix = buildMatrix(root, settings.samples, 1, callbacks, progress);
+  const matrix = buildMatrix(root, settings.samples, tera, 1, callbacks, progress);
   let ranked = rankFromMatrix(matrix, rootValue);
   let result = toResult(ranked, 1);
   callbacks?.onPartial?.(result);

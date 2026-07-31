@@ -41,12 +41,17 @@ function sideIndex(side: 'p1' | 'p2'): 0 | 1 {
   return side === 'p1' ? 0 : 1;
 }
 
-export function legalChoices(position: SimPosition, side: 'p1' | 'p2'): ChoiceOption[] {
+export function legalChoices(
+  position: SimPosition,
+  side: 'p1' | 'p2',
+  opts?: { tera?: boolean },
+): ChoiceOption[] {
   const battle = positionBattle(position);
   const sideState = battle.sides[sideIndex(side)];
   const request = sideState.activeRequest;
   if (!request || battle.ended) return [];
 
+  const allowTera = opts?.tera ?? true;
   const options: ChoiceOption[] = [];
   const active = 'active' in request ? request.active?.[0] : undefined;
   const forced = 'forceSwitch' in request && !!request.forceSwitch?.[0];
@@ -56,7 +61,7 @@ export function legalChoices(position: SimPosition, side: 'p1' | 'p2'): ChoiceOp
     for (const move of active.moves) {
       if ('disabled' in move && move.disabled) continue;
       options.push({ choice: `move ${choiceKey(move.move)}`, label: move.move });
-      if ('canTerastallize' in active && active.canTerastallize) {
+      if (allowTera && 'canTerastallize' in active && active.canTerastallize) {
         options.push({
           choice: `move ${choiceKey(move.move)} terastallize`,
           label: `Tera + ${move.move}`,

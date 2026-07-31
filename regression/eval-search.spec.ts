@@ -72,6 +72,18 @@ test.describe('depth-1 search', () => {
     }
   });
 
+  test('tera can be excluded from the search', () => {
+    const root = serialize(makeBattle(
+      [makeSet('Machamp', 'Machamp', ['Seismic Toss', 'Protect'], 100)],
+      [makeSet('Chansey', 'Chansey', ['Seismic Toss', 'Protect'], 100)],
+    ));
+    const result = searchPosition(root, { depth: 1, samples: 1, tera: false });
+    for (const side of ['p1', 'p2'] as const) {
+      expect(result.perSide[side].length).toBeGreaterThan(0);
+      expect(result.perSide[side].some(choice => choice.choice.includes('terastallize'))).toBe(false);
+    }
+  });
+
   test('progress covers the full matrix and results are deterministic', () => {
     const root = serialize(makeBattle(
       [makeSet('Snorlax', 'Snorlax', ['Protect', 'Substitute'])],

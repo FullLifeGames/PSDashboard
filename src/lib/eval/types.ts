@@ -4,6 +4,8 @@ export interface EvalSettings {
   depth: 1 | 2 | 3;
   /** Number of fixed PRNG seeds averaged per matrix cell. */
   samples: 1 | 3 | 5;
+  /** Enumerate Terastallize move variants (default true). */
+  tera?: boolean;
 }
 
 /** Panel preferences persisted in localStorage (worker only sees EvalSettings). */
