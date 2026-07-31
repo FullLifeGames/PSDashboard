@@ -53,6 +53,8 @@ The current precedence is:
 3. Smogon usage-stat guesses for anything still unknown, when monthly stats can be fetched — formats without a stats file (Custom Game, niche metas) fall back to the generation's OU stats
 4. `@pkmn/smogon` set assumptions for remaining gaps (Custom Game also maps to the generation's OU here)
 
+The knowledge model round-trips natures, IVs, and levels. Both teams can be exported as text and re-imported (`src/lib/sets-io.ts`, side-headered Showdown blocks); imports overlay as manual knowledge, persist per replay id in localStorage, and rebuild a live branch through the same refresh path as team edits. The team editor draws its choices from legal pools (`src/lib/pokemon-options.ts`: learnset-based move pools with prevo-chain walk, gen-legal items, species abilities, tera types, natures), loaded via dynamic import so dex data stays out of the entry chunk.
+
 This is the most important approximation point in the current implementation. The branch engine can only be as accurate as the reconstructed teams.
 
 Relevant files:
@@ -103,7 +105,7 @@ The main application surface in [`src/App.tsx`](./src/App.tsx) has two modes:
 ### Branch mode
 
 - `PSReplayFrame` renders the branch simulator log instead of the original replay log.
-- `BranchPanel` shows move, target, and switch controls for both sides.
+- `BranchPanel` shows move, target, and switch controls for both sides, plus a "What if it had …" row that loads a hypothetical legal move into the active set — implemented as a team edit going through the same branch-refresh path as `TeamEditor` saves, with the move pre-seeded as that slot's pending choice.
 - `BranchHistoryPanel` compares executed branch turns against the original replay line.
 - `BranchSaveSharePanel` saves compact branch reports to localStorage and creates URL-hash share payloads.
 - `BattleStatsPanel` stays visible to show inferred team information.

@@ -20,6 +20,9 @@ The current implementation is a working prototype, not a fully accurate replay r
 - Fetch optional usage stats (via the CORS-safe `data.pkmn.cc` mirror) and `@pkmn/smogon` set assumptions for unrevealed abilities, items, moves, natures, and EV spreads.
 - Display whether team data is revealed from the replay, guessed from usage stats, or manually edited.
 - Edit reconstructed information for both players before or during branching (edits rebuild the branch and replay its history).
+- Edit teams with legal dropdown pools: species-legal moves (learnset-based, prevo chain included), gen-legal items, the species' real abilities, tera types (gen 9), and natures — with validation against the pools.
+- Export both teams' current sets as text (Showdown format under `=== p1 ===` / `=== p2 ===` headers) and import corrected sets back — imported values apply as green manual knowledge, rebuild a live branch in place, and persist per replay for repeated perfect-information "what if I did a, b, or c" analysis. Natures, IVs, and levels round-trip.
+- Try hypothetical moves while branching ("What if it had Flamethrower?") — picked from the legal move pool, loaded into the set (adding or replacing a move), and pre-selected as that slot's pending choice with damage previews included.
 - Select a turn and branch from that point into a controllable simulator — including Random Battle replays and older generations.
 - Pick moves or switches for both players and advance the branch turn by turn. Choices are stored by move identity, so forced-switch interludes and team edits can never execute a different move than the one clicked.
 - Use Tera / Mega Evolution / Ultra Burst / Z-Move toggles where the format and the reconstructed sets allow them.
@@ -37,8 +40,8 @@ As of the current repository state:
 
 - `npm run lint` passes.
 - `npm run build` succeeds.
-- `npm run test:e2e` passes with 44 browser tests (the replay JSON and the Showdown embed script are served from fixtures/cache, so the suite is CDN-independent).
-- `npm run test:regression` passes with 108 tests (plus 2 documented known-divergence skips) covering replay reconstruction, identity-based choice resolution, execute error paths, gimmick availability, damage-calc generation/set alignment, team sheets, team paste, stats parsing, exported replay file parsing, save/share, and inference quality.
+- `npm run test:e2e` passes with 50 browser tests (the replay JSON and the Showdown embed script are served from fixtures/cache, so the suite is CDN-independent).
+- `npm run test:regression` passes with 121 tests (plus 2 documented known-divergence skips) covering replay reconstruction, identity-based choice resolution, execute error paths, gimmick availability, damage-calc generation/set alignment, team sheets, team paste (including natures, IVs, and levels), sets import/export round-trips, legal option pools, stats parsing, exported replay file parsing, save/share, and inference quality.
 
 The browser test suite validates the main happy path with a mocked replay fixture:
 
@@ -138,11 +141,12 @@ The app can be included in another site and handed a replay to render:
 1. Paste a replay URL or replay ID into the loader, or drop an exported replay `.html` file onto the loader panel.
 2. Optionally expand the team section and paste your own exported team to improve reconstruction.
 3. Load the replay.
-4. Scrub to a turn using the replay viewer or the branch slider.
-5. Click `Branch Here`.
-6. Choose a move or switch for both sides.
-7. Execute the turn and continue exploring the branch.
-8. Use `Edit Player` or `Edit Opp` if you want to override inferred details before branching.
+4. For perfect-information analysis, open `Import/Export Sets`, correct both teams (or paste the real sets), and import — the import is remembered for this replay.
+5. Scrub to a turn using the replay viewer or the branch slider.
+6. Click `Branch Here`.
+7. Choose a move or switch for both sides — or load a hypothetical move via "What if it had …".
+8. Execute the turn and continue exploring the branch.
+9. Use `Edit Player` or `Edit Opp` if you want to override inferred details before branching.
 
 ## Repository Map
 
@@ -160,7 +164,9 @@ The app can be included in another site and handed a replay to render:
 - [`src/lib/team-info.ts`](./src/lib/team-info.ts) enriches revealed team data while preserving revealed/guessed/manual source labels.
 - [`src/lib/branch-choices.ts`](./src/lib/branch-choices.ts) defines the identity-based choice model shared by the UI and the engine.
 - [`src/lib/damage-calc.ts`](./src/lib/damage-calc.ts) computes damage previews with `@smogon/calc` using the replay generation, sim sets, and field state.
-- [`src/lib/team-paste.ts`](./src/lib/team-paste.ts) parses pasted Showdown exports and overlays them as manual knowledge.
+- [`src/lib/team-paste.ts`](./src/lib/team-paste.ts) parses pasted Showdown exports (including natures, IVs, and levels) and overlays them as manual knowledge.
+- [`src/lib/sets-io.ts`](./src/lib/sets-io.ts) builds and parses the side-headered both-teams text format for the Import/Export Sets panel.
+- [`src/lib/pokemon-options.ts`](./src/lib/pokemon-options.ts) serves legal move/item/ability/tera/nature pools for dropdowns (loaded lazily to keep dex data out of the entry chunk).
 - [`src/components/PSReplayFrame.tsx`](./src/components/PSReplayFrame.tsx) renders the Showdown replay viewer in an iframe.
 - [`src/components/BranchPanel.tsx`](./src/components/BranchPanel.tsx) renders move and switch controls for the active branch.
 - [`src/components/BranchSaveSharePanel.tsx`](./src/components/BranchSaveSharePanel.tsx) saves branch summaries locally and creates compact share links.

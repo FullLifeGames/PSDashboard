@@ -506,17 +506,17 @@ test.describe('PS Dashboard', () => {
     const editor = page.getByRole('dialog', { name: 'Edit Player Team' });
     const garchompCard = editor.locator('.ps-panel').filter({ hasText: 'Garchomp' }).first();
     await garchompCard.getByLabel('Remove Earthquake from Garchomp').click();
-    await garchompCard.getByPlaceholder('Add move...').fill('Brave Bird');
+    await garchompCard.getByPlaceholder('Add move...').fill('Stone Edge');
     await garchompCard.getByPlaceholder('Add move...').press('Enter');
     await editor.locator('button', { hasText: /^Save$/ }).click();
 
     await expect(page.getByText(/Branching.*Turn 2/)).toBeVisible({ timeout: 15000 });
     await expect(page.locator('.ps-panel', { hasText: 'Branch History' })).toContainText('Turn 1');
-    await expect(p1Controls).toContainText('Brave Bird');
+    await expect(p1Controls).toContainText('Stone Edge');
     await expect(p1Controls).not.toContainText('Earthquake');
     await expect(p2Controls).toContainText(/\[move .+\]/);
 
-    await p1Controls.locator('.ps-movebtn', { hasText: 'Brave Bird' }).click();
+    await p1Controls.locator('.ps-movebtn', { hasText: 'Stone Edge' }).click();
     await expect(page.locator('button', { hasText: 'Execute Turn' })).toBeEnabled();
   });
 
