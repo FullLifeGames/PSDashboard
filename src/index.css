@@ -1207,3 +1207,76 @@ input[type="range"]::-webkit-slider-thumb {
   background: rgba(200,160,80,0.25);
   color: #ca8;
 }
+
+/* ----- Evaluation panel ----- */
+.ps-eval-panel {
+  margin-top: 8px;
+}
+.ps-eval-bar {
+  display: flex;
+  height: 22px;
+  border-radius: 3px;
+  overflow: hidden;
+  font-size: 11px;
+  font-weight: bold;
+  background: #7a3550;
+}
+.ps-eval-bar-p1 {
+  background: #35507a;
+  color: #cde;
+  display: flex;
+  align-items: center;
+  padding: 0 6px;
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+}
+.ps-eval-bar-p2 {
+  color: #edc;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  padding: 0 6px;
+  margin-left: auto;
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+}
+.ps-eval-columns {
+  display: flex;
+  gap: 12px;
+  margin-top: 8px;
+  flex-wrap: wrap;
+}
+.ps-eval-column {
+  flex: 1;
+  min-width: 180px;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+.ps-eval-choice {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 8px;
+  width: 100%;
+  text-align: left;
+  font-size: 11px;
+  padding: 3px 6px;
+}
+.ps-eval-stale {
+  opacity: 0.5;
+}
+.ps-eval-progress {
+  height: 6px;
+  background: #223;
+  border-radius: 3px;
+  overflow: hidden;
+  margin: 6px 0;
+}
+.ps-eval-progress > div {
+  height: 100%;
+  background: #8cf;
+  transition: width 0.2s;
+}

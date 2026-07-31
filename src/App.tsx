@@ -13,14 +13,17 @@ import { BranchSaveSharePanel } from './components/BranchSaveSharePanel';
 import { BattleStatsPanel } from './components/BattleStatsPanel';
 import { TeamEditor } from './components/TeamEditor';
 import { SetsImportExportPanel } from './components/SetsImportExportPanel';
+import { EvalPanel } from './components/EvalPanel';
+import { useEvaluation } from './hooks/useEvaluation';
 import { buildSetsExport, parseSetsImport } from './lib/sets-io';
 import { parseTeamText } from './lib/team-parser';
 import { enrichTeamInfo, manualMove } from './lib/team-info';
 import { applyPastedTeam, countMatchingSpecies, parsePastedTeam, type PastedSet } from './lib/team-paste';
 import type { OpponentTeamInfo } from './types';
 import { decodeBranchShare, type BranchSharePayload } from './lib/branch-share';
-import { getBranchSimulatorFormat, getReplayGeneration } from './lib/replay-format';
+import { getBranchSimulatorFormat, getReplayGameType, getReplayGeneration } from './lib/replay-format';
 import { choiceId, type BranchSlotChoice } from './lib/branch-choices';
+import type { RankedChoice } from './lib/eval/types';
 
 const TEAM_PASTE_STORAGE_KEY = 'ps-replay-interceptor:team-paste';
 
@@ -111,7 +114,8 @@ function SharedBranchView({
 function App() {
   const { loading, error, replayData, snapshots, opponentInfo, p1Info, loadReplay, loadReplayFile } = useReplay();
   const { embed, requestedReplay } = useEmbedHost({ loadReplay, loadReplayFile });
-  const { branching, simState, history, executeError, executing, startBranch, setChoice, executeTurn, stopBranch } = useBranch();
+  const { branching, simState, history, executeError, executing, startBranch, setChoice, executeTurn, stopBranch, getBattle } = useBranch();
+  const evaluation = useEvaluation();
   const branchWindowOpenRef = useRef(false);
   const usageStats = useSmogonUsageStats(replayData?.formatid);
   const revealedSpecies = useMemo(() => {
@@ -377,6 +381,108 @@ function App() {
   const handleSetChoice = useCallback((side: 'p1' | 'p2', choice: BranchSlotChoice, activeSlot?: number) => {
     setChoice(side, choice, activeSlot);
   }, [setChoice]);
+
+  // ----- Position evaluation (singles only) -----
+  const evalAvailable = useMemo(() => {
+    if (!replayData) return false;
+    const gameType = getReplayGameType(replayData.log);
+    return gameType === null || gameType === 'singles';
+  }, [replayData]);
+
+  const setsFingerprint = useMemo(
+    () => JSON.stringify([editedP1Info, editedP2Info, teamText]),
+    [editedP1Info, editedP2Info, teamText],
+  );
+
+  const acquireBranchPosition = useCallback(async () => {
+    const battle = getBattle();
+    if (!battle) throw new Error('No live branch battle to evaluate.');
+    const { serializeLiveBattle } = await import('./lib/eval/serialize');
+    return serializeLiveBattle(battle);
+  }, [getBattle]);
+
+  const acquireReplayPosition = useCallback(async (reportReconstruct: (turn: number, target: number) => void) => {
+    if (!replayData) throw new Error('Load a replay first.');
+    const { buildTeamsFromReplay } = await import('./lib/team-builder');
+    const branchEngine = await import('./lib/branch-engine');
+    const { serializeLiveBattle } = await import('./lib/eval/serialize');
+    const { p1Team, p2Team } = buildTeamsFromReplay(replayData.log, {
+      userTeamText: teamText || undefined,
+      p1Info: effectiveP1Info,
+      p2Info: effectiveP2Info,
+      usageStats: usageStats.stats,
+      setAssumptions: setAssumptions.assumptions,
+    });
+    if (p1Team.length === 0 || p2Team.length === 0) throw new Error('Could not build both teams for this replay.');
+    const runtime = await branchEngine.reconstructBranchRuntime({
+      format: getBranchSimulatorFormat(replayData),
+      p1Team,
+      p2Team,
+      replayLog: replayData.log,
+      targetTurn: branchTurn,
+      snapshot: branchSnapshot,
+      playerNames: [replayData.players[0], replayData.players[1]],
+      onProgress: reportReconstruct,
+    });
+    const invalid = branchEngine.validateBranchRuntime(runtime);
+    if (invalid) throw new Error(invalid);
+    const battle = runtime.battleStream.battle;
+    if (!battle) throw new Error('Reconstruction produced no battle.');
+    return serializeLiveBattle(battle);
+  }, [replayData, teamText, effectiveP1Info, effectiveP2Info, usageStats.stats, setAssumptions.assumptions, branchTurn, branchSnapshot]);
+
+  const handleEvaluate = useCallback(() => {
+    if (!replayData) return;
+    if (branching) {
+      evaluation.evaluate({ cacheKey: null, acquire: acquireBranchPosition });
+    } else {
+      evaluation.evaluate({
+        cacheKey: `${replayData.id}:${branchTurn}:${setsFingerprint}`,
+        acquire: acquireReplayPosition,
+      });
+    }
+  }, [replayData, branching, evaluation, acquireBranchPosition, acquireReplayPosition, branchTurn, setsFingerprint]);
+
+  // Clicking a recommended choice pre-fills the branch pickers.
+  const handlePickEvalChoice = useCallback((side: 'p1' | 'p2', ranked: RankedChoice) => {
+    if (!simState) return;
+    const parts = ranked.choice.split(' ');
+    if (parts[0] === 'move') {
+      const moves = side === 'p1' ? simState.p1MovesBySlot[0] : simState.p2MovesBySlot[0];
+      const option = (moves ?? []).find(move => choiceId(move.name) === parts[1]);
+      if (!option) return;
+      handleSetChoice(side, {
+        kind: 'move',
+        moveId: choiceId(option.name),
+        moveName: option.name,
+        ...(parts[2] === 'terastallize' ? { modifier: 'terastallize' as const } : {}),
+      });
+    } else if (parts[0] === 'switch') {
+      const slot = parseInt(parts[1], 10);
+      const switches = side === 'p1' ? simState.p1SwitchesBySlot[0] : simState.p2SwitchesBySlot[0];
+      const option = (switches ?? []).find(candidate => candidate.slot === slot);
+      if (!option) return;
+      handleSetChoice(side, { kind: 'switch', speciesId: choiceId(option.species), pokemonName: option.name });
+    }
+  }, [simState, handleSetChoice]);
+
+  // Any position change invalidates a displayed result.
+  const { markStale: markEvalStale, reset: resetEval } = evaluation;
+  useEffect(() => {
+    markEvalStale();
+  }, [branchTurn, history.length, editedP1Info, editedP2Info, markEvalStale]);
+
+  // A different replay or entering/leaving branch mode is a new position context.
+  useEffect(() => {
+    resetEval();
+  }, [replayData?.id, branching, resetEval]);
+
+  // Opt-in: keep the branch evaluation fresh after each executed turn.
+  useEffect(() => {
+    if (branching && evaluation.panelOpen && evaluation.prefs.auto && evaluation.status === 'stale' && !executing) {
+      handleEvaluate();
+    }
+  }, [branching, evaluation.panelOpen, evaluation.prefs.auto, evaluation.status, executing, handleEvaluate]);
 
   // "What if it had …": a team edit plus the normal branch refresh, with the
   // hypothetical move pre-seeded as that slot's pending choice.
@@ -649,6 +755,16 @@ function App() {
                       />
                       Animate branch turns
                     </label>
+                    {evalAvailable && (
+                      <button
+                        type="button"
+                        className="ps-btn"
+                        onClick={evaluation.togglePanel}
+                        style={{ padding: '2px 8px', fontSize: 10 }}
+                      >
+                        Eval
+                      </button>
+                    )}
                     <button type="button" className="ps-btn" onClick={handleStopBranch} style={{ padding: '2px 8px', fontSize: 10 }}>
                       Back
                     </button>
@@ -760,7 +876,36 @@ function App() {
                 >
                   {branchPreparing ? 'Preparing...' : 'Branch Here'}
                 </button>
+                {evalAvailable && (
+                  <button
+                    type="button"
+                    className="ps-btn"
+                    onClick={evaluation.togglePanel}
+                    disabled={atEndPosition}
+                    title={atEndPosition ? 'The battle is already over at the end position.' : 'Toggle the position evaluation panel.'}
+                    style={{ padding: '3px 12px', fontSize: 11 }}
+                  >
+                    Eval
+                  </button>
+                )}
               </div>
+            )}
+
+            {evaluation.panelOpen && evalAvailable && replayData && (
+              <EvalPanel
+                playerNames={[replayData.players[0], replayData.players[1]]}
+                status={evaluation.status}
+                result={evaluation.result}
+                progress={evaluation.progress}
+                reconstructProgress={evaluation.reconstructProgress}
+                error={evaluation.error}
+                prefs={evaluation.prefs}
+                onPrefsChange={evaluation.setPrefs}
+                onEvaluate={handleEvaluate}
+                onCancel={evaluation.cancel}
+                onPickChoice={branching ? handlePickEvalChoice : undefined}
+                showAuto={branching}
+              />
             )}
 
             {branching ? (
