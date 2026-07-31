@@ -190,6 +190,49 @@ test.describe('PS Dashboard', () => {
     await expect(page.locator('button', { hasText: 'Branch Here' })).toBeVisible();
   });
 
+  test('exports both sides and applies an imported set as manual data (Import/Export Sets)', async ({ page }) => {
+    await page.locator('button', { hasText: 'Load' }).click();
+    await expect(page.getByText('TestPlayer1', { exact: true }).first()).toBeVisible({ timeout: 10000 });
+
+    await page.locator('button', { hasText: 'Import/Export Sets' }).click();
+    const dialog = page.getByRole('dialog', { name: 'Import / Export Sets' });
+    await expect(dialog).toBeVisible();
+
+    const textarea = dialog.locator('textarea');
+    const exported = await textarea.inputValue();
+    expect(exported).toContain('=== p1: TestPlayer1 ===');
+    expect(exported).toContain('=== p2: TestPlayer2 ===');
+    expect(exported).toContain('Garchomp');
+
+    await textarea.fill('=== p1: TestPlayer1 ===\n\nGarchomp @ Choice Band\nAbility: Rough Skin\nAdamant Nature\n- Earthquake');
+    await dialog.locator('button', { hasText: 'Import' }).click();
+
+    await expect(page.locator('.ps-main-right')).toContainText('Choice Band');
+  });
+
+  test('imported sets persist per replay across reloads', async ({ page }) => {
+    await page.locator('button', { hasText: 'Load' }).click();
+    await page.locator('button', { hasText: 'Import/Export Sets' }).click();
+    const dialog = page.getByRole('dialog', { name: 'Import / Export Sets' });
+    await dialog.locator('textarea')
+      .fill('=== p1 ===\n\nGarchomp @ Choice Band\n- Earthquake');
+    await dialog.locator('button', { hasText: 'Import' }).click();
+    await expect(page.locator('.ps-main-right')).toContainText('Choice Band');
+
+    await page.reload();
+    await page.locator('button', { hasText: 'Load' }).click();
+    await expect(page.locator('.ps-main-right')).toContainText('Choice Band', { timeout: 10000 });
+  });
+
+  test('rejects an import without side headers', async ({ page }) => {
+    await page.locator('button', { hasText: 'Load' }).click();
+    await page.locator('button', { hasText: 'Import/Export Sets' }).click();
+    const dialog = page.getByRole('dialog', { name: 'Import / Export Sets' });
+    await dialog.locator('textarea').fill('Garchomp @ Choice Band\n- Earthquake');
+    await dialog.locator('button', { hasText: 'Import' }).click();
+    await expect(dialog.getByRole('alert')).toContainText('=== p1');
+  });
+
   test('landing screen explains the replay branching workflow', async ({ page }) => {
     await expect(page.getByText('Pick a branch turn')).toBeVisible();
     await expect(page.getByText('Choose both sides')).toBeVisible();

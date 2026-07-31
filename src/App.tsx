@@ -12,6 +12,8 @@ import { BranchHistoryPanel } from './components/BranchHistoryPanel';
 import { BranchSaveSharePanel } from './components/BranchSaveSharePanel';
 import { BattleStatsPanel } from './components/BattleStatsPanel';
 import { TeamEditor } from './components/TeamEditor';
+import { SetsImportExportPanel } from './components/SetsImportExportPanel';
+import { buildSetsExport, parseSetsImport } from './lib/sets-io';
 import { parseTeamText } from './lib/team-parser';
 import { enrichTeamInfo } from './lib/team-info';
 import { applyPastedTeam, countMatchingSpecies, parsePastedTeam, type PastedSet } from './lib/team-paste';
@@ -123,6 +125,8 @@ function App() {
   const [pastedSets, setPastedSets] = useState<PastedSet[] | null>(null);
   const [teamPasteError, setTeamPasteError] = useState<string | null>(null);
   const [editorSide, setEditorSide] = useState<'p1' | 'p2' | null>(null);
+  const [setsPanelOpen, setSetsPanelOpen] = useState(false);
+  const pendingStoredSetsRef = useRef<string | null>(null);
   const [editedP1Info, setEditedP1Info] = useState<OpponentTeamInfo | null>(null);
   const [editedP2Info, setEditedP2Info] = useState<OpponentTeamInfo | null>(null);
   const [branchTurn, setBranchTurn] = useState(1);
@@ -166,6 +170,11 @@ function App() {
     setEditedP1Info(null);
     setEditedP2Info(null);
     setEditorSide(null);
+    // Sets imported for this replay earlier are re-applied once the fresh
+    // inference is available (see the effect below).
+    pendingStoredSetsRef.current = replayData?.id
+      ? localStorage.getItem(`ps-replay-interceptor:sets:${replayData.id}`)
+      : null;
   }, [replayData?.id, stopBranch]);
 
   const handleTeamLoad = useCallback((rawText: string) => {
@@ -400,6 +409,44 @@ function App() {
     }
   }, [effectiveP1Info, effectiveP2Info, history, simState]);
 
+  /** Applies a sets-import text to both sides; returns an error message or null. */
+  const applySetsText = useCallback((text: string): string | null => {
+    if (!replayData || !effectiveP1Info || !effectiveP2Info) return 'Load a replay first.';
+    let parsed: ReturnType<typeof parseSetsImport>;
+    try {
+      parsed = parseSetsImport(text);
+    } catch (err) {
+      return err instanceof Error ? err.message : 'Could not parse the sets text.';
+    }
+    const nextP1 = parsed.p1.length > 0 ? applyPastedTeam(effectiveP1Info, parsed.p1).info : effectiveP1Info;
+    const nextP2 = parsed.p2.length > 0 ? applyPastedTeam(effectiveP2Info, parsed.p2).info : effectiveP2Info;
+    setEditedP1Info(nextP1);
+    setEditedP2Info(nextP2);
+    try {
+      localStorage.setItem(`ps-replay-interceptor:sets:${replayData.id}`, text);
+    } catch {
+      // Storage full/blocked — the import still applies for this session.
+    }
+    if (branchWindowOpenRef.current || simState) {
+      setPendingBranchRefresh({
+        p1Info: nextP1,
+        p2Info: nextP2,
+        history: [...history],
+        p1Choices: [...(simState?.p1Choices ?? [])],
+        p2Choices: [...(simState?.p2Choices ?? [])],
+      });
+    }
+    return null;
+  }, [replayData, effectiveP1Info, effectiveP2Info, history, simState]);
+
+  // Re-apply this replay's stored sets once the fresh inference exists.
+  useEffect(() => {
+    if (!pendingStoredSetsRef.current || !p1Info || !opponentInfo) return;
+    const stored = pendingStoredSetsRef.current;
+    pendingStoredSetsRef.current = null;
+    applySetsText(stored);
+  }, [p1Info, opponentInfo, applySetsText]);
+
   const clearSharedBranch = useCallback(() => {
     window.history.replaceState(null, '', `${window.location.pathname}${window.location.search}`);
     setSharedBranch(null);
@@ -580,6 +627,14 @@ function App() {
                 >
                   Edit Opp
                 </button>
+                <button
+                  type="button"
+                  onClick={() => setSetsPanelOpen(true)}
+                  className="ps-btn"
+                  style={{ padding: '2px 8px', fontSize: 10 }}
+                >
+                  Import/Export Sets
+                </button>
               </div>
             </div>
 
@@ -711,6 +766,23 @@ function App() {
             />
           </div>
         </div>
+      )}
+
+      {setsPanelOpen && replayData && (
+        <SetsImportExportPanel
+          exportText={buildSetsExport({
+            p1Name: replayData.players[0] ?? 'p1',
+            p2Name: replayData.players[1] ?? 'p2',
+            p1Info: effectiveP1Info,
+            p2Info: effectiveP2Info,
+          })}
+          onImport={text => {
+            const importError = applySetsText(text);
+            if (!importError) setSetsPanelOpen(false);
+            return importError;
+          }}
+          onClose={() => setSetsPanelOpen(false)}
+        />
       )}
 
       {editorSide === 'p1' && effectiveP1Info && (
