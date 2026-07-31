@@ -15,12 +15,12 @@ import { TeamEditor } from './components/TeamEditor';
 import { SetsImportExportPanel } from './components/SetsImportExportPanel';
 import { buildSetsExport, parseSetsImport } from './lib/sets-io';
 import { parseTeamText } from './lib/team-parser';
-import { enrichTeamInfo } from './lib/team-info';
+import { enrichTeamInfo, manualMove } from './lib/team-info';
 import { applyPastedTeam, countMatchingSpecies, parsePastedTeam, type PastedSet } from './lib/team-paste';
 import type { OpponentTeamInfo } from './types';
 import { decodeBranchShare, type BranchSharePayload } from './lib/branch-share';
 import { getBranchSimulatorFormat, getReplayGeneration } from './lib/replay-format';
-import type { BranchSlotChoice } from './lib/branch-choices';
+import { choiceId, type BranchSlotChoice } from './lib/branch-choices';
 
 const TEAM_PASTE_STORAGE_KEY = 'ps-replay-interceptor:team-paste';
 
@@ -378,6 +378,49 @@ function App() {
     setChoice(side, choice, activeSlot);
   }, [setChoice]);
 
+  // "What if it had …": a team edit plus the normal branch refresh, with the
+  // hypothetical move pre-seeded as that slot's pending choice.
+  const handleHypotheticalMove = useCallback((
+    side: 'p1' | 'p2',
+    activeSlot: number,
+    params: { species: string; move: string; replace: string | null },
+  ) => {
+    const sideInfo = side === 'p1' ? effectiveP1Info : effectiveP2Info;
+    if (!sideInfo || !simState) return;
+
+    const speciesId = (name: string) => name.toLowerCase().replace(/[^a-z0-9]/g, '');
+    const pokemon = sideInfo.pokemon.map(entry => {
+      if (speciesId(entry.species) !== speciesId(params.species)) return entry;
+      const withoutReplaced = params.replace
+        ? entry.moves.filter(move => move.name !== params.replace)
+        : entry.moves.slice(0, 3);
+      return { ...entry, moves: [...withoutReplaced, manualMove(params.move)].slice(0, 4) };
+    });
+    const updated = { pokemon };
+
+    const nextP1 = side === 'p1' ? updated : effectiveP1Info;
+    const nextP2 = side === 'p2' ? updated : effectiveP2Info;
+    if (side === 'p1') setEditedP1Info(updated); else setEditedP2Info(updated);
+
+    const seedChoices = (choices: (BranchSlotChoice | null)[], seedSide: 'p1' | 'p2') => {
+      const next = [...choices];
+      if (seedSide === side) {
+        next[activeSlot] = { kind: 'move', moveId: choiceId(params.move), moveName: params.move };
+      }
+      return next;
+    };
+
+    if (nextP1 && nextP2) {
+      setPendingBranchRefresh({
+        p1Info: nextP1,
+        p2Info: nextP2,
+        history: [...history],
+        p1Choices: seedChoices(simState.p1Choices ?? [], 'p1'),
+        p2Choices: seedChoices(simState.p2Choices ?? [], 'p2'),
+      });
+    }
+  }, [effectiveP1Info, effectiveP2Info, simState, history]);
+
   const handleExecuteTurn = useCallback(async () => {
     await executeTurn();
   }, [executeTurn]);
@@ -728,6 +771,7 @@ function App() {
                   executing={executing}
                   gen={replayGen}
                   onSetChoice={handleSetChoice}
+                  onHypotheticalMove={handleHypotheticalMove}
                   onExecuteTurn={handleExecuteTurn}
                 />
                 <BranchHistoryPanel

@@ -263,6 +263,36 @@ test.describe('PS Dashboard', () => {
     await expect(dialog.getByRole('alert')).toContainText('=== p1');
   });
 
+  test('branching can load a hypothetical move from the legal pool', async ({ page }) => {
+    await page.locator('button', { hasText: 'Load' }).click();
+    await page.locator('button', { hasText: 'Branch Here' }).click();
+    await expect(page.getByText(/Branching.*Turn/)).toBeVisible({ timeout: 15000 });
+
+    const p1Controls = page.locator('.ps-branch-side-column').first();
+    const whatIf = p1Controls.getByLabel('Hypothetical move for P1');
+
+    // Garchomp knows 3 moves — the hypothetical simply becomes the 4th.
+    await expect(whatIf).toBeVisible({ timeout: 15000 });
+    await expect(p1Controls.getByLabel('Replaced move for P1')).toHaveCount(0);
+    await whatIf.fill('Flamethrower');
+    await p1Controls.locator('button', { hasText: 'Load move' }).click();
+
+    // The branch rebuilds with the move in the set and pre-selected as pending.
+    await expect(page.getByText(/Branching.*Turn/)).toBeVisible({ timeout: 15000 });
+    await expect(p1Controls.locator('.ps-movebtn', { hasText: 'Flamethrower' })).toBeVisible({ timeout: 15000 });
+    await expect(p1Controls).toContainText('[move Flamethrower]');
+
+    // Now the set is full — a second hypothetical must replace a chosen move.
+    const whatIfAgain = p1Controls.getByLabel('Hypothetical move for P1');
+    await whatIfAgain.fill('Fire Blast');
+    await p1Controls.getByLabel('Replaced move for P1').selectOption({ label: 'Earthquake' });
+    await p1Controls.locator('button', { hasText: 'Load move' }).click();
+
+    await expect(p1Controls.locator('.ps-movebtn', { hasText: 'Fire Blast' })).toBeVisible({ timeout: 15000 });
+    await expect(p1Controls).toContainText('[move Fire Blast]');
+    await expect(p1Controls.locator('.ps-movebtn', { hasText: 'Earthquake' })).toHaveCount(0);
+  });
+
   test('landing screen explains the replay branching workflow', async ({ page }) => {
     await expect(page.getByText('Pick a branch turn')).toBeVisible();
     await expect(page.getByText('Choose both sides')).toBeVisible();

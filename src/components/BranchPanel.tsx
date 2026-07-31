@@ -23,6 +23,8 @@ interface Props {
   /** Generation of the loaded replay — keeps the damage calc on the sim's gen (B5). */
   gen: number;
   onSetChoice: (side: 'p1' | 'p2', choice: BranchSlotChoice, activeSlot?: number) => void;
+  /** "What if it had …": loads a legal move into the active set and rebuilds the branch. */
+  onHypotheticalMove: (side: 'p1' | 'p2', activeSlot: number, params: { species: string; move: string; replace: string | null }) => void;
   onExecuteTurn: () => void;
 }
 
@@ -173,10 +175,11 @@ function SwitchBtn({ sw, selected, disabled, disabledReason, onClick }: {
 }
 
 /* ── Controls for one side (moves/switches) ── */
-function SideControls({ side, label, activeName, activeFainted, moves, switches, forceSwitch, pending, blockedSwitchKeys, modifiers, dmgResults, spreadDamageResults, targetDamageResults, onChoice }: {
+function SideControls({ side, label, activeName, activeSpecies, activeFainted, moves, switches, forceSwitch, pending, blockedSwitchKeys, modifiers, dmgResults, spreadDamageResults, targetDamageResults, gen, onChoice, onHypotheticalMove }: {
   side: 'p1' | 'p2';
   label: string;
   activeName: string;
+  activeSpecies: string;
   activeFainted: boolean;
   moves: BranchMoveOption[];
   switches: BranchSwitchOption[];
@@ -187,10 +190,30 @@ function SideControls({ side, label, activeName, activeFainted, moves, switches,
   dmgResults: DamageResult[];
   spreadDamageResults: Record<number, SpreadTargetDamage[]>;
   targetDamageResults: Record<string, DamageResult | undefined>;
+  gen: number;
   onChoice: (choice: BranchSlotChoice) => void;
+  onHypotheticalMove: (params: { species: string; move: string; replace: string | null }) => void;
 }) {
   const [tab, setTab] = useState<'fight' | 'switch'>(forceSwitch ? 'switch' : 'fight');
   const [modifier, setModifier] = useState<BranchMoveModifier | null>(null);
+  const [whatIfMove, setWhatIfMove] = useState('');
+  const [whatIfReplace, setWhatIfReplace] = useState<string | null>(null);
+  const [movePool, setMovePool] = useState<string[]>([]);
+
+  // Legal move pool for "What if it had …" — loaded lazily per active species.
+  useEffect(() => {
+    let alive = true;
+    setMovePool([]);
+    if (!activeSpecies) return;
+    void import('../lib/pokemon-options')
+      .then(options => options.getMovePool(activeSpecies, gen))
+      .then(pool => {
+        if (alive) setMovePool(pool);
+      });
+    return () => {
+      alive = false;
+    };
+  }, [activeSpecies, gen]);
   const hasZMoves = modifiers.zMoves.some(Boolean);
   const hasAnyModifier = !!modifiers.teraType || modifiers.canMegaEvo || modifiers.canUltraBurst || hasZMoves;
   const modifierAvailable =
@@ -358,6 +381,54 @@ function SideControls({ side, label, activeName, activeFainted, moves, switches,
               )}
             </select>
           </div>
+          {movePool.length > 0 && (
+            <div className="ps-custom-choice" style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
+              <input
+                className="ps-input"
+                list={`ps-whatif-${label}`}
+                placeholder="What if it had…"
+                aria-label={`Hypothetical move for ${label}`}
+                value={whatIfMove}
+                onChange={event => setWhatIfMove(event.target.value)}
+                style={{ flex: 1, fontSize: 10 }}
+              />
+              <datalist id={`ps-whatif-${label}`}>
+                {movePool
+                  .filter(name => !moves.some(known => choiceId(known.name) === choiceId(name)))
+                  .map(name => <option key={name} value={name} />)}
+              </datalist>
+              {moves.length >= 4 && (
+                <select
+                  className="ps-input"
+                  aria-label={`Replaced move for ${label}`}
+                  value={whatIfReplace ?? moves[moves.length - 1].name}
+                  onChange={event => setWhatIfReplace(event.target.value)}
+                  style={{ fontSize: 10 }}
+                >
+                  {moves.map(known => <option key={known.slot} value={known.name}>{known.name}</option>)}
+                </select>
+              )}
+              <button
+                type="button"
+                className="ps-btn"
+                style={{ fontSize: 10, padding: '2px 8px' }}
+                disabled={
+                  !whatIfMove.trim() ||
+                  !movePool.some(name => choiceId(name) === choiceId(whatIfMove))
+                }
+                onClick={() => {
+                  onHypotheticalMove({
+                    species: activeSpecies,
+                    move: movePool.find(name => choiceId(name) === choiceId(whatIfMove)) ?? whatIfMove.trim(),
+                    replace: moves.length >= 4 ? (whatIfReplace ?? moves[moves.length - 1].name) : null,
+                  });
+                  setWhatIfMove('');
+                }}
+              >
+                Load move
+              </button>
+            </div>
+          )}
         </>
       )}
 
@@ -444,7 +515,7 @@ interface SideDamage {
 const EMPTY_SIDE_DAMAGE: SideDamage = { default: [], targets: {}, spread: {} };
 
 /* ── Main BranchPanel (controls only, no iframe) ── */
-export function BranchPanel({ simState, executeError, executing, gen, onSetChoice, onExecuteTurn }: Props) {
+export function BranchPanel({ simState, executeError, executing, gen, onSetChoice, onHypotheticalMove, onExecuteTurn }: Props) {
   const [showLog, setShowLog] = useState(false);
   const [damageBySide, setDamageBySide] = useState<{ p1: SideDamage; p2: SideDamage }>({
     p1: EMPTY_SIDE_DAMAGE,
@@ -593,6 +664,7 @@ export function BranchPanel({ simState, executeError, executing, gen, onSetChoic
                   side="p1"
                   label={p1ActiveSlots.length > 1 ? `P1${String.fromCharCode(65 + slot)}` : 'P1'}
                   activeName={active?.name || '???'}
+                  activeSpecies={active?.species || ''}
                   activeFainted={active?.fainted ?? true}
                   moves={p1MovesBySlot[slot] ?? EMPTY_MOVES}
                   switches={p1SwitchesBySlot[slot] ?? EMPTY_SWITCHES}
@@ -603,7 +675,9 @@ export function BranchPanel({ simState, executeError, executing, gen, onSetChoic
                   dmgResults={damageBySide.p1.default[slot] ?? []}
                   spreadDamageResults={damageBySide.p1.spread[slot] ?? {}}
                   targetDamageResults={damageBySide.p1.targets[slot] ?? {}}
+                  gen={gen}
                   onChoice={(choice) => onSetChoice('p1', choice, slot)}
+                  onHypotheticalMove={(params) => onHypotheticalMove('p1', slot, params)}
                 />
               ))}
             </div>
@@ -615,6 +689,7 @@ export function BranchPanel({ simState, executeError, executing, gen, onSetChoic
                   side="p2"
                   label={p2ActiveSlots.length > 1 ? `P2${String.fromCharCode(65 + slot)}` : 'P2'}
                   activeName={active?.name || '???'}
+                  activeSpecies={active?.species || ''}
                   activeFainted={active?.fainted ?? true}
                   moves={p2MovesBySlot[slot] ?? EMPTY_MOVES}
                   switches={p2SwitchesBySlot[slot] ?? EMPTY_SWITCHES}
@@ -625,7 +700,9 @@ export function BranchPanel({ simState, executeError, executing, gen, onSetChoic
                   dmgResults={damageBySide.p2.default[slot] ?? []}
                   spreadDamageResults={damageBySide.p2.spread[slot] ?? {}}
                   targetDamageResults={damageBySide.p2.targets[slot] ?? {}}
+                  gen={gen}
                   onChoice={(choice) => onSetChoice('p2', choice, slot)}
+                  onHypotheticalMove={(params) => onHypotheticalMove('p2', slot, params)}
                 />
               ))}
             </div>
