@@ -101,4 +101,16 @@ test.describe('evaluatePosition', () => {
     const battle = makeBattle([makeSet('A', 'Snorlax', VANILLA)], [makeSet('B', 'Chansey', VANILLA)]);
     expect(evaluatePosition(battle)).toBe(evaluatePosition(battle));
   });
+
+  test('a one-mon deficit reads clearly through the score scaling', () => {
+    const five = ['A', 'B', 'C', 'D', 'E'].map(name => makeSet(name, 'Snorlax', VANILLA));
+    const six = ['F', 'G', 'H', 'I', 'J', 'K'].map(name => makeSet(name, 'Snorlax', VANILLA));
+    const oneDown = evaluatePosition(makeBattle(five, six));
+    expect(oneDown).toBeLessThanOrEqual(-0.25);
+    expect(oneDown).toBeGreaterThanOrEqual(-0.6);
+
+    // A two-mon deficit is strictly worse.
+    const four = five.slice(0, 4);
+    expect(evaluatePosition(makeBattle(four, six))).toBeLessThan(oneDown);
+  });
 });

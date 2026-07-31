@@ -21,6 +21,8 @@ export const EVAL_WEIGHTS = {
   tailwind: 8,
   /** Awarded to the side whose remaining Pokémon are slower while Trick Room is up. */
   trickRoom: 10,
+  /** Steepness of the tanh score mapping (a one-mon lead in a 6v6 ≈ ±0.4). */
+  scale: 2.5,
 } as const;
 
 const SCREENS = ['reflect', 'lightscreen', 'auroraveil'];
@@ -74,6 +76,5 @@ export function evaluatePosition(battle: Battle): number {
 
   const teamSize = Math.max(battle.sides[0].pokemon.length, battle.sides[1].pokemon.length, 1);
   const normalizer = teamSize * (EVAL_WEIGHTS.alive + EVAL_WEIGHTS.hp);
-  const score = (p1 - p2) / normalizer;
-  return Math.max(-1, Math.min(1, score));
+  return Math.tanh(((p1 - p2) / normalizer) * EVAL_WEIGHTS.scale);
 }
