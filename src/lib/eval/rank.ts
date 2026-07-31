@@ -31,6 +31,8 @@ export type PvStep = { p1: string; p2: string };
 
 export const cellKey = (i: number, j: number) => i * 10_000 + j;
 
+export const TOP_EXPANSION = 5;
+
 export function rankFromMatrix(matrix: ValueMatrix, rootValue: number): Ranked {
   const { p1Options, p2Options, values } = matrix;
 

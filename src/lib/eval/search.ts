@@ -5,9 +5,10 @@ import {
   type SimPosition,
 } from './forward-model';
 import {
-  attachLines, cellKey, rankFromMatrix, selectExpansionCells, toResult,
+  attachLines, cellKey, rankFromMatrix, selectExpansionCells, toResult, TOP_EXPANSION,
   type PvStep, type Ranked, type ValueMatrix,
 } from './rank';
+import type { CellValue, SearchExecutor } from './orchestrator';
 import type { EvalResult, EvalSettings, SearchProgress } from './types';
 
 export interface SearchCallbacks {
@@ -21,8 +22,6 @@ export interface SearchCallbacks {
 export const SEARCH_SEEDS: readonly PRNGSeed[] = [
   '1,2,3,4', '5,6,7,8', '9,10,11,12', '13,14,15,16', '17,18,19,20',
 ];
-
-export const TOP_EXPANSION = 5;
 
 interface Matrix extends ValueMatrix {
   /** children[i][j][s]: child position for seed s (kept for deepening). */
@@ -142,4 +141,46 @@ export function searchPosition(
     callbacks?.onPartial?.(result);
   }
   return result;
+}
+
+/**
+ * Single-threaded SearchExecutor over this module's sim primitives — the
+ * reference implementation the orchestrator parity test pins against, and
+ * the fallback when no worker pool is available.
+ */
+export function createLocalExecutor(serializedBattle: string): SearchExecutor {
+  const matchupCache = createMatchupCache();
+  const root = createRootPosition(serializedBattle);
+  return {
+    async choices(tera) {
+      const battle = positionBattle(root);
+      return {
+        p1: legalChoices(root, 'p1', { tera }),
+        p2: legalChoices(root, 'p2', { tera }),
+        rootValue: evaluatePosition(battle, matchupCache),
+        rootEnded: battle.ended,
+      };
+    },
+    async evalCells(jobs, onDone) {
+      const out: CellValue[] = [];
+      let completed = 0;
+      for (const job of jobs) {
+        let sum = 0;
+        let endedFlag = false;
+        for (let s = 0; s < job.samples; s++) {
+          const child = advancePosition(root, job.p1Choice, job.p2Choice, SEARCH_SEEDS[s]);
+          if (s === 0) endedFlag = positionBattle(child).ended;
+          sum += evaluatePosition(positionBattle(child), matchupCache);
+        }
+        out.push({ i: job.i, j: job.j, value: sum / job.samples, ended: endedFlag });
+        completed += 1;
+        onDone?.(completed);
+      }
+      return out;
+    },
+    async subSearch(job) {
+      const child = advancePosition(root, job.p1Choice, job.p2Choice, SEARCH_SEEDS[0]);
+      return searchPosition(child.serialized, job.settings, undefined, matchupCache);
+    },
+  };
 }
