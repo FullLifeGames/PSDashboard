@@ -50,8 +50,11 @@ interface CachedEval {
 }
 
 export interface GraphSweepParams {
-  /** Number of turns to analyze (1..turns). */
+  /** Number of turns in the game (sizes the graph; sweep may cover less). */
   turns: number;
+  /** Optional sub-range to sweep (on-demand analysis); defaults to 1..turns. */
+  from?: number;
+  to?: number;
   /** Resolved Tera enumeration flag. */
   tera: boolean;
   cacheKeyFor(turn: number): string;
@@ -85,6 +88,8 @@ export function useEvaluation() {
 
   const clientRef = useRef<EvalWorkerClient | null>(null);
   const cacheRef = useRef(new Map<string, CachedEval>());
+  /** Latest graph arrays, so partial (range) sweeps merge instead of wiping. */
+  const graphDataRef = useRef<Pick<EvalGraphState, 'scores' | 'results' | 'played' | 'playedOutcome'> | null>(null);
   const runRef = useRef(0);
   const prefsRef = useRef(prefs);
   prefsRef.current = prefs;
@@ -190,22 +195,35 @@ export function useEvaluation() {
     setError(null);
   }, [cancel]);
 
-  /** Sequential background sweep evaluating every turn for the game graph. */
+  /**
+   * Sequential background sweep evaluating turns for the game graph — the
+   * whole game by default, or a sub-range (on-demand turn analysis). Range
+   * results merge into the existing graph state.
+   */
   const runGraphSweep = useCallback((params: GraphSweepParams) => {
     cancel();
     const runId = ++runRef.current;
     const { depth, samples, mode } = prefsRef.current;
-    const scores: (number | null)[] = new Array(params.turns).fill(null);
-    const results: (EvalResult | null)[] = new Array(params.turns).fill(null);
-    const played: (PlayedTurn | null)[] = new Array(params.turns).fill(null);
-    const playedOutcome: (number | null)[] = new Array(params.turns).fill(null);
-    const snapshot = () => ({
-      scores: [...scores], results: [...results], played: [...played], playedOutcome: [...playedOutcome],
-    });
-    setGraph({ ...snapshot(), running: true, progress: { done: 0, total: params.turns } });
+    const from = Math.max(1, params.from ?? 1);
+    const to = Math.min(params.turns, params.to ?? params.turns);
+    const previous = graphDataRef.current;
+    const keepPrevious = previous !== null && previous.scores.length === params.turns;
+    const scores: (number | null)[] = keepPrevious ? [...previous.scores] : new Array(params.turns).fill(null);
+    const results: (EvalResult | null)[] = keepPrevious ? [...previous.results] : new Array(params.turns).fill(null);
+    const played: (PlayedTurn | null)[] = keepPrevious ? [...previous.played] : new Array(params.turns).fill(null);
+    const playedOutcome: (number | null)[] = keepPrevious ? [...previous.playedOutcome] : new Array(params.turns).fill(null);
+    const snapshot = () => {
+      const data = {
+        scores: [...scores], results: [...results], played: [...played], playedOutcome: [...playedOutcome],
+      };
+      graphDataRef.current = data;
+      return data;
+    };
+    const total = Math.max(0, to - from + 1);
+    setGraph({ ...snapshot(), running: true, progress: { done: 0, total } });
 
     void (async () => {
-      for (let turn = 1; turn <= params.turns; turn++) {
+      for (let turn = from; turn <= to; turn++) {
         if (runRef.current !== runId) return;
         const key = params.cacheKeyFor(turn);
         const turnPlayed = params.playedFor(turn);
@@ -215,7 +233,29 @@ export function useEvaluation() {
         if (hit && hit.depth === depth && hit.samples === samples && hit.mode === mode && hit.tera === params.tera) {
           scores[turn - 1] = hit.result.score;
           results[turn - 1] = hit.result;
-          playedOutcome[turn - 1] = hit.playedOutcome ?? null;
+          // Entries written by single evaluations never computed the
+          // played-pair expectation (undefined ≠ null = tried, unmatched) —
+          // fill it in so the analysis gets its decision/chance split.
+          let outcome: number | null | undefined = hit.playedOutcome;
+          if (outcome === undefined) {
+            outcome = null;
+            const p1Choice = matchPlayedChoice(hit.result, 'p1', turnPlayed?.p1 ?? null);
+            const p2Choice = matchPlayedChoice(hit.result, 'p2', turnPlayed?.p2 ?? null);
+            if (p1Choice && p2Choice) {
+              try {
+                const serialized = await params.acquireFor(turn)(() => {});
+                if (runRef.current !== runId) return;
+                clientRef.current ??= new EvalWorkerClient();
+                outcome = await clientRef.current.evalPair(serialized, p1Choice.choice, p2Choice.choice);
+              } catch (err) {
+                if (runRef.current !== runId) return;
+                if (err instanceof Error && err.message === 'cancelled') return;
+              }
+              if (runRef.current !== runId) return;
+            }
+            cacheRef.current.set(key, { ...hit, playedOutcome: outcome });
+          }
+          playedOutcome[turn - 1] = outcome;
         } else {
           try {
             const serialized = await params.acquireFor(turn)(() => {});
@@ -248,7 +288,7 @@ export function useEvaluation() {
             // This turn failed (e.g. reconstruction wedge) — leave a gap.
           }
         }
-        setGraph({ ...snapshot(), running: true, progress: { done: turn, total: params.turns } });
+        setGraph({ ...snapshot(), running: true, progress: { done: turn - from + 1, total } });
       }
       if (runRef.current === runId) {
         setGraph(prev => ({ ...prev, running: false, progress: null }));
@@ -257,6 +297,7 @@ export function useEvaluation() {
   }, [cancel]);
 
   const clearGraph = useCallback(() => {
+    graphDataRef.current = null;
     setGraph({ scores: [], results: [], played: [], playedOutcome: [], running: false, progress: null });
   }, []);
 

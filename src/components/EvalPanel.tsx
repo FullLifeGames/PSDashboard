@@ -24,6 +24,8 @@ interface EvalPanelProps {
   graph: EvalGraphState;
   /** Replay view only — starts the whole-game background sweep. */
   onAnalyzeGame?: () => void;
+  /** Replay view only — analyzes just the current turn (and its follow-up). */
+  onAnalyzeTurn?: () => void;
   onSelectTurn?: (turn: number) => void;
   currentTurn: number;
   /** Analysis of the graph-selected turn (replay view only). */
@@ -81,7 +83,7 @@ function ChoiceList({
 export function EvalPanel({
   playerNames, status, result, progress, reconstructProgress, error,
   prefs, onPrefsChange, onEvaluate, onCancel, onPickChoice, showAuto, showTera,
-  graph, onAnalyzeGame, onSelectTurn, currentTurn, analysis,
+  graph, onAnalyzeGame, onAnalyzeTurn, onSelectTurn, currentTurn, analysis,
 }: EvalPanelProps) {
   const running = status === 'searching' || status === 'reconstructing';
   const hasGraph = graph.scores.some(score => score !== null);
@@ -197,16 +199,30 @@ export function EvalPanel({
                 </button>
               </>
             ) : (
-              <button
-                type="button"
-                className="ps-btn"
-                onClick={onAnalyzeGame}
-                disabled={running}
-                title="Evaluate every turn of the game in the background — the line dips where the game swung."
-                style={{ padding: '1px 6px', fontSize: 10 }}
-              >
-                {hasGraph ? 'Re-analyze' : 'Analyze game'}
-              </button>
+              <>
+                <button
+                  type="button"
+                  className="ps-btn"
+                  onClick={onAnalyzeGame}
+                  disabled={running}
+                  title="Evaluate every turn of the game in the background — the line dips where the game swung."
+                  style={{ padding: '1px 6px', fontSize: 10 }}
+                >
+                  {hasGraph ? 'Re-analyze' : 'Analyze game'}
+                </button>
+                {onAnalyzeTurn && (
+                  <button
+                    type="button"
+                    className="ps-btn"
+                    onClick={onAnalyzeTurn}
+                    disabled={running}
+                    title="Explain just this turn — evaluates it and the next one, no full sweep."
+                    style={{ padding: '1px 6px', fontSize: 10 }}
+                  >
+                    Analyze turn {currentTurn}
+                  </button>
+                )}
+              </>
             )}
           </div>
           {hasGraph && (

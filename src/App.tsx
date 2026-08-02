@@ -492,6 +492,23 @@ function App() {
     });
   }, [replayData, evaluation, analyzableTurns, effectiveTera, setsFingerprint, makeReplayAcquire, snapshots]);
 
+  // On-demand: explain the current turn without sweeping the whole game —
+  // its analysis only needs this turn and the next one evaluated.
+  const handleAnalyzeTurn = useCallback(() => {
+    if (!replayData) return;
+    const turn = Math.min(Math.max(1, branchTurn), analyzableTurns);
+    evaluation.runGraphSweep({
+      turns: analyzableTurns,
+      from: turn,
+      to: Math.min(turn + 1, analyzableTurns),
+      tera: effectiveTera,
+      cacheKeyFor: sweepTurn => `${replayData.id}:${sweepTurn}:${setsFingerprint}`,
+      acquireFor: makeReplayAcquire,
+      playedFor: sweepTurn => parsePlayedActions(snapshots[sweepTurn]?.log ?? []),
+    });
+    setAnalysisTurn(turn);
+  }, [replayData, evaluation, branchTurn, analyzableTurns, effectiveTera, setsFingerprint, makeReplayAcquire, snapshots]);
+
   // Any position change invalidates a displayed result.
   const { markStale: markEvalStale, reset: resetEval, clearGraph } = evaluation;
   useEffect(() => {
@@ -1000,6 +1017,7 @@ function App() {
                 showTera={replayGen === 9}
                 graph={evaluation.graph}
                 onAnalyzeGame={!branching ? handleAnalyzeGame : undefined}
+                onAnalyzeTurn={!branching ? handleAnalyzeTurn : undefined}
                 onSelectTurn={!branching ? handleGraphSelect : undefined}
                 currentTurn={branching ? (simState?.turnNumber ?? branchTurn) : branchTurn}
                 analysis={!branching ? turnAnalysis : null}
