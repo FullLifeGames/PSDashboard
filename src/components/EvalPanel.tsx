@@ -116,18 +116,23 @@ export function EvalPanel({
             <option value="mcts">MCTS</option>
           </select>
         </label>
-        <label style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 10, color: '#aabbcc' }}>
-          Samples
-          <select
-            value={prefs.samples}
-            onChange={event => onPrefsChange({ ...prefs, samples: parseInt(event.target.value, 10) as EvalPreferences['samples'] })}
-            disabled={running || prefs.mode === 'mcts'}
+        {prefs.mode !== 'mcts' && (
+          <label
+            title="Damage-roll seeds averaged per cell. Only affects cells where a KO is in range — quiet cells are roll-insensitive and always simulate once."
+            style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 10, color: '#aabbcc' }}
           >
-            <option value={1}>1</option>
-            <option value={3}>3</option>
-            <option value={5}>5</option>
-          </select>
-        </label>
+            Samples
+            <select
+              value={prefs.samples}
+              onChange={event => onPrefsChange({ ...prefs, samples: parseInt(event.target.value, 10) as EvalPreferences['samples'] })}
+              disabled={running}
+            >
+              <option value={1}>1</option>
+              <option value={3}>3</option>
+              <option value={5}>5</option>
+            </select>
+          </label>
+        )}
         {showTera && (
           <label style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 10, color: '#aabbcc' }}>
             Tera
