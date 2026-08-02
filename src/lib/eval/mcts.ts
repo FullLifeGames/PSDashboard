@@ -5,7 +5,7 @@ import {
 } from './forward-model';
 import { cellKey } from './rank';
 import { searchOptions, SEARCH_SEEDS } from './search';
-import type { EvalResult, EvalSettings, RankedChoice, SearchProgress } from './types';
+import type { EvalResult, EvalSettings, MctsTreeStats, RankedChoice, SearchProgress } from './types';
 
 /**
  * DUCT (decoupled UCT) Monte-Carlo tree search — the "think deeper" mode.
@@ -152,16 +152,21 @@ function toResult(root: Node, maxDepth: number): EvalResult {
   };
 }
 
-export function mctsSearch(
+function runMcts(
   serializedBattle: string,
   settings: EvalSettings,
   callbacks?: MctsCallbacks,
-): EvalResult {
+  seedOffset = 0,
+): { root: Node; maxDepth: number; result: EvalResult } {
   const matchupCache = createMatchupCache();
   const tera = settings.tera ?? true;
   const root = makeNode(createRootPosition(serializedBattle), tera, matchupCache);
   if (root.ended || root.p1Options.length === 0 || root.p2Options.length === 0) {
-    return { score: root.value, interval: 0, depthCompleted: 1, perSide: { p1: [], p2: [] } };
+    return {
+      root,
+      maxDepth: 1,
+      result: { score: root.value, interval: 0, depthCompleted: 1, perSide: { p1: [], p2: [] } },
+    };
   }
 
   let maxDepth = 1;
@@ -185,7 +190,9 @@ export function mctsSearch(
       let child = node.children.get(key);
       if (!child) {
         // Expansion: the cell's chance outcome is fixed at creation time.
-        const seed = SEARCH_SEEDS[iteration % SEARCH_SEEDS.length];
+        // The offset rotates the seed schedule so parallel trees explore
+        // different chance outcomes.
+        const seed = SEARCH_SEEDS[(iteration + seedOffset) % SEARCH_SEEDS.length];
         const position = advancePosition(node.position, node.p1Options[i].choice, node.p2Options[j].choice, seed);
         child = makeNode(position, tera, matchupCache);
         node.children.set(key, child);
@@ -217,5 +224,34 @@ export function mctsSearch(
 
   const result = toResult(root, maxDepth);
   callbacks?.onPartial?.(result);
-  return result;
+  return { root, maxDepth, result };
+}
+
+export function mctsSearch(
+  serializedBattle: string,
+  settings: EvalSettings,
+  callbacks?: MctsCallbacks,
+): EvalResult {
+  return runMcts(serializedBattle, settings, callbacks).result;
+}
+
+/** One parallel tree's run: root statistics plus its own ranked result. */
+export function mctsTreeSearch(
+  serializedBattle: string,
+  settings: EvalSettings,
+  seedOffset: number,
+  callbacks?: MctsCallbacks,
+): MctsTreeStats {
+  const { root, maxDepth, result } = runMcts(serializedBattle, settings, callbacks, seedOffset);
+  return {
+    p1Options: root.p1Options.map(option => ({ choice: option.choice, label: option.label })),
+    p2Options: root.p2Options.map(option => ({ choice: option.choice, label: option.label })),
+    p1N: root.p1N,
+    p1W: root.p1W,
+    p2N: root.p2N,
+    p2W: root.p2W,
+    visits: root.visits,
+    depth: maxDepth,
+    result,
+  };
 }

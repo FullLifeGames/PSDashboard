@@ -104,8 +104,23 @@ export interface EvalSubSearchJob {
   settings: EvalSettings;
 }
 
+/** One MCTS tree's root statistics — mergeable across parallel trees. */
+export interface MctsTreeStats {
+  p1Options: EvalChoiceOption[];
+  p2Options: EvalChoiceOption[];
+  p1N: number[];
+  p1W: number[];
+  p2N: number[];
+  p2W: number[];
+  visits: number;
+  depth: number;
+  /** This tree's own ranked result (PV/punisher donor for the merge). */
+  result: EvalResult;
+}
+
 export type EvalWorkerRequest =
   | { type: 'search'; id: number; serializedBattle: string; settings: EvalSettings }
+  | { type: 'mctstree'; id: number; serializedBattle: string; settings: EvalSettings; seedOffset: number }
   | { type: 'choices'; id: number; serializedBattle: string; tera: boolean }
   | { type: 'cells'; id: number; serializedBattle: string; jobs: EvalCellJob[] }
   | { type: 'subsearch'; id: number; serializedBattle: string; job: EvalSubSearchJob };
@@ -114,6 +129,7 @@ export type EvalWorkerResponse =
   | { type: 'progress'; id: number; progress: SearchProgress }
   | { type: 'partial'; id: number; result: EvalResult }
   | { type: 'result'; id: number; result: EvalResult }
+  | { type: 'mctsTreeResult'; id: number; tree: MctsTreeStats }
   | { type: 'choicesResult'; id: number; info: EvalChoicesInfo }
   | { type: 'cellsResult'; id: number; values: EvalCellValue[] }
   | { type: 'error'; id: number; message: string };

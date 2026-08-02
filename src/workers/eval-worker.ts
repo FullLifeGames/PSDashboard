@@ -1,5 +1,5 @@
 /// <reference lib="webworker" />
-import { mctsSearch } from '../lib/eval/mcts';
+import { mctsSearch, mctsTreeSearch } from '../lib/eval/mcts';
 import type { SearchExecutor } from '../lib/eval/orchestrator';
 import { createLocalExecutor, searchPosition } from '../lib/eval/search';
 import type { EvalWorkerRequest, EvalWorkerResponse } from '../lib/eval/types';
@@ -31,6 +31,11 @@ scope.onmessage = async (event: MessageEvent<EvalWorkerRequest>) => {
         onPartial: partial => post({ type: 'partial', id: message.id, result: partial }),
       });
       post({ type: 'result', id: message.id, result });
+    } else if (message.type === 'mctstree') {
+      const tree = mctsTreeSearch(message.serializedBattle, message.settings, message.seedOffset, {
+        onProgress: progress => post({ type: 'progress', id: message.id, progress }),
+      });
+      post({ type: 'mctsTreeResult', id: message.id, tree });
     } else if (message.type === 'choices') {
       const info = await executorFor(message.serializedBattle).choices(message.tera);
       post({ type: 'choicesResult', id: message.id, info });

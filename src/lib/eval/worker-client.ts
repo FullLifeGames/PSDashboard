@@ -1,6 +1,7 @@
+import { MCTS_TREES, mergeMctsTrees } from './mcts-merge';
 import { searchOrchestrated, type SearchExecutor } from './orchestrator';
 import type {
-  EvalCellValue, EvalResult, EvalSettings, EvalWorkerRequest, EvalWorkerResponse, SearchProgress,
+  EvalCellValue, EvalResult, EvalSettings, EvalWorkerRequest, EvalWorkerResponse, MctsTreeStats, SearchProgress,
 } from './types';
 
 export interface EvalRunHandlers {
@@ -129,24 +130,45 @@ export class EvalWorkerClient {
     const live = () => generation === this.generation;
 
     if (settings.mode === 'mcts') {
-      // The tree search is inherently sequential — one worker, streaming.
-      const handle = this.ensureWorkers()[0];
-      const id = this.nextId++;
-      return new Promise<EvalResult>((resolve, reject) => {
-        handle.pending.set(id, {
-          resolve: response => {
-            if (response.type === 'result') resolve(response.result);
-            else reject(new Error('unexpected worker response'));
-          },
-          reject,
-          onStream: response => {
-            if (!live()) return;
-            if (response.type === 'progress') handlers?.onProgress?.(response.progress);
-            else if (response.type === 'partial') handlers?.onPartial?.(response.result);
-          },
+      // Root parallelization: a FIXED number of independent trees (seed
+      // offsets 0..N−1) spread across the pool and merged by summed root
+      // statistics. The count never follows the pool size — results must
+      // not vary by machine; small pools just run trees in rounds.
+      const workers = this.ensureWorkers();
+      const doneByTree = new Array(MCTS_TREES).fill(0);
+      let totalPerTree = 1;
+      const completed: MctsTreeStats[] = [];
+      const trees = Array.from({ length: MCTS_TREES }, (_, offset) => {
+        const handle = workers[offset % workers.length];
+        const id = this.nextId++;
+        return new Promise<MctsTreeStats>((resolve, reject) => {
+          handle.pending.set(id, {
+            resolve: response => {
+              if (response.type === 'mctsTreeResult') resolve(response.tree);
+              else reject(new Error('unexpected worker response'));
+            },
+            reject,
+            onStream: response => {
+              if (!live() || response.type !== 'progress') return;
+              doneByTree[offset] = response.progress.done;
+              totalPerTree = response.progress.total;
+              handlers?.onProgress?.({
+                done: doneByTree.reduce((sum, done) => sum + done, 0),
+                total: MCTS_TREES * totalPerTree,
+                depth: response.progress.depth,
+              });
+            },
+          });
+          handle.worker.postMessage({ type: 'mctstree', id, serializedBattle, settings, seedOffset: offset });
+        }).then(tree => {
+          if (live()) {
+            completed.push(tree);
+            handlers?.onPartial?.(mergeMctsTrees([...completed]));
+          }
+          return tree;
         });
-        handle.worker.postMessage({ type: 'search', id, serializedBattle, settings });
       });
+      return Promise.all(trees).then(mergeMctsTrees);
     }
 
     const executor = this.createPooledExecutor(serializedBattle);

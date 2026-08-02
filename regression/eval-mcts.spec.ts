@@ -2,7 +2,8 @@ import { test, expect } from '@playwright/test';
 import { Battle, State, Teams, toID } from '@pkmn/sim';
 import type { PokemonSet } from '@pkmn/sim';
 import { analyzeTurn, matchPlayedChoice } from '../src/lib/eval/analysis';
-import { mctsSearch, MCTS_ITERATIONS } from '../src/lib/eval/mcts';
+import { mctsSearch, mctsTreeSearch, MCTS_ITERATIONS } from '../src/lib/eval/mcts';
+import { mergeMctsTrees, MCTS_TREES } from '../src/lib/eval/mcts-merge';
 import { searchPosition } from '../src/lib/eval/search';
 import type { EvalResult, SearchProgress } from '../src/lib/eval/types';
 
@@ -120,6 +121,29 @@ test.describe('DUCT-MCTS search', () => {
     expect(result.perSide.p1.length).toBeLessThanOrEqual(12);
     expect(result.perSide.p1[0].choice).toContain(','); // combined two-slot choice
     expect(mctsSearch(root, { depth: 1, samples: 1, tera: false, mode: 'mcts' })).toEqual(result);
+  });
+
+  test('root-parallel trees merge deterministically and agree on the win', () => {
+    const root = threeTurnWin();
+    const settings = { depth: 1, samples: 1, tera: false, mode: 'mcts' } as const;
+    const trees = Array.from({ length: MCTS_TREES }, (_, offset) => mctsTreeSearch(root, settings, offset));
+
+    // All trees rank the same option lists (a hard merge precondition).
+    for (const tree of trees) {
+      expect(tree.p1Options).toEqual(trees[0].p1Options);
+      expect(tree.p1N).toHaveLength(tree.p1Options.length);
+    }
+
+    const merged = mergeMctsTrees(trees);
+    expect(merged.perSide.p1[0].choice).toBe('move seismictoss');
+    expect(merged.score).toBeGreaterThan(0.3);
+    // Merged visits cover every tree's iterations.
+    const totalTopVisits = trees.reduce((sum, tree) => sum + tree.visits, 0);
+    expect(totalTopVisits).toBe(MCTS_TREES * MCTS_ITERATIONS);
+    // Deterministic: same trees, same merge.
+    expect(mergeMctsTrees(trees.map(tree => ({ ...tree })))).toEqual(merged);
+    // A single tree merges to exactly its own result.
+    expect(mergeMctsTrees([trees[0]])).toEqual(trees[0].result);
   });
 
   test('an ended position returns its exact value', () => {
