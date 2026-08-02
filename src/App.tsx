@@ -386,12 +386,17 @@ function App() {
     setChoice(side, choice, activeSlot);
   }, [setChoice]);
 
-  // ----- Position evaluation (singles only) -----
-  const evalAvailable = useMemo(() => {
-    if (!replayData) return false;
-    const gameType = getReplayGameType(replayData.log);
-    return gameType === null || gameType === 'singles';
-  }, [replayData]);
+  // ----- Position evaluation (singles + doubles) -----
+  const replayGameType = useMemo(
+    () => (replayData ? getReplayGameType(replayData.log) : null),
+    [replayData],
+  );
+  const evalAvailable = useMemo(
+    () => !!replayData && (replayGameType === null || replayGameType === 'singles' || replayGameType === 'doubles'),
+    [replayData, replayGameType],
+  );
+  // Played-action parsing and the regret model are singles-only for now.
+  const evalAnalysisAvailable = replayGameType !== 'doubles';
 
   const setsFingerprint = useMemo(
     () => JSON.stringify([editedP1Info, editedP2Info, teamText]),
@@ -463,11 +468,15 @@ function App() {
       const moves = side === 'p1' ? simState.p1MovesBySlot[0] : simState.p2MovesBySlot[0];
       const option = (moves ?? []).find(move => choiceId(move.name) === parts[1]);
       if (!option) return;
+      const modifier = parts[2] === 'terastallize' ? 'terastallize' as const
+        : parts[2] === 'mega' ? 'mega' as const
+          : parts[2] === 'ultra' ? 'ultra' as const
+            : undefined;
       handleSetChoice(side, {
         kind: 'move',
         moveId: choiceId(option.name),
         moveName: option.name,
-        ...(parts[2] === 'terastallize' ? { modifier: 'terastallize' as const } : {}),
+        ...(modifier ? { modifier } : {}),
       });
     } else if (parts[0] === 'switch') {
       const slot = parseInt(parts[1], 10);
@@ -488,10 +497,11 @@ function App() {
       cacheKeyFor: turn => `${replayData.id}:${turn}:${setsFingerprint}`,
       acquireFor: makeReplayAcquire,
       // snapshots[turn] carries the block ENDING at |turn|turn+1 — i.e. the
-      // actions actually played on `turn`.
-      playedFor: turn => parsePlayedActions(snapshots[turn]?.log ?? []),
+      // actions actually played on `turn`. Doubles logs carry two actions
+      // per side, which the singles parser would mis-read — skip them.
+      playedFor: turn => (evalAnalysisAvailable ? parsePlayedActions(snapshots[turn]?.log ?? []) : null),
     });
-  }, [replayData, evaluation, analyzableTurns, effectiveTera, setsFingerprint, makeReplayAcquire, snapshots]);
+  }, [replayData, evaluation, analyzableTurns, effectiveTera, setsFingerprint, makeReplayAcquire, snapshots, evalAnalysisAvailable]);
 
   // On-demand: explain the current turn without sweeping the whole game —
   // its analysis only needs this turn and the next one evaluated.
@@ -505,10 +515,10 @@ function App() {
       tera: effectiveTera,
       cacheKeyFor: sweepTurn => `${replayData.id}:${sweepTurn}:${setsFingerprint}`,
       acquireFor: makeReplayAcquire,
-      playedFor: sweepTurn => parsePlayedActions(snapshots[sweepTurn]?.log ?? []),
+      playedFor: sweepTurn => (evalAnalysisAvailable ? parsePlayedActions(snapshots[sweepTurn]?.log ?? []) : null),
     });
     setAnalysisTurn(turn);
-  }, [replayData, evaluation, branchTurn, analyzableTurns, effectiveTera, setsFingerprint, makeReplayAcquire, snapshots]);
+  }, [replayData, evaluation, branchTurn, analyzableTurns, effectiveTera, setsFingerprint, makeReplayAcquire, snapshots, evalAnalysisAvailable]);
 
   // Any position change invalidates a displayed result.
   const { markStale: markEvalStale, reset: resetEval, clearGraph } = evaluation;
@@ -675,7 +685,7 @@ function App() {
   }, [handleReplayTurn]);
 
   const turnAnalysis = useMemo(() => {
-    if (analysisTurn === null) return null;
+    if (analysisTurn === null || !evalAnalysisAvailable) return null;
     const result = evaluation.graph.results[analysisTurn - 1];
     const scoreBefore = evaluation.graph.scores[analysisTurn - 1];
     if (!result || scoreBefore === null) return null;
@@ -687,7 +697,7 @@ function App() {
       scoreBefore,
       scoreAfter: evaluation.graph.scores[analysisTurn] ?? null,
     });
-  }, [analysisTurn, evaluation.graph]);
+  }, [analysisTurn, evaluation.graph, evalAnalysisAvailable]);
 
   const replayWinner = useMemo<'p1' | 'p2' | null>(() => {
     if (!replayData) return null;
@@ -700,7 +710,7 @@ function App() {
 
   // Game-level root cause, once enough of the game is swept.
   const gameReport = useMemo(() => {
-    if (!replayData) return null;
+    if (!replayData || !evalAnalysisAvailable) return null;
     const { results, scores, played, playedOutcome, running } = evaluation.graph;
     if (running) return null;
     const analyses = results.map((result, index) => {
@@ -717,7 +727,7 @@ function App() {
     });
     if (analyses.filter(Boolean).length < 3) return null;
     return buildGameReport(analyses, [replayData.players[0], replayData.players[1]], replayWinner);
-  }, [replayData, evaluation.graph, replayWinner]);
+  }, [replayData, evaluation.graph, replayWinner, evalAnalysisAvailable]);
 
   const teamPasteStatus = useMemo(() => {
     if (!pastedSets || pastedSets.length === 0) return null;
@@ -1043,7 +1053,7 @@ function App() {
                 onPrefsChange={evaluation.setPrefs}
                 onEvaluate={handleEvaluate}
                 onCancel={evaluation.cancel}
-                onPickChoice={branching ? handlePickEvalChoice : undefined}
+                onPickChoice={branching && evalAnalysisAvailable ? handlePickEvalChoice : undefined}
                 showAuto={branching}
                 showTera={replayGen === 9}
                 graph={evaluation.graph}

@@ -908,6 +908,28 @@ test.describe('PS Dashboard', () => {
     await expect(page.locator('input[aria-label="Branch share link"]')).toHaveValue(/#branch=/);
   });
 
+  test('evaluates a doubles replay position with combined choices', async ({ page }) => {
+    test.setTimeout(180_000);
+    await page.evaluate(() => {
+      localStorage.setItem('ps-replay-interceptor:eval-pool', '2');
+      localStorage.setItem('ps-replay-interceptor:eval-prefs',
+        JSON.stringify({ depth: 1, samples: 1, auto: false, tera: 'auto' }));
+    });
+    await page.reload();
+    await page.locator('input[type="text"]').fill('gen9doubles-test');
+    await page.locator('button', { hasText: 'Load' }).click();
+    await expect(page.getByText('Alice', { exact: true }).first()).toBeVisible({ timeout: 10000 });
+
+    await page.locator('button', { hasText: 'Eval' }).click();
+    const panel = page.locator('.ps-main-right .ps-eval-panel');
+    await expect(panel).toBeVisible();
+    await panel.locator('button', { hasText: 'Evaluate' }).click();
+    await expect(panel.locator('.ps-eval-bar')).toBeVisible({ timeout: 120_000 });
+    await expect(panel.locator('.ps-eval-bar-p1')).toContainText('%');
+    // Recommendations are combined two-slot choices ("A + B").
+    await expect(panel.locator('.ps-eval-choice').first()).toContainText('+');
+  });
+
   test('doubles branch shows slot controls and blocks duplicate simultaneous switches', async ({ page }) => {
     await page.locator('input[type="text"]').fill('gen9doubles-test');
     await page.locator('button', { hasText: 'Load' }).click();
