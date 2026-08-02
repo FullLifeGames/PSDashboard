@@ -16,6 +16,29 @@ const REPLAY_IDS = [
   'gen9draft-2058494320',
   'gen9draft-2298735122',
   'gen3customgame-2115579570',
+  // High-ladder gen9ou games (≥1500 Elo, sampled 2026-08-02) — stronger play
+  // gives a cleaner sign-accuracy signal than random-ladder blunder-fests.
+  'gen9ou-2658678742',
+  'gen9ou-2658675391',
+  'gen9ou-2658676184',
+  'gen9ou-2658675932',
+  'gen9ou-2658670791',
+  'gen9ou-2658671385',
+  'gen9ou-2658663776',
+  'gen9ou-2658672151',
+  'gen9ou-2658671254',
+  'gen9ou-2658669868',
+  'gen9ou-2658668443',
+  'gen9ou-2658665571',
+  'gen9ou-2658664943',
+  'gen9ou-2658663604',
+  'gen9ou-2658664071',
+  'gen9ou-2658660641',
+  'gen9ou-2658661171',
+  'gen9ou-2658662321',
+  'gen9ou-2658661545',
+  'gen9ou-2658659909',
+  'gen9ou-2658658993',
 ];
 
 interface Sample {
@@ -28,7 +51,7 @@ test.describe('eval calibration against real replays', () => {
   test.skip(!process.env.EVAL_CALIBRATION, 'set EVAL_CALIBRATION=1 to run the calibration sweep');
 
   test('score sign tracks the actual winner', async () => {
-    test.setTimeout(600_000);
+    test.setTimeout(2_400_000);
     const samples: Sample[] = [];
 
     for (const id of REPLAY_IDS) {
@@ -65,7 +88,10 @@ test.describe('eval calibration against real replays', () => {
           const battle = runtime.battleStream.battle;
           if (!battle) continue;
           const serialized = JSON.stringify(State.serializeBattle(battle));
-          const { score } = searchPosition(serialized, { depth: 1, samples: 1, tera: false });
+          // EVAL_CALIBRATION_DEPTH separates the two levers: does more
+          // search fix a phase, or is the static eval itself miscalibrated?
+          const depth = process.env.EVAL_CALIBRATION_DEPTH === '2' ? 2 : 1;
+          const { score } = searchPosition(serialized, { depth, samples: 1, tera: false });
           const fraction = turn / maxTurn;
           samples.push({
             phase: fraction < 1 / 3 ? 'early' : fraction < 2 / 3 ? 'mid' : 'late',
@@ -87,6 +113,20 @@ test.describe('eval calibration against real replays', () => {
       console.log(
         `${phase}: n=${inPhase.length} sign-accuracy=${(100 * correct / inPhase.length).toFixed(0)}% ` +
         `mean|score|=${meanAbs.toFixed(2)}`,
+      );
+    }
+
+    // Calibration by confidence: within a |score| bucket, how often does the
+    // favored side actually win? Well-calibrated means accuracy grows with
+    // magnitude (informs the tanh scale, not just the sign).
+    const buckets: [number, number][] = [[0, 0.2], [0.2, 0.4], [0.4, 0.7], [0.7, 1.01]];
+    for (const [lo, hi] of buckets) {
+      const inBucket = samples.filter(sample => Math.abs(sample.score) >= lo && Math.abs(sample.score) < hi);
+      if (inBucket.length === 0) continue;
+      const correct = inBucket.filter(sample => (sample.score > 0) === sample.p1Won).length;
+      console.log(
+        `|score| ${lo.toFixed(1)}–${hi > 1 ? '1.0' : hi.toFixed(1)}: n=${inBucket.length} ` +
+        `favored-side-wins=${(100 * correct / inBucket.length).toFixed(0)}%`,
       );
     }
     expect(samples.length).toBeGreaterThan(0);
