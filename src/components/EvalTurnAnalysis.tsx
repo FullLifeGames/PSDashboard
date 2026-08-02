@@ -1,4 +1,5 @@
 import { REGRET_THRESHOLD, type SideAnalysis, type TurnAnalysis } from '../lib/eval/analysis';
+import { summarizeTurn } from '../lib/eval/summary';
 
 interface EvalTurnAnalysisProps {
   analysis: TurnAnalysis;
@@ -62,6 +63,7 @@ export function EvalTurnAnalysis({ analysis, playerNames }: EvalTurnAnalysisProp
         )}
         <span style={{ color: badge.color }}>{badge.text}</span>
       </div>
+      <div className="ps-eval-analysis-summary">{summarizeTurn(analysis, playerNames)}</div>
       {analysis.decisionDelta !== null && analysis.chanceDelta !== null && (
         <div className="ps-eval-analysis-row" style={{ color: '#778' }}>
           {signed(analysis.decisionDelta)} expected from the choices · {signed(analysis.chanceDelta)} from how it rolled

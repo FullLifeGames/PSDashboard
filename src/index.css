@@ -1308,6 +1308,11 @@ input[type="range"]::-webkit-slider-thumb {
   gap: 3px;
   font-size: 11px;
 }
+.ps-eval-analysis-summary {
+  font-size: 11px;
+  line-height: 1.45;
+  color: #bcd;
+}
 .ps-eval-analysis-side {
   display: flex;
   flex-direction: column;

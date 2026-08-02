@@ -277,6 +277,8 @@ test.describe('PS Dashboard', () => {
     await panel.locator('button', { hasText: 'Analyze turn' }).click();
     await expect(panel.locator('.ps-eval-analysis')).toBeVisible({ timeout: 120_000 });
     await expect(panel.locator('.ps-eval-analysis')).toContainText('Turn 1');
+    // The natural-language summary leads with the advantage movement.
+    await expect(panel.locator('.ps-eval-analysis-summary')).toContainText('%');
     // The range sweep finishes (the full-sweep button returns)…
     await expect(panel.locator('button', { hasText: 'Re-analyze' })).toBeVisible({ timeout: 60_000 });
     // …and only the selected turn and its follow-up were evaluated.
