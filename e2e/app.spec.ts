@@ -260,6 +260,26 @@ test.describe('PS Dashboard', () => {
     await expect(panel.locator('.ps-eval-analysis')).toBeVisible();
     await expect(panel.locator('.ps-eval-analysis')).toContainText('Turn 1');
     await expect(panel.locator('.ps-eval-analysis')).toContainText('played');
+
+    // The sweep persisted its results to IndexedDB…
+    const storedCount = await page.evaluate(async () => new Promise<number>(resolve => {
+      const open = indexedDB.open('ps-replay-interceptor-eval', 1);
+      open.onsuccess = () => {
+        const countRequest = open.result.transaction('evals').objectStore('evals').count();
+        countRequest.onsuccess = () => resolve(countRequest.result);
+        countRequest.onerror = () => resolve(-1);
+      };
+      open.onerror = () => resolve(-1);
+    }));
+    expect(storedCount).toBeGreaterThan(0);
+
+    // …so after a reload the graph re-analyzes from the store.
+    await page.reload();
+    await page.locator('button', { hasText: 'Load' }).click();
+    await expect(page.getByText('TestPlayer1', { exact: true }).first()).toBeVisible({ timeout: 10000 });
+    await panel.locator('button', { hasText: 'Analyze game' }).click();
+    await expect(panel.locator('.ps-eval-graph')).toBeVisible({ timeout: 30_000 });
+    await expect(panel.locator('button', { hasText: 'Re-analyze' })).toBeVisible({ timeout: 30_000 });
   });
 
   test('analyzes a single turn on demand without a full sweep', async ({ page }) => {

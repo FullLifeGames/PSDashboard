@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { matchPlayedChoice } from '../lib/eval/analysis';
 import type { PlayedTurn } from '../lib/eval/played';
 import { EvalWorkerClient } from '../lib/eval/worker-client';
+import { evalStoreKey, loadStoredEval, saveStoredEval } from '../lib/eval-cache-store';
 import type { EvalPreferences, EvalResult, SearchProgress } from '../lib/eval/types';
 
 export type EvalStatus = 'idle' | 'reconstructing' | 'searching' | 'done' | 'stale' | 'error';
@@ -143,6 +144,22 @@ export function useEvaluation() {
 
     void (async () => {
       try {
+        // Persistent cache: a result from a previous session for the same
+        // position + settings skips reconstruction and search entirely.
+        if (params.cacheKey) {
+          const stored = await loadStoredEval(evalStoreKey(params.cacheKey, depth, samples, mode, params.tera));
+          if (runRef.current !== runId) return;
+          if (stored) {
+            cacheRef.current.set(params.cacheKey, {
+              result: stored.result, depth, samples, mode, tera: params.tera,
+              ...(stored.playedOutcome !== undefined ? { playedOutcome: stored.playedOutcome } : {}),
+            });
+            setResult(stored.result);
+            setStatus('done');
+            return;
+          }
+        }
+
         const serialized = await params.acquire((turn, target) => {
           if (runRef.current === runId) setReconstructProgress({ turn, target });
         });
@@ -163,7 +180,13 @@ export function useEvaluation() {
         setResult(final);
         setStatus('done');
         setProgress(null);
-        if (params.cacheKey) cacheRef.current.set(params.cacheKey, { result: final, depth, samples, mode, tera: params.tera });
+        if (params.cacheKey) {
+          cacheRef.current.set(params.cacheKey, { result: final, depth, samples, mode, tera: params.tera });
+          void saveStoredEval({
+            key: evalStoreKey(params.cacheKey, depth, samples, mode, params.tera),
+            result: final, depth, samples, mode, tera: params.tera, savedAt: Date.now(),
+          });
+        }
       } catch (err) {
         if (runRef.current !== runId) return;
         if (err instanceof Error && err.message === 'cancelled') return;
@@ -245,11 +268,22 @@ export function useEvaluation() {
       for (let turn = from; turn <= to; turn++) {
         if (runRef.current !== runId) return;
         const key = params.cacheKeyFor(turn);
+        const storeKey = evalStoreKey(key, depth, samples, mode, params.tera);
         const turnPlayed = params.playedFor(turn);
         played[turn - 1] = turnPlayed;
 
-        const hit = cacheRef.current.get(key);
-        if (hit && hit.depth === depth && hit.samples === samples && hit.mode === mode && hit.tera === params.tera) {
+        let hit = cacheRef.current.get(key);
+        if (!(hit && hit.depth === depth && hit.samples === samples && hit.mode === mode && hit.tera === params.tera)) {
+          // Second cache layer: results persisted by a previous session.
+          const stored = await loadStoredEval(storeKey);
+          if (runRef.current !== runId) return;
+          hit = stored ? {
+            result: stored.result, depth, samples, mode, tera: params.tera,
+            ...(stored.playedOutcome !== undefined ? { playedOutcome: stored.playedOutcome } : {}),
+          } : undefined;
+          if (hit) cacheRef.current.set(key, hit);
+        }
+        if (hit) {
           scores[turn - 1] = hit.result.score;
           results[turn - 1] = hit.result;
           // Entries written by single evaluations never computed the
@@ -273,6 +307,10 @@ export function useEvaluation() {
               if (runRef.current !== runId) return;
             }
             cacheRef.current.set(key, { ...hit, playedOutcome: outcome });
+            void saveStoredEval({
+              key: storeKey, result: hit.result, depth, samples, mode, tera: params.tera,
+              playedOutcome: outcome, savedAt: Date.now(),
+            });
           }
           playedOutcome[turn - 1] = outcome;
         } else {
@@ -301,6 +339,10 @@ export function useEvaluation() {
             }
             playedOutcome[turn - 1] = outcome;
             cacheRef.current.set(key, { result, depth, samples, mode, tera: params.tera, playedOutcome: outcome });
+            void saveStoredEval({
+              key: storeKey, result, depth, samples, mode, tera: params.tera,
+              playedOutcome: outcome, savedAt: Date.now(),
+            });
           } catch (err) {
             if (runRef.current !== runId) return;
             if (err instanceof Error && err.message === 'cancelled') return;
