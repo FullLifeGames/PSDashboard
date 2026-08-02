@@ -1,5 +1,5 @@
 import { PRNG, State } from '@pkmn/sim';
-import type { Battle, PRNGSeed } from '@pkmn/sim';
+import type { Battle, PRNGSeed, Side } from '@pkmn/sim';
 import { evaluatePosition } from './eval-function';
 
 export interface ChoiceOption {
@@ -79,6 +79,102 @@ function sideIndex(side: 'p1' | 'p2'): 0 | 1 {
   return side === 'p1' ? 0 : 1;
 }
 
+/** Move target types that require picking a foe slot in doubles. */
+const TARGET_FOE = new Set(['normal', 'any', 'adjacentFoe']);
+
+interface SlotChoice {
+  choice: string;
+  label: string;
+  /** Uses a once-per-battle gimmick (Tera / Mega / Ultra) this turn. */
+  once: boolean;
+  /** Bench slot for switches (duplicate-target exclusion), null for moves. */
+  bench: number | null;
+}
+
+interface ActiveRequestSlot {
+  moves: { move: string; disabled?: unknown; target?: unknown }[];
+  trapped?: unknown;
+  canTerastallize?: unknown;
+  canMegaEvo?: unknown;
+  canUltraBurst?: unknown;
+}
+
+function benchSwitches(sideState: Side): SlotChoice[] {
+  const switches: SlotChoice[] = [];
+  sideState.pokemon.forEach((pokemon, index) => {
+    if (pokemon.isActive || pokemon.fainted) return;
+    switches.push({ choice: `switch ${index + 1}`, label: `→ ${pokemon.name}`, once: false, bench: index + 1 });
+  });
+  return switches;
+}
+
+/** All choices one doubles slot can make on its own. */
+function slotChoicesFor(
+  sideState: Side,
+  entry: ActiveRequestSlot | null | undefined,
+  forced: boolean,
+  slot: number,
+  allowTera: boolean,
+): SlotChoice[] {
+  if (forced) return benchSwitches(sideState);
+  const pokemon = sideState.active[slot];
+  if (!entry || !pokemon || pokemon.fainted) return [];
+
+  const trapped = 'trapped' in entry && !!entry.trapped;
+  const canTera = allowTera && !!entry.canTerastallize;
+  const canMega = !!entry.canMegaEvo;
+  const canUltra = !!entry.canUltraBurst;
+  const choices: SlotChoice[] = [];
+  const foeActives = sideState.foe.active;
+
+  for (const move of entry.moves) {
+    if ('disabled' in move && move.disabled) continue;
+    const key = choiceKey(move.move);
+    const targetType = 'target' in move ? (move.target as string | undefined) : undefined;
+    const targets: { suffix: string; label: string }[] = [];
+    if (targetType && TARGET_FOE.has(targetType)) {
+      const living = foeActives
+        .map((foe, index) => ({ foe, index }))
+        .filter(({ foe }) => foe && !foe.fainted);
+      if (living.length > 1) {
+        for (const { foe, index } of living) {
+          targets.push({ suffix: ` ${index + 1}`, label: `${move.move}→${foe!.name}` });
+        }
+      } else if (living.length === 1) {
+        targets.push({ suffix: ` ${living[0].index + 1}`, label: move.move });
+      } else {
+        targets.push({ suffix: '', label: move.move });
+      }
+    } else if (targetType === 'adjacentAlly') {
+      targets.push({ suffix: ` -${slot === 0 ? 2 : 1}`, label: move.move });
+    } else if (targetType === 'adjacentAllyOrSelf') {
+      targets.push({ suffix: ` -${slot + 1}`, label: move.move });
+    } else {
+      targets.push({ suffix: '', label: move.move });
+    }
+    for (const target of targets) {
+      choices.push({ choice: `move ${key}${target.suffix}`, label: target.label, once: false, bench: null });
+      if (canTera) {
+        choices.push({
+          choice: `move ${key}${target.suffix} terastallize`,
+          label: `Tera + ${target.label}`,
+          once: true,
+          bench: null,
+        });
+      }
+      if (canMega) {
+        choices.push({ choice: `move ${key}${target.suffix} mega`, label: `Mega + ${target.label}`, once: true, bench: null });
+      }
+      if (canUltra) {
+        choices.push({ choice: `move ${key}${target.suffix} ultra`, label: `Ultra + ${target.label}`, once: true, bench: null });
+      }
+    }
+  }
+
+  if (!trapped) choices.push(...benchSwitches(sideState));
+  return choices;
+}
+
 export function legalChoices(
   position: SimPosition,
   side: 'p1' | 'p2',
@@ -90,6 +186,32 @@ export function legalChoices(
   if (!request || battle.ended) return [];
 
   const allowTera = opts?.tera ?? true;
+  const actives = 'active' in request ? request.active ?? [] : [];
+  const forceSwitch = 'forceSwitch' in request ? request.forceSwitch ?? [] : [];
+  const slotCount = Math.max(actives.length, forceSwitch.length);
+
+  if (slotCount > 1) {
+    // Doubles: per-slot choices, then the combined product. Slots the sim
+    // auto-passes (fainted/empty) are skipped entirely — explicit `pass`
+    // trips "more choices than unfainted Pokémon".
+    const perSlot: SlotChoice[][] = [];
+    for (let slot = 0; slot < slotCount; slot++) {
+      const slotChoices = slotChoicesFor(sideState, actives[slot], !!forceSwitch[slot], slot, allowTera);
+      if (slotChoices.length > 0) perSlot.push(slotChoices);
+    }
+    if (perSlot.length === 0) return [];
+    if (perSlot.length === 1) return perSlot[0].map(({ choice, label }) => ({ choice, label }));
+    const combined: ChoiceOption[] = [];
+    for (const first of perSlot[0]) {
+      for (const second of perSlot[1]) {
+        if (first.once && second.once) continue; // one Tera/Mega/Ultra per side per turn
+        if (first.bench !== null && first.bench === second.bench) continue; // same bench target
+        combined.push({ choice: `${first.choice}, ${second.choice}`, label: `${first.label} + ${second.label}` });
+      }
+    }
+    return combined;
+  }
+
   const options: ChoiceOption[] = [];
   const active = 'active' in request ? request.active?.[0] : undefined;
   const forced = 'forceSwitch' in request && !!request.forceSwitch?.[0];
@@ -104,6 +226,12 @@ export function legalChoices(
           choice: `move ${choiceKey(move.move)} terastallize`,
           label: `Tera + ${move.move}`,
         });
+      }
+      if ('canMegaEvo' in active && active.canMegaEvo) {
+        options.push({ choice: `move ${choiceKey(move.move)} mega`, label: `Mega + ${move.move}` });
+      }
+      if ('canUltraBurst' in active && active.canUltraBurst) {
+        options.push({ choice: `move ${choiceKey(move.move)} ultra`, label: `Ultra + ${move.move}` });
       }
     }
   }

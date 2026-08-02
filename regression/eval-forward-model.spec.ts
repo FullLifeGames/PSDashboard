@@ -34,6 +34,20 @@ function makeBattle(p1Sets: PokemonSet[], p2Sets: PokemonSet[]): Battle {
 
 const serialize = (battle: Battle) => JSON.stringify(State.serializeBattle(battle));
 
+function makeDoublesBattle(p1Sets: PokemonSet[], p2Sets: PokemonSet[]): Battle {
+  const battle = new Battle({
+    formatid: toID('gen9doublescustomgame'),
+    seed: '1,2,3,4',
+    p1: { name: 'Alpha', team: Teams.pack(p1Sets) },
+    p2: { name: 'Beta', team: Teams.pack(p2Sets) },
+  });
+  if (battle.sides.some(side => side.requestState === 'teampreview')) {
+    battle.choose('p1', `team ${p1Sets.map((_, index) => index + 1).join('')}`);
+    battle.choose('p2', `team ${p2Sets.map((_, index) => index + 1).join('')}`);
+  }
+  return battle;
+}
+
 test.describe('sim forward model', () => {
   test('legal choices mirror the request: moves, tera variants, switches', () => {
     const root = createRootPosition(serialize(makeBattle(
@@ -183,6 +197,111 @@ test.describe('sim forward model', () => {
     expect(positionBattle(root).sides[1].active[0]!.name).toBe('Eevee');
     expect(legalChoices(root, 'p2').map(option => option.choice)).toContain('move protect');
     const child = advancePosition(root, 'move protect', 'move protect', '1,2,3,4');
+    expect(positionBattle(child).turn).toBe(positionBattle(root).turn + 1);
+  });
+
+  test('doubles: combined two-slot options with targets, spreads, tera, and switches', () => {
+    const root = createRootPosition(serialize(makeDoublesBattle(
+      [
+        makeSet('Machamp', 'Machamp', ['Rock Slide', 'Karate Chop']),
+        makeSet('Snorlax', 'Snorlax', ['Tackle']),
+        makeSet('Chansey', 'Chansey', ['Protect']),
+      ],
+      [makeSet('Pikachu', 'Pikachu', ['Protect']), makeSet('Eevee', 'Eevee', ['Protect'])],
+    )));
+    const p1 = legalChoices(root, 'p1');
+    const choices = p1.map(option => option.choice);
+    // Single-target moves enumerate both living foe slots.
+    expect(choices).toContain('move karatechop 1, move tackle 1');
+    expect(choices).toContain('move karatechop 1, move tackle 2');
+    // Spread moves take no target.
+    expect(choices).toContain('move rockslide, move tackle 1');
+    // Moves combine with switches in either slot.
+    expect(choices).toContain('move karatechop 1, switch 3');
+    expect(choices).toContain('switch 3, move tackle 1');
+    // Both slots can never take the same bench target.
+    expect(choices.some(choice => /switch 3.*switch 3/.test(choice))).toBe(false);
+    // Tera on one slot or the other, never both at once.
+    expect(choices).toContain('move karatechop 1 terastallize, move tackle 1');
+    expect(choices).toContain('move karatechop 1, move tackle 1 terastallize');
+    expect(choices.some(choice => (choice.match(/terastallize/g) ?? []).length > 1)).toBe(false);
+    // Labels name the target so PVs stay readable.
+    expect(p1.find(option => option.choice === 'move karatechop 2, move tackle 1')?.label)
+      .toBe('Karate Chop→Eevee + Tackle→Pikachu');
+  });
+
+  test('doubles: a dead foe slot is never targeted; the shorthanded side chooses one slot', () => {
+    const battle = makeDoublesBattle(
+      [
+        makeSet('Machamp', 'Machamp', ['Karate Chop']),
+        makeSet('Snorlax', 'Snorlax', ['Tackle']),
+      ],
+      [makeSet('Pikachu', 'Pikachu', ['Protect']), makeSet('Eevee', 'Eevee', ['Protect'])],
+    );
+    // Eevee is down with no bench behind it — the slot stays empty.
+    const eevee = battle.sides[1].active[1]!;
+    eevee.hp = 0;
+    eevee.faint();
+    battle.faintMessages();
+    const root = createRootPosition(serialize(battle));
+    const p1Choices = legalChoices(root, 'p1').map(option => option.choice);
+    expect(p1Choices).toContain('move karatechop 1, move tackle 1');
+    expect(p1Choices.some(choice => choice.includes('karatechop 2'))).toBe(false);
+    // The shorthanded side issues a plain one-slot choice for its living slot.
+    expect(legalChoices(root, 'p2').map(option => option.choice)).toContain('move protect');
+  });
+
+  test('mega evolution variants appear when the stone allows it', () => {
+    const battle = new Battle({
+      formatid: toID('gen7customgame'),
+      seed: '1,2,3,4',
+      p1: { name: 'Alpha', team: Teams.pack([{ ...makeSet('Charizard', 'Charizard', ['Flamethrower']), item: 'Charizardite X' }]) },
+      p2: { name: 'Beta', team: Teams.pack([makeSet('Snorlax', 'Snorlax', ['Protect'])]) },
+    });
+    if (battle.sides.some(side => side.requestState === 'teampreview')) {
+      battle.choose('p1', 'team 1');
+      battle.choose('p2', 'team 1');
+    }
+    const p1 = legalChoices(createRootPosition(serialize(battle)), 'p1');
+    const mega = p1.find(option => option.choice === 'move flamethrower mega');
+    expect(mega?.label).toBe('Mega + Flamethrower');
+  });
+
+  test('doubles: only one slot may Mega Evolve in the same turn', () => {
+    const battle = new Battle({
+      formatid: toID('gen7doublescustomgame'),
+      seed: '1,2,3,4',
+      p1: {
+        name: 'Alpha',
+        team: Teams.pack([
+          { ...makeSet('Charizard', 'Charizard', ['Flamethrower']), item: 'Charizardite X' },
+          { ...makeSet('Gyarados', 'Gyarados', ['Waterfall']), item: 'Gyaradosite' },
+        ]),
+      },
+      p2: {
+        name: 'Beta',
+        team: Teams.pack([makeSet('Snorlax', 'Snorlax', ['Protect']), makeSet('Chansey', 'Chansey', ['Protect'])]),
+      },
+    });
+    if (battle.sides.some(side => side.requestState === 'teampreview')) {
+      battle.choose('p1', 'team 12');
+      battle.choose('p2', 'team 12');
+    }
+    const choices = legalChoices(createRootPosition(serialize(battle)), 'p1').map(option => option.choice);
+    expect(choices.some(choice => /move flamethrower(?: \d)? mega/.test(choice))).toBe(true);
+    expect(choices.some(choice => /move waterfall(?: \d)? mega/.test(choice))).toBe(true);
+    expect(choices.some(choice => (choice.match(/ mega\b/g) ?? []).length > 1)).toBe(false);
+  });
+
+  test('doubles: advance accepts combined choices and resolves the turn', () => {
+    const root = createRootPosition(serialize(makeDoublesBattle(
+      [
+        makeSet('Machamp', 'Machamp', ['Rock Slide', 'Karate Chop']),
+        makeSet('Snorlax', 'Snorlax', ['Tackle']),
+      ],
+      [makeSet('Pikachu', 'Pikachu', ['Protect']), makeSet('Eevee', 'Eevee', ['Protect'])],
+    )));
+    const child = advancePosition(root, 'move rockslide, move tackle 1', 'move protect, move protect', '1,2,3,4');
     expect(positionBattle(child).turn).toBe(positionBattle(root).turn + 1);
   });
 
