@@ -204,7 +204,6 @@ test.describe('PS Dashboard', () => {
     await page.locator('button', { hasText: 'Load' }).click();
     await expect(page.getByText('TestPlayer1', { exact: true }).first()).toBeVisible({ timeout: 10000 });
 
-    await page.locator('button', { hasText: 'Eval' }).click();
     // The panel lives beside the battle in the right column (chess-style).
     const panel = page.locator('.ps-main-right .ps-eval-panel');
     await expect(panel).toBeVisible();
@@ -227,7 +226,6 @@ test.describe('PS Dashboard', () => {
     await page.locator('button', { hasText: 'Load' }).click();
     await expect(page.getByText('TestPlayer1', { exact: true }).first()).toBeVisible({ timeout: 10000 });
 
-    await page.locator('button', { hasText: 'Eval' }).click();
     const panel = page.locator('.ps-main-right .ps-eval-panel');
     await expect(panel.locator('select').first()).toHaveValue('mcts');
     await panel.locator('button', { hasText: 'Evaluate' }).click();
@@ -246,7 +244,6 @@ test.describe('PS Dashboard', () => {
     await page.locator('button', { hasText: 'Load' }).click();
     await expect(page.getByText('TestPlayer1', { exact: true }).first()).toBeVisible({ timeout: 10000 });
 
-    await page.locator('button', { hasText: 'Eval' }).click();
     const panel = page.locator('.ps-main-right .ps-eval-panel');
     await panel.locator('button', { hasText: 'Analyze game' }).click();
     await expect(panel.locator('.ps-eval-graph')).toBeVisible({ timeout: 180_000 });
@@ -276,7 +273,6 @@ test.describe('PS Dashboard', () => {
     await page.locator('button', { hasText: 'Load' }).click();
     await expect(page.getByText('TestPlayer1', { exact: true }).first()).toBeVisible({ timeout: 10000 });
 
-    await page.locator('button', { hasText: 'Eval' }).click();
     const panel = page.locator('.ps-main-right .ps-eval-panel');
     await panel.locator('button', { hasText: 'Analyze turn' }).click();
     await expect(panel.locator('.ps-eval-analysis')).toBeVisible({ timeout: 120_000 });
@@ -300,7 +296,6 @@ test.describe('PS Dashboard', () => {
     await page.locator('button', { hasText: 'Load' }).click();
     await expect(page.getByText('TestPlayer1', { exact: true }).first()).toBeVisible({ timeout: 10000 });
 
-    await page.locator('button', { hasText: 'Eval' }).click();
     const panel = page.locator('.ps-main-right .ps-eval-panel');
     await expect(panel.locator('select').first()).toHaveValue('mcts');
     await panel.locator('button', { hasText: 'Analyze game' }).click();
@@ -325,7 +320,6 @@ test.describe('PS Dashboard', () => {
     await page.locator('button', { hasText: 'Branch Here' }).click();
     await expect(page.getByText(/Branching.*Turn/)).toBeVisible({ timeout: 15000 });
 
-    await page.locator('button', { hasText: 'Eval' }).click();
     const panel = page.locator('.ps-eval-panel');
     await panel.locator('button', { hasText: 'Evaluate' }).click();
     await expect(panel.locator('.ps-eval-bar')).toBeVisible({ timeout: 120_000 });
@@ -920,7 +914,6 @@ test.describe('PS Dashboard', () => {
     await page.locator('button', { hasText: 'Load' }).click();
     await expect(page.getByText('Alice', { exact: true }).first()).toBeVisible({ timeout: 10000 });
 
-    await page.locator('button', { hasText: 'Eval' }).click();
     const panel = page.locator('.ps-main-right .ps-eval-panel');
     await expect(panel).toBeVisible();
     await panel.locator('button', { hasText: 'Evaluate' }).click();

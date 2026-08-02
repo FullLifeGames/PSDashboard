@@ -75,7 +75,6 @@ export interface EvalGraphState {
 }
 
 export function useEvaluation() {
-  const [panelOpen, setPanelOpen] = useState(false);
   const [prefs, setPrefsState] = useState<EvalPreferences>(loadPrefs);
   const [status, setStatus] = useState<EvalStatus>('idle');
   const [result, setResult] = useState<EvalResult | null>(null);
@@ -301,15 +300,7 @@ export function useEvaluation() {
     setGraph({ scores: [], results: [], played: [], playedOutcome: [], running: false, progress: null });
   }, []);
 
-  const togglePanel = useCallback(() => {
-    setPanelOpen(open => {
-      if (open) cancel();
-      return !open;
-    });
-  }, [cancel]);
-
   return {
-    panelOpen, togglePanel,
     prefs, setPrefs,
     status, result, progress, error, reconstructProgress,
     evaluate, markStale, reset, cancel,

@@ -539,10 +539,10 @@ function App() {
 
   // Opt-in: keep the branch evaluation fresh after each executed turn.
   useEffect(() => {
-    if (branching && evaluation.panelOpen && evaluation.prefs.auto && evaluation.status === 'stale' && !executing) {
+    if (branching && evaluation.prefs.auto && evaluation.status === 'stale' && !executing) {
       handleEvaluate();
     }
-  }, [branching, evaluation.panelOpen, evaluation.prefs.auto, evaluation.status, executing, handleEvaluate]);
+  }, [branching, evaluation.prefs.auto, evaluation.status, executing, handleEvaluate]);
 
   // "What if it had …": a team edit plus the normal branch refresh, with the
   // hypothetical move pre-seeded as that slot's pending choice.
@@ -865,16 +865,6 @@ function App() {
                       />
                       Animate branch turns
                     </label>
-                    {evalAvailable && (
-                      <button
-                        type="button"
-                        className="ps-btn"
-                        onClick={evaluation.togglePanel}
-                        style={{ padding: '2px 8px', fontSize: 10 }}
-                      >
-                        Eval
-                      </button>
-                    )}
                     <button type="button" className="ps-btn" onClick={handleStopBranch} style={{ padding: '2px 8px', fontSize: 10 }}>
                       Back
                     </button>
@@ -986,18 +976,6 @@ function App() {
                 >
                   {branchPreparing ? 'Preparing...' : 'Branch Here'}
                 </button>
-                {evalAvailable && (
-                  <button
-                    type="button"
-                    className="ps-btn"
-                    onClick={evaluation.togglePanel}
-                    disabled={atEndPosition}
-                    title={atEndPosition ? 'The battle is already over at the end position.' : 'Toggle the position evaluation panel.'}
-                    style={{ padding: '3px 12px', fontSize: 11 }}
-                  >
-                    Eval
-                  </button>
-                )}
               </div>
             )}
 
@@ -1041,7 +1019,7 @@ function App() {
 
           {/* Right column: evaluation beside the battle (chess-style), then stats */}
           <div className="ps-main-right">
-            {evaluation.panelOpen && evalAvailable && (
+            {evalAvailable && (
               <EvalPanel
                 playerNames={[replayData.players[0], replayData.players[1]]}
                 status={evaluation.status}
