@@ -305,6 +305,44 @@ test.describe('sim forward model', () => {
     expect(positionBattle(child).turn).toBe(positionBattle(root).turn + 1);
   });
 
+  test('doubles: a double KO resolves both forced switches with distinct replacements', () => {
+    const root = createRootPosition(serialize(makeDoublesBattle(
+      [
+        makeSet('Electrode', 'Electrode', ['Explosion']),
+        makeSet('Voltorb', 'Voltorb', ['Explosion']),
+        makeSet('Chansey', 'Chansey', ['Protect']),
+        makeSet('Blissey', 'Blissey', ['Protect']),
+      ],
+      [
+        makeSet('Registeel', 'Registeel', ['Protect']),
+        makeSet('Regirock', 'Regirock', ['Protect']),
+      ],
+    )));
+    const child = advancePosition(root, 'move explosion, move explosion', 'move protect, move protect', '1,2,3,4');
+    const childBattle = positionBattle(child);
+    expect(childBattle.turn).toBe(2);
+    const names = childBattle.sides[0].active.map(active => active?.name).sort();
+    expect(names).toEqual(['Blissey', 'Chansey']);
+  });
+
+  test('doubles: a fainted slot under a stale move request is repaired', () => {
+    const battle = makeDoublesBattle(
+      [
+        makeSet('Machamp', 'Machamp', ['Karate Chop']),
+        makeSet('Snorlax', 'Snorlax', ['Tackle']),
+        makeSet('Chansey', 'Chansey', ['Protect']),
+      ],
+      [makeSet('Registeel', 'Registeel', ['Protect']), makeSet('Regirock', 'Regirock', ['Protect'])],
+    );
+    const snorlax = battle.sides[0].active[1]!;
+    snorlax.hp = 0;
+    snorlax.fainted = true;
+    const root = createRootPosition(serialize(battle));
+    expect(positionBattle(root).sides[0].active[1]!.name).toBe('Chansey');
+    const child = advancePosition(root, 'move karatechop 1, move protect', 'move protect, move protect', '1,2,3,4');
+    expect(positionBattle(child).turn).toBe(positionBattle(root).turn + 1);
+  });
+
   test('round-trip: a serialized mid-request battle keeps its open request', () => {
     const root = createRootPosition(serialize(makeBattle(
       [makeSet('Snorlax', 'Snorlax', ['Protect'])],

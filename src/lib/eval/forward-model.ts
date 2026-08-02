@@ -260,9 +260,17 @@ function repairFaintedActives(battle: Battle): void {
   if (battle.ended) return;
   const stale = battle.sides
     .slice(0, 2)
-    .filter(side => side.requestState === 'move' && side.active[0]?.fainted);
+    .filter(side => side.requestState === 'move' &&
+      side.active.some(active => active?.fainted) &&
+      // Without a living bench there is nothing to send in — the sim
+      // auto-passes the dead slot, so a switch request would only wedge.
+      side.pokemon.some(pokemon => !pokemon.isActive && !pokemon.fainted));
   if (stale.length === 0) return;
-  for (const side of stale) side.active[0]!.switchFlag = true;
+  for (const side of stale) {
+    for (const active of side.active) {
+      if (active?.fainted) active.switchFlag = true;
+    }
+  }
   battle.makeRequest('switch');
   resolveForcedSwitches(battle, REPAIR_SEED);
 }
@@ -290,6 +298,26 @@ function applyChoice(battle: Battle, side: 'p1' | 'p2', choice: string): void {
  * picking the replacement whose entry statically evaluates best for the
  * choosing side. Runs until the battle is back at a turn boundary or over.
  */
+/**
+ * All ways to assign distinct bench replacements to the forced slots, as
+ * ready-to-send choice strings. With fewer replacements than forced slots
+ * the remainder passes.
+ */
+function switchAssignments(forcedCount: number, benchSlots: number[]): string[] {
+  if (forcedCount <= 1) return benchSlots.map(slot => `switch ${slot}`);
+  const assignments: string[] = [];
+  if (benchSlots.length === 1) {
+    return [`switch ${benchSlots[0]}, pass`, `pass, switch ${benchSlots[0]}`];
+  }
+  for (const first of benchSlots) {
+    for (const second of benchSlots) {
+      if (first === second) continue;
+      assignments.push(`switch ${first}, switch ${second}`);
+    }
+  }
+  return assignments;
+}
+
 function resolveForcedSwitches(battle: Battle, seed: PRNGSeed): void {
   for (let guard = 0; guard < 6; guard++) {
     if (battle.ended) return;
@@ -300,19 +328,23 @@ function resolveForcedSwitches(battle: Battle, seed: PRNGSeed): void {
 
     const midTurn = serializeBattleStable(battle);
     for (const side of pending) {
-      const replacements = side.pokemon
+      const request = side.activeRequest as { forceSwitch?: boolean[] } | null;
+      const forcedCount = Math.max(1, (request?.forceSwitch ?? []).filter(Boolean).length);
+      const benchSlots = side.pokemon
         .map((pokemon, index) => ({ pokemon, slot: index + 1 }))
-        .filter(({ pokemon }) => !pokemon.isActive && !pokemon.fainted);
-      if (replacements.length === 0) continue;
+        .filter(({ pokemon }) => !pokemon.isActive && !pokemon.fainted)
+        .map(({ slot }) => slot);
+      if (benchSlots.length === 0) continue;
 
-      let best = replacements[0];
-      if (replacements.length > 1) {
+      const assignments = switchAssignments(forcedCount, benchSlots);
+      let best = assignments[0];
+      if (assignments.length > 1) {
         const perspective = side.id === 'p1' ? 1 : -1;
         let bestValue = -Infinity;
-        for (const candidate of replacements) {
+        for (const candidate of assignments) {
           const trial = State.deserializeBattle(midTurn);
           trial.prng = new PRNG(seed);
-          trial.choose(side.id as 'p1' | 'p2', `switch ${candidate.slot}`);
+          if (!trial.choose(side.id as 'p1' | 'p2', candidate)) continue;
           const value = perspective * evaluatePosition(trial);
           if (value > bestValue) {
             bestValue = value;
@@ -320,7 +352,7 @@ function resolveForcedSwitches(battle: Battle, seed: PRNGSeed): void {
           }
         }
       }
-      applyChoice(battle, side.id as 'p1' | 'p2', `switch ${best.slot}`);
+      applyChoice(battle, side.id as 'p1' | 'p2', best);
     }
   }
 }
