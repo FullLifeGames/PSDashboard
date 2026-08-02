@@ -1,6 +1,8 @@
 import type { EvalPreferences, EvalResult, RankedChoice, SearchProgress } from '../lib/eval/types';
+import type { TurnAnalysis } from '../lib/eval/analysis';
 import type { EvalGraphState, EvalStatus } from '../hooks/useEvaluation';
 import { EvalGraph } from './EvalGraph';
+import { EvalTurnAnalysis } from './EvalTurnAnalysis';
 
 interface EvalPanelProps {
   playerNames: [string, string];
@@ -24,6 +26,8 @@ interface EvalPanelProps {
   onAnalyzeGame?: () => void;
   onSelectTurn?: (turn: number) => void;
   currentTurn: number;
+  /** Analysis of the graph-selected turn (replay view only). */
+  analysis: TurnAnalysis | null;
 }
 
 const signed = (value: number) => `${value >= 0 ? '+' : ''}${value.toFixed(2)}`;
@@ -77,7 +81,7 @@ function ChoiceList({
 export function EvalPanel({
   playerNames, status, result, progress, reconstructProgress, error,
   prefs, onPrefsChange, onEvaluate, onCancel, onPickChoice, showAuto, showTera,
-  graph, onAnalyzeGame, onSelectTurn, currentTurn,
+  graph, onAnalyzeGame, onSelectTurn, currentTurn, analysis,
 }: EvalPanelProps) {
   const running = status === 'searching' || status === 'reconstructing';
   const hasGraph = graph.scores.some(score => score !== null);
@@ -213,6 +217,12 @@ export function EvalPanel({
               onSelectTurn={onSelectTurn}
             />
           )}
+          {hasGraph && !analysis && (
+            <div style={{ fontSize: 10, color: '#778', marginTop: 2 }}>
+              Click a point to see that turn's analysis.
+            </div>
+          )}
+          {analysis && <EvalTurnAnalysis analysis={analysis} playerNames={playerNames} />}
         </div>
       )}
 

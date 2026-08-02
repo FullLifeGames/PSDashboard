@@ -1298,6 +1298,28 @@ input[type="range"]::-webkit-slider-thumb {
   background: rgba(0, 0, 0, 0.25);
   border-radius: 3px;
 }
+.ps-eval-analysis {
+  margin-top: 6px;
+  padding: 6px;
+  background: rgba(0, 0, 0, 0.2);
+  border-radius: 3px;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  font-size: 11px;
+}
+.ps-eval-analysis-side {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+.ps-eval-analysis-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 6px;
+  font-size: 11px;
+}
 .ps-eval-progress {
   height: 6px;
   background: #223;

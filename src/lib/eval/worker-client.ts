@@ -161,6 +161,24 @@ export class EvalWorkerClient {
     });
   }
 
+  /**
+   * Engine expectation of one specific joint choice pair from a position —
+   * a single-cell evaluation reusing the 'cells' worker path (first fixed
+   * seed, one sample).
+   */
+  async evalPair(serializedBattle: string, p1Choice: string, p2Choice: string): Promise<number> {
+    const handle = this.ensureWorkers()[0];
+    const response = await this.rpc(handle, {
+      type: 'cells',
+      serializedBattle,
+      jobs: [{ i: 0, j: 0, p1Choice, p2Choice, samples: 1 }],
+    });
+    if (response.type !== 'cellsResult' || response.values.length === 0) {
+      throw new Error('unexpected worker response');
+    }
+    return response.values[0].value;
+  }
+
   cancel(): void {
     this.generation += 1;
     if (this.workers.length === 0) return;

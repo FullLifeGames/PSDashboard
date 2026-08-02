@@ -24,6 +24,8 @@ import { decodeBranchShare, type BranchSharePayload } from './lib/branch-share';
 import { getBranchSimulatorFormat, getReplayGameType, getReplayGeneration } from './lib/replay-format';
 import { choiceId, type BranchSlotChoice } from './lib/branch-choices';
 import type { RankedChoice } from './lib/eval/types';
+import { parsePlayedActions } from './lib/eval/played';
+import { analyzeTurn } from './lib/eval/analysis';
 
 const TEAM_PASTE_STORAGE_KEY = 'ps-replay-interceptor:team-paste';
 
@@ -138,6 +140,7 @@ function App() {
   const [branchProgress, setBranchProgress] = useState<{ turn: number; target: number } | null>(null);
   const branchAbortRef = useRef<AbortController | null>(null);
   const [branchSession, setBranchSession] = useState(0);
+  const [analysisTurn, setAnalysisTurn] = useState<number | null>(null);
   const [animateBranchTurns, setAnimateBranchTurns] = useState(true);
   const [sharedBranch, setSharedBranch] = useState<BranchSharePayload | null>(null);
   const [sharedBranchError, setSharedBranchError] = useState<string | null>(null);
@@ -483,8 +486,11 @@ function App() {
       tera: effectiveTera,
       cacheKeyFor: turn => `${replayData.id}:${turn}:${setsFingerprint}`,
       acquireFor: makeReplayAcquire,
+      // snapshots[turn] carries the block ENDING at |turn|turn+1 — i.e. the
+      // actions actually played on `turn`.
+      playedFor: turn => parsePlayedActions(snapshots[turn]?.log ?? []),
     });
-  }, [replayData, evaluation, analyzableTurns, effectiveTera, setsFingerprint, makeReplayAcquire]);
+  }, [replayData, evaluation, analyzableTurns, effectiveTera, setsFingerprint, makeReplayAcquire, snapshots]);
 
   // Any position change invalidates a displayed result.
   const { markStale: markEvalStale, reset: resetEval, clearGraph } = evaluation;
@@ -500,6 +506,7 @@ function App() {
   // The graph is tied to a specific replay + set knowledge + Tera mode.
   useEffect(() => {
     clearGraph();
+    setAnalysisTurn(null);
   }, [replayData?.id, setsFingerprint, effectiveTera, clearGraph]);
 
   // Opt-in: keep the branch evaluation fresh after each executed turn.
@@ -643,6 +650,26 @@ function App() {
       return turn;
     });
   }, [branching, endSnapshotTurn]);
+
+  const handleGraphSelect = useCallback((turn: number) => {
+    handleReplayTurn(turn);
+    setAnalysisTurn(turn);
+  }, [handleReplayTurn]);
+
+  const turnAnalysis = useMemo(() => {
+    if (analysisTurn === null) return null;
+    const result = evaluation.graph.results[analysisTurn - 1];
+    const scoreBefore = evaluation.graph.scores[analysisTurn - 1];
+    if (!result || scoreBefore === null) return null;
+    return analyzeTurn({
+      turn: analysisTurn,
+      result,
+      played: evaluation.graph.played[analysisTurn - 1] ?? null,
+      playedOutcome: evaluation.graph.playedOutcome[analysisTurn - 1] ?? null,
+      scoreBefore,
+      scoreAfter: evaluation.graph.scores[analysisTurn] ?? null,
+    });
+  }, [analysisTurn, evaluation.graph]);
 
   const teamPasteStatus = useMemo(() => {
     if (!pastedSets || pastedSets.length === 0) return null;
@@ -973,8 +1000,9 @@ function App() {
                 showTera={replayGen === 9}
                 graph={evaluation.graph}
                 onAnalyzeGame={!branching ? handleAnalyzeGame : undefined}
-                onSelectTurn={!branching ? handleReplayTurn : undefined}
+                onSelectTurn={!branching ? handleGraphSelect : undefined}
                 currentTurn={branching ? (simState?.turnNumber ?? branchTurn) : branchTurn}
+                analysis={!branching ? turnAnalysis : null}
               />
             )}
             <BattleStatsPanel
