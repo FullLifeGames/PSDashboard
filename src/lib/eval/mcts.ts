@@ -1,10 +1,10 @@
 import { createMatchupCache, evaluatePosition, type MatchupCache } from './eval-function';
 import {
-  advancePosition, createRootPosition, legalChoices, positionBattle,
+  advancePosition, createRootPosition, positionBattle,
   type ChoiceOption, type SimPosition,
 } from './forward-model';
 import { cellKey } from './rank';
-import { SEARCH_SEEDS } from './search';
+import { searchOptions, SEARCH_SEEDS } from './search';
 import type { EvalResult, EvalSettings, RankedChoice, SearchProgress } from './types';
 
 /**
@@ -46,8 +46,8 @@ interface Node {
 function makeNode(position: SimPosition, tera: boolean, matchupCache: MatchupCache): Node {
   const battle = positionBattle(position);
   const ended = battle.ended;
-  const p1Options = ended ? [] : legalChoices(position, 'p1', { tera });
-  const p2Options = ended ? [] : legalChoices(position, 'p2', { tera });
+  const p1Options = ended ? [] : searchOptions(position, 'p1', { tera });
+  const p2Options = ended ? [] : searchOptions(position, 'p2', { tera });
   return {
     position,
     ended,

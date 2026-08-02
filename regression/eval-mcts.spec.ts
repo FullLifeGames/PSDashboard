@@ -91,6 +91,37 @@ test.describe('DUCT-MCTS search', () => {
     expect(analysis.p1.regret).toBeGreaterThan(0);
   });
 
+  test('runs on a doubles position over restricted combined choices', () => {
+    const battle = new Battle({
+      formatid: toID('gen9doublescustomgame'),
+      seed: '1,2,3,4',
+      p1: {
+        name: 'Alpha',
+        team: Teams.pack([
+          makeSet('Machamp', 'Machamp', ['Rock Slide', 'Karate Chop']),
+          makeSet('Snorlax', 'Snorlax', ['Tackle', 'Protect']),
+        ]),
+      },
+      p2: {
+        name: 'Beta',
+        team: Teams.pack([
+          makeSet('Pikachu', 'Pikachu', ['Tackle', 'Growl'], 30),
+          makeSet('Eevee', 'Eevee', ['Tackle', 'Growl'], 30),
+        ]),
+      },
+    });
+    if (battle.sides.some(side => side.requestState === 'teampreview')) {
+      battle.choose('p1', 'team 12');
+      battle.choose('p2', 'team 12');
+    }
+    const root = serialize(battle);
+    const result = mctsSearch(root, { depth: 1, samples: 1, tera: false, mode: 'mcts' });
+    expect(result.perSide.p1.length).toBeGreaterThan(0);
+    expect(result.perSide.p1.length).toBeLessThanOrEqual(12);
+    expect(result.perSide.p1[0].choice).toContain(','); // combined two-slot choice
+    expect(mctsSearch(root, { depth: 1, samples: 1, tera: false, mode: 'mcts' })).toEqual(result);
+  });
+
   test('an ended position returns its exact value', () => {
     const battle = makeBattle(
       [makeSet('A', 'Snorlax', ['Protect'])],

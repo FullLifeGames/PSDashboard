@@ -33,6 +33,33 @@ function makeBattle(p1Sets: PokemonSet[], p2Sets: PokemonSet[]): Battle {
 
 const serialize = (battle: Battle) => JSON.stringify(State.serializeBattle(battle));
 
+function makeDoublesBattle(p1Sets: PokemonSet[], p2Sets: PokemonSet[]): Battle {
+  const battle = new Battle({
+    formatid: toID('gen9doublescustomgame'),
+    seed: '1,2,3,4',
+    p1: { name: 'Alpha', team: Teams.pack(p1Sets) },
+    p2: { name: 'Beta', team: Teams.pack(p2Sets) },
+  });
+  if (battle.sides.some(side => side.requestState === 'teampreview')) {
+    battle.choose('p1', `team ${p1Sets.map((_, index) => index + 1).join('')}`);
+    battle.choose('p2', `team ${p2Sets.map((_, index) => index + 1).join('')}`);
+  }
+  return battle;
+}
+
+const doublesRoot = () => serialize(makeDoublesBattle(
+  [
+    makeSet('Machamp', 'Machamp', ['Rock Slide', 'Karate Chop']),
+    makeSet('Snorlax', 'Snorlax', ['Tackle', 'Protect']),
+    makeSet('Chansey', 'Chansey', ['Protect']),
+  ],
+  [
+    makeSet('Pikachu', 'Pikachu', ['Tackle', 'Growl'], 30),
+    makeSet('Eevee', 'Eevee', ['Tackle', 'Growl'], 30),
+    makeSet('Vulpix', 'Vulpix', ['Protect'], 30),
+  ],
+));
+
 // Level-100 Machamp: Seismic Toss does a flat 100. Level-30 Pikachu has < 100 max HP.
 test.describe('depth-1 search', () => {
   test('a guaranteed KO into a win ranks first with a winning score', () => {
@@ -263,5 +290,24 @@ test.describe('iterative deepening', () => {
 
     const again = searchPosition(threeTurnWin(), { depth: 3, samples: 1, tera: false });
     expect(again.perSide.p1[0].line).toEqual(depth3.perSide.p1[0].line);
+  });
+});
+
+test.describe('doubles search', () => {
+  test('the root is restricted to a tractable option list and stays deterministic', () => {
+    const root = doublesRoot();
+    const result = searchPosition(root, { depth: 1, samples: 1, tera: false });
+    // Mandatory doubles restriction: at most 12 combined options per side.
+    expect(result.perSide.p1.length).toBeLessThanOrEqual(12);
+    expect(result.perSide.p2.length).toBeLessThanOrEqual(12);
+    expect(result.perSide.p1[0].choice).toContain(','); // combined two-slot choice
+    expect(result.score).toBeGreaterThan(0); // the level-50 side bullies the level-30s
+    expect(searchPosition(root, { depth: 1, samples: 1, tera: false })).toEqual(result);
+  });
+
+  test('deepening runs doubles sub-searches to completion', () => {
+    const deep = searchPosition(doublesRoot(), { depth: 2, samples: 1, tera: false });
+    expect(deep.depthCompleted).toBe(2);
+    expect(deep.perSide.p1.length).toBeGreaterThan(0);
   });
 });

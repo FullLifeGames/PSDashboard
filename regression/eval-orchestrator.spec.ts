@@ -54,6 +54,40 @@ test.describe('search orchestrator', () => {
     }
   });
 
+  test('parity holds for a doubles position', async () => {
+    const root = serialize((() => {
+      const battle = new Battle({
+        formatid: toID('gen9doublescustomgame'),
+        seed: '1,2,3,4',
+        p1: {
+          name: 'Alpha',
+          team: Teams.pack([
+            makeSet('Machamp', 'Machamp', ['Rock Slide', 'Karate Chop']),
+            makeSet('Snorlax', 'Snorlax', ['Tackle', 'Protect']),
+            makeSet('Chansey', 'Chansey', ['Protect']),
+          ]),
+        },
+        p2: {
+          name: 'Beta',
+          team: Teams.pack([
+            makeSet('Pikachu', 'Pikachu', ['Tackle', 'Growl'], 30),
+            makeSet('Eevee', 'Eevee', ['Tackle', 'Growl'], 30),
+          ]),
+        },
+      });
+      if (battle.sides.some(side => side.requestState === 'teampreview')) {
+        battle.choose('p1', 'team 123');
+        battle.choose('p2', 'team 12');
+      }
+      return battle;
+    })());
+    for (const settings of [{ depth: 1, samples: 1, tera: false }, { depth: 2, samples: 1, tera: false }] as const) {
+      const sync = searchPosition(root, settings);
+      const orchestrated = await searchOrchestrated(createLocalExecutor(root), settings);
+      expect(orchestrated, `settings ${JSON.stringify(settings)}`).toEqual(sync);
+    }
+  });
+
   test('progress covers the matrix and partials arrive per depth', async () => {
     const root = threeTurnWin();
     const progress: SearchProgress[] = [];

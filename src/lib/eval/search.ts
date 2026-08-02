@@ -1,4 +1,4 @@
-import type { PRNGSeed } from '@pkmn/sim';
+import type { Pokemon, PRNGSeed } from '@pkmn/sim';
 import {
   createMatchupCache, evaluatePosition, pairThreat, singleMoveFraction, type MatchupCache,
 } from './eval-function';
@@ -63,6 +63,65 @@ function sampleCell(
 
 /** Sub-matrix cap for candidate restriction (base moves always survive). */
 export const RESTRICT_K = 8;
+
+/**
+ * Combined-option cap for doubles. Unlike the singles sub-search cap this is
+ * mandatory everywhere (root included): the raw slot product reaches hundreds
+ * of options per side, and a full matrix over it would take minutes.
+ */
+export const RESTRICT_K_DOUBLES = 12;
+
+const isCombined = (options: ChoiceOption[]) => options.some(option => option.choice.includes(','));
+
+/** Ranks combined doubles options by summed per-slot static threat hints. */
+function restrictCombined(position: SimPosition, side: 'p1' | 'p2', options: ChoiceOption[]): ChoiceOption[] {
+  if (options.length <= RESTRICT_K_DOUBLES) return options;
+  const battle = positionBattle(position);
+  const sideState = battle.sides[side === 'p1' ? 0 : 1];
+  const foeActives = sideState.foe.active;
+  const foes = foeActives.filter((foe): foe is Pokemon => !!foe && !foe.fainted);
+  const actors = sideState.active.filter((active): active is Pokemon => !!active && !active.fainted);
+
+  const partHint = (part: string, partIndex: number): number => {
+    const tokens = part.trim().split(' ');
+    if (tokens[0] === 'switch') {
+      const candidate = sideState.pokemon[parseInt(tokens[1], 10) - 1];
+      if (!candidate || foes.length === 0) return 0;
+      return Math.max(...foes.map(foe =>
+        pairThreat(candidate, foe, battle).fraction - pairThreat(foe, candidate, battle).fraction));
+    }
+    if (tokens[0] !== 'move') return 0;
+    const attacker = actors[partIndex];
+    if (!attacker || foes.length === 0) return 0;
+    const targetLoc = tokens.length > 2 ? parseInt(tokens[2], 10) : NaN;
+    if (Number.isFinite(targetLoc) && targetLoc > 0) {
+      const foe = foeActives[targetLoc - 1];
+      return foe && !foe.fainted ? singleMoveFraction(attacker, foe, tokens[1], battle) : 0;
+    }
+    return Math.max(...foes.map(foe => singleMoveFraction(attacker, foe, tokens[1], battle)));
+  };
+
+  return options
+    .map((option, index) => ({
+      option,
+      index,
+      value: option.choice.split(',').reduce((sum, part, partIndex) => sum + partHint(part, partIndex), 0),
+    }))
+    .sort((a, b) => b.value - a.value || a.index - b.index)
+    .slice(0, RESTRICT_K_DOUBLES)
+    .sort((a, b) => a.index - b.index)
+    .map(entry => entry.option);
+}
+
+/**
+ * The engine's option source: legal choices, with the mandatory doubles
+ * restriction applied. Every consumer (search root, sub-searches, MCTS
+ * nodes, executors) goes through here so all engines see the same lists.
+ */
+export function searchOptions(position: SimPosition, side: 'p1' | 'p2', opts?: { tera?: boolean }): ChoiceOption[] {
+  const options = legalChoices(position, side, opts);
+  return isCombined(options) ? restrictCombined(position, side, options) : options;
+}
 
 /**
  * Caps a wide option list for deep sub-searches: every base move is kept
@@ -156,8 +215,8 @@ export function subSearchDepth1(
     return { score: evaluatePosition(battle, matchupCache), interval: 0, depthCompleted: settings.depth, perSide: { p1: [], p2: [] } };
   }
   const tera = settings.tera ?? true;
-  const p1Options = legalChoices(root, 'p1', { tera });
-  const p2Options = legalChoices(root, 'p2', { tera });
+  const p1Options = searchOptions(root, 'p1', { tera });
+  const p2Options = searchOptions(root, 'p2', { tera });
   if (p1Options.length === 0 || p2Options.length === 0) {
     return searchPosition(serializedBattle, settings, undefined, matchupCache);
   }
@@ -269,8 +328,8 @@ export function searchPosition(
 
   const rootValue = evaluatePosition(battle, matchupCache);
   const tera = settings.tera ?? true;
-  let p1Options = legalChoices(root, 'p1', { tera });
-  let p2Options = legalChoices(root, 'p2', { tera });
+  let p1Options = searchOptions(root, 'p1', { tera });
+  let p2Options = searchOptions(root, 'p2', { tera });
   if (restrictCandidates) {
     p1Options = restrictOptions(root, 'p1', p1Options);
     p2Options = restrictOptions(root, 'p2', p2Options);
@@ -347,8 +406,8 @@ export function createLocalExecutor(serializedBattle: string): SearchExecutor {
     async choices(tera) {
       const battle = positionBattle(root);
       return {
-        p1: legalChoices(root, 'p1', { tera }),
-        p2: legalChoices(root, 'p2', { tera }),
+        p1: searchOptions(root, 'p1', { tera }),
+        p2: searchOptions(root, 'p2', { tera }),
         rootValue: evaluatePosition(battle, matchupCache),
         rootEnded: battle.ended,
       };
