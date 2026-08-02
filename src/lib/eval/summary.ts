@@ -60,6 +60,12 @@ export function summarizeTurn(analysis: TurnAnalysis, playerNames: [string, stri
       sentences.push('Both sides picked reasonable options — the swing came from how the turn rolled ' +
         `(${signed(analysis.chanceDelta ?? analysis.swing ?? 0)}).`);
       break;
+    case 'shift':
+      sentences.push(analysis.decisionDelta !== null && analysis.chanceDelta !== null
+        ? 'No single mistake stands out — the choices and the rolls pushed the same way ' +
+          `(${signed(analysis.decisionDelta)} expected, ${signed(analysis.chanceDelta)} from the rolls).`
+        : 'No single mistake stands out — the swing built up without a clear culprit.');
+      break;
     case 'unclear':
       sentences.push('The score swung, but a choice never surfaced (a Pokémon fainted or was fully prevented) — no blame assigned.');
       break;

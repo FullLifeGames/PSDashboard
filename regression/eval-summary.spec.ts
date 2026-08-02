@@ -57,6 +57,21 @@ test.describe('natural-language turn summaries', () => {
     expect(summary).not.toContain('mistake');
   });
 
+  test('a culprit-free swing is called a shift with its decomposition', () => {
+    const summary = summarizeTurn(analyzeTurn({
+      turn: 19,
+      result,
+      played: { p1: { kind: 'move', name: 'Draco Meteor', tera: false }, p2: { kind: 'switch', name: 'Dragapult', species: 'Dragapult' } },
+      playedOutcome: 0.21,
+      scoreBefore: 0.1,
+      scoreAfter: 0.35,
+    }), names);
+    expect(summary).toContain('No single mistake');
+    expect(summary).toContain('+0.11');
+    expect(summary).toContain('+0.14');
+    expect(summary).not.toContain('quiet');
+  });
+
   test('a quiet turn with both engine moves says so', () => {
     const summary = summarizeTurn(analyzeTurn({
       turn: 3,

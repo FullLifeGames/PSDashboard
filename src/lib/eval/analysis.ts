@@ -13,7 +13,12 @@ export const REGRET_THRESHOLD = 0.15;
 /** Residual swing (actual − expected outcome) that marks a chance swing. */
 export const CHANCE_THRESHOLD = 0.2;
 
-export type TurnAttribution = 'p1-decision' | 'p2-decision' | 'both-decision' | 'chance' | 'quiet' | 'unclear';
+export type TurnAttribution =
+  | 'p1-decision' | 'p2-decision' | 'both-decision'
+  | 'chance'
+  /** A meaningful swing with no single culprit: decision and chance parts each stay under their thresholds. */
+  | 'shift'
+  | 'quiet' | 'unclear';
 
 export interface SideAnalysis {
   playedRaw: PlayedAction | null;
@@ -88,8 +93,11 @@ export function analyzeTurn(params: {
   else if (p1Bad) attribution = 'p1-decision';
   else if (p2Bad) attribution = 'p2-decision';
   else if (chanceDelta !== null && Math.abs(chanceDelta) >= CHANCE_THRESHOLD) attribution = 'chance';
-  else if (swing !== null && Math.abs(swing) >= CHANCE_THRESHOLD && (p1.played === null || p2.played === null)) {
-    attribution = 'unclear';
+  else if (swing !== null && Math.abs(swing) >= CHANCE_THRESHOLD) {
+    // The score clearly moved but nothing crossed a blame threshold: either
+    // a side's choice never surfaced (unclear), or pressure and rolls just
+    // added up (shift) — never "quiet".
+    attribution = p1.played === null || p2.played === null ? 'unclear' : 'shift';
   } else attribution = 'quiet';
 
   return {

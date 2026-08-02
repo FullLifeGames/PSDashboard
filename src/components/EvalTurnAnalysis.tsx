@@ -25,6 +25,11 @@ function SideRow({ name, side }: { name: string; side: SideAnalysis }) {
         {side.played && side.best && !regretful && side.played.choice === side.best.choice && (
           <span style={{ color: '#8c8' }}>✓ the engine's move</span>
         )}
+        {side.played && side.best && !regretful && side.played.choice !== side.best.choice && (
+          <span style={{ color: '#778' }}>
+            engine: {side.best.label} ({signed(side.best.worstCase)})
+          </span>
+        )}
         {regretful && side.regret !== null && (
           <span style={{ color: '#f3a6a6' }}>−{side.regret.toFixed(2)} regret</span>
         )}

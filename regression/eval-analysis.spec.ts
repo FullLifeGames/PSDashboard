@@ -61,6 +61,23 @@ test.describe('turn analysis assembly', () => {
     expect(analysis.chanceDelta).toBeCloseTo(-0.55, 10);
   });
 
+  test('a big swing with no culprit is a shift, not a quiet turn', () => {
+    // Both sides played the engine's move, and neither the decision part
+    // (+0.11) nor the chance part (+0.14) crosses its own threshold — but
+    // the total swing (+0.25) is anything but quiet.
+    const analysis = analyzeTurn({
+      turn: 19,
+      result,
+      played: { p1: { kind: 'move', name: 'Draco Meteor', tera: false }, p2: { kind: 'switch', name: 'Dragapult', species: 'Dragapult' } },
+      playedOutcome: 0.21,
+      scoreBefore: 0.1,
+      scoreAfter: 0.35,
+    });
+    expect(analysis.attribution).toBe('shift');
+    expect(analysis.decisionDelta).toBeCloseTo(0.11, 10);
+    expect(analysis.chanceDelta).toBeCloseTo(0.14, 10);
+  });
+
   test('small regrets and small residual is quiet', () => {
     const analysis = analyzeTurn({
       turn: 3,
