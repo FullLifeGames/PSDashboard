@@ -253,6 +253,12 @@ test.describe('PS Dashboard', () => {
     expect(await panel.locator('.ps-eval-graph circle').count()).toBeGreaterThan(0);
     // The sweep finishes and offers a re-run.
     await expect(panel.locator('button', { hasText: 'Re-analyze' })).toBeVisible({ timeout: 60_000 });
+
+    // Selecting a point opens that turn's played-vs-best analysis.
+    await panel.locator('.ps-eval-graph rect').first().click();
+    await expect(panel.locator('.ps-eval-analysis')).toBeVisible();
+    await expect(panel.locator('.ps-eval-analysis')).toContainText('Turn 1');
+    await expect(panel.locator('.ps-eval-analysis')).toContainText('played');
   });
 
   test('branch mode: picking both recommendations arms Execute Turn', async ({ page }) => {
