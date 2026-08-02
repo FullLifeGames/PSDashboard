@@ -261,6 +261,30 @@ test.describe('PS Dashboard', () => {
     await expect(panel.locator('.ps-eval-analysis')).toContainText('played');
   });
 
+  test('analyzes the whole game with the MCTS engine', async ({ page }) => {
+    test.setTimeout(240_000);
+    await page.evaluate(() => {
+      localStorage.setItem('ps-replay-interceptor:eval-pool', '2');
+      localStorage.setItem('ps-replay-interceptor:eval-prefs',
+        JSON.stringify({ depth: 1, samples: 1, mode: 'mcts', auto: false, tera: 'auto' }));
+    });
+    await page.reload();
+    await page.locator('button', { hasText: 'Load' }).click();
+    await expect(page.getByText('TestPlayer1', { exact: true }).first()).toBeVisible({ timeout: 10000 });
+
+    await page.locator('button', { hasText: 'Eval' }).click();
+    const panel = page.locator('.ps-main-right .ps-eval-panel');
+    await expect(panel.locator('select').first()).toHaveValue('mcts');
+    await panel.locator('button', { hasText: 'Analyze game' }).click();
+    await expect(panel.locator('.ps-eval-graph')).toBeVisible({ timeout: 180_000 });
+    await expect(panel.locator('button', { hasText: 'Re-analyze' })).toBeVisible({ timeout: 120_000 });
+
+    // The analysis pipeline works on visit-ranked MCTS results too.
+    await panel.locator('.ps-eval-graph rect').first().click();
+    await expect(panel.locator('.ps-eval-analysis')).toBeVisible();
+    await expect(panel.locator('.ps-eval-analysis')).toContainText('played');
+  });
+
   test('branch mode: picking both recommendations arms Execute Turn', async ({ page }) => {
     test.setTimeout(180_000);
     await page.evaluate(() => {

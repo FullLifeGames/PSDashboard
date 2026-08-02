@@ -1,6 +1,7 @@
 import { test, expect } from '@playwright/test';
 import { Battle, State, Teams, toID } from '@pkmn/sim';
 import type { PokemonSet } from '@pkmn/sim';
+import { analyzeTurn, matchPlayedChoice } from '../src/lib/eval/analysis';
 import { mctsSearch, MCTS_ITERATIONS } from '../src/lib/eval/mcts';
 import { searchPosition } from '../src/lib/eval/search';
 import type { EvalResult, SearchProgress } from '../src/lib/eval/types';
@@ -66,6 +67,28 @@ test.describe('DUCT-MCTS search', () => {
     expect(first).toEqual(second);
     expect(progress[progress.length - 1].done).toBe(MCTS_ITERATIONS);
     expect(partials.length).toBeGreaterThan(0);
+  });
+
+  test('feeds the played-vs-best turn analysis (graph sweeps in MCTS mode)', () => {
+    const result = mctsSearch(threeTurnWin(), { depth: 1, samples: 1, tera: false, mode: 'mcts' });
+    // Even a clearly bad option gets visits (unvisited-first UCB), so a
+    // sweep's played-action matching works on visit-ranked results too.
+    expect(matchPlayedChoice(result, 'p1', { kind: 'move', name: 'Protect', tera: false })?.choice).toBe('move protect');
+    const analysis = analyzeTurn({
+      turn: 1,
+      result,
+      played: {
+        p1: { kind: 'move', name: 'Protect', tera: false },
+        p2: { kind: 'move', name: 'Tackle', tera: false },
+      },
+      playedOutcome: result.score - 0.1,
+      scoreBefore: result.score,
+      scoreAfter: result.score - 0.15,
+    });
+    expect(analysis.p1.best?.choice).toBe('move seismictoss');
+    expect(analysis.p1.played?.label).toBe('Protect');
+    expect(analysis.p2.played?.choice).toBe('move tackle');
+    expect(analysis.p1.regret).toBeGreaterThan(0);
   });
 
   test('an ended position returns its exact value', () => {

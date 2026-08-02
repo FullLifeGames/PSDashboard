@@ -42,8 +42,8 @@ As of the current repository state:
 
 - `npm run lint` passes.
 - `npm run build` succeeds.
-- `npm run test:e2e` passes with 54 browser tests (the replay JSON and the Showdown embed script are served from fixtures/cache, so the suite is CDN-independent).
-- `npm run test:regression` passes with 190 tests (plus 2 documented known-divergence skips and an opt-in `EVAL_BENCH=1` throughput benchmark) covering replay reconstruction, identity-based choice resolution, execute error paths, gimmick availability, damage-calc generation/set alignment, team sheets, team paste (including natures, IVs, and levels), sets import/export round-trips, legal option pools, position evaluation (static eval, forward model, maximin search with deepening), stats parsing, exported replay file parsing, save/share, and inference quality.
+- `npm run test:e2e` passes with 55 browser tests (the replay JSON and the Showdown embed script are served from fixtures/cache, so the suite is CDN-independent).
+- `npm run test:regression` passes with 191 tests (plus 2 documented known-divergence skips and an opt-in `EVAL_BENCH=1` throughput benchmark) covering replay reconstruction, identity-based choice resolution, execute error paths, gimmick availability, damage-calc generation/set alignment, team sheets, team paste (including natures, IVs, and levels), sets import/export round-trips, legal option pools, position evaluation (static eval, forward model, maximin search with deepening), stats parsing, exported replay file parsing, save/share, and inference quality.
 
 The browser test suite validates the main happy path with a mocked replay fixture:
 
