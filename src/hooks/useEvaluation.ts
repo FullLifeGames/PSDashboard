@@ -3,7 +3,8 @@ import { matchPlayedChoice } from '../lib/eval/analysis';
 import type { PlayedTurn } from '../lib/eval/played';
 import { EvalWorkerClient } from '../lib/eval/worker-client';
 import { evalStoreKey, loadStoredEval, saveStoredEval } from '../lib/eval-cache-store';
-import type { EvalPreferences, EvalResult, SearchProgress } from '../lib/eval/types';
+import { selectKeyTurns } from '../lib/eval/graph';
+import type { EvalPreferences, EvalResult, EvalSettings, SearchProgress } from '../lib/eval/types';
 
 export type EvalStatus = 'idle' | 'reconstructing' | 'searching' | 'done' | 'stale' | 'error';
 
@@ -264,9 +265,13 @@ export function useEvaluation() {
       return params.acquireFor(turn)(() => {});
     };
 
-    void (async () => {
-      for (let turn = from; turn <= to; turn++) {
-        if (runRef.current !== runId) return;
+    /** One sequential pass over `turnList` at `settings`; false = cancelled. */
+    const sweepTurns = async (turnList: number[], settings: EvalSettings): Promise<boolean> => {
+      const { depth, samples } = settings;
+      const mode = settings.mode ?? 'matrix';
+      for (let index = 0; index < turnList.length; index++) {
+        const turn = turnList[index];
+        if (runRef.current !== runId) return false;
         const key = params.cacheKeyFor(turn);
         const storeKey = evalStoreKey(key, depth, samples, mode, params.tera);
         const turnPlayed = params.playedFor(turn);
@@ -276,9 +281,9 @@ export function useEvaluation() {
         if (!(hit && hit.depth === depth && hit.samples === samples && hit.mode === mode && hit.tera === params.tera)) {
           // Second cache layer: results persisted by a previous session.
           const stored = await loadStoredEval(storeKey);
-          if (runRef.current !== runId) return;
+          if (runRef.current !== runId) return false;
           hit = stored ? {
-            result: stored.result, depth, samples, mode, tera: params.tera,
+            result: stored.result, depth, samples, mode: mode, tera: params.tera,
             ...(stored.playedOutcome !== undefined ? { playedOutcome: stored.playedOutcome } : {}),
           } : undefined;
           if (hit) cacheRef.current.set(key, hit);
@@ -297,18 +302,18 @@ export function useEvaluation() {
             if (p1Choice && p2Choice) {
               try {
                 const serialized = await positionFor(turn);
-                if (runRef.current !== runId) return;
+                if (runRef.current !== runId) return false;
                 clientRef.current ??= new EvalWorkerClient();
                 outcome = await clientRef.current.evalPair(serialized, p1Choice.choice, p2Choice.choice);
               } catch (err) {
-                if (runRef.current !== runId) return;
-                if (err instanceof Error && err.message === 'cancelled') return;
+                if (runRef.current !== runId) return false;
+                if (err instanceof Error && err.message === 'cancelled') return false;
               }
-              if (runRef.current !== runId) return;
+              if (runRef.current !== runId) return false;
             }
             cacheRef.current.set(key, { ...hit, playedOutcome: outcome });
             void saveStoredEval({
-              key: storeKey, result: hit.result, depth, samples, mode, tera: params.tera,
+              key: storeKey, result: hit.result, depth, samples, mode: mode, tera: params.tera,
               playedOutcome: outcome, savedAt: Date.now(),
             });
           }
@@ -316,10 +321,10 @@ export function useEvaluation() {
         } else {
           try {
             const serialized = await positionFor(turn);
-            if (runRef.current !== runId) return;
+            if (runRef.current !== runId) return false;
             clientRef.current ??= new EvalWorkerClient();
             const result = await clientRef.current.evaluate(serialized, { depth, samples, mode, tera: params.tera });
-            if (runRef.current !== runId) return;
+            if (runRef.current !== runId) return false;
             scores[turn - 1] = result.score;
             results[turn - 1] = result;
 
@@ -332,24 +337,45 @@ export function useEvaluation() {
               try {
                 outcome = await clientRef.current.evalPair(serialized, p1Choice.choice, p2Choice.choice);
               } catch (err) {
-                if (runRef.current !== runId) return;
-                if (err instanceof Error && err.message === 'cancelled') return;
+                if (runRef.current !== runId) return false;
+                if (err instanceof Error && err.message === 'cancelled') return false;
               }
-              if (runRef.current !== runId) return;
+              if (runRef.current !== runId) return false;
             }
             playedOutcome[turn - 1] = outcome;
-            cacheRef.current.set(key, { result, depth, samples, mode, tera: params.tera, playedOutcome: outcome });
+            cacheRef.current.set(key, { result, depth, samples, mode: mode, tera: params.tera, playedOutcome: outcome });
             void saveStoredEval({
-              key: storeKey, result, depth, samples, mode, tera: params.tera,
+              key: storeKey, result, depth, samples, mode: mode, tera: params.tera,
               playedOutcome: outcome, savedAt: Date.now(),
             });
           } catch (err) {
-            if (runRef.current !== runId) return;
-            if (err instanceof Error && err.message === 'cancelled') return;
+            if (runRef.current !== runId) return false;
+            if (err instanceof Error && err.message === 'cancelled') return false;
             // This turn failed (e.g. reconstruction wedge) — leave a gap.
           }
         }
-        setGraph({ ...snapshot(), running: true, progress: { done: turn - from + 1, total } });
+        setGraph({ ...snapshot(), running: true, progress: { done: index + 1, total: turnList.length } });
+      }
+      return true;
+    };
+
+    void (async () => {
+      const rangeTurns: number[] = [];
+      for (let turn = from; turn <= to; turn++) rangeTurns.push(turn);
+      const fullSettings: EvalSettings = { depth, samples, mode, tera: params.tera };
+      const fastSettings: EvalSettings = { depth: 1, samples: 1, mode: 'matrix', tera: params.tera };
+      const isFast = depth === 1 && samples === 1 && mode !== 'mcts';
+
+      // Two-pass sweep: a fast depth-1 pass shapes the whole graph first,
+      // then the configured settings deepen only the turns around the big
+      // swings (both sides of each — analysis compares across them). Short
+      // ranges (on-demand turn analysis) go straight to full settings.
+      if (rangeTurns.length > 2 && !isFast) {
+        if (!(await sweepTurns(rangeTurns, fastSettings))) return;
+        const keyTurns = selectKeyTurns(scores).filter(turn => turn >= from && turn <= to);
+        if (keyTurns.length > 0 && !(await sweepTurns(keyTurns, fullSettings))) return;
+      } else if (!(await sweepTurns(rangeTurns, fullSettings))) {
+        return;
       }
       if (runRef.current === runId) {
         setGraph(prev => ({ ...prev, running: false, progress: null }));
