@@ -445,6 +445,50 @@ function App() {
       return serializeLiveBattle(battle);
     }, [replayData, teamText, effectiveP1Info, effectiveP2Info, usageStats.stats, setAssumptions.assumptions, snapshots]);
 
+  // Single-pass sweep acquisition: one reconstruction captures every turn
+  // boundary, instead of one O(turn) replay per turn (quadratic polling).
+  const makeSweepAcquireAll = useCallback((turns: number) =>
+    async (report: (turn: number, target: number) => void): Promise<(string | null)[]> => {
+      if (!replayData) throw new Error('Load a replay first.');
+      const { buildTeamsFromReplay } = await import('./lib/team-builder');
+      const branchEngine = await import('./lib/branch-engine');
+      const { serializeLiveBattle } = await import('./lib/eval/serialize');
+      const { p1Team, p2Team } = buildTeamsFromReplay(replayData.log, {
+        userTeamText: teamText || undefined,
+        p1Info: effectiveP1Info,
+        p2Info: effectiveP2Info,
+        usageStats: usageStats.stats,
+        setAssumptions: setAssumptions.assumptions,
+      });
+      if (p1Team.length === 0 || p2Team.length === 0) throw new Error('Could not build both teams for this replay.');
+      const positions: (string | null)[] = new Array(turns).fill(null);
+      const runtime = await branchEngine.reconstructBranchRuntime({
+        format: getBranchSimulatorFormat(replayData),
+        p1Team,
+        p2Team,
+        replayLog: replayData.log,
+        targetTurn: turns,
+        snapshot: snapshots.length > 0 ? snapshots[Math.min(turns - 1, snapshots.length - 1)] : null,
+        playerNames: [replayData.players[0], replayData.players[1]],
+        onProgress: report,
+        capturePositions: {
+          snapshotFor: turn => snapshots[Math.min(turn - 1, snapshots.length - 1)] ?? null,
+          onPosition: (turn, battle) => {
+            if (turn > turns) return;
+            try {
+              positions[turn - 1] = serializeLiveBattle(battle);
+            } catch {
+              // A broken boundary becomes a graph gap, not a failed sweep.
+            }
+          },
+        },
+      });
+      const invalid = branchEngine.validateBranchRuntime(runtime);
+      const battle = runtime.battleStream.battle;
+      if (!invalid && battle) positions[turns - 1] = serializeLiveBattle(battle);
+      return positions;
+    }, [replayData, teamText, effectiveP1Info, effectiveP2Info, usageStats.stats, setAssumptions.assumptions, snapshots]);
+
   const acquireReplayPosition = useMemo(() => makeReplayAcquire(branchTurn), [makeReplayAcquire, branchTurn]);
 
   const handleEvaluate = useCallback(() => {
@@ -496,12 +540,13 @@ function App() {
       tera: effectiveTera,
       cacheKeyFor: turn => `${replayData.id}:${turn}:${setsFingerprint}`,
       acquireFor: makeReplayAcquire,
+      acquireAll: makeSweepAcquireAll(analyzableTurns),
       // snapshots[turn] carries the block ENDING at |turn|turn+1 — i.e. the
       // actions actually played on `turn`. Doubles logs carry two actions
       // per side, which the singles parser would mis-read — skip them.
       playedFor: turn => (evalAnalysisAvailable ? parsePlayedActions(snapshots[turn]?.log ?? []) : null),
     });
-  }, [replayData, evaluation, analyzableTurns, effectiveTera, setsFingerprint, makeReplayAcquire, snapshots, evalAnalysisAvailable]);
+  }, [replayData, evaluation, analyzableTurns, effectiveTera, setsFingerprint, makeReplayAcquire, makeSweepAcquireAll, snapshots, evalAnalysisAvailable]);
 
   // On-demand: explain the current turn without sweeping the whole game —
   // its analysis only needs this turn and the next one evaluated.

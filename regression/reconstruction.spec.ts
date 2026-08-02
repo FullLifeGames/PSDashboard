@@ -132,6 +132,39 @@ test.describe('Replay reconstruction regression suite', () => {
     });
   });
 
+  test('single-pass capture yields a position at every turn boundary', async () => {
+    const fixture = loadFixtureReplay();
+    const snapshots = parseReplayLog(fixture.log);
+    const { p1Team, p2Team } = buildTeamsFromReplay(fixture.log);
+    const targetTurn = 3;
+    const captured = new Map<number, string>();
+
+    const runtime = await reconstructBranchRuntime({
+      format: fixture.formatid || 'gen9ou',
+      p1Team,
+      p2Team,
+      replayLog: fixture.log,
+      targetTurn,
+      snapshot: snapshots[Math.min(targetTurn - 1, snapshots.length - 1)] ?? null,
+      capturePositions: {
+        snapshotFor: turn => snapshots[Math.min(turn - 1, snapshots.length - 1)] ?? null,
+        onPosition: (turn, battle) => {
+          captured.set(turn, JSON.stringify({ turn: battle.turn, ended: battle.ended }));
+        },
+      },
+    });
+
+    // One pass produced every boundary before the target…
+    expect([...captured.keys()]).toEqual([1, 2]);
+    for (const [turn, state] of captured) {
+      expect(JSON.parse(state).turn).toBe(turn);
+      expect(JSON.parse(state).ended).toBe(false);
+    }
+    // …and the runtime itself is the final position, same as a per-turn run
+    // (whose state fidelity the checkpoint test above already covers).
+    expect(runtime.battleStream.battle?.turn).toBe(targetTurn);
+  });
+
   test('reconstructs stable checkpoints from a real saved replay', async () => {
     test.skip(!existsSync(SAVED_REPLAY_HTML), 'local saved replay HTML is gitignored and not present');
     const log = loadHtmlReplayLog(SAVED_REPLAY_HTML);

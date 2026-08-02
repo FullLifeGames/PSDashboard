@@ -1100,8 +1100,17 @@ export async function reconstructBranchRuntime(params: {
   abort?: AbortSignal;
   /** Overall replay deadline; a wedged reconstruction stops instead of hanging. */
   deadlineMs?: number;
+  /**
+   * Single-pass position capture (eval sweeps): at every turn boundary
+   * before targetTurn the battle is snapshot-corrected and handed out, so
+   * one reconstruction yields the whole game instead of one per turn.
+   */
+  capturePositions?: {
+    snapshotFor(turn: number): TurnSnapshot | null;
+    onPosition(turn: number, battle: SimBattle): void;
+  };
 }): Promise<BranchRuntime> {
-  const { format, p1Team, p2Team, replayLog, targetTurn, snapshot, onLogLines, onProgress, abort } = params;
+  const { format, p1Team, p2Team, replayLog, targetTurn, snapshot, onLogLines, onProgress, abort, capturePositions } = params;
   const overallDeadline = Date.now() + (params.deadlineMs ?? 60_000);
   let timedOut = false;
   const { p1Leads, p2Leads } = extractLeads(replayLog);
@@ -1242,6 +1251,17 @@ export async function reconstructBranchRuntime(params: {
     const battle = battleStream.battle;
     if (!battle || battle.ended) break;
     onProgress?.(turnBlock.turn, targetTurn);
+
+    // Boundary capture: the battle sits at the start of turnBlock.turn —
+    // exactly the position a per-turn reconstruction of this turn returns.
+    // Corrections keep the ongoing replay in lockstep with the protocol.
+    if (capturePositions && battle.turn === turnBlock.turn) {
+      const turnSnapshot = capturePositions.snapshotFor(turnBlock.turn);
+      if (turnSnapshot) correctBattleFromSnapshot(battle, turnSnapshot);
+      repairStaleForcedSwitchRequest(battle);
+      capturePositions.onPosition(turnBlock.turn, battle);
+    }
+
     const turnBeforeChoice = battle.turn;
 
     const p1Choice = getMainChoice(turnBlock.preUpkeep, 'p1', battle);

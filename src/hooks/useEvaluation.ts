@@ -59,6 +59,12 @@ export interface GraphSweepParams {
   tera: boolean;
   cacheKeyFor(turn: number): string;
   acquireFor(turn: number): (report: (turn: number, target: number) => void) => Promise<string>;
+  /**
+   * Optional single-pass acquisition of ALL positions (index = turn − 1).
+   * Preferred over acquireFor when present — one reconstruction instead of
+   * one per turn. Only invoked once, on the first cache miss.
+   */
+  acquireAll?(report: (turn: number, target: number) => void): Promise<(string | null)[]>;
   /** What was actually played on this turn (parsed from the replay log). */
   playedFor(turn: number): PlayedTurn | null;
 }
@@ -221,6 +227,20 @@ export function useEvaluation() {
     const total = Math.max(0, to - from + 1);
     setGraph({ ...snapshot(), running: true, progress: { done: 0, total } });
 
+    // Lazily-run single-pass acquisition: nothing is reconstructed when
+    // every turn in the range is already cached. The shared promise makes a
+    // failed reconstruction fail every turn at once instead of retrying.
+    let sweepAcquire: Promise<(string | null)[]> | null = null;
+    const positionFor = async (turn: number): Promise<string> => {
+      if (params.acquireAll) {
+        sweepAcquire ??= params.acquireAll(() => {});
+        const found = (await sweepAcquire)[turn - 1];
+        if (!found) throw new Error(`No position captured for turn ${turn}.`);
+        return found;
+      }
+      return params.acquireFor(turn)(() => {});
+    };
+
     void (async () => {
       for (let turn = from; turn <= to; turn++) {
         if (runRef.current !== runId) return;
@@ -242,7 +262,7 @@ export function useEvaluation() {
             const p2Choice = matchPlayedChoice(hit.result, 'p2', turnPlayed?.p2 ?? null);
             if (p1Choice && p2Choice) {
               try {
-                const serialized = await params.acquireFor(turn)(() => {});
+                const serialized = await positionFor(turn);
                 if (runRef.current !== runId) return;
                 clientRef.current ??= new EvalWorkerClient();
                 outcome = await clientRef.current.evalPair(serialized, p1Choice.choice, p2Choice.choice);
@@ -257,7 +277,7 @@ export function useEvaluation() {
           playedOutcome[turn - 1] = outcome;
         } else {
           try {
-            const serialized = await params.acquireFor(turn)(() => {});
+            const serialized = await positionFor(turn);
             if (runRef.current !== runId) return;
             clientRef.current ??= new EvalWorkerClient();
             const result = await clientRef.current.evaluate(serialized, { depth, samples, mode, tera: params.tera });
