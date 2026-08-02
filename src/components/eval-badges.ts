@@ -1,0 +1,13 @@
+import type { TurnAnalysis } from '../lib/eval/analysis';
+
+/** Shared attribution label + color for analysis and report views. */
+export function attributionBadge(analysis: TurnAnalysis, playerNames: [string, string]): { text: string; color: string } {
+  switch (analysis.attribution) {
+    case 'p1-decision': return { text: `${playerNames[0]} misplayed`, color: '#f3a6a6' };
+    case 'p2-decision': return { text: `${playerNames[1]} misplayed`, color: '#f3a6a6' };
+    case 'both-decision': return { text: 'both sides misplayed', color: '#f3a6a6' };
+    case 'chance': return { text: 'chance swing (rolls, crits, reveals)', color: '#b6a46a' };
+    case 'unclear': return { text: 'unclear (a choice never surfaced)', color: '#778' };
+    default: return { text: 'quiet turn', color: '#778' };
+  }
+}

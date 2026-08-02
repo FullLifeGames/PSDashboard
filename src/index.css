@@ -1313,6 +1313,27 @@ input[type="range"]::-webkit-slider-thumb {
   line-height: 1.45;
   color: #bcd;
 }
+.ps-eval-report {
+  margin-top: 6px;
+  padding: 6px;
+  background: rgba(0, 0, 0, 0.2);
+  border-radius: 3px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.ps-eval-report-moments {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+.ps-eval-report-moment {
+  display: flex;
+  gap: 5px;
+  align-items: baseline;
+  padding: 2px 6px;
+  font-size: 10px;
+}
 .ps-eval-analysis-side {
   display: flex;
   flex-direction: column;

@@ -254,6 +254,10 @@ test.describe('PS Dashboard', () => {
     // The sweep finishes and offers a re-run.
     await expect(panel.locator('button', { hasText: 'Re-analyze' })).toBeVisible({ timeout: 60_000 });
 
+    // A completed sweep produces the game-level report.
+    await expect(panel.locator('.ps-eval-report')).toBeVisible();
+    await expect(panel.locator('.ps-eval-report')).toContainText('Game report');
+
     // Selecting a point opens that turn's played-vs-best analysis.
     await panel.locator('.ps-eval-graph rect').first().click();
     await expect(panel.locator('.ps-eval-analysis')).toBeVisible();

@@ -26,6 +26,7 @@ import { choiceId, type BranchSlotChoice } from './lib/branch-choices';
 import type { RankedChoice } from './lib/eval/types';
 import { parsePlayedActions } from './lib/eval/played';
 import { analyzeTurn } from './lib/eval/analysis';
+import { buildGameReport } from './lib/eval/report';
 
 const TEAM_PASTE_STORAGE_KEY = 'ps-replay-interceptor:team-paste';
 
@@ -688,6 +689,36 @@ function App() {
     });
   }, [analysisTurn, evaluation.graph]);
 
+  const replayWinner = useMemo<'p1' | 'p2' | null>(() => {
+    if (!replayData) return null;
+    const name = replayData.log.match(/\|win\|(.+)/)?.[1]?.trim();
+    if (!name) return null;
+    if (name === replayData.players[0]) return 'p1';
+    if (name === replayData.players[1]) return 'p2';
+    return null;
+  }, [replayData]);
+
+  // Game-level root cause, once enough of the game is swept.
+  const gameReport = useMemo(() => {
+    if (!replayData) return null;
+    const { results, scores, played, playedOutcome, running } = evaluation.graph;
+    if (running) return null;
+    const analyses = results.map((result, index) => {
+      const scoreBefore = scores[index];
+      if (!result || scoreBefore === null) return null;
+      return analyzeTurn({
+        turn: index + 1,
+        result,
+        played: played[index] ?? null,
+        playedOutcome: playedOutcome[index] ?? null,
+        scoreBefore,
+        scoreAfter: scores[index + 1] ?? null,
+      });
+    });
+    if (analyses.filter(Boolean).length < 3) return null;
+    return buildGameReport(analyses, [replayData.players[0], replayData.players[1]], replayWinner);
+  }, [replayData, evaluation.graph, replayWinner]);
+
   const teamPasteStatus = useMemo(() => {
     if (!pastedSets || pastedSets.length === 0) return null;
     if (!p1Info) return `Team loaded (${pastedSets.length} Pokémon)`;
@@ -1021,6 +1052,7 @@ function App() {
                 onSelectTurn={!branching ? handleGraphSelect : undefined}
                 currentTurn={branching ? (simState?.turnNumber ?? branchTurn) : branchTurn}
                 analysis={!branching ? turnAnalysis : null}
+                report={!branching ? gameReport : null}
               />
             )}
             <BattleStatsPanel

@@ -10,11 +10,14 @@ import { CHANCE_THRESHOLD, REGRET_THRESHOLD, type SideAnalysis, type TurnAnalysi
 const pct = (score: number) => Math.round(50 + 50 * score);
 
 /** Signed value with a typographic minus (matches the panel's tone). */
-const signed = (value: number) =>
+export const signedValue = (value: number) =>
   value < 0 ? `−${Math.abs(value).toFixed(2)}` : `+${value.toFixed(2)}`;
 
 /** Choice labels read as prose: "→ Dragapult" becomes "switching to Dragapult". */
-const phrase = (label: string) => (label.startsWith('→ ') ? `switching to ${label.slice(2)}` : label);
+export const labelPhrase = (label: string) => (label.startsWith('→ ') ? `switching to ${label.slice(2)}` : label);
+
+const signed = signedValue;
+const phrase = labelPhrase;
 
 const playedBest = (side: SideAnalysis) =>
   side.played !== null && side.best !== null && side.played.choice === side.best.choice;

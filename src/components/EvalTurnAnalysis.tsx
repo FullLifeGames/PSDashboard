@@ -1,5 +1,6 @@
 import { REGRET_THRESHOLD, type SideAnalysis, type TurnAnalysis } from '../lib/eval/analysis';
 import { summarizeTurn } from '../lib/eval/summary';
+import { attributionBadge } from './eval-badges';
 
 interface EvalTurnAnalysisProps {
   analysis: TurnAnalysis;
@@ -7,17 +8,6 @@ interface EvalTurnAnalysisProps {
 }
 
 const signed = (value: number) => `${value >= 0 ? '+' : ''}${value.toFixed(2)}`;
-
-function attributionBadge(analysis: TurnAnalysis, playerNames: [string, string]): { text: string; color: string } {
-  switch (analysis.attribution) {
-    case 'p1-decision': return { text: `${playerNames[0]} misplayed`, color: '#f3a6a6' };
-    case 'p2-decision': return { text: `${playerNames[1]} misplayed`, color: '#f3a6a6' };
-    case 'both-decision': return { text: 'both sides misplayed', color: '#f3a6a6' };
-    case 'chance': return { text: 'chance swing (rolls, crits, reveals)', color: '#b6a46a' };
-    case 'unclear': return { text: 'unclear (a choice never surfaced)', color: '#778' };
-    default: return { text: 'quiet turn', color: '#778' };
-  }
-}
 
 function SideRow({ name, side }: { name: string; side: SideAnalysis }) {
   const playedText = side.played
