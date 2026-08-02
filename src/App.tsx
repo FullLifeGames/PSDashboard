@@ -448,7 +448,10 @@ function App() {
   // Single-pass sweep acquisition: one reconstruction captures every turn
   // boundary, instead of one O(turn) replay per turn (quadratic polling).
   const makeSweepAcquireAll = useCallback((turns: number) =>
-    async (report: (turn: number, target: number) => void): Promise<(string | null)[]> => {
+    async (
+      report: (turn: number, target: number) => void,
+      onPosition?: (turn: number, serialized: string) => void,
+    ): Promise<(string | null)[]> => {
       if (!replayData) throw new Error('Load a replay first.');
       const { buildTeamsFromReplay } = await import('./lib/team-builder');
       const branchEngine = await import('./lib/branch-engine');
@@ -476,7 +479,9 @@ function App() {
           onPosition: (turn, battle) => {
             if (turn > turns) return;
             try {
-              positions[turn - 1] = serializeLiveBattle(battle);
+              const serialized = serializeLiveBattle(battle);
+              positions[turn - 1] = serialized;
+              onPosition?.(turn, serialized);
             } catch {
               // A broken boundary becomes a graph gap, not a failed sweep.
             }
@@ -485,7 +490,11 @@ function App() {
       });
       const invalid = branchEngine.validateBranchRuntime(runtime);
       const battle = runtime.battleStream.battle;
-      if (!invalid && battle) positions[turns - 1] = serializeLiveBattle(battle);
+      if (!invalid && battle) {
+        const serialized = serializeLiveBattle(battle);
+        positions[turns - 1] = serialized;
+        onPosition?.(turns, serialized);
+      }
       return positions;
     }, [replayData, teamText, effectiveP1Info, effectiveP2Info, usageStats.stats, setAssumptions.assumptions, snapshots]);
 

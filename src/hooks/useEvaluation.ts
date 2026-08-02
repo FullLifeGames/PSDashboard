@@ -64,9 +64,14 @@ export interface GraphSweepParams {
   /**
    * Optional single-pass acquisition of ALL positions (index = turn − 1).
    * Preferred over acquireFor when present — one reconstruction instead of
-   * one per turn. Only invoked once, on the first cache miss.
+   * one per turn. Only invoked once, on the first cache miss. `onPosition`
+   * streams each position as it is captured so searches start immediately
+   * instead of waiting for the full replay pass.
    */
-  acquireAll?(report: (turn: number, target: number) => void): Promise<(string | null)[]>;
+  acquireAll?(
+    report: (turn: number, target: number) => void,
+    onPosition?: (turn: number, serialized: string) => void,
+  ): Promise<(string | null)[]>;
   /** What was actually played on this turn (parsed from the replay log). */
   playedFor(turn: number): PlayedTurn | null;
 }
@@ -251,18 +256,56 @@ export function useEvaluation() {
     const total = Math.max(0, to - from + 1);
     setGraph({ ...snapshot(), running: true, progress: { done: 0, total } });
 
-    // Lazily-run single-pass acquisition: nothing is reconstructed when
-    // every turn in the range is already cached. The shared promise makes a
-    // failed reconstruction fail every turn at once instead of retrying.
-    let sweepAcquire: Promise<(string | null)[]> | null = null;
-    const positionFor = async (turn: number): Promise<string> => {
-      if (params.acquireAll) {
-        sweepAcquire ??= params.acquireAll(() => {});
-        const found = (await sweepAcquire)[turn - 1];
-        if (!found) throw new Error(`No position captured for turn ${turn}.`);
-        return found;
+    // Lazily-run single-pass acquisition, pipelined: positions stream out of
+    // the ongoing reconstruction, so the first search starts after the first
+    // captured turn instead of after the whole replay pass. Started at most
+    // once; a failure fails every waiting turn instead of retrying.
+    const arrived = new Map<number, string>();
+    const waiters = new Map<number, { resolve(serialized: string): void; reject(error: unknown): void }[]>();
+    let acquireStarted = false;
+    let acquireSettled = false;
+    let acquireError: unknown = null;
+    const settleWaiters = () => {
+      for (const [turn, list] of waiters) {
+        for (const waiter of list) {
+          const found = arrived.get(turn);
+          if (found) waiter.resolve(found);
+          else waiter.reject(acquireError ?? new Error(`No position captured for turn ${turn}.`));
+        }
       }
-      return params.acquireFor(turn)(() => {});
+      waiters.clear();
+    };
+    const startAcquisition = () => {
+      if (acquireStarted) return;
+      acquireStarted = true;
+      params.acquireAll!(() => {}, (turn, serialized) => {
+        arrived.set(turn, serialized);
+        for (const waiter of waiters.get(turn) ?? []) waiter.resolve(serialized);
+        waiters.delete(turn);
+      }).then(positions => {
+        positions.forEach((serialized, index) => {
+          if (serialized) arrived.set(index + 1, serialized);
+        });
+      }).catch(error => {
+        acquireError = error;
+      }).finally(() => {
+        acquireSettled = true;
+        settleWaiters();
+      });
+    };
+    const positionFor = (turn: number): Promise<string> => {
+      if (!params.acquireAll) return params.acquireFor(turn)(() => {});
+      const found = arrived.get(turn);
+      if (found) return Promise.resolve(found);
+      if (acquireSettled) {
+        return Promise.reject(acquireError ?? new Error(`No position captured for turn ${turn}.`));
+      }
+      startAcquisition();
+      return new Promise((resolve, reject) => {
+        const list = waiters.get(turn) ?? [];
+        list.push({ resolve, reject });
+        waiters.set(turn, list);
+      });
     };
 
     /** One sequential pass over `turnList` at `settings`; false = cancelled. */
