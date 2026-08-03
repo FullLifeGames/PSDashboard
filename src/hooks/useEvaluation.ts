@@ -349,7 +349,7 @@ export function useEvaluation() {
                 const serialized = await positionFor(turn);
                 if (runRef.current !== runId) return false;
                 clientRef.current ??= new EvalWorkerClient();
-                outcome = await clientRef.current.evalPair(serialized, p1Choice.choice, p2Choice.choice);
+                outcome = await clientRef.current.evalPair(serialized, p1Choice.choice, p2Choice.choice, { depth, samples, mode, tera: params.tera });
               } catch (err) {
                 if (runRef.current !== runId) return false;
                 if (err instanceof Error && err.message === 'cancelled') return false;
@@ -381,7 +381,7 @@ export function useEvaluation() {
             const p2Choice = matchPlayedSide(result, 'p2', turnPlayed);
             if (p1Choice && p2Choice) {
               try {
-                outcome = await clientRef.current.evalPair(serialized, p1Choice.choice, p2Choice.choice);
+                outcome = await clientRef.current.evalPair(serialized, p1Choice.choice, p2Choice.choice, { depth, samples, mode, tera: params.tera });
               } catch (err) {
                 if (runRef.current !== runId) return false;
                 if (err instanceof Error && err.message === 'cancelled') return false;

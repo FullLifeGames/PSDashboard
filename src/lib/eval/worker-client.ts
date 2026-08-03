@@ -24,6 +24,20 @@ interface WorkerHandle {
 /** Omit that distributes over a discriminated union (plain Omit collapses it). */
 type DistributiveOmit<T, K extends PropertyKey> = T extends unknown ? Omit<T, K> : never;
 
+/**
+ * Sub-search settings that value a played pair with the same machinery the
+ * sweep's own cells get: depth-1 matrix cells are static evals already
+ * (null = use the plain cell path); deeper searches deepen their cells with
+ * a depth-(d−1) sub-search, so the played pair gets exactly that. MCTS has
+ * no fixed-depth equivalent — a depth-1 sub-search is the approximation.
+ */
+export function playedOutcomeSettings(settings: EvalSettings): EvalSettings | null {
+  const mode = settings.mode ?? 'matrix';
+  if (mode !== 'mcts' && settings.depth <= 1) return null;
+  const depth = (mode === 'mcts' ? 1 : Math.min(settings.depth - 1, 2)) as 1 | 2;
+  return { depth, samples: 1, tera: settings.tera, mode: 'matrix' };
+}
+
 function poolSize(): number {
   const cores = typeof navigator !== 'undefined' ? navigator.hardwareConcurrency ?? 4 : 4;
   const size = Math.max(1, Math.min(cores - 2, 6));
@@ -184,12 +198,23 @@ export class EvalWorkerClient {
   }
 
   /**
-   * Engine expectation of one specific joint choice pair from a position —
-   * a single-cell evaluation reusing the 'cells' worker path (first fixed
-   * seed, one sample).
+   * Engine expectation of one specific joint choice pair, valued at the
+   * SAME depth as the surrounding sweep (see playedOutcomeSettings) — a
+   * shallow static value against deep before/after scores would leak
+   * estimator disagreement into the decision/chance decomposition.
    */
-  async evalPair(serializedBattle: string, p1Choice: string, p2Choice: string): Promise<number> {
+  async evalPair(serializedBattle: string, p1Choice: string, p2Choice: string, settings: EvalSettings): Promise<number> {
     const handle = this.ensureWorkers()[0];
+    const subSettings = playedOutcomeSettings(settings);
+    if (subSettings) {
+      const response = await this.rpc(handle, {
+        type: 'subsearch',
+        serializedBattle,
+        job: { i: 0, j: 0, p1Choice, p2Choice, settings: subSettings },
+      });
+      if (response.type !== 'result') throw new Error('unexpected worker response');
+      return response.result.score;
+    }
     const response = await this.rpc(handle, {
       type: 'cells',
       serializedBattle,

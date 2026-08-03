@@ -141,3 +141,22 @@ test.describe('search orchestrator', () => {
     expect(result.interval).toBeCloseTo(0.1, 10);
   });
 });
+
+test.describe('depth-matched played outcome', () => {
+  test('routes the played pair to the same estimator as the sweep cells', async () => {
+    const { playedOutcomeSettings } = await import('../src/lib/eval/worker-client');
+    // Depth-1 matrix cells ARE static evals — the plain cell path matches.
+    expect(playedOutcomeSettings({ depth: 1, samples: 3, tera: false })).toBeNull();
+    // Deeper searches deepen cells with a depth-(d−1) sub-search — so does the pair.
+    expect(playedOutcomeSettings({ depth: 2, samples: 3, tera: true }))
+      .toEqual({ depth: 1, samples: 1, tera: true, mode: 'matrix' });
+    expect(playedOutcomeSettings({ depth: 3, samples: 1, tera: false }))
+      .toEqual({ depth: 2, samples: 1, tera: false, mode: 'matrix' });
+    // MCTS approximates with a depth-1 sub-search (better than a bare static).
+    expect(playedOutcomeSettings({ depth: 1, samples: 1, tera: false, mode: 'mcts' }))
+      .toEqual({ depth: 1, samples: 1, tera: false, mode: 'matrix' });
+    // Root-only hints never leak into the pair's sub-search.
+    expect(playedOutcomeSettings({ depth: 2, samples: 1, tera: false, keepPlayed: { p1Slots: [] } })?.keepPlayed)
+      .toBeUndefined();
+  });
+});
