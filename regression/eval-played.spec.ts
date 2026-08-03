@@ -122,3 +122,27 @@ test.describe('doubles played-action parsing', () => {
     expect(played.p1Slots?.[1]).toEqual({ kind: 'move', name: 'Sucker Punch', tera: false, targetLoc: 1 });
   });
 });
+
+test.describe('mega evolution tracking', () => {
+  test('doubles: |-mega| marks the slot and the move carries the flag', () => {
+    const played = parsePlayedActionsDoubles([
+      '|-mega|p1a: Lacksatives|Lucario|Lucarionite',
+      '|move|p1a: Lacksatives|Close Combat|p2a: Incineroar',
+      '|move|p1b: Partner|Protect|',
+      '|turn|3',
+    ]);
+    expect(played.p1Slots?.[0]).toEqual({
+      kind: 'move', name: 'Close Combat', tera: false, mega: true, targetLoc: 1,
+    });
+    expect(played.p1Slots?.[1]?.mega).toBeUndefined();
+  });
+
+  test('singles: mega moves match the mega variant, never the base option', () => {
+    const played = parsePlayedActions([
+      '|-mega|p1a: Lucario|Lucario|Lucarionite',
+      '|move|p1a: Lucario|Close Combat|p2a: Snorlax',
+      '|turn|3',
+    ]);
+    expect(played.p1?.mega).toBe(true);
+  });
+});

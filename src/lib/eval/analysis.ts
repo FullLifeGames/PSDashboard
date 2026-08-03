@@ -74,7 +74,11 @@ function slotMatches(choicePart: string, labelPart: string, action: PlayedAction
   if (action.kind === 'switch') return labelPart === `→ ${action.species ?? action.name}`;
   const tokens = choicePart.split(' ');
   if (tokens[0] !== 'move' || tokens[1] !== choiceKeyOf(action.name)) return false;
-  if (choicePart.includes(' terastallize') !== !!action.tera) return false;
+  // Every gimmick marker must agree — a mega move must match the mega
+  // variant, never the base option (VGC 2026 brought Megas back to gen 9).
+  if (tokens.includes('terastallize') !== !!action.tera) return false;
+  if (tokens.includes('mega') !== !!action.mega) return false;
+  if (tokens.includes('ultra') !== !!action.ultra) return false;
   const locToken = tokens.find(token => /^-?\d+$/.test(token));
   // A locless fragment (spread/self move) accepts any protocol target.
   if (locToken !== undefined && action.targetLoc != null && parseInt(locToken, 10) !== action.targetLoc) return false;
@@ -120,7 +124,8 @@ export function matchPlayedChoice(
   if (!action) return null;
   const options = result.perSide[side];
   if (action.kind === 'move') {
-    const choice = `move ${choiceKeyOf(action.name)}${action.tera ? ' terastallize' : ''}`;
+    const gimmick = action.tera ? ' terastallize' : action.mega ? ' mega' : action.ultra ? ' ultra' : '';
+    const choice = `move ${choiceKeyOf(action.name)}${gimmick}`;
     return options.find(option => option.choice === choice) ?? null;
   }
   // Labels carry species names; the nickname is only a fallback for logs

@@ -11,6 +11,9 @@ export interface PlayedAction {
   species?: string;
   /** Move actions: the side terastallized this turn. */
   tera?: boolean;
+  /** Move actions: the Pokémon Mega Evolved / Ultra Bursted this turn. */
+  mega?: boolean;
+  ultra?: boolean;
   /**
    * Doubles moves: the sim target location (1/2 = foe slots, negative =
    * own side), null when the line names no slot target (spread/self).
@@ -51,15 +54,21 @@ export function parsePlayedActions(lines: string[]): PlayedTurn {
   const actions: { p1: PlayedAction | null; p2: PlayedAction | null } = { p1: null, p2: null };
   const settled = { p1: false, p2: false };
   const tera = { p1: false, p2: false };
+  const mega = { p1: false, p2: false };
+  const ultra = { p1: false, p2: false };
 
   for (const line of lines) {
     const parts = line.split('|');
     const tag = parts[1];
     if (!tag) continue;
 
-    if (tag === '-terastallize') {
+    if (tag === '-terastallize' || tag === '-mega' || tag === '-burst') {
       const side = sideOf(parts[2] ?? '');
-      if (side) tera[side] = true;
+      if (side) {
+        if (tag === '-terastallize') tera[side] = true;
+        else if (tag === '-mega') mega[side] = true;
+        else ultra[side] = true;
+      }
       continue;
     }
     if (tag === 'faint' || tag === 'cant') {
@@ -72,7 +81,10 @@ export function parsePlayedActions(lines: string[]): PlayedTurn {
     if (tag === 'move') {
       const side = sideOf(parts[2] ?? '');
       if (!side || settled[side]) continue;
-      actions[side] = { kind: 'move', name: parts[3] ?? '', tera: tera[side] };
+      actions[side] = {
+        kind: 'move', name: parts[3] ?? '', tera: tera[side],
+        ...(mega[side] ? { mega: true } : {}), ...(ultra[side] ? { ultra: true } : {}),
+      };
       settled[side] = true;
       continue;
     }
@@ -97,6 +109,8 @@ export function parsePlayedActionsDoubles(lines: string[]): PlayedTurn {
   const slots: Record<'p1' | 'p2', (PlayedAction | null)[]> = { p1: [null, null], p2: [null, null] };
   const settled: Record<'p1' | 'p2', boolean[]> = { p1: [false, false], p2: [false, false] };
   const tera: Record<'p1' | 'p2', boolean[]> = { p1: [false, false], p2: [false, false] };
+  const mega: Record<'p1' | 'p2', boolean[]> = { p1: [false, false], p2: [false, false] };
+  const ultra: Record<'p1' | 'p2', boolean[]> = { p1: [false, false], p2: [false, false] };
 
   for (const line of lines) {
     const parts = line.split('|');
@@ -107,6 +121,10 @@ export function parsePlayedActionsDoubles(lines: string[]): PlayedTurn {
 
     if (tag === '-terastallize') {
       tera[ref.side][ref.slot] = true;
+    } else if (tag === '-mega') {
+      mega[ref.side][ref.slot] = true;
+    } else if (tag === '-burst') {
+      ultra[ref.side][ref.slot] = true;
     } else if (tag === 'faint' || tag === 'cant') {
       settled[ref.side][ref.slot] = true;
     } else if (tag === 'move') {
@@ -115,7 +133,12 @@ export function parsePlayedActionsDoubles(lines: string[]): PlayedTurn {
       const targetLoc = target === null || target.slot > 1
         ? null
         : target.side === ref.side ? -(target.slot + 1) : target.slot + 1;
-      slots[ref.side][ref.slot] = { kind: 'move', name: parts[3] ?? '', tera: tera[ref.side][ref.slot], targetLoc };
+      slots[ref.side][ref.slot] = {
+        kind: 'move', name: parts[3] ?? '', tera: tera[ref.side][ref.slot],
+        ...(mega[ref.side][ref.slot] ? { mega: true } : {}),
+        ...(ultra[ref.side][ref.slot] ? { ultra: true } : {}),
+        targetLoc,
+      };
       settled[ref.side][ref.slot] = true;
     } else if (tag === 'switch') {
       if (settled[ref.side][ref.slot]) continue;
