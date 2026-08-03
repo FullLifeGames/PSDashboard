@@ -145,3 +145,69 @@ test.describe('turn analysis assembly', () => {
     expect(analysis.attribution).toBe('both-decision');
   });
 });
+
+test.describe('doubles combined matching', () => {
+  const combined: EvalResult = {
+    score: 0.1,
+    interval: 0,
+    depthCompleted: 1,
+    perSide: {
+      p1: [
+        choice('move moonblast 2, move fakeout 1', 'Moonblast→Chien-Pao + Fake Out→Incineroar', 0.3),
+        choice('move moonblast 1, switch 3', 'Moonblast→Incineroar + → Amoonguss', 0.1),
+        choice('move dazzlinggleam, move fakeout 1 terastallize', 'Dazzling Gleam + Tera + Fake Out→Incineroar', 0.0),
+      ],
+      p2: [],
+    },
+  };
+
+  test('matches per-slot moves with targets, spreads, tera, and switches', async () => {
+    const { matchPlayedSide } = await import('../src/lib/eval/analysis');
+    const match = (slots: import('../src/lib/eval/played').PlayedTurn['p1Slots']) =>
+      matchPlayedSide(combined, 'p1', { p1: null, p2: null, p1Slots: slots })?.choice ?? null;
+
+    expect(match([
+      { kind: 'move', name: 'Moonblast', tera: false, targetLoc: 2 },
+      { kind: 'move', name: 'Fake Out', tera: false, targetLoc: 1 },
+    ])).toBe('move moonblast 2, move fakeout 1');
+
+    expect(match([
+      { kind: 'move', name: 'Moonblast', tera: false, targetLoc: 1 },
+      { kind: 'switch', name: 'Mushy', species: 'Amoonguss' },
+    ])).toBe('move moonblast 1, switch 3');
+
+    // Spread part accepts any protocol target; Tera label splits correctly.
+    expect(match([
+      { kind: 'move', name: 'Dazzling Gleam', tera: false, targetLoc: 1 },
+      { kind: 'move', name: 'Fake Out', tera: true, targetLoc: 1 },
+    ])).toBe('move dazzlinggleam, move fakeout 1 terastallize');
+
+    // Wrong target → no match; prevented slot (null) → part count mismatch.
+    expect(match([
+      { kind: 'move', name: 'Moonblast', tera: false, targetLoc: 1 },
+      { kind: 'move', name: 'Fake Out', tera: false, targetLoc: 1 },
+    ])).toBeNull();
+    expect(match([null, { kind: 'move', name: 'Fake Out', tera: false, targetLoc: 1 }])).toBeNull();
+  });
+
+  test('analyzeTurn computes doubles regret from the matched combo', async () => {
+    const analysis = analyzeTurn({
+      turn: 4,
+      result: combined,
+      played: {
+        p1: null, p2: null,
+        p1Slots: [
+          { kind: 'move', name: 'Moonblast', tera: false, targetLoc: 1 },
+          { kind: 'switch', name: 'Mushy', species: 'Amoonguss' },
+        ],
+        p2Slots: [null, null],
+      },
+      playedOutcome: null,
+      scoreBefore: 0.1,
+      scoreAfter: null,
+    });
+    expect(analysis.p1.played?.choice).toBe('move moonblast 1, switch 3');
+    expect(analysis.p1.regret).toBeCloseTo(0.2, 10);
+    expect(analysis.p1.playedSlots).toHaveLength(2);
+  });
+});

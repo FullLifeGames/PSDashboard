@@ -946,11 +946,11 @@ test.describe('PS Dashboard', () => {
     await expect(page.locator('.ps-stats-tag', { hasText: 'Light Ball' })).toBeVisible();
     await expect(page.locator('.ps-stats-tag', { hasText: 'Light Ball' })).toContainText('sheet');
 
-    // Doubles turn analysis: no played-tracking, but summary + engine lines.
+    // Doubles turn analysis with full played-vs-best tracking.
     await panel.locator('button', { hasText: 'Analyze turn' }).click();
     await expect(panel.locator('.ps-eval-analysis')).toBeVisible({ timeout: 120_000 });
     await expect(panel.locator('.ps-eval-analysis-summary')).toContainText('%');
-    await expect(panel.locator('.ps-eval-analysis')).toContainText('engine:');
+    await expect(panel.locator('.ps-eval-analysis')).toContainText('played');
   });
 
   test('doubles branch shows slot controls and blocks duplicate simultaneous switches', async ({ page }) => {

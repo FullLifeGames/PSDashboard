@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { matchPlayedChoice } from '../lib/eval/analysis';
+import { matchPlayedSide } from '../lib/eval/analysis';
 import type { PlayedTurn } from '../lib/eval/played';
 import { EvalWorkerClient } from '../lib/eval/worker-client';
 import { evalStoreKey, loadStoredEval, saveStoredEval } from '../lib/eval-cache-store';
@@ -342,8 +342,8 @@ export function useEvaluation() {
           let outcome: number | null | undefined = hit.playedOutcome;
           if (outcome === undefined) {
             outcome = null;
-            const p1Choice = matchPlayedChoice(hit.result, 'p1', turnPlayed?.p1 ?? null);
-            const p2Choice = matchPlayedChoice(hit.result, 'p2', turnPlayed?.p2 ?? null);
+            const p1Choice = matchPlayedSide(hit.result, 'p1', turnPlayed);
+            const p2Choice = matchPlayedSide(hit.result, 'p2', turnPlayed);
             if (p1Choice && p2Choice) {
               try {
                 const serialized = await positionFor(turn);
@@ -368,7 +368,8 @@ export function useEvaluation() {
             const serialized = await positionFor(turn);
             if (runRef.current !== runId) return false;
             clientRef.current ??= new EvalWorkerClient();
-            const result = await clientRef.current.evaluate(serialized, { depth, samples, mode, tera: params.tera });
+            const keepPlayed = turnPlayed?.p1Slots || turnPlayed?.p2Slots ? turnPlayed : undefined;
+            const result = await clientRef.current.evaluate(serialized, { depth, samples, mode, tera: params.tera, keepPlayed });
             if (runRef.current !== runId) return false;
             scores[turn - 1] = result.score;
             results[turn - 1] = result;
@@ -376,8 +377,8 @@ export function useEvaluation() {
             // The engine's expectation of the real choices — the decision
             // part of the coming swing (chance is the rest).
             let outcome: number | null = null;
-            const p1Choice = matchPlayedChoice(result, 'p1', turnPlayed?.p1 ?? null);
-            const p2Choice = matchPlayedChoice(result, 'p2', turnPlayed?.p2 ?? null);
+            const p1Choice = matchPlayedSide(result, 'p1', turnPlayed);
+            const p2Choice = matchPlayedSide(result, 'p2', turnPlayed);
             if (p1Choice && p2Choice) {
               try {
                 outcome = await clientRef.current.evalPair(serialized, p1Choice.choice, p2Choice.choice);

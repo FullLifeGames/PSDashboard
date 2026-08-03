@@ -26,7 +26,7 @@ import { decodeBranchShare, type BranchSharePayload } from './lib/branch-share';
 import { getBranchSimulatorFormat, getReplayGameType, getReplayGeneration } from './lib/replay-format';
 import { choiceId, type BranchSlotChoice } from './lib/branch-choices';
 import type { RankedChoice } from './lib/eval/types';
-import { parsePlayedActions } from './lib/eval/played';
+import { parsePlayedActions, parsePlayedActionsDoubles } from './lib/eval/played';
 import { analyzeTurn } from './lib/eval/analysis';
 import { buildGameReport } from './lib/eval/report';
 
@@ -397,8 +397,7 @@ function App() {
     () => !!replayData && (replayGameType === null || replayGameType === 'singles' || replayGameType === 'doubles'),
     [replayData, replayGameType],
   );
-  // Played-action parsing and the regret model are singles-only for now.
-  const evalAnalysisAvailable = replayGameType !== 'doubles';
+  const evalIsDoubles = replayGameType === 'doubles';
 
   const setsFingerprint = useMemo(
     () => JSON.stringify([editedP1Info, editedP2Info, teamText]),
@@ -575,10 +574,12 @@ function App() {
       acquireAll: makeSweepAcquireAll(analyzableTurns),
       // snapshots[turn] carries the block ENDING at |turn|turn+1 — i.e. the
       // actions actually played on `turn`. Doubles logs carry two actions
-      // per side, which the singles parser would mis-read — skip them.
-      playedFor: turn => (evalAnalysisAvailable ? parsePlayedActions(snapshots[turn]?.log ?? []) : null),
+      // per side and use the per-slot parser.
+      playedFor: turn => (evalIsDoubles
+        ? parsePlayedActionsDoubles(snapshots[turn]?.log ?? [])
+        : parsePlayedActions(snapshots[turn]?.log ?? [])),
     });
-  }, [replayData, evaluation, analyzableTurns, effectiveTera, setsFingerprint, makeReplayAcquire, makeSweepAcquireAll, snapshots, evalAnalysisAvailable]);
+  }, [replayData, evaluation, analyzableTurns, effectiveTera, setsFingerprint, makeReplayAcquire, makeSweepAcquireAll, snapshots, evalIsDoubles]);
 
   // On-demand: explain the current turn without sweeping the whole game —
   // its analysis only needs this turn and the next one evaluated.
@@ -592,10 +593,12 @@ function App() {
       tera: effectiveTera,
       cacheKeyFor: sweepTurn => `${replayData.id}:${sweepTurn}:${setsFingerprint}`,
       acquireFor: makeReplayAcquire,
-      playedFor: sweepTurn => (evalAnalysisAvailable ? parsePlayedActions(snapshots[sweepTurn]?.log ?? []) : null),
+      playedFor: sweepTurn => (evalIsDoubles
+        ? parsePlayedActionsDoubles(snapshots[sweepTurn]?.log ?? [])
+        : parsePlayedActions(snapshots[sweepTurn]?.log ?? [])),
     });
     setAnalysisTurn(turn);
-  }, [replayData, evaluation, branchTurn, analyzableTurns, effectiveTera, setsFingerprint, makeReplayAcquire, snapshots, evalAnalysisAvailable]);
+  }, [replayData, evaluation, branchTurn, analyzableTurns, effectiveTera, setsFingerprint, makeReplayAcquire, snapshots, evalIsDoubles]);
 
   // Any position change invalidates a displayed result.
   const { markStale: markEvalStale, reset: resetEval, clearGraph } = evaluation;
@@ -784,9 +787,9 @@ function App() {
       playedOutcome: evaluation.graph.playedOutcome[analysisTurn - 1] ?? null,
       scoreBefore,
       scoreAfter: evaluation.graph.scores[analysisTurn] ?? null,
-      playedTracking: evalAnalysisAvailable,
+      playedTracking: true,
     });
-  }, [analysisTurn, evaluation.graph, evalAnalysisAvailable]);
+  }, [analysisTurn, evaluation.graph]);
 
   const replayWinner = useMemo<'p1' | 'p2' | null>(() => {
     if (!replayData) return null;
@@ -812,12 +815,12 @@ function App() {
         playedOutcome: playedOutcome[index] ?? null,
         scoreBefore,
         scoreAfter: scores[index + 1] ?? null,
-        playedTracking: evalAnalysisAvailable,
+        playedTracking: true,
       });
     });
     if (analyses.filter(Boolean).length < 3) return null;
-    return buildGameReport(analyses, [replayData.players[0], replayData.players[1]], replayWinner, evalAnalysisAvailable);
-  }, [replayData, evaluation.graph, replayWinner, evalAnalysisAvailable]);
+    return buildGameReport(analyses, [replayData.players[0], replayData.players[1]], replayWinner, true);
+  }, [replayData, evaluation.graph, replayWinner]);
 
   const teamPasteStatus = useMemo(() => {
     if (!pastedSets || pastedSets.length === 0) return null;
@@ -1121,7 +1124,7 @@ function App() {
                 onPrefsChange={evaluation.setPrefs}
                 onEvaluate={handleEvaluate}
                 onCancel={evaluation.cancel}
-                onPickChoice={branching && evalAnalysisAvailable ? handlePickEvalChoice : undefined}
+                onPickChoice={branching && !evalIsDoubles ? handlePickEvalChoice : undefined}
                 showAuto={branching}
                 showTera={replayGen === 9}
                 graph={evaluation.graph}

@@ -20,7 +20,7 @@ export type CellValue = EvalCellValue;
 export type SubSearchJob = EvalSubSearchJob;
 
 export interface SearchExecutor {
-  choices(tera: boolean): Promise<ChoicesInfo>;
+  choices(tera: boolean, keepPlayed?: EvalSettings['keepPlayed']): Promise<ChoicesInfo>;
   /** Evaluate all cells; report incremental completion via onDone(completedCount). */
   evalCells(jobs: CellJob[], onDone?: (completed: number) => void): Promise<CellValue[]>;
   /** Advance from the root by the job's pair (first fixed seed) and search the child. */
@@ -39,7 +39,7 @@ export async function searchOrchestrated(
   callbacks?: OrchestratorCallbacks,
 ): Promise<EvalResult> {
   const tera = settings.tera ?? true;
-  const info = await executor.choices(tera);
+  const info = await executor.choices(tera, settings.keepPlayed);
   if (info.rootEnded) {
     return { score: info.rootValue, interval: 0, depthCompleted: settings.depth, perSide: { p1: [], p2: [] } };
   }
@@ -89,7 +89,8 @@ export async function searchOrchestrated(
 
       const subs = await Promise.all(wanted.map(([i, j]) => executor.subSearch({
         i, j, p1Choice: p1[i].choice, p2Choice: p2[j].choice,
-        settings: { ...settings, depth: (depth - 1) as 1 | 2, samples: 1 },
+        // keepPlayed is a root-position hint — meaningless one turn deeper.
+        settings: { ...settings, depth: (depth - 1) as 1 | 2, samples: 1, keepPlayed: undefined },
       })));
       subs.forEach((sub, index) => {
         const [i, j] = wanted[index];

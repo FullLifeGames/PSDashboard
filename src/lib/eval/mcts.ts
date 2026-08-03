@@ -43,11 +43,16 @@ interface Node {
   children: Map<number, Node>;
 }
 
-function makeNode(position: SimPosition, tera: boolean, matchupCache: MatchupCache): Node {
+function makeNode(
+  position: SimPosition,
+  tera: boolean,
+  matchupCache: MatchupCache,
+  keepPlayed?: EvalSettings['keepPlayed'],
+): Node {
   const battle = positionBattle(position);
   const ended = battle.ended;
-  const p1Options = ended ? [] : searchOptions(position, 'p1', { tera });
-  const p2Options = ended ? [] : searchOptions(position, 'p2', { tera });
+  const p1Options = ended ? [] : searchOptions(position, 'p1', { tera, keep: keepPlayed?.p1Slots });
+  const p2Options = ended ? [] : searchOptions(position, 'p2', { tera, keep: keepPlayed?.p2Slots });
   return {
     position,
     ended,
@@ -160,7 +165,8 @@ function runMcts(
 ): { root: Node; maxDepth: number; result: EvalResult } {
   const matchupCache = createMatchupCache();
   const tera = settings.tera ?? true;
-  const root = makeNode(createRootPosition(serializedBattle), tera, matchupCache);
+  // keepPlayed applies to the root only — children have their own spaces.
+  const root = makeNode(createRootPosition(serializedBattle), tera, matchupCache, settings.keepPlayed);
   if (root.ended || root.p1Options.length === 0 || root.p2Options.length === 0) {
     return {
       root,

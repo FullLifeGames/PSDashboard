@@ -87,8 +87,8 @@ export class EvalWorkerClient {
   private createPooledExecutor(serializedBattle: string): SearchExecutor {
     let roundRobin = 0;
     return {
-      choices: async tera => {
-        const response = await this.rpc(this.ensureWorkers()[0], { type: 'choices', serializedBattle, tera });
+      choices: async (tera, keepPlayed) => {
+        const response = await this.rpc(this.ensureWorkers()[0], { type: 'choices', serializedBattle, tera, keepPlayed });
         if (response.type !== 'choicesResult') throw new Error('unexpected worker response');
         return response.info;
       },

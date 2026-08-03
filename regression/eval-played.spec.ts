@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { parsePlayedActions } from '../src/lib/eval/played';
+import { parsePlayedActions, parsePlayedActionsDoubles } from '../src/lib/eval/played';
 
 test.describe('played-action parsing', () => {
   test('both sides move', () => {
@@ -74,5 +74,51 @@ test.describe('played-action parsing', () => {
     ]);
     expect(played.p1).toEqual({ kind: 'move', name: 'Whirlwind', tera: false });
     expect(played.p2).toBeNull();
+  });
+});
+
+test.describe('doubles played-action parsing', () => {
+  test('per-slot actions with foe/ally target locations', () => {
+    const played = parsePlayedActionsDoubles([
+      '|move|p1a: Flutter Mane|Moonblast|p2b: Chien-Pao',
+      '|-damage|p2b: Chien-Pao|10/100',
+      '|move|p2a: Incineroar|Fake Out|p1a: Flutter Mane',
+      '|move|p1b: Rillaboom|Fake Out|p2a: Incineroar',
+      '|switch|p2b: Urshifu|Urshifu, M|100/100',
+      '|turn|4',
+    ]);
+    expect(played.p1Slots?.[0]).toEqual({ kind: 'move', name: 'Moonblast', tera: false, targetLoc: 2 });
+    expect(played.p1Slots?.[1]).toEqual({ kind: 'move', name: 'Fake Out', tera: false, targetLoc: 1 });
+    expect(played.p2Slots?.[0]).toEqual({ kind: 'move', name: 'Fake Out', tera: false, targetLoc: 1 });
+    // Chien-Pao took damage but never acted — the switch is its chosen action.
+    expect(played.p2Slots?.[1]).toEqual({ kind: 'switch', name: 'Urshifu', species: 'Urshifu' });
+  });
+
+  test('tera marks the slot, faint/cant settle only that slot', () => {
+    const played = parsePlayedActionsDoubles([
+      '|-terastallize|p1b: Rillaboom|Grass',
+      '|move|p2a: Incineroar|Fake Out|p1a: Flutter Mane',
+      '|cant|p1a: Flutter Mane|flinch',
+      '|move|p1b: Rillaboom|Wood Hammer|p2a: Incineroar',
+      '|-damage|p2a: Incineroar|0 fnt',
+      '|faint|p2a: Incineroar',
+      '|switch|p2a: Amoonguss|Amoonguss, F|100/100',
+      '|move|p2b: Urshifu|Protect|',
+      '|turn|9',
+    ]);
+    expect(played.p1Slots?.[0]).toBeNull(); // flinched — choice never surfaced
+    expect(played.p1Slots?.[1]).toEqual({ kind: 'move', name: 'Wood Hammer', tera: true, targetLoc: 1 });
+    expect(played.p2Slots?.[0]).toEqual({ kind: 'move', name: 'Fake Out', tera: false, targetLoc: 1 });
+    expect(played.p2Slots?.[1]).toEqual({ kind: 'move', name: 'Protect', tera: false, targetLoc: null });
+  });
+
+  test('ally-targeted moves get negative locations', () => {
+    const played = parsePlayedActionsDoubles([
+      '|move|p1a: Clefairy|Follow Me|p1a: Clefairy',
+      '|move|p1b: Kingambit|Sucker Punch|p2a: Urshifu',
+      '|turn|3',
+    ]);
+    expect(played.p1Slots?.[0]).toEqual({ kind: 'move', name: 'Follow Me', tera: false, targetLoc: -1 });
+    expect(played.p1Slots?.[1]).toEqual({ kind: 'move', name: 'Sucker Punch', tera: false, targetLoc: 1 });
   });
 });

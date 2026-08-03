@@ -22,6 +22,8 @@ export type TurnAttribution =
 
 export interface SideAnalysis {
   playedRaw: PlayedAction | null;
+  /** Doubles: the per-slot actions this side actually took. */
+  playedSlots?: (PlayedAction | null)[];
   /** The played action matched into the engine's ranked list. */
   played: RankedChoice | null;
   best: RankedChoice | null;
@@ -53,6 +55,63 @@ export interface TurnAnalysis {
 
 const choiceKeyOf = (name: string): string => name.toLowerCase().replace(/[^a-z0-9]/g, '');
 
+/** "Tera + X" labels contain the slot separator — re-merge after splitting. */
+const splitCombinedLabel = (label: string): string[] => {
+  const segments = label.split(' + ');
+  const parts: string[] = [];
+  for (let index = 0; index < segments.length; index++) {
+    if ((segments[index] === 'Tera' || segments[index] === 'Mega' || segments[index] === 'Ultra') && index + 1 < segments.length) {
+      parts.push(`${segments[index]} + ${segments[index + 1]}`);
+      index += 1;
+    } else {
+      parts.push(segments[index]);
+    }
+  }
+  return parts;
+};
+
+function slotMatches(choicePart: string, labelPart: string, action: PlayedAction): boolean {
+  if (action.kind === 'switch') return labelPart === `→ ${action.species ?? action.name}`;
+  const tokens = choicePart.split(' ');
+  if (tokens[0] !== 'move' || tokens[1] !== choiceKeyOf(action.name)) return false;
+  if (choicePart.includes(' terastallize') !== !!action.tera) return false;
+  const locToken = tokens.find(token => /^-?\d+$/.test(token));
+  // A locless fragment (spread/self move) accepts any protocol target.
+  if (locToken !== undefined && action.targetLoc != null && parseInt(locToken, 10) !== action.targetLoc) return false;
+  return true;
+}
+
+/**
+ * Finds the combined (doubles) option matching the side's per-slot actions.
+ * Generic over anything with choice + label, so the search restriction can
+ * use it on raw options and the analysis on ranked results.
+ */
+export function findPlayedOption<T extends { choice: string; label: string }>(
+  options: T[],
+  slots: (PlayedAction | null)[] | undefined,
+): T | null {
+  const actions = (slots ?? []).filter((action): action is PlayedAction => action !== null);
+  if (actions.length === 0) return null;
+  return options.find(option => {
+    const choiceParts = option.choice.split(',').map(part => part.trim());
+    if (choiceParts.length !== actions.length) return false;
+    const labelParts = splitCombinedLabel(option.label);
+    return choiceParts.every((part, index) => slotMatches(part, labelParts[index] ?? '', actions[index]));
+  }) ?? null;
+}
+
+/** Side dispatcher: doubles slots when present, singles action otherwise. */
+export function matchPlayedSide(
+  result: EvalResult,
+  side: 'p1' | 'p2',
+  played: PlayedTurn | null,
+): RankedChoice | null {
+  if (!played) return null;
+  const slots = side === 'p1' ? played.p1Slots : played.p2Slots;
+  if (slots) return findPlayedOption(result.perSide[side], slots);
+  return matchPlayedChoice(result, side, played[side]);
+}
+
 export function matchPlayedChoice(
   result: EvalResult,
   side: 'p1' | 'p2',
@@ -83,10 +142,11 @@ export function analyzeTurn(params: {
   const playedTracking = params.playedTracking !== false;
   const sideAnalysis = (key: 'p1' | 'p2'): SideAnalysis => {
     const playedRaw = params.played?.[key] ?? null;
-    const played = matchPlayedChoice(params.result, key, playedRaw);
+    const playedSlots = key === 'p1' ? params.played?.p1Slots : params.played?.p2Slots;
+    const played = matchPlayedSide(params.result, key, params.played);
     const best = params.result.perSide[key][0] ?? null;
     const regret = played && best ? Math.max(0, best.worstCase - played.worstCase) : null;
-    return { playedRaw, played, best, regret };
+    return { playedRaw, ...(playedSlots ? { playedSlots } : {}), played, best, regret };
   };
 
   const p1 = sideAnalysis('p1');

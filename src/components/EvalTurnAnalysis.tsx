@@ -31,11 +31,17 @@ function SideRow({ name, side }: { name: string; side: SideAnalysis }) {
   const playedRawName = side.playedRaw?.kind === 'switch'
     ? `→ ${side.playedRaw.species ?? side.playedRaw.name}`
     : side.playedRaw?.name;
+  const slotText = side.playedSlots
+    ?.filter((action): action is NonNullable<typeof action> => action !== null)
+    .map(action => (action.kind === 'switch' ? `→ ${action.species ?? action.name}` : action.name))
+    .join(' + ');
   const playedText = side.played
     ? `${side.played.label} (${signed(side.played.worstCase)})`
-    : side.playedRaw
-      ? `${playedRawName} — not among the engine's options`
-      : 'could not act (fainted or fully prevented)';
+    : slotText
+      ? `${slotText} — not among the engine's candidates`
+      : side.playedRaw
+        ? `${playedRawName} — not among the engine's options`
+        : 'could not act (fainted or fully prevented)';
   const regretful = (side.regret ?? 0) >= REGRET_THRESHOLD;
 
   return (

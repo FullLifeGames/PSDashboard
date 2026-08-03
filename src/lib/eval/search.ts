@@ -10,6 +10,8 @@ import {
   attachLines, cellKey, rankFromMatrix, selectExpansionCells, toResult, TOP_EXPANSION,
   type PvStep, type Ranked, type ValueMatrix,
 } from './rank';
+import { findPlayedOption } from './analysis';
+import type { PlayedAction } from './played';
 import type { CellValue, SearchExecutor } from './orchestrator';
 import type { EvalResult, EvalSettings, RankedChoice, SearchProgress } from './types';
 
@@ -74,7 +76,12 @@ export const RESTRICT_K_DOUBLES = 12;
 const isCombined = (options: ChoiceOption[]) => options.some(option => option.choice.includes(','));
 
 /** Ranks combined doubles options by summed per-slot static threat hints. */
-function restrictCombined(position: SimPosition, side: 'p1' | 'p2', options: ChoiceOption[]): ChoiceOption[] {
+function restrictCombined(
+  position: SimPosition,
+  side: 'p1' | 'p2',
+  options: ChoiceOption[],
+  keep?: (PlayedAction | null)[],
+): ChoiceOption[] {
   if (options.length <= RESTRICT_K_DOUBLES) return options;
   const battle = positionBattle(position);
   const sideState = battle.sides[side === 'p1' ? 0 : 1];
@@ -101,7 +108,7 @@ function restrictCombined(position: SimPosition, side: 'p1' | 'p2', options: Cho
     return Math.max(...foes.map(foe => singleMoveFraction(attacker, foe, tokens[1], battle)));
   };
 
-  return options
+  const restricted = options
     .map((option, index) => ({
       option,
       index,
@@ -111,6 +118,14 @@ function restrictCombined(position: SimPosition, side: 'p1' | 'p2', options: Cho
     .slice(0, RESTRICT_K_DOUBLES)
     .sort((a, b) => a.index - b.index)
     .map(entry => entry.option);
+
+  // The actually played combo must stay rankable even when the hint scoring
+  // wouldn't keep it — otherwise played-vs-best regret has nothing to read.
+  if (keep) {
+    const played = findPlayedOption(options, keep);
+    if (played && !restricted.includes(played)) restricted.push(played);
+  }
+  return restricted;
 }
 
 /**
@@ -118,9 +133,13 @@ function restrictCombined(position: SimPosition, side: 'p1' | 'p2', options: Cho
  * restriction applied. Every consumer (search root, sub-searches, MCTS
  * nodes, executors) goes through here so all engines see the same lists.
  */
-export function searchOptions(position: SimPosition, side: 'p1' | 'p2', opts?: { tera?: boolean }): ChoiceOption[] {
+export function searchOptions(
+  position: SimPosition,
+  side: 'p1' | 'p2',
+  opts?: { tera?: boolean; keep?: (PlayedAction | null)[] },
+): ChoiceOption[] {
   const options = legalChoices(position, side, opts);
-  return isCombined(options) ? restrictCombined(position, side, options) : options;
+  return isCombined(options) ? restrictCombined(position, side, options, opts?.keep) : options;
 }
 
 /**
@@ -215,8 +234,8 @@ export function subSearchDepth1(
     return { score: evaluatePosition(battle, matchupCache), interval: 0, depthCompleted: settings.depth, perSide: { p1: [], p2: [] } };
   }
   const tera = settings.tera ?? true;
-  const p1Options = searchOptions(root, 'p1', { tera });
-  const p2Options = searchOptions(root, 'p2', { tera });
+  const p1Options = searchOptions(root, 'p1', { tera, keep: settings.keepPlayed?.p1Slots });
+  const p2Options = searchOptions(root, 'p2', { tera, keep: settings.keepPlayed?.p2Slots });
   if (p1Options.length === 0 || p2Options.length === 0) {
     return searchPosition(serializedBattle, settings, undefined, matchupCache);
   }
@@ -328,8 +347,8 @@ export function searchPosition(
 
   const rootValue = evaluatePosition(battle, matchupCache);
   const tera = settings.tera ?? true;
-  let p1Options = searchOptions(root, 'p1', { tera });
-  let p2Options = searchOptions(root, 'p2', { tera });
+  let p1Options = searchOptions(root, 'p1', { tera, keep: settings.keepPlayed?.p1Slots });
+  let p2Options = searchOptions(root, 'p2', { tera, keep: settings.keepPlayed?.p2Slots });
   if (restrictCandidates) {
     p1Options = restrictOptions(root, 'p1', p1Options);
     p2Options = restrictOptions(root, 'p2', p2Options);
@@ -367,7 +386,9 @@ export function searchPosition(
         // sample (the child is seed-specific); its midpoint score replaces
         // the cell's static value.
         const child = matrix.children[i][j];
-        const sub = subSearch(child.serialized, { ...settings, depth: (depth - 1) as 1 | 2, samples: 1 }, matchupCache);
+        // keepPlayed is a root-position hint — child positions have their
+        // own choice space where those actions mean nothing.
+        const sub = subSearch(child.serialized, { ...settings, depth: (depth - 1) as 1 | 2, samples: 1, keepPlayed: undefined }, matchupCache);
         matrix.values[i][j] = sub.score;
         expandedThisLevel.add(cellKey(i, j));
         const subTopP1 = sub.perSide.p1[0];
@@ -403,11 +424,11 @@ export function createLocalExecutor(serializedBattle: string): SearchExecutor {
   const matchupCache = createMatchupCache();
   const root = createRootPosition(serializedBattle);
   return {
-    async choices(tera) {
+    async choices(tera, keepPlayed) {
       const battle = positionBattle(root);
       return {
-        p1: searchOptions(root, 'p1', { tera }),
-        p2: searchOptions(root, 'p2', { tera }),
+        p1: searchOptions(root, 'p1', { tera, keep: keepPlayed?.p1Slots }),
+        p2: searchOptions(root, 'p2', { tera, keep: keepPlayed?.p2Slots }),
         rootValue: evaluatePosition(battle, matchupCache),
         rootEnded: battle.ended,
       };

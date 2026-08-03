@@ -311,3 +311,23 @@ test.describe('doubles search', () => {
     expect(deep.perSide.p1.length).toBeGreaterThan(0);
   });
 });
+
+test.describe('doubles keepPlayed', () => {
+  test('the played combo survives the restriction and gets ranked', () => {
+    const keepPlayed = {
+      p1Slots: [
+        { kind: 'switch' as const, name: 'Chansey', species: 'Chansey' },
+        { kind: 'move' as const, name: 'Protect', tera: false, targetLoc: null },
+      ],
+    };
+    const without = searchPosition(doublesRoot(), { depth: 1, samples: 1, tera: false });
+    const withKeep = searchPosition(doublesRoot(), { depth: 1, samples: 1, tera: false, keepPlayed });
+    // The zero-hint combo is exactly what the restriction drops…
+    expect(without.perSide.p1.some(option => option.choice === 'switch 3, move protect')).toBe(false);
+    // …and exactly what keepPlayed forces back in, ranked like any option.
+    const kept = withKeep.perSide.p1.find(option => option.choice === 'switch 3, move protect');
+    expect(kept).toBeTruthy();
+    expect(Number.isFinite(kept!.worstCase)).toBe(true);
+    expect(withKeep.perSide.p1.length).toBeLessThanOrEqual(13);
+  });
+});

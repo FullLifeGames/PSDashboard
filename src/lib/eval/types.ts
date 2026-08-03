@@ -1,3 +1,5 @@
+import type { PlayedAction } from './played';
+
 /** Engine settings sent to the worker. */
 export interface EvalSettings {
   /** Turns ahead. 1 = full joint matrix only. */
@@ -8,6 +10,12 @@ export interface EvalSettings {
   tera?: boolean;
   /** 'mcts' runs the DUCT tree search instead of the fixed-depth matrix. */
   mode?: 'matrix' | 'mcts';
+  /**
+   * Sweep hint (root only): the actions actually played this turn. The
+   * doubles candidate restriction keeps the matching combined option ranked
+   * so played-vs-best regret stays computable.
+   */
+  keepPlayed?: { p1Slots?: (PlayedAction | null)[]; p2Slots?: (PlayedAction | null)[] } | null;
 }
 
 /** Panel preferences persisted in localStorage (worker only sees EvalSettings). */
@@ -122,7 +130,7 @@ export interface MctsTreeStats {
 export type EvalWorkerRequest =
   | { type: 'search'; id: number; serializedBattle: string; settings: EvalSettings }
   | { type: 'mctstree'; id: number; serializedBattle: string; settings: EvalSettings; seedOffset: number }
-  | { type: 'choices'; id: number; serializedBattle: string; tera: boolean }
+  | { type: 'choices'; id: number; serializedBattle: string; tera: boolean; keepPlayed?: EvalSettings['keepPlayed'] }
   | { type: 'cells'; id: number; serializedBattle: string; jobs: EvalCellJob[] }
   | { type: 'subsearch'; id: number; serializedBattle: string; job: EvalSubSearchJob };
 
