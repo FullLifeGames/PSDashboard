@@ -34,7 +34,7 @@ The current implementation is a working prototype, not a fully accurate replay r
 - Animate newly executed branch turns, or disable animation to jump straight to the result.
 - Compare branch history (including forced replacements) against the original replay line.
 - Save branches locally (open and delete them again) and create share links that also work in an already-open tab.
-- Show a battle statistics panel for both teams, with placeholders for unrevealed Random Battle slots.
+- Show a battle statistics panel for both teams, with placeholders for unrevealed Random Battle slots. Knowledge is provenance-tagged: revealed (proven by the protocol), sheet (from an open team sheet posted in the replay chat — authoritative for items, abilities, moves, and EVs the protocol never showed, like a Choice Scarf on a Pokémon that never moved), guessed (usage statistics), and manual (your edits). Proven and manual knowledge always outrank the sheet; the sheet outranks guesses and the "has item" preview marker.
 
 ## What "Works" Today
 
@@ -43,7 +43,7 @@ As of the current repository state:
 - `npm run lint` passes.
 - `npm run build` succeeds.
 - `npm run test:e2e` passes with 57 browser tests (the replay JSON and the Showdown embed script are served from fixtures/cache, so the suite is CDN-independent).
-- `npm run test:regression` passes with 215 tests (plus 2 documented known-divergence skips, an opt-in `EVAL_BENCH=1` throughput benchmark, and an opt-in `EVAL_CALIBRATION=1` sweep scoring the eval's sign-accuracy and confidence calibration against 24 real replays) covering replay reconstruction, identity-based choice resolution, execute error paths, gimmick availability, damage-calc generation/set alignment, team sheets, team paste (including natures, IVs, and levels), sets import/export round-trips, legal option pools, position evaluation (static eval, forward model, maximin search with deepening), stats parsing, exported replay file parsing, save/share, and inference quality.
+- `npm run test:regression` passes with 224 tests (plus 2 documented known-divergence skips, an opt-in `EVAL_BENCH=1` throughput benchmark, and an opt-in `EVAL_CALIBRATION=1` sweep scoring the eval's sign-accuracy and confidence calibration against 24 real replays) covering replay reconstruction, identity-based choice resolution, execute error paths, gimmick availability, damage-calc generation/set alignment, team sheets, team paste (including natures, IVs, and levels), sets import/export round-trips, legal option pools, position evaluation (static eval, forward model, maximin search with deepening), stats parsing, exported replay file parsing, save/share, and inference quality.
 
 The browser test suite validates the main happy path with a mocked replay fixture:
 

@@ -175,6 +175,11 @@ function mergeSetMoves(observed: string[], setMoves: SetAssumption[]): string[] 
   return result.slice(0, 4);
 }
 
+/** Public: the open-team-sheet sets both players posted, if any. */
+export function extractTeamSheets(log: string): { p1: PokemonSet[] | null; p2: PokemonSet[] | null } {
+  return extractEmbeddedShowteamExports(log);
+}
+
 function extractEmbeddedShowteamExports(log: string): { p1: PokemonSet[] | null; p2: PokemonSet[] | null } {
   const playerByName = new Map<string, 'p1' | 'p2'>();
   const fromShowteam: { p1: PokemonSet[] | null; p2: PokemonSet[] | null } = { p1: null, p2: null };

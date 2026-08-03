@@ -1,4 +1,5 @@
 import { useEffect, useState, useCallback, useMemo, useRef } from 'react';
+import type { PokemonSet } from '@pkmn/sim';
 import { useReplay } from './hooks/useReplay';
 import { useEmbedHost } from './hooks/useEmbedHost';
 import { useBranch } from './hooks/useBranch';
@@ -11,6 +12,7 @@ import { BranchPanel } from './components/BranchPanel';
 import { BranchHistoryPanel } from './components/BranchHistoryPanel';
 import { BranchSaveSharePanel } from './components/BranchSaveSharePanel';
 import { BattleStatsPanel } from './components/BattleStatsPanel';
+import { applyTeamSheetToInfo } from './lib/team-sheets';
 import { TeamEditor } from './components/TeamEditor';
 import { SetsImportExportPanel } from './components/SetsImportExportPanel';
 import { EvalPanel } from './components/EvalPanel';
@@ -406,6 +408,27 @@ function App() {
   // 'auto' Tera: a finished game that never terastallized treats it as banned.
   const teraSeen = useMemo(() => !!replayData && replayData.log.includes('terastallize'), [replayData]);
   const effectiveTera = evaluation.prefs.tera === 'auto' ? teraSeen : evaluation.prefs.tera === 'on';
+
+  // Posted open team sheets, surfaced in the stats panel as 'sheet'
+  // knowledge (the extraction needs the sim's Teams parser — lazy import).
+  const [sheetTeams, setSheetTeams] = useState<{ p1: PokemonSet[] | null; p2: PokemonSet[] | null }>({ p1: null, p2: null });
+  useEffect(() => {
+    let stale = false;
+    setSheetTeams({ p1: null, p2: null });
+    if (!replayData) return;
+    void import('./lib/team-builder').then(({ extractTeamSheets }) => {
+      if (!stale) setSheetTeams(extractTeamSheets(replayData.log));
+    });
+    return () => { stale = true; };
+  }, [replayData]);
+  const statsP1Info = useMemo(
+    () => (effectiveP1Info ? applyTeamSheetToInfo(effectiveP1Info, sheetTeams.p1) : null),
+    [effectiveP1Info, sheetTeams],
+  );
+  const statsP2Info = useMemo(
+    () => (effectiveP2Info ? applyTeamSheetToInfo(effectiveP2Info, sheetTeams.p2) : null),
+    [effectiveP2Info, sheetTeams],
+  );
 
   const acquireBranchPosition = useCallback(async () => {
     const battle = getBattle();
@@ -1099,8 +1122,8 @@ function App() {
             )}
             <BattleStatsPanel
               replayData={replayData}
-              p1Info={effectiveP1Info}
-              p2Info={effectiveP2Info}
+              p1Info={statsP1Info}
+              p2Info={statsP2Info}
             />
           </div>
         </div>

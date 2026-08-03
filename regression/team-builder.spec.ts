@@ -126,3 +126,66 @@ test.describe('team builder edited assumptions', () => {
     expect(state.p1Moves.map(move => move.name)).toEqual(['Swords Dance', 'Scale Shot', 'Dragon Claw']);
   });
 });
+
+test.describe('team sheet display overlay', () => {
+  test('fills unproven fields from the sheet, never overriding proof or edits', async () => {
+    const { applyTeamSheetToInfo } = await import('../src/lib/team-sheets');
+    const field = (value: string, source: 'revealed' | 'guessed' | 'unknown') => ({ value, source } as const);
+    const info = {
+      pokemon: [{
+        species: 'Heatran',
+        moves: [
+          { name: 'Overheat', source: 'revealed' as const },
+          { name: 'Earth Power', source: 'guessed' as const, probability: 0.5 },
+        ],
+        ability: field('', 'unknown'),
+        item: field('Leftovers', 'guessed'),
+        teraType: field('', 'unknown'),
+        evs: { value: { hp: 0, atk: 0, def: 0, spa: 0, spd: 0, spe: 0 }, source: 'unknown' as const },
+        level: 100,
+        gender: 'M',
+      }],
+    };
+    const sheet = [{
+      name: 'Fire Shadow', species: 'Heatran', item: 'Choice Scarf', ability: 'Flash Fire',
+      moves: ['Power Gem', 'Overheat', 'Flamethrower', 'Steel Beam'], nature: 'Modest',
+      evs: { hp: 80, atk: 0, def: 0, spa: 252, spd: 0, spe: 176 },
+      ivs: { hp: 31, atk: 0, def: 31, spa: 31, spd: 31, spe: 31 },
+      level: 100, gender: 'M', teraType: 'Fire',
+    }];
+
+    // The "(has item)" team-preview placeholder loses to the sheet's name.
+    const withPlaceholder = {
+      pokemon: [{
+        ...info.pokemon[0],
+        item: { value: '(has item)', source: 'revealed' as const },
+      }],
+    };
+    expect(applyTeamSheetToInfo(withPlaceholder, sheet).pokemon[0].item.value).toBe('Choice Scarf');
+
+    const out = applyTeamSheetToInfo(info, sheet).pokemon[0];
+    // The usage guess loses to the sheet; the revealed move survives.
+    expect(out.item).toEqual({ value: 'Choice Scarf', source: 'sheet', sourceDetail: expect.stringContaining('team sheet') });
+    expect(out.ability.value).toBe('Flash Fire');
+    expect(out.evs.source).toBe('sheet');
+    expect(out.evs.value.spe).toBe(176);
+    expect(out.moves.map(move => `${move.name}:${move.source}`)).toEqual([
+      'Overheat:revealed', 'Power Gem:sheet', 'Flamethrower:sheet', 'Steel Beam:sheet',
+    ]);
+    // No sheet -> untouched.
+    expect(applyTeamSheetToInfo(info, null)).toBe(info);
+  });
+
+  test('extractTeamSheets finds the chat-posted infobox sheets', async () => {
+    const { extractTeamSheets } = await import('../src/lib/team-builder');
+    const log = [
+      '|player|p1|Alice|1|',
+      '|player|p2|Bob|2|',
+      '|c| Bob|/raw <div class="infobox"><details><summary>View team</summary>Fire Shadow (Heatran) (M) @ Choice Scarf  <br />Ability: Flash Fire  <br />- Overheat  <br /></details></div>',
+    ].join('\n');
+    const sheets = extractTeamSheets(log);
+    expect(sheets.p1).toBeNull();
+    expect(sheets.p2?.[0].species).toBe('Heatran');
+    expect(sheets.p2?.[0].item).toBe('Choice Scarf');
+  });
+});

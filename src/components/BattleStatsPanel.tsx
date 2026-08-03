@@ -47,6 +47,8 @@ function sourceAccent(source: KnowledgeSource): string {
       return '#f3c969';
     case 'manual':
       return '#78df9b';
+    case 'sheet':
+      return '#b48ef0';
     default:
       return '#8899aa';
   }
@@ -65,6 +67,8 @@ function sourceLabel(source: KnowledgeSource, probability?: number): string {
       return probability === undefined ? 'guessed' : `guessed ${formatProbability(probability)}`;
     case 'manual':
       return 'manual';
+    case 'sheet':
+      return 'sheet';
     default:
       return 'unknown';
   }

@@ -941,6 +941,10 @@ test.describe('PS Dashboard', () => {
     await expect(panel.locator('.ps-eval-bar-p1')).toContainText('%');
     // Recommendations are combined two-slot choices ("A + B").
     await expect(panel.locator('.ps-eval-choice').first()).toContainText('+');
+
+    // The chat-posted team sheet surfaces in the stats panel as SHEET data.
+    await expect(page.locator('.ps-stats-tag', { hasText: 'Light Ball' })).toBeVisible();
+    await expect(page.locator('.ps-stats-tag', { hasText: 'Light Ball' })).toContainText('sheet');
   });
 
   test('doubles branch shows slot controls and blocks duplicate simultaneous switches', async ({ page }) => {

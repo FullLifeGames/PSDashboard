@@ -49,7 +49,7 @@ export interface TurnSnapshot {
   log: string[];
 }
 
-export type KnowledgeSource = 'revealed' | 'guessed' | 'manual' | 'unknown';
+export type KnowledgeSource = 'revealed' | 'guessed' | 'manual' | 'sheet' | 'unknown';
 export type StatId = 'hp' | 'atk' | 'def' | 'spa' | 'spd' | 'spe';
 export type PokemonEvs = Record<StatId, number>;
 
