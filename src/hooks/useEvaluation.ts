@@ -30,7 +30,7 @@ function loadPrefs(): EvalPreferences {
     if (!raw) return DEFAULT_PREFS;
     const parsed = JSON.parse(raw) as Partial<EvalPreferences>;
     return {
-      depth: parsed.depth === 1 || parsed.depth === 3 ? parsed.depth : 2,
+      depth: parsed.depth === 1 ? 1 : 2,
       samples: parsed.samples === 1 || parsed.samples === 5 ? parsed.samples : 3,
       mode: parsed.mode === 'mcts' ? 'mcts' : 'matrix',
       auto: !!parsed.auto,
@@ -43,8 +43,10 @@ function loadPrefs(): EvalPreferences {
 
 interface CachedEval {
   result: EvalResult;
-  depth: EvalPreferences['depth'];
-  samples: EvalPreferences['samples'];
+  // Engine-typed: the UI only offers depth 1/2, but sweeps cache whatever
+  // EvalSettings the engine ran with.
+  depth: EvalSettings['depth'];
+  samples: EvalSettings['samples'];
   mode: EvalPreferences['mode'];
   tera: boolean;
   /** Engine expectation of the actually played pair (set by graph sweeps). */

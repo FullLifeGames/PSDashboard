@@ -103,7 +103,8 @@ function benchSwitches(sideState: Side): SlotChoice[] {
   const switches: SlotChoice[] = [];
   sideState.pokemon.forEach((pokemon, index) => {
     if (pokemon.isActive || pokemon.fainted) return;
-    switches.push({ choice: `switch ${index + 1}`, label: `→ ${pokemon.name}`, once: false, bench: index + 1 });
+    // Species, not nickname — labels feed the analysis text and PVs.
+    switches.push({ choice: `switch ${index + 1}`, label: `→ ${pokemon.species.name}`, once: false, bench: index + 1 });
   });
   return switches;
 }
@@ -138,7 +139,7 @@ function slotChoicesFor(
         .filter(({ foe }) => foe && !foe.fainted);
       if (living.length > 1) {
         for (const { foe, index } of living) {
-          targets.push({ suffix: ` ${index + 1}`, label: `${move.move}→${foe!.name}` });
+          targets.push({ suffix: ` ${index + 1}`, label: `${move.move}→${foe!.species.name}` });
         }
       } else if (living.length === 1) {
         targets.push({ suffix: ` ${living[0].index + 1}`, label: move.move });
@@ -239,7 +240,7 @@ export function legalChoices(
   if (forced || !trapped) {
     sideState.pokemon.forEach((pokemon, index) => {
       if (pokemon.isActive || pokemon.fainted) return;
-      options.push({ choice: `switch ${index + 1}`, label: `→ ${pokemon.name}` });
+      options.push({ choice: `switch ${index + 1}`, label: `→ ${pokemon.species.name}` });
     });
   }
 

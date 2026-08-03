@@ -43,6 +43,12 @@ export interface TurnAnalysis {
   attribution: TurnAttribution;
   p1: SideAnalysis;
   p2: SideAnalysis;
+  /**
+   * False when played actions were never parsed (doubles) — score movement
+   * and engine lines still apply, but nothing may claim blame or "could not
+   * act". Absent means true.
+   */
+  playedTracking?: boolean;
 }
 
 const choiceKeyOf = (name: string): string => name.toLowerCase().replace(/[^a-z0-9]/g, '');
@@ -58,8 +64,10 @@ export function matchPlayedChoice(
     const choice = `move ${choiceKeyOf(action.name)}${action.tera ? ' terastallize' : ''}`;
     return options.find(option => option.choice === choice) ?? null;
   }
-  return options.find(option => option.label === `→ ${action.name}`) ??
-    (action.species ? options.find(option => option.label === `→ ${action.species}`) ?? null : null);
+  // Labels carry species names; the nickname is only a fallback for logs
+  // where the species could not be parsed.
+  return (action.species ? options.find(option => option.label === `→ ${action.species}`) : undefined) ??
+    options.find(option => option.label === `→ ${action.name}`) ?? null;
 }
 
 export function analyzeTurn(params: {
@@ -69,7 +77,10 @@ export function analyzeTurn(params: {
   playedOutcome: number | null;
   scoreBefore: number;
   scoreAfter: number | null;
+  /** False = played actions unavailable (doubles); blame is off the table. */
+  playedTracking?: boolean;
 }): TurnAnalysis {
+  const playedTracking = params.playedTracking !== false;
   const sideAnalysis = (key: 'p1' | 'p2'): SideAnalysis => {
     const playedRaw = params.played?.[key] ?? null;
     const played = matchPlayedChoice(params.result, key, playedRaw);
@@ -89,7 +100,10 @@ export function analyzeTurn(params: {
   const p1Bad = (p1.regret ?? 0) >= REGRET_THRESHOLD;
   const p2Bad = (p2.regret ?? 0) >= REGRET_THRESHOLD;
   let attribution: TurnAttribution;
-  if (p1Bad && p2Bad) attribution = 'both-decision';
+  if (!playedTracking) {
+    // Without played actions only the movement itself can be described.
+    attribution = swing !== null && Math.abs(swing) >= CHANCE_THRESHOLD ? 'shift' : 'quiet';
+  } else if (p1Bad && p2Bad) attribution = 'both-decision';
   else if (p1Bad) attribution = 'p1-decision';
   else if (p2Bad) attribution = 'p2-decision';
   else if (chanceDelta !== null && Math.abs(chanceDelta) >= CHANCE_THRESHOLD) attribution = 'chance';
@@ -111,5 +125,6 @@ export function analyzeTurn(params: {
     attribution,
     p1,
     p2,
+    playedTracking,
   };
 }

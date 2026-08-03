@@ -78,6 +78,32 @@ test.describe('turn analysis assembly', () => {
     expect(analysis.chanceDelta).toBeCloseTo(0.14, 10);
   });
 
+  test('without played tracking (doubles) only shift/quiet are possible', () => {
+    const big = analyzeTurn({
+      turn: 5,
+      result,
+      played: null,
+      playedOutcome: null,
+      scoreBefore: 0.1,
+      scoreAfter: -0.4,
+      playedTracking: false,
+    });
+    expect(big.attribution).toBe('shift'); // never 'unclear' — nothing was mis-parsed
+    expect(big.playedTracking).toBe(false);
+    expect(big.p1.best?.choice).toBe('move dracometeor'); // engine lines still there
+
+    const small = analyzeTurn({
+      turn: 6,
+      result,
+      played: null,
+      playedOutcome: null,
+      scoreBefore: 0.1,
+      scoreAfter: 0.15,
+      playedTracking: false,
+    });
+    expect(small.attribution).toBe('quiet');
+  });
+
   test('small regrets and small residual is quiet', () => {
     const analysis = analyzeTurn({
       turn: 3,

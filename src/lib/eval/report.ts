@@ -61,6 +61,8 @@ export function buildGameReport(
   analyses: (TurnAnalysis | null)[],
   playerNames: [string, string],
   winner: 'p1' | 'p2' | null,
+  /** False = played actions unavailable (doubles): no seeds, no clean-play claim. */
+  playedTracking = true,
 ): GameReport {
   const known = analyses.filter((entry): entry is TurnAnalysis => entry !== null);
 
@@ -87,7 +89,7 @@ export function buildGameReport(
 
     const loser = winner === 'p1' ? 'p2' : 'p1';
     const loserName = playerNames[loser === 'p1' ? 0 : 1];
-    const seeds = known
+    const seeds = !playedTracking ? [] : known
       .filter(analysis => (turningPoint === null || analysis.turn <= turningPoint) &&
         (analysis[loser].regret ?? 0) >= REGRET_THRESHOLD && analysis[loser].played && analysis[loser].best)
       .sort((a, b) => (b[loser].regret ?? 0) - (a[loser].regret ?? 0))
@@ -100,7 +102,7 @@ export function buildGameReport(
           `−${(side.regret ?? 0).toFixed(2)} — safer was ${labelPhrase(side.best!.label)})`;
       });
       sentences.push(`The seeds of the loss: ${parts.join(' and ')}.`);
-    } else if (decisionTotals[loser] < CLEAN_PLAY_TOTAL) {
+    } else if (playedTracking && decisionTotals[loser] < CLEAN_PLAY_TOTAL) {
       sentences.push(`${loserName}'s play was clean — the loss came from matchup and variance, not blunders.`);
     }
   } else if (known.length > 0) {

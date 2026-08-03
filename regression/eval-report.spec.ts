@@ -97,6 +97,17 @@ test.describe('game report (multi-turn root cause)', () => {
     expect(report.summary).toContain('clean');
   });
 
+  test('without played tracking the report never claims clean play or seeds', () => {
+    const report = buildGameReport([
+      mk(1, -0.2, -0.4),
+      mk(2, -0.4, -0.6),
+      mk(3, -0.6, -0.9),
+    ], names, 'p2', false);
+    expect(report.summary).toContain('Beta won');
+    expect(report.summary).not.toContain('clean');
+    expect(report.summary).not.toContain('seeds');
+  });
+
   test('gaps in the sweep are tolerated', () => {
     const report = buildGameReport([
       mk(1, 0.2, 0.1),

@@ -12,7 +12,8 @@ export interface EvalSettings {
 
 /** Panel preferences persisted in localStorage (worker only sees EvalSettings). */
 export interface EvalPreferences {
-  depth: 1 | 2 | 3;
+  /** UI offers 1/2 only — depth 3 costs 3-4× for capped gains (MCTS is the "deeper" mode). */
+  depth: 1 | 2;
   samples: 1 | 3 | 5;
   /** 'mcts' runs the DUCT tree search; depth/samples then don't apply. */
   mode: 'matrix' | 'mcts';

@@ -9,11 +9,32 @@ interface EvalTurnAnalysisProps {
 
 const signed = (value: number) => `${value >= 0 ? '+' : ''}${value.toFixed(2)}`;
 
+/** Untracked (doubles): only the engine's preferred line — no played/blame. */
+function EngineRow({ name, side }: { name: string; side: SideAnalysis }) {
+  if (!side.best) return null;
+  return (
+    <div className="ps-eval-analysis-side">
+      <div className="ps-eval-analysis-row">
+        <span style={{ color: '#cde', fontWeight: 'bold' }}>{name}</span>
+        <span style={{ color: '#aab' }}>
+          engine: <span style={{ color: '#cde' }}>{side.best.label}</span> ({signed(side.best.worstCase)})
+        </span>
+        {side.best.line && side.best.line.length > 0 && (
+          <span className="ps-eval-line">then {side.best.line.map(step => `${step.p1} · ${step.p2}`).join(' → ')}</span>
+        )}
+      </div>
+    </div>
+  );
+}
+
 function SideRow({ name, side }: { name: string; side: SideAnalysis }) {
+  const playedRawName = side.playedRaw?.kind === 'switch'
+    ? `→ ${side.playedRaw.species ?? side.playedRaw.name}`
+    : side.playedRaw?.name;
   const playedText = side.played
     ? `${side.played.label} (${signed(side.played.worstCase)})`
     : side.playedRaw
-      ? `${side.playedRaw.name} — not among the engine's options`
+      ? `${playedRawName} — not among the engine's options`
       : 'could not act (fainted or fully prevented)';
   const regretful = (side.regret ?? 0) >= REGRET_THRESHOLD;
 
@@ -64,8 +85,17 @@ export function EvalTurnAnalysis({ analysis, playerNames }: EvalTurnAnalysisProp
           {signed(analysis.decisionDelta)} expected from the choices · {signed(analysis.chanceDelta)} from how it rolled
         </div>
       )}
-      <SideRow name={playerNames[0]} side={analysis.p1} />
-      <SideRow name={playerNames[1]} side={analysis.p2} />
+      {analysis.playedTracking === false ? (
+        <>
+          <EngineRow name={playerNames[0]} side={analysis.p1} />
+          <EngineRow name={playerNames[1]} side={analysis.p2} />
+        </>
+      ) : (
+        <>
+          <SideRow name={playerNames[0]} side={analysis.p1} />
+          <SideRow name={playerNames[1]} side={analysis.p2} />
+        </>
+      )}
     </div>
   );
 }

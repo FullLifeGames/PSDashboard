@@ -761,8 +761,19 @@ function App() {
     setAnalysisTurn(turn);
   }, [handleReplayTurn]);
 
+  // Once an analysis is open it follows the replay position — moving the
+  // slider (or stepping the battle) re-targets the analyzed turn.
+  useEffect(() => {
+    if (branching) return;
+    setAnalysisTurn(prev => {
+      if (prev === null) return prev;
+      const turn = Math.min(Math.max(1, branchTurn), analyzableTurns);
+      return turn === prev ? prev : turn;
+    });
+  }, [branching, branchTurn, analyzableTurns]);
+
   const turnAnalysis = useMemo(() => {
-    if (analysisTurn === null || !evalAnalysisAvailable) return null;
+    if (analysisTurn === null) return null;
     const result = evaluation.graph.results[analysisTurn - 1];
     const scoreBefore = evaluation.graph.scores[analysisTurn - 1];
     if (!result || scoreBefore === null) return null;
@@ -773,6 +784,7 @@ function App() {
       playedOutcome: evaluation.graph.playedOutcome[analysisTurn - 1] ?? null,
       scoreBefore,
       scoreAfter: evaluation.graph.scores[analysisTurn] ?? null,
+      playedTracking: evalAnalysisAvailable,
     });
   }, [analysisTurn, evaluation.graph, evalAnalysisAvailable]);
 
@@ -787,7 +799,7 @@ function App() {
 
   // Game-level root cause, once enough of the game is swept.
   const gameReport = useMemo(() => {
-    if (!replayData || !evalAnalysisAvailable) return null;
+    if (!replayData) return null;
     const { results, scores, played, playedOutcome, running } = evaluation.graph;
     if (running) return null;
     const analyses = results.map((result, index) => {
@@ -800,10 +812,11 @@ function App() {
         playedOutcome: playedOutcome[index] ?? null,
         scoreBefore,
         scoreAfter: scores[index + 1] ?? null,
+        playedTracking: evalAnalysisAvailable,
       });
     });
     if (analyses.filter(Boolean).length < 3) return null;
-    return buildGameReport(analyses, [replayData.players[0], replayData.players[1]], replayWinner);
+    return buildGameReport(analyses, [replayData.players[0], replayData.players[1]], replayWinner, evalAnalysisAvailable);
   }, [replayData, evaluation.graph, replayWinner, evalAnalysisAvailable]);
 
   const teamPasteStatus = useMemo(() => {

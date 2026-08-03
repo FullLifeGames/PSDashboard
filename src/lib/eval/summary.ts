@@ -43,6 +43,15 @@ export function summarizeTurn(analysis: TurnAnalysis, playerNames: [string, stri
       : `The estimate moved from ${before}% to ${after}% for ${playerNames[0]}.`);
   }
 
+  if (analysis.playedTracking === false) {
+    // Played actions were never parsed (doubles) — describe the movement
+    // and point at the engine lines; blame is off the table.
+    sentences.push(analysis.attribution === 'shift'
+      ? "The advantage moved — compare the engine's preferred lines for both sides below."
+      : 'A quiet turn.');
+    return sentences.join(' ');
+  }
+
   switch (analysis.attribution) {
     case 'p1-decision':
     case 'p2-decision':

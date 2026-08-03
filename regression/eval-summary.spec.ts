@@ -72,6 +72,21 @@ test.describe('natural-language turn summaries', () => {
     expect(summary).not.toContain('quiet');
   });
 
+  test('without played tracking the summary points at the engine lines', () => {
+    const summary = summarizeTurn(analyzeTurn({
+      turn: 5,
+      result,
+      played: null,
+      playedOutcome: null,
+      scoreBefore: 0.1,
+      scoreAfter: -0.4,
+      playedTracking: false,
+    }), names);
+    expect(summary).toContain("engine's preferred lines");
+    expect(summary).not.toContain('mistake');
+    expect(summary).not.toContain('never surfaced');
+  });
+
   test('a quiet turn with both engine moves says so', () => {
     const summary = summarizeTurn(analyzeTurn({
       turn: 3,

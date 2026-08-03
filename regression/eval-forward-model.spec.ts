@@ -64,6 +64,14 @@ test.describe('sim forward model', () => {
     expect(p1.find(option => option.choice === 'switch 2')?.label).toBe('→ Chansey');
   });
 
+  test('switch labels use the species, not the nickname', () => {
+    const root = createRootPosition(serialize(makeBattle(
+      [makeSet('Snorlax', 'Snorlax', ['Protect']), makeSet('Fluffy', 'Chansey', ['Protect'])],
+      [makeSet('Pikachu', 'Pikachu', ['Protect'])],
+    )));
+    expect(legalChoices(root, 'p1').find(option => option.choice === 'switch 2')?.label).toBe('→ Chansey');
+  });
+
   test('tera variants can be disabled', () => {
     const root = createRootPosition(serialize(makeBattle(
       [makeSet('Snorlax', 'Snorlax', ['Protect'])],

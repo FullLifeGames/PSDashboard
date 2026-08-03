@@ -945,6 +945,12 @@ test.describe('PS Dashboard', () => {
     // The chat-posted team sheet surfaces in the stats panel as SHEET data.
     await expect(page.locator('.ps-stats-tag', { hasText: 'Light Ball' })).toBeVisible();
     await expect(page.locator('.ps-stats-tag', { hasText: 'Light Ball' })).toContainText('sheet');
+
+    // Doubles turn analysis: no played-tracking, but summary + engine lines.
+    await panel.locator('button', { hasText: 'Analyze turn' }).click();
+    await expect(panel.locator('.ps-eval-analysis')).toBeVisible({ timeout: 120_000 });
+    await expect(panel.locator('.ps-eval-analysis-summary')).toContainText('%');
+    await expect(panel.locator('.ps-eval-analysis')).toContainText('engine:');
   });
 
   test('doubles branch shows slot controls and blocks duplicate simultaneous switches', async ({ page }) => {
