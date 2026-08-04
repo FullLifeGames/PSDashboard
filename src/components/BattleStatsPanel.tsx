@@ -125,7 +125,14 @@ function MetaTag({
       title={field.sourceDetail || sourceLabel(field.source, field.probability)}
     >
       {value}
-      <span style={{ marginLeft: 6, color: sourceAccent(field.source), fontSize: 9, textTransform: 'uppercase' }}>
+      <span
+        style={{
+          marginLeft: 6, color: sourceAccent(field.source), fontSize: 9, textTransform: 'uppercase',
+          // Type-colored pills (Tera) drown the accent — back it with a
+          // dark chip so the source stays readable on any type color.
+          ...(background ? { background: 'rgba(0,0,0,0.45)', padding: '0 3px', borderRadius: 2 } : {}),
+        }}
+      >
         {sourceLabel(field.source, field.probability)}
       </span>
     </span>

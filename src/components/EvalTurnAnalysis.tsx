@@ -16,7 +16,7 @@ function ExplorableLabel({ label, color = '#cde', onClick }: { label: string; co
   return (
     <button
       type="button"
-      className="ps-btn"
+      className="ps-btn ps-eval-inline-btn"
       title="Play this line out in a branch"
       onClick={onClick}
       style={{ padding: '0 4px', fontSize: 10, color, whiteSpace: 'normal', textAlign: 'left' }}

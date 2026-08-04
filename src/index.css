@@ -1279,6 +1279,20 @@ input[type="range"]::-webkit-slider-thumb {
   font-size: 11px;
   padding: 3px 6px;
 }
+/* Engine lines speak in the panel's muted dark-theme palette — the standard
+   blue button gradient drowns it. Dark chip styling keeps it readable. */
+button.ps-eval-choice,
+.ps-eval-report-moment,
+.ps-eval-inline-btn {
+  background: rgba(0, 0, 0, 0.28);
+  border: 1px solid rgba(190, 222, 255, 0.18);
+  font-weight: normal;
+}
+button.ps-eval-choice:hover,
+.ps-eval-report-moment:hover,
+.ps-eval-inline-btn:hover {
+  background: rgba(96, 140, 190, 0.3);
+}
 .ps-eval-choice-main {
   display: flex;
   justify-content: space-between;
