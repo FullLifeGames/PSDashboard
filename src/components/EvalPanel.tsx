@@ -17,7 +17,7 @@ interface EvalPanelProps {
   onPrefsChange: (prefs: EvalPreferences) => void;
   onEvaluate: () => void;
   onCancel: () => void;
-  /** Present only in branch mode — enables click-to-prefill. */
+  /** Click on an engine line: prefills it in the branch (entering one first when needed). */
   onPickChoice?: (side: 'p1' | 'p2', choice: RankedChoice) => void;
   /** Branch mode: hides the auto checkbox on the replay view. */
   showAuto: boolean;
@@ -69,7 +69,7 @@ function ChoiceList({
             key={choice.choice}
             type="button"
             className="ps-btn ps-eval-choice"
-            title="Use this choice in the branch"
+            title="Play this choice out in a branch"
             onClick={() => onPickChoice(side, choice)}
           >
             {detail}
@@ -253,7 +253,7 @@ export function EvalPanel({
             </div>
           )}
           {report && <EvalGameReport report={report} playerNames={playerNames} onSelectTurn={onSelectTurn} />}
-          {analysis && <EvalTurnAnalysis analysis={analysis} playerNames={playerNames} />}
+          {analysis && <EvalTurnAnalysis analysis={analysis} playerNames={playerNames} onExplore={onPickChoice} />}
         </div>
       )}
 

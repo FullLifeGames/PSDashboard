@@ -4,11 +4,13 @@ import {
   choiceId,
   conflictingSwitchTargets,
   describeSlotChoice,
+  evalChoiceToSlotChoices,
   requiredChoicesForActiveSlots,
   switchChoiceKey,
   switchOptionKey,
   type BranchSlotChoice,
 } from '../src/lib/branch-choices';
+import type { BranchMoveOption, BranchSwitchOption, BranchTargetOption } from '../src/lib/branch-engine';
 
 function switchTo(species: string, name = species): BranchSlotChoice {
   return { kind: 'switch', speciesId: choiceId(species), pokemonName: name };
@@ -58,5 +60,43 @@ test.describe('branch choice helpers', () => {
     expect(describeSlotChoice(moveBy('Flamethrower', -2))).toBe('move Flamethrower -2');
     expect(describeSlotChoice(switchTo('Skarmory'))).toBe('switch Skarmory');
     expect(describeSlotChoice(null)).toBe('');
+  });
+});
+
+test.describe('engine choice → branch slot choices', () => {
+  const target = (targetLoc: number): BranchTargetOption =>
+    ({ label: `${targetLoc}`, targetLoc, side: 'p2', activeSlot: 0, name: 'Foe', species: 'Foe', hpPercent: 100 });
+  const move = (name: string, activeSlot: number, slot: number, targets: number[] = []): BranchMoveOption => ({
+    name, activeSlot, slot, pp: 16, maxpp: 16, disabled: false, type: 'Normal', targetType: 'normal',
+    requiresTarget: targets.length > 0, targetOptions: targets.map(target),
+  });
+  const bench = (name: string, slot: number): BranchSwitchOption =>
+    ({ name, species: name, activeSlot: 0, slot, hp: '100/100', hpPercent: 100, fainted: false });
+
+  test('a singles move with a gimmick maps onto one slot', () => {
+    const choices = evalChoiceToSlotChoices('move bugbite terastallize', [[move('Bug Bite', 0, 1)]], [[]]);
+    expect(choices).toEqual([
+      { kind: 'move', moveId: 'bugbite', moveName: 'Bug Bite', modifier: 'terastallize' },
+    ]);
+  });
+
+  test('a doubles combined choice maps per slot with targets, mega, and switches', () => {
+    const choices = evalChoiceToSlotChoices(
+      'move bugbite 1 mega, switch 3',
+      [[move('Bug Bite', 0, 1, [1, 2])], []],
+      [[], [bench('Amoonguss', 3)]],
+    );
+    expect(choices).toEqual([
+      { kind: 'move', moveId: 'bugbite', moveName: 'Bug Bite', targetLoc: 1, modifier: 'mega' },
+      { kind: 'switch', speciesId: 'amoonguss', pokemonName: 'Amoonguss' },
+    ]);
+  });
+
+  test('a pass slot stays empty and an unresolvable part rejects the whole pick', () => {
+    expect(evalChoiceToSlotChoices('pass, move protect', [[], [move('Protect', 1, 1)]], [[], []]))
+      .toEqual([null, { kind: 'move', moveId: 'protect', moveName: 'Protect' }]);
+    // The move exists but the named switch target does not — no partial prefill.
+    expect(evalChoiceToSlotChoices('move protect, switch 5', [[move('Protect', 0, 1)], []], [[], [bench('Amoonguss', 3)]]))
+      .toBeNull();
   });
 });

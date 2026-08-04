@@ -215,6 +215,34 @@ test.describe('PS Dashboard', () => {
     await expect(panel.getByText(/worst vs/).first()).toBeVisible();
   });
 
+  test('clicking an engine choice from the replay view branches with it prefilled', async ({ page }) => {
+    test.setTimeout(240_000);
+    await page.evaluate(() => {
+      localStorage.setItem('ps-replay-interceptor:eval-pool', '2');
+      localStorage.setItem('ps-replay-interceptor:eval-prefs',
+        JSON.stringify({ depth: 1, samples: 1, auto: false, tera: 'auto' }));
+    });
+    await page.reload();
+    await page.locator('button', { hasText: 'Load' }).click();
+    await expect(page.getByText('TestPlayer1', { exact: true }).first()).toBeVisible({ timeout: 10000 });
+
+    const panel = page.locator('.ps-main-right .ps-eval-panel');
+    await panel.locator('button', { hasText: 'Evaluate' }).click();
+    await expect(panel.locator('.ps-eval-bar')).toBeVisible({ timeout: 120_000 });
+
+    // Clicking p1's top engine line enters a branch at this turn…
+    await panel.locator('.ps-eval-column').first().locator('button.ps-eval-choice').first().click();
+    await expect(page.getByText(/Branching.*Turn/)).toBeVisible({ timeout: 60_000 });
+
+    // …with that line already selected: choosing only p2's reply arms the turn.
+    const p2Moves = page.locator('.ps-movegrid').nth(1).locator('.ps-movebtn');
+    await expect(p2Moves.first()).toBeVisible({ timeout: 5000 });
+    await p2Moves.first().click();
+    const execBtn = page.locator('button', { hasText: 'Execute Turn' });
+    await expect(execBtn).toBeVisible({ timeout: 5000 });
+    await expect(execBtn).toBeEnabled();
+  });
+
   test('evaluates a position with the MCTS mode', async ({ page }) => {
     test.setTimeout(180_000);
     await page.evaluate(() => {

@@ -1,10 +1,29 @@
 import { REGRET_THRESHOLD, diffChoices, playedSetupMove, type SideAnalysis, type TurnAnalysis } from '../lib/eval/analysis';
+import type { RankedChoice } from '../lib/eval/types';
 import { summarizeTurn } from '../lib/eval/summary';
 import { attributionBadge } from './eval-badges';
 
 interface EvalTurnAnalysisProps {
   analysis: TurnAnalysis;
   playerNames: [string, string];
+  /** Click on an engine line: play it out in a branch at this turn. */
+  onExplore?: (side: 'p1' | 'p2', choice: RankedChoice) => void;
+}
+
+/** The engine's line as a click-to-explore button, or a plain span. */
+function ExplorableLabel({ label, onClick }: { label: string; onClick?: () => void }) {
+  if (!onClick) return <span style={{ color: '#cde' }}>{label}</span>;
+  return (
+    <button
+      type="button"
+      className="ps-btn"
+      title="Play this line out in a branch"
+      onClick={onClick}
+      style={{ padding: '0 4px', fontSize: 10, color: '#cde' }}
+    >
+      {label} ↗
+    </button>
+  );
 }
 
 const signed = (value: number) => `${value >= 0 ? '+' : ''}${value.toFixed(2)}`;
@@ -34,24 +53,25 @@ function MiniBar({ value }: { value: number }) {
 }
 
 /** Untracked (doubles): only the engine's preferred line — no played/blame. */
-function EngineRow({ name, side }: { name: string; side: SideAnalysis }) {
+function EngineRow({ name, side, onExplore }: { name: string; side: SideAnalysis; onExplore?: (choice: RankedChoice) => void }) {
   if (!side.best) return null;
+  const best = side.best;
   return (
     <div className="ps-eval-analysis-side">
       <div className="ps-eval-analysis-row">
         <span style={{ color: '#cde', fontWeight: 'bold' }}>{name}</span>
         <span style={{ color: '#aab' }}>
-          engine: <span style={{ color: '#cde' }}>{side.best.label}</span> ({signed(side.best.worstCase)})
+          engine: <ExplorableLabel label={best.label} onClick={onExplore && (() => onExplore(best))} /> ({signed(best.worstCase)})
         </span>
-        {side.best.line && side.best.line.length > 0 && (
-          <span className="ps-eval-line">then {side.best.line.map(step => `${step.p1} · ${step.p2}`).join(' → ')}</span>
+        {best.line && best.line.length > 0 && (
+          <span className="ps-eval-line">then {best.line.map(step => `${step.p1} · ${step.p2}`).join(' → ')}</span>
         )}
       </div>
     </div>
   );
 }
 
-function SideRow({ name, side }: { name: string; side: SideAnalysis }) {
+function SideRow({ name, side, onExplore }: { name: string; side: SideAnalysis; onExplore?: (choice: RankedChoice) => void }) {
   const playedRawName = side.playedRaw?.kind === 'switch'
     ? `→ ${side.playedRaw.species ?? side.playedRaw.name}`
     : side.playedRaw?.name;
@@ -104,7 +124,10 @@ function SideRow({ name, side }: { name: string; side: SideAnalysis }) {
           <div className="ps-eval-analysis-row" style={{ color: '#aab' }}>
             <MiniBar value={side.best.worstCase} />
             <span style={{ whiteSpace: 'nowrap' }}>{signed(side.best.worstCase)} better:</span>
-            <span style={{ color: '#cde' }}>{side.best.label}</span>
+            <ExplorableLabel
+              label={side.best.label}
+              onClick={onExplore && (() => onExplore(side.best!))}
+            />
             {side.best.punishedBy && <span style={{ color: '#778' }}>· worst vs {side.best.punishedBy}</span>}
             {side.best.line && side.best.line.length > 0 && (
               <span className="ps-eval-line">then {side.best.line.map(step => `${step.p1} · ${step.p2}`).join(' → ')}</span>
@@ -123,8 +146,10 @@ function SideRow({ name, side }: { name: string; side: SideAnalysis }) {
 }
 
 /** Chess-style explanation of one analyzed turn: played vs best, and why the score moved. */
-export function EvalTurnAnalysis({ analysis, playerNames }: EvalTurnAnalysisProps) {
+export function EvalTurnAnalysis({ analysis, playerNames, onExplore }: EvalTurnAnalysisProps) {
   const badge = attributionBadge(analysis, playerNames);
+  const exploreFor = (side: 'p1' | 'p2') =>
+    onExplore && ((choice: RankedChoice) => onExplore(side, choice));
   return (
     <div className="ps-eval-analysis">
       <div className="ps-eval-analysis-row">
@@ -142,13 +167,13 @@ export function EvalTurnAnalysis({ analysis, playerNames }: EvalTurnAnalysisProp
       )}
       {analysis.playedTracking === false ? (
         <>
-          <EngineRow name={playerNames[0]} side={analysis.p1} />
-          <EngineRow name={playerNames[1]} side={analysis.p2} />
+          <EngineRow name={playerNames[0]} side={analysis.p1} onExplore={exploreFor('p1')} />
+          <EngineRow name={playerNames[1]} side={analysis.p2} onExplore={exploreFor('p2')} />
         </>
       ) : (
         <>
-          <SideRow name={playerNames[0]} side={analysis.p1} />
-          <SideRow name={playerNames[1]} side={analysis.p2} />
+          <SideRow name={playerNames[0]} side={analysis.p1} onExplore={exploreFor('p1')} />
+          <SideRow name={playerNames[1]} side={analysis.p2} onExplore={exploreFor('p2')} />
         </>
       )}
     </div>

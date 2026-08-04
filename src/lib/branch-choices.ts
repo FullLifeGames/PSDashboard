@@ -157,6 +157,44 @@ function resolveCustomSwitch(
   };
 }
 
+const EVAL_MODIFIERS = ['terastallize', 'mega', 'ultra'] as const;
+
+/**
+ * Maps an engine choice string (possibly a doubles combined choice like
+ * "move bugbite 1 mega, switch 3") onto per-slot branch choices, validated
+ * against each slot's live options. Null when any part fails to resolve —
+ * a partial prefill would silently misrepresent the engine's line. A null
+ * entry inside the array is a "pass" slot (nothing to choose there).
+ */
+export function evalChoiceToSlotChoices(
+  evalChoice: string,
+  movesBySlot: BranchMoveOption[][],
+  switchesBySlot: BranchSwitchOption[][],
+): (BranchSlotChoice | null)[] | null {
+  const parts = evalChoice.split(',').map(part => part.trim());
+  const choices: (BranchSlotChoice | null)[] = [];
+  for (let slot = 0; slot < parts.length; slot++) {
+    const tokens = parts[slot].split(' ');
+    if (tokens[0] === 'pass') {
+      choices.push(null);
+      continue;
+    }
+    if (tokens[0] === 'switch') {
+      const resolved = resolveCustomSwitch(tokens[1], switchesBySlot[slot] ?? []);
+      if (!resolved.ok) return null;
+      choices.push(resolved.choice);
+      continue;
+    }
+    if (tokens[0] !== 'move') return null;
+    const modifier = EVAL_MODIFIERS.find(candidate => tokens.includes(candidate));
+    const locToken = tokens.slice(2).find(token => /^-?\d+$/.test(token));
+    const resolved = resolveCustomMove(tokens[1], locToken, movesBySlot[slot] ?? []);
+    if (!resolved.ok || resolved.choice.kind !== 'move') return null;
+    choices.push(modifier ? { ...resolved.choice, modifier } : resolved.choice);
+  }
+  return choices;
+}
+
 /**
  * Validates a free-text choice against the current request before it is ever
  * stored, so invalid input can never reach the simulator (B8).

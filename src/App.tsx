@@ -24,7 +24,7 @@ import { applyPastedTeam, countMatchingSpecies, parsePastedTeam, type PastedSet 
 import type { OpponentTeamInfo } from './types';
 import { decodeBranchShare, type BranchSharePayload } from './lib/branch-share';
 import { getBranchSimulatorFormat, getReplayGameType, getReplayGeneration } from './lib/replay-format';
-import { choiceId, type BranchSlotChoice } from './lib/branch-choices';
+import { choiceId, evalChoiceToSlotChoices, type BranchSlotChoice } from './lib/branch-choices';
 import type { RankedChoice } from './lib/eval/types';
 import { parsePlayedActions, parsePlayedActionsDoubles } from './lib/eval/played';
 import { analyzeTurn } from './lib/eval/analysis';
@@ -538,29 +538,39 @@ function App() {
   // Clicking a recommended choice pre-fills the branch pickers.
   const handlePickEvalChoice = useCallback((side: 'p1' | 'p2', ranked: RankedChoice) => {
     if (!simState) return;
-    const parts = ranked.choice.split(' ');
-    if (parts[0] === 'move') {
-      const moves = side === 'p1' ? simState.p1MovesBySlot[0] : simState.p2MovesBySlot[0];
-      const option = (moves ?? []).find(move => choiceId(move.name) === parts[1]);
-      if (!option) return;
-      const modifier = parts[2] === 'terastallize' ? 'terastallize' as const
-        : parts[2] === 'mega' ? 'mega' as const
-          : parts[2] === 'ultra' ? 'ultra' as const
-            : undefined;
-      handleSetChoice(side, {
-        kind: 'move',
-        moveId: choiceId(option.name),
-        moveName: option.name,
-        ...(modifier ? { modifier } : {}),
-      });
-    } else if (parts[0] === 'switch') {
-      const slot = parseInt(parts[1], 10);
-      const switches = side === 'p1' ? simState.p1SwitchesBySlot[0] : simState.p2SwitchesBySlot[0];
-      const option = (switches ?? []).find(candidate => candidate.slot === slot);
-      if (!option) return;
-      handleSetChoice(side, { kind: 'switch', speciesId: choiceId(option.species), pokemonName: option.name });
-    }
+    const movesBySlot = side === 'p1' ? simState.p1MovesBySlot : simState.p2MovesBySlot;
+    const switchesBySlot = side === 'p1' ? simState.p1SwitchesBySlot : simState.p2SwitchesBySlot;
+    const slotChoices = evalChoiceToSlotChoices(ranked.choice, movesBySlot, switchesBySlot);
+    if (!slotChoices) return;
+    slotChoices.forEach((choice, activeSlot) => {
+      if (choice) handleSetChoice(side, choice, slotChoices.length > 1 ? activeSlot : undefined);
+    });
   }, [simState, handleSetChoice]);
+
+  // "How would the game have turned out?" — clicking an engine line in the
+  // replay view branches at the shown turn with that line prefilled; the
+  // pick applies once the branch runtime is up.
+  const [pendingEvalPick, setPendingEvalPick] = useState<{ side: 'p1' | 'p2'; ranked: RankedChoice } | null>(null);
+
+  const handleExploreChoice = useCallback((side: 'p1' | 'p2', ranked: RankedChoice) => {
+    if (branching) {
+      handlePickEvalChoice(side, ranked);
+      return;
+    }
+    setPendingEvalPick({ side, ranked });
+    void handleBranch();
+  }, [branching, handlePickEvalChoice, handleBranch]);
+
+  useEffect(() => {
+    if (!pendingEvalPick) return;
+    if (branching && simState) {
+      handlePickEvalChoice(pendingEvalPick.side, pendingEvalPick.ranked);
+      setPendingEvalPick(null);
+    } else if (!branching && !branchPreparing) {
+      // Branch entry failed or was cancelled — drop the stale pick.
+      setPendingEvalPick(null);
+    }
+  }, [pendingEvalPick, branching, simState, branchPreparing, handlePickEvalChoice]);
 
   const analyzableTurns = endSnapshotTurn !== null ? Math.max(1, endSnapshotTurn - 1) : maxTurn;
 
@@ -1124,7 +1134,7 @@ function App() {
                 onPrefsChange={evaluation.setPrefs}
                 onEvaluate={handleEvaluate}
                 onCancel={evaluation.cancel}
-                onPickChoice={branching && !evalIsDoubles ? handlePickEvalChoice : undefined}
+                onPickChoice={handleExploreChoice}
                 showAuto={branching}
                 showTera={replayGen === 9}
                 graph={evaluation.graph}
