@@ -290,8 +290,10 @@ export function EvalPanel({
             )}
           </div>
           <div className="ps-eval-columns">
-            <ChoiceList side="p1" choices={result.perSide.p1} reply={result.perSide.p2[0] ?? null} onPickChoice={onPickChoice} />
-            <ChoiceList side="p2" choices={result.perSide.p2} reply={result.perSide.p1[0] ?? null} onPickChoice={onPickChoice} />
+            {/* Stale results describe the PREVIOUS position — clicking them
+                would map old choices onto the new state (wrong switches). */}
+            <ChoiceList side="p1" choices={result.perSide.p1} reply={result.perSide.p2[0] ?? null} onPickChoice={status === 'stale' ? undefined : onPickChoice} />
+            <ChoiceList side="p2" choices={result.perSide.p2} reply={result.perSide.p1[0] ?? null} onPickChoice={status === 'stale' ? undefined : onPickChoice} />
           </div>
         </div>
       )}

@@ -92,6 +92,22 @@ test.describe('engine choice → branch slot choices', () => {
     ]);
   });
 
+  test('switch parts resolve by the label species, surviving bench-order divergence', () => {
+    // The engine's "switch 3" indexes ITS battle's bench; here the branch
+    // holds Amoonguss at slot 5 — the label species must win over the slot.
+    expect(evalChoiceToSlotChoices(
+      'move protect, switch 3',
+      [[move('Protect', 0, 1)], []],
+      [[], [bench('Amoonguss', 5)]],
+      'Protect + → Amoonguss',
+    )).toEqual([
+      { kind: 'move', moveId: 'protect', moveName: 'Protect' },
+      { kind: 'switch', speciesId: 'amoonguss', pokemonName: 'Amoonguss' },
+    ]);
+    // Without a label the slot number remains the only key.
+    expect(evalChoiceToSlotChoices('switch 3', [[]], [[bench('Amoonguss', 5)]])).toBeNull();
+  });
+
   test('a pass slot stays empty and an unresolvable part rejects the whole pick', () => {
     expect(evalChoiceToSlotChoices('pass, move protect', [[], [move('Protect', 1, 1)]], [[], []]))
       .toEqual([null, { kind: 'move', moveId: 'protect', moveName: 'Protect' }]);

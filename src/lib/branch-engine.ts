@@ -1433,10 +1433,10 @@ function resolveMoveSlotChoice(
     move.id === choice.moveId || toId(move.move) === choice.moveId
   );
   if (requestIndex < 0) {
-    return { ok: false, error: `${active.name} no longer knows ${choice.moveName}.` };
+    return { ok: false, error: `${describePokemon(active)} no longer knows ${choice.moveName}.` };
   }
   if (requestMoves[requestIndex].disabled) {
-    return { ok: false, error: `${choice.moveName} is disabled for ${active.name} right now.` };
+    return { ok: false, error: `${choice.moveName} is disabled for ${describePokemon(active)} right now.` };
   }
 
   const suffix = targetLocSuffixForChoice(battle, active, choice.moveName, choice.targetLoc ?? 0);
@@ -1466,7 +1466,34 @@ function resolveSwitchSlotChoice(
   }
 
   if (speciesMatch >= 0) return { ok: true, command: `switch ${speciesMatch + 1}` };
-  return { ok: false, error: `${choice.pokemonName} is no longer available to switch in.` };
+  const named = bench.find(pokemon => toId(pokemon.name || '') === nameId);
+  return { ok: false, error: `${named ? describePokemon(named) : choice.pokemonName} is no longer available to switch in.` };
+}
+
+/** "Sludge Shadow (Muk-Alola)" — draft nicknames alone explain nothing. */
+function describePokemon(pokemon: SimPokemon): string {
+  const species = pokemon.species?.name || '';
+  if (!species || toId(pokemon.name || '') === toId(species)) return pokemon.name || species;
+  return `${pokemon.name} (${species})`;
+}
+
+/**
+ * Simulator error messages speak in nicknames — append the species after
+ * every nicknamed Pokémon mentioned so the message stays decodable.
+ */
+export function annotateNicknames(message: string, battle: SimBattle | null | undefined): string {
+  if (!battle) return message;
+  let annotated = message;
+  const nicknamed = battle.sides
+    .flatMap(side => side.pokemon)
+    .filter(pokemon => pokemon.name && pokemon.species?.name && toId(pokemon.name) !== toId(pokemon.species.name))
+    .sort((a, b) => b.name.length - a.name.length);
+  for (const pokemon of nicknamed) {
+    if (annotated.includes(pokemon.name) && !annotated.includes(`${pokemon.name} (`)) {
+      annotated = annotated.split(pokemon.name).join(`${pokemon.name} (${pokemon.species.name})`);
+    }
+  }
+  return annotated;
 }
 
 /**

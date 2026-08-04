@@ -540,7 +540,7 @@ function App() {
     if (!simState) return false;
     const movesBySlot = side === 'p1' ? simState.p1MovesBySlot : simState.p2MovesBySlot;
     const switchesBySlot = side === 'p1' ? simState.p1SwitchesBySlot : simState.p2SwitchesBySlot;
-    const slotChoices = evalChoiceToSlotChoices(ranked.choice, movesBySlot, switchesBySlot);
+    const slotChoices = evalChoiceToSlotChoices(ranked.choice, movesBySlot, switchesBySlot, ranked.label);
     if (!slotChoices) return false;
     let applied = false;
     slotChoices.forEach((choice, activeSlot) => {

@@ -88,6 +88,26 @@ test.describe('game report (multi-turn root cause)', () => {
     expect(report.summary).toContain('turn 2');
   });
 
+  test('lists the biggest misplays across both sides, in turn order', () => {
+    const misplay = (played: string, better: string, regret: number) => ({
+      playedRaw: null,
+      played: ranked(`move ${played.toLowerCase()}`, played, -0.2),
+      best: ranked(`move ${better.toLowerCase()}`, better, 0.1),
+      regret,
+    });
+    const report = buildGameReport([
+      mk(1, 0.1, 0.0, { p1: misplay('Tackle', 'Surf', 0.18) }),
+      mk(2, 0.0, -0.2, { p2: misplay('Growl', 'Protect', 0.4) }),
+      mk(3, -0.2, -0.3, { p1: misplay('Splash', 'Toxic', 0.3), p2: misplay('Leer', 'Recover', 0.2) }),
+      // Below the regret threshold — never listed.
+      mk(4, -0.3, -0.35, { p1: misplay('Peck', 'Fly', 0.1) }),
+      mk(5, -0.35, -0.5, { p2: misplay('Bite', 'Crunch', 0.25) }),
+    ], names, 'p2');
+    // Five qualify; the cap keeps the four biggest regrets (turn 1's 0.18 drops).
+    expect(report.misplays.map(entry => `${entry.turn}${entry.side}`)).toEqual(['2p2', '3p1', '3p2', '5p2']);
+    expect(report.misplays[0]).toEqual({ turn: 2, side: 'p2', regret: 0.4, played: 'Growl', better: 'Protect' });
+  });
+
   test('a clean loss is called out as matchup/variance, not blunders', () => {
     const report = buildGameReport([
       mk(1, -0.2, -0.4),

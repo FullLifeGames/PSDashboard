@@ -11,15 +11,15 @@ interface EvalTurnAnalysisProps {
 }
 
 /** The engine's line as a click-to-explore button, or a plain span. */
-function ExplorableLabel({ label, onClick }: { label: string; onClick?: () => void }) {
-  if (!onClick) return <span style={{ color: '#cde' }}>{label}</span>;
+function ExplorableLabel({ label, color = '#cde', onClick }: { label: string; color?: string; onClick?: () => void }) {
+  if (!onClick) return <span style={{ color }}>{label}</span>;
   return (
     <button
       type="button"
       className="ps-btn"
       title="Play this line out in a branch"
       onClick={onClick}
-      style={{ padding: '0 4px', fontSize: 10, color: '#cde', whiteSpace: 'normal', textAlign: 'left' }}
+      style={{ padding: '0 4px', fontSize: 10, color, whiteSpace: 'normal', textAlign: 'left' }}
     >
       {label} ↗
     </button>
@@ -96,11 +96,16 @@ function SideRow({ name, side, onExplore }: { name: string; side: SideAnalysis; 
         <span style={{ color: '#cde', fontWeight: 'bold' }}>{name}</span>
         <span style={{ color: '#aab' }}>played {playedText}</span>
         {side.played && side.best && !regretful && side.played.choice === side.best.choice && (
-          <span style={{ color: '#8c8' }}>✓ the engine's move</span>
+          <ExplorableLabel
+            label="✓ the engine's move"
+            color="#8c8"
+            onClick={onExplore && (() => onExplore(side.best!))}
+          />
         )}
         {side.played && side.best && !regretful && side.played.choice !== side.best.choice && (
           <span style={{ color: '#778' }}>
-            engine: {side.best.label} ({signed(side.best.worstCase)})
+            engine: <ExplorableLabel label={side.best.label} color="#778" onClick={onExplore && (() => onExplore(side.best!))} />
+            {' '}({signed(side.best.worstCase)})
           </span>
         )}
         {regretful && side.regret !== null && (setupMove ? (

@@ -247,7 +247,7 @@ export function useBranch() {
       });
 
       if (!result.ok) {
-        setExecuteError(result.error);
+        setExecuteError(branchEngine.annotateNicknames(result.error, battle));
         return;
       }
 
@@ -296,7 +296,7 @@ export function useBranch() {
       });
 
       if (!result.ok) {
-        setExecuteError(result.error);
+        setExecuteError(branchEngine.annotateNicknames(result.error, battleStream.battle));
         return;
       }
 

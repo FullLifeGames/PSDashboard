@@ -79,7 +79,7 @@ export function playedSetupMove(side: SideAnalysis): string | null {
 }
 
 /** "Tera + X" labels contain the slot separator — re-merge after splitting. */
-const splitCombinedLabel = (label: string): string[] => {
+export const splitCombinedLabel = (label: string): string[] => {
   const segments = label.split(' + ');
   const parts: string[] = [];
   for (let index = 0; index < segments.length; index++) {

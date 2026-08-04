@@ -1,4 +1,5 @@
 import type { BranchMoveOption, BranchSwitchOption } from './branch-engine';
+import { splitCombinedLabel } from './eval/analysis';
 
 export interface BranchChoiceActive {
   fainted: boolean;
@@ -165,13 +166,19 @@ const EVAL_MODIFIERS = ['terastallize', 'mega', 'ultra'] as const;
  * against each slot's live options. Null when any part fails to resolve —
  * a partial prefill would silently misrepresent the engine's line. A null
  * entry inside the array is a "pass" slot (nothing to choose there).
+ *
+ * Switch parts resolve by the label's species ("→ Muk-Alola") when the
+ * label is provided — the engine's slot numbers index ITS battle's bench,
+ * which is not guaranteed to share the branch reconstruction's order.
  */
 export function evalChoiceToSlotChoices(
   evalChoice: string,
   movesBySlot: BranchMoveOption[][],
   switchesBySlot: BranchSwitchOption[][],
+  label?: string,
 ): (BranchSlotChoice | null)[] | null {
   const parts = evalChoice.split(',').map(part => part.trim());
+  const labelParts = label ? splitCombinedLabel(label) : [];
   const choices: (BranchSlotChoice | null)[] = [];
   for (let slot = 0; slot < parts.length; slot++) {
     const tokens = parts[slot].split(' ');
@@ -180,7 +187,8 @@ export function evalChoiceToSlotChoices(
       continue;
     }
     if (tokens[0] === 'switch') {
-      const resolved = resolveCustomSwitch(tokens[1], switchesBySlot[slot] ?? []);
+      const species = labelParts[slot]?.startsWith('→ ') ? labelParts[slot].slice(2) : null;
+      const resolved = resolveCustomSwitch(species ?? tokens[1], switchesBySlot[slot] ?? []);
       if (!resolved.ok) return null;
       choices.push(resolved.choice);
       continue;

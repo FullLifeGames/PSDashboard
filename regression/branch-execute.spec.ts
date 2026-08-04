@@ -1,6 +1,8 @@
 import { test, expect } from '@playwright/test';
+import { Battle, Teams, toID } from '@pkmn/sim';
 import type { PokemonSet } from '@pkmn/sim';
 import {
+  annotateNicknames,
   reconstructBranchRuntime,
   executeBranchChoices,
   type BranchMoveOption,
@@ -247,5 +249,26 @@ test.describe('resolveCustomChoice', () => {
     const garbage = resolveCustomChoice('attack now', moves, switches);
     expect(garbage.ok).toBe(false);
     if (!garbage.ok) expect(garbage.error).toContain('Supported');
+  });
+});
+
+test.describe('error message nickname annotation', () => {
+  test('annotates nicknames with species in simulator error messages', () => {
+    const battle = new Battle({
+      formatid: toID('gen9customgame'),
+      seed: '1,2,3,4',
+      p1: { name: 'Alpha', team: Teams.pack([{ ...p1Team[0], name: 'Sludge Shadow', species: 'Muk-Alola' }]) },
+      p2: { name: 'Beta', team: Teams.pack([p2Team[0]]) },
+    });
+    if (battle.sides.some(side => side.requestState === 'teampreview')) {
+      battle.choose('p1', 'team 1');
+      battle.choose('p2', 'team 1');
+    }
+    expect(annotateNicknames("Can't switch: Sludge Shadow is already in.", battle))
+      .toBe("Can't switch: Sludge Shadow (Muk-Alola) is already in.");
+    // Non-nicknamed Pokémon and already-annotated messages pass through.
+    expect(annotateNicknames('Bulbasaur is trapped.', battle)).toBe('Bulbasaur is trapped.');
+    expect(annotateNicknames('Sludge Shadow (Muk-Alola) fainted.', battle))
+      .toBe('Sludge Shadow (Muk-Alola) fainted.');
   });
 });

@@ -11,8 +11,19 @@ import { labelPhrase, signedValue } from './summary';
 export const KEY_MOMENT_SWING = 0.25;
 /** How many key moments the report keeps. */
 export const REPORT_KEY_MOMENTS = 4;
+/** How many misplays the report lists. */
+export const REPORT_MISPLAYS = 4;
 /** Below this summed regret a player's game counts as clean. */
 export const CLEAN_PLAY_TOTAL = 0.2;
+
+/** One regretted decision, ready for display. */
+export interface GameMisplay {
+  turn: number;
+  side: 'p1' | 'p2';
+  regret: number;
+  played: string;
+  better: string;
+}
 
 export interface GameReport {
   winner: 'p1' | 'p2' | null;
@@ -20,6 +31,8 @@ export interface GameReport {
   turningPoint: number | null;
   /** The biggest non-quiet swings, in turn order. */
   keyMoments: TurnAnalysis[];
+  /** The biggest regrets across the game, either side, in turn order. */
+  misplays: GameMisplay[];
   /** Summed regret per player across the analyzed game. */
   decisionTotals: { p1: number; p2: number };
   /** Net chance contribution across the game (p1 perspective). */
@@ -72,6 +85,20 @@ export function buildGameReport(
     .slice(0, REPORT_KEY_MOMENTS)
     .sort((a, b) => a.turn - b.turn);
 
+  const misplays: GameMisplay[] = !playedTracking ? [] : known
+    .flatMap(analysis => (['p1', 'p2'] as const)
+      .filter(side => (analysis[side].regret ?? 0) >= REGRET_THRESHOLD && analysis[side].played && analysis[side].best)
+      .map(side => ({
+        turn: analysis.turn,
+        side,
+        regret: analysis[side].regret ?? 0,
+        played: analysis[side].played!.label,
+        better: analysis[side].best!.label,
+      })))
+    .sort((a, b) => b.regret - a.regret)
+    .slice(0, REPORT_MISPLAYS)
+    .sort((a, b) => a.turn - b.turn || a.side.localeCompare(b.side));
+
   const decisionTotals = {
     p1: known.reduce((sum, analysis) => sum + (analysis.p1.regret ?? 0), 0),
     p2: known.reduce((sum, analysis) => sum + (analysis.p2.regret ?? 0), 0),
@@ -114,5 +141,5 @@ export function buildGameReport(
     sentences.push(`Luck ran ${chanceTotal > 0 ? 'for' : 'against'} ${playerNames[0]} overall (${signedValue(chanceTotal)}).`);
   }
 
-  return { winner, turningPoint, keyMoments, decisionTotals, chanceTotal, summary: sentences.join(' ') };
+  return { winner, turningPoint, keyMoments, misplays, decisionTotals, chanceTotal, summary: sentences.join(' ') };
 }
