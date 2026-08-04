@@ -142,7 +142,11 @@ function SideRow({ name, side, onExplore }: { name: string; side: SideAnalysis; 
           </div>
           <div className="ps-eval-analysis-row" style={{ color: '#aab' }}>
             <MiniBar value={side.best.worstCase} />
-            <span style={{ whiteSpace: 'nowrap' }}>{signed(side.best.worstCase)} better:</span>
+            {/* For a read, the engine's line is merely "safe" — calling it
+                "better" would credit passivity the read outperformed. */}
+            <span style={{ whiteSpace: 'nowrap' }}>
+              {signed(side.best.worstCase)} {side.riskUnpunished || side.riskPaidOff ? 'safe:' : 'better:'}
+            </span>
             <ExplorableLabel
               label={side.best.label}
               onClick={onExplore && (() => onExplore(side.best!))}

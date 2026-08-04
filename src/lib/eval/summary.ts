@@ -40,17 +40,24 @@ function mistakeClause(name: string, side: SideAnalysis, opponent: SideAnalysis)
   const line = side.best.line && side.best.line.length > 0
     ? `, then ${side.best.line.map(step => `${step.p1} · ${step.p2}`).join(' → ')}`
     : '';
-  const risk = side.riskUnpunished && side.played.punishedBy && opponent.played
-    ? ` The floor priced in ${side.played.punishedBy}; ${phrase(opponent.played.label)} came instead — the read went unpunished.`
-    : '';
   const difference = diffChoices(side.played, side.best);
   const why = difference ? ` The difference: ${difference}.` : '';
   const setup = playedSetupMove(side);
   const caveat = setup
     ? ` (${setup} is a setup move — its payoff lies past the search horizon, so the regret may be overstated.)`
     : '';
+  if (side.riskUnpunished) {
+    // An unpunished read gets neutral framing: the engine's line is "safe",
+    // not "better" — maximin's guarantee always merely holds the current
+    // assessment, and holding is no achievement.
+    const came = side.played.punishedBy && opponent.played
+      ? `its floor risked ${side.played.punishedBy} (${signed(side.played.worstCase)}); ${phrase(opponent.played.label)} came instead`
+      : `its floor sat at ${signed(side.played.worstCase)}`;
+    return `${name} played ${phrase(side.played.label)} — a read: ${came}. ` +
+      `The engine's safe line was ${phrase(side.best.label)} (${signed(side.best.worstCase)})${line}.${why}${caveat}`;
+  }
   return `${name} played ${phrase(side.played.label)} (${signed(side.played.worstCase)}); ` +
-    `safer was ${phrase(side.best.label)} (${signed(side.best.worstCase)})${line}.${risk}${why}${caveat}`;
+    `safer was ${phrase(side.best.label)} (${signed(side.best.worstCase)})${line}.${why}${caveat}`;
 }
 
 export function summarizeTurn(analysis: TurnAnalysis, playerNames: [string, string]): string {

@@ -43,8 +43,28 @@ test.describe('natural-language turn summaries', () => {
     expect(summary).not.toContain('→');
     expect(summary).not.toContain('setup move');
     // The fixture's punishing reply ("Reply") was never clicked — the
-    // regret reads as an unpunished risk, not a punished misplay.
-    expect(summary).toContain('The floor priced in Reply; Draco Meteor came instead — the read went unpunished.');
+    // regret reads as an unpunished risk with neutral safe-line framing.
+    expect(summary).toContain('a read: its floor risked Reply (−0.30); Draco Meteor came instead.');
+    expect(summary).toContain("The engine's safe line was switching to Dragapult");
+    expect(summary).not.toContain('safer was');
+  });
+
+  test('a punished misplay keeps the reproachful safer-was framing', () => {
+    const punished: EvalResult = {
+      ...result,
+      perSide: { p1: [choice('move reply', 'Reply', 0.2)], p2: result.perSide.p2 },
+    };
+    const summary = summarizeTurn(analyzeTurn({
+      turn: 21,
+      result: punished,
+      played: { p1: { kind: 'move', name: 'Reply', tera: false }, p2: { kind: 'move', name: 'Recover', tera: false } },
+      playedOutcome: -0.2,
+      scoreBefore: 0.1,
+      scoreAfter: -0.25,
+    }), names);
+    expect(summary).toContain('Beta played Recover');
+    expect(summary).toContain('safer was switching to Dragapult');
+    expect(summary).not.toContain('a read');
   });
 
   test('a one-detail difference is condensed into a why clause', () => {
@@ -76,7 +96,7 @@ test.describe('natural-language turn summaries', () => {
       scoreBefore: 0.4,
       scoreAfter: 0.48,
     }), names);
-    expect(summary).toContain('safer was Mega + Bug Bite→Politoed + Close Combat→Politoed');
+    expect(summary).toContain("The engine's safe line was Mega + Bug Bite→Politoed + Close Combat→Politoed");
     expect(summary).toContain('The difference: only the Mega Evolution.');
   });
 
