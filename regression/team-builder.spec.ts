@@ -28,6 +28,46 @@ const baseLog = [
 ].join('\n');
 
 test.describe('team builder edited assumptions', () => {
+  test('a usage-guessed item never overrides the team sheet', () => {
+    // The chat-posted sheet says Choice Scarf; an enriched info carries a
+    // usage GUESS (Leftovers) in value. Sheet must win; a revealed item must
+    // still beat the sheet.
+    const sheetLog = [
+      '|player|p1|Alice|',
+      '|player|p2|Bob|',
+      '|gen|9',
+      '|tier|[Gen 9] Draft',
+      '|poke|p1|Heatran, M|item',
+      '|poke|p2|Kingambit, M|item',
+      '|c| Alice|/raw <div class="infobox"><details><summary>View team</summary>Heatran (M) @ Choice Scarf  <br />Ability: Flash Fire  <br />EVs: 252 SpA &#x2f; 4 SpD &#x2f; 252 Spe  <br />Timid Nature  <br />- Magma Storm  <br />- Earth Power  <br />- Flash Cannon  <br />- Stealth Rock  <br /></details></div>',
+      '|start',
+      '|switch|p1a: Heatran|Heatran, M|100/100',
+      '|switch|p2a: Kingambit|Kingambit, M|100/100',
+      '|turn|1',
+    ].join('\n');
+    const infoWith = (item: { value: string; source: 'guessed' | 'revealed' }): OpponentTeamInfo => ({
+      pokemon: [{
+        species: 'Heatran',
+        moves: [{ name: 'Magma Storm', source: 'revealed' }],
+        ability: { value: '', source: 'unknown' },
+        item: { ...item, probability: 0.58 },
+        teraType: { value: '', source: 'unknown' },
+        evs: { value: { hp: 0, atk: 0, def: 0, spa: 0, spd: 0, spe: 0 }, source: 'unknown' },
+        nature: { value: 'Modest', source: 'guessed' },
+        ivs: { value: { hp: 31, atk: 31, def: 31, spa: 31, spd: 31, spe: 31 }, source: 'unknown' },
+        level: 100,
+        gender: 'M',
+      }],
+    });
+
+    const guessed = buildTeamsFromReplay(sheetLog, { p1Info: infoWith({ value: 'Leftovers', source: 'guessed' }) });
+    expect(guessed.p1Team[0].item).toBe('Choice Scarf');
+    expect(guessed.p1Team[0].nature).toBe('Timid'); // guessed nature loses to the sheet too
+
+    const revealed = buildTeamsFromReplay(sheetLog, { p1Info: infoWith({ value: 'Leftovers', source: 'revealed' }) });
+    expect(revealed.p1Team[0].item).toBe('Leftovers');
+  });
+
   test('manual nature and IVs reach the simulator set', () => {
     const p1Info: OpponentTeamInfo = {
       pokemon: [{

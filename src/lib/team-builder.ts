@@ -4,7 +4,7 @@ import { inferOpponentTeam } from './opponent-inferrer';
 import { getSpeciesUsageSet, type SmogonUsageStats, type UsageProbability } from './smogon-stats';
 import { getSpeciesSetAssumption, type SetAssumption, type SmogonSetAssumptions } from './smogon-sets';
 import { itemSetValue } from './team-info';
-import type { OpponentTeamInfo, PokemonEvs, RevealedPokemonInfo } from '../types';
+import type { KnowledgeSource, OpponentTeamInfo, PokemonEvs, RevealedPokemonInfo } from '../types';
 
 function toId(name: string): string {
   return name.toLowerCase().replace(/[^a-z0-9]/g, '');
@@ -54,10 +54,17 @@ function buildSet(
   const editedEvs = info.evs?.source === 'manual' || info.evs?.source === 'revealed'
     ? sanitizeEvs(info.evs.value)
     : null;
-  const editedNature = info.nature?.value ? (info.nature.value as PokemonSet['nature']) : null;
+  const editedNature = (info.nature?.source === 'manual' || info.nature?.source === 'revealed') && info.nature.value
+    ? (info.nature.value as PokemonSet['nature'])
+    : null;
   const editedIvs = info.ivs?.source === 'manual' || info.ivs?.source === 'revealed'
     ? info.ivs.value
     : null;
+  // Only knowledge that outranks a team sheet: seen in game or user-edited.
+  // Enriched infos carry usage GUESSES in value — a 58% Leftovers guess must
+  // never beat a sheet's Choice Scarf.
+  const known = (field: { value: string; source: KnowledgeSource }) =>
+    field.source === 'revealed' || field.source === 'manual' ? field.value : '';
   const userMatch = userTeam?.find(candidate => {
     const candidateId = toId(candidate.species);
     const infoId = toId(info.species);
@@ -86,9 +93,9 @@ function buildSet(
     return {
       ...userMatch,
       moves: moves.length > 0 ? moves : userMatch.moves,
-      ability: info.ability.value || userMatch.ability,
-      item: cleanItem(info.item.value, userMatch.item),
-      teraType: info.teraType.value || userMatch.teraType,
+      ability: known(info.ability) || userMatch.ability,
+      item: cleanItem(known(info.item), userMatch.item),
+      teraType: known(info.teraType) || userMatch.teraType,
       nature: (editedNature || userMatch.nature || fallbackSpread?.nature || 'Hardy') as PokemonSet['nature'],
       evs: editedEvs || matchEvs,
       ivs: editedIvs || userMatch.ivs,
