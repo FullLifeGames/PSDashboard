@@ -19,7 +19,7 @@ function ExplorableLabel({ label, onClick }: { label: string; onClick?: () => vo
       className="ps-btn"
       title="Play this line out in a branch"
       onClick={onClick}
-      style={{ padding: '0 4px', fontSize: 10, color: '#cde' }}
+      style={{ padding: '0 4px', fontSize: 10, color: '#cde', whiteSpace: 'normal', textAlign: 'left' }}
     >
       {label} ↗
     </button>
@@ -28,8 +28,8 @@ function ExplorableLabel({ label, onClick }: { label: string; onClick?: () => vo
 
 const signed = (value: number) => `${value >= 0 ? '+' : ''}${value.toFixed(2)}`;
 
-/** Tiny centered gauge on [−1, +1] — makes the played/better gap visual. */
-function MiniBar({ value }: { value: number }) {
+/** Tiny centered gauge on [−1, +1] — makes score gaps visual at a glance. */
+export function MiniBar({ value }: { value: number }) {
   const pct = 50 + 50 * Math.max(-1, Math.min(1, value));
   const positive = value >= 0;
   return (

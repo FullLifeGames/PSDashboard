@@ -1211,6 +1211,10 @@ input[type="range"]::-webkit-slider-thumb {
 /* ----- Evaluation panel ----- */
 .ps-eval-panel {
   margin-top: 8px;
+  /* Combined doubles labels and PV lines must wrap inside the column —
+     never widen the panel past its grid track. */
+  overflow-wrap: anywhere;
+  min-width: 0;
 }
 .ps-eval-labels {
   display: flex;
@@ -1280,6 +1284,9 @@ input[type="range"]::-webkit-slider-thumb {
   justify-content: space-between;
   align-items: baseline;
   gap: 8px;
+  /* Doubles labels are long — the numbers block drops below rather than
+     forcing the panel wide. */
+  flex-wrap: wrap;
 }
 .ps-eval-line {
   display: block;

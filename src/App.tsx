@@ -566,11 +566,15 @@ function App() {
     if (branching && simState) {
       handlePickEvalChoice(pendingEvalPick.side, pendingEvalPick.ranked);
       setPendingEvalPick(null);
+      // Evaluate the branched position right away: the pick shows as
+      // selected AND the engine's next recommendations appear without the
+      // user having to know about the Evaluate button.
+      handleEvaluate();
     } else if (!branching && !branchPreparing) {
       // Branch entry failed or was cancelled — drop the stale pick.
       setPendingEvalPick(null);
     }
-  }, [pendingEvalPick, branching, simState, branchPreparing, handlePickEvalChoice]);
+  }, [pendingEvalPick, branching, simState, branchPreparing, handlePickEvalChoice, handleEvaluate]);
 
   const analyzableTurns = endSnapshotTurn !== null ? Math.max(1, endSnapshotTurn - 1) : maxTurn;
 

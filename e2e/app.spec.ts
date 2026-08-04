@@ -212,7 +212,10 @@ test.describe('PS Dashboard', () => {
     await expect(panel.locator('.ps-eval-bar')).toBeVisible({ timeout: 120_000 });
     await expect(panel.locator('.ps-eval-bar-p1')).toContainText('%');
     expect(await panel.locator('.ps-eval-column').count()).toBe(2);
-    await expect(panel.getByText(/worst vs/).first()).toBeVisible();
+    // Ranked choices speak the bar's percent language; raw scores and the
+    // punishing reply live in the tooltip.
+    await expect(panel.getByText(/≥\d+%/).first()).toBeVisible();
+    await expect(panel.locator('.ps-eval-choice').first()).toHaveAttribute('title', /worst reply/);
   });
 
   test('clicking an engine choice from the replay view branches with it prefilled', async ({ page }) => {
@@ -979,6 +982,10 @@ test.describe('PS Dashboard', () => {
     await expect(panel.locator('.ps-eval-analysis')).toBeVisible({ timeout: 120_000 });
     await expect(panel.locator('.ps-eval-analysis-summary')).toContainText('%');
     await expect(panel.locator('.ps-eval-analysis')).toContainText('played');
+
+    // Long combined labels must wrap inside the panel, never widen it.
+    const overflow = await panel.evaluate(element => element.scrollWidth - element.clientWidth);
+    expect(overflow).toBeLessThanOrEqual(1);
   });
 
   test('doubles branch shows slot controls and blocks duplicate simultaneous switches', async ({ page }) => {

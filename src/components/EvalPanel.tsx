@@ -4,7 +4,7 @@ import type { GameReport } from '../lib/eval/report';
 import type { EvalGraphState, EvalStatus } from '../hooks/useEvaluation';
 import { EvalGameReport } from './EvalGameReport';
 import { EvalGraph } from './EvalGraph';
-import { EvalTurnAnalysis } from './EvalTurnAnalysis';
+import { EvalTurnAnalysis, MiniBar } from './EvalTurnAnalysis';
 
 interface EvalPanelProps {
   playerNames: [string, string];
@@ -45,16 +45,28 @@ function ChoiceList({
   choices: RankedChoice[];
   onPickChoice?: (side: 'p1' | 'p2', choice: RankedChoice) => void;
 }) {
+  const best = choices[0];
   return (
     <div className="ps-eval-column">
-      {choices.slice(0, 3).map(choice => {
+      {choices.slice(0, 3).map((choice, index) => {
+        // The floor in the eval bar's own language: the win odds this choice
+        // guarantees against the engine's best reply. Raw scores and the
+        // punishing reply live in the tooltip.
+        const floorPct = Math.round(50 + 50 * choice.worstCase);
+        const gap = best ? choice.worstCase - best.worstCase : 0;
+        const tooltip = `Guaranteed floor ${signed(choice.worstCase)}` +
+          (choice.punishedBy ? ` — worst reply: ${choice.punishedBy}` : '') +
+          ` · expected ${signed(choice.expected)}. Choices are ranked by their floor.` +
+          (onPickChoice ? ' Click to play this out in a branch.' : '');
         const detail = (
           <>
             <span className="ps-eval-choice-main">
-              <span style={{ color: '#cde' }}>{choice.label}</span>
-              <span style={{ color: '#aab', whiteSpace: 'nowrap' }}>
-                {signed(choice.worstCase)} / {signed(choice.expected)}
-                {choice.punishedBy ? <span style={{ color: '#778' }}> · worst vs {choice.punishedBy}</span> : null}
+              <span style={{ color: '#778' }}>{index + 1}.</span>
+              <span style={{ color: '#cde', flex: '1 1 auto', minWidth: 0 }}>{choice.label}</span>
+              <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, whiteSpace: 'nowrap', color: '#aab' }}>
+                <MiniBar value={choice.worstCase} />
+                ≥{floorPct}%
+                {index > 0 && gap < 0 && <span style={{ color: '#778' }}>({gap.toFixed(2)})</span>}
               </span>
             </span>
             {choice.line && choice.line.length > 0 && (
@@ -69,13 +81,13 @@ function ChoiceList({
             key={choice.choice}
             type="button"
             className="ps-btn ps-eval-choice"
-            title="Play this choice out in a branch"
+            title={tooltip}
             onClick={() => onPickChoice(side, choice)}
           >
             {detail}
           </button>
         ) : (
-          <div key={choice.choice} className="ps-eval-choice">
+          <div key={choice.choice} className="ps-eval-choice" title={tooltip}>
             {detail}
           </div>
         );
