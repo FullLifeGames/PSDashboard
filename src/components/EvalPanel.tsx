@@ -233,6 +233,12 @@ export function EvalPanel({
               </>
             )}
           </div>
+          <div
+            style={{ fontSize: 10, color: '#778', marginTop: 2 }}
+            title="Analyze game paints the whole line with a fast depth-1 scan first, then re-evaluates the biggest swings with the settings above. Analyze turn and Evaluate always use those settings directly; Tera applies everywhere."
+          >
+            line: fast scan · key swings &amp; analyzed turns: {prefs.mode === 'mcts' ? 'MCTS' : `depth ${prefs.depth}`}
+          </div>
           {hasGraph && (
             <EvalGraph
               scores={graph.scores}
