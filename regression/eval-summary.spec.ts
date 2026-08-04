@@ -41,6 +41,28 @@ test.describe('natural-language turn summaries', () => {
     expect(summary).toContain('switching to Dragapult');
     expect(summary).toContain('then Draco Meteor · U-turn');
     expect(summary).not.toContain('→');
+    expect(summary).not.toContain('setup move');
+  });
+
+  test('a regretted setup move carries the horizon caveat', () => {
+    const setupResult: EvalResult = {
+      ...result,
+      perSide: {
+        p1: result.perSide.p1,
+        p2: [...result.perSide.p2, choice('move swordsdance', 'Swords Dance', -0.35)],
+      },
+    };
+    const summary = summarizeTurn(analyzeTurn({
+      turn: 12,
+      result: setupResult,
+      played: { p1: { kind: 'move', name: 'Draco Meteor', tera: false }, p2: { kind: 'move', name: 'Swords Dance', tera: false } },
+      playedOutcome: -0.2,
+      scoreBefore: 0.1,
+      scoreAfter: -0.25,
+    }), names);
+    expect(summary).toContain('Beta played Swords Dance');
+    expect(summary).toContain('Swords Dance is a setup move');
+    expect(summary).toContain('regret may be overstated');
   });
 
   test('a chance turn blames the rolls, not the players', () => {

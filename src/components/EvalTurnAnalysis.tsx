@@ -1,4 +1,4 @@
-import { REGRET_THRESHOLD, type SideAnalysis, type TurnAnalysis } from '../lib/eval/analysis';
+import { REGRET_THRESHOLD, playedSetupMove, type SideAnalysis, type TurnAnalysis } from '../lib/eval/analysis';
 import { summarizeTurn } from '../lib/eval/summary';
 import { attributionBadge } from './eval-badges';
 
@@ -43,6 +43,7 @@ function SideRow({ name, side }: { name: string; side: SideAnalysis }) {
         ? `${playedRawName} — not among the engine's options`
         : 'could not act (fainted or fully prevented)';
   const regretful = (side.regret ?? 0) >= REGRET_THRESHOLD;
+  const setupMove = playedSetupMove(side);
 
   return (
     <div className="ps-eval-analysis-side">
@@ -57,9 +58,16 @@ function SideRow({ name, side }: { name: string; side: SideAnalysis }) {
             engine: {side.best.label} ({signed(side.best.worstCase)})
           </span>
         )}
-        {regretful && side.regret !== null && (
+        {regretful && side.regret !== null && (setupMove ? (
+          <span
+            style={{ color: '#b6a46a' }}
+            title={`${setupMove} is a setup move — its payoff lies past the search horizon, so the regret may be overstated.`}
+          >
+            −{side.regret.toFixed(2)} regret · setup caveat
+          </span>
+        ) : (
           <span style={{ color: '#f3a6a6' }}>−{side.regret.toFixed(2)} regret</span>
-        )}
+        ))}
       </div>
       {regretful && side.best && (
         <div className="ps-eval-analysis-row" style={{ color: '#aab' }}>

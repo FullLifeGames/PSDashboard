@@ -1,4 +1,4 @@
-import { REGRET_THRESHOLD, type TurnAnalysis } from './analysis';
+import { REGRET_THRESHOLD, playedSetupMove, type TurnAnalysis } from './analysis';
 import { labelPhrase, signedValue } from './summary';
 
 /**
@@ -98,8 +98,9 @@ export function buildGameReport(
     if (seeds.length > 0) {
       const parts = seeds.map(analysis => {
         const side = analysis[loser];
+        const setup = playedSetupMove(side) ? '; a setup move the engine may undervalue' : '';
         return `turn ${analysis.turn} (${labelPhrase(side.played!.label)}, ` +
-          `−${(side.regret ?? 0).toFixed(2)} — safer was ${labelPhrase(side.best!.label)})`;
+          `−${(side.regret ?? 0).toFixed(2)} — safer was ${labelPhrase(side.best!.label)}${setup})`;
       });
       sentences.push(`The seeds of the loss: ${parts.join(' and ')}.`);
     } else if (playedTracking && decisionTotals[loser] < CLEAN_PLAY_TOTAL) {

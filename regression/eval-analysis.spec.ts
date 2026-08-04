@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { analyzeTurn, matchPlayedChoice, REGRET_THRESHOLD } from '../src/lib/eval/analysis';
+import { analyzeTurn, matchPlayedChoice, playedSetupMove, REGRET_THRESHOLD, type SideAnalysis } from '../src/lib/eval/analysis';
 import type { EvalResult, RankedChoice } from '../src/lib/eval/types';
 
 const choice = (choiceStr: string, label: string, worstCase: number): RankedChoice =>
@@ -209,5 +209,23 @@ test.describe('doubles combined matching', () => {
     expect(analysis.p1.played?.choice).toBe('move moonblast 1, switch 3');
     expect(analysis.p1.regret).toBeCloseTo(0.2, 10);
     expect(analysis.p1.playedSlots).toHaveLength(2);
+  });
+});
+
+test.describe('setup-move detection', () => {
+  const side = (over: Partial<SideAnalysis>): SideAnalysis =>
+    ({ playedRaw: null, played: null, best: null, regret: null, ...over });
+
+  test('singles: the played move is recognized by name', () => {
+    expect(playedSetupMove(side({ playedRaw: { kind: 'move', name: 'Swords Dance' } }))).toBe('Swords Dance');
+    expect(playedSetupMove(side({ playedRaw: { kind: 'move', name: 'Ice Beam' } }))).toBeNull();
+    // A switch to a Pokémon nicknamed after a setup move is not a setup move.
+    expect(playedSetupMove(side({ playedRaw: { kind: 'switch', name: 'Curse' } }))).toBeNull();
+    expect(playedSetupMove(side({}))).toBeNull();
+  });
+
+  test('doubles: any slot clicking a setup move counts', () => {
+    expect(playedSetupMove(side({ playedSlots: [null, { kind: 'move', name: 'Dragon Dance' }] }))).toBe('Dragon Dance');
+    expect(playedSetupMove(side({ playedSlots: [{ kind: 'move', name: 'Protect' }, { kind: 'move', name: 'Fake Out' }] }))).toBeNull();
   });
 });

@@ -55,6 +55,29 @@ export interface TurnAnalysis {
 
 const choiceKeyOf = (name: string): string => name.toLowerCase().replace(/[^a-z0-9]/g, '');
 
+/**
+ * Pure self-boosting moves. The maximin worst case prices a setup turn as
+ * "took a hit for nothing" — the boost's payoff lies past the search
+ * horizon, so regret against these moves reads systematically high.
+ * Curated, not exhaustive: the moves competitive games actually see.
+ */
+const SETUP_MOVES = new Set([
+  'acidarmor', 'agility', 'amnesia', 'autotomize', 'barrier', 'bellydrum',
+  'bulkup', 'calmmind', 'clangoroussoul', 'coil', 'cosmicpower', 'cottonguard',
+  'curse', 'defendorder', 'dragondance', 'filletaway', 'geomancy', 'growth',
+  'honeclaws', 'irondefense', 'nastyplot', 'noretreat', 'quiverdance',
+  'rockpolish', 'shellsmash', 'shiftgear', 'stockpile', 'swordsdance',
+  'tailglow', 'victorydance', 'workup',
+]);
+
+/** The setup move this side actually clicked, if any (display name). */
+export function playedSetupMove(side: SideAnalysis): string | null {
+  const actions = side.playedSlots?.filter((action): action is PlayedAction => action !== null) ??
+    (side.playedRaw ? [side.playedRaw] : []);
+  const setup = actions.find(action => action.kind === 'move' && SETUP_MOVES.has(choiceKeyOf(action.name)));
+  return setup?.name ?? null;
+}
+
 /** "Tera + X" labels contain the slot separator — re-merge after splitting. */
 const splitCombinedLabel = (label: string): string[] => {
   const segments = label.split(' + ');
