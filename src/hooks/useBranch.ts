@@ -32,6 +32,12 @@ interface StartBranchOptions {
   playerNames?: [string, string];
   onProgress?: (turn: number, targetTurn: number) => void;
   abort?: AbortSignal;
+  /**
+   * Per-turn snapshots for boundary correction during the replay — without
+   * them a long reconstruction drifts (guessed sets force different replays)
+   * and the branch can open with the wrong Pokémon on the field.
+   */
+  snapshotFor?: (turn: number) => TurnSnapshot | null;
 }
 
 export interface BranchHistoryEntry {
@@ -389,6 +395,9 @@ export function useBranch() {
       playerNames: options?.playerNames,
       onProgress: options?.onProgress,
       abort: options?.abort,
+      ...(options?.snapshotFor
+        ? { capturePositions: { snapshotFor: options.snapshotFor, onPosition: () => {} } }
+        : {}),
     });
 
     if (options?.abort?.aborted) return;

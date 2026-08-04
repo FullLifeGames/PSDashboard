@@ -306,6 +306,7 @@ function App() {
           playerNames: [replayData.players[0], replayData.players[1]],
           onProgress: (turn, target) => setBranchProgress({ turn, target }),
           abort: abortController.signal,
+          snapshotFor: turn => snapshots[Math.min(turn - 1, snapshots.length - 1)] ?? null,
         });
         if (!abortController.signal.aborted) {
           branchWindowOpenRef.current = true;
@@ -316,7 +317,7 @@ function App() {
       setBranchProgress(null);
       branchAbortRef.current = null;
     }
-  }, [replayData, branchPreparing, teamText, branchTurn, branchSnapshot, effectiveP1Info, effectiveP2Info, usageStats.stats, setAssumptions.assumptions, startBranch]);
+  }, [replayData, branchPreparing, teamText, branchTurn, branchSnapshot, snapshots, effectiveP1Info, effectiveP2Info, usageStats.stats, setAssumptions.assumptions, startBranch]);
 
   const handleCancelBranchPreparation = useCallback(() => {
     branchAbortRef.current?.abort();
@@ -354,6 +355,7 @@ function App() {
             playerNames: [activeReplay.players[0], activeReplay.players[1]],
             onProgress: (turn, target) => setBranchProgress({ turn, target }),
             abort: abortController.signal,
+            snapshotFor: turn => snapshots[Math.min(turn - 1, snapshots.length - 1)] ?? null,
           });
           if (!abortController.signal.aborted) {
             branchWindowOpenRef.current = true;
@@ -379,6 +381,7 @@ function App() {
     teamText,
     branchTurn,
     branchSnapshot,
+    snapshots,
     usageStats.stats,
     setAssumptions.assumptions,
     startBranch,
