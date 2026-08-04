@@ -185,6 +185,13 @@ export function legalChoices(
   const sideState = battle.sides[sideIndex(side)];
   const request = sideState.activeRequest;
   if (!request || battle.ended) return [];
+  // Mid-forced-switch positions: the OTHER side resolves its replacement,
+  // this side cannot act at all — inventing bench switches here made the
+  // sim reject them with "It's not your turn". The sentinel never reaches
+  // the sim (applyChoice skips it).
+  if ('wait' in request && request.wait) {
+    return [{ choice: 'wait', label: '(waiting)' }];
+  }
 
   const allowTera = opts?.tera ?? true;
   const actives = 'active' in request ? request.active ?? [] : [];
@@ -288,6 +295,8 @@ function forkBattle(position: SimPosition, seed: PRNGSeed): Battle {
 }
 
 function applyChoice(battle: Battle, side: 'p1' | 'p2', choice: string): void {
+  // The waiting-side sentinel (see legalChoices): nothing to submit.
+  if (choice === 'wait') return;
   if (!battle.choose(side, choice)) {
     const error = battle.sides[sideIndex(side)].choice.error || 'choice rejected';
     throw new Error(`${side} "${choice}": ${error}`);

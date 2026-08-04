@@ -362,3 +362,43 @@ test.describe('sim forward model', () => {
     expect(legalChoices(root, 'p2').length).toBeGreaterThan(0);
   });
 });
+
+test.describe('one-sided forced switch (waiting side)', () => {
+  const midSwitchBattle = () => {
+    // Seismic Toss at level 100 deals a fixed 100: Pikachu at level 30
+    // faints, p2 must pick a replacement, p1 can only wait.
+    const battle = makeBattle(
+      [makeSet('Machamp', 'Machamp', ['Seismic Toss', 'Protect'], 100)],
+      [
+        makeSet('Pikachu', 'Pikachu', ['Tackle', 'Growl'], 30),
+        makeSet('Eevee', 'Eevee', ['Tackle', 'Growl'], 30),
+      ],
+    );
+    battle.choose('p1', 'move 1');
+    battle.choose('p2', 'move 1');
+    return battle;
+  };
+
+  test('the waiting side gets the sentinel, never bench switches', async () => {
+    const battle = midSwitchBattle();
+    expect(battle.sides[1].requestState).toBe('switch');
+    const root = createRootPosition(serialize(battle));
+    expect(legalChoices(root, 'p1')).toEqual([{ choice: 'wait', label: '(waiting)' }]);
+    expect(legalChoices(root, 'p2').map(option => option.choice)).toEqual(['switch 2']);
+
+    // The advance applies only the switching side and reaches a boundary.
+    const next = advancePosition(root, 'wait', 'switch 2', '5,6,7,8');
+    const nextBattle = positionBattle(next);
+    expect(nextBattle.sides[1].active[0]?.species.name).toBe('Eevee');
+    expect(nextBattle.sides.every(side => side.requestState === 'move')).toBe(true);
+  });
+
+  test('a full search on a mid-switch position completes without sim rejections', async () => {
+    const { searchPosition } = await import('../src/lib/eval/search');
+    const result = searchPosition(serialize(midSwitchBattle()), { depth: 1, samples: 1, tera: false });
+    expect(result.perSide.p1).toEqual([
+      expect.objectContaining({ choice: 'wait', label: '(waiting)' }),
+    ]);
+    expect(result.perSide.p2[0].choice).toBe('switch 2');
+  });
+});
