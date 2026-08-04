@@ -115,6 +115,13 @@ function SideRow({ name, side, onExplore }: { name: string; side: SideAnalysis; 
           >
             −{side.regret.toFixed(2)} regret · setup caveat
           </span>
+        ) : side.riskUnpunished ? (
+          <span
+            style={{ color: '#b6a46a' }}
+            title={`The floor assumes ${side.played?.punishedBy ?? 'the punishing reply'} — the opponent chose differently, so the read came true.`}
+          >
+            −{side.regret.toFixed(2)} regret · risk unpunished
+          </span>
         ) : (
           <span style={{ color: '#f3a6a6' }}>−{side.regret.toFixed(2)} regret</span>
         ))}

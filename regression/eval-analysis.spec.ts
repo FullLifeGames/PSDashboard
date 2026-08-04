@@ -48,6 +48,36 @@ test.describe('turn analysis assembly', () => {
     expect(analysis.swing).toBeCloseTo(-0.35, 10);
   });
 
+  test('a flagged regret is a risk (unpunished) when the punishing reply never came', () => {
+    // p2's Recover regrets 0.25; its floor assumes the reply "Reply" — p1
+    // actually clicked Draco Meteor, so the read went unpunished.
+    const analysis = analyzeTurn({
+      turn: 20,
+      result,
+      played: { p1: { kind: 'move', name: 'Draco Meteor', tera: false }, p2: { kind: 'move', name: 'Recover', tera: false } },
+      playedOutcome: -0.2,
+      scoreBefore: 0.1,
+      scoreAfter: -0.25,
+    });
+    expect(analysis.p2.riskUnpunished).toBe(true);
+    expect(analysis.p1.riskUnpunished).toBeUndefined();
+
+    // When the opponent DID click the punisher, the flag stays off.
+    const punished: EvalResult = {
+      ...result,
+      perSide: { p1: [choice('move reply', 'Reply', 0.2)], p2: result.perSide.p2 },
+    };
+    const analysisPunished = analyzeTurn({
+      turn: 21,
+      result: punished,
+      played: { p1: { kind: 'move', name: 'Reply', tera: false }, p2: { kind: 'move', name: 'Recover', tera: false } },
+      playedOutcome: -0.2,
+      scoreBefore: 0.1,
+      scoreAfter: -0.25,
+    });
+    expect(analysisPunished.p2.riskUnpunished).toBeUndefined();
+  });
+
   test('best moves on both sides with a big residual is a chance swing', () => {
     const analysis = analyzeTurn({
       turn: 8,

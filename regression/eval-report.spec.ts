@@ -88,24 +88,46 @@ test.describe('game report (multi-turn root cause)', () => {
     expect(report.summary).toContain('turn 2');
   });
 
-  test('lists the biggest misplays across both sides, in turn order', () => {
-    const misplay = (played: string, better: string, regret: number) => ({
+  test('lists each side\'s biggest misplays, in turn order', () => {
+    const misplay = (played: string, better: string, regret: number, riskUnpunished = false) => ({
       playedRaw: null,
       played: ranked(`move ${played.toLowerCase()}`, played, -0.2),
       best: ranked(`move ${better.toLowerCase()}`, better, 0.1),
       regret,
+      ...(riskUnpunished ? { riskUnpunished } : {}),
     });
     const report = buildGameReport([
       mk(1, 0.1, 0.0, { p1: misplay('Tackle', 'Surf', 0.18) }),
-      mk(2, 0.0, -0.2, { p2: misplay('Growl', 'Protect', 0.4) }),
+      mk(2, 0.0, -0.2, { p2: misplay('Growl', 'Protect', 0.4, true) }),
       mk(3, -0.2, -0.3, { p1: misplay('Splash', 'Toxic', 0.3), p2: misplay('Leer', 'Recover', 0.2) }),
       // Below the regret threshold — never listed.
       mk(4, -0.3, -0.35, { p1: misplay('Peck', 'Fly', 0.1) }),
       mk(5, -0.35, -0.5, { p2: misplay('Bite', 'Crunch', 0.25) }),
     ], names, 'p2');
-    // Five qualify; the cap keeps the four biggest regrets (turn 1's 0.18 drops).
-    expect(report.misplays.map(entry => `${entry.turn}${entry.side}`)).toEqual(['2p2', '3p1', '3p2', '5p2']);
-    expect(report.misplays[0]).toEqual({ turn: 2, side: 'p2', regret: 0.4, played: 'Growl', better: 'Protect' });
+    // Top two PER SIDE — p2's bigger numbers cannot crowd p1 out.
+    expect(report.misplays.map(entry => `${entry.turn}${entry.side}`)).toEqual(['1p1', '2p2', '3p1', '5p2']);
+    expect(report.misplays[1]).toEqual({ turn: 2, side: 'p2', regret: 0.4, played: 'Growl', better: 'Protect', riskUnpunished: true });
+    expect(report.tracked).toBe(true);
+  });
+
+  test('an unpunished risk never counts as a seed of the loss', () => {
+    const report = buildGameReport([
+      mk(1, 0.1, 0.05),
+      mk(2, 0.05, -0.3, {
+        attribution: 'p1-decision',
+        p1: {
+          playedRaw: { kind: 'move', name: 'Recover', tera: false },
+          played: ranked('move recover', 'Recover', -0.3),
+          best: ranked('switch 3', '→ Dragapult', -0.05),
+          regret: 0.25,
+          riskUnpunished: true,
+        },
+      }),
+      mk(3, -0.3, -0.6),
+      mk(4, -0.6, -0.9),
+    ], names, 'p2');
+    expect(report.summary).not.toContain('seeds');
+    expect(report.summary).not.toContain('Recover');
   });
 
   test('a clean loss is called out as matchup/variance, not blunders', () => {

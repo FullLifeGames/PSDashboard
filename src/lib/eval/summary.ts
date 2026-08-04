@@ -22,10 +22,13 @@ const phrase = labelPhrase;
 const playedBest = (side: SideAnalysis) =>
   side.played !== null && side.best !== null && side.played.choice === side.best.choice;
 
-function mistakeClause(name: string, side: SideAnalysis): string | null {
+function mistakeClause(name: string, side: SideAnalysis, opponent: SideAnalysis): string | null {
   if ((side.regret ?? 0) < REGRET_THRESHOLD || !side.played || !side.best) return null;
   const line = side.best.line && side.best.line.length > 0
     ? `, then ${side.best.line.map(step => `${step.p1} · ${step.p2}`).join(' → ')}`
+    : '';
+  const risk = side.riskUnpunished && side.played.punishedBy && opponent.played
+    ? ` The floor priced in ${side.played.punishedBy}; ${phrase(opponent.played.label)} came instead — the read went unpunished.`
     : '';
   const difference = diffChoices(side.played, side.best);
   const why = difference ? ` The difference: ${difference}.` : '';
@@ -34,7 +37,7 @@ function mistakeClause(name: string, side: SideAnalysis): string | null {
     ? ` (${setup} is a setup move — its payoff lies past the search horizon, so the regret may be overstated.)`
     : '';
   return `${name} played ${phrase(side.played.label)} (${signed(side.played.worstCase)}); ` +
-    `safer was ${phrase(side.best.label)} (${signed(side.best.worstCase)})${line}.${why}${caveat}`;
+    `safer was ${phrase(side.best.label)} (${signed(side.best.worstCase)})${line}.${risk}${why}${caveat}`;
 }
 
 export function summarizeTurn(analysis: TurnAnalysis, playerNames: [string, string]): string {
@@ -62,8 +65,8 @@ export function summarizeTurn(analysis: TurnAnalysis, playerNames: [string, stri
     case 'p1-decision':
     case 'p2-decision':
     case 'both-decision': {
-      const p1Clause = mistakeClause(playerNames[0], analysis.p1);
-      const p2Clause = mistakeClause(playerNames[1], analysis.p2);
+      const p1Clause = mistakeClause(playerNames[0], analysis.p1, analysis.p2);
+      const p2Clause = mistakeClause(playerNames[1], analysis.p2, analysis.p1);
       if (p1Clause) sentences.push(p1Clause);
       if (p2Clause) sentences.push(p2Clause);
       if (analysis.chanceDelta !== null && Math.abs(analysis.chanceDelta) >= CHANCE_THRESHOLD) {

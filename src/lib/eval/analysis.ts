@@ -29,6 +29,11 @@ export interface SideAnalysis {
   best: RankedChoice | null;
   /** best.worstCase − played.worstCase (own perspective), floored at 0. */
   regret: number | null;
+  /**
+   * The regret's floor priced in a punishing reply the opponent did NOT
+   * click — a prediction play whose read came true, not a punished misplay.
+   */
+  riskUnpunished?: boolean;
 }
 
 export interface TurnAnalysis {
@@ -232,6 +237,15 @@ export function analyzeTurn(params: {
 
   const p1 = sideAnalysis('p1');
   const p2 = sideAnalysis('p2');
+  // A flagged risk whose punishing reply was never clicked reads differently
+  // from a punished misplay — the floor stays, the verdict softens.
+  const markRisk = (side: SideAnalysis, opponent: SideAnalysis) => {
+    if ((side.regret ?? 0) < REGRET_THRESHOLD) return;
+    if (!side.played?.punishedBy || !opponent.played) return;
+    if (opponent.played.label !== side.played.punishedBy) side.riskUnpunished = true;
+  };
+  markRisk(p1, p2);
+  markRisk(p2, p1);
   const swing = params.scoreAfter !== null ? params.scoreAfter - params.scoreBefore : null;
   const decisionDelta = params.playedOutcome !== null ? params.playedOutcome - params.scoreBefore : null;
   const chanceDelta = params.playedOutcome !== null && params.scoreAfter !== null

@@ -11,8 +11,8 @@ import { labelPhrase, signedValue } from './summary';
 export const KEY_MOMENT_SWING = 0.25;
 /** How many key moments the report keeps. */
 export const REPORT_KEY_MOMENTS = 4;
-/** How many misplays the report lists. */
-export const REPORT_MISPLAYS = 4;
+/** How many misplays the report lists per player. */
+export const REPORT_MISPLAYS_PER_SIDE = 2;
 /** Below this summed regret a player's game counts as clean. */
 export const CLEAN_PLAY_TOTAL = 0.2;
 
@@ -23,6 +23,8 @@ export interface GameMisplay {
   regret: number;
   played: string;
   better: string;
+  /** The punishing reply never came — a read that came true, not a punished misplay. */
+  riskUnpunished?: boolean;
 }
 
 export interface GameReport {
@@ -31,8 +33,10 @@ export interface GameReport {
   turningPoint: number | null;
   /** The biggest non-quiet swings, in turn order. */
   keyMoments: TurnAnalysis[];
-  /** The biggest regrets across the game, either side, in turn order. */
+  /** Each side's biggest regrets, in turn order. */
   misplays: GameMisplay[];
+  /** False when played actions were unavailable — an empty misplay list then means "unknown", not "clean". */
+  tracked: boolean;
   /** Summed regret per player across the analyzed game. */
   decisionTotals: { p1: number; p2: number };
   /** Net chance contribution across the game (p1 perspective). */
@@ -85,18 +89,21 @@ export function buildGameReport(
     .slice(0, REPORT_KEY_MOMENTS)
     .sort((a, b) => a.turn - b.turn);
 
-  const misplays: GameMisplay[] = !playedTracking ? [] : known
-    .flatMap(analysis => (['p1', 'p2'] as const)
-      .filter(side => (analysis[side].regret ?? 0) >= REGRET_THRESHOLD && analysis[side].played && analysis[side].best)
-      .map(side => ({
-        turn: analysis.turn,
-        side,
-        regret: analysis[side].regret ?? 0,
-        played: analysis[side].played!.label,
-        better: analysis[side].best!.label,
-      })))
+  // Selected PER SIDE — a global top list lets one player's numbers (often
+  // a winner's unpunished risks) crowd the other's out entirely.
+  const misplaysFor = (side: 'p1' | 'p2'): GameMisplay[] => known
+    .filter(analysis => (analysis[side].regret ?? 0) >= REGRET_THRESHOLD && analysis[side].played && analysis[side].best)
+    .map(analysis => ({
+      turn: analysis.turn,
+      side,
+      regret: analysis[side].regret ?? 0,
+      played: analysis[side].played!.label,
+      better: analysis[side].best!.label,
+      ...(analysis[side].riskUnpunished ? { riskUnpunished: true } : {}),
+    }))
     .sort((a, b) => b.regret - a.regret)
-    .slice(0, REPORT_MISPLAYS)
+    .slice(0, REPORT_MISPLAYS_PER_SIDE);
+  const misplays = !playedTracking ? [] : [...misplaysFor('p1'), ...misplaysFor('p2')]
     .sort((a, b) => a.turn - b.turn || a.side.localeCompare(b.side));
 
   const decisionTotals = {
@@ -118,7 +125,9 @@ export function buildGameReport(
     const loserName = playerNames[loser === 'p1' ? 0 : 1];
     const seeds = !playedTracking ? [] : known
       .filter(analysis => (turningPoint === null || analysis.turn <= turningPoint) &&
-        (analysis[loser].regret ?? 0) >= REGRET_THRESHOLD && analysis[loser].played && analysis[loser].best)
+        (analysis[loser].regret ?? 0) >= REGRET_THRESHOLD && analysis[loser].played && analysis[loser].best &&
+        // An unpunished risk cost nothing — it cannot have seeded the loss.
+        !analysis[loser].riskUnpunished)
       .sort((a, b) => (b[loser].regret ?? 0) - (a[loser].regret ?? 0))
       .slice(0, 2)
       .sort((a, b) => a.turn - b.turn);
@@ -141,5 +150,5 @@ export function buildGameReport(
     sentences.push(`Luck ran ${chanceTotal > 0 ? 'for' : 'against'} ${playerNames[0]} overall (${signedValue(chanceTotal)}).`);
   }
 
-  return { winner, turningPoint, keyMoments, misplays, decisionTotals, chanceTotal, summary: sentences.join(' ') };
+  return { winner, turningPoint, keyMoments, misplays, tracked: playedTracking, decisionTotals, chanceTotal, summary: sentences.join(' ') };
 }

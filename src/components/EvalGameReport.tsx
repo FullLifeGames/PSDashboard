@@ -19,21 +19,35 @@ export function EvalGameReport({ report, playerNames, onSelectTurn }: EvalGameRe
       <div className="ps-eval-analysis-summary">{report.summary}</div>
       {report.misplays.length > 0 && (
         <div className="ps-eval-report-moments">
-          {report.misplays.map(misplay => (
-            <button
-              key={`${misplay.turn}-${misplay.side}`}
-              type="button"
-              className="ps-btn ps-eval-report-moment"
-              onClick={() => onSelectTurn?.(misplay.turn)}
-              title="Jump to this turn's analysis"
-            >
-              <span style={{ color: '#cde' }}>T{misplay.turn}</span>
-              <span style={{ color: '#f3a6a6' }}>{playerNames[misplay.side === 'p1' ? 0 : 1]}</span>
-              <span style={{ color: '#aab' }}>{misplay.played}</span>
-              <span style={{ color: '#778' }}>better: {misplay.better}</span>
-              <span style={{ color: '#f3a6a6' }}>−{misplay.regret.toFixed(2)}</span>
-            </button>
-          ))}
+          {report.misplays.map(misplay => {
+            const tone = misplay.riskUnpunished ? '#b6a46a' : '#f3a6a6';
+            return (
+              <button
+                key={`${misplay.turn}-${misplay.side}`}
+                type="button"
+                className="ps-btn ps-eval-report-moment"
+                onClick={() => onSelectTurn?.(misplay.turn)}
+                title={misplay.riskUnpunished
+                  ? "The engine's floor priced in a reply that never came — jump to this turn's analysis"
+                  : "Jump to this turn's analysis"}
+              >
+                <span style={{ color: '#cde' }}>T{misplay.turn}</span>
+                <span style={{ color: tone }}>{playerNames[misplay.side === 'p1' ? 0 : 1]}</span>
+                <span style={{ color: '#aab' }}>{misplay.played}</span>
+                {misplay.riskUnpunished
+                  ? <span style={{ color: tone }}>risk (unpunished)</span>
+                  : <span style={{ color: '#778' }}>better: {misplay.better}</span>}
+                <span style={{ color: tone }}>−{misplay.regret.toFixed(2)}</span>
+              </button>
+            );
+          })}
+          {report.tracked && (['p1', 'p2'] as const)
+            .filter(side => !report.misplays.some(misplay => misplay.side === side))
+            .map(side => (
+              <span key={side} style={{ color: '#778', fontSize: 10, alignSelf: 'center' }}>
+                {playerNames[side === 'p1' ? 0 : 1]}: no clear misplays
+              </span>
+            ))}
         </div>
       )}
       {report.keyMoments.length > 0 && (

@@ -42,6 +42,9 @@ test.describe('natural-language turn summaries', () => {
     expect(summary).toContain('then Draco Meteor · U-turn');
     expect(summary).not.toContain('→');
     expect(summary).not.toContain('setup move');
+    // The fixture's punishing reply ("Reply") was never clicked — the
+    // regret reads as an unpunished risk, not a punished misplay.
+    expect(summary).toContain('The floor priced in Reply; Draco Meteor came instead — the read went unpunished.');
   });
 
   test('a one-detail difference is condensed into a why clause', () => {
