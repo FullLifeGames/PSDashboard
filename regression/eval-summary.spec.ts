@@ -44,6 +44,39 @@ test.describe('natural-language turn summaries', () => {
     expect(summary).not.toContain('setup move');
   });
 
+  test('a one-detail difference is condensed into a why clause', () => {
+    // The VGC shape: same two moves, the only difference is the Mega.
+    const doubles: EvalResult = {
+      score: 0.4,
+      interval: 0.05,
+      depthCompleted: 2,
+      perSide: {
+        p1: [
+          choice('move bugbite 1 mega, move closecombat 1', 'Mega + Bug Bite→Politoed + Close Combat→Politoed', 0.35),
+          choice('move bugbite 1, move closecombat 1', 'Bug Bite→Politoed + Close Combat→Politoed', -0.14),
+        ],
+        p2: [choice('move surf', 'Surf', -0.2)],
+      },
+    };
+    const summary = summarizeTurn(analyzeTurn({
+      turn: 3,
+      result: doubles,
+      played: {
+        p1: null,
+        p2: { kind: 'move', name: 'Surf', tera: false },
+        p1Slots: [
+          { kind: 'move', name: 'Bug Bite', targetLoc: 1 },
+          { kind: 'move', name: 'Close Combat', targetLoc: 1 },
+        ],
+      },
+      playedOutcome: 0.3,
+      scoreBefore: 0.4,
+      scoreAfter: 0.48,
+    }), names);
+    expect(summary).toContain('safer was Mega + Bug Bite→Politoed + Close Combat→Politoed');
+    expect(summary).toContain('The difference: only the Mega Evolution.');
+  });
+
   test('a regretted setup move carries the horizon caveat', () => {
     const setupResult: EvalResult = {
       ...result,

@@ -1,4 +1,4 @@
-import { CHANCE_THRESHOLD, REGRET_THRESHOLD, playedSetupMove, type SideAnalysis, type TurnAnalysis } from './analysis';
+import { CHANCE_THRESHOLD, REGRET_THRESHOLD, diffChoices, playedSetupMove, type SideAnalysis, type TurnAnalysis } from './analysis';
 
 /**
  * Annotator-style natural-language rendering of a turn analysis. Pure
@@ -27,12 +27,14 @@ function mistakeClause(name: string, side: SideAnalysis): string | null {
   const line = side.best.line && side.best.line.length > 0
     ? `, then ${side.best.line.map(step => `${step.p1} · ${step.p2}`).join(' → ')}`
     : '';
+  const difference = diffChoices(side.played, side.best);
+  const why = difference ? ` The difference: ${difference}.` : '';
   const setup = playedSetupMove(side);
   const caveat = setup
     ? ` (${setup} is a setup move — its payoff lies past the search horizon, so the regret may be overstated.)`
     : '';
   return `${name} played ${phrase(side.played.label)} (${signed(side.played.worstCase)}); ` +
-    `safer was ${phrase(side.best.label)} (${signed(side.best.worstCase)})${line}.${caveat}`;
+    `safer was ${phrase(side.best.label)} (${signed(side.best.worstCase)})${line}.${why}${caveat}`;
 }
 
 export function summarizeTurn(analysis: TurnAnalysis, playerNames: [string, string]): string {

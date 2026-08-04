@@ -127,6 +127,59 @@ export function findPlayedOption<T extends { choice: string; label: string }>(
   }) ?? null;
 }
 
+const GIMMICK_NAMES: Record<string, string> = {
+  mega: 'Mega Evolution',
+  terastallize: 'Terastallization',
+  ultra: 'Ultra Burst',
+};
+
+/** "Mega + Close Combat→Politoed" → "Close Combat" (the display move name). */
+const moveDisplayName = (labelPart: string): string =>
+  labelPart.replace(/^(Tera|Mega|Ultra) \+ /, '').split('→')[0];
+
+/** "→ Amoonguss" reads as prose in a sentence context. */
+const partPhrase = (labelPart: string): string =>
+  labelPart.startsWith('→ ') ? `switching to ${labelPart.slice(2)}` : labelPart;
+
+/**
+ * The condensed "why" between the played and the recommended choice: names
+ * the single structural difference when there is exactly one — a skipped
+ * gimmick, a move's target, or one slot of a doubles pair. Null when the
+ * choices differ wholesale (the full labels already tell that story).
+ */
+export function diffChoices(played: RankedChoice, best: RankedChoice): string | null {
+  const playedParts = played.choice.split(',').map(part => part.trim().split(' '));
+  const bestParts = best.choice.split(',').map(part => part.trim().split(' '));
+  if (playedParts.length !== bestParts.length) return null;
+  const playedLabels = splitCombinedLabel(played.label);
+  const bestLabels = splitCombinedLabel(best.label);
+  const stripGimmicks = (tokens: string[]) => tokens.filter(token => !(token in GIMMICK_NAMES));
+  const stripLocs = (tokens: string[]) => tokens.filter(token => !/^-?\d+$/.test(token));
+
+  const diffs: string[] = [];
+  for (let index = 0; index < playedParts.length; index++) {
+    const from = playedParts[index];
+    const to = bestParts[index];
+    if (from.join(' ') === to.join(' ')) continue;
+    if (stripGimmicks(from).join(' ') === stripGimmicks(to).join(' ')) {
+      const changed = [...from, ...to].find(token =>
+        token in GIMMICK_NAMES && from.includes(token) !== to.includes(token));
+      diffs.push(`only the ${changed ? GIMMICK_NAMES[changed] : 'gimmick'}`);
+      continue;
+    }
+    if (from[0] === 'move' && to[0] === 'move' && from[1] === to[1] &&
+      stripLocs(from).join(' ') === stripLocs(to).join(' ')) {
+      diffs.push(`only the target of ${moveDisplayName(bestLabels[index] ?? best.label)}`);
+      continue;
+    }
+    // A whole-action difference only condenses when it is one slot of a
+    // multi-slot pair — for a single action the full labels say it all.
+    if (playedParts.length === 1) return null;
+    diffs.push(`${partPhrase(bestLabels[index] ?? best.label)} instead of ${partPhrase(playedLabels[index] ?? played.label)}`);
+  }
+  return diffs.length === 1 ? diffs[0] : null;
+}
+
 /** Side dispatcher: doubles slots when present, singles action otherwise. */
 export function matchPlayedSide(
   result: EvalResult,

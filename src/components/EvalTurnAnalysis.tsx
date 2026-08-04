@@ -1,4 +1,4 @@
-import { REGRET_THRESHOLD, playedSetupMove, type SideAnalysis, type TurnAnalysis } from '../lib/eval/analysis';
+import { REGRET_THRESHOLD, diffChoices, playedSetupMove, type SideAnalysis, type TurnAnalysis } from '../lib/eval/analysis';
 import { summarizeTurn } from '../lib/eval/summary';
 import { attributionBadge } from './eval-badges';
 
@@ -8,6 +8,30 @@ interface EvalTurnAnalysisProps {
 }
 
 const signed = (value: number) => `${value >= 0 ? '+' : ''}${value.toFixed(2)}`;
+
+/** Tiny centered gauge on [−1, +1] — makes the played/better gap visual. */
+function MiniBar({ value }: { value: number }) {
+  const pct = 50 + 50 * Math.max(-1, Math.min(1, value));
+  const positive = value >= 0;
+  return (
+    <span
+      aria-hidden
+      style={{
+        position: 'relative', display: 'inline-block', width: 48, height: 7, flex: 'none',
+        background: 'rgba(255,255,255,0.08)', borderRadius: 2,
+      }}
+    >
+      <span
+        style={{
+          position: 'absolute', top: 0, bottom: 0,
+          left: `${positive ? 50 : pct}%`, width: `${Math.abs(pct - 50)}%`,
+          background: positive ? '#8c8' : '#f3a6a6', borderRadius: 1,
+        }}
+      />
+      <span style={{ position: 'absolute', top: 0, bottom: 0, left: '50%', width: 1, background: '#667' }} />
+    </span>
+  );
+}
 
 /** Untracked (doubles): only the engine's preferred line — no played/blame. */
 function EngineRow({ name, side }: { name: string; side: SideAnalysis }) {
@@ -44,6 +68,7 @@ function SideRow({ name, side }: { name: string; side: SideAnalysis }) {
         : 'could not act (fainted or fully prevented)';
   const regretful = (side.regret ?? 0) >= REGRET_THRESHOLD;
   const setupMove = playedSetupMove(side);
+  const difference = regretful && side.played && side.best ? diffChoices(side.played, side.best) : null;
 
   return (
     <div className="ps-eval-analysis-side">
@@ -69,13 +94,29 @@ function SideRow({ name, side }: { name: string; side: SideAnalysis }) {
           <span style={{ color: '#f3a6a6' }}>−{side.regret.toFixed(2)} regret</span>
         ))}
       </div>
-      {regretful && side.best && (
-        <div className="ps-eval-analysis-row" style={{ color: '#aab' }}>
-          better: <span style={{ color: '#cde' }}>{side.best.label}</span> ({signed(side.best.worstCase)})
-          {side.best.line && side.best.line.length > 0 && (
-            <span className="ps-eval-line"> then {side.best.line.map(step => `${step.p1} · ${step.p2}`).join(' → ')}</span>
+      {regretful && side.played && side.best && (
+        <>
+          <div className="ps-eval-analysis-row" style={{ color: '#aab' }}>
+            <MiniBar value={side.played.worstCase} />
+            <span style={{ whiteSpace: 'nowrap' }}>{signed(side.played.worstCase)} played</span>
+            {side.played.punishedBy && <span style={{ color: '#778' }}>· worst vs {side.played.punishedBy}</span>}
+          </div>
+          <div className="ps-eval-analysis-row" style={{ color: '#aab' }}>
+            <MiniBar value={side.best.worstCase} />
+            <span style={{ whiteSpace: 'nowrap' }}>{signed(side.best.worstCase)} better:</span>
+            <span style={{ color: '#cde' }}>{side.best.label}</span>
+            {side.best.punishedBy && <span style={{ color: '#778' }}>· worst vs {side.best.punishedBy}</span>}
+            {side.best.line && side.best.line.length > 0 && (
+              <span className="ps-eval-line">then {side.best.line.map(step => `${step.p1} · ${step.p2}`).join(' → ')}</span>
+            )}
+          </div>
+          {difference && (
+            <div className="ps-eval-analysis-row">
+              <span style={{ color: '#778' }}>difference:</span>
+              <span style={{ color: '#cde' }}>{difference}</span>
+            </div>
           )}
-        </div>
+        </>
       )}
     </div>
   );

@@ -229,3 +229,47 @@ test.describe('setup-move detection', () => {
     expect(playedSetupMove(side({ playedSlots: [{ kind: 'move', name: 'Protect' }, { kind: 'move', name: 'Fake Out' }] }))).toBeNull();
   });
 });
+
+test.describe('choice diffing (the condensed why)', () => {
+  const ranked = (choiceStr: string, label: string): RankedChoice => choice(choiceStr, label, 0);
+
+  test('a skipped gimmick names the gimmick alone', async () => {
+    const { diffChoices } = await import('../src/lib/eval/analysis');
+    expect(diffChoices(
+      ranked('move bugbite 1, move closecombat 1', 'Bug Bite→Politoed + Close Combat→Politoed'),
+      ranked('move bugbite 1 mega, move closecombat 1', 'Mega + Bug Bite→Politoed + Close Combat→Politoed'),
+    )).toBe('only the Mega Evolution');
+    expect(diffChoices(
+      ranked('move freezedry', 'Freeze-Dry'),
+      ranked('move freezedry terastallize', 'Tera + Freeze-Dry'),
+    )).toBe('only the Terastallization');
+  });
+
+  test('a target-only difference names the move', async () => {
+    const { diffChoices } = await import('../src/lib/eval/analysis');
+    expect(diffChoices(
+      ranked('move closecombat 1, move protect', 'Close Combat→Politoed + Protect'),
+      ranked('move closecombat 2, move protect', 'Close Combat→Incineroar + Protect'),
+    )).toBe('only the target of Close Combat');
+  });
+
+  test('one differing doubles slot condenses; a singles whole-action does not', async () => {
+    const { diffChoices } = await import('../src/lib/eval/analysis');
+    expect(diffChoices(
+      ranked('move protect, move surf 1', 'Protect + Surf→Incineroar'),
+      ranked('move protect, switch 3', 'Protect + → Amoonguss'),
+    )).toBe('switching to Amoonguss instead of Surf→Incineroar');
+    expect(diffChoices(
+      ranked('move recover', 'Recover'),
+      ranked('switch 3', '→ Dragapult'),
+    )).toBeNull();
+  });
+
+  test('more than one difference stays uncondensed', async () => {
+    const { diffChoices } = await import('../src/lib/eval/analysis');
+    expect(diffChoices(
+      ranked('move bugbite 1, move closecombat 1', 'Bug Bite→Politoed + Close Combat→Politoed'),
+      ranked('move bugbite 2 mega, switch 3', 'Mega + Bug Bite→Incineroar + → Amoonguss'),
+    )).toBeNull();
+  });
+});
