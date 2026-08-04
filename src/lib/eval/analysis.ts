@@ -15,10 +15,20 @@ export const CHANCE_THRESHOLD = 0.2;
 
 export type TurnAttribution =
   | 'p1-decision' | 'p2-decision' | 'both-decision'
+  /** A flagged risk whose read won real value — graded as a good play, not a mistake. */
+  | 'p1-read' | 'p2-read' | 'both-read'
   | 'chance'
   /** A meaningful swing with no single culprit: decision and chance parts each stay under their thresholds. */
   | 'shift'
   | 'quiet' | 'unclear';
+
+/**
+ * A risk pays off when the actual pair's expected value beats the safe
+ * line's GUARANTEE by at least this much (own perspective). Comparing
+ * against the floor is deliberate: the guarantee is exactly what the safe
+ * player locks in — beating it is what the read earned.
+ */
+export const RISK_PAYOFF_MARGIN = 0.1;
 
 export interface SideAnalysis {
   playedRaw: PlayedAction | null;
@@ -34,6 +44,10 @@ export interface SideAnalysis {
    * click — a prediction play whose read came true, not a punished misplay.
    */
   riskUnpunished?: boolean;
+  /** Own-perspective value of the actual pair over the safe line's floor. */
+  riskPayoff?: number;
+  /** The read won at least RISK_PAYOFF_MARGIN over the safe guarantee. */
+  riskPaidOff?: boolean;
 }
 
 export interface TurnAnalysis {
@@ -238,22 +252,33 @@ export function analyzeTurn(params: {
   const p1 = sideAnalysis('p1');
   const p2 = sideAnalysis('p2');
   // A flagged risk whose punishing reply was never clicked reads differently
-  // from a punished misplay — the floor stays, the verdict softens.
-  const markRisk = (side: SideAnalysis, opponent: SideAnalysis) => {
+  // from a punished misplay. Where the pair's expected value is known, the
+  // payoff over the safe guarantee grades the read: clearly ahead = a good
+  // play, clearly behind = a plain misplay even unpunished, between = risk.
+  const markRisk = (key: 'p1' | 'p2', side: SideAnalysis, opponent: SideAnalysis) => {
     if ((side.regret ?? 0) < REGRET_THRESHOLD) return;
     if (!side.played?.punishedBy || !opponent.played) return;
-    if (opponent.played.label !== side.played.punishedBy) side.riskUnpunished = true;
+    if (opponent.played.label === side.played.punishedBy) return;
+    if (params.playedOutcome !== null && side.best) {
+      const own = key === 'p1' ? params.playedOutcome : -params.playedOutcome;
+      const payoff = own - side.best.worstCase;
+      side.riskPayoff = payoff;
+      if (payoff <= -RISK_PAYOFF_MARGIN) return;
+      if (payoff >= RISK_PAYOFF_MARGIN) side.riskPaidOff = true;
+    }
+    side.riskUnpunished = true;
   };
-  markRisk(p1, p2);
-  markRisk(p2, p1);
+  markRisk('p1', p1, p2);
+  markRisk('p2', p2, p1);
   const swing = params.scoreAfter !== null ? params.scoreAfter - params.scoreBefore : null;
   const decisionDelta = params.playedOutcome !== null ? params.playedOutcome - params.scoreBefore : null;
   const chanceDelta = params.playedOutcome !== null && params.scoreAfter !== null
     ? params.scoreAfter - params.playedOutcome
     : null;
 
-  const p1Bad = (p1.regret ?? 0) >= REGRET_THRESHOLD;
-  const p2Bad = (p2.regret ?? 0) >= REGRET_THRESHOLD;
+  // A paid-off read does not count as a decision problem.
+  const p1Bad = (p1.regret ?? 0) >= REGRET_THRESHOLD && !p1.riskPaidOff;
+  const p2Bad = (p2.regret ?? 0) >= REGRET_THRESHOLD && !p2.riskPaidOff;
   let attribution: TurnAttribution;
   if (!playedTracking) {
     // Without played actions only the movement itself can be described.
@@ -261,6 +286,9 @@ export function analyzeTurn(params: {
   } else if (p1Bad && p2Bad) attribution = 'both-decision';
   else if (p1Bad) attribution = 'p1-decision';
   else if (p2Bad) attribution = 'p2-decision';
+  else if (p1.riskPaidOff && p2.riskPaidOff) attribution = 'both-read';
+  else if (p1.riskPaidOff) attribution = 'p1-read';
+  else if (p2.riskPaidOff) attribution = 'p2-read';
   else if (chanceDelta !== null && Math.abs(chanceDelta) >= CHANCE_THRESHOLD) attribution = 'chance';
   else if (swing !== null && Math.abs(swing) >= CHANCE_THRESHOLD) {
     // The score clearly moved but nothing crossed a blame threshold: either

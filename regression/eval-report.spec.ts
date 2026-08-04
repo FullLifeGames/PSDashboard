@@ -110,6 +110,25 @@ test.describe('game report (multi-turn root cause)', () => {
     expect(report.tracked).toBe(true);
   });
 
+  test('paid-off reads are listed separately, never as misplays or regret totals', () => {
+    const read = (played: string, regret: number, payoff: number) => ({
+      playedRaw: null,
+      played: ranked(`move ${played.toLowerCase()}`, played, -0.2),
+      best: ranked('move safe', 'Safe', 0.1),
+      regret,
+      riskUnpunished: true,
+      riskPayoff: payoff,
+      riskPaidOff: true,
+    });
+    const report = buildGameReport([
+      mk(1, 0.1, 0.3, { p2: read('Flip Turn', 0.3, 0.25) }),
+      mk(2, 0.3, 0.2),
+    ], names, 'p2');
+    expect(report.reads).toEqual([{ turn: 1, side: 'p2', played: 'Flip Turn', payoff: 0.25 }]);
+    expect(report.misplays).toEqual([]);
+    expect(report.decisionTotals.p2).toBe(0);
+  });
+
   test('an unpunished risk never counts as a seed of the loss', () => {
     const report = buildGameReport([
       mk(1, 0.1, 0.05),

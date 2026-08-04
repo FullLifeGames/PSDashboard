@@ -50,6 +50,24 @@ export function EvalGameReport({ report, playerNames, onSelectTurn }: EvalGameRe
             ))}
         </div>
       )}
+      {report.reads.length > 0 && (
+        <div className="ps-eval-report-moments">
+          {report.reads.map(read => (
+            <button
+              key={`${read.turn}-${read.side}`}
+              type="button"
+              className="ps-btn ps-eval-report-moment"
+              onClick={() => onSelectTurn?.(read.turn)}
+              title="A risk whose read won value — jump to this turn's analysis"
+            >
+              <span style={{ color: '#cde' }}>T{read.turn}</span>
+              <span style={{ color: '#8c8' }}>{playerNames[read.side === 'p1' ? 0 : 1]}</span>
+              <span style={{ color: '#aab' }}>{read.played}</span>
+              <span style={{ color: '#8c8' }}>read paid off +{read.payoff.toFixed(2)}</span>
+            </button>
+          ))}
+        </div>
+      )}
       {report.keyMoments.length > 0 && (
         <div className="ps-eval-report-moments">
           {report.keyMoments.map(moment => {

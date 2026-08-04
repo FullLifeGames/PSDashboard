@@ -32,37 +32,60 @@ test.describe('turn analysis assembly', () => {
   });
 
   test('a side that played a clearly worse option gets the decision blame', () => {
+    // playedOutcome 0.0 keeps p2's payoff (+0.05 over the safe floor −0.05)
+    // inside the neutral band — an unpunished risk, still a decision turn.
     const analysis = analyzeTurn({
       turn: 20,
       result,
       played: { p1: { kind: 'move', name: 'Draco Meteor', tera: false }, p2: { kind: 'move', name: 'Recover', tera: false } },
-      playedOutcome: -0.2,
+      playedOutcome: 0.0,
       scoreBefore: 0.1,
       scoreAfter: -0.25,
     });
     expect(analysis.p1.regret).toBe(0);
     expect(analysis.p2.regret).toBeCloseTo(0.25, 10);
     expect(analysis.attribution).toBe('p2-decision');
-    expect(analysis.decisionDelta).toBeCloseTo(-0.3, 10);
-    expect(analysis.chanceDelta).toBeCloseTo(-0.05, 10);
+    expect(analysis.decisionDelta).toBeCloseTo(-0.1, 10);
+    expect(analysis.chanceDelta).toBeCloseTo(-0.25, 10);
     expect(analysis.swing).toBeCloseTo(-0.35, 10);
   });
 
-  test('a flagged regret is a risk (unpunished) when the punishing reply never came', () => {
-    // p2's Recover regrets 0.25; its floor assumes the reply "Reply" — p1
-    // actually clicked Draco Meteor, so the read went unpunished.
-    const analysis = analyzeTurn({
+  test('an unpunished risk grades by its payoff over the safe guarantee', () => {
+    const at = (playedOutcome: number | null) => analyzeTurn({
       turn: 20,
       result,
       played: { p1: { kind: 'move', name: 'Draco Meteor', tera: false }, p2: { kind: 'move', name: 'Recover', tera: false } },
-      playedOutcome: -0.2,
+      playedOutcome,
       scoreBefore: 0.1,
       scoreAfter: -0.25,
     });
-    expect(analysis.p2.riskUnpunished).toBe(true);
-    expect(analysis.p1.riskUnpunished).toBeUndefined();
 
-    // When the opponent DID click the punisher, the flag stays off.
+    // Own outcome +0.2 vs safe floor −0.05: the read won +0.25 — a good play.
+    const paid = at(-0.2);
+    expect(paid.p2.riskUnpunished).toBe(true);
+    expect(paid.p2.riskPaidOff).toBe(true);
+    expect(paid.p2.riskPayoff).toBeCloseTo(0.25, 10);
+    expect(paid.attribution).toBe('p2-read');
+    expect(paid.p1.riskUnpunished).toBeUndefined();
+
+    // Payoff +0.05 sits in the neutral band: risk, not a good play yet.
+    const neutral = at(0.0);
+    expect(neutral.p2.riskUnpunished).toBe(true);
+    expect(neutral.p2.riskPaidOff).toBeUndefined();
+    expect(neutral.attribution).toBe('p2-decision');
+
+    // Own outcome −0.2 vs floor −0.05: worse than the safe guarantee even
+    // with the read coming true — a plain misplay.
+    const behind = at(0.2);
+    expect(behind.p2.riskUnpunished).toBeUndefined();
+    expect(behind.attribution).toBe('p2-decision');
+
+    // Unknown pair value: the risk stays a risk.
+    const unknown = at(null);
+    expect(unknown.p2.riskUnpunished).toBe(true);
+    expect(unknown.p2.riskPaidOff).toBeUndefined();
+
+    // When the opponent DID click the punisher, no flag at all.
     const punished: EvalResult = {
       ...result,
       perSide: { p1: [choice('move reply', 'Reply', 0.2)], p2: result.perSide.p2 },

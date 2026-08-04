@@ -22,6 +22,19 @@ const phrase = labelPhrase;
 const playedBest = (side: SideAnalysis) =>
   side.played !== null && side.best !== null && side.played.choice === side.best.choice;
 
+/** A flagged risk that won value over the safe guarantee — praised, not blamed. */
+function readClause(name: string, side: SideAnalysis, opponent: SideAnalysis): string | null {
+  if (!side.riskPaidOff || !side.played || !side.best) return null;
+  const came = opponent.played ? `; ${phrase(opponent.played.label)} came instead` : '';
+  const priced = side.played.punishedBy ? ` The floor priced in ${side.played.punishedBy}${came}.` : '';
+  return `${name} played ${phrase(side.played.label)} — a read that paid off, ` +
+    `${signed(side.riskPayoff ?? 0)} over the safe ${phrase(side.best.label)} (${signed(side.best.worstCase)}).${priced}`;
+}
+
+function sideClause(name: string, side: SideAnalysis, opponent: SideAnalysis): string | null {
+  return readClause(name, side, opponent) ?? mistakeClause(name, side, opponent);
+}
+
 function mistakeClause(name: string, side: SideAnalysis, opponent: SideAnalysis): string | null {
   if ((side.regret ?? 0) < REGRET_THRESHOLD || !side.played || !side.best) return null;
   const line = side.best.line && side.best.line.length > 0
@@ -64,9 +77,12 @@ export function summarizeTurn(analysis: TurnAnalysis, playerNames: [string, stri
   switch (analysis.attribution) {
     case 'p1-decision':
     case 'p2-decision':
-    case 'both-decision': {
-      const p1Clause = mistakeClause(playerNames[0], analysis.p1, analysis.p2);
-      const p2Clause = mistakeClause(playerNames[1], analysis.p2, analysis.p1);
+    case 'both-decision':
+    case 'p1-read':
+    case 'p2-read':
+    case 'both-read': {
+      const p1Clause = sideClause(playerNames[0], analysis.p1, analysis.p2);
+      const p2Clause = sideClause(playerNames[1], analysis.p2, analysis.p1);
       if (p1Clause) sentences.push(p1Clause);
       if (p2Clause) sentences.push(p2Clause);
       if (analysis.chanceDelta !== null && Math.abs(analysis.chanceDelta) >= CHANCE_THRESHOLD) {

@@ -108,7 +108,14 @@ function SideRow({ name, side, onExplore }: { name: string; side: SideAnalysis; 
             {' '}({signed(side.best.worstCase)})
           </span>
         )}
-        {regretful && side.regret !== null && (setupMove ? (
+        {regretful && side.regret !== null && (side.riskPaidOff ? (
+          <span
+            style={{ color: '#8c8' }}
+            title={`The safe line guaranteed ${side.best ? side.best.worstCase.toFixed(2) : '?'}; the actual pair came out ${(side.riskPayoff ?? 0).toFixed(2)} better — the read won value.`}
+          >
+            read paid off · +{(side.riskPayoff ?? 0).toFixed(2)}
+          </span>
+        ) : setupMove ? (
           <span
             style={{ color: '#b6a46a' }}
             title={`${setupMove} is a setup move — its payoff lies past the search horizon, so the regret may be overstated.`}

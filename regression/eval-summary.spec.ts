@@ -31,7 +31,7 @@ test.describe('natural-language turn summaries', () => {
       turn: 20,
       result,
       played: { p1: { kind: 'move', name: 'Draco Meteor', tera: false }, p2: { kind: 'move', name: 'Recover', tera: false } },
-      playedOutcome: -0.2,
+      playedOutcome: 0.0,
       scoreBefore: 0.1,
       scoreAfter: -0.25,
     }), names);
@@ -80,6 +80,20 @@ test.describe('natural-language turn summaries', () => {
     expect(summary).toContain('The difference: only the Mega Evolution.');
   });
 
+  test('a read that beat the safe guarantee is praised, not blamed', () => {
+    const summary = summarizeTurn(analyzeTurn({
+      turn: 24,
+      result,
+      played: { p1: { kind: 'move', name: 'Draco Meteor', tera: false }, p2: { kind: 'move', name: 'Recover', tera: false } },
+      playedOutcome: -0.2,
+      scoreBefore: 0.1,
+      scoreAfter: -0.25,
+    }), names);
+    expect(summary).toContain('Beta played Recover — a read that paid off, +0.25 over the safe switching to Dragapult');
+    expect(summary).toContain('The floor priced in Reply; Draco Meteor came instead.');
+    expect(summary).not.toContain('safer was');
+  });
+
   test('a regretted setup move carries the horizon caveat', () => {
     const setupResult: EvalResult = {
       ...result,
@@ -92,7 +106,7 @@ test.describe('natural-language turn summaries', () => {
       turn: 12,
       result: setupResult,
       played: { p1: { kind: 'move', name: 'Draco Meteor', tera: false }, p2: { kind: 'move', name: 'Swords Dance', tera: false } },
-      playedOutcome: -0.2,
+      playedOutcome: 0.0,
       scoreBefore: 0.1,
       scoreAfter: -0.25,
     }), names);

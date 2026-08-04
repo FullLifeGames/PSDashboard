@@ -1,4 +1,4 @@
-import { REGRET_THRESHOLD, playedSetupMove, type TurnAnalysis } from './analysis';
+import { REGRET_THRESHOLD, playedSetupMove, type SideAnalysis, type TurnAnalysis } from './analysis';
 import { labelPhrase, signedValue } from './summary';
 
 /**
@@ -13,6 +13,17 @@ export const KEY_MOMENT_SWING = 0.25;
 export const REPORT_KEY_MOMENTS = 4;
 /** How many misplays the report lists per player. */
 export const REPORT_MISPLAYS_PER_SIDE = 2;
+/** How many paid-off reads the report lists per player. */
+export const REPORT_READS_PER_SIDE = 2;
+
+/** One risk whose read won value, ready for display. */
+export interface GameRead {
+  turn: number;
+  side: 'p1' | 'p2';
+  played: string;
+  /** Own-perspective value won over the safe line's guarantee. */
+  payoff: number;
+}
 /** Below this summed regret a player's game counts as clean. */
 export const CLEAN_PLAY_TOTAL = 0.2;
 
@@ -35,6 +46,8 @@ export interface GameReport {
   keyMoments: TurnAnalysis[];
   /** Each side's biggest regrets, in turn order. */
   misplays: GameMisplay[];
+  /** Each side's biggest paid-off reads, in turn order. */
+  reads: GameRead[];
   /** False when played actions were unavailable — an empty misplay list then means "unknown", not "clean". */
   tracked: boolean;
   /** Summed regret per player across the analyzed game. */
@@ -92,7 +105,8 @@ export function buildGameReport(
   // Selected PER SIDE — a global top list lets one player's numbers (often
   // a winner's unpunished risks) crowd the other's out entirely.
   const misplaysFor = (side: 'p1' | 'p2'): GameMisplay[] => known
-    .filter(analysis => (analysis[side].regret ?? 0) >= REGRET_THRESHOLD && analysis[side].played && analysis[side].best)
+    .filter(analysis => (analysis[side].regret ?? 0) >= REGRET_THRESHOLD &&
+      analysis[side].played && analysis[side].best && !analysis[side].riskPaidOff)
     .map(analysis => ({
       turn: analysis.turn,
       side,
@@ -106,9 +120,24 @@ export function buildGameReport(
   const misplays = !playedTracking ? [] : [...misplaysFor('p1'), ...misplaysFor('p2')]
     .sort((a, b) => a.turn - b.turn || a.side.localeCompare(b.side));
 
+  const readsFor = (side: 'p1' | 'p2'): GameRead[] => known
+    .filter(analysis => analysis[side].riskPaidOff && analysis[side].played)
+    .map(analysis => ({
+      turn: analysis.turn,
+      side,
+      played: analysis[side].played!.label,
+      payoff: analysis[side].riskPayoff ?? 0,
+    }))
+    .sort((a, b) => b.payoff - a.payoff)
+    .slice(0, REPORT_READS_PER_SIDE);
+  const reads = !playedTracking ? [] : [...readsFor('p1'), ...readsFor('p2')]
+    .sort((a, b) => a.turn - b.turn || a.side.localeCompare(b.side));
+
+  // Paid-off reads are not decision errors — they stay out of the totals.
+  const regretOf = (side: SideAnalysis) => (side.riskPaidOff ? 0 : side.regret ?? 0);
   const decisionTotals = {
-    p1: known.reduce((sum, analysis) => sum + (analysis.p1.regret ?? 0), 0),
-    p2: known.reduce((sum, analysis) => sum + (analysis.p2.regret ?? 0), 0),
+    p1: known.reduce((sum, analysis) => sum + regretOf(analysis.p1), 0),
+    p2: known.reduce((sum, analysis) => sum + regretOf(analysis.p2), 0),
   };
   const chanceTotal = known.reduce((sum, analysis) => sum + (analysis.chanceDelta ?? 0), 0);
 
@@ -150,5 +179,5 @@ export function buildGameReport(
     sentences.push(`Luck ran ${chanceTotal > 0 ? 'for' : 'against'} ${playerNames[0]} overall (${signedValue(chanceTotal)}).`);
   }
 
-  return { winner, turningPoint, keyMoments, misplays, tracked: playedTracking, decisionTotals, chanceTotal, summary: sentences.join(' ') };
+  return { winner, turningPoint, keyMoments, misplays, reads, tracked: playedTracking, decisionTotals, chanceTotal, summary: sentences.join(' ') };
 }

@@ -12,6 +12,9 @@ export function attributionBadge(analysis: TurnAnalysis, playerNames: [string, s
     case 'both-decision': return analysis.p1.riskUnpunished && analysis.p2.riskUnpunished
       ? { text: 'both took risks (unpunished)', color: '#b6a46a' }
       : { text: 'both sides misplayed', color: '#f3a6a6' };
+    case 'p1-read': return { text: `${playerNames[0]}'s read paid off`, color: '#8c8' };
+    case 'p2-read': return { text: `${playerNames[1]}'s read paid off`, color: '#8c8' };
+    case 'both-read': return { text: 'both sides\' reads paid off', color: '#8c8' };
     case 'chance': return { text: 'chance swing (rolls, crits, reveals)', color: '#b6a46a' };
     case 'shift':
       return analysis.playedTracking === false
