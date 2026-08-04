@@ -17,8 +17,8 @@ interface EvalPanelProps {
   onPrefsChange: (prefs: EvalPreferences) => void;
   onEvaluate: () => void;
   onCancel: () => void;
-  /** Click on an engine line: prefills it in the branch (entering one first when needed). */
-  onPickChoice?: (side: 'p1' | 'p2', choice: RankedChoice) => void;
+  /** Click on an engine line: plays it out in a branch (entering one first when needed), the other side answering with `reply`. */
+  onPickChoice?: (side: 'p1' | 'p2', choice: RankedChoice, reply?: RankedChoice | null) => void;
   /** Branch mode: hides the auto checkbox on the replay view. */
   showAuto: boolean;
   /** Gen 9 only — other gens have no Tera to gate. */
@@ -39,11 +39,13 @@ interface EvalPanelProps {
 const signed = (value: number) => `${value >= 0 ? '+' : ''}${value.toFixed(2)}`;
 
 function ChoiceList({
-  side, choices, onPickChoice,
+  side, choices, reply, onPickChoice,
 }: {
   side: 'p1' | 'p2';
   choices: RankedChoice[];
-  onPickChoice?: (side: 'p1' | 'p2', choice: RankedChoice) => void;
+  /** The other side's engine answer, committed alongside a clicked line. */
+  reply: RankedChoice | null;
+  onPickChoice?: (side: 'p1' | 'p2', choice: RankedChoice, reply?: RankedChoice | null) => void;
 }) {
   const best = choices[0];
   return (
@@ -57,7 +59,7 @@ function ChoiceList({
         const tooltip = `Guaranteed floor ${signed(choice.worstCase)}` +
           (choice.punishedBy ? ` — worst reply: ${choice.punishedBy}` : '') +
           ` · expected ${signed(choice.expected)}. Choices are ranked by their floor.` +
-          (onPickChoice ? ' Click to play this out in a branch.' : '');
+          (onPickChoice ? ' Click to play this turn out against the engine’s reply.' : '');
         const detail = (
           <>
             <span className="ps-eval-choice-main">
@@ -82,7 +84,7 @@ function ChoiceList({
             type="button"
             className="ps-btn ps-eval-choice"
             title={tooltip}
-            onClick={() => onPickChoice(side, choice)}
+            onClick={() => onPickChoice(side, choice, reply)}
           >
             {detail}
           </button>
@@ -288,8 +290,8 @@ export function EvalPanel({
             )}
           </div>
           <div className="ps-eval-columns">
-            <ChoiceList side="p1" choices={result.perSide.p1} onPickChoice={onPickChoice} />
-            <ChoiceList side="p2" choices={result.perSide.p2} onPickChoice={onPickChoice} />
+            <ChoiceList side="p1" choices={result.perSide.p1} reply={result.perSide.p2[0] ?? null} onPickChoice={onPickChoice} />
+            <ChoiceList side="p2" choices={result.perSide.p2} reply={result.perSide.p1[0] ?? null} onPickChoice={onPickChoice} />
           </div>
         </div>
       )}

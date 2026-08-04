@@ -6,8 +6,8 @@ import { attributionBadge } from './eval-badges';
 interface EvalTurnAnalysisProps {
   analysis: TurnAnalysis;
   playerNames: [string, string];
-  /** Click on an engine line: play it out in a branch at this turn. */
-  onExplore?: (side: 'p1' | 'p2', choice: RankedChoice) => void;
+  /** Click on an engine line: play it out in a branch at this turn, the other side answering with `reply`. */
+  onExplore?: (side: 'p1' | 'p2', choice: RankedChoice, reply?: RankedChoice | null) => void;
 }
 
 /** The engine's line as a click-to-explore button, or a plain span. */
@@ -149,7 +149,8 @@ function SideRow({ name, side, onExplore }: { name: string; side: SideAnalysis; 
 export function EvalTurnAnalysis({ analysis, playerNames, onExplore }: EvalTurnAnalysisProps) {
   const badge = attributionBadge(analysis, playerNames);
   const exploreFor = (side: 'p1' | 'p2') =>
-    onExplore && ((choice: RankedChoice) => onExplore(side, choice));
+    onExplore && ((choice: RankedChoice) =>
+      onExplore(side, choice, side === 'p1' ? analysis.p2.best : analysis.p1.best));
   return (
     <div className="ps-eval-analysis">
       <div className="ps-eval-analysis-row">

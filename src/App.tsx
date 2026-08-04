@@ -536,45 +536,62 @@ function App() {
   }, [replayData, branching, evaluation, effectiveTera, acquireBranchPosition, acquireReplayPosition, branchTurn, setsFingerprint]);
 
   // Clicking a recommended choice pre-fills the branch pickers.
-  const handlePickEvalChoice = useCallback((side: 'p1' | 'p2', ranked: RankedChoice) => {
-    if (!simState) return;
+  const applyEvalChoice = useCallback((side: 'p1' | 'p2', ranked: RankedChoice): boolean => {
+    if (!simState) return false;
     const movesBySlot = side === 'p1' ? simState.p1MovesBySlot : simState.p2MovesBySlot;
     const switchesBySlot = side === 'p1' ? simState.p1SwitchesBySlot : simState.p2SwitchesBySlot;
     const slotChoices = evalChoiceToSlotChoices(ranked.choice, movesBySlot, switchesBySlot);
-    if (!slotChoices) return;
+    if (!slotChoices) return false;
+    let applied = false;
     slotChoices.forEach((choice, activeSlot) => {
-      if (choice) handleSetChoice(side, choice, slotChoices.length > 1 ? activeSlot : undefined);
+      if (!choice) return;
+      handleSetChoice(side, choice, slotChoices.length > 1 ? activeSlot : undefined);
+      applied = true;
     });
+    return applied;
   }, [simState, handleSetChoice]);
 
-  // "How would the game have turned out?" — clicking an engine line in the
-  // replay view branches at the shown turn with that line prefilled; the
-  // pick applies once the branch runtime is up.
-  const [pendingEvalPick, setPendingEvalPick] = useState<{ side: 'p1' | 'p2'; ranked: RankedChoice } | null>(null);
-
-  const handleExploreChoice = useCallback((side: 'p1' | 'p2', ranked: RankedChoice) => {
-    if (branching) {
-      handlePickEvalChoice(side, ranked);
+  // Chess-style walk: clicking an engine line PLAYS THE TURN OUT — the
+  // clicked side commits its line, the other side answers with the engine's
+  // top reply, the turn executes, and the result re-evaluates so the next
+  // recommendations are already waiting for the next click.
+  const playOutEvalChoice = useCallback((side: 'p1' | 'p2', ranked: RankedChoice, reply: RankedChoice | null) => {
+    if (!applyEvalChoice(side, ranked)) return;
+    const other = side === 'p1' ? 'p2' : 'p1';
+    if (reply && applyEvalChoice(other, reply)) {
+      void executeTurn().then(() => handleEvaluate());
       return;
     }
-    setPendingEvalPick({ side, ranked });
+    // No engine reply to commit (forced-switch positions execute through
+    // setChoice on their own) — show the engine's view of what stands.
+    handleEvaluate();
+  }, [applyEvalChoice, executeTurn, handleEvaluate]);
+
+  const [pendingEvalPick, setPendingEvalPick] =
+    useState<{ side: 'p1' | 'p2'; ranked: RankedChoice; reply: RankedChoice | null } | null>(null);
+
+  const handleExploreChoice = useCallback((side: 'p1' | 'p2', ranked: RankedChoice, reply?: RankedChoice | null) => {
+    // The walk re-evaluates after every executed turn — surface that as the
+    // visible Auto setting rather than a hidden mode.
+    if (!evaluation.prefs.auto) evaluation.setPrefs({ ...evaluation.prefs, auto: true });
+    if (branching) {
+      playOutEvalChoice(side, ranked, reply ?? null);
+      return;
+    }
+    setPendingEvalPick({ side, ranked, reply: reply ?? null });
     void handleBranch();
-  }, [branching, handlePickEvalChoice, handleBranch]);
+  }, [branching, playOutEvalChoice, handleBranch, evaluation]);
 
   useEffect(() => {
     if (!pendingEvalPick) return;
     if (branching && simState) {
-      handlePickEvalChoice(pendingEvalPick.side, pendingEvalPick.ranked);
+      playOutEvalChoice(pendingEvalPick.side, pendingEvalPick.ranked, pendingEvalPick.reply);
       setPendingEvalPick(null);
-      // Evaluate the branched position right away: the pick shows as
-      // selected AND the engine's next recommendations appear without the
-      // user having to know about the Evaluate button.
-      handleEvaluate();
     } else if (!branching && !branchPreparing) {
       // Branch entry failed or was cancelled — drop the stale pick.
       setPendingEvalPick(null);
     }
-  }, [pendingEvalPick, branching, simState, branchPreparing, handlePickEvalChoice, handleEvaluate]);
+  }, [pendingEvalPick, branching, simState, branchPreparing, playOutEvalChoice]);
 
   const analyzableTurns = endSnapshotTurn !== null ? Math.max(1, endSnapshotTurn - 1) : maxTurn;
 

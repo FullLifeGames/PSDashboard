@@ -233,17 +233,18 @@ test.describe('PS Dashboard', () => {
     await panel.locator('button', { hasText: 'Evaluate' }).click();
     await expect(panel.locator('.ps-eval-bar')).toBeVisible({ timeout: 120_000 });
 
-    // Clicking p1's top engine line enters a branch at this turn…
+    // Clicking p1's top engine line enters a branch and PLAYS THE TURN OUT
+    // against the engine's reply…
     await panel.locator('.ps-eval-column').first().locator('button.ps-eval-choice').first().click();
-    await expect(page.getByText(/Branching.*Turn/)).toBeVisible({ timeout: 60_000 });
+    await expect(page.getByText(/Branching — Turn/)).toBeVisible({ timeout: 60_000 });
+    await expect(page.getByText(/Branching — Turn 2/)).toBeVisible({ timeout: 60_000 });
 
-    // …with that line already selected: choosing only p2's reply arms the turn.
-    const p2Moves = page.locator('.ps-movegrid').nth(1).locator('.ps-movebtn');
-    await expect(p2Moves.first()).toBeVisible({ timeout: 5000 });
-    await p2Moves.first().click();
-    const execBtn = page.locator('button', { hasText: 'Execute Turn' });
-    await expect(execBtn).toBeVisible({ timeout: 5000 });
-    await expect(execBtn).toBeEnabled();
+    // …auto re-evaluation surfaces the next recommendations for the walk
+    // (the click also arms Auto for the turns that follow).
+    await expect(panel.locator('.ps-eval-bar')).toBeVisible({ timeout: 120_000 });
+    await expect(panel.locator('.ps-eval-column').first().locator('button.ps-eval-choice').first())
+      .toBeVisible({ timeout: 120_000 });
+    await expect(panel.getByRole('checkbox')).toBeChecked();
   });
 
   test('evaluates a position with the MCTS mode', async ({ page }) => {
@@ -359,7 +360,7 @@ test.describe('PS Dashboard', () => {
     await expect(panel.locator('.ps-eval-analysis')).toContainText('played');
   });
 
-  test('branch mode: picking both recommendations arms Execute Turn', async ({ page }) => {
+  test('branch mode: clicking a recommendation plays the turn out', async ({ page }) => {
     test.setTimeout(180_000);
     await page.evaluate(() => {
       localStorage.setItem('ps-replay-interceptor:eval-pool', '2');
@@ -369,15 +370,16 @@ test.describe('PS Dashboard', () => {
     await page.reload();
     await page.locator('button', { hasText: 'Load' }).click();
     await page.locator('button', { hasText: 'Branch Here' }).click();
-    await expect(page.getByText(/Branching.*Turn/)).toBeVisible({ timeout: 15000 });
+    await expect(page.getByText(/Branching — Turn 1/)).toBeVisible({ timeout: 15000 });
 
     const panel = page.locator('.ps-eval-panel');
     await panel.locator('button', { hasText: 'Evaluate' }).click();
     await expect(panel.locator('.ps-eval-bar')).toBeVisible({ timeout: 120_000 });
 
+    // One click commits the line, answers with the engine's reply, and
+    // executes — the walk continues from the next position.
     await panel.locator('.ps-eval-column').nth(0).locator('.ps-eval-choice').first().click();
-    await panel.locator('.ps-eval-column').nth(1).locator('.ps-eval-choice').first().click();
-    await expect(page.locator('button', { hasText: 'Execute Turn' })).toBeEnabled();
+    await expect(page.getByText(/Branching — Turn 2/)).toBeVisible({ timeout: 60_000 });
   });
 
   test('exports both sides and applies an imported set as manual data (Import/Export Sets)', async ({ page }) => {
