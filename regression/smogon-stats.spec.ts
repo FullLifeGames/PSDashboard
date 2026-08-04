@@ -49,11 +49,12 @@ test.describe('Smogon usage stat enrichment', () => {
   test('only queries the client-safe data.pkmn.cc endpoint (smogon.com never sends CORS headers)', () => {
     const urls = buildSmogonStatsUrls('gen9ou');
 
-    expect(urls).toEqual([{
+    expect(urls[0]).toEqual({
       format: 'gen9ou',
       month: 'latest',
       url: 'https://data.pkmn.cc/stats/gen9ou.json',
-    }]);
+    });
+    expect(urls.every(candidate => candidate.url.startsWith('https://data.pkmn.cc/stats/'))).toBe(true);
   });
 
   test('strips the smogtours prefix before querying usage stats', () => {
@@ -62,17 +63,26 @@ test.describe('Smogon usage stat enrichment', () => {
   });
 
   test('maps Custom Game formats straight to the generation OU stats', () => {
-    expect(buildSmogonStatsUrls('gen3customgame')).toEqual([{
+    const urls = buildSmogonStatsUrls('gen3customgame');
+    expect(urls[0]).toEqual({
       format: 'gen3ou',
       month: 'latest',
       url: 'https://data.pkmn.cc/stats/gen3ou.json',
-    }]);
+    });
+    expect(urls.map(candidate => candidate.format)).toEqual(['gen3ou', 'gen3ubers']);
   });
 
-  test('adds the generation OU as fallback for formats missing from the stats', () => {
+  test('adds the generation OU and Ubers as per-species fallbacks', () => {
     const urls = buildSmogonStatsUrls('gen5nichemeta');
-    expect(urls.map(candidate => candidate.format)).toEqual(['gen5nichemeta', 'gen5ou']);
+    expect(urls.map(candidate => candidate.format)).toEqual(['gen5nichemeta', 'gen5ou', 'gen5ubers']);
     expect(urls[1].url).toBe('https://data.pkmn.cc/stats/gen5ou.json');
+  });
+
+  test('maps VGC formats to the year-level stats file with doubles fallbacks', () => {
+    const urls = buildSmogonStatsUrls('gen9championsvgc2026regmb');
+    expect(urls.map(candidate => candidate.format)).toEqual([
+      'gen9vgc2026', 'gen9doublesou', 'gen9ou', 'gen9ubers',
+    ]);
   });
 
   test('fetchSmogonUsageStats assumes OU when the format has no stats file', async () => {
@@ -94,9 +104,42 @@ test.describe('Smogon usage stat enrichment', () => {
     expect(requestedUrls).toEqual([
       'https://data.pkmn.cc/stats/gen4nichemeta.json',
       'https://data.pkmn.cc/stats/gen4ou.json',
+      'https://data.pkmn.cc/stats/gen4ubers.json',
     ]);
     expect(stats?.format).toBe('gen4ou');
     expect(stats?.pokemon.metagross.moves[0].value).toBe('Meteor Mash');
+  });
+
+  test('merges species missing from the format file from the fallback files', async () => {
+    const fetcher = (async (input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.includes('gen9vgc2026')) {
+        return new Response(JSON.stringify({
+          pokemon: { Incineroar: { count: 100, moves: { 'Fake Out': 0.9 } } },
+        }), { status: 200, headers: { 'content-type': 'application/json' } });
+      }
+      if (url.includes('gen9ubers')) {
+        return new Response(JSON.stringify({
+          pokemon: {
+            Annihilape: { count: 50, moves: { 'Rage Fist': 0.95, 'Close Combat': 0.9 } },
+            Incineroar: { count: 10, moves: { 'Knock Off': 0.8 } },
+          },
+        }), { status: 200, headers: { 'content-type': 'application/json' } });
+      }
+      return new Response('not found', { status: 404 });
+    }) as typeof fetch;
+
+    const stats = await fetchSmogonUsageStats('gen9championsvgc2026regmb', {
+      now: new Date('2026-08-04T00:00:00Z'),
+      fetcher,
+    });
+
+    // The format's own data wins for species it covers…
+    expect(stats?.format).toBe('gen9vgc2026');
+    expect(stats?.pokemon.incineroar.moves.map(move => move.value)).toEqual(['Fake Out']);
+    // …and species it lacks merge in from the fallback files.
+    expect(stats?.pokemon.annihilape.moves.map(move => move.value)).toEqual(['Rage Fist', 'Close Combat']);
+    expect(stats?.pokemon.annihilape.moves[0].sourceDetail).toBe('Smogon gen9ubers latest');
   });
 
   test('parses data.pkmn.cc usage stats as fractional probabilities', () => {
