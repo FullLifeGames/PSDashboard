@@ -296,6 +296,90 @@ test.describe('Replay reconstruction regression suite', () => {
     expect(runtime.log.join('\n')).not.toContain('|move|p2a: Scizor|Bullet Punch|p1a: Klolovor');
   });
 
+  test('replays a Mega Evolution so later positions cannot re-offer it', async () => {
+    const set = (species: string, moves: string[], item = ''): PokemonSet => ({
+      name: species, species, item, ability: '', moves,
+      nature: 'Adamant',
+      evs: { hp: 252, atk: 252, def: 0, spa: 0, spd: 4, spe: 0 },
+      ivs: { hp: 31, atk: 31, def: 31, spa: 31, spd: 31, spe: 31 },
+      level: 100,
+    });
+    const log = [
+      '|gametype|singles',
+      '|player|p1|Alice||',
+      '|player|p2|Bob||',
+      '|gen|7',
+      '|tier|[Gen 7] OU',
+      '|poke|p1|Scizor, M|',
+      '|poke|p2|Snorlax, M|',
+      '|start',
+      '|switch|p1a: Scizor|Scizor, M|100/100',
+      '|switch|p2a: Snorlax|Snorlax, M|100/100',
+      '|turn|1',
+      '|detailschange|p1a: Scizor|Scizor-Mega, M',
+      '|-mega|p1a: Scizor|Scizor|Scizorite',
+      '|move|p1a: Scizor|Bullet Punch|p2a: Snorlax',
+      '|-damage|p2a: Snorlax|85/100',
+      '|move|p2a: Snorlax|Tackle|p1a: Scizor',
+      '|-damage|p1a: Scizor|90/100',
+      '|upkeep',
+      '|turn|2',
+    ].join('\n');
+
+    const runtime = await reconstructBranchRuntime({
+      format: 'gen7ou',
+      p1Team: [{ ...set('Scizor', ['Bullet Punch'], 'Scizorite'), ability: 'Technician' }],
+      p2Team: [{ ...set('Snorlax', ['Tackle']), ability: 'Immunity' }],
+      replayLog: log,
+      targetTurn: 2,
+    });
+    const scizor = runtime.battleStream.battle!.sides[0].active[0]!;
+    expect(scizor.species.name).toBe('Scizor-Mega');
+    expect(scizor.canMegaEvo).toBeFalsy();
+  });
+
+  test('replays a Terastallization so later positions cannot re-offer it', async () => {
+    const set = (species: string, ability: string, moves: string[]): PokemonSet => ({
+      name: species, species, item: '', ability, moves,
+      nature: 'Adamant',
+      evs: { hp: 252, atk: 252, def: 0, spa: 0, spd: 4, spe: 0 },
+      ivs: { hp: 31, atk: 31, def: 31, spa: 31, spd: 31, spe: 31 },
+      level: 100,
+      teraType: 'Water',
+    });
+    const log = [
+      '|gametype|singles',
+      '|player|p1|Alice||',
+      '|player|p2|Bob||',
+      '|gen|9',
+      '|tier|[Gen 9] OU',
+      '|poke|p1|Snorlax, M|',
+      '|poke|p2|Chansey, F|',
+      '|start',
+      '|switch|p1a: Snorlax|Snorlax, M|100/100',
+      '|switch|p2a: Chansey|Chansey, F|100/100',
+      '|turn|1',
+      '|-terastallize|p1a: Snorlax|Water',
+      '|move|p1a: Snorlax|Tackle|p2a: Chansey',
+      '|-damage|p2a: Chansey|90/100',
+      '|move|p2a: Chansey|Seismic Toss|p1a: Snorlax',
+      '|-damage|p1a: Snorlax|80/100',
+      '|upkeep',
+      '|turn|2',
+    ].join('\n');
+
+    const runtime = await reconstructBranchRuntime({
+      format: 'gen9ou',
+      p1Team: [set('Snorlax', 'Immunity', ['Tackle'])],
+      p2Team: [set('Chansey', 'Natural Cure', ['Seismic Toss'])],
+      replayLog: log,
+      targetTurn: 2,
+    });
+    const snorlax = runtime.battleStream.battle!.sides[0].active[0]!;
+    expect(snorlax.terastallized).toBe('Water');
+    expect(snorlax.canTerastallize).toBeFalsy();
+  });
+
   test('corrects active Pokémon from protocol switch effects the simulator cannot reproduce', async () => {
     const p1Team: PokemonSet[] = [
       {

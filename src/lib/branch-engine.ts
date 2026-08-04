@@ -402,6 +402,24 @@ function moveChoiceForActive(active: SimPokemon | null | undefined, moveName: st
   return `move ${moveIndex >= 0 ? moveIndex + 1 : moveId}`;
 }
 
+/**
+ * Replays the protocol's gimmick markers (Tera / Mega / Ultra Burst) as
+ * choice modifiers. Without them the reconstructed sim never transforms —
+ * every later position then carries an unspent gimmick on an untransformed
+ * Pokémon, and the eval recommends a Mega that already happened. Gated on
+ * the sim actually offering the gimmick so an unknown item can never
+ * produce a rejected choice.
+ */
+function gimmickSuffixForSlot(events: string[], ident: string, active: SimPokemon | null | undefined): string {
+  if (!active) return '';
+  for (const line of events) {
+    if (line.startsWith(`|-terastallize|${ident}`) && active.canTerastallize) return ' terastallize';
+    if (line.startsWith(`|-mega|${ident}`) && active.canMegaEvo) return ' mega';
+    if (line.startsWith(`|-burst|${ident}`) && active.canUltraBurst) return ' ultra';
+  }
+  return '';
+}
+
 function getChoiceForSlot(
   events: string[],
   side: 'p1' | 'p2',
@@ -427,7 +445,7 @@ function getChoiceForSlot(
         moveName,
         targetLoc,
       );
-      return `${moveChoiceForActive(active, moveName)}${suffix}`;
+      return `${moveChoiceForActive(active, moveName)}${suffix}${gimmickSuffixForSlot(events, ident, active)}`;
     }
   }
 
