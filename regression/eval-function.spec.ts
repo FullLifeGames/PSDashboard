@@ -79,6 +79,38 @@ test.describe('evaluatePosition', () => {
     expect(evaluatePosition(battle)).toBeGreaterThan(0);
   });
 
+  test('an attack boost flips the matchup term, not just the flat bonus', () => {
+    // A Tackle mirror is a dead-even 7-turn race. +2 Atk halves the race one
+    // way: the flat boost weight alone would be worth ~0.10 here — winning
+    // every pair through the boosted matchup term is worth far more.
+    const battle = makeBattle([makeSet('A', 'Snorlax', ['Tackle'])], [makeSet('B', 'Snorlax', ['Tackle'])]);
+    expect(evaluatePosition(battle)).toBe(0);
+    battle.sides[0].active[0]!.boostBy({ atk: 2 });
+    expect(evaluatePosition(battle)).toBeGreaterThan(0.3);
+  });
+
+  test('a defense boost blunts a physical race', () => {
+    const battle = makeBattle([makeSet('A', 'Snorlax', ['Tackle'])], [makeSet('B', 'Snorlax', ['Tackle'])]);
+    battle.sides[1].active[0]!.boostBy({ def: 2 });
+    expect(evaluatePosition(battle)).toBeLessThan(-0.3);
+  });
+
+  test('a speed boost breaks an even race in the matchup term', () => {
+    const battle = makeBattle([makeSet('A', 'Snorlax', ['Tackle'])], [makeSet('B', 'Snorlax', ['Tackle'])]);
+    battle.sides[0].active[0]!.boostBy({ spe: 1 });
+    expect(evaluatePosition(battle)).toBeGreaterThan(0.3);
+  });
+
+  test('a shared matchup cache stays exact across boost changes', () => {
+    const battle = makeBattle([makeSet('A', 'Snorlax', ['Tackle'])], [makeSet('B', 'Snorlax', ['Tackle'])]);
+    const cache = createMatchupCache();
+    expect(evaluatePosition(battle, cache)).toBe(evaluatePosition(battle));
+    // The memo covers only the boost-independent part — after stages change,
+    // the cached path must track a fresh computation exactly.
+    battle.sides[0].active[0]!.boostBy({ atk: 2 });
+    expect(evaluatePosition(battle, cache)).toBe(evaluatePosition(battle));
+  });
+
   test('hazards hurt the side they lie on', () => {
     const battle = makeBattle([makeSet('A', 'Snorlax', VANILLA)], [makeSet('B', 'Snorlax', VANILLA)]);
     battle.sides[1].addSideCondition('stealthrock', battle.sides[0].active[0]!);

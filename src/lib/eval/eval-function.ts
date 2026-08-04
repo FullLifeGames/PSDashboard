@@ -60,10 +60,12 @@ function sideScore(side: Side): number {
   return score;
 }
 
-/** HP-independent threat estimate of one attacker→defender direction. */
+/** HP- and boost-independent threat estimate of one attacker→defender direction. */
 export interface PairThreat {
-  /** Best expected damage as a fraction of the defender's max HP. */
-  fraction: number;
+  /** Best expected physical-move damage as a fraction of the defender's max HP. */
+  physical: number;
+  /** Best expected special-move damage as a fraction of the defender's max HP. */
+  special: number;
   /** The attacker carries a usable damaging priority move. */
   priority: boolean;
 }
@@ -137,16 +139,35 @@ export function singleMoveFraction(attacker: Pokemon, defender: Pokemon, moveId:
 }
 
 export function pairThreat(attacker: Pokemon, defender: Pokemon, battle: Battle): PairThreat {
-  let fraction = 0;
+  let physical = 0;
+  let special = 0;
   let priority = false;
   for (const slot of attacker.moveSlots) {
     const moveFraction = singleMoveFraction(attacker, defender, slot.id, battle);
     if (moveFraction > 0) {
-      fraction = Math.max(fraction, moveFraction);
-      if (battle.dex.moves.get(slot.id).priority > 0) priority = true;
+      const move = battle.dex.moves.get(slot.id);
+      if (move.category === 'Physical') physical = Math.max(physical, moveFraction);
+      else special = Math.max(special, moveFraction);
+      if (move.priority > 0) priority = true;
     }
   }
-  return { fraction, priority };
+  return { physical, special, priority };
+}
+
+/** Standard stage multiplier: +1 → 1.5x, −1 → 0.67x. */
+const stageMultiplier = (stage: number) => (stage >= 0 ? (2 + stage) / 2 : 2 / (2 - stage));
+
+/**
+ * The memoized threat with the CURRENT boost stages applied. Stages stay
+ * outside the memo key on purpose — they change between forked positions of
+ * one search while the cached part does not. This is what makes setup moves
+ * visible to the matchup term: +2 Atk doubles the pressure on every pair,
+ * not just the flat boost weight.
+ */
+export function boostedFraction(threat: PairThreat, attacker: Pokemon, defender: Pokemon): number {
+  const physical = threat.physical * stageMultiplier(attacker.boosts.atk) / stageMultiplier(defender.boosts.def);
+  const special = threat.special * stageMultiplier(attacker.boosts.spa) / stageMultiplier(defender.boosts.spd);
+  return Math.max(physical, special);
 }
 
 /**
@@ -187,9 +208,11 @@ function matchupScore(battle: Battle, cache?: MatchupCache): number {
     for (const b of p2Living) {
       const threatA = threat(a, b);
       const threatB = threat(b, a);
+      const boostedA = boostedFraction(threatA, a, b);
+      const boostedB = boostedFraction(threatB, b, a);
       // A defender that can heal ~50% per turn walls anything short of a 2HKO.
-      const fracA = threatA.fraction <= 0.5 && heals(b) ? 0 : threatA.fraction;
-      const fracB = threatB.fraction <= 0.5 && heals(a) ? 0 : threatB.fraction;
+      const fracA = boostedA <= 0.5 && heals(b) ? 0 : boostedA;
+      const fracB = boostedB <= 0.5 && heals(a) ? 0 : boostedB;
       const turnsA = fracA > 0 ? Math.ceil(b.hp / b.maxhp / fracA) : Infinity;
       const turnsB = fracB > 0 ? Math.ceil(a.hp / a.maxhp / fracB) : Infinity;
       let sign = 0;
@@ -197,7 +220,10 @@ function matchupScore(battle: Battle, cache?: MatchupCache): number {
       else if (turnsB < turnsA) sign = -1;
       else if (turnsA !== Infinity) {
         if (threatA.priority !== threatB.priority) sign = threatA.priority ? 1 : -1;
-        else sign = Math.sign(a.storedStats.spe - b.storedStats.spe);
+        else {
+          sign = Math.sign(a.storedStats.spe * stageMultiplier(a.boosts.spe) -
+            b.storedStats.spe * stageMultiplier(b.boosts.spe));
+        }
       }
       sum += sign * (a.hp / a.maxhp) * (b.hp / b.maxhp);
     }

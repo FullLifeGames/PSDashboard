@@ -1,6 +1,6 @@
 import type { Pokemon, PRNGSeed } from '@pkmn/sim';
 import {
-  createMatchupCache, evaluatePosition, pairThreat, singleMoveFraction, type MatchupCache,
+  boostedFraction, createMatchupCache, evaluatePosition, pairThreat, singleMoveFraction, type MatchupCache,
 } from './eval-function';
 import {
   advancePosition, createRootPosition, legalChoices, positionBattle,
@@ -95,7 +95,8 @@ function restrictCombined(
       const candidate = sideState.pokemon[parseInt(tokens[1], 10) - 1];
       if (!candidate || foes.length === 0) return 0;
       return Math.max(...foes.map(foe =>
-        pairThreat(candidate, foe, battle).fraction - pairThreat(foe, candidate, battle).fraction));
+        boostedFraction(pairThreat(candidate, foe, battle), candidate, foe) -
+        boostedFraction(pairThreat(foe, candidate, battle), foe, candidate)));
     }
     if (tokens[0] !== 'move') return 0;
     const attacker = actors[partIndex];
@@ -170,7 +171,8 @@ function restrictOptions(position: SimPosition, side: 'p1' | 'p2', options: Choi
     const slot = parseInt(option.choice.split(' ')[1], 10);
     const candidate = sideState.pokemon[slot - 1];
     if (!candidate) return 0;
-    return pairThreat(candidate, opponent, battle).fraction - pairThreat(opponent, candidate, battle).fraction;
+    return boostedFraction(pairThreat(candidate, opponent, battle), candidate, opponent) -
+      boostedFraction(pairThreat(opponent, candidate, battle), opponent, candidate);
   };
 
   const kept = rest

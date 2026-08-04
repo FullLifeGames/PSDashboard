@@ -25,7 +25,7 @@ export interface StoredEval {
  * behavior) — persisted results from older engine versions must not
  * resurface as current.
  */
-export const EVAL_ENGINE_CACHE_VERSION = 2;
+export const EVAL_ENGINE_CACHE_VERSION = 3;
 
 export function evalStoreKey(
   cacheKey: string,
