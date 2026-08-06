@@ -5,6 +5,7 @@ import type { EvalGraphState, EvalStatus } from '../hooks/useEvaluation';
 import { EvalGameReport } from './EvalGameReport';
 import { EvalGraph } from './EvalGraph';
 import { EvalTurnAnalysis, MiniBar } from './EvalTurnAnalysis';
+import { winPercent } from '../lib/eval/winprob';
 
 interface EvalPanelProps {
   playerNames: [string, string];
@@ -34,18 +35,21 @@ interface EvalPanelProps {
   analysis: TurnAnalysis | null;
   /** Game-level root-cause report, once a sweep covers enough turns. */
   report?: GameReport | null;
+  /** Doubles replay — selects the fitted win-probability curve for percents. */
+  doubles?: boolean;
 }
 
 const signed = (value: number) => `${value >= 0 ? '+' : ''}${value.toFixed(2)}`;
 
 function ChoiceList({
-  side, choices, reply, onPickChoice,
+  side, choices, reply, onPickChoice, doubles,
 }: {
   side: 'p1' | 'p2';
   choices: RankedChoice[];
   /** The other side's engine answer, committed alongside a clicked line. */
   reply: RankedChoice | null;
   onPickChoice?: (side: 'p1' | 'p2', choice: RankedChoice, reply?: RankedChoice | null) => void;
+  doubles?: boolean;
 }) {
   const best = choices[0];
   return (
@@ -54,7 +58,7 @@ function ChoiceList({
         // The equilibrium value in the eval bar's own language: the win odds
         // this choice is worth against balanced play. The guaranteed floor
         // and the punishing reply live in the tooltip.
-        const evPct = Math.round(50 + 50 * choice.ev);
+        const evPct = winPercent(choice.ev, doubles);
         const gap = best ? choice.ev - best.ev : 0;
         const tooltip = `Worth ${signed(choice.ev)} vs balanced play` +
           ` · guaranteed floor ${signed(choice.worstCase)}` +
@@ -102,11 +106,11 @@ function ChoiceList({
 export function EvalPanel({
   playerNames, status, result, progress, reconstructProgress, error,
   prefs, onPrefsChange, onEvaluate, onCancel, onPickChoice, showAuto, showTera,
-  graph, onAnalyzeGame, onAnalyzeTurn, onSelectTurn, currentTurn, analysis, report,
+  graph, onAnalyzeGame, onAnalyzeTurn, onSelectTurn, currentTurn, analysis, report, doubles,
 }: EvalPanelProps) {
   const running = status === 'searching' || status === 'reconstructing';
   const hasGraph = graph.scores.some(score => score !== null);
-  const p1Pct = result ? Math.round(50 + 50 * result.score) : 50;
+  const p1Pct = result ? winPercent(result.score, doubles) : 50;
 
   return (
     <div className="ps-panel ps-eval-panel">
@@ -260,6 +264,7 @@ export function EvalPanel({
               playerNames={playerNames}
               currentTurn={currentTurn}
               onSelectTurn={onSelectTurn}
+              doubles={doubles}
             />
           )}
           {hasGraph && !analysis && (
@@ -268,7 +273,7 @@ export function EvalPanel({
             </div>
           )}
           {report && <EvalGameReport report={report} playerNames={playerNames} onSelectTurn={onSelectTurn} />}
-          {analysis && <EvalTurnAnalysis analysis={analysis} playerNames={playerNames} onExplore={onPickChoice} />}
+          {analysis && <EvalTurnAnalysis analysis={analysis} playerNames={playerNames} doubles={doubles} onExplore={onPickChoice} />}
         </div>
       )}
 
@@ -293,8 +298,8 @@ export function EvalPanel({
           <div className="ps-eval-columns">
             {/* Stale results describe the PREVIOUS position — clicking them
                 would map old choices onto the new state (wrong switches). */}
-            <ChoiceList side="p1" choices={result.perSide.p1} reply={result.perSide.p2[0] ?? null} onPickChoice={status === 'stale' ? undefined : onPickChoice} />
-            <ChoiceList side="p2" choices={result.perSide.p2} reply={result.perSide.p1[0] ?? null} onPickChoice={status === 'stale' ? undefined : onPickChoice} />
+            <ChoiceList side="p1" choices={result.perSide.p1} reply={result.perSide.p2[0] ?? null} onPickChoice={status === 'stale' ? undefined : onPickChoice} doubles={doubles} />
+            <ChoiceList side="p2" choices={result.perSide.p2} reply={result.perSide.p1[0] ?? null} onPickChoice={status === 'stale' ? undefined : onPickChoice} doubles={doubles} />
           </div>
         </div>
       )}

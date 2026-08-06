@@ -118,6 +118,11 @@ test.describe('eval calibration against real replays', () => {
           // search fix a phase, or is the static eval itself miscalibrated?
           const depth = process.env.EVAL_CALIBRATION_DEPTH === '2' ? 2 : 1;
           const { score } = searchPosition(serialized, { depth, samples: 1, tera: false });
+          if (Number.isNaN(score)) {
+            // A NaN would silently poison every aggregate — surface it loudly.
+            console.log(`NaN score: ${id} turn ${turn}`);
+            continue;
+          }
           const fraction = turn / maxTurn;
           samples.push({
             phase: fraction < 1 / 3 ? 'early' : fraction < 2 / 3 ? 'mid' : 'late',
@@ -153,6 +158,27 @@ test.describe('eval calibration against real replays', () => {
         `${gameType}: n=${inType.length} sign-accuracy=${(100 * correct / inType.length).toFixed(0)}%`,
       );
     }
+
+    // Logistic fit of P(p1 wins | score) = 1/(1+exp(−K·score)) — deterministic
+    // gradient ascent. The pooled K feeds src/lib/eval/winprob.ts (pinned by
+    // hand after each fit worth adopting).
+    const fitK = (subset: Sample[]): number => {
+      let k = 2;
+      for (let step = 0; step < 500; step++) {
+        let grad = 0;
+        for (const sample of subset) {
+          const p = 1 / (1 + Math.exp(-k * sample.score));
+          grad += ((sample.p1Won ? 1 : 0) - p) * sample.score;
+        }
+        k += 0.5 * (grad / subset.length);
+      }
+      return k;
+    };
+    console.log(
+      `winprob K: pooled=${fitK(samples).toFixed(2)} ` +
+      `singles=${fitK(samples.filter(sample => sample.gameType === 'singles')).toFixed(2)} ` +
+      `doubles=${fitK(samples.filter(sample => sample.gameType === 'doubles')).toFixed(2)}`,
+    );
 
     // Calibration by confidence: within a |score| bucket, how often does the
     // favored side actually win? Well-calibrated means accuracy grows with

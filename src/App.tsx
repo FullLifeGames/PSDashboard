@@ -1176,6 +1176,7 @@ function App() {
                 currentTurn={branching ? (simState?.turnNumber ?? branchTurn) : branchTurn}
                 analysis={!branching ? turnAnalysis : null}
                 report={!branching ? gameReport : null}
+                doubles={replayGameType === 'doubles'}
               />
             )}
             <BattleStatsPanel

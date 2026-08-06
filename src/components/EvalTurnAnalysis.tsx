@@ -6,6 +6,8 @@ import { attributionBadge } from './eval-badges';
 interface EvalTurnAnalysisProps {
   analysis: TurnAnalysis;
   playerNames: [string, string];
+  /** Selects the fitted win-probability curve for the summary's percents. */
+  doubles?: boolean;
   /** Click on an engine line: play it out in a branch at this turn, the other side answering with `reply`. */
   onExplore?: (side: 'p1' | 'p2', choice: RankedChoice, reply?: RankedChoice | null) => void;
 }
@@ -204,7 +206,7 @@ function SideRow({ name, side, onExplore }: { name: string; side: SideAnalysis; 
 }
 
 /** Chess-style explanation of one analyzed turn: played vs best, and why the score moved. */
-export function EvalTurnAnalysis({ analysis, playerNames, onExplore }: EvalTurnAnalysisProps) {
+export function EvalTurnAnalysis({ analysis, playerNames, doubles, onExplore }: EvalTurnAnalysisProps) {
   const badge = attributionBadge(analysis, playerNames);
   const exploreFor = (side: 'p1' | 'p2') =>
     onExplore && ((choice: RankedChoice) =>
@@ -218,7 +220,7 @@ export function EvalTurnAnalysis({ analysis, playerNames, onExplore }: EvalTurnA
         )}
         <span style={{ color: badge.color }}>{badge.text}</span>
       </div>
-      <div className="ps-eval-analysis-summary">{summarizeTurn(analysis, playerNames)}</div>
+      <div className="ps-eval-analysis-summary">{summarizeTurn(analysis, playerNames, { doubles })}</div>
       {analysis.decisionDelta !== null && analysis.chanceDelta !== null && (
         <div className="ps-eval-analysis-row" style={{ color: '#778' }}>
           {signed(analysis.decisionDelta)} expected from the choices · {signed(analysis.chanceDelta)} from how it rolled

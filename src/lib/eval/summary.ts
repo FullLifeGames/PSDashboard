@@ -1,13 +1,11 @@
 import { CHANCE_THRESHOLD, diffChoices, playedSetupMove, type SideAnalysis, type TurnAnalysis } from './analysis';
+import { winPercent } from './winprob';
 
 /**
  * Annotator-style natural-language rendering of a turn analysis. Pure
  * template composition over the analysis data — deterministic, sim-free,
  * main-bundle safe.
  */
-
-/** Advantage as the p1 percentage, mirroring the eval bar. */
-const pct = (score: number) => Math.round(50 + 50 * score);
 
 /** Signed value with a typographic minus (matches the panel's tone). */
 export const signedValue = (value: number) =>
@@ -84,7 +82,13 @@ function inaccuracyClause(name: string, side: SideAnalysis): string | null {
     `${phrase(side.best.label)} was slightly better (${signed(side.best.ev)} vs ${signed(side.played.ev)}).`;
 }
 
-export function summarizeTurn(analysis: TurnAnalysis, playerNames: [string, string]): string {
+export function summarizeTurn(
+  analysis: TurnAnalysis,
+  playerNames: [string, string],
+  opts?: { doubles?: boolean },
+): string {
+  // Advantage in fitted win-probability terms, mirroring the eval bar.
+  const pct = (score: number) => winPercent(score, opts?.doubles);
   const sentences: string[] = [];
   const before = pct(analysis.scoreBefore);
   if (analysis.scoreAfter === null) {

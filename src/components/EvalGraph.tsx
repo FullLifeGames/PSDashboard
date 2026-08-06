@@ -1,4 +1,5 @@
 import { computeBlunders } from '../lib/eval/graph';
+import { winPercent } from '../lib/eval/winprob';
 
 interface EvalGraphProps {
   /** scores[t-1] = score at turn t (p1 perspective, [-1,1]); null = gap. */
@@ -6,6 +7,8 @@ interface EvalGraphProps {
   playerNames: [string, string];
   currentTurn: number;
   onSelectTurn?: (turn: number) => void;
+  /** Selects the fitted win-probability curve for percent labels. */
+  doubles?: boolean;
 }
 
 const WIDTH = 300;
@@ -17,7 +20,7 @@ const PAD_X = 4;
  * needed); point color carries the polarity via the app's player colors;
  * blunder markers add a shape ring plus tooltip text, never color alone.
  */
-export function EvalGraph({ scores, playerNames, currentTurn, onSelectTurn }: EvalGraphProps) {
+export function EvalGraph({ scores, playerNames, currentTurn, onSelectTurn, doubles }: EvalGraphProps) {
   const turns = scores.length;
   if (turns === 0) return null;
 
@@ -42,7 +45,7 @@ export function EvalGraph({ scores, playerNames, currentTurn, onSelectTurn }: Ev
   const blunders = new Set(computeBlunders(scores));
   const hitWidth = (WIDTH - 2 * PAD_X) / Math.max(turns - 1, 1);
 
-  const pct = (score: number) => Math.round(50 + 50 * score);
+  const pct = (score: number) => winPercent(score, doubles);
   const label = (turn: number, score: number) => {
     const swing = blunders.has(turn) ? ' — blunder swing' : '';
     return `Turn ${turn}: ${playerNames[0]} ${pct(score)}% · ${playerNames[1]} ${100 - pct(score)}%${swing}`;
