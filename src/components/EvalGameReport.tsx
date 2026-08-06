@@ -20,7 +20,7 @@ export function EvalGameReport({ report, playerNames, onSelectTurn }: EvalGameRe
       {report.misplays.length > 0 && (
         <div className="ps-eval-report-moments">
           {report.misplays.map(misplay => {
-            const tone = misplay.riskUnpunished ? '#b6a46a' : '#f3a6a6';
+            const tone = misplay.riskUnpunished ? '#b6a46a' : misplay.tier === 'blunder' ? '#ff7a7a' : '#f3a6a6';
             return (
               <button
                 key={`${misplay.turn}-${misplay.side}`}
@@ -36,7 +36,11 @@ export function EvalGameReport({ report, playerNames, onSelectTurn }: EvalGameRe
                 <span style={{ color: '#aab' }}>{misplay.played}</span>
                 {misplay.riskUnpunished
                   ? <span style={{ color: tone }}>risk (unpunished)</span>
-                  : <span style={{ color: '#778' }}>better: {misplay.better}</span>}
+                  : (
+                    <span style={{ color: '#778' }}>
+                      {misplay.tier === 'blunder' ? 'blunder — better: ' : 'better: '}{misplay.better}
+                    </span>
+                  )}
                 <span style={{ color: tone }}>−{misplay.regret.toFixed(2)}</span>
               </button>
             );

@@ -214,6 +214,60 @@ test.describe('turn analysis assembly', () => {
     expect(analysis.p2.played).toBeNull();
   });
 
+  test('regret bands into inaccuracy, mistake, and blunder tiers', () => {
+    const at = (playedEv: number, scoreBefore = 0) => analyzeTurn({
+      turn: 7,
+      result: {
+        score: scoreBefore, interval: 0, depthCompleted: 1,
+        perSide: {
+          p1: [
+            choiceEv('move aggro', 'Aggro', 0.4, 0.4),
+            choiceEv('move bold', 'Bold', playedEv, playedEv),
+          ],
+          p2: [choiceEv('move x', 'X', 0.0, 0.0)],
+        },
+      },
+      played: { p1: { kind: 'move', name: 'Bold', tera: false }, p2: { kind: 'move', name: 'X', tera: false } },
+      playedOutcome: null,
+      scoreBefore,
+      scoreAfter: null,
+    });
+    expect(at(0.31).p1.tier).toBe('inaccuracy');
+    expect(at(0.31).attribution).toBe('quiet');
+    expect(at(0.2).p1.tier).toBe('mistake');
+    expect(at(0.2).attribution).toBe('p1-decision');
+    expect(at(0.05).p1.tier).toBe('blunder');
+    expect(at(0.38).p1.tier).toBeUndefined();
+  });
+
+  test('a decided position softens the verdict a tier', () => {
+    const at = (playedEv: number, scoreBefore: number) => analyzeTurn({
+      turn: 8,
+      result: {
+        score: scoreBefore, interval: 0, depthCompleted: 1,
+        perSide: {
+          p1: [
+            choiceEv('move aggro', 'Aggro', 0.4, 0.4),
+            choiceEv('move bold', 'Bold', playedEv, playedEv),
+          ],
+          p2: [choiceEv('move x', 'X', 0.0, 0.0)],
+        },
+      },
+      played: { p1: { kind: 'move', name: 'Bold', tera: false }, p2: { kind: 'move', name: 'X', tera: false } },
+      playedOutcome: null,
+      scoreBefore,
+      scoreAfter: null,
+    });
+    // Already lost (own −0.8): the 0.2 mistake reads as an inaccuracy and
+    // stops driving the attribution; the 0.35 blunder softens to a mistake.
+    expect(at(0.2, -0.8).p1.tier).toBe('inaccuracy');
+    expect(at(0.2, -0.8).attribution).toBe('quiet');
+    expect(at(0.05, -0.8).p1.tier).toBe('mistake');
+    expect(at(0.05, -0.8).attribution).toBe('p1-decision');
+    // Undecided positions keep the full tier.
+    expect(at(0.2, 0.3).p1.tier).toBe('mistake');
+  });
+
   test('a deeper verification pass can clear a flagged misplay', () => {
     const at = (verified?: { p2?: { playedDeep: number; bestDeep: number } }) => analyzeTurn({
       turn: 20,

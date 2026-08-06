@@ -67,6 +67,47 @@ test.describe('natural-language turn summaries', () => {
     expect(summary).not.toContain('a read');
   });
 
+  test('a blunder is called a blunder', () => {
+    const withSplash: EvalResult = {
+      ...result,
+      perSide: {
+        p1: [choice('move reply', 'Reply', 0.2)],
+        p2: [...result.perSide.p2, choice('move splash', 'Splash', -0.4)],
+      },
+    };
+    const summary = summarizeTurn(analyzeTurn({
+      turn: 22,
+      result: withSplash,
+      played: { p1: { kind: 'move', name: 'Reply', tera: false }, p2: { kind: 'move', name: 'Splash', tera: false } },
+      playedOutcome: -0.2,
+      scoreBefore: 0.1,
+      scoreAfter: -0.25,
+    }), names);
+    expect(summary).toContain('a blunder; clearly better was switching to Dragapult');
+    expect(summary).not.toContain('safer was');
+  });
+
+  test('an inaccuracy gets a light note even on a quiet turn', () => {
+    // U-turn at +0.10 ev vs Draco Meteor's +0.20: regret 0.10 — inaccuracy.
+    const light: EvalResult = {
+      ...result,
+      perSide: {
+        p1: [choice('move dracometeor', 'Draco Meteor', 0.2), choice('move uturn', 'U-turn', 0.1)],
+        p2: result.perSide.p2,
+      },
+    };
+    const summary = summarizeTurn(analyzeTurn({
+      turn: 23,
+      result: light,
+      played: { p1: { kind: 'move', name: 'U-turn', tera: false }, p2: { kind: 'switch', name: 'Dragapult', species: 'Dragapult' } },
+      playedOutcome: 0.1,
+      scoreBefore: 0.1,
+      scoreAfter: 0.1,
+    }), names);
+    expect(summary).toContain('quiet turn');
+    expect(summary).toContain("Alpha's U-turn was an inaccuracy — Draco Meteor was slightly better");
+  });
+
   test('a delayed payoff names its horizon', () => {
     const summary = summarizeTurn(analyzeTurn({
       turn: 20,

@@ -17,10 +17,14 @@ const mk = (turn: number, scoreBefore: number, scoreAfter: number | null, over: 
   decisionDelta: null,
   chanceDelta: null,
   attribution: 'quiet',
-  p1: { playedRaw: null, played: null, best: null, regret: 0 },
-  p2: { playedRaw: null, played: null, best: null, regret: 0 },
+  p1: { playedRaw: null, played: null, best: null, safe: null, regret: 0 },
+  p2: { playedRaw: null, played: null, best: null, safe: null, regret: 0 },
   ...over,
 });
+
+/** Tier as analyzeTurn would band it (fixtures hand-build SideAnalysis). */
+const tierOf = (regret: number) =>
+  regret >= 0.3 ? { tier: 'blunder' as const } : regret >= 0.15 ? { tier: 'mistake' as const } : {};
 
 test.describe('game report (multi-turn root cause)', () => {
   test('finds the turn whose play made the winning advantage permanent', () => {
@@ -77,7 +81,9 @@ test.describe('game report (multi-turn root cause)', () => {
           playedRaw: { kind: 'move', name: 'Recover', tera: false },
           played: ranked('move recover', 'Recover', -0.3),
           best: ranked('switch 3', '→ Dragapult', -0.05),
+          safe: null,
           regret: 0.25,
+          ...tierOf(0.25),
         },
       }),
       mk(3, -0.3, -0.6),
@@ -93,7 +99,9 @@ test.describe('game report (multi-turn root cause)', () => {
       playedRaw: null,
       played: ranked(`move ${played.toLowerCase()}`, played, -0.2),
       best: ranked(`move ${better.toLowerCase()}`, better, 0.1),
+      safe: null,
       regret,
+      ...tierOf(regret),
       ...(riskUnpunished ? { riskUnpunished } : {}),
     });
     const report = buildGameReport([
@@ -106,7 +114,7 @@ test.describe('game report (multi-turn root cause)', () => {
     ], names, 'p2');
     // Top two PER SIDE — p2's bigger numbers cannot crowd p1 out.
     expect(report.misplays.map(entry => `${entry.turn}${entry.side}`)).toEqual(['1p1', '2p2', '3p1', '5p2']);
-    expect(report.misplays[1]).toEqual({ turn: 2, side: 'p2', regret: 0.4, played: 'Growl', better: 'Protect', riskUnpunished: true });
+    expect(report.misplays[1]).toEqual({ turn: 2, side: 'p2', regret: 0.4, played: 'Growl', better: 'Protect', tier: 'blunder', riskUnpunished: true });
     expect(report.tracked).toBe(true);
   });
 
@@ -138,7 +146,9 @@ test.describe('game report (multi-turn root cause)', () => {
           playedRaw: { kind: 'move', name: 'Recover', tera: false },
           played: ranked('move recover', 'Recover', -0.3),
           best: ranked('switch 3', '→ Dragapult', -0.05),
+          safe: null,
           regret: 0.25,
+          ...tierOf(0.25),
           riskUnpunished: true,
         },
       }),

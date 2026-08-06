@@ -1,4 +1,4 @@
-import { CHANCE_THRESHOLD, REGRET_THRESHOLD, diffChoices, playedSetupMove, type SideAnalysis, type TurnAnalysis } from './analysis';
+import { CHANCE_THRESHOLD, diffChoices, playedSetupMove, type SideAnalysis, type TurnAnalysis } from './analysis';
 
 /**
  * Annotator-style natural-language rendering of a turn analysis. Pure
@@ -45,7 +45,7 @@ function sideClause(name: string, side: SideAnalysis, opponent: SideAnalysis): s
 }
 
 function mistakeClause(name: string, side: SideAnalysis, opponent: SideAnalysis): string | null {
-  if ((side.regret ?? 0) < REGRET_THRESHOLD || !side.played || !side.best) return null;
+  if ((side.tier !== 'mistake' && side.tier !== 'blunder') || !side.played || !side.best) return null;
   const lineOf = (choice: { line?: { p1: string; p2: string }[] }) =>
     choice.line && choice.line.length > 0
       ? `, then ${choice.line.map(step => `${step.p1} · ${step.p2}`).join(' → ')}`
@@ -67,9 +67,21 @@ function mistakeClause(name: string, side: SideAnalysis, opponent: SideAnalysis)
       `The engine's safe line was ${phrase(side.safe.label)} (${signed(side.safe.worstCase)})${lineOf(side.safe)}.${why}${caveat}`;
   }
   // The punished misplay reads in EV terms: what the choice was worth against
-  // balanced play, vs what the engine's line was worth.
+  // balanced play, vs what the engine's line was worth. A blunder earns the
+  // word; a mistake keeps the softer framing.
+  if (side.tier === 'blunder') {
+    return `${name} played ${phrase(side.played.label)} (${signed(side.played.ev)}) — ` +
+      `a blunder; clearly better was ${phrase(side.best.label)} (${signed(side.best.ev)})${lineOf(side.best)}.${why}${caveat}`;
+  }
   return `${name} played ${phrase(side.played.label)} (${signed(side.played.ev)}); ` +
     `safer was ${phrase(side.best.label)} (${signed(side.best.ev)})${lineOf(side.best)}.${why}${caveat}`;
+}
+
+/** Sub-verdict note: a light imprecision worth naming, not blaming. */
+function inaccuracyClause(name: string, side: SideAnalysis): string | null {
+  if (side.tier !== 'inaccuracy' || !side.played || !side.best) return null;
+  return `${name}'s ${phrase(side.played.label)} was an inaccuracy — ` +
+    `${phrase(side.best.label)} was slightly better (${signed(side.best.ev)} vs ${signed(side.played.ev)}).`;
 }
 
 export function summarizeTurn(analysis: TurnAnalysis, playerNames: [string, string]): string {
@@ -127,6 +139,13 @@ export function summarizeTurn(analysis: TurnAnalysis, playerNames: [string, stri
         ? "A quiet turn — both sides played the engine's preferred line."
         : 'A quiet turn.');
   }
+
+  // Inaccuracies ride along on any attribution — the decision clauses above
+  // only speak at mistake level and up.
+  const p1Note = inaccuracyClause(playerNames[0], analysis.p1);
+  const p2Note = inaccuracyClause(playerNames[1], analysis.p2);
+  if (p1Note) sentences.push(p1Note);
+  if (p2Note) sentences.push(p2Note);
 
   return sentences.join(' ');
 }

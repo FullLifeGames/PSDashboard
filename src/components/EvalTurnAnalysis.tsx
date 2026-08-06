@@ -1,4 +1,4 @@
-import { REGRET_THRESHOLD, diffChoices, playedSetupMove, type SideAnalysis, type TurnAnalysis } from '../lib/eval/analysis';
+import { diffChoices, playedSetupMove, type SideAnalysis, type TurnAnalysis } from '../lib/eval/analysis';
 import type { RankedChoice } from '../lib/eval/types';
 import { summarizeTurn } from '../lib/eval/summary';
 import { attributionBadge } from './eval-badges';
@@ -86,7 +86,7 @@ function SideRow({ name, side, onExplore }: { name: string; side: SideAnalysis; 
       : side.playedRaw
         ? `${playedRawName} — not among the engine's options`
         : 'could not act (fainted or fully prevented)';
-  const regretful = (side.regret ?? 0) >= REGRET_THRESHOLD;
+  const regretful = side.tier === 'mistake' || side.tier === 'blunder';
   const setupMove = playedSetupMove(side);
   const difference = regretful && side.played && side.best ? diffChoices(side.played, side.best) : null;
 
@@ -145,9 +145,19 @@ function SideRow({ name, side, onExplore }: { name: string; side: SideAnalysis; 
           >
             −{side.regret.toFixed(2)} regret · risk unpunished
           </span>
+        ) : side.tier === 'blunder' ? (
+          <span style={{ color: '#ff7a7a' }}>blunder · −{side.regret.toFixed(2)}</span>
         ) : (
-          <span style={{ color: '#f3a6a6' }}>−{side.regret.toFixed(2)} regret</span>
+          <span style={{ color: '#f3a6a6' }}>mistake · −{side.regret.toFixed(2)}</span>
         ))}
+        {side.tier === 'inaccuracy' && side.best && (
+          <span
+            style={{ color: '#b6a46a' }}
+            title={`${side.best.label} was slightly better — a minor imprecision, not a mistake.`}
+          >
+            · inaccuracy (−{(side.regret ?? 0).toFixed(2)})
+          </span>
+        )}
       </div>
       {regretful && side.played && side.best && (
         <>

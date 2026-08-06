@@ -1,4 +1,4 @@
-import { REGRET_THRESHOLD, playedSetupMove, type SideAnalysis, type TurnAnalysis } from './analysis';
+import { playedSetupMove, type SideAnalysis, type TurnAnalysis, type VerdictTier } from './analysis';
 import { labelPhrase, signedValue } from './summary';
 
 /**
@@ -34,6 +34,8 @@ export interface GameMisplay {
   regret: number;
   played: string;
   better: string;
+  /** Verdict band (mistake or blunder — inaccuracies stay out of the list). */
+  tier?: VerdictTier;
   /** The punishing reply never came — a read that came true, not a punished misplay. */
   riskUnpunished?: boolean;
 }
@@ -104,8 +106,9 @@ export function buildGameReport(
 
   // Selected PER SIDE — a global top list lets one player's numbers (often
   // a winner's unpunished risks) crowd the other's out entirely.
+  const badTier = (side: SideAnalysis) => side.tier === 'mistake' || side.tier === 'blunder';
   const misplaysFor = (side: 'p1' | 'p2'): GameMisplay[] => known
-    .filter(analysis => (analysis[side].regret ?? 0) >= REGRET_THRESHOLD &&
+    .filter(analysis => badTier(analysis[side]) &&
       analysis[side].played && analysis[side].best && !analysis[side].riskPaidOff)
     .map(analysis => ({
       turn: analysis.turn,
@@ -113,6 +116,7 @@ export function buildGameReport(
       regret: analysis[side].regret ?? 0,
       played: analysis[side].played!.label,
       better: analysis[side].best!.label,
+      ...(analysis[side].tier ? { tier: analysis[side].tier } : {}),
       ...(analysis[side].riskUnpunished ? { riskUnpunished: true } : {}),
     }))
     .sort((a, b) => b.regret - a.regret)
@@ -154,7 +158,7 @@ export function buildGameReport(
     const loserName = playerNames[loser === 'p1' ? 0 : 1];
     const seeds = !playedTracking ? [] : known
       .filter(analysis => (turningPoint === null || analysis.turn <= turningPoint) &&
-        (analysis[loser].regret ?? 0) >= REGRET_THRESHOLD && analysis[loser].played && analysis[loser].best &&
+        badTier(analysis[loser]) && analysis[loser].played && analysis[loser].best &&
         // An unpunished risk cost nothing — it cannot have seeded the loss.
         !analysis[loser].riskUnpunished)
       .sort((a, b) => (b[loser].regret ?? 0) - (a[loser].regret ?? 0))

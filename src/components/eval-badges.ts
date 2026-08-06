@@ -2,13 +2,14 @@ import type { TurnAnalysis } from '../lib/eval/analysis';
 
 /** Shared attribution label + color for analysis and report views. */
 export function attributionBadge(analysis: TurnAnalysis, playerNames: [string, string]): { text: string; color: string } {
+  const decisionWord = (side: TurnAnalysis['p1']) => (side.tier === 'blunder' ? 'blundered' : 'misplayed');
   switch (analysis.attribution) {
     case 'p1-decision': return analysis.p1.riskUnpunished
       ? { text: `${playerNames[0]} took a risk (unpunished)`, color: '#b6a46a' }
-      : { text: `${playerNames[0]} misplayed`, color: '#f3a6a6' };
+      : { text: `${playerNames[0]} ${decisionWord(analysis.p1)}`, color: analysis.p1.tier === 'blunder' ? '#ff7a7a' : '#f3a6a6' };
     case 'p2-decision': return analysis.p2.riskUnpunished
       ? { text: `${playerNames[1]} took a risk (unpunished)`, color: '#b6a46a' }
-      : { text: `${playerNames[1]} misplayed`, color: '#f3a6a6' };
+      : { text: `${playerNames[1]} ${decisionWord(analysis.p2)}`, color: analysis.p2.tier === 'blunder' ? '#ff7a7a' : '#f3a6a6' };
     case 'both-decision': return analysis.p1.riskUnpunished && analysis.p2.riskUnpunished
       ? { text: 'both took risks (unpunished)', color: '#b6a46a' }
       : { text: 'both sides misplayed', color: '#f3a6a6' };

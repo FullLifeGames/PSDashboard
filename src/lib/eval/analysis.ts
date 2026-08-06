@@ -8,8 +8,22 @@ import type { PlayedAction, PlayedTurn } from './played';
  * @pkmn/sim imports, main-bundle safe.
  */
 
+/** Chess-style verdict bands on the EV-regret. */
+export type VerdictTier = 'inaccuracy' | 'mistake' | 'blunder';
+export const TIER_THRESHOLDS: Record<VerdictTier, number> = {
+  inaccuracy: 0.08,
+  mistake: 0.15,
+  blunder: 0.3,
+};
+/**
+ * Lichess-style leniency: once the game is this decided (own perspective),
+ * verdicts soften one tier — piling blame onto a lost position teaches
+ * nothing, and a winning position forgives small imprecision.
+ */
+export const DECIDED_SCORE = 0.7;
+
 /** Regret (best − played, own perspective) that marks a decision problem. */
-export const REGRET_THRESHOLD = 0.15;
+export const REGRET_THRESHOLD = TIER_THRESHOLDS.mistake;
 /** Residual swing (actual − expected outcome) that marks a chance swing. */
 export const CHANCE_THRESHOLD = 0.2;
 
@@ -68,6 +82,8 @@ export interface SideAnalysis {
   playedPartial?: boolean;
   /** A depth+1 verification pass cleared the shallow misplay flag. */
   verifiedAtDepth?: boolean;
+  /** Verdict band for the regret, after leniency (absent = clean play). */
+  tier?: VerdictTier;
 }
 
 /** Deep re-search of the played and best pairs (p1-perspective outcomes). */
@@ -351,6 +367,16 @@ export function analyzeTurn(params: {
         verifiedAtDepth = true;
       }
     }
+    let tier: VerdictTier | undefined;
+    if (regret !== null) {
+      if (regret >= TIER_THRESHOLDS.blunder) tier = 'blunder';
+      else if (regret >= TIER_THRESHOLDS.mistake) tier = 'mistake';
+      else if (regret >= TIER_THRESHOLDS.inaccuracy) tier = 'inaccuracy';
+      const own = key === 'p1' ? params.scoreBefore : -params.scoreBefore;
+      if (tier && Math.abs(own) >= DECIDED_SCORE) {
+        tier = tier === 'blunder' ? 'mistake' : tier === 'mistake' ? 'inaccuracy' : undefined;
+      }
+    }
     return {
       playedRaw,
       ...(playedSlots ? { playedSlots } : {}),
@@ -360,6 +386,7 @@ export function analyzeTurn(params: {
       regret,
       ...(playedPartial ? { playedPartial } : {}),
       ...(verifiedAtDepth ? { verifiedAtDepth } : {}),
+      ...(tier ? { tier } : {}),
     };
   };
 
@@ -370,7 +397,7 @@ export function analyzeTurn(params: {
   // payoff over the safe guarantee grades the read: clearly ahead = a good
   // play, clearly behind = a plain misplay even unpunished, between = risk.
   const markRisk = (key: 'p1' | 'p2', side: SideAnalysis, opponent: SideAnalysis) => {
-    if ((side.regret ?? 0) < REGRET_THRESHOLD) return;
+    if (side.tier !== 'mistake' && side.tier !== 'blunder') return;
     if (!side.played?.punishedBy || !opponent.played) return;
     if (opponent.played.label === side.played.punishedBy) return;
     if (params.playedOutcome !== null && side.safe) {
@@ -405,9 +432,11 @@ export function analyzeTurn(params: {
     ? params.scoreAfter - params.playedOutcome
     : null;
 
-  // A paid-off read does not count as a decision problem.
-  const p1Bad = (p1.regret ?? 0) >= REGRET_THRESHOLD && !p1.riskPaidOff;
-  const p2Bad = (p2.regret ?? 0) >= REGRET_THRESHOLD && !p2.riskPaidOff;
+  // A paid-off read does not count as a decision problem; neither does an
+  // inaccuracy or a leniency-softened verdict.
+  const badTier = (side: SideAnalysis) => side.tier === 'mistake' || side.tier === 'blunder';
+  const p1Bad = badTier(p1) && !p1.riskPaidOff;
+  const p2Bad = badTier(p2) && !p2.riskPaidOff;
   let attribution: TurnAttribution;
   if (!playedTracking) {
     // Without played actions only the movement itself can be described.
