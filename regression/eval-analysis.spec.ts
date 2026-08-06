@@ -214,6 +214,30 @@ test.describe('turn analysis assembly', () => {
     expect(analysis.p2.played).toBeNull();
   });
 
+  test('a read may cash in over the following turns, not just one', () => {
+    const at = (futureOutcomes?: (number | null)[]) => analyzeTurn({
+      turn: 20,
+      result,
+      played: { p1: { kind: 'move', name: 'Draco Meteor', tera: false }, p2: { kind: 'move', name: 'Recover', tera: false } },
+      playedOutcome: 0.0,
+      futureOutcomes,
+      scoreBefore: 0.1,
+      scoreAfter: -0.25,
+    });
+    // Immediate payoff +0.05 is neutral; the expected line two turns out
+    // (own +0.30 vs the safe floor −0.05) banks +0.35 — the read paid off.
+    const paid = at([-0.3, -0.28]);
+    expect(paid.p2.riskPaidOff).toBe(true);
+    expect(paid.p2.riskPayoff).toBeCloseTo(0.35, 10);
+    expect(paid.p2.riskPayoffTurn).toBe(1);
+    expect(paid.attribution).toBe('p2-read');
+    // Without future data the behavior is exactly the old one-turn grading.
+    const neutral = at(undefined);
+    expect(neutral.p2.riskUnpunished).toBe(true);
+    expect(neutral.p2.riskPaidOff).toBeUndefined();
+    expect(neutral.p2.riskPayoffTurn).toBeUndefined();
+  });
+
   test('best moves on both sides with a big residual is a chance swing', () => {
     const analysis = analyzeTurn({
       turn: 8,

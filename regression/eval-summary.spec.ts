@@ -67,6 +67,19 @@ test.describe('natural-language turn summaries', () => {
     expect(summary).not.toContain('a read');
   });
 
+  test('a delayed payoff names its horizon', () => {
+    const summary = summarizeTurn(analyzeTurn({
+      turn: 20,
+      result,
+      played: { p1: { kind: 'move', name: 'Draco Meteor', tera: false }, p2: { kind: 'move', name: 'Recover', tera: false } },
+      playedOutcome: 0.0,
+      futureOutcomes: [-0.3, -0.28],
+      scoreBefore: 0.1,
+      scoreAfter: -0.25,
+    }), names);
+    expect(summary).toContain('a read that paid off one turn later, +0.35 over the safe switching to Dragapult');
+  });
+
   test('a hidden partner slot is disclosed in the summary', () => {
     // p2's slot b was flinched: the grade is charitable (best consistent
     // combo), and the summary must say so instead of pretending certainty.

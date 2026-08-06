@@ -30,6 +30,13 @@ export type TurnAttribution =
  */
 export const RISK_PAYOFF_MARGIN = 0.1;
 
+/**
+ * How many FUTURE turns a read gets to cash in: setup and positional plays
+ * bank their payoff over the following expected outcomes, not one turn. The
+ * chain uses depth-matched expectations only — rolls stay in the luck ledger.
+ */
+export const PAYOFF_WINDOW = 3;
+
 export interface SideAnalysis {
   playedRaw: PlayedAction | null;
   /** Doubles: the per-slot actions this side actually took. */
@@ -49,6 +56,8 @@ export interface SideAnalysis {
   riskUnpunished?: boolean;
   /** Own-perspective value of the actual pair over the safe line's floor. */
   riskPayoff?: number;
+  /** Turns AFTER this one until the payoff peaked (absent = immediate). */
+  riskPayoffTurn?: number;
   /** The read won at least RISK_PAYOFF_MARGIN over the safe guarantee. */
   riskPaidOff?: boolean;
   /**
@@ -282,6 +291,11 @@ export function analyzeTurn(params: {
   result: EvalResult;
   played: PlayedTurn | null;
   playedOutcome: number | null;
+  /**
+   * Expected pair values of the FOLLOWING turns (p1 perspective) — lets a
+   * read's payoff cash in over PAYOFF_WINDOW turns of expected play.
+   */
+  futureOutcomes?: (number | null)[];
   scoreBefore: number;
   scoreAfter: number | null;
   /** False = played actions unavailable (doubles); blame is off the table. */
@@ -328,11 +342,26 @@ export function analyzeTurn(params: {
     if (!side.played?.punishedBy || !opponent.played) return;
     if (opponent.played.label === side.played.punishedBy) return;
     if (params.playedOutcome !== null && side.safe) {
-      const own = key === 'p1' ? params.playedOutcome : -params.playedOutcome;
-      const payoff = own - side.safe.worstCase;
-      side.riskPayoff = payoff;
-      if (payoff <= -RISK_PAYOFF_MARGIN) return;
-      if (payoff >= RISK_PAYOFF_MARGIN) side.riskPaidOff = true;
+      // The payoff is the BEST expected outcome within the window vs the safe
+      // guarantee — a setup turn's value arrives on the turns after it.
+      const chain = [params.playedOutcome, ...(params.futureOutcomes ?? [])].slice(0, PAYOFF_WINDOW + 1);
+      let payoff: number | null = null;
+      let payoffTurn = 0;
+      chain.forEach((outcome, index) => {
+        if (outcome === null || outcome === undefined) return;
+        const own = key === 'p1' ? outcome : -outcome;
+        const value = own - side.safe!.worstCase;
+        if (payoff === null || value > payoff) {
+          payoff = value;
+          payoffTurn = index;
+        }
+      });
+      if (payoff !== null) {
+        side.riskPayoff = payoff;
+        if (payoffTurn > 0) side.riskPayoffTurn = payoffTurn;
+        if (payoff <= -RISK_PAYOFF_MARGIN) return;
+        if (payoff >= RISK_PAYOFF_MARGIN) side.riskPaidOff = true;
+      }
     }
     side.riskUnpunished = true;
   };

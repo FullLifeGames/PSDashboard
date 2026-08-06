@@ -27,7 +27,7 @@ import { getBranchSimulatorFormat, getReplayGameType, getReplayGeneration } from
 import { choiceId, evalChoiceToSlotChoices, type BranchSlotChoice } from './lib/branch-choices';
 import type { RankedChoice } from './lib/eval/types';
 import { parsePlayedActions, parsePlayedActionsDoubles } from './lib/eval/played';
-import { analyzeTurn } from './lib/eval/analysis';
+import { analyzeTurn, PAYOFF_WINDOW } from './lib/eval/analysis';
 import { buildGameReport } from './lib/eval/report';
 
 const TEAM_PASTE_STORAGE_KEY = 'ps-replay-interceptor:team-paste';
@@ -819,6 +819,9 @@ function App() {
       result,
       played: evaluation.graph.played[analysisTurn - 1] ?? null,
       playedOutcome: evaluation.graph.playedOutcome[analysisTurn - 1] ?? null,
+      futureOutcomes: evaluation.graph.playedOutcome
+        .slice(analysisTurn, analysisTurn + PAYOFF_WINDOW)
+        .map(value => value ?? null),
       scoreBefore,
       scoreAfter: evaluation.graph.scores[analysisTurn] ?? null,
       playedTracking: true,
@@ -847,6 +850,9 @@ function App() {
         result,
         played: played[index] ?? null,
         playedOutcome: playedOutcome[index] ?? null,
+        futureOutcomes: playedOutcome
+          .slice(index + 1, index + 1 + PAYOFF_WINDOW)
+          .map(value => value ?? null),
         scoreBefore,
         scoreAfter: scores[index + 1] ?? null,
         playedTracking: true,

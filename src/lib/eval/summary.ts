@@ -27,7 +27,10 @@ function readClause(name: string, side: SideAnalysis, opponent: SideAnalysis): s
   if (!side.riskPaidOff || !side.played || !side.safe) return null;
   const came = opponent.played ? `; ${phrase(opponent.played.label)} came instead` : '';
   const priced = side.played.punishedBy ? ` The floor priced in ${side.played.punishedBy}${came}.` : '';
-  return `${name} played ${phrase(side.played.label)} — a read that paid off, ` +
+  const horizon = side.riskPayoffTurn
+    ? side.riskPayoffTurn === 1 ? ' one turn later' : ` ${side.riskPayoffTurn} turns later`
+    : '';
+  return `${name} played ${phrase(side.played.label)} — a read that paid off${horizon}, ` +
     `${signed(side.riskPayoff ?? 0)} over the safe ${phrase(side.safe.label)} (${signed(side.safe.worstCase)}).${priced}`;
 }
 
