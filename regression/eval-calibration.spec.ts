@@ -9,8 +9,13 @@ import { searchPosition } from '../src/lib/eval/search';
 /**
  * Informational calibration run against real finished replays: does the
  * score's sign predict the actual winner, and how does confidence grow over
- * the game? Not a CI gate — network + ~2 minutes of reconstruction.
+ * the game? Not a CI gate — network + ~3 minutes of reconstruction.
  * Run: EVAL_CALIBRATION=1 npx playwright test -c playwright.regression.config.ts eval-calibration
+ *
+ * Baseline 2026-08-04 (post ev-grading, pre boost-schedule; depth 1, samples 1):
+ *   early 55% |0.23| · mid 62% |0.34| · late 81% |0.43|
+ *   singles 63% (n=169) · doubles 80% (n=44)
+ *   buckets 0.0–0.2: 58% · 0.2–0.4: 73% · 0.4–0.7: 67% · 0.7–1.0: 76%
  */
 const REPLAY_IDS = [
   'gen9draft-2058494320',
@@ -39,10 +44,23 @@ const REPLAY_IDS = [
   'gen9ou-2658661545',
   'gen9ou-2658659909',
   'gen9ou-2658658993',
+  // Doubles/VGC (sampled 2026-08-04, rating ≥1400 VGC / ≥1480 DOU, ≥7 turns) —
+  // the doubles scoring path was previously uncalibrated entirely.
+  'gen9vgc2026regi-2630677822',
+  'gen9vgc2026regi-2630452654',
+  'gen9vgc2026regi-2630461565',
+  'gen9vgc2026regi-2630685175',
+  'gen9doublesou-2660818097',
+  'gen9doublesou-2660809089',
+  'gen9doublesou-2660826377',
+  'gen9doublesou-2660813469',
+  'gen9doublesou-2660802611',
+  'gen9doublesou-2660822493',
 ];
 
 interface Sample {
   phase: 'early' | 'mid' | 'late';
+  gameType: 'singles' | 'doubles';
   score: number;
   p1Won: boolean;
 }
@@ -67,6 +85,7 @@ test.describe('eval calibration against real replays', () => {
         continue;
       }
       const p1Won = winnerName === replay.players[0];
+      const gameType: Sample['gameType'] = /\|gametype\|doubles/.test(replay.log) ? 'doubles' : 'singles';
       const { p1Team, p2Team } = buildTeamsFromReplay(replay.log, {});
       if (p1Team.length === 0 || p2Team.length === 0) {
         console.log(`skipping ${id}: could not build teams`);
@@ -95,6 +114,7 @@ test.describe('eval calibration against real replays', () => {
           const fraction = turn / maxTurn;
           samples.push({
             phase: fraction < 1 / 3 ? 'early' : fraction < 2 / 3 ? 'mid' : 'late',
+            gameType,
             score,
             p1Won,
           });
@@ -113,6 +133,17 @@ test.describe('eval calibration against real replays', () => {
       console.log(
         `${phase}: n=${inPhase.length} sign-accuracy=${(100 * correct / inPhase.length).toFixed(0)}% ` +
         `mean|score|=${meanAbs.toFixed(2)}`,
+      );
+    }
+
+    // Per-gametype accuracy: the doubles scoring path has its own candidate
+    // restriction and combined-choice space — it must be measured separately.
+    for (const gameType of ['singles', 'doubles'] as const) {
+      const inType = samples.filter(sample => sample.gameType === gameType);
+      if (inType.length === 0) continue;
+      const correct = inType.filter(sample => (sample.score > 0) === sample.p1Won).length;
+      console.log(
+        `${gameType}: n=${inType.length} sign-accuracy=${(100 * correct / inType.length).toFixed(0)}%`,
       );
     }
 
