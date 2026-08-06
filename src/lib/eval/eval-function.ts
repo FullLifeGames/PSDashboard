@@ -162,11 +162,20 @@ const stageMultiplier = (stage: number) => (stage >= 0 ? (2 + stage) / 2 : 2 / (
  * outside the memo key on purpose — they change between forked positions of
  * one search while the cached part does not. This is what makes setup moves
  * visible to the matchup term: +2 Atk doubles the pressure on every pair,
- * not just the flat boost weight.
+ * not just the flat boost weight. The optional override substitutes the
+ * attacker's offensive stages (candidate hints price a setup move by the
+ * stages it WOULD grant); defender stages always read live.
  */
-export function boostedFraction(threat: PairThreat, attacker: Pokemon, defender: Pokemon): number {
-  const physical = threat.physical * stageMultiplier(attacker.boosts.atk) / stageMultiplier(defender.boosts.def);
-  const special = threat.special * stageMultiplier(attacker.boosts.spa) / stageMultiplier(defender.boosts.spd);
+export function boostedFraction(
+  threat: PairThreat,
+  attacker: Pokemon,
+  defender: Pokemon,
+  attackerBoosts?: { atk?: number; spa?: number },
+): number {
+  const atkStage = attackerBoosts?.atk ?? attacker.boosts.atk;
+  const spaStage = attackerBoosts?.spa ?? attacker.boosts.spa;
+  const physical = threat.physical * stageMultiplier(atkStage) / stageMultiplier(defender.boosts.def);
+  const special = threat.special * stageMultiplier(spaStage) / stageMultiplier(defender.boosts.spd);
   return Math.max(physical, special);
 }
 

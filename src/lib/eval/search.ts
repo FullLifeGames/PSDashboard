@@ -75,6 +75,17 @@ export const RESTRICT_K_DOUBLES = 12;
 
 const isCombined = (options: ChoiceOption[]) => options.some(option => option.choice.includes(','));
 
+/** Floor hint for any status move: Protect, redirection, speed control stay rankable. */
+const SUPPORT_HINT = 0.25;
+/** Fake Out on the turn it works: damage plus one neutralized foe action. */
+const FLINCH_BONUS = 0.3;
+/** Boost payoff counted for ~2 future attacks. */
+const SETUP_HORIZON = 2;
+/** Spread moves hit both foes, at the doubles spread penalty. */
+const SPREAD_FACTOR = 0.75;
+
+const clampStage = (stage: number) => Math.max(-6, Math.min(6, stage));
+
 /** Ranks combined doubles options by summed per-slot static threat hints. */
 function restrictCombined(
   position: SimPosition,
@@ -89,6 +100,24 @@ function restrictCombined(
   const foes = foeActives.filter((foe): foe is Pokemon => !!foe && !foe.fainted);
   const actors = sideState.active.filter((active): active is Pokemon => !!active && !active.fainted);
 
+  /** Damage-fraction gain a self-boosting move would buy over SETUP_HORIZON turns. */
+  const setupEquity = (attacker: Pokemon, moveId: string): number => {
+    const move = battle.dex.moves.get(moveId);
+    const boosts = (move.boosts || move.self?.boosts || undefined) as { atk?: number; spa?: number } | undefined;
+    if (!boosts || (!boosts.atk && !boosts.spa)) return 0;
+    let equity = 0;
+    for (const foe of foes) {
+      const threat = pairThreat(attacker, foe, battle);
+      const now = boostedFraction(threat, attacker, foe);
+      const then = boostedFraction(threat, attacker, foe, {
+        atk: clampStage(attacker.boosts.atk + (boosts.atk ?? 0)),
+        spa: clampStage(attacker.boosts.spa + (boosts.spa ?? 0)),
+      });
+      equity = Math.max(equity, (then - now) * SETUP_HORIZON);
+    }
+    return equity;
+  };
+
   const partHint = (part: string, partIndex: number): number => {
     const tokens = part.trim().split(' ');
     if (tokens[0] === 'switch') {
@@ -101,12 +130,21 @@ function restrictCombined(
     if (tokens[0] !== 'move') return 0;
     const attacker = actors[partIndex];
     if (!attacker || foes.length === 0) return 0;
+    const move = battle.dex.moves.get(tokens[1]);
+    if (move.category === 'Status') return Math.max(SUPPORT_HINT, setupEquity(attacker, tokens[1]));
+    if (move.target === 'allAdjacentFoes' || move.target === 'allAdjacent') {
+      return foes.reduce((sum, foe) => sum + singleMoveFraction(attacker, foe, tokens[1], battle), 0) * SPREAD_FACTOR;
+    }
     const targetLoc = tokens.length > 2 ? parseInt(tokens[2], 10) : NaN;
+    let damage: number;
     if (Number.isFinite(targetLoc) && targetLoc > 0) {
       const foe = foeActives[targetLoc - 1];
-      return foe && !foe.fainted ? singleMoveFraction(attacker, foe, tokens[1], battle) : 0;
+      damage = foe && !foe.fainted ? singleMoveFraction(attacker, foe, tokens[1], battle) : 0;
+    } else {
+      damage = Math.max(...foes.map(foe => singleMoveFraction(attacker, foe, tokens[1], battle)));
     }
-    return Math.max(...foes.map(foe => singleMoveFraction(attacker, foe, tokens[1], battle)));
+    if (move.id === 'fakeout' && attacker.activeMoveActions === 0) damage += FLINCH_BONUS;
+    return damage;
   };
 
   const restricted = options

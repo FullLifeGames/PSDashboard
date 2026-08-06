@@ -2,7 +2,9 @@ import { test, expect } from '@playwright/test';
 import { Battle, State, Teams, toID } from '@pkmn/sim';
 type DeserializeFn = typeof State.deserializeBattle;
 import type { PokemonSet } from '@pkmn/sim';
-import { searchPosition, subSearchDepth1 } from '../src/lib/eval/search';
+import { searchOptions, searchPosition, subSearchDepth1 } from '../src/lib/eval/search';
+import { createRootPosition } from '../src/lib/eval/forward-model';
+import { boostedFraction, pairThreat } from '../src/lib/eval/eval-function';
 import type { EvalResult, SearchProgress } from '../src/lib/eval/types';
 
 function makeSet(name: string, species: string, moves: string[], level = 50): PokemonSet {
@@ -309,6 +311,62 @@ test.describe('doubles search', () => {
     const deep = searchPosition(doublesRoot(), { depth: 2, samples: 1, tera: false });
     expect(deep.depthCompleted).toBe(2);
     expect(deep.perSide.p1.length).toBeGreaterThan(0);
+  });
+});
+
+test.describe('doubles candidate hints', () => {
+  const vgcSet = (species: string, moves: string[], item = ''): PokemonSet => ({
+    name: species, species, item, ability: 'No Ability', moves,
+    nature: 'Adamant',
+    evs: { hp: 252, atk: 252, def: 0, spa: 0, spd: 4, spe: 0 },
+    ivs: { hp: 31, atk: 31, def: 31, spa: 31, spd: 31, spe: 31 },
+    level: 50, gender: '',
+  });
+  // A realistic VGC turn 1: ~180 legal combos per side — far over the cap,
+  // so only hint-favored combos survive. The regression this pins: setup,
+  // Protect, Fake Out, and spread moves must stay recommendable.
+  const vgcRoot = () => createRootPosition(serialize(makeDoublesBattle(
+    [
+      vgcSet('Scizor', ['Swords Dance', 'Bullet Punch', 'Bug Bite', 'Protect'], 'Life Orb'),
+      vgcSet('Sneasler', ['Fake Out', 'Dire Claw', 'Close Combat', 'Protect'], 'Focus Sash'),
+      vgcSet('Eelektross', ['Thunderbolt', 'Protect'], 'Leftovers'),
+      vgcSet('Sinistcha', ['Matcha Gotcha', 'Protect'], 'Sitrus Berry'),
+    ],
+    [
+      vgcSet('Grimmsnarl', ['Spirit Break', 'Reflect', 'Light Screen', 'Thunder Wave'], 'Light Clay'),
+      vgcSet('Annihilape', ['Rock Slide', 'Drain Punch', 'Rage Fist', 'Protect'], 'Leftovers'),
+      vgcSet('Politoed', ['Surf', 'Protect'], 'Sitrus Berry'),
+      vgcSet('Pelipper', ['Hurricane', 'Protect'], 'Life Orb'),
+    ],
+  )));
+
+  // fixme until the core-dedup selection lands: gimmick duplicates of the top
+  // damage pairs still crowd Protect out of the 12-slot cap.
+  test.fixme('setup, Protect, Fake Out, and spread moves survive the doubles restriction', () => {
+    const root = vgcRoot();
+    const labels = searchOptions(root, 'p1', { tera: true }).map(option => option.label);
+    expect(labels.some(label => label.includes('Swords Dance'))).toBe(true);
+    expect(labels.some(label => label.includes('Protect'))).toBe(true);
+    expect(labels.some(label => label.includes('Fake Out'))).toBe(true);
+    const p2Labels = searchOptions(root, 'p2', { tera: true }).map(option => option.label);
+    expect(p2Labels.some(label => label.includes('Rock Slide'))).toBe(true);
+  });
+
+  test('boostedFraction accepts hypothetical attacker stages', () => {
+    const battle = makeBattle(
+      [makeSet('Machamp', 'Machamp', ['Karate Chop'], 100)],
+      [makeSet('Chansey', 'Chansey', ['Protect'], 100)],
+    );
+    const attacker = battle.sides[0].active[0]!;
+    const defender = battle.sides[1].active[0]!;
+    const threat = pairThreat(attacker, defender, battle);
+    const base = boostedFraction(threat, attacker, defender);
+    expect(base).toBeGreaterThan(0);
+    const hypothetical = boostedFraction(threat, attacker, defender, { atk: 2 });
+    expect(hypothetical).toBeCloseTo(base * 2, 10);
+    // The override must equal actually holding the boost.
+    attacker.boosts.atk = 2;
+    expect(boostedFraction(threat, attacker, defender)).toBeCloseTo(hypothetical, 10);
   });
 });
 
