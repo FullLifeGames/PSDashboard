@@ -16,6 +16,13 @@ import { searchPosition } from '../src/lib/eval/search';
  *   early 55% |0.23| · mid 62% |0.34| · late 81% |0.43|
  *   singles 63% (n=169) · doubles 80% (n=44)
  *   buckets 0.0–0.2: 58% · 0.2–0.4: 73% · 0.4–0.7: 67% · 0.7–1.0: 76%
+ *
+ * Boost-schedule comparison 2026-08-04 (same set, deterministic):
+ *   offensive 12 / defensive 6: early 55 · mid 64 · late 78 · singles 63 · doubles 80
+ *   offensive 6 / defensive 3:  early 55 · mid 65 · late 73 · singles 61 · doubles 77
+ * Kept 12/6: net wash vs baseline (mid +2, late −3 ≈ 2 samples), halving was
+ * strictly worse (falsifying "schedule too strong"), and the schedule's real
+ * purpose — pricing setup turns honestly — is not measured by sign accuracy.
  */
 const REPLAY_IDS = [
   'gen9draft-2058494320',
