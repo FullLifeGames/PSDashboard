@@ -32,7 +32,13 @@ function readClause(name: string, side: SideAnalysis, opponent: SideAnalysis): s
 }
 
 function sideClause(name: string, side: SideAnalysis, opponent: SideAnalysis): string | null {
-  return readClause(name, side, opponent) ?? mistakeClause(name, side, opponent);
+  const clause = readClause(name, side, opponent) ?? mistakeClause(name, side, opponent);
+  if (!clause) return null;
+  // A charitable partial grade must say so — one slot's choice was never
+  // visible (flinch/sleep), so the combo shown is the best consistent one.
+  return side.playedPartial
+    ? `${clause} (Partner's action hidden — graded on the visible slot.)`
+    : clause;
 }
 
 function mistakeClause(name: string, side: SideAnalysis, opponent: SideAnalysis): string | null {

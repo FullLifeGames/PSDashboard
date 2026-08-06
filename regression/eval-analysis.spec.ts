@@ -101,6 +101,65 @@ test.describe('turn analysis assembly', () => {
     expect(analysisPunished.p2.riskUnpunished).toBeUndefined();
   });
 
+  test('a flinched slot still grades charitably against consistent combos', () => {
+    // p2 slot b flinched (|cant| settles it as null): the combo can't match
+    // exactly, but Rock Slide was observed — grade against the BEST combo the
+    // visible slot still allows, never blaming the hidden choice.
+    const doublesResult: EvalResult = {
+      score: 0, interval: 0, depthCompleted: 1,
+      perSide: {
+        p1: [choice('move tackle 1, move protect', 'Tackle + Protect', 0.1)],
+        p2: [
+          choice('move protect, move drainpunch 1', 'Protect + Drain Punch', 0.05),
+          choice('move rockslide, move ragefist 1', 'Rock Slide + Rage Fist', -0.1),
+          choice('move rockslide, move drainpunch 1', 'Rock Slide + Drain Punch', -0.3),
+        ],
+      },
+    };
+    const analysis = analyzeTurn({
+      turn: 5,
+      result: doublesResult,
+      played: {
+        p1: null, p2: null,
+        p1Slots: [
+          { kind: 'move', name: 'Tackle', targetLoc: 1 },
+          { kind: 'move', name: 'Protect', targetLoc: null },
+        ],
+        p2Slots: [{ kind: 'move', name: 'Rock Slide', targetLoc: null }, null],
+      },
+      playedOutcome: null,
+      scoreBefore: 0,
+      scoreAfter: null,
+    });
+    expect(analysis.p2.played?.choice).toBe('move rockslide, move ragefist 1');
+    expect(analysis.p2.playedPartial).toBe(true);
+    expect(analysis.p2.regret).toBeCloseTo(0.15, 10);
+    // Fully observed p1 matches exactly — no partial flag.
+    expect(analysis.p1.played?.choice).toBe('move tackle 1, move protect');
+    expect(analysis.p1.playedPartial).toBeUndefined();
+  });
+
+  test('fully hidden turns still grade nothing', () => {
+    const doublesResult: EvalResult = {
+      score: 0, interval: 0, depthCompleted: 1,
+      perSide: {
+        p1: [choice('move tackle 1, move protect', 'Tackle + Protect', 0.1)],
+        p2: [choice('move rockslide, move ragefist 1', 'Rock Slide + Rage Fist', -0.1)],
+      },
+    };
+    const analysis = analyzeTurn({
+      turn: 6,
+      result: doublesResult,
+      played: { p1: null, p2: null, p1Slots: [null, null], p2Slots: [null, null] },
+      playedOutcome: null,
+      scoreBefore: 0,
+      scoreAfter: null,
+    });
+    expect(analysis.p1.played).toBeNull();
+    expect(analysis.p1.playedPartial).toBeUndefined();
+    expect(analysis.p2.played).toBeNull();
+  });
+
   test('best moves on both sides with a big residual is a chance swing', () => {
     const analysis = analyzeTurn({
       turn: 8,
@@ -235,12 +294,14 @@ test.describe('doubles combined matching', () => {
       { kind: 'move', name: 'Fake Out', tera: true, targetLoc: 1 },
     ])).toBe('move dazzlinggleam, move fakeout 1 terastallize');
 
-    // Wrong target → no match; prevented slot (null) → part count mismatch.
+    // Wrong target → no match (a fully observed combo never matches loosely).
     expect(match([
       { kind: 'move', name: 'Moonblast', tera: false, targetLoc: 1 },
       { kind: 'move', name: 'Fake Out', tera: false, targetLoc: 1 },
     ])).toBeNull();
-    expect(match([null, { kind: 'move', name: 'Fake Out', tera: false, targetLoc: 1 }])).toBeNull();
+    // A prevented slot (null) matches charitably against consistent combos.
+    expect(match([null, { kind: 'move', name: 'Fake Out', tera: false, targetLoc: 1 }]))
+      .toBe('move moonblast 2, move fakeout 1');
   });
 
   test('analyzeTurn computes doubles regret from the matched combo', async () => {

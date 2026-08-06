@@ -95,6 +95,14 @@ function SideRow({ name, side, onExplore }: { name: string; side: SideAnalysis; 
       <div className="ps-eval-analysis-row">
         <span style={{ color: '#cde', fontWeight: 'bold' }}>{name}</span>
         <span style={{ color: '#aab' }}>played {playedText}</span>
+        {side.playedPartial && (
+          <span
+            style={{ color: '#778' }}
+            title="One slot's choice was never visible (flinched or asleep) — graded charitably against the best combo the observed action allows."
+          >
+            · partner unseen
+          </span>
+        )}
         {side.played && side.best && !regretful && side.played.choice === side.best.choice && (
           <ExplorableLabel
             label="✓ the engine's move"

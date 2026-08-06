@@ -67,6 +67,39 @@ test.describe('natural-language turn summaries', () => {
     expect(summary).not.toContain('a read');
   });
 
+  test('a hidden partner slot is disclosed in the summary', () => {
+    // p2's slot b was flinched: the grade is charitable (best consistent
+    // combo), and the summary must say so instead of pretending certainty.
+    const doubles: EvalResult = {
+      score: 0.1, interval: 0, depthCompleted: 1,
+      perSide: {
+        p1: [choice('move tackle 1, move protect', 'Tackle + Protect', 0.1)],
+        p2: [
+          choice('move protect, move drainpunch 1', 'Protect + Drain Punch', 0.05),
+          choice('move rockslide, move ragefist 1', 'Rock Slide + Rage Fist', -0.1),
+          choice('move rockslide, move drainpunch 1', 'Rock Slide + Drain Punch', -0.3),
+        ],
+      },
+    };
+    const summary = summarizeTurn(analyzeTurn({
+      turn: 5,
+      result: doubles,
+      played: {
+        p1: null, p2: null,
+        p1Slots: [
+          { kind: 'move', name: 'Tackle', targetLoc: 1 },
+          { kind: 'move', name: 'Protect', targetLoc: null },
+        ],
+        p2Slots: [{ kind: 'move', name: 'Rock Slide', targetLoc: null }, null],
+      },
+      playedOutcome: null,
+      scoreBefore: 0.1,
+      scoreAfter: -0.1,
+    }), names);
+    expect(summary).toContain('Beta played Rock Slide + Rage Fist');
+    expect(summary).toContain("Partner's action hidden — graded on the visible slot.");
+  });
+
   test('a one-detail difference is condensed into a why clause', () => {
     // The VGC shape: same two moves, the only difference is the Mega.
     const doubles: EvalResult = {

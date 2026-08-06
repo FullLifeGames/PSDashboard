@@ -10,7 +10,7 @@ import {
   attachLines, cellKey, rankFromMatrix, selectExpansionCells, toResult, TOP_EXPANSION,
   type PvStep, type Ranked, type ValueMatrix,
 } from './rank';
-import { findPlayedOption } from './analysis';
+import { findConsistentOptions, findPlayedOption } from './analysis';
 import type { PlayedAction } from './played';
 import type { CellValue, SearchExecutor } from './orchestrator';
 import type { EvalResult, EvalSettings, RankedChoice, SearchProgress } from './types';
@@ -194,9 +194,15 @@ function restrictCombined(
   // The actually played combo must stay rankable even when the hint scoring
   // wouldn't keep it — otherwise played-vs-best regret has nothing to read.
   // Its gimmick siblings ride along so "played, but with Mega/Tera" is always
-  // a comparable line.
+  // a comparable line. A hidden slot (flinch) falls back to the best-hint
+  // consistent combo — the same charitable candidate the analysis grades.
   if (keep) {
-    const played = findPlayedOption(options, keep);
+    const valueOf = new Map(scored.map(entry => [entry.option, entry.value]));
+    const consistent = findConsistentOptions(options, keep);
+    const played = findPlayedOption(options, keep) ??
+      (consistent.length > 0
+        ? consistent.reduce((a, b) => ((valueOf.get(b) ?? 0) > (valueOf.get(a) ?? 0) ? b : a))
+        : null);
     if (played) {
       const playedCore = coreOf(played.choice);
       for (const option of options) {

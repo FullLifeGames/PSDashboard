@@ -48,6 +48,12 @@ export interface SideAnalysis {
   riskPayoff?: number;
   /** The read won at least RISK_PAYOFF_MARGIN over the safe guarantee. */
   riskPaidOff?: boolean;
+  /**
+   * A slot's choice was never observed (flinch/sleep — the protocol shows
+   * `|cant|`): `played` is the BEST combo consistent with the visible slots,
+   * so the regret is a charitable lower bound, never blame for hidden picks.
+   */
+  playedPartial?: boolean;
 }
 
 export interface TurnAnalysis {
@@ -146,6 +152,46 @@ export function findPlayedOption<T extends { choice: string; label: string }>(
   }) ?? null;
 }
 
+/**
+ * Combos consistent with the OBSERVED slots — hidden (null) slots match
+ * anything. Empty when no slot was observed at all: with nothing visible
+ * there is nothing to grade.
+ */
+export function findConsistentOptions<T extends { choice: string; label: string }>(
+  options: T[],
+  slots: (PlayedAction | null)[] | undefined,
+): T[] {
+  if (!slots || slots.every(action => action === null)) return [];
+  return options.filter(option => {
+    const choiceParts = option.choice.split(',').map(part => part.trim());
+    if (choiceParts.length !== slots.length) return false;
+    const labelParts = splitCombinedLabel(option.label);
+    return slots.every((action, index) =>
+      action === null || slotMatches(choiceParts[index], labelParts[index] ?? '', action));
+  });
+}
+
+/**
+ * Doubles matcher: the exact combo when every slot was observed, otherwise
+ * the CHARITABLE pick among consistent combos — the hidden slot is assumed
+ * to have chosen whatever grades best, so regret becomes a lower bound.
+ */
+export function matchPlayedSlots(
+  options: RankedChoice[],
+  slots: (PlayedAction | null)[] | undefined,
+): { played: RankedChoice | null; partial: boolean } {
+  const exact = findPlayedOption(options, slots);
+  if (exact) return { played: exact, partial: false };
+  const consistent = findConsistentOptions(options, slots);
+  if (consistent.length === 0 || !slots?.some(action => action === null)) {
+    return { played: null, partial: false };
+  }
+  // Charitable pick by the grading reference (worstCase today, ev after the
+  // equilibrium-grading switch).
+  const played = consistent.reduce((a, b) => (b.worstCase > a.worstCase ? b : a));
+  return { played, partial: true };
+}
+
 const GIMMICK_NAMES: Record<string, string> = {
   mega: 'Mega Evolution',
   terastallize: 'Terastallization',
@@ -207,7 +253,7 @@ export function matchPlayedSide(
 ): RankedChoice | null {
   if (!played) return null;
   const slots = side === 'p1' ? played.p1Slots : played.p2Slots;
-  if (slots) return findPlayedOption(result.perSide[side], slots);
+  if (slots) return matchPlayedSlots(result.perSide[side], slots).played;
   return matchPlayedChoice(result, side, played[side]);
 }
 
@@ -243,10 +289,25 @@ export function analyzeTurn(params: {
   const sideAnalysis = (key: 'p1' | 'p2'): SideAnalysis => {
     const playedRaw = params.played?.[key] ?? null;
     const playedSlots = key === 'p1' ? params.played?.p1Slots : params.played?.p2Slots;
-    const played = matchPlayedSide(params.result, key, params.played);
+    let played: RankedChoice | null = null;
+    let playedPartial = false;
+    if (playedSlots) {
+      const match = matchPlayedSlots(params.result.perSide[key], playedSlots);
+      played = match.played;
+      playedPartial = match.partial;
+    } else if (params.played) {
+      played = matchPlayedChoice(params.result, key, playedRaw);
+    }
     const best = params.result.perSide[key][0] ?? null;
     const regret = played && best ? Math.max(0, best.worstCase - played.worstCase) : null;
-    return { playedRaw, ...(playedSlots ? { playedSlots } : {}), played, best, regret };
+    return {
+      playedRaw,
+      ...(playedSlots ? { playedSlots } : {}),
+      played,
+      best,
+      regret,
+      ...(playedPartial ? { playedPartial } : {}),
+    };
   };
 
   const p1 = sideAnalysis('p1');
