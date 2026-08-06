@@ -71,7 +71,16 @@ export const RESTRICT_K = 8;
  * mandatory everywhere (root included): the raw slot product reaches hundreds
  * of options per side, and a full matrix over it would take minutes.
  */
-export const RESTRICT_K_DOUBLES = 12;
+export const RESTRICT_K_DOUBLES = 16;
+/** Distinct move-pair cores competing on hints before gimmick variants enter. */
+const BASE_CORE_BUDGET = 12;
+/** Top cores whose Tera/Mega/Ultra variants fill the remaining slots. */
+const GIMMICK_CORE_BUDGET = 4;
+const GIMMICK_TOKENS = new Set(['terastallize', 'mega', 'ultra']);
+
+/** The combo minus its gimmick markers: 'move x terastallize, move y' → 'move x, move y'. */
+const coreOf = (choice: string) => choice.split(',').map(part =>
+  part.trim().split(' ').filter(token => !GIMMICK_TOKENS.has(token)).join(' ')).join(', ');
 
 const isCombined = (options: ChoiceOption[]) => options.some(option => option.choice.includes(','));
 
@@ -147,22 +156,53 @@ function restrictCombined(
     return damage;
   };
 
-  const restricted = options
-    .map((option, index) => ({
-      option,
-      index,
-      value: option.choice.split(',').reduce((sum, part, partIndex) => sum + partHint(part, partIndex), 0),
-    }))
-    .sort((a, b) => b.value - a.value || a.index - b.index)
-    .slice(0, RESTRICT_K_DOUBLES)
+  // Distinct cores compete on hints first — a gimmick variant scores the same
+  // hint as its base, so without the core budget three variants of each top
+  // damage pair crowded out every status/setup combo. Gimmick variants of the
+  // strongest cores then fill the remaining slots.
+  const scored = options.map((option, index) => ({
+    option,
+    index,
+    value: option.choice.split(',').reduce((sum, part, partIndex) => sum + partHint(part, partIndex), 0),
+  }));
+  const groups = new Map<string, typeof scored>();
+  for (const entry of scored) {
+    const key = coreOf(entry.option.choice);
+    const group = groups.get(key);
+    if (group) group.push(entry);
+    else groups.set(key, [entry]);
+  }
+  const rankedCores = [...groups.values()].sort((a, b) =>
+    Math.max(...b.map(entry => entry.value)) - Math.max(...a.map(entry => entry.value)) ||
+    a[0].index - b[0].index);
+
+  const selection: typeof scored = [];
+  for (const group of rankedCores.slice(0, BASE_CORE_BUDGET)) {
+    selection.push(group.find(entry =>
+      !entry.option.choice.split(/[ ,]+/).some(token => GIMMICK_TOKENS.has(token))) ?? group[0]);
+  }
+  for (const group of rankedCores.slice(0, GIMMICK_CORE_BUDGET)) {
+    for (const entry of group) {
+      if (selection.length >= RESTRICT_K_DOUBLES) break;
+      if (!selection.includes(entry)) selection.push(entry);
+    }
+  }
+  const restricted = selection
     .sort((a, b) => a.index - b.index)
     .map(entry => entry.option);
 
   // The actually played combo must stay rankable even when the hint scoring
   // wouldn't keep it — otherwise played-vs-best regret has nothing to read.
+  // Its gimmick siblings ride along so "played, but with Mega/Tera" is always
+  // a comparable line.
   if (keep) {
     const played = findPlayedOption(options, keep);
-    if (played && !restricted.includes(played)) restricted.push(played);
+    if (played) {
+      const playedCore = coreOf(played.choice);
+      for (const option of options) {
+        if (coreOf(option.choice) === playedCore && !restricted.includes(option)) restricted.push(option);
+      }
+    }
   }
   return restricted;
 }

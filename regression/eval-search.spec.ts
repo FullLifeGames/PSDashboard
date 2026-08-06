@@ -51,7 +51,7 @@ function makeDoublesBattle(p1Sets: PokemonSet[], p2Sets: PokemonSet[]): Battle {
 
 const doublesRoot = () => serialize(makeDoublesBattle(
   [
-    makeSet('Machamp', 'Machamp', ['Rock Slide', 'Karate Chop']),
+    makeSet('Machamp', 'Machamp', ['Rock Slide', 'Karate Chop', 'Bulldoze']),
     makeSet('Snorlax', 'Snorlax', ['Tackle', 'Protect']),
     makeSet('Chansey', 'Chansey', ['Protect']),
   ],
@@ -299,9 +299,9 @@ test.describe('doubles search', () => {
   test('the root is restricted to a tractable option list and stays deterministic', () => {
     const root = doublesRoot();
     const result = searchPosition(root, { depth: 1, samples: 1, tera: false });
-    // Mandatory doubles restriction: at most 12 combined options per side.
-    expect(result.perSide.p1.length).toBeLessThanOrEqual(12);
-    expect(result.perSide.p2.length).toBeLessThanOrEqual(12);
+    // Mandatory doubles restriction: at most 16 combined options per side.
+    expect(result.perSide.p1.length).toBeLessThanOrEqual(16);
+    expect(result.perSide.p2.length).toBeLessThanOrEqual(16);
     expect(result.perSide.p1[0].choice).toContain(','); // combined two-slot choice
     expect(result.score).toBeGreaterThan(0); // the level-50 side bullies the level-30s
     expect(searchPosition(root, { depth: 1, samples: 1, tera: false })).toEqual(result);
@@ -340,9 +340,7 @@ test.describe('doubles candidate hints', () => {
     ],
   )));
 
-  // fixme until the core-dedup selection lands: gimmick duplicates of the top
-  // damage pairs still crowd Protect out of the 12-slot cap.
-  test.fixme('setup, Protect, Fake Out, and spread moves survive the doubles restriction', () => {
+  test('setup, Protect, Fake Out, and spread moves survive the doubles restriction', () => {
     const root = vgcRoot();
     const labels = searchOptions(root, 'p1', { tera: true }).map(option => option.label);
     expect(labels.some(label => label.includes('Swords Dance'))).toBe(true);
@@ -350,6 +348,30 @@ test.describe('doubles candidate hints', () => {
     expect(labels.some(label => label.includes('Fake Out'))).toBe(true);
     const p2Labels = searchOptions(root, 'p2', { tera: true }).map(option => option.label);
     expect(p2Labels.some(label => label.includes('Rock Slide'))).toBe(true);
+  });
+
+  test('the restriction spends its slots on distinct cores, not gimmick duplicates', () => {
+    const kept = searchOptions(vgcRoot(), 'p1', { tera: true });
+    const gimmickTokens = ['terastallize', 'mega', 'ultra'];
+    const coreOf = (choice: string) => choice.split(',').map(part =>
+      part.trim().split(' ').filter(token => !gimmickTokens.includes(token)).join(' ')).join(', ');
+    const cores = new Set(kept.map(option => coreOf(option.choice)));
+    // Before the core budget, 12 slots held ~4 distinct pairs × 3 gimmick variants.
+    expect(cores.size).toBeGreaterThanOrEqual(10);
+    expect(kept.length).toBeLessThanOrEqual(20);
+  });
+
+  test('the played combo and its gimmick variants are always rankable', () => {
+    const keep = [
+      { kind: 'move' as const, name: 'Swords Dance', tera: false, targetLoc: null },
+      { kind: 'move' as const, name: 'Fake Out', tera: false, targetLoc: 1 },
+    ];
+    const kept = searchOptions(vgcRoot(), 'p1', { tera: true, keep });
+    const choices = kept.map(option => option.choice);
+    expect(choices).toContain('move swordsdance, move fakeout 1');
+    // The same core with the gimmick attached is what "played, but with Tera"
+    // comparisons need — it must be ranked alongside the played combo.
+    expect(choices).toContain('move swordsdance terastallize, move fakeout 1');
   });
 
   test('boostedFraction accepts hypothetical attacker stages', () => {
@@ -386,6 +408,6 @@ test.describe('doubles keepPlayed', () => {
     const kept = withKeep.perSide.p1.find(option => option.choice === 'switch 3, move protect');
     expect(kept).toBeTruthy();
     expect(Number.isFinite(kept!.worstCase)).toBe(true);
-    expect(withKeep.perSide.p1.length).toBeLessThanOrEqual(13);
+    expect(withKeep.perSide.p1.length).toBeLessThanOrEqual(20);
   });
 });
