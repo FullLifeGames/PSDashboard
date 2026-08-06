@@ -12,8 +12,16 @@ export const EVAL_WEIGHTS = {
   hp: 100,
   /** Multipliers applied to a statused Pokémon's (alive + hp) contribution. */
   status: { brn: 0.85, par: 0.85, psn: 0.9, tox: 0.7, slp: 0.8, frz: 0.75 } as Record<string, number>,
-  /** Per net boost stage on an active Pokémon (boosts vanish on switch). */
-  boostPerStage: 4,
+  /**
+   * Per boost stage on an active Pokémon (boosts vanish on switch): base
+   * points × the diminishing schedule. Offensive stages (atk/spa/spe) carry
+   * games; defensive stages read at half weight. Shape follows poke-engine's
+   * field-tested curve — the payoff of a setup turn must live in the STATIC
+   * eval, deeper search cannot see past its horizon.
+   */
+  boostStage: { offensive: 12, defensive: 6 },
+  /** Cumulative stage multipliers (index = |stage|): +2 is twice +1, the tail flattens. */
+  boostSchedule: [0, 1.0, 2.0, 2.5, 3.0, 3.15, 3.3],
   /** Per hazard layer lying on a side. */
   hazards: { stealthrock: 12, spikes: 6, toxicspikes: 5, stickyweb: 8 } as Record<string, number>,
   /** Per active screen (Reflect / Light Screen / Aurora Veil). */
@@ -47,7 +55,14 @@ function sideScore(side: Side): number {
   for (const pokemon of side.pokemon) score += pokemonScore(pokemon);
   for (const active of side.active) {
     if (!active || active.fainted) continue;
-    for (const stage of Object.values(active.boosts)) score += stage * EVAL_WEIGHTS.boostPerStage;
+    for (const [stat, stage] of Object.entries(active.boosts)) {
+      if (!stage) continue;
+      const base = stat === 'atk' || stat === 'spa' || stat === 'spe'
+        ? EVAL_WEIGHTS.boostStage.offensive
+        : EVAL_WEIGHTS.boostStage.defensive;
+      const magnitude = EVAL_WEIGHTS.boostSchedule[Math.min(Math.abs(stage), 6)];
+      score += Math.sign(stage) * base * magnitude;
+    }
   }
   for (const [id, weight] of Object.entries(EVAL_WEIGHTS.hazards)) {
     const condition = side.sideConditions[id];

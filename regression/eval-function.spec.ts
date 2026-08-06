@@ -1,7 +1,7 @@
 import { test, expect } from '@playwright/test';
 import { Battle, Teams, toID } from '@pkmn/sim';
 import type { PokemonSet } from '@pkmn/sim';
-import { createMatchupCache, evaluatePosition } from '../src/lib/eval/eval-function';
+import { createMatchupCache, evaluatePosition, EVAL_WEIGHTS } from '../src/lib/eval/eval-function';
 
 function makeSet(
   name: string,
@@ -99,6 +99,35 @@ test.describe('evaluatePosition', () => {
     const battle = makeBattle([makeSet('A', 'Snorlax', ['Tackle'])], [makeSet('B', 'Snorlax', ['Tackle'])]);
     battle.sides[0].active[0]!.boostBy({ spe: 1 });
     expect(evaluatePosition(battle)).toBeGreaterThan(0.3);
+  });
+
+  test('boost stages follow the diminishing schedule with an offense/defense split', () => {
+    // +2 is worth exactly twice +1; the tail flattens hard (+6 ≪ 3×(+2));
+    // defensive stages read at half the offensive weight.
+    expect(EVAL_WEIGHTS.boostSchedule[2]).toBe(2 * EVAL_WEIGHTS.boostSchedule[1]);
+    expect(EVAL_WEIGHTS.boostSchedule[6]).toBeLessThan(2 * EVAL_WEIGHTS.boostSchedule[2]);
+    expect(EVAL_WEIGHTS.boostStage.defensive).toBeLessThan(EVAL_WEIGHTS.boostStage.offensive);
+    // Monotone: every extra stage still helps.
+    for (let stage = 1; stage < 6; stage++) {
+      expect(EVAL_WEIGHTS.boostSchedule[stage + 1]).toBeGreaterThan(EVAL_WEIGHTS.boostSchedule[stage]);
+    }
+  });
+
+  test('the flat boost term applies the schedule (accuracy stages, matchup-invisible)', () => {
+    // Accuracy stages never touch the matchup term, so the mirror isolates
+    // the flat term exactly: the +2/+1 ratio is the schedule's 2.0.
+    const at = (stage: number) => {
+      const battle = makeBattle([makeSet('A', 'Snorlax', VANILLA)], [makeSet('B', 'Snorlax', VANILLA)]);
+      battle.sides[0].active[0]!.boostBy({ accuracy: stage as 1 | 2 | 6 });
+      return evaluatePosition(battle);
+    };
+    const v1 = at(1);
+    const v2 = at(2);
+    const v6 = at(6);
+    expect(v1).toBeGreaterThan(0);
+    // tanh curvature shaves a hair off the exact 2.0 ratio.
+    expect(v2 / v1).toBeCloseTo(2, 1);
+    expect(v6).toBeLessThan(2 * v2);
   });
 
   test('a shared matchup cache stays exact across boost changes', () => {
