@@ -51,14 +51,15 @@ function ChoiceList({
   return (
     <div className="ps-eval-column">
       {choices.slice(0, 3).map((choice, index) => {
-        // The floor in the eval bar's own language: the win odds this choice
-        // guarantees against the engine's best reply. Raw scores and the
-        // punishing reply live in the tooltip.
-        const floorPct = Math.round(50 + 50 * choice.worstCase);
-        const gap = best ? choice.worstCase - best.worstCase : 0;
-        const tooltip = `Guaranteed floor ${signed(choice.worstCase)}` +
+        // The equilibrium value in the eval bar's own language: the win odds
+        // this choice is worth against balanced play. The guaranteed floor
+        // and the punishing reply live in the tooltip.
+        const evPct = Math.round(50 + 50 * choice.ev);
+        const gap = best ? choice.ev - best.ev : 0;
+        const tooltip = `Worth ${signed(choice.ev)} vs balanced play` +
+          ` · guaranteed floor ${signed(choice.worstCase)}` +
           (choice.punishedBy ? ` — worst reply: ${choice.punishedBy}` : '') +
-          ` · expected ${signed(choice.expected)}. Choices are ranked by their floor.` +
+          '. Choices are ranked by their value against balanced play.' +
           (onPickChoice ? ' Click to play this turn out against the engine’s reply.' : '');
         const detail = (
           <>
@@ -66,8 +67,8 @@ function ChoiceList({
               <span style={{ color: '#778' }}>{index + 1}.</span>
               <span style={{ color: '#cde', flex: '1 1 auto', minWidth: 0 }}>{choice.label}</span>
               <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, whiteSpace: 'nowrap', color: '#aab' }}>
-                <MiniBar value={choice.worstCase} />
-                ≥{floorPct}%
+                <MiniBar value={choice.ev} />
+                {evPct}%
                 {index > 0 && gap < 0 && <span style={{ color: '#778' }}>({gap.toFixed(2)})</span>}
               </span>
             </span>

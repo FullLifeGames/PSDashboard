@@ -5,6 +5,10 @@ import type { EvalResult, RankedChoice } from '../src/lib/eval/types';
 const choice = (choiceStr: string, label: string, worstCase: number): RankedChoice =>
   ({ choice: choiceStr, label, worstCase, expected: worstCase, ev: worstCase, punishedBy: 'Reply' });
 
+/** A choice whose floor and equilibrium EV diverge — the ev-grading cases. */
+const choiceEv = (choiceStr: string, label: string, worstCase: number, ev: number): RankedChoice =>
+  ({ choice: choiceStr, label, worstCase, expected: worstCase, ev, punishedBy: 'Reply' });
+
 const result: EvalResult = {
   score: 0.1,
   interval: 0.05,
@@ -99,6 +103,56 @@ test.describe('turn analysis assembly', () => {
       scoreAfter: -0.25,
     });
     expect(analysisPunished.p2.riskUnpunished).toBeUndefined();
+  });
+
+  test('regret is measured against equilibrium EV, not the floor', () => {
+    // The played line has a scary floor (−0.3) but nearly full equilibrium
+    // value: floor-regret would cry 0.3 — the honest ev-regret is 0.05.
+    const evResult: EvalResult = {
+      score: 0.1, interval: 0, depthCompleted: 1,
+      perSide: {
+        p1: [
+          choiceEv('move aggro', 'Aggro', 0.0, 0.15),
+          choiceEv('move bold', 'Bold', -0.3, 0.1),
+        ],
+        p2: [choiceEv('move x', 'X', 0.0, 0.0)],
+      },
+    };
+    const analysis = analyzeTurn({
+      turn: 3,
+      result: evResult,
+      played: { p1: { kind: 'move', name: 'Bold', tera: false }, p2: { kind: 'move', name: 'X', tera: false } },
+      playedOutcome: null,
+      scoreBefore: 0.1,
+      scoreAfter: null,
+    });
+    expect(analysis.p1.regret).toBeCloseTo(0.05, 10);
+    expect(analysis.attribution).toBe('quiet');
+  });
+
+  test('the safe line is the max-floor entry even when it is not best-by-ev', () => {
+    const evResult: EvalResult = {
+      score: 0.1, interval: 0, depthCompleted: 1,
+      perSide: {
+        p1: [
+          choiceEv('move aggro', 'Aggro', -0.2, 0.3),
+          choiceEv('move careful', 'Careful', 0.05, 0.05),
+          choiceEv('move bold', 'Bold', -0.3, -0.2),
+        ],
+        p2: [choiceEv('move x', 'X', 0.0, 0.0)],
+      },
+    };
+    const analysis = analyzeTurn({
+      turn: 4,
+      result: evResult,
+      played: { p1: { kind: 'move', name: 'Bold', tera: false }, p2: { kind: 'move', name: 'X', tera: false } },
+      playedOutcome: null,
+      scoreBefore: 0.1,
+      scoreAfter: null,
+    });
+    expect(analysis.p1.best?.choice).toBe('move aggro');
+    expect(analysis.p1.safe?.choice).toBe('move careful');
+    expect(analysis.p1.regret).toBeCloseTo(0.5, 10);
   });
 
   test('a flinched slot still grades charitably against consistent combos', () => {

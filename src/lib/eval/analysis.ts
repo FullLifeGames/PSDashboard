@@ -36,8 +36,11 @@ export interface SideAnalysis {
   playedSlots?: (PlayedAction | null)[];
   /** The played action matched into the engine's ranked list. */
   played: RankedChoice | null;
+  /** The top choice by equilibrium EV — the grading reference. */
   best: RankedChoice | null;
-  /** best.worstCase − played.worstCase (own perspective), floored at 0. */
+  /** The max-floor choice — "the engine's safe line", the safety reference. */
+  safe: RankedChoice | null;
+  /** best.ev − played.ev (own perspective), floored at 0. */
   regret: number | null;
   /**
    * The regret's floor priced in a punishing reply the opponent did NOT
@@ -186,9 +189,8 @@ export function matchPlayedSlots(
   if (consistent.length === 0 || !slots?.some(action => action === null)) {
     return { played: null, partial: false };
   }
-  // Charitable pick by the grading reference (worstCase today, ev after the
-  // equilibrium-grading switch).
-  const played = consistent.reduce((a, b) => (b.worstCase > a.worstCase ? b : a));
+  // Charitable pick by the grading reference: equilibrium EV.
+  const played = consistent.reduce((a, b) => (b.ev > a.ev ? b : a));
   return { played, partial: true };
 }
 
@@ -298,13 +300,18 @@ export function analyzeTurn(params: {
     } else if (params.played) {
       played = matchPlayedChoice(params.result, key, playedRaw);
     }
-    const best = params.result.perSide[key][0] ?? null;
-    const regret = played && best ? Math.max(0, best.worstCase - played.worstCase) : null;
+    const options = params.result.perSide[key];
+    const best = options[0] ?? null;
+    const safe = options.length > 0
+      ? options.reduce((a, b) => (b.worstCase > a.worstCase ? b : a))
+      : null;
+    const regret = played && best ? Math.max(0, best.ev - played.ev) : null;
     return {
       playedRaw,
       ...(playedSlots ? { playedSlots } : {}),
       played,
       best,
+      safe,
       regret,
       ...(playedPartial ? { playedPartial } : {}),
     };
@@ -320,9 +327,9 @@ export function analyzeTurn(params: {
     if ((side.regret ?? 0) < REGRET_THRESHOLD) return;
     if (!side.played?.punishedBy || !opponent.played) return;
     if (opponent.played.label === side.played.punishedBy) return;
-    if (params.playedOutcome !== null && side.best) {
+    if (params.playedOutcome !== null && side.safe) {
       const own = key === 'p1' ? params.playedOutcome : -params.playedOutcome;
-      const payoff = own - side.best.worstCase;
+      const payoff = own - side.safe.worstCase;
       side.riskPayoff = payoff;
       if (payoff <= -RISK_PAYOFF_MARGIN) return;
       if (payoff >= RISK_PAYOFF_MARGIN) side.riskPaidOff = true;

@@ -61,7 +61,7 @@ function EngineRow({ name, side, onExplore }: { name: string; side: SideAnalysis
       <div className="ps-eval-analysis-row">
         <span style={{ color: '#cde', fontWeight: 'bold' }}>{name}</span>
         <span style={{ color: '#aab' }}>
-          engine: <ExplorableLabel label={best.label} onClick={onExplore && (() => onExplore(best))} /> ({signed(best.worstCase)})
+          engine: <ExplorableLabel label={best.label} onClick={onExplore && (() => onExplore(best))} /> ({signed(best.ev)})
         </span>
         {best.line && best.line.length > 0 && (
           <span className="ps-eval-line">then {best.line.map(step => `${step.p1} · ${step.p2}`).join(' → ')}</span>
@@ -113,13 +113,13 @@ function SideRow({ name, side, onExplore }: { name: string; side: SideAnalysis; 
         {side.played && side.best && !regretful && side.played.choice !== side.best.choice && (
           <span style={{ color: '#778' }}>
             engine: <ExplorableLabel label={side.best.label} color="#778" onClick={onExplore && (() => onExplore(side.best!))} />
-            {' '}({signed(side.best.worstCase)})
+            {' '}({signed(side.best.ev)})
           </span>
         )}
         {regretful && side.regret !== null && (side.riskPaidOff ? (
           <span
             style={{ color: '#8c8' }}
-            title={`The safe line guaranteed ${side.best ? side.best.worstCase.toFixed(2) : '?'}; the actual pair came out ${(side.riskPayoff ?? 0).toFixed(2)} better — the read won value.`}
+            title={`The safe line guaranteed ${side.safe ? side.safe.worstCase.toFixed(2) : '?'}; the actual pair came out ${(side.riskPayoff ?? 0).toFixed(2)} better — the read won value.`}
           >
             read paid off · +{(side.riskPayoff ?? 0).toFixed(2)}
           </span>
@@ -144,26 +144,35 @@ function SideRow({ name, side, onExplore }: { name: string; side: SideAnalysis; 
       {regretful && side.played && side.best && (
         <>
           <div className="ps-eval-analysis-row" style={{ color: '#aab' }}>
-            <MiniBar value={side.played.worstCase} />
-            <span style={{ whiteSpace: 'nowrap' }}>{signed(side.played.worstCase)} played</span>
+            <MiniBar value={side.played.ev} />
+            <span style={{ whiteSpace: 'nowrap' }}>{signed(side.played.ev)} played</span>
             {side.played.punishedBy && <span style={{ color: '#778' }}>· worst vs {side.played.punishedBy}</span>}
           </div>
-          <div className="ps-eval-analysis-row" style={{ color: '#aab' }}>
-            <MiniBar value={side.best.worstCase} />
-            {/* For a read, the engine's line is merely "safe" — calling it
-                "better" would credit passivity the read outperformed. */}
-            <span style={{ whiteSpace: 'nowrap' }}>
-              {signed(side.best.worstCase)} {side.riskUnpunished || side.riskPaidOff ? 'safe:' : 'better:'}
-            </span>
-            <ExplorableLabel
-              label={side.best.label}
-              onClick={onExplore && (() => onExplore(side.best!))}
-            />
-            {side.best.punishedBy && <span style={{ color: '#778' }}>· worst vs {side.best.punishedBy}</span>}
-            {side.best.line && side.best.line.length > 0 && (
-              <span className="ps-eval-line">then {side.best.line.map(step => `${step.p1} · ${step.p2}`).join(' → ')}</span>
-            )}
-          </div>
+          {(() => {
+            // For a read, the reference is the SAFE line (max floor) shown at
+            // its guarantee — calling the ev-best "better" would credit what
+            // the read outperformed. Red misplays compare against the ev-best
+            // at its equilibrium value.
+            const asSafe = side.riskUnpunished || side.riskPaidOff;
+            const target = asSafe ? side.safe ?? side.best! : side.best!;
+            const value = asSafe ? target.worstCase : target.ev;
+            return (
+              <div className="ps-eval-analysis-row" style={{ color: '#aab' }}>
+                <MiniBar value={value} />
+                <span style={{ whiteSpace: 'nowrap' }}>
+                  {signed(value)} {asSafe ? 'safe:' : 'better:'}
+                </span>
+                <ExplorableLabel
+                  label={target.label}
+                  onClick={onExplore && (() => onExplore(target))}
+                />
+                {target.punishedBy && <span style={{ color: '#778' }}>· worst vs {target.punishedBy}</span>}
+                {target.line && target.line.length > 0 && (
+                  <span className="ps-eval-line">then {target.line.map(step => `${step.p1} · ${step.p2}`).join(' → ')}</span>
+                )}
+              </div>
+            );
+          })()}
           {difference && (
             <div className="ps-eval-analysis-row">
               <span style={{ color: '#778' }}>difference:</span>

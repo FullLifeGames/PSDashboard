@@ -212,10 +212,10 @@ test.describe('PS Dashboard', () => {
     await expect(panel.locator('.ps-eval-bar')).toBeVisible({ timeout: 120_000 });
     await expect(panel.locator('.ps-eval-bar-p1')).toContainText('%');
     expect(await panel.locator('.ps-eval-column').count()).toBe(2);
-    // Ranked choices speak the bar's percent language; raw scores and the
+    // Ranked choices speak the bar's percent language; the floor and the
     // punishing reply live in the tooltip.
-    await expect(panel.getByText(/≥\d+%/).first()).toBeVisible();
-    await expect(panel.locator('.ps-eval-choice').first()).toHaveAttribute('title', /worst reply/);
+    await expect(panel.locator('.ps-eval-choice-main').first()).toContainText(/\d+%/);
+    await expect(panel.locator('.ps-eval-choice').first()).toHaveAttribute('title', /guaranteed floor/);
   });
 
   test('clicking an engine choice from the replay view branches with it prefilled', async ({ page }) => {
