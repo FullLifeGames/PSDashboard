@@ -130,11 +130,14 @@ function toResult(root: Node, maxDepth: number): EvalResult {
             punishedBy = ownSign === 1 ? root.p2Options[j].label : root.p1Options[i].label;
           }
         }
+        // DUCT visits do not converge to Nash — ev here is the visit-mean
+        // approximation, never a solved mixture.
         const ranked: RankedChoice = {
           choice: entry.option.choice,
           label: entry.option.label,
           worstCase: mean,
           expected: mean,
+          ev: mean,
           punishedBy,
         };
         return ranked;

@@ -390,13 +390,14 @@ export function subSearchDepth1(
     }
   }
 
+  // Pruned path: no full matrix exists, so ev falls back to the guarantee.
   const p1Top: RankedChoice = {
     choice: p1Options[bestI].choice, label: p1Options[bestI].label,
-    worstCase: v1, expected: v1, punishedBy: p2Options[bestIPunish].label,
+    worstCase: v1, expected: v1, ev: v1, punishedBy: p2Options[bestIPunish].label,
   };
   const p2Top: RankedChoice = {
     choice: p2Options[bestJ].choice, label: p2Options[bestJ].label,
-    worstCase: -v2, expected: -v2, punishedBy: p1Options[bestJPunish].label,
+    worstCase: -v2, expected: -v2, ev: -v2, punishedBy: p1Options[bestJPunish].label,
   };
   return {
     score: (v1 + v2) / 2,

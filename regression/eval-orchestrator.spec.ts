@@ -125,8 +125,8 @@ test.describe('search orchestrator', () => {
           interval: 0,
           depthCompleted: job.settings.depth,
           perSide: {
-            p1: [{ choice: 'move next', label: 'Next', worstCase: 0, expected: 0, punishedBy: null }],
-            p2: [{ choice: 'move reply', label: 'Reply', worstCase: 0, expected: 0, punishedBy: null }],
+            p1: [{ choice: 'move next', label: 'Next', worstCase: 0, expected: 0, ev: 0, punishedBy: null }],
+            p2: [{ choice: 'move reply', label: 'Reply', worstCase: 0, expected: 0, ev: 0, punishedBy: null }],
           },
         };
       },

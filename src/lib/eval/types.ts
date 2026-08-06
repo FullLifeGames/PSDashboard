@@ -40,10 +40,17 @@ export interface RankedChoice {
   choice: string;
   /** Display label, e.g. "Seismic Toss", "Tera + Draco Meteor", "→ Dragapult". */
   label: string;
-  /** Value after the opponent's best (most punishing) reply. */
+  /** Value after the opponent's best (most punishing) reply — the floor. */
   worstCase: number;
   /** Mean value over all opponent replies. */
   expected: number;
+  /**
+   * Expected value against the OPPONENT's equilibrium mixture (own
+   * perspective) — the primary grading reference. Choices in the
+   * equilibrium's support score ≈ the game value; dominated choices score
+   * below it. MCTS results approximate this with the visit-mean.
+   */
+  ev: number;
   /** Label of the opponent reply achieving worstCase; null when the opponent has no choices. */
   punishedBy: string | null;
   /**
@@ -55,8 +62,14 @@ export interface RankedChoice {
 }
 
 export interface EvalResult {
-  /** [-1, +1] from p1's perspective: midpoint of the two sides' maximin guarantees. */
+  /**
+   * [-1, +1] from p1's perspective. Full-matrix searches score at the solved
+   * game value (clamped into the maximin interval); pruned sub-searches and
+   * MCTS keep the guarantee midpoint.
+   */
   score: number;
+  /** Solved value of the root matrix game (p1 perspective), when a full matrix exists. */
+  gameValue?: number;
   /**
    * Width of the [v1, v2] interval the true game value lies in. Near 0 = a
    * stable line exists; wide = the turn hinges on out-predicting the

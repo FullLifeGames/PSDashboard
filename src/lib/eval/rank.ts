@@ -25,6 +25,8 @@ export interface Ranked {
   p2: RankedChoice[];
   v1: number;
   v2: number;
+  /** Solved value of the matrix game (p1 perspective); rootValue when a side has no options. */
+  gameValue: number;
 }
 
 export type PvStep = { p1: string; p2: string };
@@ -97,15 +99,26 @@ export function solveMatrixGame(values: number[][]): MatrixSolution {
 export function rankFromMatrix(matrix: ValueMatrix, rootValue: number): Ranked {
   const { p1Options, p2Options, values } = matrix;
 
+  // The one-shot matrix game's equilibrium prices every choice: `ev` is the
+  // expected value against the opponent's mixture. The floor (worstCase)
+  // stays as the safety column — sorting goes by ev, ties by floor.
+  const solved = p1Options.length > 0 && p2Options.length > 0;
+  const solution = solved ? solveMatrixGame(values) : { value: rootValue, p1Mix: [], p2Mix: [] };
+
   const p1: RankedChoice[] = p1Options.map((option, i) => {
     if (p2Options.length === 0) {
-      return { choice: option.choice, label: option.label, worstCase: rootValue, expected: rootValue, punishedBy: null };
+      return {
+        choice: option.choice, label: option.label,
+        worstCase: rootValue, expected: rootValue, ev: rootValue, punishedBy: null,
+      };
     }
     let worst = Infinity;
     let punishedBy: string | null = null;
     let sum = 0;
+    let ev = 0;
     for (let j = 0; j < p2Options.length; j++) {
       sum += values[i][j];
+      ev += values[i][j] * (solution.p2Mix[j] ?? 0);
       if (values[i][j] < worst) {
         worst = values[i][j];
         punishedBy = p2Options[j].label;
@@ -113,20 +126,25 @@ export function rankFromMatrix(matrix: ValueMatrix, rootValue: number): Ranked {
     }
     return {
       choice: option.choice, label: option.label,
-      worstCase: worst, expected: sum / p2Options.length, punishedBy,
+      worstCase: worst, expected: sum / p2Options.length, ev, punishedBy,
     };
-  }).sort((a, b) => b.worstCase - a.worstCase);
+  }).sort((a, b) => b.ev - a.ev || b.worstCase - a.worstCase);
 
   const p2: RankedChoice[] = p2Options.map((option, j) => {
     if (p1Options.length === 0) {
-      return { choice: option.choice, label: option.label, worstCase: -rootValue, expected: -rootValue, punishedBy: null };
+      return {
+        choice: option.choice, label: option.label,
+        worstCase: -rootValue, expected: -rootValue, ev: -rootValue, punishedBy: null,
+      };
     }
     // p1-perspective: p2's worst case is the p1 maximum; negate into p2's own view.
     let worst = -Infinity;
     let punishedBy: string | null = null;
     let sum = 0;
+    let ev = 0;
     for (let i = 0; i < p1Options.length; i++) {
       sum += values[i][j];
+      ev += values[i][j] * (solution.p1Mix[i] ?? 0);
       if (values[i][j] > worst) {
         worst = values[i][j];
         punishedBy = p1Options[i].label;
@@ -134,18 +152,21 @@ export function rankFromMatrix(matrix: ValueMatrix, rootValue: number): Ranked {
     }
     return {
       choice: option.choice, label: option.label,
-      worstCase: -worst, expected: -(sum / p1Options.length), punishedBy,
+      worstCase: -worst, expected: -(sum / p1Options.length), ev: -ev, punishedBy,
     };
-  }).sort((a, b) => b.worstCase - a.worstCase);
+  }).sort((a, b) => b.ev - a.ev || b.worstCase - a.worstCase);
 
-  const v1 = p1.length > 0 ? p1[0].worstCase : rootValue;
-  const v2 = p2.length > 0 ? -p2[0].worstCase : rootValue;
-  return { p1, p2, v1, v2 };
+  const v1 = p1.length > 0 ? Math.max(...p1.map(choice => choice.worstCase)) : rootValue;
+  const v2 = p2.length > 0 ? -Math.max(...p2.map(choice => choice.worstCase)) : rootValue;
+  return { p1, p2, v1, v2, gameValue: solved ? solution.value : rootValue };
 }
 
 export function toResult(ranked: Ranked, depthCompleted: number): EvalResult {
+  const lo = Math.min(ranked.v1, ranked.v2);
+  const hi = Math.max(ranked.v1, ranked.v2);
   return {
-    score: (ranked.v1 + ranked.v2) / 2,
+    score: Math.min(hi, Math.max(lo, ranked.gameValue)),
+    gameValue: ranked.gameValue,
     interval: Math.max(0, ranked.v2 - ranked.v1),
     depthCompleted,
     perSide: { p1: ranked.p1, p2: ranked.p2 },

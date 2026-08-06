@@ -38,11 +38,13 @@ function rankMerged(
           punishedBy = ranked.find(choice => choice.choice === entry.option.choice)?.punishedBy ?? null;
         }
       }
+      // Visit-mean approximation of ev — DUCT visits are not a solved mixture.
       return {
         choice: entry.option.choice,
         label: entry.option.label,
         worstCase: mean,
         expected: mean,
+        ev: mean,
         punishedBy,
       };
     });

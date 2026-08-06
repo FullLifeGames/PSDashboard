@@ -6,7 +6,7 @@ import type { RankedChoice } from '../src/lib/eval/types';
 const names: [string, string] = ['Alpha', 'Beta'];
 
 const ranked = (choiceStr: string, label: string, worstCase: number): RankedChoice =>
-  ({ choice: choiceStr, label, worstCase, expected: worstCase, punishedBy: null });
+  ({ choice: choiceStr, label, worstCase, expected: worstCase, ev: worstCase, punishedBy: null });
 
 const mk = (turn: number, scoreBefore: number, scoreAfter: number | null, over: Partial<TurnAnalysis> = {}): TurnAnalysis => ({
   turn,

@@ -3,7 +3,7 @@ import { analyzeTurn, matchPlayedChoice, playedSetupMove, REGRET_THRESHOLD, type
 import type { EvalResult, RankedChoice } from '../src/lib/eval/types';
 
 const choice = (choiceStr: string, label: string, worstCase: number): RankedChoice =>
-  ({ choice: choiceStr, label, worstCase, expected: worstCase, punishedBy: 'Reply' });
+  ({ choice: choiceStr, label, worstCase, expected: worstCase, ev: worstCase, punishedBy: 'Reply' });
 
 const result: EvalResult = {
   score: 0.1,

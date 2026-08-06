@@ -25,8 +25,8 @@ export interface StoredEval {
  * behavior) — persisted results from older engine versions must not
  * resurface as current.
  */
-// v5: doubles candidate selection rebuilt (status/setup/spread hints, core dedup).
-export const EVAL_ENGINE_CACHE_VERSION = 5;
+// v6: ev/gameValue grading — result shape and score semantics changed.
+export const EVAL_ENGINE_CACHE_VERSION = 6;
 
 export function evalStoreKey(
   cacheKey: string,

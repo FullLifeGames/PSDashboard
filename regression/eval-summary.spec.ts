@@ -4,7 +4,7 @@ import { summarizeTurn } from '../src/lib/eval/summary';
 import type { EvalResult, RankedChoice } from '../src/lib/eval/types';
 
 const choice = (choiceStr: string, label: string, worstCase: number, line?: { p1: string; p2: string }[]): RankedChoice =>
-  ({ choice: choiceStr, label, worstCase, expected: worstCase, punishedBy: 'Reply', ...(line ? { line } : {}) });
+  ({ choice: choiceStr, label, worstCase, expected: worstCase, ev: worstCase, punishedBy: 'Reply', ...(line ? { line } : {}) });
 
 const result: EvalResult = {
   score: 0.1,
