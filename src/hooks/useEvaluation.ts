@@ -1,10 +1,10 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { matchPlayedSide } from '../lib/eval/analysis';
+import { matchPlayedSide, REGRET_THRESHOLD, type TurnVerification } from '../lib/eval/analysis';
 import type { PlayedTurn } from '../lib/eval/played';
 import { EvalWorkerClient } from '../lib/eval/worker-client';
 import { evalStoreKey, loadStoredEval, saveStoredEval } from '../lib/eval-cache-store';
 import { selectKeyTurns } from '../lib/eval/graph';
-import type { EvalPreferences, EvalResult, EvalSettings, SearchProgress } from '../lib/eval/types';
+import type { EvalPreferences, EvalResult, EvalSettings, RankedChoice, SearchProgress } from '../lib/eval/types';
 
 export type EvalStatus = 'idle' | 'reconstructing' | 'searching' | 'done' | 'stale' | 'error';
 
@@ -51,6 +51,8 @@ interface CachedEval {
   tera: boolean;
   /** Engine expectation of the actually played pair (set by graph sweeps). */
   playedOutcome?: number | null;
+  /** Depth+1 re-search of flagged misplays (null = checked, nothing flagged). */
+  verified?: TurnVerification | null;
 }
 
 export interface GraphSweepParams {
@@ -85,6 +87,8 @@ export interface EvalGraphState {
   results: (EvalResult | null)[];
   played: (PlayedTurn | null)[];
   playedOutcome: (number | null)[];
+  /** Depth+1 verification of flagged misplays (null = nothing flagged / not run). */
+  verified: (TurnVerification | null)[];
   running: boolean;
   progress: { done: number; total: number } | null;
 }
@@ -97,13 +101,13 @@ export function useEvaluation() {
   const [error, setError] = useState<string | null>(null);
   const [reconstructProgress, setReconstructProgress] = useState<{ turn: number; target: number } | null>(null);
   const [graph, setGraph] = useState<EvalGraphState>({
-    scores: [], results: [], played: [], playedOutcome: [], running: false, progress: null,
+    scores: [], results: [], played: [], playedOutcome: [], verified: [], running: false, progress: null,
   });
 
   const clientRef = useRef<EvalWorkerClient | null>(null);
   const cacheRef = useRef(new Map<string, CachedEval>());
   /** Latest graph arrays, so partial (range) sweeps merge instead of wiping. */
-  const graphDataRef = useRef<Pick<EvalGraphState, 'scores' | 'results' | 'played' | 'playedOutcome'> | null>(null);
+  const graphDataRef = useRef<Pick<EvalGraphState, 'scores' | 'results' | 'played' | 'playedOutcome' | 'verified'> | null>(null);
   const runRef = useRef(0);
   const prefsRef = useRef(prefs);
   prefsRef.current = prefs;
@@ -248,9 +252,13 @@ export function useEvaluation() {
     const results: (EvalResult | null)[] = keepPrevious ? [...previous.results] : new Array(params.turns).fill(null);
     const played: (PlayedTurn | null)[] = keepPrevious ? [...previous.played] : new Array(params.turns).fill(null);
     const playedOutcome: (number | null)[] = keepPrevious ? [...previous.playedOutcome] : new Array(params.turns).fill(null);
+    const verified: (TurnVerification | null)[] = keepPrevious && previous.verified.length === params.turns
+      ? [...previous.verified]
+      : new Array(params.turns).fill(null);
     const snapshot = () => {
       const data = {
-        scores: [...scores], results: [...results], played: [...played], playedOutcome: [...playedOutcome],
+        scores: [...scores], results: [...results], played: [...played],
+        playedOutcome: [...playedOutcome], verified: [...verified],
       };
       graphDataRef.current = data;
       return data;
@@ -310,8 +318,57 @@ export function useEvaluation() {
       });
     };
 
-    /** One sequential pass over `turnList` at `settings`; false = cancelled. */
-    const sweepTurns = async (turnList: number[], settings: EvalSettings): Promise<boolean> => {
+    /**
+     * Deep re-search before a misplay verdict sticks (chess.com's sacrifice
+     * verification): for each side whose played choice trails the best by the
+     * regret threshold, value the played and best pairs one depth deeper.
+     * Flag checks are pure — the position is only acquired when needed.
+     */
+    const verifyFlagged = async (
+      getSerialized: () => Promise<string>,
+      result: EvalResult,
+      turnPlayed: PlayedTurn | null,
+      settings: EvalSettings,
+    ): Promise<TurnVerification | null> => {
+      if ((settings.mode ?? 'matrix') !== 'matrix' || settings.depth > 2) return null;
+      const p1Choice = matchPlayedSide(result, 'p1', turnPlayed);
+      const p2Choice = matchPlayedSide(result, 'p2', turnPlayed);
+      if (!p1Choice || !p2Choice) return null;
+      const flaggedBest = (side: 'p1' | 'p2', chosen: RankedChoice): RankedChoice | null => {
+        const best = result.perSide[side][0];
+        return best && best.ev - chosen.ev >= REGRET_THRESHOLD ? best : null;
+      };
+      const p1Best = flaggedBest('p1', p1Choice);
+      const p2Best = flaggedBest('p2', p2Choice);
+      if (!p1Best && !p2Best) return null;
+      const deep: EvalSettings = {
+        ...settings, depth: (settings.depth + 1) as 2 | 3, mode: 'matrix', keepPlayed: undefined,
+      };
+      const serialized = await getSerialized();
+      clientRef.current ??= new EvalWorkerClient();
+      const playedDeep = await clientRef.current.evalPair(serialized, p1Choice.choice, p2Choice.choice, deep);
+      const verification: TurnVerification = {};
+      if (p1Best) {
+        verification.p1 = {
+          playedDeep,
+          bestDeep: await clientRef.current.evalPair(serialized, p1Best.choice, p2Choice.choice, deep),
+        };
+      }
+      if (p2Best) {
+        verification.p2 = {
+          playedDeep,
+          bestDeep: await clientRef.current.evalPair(serialized, p1Choice.choice, p2Best.choice, deep),
+        };
+      }
+      return verification;
+    };
+
+    /**
+     * One sequential pass over `turnList` at `settings`; false = cancelled.
+     * `verify` runs the depth+1 misplay verification — final-verdict passes
+     * only, never the fast shaping pass (its results are provisional).
+     */
+    const sweepTurns = async (turnList: number[], settings: EvalSettings, verify: boolean): Promise<boolean> => {
       const { depth, samples } = settings;
       const mode = settings.mode ?? 'matrix';
       for (let index = 0; index < turnList.length; index++) {
@@ -330,6 +387,7 @@ export function useEvaluation() {
           hit = stored ? {
             result: stored.result, depth, samples, mode: mode, tera: params.tera,
             ...(stored.playedOutcome !== undefined ? { playedOutcome: stored.playedOutcome } : {}),
+            ...(stored.verified !== undefined ? { verified: stored.verified } : {}),
           } : undefined;
           if (hit) cacheRef.current.set(key, hit);
         }
@@ -363,6 +421,25 @@ export function useEvaluation() {
             });
           }
           playedOutcome[turn - 1] = outcome;
+          // Verification backfill: cached entries from before the pass (or
+          // written by single evaluations) never verified their flags.
+          let turnVerified: TurnVerification | null | undefined = hit.verified;
+          if (verify && turnVerified === undefined) {
+            turnVerified = null;
+            try {
+              turnVerified = await verifyFlagged(() => positionFor(turn), hit.result, turnPlayed, settings);
+            } catch (err) {
+              if (runRef.current !== runId) return false;
+              if (err instanceof Error && err.message === 'cancelled') return false;
+            }
+            if (runRef.current !== runId) return false;
+            cacheRef.current.set(key, { ...cacheRef.current.get(key) ?? hit, verified: turnVerified });
+            void saveStoredEval({
+              key: storeKey, result: hit.result, depth, samples, mode: mode, tera: params.tera,
+              playedOutcome: outcome ?? null, verified: turnVerified, savedAt: Date.now(),
+            });
+          }
+          if (turnVerified !== undefined) verified[turn - 1] = turnVerified;
         } else {
           try {
             const serialized = await positionFor(turn);
@@ -389,10 +466,27 @@ export function useEvaluation() {
               if (runRef.current !== runId) return false;
             }
             playedOutcome[turn - 1] = outcome;
-            cacheRef.current.set(key, { result, depth, samples, mode: mode, tera: params.tera, playedOutcome: outcome });
+
+            let turnVerified: TurnVerification | null | undefined;
+            if (verify) {
+              turnVerified = null;
+              try {
+                turnVerified = await verifyFlagged(() => Promise.resolve(serialized), result, turnPlayed, settings);
+              } catch (err) {
+                if (runRef.current !== runId) return false;
+                if (err instanceof Error && err.message === 'cancelled') return false;
+              }
+              if (runRef.current !== runId) return false;
+              verified[turn - 1] = turnVerified;
+            }
+            cacheRef.current.set(key, {
+              result, depth, samples, mode: mode, tera: params.tera,
+              playedOutcome: outcome, ...(turnVerified !== undefined ? { verified: turnVerified } : {}),
+            });
             void saveStoredEval({
               key: storeKey, result, depth, samples, mode: mode, tera: params.tera,
-              playedOutcome: outcome, savedAt: Date.now(),
+              playedOutcome: outcome, ...(turnVerified !== undefined ? { verified: turnVerified } : {}),
+              savedAt: Date.now(),
             });
           } catch (err) {
             if (runRef.current !== runId) return false;
@@ -417,10 +511,10 @@ export function useEvaluation() {
       // swings (both sides of each — analysis compares across them). Short
       // ranges (on-demand turn analysis) go straight to full settings.
       if (rangeTurns.length > 2 && !isFast) {
-        if (!(await sweepTurns(rangeTurns, fastSettings))) return;
+        if (!(await sweepTurns(rangeTurns, fastSettings, false))) return;
         const keyTurns = selectKeyTurns(scores).filter(turn => turn >= from && turn <= to);
-        if (keyTurns.length > 0 && !(await sweepTurns(keyTurns, fullSettings))) return;
-      } else if (!(await sweepTurns(rangeTurns, fullSettings))) {
+        if (keyTurns.length > 0 && !(await sweepTurns(keyTurns, fullSettings, true))) return;
+      } else if (!(await sweepTurns(rangeTurns, fullSettings, true))) {
         return;
       }
       if (runRef.current === runId) {
@@ -431,7 +525,7 @@ export function useEvaluation() {
 
   const clearGraph = useCallback(() => {
     graphDataRef.current = null;
-    setGraph({ scores: [], results: [], played: [], playedOutcome: [], running: false, progress: null });
+    setGraph({ scores: [], results: [], played: [], playedOutcome: [], verified: [], running: false, progress: null });
   }, []);
 
   return {

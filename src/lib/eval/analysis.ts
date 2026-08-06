@@ -66,6 +66,18 @@ export interface SideAnalysis {
    * so the regret is a charitable lower bound, never blame for hidden picks.
    */
   playedPartial?: boolean;
+  /** A depth+1 verification pass cleared the shallow misplay flag. */
+  verifiedAtDepth?: boolean;
+}
+
+/** Deep re-search of the played and best pairs (p1-perspective outcomes). */
+export interface VerifiedOutcomes {
+  playedDeep: number;
+  bestDeep: number;
+}
+export interface TurnVerification {
+  p1?: VerifiedOutcomes;
+  p2?: VerifiedOutcomes;
 }
 
 export interface TurnAnalysis {
@@ -296,6 +308,12 @@ export function analyzeTurn(params: {
    * read's payoff cash in over PAYOFF_WINDOW turns of expected play.
    */
   futureOutcomes?: (number | null)[];
+  /**
+   * Deep re-search of flagged turns (chess.com's sacrifice-verification
+   * pattern): when the depth+1 pair values say the played line holds up,
+   * the misplay verdict is cleared. Confirming passes change nothing.
+   */
+  verified?: TurnVerification | null;
   scoreBefore: number;
   scoreAfter: number | null;
   /** False = played actions unavailable (doubles); blame is off the table. */
@@ -319,7 +337,20 @@ export function analyzeTurn(params: {
     const safe = options.length > 0
       ? options.reduce((a, b) => (b.worstCase > a.worstCase ? b : a))
       : null;
-    const regret = played && best ? Math.max(0, best.ev - played.ev) : null;
+    let regret = played && best ? Math.max(0, best.ev - played.ev) : null;
+    // Verification can only ACQUIT: a deep pass that confirms the gap keeps
+    // the shallow equilibrium regret (the deep pair values are an
+    // exploitative lens, not a fairer grade when they agree).
+    let verifiedAtDepth = false;
+    const verifiedSide = params.verified?.[key];
+    if (verifiedSide && regret !== null && regret >= REGRET_THRESHOLD) {
+      const sign = key === 'p1' ? 1 : -1;
+      const deepRegret = Math.max(0, sign * (verifiedSide.bestDeep - verifiedSide.playedDeep));
+      if (deepRegret < REGRET_THRESHOLD) {
+        regret = deepRegret;
+        verifiedAtDepth = true;
+      }
+    }
     return {
       playedRaw,
       ...(playedSlots ? { playedSlots } : {}),
@@ -328,6 +359,7 @@ export function analyzeTurn(params: {
       safe,
       regret,
       ...(playedPartial ? { playedPartial } : {}),
+      ...(verifiedAtDepth ? { verifiedAtDepth } : {}),
     };
   };
 

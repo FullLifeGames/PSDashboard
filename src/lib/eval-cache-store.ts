@@ -1,4 +1,5 @@
 import type { EvalResult } from './eval/types';
+import type { TurnVerification } from './eval/analysis';
 
 /**
  * IndexedDB persistence for evaluation results, keyed by position + settings.
@@ -17,6 +18,8 @@ export interface StoredEval {
   tera: boolean;
   /** Engine expectation of the actually played pair (sweeps). */
   playedOutcome?: number | null;
+  /** Depth+1 re-search of flagged misplays (null = checked, nothing flagged). */
+  verified?: TurnVerification | null;
   savedAt: number;
 }
 

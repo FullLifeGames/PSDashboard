@@ -214,6 +214,30 @@ test.describe('turn analysis assembly', () => {
     expect(analysis.p2.played).toBeNull();
   });
 
+  test('a deeper verification pass can clear a flagged misplay', () => {
+    const at = (verified?: { p2?: { playedDeep: number; bestDeep: number } }) => analyzeTurn({
+      turn: 20,
+      result,
+      played: { p1: { kind: 'move', name: 'Draco Meteor', tera: false }, p2: { kind: 'move', name: 'Recover', tera: false } },
+      playedOutcome: 0.0,
+      verified,
+      scoreBefore: 0.1,
+      scoreAfter: -0.25,
+    });
+    // Shallow regret 0.25 flags Recover; at depth+1 the played pair is only
+    // 0.05 (own) behind the best pair — the verdict is cleared.
+    const cleared = at({ p2: { playedDeep: -0.1, bestDeep: -0.15 } });
+    expect(cleared.p2.regret).toBeCloseTo(0.05, 10);
+    expect(cleared.p2.verifiedAtDepth).toBe(true);
+    expect(cleared.p2.riskUnpunished).toBeUndefined();
+    expect(cleared.attribution).toBe('chance');
+    // The deep pass confirming the gap keeps the shallow equilibrium regret.
+    const confirmed = at({ p2: { playedDeep: 0.2, bestDeep: -0.1 } });
+    expect(confirmed.p2.regret).toBeCloseTo(0.25, 10);
+    expect(confirmed.p2.verifiedAtDepth).toBeUndefined();
+    expect(confirmed.attribution).toBe('p2-decision');
+  });
+
   test('a read may cash in over the following turns, not just one', () => {
     const at = (futureOutcomes?: (number | null)[]) => analyzeTurn({
       turn: 20,

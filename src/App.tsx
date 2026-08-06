@@ -822,6 +822,7 @@ function App() {
       futureOutcomes: evaluation.graph.playedOutcome
         .slice(analysisTurn, analysisTurn + PAYOFF_WINDOW)
         .map(value => value ?? null),
+      verified: evaluation.graph.verified[analysisTurn - 1] ?? null,
       scoreBefore,
       scoreAfter: evaluation.graph.scores[analysisTurn] ?? null,
       playedTracking: true,
@@ -840,7 +841,7 @@ function App() {
   // Game-level root cause, once enough of the game is swept.
   const gameReport = useMemo(() => {
     if (!replayData) return null;
-    const { results, scores, played, playedOutcome, running } = evaluation.graph;
+    const { results, scores, played, playedOutcome, verified, running } = evaluation.graph;
     if (running) return null;
     const analyses = results.map((result, index) => {
       const scoreBefore = scores[index];
@@ -853,6 +854,7 @@ function App() {
         futureOutcomes: playedOutcome
           .slice(index + 1, index + 1 + PAYOFF_WINDOW)
           .map(value => value ?? null),
+        verified: verified[index] ?? null,
         scoreBefore,
         scoreAfter: scores[index + 1] ?? null,
         playedTracking: true,

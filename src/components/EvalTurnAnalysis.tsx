@@ -116,6 +116,14 @@ function SideRow({ name, side, onExplore }: { name: string; side: SideAnalysis; 
             {' '}({signed(side.best.ev)})
           </span>
         )}
+        {side.verifiedAtDepth && (
+          <span
+            style={{ color: '#778' }}
+            title="A deeper search re-checked this turn: the played line holds up, so the shallow misplay flag was cleared."
+          >
+            · verified deeper
+          </span>
+        )}
         {regretful && side.regret !== null && (side.riskPaidOff ? (
           <span
             style={{ color: '#8c8' }}
