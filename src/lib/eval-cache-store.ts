@@ -28,8 +28,8 @@ export interface StoredEval {
  * behavior) — persisted results from older engine versions must not
  * resurface as current.
  */
-// v6: ev/gameValue grading — result shape and score semantics changed.
-export const EVAL_ENGINE_CACHE_VERSION = 6;
+// v7: active-pair matchup emphasis + team-preview (turn 0) evaluation.
+export const EVAL_ENGINE_CACHE_VERSION = 7;
 
 export function evalStoreKey(
   cacheKey: string,

@@ -130,6 +130,22 @@ test.describe('evaluatePosition', () => {
     expect(v6).toBeLessThan(2 * v2);
   });
 
+  test('the same teams score better with the favorable matchup active', () => {
+    // Machamp wins its pairs, Pikachu (Growl only) loses its own. The teams
+    // are identical either way — only who stands on the field differs. The
+    // team-wide matchup term alone scored both arrangements identically;
+    // the active-pair emphasis makes the on-field pressure count.
+    const machampActive = makeBattle(
+      [makeSet('Machamp', 'Machamp', ['Karate Chop']), makeSet('Pikachu', 'Pikachu', ['Growl'])],
+      [makeSet('Chansey', 'Chansey', ['Tackle']), makeSet('Snorlax', 'Snorlax', ['Tackle'])],
+    );
+    const pikachuActive = makeBattle(
+      [makeSet('Pikachu', 'Pikachu', ['Growl']), makeSet('Machamp', 'Machamp', ['Karate Chop'])],
+      [makeSet('Chansey', 'Chansey', ['Tackle']), makeSet('Snorlax', 'Snorlax', ['Tackle'])],
+    );
+    expect(evaluatePosition(machampActive)).toBeGreaterThan(evaluatePosition(pikachuActive));
+  });
+
   test('a shared matchup cache stays exact across boost changes', () => {
     const battle = makeBattle([makeSet('A', 'Snorlax', ['Tackle'])], [makeSet('B', 'Snorlax', ['Tackle'])]);
     const cache = createMatchupCache();

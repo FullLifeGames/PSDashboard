@@ -33,6 +33,13 @@ export const EVAL_WEIGHTS = {
   scale: 2.5,
   /** Weight of the aggregated 1v1 matchup term (full dominance ≈ 0.6 mons). */
   matchup: 120,
+  /**
+   * Extra weight on active-vs-active pairs in the matchup term: the mons on
+   * the field apply the pressure, the bench only threatens to. Also what
+   * makes lead choices visible at depth 1 — every leads cell shares the same
+   * teams; only the actives differ.
+   */
+  activePair: 1.5,
 } as const;
 
 const SCREENS = ['reflect', 'lightscreen', 'auroraveil'];
@@ -228,6 +235,7 @@ function matchupScore(battle: Battle, cache?: MatchupCache): number {
   };
 
   let sum = 0;
+  let totalWeight = 0;
   for (const a of p1Living) {
     for (const b of p2Living) {
       const threatA = threat(a, b);
@@ -249,10 +257,12 @@ function matchupScore(battle: Battle, cache?: MatchupCache): number {
             b.storedStats.spe * stageMultiplier(b.boosts.spe));
         }
       }
-      sum += sign * (a.hp / a.maxhp) * (b.hp / b.maxhp);
+      const weight = a.isActive && b.isActive ? EVAL_WEIGHTS.activePair : 1;
+      sum += weight * sign * (a.hp / a.maxhp) * (b.hp / b.maxhp);
+      totalWeight += weight;
     }
   }
-  return sum / (p1Living.length * p2Living.length);
+  return totalWeight > 0 ? sum / totalWeight : 0;
 }
 
 /** Static positional eval from p1's perspective in [-1, +1]; ±1 for ended battles. */

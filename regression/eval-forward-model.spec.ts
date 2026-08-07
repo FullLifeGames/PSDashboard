@@ -48,6 +48,16 @@ function makeDoublesBattle(p1Sets: PokemonSet[], p2Sets: PokemonSet[]): Battle {
   return battle;
 }
 
+/** A battle still sitting at team preview — the turn-0 decision point. */
+function makePreviewBattle(formatid: string, p1Sets: PokemonSet[], p2Sets: PokemonSet[]): Battle {
+  return new Battle({
+    formatid: toID(formatid),
+    seed: '1,2,3,4',
+    p1: { name: 'Alpha', team: Teams.pack(p1Sets) },
+    p2: { name: 'Beta', team: Teams.pack(p2Sets) },
+  });
+}
+
 test.describe('sim forward model', () => {
   test('legal choices mirror the request: moves, tera variants, switches', () => {
     const root = createRootPosition(serialize(makeBattle(
@@ -400,5 +410,42 @@ test.describe('one-sided forced switch (waiting side)', () => {
       expect.objectContaining({ choice: 'wait', label: '(waiting)' }),
     ]);
     expect(result.perSide.p2[0].choice).toBe('switch 2');
+  });
+});
+
+test.describe('team preview (turn 0)', () => {
+  const quad = [
+    makeSet('Machamp', 'Machamp', ['Karate Chop'], 100),
+    makeSet('Snorlax', 'Snorlax', ['Tackle'], 100),
+    makeSet('Chansey', 'Chansey', ['Tackle'], 100),
+    makeSet('Blissey', 'Blissey', ['Tackle'], 100),
+  ];
+
+  test('doubles preview offers every unordered lead pair', () => {
+    const root = createRootPosition(serialize(makePreviewBattle('gen9doublescustomgame', quad, quad)));
+    const options = legalChoices(root, 'p1');
+    expect(options).toHaveLength(6); // C(4,2)
+    expect(options.map(option => option.choice)).toContain('team 12');
+    expect(options.map(option => option.choice)).toContain('team 34');
+    expect(options[0].label).toMatch(/^Lead .+ \+ .+$/);
+    const labels = options.map(option => option.label);
+    expect(labels).toContain('Lead Machamp + Snorlax');
+  });
+
+  test('singles preview offers one option per lead', () => {
+    const root = createRootPosition(serialize(makePreviewBattle('gen9customgame', quad, quad)));
+    const options = legalChoices(root, 'p1');
+    expect(options).toHaveLength(4);
+    expect(options.map(option => option.choice)).toContain('team 3');
+    expect(options.map(option => option.label)).toContain('Lead Chansey');
+  });
+
+  test('advancing team choices reaches turn 1 with the chosen leads', () => {
+    const root = createRootPosition(serialize(makePreviewBattle('gen9doublescustomgame', quad, quad)));
+    const child = advancePosition(root, 'team 23', 'team 14', '1,2,3,4');
+    const battle = positionBattle(child);
+    expect(battle.turn).toBe(1);
+    expect(battle.sides[0].active.map(pokemon => pokemon?.species.name)).toEqual(['Snorlax', 'Chansey']);
+    expect(battle.sides[1].active.map(pokemon => pokemon?.species.name)).toEqual(['Machamp', 'Blissey']);
   });
 });

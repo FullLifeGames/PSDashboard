@@ -394,6 +394,42 @@ test.describe('doubles candidate hints', () => {
   });
 });
 
+test.describe('team preview search (turn 0)', () => {
+  test('the engine ranks lead pairs and favors the pressuring lead', () => {
+    // Machamp is the only mon that wins pairs — with the active-pair
+    // emphasis, cells where it leads score higher, so every top lead
+    // includes it. Passive mons carry Growl only.
+    const preview = new Battle({
+      formatid: toID('gen9doublescustomgame'),
+      seed: '1,2,3,4',
+      p1: {
+        name: 'Alpha',
+        team: Teams.pack([
+          makeSet('Machamp', 'Machamp', ['Karate Chop'], 100),
+          makeSet('A2', 'Chansey', ['Growl'], 100),
+          makeSet('A3', 'Blissey', ['Growl'], 100),
+          makeSet('A4', 'Snorlax', ['Growl'], 100),
+        ]),
+      },
+      p2: {
+        name: 'Beta',
+        team: Teams.pack([
+          makeSet('B1', 'Chansey', ['Tackle'], 100),
+          makeSet('B2', 'Blissey', ['Tackle'], 100),
+          makeSet('B3', 'Snorlax', ['Tackle'], 100),
+          makeSet('B4', 'Pikachu', ['Tackle'], 100),
+        ]),
+      },
+    });
+    const root = serialize(preview);
+    const result = searchPosition(root, { depth: 1, samples: 1, tera: false });
+    expect(result.perSide.p1).toHaveLength(6);
+    expect(result.perSide.p1[0].label).toContain('Machamp');
+    expect(result.perSide.p1[0].label).toMatch(/^Lead /);
+    expect(searchPosition(root, { depth: 1, samples: 1, tera: false })).toEqual(result);
+  });
+});
+
 test.describe('doubles keepPlayed', () => {
   test('the played combo survives the restriction and gets ranked', () => {
     const keepPlayed = {

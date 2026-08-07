@@ -23,6 +23,12 @@ import { searchPosition } from '../src/lib/eval/search';
  * Kept 12/6: net wash vs baseline (mid +2, late −3 ≈ 2 samples), halving was
  * strictly worse (falsifying "schedule too strong"), and the schedule's real
  * purpose — pricing setup turns honestly — is not measured by sign accuracy.
+ *
+ * Active-pair emphasis 2026-08-05 (turn-0 lead evaluation groundwork):
+ *   activePair 2:   early 56 · mid 64 · late 71(−7!) · singles 60 · doubles 77
+ *   activePair 1.5: early 56 · mid 64 · late 76      · singles 62 · doubles 82
+ * Kept 1.5 — late-game benches decide endgames, so the emphasis must stay
+ * modest; lead ORDERING at turn 0 only needs a nonzero active delta.
  */
 const REPLAY_IDS = [
   'gen9draft-2058494320',

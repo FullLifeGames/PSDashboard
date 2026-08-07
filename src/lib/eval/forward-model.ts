@@ -192,6 +192,29 @@ export function legalChoices(
   if ('wait' in request && request.wait) {
     return [{ choice: 'wait', label: '(waiting)' }];
   }
+  // Team preview (turn 0): the lead choice is a real simultaneous decision.
+  // Doubles offers every unordered lead pair, singles every lead; the sim
+  // autocompletes the back order from the remaining slots. Digit lists stay
+  // unambiguous because teams never exceed 6.
+  if ('teamPreview' in request && request.teamPreview) {
+    const pool = sideState.pokemon;
+    const options: ChoiceOption[] = [];
+    if (battle.gameType === 'doubles') {
+      for (let i = 0; i < pool.length; i++) {
+        for (let j = i + 1; j < pool.length; j++) {
+          options.push({
+            choice: `team ${i + 1}${j + 1}`,
+            label: `Lead ${pool[i].species.name} + ${pool[j].species.name}`,
+          });
+        }
+      }
+    } else {
+      pool.forEach((pokemon, index) => {
+        options.push({ choice: `team ${index + 1}`, label: `Lead ${pokemon.species.name}` });
+      });
+    }
+    return options;
+  }
 
   const allowTera = opts?.tera ?? true;
   const actives = 'active' in request ? request.active ?? [] : [];
