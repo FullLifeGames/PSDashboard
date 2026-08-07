@@ -158,7 +158,10 @@ export function EvalPanel({
           </label>
         )}
         {showTera && (
-          <label style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 10, color: '#aabbcc' }}>
+          <label
+            title="Auto: off when the game never terastallized; in draft/custom formats only the Pokémon that actually did keep the option. Revealed: force that per-Pokémon restriction for any format."
+            style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 10, color: '#aabbcc' }}
+          >
             Tera
             <select
               value={prefs.tera}
@@ -168,6 +171,7 @@ export function EvalPanel({
               <option value="auto">Auto</option>
               <option value="on">On</option>
               <option value="off">Off</option>
+              <option value="revealed">Revealed</option>
             </select>
           </label>
         )}

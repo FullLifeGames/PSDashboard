@@ -1,5 +1,6 @@
-import type { EvalResult } from './eval/types';
+import type { EvalResult, TeraAllowance } from './eval/types';
 import type { TurnVerification } from './eval/analysis';
+import { teraKey } from './eval/tera';
 
 /**
  * IndexedDB persistence for evaluation results, keyed by position + settings.
@@ -15,7 +16,7 @@ export interface StoredEval {
   depth: number;
   samples: number;
   mode: string;
-  tera: boolean;
+  tera: TeraAllowance;
   /** Engine expectation of the actually played pair (sweeps). */
   playedOutcome?: number | null;
   /** Depth+1 re-search of flagged misplays (null = checked, nothing flagged). */
@@ -36,9 +37,9 @@ export function evalStoreKey(
   depth: number,
   samples: number,
   mode: string,
-  tera: boolean,
+  tera: TeraAllowance,
 ): string {
-  return `v${EVAL_ENGINE_CACHE_VERSION}|${cacheKey}|d${depth}s${samples}m${mode}t${tera ? 1 : 0}`;
+  return `v${EVAL_ENGINE_CACHE_VERSION}|${cacheKey}|d${depth}s${samples}m${mode}t${teraKey(tera)}`;
 }
 
 const DB_NAME = 'ps-replay-interceptor-eval';

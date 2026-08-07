@@ -13,7 +13,7 @@ import {
 import { findConsistentOptions, findPlayedOption } from './analysis';
 import type { PlayedAction } from './played';
 import type { CellValue, SearchExecutor } from './orchestrator';
-import type { EvalResult, EvalSettings, RankedChoice, SearchProgress } from './types';
+import type { EvalResult, EvalSettings, RankedChoice, SearchProgress, TeraAllowance } from './types';
 
 export interface SearchCallbacks {
   onProgress?(progress: SearchProgress): void;
@@ -221,7 +221,7 @@ function restrictCombined(
 export function searchOptions(
   position: SimPosition,
   side: 'p1' | 'p2',
-  opts?: { tera?: boolean; keep?: (PlayedAction | null)[] },
+  opts?: { tera?: TeraAllowance; keep?: (PlayedAction | null)[] },
 ): ChoiceOption[] {
   const options = legalChoices(position, side, opts);
   return isCombined(options) ? restrictCombined(position, side, options, opts?.keep) : options;

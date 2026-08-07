@@ -23,7 +23,8 @@ import { enrichTeamInfo, manualMove } from './lib/team-info';
 import { applyPastedTeam, countMatchingSpecies, parsePastedTeam, type PastedSet } from './lib/team-paste';
 import type { OpponentTeamInfo } from './types';
 import { decodeBranchShare, type BranchSharePayload } from './lib/branch-share';
-import { getBranchSimulatorFormat, getReplayGameType, getReplayGeneration } from './lib/replay-format';
+import { getBranchSimulatorFormat, getReplayGameType, getReplayGeneration, inferReplayFormatId } from './lib/replay-format';
+import { resolveTeraPreference } from './lib/eval/tera';
 import { choiceId, evalChoiceToSlotChoices, type BranchSlotChoice } from './lib/branch-choices';
 import type { RankedChoice } from './lib/eval/types';
 import { parseLeadSpecies, parsePlayedActions, parsePlayedActionsDoubles } from './lib/eval/played';
@@ -408,9 +409,16 @@ function App() {
     [editedP1Info, editedP2Info, teamText],
   );
 
-  // 'auto' Tera: a finished game that never terastallized treats it as banned.
-  const teraSeen = useMemo(() => !!replayData && replayData.log.includes('terastallize'), [replayData]);
-  const effectiveTera = evaluation.prefs.tera === 'auto' ? teraSeen : evaluation.prefs.tera === 'on';
+  // Tera resolution: 'auto' turns enumeration off when the game never
+  // terastallized, and in draft/custom formats (per-Pokémon Tera rights)
+  // restricts it to the species that actually did — a global switch would
+  // recommend illegal Teras and price floors against impossible threats.
+  const effectiveTera = useMemo(
+    () => (replayData
+      ? resolveTeraPreference(evaluation.prefs.tera, inferReplayFormatId(replayData), replayData.log)
+      : false),
+    [replayData, evaluation.prefs.tera],
+  );
 
   // Posted open team sheets, surfaced in the stats panel as 'sheet'
   // knowledge (the extraction needs the sim's Teams parser — lazy import).

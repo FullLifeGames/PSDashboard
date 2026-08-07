@@ -3,7 +3,7 @@ import {
   type PvStep, type Ranked, type ValueMatrix,
 } from './rank';
 import type {
-  EvalCellJob, EvalCellValue, EvalChoicesInfo, EvalResult, EvalSettings, EvalSubSearchJob, SearchProgress,
+  EvalCellJob, EvalCellValue, EvalChoicesInfo, EvalResult, EvalSettings, EvalSubSearchJob, SearchProgress, TeraAllowance,
 } from './types';
 
 /**
@@ -20,7 +20,7 @@ export type CellValue = EvalCellValue;
 export type SubSearchJob = EvalSubSearchJob;
 
 export interface SearchExecutor {
-  choices(tera: boolean, keepPlayed?: EvalSettings['keepPlayed']): Promise<ChoicesInfo>;
+  choices(tera: TeraAllowance, keepPlayed?: EvalSettings['keepPlayed']): Promise<ChoicesInfo>;
   /** Evaluate all cells; report incremental completion via onDone(completedCount). */
   evalCells(jobs: CellJob[], onDone?: (completed: number) => void): Promise<CellValue[]>;
   /** Advance from the root by the job's pair (first fixed seed) and search the child. */

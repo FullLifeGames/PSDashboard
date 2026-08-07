@@ -5,7 +5,7 @@ import {
 } from './forward-model';
 import { cellKey } from './rank';
 import { searchOptions, SEARCH_SEEDS } from './search';
-import type { EvalResult, EvalSettings, MctsTreeStats, RankedChoice, SearchProgress } from './types';
+import type { EvalResult, EvalSettings, MctsTreeStats, RankedChoice, SearchProgress, TeraAllowance } from './types';
 
 /**
  * DUCT (decoupled UCT) Monte-Carlo tree search — the "think deeper" mode.
@@ -45,7 +45,7 @@ interface Node {
 
 function makeNode(
   position: SimPosition,
-  tera: boolean,
+  tera: TeraAllowance,
   matchupCache: MatchupCache,
   keepPlayed?: EvalSettings['keepPlayed'],
 ): Node {

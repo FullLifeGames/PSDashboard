@@ -1,6 +1,7 @@
 import { PRNG, State } from '@pkmn/sim';
-import type { Battle, PRNGSeed, Side } from '@pkmn/sim';
+import type { Battle, PRNGSeed, Pokemon, Side } from '@pkmn/sim';
 import { evaluatePosition } from './eval-function';
+import type { TeraAllowance } from './types';
 
 export interface ChoiceOption {
   /** Sim choice string, accepted verbatim by Battle#choose. */
@@ -176,10 +177,18 @@ function slotChoicesFor(
   return choices;
 }
 
+/** Per-Pokémon Tera check: draft allowances list the species holding rights. */
+function teraAllowed(tera: TeraAllowance | undefined, side: 'p1' | 'p2', pokemon: Pokemon | null): boolean {
+  if (tera === undefined || tera === true) return true;
+  if (tera === false || !pokemon) return false;
+  const list = tera[side];
+  return list.includes(pokemon.species.name) || list.includes(pokemon.species.baseSpecies);
+}
+
 export function legalChoices(
   position: SimPosition,
   side: 'p1' | 'p2',
-  opts?: { tera?: boolean },
+  opts?: { tera?: TeraAllowance },
 ): ChoiceOption[] {
   const battle = positionBattle(position);
   const sideState = battle.sides[sideIndex(side)];
@@ -216,7 +225,6 @@ export function legalChoices(
     return options;
   }
 
-  const allowTera = opts?.tera ?? true;
   const actives = 'active' in request ? request.active ?? [] : [];
   const forceSwitch = 'forceSwitch' in request ? request.forceSwitch ?? [] : [];
   const slotCount = Math.max(actives.length, forceSwitch.length);
@@ -227,7 +235,8 @@ export function legalChoices(
     // trips "more choices than unfainted Pokémon".
     const perSlot: SlotChoice[][] = [];
     for (let slot = 0; slot < slotCount; slot++) {
-      const slotChoices = slotChoicesFor(sideState, actives[slot], !!forceSwitch[slot], slot, allowTera);
+      const slotTera = teraAllowed(opts?.tera, side, sideState.active[slot] ?? null);
+      const slotChoices = slotChoicesFor(sideState, actives[slot], !!forceSwitch[slot], slot, slotTera);
       if (slotChoices.length > 0) perSlot.push(slotChoices);
     }
     if (perSlot.length === 0) return [];
@@ -249,10 +258,11 @@ export function legalChoices(
   const trapped = !!active && 'trapped' in active && !!active.trapped;
 
   if (active && !forced) {
+    const activeTera = teraAllowed(opts?.tera, side, sideState.active[0] ?? null);
     for (const move of active.moves) {
       if ('disabled' in move && move.disabled) continue;
       options.push({ choice: `move ${choiceKey(move.move)}`, label: move.move });
-      if (allowTera && 'canTerastallize' in active && active.canTerastallize) {
+      if (activeTera && 'canTerastallize' in active && active.canTerastallize) {
         options.push({
           choice: `move ${choiceKey(move.move)} terastallize`,
           label: `Tera + ${move.move}`,

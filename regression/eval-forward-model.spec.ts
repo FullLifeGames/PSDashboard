@@ -82,6 +82,20 @@ test.describe('sim forward model', () => {
     expect(legalChoices(root, 'p1').find(option => option.choice === 'switch 2')?.label).toBe('→ Chansey');
   });
 
+  test('a tera allowance limits variants to listed species per side', () => {
+    const root = createRootPosition(serialize(makeBattle(
+      [makeSet('Machamp', 'Machamp', ['Karate Chop'], 100), makeSet('Chansey', 'Chansey', ['Protect'], 100)],
+      [makeSet('Snorlax', 'Snorlax', ['Tackle'], 100)],
+    )));
+    // Draft-league shape: only listed species hold Tera rights.
+    const allowance = { p1: ['Chansey'], p2: ['Snorlax'] };
+    const p1 = legalChoices(root, 'p1', { tera: allowance }).map(option => option.choice);
+    expect(p1).toContain('move karatechop');
+    expect(p1.some(choice => choice.includes('terastallize'))).toBe(false);
+    const p2 = legalChoices(root, 'p2', { tera: allowance }).map(option => option.choice);
+    expect(p2).toContain('move tackle terastallize');
+  });
+
   test('tera variants can be disabled', () => {
     const root = createRootPosition(serialize(makeBattle(
       [makeSet('Snorlax', 'Snorlax', ['Protect'])],

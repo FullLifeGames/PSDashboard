@@ -1,13 +1,20 @@
 import type { PlayedAction } from './played';
 
+/**
+ * Which Pokémon may Terastallize in the search: a global switch, or per-side
+ * species allow-lists — draft leagues grant Tera rights per Pokémon, so a
+ * boolean would invent threats (and recommendations) that are illegal there.
+ */
+export type TeraAllowance = boolean | { p1: string[]; p2: string[] };
+
 /** Engine settings sent to the worker. */
 export interface EvalSettings {
   /** Turns ahead. 1 = full joint matrix only. */
   depth: 1 | 2 | 3;
   /** Number of fixed PRNG seeds averaged per matrix cell. */
   samples: 1 | 3 | 5;
-  /** Enumerate Terastallize move variants (default true). */
-  tera?: boolean;
+  /** Terastallize enumeration (default true = everyone). */
+  tera?: TeraAllowance;
   /** 'mcts' runs the DUCT tree search instead of the fixed-depth matrix. */
   mode?: 'matrix' | 'mcts';
   /**
@@ -27,8 +34,12 @@ export interface EvalPreferences {
   mode: 'matrix' | 'mcts';
   /** Re-run automatically after each executed branch turn. */
   auto: boolean;
-  /** Tera enumeration: 'auto' = on only when the replay actually terastallized. */
-  tera: 'auto' | 'on' | 'off';
+  /**
+   * Tera enumeration: 'auto' = only when the replay terastallized (and in
+   * draft/custom formats, only the Pokémon that did); 'revealed' forces the
+   * per-Pokémon restriction for any format.
+   */
+  tera: 'auto' | 'on' | 'off' | 'revealed';
 }
 
 /**
@@ -143,7 +154,7 @@ export interface MctsTreeStats {
 export type EvalWorkerRequest =
   | { type: 'search'; id: number; serializedBattle: string; settings: EvalSettings }
   | { type: 'mctstree'; id: number; serializedBattle: string; settings: EvalSettings; seedOffset: number }
-  | { type: 'choices'; id: number; serializedBattle: string; tera: boolean; keepPlayed?: EvalSettings['keepPlayed'] }
+  | { type: 'choices'; id: number; serializedBattle: string; tera: TeraAllowance; keepPlayed?: EvalSettings['keepPlayed'] }
   | { type: 'cells'; id: number; serializedBattle: string; jobs: EvalCellJob[] }
   | { type: 'subsearch'; id: number; serializedBattle: string; job: EvalSubSearchJob };
 

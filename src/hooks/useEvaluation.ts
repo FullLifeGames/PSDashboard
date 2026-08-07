@@ -5,15 +5,16 @@ import type { PlayedTurn } from '../lib/eval/played';
 import { EvalWorkerClient } from '../lib/eval/worker-client';
 import { evalStoreKey, loadStoredEval, saveStoredEval } from '../lib/eval-cache-store';
 import { selectKeyTurns } from '../lib/eval/graph';
-import type { EvalPreferences, EvalResult, EvalSettings, RankedChoice, SearchProgress } from '../lib/eval/types';
+import type { EvalPreferences, EvalResult, EvalSettings, RankedChoice, SearchProgress, TeraAllowance } from '../lib/eval/types';
+import { teraKey } from '../lib/eval/tera';
 
 export type EvalStatus = 'idle' | 'reconstructing' | 'searching' | 'done' | 'stale' | 'error';
 
 export interface EvaluateParams {
   /** Cache key for replay-view positions; null disables caching (branch mode). */
   cacheKey: string | null;
-  /** Resolved Tera enumeration flag (the 'auto' pref resolved against the replay). */
-  tera: boolean;
+  /** Resolved Tera allowance (the panel pref resolved against the replay). */
+  tera: TeraAllowance;
   /**
    * Produces the serialized position. A reconstruction-based acquire calls
    * reportReconstruct(turn, target) as it replays turns; the hook surfaces
@@ -35,7 +36,7 @@ function loadPrefs(): EvalPreferences {
       samples: parsed.samples === 1 || parsed.samples === 5 ? parsed.samples : 3,
       mode: parsed.mode === 'mcts' ? 'mcts' : 'matrix',
       auto: !!parsed.auto,
-      tera: parsed.tera === 'on' || parsed.tera === 'off' ? parsed.tera : 'auto',
+      tera: parsed.tera === 'on' || parsed.tera === 'off' || parsed.tera === 'revealed' ? parsed.tera : 'auto',
     };
   } catch {
     return DEFAULT_PREFS;
@@ -49,7 +50,7 @@ interface CachedEval {
   depth: EvalSettings['depth'];
   samples: EvalSettings['samples'];
   mode: EvalPreferences['mode'];
-  tera: boolean;
+  tera: TeraAllowance;
   /** Engine expectation of the actually played pair (set by graph sweeps). */
   playedOutcome?: number | null;
   /** Depth+1 re-search of flagged misplays (null = checked, nothing flagged). */
@@ -62,8 +63,8 @@ export interface GraphSweepParams {
   /** Optional sub-range to sweep (on-demand analysis); defaults to 1..turns. */
   from?: number;
   to?: number;
-  /** Resolved Tera enumeration flag. */
-  tera: boolean;
+  /** Resolved Tera allowance. */
+  tera: TeraAllowance;
   cacheKeyFor(turn: number): string;
   acquireFor(turn: number): (report: (turn: number, target: number) => void) => Promise<string>;
   /**
@@ -146,7 +147,7 @@ export function useEvaluation() {
     const { depth, samples, mode } = prefsRef.current;
     if (params.cacheKey) {
       const hit = cacheRef.current.get(params.cacheKey);
-      if (hit && hit.depth === depth && hit.samples === samples && hit.mode === mode && hit.tera === params.tera) {
+      if (hit && hit.depth === depth && hit.samples === samples && hit.mode === mode && teraKey(hit.tera) === teraKey(params.tera)) {
         runRef.current += 1;
         setResult(hit.result);
         setStatus('done');
@@ -391,7 +392,7 @@ export function useEvaluation() {
         played[turn - 1] = turnPlayed;
 
         let hit = cacheRef.current.get(key);
-        if (!(hit && hit.depth === depth && hit.samples === samples && hit.mode === mode && hit.tera === params.tera)) {
+        if (!(hit && hit.depth === depth && hit.samples === samples && hit.mode === mode && teraKey(hit.tera) === teraKey(params.tera))) {
           // Second cache layer: results persisted by a previous session.
           const stored = await loadStoredEval(storeKey);
           if (runRef.current !== runId) return false;
@@ -535,7 +536,7 @@ export function useEvaluation() {
         const key = params.cacheKeyFor(0);
         const storeKey = evalStoreKey(key, depth, samples, mode, params.tera);
         let hit = cacheRef.current.get(key);
-        if (!(hit && hit.depth === depth && hit.samples === samples && hit.mode === mode && hit.tera === params.tera)) {
+        if (!(hit && hit.depth === depth && hit.samples === samples && hit.mode === mode && teraKey(hit.tera) === teraKey(params.tera))) {
           const stored = await loadStoredEval(storeKey);
           if (runRef.current !== runId) return;
           hit = stored ? { result: stored.result, depth, samples, mode: mode, tera: params.tera } : undefined;
