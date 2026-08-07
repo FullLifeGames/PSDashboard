@@ -17,6 +17,16 @@ export function EvalGameReport({ report, playerNames, onSelectTurn }: EvalGameRe
         <span style={{ fontWeight: 'bold', fontSize: 11, color: '#cde' }}>Game report</span>
       </div>
       <div className="ps-eval-analysis-summary">{report.summary}</div>
+      {report.accuracy && (report.accuracy.p1 !== null || report.accuracy.p2 !== null) && (
+        <div
+          className="ps-eval-analysis-row"
+          style={{ fontSize: 10, color: '#aab' }}
+          title="Win-probability loss per graded turn through the Lichess accuracy curve; forced turns excluded. Harmonic + volatility-weighted aggregate — one blunder drags hard."
+        >
+          accuracy — {playerNames[0]} {report.accuracy.p1 !== null ? `${Math.round(report.accuracy.p1)}%` : '—'}
+          {' · '}{playerNames[1]} {report.accuracy.p2 !== null ? `${Math.round(report.accuracy.p2)}%` : '—'}
+        </div>
+      )}
       {report.misplays.length > 0 && (
         <div className="ps-eval-report-moments">
           {report.misplays.map(misplay => {

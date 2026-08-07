@@ -84,6 +84,11 @@ export interface SideAnalysis {
   verifiedAtDepth?: boolean;
   /** Verdict band for the regret, after leniency (absent = clean play). */
   tier?: VerdictTier;
+  /**
+   * How many options the engine ranked for this side — 1 marks a forced
+   * turn (or the waiting sentinel), which accuracy grading must exclude.
+   */
+  choiceCount?: number;
 }
 
 /** Deep re-search of the played and best pairs (p1-perspective outcomes). */
@@ -384,6 +389,7 @@ export function analyzeTurn(params: {
       best,
       safe,
       regret,
+      choiceCount: options.length,
       ...(playedPartial ? { playedPartial } : {}),
       ...(verifiedAtDepth ? { verifiedAtDepth } : {}),
       ...(tier ? { tier } : {}),

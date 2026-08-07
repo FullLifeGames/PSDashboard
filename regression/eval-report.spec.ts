@@ -179,6 +179,66 @@ test.describe('game report (multi-turn root cause)', () => {
     expect(report.summary).not.toContain('seeds');
   });
 
+  test('a perfect game scores 100 accuracy', () => {
+    const perfect = () => ({
+      playedRaw: null,
+      played: ranked('move a', 'A', 0.1),
+      best: ranked('move a', 'A', 0.1),
+      safe: null,
+      regret: 0,
+      choiceCount: 4,
+    });
+    const report = buildGameReport(
+      [1, 2, 3, 4, 5].map(turn => mk(turn, 0.1, 0.1, { p1: perfect(), p2: perfect() })),
+      names, 'p1',
+    );
+    expect(report.accuracy?.p1).toBeCloseTo(100, 0);
+    expect(report.accuracy?.p2).toBeCloseTo(100, 0);
+  });
+
+  test('one blunder drags the harmonic mean visibly', () => {
+    const perfect = () => ({
+      playedRaw: null, played: ranked('move a', 'A', 0.4), best: ranked('move a', 'A', 0.4),
+      safe: null, regret: 0, choiceCount: 4,
+    });
+    const blunder = {
+      playedRaw: null, played: ranked('move b', 'B', -0.8), best: ranked('move a', 'A', 0.4),
+      safe: null, regret: 1.2, tier: 'blunder' as const, choiceCount: 4,
+    };
+    const analyses = [1, 2, 3, 4, 5, 6, 7, 8, 9].map(turn => mk(turn, 0.1, 0.1, { p1: perfect() }));
+    analyses.push(mk(10, 0.1, -0.5, { p1: blunder, attribution: 'p1-decision' }));
+    const report = buildGameReport(analyses, names, 'p2');
+    expect(report.accuracy?.p1).toBeLessThan(90);
+    expect(report.accuracy?.p1).toBeGreaterThan(60);
+    // p2 never had a graded turn — no number is claimed.
+    expect(report.accuracy?.p2).toBeNull();
+  });
+
+  test('under five graded turns accuracy stays null', () => {
+    const perfect = () => ({
+      playedRaw: null, played: ranked('move a', 'A', 0.1), best: ranked('move a', 'A', 0.1),
+      safe: null, regret: 0, choiceCount: 4,
+    });
+    const report = buildGameReport(
+      [1, 2, 3].map(turn => mk(turn, 0.1, 0.1, { p1: perfect() })),
+      names, 'p1',
+    );
+    expect(report.accuracy?.p1).toBeNull();
+  });
+
+  test('forced turns never inflate accuracy', () => {
+    // choiceCount 1 (forced switch / wait sentinel) is excluded from grading.
+    const forced = () => ({
+      playedRaw: null, played: ranked('move a', 'A', 0.1), best: ranked('move a', 'A', 0.1),
+      safe: null, regret: 0, choiceCount: 1,
+    });
+    const report = buildGameReport(
+      [1, 2, 3, 4, 5, 6].map(turn => mk(turn, 0.1, 0.1, { p1: forced() })),
+      names, 'p1',
+    );
+    expect(report.accuracy?.p1).toBeNull();
+  });
+
   test('gaps in the sweep are tolerated', () => {
     const report = buildGameReport([
       mk(1, 0.2, 0.1),

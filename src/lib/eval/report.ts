@@ -1,5 +1,6 @@
 import { playedSetupMove, type SideAnalysis, type TurnAnalysis, type VerdictTier } from './analysis';
 import { labelPhrase, signedValue } from './summary';
+import { winProbability } from './winprob';
 
 /**
  * Multi-turn root-cause analysis over a completed graph sweep: where the
@@ -52,6 +53,12 @@ export interface GameReport {
   reads: GameRead[];
   /** False when played actions were unavailable — an empty misplay list then means "unknown", not "clean". */
   tracked: boolean;
+  /**
+   * Lichess-style game accuracy per player (0–100): win-probability loss per
+   * graded turn through the accuracy curve, aggregated as the mean of the
+   * harmonic and volatility-weighted means. Null under 5 graded turns.
+   */
+  accuracy?: { p1: number | null; p2: number | null };
   /** Summed regret per player across the analyzed game. */
   decisionTotals: { p1: number; p2: number };
   /** Net chance contribution across the game (p1 perspective). */
@@ -71,6 +78,52 @@ function scoreSeries(analyses: (TurnAnalysis | null)[]): (number | undefined)[] 
     if (analysis.scoreAfter !== null) series[analysis.turn + 1] = analysis.scoreAfter;
   }
   return series;
+}
+
+/** Minimum graded turns before an accuracy number is honest. */
+const ACCURACY_MIN_TURNS = 5;
+
+/**
+ * Per-player game accuracy: each graded turn's win-probability loss runs
+ * through Lichess's accuracy curve; the game aggregates as the mean of the
+ * harmonic mean (single blunders drag hard — right for short games) and the
+ * volatility-weighted mean (sharp phases count more).
+ */
+function accuracyFor(
+  known: TurnAnalysis[],
+  side: 'p1' | 'p2',
+  series: (number | undefined)[],
+  doubles: boolean,
+): number | null {
+  const graded = known.filter(analysis => {
+    const sideAnalysis = analysis[side];
+    return sideAnalysis.played && sideAnalysis.best && (sideAnalysis.choiceCount ?? 2) > 1;
+  });
+  if (graded.length < ACCURACY_MIN_TURNS) return null;
+
+  const entries = graded.map(analysis => {
+    const sideAnalysis = analysis[side];
+    // Own-perspective evs map symmetrically (σ(−x) = 1 − σ(x)), so the win
+    // probabilities read directly as this side's own odds.
+    const deltaWin = Math.max(0,
+      winProbability(sideAnalysis.best!.ev, doubles) - winProbability(sideAnalysis.played!.ev, doubles));
+    const accuracy = Math.max(0, Math.min(100,
+      103.1668 * Math.exp(-0.04354 * (100 * deltaWin)) - 3.1669));
+    const window = [series[analysis.turn - 1], series[analysis.turn], series[analysis.turn + 1]]
+      .filter((value): value is number => value !== undefined)
+      .map(value => winProbability(value, doubles));
+    const mean = window.reduce((sum, value) => sum + value, 0) / Math.max(window.length, 1);
+    const volatility = window.length > 1
+      ? Math.sqrt(window.reduce((sum, value) => sum + (value - mean) ** 2, 0) / window.length)
+      : 0;
+    return { accuracy, weight: Math.max(0.05, volatility) };
+  });
+
+  const harmonic = entries.length /
+    entries.reduce((sum, entry) => sum + 1 / Math.max(entry.accuracy, 1), 0);
+  const totalWeight = entries.reduce((sum, entry) => sum + entry.weight, 0);
+  const weighted = entries.reduce((sum, entry) => sum + entry.accuracy * entry.weight, 0) / totalWeight;
+  return (harmonic + weighted) / 2;
 }
 
 function findTurningPoint(analyses: (TurnAnalysis | null)[], winner: 'p1' | 'p2'): number | null {
@@ -95,6 +148,8 @@ export function buildGameReport(
   winner: 'p1' | 'p2' | null,
   /** False = played actions unavailable (doubles): no seeds, no clean-play claim. */
   playedTracking = true,
+  /** Doubles replay — selects the fitted win-probability curve for accuracy. */
+  doubles = false,
 ): GameReport {
   const known = analyses.filter((entry): entry is TurnAnalysis => entry !== null);
 
@@ -145,6 +200,11 @@ export function buildGameReport(
   };
   const chanceTotal = known.reduce((sum, analysis) => sum + (analysis.chanceDelta ?? 0), 0);
 
+  const series = scoreSeries(analyses);
+  const accuracy = playedTracking
+    ? { p1: accuracyFor(known, 'p1', series, doubles), p2: accuracyFor(known, 'p2', series, doubles) }
+    : { p1: null, p2: null };
+
   const turningPoint = winner ? findTurningPoint(analyses, winner) : null;
 
   const sentences: string[] = [];
@@ -183,5 +243,8 @@ export function buildGameReport(
     sentences.push(`Luck ran ${chanceTotal > 0 ? 'for' : 'against'} ${playerNames[0]} overall (${signedValue(chanceTotal)}).`);
   }
 
-  return { winner, turningPoint, keyMoments, misplays, reads, tracked: playedTracking, decisionTotals, chanceTotal, summary: sentences.join(' ') };
+  return {
+    winner, turningPoint, keyMoments, misplays, reads, tracked: playedTracking,
+    accuracy, decisionTotals, chanceTotal, summary: sentences.join(' '),
+  };
 }
