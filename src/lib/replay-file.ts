@@ -53,6 +53,12 @@ export function parseExportedReplay(content: string, fileName?: string): ReplayD
     );
   }
 
+  // Externally written files (video reconstructions, Windows editors) come
+  // with CRLF. Everything downstream splits on '\n' — a surviving \r on a
+  // line-final field (tera type, win line) poisons built teams and crashes
+  // the sim's JSON team parsing. Normalize once, here, at the door.
+  log = log.replace(/\r\n?/g, '\n');
+
   const tier = log.match(/^\|tier\|([^|\n]+)/m)?.[1]?.trim() ?? '';
   // Only a real replay id may feed format inference — a file name is
   // arbitrary text and would corrupt the inferred format id.

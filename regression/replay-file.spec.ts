@@ -88,6 +88,20 @@ test.describe('exported replay file parsing', () => {
     expect(replay.log).toBe(rawLog);
   });
 
+  test('normalizes Windows line endings out of the log', () => {
+    // Files written by external tools (video reconstructions, Windows
+    // editors) arrive with CRLF. A trailing \r on line-final fields (tera
+    // types, win lines, cant reasons) survives into built teams and crashes
+    // the sim's JSON team parsing — the log must be LF the moment it enters.
+    const crlfHtml = exportedHtml.replace(/\n/g, '\r\n');
+    const replay = parseExportedReplay(crlfHtml, 'crlf.html');
+    expect(replay.log).not.toContain('\r');
+    expect(replay.log).toContain('|turn|1');
+
+    const crlfRaw = rawLog.replace(/\n/g, '\r\n');
+    expect(parseExportedReplay(crlfRaw, 'crlf.log').log).not.toContain('\r');
+  });
+
   test('rejects files that are neither replay exports nor protocol logs', () => {
     expect(() => parseExportedReplay('hello world', 'notes.txt'))
       .toThrow(/exported replay/i);
