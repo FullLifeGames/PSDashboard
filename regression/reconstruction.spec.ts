@@ -4,6 +4,8 @@ import type { PokemonSet } from '@pkmn/sim';
 import { buildTeamsFromReplay } from '../src/lib/team-builder';
 import { reconstructBranchRuntime, createBranchState } from '../src/lib/branch-engine';
 import { parseReplayLog } from '../src/lib/protocol-parser';
+import { parseExportedReplay } from '../src/lib/replay-file';
+import { inferReplayFormatId } from '../src/lib/replay-format';
 
 function toId(name: string): string {
   return name.toLowerCase().replace(/[^a-z0-9]/g, '');
@@ -484,5 +486,117 @@ test.describe('Replay reconstruction regression suite', () => {
 
     expect(runtime.log.filter(line => line === '|start')).toHaveLength(initialStartCount);
     expect(runtime.log.join('\n')).toContain('|move|p1a: Garchomp|Earthquake|p2a: Kingambit');
+  });
+
+  test('replays a taunt-blocked move from its |cant| line instead of defaulting to move 1', async () => {
+    const set = (species: string, ability: string, moves: string[]): PokemonSet => ({
+      name: species, species, item: '', ability, moves,
+      nature: 'Timid',
+      evs: { hp: 252, atk: 0, def: 4, spa: 0, spd: 252, spe: 0 },
+      ivs: { hp: 31, atk: 31, def: 31, spa: 31, spd: 31, spe: 31 },
+      level: 50,
+    });
+    // Uxie's move 1 is U-turn: falling back to `move 1` for the blocked turn
+    // plays a pivot move the real game never saw and pulls the next Pokémon
+    // in a turn early — the first domino of the GPL replay-loop desync.
+    const log = [
+      '|gametype|singles',
+      '|player|p1|Alice||',
+      '|player|p2|Bob||',
+      '|gen|9',
+      '|tier|[Gen 9] Custom Game',
+      '|clearpoke',
+      '|poke|p1|Uxie, L50|',
+      '|poke|p1|Noivern, L50|',
+      '|poke|p2|Iron Jugulis, L50|',
+      '|start',
+      '|switch|p1a: Uxie|Uxie, L50|182/182',
+      '|switch|p2a: Jugulis|Iron Jugulis, L50|201/201',
+      '|turn|1',
+      '|move|p2a: Jugulis|Taunt|p1a: Uxie',
+      '|-start|p1a: Uxie|move: Taunt',
+      '|cant|p1a: Uxie|move: Taunt|Stealth Rock',
+      '|upkeep',
+      '|turn|2',
+    ].join('\n');
+
+    const runtime = await reconstructBranchRuntime({
+      format: 'gen9customgame',
+      p1Team: [set('Uxie', 'Levitate', ['U-turn', 'Stealth Rock', 'Psychic']), set('Noivern', 'Frisk', ['Air Slash'])],
+      p2Team: [set('Iron Jugulis', 'Quark Drive', ['Taunt', 'Flash Cannon'])],
+      replayLog: log,
+      targetTurn: 2,
+    });
+
+    expect(runtime.battleStream.battle?.sides[0].active[0]?.species.name).toBe('Uxie');
+    expect(runtime.log.join('\n')).not.toContain('|move|p1a: Uxie|U-turn|');
+  });
+});
+
+test.describe('Turn-synchronized replay of a video-reconstructed log', () => {
+  // Synthetic GPL log (gpl-pipeline video reconstruction): no |upkeep| markers,
+  // Sleep Talk/Rest loops, and a taunt-blocked turn 1. Before the turn-sync
+  // guard the block replayer ran ~5 turns ahead of the simulator here, so
+  // pending state like Future Sight silently vanished from every branch.
+  function loadGplReplay() {
+    return parseExportedReplay(readFileSync('e2e/fixtures/gpl-replay.html', 'utf-8'), 'gpl-replay.html');
+  }
+
+  test('reveals Life Orb and Rocky Helmet from item-damage lines in the log', () => {
+    const replay = loadGplReplay();
+    const { p1Team, p2Team } = buildTeamsFromReplay(replay.log);
+
+    // Iron Valiant's Life Orb recoil and Uxie's Rocky Helmet chip (no [of]
+    // attribution in this log) both surface as revealed items.
+    expect(p2Team.find(set => set.species === 'Iron Valiant')?.item).toBe('Life Orb');
+    expect(p1Team.find(set => set.species === 'Uxie')?.item).toBe('Rocky Helmet');
+    expect(p2Team.find(set => set.species === 'Rotom-Wash')?.item).toBe('Black Sludge');
+  });
+
+  test('keeps the simulator in lockstep through the taunted turn 1', async () => {
+    const replay = loadGplReplay();
+    const { p1Team, p2Team } = buildTeamsFromReplay(replay.log);
+
+    const runtime = await reconstructBranchRuntime({
+      format: inferReplayFormatId(replay),
+      p1Team,
+      p2Team,
+      replayLog: replay.log,
+      targetTurn: 2,
+    });
+
+    // Turn 1: Uxie was taunted and never moved — it must still be in.
+    expect(runtime.battleStream.battle?.turn).toBe(2);
+    expect(runtime.battleStream.battle?.sides[0].active[0]?.species.name).toBe('Uxie');
+  });
+
+  test('carries the pending Future Sight to the branch point at turn 25', async () => {
+    test.setTimeout(120_000);
+    const replay = loadGplReplay();
+    const { p1Team, p2Team } = buildTeamsFromReplay(replay.log);
+    const snapshots = parseReplayLog(replay.log);
+
+    // Mirrors the eval sweep's call: per-turn snapshot corrections keep the
+    // sim's damage rolls from drifting away from the recorded HP.
+    const runtime = await reconstructBranchRuntime({
+      format: inferReplayFormatId(replay),
+      p1Team,
+      p2Team,
+      replayLog: replay.log,
+      targetTurn: 25,
+      snapshot: snapshots[Math.min(24, snapshots.length - 1)] ?? null,
+      capturePositions: {
+        snapshotFor: turn => snapshots[Math.min(turn - 1, snapshots.length - 1)] ?? null,
+        onPosition: () => {},
+      },
+    });
+
+    const battle = runtime.battleStream.battle!;
+    expect(battle.turn).toBe(25);
+    // Turn 24 cast Future Sight at p2's slot; it lands on turn 26, so the
+    // pending slot condition must survive to the turn-25 branch point.
+    expect(Object.keys(battle.sides[1].slotConditions[0] ?? {})).toContain('futuremove');
+    expect(battle.sides[0].active[0]?.species.name).toBe('Uxie');
+    expect(battle.sides[1].active[0]?.species.name).toBe('Rhydon');
   });
 });

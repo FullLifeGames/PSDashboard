@@ -68,6 +68,28 @@ test.describe('team builder edited assumptions', () => {
     expect(revealed.p1Team[0].item).toBe('Leftovers');
   });
 
+  test('defaults an unrevealed ability to the species slot-0 ability', () => {
+    // A packed set with an empty ability gives the sim Pokémon NO ability at
+    // all (custom games skip validation) — the GPL reconstruction's Uxie
+    // died to an Earthquake it should have been immune to.
+    const log = [
+      '|player|p1|Alice|',
+      '|player|p2|Bob|',
+      '|gen|9',
+      '|tier|[Gen 9] Custom Game',
+      '|poke|p1|Uxie, L50|',
+      '|poke|p2|Landorus-Therian, L50|',
+      '|start',
+      '|switch|p1a: Uxie|Uxie, L50|100/100',
+      '|switch|p2a: Lando|Landorus-Therian, L50|100/100',
+      '|turn|1',
+    ].join('\n');
+
+    const { p1Team, p2Team } = buildTeamsFromReplay(log);
+    expect(p1Team[0].ability).toBe('Levitate');
+    expect(p2Team[0].ability).toBe('Intimidate');
+  });
+
   test('manual nature and IVs reach the simulator set', () => {
     const p1Info: OpponentTeamInfo = {
       pokemon: [{

@@ -1,5 +1,5 @@
 import type { PokemonSet } from '@pkmn/sim';
-import { Teams } from '@pkmn/sim';
+import { Dex, Teams } from '@pkmn/sim';
 import { inferOpponentTeam } from './opponent-inferrer';
 import { getSpeciesUsageSet, type SmogonUsageStats, type UsageProbability } from './smogon-stats';
 import { getSpeciesSetAssumption, type SetAssumption, type SmogonSetAssumptions } from './smogon-sets';
@@ -112,7 +112,7 @@ function buildSet(
     name: info.species,
     species: info.species,
     item: cleanItem(info.item.value, usageSet?.item?.value || smogonSet?.item?.value || ''),
-    ability: info.ability.value || usageSet?.ability?.value || smogonSet?.ability?.value || '',
+    ability: info.ability.value || usageSet?.ability?.value || smogonSet?.ability?.value || defaultAbility(info.species),
     moves: moves.length > 0 ? moves : ['Tackle'],
     nature: (editedNature || spread?.nature || setSpread?.nature || 'Hardy') as PokemonSet['nature'],
     evs: editedEvs || spread?.evs || setSpread?.evs || { hp: 252, atk: 252, def: 0, spa: 0, spd: 4, spe: 0 },
@@ -145,6 +145,16 @@ function sanitizeEvs(evs: PokemonEvs): PokemonEvs {
 
 function cleanItem(replayItem: string, fallback: string): string {
   return itemSetValue(replayItem) || fallback;
+}
+
+/**
+ * A packed set with an empty ability gives the sim Pokémon NO ability at all
+ * (custom games skip team validation) — the GPL reconstruction's Uxie died to
+ * an Earthquake it should have been immune to. Slot 0 is Showdown's own
+ * teambuilder default when nothing better is known.
+ */
+function defaultAbility(species: string): string {
+  return Dex.species.get(species).abilities?.[0] || '';
 }
 
 /** `primary` defines the set; `fill` only tops it up to four moves. */

@@ -1,6 +1,6 @@
 import { Battle, BattleStreams, Dex, Teams, toID } from '@pkmn/sim';
 import type { PokemonSet } from '@pkmn/sim';
-import type { TurnSnapshot } from '../types';
+import type { PokemonSnapshot, TurnSnapshot } from '../types';
 import type { BranchSlotChoice } from './branch-choices';
 import { serializeBattleStable } from './eval/forward-model';
 
@@ -448,6 +448,21 @@ function getChoiceForSlot(
       );
       return `${moveChoiceForActive(active, moveName)}${suffix}${gimmickSuffixForSlot(events, ident, active)}`;
     }
+
+    // A |cant| that names a move is the choice the player committed before it
+    // was blocked (same-turn Taunt, Imprison, flinch). Falling through to
+    // `move 1` instead played Uxie's U-turn on a taunted Stealth Rock turn and
+    // pulled the pivot switch a turn early — the first domino of a replay-wide
+    // desync. A reason-only |cant| (slp, par) keeps scanning: a Sleep Talk
+    // turn carries both that line and the |move| line the scan should find.
+    if (line.startsWith(`|cant|${ident}`)) {
+      const moveName = line.split('|')[4]?.trim();
+      if (moveName) {
+        const active = battle.sides[sideIdx].active[activeSlot];
+        const suffix = targetLocSuffixForChoice(battle, active, moveName, 0);
+        return `${moveChoiceForActive(active, moveName)}${suffix}${gimmickSuffixForSlot(events, ident, active)}`;
+      }
+    }
   }
 
   const active = battle.sides[sideIdx].active[activeSlot];
@@ -484,6 +499,35 @@ function collectForcedSwitchSpecies(
   return species;
 }
 
+function repointActiveSlot(side: SimSide, activeSlot: number, target: SimPokemon) {
+  if (side.active[activeSlot] === target) return;
+
+  const previous = side.active[activeSlot];
+  if (previous) previous.isActive = false;
+
+  const duplicateActiveSlot = side.active.findIndex(active => active === target);
+  if (duplicateActiveSlot >= 0 && duplicateActiveSlot !== activeSlot && previous) {
+    side.active[duplicateActiveSlot] = previous;
+    previous.isActive = true;
+  }
+
+  // Mirror BattleActions#switchIn's array swap: the sim keeps
+  // side.pokemon[i] === side.active[i], and its next real switch swaps via
+  // the position fields. Repointing active without reordering side.pokemon
+  // makes that swap duplicate one team member and erase another.
+  const targetIndex = side.pokemon.indexOf(target);
+  if (targetIndex >= 0 && targetIndex !== activeSlot) {
+    const occupant = side.pokemon[activeSlot];
+    side.pokemon[targetIndex] = occupant;
+    if (occupant) occupant.position = targetIndex;
+    side.pokemon[activeSlot] = target;
+  }
+
+  target.isActive = true;
+  target.position = activeSlot;
+  side.active[activeSlot] = target;
+}
+
 export function correctActivesFromProtocol(battle: SimBattle, events: string[]) {
   for (const line of events) {
     const match = line.match(/^\|(switch|drag)\|(p[12])([a-d]):[^|]*\|([^,|]+)/);
@@ -494,32 +538,8 @@ export function correctActivesFromProtocol(battle: SimBattle, events: string[]) 
     const species = match[4].trim();
     const side = battle.sides[sideIdx];
     const target = findPokemonOnSide(side, species);
-    if (!target || side.active[activeSlot] === target) continue;
-
-    const previous = side.active[activeSlot];
-    if (previous) previous.isActive = false;
-
-    const duplicateActiveSlot = side.active.findIndex(active => active === target);
-    if (duplicateActiveSlot >= 0 && duplicateActiveSlot !== activeSlot && previous) {
-      side.active[duplicateActiveSlot] = previous;
-      previous.isActive = true;
-    }
-
-    // Mirror BattleActions#switchIn's array swap: the sim keeps
-    // side.pokemon[i] === side.active[i], and its next real switch swaps via
-    // the position fields. Repointing active without reordering side.pokemon
-    // makes that swap duplicate one team member and erase another.
-    const targetIndex = side.pokemon.indexOf(target);
-    if (targetIndex >= 0 && targetIndex !== activeSlot) {
-      const occupant = side.pokemon[activeSlot];
-      side.pokemon[targetIndex] = occupant;
-      if (occupant) occupant.position = targetIndex;
-      side.pokemon[activeSlot] = target;
-    }
-
-    target.isActive = true;
-    target.position = activeSlot;
-    side.active[activeSlot] = target;
+    if (!target) continue;
+    repointActiveSlot(side, activeSlot, target);
   }
 }
 
@@ -722,8 +742,44 @@ function replaceLogWithReplayPrefix(log: string[], replayLog: string, targetTurn
   log.splice(0, log.length, ...replayLogPrefixThroughTurn(replayLog, targetTurn));
 }
 
+/**
+ * The protocol-line correction only fires when the real battle logged a
+ * switch. When the SIM invents a switch the real game never saw — a guessed
+ * spread lets a damage roll faint the active, and a bench mon replaces it —
+ * no later block carries a line to undo it: the GPL replay's Uxie stayed
+ * benched-dead while the protocol had it casting Future Sight two turns
+ * later. The snapshot knows who really stood on the field; put them back.
+ */
+function correctActivesFromSnapshot(battle: SimBattle, snapshot: TurnSnapshot) {
+  for (let sideIdx = 0; sideIdx < 2; sideIdx++) {
+    const snapshotSide = sideIdx === 0 ? snapshot.p1 : snapshot.p2;
+    const side = battle.sides[sideIdx];
+    const desired = snapshotSide.pokemon.filter(pokemon => pokemon.isActive && !pokemon.fainted);
+    if (desired.length === 0) continue;
+
+    const sameMon = (pokemon: SimPokemon | null | undefined, want: PokemonSnapshot) => {
+      if (!pokemon) return false;
+      const speciesId = normalizeBattleOnlyFormeId(toId(pokemon.species?.name || ''));
+      const wantId = normalizeBattleOnlyFormeId(toId(want.speciesForme));
+      return speciesId === wantId || toId(pokemon.name || '') === toId(want.name);
+    };
+
+    const missing = desired.filter(want => !side.active.some(active => sameMon(active, want)));
+    for (const want of missing) {
+      const slot = side.active.findIndex(active =>
+        !active || active.fainted || !desired.some(entry => sameMon(active, entry)));
+      if (slot < 0) break;
+      const target = findPokemonOnSide(side, want.speciesForme)
+        ?? (want.name ? findPokemonOnSide(side, want.name) : null);
+      if (!target || target.fainted) continue;
+      repointActiveSlot(side, slot, target);
+    }
+  }
+}
+
 function correctBattleFromSnapshot(battle: SimBattle, snapshot: TurnSnapshot) {
   correctHpFromSnapshot(battle, snapshot);
+  correctActivesFromSnapshot(battle, snapshot);
   correctFieldFromSnapshot(battle, snapshot);
 }
 
@@ -1254,6 +1310,49 @@ export async function reconstructBranchRuntime(params: {
     );
   };
 
+  // Turn-sync guard: choices must land on the turn that produced them. Once a
+  // block fails to commit its turn, every later block would feed the sim
+  // choices from the wrong turn — the HP corrections mask the drift while
+  // structural state diverges (the GPL replay lost a pending Future Sight and
+  // opened turn 25 with the wrong active, five blocks ahead of the sim).
+  // Feed defaults until the sim stands at `wantedTurn`; a false return means
+  // the battle is wedged and replaying further blocks would corrupt it.
+  const advanceSimToTurn = async (wantedTurn: number): Promise<boolean> => {
+    for (let attempts = 0; attempts < 12; attempts++) {
+      const battle = battleStream.battle;
+      if (!battle || battle.ended) return false;
+      if (battle.turn >= wantedTurn) return true;
+      if (abort?.aborted || Date.now() > overallDeadline) return false;
+
+      const turnBefore = battle.turn;
+      const pendingSides = battle.sides.filter(side => side.requestState && !side.isChoiceDone());
+      if (pendingSides.length === 0) {
+        // No open request — give in-flight writes a beat to surface one.
+        await waitForBattle(current =>
+          current.ended ||
+          current.turn > turnBefore ||
+          current.sides.some(side => side.requestState && !side.isChoiceDone()),
+        250);
+        const current = battleStream.battle;
+        if (!current) return false;
+        if (current.turn === turnBefore && !current.sides.some(side => side.requestState && !side.isChoiceDone())) {
+          return false;
+        }
+        continue;
+      }
+
+      const errorsBefore = choiceErrors.count;
+      void streams.omniscient.write(pendingSides.map(side => `>${side.id} default`).join('\n'));
+      await waitForBattle(current =>
+        current.ended ||
+        current.turn > turnBefore ||
+        choiceErrors.count > errorsBefore,
+      );
+      if (battleStream.battle?.turn === turnBefore && choiceErrors.count > errorsBefore) return false;
+    }
+    return (battleStream.battle?.turn ?? 0) >= wantedTurn;
+  };
+
   const p1Name = JSON.stringify(params.playerNames?.[0]?.trim() || 'Player 1');
   const p2Name = JSON.stringify(params.playerNames?.[1]?.trim() || 'Player 2');
   void streams.omniscient.write(
@@ -1295,6 +1394,15 @@ export async function reconstructBranchRuntime(params: {
     const battle = battleStream.battle;
     if (!battle || battle.ended) break;
     onProgress?.(turnBlock.turn, targetTurn);
+
+    // Re-align before writing: a sim that ran ahead skips stale blocks, a sim
+    // that fell behind advances on defaults first. Either way this block's
+    // choices only ever reach the sim standing at this block's turn.
+    if (battle.turn > turnBlock.turn) continue;
+    if (battle.turn < turnBlock.turn) {
+      if (!(await advanceSimToTurn(turnBlock.turn))) break;
+      if (battle.turn !== turnBlock.turn) continue;
+    }
 
     // Boundary capture: the battle sits at the start of turnBlock.turn —
     // exactly the position a per-turn reconstruction of this turn returns.
