@@ -55,8 +55,17 @@ export function parseReplayLog(log: string): TurnSnapshot[] {
   for (const line of lines) {
     currentTurnLines.push(line);
 
-    // Feed line to battle client
-    battle.add(line);
+    // Feed line to battle client. Synthetic logs (file drop-ins written by
+    // external tools, e.g. video reconstructions) can carry impossible
+    // orderings — an event targeting a mon that already fainted, idents that
+    // never switched in. One bad line must not kill the whole replay: skip
+    // it and keep parsing.
+    try {
+      battle.add(line);
+    } catch (error) {
+      console.warn(`protocol-parser: skipping unparseable line "${line}":`,
+        error instanceof Error ? error.message : error);
+    }
 
     // Capture turn 0 snapshot on the first |start| or |turn|
     if (!capturedInitial && (line.startsWith('|start') || line.startsWith('|turn|'))) {

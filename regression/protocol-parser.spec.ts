@@ -1,0 +1,36 @@
+import { test, expect } from '@playwright/test';
+import { parseReplayLog } from '../src/lib/protocol-parser';
+
+test.describe('protocol parser fault tolerance', () => {
+  test('a malformed event after a faint does not kill the whole parse', () => {
+    // The gpl-pipeline shape: video-reconstructed logs can emit impossible
+    // orderings — here a |-fail| targeting a mon that just fainted, which
+    // @pkmn/client resolves to null and crashes on. One bad line must not
+    // take down the whole replay.
+    const log = [
+      '|player|p1|Alice|',
+      '|player|p2|Bob|',
+      '|teamsize|p1|1',
+      '|teamsize|p2|1',
+      '|gen|9',
+      '|tier|[Gen 9] Custom Game',
+      '|start',
+      '|switch|p1a: Uxie|Uxie, L50|182/182',
+      '|switch|p2a: Sig|Iron Jugulis, L50|100/100',
+      '|turn|1',
+      '|move|p1a: Uxie|Moonblast|p2a: Sig',
+      '|-damage|p2a: Sig|0 fnt',
+      '|faint|p2a: Sig',
+      // Unresolvable ident — @pkmn/client returns null and its |-fail|
+      // handler dereferences it unconditionally.
+      '|-fail|p2a: Someone Else',
+      '|turn|2',
+    ].join('\n');
+    const snapshots = parseReplayLog(log);
+    expect(snapshots.length).toBeGreaterThanOrEqual(2);
+    // Everything around the skipped line still applied.
+    const last = snapshots[snapshots.length - 1];
+    const sig = last.p2.pokemon.find(mon => mon.speciesForme.startsWith('Iron Jugulis'));
+    expect(sig?.fainted).toBe(true);
+  });
+});
