@@ -102,6 +102,31 @@ export function parsePlayedActions(lines: string[]): PlayedTurn {
 }
 
 /**
+ * The leads each side actually sent out: the `|switch|` lines between
+ * `|start` and the first `|turn|` — the turn-0 decision as the replay shows
+ * it. Species names, in slot order.
+ */
+export function parseLeadSpecies(log: string): { p1: string[]; p2: string[] } {
+  const leads = { p1: [] as string[], p2: [] as string[] };
+  let started = false;
+  for (const line of log.split('\n')) {
+    const parts = line.split('|');
+    const tag = parts[1];
+    if (tag === 'start') {
+      started = true;
+      continue;
+    }
+    if (!started) continue;
+    if (tag === 'turn') break;
+    if (tag === 'switch') {
+      const side = sideOf(parts[2] ?? '');
+      if (side) leads[side].push((parts[3] ?? '').split(',')[0].trim());
+    }
+  }
+  return leads;
+}
+
+/**
  * Doubles variant: the same settle rules applied per SLOT (a/b), plus move
  * target locations so combined engine choices can be matched exactly.
  */

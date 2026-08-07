@@ -1,7 +1,8 @@
-import { BattleStreams, Dex, Teams } from '@pkmn/sim';
+import { Battle, BattleStreams, Dex, Teams, toID } from '@pkmn/sim';
 import type { PokemonSet } from '@pkmn/sim';
 import type { TurnSnapshot } from '../types';
 import type { BranchSlotChoice } from './branch-choices';
+import { serializeBattleStable } from './eval/forward-model';
 
 // @pkmn/sim's random-format rulesets reference Node's `global` object (e.g.
 // `global.Config?.potd` in rulesets), which doesn't exist in browsers and made
@@ -1100,6 +1101,31 @@ export function createBranchState(
     p2Choice: p2Choices[0] ?? null,
     p2Choices,
   };
+}
+
+/**
+ * The turn-0 position: a fresh battle sitting at team preview, before either
+ * side has ordered its team — the lead decision the eval engine can search.
+ * Null for formats without team preview (older gens). Deterministic seed so
+ * every caller serializes the identical position.
+ */
+export function serializePreviewPosition(
+  format: string,
+  p1Team: PokemonSet[],
+  p2Team: PokemonSet[],
+): string | null {
+  try {
+    const battle = new Battle({
+      formatid: toID(format),
+      seed: '1,2,3,4',
+      p1: { name: 'p1', team: Teams.pack(p1Team) },
+      p2: { name: 'p2', team: Teams.pack(p2Team) },
+    });
+    if (battle.sides[0]?.requestState !== 'teampreview') return null;
+    return serializeBattleStable(battle);
+  } catch {
+    return null;
+  }
 }
 
 export async function reconstructBranchRuntime(params: {

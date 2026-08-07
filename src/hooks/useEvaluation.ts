@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { matchPlayedSide, REGRET_THRESHOLD, type TurnVerification } from '../lib/eval/analysis';
+import type { LeadEvalData } from '../lib/eval/leads';
 import type { PlayedTurn } from '../lib/eval/played';
 import { EvalWorkerClient } from '../lib/eval/worker-client';
 import { evalStoreKey, loadStoredEval, saveStoredEval } from '../lib/eval-cache-store';
@@ -78,6 +79,13 @@ export interface GraphSweepParams {
   ): Promise<(string | null)[]>;
   /** What was actually played on this turn (parsed from the replay log). */
   playedFor(turn: number): PlayedTurn | null;
+  /**
+   * Turn 0: the serialized team-preview position, or null for formats
+   * without preview. Present only on full-game sweeps.
+   */
+  acquirePreview?(): Promise<string | null>;
+  /** The leads each side actually sent (species, slot order). */
+  playedLeads?: { p1: string[] | null; p2: string[] | null };
 }
 
 export interface EvalGraphState {
@@ -89,6 +97,8 @@ export interface EvalGraphState {
   playedOutcome: (number | null)[];
   /** Depth+1 verification of flagged misplays (null = nothing flagged / not run). */
   verified: (TurnVerification | null)[];
+  /** Turn 0 (team preview) evaluation — null when unavailable or not swept. */
+  lead: LeadEvalData | null;
   running: boolean;
   progress: { done: number; total: number } | null;
 }
@@ -101,13 +111,13 @@ export function useEvaluation() {
   const [error, setError] = useState<string | null>(null);
   const [reconstructProgress, setReconstructProgress] = useState<{ turn: number; target: number } | null>(null);
   const [graph, setGraph] = useState<EvalGraphState>({
-    scores: [], results: [], played: [], playedOutcome: [], verified: [], running: false, progress: null,
+    scores: [], results: [], played: [], playedOutcome: [], verified: [], lead: null, running: false, progress: null,
   });
 
   const clientRef = useRef<EvalWorkerClient | null>(null);
   const cacheRef = useRef(new Map<string, CachedEval>());
   /** Latest graph arrays, so partial (range) sweeps merge instead of wiping. */
-  const graphDataRef = useRef<Pick<EvalGraphState, 'scores' | 'results' | 'played' | 'playedOutcome' | 'verified'> | null>(null);
+  const graphDataRef = useRef<Pick<EvalGraphState, 'scores' | 'results' | 'played' | 'playedOutcome' | 'verified' | 'lead'> | null>(null);
   const runRef = useRef(0);
   const prefsRef = useRef(prefs);
   prefsRef.current = prefs;
@@ -255,10 +265,11 @@ export function useEvaluation() {
     const verified: (TurnVerification | null)[] = keepPrevious && previous.verified.length === params.turns
       ? [...previous.verified]
       : new Array(params.turns).fill(null);
+    let lead: LeadEvalData | null = keepPrevious ? previous.lead : null;
     const snapshot = () => {
       const data = {
         scores: [...scores], results: [...results], played: [...played],
-        playedOutcome: [...playedOutcome], verified: [...verified],
+        playedOutcome: [...playedOutcome], verified: [...verified], lead,
       };
       graphDataRef.current = data;
       return data;
@@ -517,6 +528,46 @@ export function useEvaluation() {
       } else if (!(await sweepTurns(rangeTurns, fullSettings, true))) {
         return;
       }
+
+      // Turn 0: the lead decision, one extra evaluation at full settings —
+      // after the graph so the game line appears first.
+      if (params.acquirePreview && lead === null && runRef.current === runId) {
+        const key = params.cacheKeyFor(0);
+        const storeKey = evalStoreKey(key, depth, samples, mode, params.tera);
+        let hit = cacheRef.current.get(key);
+        if (!(hit && hit.depth === depth && hit.samples === samples && hit.mode === mode && hit.tera === params.tera)) {
+          const stored = await loadStoredEval(storeKey);
+          if (runRef.current !== runId) return;
+          hit = stored ? { result: stored.result, depth, samples, mode: mode, tera: params.tera } : undefined;
+          if (hit) cacheRef.current.set(key, hit);
+        }
+        let leadResult = hit?.result ?? null;
+        if (!leadResult) {
+          try {
+            const serialized = await params.acquirePreview();
+            if (runRef.current !== runId) return;
+            if (serialized) {
+              clientRef.current ??= new EvalWorkerClient();
+              leadResult = await clientRef.current.evaluate(serialized, fullSettings);
+              if (runRef.current !== runId) return;
+              cacheRef.current.set(key, { result: leadResult, depth, samples, mode: mode, tera: params.tera });
+              void saveStoredEval({
+                key: storeKey, result: leadResult, depth, samples, mode: mode, tera: params.tera,
+                savedAt: Date.now(),
+              });
+            }
+          } catch (err) {
+            if (runRef.current !== runId) return;
+            if (err instanceof Error && err.message === 'cancelled') return;
+            // No turn 0 for this replay — the graph stands on its own.
+          }
+        }
+        if (leadResult) {
+          lead = { result: leadResult, played: params.playedLeads ?? { p1: null, p2: null } };
+          setGraph({ ...snapshot(), running: true, progress: null });
+        }
+      }
+
       if (runRef.current === runId) {
         setGraph(prev => ({ ...prev, running: false, progress: null }));
       }
@@ -525,7 +576,7 @@ export function useEvaluation() {
 
   const clearGraph = useCallback(() => {
     graphDataRef.current = null;
-    setGraph({ scores: [], results: [], played: [], playedOutcome: [], verified: [], running: false, progress: null });
+    setGraph({ scores: [], results: [], played: [], playedOutcome: [], verified: [], lead: null, running: false, progress: null });
   }, []);
 
   return {

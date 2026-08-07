@@ -26,7 +26,7 @@ import { decodeBranchShare, type BranchSharePayload } from './lib/branch-share';
 import { getBranchSimulatorFormat, getReplayGameType, getReplayGeneration } from './lib/replay-format';
 import { choiceId, evalChoiceToSlotChoices, type BranchSlotChoice } from './lib/branch-choices';
 import type { RankedChoice } from './lib/eval/types';
-import { parsePlayedActions, parsePlayedActionsDoubles } from './lib/eval/played';
+import { parseLeadSpecies, parsePlayedActions, parsePlayedActionsDoubles } from './lib/eval/played';
 import { analyzeTurn, PAYOFF_WINDOW } from './lib/eval/analysis';
 import { buildGameReport } from './lib/eval/report';
 
@@ -612,8 +612,27 @@ function App() {
       playedFor: turn => (evalIsDoubles
         ? parsePlayedActionsDoubles(snapshots[turn]?.log ?? [])
         : parsePlayedActions(snapshots[turn]?.log ?? [])),
+      // Turn 0: the lead decision at team preview.
+      acquirePreview: async () => {
+        const { buildTeamsFromReplay } = await import('./lib/team-builder');
+        const branchEngine = await import('./lib/branch-engine');
+        const { p1Team, p2Team } = buildTeamsFromReplay(replayData.log, {
+          userTeamText: teamText || undefined,
+          p1Info: effectiveP1Info,
+          p2Info: effectiveP2Info,
+          usageStats: usageStats.stats,
+          setAssumptions: setAssumptions.assumptions,
+        });
+        if (p1Team.length === 0 || p2Team.length === 0) return null;
+        return branchEngine.serializePreviewPosition(getBranchSimulatorFormat(replayData), p1Team, p2Team);
+      },
+      playedLeads: parseLeadSpecies(replayData.log),
     });
-  }, [replayData, evaluation, analyzableTurns, effectiveTera, setsFingerprint, makeReplayAcquire, makeSweepAcquireAll, snapshots, evalIsDoubles]);
+  }, [
+    replayData, evaluation, analyzableTurns, effectiveTera, setsFingerprint, makeReplayAcquire,
+    makeSweepAcquireAll, snapshots, evalIsDoubles, teamText, effectiveP1Info, effectiveP2Info,
+    usageStats.stats, setAssumptions.assumptions,
+  ]);
 
   // On-demand: explain the current turn without sweeping the whole game —
   // its analysis only needs this turn and the next one evaluated.
