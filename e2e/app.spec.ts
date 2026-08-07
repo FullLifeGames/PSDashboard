@@ -287,11 +287,19 @@ test.describe('PS Dashboard', () => {
     await expect(panel.locator('.ps-eval-report')).toBeVisible();
     await expect(panel.locator('.ps-eval-report')).toContainText('Game report');
 
+    // Turn 0: the team-preview lead evaluation adds its own graph point.
+    await expect(panel.locator('.ps-eval-graph title:has-text("Leads:")')).toHaveCount(1, { timeout: 60_000 });
+
     // Selecting a point opens that turn's played-vs-best analysis.
-    await panel.locator('.ps-eval-graph rect').first().click();
+    await panel.locator('.ps-eval-graph rect[data-turn="1"]').click();
     await expect(panel.locator('.ps-eval-analysis')).toBeVisible();
     await expect(panel.locator('.ps-eval-analysis')).toContainText('Turn 1');
     await expect(panel.locator('.ps-eval-analysis')).toContainText('played');
+
+    // Selecting the leads point opens the team-preview analysis.
+    await panel.locator('.ps-eval-graph rect[data-turn="0"]').click();
+    await expect(panel.locator('.ps-eval-analysis')).toContainText('Team preview');
+    await expect(panel.locator('.ps-eval-analysis')).toContainText('led');
 
     // The sweep persisted its results to IndexedDB…
     const storedCount = await page.evaluate(async () => new Promise<number>(resolve => {
@@ -355,7 +363,7 @@ test.describe('PS Dashboard', () => {
     await expect(panel.locator('button', { hasText: 'Re-analyze' })).toBeVisible({ timeout: 120_000 });
 
     // The analysis pipeline works on visit-ranked MCTS results too.
-    await panel.locator('.ps-eval-graph rect').first().click();
+    await panel.locator('.ps-eval-graph rect[data-turn="1"]').click();
     await expect(panel.locator('.ps-eval-analysis')).toBeVisible();
     await expect(panel.locator('.ps-eval-analysis')).toContainText('played');
   });

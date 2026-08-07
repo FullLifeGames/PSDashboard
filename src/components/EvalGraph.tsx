@@ -9,6 +9,8 @@ interface EvalGraphProps {
   onSelectTurn?: (turn: number) => void;
   /** Selects the fitted win-probability curve for percent labels. */
   doubles?: boolean;
+  /** Turn 0 (team preview) game value — adds a leads point before turn 1. */
+  leadScore?: number | null;
 }
 
 const WIDTH = 300;
@@ -20,13 +22,16 @@ const PAD_X = 4;
  * needed); point color carries the polarity via the app's player colors;
  * blunder markers add a shape ring plus tooltip text, never color alone.
  */
-export function EvalGraph({ scores, playerNames, currentTurn, onSelectTurn, doubles }: EvalGraphProps) {
+export function EvalGraph({ scores, playerNames, currentTurn, onSelectTurn, doubles, leadScore }: EvalGraphProps) {
   const turns = scores.length;
   if (turns === 0) return null;
 
-  const x = (turn: number) => turns === 1
+  // With a lead evaluation the x-domain starts at turn 0 (team preview).
+  const hasLead = leadScore !== null && leadScore !== undefined;
+  const first = hasLead ? 0 : 1;
+  const x = (turn: number) => turns === first
     ? WIDTH / 2
-    : PAD_X + ((turn - 1) / (turns - 1)) * (WIDTH - 2 * PAD_X);
+    : PAD_X + ((turn - first) / (turns - first)) * (WIDTH - 2 * PAD_X);
   const y = (score: number) => HEIGHT / 2 - score * (HEIGHT / 2 - 6);
 
   // Consecutive non-null runs become path segments; gaps stay gaps.
@@ -43,7 +48,7 @@ export function EvalGraph({ scores, playerNames, currentTurn, onSelectTurn, doub
   if (current.length > 1) segments.push(`M ${current.join(' L ')}`);
 
   const blunders = new Set(computeBlunders(scores));
-  const hitWidth = (WIDTH - 2 * PAD_X) / Math.max(turns - 1, 1);
+  const hitWidth = (WIDTH - 2 * PAD_X) / Math.max(turns - first, 1);
 
   const pct = (score: number) => winPercent(score, doubles);
   const label = (turn: number, score: number) => {
@@ -66,6 +71,33 @@ export function EvalGraph({ scores, playerNames, currentTurn, onSelectTurn, doub
       {segments.map(d => (
         <path key={d} d={d} fill="none" stroke="#cde" strokeWidth={1.6} strokeLinejoin="round" vectorEffect="non-scaling-stroke" />
       ))}
+      {hasLead && (
+        <>
+          {scores[0] !== null && (
+            <line
+              x1={x(0)} y1={y(leadScore!)} x2={x(1)} y2={y(scores[0])}
+              stroke="#cde" strokeOpacity={0.5} strokeDasharray="3 2" vectorEffect="non-scaling-stroke"
+            />
+          )}
+          {/* Diamond, not circle — the lead decision is a different kind of point. */}
+          <rect
+            x={x(0) - 2.6} y={y(leadScore!) - 2.6} width={5.2} height={5.2}
+            transform={`rotate(45 ${x(0)} ${y(leadScore!)})`}
+            fill={leadScore! >= 0 ? '#8ac' : '#c8a'}
+            stroke="#cde" strokeWidth={0.8} vectorEffect="non-scaling-stroke"
+            style={{ pointerEvents: 'none' }}
+          />
+          <rect
+            data-turn={0}
+            x={x(0) - hitWidth / 2} y={0} width={hitWidth} height={HEIGHT}
+            fill="transparent"
+            style={onSelectTurn ? { cursor: 'pointer' } : undefined}
+            onClick={onSelectTurn ? () => onSelectTurn(0) : undefined}
+          >
+            <title>{`Leads: ${playerNames[0]} ${pct(leadScore!)}% · ${playerNames[1]} ${100 - pct(leadScore!)}%`}</title>
+          </rect>
+        </>
+      )}
       {scores.map((score, index) => score === null ? null : (
         <circle
           key={`p${index}`}
@@ -81,6 +113,7 @@ export function EvalGraph({ scores, playerNames, currentTurn, onSelectTurn, doub
       {scores.map((score, index) => score === null ? null : (
         <rect
           key={`h${index}`}
+          data-turn={index + 1}
           x={x(index + 1) - hitWidth / 2}
           y={0}
           width={hitWidth}

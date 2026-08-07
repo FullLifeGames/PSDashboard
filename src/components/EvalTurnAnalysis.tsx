@@ -1,4 +1,5 @@
 import { diffChoices, playedSetupMove, type SideAnalysis, type TurnAnalysis } from '../lib/eval/analysis';
+import type { LeadAnalysis, LeadSideAnalysis } from '../lib/eval/leads';
 import type { RankedChoice } from '../lib/eval/types';
 import { summarizeTurn } from '../lib/eval/summary';
 import { attributionBadge } from './eval-badges';
@@ -237,6 +238,56 @@ export function EvalTurnAnalysis({ analysis, playerNames, doubles, onExplore }: 
           <SideRow name={playerNames[1]} side={analysis.p2} onExplore={exploreFor('p2')} />
         </>
       )}
+    </div>
+  );
+}
+
+const stripLead = (label: string) => label.replace(/^Lead /, '');
+
+function LeadRow({ name, side }: { name: string; side: LeadSideAnalysis }) {
+  const bad = side.tier === 'mistake' || side.tier === 'blunder';
+  return (
+    <div className="ps-eval-analysis-side">
+      <div className="ps-eval-analysis-row">
+        <span style={{ color: '#cde', fontWeight: 'bold' }}>{name}</span>
+        <span style={{ color: '#aab' }}>
+          led {side.played
+            ? `${stripLead(side.played.label)} (${signed(side.played.ev)})`
+            : 'leads not matched'}
+        </span>
+        {side.played && side.best && side.played.choice === side.best.choice && (
+          <span style={{ color: '#8c8' }}>✓ the engine's leads</span>
+        )}
+        {bad && side.best && (
+          <span style={{ color: side.tier === 'blunder' ? '#ff7a7a' : '#f3a6a6' }}>
+            {side.tier} · −{(side.regret ?? 0).toFixed(2)} — better: {stripLead(side.best.label)} ({signed(side.best.ev)})
+          </span>
+        )}
+        {side.tier === 'inaccuracy' && side.best && (
+          <span style={{ color: '#b6a46a' }}>
+            · inaccuracy (−{(side.regret ?? 0).toFixed(2)}) — {stripLead(side.best.label)} was slightly better
+          </span>
+        )}
+        {!side.tier && side.played && side.best && side.played.choice !== side.best.choice && (
+          <span style={{ color: '#778' }}>
+            engine: {stripLead(side.best.label)} ({signed(side.best.ev)})
+          </span>
+        )}
+      </div>
+    </div>
+  );
+}
+
+/** Turn 0: the team-preview lead decision, graded like any other turn. */
+export function EvalLeadAnalysis({ leads, playerNames }: { leads: LeadAnalysis; playerNames: [string, string] }) {
+  return (
+    <div className="ps-eval-analysis">
+      <div className="ps-eval-analysis-row">
+        <span style={{ fontWeight: 'bold', fontSize: 11, color: '#cde' }}>Team preview</span>
+        <span style={{ color: '#778' }}>the lead decision before turn 1</span>
+      </div>
+      <LeadRow name={playerNames[0]} side={leads.p1} />
+      <LeadRow name={playerNames[1]} side={leads.p2} />
     </div>
   );
 }

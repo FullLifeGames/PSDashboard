@@ -4,8 +4,9 @@ import type { GameReport } from '../lib/eval/report';
 import type { EvalGraphState, EvalStatus } from '../hooks/useEvaluation';
 import { EvalGameReport } from './EvalGameReport';
 import { EvalGraph } from './EvalGraph';
-import { EvalTurnAnalysis, MiniBar } from './EvalTurnAnalysis';
+import { EvalLeadAnalysis, EvalTurnAnalysis, MiniBar } from './EvalTurnAnalysis';
 import { winPercent } from '../lib/eval/winprob';
+import type { LeadAnalysis } from '../lib/eval/leads';
 
 interface EvalPanelProps {
   playerNames: [string, string];
@@ -33,6 +34,10 @@ interface EvalPanelProps {
   currentTurn: number;
   /** Analysis of the graph-selected turn (replay view only). */
   analysis: TurnAnalysis | null;
+  /** Turn-0 analysis, shown when the graph's leads point is selected. */
+  leadAnalysis?: LeadAnalysis | null;
+  /** Lead verdicts for the report chips (independent of selection). */
+  reportLeads?: LeadAnalysis | null;
   /** Game-level root-cause report, once a sweep covers enough turns. */
   report?: GameReport | null;
   /** Doubles replay — selects the fitted win-probability curve for percents. */
@@ -106,7 +111,8 @@ function ChoiceList({
 export function EvalPanel({
   playerNames, status, result, progress, reconstructProgress, error,
   prefs, onPrefsChange, onEvaluate, onCancel, onPickChoice, showAuto, showTera,
-  graph, onAnalyzeGame, onAnalyzeTurn, onSelectTurn, currentTurn, analysis, report, doubles,
+  graph, onAnalyzeGame, onAnalyzeTurn, onSelectTurn, currentTurn, analysis,
+  leadAnalysis, reportLeads, report, doubles,
 }: EvalPanelProps) {
   const running = status === 'searching' || status === 'reconstructing';
   const hasGraph = graph.scores.some(score => score !== null);
@@ -265,6 +271,7 @@ export function EvalPanel({
               currentTurn={currentTurn}
               onSelectTurn={onSelectTurn}
               doubles={doubles}
+              leadScore={graph.lead?.result.score ?? null}
             />
           )}
           {hasGraph && !analysis && (
@@ -272,8 +279,9 @@ export function EvalPanel({
               Click a point to see that turn's analysis.
             </div>
           )}
-          {report && <EvalGameReport report={report} playerNames={playerNames} onSelectTurn={onSelectTurn} />}
-          {analysis && <EvalTurnAnalysis analysis={analysis} playerNames={playerNames} doubles={doubles} onExplore={onPickChoice} />}
+          {report && <EvalGameReport report={report} playerNames={playerNames} onSelectTurn={onSelectTurn} leads={reportLeads} />}
+          {leadAnalysis && <EvalLeadAnalysis leads={leadAnalysis} playerNames={playerNames} />}
+          {!leadAnalysis && analysis && <EvalTurnAnalysis analysis={analysis} playerNames={playerNames} doubles={doubles} onExplore={onPickChoice} />}
         </div>
       )}
 

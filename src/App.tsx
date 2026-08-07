@@ -28,6 +28,7 @@ import { choiceId, evalChoiceToSlotChoices, type BranchSlotChoice } from './lib/
 import type { RankedChoice } from './lib/eval/types';
 import { parseLeadSpecies, parsePlayedActions, parsePlayedActionsDoubles } from './lib/eval/played';
 import { analyzeTurn, PAYOFF_WINDOW } from './lib/eval/analysis';
+import { analyzeLeads } from './lib/eval/leads';
 import { buildGameReport } from './lib/eval/report';
 
 const TEAM_PASTE_STORAGE_KEY = 'ps-replay-interceptor:team-paste';
@@ -813,7 +814,8 @@ function App() {
   }, [branching, endSnapshotTurn]);
 
   const handleGraphSelect = useCallback((turn: number) => {
-    handleReplayTurn(turn);
+    // Turn 0 (team preview) has no replay position — only the analysis opens.
+    if (turn >= 1) handleReplayTurn(turn);
     setAnalysisTurn(turn);
   }, [handleReplayTurn]);
 
@@ -827,6 +829,12 @@ function App() {
       return turn === prev ? prev : turn;
     });
   }, [branching, branchTurn, analyzableTurns]);
+
+  const leadAnalysisData = useMemo(() => {
+    const lead = evaluation.graph.lead;
+    if (!lead) return null;
+    return analyzeLeads(lead.result, lead.played);
+  }, [evaluation.graph.lead]);
 
   const turnAnalysis = useMemo(() => {
     if (analysisTurn === null) return null;
@@ -1197,6 +1205,8 @@ function App() {
                 onSelectTurn={!branching ? handleGraphSelect : undefined}
                 currentTurn={branching ? (simState?.turnNumber ?? branchTurn) : branchTurn}
                 analysis={!branching ? turnAnalysis : null}
+                leadAnalysis={!branching && analysisTurn === 0 ? leadAnalysisData : null}
+                reportLeads={!branching ? leadAnalysisData : null}
                 report={!branching ? gameReport : null}
                 doubles={replayGameType === 'doubles'}
               />
