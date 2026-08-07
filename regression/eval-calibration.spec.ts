@@ -23,6 +23,11 @@ import { searchPosition } from '../src/lib/eval/search';
  * Kept 12/6: net wash vs baseline (mid +2, late −3 ≈ 2 samples), halving was
  * strictly worse (falsifying "schedule too strong"), and the schedule's real
  * purpose — pricing setup turns honestly — is not measured by sign accuracy.
+ * RESOLVED 2026-08-05 by a PAIRED re-test (both weight sets on identical
+ * positions): 56/73 late-game correct under BOTH — zero sign flips in either
+ * direction, though 35/73 positions had boosts on the field. The "late −3"
+ * was sample-composition noise between runs (fetches/reconstructions vary),
+ * not an effect of the schedule. Cross-run comparisons here need pairing.
  *
  * Active-pair emphasis 2026-08-05 (turn-0 lead evaluation groundwork):
  *   activePair 2:   early 56 · mid 64 · late 71(−7!) · singles 60 · doubles 77
