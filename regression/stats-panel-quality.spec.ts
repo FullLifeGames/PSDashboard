@@ -56,6 +56,69 @@ test.describe('stats panel data quality (WP11)', () => {
     expect(skarmory?.item).toEqual(expect.objectContaining({ value: 'Leftovers', source: 'revealed' }));
   });
 
+  test('item damage recoil reveals the holder (Life Orb)', () => {
+    const log = [
+      '|player|p2|Bob|',
+      '|gen|9',
+      '|poke|p2|Iron Valiant|item',
+      '|start',
+      '|switch|p2a: Izumi|Iron Valiant|100/100',
+      '|turn|1',
+      '|move|p2a: Izumi|Knock Off|p1a: Relous',
+      '|-damage|p2a: Izumi|84/100|[from] item: Life Orb',
+      '|turn|2',
+    ].join('\n');
+
+    const info = inferOpponentTeam(log, 'p2');
+    const valiant = info.pokemon.find(pokemon => pokemon.species === 'Iron Valiant');
+    expect(valiant?.item).toEqual(expect.objectContaining({ value: 'Life Orb', source: 'revealed' }));
+  });
+
+  test('Rocky Helmet damage reveals the [of] holder, not the damaged attacker', () => {
+    const log = [
+      '|player|p2|Bob|',
+      '|gen|9',
+      '|poke|p2|Amoonguss, F|item',
+      '|start',
+      '|switch|p1a: Kleavor|Kleavor, M|100/100',
+      '|switch|p2a: Amoon|Amoonguss, F|100/100',
+      '|turn|1',
+      '|move|p1a: Kleavor|X-Scissor|p2a: Amoon',
+      '|-damage|p2a: Amoon|60/100',
+      '|-damage|p1a: Kleavor|84/100|[from] item: Rocky Helmet|[of] p2a: Amoon',
+      '|turn|2',
+    ].join('\n');
+
+    const amoonguss = inferOpponentTeam(log, 'p2').pokemon.find(pokemon => pokemon.species === 'Amoonguss');
+    expect(amoonguss?.item).toEqual(expect.objectContaining({ value: 'Rocky Helmet', source: 'revealed' }));
+  });
+
+  test('Rocky Helmet damage without [of] falls back to the attacker\'s move target (video logs)', () => {
+    // gpl-pipeline reconstructions drop the [of] attribution — the holder is
+    // whoever the damaged Pokémon just hit with a contact move.
+    const log = [
+      '|player|p1|Alice|',
+      '|gen|9',
+      '|poke|p1|Uxie, L50|',
+      '|poke|p2|Landorus-Therian, L50|',
+      '|start',
+      '|switch|p1a: Dauni|Uxie, L50|100/100',
+      '|switch|p2a: Armstrong|Landorus-Therian, L50|100/100',
+      '|turn|1',
+      '|move|p2a: Armstrong|U-turn|p1a: Dauni',
+      '|-damage|p1a: Dauni|80/100',
+      '|-damage|p2a: Armstrong|88/100|[from] item: Rocky Helmet',
+      '|turn|2',
+    ].join('\n');
+
+    const uxie = inferOpponentTeam(log, 'p1').pokemon.find(pokemon => pokemon.species === 'Uxie');
+    expect(uxie?.item).toEqual(expect.objectContaining({ value: 'Rocky Helmet', source: 'revealed' }));
+
+    // The damaged attacker itself must NOT be credited with the helmet.
+    const lando = inferOpponentTeam(log, 'p2').pokemon.find(pokemon => pokemon.species === 'Landorus-Therian');
+    expect(lando?.item?.value ?? '').not.toBe('Rocky Helmet');
+  });
+
   test('sprite URLs drop base-name hyphens but keep forme hyphens (Ting-Lu)', () => {
     expect(spriteUrl('Ting-Lu')).toBe('https://play.pokemonshowdown.com/sprites/gen5/tinglu.png');
     expect(spriteUrl('Chien-Pao')).toBe('https://play.pokemonshowdown.com/sprites/gen5/chienpao.png');

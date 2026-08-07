@@ -115,6 +115,9 @@ function applyTeamSheet(pokemonMap: Map<string, RevealedPokemonInfo>, sheet: She
   }
 }
 
+/** Items whose `[from] item:` damage hits the attacker instead of the holder. */
+const ATTACKER_PUNISH_ITEMS = new Set(['rockyhelmet', 'jabocaberry', 'rowapberry']);
+
 /**
  * Extracts revealed information about the opponent's team from the replay log.
  * Parses |poke|, |switch|, |move|, |-ability|, |-item|, |-terastallize| lines for p2.
@@ -122,8 +125,17 @@ function applyTeamSheet(pokemonMap: Map<string, RevealedPokemonInfo>, sheet: She
 export function inferOpponentTeam(log: string, opponentSide: 'p1' | 'p2' = 'p2'): OpponentTeamInfo {
   const lines = log.split('\n');
   const pokemonMap = new Map<string, RevealedPokemonInfo>();
+  // Each ident's latest move target — resolves Rocky Helmet reveals in
+  // video-reconstructed logs that drop the [of] attribution.
+  const lastMoveTarget = new Map<string, string>();
 
   for (const line of lines) {
+    if (line.startsWith('|move|')) {
+      const parts = line.split('|');
+      if (parts[2] && parts[4] && /^p[12][a-d]?:/.test(parts[4])) {
+        lastMoveTarget.set(parts[2], parts[4]);
+      }
+    }
     // Team preview: |poke|p2|Species, L50, M|item
     if (line.startsWith(`|poke|${opponentSide}|`)) {
       const parts = line.split('|');
@@ -221,6 +233,29 @@ export function inferOpponentTeam(log: string, opponentSide: 'p1' | 'p2' = 'p2')
       const pokemon = findPokemonByNickname(pokemonMap, nickname, lines, opponentSide);
       if (pokemon && itemName && (!pokemon.item.value || pokemon.item.value === '(has item)')) {
         pokemon.item = revealedField(itemName);
+      }
+    }
+
+    // Item damage reveals the holder: Life Orb/Black Sludge recoil hurts the
+    // holder itself, but Rocky Helmet hurts the ATTACKER — its holder is the
+    // [of] Pokémon, or in video-reconstructed logs that drop [of], the target
+    // of the damaged Pokémon's own move.
+    if (line.startsWith('|-damage|') && line.includes('[from] item:')) {
+      const damagedIdent = line.split('|')[2] ?? '';
+      const itemName = line.match(/\[from\] item:\s*([^|\n[]+)/)?.[1]?.trim();
+      const ofIdent = line.match(/\[of\]\s*(p[12][a-d]?):\s*([^|\n]+)/);
+      let owner: string | null = damagedIdent;
+      if (ofIdent) {
+        owner = `${ofIdent[1]}: ${ofIdent[2].trim()}`;
+      } else if (itemName && ATTACKER_PUNISH_ITEMS.has(toId(itemName))) {
+        owner = lastMoveTarget.get(damagedIdent) ?? null;
+      }
+      const ownerMatch = owner?.match(/^(p[12])[a-d]?:\s*(.+)$/);
+      if (itemName && ownerMatch && ownerMatch[1] === opponentSide) {
+        const pokemon = findPokemonByNickname(pokemonMap, ownerMatch[2].trim(), lines, opponentSide);
+        if (pokemon && (!pokemon.item.value || pokemon.item.value === '(has item)')) {
+          pokemon.item = revealedField(itemName);
+        }
       }
     }
 
