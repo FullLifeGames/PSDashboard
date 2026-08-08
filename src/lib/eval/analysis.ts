@@ -33,8 +33,12 @@ export const DECIDED_SCORE = 0.7;
 
 /** Regret (best − played, own perspective) that marks a decision problem. */
 export const REGRET_THRESHOLD = TIER_THRESHOLDS.mistake;
-/** Residual swing (actual − expected outcome) that marks a chance swing. */
-export const CHANCE_THRESHOLD = 0.2;
+/**
+ * Residual swing (actual − expected outcome) that marks a chance swing.
+ * Derived from the tier bands (re-derived with them for wp-units): the roll
+ * "mattered" when it moved the game a mistake-sized amount.
+ */
+export const CHANCE_THRESHOLD = TIER_THRESHOLDS.mistake;
 
 export type TurnAttribution =
   | 'p1-decision' | 'p2-decision' | 'both-decision'
@@ -49,9 +53,10 @@ export type TurnAttribution =
  * A risk pays off when the actual pair's expected value beats the safe
  * line's GUARANTEE by at least this much (own perspective). Comparing
  * against the floor is deliberate: the guarantee is exactly what the safe
- * player locks in — beating it is what the read earned.
+ * player locks in — beating it is what the read earned. Derived from the
+ * tier bands (wp-units): an inaccuracy-sized edge is a real edge.
  */
-export const RISK_PAYOFF_MARGIN = 0.1;
+export const RISK_PAYOFF_MARGIN = TIER_THRESHOLDS.inaccuracy;
 
 /**
  * How many FUTURE turns a read gets to cash in: setup and positional plays
@@ -396,24 +401,24 @@ export function analyzeTurn(params: {
         verifiedAtDepth = true;
       }
     }
+    const demoteTier = (current: VerdictTier | undefined): VerdictTier | undefined =>
+      current === 'blunder' ? 'mistake' : current === 'mistake' ? 'inaccuracy' : undefined;
     let tier: VerdictTier | undefined;
     if (regret !== null) {
       if (regret >= TIER_THRESHOLDS.blunder) tier = 'blunder';
       else if (regret >= TIER_THRESHOLDS.mistake) tier = 'mistake';
       else if (regret >= TIER_THRESHOLDS.inaccuracy) tier = 'inaccuracy';
       const own = key === 'p1' ? params.scoreBefore : -params.scoreBefore;
-      if (tier && Math.abs(own) >= DECIDED_SCORE) {
-        tier = tier === 'blunder' ? 'mistake' : tier === 'mistake' ? 'inaccuracy' : undefined;
-      }
+      if (tier && Math.abs(own) >= DECIDED_SCORE) tier = demoteTier(tier);
     }
     // A sack of a nearly-dead body is a deliberate low-cost play: demote one
     // band (same shape as the decided-position leniency) and mark it so the
-    // risk machinery and the report treat it neutrally.
+    // risk machinery and the report treat it neutrally. BOUNDED: a
+    // blunder-sized regret is a throw whatever the body was worth — the
+    // sack leniency never forgives the blunder band.
     const sack = params.sacks?.[key];
-    const sacrificed = !!(tier && sack);
-    if (sacrificed) {
-      tier = tier === 'blunder' ? 'mistake' : tier === 'mistake' ? 'inaccuracy' : undefined;
-    }
+    const sacrificed = !!(tier && sack && (regret ?? 0) < TIER_THRESHOLDS.blunder);
+    if (sacrificed) tier = demoteTier(tier);
     return {
       playedRaw,
       ...(playedSlots ? { playedSlots } : {}),

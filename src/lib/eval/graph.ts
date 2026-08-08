@@ -3,8 +3,14 @@
  * main-bundle safe.
  */
 
-/** Score swing between consecutive evaluated turns that marks a blunder. */
-export const BLUNDER_SWING = 0.25;
+import { TIER_THRESHOLDS } from './analysis';
+
+/**
+ * Score swing between consecutive evaluated turns that marks a blunder.
+ * Scores are wp-units, so the blunder ring means what the verdict band
+ * means: a blunder-sized (20% win-probability) move between turns.
+ */
+export const BLUNDER_SWING = TIER_THRESHOLDS.blunder;
 
 /**
  * Returns the 1-based turn numbers whose score swung by at least

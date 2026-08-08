@@ -146,6 +146,36 @@ test.describe('sacrifice detection', () => {
     expect(analysis.p1.tier).toBe('inaccuracy');
     expect(analysis.p1.riskUnpunished).toBeFalsy();
   });
+
+  test('a blunder-sized throw is not forgiven by the sack label', () => {
+    // Sacking the nearly-dead mon can still be the wrong play: when the
+    // regret reaches the blunder band, the sack leniency must not apply.
+    const sackResult: EvalResult = {
+      score: 0.1, interval: 0.05, depthCompleted: 2,
+      perSide: {
+        p1: [
+          choiceEv('move dracometeor', 'Draco Meteor', 0.2, 0.2),
+          choiceEv('switch 2', '→ Uxie', -0.3, -0.25),
+        ],
+        p2: [choice('move trick', 'Trick', -0.05)],
+      },
+    };
+    const analysis = analyzeTurn({
+      turn: 29,
+      result: sackResult,
+      played: {
+        p1: { kind: 'switch', name: 'Dauni', species: 'Uxie' },
+        p2: { kind: 'move', name: 'Trick', tera: false },
+      },
+      playedOutcome: -0.1,
+      scoreBefore: 0.1,
+      scoreAfter: -0.3,
+      sacks: { p1: { name: 'Uxie', hpFraction: 0.09 } },
+    });
+    // Regret 0.45 = blunder band: tier and grading stay, no neutral sack framing.
+    expect(analysis.p1.tier).toBe('blunder');
+    expect(analysis.p1.sacrifice).toBeUndefined();
+  });
 });
 
 test.describe('turn analysis assembly', () => {
