@@ -1,7 +1,7 @@
 import { test, expect } from '@playwright/test';
 import { Battle, Teams, toID } from '@pkmn/sim';
 import type { PokemonSet } from '@pkmn/sim';
-import { createMatchupCache, evaluatePosition, EVAL_WEIGHTS } from '../src/lib/eval/eval-function';
+import { createMatchupCache, evaluatePosition, EVAL_WEIGHTS, hazardCost } from '../src/lib/eval/eval-function';
 
 function makeSet(
   name: string,
@@ -160,6 +160,42 @@ test.describe('evaluatePosition', () => {
     const battle = makeBattle([makeSet('A', 'Snorlax', VANILLA)], [makeSet('B', 'Snorlax', VANILLA)]);
     battle.sides[1].addSideCondition('stealthrock', battle.sides[0].active[0]!);
     expect(evaluatePosition(battle)).toBeGreaterThan(0);
+  });
+
+  test('Stealth Rock is worth more against a rock-weak team than a resisting one', () => {
+    const weak = makeBattle(
+      [makeSet('A1', 'Charizard', VANILLA), makeSet('A2', 'Volcarona', VANILLA)],
+      [makeSet('B1', 'Charizard', VANILLA), makeSet('B2', 'Volcarona', VANILLA)],
+    );
+    const resist = makeBattle(
+      [makeSet('A1', 'Lucario', VANILLA), makeSet('A2', 'Excadrill', VANILLA)],
+      [makeSet('B1', 'Lucario', VANILLA), makeSet('B2', 'Excadrill', VANILLA)],
+    );
+    weak.sides[1].addSideCondition('stealthrock', weak.sides[0].active[0]!);
+    resist.sides[1].addSideCondition('stealthrock', resist.sides[0].active[0]!);
+    // Mirrors: base score 0; the whole score IS the hazard delta.
+    expect(evaluatePosition(weak)).toBeGreaterThan(evaluatePosition(resist));
+    expect(evaluatePosition(resist)).toBeGreaterThan(0);
+  });
+
+  test('hazard cost skips Boots and Magic Guard and caps at hazardCap', () => {
+    const battle = makeBattle(
+      [makeSet('A', 'Snorlax', VANILLA)],
+      [makeSet('B', 'Volcarona', VANILLA, 50, { item: 'Heavy-Duty Boots' })],
+    );
+    battle.sides[1].addSideCondition('stealthrock', battle.sides[0].active[0]!);
+    expect(hazardCost(battle.sides[1], battle)).toBe(0);
+
+    const stacked = makeBattle(
+      [makeSet('A', 'Snorlax', VANILLA)],
+      Array.from({ length: 6 }, (_, i) => makeSet(`B${i}`, 'Volcarona', VANILLA)),
+    );
+    const source = stacked.sides[0].active[0]!;
+    stacked.sides[1].addSideCondition('stealthrock', source);
+    for (let i = 0; i < 3; i++) stacked.sides[1].addSideCondition('spikes', source);
+    stacked.sides[1].addSideCondition('toxicspikes', source);
+    stacked.sides[1].addSideCondition('stickyweb', source);
+    expect(hazardCost(stacked.sides[1], stacked)).toBe(EVAL_WEIGHTS.hazardCap);
   });
 
   test('tailwind helps its side, trick room helps the slower side', () => {

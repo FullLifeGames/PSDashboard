@@ -22,8 +22,16 @@ export const EVAL_WEIGHTS = {
   boostStage: { offensive: 12, defensive: 6 },
   /** Cumulative stage multipliers (index = |stage|): +2 is twice +1, the tail flattens. */
   boostSchedule: [0, 1.0, 2.0, 2.5, 3.0, 3.15, 3.3],
-  /** Per hazard layer lying on a side. */
-  hazards: { stealthrock: 12, spikes: 6, toxicspikes: 5, stickyweb: 8 } as Record<string, number>,
+  /**
+   * Hazards are priced by their VICTIMS, not per layer: each living Pokémon
+   * on the suffering side contributes its body weight × the entry-damage
+   * fraction the type chart actually assigns it (a 4x-rock Volcarona bleeds
+   * 50% per entry, a Lucario 6%) × the expected future entries. A flat layer
+   * weight recommended switching out of a rocks turn against rock-weak teams.
+   */
+  hazardEntries: 0.75,
+  /** Per-side clamp on the hazard term (≈ 0.6 mons) so stacking cannot outweigh bodies. */
+  hazardCap: 120,
   /** Per active screen (Reflect / Light Screen / Aurora Veil). */
   screen: 5,
   tailwind: 8,
@@ -57,7 +65,41 @@ function averageSpeed(side: Side): number {
   return living.reduce((sum, pokemon) => sum + pokemon.storedStats.spe, 0) / living.length;
 }
 
-function sideScore(side: Side): number {
+/**
+ * Victim-aware hazard cost for the side the hazards lie on, capped at
+ * `hazardCap`. Exported for direct testing.
+ */
+export function hazardCost(side: Side, battle: Battle): number {
+  const hasRocks = !!side.sideConditions['stealthrock'];
+  const spikesLayers = Math.min(side.sideConditions['spikes']?.layers ?? 0, 3);
+  const hasToxicSpikes = !!side.sideConditions['toxicspikes'];
+  const hasWeb = !!side.sideConditions['stickyweb'];
+  if (!hasRocks && !spikesLayers && !hasToxicSpikes && !hasWeb) return 0;
+
+  const bodyWeight = EVAL_WEIGHTS.alive + EVAL_WEIGHTS.hp;
+  let cost = 0;
+  for (const pokemon of side.pokemon) {
+    if (pokemon.fainted || pokemon.hp <= 0) continue;
+    if (pokemon.item === 'heavydutyboots' || pokemon.ability === 'magicguard') continue;
+    const grounded = !pokemon.types.includes('Flying') &&
+      pokemon.ability !== 'levitate' && pokemon.item !== 'airballoon';
+    let fraction = 0;
+    if (hasRocks) {
+      fraction += 0.125 * Math.pow(2, battle.dex.getEffectiveness('Rock', pokemon.types));
+    }
+    if (grounded) {
+      if (spikesLayers) fraction += [0, 1 / 8, 1 / 6, 1 / 4][spikesLayers];
+      if (hasToxicSpikes && !pokemon.types.includes('Poison') && !pokemon.types.includes('Steel')) {
+        fraction += 0.06; // priced as a slice of the psn/tox status cost
+      }
+      if (hasWeb) fraction += 0.04;
+    }
+    cost += bodyWeight * fraction * EVAL_WEIGHTS.hazardEntries;
+  }
+  return Math.min(cost, EVAL_WEIGHTS.hazardCap);
+}
+
+function sideScore(side: Side, battle: Battle): number {
   let score = 0;
   for (const pokemon of side.pokemon) score += pokemonScore(pokemon);
   for (const active of side.active) {
@@ -71,10 +113,7 @@ function sideScore(side: Side): number {
       score += Math.sign(stage) * base * magnitude;
     }
   }
-  for (const [id, weight] of Object.entries(EVAL_WEIGHTS.hazards)) {
-    const condition = side.sideConditions[id];
-    if (condition) score -= weight * (condition.layers ?? 1);
-  }
+  score -= hazardCost(side, battle);
   for (const id of SCREENS) {
     if (side.sideConditions[id]) score += EVAL_WEIGHTS.screen;
   }
@@ -273,8 +312,8 @@ export function evaluatePosition(battle: Battle, cache?: MatchupCache): number {
     return -1;
   }
 
-  let p1 = sideScore(battle.sides[0]);
-  let p2 = sideScore(battle.sides[1]);
+  let p1 = sideScore(battle.sides[0], battle);
+  let p2 = sideScore(battle.sides[1], battle);
 
   if (battle.field.pseudoWeather['trickroom']) {
     if (averageSpeed(battle.sides[0]) <= averageSpeed(battle.sides[1])) p1 += EVAL_WEIGHTS.trickRoom;

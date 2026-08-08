@@ -30,7 +30,7 @@ export interface StoredEval {
  * resurface as current.
  */
 // v7: active-pair matchup emphasis + team-preview (turn 0) evaluation.
-export const EVAL_ENGINE_CACHE_VERSION = 7;
+export const EVAL_ENGINE_CACHE_VERSION = 8;
 
 export function evalStoreKey(
   cacheKey: string,
