@@ -66,6 +66,28 @@ import { searchPosition } from '../src/lib/eval/search';
  *     doubles' expense. Screens/trickRoom implied values are confounded
  *     (setup correlates with already winning); tailwind/matchup/choiceMismatch
  *     had no signal (SE ≥ estimate). Hand values stay.
+ *
+ * Attribution/solver fixes 2026-08-08 (action-window attribution, spread
+ * rungs inherit priors, tendencies/MCTS-matrix): 58/65/82/65/84 — within
+ * gate of the 58/67/83/66/82 record (mid −2 = the usual composition noise);
+ * doubles +2. This run is the record for the per-gametype adoption below.
+ *
+ * PER-GAMETYPE weights 2026-08-08 (eval-fit on the EXPANDED corpus: 1100
+ * games / 5976 positions, doubles now 590 games / 2436 positions via NPA 15
+ * + OSDT + doubles ladder — the old doubles fit rested on 49 games):
+ *   ADOPTED (DOUBLES_FEATURE_WEIGHTS): boosts 27 (fit 27±7), tailwind 68
+ *     (68±25), trickRoom 87 (87±27) + WINPROB_K doubles 2.3→3.1 (n=2436;
+ *     sign accuracy cannot see K — it is justified by the leaf-level fit
+ *     alone). Gate: 58/65/80/64/82, all within 2 of the record. The
+ *     direction matches doubles domain knowledge: speed control decides
+ *     VGC games.
+ *   REJECTED: screens 103 (103±40) — gate read 56/62/79/64/73, doubles
+ *     −11: the screens fit is confounded exactly like the singles one.
+ *   REJECTED (again): singles boosts 12→37 (fit 37±11, third consistent
+ *     fit) — gate read 58/67/79/65/80, late −3 on a DETERMINISTIC re-test
+ *     (identical numbers twice). The boost fit keeps promising and keeps
+ *     failing the gate; whatever it measures correlates with winning in the
+ *     corpus but does not improve position-level sign accuracy.
  */
 const REPLAY_IDS = [
   'gen9draft-2058494320',

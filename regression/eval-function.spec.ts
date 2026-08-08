@@ -1,7 +1,10 @@
 import { test, expect } from '@playwright/test';
 import { Battle, Teams, toID } from '@pkmn/sim';
 import type { PokemonSet } from '@pkmn/sim';
-import { createMatchupCache, evaluatePosition, EVAL_WEIGHTS, hazardCost, matchupTerms, pairThreat } from '../src/lib/eval/eval-function';
+import {
+  createMatchupCache, DOUBLES_FEATURE_WEIGHTS, evalFeatures, evaluatePosition, EVAL_WEIGHTS,
+  FEATURE_WEIGHTS, featureWeights, hazardCost, matchupTerms, pairThreat, type EvalFeatures,
+} from '../src/lib/eval/eval-function';
 
 function makeSet(
   name: string,
@@ -37,7 +40,43 @@ function makeBattle(p1Sets: PokemonSet[], p2Sets: PokemonSet[]): Battle {
 
 const VANILLA = ['Protect', 'Substitute'];
 
+function makeDoublesBattle(p1Sets: PokemonSet[], p2Sets: PokemonSet[]): Battle {
+  const battle = new Battle({
+    formatid: toID('gen9doublescustomgame'),
+    seed: '1,2,3,4',
+    p1: { name: 'Alpha', team: Teams.pack(p1Sets) },
+    p2: { name: 'Beta', team: Teams.pack(p2Sets) },
+  });
+  if (battle.sides.some(side => side.requestState === 'teampreview')) {
+    battle.choose('p1', 'team 12');
+    battle.choose('p2', 'team 12');
+  }
+  return battle;
+}
+
 test.describe('evaluatePosition', () => {
+  test('doubles positions score with the doubles-fitted weights', () => {
+    // Per-gametype calibration (2026-08-08 corpus fit): speed control is
+    // worth far more in doubles. The doubles dot product must use the
+    // doubles weight table, verified against a hand-computed score.
+    expect(featureWeights(true)).toEqual(DOUBLES_FEATURE_WEIGHTS);
+    expect(featureWeights(false)).toEqual(FEATURE_WEIGHTS);
+    expect(DOUBLES_FEATURE_WEIGHTS.tailwind).toBeGreaterThan(FEATURE_WEIGHTS.tailwind);
+    expect(DOUBLES_FEATURE_WEIGHTS.trickRoom).toBeGreaterThan(FEATURE_WEIGHTS.trickRoom);
+
+    const doubles = makeDoublesBattle(
+      [makeSet('A', 'Snorlax', VANILLA), makeSet('A2', 'Charizard', VANILLA)],
+      [makeSet('B', 'Dragapult', VANILLA), makeSet('B2', 'Volcarona', VANILLA)],
+    );
+    doubles.sides[0].addSideCondition('tailwind', doubles.sides[0].active[0]!);
+    const features = evalFeatures(doubles);
+    const teamSize = Math.max(doubles.sides[0].pokemon.length, doubles.sides[1].pokemon.length, 1);
+    const normalizer = teamSize * (EVAL_WEIGHTS.alive + EVAL_WEIGHTS.hp);
+    const diff = (Object.keys(DOUBLES_FEATURE_WEIGHTS) as (keyof EvalFeatures)[])
+      .reduce((sum, key) => sum + DOUBLES_FEATURE_WEIGHTS[key] * features[key], 0);
+    expect(evaluatePosition(doubles)).toBeCloseTo(Math.tanh((diff / normalizer) * EVAL_WEIGHTS.scale), 10);
+  });
+
   test('pinned scores survive the feature-vector refactor', () => {
     // Contract for the WP 7 featureization: same battles, same numbers.
     const hazardous = makeBattle(

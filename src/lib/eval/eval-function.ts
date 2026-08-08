@@ -121,6 +121,27 @@ export const FEATURE_WEIGHTS: Record<keyof EvalFeatures, number> = {
   choiceMismatch: EVAL_WEIGHTS.choiceMismatch,
 };
 
+/**
+ * Doubles overrides, corpus-fitted 2026-08-08 (590 doubles/VGC games,
+ * cluster-bootstrap significant): speed control and screens carry far more
+ * win probability in doubles than the singles hand weights say — tailwind
+ * 68±25 vs 8, Trick Room 87±27 vs 10, screens 103±40 vs 5, boosts 27±7 vs
+ * 12. The direction matches doubles domain knowledge (speed control decides
+ * VGC games); confounding (winning teams get their setup up) likely inflates
+ * the magnitudes, so adoption is gated on the calibration buckets like every
+ * other weight change. Features consistent with the hand weights (hazards,
+ * matchup, coverage) keep them.
+ */
+export const DOUBLES_FEATURE_WEIGHTS: Record<keyof EvalFeatures, number> = {
+  ...FEATURE_WEIGHTS,
+  boosts: 27,
+  tailwind: 68,
+  trickRoom: 87,
+};
+
+export const featureWeights = (doubles: boolean): Record<keyof EvalFeatures, number> =>
+  (doubles ? DOUBLES_FEATURE_WEIGHTS : FEATURE_WEIGHTS);
+
 function averageSpeed(side: Side): number {
   const living = side.pokemon.filter(pokemon => !pokemon.fainted && pokemon.hp > 0);
   if (living.length === 0) return 0;
@@ -440,11 +461,12 @@ export function evaluatePosition(battle: Battle, cache?: MatchupCache): number {
   }
 
   const features = evalFeatures(battle, cache);
+  const weights = featureWeights(battle.gameType === 'doubles');
   const teamSize = Math.max(battle.sides[0].pokemon.length, battle.sides[1].pokemon.length, 1);
   const normalizer = teamSize * (EVAL_WEIGHTS.alive + EVAL_WEIGHTS.hp);
   let diff = 0;
-  for (const key of Object.keys(FEATURE_WEIGHTS) as (keyof EvalFeatures)[]) {
-    diff += FEATURE_WEIGHTS[key] * features[key];
+  for (const key of Object.keys(weights) as (keyof EvalFeatures)[]) {
+    diff += weights[key] * features[key];
   }
   return Math.tanh((diff / normalizer) * EVAL_WEIGHTS.scale);
 }
