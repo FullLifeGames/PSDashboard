@@ -43,6 +43,12 @@ import { searchPosition } from '../src/lib/eval/search';
  * noise again, per the paired-test precedent above. Late-game +4 across all
  * runs: victim-aware hazards genuinely help endgame sign accuracy. Full
  * WP 2–4 package: every bucket at or above baseline. GATE PASSED.
+ *
+ * Damage-consistent spread inference 2026-08-08 (observations → solver → overlay):
+ *   early 58 · mid 67 · late 83 · singles 66 · doubles 84
+ * Every bucket up vs the 56/64/76/62/82 baseline (mid +3, late +7, singles +4):
+ * pair-consistent spreads make reconstructed positions genuinely more
+ * predictive of outcomes. GATE PASSED.
  */
 const REPLAY_IDS = [
   'gen9draft-2058494320',
