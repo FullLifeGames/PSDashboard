@@ -23,6 +23,12 @@ export const EVAL_WEIGHTS = {
   /** Cumulative stage multipliers (index = |stage|): +2 is twice +1, the tail flattens. */
   boostSchedule: [0, 1.0, 2.0, 2.5, 3.0, 3.15, 3.3],
   /**
+   * Boosts on a statused sweeper sit on a timer — Toxic outruns recovery, so
+   * the accumulated stages are worth half (the anti-setup Toxic becomes a
+   * rankable line); psn/brn erode slower.
+   */
+  boostStatusDiscount: { tox: 0.5, psn: 0.8, brn: 0.8 } as Record<string, number>,
+  /**
    * Hazards are priced by their VICTIMS, not per layer: each living Pokémon
    * on the suffering side contributes its body weight × the entry-damage
    * fraction the type chart actually assigns it (a 4x-rock Volcarona bleeds
@@ -142,13 +148,14 @@ function sideScore(side: Side, battle: Battle): number {
   }
   for (const active of side.active) {
     if (!active || active.fainted) continue;
+    const statusDiscount = EVAL_WEIGHTS.boostStatusDiscount[active.status] ?? 1;
     for (const [stat, stage] of Object.entries(active.boosts)) {
       if (!stage) continue;
       const base = stat === 'atk' || stat === 'spa' || stat === 'spe'
         ? EVAL_WEIGHTS.boostStage.offensive
         : EVAL_WEIGHTS.boostStage.defensive;
       const magnitude = EVAL_WEIGHTS.boostSchedule[Math.min(Math.abs(stage), 6)];
-      score += Math.sign(stage) * base * magnitude;
+      score += Math.sign(stage) * base * magnitude * statusDiscount;
     }
   }
   score -= hazardCost(side, battle);

@@ -185,6 +185,28 @@ test.describe('evaluatePosition', () => {
     expect(poisonHolder('Black Sludge')).toBeGreaterThan(poisonHolder());
   });
 
+  test('Toxic puts boosts on a timer: statused boost value is discounted', () => {
+    const scoreWith = (boosted: boolean, status?: 'tox') => {
+      const battle = makeBattle(
+        [makeSet('A', 'Clefable', VANILLA)],
+        [makeSet('B', 'Snorlax', VANILLA)],
+      );
+      const clef = battle.sides[0].active[0]!;
+      if (boosted) {
+        clef.boosts.def = 2;
+        clef.boosts.spd = 2;
+      }
+      if (status) clef.setStatus(status);
+      return evaluatePosition(battle);
+    };
+    // The DELTA the boosts add must roughly halve under Toxic. Tanh curvature
+    // alone shifts it ~2% — assert the discount, not the curvature.
+    const healthyDelta = scoreWith(true) - scoreWith(false);
+    const toxedDelta = scoreWith(true, 'tox') - scoreWith(false, 'tox');
+    expect(toxedDelta).toBeLessThan(healthyDelta * 0.6);
+    expect(toxedDelta).toBeGreaterThan(0);
+  });
+
   test('a choice-locked attacker threatens only its locked move', () => {
     const battle = makeBattle(
       [makeSet('Tran', 'Heatran', ['Flamethrower', 'Earth Power'], 50, { item: 'Choice Specs', ability: 'Flash Fire' })],
