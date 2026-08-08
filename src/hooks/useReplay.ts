@@ -1,13 +1,15 @@
 import { useState, useCallback } from 'react';
 import { fetchReplay } from '../lib/replay-fetcher';
 import { parseExportedReplay } from '../lib/replay-file';
-import type { ReplayData, TurnSnapshot, OpponentTeamInfo } from '../types';
+import type { DamageObservation, ReplayData, TurnSnapshot, OpponentTeamInfo } from '../types';
 
 export interface ReplayState {
   loading: boolean;
   error: string | null;
   replayData: ReplayData | null;
   snapshots: TurnSnapshot[];
+  /** Clean damaging hits observed in the protocol — spread inference input. */
+  observations: DamageObservation[];
   p1Info: OpponentTeamInfo | null;
   opponentInfo: OpponentTeamInfo | null;
 }
@@ -24,6 +26,7 @@ export function useReplay() {
     error: null,
     replayData: null,
     snapshots: [],
+    observations: [],
     p1Info: null,
     opponentInfo: null,
   });
@@ -32,11 +35,11 @@ export function useReplay() {
     setState(prev => ({ ...prev, loading: true, error: null }));
     try {
       const data = await task();
-      const [{ parseReplayLog }, { inferOpponentTeam }] = await Promise.all([
+      const [{ parseReplayLogWithObservations }, { inferOpponentTeam }] = await Promise.all([
         import('../lib/protocol-parser'),
         import('../lib/opponent-inferrer'),
       ]);
-      const snapshots = parseReplayLog(data.log);
+      const { snapshots, observations } = parseReplayLogWithObservations(data.log);
       const p1Info = inferOpponentTeam(data.log, 'p1');
       const opponentInfo = inferOpponentTeam(data.log, 'p2');
 
@@ -45,6 +48,7 @@ export function useReplay() {
         error: null,
         replayData: data,
         snapshots,
+        observations,
         p1Info,
         opponentInfo,
       });

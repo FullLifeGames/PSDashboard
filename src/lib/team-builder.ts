@@ -4,7 +4,8 @@ import { inferOpponentTeam } from './opponent-inferrer';
 import { getSpeciesUsageSet, type SmogonUsageStats, type UsageProbability } from './smogon-stats';
 import { getSpeciesSetAssumption, type SetAssumption, type SmogonSetAssumptions } from './smogon-sets';
 import { itemSetValue } from './team-info';
-import type { KnowledgeSource, OpponentTeamInfo, PokemonEvs, RevealedPokemonInfo } from '../types';
+import { inferSpreads, type SpreadCandidate } from './spread-inference';
+import type { DamageObservation, KnowledgeSource, OpponentTeamInfo, PokemonEvs, RevealedPokemonInfo } from '../types';
 
 function toId(name: string): string {
   return name.toLowerCase().replace(/[^a-z0-9]/g, '');
@@ -23,6 +24,13 @@ export function buildTeamsFromReplay(
     p2Info?: OpponentTeamInfo | null;
     usageStats?: SmogonUsageStats | null;
     setAssumptions?: SmogonSetAssumptions | null;
+    /** Precomputed damage-consistent spreads, keyed `side:speciesId`. */
+    inferredSpreads?: Map<string, SpreadCandidate>;
+    /**
+     * Raw damage observations: the builder solves spreads itself — base
+     * guesses first, then the solver, then a rebuild with the overlay.
+     */
+    observations?: DamageObservation[];
   },
 ): { p1Team: PokemonSet[]; p2Team: PokemonSet[] } {
   const p1Info = options?.p1Info || inferOpponentTeam(log, 'p1');
@@ -39,10 +47,22 @@ export function buildTeamsFromReplay(
 
   const p1KnownTeam = userTeam || embeddedTeams.p1 || null;
   const p2KnownTeam = embeddedTeams.p2 || null;
-  const p1Team = p1Info.pokemon.map(pokemon => buildSet(pokemon, p1KnownTeam, options?.usageStats, options?.setAssumptions));
-  const p2Team = p2Info.pokemon.map(pokemon => buildSet(pokemon, p2KnownTeam, options?.usageStats, options?.setAssumptions));
+  const build = (inferred?: Map<string, SpreadCandidate>) => ({
+    p1Team: p1Info.pokemon.map(pokemon => buildSet(
+      pokemon, p1KnownTeam, options?.usageStats, options?.setAssumptions,
+      inferred?.get(`p1:${toId(pokemon.species)}`))),
+    p2Team: p2Info.pokemon.map(pokemon => buildSet(
+      pokemon, p2KnownTeam, options?.usageStats, options?.setAssumptions,
+      inferred?.get(`p2:${toId(pokemon.species)}`))),
+  });
 
-  return { p1Team, p2Team };
+  let inferred = options?.inferredSpreads;
+  if (!inferred && options?.observations && options.observations.length > 0) {
+    const base = build();
+    const gen = log.match(/^\|gen\|(\d)/m)?.[1] ?? '9';
+    inferred = inferSpreads(options.observations, { p1: base.p1Team, p2: base.p2Team }, `gen${gen}`);
+  }
+  return build(inferred);
 }
 
 function buildSet(
@@ -50,6 +70,7 @@ function buildSet(
   userTeam: PokemonSet[] | null,
   usageStats?: SmogonUsageStats | null,
   setAssumptions?: SmogonSetAssumptions | null,
+  inferred?: SpreadCandidate,
 ): PokemonSet {
   const editedEvs = info.evs?.source === 'manual' || info.evs?.source === 'revealed'
     ? sanitizeEvs(info.evs.value)
@@ -117,8 +138,9 @@ function buildSet(
     ability: info.ability.value || usageSet?.ability?.value || allowed(smogonSet?.ability?.value, info.ruledOut?.abilities) ||
       defaultAbility(info.species, info.ruledOut?.abilities),
     moves: moves.length > 0 ? moves : ['Tackle'],
-    nature: (editedNature || spread?.nature || setSpread?.nature || 'Hardy') as PokemonSet['nature'],
-    evs: editedEvs || spread?.evs || setSpread?.evs || { hp: 252, atk: 252, def: 0, spa: 0, spd: 4, spe: 0 },
+    // Damage-consistent spreads beat usage guesses, never edited/revealed EVs.
+    nature: (editedNature || inferred?.nature || spread?.nature || setSpread?.nature || 'Hardy') as PokemonSet['nature'],
+    evs: editedEvs || inferred?.evs || spread?.evs || setSpread?.evs || { hp: 252, atk: 252, def: 0, spa: 0, spd: 4, spe: 0 },
     ivs: editedIvs || { hp: 31, atk: 31, def: 31, spa: 31, spd: 31, spe: 31 },
     level: info.level || 100,
     gender: (info.gender || '') as '' | 'M' | 'F',
@@ -158,7 +180,7 @@ function cleanItem(replayItem: string, fallback: string): string {
  * to the next slot (a Bronzong that took an Earthquake is not Levitate).
  */
 function defaultAbility(species: string, ruledOut?: string[]): string {
-  const abilities = (Dex.species.get(species).abilities ?? {}) as Record<string, string | undefined>;
+  const abilities = (Dex.species.get(species).abilities ?? {}) as unknown as Record<string, string | undefined>;
   for (const slot of ['0', '1', 'H'] as const) {
     const ability = abilities[slot];
     if (ability && !(ruledOut ?? []).includes(toId(ability))) return ability;

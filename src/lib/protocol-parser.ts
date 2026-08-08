@@ -108,8 +108,9 @@ export function parseReplayLogWithObservations(log: string): {
             lastMove.observationIndex = null;
           }
         } else if (!lastMove.crit) {
-          const defender = battle.getPokemon(defenderIdent);
-          const attacker = battle.getPokemon(lastMove.attacker);
+          type Ident = Parameters<Battle['getPokemon']>[0];
+          const defender = battle.getPokemon(defenderIdent as Ident);
+          const attacker = battle.getPokemon(lastMove.attacker as Ident);
           const newFraction = hpFractionOf(parts[3] ?? '');
           if (defender && attacker && newFraction !== null && defender.maxhp > 0) {
             const preFraction = defender.hp / defender.maxhp;

@@ -9,6 +9,12 @@ import type { DamageObservation, PokemonEvs } from '../types';
  * Pokémon appears in; the best-fitting rung replaces the guessed EVs (only
  * where EVs were guessed — sheet/revealed/manual spreads are never touched;
  * the overlay in team-builder enforces that precedence).
+ *
+ * Honest limitation: with sparse observations, "the defender is bulkier" and
+ * "the attacker is weaker" fit the same damage line — the greedy solve picks
+ * one, so per-mon spreads are not ground truth. What the result guarantees is
+ * PAIR consistency: forked eval battles reproduce the damage the replay
+ * showed, so branches stop killing Pokémon that visibly survived.
  */
 
 export interface SpreadCandidate {

@@ -3,7 +3,7 @@ import { State } from '@pkmn/sim';
 import { buildTeamsFromReplay } from '../src/lib/team-builder';
 import { reconstructBranchRuntime } from '../src/lib/branch-engine';
 import { getBranchSimulatorFormat } from '../src/lib/replay-format';
-import { parseReplayLog } from '../src/lib/protocol-parser';
+import { parseReplayLogWithObservations } from '../src/lib/protocol-parser';
 import { searchPosition } from '../src/lib/eval/search';
 
 /**
@@ -113,12 +113,13 @@ test.describe('eval calibration against real replays', () => {
       }
       const p1Won = winnerName === replay.players[0];
       const gameType: Sample['gameType'] = /\|gametype\|doubles/.test(replay.log) ? 'doubles' : 'singles';
-      const { p1Team, p2Team } = buildTeamsFromReplay(replay.log, {});
+      // Observations drive spread inference — same path the app takes.
+      const { snapshots, observations } = parseReplayLogWithObservations(replay.log);
+      const { p1Team, p2Team } = buildTeamsFromReplay(replay.log, { observations });
       if (p1Team.length === 0 || p2Team.length === 0) {
         console.log(`skipping ${id}: could not build teams`);
         continue;
       }
-      const snapshots = parseReplayLog(replay.log);
       const maxTurn = snapshots.length;
       const step = Math.max(1, Math.ceil(maxTurn / 8));
 

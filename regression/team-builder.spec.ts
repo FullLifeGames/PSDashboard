@@ -5,6 +5,8 @@ import { fileURLToPath } from 'url';
 import { buildTeamsFromReplay } from '../src/lib/team-builder';
 import { createBranchState, reconstructBranchRuntime } from '../src/lib/branch-engine';
 import { inferOpponentTeam } from '../src/lib/opponent-inferrer';
+import { parseExportedReplay } from '../src/lib/replay-file';
+import { parseReplayLogWithObservations } from '../src/lib/protocol-parser';
 import type { OpponentTeamInfo } from '../src/types';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -117,6 +119,51 @@ test.describe('team builder edited assumptions', () => {
     const { p1Team, p2Team } = buildTeamsFromReplay(log);
     expect(p1Team[0].ability).toBe('Levitate');
     expect(p2Team[0].ability).toBe('Intimidate');
+  });
+
+  test('inferred spreads overlay guessed EVs but never manual ones', () => {
+    const log = [
+      '|player|p1|Alice|', '|gen|9', '|tier|[Gen 9] Custom Game',
+      '|poke|p1|Uxie, L50|', '|poke|p2|Landorus-Therian, L50|',
+      '|start', '|switch|p1a: Uxie|Uxie, L50|100/100',
+      '|switch|p2a: Lando|Landorus-Therian, L50|100/100', '|turn|1',
+    ].join('\n');
+    const inferredSpreads = new Map([
+      ['p1:uxie', { evs: { hp: 252, atk: 0, def: 252, spa: 0, spd: 0, spe: 0 }, nature: 'Bold' }],
+    ]);
+
+    const { p1Team } = buildTeamsFromReplay(log, { inferredSpreads });
+    const uxie = p1Team.find(set => set.species === 'Uxie');
+    expect(uxie?.evs.def).toBe(252);
+    expect(uxie?.nature).toBe('Bold');
+
+    // Manually edited EVs always beat the inference.
+    const manualInfo = inferOpponentTeam(log, 'p1');
+    const uxieInfo = manualInfo.pokemon.find(p => p.species === 'Uxie')!;
+    uxieInfo.evs = { value: { hp: 4, atk: 0, def: 0, spa: 252, spd: 0, spe: 252 }, source: 'manual' };
+    const manual = buildTeamsFromReplay(log, { p1Info: manualInfo, inferredSpreads });
+    expect(manual.p1Team.find(set => set.species === 'Uxie')?.evs.spa).toBe(252);
+    expect(manual.p1Team.find(set => set.species === 'Uxie')?.evs.def).toBe(0);
+  });
+
+  test('observations drive the overlay end-to-end on the GPL replay', () => {
+    const replay = parseExportedReplay(readFileSync('e2e/fixtures/gpl-replay.html', 'utf-8'), 'gpl-replay.html');
+    const { observations } = parseReplayLogWithObservations(replay.log);
+    expect(observations.length).toBeGreaterThan(5);
+
+    const teams = buildTeamsFromReplay(replay.log, { observations });
+    const uxie = teams.p1Team.find(set => set.species === 'Uxie');
+    // The solver recovers Uxie's HP investment (its real 182 max HP). With
+    // one observation per direction, "bulkier defender" vs "weaker attacker"
+    // is underdetermined — but the PAIR becomes replay-consistent either way:
+    // the eval's branches stop killing Uxie with hits it visibly survived.
+    expect(uxie).toBeTruthy();
+    expect(uxie!.evs.hp).toBe(252);
+    const lando = teams.p2Team.find(set => set.species === 'Landorus-Therian')!;
+    const landoAtk = lando.evs.atk ?? 0;
+    const uxieBulk = (uxie!.evs.hp ?? 0) + (uxie!.evs.def ?? 0);
+    // At least one side of the U-turn pair moved to explain the observed 31%.
+    expect(landoAtk === 0 || uxieBulk > 252).toBe(true);
   });
 
   test('manual nature and IVs reach the simulator set', () => {

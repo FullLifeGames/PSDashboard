@@ -119,7 +119,7 @@ function SharedBranchView({
 }
 
 function App() {
-  const { loading, error, replayData, snapshots, opponentInfo, p1Info, loadReplay, loadReplayFile } = useReplay();
+  const { loading, error, replayData, snapshots, observations, opponentInfo, p1Info, loadReplay, loadReplayFile } = useReplay();
   const { embed, requestedReplay } = useEmbedHost({ loadReplay, loadReplayFile });
   const { branching, simState, history, executeError, executing, startBranch, setChoice, executeTurn, stopBranch, getBattle } = useBranch();
   const evaluation = useEvaluation();
@@ -301,6 +301,7 @@ function App() {
         p2Info: effectiveP2Info,
         usageStats: usageStats.stats,
         setAssumptions: setAssumptions.assumptions,
+        observations,
       });
       if (p1Team.length > 0 && p2Team.length > 0) {
         setBranchSession(session => session + 1);
@@ -319,7 +320,7 @@ function App() {
       setBranchProgress(null);
       branchAbortRef.current = null;
     }
-  }, [replayData, branchPreparing, teamText, branchTurn, branchSnapshot, snapshots, effectiveP1Info, effectiveP2Info, usageStats.stats, setAssumptions.assumptions, startBranch]);
+  }, [replayData, branchPreparing, teamText, branchTurn, branchSnapshot, snapshots, observations, effectiveP1Info, effectiveP2Info, usageStats.stats, setAssumptions.assumptions, startBranch]);
 
   const handleCancelBranchPreparation = useCallback(() => {
     branchAbortRef.current?.abort();
@@ -347,6 +348,7 @@ function App() {
           p2Info: refreshRequest.p2Info,
           usageStats: usageStats.stats,
           setAssumptions: setAssumptions.assumptions,
+          observations,
         });
         if (!cancelled && p1Team.length > 0 && p2Team.length > 0) {
           setBranchSession(session => session + 1);
@@ -380,6 +382,7 @@ function App() {
   }, [
     pendingBranchRefresh,
     replayData,
+    observations,
     teamText,
     branchTurn,
     branchSnapshot,
@@ -460,6 +463,7 @@ function App() {
         p2Info: effectiveP2Info,
         usageStats: usageStats.stats,
         setAssumptions: setAssumptions.assumptions,
+        observations,
       });
       if (p1Team.length === 0 || p2Team.length === 0) throw new Error('Could not build both teams for this replay.');
       const runtime = await branchEngine.reconstructBranchRuntime({
@@ -477,7 +481,7 @@ function App() {
       const battle = runtime.battleStream.battle;
       if (!battle) throw new Error('Reconstruction produced no battle.');
       return serializeLiveBattle(battle);
-    }, [replayData, teamText, effectiveP1Info, effectiveP2Info, usageStats.stats, setAssumptions.assumptions, snapshots]);
+    }, [replayData, teamText, effectiveP1Info, effectiveP2Info, usageStats.stats, setAssumptions.assumptions, snapshots, observations]);
 
   // Single-pass sweep acquisition: one reconstruction captures every turn
   // boundary, instead of one O(turn) replay per turn (quadratic polling).
@@ -496,6 +500,7 @@ function App() {
         p2Info: effectiveP2Info,
         usageStats: usageStats.stats,
         setAssumptions: setAssumptions.assumptions,
+        observations,
       });
       if (p1Team.length === 0 || p2Team.length === 0) throw new Error('Could not build both teams for this replay.');
       const positions: (string | null)[] = new Array(turns).fill(null);
@@ -530,7 +535,7 @@ function App() {
         onPosition?.(turns, serialized);
       }
       return positions;
-    }, [replayData, teamText, effectiveP1Info, effectiveP2Info, usageStats.stats, setAssumptions.assumptions, snapshots]);
+    }, [replayData, teamText, effectiveP1Info, effectiveP2Info, usageStats.stats, setAssumptions.assumptions, snapshots, observations]);
 
   const acquireReplayPosition = useMemo(() => makeReplayAcquire(branchTurn), [makeReplayAcquire, branchTurn]);
 
@@ -631,6 +636,7 @@ function App() {
           p2Info: effectiveP2Info,
           usageStats: usageStats.stats,
           setAssumptions: setAssumptions.assumptions,
+          observations,
         });
         if (p1Team.length === 0 || p2Team.length === 0) return null;
         return branchEngine.serializePreviewPosition(getBranchSimulatorFormat(replayData), p1Team, p2Team);
@@ -639,7 +645,7 @@ function App() {
     });
   }, [
     replayData, evaluation, analyzableTurns, effectiveTera, setsFingerprint, makeReplayAcquire,
-    makeSweepAcquireAll, snapshots, evalIsDoubles, teamText, effectiveP1Info, effectiveP2Info,
+    makeSweepAcquireAll, snapshots, observations, evalIsDoubles, teamText, effectiveP1Info, effectiveP2Info,
     usageStats.stats, setAssumptions.assumptions,
   ]);
 
