@@ -1286,6 +1286,16 @@ export async function reconstructBranchRuntime(params: {
     }
   };
 
+  // A sim crash inside a write (old-gen mods throw on odd states) must not
+  // become an unhandled rejection — surface it as a choice error so the
+  // turn-sync guard skips or stops instead of taking the process down.
+  const writeSim = (payload: string) => {
+    streams.omniscient.write(payload).catch(error => {
+      choiceErrors.count += 1;
+      choiceErrors.last = error instanceof Error ? error.message : String(error);
+    });
+  };
+
   // A rejected replay choice (a team edit can remove the very move the
   // protocol used) must not abandon the turn half-chosen: the sim keeps the
   // other side's accepted choice pending, and the next write would commit the
@@ -1300,7 +1310,7 @@ export async function reconstructBranchRuntime(params: {
     const pendingSides = battle.sides.filter(side => side.requestState && !side.isChoiceDone());
     if (pendingSides.length === 0) return;
     const retryErrors = choiceErrors.count;
-    void streams.omniscient.write(pendingSides.map(side => `>${side.id} default`).join('\n'));
+    writeSim(pendingSides.map(side => `>${side.id} default`).join('\n'));
     await waitForBattle(currentBattle =>
       currentBattle.ended ||
       currentBattle.turn > turnBeforeChoice ||
@@ -1342,7 +1352,7 @@ export async function reconstructBranchRuntime(params: {
       }
 
       const errorsBefore = choiceErrors.count;
-      void streams.omniscient.write(pendingSides.map(side => `>${side.id} default`).join('\n'));
+      writeSim(pendingSides.map(side => `>${side.id} default`).join('\n'));
       await waitForBattle(current =>
         current.ended ||
         current.turn > turnBefore ||
@@ -1355,7 +1365,7 @@ export async function reconstructBranchRuntime(params: {
 
   const p1Name = JSON.stringify(params.playerNames?.[0]?.trim() || 'Player 1');
   const p2Name = JSON.stringify(params.playerNames?.[1]?.trim() || 'Player 2');
-  void streams.omniscient.write(
+  writeSim(
     `>start {"formatid":"${format}"}\n>player p1 {"name":${p1Name},"team":"${p1Packed}"}\n>player p2 {"name":${p2Name},"team":"${p2Packed}"}`
   );
   await waitForBattle(battle => !!battle.sides[0] && !!battle.sides[1], 1000);
@@ -1370,7 +1380,7 @@ export async function reconstructBranchRuntime(params: {
   }
 
   if (teamPreviewCommands.length > 0) {
-    void streams.omniscient.write(teamPreviewCommands.join('\n'));
+    writeSim(teamPreviewCommands.join('\n'));
   }
   await waitForBattle(
     battle =>
@@ -1422,7 +1432,7 @@ export async function reconstructBranchRuntime(params: {
     // Waking up on choice rejections keeps wedged turns from burning the full
     // wait timeout on every retry (B17 — 30-60s "Preparing branch…" hangs).
     const mainChoiceErrors = choiceErrors.count;
-    void streams.omniscient.write(`>p1 ${p1Choice}\n>p2 ${p2Choice}`);
+    writeSim(`>p1 ${p1Choice}\n>p2 ${p2Choice}`);
     await waitForBattle(currentBattle =>
       currentBattle.ended ||
       currentBattle.turn > turnBeforeChoice ||
@@ -1460,7 +1470,7 @@ export async function reconstructBranchRuntime(params: {
 
       if (commands.length === 0) break;
       const forcedChoiceErrors = choiceErrors.count;
-      void streams.omniscient.write(commands.join('\n'));
+      writeSim(commands.join('\n'));
       await waitForBattle(currentBattle =>
         currentBattle.ended ||
         currentBattle.turn > turnBeforeChoice ||
@@ -1681,9 +1691,13 @@ export async function executeBranchChoices(params: {
   const previousLogLength = log.length;
   const previousErrorCount = choiceErrors.count;
 
-  void streams.omniscient.write(
+  // Surface sim crashes as choice errors instead of unhandled rejections.
+  streams.omniscient.write(
     commands.map(({ side, command }) => `>${side} ${command}`).join('\n'),
-  );
+  ).catch(error => {
+    choiceErrors.count += 1;
+    choiceErrors.last = error instanceof Error ? error.message : String(error);
+  });
 
   const deadline = Date.now() + timeoutMs;
   while (Date.now() < deadline) {
