@@ -1,3 +1,4 @@
+import { Dex } from '@pkmn/sim';
 import type { OpponentTeamInfo, RevealedPokemonInfo } from '../types';
 import { guessedField, revealedField, unknownEvs, unknownField } from './team-info';
 
@@ -125,15 +126,49 @@ const ATTACKER_PUNISH_ITEMS = new Set(['rockyhelmet', 'jabocaberry', 'rowapberry
 export function inferOpponentTeam(log: string, opponentSide: 'p1' | 'p2' = 'p2'): OpponentTeamInfo {
   const lines = log.split('\n');
   const pokemonMap = new Map<string, RevealedPokemonInfo>();
-  // Each ident's latest move target — resolves Rocky Helmet reveals in
-  // video-reconstructed logs that drop the [of] attribution.
-  const lastMoveTarget = new Map<string, string>();
+  // Each ident's latest move + target — resolves Rocky Helmet reveals in
+  // video-reconstructed logs that drop the [of] attribution, and attributes
+  // landed moves for the Levitate rule-out.
+  const lastMove = new Map<string, { target: string; move: string }>();
+  // Latest attack aimed AT an ident: `|-damage|` lines carry the victim, so
+  // rule-outs need the reverse index.
+  const lastMoveAt = new Map<string, string>();
+
+  const ruleOut = (nickname: string, kind: 'abilities' | 'items', id: string) => {
+    const pokemon = findPokemonByNickname(pokemonMap, nickname, lines, opponentSide);
+    if (!pokemon) return;
+    const ruledOut = (pokemon.ruledOut ??= { abilities: [], items: [] });
+    if (!ruledOut[kind].includes(id)) ruledOut[kind].push(id);
+  };
 
   for (const line of lines) {
     if (line.startsWith('|move|')) {
       const parts = line.split('|');
       if (parts[2] && parts[4] && /^p[12][a-d]?:/.test(parts[4])) {
-        lastMoveTarget.set(parts[2], parts[4]);
+        lastMove.set(parts[2], { target: parts[4], move: parts[3] ?? '' });
+        lastMoveAt.set(parts[4], parts[3] ?? '');
+      }
+    }
+
+    // Disproving evidence: a Pokémon that TAKES hazard/status/weather/recoil
+    // damage cannot be Magic Guard; rocks chip rules out Heavy-Duty Boots; a
+    // landed Ground move rules out Levitate (T25 — Clefable was simmed with
+    // Magic Guard while visibly taking Stealth Rock damage).
+    if (line.startsWith(`|-damage|${opponentSide}`)) {
+      const nickname = line.split('|')[2]?.split(': ')[1]?.trim();
+      if (nickname) {
+        if (/\[from\] (Stealth Rock|Spikes)\b/.test(line)) {
+          ruleOut(nickname, 'abilities', 'magicguard');
+          ruleOut(nickname, 'items', 'heavydutyboots');
+        } else if (/\[from\] (psn|tox|brn|Sandstorm|Hail)\b/.test(line) || line.includes('[from] item: Life Orb')) {
+          ruleOut(nickname, 'abilities', 'magicguard');
+        } else if (!line.includes('[from]')) {
+          const ident = line.split('|')[2];
+          const incoming = ident ? lastMoveAt.get(ident) : undefined;
+          if (incoming && Dex.moves.get(incoming).type === 'Ground') {
+            ruleOut(nickname, 'abilities', 'levitate');
+          }
+        }
       }
     }
     // Team preview: |poke|p2|Species, L50, M|item
@@ -248,7 +283,7 @@ export function inferOpponentTeam(log: string, opponentSide: 'p1' | 'p2' = 'p2')
       if (ofIdent) {
         owner = `${ofIdent[1]}: ${ofIdent[2].trim()}`;
       } else if (itemName && ATTACKER_PUNISH_ITEMS.has(toId(itemName))) {
-        owner = lastMoveTarget.get(damagedIdent) ?? null;
+        owner = lastMove.get(damagedIdent)?.target ?? null;
       }
       const ownerMatch = owner?.match(/^(p[12])[a-d]?:\s*(.+)$/);
       if (itemName && ownerMatch && ownerMatch[1] === opponentSide) {

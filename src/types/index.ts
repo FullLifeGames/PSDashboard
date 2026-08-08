@@ -89,6 +89,12 @@ export interface RevealedPokemonInfo {
   ivs?: PokemonEvsInfo;
   level: number;
   gender: string;
+  /**
+   * Values DISPROVEN by protocol evidence (toId'd) — hazard damage rules out
+   * Magic Guard, rocks chip rules out Heavy-Duty Boots, a landed Ground move
+   * rules out Levitate. Rule-outs beat guesses, never revealed/manual/sheet.
+   */
+  ruledOut?: { abilities: string[]; items: string[] };
 }
 
 export interface OpponentTeamInfo {

@@ -56,6 +56,42 @@ test.describe('stats panel data quality (WP11)', () => {
     expect(skarmory?.item).toEqual(expect.objectContaining({ value: 'Leftovers', source: 'revealed' }));
   });
 
+  test('hazard and status damage rule out Magic Guard', () => {
+    const log = [
+      '|player|p2|Bob|', '|gen|9', '|poke|p2|Clefable, F|',
+      '|start', '|switch|p2a: Clef|Clefable, F|100/100', '|turn|1',
+      '|-damage|p2a: Clef|88/100|[from] Stealth Rock',
+      '|turn|2',
+    ].join('\n');
+    const clef = inferOpponentTeam(log, 'p2').pokemon.find(p => p.species === 'Clefable');
+    expect(clef?.ruledOut?.abilities).toContain('magicguard');
+  });
+
+  test('Stealth Rock damage on switch-in rules out Heavy-Duty Boots', () => {
+    const log = [
+      '|player|p2|Bob|', '|gen|9', '|poke|p2|Corviknight, M|',
+      '|start', '|switch|p2a: Corv|Corviknight, M|100/100', '|turn|1',
+      '|switch|p2a: Corv|Corviknight, M|88/100',
+      '|-damage|p2a: Corv|76/100|[from] Stealth Rock',
+      '|turn|2',
+    ].join('\n');
+    const corv = inferOpponentTeam(log, 'p2').pokemon.find(p => p.species === 'Corviknight');
+    expect(corv?.ruledOut?.items).toContain('heavydutyboots');
+  });
+
+  test('taking a Ground move rules out Levitate', () => {
+    const log = [
+      '|player|p2|Bob|', '|gen|9', '|poke|p2|Rotom-Heat|',
+      '|start', '|switch|p1a: Chomp|Garchomp, M|100/100',
+      '|switch|p2a: Toaster|Rotom-Heat|100/100', '|turn|1',
+      '|move|p1a: Chomp|Earthquake|p2a: Toaster',
+      '|-damage|p2a: Toaster|40/100',
+      '|turn|2',
+    ].join('\n');
+    const rotom = inferOpponentTeam(log, 'p2').pokemon.find(p => p.species === 'Rotom-Heat');
+    expect(rotom?.ruledOut?.abilities).toContain('levitate');
+  });
+
   test('item damage recoil reveals the holder (Life Orb)', () => {
     const log = [
       '|player|p2|Bob|',
