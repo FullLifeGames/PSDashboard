@@ -50,6 +50,22 @@ test.describe('natural-language turn summaries', () => {
     expect(summary).not.toContain('safer was');
   });
 
+  test('a low-cost sacrifice reads neutrally', () => {
+    const summary = summarizeTurn(analyzeTurn({
+      turn: 29,
+      result,
+      played: { p1: { kind: 'move', name: 'Draco Meteor', tera: false }, p2: { kind: 'move', name: 'Recover', tera: false } },
+      playedOutcome: 0.0,
+      scoreBefore: 0.1,
+      scoreAfter: -0.25,
+      sacks: { p2: { name: 'Uxie', hpFraction: 0.09 } },
+    }), names);
+    expect(summary).toContain('Beta sacked Uxie (9% HP)');
+    expect(summary).not.toContain('a read:');
+    expect(summary).not.toContain('safer was');
+    expect(summary).not.toContain('inaccuracy');
+  });
+
   test('a punished misplay keeps the reproachful safer-was framing', () => {
     const punished: EvalResult = {
       ...result,

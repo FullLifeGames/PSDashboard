@@ -39,6 +39,8 @@ export interface GameMisplay {
   tier?: VerdictTier;
   /** The punishing reply never came — a read that came true, not a punished misplay. */
   riskUnpunished?: boolean;
+  /** A nearly-dead Pokémon was deliberately fed — rendered neutrally as a sack. */
+  sacrifice?: boolean;
 }
 
 export interface GameReport {
@@ -173,6 +175,7 @@ export function buildGameReport(
       better: analysis[side].best!.label,
       ...(analysis[side].tier ? { tier: analysis[side].tier } : {}),
       ...(analysis[side].riskUnpunished ? { riskUnpunished: true } : {}),
+      ...(analysis[side].sacrifice ? { sacrifice: true } : {}),
     }))
     .sort((a, b) => b.regret - a.regret)
     .slice(0, REPORT_MISPLAYS_PER_SIDE);
@@ -219,8 +222,9 @@ export function buildGameReport(
     const seeds = !playedTracking ? [] : known
       .filter(analysis => (turningPoint === null || analysis.turn <= turningPoint) &&
         badTier(analysis[loser]) && analysis[loser].played && analysis[loser].best &&
-        // An unpunished risk cost nothing — it cannot have seeded the loss.
-        !analysis[loser].riskUnpunished)
+        // An unpunished risk cost nothing — it cannot have seeded the loss;
+        // a deliberate low-cost sack likewise.
+        !analysis[loser].riskUnpunished && !analysis[loser].sacrifice)
       .sort((a, b) => (b[loser].regret ?? 0) - (a[loser].regret ?? 0))
       .slice(0, 2)
       .sort((a, b) => a.turn - b.turn);

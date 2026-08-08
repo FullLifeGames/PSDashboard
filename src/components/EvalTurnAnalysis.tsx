@@ -127,7 +127,15 @@ function SideRow({ name, side, onExplore }: { name: string; side: SideAnalysis; 
             · verified deeper
           </span>
         )}
-        {regretful && side.regret !== null && (side.riskPaidOff ? (
+        {side.sacrifice && (
+          <span
+            style={{ color: '#9aa5b1' }}
+            title="A nearly-dead Pokémon was fed deliberately — a low-cost sack, not graded as a misplay."
+          >
+            · sacked {side.sacrifice.name} ({Math.round(side.sacrifice.hpFraction * 100)}% HP)
+          </span>
+        )}
+        {regretful && !side.sacrifice && side.regret !== null && (side.riskPaidOff ? (
           <span
             style={{ color: '#8c8' }}
             title={`The safe line guaranteed ${side.safe ? side.safe.worstCase.toFixed(2) : '?'}; the actual pair came out ${(side.riskPayoff ?? 0).toFixed(2)} better — the read won value.`}

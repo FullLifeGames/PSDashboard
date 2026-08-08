@@ -118,6 +118,27 @@ test.describe('game report (multi-turn root cause)', () => {
     expect(report.tracked).toBe(true);
   });
 
+  test('a sacked turn stays out of the seeds and carries the sacrifice flag', () => {
+    const sackSide = {
+      playedRaw: null,
+      played: ranked('switch 2', '→ Uxie', -0.1),
+      best: ranked('move dracometeor', 'Draco Meteor', 0.2),
+      safe: ranked('move dracometeor', 'Draco Meteor', 0.2),
+      regret: 0.2,
+      tier: 'mistake' as const,
+      sacrifice: { name: 'Uxie', hpFraction: 0.09 },
+    };
+    const report = buildGameReport([
+      mk(1, 0.2, -0.1, { attribution: 'p1-decision', p1: sackSide }),
+      mk(2, -0.1, -0.4),
+      mk(3, -0.4, -0.7),
+    ], names, 'p2');
+    // The sack appears as a flagged chip but never as a seed of the loss.
+    expect(report.misplays).toHaveLength(1);
+    expect(report.misplays[0]).toMatchObject({ turn: 1, side: 'p1', sacrifice: true });
+    expect(report.summary).not.toContain('seeds of the loss');
+  });
+
   test('paid-off reads are listed separately, never as misplays or regret totals', () => {
     const read = (played: string, regret: number, payoff: number) => ({
       playedRaw: null,

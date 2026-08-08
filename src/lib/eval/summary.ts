@@ -43,6 +43,7 @@ function sideClause(name: string, side: SideAnalysis, opponent: SideAnalysis): s
 }
 
 function mistakeClause(name: string, side: SideAnalysis, opponent: SideAnalysis): string | null {
+  if (side.sacrifice) return null; // the sack note carries the turn instead
   if ((side.tier !== 'mistake' && side.tier !== 'blunder') || !side.played || !side.best) return null;
   const lineOf = (choice: { line?: { p1: string; p2: string }[] }) =>
     choice.line && choice.line.length > 0
@@ -80,6 +81,16 @@ function inaccuracyClause(name: string, side: SideAnalysis): string | null {
   if (side.tier !== 'inaccuracy' || !side.played || !side.best) return null;
   return `${name}'s ${phrase(side.played.label)} was an inaccuracy — ` +
     `${phrase(side.best.label)} was slightly better (${signed(side.best.ev)} vs ${signed(side.played.ev)}).`;
+}
+
+/**
+ * A deliberate low-cost sack: neutral framing, no blame vocabulary — the
+ * engine cannot see the intent (Trick absorption, momentum), only the cost.
+ */
+function sackClause(name: string, side: SideAnalysis): string | null {
+  if (!side.sacrifice) return null;
+  const pct = Math.round(side.sacrifice.hpFraction * 100);
+  return `${name} sacked ${side.sacrifice.name} (${pct}% HP) — a low-cost trade, not graded as a misplay.`;
 }
 
 export function summarizeTurn(
@@ -144,10 +155,11 @@ export function summarizeTurn(
         : 'A quiet turn.');
   }
 
-  // Inaccuracies ride along on any attribution — the decision clauses above
-  // only speak at mistake level and up.
-  const p1Note = inaccuracyClause(playerNames[0], analysis.p1);
-  const p2Note = inaccuracyClause(playerNames[1], analysis.p2);
+  // Sacks and inaccuracies ride along on any attribution — the decision
+  // clauses above only speak at mistake level and up. A sack replaces the
+  // inaccuracy note its demoted tier would otherwise produce.
+  const p1Note = sackClause(playerNames[0], analysis.p1) ?? inaccuracyClause(playerNames[0], analysis.p1);
+  const p2Note = sackClause(playerNames[1], analysis.p2) ?? inaccuracyClause(playerNames[1], analysis.p2);
   if (p1Note) sentences.push(p1Note);
   if (p2Note) sentences.push(p2Note);
 

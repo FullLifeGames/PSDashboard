@@ -61,27 +61,33 @@ export function EvalGameReport({ report, playerNames, onSelectTurn, leads }: Eva
       {report.misplays.length > 0 && (
         <div className="ps-eval-report-moments">
           {report.misplays.map(misplay => {
-            const tone = misplay.riskUnpunished ? '#b6a46a' : misplay.tier === 'blunder' ? '#ff7a7a' : '#f3a6a6';
+            const tone = misplay.sacrifice ? '#9aa5b1'
+              : misplay.riskUnpunished ? '#b6a46a'
+                : misplay.tier === 'blunder' ? '#ff7a7a' : '#f3a6a6';
             return (
               <button
                 key={`${misplay.turn}-${misplay.side}`}
                 type="button"
                 className="ps-btn ps-eval-report-moment"
                 onClick={() => onSelectTurn?.(misplay.turn)}
-                title={misplay.riskUnpunished
-                  ? "The engine's floor priced in a reply that never came — jump to this turn's analysis"
-                  : "Jump to this turn's analysis"}
+                title={misplay.sacrifice
+                  ? 'A nearly-dead Pokémon was fed deliberately — a low-cost sack, not a misplay'
+                  : misplay.riskUnpunished
+                    ? "The engine's floor priced in a reply that never came — jump to this turn's analysis"
+                    : "Jump to this turn's analysis"}
               >
                 <span style={{ color: '#cde' }}>T{misplay.turn}</span>
                 <span style={{ color: tone }}>{playerNames[misplay.side === 'p1' ? 0 : 1]}</span>
                 <span style={{ color: '#aab' }}>{misplay.played}</span>
-                {misplay.riskUnpunished
-                  ? <span style={{ color: tone }}>risk (unpunished)</span>
-                  : (
-                    <span style={{ color: '#778' }}>
-                      {misplay.tier === 'blunder' ? 'blunder — better: ' : 'better: '}{misplay.better}
-                    </span>
-                  )}
+                {misplay.sacrifice
+                  ? <span style={{ color: tone }}>sack</span>
+                  : misplay.riskUnpunished
+                    ? <span style={{ color: tone }}>risk (unpunished)</span>
+                    : (
+                      <span style={{ color: '#778' }}>
+                        {misplay.tier === 'blunder' ? 'blunder — better: ' : 'better: '}{misplay.better}
+                      </span>
+                    )}
                 <span style={{ color: tone }}>−{misplay.regret.toFixed(2)}</span>
               </button>
             );
