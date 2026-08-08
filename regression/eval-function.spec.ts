@@ -1,7 +1,7 @@
 import { test, expect } from '@playwright/test';
 import { Battle, Teams, toID } from '@pkmn/sim';
 import type { PokemonSet } from '@pkmn/sim';
-import { createMatchupCache, evaluatePosition, EVAL_WEIGHTS, hazardCost, matchupTerms } from '../src/lib/eval/eval-function';
+import { createMatchupCache, evaluatePosition, EVAL_WEIGHTS, hazardCost, matchupTerms, pairThreat } from '../src/lib/eval/eval-function';
 
 function makeSet(
   name: string,
@@ -183,6 +183,31 @@ test.describe('evaluatePosition', () => {
       return evaluatePosition(battle);
     };
     expect(poisonHolder('Black Sludge')).toBeGreaterThan(poisonHolder());
+  });
+
+  test('a choice-locked attacker threatens only its locked move', () => {
+    const battle = makeBattle(
+      [makeSet('Tran', 'Heatran', ['Flamethrower', 'Earth Power'], 50, { item: 'Choice Specs', ability: 'Flash Fire' })],
+      [makeSet('Skarm', 'Skarmory', VANILLA, 50, { ability: 'Sturdy' })],
+    );
+    const cache = createMatchupCache();
+    const attacker = () => battle.sides[0].active[0]!;
+    const defender = () => battle.sides[1].active[0]!;
+
+    const before = pairThreat(attacker(), defender(), battle);
+    expect(before.special).toBeGreaterThan(0); // Flamethrower threatens Skarmory
+
+    // Prime the cache with the unlocked threat, then lock into Earth Power
+    // (Skarmory is immune): the collapsed threat must not be served stale.
+    const scoreBefore = evaluatePosition(battle, cache);
+    battle.choose('p1', 'move earthpower');
+    battle.choose('p2', 'move protect');
+    expect(attacker().volatiles['choicelock']).toBeTruthy();
+
+    const locked = pairThreat(attacker(), defender(), battle);
+    expect(locked.special).toBe(0);
+    expect(locked.physical).toBe(0);
+    expect(evaluatePosition(battle, cache)).toBeLessThan(scoreBefore);
   });
 
   test('a Choice item on a status-heavy holder is a liability', () => {

@@ -180,8 +180,14 @@ export function createMatchupCache(): MatchupCache {
   return new Map();
 }
 
+/** The move a Choice item has locked this Pokémon into, if any. */
+function lockedMoveId(pokemon: Pokemon): string | null {
+  const locked = pokemon.volatiles['choicelock'] as { move?: string } | undefined;
+  return locked?.move ?? null;
+}
+
 function pairKey(attacker: Pokemon, defender: Pokemon): string {
-  return `${attacker.side.id}:${attacker.name}:${attacker.species.id}:${attacker.level}:${attacker.item}:${attacker.ability}>` +
+  return `${attacker.side.id}:${attacker.name}:${attacker.species.id}:${attacker.level}:${attacker.item}:${attacker.ability}:${lockedMoveId(attacker) ?? ''}>` +
     `${defender.side.id}:${defender.name}:${defender.species.id}:${defender.level}:${defender.item}:${defender.ability}`;
 }
 
@@ -241,7 +247,11 @@ export function pairThreat(attacker: Pokemon, defender: Pokemon, battle: Battle)
   let physical = 0;
   let special = 0;
   let priority = false;
-  for (const slot of attacker.moveSlots) {
+  // A choice-locked attacker only ever clicks its locked move again — a lock
+  // into a resisted attack (or a status move) ends its threat outright.
+  const locked = lockedMoveId(attacker);
+  const slots = locked ? attacker.moveSlots.filter(slot => slot.id === locked) : attacker.moveSlots;
+  for (const slot of slots) {
     const moveFraction = singleMoveFraction(attacker, defender, slot.id, battle);
     if (moveFraction > 0) {
       const move = battle.dex.moves.get(slot.id);
