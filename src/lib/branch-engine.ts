@@ -1222,24 +1222,40 @@ export async function reconstructBranchRuntime(params: {
   const collectedLog: string[] = [];
   const choiceErrors: BranchChoiceErrorLog = { count: 0, last: null };
 
+  // A sim crash (old-gen mods throw on odd states) rejects these detached
+  // stream pumps — record it as a choice error so the turn-sync guard reacts
+  // instead of the rejection escaping as an unhandled promise.
+  const recordStreamError = (error: unknown) => {
+    choiceErrors.count += 1;
+    choiceErrors.last = error instanceof Error ? error.message : String(error);
+  };
+
   void (async () => {
-    for await (const chunk of streams.omniscient) {
-      const lines = chunk.split('\n').filter(line => line.trim());
-      collectedLog.push(...lines);
-      onLogLines?.(lines);
+    try {
+      for await (const chunk of streams.omniscient) {
+        const lines = chunk.split('\n').filter(line => line.trim());
+        collectedLog.push(...lines);
+        onLogLines?.(lines);
+      }
+    } catch (error) {
+      recordStreamError(error);
     }
   })();
 
   for (const sideStream of [streams.p1, streams.p2]) {
     void (async () => {
-      for await (const chunk of sideStream) {
-        for (const line of chunk.split('\n')) {
-          if (!line.startsWith('|error|')) continue;
-          choiceErrors.count += 1;
-          choiceErrors.last = line
-            .slice('|error|'.length)
-            .replace(/^\[(?:Invalid|Unavailable) choice\]\s*/, '');
+      try {
+        for await (const chunk of sideStream) {
+          for (const line of chunk.split('\n')) {
+            if (!line.startsWith('|error|')) continue;
+            choiceErrors.count += 1;
+            choiceErrors.last = line
+              .slice('|error|'.length)
+              .replace(/^\[(?:Invalid|Unavailable) choice\]\s*/, '');
+          }
         }
+      } catch (error) {
+        recordStreamError(error);
       }
     })();
   }
