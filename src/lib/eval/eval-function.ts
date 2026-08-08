@@ -56,7 +56,15 @@ export const EVAL_WEIGHTS = {
    * enemy by its remaining HP.
    */
   coverage: 40,
+  /**
+   * A Choice item on a status-heavy moveset is a liability, not a boost —
+   * the holder can never run its actual game plan again (the anti-setup
+   * Trick). Scaled by the holder's status-move fraction: 4 attacks → 0.
+   */
+  choiceMismatch: 40,
 } as const;
+
+const CHOICE_ITEMS = new Set(['choiceband', 'choicespecs', 'choicescarf']);
 
 const SCREENS = ['reflect', 'lightscreen', 'auroraveil'];
 
@@ -123,7 +131,15 @@ export function hazardCost(side: Side, battle: Battle): number {
 
 function sideScore(side: Side, battle: Battle): number {
   let score = 0;
-  for (const pokemon of side.pokemon) score += pokemonScore(pokemon);
+  for (const pokemon of side.pokemon) {
+    score += pokemonScore(pokemon);
+    if (pokemon.fainted || pokemon.hp <= 0) continue;
+    if (CHOICE_ITEMS.has(pokemon.item) && pokemon.moveSlots.length > 0) {
+      const statusMoves = pokemon.moveSlots
+        .filter(slot => battle.dex.moves.get(slot.id).category === 'Status').length;
+      score -= EVAL_WEIGHTS.choiceMismatch * (statusMoves / pokemon.moveSlots.length);
+    }
+  }
   for (const active of side.active) {
     if (!active || active.fainted) continue;
     for (const [stat, stage] of Object.entries(active.boosts)) {

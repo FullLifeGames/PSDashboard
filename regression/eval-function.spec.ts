@@ -185,6 +185,29 @@ test.describe('evaluatePosition', () => {
     expect(poisonHolder('Black Sludge')).toBeGreaterThan(poisonHolder());
   });
 
+  test('a Choice item on a status-heavy holder is a liability', () => {
+    const clefWith = (item?: string) => {
+      const battle = makeBattle(
+        [makeSet('Clef', 'Clefable', ['Calm Mind', 'Moonlight', 'Moonblast', 'Stored Power'], 50, item ? { item } : {})],
+        [makeSet('B', 'Snorlax', VANILLA)],
+      );
+      return evaluatePosition(battle);
+    };
+    // Half its moveset is dead behind a Choice lock — the sweep plan is over.
+    // Itemless baseline isolates the mismatch penalty from item multipliers.
+    expect(clefWith('Choice Scarf')).toBeLessThan(clefWith());
+
+    const pultWith = (item?: string) => {
+      const battle = makeBattle(
+        [makeSet('Pult', 'Dragapult', ['Draco Meteor', 'Shadow Ball', 'Flamethrower', 'Thunderbolt'], 50, item ? { item } : {})],
+        [makeSet('B', 'Snorlax', VANILLA)],
+      );
+      return evaluatePosition(battle);
+    };
+    // Four attacks: the Choice item is what it is for — no penalty.
+    expect(pultWith('Choice Specs')).toBeGreaterThanOrEqual(pultWith());
+  });
+
   test('coverage penalizes an enemy that nobody answers, max-based', () => {
     const answered = makeBattle(
       [makeSet('Sala', 'Salazzle', ['Sludge Wave', 'Flamethrower'])],
