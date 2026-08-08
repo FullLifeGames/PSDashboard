@@ -1,0 +1,2679 @@
+{
+  "replays": [
+    {
+      "id": "smogtours-gen9ru-894119",
+      "format": "gen9ru",
+      "source": "tournament"
+    },
+    {
+      "id": "smogtours-gen9ru-894117",
+      "format": "gen9ru",
+      "source": "tournament"
+    },
+    {
+      "id": "smogtours-gen9ru-894114",
+      "format": "gen9ru",
+      "source": "tournament"
+    },
+    {
+      "id": "smogtours-gen9ru-894106",
+      "format": "gen9ru",
+      "source": "tournament"
+    },
+    {
+      "id": "smogtours-gen9ru-894112",
+      "format": "gen9ru",
+      "source": "tournament"
+    },
+    {
+      "id": "smogtours-gen9ru-892591",
+      "format": "gen9ru",
+      "source": "tournament"
+    },
+    {
+      "id": "smogtours-gen9ru-889277",
+      "format": "gen9ru",
+      "source": "tournament"
+    },
+    {
+      "id": "smogtours-gen9ru-890842",
+      "format": "gen9ru",
+      "source": "tournament"
+    },
+    {
+      "id": "smogtours-gen9ru-890556",
+      "format": "gen9ru",
+      "source": "tournament"
+    },
+    {
+      "id": "smogtours-gen9ru-893296",
+      "format": "gen9ru",
+      "source": "tournament"
+    },
+    {
+      "id": "smogtours-gen9ru-893650",
+      "format": "gen9ru",
+      "source": "tournament"
+    },
+    {
+      "id": "smogtours-gen9ru-893649",
+      "format": "gen9ru",
+      "source": "tournament"
+    },
+    {
+      "id": "smogtours-gen9ru-892674",
+      "format": "gen9ru",
+      "source": "tournament"
+    },
+    {
+      "id": "smogtours-gen9ru-893644",
+      "format": "gen9ru",
+      "source": "tournament"
+    },
+    {
+      "id": "smogtours-gen9ru-893647",
+      "format": "gen9ru",
+      "source": "tournament"
+    },
+    {
+      "id": "smogtours-gen9ru-893645",
+      "format": "gen9ru",
+      "source": "tournament"
+    },
+    {
+      "id": "smogtours-gen9ru-891827",
+      "format": "gen9ru",
+      "source": "tournament"
+    },
+    {
+      "id": "smogtours-gen9ru-889013",
+      "format": "gen9ru",
+      "source": "tournament"
+    },
+    {
+      "id": "smogtours-gen9ru-892072",
+      "format": "gen9ru",
+      "source": "tournament"
+    },
+    {
+      "id": "smogtours-gen9ru-892996",
+      "format": "gen9ru",
+      "source": "tournament"
+    },
+    {
+      "id": "smogtours-gen9ru-888837",
+      "format": "gen9ru",
+      "source": "tournament"
+    },
+    {
+      "id": "smogtours-gen9ru-891995",
+      "format": "gen9ru",
+      "source": "tournament"
+    },
+    {
+      "id": "smogtours-gen9ru-886698",
+      "format": "gen9ru",
+      "source": "tournament"
+    },
+    {
+      "id": "smogtours-gen9ru-892588",
+      "format": "gen9ru",
+      "source": "tournament"
+    },
+    {
+      "id": "smogtours-gen9ru-892403",
+      "format": "gen9ru",
+      "source": "tournament"
+    },
+    {
+      "id": "smogtours-gen9ru-889328",
+      "format": "gen9ru",
+      "source": "tournament"
+    },
+    {
+      "id": "smogtours-gen9ru-888017",
+      "format": "gen9ru",
+      "source": "tournament"
+    },
+    {
+      "id": "smogtours-gen9ru-892111",
+      "format": "gen9ru",
+      "source": "tournament"
+    },
+    {
+      "id": "smogtours-gen9ru-892105",
+      "format": "gen9ru",
+      "source": "tournament"
+    },
+    {
+      "id": "smogtours-gen9ru-892096",
+      "format": "gen9ru",
+      "source": "tournament"
+    },
+    {
+      "id": "smogtours-gen7ru-893256",
+      "format": "gen7ru",
+      "source": "tournament"
+    },
+    {
+      "id": "smogtours-gen7ru-892681",
+      "format": "gen7ru",
+      "source": "tournament"
+    },
+    {
+      "id": "smogtours-gen7ru-884729",
+      "format": "gen7ru",
+      "source": "tournament"
+    },
+    {
+      "id": "smogtours-gen7ru-883343",
+      "format": "gen7ru",
+      "source": "tournament"
+    },
+    {
+      "id": "smogtours-gen7ru-827556",
+      "format": "gen7ru",
+      "source": "tournament"
+    },
+    {
+      "id": "smogtours-gen7ru-892075",
+      "format": "gen7ru",
+      "source": "tournament"
+    },
+    {
+      "id": "smogtours-gen7ru-831013",
+      "format": "gen7ru",
+      "source": "tournament"
+    },
+    {
+      "id": "smogtours-gen7ru-891157",
+      "format": "gen7ru",
+      "source": "tournament"
+    },
+    {
+      "id": "smogtours-gen7ru-890670",
+      "format": "gen7ru",
+      "source": "tournament"
+    },
+    {
+      "id": "smogtours-gen7ru-817779",
+      "format": "gen7ru",
+      "source": "tournament"
+    },
+    {
+      "id": "smogtours-gen7ru-890011",
+      "format": "gen7ru",
+      "source": "tournament"
+    },
+    {
+      "id": "smogtours-gen7ru-690446",
+      "format": "gen7ru",
+      "source": "tournament"
+    },
+    {
+      "id": "smogtours-gen7ru-768561",
+      "format": "gen7ru",
+      "source": "tournament"
+    },
+    {
+      "id": "gen7ru-2222208442",
+      "format": "gen7ru",
+      "source": "tournament"
+    },
+    {
+      "id": "smogtours-gen7ru-889665",
+      "format": "gen7ru",
+      "source": "tournament"
+    },
+    {
+      "id": "smogtours-gen7ru-889231",
+      "format": "gen7ru",
+      "source": "tournament"
+    },
+    {
+      "id": "smogtours-gen7ru-826813",
+      "format": "gen7ru",
+      "source": "tournament"
+    },
+    {
+      "id": "smogtours-gen7ru-886578",
+      "format": "gen7ru",
+      "source": "tournament"
+    },
+    {
+      "id": "smogtours-gen7ru-889134",
+      "format": "gen7ru",
+      "source": "tournament"
+    },
+    {
+      "id": "smogtours-gen7ru-888668",
+      "format": "gen7ru",
+      "source": "tournament"
+    },
+    {
+      "id": "smogtours-gen7ru-888230",
+      "format": "gen7ru",
+      "source": "tournament"
+    },
+    {
+      "id": "smogtours-gen7ru-712485",
+      "format": "gen7ru",
+      "source": "tournament"
+    },
+    {
+      "id": "smogtours-gen7ru-888180",
+      "format": "gen7ru",
+      "source": "tournament"
+    },
+    {
+      "id": "smogtours-gen7ru-888176",
+      "format": "gen7ru",
+      "source": "tournament"
+    },
+    {
+      "id": "smogtours-gen7ru-768311",
+      "format": "gen7ru",
+      "source": "tournament"
+    },
+    {
+      "id": "smogtours-gen7ru-832159",
+      "format": "gen7ru",
+      "source": "tournament"
+    },
+    {
+      "id": "smogtours-gen7ru-887547",
+      "format": "gen7ru",
+      "source": "tournament"
+    },
+    {
+      "id": "smogtours-gen7ru-767035",
+      "format": "gen7ru",
+      "source": "tournament"
+    },
+    {
+      "id": "smogtours-gen7ru-689957",
+      "format": "gen7ru",
+      "source": "tournament"
+    },
+    {
+      "id": "smogtours-gen7ru-772904",
+      "format": "gen7ru",
+      "source": "tournament"
+    },
+    {
+      "id": "smogtours-gen5ru-893231",
+      "format": "gen5ru",
+      "source": "tournament"
+    },
+    {
+      "id": "smogtours-gen5ru-842835",
+      "format": "gen5ru",
+      "source": "tournament"
+    },
+    {
+      "id": "smogtours-gen5ru-815081",
+      "format": "gen5ru",
+      "source": "tournament"
+    },
+    {
+      "id": "smogtours-gen5ru-892959",
+      "format": "gen5ru",
+      "source": "tournament"
+    },
+    {
+      "id": "smogtours-gen5ru-887736",
+      "format": "gen5ru",
+      "source": "tournament"
+    },
+    {
+      "id": "smogtours-gen5ru-838707",
+      "format": "gen5ru",
+      "source": "tournament"
+    },
+    {
+      "id": "smogtours-gen5ru-840325",
+      "format": "gen5ru",
+      "source": "tournament"
+    },
+    {
+      "id": "smogtours-gen5ru-839391",
+      "format": "gen5ru",
+      "source": "tournament"
+    },
+    {
+      "id": "smogtours-gen5ru-828591",
+      "format": "gen5ru",
+      "source": "tournament"
+    },
+    {
+      "id": "smogtours-gen5ru-788671",
+      "format": "gen5ru",
+      "source": "tournament"
+    },
+    {
+      "id": "smogtours-gen5ru-780305",
+      "format": "gen5ru",
+      "source": "tournament"
+    },
+    {
+      "id": "smogtours-gen5ru-762707",
+      "format": "gen5ru",
+      "source": "tournament"
+    },
+    {
+      "id": "smogtours-gen5ru-892216",
+      "format": "gen5ru",
+      "source": "tournament"
+    },
+    {
+      "id": "smogtours-gen5ru-834658",
+      "format": "gen5ru",
+      "source": "tournament"
+    },
+    {
+      "id": "smogtours-gen5ru-883107",
+      "format": "gen5ru",
+      "source": "tournament"
+    },
+    {
+      "id": "smogtours-gen5ru-710419",
+      "format": "gen5ru",
+      "source": "tournament"
+    },
+    {
+      "id": "smogtours-gen5ru-885375",
+      "format": "gen5ru",
+      "source": "tournament"
+    },
+    {
+      "id": "smogtours-gen5ru-690384",
+      "format": "gen5ru",
+      "source": "tournament"
+    },
+    {
+      "id": "smogtours-gen5ru-762277",
+      "format": "gen5ru",
+      "source": "tournament"
+    },
+    {
+      "id": "smogtours-gen5ru-892187",
+      "format": "gen5ru",
+      "source": "tournament"
+    },
+    {
+      "id": "smogtours-gen5ru-891654",
+      "format": "gen5ru",
+      "source": "tournament"
+    },
+    {
+      "id": "smogtours-gen5ru-770189",
+      "format": "gen5ru",
+      "source": "tournament"
+    },
+    {
+      "id": "smogtours-gen5ru-891228",
+      "format": "gen5ru",
+      "source": "tournament"
+    },
+    {
+      "id": "gen5ru-2125336942",
+      "format": "gen5ru",
+      "source": "tournament"
+    },
+    {
+      "id": "smogtours-gen5ru-776039",
+      "format": "gen5ru",
+      "source": "tournament"
+    },
+    {
+      "id": "smogtours-gen5ru-771766",
+      "format": "gen5ru",
+      "source": "tournament"
+    },
+    {
+      "id": "smogtours-gen5ru-890982",
+      "format": "gen5ru",
+      "source": "tournament"
+    },
+    {
+      "id": "smogtours-gen5ru-835357",
+      "format": "gen5ru",
+      "source": "tournament"
+    },
+    {
+      "id": "smogtours-gen5ru-836339",
+      "format": "gen5ru",
+      "source": "tournament"
+    },
+    {
+      "id": "smogtours-gen5ru-886198",
+      "format": "gen5ru",
+      "source": "tournament"
+    },
+    {
+      "id": "smogtours-gen6ru-893227",
+      "format": "gen6ru",
+      "source": "tournament"
+    },
+    {
+      "id": "gen6ru-2124625732",
+      "format": "gen6ru",
+      "source": "tournament"
+    },
+    {
+      "id": "smogtours-gen6ru-787827",
+      "format": "gen6ru",
+      "source": "tournament"
+    },
+    {
+      "id": "smogtours-gen6ru-835376",
+      "format": "gen6ru",
+      "source": "tournament"
+    },
+    {
+      "id": "smogtours-gen6ru-891587",
+      "format": "gen6ru",
+      "source": "tournament"
+    },
+    {
+      "id": "smogtours-gen6ru-891115",
+      "format": "gen6ru",
+      "source": "tournament"
+    },
+    {
+      "id": "smogtours-gen6ru-891061",
+      "format": "gen6ru",
+      "source": "tournament"
+    },
+    {
+      "id": "smogtours-gen6ru-830080",
+      "format": "gen6ru",
+      "source": "tournament"
+    },
+    {
+      "id": "smogtours-gen6ru-890532",
+      "format": "gen6ru",
+      "source": "tournament"
+    },
+    {
+      "id": "smogtours-gen6ru-885242",
+      "format": "gen6ru",
+      "source": "tournament"
+    },
+    {
+      "id": "smogtours-gen6ru-769066",
+      "format": "gen6ru",
+      "source": "tournament"
+    },
+    {
+      "id": "smogtours-gen6ru-773069",
+      "format": "gen6ru",
+      "source": "tournament"
+    },
+    {
+      "id": "smogtours-gen6ru-850813",
+      "format": "gen6ru",
+      "source": "tournament"
+    },
+    {
+      "id": "smogtours-gen6ru-836243",
+      "format": "gen6ru",
+      "source": "tournament"
+    },
+    {
+      "id": "smogtours-gen6ru-694044",
+      "format": "gen6ru",
+      "source": "tournament"
+    },
+    {
+      "id": "smogtours-gen6ru-885102",
+      "format": "gen6ru",
+      "source": "tournament"
+    },
+    {
+      "id": "smogtours-gen6ru-695588",
+      "format": "gen6ru",
+      "source": "tournament"
+    },
+    {
+      "id": "smogtours-gen6ru-832621",
+      "format": "gen6ru",
+      "source": "tournament"
+    },
+    {
+      "id": "smogtours-gen6ru-890315",
+      "format": "gen6ru",
+      "source": "tournament"
+    },
+    {
+      "id": "smogtours-gen6ru-889940",
+      "format": "gen6ru",
+      "source": "tournament"
+    },
+    {
+      "id": "smogtours-gen6ru-809562",
+      "format": "gen6ru",
+      "source": "tournament"
+    },
+    {
+      "id": "smogtours-gen6ru-840654",
+      "format": "gen6ru",
+      "source": "tournament"
+    },
+    {
+      "id": "smogtours-gen6ru-889655",
+      "format": "gen6ru",
+      "source": "tournament"
+    },
+    {
+      "id": "smogtours-gen6ru-789395",
+      "format": "gen6ru",
+      "source": "tournament"
+    },
+    {
+      "id": "smogtours-gen6ru-789788",
+      "format": "gen6ru",
+      "source": "tournament"
+    },
+    {
+      "id": "smogtours-gen6ru-889547",
+      "format": "gen6ru",
+      "source": "tournament"
+    },
+    {
+      "id": "smogtours-gen6ru-839836",
+      "format": "gen6ru",
+      "source": "tournament"
+    },
+    {
+      "id": "gen6ru-2146403417",
+      "format": "gen6ru",
+      "source": "tournament"
+    },
+    {
+      "id": "smogtours-gen6ru-845005",
+      "format": "gen6ru",
+      "source": "tournament"
+    },
+    {
+      "id": "smogtours-gen6ru-889105",
+      "format": "gen6ru",
+      "source": "tournament"
+    },
+    {
+      "id": "smogtours-gen3ru-892414",
+      "format": "gen3ru",
+      "source": "tournament"
+    },
+    {
+      "id": "smogtours-gen3ru-891227",
+      "format": "gen3ru",
+      "source": "tournament"
+    },
+    {
+      "id": "smogtours-gen3ru-890569",
+      "format": "gen3ru",
+      "source": "tournament"
+    },
+    {
+      "id": "smogtours-gen3ru-890454",
+      "format": "gen3ru",
+      "source": "tournament"
+    },
+    {
+      "id": "smogtours-gen3ru-890431",
+      "format": "gen3ru",
+      "source": "tournament"
+    },
+    {
+      "id": "smogtours-gen3ru-836008",
+      "format": "gen3ru",
+      "source": "tournament"
+    },
+    {
+      "id": "smogtours-gen3ru-889590",
+      "format": "gen3ru",
+      "source": "tournament"
+    },
+    {
+      "id": "smogtours-gen3ru-889322",
+      "format": "gen3ru",
+      "source": "tournament"
+    },
+    {
+      "id": "smogtours-gen3ru-889016",
+      "format": "gen3ru",
+      "source": "tournament"
+    },
+    {
+      "id": "smogtours-gen3ru-888894",
+      "format": "gen3ru",
+      "source": "tournament"
+    },
+    {
+      "id": "smogtours-gen3ru-800234",
+      "format": "gen3ru",
+      "source": "tournament"
+    },
+    {
+      "id": "smogtours-gen3ru-887897",
+      "format": "gen3ru",
+      "source": "tournament"
+    },
+    {
+      "id": "smogtours-gen3ru-887836",
+      "format": "gen3ru",
+      "source": "tournament"
+    },
+    {
+      "id": "smogtours-gen3ru-887607",
+      "format": "gen3ru",
+      "source": "tournament"
+    },
+    {
+      "id": "smogtours-gen3ru-887566",
+      "format": "gen3ru",
+      "source": "tournament"
+    },
+    {
+      "id": "smogtours-gen3ru-886389",
+      "format": "gen3ru",
+      "source": "tournament"
+    },
+    {
+      "id": "smogtours-gen3ru-886262",
+      "format": "gen3ru",
+      "source": "tournament"
+    },
+    {
+      "id": "smogtours-gen3ru-834246",
+      "format": "gen3ru",
+      "source": "tournament"
+    },
+    {
+      "id": "smogtours-gen3ru-885958",
+      "format": "gen3ru",
+      "source": "tournament"
+    },
+    {
+      "id": "smogtours-gen3ru-885825",
+      "format": "gen3ru",
+      "source": "tournament"
+    },
+    {
+      "id": "smogtours-gen3ru-885017",
+      "format": "gen3ru",
+      "source": "tournament"
+    },
+    {
+      "id": "smogtours-gen3ru-884913",
+      "format": "gen3ru",
+      "source": "tournament"
+    },
+    {
+      "id": "smogtours-gen3ru-884310",
+      "format": "gen3ru",
+      "source": "tournament"
+    },
+    {
+      "id": "smogtours-gen3ru-884250",
+      "format": "gen3ru",
+      "source": "tournament"
+    },
+    {
+      "id": "smogtours-gen3ru-883320",
+      "format": "gen3ru",
+      "source": "tournament"
+    },
+    {
+      "id": "smogtours-gen3ru-882564",
+      "format": "gen3ru",
+      "source": "tournament"
+    },
+    {
+      "id": "smogtours-gen3ru-826140",
+      "format": "gen3ru",
+      "source": "tournament"
+    },
+    {
+      "id": "smogtours-gen3ru-882380",
+      "format": "gen3ru",
+      "source": "tournament"
+    },
+    {
+      "id": "smogtours-gen3ru-882046",
+      "format": "gen3ru",
+      "source": "tournament"
+    },
+    {
+      "id": "smogtours-gen3ru-880629",
+      "format": "gen3ru",
+      "source": "tournament"
+    },
+    {
+      "id": "smogtours-gen8ru-829274",
+      "format": "gen8ru",
+      "source": "tournament"
+    },
+    {
+      "id": "smogtours-gen8ru-891781",
+      "format": "gen8ru",
+      "source": "tournament"
+    },
+    {
+      "id": "smogtours-gen8ru-765412",
+      "format": "gen8ru",
+      "source": "tournament"
+    },
+    {
+      "id": "smogtours-gen8ru-689081",
+      "format": "gen8ru",
+      "source": "tournament"
+    },
+    {
+      "id": "smogtours-gen8ru-891776",
+      "format": "gen8ru",
+      "source": "tournament"
+    },
+    {
+      "id": "smogtours-gen8ru-891617",
+      "format": "gen8ru",
+      "source": "tournament"
+    },
+    {
+      "id": "smogtours-gen8ru-881090",
+      "format": "gen8ru",
+      "source": "tournament"
+    },
+    {
+      "id": "smogtours-gen8ru-890890",
+      "format": "gen8ru",
+      "source": "tournament"
+    },
+    {
+      "id": "smogtours-gen8ru-836695",
+      "format": "gen8ru",
+      "source": "tournament"
+    },
+    {
+      "id": "smogtours-gen8ru-827115",
+      "format": "gen8ru",
+      "source": "tournament"
+    },
+    {
+      "id": "smogtours-gen8ru-890372",
+      "format": "gen8ru",
+      "source": "tournament"
+    },
+    {
+      "id": "smogtours-gen8ru-890118",
+      "format": "gen8ru",
+      "source": "tournament"
+    },
+    {
+      "id": "smogtours-gen8ru-826926",
+      "format": "gen8ru",
+      "source": "tournament"
+    },
+    {
+      "id": "smogtours-gen8ru-842125",
+      "format": "gen8ru",
+      "source": "tournament"
+    },
+    {
+      "id": "smogtours-gen8ru-889867",
+      "format": "gen8ru",
+      "source": "tournament"
+    },
+    {
+      "id": "smogtours-gen8ru-884971",
+      "format": "gen8ru",
+      "source": "tournament"
+    },
+    {
+      "id": "smogtours-gen8ru-815121",
+      "format": "gen8ru",
+      "source": "tournament"
+    },
+    {
+      "id": "smogtours-gen8ru-889856",
+      "format": "gen8ru",
+      "source": "tournament"
+    },
+    {
+      "id": "smogtours-gen8ru-835300",
+      "format": "gen8ru",
+      "source": "tournament"
+    },
+    {
+      "id": "smogtours-gen8ru-846087",
+      "format": "gen8ru",
+      "source": "tournament"
+    },
+    {
+      "id": "smogtours-gen8ru-889720",
+      "format": "gen8ru",
+      "source": "tournament"
+    },
+    {
+      "id": "smogtours-gen8ru-889600",
+      "format": "gen8ru",
+      "source": "tournament"
+    },
+    {
+      "id": "smogtours-gen8ru-889533",
+      "format": "gen8ru",
+      "source": "tournament"
+    },
+    {
+      "id": "smogtours-gen8ru-686507",
+      "format": "gen8ru",
+      "source": "tournament"
+    },
+    {
+      "id": "smogtours-gen8ru-888317",
+      "format": "gen8ru",
+      "source": "tournament"
+    },
+    {
+      "id": "smogtours-gen8ru-888049",
+      "format": "gen8ru",
+      "source": "tournament"
+    },
+    {
+      "id": "smogtours-gen8ru-887855",
+      "format": "gen8ru",
+      "source": "tournament"
+    },
+    {
+      "id": "smogtours-gen8ru-887576",
+      "format": "gen8ru",
+      "source": "tournament"
+    },
+    {
+      "id": "smogtours-gen8ru-886970",
+      "format": "gen8ru",
+      "source": "tournament"
+    },
+    {
+      "id": "smogtours-gen8ru-886407",
+      "format": "gen8ru",
+      "source": "tournament"
+    },
+    {
+      "id": "smogtours-gen9uu-778674",
+      "format": "gen9uu",
+      "source": "tournament"
+    },
+    {
+      "id": "smogtours-gen9uu-809452",
+      "format": "gen9uu",
+      "source": "tournament"
+    },
+    {
+      "id": "smogtours-gen9uu-831536",
+      "format": "gen9uu",
+      "source": "tournament"
+    },
+    {
+      "id": "smogtours-gen9uu-829813",
+      "format": "gen9uu",
+      "source": "tournament"
+    },
+    {
+      "id": "smogtours-gen9uu-831558",
+      "format": "gen9uu",
+      "source": "tournament"
+    },
+    {
+      "id": "smogtours-gen9uu-830470",
+      "format": "gen9uu",
+      "source": "tournament"
+    },
+    {
+      "id": "smogtours-gen9uu-831144",
+      "format": "gen9uu",
+      "source": "tournament"
+    },
+    {
+      "id": "smogtours-gen9uu-831129",
+      "format": "gen9uu",
+      "source": "tournament"
+    },
+    {
+      "id": "smogtours-gen9uu-831120",
+      "format": "gen9uu",
+      "source": "tournament"
+    },
+    {
+      "id": "smogtours-gen9uu-830875",
+      "format": "gen9uu",
+      "source": "tournament"
+    },
+    {
+      "id": "smogtours-gen9uu-830732",
+      "format": "gen9uu",
+      "source": "tournament"
+    },
+    {
+      "id": "smogtours-gen9uu-809072",
+      "format": "gen9uu",
+      "source": "tournament"
+    },
+    {
+      "id": "smogtours-gen9uu-809735",
+      "format": "gen9uu",
+      "source": "tournament"
+    },
+    {
+      "id": "smogtours-gen9uu-809622",
+      "format": "gen9uu",
+      "source": "tournament"
+    },
+    {
+      "id": "smogtours-gen9uu-809612",
+      "format": "gen9uu",
+      "source": "tournament"
+    },
+    {
+      "id": "smogtours-gen9uu-809111",
+      "format": "gen9uu",
+      "source": "tournament"
+    },
+    {
+      "id": "smogtours-gen9uu-795466",
+      "format": "gen9uu",
+      "source": "tournament"
+    },
+    {
+      "id": "smogtours-gen9uu-809601",
+      "format": "gen9uu",
+      "source": "tournament"
+    },
+    {
+      "id": "smogtours-gen9uu-778515",
+      "format": "gen9uu",
+      "source": "tournament"
+    },
+    {
+      "id": "smogtours-gen9uu-778992",
+      "format": "gen9uu",
+      "source": "tournament"
+    },
+    {
+      "id": "smogtours-gen9uu-737941",
+      "format": "gen9uu",
+      "source": "tournament"
+    },
+    {
+      "id": "smogtours-gen9uu-737937",
+      "format": "gen9uu",
+      "source": "tournament"
+    },
+    {
+      "id": "smogtours-gen9uu-737935",
+      "format": "gen9uu",
+      "source": "tournament"
+    },
+    {
+      "id": "smogtours-gen9uu-829836",
+      "format": "gen9uu",
+      "source": "tournament"
+    },
+    {
+      "id": "smogtours-gen7uu-835555",
+      "format": "gen7uu",
+      "source": "tournament"
+    },
+    {
+      "id": "smogtours-gen7uu-645339",
+      "format": "gen7uu",
+      "source": "tournament"
+    },
+    {
+      "id": "smogtours-gen7uu-644692",
+      "format": "gen7uu",
+      "source": "tournament"
+    },
+    {
+      "id": "smogtours-gen7uu-644416",
+      "format": "gen7uu",
+      "source": "tournament"
+    },
+    {
+      "id": "smogtours-gen7uu-644475",
+      "format": "gen7uu",
+      "source": "tournament"
+    },
+    {
+      "id": "smogtours-gen7uu-644399",
+      "format": "gen7uu",
+      "source": "tournament"
+    },
+    {
+      "id": "smogtours-gen7uu-644321",
+      "format": "gen7uu",
+      "source": "tournament"
+    },
+    {
+      "id": "smogtours-gen7uu-644288",
+      "format": "gen7uu",
+      "source": "tournament"
+    },
+    {
+      "id": "smogtours-gen7uu-643427",
+      "format": "gen7uu",
+      "source": "tournament"
+    },
+    {
+      "id": "smogtours-gen7uu-643055",
+      "format": "gen7uu",
+      "source": "tournament"
+    },
+    {
+      "id": "smogtours-gen7uu-642736",
+      "format": "gen7uu",
+      "source": "tournament"
+    },
+    {
+      "id": "smogtours-gen7uu-642456",
+      "format": "gen7uu",
+      "source": "tournament"
+    },
+    {
+      "id": "smogtours-gen7uu-460320",
+      "format": "gen7uu",
+      "source": "tournament"
+    },
+    {
+      "id": "smogtours-gen7uu-440751",
+      "format": "gen7uu",
+      "source": "tournament"
+    },
+    {
+      "id": "gen7uu-845335872",
+      "format": "gen7uu",
+      "source": "tournament"
+    },
+    {
+      "id": "gen7uu-845404245",
+      "format": "gen7uu",
+      "source": "tournament"
+    },
+    {
+      "id": "gen7uu-846273974",
+      "format": "gen7uu",
+      "source": "tournament"
+    },
+    {
+      "id": "smogtours-gen7uu-403447",
+      "format": "gen7uu",
+      "source": "tournament"
+    },
+    {
+      "id": "smogtours-gen7uu-346444",
+      "format": "gen7uu",
+      "source": "tournament"
+    },
+    {
+      "id": "smogtours-gen7uu-346207",
+      "format": "gen7uu",
+      "source": "tournament"
+    },
+    {
+      "id": "smogtours-gen7uu-345617",
+      "format": "gen7uu",
+      "source": "tournament"
+    },
+    {
+      "id": "smogtours-gen7uu-344962",
+      "format": "gen7uu",
+      "source": "tournament"
+    },
+    {
+      "id": "smogtours-gen7uu-342038",
+      "format": "gen7uu",
+      "source": "tournament"
+    },
+    {
+      "id": "smogtours-gen7uu-342015",
+      "format": "gen7uu",
+      "source": "tournament"
+    },
+    {
+      "id": "smogtours-gen7uu-341709",
+      "format": "gen7uu",
+      "source": "tournament"
+    },
+    {
+      "id": "smogtours-gen7uu-341589",
+      "format": "gen7uu",
+      "source": "tournament"
+    },
+    {
+      "id": "smogtours-gen7uu-340776",
+      "format": "gen7uu",
+      "source": "tournament"
+    },
+    {
+      "id": "smogtours-gen7uu-321633",
+      "format": "gen7uu",
+      "source": "tournament"
+    },
+    {
+      "id": "smogtours-gen7uu-321437",
+      "format": "gen7uu",
+      "source": "tournament"
+    },
+    {
+      "id": "smogtours-gen7uu-321385",
+      "format": "gen7uu",
+      "source": "tournament"
+    },
+    {
+      "id": "china-gen3uu-12183661",
+      "format": "gen3uu",
+      "source": "tournament"
+    },
+    {
+      "id": "smogtours-gen9ou-713694",
+      "format": "gen9ou",
+      "source": "tournament"
+    },
+    {
+      "id": "smogtours-gen8ou-739704",
+      "format": "gen8ou",
+      "source": "tournament"
+    },
+    {
+      "id": "smogtours-gen8ou-661196",
+      "format": "gen8ou",
+      "source": "tournament"
+    },
+    {
+      "id": "smogtours-gen8ou-648031",
+      "format": "gen8ou",
+      "source": "tournament"
+    },
+    {
+      "id": "smogtours-gen8ou-678379",
+      "format": "gen8ou",
+      "source": "tournament"
+    },
+    {
+      "id": "smogtours-gen8ou-738618",
+      "format": "gen8ou",
+      "source": "tournament"
+    },
+    {
+      "id": "smogtours-gen8ou-662221",
+      "format": "gen8ou",
+      "source": "tournament"
+    },
+    {
+      "id": "smogtours-gen8ou-655044",
+      "format": "gen8ou",
+      "source": "tournament"
+    },
+    {
+      "id": "smogtours-gen8ou-737390",
+      "format": "gen8ou",
+      "source": "tournament"
+    },
+    {
+      "id": "smogtours-gen8ou-662060",
+      "format": "gen8ou",
+      "source": "tournament"
+    },
+    {
+      "id": "smogtours-gen8ou-677063",
+      "format": "gen8ou",
+      "source": "tournament"
+    },
+    {
+      "id": "smogtours-gen8ou-737367",
+      "format": "gen8ou",
+      "source": "tournament"
+    },
+    {
+      "id": "smogtours-gen8ou-737248",
+      "format": "gen8ou",
+      "source": "tournament"
+    },
+    {
+      "id": "smogtours-gen8ou-631729",
+      "format": "gen8ou",
+      "source": "tournament"
+    },
+    {
+      "id": "smogtours-gen8ou-633446",
+      "format": "gen8ou",
+      "source": "tournament"
+    },
+    {
+      "id": "smogtours-gen8ou-632429",
+      "format": "gen8ou",
+      "source": "tournament"
+    },
+    {
+      "id": "smogtours-gen8ou-633522",
+      "format": "gen8ou",
+      "source": "tournament"
+    },
+    {
+      "id": "smogtours-gen8ou-631328",
+      "format": "gen8ou",
+      "source": "tournament"
+    },
+    {
+      "id": "smogtours-gen8ou-656871",
+      "format": "gen8ou",
+      "source": "tournament"
+    },
+    {
+      "id": "smogtours-gen8ou-736854",
+      "format": "gen8ou",
+      "source": "tournament"
+    },
+    {
+      "id": "smogtours-gen8ou-608443",
+      "format": "gen8ou",
+      "source": "tournament"
+    },
+    {
+      "id": "smogtours-gen8ou-610656",
+      "format": "gen8ou",
+      "source": "tournament"
+    },
+    {
+      "id": "smogtours-gen8ou-736534",
+      "format": "gen8ou",
+      "source": "tournament"
+    },
+    {
+      "id": "smogtours-gen8ou-736411",
+      "format": "gen8ou",
+      "source": "tournament"
+    },
+    {
+      "id": "smogtours-gen8ou-617857",
+      "format": "gen8ou",
+      "source": "tournament"
+    },
+    {
+      "id": "smogtours-gen8ou-617766",
+      "format": "gen8ou",
+      "source": "tournament"
+    },
+    {
+      "id": "smogtours-gen8ou-614957",
+      "format": "gen8ou",
+      "source": "tournament"
+    },
+    {
+      "id": "smogtours-gen8ou-736389",
+      "format": "gen8ou",
+      "source": "tournament"
+    },
+    {
+      "id": "smogtours-gen8ou-736201",
+      "format": "gen8ou",
+      "source": "tournament"
+    },
+    {
+      "id": "smogtours-gen8ou-697267",
+      "format": "gen8ou",
+      "source": "tournament"
+    },
+    {
+      "id": "smogtours-gen8ou-634469",
+      "format": "gen8ou",
+      "source": "tournament"
+    },
+    {
+      "id": "smogtours-gen8oudlc1-524676",
+      "format": "gen8oudlc1",
+      "source": "tournament"
+    },
+    {
+      "id": "smogtours-gen8oudlc1-524901",
+      "format": "gen8oudlc1",
+      "source": "tournament"
+    },
+    {
+      "id": "smogtours-gen8oudlc1-525503",
+      "format": "gen8oudlc1",
+      "source": "tournament"
+    },
+    {
+      "id": "smogtours-gen8oudlc1-525411",
+      "format": "gen8oudlc1",
+      "source": "tournament"
+    },
+    {
+      "id": "smogtours-gen8oudlc1-525369",
+      "format": "gen8oudlc1",
+      "source": "tournament"
+    },
+    {
+      "id": "smogtours-gen8oudlc1-525354",
+      "format": "gen8oudlc1",
+      "source": "tournament"
+    },
+    {
+      "id": "smogtours-gen8oudlc1-525298",
+      "format": "gen8oudlc1",
+      "source": "tournament"
+    },
+    {
+      "id": "smogtours-gen8oudlc1-525260",
+      "format": "gen8oudlc1",
+      "source": "tournament"
+    },
+    {
+      "id": "smogtours-gen8oudlc1-525249",
+      "format": "gen8oudlc1",
+      "source": "tournament"
+    },
+    {
+      "id": "smogtours-gen8oudlc1-525228",
+      "format": "gen8oudlc1",
+      "source": "tournament"
+    },
+    {
+      "id": "smogtours-gen8oudlc1-525210",
+      "format": "gen8oudlc1",
+      "source": "tournament"
+    },
+    {
+      "id": "smogtours-gen8oudlc1-525158",
+      "format": "gen8oudlc1",
+      "source": "tournament"
+    },
+    {
+      "id": "smogtours-gen8oudlc1-524953",
+      "format": "gen8oudlc1",
+      "source": "tournament"
+    },
+    {
+      "id": "smogtours-gen8oudlc1-524932",
+      "format": "gen8oudlc1",
+      "source": "tournament"
+    },
+    {
+      "id": "smogtours-gen8oudlc1-524923",
+      "format": "gen8oudlc1",
+      "source": "tournament"
+    },
+    {
+      "id": "smogtours-gen8oudlc1-524907",
+      "format": "gen8oudlc1",
+      "source": "tournament"
+    },
+    {
+      "id": "smogtours-gen8ubers-487571",
+      "format": "gen8ubers",
+      "source": "tournament"
+    },
+    {
+      "id": "smogtours-gen8ubers-513787",
+      "format": "gen8ubers",
+      "source": "tournament"
+    },
+    {
+      "id": "smogtours-gen8ubers-513709",
+      "format": "gen8ubers",
+      "source": "tournament"
+    },
+    {
+      "id": "smogtours-gen8ubers-513688",
+      "format": "gen8ubers",
+      "source": "tournament"
+    },
+    {
+      "id": "smogtours-gen8ubers-486661",
+      "format": "gen8ubers",
+      "source": "tournament"
+    },
+    {
+      "id": "smogtours-gen8ubers-486656",
+      "format": "gen8ubers",
+      "source": "tournament"
+    },
+    {
+      "id": "smogtours-gen8ubers-488100",
+      "format": "gen8ubers",
+      "source": "tournament"
+    },
+    {
+      "id": "smogtours-gen8ubers-488079",
+      "format": "gen8ubers",
+      "source": "tournament"
+    },
+    {
+      "id": "smogtours-gen8ubers-488075",
+      "format": "gen8ubers",
+      "source": "tournament"
+    },
+    {
+      "id": "smogtours-gen8ubers-487591",
+      "format": "gen8ubers",
+      "source": "tournament"
+    },
+    {
+      "id": "smogtours-gen8ubers-487579",
+      "format": "gen8ubers",
+      "source": "tournament"
+    },
+    {
+      "id": "smogtours-gen8ubers-487586",
+      "format": "gen8ubers",
+      "source": "tournament"
+    },
+    {
+      "id": "smogtours-gen8ubers-487570",
+      "format": "gen8ubers",
+      "source": "tournament"
+    },
+    {
+      "id": "smogtours-gen8ubers-487558",
+      "format": "gen8ubers",
+      "source": "tournament"
+    },
+    {
+      "id": "smogtours-gen8ubers-487554",
+      "format": "gen8ubers",
+      "source": "tournament"
+    },
+    {
+      "id": "smogtours-gen7ou-552815",
+      "format": "gen7ou",
+      "source": "tournament"
+    },
+    {
+      "id": "smogtours-gen7ou-551452",
+      "format": "gen7ou",
+      "source": "tournament"
+    },
+    {
+      "id": "smogtours-gen7ou-549479",
+      "format": "gen7ou",
+      "source": "tournament"
+    },
+    {
+      "id": "smogtours-gen7ou-549257",
+      "format": "gen7ou",
+      "source": "tournament"
+    },
+    {
+      "id": "smogtours-gen7ou-459657",
+      "format": "gen7ou",
+      "source": "tournament"
+    },
+    {
+      "id": "smogtours-gen7ou-462555",
+      "format": "gen7ou",
+      "source": "tournament"
+    },
+    {
+      "id": "smogtours-gen7ou-476718",
+      "format": "gen7ou",
+      "source": "tournament"
+    },
+    {
+      "id": "smogtours-gen7ou-455267",
+      "format": "gen7ou",
+      "source": "tournament"
+    },
+    {
+      "id": "smogtours-gen7ou-543289",
+      "format": "gen7ou",
+      "source": "tournament"
+    },
+    {
+      "id": "smogtours-gen7ou-547977",
+      "format": "gen7ou",
+      "source": "tournament"
+    },
+    {
+      "id": "smogtours-gen7ou-458719",
+      "format": "gen7ou",
+      "source": "tournament"
+    },
+    {
+      "id": "smogtours-gen7ou-547517",
+      "format": "gen7ou",
+      "source": "tournament"
+    },
+    {
+      "id": "smogtours-gen7ou-392626",
+      "format": "gen7ou",
+      "source": "tournament"
+    },
+    {
+      "id": "smogtours-gen7ou-444901",
+      "format": "gen7ou",
+      "source": "tournament"
+    },
+    {
+      "id": "smogtours-gen7ou-547119",
+      "format": "gen7ou",
+      "source": "tournament"
+    },
+    {
+      "id": "smogtours-gen7ou-460580",
+      "format": "gen7ou",
+      "source": "tournament"
+    },
+    {
+      "id": "smogtours-gen7ou-462578",
+      "format": "gen7ou",
+      "source": "tournament"
+    },
+    {
+      "id": "smogtours-gen7ou-546921",
+      "format": "gen7ou",
+      "source": "tournament"
+    },
+    {
+      "id": "smogtours-gen7ou-478984",
+      "format": "gen7ou",
+      "source": "tournament"
+    },
+    {
+      "id": "smogtours-gen7ou-546696",
+      "format": "gen7ou",
+      "source": "tournament"
+    },
+    {
+      "id": "smogtours-gen7ou-464021",
+      "format": "gen7ou",
+      "source": "tournament"
+    },
+    {
+      "id": "smogtours-gen7ou-403998",
+      "format": "gen7ou",
+      "source": "tournament"
+    },
+    {
+      "id": "smogtours-gen7ou-545791",
+      "format": "gen7ou",
+      "source": "tournament"
+    },
+    {
+      "id": "smogtours-gen7ou-545298",
+      "format": "gen7ou",
+      "source": "tournament"
+    },
+    {
+      "id": "smogtours-gen7ou-545229",
+      "format": "gen7ou",
+      "source": "tournament"
+    },
+    {
+      "id": "smogtours-gen7ou-455484",
+      "format": "gen7ou",
+      "source": "tournament"
+    },
+    {
+      "id": "smogtours-gen7ou-463176",
+      "format": "gen7ou",
+      "source": "tournament"
+    },
+    {
+      "id": "smogtours-gen7ou-455719",
+      "format": "gen7ou",
+      "source": "tournament"
+    },
+    {
+      "id": "smogtours-gen7ou-455177",
+      "format": "gen7ou",
+      "source": "tournament"
+    },
+    {
+      "id": "smogtours-gen7ou-461259",
+      "format": "gen7ou",
+      "source": "tournament"
+    },
+    {
+      "id": "smogtours-gen7ubers-317149",
+      "format": "gen7ubers",
+      "source": "tournament"
+    },
+    {
+      "id": "smogtours-gen7ubers-317091",
+      "format": "gen7ubers",
+      "source": "tournament"
+    },
+    {
+      "id": "smogtours-gen7ubers-316727",
+      "format": "gen7ubers",
+      "source": "tournament"
+    },
+    {
+      "id": "smogtours-gen7ubers-316919",
+      "format": "gen7ubers",
+      "source": "tournament"
+    },
+    {
+      "id": "smogtours-gen7ubers-317438",
+      "format": "gen7ubers",
+      "source": "tournament"
+    },
+    {
+      "id": "smogtours-gen7ubers-317232",
+      "format": "gen7ubers",
+      "source": "tournament"
+    },
+    {
+      "id": "smogtours-gen7ubers-317054",
+      "format": "gen7ubers",
+      "source": "tournament"
+    },
+    {
+      "id": "smogtours-gen7ubers-316839",
+      "format": "gen7ubers",
+      "source": "tournament"
+    },
+    {
+      "id": "smogtours-gen7ubers-316810",
+      "format": "gen7ubers",
+      "source": "tournament"
+    },
+    {
+      "id": "smogtours-gen7ubers-316733",
+      "format": "gen7ubers",
+      "source": "tournament"
+    },
+    {
+      "id": "smogtours-gen4ou-551401",
+      "format": "gen4ou",
+      "source": "tournament"
+    },
+    {
+      "id": "smogtours-gen4ou-549503",
+      "format": "gen4ou",
+      "source": "tournament"
+    },
+    {
+      "id": "smogtours-gen4ou-548783",
+      "format": "gen4ou",
+      "source": "tournament"
+    },
+    {
+      "id": "smogtours-gen4ou-547624",
+      "format": "gen4ou",
+      "source": "tournament"
+    },
+    {
+      "id": "smogtours-gen4ou-547564",
+      "format": "gen4ou",
+      "source": "tournament"
+    },
+    {
+      "id": "smogtours-gen4ou-509374",
+      "format": "gen4ou",
+      "source": "tournament"
+    },
+    {
+      "id": "smogtours-gen4ou-427388",
+      "format": "gen4ou",
+      "source": "tournament"
+    },
+    {
+      "id": "smogtours-gen4ou-547555",
+      "format": "gen4ou",
+      "source": "tournament"
+    },
+    {
+      "id": "smogtours-gen4ou-442980",
+      "format": "gen4ou",
+      "source": "tournament"
+    },
+    {
+      "id": "smogtours-gen4ou-443823",
+      "format": "gen4ou",
+      "source": "tournament"
+    },
+    {
+      "id": "smogtours-gen4ou-442955",
+      "format": "gen4ou",
+      "source": "tournament"
+    },
+    {
+      "id": "smogtours-gen4ou-547544",
+      "format": "gen4ou",
+      "source": "tournament"
+    },
+    {
+      "id": "smogtours-gen4ou-475926",
+      "format": "gen4ou",
+      "source": "tournament"
+    },
+    {
+      "id": "smogtours-gen4ou-539909",
+      "format": "gen4ou",
+      "source": "tournament"
+    },
+    {
+      "id": "smogtours-gen4ou-547532",
+      "format": "gen4ou",
+      "source": "tournament"
+    },
+    {
+      "id": "smogtours-gen4ou-545733",
+      "format": "gen4ou",
+      "source": "tournament"
+    },
+    {
+      "id": "smogtours-gen4ou-545729",
+      "format": "gen4ou",
+      "source": "tournament"
+    },
+    {
+      "id": "smogtours-gen4ou-541080",
+      "format": "gen4ou",
+      "source": "tournament"
+    },
+    {
+      "id": "smogtours-gen4ou-545411",
+      "format": "gen4ou",
+      "source": "tournament"
+    },
+    {
+      "id": "smogtours-gen4ou-545375",
+      "format": "gen4ou",
+      "source": "tournament"
+    },
+    {
+      "id": "smogtours-gen4ou-544929",
+      "format": "gen4ou",
+      "source": "tournament"
+    },
+    {
+      "id": "smogtours-gen4ou-544860",
+      "format": "gen4ou",
+      "source": "tournament"
+    },
+    {
+      "id": "smogtours-gen4ou-544662",
+      "format": "gen4ou",
+      "source": "tournament"
+    },
+    {
+      "id": "smogtours-gen4ou-544652",
+      "format": "gen4ou",
+      "source": "tournament"
+    },
+    {
+      "id": "smogtours-gen4ou-477284",
+      "format": "gen4ou",
+      "source": "tournament"
+    },
+    {
+      "id": "smogtours-gen4ou-544639",
+      "format": "gen4ou",
+      "source": "tournament"
+    },
+    {
+      "id": "smogtours-gen4ou-544617",
+      "format": "gen4ou",
+      "source": "tournament"
+    },
+    {
+      "id": "smogtours-gen4ou-543716",
+      "format": "gen4ou",
+      "source": "tournament"
+    },
+    {
+      "id": "smogtours-gen4ou-543542",
+      "format": "gen4ou",
+      "source": "tournament"
+    },
+    {
+      "id": "smogtours-gen4ou-543536",
+      "format": "gen4ou",
+      "source": "tournament"
+    },
+    {
+      "id": "smogtours-gen6ou-606002",
+      "format": "gen6ou",
+      "source": "tournament"
+    },
+    {
+      "id": "smogtours-gen6ou-651425",
+      "format": "gen6ou",
+      "source": "tournament"
+    },
+    {
+      "id": "smogtours-gen6ou-666280",
+      "format": "gen6ou",
+      "source": "tournament"
+    },
+    {
+      "id": "smogtours-gen6ou-545092",
+      "format": "gen6ou",
+      "source": "tournament"
+    },
+    {
+      "id": "smogtours-gen6ou-666279",
+      "format": "gen6ou",
+      "source": "tournament"
+    },
+    {
+      "id": "smogtours-gen6ou-659186",
+      "format": "gen6ou",
+      "source": "tournament"
+    },
+    {
+      "id": "smogtours-gen6ou-420939",
+      "format": "gen6ou",
+      "source": "tournament"
+    },
+    {
+      "id": "smogtours-gen6ou-666278",
+      "format": "gen6ou",
+      "source": "tournament"
+    },
+    {
+      "id": "smogtours-gen6ou-660331",
+      "format": "gen6ou",
+      "source": "tournament"
+    },
+    {
+      "id": "smogtours-gen6ou-666274",
+      "format": "gen6ou",
+      "source": "tournament"
+    },
+    {
+      "id": "smogtours-gen6ou-665309",
+      "format": "gen6ou",
+      "source": "tournament"
+    },
+    {
+      "id": "smogtours-gen6ou-655265",
+      "format": "gen6ou",
+      "source": "tournament"
+    },
+    {
+      "id": "smogtours-gen6ou-658228",
+      "format": "gen6ou",
+      "source": "tournament"
+    },
+    {
+      "id": "smogtours-gen6ou-601598",
+      "format": "gen6ou",
+      "source": "tournament"
+    },
+    {
+      "id": "smogtours-gen6ou-659831",
+      "format": "gen6ou",
+      "source": "tournament"
+    },
+    {
+      "id": "smogtours-gen6ou-665305",
+      "format": "gen6ou",
+      "source": "tournament"
+    },
+    {
+      "id": "smogtours-gen6ou-665301",
+      "format": "gen6ou",
+      "source": "tournament"
+    },
+    {
+      "id": "smogtours-gen6ou-604671",
+      "format": "gen6ou",
+      "source": "tournament"
+    },
+    {
+      "id": "smogtours-gen6ou-656693",
+      "format": "gen6ou",
+      "source": "tournament"
+    },
+    {
+      "id": "smogtours-gen6ou-658573",
+      "format": "gen6ou",
+      "source": "tournament"
+    },
+    {
+      "id": "smogtours-gen6ou-665303",
+      "format": "gen6ou",
+      "source": "tournament"
+    },
+    {
+      "id": "smogtours-gen6ou-665299",
+      "format": "gen6ou",
+      "source": "tournament"
+    },
+    {
+      "id": "smogtours-gen6ou-609324",
+      "format": "gen6ou",
+      "source": "tournament"
+    },
+    {
+      "id": "smogtours-gen6ou-662362",
+      "format": "gen6ou",
+      "source": "tournament"
+    },
+    {
+      "id": "smogtours-gen6ou-659829",
+      "format": "gen6ou",
+      "source": "tournament"
+    },
+    {
+      "id": "smogtours-gen6ou-663347",
+      "format": "gen6ou",
+      "source": "tournament"
+    },
+    {
+      "id": "smogtours-gen6ou-664208",
+      "format": "gen6ou",
+      "source": "tournament"
+    },
+    {
+      "id": "smogtours-gen6ou-664207",
+      "format": "gen6ou",
+      "source": "tournament"
+    },
+    {
+      "id": "smogtours-gen6ou-664206",
+      "format": "gen6ou",
+      "source": "tournament"
+    },
+    {
+      "id": "smogtours-gen6ou-602935",
+      "format": "gen6ou",
+      "source": "tournament"
+    },
+    {
+      "id": "smogtours-gen2ou-451294",
+      "format": "gen2ou",
+      "source": "tournament"
+    },
+    {
+      "id": "smogtours-gen2ou-609808",
+      "format": "gen2ou",
+      "source": "tournament"
+    },
+    {
+      "id": "smogtours-gen2ou-536904",
+      "format": "gen2ou",
+      "source": "tournament"
+    },
+    {
+      "id": "smogtours-gen2ou-684843",
+      "format": "gen2ou",
+      "source": "tournament"
+    },
+    {
+      "id": "smogtours-gen2ou-601789",
+      "format": "gen2ou",
+      "source": "tournament"
+    },
+    {
+      "id": "smogtours-gen2ou-427989",
+      "format": "gen2ou",
+      "source": "tournament"
+    },
+    {
+      "id": "smogtours-gen2ou-674353",
+      "format": "gen2ou",
+      "source": "tournament"
+    },
+    {
+      "id": "smogtours-gen2ou-608199",
+      "format": "gen2ou",
+      "source": "tournament"
+    },
+    {
+      "id": "smogtours-gen2ou-450866",
+      "format": "gen2ou",
+      "source": "tournament"
+    },
+    {
+      "id": "smogtours-gen2ou-670224",
+      "format": "gen2ou",
+      "source": "tournament"
+    },
+    {
+      "id": "smogtours-gen2ou-612058",
+      "format": "gen2ou",
+      "source": "tournament"
+    },
+    {
+      "id": "smogtours-gen2ou-681538",
+      "format": "gen2ou",
+      "source": "tournament"
+    },
+    {
+      "id": "smogtours-gen2ou-530724",
+      "format": "gen2ou",
+      "source": "tournament"
+    },
+    {
+      "id": "smogtours-gen2ou-680484",
+      "format": "gen2ou",
+      "source": "tournament"
+    },
+    {
+      "id": "smogtours-gen2ou-472471",
+      "format": "gen2ou",
+      "source": "tournament"
+    },
+    {
+      "id": "smogtours-gen2ou-683133",
+      "format": "gen2ou",
+      "source": "tournament"
+    },
+    {
+      "id": "smogtours-gen2ou-604257",
+      "format": "gen2ou",
+      "source": "tournament"
+    },
+    {
+      "id": "smogtours-gen2ou-349774",
+      "format": "gen2ou",
+      "source": "tournament"
+    },
+    {
+      "id": "smogtours-gen2ou-674874",
+      "format": "gen2ou",
+      "source": "tournament"
+    },
+    {
+      "id": "smogtours-gen2ou-475144",
+      "format": "gen2ou",
+      "source": "tournament"
+    },
+    {
+      "id": "smogtours-gen2ou-423711",
+      "format": "gen2ou",
+      "source": "tournament"
+    },
+    {
+      "id": "smogtours-gen2ou-424872",
+      "format": "gen2ou",
+      "source": "tournament"
+    },
+    {
+      "id": "gen2ou-847080496",
+      "format": "gen2ou",
+      "source": "tournament"
+    },
+    {
+      "id": "smogtours-gen2ou-422460",
+      "format": "gen2ou",
+      "source": "tournament"
+    },
+    {
+      "id": "smogtours-gen2ou-681739",
+      "format": "gen2ou",
+      "source": "tournament"
+    },
+    {
+      "id": "smogtours-gen2ou-678448",
+      "format": "gen2ou",
+      "source": "tournament"
+    },
+    {
+      "id": "smogtours-gen2ou-677206",
+      "format": "gen2ou",
+      "source": "tournament"
+    },
+    {
+      "id": "smogtours-gen2ou-538644",
+      "format": "gen2ou",
+      "source": "tournament"
+    },
+    {
+      "id": "smogtours-gen2ou-410608",
+      "format": "gen2ou",
+      "source": "tournament"
+    },
+    {
+      "id": "smogtours-gen2ou-681297",
+      "format": "gen2ou",
+      "source": "tournament"
+    },
+    {
+      "id": "smogtours-gen8uu-583310",
+      "format": "gen8uu",
+      "source": "tournament"
+    },
+    {
+      "id": "smogtours-gen8uu-617963",
+      "format": "gen8uu",
+      "source": "tournament"
+    },
+    {
+      "id": "smogtours-gen8uu-535223",
+      "format": "gen8uu",
+      "source": "tournament"
+    },
+    {
+      "id": "smogtours-gen8uu-533280",
+      "format": "gen8uu",
+      "source": "tournament"
+    },
+    {
+      "id": "smogtours-gen8uu-535597",
+      "format": "gen8uu",
+      "source": "tournament"
+    },
+    {
+      "id": "smogtours-gen8uu-535595",
+      "format": "gen8uu",
+      "source": "tournament"
+    },
+    {
+      "id": "smogtours-gen8uu-535590",
+      "format": "gen8uu",
+      "source": "tournament"
+    },
+    {
+      "id": "smogtours-gen8uu-535139",
+      "format": "gen8uu",
+      "source": "tournament"
+    },
+    {
+      "id": "smogtours-gen8uu-535596",
+      "format": "gen8uu",
+      "source": "tournament"
+    },
+    {
+      "id": "smogtours-gen8uu-534941",
+      "format": "gen8uu",
+      "source": "tournament"
+    },
+    {
+      "id": "smogtours-gen8uu-534937",
+      "format": "gen8uu",
+      "source": "tournament"
+    },
+    {
+      "id": "smogtours-gen8uu-534936",
+      "format": "gen8uu",
+      "source": "tournament"
+    },
+    {
+      "id": "smogtours-gen8uu-533854",
+      "format": "gen8uu",
+      "source": "tournament"
+    },
+    {
+      "id": "smogtours-gen8uu-533048",
+      "format": "gen8uu",
+      "source": "tournament"
+    },
+    {
+      "id": "smogtours-gen8uu-533044",
+      "format": "gen8uu",
+      "source": "tournament"
+    },
+    {
+      "id": "smogtours-gen8uu-533042",
+      "format": "gen8uu",
+      "source": "tournament"
+    },
+    {
+      "id": "smogtours-gen8uu-533036",
+      "format": "gen8uu",
+      "source": "tournament"
+    },
+    {
+      "id": "smogtours-gen8uu-532934",
+      "format": "gen8uu",
+      "source": "tournament"
+    },
+    {
+      "id": "smogtours-gen8uu-532852",
+      "format": "gen8uu",
+      "source": "tournament"
+    },
+    {
+      "id": "smogtours-gen8uu-524452",
+      "format": "gen8uu",
+      "source": "tournament"
+    },
+    {
+      "id": "smogtours-gen8uu-522155",
+      "format": "gen8uu",
+      "source": "tournament"
+    },
+    {
+      "id": "smogtours-gen8uu-516047",
+      "format": "gen8uu",
+      "source": "tournament"
+    },
+    {
+      "id": "smogtours-gen8uu-510504",
+      "format": "gen8uu",
+      "source": "tournament"
+    },
+    {
+      "id": "smogtours-gen8uu-508963",
+      "format": "gen8uu",
+      "source": "tournament"
+    },
+    {
+      "id": "smogtours-gen8uu-505430",
+      "format": "gen8uu",
+      "source": "tournament"
+    },
+    {
+      "id": "smogtours-gen8uu-505585",
+      "format": "gen8uu",
+      "source": "tournament"
+    },
+    {
+      "id": "smogtours-gen8uu-505581",
+      "format": "gen8uu",
+      "source": "tournament"
+    },
+    {
+      "id": "smogtours-gen8uu-505353",
+      "format": "gen8uu",
+      "source": "tournament"
+    },
+    {
+      "id": "smogtours-gen8uu-505159",
+      "format": "gen8uu",
+      "source": "tournament"
+    },
+    {
+      "id": "smogtours-gen8uu-505112",
+      "format": "gen8uu",
+      "source": "tournament"
+    },
+    {
+      "id": "smogtours-gen7rususpecttest-374393",
+      "format": "gen7rususpecttest",
+      "source": "tournament"
+    },
+    {
+      "id": "smogtours-gen7rususpecttest-374376",
+      "format": "gen7rususpecttest",
+      "source": "tournament"
+    },
+    {
+      "id": "gen7rususpecttest-743109645",
+      "format": "gen7rususpecttest",
+      "source": "tournament"
+    },
+    {
+      "id": "gen9ou-2661681857",
+      "format": "gen9ou",
+      "source": "ladder"
+    },
+    {
+      "id": "gen9ou-2661677751",
+      "format": "gen9ou",
+      "source": "ladder"
+    },
+    {
+      "id": "gen9ou-2661681534",
+      "format": "gen9ou",
+      "source": "ladder"
+    },
+    {
+      "id": "gen9ou-2661677533",
+      "format": "gen9ou",
+      "source": "ladder"
+    },
+    {
+      "id": "gen9ou-2661682673",
+      "format": "gen9ou",
+      "source": "ladder"
+    },
+    {
+      "id": "gen9ou-2661683601",
+      "format": "gen9ou",
+      "source": "ladder"
+    },
+    {
+      "id": "gen9ou-2661682798",
+      "format": "gen9ou",
+      "source": "ladder"
+    },
+    {
+      "id": "gen9ou-2661682270",
+      "format": "gen9ou",
+      "source": "ladder"
+    },
+    {
+      "id": "gen9ou-2661677128",
+      "format": "gen9ou",
+      "source": "ladder"
+    },
+    {
+      "id": "gen9ou-2661677676",
+      "format": "gen9ou",
+      "source": "ladder"
+    },
+    {
+      "id": "gen9ou-2661676193",
+      "format": "gen9ou",
+      "source": "ladder"
+    },
+    {
+      "id": "gen9ou-2661679468",
+      "format": "gen9ou",
+      "source": "ladder"
+    },
+    {
+      "id": "gen9ou-2661681123",
+      "format": "gen9ou",
+      "source": "ladder"
+    },
+    {
+      "id": "gen9ou-2661677962",
+      "format": "gen9ou",
+      "source": "ladder"
+    },
+    {
+      "id": "gen9ou-2661679057",
+      "format": "gen9ou",
+      "source": "ladder"
+    },
+    {
+      "id": "gen9ou-2661680998",
+      "format": "gen9ou",
+      "source": "ladder"
+    },
+    {
+      "id": "gen9ou-2661676758",
+      "format": "gen9ou",
+      "source": "ladder"
+    },
+    {
+      "id": "gen9ou-2661679457",
+      "format": "gen9ou",
+      "source": "ladder"
+    },
+    {
+      "id": "gen9ou-2661680703",
+      "format": "gen9ou",
+      "source": "ladder"
+    },
+    {
+      "id": "gen9ou-2661679800",
+      "format": "gen9ou",
+      "source": "ladder"
+    },
+    {
+      "id": "gen9ou-2661682557",
+      "format": "gen9ou",
+      "source": "ladder"
+    },
+    {
+      "id": "gen9ou-2661682751",
+      "format": "gen9ou",
+      "source": "ladder"
+    },
+    {
+      "id": "gen9ou-2661677307",
+      "format": "gen9ou",
+      "source": "ladder"
+    },
+    {
+      "id": "gen9ou-2661676444",
+      "format": "gen9ou",
+      "source": "ladder"
+    },
+    {
+      "id": "gen9ou-2661680852",
+      "format": "gen9ou",
+      "source": "ladder"
+    },
+    {
+      "id": "gen9doublesou-2661676790",
+      "format": "gen9doublesou",
+      "source": "ladder"
+    },
+    {
+      "id": "gen9doublesou-2661683138",
+      "format": "gen9doublesou",
+      "source": "ladder"
+    },
+    {
+      "id": "gen9doublesou-2661683621",
+      "format": "gen9doublesou",
+      "source": "ladder"
+    },
+    {
+      "id": "gen9doublesou-2661679765",
+      "format": "gen9doublesou",
+      "source": "ladder"
+    },
+    {
+      "id": "gen9doublesou-2661676977",
+      "format": "gen9doublesou",
+      "source": "ladder"
+    },
+    {
+      "id": "gen9doublesou-2661681869",
+      "format": "gen9doublesou",
+      "source": "ladder"
+    },
+    {
+      "id": "gen9doublesou-2661679056",
+      "format": "gen9doublesou",
+      "source": "ladder"
+    },
+    {
+      "id": "gen9doublesou-2661680372",
+      "format": "gen9doublesou",
+      "source": "ladder"
+    },
+    {
+      "id": "gen9doublesou-2661678491",
+      "format": "gen9doublesou",
+      "source": "ladder"
+    },
+    {
+      "id": "gen9doublesou-2661676468",
+      "format": "gen9doublesou",
+      "source": "ladder"
+    },
+    {
+      "id": "gen9doublesou-2661680847",
+      "format": "gen9doublesou",
+      "source": "ladder"
+    },
+    {
+      "id": "gen9doublesou-2661676087",
+      "format": "gen9doublesou",
+      "source": "ladder"
+    },
+    {
+      "id": "gen9doublesou-2661680452",
+      "format": "gen9doublesou",
+      "source": "ladder"
+    },
+    {
+      "id": "gen9doublesou-2661683148",
+      "format": "gen9doublesou",
+      "source": "ladder"
+    },
+    {
+      "id": "gen9doublesou-2661681668",
+      "format": "gen9doublesou",
+      "source": "ladder"
+    },
+    {
+      "id": "gen9doublesou-2661679278",
+      "format": "gen9doublesou",
+      "source": "ladder"
+    },
+    {
+      "id": "gen9doublesou-2661676373",
+      "format": "gen9doublesou",
+      "source": "ladder"
+    },
+    {
+      "id": "gen9doublesou-2661681867",
+      "format": "gen9doublesou",
+      "source": "ladder"
+    },
+    {
+      "id": "gen9doublesou-2661681456",
+      "format": "gen9doublesou",
+      "source": "ladder"
+    },
+    {
+      "id": "gen9doublesou-2661678728",
+      "format": "gen9doublesou",
+      "source": "ladder"
+    },
+    {
+      "id": "gen9doublesou-2661677291",
+      "format": "gen9doublesou",
+      "source": "ladder"
+    },
+    {
+      "id": "gen9doublesou-2661680544",
+      "format": "gen9doublesou",
+      "source": "ladder"
+    },
+    {
+      "id": "gen9doublesou-2661676964",
+      "format": "gen9doublesou",
+      "source": "ladder"
+    },
+    {
+      "id": "gen9doublesou-2661683112",
+      "format": "gen9doublesou",
+      "source": "ladder"
+    },
+    {
+      "id": "gen9doublesou-2661680113",
+      "format": "gen9doublesou",
+      "source": "ladder"
+    },
+    {
+      "id": "gen9vgc2024regh-2273230292",
+      "format": "gen9vgc2024regh",
+      "source": "ladder"
+    },
+    {
+      "id": "gen9vgc2024regh-2273231017",
+      "format": "gen9vgc2024regh",
+      "source": "ladder"
+    },
+    {
+      "id": "gen9vgc2024regh-2273226407",
+      "format": "gen9vgc2024regh",
+      "source": "ladder"
+    },
+    {
+      "id": "gen9vgc2024regh-2273222549",
+      "format": "gen9vgc2024regh",
+      "source": "ladder"
+    },
+    {
+      "id": "gen9vgc2024regh-2273212502",
+      "format": "gen9vgc2024regh",
+      "source": "ladder"
+    },
+    {
+      "id": "gen9vgc2024regh-2273226343",
+      "format": "gen9vgc2024regh",
+      "source": "ladder"
+    },
+    {
+      "id": "gen9vgc2024regh-2273223830",
+      "format": "gen9vgc2024regh",
+      "source": "ladder"
+    },
+    {
+      "id": "gen9vgc2024regh-2273227995",
+      "format": "gen9vgc2024regh",
+      "source": "ladder"
+    },
+    {
+      "id": "gen9vgc2024regh-2273224139",
+      "format": "gen9vgc2024regh",
+      "source": "ladder"
+    },
+    {
+      "id": "gen9vgc2024regh-2273220755",
+      "format": "gen9vgc2024regh",
+      "source": "ladder"
+    },
+    {
+      "id": "gen9vgc2024regh-2273215648",
+      "format": "gen9vgc2024regh",
+      "source": "ladder"
+    },
+    {
+      "id": "gen9vgc2024regh-2273230773",
+      "format": "gen9vgc2024regh",
+      "source": "ladder"
+    },
+    {
+      "id": "gen9vgc2024regh-2273228131",
+      "format": "gen9vgc2024regh",
+      "source": "ladder"
+    },
+    {
+      "id": "gen9vgc2024regh-2273226013",
+      "format": "gen9vgc2024regh",
+      "source": "ladder"
+    },
+    {
+      "id": "gen9vgc2024regh-2273232611",
+      "format": "gen9vgc2024regh",
+      "source": "ladder"
+    },
+    {
+      "id": "gen9vgc2024regh-2273231908",
+      "format": "gen9vgc2024regh",
+      "source": "ladder"
+    },
+    {
+      "id": "gen9vgc2024regh-2273200203",
+      "format": "gen9vgc2024regh",
+      "source": "ladder"
+    },
+    {
+      "id": "gen9vgc2024regh-2273222953",
+      "format": "gen9vgc2024regh",
+      "source": "ladder"
+    },
+    {
+      "id": "gen9vgc2024regh-2273217172",
+      "format": "gen9vgc2024regh",
+      "source": "ladder"
+    },
+    {
+      "id": "gen9vgc2024regh-2273226938",
+      "format": "gen9vgc2024regh",
+      "source": "ladder"
+    },
+    {
+      "id": "gen9vgc2024regh-2273215549",
+      "format": "gen9vgc2024regh",
+      "source": "ladder"
+    },
+    {
+      "id": "gen9vgc2024regh-2273218733",
+      "format": "gen9vgc2024regh",
+      "source": "ladder"
+    },
+    {
+      "id": "gen9vgc2024regh-2273214476",
+      "format": "gen9vgc2024regh",
+      "source": "ladder"
+    },
+    {
+      "id": "gen9vgc2024regh-2273212624",
+      "format": "gen9vgc2024regh",
+      "source": "ladder"
+    },
+    {
+      "id": "gen9vgc2024regh-2273223547",
+      "format": "gen9vgc2024regh",
+      "source": "ladder"
+    }
+  ]
+}

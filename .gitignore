@@ -29,3 +29,6 @@ test-results
 .playwright-mcp
 FIXPLAN.md
 docs
+
+# Fitting corpus cache (manifest is committed; logs are re-downloadable)
+.fit-corpus/
