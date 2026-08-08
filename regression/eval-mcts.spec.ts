@@ -146,6 +146,21 @@ test.describe('DUCT-MCTS search', () => {
     expect(mergeMctsTrees([trees[0]])).toEqual(trees[0].result);
   });
 
+  test('attaches the solved matrix for the Read lens', () => {
+    // The Read lens reads EvalResult.matrix — MCTS mode must attach it too,
+    // or reads silently vanish whenever the engine mode is 'mcts'.
+    const result = mctsSearch(threeTurnWin(), { depth: 1, samples: 1, tera: false, mode: 'mcts' });
+    expect(result.matrix).toBeTruthy();
+    expect(result.matrix!.p1Labels).toContain('Seismic Toss');
+    const sum = (mix: number[]) => mix.reduce((total, p) => total + p, 0);
+    expect(sum(result.matrix!.mixes.p1)).toBeCloseTo(1, 6);
+    expect(sum(result.matrix!.mixes.p2)).toBeCloseTo(1, 6);
+
+    const trees = Array.from({ length: MCTS_TREES }, (_, offset) =>
+      mctsTreeSearch(threeTurnWin(), { depth: 1, samples: 1, tera: false, mode: 'mcts' }, offset));
+    expect(mergeMctsTrees(trees).matrix).toBeTruthy();
+  });
+
   test('an ended position returns its exact value', () => {
     const battle = makeBattle(
       [makeSet('A', 'Snorlax', ['Protect'])],

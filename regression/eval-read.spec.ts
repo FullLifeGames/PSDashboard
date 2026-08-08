@@ -76,6 +76,27 @@ test.describe('opponent model and read solve', () => {
     expect(tendencies.repeatBias).toBeGreaterThan(0);
   });
 
+  test('parseTendencies ignores forced replacement switches after a faint', () => {
+    // p2 never chooses to switch: B faints before acting and C is the forced
+    // replacement. Counting it would fabricate a switch tendency.
+    const log = [
+      '|start',
+      '|switch|p1a: A|Snorlax, M|100/100', '|switch|p2a: B|Garchomp, F|100/100',
+      '|turn|1',
+      '|move|p1a: A|Ice Beam|p2a: B',
+      '|-damage|p2a: B|0 fnt',
+      '|faint|p2a: B',
+      '|switch|p2a: C|Rotom-Wash|100/100',
+      '|turn|2',
+      '|move|p1a: A|Tackle|p2a: C',
+      '|move|p2a: C|Volt Switch|p1a: A',
+      '|turn|3',
+    ].join('\n');
+    const tendencies = parseTendencies(log, 'p2');
+    expect(tendencies.switchRate).toBe(0);
+    expect(tendencies.attackRate).toBe(1);
+  });
+
   test('lambda keeps the model anchored to the equilibrium', () => {
     expect(READ_LAMBDA).toBeGreaterThan(0);
     expect(READ_LAMBDA).toBeLessThan(1);

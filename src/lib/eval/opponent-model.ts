@@ -48,12 +48,21 @@ export function parseTendencies(log: string, side: 'p1' | 'p2'): PlayerTendencie
   let settledThisTurn = false;
   let moved = false;
   let started = false; // leads before |turn|1 are not choices
+  let pendingFaints = 0; // replacements after own faints are forced, not chosen
 
   for (const line of log.split('\n')) {
     if (line.startsWith('|turn|')) {
       started = true;
       settledThisTurn = false;
       moved = false;
+      continue;
+    }
+    if (line.startsWith(`|faint|${side}`)) {
+      pendingFaints += 1;
+      continue;
+    }
+    if (line.startsWith(`|switch|${side}`) && pendingFaints > 0) {
+      pendingFaints -= 1;
       continue;
     }
     if (!started || settledThisTurn) continue;

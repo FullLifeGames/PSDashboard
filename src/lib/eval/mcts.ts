@@ -3,9 +3,9 @@ import {
   advancePosition, createRootPosition, positionBattle,
   type ChoiceOption, type SimPosition,
 } from './forward-model';
-import { cellKey } from './rank';
+import { cellKey, rankFromMatrix } from './rank';
 import { leafValue, searchOptions, SEARCH_SEEDS } from './search';
-import type { EvalResult, EvalSettings, MctsTreeStats, RankedChoice, SearchProgress, TeraAllowance } from './types';
+import type { EvalMatrix, EvalResult, EvalSettings, MctsTreeStats, RankedChoice, SearchProgress, TeraAllowance } from './types';
 
 /**
  * DUCT (decoupled UCT) Monte-Carlo tree search — the "think deeper" mode.
@@ -154,11 +154,29 @@ function toResult(root: Node, maxDepth: number): EvalResult {
 
   const v1 = p1.length > 0 ? p1[0].worstCase : root.value;
   const v2 = p2.length > 0 ? -p2[0].worstCase : root.value;
+
+  // Read-lens matrix: per-cell leaf values (a child carries the static eval
+  // of its creation-time position; unexpanded cells fall back to the root
+  // value), solved by the same equilibrium solver as matrix mode so
+  // matrix/mixes semantics stay identical across engine modes.
+  let matrix: EvalMatrix | undefined;
+  if (!root.ended && root.p1Options.length > 0 && root.p2Options.length > 0) {
+    const values = root.p1Options.map((_, i) =>
+      root.p2Options.map((_, j) => root.children.get(cellKey(i, j))?.value ?? root.value));
+    const ended = root.p1Options.map((_, i) =>
+      root.p2Options.map((_, j) => root.children.get(cellKey(i, j))?.ended ?? false));
+    matrix = rankFromMatrix(
+      { p1Options: root.p1Options, p2Options: root.p2Options, values, ended },
+      root.value,
+    ).matrixOut;
+  }
+
   return {
     score: root.visits > 0 ? (v1 + v2) / 2 : root.value,
     interval: Math.abs(v2 - v1),
     depthCompleted: maxDepth,
     perSide: { p1, p2 },
+    ...(matrix ? { matrix } : {}),
   };
 }
 

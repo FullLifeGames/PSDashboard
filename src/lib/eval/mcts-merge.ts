@@ -74,5 +74,8 @@ export function mergeMctsTrees(trees: MctsTreeStats[]): EvalResult {
     interval: Math.abs(v2 - v1),
     depthCompleted: Math.max(...trees.map(tree => tree.depth)),
     perSide: { p1, p2 },
+    // The Read-lens matrix: option lists are merge-identical across trees,
+    // so tree 0's solved matrix stands for the merged result.
+    ...(base.result.matrix ? { matrix: base.result.matrix } : {}),
   };
 }
