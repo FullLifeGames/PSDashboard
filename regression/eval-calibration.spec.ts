@@ -38,9 +38,11 @@ import { searchPosition } from '../src/lib/eval/search';
  * Long-term-structure terms 2026-08-08 (baseline for comparison: 56/64/76/62/82):
  *   hazards-by-victim only:              early 58 · mid 61 · late 81 · singles 62 · doubles 84
  *   + coverage + items + choice-mismatch: early 56 · mid 63 · late 80 · singles 63 · doubles 82
+ *   + lock-aware threat + boost discount: early 56 · mid 64 · late 80 · singles 63 · doubles 82
  * The first run's "mid −3" recovered on the second sample (−1) — composition
- * noise again, per the paired-test precedent above. Late-game +4/+5 in both
- * runs: victim-aware hazards genuinely help endgame sign accuracy. GATE PASSED.
+ * noise again, per the paired-test precedent above. Late-game +4 across all
+ * runs: victim-aware hazards genuinely help endgame sign accuracy. Full
+ * WP 2–4 package: every bucket at or above baseline. GATE PASSED.
  */
 const REPLAY_IDS = [
   'gen9draft-2058494320',
