@@ -165,6 +165,41 @@ test.describe('stats panel data quality (WP11)', () => {
     expect(spriteUrl('Mr. Mime')).toBe('https://play.pokemonshowdown.com/sprites/gen5/mrmime.png');
   });
 
+  test('ruled-out abilities filter usage guesses down to the next candidate', () => {
+    const revealed: RevealedPokemonInfo = {
+      species: 'Clefable',
+      moves: [],
+      ability: { value: '', source: 'unknown' },
+      item: { value: '', source: 'unknown' },
+      teraType: { value: '', source: 'unknown' },
+      evs: { value: { hp: 0, atk: 0, def: 0, spa: 0, spd: 0, spe: 0 }, source: 'unknown' },
+      level: 100,
+      gender: 'F',
+      ruledOut: { abilities: ['magicguard'], items: [] },
+    };
+    const usageStats: SmogonUsageStats = {
+      format: 'gen9ou',
+      month: 'latest',
+      source: 'test',
+      pokemon: {
+        clefable: {
+          species: 'Clefable',
+          rawCount: 100,
+          abilities: [
+            { value: 'Magic Guard', probability: 0.9 },
+            { value: 'Unaware', probability: 0.1 },
+          ],
+          items: [],
+          moves: [],
+          spreads: [],
+        },
+      },
+    };
+
+    const enriched = enrichPokemonInfo(revealed, usageStats);
+    expect(enriched.ability.value).toBe('Unaware');
+  });
+
   test('guessed typed Hidden Power does not join a revealed generic one (G12)', () => {
     const revealed: RevealedPokemonInfo = {
       species: 'Zapdos',

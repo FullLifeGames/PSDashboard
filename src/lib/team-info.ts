@@ -66,13 +66,22 @@ function guessedMoveFromSet(move: SetAssumption): PokemonMoveInfo {
   };
 }
 
+const idOf = (name: string) => name.toLowerCase().replace(/[^a-z0-9]/g, '');
+
+function allowedSetFallback(setFallback: SetAssumption | undefined, ruledOut?: string[]): SetAssumption | undefined {
+  if (!setFallback) return undefined;
+  return (ruledOut ?? []).includes(idOf(setFallback.value)) ? undefined : setFallback;
+}
+
 function normalizeItemField(
   item: PokemonFieldInfo,
   fallback: UsageProbability | undefined,
   setFallback?: SetAssumption,
+  ruledOut?: string[],
 ): PokemonFieldInfo {
+  const allowedSet = allowedSetFallback(setFallback, ruledOut);
   if (item.value && item.value !== '(has item)') return item;
-  if (!fallback && setFallback) return guessedField(setFallback.value, undefined, setFallback.sourceDetail);
+  if (!fallback && allowedSet) return guessedField(allowedSet.value, undefined, allowedSet.sourceDetail);
   if (!fallback) return item;
   return guessedField(fallback.value, fallback.probability, fallback.sourceDetail);
 }
@@ -81,9 +90,11 @@ function normalizeAbilityField(
   ability: PokemonFieldInfo,
   fallback: UsageProbability | undefined,
   setFallback?: SetAssumption,
+  ruledOut?: string[],
 ): PokemonFieldInfo {
+  const allowedSet = allowedSetFallback(setFallback, ruledOut);
   if (ability.value) return ability;
-  if (!fallback && setFallback) return guessedField(setFallback.value, undefined, setFallback.sourceDetail);
+  if (!fallback && allowedSet) return guessedField(allowedSet.value, undefined, allowedSet.sourceDetail);
   if (!fallback) return ability;
   return guessedField(fallback.value, fallback.probability, fallback.sourceDetail);
 }
@@ -157,14 +168,14 @@ export function enrichPokemonInfo(
   usageStats?: SmogonUsageStats | null,
   setAssumptions?: SmogonSetAssumptions | null,
 ): RevealedPokemonInfo {
-  const usageSet = getSpeciesUsageSet(usageStats, pokemon.species);
+  const usageSet = getSpeciesUsageSet(usageStats, pokemon.species, pokemon.ruledOut);
   const smogonSet = getSpeciesSetAssumption(setAssumptions, pokemon.species);
   const usageFilledMoves = usageSet ? fillUsageMoves(pokemon.moves, usageSet.moves) : pokemon.moves;
 
   return {
     ...pokemon,
-    ability: normalizeAbilityField(pokemon.ability, usageSet?.ability, smogonSet?.ability),
-    item: normalizeItemField(pokemon.item, usageSet?.item, smogonSet?.item),
+    ability: normalizeAbilityField(pokemon.ability, usageSet?.ability, smogonSet?.ability, pokemon.ruledOut?.abilities),
+    item: normalizeItemField(pokemon.item, usageSet?.item, smogonSet?.item, pokemon.ruledOut?.items),
     evs: normalizeEvsField(pokemon.evs, usageSet?.spread, smogonSet?.spread),
     nature: normalizeNatureField(pokemon.nature, usageSet?.spread, smogonSet?.spread),
     moves: smogonSet ? fillSetMoves(usageFilledMoves, smogonSet.moves) : usageFilledMoves,

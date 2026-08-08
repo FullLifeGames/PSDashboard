@@ -68,6 +68,35 @@ test.describe('team builder edited assumptions', () => {
     expect(revealed.p1Team[0].item).toBe('Leftovers');
   });
 
+  test('ruled-out abilities are skipped by guesses and the slot default', () => {
+    const log = [
+      '|player|p1|Alice|', '|gen|9', '|tier|[Gen 9] Custom Game',
+      '|poke|p1|Uxie, L50|', '|poke|p2|Clefable, F|',
+      '|start', '|switch|p1a: Uxie|Uxie, L50|100/100',
+      '|switch|p2a: Clef|Clefable, F|100/100', '|turn|1',
+      '|-damage|p2a: Clef|88/100|[from] Stealth Rock', '|turn|2',
+    ].join('\n');
+    const { p2Team } = buildTeamsFromReplay(log);
+    const clef = p2Team.find(set => set.species === 'Clefable');
+    expect(clef?.ability).not.toBe('Magic Guard');
+    expect(clef?.ability).toBeTruthy(); // falls to another real Clefable ability
+  });
+
+  test('a ruled-out slot-0 ability falls to the next species slot', () => {
+    // Bronzong's slot 0 IS Levitate — a landed Earthquake must walk past it.
+    const log = [
+      '|player|p1|Alice|', '|gen|9', '|tier|[Gen 9] Custom Game',
+      '|poke|p1|Garchomp, M|', '|poke|p2|Bronzong|',
+      '|start', '|switch|p1a: Chomp|Garchomp, M|100/100',
+      '|switch|p2a: Bell|Bronzong|100/100', '|turn|1',
+      '|move|p1a: Chomp|Earthquake|p2a: Bell',
+      '|-damage|p2a: Bell|60/100', '|turn|2',
+    ].join('\n');
+    const { p2Team } = buildTeamsFromReplay(log);
+    const bronzong = p2Team.find(set => set.species === 'Bronzong');
+    expect(bronzong?.ability).toBe('Heatproof');
+  });
+
   test('defaults an unrevealed ability to the species slot-0 ability', () => {
     // A packed set with an empty ability gives the sim Pokémon NO ability at
     // all (custom games skip validation) — the GPL reconstruction's Uxie

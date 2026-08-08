@@ -388,6 +388,8 @@ function inferBootsFromHazards(
     if (!pokemon) continue;
     if (pokemon.item.value && pokemon.item.value !== '(has item)') continue;
     if (toId(pokemon.ability.value) === 'magicguard') continue;
+    // A rocks chip elsewhere in the game disproves Boots outright.
+    if (pokemon.ruledOut?.items.includes('heavydutyboots')) continue;
     pokemon.item = guessedField('Heavy-Duty Boots', undefined, 'No Stealth Rock damage on switch-in');
   }
 }

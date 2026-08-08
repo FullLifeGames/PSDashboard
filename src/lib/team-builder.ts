@@ -74,8 +74,10 @@ function buildSet(
       infoId === toId(candidate.species.split('-')[0]);
   });
 
-  const usageSet = getSpeciesUsageSet(usageStats, info.species);
+  const usageSet = getSpeciesUsageSet(usageStats, info.species, info.ruledOut);
   const smogonSet = getSpeciesSetAssumption(setAssumptions, info.species);
+  const allowed = (value: string | undefined, ruledOut?: string[]) =>
+    value && !(ruledOut ?? []).includes(toId(value)) ? value : '';
 
   if (userMatch) {
     // A full team sheet normally defines the moveset — but a manual edit
@@ -111,8 +113,9 @@ function buildSet(
   return {
     name: info.species,
     species: info.species,
-    item: cleanItem(info.item.value, usageSet?.item?.value || smogonSet?.item?.value || ''),
-    ability: info.ability.value || usageSet?.ability?.value || smogonSet?.ability?.value || defaultAbility(info.species),
+    item: cleanItem(info.item.value, usageSet?.item?.value || allowed(smogonSet?.item?.value, info.ruledOut?.items)),
+    ability: info.ability.value || usageSet?.ability?.value || allowed(smogonSet?.ability?.value, info.ruledOut?.abilities) ||
+      defaultAbility(info.species, info.ruledOut?.abilities),
     moves: moves.length > 0 ? moves : ['Tackle'],
     nature: (editedNature || spread?.nature || setSpread?.nature || 'Hardy') as PokemonSet['nature'],
     evs: editedEvs || spread?.evs || setSpread?.evs || { hp: 252, atk: 252, def: 0, spa: 0, spd: 4, spe: 0 },
@@ -151,10 +154,18 @@ function cleanItem(replayItem: string, fallback: string): string {
  * A packed set with an empty ability gives the sim Pokémon NO ability at all
  * (custom games skip team validation) — the GPL reconstruction's Uxie died to
  * an Earthquake it should have been immune to. Slot 0 is Showdown's own
- * teambuilder default when nothing better is known.
+ * teambuilder default when nothing better is known; protocol rule-outs walk
+ * to the next slot (a Bronzong that took an Earthquake is not Levitate).
  */
-function defaultAbility(species: string): string {
-  return Dex.species.get(species).abilities?.[0] || '';
+function defaultAbility(species: string, ruledOut?: string[]): string {
+  const abilities = (Dex.species.get(species).abilities ?? {}) as Record<string, string | undefined>;
+  for (const slot of ['0', '1', 'H'] as const) {
+    const ability = abilities[slot];
+    if (ability && !(ruledOut ?? []).includes(toId(ability))) return ability;
+  }
+  // Every slot ruled out (single-ability species with contradictory evidence,
+  // e.g. a video log's mis-read): keep slot 0 — a wrong ability beats none.
+  return abilities['0'] || '';
 }
 
 /** `primary` defines the set; `fill` only tops it up to four moves. */

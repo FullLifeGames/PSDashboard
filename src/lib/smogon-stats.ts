@@ -371,13 +371,19 @@ export function getSpeciesUsageStats(
 export function getSpeciesUsageSet(
   usageStats: SmogonUsageStats | null | undefined,
   species: string,
+  ruledOut?: { abilities?: string[]; items?: string[] },
 ): SpeciesUsageSet | null {
   const stats = getSpeciesUsageStats(species, usageStats);
   if (!stats || !usageStats) return null;
 
+  // Protocol evidence can DISPROVE the top usage pick (a Clefable that takes
+  // Stealth Rock damage is not Magic Guard) — fall to the next candidate.
+  const firstAllowed = (entries: UsageProbability[], excluded?: string[]) =>
+    entries.find(entry => !(excluded ?? []).includes(toId(entry.value)));
+
   return {
-    ability: stats.abilities[0],
-    item: stats.items[0],
+    ability: firstAllowed(stats.abilities, ruledOut?.abilities),
+    item: firstAllowed(stats.items, ruledOut?.items),
     moves: stats.moves.slice(0, 4),
     spread: stats.spreads[0],
     sourceDetail: sourceDetail(usageStats.format, usageStats.month),
