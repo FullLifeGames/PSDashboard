@@ -13,10 +13,13 @@ import { TIER_THRESHOLDS } from './analysis';
 export const BLUNDER_SWING = TIER_THRESHOLDS.blunder;
 
 /**
- * Returns the 1-based turn numbers whose score swung by at least
- * BLUNDER_SWING relative to the directly preceding evaluated turn. Gaps
- * (null scores) break the chain — a swing across several turns cannot be
- * pinned on one decision.
+ * Returns the 1-based turn numbers whose PLAY created a blunder-sized swing:
+ * scores[t-1] is the position at the start of turn t, so a swing between
+ * scores[index-1] and scores[index] was played on turn `index` — the marker
+ * must sit on that turn (clicking it opens the analysis that explains the
+ * swing), not on the turn after, where the drop merely becomes visible.
+ * Gaps (null scores) break the chain — a swing across several turns cannot
+ * be pinned on one decision.
  */
 export function computeBlunders(scores: (number | null)[]): number[] {
   const blunders: number[] = [];
@@ -24,7 +27,7 @@ export function computeBlunders(scores: (number | null)[]): number[] {
     const previous = scores[index - 1];
     const current = scores[index];
     if (previous === null || current === null) continue;
-    if (Math.abs(current - previous) >= BLUNDER_SWING) blunders.push(index + 1);
+    if (Math.abs(current - previous) >= BLUNDER_SWING) blunders.push(index);
   }
   return blunders;
 }

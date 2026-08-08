@@ -2,10 +2,13 @@ import { test, expect } from '@playwright/test';
 import { computeBlunders, selectKeyTurns, BLUNDER_SWING } from '../src/lib/eval/graph';
 
 test.describe('eval graph blunder detection', () => {
-  test('flags swings at or above the threshold', () => {
+  test('flags the turn whose play created the swing, not the turn after', () => {
     const scores = [0.1, 0.15, -0.3, -0.25, 0.4];
-    // turn 3 swings -0.45, turn 5 swings +0.65
-    expect(computeBlunders(scores)).toEqual([3, 5]);
+    // The -0.45 swing shows between the turn-2 and turn-3 points — it was
+    // PLAYED on turn 2 (scores[t-1] is the start of turn t); same for the
+    // +0.65 swing played on turn 4. The marker must match the turn whose
+    // analysis explains the swing.
+    expect(computeBlunders(scores)).toEqual([2, 4]);
   });
 
   test('ignores gaps and small drifts', () => {
