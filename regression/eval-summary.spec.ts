@@ -89,7 +89,8 @@ test.describe('natural-language turn summaries', () => {
       ...result,
       perSide: {
         p1: [choice('move reply', 'Reply', 0.2)],
-        p2: [...result.perSide.p2, choice('move splash', 'Splash', -0.4)],
+        // 0.45 wp-unit regret vs the −0.05 best: past the 20%-win-prob band.
+        p2: [...result.perSide.p2, choice('move splash', 'Splash', -0.5)],
       },
     };
     const summary = summarizeTurn(analyzeTurn({
@@ -147,7 +148,7 @@ test.describe('natural-language turn summaries', () => {
         p1: [choice('move tackle 1, move protect', 'Tackle + Protect', 0.1)],
         p2: [
           choice('move protect, move drainpunch 1', 'Protect + Drain Punch', 0.05),
-          choice('move rockslide, move ragefist 1', 'Rock Slide + Rage Fist', -0.1),
+          choice('move rockslide, move ragefist 1', 'Rock Slide + Rage Fist', -0.2),
           choice('move rockslide, move drainpunch 1', 'Rock Slide + Drain Punch', -0.3),
         ],
       },
@@ -318,9 +319,11 @@ test.describe('natural-language turn summaries', () => {
       scoreBefore: 0.1,
       scoreAfter: null,
     }), names);
-    // Scores ARE wp-units now: percent display is linear ((s+1)/2).
+    // Scores ARE wp-units now: percent display is linear ((s+1)/2), and
+    // Alpha's 0.15 regret sits below the wp-unit mistake band — it surfaces
+    // as the inaccuracy note instead of a decision clause.
     expect(summary).toContain('55%');
-    expect(summary).toContain('Alpha played U-turn');
+    expect(summary).toContain("Alpha's U-turn was an inaccuracy");
     expect(summary).toContain('Beta played Recover');
   });
 

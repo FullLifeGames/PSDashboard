@@ -49,6 +49,13 @@ import { searchPosition } from '../src/lib/eval/search';
  * Every bucket up vs the 56/64/76/62/82 baseline (mid +3, late +7, singles +4):
  * pair-consistent spreads make reconstructed positions genuinely more
  * predictive of outcomes. GATE PASSED.
+ *
+ * Win-prob-unit conversion 2026-08-08 (wpUnits at the search leaf): sign
+ * accuracy is INVARIANT under the monotone sigmoid, so these buckets carry
+ * over unchanged; mean|score| values are no longer comparable across the
+ * conversion (wp-units compress). Verdict thresholds re-derived as 0.1/0.2/0.4
+ * wp-units (5/10/20% win-prob loss — half-Lichess; the score-space bands
+ * flagged 3–5% losses, the source of the T22/T26/T29 over-flagging).
  */
 const REPLAY_IDS = [
   'gen9draft-2058494320',

@@ -44,6 +44,31 @@ const sackSnapshot = (hpPercent: number): TurnSnapshot => ({
   log: [],
 });
 
+test.describe('verdict tiers in wp-units', () => {
+  test('bands sit at 5/10/20% win-probability loss', () => {
+    const at = (playedEv: number) => analyzeTurn({
+      turn: 5,
+      result: {
+        score: 0, interval: 0, depthCompleted: 1,
+        perSide: {
+          p1: [choiceEv('move a', 'A', 0.5, 0.5), choiceEv('move b', 'B', 0.5 - 1, playedEv)],
+          p2: [choice('move x', 'X', 0)],
+        },
+      },
+      played: { p1: { kind: 'move', name: 'B', tera: false }, p2: { kind: 'move', name: 'X', tera: false } },
+      playedOutcome: null,
+      scoreBefore: 0,
+      scoreAfter: null,
+    }).p1.tier;
+    // regret = 0.5 − playedEv (wp-units; 0.1 units = 5% win probability).
+    expect(at(0.5 - 0.17)).toBe('inaccuracy'); // 8.5% loss — old bands called this a mistake
+    expect(at(0.5 - 0.25)).toBe('mistake');
+    expect(at(0.5 - 0.35)).toBe('mistake');    // old bands called this a blunder
+    expect(at(0.5 - 0.45)).toBe('blunder');
+    expect(at(0.5 - 0.05)).toBeUndefined();
+  });
+});
+
 test.describe('sacrifice detection', () => {
   test('turnEvents slices the lines strictly between turn markers', () => {
     const log = ['|start', '|turn|1', '|move|a', '|turn|2', '|move|b', '|win|X'].join('\n');
@@ -298,11 +323,11 @@ test.describe('turn analysis assembly', () => {
       scoreBefore,
       scoreAfter: null,
     });
-    expect(at(0.31).p1.tier).toBe('inaccuracy');
-    expect(at(0.31).attribution).toBe('quiet');
+    expect(at(0.28).p1.tier).toBe('inaccuracy');
+    expect(at(0.28).attribution).toBe('quiet');
     expect(at(0.2).p1.tier).toBe('mistake');
     expect(at(0.2).attribution).toBe('p1-decision');
-    expect(at(0.05).p1.tier).toBe('blunder');
+    expect(at(-0.05).p1.tier).toBe('blunder');
     expect(at(0.38).p1.tier).toBeUndefined();
   });
 
@@ -325,11 +350,11 @@ test.describe('turn analysis assembly', () => {
       scoreAfter: null,
     });
     // Already lost (own −0.8): the 0.2 mistake reads as an inaccuracy and
-    // stops driving the attribution; the 0.35 blunder softens to a mistake.
+    // stops driving the attribution; the 0.45 blunder softens to a mistake.
     expect(at(0.2, -0.8).p1.tier).toBe('inaccuracy');
     expect(at(0.2, -0.8).attribution).toBe('quiet');
-    expect(at(0.05, -0.8).p1.tier).toBe('mistake');
-    expect(at(0.05, -0.8).attribution).toBe('p1-decision');
+    expect(at(-0.05, -0.8).p1.tier).toBe('mistake');
+    expect(at(-0.05, -0.8).attribution).toBe('p1-decision');
     // Undecided positions keep the full tier.
     expect(at(0.2, 0.3).p1.tier).toBe('mistake');
   });
@@ -474,9 +499,12 @@ test.describe('turn analysis assembly', () => {
       scoreAfter: null,
     });
     expect(analysis.swing).toBeNull();
+    // p1's 0.15 regret (7.5% win prob) sits below the wp-unit mistake band —
+    // reported as a number, no longer a decision flag; p2's 0.25 still is.
     expect(analysis.p1.regret).toBeCloseTo(0.15, 10);
-    expect(analysis.p1.regret).toBeGreaterThanOrEqual(REGRET_THRESHOLD);
-    expect(analysis.attribution).toBe('both-decision');
+    expect(analysis.p2.regret).toBeCloseTo(0.25, 10);
+    expect(analysis.p2.regret).toBeGreaterThanOrEqual(REGRET_THRESHOLD);
+    expect(analysis.attribution).toBe('p2-decision');
   });
 });
 

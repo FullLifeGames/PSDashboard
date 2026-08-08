@@ -8,17 +8,26 @@ import type { PlayedAction, PlayedTurn, SackInfo } from './played';
  * @pkmn/sim imports, main-bundle safe.
  */
 
-/** Chess-style verdict bands on the EV-regret. */
+/**
+ * Chess-style verdict bands on the EV-regret, in WP-UNITS (0.1 = 5% win
+ * probability): 5% / 10% / 20% win-prob loss. Half of Lichess's 10/20/30
+ * bands — deliberately: the score-space thresholds flagged ~3–5% losses as
+ * mistakes (the T22/T26/T29 over-flagging), while full Lichess bands would
+ * barely flag anything at this engine's confidence levels.
+ */
 export type VerdictTier = 'inaccuracy' | 'mistake' | 'blunder';
 export const TIER_THRESHOLDS: Record<VerdictTier, number> = {
-  inaccuracy: 0.08,
-  mistake: 0.15,
-  blunder: 0.3,
+  inaccuracy: 0.1,
+  mistake: 0.2,
+  blunder: 0.4,
 };
 /**
- * Lichess-style leniency: once the game is this decided (own perspective),
- * verdicts soften one tier — piling blame onto a lost position teaches
- * nothing, and a winning position forgives small imprecision.
+ * Lichess-style leniency: once the game is this decided (own perspective;
+ * 0.7 wp-units = 85% win probability), verdicts soften one tier — piling
+ * blame onto a lost position teaches nothing, and a winning position
+ * forgives small imprecision. KEPT after the wp-unit conversion: sigmoid
+ * compression already shrinks decided-position regrets, but garbage-time
+ * turns still produce band-crossing regrets when the leaf spread is wide.
  */
 export const DECIDED_SCORE = 0.7;
 
