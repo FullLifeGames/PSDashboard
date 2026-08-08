@@ -68,4 +68,28 @@ test.describe('damage-consistent spread inference', () => {
     const single = inferSpreads([observe('U-turn', {}, 'Hardy')], sets, 'gen9customgame');
     expect(single.get('p1:uxie')).toBeUndefined();
   });
+
+  test('solving bulk preserves the prior Speed EVs, speed nature, and unmeasured offense', () => {
+    // Damage observations carry no information about Speed (and none about
+    // the offense of a mon only ever observed defending) — the solver must
+    // not overwrite what the evidence cannot measure.
+    const timidSets = {
+      p1: [{
+        ...set('Uxie', ['Stealth Rock', 'U-turn']),
+        nature: 'Timid',
+        evs: { hp: 0, atk: 0, def: 0, spa: 252, spd: 0, spe: 252 },
+      }],
+      p2: [set('Landorus-Therian', ['U-turn', 'Knock Off'])],
+    };
+    const observations = [
+      observe('U-turn', { hp: 252 }, 'Hardy'),
+      observe('Knock Off', { hp: 252 }, 'Hardy'),
+    ];
+    const uxie = inferSpreads(observations, timidSets, 'gen9customgame').get('p1:uxie');
+    expect(uxie).toBeTruthy();
+    expect(uxie!.evs.hp).toBe(252);
+    expect(uxie!.evs.spe).toBe(252);
+    expect(uxie!.evs.spa).toBe(252);
+    expect(uxie!.nature).toBe('Timid');
+  });
 });

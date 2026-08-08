@@ -1,6 +1,7 @@
 import { Generations, Pokemon, Move, Field, calculate } from '@smogon/calc';
 import type { PokemonSet } from '@pkmn/sim';
 import type { DamageObservation, PokemonEvs } from '../types';
+import { WEATHER_BY_ID } from './damage-calc';
 
 /**
  * Damage-consistent spread inference: the replay's observed damage fractions
@@ -29,52 +30,82 @@ const OBSERVATION_SLACK = 0.02;
 /** Minimum observations before a spread claim beats the existing guess. */
 const MIN_OBSERVATIONS = 2;
 
-const WEATHER_NAMES: Record<string, 'Sand' | 'Rain' | 'Sun' | 'Snow' | 'Hail'> = {
-  sand: 'Sand', sandstorm: 'Sand',
-  rain: 'Rain', raindance: 'Rain',
-  sun: 'Sun', sunnyday: 'Sun',
-  snow: 'Snow', snowscape: 'Snow',
-  hail: 'Hail',
+/** Client condition ids the shared calc map doesn't spell out. */
+const WEATHER_ALIASES: Record<string, string> = {
+  sand: 'sandstorm', rain: 'raindance', sun: 'sunnyday',
 };
 
 const toId = (name: string) => name.toLowerCase().replace(/[^a-z0-9]/g, '');
+
+const weatherFor = (raw: string) => WEATHER_BY_ID[WEATHER_ALIASES[toId(raw)] ?? toId(raw)];
 
 interface CandidateRung {
   evs: PokemonEvs;
   nature: string;
 }
 
+/** The stat a nature boosts — for deciding whether a rung must neutralize it. */
+const NATURE_PLUS: Record<string, keyof PokemonEvs> = {
+  adamant: 'atk', lonely: 'atk', brave: 'atk', naughty: 'atk',
+  modest: 'spa', quiet: 'spa', mild: 'spa', rash: 'spa',
+  bold: 'def', impish: 'def', lax: 'def', relaxed: 'def',
+  calm: 'spd', careful: 'spd', gentle: 'spd', sassy: 'spd',
+  timid: 'spe', jolly: 'spe', hasty: 'spe', naive: 'spe',
+};
+
 /**
  * The discrete ladder: offense {0, 252, 252+nature} × bulk {uninvested,
  * 252 HP, 252 HP + 252 Def(/SpD), +nature}. Offense-plus and bulk-plus
  * natures conflict (a nature boosts one stat), so those combinations are
- * skipped. `physicalAttacker` picks Adamant vs Modest and which offense EV
- * the offense rungs invest.
+ * skipped.
+ *
+ * Every rung INHERITS the prior and overrides only the dimensions the mon's
+ * observations can actually measure: offense only with attacker
+ * observations, bulk only with defender observations, and Speed never —
+ * damage carries no Speed information, so a rung must not strip Speed EVs
+ * or a speed nature the usage prior claims. A prior nature is neutralized
+ * to Hardy only when it boosts a measured stat the rung claims uninvested.
  */
-function candidateLadder(physicalAttacker: boolean): CandidateRung[] {
+function candidateLadder(
+  prior: SpreadCandidate,
+  physicalAttacker: boolean,
+  hasAttackerObs: boolean,
+  hasDefenderObs: boolean,
+): CandidateRung[] {
   const offenseStat = physicalAttacker ? 'atk' : 'spa';
   const offensePlus = physicalAttacker ? 'Adamant' : 'Modest';
-  const offense: { value: number; nature?: string }[] = [
-    { value: 0 },
-    { value: 252 },
-    { value: 252, nature: offensePlus },
-  ];
-  const bulk: { evs: Partial<PokemonEvs>; nature?: string }[] = [
-    { evs: {} },
-    { evs: { hp: 252 } },
-    { evs: { hp: 252, def: 252 } },
-    { evs: { hp: 252, spd: 252 } },
-    { evs: { hp: 252, def: 252 }, nature: 'Bold' },
-    { evs: { hp: 252, spd: 252 }, nature: 'Calm' },
-  ];
+  const offense: { evs?: Partial<PokemonEvs>; nature?: string }[] = hasAttackerObs
+    ? [
+      { evs: { [offenseStat]: 0 } },
+      { evs: { [offenseStat]: 252 } },
+      { evs: { [offenseStat]: 252 }, nature: offensePlus },
+    ]
+    : [{}];
+  const bulk: { evs?: Partial<PokemonEvs>; nature?: string }[] = hasDefenderObs
+    ? [
+      { evs: { hp: 0, def: 0, spd: 0 } },
+      { evs: { hp: 252, def: 0, spd: 0 } },
+      { evs: { hp: 252, def: 252, spd: 0 } },
+      { evs: { hp: 252, def: 0, spd: 252 } },
+      { evs: { hp: 252, def: 252, spd: 0 }, nature: 'Bold' },
+      { evs: { hp: 252, def: 0, spd: 252 }, nature: 'Calm' },
+    ]
+    : [{}];
 
-  const rungs: CandidateRung[] = [];
+  const measured = new Set<keyof PokemonEvs>([
+    ...(hasAttackerObs ? [offenseStat as keyof PokemonEvs] : []),
+    ...(hasDefenderObs ? (['def', 'spd'] as (keyof PokemonEvs)[]) : []),
+  ]);
+  const priorPlus = NATURE_PLUS[toId(prior.nature)];
+
+  const rungs: CandidateRung[] = [{ evs: { ...ZERO_EVS, ...prior.evs }, nature: prior.nature }];
   for (const o of offense) {
     for (const b of bulk) {
       if (o.nature && b.nature) continue;
       rungs.push({
-        evs: { ...ZERO_EVS, ...b.evs, [offenseStat]: o.value },
-        nature: o.nature ?? b.nature ?? 'Hardy',
+        evs: { ...ZERO_EVS, ...prior.evs, ...b.evs, ...o.evs },
+        nature: o.nature ?? b.nature ??
+          (priorPlus && measured.has(priorPlus) ? 'Hardy' : prior.nature),
       });
     }
   }
@@ -144,7 +175,7 @@ export function inferSpreads(
       const defender = calcPokemon(defenderSide, obs.defenderSpecies, defenderSpread, obs.defenderBoosts, '');
       const screens = new Set(obs.screens);
       const result = calculate(gen, attacker, defender, new Move(gen, obs.moveId), new Field({
-        weather: WEATHER_NAMES[toId(obs.weather)],
+        weather: weatherFor(obs.weather),
         defenderSide: {
           isReflect: screens.has('reflect'),
           isLightScreen: screens.has('lightscreen'),
@@ -193,7 +224,12 @@ export function inferSpreads(
   const solveOne = (key: string) => {
     const monObservations = byMon.get(key) ?? [];
     if (monObservations.length < MIN_OBSERVATIONS) return;
-    const ladder = candidateLadder(physicalAttackerFor(key));
+    const hasAttackerObs = monObservations.some(obs => keyOf(obs.attackerSide, obs.attackerSpecies) === key);
+    const hasDefenderObs = monObservations.some(obs =>
+      keyOf(obs.attackerSide === 'p1' ? 'p2' : 'p1', obs.defenderSpecies) === key);
+    const prior = priors.get(key);
+    if (!prior) return;
+    const ladder = candidateLadder(prior, physicalAttackerFor(key), hasAttackerObs, hasDefenderObs);
     let best: CandidateRung | null = null;
     let bestError = Infinity;
     for (const rung of ladder) {
@@ -219,9 +255,5 @@ export function inferSpreads(
   for (const key of order) solveOne(key);
   for (const key of order) solveOne(key);
 
-  // Only claim spreads that had enough evidence.
-  for (const key of [...solved.keys()]) {
-    if ((byMon.get(key)?.length ?? 0) < MIN_OBSERVATIONS) solved.delete(key);
-  }
   return solved;
 }

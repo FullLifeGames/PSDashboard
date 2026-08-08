@@ -34,7 +34,7 @@ function toConditionId(value: string | undefined): string {
   return (value || '').toLowerCase().replace(/[^a-z0-9]/g, '');
 }
 
-const WEATHER_BY_ID: Record<string, NonNullable<CalcWeather>> = {
+export const WEATHER_BY_ID: Record<string, NonNullable<CalcWeather>> = {
   raindance: 'Rain',
   primordialsea: 'Heavy Rain',
   sunnyday: 'Sun',
