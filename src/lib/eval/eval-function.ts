@@ -88,12 +88,38 @@ function itemMultiplier(pokemon: Pokemon): number {
   return 1;
 }
 
-function pokemonScore(pokemon: Pokemon): number {
-  if (pokemon.fainted || pokemon.hp <= 0) return 0;
-  const base = EVAL_WEIGHTS.alive + EVAL_WEIGHTS.hp * (pokemon.hp / pokemon.maxhp);
-  const statusMultiplier = EVAL_WEIGHTS.status[pokemon.status] ?? 1;
-  return base * statusMultiplier * itemMultiplier(pokemon);
+/**
+ * Raw, unweighted feature values (p1-positive differences). The score is the
+ * weighted sum through tanh — ONE code path shared by scoring and the WP 7
+ * fitting harness, so fitted weights and runtime scores cannot diverge.
+ * Multiplicative modifiers are NOT independent features: status and item
+ * multipliers fold into `bodies`, the status discount into `boosts`, the
+ * offensive/defensive split (2:1) and the cap/entries coupling into their
+ * raw values. Only the top-level FEATURE_WEIGHTS are fittable.
+ */
+export interface EvalFeatures {
+  bodies: number;
+  boosts: number;
+  hazards: number;
+  screens: number;
+  tailwind: number;
+  trickRoom: number;
+  matchup: number;
+  coverage: number;
+  choiceMismatch: number;
 }
+
+export const FEATURE_WEIGHTS: Record<keyof EvalFeatures, number> = {
+  bodies: EVAL_WEIGHTS.alive + EVAL_WEIGHTS.hp,
+  boosts: EVAL_WEIGHTS.boostStage.offensive,
+  hazards: EVAL_WEIGHTS.hazardEntries,
+  screens: EVAL_WEIGHTS.screen,
+  tailwind: EVAL_WEIGHTS.tailwind,
+  trickRoom: EVAL_WEIGHTS.trickRoom,
+  matchup: EVAL_WEIGHTS.matchup,
+  coverage: EVAL_WEIGHTS.coverage,
+  choiceMismatch: EVAL_WEIGHTS.choiceMismatch,
+};
 
 function averageSpeed(side: Side): number {
   const living = side.pokemon.filter(pokemon => !pokemon.fainted && pokemon.hp > 0);
@@ -135,15 +161,20 @@ export function hazardCost(side: Side, battle: Battle): number {
   return Math.min(cost, EVAL_WEIGHTS.hazardCap);
 }
 
-function sideScore(side: Side, battle: Battle): number {
-  let score = 0;
+function sideFeatureValues(side: Side, battle: Battle) {
+  const bodyWeight = EVAL_WEIGHTS.alive + EVAL_WEIGHTS.hp;
+  let bodies = 0;
+  let boosts = 0;
+  let choiceMismatch = 0;
+  let screens = 0;
   for (const pokemon of side.pokemon) {
-    score += pokemonScore(pokemon);
     if (pokemon.fainted || pokemon.hp <= 0) continue;
+    bodies += ((EVAL_WEIGHTS.alive + EVAL_WEIGHTS.hp * (pokemon.hp / pokemon.maxhp)) / bodyWeight) *
+      (EVAL_WEIGHTS.status[pokemon.status] ?? 1) * itemMultiplier(pokemon);
     if (CHOICE_ITEMS.has(pokemon.item) && pokemon.moveSlots.length > 0) {
       const statusMoves = pokemon.moveSlots
         .filter(slot => battle.dex.moves.get(slot.id).category === 'Status').length;
-      score -= EVAL_WEIGHTS.choiceMismatch * (statusMoves / pokemon.moveSlots.length);
+      choiceMismatch += statusMoves / pokemon.moveSlots.length;
     }
   }
   for (const active of side.active) {
@@ -151,19 +182,45 @@ function sideScore(side: Side, battle: Battle): number {
     const statusDiscount = EVAL_WEIGHTS.boostStatusDiscount[active.status] ?? 1;
     for (const [stat, stage] of Object.entries(active.boosts)) {
       if (!stage) continue;
-      const base = stat === 'atk' || stat === 'spa' || stat === 'spe'
-        ? EVAL_WEIGHTS.boostStage.offensive
-        : EVAL_WEIGHTS.boostStage.defensive;
+      // Defensive stages read at half the offensive weight (12 vs 6).
+      const statWeight = stat === 'atk' || stat === 'spa' || stat === 'spe' ? 1 : 0.5;
       const magnitude = EVAL_WEIGHTS.boostSchedule[Math.min(Math.abs(stage), 6)];
-      score += Math.sign(stage) * base * magnitude * statusDiscount;
+      boosts += Math.sign(stage) * statWeight * magnitude * statusDiscount;
     }
   }
-  score -= hazardCost(side, battle);
   for (const id of SCREENS) {
-    if (side.sideConditions[id]) score += EVAL_WEIGHTS.screen;
+    if (side.sideConditions[id]) screens += 1;
   }
-  if (side.sideConditions['tailwind']) score += EVAL_WEIGHTS.tailwind;
-  return score;
+  return {
+    bodies,
+    boosts,
+    choiceMismatch,
+    screens,
+    // Raw value carries the cap; the entries weight scales back to points.
+    hazards: hazardCost(side, battle) / EVAL_WEIGHTS.hazardEntries,
+    tailwind: side.sideConditions['tailwind'] ? 1 : 0,
+  };
+}
+
+export function evalFeatures(battle: Battle, cache?: MatchupCache): EvalFeatures {
+  const p1 = sideFeatureValues(battle.sides[0], battle);
+  const p2 = sideFeatureValues(battle.sides[1], battle);
+  let trickRoom = 0;
+  if (battle.field.pseudoWeather['trickroom']) {
+    trickRoom = averageSpeed(battle.sides[0]) <= averageSpeed(battle.sides[1]) ? 1 : -1;
+  }
+  const terms = matchupTerms(battle, cache);
+  return {
+    bodies: p1.bodies - p2.bodies,
+    boosts: p1.boosts - p2.boosts,
+    hazards: p2.hazards - p1.hazards, // hazards on THEIR side favor p1
+    screens: p1.screens - p2.screens,
+    tailwind: p1.tailwind - p2.tailwind,
+    trickRoom,
+    matchup: terms.matchup,
+    coverage: terms.coverage,
+    choiceMismatch: p2.choiceMismatch - p1.choiceMismatch,
+  };
 }
 
 /** HP- and boost-independent threat estimate of one attacker→defender direction. */
@@ -382,17 +439,12 @@ export function evaluatePosition(battle: Battle, cache?: MatchupCache): number {
     return -1;
   }
 
-  let p1 = sideScore(battle.sides[0], battle);
-  let p2 = sideScore(battle.sides[1], battle);
-
-  if (battle.field.pseudoWeather['trickroom']) {
-    if (averageSpeed(battle.sides[0]) <= averageSpeed(battle.sides[1])) p1 += EVAL_WEIGHTS.trickRoom;
-    else p2 += EVAL_WEIGHTS.trickRoom;
-  }
-
+  const features = evalFeatures(battle, cache);
   const teamSize = Math.max(battle.sides[0].pokemon.length, battle.sides[1].pokemon.length, 1);
   const normalizer = teamSize * (EVAL_WEIGHTS.alive + EVAL_WEIGHTS.hp);
-  const terms = matchupTerms(battle, cache);
-  const diff = (p1 - p2) + terms.matchup * EVAL_WEIGHTS.matchup + terms.coverage * EVAL_WEIGHTS.coverage;
+  let diff = 0;
+  for (const key of Object.keys(FEATURE_WEIGHTS) as (keyof EvalFeatures)[]) {
+    diff += FEATURE_WEIGHTS[key] * features[key];
+  }
   return Math.tanh((diff / normalizer) * EVAL_WEIGHTS.scale);
 }

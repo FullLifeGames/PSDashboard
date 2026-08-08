@@ -38,6 +38,29 @@ function makeBattle(p1Sets: PokemonSet[], p2Sets: PokemonSet[]): Battle {
 const VANILLA = ['Protect', 'Substitute'];
 
 test.describe('evaluatePosition', () => {
+  test('pinned scores survive the feature-vector refactor', () => {
+    // Contract for the WP 7 featureization: same battles, same numbers.
+    const hazardous = makeBattle(
+      [makeSet('A', 'Snorlax', VANILLA), makeSet('A2', 'Charizard', VANILLA)],
+      [makeSet('B', 'Dragapult', VANILLA), makeSet('B2', 'Volcarona', VANILLA)],
+    );
+    hazardous.sides[1].addSideCondition('stealthrock', hazardous.sides[0].active[0]!);
+    hazardous.sides[0].active[0]!.boosts.atk = 2;
+    hazardous.sides[1].active[0]!.setStatus('tox');
+
+    const races = makeBattle(
+      [makeSet('Sala', 'Salazzle', ['Sludge Wave', 'Flamethrower'])],
+      [makeSet('Clef', 'Clefable', ['Calm Mind', 'Moonlight', 'Moonblast', 'Stored Power'], 50, { item: 'Choice Scarf' })],
+    );
+
+    const trickroom = makeBattle([makeSet('A', 'Snorlax', VANILLA)], [makeSet('B', 'Dragapult', VANILLA)]);
+    trickroom.field.addPseudoWeather('trickroom', trickroom.sides[0].active[0]!);
+
+    expect(evaluatePosition(hazardous)).toBeCloseTo(0.8043935326321168, 6);
+    expect(evaluatePosition(races)).toBeCloseTo(0.9672891743979647, 6);
+    expect(evaluatePosition(trickroom)).toBeCloseTo(0.1243530017715962, 6);
+  });
+
   test('a mirror position evaluates to zero', () => {
     const battle = makeBattle(
       [makeSet('Snorlax', 'Snorlax', VANILLA)],
