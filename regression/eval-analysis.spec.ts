@@ -1,6 +1,8 @@
 import { test, expect } from '@playwright/test';
 import { analyzeTurn, matchPlayedChoice, playedSetupMove, REGRET_THRESHOLD, type SideAnalysis } from '../src/lib/eval/analysis';
+import { detectSacks, turnEvents } from '../src/lib/eval/played';
 import type { EvalResult, RankedChoice } from '../src/lib/eval/types';
+import type { TurnSnapshot } from '../src/types';
 
 const choice = (choiceStr: string, label: string, worstCase: number): RankedChoice =>
   ({ choice: choiceStr, label, worstCase, expected: worstCase, ev: worstCase, punishedBy: 'Reply' });
@@ -26,6 +28,70 @@ const result: EvalResult = {
     ],
   },
 };
+
+const sackSnapshot = (hpPercent: number): TurnSnapshot => ({
+  turn: 29,
+  p1: {
+    name: 'P1', id: 'p1', sideConditions: {},
+    pokemon: [{
+      name: 'Dauni', speciesForme: 'Uxie', hp: 17, maxhp: 182, hpPercent,
+      status: '', fainted: false, isActive: true, boosts: {}, moves: [],
+      ability: '', item: '', terastallized: '', level: 50, gender: '',
+    }],
+  },
+  p2: { name: 'P2', id: 'p2', pokemon: [], sideConditions: {} },
+  field: { weather: '', terrain: '', pseudoWeather: {} },
+  log: [],
+});
+
+test.describe('sacrifice detection', () => {
+  test('turnEvents slices the lines strictly between turn markers', () => {
+    const log = ['|start', '|turn|1', '|move|a', '|turn|2', '|move|b', '|win|X'].join('\n');
+    expect(turnEvents(log, 1)).toEqual(['|move|a']);
+    expect(turnEvents(log, 2)).toEqual(['|move|b', '|win|X']);
+    expect(turnEvents(log, 3)).toEqual([]);
+  });
+
+  test('detectSacks flags a fainted mon that started the turn nearly dead', () => {
+    const events = [
+      '|switch|p1a: Dauni|Uxie, L50|17/182',
+      '|-damage|p1a: Dauni|0 fnt|[from] Stealth Rock',
+      '|faint|p1a: Dauni',
+    ];
+    expect(detectSacks(events, sackSnapshot(9))).toEqual({ p1: { name: 'Dauni', hpFraction: 0.09 } });
+    expect(detectSacks(events, sackSnapshot(45))).toEqual({});
+    expect(detectSacks(events, null)).toEqual({});
+  });
+
+  test('a low-HP sacrifice demotes the tier and suppresses the risk label', () => {
+    const sackResult: EvalResult = {
+      score: 0.1, interval: 0.05, depthCompleted: 2,
+      perSide: {
+        p1: [
+          choiceEv('move dracometeor', 'Draco Meteor', 0.2, 0.2),
+          choiceEv('switch 2', '→ Uxie', -0.1, 0.0),
+        ],
+        p2: [choice('move trick', 'Trick', -0.05)],
+      },
+    };
+    const analysis = analyzeTurn({
+      turn: 29,
+      result: sackResult,
+      played: {
+        p1: { kind: 'switch', name: 'Dauni', species: 'Uxie' },
+        p2: { kind: 'move', name: 'Trick', tera: false },
+      },
+      playedOutcome: -0.1,
+      scoreBefore: 0.1,
+      scoreAfter: -0.1,
+      sacks: { p1: { name: 'Uxie', hpFraction: 0.09 } },
+    });
+    // Regret 0.2 = mistake; the sack demotes one band and replaces the risk label.
+    expect(analysis.p1.sacrifice).toEqual({ name: 'Uxie', hpFraction: 0.09 });
+    expect(analysis.p1.tier).toBe('inaccuracy');
+    expect(analysis.p1.riskUnpunished).toBeFalsy();
+  });
+});
 
 test.describe('turn analysis assembly', () => {
   test('matches moves, tera variants, and switches (nickname or species)', () => {

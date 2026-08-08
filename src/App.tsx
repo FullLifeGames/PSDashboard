@@ -27,7 +27,7 @@ import { getBranchSimulatorFormat, getReplayGameType, getReplayGeneration, infer
 import { resolveTeraPreference } from './lib/eval/tera';
 import { choiceId, evalChoiceToSlotChoices, type BranchSlotChoice } from './lib/branch-choices';
 import type { RankedChoice } from './lib/eval/types';
-import { parseLeadSpecies, parsePlayedActions, parsePlayedActionsDoubles } from './lib/eval/played';
+import { detectSacks, parseLeadSpecies, parsePlayedActions, parsePlayedActionsDoubles, turnEvents } from './lib/eval/played';
 import { analyzeTurn, PAYOFF_WINDOW } from './lib/eval/analysis';
 import { analyzeLeads } from './lib/eval/leads';
 import { buildGameReport } from './lib/eval/report';
@@ -861,8 +861,11 @@ function App() {
       scoreBefore,
       scoreAfter: evaluation.graph.scores[analysisTurn] ?? null,
       playedTracking: true,
+      ...(replayData
+        ? { sacks: detectSacks(turnEvents(replayData.log, analysisTurn), snapshots[analysisTurn - 1] ?? null) }
+        : {}),
     });
-  }, [analysisTurn, evaluation.graph]);
+  }, [analysisTurn, evaluation.graph, replayData, snapshots]);
 
   const replayWinner = useMemo<'p1' | 'p2' | null>(() => {
     if (!replayData) return null;
@@ -893,6 +896,7 @@ function App() {
         scoreBefore,
         scoreAfter: scores[index + 1] ?? null,
         playedTracking: true,
+        sacks: detectSacks(turnEvents(replayData.log, index + 1), snapshots[index] ?? null),
       });
     });
     if (analyses.filter(Boolean).length < 3) return null;
@@ -900,7 +904,7 @@ function App() {
       analyses, [replayData.players[0], replayData.players[1]], replayWinner, true,
       replayGameType === 'doubles',
     );
-  }, [replayData, evaluation.graph, replayWinner, replayGameType]);
+  }, [replayData, snapshots, evaluation.graph, replayWinner, replayGameType]);
 
   const teamPasteStatus = useMemo(() => {
     if (!pastedSets || pastedSets.length === 0) return null;

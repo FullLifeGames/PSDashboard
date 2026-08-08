@@ -3,6 +3,8 @@
  * no @pkmn/sim imports, main-bundle safe.
  */
 
+import type { TurnSnapshot } from '../../types';
+
 export interface PlayedAction {
   kind: 'move' | 'switch';
   /** Move name, or the incoming Pokémon's nickname for switches. */
@@ -174,4 +176,66 @@ export function parsePlayedActionsDoubles(lines: string[]): PlayedTurn {
   }
 
   return { p1: null, p2: null, p1Slots: slots.p1, p2Slots: slots.p2 };
+}
+
+/** A Pokémon fed to the opponent while nearly dead — its loss cost almost nothing. */
+export interface SackInfo {
+  name: string;
+  hpFraction: number;
+}
+
+/** Below this pre-turn HP fraction a faint reads as a sacrifice, not a loss. */
+export const SACK_HP_THRESHOLD = 0.15;
+
+/**
+ * The protocol lines strictly between `|turn|N` and `|turn|N+1` (or the log
+ * end). NOT the same as a TurnSnapshot's `log` chunk, which groups lines by
+ * snapshot association rather than turn boundaries.
+ */
+export function turnEvents(log: string, turn: number): string[] {
+  const lines = log.split('\n');
+  const start = lines.indexOf(`|turn|${turn}`);
+  if (start < 0) return [];
+  const events: string[] = [];
+  for (let index = start + 1; index < lines.length; index++) {
+    if (lines[index].startsWith('|turn|')) break;
+    events.push(lines[index]);
+  }
+  return events;
+}
+
+/**
+ * Detects per-side sacrifices in one turn's events: an own Pokémon fainted
+ * that already stood at ≤ SACK_HP_THRESHOLD when the turn began (per the
+ * pre-turn snapshot). Feeding a nearly-dead body to absorb an attack, a
+ * Trick, or hazard chip is a deliberate low-cost play — the verdict layer
+ * grades it as a sack instead of a risk.
+ */
+export function detectSacks(
+  events: string[],
+  snapshotBefore: TurnSnapshot | null,
+): { p1?: SackInfo; p2?: SackInfo } {
+  if (!snapshotBefore) return {};
+  const sacks: { p1?: SackInfo; p2?: SackInfo } = {};
+
+  for (const line of events) {
+    const match = line.match(/^\|faint\|(p[12])[a-d]:\s*(.+)$/);
+    if (!match) continue;
+    const side = match[1] as 'p1' | 'p2';
+    if (sacks[side]) continue;
+    const name = match[2].trim();
+    const nameId = name.toLowerCase().replace(/[^a-z0-9]/g, '');
+    const snapshotSide = side === 'p1' ? snapshotBefore.p1 : snapshotBefore.p2;
+    const pokemon = snapshotSide.pokemon.find(entry => {
+      const entryName = entry.name.toLowerCase().replace(/[^a-z0-9]/g, '');
+      const entrySpecies = entry.speciesForme.toLowerCase().replace(/[^a-z0-9]/g, '');
+      return entryName === nameId || entrySpecies === nameId;
+    });
+    if (!pokemon || pokemon.fainted) continue;
+    const hpFraction = pokemon.hpPercent / 100;
+    if (hpFraction > SACK_HP_THRESHOLD) continue;
+    sacks[side] = { name, hpFraction };
+  }
+
+  return sacks;
 }

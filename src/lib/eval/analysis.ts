@@ -1,5 +1,5 @@
 import type { EvalResult, RankedChoice } from './types';
-import type { PlayedAction, PlayedTurn } from './played';
+import type { PlayedAction, PlayedTurn, SackInfo } from './played';
 
 /**
  * Turns a sweep's cached per-turn data into a chess-style turn explanation:
@@ -84,6 +84,12 @@ export interface SideAnalysis {
   verifiedAtDepth?: boolean;
   /** Verdict band for the regret, after leniency (absent = clean play). */
   tier?: VerdictTier;
+  /**
+   * The flagged turn fed a nearly-dead Pokémon (≤ SACK_HP_THRESHOLD at turn
+   * start) to the opponent — graded as a deliberate low-cost sack: tier
+   * demoted one band, never labeled a risk.
+   */
+  sacrifice?: SackInfo;
   /**
    * How many options the engine ranked for this side — 1 marks a forced
    * turn (or the waiting sentinel), which accuracy grading must exclude.
@@ -339,6 +345,8 @@ export function analyzeTurn(params: {
   scoreAfter: number | null;
   /** False = played actions unavailable (doubles); blame is off the table. */
   playedTracking?: boolean;
+  /** Per-side low-HP sacrifices detected in the turn's protocol (played.ts). */
+  sacks?: { p1?: SackInfo; p2?: SackInfo };
 }): TurnAnalysis {
   const playedTracking = params.playedTracking !== false;
   const sideAnalysis = (key: 'p1' | 'p2'): SideAnalysis => {
@@ -382,6 +390,14 @@ export function analyzeTurn(params: {
         tier = tier === 'blunder' ? 'mistake' : tier === 'mistake' ? 'inaccuracy' : undefined;
       }
     }
+    // A sack of a nearly-dead body is a deliberate low-cost play: demote one
+    // band (same shape as the decided-position leniency) and mark it so the
+    // risk machinery and the report treat it neutrally.
+    const sack = params.sacks?.[key];
+    const sacrificed = !!(tier && sack);
+    if (sacrificed) {
+      tier = tier === 'blunder' ? 'mistake' : tier === 'mistake' ? 'inaccuracy' : undefined;
+    }
     return {
       playedRaw,
       ...(playedSlots ? { playedSlots } : {}),
@@ -393,6 +409,7 @@ export function analyzeTurn(params: {
       ...(playedPartial ? { playedPartial } : {}),
       ...(verifiedAtDepth ? { verifiedAtDepth } : {}),
       ...(tier ? { tier } : {}),
+      ...(sacrificed && sack ? { sacrifice: sack } : {}),
     };
   };
 
@@ -403,6 +420,7 @@ export function analyzeTurn(params: {
   // payoff over the safe guarantee grades the read: clearly ahead = a good
   // play, clearly behind = a plain misplay even unpunished, between = risk.
   const markRisk = (key: 'p1' | 'p2', side: SideAnalysis, opponent: SideAnalysis) => {
+    if (side.sacrifice) return;
     if (side.tier !== 'mistake' && side.tier !== 'blunder') return;
     if (!side.played?.punishedBy || !opponent.played) return;
     if (opponent.played.label === side.played.punishedBy) return;
