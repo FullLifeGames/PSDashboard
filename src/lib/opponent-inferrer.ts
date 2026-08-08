@@ -118,6 +118,8 @@ function applyTeamSheet(pokemonMap: Map<string, RevealedPokemonInfo>, sheet: She
 
 /** Items whose `[from] item:` damage hits the attacker instead of the holder. */
 const ATTACKER_PUNISH_ITEMS = new Set(['rockyhelmet', 'jabocaberry', 'rowapberry']);
+/** A landed Ground move from a possible immunity-breaker proves nothing about Levitate. */
+const MOLD_BREAKER_ABILITIES = new Set(['moldbreaker', 'teravolt', 'turboblaze']);
 
 /**
  * Extracts revealed information about the opponent's team from the replay log.
@@ -126,13 +128,18 @@ const ATTACKER_PUNISH_ITEMS = new Set(['rockyhelmet', 'jabocaberry', 'rowapberry
 export function inferOpponentTeam(log: string, opponentSide: 'p1' | 'p2' = 'p2'): OpponentTeamInfo {
   const lines = log.split('\n');
   const pokemonMap = new Map<string, RevealedPokemonInfo>();
-  // Each ident's latest move + target — resolves Rocky Helmet reveals in
-  // video-reconstructed logs that drop the [of] attribution, and attributes
-  // landed moves for the Levitate rule-out.
-  const lastMove = new Map<string, { target: string; move: string }>();
-  // Latest attack aimed AT an ident: `|-damage|` lines carry the victim, so
-  // rule-outs need the reverse index.
-  const lastMoveAt = new Map<string, string>();
+  // Each ident's latest move target — resolves Rocky Helmet reveals in
+  // video-reconstructed logs that drop the [of] attribution.
+  const lastMoveTarget = new Map<string, string>();
+  // The move action currently resolving. Bare |-damage| lines are attributed
+  // to it ONLY until an action boundary (miss/immune/switch/turn/...) —
+  // a stale attribution would let a confusion self-hit or Future Sight
+  // resolution "prove" that an immune-blocked Earthquake landed.
+  let pendingMove: { attacker: string; moveName: string } | null = null;
+  // Ident → species for BOTH sides (the attacker of a rule-out line can be
+  // on either side).
+  const identSpecies = new Map<string, string>();
+  let gravityActive = false;
 
   const ruleOut = (nickname: string, kind: 'abilities' | 'items', id: string) => {
     const pokemon = findPokemonByNickname(pokemonMap, nickname, lines, opponentSide);
@@ -144,10 +151,26 @@ export function inferOpponentTeam(log: string, opponentSide: 'p1' | 'p2' = 'p2')
   for (const line of lines) {
     if (line.startsWith('|move|')) {
       const parts = line.split('|');
-      if (parts[2] && parts[4] && /^p[12][a-d]?:/.test(parts[4])) {
-        lastMove.set(parts[2], { target: parts[4], move: parts[3] ?? '' });
-        lastMoveAt.set(parts[4], parts[3] ?? '');
+      if (parts[2]) {
+        pendingMove = { attacker: parts[2], moveName: parts[3] ?? '' };
+        if (parts[4] && /^p[12][a-d]?:/.test(parts[4])) {
+          lastMoveTarget.set(parts[2], parts[4]);
+        }
       }
+    } else if (
+      /^\|(?:-miss|-immune|-fail|-end|turn|upkeep|cant|faint)\|/.test(line) ||
+      (line.startsWith('|-activate|') && line.includes('confusion'))
+    ) {
+      pendingMove = null;
+    }
+
+    if (line.startsWith('|-fieldstart|') && line.includes('Gravity')) gravityActive = true;
+    if (line.startsWith('|-fieldend|') && line.includes('Gravity')) gravityActive = false;
+    if (line.startsWith('|switch|') || line.startsWith('|drag|')) {
+      pendingMove = null;
+      const parts = line.split('|');
+      const parsed = parseDetails(parts[3]);
+      if (parts[2] && parsed) identSpecies.set(parts[2], parsed.species);
     }
 
     // Disproving evidence: a Pokémon that TAKES hazard/status/weather/recoil
@@ -162,10 +185,16 @@ export function inferOpponentTeam(log: string, opponentSide: 'p1' | 'p2' = 'p2')
           ruleOut(nickname, 'items', 'heavydutyboots');
         } else if (/\[from\] (psn|tox|brn|Sandstorm|Hail)\b/.test(line) || line.includes('[from] item: Life Orb')) {
           ruleOut(nickname, 'abilities', 'magicguard');
-        } else if (!line.includes('[from]')) {
-          const ident = line.split('|')[2];
-          const incoming = ident ? lastMoveAt.get(ident) : undefined;
-          if (incoming && Dex.moves.get(incoming).type === 'Ground') {
+        } else if (!line.includes('[from]') && pendingMove && !gravityActive) {
+          const move = Dex.moves.get(pendingMove.moveName);
+          const ignore = move.ignoreImmunity as boolean | Record<string, boolean> | undefined;
+          const ignoresGround = ignore === true || (typeof ignore === 'object' && !!ignore?.Ground);
+          const attackerSpecies = identSpecies.get(pendingMove.attacker);
+          const possiblyMoldBreaker = attackerSpecies
+            ? Object.values(Dex.species.get(attackerSpecies).abilities ?? {})
+              .some(ability => MOLD_BREAKER_ABILITIES.has(toId(String(ability))))
+            : false;
+          if (move.type === 'Ground' && !ignoresGround && !possiblyMoldBreaker) {
             ruleOut(nickname, 'abilities', 'levitate');
           }
         }
@@ -283,7 +312,7 @@ export function inferOpponentTeam(log: string, opponentSide: 'p1' | 'p2' = 'p2')
       if (ofIdent) {
         owner = `${ofIdent[1]}: ${ofIdent[2].trim()}`;
       } else if (itemName && ATTACKER_PUNISH_ITEMS.has(toId(itemName))) {
-        owner = lastMove.get(damagedIdent)?.target ?? null;
+        owner = lastMoveTarget.get(damagedIdent) ?? null;
       }
       const ownerMatch = owner?.match(/^(p[12])[a-d]?:\s*(.+)$/);
       if (itemName && ownerMatch && ownerMatch[1] === opponentSide) {

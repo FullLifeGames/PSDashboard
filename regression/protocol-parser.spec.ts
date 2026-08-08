@@ -106,4 +106,41 @@ test.describe('damage observations', () => {
     ].join('\n');
     expect(parseReplayLogWithObservations(doubles).observations).toHaveLength(0);
   });
+
+  test('unattributed damage outside the move action window yields no observation', () => {
+    // A miss ends the action: the confusion self-hit that follows must not be
+    // recorded as Tackle damage (the stale-attribution bug class).
+    const confusionAfterMiss = [
+      ...obsHeader,
+      '|move|p1a: Lax|Tackle|p2a: Chomp',
+      '|-miss|p1a: Lax|p2a: Chomp',
+      '|-activate|p2a: Chomp|confusion',
+      '|-damage|p2a: Chomp|90/100',
+      '|turn|2',
+    ].join('\n');
+    expect(parseReplayLogWithObservations(confusionAfterMiss).observations).toHaveLength(0);
+
+    // Future Sight resolves at end of turn with a bare |-damage| after |-end|;
+    // it must not be attributed to an earlier move that targeted the same mon.
+    const futureSight = [
+      ...obsHeader,
+      '|move|p1a: Lax|Tackle|p2a: Chomp',
+      '|-immune|p2a: Chomp',
+      '|-end|p2a: Chomp|move: Future Sight',
+      '|-damage|p2a: Chomp|55/100',
+      '|turn|2',
+    ].join('\n');
+    expect(parseReplayLogWithObservations(futureSight).observations).toHaveLength(0);
+  });
+
+  test('self-targeting damage (Substitute cost) yields no observation', () => {
+    const log = [
+      ...obsHeader,
+      '|move|p2a: Chomp|Substitute|p2a: Chomp',
+      '|-start|p2a: Chomp|Substitute',
+      '|-damage|p2a: Chomp|75/100',
+      '|turn|2',
+    ].join('\n');
+    expect(parseReplayLogWithObservations(log).observations).toHaveLength(0);
+  });
 });

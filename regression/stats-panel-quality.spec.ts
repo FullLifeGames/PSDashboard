@@ -92,6 +92,64 @@ test.describe('stats panel data quality (WP11)', () => {
     expect(rotom?.ruledOut?.abilities).toContain('levitate');
   });
 
+  test('an immune Ground move plus later unattributed damage does NOT rule out Levitate', () => {
+    // The stale-attribution bug class: |-immune| ends the action, so the
+    // confusion self-hit next turn must not be read as landed Earthquake.
+    const log = [
+      '|player|p2|Bob|', '|gen|9', '|poke|p2|Bronzong|',
+      '|start', '|switch|p1a: Chomp|Garchomp, M|100/100',
+      '|switch|p2a: Bell|Bronzong|100/100', '|turn|1',
+      '|move|p1a: Chomp|Earthquake|p2a: Bell',
+      '|-immune|p2a: Bell',
+      '|turn|2',
+      '|-activate|p2a: Bell|confusion',
+      '|-damage|p2a: Bell|90/100',
+      '|turn|3',
+    ].join('\n');
+    const zong = inferOpponentTeam(log, 'p2').pokemon.find(p => p.species === 'Bronzong');
+    expect(zong?.ruledOut?.abilities ?? []).not.toContain('levitate');
+  });
+
+  test('Ground damage from a Mold Breaker species or under Gravity does NOT rule out Levitate', () => {
+    // Excadrill can be Mold Breaker: its landed Earthquake proves nothing.
+    const moldBreaker = [
+      '|player|p2|Bob|', '|gen|9', '|poke|p2|Bronzong|',
+      '|start', '|switch|p1a: Drill|Excadrill, M|100/100',
+      '|switch|p2a: Bell|Bronzong|100/100', '|turn|1',
+      '|move|p1a: Drill|Earthquake|p2a: Bell',
+      '|-damage|p2a: Bell|60/100',
+      '|turn|2',
+    ].join('\n');
+    const zong = inferOpponentTeam(moldBreaker, 'p2').pokemon.find(p => p.species === 'Bronzong');
+    expect(zong?.ruledOut?.abilities ?? []).not.toContain('levitate');
+
+    // Gravity grounds everyone; a landed Ground move proves nothing.
+    const gravity = [
+      '|player|p2|Bob|', '|gen|9', '|poke|p2|Rotom-Heat|',
+      '|start', '|switch|p1a: Chomp|Garchomp, M|100/100',
+      '|switch|p2a: Toaster|Rotom-Heat|100/100', '|turn|1',
+      '|-fieldstart|move: Gravity',
+      '|move|p1a: Chomp|Earthquake|p2a: Toaster',
+      '|-damage|p2a: Toaster|40/100',
+      '|turn|2',
+    ].join('\n');
+    const rotom = inferOpponentTeam(gravity, 'p2').pokemon.find(p => p.species === 'Rotom-Heat');
+    expect(rotom?.ruledOut?.abilities ?? []).not.toContain('levitate');
+  });
+
+  test('a Ground move that ignores immunity (Thousand Arrows) does NOT rule out Levitate', () => {
+    const log = [
+      '|player|p2|Bob|', '|gen|9', '|poke|p2|Rotom-Heat|',
+      '|start', '|switch|p1a: Zyg|Zygarde|100/100',
+      '|switch|p2a: Toaster|Rotom-Heat|100/100', '|turn|1',
+      '|move|p1a: Zyg|Thousand Arrows|p2a: Toaster',
+      '|-damage|p2a: Toaster|60/100',
+      '|turn|2',
+    ].join('\n');
+    const rotom = inferOpponentTeam(log, 'p2').pokemon.find(p => p.species === 'Rotom-Heat');
+    expect(rotom?.ruledOut?.abilities ?? []).not.toContain('levitate');
+  });
+
   test('item damage recoil reveals the holder (Life Orb)', () => {
     const log = [
       '|player|p2|Bob|',

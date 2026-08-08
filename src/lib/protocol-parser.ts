@@ -93,12 +93,21 @@ export function parseReplayLogWithObservations(log: string): {
         : null;
     } else if (line.startsWith('|-crit|')) {
       if (lastMove) lastMove.crit = true;
+    } else if (
+      /^\|(?:-miss|-immune|-fail|-end|switch|drag|turn|upkeep|cant|faint)\|/.test(line) ||
+      (line.startsWith('|-activate|') && line.includes('confusion'))
+    ) {
+      // Action boundary: a bare |-damage| after any of these (confusion
+      // self-hit, Future Sight resolution, residuals) belongs to no pending
+      // move — attributing it fabricates observations.
+      lastMove = null;
     } else if (singles && line.startsWith('|-damage|') && !line.includes('[from]') && lastMove) {
       // Read the defender BEFORE battle.add applies the line — its current
       // client HP is the pre-hit value.
       const parts = line.split('|');
       const defenderIdent = parts[2] ?? '';
-      if (defenderIdent === lastMove.target) {
+      // Self-targeting damage (Substitute/Belly Drum cost) is not a hit.
+      if (defenderIdent === lastMove.target && lastMove.target !== lastMove.attacker) {
         lastMove.damageCount += 1;
         if (lastMove.damageCount > 1) {
           // Multi-hit: per-hit rolls are not individually solvable — drop
