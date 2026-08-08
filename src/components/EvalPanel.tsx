@@ -276,7 +276,6 @@ export function EvalPanel({
               playerNames={playerNames}
               currentTurn={currentTurn}
               onSelectTurn={onSelectTurn}
-              doubles={doubles}
               leadScore={graph.lead?.result.score ?? null}
             />
           )}
@@ -287,7 +286,7 @@ export function EvalPanel({
           )}
           {report && <EvalGameReport report={report} playerNames={playerNames} onSelectTurn={onSelectTurn} leads={reportLeads} />}
           {leadAnalysis && <EvalLeadAnalysis leads={leadAnalysis} playerNames={playerNames} />}
-          {!leadAnalysis && analysis && <EvalTurnAnalysis analysis={analysis} playerNames={playerNames} doubles={doubles} reads={reads} onExplore={onPickChoice} />}
+          {!leadAnalysis && analysis && <EvalTurnAnalysis analysis={analysis} playerNames={playerNames} reads={reads} onExplore={onPickChoice} />}
         </div>
       )}
 

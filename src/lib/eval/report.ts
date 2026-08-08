@@ -1,5 +1,6 @@
 import { playedSetupMove, type SideAnalysis, type TurnAnalysis, type VerdictTier } from './analysis';
 import { labelPhrase, signedValue } from './summary';
+import { winPercent } from './winprob';
 
 /**
  * Multi-turn root-cause analysis over a completed graph sweep: where the
@@ -103,9 +104,8 @@ function accuracyFor(
 
   const entries = graded.map(analysis => {
     const sideAnalysis = analysis[side];
-    // Scores and EVs are wp-units (2p−1): the win probability is linear —
-    // the sigmoid already applied once at the search leaf.
-    const toWin = (value: number) => (value + 1) / 2;
+    // Scores and EVs are wp-units: winPercent owns the (linear) conversion.
+    const toWin = (value: number) => winPercent(value) / 100;
     const deltaWin = Math.max(0, toWin(sideAnalysis.best!.ev) - toWin(sideAnalysis.played!.ev));
     const accuracy = Math.max(0, Math.min(100,
       103.1668 * Math.exp(-0.04354 * (100 * deltaWin)) - 3.1669));

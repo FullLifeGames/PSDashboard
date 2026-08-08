@@ -27,11 +27,15 @@ const matrix: ValueMatrix = {
 test.describe('opponent model and read solve', () => {
   test('the softmax base concentrates on the opponent high-EV column', () => {
     const ranked = rankFromMatrix(matrix, 0);
-    const model = modelOpponent(toResult(ranked, 1).matrix!, 'p1');
+    const solved = toResult(ranked, 1).matrix!;
+    const model = modelOpponent(solved, 'p1');
     // From p2's view Earthquake dominates vs the equilibrium-heavy Stay row.
     const eqIndex = 0;
     expect(model.probs[eqIndex]).toBeGreaterThan(0.5);
     expect(model.probs.reduce((sum, p) => sum + p, 0)).toBeCloseTo(1, 8);
+    // The attached mixes are probability distributions.
+    expect(solved.mixes.p1.reduce((sum, p) => sum + p, 0)).toBeCloseTo(1, 8);
+    expect(solved.mixes.p2.reduce((sum, p) => sum + p, 0)).toBeCloseTo(1, 8);
   });
 
   test('a confident model flips the recommendation to the exploit row', () => {

@@ -7,8 +7,6 @@ interface EvalGraphProps {
   playerNames: [string, string];
   currentTurn: number;
   onSelectTurn?: (turn: number) => void;
-  /** Selects the fitted win-probability curve for percent labels. */
-  doubles?: boolean;
   /** Turn 0 (team preview) game value — adds a leads point before turn 1. */
   leadScore?: number | null;
 }

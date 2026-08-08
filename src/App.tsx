@@ -19,7 +19,7 @@ import { EvalPanel } from './components/EvalPanel';
 import { useEvaluation } from './hooks/useEvaluation';
 import { buildSetsExport, parseSetsImport } from './lib/sets-io';
 import { parseTeamText } from './lib/team-parser';
-import { enrichTeamInfo, manualMove } from './lib/team-info';
+import { applyInferredSpreads, enrichTeamInfo, manualMove } from './lib/team-info';
 import { applyPastedTeam, countMatchingSpecies, parsePastedTeam, type PastedSet } from './lib/team-paste';
 import type { OpponentTeamInfo } from './types';
 import { decodeBranchShare, type BranchSharePayload } from './lib/branch-share';
@@ -260,6 +260,12 @@ function App() {
   // re-solving on every branch/eval build. Lazy (ref, not useMemo) so
   // team-builder stays out of the main bundle.
   const spreadSolveRef = useRef<{ key: unknown[]; value: Map<string, import('./lib/spread-inference').SpreadCandidate> } | null>(null);
+  // Mirror of the latest solve for the stats panel's provenance display.
+  const [solvedSpreads, setSolvedSpreads] = useState<Map<string, import('./lib/spread-inference').SpreadCandidate> | null>(null);
+  useEffect(() => {
+    spreadSolveRef.current = null;
+    setSolvedSpreads(null);
+  }, [replayData]);
   const getInferredSpreads = useCallback(async (
     p1InfoOverride?: OpponentTeamInfo | null,
     p2InfoOverride?: OpponentTeamInfo | null,
@@ -281,6 +287,7 @@ function App() {
       setAssumptions: setAssumptions.assumptions,
     });
     spreadSolveRef.current = { key, value };
+    setSolvedSpreads(value);
     return value;
   }, [replayData, observations, teamText, effectiveP1Info, effectiveP2Info, usageStats.stats, setAssumptions.assumptions]);
 
@@ -466,12 +473,16 @@ function App() {
     return () => { stale = true; };
   }, [replayData]);
   const statsP1Info = useMemo(
-    () => (effectiveP1Info ? applyTeamSheetToInfo(effectiveP1Info, sheetTeams.p1) : null),
-    [effectiveP1Info, sheetTeams],
+    () => (effectiveP1Info
+      ? applyInferredSpreads(applyTeamSheetToInfo(effectiveP1Info, sheetTeams.p1), 'p1', solvedSpreads)
+      : null),
+    [effectiveP1Info, sheetTeams, solvedSpreads],
   );
   const statsP2Info = useMemo(
-    () => (effectiveP2Info ? applyTeamSheetToInfo(effectiveP2Info, sheetTeams.p2) : null),
-    [effectiveP2Info, sheetTeams],
+    () => (effectiveP2Info
+      ? applyInferredSpreads(applyTeamSheetToInfo(effectiveP2Info, sheetTeams.p2), 'p2', solvedSpreads)
+      : null),
+    [effectiveP2Info, sheetTeams, solvedSpreads],
   );
 
   const acquireBranchPosition = useCallback(async () => {

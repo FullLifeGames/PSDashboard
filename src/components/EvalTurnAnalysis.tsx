@@ -7,8 +7,6 @@ import { attributionBadge } from './eval-badges';
 interface EvalTurnAnalysisProps {
   analysis: TurnAnalysis;
   playerNames: [string, string];
-  /** Selects the fitted win-probability curve for the summary's percents. */
-  doubles?: boolean;
   /** Exploitative Read recommendations (advisory — never part of the grade). */
   reads?: { p1?: ReadRecommendation | null; p2?: ReadRecommendation | null } | null;
   /** Click on an engine line: play it out in a branch at this turn, the other side answering with `reply`. */

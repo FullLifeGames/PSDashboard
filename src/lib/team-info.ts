@@ -36,6 +36,40 @@ export function manualMove(name: string): PokemonMoveInfo {
   return { name, source: 'manual' };
 }
 
+/** Provenance label the stats panel shows for damage-solved spreads. */
+export const INFERRED_SPREAD_DETAIL = 'fits observed damage';
+
+/**
+ * Display overlay for damage-consistent spreads: mirrors the simulator
+ * precedence (edited/revealed/sheet beat inference; inference beats usage
+ * guesses), so what the panel shows is what the sim runs.
+ */
+export function applyInferredSpreads(
+  info: OpponentTeamInfo,
+  side: 'p1' | 'p2',
+  inferred: Map<string, { evs: PokemonEvs; nature: string }> | null,
+): OpponentTeamInfo {
+  if (!inferred || inferred.size === 0) return info;
+  const idOfSpecies = (species: string) => species.toLowerCase().replace(/[^a-z0-9]/g, '');
+  return {
+    ...info,
+    pokemon: info.pokemon.map(pokemon => {
+      const candidate = inferred.get(`${side}:${idOfSpecies(pokemon.species)}`);
+      if (!candidate) return pokemon;
+      const evsGuessed = pokemon.evs.source === 'guessed' || pokemon.evs.source === 'unknown';
+      const natureGuessed = !pokemon.nature || pokemon.nature.source === 'guessed' || pokemon.nature.source === 'unknown';
+      if (!evsGuessed) return pokemon;
+      return {
+        ...pokemon,
+        evs: guessedEvs({ ...candidate.evs }, undefined, INFERRED_SPREAD_DETAIL),
+        ...(natureGuessed
+          ? { nature: guessedField(candidate.nature, undefined, INFERRED_SPREAD_DETAIL) }
+          : {}),
+      };
+    }),
+  };
+}
+
 /**
  * Item values carry display annotations ("Sitrus Berry (consumed)",
  * "(has item)") that describe battle knowledge, not the set. This strips them

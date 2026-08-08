@@ -1,6 +1,6 @@
 import { test, expect } from '@playwright/test';
 import { inferOpponentTeam } from '../src/lib/opponent-inferrer';
-import { enrichPokemonInfo } from '../src/lib/team-info';
+import { applyInferredSpreads, enrichPokemonInfo, guessedEvs, INFERRED_SPREAD_DETAIL, manualEvs, unknownField } from '../src/lib/team-info';
 import { spriteUrl } from '../src/lib/sprite-url';
 import type { RevealedPokemonInfo } from '../src/types';
 import type { SmogonUsageStats } from '../src/lib/smogon-stats';
@@ -148,6 +148,37 @@ test.describe('stats panel data quality (WP11)', () => {
     ].join('\n');
     const rotom = inferOpponentTeam(log, 'p2').pokemon.find(p => p.species === 'Rotom-Heat');
     expect(rotom?.ruledOut?.abilities ?? []).not.toContain('levitate');
+  });
+
+  test('inferred spreads surface in the display info with their provenance', () => {
+    const info = {
+      pokemon: [{
+        species: 'Uxie',
+        moves: [],
+        ability: unknownField(), item: unknownField(), teraType: unknownField(),
+        evs: guessedEvs({ hp: 0, atk: 0, def: 0, spa: 252, spd: 0, spe: 252 }),
+        level: 50, gender: '',
+      }, {
+        species: 'Clefable',
+        moves: [],
+        ability: unknownField(), item: unknownField(), teraType: unknownField(),
+        evs: manualEvs({ hp: 252, atk: 0, def: 252, spa: 0, spd: 4, spe: 0 }),
+        level: 50, gender: '',
+      }],
+    };
+    const inferred = new Map([
+      ['p1:uxie', { evs: { hp: 252, atk: 0, def: 0, spa: 252, spd: 0, spe: 252 }, nature: 'Timid' }],
+      ['p1:clefable', { evs: { hp: 0, atk: 0, def: 0, spa: 0, spd: 0, spe: 0 }, nature: 'Hardy' }],
+    ]);
+    const overlaid = applyInferredSpreads(info, 'p1', inferred);
+    const uxie = overlaid.pokemon[0];
+    expect(uxie.evs.value.hp).toBe(252);
+    expect(uxie.evs.sourceDetail).toBe(INFERRED_SPREAD_DETAIL);
+    expect(uxie.nature?.value).toBe('Timid');
+    // Manual EVs are never overridden by inference.
+    const clef = overlaid.pokemon[1];
+    expect(clef.evs.value.hp).toBe(252);
+    expect(clef.evs.sourceDetail).toBeUndefined();
   });
 
   test('item damage recoil reveals the holder (Life Orb)', () => {
