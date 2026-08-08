@@ -29,12 +29,18 @@ const MANIFEST_PATH = 'regression/fixtures/fit-corpus-manifest.json';
 const CACHE_DIR = '.fit-corpus';
 /**
  * Captured samples are cached so fit-side iterations skip the hour-long
- * reconstruction pass. The cache stores FEATURE_KEYS and is invalidated on
- * mismatch — but a change to feature DEFINITIONS or EVAL_WEIGHTS keeps the
- * same keys, so delete this file by hand after touching eval-function.ts.
+ * reconstruction pass. The stamp covers the feature keys, every weight
+ * value, and the manifest's replay list — a change to any of them
+ * invalidates automatically. Feature DEFINITION changes (same keys, same
+ * weights) still require deleting the file by hand.
  */
 const SAMPLES_CACHE = join(CACHE_DIR, 'samples-cache.json');
 const FEATURE_KEYS = Object.keys(FEATURE_WEIGHTS) as (keyof EvalFeatures)[];
+const cacheStamp = (manifest: { replays: { id: string }[] }) => JSON.stringify({
+  featureKeys: FEATURE_KEYS,
+  weights: { EVAL_WEIGHTS, FEATURE_WEIGHTS },
+  manifestIds: manifest.replays.map(entry => entry.id),
+});
 
 interface FitSample {
   game: string;
@@ -123,9 +129,9 @@ test.describe('eval weight fitting (EVAL_FIT=1)', () => {
 
     if (existsSync(SAMPLES_CACHE)) {
       const cached = JSON.parse(readFileSync(SAMPLES_CACHE, 'utf-8')) as {
-        featureKeys: string[]; samples: FitSample[];
+        stamp?: string; samples: FitSample[];
       };
-      if (JSON.stringify(cached.featureKeys) === JSON.stringify(FEATURE_KEYS)) {
+      if (cached.stamp === cacheStamp(manifest)) {
         samples = cached.samples;
         console.log(`loaded ${samples.length} samples from ${SAMPLES_CACHE}`);
       }
@@ -190,7 +196,7 @@ test.describe('eval weight fitting (EVAL_FIT=1)', () => {
       return;
     }
     if (!cacheHit) {
-      writeFileSync(SAMPLES_CACHE, JSON.stringify({ featureKeys: FEATURE_KEYS, samples }));
+      writeFileSync(SAMPLES_CACHE, JSON.stringify({ stamp: cacheStamp(manifest), samples }));
       console.log(`cached samples to ${SAMPLES_CACHE}`);
     }
 
