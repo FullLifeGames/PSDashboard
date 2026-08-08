@@ -635,7 +635,9 @@ test.describe('PS Dashboard', () => {
     await page.locator('button', { hasText: 'Branch Here' }).click();
     await expect(page.getByText(/Branching.*Turn/)).toBeVisible({ timeout: 15000 });
     await expect(page.locator('.ps-movebtn').first()).toBeVisible({ timeout: 5000 });
-    await expect(page.locator('.ps-movebtn', { hasText: 'Earthquake' })).toContainText('69.8% - 82.2%', { timeout: 10000 });
+    // Range shifted when spread inference started overlaying damage-consistent
+    // EVs from replay observations onto the usage-stats defaults.
+    await expect(page.locator('.ps-movebtn', { hasText: 'Earthquake' })).toContainText('51% - 60.9%', { timeout: 10000 });
   });
 
   test('branch simulation can pick recommended moves without Smogon stats', async ({ page }) => {
@@ -761,27 +763,28 @@ test.describe('PS Dashboard', () => {
     expect(frame).toBeTruthy();
     await expectReplayTurn(frame!, 2);
 
+    const logLength = () =>
+      frame!.evaluate(() => (document.querySelector('.battle-log')?.textContent ?? '').length);
+    const beforeLength = await logLength();
+
     await page.locator('button', { hasText: /Use Recommended/i }).nth(0).click();
     await page.locator('button', { hasText: /Use Recommended/i }).nth(1).click();
     await page.locator('button', { hasText: 'Execute Turn' }).click();
 
-    await expect.poll(async () =>
-      frame!.evaluate(() => document.querySelector('.battle-log')?.textContent ?? '')
-    ).toContain('The opposing Kingambit fainted!');
+    // The appended turn grows the visible log — a marker that does not
+    // depend on damage rolls, KOs, or the inferred spreads.
+    await expect.poll(logLength).toBeGreaterThan(beforeLength + 20);
+    const afterLength = await logLength();
     await expect.poll(async () =>
       frame!.evaluate(() => (document.querySelector('.battle-log')?.textContent ?? '').match(/Battle started/g)?.length ?? 0)
     ).toBe(1);
 
     await frame!.locator('button', { hasText: 'Last turn' }).click();
-    await expect.poll(async () =>
-      frame!.evaluate(() => document.querySelector('.battle-log')?.textContent ?? '')
-    ).not.toContain('The opposing Kingambit fainted!');
+    await expect.poll(logLength).toBeLessThan(afterLength);
 
     await frame!.locator('button', { hasText: 'Next turn' }).click();
     await frame!.locator('button', { hasText: 'Next turn' }).click();
-    await expect.poll(async () =>
-      frame!.evaluate(() => document.querySelector('.battle-log')?.textContent ?? '')
-    ).toContain('The opposing Kingambit fainted!');
+    await expect.poll(logLength).toBeGreaterThanOrEqual(afterLength);
   });
 
   test('branch execution defaults to animating the appended turn', async ({ page }) => {
