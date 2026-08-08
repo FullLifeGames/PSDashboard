@@ -1,7 +1,7 @@
 import { Battle } from '@pkmn/client';
 import { Generations } from '@pkmn/data';
 import { Dex } from '@pkmn/dex';
-import type { TurnSnapshot, PokemonSnapshot, SideSnapshot, FieldSnapshot } from '../types';
+import type { DamageObservation, TurnSnapshot, PokemonSnapshot, SideSnapshot, FieldSnapshot } from '../types';
 import type { Pokemon, Side, Field } from '@pkmn/client';
 
 const gens = new Generations(Dex);
@@ -44,16 +44,96 @@ function snapshotField(field: Field): FieldSnapshot {
 }
 
 export function parseReplayLog(log: string): TurnSnapshot[] {
+  return parseReplayLogWithObservations(log).snapshots;
+}
+
+const SCREEN_IDS = ['reflect', 'lightscreen', 'auroraveil'];
+
+function hpFractionOf(text: string): number | null {
+  if (!text) return null;
+  if (text.startsWith('0')) return 0;
+  const match = text.match(/^(\d+)\/(\d+)/);
+  if (!match) return null;
+  const denom = parseInt(match[2], 10);
+  return denom > 0 ? parseInt(match[1], 10) / denom : null;
+}
+
+export function parseReplayLogWithObservations(log: string): {
+  snapshots: TurnSnapshot[];
+  observations: DamageObservation[];
+} {
   const battle = new Battle(gens);
   const lines = log.split('\n');
   const snapshots: TurnSnapshot[] = [];
+  const observations: DamageObservation[] = [];
   let currentTurnLines: string[] = [];
+  let singles = true;
+  // The pending move context: crits and multi-hits disqualify its damage.
+  let lastMove: {
+    attacker: string; target: string; moveId: string;
+    crit: boolean; observationIndex: number | null; damageCount: number;
+  } | null = null;
 
   // Take initial snapshot at turn 0 (before any turns)
   let capturedInitial = false;
 
   for (const line of lines) {
     currentTurnLines.push(line);
+
+    if (line.startsWith('|gametype|')) {
+      singles = line.split('|')[2]?.trim() === 'singles';
+    } else if (line.startsWith('|move|')) {
+      const parts = line.split('|');
+      lastMove = parts[2] && parts[4]
+        ? {
+          attacker: parts[2], target: parts[4],
+          moveId: (parts[3] ?? '').toLowerCase().replace(/[^a-z0-9]/g, ''),
+          crit: false, observationIndex: null, damageCount: 0,
+        }
+        : null;
+    } else if (line.startsWith('|-crit|')) {
+      if (lastMove) lastMove.crit = true;
+    } else if (singles && line.startsWith('|-damage|') && !line.includes('[from]') && lastMove) {
+      // Read the defender BEFORE battle.add applies the line — its current
+      // client HP is the pre-hit value.
+      const parts = line.split('|');
+      const defenderIdent = parts[2] ?? '';
+      if (defenderIdent === lastMove.target) {
+        lastMove.damageCount += 1;
+        if (lastMove.damageCount > 1) {
+          // Multi-hit: per-hit rolls are not individually solvable — drop
+          // the first hit's observation too.
+          if (lastMove.observationIndex !== null) {
+            observations.splice(lastMove.observationIndex, 1);
+            lastMove.observationIndex = null;
+          }
+        } else if (!lastMove.crit) {
+          const defender = battle.getPokemon(defenderIdent);
+          const attacker = battle.getPokemon(lastMove.attacker);
+          const newFraction = hpFractionOf(parts[3] ?? '');
+          if (defender && attacker && newFraction !== null && defender.maxhp > 0) {
+            const preFraction = defender.hp / defender.maxhp;
+            const observedFraction = preFraction - newFraction;
+            if (observedFraction > 0) {
+              const defenderSide = defenderIdent.startsWith('p1') ? battle.p1 : battle.p2;
+              lastMove.observationIndex = observations.length;
+              observations.push({
+                attackerSpecies: attacker.speciesForme,
+                defenderSpecies: defender.speciesForme,
+                attackerSide: lastMove.attacker.startsWith('p1') ? 'p1' : 'p2',
+                moveId: lastMove.moveId,
+                observedFraction,
+                attackerBoosts: { ...attacker.boosts },
+                defenderBoosts: { ...defender.boosts },
+                attackerStatus: attacker.status || '',
+                screens: SCREEN_IDS.filter(id => (defenderSide.sideConditions as Record<string, unknown>)[id]),
+                weather: battle.field.weather || '',
+              });
+            }
+          }
+        }
+      }
+    }
 
     // Feed line to battle client. Synthetic logs (file drop-ins written by
     // external tools, e.g. video reconstructions) can carry impossible
@@ -107,5 +187,5 @@ export function parseReplayLog(log: string): TurnSnapshot[] {
     });
   }
 
-  return snapshots;
+  return { snapshots, observations };
 }

@@ -49,6 +49,28 @@ export interface TurnSnapshot {
   log: string[];
 }
 
+/**
+ * One clean, direct damaging hit observed in the protocol, with the context
+ * needed to recompute it with a damage calculator: spread inference scores
+ * candidate EV spreads by how well their roll ranges reproduce these.
+ * Crits, multi-hits, spread moves (doubles), and [from]-attributed damage
+ * are excluded at collection time.
+ */
+export interface DamageObservation {
+  attackerSpecies: string;
+  defenderSpecies: string;
+  attackerSide: 'p1' | 'p2';
+  moveId: string;
+  /** Damage dealt as a fraction of the defender's max HP (HP-bar precision). */
+  observedFraction: number;
+  attackerBoosts: Record<string, number>;
+  defenderBoosts: Record<string, number>;
+  attackerStatus: string;
+  /** Screens up on the DEFENDER's side at the moment of the hit. */
+  screens: string[];
+  weather: string;
+}
+
 export type KnowledgeSource = 'revealed' | 'guessed' | 'manual' | 'sheet' | 'unknown';
 export type StatId = 'hp' | 'atk' | 'def' | 'spa' | 'spd' | 'spe';
 export type PokemonEvs = Record<StatId, number>;
