@@ -162,6 +162,29 @@ test.describe('evaluatePosition', () => {
     expect(evaluatePosition(battle)).toBeGreaterThan(0);
   });
 
+  test('residual items price into the body score', () => {
+    const withItem = (item?: string) => {
+      const battle = makeBattle(
+        [makeSet('A', 'Rotom-Wash', VANILLA, 50, item ? { item } : {})],
+        [makeSet('B', 'Snorlax', VANILLA)],
+      );
+      return evaluatePosition(battle);
+    };
+    // Black Sludge slowly kills a non-Poison holder; on a Poison type it heals.
+    expect(withItem('Black Sludge')).toBeLessThan(withItem());
+    expect(withItem('Sticky Barb')).toBeLessThan(withItem());
+    expect(withItem('Leftovers')).toBeGreaterThan(withItem());
+
+    const poisonHolder = (item?: string) => {
+      const battle = makeBattle(
+        [makeSet('A', 'Amoonguss', VANILLA, 50, item ? { item } : {})],
+        [makeSet('B', 'Snorlax', VANILLA)],
+      );
+      return evaluatePosition(battle);
+    };
+    expect(poisonHolder('Black Sludge')).toBeGreaterThan(poisonHolder());
+  });
+
   test('coverage penalizes an enemy that nobody answers, max-based', () => {
     const answered = makeBattle(
       [makeSet('Sala', 'Salazzle', ['Sludge Wave', 'Flamethrower'])],

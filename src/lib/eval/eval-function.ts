@@ -60,11 +60,25 @@ export const EVAL_WEIGHTS = {
 
 const SCREENS = ['reflect', 'lightscreen', 'auroraveil'];
 
+/**
+ * Residual items are beyond-horizon drips (Black Sludge erodes 1/8 a turn —
+ * exactly what kills a Cosmic Power wincon after a Trick): price them like
+ * status, as a body-value multiplier. Tactical items (Choice damage, Eviolite
+ * bulk) stay in the threat proxy instead.
+ */
+function itemMultiplier(pokemon: Pokemon): number {
+  const item = pokemon.item;
+  if (item === 'blacksludge') return pokemon.types.includes('Poison') ? 1.03 : 0.9;
+  if (item === 'stickybarb') return 0.9;
+  if (item === 'leftovers') return 1.03;
+  return 1;
+}
+
 function pokemonScore(pokemon: Pokemon): number {
   if (pokemon.fainted || pokemon.hp <= 0) return 0;
   const base = EVAL_WEIGHTS.alive + EVAL_WEIGHTS.hp * (pokemon.hp / pokemon.maxhp);
   const statusMultiplier = EVAL_WEIGHTS.status[pokemon.status] ?? 1;
-  return base * statusMultiplier;
+  return base * statusMultiplier * itemMultiplier(pokemon);
 }
 
 function averageSpeed(side: Side): number {
