@@ -14,6 +14,7 @@ import { findConsistentOptions, findPlayedOption } from './analysis';
 import type { PlayedAction } from './played';
 import type { CellValue, SearchExecutor } from './orchestrator';
 import type { EvalResult, EvalSettings, RankedChoice, SearchProgress, TeraAllowance } from './types';
+import { wpUnits } from './winprob';
 
 export interface SearchCallbacks {
   onProgress?(progress: SearchProgress): void;
@@ -38,6 +39,21 @@ function countFainted(battle: ReturnType<typeof positionBattle>): number {
 }
 
 /**
+ * The ONE place the sigmoid applies: every leaf evaluation becomes win-prob
+ * units (2p−1), so cell averages, the equilibrium solve, and regret all live
+ * in probability space — variance is genuinely valuable when behind (Jensen)
+ * instead of being flattened by score-space means. Ended battles clamp to
+ * exact ±1 (the sigmoid saturates near but not at ±1). Shared by the sync
+ * search, the executor (worker path), and MCTS — all engine modes must live
+ * in the same value space.
+ */
+export function leafValue(battle: ReturnType<typeof positionBattle>, matchupCache: MatchupCache): number {
+  const raw = evaluatePosition(battle, matchupCache);
+  if (battle.ended) return raw > 0 ? 1 : raw < 0 ? -1 : 0;
+  return wpUnits(raw, battle.gameType === 'doubles');
+}
+
+/**
  * Damage-roll grouping (foul-play style): a cell where nothing fainted is
  * roll-insensitive — one sim suffices. Only cells where a KO happened get
  * the full seed spread, because that's where rolls change the outcome. An
@@ -54,11 +70,14 @@ function sampleCell(
   const firstChild = advancePosition(root, p1Choice, p2Choice, SEARCH_SEEDS[0]);
   const firstBattle = positionBattle(firstChild);
   const ended = firstBattle.ended;
-  let sum = evaluatePosition(firstBattle, matchupCache);
+  // Averaging wp-units = averaging win probabilities across rolls: the
+  // KO-boundary roll groups carry their true value ("30% this crit wins")
+  // instead of a flattened score mean.
+  let sum = leafValue(firstBattle, matchupCache);
   const draws = !ended && countFainted(firstBattle) > rootFainted ? samples : 1;
   for (let s = 1; s < draws; s++) {
     const child = advancePosition(root, p1Choice, p2Choice, SEARCH_SEEDS[s]);
-    sum += evaluatePosition(positionBattle(child), matchupCache);
+    sum += leafValue(positionBattle(child), matchupCache);
   }
   return { value: sum / draws, ended, firstChild };
 }
@@ -317,7 +336,7 @@ export function subSearchDepth1(
   const root = createRootPosition(serializedBattle);
   const battle = positionBattle(root);
   if (battle.ended) {
-    return { score: evaluatePosition(battle, matchupCache), interval: 0, depthCompleted: settings.depth, perSide: { p1: [], p2: [] } };
+    return { score: leafValue(battle, matchupCache), interval: 0, depthCompleted: settings.depth, perSide: { p1: [], p2: [] } };
   }
   const tera = settings.tera ?? true;
   const p1Options = searchOptions(root, 'p1', { tera, keep: settings.keepPlayed?.p1Slots });
@@ -428,11 +447,11 @@ export function searchPosition(
   const root = createRootPosition(serializedBattle);
   const battle = positionBattle(root);
   if (battle.ended) {
-    const score = evaluatePosition(battle, matchupCache);
+    const score = leafValue(battle, matchupCache);
     return { score, interval: 0, depthCompleted: settings.depth, perSide: { p1: [], p2: [] } };
   }
 
-  const rootValue = evaluatePosition(battle, matchupCache);
+  const rootValue = leafValue(battle, matchupCache);
   const tera = settings.tera ?? true;
   let p1Options = searchOptions(root, 'p1', { tera, keep: settings.keepPlayed?.p1Slots });
   let p2Options = searchOptions(root, 'p2', { tera, keep: settings.keepPlayed?.p2Slots });
@@ -516,7 +535,7 @@ export function createLocalExecutor(serializedBattle: string): SearchExecutor {
       return {
         p1: searchOptions(root, 'p1', { tera, keep: keepPlayed?.p1Slots }),
         p2: searchOptions(root, 'p2', { tera, keep: keepPlayed?.p2Slots }),
-        rootValue: evaluatePosition(battle, matchupCache),
+        rootValue: leafValue(battle, matchupCache),
         rootEnded: battle.ended,
       };
     },

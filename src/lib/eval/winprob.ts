@@ -1,21 +1,32 @@
 /**
  * Score → win-probability mapping fitted to real replay outcomes (the
- * logistic fit lives in regression/eval-calibration.spec.ts; run it with
- * EVAL_CALIBRATION=1 and pin the printed K here when adopting a new fit).
- * Display-only: engine internals stay in raw score space. Pure, sim-free.
+ * logistic fit lives in regression/eval-calibration.spec.ts and the larger
+ * corpus refit in regression/eval-fit.spec.ts; pin the printed K here when
+ * adopting a new fit).
  *
  * Fitted 2026-08-04: singles K=0.88, doubles K=2.80 (pooled 1.27). The gap is
  * real — the doubles eval is better calibrated per point of score — so the
  * mapping selects by gametype instead of averaging both into mush.
+ *
+ * Since the win-prob-space conversion, the sigmoid applies ONCE, at the
+ * search leaf (`wpUnits`): every downstream value — cell averages, the
+ * equilibrium solve, EvalResult.score, regret — lives in wp-units
+ * (2p−1 ∈ [−1, +1]). Averaging wp-units averages probabilities, which is
+ * what makes variance genuinely valuable when behind (Jensen) instead of
+ * being flattened by score-space means. Display is therefore LINEAR.
  */
 export const WINPROB_K = { singles: 0.9, doubles: 2.8 } as const;
 
-/** P(the score's side wins), from p1's perspective like the score itself. */
+/** P(the RAW score's side wins) — the leaf mapping's core. */
 export function winProbability(score: number, doubles = false): number {
   const k = doubles ? WINPROB_K.doubles : WINPROB_K.singles;
   return 1 / (1 + Math.exp(-k * score));
 }
 
-/** Rounded percent for display. */
-export const winPercent = (score: number, doubles = false): number =>
-  Math.round(100 * winProbability(score, doubles));
+/** Raw leaf score → win-prob units (2p−1, still in [−1, +1]). */
+export const wpUnits = (score: number, doubles = false): number =>
+  2 * winProbability(score, doubles) - 1;
+
+/** Rounded percent for display — LINEAR: scores are wp-units already. */
+export const winPercent = (score: number): number =>
+  Math.round(100 * (score + 1) / 2);

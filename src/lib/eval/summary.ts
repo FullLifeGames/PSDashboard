@@ -96,10 +96,9 @@ function sackClause(name: string, side: SideAnalysis): string | null {
 export function summarizeTurn(
   analysis: TurnAnalysis,
   playerNames: [string, string],
-  opts?: { doubles?: boolean },
 ): string {
-  // Advantage in fitted win-probability terms, mirroring the eval bar.
-  const pct = (score: number) => winPercent(score, opts?.doubles);
+  // Scores are wp-units — winPercent is the linear display mapping.
+  const pct = (score: number) => winPercent(score);
   const sentences: string[] = [];
   const before = pct(analysis.scoreBefore);
   if (analysis.scoreAfter === null) {

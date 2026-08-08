@@ -908,9 +908,8 @@ function App() {
     if (analyses.filter(Boolean).length < 3) return null;
     return buildGameReport(
       analyses, [replayData.players[0], replayData.players[1]], replayWinner, true,
-      replayGameType === 'doubles',
     );
-  }, [replayData, snapshots, evaluation.graph, replayWinner, replayGameType]);
+  }, [replayData, snapshots, evaluation.graph, replayWinner]);
 
   const teamPasteStatus = useMemo(() => {
     if (!pastedSets || pastedSets.length === 0) return null;

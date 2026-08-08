@@ -1,6 +1,5 @@
 import { playedSetupMove, type SideAnalysis, type TurnAnalysis, type VerdictTier } from './analysis';
 import { labelPhrase, signedValue } from './summary';
-import { winProbability } from './winprob';
 
 /**
  * Multi-turn root-cause analysis over a completed graph sweep: where the
@@ -95,7 +94,6 @@ function accuracyFor(
   known: TurnAnalysis[],
   side: 'p1' | 'p2',
   series: (number | undefined)[],
-  doubles: boolean,
 ): number | null {
   const graded = known.filter(analysis => {
     const sideAnalysis = analysis[side];
@@ -105,15 +103,15 @@ function accuracyFor(
 
   const entries = graded.map(analysis => {
     const sideAnalysis = analysis[side];
-    // Own-perspective evs map symmetrically (σ(−x) = 1 − σ(x)), so the win
-    // probabilities read directly as this side's own odds.
-    const deltaWin = Math.max(0,
-      winProbability(sideAnalysis.best!.ev, doubles) - winProbability(sideAnalysis.played!.ev, doubles));
+    // Scores and EVs are wp-units (2p−1): the win probability is linear —
+    // the sigmoid already applied once at the search leaf.
+    const toWin = (value: number) => (value + 1) / 2;
+    const deltaWin = Math.max(0, toWin(sideAnalysis.best!.ev) - toWin(sideAnalysis.played!.ev));
     const accuracy = Math.max(0, Math.min(100,
       103.1668 * Math.exp(-0.04354 * (100 * deltaWin)) - 3.1669));
     const window = [series[analysis.turn - 1], series[analysis.turn], series[analysis.turn + 1]]
       .filter((value): value is number => value !== undefined)
-      .map(value => winProbability(value, doubles));
+      .map(toWin);
     const mean = window.reduce((sum, value) => sum + value, 0) / Math.max(window.length, 1);
     const volatility = window.length > 1
       ? Math.sqrt(window.reduce((sum, value) => sum + (value - mean) ** 2, 0) / window.length)
@@ -150,8 +148,6 @@ export function buildGameReport(
   winner: 'p1' | 'p2' | null,
   /** False = played actions unavailable (doubles): no seeds, no clean-play claim. */
   playedTracking = true,
-  /** Doubles replay — selects the fitted win-probability curve for accuracy. */
-  doubles = false,
 ): GameReport {
   const known = analyses.filter((entry): entry is TurnAnalysis => entry !== null);
 
@@ -205,7 +201,7 @@ export function buildGameReport(
 
   const series = scoreSeries(analyses);
   const accuracy = playedTracking
-    ? { p1: accuracyFor(known, 'p1', series, doubles), p2: accuracyFor(known, 'p2', series, doubles) }
+    ? { p1: accuracyFor(known, 'p1', series), p2: accuracyFor(known, 'p2', series) }
     : { p1: null, p2: null };
 
   const turningPoint = winner ? findTurningPoint(analyses, winner) : null;

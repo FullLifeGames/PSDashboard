@@ -35,9 +35,9 @@ test.describe('natural-language turn summaries', () => {
       scoreBefore: 0.1,
       scoreAfter: -0.25,
     }), names);
-    // Percents run through the fitted win-prob curve (singles K), not 50+50·s.
-    expect(summary).toContain('52%');
-    expect(summary).toContain('44%');
+    // Scores ARE wp-units now: percent display is linear ((s+1)/2).
+    expect(summary).toContain('55%');
+    expect(summary).toContain('38%');
     expect(summary).toContain('Beta played Recover');
     expect(summary).toContain('switching to Dragapult');
     expect(summary).toContain('then Draco Meteor · U-turn');
@@ -318,8 +318,8 @@ test.describe('natural-language turn summaries', () => {
       scoreBefore: 0.1,
       scoreAfter: null,
     }), names);
-    // Percents run through the fitted win-prob curve (singles K), not 50+50·s.
-    expect(summary).toContain('52%');
+    // Scores ARE wp-units now: percent display is linear ((s+1)/2).
+    expect(summary).toContain('55%');
     expect(summary).toContain('Alpha played U-turn');
     expect(summary).toContain('Beta played Recover');
   });

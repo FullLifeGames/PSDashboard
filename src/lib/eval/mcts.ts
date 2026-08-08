@@ -1,10 +1,10 @@
-import { createMatchupCache, evaluatePosition, type MatchupCache } from './eval-function';
+import { createMatchupCache, type MatchupCache } from './eval-function';
 import {
   advancePosition, createRootPosition, positionBattle,
   type ChoiceOption, type SimPosition,
 } from './forward-model';
 import { cellKey } from './rank';
-import { searchOptions, SEARCH_SEEDS } from './search';
+import { leafValue, searchOptions, SEARCH_SEEDS } from './search';
 import type { EvalResult, EvalSettings, MctsTreeStats, RankedChoice, SearchProgress, TeraAllowance } from './types';
 
 /**
@@ -56,7 +56,9 @@ function makeNode(
   return {
     position,
     ended,
-    value: evaluatePosition(battle, matchupCache),
+    // Same wp-unit value space as the matrix mode — mode switches must not
+    // change what a number means.
+    value: leafValue(battle, matchupCache),
     p1Options,
     p2Options,
     p1N: new Array(p1Options.length).fill(0),

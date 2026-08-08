@@ -47,7 +47,7 @@ interface EvalPanelProps {
 const signed = (value: number) => `${value >= 0 ? '+' : ''}${value.toFixed(2)}`;
 
 function ChoiceList({
-  side, choices, reply, onPickChoice, doubles,
+  side, choices, reply, onPickChoice,
 }: {
   side: 'p1' | 'p2';
   choices: RankedChoice[];
@@ -63,7 +63,7 @@ function ChoiceList({
         // The equilibrium value in the eval bar's own language: the win odds
         // this choice is worth against balanced play. The guaranteed floor
         // and the punishing reply live in the tooltip.
-        const evPct = winPercent(choice.ev, doubles);
+        const evPct = winPercent(choice.ev);
         const gap = best ? choice.ev - best.ev : 0;
         const tooltip = `Worth ${signed(choice.ev)} vs balanced play` +
           ` · guaranteed floor ${signed(choice.worstCase)}` +
@@ -116,7 +116,7 @@ export function EvalPanel({
 }: EvalPanelProps) {
   const running = status === 'searching' || status === 'reconstructing';
   const hasGraph = graph.scores.some(score => score !== null);
-  const p1Pct = result ? winPercent(result.score, doubles) : 50;
+  const p1Pct = result ? winPercent(result.score) : 50;
 
   return (
     <div className="ps-panel ps-eval-panel">

@@ -22,7 +22,7 @@ const PAD_X = 4;
  * needed); point color carries the polarity via the app's player colors;
  * blunder markers add a shape ring plus tooltip text, never color alone.
  */
-export function EvalGraph({ scores, playerNames, currentTurn, onSelectTurn, doubles, leadScore }: EvalGraphProps) {
+export function EvalGraph({ scores, playerNames, currentTurn, onSelectTurn, leadScore }: EvalGraphProps) {
   const turns = scores.length;
   if (turns === 0) return null;
 
@@ -50,7 +50,7 @@ export function EvalGraph({ scores, playerNames, currentTurn, onSelectTurn, doub
   const blunders = new Set(computeBlunders(scores));
   const hitWidth = (WIDTH - 2 * PAD_X) / Math.max(turns - first, 1);
 
-  const pct = (score: number) => winPercent(score, doubles);
+  const pct = (score: number) => winPercent(score);
   const label = (turn: number, score: number) => {
     const swing = blunders.has(turn) ? ' — blunder swing' : '';
     return `Turn ${turn}: ${playerNames[0]} ${pct(score)}% · ${playerNames[1]} ${100 - pct(score)}%${swing}`;

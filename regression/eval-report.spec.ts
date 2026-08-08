@@ -229,8 +229,10 @@ test.describe('game report (multi-turn root cause)', () => {
     const analyses = [1, 2, 3, 4, 5, 6, 7, 8, 9].map(turn => mk(turn, 0.1, 0.1, { p1: perfect() }));
     analyses.push(mk(10, 0.1, -0.5, { p1: blunder, attribution: 'p1-decision' }));
     const report = buildGameReport(analyses, names, 'p2');
-    expect(report.accuracy?.p1).toBeLessThan(90);
-    expect(report.accuracy?.p1).toBeGreaterThan(60);
+    // In wp-units the 1.2 ev gap is a ~60% win-prob throw — it drags hard,
+    // but nine clean turns keep the game off the floor.
+    expect(report.accuracy?.p1).toBeLessThan(80);
+    expect(report.accuracy?.p1).toBeGreaterThan(30);
     // p2 never had a graded turn — no number is claimed.
     expect(report.accuracy?.p2).toBeNull();
   });
