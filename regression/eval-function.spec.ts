@@ -1,7 +1,7 @@
 import { test, expect } from '@playwright/test';
 import { Battle, Teams, toID } from '@pkmn/sim';
 import type { PokemonSet } from '@pkmn/sim';
-import { createMatchupCache, evaluatePosition, EVAL_WEIGHTS, hazardCost } from '../src/lib/eval/eval-function';
+import { createMatchupCache, evaluatePosition, EVAL_WEIGHTS, hazardCost, matchupTerms } from '../src/lib/eval/eval-function';
 
 function makeSet(
   name: string,
@@ -160,6 +160,33 @@ test.describe('evaluatePosition', () => {
     const battle = makeBattle([makeSet('A', 'Snorlax', VANILLA)], [makeSet('B', 'Snorlax', VANILLA)]);
     battle.sides[1].addSideCondition('stealthrock', battle.sides[0].active[0]!);
     expect(evaluatePosition(battle)).toBeGreaterThan(0);
+  });
+
+  test('coverage penalizes an enemy that nobody answers, max-based', () => {
+    const answered = makeBattle(
+      [makeSet('Sala', 'Salazzle', ['Sludge Wave', 'Flamethrower'])],
+      [makeSet('Don', 'Rhydon', ['Earthquake']), makeSet('Clef', 'Clefable', VANILLA)],
+    );
+    const unanswered = makeBattle(
+      [makeSet('Sala', 'Salazzle', ['Sludge Wave', 'Flamethrower'])],
+      [makeSet('Clef', 'Clefable', VANILLA), makeSet('Corv', 'Corviknight', VANILLA)],
+    );
+    const covAnswered = matchupTerms(answered).coverage;
+    const covUnanswered = matchupTerms(unanswered).coverage;
+    // Salazzle unanswered → coverage favors p1; Rhydon answering pulls it back toward zero.
+    expect(covUnanswered).toBeGreaterThan(covAnswered);
+    expect(covUnanswered).toBeGreaterThan(0);
+
+    // Max-based: a second copy of MY mon changes nothing — the enemy's best
+    // answer margin is a max, not a sum over my team.
+    const dupSala = makeBattle(
+      [
+        makeSet('Sala', 'Salazzle', ['Sludge Wave', 'Flamethrower']),
+        makeSet('Sala2', 'Salazzle', ['Sludge Wave', 'Flamethrower']),
+      ],
+      [makeSet('Don', 'Rhydon', ['Earthquake']), makeSet('Clef', 'Clefable', VANILLA)],
+    );
+    expect(matchupTerms(dupSala).coverage).toBeCloseTo(covAnswered, 5);
   });
 
   test('Stealth Rock is worth more against a rock-weak team than a resisting one', () => {

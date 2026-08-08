@@ -48,6 +48,14 @@ export const EVAL_WEIGHTS = {
    * teams; only the actives differ.
    */
   activePair: 1.5,
+  /**
+   * Uncovered-threat term: MAX-based per enemy, unlike the sum-based matchup.
+   * An enemy that NO remaining teammate trades favorably against is a
+   * wincon-in-waiting — the sum dilutes that into an average, so losing the
+   * sole answer (Rhydon vs Salazzle) read as cheap. Weighted per uncovered
+   * enemy by its remaining HP.
+   */
+  coverage: 40,
 } as const;
 
 const SCREENS = ['reflect', 'lightscreen', 'auroraveil'];
@@ -241,16 +249,19 @@ export function boostedFraction(
 }
 
 /**
- * Aggregated 1v1 threat estimate in [-1, +1] from p1's perspective: for every
- * living pair, whoever KOs first (against current HP) wins the pair, speed
- * breaking ties; pairs are weighted by both sides' HP fractions.
+ * Aggregated 1v1 threat terms from p1's perspective. `matchup` in [-1, +1]:
+ * for every living pair, whoever KOs first (against current HP) wins the
+ * pair, speed breaking ties; pairs are weighted by both sides' HP fractions.
+ * `coverage` is MAX-based per enemy: each living Pokémon that the other side
+ * has NO favorable trade against contributes its answer deficit × its HP
+ * fraction (p1-positive). Exported for direct testing.
  */
-function matchupScore(battle: Battle, cache?: MatchupCache): number {
+export function matchupTerms(battle: Battle, cache?: MatchupCache): { matchup: number; coverage: number } {
   const living = (index: 0 | 1) =>
     battle.sides[index].pokemon.filter(pokemon => !pokemon.fainted && pokemon.hp > 0);
   const p1Living = living(0);
   const p2Living = living(1);
-  if (p1Living.length === 0 || p2Living.length === 0) return 0;
+  if (p1Living.length === 0 || p2Living.length === 0) return { matchup: 0, coverage: 0 };
 
   const threat = (attacker: Pokemon, defender: Pokemon): PairThreat => {
     if (!cache) return pairThreat(attacker, defender, battle);
@@ -275,6 +286,9 @@ function matchupScore(battle: Battle, cache?: MatchupCache): number {
 
   let sum = 0;
   let totalWeight = 0;
+  // Per-enemy best answer margins (my best fraction minus theirs).
+  const bestAnswerToP2 = new Map<Pokemon, number>(); // p2 mon -> best p1 margin
+  const bestAnswerToP1 = new Map<Pokemon, number>(); // p1 mon -> best p2 margin
   for (const a of p1Living) {
     for (const b of p2Living) {
       const threatA = threat(a, b);
@@ -284,6 +298,8 @@ function matchupScore(battle: Battle, cache?: MatchupCache): number {
       // A defender that can heal ~50% per turn walls anything short of a 2HKO.
       const fracA = boostedA <= 0.5 && heals(b) ? 0 : boostedA;
       const fracB = boostedB <= 0.5 && heals(a) ? 0 : boostedB;
+      bestAnswerToP2.set(b, Math.max(bestAnswerToP2.get(b) ?? -Infinity, fracA - fracB));
+      bestAnswerToP1.set(a, Math.max(bestAnswerToP1.get(a) ?? -Infinity, fracB - fracA));
       const turnsA = fracA > 0 ? Math.ceil(b.hp / b.maxhp / fracA) : Infinity;
       const turnsB = fracB > 0 ? Math.ceil(a.hp / a.maxhp / fracB) : Infinity;
       let sign = 0;
@@ -301,7 +317,14 @@ function matchupScore(battle: Battle, cache?: MatchupCache): number {
       totalWeight += weight;
     }
   }
-  return totalWeight > 0 ? sum / totalWeight : 0;
+  let coverage = 0;
+  for (const [enemy, margin] of bestAnswerToP2) {
+    if (margin < 0) coverage -= Math.min(-margin, 1) * (enemy.hp / enemy.maxhp);
+  }
+  for (const [enemy, margin] of bestAnswerToP1) {
+    if (margin < 0) coverage += Math.min(-margin, 1) * (enemy.hp / enemy.maxhp);
+  }
+  return { matchup: totalWeight > 0 ? sum / totalWeight : 0, coverage };
 }
 
 /** Static positional eval from p1's perspective in [-1, +1]; ±1 for ended battles. */
@@ -322,6 +345,7 @@ export function evaluatePosition(battle: Battle, cache?: MatchupCache): number {
 
   const teamSize = Math.max(battle.sides[0].pokemon.length, battle.sides[1].pokemon.length, 1);
   const normalizer = teamSize * (EVAL_WEIGHTS.alive + EVAL_WEIGHTS.hp);
-  const diff = (p1 - p2) + matchupScore(battle, cache) * EVAL_WEIGHTS.matchup;
+  const terms = matchupTerms(battle, cache);
+  const diff = (p1 - p2) + terms.matchup * EVAL_WEIGHTS.matchup + terms.coverage * EVAL_WEIGHTS.coverage;
   return Math.tanh((diff / normalizer) * EVAL_WEIGHTS.scale);
 }
