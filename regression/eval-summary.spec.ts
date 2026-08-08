@@ -1,6 +1,6 @@
 import { test, expect } from '@playwright/test';
 import { analyzeTurn } from '../src/lib/eval/analysis';
-import { summarizeTurn } from '../src/lib/eval/summary';
+import { formatRead, summarizeTurn } from '../src/lib/eval/summary';
 import type { EvalResult, RankedChoice } from '../src/lib/eval/types';
 
 const choice = (choiceStr: string, label: string, worstCase: number, line?: { p1: string; p2: string }[]): RankedChoice =>
@@ -48,6 +48,41 @@ test.describe('natural-language turn summaries', () => {
     expect(summary).toContain('a read: its floor risked Reply (−0.30); Draco Meteor came instead.');
     expect(summary).toContain("The engine's safe line was switching to Dragapult");
     expect(summary).not.toContain('safer was');
+  });
+
+  test('formatRead renders the exploit line with its breakdown', () => {
+    const line = formatRead({
+      choice: { label: '→ Noivern', ev: 0.19, worstCase: -0.25 },
+      net: 0.19,
+      confidence: 0.74,
+      breakdown: [
+        { label: 'Earthquake', prob: 0.74, value: 0.32 },
+        { label: 'Ice Beam', prob: 0.26, value: -0.25 },
+      ],
+    });
+    expect(line).toContain('Read: switch Noivern');
+    expect(line).toContain('+0.32 if Earthquake (74%)');
+    expect(line).toContain('−0.25 if Ice Beam (26%)');
+    expect(line).toContain('net +0.19');
+  });
+
+  test('a read-matching risk is credited to the opponent model', () => {
+    const summary = summarizeTurn(analyzeTurn({
+      turn: 20,
+      result,
+      played: { p1: { kind: 'move', name: 'Draco Meteor', tera: false }, p2: { kind: 'move', name: 'Recover', tera: false } },
+      playedOutcome: 0.0,
+      scoreBefore: 0.1,
+      scoreAfter: -0.25,
+      reads: {
+        p2: {
+          choice: { label: 'Recover', ev: 0.1, worstCase: -0.3 },
+          net: 0.1, confidence: 0.7, breakdown: [],
+        },
+      },
+    }), names);
+    expect(summary).toContain("a read against the opponent's tendencies");
+    expect(summary).not.toContain('a read: its floor risked');
   });
 
   test('a low-cost sacrifice reads neutrally', () => {

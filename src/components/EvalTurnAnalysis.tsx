@@ -1,7 +1,7 @@
 import { diffChoices, playedSetupMove, type SideAnalysis, type TurnAnalysis } from '../lib/eval/analysis';
 import type { LeadAnalysis, LeadSideAnalysis } from '../lib/eval/leads';
-import type { RankedChoice } from '../lib/eval/types';
-import { summarizeTurn } from '../lib/eval/summary';
+import type { RankedChoice, ReadRecommendation } from '../lib/eval/types';
+import { formatRead, summarizeTurn } from '../lib/eval/summary';
 import { attributionBadge } from './eval-badges';
 
 interface EvalTurnAnalysisProps {
@@ -9,6 +9,8 @@ interface EvalTurnAnalysisProps {
   playerNames: [string, string];
   /** Selects the fitted win-probability curve for the summary's percents. */
   doubles?: boolean;
+  /** Exploitative Read recommendations (advisory — never part of the grade). */
+  reads?: { p1?: ReadRecommendation | null; p2?: ReadRecommendation | null } | null;
   /** Click on an engine line: play it out in a branch at this turn, the other side answering with `reply`. */
   onExplore?: (side: 'p1' | 'p2', choice: RankedChoice, reply?: RankedChoice | null) => void;
 }
@@ -215,7 +217,7 @@ function SideRow({ name, side, onExplore }: { name: string; side: SideAnalysis; 
 }
 
 /** Chess-style explanation of one analyzed turn: played vs best, and why the score moved. */
-export function EvalTurnAnalysis({ analysis, playerNames, onExplore }: EvalTurnAnalysisProps) {
+export function EvalTurnAnalysis({ analysis, playerNames, reads, onExplore }: EvalTurnAnalysisProps) {
   const badge = attributionBadge(analysis, playerNames);
   const exploreFor = (side: 'p1' | 'p2') =>
     onExplore && ((choice: RankedChoice) =>
@@ -246,6 +248,22 @@ export function EvalTurnAnalysis({ analysis, playerNames, onExplore }: EvalTurnA
           <SideRow name={playerNames[1]} side={analysis.p2} onExplore={exploreFor('p2')} />
         </>
       )}
+      {(['p1', 'p2'] as const).map(side => {
+        const read = reads?.[side];
+        if (!read) return null;
+        return (
+          <div
+            key={`read-${side}`}
+            className="ps-eval-analysis-row"
+            style={{ color: '#7da7d9' }}
+            title={'Exploitative line: the best response to how the opponent actually plays — ' +
+              'refutable by their perfect reply, priced by its spread. Advisory only; the grades above stay equilibrium-based.'}
+          >
+            <span style={{ fontWeight: 'bold' }}>{playerNames[side === 'p1' ? 0 : 1]}</span>
+            <span>{formatRead(read)}</span>
+          </div>
+        );
+      })}
     </div>
   );
 }

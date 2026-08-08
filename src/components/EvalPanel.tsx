@@ -1,4 +1,4 @@
-import type { EvalPreferences, EvalResult, RankedChoice, SearchProgress } from '../lib/eval/types';
+import type { EvalPreferences, EvalResult, RankedChoice, ReadRecommendation, SearchProgress } from '../lib/eval/types';
 import type { TurnAnalysis } from '../lib/eval/analysis';
 import type { GameReport } from '../lib/eval/report';
 import type { EvalGraphState, EvalStatus } from '../hooks/useEvaluation';
@@ -34,6 +34,8 @@ interface EvalPanelProps {
   currentTurn: number;
   /** Analysis of the graph-selected turn (replay view only). */
   analysis: TurnAnalysis | null;
+  /** Exploitative Read recommendations for the selected turn (advisory). */
+  reads?: { p1?: ReadRecommendation | null; p2?: ReadRecommendation | null } | null;
   /** Turn-0 analysis, shown when the graph's leads point is selected. */
   leadAnalysis?: LeadAnalysis | null;
   /** Lead verdicts for the report chips (independent of selection). */
@@ -112,7 +114,7 @@ export function EvalPanel({
   playerNames, status, result, progress, reconstructProgress, error,
   prefs, onPrefsChange, onEvaluate, onCancel, onPickChoice, showAuto, showTera,
   graph, onAnalyzeGame, onAnalyzeTurn, onSelectTurn, currentTurn, analysis,
-  leadAnalysis, reportLeads, report, doubles,
+  reads, leadAnalysis, reportLeads, report, doubles,
 }: EvalPanelProps) {
   const running = status === 'searching' || status === 'reconstructing';
   const hasGraph = graph.scores.some(score => score !== null);
@@ -285,7 +287,7 @@ export function EvalPanel({
           )}
           {report && <EvalGameReport report={report} playerNames={playerNames} onSelectTurn={onSelectTurn} leads={reportLeads} />}
           {leadAnalysis && <EvalLeadAnalysis leads={leadAnalysis} playerNames={playerNames} />}
-          {!leadAnalysis && analysis && <EvalTurnAnalysis analysis={analysis} playerNames={playerNames} doubles={doubles} onExplore={onPickChoice} />}
+          {!leadAnalysis && analysis && <EvalTurnAnalysis analysis={analysis} playerNames={playerNames} doubles={doubles} reads={reads} onExplore={onPickChoice} />}
         </div>
       )}
 

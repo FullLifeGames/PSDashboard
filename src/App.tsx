@@ -29,6 +29,7 @@ import { choiceId, evalChoiceToSlotChoices, type BranchSlotChoice } from './lib/
 import type { RankedChoice } from './lib/eval/types';
 import { detectSacks, parseLeadSpecies, parsePlayedActions, parsePlayedActionsDoubles, turnEvents } from './lib/eval/played';
 import { analyzeTurn, PAYOFF_WINDOW } from './lib/eval/analysis';
+import { computeRead, parseTendencies } from './lib/eval/opponent-model';
 import { analyzeLeads } from './lib/eval/leads';
 import { buildGameReport } from './lib/eval/report';
 
@@ -850,6 +851,18 @@ function App() {
     return analyzeLeads(lead.result, lead.played);
   }, [evaluation.graph.lead]);
 
+  // Exploitative Read lens: best response to the opponent model over the
+  // already-solved matrix — advisory only, verdicts stay equilibrium-graded.
+  const turnReads = useMemo(() => {
+    if (analysisTurn === null || analysisTurn < 1 || !replayData) return null;
+    const result = evaluation.graph.results[analysisTurn - 1];
+    if (!result?.matrix) return null;
+    return {
+      p1: computeRead(result.matrix, 'p1', parseTendencies(replayData.log, 'p2')),
+      p2: computeRead(result.matrix, 'p2', parseTendencies(replayData.log, 'p1')),
+    };
+  }, [analysisTurn, evaluation.graph, replayData]);
+
   const turnAnalysis = useMemo(() => {
     if (analysisTurn === null) return null;
     const result = evaluation.graph.results[analysisTurn - 1];
@@ -870,8 +883,9 @@ function App() {
       ...(replayData
         ? { sacks: detectSacks(turnEvents(replayData.log, analysisTurn), snapshots[analysisTurn - 1] ?? null) }
         : {}),
+      ...(turnReads ? { reads: turnReads } : {}),
     });
-  }, [analysisTurn, evaluation.graph, replayData, snapshots]);
+  }, [analysisTurn, evaluation.graph, replayData, snapshots, turnReads]);
 
   const replayWinner = useMemo<'p1' | 'p2' | null>(() => {
     if (!replayData) return null;
@@ -1222,6 +1236,7 @@ function App() {
                 onSelectTurn={!branching ? handleGraphSelect : undefined}
                 currentTurn={branching ? (simState?.turnNumber ?? branchTurn) : branchTurn}
                 analysis={!branching ? turnAnalysis : null}
+                reads={!branching ? turnReads : null}
                 leadAnalysis={!branching && analysisTurn === 0 ? leadAnalysisData : null}
                 reportLeads={!branching ? leadAnalysisData : null}
                 report={!branching ? gameReport : null}

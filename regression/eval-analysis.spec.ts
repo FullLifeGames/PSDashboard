@@ -69,6 +69,36 @@ test.describe('verdict tiers in wp-units', () => {
   });
 });
 
+test.describe('read-aware risk phrasing', () => {
+  test('a risk matching the read is marked as a read on tendencies', () => {
+    const at = (readLabel?: string) => analyzeTurn({
+      turn: 20,
+      result,
+      played: { p1: { kind: 'move', name: 'Draco Meteor', tera: false }, p2: { kind: 'move', name: 'Recover', tera: false } },
+      playedOutcome: 0.0,
+      scoreBefore: 0.1,
+      scoreAfter: -0.25,
+      ...(readLabel
+        ? {
+          reads: {
+            p2: {
+              choice: { label: readLabel, ev: 0.1, worstCase: -0.3 },
+              net: 0.1, confidence: 0.7,
+              breakdown: [],
+            },
+          },
+        }
+        : {}),
+    });
+    // Recover is an unpunished risk (regret 0.25); when the opponent model's
+    // best response IS Recover, the risk was a read.
+    expect(at().p2.riskUnpunished).toBe(true);
+    expect(at().p2.riskWasRead).toBeFalsy();
+    expect(at('Recover').p2.riskWasRead).toBe(true);
+    expect(at('→ Dragapult').p2.riskWasRead).toBeFalsy();
+  });
+});
+
 test.describe('sacrifice detection', () => {
   test('turnEvents slices the lines strictly between turn markers', () => {
     const log = ['|start', '|turn|1', '|move|a', '|turn|2', '|move|b', '|win|X'].join('\n');

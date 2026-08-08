@@ -58,11 +58,15 @@ function mistakeClause(name: string, side: SideAnalysis, opponent: SideAnalysis)
   if (side.riskUnpunished && side.safe) {
     // An unpunished read gets neutral framing: the engine's line is "safe",
     // not "better" — maximin's guarantee always merely holds the current
-    // assessment, and holding is no achievement.
+    // assessment, and holding is no achievement. When the opponent model's
+    // own best response matches the play, credit the read explicitly.
     const came = side.played.punishedBy && opponent.played
       ? `its floor risked ${side.played.punishedBy} (${signed(side.played.worstCase)}); ${phrase(opponent.played.label)} came instead`
       : `its floor sat at ${signed(side.played.worstCase)}`;
-    return `${name} played ${phrase(side.played.label)} — a read: ${came}. ` +
+    const framing = side.riskWasRead
+      ? `a read against the opponent's tendencies: ${came}`
+      : `a read: ${came}`;
+    return `${name} played ${phrase(side.played.label)} — ${framing}. ` +
       `The engine's safe line was ${phrase(side.safe.label)} (${signed(side.safe.worstCase)})${lineOf(side.safe)}.${why}${caveat}`;
   }
   // The punished misplay reads in EV terms: what the choice was worth against
@@ -74,6 +78,24 @@ function mistakeClause(name: string, side: SideAnalysis, opponent: SideAnalysis)
   }
   return `${name} played ${phrase(side.played.label)} (${signed(side.played.ev)}); ` +
     `safer was ${phrase(side.best.label)} (${signed(side.best.ev)})${lineOf(side.best)}.${why}${caveat}`;
+}
+
+/**
+ * One-line rendering of an exploitative read recommendation (the Read row):
+ * the payoff SPREAD stays visible — a read is a priced gamble, not a mean.
+ */
+export function formatRead(read: {
+  choice: { label: string };
+  net: number;
+  breakdown: { label: string; prob: number; value: number }[];
+}): string {
+  const target = read.choice.label.startsWith('→ ')
+    ? `switch ${read.choice.label.slice(2)}`
+    : read.choice.label;
+  const parts = read.breakdown
+    .map(entry => `${signed(entry.value)} if ${entry.label} (${Math.round(entry.prob * 100)}%)`)
+    .join(', ');
+  return `Read: ${target}${parts ? ` — ${parts}` : ''} — net ${signed(read.net)}.`;
 }
 
 /** Sub-verdict note: a light imprecision worth naming, not blaming. */

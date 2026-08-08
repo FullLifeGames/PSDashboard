@@ -1,4 +1,4 @@
-import type { EvalResult, RankedChoice } from './types';
+import type { EvalResult, RankedChoice, ReadRecommendation } from './types';
 import type { PlayedAction, PlayedTurn, SackInfo } from './played';
 
 /**
@@ -83,6 +83,11 @@ export interface SideAnalysis {
   riskPayoffTurn?: number;
   /** The read won at least RISK_PAYOFF_MARGIN over the safe guarantee. */
   riskPaidOff?: boolean;
+  /**
+   * The flagged risk MATCHES the opponent model's best response — phrased
+   * as "a read against the opponent's tendencies" (grading unchanged).
+   */
+  riskWasRead?: boolean;
   /**
    * A slot's choice was never observed (flinch/sleep — the protocol shows
    * `|cant|`): `played` is the BEST combo consistent with the visible slots,
@@ -356,6 +361,8 @@ export function analyzeTurn(params: {
   playedTracking?: boolean;
   /** Per-side low-HP sacrifices detected in the turn's protocol (played.ts). */
   sacks?: { p1?: SackInfo; p2?: SackInfo };
+  /** Per-side opponent-model best responses (opponent-model.ts computeRead). */
+  reads?: { p1?: ReadRecommendation | null; p2?: ReadRecommendation | null };
 }): TurnAnalysis {
   const playedTracking = params.playedTracking !== false;
   const sideAnalysis = (key: 'p1' | 'p2'): SideAnalysis => {
@@ -456,6 +463,12 @@ export function analyzeTurn(params: {
       }
     }
     side.riskUnpunished = true;
+    // The opponent model agrees: this "risk" was the exploitative best
+    // response to how the opponent actually plays — phrase it as a read.
+    const read = params.reads?.[key];
+    if (read && side.played && read.choice.label === side.played.label) {
+      side.riskWasRead = true;
+    }
   };
   markRisk('p1', p1, p2);
   markRisk('p2', p2, p1);
