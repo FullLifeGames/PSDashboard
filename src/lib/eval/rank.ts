@@ -1,4 +1,4 @@
-import type { EvalResult, RankedChoice } from './types';
+import type { EvalMatrix, EvalResult, RankedChoice } from './types';
 
 /**
  * Pure ranking math over a computed value matrix. No @pkmn/sim imports —
@@ -27,6 +27,8 @@ export interface Ranked {
   v2: number;
   /** Solved value of the matrix game (p1 perspective); rootValue when a side has no options. */
   gameValue: number;
+  /** The solved matrix + mixes, for the Read lens (absent when degenerate). */
+  matrixOut?: EvalMatrix;
 }
 
 export type PvStep = { p1: string; p2: string };
@@ -158,7 +160,20 @@ export function rankFromMatrix(matrix: ValueMatrix, rootValue: number): Ranked {
 
   const v1 = p1.length > 0 ? Math.max(...p1.map(choice => choice.worstCase)) : rootValue;
   const v2 = p2.length > 0 ? -Math.max(...p2.map(choice => choice.worstCase)) : rootValue;
-  return { p1, p2, v1, v2, gameValue: solved ? solution.value : rootValue };
+  return {
+    p1, p2, v1, v2,
+    gameValue: solved ? solution.value : rootValue,
+    ...(solved
+      ? {
+        matrixOut: {
+          p1Labels: p1Options.map(option => option.label),
+          p2Labels: p2Options.map(option => option.label),
+          values: values.map(row => [...row]),
+          mixes: { p1: solution.p1Mix, p2: solution.p2Mix },
+        },
+      }
+      : {}),
+  };
 }
 
 export function toResult(ranked: Ranked, depthCompleted: number): EvalResult {
@@ -170,6 +185,7 @@ export function toResult(ranked: Ranked, depthCompleted: number): EvalResult {
     interval: Math.max(0, ranked.v2 - ranked.v1),
     depthCompleted,
     perSide: { p1: ranked.p1, p2: ranked.p2 },
+    ...(ranked.matrixOut ? { matrix: ranked.matrixOut } : {}),
   };
 }
 
