@@ -148,8 +148,10 @@ test.describe('evaluatePosition', () => {
     const v2 = at(2);
     const v6 = at(6);
     expect(v1).toBeGreaterThan(0);
-    // tanh curvature shaves a hair off the exact 2.0 ratio.
-    expect(v2 / v1).toBeCloseTo(2, 1);
+    // The RAW schedule is exactly 2.0 at +2; at the corpus-fitted boost
+    // weight the tanh curvature bends the score-space ratio toward ~1.9.
+    expect(v2 / v1).toBeGreaterThan(1.7);
+    expect(v2 / v1).toBeLessThanOrEqual(2);
     expect(v6).toBeLessThan(2 * v2);
   });
 

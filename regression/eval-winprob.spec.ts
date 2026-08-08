@@ -16,8 +16,10 @@ test.describe('win probability mapping', () => {
   test('matches the pinned logistic constants', () => {
     expect(winProbability(0.5, true)).toBeCloseTo(1 / (1 + Math.exp(-WINPROB_K.doubles * 0.5)), 10);
     expect(winProbability(0.5)).toBeCloseTo(1 / (1 + Math.exp(-WINPROB_K.singles * 0.5)), 10);
-    // The doubles eval earns more confidence per point of score.
-    expect(winProbability(0.5, true)).toBeGreaterThan(winProbability(0.5));
+    // Corpus-fitted 2026-08-08: both gametypes earn similar confidence per
+    // point (2.7 / 2.3) — the old singles 0.9 rested on a tiny sample.
+    expect(WINPROB_K.singles).toBeGreaterThan(1);
+    expect(WINPROB_K.doubles).toBeGreaterThan(1);
   });
 
   test('wpUnits carries the Jensen effect: variance helps when behind, hurts ahead', () => {

@@ -4,9 +4,10 @@
  * corpus refit in regression/eval-fit.spec.ts; pin the printed K here when
  * adopting a new fit).
  *
- * Fitted 2026-08-04: singles K=0.88, doubles K=2.80 (pooled 1.27). The gap is
- * real — the doubles eval is better calibrated per point of score — so the
- * mapping selects by gametype instead of averaging both into mush.
+ * Fitted 2026-08-08 on the 534-game pinned corpus (eval-fit harness, leaf
+ * scores vs outcomes): singles K=2.69 (n=3393), doubles K=2.32 (n=172) —
+ * replacing the 2026-08-04 fit (0.88/2.80) that rested on ~24 sweep games.
+ * The mapping still selects by gametype.
  *
  * Since the win-prob-space conversion, the sigmoid applies ONCE, at the
  * search leaf (`wpUnits`): every downstream value — cell averages, the
@@ -15,7 +16,7 @@
  * what makes variance genuinely valuable when behind (Jensen) instead of
  * being flattened by score-space means. Display is therefore LINEAR.
  */
-export const WINPROB_K = { singles: 0.9, doubles: 2.8 } as const;
+export const WINPROB_K = { singles: 2.7, doubles: 2.3 } as const;
 
 /** P(the RAW score's side wins) — the leaf mapping's core. */
 export function winProbability(score: number, doubles = false): number {

@@ -56,6 +56,16 @@ import { searchPosition } from '../src/lib/eval/search';
  * conversion (wp-units compress). Verdict thresholds re-derived as 0.1/0.2/0.4
  * wp-units (5/10/20% win-prob loss — half-Lichess; the score-space bands
  * flagged 3–5% losses, the source of the T22/T26/T29 over-flagging).
+ *
+ * Corpus weight fit 2026-08-08 (eval-fit, 534 games / 3565 positions):
+ *   ADOPTED: WINPROB_K singles 0.9→2.7, doubles 2.8→2.3 (leaf-level fit,
+ *     n=3393/172) — gate with K only: 58/67/83/66/82, all at/above baseline.
+ *   REJECTED: boosts 12→40 + coverage 40→80 (implied 47±12 / 224±98) —
+ *     gate read 56/68/79/66/75: doubles −9, late −4. The fit is dominated
+ *     by singles tournament games; those weights are singles-tuned at
+ *     doubles' expense. Screens/trickRoom implied values are confounded
+ *     (setup correlates with already winning); tailwind/matchup/choiceMismatch
+ *     had no signal (SE ≥ estimate). Hand values stay.
  */
 const REPLAY_IDS = [
   'gen9draft-2058494320',
