@@ -1,6 +1,6 @@
 import { test, expect } from '@playwright/test';
 import { analyzeTurn, matchPlayedChoice, playedSetupMove, REGRET_THRESHOLD, type SideAnalysis } from '../src/lib/eval/analysis';
-import { detectSacks, turnEvents } from '../src/lib/eval/played';
+import { allTurnEvents, detectSacks, turnEvents } from '../src/lib/eval/played';
 import type { EvalResult, RankedChoice } from '../src/lib/eval/types';
 import type { TurnSnapshot } from '../src/types';
 
@@ -105,6 +105,11 @@ test.describe('sacrifice detection', () => {
     expect(turnEvents(log, 1)).toEqual(['|move|a']);
     expect(turnEvents(log, 2)).toEqual(['|move|b', '|win|X']);
     expect(turnEvents(log, 3)).toEqual([]);
+    // The one-pass index slices identically.
+    const index = allTurnEvents(log);
+    expect(index[1]).toEqual(turnEvents(log, 1));
+    expect(index[2]).toEqual(turnEvents(log, 2));
+    expect(index[3]).toBeUndefined();
   });
 
   test('detectSacks flags a fainted mon that started the turn nearly dead', () => {

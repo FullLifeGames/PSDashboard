@@ -1,5 +1,5 @@
 import { test } from '@playwright/test';
-import { existsSync, readFileSync } from 'fs';
+import { existsSync, readFileSync, writeFileSync } from 'fs';
 import { join } from 'path';
 import { buildTeamsFromReplay } from '../src/lib/team-builder';
 import { reconstructBranchRuntime } from '../src/lib/branch-engine';
@@ -27,6 +27,13 @@ import {
 
 const MANIFEST_PATH = 'regression/fixtures/fit-corpus-manifest.json';
 const CACHE_DIR = '.fit-corpus';
+/**
+ * Captured samples are cached so fit-side iterations skip the hour-long
+ * reconstruction pass. The cache stores FEATURE_KEYS and is invalidated on
+ * mismatch — but a change to feature DEFINITIONS or EVAL_WEIGHTS keeps the
+ * same keys, so delete this file by hand after touching eval-function.ts.
+ */
+const SAMPLES_CACHE = join(CACHE_DIR, 'samples-cache.json');
 const FEATURE_KEYS = Object.keys(FEATURE_WEIGHTS) as (keyof EvalFeatures)[];
 
 interface FitSample {
@@ -112,9 +119,20 @@ test.describe('eval weight fitting (EVAL_FIT=1)', () => {
     const manifest = JSON.parse(readFileSync(MANIFEST_PATH, 'utf-8')) as {
       replays: { id: string; format: string; source: 'tournament' | 'ladder' }[];
     };
-    const samples: FitSample[] = [];
+    let samples: FitSample[] = [];
 
-    for (const entry of manifest.replays) {
+    if (existsSync(SAMPLES_CACHE)) {
+      const cached = JSON.parse(readFileSync(SAMPLES_CACHE, 'utf-8')) as {
+        featureKeys: string[]; samples: FitSample[];
+      };
+      if (JSON.stringify(cached.featureKeys) === JSON.stringify(FEATURE_KEYS)) {
+        samples = cached.samples;
+        console.log(`loaded ${samples.length} samples from ${SAMPLES_CACHE}`);
+      }
+    }
+
+    const cacheHit = samples.length > 0;
+    for (const entry of cacheHit ? [] : manifest.replays) {
       const cachePath = join(CACHE_DIR, `${entry.id}.json`);
       if (!existsSync(cachePath)) continue;
       try {
@@ -171,6 +189,10 @@ test.describe('eval weight fitting (EVAL_FIT=1)', () => {
       console.log('too few samples to fit — check the corpus cache');
       return;
     }
+    if (!cacheHit) {
+      writeFileSync(SAMPLES_CACHE, JSON.stringify({ featureKeys: FEATURE_KEYS, samples }));
+      console.log(`cached samples to ${SAMPLES_CACHE}`);
+    }
 
     const report = (label: string, subset: FitSample[]) => {
       if (subset.length < 50) {
@@ -186,31 +208,48 @@ test.describe('eval weight fitting (EVAL_FIT=1)', () => {
       return implied;
     };
 
+    // Cluster bootstrap by GAME for a subset's implied-weight standard errors.
+    const bootstrap = (label: string, subset: FitSample[]) => {
+      const subsetGames = [...new Set(subset.map(sample => sample.game))];
+      if (subsetGames.length < 20) {
+        console.log(`bootstrap ${label}: too few games (${subsetGames.length})`);
+        return;
+      }
+      const byGame = new Map<string, FitSample[]>();
+      for (const sample of subset) byGame.set(sample.game, [...(byGame.get(sample.game) ?? []), sample]);
+      const rng = mulberry32(42);
+      const draws: number[][] = [];
+      for (let b = 0; b < 100; b++) {
+        const resample: FitSample[] = [];
+        for (let i = 0; i < subsetGames.length; i++) {
+          const pick = subsetGames[Math.floor(rng() * subsetGames.length)];
+          resample.push(...(byGame.get(pick) ?? []));
+        }
+        draws.push(impliedWeights(fitLogistic(resample)));
+      }
+      console.log(`\nbootstrap SE ${label} (implied weights, games=${subsetGames.length}):`);
+      FEATURE_KEYS.forEach((key, j) => {
+        const values = draws.map(draw => draw[j]).filter(value => Number.isFinite(value));
+        const mean = values.reduce((sum, value) => sum + value, 0) / values.length;
+        const se = Math.sqrt(values.reduce((sum, value) => sum + (value - mean) ** 2, 0) / values.length);
+        console.log(`  ${key}: mean=${mean.toFixed(1)} se=${se.toFixed(1)}`);
+      });
+    };
+
+    const singles = samples.filter(sample => sample.gameType === 'singles');
+    const doubles = samples.filter(sample => sample.gameType === 'doubles');
     report('ALL', samples);
     report('TOURNAMENT-ONLY', samples.filter(sample => sample.source === 'tournament'));
     report('LADDER-ONLY', samples.filter(sample => sample.source === 'ladder'));
+    // Per-gametype fits: the pooled fit is singles-dominated, so a weight it
+    // favors can hurt doubles (seen in the 2026-08-08 adoption gate). These
+    // ask whether the doubles data itself supports different weights.
+    report('SINGLES-ONLY', singles);
+    report('DOUBLES-ONLY', doubles);
 
-    // Cluster bootstrap by GAME for the full fit's standard errors.
-    const gameList = [...games];
-    const byGame = new Map<string, FitSample[]>();
-    for (const sample of samples) byGame.set(sample.game, [...(byGame.get(sample.game) ?? []), sample]);
-    const rng = mulberry32(42);
-    const draws: number[][] = [];
-    for (let b = 0; b < 100; b++) {
-      const resample: FitSample[] = [];
-      for (let i = 0; i < gameList.length; i++) {
-        const pick = gameList[Math.floor(rng() * gameList.length)];
-        resample.push(...(byGame.get(pick) ?? []));
-      }
-      draws.push(impliedWeights(fitLogistic(resample)));
-    }
-    console.log('\nbootstrap SE (implied weights):');
-    FEATURE_KEYS.forEach((key, j) => {
-      const values = draws.map(draw => draw[j]).filter(value => Number.isFinite(value));
-      const mean = values.reduce((sum, value) => sum + value, 0) / values.length;
-      const se = Math.sqrt(values.reduce((sum, value) => sum + (value - mean) ** 2, 0) / values.length);
-      console.log(`  ${key}: mean=${mean.toFixed(1)} se=${se.toFixed(1)}`);
-    });
+    bootstrap('ALL', samples);
+    bootstrap('SINGLES-ONLY', singles);
+    bootstrap('DOUBLES-ONLY', doubles);
 
     // Win-probability curve refit on the larger corpus.
     for (const gameType of ['singles', 'doubles'] as const) {

@@ -178,6 +178,8 @@ export function parsePlayedActionsDoubles(lines: string[]): PlayedTurn {
   return { p1: null, p2: null, p1Slots: slots.p1, p2Slots: slots.p2 };
 }
 
+const normalizeName = (name: string) => name.toLowerCase().replace(/[^a-z0-9]/g, '');
+
 /** A Pokémon fed to the opponent while nearly dead — its loss cost almost nothing. */
 export interface SackInfo {
   name: string;
@@ -205,6 +207,26 @@ export function turnEvents(log: string, turn: number): string[] {
 }
 
 /**
+ * One-pass turn index: `result[turn]` holds that turn's events (same slicing
+ * as turnEvents). Callers iterating every turn use this instead of calling
+ * turnEvents per turn, which re-splits the whole log each time.
+ */
+export function allTurnEvents(log: string): string[][] {
+  const byTurn: string[][] = [];
+  let current: string[] | null = null;
+  for (const line of log.split('\n')) {
+    const match = line.match(/^\|turn\|(\d+)/);
+    if (match) {
+      current = [];
+      byTurn[parseInt(match[1], 10)] = current;
+      continue;
+    }
+    current?.push(line);
+  }
+  return byTurn;
+}
+
+/**
  * Detects per-side sacrifices in one turn's events: an own Pokémon fainted
  * that already stood at ≤ SACK_HP_THRESHOLD when the turn began (per the
  * pre-turn snapshot). Feeding a nearly-dead body to absorb an attack, a
@@ -224,13 +246,10 @@ export function detectSacks(
     const side = match[1] as 'p1' | 'p2';
     if (sacks[side]) continue;
     const name = match[2].trim();
-    const nameId = name.toLowerCase().replace(/[^a-z0-9]/g, '');
+    const nameId = normalizeName(name);
     const snapshotSide = side === 'p1' ? snapshotBefore.p1 : snapshotBefore.p2;
-    const pokemon = snapshotSide.pokemon.find(entry => {
-      const entryName = entry.name.toLowerCase().replace(/[^a-z0-9]/g, '');
-      const entrySpecies = entry.speciesForme.toLowerCase().replace(/[^a-z0-9]/g, '');
-      return entryName === nameId || entrySpecies === nameId;
-    });
+    const pokemon = snapshotSide.pokemon.find(entry =>
+      normalizeName(entry.name) === nameId || normalizeName(entry.speciesForme) === nameId);
     if (!pokemon || pokemon.fainted) continue;
     const hpFraction = pokemon.hpPercent / 100;
     if (hpFraction > SACK_HP_THRESHOLD) continue;

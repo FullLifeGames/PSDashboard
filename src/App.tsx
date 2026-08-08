@@ -27,7 +27,7 @@ import { getBranchSimulatorFormat, getReplayGameType, getReplayGeneration, infer
 import { resolveTeraPreference } from './lib/eval/tera';
 import { choiceId, evalChoiceToSlotChoices, type BranchSlotChoice } from './lib/branch-choices';
 import type { RankedChoice } from './lib/eval/types';
-import { detectSacks, parseLeadSpecies, parsePlayedActions, parsePlayedActionsDoubles, turnEvents } from './lib/eval/played';
+import { allTurnEvents, detectSacks, parseLeadSpecies, parsePlayedActions, parsePlayedActionsDoubles } from './lib/eval/played';
 import { analyzeTurn, PAYOFF_WINDOW } from './lib/eval/analysis';
 import { computeRead, parseTendencies } from './lib/eval/opponent-model';
 import { analyzeLeads } from './lib/eval/leads';
@@ -255,6 +255,35 @@ function App() {
     void import('./lib/branch-engine');
   }, [replayData]);
 
+  // The damage-consistent spread solve is deterministic per replay but runs
+  // thousands of calc calls — cache it across the build call sites instead of
+  // re-solving on every branch/eval build. Lazy (ref, not useMemo) so
+  // team-builder stays out of the main bundle.
+  const spreadSolveRef = useRef<{ key: unknown[]; value: Map<string, import('./lib/spread-inference').SpreadCandidate> } | null>(null);
+  const getInferredSpreads = useCallback(async (
+    p1InfoOverride?: OpponentTeamInfo | null,
+    p2InfoOverride?: OpponentTeamInfo | null,
+  ) => {
+    if (!replayData || observations.length === 0) return undefined;
+    const info1 = p1InfoOverride ?? effectiveP1Info;
+    const info2 = p2InfoOverride ?? effectiveP2Info;
+    const key = [replayData, observations, teamText, info1, info2, usageStats.stats, setAssumptions.assumptions];
+    const cached = spreadSolveRef.current;
+    if (cached && cached.key.length === key.length && cached.key.every((entry, index) => entry === key[index])) {
+      return cached.value;
+    }
+    const { solveReplaySpreads } = await import('./lib/team-builder');
+    const value = solveReplaySpreads(replayData.log, observations, {
+      userTeamText: teamText || undefined,
+      p1Info: info1,
+      p2Info: info2,
+      usageStats: usageStats.stats,
+      setAssumptions: setAssumptions.assumptions,
+    });
+    spreadSolveRef.current = { key, value };
+    return value;
+  }, [replayData, observations, teamText, effectiveP1Info, effectiveP2Info, usageStats.stats, setAssumptions.assumptions]);
+
   // Share links must also work in an already-open tab (G17) — listen for
   // hash changes instead of only parsing on the initial load.
   useEffect(() => {
@@ -302,7 +331,7 @@ function App() {
         p2Info: effectiveP2Info,
         usageStats: usageStats.stats,
         setAssumptions: setAssumptions.assumptions,
-        observations,
+        inferredSpreads: await getInferredSpreads(),
       });
       if (p1Team.length > 0 && p2Team.length > 0) {
         setBranchSession(session => session + 1);
@@ -321,7 +350,7 @@ function App() {
       setBranchProgress(null);
       branchAbortRef.current = null;
     }
-  }, [replayData, branchPreparing, teamText, branchTurn, branchSnapshot, snapshots, observations, effectiveP1Info, effectiveP2Info, usageStats.stats, setAssumptions.assumptions, startBranch]);
+  }, [replayData, branchPreparing, teamText, branchTurn, branchSnapshot, snapshots, getInferredSpreads, effectiveP1Info, effectiveP2Info, usageStats.stats, setAssumptions.assumptions, startBranch]);
 
   const handleCancelBranchPreparation = useCallback(() => {
     branchAbortRef.current?.abort();
@@ -349,7 +378,7 @@ function App() {
           p2Info: refreshRequest.p2Info,
           usageStats: usageStats.stats,
           setAssumptions: setAssumptions.assumptions,
-          observations,
+          inferredSpreads: await getInferredSpreads(refreshRequest.p1Info, refreshRequest.p2Info),
         });
         if (!cancelled && p1Team.length > 0 && p2Team.length > 0) {
           setBranchSession(session => session + 1);
@@ -383,7 +412,7 @@ function App() {
   }, [
     pendingBranchRefresh,
     replayData,
-    observations,
+    getInferredSpreads,
     teamText,
     branchTurn,
     branchSnapshot,
@@ -464,7 +493,7 @@ function App() {
         p2Info: effectiveP2Info,
         usageStats: usageStats.stats,
         setAssumptions: setAssumptions.assumptions,
-        observations,
+        inferredSpreads: await getInferredSpreads(),
       });
       if (p1Team.length === 0 || p2Team.length === 0) throw new Error('Could not build both teams for this replay.');
       const runtime = await branchEngine.reconstructBranchRuntime({
@@ -482,7 +511,7 @@ function App() {
       const battle = runtime.battleStream.battle;
       if (!battle) throw new Error('Reconstruction produced no battle.');
       return serializeLiveBattle(battle);
-    }, [replayData, teamText, effectiveP1Info, effectiveP2Info, usageStats.stats, setAssumptions.assumptions, snapshots, observations]);
+    }, [replayData, teamText, effectiveP1Info, effectiveP2Info, usageStats.stats, setAssumptions.assumptions, snapshots, getInferredSpreads]);
 
   // Single-pass sweep acquisition: one reconstruction captures every turn
   // boundary, instead of one O(turn) replay per turn (quadratic polling).
@@ -501,7 +530,7 @@ function App() {
         p2Info: effectiveP2Info,
         usageStats: usageStats.stats,
         setAssumptions: setAssumptions.assumptions,
-        observations,
+        inferredSpreads: await getInferredSpreads(),
       });
       if (p1Team.length === 0 || p2Team.length === 0) throw new Error('Could not build both teams for this replay.');
       const positions: (string | null)[] = new Array(turns).fill(null);
@@ -536,7 +565,7 @@ function App() {
         onPosition?.(turns, serialized);
       }
       return positions;
-    }, [replayData, teamText, effectiveP1Info, effectiveP2Info, usageStats.stats, setAssumptions.assumptions, snapshots, observations]);
+    }, [replayData, teamText, effectiveP1Info, effectiveP2Info, usageStats.stats, setAssumptions.assumptions, snapshots, getInferredSpreads]);
 
   const acquireReplayPosition = useMemo(() => makeReplayAcquire(branchTurn), [makeReplayAcquire, branchTurn]);
 
@@ -637,7 +666,7 @@ function App() {
           p2Info: effectiveP2Info,
           usageStats: usageStats.stats,
           setAssumptions: setAssumptions.assumptions,
-          observations,
+          inferredSpreads: await getInferredSpreads(),
         });
         if (p1Team.length === 0 || p2Team.length === 0) return null;
         return branchEngine.serializePreviewPosition(getBranchSimulatorFormat(replayData), p1Team, p2Team);
@@ -646,7 +675,7 @@ function App() {
     });
   }, [
     replayData, evaluation, analyzableTurns, effectiveTera, setsFingerprint, makeReplayAcquire,
-    makeSweepAcquireAll, snapshots, observations, evalIsDoubles, teamText, effectiveP1Info, effectiveP2Info,
+    makeSweepAcquireAll, snapshots, getInferredSpreads, evalIsDoubles, teamText, effectiveP1Info, effectiveP2Info,
     usageStats.stats, setAssumptions.assumptions,
   ]);
 
@@ -851,17 +880,27 @@ function App() {
     return analyzeLeads(lead.result, lead.played);
   }, [evaluation.graph.lead]);
 
+  // Tendencies and the turn-event index depend only on the loaded replay —
+  // computed once, not per turn click or graph update.
+  const tendencies = useMemo(() => (replayData
+    ? { p1: parseTendencies(replayData.log, 'p1'), p2: parseTendencies(replayData.log, 'p2') }
+    : null), [replayData]);
+  const turnEventsIndex = useMemo(
+    () => (replayData ? allTurnEvents(replayData.log) : []),
+    [replayData],
+  );
+
   // Exploitative Read lens: best response to the opponent model over the
   // already-solved matrix — advisory only, verdicts stay equilibrium-graded.
   const turnReads = useMemo(() => {
-    if (analysisTurn === null || analysisTurn < 1 || !replayData) return null;
+    if (analysisTurn === null || analysisTurn < 1 || !tendencies) return null;
     const result = evaluation.graph.results[analysisTurn - 1];
     if (!result?.matrix) return null;
     return {
-      p1: computeRead(result.matrix, 'p1', parseTendencies(replayData.log, 'p2')),
-      p2: computeRead(result.matrix, 'p2', parseTendencies(replayData.log, 'p1')),
+      p1: computeRead(result.matrix, 'p1', tendencies.p2),
+      p2: computeRead(result.matrix, 'p2', tendencies.p1),
     };
-  }, [analysisTurn, evaluation.graph, replayData]);
+  }, [analysisTurn, evaluation.graph, tendencies]);
 
   const turnAnalysis = useMemo(() => {
     if (analysisTurn === null) return null;
@@ -881,11 +920,11 @@ function App() {
       scoreAfter: evaluation.graph.scores[analysisTurn] ?? null,
       playedTracking: true,
       ...(replayData
-        ? { sacks: detectSacks(turnEvents(replayData.log, analysisTurn), snapshots[analysisTurn - 1] ?? null) }
+        ? { sacks: detectSacks(turnEventsIndex[analysisTurn] ?? [], snapshots[analysisTurn - 1] ?? null) }
         : {}),
       ...(turnReads ? { reads: turnReads } : {}),
     });
-  }, [analysisTurn, evaluation.graph, replayData, snapshots, turnReads]);
+  }, [analysisTurn, evaluation.graph, replayData, snapshots, turnReads, turnEventsIndex]);
 
   const replayWinner = useMemo<'p1' | 'p2' | null>(() => {
     if (!replayData) return null;
@@ -916,14 +955,14 @@ function App() {
         scoreBefore,
         scoreAfter: scores[index + 1] ?? null,
         playedTracking: true,
-        sacks: detectSacks(turnEvents(replayData.log, index + 1), snapshots[index] ?? null),
+        sacks: detectSacks(turnEventsIndex[index + 1] ?? [], snapshots[index] ?? null),
       });
     });
     if (analyses.filter(Boolean).length < 3) return null;
     return buildGameReport(
       analyses, [replayData.players[0], replayData.players[1]], replayWinner, true,
     );
-  }, [replayData, snapshots, evaluation.graph, replayWinner]);
+  }, [replayData, snapshots, evaluation.graph, replayWinner, turnEventsIndex]);
 
   const teamPasteStatus = useMemo(() => {
     if (!pastedSets || pastedSets.length === 0) return null;

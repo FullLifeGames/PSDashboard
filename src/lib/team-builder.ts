@@ -65,6 +65,24 @@ export function buildTeamsFromReplay(
   return build(inferred);
 }
 
+/**
+ * Solves the damage-consistent spreads once for a replay. The solve is
+ * deterministic in (log, observations, build inputs) and runs thousands of
+ * calc calls — memoize this per replay and hand the result to
+ * buildTeamsFromReplay as `inferredSpreads` instead of passing raw
+ * `observations` at every call site.
+ */
+export function solveReplaySpreads(
+  log: string,
+  observations: DamageObservation[],
+  options?: Omit<Parameters<typeof buildTeamsFromReplay>[1], 'observations' | 'inferredSpreads'>,
+): Map<string, SpreadCandidate> {
+  if (observations.length === 0) return new Map();
+  const base = buildTeamsFromReplay(log, options);
+  const gen = log.match(/^\|gen\|(\d)/m)?.[1] ?? '9';
+  return inferSpreads(observations, { p1: base.p1Team, p2: base.p2Team }, `gen${gen}`);
+}
+
 function buildSet(
   info: RevealedPokemonInfo,
   userTeam: PokemonSet[] | null,
