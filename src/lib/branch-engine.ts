@@ -1290,10 +1290,17 @@ export async function reconstructBranchRuntime(params: {
   // become an unhandled rejection — surface it as a choice error so the
   // turn-sync guard skips or stops instead of taking the process down.
   const writeSim = (payload: string) => {
-    streams.omniscient.write(payload).catch(error => {
+    const record = (error: unknown) => {
       choiceErrors.count += 1;
       choiceErrors.last = error instanceof Error ? error.message : String(error);
-    });
+    };
+    try {
+      // write() returns void on the buffered path and a promise otherwise —
+      // guard both the synchronous throw and the async rejection.
+      void Promise.resolve(streams.omniscient.write(payload)).catch(record);
+    } catch (error) {
+      record(error);
+    }
   };
 
   // A rejected replay choice (a team edit can remove the very move the
@@ -1692,12 +1699,19 @@ export async function executeBranchChoices(params: {
   const previousErrorCount = choiceErrors.count;
 
   // Surface sim crashes as choice errors instead of unhandled rejections.
-  streams.omniscient.write(
-    commands.map(({ side, command }) => `>${side} ${command}`).join('\n'),
-  ).catch(error => {
-    choiceErrors.count += 1;
-    choiceErrors.last = error instanceof Error ? error.message : String(error);
-  });
+  {
+    const record = (error: unknown) => {
+      choiceErrors.count += 1;
+      choiceErrors.last = error instanceof Error ? error.message : String(error);
+    };
+    try {
+      void Promise.resolve(streams.omniscient.write(
+        commands.map(({ side, command }) => `>${side} ${command}`).join('\n'),
+      )).catch(record);
+    } catch (error) {
+      record(error);
+    }
+  }
 
   const deadline = Date.now() + timeoutMs;
   while (Date.now() < deadline) {
