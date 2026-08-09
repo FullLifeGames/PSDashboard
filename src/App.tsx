@@ -143,7 +143,23 @@ function App() {
   const pendingStoredSetsRef = useRef<string | null>(null);
   const [editedP1Info, setEditedP1Info] = useState<OpponentTeamInfo | null>(null);
   const [editedP2Info, setEditedP2Info] = useState<OpponentTeamInfo | null>(null);
-  const [branchTurn, setBranchTurn] = useState(1);
+  const [branchTurn, setBranchTurnState] = useState(1);
+  /**
+   * Synchronous mirror of branchTurn: a slider change followed by an
+   * immediate "Branch Here" click can fire BEFORE React commits the
+   * re-render, so the click handler's closure still holds the old turn
+   * (the branch then starts on the wrong turn — seen as e2e flake under
+   * CPU load, but a real race for fast human hands too). Handlers that
+   * act on the selected turn read the ref, never the closure state.
+   */
+  const branchTurnRef = useRef(1);
+  const setBranchTurn = useCallback((value: number | ((turn: number) => number)) => {
+    setBranchTurnState(previous => {
+      const next = typeof value === 'function' ? value(previous) : value;
+      branchTurnRef.current = next;
+      return next;
+    });
+  }, []);
   const [branchPreparing, setBranchPreparing] = useState(false);
   const [branchProgress, setBranchProgress] = useState<{ turn: number; target: number } | null>(null);
   const branchAbortRef = useRef<AbortController | null>(null);
@@ -190,7 +206,7 @@ function App() {
     pendingStoredSetsRef.current = replayData?.id
       ? localStorage.getItem(`ps-replay-interceptor:sets:${replayData.id}`)
       : null;
-  }, [replayData?.id, stopBranch]);
+  }, [replayData?.id, stopBranch, setBranchTurn]);
 
   const handleTeamLoad = useCallback((rawText: string) => {
     const processed = parseTeamText(rawText);
@@ -344,7 +360,12 @@ function App() {
       });
       if (p1Team.length > 0 && p2Team.length > 0) {
         setBranchSession(session => session + 1);
-        await startBranch(getBranchSimulatorFormat(replayData), p1Team, p2Team, replayData.log, branchTurn, branchSnapshot, {
+        // The ref, not the closure: see branchTurnRef (slider→click race).
+        const selectedTurn = branchTurnRef.current;
+        const selectedSnapshot = snapshots.length > 0
+          ? snapshots[Math.min(selectedTurn - 1, snapshots.length - 1)] ?? null
+          : null;
+        await startBranch(getBranchSimulatorFormat(replayData), p1Team, p2Team, replayData.log, selectedTurn, selectedSnapshot, {
           playerNames: [replayData.players[0], replayData.players[1]],
           onProgress: (turn, target) => setBranchProgress({ turn, target }),
           abort: abortController.signal,
@@ -359,7 +380,7 @@ function App() {
       setBranchProgress(null);
       branchAbortRef.current = null;
     }
-  }, [replayData, branchPreparing, teamText, branchTurn, branchSnapshot, snapshots, getInferredSpreads, effectiveP1Info, effectiveP2Info, usageStats.stats, setAssumptions.assumptions, startBranch]);
+  }, [replayData, branchPreparing, teamText, snapshots, getInferredSpreads, effectiveP1Info, effectiveP2Info, usageStats.stats, setAssumptions.assumptions, startBranch]);
 
   const handleCancelBranchPreparation = useCallback(() => {
     branchAbortRef.current?.abort();
@@ -711,7 +732,8 @@ function App() {
   // its analysis only needs this turn and the next one evaluated.
   const handleAnalyzeTurn = useCallback(() => {
     if (!replayData) return;
-    const turn = Math.min(Math.max(1, branchTurn), analyzableTurns);
+    // The ref, not the closure: see branchTurnRef (slider→click race).
+    const turn = Math.min(Math.max(1, branchTurnRef.current), analyzableTurns);
     evaluation.runGraphSweep({
       turns: analyzableTurns,
       from: turn,
@@ -725,7 +747,7 @@ function App() {
       sensitivityTargetsFor,
     });
     setAnalysisTurn(turn);
-  }, [replayData, evaluation, branchTurn, analyzableTurns, effectiveTera, setsFingerprint, makeReplayAcquire, snapshots, evalIsDoubles, sensitivityTargetsFor]);
+  }, [replayData, evaluation, analyzableTurns, effectiveTera, setsFingerprint, makeReplayAcquire, snapshots, evalIsDoubles, sensitivityTargetsFor]);
 
   // Any position change invalidates a displayed result.
   const { markStale: markEvalStale, reset: resetEval, clearGraph } = evaluation;
@@ -884,7 +906,7 @@ function App() {
       }
       return turn;
     });
-  }, [branching, endSnapshotTurn]);
+  }, [branching, endSnapshotTurn, setBranchTurn]);
 
   const handleGraphSelect = useCallback((turn: number) => {
     // Turn 0 (team preview) has no replay position — only the analysis opens.
