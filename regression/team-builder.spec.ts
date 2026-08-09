@@ -335,6 +335,26 @@ test.describe('team sheet display overlay', () => {
     expect(talon?.moves).toEqual(expect.arrayContaining(['Roost', 'Defog', 'Brave Bird']));
   });
 
+  test('Champions replays build with the 32/66 EV budget', () => {
+    const champLog = [
+      '|player|p1|Alice|1|',
+      '|player|p2|Bob|2|',
+      '|gen|9',
+      '|tier|[Gen 9] Champions VGC 2026 Reg M-A (Bo3)',
+      '|poke|p1|Garchomp, M|',
+      '|poke|p2|Kingambit, M|',
+      '|start',
+      '|switch|p1a: Garchomp|Garchomp, M|100/100',
+      '|switch|p2a: Kingambit|Kingambit, M|100/100',
+      '|turn|1',
+    ].join('\n');
+    const { p1Team } = buildTeamsFromReplay(champLog);
+    const chomp = p1Team[0];
+    const values = Object.values(chomp.evs ?? {});
+    for (const value of values) expect(value).toBeLessThanOrEqual(32);
+    expect(values.reduce((sum, value) => sum + (value ?? 0), 0)).toBeLessThanOrEqual(66);
+  });
+
   test('extractTeamSheets finds the chat-posted infobox sheets', async () => {
     const { extractTeamSheets } = await import('../src/lib/team-builder');
     const log = [

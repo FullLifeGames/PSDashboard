@@ -4,7 +4,7 @@ import { inferOpponentTeam } from './opponent-inferrer';
 import { getSpeciesUsageSet, type SmogonUsageStats, type UsageProbability } from './smogon-stats';
 import { getSpeciesSetAssumption, type SetAssumption, type SmogonSetAssumptions } from './smogon-sets';
 import { itemSetValue } from './team-info';
-import { inferSpreads, type SpreadCandidate } from './spread-inference';
+import { evBudget, inferSpreads, legalizeEvs, type SpreadCandidate } from './spread-inference';
 import type { DamageObservation, KnowledgeSource, OpponentTeamInfo, PokemonEvs, RevealedPokemonInfo } from '../types';
 
 function toId(name: string): string {
@@ -47,20 +47,26 @@ export function buildTeamsFromReplay(
 
   const p1KnownTeam = userTeam || embeddedTeams.p1 || null;
   const p2KnownTeam = embeddedTeams.p2 || null;
+  // Pokémon Champions uses its own EV system (32 per stat, 66 total) —
+  // standard-scale guesses/fallbacks must be clamped to the format budget.
+  const gen = log.match(/^\|gen\|(\d)/m)?.[1] ?? '9';
+  const formatHint = /^\|tier\|.*champions/im.test(log) ? `gen${gen}champions` : `gen${gen}`;
+  const champions = evBudget(formatHint).perStat !== 252;
+  const legalize = (team: PokemonSet[]): PokemonSet[] =>
+    (champions ? team.map(set => ({ ...set, evs: legalizeEvs(set.evs, formatHint) })) : team);
   const build = (inferred?: Map<string, SpreadCandidate>) => ({
-    p1Team: p1Info.pokemon.map(pokemon => buildSet(
+    p1Team: legalize(p1Info.pokemon.map(pokemon => buildSet(
       pokemon, p1KnownTeam, options?.usageStats, options?.setAssumptions,
-      inferred?.get(`p1:${toId(pokemon.species)}`))),
-    p2Team: p2Info.pokemon.map(pokemon => buildSet(
+      inferred?.get(`p1:${toId(pokemon.species)}`)))),
+    p2Team: legalize(p2Info.pokemon.map(pokemon => buildSet(
       pokemon, p2KnownTeam, options?.usageStats, options?.setAssumptions,
-      inferred?.get(`p2:${toId(pokemon.species)}`))),
+      inferred?.get(`p2:${toId(pokemon.species)}`)))),
   });
 
   let inferred = options?.inferredSpreads;
   if (!inferred && options?.observations && options.observations.length > 0) {
     const base = build();
-    const gen = log.match(/^\|gen\|(\d)/m)?.[1] ?? '9';
-    inferred = inferSpreads(options.observations, { p1: base.p1Team, p2: base.p2Team }, `gen${gen}`);
+    inferred = inferSpreads(options.observations, { p1: base.p1Team, p2: base.p2Team }, formatHint);
   }
   return build(inferred);
 }
@@ -80,7 +86,8 @@ export function solveReplaySpreads(
   if (observations.length === 0) return new Map();
   const base = buildTeamsFromReplay(log, options);
   const gen = log.match(/^\|gen\|(\d)/m)?.[1] ?? '9';
-  return inferSpreads(observations, { p1: base.p1Team, p2: base.p2Team }, `gen${gen}`);
+  const formatHint = /^\|tier\|.*champions/im.test(log) ? `gen${gen}champions` : `gen${gen}`;
+  return inferSpreads(observations, { p1: base.p1Team, p2: base.p2Team }, formatHint);
 }
 
 function buildSet(

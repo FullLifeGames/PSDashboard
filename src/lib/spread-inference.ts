@@ -25,6 +25,42 @@ export interface SpreadCandidate {
 
 const ZERO_EVS: PokemonEvs = { hp: 0, atk: 0, def: 0, spa: 0, spd: 0, spe: 0 };
 
+/** Format-dependent EV legality (Pokémon Champions uses 32/stat, 66 total). */
+export interface EvBudget { perStat: number; total: number }
+export function evBudget(formatid: string): EvBudget {
+  return /champions/.test(formatid) ? { perStat: 32, total: 66 } : { perStat: 252, total: 508 };
+}
+
+const evTotal = (evs: PokemonEvs): number =>
+  Object.values(evs).reduce((sum, value) => sum + (value ?? 0), 0);
+
+/**
+ * Legalize a composed spread: clamp every stat to the per-stat cap, then
+ * shave down to the total budget — least-evidenced stats first (the
+ * unprotected offense, then bulk, then HP), Speed last (damage evidence
+ * never justifies stripping Speed, so it only gives way when the budget
+ * leaves no other room), and rung-claimed (protected) stats after all
+ * unprotected ones. The old unlegalized composition let a prior's 252 Spe
+ * ride along with 252/252 overrides — a 756-EV spread the sim then played.
+ */
+function capToBudget(evs: PokemonEvs, protectedStats: Set<keyof PokemonEvs>, budget: EvBudget): PokemonEvs {
+  const out: PokemonEvs = { ...evs };
+  for (const stat of Object.keys(out) as (keyof PokemonEvs)[]) {
+    out[stat] = Math.min(budget.perStat, Math.max(0, out[stat] ?? 0));
+  }
+  const shaveOrder: (keyof PokemonEvs)[] = [
+    ...(['atk', 'spa', 'def', 'spd', 'hp'] as (keyof PokemonEvs)[]).filter(stat => !protectedStats.has(stat)),
+    'spe',
+    ...(['spd', 'def', 'hp', 'spa', 'atk'] as (keyof PokemonEvs)[]).filter(stat => protectedStats.has(stat)),
+  ];
+  for (const stat of shaveOrder) {
+    const over = evTotal(out) - budget.total;
+    if (over <= 0) break;
+    out[stat] = Math.max(0, (out[stat] ?? 0) - over);
+  }
+  return out;
+}
+
 /** HP-bar reading noise (the GPL pipeline is ±1–2%): error inside this slack is free. */
 const OBSERVATION_SLACK = 0.02;
 /** Minimum observations before a spread claim beats the existing guess. */
@@ -71,24 +107,26 @@ function candidateLadder(
   physicalAttacker: boolean,
   hasAttackerObs: boolean,
   hasDefenderObs: boolean,
+  budget: EvBudget,
 ): CandidateRung[] {
+  const max = budget.perStat;
   const offenseStat = physicalAttacker ? 'atk' : 'spa';
   const offensePlus = physicalAttacker ? 'Adamant' : 'Modest';
   const offense: { evs?: Partial<PokemonEvs>; nature?: string }[] = hasAttackerObs
     ? [
       { evs: { [offenseStat]: 0 } },
-      { evs: { [offenseStat]: 252 } },
-      { evs: { [offenseStat]: 252 }, nature: offensePlus },
+      { evs: { [offenseStat]: max } },
+      { evs: { [offenseStat]: max }, nature: offensePlus },
     ]
     : [{}];
   const bulk: { evs?: Partial<PokemonEvs>; nature?: string }[] = hasDefenderObs
     ? [
       { evs: { hp: 0, def: 0, spd: 0 } },
-      { evs: { hp: 252, def: 0, spd: 0 } },
-      { evs: { hp: 252, def: 252, spd: 0 } },
-      { evs: { hp: 252, def: 0, spd: 252 } },
-      { evs: { hp: 252, def: 252, spd: 0 }, nature: 'Bold' },
-      { evs: { hp: 252, def: 0, spd: 252 }, nature: 'Calm' },
+      { evs: { hp: max, def: 0, spd: 0 } },
+      { evs: { hp: max, def: max, spd: 0 } },
+      { evs: { hp: max, def: 0, spd: max } },
+      { evs: { hp: max, def: max, spd: 0 }, nature: 'Bold' },
+      { evs: { hp: max, def: 0, spd: max }, nature: 'Calm' },
     ]
     : [{}];
 
@@ -98,12 +136,21 @@ function candidateLadder(
   ]);
   const priorPlus = NATURE_PLUS[toId(prior.nature)];
 
-  const rungs: CandidateRung[] = [{ evs: { ...ZERO_EVS, ...prior.evs }, nature: prior.nature }];
+  // Every rung is LEGALIZED before scoring: rung-claimed stats are
+  // protected, prior carry-overs give way first (capToBudget).
+  const rungs: CandidateRung[] = [{
+    evs: capToBudget({ ...ZERO_EVS, ...prior.evs }, new Set(), budget),
+    nature: prior.nature,
+  }];
   for (const o of offense) {
     for (const b of bulk) {
       if (o.nature && b.nature) continue;
+      const overrides = { ...b.evs, ...o.evs };
+      const protectedStats = new Set((Object.entries(overrides) as [keyof PokemonEvs, number][])
+        .filter(([, value]) => (value ?? 0) > 0)
+        .map(([stat]) => stat));
       rungs.push({
-        evs: { ...ZERO_EVS, ...prior.evs, ...b.evs, ...o.evs },
+        evs: capToBudget({ ...ZERO_EVS, ...prior.evs, ...overrides }, protectedStats, budget),
         nature: o.nature ?? b.nature ??
           (priorPlus && measured.has(priorPlus) ? 'Hardy' : prior.nature),
       });
@@ -117,12 +164,18 @@ function genOf(formatid: string) {
   return Generations.get(Math.min(Math.max(genNumber, 1), 9) as 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9);
 }
 
+/** Public legalizer: clamp any EV spread to the format's budget. */
+export function legalizeEvs(evs: Partial<PokemonEvs> | undefined, formatid: string): PokemonEvs {
+  return capToBudget({ ...ZERO_EVS, ...(evs ?? {}) }, new Set(), evBudget(formatid));
+}
+
 export function inferSpreads(
   observations: DamageObservation[],
   sets: { p1: PokemonSet[]; p2: PokemonSet[] },
   formatid: string,
 ): Map<string, SpreadCandidate> {
   const gen = genOf(formatid);
+  const budget = evBudget(formatid);
   const solved = new Map<string, SpreadCandidate>();
 
   const keyOf = (side: 'p1' | 'p2', species: string) => `${side}:${toId(species)}`;
@@ -200,7 +253,19 @@ export function inferSpreads(
 
   const physicalAttackerFor = (key: string): boolean => {
     const attacking = (byMon.get(key) ?? []).filter(obs => keyOf(obs.attackerSide, obs.attackerSpecies) === key);
-    if (attacking.length === 0) return true;
+    if (attacking.length === 0) {
+      // Never observed attacking — classify by the set's damaging moves so
+      // the leftover-EV fill lands in the right offense stat.
+      const [side, species] = key.split(':') as ['p1' | 'p2', string];
+      let physical = 0;
+      let special = 0;
+      for (const name of setOf(side, species)?.moves ?? []) {
+        const category = gen.moves.get(toId(name) as Parameters<typeof gen.moves.get>[0])?.category;
+        if (category === 'Physical') physical += 1;
+        else if (category === 'Special') special += 1;
+      }
+      return physical >= special;
+    }
     let physical = 0;
     for (const obs of attacking) {
       const category = gen.moves.get(obs.moveId as Parameters<typeof gen.moves.get>[0])?.category;
@@ -229,7 +294,8 @@ export function inferSpreads(
       keyOf(obs.attackerSide === 'p1' ? 'p2' : 'p1', obs.defenderSpecies) === key);
     const prior = priors.get(key);
     if (!prior) return;
-    const ladder = candidateLadder(prior, physicalAttackerFor(key), hasAttackerObs, hasDefenderObs);
+    const physicalAttacker = physicalAttackerFor(key);
+    const ladder = candidateLadder(prior, physicalAttacker, hasAttackerObs, hasDefenderObs, budget);
     let best: CandidateRung | null = null;
     let bestError = Infinity;
     for (const rung of ladder) {
@@ -240,7 +306,29 @@ export function inferSpreads(
         best = rung;
       }
     }
-    if (best) solved.set(key, best);
+    if (!best) return;
+    // Top up the leftover budget in UNMEASURED, non-Speed stats: a winner
+    // like "252 HP only" would otherwise field a systematically
+    // under-statted sim mon. Filled stats carry no observation evidence
+    // either way (they are exactly the unmeasured ones), so the fill can
+    // never contradict the solve.
+    const offenseStat: keyof PokemonEvs = physicalAttacker ? 'atk' : 'spa';
+    const measured = new Set<keyof PokemonEvs>([
+      ...(hasAttackerObs ? [offenseStat] : []),
+      ...(hasDefenderObs ? (['hp', 'def', 'spd'] as (keyof PokemonEvs)[]) : []),
+    ]);
+    const evs: PokemonEvs = { ...best.evs };
+    let remaining = budget.total - evTotal(evs);
+    for (const stat of ([offenseStat, 'hp', 'def', 'spd'] as (keyof PokemonEvs)[])) {
+      if (remaining <= 0) break;
+      if (measured.has(stat)) continue;
+      const add = Math.min(budget.perStat - (evs[stat] ?? 0), remaining);
+      if (add > 0) {
+        evs[stat] = (evs[stat] ?? 0) + add;
+        remaining -= add;
+      }
+    }
+    solved.set(key, { evs, nature: best.nature });
   };
 
   // Greedy by observation count, then a refinement pass: the first pass can

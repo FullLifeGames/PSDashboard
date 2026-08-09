@@ -69,10 +69,12 @@ test.describe('damage-consistent spread inference', () => {
     expect(single.get('p1:uxie')).toBeUndefined();
   });
 
-  test('solving bulk preserves the prior Speed EVs, speed nature, and unmeasured offense', () => {
-    // Damage observations carry no information about Speed (and none about
-    // the offense of a mon only ever observed defending) — the solver must
-    // not overwrite what the evidence cannot measure.
+  test('solving bulk preserves Speed and nature but never exceeds the EV budget', () => {
+    // Damage observations carry no information about Speed — the solver
+    // must not strip Speed EVs or the speed nature. But the LEGAL budget
+    // (508) binds: with 252 HP measured and 252 Spe preserved, the
+    // unmeasured 252 SpA cannot also survive — it yields first. (The old
+    // expectation institutionalized a 756-EV spread the sim then played.)
     const timidSets = {
       p1: [{
         ...set('Uxie', ['Stealth Rock', 'U-turn']),
@@ -89,7 +91,43 @@ test.describe('damage-consistent spread inference', () => {
     expect(uxie).toBeTruthy();
     expect(uxie!.evs.hp).toBe(252);
     expect(uxie!.evs.spe).toBe(252);
-    expect(uxie!.evs.spa).toBe(252);
     expect(uxie!.nature).toBe('Timid');
+    const total = Object.values(uxie!.evs).reduce((sum, value) => sum + value, 0);
+    expect(total).toBeLessThanOrEqual(508);
+    expect(uxie!.evs.spa).toBeLessThanOrEqual(4);
+  });
+
+  test('an incomplete winner is topped up in unmeasured non-Speed stats', () => {
+    // Bulk-only evidence over an empty prior used to emit a 252-total
+    // spread — a systematically under-statted sim mon. Leftover EVs fill
+    // the unmeasured offense (U-turn Uxie: physical → Atk), never Speed.
+    const emptyPriorSets = {
+      p1: [{ ...set('Uxie', ['Stealth Rock', 'U-turn']), evs: { hp: 0, atk: 0, def: 0, spa: 0, spd: 0, spe: 0 } }],
+      p2: [set('Landorus-Therian', ['U-turn', 'Knock Off'])],
+    };
+    const observations = [
+      observe('U-turn', { hp: 252 }, 'Hardy'),
+      observe('Knock Off', { hp: 252 }, 'Hardy'),
+    ];
+    const uxie = inferSpreads(observations, emptyPriorSets, 'gen9customgame').get('p1:uxie');
+    expect(uxie).toBeTruthy();
+    expect(uxie!.evs.hp).toBe(252);
+    expect(uxie!.evs.atk).toBe(252);
+    expect(uxie!.evs.spe).toBe(0);
+    const total = Object.values(uxie!.evs).reduce((sum, value) => sum + value, 0);
+    expect(total).toBeLessThanOrEqual(508);
+    expect(total).toBeGreaterThanOrEqual(500);
+  });
+
+  test('Champions formats use the 32-per-stat / 66-total budget', () => {
+    const observations = [
+      observe('U-turn', { hp: 252 }, 'Hardy'),
+      observe('Knock Off', { hp: 252 }, 'Hardy'),
+    ];
+    const uxie = inferSpreads(observations, sets, 'gen9championsvgc2026regma').get('p1:uxie');
+    expect(uxie).toBeTruthy();
+    for (const value of Object.values(uxie!.evs)) expect(value).toBeLessThanOrEqual(32);
+    const total = Object.values(uxie!.evs).reduce((sum, value) => sum + value, 0);
+    expect(total).toBeLessThanOrEqual(66);
   });
 });
