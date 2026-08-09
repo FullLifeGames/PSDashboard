@@ -196,6 +196,20 @@ import { brierScore, fitConstantK } from './fit-helpers';
  * passes, but reconstructed battles store the pending marker
  * inconsistently — left unfiltered.
  *
+ * EV LEGALIZATION 2026-08-09 (user findings: inferred spreads could stack
+ * to 756+ EVs — the ladder inherited prior investment past the 508 budget
+ * and the sim PLAYED those monsters in custom formats — or stop at 252
+ * total; Champions formats use 32/stat 66 total). Rungs are legalized
+ * before scoring (per-stat clamp + ordered shave, Speed last), winners are
+ * topped up in unmeasured non-Speed stats, and Champions replays build
+ * with their own budget end to end. Gate 59/67/79/66/80, re-test
+ * 59/68/79/66/80 — late stable at 79 (−2 vs the preceding state, at the
+ * limit). ADOPTED as a CORRECTNESS fix (the sim must field legal spreads;
+ * precedent: the attribution/spread-solver adoptions). CAVEAT recorded:
+ * today's per-step gates each passed at the limit while late drifted
+ * 83→79 cumulatively (early/mid/singles +1/+3/+2) — the next round should
+ * re-baseline with a paired comparison instead of chaining limit-passes.
+ *
  * ROUND CLOSE 2026-08-09 (calibration/honesty round, cache v11). The
  * sim-grounded-hazards re-test above IS the closing run — no eval-changing
  * task landed after it: 58/65/83/65/82, brier 0.2585/0.2267/0.1740.
