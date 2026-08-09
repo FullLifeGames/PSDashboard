@@ -34,18 +34,31 @@ const SMOGON_DOUBLES_THREADS = [
   3778554, // Official Smogon Doubles Tournament - Replays and Usage Stats
   3781999, // OSDT VI Play-In (replays required)
 ];
+// Gen9 SINGLES tournament threads (2026-08-09 expansion): the fit's
+// gen9-singles tranche was under-powered (~105 games vs 405 oldgen) while
+// the app targets gen9 — and the instrumented fit showed the matchup term
+// carrying 4x more outcome signal in gen9 than in old gens.
+const SMOGON_SINGLES_THREADS = [
+  3718664, // SV OU Official Tournament Replays (SPL/OST/WCoP archive)
+  3779021, // UWC Replay Thread (Ubers World Cup, gen9ubers-heavy)
+];
 const LADDER_FORMATS = ['gen9ou', 'gen9doublesou', 'gen9vgc2024regh', 'gen9vgc2026regm'];
 const FORMAT_FILTER = /^gen\d(ou|uu|ru|nu|ubers|doublesou|vgc|champions)/;
 const DOUBLES_FORMAT = /doubles|vgc|champions/;
+const GEN9_SINGLES_FORMAT = /^gen9(ou|uu|ru|nu|ubers)/;
 const PER_FORMAT_CAP = 30;
 // The doubles tranche is the corpus's scarce resource — cap far higher.
 const DOUBLES_PER_FORMAT_CAP = 150;
+// Gen9 singles: the app's home turf — power the tranche properly.
+const GEN9_SINGLES_PER_FORMAT_CAP = 300;
 const LADDER_PER_FORMAT = 25;
 const MANIFEST_PATH = 'regression/fixtures/fit-corpus-manifest.json';
 const CACHE_DIR = '.fit-corpus';
 const DELAY_MS = 300;
 
-const formatCap = format => (DOUBLES_FORMAT.test(format) ? DOUBLES_PER_FORMAT_CAP : PER_FORMAT_CAP);
+const formatCap = format => (DOUBLES_FORMAT.test(format)
+  ? DOUBLES_PER_FORMAT_CAP
+  : GEN9_SINGLES_FORMAT.test(format) ? GEN9_SINGLES_PER_FORMAT_CAP : PER_FORMAT_CAP);
 
 const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
 
@@ -91,7 +104,7 @@ async function smogonThreadTranche() {
   const byFormat = new Map();
   const seen = new Set();
   const headers = { 'user-agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)' };
-  for (const thread of SMOGON_DOUBLES_THREADS) {
+  for (const thread of [...SMOGON_DOUBLES_THREADS, ...SMOGON_SINGLES_THREADS]) {
     try {
       const base = `https://www.smogon.com/forums/threads/${thread}/`;
       const first = await (await fetch(base, { headers })).text();
@@ -103,9 +116,11 @@ async function smogonThreadTranche() {
       }
       let found = 0;
       for (const html of pages) {
-        for (const match of html.matchAll(/replay\.pokemonshowdown\.com\/([a-z0-9]+-\d+[a-z0-9-]*)/g)) {
+        // Official tournament replays carry a room prefix (smogtours-gen9ou-…)
+        // — the id is one or more dash-joined segments before the number.
+        for (const match of html.matchAll(/replay\.pokemonshowdown\.com\/((?:[a-z0-9]+-)+\d+[a-z0-9-]*)/g)) {
           const id = match[1];
-          const format = id.split(/-\d/)[0];
+          const format = id.replace(/^smogtours-/, '').split(/-\d{4,}/)[0];
           if (!FORMAT_FILTER.test(format) || seen.has(id)) continue;
           seen.add(id);
           const bucket = byFormat.get(format) ?? [];
