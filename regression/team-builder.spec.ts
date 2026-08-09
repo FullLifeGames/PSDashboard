@@ -314,6 +314,27 @@ test.describe('team sheet display overlay', () => {
     expect(applyTeamSheetToInfo(info, null)).toBe(info);
   });
 
+  test('chat-posted sheets feed the BUILT teams, not just the display', () => {
+    // Draft T14 root cause: Talonflame's Heavy-Duty Boots (and Defog) sat in
+    // the chat-posted sheet, but the builder only consumed |showteam| embeds
+    // — the simulated Talonflame paid Stealth Rock entries it never takes.
+    const log = [
+      '|player|p1|Alice|1|',
+      '|player|p2|Bob|2|',
+      '|gen|9',
+      '|poke|p1|Talonflame, F|item',
+      '|start',
+      '|switch|p1a: Talon|Talonflame, F|100/100',
+      '|turn|1',
+      '|c| Alice|/raw <div class="infobox"><details><summary>View team</summary>Talon (Talonflame) (F) @ Heavy-Duty Boots  <br />Ability: Flame Body  <br />- Roost  <br />- Defog  <br />- Brave Bird  <br /></details></div>',
+    ].join('\n');
+    const { p1Team } = buildTeamsFromReplay(log);
+    const talon = p1Team.find(set => set.species === 'Talonflame');
+    expect(talon?.item).toBe('Heavy-Duty Boots');
+    expect(talon?.ability).toBe('Flame Body');
+    expect(talon?.moves).toEqual(expect.arrayContaining(['Roost', 'Defog', 'Brave Bird']));
+  });
+
   test('extractTeamSheets finds the chat-posted infobox sheets', async () => {
     const { extractTeamSheets } = await import('../src/lib/team-builder');
     const log = [

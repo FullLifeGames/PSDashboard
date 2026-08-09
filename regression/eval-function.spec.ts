@@ -3,7 +3,7 @@ import { Battle, Teams, toID } from '@pkmn/sim';
 import type { PokemonSet } from '@pkmn/sim';
 import {
   createMatchupCache, DOUBLES_FEATURE_WEIGHTS, evalFeatures, evaluatePosition, EVAL_WEIGHTS,
-  FEATURE_WEIGHTS, featureWeights, hazardCost, matchupTerms, pairThreat, type EvalFeatures,
+  FEATURE_WEIGHTS, featureWeights, hazardCost, hazardRemovalEquity, matchupTerms, pairThreat, type EvalFeatures,
 } from '../src/lib/eval/eval-function';
 
 function makeSet(
@@ -441,6 +441,52 @@ test.describe('evaluatePosition', () => {
     expect(toxicCost('Muk')).toBe(0);
     expect(toxicCost('Klefki')).toBe(0);
     expect(toxicCost('Snorlax')).toBeGreaterThan(0);
+  });
+
+  test('hazard removal is an OPTION on the net board state', () => {
+    // A Defogger on the suffering side: the option to clear is worth the
+    // discounted net relief (the T14 Talonflame case — the switch INTO the
+    // Defogger must not read as walking deeper into the hazard cost).
+    const board = (mon: ReturnType<typeof makeSet>) => makeBattle(
+      [makeSet('A', 'Snorlax', VANILLA)],
+      [makeSet('B', 'Volcarona', VANILLA), mon],
+    );
+    const withDefog = board(makeSet('C', 'Talonflame', ['Defog', 'Roost']));
+    withDefog.sides[1].addSideCondition('stealthrock', withDefog.sides[0].active[0]!);
+    const cost = hazardCost(withDefog.sides[1], withDefog);
+    expect(cost).toBeGreaterThan(0);
+    expect(hazardRemovalEquity(withDefog.sides[1], withDefog))
+      .toBeCloseTo(cost * EVAL_WEIGHTS.hazardRemovalDiscount, 8);
+
+    // Defog is double-edged: when the side's OWN hazards on the opponent's
+    // board are worth more than its suffering, the option is never exercised
+    // — equity 0, full price stands. (Snorlax suffers cheap neutral rocks;
+    // the opposing board holds rocks that bleed 4x-weak Volcarona.)
+    const doubleEdged = makeBattle(
+      [makeSet('A', 'Snorlax', ['Defog', 'Protect'])],
+      [makeSet('B', 'Volcarona', VANILLA), makeSet('C', 'Talonflame', VANILLA)],
+    );
+    doubleEdged.sides[0].addSideCondition('stealthrock', doubleEdged.sides[1].active[0]!);
+    doubleEdged.sides[1].addSideCondition('stealthrock', doubleEdged.sides[0].active[0]!);
+    expect(hazardCost(doubleEdged.sides[0], doubleEdged))
+      .toBeLessThan(hazardCost(doubleEdged.sides[1], doubleEdged));
+    expect(hazardRemovalEquity(doubleEdged.sides[0], doubleEdged)).toBe(0);
+
+    // Rapid Spin only clears the spinner's OWN side — the same board grants
+    // full (discounted) relief because nothing of value is lost.
+    const spinner = makeBattle(
+      [makeSet('A', 'Snorlax', ['Rapid Spin', 'Protect'])],
+      [makeSet('B', 'Volcarona', VANILLA), makeSet('C', 'Talonflame', VANILLA)],
+    );
+    spinner.sides[0].addSideCondition('stealthrock', spinner.sides[1].active[0]!);
+    spinner.sides[1].addSideCondition('stealthrock', spinner.sides[0].active[0]!);
+    expect(hazardRemovalEquity(spinner.sides[0], spinner))
+      .toBeCloseTo(hazardCost(spinner.sides[0], spinner) * EVAL_WEIGHTS.hazardRemovalDiscount, 8);
+
+    // A fainted remover holds no option.
+    withDefog.sides[1].pokemon[1].faint();
+    withDefog.sides[1].pokemon[1].hp = 0;
+    expect(hazardRemovalEquity(withDefog.sides[1], withDefog)).toBe(0);
   });
 
   test('hazard cost skips Boots and Magic Guard and caps at hazardCap', () => {

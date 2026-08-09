@@ -150,6 +150,21 @@ import { brierScore, fitConstantK } from './fit-helpers';
  * stage term remains its best-measured carrier; "coverage gained" as
  * specified does not separate from the existing matchup/coverage terms.
  *
+ * HAZARD-REMOVAL OPTION VALUE 2026-08-09 (user finding, draft T14: the
+ * switch into Defog Talonflame read as an inaccuracy because standing
+ * hazards were priced as if paid forever — the removal capacity was
+ * invisible, and the payoff sits past the expansion horizon). Modeled as
+ * an OPTION on the net board state (hazardRemovalEquity): own-side movers
+ * (Rapid Spin/Mortal Spin/Tidy Up) net full relief; both-sides movers
+ * (Defog/Court Change) net relief MINUS the side's own hazards' worth on
+ * the opponent's board; a net-negative option is never exercised (counts
+ * 0); the exercised option is tempo-discounted ×0.5. T14: regret
+ * 0.165 (inaccuracy) → 0.020 (clean), the Defog switch ranks 2nd.
+ * Gate 58/67/85/67/82 vs record 58/65/83/65/82 — mid +2, late +2,
+ * singles +2, doubles level: the best run on record. GATE PASSED, ADOPTED
+ * (cache v12). A flat remover-exists discount was tried first and gated
+ * fine (58/64/82/65/80) but mispriced double-edged Defogs — superseded.
+ *
  * ROUND CLOSE 2026-08-09 (calibration/honesty round, cache v11). The
  * sim-grounded-hazards re-test above IS the closing run — no eval-changing
  * task landed after it: 58/65/83/65/82, brier 0.2585/0.2267/0.1740.

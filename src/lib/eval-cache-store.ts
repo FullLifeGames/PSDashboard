@@ -32,9 +32,10 @@ export interface StoredEval {
  * resurface as current.
  */
 // v7: active-pair matchup emphasis + team-preview (turn 0) evaluation.
-// v11: phase-aware winprob (K = k0 + k1·faintedFraction), quiescence
-//      extension on violent cells, sensitivity probes cached per turn.
-export const EVAL_ENGINE_CACHE_VERSION = 11;
+// v11: phase-aware winprob (K = k0 + k1·faintedFraction), sensitivity
+//      probes cached per turn.
+// v12: hazard-removal option value (net board state, move-aware).
+export const EVAL_ENGINE_CACHE_VERSION = 12;
 
 export function evalStoreKey(
   cacheKey: string,

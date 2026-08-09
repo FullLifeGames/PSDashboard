@@ -78,9 +78,26 @@ export const EVAL_WEIGHTS = {
    * header for the recorded outcome.
    */
   matchupEarlyDamp: 1.0,
+  /**
+   * Fraction of a removal option's NET board-state relief that counts:
+   * removal costs a tempo turn and can be punished, so the option is worth
+   * half its exercise value. See hazardRemovalEquity — the net is
+   * move-aware (Defog also destroys the side's OWN hazards on the
+   * opponent's board; a net-negative option is never exercised and counts
+   * zero). Folded into the raw hazard value — a non-independent modifier,
+   * not fittable. Motivating case: draft T14, where switching into the
+   * 4x-rock-weak Defog Talonflame read as walking deeper into the hazard
+   * cost on the very turn that sets up the removal.
+   */
+  hazardRemovalDiscount: 0.5,
 } as const;
 
 const CHOICE_ITEMS = new Set(['choiceband', 'choicespecs', 'choicescarf']);
+
+/** Removal moves that clear ONLY the user's side (pure relief). */
+const OWN_SIDE_REMOVAL_MOVES = new Set(['rapidspin', 'mortalspin', 'tidyup']);
+/** Removal moves that clear (or swap) BOTH sides — double-edged. */
+const BOTH_SIDES_REMOVAL_MOVES = new Set(['defog', 'courtchange']);
 
 const SCREENS = ['reflect', 'lightscreen', 'auroraveil'];
 
@@ -208,6 +225,33 @@ export function hazardCost(side: Side, battle: Battle): number {
   return Math.min(cost, EVAL_WEIGHTS.hazardCap);
 }
 
+/**
+ * The OPTION VALUE a side's living hazard removers hold over the board
+ * state: the best net hazard-cost change any of them could buy by clicking
+ * their removal move, floored at zero (a net-negative option — Defog that
+ * would also destroy the side's own more-valuable hazards on the opponent's
+ * board — is simply never exercised), then tempo-discounted. Own-side-only
+ * moves (Rapid Spin, Mortal Spin, Tidy Up) net the side's full relief;
+ * both-sides moves (Defog, Court Change) net relief MINUS the side's own
+ * hazards' worth over there. Exported for direct testing.
+ */
+export function hazardRemovalEquity(side: Side, battle: Battle): number {
+  const own = hazardCost(side, battle);
+  if (own <= 0) return 0;
+  let best = 0;
+  for (const pokemon of side.pokemon) {
+    if (pokemon.fainted || pokemon.hp <= 0) continue;
+    for (const slot of pokemon.moveSlots) {
+      if (OWN_SIDE_REMOVAL_MOVES.has(slot.id)) {
+        best = Math.max(best, own);
+      } else if (BOTH_SIDES_REMOVAL_MOVES.has(slot.id)) {
+        best = Math.max(best, own - hazardCost(side.foe, battle));
+      }
+    }
+  }
+  return Math.max(0, best) * EVAL_WEIGHTS.hazardRemovalDiscount;
+}
+
 function sideFeatureValues(side: Side, battle: Battle) {
   const bodyWeight = EVAL_WEIGHTS.alive + EVAL_WEIGHTS.hp;
   let bodies = 0;
@@ -243,8 +287,9 @@ function sideFeatureValues(side: Side, battle: Battle) {
     boosts,
     choiceMismatch,
     screens,
-    // Raw value carries the cap; the entries weight scales back to points.
-    hazards: hazardCost(side, battle) / EVAL_WEIGHTS.hazardEntries,
+    // Raw value carries the cap and the removal option; the entries weight
+    // scales back to points.
+    hazards: (hazardCost(side, battle) - hazardRemovalEquity(side, battle)) / EVAL_WEIGHTS.hazardEntries,
     tailwind: side.sideConditions['tailwind'] ? 1 : 0,
   };
 }
