@@ -143,6 +143,15 @@ function App() {
   const pendingStoredSetsRef = useRef<string | null>(null);
   const [editedP1Info, setEditedP1Info] = useState<OpponentTeamInfo | null>(null);
   const [editedP2Info, setEditedP2Info] = useState<OpponentTeamInfo | null>(null);
+  /**
+   * Honest divergence notice: guessed sets can make the branch replay
+   * DIVERGE from the real game — in the worst case the simulated game ends
+   * before the requested turn (GPL T39: three rejected choices, sim winner
+   * declared early). Playing recommendations into that dead sim produced
+   * baffling errors ("more choices than unfainted Pokémon"); instead the
+   * divergence is surfaced and play-outs are refused.
+   */
+  const [branchDivergence, setBranchDivergence] = useState<string | null>(null);
   const [branchTurn, setBranchTurnState] = useState(1);
   /**
    * Synchronous mirror of branchTurn: a slider change followed by an
@@ -154,11 +163,12 @@ function App() {
    */
   const branchTurnRef = useRef(1);
   const setBranchTurn = useCallback((value: number | ((turn: number) => number)) => {
-    setBranchTurnState(previous => {
-      const next = typeof value === 'function' ? value(previous) : value;
-      branchTurnRef.current = next;
-      return next;
-    });
+    // The REF is authoritative and written synchronously in the event —
+    // a setState updater only runs at the NEXT render, which is exactly
+    // the window the race lives in.
+    const next = typeof value === 'function' ? value(branchTurnRef.current) : value;
+    branchTurnRef.current = next;
+    setBranchTurnState(next);
   }, []);
   const [branchPreparing, setBranchPreparing] = useState(false);
   const [branchProgress, setBranchProgress] = useState<{ turn: number; target: number } | null>(null);
@@ -196,6 +206,7 @@ function App() {
   // game's state must never leak into the next one.
   useEffect(() => {
     setBranchTurn(1);
+    setBranchDivergence(null);
     branchWindowOpenRef.current = false;
     stopBranch();
     setEditedP1Info(null);
@@ -373,6 +384,18 @@ function App() {
         });
         if (!abortController.signal.aborted) {
           branchWindowOpenRef.current = true;
+          const branchBattle = getBattle();
+          if (branchBattle?.ended) {
+            setBranchDivergence('The simulated replay diverged from the real game and already ended' +
+              `${branchBattle.winner ? ` (${branchBattle.winner} won the simulated line)` : ''} — ` +
+              'the guessed sets could not reproduce this position. Recommendations cannot be played out here; ' +
+              'correcting items/moves via Edit Player/Opp usually fixes the divergence.');
+          } else if (branchBattle && branchBattle.turn < selectedTurn) {
+            setBranchDivergence(`The simulated replay wedged at turn ${branchBattle.turn} on the way to ` +
+              `turn ${selectedTurn} — the guessed sets diverge from the real game before this position.`);
+          } else {
+            setBranchDivergence(null);
+          }
         }
       }
     } finally {
@@ -380,7 +403,7 @@ function App() {
       setBranchProgress(null);
       branchAbortRef.current = null;
     }
-  }, [replayData, branchPreparing, teamText, snapshots, getInferredSpreads, effectiveP1Info, effectiveP2Info, usageStats.stats, setAssumptions.assumptions, startBranch]);
+  }, [replayData, branchPreparing, teamText, snapshots, getInferredSpreads, effectiveP1Info, effectiveP2Info, usageStats.stats, setAssumptions.assumptions, startBranch, getBattle]);
 
   const handleCancelBranchPreparation = useCallback(() => {
     branchAbortRef.current?.abort();
@@ -651,6 +674,13 @@ function App() {
   // top reply, the turn executes, and the result re-evaluates so the next
   // recommendations are already waiting for the next click.
   const playOutEvalChoice = useCallback((side: 'p1' | 'p2', ranked: RankedChoice, reply: RankedChoice | null) => {
+    // A diverged/finished branch sim cannot accept choices — refuse with the
+    // divergence notice instead of letting the sim reject confusingly.
+    if (getBattle()?.ended) {
+      setBranchDivergence(previous => previous ??
+        'The simulated replay already ended — recommendations cannot be played out in this diverged line.');
+      return;
+    }
     if (!applyEvalChoice(side, ranked)) return;
     const other = side === 'p1' ? 'p2' : 'p1';
     if (reply && applyEvalChoice(other, reply)) {
@@ -660,7 +690,7 @@ function App() {
     // No engine reply to commit (forced-switch positions execute through
     // setChoice on their own) — show the engine's view of what stands.
     handleEvaluate();
-  }, [applyEvalChoice, executeTurn, handleEvaluate]);
+  }, [applyEvalChoice, executeTurn, handleEvaluate, getBattle]);
 
   const [pendingEvalPick, setPendingEvalPick] =
     useState<{ side: 'p1' | 'p2'; ranked: RankedChoice; reply: RankedChoice | null } | null>(null);
@@ -1156,6 +1186,14 @@ function App() {
                     <button type="button" className="ps-btn" onClick={handleStopBranch} style={{ padding: '2px 8px', fontSize: 10 }}>
                       Back
                     </button>
+                    {branchDivergence && (
+                      <span
+                        style={{ fontSize: 10, color: '#e6b36a', maxWidth: 520 }}
+                        title={branchDivergence}
+                      >
+                        ⚠ {branchDivergence}
+                      </span>
+                    )}
                   </>
                 )}
                 <button
