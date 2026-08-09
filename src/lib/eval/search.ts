@@ -47,6 +47,19 @@ function countFainted(battle: ReturnType<typeof positionBattle>): number {
  * search, the executor (worker path), and MCTS — all engine modes must live
  * in the same value space.
  */
+/** Fainted bodies over total bodies, both sides — the phase signal for the win-prob mapping. */
+export function battleFaintedFraction(battle: ReturnType<typeof positionBattle>): number {
+  let fainted = 0;
+  let total = 0;
+  for (const side of battle.sides) {
+    for (const pokemon of side.pokemon) {
+      total += 1;
+      if (pokemon.fainted || pokemon.hp <= 0) fainted += 1;
+    }
+  }
+  return total > 0 ? fainted / total : 0;
+}
+
 export function leafValue(battle: ReturnType<typeof positionBattle>, matchupCache: MatchupCache): number {
   const raw = evaluatePosition(battle, matchupCache);
   if (battle.ended) return raw > 0 ? 1 : raw < 0 ? -1 : 0;

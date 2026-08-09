@@ -2,7 +2,7 @@ import { test, expect } from '@playwright/test';
 import { Battle, State, Teams, toID } from '@pkmn/sim';
 type DeserializeFn = typeof State.deserializeBattle;
 import type { PokemonSet } from '@pkmn/sim';
-import { searchOptions, searchPosition, subSearchDepth1 } from '../src/lib/eval/search';
+import { battleFaintedFraction, searchOptions, searchPosition, subSearchDepth1 } from '../src/lib/eval/search';
 import { createRootPosition } from '../src/lib/eval/forward-model';
 import { boostedFraction, pairThreat } from '../src/lib/eval/eval-function';
 import type { EvalResult, SearchProgress } from '../src/lib/eval/types';
@@ -431,6 +431,19 @@ test.describe('team preview search (turn 0)', () => {
     expect(result.perSide.p1[0].label).toContain('Machamp');
     expect(result.perSide.p1[0].label).toMatch(/^Lead /);
     expect(searchPosition(root, { depth: 1, samples: 1, tera: false })).toEqual(result);
+  });
+});
+
+test.describe('battleFaintedFraction', () => {
+  test('counts both sides against the full roster', () => {
+    const battle = makeBattle(
+      [makeSet('A', 'Snorlax', ['Tackle']), makeSet('A2', 'Chansey', ['Tackle'])],
+      [makeSet('B', 'Dragapult', ['Tackle']), makeSet('B2', 'Volcarona', ['Tackle'])],
+    );
+    expect(battleFaintedFraction(battle)).toBe(0);
+    battle.sides[0].pokemon[1].faint();
+    battle.sides[0].pokemon[1].hp = 0;
+    expect(battleFaintedFraction(battle)).toBeCloseTo(0.25, 8);
   });
 });
 

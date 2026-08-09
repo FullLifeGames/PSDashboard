@@ -4,7 +4,8 @@ import { buildTeamsFromReplay } from '../src/lib/team-builder';
 import { reconstructBranchRuntime } from '../src/lib/branch-engine';
 import { getBranchSimulatorFormat } from '../src/lib/replay-format';
 import { parseReplayLogWithObservations } from '../src/lib/protocol-parser';
-import { searchPosition } from '../src/lib/eval/search';
+import { battleFaintedFraction, searchPosition } from '../src/lib/eval/search';
+import { brierScore, fitConstantK } from './fit-helpers';
 
 /**
  * Informational calibration run against real finished replays: does the
@@ -134,6 +135,8 @@ interface Sample {
   phase: 'early' | 'mid' | 'late';
   gameType: 'singles' | 'doubles';
   score: number;
+  /** Fainted bodies / total bodies at the sampled position. */
+  faintedFraction: number;
   p1Won: boolean;
 }
 
@@ -194,6 +197,7 @@ test.describe('eval calibration against real replays', () => {
             phase: fraction < 1 / 3 ? 'early' : fraction < 2 / 3 ? 'mid' : 'late',
             gameType,
             score,
+            faintedFraction: battleFaintedFraction(battle),
             p1Won,
           });
         } catch (error) {
@@ -225,26 +229,25 @@ test.describe('eval calibration against real replays', () => {
       );
     }
 
-    // Logistic fit of P(p1 wins | score) = 1/(1+exp(−K·score)) — deterministic
-    // gradient ascent. The pooled K feeds src/lib/eval/winprob.ts (pinned by
-    // hand after each fit worth adopting).
-    const fitK = (subset: Sample[]): number => {
-      let k = 2;
-      for (let step = 0; step < 500; step++) {
-        let grad = 0;
-        for (const sample of subset) {
-          const p = 1 / (1 + Math.exp(-k * sample.score));
-          grad += ((sample.p1Won ? 1 : 0) - p) * sample.score;
-        }
-        k += 0.5 * (grad / subset.length);
-      }
-      return k;
-    };
+    // Logistic fit of P(p1 wins | score) = 1/(1+exp(−K·score)) via the shared
+    // helper. The pooled K feeds src/lib/eval/winprob.ts (pinned by hand after
+    // each fit worth adopting).
+    const asOutcome = (s: Sample) => ({ score: s.score, faintedFraction: s.faintedFraction, won: s.p1Won });
+    const fitK = (subset: Sample[]): number => fitConstantK(subset.map(asOutcome));
     console.log(
       `winprob K: pooled=${fitK(samples).toFixed(2)} ` +
       `singles=${fitK(samples.filter(sample => sample.gameType === 'singles')).toFixed(2)} ` +
       `doubles=${fitK(samples.filter(sample => sample.gameType === 'doubles')).toFixed(2)}`,
     );
+
+    // Brier per phase bucket under the pooled constant K — the calibration
+    // evidence sign accuracy cannot see (it is invariant under monotone maps).
+    const pooledK = fitConstantK(samples.map(asOutcome));
+    for (const phase of ['early', 'mid', 'late'] as const) {
+      const subset = samples.filter(s => s.phase === phase).map(asOutcome);
+      if (subset.length === 0) continue;
+      console.log(`${phase} brier=${brierScore(subset, pooledK).toFixed(4)}`);
+    }
 
     // Calibration by confidence: within a |score| bucket, how often does the
     // favored side actually win? Well-calibrated means accuracy grows with

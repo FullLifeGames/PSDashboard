@@ -9,6 +9,8 @@ import {
   createMatchupCache, evalFeatures, evaluatePosition, EVAL_WEIGHTS, FEATURE_WEIGHTS,
   type EvalFeatures,
 } from '../src/lib/eval/eval-function';
+import { battleFaintedFraction } from '../src/lib/eval/search';
+import { brierScore, fitConstantK, fitPhaseK, logLossScore, phaseBucket } from './fit-helpers';
 
 /**
  * Weight-fitting harness (WP 7): fits the static eval's linear feature
@@ -37,6 +39,7 @@ const CACHE_DIR = '.fit-corpus';
 const SAMPLES_CACHE = join(CACHE_DIR, 'samples-cache.json');
 const FEATURE_KEYS = Object.keys(FEATURE_WEIGHTS) as (keyof EvalFeatures)[];
 const cacheStamp = (manifest: { replays: { id: string }[] }) => JSON.stringify({
+  schema: 2, // FitSample gained faintedFraction/genClass — bump forces one recapture
   featureKeys: FEATURE_KEYS,
   weights: { EVAL_WEIGHTS, FEATURE_WEIGHTS },
   manifestIds: manifest.replays.map(entry => entry.id),
@@ -46,9 +49,12 @@ interface FitSample {
   game: string;
   source: 'tournament' | 'ladder';
   gameType: 'singles' | 'doubles';
+  genClass: 'gen9' | 'old';
   /** Features scaled by scale/normalizer — the tanh argument's addends. */
   g: number[];
   score: number;
+  /** Fainted bodies / total bodies at capture time — the phase covariate. */
+  faintedFraction: number;
   p1Won: boolean;
 }
 
@@ -103,19 +109,6 @@ function impliedWeights(fit: { beta: number[]; sigma: number[] }): number[] {
   return perUnit.map(value => (reference !== 0 ? (value / reference) * bodiesHand : NaN));
 }
 
-function fitWinprobK(samples: FitSample[]): number {
-  let k = 1.5;
-  for (let iter = 0; iter < 500; iter++) {
-    let grad = 0;
-    for (const sample of samples) {
-      const p = sigmoid(k * sample.score);
-      grad += (p - (sample.p1Won ? 1 : 0)) * sample.score / samples.length;
-    }
-    k -= 1.0 * grad;
-  }
-  return k;
-}
-
 test.describe('eval weight fitting (EVAL_FIT=1)', () => {
   test('fit feature weights on the pinned corpus and report', async () => {
     test.skip(!process.env.EVAL_FIT, 'weight fitting is opt-in: EVAL_FIT=1');
@@ -151,6 +144,7 @@ test.describe('eval weight fitting (EVAL_FIT=1)', () => {
         const p1Won = winnerName === players[0];
         if (!p1Won && winnerName !== players[1]) continue;
         const gameType: FitSample['gameType'] = /\|gametype\|doubles/.test(replay.log) ? 'doubles' : 'singles';
+        const genClass: FitSample['genClass'] = /^gen9/.test(replay.formatid ?? entry.format) ? 'gen9' : 'old';
 
         const { snapshots, observations } = parseReplayLogWithObservations(replay.log);
         const { p1Team, p2Team } = buildTeamsFromReplay(replay.log, { observations });
@@ -179,7 +173,10 @@ test.describe('eval weight fitting (EVAL_FIT=1)', () => {
               const g = FEATURE_KEYS.map(key => features[key] * scaleOverNorm);
               const score = evaluatePosition(battle, cache);
               if (Number.isNaN(score) || g.some(Number.isNaN)) return;
-              samples.push({ game: entry.id, source: entry.source, gameType, g, score, p1Won });
+              samples.push({
+                game: entry.id, source: entry.source, gameType, genClass, g, score,
+                faintedFraction: battleFaintedFraction(battle), p1Won,
+              });
             },
           },
         });
@@ -253,15 +250,33 @@ test.describe('eval weight fitting (EVAL_FIT=1)', () => {
     report('SINGLES-ONLY', singles);
     report('DOUBLES-ONLY', doubles);
 
+    // Gen-class tranches answer: is the singles weakness a corpus artifact?
+    report('GEN9-ONLY', samples.filter(s => s.genClass === 'gen9'));
+    report('OLDGEN-ONLY', samples.filter(s => s.genClass === 'old'));
+
     bootstrap('ALL', samples);
     bootstrap('SINGLES-ONLY', singles);
     bootstrap('DOUBLES-ONLY', doubles);
+    bootstrap('GEN9-ONLY', samples.filter(s => s.genClass === 'gen9'));
 
-    // Win-probability curve refit on the larger corpus.
+    // Probabilistic scoring of the winprob mapping, per gametype and phase.
     for (const gameType of ['singles', 'doubles'] as const) {
-      const subset = samples.filter(sample => sample.gameType === gameType);
-      if (subset.length < 50) continue;
-      console.log(`winprob K refit ${gameType}: ${fitWinprobK(subset).toFixed(2)} (n=${subset.length})`);
+      const subset = samples.filter(s => s.gameType === gameType)
+        .map(s => ({ score: s.score, faintedFraction: s.faintedFraction, won: s.p1Won }));
+      if (subset.length < 100) continue;
+      const constant = fitConstantK(subset);
+      const phase = fitPhaseK(subset);
+      console.log(`\nwinprob ${gameType}: constant K=${constant.toFixed(2)} ` +
+        `phase k0=${phase.k0.toFixed(2)} k1=${phase.k1.toFixed(2)} (n=${subset.length})`);
+      for (const bucket of ['early', 'mid', 'late'] as const) {
+        const inBucket = subset.filter(s => phaseBucket(s.faintedFraction) === bucket);
+        if (inBucket.length < 30) continue;
+        console.log(`  ${bucket} (n=${inBucket.length}): ` +
+          `brier const=${brierScore(inBucket, constant).toFixed(4)} ` +
+          `phase=${brierScore(inBucket, phase.k0, phase.k1).toFixed(4)} ` +
+          `logloss const=${logLossScore(inBucket, constant).toFixed(4)} ` +
+          `phase=${logLossScore(inBucket, phase.k0, phase.k1).toFixed(4)}`);
+      }
     }
   });
 });
