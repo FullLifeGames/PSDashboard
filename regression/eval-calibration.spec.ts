@@ -176,6 +176,15 @@ import { brierScore, fitConstantK } from './fit-helpers';
  * the history; late stable at 82 (−1; the prior run's 85 was composition
  * generosity). GATE PASSED, ADOPTED (cache v13).
  *
+ * Post-re-specification refit 2026-08-09 (samples recaptured, 12,636
+ * positions): the entry-cost matchup carries MORE outcome signal (implied
+ * 189.6±40.9 vs 166±40 before; still 1.7 SE from hand 120 — recorded, not
+ * adopted). REJECTED: hazardEntries 0.75→1.0 (fitted 1.0±0.1, 2.5 SE) —
+ * gate 58/67/80/66/80, re-test 59/68/79/66/80: late −3/−4 consistently,
+ * the familiar in-corpus-significant / held-out-late-harm signature
+ * (late-game boards are hazard-heavy; overweighting them drowns bodies).
+ * Hand 0.75 stays.
+ *
  * ROUND CLOSE 2026-08-09 (calibration/honesty round, cache v11). The
  * sim-grounded-hazards re-test above IS the closing run — no eval-changing
  * task landed after it: 58/65/83/65/82, brier 0.2585/0.2267/0.1740.
