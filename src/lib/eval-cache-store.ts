@@ -37,7 +37,8 @@ export interface StoredEval {
 // v12: hazard-removal option value (net board state, move-aware).
 // v13: entry-cost-weighted matchup/coverage (benched mons fight through
 //      their hazard entry damage; Boots/Magic Guard exempt).
-export const EVAL_ENGINE_CACHE_VERSION = 13;
+// v14: guaranteed-failing field moves dropped from candidate lists.
+export const EVAL_ENGINE_CACHE_VERSION = 14;
 
 export function evalStoreKey(
   cacheKey: string,

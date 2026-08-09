@@ -246,9 +246,46 @@ function restrictCombined(
 }
 
 /**
- * The engine's option source: legal choices, with the mandatory doubles
- * restriction applied. Every consumer (search root, sub-searches, MCTS
- * nodes, executors) goes through here so all engines see the same lists.
+ * Field moves that FAIL deterministically against a standing condition —
+ * clicking them is a pass with a real-looking label (GPL T25: Stealth Rock
+ * ranked while rocks were already up). `foe` = the side the hazard lands
+ * on; screens/tailwind check the mover's own side. If a player actually
+ * clicks one, the turn reads as unmatched (charitable) rather than graded.
+ */
+const NOOP_FIELD_MOVES: Record<string, (own: Side, foe: Side) => boolean> = {
+  stealthrock: (_own, foe) => !!foe.sideConditions['stealthrock'],
+  spikes: (_own, foe) => ((foe.sideConditions['spikes'] as { layers?: number } | undefined)?.layers ?? 0) >= 3,
+  toxicspikes: (_own, foe) => ((foe.sideConditions['toxicspikes'] as { layers?: number } | undefined)?.layers ?? 0) >= 2,
+  stickyweb: (_own, foe) => !!foe.sideConditions['stickyweb'],
+  reflect: own => !!own.sideConditions['reflect'],
+  lightscreen: own => !!own.sideConditions['lightscreen'],
+  auroraveil: own => !!own.sideConditions['auroraveil'],
+  tailwind: own => !!own.sideConditions['tailwind'],
+  safeguard: own => !!own.sideConditions['safeguard'],
+  mist: own => !!own.sideConditions['mist'],
+};
+
+type Side = ReturnType<typeof positionBattle>['sides'][number];
+
+function dropNoopMoves(battle: ReturnType<typeof positionBattle>, side: 'p1' | 'p2', options: ChoiceOption[]): ChoiceOption[] {
+  const own = battle.sides[side === 'p1' ? 0 : 1];
+  const foe = battle.sides[side === 'p1' ? 1 : 0];
+  const filtered = options.filter(option => {
+    if (!option.choice.startsWith('move ')) return true;
+    const check = NOOP_FIELD_MOVES[option.choice.split(' ')[1]];
+    return !check || !check(own, foe);
+  });
+  // Never filter a side into an empty list — a stuck mon whose only moves
+  // are standing field moves must still act.
+  return filtered.length > 0 ? filtered : options;
+}
+
+/**
+ * The engine's option source: legal choices, with guaranteed-failing field
+ * moves dropped (singles lists; doubles combos keep their hint-based
+ * restriction) and the mandatory doubles restriction applied. Every
+ * consumer (search root, sub-searches, MCTS nodes, executors) goes through
+ * here so all engines see the same lists.
  */
 export function searchOptions(
   position: SimPosition,
@@ -256,7 +293,8 @@ export function searchOptions(
   opts?: { tera?: TeraAllowance; keep?: (PlayedAction | null)[] },
 ): ChoiceOption[] {
   const options = legalChoices(position, side, opts);
-  return isCombined(options) ? restrictCombined(position, side, options, opts?.keep) : options;
+  if (isCombined(options)) return restrictCombined(position, side, options, opts?.keep);
+  return dropNoopMoves(positionBattle(position), side, options);
 }
 
 /**

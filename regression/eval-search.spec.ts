@@ -434,6 +434,33 @@ test.describe('team preview search (turn 0)', () => {
   });
 });
 
+test.describe('no-op candidate filter', () => {
+  test('guaranteed-failing field moves are dropped from the option list', () => {
+    // GPL T25: Stealth Rock with rocks already up is a guaranteed |-fail|
+    // — its cell equals a pass, yet it ranked with a real-looking ev.
+    const battle = makeBattle(
+      [makeSet('U', 'Uxie', ['Stealth Rock', 'Tackle', 'Reflect'], 100)],
+      [makeSet('S', 'Snorlax', ['Protect', 'Tackle'], 100)],
+    );
+    battle.sides[1].addSideCondition('stealthrock', battle.sides[0].active[0]!);
+    battle.sides[0].addSideCondition('reflect', battle.sides[0].active[0]!);
+    const options = searchOptions(createRootPosition(serialize(battle)), 'p1');
+    const choices = options.map(option => option.choice);
+    expect(choices).not.toContain('move stealthrock');
+    expect(choices).not.toContain('move reflect');
+    expect(choices).toContain('move tackle');
+
+    // Without the standing conditions both moves are real candidates.
+    const clean = makeBattle(
+      [makeSet('U', 'Uxie', ['Stealth Rock', 'Tackle', 'Reflect'], 100)],
+      [makeSet('S', 'Snorlax', ['Protect', 'Tackle'], 100)],
+    );
+    const cleanChoices = searchOptions(createRootPosition(serialize(clean)), 'p1').map(option => option.choice);
+    expect(cleanChoices).toContain('move stealthrock');
+    expect(cleanChoices).toContain('move reflect');
+  });
+});
+
 test.describe('battleFaintedFraction', () => {
   test('counts both sides against the full roster', () => {
     const battle = makeBattle(
