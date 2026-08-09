@@ -107,6 +107,15 @@ export interface EvalFeatures {
   matchup: number;
   coverage: number;
   choiceMismatch: number;
+  /**
+   * Win-condition value of standing boosts: per side, Σ over living mons
+   * with a positive offensive stage of (coverageBoosted − coverageUnboosted)
+   * × hpFraction, where coverage = fraction of the opponent's living team
+   * the mon beats 1v1. A boost only counts for the pairs it FLIPS — +2 into
+   * a wall that still counters prices at zero. Captured for the fit
+   * harness; weight 0 keeps it runtime-inert until a fit adopts it.
+   */
+  sweep: number;
 }
 
 export const FEATURE_WEIGHTS: Record<keyof EvalFeatures, number> = {
@@ -119,6 +128,7 @@ export const FEATURE_WEIGHTS: Record<keyof EvalFeatures, number> = {
   matchup: EVAL_WEIGHTS.matchup,
   coverage: EVAL_WEIGHTS.coverage,
   choiceMismatch: EVAL_WEIGHTS.choiceMismatch,
+  sweep: 0,
 };
 
 /**
@@ -231,6 +241,7 @@ export function evalFeatures(battle: Battle, cache?: MatchupCache): EvalFeatures
     trickRoom = averageSpeed(battle.sides[0]) <= averageSpeed(battle.sides[1]) ? 1 : -1;
   }
   const terms = matchupTerms(battle, cache);
+  const threat = threatGetter(battle, cache);
   return {
     bodies: p1.bodies - p2.bodies,
     boosts: p1.boosts - p2.boosts,
@@ -241,6 +252,7 @@ export function evalFeatures(battle: Battle, cache?: MatchupCache): EvalFeatures
     matchup: terms.matchup,
     coverage: terms.coverage,
     choiceMismatch: p2.choiceMismatch - p1.choiceMismatch,
+    sweep: sweepValue(0, battle, threat) - sweepValue(1, battle, threat),
   };
 }
 
@@ -381,14 +393,9 @@ export function boostedFraction(
  * has NO favorable trade against contributes its answer deficit × its HP
  * fraction (p1-positive). Exported for direct testing.
  */
-export function matchupTerms(battle: Battle, cache?: MatchupCache): { matchup: number; coverage: number } {
-  const living = (index: 0 | 1) =>
-    battle.sides[index].pokemon.filter(pokemon => !pokemon.fainted && pokemon.hp > 0);
-  const p1Living = living(0);
-  const p2Living = living(1);
-  if (p1Living.length === 0 || p2Living.length === 0) return { matchup: 0, coverage: 0 };
-
-  const threat = (attacker: Pokemon, defender: Pokemon): PairThreat => {
+/** Memoizing accessor for pairThreat over one search's MatchupCache. */
+function threatGetter(battle: Battle, cache?: MatchupCache) {
+  return (attacker: Pokemon, defender: Pokemon): PairThreat => {
     if (!cache) return pairThreat(attacker, defender, battle);
     const key = pairKey(attacker, defender);
     let value = cache.get(key);
@@ -398,6 +405,77 @@ export function matchupTerms(battle: Battle, cache?: MatchupCache): { matchup: n
     }
     return value;
   };
+}
+
+/**
+ * KO-first 1v1 verdict for one pair, same semantics as the matchup term:
+ * fewer turns to KO wins, priority then speed break ties, a ~50%-per-turn
+ * healer walls anything short of a 2HKO. The optional override substitutes
+ * the attacker's offensive stages (the sweep feature asks "who would this
+ * mon beat WITHOUT its boosts?").
+ */
+function beatsPair(
+  a: Pokemon,
+  b: Pokemon,
+  threatA: PairThreat,
+  threatB: PairThreat,
+  aHeals: boolean,
+  bHeals: boolean,
+  aBoosts?: { atk: number; spa: number },
+): boolean {
+  const boostedA = boostedFraction(threatA, a, b, aBoosts);
+  const boostedB = boostedFraction(threatB, b, a);
+  const fracA = boostedA <= 0.5 && bHeals ? 0 : boostedA;
+  const fracB = boostedB <= 0.5 && aHeals ? 0 : boostedB;
+  const turnsA = fracA > 0 ? Math.ceil(b.hp / b.maxhp / fracA) : Infinity;
+  const turnsB = fracB > 0 ? Math.ceil(a.hp / a.maxhp / fracB) : Infinity;
+  if (turnsA < turnsB) return true;
+  if (turnsB < turnsA || turnsA === Infinity) return false;
+  if (threatA.priority !== threatB.priority) return threatA.priority;
+  return a.storedStats.spe * stageMultiplier(a.boosts.spe) >
+    b.storedStats.spe * stageMultiplier(b.boosts.spe);
+}
+
+/** One side's sweep value (see EvalFeatures.sweep). */
+function sweepValue(
+  sideIndex: 0 | 1,
+  battle: Battle,
+  threat: (attacker: Pokemon, defender: Pokemon) => PairThreat,
+): number {
+  const living = (index: number) =>
+    battle.sides[index].pokemon.filter(pokemon => !pokemon.fainted && pokemon.hp > 0);
+  const mine = living(sideIndex);
+  const theirs = living(1 - sideIndex);
+  if (theirs.length === 0) return 0;
+  const heals = (pokemon: Pokemon): boolean =>
+    pokemon.moveSlots.some(slot => !!battle.dex.moves.get(slot.id).flags['heal']);
+  let value = 0;
+  for (const a of mine) {
+    if ((a.boosts.atk ?? 0) <= 0 && (a.boosts.spa ?? 0) <= 0) continue;
+    const aHeals = heals(a);
+    let flipped = 0;
+    for (const b of theirs) {
+      const threatA = threat(a, b);
+      const threatB = threat(b, a);
+      const bHeals = heals(b);
+      if (beatsPair(a, b, threatA, threatB, aHeals, bHeals) &&
+        !beatsPair(a, b, threatA, threatB, aHeals, bHeals, { atk: 0, spa: 0 })) {
+        flipped += 1;
+      }
+    }
+    value += (flipped / theirs.length) * (a.hp / a.maxhp);
+  }
+  return value;
+}
+
+export function matchupTerms(battle: Battle, cache?: MatchupCache): { matchup: number; coverage: number } {
+  const living = (index: 0 | 1) =>
+    battle.sides[index].pokemon.filter(pokemon => !pokemon.fainted && pokemon.hp > 0);
+  const p1Living = living(0);
+  const p2Living = living(1);
+  if (p1Living.length === 0 || p2Living.length === 0) return { matchup: 0, coverage: 0 };
+
+  const threat = threatGetter(battle, cache);
 
   const healers = new Map<Pokemon, boolean>();
   const heals = (pokemon: Pokemon): boolean => {

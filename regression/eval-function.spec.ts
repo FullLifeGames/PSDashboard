@@ -54,6 +54,30 @@ function makeDoublesBattle(p1Sets: PokemonSet[], p2Sets: PokemonSet[]): Battle {
   return battle;
 }
 
+test.describe('win-condition sweep feature', () => {
+  test('sweep prices gained coverage, not stages', () => {
+    // +2 Dragapult vs two hard hitters it outspeeds: unboosted they 2HKO it
+    // before its 3HKO lands (they win the pair); at +2 Darts reaches the
+    // 2HKO, the KO race ties, and speed flips both pairs — pure gained
+    // coverage.
+    const sweepy = makeBattle(
+      [makeSet('Pult', 'Dragapult', ['Dragon Darts', 'Dragon Dance'])],
+      [makeSet('A', 'Talonflame', ['Flare Blitz']), makeSet('B', 'Weavile', ['Night Slash'])],
+    );
+    sweepy.sides[0].active[0]!.boosts.atk = 2;
+    // +2 into a wall that still hard-counters: no gained coverage.
+    const walled = makeBattle(
+      [makeSet('Pult', 'Dragapult', ['Dragon Darts', 'Dragon Dance'])],
+      [makeSet('Wall', 'Clefable', ['Moonblast', 'Moonlight'])], // Fairy: immune to Dragon Darts
+    );
+    walled.sides[0].active[0]!.boosts.atk = 2;
+    expect(evalFeatures(sweepy).sweep).toBeGreaterThan(0.3);
+    expect(evalFeatures(walled).sweep).toBeCloseTo(0, 5);
+    // Weight 0 keeps runtime scores unchanged until adoption.
+    expect(FEATURE_WEIGHTS.sweep).toBe(0);
+  });
+});
+
 test.describe('evaluatePosition', () => {
   test('doubles positions score with the doubles-fitted weights', () => {
     // Per-gametype calibration (2026-08-08 corpus fit): speed control is
