@@ -276,6 +276,14 @@ test.describe('eval weight fitting (EVAL_FIT=1)', () => {
     report('GEN9-ONLY', samples.filter(s => s.genClass === 'gen9'));
     report('OLDGEN-ONLY', samples.filter(s => s.genClass === 'old'));
 
+    // Sweep-vs-boosts variant: with the flat boosts column zeroed, does the
+    // sweep feature absorb the boost signal on its own? (The adoption matrix
+    // compares both variants — see the calibration header.)
+    const boostsIndex = FEATURE_KEYS.indexOf('boosts' as keyof EvalFeatures);
+    const noBoosts = samples.map(s => ({ ...s, g: s.g.map((value, j) => (j === boostsIndex ? 0 : value)) }));
+    report('ALL-NO-BOOSTS', noBoosts);
+    bootstrap('ALL-NO-BOOSTS', noBoosts);
+
     bootstrap('ALL', samples);
     bootstrap('SINGLES-ONLY', singles);
     bootstrap('DOUBLES-ONLY', doubles);

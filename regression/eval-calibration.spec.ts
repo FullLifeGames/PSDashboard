@@ -135,6 +135,20 @@ import { brierScore, fitConstantK } from './fit-helpers';
  * re-test read 58/65/83/65/82 (mid −2, late +3, doubles +2) with slightly
  * different fetch composition both times: the mid dip is composition noise
  * (pairing precedent), every bucket within gate. GATE PASSED.
+ *
+ * Sweep feature fit 2026-08-09 (win-condition coverage-gained term,
+ * captured at weight 0; eval-fit on the recaptured corpus, 5,983 positions)
+ * — NEGATIVE RESULT, the FOURTH failed boost-term attempt:
+ *   with the flat boosts term:  sweep implied −39±105 (noise); boosts keeps
+ *     its usual 32±7.
+ *   with boosts zeroed (ALL-NO-BOOSTS): sweep 169±114 — it absorbs part of
+ *     the boost signal but at 1.5 SE never clears the 2-SE bar, and
+ *     coverage inflates to 214±63 alongside (the columns are collinear).
+ *   per-tranche sweep: singles −67±171 · doubles −58±141 · gen9 −7±142.
+ * KEPT: FEATURE_WEIGHTS.sweep = 0 (feature stays captured for future fits),
+ * boosts unchanged. Whatever boost value the corpus can see, the flat
+ * stage term remains its best-measured carrier; "coverage gained" as
+ * specified does not separate from the existing matchup/coverage terms.
  */
 const REPLAY_IDS = [
   'gen9draft-2058494320',
