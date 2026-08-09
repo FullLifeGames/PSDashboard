@@ -158,6 +158,30 @@ import { brierScore, fitConstantK } from './fit-helpers';
  * choice-id read matching, sim-grounded hazards. Rejected with evidence:
  * matchup damping (double-counts phase-K), quiescence extension (bench +
  * depth asymmetry), sweep feature (fourth boost negative).
+ *
+ * GEN9-SINGLES CORPUS EXPANSION 2026-08-09 (follow-up round; manifest
+ * 1,108→2,127 replays: SV OU official archive thread 3718664 + UWC thread
+ * 3779021 + gen9ru cap raise — the smogtours- room prefix needed a scraper
+ * regex fix; gen9 singles ~105→~840 games; fit now 12,615 positions /
+ * 2,111 games, singles tranche 1,441 games and gen9-dominated):
+ * - HYPOTHESIS RESOLVED: the "matchup is gen9-only signal" gap dissolved
+ *   with power — oldgen implied 124 vs gen9 170±47 (previously 37 vs 146
+ *   on the starved tranche = small-sample noise). Matchup reads 166±40
+ *   pooled vs hand 120 everywhere: persistent but ~1.1 SE — below the
+ *   2-SE adoption bar. Evidence recorded, no change.
+ * - Phase-K CONFIRMED on the doubled corpus: singles k0 2.22 k1 1.37,
+ *   doubles k0 2.91 k1 0.89 — within noise of the adopted 2.28/1.49 and
+ *   2.98/0.88; pins stay.
+ * - Sweep still dead beside boosts (−57±65); coverage sub-2-SE everywhere.
+ * - REJECTED (FIFTH and final boost attempt): singles boosts 12→41
+ *   (fitted 41.3±7.5, 3.9 SE — the strongest boost fit yet). Gate run
+ *   58/67/81/66/80 (passed at the limit), CONFIRMING re-test 58/65/78/64/80
+ *   — late −5. Same failure mode as attempts 2–4: the boost term is
+ *   significant in-corpus but reliably damages late-bucket sign accuracy
+ *   on held-out replays. CONCLUSION: the correlation is reverse-causal
+ *   (winning positions produce standing boosts); the flat weight stays 12
+ *   and the boost question is CLOSED absent a causal/interventional
+ *   design. Doubles keeps its gated 27.
  */
 const REPLAY_IDS = [
   'gen9draft-2058494320',

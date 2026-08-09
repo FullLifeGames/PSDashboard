@@ -47,6 +47,12 @@ import { brierScore, fitConstantK, fitPhaseK, logLossScore, phaseBucket } from '
  *   oldgen trick room is noise (−345±242). The per-gametype weight split
  *   (2026-08-08) stays justified; no doubles-weight update from this run
  *   (doubles implied values match the adopted 27/68/87 within noise).
+ *
+ * Corpus expanded 2026-08-09 to 2,127 replays (gen9-singles follow-up:
+ * SV OU archive + UWC threads + gen9ru cap raise; gen9 singles ~840
+ * games). Findings and the fifth boost rejection are recorded in the
+ * eval-calibration header — that run supersedes the tranche notes above
+ * where they conflict (the gen9-vs-oldgen matchup gap was tranche noise).
  */
 
 const MANIFEST_PATH = 'regression/fixtures/fit-corpus-manifest.json';
