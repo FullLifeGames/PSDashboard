@@ -139,7 +139,19 @@ export function inferOpponentTeam(log: string, opponentSide: 'p1' | 'p2' = 'p2')
   // Ident → species for BOTH sides (the attacker of a rule-out line can be
   // on either side).
   const identSpecies = new Map<string, string>();
+  // Distinct PLAIN move names each opponent ident used since it last entered
+  // the field — two of them disprove a Choice lock; a plain Status move
+  // disproves Assault Vest. `[from]`-attributed lines (Sleep Talk calls,
+  // bounces, Dancer copies) never count: they are not the holder's choice.
+  const plainMovesSince = new Map<string, Set<string>>();
   let gravityActive = false;
+
+  const canHaveDancer = (ident: string): boolean => {
+    const species = identSpecies.get(ident);
+    if (!species) return false;
+    return Object.values(Dex.species.get(species).abilities ?? {})
+      .some(ability => toId(String(ability)) === 'dancer');
+  };
 
   const ruleOut = (nickname: string, kind: 'abilities' | 'items', id: string) => {
     const pokemon = findPokemonByNickname(pokemonMap, nickname, lines, opponentSide);
@@ -156,6 +168,22 @@ export function inferOpponentTeam(log: string, opponentSide: 'p1' | 'p2' = 'p2')
         if (parts[4] && /^p[12][a-d]?:/.test(parts[4])) {
           lastMoveTarget.set(parts[2], parts[4]);
         }
+        if (parts[2].startsWith(opponentSide) && !line.includes('[from]') && parts[3]) {
+          const nickname = parts[2].split(': ')[1]?.trim();
+          if (nickname) {
+            const used = plainMovesSince.get(parts[2]) ?? new Set<string>();
+            used.add(toId(parts[3]));
+            plainMovesSince.set(parts[2], used);
+            if (used.size >= 2 && !canHaveDancer(parts[2])) {
+              for (const item of ['choiceband', 'choicespecs', 'choicescarf']) {
+                ruleOut(nickname, 'items', item);
+              }
+            }
+            if (Dex.moves.get(parts[3]).category === 'Status') {
+              ruleOut(nickname, 'items', 'assaultvest');
+            }
+          }
+        }
       }
     } else if (
       /^\|(?:-miss|-immune|-fail|-end|turn|upkeep|cant|faint)\|/.test(line) ||
@@ -170,7 +198,10 @@ export function inferOpponentTeam(log: string, opponentSide: 'p1' | 'p2' = 'p2')
       pendingMove = null;
       const parts = line.split('|');
       const parsed = parseDetails(parts[3]);
-      if (parts[2] && parsed) identSpecies.set(parts[2], parsed.species);
+      if (parts[2]) {
+        if (parsed) identSpecies.set(parts[2], parsed.species);
+        plainMovesSince.delete(parts[2]);
+      }
     }
 
     // Disproving evidence: a Pokémon that TAKES hazard/status/weather/recoil

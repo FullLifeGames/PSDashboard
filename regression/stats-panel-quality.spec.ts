@@ -150,6 +150,58 @@ test.describe('stats panel data quality (WP11)', () => {
     expect(rotom?.ruledOut?.abilities ?? []).not.toContain('levitate');
   });
 
+  test('two distinct moves without switching rule out Choice items', () => {
+    const log = [
+      '|player|p2|Bob|', '|gen|9', '|poke|p2|Heatran, M|',
+      '|start', '|switch|p1a: A|Garchomp, M|100/100',
+      '|switch|p2a: Tran|Heatran, M|100/100', '|turn|1',
+      '|move|p2a: Tran|Magma Storm|p1a: A', '|turn|2',
+      '|move|p2a: Tran|Earth Power|p1a: A', '|turn|3',
+    ].join('\n');
+    const tran = inferOpponentTeam(log, 'p2').pokemon.find(p => p.species === 'Heatran');
+    expect(tran?.ruledOut?.items).toEqual(expect.arrayContaining(['choiceband', 'choicespecs', 'choicescarf']));
+  });
+
+  test('a switch resets the choice evidence; repeated moves prove nothing', () => {
+    const log = [
+      '|player|p2|Bob|', '|gen|9', '|poke|p2|Heatran, M|',
+      '|start', '|switch|p1a: A|Garchomp, M|100/100',
+      '|switch|p2a: Tran|Heatran, M|100/100', '|turn|1',
+      '|move|p2a: Tran|Magma Storm|p1a: A', '|turn|2',
+      '|switch|p2a: Tran|Heatran, M|100/100', '|turn|3',
+      '|move|p2a: Tran|Earth Power|p1a: A', '|turn|4',
+      '|move|p2a: Tran|Earth Power|p1a: A', '|turn|5',
+    ].join('\n');
+    const tran = inferOpponentTeam(log, 'p2').pokemon.find(p => p.species === 'Heatran');
+    expect(tran?.ruledOut?.items ?? []).not.toContain('choicescarf');
+  });
+
+  test('a status move rules out Assault Vest; [from]-called moves count for nothing', () => {
+    const log = [
+      '|player|p2|Bob|', '|gen|9', '|poke|p2|Snorlax, M|',
+      '|start', '|switch|p1a: A|Garchomp, M|100/100',
+      '|switch|p2a: Lax|Snorlax, M|100/100', '|turn|1',
+      '|move|p2a: Lax|Curse|p2a: Lax', '|turn|2',
+      '|move|p2a: Lax|Body Slam|p1a: A|[from]move: Sleep Talk', '|turn|3',
+    ].join('\n');
+    const lax = inferOpponentTeam(log, 'p2').pokemon.find(p => p.species === 'Snorlax');
+    expect(lax?.ruledOut?.items).toContain('assaultvest');
+    // Sleep Talk's called move must not count as a second distinct choice-locked move.
+    expect(lax?.ruledOut?.items ?? []).not.toContain('choicescarf');
+  });
+
+  test('a possible Dancer species never earns the choice rule-out', () => {
+    const log = [
+      '|player|p2|Bob|', '|gen|9', '|poke|p2|Oricorio, F|',
+      '|start', '|switch|p1a: A|Volcarona, M|100/100',
+      '|switch|p2a: Ori|Oricorio, F|100/100', '|turn|1',
+      '|move|p2a: Ori|Hurricane|p1a: A', '|turn|2',
+      '|move|p2a: Ori|Quiver Dance|p2a: Ori', '|turn|3',
+    ].join('\n');
+    const ori = inferOpponentTeam(log, 'p2').pokemon.find(p => p.species === 'Oricorio');
+    expect(ori?.ruledOut?.items ?? []).not.toContain('choicescarf');
+  });
+
   test('inferred spreads surface in the display info with their provenance', () => {
     const info = {
       pokemon: [{
