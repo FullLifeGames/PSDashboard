@@ -113,6 +113,22 @@ import { brierScore, fitConstantK } from './fit-helpers';
  * moves — KEPT 1.0: the phase-aware K already prices early uncertainty at
  * the mapping layer; damping the matchup value on top double-counts it.
  * (The late-bucket wiggle is composition noise, per the pairing precedent.)
+ *
+ * Quiescence extension 2026-08-09 — REVERTED (negative result). Design:
+ * depth-1 cells whose sampled advance contained a faint got a depth-1
+ * sub-search of the child (cap 8, most faints first, sync/orchestrator
+ * parity via a shared pure selector). Two gates rejected it:
+ * 1. Bench (hard ≤1.5×): d1s1 0.3s→1.2s (4.0×), d1s3 0.3s→1.3s (4.3×);
+ *    at the minimum cap 4 still 0.6s (2.0×) — each extension costs a full
+ *    sub-search, so the budget is unreachable at any allowed cap.
+ * 2. GPL T26 pin: the extension hits only VIOLENT rows (sacks, trades)
+ *    while quiet rows keep static depth — sack lines eat one extra ply of
+ *    punishment their alternatives never receive. The redundant-Jugulis
+ *    sack's regret rose 0.19→0.25 (inaccuracy→mistake), breaking the pin.
+ * Lesson: matrix-game quiescence needs depth SYMMETRY across rows to keep
+ * relative option values honest — selective extension distorts exactly the
+ * sack/trade comparisons it was meant to sharpen. A future attempt should
+ * extend whole rows (or price tempo statically) rather than single cells.
  */
 const REPLAY_IDS = [
   'gen9draft-2058494320',
