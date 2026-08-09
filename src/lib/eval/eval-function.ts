@@ -180,19 +180,25 @@ export function hazardCost(side: Side, battle: Battle): number {
   if (!hasRocks && !spikesLayers && !hasToxicSpikes && !hasWeb) return 0;
 
   const bodyWeight = EVAL_WEIGHTS.alive + EVAL_WEIGHTS.hp;
+  const gravityActive = !!battle.field.pseudoWeather['gravity'];
   let cost = 0;
   for (const pokemon of side.pokemon) {
     if (pokemon.fainted || pokemon.hp <= 0) continue;
     if (pokemon.item === 'heavydutyboots' || pokemon.ability === 'magicguard') continue;
-    const grounded = !pokemon.types.includes('Flying') &&
-      pokemon.ability !== 'levitate' && pokemon.item !== 'airballoon';
+    // The sim's own grounding (Gravity, Iron Ball, Magnet Rise, Air Balloon,
+    // Roost, …). One correction: the sim ignores an INACTIVE mon's ability,
+    // but hazard pricing is about future ENTRIES — where Levitate applies —
+    // so benched Levitate mons stay priced as airborne (unless Gravity).
+    const grounded = !!pokemon.isGrounded() &&
+      !(!pokemon.isActive && !gravityActive && pokemon.ability === 'levitate');
     let fraction = 0;
     if (hasRocks) {
       fraction += 0.125 * Math.pow(2, battle.dex.getEffectiveness('Rock', pokemon.types));
     }
     if (grounded) {
       if (spikesLayers) fraction += [0, 1 / 8, 1 / 6, 1 / 4][spikesLayers];
-      if (hasToxicSpikes && !pokemon.types.includes('Poison') && !pokemon.types.includes('Steel')) {
+      // Dex-typed Toxic Spikes immunity (Poison/Steel via the type chart).
+      if (hasToxicSpikes && battle.dex.getImmunity('psn', pokemon.types)) {
         fraction += 0.06; // priced as a slice of the psn/tox status cost
       }
       if (hasWeb) fraction += 0.04;

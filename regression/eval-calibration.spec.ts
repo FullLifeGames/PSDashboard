@@ -129,6 +129,12 @@ import { brierScore, fitConstantK } from './fit-helpers';
  * relative option values honest — selective extension distorts exactly the
  * sack/trade comparisons it was meant to sharpen. A future attempt should
  * extend whole rows (or price tempo statically) rather than single cells.
+ *
+ * Sim-grounded hazard pricing 2026-08-09 (isGrounded + dex psn immunity,
+ * bench-Levitate correction): 58/64/83/66/80, mid −3 vs the phase-K run —
+ * re-test read 58/65/83/65/82 (mid −2, late +3, doubles +2) with slightly
+ * different fetch composition both times: the mid dip is composition noise
+ * (pairing precedent), every bucket within gate. GATE PASSED.
  */
 const REPLAY_IDS = [
   'gen9draft-2058494320',

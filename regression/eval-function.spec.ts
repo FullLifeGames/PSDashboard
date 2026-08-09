@@ -403,6 +403,46 @@ test.describe('evaluatePosition', () => {
     expect(evaluatePosition(resist)).toBeGreaterThan(0);
   });
 
+  test('grounding is the sim\'s: Gravity grounds fliers; Toxic Spikes immunity is dex-typed', () => {
+    const flier = () => makeBattle(
+      [makeSet('A', 'Snorlax', VANILLA)],
+      [makeSet('B', 'Talonflame', VANILLA)],
+    );
+    const airborne = flier();
+    airborne.sides[1].addSideCondition('spikes', airborne.sides[0].active[0]!);
+    expect(hazardCost(airborne.sides[1], airborne)).toBe(0);
+    // Under Gravity the same Flying-type pays Spikes on entry.
+    const grounded = flier();
+    grounded.sides[1].addSideCondition('spikes', grounded.sides[0].active[0]!);
+    grounded.field.addPseudoWeather('gravity', grounded.sides[0].active[0]!);
+    expect(hazardCost(grounded.sides[1], grounded)).toBeGreaterThan(0);
+    // A benched Levitate mon still prices as airborne (its ability applies
+    // the moment it enters, even though the sim ignores inactive abilities).
+    const bench = makeBattle(
+      [makeSet('A', 'Snorlax', VANILLA)],
+      [makeSet('B', 'Snorlax', VANILLA), makeSet('C', 'Rotom-Heat', VANILLA, 50, { ability: 'Levitate' })],
+    );
+    bench.sides[1].addSideCondition('spikes', bench.sides[0].active[0]!);
+    const spikesCost = hazardCost(bench.sides[1], bench);
+    const withoutLevitate = makeBattle(
+      [makeSet('A', 'Snorlax', VANILLA)],
+      [makeSet('B', 'Snorlax', VANILLA), makeSet('C', 'Rotom-Heat', VANILLA)],
+    );
+    withoutLevitate.sides[1].addSideCondition('spikes', withoutLevitate.sides[0].active[0]!);
+    expect(spikesCost).toBeLessThan(hazardCost(withoutLevitate.sides[1], withoutLevitate));
+
+    // Toxic Spikes: Poison- and Steel-types are immune by the TYPE CHART,
+    // everything grounded and typeless-of-those pays.
+    const toxicCost = (species: string) => {
+      const battle = makeBattle([makeSet('A', 'Snorlax', VANILLA)], [makeSet('B', species, VANILLA)]);
+      battle.sides[1].addSideCondition('toxicspikes', battle.sides[0].active[0]!);
+      return hazardCost(battle.sides[1], battle);
+    };
+    expect(toxicCost('Muk')).toBe(0);
+    expect(toxicCost('Klefki')).toBe(0);
+    expect(toxicCost('Snorlax')).toBeGreaterThan(0);
+  });
+
   test('hazard cost skips Boots and Magic Guard and caps at hazardCap', () => {
     const battle = makeBattle(
       [makeSet('A', 'Snorlax', VANILLA)],
