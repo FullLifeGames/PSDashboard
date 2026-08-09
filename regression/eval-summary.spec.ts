@@ -85,6 +85,26 @@ test.describe('natural-language turn summaries', () => {
     expect(summary).not.toContain('a read: its floor risked');
   });
 
+  test('a sensitivity hinge names the item split', () => {
+    const withSensitivity = analyzeTurn({
+      turn: 20,
+      result,
+      played: { p1: { kind: 'move', name: 'Draco Meteor', tera: false }, p2: { kind: 'move', name: 'Recover', tera: false } },
+      playedOutcome: 0.0,
+      scoreBefore: 0.1,
+      scoreAfter: -0.25,
+      sensitivity: {
+        p2: [
+          { species: 'Heatran', item: 'Choice Scarf', playedEv: -0.3, bestEv: -0.05 },
+          { species: 'Heatran', item: 'Leftovers', playedEv: -0.06, bestEv: -0.05 },
+        ],
+      },
+    });
+    const text = summarizeTurn(withSensitivity, names);
+    expect(text).toContain("hinges on Heatran's item");
+    expect(text).toContain('Leftovers: fine');
+  });
+
   test('a low-cost sacrifice reads neutrally', () => {
     const summary = summarizeTurn(analyzeTurn({
       turn: 29,

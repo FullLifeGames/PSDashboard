@@ -99,6 +99,34 @@ test.describe('read-aware risk phrasing', () => {
   });
 });
 
+test.describe('sensitivity probes', () => {
+  test('a sensitivity probe that clears the verdict softens it and records the hinge', () => {
+    const analysis = analyzeTurn({
+      turn: 20, result,
+      played: { p1: { kind: 'move', name: 'Draco Meteor', tera: false }, p2: { kind: 'move', name: 'Recover', tera: false } },
+      playedOutcome: 0.0, scoreBefore: 0.1, scoreAfter: -0.25,
+      sensitivity: { p2: [{ species: 'Heatran', item: 'Leftovers', playedEv: -0.06, bestEv: -0.05 }] },
+    });
+    // Un-probed: regret 0.25 = mistake. Under the probe: regret 0.01 = none.
+    expect(analysis.p2.tier).toBeUndefined();
+    expect(analysis.p2.sensitivity).toEqual({
+      species: 'Heatran',
+      alternatives: [{ item: 'Leftovers', tier: 'none' }],
+    });
+  });
+
+  test('probes never make a verdict harsher', () => {
+    const analysis = analyzeTurn({
+      turn: 20, result,
+      played: { p1: { kind: 'move', name: 'Draco Meteor', tera: false }, p2: { kind: 'move', name: 'Recover', tera: false } },
+      playedOutcome: 0.0, scoreBefore: 0.1, scoreAfter: -0.25,
+      sensitivity: { p2: [{ species: 'Heatran', item: 'Choice Specs', playedEv: -0.9, bestEv: 0.2 }] },
+    });
+    expect(analysis.p2.tier).toBe('mistake'); // unchanged
+    expect(analysis.p2.sensitivity).toBeUndefined(); // no tier change ⇒ no hinge claim
+  });
+});
+
 test.describe('sacrifice detection', () => {
   test('turnEvents slices the lines strictly between turn markers', () => {
     const log = ['|start', '|turn|1', '|move|a', '|turn|2', '|move|b', '|win|X'].join('\n');

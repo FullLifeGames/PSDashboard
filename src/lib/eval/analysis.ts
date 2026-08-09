@@ -65,6 +65,18 @@ export const RISK_PAYOFF_MARGIN = TIER_THRESHOLDS.inaccuracy;
  */
 export const PAYOFF_WINDOW = 3;
 
+/**
+ * One re-evaluation of the flagged side's turn under an ALTERNATIVE item on
+ * an opposing mon whose item is only a usage guess. EVs are own-perspective
+ * pair values, same space as RankedChoice.ev.
+ */
+export interface SensitivityProbe {
+  species: string;
+  item: string;
+  playedEv: number;
+  bestEv: number;
+}
+
 export interface SideAnalysis {
   playedRaw: PlayedAction | null;
   /** Doubles: the per-slot actions this side actually took. */
@@ -114,6 +126,13 @@ export interface SideAnalysis {
    * turn (or the waiting sentinel), which accuracy grading must exclude.
    */
   choiceCount?: number;
+  /**
+   * The verdict HINGES on a guessed item: under some usage-plausible
+   * alternative set the regret lands in a softer band. The tier above is
+   * already softened to the most charitable probed band (acquit-only —
+   * probes never add blame).
+   */
+  sensitivity?: { species: string; alternatives: { item: string; tier: VerdictTier | 'none' }[] };
 }
 
 /** Deep re-search of the played and best pairs (p1-perspective outcomes). */
@@ -368,6 +387,11 @@ export function analyzeTurn(params: {
   sacks?: { p1?: SackInfo; p2?: SackInfo };
   /** Per-side opponent-model best responses (opponent-model.ts computeRead). */
   reads?: { p1?: ReadRecommendation | null; p2?: ReadRecommendation | null };
+  /**
+   * Per-side item-sensitivity probes for flagged turns (useEvaluation).
+   * Acquit-only: a probe can soften the side's verdict, never harshen it.
+   */
+  sensitivity?: { p1?: SensitivityProbe[]; p2?: SensitivityProbe[] };
 }): TurnAnalysis {
   const playedTracking = params.playedTracking !== false;
   const sideAnalysis = (key: 'p1' | 'p2'): SideAnalysis => {
@@ -403,11 +427,13 @@ export function analyzeTurn(params: {
     }
     const demoteTier = (current: VerdictTier | undefined): VerdictTier | undefined =>
       current === 'blunder' ? 'mistake' : current === 'mistake' ? 'inaccuracy' : undefined;
+    const tierOf = (regretValue: number): VerdictTier | undefined =>
+      regretValue >= TIER_THRESHOLDS.blunder ? 'blunder'
+        : regretValue >= TIER_THRESHOLDS.mistake ? 'mistake'
+          : regretValue >= TIER_THRESHOLDS.inaccuracy ? 'inaccuracy' : undefined;
     let tier: VerdictTier | undefined;
     if (regret !== null) {
-      if (regret >= TIER_THRESHOLDS.blunder) tier = 'blunder';
-      else if (regret >= TIER_THRESHOLDS.mistake) tier = 'mistake';
-      else if (regret >= TIER_THRESHOLDS.inaccuracy) tier = 'inaccuracy';
+      tier = tierOf(regret);
       const own = key === 'p1' ? params.scoreBefore : -params.scoreBefore;
       if (tier && Math.abs(own) >= DECIDED_SCORE) tier = demoteTier(tier);
     }
@@ -419,6 +445,29 @@ export function analyzeTurn(params: {
     const sack = params.sacks?.[key];
     const sacrificed = !!(tier && sack && (regret ?? 0) < TIER_THRESHOLDS.blunder);
     if (sacrificed) tier = demoteTier(tier);
+    // Item-sensitivity: if the verdict changes band under a usage-plausible
+    // alternative item for an opposing mon whose item is only a guess, the
+    // verdict HINGES on hidden information — soften to the most charitable
+    // probed band (acquit-only) and record the hinge.
+    let sensitivity: SideAnalysis['sensitivity'];
+    const probes = params.sensitivity?.[key];
+    if (tier && probes && probes.length > 0) {
+      const rank: Record<VerdictTier | 'none', number> = { none: 0, inaccuracy: 1, mistake: 2, blunder: 3 };
+      const probed = probes.map(probe => ({
+        probe,
+        tier: tierOf(Math.max(0, probe.bestEv - probe.playedEv)) ?? 'none' as const,
+      }));
+      const charitable = probed.reduce((a, b) => (rank[b.tier] < rank[a.tier] ? b : a));
+      if (rank[charitable.tier] < rank[tier]) {
+        sensitivity = {
+          species: charitable.probe.species,
+          alternatives: probed
+            .filter(entry => entry.probe.species === charitable.probe.species)
+            .map(entry => ({ item: entry.probe.item, tier: entry.tier })),
+        };
+        tier = charitable.tier === 'none' ? undefined : charitable.tier;
+      }
+    }
     return {
       playedRaw,
       ...(playedSlots ? { playedSlots } : {}),
@@ -431,6 +480,7 @@ export function analyzeTurn(params: {
       ...(verifiedAtDepth ? { verifiedAtDepth } : {}),
       ...(tier ? { tier } : {}),
       ...(sacrificed && sack ? { sacrifice: sack } : {}),
+      ...(sensitivity ? { sensitivity } : {}),
     };
   };
 

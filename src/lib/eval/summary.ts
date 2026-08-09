@@ -115,6 +115,18 @@ function sackClause(name: string, side: SideAnalysis): string | null {
   return `${name} sacked ${side.sacrifice.name} (${pct}% HP) — a low-cost trade, not graded as a misplay.`;
 }
 
+/**
+ * The verdict hinges on a guessed item: name the split so the reader knows
+ * the grade depends on hidden information, not on the engine's confidence.
+ */
+function sensitivityClause(name: string, side: SideAnalysis): string | null {
+  if (!side.sensitivity) return null;
+  const alternatives = side.sensitivity.alternatives
+    .map(alternative => `${alternative.item}: ${alternative.tier === 'none' ? 'fine' : alternative.tier}`)
+    .join(' · ');
+  return `${name}'s verdict hinges on ${side.sensitivity.species}'s item (${alternatives}).`;
+}
+
 export function summarizeTurn(
   analysis: TurnAnalysis,
   playerNames: [string, string],
@@ -183,6 +195,13 @@ export function summarizeTurn(
   const p2Note = sackClause(playerNames[1], analysis.p2) ?? inaccuracyClause(playerNames[1], analysis.p2);
   if (p1Note) sentences.push(p1Note);
   if (p2Note) sentences.push(p2Note);
+
+  // Sensitivity hinges also ride along: the softened tier may have silenced
+  // the decision clause entirely, but the hinge itself is the finding.
+  const p1Hinge = sensitivityClause(playerNames[0], analysis.p1);
+  const p2Hinge = sensitivityClause(playerNames[1], analysis.p2);
+  if (p1Hinge) sentences.push(p1Hinge);
+  if (p2Hinge) sentences.push(p2Hinge);
 
   return sentences.join(' ');
 }
