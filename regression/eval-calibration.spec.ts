@@ -185,6 +185,17 @@ import { brierScore, fitConstantK } from './fit-helpers';
  * (late-game boards are hazard-heavy; overweighting them drowns bodies).
  * Hand 0.75 stays.
  *
+ * NO-OP CANDIDATE FILTER 2026-08-09 (user finding, GPL T25: Stealth Rock
+ * ranked with rocks already up — a guaranteed |-fail| click whose cell is
+ * a pass with a real-looking label). searchOptions drops field moves that
+ * fail deterministically against standing conditions (hazards at max,
+ * standing screens/Tailwind/Safeguard/Mist; singles lists). Gate
+ * 59/67/79/65/82 then re-test 59/68/81/67/80 — the late 79 was composition
+ * noise (n varies run-to-run), re-test within gate everywhere. ADOPTED
+ * (cache v14). Known remaining: pending Future Sight clicks are also
+ * passes, but reconstructed battles store the pending marker
+ * inconsistently — left unfiltered.
+ *
  * ROUND CLOSE 2026-08-09 (calibration/honesty round, cache v11). The
  * sim-grounded-hazards re-test above IS the closing run — no eval-changing
  * task landed after it: 58/65/83/65/82, brier 0.2585/0.2267/0.1740.
