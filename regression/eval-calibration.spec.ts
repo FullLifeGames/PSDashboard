@@ -93,7 +93,15 @@ import { brierScore, fitConstantK } from './fit-helpers';
  * Instrumented fit 2026-08-09 (eval-fit schema 2, 5,985 positions): phase-K
  * fitted at singles {k0 2.28, k1 1.49}, doubles {k0 2.98, k1 0.88} — beats
  * constant K on early Brier in both gametypes (0.2470→0.2451 / 0.2264→
- * 0.2259) with no bucket regressing. Adoption gated below (Task 4 run).
+ * 0.2259) with no bucket regressing.
+ *
+ * PHASE-AWARE WINPROB 2026-08-09 (K = k0 + k1·faintedFraction at the leaf,
+ * cache v11): gate 58/67/80/66/80 vs record 58/65/80/64/82 — mid +2,
+ * singles +2, doubles −2 (at the limit, within gate). GATE PASSED, ADOPTED.
+ * Early mean|score| 0.33→0.30: the early game now claims less confidence,
+ * which is the round's target. First Brier baseline (pooled constant K on
+ * the sweep's own samples): early 0.2572 · mid 0.2268 · late 0.1791 —
+ * cross-run Brier comparisons start here.
  */
 const REPLAY_IDS = [
   'gen9draft-2058494320',

@@ -30,7 +30,9 @@ export interface StoredEval {
  * resurface as current.
  */
 // v7: active-pair matchup emphasis + team-preview (turn 0) evaluation.
-export const EVAL_ENGINE_CACHE_VERSION = 10;
+// v11: phase-aware winprob (K = k0 + k1·faintedFraction), quiescence
+//      extension on violent cells, sensitivity probes cached per turn.
+export const EVAL_ENGINE_CACHE_VERSION = 11;
 
 export function evalStoreKey(
   cacheKey: string,

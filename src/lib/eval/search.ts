@@ -63,7 +63,7 @@ export function battleFaintedFraction(battle: ReturnType<typeof positionBattle>)
 export function leafValue(battle: ReturnType<typeof positionBattle>, matchupCache: MatchupCache): number {
   const raw = evaluatePosition(battle, matchupCache);
   if (battle.ended) return raw > 0 ? 1 : raw < 0 ? -1 : 0;
-  return wpUnits(raw, battle.gameType === 'doubles');
+  return wpUnits(raw, battle.gameType === 'doubles', battleFaintedFraction(battle));
 }
 
 /**
