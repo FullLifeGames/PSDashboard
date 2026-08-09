@@ -20,6 +20,8 @@ import { useEvaluation } from './hooks/useEvaluation';
 import { buildSetsExport, parseSetsImport } from './lib/sets-io';
 import { parseTeamText } from './lib/team-parser';
 import { applyInferredSpreads, enrichTeamInfo, manualMove } from './lib/team-info';
+import { alternativeItems } from './lib/smogon-stats';
+import type { SensitivityTarget } from './lib/eval/sensitivity';
 import { applyPastedTeam, countMatchingSpecies, parsePastedTeam, type PastedSet } from './lib/team-paste';
 import type { OpponentTeamInfo } from './types';
 import { decodeBranchShare, type BranchSharePayload } from './lib/branch-share';
@@ -485,6 +487,20 @@ function App() {
     [effectiveP2Info, sheetTeams, solvedSpreads],
   );
 
+  // Guessed-item mons + their usage-plausible alternatives — the search
+  // space for the sensitivity probes (flagged-verdict honesty).
+  const sensitivityTargetsFor = useCallback((side: 'p1' | 'p2'): SensitivityTarget[] => {
+    const info = side === 'p1' ? statsP1Info : statsP2Info;
+    if (!info) return [];
+    return info.pokemon
+      .filter(mon => mon.item.source === 'guessed' && mon.item.value)
+      .map(mon => ({
+        species: mon.species,
+        items: alternativeItems(usageStats.stats, mon.species, mon.item.value, mon.ruledOut),
+      }))
+      .filter(target => target.items.length > 0);
+  }, [statsP1Info, statsP2Info, usageStats.stats]);
+
   const acquireBranchPosition = useCallback(async () => {
     const battle = getBattle();
     if (!battle) throw new Error('No live branch battle to evaluate.');
@@ -683,11 +699,12 @@ function App() {
         return branchEngine.serializePreviewPosition(getBranchSimulatorFormat(replayData), p1Team, p2Team);
       },
       playedLeads: parseLeadSpecies(replayData.log),
+      sensitivityTargetsFor,
     });
   }, [
     replayData, evaluation, analyzableTurns, effectiveTera, setsFingerprint, makeReplayAcquire,
     makeSweepAcquireAll, snapshots, getInferredSpreads, evalIsDoubles, teamText, effectiveP1Info, effectiveP2Info,
-    usageStats.stats, setAssumptions.assumptions,
+    usageStats.stats, setAssumptions.assumptions, sensitivityTargetsFor,
   ]);
 
   // On-demand: explain the current turn without sweeping the whole game —
@@ -705,9 +722,10 @@ function App() {
       playedFor: sweepTurn => (evalIsDoubles
         ? parsePlayedActionsDoubles(snapshots[sweepTurn]?.log ?? [])
         : parsePlayedActions(snapshots[sweepTurn]?.log ?? [])),
+      sensitivityTargetsFor,
     });
     setAnalysisTurn(turn);
-  }, [replayData, evaluation, branchTurn, analyzableTurns, effectiveTera, setsFingerprint, makeReplayAcquire, snapshots, evalIsDoubles]);
+  }, [replayData, evaluation, branchTurn, analyzableTurns, effectiveTera, setsFingerprint, makeReplayAcquire, snapshots, evalIsDoubles, sensitivityTargetsFor]);
 
   // Any position change invalidates a displayed result.
   const { markStale: markEvalStale, reset: resetEval, clearGraph } = evaluation;
@@ -927,6 +945,7 @@ function App() {
         .slice(analysisTurn, analysisTurn + PAYOFF_WINDOW)
         .map(value => value ?? null),
       verified: evaluation.graph.verified[analysisTurn - 1] ?? null,
+      sensitivity: evaluation.graph.sensitivity[analysisTurn - 1] ?? null,
       scoreBefore,
       scoreAfter: evaluation.graph.scores[analysisTurn] ?? null,
       playedTracking: true,
@@ -949,7 +968,7 @@ function App() {
   // Game-level root cause, once enough of the game is swept.
   const gameReport = useMemo(() => {
     if (!replayData) return null;
-    const { results, scores, played, playedOutcome, verified, running } = evaluation.graph;
+    const { results, scores, played, playedOutcome, verified, sensitivity, running } = evaluation.graph;
     if (running) return null;
     const analyses = results.map((result, index) => {
       const scoreBefore = scores[index];
@@ -963,6 +982,7 @@ function App() {
           .slice(index + 1, index + 1 + PAYOFF_WINDOW)
           .map(value => value ?? null),
         verified: verified[index] ?? null,
+        sensitivity: sensitivity[index] ?? null,
         scoreBefore,
         scoreAfter: scores[index + 1] ?? null,
         playedTracking: true,

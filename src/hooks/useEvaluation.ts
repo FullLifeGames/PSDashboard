@@ -1,5 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { matchPlayedSide, REGRET_THRESHOLD, type TurnVerification } from '../lib/eval/analysis';
+import {
+  matchPlayedSide, REGRET_THRESHOLD,
+  type SensitivityProbe, type TurnSensitivity, type TurnVerification,
+} from '../lib/eval/analysis';
+import { patchSerializedItem, selectProbeCombos, type SensitivityTarget } from '../lib/eval/sensitivity';
 import type { LeadEvalData } from '../lib/eval/leads';
 import type { PlayedTurn } from '../lib/eval/played';
 import { EvalWorkerClient } from '../lib/eval/worker-client';
@@ -55,6 +59,8 @@ interface CachedEval {
   playedOutcome?: number | null;
   /** Depth+1 re-search of flagged misplays (null = checked, nothing flagged). */
   verified?: TurnVerification | null;
+  /** Item-sensitivity probes for still-flagged sides (null = checked, none needed). */
+  sensitivity?: TurnSensitivity | null;
 }
 
 export interface GraphSweepParams {
@@ -87,6 +93,12 @@ export interface GraphSweepParams {
   acquirePreview?(): Promise<string | null>;
   /** The leads each side actually sent (species, slot order). */
   playedLeads?: { p1: string[] | null; p2: string[] | null };
+  /**
+   * Guessed-item mons per side with their usage-plausible alternative items
+   * (rule-outs applied) — the sensitivity probes' search space. Absent =
+   * probing disabled.
+   */
+  sensitivityTargetsFor?(side: 'p1' | 'p2'): SensitivityTarget[];
 }
 
 export interface EvalGraphState {
@@ -98,6 +110,8 @@ export interface EvalGraphState {
   playedOutcome: (number | null)[];
   /** Depth+1 verification of flagged misplays (null = nothing flagged / not run). */
   verified: (TurnVerification | null)[];
+  /** Item-sensitivity probes per turn (null = nothing to probe / not run). */
+  sensitivity: (TurnSensitivity | null)[];
   /** Turn 0 (team preview) evaluation — null when unavailable or not swept. */
   lead: LeadEvalData | null;
   running: boolean;
@@ -112,13 +126,14 @@ export function useEvaluation() {
   const [error, setError] = useState<string | null>(null);
   const [reconstructProgress, setReconstructProgress] = useState<{ turn: number; target: number } | null>(null);
   const [graph, setGraph] = useState<EvalGraphState>({
-    scores: [], results: [], played: [], playedOutcome: [], verified: [], lead: null, running: false, progress: null,
+    scores: [], results: [], played: [], playedOutcome: [], verified: [], sensitivity: [], lead: null,
+    running: false, progress: null,
   });
 
   const clientRef = useRef<EvalWorkerClient | null>(null);
   const cacheRef = useRef(new Map<string, CachedEval>());
   /** Latest graph arrays, so partial (range) sweeps merge instead of wiping. */
-  const graphDataRef = useRef<Pick<EvalGraphState, 'scores' | 'results' | 'played' | 'playedOutcome' | 'verified' | 'lead'> | null>(null);
+  const graphDataRef = useRef<Pick<EvalGraphState, 'scores' | 'results' | 'played' | 'playedOutcome' | 'verified' | 'sensitivity' | 'lead'> | null>(null);
   const runRef = useRef(0);
   const prefsRef = useRef(prefs);
   prefsRef.current = prefs;
@@ -266,11 +281,14 @@ export function useEvaluation() {
     const verified: (TurnVerification | null)[] = keepPrevious && previous.verified.length === params.turns
       ? [...previous.verified]
       : new Array(params.turns).fill(null);
+    const sensitivity: (TurnSensitivity | null)[] = keepPrevious && previous.sensitivity?.length === params.turns
+      ? [...previous.sensitivity]
+      : new Array(params.turns).fill(null);
     let lead: LeadEvalData | null = keepPrevious ? previous.lead : null;
     const snapshot = () => {
       const data = {
         scores: [...scores], results: [...results], played: [...played],
-        playedOutcome: [...playedOutcome], verified: [...verified], lead,
+        playedOutcome: [...playedOutcome], verified: [...verified], sensitivity: [...sensitivity], lead,
       };
       graphDataRef.current = data;
       return data;
@@ -376,6 +394,59 @@ export function useEvaluation() {
     };
 
     /**
+     * Item-sensitivity probes for sides still flagged AFTER verification:
+     * re-evaluate the played and best pairs with an opposing guessed item
+     * swapped for its next usage candidates (≤2 combos per side = ≤4 extra
+     * pair-evals). Probes run at the sweep's own settings so their EVs stay
+     * comparable to the regret that raised the flag. Acquit-only downstream
+     * (analyzeTurn) — this only gathers evidence.
+     */
+    const probeSensitivity = async (
+      getSerialized: () => Promise<string>,
+      result: EvalResult,
+      turnPlayed: PlayedTurn | null,
+      settings: EvalSettings,
+      turnVerified: TurnVerification | null,
+    ): Promise<TurnSensitivity | null> => {
+      if (!params.sensitivityTargetsFor) return null;
+      if ((settings.mode ?? 'matrix') !== 'matrix') return null;
+      const p1Choice = matchPlayedSide(result, 'p1', turnPlayed);
+      const p2Choice = matchPlayedSide(result, 'p2', turnPlayed);
+      if (!p1Choice || !p2Choice) return null;
+      const probeSettings: EvalSettings = { ...settings, keepPlayed: undefined };
+      const out: TurnSensitivity = {};
+      for (const side of ['p1', 'p2'] as const) {
+        const chosen = side === 'p1' ? p1Choice : p2Choice;
+        const best = result.perSide[side][0];
+        if (!best || best.ev - chosen.ev < REGRET_THRESHOLD) continue;
+        // The deep pass already acquitted this side — nothing left to soften.
+        const sign = side === 'p1' ? 1 : -1;
+        const deepSide = turnVerified?.[side];
+        if (deepSide && Math.max(0, sign * (deepSide.bestDeep - deepSide.playedDeep)) < REGRET_THRESHOLD) continue;
+        const opposing = side === 'p1' ? 'p2' : 'p1';
+        const targets = params.sensitivityTargetsFor(opposing);
+        if (targets.length === 0) continue;
+        const serialized = await getSerialized();
+        const opposingPlayed = side === 'p1' ? p2Choice : p1Choice;
+        const opposingLabels = [opposingPlayed.label, ...(result.perSide[opposing][0] ? [result.perSide[opposing][0].label] : [])];
+        const combos = selectProbeCombos(serialized, opposing, targets, opposingLabels);
+        const probes: SensitivityProbe[] = [];
+        for (const combo of combos) {
+          const patched = patchSerializedItem(serialized, opposing, combo.species, combo.item);
+          if (!patched) continue;
+          clientRef.current ??= new EvalWorkerClient();
+          const playedEv = await clientRef.current.evalPair(patched, p1Choice.choice, p2Choice.choice, probeSettings);
+          const bestEv = side === 'p1'
+            ? await clientRef.current.evalPair(patched, best.choice, p2Choice.choice, probeSettings)
+            : await clientRef.current.evalPair(patched, p1Choice.choice, best.choice, probeSettings);
+          probes.push({ species: combo.species, item: combo.item, playedEv: sign * playedEv, bestEv: sign * bestEv });
+        }
+        if (probes.length > 0) out[side] = probes;
+      }
+      return out.p1 || out.p2 ? out : null;
+    };
+
+    /**
      * One sequential pass over `turnList` at `settings`; false = cancelled.
      * `verify` runs the depth+1 misplay verification — final-verdict passes
      * only, never the fast shaping pass (its results are provisional).
@@ -400,6 +471,7 @@ export function useEvaluation() {
             result: stored.result, depth, samples, mode: mode, tera: params.tera,
             ...(stored.playedOutcome !== undefined ? { playedOutcome: stored.playedOutcome } : {}),
             ...(stored.verified !== undefined ? { verified: stored.verified } : {}),
+            ...(stored.sensitivity !== undefined ? { sensitivity: stored.sensitivity } : {}),
           } : undefined;
           if (hit) cacheRef.current.set(key, hit);
         }
@@ -452,6 +524,25 @@ export function useEvaluation() {
             });
           }
           if (turnVerified !== undefined) verified[turn - 1] = turnVerified;
+          // Sensitivity backfill, same shape as the verification backfill.
+          let turnSensitivity: TurnSensitivity | null | undefined = hit.sensitivity;
+          if (verify && turnSensitivity === undefined) {
+            turnSensitivity = null;
+            try {
+              turnSensitivity = await probeSensitivity(() => positionFor(turn), hit.result, turnPlayed, settings, turnVerified ?? null);
+            } catch (err) {
+              if (runRef.current !== runId) return false;
+              if (err instanceof Error && err.message === 'cancelled') return false;
+            }
+            if (runRef.current !== runId) return false;
+            cacheRef.current.set(key, { ...cacheRef.current.get(key) ?? hit, sensitivity: turnSensitivity });
+            void saveStoredEval({
+              key: storeKey, result: hit.result, depth, samples, mode: mode, tera: params.tera,
+              playedOutcome: outcome ?? null, verified: turnVerified ?? null,
+              sensitivity: turnSensitivity, savedAt: Date.now(),
+            });
+          }
+          if (turnSensitivity !== undefined) sensitivity[turn - 1] = turnSensitivity;
         } else {
           try {
             const serialized = await positionFor(turn);
@@ -480,6 +571,7 @@ export function useEvaluation() {
             playedOutcome[turn - 1] = outcome;
 
             let turnVerified: TurnVerification | null | undefined;
+            let turnSensitivity: TurnSensitivity | null | undefined;
             if (verify) {
               turnVerified = null;
               try {
@@ -490,14 +582,27 @@ export function useEvaluation() {
               }
               if (runRef.current !== runId) return false;
               verified[turn - 1] = turnVerified;
+              turnSensitivity = null;
+              try {
+                turnSensitivity = await probeSensitivity(() => Promise.resolve(serialized), result, turnPlayed, settings, turnVerified ?? null);
+              } catch (err) {
+                if (runRef.current !== runId) return false;
+                if (err instanceof Error && err.message === 'cancelled') return false;
+              }
+              if (runRef.current !== runId) return false;
+              sensitivity[turn - 1] = turnSensitivity;
             }
             cacheRef.current.set(key, {
               result, depth, samples, mode: mode, tera: params.tera,
-              playedOutcome: outcome, ...(turnVerified !== undefined ? { verified: turnVerified } : {}),
+              playedOutcome: outcome,
+              ...(turnVerified !== undefined ? { verified: turnVerified } : {}),
+              ...(turnSensitivity !== undefined ? { sensitivity: turnSensitivity } : {}),
             });
             void saveStoredEval({
               key: storeKey, result, depth, samples, mode: mode, tera: params.tera,
-              playedOutcome: outcome, ...(turnVerified !== undefined ? { verified: turnVerified } : {}),
+              playedOutcome: outcome,
+              ...(turnVerified !== undefined ? { verified: turnVerified } : {}),
+              ...(turnSensitivity !== undefined ? { sensitivity: turnSensitivity } : {}),
               savedAt: Date.now(),
             });
           } catch (err) {
@@ -577,7 +682,7 @@ export function useEvaluation() {
 
   const clearGraph = useCallback(() => {
     graphDataRef.current = null;
-    setGraph({ scores: [], results: [], played: [], playedOutcome: [], verified: [], lead: null, running: false, progress: null });
+    setGraph({ scores: [], results: [], played: [], playedOutcome: [], verified: [], sensitivity: [], lead: null, running: false, progress: null });
   }, []);
 
   return {

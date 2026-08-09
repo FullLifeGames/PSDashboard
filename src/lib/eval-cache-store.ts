@@ -1,5 +1,5 @@
 import type { EvalResult, TeraAllowance } from './eval/types';
-import type { TurnVerification } from './eval/analysis';
+import type { TurnSensitivity, TurnVerification } from './eval/analysis';
 import { teraKey } from './eval/tera';
 
 /**
@@ -21,6 +21,8 @@ export interface StoredEval {
   playedOutcome?: number | null;
   /** Depth+1 re-search of flagged misplays (null = checked, nothing flagged). */
   verified?: TurnVerification | null;
+  /** Item-sensitivity probes for still-flagged sides (null = checked, none needed). */
+  sensitivity?: TurnSensitivity | null;
   savedAt: number;
 }
 

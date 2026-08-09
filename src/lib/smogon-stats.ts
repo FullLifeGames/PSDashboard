@@ -390,6 +390,27 @@ export function getSpeciesUsageSet(
   };
 }
 
+/**
+ * The next usage-plausible item candidates for a sensitivity probe: up to
+ * two items from the species' usage list that differ from the current guess
+ * and are not disproven by protocol evidence. Empty when the species has no
+ * usage entry — with no plausible alternatives there is nothing to probe.
+ */
+export function alternativeItems(
+  usageStats: SmogonUsageStats | null | undefined,
+  species: string,
+  currentGuess: string,
+  ruledOut?: { items?: string[] },
+): string[] {
+  const stats = getSpeciesUsageStats(species, usageStats);
+  if (!stats) return [];
+  const excluded = new Set((ruledOut?.items ?? []).map(toId));
+  return stats.items
+    .filter(entry => entry.value && toId(entry.value) !== toId(currentGuess) && !excluded.has(toId(entry.value)))
+    .slice(0, 2)
+    .map(entry => entry.value);
+}
+
 export function guessedFieldFromUsage(guess: UsageProbability | undefined): PokemonFieldInfo | null {
   if (!guess?.value) return null;
   return {

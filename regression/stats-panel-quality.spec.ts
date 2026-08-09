@@ -3,7 +3,7 @@ import { inferOpponentTeam } from '../src/lib/opponent-inferrer';
 import { applyInferredSpreads, enrichPokemonInfo, guessedEvs, INFERRED_SPREAD_DETAIL, manualEvs, unknownField } from '../src/lib/team-info';
 import { spriteUrl } from '../src/lib/sprite-url';
 import type { RevealedPokemonInfo } from '../src/types';
-import type { SmogonUsageStats } from '../src/lib/smogon-stats';
+import { alternativeItems, type SmogonUsageStats } from '../src/lib/smogon-stats';
 
 const megaLog = [
   '|player|p1|Alice|',
@@ -339,6 +339,31 @@ test.describe('stats panel data quality (WP11)', () => {
 
     const enriched = enrichPokemonInfo(revealed, usageStats);
     expect(enriched.ability.value).toBe('Unaware');
+  });
+
+  test('alternativeItems yields the next usage candidates, respecting rule-outs', () => {
+    const usageStats: SmogonUsageStats = {
+      format: 'gen9ou', month: 'latest', source: 'test',
+      pokemon: {
+        heatran: {
+          species: 'Heatran', rawCount: 100,
+          abilities: [],
+          items: [
+            { value: 'Leftovers', probability: 0.4 },
+            { value: 'Choice Specs', probability: 0.3 },
+            { value: 'Air Balloon', probability: 0.2 },
+            { value: 'Assault Vest', probability: 0.1 },
+          ],
+          moves: [], spreads: [],
+        },
+      },
+    };
+    // Current guess excluded, ruled-out items skipped, capped at 2.
+    expect(alternativeItems(usageStats, 'Heatran', 'Leftovers', { items: ['choicespecs'] }))
+      .toEqual(['Air Balloon', 'Assault Vest']);
+    expect(alternativeItems(usageStats, 'Heatran', 'Choice Specs')).toEqual(['Leftovers', 'Air Balloon']);
+    // Unknown species: nothing to probe.
+    expect(alternativeItems(usageStats, 'Blissey', 'Leftovers')).toEqual([]);
   });
 
   test('guessed typed Hidden Power does not join a revealed generic one (G12)', () => {

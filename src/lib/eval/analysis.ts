@@ -77,6 +77,12 @@ export interface SensitivityProbe {
   bestEv: number;
 }
 
+/** Per-side probes for one turn — the shape sweeps cache and analyzeTurn consumes. */
+export interface TurnSensitivity {
+  p1?: SensitivityProbe[];
+  p2?: SensitivityProbe[];
+}
+
 export interface SideAnalysis {
   playedRaw: PlayedAction | null;
   /** Doubles: the per-slot actions this side actually took. */
@@ -391,7 +397,7 @@ export function analyzeTurn(params: {
    * Per-side item-sensitivity probes for flagged turns (useEvaluation).
    * Acquit-only: a probe can soften the side's verdict, never harshen it.
    */
-  sensitivity?: { p1?: SensitivityProbe[]; p2?: SensitivityProbe[] };
+  sensitivity?: TurnSensitivity | null;
 }): TurnAnalysis {
   const playedTracking = params.playedTracking !== false;
   const sideAnalysis = (key: 'p1' | 'p2'): SideAnalysis => {

@@ -169,6 +169,16 @@ function SideRow({ name, side, onExplore }: { name: string; side: SideAnalysis; 
             · inaccuracy (−{(side.regret ?? 0).toFixed(2)})
           </span>
         )}
+        {side.sensitivity && (
+          <span
+            style={{ color: '#b6a46a' }}
+            title={`The verdict depends on a guessed item: ${side.sensitivity.alternatives
+              .map(alternative => `${alternative.item}: ${alternative.tier === 'none' ? 'fine' : alternative.tier}`)
+              .join(' · ')}`}
+          >
+            ± hinges on {side.sensitivity.species}
+          </span>
+        )}
       </div>
       {regretful && side.played && side.best && (
         <>
