@@ -443,6 +443,39 @@ test.describe('evaluatePosition', () => {
     expect(toxicCost('Snorlax')).toBeGreaterThan(0);
   });
 
+  test('entry cost discounts a benched mon\'s matchup pressure; Boots negate it', () => {
+    // Volcarona dominates its pairs from the bench — but with rocks up it
+    // enters at half HP, so its pressure must read weaker. The wincon-vs-
+    // hazards interaction (endgame: hazards effectively disable a benched
+    // sweeper) was invisible to the additive model.
+    const board = (item = '') => makeBattle(
+      [makeSet('A', 'Snorlax', VANILLA), makeSet('Volc', 'Volcarona', ['Flamethrower', 'Quiver Dance'], 50, item ? { item } : {})],
+      [makeSet('B', 'Scizor', ['Bullet Punch', 'Swords Dance']), makeSet('C', 'Ferrothorn', ['Power Whip'])],
+    );
+    const clean = board();
+    const rocked = board();
+    rocked.sides[0].addSideCondition('stealthrock', rocked.sides[1].active[0]!);
+    const booted = board('Heavy-Duty Boots');
+    booted.sides[0].addSideCondition('stealthrock', booted.sides[1].active[0]!);
+
+    const matchupOf = (battle: Battle) => matchupTerms(battle).matchup;
+    // Rocks on Volcarona's side weaken p1's matchup pressure…
+    expect(matchupOf(rocked)).toBeLessThan(matchupOf(clean));
+    // …but Heavy-Duty Boots restore it exactly (no entry cost).
+    expect(matchupOf(booted)).toBeCloseTo(matchupOf(clean), 8);
+    // Active mons pay no entry cost: single-mon sides are unaffected.
+    const activesOnly = makeBattle(
+      [makeSet('A', 'Snorlax', VANILLA)],
+      [makeSet('B', 'Scizor', ['Bullet Punch'])],
+    );
+    const activesRocked = makeBattle(
+      [makeSet('A', 'Snorlax', VANILLA)],
+      [makeSet('B', 'Scizor', ['Bullet Punch'])],
+    );
+    activesRocked.sides[0].addSideCondition('stealthrock', activesRocked.sides[1].active[0]!);
+    expect(matchupOf(activesRocked)).toBeCloseTo(matchupOf(activesOnly), 8);
+  });
+
   test('hazard removal is an OPTION on the net board state', () => {
     // A Defogger on the suffering side: the option to clear is worth the
     // discounted net relief (the T14 Talonflame case — the switch INTO the

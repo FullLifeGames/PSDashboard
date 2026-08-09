@@ -190,39 +190,46 @@ function averageSpeed(side: Side): number {
  * `hazardCap`. Exported for direct testing.
  */
 export function hazardCost(side: Side, battle: Battle): number {
+  const bodyWeight = EVAL_WEIGHTS.alive + EVAL_WEIGHTS.hp;
+  let cost = 0;
+  for (const pokemon of side.pokemon) {
+    if (pokemon.fainted || pokemon.hp <= 0) continue;
+    cost += bodyWeight * hazardEntryFraction(pokemon, side, battle) * EVAL_WEIGHTS.hazardEntries;
+  }
+  return Math.min(cost, EVAL_WEIGHTS.hazardCap);
+}
+
+/**
+ * The entry-damage fraction THIS mon pays to switch into its side's
+ * hazards — the shared per-mon term behind hazardCost and the matchup
+ * entry discount. 0 for Heavy-Duty Boots and Magic Guard; ground-bound
+ * hazards use the sim's grounding (with the bench-Levitate correction:
+ * the sim ignores an INACTIVE mon's ability, but entry pricing is about
+ * the moment it becomes active); Toxic Spikes immunity is dex-typed.
+ */
+export function hazardEntryFraction(pokemon: Pokemon, side: Side, battle: Battle): number {
   const hasRocks = !!side.sideConditions['stealthrock'];
   const spikesLayers = Math.min(side.sideConditions['spikes']?.layers ?? 0, 3);
   const hasToxicSpikes = !!side.sideConditions['toxicspikes'];
   const hasWeb = !!side.sideConditions['stickyweb'];
   if (!hasRocks && !spikesLayers && !hasToxicSpikes && !hasWeb) return 0;
+  if (pokemon.item === 'heavydutyboots' || pokemon.ability === 'magicguard') return 0;
 
-  const bodyWeight = EVAL_WEIGHTS.alive + EVAL_WEIGHTS.hp;
   const gravityActive = !!battle.field.pseudoWeather['gravity'];
-  let cost = 0;
-  for (const pokemon of side.pokemon) {
-    if (pokemon.fainted || pokemon.hp <= 0) continue;
-    if (pokemon.item === 'heavydutyboots' || pokemon.ability === 'magicguard') continue;
-    // The sim's own grounding (Gravity, Iron Ball, Magnet Rise, Air Balloon,
-    // Roost, …). One correction: the sim ignores an INACTIVE mon's ability,
-    // but hazard pricing is about future ENTRIES — where Levitate applies —
-    // so benched Levitate mons stay priced as airborne (unless Gravity).
-    const grounded = !!pokemon.isGrounded() &&
-      !(!pokemon.isActive && !gravityActive && pokemon.ability === 'levitate');
-    let fraction = 0;
-    if (hasRocks) {
-      fraction += 0.125 * Math.pow(2, battle.dex.getEffectiveness('Rock', pokemon.types));
-    }
-    if (grounded) {
-      if (spikesLayers) fraction += [0, 1 / 8, 1 / 6, 1 / 4][spikesLayers];
-      // Dex-typed Toxic Spikes immunity (Poison/Steel via the type chart).
-      if (hasToxicSpikes && battle.dex.getImmunity('psn', pokemon.types)) {
-        fraction += 0.06; // priced as a slice of the psn/tox status cost
-      }
-      if (hasWeb) fraction += 0.04;
-    }
-    cost += bodyWeight * fraction * EVAL_WEIGHTS.hazardEntries;
+  const grounded = !!pokemon.isGrounded() &&
+    !(!pokemon.isActive && !gravityActive && pokemon.ability === 'levitate');
+  let fraction = 0;
+  if (hasRocks) {
+    fraction += 0.125 * Math.pow(2, battle.dex.getEffectiveness('Rock', pokemon.types));
   }
-  return Math.min(cost, EVAL_WEIGHTS.hazardCap);
+  if (grounded) {
+    if (spikesLayers) fraction += [0, 1 / 8, 1 / 6, 1 / 4][spikesLayers];
+    if (hasToxicSpikes && battle.dex.getImmunity('psn', pokemon.types)) {
+      fraction += 0.06; // priced as a slice of the psn/tox status cost
+    }
+    if (hasWeb) fraction += 0.04;
+  }
+  return fraction;
 }
 
 /**
@@ -550,6 +557,25 @@ export function matchupTerms(battle: Battle, cache?: MatchupCache): { matchup: n
 
   const threat = threatGetter(battle, cache);
 
+  // Wincon-vs-hazards interaction: a BENCHED mon fights through its entry
+  // damage — its pressure is weighed by the HP it would actually arrive
+  // with (Boots/Magic Guard/airborne mons pay nothing via
+  // hazardEntryFraction). Actives are already on the field. A mon whose
+  // entry would kill it contributes nothing — hazards can fully disable a
+  // benched sweeper, which the additive hazards term alone never saw.
+  const effHpMemo = new Map<Pokemon, number>();
+  const effHp = (pokemon: Pokemon): number => {
+    let value = effHpMemo.get(pokemon);
+    if (value === undefined) {
+      const hp = pokemon.hp / pokemon.maxhp;
+      value = pokemon.isActive
+        ? hp
+        : Math.max(0, hp - hazardEntryFraction(pokemon, pokemon.side, battle));
+      effHpMemo.set(pokemon, value);
+    }
+    return value;
+  };
+
   const healers = new Map<Pokemon, boolean>();
   const heals = (pokemon: Pokemon): boolean => {
     let value = healers.get(pokemon);
@@ -576,8 +602,8 @@ export function matchupTerms(battle: Battle, cache?: MatchupCache): { matchup: n
       const fracB = boostedB <= 0.5 && heals(a) ? 0 : boostedB;
       bestAnswerToP2.set(b, Math.max(bestAnswerToP2.get(b) ?? -Infinity, fracA - fracB));
       bestAnswerToP1.set(a, Math.max(bestAnswerToP1.get(a) ?? -Infinity, fracB - fracA));
-      const turnsA = fracA > 0 ? Math.ceil(b.hp / b.maxhp / fracA) : Infinity;
-      const turnsB = fracB > 0 ? Math.ceil(a.hp / a.maxhp / fracB) : Infinity;
+      const turnsA = fracA > 0 ? Math.ceil(effHp(b) / fracA) : Infinity;
+      const turnsB = fracB > 0 ? Math.ceil(effHp(a) / fracB) : Infinity;
       let sign = 0;
       if (turnsA < turnsB) sign = 1;
       else if (turnsB < turnsA) sign = -1;
@@ -589,16 +615,16 @@ export function matchupTerms(battle: Battle, cache?: MatchupCache): { matchup: n
         }
       }
       const weight = a.isActive && b.isActive ? EVAL_WEIGHTS.activePair : 1;
-      sum += weight * sign * (a.hp / a.maxhp) * (b.hp / b.maxhp);
+      sum += weight * sign * effHp(a) * effHp(b);
       totalWeight += weight;
     }
   }
   let coverage = 0;
   for (const [enemy, margin] of bestAnswerToP2) {
-    if (margin < 0) coverage -= Math.min(-margin, 1) * (enemy.hp / enemy.maxhp);
+    if (margin < 0) coverage -= Math.min(-margin, 1) * effHp(enemy);
   }
   for (const [enemy, margin] of bestAnswerToP1) {
-    if (margin < 0) coverage += Math.min(-margin, 1) * (enemy.hp / enemy.maxhp);
+    if (margin < 0) coverage += Math.min(-margin, 1) * effHp(enemy);
   }
   return { matchup: totalWeight > 0 ? sum / totalWeight : 0, coverage };
 }

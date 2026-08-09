@@ -35,7 +35,9 @@ export interface StoredEval {
 // v11: phase-aware winprob (K = k0 + k1·faintedFraction), sensitivity
 //      probes cached per turn.
 // v12: hazard-removal option value (net board state, move-aware).
-export const EVAL_ENGINE_CACHE_VERSION = 12;
+// v13: entry-cost-weighted matchup/coverage (benched mons fight through
+//      their hazard entry damage; Boots/Magic Guard exempt).
+export const EVAL_ENGINE_CACHE_VERSION = 13;
 
 export function evalStoreKey(
   cacheKey: string,

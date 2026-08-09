@@ -165,6 +165,17 @@ import { brierScore, fitConstantK } from './fit-helpers';
  * (cache v12). A flat remover-exists discount was tried first and gated
  * fine (58/64/82/65/80) but mispriced double-edged Defogs — superseded.
  *
+ * ENTRY-COST-WEIGHTED MATCHUP 2026-08-09 (user follow-up: hazards can
+ * disable a benched wincon, an interaction the additive model never saw).
+ * matchupTerms weighs every BENCHED mon by the HP it would actually arrive
+ * with: effHp = max(0, hp − hazardEntryFraction), applied to pair weights,
+ * KO races, and coverage weights; actives pay nothing; Boots/Magic Guard/
+ * airborne exempt via the shared hazardEntryFraction (extracted from
+ * hazardCost). Gate 58/68/82/67/80, re-test 59/68/82/67/82 vs record
+ * 58/65/83/65/82 — early 59, mid 68, singles 67 are the BEST values in
+ * the history; late stable at 82 (−1; the prior run's 85 was composition
+ * generosity). GATE PASSED, ADOPTED (cache v13).
+ *
  * ROUND CLOSE 2026-08-09 (calibration/honesty round, cache v11). The
  * sim-grounded-hazards re-test above IS the closing run — no eval-changing
  * task landed after it: 58/65/83/65/82, brier 0.2585/0.2267/0.1740.
