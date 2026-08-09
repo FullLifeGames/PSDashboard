@@ -144,6 +144,10 @@ export function inferOpponentTeam(log: string, opponentSide: 'p1' | 'p2' = 'p2')
   // disproves Assault Vest. `[from]`-attributed lines (Sleep Talk calls,
   // bounces, Dancer copies) never count: they are not the holder's choice.
   const plainMovesSince = new Map<string, Set<string>>();
+  // Opponent nickname → species, fed by the same switch/drag lines as
+  // identSpecies — serves the rule-out path without re-scanning the log
+  // (the full scan remains only as the fallback for synthetic logs).
+  const nicknameSpecies = new Map<string, string>();
   let gravityActive = false;
 
   const canHaveDancer = (ident: string): boolean => {
@@ -154,7 +158,9 @@ export function inferOpponentTeam(log: string, opponentSide: 'p1' | 'p2' = 'p2')
   };
 
   const ruleOut = (nickname: string, kind: 'abilities' | 'items', id: string) => {
-    const pokemon = findPokemonByNickname(pokemonMap, nickname, lines, opponentSide);
+    const known = nicknameSpecies.get(nickname);
+    const pokemon = (known ? pokemonMap.get(known) : undefined) ??
+      findPokemonByNickname(pokemonMap, nickname, lines, opponentSide);
     if (!pokemon) return;
     const ruledOut = (pokemon.ruledOut ??= { abilities: [], items: [] });
     if (!ruledOut[kind].includes(id)) ruledOut[kind].push(id);
@@ -199,7 +205,13 @@ export function inferOpponentTeam(log: string, opponentSide: 'p1' | 'p2' = 'p2')
       const parts = line.split('|');
       const parsed = parseDetails(parts[3]);
       if (parts[2]) {
-        if (parsed) identSpecies.set(parts[2], parsed.species);
+        if (parsed) {
+          identSpecies.set(parts[2], parsed.species);
+          if (parts[2].startsWith(opponentSide)) {
+            const nickname = parts[2].split(': ')[1]?.trim();
+            if (nickname) nicknameSpecies.set(nickname, parsed.species);
+          }
+        }
         plainMovesSince.delete(parts[2]);
       }
     }

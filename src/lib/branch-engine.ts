@@ -1184,6 +1184,24 @@ export function serializePreviewPosition(
   }
 }
 
+/**
+ * Guarded stream write: a sim crash inside write() (old-gen mods throw on
+ * odd states) must surface via `record` — both the synchronous throw and
+ * the async rejection — instead of escaping as an unhandled rejection.
+ * write() returns void on the buffered path and a promise otherwise.
+ */
+function safeStreamWrite(
+  stream: { write(data: string): void | Promise<void> },
+  payload: string,
+  record: (error: unknown) => void,
+): void {
+  try {
+    void Promise.resolve(stream.write(payload)).catch(record);
+  } catch (error) {
+    record(error);
+  }
+}
+
 export async function reconstructBranchRuntime(params: {
   format: string;
   p1Team: PokemonSet[];
@@ -1302,22 +1320,9 @@ export async function reconstructBranchRuntime(params: {
     }
   };
 
-  // A sim crash inside a write (old-gen mods throw on odd states) must not
-  // become an unhandled rejection — surface it as a choice error so the
+  // A sim crash inside a write must surface as a choice error so the
   // turn-sync guard skips or stops instead of taking the process down.
-  const writeSim = (payload: string) => {
-    const record = (error: unknown) => {
-      choiceErrors.count += 1;
-      choiceErrors.last = error instanceof Error ? error.message : String(error);
-    };
-    try {
-      // write() returns void on the buffered path and a promise otherwise —
-      // guard both the synchronous throw and the async rejection.
-      void Promise.resolve(streams.omniscient.write(payload)).catch(record);
-    } catch (error) {
-      record(error);
-    }
-  };
+  const writeSim = (payload: string) => safeStreamWrite(streams.omniscient, payload, recordStreamError);
 
   // A rejected replay choice (a team edit can remove the very move the
   // protocol used) must not abandon the turn half-chosen: the sim keeps the
@@ -1715,19 +1720,14 @@ export async function executeBranchChoices(params: {
   const previousErrorCount = choiceErrors.count;
 
   // Surface sim crashes as choice errors instead of unhandled rejections.
-  {
-    const record = (error: unknown) => {
+  safeStreamWrite(
+    streams.omniscient,
+    commands.map(({ side, command }) => `>${side} ${command}`).join('\n'),
+    (error: unknown) => {
       choiceErrors.count += 1;
       choiceErrors.last = error instanceof Error ? error.message : String(error);
-    };
-    try {
-      void Promise.resolve(streams.omniscient.write(
-        commands.map(({ side, command }) => `>${side} ${command}`).join('\n'),
-      )).catch(record);
-    } catch (error) {
-      record(error);
-    }
-  }
+    },
+  );
 
   const deadline = Date.now() + timeoutMs;
   while (Date.now() < deadline) {
