@@ -149,6 +149,15 @@ import { brierScore, fitConstantK } from './fit-helpers';
  * boosts unchanged. Whatever boost value the corpus can see, the flat
  * stage term remains its best-measured carrier; "coverage gained" as
  * specified does not separate from the existing matchup/coverage terms.
+ *
+ * ROUND CLOSE 2026-08-09 (calibration/honesty round, cache v11). The
+ * sim-grounded-hazards re-test above IS the closing run — no eval-changing
+ * task landed after it: 58/65/83/65/82, brier 0.2585/0.2267/0.1740.
+ * Adopted: phase-aware winprob (the early game claims less per point),
+ * choice/AV rule-outs, sensitivity probes (acquit-only hinge softening),
+ * choice-id read matching, sim-grounded hazards. Rejected with evidence:
+ * matchup damping (double-counts phase-K), quiescence extension (bench +
+ * depth asymmetry), sweep feature (fourth boost negative).
  */
 const REPLAY_IDS = [
   'gen9draft-2058494320',
