@@ -54,6 +54,23 @@ function makeDoublesBattle(p1Sets: PokemonSet[], p2Sets: PokemonSet[]): Battle {
   return battle;
 }
 
+test.describe('full-HP matchup damping', () => {
+  test('matchupEarlyDamp scales the matchup feature at full rosters only', () => {
+    const battle = makeBattle(
+      [makeSet('Sala', 'Salazzle', ['Sludge Wave', 'Flamethrower'])],
+      [makeSet('Clef', 'Clefable', ['Moonblast', 'Moonlight'])],
+    );
+    const undamped = evalFeatures(battle).matchup;
+    const prior = EVAL_WEIGHTS.matchupEarlyDamp;
+    (EVAL_WEIGHTS as { matchupEarlyDamp: number }).matchupEarlyDamp = 0.5;
+    try {
+      expect(evalFeatures(battle).matchup).toBeCloseTo(undamped * 0.5, 8);
+    } finally {
+      (EVAL_WEIGHTS as { matchupEarlyDamp: number }).matchupEarlyDamp = prior;
+    }
+  });
+});
+
 test.describe('win-condition sweep feature', () => {
   test('sweep prices gained coverage, not stages', () => {
     // +2 Dragapult vs two hard hitters it outspeeds: unboosted they 2HKO it

@@ -68,6 +68,16 @@ export const EVAL_WEIGHTS = {
    * Trick). Scaled by the holder's status-move fraction: 4 attacks → 0.
    */
   choiceMismatch: 40,
+  /**
+   * Early-game damp on the matchup FEATURE VALUE: at zero faints the term
+   * reads at damp × matchup, scaling linearly to full weight at ≥1/3 of all
+   * bodies fainted. 1.0 = off. A phase multiplier folded into the raw value
+   * like the other non-independent modifiers — NOT independently fittable
+   * (it rescales a feature the fit already prices). Grid-tested 2026-08-09
+   * at 1.0/0.75/0.5 through the calibration sweep; see the calibration
+   * header for the recorded outcome.
+   */
+  matchupEarlyDamp: 1.0,
 } as const;
 
 const CHOICE_ITEMS = new Set(['choiceband', 'choicespecs', 'choicescarf']);
@@ -242,6 +252,18 @@ export function evalFeatures(battle: Battle, cache?: MatchupCache): EvalFeatures
   }
   const terms = matchupTerms(battle, cache);
   const threat = threatGetter(battle, cache);
+  // Fainted-body fraction, inline (importing search.ts here would cycle).
+  let faintedBodies = 0;
+  let totalBodies = 0;
+  for (const side of battle.sides) {
+    for (const pokemon of side.pokemon) {
+      totalBodies += 1;
+      if (pokemon.fainted || pokemon.hp <= 0) faintedBodies += 1;
+    }
+  }
+  const faintedFraction = totalBodies > 0 ? faintedBodies / totalBodies : 0;
+  const damp = EVAL_WEIGHTS.matchupEarlyDamp;
+  const matchupPhase = damp + (1 - damp) * Math.min(1, faintedFraction * 3);
   return {
     bodies: p1.bodies - p2.bodies,
     boosts: p1.boosts - p2.boosts,
@@ -249,7 +271,7 @@ export function evalFeatures(battle: Battle, cache?: MatchupCache): EvalFeatures
     screens: p1.screens - p2.screens,
     tailwind: p1.tailwind - p2.tailwind,
     trickRoom,
-    matchup: terms.matchup,
+    matchup: terms.matchup * matchupPhase,
     coverage: terms.coverage,
     choiceMismatch: p2.choiceMismatch - p1.choiceMismatch,
     sweep: sweepValue(0, battle, threat) - sweepValue(1, battle, threat),

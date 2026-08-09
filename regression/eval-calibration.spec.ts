@@ -102,6 +102,17 @@ import { brierScore, fitConstantK } from './fit-helpers';
  * which is the round's target. First Brier baseline (pooled constant K on
  * the sweep's own samples): early 0.2572 · mid 0.2268 · late 0.1791 —
  * cross-run Brier comparisons start here.
+ *
+ * matchupEarlyDamp grid 2026-08-09 (candidate phase multiplier on the
+ * matchup feature; adoption required early sign or Brier to beat the
+ * phase-K run above):
+ *   1.0 (off): 58/67/80/66/80 · early brier 0.2572
+ *   0.75:      58/63/81/64/82 · early brier 0.2592
+ *   0.5:       58/64/84/66/80 · early brier 0.2617
+ * Early Brier degrades MONOTONICALLY with damping and early sign never
+ * moves — KEPT 1.0: the phase-aware K already prices early uncertainty at
+ * the mapping layer; damping the matchup value on top double-counts it.
+ * (The late-bucket wiggle is composition noise, per the pairing precedent.)
  */
 const REPLAY_IDS = [
   'gen9draft-2058494320',
