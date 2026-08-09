@@ -89,6 +89,11 @@ import { brierScore, fitConstantK } from './fit-helpers';
  *     (identical numbers twice). The boost fit keeps promising and keeps
  *     failing the gate; whatever it measures correlates with winning in the
  *     corpus but does not improve position-level sign accuracy.
+ *
+ * Instrumented fit 2026-08-09 (eval-fit schema 2, 5,985 positions): phase-K
+ * fitted at singles {k0 2.28, k1 1.49}, doubles {k0 2.98, k1 0.88} — beats
+ * constant K on early Brier in both gametypes (0.2470→0.2451 / 0.2264→
+ * 0.2259) with no bucket regressing. Adoption gated below (Task 4 run).
  */
 const REPLAY_IDS = [
   'gen9draft-2058494320',

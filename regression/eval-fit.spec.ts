@@ -25,6 +25,28 @@ import { brierScore, fitConstantK, fitPhaseK, logLossScore, phaseBucket } from '
  * Effective sample size is the number of GAMES (positions share their game's
  * outcome label) — hence the cluster bootstrap for standard errors and the
  * tournament-vs-ladder comparison (tournament outcomes carry cleaner labels).
+ *
+ * Instrumented run 2026-08-09 (schema 2: faintedFraction + genClass;
+ * 5,985 positions / 1,100 games):
+ * - K(phase) fit, P = sigmoid((k0 + k1·ff)·score):
+ *     singles constant K=2.61 · phase k0=2.28 k1=1.49
+ *       early brier 0.2470→0.2451 · mid 0.1802→0.1799 · late 0.1661→0.1634
+ *     doubles constant K=3.15 · phase k0=2.98 k1=0.88
+ *       early brier 0.2264→0.2259 · mid 0.1764→0.1764 · late 0.1655→0.1644
+ *   Phase-K beats constant-K on the early bucket in BOTH gametypes and
+ *   regresses nowhere → ADOPTED (winprob.ts, cache v11). The k1 direction
+ *   (confidence grows as bodies drop) is exactly the measured early
+ *   overconfidence the round targets.
+ * - Gen-class tranches (is the singles weakness a corpus artifact?):
+ *     matchup implied GEN9-ONLY 145.6±68.0 vs OLDGEN-ONLY 37.3 (pooled
+ *     88.8±48.3, hand 120): matchup carries far more outcome signal in gen9;
+ *     the oldgen-heavy singles tranche drags the pooled fit down. Within
+ *     ~1.5 SE of pooled → no weight change; RECORDED as the follow-up
+ *     trigger for a gen9-singles corpus expansion (out of scope this round).
+ * - Tranche sanity: tailwind never occurs in the singles corpus (0.0±0.0);
+ *   oldgen trick room is noise (−345±242). The per-gametype weight split
+ *   (2026-08-08) stays justified; no doubles-weight update from this run
+ *   (doubles implied values match the adopted 27/68/87 within noise).
  */
 
 const MANIFEST_PATH = 'regression/fixtures/fit-corpus-manifest.json';
