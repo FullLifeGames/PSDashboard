@@ -36,6 +36,9 @@ test.describe('opponent model and read solve', () => {
     // The attached mixes are probability distributions.
     expect(solved.mixes.p1.reduce((sum, p) => sum + p, 0)).toBeCloseTo(1, 8);
     expect(solved.mixes.p2.reduce((sum, p) => sum + p, 0)).toBeCloseTo(1, 8);
+    // Machine-readable choice ids ride along, aligned with the label arrays.
+    expect(solved.p1Choices).toEqual(['move stay', 'switch 3']);
+    expect(solved.p2Choices).toEqual(['move earthquake', 'move icebeam']);
   });
 
   test('a confident model flips the recommendation to the exploit row', () => {
@@ -46,6 +49,7 @@ test.describe('opponent model and read solve', () => {
     expect(result.perSide.p1[0].label).toBe('Stay');
     expect(read).not.toBeNull();
     expect(read!.choice.label).toBe('→ Noivern');
+    expect(read!.choice.choiceId).toBe('switch 3');
     expect(read!.net).toBeGreaterThan(0);
     expect(read!.confidence).toBeGreaterThanOrEqual(READ_CONFIDENCE);
     const eqEntry = read!.breakdown.find(entry => entry.label === 'Earthquake');

@@ -521,7 +521,11 @@ export function analyzeTurn(params: {
     // The opponent model agrees: this "risk" was the exploitative best
     // response to how the opponent actually plays — phrase it as a read.
     const read = params.reads?.[key];
-    if (read && side.played && read.choice.label === side.played.label) {
+    // The machine id is authoritative; the label match only serves cached
+    // reads written before choice ids existed.
+    if (read && side.played && (read.choice.choiceId !== undefined
+      ? read.choice.choiceId === side.played.choice
+      : read.choice.label === side.played.label)) {
       side.riskWasRead = true;
     }
   };

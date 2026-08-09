@@ -168,6 +168,8 @@ export function rankFromMatrix(matrix: ValueMatrix, rootValue: number): Ranked {
         matrixOut: {
           p1Labels: p1Options.map(option => option.label),
           p2Labels: p2Options.map(option => option.label),
+          p1Choices: p1Options.map(option => option.choice),
+          p2Choices: p2Options.map(option => option.choice),
           values: values.map(row => [...row]),
           mixes: { p1: solution.p1Mix, p2: solution.p2Mix },
         },

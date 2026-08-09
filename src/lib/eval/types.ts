@@ -100,6 +100,13 @@ export interface EvalResult {
 export interface EvalMatrix {
   p1Labels: string[];
   p2Labels: string[];
+  /**
+   * Machine-readable choice ids aligned with the label arrays — the Read
+   * lens classifies and matches on these, never on display labels. Optional
+   * only for cached results written before the ids existed.
+   */
+  p1Choices?: string[];
+  p2Choices?: string[];
   /** values[i][j]: p1-perspective wp-unit value of (p1Labels[i], p2Labels[j]). */
   values: number[][];
   /** Equilibrium average strategies, index-aligned with the label arrays. */
@@ -108,7 +115,8 @@ export interface EvalMatrix {
 
 /** An exploitative recommendation: best response to the opponent MODEL. */
 export interface ReadRecommendation {
-  choice: { label: string; ev: number; worstCase: number };
+  /** choiceId is the machine id ('move recover', 'switch 3'); absent only on cached reads predating ids. */
+  choice: { label: string; ev: number; worstCase: number; choiceId?: string };
   /** Own-perspective EV against the model (wp-units). */
   net: number;
   /** The model's top opponent probability — reads only surface when confident. */

@@ -91,7 +91,13 @@ export function parseTendencies(log: string, side: 'p1' | 'p2'): PlayerTendencie
   };
 }
 
-const isSwitchLabel = (label: string) => label.startsWith('→') || label.startsWith('Lead ');
+/**
+ * Switch-kind classification on the machine choice id ('switch 3',
+ * 'team 12'); the display-label heuristic remains only as the fallback for
+ * cached matrices written before choice ids existed.
+ */
+const isSwitchChoice = (choiceId: string | undefined, label: string): boolean =>
+  choiceId !== undefined ? /^(?:switch |team )/.test(choiceId) : (label.startsWith('→') || label.startsWith('Lead '));
 
 /**
  * The opponent model for `side`'s Read: probabilities over the OTHER side's
@@ -104,7 +110,9 @@ export function modelOpponent(
 ): OpponentModel {
   const opponent = side === 'p1' ? 'p2' : 'p1';
   const labels = opponent === 'p1' ? matrix.p1Labels : matrix.p2Labels;
+  const choices = opponent === 'p1' ? matrix.p1Choices : matrix.p2Choices;
   const myLabels = side === 'p1' ? matrix.p1Labels : matrix.p2Labels;
+  const myChoices = side === 'p1' ? matrix.p1Choices : matrix.p2Choices;
   const equilibrium = matrix.mixes[opponent];
 
   // Status-quo-biased reference for MY play: humans click what is best
@@ -114,7 +122,7 @@ export function modelOpponent(
   // renormalized; uniform over moves as fallback; full mix if I can only switch.
   const rawMyMix = matrix.mixes[side];
   const moveIndices = myLabels.map((label, index) => ({ label, index }))
-    .filter(entry => !isSwitchLabel(entry.label))
+    .filter(entry => !isSwitchChoice(myChoices?.[entry.index], entry.label))
     .map(entry => entry.index);
   const myMix = new Array<number>(myLabels.length).fill(0);
   if (moveIndices.length > 0) {
@@ -147,10 +155,10 @@ export function modelOpponent(
   // Tendency prior: reallocate mass between move-kind and switch-kind option
   // groups toward the player's observed rates; within-group shape stands.
   if (tendencies) {
-    const switchMass = probs.reduce((sum, p, index) => sum + (isSwitchLabel(labels[index]) ? p : 0), 0);
+    const switchMass = probs.reduce((sum, p, index) => sum + (isSwitchChoice(choices?.[index], labels[index]) ? p : 0), 0);
     const moveMass = 1 - switchMass;
     if (switchMass > 0 && moveMass > 0) {
-      probs = probs.map((p, index) => isSwitchLabel(labels[index])
+      probs = probs.map((p, index) => isSwitchChoice(choices?.[index], labels[index])
         ? p * (tendencies.switchRate / switchMass)
         : p * (tendencies.attackRate / moveMass));
       const total = probs.reduce((sum, p) => sum + p, 0);
@@ -210,8 +218,12 @@ export function computeRead(
     worstCase = Math.min(worstCase, ownValue(bestRead, theirs));
   }
 
+  const myChoices = side === 'p1' ? matrix.p1Choices : matrix.p2Choices;
   return {
-    choice: { label: myLabels[bestRead], ev: bestReadEv, worstCase },
+    choice: {
+      label: myLabels[bestRead], ev: bestReadEv, worstCase,
+      ...(myChoices?.[bestRead] !== undefined ? { choiceId: myChoices[bestRead] } : {}),
+    },
     net: bestReadEv,
     confidence: model.confidence,
     breakdown: oppLabels.map((label, theirs) => ({

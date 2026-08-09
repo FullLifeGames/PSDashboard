@@ -71,7 +71,7 @@ test.describe('verdict tiers in wp-units', () => {
 
 test.describe('read-aware risk phrasing', () => {
   test('a risk matching the read is marked as a read on tendencies', () => {
-    const at = (readLabel?: string) => analyzeTurn({
+    const at = (readLabel?: string, choiceId?: string) => analyzeTurn({
       turn: 20,
       result,
       played: { p1: { kind: 'move', name: 'Draco Meteor', tera: false }, p2: { kind: 'move', name: 'Recover', tera: false } },
@@ -82,7 +82,7 @@ test.describe('read-aware risk phrasing', () => {
         ? {
           reads: {
             p2: {
-              choice: { label: readLabel, ev: 0.1, worstCase: -0.3 },
+              choice: { label: readLabel, ev: 0.1, worstCase: -0.3, ...(choiceId ? { choiceId } : {}) },
               net: 0.1, confidence: 0.7,
               breakdown: [],
             },
@@ -96,6 +96,11 @@ test.describe('read-aware risk phrasing', () => {
     expect(at().p2.riskWasRead).toBeFalsy();
     expect(at('Recover').p2.riskWasRead).toBe(true);
     expect(at('→ Dragapult').p2.riskWasRead).toBeFalsy();
+    // The id match is authoritative: a mismatched display label must not
+    // break the read match (labels are for humans, ids for machines)…
+    expect(at('Mislabeled', 'move recover').p2.riskWasRead).toBe(true);
+    // …and a mismatched id must not be rescued by a matching label.
+    expect(at('Recover', 'move protect').p2.riskWasRead).toBeFalsy();
   });
 });
 
