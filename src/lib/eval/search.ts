@@ -262,12 +262,34 @@ const NOOP_FIELD_MOVES: Record<string, (own: Side, foe: Side) => boolean> = {
 
 type Side = ReturnType<typeof positionBattle>['sides'][number];
 
-function dropNoopMoves(battle: ReturnType<typeof positionBattle>, side: 'p1' | 'p2', options: ChoiceOption[]): ChoiceOption[] {
+/**
+ * Sleep Clause makes a second sleep FAIL while a foe already sleeps —
+ * recommending Sleep Powder into a sleeping team is a no-op with a
+ * real-looking label (GPL T11). The clause comes from the battle's own
+ * ruleTable (real ladder formats survive serialization) or the settings
+ * flag (custom-game reconstructions lose their @@@ suffix when serialized).
+ * Rest-sleeps don't trip the real clause; the filter accepts that rare
+ * false drop — the sim still prices whatever stays listed.
+ */
+function sleepClauseActive(battle: ReturnType<typeof positionBattle>, sleepClause: boolean | undefined): boolean {
+  return sleepClause === true || battle.ruleTable?.has('sleepclausemod') === true;
+}
+
+function dropNoopMoves(
+  battle: ReturnType<typeof positionBattle>,
+  side: 'p1' | 'p2',
+  options: ChoiceOption[],
+  sleepClause?: boolean,
+): ChoiceOption[] {
   const own = battle.sides[side === 'p1' ? 0 : 1];
   const foe = battle.sides[side === 'p1' ? 1 : 0];
+  const foeSleeps = sleepClauseActive(battle, sleepClause) &&
+    foe.pokemon.some(pokemon => !pokemon.fainted && pokemon.status === 'slp');
   const filtered = options.filter(option => {
     if (!option.choice.startsWith('move ')) return true;
-    const check = NOOP_FIELD_MOVES[option.choice.split(' ')[1]];
+    const moveId = option.choice.split(' ')[1];
+    if (foeSleeps && battle.dex.moves.get(moveId).status === 'slp') return false;
+    const check = NOOP_FIELD_MOVES[moveId];
     return !check || !check(own, foe);
   });
   // Never filter a side into an empty list — a stuck mon whose only moves
@@ -285,11 +307,11 @@ function dropNoopMoves(battle: ReturnType<typeof positionBattle>, side: 'p1' | '
 export function searchOptions(
   position: SimPosition,
   side: 'p1' | 'p2',
-  opts?: { tera?: TeraAllowance; keep?: (PlayedAction | null)[] },
+  opts?: { tera?: TeraAllowance; keep?: (PlayedAction | null)[]; sleepClause?: boolean },
 ): ChoiceOption[] {
   const options = legalChoices(position, side, opts);
   if (isCombined(options)) return restrictCombined(position, side, options, opts?.keep);
-  return dropNoopMoves(positionBattle(position), side, options);
+  return dropNoopMoves(positionBattle(position), side, options, opts?.sleepClause);
 }
 
 /**
@@ -385,8 +407,8 @@ export function subSearchDepth1(
     return { score: leafValue(battle, matchupCache), interval: 0, depthCompleted: settings.depth, perSide: { p1: [], p2: [] } };
   }
   const tera = settings.tera ?? true;
-  const p1Options = searchOptions(root, 'p1', { tera, keep: settings.keepPlayed?.p1Slots });
-  const p2Options = searchOptions(root, 'p2', { tera, keep: settings.keepPlayed?.p2Slots });
+  const p1Options = searchOptions(root, 'p1', { tera, keep: settings.keepPlayed?.p1Slots, sleepClause: settings.sleepClause });
+  const p2Options = searchOptions(root, 'p2', { tera, keep: settings.keepPlayed?.p2Slots, sleepClause: settings.sleepClause });
   if (p1Options.length === 0 || p2Options.length === 0) {
     return searchPosition(serializedBattle, settings, undefined, matchupCache);
   }
@@ -499,8 +521,8 @@ export function searchPosition(
 
   const rootValue = leafValue(battle, matchupCache);
   const tera = settings.tera ?? true;
-  let p1Options = searchOptions(root, 'p1', { tera, keep: settings.keepPlayed?.p1Slots });
-  let p2Options = searchOptions(root, 'p2', { tera, keep: settings.keepPlayed?.p2Slots });
+  let p1Options = searchOptions(root, 'p1', { tera, keep: settings.keepPlayed?.p1Slots, sleepClause: settings.sleepClause });
+  let p2Options = searchOptions(root, 'p2', { tera, keep: settings.keepPlayed?.p2Slots, sleepClause: settings.sleepClause });
   if (restrictCandidates) {
     p1Options = restrictOptions(root, 'p1', p1Options);
     p2Options = restrictOptions(root, 'p2', p2Options);
@@ -593,11 +615,11 @@ export function createLocalExecutor(serializedBattle: string): SearchExecutor {
   const matchupCache = createMatchupCache();
   const root = createRootPosition(serializedBattle);
   return {
-    async choices(tera, keepPlayed) {
+    async choices(tera, keepPlayed, sleepClause) {
       const battle = positionBattle(root);
       return {
-        p1: searchOptions(root, 'p1', { tera, keep: keepPlayed?.p1Slots }),
-        p2: searchOptions(root, 'p2', { tera, keep: keepPlayed?.p2Slots }),
+        p1: searchOptions(root, 'p1', { tera, keep: keepPlayed?.p1Slots, sleepClause }),
+        p2: searchOptions(root, 'p2', { tera, keep: keepPlayed?.p2Slots, sleepClause }),
         rootValue: leafValue(battle, matchupCache),
         rootEnded: battle.ended,
       };

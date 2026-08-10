@@ -15,6 +15,12 @@ export interface EvalSettings {
   samples: 1 | 3 | 5;
   /** Terastallize enumeration (default true = everyone). */
   tera?: TeraAllowance;
+  /**
+   * Sleep Clause is enforced for this replay (custom-game reconstructions
+   * lose their @@@ rule suffix in serialization, so the sim can't say) —
+   * redundant sleep moves drop from candidate lists.
+   */
+  sleepClause?: boolean;
   /** 'mcts' runs the DUCT tree search instead of the fixed-depth matrix. */
   mode?: 'matrix' | 'mcts';
   /**
@@ -187,7 +193,7 @@ export interface MctsTreeStats {
 export type EvalWorkerRequest =
   | { type: 'search'; id: number; serializedBattle: string; settings: EvalSettings }
   | { type: 'mctstree'; id: number; serializedBattle: string; settings: EvalSettings; seedOffset: number }
-  | { type: 'choices'; id: number; serializedBattle: string; tera: TeraAllowance; keepPlayed?: EvalSettings['keepPlayed'] }
+  | { type: 'choices'; id: number; serializedBattle: string; tera: TeraAllowance; keepPlayed?: EvalSettings['keepPlayed']; sleepClause?: boolean }
   | { type: 'cells'; id: number; serializedBattle: string; jobs: EvalCellJob[] }
   | { type: 'subsearch'; id: number; serializedBattle: string; job: EvalSubSearchJob };
 

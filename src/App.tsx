@@ -25,7 +25,7 @@ import type { SensitivityTarget } from './lib/eval/sensitivity';
 import { applyPastedTeam, countMatchingSpecies, parsePastedTeam, type PastedSet } from './lib/team-paste';
 import type { OpponentTeamInfo } from './types';
 import { decodeBranchShare, type BranchSharePayload } from './lib/branch-share';
-import { getBranchSimulatorFormat, getReplayGameType, getReplayGeneration, inferReplayFormatId } from './lib/replay-format';
+import { formatEnforcesSleepClause, getBranchSimulatorFormat, getReplayGameType, getReplayGeneration, inferReplayFormatId } from './lib/replay-format';
 import { resolveTeraPreference } from './lib/eval/tera';
 import { choiceId, evalChoiceToSlotChoices, type BranchSlotChoice } from './lib/branch-choices';
 import type { RankedChoice } from './lib/eval/types';
@@ -506,6 +506,14 @@ function App() {
     [replayData, evaluation.prefs.tera],
   );
 
+  // Sleep Clause resolution: the branch format carries it (declared |rule|
+  // lines, or the singles default for rule-less logs) — the eval candidate
+  // filter needs it as a flag because serialization strips custom rules.
+  const effectiveSleepClause = useMemo(
+    () => (replayData ? formatEnforcesSleepClause(getBranchSimulatorFormat(replayData)) : false),
+    [replayData],
+  );
+
   // Posted open team sheets, surfaced in the stats panel as 'sheet'
   // knowledge (the extraction needs the sim's Teams parser — lazy import).
   const [sheetTeams, setSheetTeams] = useState<{ p1: PokemonSet[] | null; p2: PokemonSet[] | null }>({ p1: null, p2: null });
@@ -643,15 +651,16 @@ function App() {
   const handleEvaluate = useCallback(() => {
     if (!replayData) return;
     if (branching) {
-      evaluation.evaluate({ cacheKey: null, tera: effectiveTera, acquire: acquireBranchPosition });
+      evaluation.evaluate({ cacheKey: null, tera: effectiveTera, sleepClause: effectiveSleepClause, acquire: acquireBranchPosition });
     } else {
       evaluation.evaluate({
         cacheKey: `${replayData.id}:${branchTurn}:${setsFingerprint}`,
         tera: effectiveTera,
+        sleepClause: effectiveSleepClause,
         acquire: acquireReplayPosition,
       });
     }
-  }, [replayData, branching, evaluation, effectiveTera, acquireBranchPosition, acquireReplayPosition, branchTurn, setsFingerprint]);
+  }, [replayData, branching, evaluation, effectiveTera, effectiveSleepClause, acquireBranchPosition, acquireReplayPosition, branchTurn, setsFingerprint]);
 
   // Clicking a recommended choice pre-fills the branch pickers.
   const applyEvalChoice = useCallback((side: 'p1' | 'p2', ranked: RankedChoice): boolean => {
@@ -725,6 +734,7 @@ function App() {
     evaluation.runGraphSweep({
       turns: analyzableTurns,
       tera: effectiveTera,
+      sleepClause: effectiveSleepClause,
       cacheKeyFor: turn => `${replayData.id}:${turn}:${setsFingerprint}`,
       acquireFor: makeReplayAcquire,
       acquireAll: makeSweepAcquireAll(analyzableTurns),
@@ -753,7 +763,7 @@ function App() {
       sensitivityTargetsFor,
     });
   }, [
-    replayData, evaluation, analyzableTurns, effectiveTera, setsFingerprint, makeReplayAcquire,
+    replayData, evaluation, analyzableTurns, effectiveTera, effectiveSleepClause, setsFingerprint, makeReplayAcquire,
     makeSweepAcquireAll, snapshots, getInferredSpreads, evalIsDoubles, teamText, effectiveP1Info, effectiveP2Info,
     usageStats.stats, setAssumptions.assumptions, sensitivityTargetsFor,
   ]);
@@ -769,6 +779,7 @@ function App() {
       from: turn,
       to: Math.min(turn + 1, analyzableTurns),
       tera: effectiveTera,
+      sleepClause: effectiveSleepClause,
       cacheKeyFor: sweepTurn => `${replayData.id}:${sweepTurn}:${setsFingerprint}`,
       acquireFor: makeReplayAcquire,
       playedFor: sweepTurn => (evalIsDoubles
@@ -777,7 +788,7 @@ function App() {
       sensitivityTargetsFor,
     });
     setAnalysisTurn(turn);
-  }, [replayData, evaluation, analyzableTurns, effectiveTera, setsFingerprint, makeReplayAcquire, snapshots, evalIsDoubles, sensitivityTargetsFor]);
+  }, [replayData, evaluation, analyzableTurns, effectiveTera, effectiveSleepClause, setsFingerprint, makeReplayAcquire, snapshots, evalIsDoubles, sensitivityTargetsFor]);
 
   // Any position change invalidates a displayed result.
   const { markStale: markEvalStale, reset: resetEval, clearGraph } = evaluation;

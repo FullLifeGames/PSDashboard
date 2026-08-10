@@ -48,11 +48,12 @@ function makeNode(
   tera: TeraAllowance,
   matchupCache: MatchupCache,
   keepPlayed?: EvalSettings['keepPlayed'],
+  sleepClause?: boolean,
 ): Node {
   const battle = positionBattle(position);
   const ended = battle.ended;
-  const p1Options = ended ? [] : searchOptions(position, 'p1', { tera, keep: keepPlayed?.p1Slots });
-  const p2Options = ended ? [] : searchOptions(position, 'p2', { tera, keep: keepPlayed?.p2Slots });
+  const p1Options = ended ? [] : searchOptions(position, 'p1', { tera, keep: keepPlayed?.p1Slots, sleepClause });
+  const p2Options = ended ? [] : searchOptions(position, 'p2', { tera, keep: keepPlayed?.p2Slots, sleepClause });
   return {
     position,
     ended,
@@ -189,7 +190,7 @@ function runMcts(
   const matchupCache = createMatchupCache();
   const tera = settings.tera ?? true;
   // keepPlayed applies to the root only — children have their own spaces.
-  const root = makeNode(createRootPosition(serializedBattle), tera, matchupCache, settings.keepPlayed);
+  const root = makeNode(createRootPosition(serializedBattle), tera, matchupCache, settings.keepPlayed, settings.sleepClause);
   if (root.ended || root.p1Options.length === 0 || root.p2Options.length === 0) {
     return {
       root,
@@ -223,7 +224,7 @@ function runMcts(
         // different chance outcomes.
         const seed = SEARCH_SEEDS[(iteration + seedOffset) % SEARCH_SEEDS.length];
         const position = advancePosition(node.position, node.p1Options[i].choice, node.p2Options[j].choice, seed);
-        child = makeNode(position, tera, matchupCache);
+        child = makeNode(position, tera, matchupCache, undefined, settings.sleepClause);
         node.children.set(key, child);
         leafValue = child.value;
         child.visits += 1;

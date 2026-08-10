@@ -37,7 +37,7 @@ scope.onmessage = async (event: MessageEvent<EvalWorkerRequest>) => {
       });
       post({ type: 'mctsTreeResult', id: message.id, tree });
     } else if (message.type === 'choices') {
-      const info = await executorFor(message.serializedBattle).choices(message.tera, message.keepPlayed);
+      const info = await executorFor(message.serializedBattle).choices(message.tera, message.keepPlayed, message.sleepClause);
       post({ type: 'choicesResult', id: message.id, info });
     } else if (message.type === 'cells') {
       const values = await executorFor(message.serializedBattle).evalCells(message.jobs);

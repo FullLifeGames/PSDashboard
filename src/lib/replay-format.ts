@@ -1,3 +1,4 @@
+import { Dex } from '@pkmn/sim';
 import type { ReplayData } from '../types';
 
 type ReplayFormatSource = Partial<Pick<ReplayData, 'id' | 'format' | 'formatid' | 'log'>>;
@@ -76,6 +77,58 @@ export function getReplayGeneration(source: ReplayFormatSource): number {
   return parseInt(extractGen({ ...source, formatid }), 10) || 9;
 }
 
+/** Sides' currently-sleeping (non-Rest) victims — detects logs the clause cannot describe. */
+function logShowsSecondSleep(log: string): boolean {
+  const sleepers: Record<'p1' | 'p2', Set<string>> = { p1: new Set(), p2: new Set() };
+  let lastMoveWasRest = false;
+  for (const line of log.split('\n')) {
+    if (line.startsWith('|move|')) {
+      lastMoveWasRest = toId(line.split('|')[3]) === 'rest';
+      continue;
+    }
+    const status = line.match(/^\|-status\|(p[12])[a-d]?: ([^|\n]+)\|slp/);
+    if (status) {
+      if (lastMoveWasRest || line.includes('[from] move: Rest')) continue;
+      const side = status[1] as 'p1' | 'p2';
+      if (sleepers[side].size > 0) return true;
+      sleepers[side].add(status[2].trim());
+      continue;
+    }
+    const cure = line.match(/^\|-curestatus\|(p[12])[a-d]?: ([^|\n]+)\|slp/);
+    if (cure) sleepers[cure[1] as 'p1' | 'p2'].delete(cure[2].trim());
+    const faint = line.match(/^\|faint\|(p[12])[a-d]?: ([^|\n]+)/);
+    if (faint) sleepers[faint[1] as 'p1' | 'p2'].delete(faint[2].trim());
+  }
+  return false;
+}
+
+/**
+ * Sleep Clause for the singles branch sim — CUSTOM-GAME bases only: a real
+ * ladder format is its own rule authority (gen3ou carries the clause; gen9ou
+ * bans sleep moves outright instead). The replay's |rule| lines decide; a
+ * log with NO rule lines at all (video-reconstructed pipelines) gets the
+ * singles-standard default unless the log itself shows a second
+ * simultaneous sleep.
+ */
+function sleepClauseSuffix(log: string | undefined, base: string): string {
+  if (!log || !base.endsWith('customgame')) return '';
+  if (/^\|rule\|Sleep Clause/m.test(log)) return '@@@Sleep Clause Mod';
+  if (/^\|rule\|/m.test(log)) return '';
+  if (logShowsSecondSleep(log)) return '';
+  return '@@@Sleep Clause Mod';
+}
+
+/** The branch format carries the clause as a custom-rule suffix — is it there? */
+export function formatEnforcesSleepClause(format: string): boolean {
+  if (/@@@.*sleep ?clause/i.test(format)) return true;
+  const base = Dex.formats.get(format.split('@@@')[0]);
+  try {
+    return base.exists && Dex.formats.getRuleTable(base).has('sleepclausemod');
+  } catch {
+    return false;
+  }
+}
+
 export function getBranchSimulatorFormat(source: ReplayFormatSource): string {
   const formatid = inferReplayFormatId(source);
   const gameType = getReplayGameType(source.log);
@@ -85,5 +138,10 @@ export function getBranchSimulatorFormat(source: ReplayFormatSource): string {
     return `gen${gen}doublesou`;
   }
 
-  return formatid || `gen${gen}ou`;
+  // A formatid the sim doesn't know (draft leagues, video pipelines) runs as
+  // a rule-less custom game anyway — name that explicitly so clause suffixes
+  // have a real base to attach to.
+  const known = formatid && Dex.formats.get(formatid).exists ? formatid : '';
+  const base = known || (formatid ? `gen${gen}customgame` : `gen${gen}ou`);
+  return `${base}${sleepClauseSuffix(source.log, base)}`;
 }

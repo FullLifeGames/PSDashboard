@@ -1,7 +1,7 @@
 import { test, expect } from '@playwright/test';
 import { readFileSync } from 'fs';
 import { State } from '@pkmn/sim';
-import { inferReplayFormatId, getBranchSimulatorFormat } from '../src/lib/replay-format';
+import { formatEnforcesSleepClause, inferReplayFormatId, getBranchSimulatorFormat } from '../src/lib/replay-format';
 import { parseReplayLogWithObservations } from '../src/lib/protocol-parser';
 import { buildTeamsFromReplay } from '../src/lib/team-builder';
 import { reconstructBranchRuntime } from '../src/lib/branch-engine';
@@ -41,7 +41,10 @@ test.describe('draft replay end-to-end verdicts', () => {
     const battle = runtime.battleStream.battle!;
     const serialized = JSON.stringify(State.serializeBattle(battle));
 
-    const result = searchPosition(serialized, { depth: 1, samples: 1, tera });
+    const result = searchPosition(serialized, {
+      depth: 1, samples: 1, tera,
+      sleepClause: formatEnforcesSleepClause(getBranchSimulatorFormat(replay)),
+    });
     const p2 = result.perSide.p2;
     // Find by label, not slot number — bench slots are a reconstruction
     // detail; the pin is about WHICH Pokémon leads the ranking.

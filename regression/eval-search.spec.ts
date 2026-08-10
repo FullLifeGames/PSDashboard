@@ -465,6 +465,38 @@ test.describe('no-op candidate filter', () => {
     expect(cleanChoices).toContain('move stealthrock');
     expect(cleanChoices).toContain('move reflect');
   });
+
+  test('sleep moves drop under Sleep Clause while a foe already sleeps (GPL T11)', () => {
+    const sleeping = () => {
+      const battle = makeBattle(
+        [makeSet('V', 'Vileplume', ['Sleep Powder', 'Giga Drain', 'Sludge Bomb'], 100)],
+        [makeSet('J', 'Iron Jugulis', ['Dark Pulse', 'Taunt'], 100), makeSet('R', 'Rhydon', ['Earthquake'], 100)],
+      );
+      battle.sides[1].active[0]!.setStatus('slp');
+      return serialize(battle);
+    };
+
+    // Clause flagged (custom-game reconstructions lose the rule in
+    // serialization): re-sleeping is a guaranteed no-op — dropped.
+    const clause = searchOptions(createRootPosition(sleeping()), 'p1', { tera: false, sleepClause: true })
+      .map(option => option.choice);
+    expect(clause).not.toContain('move sleeppowder');
+    expect(clause).toContain('move gigadrain');
+
+    // No clause: double sleep is legal — the candidate stays.
+    const noClause = searchOptions(createRootPosition(sleeping()), 'p1', { tera: false })
+      .map(option => option.choice);
+    expect(noClause).toContain('move sleeppowder');
+
+    // Clause active but nobody sleeps: the candidate stays.
+    const awake = makeBattle(
+      [makeSet('V', 'Vileplume', ['Sleep Powder', 'Giga Drain', 'Sludge Bomb'], 100)],
+      [makeSet('J', 'Iron Jugulis', ['Dark Pulse', 'Taunt'], 100)],
+    );
+    const awakeChoices = searchOptions(createRootPosition(serialize(awake)), 'p1', { tera: false, sleepClause: true })
+      .map(option => option.choice);
+    expect(awakeChoices).toContain('move sleeppowder');
+  });
 });
 
 test.describe('battleFaintedFraction', () => {

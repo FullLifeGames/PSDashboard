@@ -20,7 +20,7 @@ export type CellValue = EvalCellValue;
 export type SubSearchJob = EvalSubSearchJob;
 
 export interface SearchExecutor {
-  choices(tera: TeraAllowance, keepPlayed?: EvalSettings['keepPlayed']): Promise<ChoicesInfo>;
+  choices(tera: TeraAllowance, keepPlayed?: EvalSettings['keepPlayed'], sleepClause?: boolean): Promise<ChoicesInfo>;
   /** Evaluate all cells; report incremental completion via onDone(completedCount). */
   evalCells(jobs: CellJob[], onDone?: (completed: number) => void): Promise<CellValue[]>;
   /** Advance from the root by the job's pair (first fixed seed) and search the child. */
@@ -39,7 +39,7 @@ export async function searchOrchestrated(
   callbacks?: OrchestratorCallbacks,
 ): Promise<EvalResult> {
   const tera = settings.tera ?? true;
-  const info = await executor.choices(tera, settings.keepPlayed);
+  const info = await executor.choices(tera, settings.keepPlayed, settings.sleepClause);
   if (info.rootEnded) {
     return { score: info.rootValue, interval: 0, depthCompleted: settings.depth, perSide: { p1: [], p2: [] } };
   }

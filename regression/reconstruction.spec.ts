@@ -550,7 +550,10 @@ test.describe('Turn-synchronized replay of a video-reconstructed log', () => {
     // attribution in this log) both surface as revealed items.
     expect(p2Team.find(set => set.species === 'Iron Valiant')?.item).toBe('Life Orb');
     expect(p1Team.find(set => set.species === 'Uxie')?.item).toBe('Rocky Helmet');
-    expect(p2Team.find(set => set.species === 'Rotom-Wash')?.item).toBe('Black Sludge');
+    // Rotom-Wash TRICKED its scarf away and received Black Sludge — the
+    // sludge's later self-damage reveals must not overwrite the set item
+    // (the old pin institutionalized exactly that pollution).
+    expect(p2Team.find(set => set.species === 'Rotom-Wash')?.item).toBe('Choice Scarf');
   });
 
   test('keeps the simulator in lockstep through the taunted turn 1', async () => {

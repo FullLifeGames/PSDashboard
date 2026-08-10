@@ -2,7 +2,7 @@ import { test, expect } from '@playwright/test';
 import { readFileSync } from 'fs';
 import { State } from '@pkmn/sim';
 import { parseExportedReplay } from '../src/lib/replay-file';
-import { inferReplayFormatId, getBranchSimulatorFormat } from '../src/lib/replay-format';
+import { formatEnforcesSleepClause, inferReplayFormatId, getBranchSimulatorFormat } from '../src/lib/replay-format';
 import { parseReplayLogWithObservations } from '../src/lib/protocol-parser';
 import { buildTeamsFromReplay } from '../src/lib/team-builder';
 import { reconstructBranchRuntime } from '../src/lib/branch-engine';
@@ -49,7 +49,8 @@ test.describe('GPL replay end-to-end verdicts', () => {
       });
       const battle = runtime.battleStream.battle!;
       const serialized = JSON.stringify(State.serializeBattle(battle));
-      const result = searchPosition(serialized, { depth: 1, samples: 1, tera });
+      const sleepClause = formatEnforcesSleepClause(getBranchSimulatorFormat(replay));
+      const result = searchPosition(serialized, { depth: 1, samples: 1, tera, sleepClause });
       const events = turnEvents(replay.log, turn);
       return analyzeTurn({
         turn,

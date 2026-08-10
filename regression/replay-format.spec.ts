@@ -1,6 +1,7 @@
 import { test, expect } from '@playwright/test';
 import { fetchReplay, parseReplayUrl } from '../src/lib/replay-fetcher';
 import {
+  formatEnforcesSleepClause,
   getBranchSimulatorFormat,
   getReplayGameType,
   inferReplayFormatId,
@@ -75,6 +76,57 @@ test.describe('replay format inference', () => {
       formatid: 'gen9ou',
       log: vgcReplay.log.replace('|gametype|doubles', '|gametype|singles'),
     })).toBe('gen9ou');
+  });
+
+  test('unknown singles formats run as custom games with Sleep Clause resolved from the log', () => {
+    // Declared |rule| line → the clause rides the format as a custom rule.
+    expect(getBranchSimulatorFormat({
+      id: 'gen9draft-123',
+      log: '|gametype|singles\n|gen|9\n|rule|Sleep Clause Mod: Limit one foe put to sleep',
+    })).toBe('gen9customgame@@@Sleep Clause Mod');
+
+    // Rules declared but no sleep clause among them → none injected.
+    expect(getBranchSimulatorFormat({
+      id: 'gen9draft-123',
+      log: '|gametype|singles\n|gen|9\n|rule|OHKO Clause: OHKO moves are banned',
+    })).toBe('gen9customgame');
+
+    // NO rule lines at all (video pipelines): singles-standard default.
+    expect(getBranchSimulatorFormat({
+      id: 'gen9customgame-99',
+      log: '|gametype|singles\n|gen|9\n|tier|[Gen 9] Custom Game',
+    })).toBe('gen9customgame@@@Sleep Clause Mod');
+
+    // …unless the log itself shows a second simultaneous sleep.
+    expect(getBranchSimulatorFormat({
+      id: 'gen9customgame-99',
+      log: [
+        '|gametype|singles', '|gen|9', '|tier|[Gen 9] Custom Game',
+        '|move|p1a: A|Spore|p2a: X', '|-status|p2a: X|slp',
+        '|move|p1a: A|Spore|p2a: Y', '|-status|p2a: Y|slp',
+      ].join('\n'),
+    })).toBe('gen9customgame');
+
+    // Rest sleeps never count against the clause detection.
+    expect(getBranchSimulatorFormat({
+      id: 'gen9customgame-99',
+      log: [
+        '|gametype|singles', '|gen|9', '|tier|[Gen 9] Custom Game',
+        '|move|p1a: A|Spore|p2a: X', '|-status|p2a: X|slp',
+        '|move|p2a: Y|Rest|p2a: Y', '|-status|p2a: Y|slp|[from] move: Rest',
+      ].join('\n'),
+    })).toBe('gen9customgame@@@Sleep Clause Mod');
+
+    // Real formats are their own rule authority and never get suffixed:
+    // gen3ou carries the clause natively; gen9 OU bans sleep moves instead.
+    expect(getBranchSimulatorFormat({
+      id: 'gen9ou-123',
+      log: '|gametype|singles\n|gen|9\n|tier|[Gen 9] OU',
+    })).toBe('gen9ou');
+    expect(formatEnforcesSleepClause('gen3ou')).toBe(true);
+    expect(formatEnforcesSleepClause('gen9ou')).toBe(false);
+    expect(formatEnforcesSleepClause('gen9customgame')).toBe(false);
+    expect(formatEnforcesSleepClause('gen9customgame@@@Sleep Clause Mod')).toBe(true);
   });
 
   test('parseReplayUrl accepts URL variants and rejects non-replay input (G2)', () => {

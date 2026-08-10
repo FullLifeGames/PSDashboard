@@ -19,6 +19,8 @@ export interface EvaluateParams {
   cacheKey: string | null;
   /** Resolved Tera allowance (the panel pref resolved against the replay). */
   tera: TeraAllowance;
+  /** Sleep Clause enforced for this replay (resolved from the branch format). */
+  sleepClause?: boolean;
   /**
    * Produces the serialized position. A reconstruction-based acquire calls
    * reportReconstruct(turn, target) as it replays turns; the hook surfaces
@@ -71,6 +73,8 @@ export interface GraphSweepParams {
   to?: number;
   /** Resolved Tera allowance. */
   tera: TeraAllowance;
+  /** Sleep Clause enforced for this replay (resolved from the branch format). */
+  sleepClause?: boolean;
   cacheKeyFor(turn: number): string;
   acquireFor(turn: number): (report: (turn: number, target: number) => void) => Promise<string>;
   /**
@@ -206,7 +210,7 @@ export function useEvaluation() {
         setReconstructProgress(null);
 
         clientRef.current ??= new EvalWorkerClient();
-        const final = await clientRef.current.evaluate(serialized, { depth, samples, mode, tera: params.tera }, {
+        const final = await clientRef.current.evaluate(serialized, { depth, samples, mode, tera: params.tera, sleepClause: params.sleepClause }, {
           onProgress: update => {
             if (runRef.current === runId) setProgress(update);
           },
@@ -491,7 +495,7 @@ export function useEvaluation() {
                 const serialized = await positionFor(turn);
                 if (runRef.current !== runId) return false;
                 clientRef.current ??= new EvalWorkerClient();
-                outcome = await clientRef.current.evalPair(serialized, p1Choice.choice, p2Choice.choice, { depth, samples, mode, tera: params.tera });
+                outcome = await clientRef.current.evalPair(serialized, p1Choice.choice, p2Choice.choice, { depth, samples, mode, tera: params.tera, sleepClause: params.sleepClause });
               } catch (err) {
                 if (runRef.current !== runId) return false;
                 if (err instanceof Error && err.message === 'cancelled') return false;
@@ -549,7 +553,7 @@ export function useEvaluation() {
             if (runRef.current !== runId) return false;
             clientRef.current ??= new EvalWorkerClient();
             const keepPlayed = turnPlayed?.p1Slots || turnPlayed?.p2Slots ? turnPlayed : undefined;
-            const result = await clientRef.current.evaluate(serialized, { depth, samples, mode, tera: params.tera, keepPlayed });
+            const result = await clientRef.current.evaluate(serialized, { depth, samples, mode, tera: params.tera, keepPlayed, sleepClause: params.sleepClause });
             if (runRef.current !== runId) return false;
             scores[turn - 1] = result.score;
             results[turn - 1] = result;
@@ -561,7 +565,7 @@ export function useEvaluation() {
             const p2Choice = matchPlayedSide(result, 'p2', turnPlayed);
             if (p1Choice && p2Choice) {
               try {
-                outcome = await clientRef.current.evalPair(serialized, p1Choice.choice, p2Choice.choice, { depth, samples, mode, tera: params.tera });
+                outcome = await clientRef.current.evalPair(serialized, p1Choice.choice, p2Choice.choice, { depth, samples, mode, tera: params.tera, sleepClause: params.sleepClause });
               } catch (err) {
                 if (runRef.current !== runId) return false;
                 if (err instanceof Error && err.message === 'cancelled') return false;
@@ -619,8 +623,8 @@ export function useEvaluation() {
     void (async () => {
       const rangeTurns: number[] = [];
       for (let turn = from; turn <= to; turn++) rangeTurns.push(turn);
-      const fullSettings: EvalSettings = { depth, samples, mode, tera: params.tera };
-      const fastSettings: EvalSettings = { depth: 1, samples: 1, mode: 'matrix', tera: params.tera };
+      const fullSettings: EvalSettings = { depth, samples, mode, tera: params.tera, sleepClause: params.sleepClause };
+      const fastSettings: EvalSettings = { depth: 1, samples: 1, mode: 'matrix', tera: params.tera, sleepClause: params.sleepClause };
       const isFast = depth === 1 && samples === 1 && mode !== 'mcts';
 
       // Two-pass sweep: a fast depth-1 pass shapes the whole graph first,

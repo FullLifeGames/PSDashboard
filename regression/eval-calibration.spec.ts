@@ -2,7 +2,7 @@ import { test, expect } from '@playwright/test';
 import { State } from '@pkmn/sim';
 import { buildTeamsFromReplay } from '../src/lib/team-builder';
 import { reconstructBranchRuntime } from '../src/lib/branch-engine';
-import { getBranchSimulatorFormat } from '../src/lib/replay-format';
+import { formatEnforcesSleepClause, getBranchSimulatorFormat } from '../src/lib/replay-format';
 import { parseReplayLogWithObservations } from '../src/lib/protocol-parser';
 import { battleFaintedFraction, searchPosition } from '../src/lib/eval/search';
 import { brierScore, fitConstantK } from './fit-helpers';
@@ -339,7 +339,10 @@ test.describe('eval calibration against real replays', () => {
           // EVAL_CALIBRATION_DEPTH separates the two levers: does more
           // search fix a phase, or is the static eval itself miscalibrated?
           const depth = process.env.EVAL_CALIBRATION_DEPTH === '2' ? 2 : 1;
-          const { score } = searchPosition(serialized, { depth, samples: 1, tera: false });
+          const { score } = searchPosition(serialized, {
+            depth, samples: 1, tera: false,
+            sleepClause: formatEnforcesSleepClause(getBranchSimulatorFormat(replay)),
+          });
           if (Number.isNaN(score)) {
             // A NaN would silently poison every aggregate — surface it loudly.
             console.log(`NaN score: ${id} turn ${turn}`);
