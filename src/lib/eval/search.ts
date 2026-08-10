@@ -67,11 +67,35 @@ export function leafValue(battle: ReturnType<typeof positionBattle>, matchupCach
   return wpUnits(raw, battle.gameType === 'doubles', battleFaintedFraction(battle));
 }
 
+/** Moves that call a RANDOM move — the seed decides what actually happens. */
+const RANDOM_CALL_MOVES = new Set(['sleeptalk', 'metronome', 'assist', 'copycat']);
+
+/** Move ids named in a (possibly combined) choice string. */
+const choiceMoveIds = (choice: string): string[] => choice.split(',')
+  .map(part => part.trim().split(' '))
+  .filter(tokens => tokens[0] === 'move')
+  .map(tokens => tokens[1]);
+
+/** The pair includes an accuracy roll or a random-call move — seeds diverge. */
+function rollSensitivePair(battle: ReturnType<typeof positionBattle>, p1Choice: string, p2Choice: string): boolean {
+  return [...choiceMoveIds(p1Choice), ...choiceMoveIds(p2Choice)].some(id => {
+    const move = battle.dex.moves.get(id);
+    if (!move.exists) return false;
+    if (RANDOM_CALL_MOVES.has(move.id)) return true;
+    return typeof move.accuracy === 'number' && move.accuracy < 100;
+  });
+}
+
 /**
  * Damage-roll grouping (foul-play style): a cell where nothing fainted is
- * roll-insensitive — one sim suffices. Only cells where a KO happened get
- * the full seed spread, because that's where rolls change the outcome. An
- * already-ended child is exact (±1) and also samples once.
+ * roll-insensitive — one sim suffices. Cells where a KO happened get the
+ * full seed spread, and so do cells whose pair carries an accuracy roll or
+ * a random-call move (Sleep Talk) — the seed decides those outcomes.
+ * A child that ENDED the game is exact only when no such roll was involved:
+ * draft T64 priced a 90%-accurate Overheat as a CERTAIN +1.00 off one seed
+ * that hit, so terminal roll cells always take at least three seeds, even
+ * in single-sample sweeps — a ±1 claim is the strongest output the engine
+ * makes.
  */
 function sampleCell(
   root: SimPosition,
@@ -88,7 +112,10 @@ function sampleCell(
   // KO-boundary roll groups carry their true value ("30% this crit wins")
   // instead of a flattened score mean.
   let sum = leafValue(firstBattle, matchupCache);
-  const draws = !ended && countFainted(firstBattle) > rootFainted ? samples : 1;
+  const rollMoves = rollSensitivePair(positionBattle(root), p1Choice, p2Choice);
+  const draws = ended
+    ? (rollMoves ? Math.max(samples, 3) : 1)
+    : (countFainted(firstBattle) > rootFainted || rollMoves ? samples : 1);
   for (let s = 1; s < draws; s++) {
     const child = advancePosition(root, p1Choice, p2Choice, SEARCH_SEEDS[s]);
     sum += leafValue(positionBattle(child), matchupCache);

@@ -499,6 +499,58 @@ test.describe('no-op candidate filter', () => {
   });
 });
 
+test.describe('accuracy and random-call roll sensitivity', () => {
+  test('a game-ending cell behind an accuracy roll is never priced as certain (draft T64)', () => {
+    // Machamp's Dynamic Punch (50%) KOs the last foe when it hits: one seed
+    // that hit once priced the win as a CERTAIN +1.00 — the seed spread
+    // prices the miss even in single-sample sweeps.
+    const risky = makeBattle(
+      [makeSet('M', 'Machamp', ['Dynamic Punch'], 100)],
+      [makeSet('P', 'Pikachu', ['Growl'], 5)],
+    );
+    const result = searchPosition(serialize(risky), { depth: 1, samples: 1, tera: false });
+    expect(result.score).toBeGreaterThan(0.2);
+    expect(result.score).toBeLessThan(0.999);
+
+    // The same KO behind a sure move stays exact.
+    const sure = makeBattle(
+      [makeSet('M', 'Machamp', ['Seismic Toss'], 100)],
+      [makeSet('P', 'Pikachu', ['Growl'], 5)],
+    );
+    const sureResult = searchPosition(serialize(sure), { depth: 1, samples: 1, tera: false });
+    expect(sureResult.score).toBeCloseTo(1, 5);
+  });
+
+  test('Sleep Talk cells take the seed spread even without a KO (GPL T25)', () => {
+    const original = State.deserializeBattle;
+    let forks = 0;
+    State.deserializeBattle = ((serialized: Parameters<DeserializeFn>[0]) => {
+      forks += 1;
+      return original.call(State, serialized);
+    }) as DeserializeFn;
+    try {
+      // A sleeping Sleep Talker: which move comes out is pure seed — the
+      // cell must not be judged off a single called move.
+      const sleeper = () => {
+        const battle = makeBattle(
+          [makeSet('S', 'Snorlax', ['Sleep Talk', 'Protect'], 100)],
+          [makeSet('C', 'Chansey', ['Protect', 'Substitute'], 100)],
+        );
+        battle.sides[0].active[0]!.setStatus('slp');
+        return serialize(battle);
+      };
+      forks = 0;
+      searchPosition(sleeper(), { depth: 1, samples: 1, tera: false });
+      const single = forks;
+      forks = 0;
+      searchPosition(sleeper(), { depth: 1, samples: 3, tera: false });
+      expect(forks).toBeGreaterThan(single);
+    } finally {
+      State.deserializeBattle = original;
+    }
+  });
+});
+
 test.describe('battleFaintedFraction', () => {
   test('counts both sides against the full roster', () => {
     const battle = makeBattle(
