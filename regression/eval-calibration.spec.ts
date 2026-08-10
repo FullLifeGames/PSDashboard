@@ -5,6 +5,7 @@ import { reconstructBranchRuntime } from '../src/lib/branch-engine';
 import { formatEnforcesSleepClause, getBranchSimulatorFormat } from '../src/lib/replay-format';
 import { parseReplayLogWithObservations } from '../src/lib/protocol-parser';
 import { battleFaintedFraction, searchPosition } from '../src/lib/eval/search';
+import { mctsSearch } from '../src/lib/eval/mcts';
 import { brierScore, fitConstantK } from './fit-helpers';
 
 /**
@@ -394,6 +395,22 @@ import { brierScore, fitConstantK } from './fit-helpers';
  *   redundant body at full weight — see the T35 RESOLUTION below for why
  *   the discount was deliberately NOT built this round.
  *
+ * FIRST MCTS CALIBRATION 2026-08-10 (EVAL_CALIBRATION_MODE=mcts — the
+ * DUCT tree had shipped for months without corpus numbers): 56/68/82/66/80,
+ * brier 0.2524/0.2147/0.1370, n 216 (two mid positions error out), vs the
+ * matrix d1 record 61/67/81/65/84 / 0.2516/0.2139/0.1550 n 218. Reading:
+ * MCTS is the best LATE-GAME engine on record (brier 0.1370; the 0.7–1.0
+ * confidence bucket hits 85% at n 39 vs 79% at n 34) — adaptive depth pays
+ * in narrow decided positions — but EARLY it wanders (56, five under the
+ * matrix) and DOUBLES starves (80, the combined choice space eats the 600
+ * iterations). Verdict: not default material (and it still lacks
+ * verification, sensitivity, pivot pairs, and trend folding); its real
+ * niche is a late-game/endgame lens. OPEN FINDING: phase-hybrid sweep
+ * (matrix early/mid, MCTS late) or MCTS as the late-turn think-deeper
+ * escalation. NOTE the accidental determinism proof: the first attempt
+ * dispatched searchPosition (which ignores `mode`) and reproduced the
+ * matrix record BIT-IDENTICAL a third time.
+ *
  * DIRECTIONAL SPEED EXCLUSIONS 2026-08-10: observations now drop only when
  * the modifier could EXPLAIN the observed order — a speed-raising factor
  * (Tailwind, +spe stages, paradox boosters) on the FIRST mover, or a
@@ -547,8 +564,12 @@ test.describe('eval calibration against real replays', () => {
           const serialized = JSON.stringify(State.serializeBattle(battle));
           // EVAL_CALIBRATION_DEPTH separates the two levers: does more
           // search fix a phase, or is the static eval itself miscalibrated?
+          // EVAL_CALIBRATION_MODE=mcts runs the DUCT tree instead — the
+          // matrix path is gated every round; MCTS earns numbers here too.
+          // (Dispatch mirrors eval-worker: searchPosition IGNORES mode.)
           const depth = process.env.EVAL_CALIBRATION_DEPTH === '2' ? 2 : 1;
-          const { score } = searchPosition(serialized, {
+          const runSearch = process.env.EVAL_CALIBRATION_MODE === 'mcts' ? mctsSearch : searchPosition;
+          const { score } = runSearch(serialized, {
             depth, samples: 1, tera: false,
             sleepClause: formatEnforcesSleepClause(getBranchSimulatorFormat(replay)),
           });
