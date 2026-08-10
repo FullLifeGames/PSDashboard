@@ -269,3 +269,135 @@ test.describe('Smogon usage stat enrichment', () => {
     ]);
   });
 });
+
+/**
+ * The displayed set guesses must be assembled by the SAME machinery the
+ * simulator's team builder uses (curated selection + coherence vetoes) — the
+ * GPL finding was Cobalion showing Body Press next to revealed Swords Dance
+ * while the built team had already vetoed it.
+ */
+test.describe('coherent move enrichment', () => {
+  const detail = 'Smogon gen9ou 2026-03';
+  const monInfo = (species: string, moves: OpponentTeamInfo['pokemon'][number]['moves']) => ({
+    pokemon: [{
+      species,
+      moves,
+      ability: { value: '', source: 'unknown' },
+      item: { value: '', source: 'unknown' },
+      teraType: { value: '', source: 'unknown' },
+      evs: unknownEvs(),
+      level: 100,
+      gender: '',
+    }],
+  }) as OpponentTeamInfo;
+  const statsFor = (species: string, entries: {
+    moves: [string, number][]; item?: [string, number];
+  }): SmogonUsageStats => ({
+    format: 'gen9ou', month: '2026-03', source: 'test',
+    pokemon: {
+      [species.toLowerCase()]: {
+        species, rawCount: 100,
+        abilities: [{ value: 'Justified', probability: 1, sourceDetail: detail }],
+        items: entries.item ? [{ value: entries.item[0], probability: entries.item[1], sourceDetail: detail }] : [],
+        moves: entries.moves.map(([value, probability]) => ({ value, probability, sourceDetail: detail })),
+        spreads: [],
+      },
+    },
+  } as unknown as SmogonUsageStats);
+
+  test('a boost-contradicting usage fill is vetoed from the displayed set', () => {
+    const info = monInfo('Cobalion', [
+      { name: 'Swords Dance', source: 'revealed' },
+      { name: 'Heavy Slam', source: 'revealed' },
+    ]);
+    const stats = statsFor('Cobalion', {
+      moves: [['Iron Head', 0.8], ['Body Press', 0.7], ['Stone Edge', 0.5], ['Close Combat', 0.4]],
+      item: ['Leftovers', 0.5],
+    });
+
+    const enriched = enrichTeamInfo(info, stats).pokemon[0];
+
+    // Body Press scales with Defense — Swords Dance does not serve it; Iron
+    // Head duplicates the revealed Heavy Slam's Steel damage. Both drop and
+    // the usage tail refills the display, exactly like the built team.
+    expect(enriched.moves.map(move => move.name)).toEqual([
+      'Swords Dance', 'Heavy Slam', 'Stone Edge', 'Close Combat',
+    ]);
+    expect(enriched.moves[2]).toEqual({
+      name: 'Stone Edge', source: 'guessed', probability: 0.5, sourceDetail: detail,
+    });
+  });
+
+  test('a Choice-item guess suppresses guessed status fills in the display', () => {
+    const info = monInfo('Dragapult', []);
+    const stats = statsFor('Dragapult', {
+      moves: [['Draco Meteor', 0.8], ['Calm Mind', 0.7], ['Flamethrower', 0.6], ['Recover', 0.5]],
+      item: ['Choice Specs', 0.6],
+    });
+
+    const enriched = enrichTeamInfo(info, stats).pokemon[0];
+
+    expect(enriched.item.value).toBe('Choice Specs');
+    expect(enriched.moves.map(move => move.name)).toEqual(['Draco Meteor', 'Flamethrower']);
+  });
+
+  test('revealed moves are immune however incoherent the pairing looks', () => {
+    // Revealed Body Press survives a pool whose boost serves Attack — proof
+    // is never second-guessed. (Stone Edge, not Close Combat: a Fighting
+    // fill would be same-type-redundant next to the revealed Body Press.)
+    const info = monInfo('Cobalion', [{ name: 'Body Press', source: 'revealed' }]);
+    const stats = statsFor('Cobalion', {
+      moves: [['Swords Dance', 0.9], ['Stone Edge', 0.8]],
+    });
+
+    const enriched = enrichTeamInfo(info, stats).pokemon[0];
+
+    expect(enriched.moves.map(move => move.name)).toEqual([
+      'Body Press', 'Swords Dance', 'Stone Edge',
+    ]);
+  });
+
+  test('a revealed move selects the coherent curated set for the display', () => {
+    const info = monInfo('Noivern', [{ name: 'Super Fang', source: 'revealed' }]);
+    const stats = statsFor('Noivern', {
+      moves: [['Draco Meteor', 0.7], ['Super Fang', 0.3]],
+      item: ['Leftovers', 0.5],
+    });
+    const sets = {
+      format: 'gen9ou', source: 'test',
+      pokemon: {
+        noivern: {
+          species: 'Noivern', sourceDetail: 'Smogon sets gen9ou',
+          item: { value: 'Choice Specs', sourceDetail: 'Smogon sets gen9ou' },
+          moves: [
+            { value: 'Draco Meteor', sourceDetail: 'Smogon sets gen9ou' },
+            { value: 'Hurricane', sourceDetail: 'Smogon sets gen9ou' },
+            { value: 'Flamethrower', sourceDetail: 'Smogon sets gen9ou' },
+            { value: 'U-turn', sourceDetail: 'Smogon sets gen9ou' },
+          ],
+          alternatives: [{
+            species: 'Noivern', sourceDetail: 'Smogon sets gen9ou',
+            item: { value: 'Heavy-Duty Boots', sourceDetail: 'Smogon sets gen9ou' },
+            moves: [
+              { value: 'Super Fang', sourceDetail: 'Smogon sets gen9ou' },
+              { value: 'Air Slash', sourceDetail: 'Smogon sets gen9ou' },
+              { value: 'U-turn', sourceDetail: 'Smogon sets gen9ou' },
+              { value: 'Roost', sourceDetail: 'Smogon sets gen9ou' },
+            ],
+          }],
+        },
+      },
+    } as unknown as Parameters<typeof enrichTeamInfo>[2];
+
+    const enriched = enrichTeamInfo(info, stats, sets).pokemon[0];
+
+    // The alternative covers the revealed Super Fang — its moves AND its item
+    // fill the display (the first set contradicts what we saw).
+    expect(enriched.moves.map(move => move.name)).toEqual([
+      'Super Fang', 'Air Slash', 'U-turn', 'Roost',
+    ]);
+    expect(enriched.item).toEqual({
+      value: 'Heavy-Duty Boots', source: 'guessed', sourceDetail: 'Smogon sets gen9ou',
+    });
+  });
+});

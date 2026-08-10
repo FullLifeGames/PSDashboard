@@ -155,6 +155,39 @@ test.describe('PS Dashboard', () => {
     await expect(page.locator('button', { hasText: 'Branch Here' })).toBeVisible();
   });
 
+  test('displayed set guesses pass the coherence vetoes (GPL Cobalion)', async ({ page }) => {
+    // Deterministic usage payload: Body Press tops the marginals while the
+    // replay reveals Swords Dance — the panel must show the vetoed assembly
+    // the simulator builds, never a second raw-usage guess (the GPL split).
+    await page.route('https://data.pkmn.cc/**', (route) => {
+      if (route.request().url().includes('/stats/')) {
+        route.fulfill({
+          status: 200, contentType: 'application/json',
+          body: JSON.stringify({
+            pokemon: {
+              Cobalion: {
+                count: 100,
+                abilities: { Justified: 1 },
+                items: { Leftovers: 0.5 },
+                moves: { 'Iron Head': 0.8, 'Body Press': 0.7, 'Stone Edge': 0.5, 'Close Combat': 0.4 },
+                spreads: {},
+              },
+            },
+          }),
+        });
+        return;
+      }
+      route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({}) });
+    });
+    await page.locator('input[aria-label="Load exported replay file"]')
+      .setInputFiles(join(__dirname, 'fixtures', 'gpl-replay.html'));
+
+    const cobalion = page.locator('.ps-stats-pokemon', { hasText: 'Cobalion' });
+    await expect(cobalion.getByText('Swords Dance')).toBeVisible({ timeout: 15000 });
+    await expect(cobalion.getByText('Close Combat')).toBeVisible();
+    await expect(cobalion.getByText('Body Press')).toHaveCount(0);
+  });
+
   test('auto-loads a replay from the ?replay query parameter', async ({ page }) => {
     await page.goto('/?replay=gen9ou-test-123');
     await expect(page.getByText('TestPlayer1', { exact: true }).first()).toBeVisible({ timeout: 10000 });

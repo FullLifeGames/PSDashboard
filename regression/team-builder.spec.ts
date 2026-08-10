@@ -32,6 +32,7 @@ import { createBranchState, reconstructBranchRuntime } from '../src/lib/branch-e
 import { inferOpponentTeam } from '../src/lib/opponent-inferrer';
 import { parseExportedReplay } from '../src/lib/replay-file';
 import { parseReplayLogWithObservations } from '../src/lib/protocol-parser';
+import { enrichTeamInfo } from '../src/lib/team-info';
 import type { SmogonUsageStats } from '../src/lib/smogon-stats';
 import type { SmogonSetAssumptions } from '../src/lib/smogon-sets';
 import type { OpponentTeamInfo } from '../src/types';
@@ -228,6 +229,49 @@ test.describe('team builder edited assumptions', () => {
     const { p1Team } = buildTeamsFromReplay(baseLog, { p1Info, usageStats });
 
     expect(p1Team[0].moves).toEqual(['Swords Dance', 'Iron Head', 'Stone Edge', 'Close Combat']);
+  });
+
+  test('the displayed enrichment and the built set agree on the guessed moves', () => {
+    // The app builds teams from ENRICHED infos — what the stats panel shows
+    // must be what the simulator plays (the GPL Body Press split).
+    const p1Info = {
+      pokemon: [{
+        species: 'Cobalion',
+        moves: [
+          { name: 'Swords Dance', source: 'revealed' },
+          { name: 'Heavy Slam', source: 'revealed' },
+        ],
+        ability: { value: '', source: 'unknown' },
+        item: { value: '', source: 'unknown' },
+        teraType: { value: '', source: 'unknown' },
+        level: 100,
+        gender: '',
+      }],
+    } as OpponentTeamInfo;
+    const usageStats = {
+      format: 'gen9ou', month: '2026-07', source: 'test',
+      pokemon: {
+        cobalion: {
+          species: 'Cobalion', rawCount: 100,
+          abilities: [{ value: 'Justified', probability: 1, sourceDetail: 't' }],
+          items: [{ value: 'Leftovers', probability: 0.5, sourceDetail: 't' }],
+          moves: [
+            { value: 'Iron Head', probability: 0.8, sourceDetail: 't' },
+            { value: 'Body Press', probability: 0.7, sourceDetail: 't' },
+            { value: 'Stone Edge', probability: 0.5, sourceDetail: 't' },
+            { value: 'Close Combat', probability: 0.4, sourceDetail: 't' },
+          ],
+          spreads: [],
+        },
+      },
+    } as unknown as SmogonUsageStats;
+
+    const enriched = enrichTeamInfo(p1Info, usageStats);
+    const displayed = enriched.pokemon[0].moves.map(move => move.name);
+    expect(displayed).toEqual(['Swords Dance', 'Heavy Slam', 'Stone Edge', 'Close Combat']);
+
+    const { p1Team } = buildTeamsFromReplay(baseLog, { p1Info: enriched, usageStats });
+    expect(p1Team[0].moves).toEqual(displayed);
   });
 
   test('a revealed move selects the coherent curated set and fills from it', () => {

@@ -1,4 +1,7 @@
-import { Dex } from '@pkmn/sim';
+// Data-only Dex: this module is reachable from the app's MAIN bundle via
+// team-info's enrichment — importing @pkmn/sim here would drag the whole
+// simulator across the dynamic-import boundary (team-builder stays lazy).
+import { Dex } from '@pkmn/dex';
 import type { PokemonSetAssumption } from './smogon-sets';
 
 /**
