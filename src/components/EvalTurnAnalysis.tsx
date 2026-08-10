@@ -1,4 +1,4 @@
-import { diffChoices, playedSetupMove, type SideAnalysis, type TurnAnalysis } from '../lib/eval/analysis';
+import { diffChoices, playedSetupMove, TIER_THRESHOLDS, type SideAnalysis, type TurnAnalysis } from '../lib/eval/analysis';
 import type { LeadAnalysis, LeadSideAnalysis } from '../lib/eval/leads';
 import type { RankedChoice, ReadRecommendation } from '../lib/eval/types';
 import { formatRead, summarizeTurn } from '../lib/eval/summary';
@@ -30,6 +30,17 @@ function ExplorableLabel({ label, color = '#cde', onClick }: { label: string; co
 }
 
 const signed = (value: number) => `${value >= 0 ? '+' : ''}${value.toFixed(2)}`;
+
+/**
+ * The played chip shows the row's EV — the SAME quantity as the engine chip
+ * and the regret grading. The floor appears only as a labeled risk clause,
+ * and only when the row gave up mistake-sized safety (a genuine gamble):
+ * showing "(−0.39)" beside the engine's "(+0.05)" once made a co-optimal
+ * switch look ranked very lowly (draft T50).
+ */
+const RISK_DISPLAY_GAP = TIER_THRESHOLDS.mistake;
+/** Played-vs-engine EV gaps under this are display noise — the picks are equivalent. */
+const ENGINE_EQUIVALENT_EPSILON = 0.01;
 
 /** Tiny centered gauge on [−1, +1] — makes score gaps visual at a glance. */
 export function MiniBar({ value }: { value: number }) {
@@ -83,12 +94,13 @@ function SideRow({ name, side, onExplore }: { name: string; side: SideAnalysis; 
     .map(action => (action.kind === 'switch' ? `→ ${action.species ?? action.name}` : action.name))
     .join(' + ');
   const playedText = side.played
-    ? `${side.played.label} (${signed(side.played.worstCase)})`
+    ? `${side.played.label} (${signed(side.played.ev)})`
     : slotText
       ? `${slotText} — not among the engine's candidates`
       : side.playedRaw
         ? `${playedRawName} — not among the engine's options`
         : 'could not act (fainted or fully prevented)';
+  const playedGamble = side.played !== null && side.played.ev - side.played.worstCase >= RISK_DISPLAY_GAP;
   const regretful = side.tier === 'mistake' || side.tier === 'blunder';
   const setupMove = playedSetupMove(side);
   const difference = regretful && side.played && side.best ? diffChoices(side.played, side.best) : null;
@@ -98,6 +110,14 @@ function SideRow({ name, side, onExplore }: { name: string; side: SideAnalysis; 
       <div className="ps-eval-analysis-row">
         <span style={{ color: '#cde', fontWeight: 'bold' }}>{name}</span>
         <span style={{ color: '#aab' }}>played {playedText}</span>
+        {playedGamble && side.played && (
+          <span
+            style={{ color: '#778' }}
+            title="The floor prices the opponent's most punishing reply — a worst case, not the expected outcome."
+          >
+            · risked {signed(side.played.worstCase)}{side.played.punishedBy ? ` vs ${side.played.punishedBy}` : ''}
+          </span>
+        )}
         {side.playedPartial && (
           <span
             style={{ color: '#778' }}
@@ -117,6 +137,9 @@ function SideRow({ name, side, onExplore }: { name: string; side: SideAnalysis; 
           <span style={{ color: '#778' }}>
             engine: <ExplorableLabel label={side.best.label} color="#778" onClick={onExplore && (() => onExplore(side.best!))} />
             {' '}({signed(side.best.ev)})
+            {side.best.ev - side.played.ev < ENGINE_EQUIVALENT_EPSILON && (
+              <span title="The EV gap is inside noise — the engine considers both picks equally good."> · equivalent</span>
+            )}
           </span>
         )}
         {side.verifiedAtDepth && (
@@ -135,14 +158,15 @@ function SideRow({ name, side, onExplore }: { name: string; side: SideAnalysis; 
             · sacked {side.sacrifice.name} ({Math.round(side.sacrifice.hpFraction * 100)}% HP)
           </span>
         )}
-        {regretful && !side.sacrifice && side.regret !== null && (side.riskPaidOff ? (
+        {side.riskPaidOff && !side.sacrifice && (
           <span
             style={{ color: '#8c8' }}
             title={`The safe line guaranteed ${side.safe ? side.safe.worstCase.toFixed(2) : '?'}; the actual pair came out ${(side.riskPayoff ?? 0).toFixed(2)} better — the read won value.`}
           >
             read paid off · +{(side.riskPayoff ?? 0).toFixed(2)}
           </span>
-        ) : setupMove ? (
+        )}
+        {regretful && !side.sacrifice && side.regret !== null && !side.riskPaidOff && (setupMove ? (
           <span
             style={{ color: '#b6a46a' }}
             title={`${setupMove} is a setup move — its payoff lies past the search horizon, so the regret may be overstated.`}
