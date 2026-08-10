@@ -41,7 +41,21 @@ test.describe('graph merge monotonicity', () => {
     expect(supersedesStored({ depth: 1, samples: 1, mode: 'mcts' }, { depth: 1, samples: 1, mode: 'mcts' }, 'mcts')).toBe(true);
   });
 });
-import { computeBlunders, selectKeyTurns, BLUNDER_SWING } from '../src/lib/eval/graph';
+import { computeBlunders, selectKeyTurns, BLUNDER_SWING, KEY_TURN_SWING } from '../src/lib/eval/graph';
+import { KEY_MOMENT_SWING } from '../src/lib/eval/report';
+
+test.describe('key-turn coverage matches the report', () => {
+  test('every report-worthy swing gets the deepening pass', () => {
+    // GPL finding: the report named T14/T36 (+15% ≈ 0.29–0.34 swings) while
+    // selectKeyTurns still used the 0.4 blunder threshold — the whole
+    // deepening pass skipped the replay and the chips carried d1 badges
+    // under MCTS prefs. One constant now feeds both.
+    expect(KEY_MOMENT_SWING).toBe(KEY_TURN_SWING);
+    expect(selectKeyTurns([-0.16, -0.25, 0.1])).toEqual([2, 3]);
+    // Below the report threshold stays on the fast scan.
+    expect(selectKeyTurns([0.0, 0.2, 0.1])).toEqual([]);
+  });
+});
 
 test.describe('eval graph blunder detection', () => {
   test('flags the turn whose play created the swing, not the turn after', () => {

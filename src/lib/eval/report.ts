@@ -1,4 +1,5 @@
 import { playedSetupMove, type SideAnalysis, type TurnAnalysis, type VerdictTier } from './analysis';
+import { KEY_TURN_SWING } from './graph';
 import { labelPhrase } from './summary';
 import { winDeltaText, winPercent } from './winprob';
 
@@ -8,8 +9,10 @@ import { winDeltaText, winPercent } from './winprob';
  * the result was play vs luck. Pure — no sim imports, main-bundle safe.
  */
 
-/** A key moment needs at least this much swing (matches the blunder rings). */
-export const KEY_MOMENT_SWING = 0.25;
+/** A key moment needs at least this much swing — the same constant that
+ * selects the sweep's deepening turns (graph.ts): whatever the report
+ * names ran at the configured settings. */
+export const KEY_MOMENT_SWING = KEY_TURN_SWING;
 /** How many key moments the report keeps. */
 export const REPORT_KEY_MOMENTS = 4;
 /** How many misplays the report lists per player. */

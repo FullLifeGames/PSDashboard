@@ -36,8 +36,18 @@ export function computeBlunders(scores: (number | null)[]): number[] {
 export const KEY_TURN_CAP = 16;
 
 /**
+ * Swing that earns the deepening pass — the SAME constant the report's key
+ * moments use (report.ts re-exports it), so the report can never name a
+ * turn the sweep left on the fast scan. When the wp-unit conversion moved
+ * the blunder band to 0.4, the old BLUNDER_SWING-based selection silently
+ * stopped covering report-worthy 0.25–0.4 swings: the GPL sweep deepened
+ * NOTHING and its chips carried d1 badges under MCTS prefs.
+ */
+export const KEY_TURN_SWING = 0.25;
+
+/**
  * The turns worth a deeper look after a fast first pass: for every
- * blunder-sized swing, the turn that played into it AND the turn after it
+ * report-worthy swing, the turn that played into it AND the turn after it
  * (analysis compares both sides of a swing — mixing depths across a swing
  * boundary would blur exactly the numbers people click on). Biggest swings
  * win under the cap.
@@ -49,7 +59,7 @@ export function selectKeyTurns(scores: (number | null)[], cap = KEY_TURN_CAP): n
     const current = scores[index];
     if (previous === null || current === null) continue;
     const magnitude = Math.abs(current - previous);
-    if (magnitude >= BLUNDER_SWING) swings.push({ turn: index + 1, magnitude });
+    if (magnitude >= KEY_TURN_SWING) swings.push({ turn: index + 1, magnitude });
   }
   swings.sort((a, b) => b.magnitude - a.magnitude || a.turn - b.turn);
   const keys = new Set<number>();
