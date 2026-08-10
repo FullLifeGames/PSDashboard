@@ -46,7 +46,9 @@ export interface StoredEval {
 // v17: Sleep Clause — branch formats carry the clause (declared |rule| lines
 //      or the singles default), and redundant sleep moves leave the
 //      candidate lists.
-export const EVAL_ENGINE_CACHE_VERSION = 17;
+// v18: video-pipeline watermark |rule| lines no longer suppress the
+//      singles Sleep Clause default (GPL evals cached without the clause).
+export const EVAL_ENGINE_CACHE_VERSION = 18;
 
 export function evalStoreKey(
   cacheKey: string,

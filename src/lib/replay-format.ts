@@ -113,7 +113,12 @@ function logShowsSecondSleep(log: string): boolean {
 function sleepClauseSuffix(log: string | undefined, base: string): string {
   if (!log || !base.endsWith('customgame')) return '';
   if (/^\|rule\|Sleep Clause/m.test(log)) return '@@@Sleep Clause Mod';
-  if (/^\|rule\|/m.test(log)) return '';
+  // Only REAL rule declarations ("Name: description") count as a declared
+  // ruleset — video pipelines watermark their logs with colon-less |rule|
+  // lines ("Reconstructed from video by gpl-pipeline - best effort"), and
+  // treating those as "rules declared, clause absent" silenced the singles
+  // default exactly where it was needed (GPL T11).
+  if (/^\|rule\|[^|\n]*: /m.test(log)) return '';
   if (logShowsSecondSleep(log)) return '';
   return '@@@Sleep Clause Mod';
 }

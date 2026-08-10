@@ -91,6 +91,13 @@ test.describe('replay format inference', () => {
       log: '|gametype|singles\n|gen|9\n|rule|OHKO Clause: OHKO moves are banned',
     })).toBe('gen9customgame');
 
+    // A colon-less |rule| line is a pipeline watermark, not a ruleset —
+    // the singles default still applies (GPL video reconstructions).
+    expect(getBranchSimulatorFormat({
+      id: 'gen9customgame-99',
+      log: '|gametype|singles\n|gen|9\n|rule|Reconstructed from video by gpl-pipeline - best effort',
+    })).toBe('gen9customgame@@@Sleep Clause Mod');
+
     // NO rule lines at all (video pipelines): singles-standard default.
     expect(getBranchSimulatorFormat({
       id: 'gen9customgame-99',
