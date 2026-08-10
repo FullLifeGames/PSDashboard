@@ -32,6 +32,9 @@ interface EvalPanelProps {
   onThinkDeeper?: () => void;
   /** The settings the deepen button would run (null = at the cap / not applicable). */
   thinkDeeperTarget?: TurnEvalSettings | null;
+  /** Smogon usage/sets still loading — a sweep started now would silently
+   * build teams without the guessed fills (the T35 one-move Iron Valiant). */
+  smogonPending?: boolean;
   /** Branch mode: hides the auto checkbox on the replay view. */
   showAuto: boolean;
   /** Gen 9 only — other gens have no Tera to gate. */
@@ -123,7 +126,7 @@ export function EvalPanel({
   playerNames, status, result, progress, reconstructProgress, error,
   prefs, onPrefsChange, onEvaluate, onCancel, onPickChoice, onPickPair, showAuto, showTera,
   graph, onAnalyzeGame, onSelectTurn, currentTurn, analysis,
-  reads, leadAnalysis, reportLeads, report, doubles, resultSettings, onThinkDeeper, thinkDeeperTarget,
+  reads, leadAnalysis, reportLeads, report, doubles, resultSettings, onThinkDeeper, thinkDeeperTarget, smogonPending,
 }: EvalPanelProps) {
   const running = status === 'searching' || status === 'reconstructing';
   const hasGraph = graph.scores.some(score => score !== null);
@@ -136,9 +139,11 @@ export function EvalPanel({
     <button
       type="button"
       className="ps-btn"
-      disabled={graph.running}
+      disabled={graph.running || smogonPending}
       onClick={onThinkDeeper}
-      title="Re-search this position (and its follow-up turn) at the named settings — the score, ranked moves, matrix, graph, and report update together."
+      title={smogonPending
+        ? 'Waiting for Smogon data — searching now would build the teams without the guessed sets.'
+        : 'Re-search this position (and its follow-up turn) at the named settings — the score, ranked moves, matrix, graph, and report update together.'}
       style={{ padding: '1px 6px', fontSize: 10 }}
     >
       {result ? 'Think deeper about this position' : 'Analyze this position'}
@@ -289,8 +294,10 @@ export function EvalPanel({
                   type="button"
                   className="ps-btn"
                   onClick={onAnalyzeGame}
-                  disabled={running}
-                  title="Evaluate every turn of the game in the background — the line dips where the game swung. The selected turn's analysis, ranked choices, and matrix follow automatically."
+                  disabled={running || smogonPending}
+                  title={smogonPending
+                    ? 'Waiting for Smogon data — a sweep started now would build the teams without the guessed sets.'
+                    : "Evaluate every turn of the game in the background — the line dips where the game swung. The selected turn's analysis, ranked choices, and matrix follow automatically."}
                   style={{ padding: '1px 6px', fontSize: 10 }}
                 >
                   {hasGraph ? 'Re-analyze' : 'Analyze game'}

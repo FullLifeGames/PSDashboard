@@ -1452,6 +1452,7 @@ function App() {
                 resultSettings={analyzedSettings}
                 onThinkDeeper={!branching ? handleThinkDeeper : undefined}
                 thinkDeeperTarget={!branching ? thinkDeeperTarget : null}
+                smogonPending={usageStats.loading || setAssumptions.loading}
                 progress={evaluation.progress}
                 reconstructProgress={evaluation.reconstructProgress}
                 error={evaluation.error}
