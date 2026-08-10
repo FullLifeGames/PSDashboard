@@ -215,7 +215,16 @@ test.describe('PS Dashboard', () => {
     // Ranked choices speak the bar's percent language; the floor and the
     // punishing reply live in the tooltip.
     await expect(panel.locator('.ps-eval-choice-main').first()).toContainText(/\d+%/);
-    await expect(panel.locator('.ps-eval-choice').first()).toHaveAttribute('title', /guaranteed floor/);
+    await expect(panel.locator('.ps-eval-choice').first()).toHaveAttribute('title', /guaranteed at least/);
+
+    // The solved matrix behind the rankings opens on demand: every pair at
+    // its win probability, equilibrium mixes on the headers.
+    await panel.locator('button', { hasText: 'Matrix' }).click();
+    const matrix = panel.locator('table');
+    await expect(matrix).toBeVisible();
+    await expect(matrix.locator('td').first()).toContainText(/\d+%/);
+    await panel.locator('button', { hasText: 'Hide matrix' }).click();
+    await expect(matrix).toBeHidden();
   });
 
   test('clicking an engine choice from the replay view branches with it prefilled', async ({ page }) => {
@@ -245,6 +254,29 @@ test.describe('PS Dashboard', () => {
     await expect(panel.locator('.ps-eval-column').first().locator('button.ps-eval-choice').first())
       .toBeVisible({ timeout: 120_000 });
     await expect(panel.getByRole('checkbox')).toBeChecked();
+  });
+
+  test('clicking a matrix cell branches with exactly that pair', async ({ page }) => {
+    test.setTimeout(240_000);
+    await page.evaluate(() => {
+      localStorage.setItem('ps-replay-interceptor:eval-pool', '2');
+      localStorage.setItem('ps-replay-interceptor:eval-prefs',
+        JSON.stringify({ depth: 1, samples: 1, auto: false, tera: 'auto' }));
+    });
+    await page.reload();
+    await page.locator('button', { hasText: 'Load' }).click();
+    await expect(page.getByText('TestPlayer1', { exact: true }).first()).toBeVisible({ timeout: 10000 });
+
+    const panel = page.locator('.ps-main-right .ps-eval-panel');
+    await panel.locator('button', { hasText: 'Evaluate' }).click();
+    await expect(panel.locator('.ps-eval-bar')).toBeVisible({ timeout: 120_000 });
+
+    // A cell names BOTH sides' choices — the branch executes exactly that
+    // pair (not the engine's preferred reply).
+    await panel.locator('button', { hasText: 'Matrix' }).click();
+    await panel.locator('table td button').first().click();
+    await expect(page.getByText(/Branching — Turn/)).toBeVisible({ timeout: 60_000 });
+    await expect(page.getByText(/Branching — Turn 2/)).toBeVisible({ timeout: 60_000 });
   });
 
   test('evaluates a position with the MCTS mode', async ({ page }) => {

@@ -716,6 +716,14 @@ function App() {
     void handleBranch();
   }, [branching, playOutEvalChoice, handleBranch, evaluation]);
 
+  // A matrix cell names BOTH sides' choices — play exactly that pair out
+  // (draft T48: "what would Shadow Ball into Knock Off look like?").
+  const handlePickPair = useCallback((p1: { choice: string; label: string }, p2: { choice: string; label: string }) => {
+    const rankedLike = (entry: { choice: string; label: string }): RankedChoice =>
+      ({ choice: entry.choice, label: entry.label, worstCase: 0, expected: 0, ev: 0, punishedBy: null });
+    handleExploreChoice('p1', rankedLike(p1), rankedLike(p2));
+  }, [handleExploreChoice]);
+
   useEffect(() => {
     if (!pendingEvalPick) return;
     if (branching && simState) {
@@ -1369,6 +1377,7 @@ function App() {
                 onEvaluate={handleEvaluate}
                 onCancel={evaluation.cancel}
                 onPickChoice={handleExploreChoice}
+                onPickPair={handlePickPair}
                 showAuto={branching}
                 showTera={replayGen === 9}
                 graph={evaluation.graph}

@@ -5,6 +5,7 @@ import type { EvalGraphState, EvalStatus } from '../hooks/useEvaluation';
 import { EvalGameReport } from './EvalGameReport';
 import { EvalGraph } from './EvalGraph';
 import { EvalLeadAnalysis, EvalTurnAnalysis, MiniBar } from './EvalTurnAnalysis';
+import { EvalMatrixView } from './EvalMatrixView';
 import { winDeltaText, winPercent } from '../lib/eval/winprob';
 import type { LeadAnalysis } from '../lib/eval/leads';
 
@@ -21,6 +22,8 @@ interface EvalPanelProps {
   onCancel: () => void;
   /** Click on an engine line: plays it out in a branch (entering one first when needed), the other side answering with `reply`. */
   onPickChoice?: (side: 'p1' | 'p2', choice: RankedChoice, reply?: RankedChoice | null) => void;
+  /** Click on a matrix cell: plays EXACTLY that pair out in a branch. */
+  onPickPair?: (p1: { choice: string; label: string }, p2: { choice: string; label: string }) => void;
   /** Branch mode: hides the auto checkbox on the replay view. */
   showAuto: boolean;
   /** Gen 9 only — other gens have no Tera to gate. */
@@ -112,7 +115,7 @@ function ChoiceList({
 
 export function EvalPanel({
   playerNames, status, result, progress, reconstructProgress, error,
-  prefs, onPrefsChange, onEvaluate, onCancel, onPickChoice, showAuto, showTera,
+  prefs, onPrefsChange, onEvaluate, onCancel, onPickChoice, onPickPair, showAuto, showTera,
   graph, onAnalyzeGame, onAnalyzeTurn, onSelectTurn, currentTurn, analysis,
   reads, leadAnalysis, reportLeads, report, doubles,
 }: EvalPanelProps) {
@@ -314,6 +317,13 @@ export function EvalPanel({
             <ChoiceList side="p1" choices={result.perSide.p1} reply={result.perSide.p2[0] ?? null} onPickChoice={status === 'stale' ? undefined : onPickChoice} doubles={doubles} />
             <ChoiceList side="p2" choices={result.perSide.p2} reply={result.perSide.p1[0] ?? null} onPickChoice={status === 'stale' ? undefined : onPickChoice} doubles={doubles} />
           </div>
+          {result.matrix && (
+            <EvalMatrixView
+              matrix={result.matrix}
+              playerNames={playerNames}
+              onPickPair={status === 'stale' ? undefined : onPickPair}
+            />
+          )}
         </div>
       )}
     </div>
