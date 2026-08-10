@@ -74,28 +74,37 @@ export function parseReplayLogWithObservations(log: string): {
   // Speed-order evidence: the first two |move| lines of a singles turn prove
   // effective speed order — but only when nothing else could explain it.
   let speedTurn = 0;
-  let turnMovers: { side: 'p1' | 'p2'; species: string; clean: boolean }[] = [];
+  let turnMovers: { side: 'p1' | 'p2'; species: string; cleanFirst: boolean; cleanSecond: boolean }[] = [];
   let switchedThisTurn = new Set<string>();
   let actedThisTurn = new Set<string>();
-  // Everything that could explain a move order besides raw speed, read at
-  // decision time: status, stages, Tailwind, Trick Room, same-turn entry,
-  // and paradox boosters (Quark Drive/Protosynthesis are VOLATILES, not
-  // stat stages — a boosted Iron Valiant proves nothing either way).
+  // DIRECTIONAL contamination, read at decision time: an observation drops
+  // only when the factor could EXPLAIN the observed order — a speed-RAISING
+  // factor (Tailwind, +spe stages, paradox boosters) on the FIRST mover, or
+  // a speed-LOWERING factor (paralysis, −spe stages) on the SECOND. The
+  // kept directions are IMPLIED constraints: outrunning a Tailwind-doubled
+  // opponent outruns its base speed a fortiori, and a paralyzed mon moving
+  // first won the race at a quarter of its speed. Trick Room inverts order
+  // outright and same-turn entries are unknowable at order time — both
+  // stay bilateral. (Paradox boosters are VOLATILES, not stat stages; any
+  // variant counts as a raiser and none as a lowerer.)
   type ClientIdent = Parameters<Battle['getPokemon']>[0];
-  const speedCleanAt = (ident: string): boolean => {
+  const speedContaminatedAt = (ident: string, role: 'first' | 'second'): boolean => {
     const mon = battle.getPokemon(ident as ClientIdent);
-    if (!mon) return false;
-    const side = ident.startsWith('p1') ? battle.p1 : battle.p2;
-    const paradox = Object.keys((mon.volatiles ?? {}) as Record<string, unknown>)
-      .some(key => /^(protosynthesis|quarkdrive)/.test(key));
-    return mon.status !== 'par' && (mon.boosts.spe ?? 0) === 0 && !paradox &&
-      !(side.sideConditions as Record<string, unknown>)['tailwind'] &&
-      !(battle.field.pseudoWeather as Record<string, unknown>)['trickroom'] &&
-      !switchedThisTurn.has(ident);
+    if (!mon) return true;
+    if ((battle.field.pseudoWeather as Record<string, unknown>)['trickroom']) return true;
+    if (switchedThisTurn.has(ident)) return true;
+    if (role === 'first') {
+      const side = ident.startsWith('p1') ? battle.p1 : battle.p2;
+      const paradox = Object.keys((mon.volatiles ?? {}) as Record<string, unknown>)
+        .some(key => /^(protosynthesis|quarkdrive)/.test(key));
+      return paradox || (mon.boosts.spe ?? 0) > 0 ||
+        !!(side.sideConditions as Record<string, unknown>)['tailwind'];
+    }
+    return mon.status === 'par' || (mon.boosts.spe ?? 0) < 0;
   };
   const flushSpeedOrder = () => {
     const [first, second] = turnMovers;
-    if (first && second && first.clean && second.clean &&
+    if (first && second && first.cleanFirst && second.cleanSecond &&
       first.side !== second.side && first.species && second.species) {
       speedOrders.push({
         firstSide: first.side, firstSpecies: first.species,
@@ -136,17 +145,20 @@ export function parseReplayLogWithObservations(log: string): {
       const mover = ident ? battle.getPokemon(ident as ClientIdent) : undefined;
       const moveId = (parts[3] ?? '').toLowerCase().replace(/[^a-z0-9]/g, '');
       const priority = gens.get(genNum).moves.get(moveId)?.priority ?? 0;
-      const clean = priority === 0 && speedCleanAt(ident);
+      // Nonzero priority breaks the race premise in EITHER role — order
+      // across priority brackets says nothing about speed.
+      const cleanFirst = priority === 0 && !speedContaminatedAt(ident, 'first');
+      const cleanSecond = priority === 0 && !speedContaminatedAt(ident, 'second');
       lastMove = parts[2] && parts[4]
         ? {
           attacker: parts[2], target: parts[4], moveId,
           crit: false, observationIndex: null, damageCount: 0,
-          speedClean: clean, attackerSide: side, attackerSpecies: mover?.speciesForme ?? '',
+          speedClean: cleanFirst, attackerSide: side, attackerSpecies: mover?.speciesForme ?? '',
         }
         : null;
       if (singles && ident) {
         actedThisTurn.add(ident);
-        turnMovers.push({ side, species: mover?.speciesForme ?? '', clean });
+        turnMovers.push({ side, species: mover?.speciesForme ?? '', cleanFirst, cleanSecond });
       }
     } else if (line.startsWith('|-crit|')) {
       if (lastMove) lastMove.crit = true;
@@ -162,7 +174,8 @@ export function parseReplayLogWithObservations(log: string): {
       if (singles && line.startsWith('|faint|') && lastMove) {
         const victim = line.split('|')[2] ?? '';
         if (victim === lastMove.target && victim !== lastMove.attacker &&
-          lastMove.speedClean && !actedThisTurn.has(victim) && speedCleanAt(victim)) {
+          lastMove.speedClean && !actedThisTurn.has(victim) &&
+          !speedContaminatedAt(victim, 'second')) {
           const victimMon = battle.getPokemon(victim as ClientIdent);
           if (victimMon) {
             speedOrders.push({

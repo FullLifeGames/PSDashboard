@@ -194,7 +194,7 @@ test.describe('speed-order evidence', () => {
     expect(speedOrders[0].turn).toBe(1);
   });
 
-  test('paralysis on the first mover voids the evidence', () => {
+  test('paralysis is directional: it excuses the slow, never the fast', () => {
     const { speedOrders } = parseReplayLogWithObservations(speedLog([
       '|move|p1a: Fast|Thunder Wave|p2a: Val',
       '|-status|p2a: Val|par',
@@ -204,9 +204,52 @@ test.describe('speed-order evidence', () => {
       '|move|p1a: Fast|Air Slash|p2a: Val',
       '|turn|3',
     ]));
-    // Turn 1: Thunder Wave is clean but Val is paralyzed by move time.
-    // Turn 2: the paralyzed Val moving first proves nothing.
-    expect(speedOrders).toEqual([]);
+    // Turn 1: Val moved second AND is paralyzed by move time — the para
+    // explains the slowness, no constraint. Turn 2: the paralyzed Val
+    // moving FIRST is STRONGER evidence (its quartered speed still won —
+    // the base-speed conclusion follows a fortiori).
+    expect(speedOrders).toEqual([{
+      firstSide: 'p2', firstSpecies: 'Iron Valiant',
+      secondSide: 'p1', secondSpecies: 'Noivern',
+      turn: 2,
+    }]);
+  });
+
+  test('Tailwind on the SECOND mover keeps the evidence (it only strengthens)', () => {
+    const { speedOrders } = parseReplayLogWithObservations(speedLog([
+      '|move|p2a: Val|Tailwind|p2a: Val',
+      '|-sidestart|p2: Bob|move: Tailwind',
+      '|turn|2',
+      '|move|p1a: Fast|Air Slash|p2a: Val',
+      '|move|p2a: Val|Moonblast|p1a: Fast',
+      '|turn|3',
+    ]));
+    // Val moved second DESPITE doubled speed — Noivern outruns even the
+    // doubled value, so it outruns the base speed a fortiori.
+    expect(speedOrders).toEqual([{
+      firstSide: 'p1', firstSpecies: 'Noivern',
+      secondSide: 'p2', secondSpecies: 'Iron Valiant',
+      turn: 2,
+    }]);
+  });
+
+  test('a speed drop on the first mover keeps the evidence', () => {
+    const { speedOrders } = parseReplayLogWithObservations(speedLog([
+      '|move|p1a: Fast|Icy Wind|p2a: Val',
+      '|-unboost|p2a: Val|spe|1',
+      '|move|p2a: Val|Moonblast|p1a: Fast',
+      '|turn|2',
+      '|move|p2a: Val|Moonblast|p1a: Fast',
+      '|move|p1a: Fast|Air Slash|p2a: Val',
+      '|turn|3',
+    ]));
+    // Turn 1: Val moved second at −1 Speed — explained, dropped. Turn 2:
+    // Val moved FIRST at −1 Speed — stronger than a clean read.
+    expect(speedOrders).toEqual([{
+      firstSide: 'p2', firstSpecies: 'Iron Valiant',
+      secondSide: 'p1', secondSpecies: 'Noivern',
+      turn: 2,
+    }]);
   });
 
   test('Trick Room turns prove nothing (and the setup move has priority)', () => {
@@ -306,8 +349,10 @@ test.describe('KO-before-acting speed evidence', () => {
     expect(speedOrders[0].turn).toBe(1);
   });
 
-  test('a paradox speed booster on either side voids the evidence', () => {
-    const { speedOrders } = parseReplayLogWithObservations(koLog([
+  test('a paradox booster is directional: it voids the fast, not the outrun', () => {
+    // Booster on the VICTIM: the attacker outran a Quark-Drive-boosted
+    // speed — outrunning the base speed follows a fortiori. Keep.
+    const boostedVictim = parseReplayLogWithObservations(koLog([
       '|-activate|p2a: Val|ability: Quark Drive',
       '|-start|p2a: Val|quarkdrivespe',
       '|move|p1a: Fast|Draco Meteor|p2a: Val',
@@ -315,6 +360,20 @@ test.describe('KO-before-acting speed evidence', () => {
       '|faint|p2a: Val',
       '|turn|2',
     ]));
-    expect(speedOrders).toEqual([]);
+    expect(boostedVictim.speedOrders).toEqual([{
+      firstSide: 'p1', firstSpecies: 'Noivern',
+      secondSide: 'p2', secondSpecies: 'Iron Valiant',
+      turn: 1,
+    }]);
+    // Booster on the ATTACKER: the boosted speed explains the race. Drop.
+    const boostedAttacker = parseReplayLogWithObservations(koLog([
+      '|-activate|p1a: Fast|ability: Protosynthesis',
+      '|-start|p1a: Fast|protosynthesisspe',
+      '|move|p1a: Fast|Draco Meteor|p2a: Val',
+      '|-damage|p2a: Val|0 fnt',
+      '|faint|p2a: Val',
+      '|turn|2',
+    ]));
+    expect(boostedAttacker.speedOrders).toEqual([]);
   });
 });

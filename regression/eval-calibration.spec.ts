@@ -377,8 +377,19 @@ import { brierScore, fitConstantK } from './fit-helpers';
  * - Endgame-sack PRICING (eval side): the bodies term still prices a
  *   redundant body at full weight — see the T35 RESOLUTION below for why
  *   the discount was deliberately NOT built this round.
- * - Directional speed-evidence exclusions (a second mover's Tailwind
- *   STRENGTHENS the conclusion; today all modifiers exclude bilaterally).
+ *
+ * DIRECTIONAL SPEED EXCLUSIONS 2026-08-10: observations now drop only when
+ * the modifier could EXPLAIN the observed order — a speed-raising factor
+ * (Tailwind, +spe stages, paradox boosters) on the FIRST mover, or a
+ * speed-lowering factor (paralysis, −spe stages) on the SECOND. The kept
+ * directions are IMPLIED constraints (outrunning a Tailwind-doubled foe
+ * outruns its base speed a fortiori; a paralyzed mon moving first won at a
+ * quarter speed). Priority stays bilateral (cross-bracket order is not a
+ * race); Trick Room and same-turn entries stay bilateral. Gate vs the v24
+ * record: buckets IDENTICAL 61/67/80/65/84 (n identical), brier mid
+ * 0.2145→0.2139 and late 0.1586→0.1585, early flat — sharper spreads,
+ * no sign moved. STANDING RECORD d1: 61/67/80/65/84, brier
+ * 0.2513/0.2139/0.1585, n 216.
  *
  * MID-CHARGE RELEASES 2026-08-10 (cache v24): a locked request entry
  * (mid-charge Phantom Force, rampages) carries no target data; the LIVE
