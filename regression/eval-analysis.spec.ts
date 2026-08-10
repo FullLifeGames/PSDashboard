@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { analyzeTurn, findPlayedOption, matchPlayedChoice, playedSetupMove, REGRET_THRESHOLD, type SideAnalysis } from '../src/lib/eval/analysis';
+import { analyzeTurn, findPlayedOption, matchPlayedChoice, phantomStayIn, playedSetupMove, REGRET_THRESHOLD, type SideAnalysis } from '../src/lib/eval/analysis';
 import { allTurnEvents, detectSacks, turnEvents } from '../src/lib/eval/played';
 import type { EvalResult, RankedChoice } from '../src/lib/eval/types';
 import type { TurnSnapshot } from '../src/types';
@@ -178,6 +178,76 @@ test.describe('sacrifice detection', () => {
     expect(detectSacks(['|drag|p1a: Dauni|Uxie, L50|120/182', '|faint|p1a: Dauni'], sackSnapshot(66))).toEqual({});
     expect(detectSacks(['|switch|p1a: Relous|Salazzle, F|116/253'], sackSnapshot(46))).toEqual({});
     expect(detectSacks(['|faint|p1a: Dauni'], sackSnapshot(46))).toEqual({});
+  });
+
+  test('a faint-prevented side gets a charitable stay-in phantom (priority moves excluded)', () => {
+    // GPL T14/T36: the victim provably chose a MOVE (a switch would have
+    // resolved before the attack) and every priority-0 move is
+    // outcome-equivalent — a priority choice would have preempted the KO,
+    // so it cannot represent what happened.
+    const result: EvalResult = {
+      score: 0.2, interval: 0.05, depthCompleted: 1,
+      perSide: {
+        p1: [choiceEv('move airslash', 'Air Slash', 0.3, 0.35)],
+        p2: [
+          choiceEv('switch 2', '→ Rotom-Wash', 0.05, 0.1),
+          choiceEv('move suckerpunch', 'Sucker Punch', -0.05, 0.0),
+          choiceEv('move moonblast', 'Moonblast', -0.25, -0.2),
+        ],
+      },
+    };
+    const played = {
+      p1: { kind: 'move' as const, name: 'Air Slash', tera: false },
+      p2: null,
+      prevented: { p2: 'faint' },
+    };
+    const phantom = phantomStayIn(result, 'p2', played);
+    expect(phantom?.choice).toBe('move moonblast');
+    expect(phantom?.label).toContain('stayed in');
+    // No marker, no phantom; a non-faint prevention stays unmatched.
+    expect(phantomStayIn(result, 'p2', { ...played, prevented: {} })).toBeNull();
+    expect(phantomStayIn(result, 'p2', { ...played, prevented: { p2: 'slp' } })).toBeNull();
+
+    const analysis = analyzeTurn({
+      turn: 14,
+      result,
+      played,
+      playedOutcome: 0.35,
+      scoreBefore: 0.2,
+      scoreAfter: 0.55,
+    });
+    // The stay-in itself is gradable: the engine's switch was worth 0.3
+    // more than the best outcome-equivalent move — a mistake, whichever
+    // move was hidden behind it.
+    expect(analysis.p2.neverActed).toBe(true);
+    expect(analysis.p2.played?.label).toContain('stayed in');
+    expect(analysis.p2.tier).toBe('mistake');
+    expect(analysis.p2.riskUnpunished).toBeFalsy();
+    expect(analysis.attribution).not.toBe('unclear');
+  });
+
+  test('a cant-prevented side still reads unclear (its choice may have mattered)', () => {
+    const result: EvalResult = {
+      score: 0.2, interval: 0.05, depthCompleted: 1,
+      perSide: {
+        p1: [choiceEv('move airslash', 'Air Slash', 0.3, 0.35)],
+        p2: [choiceEv('move moonblast', 'Moonblast', -0.25, -0.2)],
+      },
+    };
+    const analysis = analyzeTurn({
+      turn: 20,
+      result,
+      played: {
+        p1: { kind: 'move', name: 'Air Slash', tera: false },
+        p2: null,
+        prevented: { p2: 'slp' },
+      },
+      playedOutcome: null,
+      scoreBefore: 0.2,
+      scoreAfter: 0.55,
+    });
+    expect(analysis.p2.neverActed).toBeFalsy();
+    expect(analysis.attribution).toBe('unclear');
   });
 
   test('a healthy sack is excused only while the engine stays decisively ahead on both sides of it', () => {

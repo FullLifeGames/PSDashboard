@@ -80,6 +80,13 @@ test.describe('GPL replay end-to-end verdicts', () => {
     expect(t29.p1.riskUnpunished).toBeFalsy();
     if (t29.p1.tier) expect(t29.p1.sacrifice).toBeTruthy();
 
+    // T14: Cobalion was KO'd before it ever acted — the side prices through
+    // the charitable stay-in phantom instead of reading "unclear (a choice
+    // never surfaced)" (same shape as T36).
+    const t14 = await analyze(14);
+    expect(t14.p2.neverActed).toBe(true);
+    expect(t14.p2.played?.label).toContain('stayed in');
+
     // T35: the WINNER feeds a healthy Salazzle into Knock Off while the
     // engine calls the game decisively won on both sides of the sack
     // (probe: 83% before, 71% after; with the body deleted outright p1

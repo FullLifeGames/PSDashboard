@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
-  matchPlayedSide, REGRET_THRESHOLD,
+  matchPlayedSide, phantomStayIn, REGRET_THRESHOLD,
   type SensitivityProbe, type TurnSensitivity, type TurnVerification,
 } from '../lib/eval/analysis';
 import { patchSerializedItem, selectProbeCombos, type SensitivityTarget } from '../lib/eval/sensitivity';
@@ -48,6 +48,13 @@ function loadPrefs(): EvalPreferences {
     return DEFAULT_PREFS;
   }
 }
+
+/** Played-pair matching with the KO'd-before-acting stand-in: a side that
+ * never got to act still prices its pair through the charitable
+ * outcome-equivalent phantom (analysis.ts) — T14/T36 stop reading
+ * "unclear". */
+const matchOrPhantom = (result: EvalResult, side: 'p1' | 'p2', played: PlayedTurn | null): RankedChoice | null =>
+  matchPlayedSide(result, side, played) ?? phantomStayIn(result, side, played);
 
 interface CachedEval {
   result: EvalResult;
@@ -418,8 +425,8 @@ export function useEvaluation() {
       settings: EvalSettings,
     ): Promise<TurnVerification | null> => {
       if ((settings.mode ?? 'matrix') !== 'matrix' || settings.depth > 2) return null;
-      const p1Choice = matchPlayedSide(result, 'p1', turnPlayed);
-      const p2Choice = matchPlayedSide(result, 'p2', turnPlayed);
+      const p1Choice = matchOrPhantom(result, 'p1', turnPlayed);
+      const p2Choice = matchOrPhantom(result, 'p2', turnPlayed);
       if (!p1Choice || !p2Choice) return null;
       const flaggedBest = (side: 'p1' | 'p2', chosen: RankedChoice): RankedChoice | null => {
         const best = result.perSide[side][0];
@@ -467,8 +474,8 @@ export function useEvaluation() {
     ): Promise<TurnSensitivity | null> => {
       if (!params.sensitivityTargetsFor) return null;
       if ((settings.mode ?? 'matrix') !== 'matrix') return null;
-      const p1Choice = matchPlayedSide(result, 'p1', turnPlayed);
-      const p2Choice = matchPlayedSide(result, 'p2', turnPlayed);
+      const p1Choice = matchOrPhantom(result, 'p1', turnPlayed);
+      const p2Choice = matchOrPhantom(result, 'p2', turnPlayed);
       if (!p1Choice || !p2Choice) return null;
       const probeSettings: EvalSettings = { ...settings, keepPlayed: undefined };
       const out: TurnSensitivity = {};
@@ -550,8 +557,8 @@ export function useEvaluation() {
           let outcome: number | null | undefined = hit.playedOutcome;
           if (outcome === undefined) {
             outcome = null;
-            const p1Choice = matchPlayedSide(hit.result, 'p1', turnPlayed);
-            const p2Choice = matchPlayedSide(hit.result, 'p2', turnPlayed);
+            const p1Choice = matchOrPhantom(hit.result, 'p1', turnPlayed);
+            const p2Choice = matchOrPhantom(hit.result, 'p2', turnPlayed);
             if (p1Choice && p2Choice) {
               try {
                 const serialized = await positionFor(turn);
@@ -624,8 +631,8 @@ export function useEvaluation() {
             // The engine's expectation of the real choices — the decision
             // part of the coming swing (chance is the rest).
             let outcome: number | null = null;
-            const p1Choice = matchPlayedSide(result, 'p1', turnPlayed);
-            const p2Choice = matchPlayedSide(result, 'p2', turnPlayed);
+            const p1Choice = matchOrPhantom(result, 'p1', turnPlayed);
+            const p2Choice = matchOrPhantom(result, 'p2', turnPlayed);
             if (p1Choice && p2Choice) {
               try {
                 outcome = await clientRef.current.evalPair(serialized, p1Choice.choice, p2Choice.choice, { depth, samples, mode, tera: params.tera, sleepClause: params.sleepClause });

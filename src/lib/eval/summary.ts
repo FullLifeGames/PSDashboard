@@ -179,7 +179,7 @@ export function summarizeTurn(
         : 'No single mistake stands out — the swing built up without a clear culprit.');
       break;
     case 'unclear':
-      sentences.push('The score swung, but a choice never surfaced (a Pokémon slept, flinched, or fainted before acting) — no blame assigned.');
+      sentences.push('The score swung, but a choice never surfaced (a Pokémon slept, flinched, or was fully paralyzed) — no blame assigned.');
       break;
     default:
       sentences.push(playedBest(analysis.p1) && playedBest(analysis.p2)

@@ -1,3 +1,6 @@
+// Data-only Dex (move priorities for the stay-in phantom) — this module is
+// in the app's MAIN bundle; @pkmn/sim must never be imported here.
+import { Dex } from '@pkmn/dex';
 import type { EvalResult, RankedChoice, ReadRecommendation } from './types';
 import type { PlayedAction, PlayedTurn, SackInfo } from './played';
 
@@ -98,6 +101,10 @@ export interface SideAnalysis {
    * 'move: Taunt', 'faint', …) — the side DID pick something.
    */
   prevented?: string;
+  /** The side was KO'd before it ever acted — `played` is a charitable
+   * outcome-equivalent stand-in ("stayed in") for the hidden move choice,
+   * gradable against the engine's best; risk framing stays off. */
+  neverActed?: boolean;
   /** Doubles: the per-slot actions this side actually took. */
   playedSlots?: (PlayedAction | null)[];
   /** The played action matched into the engine's ranked list. */
@@ -377,6 +384,33 @@ export function matchPlayedSide(
   return matchPlayedChoice(result, side, played[side]);
 }
 
+/**
+ * Stand-in for a side KO'd before it ever acted (`prevented: 'faint'` with
+ * no action line): the KO-before-acting logic proves the side chose a MOVE
+ * (a chosen switch would have resolved before the attack), and every
+ * priority-0 move is outcome-equivalent — none of them executed. The
+ * best-ranked priority-0 move represents the stay-in most charitably; a
+ * priority choice cannot represent it (it would have preempted the KO).
+ * Null when the marker is absent, the parse is doubles-shaped, or only
+ * priority moves exist. Cant-family preventions (sleep, flinch, full
+ * paralysis) get NO phantom — their hidden choice may have mattered.
+ */
+export function phantomStayIn(
+  result: EvalResult,
+  side: 'p1' | 'p2',
+  played: PlayedTurn | null | undefined,
+): RankedChoice | null {
+  if (!played || played[side] !== null) return null;
+  if (played.p1Slots || played.p2Slots) return null;
+  if (played.prevented?.[side] !== 'faint') return null;
+  const option = result.perSide[side].find(candidate => {
+    if (!candidate.choice.startsWith('move ')) return false;
+    const id = candidate.choice.split(' ')[1] ?? '';
+    return (Dex.moves.get(id).priority ?? 0) === 0;
+  });
+  return option ? { ...option, label: 'stayed in (KO’d before acting)' } : null;
+}
+
 export function matchPlayedChoice(
   result: EvalResult,
   side: 'p1' | 'p2',
@@ -431,12 +465,20 @@ export function analyzeTurn(params: {
     const playedSlots = key === 'p1' ? params.played?.p1Slots : params.played?.p2Slots;
     let played: RankedChoice | null = null;
     let playedPartial = false;
+    let neverActed = false;
     if (playedSlots) {
       const match = matchPlayedSlots(params.result.perSide[key], playedSlots);
       played = match.played;
       playedPartial = match.partial;
     } else if (params.played) {
       played = matchPlayedChoice(params.result, key, playedRaw);
+      if (!played) {
+        const phantom = phantomStayIn(params.result, key, params.played);
+        if (phantom) {
+          played = phantom;
+          neverActed = true;
+        }
+      }
     }
     const options = params.result.perSide[key];
     const best = options[0] ?? null;
@@ -514,6 +556,7 @@ export function analyzeTurn(params: {
       playedRaw,
       ...(params.played?.prevented?.[key] ? { prevented: params.played.prevented[key] } : {}),
       ...(playedSlots ? { playedSlots } : {}),
+      ...(neverActed ? { neverActed } : {}),
       played,
       best,
       safe,
@@ -543,7 +586,8 @@ export function analyzeTurn(params: {
   // the payoff window softens flagged risks; here it would attribute the
   // opponent's follow-up choices and the rolls to the gamble.
   const markRisk = (key: 'p1' | 'p2', side: SideAnalysis, opponent: SideAnalysis) => {
-    if (side.sacrifice) return;
+    // A phantom stay-in has no real floor to price a read against.
+    if (side.sacrifice || side.neverActed) return;
     const tiered = side.tier === 'mistake' || side.tier === 'blunder';
     const ownBefore = key === 'p1' ? params.scoreBefore : -params.scoreBefore;
     const gamble = !tiered && side.played !== null && side.best !== null && side.safe !== null

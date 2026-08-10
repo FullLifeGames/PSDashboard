@@ -63,7 +63,10 @@ export interface StoredEval {
 // v24: locked releases carry dex-derived targets (doubles mid-charge
 //      Phantom Force/Meteor Beam candidates were guaranteed rejects on
 //      round-tripped states — those cells never sampled).
-export const EVAL_ENGINE_CACHE_VERSION = 24;
+// v25: KO'd-before-acting sides price their pair through the stay-in
+//      phantom — playedOutcome values stored as null under v24 would
+//      otherwise never heal (null means "tried, unmatched" and is final).
+export const EVAL_ENGINE_CACHE_VERSION = 25;
 
 export function evalStoreKey(
   cacheKey: string,
