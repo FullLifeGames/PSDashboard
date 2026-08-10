@@ -48,7 +48,9 @@ export interface StoredEval {
 //      candidate lists.
 // v18: video-pipeline watermark |rule| lines no longer suppress the
 //      singles Sleep Clause default (GPL evals cached without the clause).
-export const EVAL_ENGINE_CACHE_VERSION = 18;
+// v19: corrected actives enter FRESH (no inherited choice locks from
+//      diverged sim histories — GPL T38 hid Grass Knot).
+export const EVAL_ENGINE_CACHE_VERSION = 19;
 
 export function evalStoreKey(
   cacheKey: string,

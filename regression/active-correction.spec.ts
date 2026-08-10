@@ -61,6 +61,32 @@ test.describe('correctActivesFromProtocol', () => {
     side.pokemon.forEach((pokemon, index) => expect(pokemon.position).toBe(index));
   });
 
+  test('a repointed Pokémon enters fresh — no inherited choice lock (GPL T38)', async () => {
+    // A diverged sim can keep a mon on the field locked into a Choice move
+    // while the REAL game switched it out and back in. The correction that
+    // forces it active must clear the lock trio — the real entry was fresh.
+    const runtime = await reconstructBranchRuntime({
+      format: 'gen9ou',
+      p1Team,
+      p2Team,
+      replayLog: singlesLog,
+      targetTurn: 1,
+    });
+    const battle = runtime.battleStream.battle!;
+    const side = battle.sides[0];
+    const eve = side.pokemon.find(pokemon => pokemon.name === 'Eve')!;
+    // Manufacture the diverged state: benched Eevee carrying a stale lock.
+    eve.volatiles['choicelock'] = { id: 'choicelock', move: 'tackle' } as never;
+    eve.moveSlots.forEach(slot => { slot.disabled = true; });
+
+    correctActivesFromProtocol(battle, ['|switch|p1a: Eve|Eevee, L50|100/100']);
+
+    expect(side.active[0]?.name).toBe('Eve');
+    expect('choicelock' in eve.volatiles).toBe(false);
+    expect(eve.lastMove).toBeNull();
+    eve.moveSlots.forEach(slot => expect(slot.disabled).toBe(false));
+  });
+
   test('a real switch after a correction neither duplicates nor loses team members', async () => {
     const runtime = await reconstructBranchRuntime({
       format: 'gen9ou',

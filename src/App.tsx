@@ -735,7 +735,11 @@ function App() {
     }
   }, [pendingEvalPick, branching, simState, branchPreparing, playOutEvalChoice]);
 
-  const analyzableTurns = endSnapshotTurn !== null ? Math.max(1, endSnapshotTurn - 1) : maxTurn;
+  // The END snapshot's `.turn` IS the final played turn — its actions live
+  // in the trailing block (after the last |turn| marker), so it analyzes
+  // like any other turn. Excluding it left the game-ending turn without a
+  // graph node or options (GPL).
+  const analyzableTurns = endSnapshotTurn !== null ? Math.max(1, endSnapshotTurn) : maxTurn;
 
   const handleAnalyzeGame = useCallback(() => {
     if (!replayData) return;

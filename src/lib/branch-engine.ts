@@ -526,6 +526,16 @@ function repointActiveSlot(side: SimSide, activeSlot: number, target: SimPokemon
   target.isActive = true;
   target.position = activeSlot;
   side.active[activeSlot] = target;
+
+  // The REAL game brought this Pokémon in fresh; the sim history being
+  // corrected may never have switched it out at all — a diverged GPL
+  // reconstruction kept Vileplume on the field locked into its tricked
+  // scarf's Sludge Bomb, and the stale lock followed it into the corrected
+  // position (T38: "Grass Knot not among the options"). Mirror the parts of
+  // a real entry that gate move choice.
+  delete target.volatiles['choicelock'];
+  target.lastMove = null;
+  for (const slot of target.moveSlots) slot.disabled = false;
 }
 
 export function correctActivesFromProtocol(battle: SimBattle, events: string[]) {
