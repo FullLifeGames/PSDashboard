@@ -373,11 +373,11 @@ test.describe('PS Dashboard', () => {
     // Selecting a turn re-targets EVERYTHING in one place: the analysis,
     // the advantage bar, the ranked lists, and the matrix toggle.
     await panel.locator('.ps-eval-graph rect[data-turn="2"]').click();
-    await expect(panel.locator('.ps-eval-analysis')).toContainText('Turn 2');
+    await expect(panel.locator('.ps-eval-analysis')).toContainText('Turn 2', { timeout: 15_000 });
     await expect(panel.locator('.ps-eval-bar')).toBeVisible();
     await expect(panel.locator('button', { hasText: 'Matrix' })).toBeVisible();
     await panel.locator('.ps-eval-graph rect[data-turn="1"]').click();
-    await expect(panel.locator('.ps-eval-analysis')).toContainText('Turn 1');
+    await expect(panel.locator('.ps-eval-analysis')).toContainText('Turn 1', { timeout: 15_000 });
   });
 
   test('analyzes the whole game with the MCTS engine', async ({ page }) => {

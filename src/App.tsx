@@ -808,15 +808,21 @@ function App() {
     if (analysisTurn === null || analysisTurn < 1) return;
     if (evaluation.graph.running) return;
     if (!evaluation.graph.scores.some(score => score !== null)) return;
-    if (evaluation.graph.results[analysisTurn - 1]) return;
-    const key = `${replayData.id}:${analysisTurn}:${setsFingerprint}`;
+    // A fast-pass (depth 1) result is a sketch: selecting the turn UPGRADES
+    // it to the configured settings — the old "Analyze turn" button's depth
+    // escalation, now automatic. MCTS results have no comparable depth
+    // number; any cached result counts there.
+    const cached = evaluation.graph.results[analysisTurn - 1];
+    const wantDepth = evaluation.prefs.mode === 'mcts' ? null : evaluation.prefs.depth;
+    if (cached && (wantDepth === null || cached.depthCompleted >= wantDepth)) return;
+    const key = `${replayData.id}:${analysisTurn}:${setsFingerprint}:d${wantDepth ?? 'mcts'}`;
     if (autoAnalyzeAttemptedRef.current.has(key)) return;
     const timer = setTimeout(() => {
       autoAnalyzeAttemptedRef.current.add(key);
       analyzeTurnNow(analysisTurn);
     }, 400);
     return () => clearTimeout(timer);
-  }, [branching, replayData, analysisTurn, evaluation.graph.running, evaluation.graph.scores, evaluation.graph.results, setsFingerprint, analyzeTurnNow]);
+  }, [branching, replayData, analysisTurn, evaluation.graph.running, evaluation.graph.scores, evaluation.graph.results, evaluation.prefs.mode, evaluation.prefs.depth, setsFingerprint, analyzeTurnNow]);
 
   // Any position change invalidates a displayed result.
   const { markStale: markEvalStale, reset: resetEval, clearGraph } = evaluation;
