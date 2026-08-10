@@ -104,7 +104,11 @@ export interface SideAnalysis {
   riskPayoff?: number;
   /** Turns AFTER this one until the payoff peaked (absent = immediate). */
   riskPayoffTurn?: number;
-  /** The read won at least RISK_PAYOFF_MARGIN over the safe guarantee. */
+  /**
+   * The read won at least RISK_PAYOFF_MARGIN over the safe guarantee. Also
+   * set on UNTIERED turns when the play was a genuine gamble (deviated from
+   * the engine's pick, gave up a mistake-sized floor) that landed.
+   */
   riskPaidOff?: boolean;
   /**
    * The flagged risk MATCHES the opponent model's best response — phrased
@@ -496,9 +500,20 @@ export function analyzeTurn(params: {
   // from a punished misplay. Where the pair's expected value is known, the
   // payoff over the safe guarantee grades the read: clearly ahead = a good
   // play, clearly behind = a plain misplay even unpunished, between = risk.
+  // UNTIERED turns enter too, but only as genuine gambles — the play deviated
+  // from the engine's pick AND gave up a mistake-sized floor vs the safe line
+  // (draft T50: a co-optimal switch whose floor priced in Earth Power). They
+  // can only EARN the paid-off credit; with no verdict to soften, the risk
+  // labels stay off.
   const markRisk = (key: 'p1' | 'p2', side: SideAnalysis, opponent: SideAnalysis) => {
     if (side.sacrifice) return;
-    if (side.tier !== 'mistake' && side.tier !== 'blunder') return;
+    const tiered = side.tier === 'mistake' || side.tier === 'blunder';
+    const gamble = !tiered && side.played !== null && side.best !== null && side.safe !== null
+      && side.played.choice !== side.best.choice
+      && side.played.choice !== side.safe.choice
+      && side.safe.worstCase - side.played.worstCase >= TIER_THRESHOLDS.mistake
+      && params.playedOutcome !== null;
+    if (!tiered && !gamble) return;
     if (!side.played?.punishedBy || !opponent.played) return;
     if (opponent.played.label === side.played.punishedBy) return;
     if (params.playedOutcome !== null && side.safe) {
@@ -523,6 +538,8 @@ export function analyzeTurn(params: {
         if (payoff >= RISK_PAYOFF_MARGIN) side.riskPaidOff = true;
       }
     }
+    // Gambles stop here: paid-off credit or nothing.
+    if (!tiered) return;
     side.riskUnpunished = true;
     // The opponent model agrees: this "risk" was the exploitative best
     // response to how the opponent actually plays — phrase it as a read.

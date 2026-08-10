@@ -294,6 +294,88 @@ test.describe('turn analysis assembly', () => {
     expect(analysisPunished.p2.riskUnpunished).toBeUndefined();
   });
 
+  test('a no-regret gamble that beats the safe guarantee reads as paid off', () => {
+    // Draft T50-shaped: the played switch TIES the engine pick by EV (regret
+    // ~0, so no tier), but its floor gave up mistake-sized safety vs the safe
+    // line. The punisher never came and the outcome beat the safe guarantee —
+    // the report should say the read paid off, not stay mute.
+    const tied: EvalResult = {
+      score: -0.05, interval: 0.02, depthCompleted: 1,
+      perSide: {
+        p1: [choiceEv('move ironhead', 'Iron Head', -0.06, -0.05)],
+        p2: [
+          choiceEv('move recover', 'Recover', 0.04, 0.05),
+          choiceEv('switch 5', '→ Heatran', -0.39, 0.047),
+        ],
+      },
+    };
+    const at = (playedOutcome: number | null) => analyzeTurn({
+      turn: 50,
+      result: tied,
+      played: { p1: { kind: 'move', name: 'Iron Head', tera: false }, p2: { kind: 'switch', name: 'Heatran', species: 'Heatran' } },
+      playedOutcome,
+      scoreBefore: -0.05,
+      scoreAfter: -0.14,
+    });
+
+    // Own outcome +0.19 vs the safe floor +0.04: payoff +0.15 ≥ the margin.
+    const paid = at(-0.19);
+    expect(paid.p2.tier).toBeUndefined();
+    expect(paid.p2.riskPaidOff).toBe(true);
+    expect(paid.p2.riskPayoff).toBeCloseTo(0.15, 10);
+    // No tier means nothing to soften — the risk labels stay off.
+    expect(paid.p2.riskUnpunished).toBeUndefined();
+    expect(paid.attribution).toBe('p2-read');
+
+    // Payoff +0.01: inside the neutral band — the turn stays quiet.
+    const neutral = at(-0.05);
+    expect(neutral.p2.riskPaidOff).toBeUndefined();
+    expect(neutral.attribution).toBe('quiet');
+
+    // Unknown pair value: nothing to grade the gamble on.
+    const unknown = at(null);
+    expect(unknown.p2.riskPaidOff).toBeUndefined();
+    expect(unknown.p2.riskUnpunished).toBeUndefined();
+
+    // A small floor give-up is not a gamble — an ordinary attack that went
+    // well must not earn read praise (chattiness guard).
+    const smallGap: EvalResult = {
+      ...tied,
+      perSide: {
+        p1: tied.perSide.p1,
+        p2: [
+          choiceEv('move recover', 'Recover', 0.04, 0.05),
+          choiceEv('switch 5', '→ Heatran', -0.1, 0.047),
+        ],
+      },
+    };
+    const ordinary = analyzeTurn({
+      turn: 50, result: smallGap,
+      played: { p1: { kind: 'move', name: 'Iron Head', tera: false }, p2: { kind: 'switch', name: 'Heatran', species: 'Heatran' } },
+      playedOutcome: -0.19, scoreBefore: -0.05, scoreAfter: -0.14,
+    });
+    expect(ordinary.p2.riskPaidOff).toBeUndefined();
+
+    // Playing the engine's own pick is covered by the ✓ chip — no read
+    // credit on top even when the floor was scary.
+    const gambleBest: EvalResult = {
+      ...tied,
+      perSide: {
+        p1: tied.perSide.p1,
+        p2: [
+          choiceEv('switch 5', '→ Heatran', -0.39, 0.06),
+          choiceEv('move recover', 'Recover', 0.04, 0.05),
+        ],
+      },
+    };
+    const enginePick = analyzeTurn({
+      turn: 50, result: gambleBest,
+      played: { p1: { kind: 'move', name: 'Iron Head', tera: false }, p2: { kind: 'switch', name: 'Heatran', species: 'Heatran' } },
+      playedOutcome: -0.19, scoreBefore: -0.05, scoreAfter: -0.14,
+    });
+    expect(enginePick.p2.riskPaidOff).toBeUndefined();
+  });
+
   test('regret is measured against equilibrium EV, not the floor', () => {
     // The played line has a scary floor (−0.3) but nearly full equilibrium
     // value: floor-regret would cry 0.3 — the honest ev-regret is 0.05.

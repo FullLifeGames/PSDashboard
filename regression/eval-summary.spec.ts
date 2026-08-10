@@ -85,6 +85,34 @@ test.describe('natural-language turn summaries', () => {
     expect(summary).not.toContain('a read: its floor risked');
   });
 
+  test('an untiered gamble that landed is praised as a read that paid off', () => {
+    // Draft T50-shaped: the played switch ties the engine pick by EV (no
+    // tier), gave up a mistake-sized floor, and the outcome beat the safe
+    // guarantee — the headline is the read, not "a quiet turn".
+    const tied: EvalResult = {
+      score: -0.05, interval: 0.02, depthCompleted: 1,
+      perSide: {
+        p1: [choice('move ironhead', 'Iron Head', -0.05)],
+        p2: [
+          { ...choice('move recover', 'Recover', 0.04), ev: 0.05, punishedBy: 'Iron Head' },
+          { ...choice('switch 5', '→ Heatran', -0.39), ev: 0.047, punishedBy: 'Earth Power' },
+        ],
+      },
+    };
+    const summary = summarizeTurn(analyzeTurn({
+      turn: 50,
+      result: tied,
+      played: { p1: { kind: 'move', name: 'Iron Head', tera: false }, p2: { kind: 'switch', name: 'Heatran', species: 'Heatran' } },
+      playedOutcome: -0.19,
+      scoreBefore: -0.05,
+      scoreAfter: -0.14,
+    }), names);
+    expect(summary).toContain('a read that paid off');
+    expect(summary).toContain('+0.15 over the safe Recover');
+    expect(summary).toContain('The floor priced in Earth Power; Iron Head came instead.');
+    expect(summary).not.toContain('quiet turn');
+  });
+
   test('a sensitivity hinge names the item split', () => {
     const withSensitivity = analyzeTurn({
       turn: 20,
