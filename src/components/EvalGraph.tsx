@@ -80,19 +80,15 @@ export function EvalGraph({ scores, playerNames, currentTurn, onSelectTurn, lead
   const hitWidth = (width - 2 * PAD_X) / Math.max(turns - first, 1);
 
   const pct = (score: number) => winPercent(score);
-  // A node IS the estimate before its turn — the story of HOW it got there
-  // is the PREVIOUS turn's play, so that's what a click opens (peaks were
-  // drawing clicks that landed on "not much happening yet").
-  const producerOf = (turn: number) => Math.max(first, turn - 1);
+  // A node IS the estimate before its turn; the movement INTO it was the
+  // previous turn's doing. Clicks stay on the node's own turn (a shifted
+  // click felt like landing one node back) — the tooltip names the producer
+  // and the selection glow shows the clicked turn's own movement.
   const label = (turn: number, score: number) => {
     const swing = blunders.has(turn) ? ' — blunder swing' : '';
-    const producer = producerOf(turn);
-    const click = producer === turn
-      ? ''
-      : producer === 0
-        ? ' · click: the lead decision that set this up'
-        : ` · click: turn ${producer}, which produced this position`;
-    return `Before turn ${turn}: ${playerNames[0]} ${pct(score)}% · ${playerNames[1]} ${100 - pct(score)}%${swing}${click}`;
+    const producer = turn - 1 >= first ? (turn - 1 === 0 ? 'the lead decision' : `turn ${turn - 1}`) : null;
+    const arrival = producer ? ` (what ${producer} produced)` : '';
+    return `Before turn ${turn}${arrival}: ${playerNames[0]} ${pct(score)}% · ${playerNames[1]} ${100 - pct(score)}%${swing}`;
   };
 
   // The selected turn's movement: its node → the next node (what that play
@@ -139,12 +135,13 @@ export function EvalGraph({ scores, playerNames, currentTurn, onSelectTurn, lead
               stroke="#cde" strokeOpacity={0.5} strokeDasharray="3 2"
             />
           )}
-          {/* Diamond, not circle — the lead decision is a different kind of point. */}
+          {/* Diamond, not circle — the lead decision is a different kind of
+              point, drawn larger so it reads as its own clickable stop. */}
           <rect
-            x={x(0) - 2.6} y={y(leadScore!) - 2.6} width={5.2} height={5.2}
+            x={x(0) - 3.4} y={y(leadScore!) - 3.4} width={6.8} height={6.8}
             transform={`rotate(45 ${x(0)} ${y(leadScore!)})`}
             fill={leadScore! >= 0 ? '#8ac' : '#c8a'}
-            stroke="#cde" strokeWidth={0.8}
+            stroke="#cde" strokeWidth={1}
             style={{ pointerEvents: 'none' }}
           />
           <rect
@@ -179,7 +176,7 @@ export function EvalGraph({ scores, playerNames, currentTurn, onSelectTurn, lead
           height={HEIGHT}
           fill="transparent"
           style={onSelectTurn ? { cursor: 'pointer' } : undefined}
-          onClick={onSelectTurn ? () => onSelectTurn(producerOf(index + 1)) : undefined}
+          onClick={onSelectTurn ? () => onSelectTurn(index + 1) : undefined}
         >
           <title>{label(index + 1, score)}</title>
         </rect>
