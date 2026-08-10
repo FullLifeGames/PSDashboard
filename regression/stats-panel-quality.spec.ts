@@ -233,6 +233,69 @@ test.describe('stats panel data quality (WP11)', () => {
     expect(clef.evs.sourceDetail).toBeUndefined();
   });
 
+  test('a tricked item is never the set item; the giver gets the credit (GPL T11)', () => {
+    // Rotom tricks its scarf onto Vileplume: the scarf is NOT Vileplume's
+    // set item (crediting it manufactured a choice lock that hid the real
+    // moves), and it IS Rotom's.
+    const log = [
+      '|player|p1|Alice|', '|player|p2|Bob|', '|gen|9',
+      '|poke|p1|Vileplume, F|', '|poke|p2|Rotom-Wash|',
+      '|start',
+      '|switch|p1a: Plume|Vileplume, F|100/100',
+      '|switch|p2a: Wash|Rotom-Wash|100/100',
+      '|turn|1',
+      '|move|p2a: Wash|Trick|p1a: Plume',
+      '|-item|p1a: Plume|Choice Scarf|[from] move: Trick',
+      '|-item|p2a: Wash|Black Sludge|[from] move: Trick',
+      '|turn|2',
+    ].join('\n');
+    const plume = inferOpponentTeam(log, 'p1').pokemon.find(p => p.species === 'Vileplume');
+    // Not the scarf — and the counterpart line reveals Plume's original.
+    expect(plume?.item?.value).toBe('Black Sludge');
+    const wash = inferOpponentTeam(log, 'p2').pokemon.find(p => p.species === 'Rotom-Wash');
+    expect(wash?.item?.value).toBe('Choice Scarf');
+  });
+
+  test('a sparse video log (one -item line, no counterpart) still excludes the tricked item', () => {
+    const log = [
+      '|player|p1|Alice|', '|player|p2|Bob|', '|gen|9',
+      '|poke|p1|Vileplume, F|', '|poke|p2|Rotom-Wash|',
+      '|start',
+      '|switch|p1a: Plume|Vileplume, F|100/100',
+      '|switch|p2a: Wash|Rotom-Wash|100/100',
+      '|turn|1',
+      '|move|p2a: Wash|Trick|p1a: Plume',
+      '|-item|p1a: Plume|Choice Scarf|[from] move: Trick',
+      '|turn|2',
+    ].join('\n');
+    const plume = inferOpponentTeam(log, 'p1').pokemon.find(p => p.species === 'Vileplume');
+    expect(plume?.item?.value).toBeFalsy();
+    // The giver still gets its original credited from the receiver's line.
+    const wash = inferOpponentTeam(log, 'p2').pokemon.find(p => p.species === 'Rotom-Wash');
+    expect(wash?.item?.value).toBe('Choice Scarf');
+  });
+
+  test('post-swap consumption and reveals stay excluded; pre-swap reveals win', () => {
+    const log = [
+      '|player|p1|Alice|', '|player|p2|Bob|', '|gen|9',
+      '|poke|p1|Vileplume, F|', '|poke|p2|Rotom-Wash|',
+      '|start',
+      '|switch|p1a: Plume|Vileplume, F|100/100',
+      '|switch|p2a: Wash|Rotom-Wash|100/100',
+      '|turn|1',
+      '|-heal|p1a: Plume|100/100|[from] item: Black Sludge',
+      '|turn|2',
+      '|move|p2a: Wash|Trick|p1a: Plume',
+      '|-item|p1a: Plume|Choice Scarf|[from] move: Trick',
+      '|turn|3',
+      '|-enditem|p1a: Plume|Choice Scarf|[from] move: Knock Off|[of] p2a: Wash',
+      '|turn|4',
+    ].join('\n');
+    const plume = inferOpponentTeam(log, 'p1').pokemon.find(p => p.species === 'Vileplume');
+    // The pre-swap heal reveal is the set item; the knocked-off scarf is not.
+    expect(plume?.item?.value).toBe('Black Sludge');
+  });
+
   test('item damage recoil reveals the holder (Life Orb)', () => {
     const log = [
       '|player|p2|Bob|',

@@ -118,6 +118,11 @@ function applyTeamSheet(pokemonMap: Map<string, RevealedPokemonInfo>, sheet: She
 
 /** Items whose `[from] item:` damage hits the attacker instead of the holder. */
 const ATTACKER_PUNISH_ITEMS = new Set(['rockyhelmet', 'jabocaberry', 'rowapberry']);
+/** `|-item|` sources that mean the holder ACQUIRED the item mid-game — not its set item. */
+const SWAP_ITEM_SOURCES =
+  /\[from\] (?:move: (?:Trick|Switcheroo|Thief|Covet|Bestow)|ability: (?:Magician|Pickpocket|Symbiosis))/;
+/** Swap moves whose resolving-move context pairs giver and receiver (no [of] emitted). */
+const SWAP_PAIR_MOVES = new Set(['trick', 'switcheroo', 'thief', 'covet']);
 /** A landed Ground move from a possible immunity-breaker proves nothing about Levitate. */
 const MOLD_BREAKER_ABILITIES = new Set(['moldbreaker', 'teravolt', 'turboblaze']);
 
@@ -148,6 +153,12 @@ export function inferOpponentTeam(log: string, opponentSide: 'p1' | 'p2' = 'p2')
   // identSpecies — serves the rule-out path without re-scanning the log
   // (the full scan remains only as the fallback for synthetic logs).
   const nicknameSpecies = new Map<string, string>();
+  // Idents whose current item arrived via a swap (Trick & co) — later item
+  // reveals/consumptions for them show the acquired item, not the set item.
+  // The value is the swap's resolving-move action (object identity): within
+  // the SAME action the counterpart line may still credit the giver's
+  // original; from a later action the ident only gives away acquired items.
+  const swappedIdents = new Map<string, object | null>();
   let gravityActive = false;
 
   const canHaveDancer = (ident: string): boolean => {
@@ -308,26 +319,63 @@ export function inferOpponentTeam(log: string, opponentSide: 'p1' | 'p2' = 'p2')
       }
     }
 
-    // Item: |-item|p2a: Nickname|Item Name
-    if (line.startsWith(`|-item|${opponentSide}`)) {
+    // Item: |-item|pXa: Nickname|Item Name[|tags]. A swap-ACQUIRED item
+    // ([from] Trick/Switcheroo/Thief/Covet/Bestow or Magician/Pickpocket/
+    // Symbiosis) is NOT the holder's set item — crediting Vileplume with the
+    // scarf a Trick planted on it manufactured a choice lock that hid its
+    // real moves (GPL T11). The same line DOES reveal the GIVER's set item:
+    // whatever arrived came off the other party of the resolving swap.
+    if (line.startsWith('|-item|')) {
       const parts = line.split('|');
-      const identParts = parts[2].split(': ');
-      const nickname = identParts[1];
+      const ident = parts[2] ?? '';
+      const nickname = ident.split(': ')[1];
       const itemName = parts[3];
-      const pokemon = findPokemonByNickname(pokemonMap, nickname, lines, opponentSide);
-      if (pokemon) {
-        pokemon.item = revealedField(itemName);
+      const swapAcquired = SWAP_ITEM_SOURCES.test(line);
+      if (ident.startsWith(opponentSide) && nickname) {
+        if (swapAcquired) {
+          swappedIdents.set(ident, pendingMove);
+        } else if (!swappedIdents.has(ident)) {
+          const pokemon = findPokemonByNickname(pokemonMap, nickname, lines, opponentSide);
+          if (pokemon) {
+            pokemon.item = revealedField(itemName);
+          }
+        }
+      }
+      if (swapAcquired && itemName) {
+        // Giver: the [of] ident when present, else the OTHER party of the
+        // resolving swap move (Trick swaps emit no [of]).
+        const ofIdent = line.match(/\[of\] (p[12][a-d]?: [^|\n]+)/)?.[1]?.trim() ?? null;
+        const pairedMove = pendingMove && SWAP_PAIR_MOVES.has(toId(pendingMove.moveName)) ? pendingMove : null;
+        const giver = ofIdent ?? (pairedMove
+          ? (pairedMove.attacker === ident
+            ? lastMoveTarget.get(pairedMove.attacker) ?? null
+            : pairedMove.attacker)
+          : null);
+        // A giver that swap-acquired in an EARLIER action only gives away
+        // acquired goods; its counterpart line in THIS action still counts.
+        const priorSwap = giver !== null && swappedIdents.has(giver) && swappedIdents.get(giver) !== pendingMove;
+        if (giver && giver.startsWith(opponentSide) && !priorSwap) {
+          const giverNickname = giver.split(': ')[1];
+          const pokemon = giverNickname
+            ? findPokemonByNickname(pokemonMap, giverNickname, lines, opponentSide)
+            : null;
+          if (pokemon && !pokemon.item.value) {
+            pokemon.item = revealedField(itemName);
+          }
+        }
       }
     }
 
-    // End item (consumed): |-enditem|p2a: Nickname|Item Name
+    // End item (consumed): |-enditem|p2a: Nickname|Item Name. After a swap
+    // the mon consumes/loses the ACQUIRED item — never its set item.
     if (line.startsWith(`|-enditem|${opponentSide}`)) {
       const parts = line.split('|');
+      const ident = parts[2] ?? '';
       const identParts = parts[2].split(': ');
       const nickname = identParts[1];
       const itemName = parts[3];
       const pokemon = findPokemonByNickname(pokemonMap, nickname, lines, opponentSide);
-      if (pokemon && !pokemon.item.value) {
+      if (pokemon && !pokemon.item.value && !swappedIdents.has(ident)) {
         pokemon.item = revealedField(`${itemName} (consumed)`);
       }
     }
