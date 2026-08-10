@@ -776,12 +776,11 @@ function App() {
     usageStats.stats, setAssumptions.assumptions, sensitivityTargetsFor,
   ]);
 
-  // On-demand: explain the current turn without sweeping the whole game —
-  // its analysis only needs this turn and the next one evaluated.
-  const handleAnalyzeTurn = useCallback(() => {
+  // Explains ONE turn: a two-turn mini sweep (turn + its follow-up) so the
+  // report can price the played outcome. Runs AUTOMATICALLY for whatever
+  // turn is selected — analysis, ranked lists, and matrix live in one place.
+  const analyzeTurnNow = useCallback((turn: number) => {
     if (!replayData) return;
-    // The ref, not the closure: see branchTurnRef (slider→click race).
-    const turn = Math.min(Math.max(1, branchTurnRef.current), analyzableTurns);
     evaluation.runGraphSweep({
       turns: analyzableTurns,
       from: turn,
@@ -795,8 +794,29 @@ function App() {
         : parsePlayedActions(snapshots[sweepTurn]?.log ?? [])),
       sensitivityTargetsFor,
     });
-    setAnalysisTurn(turn);
   }, [replayData, evaluation, analyzableTurns, effectiveTera, effectiveSleepClause, setsFingerprint, makeReplayAcquire, snapshots, evalIsDoubles, sensitivityTargetsFor]);
+
+  // Quiet gap-filler: once the game has ANY analysis, the selected turn
+  // analyzes itself when the sweep has nothing for it yet — "Analyze game"
+  // is the single entry point, selection does the rest. Gated on existing
+  // graph data so merely loading a replay never starts background evals,
+  // and one attempt per (replay, turn, sets) — a wedged reconstruction must
+  // not retry forever.
+  const autoAnalyzeAttemptedRef = useRef(new Set<string>());
+  useEffect(() => {
+    if (branching || !replayData) return;
+    if (analysisTurn === null || analysisTurn < 1) return;
+    if (evaluation.graph.running) return;
+    if (!evaluation.graph.scores.some(score => score !== null)) return;
+    if (evaluation.graph.results[analysisTurn - 1]) return;
+    const key = `${replayData.id}:${analysisTurn}:${setsFingerprint}`;
+    if (autoAnalyzeAttemptedRef.current.has(key)) return;
+    const timer = setTimeout(() => {
+      autoAnalyzeAttemptedRef.current.add(key);
+      analyzeTurnNow(analysisTurn);
+    }, 400);
+    return () => clearTimeout(timer);
+  }, [branching, replayData, analysisTurn, evaluation.graph.running, evaluation.graph.scores, evaluation.graph.results, setsFingerprint, analyzeTurnNow]);
 
   // Any position change invalidates a displayed result.
   const { markStale: markEvalStale, reset: resetEval, clearGraph } = evaluation;
@@ -810,9 +830,12 @@ function App() {
   }, [replayData?.id, branching, resetEval]);
 
   // The graph is tied to a specific replay + set knowledge + Tera mode.
+  // The SELECTION survives the reset — analysisTurn mirrors the slider and
+  // simply has nothing to show until fresh data arrives (nulling it here
+  // raced the mirror effect whenever usage stats landed after load, leaving
+  // the merged panel permanently empty).
   useEffect(() => {
     clearGraph();
-    setAnalysisTurn(null);
   }, [replayData?.id, setsFingerprint, effectiveTera, clearGraph]);
 
   // Opt-in: keep the branch evaluation fresh after each executed turn.
@@ -963,12 +986,12 @@ function App() {
     setAnalysisTurn(turn);
   }, [handleReplayTurn]);
 
-  // Once an analysis is open it follows the replay position — moving the
-  // slider (or stepping the battle) re-targets the analyzed turn.
+  // The analysis follows the replay position — selecting a turn (slider,
+  // graph click, stepping) IS the analysis request; there is no separate
+  // "open" state. A lead selection (turn 0) survives until the slider moves.
   useEffect(() => {
     if (branching) return;
     setAnalysisTurn(prev => {
-      if (prev === null) return prev;
       const turn = Math.min(Math.max(1, branchTurn), analyzableTurns);
       return turn === prev ? prev : turn;
     });
@@ -1026,6 +1049,16 @@ function App() {
       ...(turnReads ? { reads: turnReads } : {}),
     });
   }, [analysisTurn, evaluation.graph, replayData, snapshots, turnReads, turnEventsIndex]);
+
+  // ONE place for everything: in replay view the advantage bar, ranked
+  // lists, and matrix render from the ANALYZED turn's cached sweep result
+  // (turn 0 = the lead decision) — the branch view keeps its live result.
+  const analyzedResult = useMemo(() => {
+    if (branching) return evaluation.result;
+    if (analysisTurn === 0) return evaluation.graph.lead?.result ?? null;
+    if (analysisTurn !== null && analysisTurn >= 1) return evaluation.graph.results[analysisTurn - 1] ?? null;
+    return null;
+  }, [branching, evaluation.result, evaluation.graph, analysisTurn]);
 
   const replayWinner = useMemo<'p1' | 'p2' | null>(() => {
     if (!replayData) return null;
@@ -1367,14 +1400,14 @@ function App() {
             {evalAvailable && (
               <EvalPanel
                 playerNames={[replayData.players[0], replayData.players[1]]}
-                status={evaluation.status}
-                result={evaluation.result}
+                status={branching ? evaluation.status : 'idle'}
+                result={analyzedResult}
                 progress={evaluation.progress}
                 reconstructProgress={evaluation.reconstructProgress}
                 error={evaluation.error}
                 prefs={evaluation.prefs}
                 onPrefsChange={evaluation.setPrefs}
-                onEvaluate={handleEvaluate}
+                onEvaluate={branching ? handleEvaluate : undefined}
                 onCancel={evaluation.cancel}
                 onPickChoice={handleExploreChoice}
                 onPickPair={handlePickPair}
@@ -1382,7 +1415,6 @@ function App() {
                 showTera={replayGen === 9}
                 graph={evaluation.graph}
                 onAnalyzeGame={!branching ? handleAnalyzeGame : undefined}
-                onAnalyzeTurn={!branching ? handleAnalyzeTurn : undefined}
                 onSelectTurn={!branching ? handleGraphSelect : undefined}
                 currentTurn={branching ? (simState?.turnNumber ?? branchTurn) : branchTurn}
                 analysis={!branching ? turnAnalysis : null}

@@ -18,7 +18,8 @@ interface EvalPanelProps {
   error: string | null;
   prefs: EvalPreferences;
   onPrefsChange: (prefs: EvalPreferences) => void;
-  onEvaluate: () => void;
+  /** Branch mode only — the replay view analyzes the selected turn automatically. */
+  onEvaluate?: () => void;
   onCancel: () => void;
   /** Click on an engine line: plays it out in a branch (entering one first when needed), the other side answering with `reply`. */
   onPickChoice?: (side: 'p1' | 'p2', choice: RankedChoice, reply?: RankedChoice | null) => void;
@@ -31,8 +32,6 @@ interface EvalPanelProps {
   graph: EvalGraphState;
   /** Replay view only — starts the whole-game background sweep. */
   onAnalyzeGame?: () => void;
-  /** Replay view only — analyzes just the current turn (and its follow-up). */
-  onAnalyzeTurn?: () => void;
   onSelectTurn?: (turn: number) => void;
   currentTurn: number;
   /** Analysis of the graph-selected turn (replay view only). */
@@ -116,7 +115,7 @@ function ChoiceList({
 export function EvalPanel({
   playerNames, status, result, progress, reconstructProgress, error,
   prefs, onPrefsChange, onEvaluate, onCancel, onPickChoice, onPickPair, showAuto, showTera,
-  graph, onAnalyzeGame, onAnalyzeTurn, onSelectTurn, currentTurn, analysis,
+  graph, onAnalyzeGame, onSelectTurn, currentTurn, analysis,
   reads, leadAnalysis, reportLeads, report, doubles,
 }: EvalPanelProps) {
   const running = status === 'searching' || status === 'reconstructing';
@@ -190,7 +189,7 @@ export function EvalPanel({
             Auto
           </label>
         )}
-        {running ? (
+        {onEvaluate && (running ? (
           <button type="button" className="ps-btn" onClick={onCancel} style={{ padding: '2px 8px', fontSize: 10 }}>
             Cancel
           </button>
@@ -198,7 +197,7 @@ export function EvalPanel({
           <button type="button" className="ps-btn" onClick={onEvaluate} style={{ padding: '2px 8px', fontSize: 10 }}>
             {result || status === 'stale' ? 'Re-evaluate' : 'Evaluate'}
           </button>
-        )}
+        ))}
       </div>
 
       {status === 'reconstructing' && (
@@ -247,31 +246,19 @@ export function EvalPanel({
                   className="ps-btn"
                   onClick={onAnalyzeGame}
                   disabled={running}
-                  title="Evaluate every turn of the game in the background — the line dips where the game swung."
+                  title="Evaluate every turn of the game in the background — the line dips where the game swung. The selected turn's analysis, ranked choices, and matrix follow automatically."
                   style={{ padding: '1px 6px', fontSize: 10 }}
                 >
                   {hasGraph ? 'Re-analyze' : 'Analyze game'}
                 </button>
-                {onAnalyzeTurn && (
-                  <button
-                    type="button"
-                    className="ps-btn"
-                    onClick={onAnalyzeTurn}
-                    disabled={running}
-                    title="Explain just this turn — evaluates it and the next one, no full sweep."
-                    style={{ padding: '1px 6px', fontSize: 10 }}
-                  >
-                    Analyze turn {currentTurn}
-                  </button>
-                )}
               </>
             )}
           </div>
           <div
             style={{ fontSize: 10, color: '#778', marginTop: 2 }}
-            title="Analyze game paints the whole line with a fast depth-1 scan first, then re-evaluates the biggest swings with the settings above. Analyze turn and Evaluate always use those settings directly; Tera applies everywhere."
+            title="Analyze game paints the whole line with a fast depth-1 scan first, then re-evaluates the biggest swings with the settings above. Selecting a turn analyzes it automatically; Tera applies everywhere."
           >
-            line: fast scan · key swings &amp; analyzed turns: {prefs.mode === 'mcts' ? 'MCTS' : `depth ${prefs.depth}`}
+            line: fast scan · key swings &amp; selected turns: {prefs.mode === 'mcts' ? 'MCTS' : `depth ${prefs.depth}`}
           </div>
           {hasGraph && (
             <EvalGraph

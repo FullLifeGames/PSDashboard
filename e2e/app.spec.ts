@@ -207,8 +207,9 @@ test.describe('PS Dashboard', () => {
     // The panel lives beside the battle in the right column (chess-style).
     const panel = page.locator('.ps-main-right .ps-eval-panel');
     await expect(panel).toBeVisible();
-    // Reconstruction + search on the small fixture replay.
-    await panel.locator('button', { hasText: 'Evaluate' }).click();
+    // ONE entry point: the sweep analyzes the game and the selected turn's
+    // bar, ranked lists, and matrix follow automatically.
+    await panel.locator('button', { hasText: 'Analyze game' }).click();
     await expect(panel.locator('.ps-eval-bar')).toBeVisible({ timeout: 120_000 });
     await expect(panel.locator('.ps-eval-bar-p1')).toContainText('%');
     expect(await panel.locator('.ps-eval-column').count()).toBe(2);
@@ -239,7 +240,7 @@ test.describe('PS Dashboard', () => {
     await expect(page.getByText('TestPlayer1', { exact: true }).first()).toBeVisible({ timeout: 10000 });
 
     const panel = page.locator('.ps-main-right .ps-eval-panel');
-    await panel.locator('button', { hasText: 'Evaluate' }).click();
+    await panel.locator('button', { hasText: 'Analyze game' }).click();
     await expect(panel.locator('.ps-eval-bar')).toBeVisible({ timeout: 120_000 });
 
     // Clicking p1's top engine line enters a branch and PLAYS THE TURN OUT
@@ -268,7 +269,7 @@ test.describe('PS Dashboard', () => {
     await expect(page.getByText('TestPlayer1', { exact: true }).first()).toBeVisible({ timeout: 10000 });
 
     const panel = page.locator('.ps-main-right .ps-eval-panel');
-    await panel.locator('button', { hasText: 'Evaluate' }).click();
+    await panel.locator('button', { hasText: 'Analyze game' }).click();
     await expect(panel.locator('.ps-eval-bar')).toBeVisible({ timeout: 120_000 });
 
     // A cell names BOTH sides' choices — the branch executes exactly that
@@ -292,7 +293,7 @@ test.describe('PS Dashboard', () => {
 
     const panel = page.locator('.ps-main-right .ps-eval-panel');
     await expect(panel.locator('select').first()).toHaveValue('mcts');
-    await panel.locator('button', { hasText: 'Evaluate' }).click();
+    await panel.locator('button', { hasText: 'Analyze game' }).click();
     await expect(panel.locator('.ps-eval-bar')).toBeVisible({ timeout: 120_000 });
     await expect(panel.locator('.ps-eval-bar-p1')).toContainText('%');
   });
@@ -354,8 +355,8 @@ test.describe('PS Dashboard', () => {
     await expect(panel.locator('button', { hasText: 'Re-analyze' })).toBeVisible({ timeout: 30_000 });
   });
 
-  test('analyzes a single turn on demand without a full sweep', async ({ page }) => {
-    test.setTimeout(180_000);
+  test('the analysis, lists, and matrix follow the selected turn after a sweep', async ({ page }) => {
+    test.setTimeout(240_000);
     await page.evaluate(() => {
       localStorage.setItem('ps-replay-interceptor:eval-pool', '2');
       localStorage.setItem('ps-replay-interceptor:eval-prefs',
@@ -366,15 +367,17 @@ test.describe('PS Dashboard', () => {
     await expect(page.getByText('TestPlayer1', { exact: true }).first()).toBeVisible({ timeout: 10000 });
 
     const panel = page.locator('.ps-main-right .ps-eval-panel');
-    await panel.locator('button', { hasText: 'Analyze turn' }).click();
-    await expect(panel.locator('.ps-eval-analysis')).toBeVisible({ timeout: 120_000 });
+    await panel.locator('button', { hasText: 'Analyze game' }).click();
+    await expect(panel.locator('button', { hasText: 'Re-analyze' })).toBeVisible({ timeout: 180_000 });
+
+    // Selecting a turn re-targets EVERYTHING in one place: the analysis,
+    // the advantage bar, the ranked lists, and the matrix toggle.
+    await panel.locator('.ps-eval-graph rect[data-turn="2"]').click();
+    await expect(panel.locator('.ps-eval-analysis')).toContainText('Turn 2');
+    await expect(panel.locator('.ps-eval-bar')).toBeVisible();
+    await expect(panel.locator('button', { hasText: 'Matrix' })).toBeVisible();
+    await panel.locator('.ps-eval-graph rect[data-turn="1"]').click();
     await expect(panel.locator('.ps-eval-analysis')).toContainText('Turn 1');
-    // The natural-language summary leads with the advantage movement.
-    await expect(panel.locator('.ps-eval-analysis-summary')).toContainText('%');
-    // The range sweep finishes (the full-sweep button returns)…
-    await expect(panel.locator('button', { hasText: 'Re-analyze' })).toBeVisible({ timeout: 60_000 });
-    // …and only the selected turn and its follow-up were evaluated.
-    expect(await panel.locator('.ps-eval-graph circle').count()).toBeLessThanOrEqual(2);
   });
 
   test('analyzes the whole game with the MCTS engine', async ({ page }) => {
@@ -1012,7 +1015,9 @@ test.describe('PS Dashboard', () => {
 
     const panel = page.locator('.ps-main-right .ps-eval-panel');
     await expect(panel).toBeVisible();
-    await panel.locator('button', { hasText: 'Evaluate' }).click();
+    // One entry point: the sweep analyzes the game; the selected turn's bar,
+    // combined choices, and analysis follow automatically.
+    await panel.locator('button', { hasText: 'Analyze game' }).click();
     await expect(panel.locator('.ps-eval-bar')).toBeVisible({ timeout: 120_000 });
     await expect(panel.locator('.ps-eval-bar-p1')).toContainText('%');
     // Recommendations are combined two-slot choices ("A + B").
@@ -1022,11 +1027,13 @@ test.describe('PS Dashboard', () => {
     await expect(page.locator('.ps-stats-tag', { hasText: 'Light Ball' })).toBeVisible();
     await expect(page.locator('.ps-stats-tag', { hasText: 'Light Ball' })).toContainText('sheet');
 
-    // Doubles turn analysis with full played-vs-best tracking.
-    await panel.locator('button', { hasText: 'Analyze turn' }).click();
+    // Doubles turn analysis — automatic. The fixture's only turn is the
+    // FINAL turn (its played actions have no trailing block to parse from),
+    // so the honest copy says the choice never surfaced while the engine's
+    // combined lines still render.
     await expect(panel.locator('.ps-eval-analysis')).toBeVisible({ timeout: 120_000 });
     await expect(panel.locator('.ps-eval-analysis-summary')).toContainText('%');
-    await expect(panel.locator('.ps-eval-analysis')).toContainText('played');
+    await expect(panel.locator('.ps-eval-analysis')).toContainText('engine:');
 
     // Long combined labels must wrap inside the panel, never widen it.
     const overflow = await panel.evaluate(element => element.scrollWidth - element.clientWidth);
