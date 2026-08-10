@@ -7,7 +7,8 @@ import {
   type ChoiceOption, type SimPosition,
 } from './forward-model';
 import {
-  attachLines, cellKey, rankFromMatrix, selectExpansionCells, toResult, TOP_EXPANSION,
+  applyTrendTiebreak, attachLines, cellKey, coreOf, GIMMICK_TOKENS, rankFromMatrix,
+  selectExpansionCells, selectTieProbeCells, toResult, TOP_EXPANSION,
   type PvStep, type Ranked, type ValueMatrix,
 } from './rank';
 import { findConsistentOptions, findPlayedOption } from './analysis';
@@ -108,12 +109,6 @@ export const RESTRICT_K_DOUBLES = 16;
 const BASE_CORE_BUDGET = 12;
 /** Top cores whose Tera/Mega/Ultra variants fill the remaining slots. */
 const GIMMICK_CORE_BUDGET = 4;
-const GIMMICK_TOKENS = new Set(['terastallize', 'mega', 'ultra']);
-
-/** The combo minus its gimmick markers: 'move x terastallize, move y' → 'move x, move y'. */
-const coreOf = (choice: string) => choice.split(',').map(part =>
-  part.trim().split(' ').filter(token => !GIMMICK_TOKENS.has(token)).join(' ')).join(', ');
-
 const isCombined = (options: ChoiceOption[]) => options.some(option => option.choice.includes(','));
 
 /** Floor hint for any status move: Protect, redirection, speed control stay rankable. */
@@ -513,6 +508,11 @@ export function searchPosition(
   const progress = { done: 0, total: Math.max(p1Options.length * p2Options.length, 1) };
 
   const matrix = buildMatrix(root, p1Options, p2Options, settings.samples, 1, callbacks, progress, matchupCache);
+  // Pre-deepening statics: the trend baseline. Every trend the tiebreak
+  // compares is uniformly 1-ply-vs-static — mixed ply counts inside one
+  // comparison are the depth-asymmetry trap.
+  const staticValues = matrix.values.map(row => [...row]);
+  const trendMap = new Map<number, number>();
   let ranked: Ranked = rankFromMatrix(matrix, rootValue);
   let result = toResult(ranked, 1);
   callbacks?.onPartial?.(result);
@@ -546,6 +546,7 @@ export function searchPosition(
         // keepPlayed is a root-position hint — child positions have their
         // own choice space where those actions mean nothing.
         const sub = subSearch(child.serialized, { ...settings, depth: (depth - 1) as 1 | 2, samples: 1, keepPlayed: undefined }, matchupCache);
+        if (depth === 2) trendMap.set(cellKey(i, j), sub.score - staticValues[i][j]);
         matrix.values[i][j] = sub.score;
         expandedThisLevel.add(cellKey(i, j));
         const subTopP1 = sub.perSide.p1[0];
@@ -568,6 +569,17 @@ export function searchPosition(
     attachLines(matrix, ranked, pvByCell);
     result = toResult(ranked, depth);
     callbacks?.onPartial?.(result);
+  }
+
+  // Horizon-trend tiebreak: root search over singles-shaped lists only
+  // (combined doubles probes cost far more than a label swap is worth);
+  // sub-searches skip it — ordering inside a tie cannot move a cell value.
+  if (!stopped && !restrictCandidates && !isCombined(p1Options) && !isCombined(p2Options)) {
+    for (const [i, j] of selectTieProbeCells(matrix, result, trendMap)) {
+      const sub = subSearch(matrix.children[i][j].serialized, { ...settings, depth: 1, samples: 1, keepPlayed: undefined }, matchupCache);
+      trendMap.set(cellKey(i, j), sub.score - staticValues[i][j]);
+    }
+    applyTrendTiebreak(matrix, result, trendMap);
   }
   return result;
 }

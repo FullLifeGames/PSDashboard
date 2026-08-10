@@ -252,3 +252,163 @@ export function selectExpansionCells(matrix: ValueMatrix, ranked: Ranked, cap: n
   }
   return cells;
 }
+
+/** Rows within this of the top EV are a coin flip the static ranking cannot split. */
+export const TIE_EPSILON = 0.02;
+/** A tie is reordered only when the trend separation is meaningful. */
+export const TREND_MARGIN = 0.02;
+/** Widest tied prefix examined per side. */
+const TIE_GROUP_CAP = 3;
+/** Mix-weight floor so a 0%-mix punisher still counts a little. */
+const MIN_TREND_WEIGHT = 0.05;
+
+export const GIMMICK_TOKENS = new Set(['terastallize', 'mega', 'ultra']);
+
+/** The choice minus its gimmick markers: 'move x terastallize, move y' → 'move x, move y'. */
+export const coreOf = (choice: string) => choice.split(',').map(part =>
+  part.trim().split(' ').filter(token => !GIMMICK_TOKENS.has(token)).join(' ')).join(', ');
+
+interface TieRow {
+  side: 'p1' | 'p2';
+  entry: RankedChoice;
+  /** This entry's position in the ranked list — reorders write back into these slots. */
+  listIndex: number;
+  /** The cells that decide this row: its punisher and the opponent's modal reply. */
+  cells: [number, number][];
+}
+
+/**
+ * The tied leading rows per side: an ev-sorted PREFIX within TIE_EPSILON of
+ * the top, each carrying its decisive cells. A gimmick variant tied with its
+ * own core is NOT a stall-vs-progress question but a resource-spend one —
+ * only the first row per core enters, so the plain-first convention stands.
+ * Needs the solved mixes; a side whose entries cannot all be mapped back to
+ * options yields no group.
+ */
+function tieGroups(matrix: ValueMatrix, result: EvalResult): TieRow[][] {
+  const mixes = result.matrix?.mixes;
+  if (!mixes) return [];
+  const byChoice = {
+    p1: new Map(matrix.p1Options.map((option, index) => [option.choice, index])),
+    p2: new Map(matrix.p2Options.map((option, index) => [option.choice, index])),
+  };
+  const groups: TieRow[][] = [];
+  for (const side of ['p1', 'p2'] as const) {
+    const list = result.perSide[side];
+    if (list.length < 2) continue;
+    const cores = new Set<string>();
+    const tied: { entry: RankedChoice; listIndex: number }[] = [];
+    for (let listIndex = 0; listIndex < Math.min(list.length, TIE_GROUP_CAP); listIndex++) {
+      const entry = list[listIndex];
+      if (list[0].ev - entry.ev > TIE_EPSILON) break;
+      const core = coreOf(entry.choice);
+      if (cores.has(core)) continue;
+      cores.add(core);
+      tied.push({ entry, listIndex });
+    }
+    if (tied.length < 2) continue;
+    const oppMix = side === 'p1' ? mixes.p2 : mixes.p1;
+    let modal = 0;
+    oppMix.forEach((weight, index) => { if (weight > oppMix[modal]) modal = index; });
+    const group: TieRow[] = [];
+    for (const { entry, listIndex } of tied) {
+      const own = byChoice[side].get(entry.choice);
+      if (own === undefined) break;
+      // p1 rows fear the column MINIMUM, p2 columns fear the row MAXIMUM
+      // (values are p1-perspective throughout).
+      const against = side === 'p1' ? matrix.values[own] : matrix.values.map(row => row[own]);
+      let punish = 0;
+      for (let index = 1; index < against.length; index++) {
+        if (side === 'p1' ? against[index] < against[punish] : against[index] > against[punish]) punish = index;
+      }
+      const cells = [...new Set([punish, modal])].map(opp =>
+        (side === 'p1' ? [own, opp] : [opp, own]) as [number, number]);
+      group.push({ side, entry, listIndex, cells });
+    }
+    if (group.length === tied.length) groups.push(group);
+  }
+  return groups;
+}
+
+/**
+ * The cells whose one-ply trend the tiebreak still needs: decisive cells of
+ * tied rows that are neither terminal nor already priced in `trends`.
+ */
+export function selectTieProbeCells(
+  matrix: ValueMatrix,
+  result: EvalResult,
+  trends: Map<number, number>,
+): [number, number][] {
+  const cells: [number, number][] = [];
+  const seen = new Set<number>();
+  for (const group of tieGroups(matrix, result)) {
+    for (const row of group) {
+      for (const [i, j] of row.cells) {
+        const key = cellKey(i, j);
+        if (seen.has(key) || matrix.ended[i][j] || trends.has(key)) continue;
+        seen.add(key);
+        cells.push([i, j]);
+      }
+    }
+  }
+  return cells;
+}
+
+/**
+ * Horizon-trend tiebreak. When the leading rows tie within TIE_EPSILON the
+ * static matrix cannot split them — but the one-ply trend of their decisive
+ * cells can tell a line that BUILDS (value rises under lookahead) from one
+ * that BLEEDS (draft T50: the Recover stall holds its static value yet loses
+ * ground every ply actually searched, while the Heatran switch improves).
+ * Reorders ONLY the tied prefix by mix-weighted own-perspective trend; every
+ * trend is uniformly 1-ply-vs-static (mixed ply counts inside a comparison
+ * are the depth-asymmetry trap that broke the quiescence experiment). EVs,
+ * cell values, and the score never move — ordering only, so grading stays
+ * calibration-neutral by construction.
+ */
+export function applyTrendTiebreak(
+  matrix: ValueMatrix,
+  result: EvalResult,
+  trends: Map<number, number>,
+): void {
+  const mixes = result.matrix?.mixes;
+  if (!mixes) return;
+  for (const group of tieGroups(matrix, result)) {
+    const side = group[0].side;
+    const oppMix = side === 'p1' ? mixes.p2 : mixes.p1;
+    const rowTrend = new Map<string, number>();
+    for (const row of group) {
+      let weightSum = 0;
+      let weighted = 0;
+      let missing = false;
+      for (const [i, j] of row.cells) {
+        const trend = matrix.ended[i][j] ? 0 : trends.get(cellKey(i, j));
+        if (trend === undefined) {
+          missing = true;
+          break;
+        }
+        const weight = Math.max(oppMix[side === 'p1' ? j : i] ?? 0, MIN_TREND_WEIGHT);
+        weightSum += weight;
+        weighted += weight * trend;
+      }
+      // An unpriced cell (probe budget/stop) forfeits the whole reorder —
+      // a partial comparison would be exactly the asymmetry to avoid.
+      if (missing || weightSum === 0) {
+        rowTrend.clear();
+        break;
+      }
+      // Trends are p1-perspective; a p2 row reads them negated.
+      rowTrend.set(row.entry.choice, (side === 'p1' ? 1 : -1) * (weighted / weightSum));
+    }
+    if (rowTrend.size < group.length) continue;
+    const spread = Math.max(...rowTrend.values()) - Math.min(...rowTrend.values());
+    if (spread < TREND_MARGIN) continue;
+    // Write back into the group's OWN slots (core-deduping can leave gaps in
+    // the tied prefix — skipped gimmick variants keep their positions).
+    const slots = group.map(row => row.listIndex).sort((a, b) => a - b);
+    const reordered = group.map(row => row.entry)
+      .sort((a, b) => rowTrend.get(b.choice)! - rowTrend.get(a.choice)!);
+    const list = result.perSide[side];
+    slots.forEach((slot, index) => { list[slot] = reordered[index]; });
+  }
+}

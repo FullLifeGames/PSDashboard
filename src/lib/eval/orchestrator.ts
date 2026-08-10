@@ -1,6 +1,6 @@
 import {
-  attachLines, cellKey, rankFromMatrix, selectExpansionCells, toResult, TOP_EXPANSION,
-  type PvStep, type Ranked, type ValueMatrix,
+  applyTrendTiebreak, attachLines, cellKey, rankFromMatrix, selectExpansionCells, selectTieProbeCells,
+  toResult, TOP_EXPANSION, type PvStep, type Ranked, type ValueMatrix,
 } from './rank';
 import type {
   EvalCellJob, EvalCellValue, EvalChoicesInfo, EvalResult, EvalSettings, EvalSubSearchJob, SearchProgress, TeraAllowance,
@@ -63,6 +63,9 @@ export async function searchOrchestrated(
     values[cell.i][cell.j] = cell.value;
     ended[cell.i][cell.j] = cell.ended;
   }
+  // Trend baseline, mirroring searchPosition: uniformly 1-ply-vs-static.
+  const staticValues = values.map(row => [...row]);
+  const trendMap = new Map<number, number>();
 
   let ranked: Ranked = rankFromMatrix(matrix, rootValue);
   let result = toResult(ranked, 1);
@@ -94,6 +97,7 @@ export async function searchOrchestrated(
       })));
       subs.forEach((sub, index) => {
         const [i, j] = wanted[index];
+        if (depth === 2) trendMap.set(cellKey(i, j), sub.score - staticValues[i][j]);
         values[i][j] = sub.score;
         expandedThisLevel.add(cellKey(i, j));
         const subTopP1 = sub.perSide.p1[0];
@@ -115,6 +119,24 @@ export async function searchOrchestrated(
     attachLines(matrix, ranked, pvByCell);
     result = toResult(ranked, depth);
     callbacks?.onPartial?.(result);
+  }
+
+  // Horizon-trend tiebreak, mirroring searchPosition: singles-shaped lists
+  // only; probes are one-ply sub-searches of the tied rows' decisive cells.
+  const combined = p1.some(option => option.choice.includes(',')) || p2.some(option => option.choice.includes(','));
+  if (!stopped && !combined) {
+    const probes = selectTieProbeCells(matrix, result, trendMap);
+    if (probes.length > 0) {
+      const subs = await Promise.all(probes.map(([i, j]) => executor.subSearch({
+        i, j, p1Choice: p1[i].choice, p2Choice: p2[j].choice,
+        settings: { ...settings, depth: 1, samples: 1, keepPlayed: undefined },
+      })));
+      subs.forEach((sub, index) => {
+        const [i, j] = probes[index];
+        trendMap.set(cellKey(i, j), sub.score - staticValues[i][j]);
+      });
+    }
+    applyTrendTiebreak(matrix, result, trendMap);
   }
   return result;
 }

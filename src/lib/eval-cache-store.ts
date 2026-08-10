@@ -38,7 +38,10 @@ export interface StoredEval {
 // v13: entry-cost-weighted matchup/coverage (benched mons fight through
 //      their hazard entry damage; Boots/Magic Guard exempt).
 // v14: guaranteed-failing field moves dropped from candidate lists.
-export const EVAL_ENGINE_CACHE_VERSION = 14;
+// v15: horizon-trend tiebreak — EV ties in the leading rows reorder by the
+//      one-ply trend of their decisive cells (stall lines stop shading out
+//      equivalent switches).
+export const EVAL_ENGINE_CACHE_VERSION = 15;
 
 export function evalStoreKey(
   cacheKey: string,

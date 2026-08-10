@@ -135,15 +135,21 @@ test.describe('depth-1 search', () => {
 
       // Toss KOs Pikachu (bench Eevee continues the game): those cells are
       // roll-sensitive and take the full spread; quiet cells still take one.
+      // The trend tiebreak's probe forks are the same in both runs, so the
+      // s3−s1 delta isolates the sampling behavior.
       const violent = serialize(makeBattle(
         [makeSet('Machamp', 'Machamp', ['Seismic Toss', 'Protect'], 100)],
         [makeSet('Pikachu', 'Pikachu', ['Tackle', 'Growl'], 30), makeSet('Eevee', 'Eevee', ['Tackle', 'Growl'], 30)],
       ));
       forks = 0;
+      searchPosition(violent, { depth: 1, samples: 1, tera: false });
+      const forksSingle = forks;
+      forks = 0;
       searchPosition(violent, { depth: 1, samples: 3, tera: false });
+      const extraDraws = forks - forksSingle;
       const cells = 2 * 3; // 2 p1 options x 3 p2 options
-      expect(forks).toBeGreaterThan(1 + cells);       // some cells multi-sampled
-      expect(forks).toBeLessThan(1 + cells * 3);      // but not all of them
+      expect(extraDraws).toBeGreaterThan(0);           // some cells multi-sampled
+      expect(extraDraws).toBeLessThan(cells * 2);      // but not all of them
     } finally {
       State.deserializeBattle = original;
     }

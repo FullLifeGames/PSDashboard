@@ -1,5 +1,8 @@
 import { test, expect } from '@playwright/test';
-import { rankFromMatrix, solveMatrixGame, toResult, type ValueMatrix } from '../src/lib/eval/rank';
+import {
+  applyTrendTiebreak, cellKey, rankFromMatrix, selectTieProbeCells, solveMatrixGame, toResult,
+  TIE_EPSILON, TREND_MARGIN, type ValueMatrix,
+} from '../src/lib/eval/rank';
 
 // Pins the regret-matching solver against games with known solutions. The
 // solver is pure math (no sim), deterministic, and reads the AVERAGE
@@ -91,5 +94,118 @@ test.describe('equilibrium-aware ranking', () => {
     expect(result.perSide.p1[0].choice).toBe('p1c0');
     expect(result.score).toBeCloseTo(0.3, 2);
     expect(result.perSide.p1[0].ev).toBeCloseTo(0.3, 2);
+  });
+});
+
+test.describe('horizon-trend tiebreak', () => {
+  const matrixOf = (values: number[][], ended?: boolean[][]): ValueMatrix => ({
+    p1Options: values.map((_, i) => ({ choice: `p1c${i}`, label: `P1 ${i}` })),
+    p2Options: (values[0] ?? []).map((_, j) => ({ choice: `p2c${j}`, label: `P2 ${j}` })),
+    values,
+    ended: ended ?? values.map(row => row.map(() => false)),
+  });
+  const resultOf = (matrix: ValueMatrix) => toResult(rankFromMatrix(matrix, 0), 1);
+
+  test('a bleeding top row yields the tie to a building runner-up — ordering only', () => {
+    // Rows 0/1 tie by EV against the single reply; row 2 is far behind.
+    const matrix = matrixOf([[0.1], [0.1], [-0.5]]);
+    const result = resultOf(matrix);
+    expect(result.perSide.p1.map(choice => choice.choice)).toEqual(['p1c0', 'p1c1', 'p1c2']);
+    const before = { score: result.score, evs: new Map(result.perSide.p1.map(c => [c.choice, c.ev])) };
+
+    const trends = new Map([[cellKey(0, 0), -0.05], [cellKey(1, 0), +0.05]]);
+    applyTrendTiebreak(matrix, result, trends);
+    expect(result.perSide.p1.map(choice => choice.choice)).toEqual(['p1c1', 'p1c0', 'p1c2']);
+    // Order is ALL the tiebreak may touch: score, EVs, floors stay.
+    expect(result.score).toBe(before.score);
+    for (const choice of result.perSide.p1) expect(choice.ev).toBe(before.evs.get(choice.choice));
+  });
+
+  test('a trend spread below the margin leaves the order alone', () => {
+    const matrix = matrixOf([[0.1], [0.1]]);
+    const result = resultOf(matrix);
+    applyTrendTiebreak(matrix, result, new Map([
+      [cellKey(0, 0), -TREND_MARGIN / 4], [cellKey(1, 0), +TREND_MARGIN / 4],
+    ]));
+    expect(result.perSide.p1.map(choice => choice.choice)).toEqual(['p1c0', 'p1c1']);
+  });
+
+  test('rows outside the tie epsilon never reorder, whatever their trends', () => {
+    const matrix = matrixOf([[0.1], [0.1 - TIE_EPSILON * 2]]);
+    const result = resultOf(matrix);
+    applyTrendTiebreak(matrix, result, new Map([[cellKey(0, 0), -0.5], [cellKey(1, 0), +0.5]]));
+    expect(result.perSide.p1.map(choice => choice.choice)).toEqual(['p1c0', 'p1c1']);
+  });
+
+  test('a missing trend forfeits the reorder instead of comparing asymmetrically', () => {
+    const matrix = matrixOf([[0.1], [0.1]]);
+    const result = resultOf(matrix);
+    applyTrendTiebreak(matrix, result, new Map([[cellKey(0, 0), -0.5]]));
+    expect(result.perSide.p1.map(choice => choice.choice)).toEqual(['p1c0', 'p1c1']);
+  });
+
+  test('p2 ties read the p1-perspective trends negated', () => {
+    // One p1 row, two tied p2 replies. Cell (0,0) IMPROVING for p1 (+0.06)
+    // is p2c0 bleeding; cell (0,1) falling for p1 is p2c1 building.
+    const matrix = matrixOf([[-0.1, -0.1]]);
+    const result = resultOf(matrix);
+    expect(result.perSide.p2.map(choice => choice.choice)).toEqual(['p2c0', 'p2c1']);
+    applyTrendTiebreak(matrix, result, new Map([[cellKey(0, 0), +0.06], [cellKey(0, 1), -0.06]]));
+    expect(result.perSide.p2.map(choice => choice.choice)).toEqual(['p2c1', 'p2c0']);
+  });
+
+  test('a core tied with its own gimmick variant is not a tie — plain stays first', () => {
+    // 'move x' vs 'move x terastallize': a resource-spend question, not a
+    // stall-vs-progress one. The group dedupes to one core → no reorder, no
+    // probes — whatever the trends say.
+    const matrix: ValueMatrix = {
+      p1Options: [
+        { choice: 'move seismictoss', label: 'Seismic Toss' },
+        { choice: 'move seismictoss terastallize', label: 'Tera + Seismic Toss' },
+      ],
+      p2Options: [{ choice: 'move x', label: 'X' }],
+      values: [[0.1], [0.1]],
+      ended: [[false], [false]],
+    };
+    const result = toResult(rankFromMatrix(matrix, 0), 1);
+    expect(selectTieProbeCells(matrix, result, new Map())).toEqual([]);
+    applyTrendTiebreak(matrix, result, new Map([[cellKey(0, 0), -0.5], [cellKey(1, 0), +0.5]]));
+    expect(result.perSide.p1.map(choice => choice.choice))
+      .toEqual(['move seismictoss', 'move seismictoss terastallize']);
+  });
+
+  test('a skipped gimmick duplicate keeps its slot while the cores reorder around it', () => {
+    // Tie of [core A, tera A, core B]: only A and B compete; B's building
+    // trend wins slot 0, tera-A stays parked in the middle.
+    const matrix: ValueMatrix = {
+      p1Options: [
+        { choice: 'move a', label: 'A' },
+        { choice: 'move a terastallize', label: 'Tera + A' },
+        { choice: 'move b', label: 'B' },
+      ],
+      p2Options: [{ choice: 'move x', label: 'X' }],
+      values: [[0.1], [0.1], [0.1]],
+      ended: [[false], [false], [false]],
+    };
+    const result = toResult(rankFromMatrix(matrix, 0), 1);
+    expect(selectTieProbeCells(matrix, result, new Map())).toEqual([[0, 0], [2, 0]]);
+    applyTrendTiebreak(matrix, result, new Map([[cellKey(0, 0), -0.05], [cellKey(2, 0), +0.05]]));
+    expect(result.perSide.p1.map(choice => choice.choice))
+      .toEqual(['move b', 'move a terastallize', 'move a']);
+  });
+
+  test('selectTieProbeCells wants only unpriced, unfinished decisive cells of real ties', () => {
+    const matrix = matrixOf([[0.1], [0.1], [-0.5]]);
+    const result = resultOf(matrix);
+    // Both tied rows' decisive cells (punisher = modal = the only column).
+    expect(selectTieProbeCells(matrix, result, new Map())).toEqual([[0, 0], [1, 0]]);
+    // Already-priced cells drop out.
+    expect(selectTieProbeCells(matrix, result, new Map([[cellKey(0, 0), 0.02]]))).toEqual([[1, 0]]);
+    // Terminal cells are exact — never probed.
+    const ended = matrixOf([[0.1], [0.1], [-0.5]], [[true], [false], [false]]);
+    expect(selectTieProbeCells(ended, resultOf(ended), new Map())).toEqual([[1, 0]]);
+    // No tie, no probes.
+    const clear = matrixOf([[0.3], [0.1]]);
+    expect(selectTieProbeCells(clear, resultOf(clear), new Map())).toEqual([]);
   });
 });
