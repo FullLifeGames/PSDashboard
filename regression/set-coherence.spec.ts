@@ -34,6 +34,31 @@ test.describe('set-coherence vetoes', () => {
     expect(names(kept)).toEqual(['Swords Dance', 'Body Press', 'Stone Edge']);
   });
 
+  test('an orphaned defense-boost fill falls with its vetoed payoff (Iron Defense)', () => {
+    // GPL Cobalion: usage ranks Iron Defense high BECAUSE of Body Press.
+    // Row 1 already drops Body Press next to the revealed Swords Dance —
+    // the enabler must not stay behind without any Defense-scaling attack.
+    const kept = applyCoherenceVetoes([
+      revealed('Swords Dance'), revealed('Heavy Slam'),
+      guessed('Body Press'), guessed('Iron Defense'), guessed('Thunder Wave'), guessed('Stone Edge'),
+    ], { itemId: '' });
+    expect(names(kept)).toEqual(['Swords Dance', 'Heavy Slam', 'Thunder Wave', 'Stone Edge']);
+  });
+
+  test('a defense-boost with its payoff attack survives', () => {
+    const kept = applyCoherenceVetoes([
+      revealed('Body Press'), guessed('Iron Defense'), guessed('Stone Edge'),
+    ], { itemId: '' });
+    expect(names(kept)).toEqual(['Body Press', 'Iron Defense', 'Stone Edge']);
+  });
+
+  test('a revealed defense-boost is never second-guessed', () => {
+    const kept = applyCoherenceVetoes([
+      revealed('Iron Defense'), guessed('Stone Edge'),
+    ], { itemId: '' });
+    expect(names(kept)).toEqual(['Iron Defense', 'Stone Edge']);
+  });
+
   test('Nasty Plot vetoes big guessed physical attacks but spares utility and pivots', () => {
     const kept = applyCoherenceVetoes([
       guessed('Nasty Plot'), guessed('Play Rough'), guessed('Knock Off'), guessed('U-turn'), guessed('Shadow Ball'),

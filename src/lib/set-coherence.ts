@@ -37,6 +37,15 @@ const BOOST_SERVES: Record<string, 'atk' | 'spa'> = {
 /** Pivots are utility whatever their category — never boost-vetoed. */
 const PIVOT_MOVES = new Set(['uturn', 'voltswitch', 'flipturn', 'partingshot', 'batonpass', 'teleport', 'chillyreception', 'shedtail']);
 
+/**
+ * Defense-boost setup whose offensive payoff is a Defense-scaling attack
+ * (Body Press). Usage ranks these high BECAUSE of the pairing — when the
+ * payoff attack is vetoed or absent, the guessed enabler must fall with it
+ * (GPL Cobalion: Body Press vetoed next to revealed Swords Dance, Iron
+ * Defense stayed behind).
+ */
+const DEF_BOOSTS = new Set(['irondefense', 'acidarmor', 'cottonguard', 'barrier', 'shelter']);
+
 const CHOICE_ITEMS = new Set(['choiceband', 'choicespecs', 'choicescarf']);
 const TRICK_FAMILY = new Set(['trick', 'switcheroo']);
 
@@ -132,23 +141,22 @@ export function applyCoherenceVetoes(
   const restrictiveItem = CHOICE_ITEMS.has(context.itemId) ? 'choice'
     : context.itemId === 'assaultvest' ? 'av' : null;
 
-  const kept: MoveCandidate[] = [];
+  // Pass 1 decides the DAMAGING keeps (rows 1 and 2), so a status rule can
+  // ask what the kept attacks scale with — Iron Defense is only coherent
+  // while a Defense-scaling attack survives.
   const keptDamageTypes = new Set<string>();
-  const keep = (candidate: MoveCandidate, facts: MoveFacts | null) => {
-    kept.push(candidate);
-    if (facts && facts.category !== 'Status') keptDamageTypes.add(facts.type);
-  };
-
+  const keptScalings = new Set<string>();
+  const damagingKept = new Set<MoveCandidate>();
   for (const candidate of candidates) {
     const facts = factsOf(candidate.name);
-    if (!candidate.guessed || !facts) {
-      keep(candidate, facts);
-      continue;
-    }
-    if (facts.category === 'Status') {
-      if (restrictiveItem === 'av') continue;
-      if (restrictiveItem === 'choice' && !TRICK_FAMILY.has(facts.id)) continue;
-      keep(candidate, facts);
+    if (!facts || facts.category === 'Status') continue;
+    const keep = () => {
+      damagingKept.add(candidate);
+      keptDamageTypes.add(facts.type);
+      if (facts.scaling) keptScalings.add(facts.scaling);
+    };
+    if (!candidate.guessed) {
+      keep();
       continue;
     }
     // Row 1: a big attack the set's boost does not serve (SD + Body Press).
@@ -159,7 +167,27 @@ export function applyCoherenceVetoes(
     // Row 2: redundant same-type damage from the same slot budget
     // (Air Slash + Hurricane) — first accepted (higher usage) wins.
     if (keptDamageTypes.has(facts.type)) continue;
-    keep(candidate, facts);
+    keep();
+  }
+
+  // Pass 2 assembles in pool order; status rows run against the kept attacks.
+  const kept: MoveCandidate[] = [];
+  for (const candidate of candidates) {
+    const facts = factsOf(candidate.name);
+    if (!candidate.guessed || !facts) {
+      kept.push(candidate);
+      continue;
+    }
+    if (facts.category === 'Status') {
+      if (restrictiveItem === 'av') continue;
+      if (restrictiveItem === 'choice' && !TRICK_FAMILY.has(facts.id)) continue;
+      // Row 3: a defense-boost enabler without its payoff attack (Iron
+      // Defense whose Body Press was vetoed or never offered).
+      if (DEF_BOOSTS.has(facts.id) && !keptScalings.has('def')) continue;
+      kept.push(candidate);
+      continue;
+    }
+    if (damagingKept.has(candidate)) kept.push(candidate);
   }
   return kept;
 }
