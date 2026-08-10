@@ -33,6 +33,15 @@ const ZERO_EVS: PokemonEvs = { hp: 0, atk: 0, def: 0, spa: 0, spd: 0, spe: 0 };
  */
 const SPEED_VIOLATION_PENALTY = 1000;
 
+/**
+ * Goodness-of-fit forfeit: mean squared misfit per observation above which
+ * the evidence itself is unreliable and the prior stands. Sized on the GPL
+ * video reconstruction — clean fits read ≤0.005 (draft/server logs ~0.0002),
+ * while Vileplume's contradictory video HP bars left EVERY rung ≥0.05 and
+ * the least-bad fit was an all-zero paper spread.
+ */
+const FIT_FORFEIT_PER_OBSERVATION = 0.01;
+
 /** Format-dependent EV legality (Pokémon Champions uses 32/stat, 66 total). */
 export interface EvBudget { perStat: number; total: number }
 export function evBudget(formatid: string): EvBudget {
@@ -374,6 +383,18 @@ export function inferSpreads(
       }
     }
     if (!best) return;
+    // When even the best rung misfits the damage evidence badly (video-read
+    // HP bars, attribution confounds), the evidence is unreliable — keep the
+    // prior instead of confidently fielding a paper spread (GPL: all-zero
+    // Vileplume, 252-HP-only Clefable). A solve that REPAIRS speed-order
+    // violations the prior carries always stands.
+    const damageResidual = monObservations.reduce((sum, obs) => sum + observationError(obs, key, best!), 0);
+    if (monObservations.length > 0 &&
+      damageResidual / monObservations.length > FIT_FORFEIT_PER_OBSERVATION &&
+      speedError(key, best) >= speedError(key, prior)) {
+      solved.delete(key);
+      return;
+    }
     // Top up the leftover budget in UNMEASURED, non-Speed stats: a winner
     // like "252 HP only" would otherwise field a systematically
     // under-statted sim mon. Filled stats carry no observation evidence

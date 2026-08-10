@@ -178,3 +178,24 @@ test.describe('speed-order constraints', () => {
     expect(valiant).toBeTruthy();
   });
 });
+
+test.describe('goodness-of-fit forfeit', () => {
+  test('contradictory observations keep the prior instead of a least-bad spread', () => {
+    // Two readings of the SAME pairing that no spread can satisfy at once
+    // (video-read HP bars): 10% and 60% from one un-boosted Knock Off.
+    const contradictory = ['0.10', '0.60'].map(fraction => ({
+      attackerSpecies: 'Landorus-Therian',
+      defenderSpecies: 'Uxie',
+      attackerSide: 'p2' as const,
+      moveId: 'knockoff',
+      observedFraction: Number(fraction),
+      attackerBoosts: {}, defenderBoosts: {}, attackerStatus: '',
+      screens: [], weather: '',
+    }));
+    const solved = inferSpreads(contradictory, sets, 'gen9');
+    // The evidence is unreliable — neither Uxie nor Landorus gets a solved
+    // overlay; their priors (the built guesses) stand.
+    expect(solved.has('p1:uxie')).toBe(false);
+    expect(solved.has('p2:landorustherian')).toBe(false);
+  });
+});
