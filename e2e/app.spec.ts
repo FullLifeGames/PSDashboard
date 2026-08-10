@@ -738,9 +738,12 @@ test.describe('PS Dashboard', () => {
     await page.locator('button', { hasText: 'Branch Here' }).click();
     await expect(page.getByText(/Branching.*Turn/)).toBeVisible({ timeout: 15000 });
     await expect(page.locator('.ps-movebtn').first()).toBeVisible({ timeout: 5000 });
-    // Range shifted when spread inference started overlaying damage-consistent
-    // EVs from replay observations onto the usage-stats defaults.
-    await expect(page.locator('.ps-movebtn', { hasText: 'Earthquake' })).toContainText('51% - 60.9%', { timeout: 10000 });
+    // Range history: shifted when spread inference started overlaying
+    // damage-consistent EVs (51–60.9%), then again when the goodness-of-fit
+    // forfeit rejected this synthetic log's hand-authored damage numbers —
+    // no legal spread fits them, so the degenerate solve (Bold 0-Atk
+    // Garchomp) falls back to the species default and Earthquake hits real.
+    await expect(page.locator('.ps-movebtn', { hasText: 'Earthquake' })).toContainText('69.8% - 82.2%', { timeout: 10000 });
   });
 
   test('branch simulation can pick recommended moves without Smogon stats', async ({ page }) => {
