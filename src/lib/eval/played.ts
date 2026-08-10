@@ -29,6 +29,12 @@ export interface PlayedTurn {
   /** Doubles: per-slot actions (index 0 = slot a). Absent for singles. */
   p1Slots?: (PlayedAction | null)[];
   p2Slots?: (PlayedAction | null)[];
+  /**
+   * Why a side's choice never surfaced, when the protocol says: the `|cant|`
+   * reason ('slp', 'flinch', 'move: Taunt', …) or 'faint'. The player DID
+   * choose — the report should say what swallowed it, not "could not act".
+   */
+  prevented?: { p1?: string; p2?: string };
 }
 
 const sideOf = (pokemonRef: string): 'p1' | 'p2' | null => {
@@ -58,6 +64,7 @@ export function parsePlayedActions(lines: string[]): PlayedTurn {
   const tera = { p1: false, p2: false };
   const mega = { p1: false, p2: false };
   const ultra = { p1: false, p2: false };
+  const prevented: { p1?: string; p2?: string } = {};
 
   for (const line of lines) {
     const parts = line.split('|');
@@ -75,9 +82,15 @@ export function parsePlayedActions(lines: string[]): PlayedTurn {
     }
     if (tag === 'faint' || tag === 'cant') {
       // The side's queued choice was cancelled (or never shown) — whatever
-      // follows for it (replacements) is not the chosen action.
+      // follows for it (replacements) is not the chosen action. Record WHY
+      // when no action had surfaced yet, so the report can say so.
       const side = sideOf(parts[2] ?? '');
-      if (side) settled[side] = true;
+      if (side) {
+        if (!settled[side] && actions[side] === null && prevented[side] === undefined) {
+          prevented[side] = tag === 'faint' ? 'faint' : (parts[3] ?? 'prevented');
+        }
+        settled[side] = true;
+      }
       continue;
     }
     if (tag === 'move') {
@@ -100,7 +113,7 @@ export function parsePlayedActions(lines: string[]): PlayedTurn {
     }
   }
 
-  return actions;
+  return { ...actions, ...(prevented.p1 || prevented.p2 ? { prevented } : {}) };
 }
 
 /**

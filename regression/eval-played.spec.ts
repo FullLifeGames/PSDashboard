@@ -29,6 +29,33 @@ test.describe('played-action parsing', () => {
     expect(played.p1).toEqual({ kind: 'move', name: 'Draco Meteor', tera: false });
   });
 
+  test('a cant records WHY the choice never surfaced', () => {
+    // A sleeping mon whose turn is swallowed: the player DID choose; the
+    // report should say sleep ate it, not "could not act".
+    const slept = parsePlayedActions([
+      '|move|p1a: Vileplume|Sleep Powder|p2a: Rhydon',
+      '|cant|p2a: Rhydon|slp',
+    ]);
+    expect(slept.p2).toBeNull();
+    expect(slept.prevented?.p2).toBe('slp');
+    expect(slept.prevented?.p1).toBeUndefined();
+
+    // Taunt block carries the blocking move.
+    const taunted = parsePlayedActions([
+      '|cant|p1a: Uxie|move: Taunt|Stealth Rock',
+      '|move|p2a: Salazzle|Flamethrower|p1a: Uxie',
+    ]);
+    expect(taunted.prevented?.p1).toBe('move: Taunt');
+
+    // A side that acted BEFORE the cant keeps its action, no reason.
+    const moved = parsePlayedActions([
+      '|move|p2a: Rhydon|Avalanche|p1a: Noivern',
+      '|cant|p2a: Rhydon|flinch',
+    ]);
+    expect(moved.p2?.name).toBe('Avalanche');
+    expect(moved.prevented).toBeUndefined();
+  });
+
   test('a faint replacement is not a chosen action', () => {
     const played = parsePlayedActions([
       '|move|p1a: Kyurem|Draco Meteor|p2a: Cryogonal',
@@ -40,6 +67,7 @@ test.describe('played-action parsing', () => {
     expect(played.p1).toEqual({ kind: 'move', name: 'Draco Meteor', tera: false });
     // Cryogonal died before acting — p2's chosen action never surfaced.
     expect(played.p2).toBeNull();
+    expect(played.prevented?.p2).toBe('faint');
   });
 
   test('a pivot switch after U-turn is not a chosen switch', () => {
