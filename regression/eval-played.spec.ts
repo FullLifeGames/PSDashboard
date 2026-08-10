@@ -70,7 +70,7 @@ test.describe('played-action parsing', () => {
     expect(played.prevented?.p2).toBe('faint');
   });
 
-  test('a pivot switch after U-turn is not a chosen switch', () => {
+  test('a pivot switch after U-turn is the pair target, never a chosen switch', () => {
     const played = parsePlayedActions([
       '|move|p1a: Dragapult|U-turn|p2a: Snorlax',
       '|-damage|p2a: Snorlax|80/100',
@@ -78,7 +78,7 @@ test.describe('played-action parsing', () => {
       '|move|p2a: Snorlax|Body Slam|p1a: Corviknight',
       '|turn|9',
     ]);
-    expect(played.p1).toEqual({ kind: 'move', name: 'U-turn', tera: false });
+    expect(played.p1).toEqual({ kind: 'move', name: 'U-turn', tera: false, pivotTarget: 'Corviknight' });
     expect(played.p2).toEqual({ kind: 'move', name: 'Body Slam', tera: false });
   });
 
@@ -172,5 +172,27 @@ test.describe('mega evolution tracking', () => {
       '|turn|3',
     ]);
     expect(played.p1?.mega).toBe(true);
+  });
+});
+
+test.describe('pivot pair targets', () => {
+  test('the follow-up switch after a pivot move records the pair target', () => {
+    const played = parsePlayedActions([
+      '|move|p1a: Mien|U-turn|p2a: Chomp',
+      '|-damage|p2a: Chomp|150/200',
+      '|switch|p1a: Clef|Clefable, F|100/100',
+      '|move|p2a: Chomp|Earthquake|p1a: Clef',
+    ]);
+    expect(played.p1).toEqual({ kind: 'move', name: 'U-turn', tera: false, pivotTarget: 'Clefable' });
+  });
+
+  test('replacements after a non-pivot move record nothing', () => {
+    const played = parsePlayedActions([
+      '|move|p1a: Mien|Close Combat|p2a: Chomp',
+      '|move|p2a: Chomp|Earthquake|p1a: Mien',
+      '|faint|p1a: Mien',
+      '|switch|p1a: Clef|Clefable, F|100/100',
+    ]);
+    expect(played.p1).toEqual({ kind: 'move', name: 'Close Combat', tera: false });
   });
 });

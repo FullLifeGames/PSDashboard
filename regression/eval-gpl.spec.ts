@@ -77,5 +77,26 @@ test.describe('GPL replay end-to-end verdicts', () => {
     // Feeding a 9%-HP Uxie is a sacrifice, not a risk.
     expect(t29.p1.riskUnpunished).toBeFalsy();
     if (t29.p1.tier) expect(t29.p1.sacrifice).toBeTruthy();
+
+    // T25 (pivot pairs): the ranked lists enumerate "U-turn → X" as
+    // first-class choices on the real reconstruction — the finding was that
+    // the engine could not say WHICH incoming mon makes the pivot safe.
+    const t25runtime = await reconstructBranchRuntime({
+      format: getBranchSimulatorFormat(replay),
+      p1Team, p2Team,
+      replayLog: replay.log,
+      targetTurn: 25,
+      snapshot: snapshots[24] ?? null,
+    });
+    const t25result = searchPosition(
+      JSON.stringify(State.serializeBattle(t25runtime.battleStream.battle!)),
+      { depth: 1, samples: 1, tera, sleepClause: formatEnforcesSleepClause(getBranchSimulatorFormat(replay)) },
+    );
+    const pairRows = [...t25result.perSide.p1, ...t25result.perSide.p2]
+      .filter(row => row.choice.includes(' > switch '));
+    expect(pairRows.length).toBeGreaterThan(0);
+    for (const row of pairRows) expect(row.label).toContain(' → ');
+    // The pair rows are real ranked entries with their own values.
+    for (const row of pairRows) expect(Number.isFinite(row.ev)).toBe(true);
   });
 });

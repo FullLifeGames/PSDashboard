@@ -330,14 +330,28 @@ import { brierScore, fitConstantK } from './fit-helpers';
  *   sample moved — changed spreads shift a reconstruction path; n 66/79/68,
  *   singles 165, doubles 48.)
  *
+ * PIVOT PAIRS 2026-08-10, ADOPTED (cache v22). The U-turn family enumerates
+ * as move-plus-switch pairs at the ROOT ("U-turn → Clefable", grammar
+ * `move uturn > switch N`); the advance answers the pivot's forced-switch
+ * request with the declared follow-up (greedy fallback when it never comes
+ * or the target died mid-turn — an Earthquake KO'ing the incoming Heatran
+ * in the fixture was the first thing the tests caught); played parsing
+ * records the actual pivot target and matching prefers the exact pair.
+ * Sub-searches/MCTS/doubles keep the greedy resolution — restriction paths
+ * never see pairs by construction. Gate: 61/68/79/65/83, bucket-identical
+ * to the speed-order record, n equal, briers to 4 digits (late 0.1718→
+ * 0.1717 — pair rows re-price a few pivot roots without moving any sign).
+ * Bench: non-pivot roots identical (A/B 0.9s d1s1 both ways); pivot roots
+ * grow ≤ +4 rows/side by construction; d2 stays expansion-budget-bound
+ * (1.0→1.1s). NOTE the round-cumulative d1s1 bench drift 0.3→0.9s (trend
+ * probes + live-flag filtering accumulated) — a future perf-round item,
+ * not attributable to pairs.
+ *
  * OPEN FINDINGS FOR THE NEXT ROUNDS (2026-08-10):
- * - PIVOT PAIRS (user, 2026-08-10): U-turn/Volt Switch are really pairs —
- *   the move PLUS the incoming Pokémon — and must be enumerated as root
- *   choices ("U-turn → Clefable") to compare fairly against single actions
- *   (today's greedy mid-turn resolution hides the follow-up decision; GPL
- *   T25). Spec: docs/superpowers/specs/2026-08-10-pivot-pairs-design.md.
  * - Endgame-sack pricing + healthy-body sack detection (see T35 above).
  * - Charge-move (Phantom Force/Meteor Beam) mid-charge candidate targets.
+ * - d1s1 bench drift 0.3→0.9s across this round — profile before the next
+ *   search-space change.
  */
 const REPLAY_IDS = [
   'gen9draft-2058494320',

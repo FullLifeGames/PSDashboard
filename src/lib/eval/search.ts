@@ -341,6 +341,45 @@ export function searchOptions(
   return dropNoopMoves(positionBattle(position), side, options, opts?.sleepClause);
 }
 
+/** Moves that switch the user out — really PAIRS of move + incoming mon. */
+const PIVOT_MOVE_IDS = new Set([
+  'uturn', 'voltswitch', 'flipturn', 'partingshot', 'teleport', 'batonpass',
+  'chillyreception', 'shedtail',
+]);
+
+/**
+ * Pivot moves are pairs: the move PLUS the incoming Pokémon, chosen in the
+ * same turn. The root matrix enumerates them ("U-turn → Clefable") so the
+ * ranking can price each follow-up instead of hiding a greedy mid-turn
+ * resolution inside one row (GPL T25). Root singles only: sub-searches and
+ * doubles keep the greedy resolution — their bare `move uturn` stays valid.
+ */
+function expandPivotPairs(position: SimPosition, side: 'p1' | 'p2', options: ChoiceOption[]): ChoiceOption[] {
+  if (isCombined(options)) return options;
+  if (!options.some(option => PIVOT_MOVE_IDS.has(option.choice.split(' ')[1]))) return options;
+  const battle = positionBattle(position);
+  const sideState = battle.sides[side === 'p1' ? 0 : 1];
+  const bench = sideState.pokemon
+    .map((pokemon, index) => ({ pokemon, slot: index + 1 }))
+    .filter(({ pokemon }) => !pokemon.isActive && !pokemon.fainted);
+  if (bench.length === 0) return options;
+  const expanded: ChoiceOption[] = [];
+  for (const option of options) {
+    const tokens = option.choice.split(' ');
+    if (tokens[0] !== 'move' || !PIVOT_MOVE_IDS.has(tokens[1])) {
+      expanded.push(option);
+      continue;
+    }
+    for (const { pokemon, slot } of bench) {
+      expanded.push({
+        choice: `${option.choice} > switch ${slot}`,
+        label: `${option.label} → ${pokemon.species.name}`,
+      });
+    }
+  }
+  return expanded;
+}
+
 /**
  * Caps a wide option list for deep sub-searches: every base move is kept
  * (cheap insurance against proxy blind spots like fixed-damage moves), and
@@ -553,6 +592,10 @@ export function searchPosition(
   if (restrictCandidates) {
     p1Options = restrictOptions(root, 'p1', p1Options);
     p2Options = restrictOptions(root, 'p2', p2Options);
+  } else {
+    // Root matrix only: sub-searches keep the greedy pivot resolution.
+    p1Options = expandPivotPairs(root, 'p1', p1Options);
+    p2Options = expandPivotPairs(root, 'p2', p2Options);
   }
   const progress = { done: 0, total: Math.max(p1Options.length * p2Options.length, 1) };
 

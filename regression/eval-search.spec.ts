@@ -3,7 +3,7 @@ import { Battle, State, Teams, toID } from '@pkmn/sim';
 type DeserializeFn = typeof State.deserializeBattle;
 import type { PokemonSet } from '@pkmn/sim';
 import { battleFaintedFraction, searchOptions, searchPosition, subSearchDepth1 } from '../src/lib/eval/search';
-import { createRootPosition, positionBattle } from '../src/lib/eval/forward-model';
+import { advancePosition, createRootPosition, positionBattle } from '../src/lib/eval/forward-model';
 import { boostedFraction, pairThreat } from '../src/lib/eval/eval-function';
 import type { EvalResult, SearchProgress } from '../src/lib/eval/types';
 
@@ -584,6 +584,62 @@ test.describe('doubles keepPlayed', () => {
     expect(kept).toBeTruthy();
     expect(Number.isFinite(kept!.worstCase)).toBe(true);
     expect(withKeep.perSide.p1.length).toBeLessThanOrEqual(20);
+  });
+});
+
+test.describe('pivot pairs', () => {
+  const pivotBattle = () => makeBattle(
+    [
+      makeSet('Mien', 'Mienshao', ['U-turn', 'Close Combat']),
+      makeSet('Clef', 'Clefable', ['Moonblast']),
+      makeSet('Tran', 'Heatran', ['Lava Plume']),
+    ],
+    // Seismic Toss cannot KO the incoming mon — the pair's follow-up is what
+    // the child position shows (an Earthquake foe KO'd the entering Heatran
+    // and the greedy replacement masked the follow-up in an earlier fixture).
+    [makeSet('Bliss', 'Blissey', ['Seismic Toss'])],
+  );
+
+  test('the root matrix enumerates the pivot over the live bench', () => {
+    const result = searchPosition(serialize(pivotBattle()), { depth: 1, samples: 1, tera: false });
+    const choices = result.perSide.p1.map(option => option.choice);
+    // The bare row is replaced by one pair per healthy bench mon…
+    expect(choices).not.toContain('move uturn');
+    expect(choices).toContain('move uturn > switch 2');
+    expect(choices).toContain('move uturn > switch 3');
+    // …with labels naming the incoming Pokémon; plain moves stay plain.
+    const pair = result.perSide.p1.find(option => option.choice === 'move uturn > switch 2')!;
+    expect(pair.label).toBe('U-turn → Clefable');
+    expect(choices).toContain('move closecombat');
+  });
+
+  test('sub-searches keep the greedy resolution (no pair rows)', () => {
+    const result = subSearchDepth1(serialize(pivotBattle()), { depth: 1, samples: 1, tera: false });
+    expect(result.perSide.p1[0]).toBeTruthy();
+    // The pruned path reports bare choices only.
+    expect(result.perSide.p1[0].choice.includes(' > ')).toBe(false);
+  });
+
+  test('the advance honors the declared follow-up', () => {
+    const battle = pivotBattle();
+    const root = createRootPosition(serialize(battle));
+    const child = advancePosition(root, 'move uturn > switch 3', 'move seismictoss', '1,2,3,4');
+    const after = positionBattle(child);
+    // Mienshao pivoted and HEATRAN (slot 3) came in — not the greedy pick.
+    expect(after.sides[0].active[0]?.species.name).toBe('Heatran');
+  });
+
+  test('a fainted follow-up target falls back to the greedy resolution', () => {
+    const battle = pivotBattle();
+    const clef = battle.sides[0].pokemon.find(pokemon => pokemon.species.name === 'Clefable')!;
+    clef.faint();
+    clef.hp = 0;
+    const root = createRootPosition(serialize(battle));
+    const child = advancePosition(root, 'move uturn > switch 2', 'move seismictoss', '1,2,3,4');
+    const after = positionBattle(child);
+    // Slot 2 (Clefable) is gone — the greedy resolver brings in the only
+    // healthy bench mon instead.
+    expect(after.sides[0].active[0]?.species.name).toBe('Heatran');
   });
 });
 

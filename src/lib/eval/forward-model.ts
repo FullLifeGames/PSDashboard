@@ -366,6 +366,9 @@ function forkBattle(position: SimPosition, seed: PRNGSeed): Battle {
 function applyChoice(battle: Battle, side: 'p1' | 'p2', choice: string): void {
   // The waiting-side sentinel (see legalChoices): nothing to submit.
   if (choice === 'wait') return;
+  // Pivot pairs carry their follow-up after ' > ' — the move submits now,
+  // the follow-up answers the forced-switch request in resolveForcedSwitches.
+  [choice] = choice.split(' > ');
   if (!battle.choose(side, choice)) {
     const error = battle.sides[sideIndex(side)].choice.error || 'choice rejected';
     throw new Error(`${side} "${choice}": ${error}`);
@@ -397,7 +400,11 @@ function switchAssignments(forcedCount: number, benchSlots: number[]): string[] 
   return assignments;
 }
 
-function resolveForcedSwitches(battle: Battle, seed: PRNGSeed): void {
+function resolveForcedSwitches(
+  battle: Battle,
+  seed: PRNGSeed,
+  followUps: { p1?: string; p2?: string } = {},
+): void {
   for (let guard = 0; guard < 6; guard++) {
     if (battle.ended) return;
     const pending = battle.sides
@@ -409,6 +416,15 @@ function resolveForcedSwitches(battle: Battle, seed: PRNGSeed): void {
     for (const side of pending) {
       const request = side.activeRequest as { forceSwitch?: boolean[] } | null;
       const forcedCount = Math.max(1, (request?.forceSwitch ?? []).filter(Boolean).length);
+      // A pivot pair's declared follow-up answers this side's first switch
+      // request. Consumed once; a reject (target dragged/fainted mid-turn)
+      // falls back to the greedy resolution below.
+      const followUp = followUps[side.id as 'p1' | 'p2'];
+      if (followUp && forcedCount === 1) {
+        delete followUps[side.id as 'p1' | 'p2'];
+        if (battle.choose(side.id as 'p1' | 'p2', followUp)) continue;
+        side.clearChoice();
+      }
       const benchSlots = side.pokemon
         .map((pokemon, index) => ({ pokemon, slot: index + 1 }))
         .filter(({ pokemon }) => !pokemon.isActive && !pokemon.fainted)
@@ -449,6 +465,9 @@ export function advancePosition(
   const battle = forkBattle(position, seed);
   applyChoice(battle, 'p1', p1Choice);
   applyChoice(battle, 'p2', p2Choice);
-  resolveForcedSwitches(battle, seed);
+  resolveForcedSwitches(battle, seed, {
+    p1: p1Choice.split(' > ')[1],
+    p2: p2Choice.split(' > ')[1],
+  });
   return toPosition(battle);
 }

@@ -21,6 +21,11 @@ export interface PlayedAction {
    * own side), null when the line names no slot target (spread/self).
    */
   targetLoc?: number | null;
+  /**
+   * Pivot moves (U-turn family): the species that came in on the follow-up
+   * switch — the other half of the pair the player actually chose.
+   */
+  pivotTarget?: string;
 }
 
 export interface PlayedTurn {
@@ -50,6 +55,14 @@ const slotOf = (pokemonRef: string): { side: 'p1' | 'p2'; slot: number } | null 
 };
 
 const nickname = (pokemonRef: string): string => pokemonRef.replace(/^p[12][a-c]: /, '');
+
+const choiceKey = (name: string): string => name.toLowerCase().replace(/[^a-z0-9]/g, '');
+
+/** The U-turn family — moves whose follow-up switch is part of the choice. */
+const PIVOT_MOVE_NAMES = new Set([
+  'uturn', 'voltswitch', 'flipturn', 'partingshot', 'teleport', 'batonpass',
+  'chillyreception', 'shedtail',
+]);
 
 /**
  * Per side, the chosen action is its first `|move|` or `|switch|` line —
@@ -105,8 +118,19 @@ export function parsePlayedActions(lines: string[]): PlayedTurn {
     }
     if (tag === 'switch') {
       const side = sideOf(parts[2] ?? '');
-      if (!side || settled[side]) continue;
+      if (!side) continue;
       const species = (parts[3] ?? '').split(',')[0].trim();
+      if (settled[side]) {
+        // A switch after the side's own PIVOT move is the pair's other half —
+        // record which Pokémon the player brought in (grading distinguishes
+        // "U-turn → the wall" from "U-turn → the wincon").
+        const action = actions[side];
+        if (action && action.kind === 'move' && PIVOT_MOVE_NAMES.has(choiceKey(action.name)) &&
+          action.pivotTarget === undefined) {
+          action.pivotTarget = species;
+        }
+        continue;
+      }
       actions[side] = { kind: 'switch', name: nickname(parts[2] ?? ''), species };
       settled[side] = true;
       continue;

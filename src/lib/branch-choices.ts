@@ -177,7 +177,9 @@ export function evalChoiceToSlotChoices(
   switchesBySlot: BranchSwitchOption[][],
   label?: string,
 ): (BranchSlotChoice | null)[] | null {
-  const parts = evalChoice.split(',').map(part => part.trim());
+  // Pivot pairs ("move uturn > switch 4"): the branch UI prefills the MOVE;
+  // the sim raises the follow-up switch as its own prompt afterwards.
+  const parts = evalChoice.split(' > ')[0].split(',').map(part => part.trim());
   const labelParts = label ? splitCombinedLabel(label) : [];
   const choices: (BranchSlotChoice | null)[] = [];
   for (let slot = 0; slot < parts.length; slot++) {

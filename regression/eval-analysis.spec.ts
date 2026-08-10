@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { analyzeTurn, matchPlayedChoice, playedSetupMove, REGRET_THRESHOLD, type SideAnalysis } from '../src/lib/eval/analysis';
+import { analyzeTurn, findPlayedOption, matchPlayedChoice, playedSetupMove, REGRET_THRESHOLD, type SideAnalysis } from '../src/lib/eval/analysis';
 import { allTurnEvents, detectSacks, turnEvents } from '../src/lib/eval/played';
 import type { EvalResult, RankedChoice } from '../src/lib/eval/types';
 import type { TurnSnapshot } from '../src/types';
@@ -862,5 +862,25 @@ test.describe('choice diffing (the condensed why)', () => {
       ranked('move bugbite 1, move closecombat 1', 'Bug Bite→Politoed + Close Combat→Politoed'),
       ranked('move bugbite 2 mega, switch 3', 'Mega + Bug Bite→Incineroar + → Amoonguss'),
     )).toBeNull();
+  });
+});
+
+test.describe('pivot pair matching', () => {
+  const options = [
+    { choice: 'move uturn > switch 2', label: 'U-turn → Noivern' },
+    { choice: 'move uturn > switch 3', label: 'U-turn → Clefable' },
+    { choice: 'move closecombat', label: 'Close Combat' },
+  ];
+
+  test('a known pivot target matches the exact pair row', () => {
+    const matched = findPlayedOption(options, [
+      { kind: 'move', name: 'U-turn', pivotTarget: 'Clefable' },
+    ]);
+    expect(matched?.label).toBe('U-turn → Clefable');
+  });
+
+  test('an unknown pivot target takes the best-ranked pair of the move', () => {
+    const matched = findPlayedOption(options, [{ kind: 'move', name: 'U-turn' }]);
+    expect(matched?.label).toBe('U-turn → Noivern');
   });
 });

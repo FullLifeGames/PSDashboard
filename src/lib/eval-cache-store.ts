@@ -56,7 +56,9 @@ export interface StoredEval {
 //      moves).
 // v21: horizon-trend extrapolation (2b-lite) — tied leading rows carry
 //      their one-ply trend in their VALUES (no re-solve; score untouched).
-export const EVAL_ENGINE_CACHE_VERSION = 21;
+// v22: pivot pairs — the root matrix enumerates "U-turn → X" as first-class
+//      choices instead of one greedy row.
+export const EVAL_ENGINE_CACHE_VERSION = 22;
 
 export function evalStoreKey(
   cacheKey: string,

@@ -224,6 +224,13 @@ export const splitCombinedLabel = (label: string): string[] => {
 
 function slotMatches(choicePart: string, labelPart: string, action: PlayedAction): boolean {
   if (action.kind === 'switch') return labelPart === `→ ${action.species ?? action.name}`;
+  // A pivot pair ("move uturn > switch 4") must bring in the Pokémon the
+  // player actually chose; with the target unknown (old parses) any pair of
+  // the move matches and ranking order picks the charitable one.
+  if (action.pivotTarget && choicePart.includes(' > ') &&
+    labelPart.split(' → ').pop() !== action.pivotTarget) {
+    return false;
+  }
   const tokens = choicePart.split(' ');
   if (tokens[0] !== 'move' || tokens[1] !== choiceKeyOf(action.name)) return false;
   // Every gimmick marker must agree — a mega move must match the mega
