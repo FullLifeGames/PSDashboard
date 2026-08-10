@@ -16,7 +16,7 @@ import { applyTeamSheetToInfo } from './lib/team-sheets';
 import { TeamEditor } from './components/TeamEditor';
 import { SetsImportExportPanel } from './components/SetsImportExportPanel';
 import { EvalPanel } from './components/EvalPanel';
-import { needsSettingsUpgrade, useEvaluation } from './hooks/useEvaluation';
+import { needsSettingsUpgrade, useEvaluation, type TurnEvalSettings } from './hooks/useEvaluation';
 import { buildSetsExport, parseSetsImport } from './lib/sets-io';
 import { parseTeamText } from './lib/team-parser';
 import { applyInferredSpreads, enrichTeamInfo, manualMove } from './lib/team-info';
@@ -782,9 +782,11 @@ function App() {
   ]);
 
   // Explains ONE turn: a two-turn mini sweep (turn + its follow-up) so the
-  // report can price the played outcome. Runs AUTOMATICALLY for whatever
-  // turn is selected — analysis, ranked lists, and matrix live in one place.
-  const analyzeTurnNow = useCallback((turn: number) => {
+  // report can price the played outcome. Runs ONLY from the explicit deepen
+  // button — selecting a turn shows the stored result and never re-searches
+  // (silent score swaps read as disagreement between the report and the
+  // turn view).
+  const analyzeTurnNow = useCallback((turn: number, settings?: TurnEvalSettings) => {
     if (!replayData) return;
     evaluation.runGraphSweep({
       turns: analyzableTurns,
@@ -798,35 +800,9 @@ function App() {
         ? parsePlayedActionsDoubles(snapshots[sweepTurn]?.log ?? [])
         : parsePlayedActions(snapshots[sweepTurn]?.log ?? [])),
       sensitivityTargetsFor,
+      settings,
     });
   }, [replayData, evaluation, analyzableTurns, effectiveTera, effectiveSleepClause, setsFingerprint, makeReplayAcquire, snapshots, evalIsDoubles, sensitivityTargetsFor]);
-
-  // Quiet gap-filler: once the game has ANY analysis, the selected turn
-  // analyzes itself when the sweep has nothing for it yet — "Analyze game"
-  // is the single entry point, selection does the rest. Gated on existing
-  // graph data so merely loading a replay never starts background evals,
-  // and one attempt per (replay, turn, sets) — a wedged reconstruction must
-  // not retry forever.
-  const autoAnalyzeAttemptedRef = useRef(new Set<string>());
-  useEffect(() => {
-    if (branching || !replayData) return;
-    if (analysisTurn === null || analysisTurn < 1) return;
-    if (evaluation.graph.running) return;
-    if (!evaluation.graph.scores.some(score => score !== null)) return;
-    // A fast-pass result is a sketch: selecting the turn UPGRADES it to the
-    // configured settings (the old "Analyze turn" button's escalation, now
-    // automatic). The per-turn settings record decides — depth, samples,
-    // and engine mode all count; deeper stored results never downgrade.
-    if (!needsSettingsUpgrade(evaluation.graph.settings[analysisTurn - 1] ?? null, evaluation.prefs)) return;
-    const prefsKey = `${evaluation.prefs.mode}:${evaluation.prefs.depth}:${evaluation.prefs.samples}`;
-    const key = `${replayData.id}:${analysisTurn}:${setsFingerprint}:${prefsKey}`;
-    if (autoAnalyzeAttemptedRef.current.has(key)) return;
-    const timer = setTimeout(() => {
-      autoAnalyzeAttemptedRef.current.add(key);
-      analyzeTurnNow(analysisTurn);
-    }, 400);
-    return () => clearTimeout(timer);
-  }, [branching, replayData, analysisTurn, evaluation.graph.running, evaluation.graph.scores, evaluation.graph.settings, evaluation.prefs, setsFingerprint, analyzeTurnNow]);
 
   // Any position change invalidates a displayed result.
   const { markStale: markEvalStale, reset: resetEval, clearGraph } = evaluation;
@@ -1087,14 +1063,36 @@ function App() {
     return null;
   }, [branching, evaluation.result, evaluation.graph, analysisTurn]);
 
-  // What produced the shown result, and whether the auto-upgrade to the
-  // configured settings is still owed — the panel says so instead of
+  // What produced the shown result — the panel chip names it instead of
   // silently swapping numbers.
   const analyzedSettings = !branching && analysisTurn !== null && analysisTurn >= 1
     ? evaluation.graph.settings[analysisTurn - 1] ?? null
     : null;
-  const analyzedDeepening = !branching && analyzedResult !== null && analyzedSettings !== null
-    && needsSettingsUpgrade(analyzedSettings, evaluation.prefs);
+
+  // The explicit deepening ladder: a sketch (or gap) first rises to the
+  // configured settings, then one depth further (cap 3). Selecting a turn
+  // never re-searches — this target is the only escalation.
+  const thinkDeeperTarget = useMemo((): TurnEvalSettings | null => {
+    if (branching || analysisTurn === null || analysisTurn < 1) return null;
+    const stored = evaluation.graph.settings[analysisTurn - 1] ?? null;
+    if (!stored || needsSettingsUpgrade(stored, evaluation.prefs)) {
+      return { depth: evaluation.prefs.depth, samples: evaluation.prefs.samples, mode: evaluation.prefs.mode };
+    }
+    // MCTS has no depth ladder; matrix caps at the engine's depth 3.
+    if (stored.mode === 'mcts' || evaluation.prefs.mode === 'mcts') return null;
+    if (stored.depth >= 3) return null;
+    return {
+      depth: (stored.depth + 1) as 2 | 3,
+      // Never shed samples on the way up — a d3s3 run must supersede d2s5.
+      samples: Math.max(stored.samples, evaluation.prefs.samples) as TurnEvalSettings['samples'],
+      mode: 'matrix',
+    };
+  }, [branching, analysisTurn, evaluation.graph.settings, evaluation.prefs]);
+
+  const handleThinkDeeper = useCallback(() => {
+    if (analysisTurn === null || analysisTurn < 1 || !thinkDeeperTarget) return;
+    analyzeTurnNow(analysisTurn, thinkDeeperTarget);
+  }, [analysisTurn, thinkDeeperTarget, analyzeTurnNow]);
 
   const replayWinner = useMemo<'p1' | 'p2' | null>(() => {
     if (!replayData) return null;
@@ -1452,7 +1450,8 @@ function App() {
                 status={branching ? evaluation.status : 'idle'}
                 result={analyzedResult}
                 resultSettings={analyzedSettings}
-                deepening={analyzedDeepening}
+                onThinkDeeper={!branching ? handleThinkDeeper : undefined}
+                thinkDeeperTarget={!branching ? thinkDeeperTarget : null}
                 progress={evaluation.progress}
                 reconstructProgress={evaluation.reconstructProgress}
                 error={evaluation.error}

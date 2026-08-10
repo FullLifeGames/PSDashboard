@@ -1,5 +1,6 @@
 import type { GameReport } from '../lib/eval/report';
 import type { LeadAnalysis } from '../lib/eval/leads';
+import type { TurnEvalSettings } from '../hooks/useEvaluation';
 import { winDeltaText } from '../lib/eval/winprob';
 import { attributionBadge } from './eval-badges';
 
@@ -9,12 +10,29 @@ interface EvalGameReportProps {
   onSelectTurn?: (turn: number) => void;
   /** Turn-0 verdicts — a T0 chip appears for mistake-level lead choices. */
   leads?: LeadAnalysis | null;
+  /** What produced each turn's numbers — chips carry a d1/d2/MCTS badge so
+   * mixed-depth curves read honestly. */
+  settingsFor?: (turn: number) => TurnEvalSettings | null;
 }
 
 // Deltas render as win-probability points ("−12%") — see winDeltaText.
 
 /** Game-level story from a completed sweep: the tip, the seeds, the key moments. */
-export function EvalGameReport({ report, playerNames, onSelectTurn, leads }: EvalGameReportProps) {
+export function EvalGameReport({ report, playerNames, onSelectTurn, leads, settingsFor }: EvalGameReportProps) {
+  const settingsBadge = (turn: number) => {
+    const settings = settingsFor?.(turn);
+    if (!settings) return null;
+    return (
+      <span
+        style={{ color: '#667', fontSize: 9 }}
+        title={settings.mode === 'mcts'
+          ? 'Evaluated with the MCTS engine'
+          : `Evaluated at depth ${settings.depth} · ${settings.samples} sample${settings.samples > 1 ? 's' : ''}${settings.depth === 1 && settings.samples === 1 ? ' (fast scan)' : ''} — deepen from the turn view`}
+      >
+        {settings.mode === 'mcts' ? 'MCTS' : `d${settings.depth}`}
+      </span>
+    );
+  };
   const leadMisplays = leads
     ? (['p1', 'p2'] as const).filter(side =>
       leads[side].tier === 'mistake' || leads[side].tier === 'blunder')
@@ -78,6 +96,7 @@ export function EvalGameReport({ report, playerNames, onSelectTurn, leads }: Eva
                     : "Jump to this turn's analysis"}
               >
                 <span style={{ color: '#cde' }}>T{misplay.turn}</span>
+                {settingsBadge(misplay.turn)}
                 <span style={{ color: tone }}>{playerNames[misplay.side === 'p1' ? 0 : 1]}</span>
                 <span style={{ color: '#aab' }}>{misplay.played}</span>
                 {misplay.sacrifice
@@ -113,6 +132,7 @@ export function EvalGameReport({ report, playerNames, onSelectTurn, leads }: Eva
               title="A risk whose read won value — jump to this turn's analysis"
             >
               <span style={{ color: '#cde' }}>T{read.turn}</span>
+              {settingsBadge(read.turn)}
               <span style={{ color: '#8c8' }}>{playerNames[read.side === 'p1' ? 0 : 1]}</span>
               <span style={{ color: '#aab' }}>{read.played}</span>
               <span style={{ color: '#8c8' }}>read paid off {winDeltaText(read.payoff)}</span>
@@ -133,6 +153,7 @@ export function EvalGameReport({ report, playerNames, onSelectTurn, leads }: Eva
                 title="Jump to this turn's analysis"
               >
                 <span style={{ color: '#cde' }}>T{moment.turn}</span>
+                {settingsBadge(moment.turn)}
                 <span style={{ color: badge.color }}>{badge.text}</span>
                 {moment.swing !== null && <span style={{ color: '#aab' }}>{winDeltaText(moment.swing)}</span>}
               </button>

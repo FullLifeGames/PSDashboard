@@ -28,8 +28,10 @@ interface EvalPanelProps {
   onPickPair?: (p1: { choice: string; label: string }, p2: { choice: string; label: string }) => void;
   /** Replay view: the settings that produced the shown result (fast scan vs configured). */
   resultSettings?: TurnEvalSettings | null;
-  /** The shown result is a sketch — the auto-upgrade to the configured settings is pending/running. */
-  deepening?: boolean;
+  /** Explicit per-position deepening — selecting a turn never re-searches. */
+  onThinkDeeper?: () => void;
+  /** The settings the deepen button would run (null = at the cap / not applicable). */
+  thinkDeeperTarget?: TurnEvalSettings | null;
   /** Branch mode: hides the auto checkbox on the replay view. */
   showAuto: boolean;
   /** Gen 9 only — other gens have no Tera to gate. */
@@ -121,11 +123,28 @@ export function EvalPanel({
   playerNames, status, result, progress, reconstructProgress, error,
   prefs, onPrefsChange, onEvaluate, onCancel, onPickChoice, onPickPair, showAuto, showTera,
   graph, onAnalyzeGame, onSelectTurn, currentTurn, analysis,
-  reads, leadAnalysis, reportLeads, report, doubles, resultSettings, deepening,
+  reads, leadAnalysis, reportLeads, report, doubles, resultSettings, onThinkDeeper, thinkDeeperTarget,
 }: EvalPanelProps) {
   const running = status === 'searching' || status === 'reconstructing';
   const hasGraph = graph.scores.some(score => score !== null);
   const p1Pct = result ? winPercent(result.score) : 50;
+
+  // One escalation control for both faces of the turn view: a gap turn gets
+  // its first analysis, an analyzed turn re-searches one step deeper. The
+  // label names the target so the click is never a surprise.
+  const thinkDeeperButton = onThinkDeeper && thinkDeeperTarget ? (
+    <button
+      type="button"
+      className="ps-btn"
+      disabled={graph.running}
+      onClick={onThinkDeeper}
+      title="Re-search this position (and its follow-up turn) at the named settings — the score, ranked moves, matrix, graph, and report update together."
+      style={{ padding: '1px 6px', fontSize: 10 }}
+    >
+      {result ? 'Think deeper about this position' : 'Analyze this position'}
+      {` (${thinkDeeperTarget.mode === 'mcts' ? 'MCTS' : `depth ${thinkDeeperTarget.depth}`})`}
+    </button>
+  ) : null;
 
   // Two screens, not one stack: the game report (the cards) is the
   // overview; clicking a turn switches to that turn's full view (analysis,
@@ -300,7 +319,13 @@ export function EvalPanel({
             </div>
           )}
           {showReportView && report && (
-            <EvalGameReport report={report} playerNames={playerNames} onSelectTurn={selectTurn} leads={reportLeads} />
+            <EvalGameReport
+              report={report}
+              playerNames={playerNames}
+              onSelectTurn={selectTurn}
+              leads={reportLeads}
+              settingsFor={turn => (turn >= 1 ? graph.settings[turn - 1] ?? null : null)}
+            />
           )}
           {!showReportView && (
             <>
@@ -314,6 +339,11 @@ export function EvalPanel({
                 >
                   ← Game report
                 </button>
+              )}
+              {/* A gap turn has no result block below — the escalation
+                  control still has to be reachable to analyze it at all. */}
+              {!result && thinkDeeperButton && (
+                <div style={{ marginTop: 4 }}>{thinkDeeperButton}</div>
               )}
               {leadAnalysis && <EvalLeadAnalysis leads={leadAnalysis} playerNames={playerNames} />}
               {!leadAnalysis && analysis && <EvalTurnAnalysis analysis={analysis} playerNames={playerNames} reads={reads} onExplore={onPickChoice} />}
@@ -340,19 +370,12 @@ export function EvalPanel({
                   : `depth ${resultSettings.depth} · ${resultSettings.samples} sample${resultSettings.samples > 1 ? 's' : ''}`)
                 : `depth ${result.depthCompleted}`}
             </span>
-            {deepening && (
-              <span
-                style={{ color: '#fd6' }}
-                title="The shown numbers are the fast scan's sketch — this turn is re-running at your configured settings and will update in place."
-              >
-                deepening to {prefs.mode === 'mcts' ? 'MCTS' : `depth ${prefs.depth}`}…
-              </span>
-            )}
             {result.interval > 0.25 && (
               <span style={{ color: '#b6a46a' }} title="No safe line exists — the outcome hinges on out-predicting the opponent.">
                 toss-up: prediction battle
               </span>
             )}
+            {thinkDeeperButton}
           </div>
           <div className="ps-eval-columns">
             {/* Stale results describe the PREVIOUS position — clicking them

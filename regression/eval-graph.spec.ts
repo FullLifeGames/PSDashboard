@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { needsSettingsUpgrade } from '../src/hooks/useEvaluation';
+import { needsSettingsUpgrade, supersedesStored } from '../src/hooks/useEvaluation';
 
 test.describe('settings upgrade decision (merged flow)', () => {
   const prefs = { depth: 2, samples: 3, mode: 'matrix', auto: false, tera: 'auto' } as const;
@@ -15,6 +15,30 @@ test.describe('settings upgrade decision (merged flow)', () => {
     // for MCTS users, so their selected turns must still get MCTS.
     expect(needsSettingsUpgrade({ depth: 1, samples: 1, mode: 'matrix' }, { ...prefs, mode: 'mcts' })).toBe(true);
     expect(needsSettingsUpgrade({ depth: 2, samples: 1, mode: 'mcts' }, { ...prefs, mode: 'mcts' })).toBe(false);
+  });
+});
+
+test.describe('graph merge monotonicity', () => {
+  test('a shallower pass never overwrites deeper stored data', () => {
+    // The re-analyze fast pass (d1s1) used to clobber a deepened turn's
+    // graph entry until the key-turn pass restored some of them.
+    expect(supersedesStored({ depth: 2, samples: 3, mode: 'matrix' }, { depth: 1, samples: 1, mode: 'matrix' }, 'matrix')).toBe(false);
+    expect(supersedesStored({ depth: 1, samples: 1, mode: 'matrix' }, { depth: 2, samples: 3, mode: 'matrix' }, 'matrix')).toBe(true);
+    expect(supersedesStored(null, { depth: 1, samples: 1, mode: 'matrix' }, 'matrix')).toBe(true);
+    // Equal settings refresh in place.
+    expect(supersedesStored({ depth: 2, samples: 3, mode: 'matrix' }, { depth: 2, samples: 3, mode: 'matrix' }, 'matrix')).toBe(true);
+    // Both dimensions must hold — deeper but fewer samples is not a superset.
+    expect(supersedesStored({ depth: 2, samples: 5, mode: 'matrix' }, { depth: 3, samples: 3, mode: 'matrix' }, 'matrix')).toBe(false);
+    expect(supersedesStored({ depth: 2, samples: 5, mode: 'matrix' }, { depth: 3, samples: 5, mode: 'matrix' }, 'matrix')).toBe(true);
+  });
+  test('cross-mode results replace only toward the configured mode', () => {
+    // MCTS prefs: the matrix fast pass must not clobber stored MCTS turns…
+    expect(supersedesStored({ depth: 2, samples: 1, mode: 'mcts' }, { depth: 1, samples: 1, mode: 'matrix' }, 'mcts')).toBe(false);
+    // …but a user who SWITCHED to matrix gets matrix results again.
+    expect(supersedesStored({ depth: 2, samples: 1, mode: 'mcts' }, { depth: 1, samples: 1, mode: 'matrix' }, 'matrix')).toBe(true);
+    expect(supersedesStored({ depth: 2, samples: 3, mode: 'matrix' }, { depth: 1, samples: 1, mode: 'mcts' }, 'mcts')).toBe(true);
+    // Same-mode MCTS has no depth ordering — it refreshes.
+    expect(supersedesStored({ depth: 1, samples: 1, mode: 'mcts' }, { depth: 1, samples: 1, mode: 'mcts' }, 'mcts')).toBe(true);
   });
 });
 import { computeBlunders, selectKeyTurns, BLUNDER_SWING } from '../src/lib/eval/graph';

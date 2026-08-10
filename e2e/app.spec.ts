@@ -426,12 +426,12 @@ test.describe('PS Dashboard', () => {
     await expect(panel.locator('.ps-eval-analysis')).toContainText('Turn 1', { timeout: 15_000 });
   });
 
-  test('the selected turn deepens to the configured depth automatically', async ({ page }) => {
+  test('deepening is explicit and monotone — clicking an entry never re-searches', async ({ page }) => {
     test.setTimeout(240_000);
     await page.evaluate(() => {
       localStorage.setItem('ps-replay-interceptor:eval-pool', '2');
       localStorage.setItem('ps-replay-interceptor:eval-prefs',
-        JSON.stringify({ depth: 2, samples: 1, auto: false, tera: 'auto' }));
+        JSON.stringify({ depth: 1, samples: 1, auto: false, tera: 'auto' }));
     });
     await page.reload();
     await page.locator('button', { hasText: 'Load' }).click();
@@ -441,11 +441,21 @@ test.describe('PS Dashboard', () => {
     await panel.locator('button', { hasText: 'Analyze game' }).click();
     await expect(panel.locator('button', { hasText: 'Re-analyze' })).toBeVisible({ timeout: 180_000 });
 
-    // The fast scan sketches every turn at depth 1; the SELECTED turn then
-    // re-runs itself at the configured settings and says so — the settings
-    // chip must land on depth 2 (via the key-turn pass or the auto-upgrade).
+    // Selecting a turn shows the stored depth-1 result — no silent
+    // re-search swaps the numbers. The escalation is the explicit button.
     await panel.locator('.ps-eval-graph rect[data-turn="1"]').click();
+    await expect(panel.getByText(/^depth 1/)).toBeVisible({ timeout: 15_000 });
+    const deeper = panel.locator('button', { hasText: 'Think deeper about this position' });
+    await expect(deeper).toContainText('depth 2');
+    await deeper.click();
     await expect(panel.getByText(/^depth 2/)).toBeVisible({ timeout: 120_000 });
+
+    // Monotone merge: a later re-analyze (fast scan) must NOT downgrade the
+    // explicitly deepened turn back to depth 1.
+    await panel.locator('button', { hasText: 'Re-analyze' }).click();
+    await expect(panel.locator('button', { hasText: 'Re-analyze' })).toBeVisible({ timeout: 180_000 });
+    await panel.locator('.ps-eval-graph rect[data-turn="1"]').click();
+    await expect(panel.getByText(/^depth 2/)).toBeVisible({ timeout: 15_000 });
   });
 
   test('analyzes the whole game with the MCTS engine', async ({ page }) => {

@@ -179,9 +179,9 @@ export function EvalGraph({ scores, playerNames, currentTurn, onSelectTurn, lead
           onClick={onSelectTurn ? () => onSelectTurn(index + 1) : undefined}
         >
           {/* Gap turns (reconstruction wedges, unswept ends) stay clickable —
-              selecting one analyzes it on the spot. */}
+              the turn view then offers "Analyze this position". */}
           <title>{score === null
-            ? `Turn ${index + 1} — not analyzed yet · click to analyze`
+            ? `Turn ${index + 1} — not analyzed yet · click to open, then Analyze this position`
             : label(index + 1, score)}</title>
         </rect>
       ))}

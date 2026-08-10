@@ -103,6 +103,12 @@ export interface GraphSweepParams {
    * probing disabled.
    */
   sensitivityTargetsFor?(side: 'p1' | 'p2'): SensitivityTarget[];
+  /**
+   * Engine-settings override for this sweep (the explicit think-deeper
+   * escalation). The whole sweep runs at these settings instead of the
+   * panel preferences — meant for short ranges.
+   */
+  settings?: TurnEvalSettings;
 }
 
 /** The engine settings that produced a stored per-turn result. */
@@ -113,15 +119,35 @@ export interface TurnEvalSettings {
 }
 
 /**
- * The stored result is SHALLOWER than the panel preferences — selecting the
- * turn should re-run it at full settings. Deeper/heavier stored results
- * never downgrade (a depth-2 result stays shown under depth-1 prefs).
+ * The stored result is SHALLOWER than the panel preferences — the turn can
+ * be re-run at full settings (the explicit deepen button offers exactly
+ * that). Deeper/heavier stored results never downgrade (a depth-2 result
+ * stays shown under depth-1 prefs).
  */
 export function needsSettingsUpgrade(stored: TurnEvalSettings | null, prefs: EvalPreferences): boolean {
   if (!stored) return true;
   if (stored.mode !== prefs.mode) return true;
   if (prefs.mode === 'mcts') return false;
   return stored.depth < prefs.depth || stored.samples < prefs.samples;
+}
+
+/**
+ * May a sweep pass replace the graph's stored per-turn data? Monotone merge:
+ * a shallower result never overwrites a deeper one — the fast re-scan of a
+ * later "Analyze game" must not downgrade an explicitly deepened turn.
+ * Cross-mode results replace only when the incoming pass carries the
+ * CONFIGURED engine mode (the user's stated intent beats a stale result
+ * from the other engine).
+ */
+export function supersedesStored(
+  stored: TurnEvalSettings | null,
+  incoming: TurnEvalSettings,
+  configuredMode: EvalPreferences['mode'],
+): boolean {
+  if (!stored) return true;
+  if (stored.mode !== incoming.mode) return incoming.mode === configuredMode;
+  if (incoming.mode === 'mcts') return true;
+  return incoming.depth >= stored.depth && incoming.samples >= stored.samples;
 }
 
 export interface EvalGraphState {
@@ -294,7 +320,10 @@ export function useEvaluation() {
   const runGraphSweep = useCallback((params: GraphSweepParams) => {
     cancel();
     const runId = ++runRef.current;
-    const { depth, samples, mode } = prefsRef.current;
+    const { depth, samples, mode } = params.settings ?? prefsRef.current;
+    // Cross-mode merge arbiter: the mode the USER configured, even when this
+    // sweep runs an escalation override.
+    const configuredMode = prefsRef.current.mode;
     const from = Math.max(1, params.from ?? 1);
     const to = Math.min(params.turns, params.to ?? params.turns);
     const previous = graphDataRef.current;
@@ -489,6 +518,14 @@ export function useEvaluation() {
         const storeKey = evalStoreKey(key, depth, samples, mode, params.tera);
         const turnPlayed = params.playedFor(turn);
         played[turn - 1] = turnPlayed;
+
+        // Monotone merge: the graph already holds a deeper result for this
+        // turn (an explicit deepen, a deeper prior sweep) — every stored
+        // field stands and this pass skips the turn entirely.
+        if (!supersedesStored(turnSettings[turn - 1], { depth, samples, mode }, configuredMode)) {
+          setGraph({ ...snapshot(), running: true, progress: { done: index + 1, total: turnList.length } });
+          continue;
+        }
 
         let hit = cacheRef.current.get(key);
         if (!(hit && hit.depth === depth && hit.samples === samples && hit.mode === mode && teraKey(hit.tera) === teraKey(params.tera))) {
