@@ -80,10 +80,28 @@ export function EvalGraph({ scores, playerNames, currentTurn, onSelectTurn, lead
   const hitWidth = (width - 2 * PAD_X) / Math.max(turns - first, 1);
 
   const pct = (score: number) => winPercent(score);
+  // A node IS the estimate before its turn — the story of HOW it got there
+  // is the PREVIOUS turn's play, so that's what a click opens (peaks were
+  // drawing clicks that landed on "not much happening yet").
+  const producerOf = (turn: number) => Math.max(first, turn - 1);
   const label = (turn: number, score: number) => {
     const swing = blunders.has(turn) ? ' — blunder swing' : '';
-    return `Turn ${turn}: ${playerNames[0]} ${pct(score)}% · ${playerNames[1]} ${100 - pct(score)}%${swing}`;
+    const producer = producerOf(turn);
+    const click = producer === turn
+      ? ''
+      : producer === 0
+        ? ' · click: the lead decision that set this up'
+        : ` · click: turn ${producer}, which produced this position`;
+    return `Before turn ${turn}: ${playerNames[0]} ${pct(score)}% · ${playerNames[1]} ${100 - pct(score)}%${swing}${click}`;
   };
+
+  // The selected turn's movement: its node → the next node (what that play
+  // produced), drawn as a thicker glow under the line.
+  const edgeFrom = currentTurn >= 1 ? scores[currentTurn - 1] : (hasLead ? leadScore! : null);
+  const edgeTo = currentTurn >= 0 && currentTurn < turns ? scores[currentTurn] : null;
+  const highlight = edgeFrom !== null && edgeFrom !== undefined && edgeTo !== null && currentTurn >= first
+    ? { x1: x(currentTurn), y1: y(edgeFrom), x2: x(currentTurn + 1), y2: y(edgeTo) }
+    : null;
 
   return (
     <svg
@@ -96,6 +114,12 @@ export function EvalGraph({ scores, playerNames, currentTurn, onSelectTurn, lead
       <line x1={0} y1={HEIGHT / 2} x2={width} y2={HEIGHT / 2} stroke="rgba(255,255,255,0.18)" strokeDasharray="3 3" />
       {currentTurn >= 1 && currentTurn <= turns && (
         <line x1={x(currentTurn)} y1={2} x2={x(currentTurn)} y2={HEIGHT - 2} stroke="#8cf" strokeOpacity={0.45} />
+      )}
+      {highlight && (
+        <line
+          x1={highlight.x1} y1={highlight.y1} x2={highlight.x2} y2={highlight.y2}
+          stroke="#8cf" strokeOpacity={0.55} strokeWidth={3.5} strokeLinecap="round"
+        />
       )}
       {segments.map(d => (
         <path key={d} d={d} fill="none" stroke="#cde" strokeWidth={1.6} strokeLinejoin="round" />
@@ -155,7 +179,7 @@ export function EvalGraph({ scores, playerNames, currentTurn, onSelectTurn, lead
           height={HEIGHT}
           fill="transparent"
           style={onSelectTurn ? { cursor: 'pointer' } : undefined}
-          onClick={onSelectTurn ? () => onSelectTurn(index + 1) : undefined}
+          onClick={onSelectTurn ? () => onSelectTurn(producerOf(index + 1)) : undefined}
         >
           <title>{label(index + 1, score)}</title>
         </rect>

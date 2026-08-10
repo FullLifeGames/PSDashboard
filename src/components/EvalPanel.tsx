@@ -281,7 +281,7 @@ export function EvalPanel({
           )}
           {hasGraph && !analysis && (
             <div style={{ fontSize: 10, color: '#778', marginTop: 2 }}>
-              Click a point to see that turn's analysis.
+              Click a point to see the turn that produced it.
             </div>
           )}
           {report && <EvalGameReport report={report} playerNames={playerNames} onSelectTurn={onSelectTurn} leads={reportLeads} />}
