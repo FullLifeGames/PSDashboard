@@ -356,6 +356,38 @@ test.describe('turn analysis assembly', () => {
     });
     expect(ordinary.p2.riskPaidOff).toBeUndefined();
 
+    // The payoff window is for softening flagged risks — an UNTIERED gamble
+    // grades on its immediate outcome only. Crediting a no-regret play for
+    // where the game stood 3 turns later attributes the opponent's follow-up
+    // choices (and the rolls) to the gamble (GPL T35: Knock Off praised for
+    // a swing the winner's deliberate sack produced).
+    const delayed = analyzeTurn({
+      turn: 50, result: tied,
+      played: { p1: { kind: 'move', name: 'Iron Head', tera: false }, p2: { kind: 'switch', name: 'Heatran', species: 'Heatran' } },
+      playedOutcome: -0.05, futureOutcomes: [-0.3, -0.6], scoreBefore: -0.05, scoreAfter: -0.14,
+    });
+    expect(delayed.p2.riskPaidOff).toBeUndefined();
+
+    // No praise out of an already-lost position: in garbage time every move
+    // is a "gamble" and outcome noise credits it.
+    const lost: EvalResult = {
+      ...tied,
+      score: 0.75,
+      perSide: {
+        p1: [choiceEv('move ironhead', 'Iron Head', 0.7, 0.72)],
+        p2: [
+          choiceEv('move recover', 'Recover', -0.6, -0.58),
+          choiceEv('switch 5', '→ Heatran', -0.95, -0.59),
+        ],
+      },
+    };
+    const garbage = analyzeTurn({
+      turn: 60, result: lost,
+      played: { p1: { kind: 'move', name: 'Iron Head', tera: false }, p2: { kind: 'switch', name: 'Heatran', species: 'Heatran' } },
+      playedOutcome: 0.4, scoreBefore: 0.75, scoreAfter: 0.3,
+    });
+    expect(garbage.p2.riskPaidOff).toBeUndefined();
+
     // Playing the engine's own pick is covered by the ✓ chip — no read
     // credit on top even when the floor was scary.
     const gambleBest: EvalResult = {
@@ -374,6 +406,21 @@ test.describe('turn analysis assembly', () => {
       playedOutcome: -0.19, scoreBefore: -0.05, scoreAfter: -0.14,
     });
     expect(enginePick.p2.riskPaidOff).toBeUndefined();
+  });
+
+  test('a swallowed choice carries its protocol reason and keeps the engine line', () => {
+    const analysis = analyzeTurn({
+      turn: 32,
+      result,
+      played: { p1: { kind: 'move', name: 'Draco Meteor', tera: false }, p2: null, prevented: { p2: 'slp' } },
+      playedOutcome: null,
+      scoreBefore: 0.1,
+      scoreAfter: null,
+    });
+    expect(analysis.p2.prevented).toBe('slp');
+    expect(analysis.p2.played).toBeNull();
+    // The engine's preferred line stays available for the swallowed side.
+    expect(analysis.p2.best).toBeTruthy();
   });
 
   test('regret is measured against equilibrium EV, not the floor', () => {

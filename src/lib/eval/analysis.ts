@@ -85,6 +85,11 @@ export interface TurnSensitivity {
 
 export interface SideAnalysis {
   playedRaw: PlayedAction | null;
+  /**
+   * The protocol's reason a chosen action never surfaced ('slp', 'flinch',
+   * 'move: Taunt', 'faint', …) — the side DID pick something.
+   */
+  prevented?: string;
   /** Doubles: the per-slot actions this side actually took. */
   playedSlots?: (PlayedAction | null)[];
   /** The played action matched into the engine's ranked list. */
@@ -480,6 +485,7 @@ export function analyzeTurn(params: {
     }
     return {
       playedRaw,
+      ...(params.played?.prevented?.[key] ? { prevented: params.played.prevented[key] } : {}),
       ...(playedSlots ? { playedSlots } : {}),
       played,
       best,
@@ -504,14 +510,20 @@ export function analyzeTurn(params: {
   // from the engine's pick AND gave up a mistake-sized floor vs the safe line
   // (draft T50: a co-optimal switch whose floor priced in Earth Power). They
   // can only EARN the paid-off credit; with no verdict to soften, the risk
-  // labels stay off.
+  // labels stay off. Two honesty bounds (GPL T35): no praise from an
+  // already-lost position (garbage time makes every move a "gamble" outcome
+  // noise can credit), and the credit grades on the IMMEDIATE outcome only —
+  // the payoff window softens flagged risks; here it would attribute the
+  // opponent's follow-up choices and the rolls to the gamble.
   const markRisk = (key: 'p1' | 'p2', side: SideAnalysis, opponent: SideAnalysis) => {
     if (side.sacrifice) return;
     const tiered = side.tier === 'mistake' || side.tier === 'blunder';
+    const ownBefore = key === 'p1' ? params.scoreBefore : -params.scoreBefore;
     const gamble = !tiered && side.played !== null && side.best !== null && side.safe !== null
       && side.played.choice !== side.best.choice
       && side.played.choice !== side.safe.choice
       && side.safe.worstCase - side.played.worstCase >= TIER_THRESHOLDS.mistake
+      && ownBefore > -DECIDED_SCORE
       && params.playedOutcome !== null;
     if (!tiered && !gamble) return;
     if (!side.played?.punishedBy || !opponent.played) return;
@@ -519,7 +531,9 @@ export function analyzeTurn(params: {
     if (params.playedOutcome !== null && side.safe) {
       // The payoff is the BEST expected outcome within the window vs the safe
       // guarantee — a setup turn's value arrives on the turns after it.
-      const chain = [params.playedOutcome, ...(params.futureOutcomes ?? [])].slice(0, PAYOFF_WINDOW + 1);
+      const chain = tiered
+        ? [params.playedOutcome, ...(params.futureOutcomes ?? [])].slice(0, PAYOFF_WINDOW + 1)
+        : [params.playedOutcome];
       let payoff: number | null = null;
       let payoffTurn = 0;
       chain.forEach((outcome, index) => {

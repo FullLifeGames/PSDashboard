@@ -85,6 +85,18 @@ function EngineRow({ name, side, onExplore }: { name: string; side: SideAnalysis
   );
 }
 
+/** `|cant|` reasons → honest copy: the player DID choose; this swallowed it. */
+function preventedText(reason: string): string {
+  if (reason === 'faint') return 'fainted before its action came out';
+  if (reason === 'slp') return 'slept through the turn — the chosen action never surfaced';
+  if (reason === 'frz') return 'stayed frozen — the chosen action never surfaced';
+  if (reason === 'par') return 'was fully paralyzed — the chosen action never surfaced';
+  if (reason === 'flinch') return 'flinched — the chosen action never surfaced';
+  if (reason === 'recharge') return 'had to recharge';
+  if (reason.startsWith('move: ')) return `was blocked by ${reason.slice('move: '.length)} — the chosen action never surfaced`;
+  return `was prevented (${reason}) — the chosen action never surfaced`;
+}
+
 function SideRow({ name, side, onExplore }: { name: string; side: SideAnalysis; onExplore?: (choice: RankedChoice) => void }) {
   const playedRawName = side.playedRaw?.kind === 'switch'
     ? `→ ${side.playedRaw.species ?? side.playedRaw.name}`
@@ -93,13 +105,16 @@ function SideRow({ name, side, onExplore }: { name: string; side: SideAnalysis; 
     ?.filter((action): action is NonNullable<typeof action> => action !== null)
     .map(action => (action.kind === 'switch' ? `→ ${action.species ?? action.name}` : action.name))
     .join(' + ');
+  const acted = Boolean(side.played || slotText || side.playedRaw);
   const playedText = side.played
     ? `${side.played.label} (${signed(side.played.ev)})`
     : slotText
       ? `${slotText} — not among the engine's candidates`
       : side.playedRaw
         ? `${playedRawName} — not among the engine's options`
-        : 'could not act (fainted or fully prevented)';
+        : side.prevented
+          ? preventedText(side.prevented)
+          : 'choice never surfaced';
   const playedGamble = side.played !== null && side.played.ev - side.played.worstCase >= RISK_DISPLAY_GAP;
   const regretful = side.tier === 'mistake' || side.tier === 'blunder';
   const setupMove = playedSetupMove(side);
@@ -109,7 +124,7 @@ function SideRow({ name, side, onExplore }: { name: string; side: SideAnalysis; 
     <div className="ps-eval-analysis-side">
       <div className="ps-eval-analysis-row">
         <span style={{ color: '#cde', fontWeight: 'bold' }}>{name}</span>
-        <span style={{ color: '#aab' }}>played {playedText}</span>
+        <span style={{ color: '#aab' }}>{acted ? 'played ' : ''}{playedText}</span>
         {playedGamble && side.played && (
           <span
             style={{ color: '#778' }}
@@ -140,6 +155,12 @@ function SideRow({ name, side, onExplore }: { name: string; side: SideAnalysis; 
             {side.best.ev - side.played.ev < ENGINE_EQUIVALENT_EPSILON && (
               <span title="The EV gap is inside noise — the engine considers both picks equally good."> · equivalent</span>
             )}
+          </span>
+        )}
+        {!side.played && side.best && (
+          <span style={{ color: '#778' }}>
+            engine: <ExplorableLabel label={side.best.label} color="#778" onClick={onExplore && (() => onExplore(side.best!))} />
+            {' '}({signed(side.best.ev)})
           </span>
         )}
         {side.verifiedAtDepth && (
