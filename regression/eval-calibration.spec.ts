@@ -243,22 +243,64 @@ import { brierScore, fitConstantK } from './fit-helpers';
  *   and the boost question is CLOSED absent a causal/interventional
  *   design. Doubles keeps its gated 27.
  *
- * OPEN FINDINGS FOR THE NEXT ROUND (2026-08-10, user review):
- * - GPL T35: the estimate dives 74→58 when the WINNER deliberately sacks
- *   Salazzle into Knock Off — the coverage/matchup terms price losing a key
- *   threat as catastrophic even when the endgame is already won without it.
- *   Deliberate-endgame-sack pricing is an eval-quality item; probe the T35
- *   cells during the re-baseline round.
+ * SEEDED RE-BASELINE 2026-08-10 (the paired baseline every gate in this
+ * round compares against; measured at 24490c6, cache v20 — fulfills the
+ * substrate-change and chained-limit-pass obligations recorded last round):
+ * - DETERMINISM: two pre-fix d1 sweeps were BIT-IDENTICAL (58/65/79/64/81,
+ *   briers to 4 digits, all n equal) — seeded reconstruction (af2b276) made
+ *   the sweep fully deterministic given full fetch success. Paired gates
+ *   are now exact: any delta with matching n IS the change's effect. Check
+ *   the n line before reading buckets — a fetch hiccup shows up as a
+ *   composition shift (one intermediate run lost 4 singles positions to
+ *   the network, nothing else).
+ * - ROBUSTNESS FIXES first (c472c10, 24490c6): the Imprison-Transform Mew
+ *   replay (gen9doublesou-2660802611) cost 5 positions via three defects —
+ *   stale post-correction requests offering benched mons' moves, Imprison's
+ *   concealed disables entering candidates (the sim's ONLY hidden disable;
+ *   the Taunt/Encore/choice-lock family is visible and was never affected —
+ *   pinned), and transform-shortened moveSlots crashing the sim's
+ *   deserializer. Corrections now rerun the disable pass and rebuild
+ *   requests; every eval deserialize boundary pad-repairs the round-trip.
+ * - BASELINE d1 (depth 1, samples 1): 59/66/79/64/83
+ *   n: early 66 · mid 80 · late 68 · singles 166 · doubles 48 (214 total)
+ *   brier 0.2553/0.2187/0.1752
+ * - BASELINE d2 (EVAL_CALIBRATION_DEPTH=2): 58/64/76/62/82
+ *   n: 64/77/68 · singles 164 · doubles 45 (209) · brier 0.2570/0.2203/0.1762
+ *   Depth 2 reads WORSE than depth 1 on mid/late sign accuracy (also true
+ *   pre-fix: 58/63/76 vs 58/65/79) — deeper fixed-horizon search leans
+ *   harder on leaf noise on this corpus. 2b gates against the d2 baseline
+ *   (trends barely exist at d1).
+ * - KNOWN REMAINING error positions (stable, pre-existing): gen9ou-2658675391
+ *   t38 (game over mid-sample), gen9ou-2658670791 t104/t121 (deep-game
+ *   divergence), gen9ou-2658664943 t32 + gen9ou-2658661545 t20
+ *   (fainted-actives choice shape), gen9doublesou-2660809089 t6/t8 (Phantom
+ *   Force mid-charge candidates). d2 loses 5 more to child-state mismatches:
+ *   parent choices reapplied to transformed/changed children (Toxapex
+ *   t70/t87, Mew t2/t4) and Meteor Beam mid-charge targeting (vgc t4) — the
+ *   charge-move target family appears twice; a future candidate-builder item.
+ *
+ * T35 PROBE RESOLVED 2026-08-10 (during re-baseline, d1s1 on the fixture):
+ * the winner's deliberate Salazzle sack dives the estimate because of the
+ * BODIES term (HP-weighted body worth ~−177 raw-weighted), NOT the
+ * coverage/matchup story the open finding guessed — matchup actually moves
+ * TOWARD the winner across the sack (−7.1 → +4.8) and the hazard liability
+ * shrinks (−56 → −19, entry costs died with the body). Two eval-quality
+ * gaps recorded, deliberately NOT attempted this round: (a) the bodies term
+ * prices a sacked body at full weight regardless of endgame redundancy —
+ * any "redundant body in a decided endgame" discount is boost-saga-shaped
+ * (in-corpus plausible, held-out poison) and needs its own causal design;
+ * (b) detectSacks recognizes low-HP feeds (T29 Uxie at 9%) but not
+ * healthy-body simplification sacks, so the sacrifice framing never
+ * attaches — a played.ts detection item for a future round.
+ *
+ * OPEN FINDINGS FOR THE NEXT ROUNDS (2026-08-10):
  * - PIVOT PAIRS (user, 2026-08-10): U-turn/Volt Switch are really pairs —
  *   the move PLUS the incoming Pokémon — and must be enumerated as root
  *   choices ("U-turn → Clefable") to compare fairly against single actions
  *   (today's greedy mid-turn resolution hides the follow-up decision; GPL
  *   T25). Spec: docs/superpowers/specs/2026-08-10-pivot-pairs-design.md.
- * - MEASUREMENT SUBSTRATE CHANGED: reconstructions are seeded since
- *   af2b276 (they were run-varying before — part of the historical ±3
- *   wiggle). Every number above was measured on the unseeded substrate; the
- *   next round MUST start with a full paired re-baseline (also owed for the
- *   chained-limit-pass caveat and consumed by 2b + set-coherence gating).
+ * - Endgame-sack pricing + healthy-body sack detection (see T35 above).
+ * - Charge-move (Phantom Force/Meteor Beam) mid-charge candidate targets.
  */
 const REPLAY_IDS = [
   'gen9draft-2058494320',
