@@ -50,7 +50,11 @@ export interface StoredEval {
 //      singles Sleep Clause default (GPL evals cached without the clause).
 // v19: corrected actives enter FRESH (no inherited choice locks from
 //      diverged sim histories — GPL T38 hid Grass Knot).
-export const EVAL_ENGINE_CACHE_VERSION = 19;
+// v20: post-correction request refresh, Imprison-concealed candidates
+//      filtered, transform-shortened moveSlots round-trip (the Mew replay
+//      crashed whole searches; corrected positions offered benched mons'
+//      moves).
+export const EVAL_ENGINE_CACHE_VERSION = 20;
 
 export function evalStoreKey(
   cacheKey: string,

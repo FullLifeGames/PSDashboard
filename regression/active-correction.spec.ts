@@ -87,6 +87,27 @@ test.describe('correctActivesFromProtocol', () => {
     eve.moveSlots.forEach(slot => expect(slot.disabled).toBe(false));
   });
 
+  test('the request regenerates after a correction — options follow the corrected active', async () => {
+    // Stale requests after a repoint made legalChoices offer the WRONG mon's
+    // moves (gen9doublesou-2660802611: Grimmsnarl's screens offered while
+    // Indeedee was the corrected active; Imprison-disabled flags missing).
+    const runtime = await reconstructBranchRuntime({
+      format: 'gen9ou',
+      p1Team,
+      p2Team,
+      replayLog: singlesLog,
+      targetTurn: 1,
+    });
+    const battle = runtime.battleStream.battle!;
+
+    correctActivesFromProtocol(battle, ['|drag|p1a: Eve|Eevee, L50|100/100']);
+
+    const request = battle.sides[0].activeRequest as {
+      active?: ({ moves?: { move: string }[] } | null)[];
+    } | null;
+    expect(request?.active?.[0]?.moves?.map(move => move.move)).toEqual(['Tackle', 'Protect']);
+  });
+
   test('a real switch after a correction neither duplicates nor loses team members', async () => {
     const runtime = await reconstructBranchRuntime({
       format: 'gen9ou',

@@ -29,6 +29,33 @@ export interface SimPosition {
   readonly serialized: string;
 }
 
+/**
+ * @pkmn/sim's deserializer walks baseMoveSlots indexing moveSlots to restore
+ * slot identity — a transformed mon that copied a PARTIALLY REVEALED target
+ * has fewer moveSlots than base, and the walk crashes on the missing tail
+ * ("reading 'id'"; Imprison-Transform Mew, gen9doublesou-2660802611). Pad a
+ * parsed copy up to base length, deserialize, trim the live arrays back —
+ * the battle round-trips exactly and the original string stays the cache key.
+ */
+function deserializeRepaired(serialized: string): Battle {
+  const state = JSON.parse(serialized) as {
+    sides?: { pokemon?: { moveSlots?: unknown[]; baseMoveSlots?: unknown[] }[] }[];
+  };
+  const trims: { side: number; index: number; length: number }[] = [];
+  state.sides?.forEach((side, sideIndex) => side.pokemon?.forEach((pokemon, index) => {
+    const base = pokemon.baseMoveSlots;
+    const slots = pokemon.moveSlots;
+    if (!Array.isArray(base) || !Array.isArray(slots) || base.length <= slots.length) return;
+    trims.push({ side: sideIndex, index, length: slots.length });
+    while (slots.length < base.length) slots.push(base[slots.length]);
+  }));
+  const battle = State.deserializeBattle(state as never);
+  for (const trim of trims) {
+    battle.sides[trim.side].pokemon[trim.index].moveSlots.length = trim.length;
+  }
+  return battle;
+}
+
 class Position implements SimPosition {
   private serializedCache: string | null;
   private battleCache: Battle | null;
@@ -45,7 +72,7 @@ class Position implements SimPosition {
 
   getBattle(): Battle {
     if (!this.battleCache) {
-      this.battleCache = State.deserializeBattle(this.serializedCache!);
+      this.battleCache = deserializeRepaired(this.serializedCache!);
       repairFaintedActives(this.battleCache);
     }
     return this.battleCache;
@@ -64,7 +91,7 @@ export function positionBattle(position: SimPosition): Battle {
   if (position instanceof Position) return position.getBattle();
   let battle = foreignBattleCache.get(position);
   if (!battle) {
-    battle = State.deserializeBattle(position.serialized);
+    battle = deserializeRepaired(position.serialized);
     foreignBattleCache.set(position, battle);
   }
   return battle;
@@ -128,10 +155,15 @@ function slotChoicesFor(
   const canUltra = !!entry.canUltraBurst;
   const choices: SlotChoice[] = [];
   const foeActives = sideState.foe.active;
+  // Requests conceal 'hidden' disables (Imprison — the player learns when the
+  // click bounces), but the analyzer holds the full state: a concealed-disabled
+  // candidate is a guaranteed choice reject that kills the whole search.
+  const liveDisabled = new Set<string>(pokemon.moveSlots.filter(slot => slot.disabled).map(slot => slot.id));
 
   for (const move of entry.moves) {
     if ('disabled' in move && move.disabled) continue;
     const key = choiceKey(move.move);
+    if (liveDisabled.has(key)) continue;
     const targetType = 'target' in move ? (move.target as string | undefined) : undefined;
     const targets: { suffix: string; label: string }[] = [];
     if (targetType && TARGET_FOE.has(targetType)) {
@@ -259,8 +291,12 @@ export function legalChoices(
 
   if (active && !forced) {
     const activeTera = teraAllowed(opts?.tera, side, sideState.active[0] ?? null);
+    // Mirror slotChoicesFor: requests conceal 'hidden' disables (Imprison).
+    const liveDisabled = new Set<string>(
+      (sideState.active[0]?.moveSlots ?? []).filter(slot => slot.disabled).map(slot => slot.id));
     for (const move of active.moves) {
       if ('disabled' in move && move.disabled) continue;
+      if (liveDisabled.has(choiceKey(move.move))) continue;
       options.push({ choice: `move ${choiceKey(move.move)}`, label: move.move });
       if (activeTera && 'canTerastallize' in active && active.canTerastallize) {
         options.push({
@@ -321,7 +357,7 @@ function repairFaintedActives(battle: Battle): void {
  * advance is reproducible.
  */
 function forkBattle(position: SimPosition, seed: PRNGSeed): Battle {
-  const battle = State.deserializeBattle(position.serialized);
+  const battle = deserializeRepaired(position.serialized);
   battle.prng = new PRNG(seed);
   repairFaintedActives(battle);
   return battle;
@@ -385,7 +421,7 @@ function resolveForcedSwitches(battle: Battle, seed: PRNGSeed): void {
         const perspective = side.id === 'p1' ? 1 : -1;
         let bestValue = -Infinity;
         for (const candidate of assignments) {
-          const trial = State.deserializeBattle(midTurn);
+          const trial = deserializeRepaired(midTurn);
           trial.prng = new PRNG(seed);
           if (!trial.choose(side.id as 'p1' | 'p2', candidate)) continue;
           const value = perspective * evaluatePosition(trial);

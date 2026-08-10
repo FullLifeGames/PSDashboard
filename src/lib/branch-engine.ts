@@ -499,8 +499,8 @@ function collectForcedSwitchSpecies(
   return species;
 }
 
-function repointActiveSlot(side: SimSide, activeSlot: number, target: SimPokemon) {
-  if (side.active[activeSlot] === target) return;
+function repointActiveSlot(side: SimSide, activeSlot: number, target: SimPokemon): boolean {
+  if (side.active[activeSlot] === target) return false;
 
   const previous = side.active[activeSlot];
   if (previous) previous.isActive = false;
@@ -536,9 +536,11 @@ function repointActiveSlot(side: SimSide, activeSlot: number, target: SimPokemon
   delete target.volatiles['choicelock'];
   target.lastMove = null;
   for (const slot of target.moveSlots) slot.disabled = false;
+  return true;
 }
 
 export function correctActivesFromProtocol(battle: SimBattle, events: string[]) {
+  let repointed = false;
   for (const line of events) {
     const match = line.match(/^\|(switch|drag)\|(p[12])([a-d]):[^|]*\|([^,|]+)/);
     if (!match) continue;
@@ -549,7 +551,15 @@ export function correctActivesFromProtocol(battle: SimBattle, events: string[]) 
     const side = battle.sides[sideIdx];
     const target = findPokemonOnSide(side, species);
     if (!target) continue;
-    repointActiveSlot(side, activeSlot, target);
+    if (repointActiveSlot(side, activeSlot, target)) repointed = true;
+  }
+  // The cached requests were built from the PRE-correction actives — stale
+  // options offered the wrong mon's moves and missed recomputed disable
+  // states (Imprison; gen9doublesou-2660802611). Rebuild them from the live
+  // battle; no argument keeps the request phase and pending choices intact.
+  if (repointed && !battle.ended &&
+    (battle.requestState === 'move' || battle.requestState === 'switch')) {
+    battle.makeRequest();
   }
 }
 
@@ -810,6 +820,29 @@ function repairStaleForcedSwitchRequest(battle: SimBattle) {
   if (!hasStaleForcedSwitchRequest(battle)) return;
   try {
     battle.makeRequest('move');
+  } catch {
+    // Leave the wedged state to validateBranchRuntime to report.
+  }
+}
+
+/**
+ * Requests are a VIEW of battle state, built by the sim BEFORE the correction
+ * layers (active repoints, snapshot HP/status/volatile sync) mutate it. A
+ * stale view offers the wrong mon's moves and misses disable states the
+ * corrections introduced (Imprison; gen9doublesou-2660802611 turn 2 offered
+ * Incineroar's Imprison-disabled Knock Off and turn 4 offered benched
+ * Grimmsnarl's screens). Rebuilding the view from the corrected state is the
+ * identity on healthy battles and the fix on corrected ones.
+ */
+function refreshRequestsFromLiveState(battle: SimBattle) {
+  if (battle.ended) return;
+  if (hasStaleForcedSwitchRequest(battle)) {
+    repairStaleForcedSwitchRequest(battle);
+    return;
+  }
+  if (battle.requestState !== 'move' && battle.requestState !== 'switch') return;
+  try {
+    battle.makeRequest();
   } catch {
     // Leave the wedged state to validateBranchRuntime to report.
   }
@@ -1551,7 +1584,7 @@ export async function reconstructBranchRuntime(params: {
   }
 
   if (battleStream.battle) {
-    repairStaleForcedSwitchRequest(battleStream.battle);
+    refreshRequestsFromLiveState(battleStream.battle);
     const correctionLines = syncLogActivesFromBattle(collectedLog, battleStream.battle, targetTurn);
     if (correctionLines.length > 0) onLogLines?.(correctionLines);
   }

@@ -3,7 +3,7 @@ import { Battle, State, Teams, toID } from '@pkmn/sim';
 type DeserializeFn = typeof State.deserializeBattle;
 import type { PokemonSet } from '@pkmn/sim';
 import { battleFaintedFraction, searchOptions, searchPosition, subSearchDepth1 } from '../src/lib/eval/search';
-import { createRootPosition } from '../src/lib/eval/forward-model';
+import { createRootPosition, positionBattle } from '../src/lib/eval/forward-model';
 import { boostedFraction, pairThreat } from '../src/lib/eval/eval-function';
 import type { EvalResult, SearchProgress } from '../src/lib/eval/types';
 
@@ -581,5 +581,53 @@ test.describe('doubles keepPlayed', () => {
     expect(kept).toBeTruthy();
     expect(Number.isFinite(kept!.worstCase)).toBe(true);
     expect(withKeep.perSide.p1.length).toBeLessThanOrEqual(20);
+  });
+});
+
+test.describe('hidden-disable candidate filter', () => {
+  test('an Imprison-concealed move never enters the candidate list', () => {
+    // The request reports Imprison-disabled foe moves as ENABLED (the sim
+    // hides them until the click bounces) — offering one guarantees a choice
+    // reject that aborts the whole search (gen9doublesou-2660802611 turn 2).
+    const battle = makeBattle(
+      [makeSet('Mew', 'Mew', ['Imprison', 'Confusion'])],
+      [makeSet('Rat', 'Raticate', ['Confusion', 'Quick Attack'])],
+    );
+    battle.choose('p1', 'move imprison');
+    battle.choose('p2', 'move quickattack');
+    const rat = battle.sides[1].active[0]!;
+    expect(rat.moveSlots.find(slot => slot.id === 'confusion')?.disabled).toBeTruthy();
+
+    const choices = searchOptions(createRootPosition(serialize(battle)), 'p2')
+      .map(option => option.choice);
+    expect(choices).not.toContain('move confusion');
+    expect(choices).toContain('move quickattack');
+  });
+});
+
+test.describe('serialized-state round-trip repair', () => {
+  test('a transformed mon with fewer copied moves than base moves still deserializes', () => {
+    // Transform copies the TARGET's moveSlots; a reconstructed target with
+    // only 2 revealed moves leaves the transformed mon with moveSlots shorter
+    // than its own baseMoveSlots — a legal state @pkmn/sim's deserializer
+    // crashes on ("reading 'id'"; Imprison-Transform Mew in the calibration
+    // corpus, gen9doublesou-2660802611 turns 4-10).
+    const battle = makeBattle(
+      [makeSet('Mew', 'Mew', ['Imprison', 'Knock Off', 'Transform', 'Ice Beam'])],
+      [makeSet('Blissey', 'Blissey', ['Seismic Toss'])],
+    );
+    const state = State.serializeBattle(battle) as unknown as {
+      sides: { pokemon: { moveSlots: unknown[]; baseMoveSlots?: unknown[] }[] }[];
+    };
+    const mew = state.sides[0].pokemon[0];
+    // The sim omits baseMoveSlots when identical to moveSlots — restore the
+    // transform shape explicitly: full base, shortened copied slots.
+    mew.baseMoveSlots = mew.moveSlots;
+    mew.moveSlots = mew.moveSlots.slice(0, 2);
+
+    const live = positionBattle(createRootPosition(JSON.stringify(state)));
+    const repaired = live.sides[0].pokemon[0];
+    expect(repaired.moveSlots.map(slot => slot.id)).toEqual(['imprison', 'knockoff']);
+    expect(repaired.baseMoveSlots).toHaveLength(4);
   });
 });
