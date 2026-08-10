@@ -242,6 +242,18 @@ import { brierScore, fitConstantK } from './fit-helpers';
  *   (winning positions produce standing boosts); the flat weight stays 12
  *   and the boost question is CLOSED absent a causal/interventional
  *   design. Doubles keeps its gated 27.
+ *
+ * OPEN FINDINGS FOR THE NEXT ROUND (2026-08-10, user review):
+ * - GPL T35: the estimate dives 74→58 when the WINNER deliberately sacks
+ *   Salazzle into Knock Off — the coverage/matchup terms price losing a key
+ *   threat as catastrophic even when the endgame is already won without it.
+ *   Deliberate-endgame-sack pricing is an eval-quality item; probe the T35
+ *   cells during the re-baseline round.
+ * - MEASUREMENT SUBSTRATE CHANGED: reconstructions are seeded since
+ *   af2b276 (they were run-varying before — part of the historical ±3
+ *   wiggle). Every number above was measured on the unseeded substrate; the
+ *   next round MUST start with a full paired re-baseline (also owed for the
+ *   chained-limit-pass caveat and consumed by 2b + set-coherence gating).
  */
 const REPLAY_IDS = [
   'gen9draft-2058494320',
