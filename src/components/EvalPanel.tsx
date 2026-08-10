@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import type { EvalPreferences, EvalResult, RankedChoice, ReadRecommendation, SearchProgress } from '../lib/eval/types';
 import type { TurnAnalysis } from '../lib/eval/analysis';
 import type { GameReport } from '../lib/eval/report';
@@ -125,6 +126,26 @@ export function EvalPanel({
   const running = status === 'searching' || status === 'reconstructing';
   const hasGraph = graph.scores.some(score => score !== null);
   const p1Pct = result ? winPercent(result.score) : 50;
+
+  // Two screens, not one stack: the game report (the cards) is the
+  // overview; clicking a turn switches to that turn's full view (analysis,
+  // bar, ranked lists, matrix) with a way back — "click a card, deal with
+  // it, return to the cards".
+  const [view, setView] = useState<'report' | 'turn'>('report');
+  // Render-time adjustment (not an effect): when a report first APPEARS —
+  // initial sweep done, or a new replay's sweep — land on the overview.
+  const [hadReport, setHadReport] = useState(false);
+  if (!!report !== hadReport) {
+    setHadReport(!!report);
+    if (report) setView('report');
+  }
+  const selectTurn = onSelectTurn
+    ? (turn: number) => {
+      onSelectTurn(turn);
+      setView('turn');
+    }
+    : undefined;
+  const showReportView = view === 'report' && !!report;
 
   return (
     <div className="ps-panel ps-eval-panel">
@@ -269,22 +290,39 @@ export function EvalPanel({
               scores={graph.scores}
               playerNames={playerNames}
               currentTurn={currentTurn}
-              onSelectTurn={onSelectTurn}
+              onSelectTurn={selectTurn}
               leadScore={graph.lead?.result.score ?? null}
             />
           )}
-          {hasGraph && !analysis && (
+          {hasGraph && (showReportView || !analysis) && (
             <div style={{ fontSize: 10, color: '#778', marginTop: 2 }}>
               Click a point for that turn's analysis — its movement lights up on the line.
             </div>
           )}
-          {report && <EvalGameReport report={report} playerNames={playerNames} onSelectTurn={onSelectTurn} leads={reportLeads} />}
-          {leadAnalysis && <EvalLeadAnalysis leads={leadAnalysis} playerNames={playerNames} />}
-          {!leadAnalysis && analysis && <EvalTurnAnalysis analysis={analysis} playerNames={playerNames} reads={reads} onExplore={onPickChoice} />}
+          {showReportView && report && (
+            <EvalGameReport report={report} playerNames={playerNames} onSelectTurn={selectTurn} leads={reportLeads} />
+          )}
+          {!showReportView && (
+            <>
+              {report && (
+                <button
+                  type="button"
+                  className="ps-btn"
+                  style={{ padding: '1px 6px', fontSize: 10, marginTop: 4 }}
+                  onClick={() => setView('report')}
+                  title="Back to the game report's cards"
+                >
+                  ← Game report
+                </button>
+              )}
+              {leadAnalysis && <EvalLeadAnalysis leads={leadAnalysis} playerNames={playerNames} />}
+              {!leadAnalysis && analysis && <EvalTurnAnalysis analysis={analysis} playerNames={playerNames} reads={reads} onExplore={onPickChoice} />}
+            </>
+          )}
         </div>
       )}
 
-      {result && (
+      {result && !showReportView && (
         <div className={status === 'stale' ? 'ps-eval-stale' : undefined}>
           <div className="ps-eval-labels">
             <span className="ps-eval-bar-p1">{playerNames[0]} {p1Pct}%</span>

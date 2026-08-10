@@ -166,7 +166,7 @@ export function EvalGraph({ scores, playerNames, currentTurn, onSelectTurn, lead
           strokeWidth={blunders.has(index + 1) ? 1.6 : 0}
         />
       ))}
-      {scores.map((score, index) => score === null ? null : (
+      {scores.map((score, index) => (
         <rect
           key={`h${index}`}
           data-turn={index + 1}
@@ -178,7 +178,11 @@ export function EvalGraph({ scores, playerNames, currentTurn, onSelectTurn, lead
           style={onSelectTurn ? { cursor: 'pointer' } : undefined}
           onClick={onSelectTurn ? () => onSelectTurn(index + 1) : undefined}
         >
-          <title>{label(index + 1, score)}</title>
+          {/* Gap turns (reconstruction wedges, unswept ends) stay clickable —
+              selecting one analyzes it on the spot. */}
+          <title>{score === null
+            ? `Turn ${index + 1} — not analyzed yet · click to analyze`
+            : label(index + 1, score)}</title>
         </rect>
       ))}
     </svg>

@@ -33,7 +33,7 @@ import { allTurnEvents, detectSacks, parseLeadSpecies, parsePlayedActions, parse
 import { analyzeTurn, PAYOFF_WINDOW } from './lib/eval/analysis';
 import { computeRead, parseTendencies } from './lib/eval/opponent-model';
 import { analyzeLeads } from './lib/eval/leads';
-import { buildGameReport } from './lib/eval/report';
+import { buildGameReport, type GameReport } from './lib/eval/report';
 
 const TEAM_PASTE_STORAGE_KEY = 'ps-replay-interceptor:team-paste';
 
@@ -1101,10 +1101,18 @@ function App() {
   }, [replayData]);
 
   // Game-level root cause, once enough of the game is swept.
+  const gameReportRef = useRef<GameReport | null>(null);
   const gameReport = useMemo(() => {
-    if (!replayData) return null;
+    if (!replayData) {
+      gameReportRef.current = null;
+      return null;
+    }
     const { results, scores, played, playedOutcome, verified, sensitivity, running } = evaluation.graph;
-    if (running) return null;
+    // While a sweep runs, the LAST report stays up — recomputing waits for
+    // completion (per-tick rebuilds are expensive), but returning null here
+    // made the report blink on every turn click once selection started
+    // triggering 2-turn upgrade sweeps.
+    if (running) return gameReportRef.current;
     const analyses = results.map((result, index) => {
       const scoreBefore = scores[index];
       if (!result || scoreBefore === null) return null;
@@ -1124,10 +1132,15 @@ function App() {
         sacks: detectSacks(turnEventsIndex[index + 1] ?? [], snapshots[index] ?? null),
       });
     });
-    if (analyses.filter(Boolean).length < 3) return null;
-    return buildGameReport(
+    if (analyses.filter(Boolean).length < 3) {
+      gameReportRef.current = null;
+      return null;
+    }
+    const report = buildGameReport(
       analyses, [replayData.players[0], replayData.players[1]], replayWinner, true,
     );
+    gameReportRef.current = report;
+    return report;
   }, [replayData, snapshots, evaluation.graph, replayWinner, turnEventsIndex]);
 
   const teamPasteStatus = useMemo(() => {
