@@ -354,6 +354,100 @@ export function selectTieProbeCells(
   return cells;
 }
 
+/** 2b extrapolation strength: assume the observed bleed/build continues λ more plies. Swept {0.25, 0.5, 1.0}. */
+export const TREND_LAMBDA = 0.5;
+/**
+ * Shifts below this stay unapplied: single-seed trend probes carry sampling
+ * noise on this scale (the s3−s1 fork-delta family), and decided positions
+ * tie structurally with near-zero trends — folding noise into values would
+ * churn every endgame ranking the pruned sub-search path must mirror.
+ */
+export const TREND_SHIFT_FLOOR = 0.005;
+
+/**
+ * Horizon-trend extrapolation (layer 2b): folds the one-ply trend of the tied
+ * leading rows into their VALUES — corrected = deep + λ·trend — so a stall
+ * that bleeds under lookahead separates from a building switch BY VALUE, not
+ * just tie order (draft T50). The equilibrium is deliberately NOT re-solved:
+ * re-solving lets the game absorb the correction — boosting a row re-weights
+ * the opponent toward its punishers, and the T50 sweep measured every λ in
+ * {0.25, 0.5, 1.0} self-defeating through exactly that feedback. Under FIXED
+ * mixes the row-uniform shift adds a constant to the opponent's EVs, so
+ * their comparisons are provably untouched (the quiescence lesson's depth
+ * symmetry, exact); the solved score, mixes, and gameValue stay, keeping the
+ * layer calibration-neutral by construction. Ranked rows shift in their own
+ * perspective and each list re-sorts; a group with any unpriced decisive
+ * cell forfeits whole (terminal cells price as trend 0); corrected cells
+ * clamp to the wp-unit range. Returns true when anything shifted.
+ */
+export function applyTrendExtrapolation(
+  matrix: ValueMatrix,
+  result: EvalResult,
+  trends: Map<number, number>,
+  lambda = TREND_LAMBDA,
+): boolean {
+  if (lambda === 0) return false;
+  const mixes = result.matrix?.mixes;
+  if (!mixes) return false;
+  let applied = false;
+  for (const group of tieGroups(matrix, result)) {
+    const side = group[0].side;
+    const oppMix = side === 'p1' ? mixes.p2 : mixes.p1;
+    const shifts: { row: TieRow; shift: number }[] = [];
+    let missing = false;
+    for (const row of group) {
+      let weightSum = 0;
+      let weighted = 0;
+      for (const [i, j] of row.cells) {
+        const trend = matrix.ended[i][j] ? 0 : trends.get(cellKey(i, j));
+        if (trend === undefined) {
+          missing = true;
+          break;
+        }
+        const weight = Math.max(oppMix[side === 'p1' ? j : i] ?? 0, MIN_TREND_WEIGHT);
+        weightSum += weight;
+        weighted += weight * trend;
+      }
+      if (missing || weightSum === 0) {
+        missing = true;
+        break;
+      }
+      // Trends live in p1 perspective, and so do the matrix values — the
+      // cell shift applies unsigned for both sides' groups.
+      shifts.push({ row, shift: lambda * (weighted / weightSum) });
+    }
+    if (missing) continue;
+    for (const { row, shift } of shifts) {
+      if (Math.abs(shift) < TREND_SHIFT_FLOOR) continue;
+      const own = side === 'p1'
+        ? matrix.p1Options.findIndex(option => option.choice === row.entry.choice)
+        : matrix.p2Options.findIndex(option => option.choice === row.entry.choice);
+      if (own < 0) continue;
+      applied = true;
+      if (side === 'p1') {
+        for (let j = 0; j < matrix.values[own].length; j++) {
+          matrix.values[own][j] = Math.max(-1, Math.min(1, matrix.values[own][j] + shift));
+        }
+      } else {
+        for (let i = 0; i < matrix.values.length; i++) {
+          matrix.values[i][own] = Math.max(-1, Math.min(1, matrix.values[i][own] + shift));
+        }
+      }
+      // Ranked entries read in the OWN side's perspective.
+      const ownShift = side === 'p1' ? shift : -shift;
+      row.entry.ev += ownShift;
+      row.entry.expected += ownShift;
+      row.entry.worstCase += ownShift;
+    }
+  }
+  if (applied) {
+    for (const side of ['p1', 'p2'] as const) {
+      result.perSide[side].sort((a, b) => b.ev - a.ev || b.worstCase - a.worstCase);
+    }
+  }
+  return applied;
+}
+
 /**
  * Horizon-trend tiebreak. When the leading rows tie within TIE_EPSILON the
  * static matrix cannot split them — but the one-ply trend of their decisive

@@ -159,14 +159,17 @@ test.describe('depth-1 search', () => {
     // Boost-free fixtures: with the corpus-fitted boost weight, a Growl row's
     // ev-vs-floor gap grows enough to flip top picks between the ev-sorted
     // full search and the floor-sorted sub-search — the parity contract here
-    // is about intervals and floors, not boost valuation.
+    // is about intervals and floors, not boost valuation. Tie-free tops too:
+    // the full search corrects EV-tied leading rows by their probe trends
+    // (2b), which the pruned path deliberately lacks — a tied fixture (two
+    // fixed-damage moves) would measure that layer, not the pruning.
     const fixtures = [
       serialize(makeBattle(
-        [makeSet('Machamp', 'Machamp', ['Seismic Toss', 'Protect', 'Night Shade'], 100)],
+        [makeSet('Machamp', 'Machamp', ['Seismic Toss'], 100)],
         [makeSet('Chansey', 'Chansey', ['Seismic Toss', 'Protect'], 100), makeSet('Eevee', 'Eevee', ['Protect'], 100)],
       )),
       serialize(makeBattle(
-        [makeSet('Pikachu', 'Pikachu', ['Tackle', 'Night Shade'], 30), makeSet('Blissey', 'Blissey', ['Protect'], 100)],
+        [makeSet('Pikachu', 'Pikachu', ['Night Shade'], 30), makeSet('Blissey', 'Blissey', ['Seismic Toss'], 100)],
         [makeSet('Machamp', 'Machamp', ['Seismic Toss'], 100)],
       )),
     ];

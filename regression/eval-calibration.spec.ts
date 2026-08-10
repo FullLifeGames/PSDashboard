@@ -293,6 +293,28 @@ import { brierScore, fitConstantK } from './fit-helpers';
  * healthy-body simplification sacks, so the sacrifice framing never
  * attaches — a played.ts detection item for a future round.
  *
+ * HORIZON-TREND EXTRAPOLATION (2b) 2026-08-10, ADOPTED AS 2b-LITE (λ=0.5,
+ * shift noise floor 0.005, cache v21). Two variants measured at T50, the
+ * motivating position, against the d2 by-value criterion:
+ * - REJECTED: fold trends into the tied rows' values and RE-SOLVE. The
+ *   equilibrium absorbs the correction — boosting a row re-weights the
+ *   opponent toward its punishers (Earth Power itself trends +0.018) —
+ *   and the criterion failed at EVERY λ, non-monotonically: gap(Heatran −
+ *   Recover) = −0.004 raw, −0.0065 @λ.25, −0.001 @λ.5, −0.013 @λ1.0.
+ *   Forecast-then-re-solve double-counts the opponent's reaction; the
+ *   trend already embeds the continuation's play.
+ * - ADOPTED: the same row-uniform corrections under the STANDING
+ *   equilibrium (no re-solve). T50 separates by value at d1 AND d2 (pins);
+ *   the depth-symmetry invariance is EXACT (fixed mixes ⇒ row-uniform
+ *   shifts add a constant to the opponent's EVs); score/mixes/gameValue
+ *   never move — calibration-neutral BY CONSTRUCTION, proven by a
+ *   bit-identical post-wiring d1 sweep (59/66/79/64/83, briers equal, all
+ *   n equal — the determinism dividend's first use). λ has no
+ *   calibration-visible axis under lite; it is a display/grading strength
+ *   pinned by the T50 tests. GPL T22/T26/T29 canaries green. The noise
+ *   floor keeps decided positions' structural ties (near-zero trends) out
+ *   of the values the pruned sub-search path must mirror.
+ *
  * OPEN FINDINGS FOR THE NEXT ROUNDS (2026-08-10):
  * - PIVOT PAIRS (user, 2026-08-10): U-turn/Volt Switch are really pairs —
  *   the move PLUS the incoming Pokémon — and must be enumerated as root

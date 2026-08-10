@@ -1,6 +1,7 @@
 import {
-  applyTrendTiebreak, attachLines, cellKey, rankFromMatrix, selectExpansionCells, selectTieProbeCells,
-  toResult, TOP_EXPANSION, type PvStep, type Ranked, type ValueMatrix,
+  applyTrendExtrapolation, applyTrendTiebreak, attachLines, cellKey, rankFromMatrix,
+  selectExpansionCells, selectTieProbeCells, toResult, TOP_EXPANSION,
+  type PvStep, type Ranked, type ValueMatrix,
 } from './rank';
 import type {
   EvalCellJob, EvalCellValue, EvalChoicesInfo, EvalResult, EvalSettings, EvalSubSearchJob, SearchProgress, TeraAllowance,
@@ -136,6 +137,9 @@ export async function searchOrchestrated(
         trendMap.set(cellKey(i, j), sub.score - staticValues[i][j]);
       });
     }
+    // 2b, mirroring searchPosition: corrected values (no re-solve) before
+    // the ordering-only tiebreak runs on what remains tied.
+    applyTrendExtrapolation(matrix, result, trendMap);
     applyTrendTiebreak(matrix, result, trendMap);
   }
   return result;

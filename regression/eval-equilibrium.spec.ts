@@ -1,7 +1,7 @@
 import { test, expect } from '@playwright/test';
 import {
-  applyTrendTiebreak, cellKey, rankFromMatrix, selectTieProbeCells, solveMatrixGame, toResult,
-  TIE_EPSILON, TREND_MARGIN, type ValueMatrix,
+  applyTrendExtrapolation, applyTrendTiebreak, cellKey, rankFromMatrix, selectTieProbeCells,
+  solveMatrixGame, toResult, TIE_EPSILON, TREND_LAMBDA, TREND_MARGIN, type ValueMatrix,
 } from '../src/lib/eval/rank';
 
 // Pins the regret-matching solver against games with known solutions. The
@@ -207,5 +207,130 @@ test.describe('horizon-trend tiebreak', () => {
     // No tie, no probes.
     const clear = matrixOf([[0.3], [0.1]]);
     expect(selectTieProbeCells(clear, resultOf(clear), new Map())).toEqual([]);
+  });
+});
+
+test.describe('horizon-trend extrapolation (2b)', () => {
+  const matrixOf = (values: number[][], ended?: boolean[][]): ValueMatrix => ({
+    p1Options: values.map((_, i) => ({ choice: `p1c${i}`, label: `P1 ${i}` })),
+    p2Options: (values[0] ?? []).map((_, j) => ({ choice: `p2c${j}`, label: `P2 ${j}` })),
+    values,
+    ended: ended ?? values.map(row => row.map(() => false)),
+  });
+  const resultOf = (matrix: ValueMatrix) => toResult(rankFromMatrix(matrix, 0), 1);
+
+  test('tied bleed-vs-build rows separate BY VALUE — score and mixes stay (no re-solve)', () => {
+    const matrix = matrixOf([[0.1], [0.1], [-0.5]]);
+    const result = resultOf(matrix);
+    const scoreBefore = result.score;
+    const trends = new Map([[cellKey(0, 0), -0.05], [cellKey(1, 0), +0.05]]);
+    expect(applyTrendExtrapolation(matrix, result, trends, 0.5)).toBe(true);
+    // Row shifts are λ·trend of the single decisive cell.
+    expect(matrix.values[0][0]).toBeCloseTo(0.075, 10);
+    expect(matrix.values[1][0]).toBeCloseTo(0.125, 10);
+    expect(matrix.values[2][0]).toBe(-0.5);
+    // The ranked list re-sorts by the corrected values in place…
+    expect(result.perSide.p1.map(choice => choice.choice)).toEqual(['p1c1', 'p1c0', 'p1c2']);
+    expect(result.perSide.p1[0].ev - result.perSide.p1[1].ev).toBeCloseTo(0.05, 10);
+    expect(result.perSide.p1[0].worstCase).toBeCloseTo(0.125, 10);
+    // …while the solved score does NOT move: re-solving would let the game
+    // absorb the correction (the opponent re-weights toward the corrected
+    // row's punishers — measured self-defeating at T50 for every λ).
+    expect(result.score).toBe(scoreBefore);
+  });
+
+  test('a p2 group shifts its displayed values in p2 perspective', () => {
+    // One p1 row, two tied p2 replies. Cell (0,0) falling for p1 (−0.06) is
+    // p2c0 BUILDING: its p2-perspective ev must rise.
+    const matrix = matrixOf([[-0.1, -0.1]]);
+    const result = resultOf(matrix);
+    const trends = new Map([[cellKey(0, 0), -0.06], [cellKey(0, 1), +0.06]]);
+    expect(applyTrendExtrapolation(matrix, result, trends, 0.5)).toBe(true);
+    const p2 = result.perSide.p2;
+    expect(p2[0].choice).toBe('p2c0');
+    expect(p2.find(choice => choice.choice === 'p2c0')!.ev).toBeCloseTo(0.13, 10);
+    expect(p2.find(choice => choice.choice === 'p2c1')!.ev).toBeCloseTo(0.07, 10);
+  });
+
+  test('corrections are row-uniform: every cell of a corrected row shifts by the same delta', () => {
+    // p2's columns are far apart (no p2 tie group) so the deltas are purely
+    // p1's row shifts. Row-uniformity is the depth-symmetry guarantee: under
+    // any fixed opposing strategy it adds a constant to the opponent's EVs,
+    // so their comparisons never distort directly.
+    const matrix = matrixOf([[0.1, 0.4], [0.1, 0.4]]);
+    const result = resultOf(matrix);
+    const trends = new Map([[cellKey(0, 0), -0.06], [cellKey(1, 0), +0.06]]);
+    expect(applyTrendExtrapolation(matrix, result, trends, 0.5)).toBe(true);
+    const delta0 = matrix.values[0].map((cell, j) => cell - [0.1, 0.4][j]);
+    const delta1 = matrix.values[1].map((cell, j) => cell - [0.1, 0.4][j]);
+    expect(delta0[0]).toBeCloseTo(delta0[1], 10);
+    expect(delta1[0]).toBeCloseTo(delta1[1], 10);
+    expect(delta0[0]).toBeLessThan(0);
+    expect(delta1[0]).toBeGreaterThan(0);
+  });
+
+  test('an unpriced cell forfeits its whole group while the other side still corrects', () => {
+    const matrix = matrixOf([[0.1, 0.1], [0.1, 0.1]]);
+    const result = resultOf(matrix);
+    // p2's group cells (0,0)/(0,1) priced; p1's row 1 cell (1,0) missing.
+    const trends = new Map([[cellKey(0, 0), -0.06], [cellKey(0, 1), +0.06]]);
+    expect(applyTrendExtrapolation(matrix, result, trends, 0.5)).toBe(true);
+    // Columns shifted (p2 group complete), rows did not (p1 group forfeited):
+    // every cell's delta depends on its column only.
+    const colDelta = [matrix.values[0][0] - 0.1, matrix.values[0][1] - 0.1];
+    expect(matrix.values[1][0] - 0.1).toBeCloseTo(colDelta[0], 10);
+    expect(matrix.values[1][1] - 0.1).toBeCloseTo(colDelta[1], 10);
+    expect(colDelta[0]).not.toBeCloseTo(colDelta[1], 5);
+  });
+
+  test('shifts below the noise floor stay unapplied', () => {
+    // Decided positions tie structurally with near-zero trends; folding
+    // sampling noise into values would churn endgame rankings.
+    const matrix = matrixOf([[0.1], [0.1]]);
+    const result = resultOf(matrix);
+    const trends = new Map([[cellKey(0, 0), -0.008], [cellKey(1, 0), +0.008]]);
+    expect(applyTrendExtrapolation(matrix, result, trends, 0.5)).toBe(false);
+    expect(matrix.values[0][0]).toBe(0.1);
+    expect(matrix.values[1][0]).toBe(0.1);
+  });
+
+  test('λ = 0 is the identity and reports nothing applied', () => {
+    const matrix = matrixOf([[0.1], [0.1]]);
+    const result = resultOf(matrix);
+    const trends = new Map([[cellKey(0, 0), -0.05], [cellKey(1, 0), +0.05]]);
+    expect(applyTrendExtrapolation(matrix, result, trends, 0)).toBe(false);
+    expect(matrix.values[0][0]).toBe(0.1);
+    expect(matrix.values[1][0]).toBe(0.1);
+  });
+
+  test('corrected values clamp to the wp-unit range', () => {
+    const matrix = matrixOf([[0.99], [0.99]]);
+    const result = resultOf(matrix);
+    const trends = new Map([[cellKey(0, 0), +0.2], [cellKey(1, 0), +0.1]]);
+    expect(applyTrendExtrapolation(matrix, result, trends, 0.5)).toBe(true);
+    expect(matrix.values[0][0]).toBe(1);
+    expect(matrix.values[1][0]).toBe(1);
+  });
+
+  test('a terminal decisive cell prices as trend 0, not as missing coverage', () => {
+    const matrix = matrixOf([[0.1], [0.1]], [[true], [false]]);
+    const result = resultOf(matrix);
+    // Row 0's only decisive cell is terminal → aggregate 0 → no shift; row 1
+    // still shifts — the group stays complete.
+    const trends = new Map([[cellKey(1, 0), +0.06]]);
+    expect(applyTrendExtrapolation(matrix, result, trends, 0.5)).toBe(true);
+    expect(matrix.values[0][0]).toBe(0.1);
+    expect(matrix.values[1][0]).toBeCloseTo(0.13, 10);
+  });
+
+  test('no tie groups, no corrections', () => {
+    const matrix = matrixOf([[0.3], [0.1]]);
+    const result = resultOf(matrix);
+    expect(applyTrendExtrapolation(matrix, result, new Map([[cellKey(0, 0), -0.5]]), 0.5)).toBe(false);
+    expect(matrix.values[0][0]).toBe(0.3);
+  });
+
+  test('the default λ is the swept 0.5', () => {
+    expect(TREND_LAMBDA).toBe(0.5);
   });
 });

@@ -7,8 +7,8 @@ import {
   type ChoiceOption, type SimPosition,
 } from './forward-model';
 import {
-  applyTrendTiebreak, attachLines, cellKey, coreOf, GIMMICK_TOKENS, rankFromMatrix,
-  selectExpansionCells, selectTieProbeCells, toResult, TOP_EXPANSION,
+  applyTrendExtrapolation, applyTrendTiebreak, attachLines, cellKey, coreOf, GIMMICK_TOKENS,
+  rankFromMatrix, selectExpansionCells, selectTieProbeCells, toResult, TOP_EXPANSION,
   type PvStep, type Ranked, type ValueMatrix,
 } from './rank';
 import { findConsistentOptions, findPlayedOption } from './analysis';
@@ -620,14 +620,17 @@ export function searchPosition(
     callbacks?.onPartial?.(result);
   }
 
-  // Horizon-trend tiebreak: root search over singles-shaped lists only
+  // Horizon-trend layers: root search over singles-shaped lists only
   // (combined doubles probes cost far more than a label swap is worth);
-  // sub-searches skip it — ordering inside a tie cannot move a cell value.
+  // sub-searches skip them — ordering inside a tie cannot move a cell value.
   if (!stopped && !restrictCandidates && !isCombined(p1Options) && !isCombined(p2Options)) {
     for (const [i, j] of selectTieProbeCells(matrix, result, trendMap)) {
       const sub = subSearch(matrix.children[i][j].serialized, { ...settings, depth: 1, samples: 1, keepPlayed: undefined }, matchupCache);
       trendMap.set(cellKey(i, j), sub.score - staticValues[i][j]);
     }
+    // 2b: fold the tied rows' trends into their values (no re-solve) — a
+    // bleeding stall separates from a building switch BY VALUE (draft T50).
+    applyTrendExtrapolation(matrix, result, trendMap);
     applyTrendTiebreak(matrix, result, trendMap);
   }
   return result;

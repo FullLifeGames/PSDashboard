@@ -54,7 +54,9 @@ export interface StoredEval {
 //      filtered, transform-shortened moveSlots round-trip (the Mew replay
 //      crashed whole searches; corrected positions offered benched mons'
 //      moves).
-export const EVAL_ENGINE_CACHE_VERSION = 20;
+// v21: horizon-trend extrapolation (2b-lite) — tied leading rows carry
+//      their one-ply trend in their VALUES (no re-solve; score untouched).
+export const EVAL_ENGINE_CACHE_VERSION = 21;
 
 export function evalStoreKey(
   cacheKey: string,
