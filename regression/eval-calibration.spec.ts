@@ -273,11 +273,12 @@ import { brierScore, fitConstantK } from './fit-helpers';
  * - KNOWN REMAINING error positions (stable, pre-existing): gen9ou-2658675391
  *   t38 (game over mid-sample), gen9ou-2658670791 t104/t121 (deep-game
  *   divergence), gen9ou-2658664943 t32 + gen9ou-2658661545 t20
- *   (fainted-actives choice shape), gen9doublesou-2660809089 t6/t8 (Phantom
- *   Force mid-charge candidates). d2 loses 5 more to child-state mismatches:
- *   parent choices reapplied to transformed/changed children (Toxapex
- *   t70/t87, Mew t2/t4) and Meteor Beam mid-charge targeting (vgc t4) — the
- *   charge-move target family appears twice; a future candidate-builder item.
+ *   (fainted-actives choice shape). The Phantom Force t6/t8 entries are
+ *   RESOLVED (see MID-CHARGE RELEASES below). d2 loses more to child-state
+ *   mismatches: parent choices reapplied to transformed/changed children
+ *   (Toxapex t70/t87, Mew t2/t4); the Meteor Beam mid-charge targeting
+ *   (vgc t4) shares the fixed builder path — expected resolved, unverified
+ *   until the next d2 sweep.
  *
  * T35 PROBE RESOLVED 2026-08-10 (during re-baseline, d1s1 on the fixture):
  * the winner's deliberate Salazzle sack dives the estimate because of the
@@ -376,9 +377,21 @@ import { brierScore, fitConstantK } from './fit-helpers';
  * - Endgame-sack PRICING (eval side): the bodies term still prices a
  *   redundant body at full weight — see the T35 RESOLUTION below for why
  *   the discount was deliberately NOT built this round.
- * - Charge-move (Phantom Force/Meteor Beam) mid-charge candidate targets.
  * - Directional speed-evidence exclusions (a second mover's Tailwind
  *   STRENGTHENS the conclusion; today all modifiers exclude bilaterally).
+ *
+ * MID-CHARGE RELEASES 2026-08-10 (cache v24): a locked request entry
+ * (mid-charge Phantom Force, rampages) carries no target data; the LIVE
+ * sim auto-targets a bare release, but State.serializeBattle drops
+ * activeRequest entirely and the ROUND-TRIPPED sim demands a target again
+ * ("Phantom Force needs a target") — and every eval advance runs on a
+ * round-trip, so those candidate cells were guaranteed rejects. The
+ * builder now falls back to the DEX target type for target-less request
+ * entries: foe-targeting releases enumerate live foe slots, random-target
+ * rampages (Outrage) stay bare. Gate vs 61/67/80/65/83 n214: t6/t8 sample
+ * cleanly, late n 69→71, doubles 83→84, late brier 0.1617→0.1586, no
+ * bucket down (early brier +0.0004 = K refit over the larger n). NEW
+ * STANDING RECORD d1: 61/67/80/65/84, brier 0.2513/0.2145/0.1586, n 216.
  *
  * T35 RESOLUTION 2026-08-10 (healthy-body sack framing, analysis side):
  * The redundancy probe answered the design gate. T35 = the WINNER switches

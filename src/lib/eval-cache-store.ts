@@ -60,7 +60,10 @@ export interface StoredEval {
 //      choices instead of one greedy row.
 // v23: pivot pairs reach the ORCHESTRATED path too (the app's worker-pool
 //      results cached under v22 were built from unexpanded root options).
-export const EVAL_ENGINE_CACHE_VERSION = 23;
+// v24: locked releases carry dex-derived targets (doubles mid-charge
+//      Phantom Force/Meteor Beam candidates were guaranteed rejects on
+//      round-tripped states — those cells never sampled).
+export const EVAL_ENGINE_CACHE_VERSION = 24;
 
 export function evalStoreKey(
   cacheKey: string,

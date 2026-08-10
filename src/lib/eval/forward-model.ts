@@ -164,7 +164,16 @@ function slotChoicesFor(
     if ('disabled' in move && move.disabled) continue;
     const key = choiceKey(move.move);
     if (liveDisabled.has(key)) continue;
-    const targetType = 'target' in move ? (move.target as string | undefined) : undefined;
+    // Locked requests (mid-charge Phantom Force, rampages) carry no target
+    // data. The LIVE sim auto-targets a bare release, but serialization
+    // drops the locked-request shape and the round-tripped sim demands a
+    // target again ("Phantom Force needs a target", gen9doublesou t6/t8) —
+    // and every advance here runs on a round-trip. Fall back to the dex's
+    // target type: foe-targeting releases enumerate slots, random-target
+    // rampages (Outrage) stay bare.
+    const targetType = 'target' in move
+      ? (move.target as string | undefined)
+      : sideState.battle.dex.moves.get(key).target;
     const targets: { suffix: string; label: string }[] = [];
     if (targetType && TARGET_FOE.has(targetType)) {
       const living = foeActives

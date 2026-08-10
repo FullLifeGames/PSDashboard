@@ -3,7 +3,7 @@ import { Battle, State, Teams, toID } from '@pkmn/sim';
 type DeserializeFn = typeof State.deserializeBattle;
 import type { PokemonSet } from '@pkmn/sim';
 import { battleFaintedFraction, searchOptions, searchPosition, subSearchDepth1 } from '../src/lib/eval/search';
-import { advancePosition, createRootPosition, positionBattle } from '../src/lib/eval/forward-model';
+import { advancePosition, createRootPosition, legalChoices, positionBattle } from '../src/lib/eval/forward-model';
 import { boostedFraction, pairThreat } from '../src/lib/eval/eval-function';
 import type { EvalResult, SearchProgress } from '../src/lib/eval/types';
 
@@ -719,5 +719,73 @@ test.describe('serialized-state round-trip repair', () => {
     const repaired = live.sides[0].pokemon[0];
     expect(repaired.moveSlots.map(slot => slot.id)).toEqual(['imprison', 'knockoff']);
     expect(repaired.baseMoveSlots).toHaveLength(4);
+  });
+});
+
+test.describe('mid-charge candidates', () => {
+  test('a singles mid-charge active offers exactly the locked release, and it applies', () => {
+    const battle = makeBattle(
+      [makeSet('Beamer', 'Nihilego', ['Meteor Beam', 'Power Gem'], 100)],
+      [makeSet('Wall', 'Blissey', ['Seismic Toss'], 100)],
+    );
+    battle.choose('p1', 'move meteorbeam');
+    battle.choose('p2', 'move seismictoss');
+    const position = createRootPosition(serialize(battle));
+    const candidates = legalChoices(position, 'p1');
+    expect(candidates.map(candidate => candidate.choice)).toEqual(['move meteorbeam']);
+    expect(() => advancePosition(position, 'move meteorbeam', 'move seismictoss', [1, 2, 3, 4])).not.toThrow();
+  });
+
+  test('a doubles mid-charge release carries a target the deserialized sim accepts', () => {
+    // gen9doublesou-2660809089 t6/t8: serialization drops the locked-request
+    // shape, and the round-tripped sim demands a target for the release —
+    // every bare "move phantomforce" candidate was a guaranteed reject.
+    const battle = makeDoublesBattle(
+      [
+        makeSet('Ghost', 'Dragapult', ['Phantom Force', 'Dragon Darts'], 100),
+        makeSet('Tree', 'Trevenant', ['Wood Hammer', 'Protect'], 100),
+        makeSet('Bird', 'Talonflame', ['Air Slash', 'Protect'], 100),
+      ],
+      [
+        makeSet('Wall', 'Blissey', ['Seismic Toss', 'Protect'], 100),
+        makeSet('Wall2', 'Chansey', ['Seismic Toss', 'Protect'], 100),
+      ],
+    );
+    battle.choose('p1', 'move phantomforce 1, move protect');
+    battle.choose('p2', 'move protect, move protect');
+    const position = createRootPosition(serialize(battle));
+    const candidates = legalChoices(position, 'p1');
+    expect(candidates.length).toBeGreaterThan(0);
+    for (const candidate of candidates) {
+      const [slotA] = candidate.choice.split(', ');
+      expect(slotA).toMatch(/^move phantomforce \d/);
+    }
+    expect(() => advancePosition(position, candidates[0].choice, 'move seismictoss 1, move seismictoss 1', [1, 2, 3, 4])).not.toThrow();
+  });
+
+  test('a locked random-target move stays bare (Outrage needs no slot)', () => {
+    const battle = makeDoublesBattle(
+      [
+        makeSet('Dragon', 'Garchomp', ['Outrage', 'Earthquake'], 100),
+        makeSet('Tree', 'Trevenant', ['Wood Hammer', 'Protect'], 100),
+      ],
+      [
+        makeSet('Wall', 'Blissey', ['Seismic Toss', 'Protect'], 100),
+        makeSet('Wall2', 'Chansey', ['Seismic Toss', 'Protect'], 100),
+      ],
+    );
+    battle.choose('p1', 'move outrage 1, move woodhammer 1');
+    battle.choose('p2', 'move seismictoss 1, move seismictoss 1');
+    const position = createRootPosition(serialize(battle));
+    const locked = positionBattle(position).sides[0].active[0]!.volatiles['lockedmove'];
+    // Outrage locks via lockedmove, not twoturnmove — only assert when the
+    // sim actually locked (rampage may end early on some rolls).
+    if (!locked) return;
+    const candidates = legalChoices(position, 'p1');
+    for (const candidate of candidates) {
+      const [slotA] = candidate.choice.split(', ');
+      expect(slotA).toBe('move outrage');
+    }
+    expect(() => advancePosition(position, candidates[0].choice, 'move seismictoss 1, move seismictoss 1', [1, 2, 3, 4])).not.toThrow();
   });
 });
