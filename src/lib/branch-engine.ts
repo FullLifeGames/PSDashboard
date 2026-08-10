@@ -555,7 +555,10 @@ export function correctActivesFromProtocol(battle: SimBattle, events: string[]) 
   }
   // The cached requests were built from the PRE-correction actives — refresh
   // the disable flags and the request view from the corrected board.
-  if (repointed) refreshRequestsFromLiveState(battle);
+  if (repointed) {
+    restoreSideInvariants(battle);
+    refreshRequestsFromLiveState(battle);
+  }
 }
 
 function forceSwitches(battle: SimBattle, sideIdx: number): boolean[] {
@@ -645,6 +648,24 @@ function correctHpFromSnapshot(battle: SimBattle, snapshot: TurnSnapshot) {
           battlePokemon.boosts[stat] = snapshotPokemon.boosts[stat] ?? 0;
         }
       }
+    }
+  }
+  restoreSideInvariants(battle);
+}
+
+/**
+ * Per-mon corrections change fainted/hp/actives without maintaining the
+ * side-level derived state the sim runs on: `pokemonLeft` is the WIN-CHECK
+ * counter (drifted high, a wiped side plays on behind a stale move request
+ * — GPL T38), and `isActive` drives bench enumeration (drifted false on
+ * the active, "switch 1" targeted the field — GPL T39). Recompute both
+ * from ground truth after every correction pass.
+ */
+function restoreSideInvariants(battle: SimBattle) {
+  for (const side of battle.sides) {
+    side.pokemonLeft = side.pokemon.filter(pokemon => !pokemon.fainted && pokemon.hp > 0).length;
+    for (const pokemon of side.pokemon) {
+      pokemon.isActive = side.active.includes(pokemon);
     }
   }
 }

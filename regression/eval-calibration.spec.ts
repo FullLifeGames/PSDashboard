@@ -270,15 +270,31 @@ import { brierScore, fitConstantK } from './fit-helpers';
  *   pre-fix: 58/63/76 vs 58/65/79) — deeper fixed-horizon search leans
  *   harder on leaf noise on this corpus. 2b gates against the d2 baseline
  *   (trends barely exist at d1).
- * - KNOWN REMAINING error positions (stable, pre-existing): gen9ou-2658675391
- *   t38 (game over mid-sample), gen9ou-2658670791 t104/t121 (deep-game
- *   divergence), gen9ou-2658664943 t32 + gen9ou-2658661545 t20
- *   (fainted-actives choice shape). The Phantom Force t6/t8 entries are
- *   RESOLVED (see MID-CHARGE RELEASES below). d2 loses more to child-state
- *   mismatches: parent choices reapplied to transformed/changed children
- *   (Toxapex t70/t87, Mew t2/t4); the Meteor Beam mid-charge targeting
- *   (vgc t4) shares the fixed builder path — expected resolved, unverified
- *   until the next d2 sweep.
+ * - KNOWN REMAINING error positions: gen9ou-2658675391 t38 (game over
+ *   mid-sample), gen9ou-2658670791 t104/t121 (deep-game divergence,
+ *   unverified since the invariant repair). The Phantom Force t6/t8
+ *   entries are RESOLVED (MID-CHARGE RELEASES below); the fainted-actives
+ *   choice-shape family (gen9ou-2658664943 t32, gen9ou-2658661545 t20,
+ *   gen9ou-2658659909 t37) is RESOLVED (SIDE-INVARIANT REPAIR below).
+ *   d2 loses more to child-state mismatches: parent choices reapplied to
+ *   transformed/changed children (Toxapex t70/t87, Mew t2/t4); the Meteor
+ *   Beam mid-charge targeting (vgc t4) shares the fixed builder path —
+ *   expected resolved, unverified until the next d2 sweep.
+ *
+ * SIDE-INVARIANT REPAIR 2026-08-10 (cache v26): snapshot corrections set
+ * hp/fainted per mon and repoints moved actives without maintaining the
+ * side-level state the sim runs on — pokemonLeft (the WIN-CHECK counter)
+ * read high, so a KO of the last body left a wiped side playing on behind
+ * a stale move request ("more choices than unfainted"; GPL T38's
+ * sub-search), and isActive read false on the active, so bench enumeration
+ * offered "switch 1" onto the field (GPL T39's root matrix) — the GPL
+ * graph ended at T37 (user report). Both invariants now recompute from
+ * ground truth after every correction pass AND in deserializeRepaired
+ * (the choke point all eval deserialize sites share). Gate vs
+ * 61/67/80/65/84 n216: TWO singles positions recovered (n 218, late
+ * 71→73), late 80→81, late brier 0.1585→0.1550, mid unchanged, no bucket
+ * down (early brier +0.0003 = K refit). NEW STANDING RECORD d1:
+ * 61/67/81/65/84, brier 0.2516/0.2139/0.1550, n 218.
  *
  * T35 PROBE RESOLVED 2026-08-10 (during re-baseline, d1s1 on the fixture):
  * the winner's deliberate Salazzle sack dives the estimate because of the

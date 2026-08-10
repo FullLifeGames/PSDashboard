@@ -80,6 +80,15 @@ test.describe('GPL replay end-to-end verdicts', () => {
     expect(t29.p1.riskUnpunished).toBeFalsy();
     if (t29.p1.tier) expect(t29.p1.sacrifice).toBeTruthy();
 
+    // T38/T39 — the graph's tail: correction drift left p2.pokemonLeft high
+    // and Rhydon's isActive false, the search threw on both turns, and the
+    // graph ended at T37 (user report). Both evaluate now, decisively for
+    // the winner mopping up.
+    await analyze(38);
+    await analyze(39);
+    expect(scoreByTurn.get(38)!).toBeGreaterThan(0);
+    expect(scoreByTurn.get(39)!).toBeGreaterThan(0);
+
     // T14: Cobalion was KO'd before it ever acted — the side prices through
     // the charitable stay-in phantom instead of reading "unclear (a choice
     // never surfaced)" (same shape as T36).

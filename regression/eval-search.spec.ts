@@ -789,3 +789,26 @@ test.describe('mid-charge candidates', () => {
     expect(() => advancePosition(position, candidates[0].choice, 'move seismictoss 1, move seismictoss 1', [1, 2, 3, 4])).not.toThrow();
   });
 });
+
+test.describe('side-invariant repair on deserialize', () => {
+  test('pokemonLeft and isActive restore from ground truth (GPL T38/T39)', () => {
+    const battle = makeBattle(
+      [makeSet('Machamp', 'Machamp', ['Seismic Toss'], 100)],
+      [makeSet('Pikachu', 'Pikachu', ['Tackle', 'Growl'], 30)],
+    );
+    const state = JSON.parse(serialize(battle)) as {
+      sides: { pokemonLeft: number; pokemon: { isActive: boolean }[] }[];
+    };
+    // Correction-era drift: the win-check counter reads high and the
+    // active's flag reads false.
+    state.sides[1].pokemonLeft = 3;
+    state.sides[1].pokemon[0].isActive = false;
+    const position = createRootPosition(JSON.stringify(state));
+    // A stale-false isActive must not surface a switch onto the field.
+    expect(legalChoices(position, 'p2').some(choice => choice.choice.startsWith('switch'))).toBe(false);
+    // The KO of the last body ends the game — a wiped side never plays on
+    // behind a stale request.
+    const child = advancePosition(position, 'move seismictoss', 'move tackle', [1, 2, 3, 4]);
+    expect(positionBattle(child).ended).toBe(true);
+  });
+});

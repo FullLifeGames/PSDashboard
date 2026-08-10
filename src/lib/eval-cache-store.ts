@@ -66,7 +66,10 @@ export interface StoredEval {
 // v25: KO'd-before-acting sides price their pair through the stay-in
 //      phantom — playedOutcome values stored as null under v24 would
 //      otherwise never heal (null means "tried, unmatched" and is final).
-export const EVAL_ENGINE_CACHE_VERSION = 25;
+// v26: side invariants (pokemonLeft, isActive) restore on every
+//      deserialize — corrupted-correction positions used to throw (GPL
+//      T38/T39 gaps) or evaluate wiped sides as alive.
+export const EVAL_ENGINE_CACHE_VERSION = 26;
 
 export function evalStoreKey(
   cacheKey: string,

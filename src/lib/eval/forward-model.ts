@@ -53,6 +53,17 @@ function deserializeRepaired(serialized: string): Battle {
   for (const trim of trims) {
     battle.sides[trim.side].pokemon[trim.index].moveSlots.length = trim.length;
   }
+  // Correction-era invariant drift (GPL T38/T39): snapshot corrections set
+  // hp/fainted per mon without maintaining side.pokemonLeft — the win-check
+  // counter, so a wiped side played on behind a stale move request — or
+  // isActive, so the bench enumeration offered "switch 1" onto the active.
+  // Restore both from ground truth on every deserialize.
+  for (const side of battle.sides) {
+    side.pokemonLeft = side.pokemon.filter(pokemon => !pokemon.fainted && pokemon.hp > 0).length;
+    for (const pokemon of side.pokemon) {
+      pokemon.isActive = side.active.includes(pokemon);
+    }
+  }
   return battle;
 }
 
