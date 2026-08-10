@@ -347,11 +347,38 @@ import { brierScore, fitConstantK } from './fit-helpers';
  * probes + live-flag filtering accumulated) — a future perf-round item,
  * not attributable to pairs.
  *
+ * SPEED-EVIDENCE FOLLOW-UPS 2026-08-10 (user findings on the GPL spreads —
+ * all-zero Vileplume, 252-HP-only Clefable, bulky Noivern):
+ * - GOODNESS-OF-FIT FORFEIT (fbc49c2): solves whose best rung still
+ *   misfits >0.01 mean squared fraction per observation forfeit to the
+ *   full-budget prior (video HP bars had Vileplume at 0.05/obs — every
+ *   rung garbage, the least-bad was a paper spread); solves repairing
+ *   speed violations always stand. Gate 61/67/79/65/83, Brier better in
+ *   EVERY phase (0.2512/0.2149/0.1678) — real corpora carry unreliable
+ *   fits too. Cascade effect: Noivern's "good" bulk fit collapsed once
+ *   its garbage-fit partners forfeited — unreliable evidence quarantines
+ *   itself.
+ * - KO-BEFORE-ACTING EVIDENCE (user, T36: Noivern KO'd Iron Valiant before
+ *   it ever moved): a KO'd mon with no action line chose a move (a chosen
+ *   switch would have resolved first) and lost the race — the attacker is
+ *   faster. Two-move-line extraction was blind to the class. Guards:
+ *   attacker priority-0 + clean, victim unacted + clean at faint time,
+ *   faint attributed via the pending-move context. Cleanliness now also
+ *   excludes PARADOX BOOSTERS (Quark Drive/Protosynthesis are volatiles,
+ *   not stages — the stage check never saw them). Known limitation: a
+ *   victim holding a negative-priority choice reads slower than it is.
+ *   GPL: +4 constraints incl. t36. Gate 61/67/80/65/83 — late +1, TWO
+ *   late positions recovered (n 67→69), brier better in every phase
+ *   (0.2509/0.2145/0.1617). The speed-evidence arc in one line:
+ *   59/66/79/64/83 → 61/67/80/65/83, late brier 0.1752 → 0.1617.
+ *
  * OPEN FINDINGS FOR THE NEXT ROUNDS (2026-08-10):
  * - Endgame-sack pricing + healthy-body sack detection (see T35 above).
  * - Charge-move (Phantom Force/Meteor Beam) mid-charge candidate targets.
  * - d1s1 bench drift 0.3→0.9s across this round — profile before the next
  *   search-space change.
+ * - Directional speed-evidence exclusions (a second mover's Tailwind
+ *   STRENGTHENS the conclusion; today all modifiers exclude bilaterally).
  */
 const REPLAY_IDS = [
   'gen9draft-2058494320',

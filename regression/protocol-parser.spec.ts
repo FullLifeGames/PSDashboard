@@ -239,3 +239,82 @@ test.describe('speed-order evidence', () => {
     expect(speedOrders[0].turn).toBe(1);
   });
 });
+
+test.describe('KO-before-acting speed evidence', () => {
+  const koLog = (body: string[]) => [
+    '|player|p1|Alice|', '|player|p2|Bob|',
+    '|teamsize|p1|2', '|teamsize|p2|2',
+    '|gen|9', '|gametype|singles', '|tier|[Gen 9] OU',
+    '|start',
+    '|switch|p1a: Fast|Noivern, F|100/100',
+    '|switch|p2a: Val|Iron Valiant|100/100',
+    '|turn|1',
+    ...body,
+  ].join('\n');
+
+  test('a KO before the victim ever acted proves the attacker was faster', () => {
+    // The victim chose a move (a chosen switch would have resolved BEFORE
+    // the attack and left a line) and died before executing it.
+    const { speedOrders } = parseReplayLogWithObservations(koLog([
+      '|move|p1a: Fast|Draco Meteor|p2a: Val',
+      '|-damage|p2a: Val|0 fnt',
+      '|faint|p2a: Val',
+      '|turn|2',
+    ]));
+    expect(speedOrders).toEqual([{
+      firstSide: 'p1', firstSpecies: 'Noivern',
+      secondSide: 'p2', secondSpecies: 'Iron Valiant',
+      turn: 1,
+    }]);
+  });
+
+  test('a victim that already acted this turn yields no KO evidence', () => {
+    // The victim's switch resolved first — its speed never raced the attack.
+    const { speedOrders } = parseReplayLogWithObservations(koLog([
+      '|switch|p2a: Val2|Garchomp, F|100/100',
+      '|move|p1a: Fast|Draco Meteor|p2a: Val2',
+      '|-damage|p2a: Val2|0 fnt',
+      '|faint|p2a: Val2',
+      '|turn|2',
+    ]));
+    expect(speedOrders).toEqual([]);
+  });
+
+  test('a priority KO proves nothing about speed', () => {
+    const { speedOrders } = parseReplayLogWithObservations(koLog([
+      '|move|p1a: Fast|Sucker Punch|p2a: Val',
+      '|-damage|p2a: Val|0 fnt',
+      '|faint|p2a: Val',
+      '|turn|2',
+    ]));
+    expect(speedOrders).toEqual([]);
+  });
+
+  test('residual faints after the action boundary are not KO evidence', () => {
+    const { speedOrders } = parseReplayLogWithObservations(koLog([
+      '|move|p1a: Fast|Draco Meteor|p2a: Val',
+      '|-damage|p2a: Val|5/100',
+      '|move|p2a: Val|Moonblast|p1a: Fast',
+      '|upkeep',
+      '|-damage|p2a: Val|0 fnt|[from] item: Life Orb',
+      '|faint|p2a: Val',
+      '|turn|2',
+    ]));
+    // Both moved — the ordinary pair evidence stands; the residual faint
+    // adds nothing (the victim acted).
+    expect(speedOrders).toHaveLength(1);
+    expect(speedOrders[0].turn).toBe(1);
+  });
+
+  test('a paradox speed booster on either side voids the evidence', () => {
+    const { speedOrders } = parseReplayLogWithObservations(koLog([
+      '|-activate|p2a: Val|ability: Quark Drive',
+      '|-start|p2a: Val|quarkdrivespe',
+      '|move|p1a: Fast|Draco Meteor|p2a: Val',
+      '|-damage|p2a: Val|0 fnt',
+      '|faint|p2a: Val',
+      '|turn|2',
+    ]));
+    expect(speedOrders).toEqual([]);
+  });
+});

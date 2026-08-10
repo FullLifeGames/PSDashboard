@@ -76,6 +76,23 @@ export function parseReplayLogWithObservations(log: string): {
   let speedTurn = 0;
   let turnMovers: { side: 'p1' | 'p2'; species: string; clean: boolean }[] = [];
   let switchedThisTurn = new Set<string>();
+  let actedThisTurn = new Set<string>();
+  // Everything that could explain a move order besides raw speed, read at
+  // decision time: status, stages, Tailwind, Trick Room, same-turn entry,
+  // and paradox boosters (Quark Drive/Protosynthesis are VOLATILES, not
+  // stat stages — a boosted Iron Valiant proves nothing either way).
+  type ClientIdent = Parameters<Battle['getPokemon']>[0];
+  const speedCleanAt = (ident: string): boolean => {
+    const mon = battle.getPokemon(ident as ClientIdent);
+    if (!mon) return false;
+    const side = ident.startsWith('p1') ? battle.p1 : battle.p2;
+    const paradox = Object.keys((mon.volatiles ?? {}) as Record<string, unknown>)
+      .some(key => /^(protosynthesis|quarkdrive)/.test(key));
+    return mon.status !== 'par' && (mon.boosts.spe ?? 0) === 0 && !paradox &&
+      !(side.sideConditions as Record<string, unknown>)['tailwind'] &&
+      !(battle.field.pseudoWeather as Record<string, unknown>)['trickroom'] &&
+      !switchedThisTurn.has(ident);
+  };
   const flushSpeedOrder = () => {
     const [first, second] = turnMovers;
     if (first && second && first.clean && second.clean &&
@@ -88,11 +105,16 @@ export function parseReplayLogWithObservations(log: string): {
     }
     turnMovers = [];
     switchedThisTurn = new Set();
+    actedThisTurn = new Set();
   };
   // The pending move context: crits and multi-hits disqualify its damage.
   let lastMove: {
     attacker: string; target: string; moveId: string;
     crit: boolean; observationIndex: number | null; damageCount: number;
+    /** The attacker's speed-evidence cleanliness at move time. */
+    speedClean: boolean;
+    attackerSide: 'p1' | 'p2';
+    attackerSpecies: string;
   } | null = null;
 
   // Take initial snapshot at turn 0 (before any turns)
@@ -108,27 +130,22 @@ export function parseReplayLogWithObservations(log: string): {
       if (parsed >= 1 && parsed <= 9) genNum = parsed as GenerationNum;
     } else if (line.startsWith('|move|')) {
       const parts = line.split('|');
+      // Read the mover BEFORE battle.add — status/boosts at decision time.
+      const ident = parts[2] ?? '';
+      const side: 'p1' | 'p2' = ident.startsWith('p1') ? 'p1' : 'p2';
+      const mover = ident ? battle.getPokemon(ident as ClientIdent) : undefined;
+      const moveId = (parts[3] ?? '').toLowerCase().replace(/[^a-z0-9]/g, '');
+      const priority = gens.get(genNum).moves.get(moveId)?.priority ?? 0;
+      const clean = priority === 0 && speedCleanAt(ident);
       lastMove = parts[2] && parts[4]
         ? {
-          attacker: parts[2], target: parts[4],
-          moveId: (parts[3] ?? '').toLowerCase().replace(/[^a-z0-9]/g, ''),
+          attacker: parts[2], target: parts[4], moveId,
           crit: false, observationIndex: null, damageCount: 0,
+          speedClean: clean, attackerSide: side, attackerSpecies: mover?.speciesForme ?? '',
         }
         : null;
-      if (singles && parts[2]) {
-        // Read the mover BEFORE battle.add — status/boosts at decision time.
-        type Ident = Parameters<Battle['getPokemon']>[0];
-        const ident = parts[2];
-        const side: 'p1' | 'p2' = ident.startsWith('p1') ? 'p1' : 'p2';
-        const mover = battle.getPokemon(ident as Ident);
-        const moveId = (parts[3] ?? '').toLowerCase().replace(/[^a-z0-9]/g, '');
-        const priority = gens.get(genNum).moves.get(moveId)?.priority ?? 0;
-        const sideObj = side === 'p1' ? battle.p1 : battle.p2;
-        const clean = !!mover && priority === 0 && mover.status !== 'par' &&
-          (mover.boosts.spe ?? 0) === 0 &&
-          !(sideObj.sideConditions as Record<string, unknown>)['tailwind'] &&
-          !(battle.field.pseudoWeather as Record<string, unknown>)['trickroom'] &&
-          !switchedThisTurn.has(ident);
+      if (singles && ident) {
+        actedThisTurn.add(ident);
         turnMovers.push({ side, species: mover?.speciesForme ?? '', clean });
       }
     } else if (line.startsWith('|-crit|')) {
@@ -137,12 +154,35 @@ export function parseReplayLogWithObservations(log: string): {
       /^\|(?:-miss|-immune|-fail|-end|switch|drag|turn|upkeep|cant|faint)\|/.test(line) ||
       (line.startsWith('|-activate|') && line.includes('confusion'))
     ) {
+      // KO before the victim ever acted: a chosen switch would have resolved
+      // BEFORE the attack and left a line, so the victim chose a move and
+      // lost the speed race — the attacker was faster (GPL T36: Noivern KO'd
+      // Iron Valiant before it moved; two-move-line extraction cannot see
+      // this, yet it is how players actually read speed).
+      if (singles && line.startsWith('|faint|') && lastMove) {
+        const victim = line.split('|')[2] ?? '';
+        if (victim === lastMove.target && victim !== lastMove.attacker &&
+          lastMove.speedClean && !actedThisTurn.has(victim) && speedCleanAt(victim)) {
+          const victimMon = battle.getPokemon(victim as ClientIdent);
+          if (victimMon) {
+            speedOrders.push({
+              firstSide: lastMove.attackerSide, firstSpecies: lastMove.attackerSpecies,
+              secondSide: victim.startsWith('p1') ? 'p1' : 'p2',
+              secondSpecies: victimMon.speciesForme,
+              turn: speedTurn,
+            });
+          }
+        }
+      }
       // Action boundary: a bare |-damage| after any of these (confusion
       // self-hit, Future Sight resolution, residuals) belongs to no pending
       // move — attributing it fabricates observations.
       lastMove = null;
       if (/^\|(?:switch|drag)\|/.test(line)) {
         switchedThisTurn.add(line.split('|')[2] ?? '');
+      }
+      if (/^\|(?:switch|drag|cant)\|/.test(line)) {
+        actedThisTurn.add(line.split('|')[2] ?? '');
       }
     } else if (singles && line.startsWith('|-damage|') && !line.includes('[from]') && lastMove) {
       // Read the defender BEFORE battle.add applies the line — its current
