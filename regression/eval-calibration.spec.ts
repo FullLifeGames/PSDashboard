@@ -343,9 +343,9 @@ import { brierScore, fitConstantK } from './fit-helpers';
  * 0.1717 — pair rows re-price a few pivot roots without moving any sign).
  * Bench: non-pivot roots identical (A/B 0.9s d1s1 both ways); pivot roots
  * grow ≤ +4 rows/side by construction; d2 stays expansion-budget-bound
- * (1.0→1.1s). NOTE the round-cumulative d1s1 bench drift 0.3→0.9s (trend
- * probes + live-flag filtering accumulated) — a future perf-round item,
- * not attributable to pairs.
+ * (1.0→1.1s). The "round-cumulative d1s1 bench drift 0.3→0.9s" noted here
+ * did not survive profiling — see BENCH-DRIFT PROFILE below (flat 1.0s at
+ * every commit of the round; the observation was sweep wallclock noise).
  *
  * SPEED-EVIDENCE FOLLOW-UPS 2026-08-10 (user findings on the GPL spreads —
  * all-zero Vileplume, 252-HP-only Clefable, bulky Noivern):
@@ -375,10 +375,22 @@ import { brierScore, fitConstantK } from './fit-helpers';
  * OPEN FINDINGS FOR THE NEXT ROUNDS (2026-08-10):
  * - Endgame-sack pricing + healthy-body sack detection (see T35 above).
  * - Charge-move (Phantom Force/Meteor Beam) mid-charge candidate targets.
- * - d1s1 bench drift 0.3→0.9s across this round — profile before the next
- *   search-space change.
  * - Directional speed-evidence exclusions (a second mover's Tailwind
  *   STRENGTHENS the conclusion; today all modifiers exclude bilaterally).
+ *
+ * BENCH-DRIFT PROFILE 2026-08-10 (closing the registered 0.3→0.9s item):
+ * EVAL_BENCH across the round's commits — 53ff967 (round start), c472c10
+ * (robustness), c9c7c64 (2b-lite), effd2f5 (pivots), HEAD — shows d1s1
+ * FLAT at 1.0s everywhere, forks/sec 527–606 (run noise), deserialize
+ * 1.0–1.1 ms (deserializeRepaired's pad walk is free next to the parse).
+ * The d2 line wobbles 1.1–1.8s between runs of the SAME commit —
+ * expansion-budget noise, not drift. The registered 0.3→0.9 was a sweep
+ * WALLCLOCK observation: two identical calibration runs today took 4.2
+ * and 4.9 minutes (±17% machine noise on bit-identical work), and the
+ * sweep's per-position quotient also absorbs fetch, reconstruction, and
+ * the round's build-side additions (speed solver, coherence). No search
+ * regression exists to fix; re-open only with a per-stage profile that
+ * isolates a ≥25% single cause.
  */
 const REPLAY_IDS = [
   'gen9draft-2058494320',
