@@ -553,14 +553,9 @@ export function correctActivesFromProtocol(battle: SimBattle, events: string[]) 
     if (!target) continue;
     if (repointActiveSlot(side, activeSlot, target)) repointed = true;
   }
-  // The cached requests were built from the PRE-correction actives — stale
-  // options offered the wrong mon's moves and missed recomputed disable
-  // states (Imprison; gen9doublesou-2660802611). Rebuild them from the live
-  // battle; no argument keeps the request phase and pending choices intact.
-  if (repointed && !battle.ended &&
-    (battle.requestState === 'move' || battle.requestState === 'switch')) {
-    battle.makeRequest();
-  }
+  // The cached requests were built from the PRE-correction actives — refresh
+  // the disable flags and the request view from the corrected board.
+  if (repointed) refreshRequestsFromLiveState(battle);
 }
 
 function forceSwitches(battle: SimBattle, sideIdx: number): boolean[] {
@@ -826,13 +821,43 @@ function repairStaleForcedSwitchRequest(battle: SimBattle) {
 }
 
 /**
+ * Mirror of Battle#endTurn's move-disable recomputation: reset every active's
+ * flags, run the DisableMove events, reapply cantusetwice. The sim ran this
+ * BEFORE the correction layers mutated the board, so corrected actives can
+ * carry flags in either stale direction — set for a state that no longer
+ * holds, or cleared for one that does (a repointed mon beside a standing
+ * Imprison would otherwise play through the block).
+ */
+function runDisablePass(battle: SimBattle) {
+  for (const side of battle.sides) {
+    for (const pokemon of side.active) {
+      if (!pokemon || pokemon.fainted) continue;
+      pokemon.maybeDisabled = false;
+      pokemon.maybeLocked = false;
+      for (const moveSlot of pokemon.moveSlots) {
+        moveSlot.disabled = false;
+        moveSlot.disabledSource = '';
+      }
+      battle.runEvent('DisableMove', pokemon);
+      for (const moveSlot of pokemon.moveSlots) {
+        const activeMove = battle.dex.getActiveMove(moveSlot.id);
+        battle.singleEvent('DisableMove', activeMove, null, pokemon);
+        if (activeMove.flags['cantusetwice'] && pokemon.lastMove?.id === moveSlot.id) {
+          pokemon.disableMove(pokemon.lastMove.id);
+        }
+      }
+    }
+  }
+}
+
+/**
  * Requests are a VIEW of battle state, built by the sim BEFORE the correction
  * layers (active repoints, snapshot HP/status/volatile sync) mutate it. A
- * stale view offers the wrong mon's moves and misses disable states the
- * corrections introduced (Imprison; gen9doublesou-2660802611 turn 2 offered
- * Incineroar's Imprison-disabled Knock Off and turn 4 offered benched
- * Grimmsnarl's screens). Rebuilding the view from the corrected state is the
- * identity on healthy battles and the fix on corrected ones.
+ * stale view offers the wrong mon's moves and misses recomputed disable
+ * states (Imprison; gen9doublesou-2660802611 turn 2 offered Incineroar's
+ * Imprison-disabled Knock Off and turn 4 offered benched Grimmsnarl's
+ * screens). Recompute the disable flags, then rebuild the view — both are
+ * identities on healthy battles and fixes on corrected ones.
  */
 function refreshRequestsFromLiveState(battle: SimBattle) {
   if (battle.ended) return;
@@ -842,6 +867,7 @@ function refreshRequestsFromLiveState(battle: SimBattle) {
   }
   if (battle.requestState !== 'move' && battle.requestState !== 'switch') return;
   try {
+    if (battle.requestState === 'move') runDisablePass(battle);
     battle.makeRequest();
   } catch {
     // Leave the wedged state to validateBranchRuntime to report.

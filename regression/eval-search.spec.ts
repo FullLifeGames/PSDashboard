@@ -585,6 +585,37 @@ test.describe('doubles keepPlayed', () => {
 });
 
 test.describe('hidden-disable candidate filter', () => {
+  test('Taunt-disabled moves stay out of the candidates (visible-disable family)', () => {
+    // Taunt/Encore/Disable/choice locks disable VISIBLY (request carries the
+    // flag) — pinned here so the Imprison concealment fix is never mistaken
+    // for the general case.
+    const battle = makeBattle(
+      [makeSet('Mew', 'Mew', ['Taunt', 'Confusion'])],
+      [makeSet('Rat', 'Raticate', ['Toxic', 'Quick Attack'])],
+    );
+    battle.choose('p1', 'move taunt');
+    battle.choose('p2', 'move quickattack');
+    const choices = searchOptions(createRootPosition(serialize(battle)), 'p2')
+      .map(option => option.choice);
+    expect(choices).not.toContain('move toxic');
+    expect(choices).toContain('move quickattack');
+  });
+
+  test('an Encore lock leaves only the encored move in the candidates', () => {
+    const battle = makeBattle(
+      [makeSet('Mew', 'Mew', ['Encore', 'Splash'])],
+      [makeSet('Rat', 'Raticate', ['Quick Attack', 'Toxic'])],
+    );
+    battle.choose('p1', 'move splash');
+    battle.choose('p2', 'move quickattack');
+    battle.choose('p1', 'move encore');
+    battle.choose('p2', 'move quickattack');
+    const choices = searchOptions(createRootPosition(serialize(battle)), 'p2')
+      .map(option => option.choice);
+    expect(choices).not.toContain('move toxic');
+    expect(choices).toContain('move quickattack');
+  });
+
   test('an Imprison-concealed move never enters the candidate list', () => {
     // The request reports Imprison-disabled foe moves as ENABLED (the sim
     // hides them until the click bounces) — offering one guarantees a choice

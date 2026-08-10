@@ -108,6 +108,30 @@ test.describe('correctActivesFromProtocol', () => {
     expect(request?.active?.[0]?.moves?.map(move => move.move)).toEqual(['Tackle', 'Protect']);
   });
 
+  test('a repointed mon entering beside a standing Imprison gets recomputed disable flags', async () => {
+    // The sim's DisableMove pass ran at end-of-turn, BEFORE corrections
+    // mutate the board; a freshly repointed mon (flags cleared by the
+    // fresh-entry reset) would otherwise offer — and the branch would play —
+    // moves the real game blocks.
+    const runtime = await reconstructBranchRuntime({
+      format: 'gen9ou',
+      p1Team,
+      p2Team,
+      replayLog: singlesLog,
+      targetTurn: 1,
+    });
+    const battle = runtime.battleStream.battle!;
+    const bulba = battle.sides[1].active[0]!;
+    bulba.addVolatile('imprison', bulba);
+
+    correctActivesFromProtocol(battle, ['|switch|p1a: Eve|Eevee, L50|100/100']);
+
+    const eve = battle.sides[0].active[0]!;
+    // Eevee's Protect is Imprison-shared with Bulbasaur's; Tackle is not.
+    expect(eve.moveSlots.find(slot => slot.id === 'protect')?.disabled).toBeTruthy();
+    expect(eve.moveSlots.find(slot => slot.id === 'tackle')?.disabled).toBeFalsy();
+  });
+
   test('a real switch after a correction neither duplicates nor loses team members', async () => {
     const runtime = await reconstructBranchRuntime({
       format: 'gen9ou',
