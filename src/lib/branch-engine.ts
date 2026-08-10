@@ -1393,8 +1393,13 @@ export async function reconstructBranchRuntime(params: {
 
   const p1Name = JSON.stringify(params.playerNames?.[0]?.trim() || 'Player 1');
   const p2Name = JSON.stringify(params.playerNames?.[1]?.trim() || 'Player 2');
+  // FIXED seed: an unseeded battle rerolls damage/secondary outcomes every
+  // reconstruction, so the same replay+turn yielded DIFFERENT positions run
+  // to run (diverged fallback paths, shuffled bench slots, wrong choice
+  // locks) — the sweep's cached eval and the branch a click executes in
+  // could disagree about what "switch 3" even is (draft T48).
   writeSim(
-    `>start {"formatid":"${format}"}\n>player p1 {"name":${p1Name},"team":"${p1Packed}"}\n>player p2 {"name":${p2Name},"team":"${p2Packed}"}`
+    `>start {"formatid":"${format}","seed":"1,2,3,4"}\n>player p1 {"name":${p1Name},"team":"${p1Packed}"}\n>player p2 {"name":${p2Name},"team":"${p2Packed}"}`
   );
   await waitForBattle(battle => !!battle.sides[0] && !!battle.sides[1], 1000);
 

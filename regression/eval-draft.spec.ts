@@ -43,16 +43,18 @@ test.describe('draft replay end-to-end verdicts', () => {
 
     const result = searchPosition(serialized, { depth: 1, samples: 1, tera });
     const p2 = result.perSide.p2;
+    // Find by label, not slot number — bench slots are a reconstruction
+    // detail; the pin is about WHICH Pokémon leads the ranking.
     const recover = p2.find(choice => choice.choice === 'move recover')!;
-    const heatran = p2.find(choice => choice.choice === 'switch 5')!;
+    const heatran = p2.find(choice => choice.label === '→ Heatran')!;
     expect(recover).toBeTruthy();
-    expect(heatran.label).toBe('→ Heatran');
+    expect(heatran).toBeTruthy();
 
     // The tie is real — if these ever separate by more than the epsilon the
     // tiebreak no longer decides this position and the pin must be rethought.
     expect(Math.abs(recover.ev - heatran.ev)).toBeLessThanOrEqual(TIE_EPSILON);
     // The switch leads the report; the stall no longer shades it out.
-    expect(p2[0].choice).toBe('switch 5');
+    expect(p2[0].label).toBe('→ Heatran');
     expect(p2.indexOf(heatran)).toBeLessThan(p2.indexOf(recover));
   });
 });

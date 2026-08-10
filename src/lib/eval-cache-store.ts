@@ -41,7 +41,9 @@ export interface StoredEval {
 // v15: horizon-trend tiebreak — EV ties in the leading rows reorder by the
 //      one-ply trend of their decisive cells (stall lines stop shading out
 //      equivalent switches).
-export const EVAL_ENGINE_CACHE_VERSION = 15;
+// v16: seeded reconstruction — evals cached from unseeded (run-varying)
+//      reconstructions could disagree with the branch a click executes in.
+export const EVAL_ENGINE_CACHE_VERSION = 16;
 
 export function evalStoreKey(
   cacheKey: string,
