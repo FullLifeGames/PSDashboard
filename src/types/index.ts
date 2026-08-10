@@ -71,6 +71,22 @@ export interface DamageObservation {
   weather: string;
 }
 
+/**
+ * Same-turn move order the log PROVED: `first` acted before `second` at equal
+ * priority with no speed modifier in sight (no priority moves, paralysis,
+ * Tailwind, Trick Room, speed stages, or same-turn switch-ins). The spread
+ * solver treats it as a hard effective-speed constraint so branches reproduce
+ * the order the replay showed (GPL: Noivern moved before Iron Valiant while
+ * the guessed spread had it slower).
+ */
+export interface SpeedOrderObservation {
+  firstSide: 'p1' | 'p2';
+  firstSpecies: string;
+  secondSide: 'p1' | 'p2';
+  secondSpecies: string;
+  turn: number;
+}
+
 export type KnowledgeSource = 'revealed' | 'guessed' | 'manual' | 'sheet' | 'unknown';
 export type StatId = 'hp' | 'atk' | 'def' | 'spa' | 'spd' | 'spe';
 export type PokemonEvs = Record<StatId, number>;

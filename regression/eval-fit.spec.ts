@@ -174,8 +174,8 @@ test.describe('eval weight fitting (EVAL_FIT=1)', () => {
         const gameType: FitSample['gameType'] = /\|gametype\|doubles/.test(replay.log) ? 'doubles' : 'singles';
         const genClass: FitSample['genClass'] = /^gen9/.test(replay.formatid ?? entry.format) ? 'gen9' : 'old';
 
-        const { snapshots, observations } = parseReplayLogWithObservations(replay.log);
-        const { p1Team, p2Team } = buildTeamsFromReplay(replay.log, { observations });
+        const { snapshots, observations, speedOrders } = parseReplayLogWithObservations(replay.log);
+        const { p1Team, p2Team } = buildTeamsFromReplay(replay.log, { observations, speedOrders });
         if (p1Team.length === 0 || p2Team.length === 0 || snapshots.length < 4) continue;
 
         const maxTurn = snapshots.length;

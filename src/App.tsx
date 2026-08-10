@@ -122,7 +122,7 @@ function SharedBranchView({
 }
 
 function App() {
-  const { loading, error, replayData, snapshots, observations, opponentInfo, p1Info, loadReplay, loadReplayFile } = useReplay();
+  const { loading, error, replayData, snapshots, observations, speedOrders, opponentInfo, p1Info, loadReplay, loadReplayFile } = useReplay();
   const { embed, requestedReplay } = useEmbedHost({ loadReplay, loadReplayFile });
   const { branching, simState, history, executeError, executing, startBranch, setChoice, executeTurn, stopBranch, getBattle } = useBranch();
   const evaluation = useEvaluation();
@@ -299,10 +299,10 @@ function App() {
     p1InfoOverride?: OpponentTeamInfo | null,
     p2InfoOverride?: OpponentTeamInfo | null,
   ) => {
-    if (!replayData || observations.length === 0) return undefined;
+    if (!replayData || (observations.length === 0 && speedOrders.length === 0)) return undefined;
     const info1 = p1InfoOverride ?? effectiveP1Info;
     const info2 = p2InfoOverride ?? effectiveP2Info;
-    const key = [replayData, observations, teamText, info1, info2, usageStats.stats, setAssumptions.assumptions];
+    const key = [replayData, observations, speedOrders, teamText, info1, info2, usageStats.stats, setAssumptions.assumptions];
     const cached = spreadSolveRef.current;
     if (cached && cached.key.length === key.length && cached.key.every((entry, index) => entry === key[index])) {
       return cached.value;
@@ -314,11 +314,12 @@ function App() {
       p2Info: info2,
       usageStats: usageStats.stats,
       setAssumptions: setAssumptions.assumptions,
+      speedOrders,
     });
     spreadSolveRef.current = { key, value };
     setSolvedSpreads(value);
     return value;
-  }, [replayData, observations, teamText, effectiveP1Info, effectiveP2Info, usageStats.stats, setAssumptions.assumptions]);
+  }, [replayData, observations, speedOrders, teamText, effectiveP1Info, effectiveP2Info, usageStats.stats, setAssumptions.assumptions]);
 
   // Share links must also work in an already-open tab (G17) — listen for
   // hash changes instead of only parsing on the initial load.

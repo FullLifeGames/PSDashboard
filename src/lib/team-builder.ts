@@ -6,7 +6,7 @@ import { getSpeciesSetAssumption, type SmogonSetAssumptions } from './smogon-set
 import { applyCoherenceVetoes, selectCuratedSet, type MoveCandidate } from './set-coherence';
 import { itemSetValue } from './team-info';
 import { evBudget, inferSpreads, legalizeEvs, type SpreadCandidate } from './spread-inference';
-import type { DamageObservation, KnowledgeSource, OpponentTeamInfo, PokemonEvs, RevealedPokemonInfo } from '../types';
+import type { DamageObservation, KnowledgeSource, OpponentTeamInfo, PokemonEvs, RevealedPokemonInfo, SpeedOrderObservation } from '../types';
 
 function toId(name: string): string {
   return name.toLowerCase().replace(/[^a-z0-9]/g, '');
@@ -35,6 +35,8 @@ export function buildTeamsFromReplay(
      * guesses first, then the solver, then a rebuild with the overlay.
      */
     observations?: DamageObservation[];
+    /** Observed same-turn move order — hard speed constraints for the solver. */
+    speedOrders?: SpeedOrderObservation[];
   },
 ): { p1Team: PokemonSet[]; p2Team: PokemonSet[] } {
   const p1Info = options?.p1Info || inferOpponentTeam(log, 'p1');
@@ -68,9 +70,10 @@ export function buildTeamsFromReplay(
   });
 
   let inferred = options?.inferredSpreads;
-  if (!inferred && options?.observations && options.observations.length > 0) {
+  if (!inferred && ((options?.observations?.length ?? 0) > 0 || (options?.speedOrders?.length ?? 0) > 0)) {
     const base = build();
-    inferred = inferSpreads(options.observations, { p1: base.p1Team, p2: base.p2Team }, formatHint);
+    inferred = inferSpreads(options?.observations ?? [], { p1: base.p1Team, p2: base.p2Team },
+      formatHint, options?.speedOrders ?? []);
   }
   return build(inferred);
 }
@@ -85,13 +88,13 @@ export function buildTeamsFromReplay(
 export function solveReplaySpreads(
   log: string,
   observations: DamageObservation[],
-  options?: Omit<Parameters<typeof buildTeamsFromReplay>[1], 'observations' | 'inferredSpreads'>,
+  options?: Omit<NonNullable<Parameters<typeof buildTeamsFromReplay>[1]>, 'observations' | 'inferredSpreads'>,
 ): Map<string, SpreadCandidate> {
-  if (observations.length === 0) return new Map();
+  if (observations.length === 0 && (options?.speedOrders?.length ?? 0) === 0) return new Map();
   const base = buildTeamsFromReplay(log, options);
   const gen = log.match(/^\|gen\|(\d)/m)?.[1] ?? '9';
   const formatHint = /^\|tier\|.*champions/im.test(log) ? `gen${gen}champions` : `gen${gen}`;
-  return inferSpreads(observations, { p1: base.p1Team, p2: base.p2Team }, formatHint);
+  return inferSpreads(observations, { p1: base.p1Team, p2: base.p2Team }, formatHint, options?.speedOrders ?? []);
 }
 
 function buildSet(

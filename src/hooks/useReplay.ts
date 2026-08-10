@@ -1,7 +1,7 @@
 import { useState, useCallback } from 'react';
 import { fetchReplay } from '../lib/replay-fetcher';
 import { parseExportedReplay } from '../lib/replay-file';
-import type { DamageObservation, ReplayData, TurnSnapshot, OpponentTeamInfo } from '../types';
+import type { DamageObservation, ReplayData, SpeedOrderObservation, TurnSnapshot, OpponentTeamInfo } from '../types';
 
 export interface ReplayState {
   loading: boolean;
@@ -10,6 +10,8 @@ export interface ReplayState {
   snapshots: TurnSnapshot[];
   /** Clean damaging hits observed in the protocol — spread inference input. */
   observations: DamageObservation[];
+  /** Proven same-turn move order — hard speed constraints for the solver. */
+  speedOrders: SpeedOrderObservation[];
   p1Info: OpponentTeamInfo | null;
   opponentInfo: OpponentTeamInfo | null;
 }
@@ -27,6 +29,7 @@ export function useReplay() {
     replayData: null,
     snapshots: [],
     observations: [],
+    speedOrders: [],
     p1Info: null,
     opponentInfo: null,
   });
@@ -39,7 +42,7 @@ export function useReplay() {
         import('../lib/protocol-parser'),
         import('../lib/opponent-inferrer'),
       ]);
-      const { snapshots, observations } = parseReplayLogWithObservations(data.log);
+      const { snapshots, observations, speedOrders } = parseReplayLogWithObservations(data.log);
       const p1Info = inferOpponentTeam(data.log, 'p1');
       const opponentInfo = inferOpponentTeam(data.log, 'p2');
 
@@ -49,6 +52,7 @@ export function useReplay() {
         replayData: data,
         snapshots,
         observations,
+        speedOrders,
         p1Info,
         opponentInfo,
       });

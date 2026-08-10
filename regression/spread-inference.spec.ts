@@ -131,3 +131,50 @@ test.describe('damage-consistent spread inference', () => {
     expect(total).toBeLessThanOrEqual(66);
   });
 });
+
+test.describe('speed-order constraints', () => {
+  const speedSet = (species: string, spe: number, item = ''): PokemonSet => ({
+    name: species, species, item, ability: '', moves: ['Protect'],
+    nature: 'Hardy',
+    evs: { hp: 0, atk: 0, def: 0, spa: 252, spd: 4, spe },
+    ivs: { hp: 31, atk: 31, def: 31, spa: 31, spd: 31, spe: 31 },
+    level: 100, gender: '',
+  });
+  const order = { firstSide: 'p1' as const, firstSpecies: 'Noivern', secondSide: 'p2' as const, secondSpecies: 'Iron Valiant', turn: 5 };
+
+  test('a proven move order forces the spread to reproduce it (GPL Noivern)', () => {
+    // Prior: Noivern 0 Spe (base 123 → 282) vs Iron Valiant 252 Spe
+    // (base 116 → 369): the guess contradicts the observed order.
+    const sets = { p1: [speedSet('Noivern', 0)], p2: [speedSet('Iron Valiant', 252)] };
+    const solved = inferSpreads([], sets, 'gen9', [order]);
+    const noivern = solved.get('p1:noivern');
+    expect(noivern).toBeTruthy();
+    // 252+ Speed (Timid 369+ vs 369 — the plus nature breaks the tie… any
+    // rung satisfying ≥ is acceptable; assert the constraint itself:
+    const noivernSpe = new Pokemon(gen, 'Noivern', {
+      level: 100, nature: noivern!.nature, evs: noivern!.evs,
+    }).stats.spe;
+    const valiant = solved.get('p2:ironvaliant');
+    const valiantSpe = new Pokemon(gen, 'Iron Valiant', {
+      level: 100, nature: valiant?.nature ?? 'Hardy', evs: valiant?.evs ?? sets.p2[0].evs,
+    }).stats.spe;
+    expect(noivernSpe).toBeGreaterThanOrEqual(valiantSpe);
+  });
+
+  test('a Scarf on the built set satisfies the order without Speed EVs', () => {
+    const sets = { p1: [speedSet('Noivern', 0, 'Choice Scarf')], p2: [speedSet('Iron Valiant', 252)] };
+    const solved = inferSpreads([], sets, 'gen9', [order]);
+    // 282 × 1.5 = 423 ≥ 369: the prior already reproduces the order — the
+    // solver must not invent Speed investment.
+    expect(solved.get('p1:noivern')!.evs.spe).toBe(0);
+  });
+
+  test('the slower mon can also be the constrained one', () => {
+    // Valiant moved SECOND: its 252 Spe prior would outspeed — drop it.
+    const sets = { p1: [speedSet('Noivern', 0)], p2: [speedSet('Iron Valiant', 252)] };
+    const flipped = { firstSide: 'p1' as const, firstSpecies: 'Noivern', secondSide: 'p2' as const, secondSpecies: 'Iron Valiant', turn: 3 };
+    const solved = inferSpreads([], sets, 'gen9', [flipped]);
+    const valiant = solved.get('p2:ironvaliant');
+    expect(valiant).toBeTruthy();
+  });
+});

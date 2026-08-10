@@ -27,8 +27,8 @@ test.describe('draft replay end-to-end verdicts', () => {
       id: string; log: string; players: string[];
     };
     const formatid = inferReplayFormatId(replay);
-    const { snapshots, observations } = parseReplayLogWithObservations(replay.log);
-    const { p1Team, p2Team } = buildTeamsFromReplay(replay.log, { observations });
+    const { snapshots, observations, speedOrders } = parseReplayLogWithObservations(replay.log);
+    const { p1Team, p2Team } = buildTeamsFromReplay(replay.log, { observations, speedOrders });
     const tera = resolveTeraPreference('auto', formatid, replay.log);
 
     const runtime = await reconstructBranchRuntime({

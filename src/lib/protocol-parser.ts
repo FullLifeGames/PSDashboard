@@ -1,7 +1,7 @@
 import { Battle } from '@pkmn/client';
-import { Generations } from '@pkmn/data';
+import { Generations, type GenerationNum } from '@pkmn/data';
 import { Dex } from '@pkmn/dex';
-import type { DamageObservation, TurnSnapshot, PokemonSnapshot, SideSnapshot, FieldSnapshot } from '../types';
+import type { DamageObservation, SpeedOrderObservation, TurnSnapshot, PokemonSnapshot, SideSnapshot, FieldSnapshot } from '../types';
 import type { Pokemon, Side, Field } from '@pkmn/client';
 
 const gens = new Generations(Dex);
@@ -61,13 +61,34 @@ function hpFractionOf(text: string): number | null {
 export function parseReplayLogWithObservations(log: string): {
   snapshots: TurnSnapshot[];
   observations: DamageObservation[];
+  speedOrders: SpeedOrderObservation[];
 } {
   const battle = new Battle(gens);
   const lines = log.split('\n');
   const snapshots: TurnSnapshot[] = [];
   const observations: DamageObservation[] = [];
+  const speedOrders: SpeedOrderObservation[] = [];
   let currentTurnLines: string[] = [];
   let singles = true;
+  let genNum: GenerationNum = 9;
+  // Speed-order evidence: the first two |move| lines of a singles turn prove
+  // effective speed order — but only when nothing else could explain it.
+  let speedTurn = 0;
+  let turnMovers: { side: 'p1' | 'p2'; species: string; clean: boolean }[] = [];
+  let switchedThisTurn = new Set<string>();
+  const flushSpeedOrder = () => {
+    const [first, second] = turnMovers;
+    if (first && second && first.clean && second.clean &&
+      first.side !== second.side && first.species && second.species) {
+      speedOrders.push({
+        firstSide: first.side, firstSpecies: first.species,
+        secondSide: second.side, secondSpecies: second.species,
+        turn: speedTurn,
+      });
+    }
+    turnMovers = [];
+    switchedThisTurn = new Set();
+  };
   // The pending move context: crits and multi-hits disqualify its damage.
   let lastMove: {
     attacker: string; target: string; moveId: string;
@@ -82,6 +103,9 @@ export function parseReplayLogWithObservations(log: string): {
 
     if (line.startsWith('|gametype|')) {
       singles = line.split('|')[2]?.trim() === 'singles';
+    } else if (line.startsWith('|gen|')) {
+      const parsed = parseInt(line.split('|')[2] ?? '9', 10);
+      if (parsed >= 1 && parsed <= 9) genNum = parsed as GenerationNum;
     } else if (line.startsWith('|move|')) {
       const parts = line.split('|');
       lastMove = parts[2] && parts[4]
@@ -91,6 +115,22 @@ export function parseReplayLogWithObservations(log: string): {
           crit: false, observationIndex: null, damageCount: 0,
         }
         : null;
+      if (singles && parts[2]) {
+        // Read the mover BEFORE battle.add — status/boosts at decision time.
+        type Ident = Parameters<Battle['getPokemon']>[0];
+        const ident = parts[2];
+        const side: 'p1' | 'p2' = ident.startsWith('p1') ? 'p1' : 'p2';
+        const mover = battle.getPokemon(ident as Ident);
+        const moveId = (parts[3] ?? '').toLowerCase().replace(/[^a-z0-9]/g, '');
+        const priority = gens.get(genNum).moves.get(moveId)?.priority ?? 0;
+        const sideObj = side === 'p1' ? battle.p1 : battle.p2;
+        const clean = !!mover && priority === 0 && mover.status !== 'par' &&
+          (mover.boosts.spe ?? 0) === 0 &&
+          !(sideObj.sideConditions as Record<string, unknown>)['tailwind'] &&
+          !(battle.field.pseudoWeather as Record<string, unknown>)['trickroom'] &&
+          !switchedThisTurn.has(ident);
+        turnMovers.push({ side, species: mover?.speciesForme ?? '', clean });
+      }
     } else if (line.startsWith('|-crit|')) {
       if (lastMove) lastMove.crit = true;
     } else if (
@@ -101,6 +141,9 @@ export function parseReplayLogWithObservations(log: string): {
       // self-hit, Future Sight resolution, residuals) belongs to no pending
       // move — attributing it fabricates observations.
       lastMove = null;
+      if (/^\|(?:switch|drag)\|/.test(line)) {
+        switchedThisTurn.add(line.split('|')[2] ?? '');
+      }
     } else if (singles && line.startsWith('|-damage|') && !line.includes('[from]') && lastMove) {
       // Read the defender BEFORE battle.add applies the line — its current
       // client HP is the pre-hit value.
@@ -183,8 +226,11 @@ export function parseReplayLogWithObservations(log: string): {
         log: [...currentTurnLines],
       });
       currentTurnLines = [];
+      flushSpeedOrder();
+      speedTurn = turnNum;
     }
   }
+  flushSpeedOrder();
 
   // Capture final state after last turn (end of battle)
   if (currentTurnLines.length > 0) {
@@ -197,5 +243,5 @@ export function parseReplayLogWithObservations(log: string): {
     });
   }
 
-  return { snapshots, observations };
+  return { snapshots, observations, speedOrders };
 }

@@ -1,6 +1,6 @@
 import { Generations, Pokemon, Move, Field, calculate } from '@smogon/calc';
 import type { PokemonSet } from '@pkmn/sim';
-import type { DamageObservation, PokemonEvs } from '../types';
+import type { DamageObservation, PokemonEvs, SpeedOrderObservation } from '../types';
 import { WEATHER_BY_ID } from './damage-calc';
 
 /**
@@ -24,6 +24,14 @@ export interface SpreadCandidate {
 }
 
 const ZERO_EVS: PokemonEvs = { hp: 0, atk: 0, def: 0, spa: 0, spd: 0, spe: 0 };
+
+/**
+ * A violated move-order constraint outweighs any damage-fit error: the log
+ * PROVED the order, while damage rolls only bound spreads. Rungs violating a
+ * constraint lose to any non-violating rung; if every rung violates
+ * (conflicting evidence), damage fit still decides among them.
+ */
+const SPEED_VIOLATION_PENALTY = 1000;
 
 /** Format-dependent EV legality (Pokémon Champions uses 32/stat, 66 total). */
 export interface EvBudget { perStat: number; total: number }
@@ -107,6 +115,7 @@ function candidateLadder(
   physicalAttacker: boolean,
   hasAttackerObs: boolean,
   hasDefenderObs: boolean,
+  hasSpeedObs: boolean,
   budget: EvBudget,
 ): CandidateRung[] {
   const max = budget.perStat;
@@ -129,10 +138,17 @@ function candidateLadder(
       { evs: { hp: max, def: 0, spd: max }, nature: 'Calm' },
     ]
     : [{}];
+  // Speed rungs exist only under move-order evidence — Speed was never a
+  // solved axis before (priors carried it); the observed order now is.
+  const speedPlus = physicalAttacker ? 'Jolly' : 'Timid';
+  const speed: { evs?: Partial<PokemonEvs>; nature?: string }[] = hasSpeedObs
+    ? [{}, { evs: { spe: 0 } }, { evs: { spe: max } }, { evs: { spe: max }, nature: speedPlus }]
+    : [{}];
 
   const measured = new Set<keyof PokemonEvs>([
     ...(hasAttackerObs ? [offenseStat as keyof PokemonEvs] : []),
     ...(hasDefenderObs ? (['def', 'spd'] as (keyof PokemonEvs)[]) : []),
+    ...(hasSpeedObs ? (['spe'] as (keyof PokemonEvs)[]) : []),
   ]);
   const priorPlus = NATURE_PLUS[toId(prior.nature)];
 
@@ -144,16 +160,18 @@ function candidateLadder(
   }];
   for (const o of offense) {
     for (const b of bulk) {
-      if (o.nature && b.nature) continue;
-      const overrides = { ...b.evs, ...o.evs };
-      const protectedStats = new Set((Object.entries(overrides) as [keyof PokemonEvs, number][])
-        .filter(([, value]) => (value ?? 0) > 0)
-        .map(([stat]) => stat));
-      rungs.push({
-        evs: capToBudget({ ...ZERO_EVS, ...prior.evs, ...overrides }, protectedStats, budget),
-        nature: o.nature ?? b.nature ??
-          (priorPlus && measured.has(priorPlus) ? 'Hardy' : prior.nature),
-      });
+      for (const s of speed) {
+        if ([o.nature, b.nature, s.nature].filter(Boolean).length > 1) continue;
+        const overrides = { ...b.evs, ...s.evs, ...o.evs };
+        const protectedStats = new Set((Object.entries(overrides) as [keyof PokemonEvs, number][])
+          .filter(([, value]) => (value ?? 0) > 0)
+          .map(([stat]) => stat));
+        rungs.push({
+          evs: capToBudget({ ...ZERO_EVS, ...prior.evs, ...overrides }, protectedStats, budget),
+          nature: o.nature ?? b.nature ?? s.nature ??
+            (priorPlus && measured.has(priorPlus) ? 'Hardy' : prior.nature),
+        });
+      }
     }
   }
   return rungs;
@@ -173,6 +191,7 @@ export function inferSpreads(
   observations: DamageObservation[],
   sets: { p1: PokemonSet[]; p2: PokemonSet[] },
   formatid: string,
+  speedOrders: SpeedOrderObservation[] = [],
 ): Map<string, SpreadCandidate> {
   const gen = genOf(formatid);
   const budget = evBudget(formatid);
@@ -192,6 +211,20 @@ export function inferSpreads(
       byMon.set(attackerKey, [...(byMon.get(attackerKey) ?? []), obs]);
       byMon.set(defenderKey, [...(byMon.get(defenderKey) ?? []), obs]);
     }
+  }
+
+  // Observed same-turn move order, indexed per participant. Constraints are
+  // over the BUILT configuration's effective speed (spread × the set's
+  // Scarf), the pair-consistency philosophy: branches must reproduce the
+  // order the replay showed, whatever the true item was.
+  const speedByMon = new Map<string, SpeedOrderObservation[]>();
+  for (const order of speedOrders) {
+    if (!setOf(order.firstSide, order.firstSpecies) || !setOf(order.secondSide, order.secondSpecies)) continue;
+    const firstKey = keyOf(order.firstSide, order.firstSpecies);
+    const secondKey = keyOf(order.secondSide, order.secondSpecies);
+    if (firstKey === secondKey) continue;
+    speedByMon.set(firstKey, [...(speedByMon.get(firstKey) ?? []), order]);
+    speedByMon.set(secondKey, [...(speedByMon.get(secondKey) ?? []), order]);
   }
 
   const spreadFor = (side: 'p1' | 'p2', species: string): SpreadCandidate => {
@@ -251,6 +284,36 @@ export function inferSpreads(
     }
   };
 
+  const effectiveSpeed = (side: 'p1' | 'p2', species: string, spread: SpreadCandidate): number => {
+    const set = setOf(side, species);
+    try {
+      const mon = new Pokemon(gen, set?.species ?? species, {
+        level: set?.level || 100,
+        nature: spread.nature,
+        evs: spread.evs,
+        ivs: set?.ivs,
+      });
+      return mon.stats.spe * (toId(set?.item ?? '') === 'choicescarf' ? 1.5 : 1);
+    } catch {
+      return 0;
+    }
+  };
+
+  const speedError = (key: string, candidate: SpreadCandidate): number => {
+    let violations = 0;
+    for (const order of speedByMon.get(key) ?? []) {
+      const firstKey = keyOf(order.firstSide, order.firstSpecies);
+      const firstSpread = firstKey === key ? candidate : spreadFor(order.firstSide, order.firstSpecies);
+      const secondKey = keyOf(order.secondSide, order.secondSpecies);
+      const secondSpread = secondKey === key ? candidate : spreadFor(order.secondSide, order.secondSpecies);
+      if (effectiveSpeed(order.firstSide, order.firstSpecies, firstSpread) <
+        effectiveSpeed(order.secondSide, order.secondSpecies, secondSpread)) {
+        violations += 1;
+      }
+    }
+    return violations * SPEED_VIOLATION_PENALTY;
+  };
+
   const physicalAttackerFor = (key: string): boolean => {
     const attacking = (byMon.get(key) ?? []).filter(obs => keyOf(obs.attackerSide, obs.attackerSpecies) === key);
     if (attacking.length === 0) {
@@ -288,18 +351,22 @@ export function inferSpreads(
 
   const solveOne = (key: string) => {
     const monObservations = byMon.get(key) ?? [];
-    if (monObservations.length < MIN_OBSERVATIONS) return;
+    const monSpeedOrders = speedByMon.get(key) ?? [];
+    // Speed evidence stands alone: one proven move order is worth solving
+    // for even when no damage line ever measured the mon.
+    if (monObservations.length < MIN_OBSERVATIONS && monSpeedOrders.length === 0) return;
     const hasAttackerObs = monObservations.some(obs => keyOf(obs.attackerSide, obs.attackerSpecies) === key);
     const hasDefenderObs = monObservations.some(obs =>
       keyOf(obs.attackerSide === 'p1' ? 'p2' : 'p1', obs.defenderSpecies) === key);
     const prior = priors.get(key);
     if (!prior) return;
     const physicalAttacker = physicalAttackerFor(key);
-    const ladder = candidateLadder(prior, physicalAttacker, hasAttackerObs, hasDefenderObs, budget);
+    const ladder = candidateLadder(prior, physicalAttacker, hasAttackerObs, hasDefenderObs, monSpeedOrders.length > 0, budget);
     let best: CandidateRung | null = null;
     let bestError = Infinity;
     for (const rung of ladder) {
-      const error = monObservations.reduce((sum, obs) => sum + observationError(obs, key, rung), 0);
+      const error = monObservations.reduce((sum, obs) => sum + observationError(obs, key, rung), 0) +
+        speedError(key, rung);
       if (error < bestError - 1e-12 ||
         (best !== null && Math.abs(error - bestError) <= 1e-12 && priorDistance(key, rung) < priorDistance(key, best))) {
         bestError = error;
@@ -334,8 +401,8 @@ export function inferSpreads(
   // Greedy by observation count, then a refinement pass: the first pass can
   // solve a mon against a still-wrong partner guess; the second re-solves
   // everything against the first pass's answers (deterministic order).
-  const order = [...byMon.keys()].sort((a, b) =>
-    (byMon.get(b)!.length - byMon.get(a)!.length) || a.localeCompare(b));
+  const order = [...new Set([...byMon.keys(), ...speedByMon.keys()])].sort((a, b) =>
+    ((byMon.get(b)?.length ?? 0) - (byMon.get(a)?.length ?? 0)) || a.localeCompare(b));
   for (const key of order) {
     const [side, species] = key.split(':') as ['p1' | 'p2', string];
     priors.set(key, spreadFor(side, species));

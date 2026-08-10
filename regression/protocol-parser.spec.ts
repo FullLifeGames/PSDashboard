@@ -144,3 +144,98 @@ test.describe('damage observations', () => {
     expect(parseReplayLogWithObservations(log).observations).toHaveLength(0);
   });
 });
+
+test.describe('speed-order evidence', () => {
+  const speedLog = (body: string[]) => [
+    '|player|p1|Alice|', '|player|p2|Bob|',
+    '|teamsize|p1|2', '|teamsize|p2|2',
+    '|gen|9', '|gametype|singles', '|tier|[Gen 9] OU',
+    '|start',
+    '|switch|p1a: Fast|Noivern, F|100/100',
+    '|switch|p2a: Val|Iron Valiant|100/100',
+    '|turn|1',
+    ...body,
+  ].join('\n');
+
+  test('a clean same-turn move pair proves the order', () => {
+    const { speedOrders } = parseReplayLogWithObservations(speedLog([
+      '|move|p1a: Fast|Air Slash|p2a: Val',
+      '|move|p2a: Val|Moonblast|p1a: Fast',
+      '|turn|2',
+    ]));
+    expect(speedOrders).toEqual([{
+      firstSide: 'p1', firstSpecies: 'Noivern',
+      secondSide: 'p2', secondSpecies: 'Iron Valiant',
+      turn: 1,
+    }]);
+  });
+
+  test('a priority move explains the order — no constraint', () => {
+    const { speedOrders } = parseReplayLogWithObservations(speedLog([
+      '|move|p2a: Val|Sucker Punch|p1a: Fast',
+      '|move|p1a: Fast|Air Slash|p2a: Val',
+      '|turn|2',
+    ]));
+    expect(speedOrders).toEqual([]);
+  });
+
+  test('Tailwind spans exclude later turns but not the turn it went up', () => {
+    const { speedOrders } = parseReplayLogWithObservations(speedLog([
+      '|move|p1a: Fast|Tailwind|p1a: Fast',
+      '|-sidestart|p1: Alice|move: Tailwind',
+      '|move|p2a: Val|Moonblast|p1a: Fast',
+      '|turn|2',
+      '|move|p1a: Fast|Air Slash|p2a: Val',
+      '|move|p2a: Val|Moonblast|p1a: Fast',
+      '|turn|3',
+    ]));
+    // Turn 1's order predates the Tailwind; turn 2's is explained by it.
+    expect(speedOrders).toHaveLength(1);
+    expect(speedOrders[0].turn).toBe(1);
+  });
+
+  test('paralysis on the first mover voids the evidence', () => {
+    const { speedOrders } = parseReplayLogWithObservations(speedLog([
+      '|move|p1a: Fast|Thunder Wave|p2a: Val',
+      '|-status|p2a: Val|par',
+      '|move|p2a: Val|Moonblast|p1a: Fast',
+      '|turn|2',
+      '|move|p2a: Val|Moonblast|p1a: Fast',
+      '|move|p1a: Fast|Air Slash|p2a: Val',
+      '|turn|3',
+    ]));
+    // Turn 1: Thunder Wave is clean but Val is paralyzed by move time.
+    // Turn 2: the paralyzed Val moving first proves nothing.
+    expect(speedOrders).toEqual([]);
+  });
+
+  test('Trick Room turns prove nothing (and the setup move has priority)', () => {
+    const { speedOrders } = parseReplayLogWithObservations(speedLog([
+      '|move|p1a: Fast|Trick Room|p1a: Fast',
+      '|-fieldstart|move: Trick Room',
+      '|move|p2a: Val|Moonblast|p1a: Fast',
+      '|turn|2',
+      '|move|p2a: Val|Moonblast|p1a: Fast',
+      '|move|p1a: Fast|Air Slash|p2a: Val',
+      '|turn|3',
+    ]));
+    expect(speedOrders).toEqual([]);
+  });
+
+  test('speed stages void the evidence', () => {
+    const { speedOrders } = parseReplayLogWithObservations(speedLog([
+      '|move|p1a: Fast|Dragon Dance|p1a: Fast',
+      '|-boost|p1a: Fast|atk|1',
+      '|-boost|p1a: Fast|spe|1',
+      '|move|p2a: Val|Moonblast|p1a: Fast',
+      '|turn|2',
+      '|move|p1a: Fast|Air Slash|p2a: Val',
+      '|move|p2a: Val|Moonblast|p1a: Fast',
+      '|turn|3',
+    ]));
+    // Turn 1 pair is clean (the boost lands after the move); turn 2's first
+    // mover carries +1 Speed — excluded.
+    expect(speedOrders).toHaveLength(1);
+    expect(speedOrders[0].turn).toBe(1);
+  });
+});

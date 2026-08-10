@@ -27,8 +27,8 @@ test.describe('GPL replay end-to-end verdicts', () => {
     test.setTimeout(240_000);
     const replay = parseExportedReplay(readFileSync('e2e/fixtures/gpl-replay.html', 'utf-8'), 'gpl-replay.html');
     const formatid = inferReplayFormatId(replay);
-    const { snapshots, observations } = parseReplayLogWithObservations(replay.log);
-    const { p1Team, p2Team } = buildTeamsFromReplay(replay.log, { observations });
+    const { snapshots, observations, speedOrders } = parseReplayLogWithObservations(replay.log);
+    const { p1Team, p2Team } = buildTeamsFromReplay(replay.log, { observations, speedOrders });
 
     const clefable = p1Team.find(set => set.species === 'Clefable');
     expect(clefable?.ability).not.toBe('Magic Guard');

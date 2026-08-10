@@ -315,6 +315,21 @@ import { brierScore, fitConstantK } from './fit-helpers';
  *   floor keeps decided positions' structural ties (near-zero trends) out
  *   of the values the pruned sub-search path must mirror.
  *
+ * SET COHERENCE + SPEED-ORDER EVIDENCE 2026-08-10 (no cache bump — teams
+ * flow through the setsFingerprint cache key):
+ * - Coherence layers (pairwise vetoes + curated-set selection, f189745)
+ *   left the sweep BIT-IDENTICAL: corpus games build without usage/set
+ *   data, so their gate is the unit/builder pins plus the app-level e2e.
+ * - SPEED-ORDER CONSTRAINTS (parser move-pair evidence → hard solver
+ *   constraints over the built configuration): 61/68/79/65/83 vs baseline
+ *   59/66/79/64/83 — early +2, mid +2, singles +1, late/doubles level, and
+ *   Brier improves in EVERY phase (0.2520/0.2181/0.1718 vs
+ *   0.2553/0.2187/0.1752). Deterministic substrate: the deltas ARE the
+ *   effect — order-consistent spreads make reconstructed positions more
+ *   predictive. The best d1 run on record. GATE PASSED. (One mid/singles
+ *   sample moved — changed spreads shift a reconstruction path; n 66/79/68,
+ *   singles 165, doubles 48.)
+ *
  * OPEN FINDINGS FOR THE NEXT ROUNDS (2026-08-10):
  * - PIVOT PAIRS (user, 2026-08-10): U-turn/Volt Switch are really pairs —
  *   the move PLUS the incoming Pokémon — and must be enumerated as root
@@ -396,8 +411,8 @@ test.describe('eval calibration against real replays', () => {
       const p1Won = winnerName === replay.players[0];
       const gameType: Sample['gameType'] = /\|gametype\|doubles/.test(replay.log) ? 'doubles' : 'singles';
       // Observations drive spread inference — same path the app takes.
-      const { snapshots, observations } = parseReplayLogWithObservations(replay.log);
-      const { p1Team, p2Team } = buildTeamsFromReplay(replay.log, { observations });
+      const { snapshots, observations, speedOrders } = parseReplayLogWithObservations(replay.log);
+      const { p1Team, p2Team } = buildTeamsFromReplay(replay.log, { observations, speedOrders });
       if (p1Team.length === 0 || p2Team.length === 0) {
         console.log(`skipping ${id}: could not build teams`);
         continue;
