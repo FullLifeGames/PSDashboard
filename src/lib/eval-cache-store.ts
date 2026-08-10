@@ -58,7 +58,9 @@ export interface StoredEval {
 //      their one-ply trend in their VALUES (no re-solve; score untouched).
 // v22: pivot pairs — the root matrix enumerates "U-turn → X" as first-class
 //      choices instead of one greedy row.
-export const EVAL_ENGINE_CACHE_VERSION = 22;
+// v23: pivot pairs reach the ORCHESTRATED path too (the app's worker-pool
+//      results cached under v22 were built from unexpanded root options).
+export const EVAL_ENGINE_CACHE_VERSION = 23;
 
 export function evalStoreKey(
   cacheKey: string,

@@ -690,9 +690,12 @@ export function createLocalExecutor(serializedBattle: string): SearchExecutor {
   return {
     async choices(tera, keepPlayed, sleepClause) {
       const battle = positionBattle(root);
+      // The choices RPC serves the orchestrated ROOT — pivot pairs expand
+      // here exactly as in searchPosition (the sync path), or the app's
+      // worker-pool matrix shows a bare "U-turn" row the sync pins never see.
       return {
-        p1: searchOptions(root, 'p1', { tera, keep: keepPlayed?.p1Slots, sleepClause }),
-        p2: searchOptions(root, 'p2', { tera, keep: keepPlayed?.p2Slots, sleepClause }),
+        p1: expandPivotPairs(root, 'p1', searchOptions(root, 'p1', { tera, keep: keepPlayed?.p1Slots, sleepClause })),
+        p2: expandPivotPairs(root, 'p2', searchOptions(root, 'p2', { tera, keep: keepPlayed?.p2Slots, sleepClause })),
         rootValue: leafValue(battle, matchupCache),
         rootEnded: battle.ended,
       };

@@ -54,6 +54,28 @@ test.describe('search orchestrator', () => {
     }
   });
 
+  test('parity includes pivot pairs — the orchestrated matrix names the follow-ups', async () => {
+    // The app's worker-pool path builds its root options through the choices
+    // RPC; a bare "U-turn" row there while the sync path enumerated pairs was
+    // exactly the user-visible defect (the matrix never showed "U-turn → X").
+    const root = serialize(makeBattle(
+      [
+        makeSet('Mien', 'Mienshao', ['U-turn', 'Close Combat'], 100),
+        makeSet('Clef', 'Clefable', ['Moonblast'], 100),
+        makeSet('Tran', 'Heatran', ['Lava Plume'], 100),
+      ],
+      [makeSet('Bliss', 'Blissey', ['Seismic Toss'], 100)],
+    ));
+    const settings = { depth: 1, samples: 1, tera: false } as const;
+    const sync = searchPosition(root, settings);
+    const orchestrated = await searchOrchestrated(createLocalExecutor(root), settings);
+    expect(orchestrated).toEqual(sync);
+    const labels = orchestrated.matrix?.p1Labels ?? [];
+    expect(labels).toContain('U-turn → Clefable');
+    expect(labels).toContain('U-turn → Heatran');
+    expect(labels).not.toContain('U-turn');
+  });
+
   test('parity holds for a doubles position', async () => {
     const root = serialize((() => {
       const battle = new Battle({
