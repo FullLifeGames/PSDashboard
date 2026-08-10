@@ -1,8 +1,9 @@
 import type { PokemonSet } from '@pkmn/sim';
 import { Dex, Teams } from '@pkmn/sim';
 import { inferOpponentTeam } from './opponent-inferrer';
-import { getSpeciesUsageSet, type SmogonUsageStats, type UsageProbability } from './smogon-stats';
-import { getSpeciesSetAssumption, type SetAssumption, type SmogonSetAssumptions } from './smogon-sets';
+import { getSpeciesUsageSet, type SmogonUsageStats } from './smogon-stats';
+import { getSpeciesSetAssumption, type SmogonSetAssumptions } from './smogon-sets';
+import { applyCoherenceVetoes, selectCuratedSet, type MoveCandidate } from './set-coherence';
 import { itemSetValue } from './team-info';
 import { evBudget, inferSpreads, legalizeEvs, type SpreadCandidate } from './spread-inference';
 import type { DamageObservation, KnowledgeSource, OpponentTeamInfo, PokemonEvs, RevealedPokemonInfo } from '../types';
@@ -10,6 +11,9 @@ import type { DamageObservation, KnowledgeSource, OpponentTeamInfo, PokemonEvs, 
 function toId(name: string): string {
   return name.toLowerCase().replace(/[^a-z0-9]/g, '');
 }
+
+/** Usage-move candidates fetched per species — vetoes refill from the tail. */
+const USAGE_MOVE_POOL = 10;
 
 /**
  * Build PokemonSet arrays for both sides from a replay's protocol log.
@@ -120,7 +124,7 @@ function buildSet(
       infoId === toId(candidate.species.split('-')[0]);
   });
 
-  const usageSet = getSpeciesUsageSet(usageStats, info.species, info.ruledOut);
+  const usageSet = getSpeciesUsageSet(usageStats, info.species, info.ruledOut, USAGE_MOVE_POOL);
   const smogonSet = getSpeciesSetAssumption(setAssumptions, info.species);
   const allowed = (value: string | undefined, ruledOut?: string[]) =>
     value && !(ruledOut ?? []).includes(toId(value)) ? value : '';
@@ -151,21 +155,59 @@ function buildSet(
       gender: (info.gender || userMatch.gender || '') as '' | 'M' | 'F',
     };
   }
-  const usageMoves = mergeUsageMoves(info.moves.map(move => move.name), usageSet?.moves ?? []);
-  const moves = mergeSetMoves(usageMoves, smogonSet?.moves ?? []);
+  // Coherent-set selection: score every published set against the revealed
+  // evidence — a winning curated set fills the unrevealed slots as one
+  // internally coherent unit instead of independent marginals.
+  const curated = smogonSet ? selectCuratedSet([smogonSet, ...(smogonSet.alternatives ?? [])], {
+    revealedMoves: info.moves
+      .filter(move => move.source === 'revealed' || move.source === 'manual')
+      .map(move => toId(move.name)),
+    revealedItem: toId(known(info.item)),
+    revealedAbility: toId(known(info.ability)),
+    ruledOutItems: info.ruledOut?.items ?? [],
+    ruledOutAbilities: info.ruledOut?.abilities ?? [],
+    usageProbability: moveId =>
+      usageSet?.moves.find(move => toId(move.value) === moveId)?.probability ?? 0,
+  }) : null;
+
+  const curatedItem = curated ? allowed(curated.item?.value, info.ruledOut?.items) : '';
+  const item = cleanItem(known(info.item), curatedItem) ||
+    cleanItem(info.item.value, usageSet?.item?.value || allowed(smogonSet?.item?.value, info.ruledOut?.items));
+  // Move assembly: revealed/manual knowledge first (immune to vetoes), then
+  // the winning curated set's moves, then usage fills. Coherence vetoes drop
+  // jointly implausible fills, and the deeper usage pool refills the slots.
+  const pool: MoveCandidate[] = info.moves.map(move => ({
+    name: move.name,
+    guessed: move.source !== 'revealed' && move.source !== 'manual',
+  }));
+  const pooled = new Set(pool.map(candidate => toId(candidate.name)));
+  for (const fill of [
+    ...(curated?.moves ?? []),
+    ...(usageSet?.moves ?? []),
+    ...(curated ? [] : (smogonSet?.moves ?? [])),
+  ]) {
+    if (pooled.has(toId(fill.value))) continue;
+    pooled.add(toId(fill.value));
+    pool.push({ name: fill.value, guessed: true });
+  }
+  const moves = applyCoherenceVetoes(pool, { itemId: toId(item) })
+    .slice(0, 4)
+    .map(candidate => candidate.name);
   const spread = usageSet?.spread;
   const setSpread = smogonSet?.spread;
+  const curatedAbility = curated ? allowed(curated.ability?.value, info.ruledOut?.abilities) : '';
 
   return {
     name: info.species,
     species: info.species,
-    item: cleanItem(info.item.value, usageSet?.item?.value || allowed(smogonSet?.item?.value, info.ruledOut?.items)),
-    ability: info.ability.value || usageSet?.ability?.value || allowed(smogonSet?.ability?.value, info.ruledOut?.abilities) ||
+    item,
+    ability: known(info.ability) || curatedAbility || info.ability.value ||
+      usageSet?.ability?.value || allowed(smogonSet?.ability?.value, info.ruledOut?.abilities) ||
       defaultAbility(info.species, info.ruledOut?.abilities),
     moves: moves.length > 0 ? moves : ['Tackle'],
     // Damage-consistent spreads beat usage guesses, never edited/revealed EVs.
-    nature: (editedNature || inferred?.nature || spread?.nature || setSpread?.nature || 'Hardy') as PokemonSet['nature'],
-    evs: editedEvs || inferred?.evs || spread?.evs || setSpread?.evs || defaultEvsFor(info.species),
+    nature: (editedNature || inferred?.nature || curated?.spread?.nature || spread?.nature || setSpread?.nature || 'Hardy') as PokemonSet['nature'],
+    evs: editedEvs || inferred?.evs || curated?.spread?.evs || spread?.evs || setSpread?.evs || defaultEvsFor(info.species),
     ivs: editedIvs || { hp: 31, atk: 31, def: 31, spa: 31, spd: 31, spe: 31 },
     level: info.level || 100,
     gender: (info.gender || '') as '' | 'M' | 'F',
@@ -240,28 +282,6 @@ function mergeMoveLists(fill: string[], primary: string[]): string[] {
       if (result.length < 4) {
         result.push(move);
       }
-    }
-  }
-  return result.slice(0, 4);
-}
-
-function mergeUsageMoves(observed: string[], usageMoves: UsageProbability[]): string[] {
-  const result = [...observed];
-  for (const move of usageMoves) {
-    if (result.length >= 4) break;
-    if (!result.some(existing => toId(existing) === toId(move.value))) {
-      result.push(move.value);
-    }
-  }
-  return result.slice(0, 4);
-}
-
-function mergeSetMoves(observed: string[], setMoves: SetAssumption[]): string[] {
-  const result = [...observed];
-  for (const move of setMoves) {
-    if (result.length >= 4) break;
-    if (!result.some(existing => toId(existing) === toId(move.value))) {
-      result.push(move.value);
     }
   }
   return result.slice(0, 4);

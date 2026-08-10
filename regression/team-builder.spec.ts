@@ -32,6 +32,8 @@ import { createBranchState, reconstructBranchRuntime } from '../src/lib/branch-e
 import { inferOpponentTeam } from '../src/lib/opponent-inferrer';
 import { parseExportedReplay } from '../src/lib/replay-file';
 import { parseReplayLogWithObservations } from '../src/lib/protocol-parser';
+import type { SmogonUsageStats } from '../src/lib/smogon-stats';
+import type { SmogonSetAssumptions } from '../src/lib/smogon-sets';
 import type { OpponentTeamInfo } from '../src/types';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -189,6 +191,110 @@ test.describe('team builder edited assumptions', () => {
     const uxieBulk = (uxie!.evs.hp ?? 0) + (uxie!.evs.def ?? 0);
     // At least one side of the U-turn pair moved to explain the observed 31%.
     expect(landoAtk === 0 || uxieBulk > 252).toBe(true);
+  });
+
+  test('coherence vetoes drop a boost-contradicting usage fill and refill from the pool', () => {
+    // GPL finding: SD Cobalion assembled with Body Press — marginally popular,
+    // jointly incoherent. The veto drops it and the NEXT usage move fills in.
+    const p1Info = {
+      pokemon: [{
+        species: 'Cobalion',
+        moves: [{ name: 'Swords Dance', source: 'revealed' }],
+        ability: { value: '', source: 'unknown' },
+        item: { value: '', source: 'unknown' },
+        teraType: { value: '', source: 'unknown' },
+        level: 100,
+        gender: '',
+      }],
+    } as OpponentTeamInfo;
+    const usageStats = {
+      format: 'gen9ou', month: '2026-07', source: 'test',
+      pokemon: {
+        cobalion: {
+          species: 'Cobalion', rawCount: 100,
+          abilities: [{ value: 'Justified', probability: 1, sourceDetail: 't' }],
+          items: [{ value: 'Leftovers', probability: 0.5, sourceDetail: 't' }],
+          moves: [
+            { value: 'Iron Head', probability: 0.8, sourceDetail: 't' },
+            { value: 'Body Press', probability: 0.7, sourceDetail: 't' },
+            { value: 'Stone Edge', probability: 0.5, sourceDetail: 't' },
+            { value: 'Close Combat', probability: 0.4, sourceDetail: 't' },
+          ],
+          spreads: [],
+        },
+      },
+    } as unknown as SmogonUsageStats;
+
+    const { p1Team } = buildTeamsFromReplay(baseLog, { p1Info, usageStats });
+
+    expect(p1Team[0].moves).toEqual(['Swords Dance', 'Iron Head', 'Stone Edge', 'Close Combat']);
+  });
+
+  test('a revealed move selects the coherent curated set and fills from it', () => {
+    const p1Info = {
+      pokemon: [{
+        species: 'Noivern',
+        moves: [{ name: 'Super Fang', source: 'revealed' }],
+        ability: { value: '', source: 'unknown' },
+        item: { value: '', source: 'unknown' },
+        teraType: { value: '', source: 'unknown' },
+        level: 100,
+        gender: '',
+      }],
+    } as OpponentTeamInfo;
+    const setAssumptions = {
+      format: 'gen9ou', source: 'test',
+      pokemon: {
+        noivern: {
+          species: 'Noivern', sourceDetail: 't',
+          item: { value: 'Choice Specs', sourceDetail: 't' },
+          moves: ['Draco Meteor', 'Hurricane', 'Flamethrower', 'U-turn'].map(value => ({ value, sourceDetail: 't' })),
+          alternatives: [{
+            species: 'Noivern', sourceDetail: 't',
+            item: { value: 'Heavy-Duty Boots', sourceDetail: 't' },
+            moves: ['Super Fang', 'Taunt', 'Roost', 'Hurricane'].map(value => ({ value, sourceDetail: 't' })),
+          }],
+        },
+      },
+    } as unknown as SmogonSetAssumptions;
+
+    const { p1Team } = buildTeamsFromReplay(baseLog, { p1Info, setAssumptions });
+
+    // The revealed Super Fang contradicts the Specs set — the Boots set wins
+    // and fills item + unrevealed moves as one coherent unit.
+    expect(p1Team[0].moves).toEqual(['Super Fang', 'Taunt', 'Roost', 'Hurricane']);
+    expect(p1Team[0].item).toBe('Heavy-Duty Boots');
+  });
+
+  test('revealed moves contradicting every curated set fall back to marginal assembly', () => {
+    const p1Info = {
+      pokemon: [{
+        species: 'Noivern',
+        moves: [{ name: 'Boomburst', source: 'revealed' }, { name: 'Shadow Ball', source: 'revealed' }],
+        ability: { value: '', source: 'unknown' },
+        item: { value: '', source: 'unknown' },
+        teraType: { value: '', source: 'unknown' },
+        level: 100,
+        gender: '',
+      }],
+    } as OpponentTeamInfo;
+    const setAssumptions = {
+      format: 'gen9ou', source: 'test',
+      pokemon: {
+        noivern: {
+          species: 'Noivern', sourceDetail: 't',
+          item: { value: 'Choice Specs', sourceDetail: 't' },
+          moves: ['Draco Meteor', 'Hurricane', 'Flamethrower', 'U-turn'].map(value => ({ value, sourceDetail: 't' })),
+        },
+      },
+    } as unknown as SmogonSetAssumptions;
+
+    const { p1Team } = buildTeamsFromReplay(baseLog, { p1Info, setAssumptions });
+
+    // Below the floor: the set is not adopted as a unit — revealed moves lead
+    // and its moves serve only as ordinary marginal fills (today's assembly),
+    // exactly the pre-selection behavior.
+    expect(p1Team[0].moves).toEqual(['Boomburst', 'Shadow Ball', 'Draco Meteor', 'Hurricane']);
   });
 
   test('manual nature and IVs reach the simulator set', () => {

@@ -20,6 +20,12 @@ export interface PokemonSetAssumption {
   item?: SetAssumption;
   moves: SetAssumption[];
   spread?: SetSpreadAssumption;
+  /**
+   * The species' OTHER published sets (this entry is the first). Coherent-set
+   * selection scores all of them against revealed evidence — curated sets are
+   * internally coherent by construction, unlike marginal assembly.
+   */
+  alternatives?: PokemonSetAssumption[];
 }
 
 export interface SmogonSetAssumptions {
@@ -125,7 +131,11 @@ export async function fetchSmogonSetAssumptions(params: {
         const sets = await smogon.sets(gen, name, format as ID);
         const first = sets[0];
         if (!first) return;
-        pokemon[toId(name)] = normalizeSet(name, first as AssumptionSet, detail);
+        const entry = normalizeSet(name, first as AssumptionSet, detail);
+        const alternatives = sets.slice(1, 8)
+          .map(set => normalizeSet(name, set as AssumptionSet, detail));
+        if (alternatives.length > 0) entry.alternatives = alternatives;
+        pokemon[toId(name)] = entry;
       } catch {
         // A missing Smogon set should never block replay loading.
       }

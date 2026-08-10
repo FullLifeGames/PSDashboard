@@ -372,6 +372,8 @@ export function getSpeciesUsageSet(
   usageStats: SmogonUsageStats | null | undefined,
   species: string,
   ruledOut?: { abilities?: string[]; items?: string[] },
+  /** Usage-move candidates to expose (coherence vetoes refill from the tail). */
+  moveCount = 4,
 ): SpeciesUsageSet | null {
   const stats = getSpeciesUsageStats(species, usageStats);
   if (!stats || !usageStats) return null;
@@ -384,7 +386,7 @@ export function getSpeciesUsageSet(
   return {
     ability: firstAllowed(stats.abilities, ruledOut?.abilities),
     item: firstAllowed(stats.items, ruledOut?.items),
-    moves: stats.moves.slice(0, 4),
+    moves: stats.moves.slice(0, moveCount),
     spread: stats.spreads[0],
     sourceDetail: sourceDetail(usageStats.format, usageStats.month),
   };
