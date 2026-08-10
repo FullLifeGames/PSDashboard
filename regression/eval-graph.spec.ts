@@ -1,4 +1,22 @@
 import { test, expect } from '@playwright/test';
+import { needsSettingsUpgrade } from '../src/hooks/useEvaluation';
+
+test.describe('settings upgrade decision (merged flow)', () => {
+  const prefs = { depth: 2, samples: 3, mode: 'matrix', auto: false, tera: 'auto' } as const;
+  test('shallower stored settings upgrade; deeper never downgrade', () => {
+    expect(needsSettingsUpgrade(null, prefs)).toBe(true);
+    expect(needsSettingsUpgrade({ depth: 1, samples: 1, mode: 'matrix' }, prefs)).toBe(true);
+    expect(needsSettingsUpgrade({ depth: 2, samples: 1, mode: 'matrix' }, prefs)).toBe(true);
+    expect(needsSettingsUpgrade({ depth: 2, samples: 3, mode: 'matrix' }, prefs)).toBe(false);
+    // Deeper/heavier stored results stay shown under lighter prefs.
+    expect(needsSettingsUpgrade({ depth: 2, samples: 5, mode: 'matrix' }, prefs)).toBe(false);
+    expect(needsSettingsUpgrade({ depth: 2, samples: 3, mode: 'matrix' }, { ...prefs, depth: 1, samples: 1 })).toBe(false);
+    // Engine-mode mismatch always re-runs — the fast pass is matrix even
+    // for MCTS users, so their selected turns must still get MCTS.
+    expect(needsSettingsUpgrade({ depth: 1, samples: 1, mode: 'matrix' }, { ...prefs, mode: 'mcts' })).toBe(true);
+    expect(needsSettingsUpgrade({ depth: 2, samples: 1, mode: 'mcts' }, { ...prefs, mode: 'mcts' })).toBe(false);
+  });
+});
 import { computeBlunders, selectKeyTurns, BLUNDER_SWING } from '../src/lib/eval/graph';
 
 test.describe('eval graph blunder detection', () => {

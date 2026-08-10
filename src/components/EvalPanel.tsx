@@ -1,7 +1,7 @@
 import type { EvalPreferences, EvalResult, RankedChoice, ReadRecommendation, SearchProgress } from '../lib/eval/types';
 import type { TurnAnalysis } from '../lib/eval/analysis';
 import type { GameReport } from '../lib/eval/report';
-import type { EvalGraphState, EvalStatus } from '../hooks/useEvaluation';
+import type { EvalGraphState, EvalStatus, TurnEvalSettings } from '../hooks/useEvaluation';
 import { EvalGameReport } from './EvalGameReport';
 import { EvalGraph } from './EvalGraph';
 import { EvalLeadAnalysis, EvalTurnAnalysis, MiniBar } from './EvalTurnAnalysis';
@@ -25,6 +25,10 @@ interface EvalPanelProps {
   onPickChoice?: (side: 'p1' | 'p2', choice: RankedChoice, reply?: RankedChoice | null) => void;
   /** Click on a matrix cell: plays EXACTLY that pair out in a branch. */
   onPickPair?: (p1: { choice: string; label: string }, p2: { choice: string; label: string }) => void;
+  /** Replay view: the settings that produced the shown result (fast scan vs configured). */
+  resultSettings?: TurnEvalSettings | null;
+  /** The shown result is a sketch — the auto-upgrade to the configured settings is pending/running. */
+  deepening?: boolean;
   /** Branch mode: hides the auto checkbox on the replay view. */
   showAuto: boolean;
   /** Gen 9 only — other gens have no Tera to gate. */
@@ -116,7 +120,7 @@ export function EvalPanel({
   playerNames, status, result, progress, reconstructProgress, error,
   prefs, onPrefsChange, onEvaluate, onCancel, onPickChoice, onPickPair, showAuto, showTera,
   graph, onAnalyzeGame, onSelectTurn, currentTurn, analysis,
-  reads, leadAnalysis, reportLeads, report, doubles,
+  reads, leadAnalysis, reportLeads, report, doubles, resultSettings, deepening,
 }: EvalPanelProps) {
   const running = status === 'searching' || status === 'reconstructing';
   const hasGraph = graph.scores.some(score => score !== null);
@@ -291,7 +295,21 @@ export function EvalPanel({
             <div className="ps-eval-bar-tick" />
           </div>
           <div style={{ display: 'flex', gap: 8, alignItems: 'baseline', fontSize: 10, color: '#778', marginTop: 2 }}>
-            <span>depth {result.depthCompleted}</span>
+            <span title="What produced the numbers shown for this turn.">
+              {resultSettings
+                ? (resultSettings.mode === 'mcts'
+                  ? 'MCTS'
+                  : `depth ${resultSettings.depth} · ${resultSettings.samples} sample${resultSettings.samples > 1 ? 's' : ''}`)
+                : `depth ${result.depthCompleted}`}
+            </span>
+            {deepening && (
+              <span
+                style={{ color: '#fd6' }}
+                title="The shown numbers are the fast scan's sketch — this turn is re-running at your configured settings and will update in place."
+              >
+                deepening to {prefs.mode === 'mcts' ? 'MCTS' : `depth ${prefs.depth}`}…
+              </span>
+            )}
             {result.interval > 0.25 && (
               <span style={{ color: '#b6a46a' }} title="No safe line exists — the outcome hinges on out-predicting the opponent.">
                 toss-up: prediction battle

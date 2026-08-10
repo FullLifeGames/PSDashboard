@@ -16,7 +16,7 @@ import { applyTeamSheetToInfo } from './lib/team-sheets';
 import { TeamEditor } from './components/TeamEditor';
 import { SetsImportExportPanel } from './components/SetsImportExportPanel';
 import { EvalPanel } from './components/EvalPanel';
-import { useEvaluation } from './hooks/useEvaluation';
+import { needsSettingsUpgrade, useEvaluation } from './hooks/useEvaluation';
 import { buildSetsExport, parseSetsImport } from './lib/sets-io';
 import { parseTeamText } from './lib/team-parser';
 import { applyInferredSpreads, enrichTeamInfo, manualMove } from './lib/team-info';
@@ -808,21 +808,20 @@ function App() {
     if (analysisTurn === null || analysisTurn < 1) return;
     if (evaluation.graph.running) return;
     if (!evaluation.graph.scores.some(score => score !== null)) return;
-    // A fast-pass (depth 1) result is a sketch: selecting the turn UPGRADES
-    // it to the configured settings — the old "Analyze turn" button's depth
-    // escalation, now automatic. MCTS results have no comparable depth
-    // number; any cached result counts there.
-    const cached = evaluation.graph.results[analysisTurn - 1];
-    const wantDepth = evaluation.prefs.mode === 'mcts' ? null : evaluation.prefs.depth;
-    if (cached && (wantDepth === null || cached.depthCompleted >= wantDepth)) return;
-    const key = `${replayData.id}:${analysisTurn}:${setsFingerprint}:d${wantDepth ?? 'mcts'}`;
+    // A fast-pass result is a sketch: selecting the turn UPGRADES it to the
+    // configured settings (the old "Analyze turn" button's escalation, now
+    // automatic). The per-turn settings record decides — depth, samples,
+    // and engine mode all count; deeper stored results never downgrade.
+    if (!needsSettingsUpgrade(evaluation.graph.settings[analysisTurn - 1] ?? null, evaluation.prefs)) return;
+    const prefsKey = `${evaluation.prefs.mode}:${evaluation.prefs.depth}:${evaluation.prefs.samples}`;
+    const key = `${replayData.id}:${analysisTurn}:${setsFingerprint}:${prefsKey}`;
     if (autoAnalyzeAttemptedRef.current.has(key)) return;
     const timer = setTimeout(() => {
       autoAnalyzeAttemptedRef.current.add(key);
       analyzeTurnNow(analysisTurn);
     }, 400);
     return () => clearTimeout(timer);
-  }, [branching, replayData, analysisTurn, evaluation.graph.running, evaluation.graph.scores, evaluation.graph.results, evaluation.prefs.mode, evaluation.prefs.depth, setsFingerprint, analyzeTurnNow]);
+  }, [branching, replayData, analysisTurn, evaluation.graph.running, evaluation.graph.scores, evaluation.graph.settings, evaluation.prefs, setsFingerprint, analyzeTurnNow]);
 
   // Any position change invalidates a displayed result.
   const { markStale: markEvalStale, reset: resetEval, clearGraph } = evaluation;
@@ -974,8 +973,20 @@ function App() {
     void loadReplay(replayId);
   }, [clearSharedBranch, loadReplay]);
 
+  // Programmatic seeks (graph clicks) race the embed's turn echoes: while
+  // the iframe is still seeking it keeps reporting the OLD turn, which
+  // would knock the fresh selection straight back (the analysis flipped
+  // to the previous turn under load). Stale echoes are ignored until the
+  // embed confirms the seek or the window lapses.
+  const seekIntentRef = useRef<{ turn: number; until: number } | null>(null);
+
   const handleReplayTurn = useCallback((turn: number) => {
     if (branching || turn < 1) return;
+    const intent = seekIntentRef.current;
+    if (intent && Date.now() < intent.until) {
+      if (turn !== intent.turn) return;
+      seekIntentRef.current = null;
+    }
     setBranchTurn(current => {
       // The embed can only report real turns; when the end position is
       // selected its echo (last turn) must not knock the slider back (B12).
@@ -988,9 +999,14 @@ function App() {
 
   const handleGraphSelect = useCallback((turn: number) => {
     // Turn 0 (team preview) has no replay position — only the analysis opens.
-    if (turn >= 1) handleReplayTurn(turn);
+    if (turn >= 1) {
+      seekIntentRef.current = { turn, until: Date.now() + 4000 };
+      // Direct, not via handleReplayTurn: an explicit selection beats the
+      // echo guards (which exist to protect against the embed, not the user).
+      setBranchTurn(turn);
+    }
     setAnalysisTurn(turn);
-  }, [handleReplayTurn]);
+  }, [setBranchTurn]);
 
   // The analysis follows the replay position — selecting a turn (slider,
   // graph click, stepping) IS the analysis request; there is no separate
@@ -1065,6 +1081,15 @@ function App() {
     if (analysisTurn !== null && analysisTurn >= 1) return evaluation.graph.results[analysisTurn - 1] ?? null;
     return null;
   }, [branching, evaluation.result, evaluation.graph, analysisTurn]);
+
+  // What produced the shown result, and whether the auto-upgrade to the
+  // configured settings is still owed — the panel says so instead of
+  // silently swapping numbers.
+  const analyzedSettings = !branching && analysisTurn !== null && analysisTurn >= 1
+    ? evaluation.graph.settings[analysisTurn - 1] ?? null
+    : null;
+  const analyzedDeepening = !branching && analyzedResult !== null && analyzedSettings !== null
+    && needsSettingsUpgrade(analyzedSettings, evaluation.prefs);
 
   const replayWinner = useMemo<'p1' | 'p2' | null>(() => {
     if (!replayData) return null;
@@ -1408,6 +1433,8 @@ function App() {
                 playerNames={[replayData.players[0], replayData.players[1]]}
                 status={branching ? evaluation.status : 'idle'}
                 result={analyzedResult}
+                resultSettings={analyzedSettings}
+                deepening={analyzedDeepening}
                 progress={evaluation.progress}
                 reconstructProgress={evaluation.reconstructProgress}
                 error={evaluation.error}

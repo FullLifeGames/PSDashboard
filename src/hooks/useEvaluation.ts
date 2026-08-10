@@ -105,11 +105,32 @@ export interface GraphSweepParams {
   sensitivityTargetsFor?(side: 'p1' | 'p2'): SensitivityTarget[];
 }
 
+/** The engine settings that produced a stored per-turn result. */
+export interface TurnEvalSettings {
+  depth: EvalSettings['depth'];
+  samples: EvalSettings['samples'];
+  mode: EvalPreferences['mode'];
+}
+
+/**
+ * The stored result is SHALLOWER than the panel preferences — selecting the
+ * turn should re-run it at full settings. Deeper/heavier stored results
+ * never downgrade (a depth-2 result stays shown under depth-1 prefs).
+ */
+export function needsSettingsUpgrade(stored: TurnEvalSettings | null, prefs: EvalPreferences): boolean {
+  if (!stored) return true;
+  if (stored.mode !== prefs.mode) return true;
+  if (prefs.mode === 'mcts') return false;
+  return stored.depth < prefs.depth || stored.samples < prefs.samples;
+}
+
 export interface EvalGraphState {
   /** scores[t-1] = score at turn t; null = not evaluated (gap). */
   scores: (number | null)[];
   /** Full per-turn results for the analysis view. */
   results: (EvalResult | null)[];
+  /** What produced each result (fast scan vs configured settings). */
+  settings: (TurnEvalSettings | null)[];
   played: (PlayedTurn | null)[];
   playedOutcome: (number | null)[];
   /** Depth+1 verification of flagged misplays (null = nothing flagged / not run). */
@@ -130,14 +151,14 @@ export function useEvaluation() {
   const [error, setError] = useState<string | null>(null);
   const [reconstructProgress, setReconstructProgress] = useState<{ turn: number; target: number } | null>(null);
   const [graph, setGraph] = useState<EvalGraphState>({
-    scores: [], results: [], played: [], playedOutcome: [], verified: [], sensitivity: [], lead: null,
+    scores: [], results: [], settings: [], played: [], playedOutcome: [], verified: [], sensitivity: [], lead: null,
     running: false, progress: null,
   });
 
   const clientRef = useRef<EvalWorkerClient | null>(null);
   const cacheRef = useRef(new Map<string, CachedEval>());
   /** Latest graph arrays, so partial (range) sweeps merge instead of wiping. */
-  const graphDataRef = useRef<Pick<EvalGraphState, 'scores' | 'results' | 'played' | 'playedOutcome' | 'verified' | 'sensitivity' | 'lead'> | null>(null);
+  const graphDataRef = useRef<Pick<EvalGraphState, 'scores' | 'results' | 'settings' | 'played' | 'playedOutcome' | 'verified' | 'sensitivity' | 'lead'> | null>(null);
   const runRef = useRef(0);
   const prefsRef = useRef(prefs);
   prefsRef.current = prefs;
@@ -280,6 +301,9 @@ export function useEvaluation() {
     const keepPrevious = previous !== null && previous.scores.length === params.turns;
     const scores: (number | null)[] = keepPrevious ? [...previous.scores] : new Array(params.turns).fill(null);
     const results: (EvalResult | null)[] = keepPrevious ? [...previous.results] : new Array(params.turns).fill(null);
+    const turnSettings: (TurnEvalSettings | null)[] = keepPrevious && previous.settings?.length === params.turns
+      ? [...previous.settings]
+      : new Array(params.turns).fill(null);
     const played: (PlayedTurn | null)[] = keepPrevious ? [...previous.played] : new Array(params.turns).fill(null);
     const playedOutcome: (number | null)[] = keepPrevious ? [...previous.playedOutcome] : new Array(params.turns).fill(null);
     const verified: (TurnVerification | null)[] = keepPrevious && previous.verified.length === params.turns
@@ -291,7 +315,7 @@ export function useEvaluation() {
     let lead: LeadEvalData | null = keepPrevious ? previous.lead : null;
     const snapshot = () => {
       const data = {
-        scores: [...scores], results: [...results], played: [...played],
+        scores: [...scores], results: [...results], settings: [...turnSettings], played: [...played],
         playedOutcome: [...playedOutcome], verified: [...verified], sensitivity: [...sensitivity], lead,
       };
       graphDataRef.current = data;
@@ -482,6 +506,7 @@ export function useEvaluation() {
         if (hit) {
           scores[turn - 1] = hit.result.score;
           results[turn - 1] = hit.result;
+          turnSettings[turn - 1] = { depth, samples, mode };
           // Entries written by single evaluations never computed the
           // played-pair expectation (undefined ≠ null = tried, unmatched) —
           // fill it in so the analysis gets its decision/chance split.
@@ -557,6 +582,7 @@ export function useEvaluation() {
             if (runRef.current !== runId) return false;
             scores[turn - 1] = result.score;
             results[turn - 1] = result;
+            turnSettings[turn - 1] = { depth, samples, mode };
 
             // The engine's expectation of the real choices — the decision
             // part of the coming swing (chance is the rest).
@@ -686,7 +712,7 @@ export function useEvaluation() {
 
   const clearGraph = useCallback(() => {
     graphDataRef.current = null;
-    setGraph({ scores: [], results: [], played: [], playedOutcome: [], verified: [], sensitivity: [], lead: null, running: false, progress: null });
+    setGraph({ scores: [], results: [], settings: [], played: [], playedOutcome: [], verified: [], sensitivity: [], lead: null, running: false, progress: null });
   }, []);
 
   return {
