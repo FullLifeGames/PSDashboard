@@ -697,14 +697,21 @@ export function useEvaluation() {
       const fastSettings: EvalSettings = { depth: 1, samples: 1, mode: 'matrix', tera: params.tera, sleepClause: params.sleepClause };
       const isFast = depth === 1 && samples === 1 && mode !== 'mcts';
 
-      // Two-pass sweep: a fast depth-1 pass shapes the whole graph first,
-      // then the configured settings deepen only the turns around the big
-      // swings (both sides of each — analysis compares across them). Short
-      // ranges (on-demand turn analysis) go straight to full settings.
+      // Three-pass sweep: a fast depth-1 pass shapes the whole graph in
+      // seconds, the configured settings then deepen the report-worthy
+      // swings (both sides of each — analysis compares across them), and
+      // finally EVERY remaining turn converges to the configured settings
+      // too — the settings ARE the line, the fast pass is only the sketch
+      // ("I cannot configure anything for the graph line", GPL). Badges
+      // track the convergence; the monotone merge makes each pass safe.
+      // Short ranges (on-demand turn analysis) go straight to full settings.
       if (rangeTurns.length > 2 && !isFast) {
         if (!(await sweepTurns(rangeTurns, fastSettings, false))) return;
         const keyTurns = selectKeyTurns(scores).filter(turn => turn >= from && turn <= to);
         if (keyTurns.length > 0 && !(await sweepTurns(keyTurns, fullSettings, true))) return;
+        const keySet = new Set(keyTurns);
+        const rest = rangeTurns.filter(turn => !keySet.has(turn));
+        if (rest.length > 0 && !(await sweepTurns(rest, fullSettings, true))) return;
       } else if (!(await sweepTurns(rangeTurns, fullSettings, true))) {
         return;
       }

@@ -307,9 +307,9 @@ export function EvalPanel({
           </div>
           <div
             style={{ fontSize: 10, color: '#778', marginTop: 2 }}
-            title="Analyze game paints the whole line with a fast depth-1 scan first, then re-evaluates every report-worthy swing with the settings above. Any turn can go deeper from its view (Think deeper); Tera applies everywhere."
+            title="Analyze game paints the whole line with a fast depth-1 scan first, then converges every turn to the settings above — report-worthy swings first. Any turn can go deeper still from its view (Think deeper); Tera applies everywhere."
           >
-            line: fast scan · report-worthy swings: {prefs.mode === 'mcts' ? 'MCTS' : `depth ${prefs.depth}`} · deeper: per turn
+            line: fast scan, then {prefs.mode === 'mcts' ? 'MCTS' : `depth ${prefs.depth}`} everywhere · deeper: per turn
           </div>
           {hasGraph && (
             <EvalGraph

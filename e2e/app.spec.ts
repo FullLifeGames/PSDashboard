@@ -475,10 +475,14 @@ test.describe('PS Dashboard', () => {
     await expect(panel.locator('.ps-eval-graph')).toBeVisible({ timeout: 180_000 });
     await expect(panel.locator('button', { hasText: 'Re-analyze' })).toBeVisible({ timeout: 120_000 });
 
-    // The analysis pipeline works on visit-ranked MCTS results too.
+    // The analysis pipeline works on visit-ranked MCTS results too — and
+    // the convergence pass brings EVERY turn to the configured engine, not
+    // just the report-worthy swings ("I cannot configure anything for the
+    // graph line").
     await panel.locator('.ps-eval-graph rect[data-turn="1"]').click();
     await expect(panel.locator('.ps-eval-analysis')).toBeVisible();
     await expect(panel.locator('.ps-eval-analysis')).toContainText('played');
+    await expect(panel.getByTitle('What produced the numbers shown for this turn.')).toHaveText('MCTS');
   });
 
   test('branch mode: clicking a recommendation plays the turn out', async ({ page }) => {
