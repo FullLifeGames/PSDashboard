@@ -249,6 +249,11 @@ import { brierScore, fitConstantK } from './fit-helpers';
  *   threat as catastrophic even when the endgame is already won without it.
  *   Deliberate-endgame-sack pricing is an eval-quality item; probe the T35
  *   cells during the re-baseline round.
+ * - PIVOT PAIRS (user, 2026-08-10): U-turn/Volt Switch are really pairs —
+ *   the move PLUS the incoming Pokémon — and must be enumerated as root
+ *   choices ("U-turn → Clefable") to compare fairly against single actions
+ *   (today's greedy mid-turn resolution hides the follow-up decision; GPL
+ *   T25). Spec: docs/superpowers/specs/2026-08-10-pivot-pairs-design.md.
  * - MEASUREMENT SUBSTRATE CHANGED: reconstructions are seeded since
  *   af2b276 (they were run-varying before — part of the historical ±3
  *   wiggle). Every number above was measured on the unseeded substrate; the
