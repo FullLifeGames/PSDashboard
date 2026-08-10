@@ -1,5 +1,6 @@
 import type { GameReport } from '../lib/eval/report';
 import type { LeadAnalysis } from '../lib/eval/leads';
+import { winDeltaText } from '../lib/eval/winprob';
 import { attributionBadge } from './eval-badges';
 
 interface EvalGameReportProps {
@@ -10,7 +11,7 @@ interface EvalGameReportProps {
   leads?: LeadAnalysis | null;
 }
 
-const signed = (value: number) => `${value >= 0 ? '+' : ''}${value.toFixed(2)}`;
+// Deltas render as win-probability points ("−12%") — see winDeltaText.
 
 /** Game-level story from a completed sweep: the tip, the seeds, the key moments. */
 export function EvalGameReport({ report, playerNames, onSelectTurn, leads }: EvalGameReportProps) {
@@ -52,7 +53,7 @@ export function EvalGameReport({ report, playerNames, onSelectTurn, leads }: Eva
                 <span style={{ color: tone }}>{playerNames[side === 'p1' ? 0 : 1]}</span>
                 <span style={{ color: '#aab' }}>led {lead.played ? strip(lead.played.label) : '?'}</span>
                 <span style={{ color: '#778' }}>better: {lead.best ? strip(lead.best.label) : '?'}</span>
-                <span style={{ color: tone }}>−{(lead.regret ?? 0).toFixed(2)}</span>
+                <span style={{ color: tone }}>{winDeltaText(-(lead.regret ?? 0))}</span>
               </button>
             );
           })}
@@ -88,7 +89,7 @@ export function EvalGameReport({ report, playerNames, onSelectTurn, leads }: Eva
                         {misplay.tier === 'blunder' ? 'blunder — better: ' : 'better: '}{misplay.better}
                       </span>
                     )}
-                <span style={{ color: tone }}>−{misplay.regret.toFixed(2)}</span>
+                <span style={{ color: tone }}>{winDeltaText(-misplay.regret)}</span>
               </button>
             );
           })}
@@ -114,7 +115,7 @@ export function EvalGameReport({ report, playerNames, onSelectTurn, leads }: Eva
               <span style={{ color: '#cde' }}>T{read.turn}</span>
               <span style={{ color: '#8c8' }}>{playerNames[read.side === 'p1' ? 0 : 1]}</span>
               <span style={{ color: '#aab' }}>{read.played}</span>
-              <span style={{ color: '#8c8' }}>read paid off +{read.payoff.toFixed(2)}</span>
+              <span style={{ color: '#8c8' }}>read paid off {winDeltaText(read.payoff)}</span>
             </button>
           ))}
         </div>
@@ -133,7 +134,7 @@ export function EvalGameReport({ report, playerNames, onSelectTurn, leads }: Eva
               >
                 <span style={{ color: '#cde' }}>T{moment.turn}</span>
                 <span style={{ color: badge.color }}>{badge.text}</span>
-                {moment.swing !== null && <span style={{ color: '#aab' }}>{signed(moment.swing)}</span>}
+                {moment.swing !== null && <span style={{ color: '#aab' }}>{winDeltaText(moment.swing)}</span>}
               </button>
             );
           })}

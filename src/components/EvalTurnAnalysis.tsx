@@ -2,6 +2,7 @@ import { diffChoices, playedSetupMove, TIER_THRESHOLDS, type SideAnalysis, type 
 import type { LeadAnalysis, LeadSideAnalysis } from '../lib/eval/leads';
 import type { RankedChoice, ReadRecommendation } from '../lib/eval/types';
 import { formatRead, summarizeTurn } from '../lib/eval/summary';
+import { winDeltaText, winPctText } from '../lib/eval/winprob';
 import { attributionBadge } from './eval-badges';
 
 interface EvalTurnAnalysisProps {
@@ -29,16 +30,20 @@ function ExplorableLabel({ label, color = '#cde', onClick }: { label: string; co
   );
 }
 
-const signed = (value: number) => `${value >= 0 ? '+' : ''}${value.toFixed(2)}`;
-
 /**
- * The played chip shows the row's EV — the SAME quantity as the engine chip
- * and the regret grading. The floor appears only as a labeled risk clause,
- * and only when the row gave up mistake-sized safety (a genuine gamble):
- * showing "(−0.39)" beside the engine's "(+0.05)" once made a co-optimal
- * switch look ranked very lowly (draft T50).
+ * Every displayed value is a WIN PROBABILITY for the named player — "52%"
+ * absolutes (higher is always better for that player) and "+8%" deltas —
+ * because raw wp-units ("+0.05", "−0.39") never said WHOSE position they
+ * helped. The played chip shows the row's EV — the SAME quantity as the
+ * engine chip and the regret grading. The floor appears only as a labeled
+ * risk clause, and only when the row gave up mistake-sized safety (a
+ * genuine gamble): showing the floor beside the engine's EV once made a
+ * co-optimal switch look ranked very lowly (draft T50).
  */
 const RISK_DISPLAY_GAP = TIER_THRESHOLDS.mistake;
+/** Tooltip for a side's own EV percentages. */
+const evTitle = (name: string) =>
+  `${name}'s win probability with this choice against balanced play — higher is always better for ${name}.`;
 /** Played-vs-engine EV gaps under this are display noise — the picks are equivalent. */
 const ENGINE_EQUIVALENT_EPSILON = 0.01;
 
@@ -74,8 +79,8 @@ function EngineRow({ name, side, onExplore }: { name: string; side: SideAnalysis
     <div className="ps-eval-analysis-side">
       <div className="ps-eval-analysis-row">
         <span style={{ color: '#cde', fontWeight: 'bold' }}>{name}</span>
-        <span style={{ color: '#aab' }}>
-          engine: <ExplorableLabel label={best.label} onClick={onExplore && (() => onExplore(best))} /> ({signed(best.ev)})
+        <span style={{ color: '#aab' }} title={evTitle(name)}>
+          engine: <ExplorableLabel label={best.label} onClick={onExplore && (() => onExplore(best))} /> ({winPctText(best.ev)})
         </span>
         {best.line && best.line.length > 0 && (
           <span className="ps-eval-line">then {best.line.map(step => `${step.p1} · ${step.p2}`).join(' → ')}</span>
@@ -107,7 +112,7 @@ function SideRow({ name, side, onExplore }: { name: string; side: SideAnalysis; 
     .join(' + ');
   const acted = Boolean(side.played || slotText || side.playedRaw);
   const playedText = side.played
-    ? `${side.played.label} (${signed(side.played.ev)})`
+    ? `${side.played.label} (${winPctText(side.played.ev)})`
     : slotText
       ? `${slotText} — not among the engine's candidates`
       : side.playedRaw
@@ -124,13 +129,13 @@ function SideRow({ name, side, onExplore }: { name: string; side: SideAnalysis; 
     <div className="ps-eval-analysis-side">
       <div className="ps-eval-analysis-row">
         <span style={{ color: '#cde', fontWeight: 'bold' }}>{name}</span>
-        <span style={{ color: '#aab' }}>{acted ? 'played ' : ''}{playedText}</span>
+        <span style={{ color: '#aab' }} title={side.played ? evTitle(name) : undefined}>{acted ? 'played ' : ''}{playedText}</span>
         {playedGamble && side.played && (
           <span
             style={{ color: '#778' }}
-            title="The floor prices the opponent's most punishing reply — a worst case, not the expected outcome."
+            title={`If the opponent had picked the most punishing reply, ${name} would have fallen to this win probability — a worst case, not the expected outcome.`}
           >
-            · risked {signed(side.played.worstCase)}{side.played.punishedBy ? ` vs ${side.played.punishedBy}` : ''}
+            · risked {winPctText(side.played.worstCase)}{side.played.punishedBy ? ` vs ${side.played.punishedBy}` : ''}
           </span>
         )}
         {side.playedPartial && (
@@ -149,18 +154,18 @@ function SideRow({ name, side, onExplore }: { name: string; side: SideAnalysis; 
           />
         )}
         {side.played && side.best && !regretful && side.played.choice !== side.best.choice && (
-          <span style={{ color: '#778' }}>
+          <span style={{ color: '#778' }} title={evTitle(name)}>
             engine: <ExplorableLabel label={side.best.label} color="#778" onClick={onExplore && (() => onExplore(side.best!))} />
-            {' '}({signed(side.best.ev)})
+            {' '}({winPctText(side.best.ev)})
             {side.best.ev - side.played.ev < ENGINE_EQUIVALENT_EPSILON && (
-              <span title="The EV gap is inside noise — the engine considers both picks equally good."> · equivalent</span>
+              <span title="The win-probability gap is inside noise — the engine considers both picks equally good."> · equivalent</span>
             )}
           </span>
         )}
         {!side.played && side.best && (
-          <span style={{ color: '#778' }}>
+          <span style={{ color: '#778' }} title={evTitle(name)}>
             engine: <ExplorableLabel label={side.best.label} color="#778" onClick={onExplore && (() => onExplore(side.best!))} />
-            {' '}({signed(side.best.ev)})
+            {' '}({winPctText(side.best.ev)})
           </span>
         )}
         {side.verifiedAtDepth && (
@@ -182,9 +187,9 @@ function SideRow({ name, side, onExplore }: { name: string; side: SideAnalysis; 
         {side.riskPaidOff && !side.sacrifice && (
           <span
             style={{ color: '#8c8' }}
-            title={`The safe line guaranteed ${side.safe ? side.safe.worstCase.toFixed(2) : '?'}; the actual pair came out ${(side.riskPayoff ?? 0).toFixed(2)} better — the read won value.`}
+            title={`The safe line guaranteed ${side.safe ? winPctText(side.safe.worstCase) : '?'}; the actual pair came out ${winDeltaText(side.riskPayoff ?? 0)} better — the read won value.`}
           >
-            read paid off · +{(side.riskPayoff ?? 0).toFixed(2)}
+            read paid off · {winDeltaText(side.riskPayoff ?? 0)}
           </span>
         )}
         {regretful && !side.sacrifice && side.regret !== null && !side.riskPaidOff && (setupMove ? (
@@ -192,26 +197,26 @@ function SideRow({ name, side, onExplore }: { name: string; side: SideAnalysis; 
             style={{ color: '#b6a46a' }}
             title={`${setupMove} is a setup move — its payoff lies past the search horizon, so the regret may be overstated.`}
           >
-            −{side.regret.toFixed(2)} regret · setup caveat
+            {winDeltaText(-side.regret)} regret · setup caveat
           </span>
         ) : side.riskUnpunished ? (
           <span
             style={{ color: '#b6a46a' }}
             title={`The floor assumes ${side.played?.punishedBy ?? 'the punishing reply'} — the opponent chose differently, so the read came true.`}
           >
-            −{side.regret.toFixed(2)} regret · risk unpunished
+            {winDeltaText(-side.regret)} regret · risk unpunished
           </span>
         ) : side.tier === 'blunder' ? (
-          <span style={{ color: '#ff7a7a' }}>blunder · −{side.regret.toFixed(2)}</span>
+          <span style={{ color: '#ff7a7a' }} title={`${name} gave up this much win probability vs the engine's best.`}>blunder · {winDeltaText(-side.regret)}</span>
         ) : (
-          <span style={{ color: '#f3a6a6' }}>mistake · −{side.regret.toFixed(2)}</span>
+          <span style={{ color: '#f3a6a6' }} title={`${name} gave up this much win probability vs the engine's best.`}>mistake · {winDeltaText(-side.regret)}</span>
         ))}
         {side.tier === 'inaccuracy' && side.best && (
           <span
             style={{ color: '#b6a46a' }}
             title={`${side.best.label} was slightly better — a minor imprecision, not a mistake.`}
           >
-            · inaccuracy (−{(side.regret ?? 0).toFixed(2)})
+            · inaccuracy ({winDeltaText(-(side.regret ?? 0))})
           </span>
         )}
         {side.sensitivity && (
@@ -227,9 +232,9 @@ function SideRow({ name, side, onExplore }: { name: string; side: SideAnalysis; 
       </div>
       {regretful && side.played && side.best && (
         <>
-          <div className="ps-eval-analysis-row" style={{ color: '#aab' }}>
+          <div className="ps-eval-analysis-row" style={{ color: '#aab' }} title={evTitle(name)}>
             <MiniBar value={side.played.ev} />
-            <span style={{ whiteSpace: 'nowrap' }}>{signed(side.played.ev)} played</span>
+            <span style={{ whiteSpace: 'nowrap' }}>{winPctText(side.played.ev)} played</span>
             {side.played.punishedBy && <span style={{ color: '#778' }}>· worst vs {side.played.punishedBy}</span>}
           </div>
           {(() => {
@@ -241,10 +246,10 @@ function SideRow({ name, side, onExplore }: { name: string; side: SideAnalysis; 
             const target = asSafe ? side.safe ?? side.best! : side.best!;
             const value = asSafe ? target.worstCase : target.ev;
             return (
-              <div className="ps-eval-analysis-row" style={{ color: '#aab' }}>
+              <div className="ps-eval-analysis-row" style={{ color: '#aab' }} title={evTitle(name)}>
                 <MiniBar value={value} />
                 <span style={{ whiteSpace: 'nowrap' }}>
-                  {signed(value)} {asSafe ? 'safe:' : 'better:'}
+                  {winPctText(value)} {asSafe ? 'safe:' : 'better:'}
                 </span>
                 <ExplorableLabel
                   label={target.label}
@@ -280,14 +285,18 @@ export function EvalTurnAnalysis({ analysis, playerNames, reads, onExplore }: Ev
       <div className="ps-eval-analysis-row">
         <span style={{ fontWeight: 'bold', fontSize: 11, color: '#cde' }}>Turn {analysis.turn}</span>
         {analysis.swing !== null && (
-          <span style={{ color: '#aab' }}>swing {signed(analysis.swing)}</span>
+          <span style={{ color: '#aab' }} title={`How much the graph estimate moved for ${playerNames[0]} across this turn, in win-probability points.`}>swing {winDeltaText(analysis.swing)}</span>
         )}
         <span style={{ color: badge.color }}>{badge.text}</span>
       </div>
       <div className="ps-eval-analysis-summary">{summarizeTurn(analysis, playerNames)}</div>
       {analysis.decisionDelta !== null && analysis.chanceDelta !== null && (
-        <div className="ps-eval-analysis-row" style={{ color: '#778' }}>
-          {signed(analysis.decisionDelta)} expected from the choices · {signed(analysis.chanceDelta)} from how it rolled
+        <div
+          className="ps-eval-analysis-row"
+          style={{ color: '#778' }}
+          title={`${playerNames[0]}'s estimate change split in two: what the chosen pair was expected to move, and what the actual rolls added on top.`}
+        >
+          {winDeltaText(analysis.decisionDelta)} expected from the choices · {winDeltaText(analysis.chanceDelta)} from how it rolled
         </div>
       )}
       {analysis.playedTracking === false ? (
@@ -329,9 +338,9 @@ function LeadRow({ name, side }: { name: string; side: LeadSideAnalysis }) {
     <div className="ps-eval-analysis-side">
       <div className="ps-eval-analysis-row">
         <span style={{ color: '#cde', fontWeight: 'bold' }}>{name}</span>
-        <span style={{ color: '#aab' }}>
+        <span style={{ color: '#aab' }} title={side.played ? evTitle(name) : undefined}>
           led {side.played
-            ? `${stripLead(side.played.label)} (${signed(side.played.ev)})`
+            ? `${stripLead(side.played.label)} (${winPctText(side.played.ev)})`
             : 'leads not matched'}
         </span>
         {side.played && side.best && side.played.choice === side.best.choice && (
@@ -339,17 +348,17 @@ function LeadRow({ name, side }: { name: string; side: LeadSideAnalysis }) {
         )}
         {bad && side.best && (
           <span style={{ color: side.tier === 'blunder' ? '#ff7a7a' : '#f3a6a6' }}>
-            {side.tier} · −{(side.regret ?? 0).toFixed(2)} — better: {stripLead(side.best.label)} ({signed(side.best.ev)})
+            {side.tier} · {winDeltaText(-(side.regret ?? 0))} — better: {stripLead(side.best.label)} ({winPctText(side.best.ev)})
           </span>
         )}
         {side.tier === 'inaccuracy' && side.best && (
           <span style={{ color: '#b6a46a' }}>
-            · inaccuracy (−{(side.regret ?? 0).toFixed(2)}) — {stripLead(side.best.label)} was slightly better
+            · inaccuracy ({winDeltaText(-(side.regret ?? 0))}) — {stripLead(side.best.label)} was slightly better
           </span>
         )}
         {!side.tier && side.played && side.best && side.played.choice !== side.best.choice && (
-          <span style={{ color: '#778' }}>
-            engine: {stripLead(side.best.label)} ({signed(side.best.ev)})
+          <span style={{ color: '#778' }} title={evTitle(name)}>
+            engine: {stripLead(side.best.label)} ({winPctText(side.best.ev)})
           </span>
         )}
       </div>

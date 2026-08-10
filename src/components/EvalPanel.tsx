@@ -5,7 +5,7 @@ import type { EvalGraphState, EvalStatus } from '../hooks/useEvaluation';
 import { EvalGameReport } from './EvalGameReport';
 import { EvalGraph } from './EvalGraph';
 import { EvalLeadAnalysis, EvalTurnAnalysis, MiniBar } from './EvalTurnAnalysis';
-import { winPercent } from '../lib/eval/winprob';
+import { winDeltaText, winPercent } from '../lib/eval/winprob';
 import type { LeadAnalysis } from '../lib/eval/leads';
 
 interface EvalPanelProps {
@@ -46,7 +46,7 @@ interface EvalPanelProps {
   doubles?: boolean;
 }
 
-const signed = (value: number) => `${value >= 0 ? '+' : ''}${value.toFixed(2)}`;
+// Displayed values are win probabilities ("52%") and point deltas ("−8%").
 
 function ChoiceList({
   side, choices, reply, onPickChoice,
@@ -67,9 +67,9 @@ function ChoiceList({
         // and the punishing reply live in the tooltip.
         const evPct = winPercent(choice.ev);
         const gap = best ? choice.ev - best.ev : 0;
-        const tooltip = `Worth ${signed(choice.ev)} vs balanced play` +
-          ` · guaranteed floor ${signed(choice.worstCase)}` +
-          (choice.punishedBy ? ` — worst reply: ${choice.punishedBy}` : '') +
+        const tooltip = `Win probability ${evPct}% vs balanced play — higher is better for this side` +
+          ` · guaranteed at least ${winPercent(choice.worstCase)}%` +
+          (choice.punishedBy ? ` (worst reply: ${choice.punishedBy})` : '') +
           '. Choices are ranked by their value against balanced play.' +
           (onPickChoice ? ' Click to play this turn out against the engine’s reply.' : '');
         const detail = (
@@ -80,7 +80,7 @@ function ChoiceList({
               <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, whiteSpace: 'nowrap', color: '#aab' }}>
                 <MiniBar value={choice.ev} />
                 {evPct}%
-                {index > 0 && gap < 0 && <span style={{ color: '#778' }}>({gap.toFixed(2)})</span>}
+                {index > 0 && gap < 0 && <span style={{ color: '#778' }}>({winDeltaText(gap)})</span>}
               </span>
             </span>
             {choice.line && choice.line.length > 0 && (

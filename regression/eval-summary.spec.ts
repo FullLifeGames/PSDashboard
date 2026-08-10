@@ -45,7 +45,7 @@ test.describe('natural-language turn summaries', () => {
     expect(summary).not.toContain('setup move');
     // The fixture's punishing reply ("Reply") was never clicked — the
     // regret reads as an unpunished risk with neutral safe-line framing.
-    expect(summary).toContain('a read: its floor risked Reply (−0.30); Draco Meteor came instead.');
+    expect(summary).toContain('a read: its floor risked Reply (down to 35%); Draco Meteor came instead.');
     expect(summary).toContain("The engine's safe line was switching to Dragapult");
     expect(summary).not.toContain('safer was');
   });
@@ -61,9 +61,9 @@ test.describe('natural-language turn summaries', () => {
       ],
     });
     expect(line).toContain('Read: switch Noivern');
-    expect(line).toContain('+0.32 if Earthquake (74%)');
-    expect(line).toContain('−0.25 if Ice Beam (26%)');
-    expect(line).toContain('net +0.19');
+    expect(line).toContain('66% if Earthquake (74% likely)');
+    expect(line).toContain('38% if Ice Beam (26% likely)');
+    expect(line).toContain('net 60%');
   });
 
   test('a read-matching risk is credited to the opponent model', () => {
@@ -108,7 +108,7 @@ test.describe('natural-language turn summaries', () => {
       scoreAfter: -0.14,
     }), names);
     expect(summary).toContain('a read that paid off');
-    expect(summary).toContain('+0.15 over the safe Recover');
+    expect(summary).toContain('+8% over the safe Recover (52% guaranteed)');
     expect(summary).toContain('The floor priced in Earth Power; Iron Head came instead.');
     expect(summary).not.toContain('quiet turn');
   });
@@ -219,7 +219,7 @@ test.describe('natural-language turn summaries', () => {
       scoreBefore: 0.1,
       scoreAfter: -0.25,
     }), names);
-    expect(summary).toContain('a read that paid off one turn later, +0.35 over the safe switching to Dragapult');
+    expect(summary).toContain('a read that paid off one turn later, +18% over the safe switching to Dragapult');
   });
 
   test('a hidden partner slot is disclosed in the summary', () => {
@@ -297,7 +297,7 @@ test.describe('natural-language turn summaries', () => {
       scoreBefore: 0.1,
       scoreAfter: -0.25,
     }), names);
-    expect(summary).toContain('Beta played Recover — a read that paid off, +0.25 over the safe switching to Dragapult');
+    expect(summary).toContain('Beta played Recover — a read that paid off, +13% over the safe switching to Dragapult');
     expect(summary).toContain('The floor priced in Reply; Draco Meteor came instead.');
     expect(summary).not.toContain('safer was');
   });
@@ -333,7 +333,8 @@ test.describe('natural-language turn summaries', () => {
       scoreAfter: -0.4,
     }), names);
     expect(summary).toContain('how the turn rolled');
-    expect(summary).toContain('−0.55');
+    // chanceDelta −0.55 wp-units = −28 win-probability points.
+    expect(summary).toContain('−28%');
     expect(summary).not.toContain('mistake');
   });
 
@@ -347,8 +348,9 @@ test.describe('natural-language turn summaries', () => {
       scoreAfter: 0.35,
     }), names);
     expect(summary).toContain('No single mistake');
-    expect(summary).toContain('+0.11');
-    expect(summary).toContain('+0.14');
+    // decisionDelta ~+0.11 / chanceDelta +0.14 wp-units → +5% / +7% points.
+    expect(summary).toContain('+5%');
+    expect(summary).toContain('+7%');
     expect(summary).not.toContain('quiet');
   });
 
@@ -421,6 +423,7 @@ test.describe('natural-language turn summaries', () => {
     }), names);
     expect(summary).toContain('Beta played Recover');
     expect(summary).toContain('luck');
-    expect(summary).toContain('−0.35');
+    // chanceDelta −0.35 wp-units = −18 win-probability points.
+    expect(summary).toContain('−18%');
   });
 });

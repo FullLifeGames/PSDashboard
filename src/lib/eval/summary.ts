@@ -1,20 +1,17 @@
 import { CHANCE_THRESHOLD, diffChoices, playedSetupMove, type SideAnalysis, type TurnAnalysis } from './analysis';
-import { winPercent } from './winprob';
+import { winDeltaText, winPctText, winPercent } from './winprob';
 
 /**
  * Annotator-style natural-language rendering of a turn analysis. Pure
  * template composition over the analysis data — deterministic, sim-free,
- * main-bundle safe.
+ * main-bundle safe. Values render as WIN PROBABILITIES for the named player
+ * ("52%" absolutes, "+8%" point deltas) — raw wp-units never said whose
+ * position they helped.
  */
-
-/** Signed value with a typographic minus (matches the panel's tone). */
-export const signedValue = (value: number) =>
-  value < 0 ? `−${Math.abs(value).toFixed(2)}` : `+${value.toFixed(2)}`;
 
 /** Choice labels read as prose: "→ Dragapult" becomes "switching to Dragapult". */
 export const labelPhrase = (label: string) => (label.startsWith('→ ') ? `switching to ${label.slice(2)}` : label);
 
-const signed = signedValue;
 const phrase = labelPhrase;
 
 const playedBest = (side: SideAnalysis) =>
@@ -29,7 +26,7 @@ function readClause(name: string, side: SideAnalysis, opponent: SideAnalysis): s
     ? side.riskPayoffTurn === 1 ? ' one turn later' : ` ${side.riskPayoffTurn} turns later`
     : '';
   return `${name} played ${phrase(side.played.label)} — a read that paid off${horizon}, ` +
-    `${signed(side.riskPayoff ?? 0)} over the safe ${phrase(side.safe.label)} (${signed(side.safe.worstCase)}).${priced}`;
+    `${winDeltaText(side.riskPayoff ?? 0)} over the safe ${phrase(side.safe.label)} (${winPctText(side.safe.worstCase)} guaranteed).${priced}`;
 }
 
 function sideClause(name: string, side: SideAnalysis, opponent: SideAnalysis): string | null {
@@ -61,23 +58,23 @@ function mistakeClause(name: string, side: SideAnalysis, opponent: SideAnalysis)
     // assessment, and holding is no achievement. When the opponent model's
     // own best response matches the play, credit the read explicitly.
     const came = side.played.punishedBy && opponent.played
-      ? `its floor risked ${side.played.punishedBy} (${signed(side.played.worstCase)}); ${phrase(opponent.played.label)} came instead`
-      : `its floor sat at ${signed(side.played.worstCase)}`;
+      ? `its floor risked ${side.played.punishedBy} (down to ${winPctText(side.played.worstCase)}); ${phrase(opponent.played.label)} came instead`
+      : `its floor sat at ${winPctText(side.played.worstCase)}`;
     const framing = side.riskWasRead
       ? `a read against the opponent's tendencies: ${came}`
       : `a read: ${came}`;
     return `${name} played ${phrase(side.played.label)} — ${framing}. ` +
-      `The engine's safe line was ${phrase(side.safe.label)} (${signed(side.safe.worstCase)})${lineOf(side.safe)}.${why}${caveat}`;
+      `The engine's safe line was ${phrase(side.safe.label)} (${winPctText(side.safe.worstCase)} guaranteed)${lineOf(side.safe)}.${why}${caveat}`;
   }
   // The punished misplay reads in EV terms: what the choice was worth against
   // balanced play, vs what the engine's line was worth. A blunder earns the
   // word; a mistake keeps the softer framing.
   if (side.tier === 'blunder') {
-    return `${name} played ${phrase(side.played.label)} (${signed(side.played.ev)}) — ` +
-      `a blunder; clearly better was ${phrase(side.best.label)} (${signed(side.best.ev)})${lineOf(side.best)}.${why}${caveat}`;
+    return `${name} played ${phrase(side.played.label)} (${winPctText(side.played.ev)}) — ` +
+      `a blunder; clearly better was ${phrase(side.best.label)} (${winPctText(side.best.ev)})${lineOf(side.best)}.${why}${caveat}`;
   }
-  return `${name} played ${phrase(side.played.label)} (${signed(side.played.ev)}); ` +
-    `safer was ${phrase(side.best.label)} (${signed(side.best.ev)})${lineOf(side.best)}.${why}${caveat}`;
+  return `${name} played ${phrase(side.played.label)} (${winPctText(side.played.ev)}); ` +
+    `safer was ${phrase(side.best.label)} (${winPctText(side.best.ev)})${lineOf(side.best)}.${why}${caveat}`;
 }
 
 /**
@@ -93,16 +90,16 @@ export function formatRead(read: {
     ? `switch ${read.choice.label.slice(2)}`
     : read.choice.label;
   const parts = read.breakdown
-    .map(entry => `${signed(entry.value)} if ${entry.label} (${Math.round(entry.prob * 100)}%)`)
+    .map(entry => `${winPctText(entry.value)} if ${entry.label} (${Math.round(entry.prob * 100)}% likely)`)
     .join(', ');
-  return `Read: ${target}${parts ? ` — ${parts}` : ''} — net ${signed(read.net)}.`;
+  return `Read: ${target}${parts ? ` — ${parts}` : ''} — net ${winPctText(read.net)}.`;
 }
 
 /** Sub-verdict note: a light imprecision worth naming, not blaming. */
 function inaccuracyClause(name: string, side: SideAnalysis): string | null {
   if (side.tier !== 'inaccuracy' || !side.played || !side.best) return null;
   return `${name}'s ${phrase(side.played.label)} was an inaccuracy — ` +
-    `${phrase(side.best.label)} was slightly better (${signed(side.best.ev)} vs ${signed(side.played.ev)}).`;
+    `${phrase(side.best.label)} was slightly better (${winPctText(side.best.ev)} vs ${winPctText(side.played.ev)}).`;
 }
 
 /**
@@ -165,22 +162,22 @@ export function summarizeTurn(
       if (p1Clause) sentences.push(p1Clause);
       if (p2Clause) sentences.push(p2Clause);
       if (analysis.chanceDelta !== null && Math.abs(analysis.chanceDelta) >= CHANCE_THRESHOLD) {
-        sentences.push(`On top of that, luck contributed ${signed(analysis.chanceDelta)}.`);
+        sentences.push(`On top of that, luck contributed ${winDeltaText(analysis.chanceDelta)}.`);
       }
       break;
     }
     case 'chance':
       sentences.push('Both sides picked reasonable options — the swing came from how the turn rolled ' +
-        `(${signed(analysis.chanceDelta ?? analysis.swing ?? 0)}).`);
+        `(${winDeltaText(analysis.chanceDelta ?? analysis.swing ?? 0)}).`);
       break;
     case 'shift':
       sentences.push(analysis.decisionDelta !== null && analysis.chanceDelta !== null
         ? 'No single mistake stands out — the choices and the rolls pushed the same way ' +
-          `(${signed(analysis.decisionDelta)} expected, ${signed(analysis.chanceDelta)} from the rolls).`
+          `(${winDeltaText(analysis.decisionDelta)} expected, ${winDeltaText(analysis.chanceDelta)} from the rolls).`
         : 'No single mistake stands out — the swing built up without a clear culprit.');
       break;
     case 'unclear':
-      sentences.push('The score swung, but a choice never surfaced (a Pokémon fainted or was fully prevented) — no blame assigned.');
+      sentences.push('The score swung, but a choice never surfaced (a Pokémon slept, flinched, or fainted before acting) — no blame assigned.');
       break;
     default:
       sentences.push(playedBest(analysis.p1) && playedBest(analysis.p2)

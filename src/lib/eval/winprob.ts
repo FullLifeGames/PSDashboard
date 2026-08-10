@@ -39,3 +39,14 @@ export const wpUnits = (score: number, doubles = false, faintedFraction = 0): nu
 /** Rounded percent for display — LINEAR: scores are wp-units already. */
 export const winPercent = (score: number): number =>
   Math.round(100 * (score + 1) / 2);
+
+/**
+ * Display texts: every player-facing value is a win probability. Absolute
+ * values read as "52%" (higher is always better for the named side);
+ * DIFFERENCES (regret, payoff, swing, luck) read as signed percentage
+ * points, "+8%" — one wp-unit spans 50 points.
+ */
+export const winPctText = (value: number): string => `${winPercent(value)}%`;
+
+export const winDeltaText = (delta: number): string =>
+  `${delta < 0 ? '−' : '+'}${Math.round(Math.abs(delta) * 50)}%`;

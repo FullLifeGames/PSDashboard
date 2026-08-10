@@ -1,6 +1,6 @@
 import { playedSetupMove, type SideAnalysis, type TurnAnalysis, type VerdictTier } from './analysis';
-import { labelPhrase, signedValue } from './summary';
-import { winPercent } from './winprob';
+import { labelPhrase } from './summary';
+import { winDeltaText, winPercent } from './winprob';
 
 /**
  * Multi-turn root-cause analysis over a completed graph sweep: where the
@@ -229,7 +229,7 @@ export function buildGameReport(
         const side = analysis[loser];
         const setup = playedSetupMove(side) ? '; a setup move the engine may undervalue' : '';
         return `turn ${analysis.turn} (${labelPhrase(side.played!.label)}, ` +
-          `−${(side.regret ?? 0).toFixed(2)} — safer was ${labelPhrase(side.best!.label)}${setup})`;
+          `${winDeltaText(-(side.regret ?? 0))} — safer was ${labelPhrase(side.best!.label)}${setup})`;
       });
       sentences.push(`The seeds of the loss: ${parts.join(' and ')}.`);
     } else if (playedTracking && decisionTotals[loser] < CLEAN_PLAY_TOTAL) {
@@ -240,7 +240,7 @@ export function buildGameReport(
   }
 
   if (Math.abs(chanceTotal) >= 0.25) {
-    sentences.push(`Luck ran ${chanceTotal > 0 ? 'for' : 'against'} ${playerNames[0]} overall (${signedValue(chanceTotal)}).`);
+    sentences.push(`Luck ran ${chanceTotal > 0 ? 'for' : 'against'} ${playerNames[0]} overall (${winDeltaText(chanceTotal)}).`);
   }
 
   return {
