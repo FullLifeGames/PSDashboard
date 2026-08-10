@@ -1,4 +1,29 @@
 import { test, expect } from '@playwright/test';
+
+test.describe('species-shaped default spreads', () => {
+  test('the last-resort spread follows base stats, not a flat physical template', () => {
+    // No usage stats, no sheets, no damage observations: the default must
+    // still make species sense — special attackers get SpA, fast species
+    // get Speed (base-123 Noivern was outsped by everything on 0 EVs), and
+    // slow bulky species keep HP.
+    const log = [
+      '|player|p1|Alice|', '|player|p2|Bob|', '|gen|9', '|gametype|singles',
+      '|poke|p2|Noivern, F|', '|poke|p2|Snorlax, M|',
+      '|start',
+      '|switch|p2a: Noivern|Noivern, F|100/100',
+      '|turn|1',
+    ].join('\n');
+    const { p2Team } = buildTeamsFromReplay(log);
+    const noivern = p2Team.find(set => set.species === 'Noivern')!;
+    expect(noivern.evs.spa).toBe(252);
+    expect(noivern.evs.spe).toBe(252);
+    expect(noivern.evs.atk).toBe(0);
+    const snorlax = p2Team.find(set => set.species === 'Snorlax')!;
+    expect(snorlax.evs.atk).toBe(252);
+    expect(snorlax.evs.hp).toBe(252);
+    expect(snorlax.evs.spe).toBe(0);
+  });
+});
 import { readFileSync } from 'fs';
 import { dirname, join } from 'path';
 import { fileURLToPath } from 'url';

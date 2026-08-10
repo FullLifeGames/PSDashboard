@@ -165,7 +165,7 @@ function buildSet(
     moves: moves.length > 0 ? moves : ['Tackle'],
     // Damage-consistent spreads beat usage guesses, never edited/revealed EVs.
     nature: (editedNature || inferred?.nature || spread?.nature || setSpread?.nature || 'Hardy') as PokemonSet['nature'],
-    evs: editedEvs || inferred?.evs || spread?.evs || setSpread?.evs || { hp: 252, atk: 252, def: 0, spa: 0, spd: 4, spe: 0 },
+    evs: editedEvs || inferred?.evs || spread?.evs || setSpread?.evs || defaultEvsFor(info.species),
     ivs: editedIvs || { hp: 31, atk: 31, def: 31, spa: 31, spd: 31, spe: 31 },
     level: info.level || 100,
     gender: (info.gender || '') as '' | 'M' | 'F',
@@ -175,6 +175,23 @@ function buildSet(
 
 function hasNonZeroEvs(evs: PokemonSet['evs'] | undefined): boolean {
   return !!evs && Object.values(evs).some(value => (value ?? 0) > 0);
+}
+
+/**
+ * Species-shaped last-resort spread (no usage data, no inference, no sets):
+ * max the HIGHER base offense, plus Speed on fast species and HP otherwise.
+ * The old flat 252 HP / 252 Atk default put physical EVs on special
+ * attackers and left base-123-Speed Noivern outsped by everything (GPL).
+ */
+function defaultEvsFor(species: string): PokemonSet['evs'] {
+  const data = Dex.species.get(species);
+  const stats = data.exists ? data.baseStats : null;
+  const offense: 'atk' | 'spa' = stats && stats.spa > stats.atk ? 'spa' : 'atk';
+  const secondary: 'spe' | 'hp' = stats && stats.spe >= 80 ? 'spe' : 'hp';
+  const evs = { hp: 0, atk: 0, def: 0, spa: 0, spd: 4, spe: 0 };
+  evs[offense] = 252;
+  evs[secondary] = 252;
+  return evs;
 }
 
 function sanitizeEv(value: number | undefined): number {
