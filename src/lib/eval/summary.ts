@@ -109,7 +109,9 @@ function inaccuracyClause(name: string, side: SideAnalysis): string | null {
 function sackClause(name: string, side: SideAnalysis): string | null {
   if (!side.sacrifice) return null;
   const pct = Math.round(side.sacrifice.hpFraction * 100);
-  return `${name} sacked ${side.sacrifice.name} (${pct}% HP) — a low-cost trade, not graded as a misplay.`;
+  return side.sacrifice.healthy
+    ? `${name} sacked a healthy ${side.sacrifice.name} (${pct}% HP) while decisively ahead — simplification, not graded as a misplay.`
+    : `${name} sacked ${side.sacrifice.name} (${pct}% HP) — a low-cost trade, not graded as a misplay.`;
 }
 
 /**

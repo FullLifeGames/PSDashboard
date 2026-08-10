@@ -221,6 +221,13 @@ const normalizeName = (name: string) => name.toLowerCase().replace(/[^a-z0-9]/g,
 export interface SackInfo {
   name: string;
   hpFraction: number;
+  /**
+   * The fed body was HEALTHY (switched in and fainted the same turn above
+   * the low-HP threshold) — a simplification-sack CANDIDATE. Unlike low-HP
+   * feeds, the verdict layer only honors it while the engine's own scores
+   * call the game decisively won on both sides of the sack.
+   */
+  healthy?: boolean;
 }
 
 /** Below this pre-turn HP fraction a faint reads as a sacrifice, not a loss. */
@@ -264,11 +271,15 @@ export function allTurnEvents(log: string): string[][] {
 }
 
 /**
- * Detects per-side sacrifices in one turn's events: an own Pokémon fainted
- * that already stood at ≤ SACK_HP_THRESHOLD when the turn began (per the
- * pre-turn snapshot). Feeding a nearly-dead body to absorb an attack, a
- * Trick, or hazard chip is a deliberate low-cost play — the verdict layer
- * grades it as a sack instead of a risk.
+ * Detects per-side sacrifices in one turn's events. Two shapes:
+ * - LOW-HP FEED: an own Pokémon fainted that already stood at
+ *   ≤ SACK_HP_THRESHOLD when the turn began (per the pre-turn snapshot) —
+ *   a deliberate low-cost play, graded as a sack unconditionally.
+ * - HEALTHY SIMPLIFICATION CANDIDATE: a body deliberately SWITCHED IN this
+ *   turn (never dragged) that fainted before the turn ended, entering above
+ *   the threshold (entry HP from the switch line, pre-chip). Marked
+ *   `healthy` — the verdict layer honors it only while the engine's scores
+ *   call the game decisively won on both sides of the sack (GPL T35).
  */
 export function detectSacks(
   events: string[],
@@ -276,21 +287,38 @@ export function detectSacks(
 ): { p1?: SackInfo; p2?: SackInfo } {
   if (!snapshotBefore) return {};
   const sacks: { p1?: SackInfo; p2?: SackInfo } = {};
+  /** Latest deliberate switch-in per slot ident this turn (drags excluded). */
+  const entered = new Map<string, { name: string; hpFraction: number }>();
 
   for (const line of events) {
-    const match = line.match(/^\|faint\|(p[12])[a-d]:\s*(.+)$/);
+    const switchMatch = line.match(/^\|switch\|(p[12][a-d]): ([^|]+)\|[^|]*\|(\d+)\/(\d+)/);
+    if (switchMatch) {
+      entered.set(switchMatch[1], {
+        name: switchMatch[2].trim(),
+        hpFraction: Number(switchMatch[3]) / Number(switchMatch[4]),
+      });
+      continue;
+    }
+    const match = line.match(/^\|faint\|(p[12])([a-d]):\s*(.+)$/);
     if (!match) continue;
     const side = match[1] as 'p1' | 'p2';
     if (sacks[side]) continue;
-    const name = match[2].trim();
+    const name = match[3].trim();
     const nameId = normalizeName(name);
     const snapshotSide = side === 'p1' ? snapshotBefore.p1 : snapshotBefore.p2;
     const pokemon = snapshotSide.pokemon.find(entry =>
       normalizeName(entry.name) === nameId || normalizeName(entry.speciesForme) === nameId);
-    if (!pokemon || pokemon.fainted) continue;
-    const hpFraction = pokemon.hpPercent / 100;
-    if (hpFraction > SACK_HP_THRESHOLD) continue;
-    sacks[side] = { name, hpFraction };
+    if (pokemon?.fainted) continue;
+    if (pokemon && pokemon.hpPercent / 100 <= SACK_HP_THRESHOLD) {
+      sacks[side] = { name, hpFraction: pokemon.hpPercent / 100 };
+      continue;
+    }
+    // The healthy candidate stands on the switch line alone — a body first
+    // REVEALED by the sack switch-in is absent from the pre-turn snapshot.
+    const fed = entered.get(`${side}${match[2]}`);
+    if (fed && fed.hpFraction > SACK_HP_THRESHOLD) {
+      sacks[side] = { name, hpFraction: fed.hpFraction, healthy: true };
+    }
   }
 
   return sacks;

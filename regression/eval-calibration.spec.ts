@@ -373,10 +373,30 @@ import { brierScore, fitConstantK } from './fit-helpers';
  *   59/66/79/64/83 → 61/67/80/65/83, late brier 0.1752 → 0.1617.
  *
  * OPEN FINDINGS FOR THE NEXT ROUNDS (2026-08-10):
- * - Endgame-sack pricing + healthy-body sack detection (see T35 above).
+ * - Endgame-sack PRICING (eval side): the bodies term still prices a
+ *   redundant body at full weight — see the T35 RESOLUTION below for why
+ *   the discount was deliberately NOT built this round.
  * - Charge-move (Phantom Force/Meteor Beam) mid-charge candidate targets.
  * - Directional speed-evidence exclusions (a second mover's Tailwind
  *   STRENGTHENS the conclusion; today all modifiers exclude bilaterally).
+ *
+ * T35 RESOLUTION 2026-08-10 (healthy-body sack framing, analysis side):
+ * The redundancy probe answered the design gate. T35 = the WINNER switches
+ * a 46%-HP Salazzle into Knock Off: score 0.6623 (83%) before, 0.4131
+ * (71%) after; with the body DELETED from the T35 state p1 still scores
+ * 0.4436 (72%) — the body was surplus headroom, the sack does not endanger
+ * the verdict, yet the played row lost 0.23 (tier "mistake"). The dip
+ * itself is REAL by the eval's own after-measurement (0.66 → 0.41), so an
+ * eval-side bodies discount would have to deny a value difference the
+ * engine consistently measures — the boost-saga shape the earlier T35
+ * probe warned about. ADOPTED instead: detectSacks recognizes the healthy
+ * switched-in-and-fainted feed (entry HP from the switch line, drags
+ * excluded) and analyzeTurn honors it ONLY while the sacker's engine score
+ * stays ≥ HEALTHY_SACK_FLOOR (0.4 — the |score| 0.4–0.7 bucket wins 77%)
+ * both BEFORE and AFTER, failing closed without an after-score.
+ * Expectation-based on both gates, zero eval change, sweep untouched
+ * (calibration never runs analyzeTurn — no gate needed). GPL T35 pins the
+ * framing end-to-end.
  *
  * BENCH-DRIFT PROFILE 2026-08-10 (closing the registered 0.3→0.9s item):
  * EVAL_BENCH across the round's commits — 53ff967 (round start), c472c10

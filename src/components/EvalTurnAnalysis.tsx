@@ -179,7 +179,9 @@ function SideRow({ name, side, onExplore }: { name: string; side: SideAnalysis; 
         {side.sacrifice && (
           <span
             style={{ color: '#9aa5b1' }}
-            title="A nearly-dead Pokémon was fed deliberately — a low-cost sack, not graded as a misplay."
+            title={side.sacrifice.healthy
+              ? 'A healthy body was fed while the engine stayed decisively ahead on both sides of the sack — simplification, not graded as a misplay.'
+              : 'A nearly-dead Pokémon was fed deliberately — a low-cost sack, not graded as a misplay.'}
           >
             · sacked {side.sacrifice.name} ({Math.round(side.sacrifice.hpFraction * 100)}% HP)
           </span>

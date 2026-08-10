@@ -31,6 +31,14 @@ export const TIER_THRESHOLDS: Record<VerdictTier, number> = {
  */
 export const DECIDED_SCORE = 0.7;
 
+/**
+ * Own-perspective score at or above which a HEALTHY-body feed can read as a
+ * deliberate simplification sack (both before and after the sack). Anchored
+ * to the calibration buckets: |score| 0.4–0.7 wins for the favored side 77%
+ * of the time — "decisively ahead", where surplus material buys certainty.
+ */
+export const HEALTHY_SACK_FLOOR = 0.4;
+
 /** Regret (best − played, own perspective) that marks a decision problem. */
 export const REGRET_THRESHOLD = TIER_THRESHOLDS.mistake;
 /**
@@ -131,9 +139,11 @@ export interface SideAnalysis {
   /** Verdict band for the regret, after leniency (absent = clean play). */
   tier?: VerdictTier;
   /**
-   * The flagged turn fed a nearly-dead Pokémon (≤ SACK_HP_THRESHOLD at turn
-   * start) to the opponent — graded as a deliberate low-cost sack: tier
-   * demoted one band, never labeled a risk.
+   * The flagged turn fed a body deliberately — a nearly-dead Pokémon
+   * (≤ SACK_HP_THRESHOLD at turn start, unconditional) or a HEALTHY one
+   * while the engine's scores stayed ≥ HEALTHY_SACK_FLOOR on both sides of
+   * the sack (simplification). Graded as a sack: tier demoted one band,
+   * never labeled a risk.
    */
   sacrifice?: SackInfo;
   /**
@@ -464,8 +474,18 @@ export function analyzeTurn(params: {
     // risk machinery and the report treat it neutrally. BOUNDED: a
     // blunder-sized regret is a throw whatever the body was worth — the
     // sack leniency never forgives the blunder band.
+    // A HEALTHY feed (switched in and fainted, above the low-HP threshold)
+    // is only a simplification sack while the engine's own scores call the
+    // game decisively won for the sacker BEFORE and AFTER — trading surplus
+    // material for certainty (GPL T35 Salazzle). Expectation-based, not
+    // results-based: both gates read engine scores. No after-score = no
+    // excuse (fails closed on game ends and gap turns).
     const sack = params.sacks?.[key];
-    const sacrificed = !!(tier && sack && (regret ?? 0) < TIER_THRESHOLDS.blunder);
+    const ownBefore = key === 'p1' ? params.scoreBefore : -params.scoreBefore;
+    const ownAfter = params.scoreAfter === null ? null : (key === 'p1' ? params.scoreAfter : -params.scoreAfter);
+    const sackApplies = !!sack && (!sack.healthy ||
+      (ownBefore >= HEALTHY_SACK_FLOOR && ownAfter !== null && ownAfter >= HEALTHY_SACK_FLOOR));
+    const sacrificed = !!(tier && sackApplies && (regret ?? 0) < TIER_THRESHOLDS.blunder);
     if (sacrificed) tier = demoteTier(tier);
     // Item-sensitivity: if the verdict changes band under a usage-plausible
     // alternative item for an opposing mon whose item is only a guess, the

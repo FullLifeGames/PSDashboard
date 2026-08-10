@@ -156,6 +156,66 @@ test.describe('sacrifice detection', () => {
     expect(detectSacks(events, null)).toEqual({});
   });
 
+  test('a healthy body switched in and fainted the same turn is a simplification-sack candidate', () => {
+    // GPL T35: the winner feeds a 46%-HP Salazzle into Knock Off. The entry
+    // HP comes from the switch line itself (pre-chip), and the candidate is
+    // marked healthy — the verdict layer decides whether the position
+    // justifies the framing.
+    const events = [
+      '|switch|p1a: Relous|Salazzle, F|116/253',
+      '|move|p2a: Knocker|Knock Off|p1a: Relous',
+      '|-damage|p1a: Relous|0 fnt',
+      '|faint|p1a: Relous',
+    ];
+    expect(detectSacks(events, sackSnapshot(46))).toEqual({
+      p1: { name: 'Relous', hpFraction: 116 / 253, healthy: true },
+    });
+  });
+
+  test('dragged-in faints and surviving switch-ins are not sack candidates', () => {
+    // A forced drag is not a deliberate feed; a switch-in that lives is not
+    // a sack; a mid-HP faint without a same-turn entry stays a plain loss.
+    expect(detectSacks(['|drag|p1a: Dauni|Uxie, L50|120/182', '|faint|p1a: Dauni'], sackSnapshot(66))).toEqual({});
+    expect(detectSacks(['|switch|p1a: Relous|Salazzle, F|116/253'], sackSnapshot(46))).toEqual({});
+    expect(detectSacks(['|faint|p1a: Dauni'], sackSnapshot(46))).toEqual({});
+  });
+
+  test('a healthy sack is excused only while the engine stays decisively ahead on both sides of it', () => {
+    const sackResult: EvalResult = {
+      score: 0.66, interval: 0.05, depthCompleted: 1,
+      perSide: {
+        p1: [
+          choiceEv('move moonblast', 'Moonblast', 0.66, 0.66),
+          choiceEv('switch 2', '→ Salazzle', 0.4, 0.46),
+        ],
+        p2: [choice('move knockoff', 'Knock Off', -0.6)],
+      },
+    };
+    const run = (scoreBefore: number, scoreAfter: number | null) => analyzeTurn({
+      turn: 35,
+      result: { ...sackResult, score: scoreBefore },
+      played: {
+        p1: { kind: 'switch', name: 'Relous', species: 'Salazzle' },
+        p2: { kind: 'move', name: 'Knock Off', tera: false },
+      },
+      playedOutcome: null,
+      scoreBefore,
+      scoreAfter,
+      sacks: { p1: { name: 'Relous', hpFraction: 0.46, healthy: true } },
+    });
+    // Decisively ahead before AND after: the simplification framing attaches.
+    const excused = run(0.66, 0.41);
+    expect(excused.p1.sacrifice).toBeTruthy();
+    expect(excused.p1.tier).toBe('inaccuracy');
+    // A losing side gets no simplification excuse.
+    expect(run(0.1, 0.41).p1.sacrifice).toBeFalsy();
+    expect(run(0.1, 0.41).p1.tier).toBe('mistake');
+    // A sack that collapses the position is not simplification.
+    expect(run(0.66, 0.1).p1.sacrifice).toBeFalsy();
+    // No after-score (game end, gap turn): fails closed.
+    expect(run(0.66, null).p1.sacrifice).toBeFalsy();
+  });
+
   test('a low-HP sacrifice demotes the tier and suppresses the risk label', () => {
     const sackResult: EvalResult = {
       score: 0.1, interval: 0.05, depthCompleted: 2,

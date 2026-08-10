@@ -90,7 +90,7 @@ export function EvalGameReport({ report, playerNames, onSelectTurn, leads, setti
                 className="ps-btn ps-eval-report-moment"
                 onClick={() => onSelectTurn?.(misplay.turn)}
                 title={misplay.sacrifice
-                  ? 'A nearly-dead Pokémon was fed deliberately — a low-cost sack, not a misplay'
+                  ? 'A body was fed deliberately — a sack (nearly dead, or simplifying a won position), not a misplay'
                   : misplay.riskUnpunished
                     ? "The engine's floor priced in a reply that never came — jump to this turn's analysis"
                     : "Jump to this turn's analysis"}
