@@ -710,6 +710,17 @@ import { brierScore, fitConstantK } from './fit-helpers';
  * as the standard corpus rig (records re-baseline) is REGISTERED as an
  * open decision, not taken.
  *
+ * ESCALATION-LANDING HOTFIX 2026-08-11 (user report: "Think deeper about
+ * this position doesn't work"): the escalation-keep rule protected a
+ * stored matrix-d2 result from MCTS-target sweeps but never let it LAND —
+ * supersedesStored rejected the think-deeper click's own d2s3 pass on a
+ * stored-mcts turn (matrix is not the late turn's configured engine →
+ * sweep skipped the turn → the button silently did nothing). The rule is
+ * now bidirectional: incoming matrix depth ≥ 2 supersedes a stored mcts
+ * result unconditionally. The unit matrix pins both directions, and the
+ * auto e2e now CLICKS the button and requires the 'depth 2 · 3 samples'
+ * badge — the presence-only assertion is what let this ship.
+ *
  * AUTO MODE SHIPPED 2026-08-11 (EVAL_CALIBRATION_MODE=auto; app mode
  * 'auto'): per-position dispatch on faintedFraction ≥ AUTO_MCTS_FAINTED_
  * FRACTION (0.4; the constant lives in types.ts so the UI shares it

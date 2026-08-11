@@ -229,10 +229,11 @@ export function needsSettingsUpgrade(
  * Cross-mode results replace only when the incoming pass carries the
  * CONFIGURED engine mode (the user's stated intent beats a stale result
  * from the other engine) — except that a matrix escalation of depth ≥ 2
- * outranks the d1s1-grade MCTS tier and always survives (think-deeper's
- * cross-engine product must not be trampled by the next sweep). Auto
- * resolves per turn via the fainted fraction; unresolvable cross-mode
- * conflicts keep the stored result (fail closed).
+ * outranks the d1s1-grade MCTS tier in BOTH directions: the think-deeper
+ * click's d2s3 pass LANDS on a stored MCTS turn even though matrix is not
+ * that turn's configured engine, and once stored it survives the next
+ * MCTS-target sweep. Auto resolves per turn via the fainted fraction;
+ * unresolvable cross-mode conflicts keep the stored result (fail closed).
  */
 export function supersedesStored(
   stored: TurnEvalSettings | null,
@@ -242,6 +243,7 @@ export function supersedesStored(
 ): boolean {
   if (!stored) return true;
   if (stored.mode !== incoming.mode) {
+    if (incoming.mode === 'matrix' && incoming.depth >= 2 && stored.mode === 'mcts') return true;
     if (incoming.mode !== configuredTarget(configuredMode, faintedFraction)) return false;
     return !(incoming.mode === 'mcts' && stored.mode === 'matrix' && stored.depth >= 2);
   }

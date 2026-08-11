@@ -50,6 +50,17 @@ test.describe('graph merge monotonicity', () => {
     expect(supersedesStored({ depth: 3, samples: 3, mode: 'matrix' }, { depth: 1, samples: 1, mode: 'mcts' }, 'mcts')).toBe(false);
     expect(supersedesStored({ depth: 2, samples: 3, mode: 'matrix' }, { depth: 1, samples: 1, mode: 'mcts' }, 'auto', 0.5)).toBe(false);
   });
+  test('an explicit matrix escalation LANDS on an MCTS-target turn', () => {
+    // The other direction of the same rule — the think-deeper click itself.
+    // Its d2s3 matrix pass must supersede the stored d1s1-grade MCTS result
+    // even though matrix is not the turn's configured engine; without this
+    // the sweep skips the turn and the button silently does nothing.
+    expect(supersedesStored({ depth: 1, samples: 1, mode: 'mcts' }, { depth: 2, samples: 3, mode: 'matrix' }, 'auto', 0.5)).toBe(true);
+    expect(supersedesStored({ depth: 1, samples: 1, mode: 'mcts' }, { depth: 2, samples: 3, mode: 'matrix' }, 'mcts')).toBe(true);
+    expect(supersedesStored({ depth: 1, samples: 1, mode: 'mcts' }, { depth: 3, samples: 3, mode: 'matrix' }, 'auto', 1)).toBe(true);
+    // The fast matrix sketch (d1) is NOT an escalation — routing still wins.
+    expect(supersedesStored({ depth: 1, samples: 1, mode: 'mcts' }, { depth: 1, samples: 1, mode: 'matrix' }, 'auto', 0.5)).toBe(false);
+  });
 });
 
 test.describe('auto mode resolution', () => {
