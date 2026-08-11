@@ -90,6 +90,23 @@ export function serializedFaintedFraction(serialized: string): number {
   return total > 0 ? fainted / total : 0;
 }
 
+/**
+ * The tier a flagged turn re-adjudicates at: matrix pairs one depth up.
+ * ENGINE-INDEPENDENT — an MCTS-line flag verifies at the same matrix-d2
+ * tier the d1 matrix line gets. Sound because the verdict statistic
+ * (bestDeep − playedDeep vs the threshold) is internal to the deep pass,
+ * and pair valuation under any settings already runs as matrix subsearches
+ * (playedOutcomeSettings). null = no tier left (the ladder caps at the
+ * engine's depth 3).
+ */
+export function verificationDeepSettings(settings: EvalSettings): EvalSettings | null {
+  if ((settings.mode ?? 'matrix') === 'mcts') {
+    return { ...settings, depth: 2, mode: 'matrix', keepPlayed: undefined };
+  }
+  if (settings.depth > 2) return null;
+  return { ...settings, depth: (settings.depth + 1) as 2 | 3, mode: 'matrix', keepPlayed: undefined };
+}
+
 interface CachedEval {
   result: EvalResult;
   // Engine-typed: the UI only offers depth 1/2, but sweeps cache whatever
@@ -178,7 +195,9 @@ const configuredTarget = (
  * The stored result is SHALLOWER than the panel preferences — the turn can
  * be re-run at full settings (the explicit deepen button offers exactly
  * that). Deeper/heavier stored results never downgrade (a depth-2 result
- * stays shown under depth-1 prefs). Auto prefs resolve through the turn's
+ * stays shown under depth-1 prefs); that includes a matrix escalation of
+ * depth ≥ 2 sitting on an MCTS-target turn — think-deeper's cross-engine
+ * product is settled, not stale. Auto prefs resolve through the turn's
  * fainted fraction; with the fraction unknown the answer is conservative
  * (no upgrade claimed — the next sweep resolves it).
  */
@@ -188,15 +207,17 @@ export function needsSettingsUpgrade(
   faintedFraction?: number | null,
 ): boolean {
   if (!stored) return true;
+  const escalatedPastMcts = (target: EngineMode) =>
+    target === 'mcts' && stored.mode === 'matrix' && stored.depth >= 2;
   if (prefs.mode === 'auto') {
     const target = configuredTarget('auto', faintedFraction);
     if (target === null) return false;
     const resolved = resolveAutoTurnSettings(faintedFraction!);
-    if (stored.mode !== resolved.mode) return true;
+    if (stored.mode !== resolved.mode) return !escalatedPastMcts(resolved.mode);
     if (resolved.mode === 'mcts') return false;
     return stored.depth < resolved.depth || stored.samples < resolved.samples;
   }
-  if (stored.mode !== prefs.mode) return true;
+  if (stored.mode !== prefs.mode) return !escalatedPastMcts(prefs.mode);
   if (prefs.mode === 'mcts') return false;
   return stored.depth < prefs.depth || stored.samples < prefs.samples;
 }
@@ -207,8 +228,11 @@ export function needsSettingsUpgrade(
  * later "Analyze game" must not downgrade an explicitly deepened turn.
  * Cross-mode results replace only when the incoming pass carries the
  * CONFIGURED engine mode (the user's stated intent beats a stale result
- * from the other engine). Auto resolves per turn via the fainted fraction;
- * unresolvable cross-mode conflicts keep the stored result (fail closed).
+ * from the other engine) — except that a matrix escalation of depth ≥ 2
+ * outranks the d1s1-grade MCTS tier and always survives (think-deeper's
+ * cross-engine product must not be trampled by the next sweep). Auto
+ * resolves per turn via the fainted fraction; unresolvable cross-mode
+ * conflicts keep the stored result (fail closed).
  */
 export function supersedesStored(
   stored: TurnEvalSettings | null,
@@ -218,7 +242,8 @@ export function supersedesStored(
 ): boolean {
   if (!stored) return true;
   if (stored.mode !== incoming.mode) {
-    return incoming.mode === configuredTarget(configuredMode, faintedFraction);
+    if (incoming.mode !== configuredTarget(configuredMode, faintedFraction)) return false;
+    return !(incoming.mode === 'mcts' && stored.mode === 'matrix' && stored.depth >= 2);
   }
   if (incoming.mode === 'mcts') return true;
   return incoming.depth >= stored.depth && incoming.samples >= stored.samples;
@@ -501,9 +526,11 @@ export function useEvaluation() {
 
     /**
      * Deep re-search before a misplay verdict sticks (chess.com's sacrifice
-     * verification): for each side whose played choice trails the best by the
-     * regret threshold, value the played and best pairs one depth deeper.
-     * Flag checks are pure — the position is only acquired when needed.
+     * verification): for each side whose played choice trails the best by
+     * the regret threshold, value the played and best pairs at the matrix
+     * verification tier (verificationDeepSettings — the line engine that
+     * raised the flag is irrelevant to the deep verdict). Flag checks are
+     * pure — the position is only acquired when needed.
      */
     const verifyFlagged = async (
       getSerialized: () => Promise<string>,
@@ -511,7 +538,8 @@ export function useEvaluation() {
       turnPlayed: PlayedTurn | null,
       settings: EvalSettings,
     ): Promise<TurnVerification | null> => {
-      if ((settings.mode ?? 'matrix') !== 'matrix' || settings.depth > 2) return null;
+      const deep = verificationDeepSettings(settings);
+      if (!deep) return null;
       const p1Choice = matchOrPhantom(result, 'p1', turnPlayed);
       const p2Choice = matchOrPhantom(result, 'p2', turnPlayed);
       if (!p1Choice || !p2Choice) return null;
@@ -522,9 +550,6 @@ export function useEvaluation() {
       const p1Best = flaggedBest('p1', p1Choice);
       const p2Best = flaggedBest('p2', p2Choice);
       if (!p1Best && !p2Best) return null;
-      const deep: EvalSettings = {
-        ...settings, depth: (settings.depth + 1) as 2 | 3, mode: 'matrix', keepPlayed: undefined,
-      };
       const serialized = await getSerialized();
       clientRef.current ??= new EvalWorkerClient();
       const playedDeep = await clientRef.current.evalPair(serialized, p1Choice.choice, p2Choice.choice, deep);
@@ -548,9 +573,10 @@ export function useEvaluation() {
      * Item-sensitivity probes for sides still flagged AFTER verification:
      * re-evaluate the played and best pairs with an opposing guessed item
      * swapped for its next usage candidates (≤2 combos per side = ≤4 extra
-     * pair-evals). Probes run at the sweep's own settings so their EVs stay
-     * comparable to the regret that raised the flag. Acquit-only downstream
-     * (analyzeTurn) — this only gathers evidence.
+     * pair-evals). Probes run at the sweep's own settings; pair valuation is
+     * engine-independent (an MCTS line's pairs value as matrix subsearches),
+     * and the acquit statistic compares only probe EVs with each other.
+     * Acquit-only downstream (analyzeTurn) — this only gathers evidence.
      */
     const probeSensitivity = async (
       getSerialized: () => Promise<string>,
@@ -560,7 +586,6 @@ export function useEvaluation() {
       turnVerified: TurnVerification | null,
     ): Promise<TurnSensitivity | null> => {
       if (!params.sensitivityTargetsFor) return null;
-      if ((settings.mode ?? 'matrix') !== 'matrix') return null;
       const p1Choice = matchOrPhantom(result, 'p1', turnPlayed);
       const p2Choice = matchOrPhantom(result, 'p2', turnPlayed);
       if (!p1Choice || !p2Choice) return null;

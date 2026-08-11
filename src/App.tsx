@@ -1084,8 +1084,17 @@ function App() {
       }
       return { depth: evaluation.prefs.depth, samples: evaluation.prefs.samples, mode: evaluation.prefs.mode };
     }
-    // MCTS has no depth ladder; matrix caps at the engine's depth 3.
-    if (stored.mode === 'mcts' || evaluation.prefs.mode === 'mcts') return null;
+    // From an MCTS turn the button crosses into the matrix ladder at depth
+    // 2 — the same rung the early d1s1 line escalates to. The escalation-
+    // keep rule (supersedesStored) makes the product survive later sweeps.
+    if (stored.mode === 'mcts') {
+      return {
+        depth: 2,
+        samples: Math.max(stored.samples, evaluation.prefs.samples) as TurnEvalSettings['samples'],
+        mode: 'matrix',
+      };
+    }
+    // The matrix ladder caps at the engine's depth 3.
     if (stored.depth >= 3) return null;
     return {
       depth: (stored.depth + 1) as 2 | 3,

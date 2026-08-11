@@ -516,6 +516,9 @@ test.describe('PS Dashboard', () => {
     await panel.locator('.ps-eval-graph rect[data-turn="38"]').click();
     await expect(panel.locator('.ps-eval-analysis')).toContainText('Turn 38', { timeout: 15_000 });
     await expect(panel.getByTitle('What produced the numbers shown for this turn.')).toHaveText('MCTS');
+    // The cross-engine ladder: from an MCTS turn, think-deeper crosses into
+    // the matrix ladder at depth 2 — same rung the early d1s1 line offers.
+    await expect(panel.locator('button', { hasText: 'Think deeper about this position (depth 2)' })).toBeVisible();
   });
 
   test('branch mode: clicking a recommendation plays the turn out', async ({ page }) => {

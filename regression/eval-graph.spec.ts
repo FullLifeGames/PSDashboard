@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { needsSettingsUpgrade, resolveAutoTurnSettings, serializedFaintedFraction, supersedesStored } from '../src/hooks/useEvaluation';
+import { needsSettingsUpgrade, resolveAutoTurnSettings, serializedFaintedFraction, supersedesStored, verificationDeepSettings } from '../src/hooks/useEvaluation';
 import { AUTO_MCTS_FAINTED_FRACTION } from '../src/lib/eval/types';
 
 test.describe('settings upgrade decision (merged flow)', () => {
@@ -37,9 +37,18 @@ test.describe('graph merge monotonicity', () => {
     expect(supersedesStored({ depth: 2, samples: 1, mode: 'mcts' }, { depth: 1, samples: 1, mode: 'matrix' }, 'mcts')).toBe(false);
     // …but a user who SWITCHED to matrix gets matrix results again.
     expect(supersedesStored({ depth: 2, samples: 1, mode: 'mcts' }, { depth: 1, samples: 1, mode: 'matrix' }, 'matrix')).toBe(true);
-    expect(supersedesStored({ depth: 2, samples: 3, mode: 'matrix' }, { depth: 1, samples: 1, mode: 'mcts' }, 'mcts')).toBe(true);
+    // A d1 matrix leftover is NOT an escalation — the configured MCTS wins.
+    expect(supersedesStored({ depth: 1, samples: 1, mode: 'matrix' }, { depth: 1, samples: 1, mode: 'mcts' }, 'mcts')).toBe(true);
     // Same-mode MCTS has no depth ordering — it refreshes.
     expect(supersedesStored({ depth: 1, samples: 1, mode: 'mcts' }, { depth: 1, samples: 1, mode: 'mcts' }, 'mcts')).toBe(true);
+  });
+  test('an explicit matrix escalation survives an MCTS-target sweep', () => {
+    // Think-deeper's cross-engine product (matrix depth ≥ 2) outranks the
+    // d1s1-grade MCTS tier — the next sweep must not trample it, whether
+    // MCTS is the target via explicit prefs or the auto routing.
+    expect(supersedesStored({ depth: 2, samples: 3, mode: 'matrix' }, { depth: 1, samples: 1, mode: 'mcts' }, 'mcts')).toBe(false);
+    expect(supersedesStored({ depth: 3, samples: 3, mode: 'matrix' }, { depth: 1, samples: 1, mode: 'mcts' }, 'mcts')).toBe(false);
+    expect(supersedesStored({ depth: 2, samples: 3, mode: 'matrix' }, { depth: 1, samples: 1, mode: 'mcts' }, 'auto', 0.5)).toBe(false);
   });
 });
 
@@ -90,6 +99,32 @@ test.describe('auto mode resolution', () => {
     expect(needsSettingsUpgrade(null, prefs, null)).toBe(true);
     // A think-deeper'd early turn (deeper matrix) never downgrades under auto.
     expect(needsSettingsUpgrade({ depth: 2, samples: 3, mode: 'matrix' }, prefs, 0.1)).toBe(false);
+    // A think-deeper'd LATE turn (matrix depth ≥ 2 above the MCTS tier)
+    // is settled too — no badge claims it needs the line engine back.
+    expect(needsSettingsUpgrade({ depth: 2, samples: 3, mode: 'matrix' }, prefs, 0.5)).toBe(false);
+    expect(needsSettingsUpgrade({ depth: 2, samples: 3, mode: 'matrix' }, { ...prefs, mode: 'mcts' })).toBe(false);
+  });
+});
+
+test.describe('verification deep tier', () => {
+  test('flags adjudicate one depth up in matrix pair space, from any line engine', () => {
+    // Matrix lines rise one depth; the engine cap (3) ends the ladder.
+    expect(verificationDeepSettings({ depth: 1, samples: 1, mode: 'matrix' }))
+      .toMatchObject({ depth: 2, samples: 1, mode: 'matrix' });
+    expect(verificationDeepSettings({ depth: 2, samples: 3, mode: 'matrix' }))
+      .toMatchObject({ depth: 3, samples: 3, mode: 'matrix' });
+    expect(verificationDeepSettings({ depth: 3, samples: 3, mode: 'matrix' })).toBeNull();
+    // MCTS lines verify at the SAME matrix tier the d1 line gets — the
+    // verdict statistic (bestDeep − playedDeep) is deep-tier-internal, so
+    // the engine that raised the flag is irrelevant.
+    expect(verificationDeepSettings({ depth: 1, samples: 1, mode: 'mcts' }))
+      .toMatchObject({ depth: 2, samples: 1, mode: 'matrix' });
+    expect(verificationDeepSettings({ depth: 2, samples: 3, mode: 'mcts' }))
+      .toMatchObject({ depth: 2, samples: 3, mode: 'matrix' });
+    // Context rides along; the played-pair restriction never does.
+    const deep = verificationDeepSettings({ depth: 1, samples: 1, mode: 'mcts', tera: false, keepPlayed: { p1Slots: ['move tackle'] } as never });
+    expect(deep?.tera).toBe(false);
+    expect(deep?.keepPlayed).toBeUndefined();
   });
 });
 import { computeBlunders, selectKeyTurns, BLUNDER_SWING, KEY_TURN_SWING } from '../src/lib/eval/graph';

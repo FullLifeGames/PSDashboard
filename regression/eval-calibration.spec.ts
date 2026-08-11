@@ -602,6 +602,31 @@ import { brierScore, fitConstantK } from './fit-helpers';
  * matrix guard — flags re-evaluate as matrix pairs regardless of line
  * engine), then revisit pure-MCTS-as-default.
  *
+ * VERIFICATION FOR MCTS LINES 2026-08-11 (the follow-up's first leg —
+ * app-side only, no line change): flag adjudication and the think-deeper
+ * ladder are now ENGINE-INDEPENDENT.
+ * - verifyFlagged's matrix guard is gone (verificationDeepSettings): an
+ *   MCTS-line flag re-adjudicates as matrix pairs at depth 2 — the same
+ *   tier the d1 matrix line gets. Sound because the verdict statistic
+ *   (bestDeep − playedDeep vs the threshold) is internal to the deep pass,
+ *   and pair valuation under mcts settings already runs as matrix
+ *   subsearches (playedOutcomeSettings). Sensitivity probes lift the same
+ *   guard — the acquit statistic compares probe EVs only with each other.
+ * - Think-deeper on an MCTS turn crosses into the matrix ladder at depth 2
+ *   (samples ride the prefs → d2s3 by default), then depth 3 via the
+ *   existing rungs. New ESCALATION-KEEP rule in supersedesStored /
+ *   needsSettingsUpgrade: a matrix result of depth ≥ 2 outranks the
+ *   d1s1-grade mcts tier and survives later sweeps (auto or explicit mcts
+ *   target) — without it the next sweep would trample the button's product.
+ * - Stored mcts entries carry verified: null from the guard era and do not
+ *   retro-verify (backfill triggers on undefined only) — accepted, no
+ *   cache-version bump; a re-run through the button or a cleared store
+ *   verifies fresh.
+ * - Feature asymmetry is now down to root pivot pairs (matrix-only).
+ *   Registered follow-up: revisit pure-MCTS-as-default with the user —
+ *   the feature argument for auto has thinned to pivot pairs + early
+ *   compute cost vs grand-bed mcts 56/63/78/64/69 over auto 54/62/78/64/67.
+ *
  * AUTO MODE SHIPPED 2026-08-11 (EVAL_CALIBRATION_MODE=auto; app mode
  * 'auto'): per-position dispatch on faintedFraction ≥ AUTO_MCTS_FAINTED_
  * FRACTION (0.4; the constant lives in types.ts so the UI shares it
