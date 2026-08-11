@@ -1,5 +1,6 @@
 import { test, expect } from '@playwright/test';
-import { needsSettingsUpgrade, supersedesStored } from '../src/hooks/useEvaluation';
+import { needsSettingsUpgrade, resolveAutoTurnSettings, serializedFaintedFraction, supersedesStored } from '../src/hooks/useEvaluation';
+import { AUTO_MCTS_FAINTED_FRACTION } from '../src/lib/eval/types';
 
 test.describe('settings upgrade decision (merged flow)', () => {
   const prefs = { depth: 2, samples: 3, mode: 'matrix', auto: false, tera: 'auto' } as const;
@@ -39,6 +40,56 @@ test.describe('graph merge monotonicity', () => {
     expect(supersedesStored({ depth: 2, samples: 3, mode: 'matrix' }, { depth: 1, samples: 1, mode: 'mcts' }, 'mcts')).toBe(true);
     // Same-mode MCTS has no depth ordering — it refreshes.
     expect(supersedesStored({ depth: 1, samples: 1, mode: 'mcts' }, { depth: 1, samples: 1, mode: 'mcts' }, 'mcts')).toBe(true);
+  });
+});
+
+test.describe('auto mode resolution', () => {
+  test('auto is the pinned d1s1 line: matrix below the threshold, MCTS at or above', () => {
+    expect(resolveAutoTurnSettings(0)).toEqual({ depth: 1, samples: 1, mode: 'matrix' });
+    expect(resolveAutoTurnSettings(AUTO_MCTS_FAINTED_FRACTION - 0.001)).toEqual({ depth: 1, samples: 1, mode: 'matrix' });
+    expect(resolveAutoTurnSettings(AUTO_MCTS_FAINTED_FRACTION)).toEqual({ depth: 1, samples: 1, mode: 'mcts' });
+    expect(resolveAutoTurnSettings(1)).toEqual({ depth: 1, samples: 1, mode: 'mcts' });
+  });
+
+  test('serializedFaintedFraction mirrors the engine definition', () => {
+    const battle = JSON.stringify({
+      sides: [
+        { pokemon: [{ hp: 100 }, { hp: 0 }, { hp: 12, fainted: false }] },
+        { pokemon: [{ hp: 50, fainted: true }, { hp: 88 }, { hp: 44 }] },
+      ],
+    });
+    expect(serializedFaintedFraction(battle)).toBeCloseTo(2 / 6, 10);
+    expect(serializedFaintedFraction(JSON.stringify({ sides: [] }))).toBe(0);
+  });
+
+  test('supersedes resolves auto per turn: the fast sketch never downgrades a resolved-MCTS turn', () => {
+    const mctsStored = { depth: 1, samples: 1, mode: 'mcts' } as const;
+    const fastIncoming = { depth: 1, samples: 1, mode: 'matrix' } as const;
+    // Late turn (fraction at/above the threshold): auto's target is MCTS — keep it.
+    expect(supersedesStored(mctsStored, fastIncoming, 'auto', 0.5)).toBe(false);
+    // Early turn: auto's target is matrix — the sketch may replace the stale engine.
+    expect(supersedesStored(mctsStored, fastIncoming, 'auto', 0.1)).toBe(true);
+    // Unknown fraction: cross-mode conflicts fail closed (keep stored).
+    expect(supersedesStored(mctsStored, fastIncoming, 'auto', null)).toBe(false);
+    // Same-mode comparisons never need the fraction.
+    expect(supersedesStored({ depth: 2, samples: 3, mode: 'matrix' }, fastIncoming, 'auto', null)).toBe(false);
+    expect(supersedesStored(fastIncoming, { depth: 2, samples: 3, mode: 'matrix' }, 'auto', null)).toBe(true);
+  });
+
+  test('needsSettingsUpgrade under auto prefs follows the turn resolution', () => {
+    const prefs = { depth: 2, samples: 3, mode: 'auto', auto: false, tera: 'auto' } as const;
+    // Early turn already holding the pinned d1s1 matrix: settled (depth
+    // prefs apply to the explicit matrix modes, not to auto).
+    expect(needsSettingsUpgrade({ depth: 1, samples: 1, mode: 'matrix' }, prefs, 0.1)).toBe(false);
+    // Late turn still holding matrix: the auto target is MCTS — upgrade.
+    expect(needsSettingsUpgrade({ depth: 1, samples: 1, mode: 'matrix' }, prefs, 0.5)).toBe(true);
+    // Late turn holding MCTS: settled.
+    expect(needsSettingsUpgrade({ depth: 1, samples: 1, mode: 'mcts' }, prefs, 0.5)).toBe(false);
+    // Unknown fraction: conservative for stored turns; gaps always analyze.
+    expect(needsSettingsUpgrade({ depth: 1, samples: 1, mode: 'matrix' }, prefs, null)).toBe(false);
+    expect(needsSettingsUpgrade(null, prefs, null)).toBe(true);
+    // A think-deeper'd early turn (deeper matrix) never downgrades under auto.
+    expect(needsSettingsUpgrade({ depth: 2, samples: 3, mode: 'matrix' }, prefs, 0.1)).toBe(false);
   });
 });
 import { computeBlunders, selectKeyTurns, BLUNDER_SWING, KEY_TURN_SWING } from '../src/lib/eval/graph';

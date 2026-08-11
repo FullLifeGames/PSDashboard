@@ -485,6 +485,39 @@ test.describe('PS Dashboard', () => {
     await expect(panel.getByTitle('What produced the numbers shown for this turn.')).toHaveText('MCTS');
   });
 
+  test('auto mode routes the line per turn: matrix early, MCTS once bodies fall (GPL)', async ({ page }) => {
+    test.setTimeout(360_000);
+    await page.evaluate(() => {
+      localStorage.setItem('ps-replay-interceptor:eval-pool', '2');
+      localStorage.setItem('ps-replay-interceptor:eval-prefs',
+        JSON.stringify({ depth: 2, samples: 3, mode: 'auto', auto: false, tera: 'auto' }));
+    });
+    await page.reload();
+    // Offline usage payloads: deterministic teams, and the Smogon-loading
+    // guard settles so Analyze game is clickable.
+    await page.route('https://data.pkmn.cc/**', route =>
+      route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({}) }));
+    await page.locator('input[aria-label="Load exported replay file"]')
+      .setInputFiles(join(__dirname, 'fixtures', 'gpl-replay.html'));
+
+    const panel = page.locator('.ps-main-right .ps-eval-panel');
+    // The auto pref round-trips into the dropdown and the caption names the routing.
+    await expect(panel.locator('select').first()).toHaveValue('auto');
+    await expect(panel.getByText('auto (matrix early, MCTS late)')).toBeVisible();
+    await panel.locator('button', { hasText: 'Analyze game' }).click();
+    await expect(panel.locator('button', { hasText: 'Re-analyze' })).toBeVisible({ timeout: 300_000 });
+
+    // Turn 2: full boards — the pinned d1s1 matrix side produced the number.
+    await panel.locator('.ps-eval-graph rect[data-turn="2"]').click();
+    await expect(panel.locator('.ps-eval-analysis')).toContainText('Turn 2', { timeout: 15_000 });
+    await expect(panel.getByTitle('What produced the numbers shown for this turn.')).toHaveText('depth 1 · 1 sample');
+
+    // Turn 38: nine bodies down — the DUCT tree took over.
+    await panel.locator('.ps-eval-graph rect[data-turn="38"]').click();
+    await expect(panel.locator('.ps-eval-analysis')).toContainText('Turn 38', { timeout: 15_000 });
+    await expect(panel.getByTitle('What produced the numbers shown for this turn.')).toHaveText('MCTS');
+  });
+
   test('branch mode: clicking a recommendation plays the turn out', async ({ page }) => {
     test.setTimeout(180_000);
     await page.evaluate(() => {

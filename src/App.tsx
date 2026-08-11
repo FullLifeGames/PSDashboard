@@ -16,7 +16,7 @@ import { applyTeamSheetToInfo } from './lib/team-sheets';
 import { TeamEditor } from './components/TeamEditor';
 import { SetsImportExportPanel } from './components/SetsImportExportPanel';
 import { EvalPanel } from './components/EvalPanel';
-import { needsSettingsUpgrade, useEvaluation, type TurnEvalSettings } from './hooks/useEvaluation';
+import { needsSettingsUpgrade, resolveAutoTurnSettings, useEvaluation, type TurnEvalSettings } from './hooks/useEvaluation';
 import { buildSetsExport, parseSetsImport } from './lib/sets-io';
 import { parseTeamText } from './lib/team-parser';
 import { applyInferredSpreads, enrichTeamInfo, manualMove } from './lib/team-info';
@@ -1072,10 +1072,16 @@ function App() {
   // The explicit deepening ladder: a sketch (or gap) first rises to the
   // configured settings, then one depth further (cap 3). Selecting a turn
   // never re-searches — this target is the only escalation.
-  const thinkDeeperTarget = useMemo((): TurnEvalSettings | null => {
+  const thinkDeeperTarget = useMemo((): TurnEvalSettings | { mode: 'auto' } | null => {
     if (branching || analysisTurn === null || analysisTurn < 1) return null;
     const stored = evaluation.graph.settings[analysisTurn - 1] ?? null;
-    if (!stored || needsSettingsUpgrade(stored, evaluation.prefs)) {
+    const fraction = evaluation.graph.faintedFractions[analysisTurn - 1] ?? null;
+    if (!stored || needsSettingsUpgrade(stored, evaluation.prefs, fraction)) {
+      if (evaluation.prefs.mode === 'auto') {
+        // Rise to the turn's auto-resolved engine; a gap turn's routing
+        // signal is unknown until swept — the sweep resolves it itself.
+        return fraction !== null ? resolveAutoTurnSettings(fraction) : { mode: 'auto' };
+      }
       return { depth: evaluation.prefs.depth, samples: evaluation.prefs.samples, mode: evaluation.prefs.mode };
     }
     // MCTS has no depth ladder; matrix caps at the engine's depth 3.
@@ -1087,11 +1093,13 @@ function App() {
       samples: Math.max(stored.samples, evaluation.prefs.samples) as TurnEvalSettings['samples'],
       mode: 'matrix',
     };
-  }, [branching, analysisTurn, evaluation.graph.settings, evaluation.prefs]);
+  }, [branching, analysisTurn, evaluation.graph.settings, evaluation.graph.faintedFractions, evaluation.prefs]);
 
   const handleThinkDeeper = useCallback(() => {
     if (analysisTurn === null || analysisTurn < 1 || !thinkDeeperTarget) return;
-    analyzeTurnNow(analysisTurn, thinkDeeperTarget);
+    // The 'auto' sentinel means "no override" — the sweep resolves the
+    // turn's engine from its position, exactly like Analyze game.
+    analyzeTurnNow(analysisTurn, 'depth' in thinkDeeperTarget ? thinkDeeperTarget : undefined);
   }, [analysisTurn, thinkDeeperTarget, analyzeTurnNow]);
 
   const replayWinner = useMemo<'p1' | 'p2' | null>(() => {

@@ -31,13 +31,32 @@ export interface EvalSettings {
   keepPlayed?: { p1Slots?: (PlayedAction | null)[]; p2Slots?: (PlayedAction | null)[] } | null;
 }
 
+/**
+ * The auto engine mode's switch point: matrix search below this fainted
+ * fraction, the DUCT tree at or above it. Measured 2026-08-11 on the
+ * expanded corpus (n 417 paired): the tree's adaptive depth pays exactly
+ * once bodies fall — late sign +2 over pure d1 with doubles preserved and
+ * late brier within 0.002 of pure MCTS, while below the threshold the two
+ * engines are calibration-identical and the matrix is far cheaper. Lives
+ * here (not search.ts) so the UI layer can import it without pulling
+ * @pkmn/sim into the main chunk.
+ */
+export const AUTO_MCTS_FAINTED_FRACTION = 0.4;
+
 /** Panel preferences persisted in localStorage (worker only sees EvalSettings). */
 export interface EvalPreferences {
   /** UI offers 1/2 only — depth 3 costs 3-4× for capped gains (MCTS is the "deeper" mode). */
   depth: 1 | 2;
   samples: 1 | 3 | 5;
-  /** 'mcts' runs the DUCT tree search; depth/samples then don't apply. */
-  mode: 'matrix' | 'mcts';
+  /**
+   * 'mcts' runs the DUCT tree search; depth/samples then don't apply.
+   * 'auto' routes per turn on the position's fainted fraction — matrix
+   * (at the configured depth/samples) while boards are full, MCTS once
+   * bodies fall (AUTO_MCTS_FAINTED_FRACTION). Resolved to a concrete
+   * engine BEFORE dispatch: EvalSettings and stored per-turn results only
+   * ever carry 'matrix' or 'mcts'.
+   */
+  mode: 'matrix' | 'mcts' | 'auto';
   /** Re-run automatically after each executed branch turn. */
   auto: boolean;
   /**

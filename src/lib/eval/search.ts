@@ -48,6 +48,11 @@ function countFainted(battle: ReturnType<typeof positionBattle>): number {
  * search, the executor (worker path), and MCTS — all engine modes must live
  * in the same value space.
  */
+// Re-exported for engine-side consumers (the calibration harness's auto
+// dispatch); the constant itself lives in types.ts so the UI can share it
+// without importing the sim.
+export { AUTO_MCTS_FAINTED_FRACTION } from './types';
+
 /** Fainted bodies over total bodies, both sides — the phase signal for the win-prob mapping. */
 export function battleFaintedFraction(battle: ReturnType<typeof positionBattle>): number {
   let fainted = 0;

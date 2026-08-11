@@ -4,7 +4,7 @@ import { buildTeamsFromReplay } from '../src/lib/team-builder';
 import { reconstructBranchRuntime } from '../src/lib/branch-engine';
 import { formatEnforcesSleepClause, getBranchSimulatorFormat } from '../src/lib/replay-format';
 import { parseReplayLogWithObservations } from '../src/lib/protocol-parser';
-import { battleFaintedFraction, searchPosition } from '../src/lib/eval/search';
+import { AUTO_MCTS_FAINTED_FRACTION, battleFaintedFraction, searchPosition } from '../src/lib/eval/search';
 import { mctsSearch } from '../src/lib/eval/mcts';
 import { brierScore, fitConstantK } from './fit-helpers';
 
@@ -506,6 +506,19 @@ import { brierScore, fitConstantK } from './fit-helpers';
  * comparisons of old records to these lines are invalid; the expanded bed
  * is the baseline from here on.
  *
+ * AUTO MODE SHIPPED 2026-08-11 (EVAL_CALIBRATION_MODE=auto; app mode
+ * 'auto'): per-position dispatch on faintedFraction ≥ AUTO_MCTS_FAINTED_
+ * FRACTION (0.4; the constant lives in types.ts so the UI shares it
+ * without importing the sim). BIT-EXACT GATE PASSED: all 417 auto
+ * positions equal their ff-selected parent's score exactly and the
+ * aggregate equals the offline counterfactual — 55/58/79/62/69 · late
+ * brier 0.1696. The app line and the measured counterfactual are the same
+ * object. Auto is a COMPLETE engine spec (d1s1 matrix below the threshold
+ * — the measured-best line; depth/samples prefs configure the explicit
+ * matrix modes only). Stored results always carry the concrete engine;
+ * supersedes/upgrade resolve auto per turn via the recorded fainted
+ * fraction and fail closed across modes when it is unknown.
+ *
  * DIRECTIONAL SPEED EXCLUSIONS 2026-08-10: observations now drop only when
  * the modifier could EXPLAIN the observed order — a speed-raising factor
  * (Tailwind, +spe stages, paradox boosters) on the FIRST mover, or a
@@ -712,7 +725,13 @@ test.describe('eval calibration against real replays', () => {
           // matrix path is gated every round; MCTS earns numbers here too.
           // (Dispatch mirrors eval-worker: searchPosition IGNORES mode.)
           const depth = process.env.EVAL_CALIBRATION_DEPTH === '2' ? 2 : 1;
-          const runSearch = process.env.EVAL_CALIBRATION_MODE === 'mcts' ? mctsSearch : searchPosition;
+          const faintedFraction = battleFaintedFraction(battle);
+          // EVAL_CALIBRATION_MODE=auto mirrors the app's sweep dispatch
+          // exactly: matrix below the threshold, the DUCT tree at or above.
+          const mode = process.env.EVAL_CALIBRATION_MODE;
+          const useMcts = mode === 'mcts' ||
+            (mode === 'auto' && faintedFraction >= AUTO_MCTS_FAINTED_FRACTION);
+          const runSearch = useMcts ? mctsSearch : searchPosition;
           const { score } = runSearch(serialized, {
             depth, samples: sampleCount, tera: false,
             sleepClause: formatEnforcesSleepClause(getBranchSimulatorFormat(replay)),
@@ -729,7 +748,7 @@ test.describe('eval calibration against real replays', () => {
             phase: fraction < 1 / 3 ? 'early' : fraction < 2 / 3 ? 'mid' : 'late',
             gameType,
             score,
-            faintedFraction: battleFaintedFraction(battle),
+            faintedFraction,
             p1Won,
           });
         } catch (error) {

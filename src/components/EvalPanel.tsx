@@ -31,7 +31,7 @@ interface EvalPanelProps {
   /** Explicit per-position deepening — selecting a turn never re-searches. */
   onThinkDeeper?: () => void;
   /** The settings the deepen button would run (null = at the cap / not applicable). */
-  thinkDeeperTarget?: TurnEvalSettings | null;
+  thinkDeeperTarget?: TurnEvalSettings | { mode: 'auto' } | null;
   /** Smogon usage/sets still loading — a sweep started now would silently
    * build teams without the guessed fills (the T35 one-move Iron Valiant). */
   smogonPending?: boolean;
@@ -147,7 +147,9 @@ export function EvalPanel({
       style={{ padding: '1px 6px', fontSize: 10 }}
     >
       {result ? 'Think deeper about this position' : 'Analyze this position'}
-      {` (${thinkDeeperTarget.mode === 'mcts' ? 'MCTS' : `depth ${thinkDeeperTarget.depth}`})`}
+      {` (${thinkDeeperTarget.mode === 'mcts' ? 'MCTS'
+        : thinkDeeperTarget.mode === 'auto' ? 'auto'
+        : `depth ${thinkDeeperTarget.depth}`})`}
     </button>
   ) : null;
 
@@ -180,20 +182,22 @@ export function EvalPanel({
         <label style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 10, color: '#aabbcc' }}>
           Depth
           <select
-            value={prefs.mode === 'mcts' ? 'mcts' : String(prefs.depth)}
+            value={prefs.mode === 'mcts' || prefs.mode === 'auto' ? prefs.mode : String(prefs.depth)}
             onChange={event => {
               const value = event.target.value;
-              if (value === 'mcts') onPrefsChange({ ...prefs, mode: 'mcts' });
+              if (value === 'mcts' || value === 'auto') onPrefsChange({ ...prefs, mode: value });
               else onPrefsChange({ ...prefs, mode: 'matrix', depth: parseInt(value, 10) as EvalPreferences['depth'] });
             }}
             disabled={running}
+            title="Auto routes each turn by its position: fast matrix search while boards are full, the MCTS tree once enough Pokémon have fainted — the measured-best line configuration."
           >
             <option value="1">1</option>
             <option value="2">2</option>
             <option value="mcts">MCTS</option>
+            <option value="auto">Auto</option>
           </select>
         </label>
-        {prefs.mode !== 'mcts' && (
+        {prefs.mode === 'matrix' && (
           <label
             title="Damage-roll seeds averaged per cell. Only affects cells where a KO is in range — quiet cells are roll-insensitive and always simulate once."
             style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 10, color: '#aabbcc' }}
@@ -309,7 +313,9 @@ export function EvalPanel({
             style={{ fontSize: 10, color: '#778', marginTop: 2 }}
             title="Analyze game paints the whole line with a fast depth-1 scan first, then converges every turn to the settings above — report-worthy swings first. Any turn can go deeper still from its view (Think deeper); Tera applies everywhere."
           >
-            line: fast scan, then {prefs.mode === 'mcts' ? 'MCTS' : `depth ${prefs.depth}`} everywhere · deeper: per turn
+            line: fast scan, then {prefs.mode === 'mcts' ? 'MCTS'
+              : prefs.mode === 'auto' ? 'auto (matrix early, MCTS late)'
+              : `depth ${prefs.depth}`} everywhere · deeper: per turn
           </div>
           {hasGraph && (
             <EvalGraph

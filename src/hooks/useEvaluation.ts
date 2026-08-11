@@ -9,7 +9,7 @@ import type { PlayedTurn } from '../lib/eval/played';
 import { EvalWorkerClient } from '../lib/eval/worker-client';
 import { evalStoreKey, loadStoredEval, saveStoredEval } from '../lib/eval-cache-store';
 import { selectKeyTurns } from '../lib/eval/graph';
-import type { EvalPreferences, EvalResult, EvalSettings, RankedChoice, SearchProgress, TeraAllowance } from '../lib/eval/types';
+import { AUTO_MCTS_FAINTED_FRACTION, type EvalPreferences, type EvalResult, type EvalSettings, type RankedChoice, type SearchProgress, type TeraAllowance } from '../lib/eval/types';
 import { teraKey } from '../lib/eval/tera';
 
 export type EvalStatus = 'idle' | 'reconstructing' | 'searching' | 'done' | 'stale' | 'error';
@@ -40,7 +40,7 @@ function loadPrefs(): EvalPreferences {
     return {
       depth: parsed.depth === 1 ? 1 : 2,
       samples: parsed.samples === 1 || parsed.samples === 5 ? parsed.samples : 3,
-      mode: parsed.mode === 'mcts' ? 'mcts' : 'matrix',
+      mode: parsed.mode === 'mcts' || parsed.mode === 'auto' ? parsed.mode : 'matrix',
       auto: !!parsed.auto,
       tera: parsed.tera === 'on' || parsed.tera === 'off' || parsed.tera === 'revealed' ? parsed.tera : 'auto',
     };
@@ -56,13 +56,43 @@ function loadPrefs(): EvalPreferences {
 const matchOrPhantom = (result: EvalResult, side: 'p1' | 'p2', played: PlayedTurn | null): RankedChoice | null =>
   matchPlayedSide(result, side, played) ?? phantomStayIn(result, side, played);
 
+/** A concrete engine — what actually runs and what stored results carry ('auto' resolves before dispatch). */
+export type EngineMode = NonNullable<EvalSettings['mode']>;
+
+/**
+ * Resolve the auto mode at one position: the VERIFIED line configuration —
+ * d1s1 matrix while boards are full, the DUCT tree once the fainted
+ * fraction crosses the threshold. Auto is a complete engine spec (its
+ * matrix side is pinned to the measured d1s1, independent of the depth
+ * prefs, which apply to the explicit matrix modes only).
+ */
+export function resolveAutoTurnSettings(faintedFraction: number): TurnEvalSettings {
+  return faintedFraction >= AUTO_MCTS_FAINTED_FRACTION
+    ? { depth: 1, samples: 1, mode: 'mcts' }
+    : { depth: 1, samples: 1, mode: 'matrix' };
+}
+
+/** Mirror of the engine's battleFaintedFraction on a serialized battle (sim-free for the UI chunk). */
+export function serializedFaintedFraction(serialized: string): number {
+  const battle = JSON.parse(serialized) as { sides?: { pokemon?: { hp?: number; fainted?: boolean }[] }[] };
+  let fainted = 0;
+  let total = 0;
+  for (const side of battle.sides ?? []) {
+    for (const pokemon of side.pokemon ?? []) {
+      total += 1;
+      if (pokemon.fainted || (pokemon.hp ?? 0) <= 0) fainted += 1;
+    }
+  }
+  return total > 0 ? fainted / total : 0;
+}
+
 interface CachedEval {
   result: EvalResult;
   // Engine-typed: the UI only offers depth 1/2, but sweeps cache whatever
   // EvalSettings the engine ran with.
   depth: EvalSettings['depth'];
   samples: EvalSettings['samples'];
-  mode: EvalPreferences['mode'];
+  mode: EngineMode;
   tera: TeraAllowance;
   /** Engine expectation of the actually played pair (set by graph sweeps). */
   playedOutcome?: number | null;
@@ -118,21 +148,50 @@ export interface GraphSweepParams {
   settings?: TurnEvalSettings;
 }
 
-/** The engine settings that produced a stored per-turn result. */
+/** Sweep-level settings: like EvalSettings, but the mode may still be the unresolved 'auto'. */
+type SweepSettings = Omit<EvalSettings, 'mode'> & { mode?: EvalPreferences['mode'] };
+
+/** The engine settings that produced a stored per-turn result (always concrete — never 'auto'). */
 export interface TurnEvalSettings {
   depth: EvalSettings['depth'];
   samples: EvalSettings['samples'];
-  mode: EvalPreferences['mode'];
+  mode: EngineMode;
 }
+
+/**
+ * The turn's configured target engine: 'auto' resolves through the
+ * position's fainted fraction when known; null = unresolvable (auto prefs
+ * but the fraction was never recorded for this turn — callers stay
+ * conservative until a sweep resolves it).
+ */
+const configuredTarget = (
+  mode: EvalPreferences['mode'],
+  faintedFraction: number | null | undefined,
+): EngineMode | null =>
+  mode !== 'auto' ? mode : faintedFraction == null ? null : resolveAutoTurnSettings(faintedFraction).mode;
 
 /**
  * The stored result is SHALLOWER than the panel preferences — the turn can
  * be re-run at full settings (the explicit deepen button offers exactly
  * that). Deeper/heavier stored results never downgrade (a depth-2 result
- * stays shown under depth-1 prefs).
+ * stays shown under depth-1 prefs). Auto prefs resolve through the turn's
+ * fainted fraction; with the fraction unknown the answer is conservative
+ * (no upgrade claimed — the next sweep resolves it).
  */
-export function needsSettingsUpgrade(stored: TurnEvalSettings | null, prefs: EvalPreferences): boolean {
+export function needsSettingsUpgrade(
+  stored: TurnEvalSettings | null,
+  prefs: EvalPreferences,
+  faintedFraction?: number | null,
+): boolean {
   if (!stored) return true;
+  if (prefs.mode === 'auto') {
+    const target = configuredTarget('auto', faintedFraction);
+    if (target === null) return false;
+    const resolved = resolveAutoTurnSettings(faintedFraction!);
+    if (stored.mode !== resolved.mode) return true;
+    if (resolved.mode === 'mcts') return false;
+    return stored.depth < resolved.depth || stored.samples < resolved.samples;
+  }
   if (stored.mode !== prefs.mode) return true;
   if (prefs.mode === 'mcts') return false;
   return stored.depth < prefs.depth || stored.samples < prefs.samples;
@@ -144,15 +203,19 @@ export function needsSettingsUpgrade(stored: TurnEvalSettings | null, prefs: Eva
  * later "Analyze game" must not downgrade an explicitly deepened turn.
  * Cross-mode results replace only when the incoming pass carries the
  * CONFIGURED engine mode (the user's stated intent beats a stale result
- * from the other engine).
+ * from the other engine). Auto resolves per turn via the fainted fraction;
+ * unresolvable cross-mode conflicts keep the stored result (fail closed).
  */
 export function supersedesStored(
   stored: TurnEvalSettings | null,
   incoming: TurnEvalSettings,
   configuredMode: EvalPreferences['mode'],
+  faintedFraction?: number | null,
 ): boolean {
   if (!stored) return true;
-  if (stored.mode !== incoming.mode) return incoming.mode === configuredMode;
+  if (stored.mode !== incoming.mode) {
+    return incoming.mode === configuredTarget(configuredMode, faintedFraction);
+  }
   if (incoming.mode === 'mcts') return true;
   return incoming.depth >= stored.depth && incoming.samples >= stored.samples;
 }
@@ -164,6 +227,8 @@ export interface EvalGraphState {
   results: (EvalResult | null)[];
   /** What produced each result (fast scan vs configured settings). */
   settings: (TurnEvalSettings | null)[];
+  /** Fainted fraction at each swept turn's position — the auto mode's routing signal. */
+  faintedFractions: (number | null)[];
   played: (PlayedTurn | null)[];
   playedOutcome: (number | null)[];
   /** Depth+1 verification of flagged misplays (null = nothing flagged / not run). */
@@ -184,14 +249,14 @@ export function useEvaluation() {
   const [error, setError] = useState<string | null>(null);
   const [reconstructProgress, setReconstructProgress] = useState<{ turn: number; target: number } | null>(null);
   const [graph, setGraph] = useState<EvalGraphState>({
-    scores: [], results: [], settings: [], played: [], playedOutcome: [], verified: [], sensitivity: [], lead: null,
+    scores: [], results: [], settings: [], faintedFractions: [], played: [], playedOutcome: [], verified: [], sensitivity: [], lead: null,
     running: false, progress: null,
   });
 
   const clientRef = useRef<EvalWorkerClient | null>(null);
   const cacheRef = useRef(new Map<string, CachedEval>());
   /** Latest graph arrays, so partial (range) sweeps merge instead of wiping. */
-  const graphDataRef = useRef<Pick<EvalGraphState, 'scores' | 'results' | 'settings' | 'played' | 'playedOutcome' | 'verified' | 'sensitivity' | 'lead'> | null>(null);
+  const graphDataRef = useRef<Pick<EvalGraphState, 'scores' | 'results' | 'settings' | 'faintedFractions' | 'played' | 'playedOutcome' | 'verified' | 'sensitivity' | 'lead'> | null>(null);
   const runRef = useRef(0);
   const prefsRef = useRef(prefs);
   prefsRef.current = prefs;
@@ -240,14 +305,26 @@ export function useEvaluation() {
 
     void (async () => {
       try {
+        // 'auto' needs the position before the engine is known — acquire
+        // first and resolve; concrete modes keep the stored-eval fast path
+        // that skips reconstruction entirely.
+        let serialized: string | null = null;
+        let resolved: TurnEvalSettings = mode === 'auto' ? resolveAutoTurnSettings(0) : { depth, samples, mode };
+        if (mode === 'auto') {
+          serialized = await params.acquire((turn, target) => {
+            if (runRef.current === runId) setReconstructProgress({ turn, target });
+          });
+          if (runRef.current !== runId) return;
+          resolved = resolveAutoTurnSettings(serializedFaintedFraction(serialized));
+        }
         // Persistent cache: a result from a previous session for the same
         // position + settings skips reconstruction and search entirely.
         if (params.cacheKey) {
-          const stored = await loadStoredEval(evalStoreKey(params.cacheKey, depth, samples, mode, params.tera));
+          const stored = await loadStoredEval(evalStoreKey(params.cacheKey, resolved.depth, resolved.samples, resolved.mode, params.tera));
           if (runRef.current !== runId) return;
           if (stored) {
             cacheRef.current.set(params.cacheKey, {
-              result: stored.result, depth, samples, mode, tera: params.tera,
+              result: stored.result, depth: resolved.depth, samples: resolved.samples, mode: resolved.mode, tera: params.tera,
               ...(stored.playedOutcome !== undefined ? { playedOutcome: stored.playedOutcome } : {}),
             });
             setResult(stored.result);
@@ -256,15 +333,17 @@ export function useEvaluation() {
           }
         }
 
-        const serialized = await params.acquire((turn, target) => {
-          if (runRef.current === runId) setReconstructProgress({ turn, target });
-        });
-        if (runRef.current !== runId) return;
+        if (serialized === null) {
+          serialized = await params.acquire((turn, target) => {
+            if (runRef.current === runId) setReconstructProgress({ turn, target });
+          });
+          if (runRef.current !== runId) return;
+        }
         setStatus('searching');
         setReconstructProgress(null);
 
         clientRef.current ??= new EvalWorkerClient();
-        const final = await clientRef.current.evaluate(serialized, { depth, samples, mode, tera: params.tera, sleepClause: params.sleepClause }, {
+        const final = await clientRef.current.evaluate(serialized, { depth: resolved.depth, samples: resolved.samples, mode: resolved.mode, tera: params.tera, sleepClause: params.sleepClause }, {
           onProgress: update => {
             if (runRef.current === runId) setProgress(update);
           },
@@ -277,10 +356,10 @@ export function useEvaluation() {
         setStatus('done');
         setProgress(null);
         if (params.cacheKey) {
-          cacheRef.current.set(params.cacheKey, { result: final, depth, samples, mode, tera: params.tera });
+          cacheRef.current.set(params.cacheKey, { result: final, depth: resolved.depth, samples: resolved.samples, mode: resolved.mode, tera: params.tera });
           void saveStoredEval({
-            key: evalStoreKey(params.cacheKey, depth, samples, mode, params.tera),
-            result: final, depth, samples, mode, tera: params.tera, savedAt: Date.now(),
+            key: evalStoreKey(params.cacheKey, resolved.depth, resolved.samples, resolved.mode, params.tera),
+            result: final, depth: resolved.depth, samples: resolved.samples, mode: resolved.mode, tera: params.tera, savedAt: Date.now(),
           });
         }
       } catch (err) {
@@ -340,6 +419,9 @@ export function useEvaluation() {
     const turnSettings: (TurnEvalSettings | null)[] = keepPrevious && previous.settings?.length === params.turns
       ? [...previous.settings]
       : new Array(params.turns).fill(null);
+    const faintedFractions: (number | null)[] = keepPrevious && previous.faintedFractions?.length === params.turns
+      ? [...previous.faintedFractions]
+      : new Array(params.turns).fill(null);
     const played: (PlayedTurn | null)[] = keepPrevious ? [...previous.played] : new Array(params.turns).fill(null);
     const playedOutcome: (number | null)[] = keepPrevious ? [...previous.playedOutcome] : new Array(params.turns).fill(null);
     const verified: (TurnVerification | null)[] = keepPrevious && previous.verified.length === params.turns
@@ -351,7 +433,8 @@ export function useEvaluation() {
     let lead: LeadEvalData | null = keepPrevious ? previous.lead : null;
     const snapshot = () => {
       const data = {
-        scores: [...scores], results: [...results], settings: [...turnSettings], played: [...played],
+        scores: [...scores], results: [...results], settings: [...turnSettings],
+        faintedFractions: [...faintedFractions], played: [...played],
         playedOutcome: [...playedOutcome], verified: [...verified], sensitivity: [...sensitivity], lead,
       };
       graphDataRef.current = data;
@@ -515,21 +598,45 @@ export function useEvaluation() {
      * `verify` runs the depth+1 misplay verification — final-verdict passes
      * only, never the fast shaping pass (its results are provisional).
      */
-    const sweepTurns = async (turnList: number[], settings: EvalSettings, verify: boolean): Promise<boolean> => {
-      const { depth, samples } = settings;
-      const mode = settings.mode ?? 'matrix';
+    const sweepTurns = async (turnList: number[], settings: SweepSettings, verify: boolean): Promise<boolean> => {
       for (let index = 0; index < turnList.length; index++) {
         const turn = turnList[index];
         if (runRef.current !== runId) return false;
+        // Resolve 'auto' to this turn's concrete engine BEFORE any cache or
+        // store-key work — stored results only ever carry concrete modes.
+        // The fainted fraction comes from the same serialized position the
+        // engine will evaluate (the app-side mirror of the harness rule).
+        let { depth, samples } = settings;
+        let mode: EngineMode = settings.mode === 'auto' ? 'matrix' : (settings.mode ?? 'matrix');
+        if (settings.mode === 'auto') {
+          let fraction = faintedFractions[turn - 1];
+          if (fraction === null) {
+            try {
+              fraction = serializedFaintedFraction(await positionFor(turn));
+            } catch (err) {
+              if (runRef.current !== runId) return false;
+              if (err instanceof Error && err.message === 'cancelled') return false;
+              // Reconstruction failed — leave the gap, as the eval path would.
+              setGraph({ ...snapshot(), running: true, progress: { done: index + 1, total: turnList.length } });
+              continue;
+            }
+            if (runRef.current !== runId) return false;
+            faintedFractions[turn - 1] = fraction;
+          }
+          ({ depth, samples, mode } = resolveAutoTurnSettings(fraction));
+        }
         const key = params.cacheKeyFor(turn);
         const storeKey = evalStoreKey(key, depth, samples, mode, params.tera);
         const turnPlayed = params.playedFor(turn);
         played[turn - 1] = turnPlayed;
+        const resolvedSettings: EvalSettings = {
+          depth, samples, mode, tera: params.tera, sleepClause: params.sleepClause,
+        };
 
         // Monotone merge: the graph already holds a deeper result for this
         // turn (an explicit deepen, a deeper prior sweep) — every stored
         // field stands and this pass skips the turn entirely.
-        if (!supersedesStored(turnSettings[turn - 1], { depth, samples, mode }, configuredMode)) {
+        if (!supersedesStored(turnSettings[turn - 1], { depth, samples, mode }, configuredMode, faintedFractions[turn - 1])) {
           setGraph({ ...snapshot(), running: true, progress: { done: index + 1, total: turnList.length } });
           continue;
         }
@@ -584,7 +691,7 @@ export function useEvaluation() {
           if (verify && turnVerified === undefined) {
             turnVerified = null;
             try {
-              turnVerified = await verifyFlagged(() => positionFor(turn), hit.result, turnPlayed, settings);
+              turnVerified = await verifyFlagged(() => positionFor(turn), hit.result, turnPlayed, resolvedSettings);
             } catch (err) {
               if (runRef.current !== runId) return false;
               if (err instanceof Error && err.message === 'cancelled') return false;
@@ -602,7 +709,7 @@ export function useEvaluation() {
           if (verify && turnSensitivity === undefined) {
             turnSensitivity = null;
             try {
-              turnSensitivity = await probeSensitivity(() => positionFor(turn), hit.result, turnPlayed, settings, turnVerified ?? null);
+              turnSensitivity = await probeSensitivity(() => positionFor(turn), hit.result, turnPlayed, resolvedSettings, turnVerified ?? null);
             } catch (err) {
               if (runRef.current !== runId) return false;
               if (err instanceof Error && err.message === 'cancelled') return false;
@@ -649,7 +756,7 @@ export function useEvaluation() {
             if (verify) {
               turnVerified = null;
               try {
-                turnVerified = await verifyFlagged(() => Promise.resolve(serialized), result, turnPlayed, settings);
+                turnVerified = await verifyFlagged(() => Promise.resolve(serialized), result, turnPlayed, resolvedSettings);
               } catch (err) {
                 if (runRef.current !== runId) return false;
                 if (err instanceof Error && err.message === 'cancelled') return false;
@@ -658,7 +765,7 @@ export function useEvaluation() {
               verified[turn - 1] = turnVerified;
               turnSensitivity = null;
               try {
-                turnSensitivity = await probeSensitivity(() => Promise.resolve(serialized), result, turnPlayed, settings, turnVerified ?? null);
+                turnSensitivity = await probeSensitivity(() => Promise.resolve(serialized), result, turnPlayed, resolvedSettings, turnVerified ?? null);
               } catch (err) {
                 if (runRef.current !== runId) return false;
                 if (err instanceof Error && err.message === 'cancelled') return false;
@@ -693,9 +800,9 @@ export function useEvaluation() {
     void (async () => {
       const rangeTurns: number[] = [];
       for (let turn = from; turn <= to; turn++) rangeTurns.push(turn);
-      const fullSettings: EvalSettings = { depth, samples, mode, tera: params.tera, sleepClause: params.sleepClause };
-      const fastSettings: EvalSettings = { depth: 1, samples: 1, mode: 'matrix', tera: params.tera, sleepClause: params.sleepClause };
-      const isFast = depth === 1 && samples === 1 && mode !== 'mcts';
+      const fullSettings: SweepSettings = { depth, samples, mode, tera: params.tera, sleepClause: params.sleepClause };
+      const fastSettings: SweepSettings = { depth: 1, samples: 1, mode: 'matrix', tera: params.tera, sleepClause: params.sleepClause };
+      const isFast = depth === 1 && samples === 1 && mode === 'matrix';
 
       // Three-pass sweep: a fast depth-1 pass shapes the whole graph in
       // seconds, the configured settings then deepen the report-worthy
@@ -719,13 +826,17 @@ export function useEvaluation() {
       // Turn 0: the lead decision, one extra evaluation at full settings —
       // after the graph so the game line appears first.
       if (params.acquirePreview && lead === null && runRef.current === runId) {
+        // Team preview has zero fainted bodies — under auto the lead always
+        // resolves to the pinned matrix side.
+        const lead0 = mode === 'auto' ? resolveAutoTurnSettings(0) : { depth, samples, mode };
+        const leadSettings: EvalSettings = { ...lead0, tera: params.tera, sleepClause: params.sleepClause };
         const key = params.cacheKeyFor(0);
-        const storeKey = evalStoreKey(key, depth, samples, mode, params.tera);
+        const storeKey = evalStoreKey(key, lead0.depth, lead0.samples, lead0.mode, params.tera);
         let hit = cacheRef.current.get(key);
-        if (!(hit && hit.depth === depth && hit.samples === samples && hit.mode === mode && teraKey(hit.tera) === teraKey(params.tera))) {
+        if (!(hit && hit.depth === lead0.depth && hit.samples === lead0.samples && hit.mode === lead0.mode && teraKey(hit.tera) === teraKey(params.tera))) {
           const stored = await loadStoredEval(storeKey);
           if (runRef.current !== runId) return;
-          hit = stored ? { result: stored.result, depth, samples, mode: mode, tera: params.tera } : undefined;
+          hit = stored ? { result: stored.result, depth: lead0.depth, samples: lead0.samples, mode: lead0.mode, tera: params.tera } : undefined;
           if (hit) cacheRef.current.set(key, hit);
         }
         let leadResult = hit?.result ?? null;
@@ -735,11 +846,11 @@ export function useEvaluation() {
             if (runRef.current !== runId) return;
             if (serialized) {
               clientRef.current ??= new EvalWorkerClient();
-              leadResult = await clientRef.current.evaluate(serialized, fullSettings);
+              leadResult = await clientRef.current.evaluate(serialized, leadSettings);
               if (runRef.current !== runId) return;
-              cacheRef.current.set(key, { result: leadResult, depth, samples, mode: mode, tera: params.tera });
+              cacheRef.current.set(key, { result: leadResult, depth: lead0.depth, samples: lead0.samples, mode: lead0.mode, tera: params.tera });
               void saveStoredEval({
-                key: storeKey, result: leadResult, depth, samples, mode: mode, tera: params.tera,
+                key: storeKey, result: leadResult, depth: lead0.depth, samples: lead0.samples, mode: lead0.mode, tera: params.tera,
                 savedAt: Date.now(),
               });
             }
@@ -763,7 +874,7 @@ export function useEvaluation() {
 
   const clearGraph = useCallback(() => {
     graphDataRef.current = null;
-    setGraph({ scores: [], results: [], settings: [], played: [], playedOutcome: [], verified: [], sensitivity: [], lead: null, running: false, progress: null });
+    setGraph({ scores: [], results: [], settings: [], faintedFractions: [], played: [], playedOutcome: [], verified: [], sensitivity: [], lead: null, running: false, progress: null });
   }, []);
 
   return {
