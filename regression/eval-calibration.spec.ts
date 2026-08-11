@@ -721,6 +721,27 @@ import { brierScore, fitConstantK } from './fit-helpers';
  * auto e2e now CLICKS the button and requires the 'depth 2 · 3 samples'
  * badge — the presence-only assertion is what let this ship.
  *
+ * PREMATURE-END ARTIFACTS 2026-08-11 (user report follow-through — "weird
+ * losing position" while branching the draft game at t57): the per-target
+ * reconstruction path (branch entry + THIS harness) replays raw protocol
+ * and can cascade into a fake wipe when the choice replay diverges: at
+ * gen9draft-2058494320 t56+ the sim KO'd p1's active where the real game
+ * did not, the real protocol had no forced-switch answer, and the greedy
+ * fallback fed five bench mons into the kill zone → |win| → the harness
+ * scored the ENDED battle ±1.00 with the real winner's sign. 55/827
+ * grand-bed d1 rows (46 mcts, 42 fills-d1) are exact ±1 — an upper bound
+ * on the family (some may be genuine all-lines-end endgames);
+ * DETERMINISTIC per target turn (2× reproduced), NOT the timing-flaky
+ * drop family. The capture path (app sweeps, eval-fit) heals per turn via
+ * snapshot corrections and already skips ended captures — only this
+ * harness scored them. FIX: a sampled turn is always before the real end,
+ * so ended ⇒ artifact ⇒ SKIP (loud log; specimen verified: t56/t65
+ * skipped, rest samples). Standing records carry the inflation in their
+ * late buckets — the fills re-baseline will supersede them on the clean
+ * rig. App-side the branch entry already shows the divergence notice for
+ * this state (README behavior confirmed by the ended check at branch
+ * open); an e2e pin on a real-replay fixture is a registered follow-up.
+ *
  * AUTO MODE SHIPPED 2026-08-11 (EVAL_CALIBRATION_MODE=auto; app mode
  * 'auto'): per-position dispatch on faintedFraction ≥ AUTO_MCTS_FAINTED_
  * FRACTION (0.4; the constant lives in types.ts so the UI shares it
@@ -1112,6 +1133,17 @@ test.describe('eval calibration against real replays', () => {
           });
           const battle = runtime.battleStream.battle;
           if (!battle) continue;
+          if (battle.ended) {
+            // A sampled turn is always BEFORE the real game's end (the loop
+            // stops short of maxTurn), so an ended reconstruction is always
+            // a divergence artifact: the choice replay cascaded a side into
+            // a wipe the real game never had (gen9draft-2058494320 t56+ —
+            // five greedy forced switches fed into a kill zone). Scoring it
+            // would hand the record a free ±1.00 with the real winner's
+            // sign; 55/827 grand-bed d1 rows carried exactly that.
+            console.log(`${id} turn ${turn}: reconstruction ended prematurely — skipped`);
+            continue;
+          }
           const serialized = JSON.stringify(State.serializeBattle(battle));
           // EVAL_CALIBRATION_DEPTH separates the two levers: does more
           // search fix a phase, or is the static eval itself miscalibrated?
