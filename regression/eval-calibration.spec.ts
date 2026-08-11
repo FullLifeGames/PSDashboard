@@ -656,6 +656,23 @@ import { brierScore, fitConstantK } from './fit-helpers';
  * 54/62/79 by phase; ALL 65/66/65 — mcts ties-or-beats d1 in every bucket
  * here too.
  *
+ * DISPLAY-K ADOPTED + PURE-MCTS REVISIT SETTLED 2026-08-11 (user):
+ * - winPercent = sigmoid(DISPLAY_K·s), DISPLAY_K = 1.85 (winprob.ts).
+ *   Exact ±1 — an ENDED evaluation, nothing else reaches it — stays a
+ *   literal 100/0; winDeltaText, regret, and the verdict bands stay
+ *   wp-unit-linear. One function covers panel, graph, matrix view,
+ *   report, and summary; report accuracy loss is now priced in the same
+ *   honest probability space the user sees. NO cache bump (scores are
+ *   unchanged — display-only). Two summary pins updated to the calibrated
+ *   strings; the winPercent pin now states the two-stage contract (leaf
+ *   sigmoid calibrates leaves, display sigmoid calibrates the aggregate).
+ * - DEFAULT LINE STAYS AUTO @ 0.25 (the registered revisit, user
+ *   decision): three corpora agree mcts ties-or-beats d1 everywhere, but
+ *   auto sits within ~1 sign point at lower compute and keeps root pivot
+ *   pairs exactly in the pivot-heavy opening. REGISTERED revisit trigger:
+ *   pivot pairs for MCTS roots (expandPivotPairs exists, not applied to
+ *   the tree's root enumeration yet).
+ *
  * AUTO MODE SHIPPED 2026-08-11 (EVAL_CALIBRATION_MODE=auto; app mode
  * 'auto'): per-position dispatch on faintedFraction ≥ AUTO_MCTS_FAINTED_
  * FRACTION (0.4; the constant lives in types.ts so the UI shares it

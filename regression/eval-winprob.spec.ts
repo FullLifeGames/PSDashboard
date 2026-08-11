@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { winPercent, winProbability, WINPROB_K, wpUnits } from '../src/lib/eval/winprob';
+import { DISPLAY_K, winPercent, winProbability, WINPROB_K, wpUnits } from '../src/lib/eval/winprob';
 
 test.describe('win probability mapping', () => {
   test('an even score is a coin flip in both game types', () => {
@@ -34,9 +34,22 @@ test.describe('win probability mapping', () => {
     expect(wpUnits(0)).toBeCloseTo(0, 10);
   });
 
-  test('winPercent is linear over wp-unit scores (no double sigmoid)', () => {
-    expect(winPercent(0.5)).toBe(75);
-    expect(winPercent(-0.5)).toBe(25);
+  test('winPercent is the calibrated display map: sigmoid(DISPLAY_K·s), ended ±1 literal', () => {
+    // Two-stage calibration, both measured: the leaf sigmoid calibrates
+    // static evals into leaf win-probs; averaging plus equilibrium
+    // selection re-inflates the aggregated ROOT score, and DISPLAY_K
+    // (fit-corpus-trained, grand-bed-graded) prices that back out at the
+    // display boundary. The old linear display was overconfident
+    // out-of-sample in every bucket.
+    expect(winPercent(0)).toBe(50);
+    expect(winPercent(0.5)).toBe(Math.round(100 / (1 + Math.exp(-DISPLAY_K * 0.5))));
+    expect(winPercent(0.5)).toBeLessThan(75);
+    expect(winPercent(-0.5)).toBe(100 - winPercent(0.5));
+    // Exact ±1 is an ENDED evaluation — a finished game displays finished.
     expect(winPercent(1)).toBe(100);
+    expect(winPercent(-1)).toBe(0);
+    // Near-certain but NOT ended stays honestly below 100.
+    expect(winPercent(0.999)).toBeLessThan(100);
+    expect(winPercent(0.999)).toBeGreaterThan(80);
   });
 });

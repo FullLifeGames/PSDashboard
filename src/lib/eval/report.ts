@@ -107,7 +107,9 @@ function accuracyFor(
 
   const entries = graded.map(analysis => {
     const sideAnalysis = analysis[side];
-    // Scores and EVs are wp-units: winPercent owns the (linear) conversion.
+    // Scores and EVs are wp-units: winPercent owns the calibrated
+    // score→probability conversion, so accuracy loss is priced in the same
+    // honest probability space the user sees.
     const toWin = (value: number) => winPercent(value) / 100;
     const deltaWin = Math.max(0, toWin(sideAnalysis.best!.ev) - toWin(sideAnalysis.played!.ev));
     const accuracy = Math.max(0, Math.min(100,

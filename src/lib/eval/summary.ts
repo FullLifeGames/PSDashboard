@@ -130,7 +130,7 @@ export function summarizeTurn(
   analysis: TurnAnalysis,
   playerNames: [string, string],
 ): string {
-  // Scores are wp-units — winPercent is the linear display mapping.
+  // Scores are wp-units — winPercent is the calibrated display mapping.
   const pct = (score: number) => winPercent(score);
   const sentences: string[] = [];
   const before = pct(analysis.scoreBefore);
