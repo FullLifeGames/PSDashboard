@@ -6,6 +6,9 @@ import { formatEnforcesSleepClause, getBranchSimulatorFormat } from '../src/lib/
 import { parseReplayLogWithObservations } from '../src/lib/protocol-parser';
 import { AUTO_MCTS_FAINTED_FRACTION, battleFaintedFraction, searchPosition } from '../src/lib/eval/search';
 import { mctsSearch } from '../src/lib/eval/mcts';
+import { fetchSmogonUsageStats } from '../src/lib/smogon-stats';
+import { fetchSmogonSetAssumptions } from '../src/lib/smogon-sets';
+import { diskCachedSmogonFetcher } from './smogon-fetch-cache';
 import { brierScore, fitConstantK } from './fit-helpers';
 
 /**
@@ -23,7 +26,10 @@ import { brierScore, fitConstantK } from './fit-helpers';
  * EVAL_CALIBRATION_DUMP=<path> (per-position JSONL for paired analysis) ·
  * EVAL_CALIBRATION_SOURCE=fit (swap the universe to the weight-fitting
  * corpus' disk cache for FIT-SIDE dumps — mapping fits train there and
- * grade here; refuses to run without a dump path)
+ * grade here; refuses to run without a dump path) ·
+ * EVAL_CALIBRATION_SMOGON=1 (build teams WITH the Smogon usage/set fills
+ * the app line waits for, disk-pinned in .smogon-cache/ so paired runs
+ * see identical data — the information-gap experiment)
  *
  * Baseline 2026-08-04 (post ev-grading, pre boost-schedule; depth 1, samples 1):
  *   early 55% |0.23| · mid 62% |0.34| · late 81% |0.43|
@@ -673,6 +679,37 @@ import { brierScore, fitConstantK } from './fit-helpers';
  *   pivot pairs for MCTS roots (expandPivotPairs exists, not applied to
  *   the tree's root enumeration yet).
  *
+ * SET-BELIEF ROUND 2026-08-11 (the early both-wrong mass):
+ * Candidate isolation on the grand bed (joined n=826): both engines wrong
+ * on 261 (31.6%), early 104/259 (40.2%); 47 early CONFIDENT both-wrong
+ * (min |s| ≥ 0.25), clustering within games (2658664071 t2/7/12) — the
+ * persistent-team-misread signature.
+ * DISCOVERY: the harness built teams WITHOUT the Smogon usage/set fills
+ * the app always waits for (buildTeamsFromReplay got observations +
+ * speedOrders only) — every standing record priced less-informed teams
+ * than the app line actually sees.
+ * EXPERIMENT A (EVAL_CALIBRATION_SMOGON=1; fills disk-pinned in
+ * .smogon-cache/ via smogon-fetch-cache.ts so paired runs see identical
+ * data): full-universe d1 paired run (joined n=821) —
+ *   early 54.2→54.6 (35 flips, 18 toward / 17 away — coin-flip) ·
+ *   mid 61.4→62.8 · late 76.8 flat · singles 63.4→62.2 (noise-level) ·
+ *   DOUBLES 66.0→71.0 (+5.0, mean|Δs| 0.179 — spreads/items genuinely
+ *   price the doubles matchup grid) · ALL 64.2→64.8.
+ *   SUSPECTS: 1/47 fixed. Information does NOT own the early mass.
+ * B-LITE (movement of the survivors under full information): mean |Δs|
+ * 0.090 against ≥0.25 confidence, mean movement toward zero +0.019 (not
+ * digging out), 28/47 move <0.08 — the suspects are SET-INSENSITIVE.
+ * CONCLUSIONS: (1) belief averaging over plausible sets cannot flip what
+ * full information does not move — the full perturbation harness is NOT
+ * justified; the early both-wrong mass belongs to the static eval's
+ * matchup pricing (or to genuine upsets), and the next lever there is a
+ * feature/weight round, not an information round. (2) The mcts side of A
+ * skipped: the suspects are both-engine-wrong positions sharing the same
+ * leaves — the readout is engine-independent. (3) STANDING RECORDS
+ * UNDERRATE THE APP LINE ON DOUBLES by ~5 sign points; adopting SMOGON=1
+ * as the standard corpus rig (records re-baseline) is REGISTERED as an
+ * open decision, not taken.
+ *
  * AUTO MODE SHIPPED 2026-08-11 (EVAL_CALIBRATION_MODE=auto; app mode
  * 'auto'): per-position dispatch on faintedFraction ≥ AUTO_MCTS_FAINTED_
  * FRACTION (0.4; the constant lives in types.ts so the UI shares it
@@ -999,7 +1036,13 @@ test.describe('eval calibration against real replays', () => {
       ? trancheIds.filter((_, index) => index % parseInt(slice[2], 10) === parseInt(slice[1], 10))
       : trancheIds;
 
-    type ReplayJson = { id: string; log: string; players: string[] };
+    // EVAL_CALIBRATION_SMOGON=1: the standing corpus numbers price teams
+    // built from protocol + inference alone, while the APP always waits
+    // for the Smogon usage/set fills before evaluating. This lever closes
+    // that information gap so the delta can be measured (T3 experiment A).
+    const smogonFills = process.env.EVAL_CALIBRATION_SMOGON === '1';
+    const smogonFetcher = smogonFills ? diskCachedSmogonFetcher() : undefined;
+    type ReplayJson = { id: string; log: string; players: string[]; formatid?: string };
     for (const id of replayIds) {
       let replay: ReplayJson;
       if (fs) {
@@ -1027,10 +1070,22 @@ test.describe('eval calibration against real replays', () => {
       const gameType: Sample['gameType'] = /\|gametype\|doubles/.test(replay.log) ? 'doubles' : 'singles';
       // Observations drive spread inference — same path the app takes.
       const { snapshots, observations, speedOrders } = parseReplayLogWithObservations(replay.log);
-      const { p1Team, p2Team } = buildTeamsFromReplay(replay.log, { observations, speedOrders });
+      let { p1Team, p2Team } = buildTeamsFromReplay(replay.log, { observations, speedOrders });
       if (p1Team.length === 0 || p2Team.length === 0) {
         console.log(`skipping ${id}: could not build teams`);
         continue;
+      }
+      if (smogonFetcher) {
+        // Rebuild with the fills, mirroring the app hooks: usage stats by
+        // the replay's format id, set assumptions for the known species.
+        const species = [...new Set([...p1Team, ...p2Team].map(set => set.species))];
+        const usageStats = await fetchSmogonUsageStats(replay.formatid ?? id, { fetcher: smogonFetcher });
+        const setAssumptions = await fetchSmogonSetAssumptions({ formatId: replay.formatid ?? id, species, fetcher: smogonFetcher });
+        ({ p1Team, p2Team } = buildTeamsFromReplay(replay.log, { observations, speedOrders, usageStats, setAssumptions }));
+        if (p1Team.length === 0 || p2Team.length === 0) {
+          console.log(`skipping ${id}: could not build teams with fills`);
+          continue;
+        }
       }
       const maxTurn = snapshots.length;
       const step = Math.max(1, Math.ceil(maxTurn / 8));

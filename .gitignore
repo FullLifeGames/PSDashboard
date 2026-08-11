@@ -32,3 +32,6 @@ docs
 
 # Fitting corpus cache (manifest is committed; logs are re-downloadable)
 .fit-corpus/
+
+# Pinned Smogon payloads for the calibration harness's fills lever
+.smogon-cache/
