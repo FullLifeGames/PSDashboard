@@ -411,6 +411,34 @@ import { brierScore, fitConstantK } from './fit-helpers';
  * dispatched searchPosition (which ignores `mode`) and reproduced the
  * matrix record BIT-IDENTICAL a third time.
  *
+ * PER-POSITION DUMPS 2026-08-11 (EVAL_CALIBRATION_DUMP=<path>): every sample
+ * writes {id, turn, phase, gameType, score, faintedFraction, p1Won} as JSONL
+ * at sweep end — purely observational (d1 AND mcts reproduced their records
+ * bit-identically with the lever active; 4th/5th determinism proofs).
+ * Offline paired joins on id#turn: node scripts/paired-calibration.mjs
+ * <a.jsonl> <b.jsonl>. FINDINGS 2026-08-11 (paired, joined n 214–216):
+ * - HYBRID COUNTERFACTUAL d1 + mcts@faintedFraction≥0.40: 61/66/84/66/84,
+ *   late brier 0.1383 — beats BOTH parents and the turn-fraction oracles
+ *   (bodies-down switches exactly when the DUCT tree's depth pays; the rule
+ *   is observable pre-search, so a sweep can implement it verbatim). Blends
+ *   all worse than switching.
+ * - MCTS early −5 is NOISE AT ZERO: 3 exclusive flips, all |s|≤0.06, mean|s|
+ *   identical 0.27; both-wrong dominates early (23+3 of 26+3) — routing buys
+ *   nothing early; that error mass is information-level (set beliefs).
+ * - d2s1 PAIRED vs d1s1 (56/64/79/63/81 vs 61/66/81/65/83 joined): d2 loses
+ *   6:1 exclusive flips spread thin over ALL phases at identical confidence
+ *   — equilibrium-of-equilibria amplifies opponent-model error (each child's
+ *   restricted-Nash solve selects over noisy single-seed values). d2+mcts
+ *   hybrid only 56/64/82/64/81. d2s3 (the app default!) unmeasured until the
+ *   samples lever.
+ * - Winprob K by band: below ff 0.4 the engines are calibration-identical
+ *   (K≈1.97, brier 0.211 both); above it mcts supports a steeper K (2.22,
+ *   brier 0.1506 vs matrix 1.85/0.1805) — per-mode late K is real but waits
+ *   for a bigger corpus (n 40 in the band).
+ * - RECONSTRUCTION NONDETERMINISM: gen9ou-2658670791 dropped 3/5/5 positions
+ *   across three same-day runs at the SAME turns with DIFFERENT errors;
+ *   gen9doublesou-2660802611 t2/t4 Transform-Mew drops appeared in one run.
+ *
  * DIRECTIONAL SPEED EXCLUSIONS 2026-08-10: observations now drop only when
  * the modifier could EXPLAIN the observed order — a speed-raising factor
  * (Tailwind, +spe stages, paradox boosters) on the FIRST mover, or a
@@ -511,6 +539,9 @@ const REPLAY_IDS = [
 ];
 
 interface Sample {
+  /** Replay id + sampled turn — the pairing key across engine runs. */
+  id: string;
+  turn: number;
   phase: 'early' | 'mid' | 'late';
   gameType: 'singles' | 'doubles';
   score: number;
@@ -580,6 +611,8 @@ test.describe('eval calibration against real replays', () => {
           }
           const fraction = turn / maxTurn;
           samples.push({
+            id,
+            turn,
             phase: fraction < 1 / 3 ? 'early' : fraction < 2 / 3 ? 'mid' : 'late',
             gameType,
             score,
@@ -647,6 +680,16 @@ test.describe('eval calibration against real replays', () => {
         `|score| ${lo.toFixed(1)}–${hi > 1 ? '1.0' : hi.toFixed(1)}: n=${inBucket.length} ` +
         `favored-side-wins=${(100 * correct / inBucket.length).toFixed(0)}%`,
       );
+    }
+    // Per-position dump for offline paired analysis (engine-vs-engine joins,
+    // hybrid counterfactuals). Purely observational — never changes the run.
+    if (process.env.EVAL_CALIBRATION_DUMP) {
+      const { writeFileSync } = await import('node:fs');
+      writeFileSync(
+        process.env.EVAL_CALIBRATION_DUMP,
+        samples.map(sample => JSON.stringify(sample)).join('\n') + '\n',
+      );
+      console.log(`dumped ${samples.length} samples to ${process.env.EVAL_CALIBRATION_DUMP}`);
     }
     expect(samples.length).toBeGreaterThan(0);
   });
