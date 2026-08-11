@@ -556,6 +556,30 @@ import { brierScore, fitConstantK } from './fit-helpers';
  * ladder late-sign), pure MCTS (best tournament + full-bed mid/doubles/
  * brier) — user decision, still deferred.
  *
+ * TOURNAMENT TRANCHE 4b 2026-08-11 (+32 games, same sources deeper —
+ * merged tournament stratum 64 games / 409 positions; d1 + mcts measured,
+ * d2s3 skipped as dominated):
+ *   tournament-0811  d1 51/58/68/60/56 K 0.87 · mcts 54/62/69/60/64
+ *   tournament-0811b d1 58/72/82/71/70 K 2.46 · mcts 62/69/82/70/74
+ *   MERGED (n 409):  d1 54/65/75/65/63 K 1.47 · mcts 58/65/76/65/69
+ *   GRAND BED (826): d1 54/61/76/63/66 · mcts 56/63/78/64/69 ·
+ *     brier mcts 0.2497/0.2305/0.1787 — best line measured; auto
+ *     54/62/78/64/67 · 0.2514/0.2339/0.1803.
+ * TWO LESSONS. (1) SUB-TRANCHE VARIANCE: the same tournament population
+ * swings ±5–10 points per bucket between 32-game samples (4a read "expert
+ * games are harder", 4b reads EASIER than ladder; merged K 1.47 ≈ ladder's
+ * 1.42) — the 4a-only "experts flatten the mapping" claim is SOFTENED to
+ * composition-sensitive; stratum-level claims need n ≥ ~400. (2) What
+ * survives in BOTH sub-tranches and the merge: the widened DUCT tree beats
+ * d1 on tournament early (+3/+4) and doubles (+8/+4), and on the grand bed
+ * pure MCTS beats d1 in EVERY bucket and beats auto on early/mid/doubles
+ * and all Briers, tying late — the user's "MCTS is winning" reading holds
+ * with tight numbers. Auto's remaining niche: ladder-stratum late sign
+ * (81 vs 79). FEATURE TRADE for the default decision: verification,
+ * sensitivity probes, and the think-deeper depth ladder are MATRIX-side
+ * features — a pure-MCTS line forgoes them everywhere, auto keeps them on
+ * early turns. Default still d2s3, decision with the user.
+ *
  * AUTO MODE SHIPPED 2026-08-11 (EVAL_CALIBRATION_MODE=auto; app mode
  * 'auto'): per-position dispatch on faintedFraction ≥ AUTO_MCTS_FAINTED_
  * FRACTION (0.4; the constant lives in types.ts so the UI shares it
@@ -778,6 +802,48 @@ const REPLAY_TRANCHES: ReplayTranche[] = [
       'smogtours-gen9doublesou-939635',
       'smogtours-gen9doublesou-941638',
       'smogtours-gen9doublesou-941650',
+    ],
+  },
+  {
+    // Tranche 4b (sampled 2026-08-11, same sources deeper — SV OU officials
+    // + OSDT; winner labels validated at sampling time): grows the
+    // tournament stratum to ~64 games so its per-bucket numbers tighten.
+    // Manifest-excluded like 4a. Separate tag so the tranche lever can run
+    // it alone; analyses merge every tournament-* tag into one stratum.
+    tranche: 'tournament-0811b',
+    ids: [
+      'smogtours-gen9ou-751207',
+      'smogtours-gen9ou-750540',
+      'smogtours-gen9ou-751536',
+      'smogtours-gen9ou-751533',
+      'smogtours-gen9ou-751407',
+      'smogtours-gen9ou-751170',
+      'smogtours-gen9ou-751466',
+      'smogtours-gen9ou-752324',
+      'smogtours-gen9ou-752839',
+      'smogtours-gen9ou-752549',
+      'smogtours-gen9ou-752005',
+      'smogtours-gen9ou-752624',
+      'smogtours-gen9ou-752755',
+      'smogtours-gen9ou-752781',
+      'smogtours-gen9ou-752301',
+      'smogtours-gen9ou-751881',
+      'smogtours-gen9ou-752058',
+      'smogtours-gen9ou-752068',
+      'smogtours-gen9ou-752733',
+      'smogtours-gen9ou-752702',
+      'smogtours-gen9doublesou-912045',
+      'smogtours-gen9doublesou-912047',
+      'smogtours-gen9doublesou-912883',
+      'smogtours-gen9doublesou-912884',
+      'smogtours-gen9doublesou-913990',
+      'smogtours-gen9doublesou-913993',
+      'smogtours-gen9doublesou-914406',
+      'smogtours-gen9doublesou-914408',
+      'smogtours-gen9doublesou-913994',
+      'smogtours-gen9doublesou-913996',
+      'smogtours-gen9doublesou-914621',
+      'smogtours-gen9doublesou-914633',
     ],
   },
 ];
