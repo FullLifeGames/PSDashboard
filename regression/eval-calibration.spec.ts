@@ -9,6 +9,7 @@ import { mctsSearch } from '../src/lib/eval/mcts';
 import { fetchSmogonUsageStats } from '../src/lib/smogon-stats';
 import { fetchSmogonSetAssumptions } from '../src/lib/smogon-sets';
 import { diskCachedSmogonFetcher } from './smogon-fetch-cache';
+import { createMatchupCache, evalFeatures, EVAL_WEIGHTS, FEATURE_WEIGHTS, type EvalFeatures } from '../src/lib/eval/eval-function';
 import { brierScore, fitConstantK } from './fit-helpers';
 
 /**
@@ -721,6 +722,31 @@ import { brierScore, fitConstantK } from './fit-helpers';
  * auto e2e now CLICKS the button and requires the 'depth 2 · 3 samples'
  * badge — the presence-only assertion is what let this ship.
  *
+ * EARLY-MASS FEATURE DIAGNOSIS 2026-08-11 (R1 of the "go ahead" round):
+ * - Phase-restricted implied-weight fits from the fit samples cache
+ *   (12,636 positions, offline): the matchup term's outcome signal GROWS
+ *   with ff (singles implied 123 early → 305 late vs hand 120; doubles
+ *   108 → 200) — the hand weight is early-correct and late-light. Rare
+ *   features (tailwind singles, sweep) swing wildly per phase = SE noise.
+ * - EVAL_CALIBRATION_FEATURES=1 (g-vector in dump rows, fit-spec
+ *   construction) + suspect-vs-control diagnosis (35 early-singles
+ *   confident both-wrong vs 52 confident-correct): the profiles are
+ *   IDENTICAL — bodies dominates 34/35 suspects AND 48/52 controls
+ *   (~0.37 toward the pick in both), matchup contributes ±0.04 noise in
+ *   both. Confident-wrong looks exactly like confident-right: the early
+ *   mass is MATERIAL LEADS THAT DIDN'T CONVERT — no feature signature.
+ * - VERDICT: no weight change pursued. A phase-scaled matchup weight
+ *   cannot touch a bodies-driven error mass, and set information already
+ *   proved inert (T3). The early both-wrong mass is structural beyond the
+ *   current feature basis; registered directions: win-condition/structure
+ *   representation, or accepting early irreducibility (the two-stage K
+ *   already prices the confidence honestly). Late-side matchup scaling
+ *   (the real signal growth) is REGISTERED as a future fit-round
+ *   experiment via an interaction term (matchup × ff) with bootstrap SEs.
+ * - Side product: feat-d1.jsonl (n 783, ended-skip active) is the first
+ *   artifact-free d1 bed; the 11 remaining exact-±1 rows are genuine
+ *   all-lines-end endgames (the ~44 skipped were the artifact family).
+ *
  * PREMATURE-END ARTIFACTS 2026-08-11 (user report follow-through — "weird
  * losing position" while branching the draft game at t57): the per-target
  * reconstruction path (branch entry + THIS harness) replays raw protocol
@@ -1026,6 +1052,12 @@ interface Sample {
   /** Fainted bodies / total bodies at the sampled position. */
   faintedFraction: number;
   p1Won: boolean;
+  /**
+   * EVAL_CALIBRATION_FEATURES=1: the static eval's scaled feature vector
+   * (fit-spec g construction, FEATURE_WEIGHTS key order) — for offline
+   * suspect-vs-control feature diagnosis. Observational only.
+   */
+  g?: number[];
 }
 
 test.describe('eval calibration against real replays', () => {
@@ -1144,6 +1176,17 @@ test.describe('eval calibration against real replays', () => {
             console.log(`${id} turn ${turn}: reconstruction ended prematurely — skipped`);
             continue;
           }
+          // EVAL_CALIBRATION_FEATURES=1: capture the static eval's scaled
+          // feature vector (identical construction to eval-fit's g) so the
+          // offline suspect diagnosis can compare feature profiles.
+          let g: number[] | undefined;
+          if (process.env.EVAL_CALIBRATION_FEATURES === '1') {
+            const featureCache = createMatchupCache();
+            const features = evalFeatures(battle, featureCache);
+            const teamSize = Math.max(battle.sides[0].pokemon.length, battle.sides[1].pokemon.length, 1);
+            const scaleOverNorm = EVAL_WEIGHTS.scale / (teamSize * (EVAL_WEIGHTS.alive + EVAL_WEIGHTS.hp));
+            g = (Object.keys(FEATURE_WEIGHTS) as (keyof EvalFeatures)[]).map(key => features[key] * scaleOverNorm);
+          }
           const serialized = JSON.stringify(State.serializeBattle(battle));
           // EVAL_CALIBRATION_DEPTH separates the two levers: does more
           // search fix a phase, or is the static eval itself miscalibrated?
@@ -1177,6 +1220,7 @@ test.describe('eval calibration against real replays', () => {
             score,
             faintedFraction,
             p1Won,
+            ...(g ? { g } : {}),
           });
         } catch (error) {
           console.log(`${id} turn ${turn}: ${error instanceof Error ? error.message : error}`);
