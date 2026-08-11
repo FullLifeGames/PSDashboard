@@ -3,9 +3,9 @@ import {
   advancePosition, createRootPosition, positionBattle,
   type ChoiceOption, type SimPosition,
 } from './forward-model';
-import { cellKey, rankFromMatrix } from './rank';
+import { cellKey, rankFromMatrix, toResult as rankedToResult } from './rank';
 import { leafValue, optionHints, searchOptions, SEARCH_SEEDS } from './search';
-import type { EvalMatrix, EvalResult, EvalSettings, MctsTreeStats, RankedChoice, SearchProgress, TeraAllowance } from './types';
+import type { EvalResult, EvalSettings, MctsTreeStats, SearchProgress, TeraAllowance } from './types';
 
 /**
  * DUCT (decoupled UCT) Monte-Carlo tree search — the "think deeper" mode.
@@ -147,73 +147,69 @@ function principalVariation(node: Node): { p1: string; p2: string }[] {
   return steps;
 }
 
+/**
+ * Tree-informed root cell: the mean of every leaf value backed through the
+ * cell (a child's own p1W marginals sum to its pass-through reward; its
+ * creation-time static covers the expansion pass) blended with ONE extra
+ * static-prior visit — the selection-over-noise guard, so a single wild
+ * playout cannot own a cell. Unexpanded cells fall back to the root static.
+ */
+function treeCellValue(root: Node, i: number, j: number): number {
+  const child = root.children.get(cellKey(i, j));
+  if (!child) return root.value;
+  const total = child.p1W.reduce((sum, w) => sum + w, 0) + child.value;
+  return (total + child.value) / (child.visits + 1);
+}
+
+/** Most-visited index (ties keep the lower index — the old rank order). */
+function topVisitedIndex(n: number[]): number {
+  let best = -1;
+  let bestN = 0;
+  for (let index = 0; index < n.length; index++) {
+    if (n[index] > bestN) {
+      bestN = n[index];
+      best = index;
+    }
+  }
+  return best;
+}
+
+/**
+ * HYBRID SEMANTICS (corpus-gated 2026-08-11): the RANKINGS are the same
+ * equilibrium solve the matrix mode runs, over the tree-informed cells —
+ * visit counts allocate search effort, they are not the verdict (under
+ * hint-ordered widening a hint-anchored move can stay most-visited while
+ * the tree's own values refute it: draft t58 Knock Off into a Rest loop).
+ * The SCORE keeps the visit-mean formulation — the tree's value
+ * information concentrates where its visits went, and the full-delegation
+ * equilibrium score measured −1.0 sign on the paired bed (dilution across
+ * thin static cells), so the score line stays bit-identical to the
+ * standing records while the recommendations upgrade.
+ */
 function toResult(root: Node, maxDepth: number): EvalResult {
-  const rank = (options: ChoiceOption[], n: number[], w: number[], ownSign: 1 | -1): RankedChoice[] =>
-    options
-      .map((option, index) => ({ option, index }))
-      .filter(entry => n[entry.index] > 0)
-      .sort((a, b) => n[b.index] - n[a.index] || a.index - b.index)
-      .map(entry => {
-        const mean = ownSign * (w[entry.index] / n[entry.index]);
-        // Most-visited reply within this row/column becomes the punisher.
-        let punishedBy: string | null = null;
-        let punishVisits = 0;
-        for (const [key, child] of root.children) {
-          const i = Math.floor(key / 10_000);
-          const j = key % 10_000;
-          const mine = ownSign === 1 ? i : j;
-          if (mine !== entry.index) continue;
-          if (child.visits > punishVisits) {
-            punishVisits = child.visits;
-            punishedBy = ownSign === 1 ? root.p2Options[j].label : root.p1Options[i].label;
-          }
-        }
-        // DUCT visits do not converge to Nash — ev here is the visit-mean
-        // approximation, never a solved mixture.
-        const ranked: RankedChoice = {
-          choice: entry.option.choice,
-          label: entry.option.label,
-          worstCase: mean,
-          expected: mean,
-          ev: mean,
-          punishedBy,
-        };
-        return ranked;
-      });
-
-  const p1 = rank(root.p1Options, root.p1N, root.p1W, 1);
-  const p2 = rank(root.p2Options, root.p2N, root.p2W, -1);
-  if (p1.length > 0) {
+  if (root.ended || root.p1Options.length === 0 || root.p2Options.length === 0 || root.visits === 0) {
+    return { score: root.value, interval: 0, depthCompleted: maxDepth, perSide: { p1: [], p2: [] } };
+  }
+  const values = root.p1Options.map((_, i) =>
+    root.p2Options.map((_, j) => treeCellValue(root, i, j)));
+  const ended = root.p1Options.map((_, i) =>
+    root.p2Options.map((_, j) => root.children.get(cellKey(i, j))?.ended ?? false));
+  const ranked = rankFromMatrix(
+    { p1Options: root.p1Options, p2Options: root.p2Options, values, ended },
+    root.value,
+  );
+  const result = rankedToResult(ranked, maxDepth);
+  const i = topVisitedIndex(root.p1N);
+  const j = topVisitedIndex(root.p2N);
+  const v1 = i >= 0 ? root.p1W[i] / root.p1N[i] : root.value;
+  const v2 = j >= 0 ? root.p2W[j] / root.p2N[j] : root.value;
+  result.score = (v1 + v2) / 2;
+  result.interval = Math.abs(v2 - v1);
+  if (result.perSide.p1.length > 0) {
     const line = principalVariation(root);
-    if (line.length > 1) p1[0].line = line.slice(1);
+    if (line.length > 1) result.perSide.p1[0].line = line.slice(1);
   }
-
-  const v1 = p1.length > 0 ? p1[0].worstCase : root.value;
-  const v2 = p2.length > 0 ? -p2[0].worstCase : root.value;
-
-  // Read-lens matrix: per-cell leaf values (a child carries the static eval
-  // of its creation-time position; unexpanded cells fall back to the root
-  // value), solved by the same equilibrium solver as matrix mode so
-  // matrix/mixes semantics stay identical across engine modes.
-  let matrix: EvalMatrix | undefined;
-  if (!root.ended && root.p1Options.length > 0 && root.p2Options.length > 0) {
-    const values = root.p1Options.map((_, i) =>
-      root.p2Options.map((_, j) => root.children.get(cellKey(i, j))?.value ?? root.value));
-    const ended = root.p1Options.map((_, i) =>
-      root.p2Options.map((_, j) => root.children.get(cellKey(i, j))?.ended ?? false));
-    matrix = rankFromMatrix(
-      { p1Options: root.p1Options, p2Options: root.p2Options, values, ended },
-      root.value,
-    ).matrixOut;
-  }
-
-  return {
-    score: root.visits > 0 ? (v1 + v2) / 2 : root.value,
-    interval: Math.abs(v2 - v1),
-    depthCompleted: maxDepth,
-    perSide: { p1, p2 },
-    ...(matrix ? { matrix } : {}),
-  };
+  return result;
 }
 
 function runMcts(
@@ -317,6 +313,16 @@ export function mctsTreeSearch(
     p2W: root.p2W,
     visits: root.visits,
     depth: maxDepth,
+    rootValue: root.value,
+    // Root-cell stats for the merged equilibrium (Map order is insertion
+    // order — deterministic under the fixed seed schedule).
+    cells: [...root.children.entries()].map(([key, child]) => ({
+      key,
+      visits: child.visits,
+      total: child.p1W.reduce((sum, w) => sum + w, 0) + child.value,
+      value: child.value,
+      ended: child.ended,
+    })),
     result,
   };
 }

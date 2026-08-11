@@ -768,6 +768,33 @@ import { brierScore, fitConstantK } from './fit-helpers';
  * this state (README behavior confirmed by the ended check at branch
  * open); an e2e pin on a real-replay fixture is a registered follow-up.
  *
+ * MCTS EQUILIBRIUM RANKING, HYBRID SCORE 2026-08-11 (R2 — the t58
+ * specimen's fix): rankings now come from the SAME equilibrium solve the
+ * matrix mode runs, over TREE-INFORMED cells — a cell's value is the mean
+ * of every leaf backed through it (a child's marginals sum to its
+ * pass-through reward; its creation-time static covers the expansion
+ * pass) blended with ONE static-prior visit; unexpanded cells fall back
+ * to the root static; the four-tree merge pools per-cell reward totals.
+ * Visit counts allocate search effort — they are no longer the verdict:
+ * under hint-ordered widening a hint-anchored move could stay
+ * most-visited while the tree's own values refuted it (draft t58: Knock
+ * Off ranked first into a Rest loop with the punisher misnamed → now
+ * tied with → Kyurem, punisher = Rest). Every root option is ranked
+ * (visit starvation no longer hides rows); punishers come from the
+ * matrix column; ev semantics are engine-independent.
+ * FULL SCORE DELEGATION MEASURED AND REJECTED: paired a-slice (n 389,
+ * every stratum) 65.3→64.3 sign (flips 2 toward / 6 away), brier flat
+ * 0.2120/0.2122 — the equilibrium dilutes the tree's concentrated visit
+ * information across thin static cells. HYBRID adopted: the SCORE keeps
+ * the visit-mean formulation — BIT-PARITY 20/20 vs the standing dump on
+ * the draft tranche, so the standing mcts records remain the line's
+ * record — while the rankings carry the solve. New pins: ev ≡ matrix-mix
+ * ev identity, merge cell pooling, hybrid score formula (single tree +
+ * merged), alongside the standing determinism pin. Harness timeout
+ * 40→60 min (a half-corpus mcts slice with per-result solves crossed 40
+ * by minutes; the b-slice retry under afternoon machine load crossed 60
+ * — the a-slice decided the gate, recorded honestly).
+ *
  * AUTO MODE SHIPPED 2026-08-11 (EVAL_CALIBRATION_MODE=auto; app mode
  * 'auto'): per-position dispatch on faintedFraction ≥ AUTO_MCTS_FAINTED_
  * FRACTION (0.4; the constant lives in types.ts so the UI shares it
@@ -1064,7 +1091,9 @@ test.describe('eval calibration against real replays', () => {
   test.skip(!process.env.EVAL_CALIBRATION, 'set EVAL_CALIBRATION=1 to run the calibration sweep');
 
   test('score sign tracks the actual winner', async () => {
-    test.setTimeout(2_400_000);
+    // 60 min: a half-corpus mcts slice with per-result equilibrium solves
+    // crossed the old 40-min budget by minutes (2026-08-11).
+    test.setTimeout(3_600_000);
     const samples: Sample[] = [];
     const sampleCount = Math.max(1, parseInt(process.env.EVAL_CALIBRATION_SAMPLES ?? '1', 10) || 1);
     // EVAL_CALIBRATION_SOURCE=fit swaps the replay universe to the

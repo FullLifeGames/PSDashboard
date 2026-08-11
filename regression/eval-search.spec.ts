@@ -4,6 +4,8 @@ type DeserializeFn = typeof State.deserializeBattle;
 import type { PokemonSet } from '@pkmn/sim';
 import { battleFaintedFraction, optionHints, searchOptions, searchPosition, subSearchDepth1 } from '../src/lib/eval/search';
 import { mctsSearch, mctsTreeSearch, wideningWindow, WIDENING_BASE, WIDENING_VISITS_PER_SLOT } from '../src/lib/eval/mcts';
+import { mergeMctsTrees } from '../src/lib/eval/mcts-merge';
+import type { MctsTreeStats } from '../src/lib/eval/types';
 import { advancePosition, createRootPosition, legalChoices, positionBattle } from '../src/lib/eval/forward-model';
 import { boostedFraction, pairThreat } from '../src/lib/eval/eval-function';
 import type { EvalResult, SearchProgress } from '../src/lib/eval/types';
@@ -487,6 +489,73 @@ test.describe('mcts hint-ordered expansion with progressive widening', () => {
     const first = mctsSearch(serialized, { depth: 1, samples: 1, tera: false });
     const second = mctsSearch(serialized, { depth: 1, samples: 1, tera: false });
     expect(second).toEqual(first);
+  });
+
+  test('rankings come from the equilibrium over tree-informed cells, not visit order', () => {
+    // Visit counts allocate search effort; they are not the verdict. A
+    // hint-anchored move can stay most-visited while the tree's own cell
+    // values refute it (draft t58: Knock Off most-visited, → Kyurem better)
+    // — so the published ranking must be the SAME equilibrium solve the
+    // matrix mode runs, over cells informed by the tree's backed-up means.
+    const result = mctsSearch(wideSerialized(), { depth: 1, samples: 1, tera: false });
+    expect(result.matrix).toBeTruthy();
+    const matrix = result.matrix!;
+    const evOf = new Map(matrix.p1Labels.map((labelText, i) => [labelText,
+      matrix.values[i].reduce((sum, cell, j) => sum + cell * matrix.mixes!.p2[j], 0)]));
+    for (const choice of result.perSide.p1) {
+      expect(choice.ev).toBeCloseTo(evOf.get(choice.label)!, 10);
+    }
+    const sorted = [...result.perSide.p1].every((choice, index, list) =>
+      index === 0 || list[index - 1].ev >= choice.ev - 1e-12);
+    expect(sorted).toBe(true);
+    // Every root option is ranked — visit starvation no longer hides rows.
+    expect(result.perSide.p1.length).toBe(matrix.p1Labels.length);
+    // HYBRID: the SCORE stays the visit-mean formulation (bit-comparable
+    // with the standing records) even though the rankings are solved.
+    const stats = mctsTreeSearch(wideSerialized(), { depth: 1, samples: 1, tera: false }, 0);
+    const topMean = (n: number[], w: number[]) => {
+      let bestIndex = -1;
+      let bestN = 0;
+      n.forEach((visits, index) => { if (visits > bestN) { bestN = visits; bestIndex = index; } });
+      return w[bestIndex] / n[bestIndex];
+    };
+    expect(stats.result.score).toBeCloseTo(
+      (topMean(stats.p1N, stats.p1W) + topMean(stats.p2N, stats.p2W)) / 2, 10);
+  });
+});
+
+test.describe('mcts merge pools tree-informed cells', () => {
+  const options = (labels: string[]) => labels.map(labelText => ({ choice: labelText, label: labelText }));
+  const emptyResult = { score: 0, interval: 0, depthCompleted: 1, perSide: { p1: [], p2: [] } };
+  test('the merged ranking solves the pooled matrix', () => {
+    const mk = (marginals: Pick<MctsTreeStats, 'p1N' | 'p1W' | 'p2N' | 'p2W'>, cells: MctsTreeStats['cells']): MctsTreeStats => ({
+      p1Options: options(['A', 'B']), p2Options: options(['X', 'Y']),
+      ...marginals, visits: 10, depth: 2,
+      rootValue: 0.1, cells, result: emptyResult,
+    });
+    const t1 = mk({ p1N: [10, 0], p1W: [6, 0], p2N: [10, 0], p2W: [6, 0] }, [
+      { key: 0, visits: 8, total: 4.8, value: 0.5, ended: false },
+      { key: 1, visits: 2, total: 0.4, value: 0.2, ended: false },
+    ]);
+    const t2 = mk({ p1N: [0, 5], p1W: [0, -2], p2N: [5, 0], p2W: [-2, 0] }, [
+      { key: 0, visits: 2, total: 1.0, value: 0.5, ended: false },
+      { key: 10_000, visits: 3, total: -0.9, value: -0.4, ended: false },
+    ]);
+    const merged = mergeMctsTrees([t1, t2]);
+    expect(merged.matrix).toBeTruthy();
+    // Pooled cell means with ONE static prior: (Σtotal + value)/(Σvisits + 1);
+    // the (B,Y) cell no tree expanded falls back to the root static.
+    expect(merged.matrix!.values[0][0]).toBeCloseTo((4.8 + 1.0 + 0.5) / 11, 10);
+    expect(merged.matrix!.values[0][1]).toBeCloseTo((0.4 + 0.2) / 3, 10);
+    expect(merged.matrix!.values[1][0]).toBeCloseTo((-0.9 - 0.4) / 4, 10);
+    expect(merged.matrix!.values[1][1]).toBeCloseTo(0.1, 10);
+    // Row A dominates the pooled game — the equilibrium ranking says so.
+    expect(merged.perSide.p1[0].label).toBe('A');
+    expect(merged.perSide.p1.length).toBe(2);
+    // HYBRID: the merged score is the summed-marginal visit-mean formula —
+    // top-visited p1 mean 6/10, top-visited p2 mean (6−2)/15.
+    expect(merged.score).toBeCloseTo((6 / 10 + 4 / 15) / 2, 10);
+    expect(merged.interval).toBeCloseTo(Math.abs(4 / 15 - 6 / 10), 10);
   });
 });
 

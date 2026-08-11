@@ -85,7 +85,8 @@ export interface RankedChoice {
    * Expected value against the OPPONENT's equilibrium mixture (own
    * perspective) — the primary grading reference. Choices in the
    * equilibrium's support score ≈ the game value; dominated choices score
-   * below it. MCTS results approximate this with the visit-mean.
+   * below it. MCTS results solve the same equilibrium over tree-informed
+   * cells (2026-08-11) — ev semantics are engine-independent.
    */
   ev: number;
   /** Label of the opponent reply achieving worstCase; null when the opponent has no choices. */
@@ -206,6 +207,14 @@ export interface MctsTreeStats {
   p2W: number[];
   visits: number;
   depth: number;
+  /** Root static (p1 perspective) — the unexpanded-cell fallback. */
+  rootValue: number;
+  /**
+   * Root-cell tree stats for the merged equilibrium ranking: `total` is the
+   * sum of every leaf value backed through the cell (expansion included),
+   * `value` the child's creation-time static (the one-visit prior).
+   */
+  cells: { key: number; visits: number; total: number; value: number; ended: boolean }[];
   /** This tree's own ranked result (PV/punisher donor for the merge). */
   result: EvalResult;
 }
