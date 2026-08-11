@@ -20,7 +20,10 @@ import { brierScore, fitConstantK } from './fit-helpers';
  * engine configs split into slices whose JSONL dumps concatenate cleanly) ·
  * EVAL_CALIBRATION_TRANCHE=<name> (one corpus stratum only; slices then
  * index the filtered list) ·
- * EVAL_CALIBRATION_DUMP=<path> (per-position JSONL for paired analysis)
+ * EVAL_CALIBRATION_DUMP=<path> (per-position JSONL for paired analysis) ·
+ * EVAL_CALIBRATION_SOURCE=fit (swap the universe to the weight-fitting
+ * corpus' disk cache for FIT-SIDE dumps — mapping fits train there and
+ * grade here; refuses to run without a dump path)
  *
  * Baseline 2026-08-04 (post ev-grading, pre boost-schedule; depth 1, samples 1):
  *   early 55% |0.23| · mid 62% |0.34| · late 81% |0.43|
@@ -920,25 +923,58 @@ test.describe('eval calibration against real replays', () => {
     test.setTimeout(2_400_000);
     const samples: Sample[] = [];
     const sampleCount = Math.max(1, parseInt(process.env.EVAL_CALIBRATION_SAMPLES ?? '1', 10) || 1);
+    // EVAL_CALIBRATION_SOURCE=fit swaps the replay universe to the
+    // manifest-pinned weight-fitting corpus, read from the build script's
+    // disk cache (no network). FIT-SIDE DUMPS ONLY: those games trained the
+    // winprob K and the feature weights, so their numbers must never be
+    // quoted as calibration records — hence the dump-path guard, and the
+    // tranche labels (fit-tournament / fit-ladder) keep provenance loud.
+    // The two universes never mix ids.
+    const fitSource = process.env.EVAL_CALIBRATION_SOURCE === 'fit';
+    if (fitSource && !process.env.EVAL_CALIBRATION_DUMP) {
+      throw new Error('EVAL_CALIBRATION_SOURCE=fit produces fit-side dumps only — set EVAL_CALIBRATION_DUMP');
+    }
+    const fs = fitSource ? await import('node:fs') : null;
+    const fitEntries = fs
+      ? (JSON.parse(fs.readFileSync('regression/fixtures/fit-corpus-manifest.json', 'utf-8')) as {
+          replays: { id: string; source: 'tournament' | 'ladder' }[];
+        }).replays
+      : [];
+    const universeIds = fitSource ? fitEntries.map(entry => entry.id) : REPLAY_IDS;
+    const trancheOf = fitSource
+      ? new Map(fitEntries.map(entry => [entry.id, `fit-${entry.source}`]))
+      : TRANCHE_OF;
     // Tranche filter first, then the slice indexes over the filtered list —
     // a new stratum runs alone and its dump concatenates with the standing
     // full-corpus dumps (determinism keeps the old positions valid).
     const trancheFilter = process.env.EVAL_CALIBRATION_TRANCHE;
     const trancheIds = trancheFilter
-      ? (REPLAY_TRANCHES.find(group => group.tranche === trancheFilter)?.ids ?? [])
-      : REPLAY_IDS;
+      ? universeIds.filter(id => trancheOf.get(id) === trancheFilter)
+      : universeIds;
     const slice = process.env.EVAL_CALIBRATION_SLICE?.match(/^(\d+)\/(\d+)$/);
     const replayIds = slice
       ? trancheIds.filter((_, index) => index % parseInt(slice[2], 10) === parseInt(slice[1], 10))
       : trancheIds;
 
+    type ReplayJson = { id: string; log: string; players: string[] };
     for (const id of replayIds) {
-      const response = await fetch(`https://replay.pokemonshowdown.com/${id}.json`);
-      if (!response.ok) {
-        console.log(`skipping ${id}: HTTP ${response.status}`);
-        continue;
+      let replay: ReplayJson;
+      if (fs) {
+        // Disk-cached fit replay (node scripts/build-fit-corpus.mjs).
+        const cachePath = `.fit-corpus/${id}.json`;
+        if (!fs.existsSync(cachePath)) {
+          console.log(`skipping ${id}: no fit cache`);
+          continue;
+        }
+        replay = JSON.parse(fs.readFileSync(cachePath, 'utf-8')) as ReplayJson;
+      } else {
+        const response = await fetch(`https://replay.pokemonshowdown.com/${id}.json`);
+        if (!response.ok) {
+          console.log(`skipping ${id}: HTTP ${response.status}`);
+          continue;
+        }
+        replay = await response.json() as ReplayJson;
       }
-      const replay = await response.json() as { id: string; log: string; players: string[] };
       const winnerName = replay.log.match(/^\|win\|(.+)$/m)?.[1]?.trim();
       if (!winnerName) {
         console.log(`skipping ${id}: no winner line`);
@@ -994,7 +1030,7 @@ test.describe('eval calibration against real replays', () => {
           samples.push({
             id,
             turn,
-            tranche: TRANCHE_OF.get(id) ?? 'unknown',
+            tranche: trancheOf.get(id) ?? 'unknown',
             phase: fraction < 1 / 3 ? 'early' : fraction < 2 / 3 ? 'mid' : 'late',
             gameType,
             score,
