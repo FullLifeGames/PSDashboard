@@ -474,6 +474,38 @@ import { brierScore, fitConstantK } from './fit-helpers';
  *   between them before the auto mode is built. App default stays d2s3
  *   until the user rules on these numbers.
  *
+ * CORPUS TRANCHE 3 + EXPANDED-BED RECORDS 2026-08-11 (65 replays: marathon
+ * quarantined, +32 sampled at ≥1500 OU / ≥1400 VGC / ≥1480 DOU, ≥7 turns,
+ * finished; n 417, ZERO reconstruction drops on d1/mcts — the corpus
+ * reconstructs cleanly at last). FORFEIT AUDIT: 33/65 replays end by
+ * forfeit — forfeits are KEPT (conceding a lost position is the ladder's
+ * resignation; the label is correct by rule, and the old record was built
+ * on ~50% forfeits too). gen9doublesou-2663100395 registered as a
+ * reconstruction-integrity suspect (engine reads ENDED +1.00 for the side
+ * that then forfeited — fantasy board or rage-quit; probe candidate).
+ * NEW RECORDS on the expanded bed (full sets):
+ *   d1s1: 55/58/77/62/69 · brier 0.2549/0.2418/0.1801 · n 417
+ *   mcts: 55/60/77/64/66 · brier 0.2547/0.2404/0.1678 · n 417 — now BEATS
+ *     d1 on mid (+2) and singles (+2) out-of-sample; doubles −3 keeps the
+ *     starvation diagnosis; late brier −0.012 stays the headline.
+ *   d2s3: 54/59/77/62/69 · brier 0.2560/0.2419/0.1766 · n 415 (the two
+ *     Transform-Mew drops) — statistically indistinguishable from d1s1 on
+ *     sign; late-doubles 88% niche persists.
+ *   AUTO (2-way d1 + mcts@ff≥0.40) counterfactual: 55/58/79/62/69 · late
+ *     brier 0.1696 — late +2 over d1, doubles preserved, brier within
+ *     0.002 of pure mcts: GATE PASSED. The 3-way (d2s3 doubles early)
+ *     REJECTED out-of-sample: its old-bed edge (mid +2, doubles +2)
+ *     collapsed to mixed noise — bed-luck caught by the expanded corpus.
+ *   Per-band K (ff≥0.4, n 94): matrix 1.57/brier 0.1963 vs mcts
+ *     1.73/0.1812 — per-mode late K re-confirmed, waits for a fit round.
+ * OUT-OF-SAMPLE HONESTY: the old-tranche positions still read 69% overall
+ * while the fresh tranche reads 57% — the standing records were partly
+ * bed-tuned by months of gated adoption against a fixed 218-position set.
+ * Pooled K fell 1.92→1.42: the app's winprob mapping is overconfident on
+ * fresh games (registered for the next eval-fit round). Cross-corpus
+ * comparisons of old records to these lines are invalid; the expanded bed
+ * is the baseline from here on.
+ *
  * DIRECTIONAL SPEED EXCLUSIONS 2026-08-10: observations now drop only when
  * the modifier could EXPLAIN the observed order — a speed-raising factor
  * (Tailwind, +spe stages, paradox boosters) on the FIRST mover, or a
@@ -542,7 +574,12 @@ const REPLAY_IDS = [
   'gen9ou-2658675391',
   'gen9ou-2658676184',
   'gen9ou-2658675932',
-  'gen9ou-2658670791',
+  // QUARANTINED 2026-08-11: 'gen9ou-2658670791' — 120+-turn marathon whose
+  // choice-replay reconstruction drops a load/timing-dependent subset of
+  // positions (3/5/5 across same-day runs, same turns, different errors;
+  // semantic determinism of cold reconstruction proven by probe). The
+  // varying drop set makes the n line wobble between runs — exactly what
+  // paired gates must not absorb.
   'gen9ou-2658671385',
   'gen9ou-2658663776',
   'gen9ou-2658672151',
@@ -571,6 +608,42 @@ const REPLAY_IDS = [
   'gen9doublesou-2660813469',
   'gen9doublesou-2660802611',
   'gen9doublesou-2660822493',
+  // Tranche 3 (sampled 2026-08-11 via search.json, rating ≥1500 OU / ≥1400
+  // VGC / ≥1480 DOU, verified finished with ≥7 turns) — doubles the corpus
+  // so paired gates can see <2% effects; the 2026-08-11 record baselines
+  // below this line are the first on the expanded list.
+  'gen9ou-2663115898',
+  'gen9ou-2663115494',
+  'gen9ou-2663114473',
+  'gen9ou-2663113106',
+  'gen9ou-2663114316',
+  'gen9ou-2663113816',
+  'gen9ou-2663113568',
+  'gen9ou-2663113084',
+  'gen9ou-2663112821',
+  'gen9ou-2663110678',
+  'gen9ou-2663110373',
+  'gen9ou-2663112349',
+  'gen9ou-2663108645',
+  'gen9ou-2663110845',
+  'gen9ou-2663110408',
+  'gen9ou-2663110121',
+  'gen9ou-2663109511',
+  'gen9ou-2663108252',
+  'gen9ou-2663108091',
+  'gen9ou-2663107495',
+  'gen9vgc2026regi-2630181744',
+  'gen9vgc2026regi-2630110359',
+  'gen9vgc2026regi-2629783504',
+  'gen9vgc2026regi-2629760324',
+  'gen9vgc2026regi-2629731825',
+  'gen9vgc2026regi-2629703929',
+  'gen9doublesou-2663102863',
+  'gen9doublesou-2663102669',
+  'gen9doublesou-2663100569',
+  'gen9doublesou-2663100395',
+  'gen9doublesou-2663095770',
+  'gen9doublesou-2663093831',
 ];
 
 interface Sample {
