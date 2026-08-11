@@ -63,6 +63,17 @@ console.log('\n=== joined-set records (identical positions) ===');
 record(joined.map(p => p.a), 'A (joined)');
 record(joined.map(p => p.b), 'B (joined)');
 
+const trancheOf = pair => pair.a.tranche ?? pair.b.tranche ?? 'untagged';
+const tranches = [...new Set(joined.map(trancheOf))];
+if (tranches.length > 1 || tranches[0] !== 'untagged') {
+  console.log('\n=== stratified records (joined, by corpus tranche) ===');
+  for (const tranche of tranches) {
+    const subset = joined.filter(pair => trancheOf(pair) === tranche);
+    record(subset.map(pair => pair.a), `A ${tranche}`);
+    record(subset.map(pair => pair.b), `B ${tranche}`);
+  }
+}
+
 console.log('\n=== disagreement structure (joined) ===');
 for (const phase of ['early', 'mid', 'late']) {
   for (const gameType of ['singles', 'doubles']) {

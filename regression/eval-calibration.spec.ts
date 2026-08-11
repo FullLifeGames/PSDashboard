@@ -18,6 +18,8 @@ import { brierScore, fitConstantK } from './fit-helpers';
  * line is d2s3, so the harness must be able to measure it) ·
  * EVAL_CALIBRATION_SLICE=a/b (only replays with index % b === a — long
  * engine configs split into slices whose JSONL dumps concatenate cleanly) ·
+ * EVAL_CALIBRATION_TRANCHE=<name> (one corpus stratum only; slices then
+ * index the filtered list) ·
  * EVAL_CALIBRATION_DUMP=<path> (per-position JSONL for paired analysis)
  *
  * Baseline 2026-08-04 (post ev-grading, pre boost-schedule; depth 1, samples 1):
@@ -525,6 +527,35 @@ import { brierScore, fitConstantK } from './fit-helpers';
  * brier 0.1686, late +2 / singles +1 over the shipped auto record with
  * nothing down. NEW AUTO RECORD.
  *
+ * TOURNAMENT STRATUM + STRATIFIED RECORDS 2026-08-11 (tranche 4: 32
+ * smogtours games — SV OU officials SPL/OST/WCoP + OSDT doubles — every id
+ * EXCLUDED from fit-corpus-manifest.json so the fitted weights never grade
+ * their own training data; REPLAY_TRANCHES structure + the
+ * EVAL_CALIBRATION_TRANCHE lever; dumps carry the tranche tag and
+ * scripts/paired-calibration.mjs reports stratified):
+ *   ladder+draft (n 415): d1 54/58/77/62/68 · mcts 53/61/79/63/69 (late
+ *     brier 0.1648) · AUTO 54/58/81/63/69 (late brier 0.1689) — auto keeps
+ *     the best late-sign line on the stratum app users actually load.
+ *   tournament (n 208):   d1 51/58/68/60/56 (K 0.87!) · d2s3 52/58/69/60/58
+ *     · mcts 54/62/69/60/64 — the DUCT tree beats the matrix EVERYWHERE
+ *     against experts (doubles +8) and auto's matrix-early premise
+ *     inverts. Winner labels validated 32/32 — no name-mismatch artifact.
+ *   full bed (n 623):     mcts 53/61/76/62/67 · auto 53/58/77/62/64 — pure
+ *     MCTS ties-or-beats auto once expert games enter the bed.
+ * READING: the label-noise hypothesis was WRONG in direction. Tournament
+ * labels are CLEAN but the games are HARDER: equal-skill experts flatten
+ * the advantage→win mapping (pooled K 1.42→0.87 across strata — the losing
+ * expert finds the defensive resource), so static-eval advantages convert
+ * less. The fresh-ladder 57% vs old-ladder 69% split mixes overfit decay
+ * AND game-difficulty composition — not label corruption. MCTS's edge
+ * GROWS with opponent quality (experts play closer to the forced lines the
+ * tree assumes — the Foul Play architecture bet, confirmed by stratum).
+ * The 3-way hybrid stays dead on clean labels (tournament doubles: d2s3 58
+ * vs mcts 64). DEFAULT-LINE QUESTION now has three data-backed candidates:
+ * d2s3 (status quo — weakest on every stratum measured), auto (best
+ * ladder late-sign), pure MCTS (best tournament + full-bed mid/doubles/
+ * brier) — user decision, still deferred.
+ *
  * AUTO MODE SHIPPED 2026-08-11 (EVAL_CALIBRATION_MODE=auto; app mode
  * 'auto'): per-position dispatch on faintedFraction ≥ AUTO_MCTS_FAINTED_
  * FRACTION (0.4; the constant lives in types.ts so the UI shares it
@@ -596,13 +627,29 @@ import { brierScore, fitConstantK } from './fit-helpers';
  * regression exists to fix; re-open only with a per-stage profile that
  * isolates a ≥25% single cause.
  */
-const REPLAY_IDS = [
-  'gen9draft-2058494320',
-  'gen9draft-2298735122',
-  'gen3customgame-2115579570',
-  // High-ladder gen9ou games (≥1500 Elo, sampled 2026-08-02) — stronger play
-  // gives a cleaner sign-accuracy signal than random-ladder blunder-fests.
-  'gen9ou-2658678742',
+/**
+ * Corpus strata: outcome-label quality differs by source (a tournament
+ * player resigns lost positions and plays won ones out; a mid-ladder
+ * player can throw either), so records report stratified. The tranche tag
+ * rides in the dump for offline grouping.
+ */
+interface ReplayTranche { tranche: string; ids: string[] }
+
+const REPLAY_TRANCHES: ReplayTranche[] = [
+  {
+    tranche: 'draft',
+    ids: [
+      'gen9draft-2058494320',
+      'gen9draft-2298735122',
+      'gen3customgame-2115579570',
+    ],
+  },
+  {
+    // High-ladder gen9ou games (≥1500 Elo, sampled 2026-08-02) — stronger play
+    // gives a cleaner sign-accuracy signal than random-ladder blunder-fests.
+    tranche: 'ladder-ou-0802',
+    ids: [
+      'gen9ou-2658678742',
   'gen9ou-2658675391',
   'gen9ou-2658676184',
   'gen9ou-2658675932',
@@ -628,8 +675,13 @@ const REPLAY_IDS = [
   'gen9ou-2658661545',
   'gen9ou-2658659909',
   'gen9ou-2658658993',
-  // Doubles/VGC (sampled 2026-08-04, rating ≥1400 VGC / ≥1480 DOU, ≥7 turns) —
-  // the doubles scoring path was previously uncalibrated entirely.
+    ],
+  },
+  {
+    // Doubles/VGC (sampled 2026-08-04, rating ≥1400 VGC / ≥1480 DOU, ≥7 turns) —
+    // the doubles scoring path was previously uncalibrated entirely.
+    tranche: 'ladder-dou-0804',
+    ids: [
   'gen9vgc2026regi-2630677822',
   'gen9vgc2026regi-2630452654',
   'gen9vgc2026regi-2630461565',
@@ -640,10 +692,16 @@ const REPLAY_IDS = [
   'gen9doublesou-2660813469',
   'gen9doublesou-2660802611',
   'gen9doublesou-2660822493',
-  // Tranche 3 (sampled 2026-08-11 via search.json, rating ≥1500 OU / ≥1400
-  // VGC / ≥1480 DOU, verified finished with ≥7 turns) — doubles the corpus
-  // so paired gates can see <2% effects; the 2026-08-11 record baselines
-  // below this line are the first on the expanded list.
+    ],
+  },
+  {
+    // Tranche 3 (sampled 2026-08-11 via search.json, rating ≥1500 OU / ≥1400
+    // VGC / ≥1480 DOU, verified finished with ≥7 turns) — doubles the corpus
+    // so paired gates can see <2% effects. RECENCY sample: whatever high-rated
+    // players uploaded that morning — the "what app users actually load"
+    // stratum, with the label noise that implies.
+    tranche: 'ladder-0811',
+    ids: [
   'gen9ou-2663115898',
   'gen9ou-2663115494',
   'gen9ou-2663114473',
@@ -676,12 +734,64 @@ const REPLAY_IDS = [
   'gen9doublesou-2663100395',
   'gen9doublesou-2663095770',
   'gen9doublesou-2663093831',
+    ],
+  },
+  {
+    // Tranche 4 (sampled 2026-08-11): Smogon TOURNAMENT games — SV OU
+    // officials (SPL/OST/WCoP, thread 3718664) and OSDT gen9doublesou
+    // (3778554), newest pages first. Cleanest outcome labels on the board:
+    // tournament players resign lost positions and convert won ones. Every
+    // id is EXCLUDED from fit-corpus-manifest.json — those games trained
+    // the winprob K and feature weights, so they may never grade the
+    // calibration (train/test separation).
+    tranche: 'tournament-0811',
+    ids: [
+      'smogtours-gen9ou-749601',
+      'smogtours-gen9ou-749351',
+      'smogtours-gen9ou-750267',
+      'smogtours-gen9ou-749895',
+      'smogtours-gen9ou-749739',
+      'smogtours-gen9ou-749754',
+      'smogtours-gen9ou-749828',
+      'smogtours-gen9ou-751451',
+      'smogtours-gen9ou-751543',
+      'smogtours-gen9ou-751340',
+      'smogtours-gen9ou-751436',
+      'smogtours-gen9ou-751283',
+      'smogtours-gen9ou-751505',
+      'smogtours-gen9ou-751382',
+      'smogtours-gen9ou-751443',
+      'smogtours-gen9ou-751476',
+      'smogtours-gen9ou-751341',
+      'smogtours-gen9ou-751244',
+      'smogtours-gen9ou-751512',
+      'smogtours-gen9ou-750953',
+      'smogtours-gen9doublesou-938276',
+      'smogtours-gen9doublesou-938281',
+      'smogtours-gen9doublesou-937926',
+      'smogtours-gen9doublesou-937928',
+      'smogtours-gen9doublesou-937931',
+      'smogtours-gen9doublesou-938638',
+      'smogtours-gen9doublesou-938640',
+      'smogtours-gen9doublesou-938644',
+      'smogtours-gen9doublesou-939625',
+      'smogtours-gen9doublesou-939635',
+      'smogtours-gen9doublesou-941638',
+      'smogtours-gen9doublesou-941650',
+    ],
+  },
 ];
+
+const REPLAY_IDS = REPLAY_TRANCHES.flatMap(group => group.ids);
+const TRANCHE_OF = new Map(REPLAY_TRANCHES.flatMap(group =>
+  group.ids.map(id => [id, group.tranche] as const)));
 
 interface Sample {
   /** Replay id + sampled turn — the pairing key across engine runs. */
   id: string;
   turn: number;
+  /** Corpus stratum (label-quality tier) — rides into the dump. */
+  tranche: string;
   phase: 'early' | 'mid' | 'late';
   gameType: 'singles' | 'doubles';
   score: number;
@@ -697,10 +807,17 @@ test.describe('eval calibration against real replays', () => {
     test.setTimeout(2_400_000);
     const samples: Sample[] = [];
     const sampleCount = Math.max(1, parseInt(process.env.EVAL_CALIBRATION_SAMPLES ?? '1', 10) || 1);
+    // Tranche filter first, then the slice indexes over the filtered list —
+    // a new stratum runs alone and its dump concatenates with the standing
+    // full-corpus dumps (determinism keeps the old positions valid).
+    const trancheFilter = process.env.EVAL_CALIBRATION_TRANCHE;
+    const trancheIds = trancheFilter
+      ? (REPLAY_TRANCHES.find(group => group.tranche === trancheFilter)?.ids ?? [])
+      : REPLAY_IDS;
     const slice = process.env.EVAL_CALIBRATION_SLICE?.match(/^(\d+)\/(\d+)$/);
     const replayIds = slice
-      ? REPLAY_IDS.filter((_, index) => index % parseInt(slice[2], 10) === parseInt(slice[1], 10))
-      : REPLAY_IDS;
+      ? trancheIds.filter((_, index) => index % parseInt(slice[2], 10) === parseInt(slice[1], 10))
+      : trancheIds;
 
     for (const id of replayIds) {
       const response = await fetch(`https://replay.pokemonshowdown.com/${id}.json`);
@@ -764,6 +881,7 @@ test.describe('eval calibration against real replays', () => {
           samples.push({
             id,
             turn,
+            tranche: TRANCHE_OF.get(id) ?? 'unknown',
             phase: fraction < 1 / 3 ? 'early' : fraction < 2 / 3 ? 'mid' : 'late',
             gameType,
             score,
