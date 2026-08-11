@@ -630,6 +630,32 @@ import { brierScore, fitConstantK } from './fit-helpers';
  *   the feature argument for auto has thinned to pivot pairs + early
  *   compute cost vs grand-bed mcts 56/63/78/64/69 over auto 54/62/78/64/67.
  *
+ * DISPLAY-K REFIT 2026-08-11 (the registered "per-mode late K" fit round —
+ * EVAL_CALIBRATION_SOURCE=fit): TRAIN on a 1/20 manifest slice of the fit
+ * corpus (107 games; 668 d1 / 629 mcts positions — the mcts chunks lost 39
+ * to load-sensitive reconstruction retries, the marathon family, so fits
+ * use the 629 joined pairs), GRADE out-of-sample on the standing grand-bed
+ * dumps (n 826/827).
+ * FITTED (search root scores, wp-units): d1 constant K=1.75 (phase k0=1.85
+ * k1=−0.32) · mcts K=1.81 (k0=1.94 k1=−0.41) · routed composite (t=0.25)
+ * K=1.87 · per gametype singles ≈1.4 / doubles ≈3 on BOTH engines.
+ * GRADED (brier on the calibration bed): linear display 0.2275 → shared
+ * constant-K 0.2207 (late 0.2180→0.1972) · per-mode adds 0.0002 · the
+ * phase term adds nothing (k1 fits negative, no OOS gain) · the GAMETYPE
+ * SPLIT LOSES (doubles 0.2167 vs pooled 0.2068 — fit-corpus doubles K≈3
+ * is composition-specific and does not transfer; the 3-way lesson again).
+ * VERDICT: per-mode-late-K is ANSWERED — real but worth 0.0002, not a
+ * second mapping. The finding that matters: the LINEAR display is
+ * overconfident out-of-sample everywhere (worst late); one shared constant
+ * display-K ≈ 1.85 is the honest map, robust across engines and strata,
+ * and every fancier variant ties or loses. Adoption decision with the
+ * user (semantics: winPercent becomes sigmoid(K·s), exact ±1 ended evals
+ * keep 100/0, deltas stay wp-unit-linear).
+ * Fresh-evidence engine check on the same fit pairs (a THIRD corpus,
+ * never used for engine comparisons): d1 54/61/79 · mcts 55/64/79 · auto
+ * 54/62/79 by phase; ALL 65/66/65 — mcts ties-or-beats d1 in every bucket
+ * here too.
+ *
  * AUTO MODE SHIPPED 2026-08-11 (EVAL_CALIBRATION_MODE=auto; app mode
  * 'auto'): per-position dispatch on faintedFraction ≥ AUTO_MCTS_FAINTED_
  * FRACTION (0.4; the constant lives in types.ts so the UI shares it
