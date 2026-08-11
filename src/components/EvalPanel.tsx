@@ -132,10 +132,17 @@ export function EvalPanel({
   const hasGraph = graph.scores.some(score => score !== null);
   const p1Pct = result ? winPercent(result.score) : 50;
 
-  // One escalation control for both faces of the turn view: a gap turn gets
-  // its first analysis, an analyzed turn re-searches one step deeper. The
-  // label names the target so the click is never a surprise.
-  const thinkDeeperButton = onThinkDeeper && thinkDeeperTarget ? (
+  // Gap-turn analysis control. This button used to double as "Think deeper
+  // about this position" on ANALYZED turns; that face is HIDDEN for now —
+  // REGISTERED BUG: the single-turn acquire reconstructs WITHOUT per-turn
+  // snapshot healing, so in a diverging endgame (draft replay t56+) it
+  // evaluates the premature-end artifact: score ±1, the bar snaps to
+  // 100%, and the rankings empty out ("breaks the turn"). Gap analysis
+  // shares that acquire and inherits the same risk in the same zone —
+  // kept because first-analysis of a gap is a core flow. Fix on record:
+  // heal the single-turn acquire (capturePositions path) + app-side
+  // ended-skip guard; see the calibration header.
+  const thinkDeeperButton = onThinkDeeper && thinkDeeperTarget && !result ? (
     <button
       type="button"
       className="ps-btn"
@@ -143,10 +150,10 @@ export function EvalPanel({
       onClick={onThinkDeeper}
       title={smogonPending
         ? 'Waiting for Smogon data — searching now would build the teams without the guessed sets.'
-        : 'Re-search this position (and its follow-up turn) at the named settings — the score, ranked moves, matrix, graph, and report update together.'}
+        : 'Search this position (and its follow-up turn) at the named settings — the score, ranked moves, matrix, graph, and report update together.'}
       style={{ padding: '1px 6px', fontSize: 10 }}
     >
-      {result ? 'Think deeper about this position' : 'Analyze this position'}
+      {'Analyze this position'}
       {` (${thinkDeeperTarget.mode === 'mcts' ? 'MCTS'
         : thinkDeeperTarget.mode === 'auto' ? 'auto'
         : `depth ${thinkDeeperTarget.depth}`})`}
@@ -388,7 +395,8 @@ export function EvalPanel({
                 toss-up: prediction battle
               </span>
             )}
-            {thinkDeeperButton}
+            {/* Think-deeper hidden here (registered bug — see the button's
+                definition above); analyzed turns show their stored result. */}
           </div>
           <div className="ps-eval-columns">
             {/* Stale results describe the PREVIOUS position — clicking them

@@ -883,6 +883,28 @@ import { brierScore, fitConstantK } from './fit-helpers';
  * static basis for this mass; the next lever, if any, is search/
  * planning-side.
  *
+ * REGISTERED BUG — THINK-DEEPER ON UNHEALED ACQUIRE 2026-08-11 (user
+ * report: "Think deeper breaks the turn and reduces the percentage to
+ * 100%", draft replay t56): the whole-game sweep acquires positions via
+ * capturePositions with per-turn snapshot healing (makeSweepAcquireAll),
+ * but the SINGLE-turn acquire (makeReplayAcquire — used by think-deeper's
+ * analyzeTurnNow, single-turn Evaluate, and gap-turn "Analyze this
+ * position") reconstructs single-shot WITHOUT healing. In the diverging
+ * endgame zone that is exactly the premature-end cascade: the unhealed
+ * battle arrives ENDED, evaluates ±1, the bar snaps to a literal 100%,
+ * and perSide empties — "breaks the turn". MITIGATION (this change): the
+ * think-deeper face of the button is HIDDEN on analyzed turns (EvalPanel;
+ * e2e pins the hide in both former click tests); gap-turn first analysis
+ * stays available and shares the risk in the same zone. FIX ON RECORD:
+ * route the single-turn acquire through the healed capturePositions path
+ * (or a shared healed-reconstruction helper) and add the app-side
+ * ended-skip guard (a sampled turn is always before the real end — an
+ * ended arrival is always an artifact: surface, don't evaluate). The
+ * escalation machinery (thinkDeeperTarget ladder, supersedesStored,
+ * verificationDeepSettings) is UNCHANGED and stays pinned in eval-graph;
+ * un-hide once the acquire is healed, restoring the click-through e2e
+ * assertions this change relaxed.
+ *
  * DIVERGENCE-NOTICE E2E RESOLUTION 2026-08-11 (T3): scouting the draft
  * replay under the APP path (fill-less like the e2e env, per-turn
  * snapshot healing) shows arrivals t56–67 ALL LIVE and only t68 (the
