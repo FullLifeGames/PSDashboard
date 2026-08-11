@@ -4,7 +4,8 @@ type DeserializeFn = typeof State.deserializeBattle;
 import type { PokemonSet } from '@pkmn/sim';
 import { battleFaintedFraction, optionHints, searchOptions, searchPosition, subSearchDepth1 } from '../src/lib/eval/search';
 import { mctsSearch, mctsTreeSearch, wideningWindow, WIDENING_BASE, WIDENING_VISITS_PER_SLOT } from '../src/lib/eval/mcts';
-import { mergeMctsTrees } from '../src/lib/eval/mcts-merge';
+import { mergeMctsTrees, starvedSupportCells, VERIFY_SAMPLES } from '../src/lib/eval/mcts-merge';
+import { cellKey } from '../src/lib/eval/rank';
 import type { MctsTreeStats } from '../src/lib/eval/types';
 import { advancePosition, createRootPosition, legalChoices, positionBattle } from '../src/lib/eval/forward-model';
 import { boostedFraction, pairThreat } from '../src/lib/eval/eval-function';
@@ -556,6 +557,87 @@ test.describe('mcts merge pools tree-informed cells', () => {
     // top-visited p1 mean 6/10, top-visited p2 mean (6−2)/15.
     expect(merged.score).toBeCloseTo((6 / 10 + 4 / 15) / 2, 10);
     expect(merged.interval).toBeCloseTo(Math.abs(4 / 15 - 6 / 10), 10);
+  });
+});
+
+test.describe('starved support cells are verified before the verdict', () => {
+  // Draft t56 mechanism in miniature: each root cell fixes ONE chance
+  // outcome per tree, so a 1-2 visit cell can carry a lucky sample (the
+  // Draco Meteor that missed) and the equilibrium solve trusts it at face
+  // value — the sack row dominates on noise. The fix: cells the solve's
+  // support leans on with too few pooled visits are re-priced by the matrix
+  // mode's multi-seed cell sampler and REPLACE the tree value.
+  const options = (labels: string[]) => labels.map(labelText => ({ choice: labelText, label: labelText }));
+  const emptyResult = { score: 0, interval: 0, depthCompleted: 1, perSide: { p1: [], p2: [] } };
+  const mk = (marginals: Pick<MctsTreeStats, 'p1N' | 'p1W' | 'p2N' | 'p2W'>, cells: MctsTreeStats['cells']): MctsTreeStats => ({
+    p1Options: options(['Safe', 'Sack']), p2Options: options(['X', 'Y']),
+    ...marginals, visits: 25, depth: 2,
+    rootValue: 0.5, cells, result: emptyResult,
+  });
+  // Row Safe: well-visited, converged at −0.2. Row Sack: (Sack,X) starved
+  // at 2+1 visits with a lucky +0.5; (Sack,Y) never expanded (reads the
+  // rosy root static 0.5).
+  const t1 = mk({ p1N: [20, 2], p1W: [-4, 1], p2N: [20, 2], p2W: [-4, 1] }, [
+    { key: cellKey(0, 0), visits: 12, total: -2.4, value: -0.2, ended: false },
+    { key: cellKey(0, 1), visits: 8, total: -1.6, value: -0.2, ended: false },
+    { key: cellKey(1, 0), visits: 2, total: 1.0, value: 0.5, ended: false },
+  ]);
+  const t2 = mk({ p1N: [18, 1], p1W: [-3.6, 0.5], p2N: [18, 1], p2W: [-3.6, 0.5] }, [
+    { key: cellKey(0, 0), visits: 10, total: -2.0, value: -0.2, ended: false },
+    { key: cellKey(0, 1), visits: 9, total: -1.8, value: -0.2, ended: false },
+    { key: cellKey(1, 0), visits: 1, total: 0.5, value: 0.5, ended: false },
+  ]);
+
+  test('the unverified solve trusts the lucky starved row (the bug mechanism)', () => {
+    const merged = mergeMctsTrees([t1, t2]);
+    expect(merged.perSide.p1[0].label).toBe('Sack');
+  });
+
+  test('starvedSupportCells flags starved and unexpanded support, not converged cells', () => {
+    const merged = mergeMctsTrees([t1, t2]);
+    const jobs = starvedSupportCells([t1, t2], merged);
+    const pairs = jobs.map(job => `${job.p1Choice}×${job.p2Choice}`);
+    expect(pairs).toContain('Sack×X'); // 3 pooled visits < floor
+    expect(pairs).toContain('Sack×Y'); // never expanded
+    expect(pairs).not.toContain('Safe×X'); // 22 pooled visits — converged
+    expect(pairs).not.toContain('Safe×Y'); // 17 pooled visits — converged
+    for (const job of jobs) expect(job.samples).toBe(VERIFY_SAMPLES);
+  });
+
+  test('verified values replace starved cells and the re-solve demotes the sack', () => {
+    const unverified = mergeMctsTrees([t1, t2]);
+    const verified = new Map([
+      [cellKey(1, 0), { i: 1, j: 0, value: -0.8, ended: false }],
+      [cellKey(1, 1), { i: 1, j: 1, value: -0.8, ended: false }],
+    ]);
+    const merged = mergeMctsTrees([t1, t2], verified);
+    expect(merged.matrix!.values[1][0]).toBeCloseTo(-0.8, 10); // replaced, not pooled
+    expect(merged.matrix!.values[1][1]).toBeCloseTo(-0.8, 10);
+    expect(merged.perSide.p1[0].label).toBe('Safe');
+    // HYBRID: the score is the summed-marginal visit-mean — verification
+    // must not move it (records stay comparable).
+    expect(merged.score).toBeCloseTo(unverified.score, 10);
+  });
+
+  test('trees that DISAGREE on a well-visited cell flag it too', () => {
+    // Visits measure subtree exploration, not chance samples — a cell with
+    // plenty of pooled visits still carries at most one transition outcome
+    // per tree. Here (Safe,Y) has 19 pooled visits in both trees but the
+    // trees saw opposite outcomes (−0.33 vs +0.36) — chance-suspect.
+    const d1 = mk({ p1N: [20, 2], p1W: [-4, 1], p2N: [20, 2], p2W: [-4, 1] }, [
+      { key: cellKey(0, 0), visits: 12, total: -2.4, value: -0.2, ended: false },
+      { key: cellKey(0, 1), visits: 10, total: -3.3, value: -0.3, ended: false },
+      { key: cellKey(1, 0), visits: 20, total: -4.0, value: -0.2, ended: false },
+    ]);
+    const d2 = mk({ p1N: [18, 1], p1W: [-3.6, 0.5], p2N: [18, 1], p2W: [-3.6, 0.5] }, [
+      { key: cellKey(0, 0), visits: 10, total: -2.0, value: -0.2, ended: false },
+      { key: cellKey(0, 1), visits: 9, total: 3.3, value: 0.3, ended: false },
+      { key: cellKey(1, 0), visits: 20, total: -4.0, value: -0.2, ended: false },
+    ]);
+    const merged = mergeMctsTrees([d1, d2]);
+    const pairs = starvedSupportCells([d1, d2], merged).map(job => `${job.p1Choice}×${job.p2Choice}`);
+    expect(pairs).toContain('Safe×Y'); // agreeing visits, disagreeing outcomes
+    expect(pairs).not.toContain('Safe×X'); // both trees agree at −0.2
   });
 });
 

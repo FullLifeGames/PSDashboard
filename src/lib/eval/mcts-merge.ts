@@ -1,5 +1,5 @@
 import { cellKey, rankFromMatrix, toResult as rankedToResult } from './rank';
-import type { EvalResult, MctsTreeStats } from './types';
+import type { EvalCellJob, EvalCellValue, EvalResult, MctsTreeStats } from './types';
 
 /**
  * Root parallelization for the MCTS mode: N independent trees (each with a
@@ -16,10 +16,39 @@ import type { EvalResult, MctsTreeStats } from './types';
  */
 export const MCTS_TREES = 4;
 
-/** Merges parallel trees into one result. Order of `trees` must be fixed. */
-export function mergeMctsTrees(trees: MctsTreeStats[]): EvalResult {
+/**
+ * A root cell fixes ONE chance outcome per tree at creation — every later
+ * visit descends through that same child, so visit counts measure subtree
+ * exploration, not independent samples of the cell's own transition (at
+ * most one per tree, ever). A support cell is chance-suspect when the pool
+ * has too few visits, when too few trees expanded it, or when the trees
+ * that did DISAGREE (draft t56: [Ice Beam × Draco Meteor] per-tree means
+ * −0.38/+0.37/−0.34/−0.37 — one tree rode a missed 90% Draco Meteor
+ * through its whole subtree). Suspect cells get re-priced by the matrix
+ * mode's multi-seed cell sampler before the verdict stands.
+ */
+export const VERIFY_MIN_VISITS = 8;
+/** Minimum independent chance samples (trees that expanded the cell). */
+export const VERIFY_MIN_TREES = 3;
+/** Per-tree mean spread beyond which a cell's transition is chance-suspect. */
+const VERIFY_SPREAD = 0.15;
+/** Fixed seeds per verified cell — matrix-zone grade, deterministic. */
+export const VERIFY_SAMPLES = 3;
+/** Verification budget: at most this many cell jobs per search. */
+export const VERIFY_CELL_CAP = 12;
+/** Mix weight from which an option counts as equilibrium support. */
+const SUPPORT_MIX = 0.05;
+
+/**
+ * Merges parallel trees into one result. Order of `trees` must be fixed.
+ * `verified` (cellKey → sampled cell) REPLACES starved cells' pooled values
+ * before the solve: a multi-seed matrix-grade mean outranks the 1-2 chance
+ * outcomes the tree happened to draw there. The score is untouched by
+ * design — it stays the summed-marginal visit mean (hybrid semantics).
+ */
+export function mergeMctsTrees(trees: MctsTreeStats[], verified?: Map<number, EvalCellValue>): EvalResult {
   const base = trees[0];
-  if (trees.length === 1) return base.result;
+  if (trees.length === 1 && !verified) return base.result;
 
   // Pool per-cell reward totals across trees; ONE static prior per cell
   // (the per-tree results already carry it, the pool re-applies it once).
@@ -42,6 +71,14 @@ export function mergeMctsTrees(trees: MctsTreeStats[]): EvalResult {
   }));
   const ended = base.p1Options.map((_, i) =>
     base.p2Options.map((_, j) => pooled.get(cellKey(i, j))?.ended ?? false));
+  if (verified) {
+    for (const cell of verified.values()) {
+      if (cell.i < values.length && cell.j < (values[cell.i]?.length ?? 0)) {
+        values[cell.i][cell.j] = cell.value;
+        ended[cell.i][cell.j] = cell.ended;
+      }
+    }
+  }
 
   const ranked = rankFromMatrix(
     { p1Options: base.p1Options, p2Options: base.p2Options, values, ended },
@@ -83,4 +120,101 @@ export function mergeMctsTrees(trees: MctsTreeStats[]): EvalResult {
     if (donor) result.perSide.p1[0].line = donor.result.perSide.p1[0].line;
   }
   return result;
+}
+
+/**
+ * The cells the merged equilibrium actually leans on — support rows ×
+ * support columns (mix ≥ SUPPORT_MIX, plus each side's ranked top three and
+ * their punisher cells) — that the pool has visited fewer than
+ * VERIFY_MIN_VISITS times (unexpanded cells count zero: they read the bare
+ * root static, the least-earned value in the matrix). Ordered by support
+ * mass, capped at VERIFY_CELL_CAP, emitted as matrix-grade cell jobs.
+ */
+export function starvedSupportCells(trees: MctsTreeStats[], merged: EvalResult): EvalCellJob[] {
+  const base = trees[0];
+  const mixes = merged.matrix?.mixes;
+  if (!mixes) return [];
+  const perTree = new Map<number, number[]>(); // key → prior-blended mean per expanding tree
+  const pooledVisits = new Map<number, number>();
+  const endedCells = new Set<number>();
+  for (const tree of trees) {
+    for (const cell of tree.cells) {
+      pooledVisits.set(cell.key, (pooledVisits.get(cell.key) ?? 0) + cell.visits);
+      if (cell.ended) endedCells.add(cell.key);
+      const means = perTree.get(cell.key) ?? [];
+      means.push((cell.total + cell.value) / (cell.visits + 1));
+      perTree.set(cell.key, means);
+    }
+  }
+  const suspect = (key: number): boolean => {
+    if ((pooledVisits.get(key) ?? 0) < VERIFY_MIN_VISITS) return true;
+    const means = perTree.get(key) ?? [];
+    if (means.length < Math.min(VERIFY_MIN_TREES, trees.length)) return true;
+    return Math.max(...means) - Math.min(...means) > VERIFY_SPREAD;
+  };
+
+  // Support per side: equilibrium mass, with the ranked top three injected
+  // at a nominal mass so a starved row the solve DEMOTED on noise still
+  // verifies (the demotion may itself be the artifact).
+  const support = (
+    mix: number[],
+    ranked: EvalResult['perSide']['p1'],
+    byChoice: Map<string, number>,
+  ): Map<number, number> => {
+    const mass = new Map<number, number>();
+    mix.forEach((weight, index) => {
+      if (weight >= SUPPORT_MIX) mass.set(index, weight);
+    });
+    for (const entry of ranked.slice(0, 3)) {
+      const index = byChoice.get(entry.choice);
+      if (index !== undefined && !mass.has(index)) mass.set(index, SUPPORT_MIX / 2);
+    }
+    return mass;
+  };
+  const p1ByChoice = new Map(base.p1Options.map((option, index) => [option.choice, index]));
+  const p2ByChoice = new Map(base.p2Options.map((option, index) => [option.choice, index]));
+  const p1Mass = support(mixes.p1, merged.perSide.p1, p1ByChoice);
+  const p2Mass = support(mixes.p2, merged.perSide.p2, p2ByChoice);
+
+  const candidates = new Map<number, number>(); // cellKey → priority mass
+  for (const [i, massI] of p1Mass) {
+    for (const [j, massJ] of p2Mass) {
+      candidates.set(cellKey(i, j), massI * massJ);
+    }
+  }
+  // Punisher cells: each top entry's floor is a single cell — if that cell
+  // is starved, the floor (and punishedBy) is a coin flip too.
+  const p1ByLabel = new Map(base.p1Options.map((option, index) => [option.label, index]));
+  const p2ByLabel = new Map(base.p2Options.map((option, index) => [option.label, index]));
+  for (const entry of merged.perSide.p1.slice(0, 3)) {
+    const i = p1ByChoice.get(entry.choice);
+    const j = entry.punishedBy !== null ? p2ByLabel.get(entry.punishedBy) : undefined;
+    if (i !== undefined && j !== undefined) {
+      const key = cellKey(i, j);
+      candidates.set(key, Math.max(candidates.get(key) ?? 0, SUPPORT_MIX * SUPPORT_MIX));
+    }
+  }
+  for (const entry of merged.perSide.p2.slice(0, 3)) {
+    const j = p2ByChoice.get(entry.choice);
+    const i = entry.punishedBy !== null ? p1ByLabel.get(entry.punishedBy) : undefined;
+    if (i !== undefined && j !== undefined) {
+      const key = cellKey(i, j);
+      candidates.set(key, Math.max(candidates.get(key) ?? 0, SUPPORT_MIX * SUPPORT_MIX));
+    }
+  }
+
+  return [...candidates.entries()]
+    .filter(([key]) => suspect(key) && !endedCells.has(key))
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, VERIFY_CELL_CAP)
+    .map(([key]) => {
+      const i = Math.floor(key / 10_000);
+      const j = key % 10_000;
+      return {
+        i, j,
+        p1Choice: base.p1Options[i].choice,
+        p2Choice: base.p2Options[j].choice,
+        samples: VERIFY_SAMPLES,
+      };
+    });
 }

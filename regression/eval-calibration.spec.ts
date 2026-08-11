@@ -821,6 +821,49 @@ import { brierScore, fitConstantK } from './fit-helpers';
  * comparable to the pre-fills bed (the rig change is the point); the old
  * numbers above stand as history.
  *
+ * MATCHUP×FF INTERACTION FIT 2026-08-11 (the registered follow-up to the
+ * implied-weight growth 123→305 singles / 108→200 doubles): joint fit on
+ * the fit bed (12,636 samples, cluster bootstrap by game B=200) with ff
+ * main effect + matchup·ffc + bodies·ffc (bodies interaction = the
+ * uniform-sharpening control). BOTH slopes are positive and individually
+ * significant (singles matchup×ff CI [1075, 2645], bodies×ff [717,
+ * 1113]) — the game sharpens as bodies fall, which the adopted phase-K
+ * k0+k1·ff already models on the probability side. The matchup-SPECIFIC
+ * tilt is NOT established: slopeM·baseB − slopeB·baseM CI [−80k, +696k]
+ * singles / [−478k, +920k] doubles, both straddling 0 (the late/early
+ * implied-ratio CI is division-unstable and also includes 1). HONEST
+ * NEGATIVE — no ff-dependent matchup weight; the raw growth decomposes
+ * into K-territory plus a tilt below the bootstrap's resolution.
+ *
+ * STARVED-SUPPORT VERIFICATION 2026-08-11 (user report: branching the
+ * draft game after t55 with Draco Meteor made the auto-opponent switch
+ * Mienshao INTO the nuke and keep sacking — "like it's actually
+ * searching for the worst move"; auto-reply = merged perSide[0]): a root
+ * cell fixes ONE chance outcome per tree at creation, so pooled visit
+ * counts measure subtree exploration, not independent transition samples
+ * (at most four, ever). At the healed t56 the same cell's per-tree means
+ * ran −0.38/+0.37/−0.34/−0.37 ([Ice Beam × Draco Meteor] — one tree
+ * rode a missed 90% Draco Meteor through its whole subtree); the merged
+ * equilibrium chased the phantom: p2 Draco ev 0.445 vs matrix 0.208, the
+ * healthy-Mienshao sack second by 0.003, matrix's clear best (Talonflame
+ * −0.425, gap 0.11) ranked last-but-one. The OLD visit-order ranking had
+ * the sack FIRST outright (542 visits) — not an R2 regression; R2 only
+ * changed which artifact surfaces. FIX (worker-client final merge only):
+ * support cells (mix ≥ 5%, top-3 rows/cols, punisher cells) that are
+ * starved (<8 pooled visits), thin (<3 expanding trees), or in per-tree
+ * DISAGREEMENT (mean spread > 0.15) are re-priced by the matrix-grade
+ * multi-seed cell sampler (≤12 cells × 3 seeds, one worker round,
+ * degrade-to-unverified on failure) and REPLACE the pooled value before
+ * the solve. Scores stay summed-marginal visit means — records
+ * untouched. Specimen verified: sack drops to LAST with Draco Meteor
+ * named as punisher, Shadow Ball back over Draco for p2 (0.551/0.322,
+ * matrix 0.535/0.208); t57 sane. Residual honest gap: verified cells are
+ * static-sampler means, so matrix's depth-2 Talonflame read (−0.425) is
+ * not recovered — the top pack is flat but sack-free. Single-tree
+ * results (harness path) stay unverified: score-only grading. Pins:
+ * eval-search "starved support cells" (mechanism ×4) +
+ * eval-mcts-verification (end-to-end t56).
+ *
  * AUTO MODE SHIPPED 2026-08-11 (EVAL_CALIBRATION_MODE=auto; app mode
  * 'auto'): per-position dispatch on faintedFraction ≥ AUTO_MCTS_FAINTED_
  * FRACTION (0.4; the constant lives in types.ts so the UI shares it

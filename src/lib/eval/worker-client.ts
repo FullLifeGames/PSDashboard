@@ -1,4 +1,5 @@
-import { MCTS_TREES, mergeMctsTrees } from './mcts-merge';
+import { MCTS_TREES, mergeMctsTrees, starvedSupportCells } from './mcts-merge';
+import { cellKey } from './rank';
 import { searchOrchestrated, type SearchExecutor } from './orchestrator';
 import type {
   EvalCellValue, EvalResult, EvalSettings, EvalWorkerRequest, EvalWorkerResponse, MctsTreeStats, SearchProgress,
@@ -182,7 +183,27 @@ export class EvalWorkerClient {
           return tree;
         });
       });
-      return Promise.all(trees).then(mergeMctsTrees);
+      return Promise.all(trees).then(async allTrees => {
+        // Starved-support verification: cells the merged equilibrium leans
+        // on with too few pooled visits carry ONE chance outcome per tree —
+        // re-price them with the matrix-grade multi-seed sampler before the
+        // verdict stands (draft t56: a lucky Draco Meteor miss promoted a
+        // sack). The score is visit-mean either way; only rankings sharpen.
+        const merged = mergeMctsTrees(allTrees);
+        if (!live()) return merged;
+        const jobs = starvedSupportCells(allTrees, merged);
+        if (jobs.length === 0) return merged;
+        handlers?.onPartial?.(merged);
+        try {
+          const values = await this.createPooledExecutor(serializedBattle).evalCells(jobs);
+          if (!live()) return merged;
+          return mergeMctsTrees(allTrees, new Map(values.map(value => [cellKey(value.i, value.j), value])));
+        } catch {
+          // Verification is a refinement — a failed round degrades to the
+          // unverified merge instead of failing the whole search.
+          return merged;
+        }
+      });
     }
 
     const executor = this.createPooledExecutor(serializedBattle);
