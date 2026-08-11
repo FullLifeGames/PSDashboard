@@ -752,6 +752,42 @@ test.describe('PS Dashboard', () => {
     await expect(page.getByText(/Branching.*Turn 2/)).toBeVisible({ timeout: 15000 });
   });
 
+  test('branch divergence: healed mid-cascade turns branch silently; the ended final turn is guarded', async ({ page }) => {
+    // The REAL draft replay (not the shared 4-turn fixture): its endgame
+    // is the premature-end family's home — the UNHEALED choice replay dies
+    // from turn 56 (five forced switches fed into a kill zone), while the
+    // app's per-turn snapshot healing arrives live on every turn through
+    // 67. Pin both defenses on the real replay: t56 branches with NO
+    // divergence notice (healing works), and the real final turn (68)
+    // cannot be branched at all — the button is disabled with the
+    // end-position explanation, so the ended-arrival notice stays a
+    // defense-in-depth path rather than a reachable state here.
+    test.setTimeout(300_000);
+    const draftReplay = JSON.parse(readFileSync(join(__dirname, 'fixtures', 'draft-replay.json'), 'utf-8'));
+    await page.route('**/replay.pokemonshowdown.com/**', route => route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify(draftReplay),
+    }));
+    await page.locator('button', { hasText: 'Load' }).click();
+    const slider = page.locator('input[type="range"]');
+    await expect(slider).toBeVisible({ timeout: 10000 });
+    await expect(page.getByText('puffelmaedchen', { exact: true }).first()).toBeVisible({ timeout: 15_000 });
+
+    await slider.fill('56');
+    await expect(page.getByText('T56/')).toBeVisible();
+    await page.locator('button', { hasText: 'Branch Here' }).click();
+    await expect(page.getByText(/Branching — Turn 56/)).toBeVisible({ timeout: 120_000 });
+    await expect(page.getByText(/already ended|wedged at turn/)).toHaveCount(0);
+
+    await page.locator('button', { hasText: 'Back' }).click();
+    await expect(slider).toBeVisible({ timeout: 10_000 });
+    await slider.fill('68');
+    const branchButton = page.locator('button', { hasText: 'Branch Here' });
+    await expect(branchButton).toBeDisabled();
+    await expect(branchButton).toHaveAttribute('title', /already over at the end position/);
+  });
+
   test('branch replay viewer starts on the selected turn', async ({ page }) => {
     await page.locator('button', { hasText: 'Load' }).click();
     await page.locator('input[type="range"]').fill('2');

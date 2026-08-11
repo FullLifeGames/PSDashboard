@@ -864,6 +864,39 @@ import { brierScore, fitConstantK } from './fit-helpers';
  * eval-search "starved support cells" (mechanism ×4) +
  * eval-mcts-verification (end-to-end t56).
  *
+ * WIN-CONDITION STRUCTURE DIAGNOSIS 2026-08-11 (T2 of the registered
+ * round — the early confident both-wrong mass): sweep is IDENTICALLY
+ * ZERO and coverage ≈0.01 abs on all 87 early singles positions (35
+ * suspects + 52 confident-correct controls) — the existing structural
+ * terms have no early support at all. Probe-computed candidates the
+ * basis lacks (engine 1v1 semantics): answer THINNESS (opp mons with ≤1
+ * favorable answer — coverage fires only at zero), unbreakable WALLS
+ * (healer no answer 2HKOs — the Rest-loop archetype), SPEED structure
+ * (mons faster than the whole picked side), own/opp/asymmetry variants —
+ * 11 statistics, permutation-tested: ALL NULL (|d| ≤ 0.38, p ≥ 0.099,
+ * most ≥ 0.24; the largest effect points the WRONG way — suspects'
+ * opponents hold marginally FEWER answers, "material leads that didn't
+ * convert" restated). With the R1 feature diagnosis and the set-belief
+ * negative, the early mass now has NO signature in any static structure
+ * examined — the residual is dynamics (sequencing, tempo, which body
+ * actually gets traded), not eval-basis. CONSEQUENCE: stop mining the
+ * static basis for this mass; the next lever, if any, is search/
+ * planning-side.
+ *
+ * DIVERGENCE-NOTICE E2E RESOLUTION 2026-08-11 (T3): scouting the draft
+ * replay under the APP path (fill-less like the e2e env, per-turn
+ * snapshot healing) shows arrivals t56–67 ALL LIVE and only t68 (the
+ * real end) ended — where Branch Here is already DISABLED ("The battle
+ * is already over at the end position"). The premature-end family is
+ * fully defused app-side: healing silences the cascade zone the
+ * unhealed harness replay died in, the end-guard blocks the ended
+ * arrival, so the ended/wedged notice is defense-in-depth, not a
+ * reachable state on this fixture. E2E pin (app.spec "branch
+ * divergence"): t56 branches with NO notice on the REAL draft replay
+ * (per-test route — the suite's shared fixture is a 4-turn synthetic)
+ * and t68 shows the disabled guard with its title. The notice variants
+ * keep their code path for replays healing cannot save.
+ *
  * AUTO MODE SHIPPED 2026-08-11 (EVAL_CALIBRATION_MODE=auto; app mode
  * 'auto'): per-position dispatch on faintedFraction ≥ AUTO_MCTS_FAINTED_
  * FRACTION (0.4; the constant lives in types.ts so the UI shares it
