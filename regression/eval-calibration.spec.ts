@@ -795,6 +795,32 @@ import { brierScore, fitConstantK } from './fit-helpers';
  * by minutes; the b-slice retry under afternoon machine load crossed 60
  * — the a-slice decided the gate, recorded honestly).
  *
+ * RE-BASELINE ON THE CLEAN FILLS RIG 2026-08-11 (R3 — NEW STANDING
+ * RECORDS; SMOGON=1 + ended-skip is the corpus standard from here): full
+ * universe, final engine (R2 hybrid — mcts scores bit-identical to the
+ * visit-mean line), d1 halves + mcts quarters, auto derived on the 794
+ * joined pairs at t=0.25.
+ *   d1   n799: 54.6/63.8/79.4 · singles 62.9 · doubles 72.0 · ALL 65.7 ·
+ *     K 1.88 · brier(ff) 0.2435/0.2024/0.1620
+ *   mcts n794: 53.5/62.0/79.1 · singles 62.0 · doubles 70.5 · ALL 64.6 ·
+ *     K 1.84 · brier(ff) 0.2392/0.2025/0.1759
+ *   auto n794: 55.0/63.1/79.5 · singles 62.9 · doubles 71.8 · ALL 65.6 ·
+ *     K 1.80 · brier(ff) 0.2424/0.2010/0.1761
+ *   strata (d1): draft 35 (n20 — tiny, nickname-heavy) · ladder-0811
+ *     55.4 · ladder-dou 76.0 · ladder-ou-0802 66.4 · tournament-0811
+ *     65.5 · tournament-0811b 75.6
+ * STORY CORRECTION: on the honest rig the "mcts beats d1 everywhere"
+ * reading DOES NOT SURVIVE — d1 ties-or-beats mcts overall (65.7 vs
+ * 64.6) and on doubles (72.0 vs 70.5). The old edge was measured without
+ * the fills (which feed the static cells d1 leans on) and with ±1
+ * artifacts padding the late buckets of both engines. AUTO stays the
+ * default on fresh grounds: best-or-tied early (55.0) and late (79.5),
+ * ties d1 overall, keeps the full matrix feature set early. Pooled K
+ * 1.80–1.88 brackets the adopted DISPLAY_K 1.85 — the display
+ * calibration re-validates on clean data. NEW-RIG records are NOT
+ * comparable to the pre-fills bed (the rig change is the point); the old
+ * numbers above stand as history.
+ *
  * AUTO MODE SHIPPED 2026-08-11 (EVAL_CALIBRATION_MODE=auto; app mode
  * 'auto'): per-position dispatch on faintedFraction ≥ AUTO_MCTS_FAINTED_
  * FRACTION (0.4; the constant lives in types.ts so the UI shares it
