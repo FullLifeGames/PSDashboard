@@ -30,7 +30,11 @@ export interface EvaluateParams {
 }
 
 const PREFS_KEY = 'ps-replay-interceptor:eval-prefs';
-const DEFAULT_PREFS: EvalPreferences = { depth: 2, samples: 3, mode: 'matrix', auto: false, tera: 'auto' };
+// Default line engine: 'auto' — the grid-tuned measured best (matrix d1s1
+// through the opening, the DUCT tree once AUTO_MCTS_FAINTED_FRACTION of all
+// bodies fell). depth/samples apply when the user picks an explicit matrix
+// mode; stored user prefs always win over this default.
+const DEFAULT_PREFS: EvalPreferences = { depth: 2, samples: 3, mode: 'auto', auto: false, tera: 'auto' };
 
 function loadPrefs(): EvalPreferences {
   try {

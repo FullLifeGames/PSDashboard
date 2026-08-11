@@ -580,6 +580,28 @@ import { brierScore, fitConstantK } from './fit-helpers';
  * features — a pure-MCTS line forgoes them everywhere, auto keeps them on
  * early turns. Default still d2s3, decision with the user.
  *
+ * AUTO THRESHOLD RETUNE + DEFAULT FLIP 2026-08-11: offline grid over the
+ * grand-bed dumps (14 thresholds × 4 strata, plus a gametype split):
+ *   t=0.00 (pure mcts) 65.6% · brier 0.2192 · t=0.20/0.25 65.6 · 0.2197/
+ *   0.2200 · t=1/3 65.3 · t=0.40 (old) 64.9 · 0.2215 · t=1.01 (pure d1)
+ *   64.0 · 0.2231. Thresholds quantize to faint counts — for 12 bodies
+ *   0.25 = "from the 3rd faint", 0.40 = "from the 5th".
+ * ADOPTED 0.25: on the 0.00–0.25 plateau (grand +0.7 sign / −0.0015 brier
+ * vs 0.40), ladder-robust (65.7 vs 64.7; mid +3.3, doubles +2.5, late
+ * 80.9→80.1 = one position), and it keeps the matrix side — verification,
+ * sensitivity, depth ladder — through the opening, which pure MCTS (t=0)
+ * would surrender for 0.0008 brier. Gametype-split thresholds REJECTED
+ * (+0.1 for another fitted conditional — the 3-way lesson). Live
+ * confirmation at 0.25 (ladder-dou-0804 tranche): 50/50 positions
+ * bit-exact vs the ff-selected parents, 24 mcts-routed.
+ * DEFAULT LINE = AUTO (DEFAULT_PREFS.mode; stored user prefs win): d2s3 is
+ * dominated on every stratum measured, pure MCTS forgoes the matrix-side
+ * features everywhere; auto at 0.25 is the measured line 54/62/78/64/68-
+ * grade on the grand bed with the feature set intact through the opening.
+ * Registered follow-up: verification for MCTS lines (lift verifyFlagged's
+ * matrix guard — flags re-evaluate as matrix pairs regardless of line
+ * engine), then revisit pure-MCTS-as-default.
+ *
  * AUTO MODE SHIPPED 2026-08-11 (EVAL_CALIBRATION_MODE=auto; app mode
  * 'auto'): per-position dispatch on faintedFraction ≥ AUTO_MCTS_FAINTED_
  * FRACTION (0.4; the constant lives in types.ts so the UI shares it

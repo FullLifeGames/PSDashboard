@@ -33,15 +33,16 @@ export interface EvalSettings {
 
 /**
  * The auto engine mode's switch point: matrix search below this fainted
- * fraction, the DUCT tree at or above it. Measured 2026-08-11 on the
- * expanded corpus (n 417 paired): the tree's adaptive depth pays exactly
- * once bodies fall — late sign +2 over pure d1 with doubles preserved and
- * late brier within 0.002 of pure MCTS, while below the threshold the two
- * engines are calibration-identical and the matrix is far cheaper. Lives
- * here (not search.ts) so the UI layer can import it without pulling
- * @pkmn/sim into the main chunk.
+ * fraction, the DUCT tree at or above it (for full 6v6 boards: from the
+ * third faint). Grid-tuned 2026-08-11 on the grand 826-position bed with
+ * per-stratum robustness: the 0.00–0.25 plateau wins overall (+0.7 sign,
+ * −0.002 brier vs the original 0.40) and 0.25 keeps the matrix side — and
+ * with it verification, sensitivity probes, and the think-deeper ladder —
+ * through the opening while mid (+3.3 ladder) and doubles (+2.5 ladder)
+ * take the tree's stronger reading. Lives here (not search.ts) so the UI
+ * layer can import it without pulling @pkmn/sim into the main chunk.
  */
-export const AUTO_MCTS_FAINTED_FRACTION = 0.4;
+export const AUTO_MCTS_FAINTED_FRACTION = 0.25;
 
 /** Panel preferences persisted in localStorage (worker only sees EvalSettings). */
 export interface EvalPreferences {
