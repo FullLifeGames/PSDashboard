@@ -13,6 +13,12 @@ import { brierScore, fitConstantK } from './fit-helpers';
  * score's sign predict the actual winner, and how does confidence grow over
  * the game? Not a CI gate — network + ~3 minutes of reconstruction.
  * Run: EVAL_CALIBRATION=1 npx playwright test -c playwright.regression.config.ts eval-calibration
+ * Levers: EVAL_CALIBRATION_DEPTH=2 · EVAL_CALIBRATION_MODE=mcts ·
+ * EVAL_CALIBRATION_SAMPLES=3 (seeds per cell, default 1 — the app default
+ * line is d2s3, so the harness must be able to measure it) ·
+ * EVAL_CALIBRATION_SLICE=a/b (only replays with index % b === a — long
+ * engine configs split into slices whose JSONL dumps concatenate cleanly) ·
+ * EVAL_CALIBRATION_DUMP=<path> (per-position JSONL for paired analysis)
  *
  * Baseline 2026-08-04 (post ev-grading, pre boost-schedule; depth 1, samples 1):
  *   early 55% |0.23| · mid 62% |0.34| · late 81% |0.43|
@@ -438,6 +444,35 @@ import { brierScore, fitConstantK } from './fit-helpers';
  * - RECONSTRUCTION NONDETERMINISM: gen9ou-2658670791 dropped 3/5/5 positions
  *   across three same-day runs at the SAME turns with DIFFERENT errors;
  *   gen9doublesou-2660802611 t2/t4 Transform-Mew drops appeared in one run.
+ *   PROBED 2026-08-11: team build and cold reconstruction are SEMANTICALLY
+ *   deterministic (3 attempts × 5 deep turns, projected-state hashes
+ *   identical; raw serialization differs only in log timestamps/PRNG
+ *   residue). The cross-run drop variance is load/timing-sensitive
+ *   choice-replay retry behavior at deep turns (the driver's retry logic
+ *   reads live stream state) — registered, not fixed; the replay is
+ *   quarantined from the corpus instead.
+ *
+ * FIRST d2s3/d1s3 NUMBERS 2026-08-11 (EVAL_CALIBRATION_SAMPLES lever; d2s3
+ * split via EVAL_CALIBRATION_SLICE=a/3, dumps concatenated):
+ *   d1s1: 61/67/81/65/84 · 0.2516/0.2139/0.1550 · n 218 (the record)
+ *   d1s3: 61/67/81/65/84 · 0.2514/0.2145/0.1553 · n 218 — ZERO exclusive
+ *     sign flips vs d1s1 on all 218 positions: at depth 1, seed-averaging
+ *     is pure cost. The record keeps s1 as the fast-scan spec.
+ *   d2s1: 56/64/79/63/81 · 0.2536/0.2216/0.1558 · n 214
+ *   d2s3: 56/66/81/63/85 · 0.2532/0.2186/0.1535 · n 214 — s3 recovers the
+ *     depth-2 deficit mid/late/doubles (doubles 85 = best ever measured)
+ *     but NOT early (56, structural −5 vs d1). DISCRIMINATOR VERDICT: the
+ *     d2s1 collapse was mostly single-seed selection noise (the child
+ *     equilibria select over noisy values; averaging 3 seeds washes it
+ *     out); the early remainder is depth-structural (restricted-Nash
+ *     opponent model in open positions) and no sample count fixes it.
+ *   AUTO CANDIDATES on the identical triple join (n 214):
+ *     2-way d1 + mcts@ff≥0.40:            59/66/84/66/83 · late 0.1386
+ *     3-way + d2s3 doubles below ff 0.40: 59/68/84/66/85 · late 0.1397
+ *   The 3-way weakly dominates (mid +2, doubles +2, nothing down) but its
+ *   doubles edge rides on 1–2 positions — the expanded corpus decides
+ *   between them before the auto mode is built. App default stays d2s3
+ *   until the user rules on these numbers.
  *
  * DIRECTIONAL SPEED EXCLUSIONS 2026-08-10: observations now drop only when
  * the modifier could EXPLAIN the observed order — a speed-raising factor
@@ -556,8 +591,13 @@ test.describe('eval calibration against real replays', () => {
   test('score sign tracks the actual winner', async () => {
     test.setTimeout(2_400_000);
     const samples: Sample[] = [];
+    const sampleCount = Math.max(1, parseInt(process.env.EVAL_CALIBRATION_SAMPLES ?? '1', 10) || 1);
+    const slice = process.env.EVAL_CALIBRATION_SLICE?.match(/^(\d+)\/(\d+)$/);
+    const replayIds = slice
+      ? REPLAY_IDS.filter((_, index) => index % parseInt(slice[2], 10) === parseInt(slice[1], 10))
+      : REPLAY_IDS;
 
-    for (const id of REPLAY_IDS) {
+    for (const id of replayIds) {
       const response = await fetch(`https://replay.pokemonshowdown.com/${id}.json`);
       if (!response.ok) {
         console.log(`skipping ${id}: HTTP ${response.status}`);
@@ -601,7 +641,7 @@ test.describe('eval calibration against real replays', () => {
           const depth = process.env.EVAL_CALIBRATION_DEPTH === '2' ? 2 : 1;
           const runSearch = process.env.EVAL_CALIBRATION_MODE === 'mcts' ? mctsSearch : searchPosition;
           const { score } = runSearch(serialized, {
-            depth, samples: 1, tera: false,
+            depth, samples: sampleCount, tera: false,
             sleepClause: formatEnforcesSleepClause(getBranchSimulatorFormat(replay)),
           });
           if (Number.isNaN(score)) {
