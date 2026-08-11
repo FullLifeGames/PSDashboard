@@ -154,14 +154,12 @@ const SPREAD_FACTOR = 0.75;
 
 const clampStage = (stage: number) => Math.max(-6, Math.min(6, stage));
 
-/** Ranks combined doubles options by summed per-slot static threat hints. */
-function restrictCombined(
+/** Summed per-slot static threat hints for combined doubles options. */
+function combinedOptionHints(
   position: SimPosition,
   side: 'p1' | 'p2',
   options: ChoiceOption[],
-  keep?: (PlayedAction | null)[],
-): ChoiceOption[] {
-  if (options.length <= RESTRICT_K_DOUBLES) return options;
+): number[] {
   const battle = positionBattle(position);
   const sideState = battle.sides[side === 'p1' ? 0 : 1];
   const foeActives = sideState.foe.active;
@@ -215,15 +213,24 @@ function restrictCombined(
     return damage;
   };
 
+  return options.map(option =>
+    option.choice.split(',').reduce((sum, part, partIndex) => sum + partHint(part, partIndex), 0));
+}
+
+/** Ranks combined doubles options by summed per-slot static threat hints. */
+function restrictCombined(
+  position: SimPosition,
+  side: 'p1' | 'p2',
+  options: ChoiceOption[],
+  keep?: (PlayedAction | null)[],
+): ChoiceOption[] {
+  if (options.length <= RESTRICT_K_DOUBLES) return options;
   // Distinct cores compete on hints first — a gimmick variant scores the same
   // hint as its base, so without the core budget three variants of each top
   // damage pair crowded out every status/setup combo. Gimmick variants of the
   // strongest cores then fill the remaining slots.
-  const scored = options.map((option, index) => ({
-    option,
-    index,
-    value: option.choice.split(',').reduce((sum, part, partIndex) => sum + partHint(part, partIndex), 0),
-  }));
+  const hints = combinedOptionHints(position, side, options);
+  const scored = options.map((option, index) => ({ option, index, value: hints[index] }));
   const groups = new Map<string, typeof scored>();
   for (const entry of scored) {
     const key = coreOf(entry.option.choice);
@@ -392,18 +399,12 @@ function expandPivotPairs(position: SimPosition, side: 'p1' | 'p2', options: Cho
  * threat hints. Deterministic; an approximation by design — never applied
  * to the top-level matrix the user sees.
  */
-function restrictOptions(position: SimPosition, side: 'p1' | 'p2', options: ChoiceOption[]): ChoiceOption[] {
-  if (options.length <= RESTRICT_K) return options;
+/** Static hints for singles options: damage fraction for moves, threat differential for switches. */
+function singlesOptionHints(position: SimPosition, side: 'p1' | 'p2', options: ChoiceOption[]): number[] {
   const battle = positionBattle(position);
   const sideState = battle.sides[side === 'p1' ? 0 : 1];
   const opponent = battle.sides[side === 'p1' ? 1 : 0].active[0];
   const active = sideState.active[0];
-
-  const isBaseMove = (option: ChoiceOption) =>
-    option.choice.startsWith('move ') && !option.choice.endsWith(' terastallize');
-  const baseMoves = options.filter(isBaseMove);
-  const rest = options.filter(option => !isBaseMove(option));
-
   const hint = (option: ChoiceOption): number => {
     if (!opponent || opponent.fainted) return 0;
     if (option.choice.startsWith('move ')) {
@@ -416,9 +417,32 @@ function restrictOptions(position: SimPosition, side: 'p1' | 'p2', options: Choi
     return boostedFraction(pairThreat(candidate, opponent, battle), candidate, opponent) -
       boostedFraction(pairThreat(opponent, candidate, battle), opponent, candidate);
   };
+  return options.map(hint);
+}
 
+/**
+ * Static per-option threat hints — the SAME machinery candidate restriction
+ * ranks with, exported so the MCTS expansion order can reuse it (zero sim
+ * advances). Combined doubles options sum per-slot hints (support floor,
+ * setup equity, spread factor); singles use damage fraction for moves and
+ * the threat differential for switches.
+ */
+export function optionHints(position: SimPosition, side: 'p1' | 'p2', options: ChoiceOption[]): number[] {
+  if (isCombined(options)) return combinedOptionHints(position, side, options);
+  return singlesOptionHints(position, side, options);
+}
+
+function restrictOptions(position: SimPosition, side: 'p1' | 'p2', options: ChoiceOption[]): ChoiceOption[] {
+  if (options.length <= RESTRICT_K) return options;
+
+  const isBaseMove = (option: ChoiceOption) =>
+    option.choice.startsWith('move ') && !option.choice.endsWith(' terastallize');
+  const baseMoves = options.filter(isBaseMove);
+  const rest = options.filter(option => !isBaseMove(option));
+
+  const restHints = singlesOptionHints(position, side, rest);
   const kept = rest
-    .map((option, index) => ({ option, index, value: hint(option) }))
+    .map((option, index) => ({ option, index, value: restHints[index] }))
     .sort((a, b) => b.value - a.value || a.index - b.index)
     .slice(0, Math.max(0, RESTRICT_K - baseMoves.length))
     .sort((a, b) => a.index - b.index)

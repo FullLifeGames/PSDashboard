@@ -506,6 +506,25 @@ import { brierScore, fitConstantK } from './fit-helpers';
  * comparisons of old records to these lines are invalid; the expanded bed
  * is the baseline from here on.
  *
+ * MCTS HINT-ORDERED EXPANSION + PROGRESSIVE WIDENING 2026-08-11: pick()
+ * no longer forces every unvisited option through a real visit first (the
+ * doubles 16×16 root ate its 600 iterations in that sweep). Nodes order
+ * options by the restriction's own static hints (optionHints — the same
+ * machinery, zero sim advances) and only the top wideningWindow(count,
+ * visits) = min(count, 4 + visits/8) unvisited options may open, best
+ * hint first — the window reaches every option asymptotically, so
+ * converged trees lose nothing. PAIRED GATE vs the pre-widening dump
+ * (n 417, full join): 54/61/79/63/69 vs 55/60/77/64/66 · brier
+ * 0.2555/0.2378/0.1646 vs 0.2547/0.2404/0.1678 — DOUBLES +3 (the
+ * starvation gap to the matrix closed), late +2, mid +1, mid AND late
+ * brier better; early/singles −1 inside the gate. The deep singles reads
+ * held (2658671254 t20 0.756→0.761, 2658668443 t22 still right); the
+ * 2660826377 t8 probe cell stayed ~0 — the doubles gain is broad, not one
+ * position. AUTO with the widened tree (recomputed counterfactual —
+ * bit-exact equivalence makes it the app line): 55/58/81/63/69 · late
+ * brier 0.1686, late +2 / singles +1 over the shipped auto record with
+ * nothing down. NEW AUTO RECORD.
+ *
  * AUTO MODE SHIPPED 2026-08-11 (EVAL_CALIBRATION_MODE=auto; app mode
  * 'auto'): per-position dispatch on faintedFraction ≥ AUTO_MCTS_FAINTED_
  * FRACTION (0.4; the constant lives in types.ts so the UI shares it

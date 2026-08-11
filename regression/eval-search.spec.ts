@@ -2,7 +2,8 @@ import { test, expect } from '@playwright/test';
 import { Battle, State, Teams, toID } from '@pkmn/sim';
 type DeserializeFn = typeof State.deserializeBattle;
 import type { PokemonSet } from '@pkmn/sim';
-import { battleFaintedFraction, searchOptions, searchPosition, subSearchDepth1 } from '../src/lib/eval/search';
+import { battleFaintedFraction, optionHints, searchOptions, searchPosition, subSearchDepth1 } from '../src/lib/eval/search';
+import { mctsSearch, mctsTreeSearch, wideningWindow, WIDENING_BASE, WIDENING_VISITS_PER_SLOT } from '../src/lib/eval/mcts';
 import { advancePosition, createRootPosition, legalChoices, positionBattle } from '../src/lib/eval/forward-model';
 import { boostedFraction, pairThreat } from '../src/lib/eval/eval-function';
 import type { EvalResult, SearchProgress } from '../src/lib/eval/types';
@@ -404,6 +405,88 @@ test.describe('doubles candidate hints', () => {
     // The override must equal actually holding the boost.
     attacker.boosts.atk = 2;
     expect(boostedFraction(threat, attacker, defender)).toBeCloseTo(hypothetical, 10);
+  });
+});
+
+test.describe('mcts hint-ordered expansion with progressive widening', () => {
+  const wideSet = (species: string, moves: string[], item = ''): PokemonSet => ({
+    name: species, species, item, ability: 'No Ability', moves,
+    nature: 'Adamant',
+    evs: { hp: 252, atk: 252, def: 0, spa: 0, spd: 4, spe: 0 },
+    ivs: { hp: 31, atk: 31, def: 31, spa: 31, spd: 31, spe: 31 },
+    level: 50, gender: '',
+  });
+  // Same shape as the VGC restriction fixture: a wide combined root where
+  // the 16-option cap binds — exactly where the old forced full sweep
+  // starved the 600 iterations.
+  const wideSerialized = () => serialize(makeDoublesBattle(
+    [
+      wideSet('Scizor', ['Swords Dance', 'Bullet Punch', 'Bug Bite', 'Protect'], 'Life Orb'),
+      wideSet('Sneasler', ['Fake Out', 'Dire Claw', 'Close Combat', 'Protect'], 'Focus Sash'),
+      wideSet('Eelektross', ['Thunderbolt', 'Protect'], 'Leftovers'),
+      wideSet('Sinistcha', ['Matcha Gotcha', 'Protect'], 'Sitrus Berry'),
+    ],
+    [
+      wideSet('Grimmsnarl', ['Spirit Break', 'Reflect', 'Light Screen', 'Thunder Wave'], 'Light Clay'),
+      wideSet('Annihilape', ['Rock Slide', 'Drain Punch', 'Rage Fist', 'Protect'], 'Leftovers'),
+      wideSet('Politoed', ['Surf', 'Protect'], 'Sitrus Berry'),
+      wideSet('Pelipper', ['Hurricane', 'Protect'], 'Life Orb'),
+    ],
+  ));
+
+  test('optionHints scores every option and favors damage over double-support', () => {
+    const root = createRootPosition(wideSerialized());
+    const options = searchOptions(root, 'p1', { tera: false });
+    const hints = optionHints(root, 'p1', options);
+    expect(hints.length).toBe(options.length);
+    const best = options[hints.indexOf(Math.max(...hints))];
+    // The top-hinted combo carries at least one damaging move.
+    expect(/Fake Out|Bullet Punch|Bug Bite|Dire Claw|Close Combat|Thunderbolt|Matcha Gotcha/
+      .test(best.label)).toBe(true);
+    // Hints are deterministic.
+    expect(optionHints(root, 'p1', options)).toEqual(hints);
+  });
+
+  test('the widening window starts at the floor and grows with visits', () => {
+    expect(wideningWindow(16, 0)).toBe(WIDENING_BASE);
+    expect(wideningWindow(16, WIDENING_VISITS_PER_SLOT)).toBe(WIDENING_BASE + 1);
+    expect(wideningWindow(16, 200)).toBe(16);
+    expect(wideningWindow(3, 0)).toBe(3);
+  });
+
+  test('early iterations open only hint-favored root options (no forced full sweep)', () => {
+    const serialized = wideSerialized();
+    const root = createRootPosition(serialized);
+    const options = searchOptions(root, 'p1', { tera: false });
+    let done = 0;
+    const stats = mctsTreeSearch(serialized, { depth: 1, samples: 1, tera: false }, 0, {
+      onProgress: progress => { done = progress.done; },
+      shouldStop: () => done >= 30,
+    });
+    expect(stats.p1Options.length).toBeGreaterThan(WIDENING_BASE);
+    // The old pick() forced every option through a visit first — after 30
+    // iterations on a 16-wide root nothing was unvisited. With widening,
+    // weak options stay closed…
+    expect(stats.p1N.filter(n => n === 0).length).toBeGreaterThan(0);
+    // …and every opened option sits inside the hint-order window reachable
+    // by the visits so far. (The node's options come from the same
+    // searchOptions call, so the index spaces align.)
+    expect(stats.p1Options.length).toBe(options.length);
+    const hints = optionHints(root, 'p1', options);
+    const order = hints.map((value, index) => ({ value, index }))
+      .sort((a, b) => b.value - a.value || a.index - b.index)
+      .map(entry => entry.index);
+    const window = wideningWindow(stats.p1Options.length, stats.visits);
+    for (let rank = 0; rank < order.length; rank++) {
+      if (stats.p1N[order[rank]] > 0) expect(rank).toBeLessThan(window);
+    }
+  });
+
+  test('the tree search stays bit-deterministic with ordering and widening', () => {
+    const serialized = wideSerialized();
+    const first = mctsSearch(serialized, { depth: 1, samples: 1, tera: false });
+    const second = mctsSearch(serialized, { depth: 1, samples: 1, tera: false });
+    expect(second).toEqual(first);
   });
 });
 

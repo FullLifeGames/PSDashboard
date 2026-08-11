@@ -4,7 +4,7 @@ import {
   type ChoiceOption, type SimPosition,
 } from './forward-model';
 import { cellKey, rankFromMatrix } from './rank';
-import { leafValue, searchOptions, SEARCH_SEEDS } from './search';
+import { leafValue, optionHints, searchOptions, SEARCH_SEEDS } from './search';
 import type { EvalMatrix, EvalResult, EvalSettings, MctsTreeStats, RankedChoice, SearchProgress, TeraAllowance } from './types';
 
 /**
@@ -21,6 +21,26 @@ const EXPLORATION = 0.8;
 const PARTIAL_EVERY = 150;
 const PV_MIN_VISITS = 8;
 const PV_MAX_STEPS = 3;
+
+/**
+ * Progressive widening: a node exposes only its strongest-by-hint unvisited
+ * options, and the window grows with the node's visits. The old rule forced
+ * EVERY unvisited option through a real visit first — on the doubles 16×16
+ * root that sweep ate the 600 iterations before UCB could discriminate
+ * (measured doubles −3 vs the matrix on the 2026-08-11 corpus). Hints are
+ * static (optionHints — the restriction's own ranking), so ordering stays
+ * deterministic; the window still reaches every option asymptotically.
+ */
+export const WIDENING_BASE = 4;
+export const WIDENING_VISITS_PER_SLOT = 8;
+export const wideningWindow = (count: number, visits: number): number =>
+  Math.min(count, WIDENING_BASE + Math.floor(visits / WIDENING_VISITS_PER_SLOT));
+
+/** Hint-descending option order (ties keep list order — deterministic). */
+const hintOrder = (hints: number[]): number[] =>
+  hints.map((value, index) => ({ value, index }))
+    .sort((a, b) => b.value - a.value || a.index - b.index)
+    .map(entry => entry.index);
 
 export interface MctsCallbacks {
   onProgress?(progress: SearchProgress): void;
@@ -39,6 +59,9 @@ interface Node {
   p1W: number[];
   p2N: number[];
   p2W: number[];
+  /** Hint-descending expansion order per side (indices into the option lists). */
+  p1Order: number[];
+  p2Order: number[];
   visits: number;
   children: Map<number, Node>;
 }
@@ -66,17 +89,29 @@ function makeNode(
     p1W: new Array(p1Options.length).fill(0),
     p2N: new Array(p2Options.length).fill(0),
     p2W: new Array(p2Options.length).fill(0),
+    p1Order: hintOrder(ended || p1Options.length === 0 ? [] : optionHints(position, 'p1', p1Options)),
+    p2Order: hintOrder(ended || p2Options.length === 0 ? [] : optionHints(position, 'p2', p2Options)),
     visits: 0,
     children: new Map(),
   };
 }
 
-/** UCB pick over one side's decoupled stats; unvisited options come first. */
-function pick(n: number[], w: number[], visits: number, maximize: boolean): number {
+/**
+ * UCB pick over one side's decoupled stats. Unvisited options still come
+ * first, but only inside the progressive-widening window and best hint
+ * first — weak options beyond the window stay closed until the node has
+ * earned the visits to afford them.
+ */
+function pick(n: number[], w: number[], visits: number, maximize: boolean, order: number[]): number {
+  const window = wideningWindow(n.length, visits);
   let best = -1;
   let bestScore = -Infinity;
-  for (let index = 0; index < n.length; index++) {
-    if (n[index] === 0) return index;
+  for (let rank = 0; rank < order.length; rank++) {
+    const index = order[rank];
+    if (n[index] === 0) {
+      if (rank < window) return index;
+      continue;
+    }
     const mean = w[index] / n[index];
     const exploit = maximize ? mean : -mean;
     const score = exploit + EXPLORATION * Math.sqrt(Math.log(visits + 1) / n[index]);
@@ -213,8 +248,8 @@ function runMcts(
         leafValue = node.value;
         break;
       }
-      const i = pick(node.p1N, node.p1W, node.visits, true);
-      const j = pick(node.p2N, node.p2W, node.visits, false);
+      const i = pick(node.p1N, node.p1W, node.visits, true, node.p1Order);
+      const j = pick(node.p2N, node.p2W, node.visits, false, node.p2Order);
       path.push({ node, i, j });
       const key = cellKey(i, j);
       let child = node.children.get(key);
