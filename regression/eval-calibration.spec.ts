@@ -883,6 +883,26 @@ import { brierScore, fitConstantK } from './fit-helpers';
  * static basis for this mass; the next lever, if any, is search/
  * planning-side.
  *
+ * EMPTY GAME GRAPH ON THE BUILD — MINIFIED CLASS NAMES 2026-08-12 (the
+ * user's actual report, isolated by "works on dev but not on build"):
+ * @pkmn/sim's state serializer encodes every object reference as
+ * `[${obj.constructor.name}:id]` (sim/state.mjs:348) and rebuilds classes
+ * from those names on deserialize. Minification renames Pokemon → "t", so
+ * a serialized position round-tripped into objects that were no longer
+ * Pokemon/Side instances and the first method call threw — inside the
+ * eval workers, 20× `e?.getMoveRequestData is not a function` per sweep,
+ * each swallowed by the per-turn catch as a silent gap. EVERY turn failed,
+ * so the graph came out empty while dev (unminified) looked perfect. The
+ * engine, the harness, and all 522 regression tests run unminified and
+ * could never see it; the e2e suite drove the dev server for the same
+ * reason. FIX: keepNames on BOTH bundles (build + worker are configured
+ * separately, and the two must agree on class names because the main
+ * thread serializes what the worker deserializes). GUARD: npm run
+ * test:build — a production-build Playwright suite that drives the
+ * minified bundle and fails if any typed worker error appears or the graph
+ * stays empty (verified by flipping keepNames off: the suite fails).
+ * LESSON: dev-only e2e cannot certify a bundle-sensitive engine.
+ *
  * EMPTY GAME GRAPH — PHANTOM FINAL TURN 2026-08-12 (user report: "the
  * Game Graph is empty when clicking on Analyze Game"): the same
  * premature-end family, one layer further out. makeSweepAcquireAll
