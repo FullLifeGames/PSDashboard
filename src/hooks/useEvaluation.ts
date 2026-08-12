@@ -268,6 +268,12 @@ export interface EvalGraphState {
   sensitivity: (TurnSensitivity | null)[];
   /** Turn 0 (team preview) evaluation — null when unavailable or not swept. */
   lead: LeadEvalData | null;
+  /**
+   * Why the line is short, when it is: the single-pass acquisition only
+   * reached part of the game (a diverging reconstruction). Silence here
+   * used to leave the panel showing an unexplained empty graph.
+   */
+  notice: string | null;
   running: boolean;
   progress: { done: number; total: number } | null;
 }
@@ -281,7 +287,7 @@ export function useEvaluation() {
   const [reconstructProgress, setReconstructProgress] = useState<{ turn: number; target: number } | null>(null);
   const [graph, setGraph] = useState<EvalGraphState>({
     scores: [], results: [], settings: [], faintedFractions: [], played: [], playedOutcome: [], verified: [], sensitivity: [], lead: null,
-    running: false, progress: null,
+    notice: null, running: false, progress: null,
   });
 
   const clientRef = useRef<EvalWorkerClient | null>(null);
@@ -462,11 +468,13 @@ export function useEvaluation() {
       ? [...previous.sensitivity]
       : new Array(params.turns).fill(null);
     let lead: LeadEvalData | null = keepPrevious ? previous.lead : null;
+    let notice: string | null = null;
     const snapshot = () => {
       const data = {
         scores: [...scores], results: [...results], settings: [...turnSettings],
         faintedFractions: [...faintedFractions], played: [...played],
         playedOutcome: [...playedOutcome], verified: [...verified], sensitivity: [...sensitivity], lead,
+        notice,
       };
       graphDataRef.current = data;
       return data;
@@ -504,8 +512,18 @@ export function useEvaluation() {
         positions.forEach((serialized, index) => {
           if (serialized) arrived.set(index + 1, serialized);
         });
+        // An unexplained short line is the worst outcome: the sweep leaves
+        // gaps for every turn the reconstruction never produced, and the
+        // panel used to show that as a blank graph with no reason given.
+        const covered = positions.filter(Boolean).length;
+        if (covered < positions.length) {
+          notice = covered === 0
+            ? 'The replay could not be reconstructed from the guessed sets — no turn could be analyzed. Correcting items/moves via Edit Player/Opp usually fixes it.'
+            : `The reconstruction diverged from the real game: ${covered} of ${positions.length} turns could be analyzed. Correcting items/moves via Edit Player/Opp usually fixes it.`;
+        }
       }).catch(error => {
         acquireError = error;
+        notice = `The replay could not be reconstructed: ${error instanceof Error ? error.message : String(error)}`;
       }).finally(() => {
         acquireSettled = true;
         settleWaiters();
@@ -905,7 +923,7 @@ export function useEvaluation() {
 
   const clearGraph = useCallback(() => {
     graphDataRef.current = null;
-    setGraph({ scores: [], results: [], settings: [], faintedFractions: [], played: [], playedOutcome: [], verified: [], sensitivity: [], lead: null, running: false, progress: null });
+    setGraph({ scores: [], results: [], settings: [], faintedFractions: [], played: [], playedOutcome: [], verified: [], sensitivity: [], lead: null, notice: null, running: false, progress: null });
   }, []);
 
   return {

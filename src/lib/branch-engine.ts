@@ -1650,6 +1650,30 @@ export async function reconstructBranchRuntime(params: {
  * request on a live battle, or a forced switch that has no eligible switch-in —
  * so the UI can offer a way out instead of silently dead-ending.
  */
+/**
+ * Did this reconstruction actually ARRIVE at `turn` as a live position?
+ * `validateBranchRuntime` deliberately accepts an ended battle (branching
+ * into a finished line is a legal, explained state), so callers that use
+ * the final battle AS a specific turn's position need this stricter test:
+ *
+ * - short of the turn  → the replay wedged on the way there;
+ * - `ended`            → always an artifact for a sampled turn, because a
+ *   sampled turn lies BEFORE the real game's end; an ended arrival means
+ *   the diverging choice replay killed a side the real game kept (the
+ *   premature-end cascade, gen9draft-2058494320 from turn 56 unhealed).
+ *   The calibration harness applies the same invariant when scoring.
+ *
+ * Without it the eval sweep stored a prematurely-ended battle as the LAST
+ * turn's position, and the graph showed a single phantom ±1.00 point at
+ * the far right with every other turn a gap (2026-08-12 report).
+ */
+export function reconstructionReached(runtime: BranchRuntime, turn: number): boolean {
+  if (runtime.timedOut) return false;
+  const battle = runtime.battleStream.battle;
+  if (!battle || battle.ended) return false;
+  return battle.turn >= turn;
+}
+
 export function validateBranchRuntime(runtime: BranchRuntime): string | null {
   if (runtime.timedOut) {
     return 'Reconstruction timed out before reaching this turn. Try branching from a nearby turn.';

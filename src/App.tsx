@@ -590,6 +590,13 @@ function App() {
       if (invalid) throw new Error(invalid);
       const battle = runtime.battleStream.battle;
       if (!battle) throw new Error('Reconstruction produced no battle.');
+      // Same guard the sweep's acquisition needs: an ended (or short)
+      // arrival is a divergence artifact, and evaluating it would report a
+      // decided ±1.00 — the "think deeper dropped the position to 100%"
+      // report. Fail loudly instead of publishing a phantom number.
+      if (!branchEngine.reconstructionReached(runtime, turn)) {
+        throw new Error(`The reconstruction diverged before turn ${turn} — the guessed sets could not reproduce this position. Correcting items/moves via Edit Player/Opp usually fixes it.`);
+      }
       return serializeLiveBattle(battle);
     }, [replayData, teamText, effectiveP1Info, effectiveP2Info, usageStats.stats, setAssumptions.assumptions, snapshots, getInferredSpreads]);
 
@@ -637,9 +644,15 @@ function App() {
           },
         },
       });
+      // The boundary captures above already delivered every turn the replay
+      // reached; this final store only covers the target turn itself — and
+      // only when the reconstruction ARRIVED there live. A diverged run that
+      // cascaded into an early end would otherwise be stored as the last
+      // turn's position and scored as a decided ±1: one phantom point at the
+      // far right with every other turn a gap (the empty-graph report).
       const invalid = branchEngine.validateBranchRuntime(runtime);
       const battle = runtime.battleStream.battle;
-      if (!invalid && battle) {
+      if (!invalid && battle && branchEngine.reconstructionReached(runtime, turns)) {
         const serialized = serializeLiveBattle(battle);
         positions[turns - 1] = serialized;
         onPosition?.(turns, serialized);

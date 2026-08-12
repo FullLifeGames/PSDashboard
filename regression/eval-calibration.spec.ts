@@ -883,6 +883,35 @@ import { brierScore, fitConstantK } from './fit-helpers';
  * static basis for this mass; the next lever, if any, is search/
  * planning-side.
  *
+ * EMPTY GAME GRAPH — PHANTOM FINAL TURN 2026-08-12 (user report: "the
+ * Game Graph is empty when clicking on Analyze Game"): the same
+ * premature-end family, one layer further out. makeSweepAcquireAll
+ * stored the reconstruction's FINAL battle as positions[turns-1] with no
+ * check that the replay ever reached that turn, and
+ * validateBranchRuntime deliberately returns null for an ended battle
+ * (branching into a finished line is legal and explained). So a diverged
+ * run that cascaded into an early end was stored as the last turn,
+ * evaluated as a decided ±1.00, and drew EXACTLY ONE point at the
+ * bottom-right corner — every other turn a silent gap, with the panel
+ * showing "Re-analyze" as if the line were real (hasGraph = "some score
+ * is non-null"). EvalGraph only strokes runs of ≥2 points, so one point
+ * renders as an empty box with a dot: the reported screenshot.
+ * DIAGNOSIS PATH: clean-state browser runs of BOTH the 68-turn draft
+ * (fast scan filled all 68) and the 10-turn VGC replay (full line,
+ * report, accuracies) were healthy, so the defect is not in the sweep
+ * loop — the shape (one isolated final point at ±1) is what identified
+ * the acquisition. FIX: reconstructionReached(runtime, turn) — live
+ * battle standing at or past the turn, not timed out, not ended (a
+ * sampled turn always lies BEFORE the real end; the harness applies the
+ * same invariant) — gates the store, and the single-turn acquire gets it
+ * too. That closes the mechanism behind the hidden think-deeper button:
+ * an unhealed single-shot arrival at a diverged endgame turn IS an ended
+ * battle, which is why the position read 100%. The sweep now records how
+ * much of the game the reconstruction covered and the panel states it,
+ * so a short line explains itself instead of reading as a broken app.
+ * Pins: sweep-acquire-guard.spec (predicate table + the real unhealed
+ * draft run, where validate passes and the guard rejects).
+ *
  * REGISTERED BUG — THINK-DEEPER ON UNHEALED ACQUIRE 2026-08-11 (user
  * report: "Think deeper breaks the turn and reduces the percentage to
  * 100%", draft replay t56): the whole-game sweep acquires positions via

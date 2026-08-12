@@ -324,6 +324,13 @@ export function EvalPanel({
               : prefs.mode === 'auto' ? 'auto (matrix early, MCTS late)'
               : `depth ${prefs.depth}`} everywhere · deeper: per turn
           </div>
+          {/* A short or missing line says why — an unexplained blank graph
+              reads as a broken app rather than a diverged reconstruction. */}
+          {graph.notice && (
+            <div role="status" style={{ fontSize: 10, color: '#e6b36a', marginTop: 2, maxWidth: 520 }}>
+              ⚠ {graph.notice}
+            </div>
+          )}
           {hasGraph && (
             <EvalGraph
               scores={graph.scores}
