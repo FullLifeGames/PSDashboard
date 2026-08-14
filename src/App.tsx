@@ -31,7 +31,7 @@ import { resolveTeraPreference } from './lib/eval/tera';
 import { choiceId, evalChoiceToSlotChoices, type BranchSlotChoice } from './lib/branch-choices';
 import type { RankedChoice } from './lib/eval/types';
 import { allTurnEvents, detectSacks, parseLeadSpecies, parsePlayedActions, parsePlayedActionsDoubles } from './lib/eval/played';
-import { analyzeTurn, PAYOFF_WINDOW } from './lib/eval/analysis';
+import { analyzeTurn, PAYOFF_WINDOW, type TurnAnalysis } from './lib/eval/analysis';
 import { computeRead, parseTendencies } from './lib/eval/opponent-model';
 import { analyzeLeads } from './lib/eval/leads';
 import { buildGameReport, type GameReport } from './lib/eval/report';
@@ -1148,11 +1148,13 @@ function App() {
     return null;
   }, [replayData]);
 
-  // Game-level root cause, once enough of the game is swept.
-  const gameReportRef = useRef<GameReport | null>(null);
-  const gameReport = useMemo(() => {
+  // Game-level root cause, once enough of the game is swept. The memo keeps
+  // the per-turn analyses next to the report: the feedback drift harness
+  // (and manual debugging) read both through the window handle below.
+  const gameReportDataRef = useRef<{ report: GameReport; analyses: (TurnAnalysis | null)[] } | null>(null);
+  const gameReportData = useMemo(() => {
     if (!replayData) {
-      gameReportRef.current = null;
+      gameReportDataRef.current = null;
       return null;
     }
     const { results, scores, played, playedOutcome, verified, sensitivity, running } = evaluation.graph;
@@ -1160,7 +1162,7 @@ function App() {
     // completion (per-tick rebuilds are expensive), but returning null here
     // made the report blink on every turn click once selection started
     // triggering 2-turn upgrade sweeps.
-    if (running) return gameReportRef.current;
+    if (running) return gameReportDataRef.current;
     const analyses = results.map((result, index) => {
       const scoreBefore = scores[index];
       if (!result || scoreBefore === null) return null;
@@ -1181,15 +1183,27 @@ function App() {
       });
     });
     if (analyses.filter(Boolean).length < 3) {
-      gameReportRef.current = null;
+      gameReportDataRef.current = null;
       return null;
     }
     const report = buildGameReport(
       analyses, [replayData.players[0], replayData.players[1]], replayWinner, true,
     );
-    gameReportRef.current = report;
-    return report;
+    const data = { report, analyses };
+    gameReportDataRef.current = data;
+    return data;
   }, [replayData, snapshots, evaluation.graph, replayWinner, turnEventsIndex]);
+  const gameReport = gameReportData?.report ?? null;
+
+  // Structured handle for the feedback drift harness: the SAME objects the
+  // UI renders — no recomputation, no behavior change.
+  useEffect(() => {
+    (window as Window & { __psDebug?: unknown }).__psDebug = {
+      graph: evaluation.graph,
+      analyses: gameReportData?.analyses ?? null,
+      gameReport: gameReportData?.report ?? null,
+    };
+  }, [evaluation.graph, gameReportData]);
 
   const teamPasteStatus = useMemo(() => {
     if (!pastedSets || pastedSets.length === 0) return null;
