@@ -519,3 +519,54 @@ test.describe('happiness-move choice tokens (return102 family)', () => {
     }
   });
 });
+
+test.describe('concealed trapping (Magnet Pull family)', () => {
+  // The sim marks a Magnet-Pull-trapped Steel type `trapped: 'hidden'` and
+  // deliberately keeps the REQUEST silent — the player has not seen the
+  // trapper's ability. The switch validation still rejects, so offering the
+  // switch was a guaranteed reject that killed the whole turn eval
+  // (smogtours-gen8ou-573756 t24/32/38/39/40: `p2 "switch 2": Can't
+  // switch: The active Pokémon is trapped`). The analyzer holds the full
+  // state — mirror the liveDisabled rule and consult the live field.
+  const makeTrapBattle = (): Battle => {
+    const battle = new Battle({
+      formatid: toID('gen8customgame'),
+      seed: '1,2,3,4',
+      p1: { name: 'Alpha', team: Teams.pack([
+        { ...makeSet('Magnezone', 'Magnezone', ['Thunderbolt', 'Protect']), ability: 'Magnet Pull' },
+        makeSet('Chansey', 'Chansey', ['Protect']),
+      ]) },
+      p2: { name: 'Beta', team: Teams.pack([
+        { ...makeSet('Melmetal', 'Melmetal', ['Thunder Punch', 'Protect']), ability: 'Iron Fist' },
+        makeSet('Weavile', 'Weavile', ['Protect']),
+      ]) },
+    });
+    if (battle.sides.some(side => side.requestState === 'teampreview')) {
+      battle.choose('p1', 'team 12');
+      battle.choose('p2', 'team 12');
+    }
+    return battle;
+  };
+
+  test('a hidden-trapped active offers no bench switches; the search completes', async () => {
+    const battle = makeTrapBattle();
+    const melmetal = battle.sides[1].active[0]!;
+    // Preconditions: the live field knows, the request conceals.
+    expect(melmetal.trapped).toBeTruthy();
+    expect((battle.sides[1].activeRequest?.active?.[0] as { trapped?: boolean } | undefined)?.trapped).toBeFalsy();
+
+    const root = createRootPosition(serialize(battle));
+    const p2Choices = legalChoices(root, 'p2').map(option => option.choice);
+    expect(p2Choices.some(choice => choice.startsWith('switch'))).toBe(false);
+    expect(p2Choices).toContain('move thunderpunch');
+    // The free side keeps its bench.
+    const p1Choices = legalChoices(root, 'p1').map(option => option.choice);
+    expect(p1Choices.some(choice => choice.startsWith('switch'))).toBe(true);
+
+    // The real regression: a full search on the position must not die on a
+    // guaranteed-reject switch cell.
+    const { searchPosition } = await import('../src/lib/eval/search');
+    const result = searchPosition(root.serialized, { depth: 1, samples: 1, tera: false });
+    expect(result.perSide.p2.some(option => option.choice.startsWith('switch'))).toBe(false);
+  });
+});

@@ -160,7 +160,10 @@ function slotChoicesFor(
   const pokemon = sideState.active[slot];
   if (!entry || !pokemon || pokemon.fainted) return [];
 
-  const trapped = 'trapped' in entry && !!entry.trapped;
+  // Requests also conceal 'hidden' TRAPPING (an unrevealed Magnet Pull) while
+  // the switch validation still rejects — consult the live field like the
+  // liveDisabled rule below (573756 t24/32/38-40 died on offered switches).
+  const trapped = ('trapped' in entry && !!entry.trapped) || !!pokemon.trapped;
   const canTera = allowTera && !!entry.canTerastallize;
   const canMega = !!entry.canMegaEvo;
   const canUltra = !!entry.canUltraBurst;
@@ -310,7 +313,9 @@ export function legalChoices(
   const options: ChoiceOption[] = [];
   const active = 'active' in request ? request.active?.[0] : undefined;
   const forced = 'forceSwitch' in request && !!request.forceSwitch?.[0];
-  const trapped = !!active && 'trapped' in active && !!active.trapped;
+  // Same rule as slotChoicesFor: requests conceal 'hidden' trapping (an
+  // unrevealed Magnet Pull) — the live field is what the validation checks.
+  const trapped = !!active && (('trapped' in active && !!active.trapped) || !!sideState.active[0]?.trapped);
 
   if (active && !forced) {
     const activeTera = teraAllowed(opts?.tera, side, sideState.active[0] ?? null);

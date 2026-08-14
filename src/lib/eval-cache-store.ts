@@ -74,7 +74,10 @@ export interface StoredEval {
 //      sim rejects, silently gapping every Return/Frustration turn) and
 //      guessed Frustration sets assume 0 happiness (the sim default 255
 //      priced them at BP 1).
-export const EVAL_ENGINE_CACHE_VERSION = 27;
+// v28: hidden-trapped actives (unrevealed Magnet Pull — the request conceals
+//      trapping the validation enforces) stop offering bench switches, the
+//      guaranteed reject that killed whole turn evals (573756 t24/32/38-40).
+export const EVAL_ENGINE_CACHE_VERSION = 28;
 
 export function evalStoreKey(
   cacheKey: string,
