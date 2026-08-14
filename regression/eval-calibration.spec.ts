@@ -883,6 +883,19 @@ import { brierScore, fitConstantK } from './fit-helpers';
  * static basis for this mass; the next lever, if any, is search/
  * planning-side.
  *
+ * REGISTERED BUG — OLD-GEN RETURN BRANCHING FAILURE 2026-08-14 (user
+ * report from the expert-feedback round): branching on
+ * smogtours-gen6ou-653785 turn 19 fails with `Evaluation failed: p1
+ * "move return102": Can't move: Your Lopunny doesn't have a move
+ * matching return102`. Suspected family: `return102` is the MODERN dex
+ * id for fixed-102-BP Return (happiness left the games in gen 8) — a
+ * gen 6 battle knows the move as `return`, so some choice-building path
+ * likely canonicalizes move names through the wrong generation's data.
+ * Frustration presumably fails the same way (user's read). Status:
+ * registered only, not yet investigated — scheduled into the
+ * feedback-round plan alongside the eval findings from the same replay
+ * (t19 Will-O-Wisp vs Charizard-X).
+ *
  * THINK-DEEPER UNHIDDEN — HEALED SINGLE-TURN ACQUIRE 2026-08-13: the
  * registered fix is in. makeReplayAcquire now reconstructs with the same
  * per-turn capturePositions snapshot corrections the sweep uses (arrival
