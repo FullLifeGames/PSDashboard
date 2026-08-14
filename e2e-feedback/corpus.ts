@@ -1,3 +1,6 @@
+import { readFileSync } from 'fs';
+import { dirname, join } from 'path';
+import { fileURLToPath } from 'url';
 import type { TurnAttribution, VerdictTier } from '../src/lib/eval/analysis';
 
 /**
@@ -47,7 +50,13 @@ export interface FeedbackItem {
 }
 
 /** Flipped true in the commit that lands the approved baseline pins. */
-export const BASELINE_PINNED = false;
+export const BASELINE_PINNED = true;
+
+/** The user-approved 655336 report freeze (baseline ef342fa, 2026-08-14). */
+const GOLDEN_655336 = JSON.parse(readFileSync(
+  join(dirname(fileURLToPath(import.meta.url)), 'golden', 'smogtours-gen6ou-655336.report.json'),
+  'utf-8',
+)) as ReportClaim;
 
 export const FEEDBACK_REPLAYS = [
   'smogtours-gen8ou-573756',
@@ -59,47 +68,56 @@ export const FEEDBACK_REPLAYS = [
 ] as const;
 
 export const FEEDBACK_CORPUS: FeedbackItem[] = [
-  // ---- truth ----
+  // ---- truth (pins approved by the user at Gate 1, 2026-08-14) ----
   {
-    replay: 'smogtours-gen8ou-573756', turn: 76, kind: 'truth', source: 'expert-2026-08',
-    essence: "SoulWind's game-breaking play is recognized — the analysis credits the strong play that briefly brought him back into the game.",
+    replay: 'smogtours-gen8ou-573756', turn: 75, kind: 'truth', source: 'expert-2026-08',
+    essence: "SoulWind's double switch into Kyurem — the game-breaking play that briefly brought him back — is recognized as a paid-off read. (The expert referenced it as t76; the analysis banks the read on t75, confirmed by the user.)",
+    expect: { side: 'p1', riskPaidOff: true, playedLabelIncludes: 'Kyurem' },
   },
   {
     replay: 'smogtours-gen8ou-562428', turn: 12, kind: 'truth', source: 'expert-2026-08',
     essence: "LordEnz's Close Combat over the safe Mandibuzz line is graded as a read that paid off; the expert explicitly praised that framing.",
+    expect: { side: 'p1', attribution: ['p1-read'], riskPaidOff: true, playedLabelIncludes: 'Close Combat', keyMoment: true },
   },
   {
     replay: 'smogtours-gen6ou-648453', turn: 20, kind: 'truth', source: 'expert-2026-08',
-    essence: "BKC's good play is correctly recognized.",
+    essence: "BKC's good play is correctly recognized — Knock Off graded as a paid-off read.",
+    expect: { side: 'p2', attribution: ['p2-read'], riskPaidOff: true, playedLabelIncludes: 'Knock Off' },
   },
   {
     replay: 'smogtours-gen6ou-655336', kind: 'truth', source: 'expert-2026-08',
     essence: 'The end-of-analysis highlights match the game — essentially all good plays and misplays are recognized. Frozen as a golden report subset.',
+    expect: GOLDEN_655336,
   },
-  // ---- gaps ----
+  // ---- gaps (observed baselines recorded at Gate 1, commit ef342fa) ----
   {
     replay: 'smogtours-gen8ou-573756', turn: 68, kind: 'gap', source: 'expert-2026-08',
     essence: "p2's Weavile sacrifice into Corviknight is called a misplay, but it is what enables the Garchomp sweep — the game-winning play. Win-condition horizon: a sac whose payoff arrives many turns later reads as a blunder.",
+    observed: { side: 'p2', tier: 'mistake', attribution: ['p2-decision'] },
     desired: 'The sacrifice stops being graded mistake/blunder once the engine can see or verify the win-condition payoff behind it.',
   },
   {
     replay: 'smogtours-gen8ou-562428', turn: 10, kind: 'gap', source: 'expert-2026-08',
     essence: 'The no-blunder shift verdict looks right but is shallow-wrong: both sides had four or more live options and the turn was a read — a Heatran switch would have flipped the advantage. The engine never represented the real decision space.',
+    observed: { attribution: ['shift'] },
     desired: "The analysis represents the turn's real decision breadth (read framing) instead of a no-blunder drift.",
   },
   {
     replay: 'smogtours-gen6ou-648453', turn: 13, kind: 'gap', source: 'expert-2026-08',
     essence: 'Misplay verdict against BKC with unusable reasoning; if the play works, the opponent must sacrifice into Lopunny. Missing principle: an opposing mon with NO remaining switch-ins makes any successful switch into it profitable (even via U-turn).',
+    observed: { side: 'p2', tier: 'mistake', attribution: ['p2-decision'] },
     desired: 'The engine recognizes the no-switch-ins-left state and the reasoning names it.',
   },
   {
     replay: 'smogtours-gen6ou-649664', turn: 23, kind: 'gap', source: 'expert-2026-08',
     essence: 'Graded as a risk, but Keldeo was visibly choice-locked — Hydro Pump was the only winning play, not a gamble. The reasoning assumed Scald kills; the odds are ~43%, worse than landing two Hydro Pumps.',
+    observed: { side: 'p1', tier: 'mistake', attribution: ['p1-decision'] },
     desired: 'Observed choice locks constrain the option set (a locked side is forced), and kill-odds claims are arithmetically grounded.',
   },
   {
     replay: 'smogtours-gen6ou-653785', turn: 19, kind: 'gap', source: 'expert-2026-08',
     essence: 'Will-O-Wisp is proposed over the Weavile switch against Charizard-X — Fire types cannot be burned, the suggestion is mechanically useless (the expert: the first gross error). Attached: branching this turn fails on the old-gen Return move id (registered bug, ledger 2026-08-14, commit ce00d4c).',
+    observed: { side: 'p1', tier: 'blunder', attribution: ['p1-decision'] },
     desired: 'Mechanically null moves never surface as recommendations (or carry their enabling condition), and the Return/Frustration id family branches correctly.',
   },
 ];

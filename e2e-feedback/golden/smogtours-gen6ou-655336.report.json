@@ -1,0 +1,16 @@
+{
+  "keyMoments": [
+    { "turn": 5, "attribution": "p2-decision" },
+    { "turn": 6, "attribution": "shift" },
+    { "turn": 13, "attribution": "p1-read" },
+    { "turn": 26, "attribution": "p2-decision" }
+  ],
+  "misplays": [
+    { "turn": 5, "side": "p2" },
+    { "turn": 26, "side": "p2" }
+  ],
+  "reads": [
+    { "turn": 13, "side": "p1" }
+  ],
+  "turningPoint": 4
+}

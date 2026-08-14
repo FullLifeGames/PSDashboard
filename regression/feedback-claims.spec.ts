@@ -113,6 +113,9 @@ test.describe('corpus validation', () => {
 
   test('the shipped corpus is well-formed against generous turn counts', () => {
     expect(validateCorpus(FEEDBACK_CORPUS, turns, false)).toEqual([]);
+    // BASELINE_PINNED is on: the default validation additionally enforces
+    // that every truth item carries its approved pin.
+    expect(validateCorpus(FEEDBACK_CORPUS, turns)).toEqual([]);
   });
 
   test('violations are named: unknown replay, bad turn, cross-kind fields, unpinned truth after baseline', () => {
