@@ -426,7 +426,7 @@ test.describe('PS Dashboard', () => {
     await expect(panel.locator('.ps-eval-analysis')).toContainText('Turn 1', { timeout: 15_000 });
   });
 
-  test('selecting a turn shows the stored result; think-deeper stays hidden (registered bug)', async ({ page }) => {
+  test('deepening is explicit and monotone — clicking an entry never re-searches', async ({ page }) => {
     test.setTimeout(240_000);
     await page.evaluate(() => {
       localStorage.setItem('ps-replay-interceptor:eval-pool', '2');
@@ -442,16 +442,21 @@ test.describe('PS Dashboard', () => {
     await expect(panel.locator('button', { hasText: 'Re-analyze' })).toBeVisible({ timeout: 180_000 });
 
     // Selecting a turn shows the stored depth-1 result — no silent
-    // re-search swaps the numbers.
+    // re-search swaps the numbers. The escalation is the explicit button
+    // (restored 2026-08-13: the single-turn acquire heals like the sweep).
     await panel.locator('.ps-eval-graph rect[data-turn="1"]').click();
     await expect(panel.getByText(/^depth 1/)).toBeVisible({ timeout: 15_000 });
-    // Think-deeper is HIDDEN on analyzed turns for now — the single-turn
-    // acquire reconstructs WITHOUT per-turn healing, and in a diverging
-    // endgame (draft replay t56+) it evaluates the premature-end artifact:
-    // the bar snaps to 100% and the rankings empty out. The escalation
-    // logic (targets, monotone supersede rules) stays pinned in the
-    // regression suite; this pins the hide until the acquire is healed.
-    await expect(panel.locator('button', { hasText: 'Think deeper about this position' })).toHaveCount(0);
+    const deeper = panel.locator('button', { hasText: 'Think deeper about this position' });
+    await expect(deeper).toContainText('depth 2');
+    await deeper.click();
+    await expect(panel.getByText(/^depth 2/)).toBeVisible({ timeout: 120_000 });
+
+    // Monotone merge: a later re-analyze (fast scan) must NOT downgrade the
+    // explicitly deepened turn back to depth 1.
+    await panel.locator('button', { hasText: 'Re-analyze' }).click();
+    await expect(panel.locator('button', { hasText: 'Re-analyze' })).toBeVisible({ timeout: 180_000 });
+    await panel.locator('.ps-eval-graph rect[data-turn="1"]').click();
+    await expect(panel.getByText(/^depth 2/)).toBeVisible({ timeout: 15_000 });
   });
 
   test('analyzes the whole game with the MCTS engine', async ({ page }) => {
@@ -512,11 +517,14 @@ test.describe('PS Dashboard', () => {
     await panel.locator('.ps-eval-graph rect[data-turn="38"]').click();
     await expect(panel.locator('.ps-eval-analysis')).toContainText('Turn 38', { timeout: 15_000 });
     await expect(panel.getByTitle('What produced the numbers shown for this turn.')).toHaveText('MCTS');
-    // Think-deeper is HIDDEN on analyzed turns (registered bug: unhealed
-    // single-turn acquire — see the stored-result test above). The
-    // cross-engine escalation ladder and its supersede rules stay pinned
-    // at the logic level in the regression suite.
-    await expect(panel.locator('button', { hasText: 'Think deeper about this position' })).toHaveCount(0);
+    // The cross-engine ladder: from an MCTS turn, think-deeper crosses into
+    // the matrix ladder at depth 2 — same rung the early d1s1 line offers.
+    // CLICK it: the d2s3 matrix pass must actually LAND (supersede the
+    // stored MCTS result) — the badge is the proof, and a silently skipped
+    // sweep is exactly the bug this guards against.
+    await panel.locator('button', { hasText: 'Think deeper about this position (depth 2)' }).click();
+    await expect(panel.getByTitle('What produced the numbers shown for this turn.'))
+      .toHaveText('depth 2 · 3 samples', { timeout: 180_000 });
   });
 
   test('branch mode: clicking a recommendation plays the turn out', async ({ page }) => {

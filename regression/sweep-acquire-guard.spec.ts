@@ -63,4 +63,34 @@ test.describe('sweep end-position guard', () => {
     expect(validateBranchRuntime(runtime)).toBeNull();
     expect(reconstructionReached(runtime, turns)).toBe(false);
   });
+
+  test('the HEALED single-turn acquire arrives live in the cascade zone (think-deeper re-enabled on this)', async () => {
+    test.setTimeout(600_000);
+    const replay = JSON.parse(readFileSync('e2e/fixtures/draft-replay.json', 'utf-8')) as {
+      id: string; format: string; formatid?: string; players: string[]; log: string;
+    };
+    const { snapshots, observations, speedOrders } = parseReplayLogWithObservations(replay.log);
+    const { p1Team, p2Team } = buildTeamsFromReplay(replay.log, { observations, speedOrders });
+
+    // Exactly makeReplayAcquire's arrangement after the healing fix: the
+    // arrival snapshot PLUS per-turn boundary corrections en route. Turn 56
+    // is where the unhealed cascade dies; healed, it must arrive live and
+    // pass the reached guard — that pair is what justifies un-hiding the
+    // think-deeper button.
+    const turn = 56;
+    const runtime = await reconstructBranchRuntime({
+      format: getBranchSimulatorFormat(replay),
+      p1Team, p2Team,
+      replayLog: replay.log,
+      targetTurn: turn,
+      snapshot: snapshots[Math.min(turn - 1, snapshots.length - 1)],
+      capturePositions: {
+        snapshotFor: boundary => snapshots[Math.min(boundary - 1, snapshots.length - 1)] ?? null,
+        onPosition: () => {},
+      },
+    });
+    expect(validateBranchRuntime(runtime)).toBeNull();
+    expect(reconstructionReached(runtime, turn)).toBe(true);
+    expect(runtime.battleStream.battle!.turn).toBe(turn);
+  });
 });

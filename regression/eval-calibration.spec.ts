@@ -883,6 +883,20 @@ import { brierScore, fitConstantK } from './fit-helpers';
  * static basis for this mass; the next lever, if any, is search/
  * planning-side.
  *
+ * THINK-DEEPER UNHIDDEN — HEALED SINGLE-TURN ACQUIRE 2026-08-13: the
+ * registered fix is in. makeReplayAcquire now reconstructs with the same
+ * per-turn capturePositions snapshot corrections the sweep uses (arrival
+ * snapshot unchanged), so the cascade zone arrives LIVE — pinned on the
+ * draft fixture at t56 in sweep-acquire-guard ("the HEALED single-turn
+ * acquire arrives live..."), the exact turn the unhealed run dies on.
+ * reconstructionReached stays as the loud-failure backstop for replays
+ * healing cannot save (it now throws the divergence message instead of
+ * evaluating an ended battle as ±1). Button restored to both faces
+ * (think-deeper on analyzed turns, first-analysis on gaps), both e2e
+ * click-throughs restored (d1→d2 escalation + monotone merge; the
+ * MCTS→matrix depth-2 LAND on the GPL auto line), the hide-pins removed.
+ * The two REGISTERED BUG entries below are CLOSED by this change.
+ *
  * EMPTY GAME GRAPH ON THE BUILD — MINIFIED CLASS NAMES 2026-08-12 (the
  * user's actual report, isolated by "works on dev but not on build"):
  * @pkmn/sim's state serializer encodes every object reference as

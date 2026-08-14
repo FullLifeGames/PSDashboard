@@ -585,12 +585,21 @@ function App() {
         snapshot: snapshots.length > 0 ? snapshots[Math.min(turn - 1, snapshots.length - 1)] : null,
         playerNames: [replayData.players[0], replayData.players[1]],
         onProgress: reportReconstruct,
+        // The sweep's healing, on the single-turn path too: per-turn
+        // boundary corrections keep a diverging choice replay in lockstep
+        // with the protocol, so the cascade zone (draft t56+) arrives LIVE
+        // instead of prematurely ended — this is what re-enabled the
+        // think-deeper button (the 2026-08-11 hide).
+        capturePositions: {
+          snapshotFor: boundary => snapshots[Math.min(boundary - 1, snapshots.length - 1)] ?? null,
+          onPosition: () => {},
+        },
       });
       const invalid = branchEngine.validateBranchRuntime(runtime);
       if (invalid) throw new Error(invalid);
       const battle = runtime.battleStream.battle;
       if (!battle) throw new Error('Reconstruction produced no battle.');
-      // Same guard the sweep's acquisition needs: an ended (or short)
+      // Backstop for replays healing cannot save: an ended (or short)
       // arrival is a divergence artifact, and evaluating it would report a
       // decided ±1.00 — the "think deeper dropped the position to 100%"
       // report. Fail loudly instead of publishing a phantom number.
