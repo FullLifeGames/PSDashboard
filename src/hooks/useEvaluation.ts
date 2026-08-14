@@ -107,6 +107,29 @@ export function verificationDeepSettings(settings: EvalSettings): EvalSettings |
   return { ...settings, depth: (settings.depth + 1) as 2 | 3, mode: 'matrix', keepPlayed: undefined };
 }
 
+/**
+ * Why the game line is short, worded by shape. The counts describe the
+ * RECONSTRUCTION pass — one fast replay of the game that hands out every
+ * turn's position — which settles seconds after "Analyze game" while the
+ * per-turn evaluations are still streaming, so the wording must not claim
+ * analysis that has not happened yet. A missing FINAL turn alone is the
+ * cascade's mildest form (the simulated line reaches the game's end one
+ * turn early — the draft replay does this) and gets a calm story without
+ * set-correction advice; anything else is genuine divergence.
+ */
+export function coverageNotice(positions: (string | null)[]): string | null {
+  const total = positions.length;
+  const covered = positions.filter(Boolean).length;
+  if (total === 0 || covered === total) return null;
+  if (covered === 0) {
+    return 'The replay could not be reconstructed from the guessed sets — no turn has a live position to analyze. Correcting items/moves via Edit Player/Opp usually fixes it.';
+  }
+  if (covered === total - 1 && positions[total - 1] === null) {
+    return "The simulated replay reached the game's end one turn early, so the real game's final turn has no live position to analyze — the rest of the line is unaffected.";
+  }
+  return `The reconstruction diverged from the real game: ${covered} of ${total} turns could be reconstructed for analysis. Correcting items/moves via Edit Player/Opp usually fixes it.`;
+}
+
 interface CachedEval {
   result: EvalResult;
   // Engine-typed: the UI only offers depth 1/2, but sweeps cache whatever
@@ -515,12 +538,7 @@ export function useEvaluation() {
         // An unexplained short line is the worst outcome: the sweep leaves
         // gaps for every turn the reconstruction never produced, and the
         // panel used to show that as a blank graph with no reason given.
-        const covered = positions.filter(Boolean).length;
-        if (covered < positions.length) {
-          notice = covered === 0
-            ? 'The replay could not be reconstructed from the guessed sets — no turn could be analyzed. Correcting items/moves via Edit Player/Opp usually fixes it.'
-            : `The reconstruction diverged from the real game: ${covered} of ${positions.length} turns could be analyzed. Correcting items/moves via Edit Player/Opp usually fixes it.`;
-        }
+        notice = coverageNotice(positions);
       }).catch(error => {
         acquireError = error;
         notice = `The replay could not be reconstructed: ${error instanceof Error ? error.message : String(error)}`;

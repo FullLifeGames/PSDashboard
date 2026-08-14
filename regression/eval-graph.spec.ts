@@ -1,6 +1,45 @@
 import { test, expect } from '@playwright/test';
-import { needsSettingsUpgrade, resolveAutoTurnSettings, serializedFaintedFraction, supersedesStored, verificationDeepSettings } from '../src/hooks/useEvaluation';
+import { coverageNotice, needsSettingsUpgrade, resolveAutoTurnSettings, serializedFaintedFraction, supersedesStored, verificationDeepSettings } from '../src/hooks/useEvaluation';
 import { AUTO_MCTS_FAINTED_FRACTION } from '../src/lib/eval/types';
+
+test.describe('coverage notice (acquisition pass)', () => {
+  // The notice describes the RECONSTRUCTION pass — one fast replay of the
+  // game that hands out every turn's position, settling seconds after
+  // "Analyze game" while the evaluations still stream. Its wording must
+  // not claim analysis that has not happened yet ("67 of 68 turns could
+  // be analyzed" seconds after the click read as fake), and a missing
+  // FINAL turn only — the draft replay, whose simulated line reaches the
+  // game's end one turn early — must not be dressed as scary mid-game
+  // divergence with set-correction advice that does not apply.
+  const pos = (bits: (0 | 1)[]) => bits.map((bit, index) => (bit ? `p${index + 1}` : null));
+
+  test('full coverage stays silent', () => {
+    expect(coverageNotice(pos([1, 1, 1, 1]))).toBeNull();
+    expect(coverageNotice([])).toBeNull();
+  });
+
+  test('nothing reconstructed names the guessed sets', () => {
+    expect(coverageNotice(pos([0, 0, 0]))).toContain('could not be reconstructed');
+  });
+
+  test('a missing final turn only is the mild ended-early story', () => {
+    const notice = coverageNotice(pos([1, 1, 1, 1, 0]))!;
+    expect(notice).toContain('one turn early');
+    expect(notice).toContain('rest of the line is unaffected');
+    expect(notice).not.toContain('Edit Player/Opp');
+  });
+
+  test('mid-game gaps are divergence with reconstruction counts', () => {
+    const notice = coverageNotice(pos([1, 1, 0, 1, 1, 1]))!;
+    expect(notice).toContain('5 of 6 turns could be reconstructed');
+    expect(notice).toContain('Edit Player/Opp');
+  });
+
+  test('a long trailing run is divergence, not the mild story', () => {
+    const notice = coverageNotice(pos([1, 1, 1, 0, 0, 0, 0]))!;
+    expect(notice).toContain('3 of 7 turns could be reconstructed');
+  });
+});
 
 test.describe('settings upgrade decision (merged flow)', () => {
   const prefs = { depth: 2, samples: 3, mode: 'matrix', auto: false, tera: 'auto' } as const;
