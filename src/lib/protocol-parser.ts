@@ -285,7 +285,10 @@ export function parseReplayLogWithObservations(log: string): {
   }
   flushSpeedOrder();
 
-  // Capture final state after last turn (end of battle)
+  // Capture final state after last turn (end of battle): the POST-GAME
+  // end entry, stamped lastTurn + 1. Consumers deriving turn counts from
+  // the snapshot list must not read it as a turn — see
+  // replay-turns.finalPlayedTurn.
   if (currentTurnLines.length > 0) {
     snapshots.push({
       turn: (snapshots.length > 0 ? snapshots[snapshots.length - 1].turn + 1 : 0),

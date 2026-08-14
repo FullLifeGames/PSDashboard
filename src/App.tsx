@@ -1,6 +1,7 @@
 import { useEffect, useState, useCallback, useMemo, useRef } from 'react';
 import type { PokemonSet } from '@pkmn/sim';
 import { useReplay } from './hooks/useReplay';
+import { finalPlayedTurn } from './lib/replay-turns';
 import { useEmbedHost } from './hooks/useEmbedHost';
 import { useBranch } from './hooks/useBranch';
 import type { BranchHistoryEntry } from './hooks/useBranch';
@@ -758,11 +759,16 @@ function App() {
     }
   }, [pendingEvalPick, branching, simState, branchPreparing, playOutEvalChoice]);
 
-  // The END snapshot's `.turn` IS the final played turn — its actions live
-  // in the trailing block (after the last |turn| marker), so it analyzes
-  // like any other turn. Excluding it left the game-ending turn without a
-  // graph node or options (GPL).
-  const analyzableTurns = endSnapshotTurn !== null ? Math.max(1, endSnapshotTurn) : maxTurn;
+  // The sweep counts PLAYED turns. The end snapshot (lastTurn + 1, the
+  // post-game state) is the branch slider's "End" sentinel, not a turn —
+  // counting it made the sweep chase a final position that cannot exist
+  // and report "67 of 68 turns reconstructed" on a faithful replay. The
+  // final played turn itself still analyzes like any other turn: its
+  // actions live in the trailing block, which playedFor reads (GPL).
+  const analyzableTurns = useMemo(
+    () => (snapshots.length > 0 ? finalPlayedTurn(snapshots) : 1),
+    [snapshots],
+  );
 
   const handleAnalyzeGame = useCallback(() => {
     if (!replayData) return;

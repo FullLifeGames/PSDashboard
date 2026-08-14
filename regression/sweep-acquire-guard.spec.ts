@@ -7,6 +7,7 @@ import {
 } from '../src/lib/branch-engine';
 import { getBranchSimulatorFormat } from '../src/lib/replay-format';
 import { parseReplayLogWithObservations } from '../src/lib/protocol-parser';
+import { finalPlayedTurn } from '../src/lib/replay-turns';
 
 /**
  * The sweep's single-pass acquisition stores the reconstruction's FINAL
@@ -62,6 +63,29 @@ test.describe('sweep end-position guard', () => {
     // why the sweep needed its own guard.
     expect(validateBranchRuntime(runtime)).toBeNull();
     expect(reconstructionReached(runtime, turns)).toBe(false);
+  });
+
+  test('the sweep counts played turns, not the post-game end snapshot', () => {
+    // The parser stamps the trailing end-block (lines after the final
+    // |turn| marker — the post-game state) as lastTurn + 1. Counting that
+    // entry as an analyzable turn manufactured a phantom final turn that
+    // can never have a live position: the draft replay plays 67 turns,
+    // carries 68 snapshots, and the sweep reported "67 of 68 turns" on a
+    // perfectly reconstructed game (2026-08-13 report). The branch slider
+    // already used the end entry as its "End" sentinel, one past the max.
+    const replay = JSON.parse(readFileSync('e2e/fixtures/draft-replay.json', 'utf-8')) as { log: string };
+    const { snapshots } = parseReplayLogWithObservations(replay.log);
+    expect(snapshots.length).toBe(68);
+    expect(snapshots[snapshots.length - 1].turn).toBe(68);
+    expect(finalPlayedTurn(snapshots)).toBe(67);
+
+    // A log that ends exactly ON a |turn| marker has no end entry — every
+    // snapshot is a real turn and the last one counts.
+    const truncated = snapshots.slice(0, 67);
+    expect(truncated[truncated.length - 1].log.some(line => line.startsWith('|turn|'))).toBe(true);
+    expect(finalPlayedTurn(truncated)).toBe(67);
+
+    expect(finalPlayedTurn([])).toBe(1);
   });
 
   test('the HEALED single-turn acquire arrives live in the cascade zone (think-deeper re-enabled on this)', async () => {
