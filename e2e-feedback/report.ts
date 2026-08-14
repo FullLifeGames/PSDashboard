@@ -12,6 +12,8 @@ export interface DriftMeta {
   settingsLine: string;
   wallTimes: Record<string, number>;
   noticeByReplay: Record<string, string | null>;
+  /** Per-replay eval-layer failures (turn + reason) — the self-explaining gap trail. */
+  evalErrorsByReplay: Record<string, { turn: number; error: string }[]>;
 }
 
 const STATUS_LABEL: Record<string, string> = {
@@ -30,6 +32,11 @@ export function renderReport(results: ClaimResult[], meta: DriftMeta): { markdow
   const notices = Object.entries(meta.noticeByReplay).filter(([, notice]) => notice);
   if (notices.length > 0) {
     lines.push(`- Coverage notices: ${notices.map(([id, notice]) => `${id}: ${notice}`).join(' · ')}`);
+  }
+  const evalGaps = Object.entries(meta.evalErrorsByReplay).filter(([, gaps]) => gaps.length > 0);
+  if (evalGaps.length > 0) {
+    lines.push(`- Eval-layer gaps: ${evalGaps.map(([id, gaps]) =>
+      `${id}: ${gaps.map(gap => `t${gap.turn} "${gap.error}"`).join(', ')}`).join(' · ')}`);
   }
   lines.push('');
   for (const result of results) {

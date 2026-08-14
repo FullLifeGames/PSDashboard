@@ -249,11 +249,13 @@ test.describe('PS Dashboard', () => {
     // pin its shape where an analyze-game run already exists.
     const debugShape = await page.evaluate(() => {
       const dbg = (window as unknown as {
-        __psDebug?: { graph: { running: boolean; scores: unknown[] }; analyses: unknown[] | null; gameReport: unknown };
+        __psDebug?: { graph: { running: boolean; scores: unknown[]; evalErrors: unknown[] }; analyses: unknown[] | null; gameReport: unknown };
       }).__psDebug;
       return dbg ? {
         running: dbg.graph.running,
         sweptScores: dbg.graph.scores.filter(score => score !== null).length,
+        evalErrorSlots: dbg.graph.evalErrors.length,
+        evalErrorCount: dbg.graph.evalErrors.filter(message => message !== null).length,
         analyses: dbg.analyses?.length ?? null,
         hasReport: dbg.gameReport !== null,
       } : null;
@@ -261,6 +263,9 @@ test.describe('PS Dashboard', () => {
     expect(debugShape).not.toBeNull();
     expect(debugShape!.running).toBe(false);
     expect(debugShape!.sweptScores).toBeGreaterThan(0);
+    // The eval-error trail is present and clean on the healthy fixture.
+    expect(debugShape!.evalErrorSlots).toBeGreaterThan(0);
+    expect(debugShape!.evalErrorCount).toBe(0);
     expect(debugShape!.analyses).not.toBeNull();
     expect(debugShape!.hasReport).toBe(true);
 

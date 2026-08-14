@@ -138,7 +138,7 @@ test.describe('drift report rendering', () => {
       evaluateItem(truthAt(12, { attribution: ['p1-read'] }), analysesWith(analysis(12, 'p1-read')), report()),
       evaluateItem(gapAt(10, { attribution: ['shift'] }), analysesWith(analysis(10, 'shift')), report()),
     ];
-    const meta = { commit: 'abc1234', date: '2026-08-14', settingsLine: 'd2s3 auto', wallTimes: { x: 60 }, noticeByReplay: {} };
+    const meta = { commit: 'abc1234', date: '2026-08-14', settingsLine: 'd2s3 auto', wallTimes: { x: 60 }, noticeByReplay: {}, evalErrorsByReplay: {} };
     const { markdown, json } = renderReport(results, meta);
     expect(markdown).toContain('OK');
     expect(markdown).toContain('GAP open');
@@ -152,9 +152,18 @@ test.describe('drift report rendering', () => {
     // The evaluator never emits 'error' — the runner builds these when a
     // replay cannot be graded at all (the 653785 wedged-sweep baseline).
     const errorResult = { item: truthAt(12), status: 'error' as const, details: ['sweep wedged at 10/26 — no progress for 360s'] };
-    const meta = { commit: 'abc1234', date: '2026-08-14', settingsLine: 'd2s3 auto', wallTimes: {}, noticeByReplay: {} };
+    const meta = { commit: 'abc1234', date: '2026-08-14', settingsLine: 'd2s3 auto', wallTimes: {}, noticeByReplay: {}, evalErrorsByReplay: {} };
     const { markdown } = renderReport([errorResult], meta);
     expect(markdown).toContain('ERROR');
     expect(markdown).toContain('sweep wedged');
+  });
+
+  test('eval-layer gaps render as their own meta line', () => {
+    const { markdown } = renderReport([], {
+      commit: 'abc', date: 'd', settingsLine: 's', wallTimes: {},
+      noticeByReplay: {},
+      evalErrorsByReplay: { 'smogtours-gen8ou-573756': [{ turn: 3, error: 'boom' }] },
+    });
+    expect(markdown).toContain('Eval-layer gaps: smogtours-gen8ou-573756: t3 "boom"');
   });
 });

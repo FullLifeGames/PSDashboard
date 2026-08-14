@@ -30,6 +30,7 @@ const DUMP = process.env.FEEDBACK_DUMP === '1';
 interface ExtractedDebug {
   scores: (number | null)[];
   notice: string | null;
+  evalErrors: (string | null)[];
   analyses: (TurnAnalysis | null)[] | null;
   gameReport: GameReport | null;
 }
@@ -37,6 +38,7 @@ interface ExtractedDebug {
 const results: ClaimResult[] = [];
 const wallTimes: Record<string, number> = {};
 const noticeByReplay: Record<string, string | null> = {};
+const evalErrorsByReplay: Record<string, { turn: number; error: string }[]> = {};
 
 /** A replay that cannot be graded still shows up — as ERROR rows, never silence. */
 function pushErrorResults(replayId: string, details: string[]) {
@@ -127,14 +129,17 @@ for (const replayId of FEEDBACK_REPLAYS) {
     }
     const dbg = await page.evaluate(() => {
       const raw = (window as unknown as {
-        __psDebug: { graph: { scores: unknown; notice: unknown }; analyses: unknown; gameReport: unknown };
+        __psDebug: { graph: { scores: unknown; notice: unknown; evalErrors: unknown }; analyses: unknown; gameReport: unknown };
       }).__psDebug;
       return JSON.parse(JSON.stringify({
-        scores: raw.graph.scores, notice: raw.graph.notice,
+        scores: raw.graph.scores, notice: raw.graph.notice, evalErrors: raw.graph.evalErrors,
         analyses: raw.analyses, gameReport: raw.gameReport,
       }));
     }) as ExtractedDebug;
     noticeByReplay[replayId] = dbg.notice;
+    evalErrorsByReplay[replayId] = dbg.evalErrors
+      .map((error, index) => (error === null ? null : { turn: index + 1, error }))
+      .filter((entry): entry is { turn: number; error: string } => entry !== null);
     if (DUMP) {
       const full = await page.evaluate(() =>
         JSON.parse(JSON.stringify((window as unknown as { __psDebug: unknown }).__psDebug)));
@@ -168,6 +173,7 @@ test.afterAll(() => {
     settingsLine: `depth 2 · samples 3 · mode auto (fresh-context defaults)${RECORD ? ' · RECORD' : ''}`,
     wallTimes,
     noticeByReplay,
+    evalErrorsByReplay,
   };
   mkdirSync(REPORT_DIR, { recursive: true });
   const { markdown, json } = renderReport(results, meta);
