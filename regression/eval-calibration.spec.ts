@@ -883,6 +883,48 @@ import { brierScore, fitConstantK } from './fit-helpers';
  * static basis for this mass; the next lever, if any, is search/
  * planning-side.
  *
+ * EXPERT-FEEDBACK CORPUS ROUND 2026-08-14: an experienced player reviewed
+ * the analysis on 0.5.1 across six public smogtours replays (gen8ou/
+ * gen6ou); the distilled essence is a versioned corpus (e2e-feedback/
+ * corpus.ts — 4 truths, 5 gaps) graded by `npm run test:feedback`: the
+ * REAL app swept per replay in a browser, hermetic (replay + data.pkmn.cc
+ * pins), bit-identical across runs, WARN-ONLY (drift = report material in
+ * docs/reports/, reds = harness breakage only). Pinned state: 4x OK, 5x
+ * GAP open. Gate-1 correction: the praised SoulWind game-breaking play is
+ * the t75 double switch into Kyurem (expert counted t76; the read banks on
+ * 75 — user-confirmed). Dossiers (user-approved, local docs/superpowers/
+ * feedback-round/): t68 Weavile sac = grading machinery (punished-exit
+ * blocks the payoff window for exactly the deliberate feed it should
+ * excuse; floor==ev==-0.42 is the feed signature; payoff +0.44 in-window);
+ * t10 = narrative (breadth 9/9 and 11/13 near-best is IN the matrix,
+ * 'shift' hides it; expert's Heatran-flips claim NOT confirmed, priced
+ * co-optimal); t13 = data (typeless Hidden Power runs as HP Dark, real
+ * read was HP Ice) + narrative (no-switch-ins-left never surfaced); t23 =
+ * data (Specs guessed right but the reconstruction LOSES the choice-lock
+ * volatile — choiceCount 4 instead of 1; with the lock the verdict
+ * evaporates, exactly the expert's point); t19 = HORIZON (Charizard
+ * 71/297 behind double rocks megas ON 19 — un-Mega'd re-entry costs ~148,
+ * it can never return, yet the equilibrium expects the switch 91.6%; and
+ * Mega Flare Blitz takes Cofagrigus 40%->7%, so the played Weavile feed
+ * is coherent piece preservation the depth-2 verdict cannot price —
+ * blunder CONTESTED) + data (one-move Chari) + narrative (WoW named
+ * "better" by argmax-ev while the engine's own mix plays Hex 89%; the
+ * switch-conditional is never stated). Mega bookkeeping verified clean.
+ * CROSS-CUTTING: the registered Return bug below is fully diagnosed —
+ * forward-model builds choice tokens from the request's DISPLAY NAME
+ * ("Return 102" -> return102) instead of its id, silently killing ~48
+ * turn evals across the four gen6 games (every one fields a Return
+ * Lopunny) and breaking old-gen branching; Frustration same family. And
+ * eval-layer failures have NO notice (coverageNotice counts acquisition
+ * only — 653785 lost 16/26 turns silently). Improvement agenda (approved,
+ * by leverage): return102 choice-id fix · eval-gap notice · choice-lock
+ * preservation · horizon family (deliberate-feed + hazard re-entry
+ * pricing, t68+t19) · Hidden-Power typing · narrative pack (breadth,
+ * conditionals, equilibrium-aware naming) · gen8 gap probe (573756 has 5
+ * unexplained). The 35-min record-run wedge did not reproduce
+ * hermetically (2x bit-identical clean runs); the stall detector bounds
+ * any recurrence at 6 minutes with ERROR rows.
+ *
  * REGISTERED BUG — OLD-GEN RETURN BRANCHING FAILURE 2026-08-14 (user
  * report from the expert-feedback round): branching on
  * smogtours-gen6ou-653785 turn 19 fails with `Evaluation failed: p1
