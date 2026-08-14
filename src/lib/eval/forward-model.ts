@@ -173,7 +173,10 @@ function slotChoicesFor(
 
   for (const move of entry.moves) {
     if ('disabled' in move && move.disabled) continue;
-    const key = choiceKey(move.move);
+    // Happiness moves display with computed BP ("Return 102") — the entry's
+    // id is the token the sim accepts; the display name is only the label.
+    const id = 'id' in move ? (move as { id?: string }).id : undefined;
+    const key = id || choiceKey(move.move);
     if (liveDisabled.has(key)) continue;
     // Locked requests (mid-charge Phantom Force, rampages) carry no target
     // data. The LIVE sim auto-targets a bare release, but serialization
@@ -316,19 +319,21 @@ export function legalChoices(
       (sideState.active[0]?.moveSlots ?? []).filter(slot => slot.disabled).map(slot => slot.id));
     for (const move of active.moves) {
       if ('disabled' in move && move.disabled) continue;
-      if (liveDisabled.has(choiceKey(move.move))) continue;
-      options.push({ choice: `move ${choiceKey(move.move)}`, label: move.move });
+      // Same id-over-display-name rule as slotChoicesFor ("Return 102" -> return).
+      const key = 'id' in move && move.id ? move.id : choiceKey(move.move);
+      if (liveDisabled.has(key)) continue;
+      options.push({ choice: `move ${key}`, label: move.move });
       if (activeTera && 'canTerastallize' in active && active.canTerastallize) {
         options.push({
-          choice: `move ${choiceKey(move.move)} terastallize`,
+          choice: `move ${key} terastallize`,
           label: `Tera + ${move.move}`,
         });
       }
       if ('canMegaEvo' in active && active.canMegaEvo) {
-        options.push({ choice: `move ${choiceKey(move.move)} mega`, label: `Mega + ${move.move}` });
+        options.push({ choice: `move ${key} mega`, label: `Mega + ${move.move}` });
       }
       if ('canUltraBurst' in active && active.canUltraBurst) {
-        options.push({ choice: `move ${choiceKey(move.move)} ultra`, label: `Ultra + ${move.move}` });
+        options.push({ choice: `move ${key} ultra`, label: `Ultra + ${move.move}` });
       }
     }
   }

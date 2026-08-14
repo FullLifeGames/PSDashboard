@@ -463,3 +463,59 @@ test.describe('team preview (turn 0)', () => {
     expect(battle.sides[1].active.map(pokemon => pokemon?.species.name)).toEqual(['Machamp', 'Blissey']);
   });
 });
+
+test.describe('happiness-move choice tokens (return102 family)', () => {
+  // Gen 6 requests display happiness moves with their computed base power
+  // ("Return 102" at the default 255 happiness) while the entry's `id`
+  // stays `return`. Tokens built from the display name produced
+  // `move return102`, which the sim rejects — silently gapping every turn
+  // with an active Return user across the gen6 feedback corpus and failing
+  // old-gen branching loudly (ledger: REGISTERED BUG 2026-08-14).
+  const makeGen6Battle = (p1Sets: PokemonSet[], p2Sets: PokemonSet[], doubles = false): Battle => {
+    const battle = new Battle({
+      formatid: toID(doubles ? 'gen6doublescustomgame' : 'gen6customgame'),
+      seed: '1,2,3,4',
+      p1: { name: 'Alpha', team: Teams.pack(p1Sets) },
+      p2: { name: 'Beta', team: Teams.pack(p2Sets) },
+    });
+    if (battle.sides.some(side => side.requestState === 'teampreview')) {
+      battle.choose('p1', `team ${p1Sets.map((_, index) => index + 1).join('')}`);
+      battle.choose('p2', `team ${p2Sets.map((_, index) => index + 1).join('')}`);
+    }
+    return battle;
+  };
+
+  test('singles: legalChoices emits id tokens the sim accepts, labels keep the display name', () => {
+    const root = createRootPosition(serialize(makeGen6Battle(
+      [makeSet('Lopunny', 'Lopunny', ['Return', 'Frustration', 'Protect'])],
+      [makeSet('Chansey', 'Chansey', ['Protect'])],
+    )));
+    const p1 = legalChoices(root, 'p1');
+    const choices = p1.map(option => option.choice);
+    expect(choices).toContain('move return');
+    expect(choices).toContain('move frustration');
+    expect(choices).not.toContain('move return102');
+    // The label stays what the player sees.
+    expect(p1.find(option => option.choice === 'move return')!.label).toContain('Return');
+    // The sim accepts the id token — the exact rejection the display-name
+    // token produced ("doesn't have a move matching return102").
+    const child = advancePosition(root, 'move return', 'move protect', '1,2,3,4');
+    expect(positionBattle(child).turn).toBe(positionBattle(root).turn + 1);
+  });
+
+  test('doubles: the per-slot path emits id tokens with target suffixes', () => {
+    const root = createRootPosition(serialize(makeGen6Battle(
+      [makeSet('Lopunny', 'Lopunny', ['Return', 'Protect']), makeSet('Chansey', 'Chansey', ['Protect'])],
+      [makeSet('Snorlax', 'Snorlax', ['Protect']), makeSet('Blissey', 'Blissey', ['Protect'])],
+      true,
+    )));
+    const p1 = legalChoices(root, 'p1');
+    // Doubles choices are combined slot pairs — inspect the halves.
+    const returnChoices = p1.map(option => option.choice).filter(choice => choice.includes('return'));
+    expect(returnChoices.length).toBeGreaterThan(0);
+    for (const choice of returnChoices) {
+      expect(choice).not.toContain('return102');
+      expect(choice).toMatch(/move return \d/);
+    }
+  });
+});

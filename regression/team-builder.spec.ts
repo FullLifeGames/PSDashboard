@@ -543,3 +543,34 @@ test.describe('team sheet display overlay', () => {
     expect(sheets.p2?.[0].item).toBe('Choice Scarf');
   });
 });
+
+test.describe('happiness assumption for guessed sets', () => {
+  // Showdown's teambuilder assumption: Frustration users run 0 happiness
+  // (BP 102). Nothing set `happiness` at all, so the sim default 255 made
+  // every guessed Frustration hit at BP 1. Return needs no action — the
+  // default 255 IS max happiness (BP 102).
+  const gen6Log = (moveLine: string) => [
+    '|player|p1|Alice|', '|player|p2|Bob|', '|gen|6', '|tier|[Gen 6] OU',
+    '|poke|p1|Lopunny, F|', '|poke|p2|Chansey, F|',
+    '|start',
+    '|switch|p1a: Lopunny|Lopunny, F|100/100',
+    '|switch|p2a: Chansey|Chansey, F|100/100',
+    '|turn|1',
+    moveLine,
+    '|turn|2',
+  ].join('\n');
+
+  test('a revealed Frustration forces happiness 0; Return stays untouched', () => {
+    const frustrated = buildTeamsFromReplay(gen6Log('|move|p1a: Lopunny|Frustration|p2a: Chansey')).p1Team;
+    expect(frustrated.find(set => set.species === 'Lopunny')!.happiness).toBe(0);
+    const returning = buildTeamsFromReplay(gen6Log('|move|p1a: Lopunny|Return|p2a: Chansey')).p1Team;
+    expect(returning.find(set => set.species === 'Lopunny')!.happiness).toBeUndefined();
+  });
+
+  test('an explicit happiness from an imported team wins', () => {
+    const { p1Team } = buildTeamsFromReplay(gen6Log('|move|p1a: Lopunny|Frustration|p2a: Chansey'), {
+      userTeamText: 'Lopunny\nHappiness: 128\n- Frustration\n- Protect\n',
+    });
+    expect(p1Team.find(set => set.species === 'Lopunny')!.happiness).toBe(128);
+  });
+});

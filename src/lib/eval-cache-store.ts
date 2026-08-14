@@ -69,7 +69,12 @@ export interface StoredEval {
 // v26: side invariants (pokemonLeft, isActive) restore on every
 //      deserialize — corrupted-correction positions used to throw (GPL
 //      T38/T39 gaps) or evaluate wiped sides as alive.
-export const EVAL_ENGINE_CACHE_VERSION = 26;
+// v27: choice tokens come from the request's move id (display names carry
+//      computed BP for happiness moves — "Return 102" built a token the
+//      sim rejects, silently gapping every Return/Frustration turn) and
+//      guessed Frustration sets assume 0 happiness (the sim default 255
+//      priced them at BP 1).
+export const EVAL_ENGINE_CACHE_VERSION = 27;
 
 export function evalStoreKey(
   cacheKey: string,

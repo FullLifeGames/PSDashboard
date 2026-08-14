@@ -59,7 +59,8 @@ export function buildTeamsFromReplay(
   const formatHint = /^\|tier\|.*champions/im.test(log) ? `gen${gen}champions` : `gen${gen}`;
   const champions = evBudget(formatHint).perStat !== 252;
   const legalize = (team: PokemonSet[]): PokemonSet[] =>
-    (champions ? team.map(set => ({ ...set, evs: legalizeEvs(set.evs, formatHint) })) : team);
+    (champions ? team.map(set => ({ ...set, evs: legalizeEvs(set.evs, formatHint) })) : team)
+      .map(withHappinessAssumption);
   const build = (inferred?: Map<string, SpreadCandidate>) => ({
     p1Team: legalize(p1Info.pokemon.map(pokemon => buildSet(
       pokemon, p1KnownTeam, options?.usageStats, options?.setAssumptions,
@@ -220,6 +221,16 @@ function buildSet(
 
 function hasNonZeroEvs(evs: PokemonSet['evs'] | undefined): boolean {
   return !!evs && Object.values(evs).some(value => (value ?? 0) > 0);
+}
+
+/**
+ * Showdown's teambuilder assumption: Frustration users run 0 happiness
+ * (BP 102); Return users keep the sim default 255 (also BP 102). Explicit
+ * values from sheets/imports win.
+ */
+function withHappinessAssumption(set: PokemonSet): PokemonSet {
+  if (set.happiness !== undefined) return set;
+  return set.moves.some(move => toId(move) === 'frustration') ? { ...set, happiness: 0 } : set;
 }
 
 /**
