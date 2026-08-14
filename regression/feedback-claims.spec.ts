@@ -144,4 +144,14 @@ test.describe('drift report rendering', () => {
     expect(parsed.results.length).toBe(2);
     expect(JSON.stringify(parsed.results)).not.toContain('wallTimes');
   });
+
+  test('a runner-constructed error entry renders as ERROR, never silence', () => {
+    // The evaluator never emits 'error' — the runner builds these when a
+    // replay cannot be graded at all (the 653785 wedged-sweep baseline).
+    const errorResult = { item: truthAt(12), status: 'error' as const, details: ['sweep wedged at 10/26 — no progress for 360s'] };
+    const meta = { commit: 'abc1234', date: '2026-08-14', settingsLine: 'd2s3 auto', wallTimes: {}, noticeByReplay: {} };
+    const { markdown } = renderReport([errorResult], meta);
+    expect(markdown).toContain('ERROR');
+    expect(markdown).toContain('sweep wedged');
+  });
 });

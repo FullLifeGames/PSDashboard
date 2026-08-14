@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect, type Page } from '@playwright/test';
 import { execSync } from 'child_process';
 import { mkdirSync, readFileSync, writeFileSync } from 'fs';
 import { dirname, join } from 'path';
@@ -38,7 +38,68 @@ const results: ClaimResult[] = [];
 const wallTimes: Record<string, number> = {};
 const noticeByReplay: Record<string, string | null> = {};
 
-test.describe.configure({ mode: 'serial' });
+/** A replay that cannot be graded still shows up — as ERROR rows, never silence. */
+function pushErrorResults(replayId: string, details: string[]) {
+  for (const item of FEEDBACK_CORPUS.filter(entry => entry.replay === replayId)) {
+    results.push({ item, status: 'error', details });
+  }
+}
+
+interface SweepPoll {
+  running: boolean;
+  done: number;
+  total: number;
+}
+
+/**
+ * Waits for the sweep to TERMINATE (running false), with a stall detector:
+ * the 653785 baseline wedged mid-sweep at "10/26" and burned the full
+ * 35-minute wait — running stayed true with frozen progress (the registered
+ * return102 family taking down the whole sweep, not just branching). Six
+ * minutes without a progress tick is declared a wedge; the slowest healthy
+ * per-turn step in the baseline was far under one minute. The stable reason
+ * string (no elapsed seconds) feeds the report so determinism diffs stay
+ * clean.
+ */
+async function waitForSweepEnd(page: Page): Promise<{ ok: true } | { ok: false; reason: string }> {
+  const POLL_MS = 10_000;
+  const STALL_MS = 360_000;
+  const CAP_MS = 2_100_000;
+  const startedAt = Date.now();
+  let sawRunning = false;
+  let lastDone = -2;
+  let lastProgressAt = Date.now();
+  for (;;) {
+    const state = await page.evaluate((): SweepPoll | null => {
+      const dbg = (window as unknown as {
+        __psDebug?: { graph: { running: boolean; progress: { done: number; total: number } | null } };
+      }).__psDebug;
+      if (!dbg) return null;
+      return {
+        running: dbg.graph.running,
+        done: dbg.graph.progress?.done ?? -1,
+        total: dbg.graph.progress?.total ?? -1,
+      };
+    });
+    const elapsed = Date.now() - startedAt;
+    if (state) {
+      if (state.running) sawRunning = true;
+      if (state.done !== lastDone) {
+        lastDone = state.done;
+        lastProgressAt = Date.now();
+      }
+      if (!state.running && (sawRunning || elapsed > 30_000)) return { ok: true };
+      if (state.running && Date.now() - lastProgressAt > STALL_MS) {
+        return {
+          ok: false,
+          reason: `sweep wedged at ${state.done}/${state.total} — no progress for ${Math.round(STALL_MS / 1000)}s`,
+        };
+      }
+    }
+    if (elapsed > CAP_MS) return { ok: false, reason: `sweep did not finish within ${Math.round(CAP_MS / 1000)}s` };
+    await page.waitForTimeout(POLL_MS);
+  }
+}
 
 test('corpus is well-formed against the real fixtures', () => {
   const turnsByReplay = Object.fromEntries(FEEDBACK_REPLAYS.map(id => {
@@ -57,10 +118,13 @@ for (const replayId of FEEDBACK_REPLAYS) {
     await expect(page.getByText(fixture.players[0], { exact: true }).first()).toBeVisible({ timeout: 30_000 });
     const panel = page.locator('.ps-main-right .ps-eval-panel');
     await panel.locator('button', { hasText: 'Analyze game' }).click();
-    await page.waitForFunction(() => {
-      const dbg = (window as unknown as { __psDebug?: { graph: { running: boolean }; gameReport: unknown } }).__psDebug;
-      return !!dbg && dbg.graph.running === false && dbg.gameReport !== null;
-    }, undefined, { timeout: 2_100_000, polling: 1_000 });
+    const wait = await waitForSweepEnd(page);
+    wallTimes[replayId] = Math.round((Date.now() - started) / 1000);
+    if (!wait.ok) {
+      noticeByReplay[replayId] = wait.reason;
+      pushErrorResults(replayId, [wait.reason]);
+      throw new Error(`harness failure: ${wait.reason}`);
+    }
     const dbg = await page.evaluate(() => {
       const raw = (window as unknown as {
         __psDebug: { graph: { scores: unknown; notice: unknown }; analyses: unknown; gameReport: unknown };
@@ -70,7 +134,6 @@ for (const replayId of FEEDBACK_REPLAYS) {
         analyses: raw.analyses, gameReport: raw.gameReport,
       }));
     }) as ExtractedDebug;
-    wallTimes[replayId] = Math.round((Date.now() - started) / 1000);
     noticeByReplay[replayId] = dbg.notice;
     if (DUMP) {
       const full = await page.evaluate(() =>
@@ -79,11 +142,17 @@ for (const replayId of FEEDBACK_REPLAYS) {
       writeFileSync(join(REPORT_DIR, `feedback-full-${replayId}.json`), JSON.stringify(full, null, 2));
     }
 
-    // Harness reds — the ONLY reds on this path.
-    expect(log.violations, 'unexpected external requests').toEqual([]);
-    expect(log.smogonMisses, 'unpinned data.pkmn.cc requests — run once with FEEDBACK_RECORD=1').toEqual([]);
-    expect(dbg.analyses, 'debug handle exposed no analyses').not.toBeNull();
-    expect(dbg.scores.filter(score => score !== null).length, 'sweep produced no scores').toBeGreaterThan(0);
+    // Harness reds — the ONLY reds on this path. A failed replay still
+    // reaches the report as ERROR rows before the test goes red.
+    const problems: string[] = [];
+    if (log.violations.length > 0) problems.push(`unexpected external requests: ${log.violations.join(' ')}`);
+    if (log.smogonMisses.length > 0) problems.push(`unpinned data.pkmn.cc requests (record once with FEEDBACK_RECORD=1): ${log.smogonMisses.join(' ')}`);
+    if (!dbg.analyses) problems.push('debug handle exposed no analyses (sweep ended below the report threshold)');
+    if (dbg.scores.filter(score => score !== null).length === 0) problems.push('sweep produced no scores');
+    if (problems.length > 0) {
+      pushErrorResults(replayId, problems);
+      throw new Error(`harness failure: ${problems.join(' · ')}`);
+    }
 
     for (const item of FEEDBACK_CORPUS.filter(entry => entry.replay === replayId)) {
       results.push(evaluateItem(item, dbg.analyses!, dbg.gameReport));

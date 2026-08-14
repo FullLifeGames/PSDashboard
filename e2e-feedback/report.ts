@@ -16,6 +16,7 @@ export interface DriftMeta {
 
 const STATUS_LABEL: Record<string, string> = {
   ok: 'OK', drift: 'DRIFT', 'gap-open': 'GAP open', 'gap-moved': 'GAP moved', pending: 'PENDING',
+  error: 'ERROR',
 };
 
 export function renderReport(results: ClaimResult[], meta: DriftMeta): { markdown: string; json: string } {

@@ -8,7 +8,12 @@ import { BASELINE_PINNED, FEEDBACK_REPLAYS, type FeedbackItem, type ReportClaim,
  * Pinned in regression/feedback-claims.spec.ts.
  */
 
-export type ClaimStatus = 'ok' | 'drift' | 'gap-open' | 'gap-moved' | 'pending';
+/**
+ * 'error' is never produced by the evaluator — the RUNNER constructs it when
+ * a replay could not be graded at all (wedged sweep, empty extraction), so
+ * the report carries the breakage instead of silently omitting the items.
+ */
+export type ClaimStatus = 'ok' | 'drift' | 'gap-open' | 'gap-moved' | 'pending' | 'error';
 
 export interface ClaimResult {
   item: FeedbackItem;
