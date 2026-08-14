@@ -335,6 +335,7 @@ export function EvalPanel({
               currentTurn={currentTurn}
               onSelectTurn={selectTurn}
               leadScore={graph.lead?.result.score ?? null}
+              evalErrors={graph.evalErrors}
             />
           )}
           {hasGraph && (showReportView || !analysis) && (
@@ -363,6 +364,13 @@ export function EvalPanel({
                 >
                   ← Game report
                 </button>
+              )}
+              {/* The sweep's recorded reason this turn is a hole — without
+                  it a blank turn view reads as app breakage. */}
+              {!result && currentTurn >= 1 && graph.evalErrors[currentTurn - 1] && (
+                <div role="status" style={{ fontSize: 10, color: '#e6b36a', marginTop: 4, maxWidth: 520 }}>
+                  ⚠ This turn could not be evaluated: {graph.evalErrors[currentTurn - 1]}
+                </div>
               )}
               {/* A gap turn has no result block below — the escalation
                   control still has to be reachable to analyze it at all. */}

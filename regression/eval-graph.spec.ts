@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { coverageNotice, needsSettingsUpgrade, resolveAutoTurnSettings, serializedFaintedFraction, supersedesStored, verificationDeepSettings } from '../src/hooks/useEvaluation';
+import { coverageNotice, needsSettingsUpgrade, recordEvalError, resolveAutoTurnSettings, serializedFaintedFraction, supersedesStored, verificationDeepSettings, withEvalGapNotice } from '../src/hooks/useEvaluation';
 import { AUTO_MCTS_FAINTED_FRACTION } from '../src/lib/eval/types';
 
 test.describe('coverage notice (acquisition pass)', () => {
@@ -38,6 +38,32 @@ test.describe('coverage notice (acquisition pass)', () => {
   test('a long trailing run is divergence, not the mild story', () => {
     const notice = coverageNotice(pos([1, 1, 1, 0, 0, 0, 0]))!;
     expect(notice).toContain('3 of 7 turns could be reconstructed');
+  });
+});
+
+test.describe('eval-gap visibility helpers', () => {
+  test('recordEvalError keeps the reason only while the turn is scoreless', () => {
+    const evalErrors: (string | null)[] = [null, null, null];
+    const scores: (number | null)[] = [null, 0.4, null];
+    recordEvalError(evalErrors, scores, 1, new Error('p1 "move return102": rejected'));
+    expect(evalErrors[0]).toBe('p1 "move return102": rejected');
+    // A scored turn never records — the earlier pass's number stands.
+    recordEvalError(evalErrors, scores, 2, new Error('later pass failed'));
+    expect(evalErrors[1]).toBeNull();
+    // Non-Error throws stringify.
+    recordEvalError(evalErrors, scores, 3, 'worker died');
+    expect(evalErrors[2]).toBe('worker died');
+  });
+
+  test('withEvalGapNotice combines acquisition and eval-layer stories', () => {
+    expect(withEvalGapNotice(null, [null, null])).toBeNull();
+    expect(withEvalGapNotice('short line.', [null, null])).toBe('short line.');
+    expect(withEvalGapNotice(null, ['boom', null, 'later']))
+      .toBe('2 turns had a live position but could not be evaluated (first error: "boom").');
+    expect(withEvalGapNotice(null, [null, 'single']))
+      .toBe('1 turn had a live position but could not be evaluated (first error: "single").');
+    expect(withEvalGapNotice('The reconstruction diverged: 3 of 5.', ['boom']))
+      .toBe('The reconstruction diverged: 3 of 5. 1 turn had a live position but could not be evaluated (first error: "boom").');
   });
 });
 

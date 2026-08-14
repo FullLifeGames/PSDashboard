@@ -130,6 +130,34 @@ export function coverageNotice(positions: (string | null)[]): string | null {
   return `The reconstruction diverged from the real game: ${covered} of ${total} turns could be reconstructed for analysis. Correcting items/moves via Edit Player/Opp usually fixes it.`;
 }
 
+/**
+ * Eval-layer lifecycle guard: a failure is only a gap while the turn is
+ * scoreless — the monotone sweep never lets a failing later pass talk over
+ * an earlier score (the settings badges already say how converged a scored
+ * turn is).
+ */
+export function recordEvalError(
+  evalErrors: (string | null)[], scores: (number | null)[], turn: number, error: unknown,
+): void {
+  if (scores[turn - 1] !== null) return;
+  evalErrors[turn - 1] = error instanceof Error ? error.message : String(error);
+}
+
+/**
+ * The ⚠ line's second half: acquisition gaps keep coverageNotice's wording,
+ * eval-layer gaps (live position, throwing evaluation) append their count
+ * and the first reason — without this they were invisible (653785 lost
+ * 16 of 26 turns with the notice staying null).
+ */
+export function withEvalGapNotice(
+  acquisition: string | null, evalErrors: (string | null)[],
+): string | null {
+  const failed = evalErrors.filter((message): message is string => message !== null);
+  if (failed.length === 0) return acquisition;
+  const sentence = `${failed.length} turn${failed.length === 1 ? '' : 's'} had a live position but could not be evaluated (first error: "${failed[0]}").`;
+  return acquisition ? `${acquisition} ${sentence}` : sentence;
+}
+
 interface CachedEval {
   result: EvalResult;
   // Engine-typed: the UI only offers depth 1/2, but sweeps cache whatever
@@ -289,6 +317,12 @@ export interface EvalGraphState {
   verified: (TurnVerification | null)[];
   /** Item-sensitivity probes per turn (null = nothing to probe / not run). */
   sensitivity: (TurnSensitivity | null)[];
+  /**
+   * Per-turn eval-layer failure: the position existed but its evaluation
+   * threw (evalErrors[t-1] = message). Acquisition gaps stay in `notice` —
+   * a turn never carries both. Cleared the moment any pass scores the turn.
+   */
+  evalErrors: (string | null)[];
   /** Turn 0 (team preview) evaluation — null when unavailable or not swept. */
   lead: LeadEvalData | null;
   /**
@@ -309,14 +343,14 @@ export function useEvaluation() {
   const [error, setError] = useState<string | null>(null);
   const [reconstructProgress, setReconstructProgress] = useState<{ turn: number; target: number } | null>(null);
   const [graph, setGraph] = useState<EvalGraphState>({
-    scores: [], results: [], settings: [], faintedFractions: [], played: [], playedOutcome: [], verified: [], sensitivity: [], lead: null,
+    scores: [], results: [], settings: [], faintedFractions: [], played: [], playedOutcome: [], verified: [], sensitivity: [], evalErrors: [], lead: null,
     notice: null, running: false, progress: null,
   });
 
   const clientRef = useRef<EvalWorkerClient | null>(null);
   const cacheRef = useRef(new Map<string, CachedEval>());
   /** Latest graph arrays, so partial (range) sweeps merge instead of wiping. */
-  const graphDataRef = useRef<Pick<EvalGraphState, 'scores' | 'results' | 'settings' | 'faintedFractions' | 'played' | 'playedOutcome' | 'verified' | 'sensitivity' | 'lead'> | null>(null);
+  const graphDataRef = useRef<Pick<EvalGraphState, 'scores' | 'results' | 'settings' | 'faintedFractions' | 'played' | 'playedOutcome' | 'verified' | 'sensitivity' | 'evalErrors' | 'lead'> | null>(null);
   const runRef = useRef(0);
   const prefsRef = useRef(prefs);
   prefsRef.current = prefs;
@@ -490,13 +524,17 @@ export function useEvaluation() {
     const sensitivity: (TurnSensitivity | null)[] = keepPrevious && previous.sensitivity?.length === params.turns
       ? [...previous.sensitivity]
       : new Array(params.turns).fill(null);
+    const evalErrors: (string | null)[] = keepPrevious && previous.evalErrors?.length === params.turns
+      ? [...previous.evalErrors]
+      : new Array(params.turns).fill(null);
     let lead: LeadEvalData | null = keepPrevious ? previous.lead : null;
     let notice: string | null = null;
     const snapshot = () => {
       const data = {
         scores: [...scores], results: [...results], settings: [...turnSettings],
         faintedFractions: [...faintedFractions], played: [...played],
-        playedOutcome: [...playedOutcome], verified: [...verified], sensitivity: [...sensitivity], lead,
+        playedOutcome: [...playedOutcome], verified: [...verified], sensitivity: [...sensitivity],
+        evalErrors: [...evalErrors], lead,
         notice,
       };
       graphDataRef.current = data;
@@ -723,6 +761,7 @@ export function useEvaluation() {
         }
         if (hit) {
           scores[turn - 1] = hit.result.score;
+          evalErrors[turn - 1] = null;
           results[turn - 1] = hit.result;
           turnSettings[turn - 1] = { depth, samples, mode };
           // Entries written by single evaluations never computed the
@@ -791,72 +830,86 @@ export function useEvaluation() {
           }
           if (turnSensitivity !== undefined) sensitivity[turn - 1] = turnSensitivity;
         } else {
+          // Acquisition failure = the coverage notice's story; only a
+          // THROWING EVAL on a live position is an eval-layer gap.
+          let acquired: string | null = null;
           try {
-            const serialized = await positionFor(turn);
-            if (runRef.current !== runId) return false;
-            clientRef.current ??= new EvalWorkerClient();
-            const keepPlayed = turnPlayed?.p1Slots || turnPlayed?.p2Slots ? turnPlayed : undefined;
-            const result = await clientRef.current.evaluate(serialized, { depth, samples, mode, tera: params.tera, keepPlayed, sleepClause: params.sleepClause });
-            if (runRef.current !== runId) return false;
-            scores[turn - 1] = result.score;
-            results[turn - 1] = result;
-            turnSettings[turn - 1] = { depth, samples, mode };
-
-            // The engine's expectation of the real choices — the decision
-            // part of the coming swing (chance is the rest).
-            let outcome: number | null = null;
-            const p1Choice = matchOrPhantom(result, 'p1', turnPlayed);
-            const p2Choice = matchOrPhantom(result, 'p2', turnPlayed);
-            if (p1Choice && p2Choice) {
-              try {
-                outcome = await clientRef.current.evalPair(serialized, p1Choice.choice, p2Choice.choice, { depth, samples, mode, tera: params.tera, sleepClause: params.sleepClause });
-              } catch (err) {
-                if (runRef.current !== runId) return false;
-                if (err instanceof Error && err.message === 'cancelled') return false;
-              }
-              if (runRef.current !== runId) return false;
-            }
-            playedOutcome[turn - 1] = outcome;
-
-            let turnVerified: TurnVerification | null | undefined;
-            let turnSensitivity: TurnSensitivity | null | undefined;
-            if (verify) {
-              turnVerified = null;
-              try {
-                turnVerified = await verifyFlagged(() => Promise.resolve(serialized), result, turnPlayed, resolvedSettings);
-              } catch (err) {
-                if (runRef.current !== runId) return false;
-                if (err instanceof Error && err.message === 'cancelled') return false;
-              }
-              if (runRef.current !== runId) return false;
-              verified[turn - 1] = turnVerified;
-              turnSensitivity = null;
-              try {
-                turnSensitivity = await probeSensitivity(() => Promise.resolve(serialized), result, turnPlayed, resolvedSettings, turnVerified ?? null);
-              } catch (err) {
-                if (runRef.current !== runId) return false;
-                if (err instanceof Error && err.message === 'cancelled') return false;
-              }
-              if (runRef.current !== runId) return false;
-              sensitivity[turn - 1] = turnSensitivity;
-            }
-            cacheRef.current.set(key, {
-              result, depth, samples, mode: mode, tera: params.tera,
-              playedOutcome: outcome,
-              ...(turnVerified !== undefined ? { verified: turnVerified } : {}),
-              ...(turnSensitivity !== undefined ? { sensitivity: turnSensitivity } : {}),
-            });
-            void saveStoredEval({
-              key: storeKey, result, depth, samples, mode: mode, tera: params.tera,
-              playedOutcome: outcome,
-              ...(turnVerified !== undefined ? { verified: turnVerified } : {}),
-              ...(turnSensitivity !== undefined ? { sensitivity: turnSensitivity } : {}),
-              savedAt: Date.now(),
-            });
+            acquired = await positionFor(turn);
           } catch (err) {
             if (runRef.current !== runId) return false;
             if (err instanceof Error && err.message === 'cancelled') return false;
-            // This turn failed (e.g. reconstruction wedge) — leave a gap.
+            // Reconstruction failed — leave the gap, as before.
+          }
+          if (acquired !== null) {
+            const serialized = acquired;
+            try {
+              if (runRef.current !== runId) return false;
+              clientRef.current ??= new EvalWorkerClient();
+              const keepPlayed = turnPlayed?.p1Slots || turnPlayed?.p2Slots ? turnPlayed : undefined;
+              const result = await clientRef.current.evaluate(serialized, { depth, samples, mode, tera: params.tera, keepPlayed, sleepClause: params.sleepClause });
+              if (runRef.current !== runId) return false;
+              scores[turn - 1] = result.score;
+              evalErrors[turn - 1] = null;
+              results[turn - 1] = result;
+              turnSettings[turn - 1] = { depth, samples, mode };
+
+              // The engine's expectation of the real choices — the decision
+              // part of the coming swing (chance is the rest).
+              let outcome: number | null = null;
+              const p1Choice = matchOrPhantom(result, 'p1', turnPlayed);
+              const p2Choice = matchOrPhantom(result, 'p2', turnPlayed);
+              if (p1Choice && p2Choice) {
+                try {
+                  outcome = await clientRef.current.evalPair(serialized, p1Choice.choice, p2Choice.choice, { depth, samples, mode, tera: params.tera, sleepClause: params.sleepClause });
+                } catch (err) {
+                  if (runRef.current !== runId) return false;
+                  if (err instanceof Error && err.message === 'cancelled') return false;
+                }
+                if (runRef.current !== runId) return false;
+              }
+              playedOutcome[turn - 1] = outcome;
+
+              let turnVerified: TurnVerification | null | undefined;
+              let turnSensitivity: TurnSensitivity | null | undefined;
+              if (verify) {
+                turnVerified = null;
+                try {
+                  turnVerified = await verifyFlagged(() => Promise.resolve(serialized), result, turnPlayed, resolvedSettings);
+                } catch (err) {
+                  if (runRef.current !== runId) return false;
+                  if (err instanceof Error && err.message === 'cancelled') return false;
+                }
+                if (runRef.current !== runId) return false;
+                verified[turn - 1] = turnVerified;
+                turnSensitivity = null;
+                try {
+                  turnSensitivity = await probeSensitivity(() => Promise.resolve(serialized), result, turnPlayed, resolvedSettings, turnVerified ?? null);
+                } catch (err) {
+                  if (runRef.current !== runId) return false;
+                  if (err instanceof Error && err.message === 'cancelled') return false;
+                }
+                if (runRef.current !== runId) return false;
+                sensitivity[turn - 1] = turnSensitivity;
+              }
+              cacheRef.current.set(key, {
+                result, depth, samples, mode: mode, tera: params.tera,
+                playedOutcome: outcome,
+                ...(turnVerified !== undefined ? { verified: turnVerified } : {}),
+                ...(turnSensitivity !== undefined ? { sensitivity: turnSensitivity } : {}),
+              });
+              void saveStoredEval({
+                key: storeKey, result, depth, samples, mode: mode, tera: params.tera,
+                playedOutcome: outcome,
+                ...(turnVerified !== undefined ? { verified: turnVerified } : {}),
+                ...(turnSensitivity !== undefined ? { sensitivity: turnSensitivity } : {}),
+                savedAt: Date.now(),
+              });
+            } catch (err) {
+              if (runRef.current !== runId) return false;
+              if (err instanceof Error && err.message === 'cancelled') return false;
+              // Eval-layer failure on a live position — keep the reason.
+              recordEvalError(evalErrors, scores, turn, err);
+            }
           }
         }
         setGraph({ ...snapshot(), running: true, progress: { done: index + 1, total: turnList.length } });
@@ -934,14 +987,16 @@ export function useEvaluation() {
       }
 
       if (runRef.current === runId) {
-        setGraph(prev => ({ ...prev, running: false, progress: null }));
+        // The summary ⚠ line settles once, when the line is final.
+        notice = withEvalGapNotice(notice, evalErrors);
+        setGraph({ ...snapshot(), running: false, progress: null });
       }
     })();
   }, [cancel]);
 
   const clearGraph = useCallback(() => {
     graphDataRef.current = null;
-    setGraph({ scores: [], results: [], settings: [], faintedFractions: [], played: [], playedOutcome: [], verified: [], sensitivity: [], lead: null, notice: null, running: false, progress: null });
+    setGraph({ scores: [], results: [], settings: [], faintedFractions: [], played: [], playedOutcome: [], verified: [], sensitivity: [], evalErrors: [], lead: null, notice: null, running: false, progress: null });
   }, []);
 
   return {

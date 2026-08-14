@@ -10,6 +10,8 @@ interface EvalGraphProps {
   onSelectTurn?: (turn: number) => void;
   /** Turn 0 (team preview) game value — adds a leads point before turn 1. */
   leadScore?: number | null;
+  /** evalErrors[t-1] = why turn t has no point (eval-layer failure). */
+  evalErrors?: (string | null)[];
 }
 
 const HEIGHT = 64;
@@ -25,7 +27,7 @@ const PAD_X = 4;
  * into a viewport-dependent ellipse (fills scale even where strokes are
  * protected), so markers looked different on desktop and mobile.
  */
-export function EvalGraph({ scores, playerNames, currentTurn, onSelectTurn, leadScore }: EvalGraphProps) {
+export function EvalGraph({ scores, playerNames, currentTurn, onSelectTurn, leadScore, evalErrors }: EvalGraphProps) {
   const svgRef = useRef<SVGSVGElement>(null);
   const [width, setWidth] = useState(300);
   useLayoutEffect(() => {
@@ -181,7 +183,9 @@ export function EvalGraph({ scores, playerNames, currentTurn, onSelectTurn, lead
           {/* Gap turns (reconstruction wedges, unswept ends) stay clickable —
               the turn view then offers "Analyze this position". */}
           <title>{score === null
-            ? `Turn ${index + 1} — not analyzed yet · click to open, then Analyze this position`
+            ? (evalErrors?.[index]
+              ? `Turn ${index + 1} — could not be evaluated: ${evalErrors[index]} · click to open`
+              : `Turn ${index + 1} — not analyzed yet · click to open, then Analyze this position`)
             : label(index + 1, score)}</title>
         </rect>
       ))}
