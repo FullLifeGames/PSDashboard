@@ -883,6 +883,76 @@ import { brierScore, fitConstantK } from './fit-helpers';
  * static basis for this mass; the next lever, if any, is search/
  * planning-side.
  *
+ * HORIZON-FAMILY ROUND 2026-08-15 (improvement round 3 over the corpus —
+ * agenda item ④; commits 06de5e8/4b1c489/6791ca9 + this record):
+ * A. FEED PATHWAY (06de5e8): a third sack shape in detectSacks — a mon
+ *    active since turn start (neither switched nor dragged in) fainting
+ *    above the low-HP threshold is a stay-and-die CANDIDATE (`stayed`).
+ *    The verdict layer honors it only when the played line's outcome was
+ *    priced certain (ev − floor ≤ FEED_CERTAINTY_EPSILON 0.02) AND the
+ *    best own expectation inside the payoff window clears the safe
+ *    guarantee by the read margin. markRisk's sacrifice short-circuit is
+ *    what dissolves the structural block (a deliberate feed IS "getting
+ *    punished"); blunder-band regrets are never excused. 573756 t68
+ *    re-pinned (USER-APPROVED): mistake/p2-decision → inaccuracy/quiet
+ *    with the feed named in the summary — toward the expert.
+ * B1. STRANDED-BENCH PRICING (4b1c489, cache v31): a living BENCHED mon
+ *    whose hp fraction ≤ its own side's hazardEntryFraction, on a side
+ *    with no living removal carrier, prices at alive × strandedAlive
+ *    (0.5) with no hp share and leaves the hazard victim term (no double
+ *    charge); Boots/Magic Guard/bench-Levitate/typed immunities inherit
+ *    from the shared entry-fraction term (all pinned); actives never
+ *    touched. CALIBRATION GATE PASSED: 54/62/79 (n 260/285/238), buckets
+ *    57/56/71/87, briers 0.2559/0.2304/0.1586 — no phase down beyond
+ *    noise vs the recorded pre-round numbers, buckets monotone within
+ *    noise. 653785 t19 re-pinned (USER-APPROVED): inaccuracy → none (the
+ *    stranded-Charizard position reprices; the engine's pick is now Hex,
+ *    not the mechanically-null Will-O-Wisp). Side effect: 573756 t137
+ *    (unpinned) mistake → none.
+ * B2. SWEEP WEIGHT — NOT ADOPTED (sixth boost-family attempt, recaptured
+ *    fit under v31 features, 12,798 samples / 2,111 games): implied
+ *    −101.4, cluster bootstrap −111.5 ± 64.0 — SIGNIFICANT BUT NEGATIVE;
+ *    the ALL-NO-BOOSTS variant reads +103.1 (97.8 ± 67.2). The sweep and
+ *    boosts columns are collinear (both measure standing boosts); with
+ *    both present the fit uses sweep as a negative correction. sweep
+ *    stays 0. NEW AGENDA: boosts↔sweep disentanglement — fit the
+ *    boost-flipped wincon as a REPLACEMENT for flat stages, gated as
+ *    usual.
+ * T20 KNIFE-EDGE (6791ca9): B1's repricing moved 648453 t20's safe floor
+ *    by +0.0033 and flipped the pinned paid-off read (payoff 0.1006 →
+ *    0.0972 vs margin 0.1). RISK_PAYOFF_EPSILON 0.02: a payoff within
+ *    the epsilon under the margin keeps the paid-off credit — asymmetric
+ *    by design (the feed gate and the clearly-failed exit stay strict;
+ *    the tolerance widens praise, never excuses). Truth pin green again.
+ * MEASUREMENT (runs 1+2 bit-identical at 4b1c489; re-run after 6791ca9;
+ *    confirmation run on the re-pinned corpus): all four truths OK
+ *    (655336 keeps its accepted KNOWN-DRIFT lines), eval gaps 0
+ *    everywhere. 655336: ④ SOFTENED the curve (post-DD t24 0.289 →
+ *    0.376, toward the expert) but the t23/t24 verdict artifacts persist
+ *    — stranded pricing does not fire there and sweep was not adoptable;
+ *    golden deliberately NOT refreshed (the artifact lines stay
+ *    user-rejected).
+ * C. 649664 t23 DIAGNOSED (probe, deleted): KO-ROLL SAMPLING CONFIDENCE.
+ *    At the t23 root (Keldeo 191/323 vs Medicham 245/261) Scald's
+ *    sampled damage rolls kill on 5/5 SEARCH_SEEDS (true odds ~43%) so
+ *    the engine prices Scald as a certain kill (ev = floor ≈ 0.99),
+ *    while Hydro Pump misses on 2/5 seeds (true 20%) and a miss dies to
+ *    High Jump Kick — so the actually-winning play (80% × ~100% kill,
+ *    and the real click OHKO'd) grades as a 0.82-regret mistake. Binary
+ *    events (KO rolls, accuracy) price at sampled frequencies, not true
+ *    probabilities. NEW AGENDA: analytic KO grounding at the root
+ *    (damage-range fraction × accuracy folded into cell values/floors
+ *    where the immediate question is a KO); overlaps hax alignment but
+ *    targets pricing, not reconstruction.
+ * D. GLOBAL BEFORE/AFTER vs 712de0e (last push; paired worktree runs,
+ *    junctioned caches, equal n 783): the whole 21-commit line is
+ *    CALIBRATION-NEUTRAL on the 24-game corpus (54/62/79 both sides;
+ *    briers within 0.0007; buckets within one position). Fit-corpus
+ *    hand-weight briers improve slightly everywhere, most late-game
+ *    (singles 0.1753→0.1730, doubles 0.1645→0.1602, const-K; sample sets
+ *    12,636→12,798 — directional, not paired). The line's gains are
+ *    verdict-level, which 712de0e has no harness to measure.
+ *
  * LOCK-AND-HP-TYPING ROUND 2026-08-15 (improvement round 2 over the
  * corpus; commits 626a4d4/c63d681 + this record): ③ corrected actives
  * regain PROTOCOL-PROVEN choice locks — the correction's choicelock

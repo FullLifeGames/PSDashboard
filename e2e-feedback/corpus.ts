@@ -86,14 +86,14 @@ export const FEEDBACK_CORPUS: FeedbackItem[] = [
   },
   {
     replay: 'smogtours-gen6ou-655336', kind: 'truth', source: 'expert-2026-08',
-    essence: 'The end-of-analysis highlights match the game — essentially all good plays and misplays are recognized. Frozen as a golden report subset. (KNOWN DRIFT since 2026-08-15: newly evaluated turns add misplay t23/t24 + read t24 — user-rejected engine artifacts of the active-side re-entry blindness and the inert sweep weight; golden stays until agenda item ④ lands.)',
+    essence: 'The end-of-analysis highlights match the game — essentially all good plays and misplays are recognized. Frozen as a golden report subset. (KNOWN DRIFT since 2026-08-15: newly evaluated turns add misplay t23/t24 + read t24 — user-rejected engine artifacts. ④ round 3 landed stranded pricing and the feed pathway and SOFTENED the curve — post-DD t24 0.289 → 0.376, toward the expert — but the verdict artifacts persist: stranded pricing does not fire in these positions and the sweep weight was not adoptable (fit-implied sign NEGATIVE, −111.5 ± 64.0 — collinear with the boosts feature; the no-boosts variant fits +97.8 ± 67.2). Golden stays until the boosts↔sweep disentanglement agenda item lands.)',
     expect: GOLDEN_655336,
   },
   // ---- gaps (observed baselines recorded at Gate 1, commit ef342fa) ----
   {
     replay: 'smogtours-gen8ou-573756', turn: 68, kind: 'gap', source: 'expert-2026-08',
-    essence: "p2's Weavile sacrifice into Corviknight is called a misplay, but it is what enables the Garchomp sweep — the game-winning play. Win-condition horizon: a sac whose payoff arrives many turns later reads as a blunder.",
-    observed: { side: 'p2', tier: 'mistake', attribution: ['p2-decision'] },
+    essence: "p2's Weavile sacrifice into Corviknight is called a misplay, but it is what enables the Garchomp sweep — the game-winning play. Win-condition horizon: a sac whose payoff arrives many turns later reads as a blunder. (Re-pinned 2026-08-15 round 3, user-approved: the ④ feed pathway landed — a stay-and-die feed whose outcome was priced certain (ev ≈ floor) and whose windowed payoff clears the safe guarantee grades as a sacrifice; t68 drops mistake → inaccuracy (one-band demotion by design) with the feed named in the summary. Toward the expert.)",
+    observed: { side: 'p2', tier: 'inaccuracy', attribution: ['quiet'] },
     desired: 'The sacrifice stops being graded mistake/blunder once the engine can see or verify the win-condition payoff behind it.',
   },
   {
@@ -116,8 +116,8 @@ export const FEEDBACK_CORPUS: FeedbackItem[] = [
   },
   {
     replay: 'smogtours-gen6ou-653785', turn: 19, kind: 'gap', source: 'expert-2026-08',
-    essence: 'Will-O-Wisp is proposed over the Weavile switch against Charizard-X — Fire types cannot be burned, the suggestion is mechanically useless (the expert: the first gross error). (Re-pinned 2026-08-15: the blunder verdict evaporated once turns 20-23 evaluate and Lopunny lines price — toward the expert, who contested the blunder; the conditional-recommendation narrative stays open. The attached Return branching bug is FIXED — a370c61. Re-pinned again 2026-08-15 round 2, user-approved: tier none → inaccuracy after Tornadus-T\'s typeless Hidden Power resolves to its evidence-proven HP Ice — the t15/t24 super markers refute the old IV-default Dark, so turns 20-23 price with corrected rolls; the endgame also loses 2 reconstructed turns to a seeded sim CRIT the real game did not have (hax alignment — seed search / scripted PRNG — is future-iteration agenda).)',
-    observed: { side: 'p1', tier: 'inaccuracy', attribution: ['quiet'] },
+    essence: 'Will-O-Wisp is proposed over the Weavile switch against Charizard-X — Fire types cannot be burned, the suggestion is mechanically useless (the expert: the first gross error). (Re-pinned 2026-08-15: the blunder verdict evaporated once turns 20-23 evaluate and Lopunny lines price — toward the expert, who contested the blunder; the conditional-recommendation narrative stays open. The attached Return branching bug is FIXED — a370c61. Re-pinned again 2026-08-15 round 2, user-approved: tier none → inaccuracy after Tornadus-T\'s typeless Hidden Power resolves to its evidence-proven HP Ice — the t15/t24 super markers refute the old IV-default Dark, so turns 20-23 price with corrected rolls; the endgame also loses 2 reconstructed turns to a seeded sim CRIT the real game did not have (hax alignment — seed search / scripted PRNG — is future-iteration agenda). Re-pinned 2026-08-15 round 3, user-approved: inaccuracy → none — stranded-bench pricing (④ B1) reprices the position and the regret falls below the inaccuracy band; the engine\'s recommendation is now Hex, not the null Will-O-Wisp, so the mechanically-null complaint softens too.)',
+    observed: { side: 'p1', tier: 'none', attribution: ['quiet'] },
     desired: 'Mechanically null moves never surface as recommendations (or carry their enabling condition), and the Return/Frustration id family branches correctly.',
   },
 ];
