@@ -1,9 +1,12 @@
 import { test, expect } from '@playwright/test';
+import { Battle, Teams } from '@pkmn/sim';
+import type { PokemonSet } from '@pkmn/sim';
 import {
   extractProtocolEvents, scoreAlignment, compareAlignment, isPerfectAlignment,
   summarizeAlignment, ALIGNMENT_SEEDS,
   type AlignmentScore, type TurnAlignmentRecord,
 } from '../src/lib/hax-alignment';
+import { serializeBattleStable, trialAdvanceLog } from '../src/lib/eval/forward-model';
 
 test.describe('extractProtocolEvents', () => {
   test('reads faints, win, and normalizes idents without slot letters', () => {
@@ -112,5 +115,60 @@ test.describe('seed list + summary', () => {
       record({ endedMismatch: true, faintMismatches: 1, softMismatches: 0 }, 3),
     ]);
     expect(summary).toEqual({ turns: 3, perfectTurns: 1, softResidual: 2, faintResidualTurns: 1, endedMismatches: 1 });
+  });
+});
+
+function makeSet(species: string, moves: string[], extras: Partial<PokemonSet> = {}): PokemonSet {
+  return {
+    name: species, species, item: '', ability: 'Pressure', gender: '',
+    nature: 'Hardy', level: 100,
+    evs: { hp: 85, atk: 85, def: 85, spa: 85, spd: 85, spe: 85 },
+    ivs: { hp: 31, atk: 31, def: 31, spa: 31, spd: 31, spe: 31 },
+    moves, ...extras,
+  } as PokemonSet;
+}
+
+/** Keldeo Hydro Pump (80% accurate) into a wall — the seed decides the miss. */
+function hydroPosition(): { serialized: string } {
+  const battle = new Battle({
+    formatid: 'gen9customgame' as never,
+    seed: '9,8,7,6',
+    p1: { name: 'p1', team: Teams.pack([makeSet('Keldeo', ['hydropump'], { ability: 'Justified' })]) },
+    p2: { name: 'p2', team: Teams.pack([makeSet('Blissey', ['softboiled'], { ability: 'Natural Cure' })]) },
+  });
+  // gen9customgame opens with team preview; answer it so the serialized
+  // checkpoint sits at a normal move-request turn boundary.
+  battle.choose('p1', 'team 1');
+  battle.choose('p2', 'team 1');
+  return { serialized: serializeBattleStable(battle) };
+}
+
+test.describe('trialAdvanceLog', () => {
+  test('returns only the lines this advance emitted', () => {
+    const result = trialAdvanceLog(hydroPosition(), 'move 1', 'move 1', ALIGNMENT_SEEDS[0]);
+    expect(result.log.length).toBeGreaterThan(0);
+    expect(result.log.some(line => line.startsWith('|move|p1a: Keldeo|Hydro Pump'))).toBe(true);
+    // No pre-advance history (team preview / lead switches from the fork's past):
+    expect(result.log.some(line => line.startsWith('|start'))).toBe(false);
+  });
+
+  test('the pinned seed list spreads an 80%-accuracy roll both ways', () => {
+    const position = hydroPosition();
+    const outcomes = ALIGNMENT_SEEDS.map(seed => {
+      const trial = trialAdvanceLog(position, 'move 1', 'move 1', seed);
+      return extractProtocolEvents(trial.log).misses.size > 0 ? 'miss' : 'hit';
+    });
+    // Sanity for the search: both outcomes must be reachable within the list.
+    // If this ever fails, the pinned list cannot align accuracy rolls — that
+    // is a design-level finding, not a flaky test (the run is deterministic).
+    expect(new Set(outcomes).size).toBe(2);
+  });
+
+  test('identical inputs are bit-deterministic', () => {
+    const position = hydroPosition();
+    const a = trialAdvanceLog(position, 'move 1', 'move 1', ALIGNMENT_SEEDS[3]);
+    const b = trialAdvanceLog(position, 'move 1', 'move 1', ALIGNMENT_SEEDS[3]);
+    expect(a.log.filter(line => !line.startsWith('|t:|')))
+      .toEqual(b.log.filter(line => !line.startsWith('|t:|')));
   });
 });
