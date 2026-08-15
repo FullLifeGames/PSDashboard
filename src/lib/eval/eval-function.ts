@@ -90,6 +90,16 @@ export const EVAL_WEIGHTS = {
    * cost on the very turn that sets up the removal.
    */
   hazardRemovalDiscount: 0.5,
+  /**
+   * Alive-share multiplier for a STRANDED bench mon — one whose HP cannot
+   * survive re-entering through its own side's hazards while the side has
+   * no living removal carrier. Its hp share prices at effHp (0 by
+   * definition of stranded); the remaining alive share is fodder/absorber
+   * value. Hand weight, calibration-gated 2026-08-15 (spec: horizon
+   * family ④; the depth-2 switch that strands a piece banked a phantom
+   * body — 653785 t19, 655336 t23/t24).
+   */
+  strandedAlive: 0.5,
 } as const;
 
 const CHOICE_ITEMS = new Set(['choiceband', 'choicespecs', 'choicescarf']);
@@ -189,11 +199,11 @@ function averageSpeed(side: Side): number {
  * Victim-aware hazard cost for the side the hazards lie on, capped at
  * `hazardCap`. Exported for direct testing.
  */
-export function hazardCost(side: Side, battle: Battle): number {
+export function hazardCost(side: Side, battle: Battle, exclude?: ReadonlySet<Pokemon>): number {
   const bodyWeight = EVAL_WEIGHTS.alive + EVAL_WEIGHTS.hp;
   let cost = 0;
   for (const pokemon of side.pokemon) {
-    if (pokemon.fainted || pokemon.hp <= 0) continue;
+    if (pokemon.fainted || pokemon.hp <= 0 || exclude?.has(pokemon)) continue;
     cost += bodyWeight * hazardEntryFraction(pokemon, side, battle) * EVAL_WEIGHTS.hazardEntries;
   }
   return Math.min(cost, EVAL_WEIGHTS.hazardCap);
@@ -233,6 +243,33 @@ export function hazardEntryFraction(pokemon: Pokemon, side: Side, battle: Battle
 }
 
 /**
+ * Living BENCHED mons that cannot survive re-entry through their own side's
+ * hazards (hp fraction ≤ hazardEntryFraction — Boots, Magic Guard, the
+ * bench-Levitate correction, and typed immunities all inherit from that
+ * shared term). Empty while the side keeps a living removal carrier: a
+ * piece that can wait for removal is not finished, and removal's own
+ * option value is already priced by hazardRemovalEquity. Exported for
+ * direct testing.
+ */
+export function strandedMons(side: Side, battle: Battle): Set<Pokemon> {
+  const stranded = new Set<Pokemon>();
+  for (const pokemon of side.pokemon) {
+    if (pokemon.fainted || pokemon.hp <= 0) continue;
+    for (const slot of pokemon.moveSlots) {
+      if (OWN_SIDE_REMOVAL_MOVES.has(slot.id) || BOTH_SIDES_REMOVAL_MOVES.has(slot.id)) {
+        return stranded;
+      }
+    }
+  }
+  for (const pokemon of side.pokemon) {
+    if (pokemon.fainted || pokemon.hp <= 0 || pokemon.isActive) continue;
+    const fraction = hazardEntryFraction(pokemon, side, battle);
+    if (fraction > 0 && pokemon.hp / pokemon.maxhp <= fraction) stranded.add(pokemon);
+  }
+  return stranded;
+}
+
+/**
  * The OPTION VALUE a side's living hazard removers hold over the board
  * state: the best net hazard-cost change any of them could buy by clicking
  * their removal move, floored at zero (a net-negative option — Defog that
@@ -261,13 +298,21 @@ export function hazardRemovalEquity(side: Side, battle: Battle): number {
 
 function sideFeatureValues(side: Side, battle: Battle) {
   const bodyWeight = EVAL_WEIGHTS.alive + EVAL_WEIGHTS.hp;
+  const stranded = strandedMons(side, battle);
   let bodies = 0;
   let boosts = 0;
   let choiceMismatch = 0;
   let screens = 0;
   for (const pokemon of side.pokemon) {
     if (pokemon.fainted || pokemon.hp <= 0) continue;
-    bodies += ((EVAL_WEIGHTS.alive + EVAL_WEIGHTS.hp * (pokemon.hp / pokemon.maxhp)) / bodyWeight) *
+    // A stranded piece keeps only its damped alive share: its hp share
+    // prices at effHp (0 by definition of stranded), and it leaves
+    // hazardCost below — the entry that finishes it is charged here at
+    // certainty, never twice.
+    const bodyValue = stranded.has(pokemon)
+      ? EVAL_WEIGHTS.alive * EVAL_WEIGHTS.strandedAlive
+      : EVAL_WEIGHTS.alive + EVAL_WEIGHTS.hp * (pokemon.hp / pokemon.maxhp);
+    bodies += (bodyValue / bodyWeight) *
       (EVAL_WEIGHTS.status[pokemon.status] ?? 1) * itemMultiplier(pokemon);
     if (CHOICE_ITEMS.has(pokemon.item) && pokemon.moveSlots.length > 0) {
       const statusMoves = pokemon.moveSlots
@@ -296,7 +341,10 @@ function sideFeatureValues(side: Side, battle: Battle) {
     screens,
     // Raw value carries the cap and the removal option; the entries weight
     // scales back to points.
-    hazards: (hazardCost(side, battle) - hazardRemovalEquity(side, battle)) / EVAL_WEIGHTS.hazardEntries,
+    // Stranded mons leave the victim term (their fatal entry is priced in
+    // bodies at certainty); equity is only nonzero when a removal carrier
+    // lives, and then `stranded` is empty — the two never overlap.
+    hazards: (hazardCost(side, battle, stranded) - hazardRemovalEquity(side, battle)) / EVAL_WEIGHTS.hazardEntries,
     tailwind: side.sideConditions['tailwind'] ? 1 : 0,
   };
 }

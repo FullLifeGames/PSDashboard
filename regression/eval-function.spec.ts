@@ -3,7 +3,8 @@ import { Battle, Teams, toID } from '@pkmn/sim';
 import type { PokemonSet } from '@pkmn/sim';
 import {
   createMatchupCache, DOUBLES_FEATURE_WEIGHTS, evalFeatures, evaluatePosition, EVAL_WEIGHTS,
-  FEATURE_WEIGHTS, featureWeights, hazardCost, hazardRemovalEquity, matchupTerms, pairThreat, type EvalFeatures,
+  FEATURE_WEIGHTS, featureWeights, hazardCost, hazardRemovalEquity, matchupTerms, pairThreat, strandedMons,
+  type EvalFeatures,
 } from '../src/lib/eval/eval-function';
 
 function makeSet(
@@ -68,6 +69,67 @@ test.describe('full-HP matchup damping', () => {
     } finally {
       (EVAL_WEIGHTS as { matchupEarlyDamp: number }).matchupEarlyDamp = prior;
     }
+  });
+});
+
+test.describe('stranded bench pricing', () => {
+  // p1: active Snorlax (full HP ⇒ bodies 1.0) + bench Charizard (4x rock
+  // weak ⇒ rocks entry fraction 0.5). p2: lone Snorlax ⇒ bodies 1.0.
+  // features.bodies = p1 − p2 = the Charizard contribution alone.
+  const battleAt = (
+    hpFrac: number,
+    extras: { item?: string; ability?: string } = {},
+    activeMoves: string[] = VANILLA,
+  ) => {
+    const battle = makeBattle(
+      [makeSet('A', 'Snorlax', activeMoves), makeSet('C', 'Charizard', VANILLA, 50, extras)],
+      [makeSet('B', 'Snorlax', VANILLA)],
+    );
+    battle.sides[0].addSideCondition('stealthrock', battle.sides[1].active[0]!);
+    const bench = battle.sides[0].pokemon.find(p => p.species.id === 'charizard')!;
+    bench.hp = Math.max(1, Math.floor(bench.maxhp * hpFrac));
+    return battle;
+  };
+
+  test('a bench mon that cannot survive re-entry keeps only its damped alive share', () => {
+    // Stranded: hp 24% ≤ rocks 50%. Contribution (100·0.5 + 100·0)/200 = 0.25.
+    const strandedFeatures = evalFeatures(battleAt(0.24));
+    expect(strandedFeatures.bodies).toBeCloseTo(0.25, 2);
+    // Surviving re-entry (60% > 50%): classic (100 + 100·0.6)/200 = 0.8.
+    expect(evalFeatures(battleAt(0.6)).bodies).toBeCloseTo(0.8, 2);
+  });
+
+  test('Heavy-Duty Boots and Magic Guard mons are never stranded', () => {
+    // Entry fraction 0 by hazardEntryFraction — classic (100 + 24)/200.
+    expect(evalFeatures(battleAt(0.24, { item: 'heavydutyboots' })).bodies).toBeCloseTo(0.62, 2);
+    expect(evalFeatures(battleAt(0.24, { ability: 'Magic Guard' })).bodies).toBeCloseTo(0.62, 2);
+  });
+
+  test('a spikes-only board never strands an airborne bench mon', () => {
+    const battle = makeBattle(
+      [makeSet('A', 'Snorlax', VANILLA), makeSet('C', 'Rotom-Wash', VANILLA, 50, { ability: 'Levitate' })],
+      [makeSet('B', 'Snorlax', VANILLA)],
+    );
+    battle.sides[0].addSideCondition('spikes', battle.sides[1].active[0]!);
+    const bench = battle.sides[0].pokemon.find(p => p.species.id === 'rotomwash')!;
+    bench.hp = Math.max(1, Math.floor(bench.maxhp * 0.05));
+    expect(strandedMons(battle.sides[0], battle).size).toBe(0);
+  });
+
+  test('a living removal carrier lifts the stranded discount for the whole side', () => {
+    // The active Snorlax carries Rapid Spin: the piece can wait for removal.
+    expect(evalFeatures(battleAt(0.24, {}, ['Rapid Spin', 'Protect'])).bodies).toBeCloseTo(0.62, 2);
+  });
+
+  test('active mons are never stranded and stranded mons leave hazardCost', () => {
+    const battle = battleAt(0.24);
+    const stranded = strandedMons(battle.sides[0], battle);
+    expect([...stranded].every(pokemon => !pokemon.isActive)).toBe(true);
+    expect(stranded.size).toBe(1);
+    // Dedupe: the stranded piece's future entry damage is priced in bodies
+    // at certainty — the victim-term must not charge the same event.
+    expect(hazardCost(battle.sides[0], battle, stranded))
+      .toBeLessThan(hazardCost(battle.sides[0], battle));
   });
 });
 

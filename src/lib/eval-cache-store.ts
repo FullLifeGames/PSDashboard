@@ -84,7 +84,12 @@ export interface StoredEval {
 // v30: typeless Hidden Power resolves via effectiveness evidence + usage
 //      instead of the IV-default type (648453 t13 ran HP Dark for a real
 //      HP Ice).
-export const EVAL_ENGINE_CACHE_VERSION = 30;
+// v31: stranded bench mons (hp ≤ own-side hazard entry fraction, no living
+//      removal carrier) price at a damped alive share instead of a full
+//      body, leaving the hazard victim term (653785 t19's switch banked a
+//      Charizard that could never return; 655336 t23/t24 artifacts) — and
+//      the sweep feature weight becomes adoptable (fit 2026-08-15).
+export const EVAL_ENGINE_CACHE_VERSION = 31;
 
 export function evalStoreKey(
   cacheKey: string,
