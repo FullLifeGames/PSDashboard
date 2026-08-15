@@ -184,6 +184,7 @@ export function enrichPokemonInfo(
   pokemon: RevealedPokemonInfo,
   usageStats?: SmogonUsageStats | null,
   setAssumptions?: SmogonSetAssumptions | null,
+  hpTypeResolver?: (species: string) => string | null,
 ): RevealedPokemonInfo {
   const usageSet = getSpeciesUsageSet(usageStats, pokemon.species, pokemon.ruledOut, GUESS_MOVE_POOL);
   const smogonSet = getSpeciesSetAssumption(setAssumptions, pokemon.species);
@@ -232,13 +233,25 @@ export function enrichPokemonInfo(
     if (!candidate.guessed || moves.length < 4) moves.push(move);
   }
 
+  // Display follows computed data (⑤): the sim substitutes a typeless
+  // "Hidden Power" with the evidence/usage variant — show that same name so
+  // the visible sheet and the simulated set agree. The revealed status
+  // stays; only the name gains the typed suffix, marked by its detail.
+  const typedMoves = hpTypeResolver
+    ? moves.map(move => {
+      if (idOf(move.name) !== 'hiddenpower') return move;
+      const resolved = hpTypeResolver(pokemon.species);
+      return resolved ? { ...move, name: resolved, sourceDetail: 'HP type via evidence/usage' } : move;
+    })
+    : moves;
+
   return {
     ...pokemon,
     ability: normalizeAbilityField(pokemon.ability, usageSet?.ability, curated?.ability ?? smogonSet?.ability, pokemon.ruledOut?.abilities, !!curated),
     item,
     evs: normalizeEvsField(pokemon.evs, usageSet?.spread, curated?.spread ?? smogonSet?.spread, !!curated),
     nature: normalizeNatureField(pokemon.nature, usageSet?.spread, curated?.spread ?? smogonSet?.spread, !!curated),
-    moves,
+    moves: typedMoves,
   };
 }
 
@@ -246,8 +259,9 @@ export function enrichTeamInfo(
   teamInfo: OpponentTeamInfo,
   usageStats?: SmogonUsageStats | null,
   setAssumptions?: SmogonSetAssumptions | null,
+  hpTypeResolver?: (species: string) => string | null,
 ): OpponentTeamInfo {
   return {
-    pokemon: teamInfo.pokemon.map(pokemon => enrichPokemonInfo(pokemon, usageStats, setAssumptions)),
+    pokemon: teamInfo.pokemon.map(pokemon => enrichPokemonInfo(pokemon, usageStats, setAssumptions, hpTypeResolver)),
   };
 }

@@ -81,7 +81,10 @@ export interface StoredEval {
 //      committed move since entry + choice item + undisturbed item), a
 //      guessed Choice item additionally needing damage corroboration —
 //      Keldeo @ Specs graded as a free 4-option side (649664 t23).
-export const EVAL_ENGINE_CACHE_VERSION = 29;
+// v30: typeless Hidden Power resolves via effectiveness evidence + usage
+//      instead of the IV-default type (648453 t13 ran HP Dark for a real
+//      HP Ice).
+export const EVAL_ENGINE_CACHE_VERSION = 30;
 
 export function evalStoreKey(
   cacheKey: string,

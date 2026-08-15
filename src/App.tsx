@@ -123,7 +123,7 @@ function SharedBranchView({
 }
 
 function App() {
-  const { loading, error, replayData, snapshots, observations, speedOrders, opponentInfo, p1Info, loadReplay, loadReplayFile } = useReplay();
+  const { loading, error, replayData, snapshots, observations, speedOrders, hpEvidence, opponentInfo, p1Info, loadReplay, loadReplayFile } = useReplay();
   const { embed, requestedReplay } = useEmbedHost({ loadReplay, loadReplayFile });
   const { branching, simState, history, executeError, executing, startBranch, setChoice, executeTurn, stopBranch, getBattle } = useBranch();
   const evaluation = useEvaluation();
@@ -264,25 +264,40 @@ function App() {
     return snapshots[idx];
   }, [snapshots, branchTurn]);
 
+  // Lazily loaded hidden-power module (Dex dependency) for the display-side
+  // HP-type resolver; the enrich memos re-run once it arrives.
+  const [hpModule, setHpModule] = useState<typeof import('./lib/hidden-power') | null>(null);
+  const replayGenNumber = useMemo(() =>
+    parseInt(replayData?.log.match(/^\|gen\|(\d)/m)?.[1] ?? '9', 10), [replayData]);
+  const hpResolverFor = useCallback((side: 'p1' | 'p2') => {
+    if (!hpModule) return undefined;
+    const sideEvidence = hpEvidence.filter(entry => entry.attackerSide === side);
+    return (species: string) =>
+      hpModule.resolveHiddenPowerType(sideEvidence, usageStats.stats, species, replayGenNumber);
+  }, [hpModule, hpEvidence, usageStats.stats, replayGenNumber]);
+
   const effectiveP1Info = useMemo(() => {
     if (editedP1Info) return editedP1Info;
-    const base = p1Info ? enrichTeamInfo(p1Info, usageStats.stats, setAssumptions.assumptions) : null;
+    const base = p1Info ? enrichTeamInfo(p1Info, usageStats.stats, setAssumptions.assumptions, hpResolverFor('p1')) : null;
     // A pasted team overlays the player's side as green "manual" data (G15).
     if (base && pastedSets && pastedSets.length > 0) {
       return applyPastedTeam(base, pastedSets).info;
     }
     return base;
-  }, [editedP1Info, p1Info, usageStats.stats, setAssumptions.assumptions, pastedSets]);
+  }, [editedP1Info, p1Info, usageStats.stats, setAssumptions.assumptions, pastedSets, hpResolverFor]);
 
   const effectiveP2Info = useMemo(() => {
     if (editedP2Info) return editedP2Info;
-    return opponentInfo ? enrichTeamInfo(opponentInfo, usageStats.stats, setAssumptions.assumptions) : null;
-  }, [editedP2Info, opponentInfo, usageStats.stats, setAssumptions.assumptions]);
+    return opponentInfo ? enrichTeamInfo(opponentInfo, usageStats.stats, setAssumptions.assumptions, hpResolverFor('p2')) : null;
+  }, [editedP2Info, opponentInfo, usageStats.stats, setAssumptions.assumptions, hpResolverFor]);
 
   useEffect(() => {
     if (!replayData) return;
     void import('./lib/team-builder');
     void import('./lib/branch-engine');
+    // The display-side HP-type resolver pulls @pkmn/sim's Dex — keep it out
+    // of the main chunk and hand the loaded module to the enrich memos.
+    void import('./lib/hidden-power').then(module => setHpModule(module));
   }, [replayData]);
 
   // The damage-consistent spread solve is deterministic per replay but runs
@@ -370,6 +385,7 @@ function App() {
         usageStats: usageStats.stats,
         setAssumptions: setAssumptions.assumptions,
         inferredSpreads: await getInferredSpreads(),
+        hpEvidence,
       });
       if (p1Team.length > 0 && p2Team.length > 0) {
         setBranchSession(session => session + 1);
@@ -408,7 +424,7 @@ function App() {
       setBranchProgress(null);
       branchAbortRef.current = null;
     }
-  }, [replayData, branchPreparing, teamText, snapshots, observations, getInferredSpreads, effectiveP1Info, effectiveP2Info, usageStats.stats, setAssumptions.assumptions, startBranch, getBattle]);
+  }, [replayData, branchPreparing, teamText, snapshots, observations, hpEvidence, getInferredSpreads, effectiveP1Info, effectiveP2Info, usageStats.stats, setAssumptions.assumptions, startBranch, getBattle]);
 
   const handleCancelBranchPreparation = useCallback(() => {
     branchAbortRef.current?.abort();
@@ -437,6 +453,7 @@ function App() {
           usageStats: usageStats.stats,
           setAssumptions: setAssumptions.assumptions,
           inferredSpreads: await getInferredSpreads(refreshRequest.p1Info, refreshRequest.p2Info),
+          hpEvidence,
         });
         if (!cancelled && p1Team.length > 0 && p2Team.length > 0) {
           setBranchSession(session => session + 1);
@@ -481,6 +498,7 @@ function App() {
     usageStats.stats,
     setAssumptions.assumptions,
     observations,
+    hpEvidence,
     startBranch,
   ]);
 
@@ -582,6 +600,7 @@ function App() {
         usageStats: usageStats.stats,
         setAssumptions: setAssumptions.assumptions,
         inferredSpreads: await getInferredSpreads(),
+        hpEvidence,
       });
       if (p1Team.length === 0 || p2Team.length === 0) throw new Error('Could not build both teams for this replay.');
       const { buildChoiceLockContext } = await import('./lib/choice-lock');
@@ -617,7 +636,7 @@ function App() {
         throw new Error(`The reconstruction diverged before turn ${turn} — the guessed sets could not reproduce this position. Correcting items/moves via Edit Player/Opp usually fixes it.`);
       }
       return serializeLiveBattle(battle);
-    }, [replayData, teamText, effectiveP1Info, effectiveP2Info, usageStats.stats, setAssumptions.assumptions, snapshots, observations, getInferredSpreads]);
+    }, [replayData, teamText, effectiveP1Info, effectiveP2Info, usageStats.stats, setAssumptions.assumptions, snapshots, observations, hpEvidence, getInferredSpreads]);
 
   // Single-pass sweep acquisition: one reconstruction captures every turn
   // boundary, instead of one O(turn) replay per turn (quadratic polling).
@@ -637,6 +656,7 @@ function App() {
         usageStats: usageStats.stats,
         setAssumptions: setAssumptions.assumptions,
         inferredSpreads: await getInferredSpreads(),
+        hpEvidence,
       });
       if (p1Team.length === 0 || p2Team.length === 0) throw new Error('Could not build both teams for this replay.');
       const { buildChoiceLockContext } = await import('./lib/choice-lock');
@@ -679,7 +699,7 @@ function App() {
         onPosition?.(turns, serialized);
       }
       return positions;
-    }, [replayData, teamText, effectiveP1Info, effectiveP2Info, usageStats.stats, setAssumptions.assumptions, snapshots, observations, getInferredSpreads]);
+    }, [replayData, teamText, effectiveP1Info, effectiveP2Info, usageStats.stats, setAssumptions.assumptions, snapshots, observations, hpEvidence, getInferredSpreads]);
 
   const acquireReplayPosition = useMemo(() => makeReplayAcquire(branchTurn), [makeReplayAcquire, branchTurn]);
 
@@ -807,6 +827,7 @@ function App() {
           usageStats: usageStats.stats,
           setAssumptions: setAssumptions.assumptions,
           inferredSpreads: await getInferredSpreads(),
+          hpEvidence,
         });
         if (p1Team.length === 0 || p2Team.length === 0) return null;
         return branchEngine.serializePreviewPosition(getBranchSimulatorFormat(replayData), p1Team, p2Team);
@@ -817,7 +838,7 @@ function App() {
   }, [
     replayData, evaluation, analyzableTurns, effectiveTera, effectiveSleepClause, setsFingerprint, makeReplayAcquire,
     makeSweepAcquireAll, snapshots, getInferredSpreads, evalIsDoubles, teamText, effectiveP1Info, effectiveP2Info,
-    usageStats.stats, setAssumptions.assumptions, sensitivityTargetsFor,
+    usageStats.stats, setAssumptions.assumptions, hpEvidence, sensitivityTargetsFor,
   ]);
 
   // Explains ONE turn: a two-turn mini sweep (turn + its follow-up) so the

@@ -1,7 +1,7 @@
 import { useState, useCallback } from 'react';
 import { fetchReplay } from '../lib/replay-fetcher';
 import { parseExportedReplay } from '../lib/replay-file';
-import type { DamageObservation, ReplayData, SpeedOrderObservation, TurnSnapshot, OpponentTeamInfo } from '../types';
+import type { DamageObservation, HiddenPowerEvidence, ReplayData, SpeedOrderObservation, TurnSnapshot, OpponentTeamInfo } from '../types';
 
 export interface ReplayState {
   loading: boolean;
@@ -12,6 +12,8 @@ export interface ReplayState {
   observations: DamageObservation[];
   /** Proven same-turn move order — hard speed constraints for the solver. */
   speedOrders: SpeedOrderObservation[];
+  /** Effectiveness readings of typeless Hidden Power hits — type evidence. */
+  hpEvidence: HiddenPowerEvidence[];
   p1Info: OpponentTeamInfo | null;
   opponentInfo: OpponentTeamInfo | null;
 }
@@ -30,6 +32,7 @@ export function useReplay() {
     snapshots: [],
     observations: [],
     speedOrders: [],
+    hpEvidence: [],
     p1Info: null,
     opponentInfo: null,
   });
@@ -42,7 +45,7 @@ export function useReplay() {
         import('../lib/protocol-parser'),
         import('../lib/opponent-inferrer'),
       ]);
-      const { snapshots, observations, speedOrders } = parseReplayLogWithObservations(data.log);
+      const { snapshots, observations, speedOrders, hpEvidence } = parseReplayLogWithObservations(data.log);
       const p1Info = inferOpponentTeam(data.log, 'p1');
       const opponentInfo = inferOpponentTeam(data.log, 'p2');
 
@@ -53,6 +56,7 @@ export function useReplay() {
         snapshots,
         observations,
         speedOrders,
+        hpEvidence,
         p1Info,
         opponentInfo,
       });

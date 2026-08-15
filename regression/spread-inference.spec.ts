@@ -198,4 +198,39 @@ test.describe('goodness-of-fit forfeit', () => {
     expect(solved.has('p1:uxie')).toBe(false);
     expect(solved.has('p2:landorustherian')).toBe(false);
   });
+
+  test('a typeless HP observation is fitted with the set\'s resolved type', () => {
+    // The protocol only ever records "hiddenpower"; the builder substitutes
+    // the typed variant into the set. Fitting the observation with the
+    // IV-default type instead (x1 Dark vs x4 Ice on Landorus) makes the
+    // solver explain a near-KO with absurd bulk assumptions — 653785:
+    // Dragonite survived the real t24 hit at 24/335, the Dark-fitted sim
+    // rolled a kill and the reconstruction lost its final turns.
+    const gen7 = Generations.get(7);
+    const attacker = new Pokemon(gen7, 'Manectric', {
+      level: 50, nature: 'Hardy',
+      evs: { hp: 252, atk: 252, def: 0, spa: 0, spd: 4, spe: 0 },
+    });
+    const trueDefender = new Pokemon(gen7, 'Landorus-Therian', {
+      level: 50, nature: 'Calm', evs: { hp: 252, spd: 252 },
+    });
+    const result = calculate(gen7, attacker, trueDefender, new Move(gen7, 'Hidden Power Ice'));
+    const rolls = (Array.isArray(result.damage) ? (result.damage as number[]).flat() : [Number(result.damage)]).map(Number);
+    const mid = rolls[Math.floor(rolls.length / 2)];
+    const hpObservation: DamageObservation = {
+      attackerSpecies: 'Manectric', defenderSpecies: 'Landorus-Therian',
+      attackerSide: 'p1', moveId: 'hiddenpower',
+      observedFraction: mid / trueDefender.maxHP(),
+      attackerBoosts: {}, defenderBoosts: {}, attackerStatus: '', screens: [], weather: '',
+    };
+    const typedSets = {
+      p1: [set('Manectric', ['Hidden Power Ice', 'Thunderbolt'])],
+      p2: [set('Landorus-Therian', ['Earthquake', 'U-turn'])],
+    };
+    const inferred = inferSpreads([hpObservation, hpObservation], typedSets, 'gen7customgame');
+    const lando = inferred.get('p2:landorustherian');
+    expect(lando).toBeTruthy();
+    expect(lando!.evs.hp).toBe(252);
+    expect(lando!.evs.spd).toBe(252);
+  });
 });

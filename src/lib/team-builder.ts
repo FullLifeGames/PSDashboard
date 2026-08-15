@@ -6,7 +6,8 @@ import { getSpeciesSetAssumption, type SmogonSetAssumptions } from './smogon-set
 import { applyCoherenceVetoes, selectCuratedSet, type MoveCandidate } from './set-coherence';
 import { itemSetValue } from './team-info';
 import { evBudget, inferSpreads, legalizeEvs, type SpreadCandidate } from './spread-inference';
-import type { DamageObservation, KnowledgeSource, OpponentTeamInfo, PokemonEvs, RevealedPokemonInfo, SpeedOrderObservation } from '../types';
+import { withHiddenPowerType } from './hidden-power';
+import type { DamageObservation, HiddenPowerEvidence, KnowledgeSource, OpponentTeamInfo, PokemonEvs, RevealedPokemonInfo, SpeedOrderObservation } from '../types';
 
 function toId(name: string): string {
   return name.toLowerCase().replace(/[^a-z0-9]/g, '');
@@ -37,6 +38,8 @@ export function buildTeamsFromReplay(
     observations?: DamageObservation[];
     /** Observed same-turn move order — hard speed constraints for the solver. */
     speedOrders?: SpeedOrderObservation[];
+    /** Typeless-HP effectiveness readings — type evidence for the resolver. */
+    hpEvidence?: HiddenPowerEvidence[];
   },
 ): { p1Team: PokemonSet[]; p2Team: PokemonSet[] } {
   const p1Info = options?.p1Info || inferOpponentTeam(log, 'p1');
@@ -61,13 +64,17 @@ export function buildTeamsFromReplay(
   const legalize = (team: PokemonSet[]): PokemonSet[] =>
     (champions ? team.map(set => ({ ...set, evs: legalizeEvs(set.evs, formatHint) })) : team)
       .map(withHappinessAssumption);
+  const hpFor = (side: 'p1' | 'p2') =>
+    (options?.hpEvidence ?? []).filter(entry => entry.attackerSide === side);
   const build = (inferred?: Map<string, SpreadCandidate>) => ({
     p1Team: legalize(p1Info.pokemon.map(pokemon => buildSet(
       pokemon, p1KnownTeam, options?.usageStats, options?.setAssumptions,
-      inferred?.get(`p1:${toId(pokemon.species)}`)))),
+      inferred?.get(`p1:${toId(pokemon.species)}`))))
+      .map(built => withHiddenPowerType(built, hpFor('p1'), options?.usageStats, parseInt(gen, 10))),
     p2Team: legalize(p2Info.pokemon.map(pokemon => buildSet(
       pokemon, p2KnownTeam, options?.usageStats, options?.setAssumptions,
-      inferred?.get(`p2:${toId(pokemon.species)}`)))),
+      inferred?.get(`p2:${toId(pokemon.species)}`))))
+      .map(built => withHiddenPowerType(built, hpFor('p2'), options?.usageStats, parseInt(gen, 10))),
   });
 
   let inferred = options?.inferredSpreads;

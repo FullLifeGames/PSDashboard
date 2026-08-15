@@ -33,7 +33,7 @@ import { inferOpponentTeam } from '../src/lib/opponent-inferrer';
 import { parseExportedReplay } from '../src/lib/replay-file';
 import { parseReplayLogWithObservations } from '../src/lib/protocol-parser';
 import { enrichTeamInfo } from '../src/lib/team-info';
-import type { SmogonUsageStats } from '../src/lib/smogon-stats';
+import { parseSmogonChaosStats, type SmogonUsageStats } from '../src/lib/smogon-stats';
 import type { SmogonSetAssumptions } from '../src/lib/smogon-sets';
 import type { OpponentTeamInfo } from '../src/types';
 
@@ -572,5 +572,52 @@ test.describe('happiness assumption for guessed sets', () => {
       userTeamText: 'Lopunny\nHappiness: 128\n- Frustration\n- Protect\n',
     });
     expect(p1Team.find(set => set.species === 'Lopunny')!.happiness).toBe(128);
+  });
+});
+
+test.describe('hidden-power substitution in built teams', () => {
+  test('a revealed typeless HP becomes the usage/evidence variant', () => {
+    const log = [
+      '|player|p1|Alice|', '|player|p2|Bob|', '|gen|6', '|tier|[Gen 6] OU',
+      '|poke|p1|Manectric|', '|poke|p2|Skarmory|',
+      '|start',
+      '|switch|p1a: Manectric|Manectric|100/100',
+      '|switch|p2a: Skarmory|Skarmory|100/100',
+      '|turn|1',
+      '|move|p1a: Manectric|Hidden Power|p2a: Skarmory',
+      '|-damage|p2a: Skarmory|80/100',
+      '|turn|2',
+    ].join('\n');
+    const { observations, speedOrders, hpEvidence } = parseReplayLogWithObservations(log);
+    const usageStats = parseSmogonChaosStats({
+      data: { Manectric: { 'Raw count': 100, Moves: { hiddenpowerice: 60 }, Abilities: {}, Items: {}, Spreads: {} } },
+    }, { format: 'gen6ou', month: 'test' });
+    const { p1Team } = buildTeamsFromReplay(log, { observations, speedOrders, usageStats, hpEvidence });
+    const manectric = p1Team.find(built => built.species === 'Manectric')!;
+    expect(manectric.moves).toContain('Hidden Power Ice');
+    expect(manectric.moves).not.toContain('Hidden Power');
+  });
+
+  test('enrichment displays the resolved HP variant so sheet and sim agree', () => {
+    const log = [
+      '|player|p1|Alice|', '|player|p2|Bob|', '|gen|6', '|tier|[Gen 6] OU',
+      '|poke|p1|Manectric|', '|poke|p2|Skarmory|',
+      '|start',
+      '|switch|p1a: Manectric|Manectric|100/100',
+      '|switch|p2a: Skarmory|Skarmory|100/100',
+      '|turn|1',
+      '|move|p1a: Manectric|Hidden Power|p2a: Skarmory',
+      '|-damage|p2a: Skarmory|80/100',
+      '|turn|2',
+    ].join('\n');
+    const info = inferOpponentTeam(log, 'p1');
+    const enriched = enrichTeamInfo(info, null, null, () => 'Hidden Power Ice');
+    const manectric = enriched.pokemon.find(mon => mon.species === 'Manectric')!;
+    const hpMove = manectric.moves.find(move => move.name === 'Hidden Power Ice');
+    expect(hpMove).toBeTruthy();
+    // The generic reveal stays a reveal — only the displayed name is typed,
+    // and the detail names the source of the typing.
+    expect(hpMove!.source).toBe('revealed');
+    expect(hpMove!.sourceDetail).toBe('HP type via evidence/usage');
   });
 });

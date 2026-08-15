@@ -10,6 +10,7 @@ import { calculate, Field, Generations, Move, Pokemon } from '@smogon/calc';
 import type { PokemonSet } from '@pkmn/sim';
 import type { DamageObservation } from '../types';
 import { CHOICE_ITEMS } from './eval/sensitivity';
+import { typedHiddenPowerId } from './hidden-power';
 import { inferOpponentTeam } from './opponent-inferrer';
 
 export interface ProtocolLock { species: string; moveId: string }
@@ -105,6 +106,11 @@ export function corroborateChoiceItem(
     if (obs.attackerSide !== side || toId(obs.attackerSpecies) !== speciesId) continue;
     const defenderTeam = side === 'p1' ? teams.p2Team : teams.p1Team;
     const defenderSet = defenderTeam.find(candidate => toId(candidate.species) === toId(obs.defenderSpecies));
+    // Typeless "hiddenpower" calcs as the set's resolved variant (same seam
+    // as spread-inference — the IV-default type would judge with wrong rolls).
+    const calcMoveId = obs.moveId === 'hiddenpower'
+      ? typedHiddenPowerId(attackerSet.moves) ?? obs.moveId
+      : obs.moveId;
     const explains = (withItem: string): boolean | null => {
       try {
         const attacker = new Pokemon(gen, attackerSet.species, {
@@ -117,7 +123,7 @@ export function corroborateChoiceItem(
           level: defenderSet?.level || 100, nature: defenderSet?.nature,
           evs: defenderSet?.evs, ivs: defenderSet?.ivs, boosts: obs.defenderBoosts,
         });
-        const result = calculate(gen, attacker, defender, new Move(gen, obs.moveId), new Field({}));
+        const result = calculate(gen, attacker, defender, new Move(gen, calcMoveId), new Field({}));
         const rolls = (Array.isArray(result.damage) ? (result.damage as number[]).flat() : [Number(result.damage)]).map(Number);
         const maxHp = defender.maxHP();
         if (rolls.length === 0 || maxHp <= 0) return null;
@@ -129,7 +135,7 @@ export function corroborateChoiceItem(
       }
     };
     const moveType = (() => {
-      try { return new Move(gen, obs.moveId).type; } catch { return undefined; }
+      try { return new Move(gen, calcMoveId).type; } catch { return undefined; }
     })();
     const bluff = moveType ? TYPE_BOOST_ITEMS[moveType] : undefined;
     const choiceFits = explains(item);

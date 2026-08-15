@@ -2,6 +2,7 @@ import { Generations, Pokemon, Move, Field, calculate } from '@smogon/calc';
 import type { PokemonSet } from '@pkmn/sim';
 import type { DamageObservation, PokemonEvs, SpeedOrderObservation } from '../types';
 import { WEATHER_BY_ID } from './damage-calc';
+import { typedHiddenPowerId } from './hidden-power';
 
 /**
  * Damage-consistent spread inference: the replay's observed damage fractions
@@ -269,7 +270,13 @@ export function inferSpreads(
       const attacker = calcPokemon(obs.attackerSide, obs.attackerSpecies, attackerSpread, obs.attackerBoosts, obs.attackerStatus);
       const defender = calcPokemon(defenderSide, obs.defenderSpecies, defenderSpread, obs.defenderBoosts, '');
       const screens = new Set(obs.screens);
-      const result = calculate(gen, attacker, defender, new Move(gen, obs.moveId), new Field({
+      // The protocol records typeless "hiddenpower"; calc it as the SET's
+      // resolved variant, or the fit runs the IV-default type against a hit
+      // the sim plays typed (653785: Dark-fitted spreads, Ice-rolled sim).
+      const calcMoveId = obs.moveId === 'hiddenpower'
+        ? typedHiddenPowerId(setOf(obs.attackerSide, obs.attackerSpecies)?.moves ?? []) ?? obs.moveId
+        : obs.moveId;
+      const result = calculate(gen, attacker, defender, new Move(gen, calcMoveId), new Field({
         weather: weatherFor(obs.weather),
         defenderSide: {
           isReflect: screens.has('reflect'),

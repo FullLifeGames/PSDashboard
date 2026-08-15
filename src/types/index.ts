@@ -72,6 +72,19 @@ export interface DamageObservation {
 }
 
 /**
+ * One typeless-Hidden-Power hit's effectiveness reading: the replay only
+ * ever shows the generic "Hidden Power", so these markers are the type
+ * evidence the builder filters candidates with (`neutral` = a damage line
+ * with no effectiveness marker). Typed variants emit nothing.
+ */
+export interface HiddenPowerEvidence {
+  attackerSide: 'p1' | 'p2';
+  attackerSpecies: string;
+  defenderSpecies: string;
+  marker: 'super' | 'resisted' | 'immune' | 'neutral';
+}
+
+/**
  * Same-turn move order the log PROVED: `first` acted before `second` at equal
  * priority with no speed modifier in sight (no priority moves, paralysis,
  * Tailwind, Trick Room, speed stages, or same-turn switch-ins). The spread

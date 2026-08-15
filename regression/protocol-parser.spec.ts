@@ -377,3 +377,57 @@ test.describe('KO-before-acting speed evidence', () => {
     expect(boostedAttacker.speedOrders).toEqual([]);
   });
 });
+
+test.describe('hidden-power evidence', () => {
+  const base = [
+    '|player|p1|Alice|', '|player|p2|Bob|', '|gen|6', '|gametype|singles',
+    '|poke|p1|Manectric|', '|poke|p2|Skarmory|',
+    '|start',
+    '|switch|p1a: Manectric|Manectric|100/100',
+    '|switch|p2a: Skarmory|Skarmory|100/100',
+    '|turn|1',
+  ];
+  test('markers map to evidence; typed HP emits nothing', () => {
+    const { hpEvidence } = parseReplayLogWithObservations([
+      ...base,
+      '|move|p1a: Manectric|Hidden Power|p2a: Skarmory',
+      '|-supereffective|p2a: Skarmory',
+      '|-damage|p2a: Skarmory|60/100',
+      '|turn|2',
+      '|move|p1a: Manectric|Hidden Power|p2a: Skarmory',
+      '|-damage|p2a: Skarmory|40/100',
+      '|turn|3',
+      '|move|p1a: Manectric|Hidden Power Ice|p2a: Skarmory',
+      '|-damage|p2a: Skarmory|20/100',
+      '|turn|4',
+    ].join('\n'));
+    expect(hpEvidence).toEqual([
+      { attackerSide: 'p1', attackerSpecies: 'Manectric', defenderSpecies: 'Skarmory', marker: 'super' },
+      { attackerSide: 'p1', attackerSpecies: 'Manectric', defenderSpecies: 'Skarmory', marker: 'neutral' },
+    ]);
+  });
+  test('immunity emits before the context resets', () => {
+    const { hpEvidence } = parseReplayLogWithObservations([
+      ...base,
+      '|move|p1a: Manectric|Hidden Power|p2a: Skarmory',
+      '|-immune|p2a: Skarmory',
+      '|turn|2',
+    ].join('\n'));
+    expect(hpEvidence).toEqual([
+      { attackerSide: 'p1', attackerSpecies: 'Manectric', defenderSpecies: 'Skarmory', marker: 'immune' },
+    ]);
+  });
+  test('resisted marks; a miss emits nothing', () => {
+    const { hpEvidence } = parseReplayLogWithObservations([
+      ...base,
+      '|move|p1a: Manectric|Hidden Power|p2a: Skarmory',
+      '|-resisted|p2a: Skarmory',
+      '|-damage|p2a: Skarmory|85/100',
+      '|turn|2',
+      '|move|p1a: Manectric|Hidden Power|p2a: Skarmory',
+      '|-miss|p1a: Manectric|p2a: Skarmory',
+      '|turn|3',
+    ].join('\n'));
+    expect(hpEvidence.map(entry => entry.marker)).toEqual(['resisted']);
+  });
+});

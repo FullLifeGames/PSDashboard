@@ -1,7 +1,7 @@
 import { Battle } from '@pkmn/client';
 import { Generations, type GenerationNum } from '@pkmn/data';
 import { Dex } from '@pkmn/dex';
-import type { DamageObservation, SpeedOrderObservation, TurnSnapshot, PokemonSnapshot, SideSnapshot, FieldSnapshot } from '../types';
+import type { DamageObservation, HiddenPowerEvidence, SpeedOrderObservation, TurnSnapshot, PokemonSnapshot, SideSnapshot, FieldSnapshot } from '../types';
 import type { Pokemon, Side, Field } from '@pkmn/client';
 
 const gens = new Generations(Dex);
@@ -62,12 +62,14 @@ export function parseReplayLogWithObservations(log: string): {
   snapshots: TurnSnapshot[];
   observations: DamageObservation[];
   speedOrders: SpeedOrderObservation[];
+  hpEvidence: HiddenPowerEvidence[];
 } {
   const battle = new Battle(gens);
   const lines = log.split('\n');
   const snapshots: TurnSnapshot[] = [];
   const observations: DamageObservation[] = [];
   const speedOrders: SpeedOrderObservation[] = [];
+  const hpEvidence: HiddenPowerEvidence[] = [];
   let currentTurnLines: string[] = [];
   let singles = true;
   let genNum: GenerationNum = 9;
@@ -124,6 +126,8 @@ export function parseReplayLogWithObservations(log: string): {
     speedClean: boolean;
     attackerSide: 'p1' | 'p2';
     attackerSpecies: string;
+    /** Effectiveness marker seen for this move (HP-type evidence, ⑤). */
+    effectiveness?: 'super' | 'resisted';
   } | null = null;
 
   // Take initial snapshot at turn 0 (before any turns)
@@ -160,6 +164,10 @@ export function parseReplayLogWithObservations(log: string): {
         actedThisTurn.add(ident);
         turnMovers.push({ side, species: mover?.speciesForme ?? '', cleanFirst, cleanSecond });
       }
+    } else if (line.startsWith('|-supereffective|')) {
+      if (lastMove && (line.split('|')[2] ?? '') === lastMove.target) lastMove.effectiveness = 'super';
+    } else if (line.startsWith('|-resisted|')) {
+      if (lastMove && (line.split('|')[2] ?? '') === lastMove.target) lastMove.effectiveness = 'resisted';
     } else if (line.startsWith('|-crit|')) {
       if (lastMove) lastMove.crit = true;
     } else if (
@@ -187,6 +195,18 @@ export function parseReplayLogWithObservations(log: string): {
           }
         }
       }
+      // A typeless Hidden Power that bounced off an immunity is type
+      // evidence — capture it before the context dies (spec ⑤ 2a).
+      if (line.startsWith('|-immune|') && lastMove && lastMove.moveId === 'hiddenpower' &&
+        (line.split('|')[2] ?? '') === lastMove.target) {
+        const defender = battle.getPokemon(lastMove.target as ClientIdent);
+        if (defender) {
+          hpEvidence.push({
+            attackerSide: lastMove.attackerSide, attackerSpecies: lastMove.attackerSpecies,
+            defenderSpecies: defender.speciesForme, marker: 'immune',
+          });
+        }
+      }
       // Action boundary: a bare |-damage| after any of these (confusion
       // self-hit, Future Sight resolution, residuals) belongs to no pending
       // move — attributing it fabricates observations.
@@ -205,6 +225,18 @@ export function parseReplayLogWithObservations(log: string): {
       // Self-targeting damage (Substitute/Belly Drum cost) is not a hit.
       if (defenderIdent === lastMove.target && lastMove.target !== lastMove.attacker) {
         lastMove.damageCount += 1;
+        // HP-type evidence is effectiveness-only, so crits and multi-hits do
+        // not disqualify it — but only the FIRST damage line of the move
+        // counts (spec ⑤ 2a).
+        if (lastMove.damageCount === 1 && lastMove.moveId === 'hiddenpower') {
+          const defender = battle.getPokemon(defenderIdent as ClientIdent);
+          if (defender) {
+            hpEvidence.push({
+              attackerSide: lastMove.attackerSide, attackerSpecies: lastMove.attackerSpecies,
+              defenderSpecies: defender.speciesForme, marker: lastMove.effectiveness ?? 'neutral',
+            });
+          }
+        }
         if (lastMove.damageCount > 1) {
           // Multi-hit: per-hit rolls are not individually solvable — drop
           // the first hit's observation too.
@@ -299,5 +331,5 @@ export function parseReplayLogWithObservations(log: string): {
     });
   }
 
-  return { snapshots, observations, speedOrders };
+  return { snapshots, observations, speedOrders, hpEvidence };
 }
