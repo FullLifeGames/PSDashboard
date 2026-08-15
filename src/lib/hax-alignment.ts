@@ -186,6 +186,59 @@ export const ALIGNMENT_SEEDS: readonly PRNGSeed[] = [
   '27,18,28,18', '31,41,59,26', '161,80,33,98', '14,142,13,56',
 ];
 
+export interface SeedChoice {
+  seed: PRNGSeed;
+  /** Best trial's score; null when every trial failed. */
+  trialScore: AlignmentScore | null;
+  trialPerfect: boolean;
+  candidatesTried: number;
+  trialsFailed: number;
+}
+
+/**
+ * Deterministic best-of-K seed search: candidate 0 first (perfect → done,
+ * so an RNG-quiet turn costs one trial), then the rest in order with
+ * early-exit on perfect and strict-improvement argmin (ties keep the
+ * earlier candidate). The trial runner is injected — the reconstruction
+ * supplies a forkBattle-based runner; tests supply canned logs. A runner
+ * returning null marks a failed trial; all-failed falls back to candidate 0
+ * so the block runs exactly as before this feature. shouldStop (abort /
+ * reconstruction deadline) halts between candidates, keeping the best so far.
+ */
+export function chooseAlignedSeed(params: {
+  expected: ProtocolEvents;
+  trial: (seed: PRNGSeed) => { log: string[] } | null;
+  shouldStop?: () => boolean;
+}): SeedChoice {
+  const { expected, trial, shouldStop } = params;
+  let best: { seed: PRNGSeed; score: AlignmentScore } | null = null;
+  let candidatesTried = 0;
+  let trialsFailed = 0;
+  for (const seed of ALIGNMENT_SEEDS) {
+    if (candidatesTried > 0 && shouldStop?.()) break;
+    candidatesTried += 1;
+    const outcome = trial(seed);
+    if (outcome === null) {
+      trialsFailed += 1;
+      continue;
+    }
+    const score = scoreAlignment(expected, extractProtocolEvents(outcome.log));
+    if (!best || compareAlignment(score, best.score) < 0) best = { seed, score };
+    if (isPerfectAlignment(score)) break;
+  }
+  if (!best) {
+    return {
+      seed: ALIGNMENT_SEEDS[0], trialScore: null, trialPerfect: false,
+      candidatesTried, trialsFailed,
+    };
+  }
+  return {
+    seed: best.seed, trialScore: best.score,
+    trialPerfect: isPerfectAlignment(best.score),
+    candidatesTried, trialsFailed,
+  };
+}
+
 export interface TurnAlignmentRecord {
   turn: number;
   seed: PRNGSeed;

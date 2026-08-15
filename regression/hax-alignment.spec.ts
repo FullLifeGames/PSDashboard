@@ -3,7 +3,7 @@ import { Battle, Teams } from '@pkmn/sim';
 import type { PokemonSet } from '@pkmn/sim';
 import {
   extractProtocolEvents, scoreAlignment, compareAlignment, isPerfectAlignment,
-  summarizeAlignment, ALIGNMENT_SEEDS,
+  summarizeAlignment, ALIGNMENT_SEEDS, chooseAlignedSeed,
   type AlignmentScore, type TurnAlignmentRecord,
 } from '../src/lib/hax-alignment';
 import { serializeBattleStable, trialAdvanceLog } from '../src/lib/eval/forward-model';
@@ -170,5 +170,70 @@ test.describe('trialAdvanceLog', () => {
     const b = trialAdvanceLog(position, 'move 1', 'move 1', ALIGNMENT_SEEDS[3]);
     expect(a.log.filter(line => !line.startsWith('|t:|')))
       .toEqual(b.log.filter(line => !line.startsWith('|t:|')));
+  });
+});
+
+test.describe('chooseAlignedSeed', () => {
+  const missBlock = [
+    '|move|p1a: Keldeo|Hydro Pump|p2a: Blissey',
+    '|-miss|p1a: Keldeo|p2a: Blissey',
+  ];
+  const hitBlock = ['|move|p1a: Keldeo|Hydro Pump|p2a: Blissey'];
+
+  test('candidate-0 fast path: a perfect first trial ends the search', () => {
+    let calls = 0;
+    const choice = chooseAlignedSeed({
+      expected: extractProtocolEvents(missBlock),
+      trial: () => { calls++; return { log: missBlock }; },
+    });
+    expect(choice.seed).toBe('1,2,3,4');
+    expect(choice.trialPerfect).toBe(true);
+    expect(choice.candidatesTried).toBe(1);
+    expect(calls).toBe(1);
+  });
+
+  test('searches until the first perfect candidate and stops there', () => {
+    const perfectAt = ALIGNMENT_SEEDS[4];
+    const choice = chooseAlignedSeed({
+      expected: extractProtocolEvents(missBlock),
+      trial: seed => ({ log: seed === perfectAt ? missBlock : hitBlock }),
+    });
+    expect(choice.seed).toBe(perfectAt);
+    expect(choice.trialPerfect).toBe(true);
+    expect(choice.candidatesTried).toBe(5);
+  });
+
+  test('no perfect candidate: strict-improvement argmin, ties keep the earlier seed', () => {
+    // Every trial hits (1 soft mismatch vs the expected miss) — all tie.
+    const choice = chooseAlignedSeed({
+      expected: extractProtocolEvents(missBlock),
+      trial: () => ({ log: hitBlock }),
+    });
+    expect(choice.seed).toBe('1,2,3,4');
+    expect(choice.trialPerfect).toBe(false);
+    expect(choice.trialScore?.softMismatches).toBe(1);
+    expect(choice.candidatesTried).toBe(ALIGNMENT_SEEDS.length);
+  });
+
+  test('failed trials count and an all-failed search falls back to candidate 0', () => {
+    const choice = chooseAlignedSeed({
+      expected: extractProtocolEvents(missBlock),
+      trial: () => null,
+    });
+    expect(choice.seed).toBe('1,2,3,4');
+    expect(choice.trialScore).toBeNull();
+    expect(choice.trialsFailed).toBe(ALIGNMENT_SEEDS.length);
+  });
+
+  test('shouldStop halts the loop and keeps the best so far', () => {
+    let calls = 0;
+    const choice = chooseAlignedSeed({
+      expected: extractProtocolEvents(missBlock),
+      trial: () => { calls++; return { log: hitBlock }; },
+      shouldStop: () => calls >= 3,
+    });
+    expect(calls).toBe(3);
+    expect(choice.seed).toBe('1,2,3,4');
+    expect(choice.candidatesTried).toBe(3);
   });
 });
