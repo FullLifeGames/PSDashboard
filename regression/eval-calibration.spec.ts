@@ -883,6 +883,37 @@ import { brierScore, fitConstantK } from './fit-helpers';
  * static basis for this mass; the next lever, if any, is search/
  * planning-side.
  *
+ * LOCK-AND-HP-TYPING ROUND 2026-08-15 (improvement round 2 over the
+ * corpus; commits 626a4d4/c63d681 + this record): ③ corrected actives
+ * regain PROTOCOL-PROVEN choice locks — the correction's choicelock
+ * deletion stays (tricked-scarf defense) but a re-stamp from the replay
+ * text follows, BEFORE the request refresh so the disable pass bakes it
+ * in: exactly one distinct committed move since last real entry, choice
+ * item, item undisturbed, move in the set; a GUESSED choice item further
+ * needs the damage record not to contradict it (x1.5 vs x1.2 type-boost
+ * bluff vs unboosted bands, 0.02 HP-bar slack; ambiguity never blocks).
+ * Cache v29. Pinned on the real 649664: Keldeo @ Specs at the t24
+ * boundary offers exactly `move hydropump`. ⑤ typeless Hidden Power
+ * resolves via effectiveness evidence (super/resisted/immune/neutral
+ * markers per typeless hit) filtered against the defender typing, then
+ * usage ranking — 648453/653785 ran IV-default HP Dark for real HP Ice
+ * (653785 t15 super on Landorus REFUTES Dark outright). Display shows
+ * the resolved variant; the sim keeps request id `hiddenpower` for typed
+ * sets (pinned — protocol choices and played matching depend on it); the
+ * damage fitters (spread inference, corroboration) calc typeless
+ * observations AS the resolved variant (Dark-fitted spreads made the sim
+ * overkill 653785's Dragonite). Cache v30. MEASUREMENT (2 runs,
+ * bit-identical): all truths OK, eval gaps stay 0, 655336 KNOWN DRIFT
+ * unchanged; 649664 t23 verdict unchanged (the lock lands on the t24
+ * follow-up; the t23 grading needs horizon pricing — ④); 653785 t19
+ * re-pinned none → inaccuracy (USER-APPROVED — corrected Ice rolls
+ * reprice t20-23) and its endgame loses 2 reconstructed turns to a
+ * seeded sim CRIT the real game did not have. NEW AGENDA (user): hax
+ * alignment for reconstructions — per-turn seed search or scripted PRNG
+ * so sim crits/rolls/misses reproduce the protocol's outcomes; a sim-side
+ * kill the real game disproves ends the replay early and no boundary
+ * correction can resurrect it.
+ *
  * SILENT-EVAL-GAPS ROUND 2026-08-15 (improvement round 1 over the corpus
  * below; commits a370c61/a1daacd/e231df8/45d1ff4 + this record): all 53
  * silent turn-eval losses are gone. ① Choice tokens now come from the

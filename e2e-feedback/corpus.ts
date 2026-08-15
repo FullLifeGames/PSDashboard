@@ -116,8 +116,8 @@ export const FEEDBACK_CORPUS: FeedbackItem[] = [
   },
   {
     replay: 'smogtours-gen6ou-653785', turn: 19, kind: 'gap', source: 'expert-2026-08',
-    essence: 'Will-O-Wisp is proposed over the Weavile switch against Charizard-X — Fire types cannot be burned, the suggestion is mechanically useless (the expert: the first gross error). (Re-pinned 2026-08-15: the blunder verdict evaporated once turns 20-23 evaluate and Lopunny lines price — toward the expert, who contested the blunder; the conditional-recommendation narrative stays open. The attached Return branching bug is FIXED — a370c61.)',
-    observed: { side: 'p1', tier: 'none', attribution: ['quiet'] },
+    essence: 'Will-O-Wisp is proposed over the Weavile switch against Charizard-X — Fire types cannot be burned, the suggestion is mechanically useless (the expert: the first gross error). (Re-pinned 2026-08-15: the blunder verdict evaporated once turns 20-23 evaluate and Lopunny lines price — toward the expert, who contested the blunder; the conditional-recommendation narrative stays open. The attached Return branching bug is FIXED — a370c61. Re-pinned again 2026-08-15 round 2, user-approved: tier none → inaccuracy after Tornadus-T\'s typeless Hidden Power resolves to its evidence-proven HP Ice — the t15/t24 super markers refute the old IV-default Dark, so turns 20-23 price with corrected rolls; the endgame also loses 2 reconstructed turns to a seeded sim CRIT the real game did not have (hax alignment — seed search / scripted PRNG — is future-iteration agenda).)',
+    observed: { side: 'p1', tier: 'inaccuracy', attribution: ['quiet'] },
     desired: 'Mechanically null moves never surface as recommendations (or carry their enabling condition), and the Return/Frustration id family branches correctly.',
   },
 ];
