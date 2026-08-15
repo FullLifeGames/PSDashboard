@@ -28,6 +28,7 @@ import type { OpponentTeamInfo } from './types';
 import { decodeBranchShare, type BranchSharePayload } from './lib/branch-share';
 import { formatEnforcesSleepClause, getBranchSimulatorFormat, getReplayGameType, getReplayGeneration, inferReplayFormatId } from './lib/replay-format';
 import { resolveTeraPreference } from './lib/eval/tera';
+import { summarizeAlignment, type TurnAlignmentRecord } from './lib/hax-alignment';
 import { choiceId, evalChoiceToSlotChoices, type BranchSlotChoice } from './lib/branch-choices';
 import type { RankedChoice } from './lib/eval/types';
 import { allTurnEvents, detectSacks, parseLeadSpecies, parsePlayedActions, parsePlayedActionsDoubles } from './lib/eval/played';
@@ -638,14 +639,20 @@ function App() {
       return serializeLiveBattle(battle);
     }, [replayData, teamText, effectiveP1Info, effectiveP2Info, usageStats.stats, setAssumptions.assumptions, snapshots, observations, hpEvidence, getInferredSpreads]);
 
+  // Per-block seed/residual records of the last sweep reconstruction —
+  // instrumentation only (debug handle + drift report), never verdicts.
+  const [sweepAlignment, setSweepAlignment] = useState<TurnAlignmentRecord[] | null>(null);
+
   // Single-pass sweep acquisition: one reconstruction captures every turn
   // boundary, instead of one O(turn) replay per turn (quadratic polling).
   const makeSweepAcquireAll = useCallback((turns: number) =>
     async (
       report: (turn: number, target: number) => void,
       onPosition?: (turn: number, serialized: string) => void,
+      onDiagnostic?: (message: string) => void,
     ): Promise<(string | null)[]> => {
       if (!replayData) throw new Error('Load a replay first.');
+      setSweepAlignment(null);
       const { buildTeamsFromReplay } = await import('./lib/team-builder');
       const branchEngine = await import('./lib/branch-engine');
       const { serializeLiveBattle } = await import('./lib/eval/serialize');
@@ -691,6 +698,14 @@ function App() {
       // cascaded into an early end would otherwise be stored as the last
       // turn's position and scored as a decided ±1: one phantom point at the
       // far right with every other turn a gap (the empty-graph report).
+      setSweepAlignment(runtime.haxAlignment);
+      const finalBattle = runtime.battleStream.battle;
+      if (finalBattle?.ended && finalBattle.turn < turns) {
+        onDiagnostic?.(
+          `The simulated battle ended at turn ${finalBattle.turn} although the real game continued — ` +
+          `no candidate seed avoided the divergence, so later turns have no positions.`,
+        );
+      }
       const invalid = branchEngine.validateBranchRuntime(runtime);
       const battle = runtime.battleStream.battle;
       if (!invalid && battle && branchEngine.reconstructionReached(runtime, turns)) {
@@ -1234,8 +1249,11 @@ function App() {
       graph: evaluation.graph,
       analyses: gameReportData?.analyses ?? null,
       gameReport: gameReportData?.report ?? null,
+      haxAlignment: sweepAlignment
+        ? { records: sweepAlignment, summary: summarizeAlignment(sweepAlignment) }
+        : null,
     };
-  }, [evaluation.graph, gameReportData]);
+  }, [evaluation.graph, gameReportData, sweepAlignment]);
 
   const teamPasteStatus = useMemo(() => {
     if (!pastedSets || pastedSets.length === 0) return null;

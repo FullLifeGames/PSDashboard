@@ -5,6 +5,7 @@ import { dirname, join } from 'path';
 import { fileURLToPath } from 'url';
 import type { TurnAnalysis } from '../src/lib/eval/analysis';
 import type { GameReport } from '../src/lib/eval/report';
+import type { AlignmentSummary } from '../src/lib/hax-alignment';
 import { parseReplayLogWithObservations } from '../src/lib/protocol-parser';
 import { finalPlayedTurn } from '../src/lib/replay-turns';
 import { FEEDBACK_CORPUS, FEEDBACK_REPLAYS } from './corpus';
@@ -33,12 +34,14 @@ interface ExtractedDebug {
   evalErrors: (string | null)[];
   analyses: (TurnAnalysis | null)[] | null;
   gameReport: GameReport | null;
+  haxAlignment: { summary: AlignmentSummary } | null;
 }
 
 const results: ClaimResult[] = [];
 const wallTimes: Record<string, number> = {};
 const noticeByReplay: Record<string, string | null> = {};
 const evalErrorsByReplay: Record<string, { turn: number; error: string }[]> = {};
+const alignmentByReplay: Record<string, AlignmentSummary | null> = {};
 
 /** A replay that cannot be graded still shows up — as ERROR rows, never silence. */
 function pushErrorResults(replayId: string, details: string[]) {
@@ -129,14 +132,16 @@ for (const replayId of FEEDBACK_REPLAYS) {
     }
     const dbg = await page.evaluate(() => {
       const raw = (window as unknown as {
-        __psDebug: { graph: { scores: unknown; notice: unknown; evalErrors: unknown }; analyses: unknown; gameReport: unknown };
+        __psDebug: { graph: { scores: unknown; notice: unknown; evalErrors: unknown }; analyses: unknown; gameReport: unknown; haxAlignment: unknown };
       }).__psDebug;
       return JSON.parse(JSON.stringify({
         scores: raw.graph.scores, notice: raw.graph.notice, evalErrors: raw.graph.evalErrors,
         analyses: raw.analyses, gameReport: raw.gameReport,
+        haxAlignment: raw.haxAlignment ?? null,
       }));
     }) as ExtractedDebug;
     noticeByReplay[replayId] = dbg.notice;
+    alignmentByReplay[replayId] = dbg.haxAlignment?.summary ?? null;
     evalErrorsByReplay[replayId] = dbg.evalErrors
       .map((error, index) => (error === null ? null : { turn: index + 1, error }))
       .filter((entry): entry is { turn: number; error: string } => entry !== null);
@@ -174,6 +179,7 @@ test.afterAll(() => {
     wallTimes,
     noticeByReplay,
     evalErrorsByReplay,
+    alignmentByReplay,
   };
   mkdirSync(REPORT_DIR, { recursive: true });
   const { markdown, json } = renderReport(results, meta);

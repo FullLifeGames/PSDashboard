@@ -1,4 +1,5 @@
 import type { ClaimResult } from './claims';
+import type { AlignmentSummary } from '../src/lib/hax-alignment';
 
 /**
  * Renders the drift run. The JSON's `results` array is STABLE — no wall
@@ -14,6 +15,8 @@ export interface DriftMeta {
   noticeByReplay: Record<string, string | null>;
   /** Per-replay eval-layer failures (turn + reason) — the self-explaining gap trail. */
   evalErrorsByReplay: Record<string, { turn: number; error: string }[]>;
+  /** Per-replay hax-alignment summary (null = sweep never ran / old build). */
+  alignmentByReplay: Record<string, AlignmentSummary | null>;
 }
 
 const STATUS_LABEL: Record<string, string> = {
@@ -29,6 +32,14 @@ export function renderReport(results: ClaimResult[], meta: DriftMeta): { markdow
     `- Settings: ${meta.settingsLine}`,
     `- Wall time: ${Object.entries(meta.wallTimes).map(([id, s]) => `${id} ${s}s`).join(' · ') || 'n/a'}`,
   ];
+  const alignments = Object.entries(meta.alignmentByReplay).filter(([, summary]) => summary);
+  if (alignments.length > 0) {
+    lines.push(`- Hax alignment: ${alignments.map(([id, summary]) =>
+      `${id} perfect ${summary!.perfectTurns}/${summary!.turns} · soft ${summary!.softResidual}` +
+      `${summary!.faintResidualTurns > 0 ? ` · faint-residual ${summary!.faintResidualTurns}` : ''}` +
+      `${summary!.endedMismatches > 0 ? ` · ended-mismatch ${summary!.endedMismatches}` : ''}`,
+    ).join(' · ')}`);
+  }
   const notices = Object.entries(meta.noticeByReplay).filter(([, notice]) => notice);
   if (notices.length > 0) {
     lines.push(`- Coverage notices: ${notices.map(([id, notice]) => `${id}: ${notice}`).join(' · ')}`);

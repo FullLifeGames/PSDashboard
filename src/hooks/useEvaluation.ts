@@ -196,6 +196,7 @@ export interface GraphSweepParams {
   acquireAll?(
     report: (turn: number, target: number) => void,
     onPosition?: (turn: number, serialized: string) => void,
+    onDiagnostic?: (message: string) => void,
   ): Promise<(string | null)[]>;
   /** What was actually played on this turn (parsed from the replay log). */
   playedFor(turn: number): PlayedTurn | null;
@@ -562,6 +563,7 @@ export function useEvaluation() {
       }
       waiters.clear();
     };
+    const acquireDiagnostics: string[] = [];
     const startAcquisition = () => {
       if (acquireStarted) return;
       acquireStarted = true;
@@ -569,7 +571,7 @@ export function useEvaluation() {
         arrived.set(turn, serialized);
         for (const waiter of waiters.get(turn) ?? []) waiter.resolve(serialized);
         waiters.delete(turn);
-      }).then(positions => {
+      }, message => acquireDiagnostics.push(message)).then(positions => {
         positions.forEach((serialized, index) => {
           if (serialized) arrived.set(index + 1, serialized);
         });
@@ -577,6 +579,10 @@ export function useEvaluation() {
         // gaps for every turn the reconstruction never produced, and the
         // panel used to show that as a blank graph with no reason given.
         notice = coverageNotice(positions);
+        if (acquireDiagnostics.length > 0) {
+          const extra = acquireDiagnostics.join(' ');
+          notice = notice ? `${notice} ${extra}` : extra;
+        }
       }).catch(error => {
         acquireError = error;
         notice = `The replay could not be reconstructed: ${error instanceof Error ? error.message : String(error)}`;
