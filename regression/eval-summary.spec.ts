@@ -150,6 +150,31 @@ test.describe('natural-language turn summaries', () => {
     expect(summary).not.toContain('inaccuracy');
   });
 
+  test('a stay-and-die feed gets the certainty wording', () => {
+    const feedResult: EvalResult = {
+      score: 0.17, interval: 0.05, depthCompleted: 2,
+      perSide: {
+        p1: [choice('move bodypress', 'Body Press', 0.35)],
+        p2: [
+          { ...choice('switch 2', '→ Garchomp', -0.154), ev: -0.1 },
+          { ...choice('move knockoff', 'Knock Off', -0.42), ev: -0.42 },
+        ],
+      },
+    };
+    const summary = summarizeTurn(analyzeTurn({
+      turn: 68, result: feedResult,
+      played: {
+        p1: { kind: 'move', name: 'Body Press', tera: false },
+        p2: { kind: 'move', name: 'Knock Off', tera: false },
+      },
+      playedOutcome: 0.42, futureOutcomes: [-0.1, -0.31, null],
+      scoreBefore: 0.17, scoreAfter: 0.31,
+      sacks: { p2: { name: 'Weavile', hpFraction: 0.8, stayed: true } },
+    }), names);
+    expect(summary).toContain('Beta fed Weavile (80% HP)');
+    expect(summary).toContain('graded as a sacrifice, not a misplay');
+  });
+
   test('a punished misplay keeps the reproachful safer-was framing', () => {
     const punished: EvalResult = {
       ...result,

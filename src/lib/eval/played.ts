@@ -228,6 +228,14 @@ export interface SackInfo {
    * call the game decisively won on both sides of the sack.
    */
   healthy?: boolean;
+  /**
+   * The fed body STAYED on the field (already active at turn start, never
+   * entered this turn) and fainted above the low-HP threshold — a
+   * deliberate-feed CANDIDATE (573756 t68). The verdict layer honors it
+   * only when the played line's outcome was priced certain (ev ≈ floor)
+   * and the windowed payoff over the safe guarantee clears the read margin.
+   */
+  stayed?: true;
 }
 
 /** Below this pre-turn HP fraction a faint reads as a sacrifice, not a loss. */
@@ -271,7 +279,7 @@ export function allTurnEvents(log: string): string[][] {
 }
 
 /**
- * Detects per-side sacrifices in one turn's events. Two shapes:
+ * Detects per-side sacrifices in one turn's events. Three shapes:
  * - LOW-HP FEED: an own Pokémon fainted that already stood at
  *   ≤ SACK_HP_THRESHOLD when the turn began (per the pre-turn snapshot) —
  *   a deliberate low-cost play, graded as a sack unconditionally.
@@ -280,6 +288,11 @@ export function allTurnEvents(log: string): string[][] {
  *   the threshold (entry HP from the switch line, pre-chip). Marked
  *   `healthy` — the verdict layer honors it only while the engine's scores
  *   call the game decisively won on both sides of the sack (GPL T35).
+ * - STAY-AND-DIE CANDIDATE: a body active since the turn began (neither
+ *   switched nor dragged in this turn) that fainted above the threshold.
+ *   Marked `stayed` — the verdict layer honors it only when the played
+ *   line's outcome was priced certain and the windowed payoff clears the
+ *   read margin (573756 t68).
  */
 export function detectSacks(
   events: string[],
@@ -289,6 +302,8 @@ export function detectSacks(
   const sacks: { p1?: SackInfo; p2?: SackInfo } = {};
   /** Latest deliberate switch-in per slot ident this turn (drags excluded). */
   const entered = new Map<string, { name: string; hpFraction: number }>();
+  /** Slots force-dragged in this turn — a drag is never a deliberate feed. */
+  const dragged = new Set<string>();
 
   for (const line of events) {
     const switchMatch = line.match(/^\|switch\|(p[12][a-d]): ([^|]+)\|[^|]*\|(\d+)\/(\d+)/);
@@ -297,6 +312,11 @@ export function detectSacks(
         name: switchMatch[2].trim(),
         hpFraction: Number(switchMatch[3]) / Number(switchMatch[4]),
       });
+      continue;
+    }
+    const dragMatch = line.match(/^\|drag\|(p[12][a-d]):/);
+    if (dragMatch) {
+      dragged.add(dragMatch[1]);
       continue;
     }
     const match = line.match(/^\|faint\|(p[12])([a-d]):\s*(.+)$/);
@@ -318,6 +338,13 @@ export function detectSacks(
     const fed = entered.get(`${side}${match[2]}`);
     if (fed && fed.hpFraction > SACK_HP_THRESHOLD) {
       sacks[side] = { name, hpFraction: fed.hpFraction, healthy: true };
+    }
+    // STAY-AND-DIE CANDIDATE: active since the turn began (neither switched
+    // nor dragged in this turn) and above the low-HP threshold. The verdict
+    // layer decides whether certainty + payoff justify the feed framing.
+    if (!fed && !dragged.has(`${side}${match[2]}`) && pokemon &&
+      pokemon.hpPercent / 100 > SACK_HP_THRESHOLD) {
+      sacks[side] = { name, hpFraction: pokemon.hpPercent / 100, stayed: true };
     }
   }
 

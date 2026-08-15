@@ -174,10 +174,31 @@ test.describe('sacrifice detection', () => {
 
   test('dragged-in faints and surviving switch-ins are not sack candidates', () => {
     // A forced drag is not a deliberate feed; a switch-in that lives is not
-    // a sack; a mid-HP faint without a same-turn entry stays a plain loss.
+    // a sack; a mid-HP faint without a same-turn entry is now a stay-and-die
+    // CANDIDATE — still a plain loss unless the verdict gates pass.
     expect(detectSacks(['|drag|p1a: Dauni|Uxie, L50|120/182', '|faint|p1a: Dauni'], sackSnapshot(66))).toEqual({});
     expect(detectSacks(['|switch|p1a: Relous|Salazzle, F|116/253'], sackSnapshot(46))).toEqual({});
-    expect(detectSacks(['|faint|p1a: Dauni'], sackSnapshot(46))).toEqual({});
+    expect(detectSacks(['|faint|p1a: Dauni'], sackSnapshot(46))).toEqual({
+      p1: { name: 'Dauni', hpFraction: 0.46, stayed: true },
+    });
+  });
+
+  test('a mid-HP faint that stayed in since turn start is a stay-and-die candidate', () => {
+    // 573756 t68: Weavile stays in, clicks Knock Off, dies to Body Press.
+    // The protocol alone proves nothing — the verdict layer gates it.
+    const events = [
+      '|move|p1a: Dauni|Knock Off|p2a: Wall',
+      '|-damage|p1a: Dauni|0 fnt',
+      '|faint|p1a: Dauni',
+    ];
+    expect(detectSacks(events, sackSnapshot(46))).toEqual({
+      p1: { name: 'Dauni', hpFraction: 0.46, stayed: true },
+    });
+    // Dragged in this turn = not a deliberate stay; below the low-HP
+    // threshold = shape 1 as before; absent from the snapshot = no claim.
+    expect(detectSacks(['|drag|p1a: Dauni|Uxie, L50|120/182', '|faint|p1a: Dauni'], sackSnapshot(66))).toEqual({});
+    expect(detectSacks(['|faint|p1a: Dauni'], sackSnapshot(9))).toEqual({ p1: { name: 'Dauni', hpFraction: 0.09 } });
+    expect(detectSacks(['|faint|p1a: Ghost'], sackSnapshot(46))).toEqual({});
   });
 
   test('a faint-prevented side gets a charitable stay-in phantom (priority moves excluded)', () => {
@@ -343,6 +364,83 @@ test.describe('sacrifice detection', () => {
     // Regret 0.45 = blunder band: tier and grading stay, no neutral sack framing.
     expect(analysis.p1.tier).toBe('blunder');
     expect(analysis.p1.sacrifice).toBeUndefined();
+  });
+
+  test('a certain-outcome feed whose windowed payoff clears the margin grades as a sacrifice', () => {
+    // 573756 t68 in miniature: the feed's floor equals its ev (the player
+    // accepted the known worst case), the punishing reply WAS clicked, and
+    // the payoff over the safe floor arrives inside the window.
+    const feedResult: EvalResult = {
+      score: 0.17, interval: 0.05, depthCompleted: 2,
+      perSide: {
+        p1: [choiceEv('move bodypress', 'Body Press', 0.35, 0.4)],
+        p2: [
+          choiceEv('switch 2', '→ Garchomp', -0.154, -0.1),
+          choiceEv('move knockoff', 'Knock Off', -0.42, -0.42),
+        ],
+      },
+    };
+    const run = (over: {
+      playedEv?: number; futureOutcomes?: (number | null)[]; playedOutcome?: number | null;
+    }) => analyzeTurn({
+      turn: 68,
+      result: over.playedEv === undefined ? feedResult : {
+        ...feedResult,
+        perSide: {
+          ...feedResult.perSide,
+          p2: [feedResult.perSide.p2[0], choiceEv('move knockoff', 'Knock Off', -0.42, over.playedEv)],
+        },
+      },
+      played: {
+        p1: { kind: 'move', name: 'Body Press', tera: false },
+        p2: { kind: 'move', name: 'Knock Off', tera: false },
+      },
+      // p1-perspective: the feed looks bad NOW (0.42 ⇒ p2-own −0.42) and
+      // pays off in the window (−0.31 ⇒ p2-own +0.31).
+      playedOutcome: 'playedOutcome' in over ? over.playedOutcome! : 0.42,
+      futureOutcomes: over.futureOutcomes ?? [-0.1, -0.31, null],
+      scoreBefore: 0.17,
+      scoreAfter: 0.31,
+      sacks: { p2: { name: 'Weavile', hpFraction: 0.8, stayed: true } },
+    });
+    // Both gates pass: p2-own peak 0.31 − safe floor (−0.154) = 0.464 ≥ 0.1.
+    const excused = run({});
+    expect(excused.p2.sacrifice).toEqual({ name: 'Weavile', hpFraction: 0.8, stayed: true });
+    expect(excused.p2.tier).toBe('inaccuracy'); // regret 0.32: mistake, demoted
+    expect(excused.p2.riskUnpunished).toBeFalsy();
+    // Certainty gate: an ev clearly above the floor is a gamble, not a feed.
+    expect(run({ playedEv: -0.35 }).p2.sacrifice).toBeUndefined();
+    // Payoff gate: no window value beats the safe floor by the margin
+    // (p1-perspective 0.3 ⇒ p2-own −0.3; peak −0.3 − (−0.154) < 0.1).
+    expect(run({ futureOutcomes: [0.3, 0.3, 0.3] }).p2.sacrifice).toBeUndefined();
+    // Fails closed without a played outcome.
+    expect(run({ playedOutcome: null, futureOutcomes: [] }).p2.sacrifice).toBeUndefined();
+  });
+
+  test('a blunder-sized feed is never excused', () => {
+    const throwResult: EvalResult = {
+      score: 0.17, interval: 0.05, depthCompleted: 2,
+      perSide: {
+        p1: [choiceEv('move bodypress', 'Body Press', 0.35, 0.4)],
+        p2: [
+          choiceEv('switch 2', '→ Garchomp', -0.154, 0.1),
+          choiceEv('move knockoff', 'Knock Off', -0.42, -0.42),
+        ],
+      },
+    };
+    const analysis = analyzeTurn({
+      turn: 68, result: throwResult,
+      played: {
+        p1: { kind: 'move', name: 'Body Press', tera: false },
+        p2: { kind: 'move', name: 'Knock Off', tera: false },
+      },
+      playedOutcome: 0.42, futureOutcomes: [0.5, null, null],
+      scoreBefore: 0.17, scoreAfter: 0.31,
+      sacks: { p2: { name: 'Weavile', hpFraction: 0.8, stayed: true } },
+    });
+    // Regret 0.52 = blunder band: the feed framing must not apply.
+    expect(analysis.p2.tier).toBe('blunder');
+    expect(analysis.p2.sacrifice).toBeUndefined();
   });
 });
 

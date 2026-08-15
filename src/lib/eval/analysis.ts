@@ -77,6 +77,14 @@ export const RISK_PAYOFF_MARGIN = TIER_THRESHOLDS.inaccuracy;
 export const PAYOFF_WINDOW = 3;
 
 /**
+ * A stay-and-die feed's certainty gate: the played line's ev may exceed its
+ * floor by at most this much to count as "the player accepted the known
+ * worst case" (573756 t68: floor = ev exactly). Same epsilon scale as the
+ * rank-tie threshold.
+ */
+export const FEED_CERTAINTY_EPSILON = 0.02;
+
+/**
  * One re-evaluation of the flagged side's turn under an ALTERNATIVE item on
  * an opposing mon whose item is only a usage guess. EVs are own-perspective
  * pair values, same space as RankedChoice.ev.
@@ -525,8 +533,35 @@ export function analyzeTurn(params: {
     const sack = params.sacks?.[key];
     const ownBefore = key === 'p1' ? params.scoreBefore : -params.scoreBefore;
     const ownAfter = params.scoreAfter === null ? null : (key === 'p1' ? params.scoreAfter : -params.scoreAfter);
-    const sackApplies = !!sack && (!sack.healthy ||
-      (ownBefore >= HEALTHY_SACK_FLOOR && ownAfter !== null && ownAfter >= HEALTHY_SACK_FLOOR));
+    // Shape gates: low-HP applies unconditionally; healthy only while
+    // decisively ahead on both sides of the sack; a stayed feed only when
+    // the outcome was priced certain (ev ≈ floor — the player accepted the
+    // known worst case) AND the windowed payoff over the safe guarantee
+    // clears the read margin (573756 t68). Expectation-based, fails closed.
+    let sackApplies = false;
+    if (sack) {
+      if (sack.stayed) {
+        const certain = played !== null &&
+          played.ev - played.worstCase <= FEED_CERTAINTY_EPSILON;
+        if (certain && safe && params.playedOutcome !== null) {
+          const chain = [params.playedOutcome, ...(params.futureOutcomes ?? [])]
+            .slice(0, PAYOFF_WINDOW + 1);
+          let payoff: number | null = null;
+          for (const outcome of chain) {
+            if (outcome === null || outcome === undefined) continue;
+            const own = key === 'p1' ? outcome : -outcome;
+            const value = own - safe.worstCase;
+            if (payoff === null || value > payoff) payoff = value;
+          }
+          sackApplies = payoff !== null && payoff >= RISK_PAYOFF_MARGIN;
+        }
+      } else if (sack.healthy) {
+        sackApplies = ownBefore >= HEALTHY_SACK_FLOOR &&
+          ownAfter !== null && ownAfter >= HEALTHY_SACK_FLOOR;
+      } else {
+        sackApplies = true;
+      }
+    }
     const sacrificed = !!(tier && sackApplies && (regret ?? 0) < TIER_THRESHOLDS.blunder);
     if (sacrificed) tier = demoteTier(tier);
     // Item-sensitivity: if the verdict changes band under a usage-plausible
