@@ -86,7 +86,7 @@ export const FEEDBACK_CORPUS: FeedbackItem[] = [
   },
   {
     replay: 'smogtours-gen6ou-655336', kind: 'truth', source: 'expert-2026-08',
-    essence: 'The end-of-analysis highlights match the game — essentially all good plays and misplays are recognized. Frozen as a golden report subset.',
+    essence: 'The end-of-analysis highlights match the game — essentially all good plays and misplays are recognized. Frozen as a golden report subset. (KNOWN DRIFT since 2026-08-15: newly evaluated turns add misplay t23/t24 + read t24 — user-rejected engine artifacts of the active-side re-entry blindness and the inert sweep weight; golden stays until agenda item ④ lands.)',
     expect: GOLDEN_655336,
   },
   // ---- gaps (observed baselines recorded at Gate 1, commit ef342fa) ----
@@ -104,8 +104,8 @@ export const FEEDBACK_CORPUS: FeedbackItem[] = [
   },
   {
     replay: 'smogtours-gen6ou-648453', turn: 13, kind: 'gap', source: 'expert-2026-08',
-    essence: 'Misplay verdict against BKC with unusable reasoning; if the play works, the opponent must sacrifice into Lopunny. Missing principle: an opposing mon with NO remaining switch-ins makes any successful switch into it profitable (even via U-turn).',
-    observed: { side: 'p2', tier: 'mistake', attribution: ['p2-decision'] },
+    essence: 'Misplay verdict against BKC with unusable reasoning; if the play works, the opponent must sacrifice into Lopunny. Missing principle: an opposing mon with NO remaining switch-ins makes any successful switch into it profitable (even via U-turn). (Re-pinned 2026-08-15: the mistake verdict evaporated once the silently lost neighbor turns 14-16 evaluate — toward the expert; the no-switch-ins principle stays open.)',
+    observed: { side: 'p2', tier: 'none', attribution: ['quiet'] },
     desired: 'The engine recognizes the no-switch-ins-left state and the reasoning names it.',
   },
   {
@@ -116,8 +116,8 @@ export const FEEDBACK_CORPUS: FeedbackItem[] = [
   },
   {
     replay: 'smogtours-gen6ou-653785', turn: 19, kind: 'gap', source: 'expert-2026-08',
-    essence: 'Will-O-Wisp is proposed over the Weavile switch against Charizard-X — Fire types cannot be burned, the suggestion is mechanically useless (the expert: the first gross error). Attached: branching this turn fails on the old-gen Return move id (registered bug, ledger 2026-08-14, commit ce00d4c).',
-    observed: { side: 'p1', tier: 'blunder', attribution: ['p1-decision'] },
+    essence: 'Will-O-Wisp is proposed over the Weavile switch against Charizard-X — Fire types cannot be burned, the suggestion is mechanically useless (the expert: the first gross error). (Re-pinned 2026-08-15: the blunder verdict evaporated once turns 20-23 evaluate and Lopunny lines price — toward the expert, who contested the blunder; the conditional-recommendation narrative stays open. The attached Return branching bug is FIXED — a370c61.)',
+    observed: { side: 'p1', tier: 'none', attribution: ['quiet'] },
     desired: 'Mechanically null moves never surface as recommendations (or carry their enabling condition), and the Return/Frustration id family branches correctly.',
   },
 ];

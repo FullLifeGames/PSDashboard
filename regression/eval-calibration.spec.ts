@@ -883,6 +883,40 @@ import { brierScore, fitConstantK } from './fit-helpers';
  * static basis for this mass; the next lever, if any, is search/
  * planning-side.
  *
+ * SILENT-EVAL-GAPS ROUND 2026-08-15 (improvement round 1 over the corpus
+ * below; commits a370c61/a1daacd/e231df8/45d1ff4 + this record): all 53
+ * silent turn-eval losses are gone. ① Choice tokens now come from the
+ * request move id ("Return 102" display built `return102`, the sim
+ * rejected it — 48 turns across the four gen6 games) and guessed
+ * Frustration sets assume 0 happiness (sim default 255 priced BP 1);
+ * cache v27. ② Eval-layer failures are recorded per turn (evalErrors),
+ * the ⚠ notice appends count + first reason, turn view/tooltip name it,
+ * harness + drift report carry it — a gap now explains itself. ⑦ The five
+ * gen8-573756 gaps were CONCEALED TRAPPING: the sim marks a Magnet-Pull-
+ * trapped Steel `trapped: 'hidden'` and deliberately keeps the request
+ * silent while the switch validation rejects; legalChoices offered the
+ * bench anyway — both option paths now consult the live trapped field
+ * (liveDisabled's sibling rule); cache v28; 573756 evaluates 139/139.
+ * MEASUREMENT (bit-repeatable, 9.8m): t13-648453 mistake and t19-653785
+ * blunder verdicts EVAPORATED once their silently lost neighbor turns
+ * evaluate — both toward the expert (user re-pinned observed to
+ * quiet/none). 655336 gained misplay t23/t24 + read t24 on previously
+ * silent Lopunny turns — USER-REJECTED as engine artifacts and kept as
+ * KNOWN DRIFT against the old golden: t23 is a 25-HP Lando sac that
+ * Helmet-chips Mega-Lopunny to 38/271 behind SR+Spikes (it died ON
+ * re-entry at t25 — the real game proves the sac), t24 DD is the sweep
+ * play (engine: DD ev 0.004 vs Claw 0.503; score 0.512 -> 0.289 after the
+ * FREE DD, then 0.957 as the sweep plays out — the boost is only priced
+ * once it happens). Mechanics ACQUITTED by pins (eval-mechanics.spec.ts):
+ * Intimidate/DD/Regenerator/Helmet all correct through the searched
+ * advance; benched-below-entry effHp-0 works (+0.44). The two real causes
+ * feed agenda item ④: (a) ACTIVE mons carry no re-entry death — effHp 0
+ * exists only for the bench, so a 38/271 active behind hazards reads as a
+ * working piece; (b) the sweep feature (boost-flipped 1v1s) sits at
+ * weight 0, leaving 12 points/stage against a whole body's worth of
+ * kill-now. The t24 +0.52 "read payoff" was the same artifact (engine
+ * priced the played (DD, Slowbro) pair at -0.016).
+ *
  * EXPERT-FEEDBACK CORPUS ROUND 2026-08-14: an experienced player reviewed
  * the analysis on 0.5.1 across six public smogtours replays (gen8ou/
  * gen6ou); the distilled essence is a versioned corpus (e2e-feedback/
@@ -925,18 +959,17 @@ import { brierScore, fitConstantK } from './fit-helpers';
  * hermetically (2x bit-identical clean runs); the stall detector bounds
  * any recurrence at 6 minutes with ERROR rows.
  *
- * REGISTERED BUG — OLD-GEN RETURN BRANCHING FAILURE 2026-08-14 (user
- * report from the expert-feedback round): branching on
- * smogtours-gen6ou-653785 turn 19 fails with `Evaluation failed: p1
- * "move return102": Can't move: Your Lopunny doesn't have a move
- * matching return102`. Suspected family: `return102` is the MODERN dex
- * id for fixed-102-BP Return (happiness left the games in gen 8) — a
- * gen 6 battle knows the move as `return`, so some choice-building path
- * likely canonicalizes move names through the wrong generation's data.
- * Frustration presumably fails the same way (user's read). Status:
- * registered only, not yet investigated — scheduled into the
- * feedback-round plan alongside the eval findings from the same replay
- * (t19 Will-O-Wisp vs Charizard-X).
+ * REGISTERED BUG — OLD-GEN RETURN BRANCHING FAILURE 2026-08-14, RESOLVED
+ * 2026-08-15 (a370c61): branching on smogtours-gen6ou-653785 turn 19
+ * failed with `p1 "move return102": Can't move: Your Lopunny doesn't
+ * have a move matching return102`. Actual cause was subtler than the
+ * suspected wrong-generation canonicalization: the REQUEST displays
+ * happiness moves with their computed base power ("Return 102") while
+ * the entry's id stays `return`, and forward-model built choice tokens
+ * from the display name. Fixed by using the request move id at both
+ * option paths (Frustration same family, plus the 0-happiness set
+ * assumption); pinned in eval-forward-model.spec.ts ("happiness-move
+ * choice tokens").
  *
  * THINK-DEEPER UNHIDDEN — HEALED SINGLE-TURN ACQUIRE 2026-08-13: the
  * registered fix is in. makeReplayAcquire now reconstructs with the same

@@ -181,7 +181,7 @@ The current codebase has been validated with:
 - `npm run build`
 - `npx playwright test`
 - `npm run test:regression`
-- `npm run test:feedback` (on demand): the expert-feedback drift suite — six pinned smogtours replays swept through the real app, graded warn-only against a corpus of expert-approved truths and tracked gaps; hermetic and bit-repeatable, reporting to `docs/reports/` instead of failing on drift.
+- `npm run test:feedback` (on demand): the expert-feedback drift suite — six pinned smogtours replays swept through the real app, graded warn-only against a corpus of expert-approved truths and tracked gaps; hermetic and bit-repeatable, reporting to `docs/reports/` instead of failing on drift. Eval-layer failures surface per turn (`evalErrors` through the debug handle into the report), so a gap always names its reason.
 
 The regression suite covers pure Smogon-stat parsing/enrichment (including the Custom Game → OU fallback), exported replay file parsing, branch save/share encoding, target-specific damage previews, basic doubles branch state, redirection/retargeting/phazing fixtures, stable checkpoints from a mocked fixture, and stable checkpoints from a saved real replay. Two deeper checkpoints are marked `fixme` to document known divergence rather than hiding it.
 
