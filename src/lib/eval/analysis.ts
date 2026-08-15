@@ -70,6 +70,17 @@ export type TurnAttribution =
 export const RISK_PAYOFF_MARGIN = TIER_THRESHOLDS.inaccuracy;
 
 /**
+ * Measurement-noise tolerance UNDER the payoff margin for the paid-off
+ * credit only: static-eval repricing legitimately moves guarantees at the
+ * third decimal, and a knife-edge credit must not flip with it (648453
+ * t20: a pinned paid-off read at 0.1006 fell to 0.0972 when stranded
+ * pricing moved the safe floor by 0.0033). Same epsilon scale as the
+ * rank-tie and feed-certainty gates. The feed payoff gate and the
+ * clearly-failed exit stay strict — this widens praise, never excuses.
+ */
+export const RISK_PAYOFF_EPSILON = 0.02;
+
+/**
  * How many FUTURE turns a read gets to cash in: setup and positional plays
  * bank their payoff over the following expected outcomes, not one turn. The
  * chain uses depth-matched expectations only — rolls stay in the luck ledger.
@@ -655,7 +666,7 @@ export function analyzeTurn(params: {
         side.riskPayoff = payoff;
         if (payoffTurn > 0) side.riskPayoffTurn = payoffTurn;
         if (payoff <= -RISK_PAYOFF_MARGIN) return;
-        if (payoff >= RISK_PAYOFF_MARGIN) side.riskPaidOff = true;
+        if (payoff >= RISK_PAYOFF_MARGIN - RISK_PAYOFF_EPSILON) side.riskPaidOff = true;
       }
     }
     // Gambles stop here: paid-off credit or nothing.

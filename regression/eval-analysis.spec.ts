@@ -522,6 +522,41 @@ test.describe('turn analysis assembly', () => {
     expect(analysisPunished.p2.riskUnpunished).toBeUndefined();
   });
 
+  test('a knife-edge payoff within the noise epsilon still earns the paid-off credit', () => {
+    // 648453 t20: the pinned paid-off read sat 0.0006 over the margin; a
+    // static-eval repricing moved the safe guarantee by +0.0033 and flipped
+    // the credit. Payoffs within RISK_PAYOFF_EPSILON below the margin keep
+    // the credit; clearly-below payoffs stay uncredited.
+    const tied: EvalResult = {
+      score: -0.05, interval: 0.02, depthCompleted: 1,
+      perSide: {
+        p1: [choiceEv('move ironhead', 'Iron Head', -0.06, -0.05)],
+        p2: [
+          choiceEv('move recover', 'Recover', 0.04, 0.05),
+          choiceEv('switch 5', '→ Heatran', -0.39, 0.047),
+        ],
+      },
+    };
+    const at = (playedOutcome: number) => analyzeTurn({
+      turn: 20,
+      result: tied,
+      played: { p1: { kind: 'move', name: 'Iron Head', tera: false }, p2: { kind: 'switch', name: 'Heatran', species: 'Heatran' } },
+      playedOutcome,
+      scoreBefore: -0.05,
+      scoreAfter: -0.14,
+    });
+    // Own outcome +0.13 vs safe floor +0.04: payoff 0.09 — under the 0.1
+    // margin but inside the epsilon band.
+    const knifeEdge = at(-0.13);
+    expect(knifeEdge.p2.riskPaidOff).toBe(true);
+    expect(knifeEdge.p2.riskPayoff).toBeCloseTo(0.09, 10);
+    expect(knifeEdge.attribution).toBe('p2-read');
+    // Payoff 0.07 sits below margin − epsilon: no credit.
+    const below = at(-0.11);
+    expect(below.p2.riskPaidOff).toBeUndefined();
+    expect(below.attribution).toBe('quiet');
+  });
+
   test('a no-regret gamble that beats the safe guarantee reads as paid off', () => {
     // Draft T50-shaped: the played switch TIES the engine pick by EV (regret
     // ~0, so no tier), but its floor gave up mistake-sized safety vs the safe
