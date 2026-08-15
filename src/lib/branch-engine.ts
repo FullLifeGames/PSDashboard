@@ -4,7 +4,11 @@ import type { PokemonSnapshot, TurnSnapshot } from '../types';
 import type { BranchSlotChoice } from './branch-choices';
 import { protocolChoiceLock, type ChoiceLockContext } from './choice-lock';
 import { CHOICE_ITEMS } from './eval/sensitivity';
-import { serializeBattleStable } from './eval/forward-model';
+import { serializeBattleStable, trialAdvanceLog } from './eval/forward-model';
+import {
+  ALIGNMENT_SEEDS, chooseAlignedSeed, extractProtocolEvents, scoreAlignment,
+  type SeedChoice, type TurnAlignmentRecord,
+} from './hax-alignment';
 
 // @pkmn/sim's random-format rulesets reference Node's `global` object (e.g.
 // `global.Config?.potd` in rulesets), which doesn't exist in browsers and made
@@ -139,6 +143,8 @@ export interface BranchRuntime {
   choiceErrors: BranchChoiceErrorLog;
   /** True when the overall reconstruction deadline was hit before the target turn (B17). */
   timedOut: boolean;
+  /** Per-block hax alignment: chosen seed + the truly emitted block's score. */
+  haxAlignment: TurnAlignmentRecord[];
 }
 
 /**
@@ -1362,6 +1368,7 @@ export async function reconstructBranchRuntime(params: {
   const streams = BattleStreams.getPlayerStreams(battleStream);
   const collectedLog: string[] = [];
   const choiceErrors: BranchChoiceErrorLog = { count: 0, last: null };
+  const haxAlignment: TurnAlignmentRecord[] = [];
 
   // A sim crash (old-gen mods throw on odd states) rejects these detached
   // stream pumps — record it as a choice error so the turn-sync guard reacts
@@ -1585,6 +1592,43 @@ export async function reconstructBranchRuntime(params: {
     const p1Choice = getMainChoice(turnBlock.preUpkeep, 'p1', battle);
     const p2Choice = getMainChoice(turnBlock.preUpkeep, 'p2', battle);
 
+    // HAX ALIGNMENT: pick the candidate seed whose rolls reproduce this
+    // block's protocol events (crits/misses/secondaries/faints — spec
+    // 2026-08-15-hax-alignment-design.md), then reseed the live battle
+    // before committing. Reseeding happens EVERY turn (also for candidate
+    // 0) so one turn's RNG consumption never shifts the next turn's rolls.
+    const blockLines = [...turnBlock.preUpkeep, ...turnBlock.postUpkeep];
+    const expectedEvents = extractProtocolEvents(blockLines);
+    const alignForced = {
+      p1: collectForcedSwitchSpecies(turnBlock.preUpkeep, turnBlock.postUpkeep, 'p1'),
+      p2: collectForcedSwitchSpecies(turnBlock.preUpkeep, turnBlock.postUpkeep, 'p2'),
+    };
+    let seedChoice: SeedChoice = {
+      seed: ALIGNMENT_SEEDS[0], trialScore: null, trialPerfect: false,
+      candidatesTried: 0, trialsFailed: 0,
+    };
+    try {
+      const checkpoint = serializeBattleStable(battle);
+      seedChoice = chooseAlignedSeed({
+        expected: expectedEvents,
+        trial: seed => {
+          try {
+            return trialAdvanceLog(
+              { serialized: checkpoint }, p1Choice, p2Choice, seed,
+              { p1: [...alignForced.p1], p2: [...alignForced.p2] },
+            );
+          } catch {
+            return null;
+          }
+        },
+        shouldStop: () => abort?.aborted === true || Date.now() > overallDeadline,
+      });
+    } catch {
+      // Serialization failure on an odd state: run the block exactly as today.
+    }
+    battle.resetRNG(seedChoice.seed);
+    const simLogStart = battle.log.length;
+
     // Waking up on choice rejections keeps wedged turns from burning the full
     // wait timeout on every retry (B17 — 30-60s "Preparing branch…" hangs).
     const mainChoiceErrors = choiceErrors.count;
@@ -1604,8 +1648,8 @@ export async function reconstructBranchRuntime(params: {
       }
     }
 
-    const p1Forced = collectForcedSwitchSpecies(turnBlock.preUpkeep, turnBlock.postUpkeep, 'p1');
-    const p2Forced = collectForcedSwitchSpecies(turnBlock.preUpkeep, turnBlock.postUpkeep, 'p2');
+    const p1Forced = alignForced.p1;
+    const p2Forced = alignForced.p2;
     const p1ForceIndex = { current: 0 };
     const p2ForceIndex = { current: 0 };
 
@@ -1647,6 +1691,19 @@ export async function reconstructBranchRuntime(params: {
         ...turnBlock.preUpkeep,
         ...turnBlock.postUpkeep,
       ], params.choiceLocks ? { context: params.choiceLocks, turn: turnBlock.turn + 1 } : undefined);
+      // Score the TRULY emitted block (battle.log is synchronous — the
+      // async collectedLog pump may still lag) against the protocol.
+      haxAlignment.push({
+        turn: turnBlock.turn,
+        seed: seedChoice.seed,
+        trialPerfect: seedChoice.trialPerfect,
+        trialsFailed: seedChoice.trialsFailed,
+        candidatesTried: seedChoice.candidatesTried,
+        actual: scoreAlignment(
+          expectedEvents,
+          extractProtocolEvents(latestBattle.log.slice(simLogStart)),
+        ),
+      });
     }
   }
 
@@ -1677,6 +1734,7 @@ export async function reconstructBranchRuntime(params: {
     log: collectedLog,
     choiceErrors,
     timedOut,
+    haxAlignment,
   };
 }
 

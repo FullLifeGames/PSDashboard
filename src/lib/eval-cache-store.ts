@@ -89,7 +89,12 @@ export interface StoredEval {
 //      body, leaving the hazard victim term (653785 t19's switch banked a
 //      Charizard that could never return; 655336 t23/t24 artifacts) — and
 //      the sweep feature weight becomes adoptable (fit 2026-08-15).
-export const EVAL_ENGINE_CACHE_VERSION = 31;
+// v32: hax-aligned reconstruction — every turn boundary reseeds the sim
+//      with the pinned candidate whose rolls reproduce the protocol's
+//      crits/misses/secondaries/faints (best of 16, deterministic), so
+//      positions no longer carry phantom RNG the real game disproves
+//      (653785's endgame died 2 turns early to a seeded crit).
+export const EVAL_ENGINE_CACHE_VERSION = 32;
 
 export function evalStoreKey(
   cacheKey: string,

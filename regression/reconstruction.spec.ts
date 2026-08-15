@@ -603,3 +603,33 @@ test.describe('Turn-synchronized replay of a video-reconstructed log', () => {
     expect(battle.sides[1].active[0]?.species.name).toBe('Rhydon');
   });
 });
+
+test.describe('hax alignment records', () => {
+  test('reconstruction records one aligned turn per replayed block, deterministically', async () => {
+    const replay = loadFixtureReplay();
+    const { p1Team, p2Team } = buildTeamsFromReplay(replay.log);
+    const snapshots = parseReplayLog(replay.log);
+    // The fixture carries |turn|1..4, so a target of 5 replays every block.
+    const targetTurn = 5;
+    const snapshot = snapshots.find(entry => entry.turn === targetTurn) ?? null;
+
+    const reconstruct = () => reconstructBranchRuntime({
+      format: replay.formatid, p1Team, p2Team,
+      replayLog: replay.log, targetTurn, snapshot,
+    });
+    const first = await reconstruct();
+    const second = await reconstruct();
+
+    // One record per block replayed (turns 1..targetTurn-1), ascending.
+    expect(first.haxAlignment.map(record => record.turn))
+      .toEqual(Array.from({ length: targetTurn - 1 }, (_, index) => index + 1));
+    for (const record of first.haxAlignment) {
+      expect(record.candidatesTried).toBeGreaterThanOrEqual(1);
+      expect(typeof record.actual.softMismatches).toBe('number');
+      expect(record.actual.endedMismatch).toBe(false);
+    }
+    // Determinism: the same replay picks the same seed schedule (draft T48).
+    expect(second.haxAlignment.map(record => record.seed))
+      .toEqual(first.haxAlignment.map(record => record.seed));
+  });
+});
