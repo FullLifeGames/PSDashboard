@@ -2,6 +2,8 @@ import { Battle, BattleStreams, Dex, Teams, toID } from '@pkmn/sim';
 import type { PokemonSet } from '@pkmn/sim';
 import type { PokemonSnapshot, TurnSnapshot } from '../types';
 import type { BranchSlotChoice } from './branch-choices';
+import { protocolChoiceLock, type ChoiceLockContext } from './choice-lock';
+import { CHOICE_ITEMS } from './eval/sensitivity';
 import { serializeBattleStable } from './eval/forward-model';
 
 // @pkmn/sim's random-format rulesets reference Node's `global` object (e.g.
@@ -539,7 +541,11 @@ function repointActiveSlot(side: SimSide, activeSlot: number, target: SimPokemon
   return true;
 }
 
-export function correctActivesFromProtocol(battle: SimBattle, events: string[]) {
+export function correctActivesFromProtocol(
+  battle: SimBattle,
+  events: string[],
+  locks?: { context: ChoiceLockContext; turn: number },
+) {
   let repointed = false;
   for (const line of events) {
     const match = line.match(/^\|(switch|drag)\|(p[12])([a-d]):[^|]*\|([^,|]+)/);
@@ -557,7 +563,32 @@ export function correctActivesFromProtocol(battle: SimBattle, events: string[]) 
   // the disable flags and the request view from the corrected board.
   if (repointed) {
     restoreSideInvariants(battle);
+    // Protocol-proven locks go back on BEFORE the request refresh, so the
+    // disable pass bakes them into the corrected request (spec ③ 1b).
+    if (locks) restampProtocolLocks(battle, locks.context, locks.turn);
     refreshRequestsFromLiveState(battle);
+  }
+}
+
+/** Spec 1b's stamp: protocol trail + eligibility + set sanity, never sim history. */
+function restampProtocolLocks(battle: SimBattle, context: ChoiceLockContext, turn: number) {
+  for (const sideId of ['p1', 'p2'] as const) {
+    const lock = protocolChoiceLock(context.trails, sideId, turn);
+    if (!lock) continue;
+    const side = battle.sides[sideId === 'p1' ? 0 : 1];
+    // Singles only — the trail tracker follows one active per side.
+    if (side.active.length !== 1) continue;
+    const active = side.active[0];
+    if (!active || active.fainted) continue;
+    if (toId(active.species.name) !== toId(lock.species) && toId(active.name) !== toId(lock.species)) continue;
+    if (!context.eligibility[sideId][toId(lock.species)]) continue;
+    if (!CHOICE_ITEMS.has(active.item)) continue;
+    if (!active.moveSlots.some(slot => slot.id === lock.moveId)) continue;
+    if (active.volatiles['choicelock']) continue;
+    // Not addVolatile: the condition's onStart reads battle.activeMove (null
+    // outside a move). The disable pass only consults effectState.move, so
+    // the direct volatile carries everything the sim needs.
+    active.volatiles['choicelock'] = { id: 'choicelock', move: lock.moveId } as never;
   }
 }
 
@@ -1317,6 +1348,8 @@ export async function reconstructBranchRuntime(params: {
     snapshotFor(turn: number): TurnSnapshot | null;
     onPosition(turn: number, battle: SimBattle): void;
   };
+  /** Protocol-truth lock context (③): boundary corrections re-stamp from it. */
+  choiceLocks?: ChoiceLockContext;
 }): Promise<BranchRuntime> {
   const { format, p1Team, p2Team, replayLog, targetTurn, snapshot, onLogLines, onProgress, abort, capturePositions } = params;
   const overallDeadline = Date.now() + (params.deadlineMs ?? 60_000);
@@ -1608,10 +1641,12 @@ export async function reconstructBranchRuntime(params: {
 
     const latestBattle = battleStream.battle;
     if (latestBattle) {
+      // After this block's events the board sits at the START of the next
+      // turn — that boundary's trail is the lock truth for the position.
       correctActivesFromProtocol(latestBattle, [
         ...turnBlock.preUpkeep,
         ...turnBlock.postUpkeep,
-      ]);
+      ], params.choiceLocks ? { context: params.choiceLocks, turn: turnBlock.turn + 1 } : undefined);
     }
   }
 

@@ -1,6 +1,7 @@
 import { useState, useCallback, useRef } from 'react';
 import type { BattleStreams, PokemonSet } from '@pkmn/sim';
 import type { TurnSnapshot } from '../types';
+import type { ChoiceLockContext } from '../lib/choice-lock';
 import type {
   BranchChoiceErrorLog,
   BranchRuntime,
@@ -38,6 +39,8 @@ interface StartBranchOptions {
    * and the branch can open with the wrong Pokémon on the field.
    */
   snapshotFor?: (turn: number) => TurnSnapshot | null;
+  /** Protocol-truth lock context (③) for the boundary corrections. */
+  choiceLocks?: ChoiceLockContext;
 }
 
 export interface BranchHistoryEntry {
@@ -398,6 +401,7 @@ export function useBranch() {
       ...(options?.snapshotFor
         ? { capturePositions: { snapshotFor: options.snapshotFor, onPosition: () => {} } }
         : {}),
+      choiceLocks: options?.choiceLocks,
     });
 
     if (options?.abort?.aborted) return;

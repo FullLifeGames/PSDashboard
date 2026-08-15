@@ -373,6 +373,8 @@ function App() {
       });
       if (p1Team.length > 0 && p2Team.length > 0) {
         setBranchSession(session => session + 1);
+        const { buildChoiceLockContext } = await import('./lib/choice-lock');
+        const choiceLocks = buildChoiceLockContext(replayData.log, { p1Team, p2Team }, observations);
         // The ref, not the closure: see branchTurnRef (slider→click race).
         const selectedTurn = branchTurnRef.current;
         const selectedSnapshot = snapshots.length > 0
@@ -383,6 +385,7 @@ function App() {
           onProgress: (turn, target) => setBranchProgress({ turn, target }),
           abort: abortController.signal,
           snapshotFor: turn => snapshots[Math.min(turn - 1, snapshots.length - 1)] ?? null,
+          choiceLocks,
         });
         if (!abortController.signal.aborted) {
           branchWindowOpenRef.current = true;
@@ -405,7 +408,7 @@ function App() {
       setBranchProgress(null);
       branchAbortRef.current = null;
     }
-  }, [replayData, branchPreparing, teamText, snapshots, getInferredSpreads, effectiveP1Info, effectiveP2Info, usageStats.stats, setAssumptions.assumptions, startBranch, getBattle]);
+  }, [replayData, branchPreparing, teamText, snapshots, observations, getInferredSpreads, effectiveP1Info, effectiveP2Info, usageStats.stats, setAssumptions.assumptions, startBranch, getBattle]);
 
   const handleCancelBranchPreparation = useCallback(() => {
     branchAbortRef.current?.abort();
@@ -437,6 +440,8 @@ function App() {
         });
         if (!cancelled && p1Team.length > 0 && p2Team.length > 0) {
           setBranchSession(session => session + 1);
+          const { buildChoiceLockContext } = await import('./lib/choice-lock');
+          const choiceLocks = buildChoiceLockContext(activeReplay.log, { p1Team, p2Team }, observations);
           await startBranch(getBranchSimulatorFormat(activeReplay), p1Team, p2Team, activeReplay.log, branchTurn, branchSnapshot, {
             replayHistory: refreshRequest.history,
             p1Choices: refreshRequest.p1Choices,
@@ -445,6 +450,7 @@ function App() {
             onProgress: (turn, target) => setBranchProgress({ turn, target }),
             abort: abortController.signal,
             snapshotFor: turn => snapshots[Math.min(turn - 1, snapshots.length - 1)] ?? null,
+            choiceLocks,
           });
           if (!abortController.signal.aborted) {
             branchWindowOpenRef.current = true;
@@ -474,6 +480,7 @@ function App() {
     snapshots,
     usageStats.stats,
     setAssumptions.assumptions,
+    observations,
     startBranch,
   ]);
 
@@ -577,6 +584,7 @@ function App() {
         inferredSpreads: await getInferredSpreads(),
       });
       if (p1Team.length === 0 || p2Team.length === 0) throw new Error('Could not build both teams for this replay.');
+      const { buildChoiceLockContext } = await import('./lib/choice-lock');
       const runtime = await branchEngine.reconstructBranchRuntime({
         format: getBranchSimulatorFormat(replayData),
         p1Team,
@@ -586,6 +594,7 @@ function App() {
         snapshot: snapshots.length > 0 ? snapshots[Math.min(turn - 1, snapshots.length - 1)] : null,
         playerNames: [replayData.players[0], replayData.players[1]],
         onProgress: reportReconstruct,
+        choiceLocks: buildChoiceLockContext(replayData.log, { p1Team, p2Team }, observations),
         // The sweep's healing, on the single-turn path too: per-turn
         // boundary corrections keep a diverging choice replay in lockstep
         // with the protocol, so the cascade zone (draft t56+) arrives LIVE
@@ -608,7 +617,7 @@ function App() {
         throw new Error(`The reconstruction diverged before turn ${turn} — the guessed sets could not reproduce this position. Correcting items/moves via Edit Player/Opp usually fixes it.`);
       }
       return serializeLiveBattle(battle);
-    }, [replayData, teamText, effectiveP1Info, effectiveP2Info, usageStats.stats, setAssumptions.assumptions, snapshots, getInferredSpreads]);
+    }, [replayData, teamText, effectiveP1Info, effectiveP2Info, usageStats.stats, setAssumptions.assumptions, snapshots, observations, getInferredSpreads]);
 
   // Single-pass sweep acquisition: one reconstruction captures every turn
   // boundary, instead of one O(turn) replay per turn (quadratic polling).
@@ -630,6 +639,7 @@ function App() {
         inferredSpreads: await getInferredSpreads(),
       });
       if (p1Team.length === 0 || p2Team.length === 0) throw new Error('Could not build both teams for this replay.');
+      const { buildChoiceLockContext } = await import('./lib/choice-lock');
       const positions: (string | null)[] = new Array(turns).fill(null);
       const runtime = await branchEngine.reconstructBranchRuntime({
         format: getBranchSimulatorFormat(replayData),
@@ -640,6 +650,7 @@ function App() {
         snapshot: snapshots.length > 0 ? snapshots[Math.min(turns - 1, snapshots.length - 1)] : null,
         playerNames: [replayData.players[0], replayData.players[1]],
         onProgress: report,
+        choiceLocks: buildChoiceLockContext(replayData.log, { p1Team, p2Team }, observations),
         capturePositions: {
           snapshotFor: turn => snapshots[Math.min(turn - 1, snapshots.length - 1)] ?? null,
           onPosition: (turn, battle) => {
@@ -668,7 +679,7 @@ function App() {
         onPosition?.(turns, serialized);
       }
       return positions;
-    }, [replayData, teamText, effectiveP1Info, effectiveP2Info, usageStats.stats, setAssumptions.assumptions, snapshots, getInferredSpreads]);
+    }, [replayData, teamText, effectiveP1Info, effectiveP2Info, usageStats.stats, setAssumptions.assumptions, snapshots, observations, getInferredSpreads]);
 
   const acquireReplayPosition = useMemo(() => makeReplayAcquire(branchTurn), [makeReplayAcquire, branchTurn]);
 

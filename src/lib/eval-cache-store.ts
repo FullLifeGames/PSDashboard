@@ -77,7 +77,11 @@ export interface StoredEval {
 // v28: hidden-trapped actives (unrevealed Magnet Pull — the request conceals
 //      trapping the validation enforces) stop offering bench switches, the
 //      guaranteed reject that killed whole turn evals (573756 t24/32/38-40).
-export const EVAL_ENGINE_CACHE_VERSION = 28;
+// v29: corrected actives regain protocol-proven choice locks (one distinct
+//      committed move since entry + choice item + undisturbed item), a
+//      guessed Choice item additionally needing damage corroboration —
+//      Keldeo @ Specs graded as a free 4-option side (649664 t23).
+export const EVAL_ENGINE_CACHE_VERSION = 29;
 
 export function evalStoreKey(
   cacheKey: string,

@@ -5,6 +5,8 @@ import {
   executeBranchChoices,
   correctActivesFromProtocol,
 } from '../src/lib/branch-engine';
+import { buildChoiceLockContext } from '../src/lib/choice-lock';
+import { createRootPosition, legalChoices, serializeBattleStable } from '../src/lib/eval/forward-model';
 
 function makeSet(name: string, species: string, moves: string[]): PokemonSet {
   return {
@@ -160,5 +162,68 @@ test.describe('correctActivesFromProtocol', () => {
     expect(new Set(names).size).toBe(3);
     expect(names.sort()).toEqual(['Eve', 'Pika', 'Squirt']);
     expect(side.pokemon.filter(pokemon => pokemon.isActive)).toHaveLength(1);
+  });
+});
+
+test.describe('protocol lock restamp after correction', () => {
+  const keldeoLog = [
+    '|player|p1|Alice|', '|player|p2|Bob|', '|gen|6', '|tier|[Gen 6] OU',
+    '|poke|p1|Keldeo|', '|poke|p2|Chansey|',
+    '|start',
+    '|switch|p1a: Keldeo|Keldeo|100/100',
+    '|switch|p2a: Blissey|Blissey|100/100',
+    '|turn|1',
+    '|move|p1a: Keldeo|Hydro Pump|p2a: Blissey',
+    '|turn|2',
+  ].join('\n');
+  const specsKeldeo = makeSet('Keldeo', 'Keldeo', ['Hydro Pump', 'Secret Sword', 'Icy Wind', 'Rest']);
+  specsKeldeo.item = 'Choice Specs';
+  const specsTeams = {
+    p1Team: [specsKeldeo],
+    p2Team: [makeSet('Blissey', 'Blissey', ['Protect']), makeSet('Chansey', 'Chansey', ['Protect'])],
+  };
+
+  test('repointing ONTO the locked mon restores its protocol lock; the request disables the rest', async () => {
+    // The real loss case: the DIVERGED sim has the wrong mon on the field;
+    // the correction repoints onto Keldeo and deletes lock bookkeeping —
+    // the protocol trail (Specs + a lone Hydro Pump in the REAL log) must
+    // bring the lock back. The runtime deliberately replays a log where
+    // the sim never saw Keldeo act.
+    const divergedLog = [
+      '|switch|p1a: Filler|Blissey|100/100',
+      '|switch|p2a: Blissey|Blissey|100/100',
+      '|turn|1',
+    ].join('\n');
+    const p1Team = [makeSet('Filler', 'Blissey', ['Protect']), specsKeldeo];
+    const runtime = await reconstructBranchRuntime({
+      format: 'gen6ou', p1Team, p2Team: specsTeams.p2Team,
+      replayLog: divergedLog, targetTurn: 1,
+    });
+    const battle = runtime.battleStream.battle!;
+    // Context from the REAL replay's log — that is its whole premise.
+    const context = buildChoiceLockContext(keldeoLog, { p1Team, p2Team: specsTeams.p2Team }, []);
+    correctActivesFromProtocol(battle, ['|switch|p1a: Keldeo|Keldeo|100/100'], { context, turn: 2 });
+    const keldeo = battle.sides[0].active[0]!;
+    expect(keldeo.species.name).toBe('Keldeo');
+    const volatile = keldeo.volatiles['choicelock'] as { move?: string } | undefined;
+    expect(volatile?.move).toBe('hydropump');
+    const root = createRootPosition(serializeBattleStable(battle));
+    const moveChoices = legalChoices(root, 'p1').map(option => option.choice).filter(choice => choice.startsWith('move '));
+    expect(moveChoices).toEqual(['move hydropump']);
+  });
+
+  test('without eligibility (non-choice item) nothing is stamped', async () => {
+    const freeTeams = {
+      p1Team: [makeSet('Keldeo', 'Keldeo', ['Hydro Pump', 'Secret Sword'])],
+      p2Team: specsTeams.p2Team,
+    };
+    const runtime = await reconstructBranchRuntime({
+      format: 'gen6ou', p1Team: freeTeams.p1Team, p2Team: freeTeams.p2Team,
+      replayLog: keldeoLog, targetTurn: 2,
+    });
+    const battle = runtime.battleStream.battle!;
+    const context = buildChoiceLockContext(keldeoLog, freeTeams, []);
+    correctActivesFromProtocol(battle, ['|drag|p2a: Chansey|Chansey|100/100'], { context, turn: 2 });
+    expect(battle.sides[0].active[0]!.volatiles['choicelock']).toBeFalsy();
   });
 });

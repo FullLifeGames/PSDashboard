@@ -24,7 +24,7 @@ interface SerializedBattleShape {
 }
 
 const toId = (value: string) => value.toLowerCase().replace(/[^a-z0-9]/g, '');
-const CHOICE_ITEMS = new Set(['choiceband', 'choicespecs', 'choicescarf']);
+export const CHOICE_ITEMS = new Set(['choiceband', 'choicespecs', 'choicescarf']);
 
 const sideIndex = (side: 'p1' | 'p2') => (side === 'p1' ? 0 : 1);
 
