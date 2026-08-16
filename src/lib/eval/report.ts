@@ -1,6 +1,6 @@
 import { playedSetupMove, type SideAnalysis, type TurnAnalysis, type VerdictTier } from './analysis';
 import { KEY_TURN_SWING } from './graph';
-import { labelPhrase } from './summary';
+import { koPhrase, labelPhrase } from './summary';
 import { winDeltaText, winPercent } from './winprob';
 
 /**
@@ -236,7 +236,9 @@ export function buildGameReport(
         const side = analysis[loser];
         const setup = playedSetupMove(side) ? '; a setup move the engine may undervalue' : '';
         const better = side.bestNull?.alternative?.label ?? side.best!.label;
-        return `turn ${analysis.turn} (${labelPhrase(side.played!.label)}, ` +
+        // Round 6: the played move's analytic odds ground the claim.
+        const oddsBit = side.played!.koOdds ? ` (${koPhrase(side.played!.koOdds)})` : '';
+        return `turn ${analysis.turn} (${labelPhrase(side.played!.label)}${oddsBit}, ` +
           `${winDeltaText(-(side.regret ?? 0))} — safer was ${labelPhrase(better)}${setup})`;
       });
       sentences.push(`The seeds of the loss: ${parts.join(' and ')}.`);

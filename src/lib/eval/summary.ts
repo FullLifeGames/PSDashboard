@@ -37,6 +37,39 @@ const nullNote = (side: SideAnalysis): string =>
     : '';
 
 /**
+ * The three analytic odds shapes (round 6 expectation grounding): "a 90%
+ * roll into a ~43% kill range" / "kills ~43% of the time" / "an 80% roll
+ * to connect". Exported for the report's seeds sentence.
+ */
+export function koPhrase(odds: { accuracy: number; killFraction: number }): string {
+  const acc = Math.round(odds.accuracy * 100);
+  const kill = Math.round(odds.killFraction * 100);
+  const art = (n: number) => (n === 8 || n === 11 || n === 18 || (n >= 80 && n <= 89) ? 'an' : 'a');
+  if (odds.accuracy < 1 && odds.killFraction < 1) return `${art(acc)} ${acc}% roll into a ~${kill}% kill range`;
+  if (odds.killFraction < 1) return `kills ~${kill}% of the time`;
+  return `${art(acc)} ${acc}% roll to connect`;
+}
+
+/**
+ * One parenthetical naming the true odds behind the clause's claims — the
+ * played move's and/or the recommendation's. The "kills ~43% of the time"
+ * shape already reads as a verb phrase; the roll shapes take a copula.
+ */
+const oddsNote = (side: SideAnalysis): string => {
+  const shown = displayBest(side);
+  const shownOdds = side.bestNull?.alternative ? side.bestNull.alternative.koOdds : side.best?.koOdds;
+  const parts: string[] = [];
+  if (side.played?.koOdds && side.played.choice !== side.best?.choice) {
+    const odds = side.played.koOdds;
+    parts.push(`${phrase(side.played.label)} ${odds.killFraction < 1 && odds.accuracy === 1 ? koPhrase(odds) : `was ${koPhrase(odds)}`}`);
+  }
+  if (shownOdds) {
+    parts.push(`${phrase(shown.label)} ${shownOdds.killFraction < 1 && shownOdds.accuracy === 1 ? koPhrase(shownOdds) : `is ${koPhrase(shownOdds)}`}`);
+  }
+  return parts.length > 0 ? ` (True odds: ${parts.join('; ')}.)` : '';
+};
+
+/**
  * The engine's own equilibrium leans a different choice than the rendered
  * recommendation: say so, and name the opponent replies that split them —
  * the recommendation becomes conditional instead of absolute (653785 t19).
@@ -62,8 +95,9 @@ function readClause(name: string, side: SideAnalysis, opponent: SideAnalysis): s
   const horizon = side.riskPayoffTurn
     ? side.riskPayoffTurn === 1 ? ' one turn later' : ` ${side.riskPayoffTurn} turns later`
     : '';
+  const click = side.played.koOdds ? ` The click was ${koPhrase(side.played.koOdds)}.` : '';
   return `${name} played ${phrase(side.played.label)} — a read that paid off${horizon}, ` +
-    `${winDeltaText(side.riskPayoff ?? 0)} over the safe ${phrase(side.safe.label)} (${winPctText(side.safe.worstCase)} guaranteed).${priced}`;
+    `${winDeltaText(side.riskPayoff ?? 0)} over the safe ${phrase(side.safe.label)} (${winPctText(side.safe.worstCase)} guaranteed).${priced}${click}`;
 }
 
 function sideClause(name: string, side: SideAnalysis, opponent: SideAnalysis): string | null {
@@ -101,7 +135,7 @@ function mistakeClause(name: string, side: SideAnalysis, opponent: SideAnalysis)
       ? `a read against the opponent's tendencies: ${came}`
       : `a read: ${came}`;
     return `${name} played ${phrase(side.played.label)} — ${framing}. ` +
-      `The engine's safe line was ${phrase(side.safe.label)} (${winPctText(side.safe.worstCase)} guaranteed)${lineOf(side.safe)}.${why}${caveat}`;
+      `The engine's safe line was ${phrase(side.safe.label)} (${winPctText(side.safe.worstCase)} guaranteed)${lineOf(side.safe)}.${why}${caveat}${oddsNote(side)}`;
   }
   // The punished misplay reads in EV terms: what the choice was worth against
   // balanced play, vs what the engine's line was worth. A blunder earns the
@@ -109,7 +143,7 @@ function mistakeClause(name: string, side: SideAnalysis, opponent: SideAnalysis)
   // drops the PV line and the why clause — both belong to the true best.
   const shown = displayBest(side);
   const line = shown.swapped ? '' : lineOf(side.best);
-  const reasons = `${shown.swapped ? '' : why}${caveat}${nullNote(side)}${conditionalNote(side)}`;
+  const reasons = `${shown.swapped ? '' : why}${caveat}${nullNote(side)}${conditionalNote(side)}${oddsNote(side)}`;
   if (side.tier === 'blunder') {
     return `${name} played ${phrase(side.played.label)} (${winPctText(side.played.ev)}) — ` +
       `a blunder; clearly better was ${phrase(shown.label)} (${winPctText(shown.ev)})${line}.${reasons}`;
@@ -142,7 +176,7 @@ function inaccuracyClause(name: string, side: SideAnalysis): string | null {
   const shown = displayBest(side);
   return `${name}'s ${phrase(side.played.label)} was an inaccuracy — ` +
     `${phrase(shown.label)} was slightly better (${winPctText(shown.ev)} vs ${winPctText(side.played.ev)}).` +
-    `${nullNote(side)}${conditionalNote(side)}`;
+    `${oddsNote(side)}${nullNote(side)}${conditionalNote(side)}`;
 }
 
 /**

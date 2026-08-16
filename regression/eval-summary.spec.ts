@@ -651,3 +651,92 @@ test.describe('forced-mix dedup against the conditional', () => {
     expect(summary).not.toContain('all but commits');
   });
 });
+
+test.describe('odds grounding (round 6)', () => {
+  test('a punished mistake grounds the played move\'s kill odds', () => {
+    const punished: EvalResult = {
+      score: 0.1, interval: 0.05, depthCompleted: 2,
+      perSide: {
+        p1: [choice('move dracometeor', 'Draco Meteor', 0.2)],
+        p2: [
+          choice('switch 3', '→ Dragapult', -0.05),
+          { ...choice('move scald', 'Scald', -0.3), koOdds: { accuracy: 1, killFraction: 0.43 }, punishedBy: 'Draco Meteor' },
+        ],
+      },
+    };
+    const summary = summarizeTurn(analyzeTurn({
+      turn: 23,
+      result: punished,
+      played: { p1: { kind: 'move', name: 'Draco Meteor', tera: false }, p2: { kind: 'move', name: 'Scald', tera: false } },
+      playedOutcome: 0.0,
+      scoreBefore: 0.1,
+      scoreAfter: -0.25,
+    }), names);
+    expect(summary).toContain('safer was switching to Dragapult');
+    expect(summary).toContain('(True odds: Scald kills ~43% of the time.)');
+  });
+
+  test('a read that paid off names the roll it took', () => {
+    const tied: EvalResult = {
+      score: -0.05, interval: 0.02, depthCompleted: 1,
+      perSide: {
+        p1: [choice('move ironhead', 'Iron Head', -0.05)],
+        p2: [
+          { ...choice('move recover', 'Recover', 0.04), ev: 0.05, punishedBy: 'Iron Head' },
+          {
+            ...choice('move hydropump', 'Hydro Pump', -0.39), ev: 0.047, punishedBy: 'Earth Power',
+            koOdds: { accuracy: 0.8, killFraction: 1 },
+          },
+        ],
+      },
+    };
+    const summary = summarizeTurn(analyzeTurn({
+      turn: 50,
+      result: tied,
+      played: { p1: { kind: 'move', name: 'Iron Head', tera: false }, p2: { kind: 'move', name: 'Hydro Pump', tera: false } },
+      playedOutcome: -0.19,
+      scoreBefore: -0.05,
+      scoreAfter: -0.14,
+    }), names);
+    expect(summary).toContain('a read that paid off');
+    expect(summary).toContain('The click was an 80% roll to connect.');
+  });
+
+  test('an inaccuracy grounds the recommendation\'s odds', () => {
+    const slight: EvalResult = {
+      score: 0.1, interval: 0.05, depthCompleted: 2,
+      perSide: {
+        p1: [
+          { ...choice('move focusblast', 'Focus Blast', 0.14), koOdds: { accuracy: 0.9, killFraction: 0.43 } },
+          choice('move surf', 'Surf', 0.02),
+        ],
+        p2: [choice('move recover', 'Recover', -0.1)],
+      },
+    };
+    const summary = summarizeTurn(analyzeTurn({
+      turn: 12,
+      result: slight,
+      played: { p1: { kind: 'move', name: 'Surf', tera: false }, p2: { kind: 'move', name: 'Recover', tera: false } },
+      playedOutcome: 0.0,
+      scoreBefore: 0.1,
+      scoreAfter: 0.05,
+    }), names);
+    expect(summary).toContain('was an inaccuracy');
+    expect(summary).toContain('(True odds: Focus Blast is a 90% roll into a ~43% kill range.)');
+  });
+
+  test('options without koOdds render no odds language', () => {
+    const summary = summarizeTurn(analyzeTurn({
+      turn: 20,
+      result,
+      played: { p1: { kind: 'move', name: 'Draco Meteor', tera: false }, p2: { kind: 'move', name: 'Recover', tera: false } },
+      playedOutcome: 0.0,
+      scoreBefore: 0.1,
+      scoreAfter: -0.25,
+    }), names);
+    expect(summary).not.toContain('% roll');
+    expect(summary).not.toContain('kill range');
+    expect(summary).not.toContain('% of the time');
+    expect(summary).not.toContain('True odds');
+  });
+});

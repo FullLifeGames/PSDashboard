@@ -78,8 +78,8 @@ test.describe('game report (multi-turn root cause)', () => {
       mk(2, 0.05, -0.3, {
         attribution: 'p1-decision',
         p1: {
-          playedRaw: { kind: 'move', name: 'Recover', tera: false },
-          played: ranked('move recover', 'Recover', -0.3),
+          playedRaw: { kind: 'move', name: 'Scald', tera: false },
+          played: { ...ranked('move scald', 'Scald', -0.3), koOdds: { accuracy: 1, killFraction: 0.43 } },
           best: ranked('switch 3', '→ Dragapult', -0.05),
           safe: null,
           regret: 0.25,
@@ -89,9 +89,11 @@ test.describe('game report (multi-turn root cause)', () => {
       mk(3, -0.3, -0.6),
       mk(4, -0.6, -0.9),
     ], names, 'p2');
-    expect(report.summary).toContain('Recover');
+    expect(report.summary).toContain('Scald');
     expect(report.summary).toContain('switching to Dragapult');
     expect(report.summary).toContain('turn 2');
+    // Round 6: the played move's true odds ground the seed parenthetical.
+    expect(report.summary).toContain('(kills ~43% of the time');
   });
 
   test('lists each side\'s biggest misplays, in turn order', () => {

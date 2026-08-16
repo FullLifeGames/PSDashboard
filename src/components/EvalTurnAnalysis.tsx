@@ -91,6 +91,25 @@ function EngineRow({ name, side, onExplore }: { name: string; side: SideAnalysis
 }
 
 /** `|cant|` reasons → honest copy: the player DID choose; this swallowed it. */
+/**
+ * Compact analytic-odds suffix for a ranked row (round 6): "· 43% KO" with
+ * the accuracy × kill-roll decomposition in the tooltip. Hidden when the
+ * product rounds to nothing or to certainty.
+ */
+function KoSuffix({ odds }: { odds?: { accuracy: number; killFraction: number } }) {
+  if (!odds) return null;
+  const pct = Math.round(odds.accuracy * odds.killFraction * 100);
+  if (pct <= 0 || pct >= 100) return null;
+  return (
+    <span
+      style={{ color: '#778' }}
+      title={`${Math.round(odds.accuracy * 100)}% to hit × ${Math.round(odds.killFraction * 100)}% of damage rolls KO — analytic odds vs the standing active.`}
+    >
+      · {pct}% KO
+    </span>
+  );
+}
+
 function preventedText(reason: string): string {
   if (reason === 'faint') return 'fainted before its action came out';
   if (reason === 'slp') return 'slept through the turn — the chosen action never surfaced';
@@ -238,6 +257,7 @@ function SideRow({ name, side, onExplore }: { name: string; side: SideAnalysis; 
             <MiniBar value={side.played.ev} />
             <span style={{ whiteSpace: 'nowrap' }}>{winPctText(side.played.ev)} played</span>
             {side.played.punishedBy && <span style={{ color: '#778' }}>· worst vs {side.played.punishedBy}</span>}
+            <KoSuffix odds={side.played.koOdds} />
           </div>
           {(() => {
             // For a read, the reference is the SAFE line (max floor) shown at
@@ -269,6 +289,7 @@ function SideRow({ name, side, onExplore }: { name: string; side: SideAnalysis; 
                 {!swapped && target.line && target.line.length > 0 && (
                   <span className="ps-eval-line">then {target.line.map(step => `${step.p1} · ${step.p2}`).join(' → ')}</span>
                 )}
+                <KoSuffix odds={swapped ? swapped.koOdds : target.koOdds} />
               </div>
             );
           })()}
