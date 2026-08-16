@@ -273,3 +273,26 @@ test.describe('game report (multi-turn root cause)', () => {
     expect(report.keyMoments.length).toBeGreaterThanOrEqual(0);
   });
 });
+
+test.describe('null-swapped recommendations (round 5)', () => {
+  test('misplay rows and the seeds sentence use the co-optimal alternative', () => {
+    const played = ranked('move splash', 'Splash', -0.3);
+    const best = ranked('move willowisp', 'Will-O-Wisp', 0.2);
+    const flagged = {
+      playedRaw: null, played, best, safe: best, regret: 0.5, tier: 'blunder' as const,
+      bestNull: {
+        reason: 'Charizard-Mega-X cannot be burned (Fire-type)',
+        alternative: { label: 'Hex', ev: 0.19 },
+      },
+    };
+    const report = buildGameReport([
+      mk(1, 0.1, -0.2, { attribution: 'p1-decision', p1: flagged }),
+      mk(2, -0.2, -0.4),
+      mk(3, -0.4, -0.6),
+    ], names, 'p2');
+    expect(report.misplays).toHaveLength(1);
+    expect(report.misplays[0].better).toBe('Hex');
+    expect(report.summary).toContain('safer was Hex');
+    expect(report.summary).not.toContain('Will-O-Wisp');
+  });
+});

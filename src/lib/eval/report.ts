@@ -173,7 +173,9 @@ export function buildGameReport(
       side,
       regret: analysis[side].regret ?? 0,
       played: analysis[side].played!.label,
-      better: analysis[side].best!.label,
+      // A mechanically null best displays as its co-optimal alternative —
+      // same swap the turn summary makes (grading untouched).
+      better: analysis[side].bestNull?.alternative?.label ?? analysis[side].best!.label,
       ...(analysis[side].tier ? { tier: analysis[side].tier } : {}),
       ...(analysis[side].riskUnpunished ? { riskUnpunished: true } : {}),
       ...(analysis[side].sacrifice ? { sacrifice: true } : {}),
@@ -233,8 +235,9 @@ export function buildGameReport(
       const parts = seeds.map(analysis => {
         const side = analysis[loser];
         const setup = playedSetupMove(side) ? '; a setup move the engine may undervalue' : '';
+        const better = side.bestNull?.alternative?.label ?? side.best!.label;
         return `turn ${analysis.turn} (${labelPhrase(side.played!.label)}, ` +
-          `${winDeltaText(-(side.regret ?? 0))} — safer was ${labelPhrase(side.best!.label)}${setup})`;
+          `${winDeltaText(-(side.regret ?? 0))} — safer was ${labelPhrase(better)}${setup})`;
       });
       sentences.push(`The seeds of the loss: ${parts.join(' and ')}.`);
     } else if (playedTracking && decisionTotals[loser] < CLEAN_PLAY_TOTAL) {

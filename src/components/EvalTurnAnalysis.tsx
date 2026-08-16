@@ -246,19 +246,27 @@ function SideRow({ name, side, onExplore }: { name: string; side: SideAnalysis; 
             // at its equilibrium value.
             const asSafe = side.riskUnpunished || side.riskPaidOff;
             const target = asSafe ? side.safe ?? side.best! : side.best!;
-            const value = asSafe ? target.worstCase : target.ev;
+            // A mechanically null best displays as its co-optimal alternative
+            // (same swap the summary makes); punisher/PV belong to the true
+            // best, so they drop, and explore stays off the substitute.
+            const swapped = !asSafe ? side.bestNull?.alternative ?? null : null;
+            const value = asSafe ? target.worstCase : swapped?.ev ?? target.ev;
             return (
               <div className="ps-eval-analysis-row" style={{ color: '#aab' }} title={evTitle(name)}>
                 <MiniBar value={value} />
                 <span style={{ whiteSpace: 'nowrap' }}>
                   {winPctText(value)} {asSafe ? 'safe:' : 'better:'}
                 </span>
-                <ExplorableLabel
-                  label={target.label}
-                  onClick={onExplore && (() => onExplore(target))}
-                />
-                {target.punishedBy && <span style={{ color: '#778' }}>· worst vs {target.punishedBy}</span>}
-                {target.line && target.line.length > 0 && (
+                {swapped ? (
+                  <span>{swapped.label}</span>
+                ) : (
+                  <ExplorableLabel
+                    label={target.label}
+                    onClick={onExplore && (() => onExplore(target))}
+                  />
+                )}
+                {!swapped && target.punishedBy && <span style={{ color: '#778' }}>· worst vs {target.punishedBy}</span>}
+                {!swapped && target.line && target.line.length > 0 && (
                   <span className="ps-eval-line">then {target.line.map(step => `${step.p1} · ${step.p2}`).join(' → ')}</span>
                 )}
               </div>
