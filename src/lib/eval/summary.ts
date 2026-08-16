@@ -152,6 +152,8 @@ function inaccuracyClause(name: string, side: SideAnalysis): string | null {
  */
 function forcedClause(name: string, side: SideAnalysis): string | null {
   if (!side.forcedMix) return null;
+  // The conditional already told this story — one equilibrium mention is enough.
+  if (side.conditional?.mixLabel === side.forcedMix.label) return null;
   const base = `The equilibrium all but commits ${name} to ${phrase(side.forcedMix.label)} ` +
     `here (${Math.round(side.forcedMix.weight * 100)}%)`;
   if (!side.played) return `${base}.`;

@@ -611,3 +611,43 @@ test.describe('round-5 narrative: breadth, conditionals, null guard, forced mixe
     expect(summary).toContain('which is what happened');
   });
 });
+
+test.describe('forced-mix dedup against the conditional', () => {
+  const conditionalDedupChoice = (choiceStr: string, label: string, ev: number, punishedBy: string | null = null): RankedChoice =>
+    ({ choice: choiceStr, label, worstCase: ev - 0.05, expected: ev, ev, punishedBy });
+
+  test('the forced sentence yields when the conditional already names the same mix', () => {
+    const leaning: EvalResult = {
+      score: 0.05, interval: 0.02, depthCompleted: 1,
+      perSide: {
+        p1: [conditionalDedupChoice('move ironhead', 'Iron Head', 0.05), conditionalDedupChoice('move earthpower', 'Earth Power', 0.04)],
+        p2: [
+          conditionalDedupChoice('move recover', 'Recover', -0.05, 'Iron Head'),
+          conditionalDedupChoice('switch 5', '→ Heatran', -0.06),
+          conditionalDedupChoice('move splash', 'Splash', -0.35, 'Iron Head'),
+        ],
+      },
+      matrix: {
+        p1Labels: ['Iron Head', 'Earth Power'],
+        p2Labels: ['Recover', '→ Heatran', 'Splash'],
+        p1Choices: ['move ironhead', 'move earthpower'],
+        p2Choices: ['move recover', 'switch 5', 'move splash'],
+        values: [
+          [0.05, 0.02, 0.30],
+          [0.10, 0.40, 0.35],
+        ],
+        mixes: { p1: [0.5, 0.5], p2: [0.05, 0.92, 0.03] },
+      },
+    };
+    const summary = summarizeTurn(analyzeTurn({
+      turn: 7,
+      result: leaning,
+      played: { p1: { kind: 'move', name: 'Iron Head', tera: false }, p2: { kind: 'move', name: 'Splash', tera: false } },
+      playedOutcome: 0.0,
+      scoreBefore: 0.05,
+      scoreAfter: 0.3,
+    }), names);
+    expect(summary).toContain("The engine's own equilibrium leans switching to Heatran (92%)");
+    expect(summary).not.toContain('all but commits');
+  });
+});
