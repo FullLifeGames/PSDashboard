@@ -250,4 +250,18 @@ test.describe('root-cell blend integration', () => {
     expect(orchestrated.perSide.p1.map(r => [r.choice, r.ev])).toEqual(sync.perSide.p1.map(r => [r.choice, r.ev]));
     expect(orchestrated.koDiagnostics ?? null).toEqual(sync.koDiagnostics ?? null);
   });
+
+  test('ranked options carry koOdds for real boundary events only', () => {
+    const result = searchPosition(machampRoot(), { depth: 1, samples: 3 });
+    const pump = result.perSide.p1.find(row => row.choice === 'move hydropump')!;
+    const toss = result.perSide.p1.find(row => row.choice === 'move seismictoss')!;
+    expect(pump.koOdds).toEqual({ accuracy: expect.closeTo(0.8, 5), killFraction: 1 });
+    expect(toss.koOdds).toBeUndefined();
+  });
+
+  test('the orchestrated path attaches identical koOdds', async () => {
+    const orchestrated = await searchOrchestrated(createLocalExecutor(machampRoot()), { depth: 1, samples: 3 });
+    const pump = orchestrated.perSide.p1.find(row => row.choice === 'move hydropump')!;
+    expect(pump.koOdds).toEqual({ accuracy: expect.closeTo(0.8, 5), killFraction: 1 });
+  });
 });

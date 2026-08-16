@@ -1287,4 +1287,29 @@ test.describe('narrative signals (round 5)', () => {
     expect(analysis.p1.bestNull?.reason).toContain('cannot be burned');
     expect(analysis.p1.bestNull?.alternative).toBeNull();
   });
+
+  test('the null-guard alternative forwards its koOdds grounding', () => {
+    const wisp: EvalResult = {
+      score: 0.1, interval: 0, depthCompleted: 1,
+      perSide: {
+        p1: [
+          choiceEv('move willowisp', 'Will-O-Wisp', 0.1, 0.2),
+          { ...choiceEv('move hex', 'Hex', 0.08, 0.19), koOdds: { accuracy: 0.9, killFraction: 0.5 } },
+          choiceEv('move splash', 'Splash', -0.5, -0.3),
+        ],
+        p2: [choice('move flareblitz', 'Flare Blitz', -0.1)],
+      },
+    };
+    const analysis = analyzeTurn({
+      turn: 19,
+      result: wisp,
+      played: { p1: { kind: 'move', name: 'Splash', tera: false }, p2: { kind: 'move', name: 'Flare Blitz', tera: false } },
+      playedOutcome: 0.0,
+      scoreBefore: 0.1,
+      scoreAfter: -0.2,
+      actives: { p1: 'Mew', p2: 'Charizard-Mega-X', gen: 6 },
+    });
+    expect(analysis.p1.bestNull?.alternative)
+      .toEqual({ label: 'Hex', ev: 0.19, koOdds: { accuracy: 0.9, killFraction: 0.5 } });
+  });
 });

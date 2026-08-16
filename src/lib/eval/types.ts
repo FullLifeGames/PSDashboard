@@ -145,6 +145,13 @@ export interface RankedChoice {
    * expanded (depth ≥ 2).
    */
   line?: { p1: string; p2: string }[];
+  /**
+   * Analytic kill odds of this option's own move vs the opposing pre-turn
+   * active — present only when a real boundary event exists (killFraction
+   * > 0, not a guaranteed kill). Cache-borne so narrative layers can quote
+   * true odds without re-computation.
+   */
+  koOdds?: KoOddsInfo;
 }
 
 export interface EvalResult {
@@ -223,6 +230,8 @@ export interface EvalChoicesInfo {
   /** Static eval of the root (±1 when the battle already ended). */
   rootValue: number;
   rootEnded: boolean;
+  /** Per-option analytic kill odds, index-aligned with p1/p2 (round 6). */
+  koOdds?: { p1: (KoOddsInfo | null)[]; p2: (KoOddsInfo | null)[] };
 }
 
 export interface EvalCellJob {

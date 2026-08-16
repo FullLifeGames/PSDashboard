@@ -1,7 +1,7 @@
 // Data-only Dex (move priorities for the stay-in phantom) — this module is
 // in the app's MAIN bundle; @pkmn/sim must never be imported here.
 import { Dex } from '@pkmn/dex';
-import type { EvalMatrix, EvalResult, RankedChoice, ReadRecommendation } from './types';
+import type { EvalMatrix, EvalResult, KoOddsInfo, RankedChoice, ReadRecommendation } from './types';
 import { nullMoveReason } from './null-moves';
 import { TIE_EPSILON } from './rank';
 import type { PlayedAction, PlayedTurn, SackInfo } from './played';
@@ -231,7 +231,7 @@ export interface SideAnalysis {
    * displays it in place of the null pick (grading untouched); with no such
    * option the narrative keeps the true best and names the caveat.
    */
-  bestNull?: { reason: string; alternative: { label: string; ev: number } | null };
+  bestNull?: { reason: string; alternative: { label: string; ev: number; koOdds?: KoOddsInfo } | null };
   /**
    * The side's equilibrium mix all but commits to one SWITCH
    * (≥ FORCED_MIX_THRESHOLD with more than one option) — a forced-sac /
@@ -715,7 +715,9 @@ export function analyzeTurn(params: {
           best.ev - option.ev <= TIE_EPSILON && nullFor(option.choice) === null) ?? null;
         bestNull = {
           reason,
-          alternative: alternative ? { label: alternative.label, ev: alternative.ev } : null,
+          alternative: alternative
+            ? { label: alternative.label, ev: alternative.ev, ...(alternative.koOdds ? { koOdds: alternative.koOdds } : {}) }
+            : null,
         };
       }
     }

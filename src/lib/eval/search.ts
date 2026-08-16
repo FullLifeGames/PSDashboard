@@ -13,7 +13,7 @@ import {
 } from './rank';
 import { findConsistentOptions, findPlayedOption } from './analysis';
 import {
-  BOUNDARY_DRAW_BUDGET, classifyChild, foldClassWeights, observeOrder, planCellEvents, PROBE_SEEDS,
+  BOUNDARY_DRAW_BUDGET, classifyChild, foldClassWeights, koOddsForOptions, observeOrder, planCellEvents, PROBE_SEEDS,
 } from './cell-blend';
 import { RANDOM_CALL_MOVES } from './ko-odds';
 import type { PlayedAction } from './played';
@@ -723,6 +723,25 @@ export function searchPosition(
   const attachKoDiagnostics = (target: EvalResult) => {
     if (matrix.diagnostics.length > 0) target.koDiagnostics = matrix.diagnostics;
   };
+  // Root options carry their own move's analytic kill odds (vs the standing
+  // opposing active) for the narrative layers — computed once per side.
+  const koOddsMaps = restrictCandidates ? null : (() => {
+    const p1Odds = koOddsForOptions(battle, 'p1', p1Options.map(option => option.choice));
+    const p2Odds = koOddsForOptions(battle, 'p2', p2Options.map(option => option.choice));
+    return {
+      p1: new Map(p1Options.map((option, index) => [option.choice, p1Odds[index]])),
+      p2: new Map(p2Options.map((option, index) => [option.choice, p2Odds[index]])),
+    };
+  })();
+  const attachKoOdds = (target: EvalResult) => {
+    if (!koOddsMaps) return;
+    for (const side of ['p1', 'p2'] as const) {
+      for (const row of target.perSide[side]) {
+        const odds = koOddsMaps[side].get(row.choice);
+        if (odds) row.koOdds = odds;
+      }
+    }
+  };
   // Pre-deepening statics: the trend baseline. Every trend the tiebreak
   // compares is uniformly 1-ply-vs-static — mixed ply counts inside one
   // comparison are the depth-asymmetry trap.
@@ -731,6 +750,7 @@ export function searchPosition(
   let ranked: Ranked = rankFromMatrix(matrix, rootValue);
   let result = toResult(ranked, 1);
   attachKoDiagnostics(result);
+  attachKoOdds(result);
   callbacks?.onPartial?.(result);
 
   let stopped = false;
@@ -788,6 +808,7 @@ export function searchPosition(
     attachLines(matrix, ranked, pvByCell);
     result = toResult(ranked, depth);
     attachKoDiagnostics(result);
+    attachKoOdds(result);
     callbacks?.onPartial?.(result);
   }
 
@@ -821,11 +842,16 @@ export function createLocalExecutor(serializedBattle: string): SearchExecutor {
       // The choices RPC serves the orchestrated ROOT — pivot pairs expand
       // here exactly as in searchPosition (the sync path), or the app's
       // worker-pool matrix shows a bare "U-turn" row the sync pins never see.
+      const p1 = expandPivotPairs(root, 'p1', searchOptions(root, 'p1', { tera, keep: keepPlayed?.p1Slots, sleepClause }));
+      const p2 = expandPivotPairs(root, 'p2', searchOptions(root, 'p2', { tera, keep: keepPlayed?.p2Slots, sleepClause }));
       return {
-        p1: expandPivotPairs(root, 'p1', searchOptions(root, 'p1', { tera, keep: keepPlayed?.p1Slots, sleepClause })),
-        p2: expandPivotPairs(root, 'p2', searchOptions(root, 'p2', { tera, keep: keepPlayed?.p2Slots, sleepClause })),
+        p1, p2,
         rootValue: leafValue(battle, matchupCache),
         rootEnded: battle.ended,
+        koOdds: {
+          p1: koOddsForOptions(battle, 'p1', p1.map(option => option.choice)),
+          p2: koOddsForOptions(battle, 'p2', p2.map(option => option.choice)),
+        },
       };
     },
     async evalCells(jobs, onDone) {

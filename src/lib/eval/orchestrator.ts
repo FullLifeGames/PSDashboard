@@ -5,7 +5,7 @@ import {
 } from './rank';
 import type {
   CellBlend, EvalCellJob, EvalCellValue, EvalChoicesInfo, EvalResult, EvalSettings, EvalSubSearchJob,
-  KoOddsMismatch, SearchProgress, TeraAllowance,
+  KoOddsInfo, KoOddsMismatch, SearchProgress, TeraAllowance,
 } from './types';
 
 /**
@@ -72,6 +72,21 @@ export async function searchOrchestrated(
   const attachKoDiagnostics = (target: EvalResult) => {
     if (diagnostics.length > 0) target.koDiagnostics = diagnostics;
   };
+  // Mirrors searchPosition's attachKoOdds (duplicated: no imports from
+  // search.ts — this module stays sim-free).
+  const koOddsMaps = info.koOdds ? {
+    p1: new Map<string, KoOddsInfo | null>(p1.map((option, index) => [option.choice, info.koOdds!.p1[index] ?? null])),
+    p2: new Map<string, KoOddsInfo | null>(p2.map((option, index) => [option.choice, info.koOdds!.p2[index] ?? null])),
+  } : null;
+  const attachKoOdds = (target: EvalResult) => {
+    if (!koOddsMaps) return;
+    for (const side of ['p1', 'p2'] as const) {
+      for (const row of target.perSide[side]) {
+        const odds = koOddsMaps[side].get(row.choice);
+        if (odds) row.koOdds = odds;
+      }
+    }
+  };
   // Trend baseline, mirroring searchPosition: uniformly 1-ply-vs-static.
   const staticValues = values.map(row => [...row]);
   const trendMap = new Map<number, number>();
@@ -79,6 +94,7 @@ export async function searchOrchestrated(
   let ranked: Ranked = rankFromMatrix(matrix, rootValue);
   let result = toResult(ranked, 1);
   attachKoDiagnostics(result);
+  attachKoOdds(result);
   callbacks?.onPartial?.(result);
 
   let stopped = false;
@@ -132,6 +148,7 @@ export async function searchOrchestrated(
     attachLines(matrix, ranked, pvByCell);
     result = toResult(ranked, depth);
     attachKoDiagnostics(result);
+    attachKoOdds(result);
     callbacks?.onPartial?.(result);
   }
 
