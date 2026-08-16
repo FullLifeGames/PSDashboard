@@ -1,4 +1,4 @@
-import { CHANCE_THRESHOLD, diffChoices, playedSetupMove, type SideAnalysis, type TurnAnalysis } from './analysis';
+import { BREADTH_MIN_OPTIONS, CHANCE_THRESHOLD, diffChoices, playedSetupMove, type SideAnalysis, type TurnAnalysis } from './analysis';
 import { winDeltaText, winPctText, winPercent } from './winprob';
 
 /**
@@ -16,6 +16,43 @@ const phrase = labelPhrase;
 
 const playedBest = (side: SideAnalysis) =>
   side.played !== null && side.best !== null && side.played.choice === side.best.choice;
+
+/**
+ * What the clause RECOMMENDS: the true best, unless it is mechanically null
+ * against the opposing active and a co-optimal alternative exists — then the
+ * alternative's label/EV display in its place (the grading upstream stays
+ * priced against the true argmax; the swap lives within the rank-tie
+ * epsilon). `swapped` tells callers to drop best-specific extras (the PV
+ * line) that would misattach to the substitute.
+ */
+const displayBest = (side: SideAnalysis): { label: string; ev: number; swapped: boolean } =>
+  side.bestNull?.alternative
+    ? { ...side.bestNull.alternative, swapped: true }
+    : { label: side.best!.label, ev: side.best!.ev, swapped: false };
+
+/** The null recommendation kept its place (no alternative): name the caveat. */
+const nullNote = (side: SideAnalysis): string =>
+  side.bestNull && !side.bestNull.alternative && side.best
+    ? ` (A caveat: ${side.best.label} does nothing here — ${side.bestNull.reason}; it only pays against the rest of the team.)`
+    : '';
+
+/**
+ * The engine's own equilibrium leans a different choice than the rendered
+ * recommendation: say so, and name the opponent replies that split them —
+ * the recommendation becomes conditional instead of absolute (653785 t19).
+ */
+function conditionalNote(side: SideAnalysis): string {
+  const conditional = side.conditional;
+  if (!conditional || !side.best) return '';
+  const segments = [
+    conditional.bestWhen
+      ? `${phrase(displayBest(side).label)} is the pick only if you expect ${conditional.bestWhen}`
+      : null,
+    conditional.mixWhen ? `${phrase(conditional.mixLabel)} covers ${conditional.mixWhen}` : null,
+  ].filter((segment): segment is string => segment !== null);
+  return ` The engine's own equilibrium leans ${phrase(conditional.mixLabel)} ` +
+    `(${Math.round(conditional.mixWeight * 100)}%)${segments.length > 0 ? ` — ${segments.join('; ')}` : ''}.`;
+}
 
 /** A flagged risk that won value over the safe guarantee — praised, not blamed. */
 function readClause(name: string, side: SideAnalysis, opponent: SideAnalysis): string | null {
@@ -68,13 +105,17 @@ function mistakeClause(name: string, side: SideAnalysis, opponent: SideAnalysis)
   }
   // The punished misplay reads in EV terms: what the choice was worth against
   // balanced play, vs what the engine's line was worth. A blunder earns the
-  // word; a mistake keeps the softer framing.
+  // word; a mistake keeps the softer framing. A null-swapped recommendation
+  // drops the PV line and the why clause — both belong to the true best.
+  const shown = displayBest(side);
+  const line = shown.swapped ? '' : lineOf(side.best);
+  const reasons = `${shown.swapped ? '' : why}${caveat}${nullNote(side)}${conditionalNote(side)}`;
   if (side.tier === 'blunder') {
     return `${name} played ${phrase(side.played.label)} (${winPctText(side.played.ev)}) — ` +
-      `a blunder; clearly better was ${phrase(side.best.label)} (${winPctText(side.best.ev)})${lineOf(side.best)}.${why}${caveat}`;
+      `a blunder; clearly better was ${phrase(shown.label)} (${winPctText(shown.ev)})${line}.${reasons}`;
   }
   return `${name} played ${phrase(side.played.label)} (${winPctText(side.played.ev)}); ` +
-    `safer was ${phrase(side.best.label)} (${winPctText(side.best.ev)})${lineOf(side.best)}.${why}${caveat}`;
+    `safer was ${phrase(shown.label)} (${winPctText(shown.ev)})${line}.${reasons}`;
 }
 
 /**
@@ -98,8 +139,25 @@ export function formatRead(read: {
 /** Sub-verdict note: a light imprecision worth naming, not blaming. */
 function inaccuracyClause(name: string, side: SideAnalysis): string | null {
   if (side.tier !== 'inaccuracy' || !side.played || !side.best) return null;
+  const shown = displayBest(side);
   return `${name}'s ${phrase(side.played.label)} was an inaccuracy — ` +
-    `${phrase(side.best.label)} was slightly better (${winPctText(side.best.ev)} vs ${winPctText(side.played.ev)}).`;
+    `${phrase(shown.label)} was slightly better (${winPctText(shown.ev)} vs ${winPctText(side.played.ev)}).` +
+    `${nullNote(side)}${conditionalNote(side)}`;
+}
+
+/**
+ * A near-pure equilibrium SWITCH is an expectation worth prose: the side is
+ * effectively forced to give something up, and the reader should hear that
+ * as a sentence, not read it off a matrix header percentage.
+ */
+function forcedClause(name: string, side: SideAnalysis): string | null {
+  if (!side.forcedMix) return null;
+  const base = `The equilibrium all but commits ${name} to ${phrase(side.forcedMix.label)} ` +
+    `here (${Math.round(side.forcedMix.weight * 100)}%)`;
+  if (!side.played) return `${base}.`;
+  return side.played.label === side.forcedMix.label
+    ? `${base} — which is what happened.`
+    : `${base} — ${phrase(side.played.label)} came instead.`;
 }
 
 /**
@@ -176,12 +234,25 @@ export function summarizeTurn(
       sentences.push('Both sides picked reasonable options — the swing came from how the turn rolled ' +
         `(${winDeltaText(analysis.chanceDelta ?? analysis.swing ?? 0)}).`);
       break;
-    case 'shift':
-      sentences.push(analysis.decisionDelta !== null && analysis.chanceDelta !== null
-        ? 'No single mistake stands out — the choices and the rolls pushed the same way ' +
-          `(${winDeltaText(analysis.decisionDelta)} expected, ${winDeltaText(analysis.chanceDelta)} from the rolls).`
-        : 'No single mistake stands out — the swing built up without a clear culprit.');
+    case 'shift': {
+      const decomposition = analysis.decisionDelta !== null && analysis.chanceDelta !== null
+        ? ` (${winDeltaText(analysis.decisionDelta)} expected, ${winDeltaText(analysis.chanceDelta)} from the rolls)`
+        : '';
+      // A wide board on both sides is not a drift — the matrix knew the
+      // breadth (562428 t10), so the prose names it: the turn was a
+      // prediction contest, and the swing is how the picks collided.
+      const open = (analysis.p1.viableCount ?? 0) >= BREADTH_MIN_OPTIONS &&
+        (analysis.p2.viableCount ?? 0) >= BREADTH_MIN_OPTIONS;
+      sentences.push(open
+        ? `A genuinely open turn rather than a drift — ${analysis.p1.viableCount} of ` +
+          `${analysis.p1.choiceCount} options for ${playerNames[0]} and ${analysis.p2.viableCount} of ` +
+          `${analysis.p2.choiceCount} for ${playerNames[1]} sat within an inaccuracy of best, so the ` +
+          `turn hinged on out-predicting the opponent${decomposition}.`
+        : decomposition
+          ? `No single mistake stands out — the choices and the rolls pushed the same way${decomposition}.`
+          : 'No single mistake stands out — the swing built up without a clear culprit.');
       break;
+    }
     case 'unclear':
       sentences.push('The score swung, but a choice never surfaced (a Pokémon slept, flinched, or was fully paralyzed) — no blame assigned.');
       break;
@@ -198,6 +269,13 @@ export function summarizeTurn(
   const p2Note = sackClause(playerNames[1], analysis.p2) ?? inaccuracyClause(playerNames[1], analysis.p2);
   if (p1Note) sentences.push(p1Note);
   if (p2Note) sentences.push(p2Note);
+
+  // Forced equilibrium expectations ride along on any attribution — a
+  // near-forced sack is turn context, not a verdict.
+  const p1Forced = forcedClause(playerNames[0], analysis.p1);
+  const p2Forced = forcedClause(playerNames[1], analysis.p2);
+  if (p1Forced) sentences.push(p1Forced);
+  if (p2Forced) sentences.push(p2Forced);
 
   // Sensitivity hinges also ride along: the softened tier may have silenced
   // the decision clause entirely, but the hinge itself is the finding.

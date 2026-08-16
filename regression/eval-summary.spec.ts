@@ -453,3 +453,161 @@ test.describe('natural-language turn summaries', () => {
     expect(summary).toContain('−18%');
   });
 });
+
+test.describe('round-5 narrative: breadth, conditionals, null guard, forced mixes', () => {
+  test('a wide culprit-free swing reads as an open turn, not a drift', () => {
+    const wide: EvalResult = {
+      score: 0.0, interval: 0.3, depthCompleted: 1,
+      perSide: {
+        p1: [
+          choice('move ironhead', 'Iron Head', 0.1),
+          choice('move earthpower', 'Earth Power', 0.1),
+          choice('move recover', 'Recover', 0.09),
+          choice('move toxic', 'Toxic', 0.05),
+          choice('switch 2', '→ Heatran', 0.02),
+        ],
+        p2: [
+          choice('move surf', 'Surf', 0.05),
+          choice('move icebeam', 'Ice Beam', 0.04),
+          choice('move roost', 'Roost', 0.0),
+          choice('switch 3', '→ Mandibuzz', -0.02),
+        ],
+      },
+    };
+    const summary = summarizeTurn(analyzeTurn({
+      turn: 10,
+      result: wide,
+      played: { p1: { kind: 'move', name: 'Iron Head', tera: false }, p2: { kind: 'move', name: 'Surf', tera: false } },
+      playedOutcome: 0.12,
+      scoreBefore: 0.0,
+      scoreAfter: 0.25,
+    }), names);
+    expect(summary).toContain('open turn');
+    expect(summary).toContain('5 of 5 options for Alpha');
+    expect(summary).toContain('4 of 4 for Beta');
+    expect(summary).toContain('out-predicting');
+    expect(summary).not.toContain('No single mistake');
+  });
+
+  const conditionalChoice = (choiceStr: string, label: string, ev: number, punishedBy: string | null = null): RankedChoice =>
+    ({ choice: choiceStr, label, worstCase: ev - 0.05, expected: ev, ev, punishedBy });
+
+  test('a punished mistake whose engine mix leans elsewhere renders the conditional', () => {
+    const leaning: EvalResult = {
+      score: 0.05, interval: 0.02, depthCompleted: 1,
+      perSide: {
+        p1: [conditionalChoice('move ironhead', 'Iron Head', 0.05), conditionalChoice('move earthpower', 'Earth Power', 0.04)],
+        p2: [
+          conditionalChoice('move recover', 'Recover', -0.05, 'Iron Head'),
+          conditionalChoice('switch 5', '→ Heatran', -0.06),
+          conditionalChoice('move splash', 'Splash', -0.35, 'Iron Head'),
+        ],
+      },
+      matrix: {
+        p1Labels: ['Iron Head', 'Earth Power'],
+        p2Labels: ['Recover', '→ Heatran', 'Splash'],
+        p1Choices: ['move ironhead', 'move earthpower'],
+        p2Choices: ['move recover', 'switch 5', 'move splash'],
+        values: [
+          [0.05, 0.02, 0.30],
+          [0.10, 0.40, 0.35],
+        ],
+        mixes: { p1: [0.5, 0.5], p2: [0.11, 0.89, 0] },
+      },
+    };
+    const summary = summarizeTurn(analyzeTurn({
+      turn: 7,
+      result: leaning,
+      played: { p1: { kind: 'move', name: 'Iron Head', tera: false }, p2: { kind: 'move', name: 'Splash', tera: false } },
+      playedOutcome: 0.0,
+      scoreBefore: 0.05,
+      scoreAfter: 0.3,
+    }), names);
+    expect(summary).toContain('safer was Recover');
+    expect(summary).toContain("The engine's own equilibrium leans switching to Heatran (89%)");
+    expect(summary).toContain('Recover is the pick only if you expect Earth Power');
+    expect(summary).toContain('switching to Heatran covers Iron Head');
+  });
+
+  const wispResult = (withHex: boolean): EvalResult => ({
+    score: 0.1, interval: 0, depthCompleted: 1,
+    perSide: {
+      p1: [
+        conditionalChoice('move willowisp', 'Will-O-Wisp', 0.2),
+        ...(withHex ? [conditionalChoice('move hex', 'Hex', 0.19)] : []),
+        conditionalChoice('move splash', 'Splash', -0.3, 'Flare Blitz'),
+      ],
+      p2: [conditionalChoice('move flareblitz', 'Flare Blitz', -0.1)],
+    },
+  });
+  const wispParams = (result: EvalResult) => ({
+    turn: 19,
+    result,
+    played: {
+      p1: { kind: 'move' as const, name: 'Splash', tera: false },
+      p2: { kind: 'move' as const, name: 'Flare Blitz', tera: false },
+    },
+    playedOutcome: 0.0,
+    scoreBefore: 0.1,
+    scoreAfter: -0.2,
+    actives: { p1: 'Mew', p2: 'Charizard-Mega-X', gen: 6 },
+  });
+
+  test('a null recommendation swaps to the co-optimal alternative', () => {
+    const summary = summarizeTurn(analyzeTurn(wispParams(wispResult(true))), names);
+    expect(summary).toContain('clearly better was Hex');
+    expect(summary).not.toContain('Will-O-Wisp');
+  });
+
+  test('a null recommendation without an alternative carries its caveat', () => {
+    const summary = summarizeTurn(analyzeTurn(wispParams(wispResult(false))), names);
+    expect(summary).toContain('clearly better was Will-O-Wisp');
+    expect(summary).toContain('cannot be burned');
+    expect(summary).toContain('rest of the team');
+  });
+
+  const forcedResult = (): EvalResult => ({
+    score: 0.05, interval: 0.02, depthCompleted: 1,
+    perSide: {
+      p1: [conditionalChoice('move ironhead', 'Iron Head', 0.05)],
+      p2: [
+        conditionalChoice('move recover', 'Recover', -0.05),
+        conditionalChoice('switch 5', '→ Heatran', -0.06),
+      ],
+    },
+    matrix: {
+      p1Labels: ['Iron Head'],
+      p2Labels: ['Recover', '→ Heatran'],
+      p1Choices: ['move ironhead'],
+      p2Choices: ['move recover', 'switch 5'],
+      values: [[0.05, 0.06]],
+      mixes: { p1: [1], p2: [0.08, 0.92] },
+    },
+  });
+
+  test('a near-forced equilibrium switch is named — deviation variant', () => {
+    const summary = summarizeTurn(analyzeTurn({
+      turn: 30,
+      result: forcedResult(),
+      played: { p1: { kind: 'move', name: 'Iron Head', tera: false }, p2: { kind: 'move', name: 'Recover', tera: false } },
+      playedOutcome: 0.05,
+      scoreBefore: 0.05,
+      scoreAfter: 0.08,
+    }), names);
+    expect(summary).toContain('The equilibrium all but commits Beta to switching to Heatran here (92%)');
+    expect(summary).toContain('Recover came instead');
+  });
+
+  test('a near-forced equilibrium switch is named — followed variant', () => {
+    const summary = summarizeTurn(analyzeTurn({
+      turn: 30,
+      result: forcedResult(),
+      played: { p1: { kind: 'move', name: 'Iron Head', tera: false }, p2: { kind: 'switch', name: 'Heatran', species: 'Heatran' } },
+      playedOutcome: 0.05,
+      scoreBefore: 0.05,
+      scoreAfter: 0.08,
+    }), names);
+    expect(summary).toContain('The equilibrium all but commits Beta to switching to Heatran here (92%)');
+    expect(summary).toContain('which is what happened');
+  });
+});
