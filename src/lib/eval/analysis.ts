@@ -1,7 +1,9 @@
 // Data-only Dex (move priorities for the stay-in phantom) — this module is
 // in the app's MAIN bundle; @pkmn/sim must never be imported here.
 import { Dex } from '@pkmn/dex';
-import type { EvalResult, RankedChoice, ReadRecommendation } from './types';
+import type { EvalMatrix, EvalResult, RankedChoice, ReadRecommendation } from './types';
+import { nullMoveReason } from './null-moves';
+import { TIE_EPSILON } from './rank';
 import type { PlayedAction, PlayedTurn, SackInfo } from './played';
 
 /**
@@ -96,6 +98,29 @@ export const PAYOFF_WINDOW = 3;
 export const FEED_CERTAINTY_EPSILON = 0.02;
 
 /**
+ * Both sides must have at least this many VIABLE options (within an
+ * inaccuracy of best) before a culprit-free swing reads as a genuinely open
+ * turn instead of a drift (562428 t10: the expert counted four-plus live
+ * options per side and called the turn a read, not a shift).
+ */
+export const BREADTH_MIN_OPTIONS = 4;
+
+/**
+ * A recommendation conflicts with the engine's own play when the side's
+ * equilibrium mix puts at least this much weight on a DIFFERENT choice than
+ * the argmax-EV pick — the "better was X" line then owes the reader the
+ * condition under which X actually is the pick (653785 t19).
+ */
+export const CONDITIONAL_MIX_MIN = 0.5;
+
+/**
+ * An equilibrium mix this concentrated on one SWITCH reads as "effectively
+ * forced" — the forced-sac situations whose expectation the narrative names
+ * in prose instead of leaving the percentage in matrix header badges.
+ */
+export const FORCED_MIX_THRESHOLD = 0.85;
+
+/**
  * One re-evaluation of the flagged side's turn under an ALTERNATIVE item on
  * an opposing mon whose item is only a usage guess. EVs are own-perspective
  * pair values, same space as RankedChoice.ev.
@@ -184,6 +209,35 @@ export interface SideAnalysis {
    * probes never add blame).
    */
   sensitivity?: { species: string; alternatives: { item: string; tier: VerdictTier | 'none' }[] };
+  /**
+   * How many ranked options sit within an inaccuracy of best — the side's
+   * real decision breadth. Both sides clearing BREADTH_MIN_OPTIONS turns a
+   * culprit-free shift into an "open turn" in the narrative.
+   */
+  viableCount?: number;
+  /**
+   * The engine's own equilibrium leans a DIFFERENT choice than the argmax-EV
+   * recommendation (weight ≥ CONDITIONAL_MIX_MIN): the narrative renders the
+   * recommendation conditionally. bestWhen/mixWhen name the opponent replies
+   * against which each choice earns its keep (largest own-perspective value
+   * difference in the solved matrix); null when no reply favors that side of
+   * the split. Only computed on tiered turns — where a recommendation renders.
+   */
+  conditional?: { mixLabel: string; mixWeight: number; bestWhen: string | null; mixWhen: string | null };
+  /**
+   * The recommended best is MECHANICALLY NULL against the opposing active
+   * (Will-O-Wisp into a Fire-type). `alternative` is a co-optimal option
+   * within the rank-tie epsilon that is not itself null — the narrative
+   * displays it in place of the null pick (grading untouched); with no such
+   * option the narrative keeps the true best and names the caveat.
+   */
+  bestNull?: { reason: string; alternative: { label: string; ev: number } | null };
+  /**
+   * The side's equilibrium mix all but commits to one SWITCH
+   * (≥ FORCED_MIX_THRESHOLD with more than one option) — a forced-sac /
+   * forced-pivot expectation the narrative names in prose.
+   */
+  forcedMix?: { label: string; weight: number };
 }
 
 /** Deep re-search of the played and best pairs (p1-perspective outcomes). */
@@ -477,6 +531,12 @@ export function analyzeTurn(params: {
    * Acquit-only: a probe can soften the side's verdict, never harshen it.
    */
   sensitivity?: TurnSensitivity | null;
+  /**
+   * Active species at turn start (singles: exactly one per side, else null)
+   * plus the replay generation — the null-move guard's board context.
+   * Absent/null species keep the guard off (fail closed).
+   */
+  actives?: { p1: string | null; p2: string | null; gen: number } | null;
 }): TurnAnalysis {
   const playedTracking = params.playedTracking !== false;
   const sideAnalysis = (key: 'p1' | 'p2'): SideAnalysis => {
@@ -598,6 +658,68 @@ export function analyzeTurn(params: {
         tier = charitable.tier === 'none' ? undefined : charitable.tier;
       }
     }
+    // ---- Narrative signals (round 5 ⑥): computed here where the full
+    // result is in scope, rendered in summary.ts/report.ts. All of them
+    // fail closed on missing data and never touch the grading above. ----
+    const viableCount = best === null ? undefined :
+      options.filter(option => best.ev - option.ev <= TIER_THRESHOLDS.inaccuracy).length;
+
+    const matrix = params.result.matrix;
+    const sideChoices = key === 'p1' ? matrix?.p1Choices : matrix?.p2Choices;
+    const sideLabels = key === 'p1' ? matrix?.p1Labels : matrix?.p2Labels;
+    const oppLabels = key === 'p1' ? matrix?.p2Labels : matrix?.p1Labels;
+    const mix = key === 'p1' ? matrix?.mixes.p1 : matrix?.mixes.p2;
+    // Own-perspective matrix value of (own index i, opponent index j).
+    const ownValue = (grid: EvalMatrix, i: number, j: number): number =>
+      key === 'p1' ? grid.values[i][j] : -grid.values[j][i];
+    const mixTop = mix && mix.length > 0
+      ? mix.reduce((top, weight, index) => (weight > mix[top] ? index : top), 0)
+      : -1;
+
+    let conditional: SideAnalysis['conditional'];
+    if (tier && matrix && sideChoices && sideLabels && oppLabels && mix && best && mixTop >= 0) {
+      const bestIndex = sideChoices.indexOf(best.choice);
+      if (bestIndex >= 0 && mixTop !== bestIndex && mix[mixTop] >= CONDITIONAL_MIX_MIN) {
+        let bestWhen: string | null = null;
+        let mixWhen: string | null = null;
+        let bestDiff = 0;
+        let mixDiff = 0;
+        for (let j = 0; j < oppLabels.length; j++) {
+          const diff = ownValue(matrix, bestIndex, j) - ownValue(matrix, mixTop, j);
+          if (diff > bestDiff) { bestDiff = diff; bestWhen = oppLabels[j]; }
+          if (diff < mixDiff) { mixDiff = diff; mixWhen = oppLabels[j]; }
+        }
+        conditional = { mixLabel: sideLabels[mixTop], mixWeight: mix[mixTop], bestWhen, mixWhen };
+      }
+    }
+
+    let forcedMix: SideAnalysis['forcedMix'];
+    if (matrix && sideChoices && sideLabels && mix && options.length > 1 && mixTop >= 0 &&
+      mix[mixTop] >= FORCED_MIX_THRESHOLD && sideChoices[mixTop]?.startsWith('switch')) {
+      forcedMix = { label: sideLabels[mixTop], weight: mix[mixTop] };
+    }
+
+    let bestNull: SideAnalysis['bestNull'];
+    const actives = params.actives;
+    const defenderSpecies = actives ? (key === 'p1' ? actives.p2 : actives.p1) : null;
+    if (best && actives && defenderSpecies) {
+      const attackerSpecies = key === 'p1' ? actives.p1 : actives.p2;
+      const nullFor = (choice: string) => nullMoveReason({
+        choice, gen: actives.gen, attackerSpecies, defenderSpecies,
+      });
+      const reason = nullFor(best.choice);
+      if (reason) {
+        // The swap stays within the established rank-tie scale: a co-optimal
+        // option is a fair display substitute, never a regrade.
+        const alternative = options.find(option => option !== best &&
+          best.ev - option.ev <= TIE_EPSILON && nullFor(option.choice) === null) ?? null;
+        bestNull = {
+          reason,
+          alternative: alternative ? { label: alternative.label, ev: alternative.ev } : null,
+        };
+      }
+    }
+
     return {
       playedRaw,
       ...(params.played?.prevented?.[key] ? { prevented: params.played.prevented[key] } : {}),
@@ -613,6 +735,10 @@ export function analyzeTurn(params: {
       ...(tier ? { tier } : {}),
       ...(sacrificed && sack ? { sacrifice: sack } : {}),
       ...(sensitivity ? { sensitivity } : {}),
+      ...(viableCount !== undefined ? { viableCount } : {}),
+      ...(conditional ? { conditional } : {}),
+      ...(bestNull ? { bestNull } : {}),
+      ...(forcedMix ? { forcedMix } : {}),
     };
   };
 

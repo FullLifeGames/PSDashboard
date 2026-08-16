@@ -1147,3 +1147,144 @@ test.describe('pivot pair matching', () => {
     expect(matched?.label).toBe('U-turn → Noivern');
   });
 });
+
+test.describe('narrative signals (round 5)', () => {
+  /** Two p1 attacks vs three p2 options; p2's equilibrium leans the switch. */
+  const conditionalResult = (p2Choices?: string[]): EvalResult => ({
+    score: 0.05, interval: 0.02, depthCompleted: 1,
+    perSide: {
+      p1: [choiceEv('move ironhead', 'Iron Head', 0.02, 0.05), choiceEv('move earthpower', 'Earth Power', 0.02, 0.04)],
+      p2: [
+        choiceEv('move recover', 'Recover', -0.1, -0.05),
+        choiceEv('switch 5', '→ Heatran', -0.4, -0.06),
+        choiceEv('move splash', 'Splash', -0.5, -0.35),
+      ],
+    },
+    matrix: {
+      p1Labels: ['Iron Head', 'Earth Power'],
+      p2Labels: ['Recover', '→ Heatran', 'Splash'],
+      p1Choices: ['move ironhead', 'move earthpower'],
+      ...(p2Choices ? { p2Choices } : {}),
+      values: [
+        [0.05, 0.02, 0.30],
+        [0.10, 0.40, 0.35],
+      ],
+      mixes: { p1: [0.5, 0.5], p2: [0.11, 0.89, 0] },
+    },
+  });
+  const conditionalParams = (result: EvalResult) => ({
+    turn: 7,
+    result,
+    played: {
+      p1: { kind: 'move' as const, name: 'Iron Head', tera: false },
+      p2: { kind: 'move' as const, name: 'Splash', tera: false },
+    },
+    playedOutcome: 0.0,
+    scoreBefore: 0.05,
+    scoreAfter: 0.3,
+  });
+
+  test('viableCount counts options within an inaccuracy of best', () => {
+    const analysis = analyzeTurn(conditionalParams(conditionalResult()));
+    // p1: 0.05 and 0.04 both within 0.1. p2: −0.05 and −0.06 within 0.1; Splash is not.
+    expect(analysis.p1.viableCount).toBe(2);
+    expect(analysis.p2.viableCount).toBe(2);
+  });
+
+  test('a tiered side whose equilibrium leans another choice gets the conditional', () => {
+    const analysis = analyzeTurn(conditionalParams(
+      conditionalResult(['move recover', 'switch 5', 'move splash'])));
+    expect(analysis.p2.tier).toBe('mistake');
+    expect(analysis.p2.conditional).toEqual({
+      mixLabel: '→ Heatran',
+      mixWeight: 0.89,
+      // Own-perspective (p2) diffs best−mix: vs Iron Head −0.03 (mix covers it),
+      // vs Earth Power +0.30 (best only pays there).
+      bestWhen: 'Earth Power',
+      mixWhen: 'Iron Head',
+    });
+  });
+
+  test('the conditional fails closed without machine choice ids', () => {
+    const analysis = analyzeTurn(conditionalParams(conditionalResult()));
+    expect(analysis.p2.conditional).toBeUndefined();
+  });
+
+  test('an untiered side never carries a conditional', () => {
+    const result = conditionalResult(['move recover', 'switch 5', 'move splash']);
+    const clean = analyzeTurn({
+      ...conditionalParams(result),
+      played: {
+        p1: { kind: 'move' as const, name: 'Iron Head', tera: false },
+        p2: { kind: 'move' as const, name: 'Recover', tera: false },
+      },
+    });
+    expect(clean.p2.tier).toBeUndefined();
+    expect(clean.p2.conditional).toBeUndefined();
+  });
+
+  test('a near-pure equilibrium switch is named as forced; move tops are not', () => {
+    const forced = conditionalResult(['move recover', 'switch 5', 'move splash']);
+    forced.matrix!.mixes.p2 = [0.05, 0.92, 0.03];
+    const analysis = analyzeTurn(conditionalParams(forced));
+    expect(analysis.p2.forcedMix).toEqual({ label: '→ Heatran', weight: 0.92 });
+    // p1's mix is split — no forced expectation.
+    expect(analysis.p1.forcedMix).toBeUndefined();
+
+    const moveTop = conditionalResult(['move recover', 'switch 5', 'move splash']);
+    moveTop.matrix!.mixes.p2 = [0.92, 0.05, 0.03];
+    expect(analyzeTurn(conditionalParams(moveTop)).p2.forcedMix).toBeUndefined();
+  });
+
+  test('a mechanically null best names its reason and a co-optimal alternative', () => {
+    const wisp: EvalResult = {
+      score: 0.1, interval: 0, depthCompleted: 1,
+      perSide: {
+        p1: [
+          choiceEv('move willowisp', 'Will-O-Wisp', 0.1, 0.2),
+          choiceEv('move hex', 'Hex', 0.08, 0.19),
+          choiceEv('move splash', 'Splash', -0.5, -0.3),
+        ],
+        p2: [choice('move flareblitz', 'Flare Blitz', -0.1)],
+      },
+    };
+    const at = (actives?: { p1: string | null; p2: string | null; gen: number }) => analyzeTurn({
+      turn: 19,
+      result: wisp,
+      played: { p1: { kind: 'move', name: 'Splash', tera: false }, p2: { kind: 'move', name: 'Flare Blitz', tera: false } },
+      playedOutcome: 0.0,
+      scoreBefore: 0.1,
+      scoreAfter: -0.2,
+      ...(actives ? { actives } : {}),
+    });
+    const flagged = at({ p1: 'Mew', p2: 'Charizard-Mega-X', gen: 6 });
+    expect(flagged.p1.bestNull?.reason).toContain('cannot be burned');
+    expect(flagged.p1.bestNull?.alternative).toEqual({ label: 'Hex', ev: 0.19 });
+    // Without actives the guard stays off entirely.
+    expect(at().p1.bestNull).toBeUndefined();
+  });
+
+  test('a null best without a co-optimal survivor keeps alternative null', () => {
+    const lonely: EvalResult = {
+      score: 0.1, interval: 0, depthCompleted: 1,
+      perSide: {
+        p1: [
+          choiceEv('move willowisp', 'Will-O-Wisp', 0.1, 0.2),
+          choiceEv('move splash', 'Splash', -0.5, -0.3),
+        ],
+        p2: [choice('move flareblitz', 'Flare Blitz', -0.1)],
+      },
+    };
+    const analysis = analyzeTurn({
+      turn: 19,
+      result: lonely,
+      played: { p1: { kind: 'move', name: 'Splash', tera: false }, p2: { kind: 'move', name: 'Flare Blitz', tera: false } },
+      playedOutcome: 0.0,
+      scoreBefore: 0.1,
+      scoreAfter: -0.2,
+      actives: { p1: 'Mew', p2: 'Charizard-Mega-X', gen: 6 },
+    });
+    expect(analysis.p1.bestNull?.reason).toContain('cannot be burned');
+    expect(analysis.p1.bestNull?.alternative).toBeNull();
+  });
+});
