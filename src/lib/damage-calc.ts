@@ -46,7 +46,7 @@ export const WEATHER_BY_ID: Record<string, NonNullable<CalcWeather>> = {
   deltastream: 'Strong Winds',
 };
 
-const TERRAIN_BY_ID: Record<string, NonNullable<CalcTerrain>> = {
+export const TERRAIN_BY_ID: Record<string, NonNullable<CalcTerrain>> = {
   electricterrain: 'Electric',
   grassyterrain: 'Grassy',
   psychicterrain: 'Psychic',

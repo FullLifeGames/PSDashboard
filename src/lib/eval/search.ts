@@ -12,6 +12,7 @@ import {
   type PvStep, type Ranked, type ValueMatrix,
 } from './rank';
 import { findConsistentOptions, findPlayedOption } from './analysis';
+import { RANDOM_CALL_MOVES } from './ko-odds';
 import type { PlayedAction } from './played';
 import type { CellValue, SearchExecutor } from './orchestrator';
 import type { EvalResult, EvalSettings, RankedChoice, SearchProgress, TeraAllowance } from './types';
@@ -71,9 +72,6 @@ export function leafValue(battle: ReturnType<typeof positionBattle>, matchupCach
   if (battle.ended) return raw > 0 ? 1 : raw < 0 ? -1 : 0;
   return wpUnits(raw, battle.gameType === 'doubles', battleFaintedFraction(battle));
 }
-
-/** Moves that call a RANDOM move — the seed decides what actually happens. */
-const RANDOM_CALL_MOVES = new Set(['sleeptalk', 'metronome', 'assist', 'copycat']);
 
 /** Move ids named in a (possibly combined) choice string. */
 const choiceMoveIds = (choice: string): string[] => choice.split(',')
