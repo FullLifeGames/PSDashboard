@@ -675,6 +675,24 @@ test.describe('starved support cells are verified before the verdict', () => {
     expect(pairs).toContain('Safe×X');     // boundary bypasses the ended exclusion
     expect(pairs).not.toContain('Sack×X'); // starved AND ended, but not boundary — excluded as today
   });
+
+  test('verified-cell diagnostics attach sorted by (i, j) (round 7)', () => {
+    // The pooled executor returns chunk results in completion order — an
+    // unsorted attach would be run-nondeterministic.
+    const diag = (i: number, j: number) => ({
+      i, j, p1Choice: 'Sack', p2Choice: 'Y', missing: ['miss'],
+      analytic: { miss: 0.2, 'hit-kill': 0.8 }, sampled: { 'hit-kill': 3 },
+    });
+    const verified = new Map([
+      [cellKey(1, 1), { i: 1, j: 1, value: -0.1, ended: false, diagnostic: diag(1, 1) }],
+      [cellKey(0, 1), { i: 0, j: 1, value: -0.1, ended: false, diagnostic: diag(0, 1) }],
+      [cellKey(1, 0), { i: 1, j: 0, value: -0.1, ended: false }],
+    ]);
+    const merged = mergeMctsTrees([t1, t2], verified);
+    expect(merged.koDiagnostics?.map(d => [d.i, d.j])).toEqual([[0, 1], [1, 1]]);
+    // No verify round → no diagnostics key at all.
+    expect(mergeMctsTrees([t1, t2]).koDiagnostics).toBeUndefined();
+  });
 });
 
 test.describe('team preview search (turn 0)', () => {

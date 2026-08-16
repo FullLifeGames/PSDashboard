@@ -1,5 +1,5 @@
 import { cellKey, rankFromMatrix, toResult as rankedToResult } from './rank';
-import type { EvalCellJob, EvalCellValue, EvalResult, KoOddsInfo, MctsTreeStats } from './types';
+import type { EvalCellJob, EvalCellValue, EvalResult, KoOddsInfo, KoOddsMismatch, MctsTreeStats } from './types';
 
 /**
  * Root parallelization for the MCTS mode: N independent trees (each with a
@@ -79,12 +79,23 @@ export function mergeMctsTrees(trees: MctsTreeStats[], verified?: Map<number, Ev
       }
     }
   }
+  // Round 7: the verify sampler's mismatch diagnostics survive the merge —
+  // sorted (i, j) because the pooled executor returns chunks in completion
+  // order. Blend payloads are dropped on purpose: MCTS has no deepening,
+  // so reblendValue has no call site here.
+  const diagnostics = verified
+    ? [...verified.values()]
+      .map(value => value.diagnostic)
+      .filter((diagnostic): diagnostic is KoOddsMismatch => Boolean(diagnostic))
+      .sort((a, b) => a.i - b.i || a.j - b.j)
+    : [];
 
   const ranked = rankFromMatrix(
     { p1Options: base.p1Options, p2Options: base.p2Options, values, ended },
     base.rootValue,
   );
   const result = rankedToResult(ranked, Math.max(...trees.map(tree => tree.depth)));
+  if (diagnostics.length > 0) result.koDiagnostics = diagnostics;
 
   // HYBRID SEMANTICS (see mcts.ts toResult): the score keeps the summed
   // visit-mean formulation — bit-comparable with the standing records —
