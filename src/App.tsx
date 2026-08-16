@@ -1091,6 +1091,19 @@ function App() {
     [replayData],
   );
 
+  // Null-move guard board context (round 5 ⑥): the PRE-TURN active species
+  // per side, singles only — anything but exactly one live active passes
+  // null and keeps the guard off (fail closed, doubles out of scope).
+  const activesForTurn = useCallback((turn: number) => {
+    const snapshot = snapshots[turn - 1] ?? null;
+    if (!snapshot) return null;
+    const activeOf = (side: typeof snapshot.p1): string | null => {
+      const active = side.pokemon.filter(pokemon => pokemon.isActive && !pokemon.fainted);
+      return active.length === 1 ? active[0].speciesForme : null;
+    };
+    return { p1: activeOf(snapshot.p1), p2: activeOf(snapshot.p2), gen: replayGen };
+  }, [snapshots, replayGen]);
+
   // Exploitative Read lens: best response to the opponent model over the
   // already-solved matrix — advisory only, verdicts stay equilibrium-graded.
   const turnReads = useMemo(() => {
@@ -1125,8 +1138,9 @@ function App() {
         ? { sacks: detectSacks(turnEventsIndex[analysisTurn] ?? [], snapshots[analysisTurn - 1] ?? null) }
         : {}),
       ...(turnReads ? { reads: turnReads } : {}),
+      actives: activesForTurn(analysisTurn),
     });
-  }, [analysisTurn, evaluation.graph, replayData, snapshots, turnReads, turnEventsIndex]);
+  }, [analysisTurn, evaluation.graph, replayData, snapshots, turnReads, turnEventsIndex, activesForTurn]);
 
   // ONE place for everything: in replay view the advantage bar, ranked
   // lists, and matrix render from the ANALYZED turn's cached sweep result
@@ -1227,6 +1241,7 @@ function App() {
         scoreAfter: scores[index + 1] ?? null,
         playedTracking: true,
         sacks: detectSacks(turnEventsIndex[index + 1] ?? [], snapshots[index] ?? null),
+        actives: activesForTurn(index + 1),
       });
     });
     if (analyses.filter(Boolean).length < 3) {
@@ -1239,7 +1254,7 @@ function App() {
     const data = { report, analyses };
     gameReportDataRef.current = data;
     return data;
-  }, [replayData, snapshots, evaluation.graph, replayWinner, turnEventsIndex]);
+  }, [replayData, snapshots, evaluation.graph, replayWinner, turnEventsIndex, activesForTurn]);
   const gameReport = gameReportData?.report ?? null;
 
   // Structured handle for the feedback drift harness: the SAME objects the

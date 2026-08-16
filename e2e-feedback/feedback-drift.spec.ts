@@ -165,7 +165,8 @@ for (const replayId of FEEDBACK_REPLAYS) {
     }
 
     for (const item of FEEDBACK_CORPUS.filter(entry => entry.replay === replayId)) {
-      results.push(evaluateItem(item, dbg.analyses!, dbg.gameReport));
+      results.push(evaluateItem(item, dbg.analyses!, dbg.gameReport,
+        [fixture.players[0], fixture.players[1]]));
     }
   });
 }

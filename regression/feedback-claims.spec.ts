@@ -184,3 +184,26 @@ test.describe('drift report rendering', () => {
     expect(markdown).not.toContain('no-sweep');
   });
 });
+
+test.describe('narrative pins (round 5)', () => {
+  test('summaryIncludes renders the summary and requires every fragment', () => {
+    const a = analysis(12, 'shift');
+    const ok = evaluateItem(
+      truthAt(12, { attribution: ['shift'], summaryIncludes: ['No single mistake'] }),
+      analysesWith(a), report(), ['Alpha', 'Beta']);
+    expect(ok.status).toBe('ok');
+    const missing = evaluateItem(
+      truthAt(12, { summaryIncludes: ['open turn'] }),
+      analysesWith(a), report(), ['Alpha', 'Beta']);
+    expect(missing.status).toBe('drift');
+    expect(missing.details.join(' ')).toContain("summary is missing 'open turn'");
+  });
+
+  test('summaryIncludes without player names mismatches loudly', () => {
+    const a = analysis(12, 'shift');
+    const result = evaluateItem(
+      truthAt(12, { summaryIncludes: ['No single mistake'] }), analysesWith(a), report());
+    expect(result.status).toBe('drift');
+    expect(result.details.join(' ')).toContain('player names');
+  });
+});

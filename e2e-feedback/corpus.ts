@@ -24,6 +24,13 @@ export interface TurnClaim {
   playedLabelIncludes?: string;
   /** Whether the turn must appear among the report's key moments. */
   keyMoment?: boolean;
+  /**
+   * Narrative pins (round 5 ⑥): every fragment must appear in the turn's
+   * rendered summary (`summarizeTurn` with the replay's player names). Keep
+   * fragments short and structural ("open turn", "cannot be burned") — the
+   * summary wording may be refined without moving verdicts.
+   */
+  summaryIncludes?: string[];
 }
 
 /** Frozen GameReport subset for a whole-game truth item. */

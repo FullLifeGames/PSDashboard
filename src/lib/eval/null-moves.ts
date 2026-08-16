@@ -69,7 +69,7 @@ export function nullMoveReason(params: {
   const ignoreImmunity = move.ignoreImmunity === true ||
     (typeof move.ignoreImmunity === 'object' && move.ignoreImmunity !== null &&
       (move.ignoreImmunity as Record<string, boolean>)[move.type] === true);
-  const typeImmune = !ignoreImmunity && !dex.getImmunity(move.type, types as unknown as string[]);
+  const typeImmune = !ignoreImmunity && !dex.getImmunity(move.type, types as never);
   // Scrappy (and gen 9's Mind's Eye) hit Ghosts with Normal/Fighting moves.
   const immunityBroken = (move.type === 'Normal' || move.type === 'Fighting') &&
     types.includes('Ghost') && (mayHave('Scrappy') || mayHave("Mind's Eye"));
@@ -81,7 +81,8 @@ export function nullMoveReason(params: {
   }
 
   if (move.status) {
-    const blocked = statusImmuneTypes(move.status, params.gen).find(type => types.includes(type));
+    const blocked = statusImmuneTypes(move.status, params.gen)
+      .find(type => (types as readonly string[]).includes(type));
     const corroded = (move.status === 'psn' || move.status === 'tox') && mayHave('Corrosion');
     if (blocked && !corroded) {
       return `${defender.name} cannot be ${STATUS_TEXT[move.status] ?? move.status} (${blocked}-type)`;

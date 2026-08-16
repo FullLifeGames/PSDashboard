@@ -1,5 +1,6 @@
 import type { GameReport } from '../src/lib/eval/report';
 import type { TurnAnalysis } from '../src/lib/eval/analysis';
+import { summarizeTurn } from '../src/lib/eval/summary';
 import { BASELINE_PINNED, FEEDBACK_REPLAYS, type FeedbackItem, type ReportClaim, type TurnClaim } from './corpus';
 
 /**
@@ -31,6 +32,7 @@ function turnClaimMismatches(
   analysis: TurnAnalysis | null,
   report: GameReport | null,
   turn: number,
+  playerNames?: [string, string],
 ): string[] {
   if (!analysis) return [`turn ${turn} has no analysis (coverage hole in the sweep)`];
   const out: string[] = [];
@@ -63,6 +65,17 @@ function turnClaimMismatches(
   if (claim.keyMoment !== undefined) {
     const isKey = !!report?.keyMoments.some(moment => moment.turn === turn);
     if (isKey !== claim.keyMoment) out.push(`keyMoment membership is ${isKey}, expected ${claim.keyMoment}`);
+  }
+  if (claim.summaryIncludes && claim.summaryIncludes.length > 0) {
+    // Narrative pins render the SAME summary the UI shows. Missing names are
+    // a loud mismatch, never a silent pass.
+    if (!playerNames) out.push('claim has summaryIncludes but no player names were provided');
+    else {
+      const summary = summarizeTurn(analysis, playerNames);
+      for (const fragment of claim.summaryIncludes) {
+        if (!summary.includes(fragment)) out.push(`summary is missing '${fragment}'`);
+      }
+    }
   }
   return out;
 }
@@ -98,16 +111,18 @@ export function evaluateItem(
   item: FeedbackItem,
   analyses: (TurnAnalysis | null)[],
   report: GameReport | null,
+  /** Needed only by narrative pins (summaryIncludes) — the replay's player names. */
+  playerNames?: [string, string],
 ): ClaimResult {
   if (item.kind === 'truth') {
     if (!item.expect) return { item, status: 'pending', details: ['truth not yet pinned (pre-baseline)'] };
     const mismatches = isReportClaim(item.expect)
       ? reportClaimMismatches(item.expect, report)
-      : turnClaimMismatches(item.expect, analyses[(item.turn ?? 1) - 1] ?? null, report, item.turn ?? 1);
+      : turnClaimMismatches(item.expect, analyses[(item.turn ?? 1) - 1] ?? null, report, item.turn ?? 1, playerNames);
     return { item, status: mismatches.length === 0 ? 'ok' : 'drift', details: mismatches };
   }
   if (!item.observed) return { item, status: 'pending', details: ['gap baseline not yet recorded'] };
-  const mismatches = turnClaimMismatches(item.observed, analyses[(item.turn ?? 1) - 1] ?? null, report, item.turn ?? 1);
+  const mismatches = turnClaimMismatches(item.observed, analyses[(item.turn ?? 1) - 1] ?? null, report, item.turn ?? 1, playerNames);
   return mismatches.length === 0
     ? { item, status: 'gap-open', details: [] }
     : { item, status: 'gap-moved', details: mismatches };
