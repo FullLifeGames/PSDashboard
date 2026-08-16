@@ -1312,4 +1312,27 @@ test.describe('narrative signals (round 5)', () => {
     expect(analysis.p1.bestNull?.alternative)
       .toEqual({ label: 'Hex', ev: 0.19, koOdds: { accuracy: 0.9, killFraction: 0.5 } });
   });
+
+  test('streak odds detect from the played history and fail closed without it', () => {
+    const historyEntry = () => ({
+      attacker: 'Kyurem', moveId: 'icebeam', defender: 'Blissey', movedFirst: true,
+      attackerAbility: 'pressure', defenderAbility: 'naturalcure', defenderItem: 'leftovers',
+      defenderBoosts: { def: 0, spd: 0 },
+    });
+    const withHistory = analyzeTurn({
+      ...conditionalParams(conditionalResult()),
+      turn: 3,
+      actives: { p1: 'Kyurem', p2: 'Blissey', gen: 6 },
+      playedHistory: { p1: [historyEntry(), historyEntry(), historyEntry()], p2: [null, null, null] },
+    });
+    expect(withHistory.p1.streakOdds?.event).toBe('freeze');
+    expect(withHistory.p1.streakOdds?.n).toBe(3);
+    expect(withHistory.p2.streakOdds).toBeUndefined();
+    // Render-time signal: absent history keeps the signal off entirely.
+    const without = analyzeTurn({
+      ...conditionalParams(conditionalResult()),
+      actives: { p1: 'Kyurem', p2: 'Blissey', gen: 6 },
+    });
+    expect(without.p1.streakOdds).toBeUndefined();
+  });
 });

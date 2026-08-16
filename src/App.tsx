@@ -33,6 +33,8 @@ import { choiceId, evalChoiceToSlotChoices, type BranchSlotChoice } from './lib/
 import type { RankedChoice } from './lib/eval/types';
 import { allTurnEvents, detectSacks, parseLeadSpecies, parsePlayedActions, parsePlayedActionsDoubles } from './lib/eval/played';
 import { analyzeTurn, PAYOFF_WINDOW, type TurnAnalysis } from './lib/eval/analysis';
+import { toID } from '@pkmn/dex';
+import type { StreakHistoryEntry } from './lib/eval/streaks';
 import { computeRead, parseTendencies } from './lib/eval/opponent-model';
 import { analyzeLeads } from './lib/eval/leads';
 import { buildGameReport, type GameReport } from './lib/eval/report';
@@ -1104,6 +1106,41 @@ function App() {
     return { p1: activeOf(snapshot.p1), p2: activeOf(snapshot.p2), gen: replayGen };
   }, [snapshots, replayGen]);
 
+  // Streak-detector history (round 6 ②, narrative channel): per side per
+  // turn, who attacked whom with what — read from the replay's own
+  // snapshots and protocol lines, render-time only. Gaps push null (breaks
+  // streaks; the detector fails closed).
+  const playedHistoryAll = useMemo(() => {
+    const sides = { p1: [] as (StreakHistoryEntry | null)[], p2: [] as (StreakHistoryEntry | null)[] };
+    const turns = evaluation.graph.played.length;
+    for (let t = 1; t <= turns; t++) {
+      const playedTurn = evaluation.graph.played[t - 1];
+      const snapshot = snapshots[t - 1] ?? null;
+      const events = turnEventsIndex[t] ?? [];
+      const firstMover = events.find(line => line.startsWith('|move|'))?.split('|')[2]?.slice(0, 2) ?? null;
+      for (const side of ['p1', 'p2'] as const) {
+        const action = playedTurn?.[side] ?? null;
+        const own = snapshot?.[side].pokemon.find(pokemon => pokemon.isActive && !pokemon.fainted) ?? null;
+        const opp = snapshot?.[side === 'p1' ? 'p2' : 'p1'].pokemon.find(pokemon => pokemon.isActive && !pokemon.fainted) ?? null;
+        if (!action || action.kind !== 'move' || !own || !opp) {
+          sides[side].push(null);
+          continue;
+        }
+        sides[side].push({
+          attacker: own.speciesForme,
+          moveId: toID(action.name) || null,
+          defender: opp.speciesForme,
+          movedFirst: firstMover === side,
+          attackerAbility: toID(own.ability),
+          defenderAbility: toID(opp.ability),
+          defenderItem: toID(opp.item),
+          defenderBoosts: { def: opp.boosts['def'] ?? 0, spd: opp.boosts['spd'] ?? 0 },
+        });
+      }
+    }
+    return sides;
+  }, [evaluation.graph.played, snapshots, turnEventsIndex]);
+
   // Exploitative Read lens: best response to the opponent model over the
   // already-solved matrix — advisory only, verdicts stay equilibrium-graded.
   const turnReads = useMemo(() => {
@@ -1139,8 +1176,9 @@ function App() {
         : {}),
       ...(turnReads ? { reads: turnReads } : {}),
       actives: activesForTurn(analysisTurn),
+      playedHistory: playedHistoryAll,
     });
-  }, [analysisTurn, evaluation.graph, replayData, snapshots, turnReads, turnEventsIndex, activesForTurn]);
+  }, [analysisTurn, evaluation.graph, replayData, snapshots, turnReads, turnEventsIndex, activesForTurn, playedHistoryAll]);
 
   // ONE place for everything: in replay view the advantage bar, ranked
   // lists, and matrix render from the ANALYZED turn's cached sweep result
@@ -1242,6 +1280,7 @@ function App() {
         playedTracking: true,
         sacks: detectSacks(turnEventsIndex[index + 1] ?? [], snapshots[index] ?? null),
         actives: activesForTurn(index + 1),
+        playedHistory: playedHistoryAll,
       });
     });
     if (analyses.filter(Boolean).length < 3) {
@@ -1254,7 +1293,7 @@ function App() {
     const data = { report, analyses };
     gameReportDataRef.current = data;
     return data;
-  }, [replayData, snapshots, evaluation.graph, replayWinner, turnEventsIndex, activesForTurn]);
+  }, [replayData, snapshots, evaluation.graph, replayWinner, turnEventsIndex, activesForTurn, playedHistoryAll]);
   const gameReport = gameReportData?.report ?? null;
 
   // Structured handle for the feedback drift harness: the SAME objects the

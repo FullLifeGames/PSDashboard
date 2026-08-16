@@ -212,6 +212,20 @@ function sackClause(name: string, side: SideAnalysis): string | null {
     : `${name} sacked ${side.sacrifice.name} (${pct}% HP) — a low-cost trade, not graded as a misplay.`;
 }
 
+/** Multi-turn expectation: the narrative half of round 6 — never a grade. */
+function streakClause(name: string, side: SideAnalysis): string | null {
+  if (!side.streakOdds) return null;
+  const streak = side.streakOdds;
+  const n = streak.n;
+  const nth = `${n}${n % 10 === 1 && n % 100 !== 11 ? 'st' : n % 10 === 2 && n % 100 !== 12 ? 'nd' : n % 10 === 3 && n % 100 !== 13 ? 'rd' : 'th'}`;
+  const pct = Math.round(streak.cumulative * 100);
+  if (streak.event === 'crit') {
+    return `${name}'s ${nth} straight attack into the boosted ${streak.defenderSpecies} — cumulative crit odds ` +
+      `reach ~${pct}% across the streak, and a crit ignores those boosts.`;
+  }
+  return `${name}'s ${nth} ${streak.moveLabel} into ${streak.defenderSpecies} — ${streak.event} fishing compounds to ~${pct}% across the streak.`;
+}
+
 /**
  * The verdict hinges on a guessed item: name the split so the reader knows
  * the grade depends on hidden information, not on the engine's confidence.
@@ -312,6 +326,13 @@ export function summarizeTurn(
   const p2Forced = forcedClause(playerNames[1], analysis.p2);
   if (p1Forced) sentences.push(p1Forced);
   if (p2Forced) sentences.push(p2Forced);
+
+  // Streak cumulation rides along the same way: multi-turn expectation is
+  // narrative context, never a verdict.
+  const p1Streak = streakClause(playerNames[0], analysis.p1);
+  const p2Streak = streakClause(playerNames[1], analysis.p2);
+  if (p1Streak) sentences.push(p1Streak);
+  if (p2Streak) sentences.push(p2Streak);
 
   // Sensitivity hinges also ride along: the softened tier may have silenced
   // the decision clause entirely, but the hinge itself is the finding.

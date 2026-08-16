@@ -3,6 +3,7 @@
 import { Dex } from '@pkmn/dex';
 import type { EvalMatrix, EvalResult, KoOddsInfo, RankedChoice, ReadRecommendation } from './types';
 import { nullMoveReason } from './null-moves';
+import { detectStreakOdds, type StreakHistoryEntry, type StreakOdds } from './streaks';
 import { TIE_EPSILON } from './rank';
 import type { PlayedAction, PlayedTurn, SackInfo } from './played';
 
@@ -238,6 +239,12 @@ export interface SideAnalysis {
    * forced-pivot expectation the narrative names in prose.
    */
   forcedMix?: { label: string; weight: number };
+  /**
+   * Multi-turn expectation cumulation (round 6): a milestone streak of
+   * secondary fishing or crit accumulation ending on this turn. Render-time
+   * narrative only — grading never sees it.
+   */
+  streakOdds?: StreakOdds;
 }
 
 /** Deep re-search of the played and best pairs (p1-perspective outcomes). */
@@ -537,6 +544,12 @@ export function analyzeTurn(params: {
    * Absent/null species keep the guard off (fail closed).
    */
   actives?: { p1: string | null; p2: string | null; gen: number } | null;
+  /**
+   * Per-side played-move history for the whole game (index t−1 = turn t,
+   * the current turn included) — the streak detector's input. Render-time
+   * only, fail closed when absent.
+   */
+  playedHistory?: { p1: (StreakHistoryEntry | null)[]; p2: (StreakHistoryEntry | null)[] } | null;
 }): TurnAnalysis {
   const playedTracking = params.playedTracking !== false;
   const sideAnalysis = (key: 'p1' | 'p2'): SideAnalysis => {
@@ -722,6 +735,13 @@ export function analyzeTurn(params: {
       }
     }
 
+    // Round 6 ②: multi-turn cumulation — a streak ending THIS turn, read
+    // from the render-time history (index t−1 = turn t, current included).
+    let streakOdds: SideAnalysis['streakOdds'];
+    if (params.playedHistory && actives) {
+      streakOdds = detectStreakOdds(actives.gen, params.playedHistory[key].slice(0, params.turn)) ?? undefined;
+    }
+
     return {
       playedRaw,
       ...(params.played?.prevented?.[key] ? { prevented: params.played.prevented[key] } : {}),
@@ -741,6 +761,7 @@ export function analyzeTurn(params: {
       ...(conditional ? { conditional } : {}),
       ...(bestNull ? { bestNull } : {}),
       ...(forcedMix ? { forcedMix } : {}),
+      ...(streakOdds ? { streakOdds } : {}),
     };
   };
 

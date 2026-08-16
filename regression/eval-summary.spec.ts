@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { analyzeTurn } from '../src/lib/eval/analysis';
+import { analyzeTurn, type TurnAnalysis } from '../src/lib/eval/analysis';
 import { formatRead, summarizeTurn } from '../src/lib/eval/summary';
 import type { EvalResult, RankedChoice } from '../src/lib/eval/types';
 
@@ -738,5 +738,40 @@ test.describe('odds grounding (round 6)', () => {
     expect(summary).not.toContain('kill range');
     expect(summary).not.toContain('% of the time');
     expect(summary).not.toContain('True odds');
+  });
+});
+
+test.describe('streak clauses (round 6)', () => {
+  const base: TurnAnalysis = {
+    turn: 30, scoreBefore: 0.1, scoreAfter: 0.1, swing: 0,
+    playedOutcome: null, decisionDelta: null, chanceDelta: null,
+    attribution: 'quiet',
+    p1: { playedRaw: null, played: null, best: null, safe: null, regret: null },
+    p2: { playedRaw: null, played: null, best: null, safe: null, regret: null },
+  };
+
+  test('freeze fishing names the ordinal and the compounded odds', () => {
+    const analysis: TurnAnalysis = {
+      ...base,
+      p1: {
+        ...base.p1,
+        streakOdds: { moveLabel: 'Ice Beam', defenderSpecies: 'Blissey', n: 5, perTurn: 0.1, cumulative: 0.41, event: 'freeze' },
+      },
+    };
+    const summary = summarizeTurn(analysis, names);
+    expect(summary).toContain("Alpha's 5th Ice Beam into Blissey — freeze fishing compounds to ~41% across the streak.");
+  });
+
+  test('crit accumulation names the boost-ignoring roll', () => {
+    const analysis: TurnAnalysis = {
+      ...base,
+      p2: {
+        ...base.p2,
+        streakOdds: { moveLabel: 'Surf', defenderSpecies: 'Snorlax', n: 3, perTurn: 1 / 16, cumulative: 0.176, event: 'crit' },
+      },
+    };
+    const summary = summarizeTurn(analysis, names);
+    expect(summary).toContain("Beta's 3rd straight attack into the boosted Snorlax");
+    expect(summary).toContain('and a crit ignores those boosts');
   });
 });
