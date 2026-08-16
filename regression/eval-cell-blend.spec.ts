@@ -7,6 +7,8 @@ import {
 } from '../src/lib/eval/cell-blend';
 import { reblendValue } from '../src/lib/eval/rank';
 import { advancePositionWithLog, createRootPosition } from '../src/lib/eval/forward-model';
+import { createLocalExecutor, searchPosition } from '../src/lib/eval/search';
+import { searchOrchestrated } from '../src/lib/eval/orchestrator';
 
 function makeSet(name: string, species: string, moves: string[], level = 50, item = '', ability = 'No Ability'): PokemonSet {
   return {
@@ -187,4 +189,65 @@ test('probe constants: eleven fixed seeds under a 16-draw budget', () => {
   expect(PROBE_SEEDS[0]).toBe('21,22,23,24');
   expect(PROBE_SEEDS[10]).toBe('61,62,63,64');
   expect(BOUNDARY_DRAW_BUDGET).toBe(16);
+});
+
+test.describe('root-cell blend integration', () => {
+  // Mutual-OHKO cell with exact ±1 leaves: p1's 80% Hydro Pump always kills
+  // on a hit (+1); on a miss the surviving Pikachu's Tackle kills the 1-HP
+  // attacker (−1). Analytic value = 0.8·1 + 0.2·(−1) = 0.6 exactly. The
+  // fixed base seeds hit only 3/5 (frequency mean 0.2) — the assertion can
+  // only pass when the analytic weights price the cell.
+  const mutualRoot = () => {
+    const battle = makeBattle(
+      [makeSet('Deo', 'Deoxys-Speed', ['Hydro Pump', 'Seismic Toss'], 100)],
+      [makeSet('Pika', 'Pikachu', ['Tackle', 'Growl'], 30)],
+    );
+    battle.sides[0].active[0]!.hp = 1;
+    return serialize(battle);
+  };
+  // Full-HP variant: miss children stay alive (non-ended), exercising the
+  // deepening re-blend path in both engines.
+  const machampRoot = () => serialize(makeBattle(
+    [makeSet('Machamp', 'Machamp', ['Hydro Pump', 'Seismic Toss'], 100)],
+    [makeSet('Pikachu', 'Pikachu', ['Tackle', 'Growl'], 30)],
+  ));
+
+  test('a boundary cell prices at analytic weights, not seed frequency', () => {
+    const result = searchPosition(mutualRoot(), { depth: 1, samples: 5 });
+    const matrix = result.matrix!;
+    const i = matrix.p1Choices!.indexOf('move hydropump');
+    const j = matrix.p2Choices!.indexOf('move tackle');
+    expect(i).toBeGreaterThanOrEqual(0);
+    expect(j).toBeGreaterThanOrEqual(0);
+    expect(matrix.values[i][j]).toBeCloseTo(0.6, 9);
+    // Seismic Toss (deterministic KO) still prices as the certain line and
+    // outranks the 80% gamble on floor.
+    const toss = result.perSide.p1.find(row => row.choice === 'move seismictoss')!;
+    const pump = result.perSide.p1.find(row => row.choice === 'move hydropump')!;
+    expect(toss.worstCase).toBeCloseTo(1, 9);
+    expect(toss.worstCase).toBeGreaterThan(pump.worstCase);
+  });
+
+  test('samples:1 still blends at the root (the blend path draws what it needs)', () => {
+    const result = searchPosition(mutualRoot(), { depth: 1, samples: 1 });
+    const matrix = result.matrix!;
+    const i = matrix.p1Choices!.indexOf('move hydropump');
+    const j = matrix.p2Choices!.indexOf('move tackle');
+    // One base draw hits (+1); the probe chase must find the missing miss
+    // class and fold it at its analytic 0.2 — not the 1/3 of a 3-draw mean.
+    expect(matrix.values[i][j]).toBeCloseTo(0.6, 9);
+    const toss = result.perSide.p1.find(row => row.choice === 'move seismictoss')!;
+    const pump = result.perSide.p1.find(row => row.choice === 'move hydropump')!;
+    expect(toss.worstCase).toBeGreaterThan(pump.worstCase);
+  });
+
+  test('orchestrated parity: the executor path produces the same blended matrix', async () => {
+    const serialized = machampRoot();
+    const sync = searchPosition(serialized, { depth: 2, samples: 3 });
+    const orchestrated = await searchOrchestrated(createLocalExecutor(serialized), { depth: 2, samples: 3 });
+    expect(orchestrated.score).toBeCloseTo(sync.score, 9);
+    expect(orchestrated.matrix!.values).toEqual(sync.matrix!.values);
+    expect(orchestrated.perSide.p1.map(r => [r.choice, r.ev])).toEqual(sync.perSide.p1.map(r => [r.choice, r.ev]));
+    expect(orchestrated.koDiagnostics ?? null).toEqual(sync.koDiagnostics ?? null);
+  });
 });

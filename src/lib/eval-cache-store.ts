@@ -94,7 +94,10 @@ export interface StoredEval {
 //      crits/misses/secondaries/faints (best of 16, deterministic), so
 //      positions no longer carry phantom RNG the real game disproves
 //      (653785's endgame died 2 turns early to a seeded crit).
-export const EVAL_ENGINE_CACHE_VERSION = 32;
+// v33: analytic class-blend at root boundary cells + koOdds payloads
+//      (expectation grounding round — a 43% kill roll can no longer
+//      sample 5/5 and grade certain; 649664 t23's desired).
+export const EVAL_ENGINE_CACHE_VERSION = 33;
 
 export function evalStoreKey(
   cacheKey: string,

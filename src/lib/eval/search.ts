@@ -3,19 +3,24 @@ import {
   boostedFraction, createMatchupCache, evaluatePosition, pairThreat, singleMoveFraction, type MatchupCache,
 } from './eval-function';
 import {
-  advancePosition, createRootPosition, legalChoices, positionBattle,
+  advancePosition, advancePositionWithLog, createRootPosition, legalChoices, positionBattle,
   type ChoiceOption, type SimPosition,
 } from './forward-model';
 import {
   applyTrendExtrapolation, applyTrendTiebreak, attachLines, cellKey, coreOf, GIMMICK_TOKENS,
-  rankFromMatrix, selectExpansionCells, selectTieProbeCells, toResult, TOP_EXPANSION,
+  rankFromMatrix, reblendValue, selectExpansionCells, selectTieProbeCells, toResult, TOP_EXPANSION,
   type PvStep, type Ranked, type ValueMatrix,
 } from './rank';
 import { findConsistentOptions, findPlayedOption } from './analysis';
+import {
+  BOUNDARY_DRAW_BUDGET, classifyChild, foldClassWeights, observeOrder, planCellEvents, PROBE_SEEDS,
+} from './cell-blend';
 import { RANDOM_CALL_MOVES } from './ko-odds';
 import type { PlayedAction } from './played';
 import type { CellValue, SearchExecutor } from './orchestrator';
-import type { EvalResult, EvalSettings, RankedChoice, SearchProgress, TeraAllowance } from './types';
+import type {
+  CellBlend, CellBlendClass, EvalResult, EvalSettings, KoOddsMismatch, RankedChoice, SearchProgress, TeraAllowance,
+} from './types';
 import { wpUnits } from './winprob';
 
 export interface SearchCallbacks {
@@ -33,6 +38,10 @@ export const SEARCH_SEEDS: readonly PRNGSeed[] = [
 interface Matrix extends ValueMatrix {
   /** children[i][j]: first-seed child position (kept for deepening). */
   children: SimPosition[][];
+  /** cellKey(i, j) → analytic class blend (root boundary cells only). */
+  blends: Map<number, CellBlend>;
+  /** Boundary cells whose analytic classes went unsampled (probe budget). */
+  diagnostics: KoOddsMismatch[];
 }
 
 function countFainted(battle: ReturnType<typeof positionBattle>): number {
@@ -107,23 +116,100 @@ function sampleCell(
   p2Choice: string,
   samples: number,
   matchupCache: MatchupCache,
-): { value: number; ended: boolean; firstChild: SimPosition } {
-  const firstChild = advancePosition(root, p1Choice, p2Choice, SEARCH_SEEDS[0]);
-  const firstBattle = positionBattle(firstChild);
-  const ended = firstBattle.ended;
-  // Averaging wp-units = averaging win probabilities across rolls: the
-  // KO-boundary roll groups carry their true value ("30% this crit wins")
-  // instead of a flattened score mean.
-  let sum = leafValue(firstBattle, matchupCache);
-  const rollMoves = rollSensitivePair(positionBattle(root), p1Choice, p2Choice);
-  const draws = ended
-    ? (rollMoves ? Math.max(samples, 3) : 1)
-    : (countFainted(firstBattle) > rootFainted || rollMoves ? samples : 1);
-  for (let s = 1; s < draws; s++) {
-    const child = advancePosition(root, p1Choice, p2Choice, SEARCH_SEEDS[s]);
-    sum += leafValue(positionBattle(child), matchupCache);
+  blendRoot = false,
+): { value: number; ended: boolean; firstChild: SimPosition; blend?: CellBlend; diagnostic?: KoOddsMismatch } {
+  const rootBattle = positionBattle(root);
+  const plan = blendRoot ? planCellEvents(rootBattle, p1Choice, p2Choice) : null;
+  if (!plan || plan.kind !== 'events') {
+    const firstChild = advancePosition(root, p1Choice, p2Choice, SEARCH_SEEDS[0]);
+    const firstBattle = positionBattle(firstChild);
+    const ended = firstBattle.ended;
+    // Averaging wp-units = averaging win probabilities across rolls: the
+    // KO-boundary roll groups carry their true value ("30% this crit wins")
+    // instead of a flattened score mean.
+    let sum = leafValue(firstBattle, matchupCache);
+    const rollMoves = rollSensitivePair(rootBattle, p1Choice, p2Choice);
+    const draws = ended
+      ? (rollMoves ? Math.max(samples, 3) : 1)
+      : (countFainted(firstBattle) > rootFainted || rollMoves ? samples : 1);
+    for (let s = 1; s < draws; s++) {
+      const child = advancePosition(root, p1Choice, p2Choice, SEARCH_SEEDS[s]);
+      sum += leafValue(positionBattle(child), matchupCache);
+    }
+    return { value: sum / draws, ended, firstChild };
   }
-  return { value: sum / draws, ended, firstChild };
+
+  // Blend path (round 6): draw with logs, classify children into outcome
+  // classes, weight the class means analytically — a 43% kill roll cannot
+  // sample 5/5 and grade certain anymore. Any deviation from the fold's
+  // occurrence model falls back to the plain seed average.
+  const draws: { child: SimPosition; log: string[]; leaf: number; ended: boolean }[] = [];
+  const drawSeed = (seed: PRNGSeed) => {
+    const { child, log } = advancePositionWithLog(root, p1Choice, p2Choice, seed);
+    const battle = positionBattle(child);
+    draws.push({ child, log, leaf: leafValue(battle, matchupCache), ended: battle.ended });
+  };
+  const baseDraws = Math.max(1, Math.min(samples, SEARCH_SEEDS.length));
+  for (let s = 0; s < baseDraws; s++) drawSeed(SEARCH_SEEDS[s]);
+
+  const fallback = () => ({
+    value: draws.slice(0, baseDraws).reduce((sum, draw) => sum + draw.leaf, 0) / baseDraws,
+    ended: draws[0].ended,
+    firstChild: draws[0].child,
+  });
+
+  const first = observeOrder(draws.map(draw => draw.log), plan.events);
+  if (first === null) return fallback();
+  const expected = foldClassWeights(plan.events, first);
+  const classes = new Map<string, { leafSum: number; count: number; hasFirst: boolean; ended: boolean }>();
+  const classify = (draw: (typeof draws)[number], isFirst: boolean): boolean => {
+    const key = classifyChild(draw.log, plan.events);
+    if (key === null || !expected.has(key)) return false;
+    const entry = classes.get(key) ?? { leafSum: 0, count: 0, hasFirst: false, ended: true };
+    entry.leafSum += draw.leaf;
+    entry.count += 1;
+    entry.hasFirst = entry.hasFirst || isFirst;
+    entry.ended = entry.ended && draw.ended;
+    classes.set(key, entry);
+    return true;
+  };
+  for (let index = 0; index < draws.length; index++) {
+    if (!classify(draws[index], index === 0)) return fallback();
+  }
+  // Chase analytically-expected classes the base draws missed.
+  let probeIndex = 0;
+  while (
+    [...expected.keys()].some(key => !classes.has(key)) &&
+    draws.length < BOUNDARY_DRAW_BUDGET && probeIndex < PROBE_SEEDS.length
+  ) {
+    drawSeed(PROBE_SEEDS[probeIndex++]);
+    if (!classify(draws[draws.length - 1], false)) return fallback();
+  }
+
+  const missing = [...expected.keys()].filter(key => !classes.has(key));
+  let weightTotal = 0;
+  for (const [key, weight] of expected) if (classes.has(key)) weightTotal += weight;
+  if (weightTotal <= 0) return fallback();
+
+  let value = 0;
+  const blendClasses: CellBlendClass[] = [];
+  for (const [key, weight] of expected) {
+    const cls = classes.get(key);
+    if (!cls) continue;
+    const normalized = weight / weightTotal; // 1.0 total when nothing is missing
+    value += normalized * (cls.leafSum / cls.count);
+    blendClasses.push({ weight: normalized, leafSum: cls.leafSum, count: cls.count, hasFirst: cls.hasFirst });
+  }
+  const blend: CellBlend = { classes: blendClasses, firstLeaf: draws[0].leaf };
+  const ended = draws.every(draw => draw.ended);
+  const diagnostic: KoOddsMismatch | undefined = missing.length > 0
+    ? {
+      i: -1, j: -1, p1Choice, p2Choice, missing, // i/j stamped by the caller
+      analytic: Object.fromEntries(expected),
+      sampled: Object.fromEntries([...classes].map(([key, cls]) => [key, cls.count])),
+    }
+    : undefined;
+  return { value, ended, firstChild: draws[0].child, blend, ...(diagnostic ? { diagnostic } : {}) };
 }
 
 /** Sub-matrix cap for candidate restriction (base moves always survive). */
@@ -457,27 +543,32 @@ function buildMatrix(
   callbacks: SearchCallbacks | undefined,
   progress: { done: number; total: number },
   matchupCache: MatchupCache,
+  blendRoot = false,
 ): Matrix {
   const rootFainted = countFainted(positionBattle(position));
   const values: number[][] = [];
   const ended: boolean[][] = [];
   const children: SimPosition[][] = [];
+  const blends = new Map<number, CellBlend>();
+  const diagnostics: KoOddsMismatch[] = [];
 
   for (let i = 0; i < p1Options.length; i++) {
     values.push([]);
     ended.push([]);
     children.push([]);
     for (let j = 0; j < p2Options.length; j++) {
-      const cell = sampleCell(position, rootFainted, p1Options[i].choice, p2Options[j].choice, samples, matchupCache);
+      const cell = sampleCell(position, rootFainted, p1Options[i].choice, p2Options[j].choice, samples, matchupCache, blendRoot);
       values[i].push(cell.value);
       ended[i].push(cell.ended);
       children[i].push(cell.firstChild);
+      if (cell.blend) blends.set(cellKey(i, j), cell.blend);
+      if (cell.diagnostic) diagnostics.push({ ...cell.diagnostic, i, j });
       progress.done += 1;
       callbacks?.onProgress?.({ done: progress.done, total: progress.total, depth });
     }
   }
 
-  return { p1Options, p2Options, values, ended, children };
+  return { p1Options, p2Options, values, ended, children, blends, diagnostics };
 }
 
 /**
@@ -626,7 +717,12 @@ export function searchPosition(
   }
   const progress = { done: 0, total: Math.max(p1Options.length * p2Options.length, 1) };
 
-  const matrix = buildMatrix(root, p1Options, p2Options, settings.samples, 1, callbacks, progress, matchupCache);
+  // Root matrices blend boundary cells analytically; restricted sub-searches
+  // keep the plain seed average (their consumers read only score/tops).
+  const matrix = buildMatrix(root, p1Options, p2Options, settings.samples, 1, callbacks, progress, matchupCache, !restrictCandidates);
+  const attachKoDiagnostics = (target: EvalResult) => {
+    if (matrix.diagnostics.length > 0) target.koDiagnostics = matrix.diagnostics;
+  };
   // Pre-deepening statics: the trend baseline. Every trend the tiebreak
   // compares is uniformly 1-ply-vs-static — mixed ply counts inside one
   // comparison are the depth-asymmetry trap.
@@ -634,6 +730,7 @@ export function searchPosition(
   const trendMap = new Map<number, number>();
   let ranked: Ranked = rankFromMatrix(matrix, rootValue);
   let result = toResult(ranked, 1);
+  attachKoDiagnostics(result);
   callbacks?.onPartial?.(result);
 
   let stopped = false;
@@ -666,7 +763,10 @@ export function searchPosition(
         // own choice space where those actions mean nothing.
         const sub = subSearch(child.serialized, { ...settings, depth: (depth - 1) as 1 | 2, samples: 1, keepPlayed: undefined }, matchupCache);
         if (depth === 2) trendMap.set(cellKey(i, j), sub.score - staticValues[i][j]);
-        matrix.values[i][j] = sub.score;
+        // A blended cell re-blends through the first-seed child's class —
+        // one deepened branch must not overwrite the mixture.
+        const cellBlend = matrix.blends.get(cellKey(i, j));
+        matrix.values[i][j] = cellBlend ? reblendValue(cellBlend, sub.score) : sub.score;
         expandedThisLevel.add(cellKey(i, j));
         const subTopP1 = sub.perSide.p1[0];
         const subTopP2 = sub.perSide.p2[0];
@@ -687,6 +787,7 @@ export function searchPosition(
     ranked = rankFromMatrix(matrix, rootValue);
     attachLines(matrix, ranked, pvByCell);
     result = toResult(ranked, depth);
+    attachKoDiagnostics(result);
     callbacks?.onPartial?.(result);
   }
 
@@ -732,8 +833,14 @@ export function createLocalExecutor(serializedBattle: string): SearchExecutor {
       const rootFainted = countFainted(positionBattle(root));
       let completed = 0;
       for (const job of jobs) {
-        const cell = sampleCell(root, rootFainted, job.p1Choice, job.p2Choice, job.samples, matchupCache);
-        out.push({ i: job.i, j: job.j, value: cell.value, ended: cell.ended });
+        // evalCells only ever serves the orchestrated ROOT — blend like the
+        // sync path's root matrix.
+        const cell = sampleCell(root, rootFainted, job.p1Choice, job.p2Choice, job.samples, matchupCache, true);
+        out.push({
+          i: job.i, j: job.j, value: cell.value, ended: cell.ended,
+          ...(cell.blend ? { blend: cell.blend } : {}),
+          ...(cell.diagnostic ? { diagnostic: { ...cell.diagnostic, i: job.i, j: job.j } } : {}),
+        });
         completed += 1;
         onDone?.(completed);
       }

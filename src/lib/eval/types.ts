@@ -170,6 +170,12 @@ export interface EvalResult {
    * lens can best-respond later without re-searching (cached results too).
    */
   matrix?: EvalMatrix;
+  /**
+   * Boundary cells whose analytic classes went unsampled within the probe
+   * budget (advisory — the cells renormalized instead of inventing values).
+   * The feedback harness counts these per replay.
+   */
+  koDiagnostics?: KoOddsMismatch[];
 }
 
 export interface EvalMatrix {
@@ -232,8 +238,12 @@ export interface EvalCellValue {
   i: number;
   j: number;
   value: number;
-  /** The first-seed child is terminal. */
+  /** The first-seed child is terminal (blended cells: every sampled child is). */
   ended: boolean;
+  /** Analytic class blend of a boundary cell (root cells only). */
+  blend?: CellBlend;
+  /** Probe budget exhausted with analytic classes unsampled. */
+  diagnostic?: KoOddsMismatch;
 }
 
 export interface EvalSubSearchJob {

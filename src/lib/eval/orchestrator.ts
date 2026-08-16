@@ -1,10 +1,11 @@
 import {
-  applyTrendExtrapolation, applyTrendTiebreak, attachLines, cellKey, rankFromMatrix,
+  applyTrendExtrapolation, applyTrendTiebreak, attachLines, cellKey, rankFromMatrix, reblendValue,
   selectExpansionCells, selectTieProbeCells, toResult, TOP_EXPANSION,
   type PvStep, type Ranked, type ValueMatrix,
 } from './rank';
 import type {
-  EvalCellJob, EvalCellValue, EvalChoicesInfo, EvalResult, EvalSettings, EvalSubSearchJob, SearchProgress, TeraAllowance,
+  CellBlend, EvalCellJob, EvalCellValue, EvalChoicesInfo, EvalResult, EvalSettings, EvalSubSearchJob,
+  KoOddsMismatch, SearchProgress, TeraAllowance,
 } from './types';
 
 /**
@@ -58,18 +59,26 @@ export async function searchOrchestrated(
   const ended: boolean[][] = p1.map(() => p2.map(() => false));
   const matrix: ValueMatrix = { p1Options: p1, p2Options: p2, values, ended };
 
+  const blends = new Map<number, CellBlend>();
+  const diagnostics: KoOddsMismatch[] = [];
   const cellValues = await executor.evalCells(jobs, completed =>
     callbacks?.onProgress?.({ done: Math.min(completed, total), total, depth: 1 }));
   for (const cell of cellValues) {
     values[cell.i][cell.j] = cell.value;
     ended[cell.i][cell.j] = cell.ended;
+    if (cell.blend) blends.set(cellKey(cell.i, cell.j), cell.blend);
+    if (cell.diagnostic) diagnostics.push(cell.diagnostic);
   }
+  const attachKoDiagnostics = (target: EvalResult) => {
+    if (diagnostics.length > 0) target.koDiagnostics = diagnostics;
+  };
   // Trend baseline, mirroring searchPosition: uniformly 1-ply-vs-static.
   const staticValues = values.map(row => [...row]);
   const trendMap = new Map<number, number>();
 
   let ranked: Ranked = rankFromMatrix(matrix, rootValue);
   let result = toResult(ranked, 1);
+  attachKoDiagnostics(result);
   callbacks?.onPartial?.(result);
 
   let stopped = false;
@@ -99,7 +108,10 @@ export async function searchOrchestrated(
       subs.forEach((sub, index) => {
         const [i, j] = wanted[index];
         if (depth === 2) trendMap.set(cellKey(i, j), sub.score - staticValues[i][j]);
-        values[i][j] = sub.score;
+        // Mirrors searchPosition: a blended cell re-blends through the
+        // first-seed child's class instead of being overwritten.
+        const cellBlend = blends.get(cellKey(i, j));
+        values[i][j] = cellBlend ? reblendValue(cellBlend, sub.score) : sub.score;
         expandedThisLevel.add(cellKey(i, j));
         const subTopP1 = sub.perSide.p1[0];
         const subTopP2 = sub.perSide.p2[0];
@@ -119,6 +131,7 @@ export async function searchOrchestrated(
     ranked = rankFromMatrix(matrix, rootValue);
     attachLines(matrix, ranked, pvByCell);
     result = toResult(ranked, depth);
+    attachKoDiagnostics(result);
     callbacks?.onPartial?.(result);
   }
 

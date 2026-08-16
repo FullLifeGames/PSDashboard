@@ -69,6 +69,12 @@ test.describe('draft replay end-to-end verdicts', () => {
     // the building switch BY VALUE.
     const d2 = rows(2);
     expect(d2.heatran.ev).toBeGreaterThan(d2.recover.ev);
-    expect(d2.p2[0].label).toBe('→ Heatran');
+    // Round 6 (analytic blend): the crit-tail boundary cells around the
+    // Slowking column and the Flash Cannon row re-priced from single-seed
+    // values to class means, re-ordering the near-tied wall pair (ev gap
+    // ~0.001; the Heatran column itself carries no boundary event). WHICH
+    // wall leads is a coin flip — the pin is that a wall switch leads and
+    // the stall sits below by value.
+    expect(d2.p2[0].label).toMatch(/^→ (Heatran|Slowking)$/);
   });
 });
