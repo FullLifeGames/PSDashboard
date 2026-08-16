@@ -35,6 +35,7 @@ interface ExtractedDebug {
   analyses: (TurnAnalysis | null)[] | null;
   gameReport: GameReport | null;
   haxAlignment: { summary: AlignmentSummary } | null;
+  koMismatches: number;
 }
 
 const results: ClaimResult[] = [];
@@ -42,6 +43,7 @@ const wallTimes: Record<string, number> = {};
 const noticeByReplay: Record<string, string | null> = {};
 const evalErrorsByReplay: Record<string, { turn: number; error: string }[]> = {};
 const alignmentByReplay: Record<string, AlignmentSummary | null> = {};
+const koMismatchByReplay: Record<string, number> = {};
 
 /** A replay that cannot be graded still shows up — as ERROR rows, never silence. */
 function pushErrorResults(replayId: string, details: string[]) {
@@ -132,16 +134,22 @@ for (const replayId of FEEDBACK_REPLAYS) {
     }
     const dbg = await page.evaluate(() => {
       const raw = (window as unknown as {
-        __psDebug: { graph: { scores: unknown; notice: unknown; evalErrors: unknown }; analyses: unknown; gameReport: unknown; haxAlignment: unknown };
+        __psDebug: {
+          graph: { scores: unknown; notice: unknown; evalErrors: unknown; results: ({ koDiagnostics?: unknown[] } | null)[] };
+          analyses: unknown; gameReport: unknown; haxAlignment: unknown;
+        };
       }).__psDebug;
       return JSON.parse(JSON.stringify({
         scores: raw.graph.scores, notice: raw.graph.notice, evalErrors: raw.graph.evalErrors,
         analyses: raw.analyses, gameReport: raw.gameReport,
         haxAlignment: raw.haxAlignment ?? null,
+        koMismatches: raw.graph.results.reduce(
+          (count: number, result) => count + (result?.koDiagnostics?.length ?? 0), 0),
       }));
     }) as ExtractedDebug;
     noticeByReplay[replayId] = dbg.notice;
     alignmentByReplay[replayId] = dbg.haxAlignment?.summary ?? null;
+    koMismatchByReplay[replayId] = dbg.koMismatches;
     evalErrorsByReplay[replayId] = dbg.evalErrors
       .map((error, index) => (error === null ? null : { turn: index + 1, error }))
       .filter((entry): entry is { turn: number; error: string } => entry !== null);
@@ -181,6 +189,7 @@ test.afterAll(() => {
     noticeByReplay,
     evalErrorsByReplay,
     alignmentByReplay,
+    koMismatchByReplay,
   };
   mkdirSync(REPORT_DIR, { recursive: true });
   const { markdown, json } = renderReport(results, meta);

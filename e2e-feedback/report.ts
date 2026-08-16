@@ -17,6 +17,8 @@ export interface DriftMeta {
   evalErrorsByReplay: Record<string, { turn: number; error: string }[]>;
   /** Per-replay hax-alignment summary (null = sweep never ran / old build). */
   alignmentByReplay: Record<string, AlignmentSummary | null>;
+  /** Per-replay count of analytic-vs-sampled KO-odds mismatches (probe budget exhausted). */
+  koMismatchByReplay?: Record<string, number>;
 }
 
 const STATUS_LABEL: Record<string, string> = {
@@ -39,6 +41,10 @@ export function renderReport(results: ClaimResult[], meta: DriftMeta): { markdow
       `${summary!.faintResidualTurns > 0 ? ` · faint-residual ${summary!.faintResidualTurns}` : ''}` +
       `${summary!.endedMismatches > 0 ? ` · ended-mismatch ${summary!.endedMismatches}` : ''}`,
     ).join(' · ')}`);
+  }
+  const koMismatches = Object.entries(meta.koMismatchByReplay ?? {}).filter(([, count]) => count > 0);
+  if (koMismatches.length > 0) {
+    lines.push(`- KO-odds mismatches: ${koMismatches.map(([id, count]) => `${id} ${count}`).join(' · ')}`);
   }
   const notices = Object.entries(meta.noticeByReplay).filter(([, notice]) => notice);
   if (notices.length > 0) {
