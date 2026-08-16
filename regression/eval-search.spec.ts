@@ -569,10 +569,10 @@ test.describe('starved support cells are verified before the verdict', () => {
   // mode's multi-seed cell sampler and REPLACE the tree value.
   const options = (labels: string[]) => labels.map(labelText => ({ choice: labelText, label: labelText }));
   const emptyResult = { score: 0, interval: 0, depthCompleted: 1, perSide: { p1: [], p2: [] } };
-  const mk = (marginals: Pick<MctsTreeStats, 'p1N' | 'p1W' | 'p2N' | 'p2W'>, cells: MctsTreeStats['cells']): MctsTreeStats => ({
+  const mk = (marginals: Pick<MctsTreeStats, 'p1N' | 'p1W' | 'p2N' | 'p2W'>, cells: MctsTreeStats['cells'], extra: Partial<MctsTreeStats> = {}): MctsTreeStats => ({
     p1Options: options(['Safe', 'Sack']), p2Options: options(['X', 'Y']),
     ...marginals, visits: 25, depth: 2,
-    rootValue: 0.5, cells, result: emptyResult,
+    rootValue: 0.5, cells, result: emptyResult, ...extra,
   });
   // Row Safe: well-visited, converged at −0.2. Row Sack: (Sack,X) starved
   // at 2+1 visits with a lucky +0.5; (Sack,Y) never expanded (reads the
@@ -638,6 +638,42 @@ test.describe('starved support cells are verified before the verdict', () => {
     const pairs = starvedSupportCells([d1, d2], merged).map(job => `${job.p1Choice}×${job.p2Choice}`);
     expect(pairs).toContain('Safe×Y'); // agreeing visits, disagreeing outcomes
     expect(pairs).not.toContain('Safe×X'); // both trees agree at −0.2
+  });
+
+  test('boundary support cells are chance-suspect regardless of visit stats (round 7)', () => {
+    // (Safe,X) is rich and agreeing — the visit/spread rules trust it. But
+    // as a boundary cell its K fixed outcomes cannot represent an
+    // accuracy×killFraction split: suspect by construction.
+    const cells = [
+      { key: cellKey(0, 0), visits: 12, total: -2.6, value: -0.2, ended: false },
+      { key: cellKey(0, 1), visits: 8, total: -1.8, value: -0.2, ended: false },
+      { key: cellKey(1, 0), visits: 20, total: -4.2, value: -0.2, ended: false },
+      { key: cellKey(1, 1), visits: 20, total: -4.2, value: -0.2, ended: false },
+    ];
+    const b1 = mk({ p1N: [20, 2], p1W: [-4, 1], p2N: [20, 2], p2W: [-4, 1] }, cells, { boundaryCells: [cellKey(0, 0)] });
+    const b2 = mk({ p1N: [18, 1], p1W: [-3.6, 0.5], p2N: [18, 1], p2W: [-3.6, 0.5] }, cells, { boundaryCells: [cellKey(0, 0)] });
+    const merged = mergeMctsTrees([b1, b2]);
+    const pairs = starvedSupportCells([b1, b2], merged).map(job => `${job.p1Choice}×${job.p2Choice}`);
+    expect(pairs).toContain('Safe×X');    // boundary — must be re-priced
+    expect(pairs).not.toContain('Safe×Y'); // converged, no boundary flag
+  });
+
+  test('a boundary cell that ended the game still verifies; a plain ended cell stays excluded (round 7)', () => {
+    // A mutual-kill range ends the game in EVERY drawn class — the ended
+    // flag is exactly why the pool cannot see the other class. Non-boundary
+    // ended cells keep today's exclusion.
+    const cells = [
+      { key: cellKey(0, 0), visits: 1, total: 2.0, value: 1, ended: true },
+      { key: cellKey(0, 1), visits: 8, total: -1.8, value: -0.2, ended: false },
+      { key: cellKey(1, 0), visits: 1, total: 2.0, value: 1, ended: true },
+      { key: cellKey(1, 1), visits: 20, total: -4.2, value: -0.2, ended: false },
+    ];
+    const e1 = mk({ p1N: [20, 2], p1W: [-4, 1], p2N: [20, 2], p2W: [-4, 1] }, cells, { boundaryCells: [cellKey(0, 0)] });
+    const e2 = mk({ p1N: [18, 1], p1W: [-3.6, 0.5], p2N: [18, 1], p2W: [-3.6, 0.5] }, cells, { boundaryCells: [cellKey(0, 0)] });
+    const merged = mergeMctsTrees([e1, e2]);
+    const pairs = starvedSupportCells([e1, e2], merged).map(job => `${job.p1Choice}×${job.p2Choice}`);
+    expect(pairs).toContain('Safe×X');     // boundary bypasses the ended exclusion
+    expect(pairs).not.toContain('Sack×X'); // starved AND ended, but not boundary — excluded as today
   });
 });
 

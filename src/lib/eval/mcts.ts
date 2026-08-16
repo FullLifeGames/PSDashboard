@@ -3,7 +3,7 @@ import {
   advancePosition, createRootPosition, positionBattle,
   type ChoiceOption, type SimPosition,
 } from './forward-model';
-import { koOddsForOptions } from './cell-blend';
+import { koOddsForOptions, planCellEvents } from './cell-blend';
 import { cellKey, rankFromMatrix, toResult as rankedToResult } from './rank';
 import { leafValue, optionHints, searchOptions, SEARCH_SEEDS } from './search';
 import type { EvalResult, EvalSettings, KoOddsInfo, MctsTreeStats, SearchProgress, TeraAllowance } from './types';
@@ -330,6 +330,19 @@ export function mctsTreeSearch(
   callbacks?: MctsCallbacks,
 ): MctsTreeStats {
   const { root, maxDepth, result, koOdds } = runMcts(serializedBattle, settings, callbacks, seedOffset);
+  // Boundary flags for the merge's verify selection. Analytic only (one
+  // calc per damaging pair, no sim advances); identical across trees —
+  // the merge reads trees[0].
+  const boundaryCells: number[] = [];
+  if (!root.ended && root.p1Options.length > 0 && root.p2Options.length > 0) {
+    const battle = positionBattle(root.position);
+    for (let i = 0; i < root.p1Options.length; i++) {
+      for (let j = 0; j < root.p2Options.length; j++) {
+        const plan = planCellEvents(battle, root.p1Options[i].choice, root.p2Options[j].choice);
+        if (plan.kind === 'events') boundaryCells.push(cellKey(i, j));
+      }
+    }
+  }
   return {
     p1Options: root.p1Options.map(option => ({ choice: option.choice, label: option.label })),
     p2Options: root.p2Options.map(option => ({ choice: option.choice, label: option.label })),
@@ -341,6 +354,7 @@ export function mctsTreeSearch(
     depth: maxDepth,
     rootValue: root.value,
     koOdds,
+    boundaryCells,
     // Root-cell stats for the merged equilibrium (Map order is insertion
     // order — deterministic under the fixed seed schedule).
     cells: [...root.children.entries()].map(([key, child]) => ({

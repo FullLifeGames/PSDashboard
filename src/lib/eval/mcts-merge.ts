@@ -161,7 +161,11 @@ export function starvedSupportCells(trees: MctsTreeStats[], merged: EvalResult):
       perTree.set(cell.key, means);
     }
   }
+  const boundary = new Set(trees[0].boundaryCells ?? []);
   const suspect = (key: number): boolean => {
+    // A boundary cell's fixed per-tree outcomes cannot represent its
+    // accuracy×killFraction split — suspect regardless of visit stats.
+    if (boundary.has(key)) return true;
     if ((pooledVisits.get(key) ?? 0) < VERIFY_MIN_VISITS) return true;
     const means = perTree.get(key) ?? [];
     if (means.length < Math.min(VERIFY_MIN_TREES, trees.length)) return true;
@@ -219,7 +223,11 @@ export function starvedSupportCells(trees: MctsTreeStats[], merged: EvalResult):
   }
 
   return [...candidates.entries()]
-    .filter(([key]) => suspect(key) && !endedCells.has(key))
+    // Boundary cells bypass the ended exclusion: a game-ending kill range
+    // is ended in its drawn class precisely because the pool cannot see
+    // the other one. sampleCell's own ended semantics (ALL children ended)
+    // replace the pooled flag through the verified merge.
+    .filter(([key]) => suspect(key) && (boundary.has(key) || !endedCells.has(key)))
     .sort((a, b) => b[1] - a[1])
     .slice(0, VERIFY_CELL_CAP)
     .map(([key]) => {

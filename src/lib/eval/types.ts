@@ -283,6 +283,12 @@ export interface MctsTreeStats {
    */
   koOdds?: { p1: (KoOddsInfo | null)[]; p2: (KoOddsInfo | null)[] };
   /**
+   * Root cells with ≥1 priceable boundary event (planCellEvents kind
+   * 'events') — chance-suspect by construction: K fixed outcomes cannot
+   * represent an accuracy×killFraction split. Drives the verify sampler.
+   */
+  boundaryCells?: number[];
+  /**
    * Root-cell tree stats for the merged equilibrium ranking: `total` is the
    * sum of every leaf value backed through the cell (expansion included),
    * `value` the child's creation-time static (the one-visit prior).

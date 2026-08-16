@@ -3,8 +3,9 @@ import { Battle, State, Teams, toID } from '@pkmn/sim';
 import type { PokemonSet } from '@pkmn/sim';
 import { analyzeTurn, matchPlayedChoice } from '../src/lib/eval/analysis';
 import { mctsSearch, mctsTreeSearch, MCTS_ITERATIONS } from '../src/lib/eval/mcts';
-import { mergeMctsTrees, MCTS_TREES } from '../src/lib/eval/mcts-merge';
-import { searchPosition } from '../src/lib/eval/search';
+import { mergeMctsTrees, MCTS_TREES, starvedSupportCells } from '../src/lib/eval/mcts-merge';
+import { createLocalExecutor, searchPosition } from '../src/lib/eval/search';
+import { cellKey } from '../src/lib/eval/rank';
 import type { EvalResult, SearchProgress } from '../src/lib/eval/types';
 
 function makeSet(name: string, species: string, moves: string[], level = 50): PokemonSet {
@@ -53,6 +54,20 @@ const gambleRoot = () => serialize(makeBattle(
     makeSet('Eevee', 'Eevee', ['Tackle', 'Growl'], 30),
   ],
 ));
+
+// Round-6 mutual-OHKO cell (see eval-cell-blend.spec.ts): the 1-HP
+// Deoxys-Speed's 80% Hydro Pump kills on a hit (+1); on a miss the
+// surviving Pikachu's Tackle kills the attacker (−1). Analytic value
+// 0.8·1 + 0.2·(−1) = 0.6 exactly — and BOTH classes end the game, so the
+// cell is ended in every tree that expands it.
+const mutualRoot = () => {
+  const battle = makeBattle(
+    [makeSet('Deo', 'Deoxys-Speed', ['Hydro Pump', 'Seismic Toss'], 100)],
+    [makeSet('Pika', 'Pikachu', ['Tackle', 'Growl'], 30)],
+  );
+  battle.sides[0].active[0]!.hp = 1;
+  return serialize(battle);
+};
 
 test.describe('DUCT-MCTS search', () => {
   test('finds the winning line and prefers it', () => {
@@ -234,5 +249,24 @@ test.describe('MCTS koOdds payload (round 7)', () => {
     for (const row of [...result.perSide.p1, ...result.perSide.p2]) {
       expect(row.koOdds).toBeUndefined();
     }
+  });
+
+  test('a uniform-outcome mutual-kill cell re-prices to the analytic blend end-to-end', async () => {
+    const root = mutualRoot();
+    const trees = Array.from({ length: 2 }, (_, offset) => mctsTreeSearch(root, settings, offset));
+    const merged = mergeMctsTrees(trees);
+    const jobs = starvedSupportCells(trees, merged);
+    // Every draw of this cell ends the game — only the boundary bypass
+    // can emit it for verification.
+    const cell = jobs.find(job => job.p1Choice === 'move hydropump' && job.p2Choice === 'move tackle');
+    expect(cell).toBeTruthy();
+    const values = await createLocalExecutor(root).evalCells(jobs);
+    const verified = mergeMctsTrees(trees, new Map(values.map(value => [cellKey(value.i, value.j), value])));
+    const matrix = verified.matrix!;
+    const i = matrix.p1Choices!.indexOf('move hydropump');
+    const j = matrix.p2Choices!.indexOf('move tackle');
+    expect(matrix.values[i][j]).toBeCloseTo(0.6, 9);
+    // HYBRID: verification refines rankings, never the score line.
+    expect(verified.score).toBeCloseTo(merged.score, 10);
   });
 });
