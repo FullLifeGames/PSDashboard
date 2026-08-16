@@ -1,5 +1,5 @@
 import { cellKey, rankFromMatrix, toResult as rankedToResult } from './rank';
-import type { EvalCellJob, EvalCellValue, EvalResult, MctsTreeStats } from './types';
+import type { EvalCellJob, EvalCellValue, EvalResult, KoOddsInfo, MctsTreeStats } from './types';
 
 /**
  * Root parallelization for the MCTS mode: N independent trees (each with a
@@ -118,6 +118,21 @@ export function mergeMctsTrees(trees: MctsTreeStats[], verified?: Map<number, Ev
     const donor = trees.find(tree =>
       tree.result.perSide.p1[0]?.choice === result.perSide.p1[0].choice && tree.result.perSide.p1[0].line);
     if (donor) result.perSide.p1[0].line = donor.result.perSide.p1[0].line;
+  }
+
+  // Round 7: analytic per-option kill odds, shipped by the trees (this
+  // module stays sim-free — same duplication rationale as orchestrator.ts).
+  if (base.koOdds) {
+    const oddsMaps = {
+      p1: new Map<string, KoOddsInfo | null>(base.p1Options.map((option, index) => [option.choice, base.koOdds!.p1[index] ?? null])),
+      p2: new Map<string, KoOddsInfo | null>(base.p2Options.map((option, index) => [option.choice, base.koOdds!.p2[index] ?? null])),
+    };
+    for (const side of ['p1', 'p2'] as const) {
+      for (const row of result.perSide[side]) {
+        const odds = oddsMaps[side].get(row.choice);
+        if (odds) row.koOdds = odds;
+      }
+    }
   }
   return result;
 }

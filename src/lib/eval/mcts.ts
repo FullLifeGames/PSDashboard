@@ -3,9 +3,10 @@ import {
   advancePosition, createRootPosition, positionBattle,
   type ChoiceOption, type SimPosition,
 } from './forward-model';
+import { koOddsForOptions } from './cell-blend';
 import { cellKey, rankFromMatrix, toResult as rankedToResult } from './rank';
 import { leafValue, optionHints, searchOptions, SEARCH_SEEDS } from './search';
-import type { EvalResult, EvalSettings, MctsTreeStats, SearchProgress, TeraAllowance } from './types';
+import type { EvalResult, EvalSettings, KoOddsInfo, MctsTreeStats, SearchProgress, TeraAllowance } from './types';
 
 /**
  * DUCT (decoupled UCT) Monte-Carlo tree search — the "think deeper" mode.
@@ -47,6 +48,9 @@ export interface MctsCallbacks {
   onPartial?(result: EvalResult): void;
   shouldStop?(): boolean;
 }
+
+/** Root per-option kill odds, index-aligned with the node's option lists. */
+type RootKoOdds = { p1: (KoOddsInfo | null)[]; p2: (KoOddsInfo | null)[] };
 
 interface Node {
   position: SimPosition;
@@ -186,7 +190,7 @@ function topVisitedIndex(n: number[]): number {
  * thin static cells), so the score line stays bit-identical to the
  * standing records while the recommendations upgrade.
  */
-function toResult(root: Node, maxDepth: number): EvalResult {
+function toResult(root: Node, maxDepth: number, koOdds?: RootKoOdds): EvalResult {
   if (root.ended || root.p1Options.length === 0 || root.p2Options.length === 0 || root.visits === 0) {
     return { score: root.value, interval: 0, depthCompleted: maxDepth, perSide: { p1: [], p2: [] } };
   }
@@ -209,6 +213,20 @@ function toResult(root: Node, maxDepth: number): EvalResult {
     const line = principalVariation(root);
     if (line.length > 1) result.perSide.p1[0].line = line.slice(1);
   }
+  if (koOdds) {
+    // Mirrors attachKoOdds in search.ts:736 — rows are ranked (reordered),
+    // so match by choice string, attach only real events.
+    const maps = {
+      p1: new Map(root.p1Options.map((option, index) => [option.choice, koOdds.p1[index] ?? null])),
+      p2: new Map(root.p2Options.map((option, index) => [option.choice, koOdds.p2[index] ?? null])),
+    };
+    for (const side of ['p1', 'p2'] as const) {
+      for (const row of result.perSide[side]) {
+        const odds = maps[side].get(row.choice);
+        if (odds) row.koOdds = odds;
+      }
+    }
+  }
   return result;
 }
 
@@ -217,7 +235,7 @@ function runMcts(
   settings: EvalSettings,
   callbacks?: MctsCallbacks,
   seedOffset = 0,
-): { root: Node; maxDepth: number; result: EvalResult } {
+): { root: Node; maxDepth: number; result: EvalResult; koOdds?: RootKoOdds } {
   const matchupCache = createMatchupCache();
   const tera = settings.tera ?? true;
   // keepPlayed applies to the root only — children have their own spaces.
@@ -229,6 +247,14 @@ function runMcts(
       result: { score: root.value, interval: 0, depthCompleted: 1, perSide: { p1: [], p2: [] } },
     };
   }
+
+  // Analytic per-option kill odds, computed once at the root (narrative
+  // payload — value pricing is the verify sampler's job).
+  const rootBattle = positionBattle(root.position);
+  const koOdds: RootKoOdds = {
+    p1: koOddsForOptions(rootBattle, 'p1', root.p1Options.map(option => option.choice)),
+    p2: koOddsForOptions(rootBattle, 'p2', root.p2Options.map(option => option.choice)),
+  };
 
   let maxDepth = 1;
   for (let iteration = 0; iteration < MCTS_ITERATIONS; iteration++) {
@@ -279,13 +305,13 @@ function runMcts(
     const done = iteration + 1;
     callbacks?.onProgress?.({ done, total: MCTS_ITERATIONS, depth: maxDepth });
     if (done % PARTIAL_EVERY === 0 && done < MCTS_ITERATIONS) {
-      callbacks?.onPartial?.(toResult(root, maxDepth));
+      callbacks?.onPartial?.(toResult(root, maxDepth, koOdds));
     }
   }
 
-  const result = toResult(root, maxDepth);
+  const result = toResult(root, maxDepth, koOdds);
   callbacks?.onPartial?.(result);
-  return { root, maxDepth, result };
+  return { root, maxDepth, result, koOdds };
 }
 
 export function mctsSearch(
@@ -303,7 +329,7 @@ export function mctsTreeSearch(
   seedOffset: number,
   callbacks?: MctsCallbacks,
 ): MctsTreeStats {
-  const { root, maxDepth, result } = runMcts(serializedBattle, settings, callbacks, seedOffset);
+  const { root, maxDepth, result, koOdds } = runMcts(serializedBattle, settings, callbacks, seedOffset);
   return {
     p1Options: root.p1Options.map(option => ({ choice: option.choice, label: option.label })),
     p2Options: root.p2Options.map(option => ({ choice: option.choice, label: option.label })),
@@ -314,6 +340,7 @@ export function mctsTreeSearch(
     visits: root.visits,
     depth: maxDepth,
     rootValue: root.value,
+    koOdds,
     // Root-cell stats for the merged equilibrium (Map order is insertion
     // order — deterministic under the fixed seed schedule).
     cells: [...root.children.entries()].map(([key, child]) => ({

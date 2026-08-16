@@ -97,7 +97,10 @@ export interface StoredEval {
 // v33: analytic class-blend at root boundary cells + koOdds payloads
 //      (expectation grounding round — a 43% kill roll can no longer
 //      sample 5/5 and grade certain; 649664 t23's desired).
-export const EVAL_ENGINE_CACHE_VERSION = 33;
+// v34: MCTS root odds grounding — koOdds payloads on MCTS rows, boundary-
+//      suspect verify coverage (uniform-outcome kill ranges re-priced by
+//      the blending sampler), mismatch diagnostics passthrough.
+export const EVAL_ENGINE_CACHE_VERSION = 34;
 
 export function evalStoreKey(
   cacheKey: string,

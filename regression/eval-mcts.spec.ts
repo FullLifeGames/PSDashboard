@@ -42,6 +42,18 @@ const threeTurnWin = () => serialize(makeBattle(
   ],
 ));
 
+// Machamp's Hydro Pump always kills a lvl-30 Pikachu (killFraction 1) but
+// carries the 80% accuracy roll — a priceable boundary event with
+// pKill 0.8 < 1, so koOddsForOptions emits it. Seismic Toss is the
+// deterministic KO: no event, no odds. The Eevee bench gives p2 switch rows.
+const gambleRoot = () => serialize(makeBattle(
+  [makeSet('Machamp', 'Machamp', ['Hydro Pump', 'Seismic Toss'], 100)],
+  [
+    makeSet('Pikachu', 'Pikachu', ['Tackle', 'Growl'], 30),
+    makeSet('Eevee', 'Eevee', ['Tackle', 'Growl'], 30),
+  ],
+));
+
 test.describe('DUCT-MCTS search', () => {
   test('finds the winning line and prefers it', () => {
     const result = mctsSearch(threeTurnWin(), { depth: 1, samples: 1, tera: false, mode: 'mcts' });
@@ -170,5 +182,57 @@ test.describe('DUCT-MCTS search', () => {
     const result = mctsSearch(serialize(battle), { depth: 1, samples: 1, mode: 'mcts' });
     expect(result.score).toBe(1);
     expect(result.perSide.p1).toHaveLength(0);
+  });
+});
+
+test.describe('MCTS koOdds payload (round 7)', () => {
+  const settings = { depth: 1, samples: 1, tera: false, mode: 'mcts' } as const;
+
+  test('sync results carry analytic koOdds on boundary rows only', () => {
+    const result = mctsSearch(gambleRoot(), settings);
+    const pump = result.perSide.p1.find(row => row.choice === 'move hydropump')!;
+    const toss = result.perSide.p1.find(row => row.choice === 'move seismictoss')!;
+    expect(pump.koOdds).toEqual({ accuracy: expect.closeTo(0.8, 5), killFraction: 1 });
+    expect(toss.koOdds).toBeUndefined();
+    const bench = result.perSide.p2.find(row => row.choice.startsWith('switch'));
+    expect(bench).toBeTruthy();
+    expect(bench!.koOdds).toBeUndefined();
+  });
+
+  test('merged parallel trees carry the same koOdds (partials path)', () => {
+    const trees = Array.from({ length: 2 }, (_, offset) => mctsTreeSearch(gambleRoot(), settings, offset));
+    expect(trees[0].koOdds?.p1.some(Boolean)).toBe(true);
+    const merged = mergeMctsTrees(trees);
+    const pump = merged.perSide.p1.find(row => row.choice === 'move hydropump')!;
+    expect(pump.koOdds).toEqual({ accuracy: expect.closeTo(0.8, 5), killFraction: 1 });
+  });
+
+  test('doubles results carry no koOdds (fail-closed)', () => {
+    const battle = new Battle({
+      formatid: toID('gen9doublescustomgame'),
+      seed: '1,2,3,4',
+      p1: {
+        name: 'Alpha',
+        team: Teams.pack([
+          makeSet('Machamp', 'Machamp', ['Rock Slide', 'Karate Chop']),
+          makeSet('Snorlax', 'Snorlax', ['Tackle', 'Protect']),
+        ]),
+      },
+      p2: {
+        name: 'Beta',
+        team: Teams.pack([
+          makeSet('Pikachu', 'Pikachu', ['Tackle', 'Growl'], 30),
+          makeSet('Eevee', 'Eevee', ['Tackle', 'Growl'], 30),
+        ]),
+      },
+    });
+    if (battle.sides.some(side => side.requestState === 'teampreview')) {
+      battle.choose('p1', 'team 12');
+      battle.choose('p2', 'team 12');
+    }
+    const result = mctsSearch(serialize(battle), settings);
+    for (const row of [...result.perSide.p1, ...result.perSide.p2]) {
+      expect(row.koOdds).toBeUndefined();
+    }
   });
 });

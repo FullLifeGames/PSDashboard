@@ -277,6 +277,12 @@ export interface MctsTreeStats {
   /** Root static (p1 perspective) — the unexpanded-cell fallback. */
   rootValue: number;
   /**
+   * Per-option kill odds at the root (index-aligned with the option lists;
+   * absent for dead roots). Round 7: the merge attaches these to ranked
+   * rows — mcts-merge stays sim-free, so the worker ships the facts.
+   */
+  koOdds?: { p1: (KoOddsInfo | null)[]; p2: (KoOddsInfo | null)[] };
+  /**
    * Root-cell tree stats for the merged equilibrium ranking: `total` is the
    * sum of every leaf value backed through the cell (expansion included),
    * `value` the child's creation-time static (the one-visit prior).
