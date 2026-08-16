@@ -883,6 +883,48 @@ import { brierScore, fitConstantK } from './fit-helpers';
  * static basis for this mass; the next lever, if any, is search/
  * planning-side.
  *
+ * HAX-ALIGNMENT ROUND 2026-08-15 (improvement round 4 — agenda item
+ * Hax-Alignment; commits 5824b5b/428f44b/63951ea/3b0d0e6/f524611 + this
+ * record):
+ * DESIGN (per-turn seed search, cache v32): at every turn boundary the
+ *    reconstruction serializes a checkpoint, trials the block's protocol
+ *    choices under a pinned 16-seed list (trialAdvanceLog fork; forced
+ *    switches answered from protocol species), scores emitted events
+ *    against the block (ended > faint-set > soft counts over misses/
+ *    crits/secondaries/hitcounts/cants/confusion/move-counts + 0/1
+ *    order), and battle.resetRNG's the argmin candidate (ties keep the
+ *    earlier seed; candidate-0 fast path; reseed EVERY turn so turns'
+ *    RNG consumption decouples). Scripted PRNG rejected (fragile @pkmn
+ *    internals coupling); backstop deliberately NOT built — measure
+ *    first (user decision).
+ * MEASURED (runs ×3 bit-identical; stable results, alignment summaries,
+ *    notices): 653785 REGAINED its 2 endgame turns (the round-2 phantom
+ *    seed-crit heals; perfect 20/25). Premature-end residual: 1 block of
+ *    270 (648453 keeps "35 of 39", ended-mismatch 1 — no candidate seed
+ *    avoids it; WATCH, no backstop agenda at this rate). Quotas
+ *    (actual-scored): gen6 80/110 perfect turns (655336 27/27, 649664
+ *    21/23, 653785 20/25, 648453 12/35), gen8 14/160 (573756 9/138 soft
+ *    275, 562428 5/22 — long stall games carry nearly all soft
+ *    residual; faint residuals single-digit everywhere). Trial-vs-
+ *    actual gap 1 turn of 270 — the fork faithfully predicts the live
+ *    battle. Feedback wall time 17.3m → 10.2m despite the search.
+ * CALIBRATION GATE PASSED (paired worktree vs c1c794a, mode=auto,
+ *    junctioned caches): n 783 → 806 (late 238 → 257 — exactly the
+ *    positions premature ends used to cut), phases 54/66/82 → 55/65/82,
+ *    briers 0.2566/0.2258/0.1513 → 0.2588/0.2251/0.1447 (late −0.0066;
+ *    early +0.0022 under the +23-position composition shift), buckets
+ *    61/58/69/89 → 61/58/71/90, doubles 70% → 72%. Calibration wall
+ *    +5.5m (the search's cost lives here).
+ * RE-PIN (user-approved): 649664 t23 gap observed mistake/p1-decision →
+ *    none/p1-read — the aligned seeds sample the t23 root differently
+ *    and the round-3-diagnosed false mistake (KO-roll sampling
+ *    confidence) dissolves; the gap stays open on the desired side.
+ *    Golden 655336 untouched (27/27 perfect). AGENDA RENAME: "analytic
+ *    KO grounding" (C. below) generalizes to ERWARTUNGS-GRUNDIERUNG —
+ *    probability-weighted analytic folding for future-turn expectation
+ *    (freeze fishing, Serene-Grace chains, crits vs boosted walls);
+ *    value vs narrative as separate consumers; own round.
+ *
  * HORIZON-FAMILY ROUND 2026-08-15 (improvement round 3 over the corpus —
  * agenda item ④; commits 06de5e8/4b1c489/6791ca9 + this record):
  * A. FEED PATHWAY (06de5e8): a third sack shape in detectSacks — a mon

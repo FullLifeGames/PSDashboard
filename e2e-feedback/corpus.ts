@@ -110,8 +110,8 @@ export const FEEDBACK_CORPUS: FeedbackItem[] = [
   },
   {
     replay: 'smogtours-gen6ou-649664', turn: 23, kind: 'gap', source: 'expert-2026-08',
-    essence: 'Graded as a risk, but Keldeo was visibly choice-locked — Hydro Pump was the only winning play, not a gamble. The reasoning assumed Scald kills; the odds are ~43%, worse than landing two Hydro Pumps.',
-    observed: { side: 'p1', tier: 'mistake', attribution: ['p1-decision'] },
+    essence: 'Graded as a risk, but Keldeo was visibly choice-locked — Hydro Pump was the only winning play, not a gamble. The reasoning assumed Scald kills; the odds are ~43%, worse than landing two Hydro Pumps. (Re-pinned 2026-08-15 round 4, user-approved: the hax-aligned seeds sample the t23 root differently and the false mistake verdict dissolves — mistake/p1-decision → none/p1-read, toward the expert. The structural weakness stays: binary events still price at sampled frequencies, not true probabilities — the Erwartungs-Grundierung agenda item.)',
+    observed: { side: 'p1', tier: 'none', attribution: ['p1-read'] },
     desired: 'Observed choice locks constrain the option set (a locked side is forced), and kill-odds claims are arithmetically grounded.',
   },
   {
