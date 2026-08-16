@@ -46,7 +46,8 @@ export interface FeedbackItem {
   /** 1-based played turn; absent = whole-game item (ReportClaim territory). */
   turn?: number;
   kind: 'truth' | 'gap';
-  source: 'expert-2026-08';
+  /** expert-…: distilled expert claims. round…-gate-…: engine deliverables pinned at a round's user gate. */
+  source: 'expert-2026-08' | 'round6-gate-2026-08';
   essence: string;
   /** truth only — pinned from the user-approved baseline. */
   expect?: TurnClaim | ReportClaim;
@@ -82,6 +83,11 @@ export const FEEDBACK_CORPUS: FeedbackItem[] = [
     expect: { side: 'p1', riskPaidOff: true, playedLabelIncludes: 'Kyurem' },
   },
   {
+    replay: 'smogtours-gen8ou-573756', turn: 8, kind: 'truth', source: 'round6-gate-2026-08',
+    essence: "Round-6 narrative deliverable (user-pinned at the gate): the streak detector names multi-turn expectation — LordEnz's 5th consecutive Scald into Clefable compounds burn fishing to ~83% across the streak. Milestone-throttled, render-time only, never a grade.",
+    expect: { summaryIncludes: ['burn fishing compounds to ~83%'] },
+  },
+  {
     replay: 'smogtours-gen8ou-562428', turn: 12, kind: 'truth', source: 'expert-2026-08',
     essence: "LordEnz's Close Combat over the safe Mandibuzz line is graded as a read that paid off; the expert explicitly praised that framing.",
     expect: { side: 'p1', attribution: ['p1-read'], riskPaidOff: true, playedLabelIncludes: 'Close Combat', keyMoment: true },
@@ -90,6 +96,11 @@ export const FEEDBACK_CORPUS: FeedbackItem[] = [
     replay: 'smogtours-gen6ou-648453', turn: 20, kind: 'truth', source: 'expert-2026-08',
     essence: "BKC's good play is correctly recognized — Knock Off graded as a paid-off read.",
     expect: { side: 'p2', attribution: ['p2-read'], riskPaidOff: true, playedLabelIncludes: 'Knock Off' },
+  },
+  {
+    replay: 'smogtours-gen6ou-649664', turn: 8, kind: 'truth', source: 'round6-gate-2026-08',
+    essence: "Round-6 odds-grounding deliverable (user-pinned at the gate): the read clause quotes the analytic odds behind the click — BKC's Fire Blast renders as 'an 85% roll into a ~53% kill range' from the cache-borne koOdds payload (accuracy × crit-weighted kill share of the 16 damage rolls).",
+    expect: { summaryIncludes: ['an 85% roll into a ~53% kill range'] },
   },
   {
     replay: 'smogtours-gen6ou-655336', kind: 'truth', source: 'expert-2026-08',
@@ -117,7 +128,7 @@ export const FEEDBACK_CORPUS: FeedbackItem[] = [
   },
   {
     replay: 'smogtours-gen6ou-649664', turn: 23, kind: 'gap', source: 'expert-2026-08',
-    essence: 'Graded as a risk, but Keldeo was visibly choice-locked — Hydro Pump was the only winning play, not a gamble. The reasoning assumed Scald kills; the odds are ~43%, worse than landing two Hydro Pumps. (Re-pinned 2026-08-15 round 4, user-approved: the hax-aligned seeds sample the t23 root differently and the false mistake verdict dissolves — mistake/p1-decision → none/p1-read, toward the expert. The structural weakness stays: binary events still price at sampled frequencies, not true probabilities — the Erwartungs-Grundierung agenda item.)',
+    essence: 'Graded as a risk, but Keldeo was visibly choice-locked — Hydro Pump was the only winning play, not a gamble. The reasoning assumed Scald kills; the odds are ~43%, worse than landing two Hydro Pumps. (Re-pinned 2026-08-15 round 4, user-approved: the hax-aligned seeds sample the t23 root differently and the false mistake verdict dissolves — mistake/p1-decision → none/p1-read, toward the expert. The structural weakness stays: binary events still price at sampled frequencies, not true probabilities — the Erwartungs-Grundierung agenda item. Round 6 2026-08-16, user-approved note: the Erwartungs-Grundierung landed — root MATRIX cells blend boundary events at analytic class weights (a 43% kill roll can no longer sample 5/5 and grade certain; cache v33) and ranked rows carry koOdds that ground the prose (this replay\'s t8 renders "an 85% roll into a ~53% kill range", pinned as a round-6 truth). t23 itself evaluates under MCTS once auto mode flips at t13, which the blend deliberately does not touch — extending the blend to MCTS roots is the registered follow-up agenda item; the odds half of the desired is delivered on matrix turns.)',
     observed: { side: 'p1', tier: 'none', attribution: ['p1-read'] },
     desired: 'Observed choice locks constrain the option set (a locked side is forced), and kill-odds claims are arithmetically grounded.',
   },

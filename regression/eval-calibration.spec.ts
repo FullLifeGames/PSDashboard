@@ -883,6 +883,76 @@ import { brierScore, fitConstantK } from './fit-helpers';
  * static basis for this mass; the next lever, if any, is search/
  * planning-side.
  *
+ * EXPECTATION-GROUNDING ROUND 2026-08-16 (improvement round 6 — the
+ * Erwartungs-Grundierung item spun out of round 4's agenda rename; commits
+ * d9372f4/399f6aa/f0125d8/d77e289/316ce76/7a26c93/1323a3b + this record):
+ * DESIGN (cache v33): binary boundary events (KO-range rolls, accuracy)
+ *    price at ANALYTIC probabilities instead of seed frequencies at root
+ *    matrix cells — singles, matrix mode only; sub-searches, MCTS, and
+ *    doubles byte-identical. ko-odds.ts computes one-turn odds via a
+ *    sim-exact @smogon/calc bridge fed the battle's own reconstructed
+ *    stats: killFraction = crit-weighted share of the 16 damage rolls
+ *    ≥ current HP, × accuracy after stage/weather modifiers; status moves
+ *    with imperfect accuracy yield accuracy-only events; everything
+ *    unpriceable (multi-hit, charge, counter/sucker families, self-KO,
+ *    accuracy items/abilities, gen ≤ 2) fails closed to the seed average.
+ *    cell-blend.ts plans a cell's events (guards: protect family,
+ *    action-prevention statuses, sash/Sturdy/Disguise, hazard/pivot
+ *    defenders), classifies each seed child's outcome from its advance
+ *    log (any deviation from the kill-truncation occurrence model —
+ *    flinch, |cant|, ambiguous faints — falls back to the plain seed
+ *    average), folds class weights in observed actor order (the first
+ *    mover's kill truncates the second event), and prices the cell as
+ *    analytically weighted class means. Missing classes are chased with
+ *    11 fixed probe seeds under a 16-draw budget; a class never found
+ *    renormalizes the found weights and surfaces as a koDiagnostics
+ *    entry — values are never invented. Deepening re-blends through the
+ *    first-seed child's class (reblendValue — one deepened branch cannot
+ *    erase the mixture); both engine paths share the semantics (the
+ *    local executor blends evalCells, the orchestrator re-blends with
+ *    the same pure helper). Ranked root options carry koOdds (accuracy ×
+ *    killFraction vs the standing opposing active), cache-borne; the
+ *    narrative quotes them ("kills ~43% of the time", "an 80% roll to
+ *    connect", "a 90% roll into a ~43% kill range") in the mistake/
+ *    inaccuracy/read clauses, the report's seeds sentence, and a panel
+ *    suffix. streaks.ts adds the NARRATIVE half: milestone-throttled
+ *    multi-turn cumulation (secondary fishing with Serene Grace/Shield
+ *    Dust/Covert Cloak priced in, flinch gated on outspeeding; crit
+ *    accumulation vs boosted walls) — render-time only, grading never
+ *    sees it. The contract in one line: the search prices what the next
+ *    roll is worth; the report narrates what many rolls mean.
+ * MEASURED (runs ×3 bit-identical incl. a DUMP run, ~12m): ZERO item
+ *    drift vs the round-5 baseline — truths, gaps, notices, alignment,
+ *    eval-gap channels all identical; wall +4–8% (probe draws). Odds
+ *    language fires where matrix mode runs: 649664 t8 "an 85% roll into
+ *    a ~53% kill range" (pinned), 648453 t14/t15, 562428 t11, 655336
+ *    t13; streaks fire in the 573756 stall (t8/t118 "burn fishing
+ *    compounds to ~83%", t8 pinned). 649664 t23 itself flips to MCTS at
+ *    t13 under auto mode — the anchor keeps its round-4 none/p1-read
+ *    verdict but the odds sentence waits on an MCTS-root blend (NEW
+ *    AGENDA). koMismatchByReplay 36–141 — NOT single digits: the dump
+ *    audit shows (a) tail classes ≤ 0.15 weight the fixed probes
+ *    structurally miss (first-roll bias — seeds 21..64 nearly always
+ *    hit), and (b) chip-death cells (burn/poison kills in-window) where
+ *    every child classifies hit-kill and the missing hit-nokill mass is
+ *    large — renormalization equals the OBSERVED truth in both shapes;
+ *    no calc-vs-sim bridge failures. A probe-chase weight threshold is
+ *    noted as a future refinement, deliberately not built mid-round.
+ * CALIBRATION GATE PASSED (mode=auto vs the round-4 record): n 806
+ *    identical, phases 54/65/82 (early −1pp ≈ 1–3 positions), briers
+ *    0.2592/0.2252/0.1448 (max +0.0004, inside the recorded ±0.0007
+ *    noise band; late identical to the 4th decimal), buckets 60/58/71/90,
+ *    doubles 72%, wall 26.3m vs 26.7m — the probe draws are free at
+ *    bench scale.
+ * RE-PIN (user-approved): TWO new round6-gate truth items — 649664 t8
+ *    summaryIncludes ['an 85% roll into a ~53% kill range'] and 573756
+ *    t8 ['burn fishing compounds to ~83%'] (both verbatim-stable across
+ *    the three runs); the 649664 t23 essence notes the matrix-only
+ *    scope. One regression re-pin during implementation: draft T50's
+ *    top label coarsened to either wall (crit-tail cells around the
+ *    Slowking column re-priced a ~0.001 tie; the Heatran column carries
+ *    no boundary event). Golden 655336 untouched.
+ *
  * NARRATIVE ROUND 2026-08-16 (improvement round 5 — agenda item ⑥;
  * commits cd5ffa5/5f75a08/6c36965/c2140f9/4aa639a/a8f64d9 + this record):
  * DESIGN (render-time only — NO cache bump, grading/tiers/attribution
