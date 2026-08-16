@@ -883,6 +883,50 @@ import { brierScore, fitConstantK } from './fit-helpers';
  * static basis for this mass; the next lever, if any, is search/
  * planning-side.
  *
+ * NARRATIVE ROUND 2026-08-16 (improvement round 5 — agenda item ⑥;
+ * commits cd5ffa5/5f75a08/6c36965/c2140f9/4aa639a/a8f64d9 + this record):
+ * DESIGN (render-time only — NO cache bump, grading/tiers/attribution
+ *    untouched): four signals computed in analyzeTurn over the cached
+ *    results and spoken by summary.ts/report.ts, all failing closed on
+ *    missing data. (1) BREADTH: viableCount = options within an
+ *    inaccuracy of best; a shift turn with ≥4 viable options per side
+ *    reads "a genuinely open turn rather than a drift … hinged on
+ *    out-predicting the opponent" (562428 t10 renders the expert's own
+ *    numbers, 9 of 9 / 11 of 13). (2) CONDITIONAL: when the side's own
+ *    equilibrium mix leans a DIFFERENT choice than the argmax-EV pick
+ *    (weight ≥ 0.5), the recommendation carries its condition — the
+ *    opponent replies with the largest own-value split in the solved
+ *    matrix ("B only if you expect X; Z covers Y"). (3) NULL-MOVE GUARD
+ *    (null-moves.ts, type-chart-driven and conservative — status
+ *    immunities as a gen-aware table since the dex damageTaken chart
+ *    carries no status keys; Thunder Wave's missing ignoreImmunity;
+ *    attacker abilities SUPPRESS verdicts): a mechanically null best
+ *    swaps its display to a co-optimal alternative within TIE_EPSILON
+ *    or carries the enabling-condition caveat; fires in the corpus on
+ *    573756 Toxic→Toxapex and 562428 Toxic/Earthquake→Corviknight
+ *    (where "pays against the rest of the team" is exactly right — the
+ *    value lies on the expected switch-in). (4) FORCED MIX: a ≥0.85
+ *    equilibrium SWITCH is said in prose ("all but commits X to
+ *    switching to Y (92%) — which is what happened / came instead"),
+ *    deduped when the conditional already names it. Harness: TurnClaim
+ *    gains summaryIncludes narrative pins (rendered via summarizeTurn
+ *    with the replay's player names; missing names mismatch loudly).
+ * MEASURED (runs ×3 bit-identical, 9.8m): ZERO drift in every machine
+ *    channel vs the round-4 baseline — results, notices, evalErrors,
+ *    alignment all identical — as designed for a narrative-only round.
+ *    NO calibration gate: nothing the calibration bed prices changed,
+ *    and the zero-drift runs prove it. Signal inventory over the dumps:
+ *    open-turn ×3 (562428 t10, 653785 t15, 655336 t6), conditional ×7,
+ *    bestNull ×6 (rendered only where a recommendation speaks — tier-
+ *    less turns keep it silent by design), forcedMix ~50 (~30 in the
+ *    573756 regenerator stall loop; per-turn display keeps it honest).
+ * RE-PIN (user-approved): 562428 t10 observed gains the narrative pin
+ *    summaryIncludes ['open turn'] — the breadth half of the desired is
+ *    delivered; the remaining half is an actual read RECOMMENDATION
+ *    (opponent-model territory). 653785 t19 essence notes the general
+ *    guard landed (the Will-O-Wisp half of its desired is delivered).
+ *    Golden 655336 untouched.
+ *
  * HAX-ALIGNMENT ROUND 2026-08-15 (improvement round 4 — agenda item
  * Hax-Alignment; commits 5824b5b/428f44b/63951ea/3b0d0e6/f524611 + this
  * record):
