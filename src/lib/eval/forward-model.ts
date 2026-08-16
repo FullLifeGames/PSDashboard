@@ -492,14 +492,28 @@ export function advancePosition(
   p2Choice: string,
   seed: PRNGSeed,
 ): SimPosition {
+  return advancePositionWithLog(position, p1Choice, p2Choice, seed).child;
+}
+
+/**
+ * advancePosition plus the battle.log delta of THIS advance only — the
+ * cell-blend classifier reads outcome classes from these lines.
+ */
+export function advancePositionWithLog(
+  position: SimPosition,
+  p1Choice: string,
+  p2Choice: string,
+  seed: PRNGSeed,
+): { child: SimPosition; log: string[] } {
   const battle = forkBattle(position, seed);
+  const logStart = battle.log.length;
   applyChoice(battle, 'p1', p1Choice);
   applyChoice(battle, 'p2', p2Choice);
   resolveForcedSwitches(battle, seed, {
     p1: p1Choice.split(' > ')[1],
     p2: p2Choice.split(' > ')[1],
   });
-  return toPosition(battle);
+  return { child: toPosition(battle), log: battle.log.slice(logStart) };
 }
 
 export interface TrialAdvanceResult {

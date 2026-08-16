@@ -1,0 +1,190 @@
+import { test, expect } from '@playwright/test';
+import { Battle, State, Teams, toID } from '@pkmn/sim';
+import type { PokemonSet } from '@pkmn/sim';
+import {
+  classifyChild, foldClassWeights, observeOrder, planCellEvents, koOddsForOptions,
+  BOUNDARY_DRAW_BUDGET, PROBE_SEEDS, type CellEvent,
+} from '../src/lib/eval/cell-blend';
+import { reblendValue } from '../src/lib/eval/rank';
+import { advancePositionWithLog, createRootPosition } from '../src/lib/eval/forward-model';
+
+function makeSet(name: string, species: string, moves: string[], level = 50, item = '', ability = 'No Ability'): PokemonSet {
+  return {
+    name, species, item, ability, moves,
+    nature: 'Hardy',
+    evs: { hp: 252, atk: 252, def: 0, spa: 252, spd: 4, spe: 0 },
+    ivs: { hp: 31, atk: 31, def: 31, spa: 31, spd: 31, spe: 31 },
+    level, gender: '',
+  };
+}
+
+function makeBattle(p1Sets: PokemonSet[], p2Sets: PokemonSet[], formatid = 'gen9customgame'): Battle {
+  const battle = new Battle({
+    formatid: toID(formatid),
+    seed: '1,2,3,4',
+    p1: { name: 'Alpha', team: Teams.pack(p1Sets) },
+    p2: { name: 'Beta', team: Teams.pack(p2Sets) },
+  });
+  if (battle.sides.some(side => side.requestState === 'teampreview')) {
+    battle.choose('p1', 'team 1');
+    battle.choose('p2', 'team 1');
+  }
+  return battle;
+}
+
+const serialize = (battle: Battle) => JSON.stringify(State.serializeBattle(battle));
+
+const event = (side: 'p1' | 'p2', accuracy: number, killFraction: number, defenderIdent: string): CellEvent =>
+  ({ side, moveId: 'testmove', defenderIdent, event: { accuracy, killFraction, pKill: accuracy * killFraction } });
+
+test.describe('foldClassWeights', () => {
+  test('the t23 shape: kill truncates the second actor', () => {
+    // p1 Scald: 100% acc, 43% kill. p2 HJK: 90% acc, 100% kill. p1 first.
+    const events = [event('p1', 1, 0.43, 'p2a: Medicham'), event('p2', 0.9, 1, 'p1a: Keldeo')];
+    const weights = foldClassWeights(events, 'p1');
+    expect(weights.get('hit-kill|none')).toBeCloseTo(0.43, 9);
+    expect(weights.get('hit-nokill|hit-kill')).toBeCloseTo(0.57 * 0.9, 9);
+    expect(weights.get('hit-nokill|miss')).toBeCloseTo(0.57 * 0.1, 9);
+    expect([...weights.values()].reduce((a, b) => a + b, 0)).toBeCloseTo(1, 9);
+  });
+
+  test('a single accuracy-only event splits hit/miss', () => {
+    const weights = foldClassWeights([event('p1', 0.9, 0, 'p2a: Snorlax')], 'p1');
+    expect(weights.get('miss')).toBeCloseTo(0.1, 9);
+    expect(weights.get('hit-nokill')).toBeCloseTo(0.9, 9);
+    expect(weights.has('hit-kill')).toBe(false);
+  });
+});
+
+test.describe('classifyChild', () => {
+  const events = [event('p1', 1, 0.43, 'p2a: Medicham'), event('p2', 0.9, 1, 'p1a: Keldeo')];
+  test('kill before the second move classifies as truncation', () => {
+    const key = classifyChild([
+      '|move|p1a: Keldeo|Scald|p2a: Medicham',
+      '|-damage|p2a: Medicham|0 fnt',
+      '|faint|p2a: Medicham',
+    ], events);
+    expect(key).toBe('hit-kill|none');
+  });
+  test('survive then hit-kill back', () => {
+    const key = classifyChild([
+      '|move|p1a: Keldeo|Scald|p2a: Medicham',
+      '|-damage|p2a: Medicham|20/100',
+      '|move|p2a: Medicham|High Jump Kick|p1a: Keldeo',
+      '|-damage|p1a: Keldeo|0 fnt',
+      '|faint|p1a: Keldeo',
+    ], events);
+    expect(key).toBe('hit-nokill|hit-kill');
+  });
+  test('a miss classifies as miss', () => {
+    const key = classifyChild([
+      '|move|p1a: Keldeo|Scald|p2a: Medicham',
+      '|-damage|p2a: Medicham|20/100',
+      '|move|p2a: Medicham|High Jump Kick|p1a: Keldeo',
+      '|-miss|p2a: Medicham|p1a: Keldeo',
+      '|-damage|p2a: Medicham|1/100',
+    ], events);
+    expect(key).toBe('hit-nokill|miss');
+  });
+  test('an unmodeled skip (cant) fails closed', () => {
+    expect(classifyChild([
+      '|move|p1a: Keldeo|Scald|p2a: Medicham',
+      '|-damage|p2a: Medicham|20/100',
+      '|cant|p2a: Medicham|par',
+    ], events)).toBeNull();
+  });
+});
+
+test.describe('observeOrder', () => {
+  const events = [event('p1', 1, 0.43, 'p2a: B'), event('p2', 0.9, 1, 'p1a: A')];
+  test('a lone mover votes as first (kill truncation)', () => {
+    expect(observeOrder([
+      ['|move|p1a: A|Scald|p2a: B', '|faint|p2a: B'],
+      ['|move|p1a: A|Scald|p2a: B', '|move|p2a: B|HJK|p1a: A'],
+    ], events)).toBe('p1');
+  });
+  test('disagreeing orders fail closed', () => {
+    expect(observeOrder([
+      ['|move|p1a: A|Scald|p2a: B'],
+      ['|move|p2a: B|HJK|p1a: A', '|move|p1a: A|Scald|p2a: B'],
+    ], events)).toBeNull();
+  });
+});
+
+test('reblendValue swaps the first leaf inside its class only', () => {
+  const blend = {
+    firstLeaf: 1,
+    classes: [
+      { weight: 0.43, leafSum: 2, count: 2, hasFirst: true },   // leaves 1, 1
+      { weight: 0.57, leafSum: -1, count: 1, hasFirst: false },
+    ],
+  };
+  // Deepened first child: 0.5 → class mean (0.5 + 1)/2 = 0.75.
+  expect(reblendValue(blend, 0.5)).toBeCloseTo(0.43 * 0.75 + 0.57 * -1, 9);
+});
+
+test.describe('planCellEvents guards', () => {
+  test('a paralyzed attacker fails closed', () => {
+    const battle = makeBattle(
+      [makeSet('Machamp', 'Machamp', ['Hydro Pump'], 100)],
+      [makeSet('Snorlax', 'Snorlax', ['Tackle'], 50)],
+    );
+    battle.sides[0].active[0]!.status = 'par' as never;
+    expect(planCellEvents(battle, 'move hydropump', 'move tackle').kind).toBe('fail');
+  });
+  test('protect in the pair fails closed', () => {
+    const battle = makeBattle(
+      [makeSet('Machamp', 'Machamp', ['Hydro Pump'], 100)],
+      [makeSet('Snorlax', 'Snorlax', ['Protect'], 50)],
+    );
+    expect(planCellEvents(battle, 'move hydropump', 'move protect').kind).toBe('fail');
+  });
+  test('an 80% move yields a plan with one event', () => {
+    const battle = makeBattle(
+      [makeSet('Machamp', 'Machamp', ['Hydro Pump'], 100)],
+      [makeSet('Pikachu', 'Pikachu', ['Tackle'], 30)],
+    );
+    const plan = planCellEvents(battle, 'move hydropump', 'move tackle');
+    expect(plan.kind).toBe('events');
+    if (plan.kind === 'events') {
+      expect(plan.events).toHaveLength(1);
+      expect(plan.events[0].event.accuracy).toBeCloseTo(0.8, 5);
+    }
+  });
+  test('all-deterministic pairs plan none', () => {
+    const battle = makeBattle(
+      [makeSet('Machamp', 'Machamp', ['Seismic Toss'], 100)],
+      [makeSet('Blissey', 'Blissey', ['Seismic Toss'], 100)],
+    );
+    expect(planCellEvents(battle, 'move seismictoss', 'move seismictoss').kind).toBe('none');
+  });
+});
+
+test('advancePositionWithLog returns exactly this advance\'s lines', () => {
+  const battle = makeBattle(
+    [makeSet('Machamp', 'Machamp', ['Seismic Toss'], 100)],
+    [makeSet('Pikachu', 'Pikachu', ['Tackle'], 30)],
+  );
+  const root = createRootPosition(serialize(battle));
+  const { log } = advancePositionWithLog(root, 'move seismictoss', 'move tackle', '1,2,3,4');
+  expect(log.some(line => line.startsWith('|move|p1a:'))).toBe(true);
+  expect(log.some(line => line.startsWith('|start'))).toBe(false); // pre-advance lines excluded
+});
+
+test('koOddsForOptions prices the stay-column headline', () => {
+  const battle = makeBattle(
+    [makeSet('Machamp', 'Machamp', ['Hydro Pump', 'Seismic Toss'], 100)],
+    [makeSet('Pikachu', 'Pikachu', ['Tackle'], 30)],
+  );
+  const [pump, toss] = koOddsForOptions(battle, 'p1', ['move hydropump', 'move seismictoss']);
+  expect(pump).toEqual({ accuracy: expect.closeTo(0.8, 5), killFraction: 1 });
+  expect(toss).toBeNull(); // fully deterministic — no event
+});
+
+// Keep the fixed-seed constants honest without pinning exact values elsewhere.
+test('probe constants: eleven fixed seeds under a 16-draw budget', () => {
+  expect(PROBE_SEEDS).toHaveLength(11);
+  expect(PROBE_SEEDS[0]).toBe('21,22,23,24');
+  expect(PROBE_SEEDS[10]).toBe('61,62,63,64');
+  expect(BOUNDARY_DRAW_BUDGET).toBe(16);
+});

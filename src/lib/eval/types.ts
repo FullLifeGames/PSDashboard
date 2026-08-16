@@ -69,6 +69,54 @@ export interface EvalPreferences {
 }
 
 /**
+ * Analytic one-turn odds of an option's own damaging move against the
+ * standing opposing active (round 6 expectation grounding): accuracy after
+ * stage/weather modifiers × the crit-weighted share of damage rolls that KO.
+ */
+export interface KoOddsInfo {
+  accuracy: number;
+  killFraction: number;
+}
+
+/** One outcome class of a blended boundary cell (round 6). */
+export interface CellBlendClass {
+  /** Analytic weight (normalized over the classes that were sampled). */
+  weight: number;
+  /** Sum of the sampled children's leaf values in this class. */
+  leafSum: number;
+  /** Number of sampled children in this class. */
+  count: number;
+  /** The first-seed child (the one deepening expands) lives in this class. */
+  hasFirst: boolean;
+}
+
+/**
+ * A root boundary cell's analytic class blend. Deepening re-blends through
+ * it (reblendValue) instead of overwriting the mixture with one branch.
+ */
+export interface CellBlend {
+  classes: CellBlendClass[];
+  /** The first-seed child's leaf value (swapped out on deepening). */
+  firstLeaf: number;
+}
+
+/**
+ * Diagnostic: a boundary cell whose analytic outcome classes were not all
+ * observed within the probe budget. The cell renormalizes over the found
+ * classes instead of inventing values; the harness counts these.
+ */
+export interface KoOddsMismatch {
+  i: number;
+  j: number;
+  p1Choice: string;
+  p2Choice: string;
+  /** Class keys with analytic weight but no sampled representative after the probe budget. */
+  missing: string[];
+  analytic: Record<string, number>;
+  sampled: Record<string, number>;
+}
+
+/**
  * One ranked option for a side. Values are from that side's OWN perspective
  * (p2 values are negated from the internal p1-perspective matrix).
  */

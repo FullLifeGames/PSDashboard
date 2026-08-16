@@ -1,4 +1,4 @@
-import type { EvalMatrix, EvalResult, RankedChoice } from './types';
+import type { CellBlend, EvalMatrix, EvalResult, RankedChoice } from './types';
 
 /**
  * Pure ranking math over a computed value matrix. No @pkmn/sim imports —
@@ -34,6 +34,24 @@ export interface Ranked {
 export type PvStep = { p1: string; p2: string };
 
 export const cellKey = (i: number, j: number) => i * 10_000 + j;
+
+/**
+ * Re-blend a boundary cell after deepening: the deepened sub-search score
+ * replaces the FIRST-SEED child's leaf inside its outcome class; every other
+ * class keeps its sampled mean and analytic weight. Without this, writing
+ * the sub-score into the cell would silently erase the blend (a 43% kill
+ * branch would grade certain again the moment depth 2 expands it).
+ */
+export function reblendValue(blend: CellBlend, subScore: number): number {
+  let value = 0;
+  for (const cls of blend.classes) {
+    const mean = cls.hasFirst
+      ? (cls.leafSum - blend.firstLeaf + subScore) / cls.count
+      : cls.leafSum / cls.count;
+    value += cls.weight * mean;
+  }
+  return value;
+}
 
 export const TOP_EXPANSION = 5;
 
