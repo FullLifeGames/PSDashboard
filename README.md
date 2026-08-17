@@ -2,7 +2,9 @@
 
 PS Dashboard is an early-stage web app for replay-based "what if?" analysis on Pokemon Showdown battles. It loads a Showdown replay, reconstructs the battle state up to a chosen turn, and then lets you branch from that point by selecting alternative moves or switches for both sides.
 
-Published app: [https://fulllifegames.github.io/PSDashboard/](https://fulllifegames.github.io/PSDashboard/)
+- **Production** (current official release): <https://fulllifegames.com/Tools/PSDashboard/>
+- **Nightly** (tracks `master`): <https://fulllifegames.github.io/PSDashboard/>
+- **Every hosted build**: <https://fulllifegames.github.io/PSDashboard/versions/>
 
 The current implementation is a working prototype, not a fully accurate replay recreation engine yet. It is best treated as an exploratory simulator built from replay evidence plus inferred hidden information.
 
@@ -139,6 +141,10 @@ A push that does not change the version costs a ~6-second version check and stop
 
 ### Where builds are hosted
 
+Production runs at **<https://fulllifegames.com/Tools/PSDashboard/>** and is updated by hand from an
+official release — no workflow deploys to it. Everything below is the GitHub Pages site, which is
+where the automated builds live.
+
 [`pages.yml`](./.github/workflows/pages.yml) deploys on every push to `master` and again whenever a
 release is published. It serves two channels from one site:
 
@@ -147,7 +153,7 @@ release is published. It serves two channels from one site:
 | `/` | Nightly — current `master` | Every push |
 | `/latest/` | Newest official release | Every release |
 | `/v0.5.2/` | That release, frozen | Never |
-| `/versions/` | Index of hosted builds | Every deploy |
+| `/versions/` | Index of hosted builds, and a link out to production | Every deploy |
 
 Frozen builds are never recompiled from old source: the workflow downloads each release's
 `ps-dashboard-<version>.zip` and unpacks it, so a pinned build stays byte-for-byte what shipped.

@@ -11,6 +11,9 @@
  * Manifest format is one release per line, newest first — the first line is the
  * one mirrored at /latest/:
  *   <tag>\t<publishedAt ISO>
+ *
+ * Set PS_PRODUCTION_URL to also surface the hosted production deployment. It is
+ * optional so the page still renders for a fork with nowhere to point.
  */
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
@@ -88,6 +91,25 @@ const stableNote = releases.length
   : '';
 
 const nightlyMeta = [nightlySha, nightlyDate].filter(Boolean).map(esc);
+
+const productionUrl = process.env.PS_PRODUCTION_URL;
+const production = productionUrl
+  ? `      <section class="panel panel-official">
+        <div class="channel">
+          <h2>Production</h2>
+          <span>the deployment people actually use</span>
+        </div>
+        <div class="head">
+          <div>
+            <span class="meta">${esc(productionUrl.replace(/^https?:\/\//, '').replace(/\/$/, ''))}</span>
+            <small>Runs an official release, updated by hand — not by this pipeline.</small>
+          </div>
+          <a class="btn btn-live" href="${esc(productionUrl)}">Open production</a>
+        </div>
+      </section>
+
+`
+  : '';
 
 const html = `<!doctype html>
 <html lang="en">
@@ -202,6 +224,13 @@ const html = `<!doctype html>
         white-space: nowrap;
       }
       .btn:hover { filter: brightness(1.12); }
+      /* Production is the one to reach for, so it borrows the app's own
+         gold "recommended action" button rather than the plain blue. */
+      .btn-live {
+        background: linear-gradient(180deg, rgba(111, 87, 31, 0.94) 0%, rgba(65, 52, 25, 0.94) 100%);
+        border-color: rgba(255, 224, 102, 0.45);
+        color: #ffe8a3;
+      }
 
       /* The rail is the release order made visible: newest at the top, one
          node per hosted build. */
@@ -300,14 +329,15 @@ const html = `<!doctype html>
       <div class="wrap">
         <h1>PS Dashboard — versions</h1>
         <p>
-          Two channels: the nightly follows master, and every official release keeps a frozen
-          copy at its own address — so you can reopen a replay exactly as that build analyzed it.
+          ${productionUrl ? 'Production runs an official release, the nightly follows master' : 'The nightly follows master'},
+          and every release keeps a frozen copy at its own address — so you can reopen a replay
+          exactly as that build analyzed it.
         </p>
       </div>
     </header>
 
     <main class="wrap">
-      <section class="panel panel-nightly">
+${production}      <section class="panel panel-nightly">
         <div class="channel">
           <h2>Nightly</h2>
           <span>rebuilt on every push to master</span>

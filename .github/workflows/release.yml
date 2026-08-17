@@ -84,6 +84,6 @@ jobs:
           gh release create "v$VERSION" \
             --title "v$VERSION" \
             --target "$GITHUB_SHA" \
-            --notes "**[Open this build]($site/v$VERSION/)** · [All hosted versions]($site/versions/) · [Nightly]($site/)" \
+            --notes "**[Open this build]($site/v$VERSION/)** · [Production](https://fulllifegames.com/Tools/PSDashboard/) · [All hosted versions]($site/versions/) · [Nightly]($site/)" \
             --generate-notes \
             "ps-dashboard-$VERSION.zip"
