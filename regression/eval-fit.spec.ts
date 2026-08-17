@@ -10,7 +10,7 @@ import {
   type EvalFeatures,
 } from '../src/lib/eval/eval-function';
 import { battleFaintedFraction } from '../src/lib/eval/search';
-import { brierScore, fitConstantK, fitLogistic, fitPhaseK, logLossScore, mulberry32, phaseBucket } from './fit-helpers';
+import { brierScore, crossValidate, fitConstantK, fitLogistic, fitPhaseK, logLossScore, mulberry32, phaseBucket } from './fit-helpers';
 
 /**
  * Weight-fitting harness (WP 7): fits the static eval's linear feature
@@ -99,7 +99,7 @@ test.describe('eval weight fitting (EVAL_FIT=1)', () => {
   test('fit feature weights on the pinned corpus and report', async () => {
     test.skip(!process.env.EVAL_FIT, 'weight fitting is opt-in: EVAL_FIT=1');
     test.skip(!existsSync(MANIFEST_PATH), 'run node scripts/build-fit-corpus.mjs first');
-    test.setTimeout(3_600_000);
+    test.setTimeout(7_200_000);
 
     const manifest = JSON.parse(readFileSync(MANIFEST_PATH, 'utf-8')) as {
       replays: { id: string; format: string; source: 'tournament' | 'ladder' }[];
@@ -252,6 +252,57 @@ test.describe('eval weight fitting (EVAL_FIT=1)', () => {
     bootstrap('SINGLES-ONLY', singles);
     bootstrap('DOUBLES-ONLY', doubles);
     bootstrap('GEN9-ONLY', samples.filter(s => s.genClass === 'gen9'));
+
+    // Boosts↔sweep disentanglement (round 8, design doc 2026-08-17):
+    // game-clustered 5-fold CV over three bases — M0 keeps flat boosts
+    // (sweep masked), M1 replaces boosts with sweep (boosts masked), M2
+    // carries both (known collinear, record only). Out-of-fold logloss
+    // decides; coefficient SEs cannot under collinearity. Decision tranche
+    // SINGLES-ONLY. PRE-REGISTERED adoption criterion: M1 becomes the
+    // weight candidate only if singles mean OOF logloss(M1) < M0 AND
+    // M1 < M0 in ≥ 16/20 seeds AND mean OOF brier(M1) ≤ M0.
+    const sweepIndex = FEATURE_KEYS.indexOf('sweep' as keyof EvalFeatures);
+    const cvModels = [
+      { name: 'M0 boosts-only', drop: new Set([sweepIndex]) },
+      { name: 'M1 sweep-only', drop: new Set([boostsIndex]) },
+      { name: 'M2 additive', drop: new Set<number>() },
+    ];
+    const cvSeeds = Array.from({ length: 20 }, (_, i) => i + 1);
+    const cvTranche = (label: string, subset: FitSample[]) => {
+      const gameCount = new Set(subset.map(s => s.game)).size;
+      if (gameCount < 25) {
+        console.log(`\ncv ${label}: too few games (${gameCount})`);
+        return null;
+      }
+      const cvSamples = subset.map(s => ({ g: s.g, won: s.p1Won, game: s.game }));
+      const runs = new Map(cvModels.map(model => [model.name,
+        cvSeeds.map(seed => crossValidate(cvSamples, 5, seed, model.drop))]));
+      console.log(`\ncv ${label} (n=${subset.length}, games=${gameCount}, k=5, seeds=${cvSeeds.length}):`);
+      const mean = (values: number[]) => values.reduce((sum, value) => sum + value, 0) / values.length;
+      for (const model of cvModels) {
+        const modelRuns = runs.get(model.name)!;
+        console.log(`  ${model.name}: logloss=${mean(modelRuns.map(r => r.logLoss)).toFixed(5)} ` +
+          `brier=${mean(modelRuns.map(r => r.brier)).toFixed(5)}`);
+      }
+      const m0 = runs.get('M0 boosts-only')!;
+      const m1 = runs.get('M1 sweep-only')!;
+      const deltas = cvSeeds.map((_, i) => m1[i].logLoss - m0[i].logLoss);
+      const wins = deltas.filter(delta => delta < 0).length;
+      const meanDelta = mean(deltas);
+      const brierOk = mean(m1.map(r => r.brier)) <= mean(m0.map(r => r.brier));
+      console.log(`  Δlogloss(M1−M0): mean=${meanDelta.toFixed(6)} · ` +
+        `M1 wins ${wins}/${cvSeeds.length} seeds · brier M1≤M0: ${brierOk}`);
+      return { meanDelta, wins, brierOk };
+    };
+    cvTranche('ALL', samples);
+    const singlesCv = cvTranche('SINGLES-ONLY', singles);
+    cvTranche('DOUBLES-ONLY', doubles);
+    cvTranche('GEN9-ONLY', samples.filter(s => s.genClass === 'gen9'));
+    if (singlesCv) {
+      const adopt = singlesCv.meanDelta < 0 && singlesCv.wins >= 16 && singlesCv.brierOk;
+      console.log(`\nCV VERDICT (singles): ${adopt ? 'REPLACEMENT CANDIDATE' : 'STATUS QUO HOLDS'} ` +
+        `(meanΔ=${singlesCv.meanDelta.toFixed(6)}, wins=${singlesCv.wins}/20, brierOk=${singlesCv.brierOk})`);
+    }
 
     // Probabilistic scoring of the winprob mapping, per gametype and phase.
     for (const gameType of ['singles', 'doubles'] as const) {
