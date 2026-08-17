@@ -10,7 +10,7 @@ import {
   type EvalFeatures,
 } from '../src/lib/eval/eval-function';
 import { battleFaintedFraction } from '../src/lib/eval/search';
-import { brierScore, fitConstantK, fitPhaseK, logLossScore, phaseBucket } from './fit-helpers';
+import { brierScore, fitConstantK, fitLogistic, fitPhaseK, logLossScore, mulberry32, phaseBucket } from './fit-helpers';
 
 /**
  * Weight-fitting harness (WP 7): fits the static eval's linear feature
@@ -84,48 +84,6 @@ interface FitSample {
   /** Fainted bodies / total bodies at capture time — the phase covariate. */
   faintedFraction: number;
   p1Won: boolean;
-}
-
-/** Deterministic PRNG for the cluster bootstrap. */
-function mulberry32(seed: number) {
-  let a = seed;
-  return () => {
-    a |= 0; a = (a + 0x6d2b79f5) | 0;
-    let t = Math.imul(a ^ (a >>> 15), 1 | a);
-    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
-    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
-  };
-}
-
-const sigmoid = (z: number) => 1 / (1 + Math.exp(-z));
-
-/** Logistic regression on standardized features; deterministic fixed-iteration GD. */
-function fitLogistic(samples: FitSample[]): { beta: number[]; intercept: number; sigma: number[]; mu: number[] } {
-  const n = samples.length;
-  const k = FEATURE_KEYS.length;
-  const mu = Array(k).fill(0);
-  const sigma = Array(k).fill(0);
-  for (const sample of samples) for (let j = 0; j < k; j++) mu[j] += sample.g[j] / n;
-  for (const sample of samples) for (let j = 0; j < k; j++) sigma[j] += (sample.g[j] - mu[j]) ** 2 / n;
-  for (let j = 0; j < k; j++) sigma[j] = Math.sqrt(sigma[j]) || 1;
-
-  const z = samples.map(sample => sample.g.map((value, j) => (value - mu[j]) / sigma[j]));
-  const beta = Array(k).fill(0);
-  let intercept = 0;
-  const lr = 0.5;
-  for (let iter = 0; iter < 500; iter++) {
-    const gradBeta = Array(k).fill(0);
-    let gradIntercept = 0;
-    for (let i = 0; i < n; i++) {
-      const p = sigmoid(intercept + z[i].reduce((sum, value, j) => sum + value * beta[j], 0));
-      const err = p - (samples[i].p1Won ? 1 : 0);
-      for (let j = 0; j < k; j++) gradBeta[j] += err * z[i][j] / n;
-      gradIntercept += err / n;
-    }
-    for (let j = 0; j < k; j++) beta[j] -= lr * gradBeta[j];
-    intercept -= lr * gradIntercept;
-  }
-  return { beta, intercept, sigma, mu };
 }
 
 /** Implied point-scale weights, normalized so `bodies` matches its hand weight. */
@@ -230,7 +188,7 @@ test.describe('eval weight fitting (EVAL_FIT=1)', () => {
         console.log(`${label}: too few samples (${subset.length})`);
         return;
       }
-      const fit = fitLogistic(subset);
+      const fit = fitLogistic(subset.map(s => ({ g: s.g, won: s.p1Won })));
       const implied = impliedWeights(fit);
       console.log(`\n${label} (n=${subset.length}, games=${new Set(subset.map(s => s.game)).size}):`);
       FEATURE_KEYS.forEach((key, j) => {
@@ -256,7 +214,7 @@ test.describe('eval weight fitting (EVAL_FIT=1)', () => {
           const pick = subsetGames[Math.floor(rng() * subsetGames.length)];
           resample.push(...(byGame.get(pick) ?? []));
         }
-        draws.push(impliedWeights(fitLogistic(resample)));
+        draws.push(impliedWeights(fitLogistic(resample.map(s => ({ g: s.g, won: s.p1Won })))));
       }
       console.log(`\nbootstrap SE ${label} (implied weights, games=${subsetGames.length}):`);
       FEATURE_KEYS.forEach((key, j) => {
