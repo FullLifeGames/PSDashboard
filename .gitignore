@@ -12,6 +12,10 @@ dist
 dist-ssr
 *.local
 
+# Pages deploy staging: the nightly plus the unpacked release builds
+site
+.versions-tmp
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json

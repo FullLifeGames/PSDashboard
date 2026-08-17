@@ -73,8 +73,17 @@ jobs:
           VERSION: ${{ needs.check.outputs.version }}
           GH_TOKEN: ${{ github.token }}
         run: |
+          # Default Pages address for this repo — the owner segment is
+          # lower-cased, the repo segment keeps its case.
+          owner="${GITHUB_REPOSITORY%%/*}"
+          repo="${GITHUB_REPOSITORY##*/}"
+          site="https://$(echo "$owner" | tr '[:upper:]' '[:lower:]').github.io/$repo"
+          # gh prepends --notes to the generated changelog, so these links head
+          # the release body. The frozen copy appears once the Pages run that
+          # this release triggers finishes.
           gh release create "v$VERSION" \
             --title "v$VERSION" \
             --target "$GITHUB_SHA" \
+            --notes "**[Open this build]($site/v$VERSION/)** · [All hosted versions]($site/versions/) · [Nightly]($site/)" \
             --generate-notes \
             "ps-dashboard-$VERSION.zip"

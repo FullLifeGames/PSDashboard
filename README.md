@@ -116,6 +116,48 @@ npm run test:e2e
 npm run test:regression
 ```
 
+## Releases And Hosted Builds
+
+Two workflows in [`.github/workflows/`](./.github/workflows/) publish the app. Neither needs to be
+triggered by hand.
+
+### Cutting a release
+
+[`release.yml`](./.github/workflows/release.yml) runs on every push to `master` but only acts when
+the `version` in `package.json` has no matching `v<version>` tag yet. A release is therefore cut by
+bumping the version — nothing else:
+
+```bash
+npm version patch --no-git-tag-version   # or edit package.json directly
+git commit -am "0.5.3 release bump"
+git push
+```
+
+The workflow then builds the app, creates the `v<version>` tag on that commit, and publishes a
+GitHub Release carrying `ps-dashboard-<version>.zip` (the built `dist/`) plus auto-generated notes.
+A push that does not change the version costs a ~6-second version check and stops there.
+
+### Where builds are hosted
+
+[`pages.yml`](./.github/workflows/pages.yml) deploys on every push to `master` and again whenever a
+release is published. It serves two channels from one site:
+
+| URL | Channel | Updated |
+| --- | --- | --- |
+| `/` | Nightly — current `master` | Every push |
+| `/latest/` | Newest official release | Every release |
+| `/v0.5.2/` | That release, frozen | Never |
+| `/versions/` | Index of hosted builds | Every deploy |
+
+Frozen builds are never recompiled from old source: the workflow downloads each release's
+`ps-dashboard-<version>.zip` and unpacks it, so a pinned build stays byte-for-byte what shipped.
+The ten most recent releases are hosted; older ones remain downloadable from their release page.
+Releases predating the pipeline (`v0.1.0`, `v0.1.1`) carry no zip and are skipped.
+
+This only works because [`vite.config.ts`](./vite.config.ts) sets `base: "./"`, which makes every
+asset reference relative so a build runs from any subdirectory. Switching `base` to an absolute
+path would silently break every versioned copy — they would load the nightly's bundles instead.
+
 ## Embedding
 
 The app can be included in another site and handed a replay to render:
@@ -175,6 +217,7 @@ The app can be included in another site and handed a replay to render:
 - [`src/lib/set-coherence.ts`](./src/lib/set-coherence.ts) scores published sets against revealed evidence and applies the pairwise coherence vetoes shared by the stats-panel display and the simulator team builder.
 - [`src/lib/spread-inference.ts`](./src/lib/spread-inference.ts) solves damage-consistent EV spreads from replay observations against `@smogon/calc` roll ranges — hard-constrained by observed speed races, forfeiting solves that misfit their own evidence — legalized to the format's EV budget (standard 508/252, Pokémon Champions 66/32).
 - [`scripts/build-fit-corpus.mjs`](./scripts/build-fit-corpus.mjs) builds the manifest-pinned weight-fitting corpus (ReplayScouter tournament data, direct Smogon-thread scraping for gen9 singles, doubles, and VGC — official tournament replays carry a `smogtours-` room prefix the scraper understands — plus ladder samples); the manifest is committed, the replay cache is not.
+- [`scripts/build-versions-index.mjs`](./scripts/build-versions-index.mjs) renders the `/versions/` page listing the nightly and the hosted release builds; the Pages workflow feeds it a manifest of the releases it unpacked.
 - [`src/hooks/useEvaluation.ts`](./src/hooks/useEvaluation.ts) coordinates single evaluations, two-pass game sweeps, per-turn caching (memory + IndexedDB), and evaluation preferences.
 - [`src/lib/team-paste.ts`](./src/lib/team-paste.ts) parses pasted Showdown exports (including natures, IVs, and levels) and overlays them as manual knowledge.
 - [`src/lib/sets-io.ts`](./src/lib/sets-io.ts) builds and parses the side-headered both-teams text format for the Import/Export Sets panel.

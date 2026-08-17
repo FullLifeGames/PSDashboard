@@ -5,6 +5,11 @@ on:
     branches:
       - master
       - main
+  # A published release has to redeploy the site, otherwise its frozen copy
+  # would not appear until the next unrelated push.
+  release:
+    types:
+      - published
   workflow_dispatch:
 
 permissions:
@@ -39,13 +44,52 @@ jobs:
       - name: Build
         run: npm run build
 
+      # Two channels share the site: the nightly sits at the root and tracks
+      # master, while every official release keeps a frozen copy under its own
+      # tag — rebuilt from the zip that release published, so old builds never
+      # have to be recompiled from old source.
+      - name: Assemble nightly and release channels
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          mkdir -p site
+          cp -r dist/. site/
+          rm -rf .versions-tmp && mkdir -p .versions-tmp
+          kept=0
+          while IFS=$'\t' read -r tag published; do
+            if [ "$kept" -ge 10 ]; then break; fi
+            if ! gh release download "$tag" --repo "$GITHUB_REPOSITORY" \
+                 --pattern 'ps-dashboard-*.zip' \
+                 --dir .versions-tmp --clobber >/dev/null 2>&1; then
+              echo "No build asset on $tag - skipping."
+              continue
+            fi
+            mkdir -p "site/$tag"
+            unzip -q -o .versions-tmp/ps-dashboard-*.zip -d "site/$tag"
+            # The newest release carrying a build is also served at /latest/,
+            # so there is a stable address that never names a version.
+            if [ "$kept" -eq 0 ]; then
+              mkdir -p site/latest
+              cp -r "site/$tag/." site/latest/
+            fi
+            rm -f .versions-tmp/*.zip
+            printf '%s\t%s\n' "$tag" "$published" >> .versions-tmp/manifest.tsv
+            kept=$((kept + 1))
+          done < <(gh release list --repo "$GITHUB_REPOSITORY" \
+                     --limit 40 --exclude-drafts \
+                     --json tagName,publishedAt \
+                     --jq '.[] | [.tagName, .publishedAt] | @tsv')
+          node scripts/build-versions-index.mjs site .versions-tmp/manifest.tsv \
+            "$GITHUB_REPOSITORY" "$(git rev-parse --short HEAD)" "$(date -u +%F)"
+          echo "Assembled the nightly plus $kept frozen build(s)."
+
       - name: Configure Pages
         uses: actions/configure-pages@v6
 
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v5
         with:
-          path: ./dist
+          path: ./site
 
   deploy:
     name: Deploy
