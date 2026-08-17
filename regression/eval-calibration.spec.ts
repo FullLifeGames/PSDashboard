@@ -883,6 +883,40 @@ import { brierScore, fitConstantK } from './fit-helpers';
  * static basis for this mass; the next lever, if any, is search/
  * planning-side.
  *
+ * BOOSTS↔SWEEP CV ROUND 2026-08-17 (improvement round 8 — the registered
+ * round-3 agenda item "boosts↔sweep disentanglement, the fit itself"):
+ * METHOD: round 3 left the question stuck on coefficient SEs — the
+ *    additive fit prices sweep NEGATIVE (collinearity correction,
+ *    −111.5±64.0) and the no-boosts basis reads +97.8±67.2, ~1.5 SE.
+ *    Under collinearity coefficient SEs structurally cannot decide which
+ *    regressor carries the outcome signal, and the fifth boost attempt
+ *    showed in-corpus significance failing held-out. So the round asked
+ *    the model-comparison question instead: game-clustered 5-fold CV,
+ *    20 fold seeds, three bases via column masks (M0 boosts-only/sweep
+ *    masked, M1 sweep-only/boosts masked, M2 additive record-only),
+ *    out-of-fold logloss decides, decision tranche SINGLES-ONLY.
+ *    PRE-REGISTERED criterion: adopt M1 only if singles mean OOF
+ *    logloss(M1) < M0 AND M1 < M0 in ≥16/20 seeds AND mean OOF
+ *    brier(M1) ≤ M0. Ties to status quo.
+ * CORPUS: manifest-pinned recapture (2,122/2,127 replays — 5 upstream
+ *    404s), 12,828 samples / 2,111 games (R3: 12,798/2,111). Fresh full
+ *    fits replicate round 3: ALL sweep −88.9 (bootstrap −99.6±61.8),
+ *    ALL-NO-BOOSTS sweep +109.8 (+103.6±65.4, coverage inflating to
+ *    ~262 alongside), SINGLES boosts 39.1±7.3.
+ * RESULT — STATUS QUO HOLDS, and not narrowly: M1 loses EVERY seed in
+ *    EVERY tranche. Singles: M0 logloss 0.61088/brier 0.21224 vs M1
+ *    0.61469/0.21391, meanΔ(M1−M0) +0.003801, wins 0/20, brierOk false
+ *    (ALL +0.004909, DOUBLES +0.008698, GEN9 +0.005723 — all 0/20).
+ *    M2 additive sits on M0 everywhere (singles 0.61097): sweep carries
+ *    NOTHING out-of-sample that flat boosts don't already carry, neither
+ *    as replacement nor on top. Seventh boost-family attempt, first with
+ *    a held-out design — the flat boost term is not a collinearity
+ *    artifact; it is the better outcome carrier. sweep stays weight 0
+ *    (runtime-inert), no cache bump, no calibration/feedback gates
+ *    needed (zero runtime change). FOLLOW-UP (not this round): sharpen
+ *    the sweep DEFINITION (v2 — e.g. speed-order and cleanup-context
+ *    aware) before ever re-asking; the current definition is answered.
+ *
  * MCTS ROOT BLEND ROUND 2026-08-17 (improvement round 7 — the registered
  * round-6 follow-up; commits 2caf79c/df7efbd/f04464a + this record):
  * DESIGN (cache v34): the round-6 odds grounding reaches MCTS-mode
