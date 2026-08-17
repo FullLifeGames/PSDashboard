@@ -883,6 +883,56 @@ import { brierScore, fitConstantK } from './fit-helpers';
  * static basis for this mass; the next lever, if any, is search/
  * planning-side.
  *
+ * MCTS ROOT BLEND ROUND 2026-08-17 (improvement round 7 — the registered
+ * round-6 follow-up; commits 2caf79c/df7efbd/f04464a + this record):
+ * DESIGN (cache v34): the round-6 odds grounding reaches MCTS-mode
+ *    results on all three channels. NARRATIVE: runMcts computes
+ *    koOddsForOptions once at the live root and toResult stamps ranked
+ *    rows by choice string (rows are ranked — index alignment is gone);
+ *    trees ship the arrays on MctsTreeStats.koOdds so mergeMctsTrees
+ *    attaches them sim-free (merge purity kept — same duplication
+ *    rationale as orchestrator.ts). VALUE: each tree scans the root grid
+ *    with planCellEvents (analytic only, no sim advances) and ships
+ *    boundaryCells; starvedSupportCells treats a boundary cell as
+ *    chance-suspect regardless of visit statistics — K fixed per-tree
+ *    outcomes cannot represent an accuracy×killFraction split, so four
+ *    trees that all drew the hit side of an 80% kill range look rich,
+ *    unanimous, converged, and wrong — and boundary cells bypass the
+ *    endedCells exclusion (a game-ending kill range is ended in its
+ *    drawn class precisely because the pool cannot see the other one);
+ *    the blending verify sampler (blendRoot since round 6) re-prices
+ *    them analytically. INVENTORY: verified-cell KoOddsMismatch
+ *    diagnostics survive the merge as koDiagnostics, sorted (i, j) —
+ *    the pooled executor returns chunks in completion order. Blend
+ *    payloads stay dropped: MCTS has no deepening, reblendValue has no
+ *    call site. Score/interval remain hybrid-invariant; the sync
+ *    mctsSearch path skips the scan (no verify round to feed).
+ * MEASURED (runs ×3, all result channels bit-identical; wall ~11m):
+ *    non-MCTS turns byte-identical to the round-6 baseline (alignment,
+ *    notices, eval-gap channels, both round6-gate t8 pins). GOLDEN
+ *    655336 HEALED: the three user-rejected artifacts (extra misplay
+ *    t23/t24 + read t24, KNOWN DRIFT since 2026-08-15) vanish — the
+ *    report matches the golden exactly again; healed by the boundary
+ *    verify at MCTS roots, not by boosts↔sweep. 649664 t23 attribution
+ *    p1-read → chance: the re-priced root dissolves the read framing
+ *    (regret ~0.0003, both sides reasonable) — closer to the expert,
+ *    who rejected the gamble framing outright ("the only winning play,
+ *    not a gamble"); rows carry the arithmetic he asked for (Scald
+ *    kf 47.3% vs Hydro Pump acc 80%). Odds PROSE fires only in read/
+ *    mistake bands — t23 is bandless, the sentence has no seat there.
+ *    koMismatchByReplay 47–206 (was 36–141): MCTS turns now report;
+ *    the probe-chase weight threshold note stands.
+ * CALIBRATION GATE PASSED (mode=auto vs the round-6 record): n 806
+ *    identical, phases 54/65/82, briers 0.2592/0.2252/0.1448 and
+ *    buckets 60/58/71/90 identical to the digit (the score line is
+ *    hybrid-invariant by design — the round moves rankings, attribution
+ *    and narrative, never scores), doubles 72%, wall 26.7m vs 26.3m —
+ *    the boundary scan is free at bench scale.
+ * RE-PIN (user-approved): 649664 t23 observed none/p1-read →
+ *    none/chance (essence records the mechanism); 655336 essence gains
+ *    the HEALED note — the golden file itself is untouched (the diff
+ *    closed to zero, nothing to refresh).
+ *
  * EXPECTATION-GROUNDING ROUND 2026-08-16 (improvement round 6 — the
  * Erwartungs-Grundierung item spun out of round 4's agenda rename; commits
  * d9372f4/399f6aa/f0125d8/d77e289/316ce76/7a26c93/1323a3b + this record):
