@@ -7,8 +7,25 @@ function toId(value: string | undefined): string {
   return (value || '').toLowerCase().replace(/[^a-z0-9]+/g, '');
 }
 
+/**
+ * Splits Showdown's `-{password}pw` suffix off a private replay id
+ * (`gen9natdexdraft-2632003305-e10u50b7xrkmn0w7j5q2bac68relhlwpw`), mirroring
+ * the replay server's own splitPasswordSuffix. The suffix belongs in the
+ * FETCHED id — the replay API parses it there — but never in anything derived
+ * from the id: a 31-character password read as part of the format produced
+ * `gen9natdexdraft2632003305e10u...pw`, which no Dex knows, so every private
+ * replay silently fell back to a rule-less custom game.
+ */
+export function splitReplayPassword(fullid: string): [id: string, password: string | null] {
+  if (fullid.endsWith('pw')) {
+    const dash = fullid.lastIndexOf('-');
+    if (dash > 0) return [fullid.slice(0, dash), fullid.slice(dash + 1, -2)];
+  }
+  return [fullid, null];
+}
+
 function stripReplayNumber(id: string | undefined): string {
-  return (id || '').replace(/-\d+$/, '');
+  return splitReplayPassword(id || '')[0].replace(/-\d+$/, '');
 }
 
 function extractTier(log: string | undefined): string {
