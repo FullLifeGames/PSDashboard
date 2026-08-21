@@ -5,6 +5,7 @@ import {
   getBranchSimulatorFormat,
   getReplayGameType,
   inferReplayFormatId,
+  splitReplayPassword,
 } from '../src/lib/replay-format';
 
 const vgcReplay = {
@@ -184,6 +185,118 @@ test.describe('replay format inference', () => {
       const replay = await fetchReplay('https://replay.pokemonshowdown.com/gen9championsvgc2026regmb-2639020147');
       expect(replay.formatid).toBe('gen9championsvgc2026regmb');
       expect(getBranchSimulatorFormat(replay)).toBe('gen9doublesou');
+    } finally {
+      globalThis.fetch = originalFetch;
+    }
+  });
+  // A private replay link carries a 31-character password as a `-{password}pw`
+  // suffix on the id. The suffix belongs in the fetched id and nowhere else:
+  // read as part of the format it produced `gen9ou2632003305e10u...pw`, so an
+  // ordinary private OU replay branched as a rule-less custom game (G22).
+  const privateId = 'gen9ou-2632003305-e10u50b7xrkmn0w7j5q2bac68relhlwpw';
+  const privateLog = '|gametype|singles\n|gen|9\n|tier|[Gen 9] OU\n|turn|1';
+
+  test('splitReplayPassword parses the private-replay suffix (G22)', () => {
+    expect(splitReplayPassword(privateId))
+      .toEqual(['gen9ou-2632003305', 'e10u50b7xrkmn0w7j5q2bac68relhlw']);
+    expect(splitReplayPassword('gen9ou-2632003305')).toEqual(['gen9ou-2632003305', null]);
+    expect(splitReplayPassword('smogtours-gen3ou-56583')).toEqual(['smogtours-gen3ou-56583', null]);
+  });
+
+  test('a private replay id infers its real format, not its password (G22)', () => {
+    expect(inferReplayFormatId({ id: privateId, log: privateLog })).toBe('gen9ou');
+    expect(getBranchSimulatorFormat({ id: privateId, log: privateLog })).toBe('gen9ou');
+  });
+
+  test('parseReplayUrl keeps the password suffix the replay server needs (G22)', () => {
+    expect(parseReplayUrl(`https://replay.pokemonshowdown.com/${privateId}`)).toBe(privateId);
+    expect(parseReplayUrl(privateId)).toBe(privateId);
+  });
+
+  test('fetchReplay falls back to the .log route when .json refuses (G22)', async () => {
+    const originalFetch = globalThis.fetch;
+    const asked: string[] = [];
+    globalThis.fetch = (async (url: string) => {
+      asked.push(String(url));
+      // The JSON route rejects at the network layer, exactly as a CORS-less
+      // 404 from the replay host does in a browser.
+      if (String(url).endsWith('.json')) throw new TypeError('Failed to fetch');
+      return new Response(`|player|p1|Alpha|\n|player|p2|Beta|\n${privateLog}`, { status: 200 });
+    }) as unknown as typeof fetch;
+
+    try {
+      const replay = await fetchReplay(`https://replay.pokemonshowdown.com/${privateId}`);
+      expect(asked).toEqual([
+        `https://replay.pokemonshowdown.com/${privateId}.json`,
+        `https://replay.pokemonshowdown.com/${privateId}.log`,
+      ]);
+      expect(replay.id).toBe(privateId);
+      expect(replay.formatid).toBe('gen9ou');
+      expect(replay.format).toBe('[Gen 9] OU');
+      expect(replay.players).toEqual(['Alpha', 'Beta']);
+      expect(replay.log).toContain('|turn|1');
+    } finally {
+      globalThis.fetch = originalFetch;
+    }
+  });
+
+  test('fetchReplay treats a non-JSON body as a failed JSON route (G22)', async () => {
+    const originalFetch = globalThis.fetch;
+    globalThis.fetch = (async (url: string) => (String(url).endsWith('.json')
+      ? new Response('<!DOCTYPE html><title>404</title>', { status: 200 })
+      : new Response(`|player|p1|Alpha|\n|player|p2|Beta|\n${privateLog}`, { status: 200 }))) as unknown as typeof fetch;
+
+    try {
+      const replay = await fetchReplay(privateId);
+      expect(replay.formatid).toBe('gen9ou');
+    } finally {
+      globalThis.fetch = originalFetch;
+    }
+  });
+
+  test('fetchReplay keeps JSON metadata when only the log route has the battle', async () => {
+    const originalFetch = globalThis.fetch;
+    globalThis.fetch = (async (url: string) => (String(url).endsWith('.json')
+      ? new Response(JSON.stringify({
+        id: 'gen9ou-2632003305', format: '[Gen 9] OU', formatid: 'gen9ou',
+        players: ['Alpha', 'Beta'], log: '', uploadtime: 1782410309, views: 7,
+      }), { status: 200 })
+      : new Response(privateLog, { status: 200 }))) as unknown as typeof fetch;
+
+    try {
+      const replay = await fetchReplay(privateId);
+      expect(replay.id).toBe('gen9ou-2632003305');
+      expect(replay.views).toBe(7);
+      expect(replay.uploadtime).toBe(1782410309);
+      expect(replay.log).toContain('|turn|1');
+    } finally {
+      globalThis.fetch = originalFetch;
+    }
+  });
+
+  test('a private replay that stays unreachable is explained as one (G22)', async () => {
+    const originalFetch = globalThis.fetch;
+    globalThis.fetch = (async () => { throw new TypeError('Failed to fetch'); }) as unknown as typeof fetch;
+
+    try {
+      await expect(fetchReplay(privateId)).rejects.toThrow(/private replay link/i);
+      await expect(fetchReplay('gen9ou-2632003305')).rejects.toThrow(/Double-check the replay id/i);
+    } finally {
+      globalThis.fetch = originalFetch;
+    }
+  });
+
+  test('a replay record without any battle log says so (G22)', async () => {
+    const originalFetch = globalThis.fetch;
+    globalThis.fetch = (async (url: string) => (String(url).endsWith('.json')
+      ? new Response(JSON.stringify({
+        id: 'gen9ou-2632003305', format: '[Gen 9] OU', players: ['Alpha', 'Beta'],
+        log: '', uploadtime: 0, views: 0,
+      }), { status: 200 })
+      : new Response('', { status: 404 }))) as unknown as typeof fetch;
+
+    try {
+      await expect(fetchReplay('gen9ou-2632003305')).rejects.toThrow(/without a battle log/i);
     } finally {
       globalThis.fetch = originalFetch;
     }

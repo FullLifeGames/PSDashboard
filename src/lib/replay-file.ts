@@ -53,24 +53,35 @@ export function parseExportedReplay(content: string, fileName?: string): ReplayD
     );
   }
 
+  return replayDataFromLog(log, embeddedId || fileNameId(fileName) || 'imported-replay', embeddedId);
+}
+
+/**
+ * Builds ReplayData from a bare protocol log — the shape shared by the file
+ * import and the replay server's `.log` endpoint, which answers with the log
+ * alone and no metadata.
+ *
+ * `inferenceId` is the id allowed to feed format inference, and it is not
+ * always `id`: a file name is arbitrary text and would corrupt the inferred
+ * format, so the import passes null for one.
+ */
+export function replayDataFromLog(log: string, id: string, inferenceId: string | null = id): ReplayData {
   // Externally written files (video reconstructions, Windows editors) come
   // with CRLF. Everything downstream splits on '\n' — a surviving \r on a
   // line-final field (tera type, win line) poisons built teams and crashes
   // the sim's JSON team parsing. Normalize once, here, at the door.
-  log = log.replace(/\r\n?/g, '\n');
+  const normalized = log.replace(/\r\n?/g, '\n');
 
-  const tier = log.match(/^\|tier\|([^|\n]+)/m)?.[1]?.trim() ?? '';
-  // Only a real replay id may feed format inference — a file name is
-  // arbitrary text and would corrupt the inferred format id.
-  const formatid = inferReplayFormatId({ id: embeddedId ?? undefined, log, format: tier });
+  const tier = normalized.match(/^\|tier\|([^|\n]+)/m)?.[1]?.trim() ?? '';
+  const formatid = inferReplayFormatId({ id: inferenceId ?? undefined, log: normalized, format: tier });
 
   return {
-    id: embeddedId || fileNameId(fileName) || 'imported-replay',
-    format: getReplayDisplayFormat({ log, format: tier }, formatid),
+    id,
+    format: getReplayDisplayFormat({ log: normalized, format: tier }, formatid),
     formatid,
-    players: [playerName(log, 'p1'), playerName(log, 'p2')],
-    log,
-    uploadtime: Number.parseInt(log.match(/^\|t:\|(\d+)/m)?.[1] ?? '0', 10),
+    players: [playerName(normalized, 'p1'), playerName(normalized, 'p2')],
+    log: normalized,
+    uploadtime: Number.parseInt(normalized.match(/^\|t:\|(\d+)/m)?.[1] ?? '0', 10),
     views: 0,
   };
 }

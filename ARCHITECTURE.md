@@ -14,7 +14,7 @@ The app starts in [`src/components/ReplayLoader.tsx`](./src/components/ReplayLoa
 
 `useReplay` then:
 
-1. normalizes the replay input in `parseReplayUrl` and fetches `https://replay.pokemonshowdown.com/<id>.json` — or, for files, parses the export in `parseExportedReplay` (the export wraps the log in a `text/plain` script with `/` escaped as `\/`; the replay id comes from the hidden `replayid` input, never from the file name, so arbitrary file names cannot corrupt format inference)
+1. normalizes the replay input in `parseReplayUrl` and fetches `https://replay.pokemonshowdown.com/<id>.json`, falling back to the `<id>.log` route when the JSON one answers with nothing usable (refused, empty, non-JSON, or a record with no log) — the two routes are separate handlers on the replay server and do not always answer alike. A private replay's `-{password}pw` suffix stays on the fetched id (the replay server parses it off itself) and is stripped from everything derived from the id, so a 31-character password cannot end up inside the inferred format. Or, for files, parses the export in `parseExportedReplay` (the export wraps the log in a `text/plain` script with `/` escaped as `\/`; the replay id comes from the hidden `replayid` input, never from the file name, so arbitrary file names cannot corrupt format inference)
 2. parses the replay log into snapshots
 3. infers visible team information for both sides
 
