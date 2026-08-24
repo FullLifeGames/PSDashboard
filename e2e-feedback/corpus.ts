@@ -88,6 +88,11 @@ export const FEEDBACK_CORPUS: FeedbackItem[] = [
     expect: { summaryIncludes: ['burn fishing compounds to ~83%'] },
   },
   {
+    replay: 'smogtours-gen8ou-573756', turn: 68, kind: 'truth', source: 'expert-2026-08',
+    essence: "p2's Weavile sacrifice into Corviknight is the play that enables the Garchomp sweep — the game-winning line, per the expert. Closed 2026-08-24 round 10 (user-approved): a stayed feed whose windowed payoff repays the FULL regret plus the read margin VERIFIES (t68: payoff 0.4415 ≥ regret 0.2661 + 0.1) — the verdict clears entirely and the summary names the win-condition sacrifice; round 3 had reached one-band demotion (mistake → inaccuracy). Formerly the 'win-condition horizon' gap.",
+    expect: { side: 'p2', tier: 'none', summaryIncludes: ['verified as a win-condition sacrifice'] },
+  },
+  {
     replay: 'smogtours-gen8ou-562428', turn: 12, kind: 'truth', source: 'expert-2026-08',
     essence: "LordEnz's Close Combat over the safe Mandibuzz line is graded as a read that paid off; the expert explicitly praised that framing.",
     expect: { side: 'p1', attribution: ['p1-read'], riskPaidOff: true, playedLabelIncludes: 'Close Combat', keyMoment: true },
@@ -108,12 +113,6 @@ export const FEEDBACK_CORPUS: FeedbackItem[] = [
     expect: GOLDEN_655336,
   },
   // ---- gaps (observed baselines recorded at Gate 1, commit ef342fa) ----
-  {
-    replay: 'smogtours-gen8ou-573756', turn: 68, kind: 'gap', source: 'expert-2026-08',
-    essence: "p2's Weavile sacrifice into Corviknight is called a misplay, but it is what enables the Garchomp sweep — the game-winning play. Win-condition horizon: a sac whose payoff arrives many turns later reads as a blunder. (Re-pinned 2026-08-15 round 3, user-approved: the ④ feed pathway landed — a stay-and-die feed whose outcome was priced certain (ev ≈ floor) and whose windowed payoff clears the safe guarantee grades as a sacrifice; t68 drops mistake → inaccuracy (one-band demotion by design) with the feed named in the summary. Toward the expert.)",
-    observed: { side: 'p2', tier: 'inaccuracy', attribution: ['quiet'] },
-    desired: 'The sacrifice stops being graded mistake/blunder once the engine can see or verify the win-condition payoff behind it.',
-  },
   {
     replay: 'smogtours-gen8ou-562428', turn: 10, kind: 'gap', source: 'expert-2026-08',
     essence: 'The no-blunder shift verdict looks right but is shallow-wrong: both sides had four or more live options and the turn was a read — a Heatran switch would have flipped the advantage. The engine never represented the real decision space. (Re-pinned 2026-08-16 round 5, user-approved: the breadth narrative landed — the summary now reads "A genuinely open turn rather than a drift — 9 of 9 options … and 11 of 13 … sat within an inaccuracy of best, so the turn hinged on out-predicting the opponent", pinned via summaryIncludes. Toward the expert; the remaining desired half is an actual read RECOMMENDATION (opponent-model territory, e.g. the Heatran switch), not just naming the breadth.)',

@@ -883,6 +883,32 @@ import { brierScore, fitConstantK } from './fit-helpers';
  * static basis for this mass; the next lever, if any, is search/
  * planning-side.
  *
+ * VERIFIED-FEED ROUND 2026-08-24 (improvement round 10 — the win-condition
+ * horizon gap 573756 t68, closed at the analysis layer; commits
+ * ee1736c/506b448 + this record): the round-3 stayed-feed pathway demoted
+ * a certainty-priced feed one band when its windowed payoff cleared the
+ * safe guarantee by the read margin — t68 (the Weavile feed that funnels
+ * Garchomp in for two free Swords Dances, the expert's "game-winning
+ * play") stayed an inaccuracy although its window peak ends 0.4415 over
+ * the safe floor. THE BAR: under the certainty gate, payoff − regret ≈
+ * windowed peak − best.ev, so payoff ≥ regret + RISK_PAYOFF_MARGIN says
+ * the line reached what the engine's best promised — such a feed VERIFIES:
+ * the verdict clears entirely (SackInfo.verified, named in the summary),
+ * margin-only feeds keep the one-band demotion, the blunder bound stays.
+ * MEASURED: t68 payoff 0.4415 ≥ regret 0.2661 + 0.1 → tier none (the
+ * depth-3 verification had CONFIRMED the flag — the sweep lies past its
+ * horizon; the future-outcome chain is the instrument that sees it).
+ * Analysis-layer only: no cache bump, calibration bench untouched (scores
+ * identical by construction). Feedback drift: three bit-identical runs,
+ * the ONLY moving channel is t68 gap-open → gap-moved ("p2.tier is
+ * 'none', expected 'inaccuracy'"), all truths ok, machine channels
+ * identical, golden 655336 exact. USER-GATED re-pin: the t68 gap converts
+ * to a truth pin (tier none + the verified-sacrifice summary fragment).
+ * NOT extended to non-feed setup turns (t70's second Swords Dance stays
+ * inaccuracy 0.1246 by design: crediting later turns on uncertain lines
+ * would launder outcome luck into grades — the round-3 certainty boundary
+ * holds).
+ *
  * SWEEP V2 + EFFECTIVE SPEED ROUND 2026-08-24 (improvement round 9 — the
  * registered round-8 follow-up "sharpen the sweep definition"; design doc
  * 2026-08-17, commits 22d02c7/02e29e4/b226ca7/cf73e84 + this record):
