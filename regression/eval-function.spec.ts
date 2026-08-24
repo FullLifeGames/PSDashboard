@@ -133,27 +133,111 @@ test.describe('stranded bench pricing', () => {
   });
 });
 
-test.describe('win-condition sweep feature', () => {
-  test('sweep prices gained coverage, not stages', () => {
-    // +2 Dragapult vs two hard hitters it outspeeds: unboosted they 2HKO it
-    // before its 3HKO lands (they win the pair); at +2 Darts reaches the
-    // 2HKO, the KO race ties, and speed flips both pairs — pure gained
-    // coverage.
+test.describe('win-condition sweep cells', () => {
+  test('a fast non-OHKO flip lands in fastChip alone', () => {
+    // +2 Dragapult vs Talonflame + Weavile. Measured pair fractions (empirical
+    // pin 2026-08-24): Darts→Talon 0.3534 (+2: 0.7067), Darts→Weavile 0.3942
+    // (+2: 0.7884), Flare Blitz→Pult 0.292, Night Slash→Pult 0.8887; speeds
+    // 162/146/145. Only the WEAVILE pair flips: unboosted Pult loses the 3v2
+    // race, at +2 the race ties 2-2 and speed decides. (The Talonflame pair
+    // never flips — unboosted Pult already wins 3v4.) Boosted Darts (0.7884)
+    // don't reach full-HP Weavile, so the flip is fast but not in KO range:
+    // fastChip = 1 flip / 2 targets × hp 1.0 = 0.5, every other cell 0.
     const sweepy = makeBattle(
       [makeSet('Pult', 'Dragapult', ['Dragon Darts', 'Dragon Dance'])],
       [makeSet('A', 'Talonflame', ['Flare Blitz']), makeSet('B', 'Weavile', ['Night Slash'])],
     );
     sweepy.sides[0].active[0]!.boosts.atk = 2;
-    // +2 into a wall that still hard-counters: no gained coverage.
+    const features = evalFeatures(sweepy);
+    expect(features.sweepFastChip).toBeCloseTo(0.5, 5);
+    expect(features.sweepFastKo).toBeCloseTo(0, 5);
+    expect(features.sweepSlowKo).toBeCloseTo(0, 5);
+    expect(features.sweepSlowChip).toBeCloseTo(0, 5);
+  });
+
+  test('an Iron Ball moves the flips into the slow cells', () => {
+    // An Iron Ball (speed 162→81, now slowest) breaks the tie-WIN the fast
+    // flip rode on, so the full-HP board prices at zero — slow flips need
+    // strict turn wins. Two boards produce them (fractions as pinned above):
+    // slowChip: Pult chipped to 136/195 (0.6974) — Flare Blitz now 3HKOs it,
+    //   boosted Darts win 2v3 strictly, unboosted 3v3 ties and the slower
+    //   side loses → the Talonflame pair flips, no KO range (0.7067 < 1.0).
+    //   slowChip = 1/2 × 0.6974 ≈ 0.3487. (Weavile 1HKOs the chipped Pult —
+    //   that pair stops flipping.)
+    const chipped = makeBattle(
+      [makeSet('Pult', 'Dragapult', ['Dragon Darts', 'Dragon Dance'], 50, { item: 'ironball' })],
+      [makeSet('A', 'Talonflame', ['Flare Blitz']), makeSet('B', 'Weavile', ['Night Slash'])],
+    );
+    const pult = chipped.sides[0].active[0]!;
+    pult.boosts.atk = 2;
+    pult.hp = Math.floor(pult.maxhp * 0.7);
+    const chippedCells = evalFeatures(chipped);
+    expect(chippedCells.sweepSlowChip).toBeGreaterThan(0);
+    expect(chippedCells.sweepSlowChip).toBeCloseTo(0.5 * (pult.hp / pult.maxhp), 5);
+    expect(chippedCells.sweepFastChip).toBeCloseTo(0, 5);
+    expect(chippedCells.sweepFastKo).toBeCloseTo(0, 5);
+    expect(chippedCells.sweepSlowKo).toBeCloseTo(0, 5);
+    // slowKo: full-HP Pult, targets at 0.6 — boosted Darts (0.7884) cover
+    //   Weavile's 0.5989, unboosted ties 2-2 and the slower side loses →
+    //   the Weavile flip lands in slowKo = 1/2 × hp 1.0 = 0.5.
+    const koBoard = makeBattle(
+      [makeSet('Pult', 'Dragapult', ['Dragon Darts', 'Dragon Dance'], 50, { item: 'ironball' })],
+      [makeSet('A', 'Talonflame', ['Flare Blitz']), makeSet('B', 'Weavile', ['Night Slash'])],
+    );
+    koBoard.sides[0].active[0]!.boosts.atk = 2;
+    for (const target of koBoard.sides[1].pokemon) {
+      target.hp = Math.max(1, Math.floor(target.maxhp * 0.6));
+    }
+    const koCells = evalFeatures(koBoard);
+    expect(koCells.sweepSlowKo).toBeCloseTo(0.5, 5);
+    expect(koCells.sweepFastKo).toBeCloseTo(0, 5);
+    expect(koCells.sweepFastChip).toBeCloseTo(0, 5);
+    expect(koCells.sweepSlowChip).toBeCloseTo(0, 5);
+  });
+
+  test('a target inside boosted KO range moves its flip into a Ko cell', () => {
+    // fastKo is the glass-cannon race won purely by moving first: the target
+    // must OHKO the sweeper back (else the unboosted 2HKO still wins the
+    // pair and the flip dies). Empirical pin (fractions as above): Pult at
+    // 156/195 (0.8, inside Night Slash's 0.8887), Weavile at 106/177
+    // (0.5989, inside boosted Darts' 0.7884 but above unboosted 0.3942) —
+    // boosted races 1-1 and speed decides, unboosted needs 2 turns and
+    // loses. fastKo = 1 flip / 2 targets × hp 0.8 = 0.4. (Talonflame's pair:
+    // unboosted Pult wins 2v3 outright — no flip.)
+    const sweepy = makeBattle(
+      [makeSet('Pult', 'Dragapult', ['Dragon Darts', 'Dragon Dance'])],
+      [makeSet('A', 'Talonflame', ['Flare Blitz']), makeSet('B', 'Weavile', ['Night Slash'])],
+    );
+    const pult = sweepy.sides[0].active[0]!;
+    pult.boosts.atk = 2;
+    pult.hp = Math.floor(pult.maxhp * 0.8);
+    for (const target of sweepy.sides[1].pokemon) {
+      target.hp = Math.max(1, Math.floor(target.maxhp * 0.6));
+    }
+    const features = evalFeatures(sweepy);
+    expect(features.sweepFastKo).toBeGreaterThan(0);
+    expect(features.sweepFastKo + features.sweepFastChip).toBeCloseTo(0.4, 5);
+  });
+
+  test('a walled boost prices at zero in every cell, weights stay 0', () => {
     const walled = makeBattle(
       [makeSet('Pult', 'Dragapult', ['Dragon Darts', 'Dragon Dance'])],
       [makeSet('Wall', 'Clefable', ['Moonblast', 'Moonlight'])], // Fairy: immune to Dragon Darts
     );
+    // Flip core unchanged: without a positive offensive stage every cell is 0.
+    const unboosted = evalFeatures(walled);
+    expect(unboosted.sweepFastKo + unboosted.sweepFastChip +
+      unboosted.sweepSlowKo + unboosted.sweepSlowChip).toBeCloseTo(0, 5);
     walled.sides[0].active[0]!.boosts.atk = 2;
-    expect(evalFeatures(sweepy).sweep).toBeGreaterThan(0.3);
-    expect(evalFeatures(walled).sweep).toBeCloseTo(0, 5);
-    // Weight 0 keeps runtime scores unchanged until adoption.
-    expect(FEATURE_WEIGHTS.sweep).toBe(0);
+    const features = evalFeatures(walled);
+    expect(features.sweepFastKo).toBeCloseTo(0, 5);
+    expect(features.sweepFastChip).toBeCloseTo(0, 5);
+    expect(features.sweepSlowKo).toBeCloseTo(0, 5);
+    expect(features.sweepSlowChip).toBeCloseTo(0, 5);
+    expect(FEATURE_WEIGHTS.sweepFastKo).toBe(0);
+    expect(FEATURE_WEIGHTS.sweepFastChip).toBe(0);
+    expect(FEATURE_WEIGHTS.sweepSlowKo).toBe(0);
+    expect(FEATURE_WEIGHTS.sweepSlowChip).toBe(0);
   });
 });
 

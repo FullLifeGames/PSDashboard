@@ -146,14 +146,20 @@ export interface EvalFeatures {
   coverage: number;
   choiceMismatch: number;
   /**
-   * Win-condition value of standing boosts: per side, Σ over living mons
-   * with a positive offensive stage of (coverageBoosted − coverageUnboosted)
-   * × hpFraction, where coverage = fraction of the opponent's living team
-   * the mon beats 1v1. A boost only counts for the pairs it FLIPS — +2 into
-   * a wall that still counters prices at zero. Captured for the fit
-   * harness; weight 0 keeps it runtime-inert until a fit adopts it.
+   * Win-condition value of standing boosts, split by HOW the sweep would
+   * actually play out. Per side, over living mons with a positive offensive
+   * stage, each pair the boost FLIPS (beats 1v1 boosted, loses unboosted)
+   * contributes 1/enemies × hpFraction into exactly ONE cell:
+   * fast = the sweeper acts first (movesFirst: priority rule, effective
+   * speed, Trick Room), ko = the boosted best-move fraction covers the
+   * target's current HP. The four cells sum to the old v1 flip value; the
+   * fit prices them separately (no guessed factors). Weights 0 keep them
+   * runtime-inert until a fit adopts them (round 9 design doc).
    */
-  sweep: number;
+  sweepFastKo: number;
+  sweepFastChip: number;
+  sweepSlowKo: number;
+  sweepSlowChip: number;
 }
 
 export const FEATURE_WEIGHTS: Record<keyof EvalFeatures, number> = {
@@ -166,7 +172,10 @@ export const FEATURE_WEIGHTS: Record<keyof EvalFeatures, number> = {
   matchup: EVAL_WEIGHTS.matchup,
   coverage: EVAL_WEIGHTS.coverage,
   choiceMismatch: EVAL_WEIGHTS.choiceMismatch,
-  sweep: 0,
+  sweepFastKo: 0,
+  sweepFastChip: 0,
+  sweepSlowKo: 0,
+  sweepSlowChip: 0,
 };
 
 /**
@@ -371,6 +380,8 @@ export function evalFeatures(battle: Battle, cache?: MatchupCache): EvalFeatures
   const faintedFraction = totalBodies > 0 ? faintedBodies / totalBodies : 0;
   const damp = EVAL_WEIGHTS.matchupEarlyDamp;
   const matchupPhase = damp + (1 - damp) * Math.min(1, faintedFraction * 3);
+  const p1Cells = sweepCells(0, battle, threat);
+  const p2Cells = sweepCells(1, battle, threat);
   return {
     bodies: p1.bodies - p2.bodies,
     boosts: p1.boosts - p2.boosts,
@@ -381,7 +392,10 @@ export function evalFeatures(battle: Battle, cache?: MatchupCache): EvalFeatures
     matchup: terms.matchup * matchupPhase,
     coverage: terms.coverage,
     choiceMismatch: p2.choiceMismatch - p1.choiceMismatch,
-    sweep: sweepValue(0, battle, threat) - sweepValue(1, battle, threat),
+    sweepFastKo: p1Cells.fastKo - p2Cells.fastKo,
+    sweepFastChip: p1Cells.fastChip - p2Cells.fastChip,
+    sweepSlowKo: p1Cells.slowKo - p2Cells.slowKo,
+    sweepSlowChip: p1Cells.slowChip - p2Cells.slowChip,
   };
 }
 
@@ -564,36 +578,43 @@ function beatsPair(
   return movesFirst(a, b, threatA, threatB, battle);
 }
 
-/** One side's sweep value (see EvalFeatures.sweep). */
-function sweepValue(
+interface SweepCells { fastKo: number; fastChip: number; slowKo: number; slowChip: number }
+
+/** One side's sweep cells (see EvalFeatures.sweepFastKo). */
+function sweepCells(
   sideIndex: 0 | 1,
   battle: Battle,
   threat: (attacker: Pokemon, defender: Pokemon) => PairThreat,
-): number {
+): SweepCells {
   const living = (index: number) =>
     battle.sides[index].pokemon.filter(pokemon => !pokemon.fainted && pokemon.hp > 0);
   const mine = living(sideIndex);
   const theirs = living(1 - sideIndex);
-  if (theirs.length === 0) return 0;
+  const cells: SweepCells = { fastKo: 0, fastChip: 0, slowKo: 0, slowChip: 0 };
+  if (theirs.length === 0) return cells;
   const heals = (pokemon: Pokemon): boolean =>
     pokemon.moveSlots.some(slot => !!battle.dex.moves.get(slot.id).flags['heal']);
-  let value = 0;
   for (const a of mine) {
     if ((a.boosts.atk ?? 0) <= 0 && (a.boosts.spa ?? 0) <= 0) continue;
     const aHeals = heals(a);
-    let flipped = 0;
     for (const b of theirs) {
       const threatA = threat(a, b);
       const threatB = threat(b, a);
       const bHeals = heals(b);
-      if (beatsPair(a, b, threatA, threatB, aHeals, bHeals, battle) &&
-        !beatsPair(a, b, threatA, threatB, aHeals, bHeals, battle, { atk: 0, spa: 0 })) {
-        flipped += 1;
+      if (!beatsPair(a, b, threatA, threatB, aHeals, bHeals, battle) ||
+        beatsPair(a, b, threatA, threatB, aHeals, bHeals, battle, { atk: 0, spa: 0 })) {
+        continue;
       }
+      const weight = (1 / theirs.length) * (a.hp / a.maxhp);
+      const fast = movesFirst(a, b, threatA, threatB, battle);
+      const ko = boostedFraction(threatA, a, b) >= b.hp / b.maxhp;
+      if (fast && ko) cells.fastKo += weight;
+      else if (fast) cells.fastChip += weight;
+      else if (ko) cells.slowKo += weight;
+      else cells.slowChip += weight;
     }
-    value += (flipped / theirs.length) * (a.hp / a.maxhp);
   }
-  return value;
+  return cells;
 }
 
 export function matchupTerms(battle: Battle, cache?: MatchupCache): { matchup: number; coverage: number } {
