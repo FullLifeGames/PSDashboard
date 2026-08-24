@@ -883,6 +883,53 @@ import { brierScore, fitConstantK } from './fit-helpers';
  * static basis for this mass; the next lever, if any, is search/
  * planning-side.
  *
+ * RACE-GROUNDED HEALER WALLS 2026-08-24 (improvement round 11 — the 573756
+ * t138 endgame gap; commits c9f0eb5/9351f37 + this record, cache v36):
+ * ROOT CAUSE: the static eval ignored PP entirely and its healer rule
+ *    ("≤50% per turn vs a healer ⇒ fraction 0") declared walls infinite
+ *    while letting them heal and chip in the same turn. 573756's endgame:
+ *    p2's Toxapex Struggle-locked from t134 (the sim's PP bookkeeping knew)
+ *    yet priced as a full wall while it recoiled itself out, and p1's lone
+ *    burned Toxapex holding 3 Recover PP read unkillable against a
+ *    sub-50%-proxy Stomping Tantrum (real: 59% a hit, ×2 vs Poison) — so
+ *    the bar walked toward the loser (own-p2 +0.44 → −0.09 across
+ *    t135–t138), the winning Tantrum priced −0.107 "punished by Toxic",
+ *    the resolution booked as chanceDelta −1.07 (the docstring admits:
+ *    model error), and t138 became the turning point.
+ * THE FIX, two commits: (1) PP truth — pair threats, heal status, and the
+ *    removal-option terms filter to live slot PP (never dex pools; per the
+ *    user, PP counts differ across rule sets — Pokémon Champions), with
+ *    the usable-slot signature keyed into the matchup memo. (2) raceClocks
+ *    — heal PP absorb as survival at each move's OWN heal rate (dex
+ *    ratios exact, callback healers ~50%), a pressured healer attacks only
+ *    on spare turns (pinned once pressure ≥ its best heal rate; status
+ *    residuals brn 1/16, psn/tox 1/8 count toward pressure, Magic
+ *    Guard/Poison Heal exempt), and every clock caps at the attacker's
+ *    usable PP budget. Coverage margins read the effective offenses.
+ * CALIBRATION (n 806, composition 260/289/257 identical): phases
+ *    55/63/82 → 54/63/82 (early −1pp), briers 0.2589/0.2288/0.1473 →
+ *    0.2600/0.2294/0.1499 (+0.0011/+0.0006/+0.0026 — round 9 Phase A was
+ *    accepted at mid +0.0036), buckets 59/59/70/90, singles 64%, doubles
+ *    72→73%, wall 18.9m (−3.8m). USER-ACCEPTED at the gate.
+ * FEEDBACK DRIFT (three runs, all 13 channels bit-identical): 573756's
+ *    turning point moved 138 → 71 (the Garchomp sweep — the t138 pin's
+ *    core ask), the endgame bar stays on the winner's side (own-p2
+ *    +0.20…+0.34 across t133–t138), t68's raw regret HALVED toward the
+ *    expert (0.266 → 0.129). TWO CHANNEL COSTS, both user-gated: the t68
+ *    verified-feed truth REOPENED as a gap (the race-grounded cells price
+ *    the feed turn with real spread — certainty gap 0.171 vs the ≤0.02
+ *    round-3 gate, which holds by design; verification without priced
+ *    certainty is round-12 agenda), and golden 655336 carries a KNOWN
+ *    DRIFT (t26's free-DD Protect loses its misplay: the race pins the
+ *    paralyzed Slowbro so hard Slack Off prices 0.041 over Protect — the
+ *    golden stays, the expert is right; heal-turn delay value is the
+ *    candidate fix). The t138 pin itself stays gap-open by its coarse
+ *    observed channels: the bar reads +0.2, not decided, so the
+ *    resolution still books as chance (−1.02) and remains a key moment —
+ *    the residual half of the desired. 573756's whole-game chanceTotal
+ *    grew −1.27 → −3.18 (more static/search disagreement routed through
+ *    the chance residual) — watch item.
+ *
  * VERIFIED-FEED ROUND 2026-08-24 (improvement round 10 — the win-condition
  * horizon gap 573756 t68, closed at the analysis layer; commits
  * ee1736c/506b448 + this record): the round-3 stayed-feed pathway demoted
