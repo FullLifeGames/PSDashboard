@@ -265,7 +265,7 @@ export function strandedMons(side: Side, battle: Battle): Set<Pokemon> {
   const stranded = new Set<Pokemon>();
   for (const pokemon of side.pokemon) {
     if (pokemon.fainted || pokemon.hp <= 0) continue;
-    for (const slot of pokemon.moveSlots) {
+    for (const slot of usableSlots(pokemon)) {
       if (OWN_SIDE_REMOVAL_MOVES.has(slot.id) || BOTH_SIDES_REMOVAL_MOVES.has(slot.id)) {
         return stranded;
       }
@@ -295,7 +295,7 @@ export function hazardRemovalEquity(side: Side, battle: Battle): number {
   let best = 0;
   for (const pokemon of side.pokemon) {
     if (pokemon.fainted || pokemon.hp <= 0) continue;
-    for (const slot of pokemon.moveSlots) {
+    for (const slot of usableSlots(pokemon)) {
       if (OWN_SIDE_REMOVAL_MOVES.has(slot.id)) {
         best = Math.max(best, own);
       } else if (BOTH_SIDES_REMOVAL_MOVES.has(slot.id)) {
@@ -426,8 +426,25 @@ function lockedMoveId(pokemon: Pokemon): string | null {
   return locked?.move ?? null;
 }
 
+/**
+ * Move slots with PP left to click. PP is read LIVE from the sim state and
+ * never derived from dex base PP: pools differ across rule sets (Showdown
+ * effectively always runs maxed PP Ups; Pokémon Champions runs different
+ * counts), and the replay's PP bookkeeping is the only ground truth. A slot
+ * without a pp field stays usable (defensive default). A fully drained mon
+ * can still Struggle in reality, but its chip is no sustained threat — it
+ * prices as threatless (573756: the Struggle-locked Toxapex kept pricing as
+ * a full wall while it recoiled itself out).
+ */
+function usableSlots(pokemon: Pokemon) {
+  return pokemon.moveSlots.filter(slot => (slot.pp ?? 1) > 0);
+}
+
 function pairKey(attacker: Pokemon, defender: Pokemon): string {
-  return `${attacker.side.id}:${attacker.name}:${attacker.species.id}:${attacker.level}:${attacker.item}:${attacker.ability}:${lockedMoveId(attacker) ?? ''}>` +
+  // The usable-slot signature keys PP transitions: a move draining to zero
+  // mid-search changes the attacker's threat, so it must miss the memo.
+  const usable = usableSlots(attacker).map(slot => slot.id).join(',');
+  return `${attacker.side.id}:${attacker.name}:${attacker.species.id}:${attacker.level}:${attacker.item}:${attacker.ability}:${lockedMoveId(attacker) ?? ''}:${usable}>` +
     `${defender.side.id}:${defender.name}:${defender.species.id}:${defender.level}:${defender.item}:${defender.ability}`;
 }
 
@@ -490,7 +507,8 @@ export function pairThreat(attacker: Pokemon, defender: Pokemon, battle: Battle)
   // A choice-locked attacker only ever clicks its locked move again — a lock
   // into a resisted attack (or a status move) ends its threat outright.
   const locked = lockedMoveId(attacker);
-  const slots = locked ? attacker.moveSlots.filter(slot => slot.id === locked) : attacker.moveSlots;
+  const usable = usableSlots(attacker);
+  const slots = locked ? usable.filter(slot => slot.id === locked) : usable;
   for (const slot of slots) {
     const moveFraction = singleMoveFraction(attacker, defender, slot.id, battle);
     if (moveFraction > 0) {
@@ -593,7 +611,7 @@ function sweepCells(
   const cells: SweepCells = { fastKo: 0, fastChip: 0, slowKo: 0, slowChip: 0 };
   if (theirs.length === 0) return cells;
   const heals = (pokemon: Pokemon): boolean =>
-    pokemon.moveSlots.some(slot => !!battle.dex.moves.get(slot.id).flags['heal']);
+    usableSlots(pokemon).some(slot => !!battle.dex.moves.get(slot.id).flags['heal']);
   for (const a of mine) {
     if ((a.boosts.atk ?? 0) <= 0 && (a.boosts.spa ?? 0) <= 0) continue;
     const aHeals = heals(a);
@@ -649,7 +667,7 @@ export function matchupTerms(battle: Battle, cache?: MatchupCache): { matchup: n
   const heals = (pokemon: Pokemon): boolean => {
     let value = healers.get(pokemon);
     if (value === undefined) {
-      value = pokemon.moveSlots.some(slot => !!battle.dex.moves.get(slot.id).flags['heal']);
+      value = usableSlots(pokemon).some(slot => !!battle.dex.moves.get(slot.id).flags['heal']);
       healers.set(pokemon, value);
     }
     return value;

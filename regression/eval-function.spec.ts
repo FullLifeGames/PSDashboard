@@ -868,3 +868,44 @@ test.describe('effective speed in the eval (round 9)', () => {
     expect(evalFeatures(balled).trickRoom).toBe(-1);
   });
 });
+
+test.describe('PP truth in the threat model (round 11)', () => {
+  // PP is read LIVE from the sim's move slots, never derived from dex base
+  // PP: pools differ across rule sets (Showdown effectively always runs
+  // maxed PP Ups; Pokémon Champions runs different counts), and the sim's
+  // replay bookkeeping is the only ground truth.
+  test('pairThreat ignores move slots with no PP left', () => {
+    const battle = makeBattle(
+      [makeSet('A', 'Golem', ['Earthquake', 'Protect'])],
+      [makeSet('B', 'Weezing', ['Sludge Bomb'], 50, { ability: 'Neutralizing Gas' })],
+    );
+    const attacker = battle.sides[0].active[0]!;
+    const defender = battle.sides[1].active[0]!;
+    expect(pairThreat(attacker, defender, battle).physical).toBeGreaterThan(0);
+    for (const slot of attacker.moveSlots) slot.pp = 0;
+    expect(pairThreat(attacker, defender, battle).physical).toBe(0);
+  });
+
+  test('a drained healer no longer walls', () => {
+    // 573756 t134–139: p2's Toxapex played its whole set to 0 PP and could
+    // only Struggle, yet kept pricing as a full healer-wall. A heal move
+    // with no PP left is no heal move.
+    const attacker = makeSet('A', 'Pikachu', ['Tackle'], 30);
+    const walled = makeBattle([attacker], [makeSet('B', 'Blissey', ['Soft-Boiled'], 100)]);
+    const drained = makeBattle([attacker], [makeSet('B', 'Blissey', ['Soft-Boiled'], 100)]);
+    for (const slot of drained.sides[1].active[0]!.moveSlots) slot.pp = 0;
+    expect(evaluatePosition(drained)).toBeGreaterThan(evaluatePosition(walled));
+  });
+
+  test('the matchup cache tracks PP transitions', () => {
+    const battle = makeBattle(
+      [makeSet('A', 'Golem', ['Earthquake'])],
+      [makeSet('B', 'Weezing', ['Sludge Bomb'], 50, { ability: 'Neutralizing Gas' })],
+    );
+    const cache = createMatchupCache();
+    expect(evaluatePosition(battle, cache)).toBe(evaluatePosition(battle));
+    // Draining a move between evaluations must not serve the stale threat.
+    battle.sides[0].active[0]!.moveSlots[0].pp = 0;
+    expect(evaluatePosition(battle, cache)).toBe(evaluatePosition(battle));
+  });
+});

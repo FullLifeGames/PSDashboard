@@ -104,7 +104,11 @@ export interface StoredEval {
 //      sweep tie-breaks and the Trick Room sign read stages, paralysis,
 //      Tailwind, Choice Scarf, Iron Ball, Unburden, weather abilities,
 //      and invert under Trick Room instead of comparing naked stats.
-export const EVAL_ENGINE_CACHE_VERSION = 35;
+// v36: PP truth in the threat model — pair threats, heal status, and the
+//      removal-option terms read live slot PP (a drained wall stops
+//      walling, a Struggle-locked body stops threatening; 573756's
+//      endgame). PP comes from the sim state only, never from dex pools.
+export const EVAL_ENGINE_CACHE_VERSION = 36;
 
 export function evalStoreKey(
   cacheKey: string,
