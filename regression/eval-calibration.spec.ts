@@ -883,6 +883,57 @@ import { brierScore, fitConstantK } from './fit-helpers';
  * static basis for this mass; the next lever, if any, is search/
  * planning-side.
  *
+ * SWEEP V2 + EFFECTIVE SPEED ROUND 2026-08-24 (improvement round 9 — the
+ * registered round-8 follow-up "sharpen the sweep definition"; design doc
+ * 2026-08-17, commits 22d02c7/02e29e4/b226ca7/cf73e84 + this record):
+ * METHOD, two phases. PHASE A (runtime, cache v35): a new effective-speed
+ *    model (speed.ts — stages, paralysis gen-dependent with Quick Feet,
+ *    Tailwind, Choice Scarf, Iron Ball, Unburden as ability+empty-slot,
+ *    weather/terrain doublers) plus movesFirst (priority rule, then
+ *    effective speed, inverted under Trick Room, exact tie never "first")
+ *    becomes the STANDARD speed source at all three eval speed sites: the
+ *    matchup pair tie-break, the beatsPair/sweep tie-break, and the Trick
+ *    Room sign (averageSpeed without the TR inversion — it measures
+ *    structural slowness). PHASE B (fit-only): the v1 sweep feature
+ *    splits into four exclusive cells per flipped pair — acts-first ×
+ *    in-boosted-KO-range (fastKo/fastChip/slowKo/slowChip, sum = v1
+ *    value, all weight 0) — so each CV training fold prices the speed and
+ *    cleanup context itself instead of hand-guessed factors.
+ *    PRE-REGISTERED hierarchy on the round-8 CV harness (game-clustered
+ *    5-fold, 20 seeds, singles decides, criterion per branch: mean OOF
+ *    logloss Δ < 0 AND wins ≥ 16/20 AND mean OOF brier ≤ base):
+ *    1. REPLACEMENT M1 cells-only beats M0 boosts-only, 2. else ADDITIVE
+ *    M2 beats M0, 3. else status quo.
+ * PHASE A MEASURED (calibration vs the round-7 record, n 806 identical,
+ *    composition 260/289/257): phases 54/65/82 → 55/63/82 (early +1pp,
+ *    mid −2pp ≈ 6 positions, late =), briers 0.2592/0.2252/0.1448 →
+ *    0.2589/0.2288/0.1473 (early −0.0003, mid +0.0036, late +0.0025 —
+ *    outside the ±0.0007 band recorded for score-INVARIANT rounds; this
+ *    round moves real scores), buckets 60/58/71/90 → 59/60/70/90,
+ *    doubles 72% =, wall 22.7m. Feedback drift ZERO across three
+ *    bit-identical runs — every truth pin ok, every gap pin unchanged,
+ *    golden 655336 exact (27/27), no re-pins. USER-ACCEPTED at the gate:
+ *    the eval is mechanically truer (a Scarfer wins the tie-break it
+ *    wins on the field, an Iron Ball flips the TR mirror — both pinned
+ *    as regression tests), the mid cost is ~6 positions on a 9-game
+ *    bench. Kept.
+ * PHASE B RESULT — STATUS QUO HOLDS, the v2 answer equals the v1 answer:
+ *    recapture identical (12,828 samples / 2,111 games), M1 cells-only
+ *    loses EVERY seed in EVERY tranche (singles meanΔ +0.004094, 0/20,
+ *    brier worse; ALL +0.005060, DOUBLES +0.010641, GEN9 +0.006121 — all
+ *    0/20), M2 additive sits on M0 (singles +0.000383, 2/20, brier
+ *    worse). Cell betas are collinearity noise (singles implied: fastKo
+ *    −204.5±145.2, fastChip +83.8±153.8, slowKo +31.8±176.0, slowChip
+ *    −387.8±208.8 — the pure speed-sweep cell prices NEGATIVE); boosts
+ *    stays rock-stable at 39.2±7.3. Eighth boost-family attempt, second
+ *    held-out design, same answer: flat boosts is the better outcome
+ *    carrier. Cells stay weight 0 (captured for future fits), no cache
+ *    bump beyond v35, no adoption gates. CONSEQUENCE: the sweep-feature
+ *    question is CLOSED — v1 and v2 both carry nothing beyond flat
+ *    boosts; any future re-ask needs a genuinely different information
+ *    source (temporal/sequence signal, not another recombination of the
+ *    flip mass).
+ *
  * BOOSTS↔SWEEP CV ROUND 2026-08-17 (improvement round 8 — the registered
  * round-3 agenda item "boosts↔sweep disentanglement, the fit itself"):
  * METHOD: round 3 left the question stuck on coefficient SEs — the
