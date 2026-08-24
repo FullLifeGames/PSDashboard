@@ -194,8 +194,9 @@ export interface SideAnalysis {
    * The flagged turn fed a body deliberately — a nearly-dead Pokémon
    * (≤ SACK_HP_THRESHOLD at turn start, unconditional) or a HEALTHY one
    * while the engine's scores stayed ≥ HEALTHY_SACK_FLOOR on both sides of
-   * the sack (simplification). Graded as a sack: tier demoted one band,
-   * never labeled a risk.
+   * the sack (simplification). Graded as a sack: tier demoted one band —
+   * cleared entirely for a stayed feed whose windowed payoff repaid the
+   * full regret plus the margin (`verified`) — never labeled a risk.
    */
   sacrifice?: SackInfo;
   /**
@@ -623,6 +624,7 @@ export function analyzeTurn(params: {
     // known worst case) AND the windowed payoff over the safe guarantee
     // clears the read margin (573756 t68). Expectation-based, fails closed.
     let sackApplies = false;
+    let feedPayoff: number | null = null;
     if (sack) {
       if (sack.stayed) {
         const certain = played !== null &&
@@ -638,6 +640,7 @@ export function analyzeTurn(params: {
             if (payoff === null || value > payoff) payoff = value;
           }
           sackApplies = payoff !== null && payoff >= RISK_PAYOFF_MARGIN;
+          if (sackApplies) feedPayoff = payoff;
         }
       } else if (sack.healthy) {
         sackApplies = ownBefore >= HEALTHY_SACK_FLOOR &&
@@ -647,7 +650,16 @@ export function analyzeTurn(params: {
       }
     }
     const sacrificed = !!(tier && sackApplies && (regret ?? 0) < TIER_THRESHOLDS.blunder);
-    if (sacrificed) tier = demoteTier(tier);
+    // A stayed feed VERIFIES when its windowed payoff repaid the FULL regret
+    // with the read margin on top. Under the certainty gate, payoff − regret
+    // ≈ windowed peak − best.ev, so this bar says the line reached what the
+    // engine's best promised — the win-condition payoff is real, and no
+    // verdict band sticks (573756 t68: payoff 0.4415 ≥ regret 0.2661 + 0.1).
+    // The blunder bound above still applies: a blunder-sized feed is never
+    // excused, verified or not.
+    const feedVerified = sacrificed && feedPayoff !== null && regret !== null &&
+      feedPayoff >= regret + RISK_PAYOFF_MARGIN;
+    if (sacrificed) tier = feedVerified ? undefined : demoteTier(tier);
     // Item-sensitivity: if the verdict changes band under a usage-plausible
     // alternative item for an opposing mon whose item is only a guess, the
     // verdict HINGES on hidden information — soften to the most charitable
@@ -755,7 +767,7 @@ export function analyzeTurn(params: {
       ...(playedPartial ? { playedPartial } : {}),
       ...(verifiedAtDepth ? { verifiedAtDepth } : {}),
       ...(tier ? { tier } : {}),
-      ...(sacrificed && sack ? { sacrifice: sack } : {}),
+      ...(sacrificed && sack ? { sacrifice: feedVerified ? { ...sack, verified: true } : sack } : {}),
       ...(sensitivity ? { sensitivity } : {}),
       ...(viableCount !== undefined ? { viableCount } : {}),
       ...(conditional ? { conditional } : {}),

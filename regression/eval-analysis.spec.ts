@@ -403,11 +403,19 @@ test.describe('sacrifice detection', () => {
       scoreAfter: 0.31,
       sacks: { p2: { name: 'Weavile', hpFraction: 0.8, stayed: true } },
     });
-    // Both gates pass: p2-own peak 0.31 − safe floor (−0.154) = 0.464 ≥ 0.1.
-    const excused = run({});
-    expect(excused.p2.sacrifice).toEqual({ name: 'Weavile', hpFraction: 0.8, stayed: true });
-    expect(excused.p2.tier).toBe('inaccuracy'); // regret 0.32: mistake, demoted
-    expect(excused.p2.riskUnpunished).toBeFalsy();
+    // Both gates pass AND the payoff repays the full regret with the read
+    // margin on top (peak 0.31 − safe floor −0.154 = 0.464 ≥ 0.32 + 0.1):
+    // the feed VERIFIES — the line reached what the engine's best promised,
+    // so no verdict band sticks (573756 t68: payoff 0.4415, regret 0.2661).
+    const verified = run({});
+    expect(verified.p2.sacrifice).toEqual({ name: 'Weavile', hpFraction: 0.8, stayed: true, verified: true });
+    expect(verified.p2.tier).toBeUndefined();
+    expect(verified.p2.riskUnpunished).toBeFalsy();
+    // Margin cleared but the regret NOT repaid (peak own 0.1 ⇒ payoff
+    // 0.254 ∈ [0.1, 0.42)): the sack framing holds at one-band demotion.
+    const demoted = run({ futureOutcomes: [-0.1, -0.05, null] });
+    expect(demoted.p2.sacrifice).toEqual({ name: 'Weavile', hpFraction: 0.8, stayed: true });
+    expect(demoted.p2.tier).toBe('inaccuracy'); // regret 0.32: mistake, demoted
     // Certainty gate: an ev clearly above the floor is a gamble, not a feed.
     expect(run({ playedEv: -0.35 }).p2.sacrifice).toBeUndefined();
     // Payoff gate: no window value beats the safe floor by the margin

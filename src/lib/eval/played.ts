@@ -236,6 +236,12 @@ export interface SackInfo {
    * and the windowed payoff over the safe guarantee clears the read margin.
    */
   stayed?: true;
+  /**
+   * Verdict-layer stamp (analysis.ts) — never set by detection: the stayed
+   * feed's windowed payoff repaid the FULL regret with the read margin on
+   * top, so the verdict cleared entirely instead of demoting one band.
+   */
+  verified?: true;
 }
 
 /** Below this pre-turn HP fraction a faint reads as a sacrifice, not a loss. */
