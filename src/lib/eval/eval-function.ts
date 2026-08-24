@@ -547,12 +547,150 @@ export function boostedFraction(
 }
 
 /**
+ * Fallback per-turn heal fraction for heal-flagged moves whose amount lives
+ * in a callback instead of a dex ratio (the Moonlight family's weather
+ * scaling, Rest's full-heal-but-sleep, Strength Sap's stat dependence):
+ * ~50% is the grounded proxy. Moves with a direct dex ratio price exactly —
+ * heal rates differ per move (Recover 1/2, Life Dew 1/4, …).
+ */
+const HEAL_FRACTION_DEFAULT = 0.5;
+
+/**
+ * Per-turn fraction a status burns off its holder (gen7+ residuals; toxic
+ * priced at its early ramp). Magic Guard blanks residuals; Poison Heal turns
+ * poison into upkeep — priced as merely no residual (the passive regen, like
+ * item regen, stays out: second-order next to the race sign).
+ */
+const STATUS_RESIDUALS: Record<string, number> = { brn: 1 / 16, psn: 1 / 8, tox: 1 / 8 };
+
+function statusResidual(pokemon: Pokemon): number {
+  if (pokemon.ability === 'magicguard' || pokemon.ability === 'poisonheal') return 0;
+  return STATUS_RESIDUALS[pokemon.status] ?? 0;
+}
+
+/**
+ * The wall's finite fuel from usable heal moves: the best per-turn heal
+ * rate, and the total HP fraction the remaining heal PP can restore
+ * (Σ pp × per-move rate).
+ */
+function healProfile(pokemon: Pokemon, battle: Battle): { rate: number; absorb: number } {
+  let rate = 0;
+  let absorb = 0;
+  for (const slot of usableSlots(pokemon)) {
+    const move = battle.dex.moves.get(slot.id);
+    if (!move.flags['heal']) continue;
+    const fraction = move.heal ? move.heal[0] / move.heal[1] : HEAL_FRACTION_DEFAULT;
+    rate = Math.max(rate, fraction);
+    absorb += (slot.pp ?? 8) * fraction;
+  }
+  return { rate, absorb };
+}
+
+/**
+ * Total usable PP — a coarse ceiling on how many turns of pressure the mon
+ * can still produce (heal turns included; the Struggle a drained mon could
+ * still click stays out, see usableSlots).
+ */
+function ppBudget(pokemon: Pokemon): number {
+  let pp = 0;
+  for (const slot of usableSlots(pokemon)) pp += slot.pp ?? 8;
+  return pp;
+}
+
+/** One side of a 1v1 race, in HP fractions per turn. */
+export interface RaceSide {
+  /** Starting HP fraction (the matchup term passes hazard-adjusted entry HP). */
+  hp: number;
+  /** Best per-turn damage fraction onto the opponent (boost-adjusted). */
+  frac: number;
+  /** Per-turn status residual burning THIS side. */
+  residual: number;
+  /** Best per-turn heal fraction among usable heal moves (0 = no healer). */
+  healRate: number;
+  /** Total HP fraction the remaining heal PP can restore (Σ pp × rate). */
+  healAbsorb: number;
+  /** Total usable PP: the ceiling on turns of pressure this side can produce. */
+  ppBudget: number;
+}
+
+export interface RaceClocks {
+  /** Turns side A needs to KO side B (Infinity = never lands). */
+  turnsA: number;
+  turnsB: number;
+  /** Offense after the wall's action economy (see below). */
+  effFracA: number;
+  effFracB: number;
+}
+
+/**
+ * KO-race clocks for one pair, replacing the old "a healer walls anything
+ * short of a 2HKO" pauschal (573756 t134–139: that rule priced a burned,
+ * 3-Recover-PP Toxapex as unkillable AND let it heal and chip in the same
+ * turn). Three deliberately coarse rules, all fed by live sim state:
+ *
+ * - Heal PP absorbs as survival: the remaining heal PP restore healAbsorb
+ *   bars in total, so a defender soaks hp + healAbsorb before it falls —
+ *   pure delay whether or not the wall arithmetic holds.
+ * - Action economy: a healer under pressure spends pressure/healRate of its
+ *   turns healing and attacks only on the spare ones; under crumbling
+ *   pressure (≥ its best heal rate, e.g. a burn tipping a borderline hit
+ *   over the sustain) it is pinned — priced as never attacking, since it
+ *   loses the pair either way.
+ * - The PP budget caps every clock: a win that needs more turns than the
+ *   attacker has PP never lands (a full-PP wall still walls — the slow
+ *   attacker runs dry first).
+ *
+ * Residuals alone can finish a race (stall wars end by status), but a side
+ * with no damaging move at all never wins one.
+ */
+export function raceClocks(a: RaceSide, b: RaceSide): RaceClocks {
+  const spare = (side: RaceSide, incoming: number): number =>
+    side.healRate > 0 && incoming > 0 ? Math.max(0, 1 - incoming / side.healRate) : 1;
+  const effFracA = a.frac * spare(a, b.frac + a.residual);
+  const effFracB = b.frac * spare(b, a.frac + b.residual);
+  const clock = (attacker: RaceSide, effFrac: number, defender: RaceSide): number => {
+    if (attacker.frac <= 0) return Infinity;
+    const pressure = effFrac + defender.residual;
+    if (pressure <= 0) return Infinity;
+    // The epsilon keeps float noise (0.1 − 0.45/0.5 ≠ exactly 0.02) from
+    // pushing an exact division over the next whole turn.
+    const turns = Math.ceil((defender.hp + defender.healAbsorb) / pressure - 1e-9);
+    return turns > attacker.ppBudget ? Infinity : turns;
+  };
+  return {
+    turnsA: clock(a, effFracA, b),
+    turnsB: clock(b, effFracB, a),
+    effFracA,
+    effFracB,
+  };
+}
+
+/** Assembles one Pokémon's race side from live battle state. */
+function raceSide(
+  pokemon: Pokemon,
+  hp: number,
+  frac: number,
+  battle: Battle,
+): RaceSide {
+  const heal = healProfile(pokemon, battle);
+  return {
+    hp,
+    frac,
+    residual: statusResidual(pokemon),
+    healRate: heal.rate,
+    healAbsorb: heal.absorb,
+    ppBudget: ppBudget(pokemon),
+  };
+}
+
+/**
  * Aggregated 1v1 threat terms from p1's perspective. `matchup` in [-1, +1]:
- * for every living pair, whoever KOs first (against current HP) wins the
- * pair, speed breaking ties; pairs are weighted by both sides' HP fractions.
- * `coverage` is MAX-based per enemy: each living Pokémon that the other side
- * has NO favorable trade against contributes its answer deficit × its HP
- * fraction (p1-positive). Exported for direct testing.
+ * for every living pair, whoever's race clock lands first wins the pair
+ * (raceClocks: heal-PP absorption, action economy, PP budgets — no infinite
+ * walls), speed breaking ties; pairs are weighted by both sides' HP
+ * fractions. `coverage` is MAX-based per enemy: each living Pokémon that the
+ * other side has NO favorable trade against contributes its answer deficit ×
+ * its HP fraction (p1-positive). Exported for direct testing.
  */
 /** Memoizing accessor for pairThreat over one search's MatchupCache. */
 function threatGetter(battle: Battle, cache?: MatchupCache) {
@@ -570,27 +708,23 @@ function threatGetter(battle: Battle, cache?: MatchupCache) {
 
 /**
  * KO-first 1v1 verdict for one pair, same semantics as the matchup term:
- * fewer turns to KO wins, priority then speed break ties, a ~50%-per-turn
- * healer walls anything short of a 2HKO. The optional override substitutes
- * the attacker's offensive stages (the sweep feature asks "who would this
- * mon beat WITHOUT its boosts?").
+ * fewer race-clock turns to KO wins (raceClocks: heal-PP absorption, action
+ * economy, PP budgets), priority then speed break ties. The optional
+ * override substitutes the attacker's offensive stages (the sweep feature
+ * asks "who would this mon beat WITHOUT its boosts?").
  */
 function beatsPair(
   a: Pokemon,
   b: Pokemon,
   threatA: PairThreat,
   threatB: PairThreat,
-  aHeals: boolean,
-  bHeals: boolean,
   battle: Battle,
   aBoosts?: { atk: number; spa: number },
 ): boolean {
-  const boostedA = boostedFraction(threatA, a, b, aBoosts);
-  const boostedB = boostedFraction(threatB, b, a);
-  const fracA = boostedA <= 0.5 && bHeals ? 0 : boostedA;
-  const fracB = boostedB <= 0.5 && aHeals ? 0 : boostedB;
-  const turnsA = fracA > 0 ? Math.ceil(b.hp / b.maxhp / fracA) : Infinity;
-  const turnsB = fracB > 0 ? Math.ceil(a.hp / a.maxhp / fracB) : Infinity;
+  const { turnsA, turnsB } = raceClocks(
+    raceSide(a, a.hp / a.maxhp, boostedFraction(threatA, a, b, aBoosts), battle),
+    raceSide(b, b.hp / b.maxhp, boostedFraction(threatB, b, a), battle),
+  );
   if (turnsA < turnsB) return true;
   if (turnsB < turnsA || turnsA === Infinity) return false;
   return movesFirst(a, b, threatA, threatB, battle);
@@ -610,17 +744,13 @@ function sweepCells(
   const theirs = living(1 - sideIndex);
   const cells: SweepCells = { fastKo: 0, fastChip: 0, slowKo: 0, slowChip: 0 };
   if (theirs.length === 0) return cells;
-  const heals = (pokemon: Pokemon): boolean =>
-    usableSlots(pokemon).some(slot => !!battle.dex.moves.get(slot.id).flags['heal']);
   for (const a of mine) {
     if ((a.boosts.atk ?? 0) <= 0 && (a.boosts.spa ?? 0) <= 0) continue;
-    const aHeals = heals(a);
     for (const b of theirs) {
       const threatA = threat(a, b);
       const threatB = threat(b, a);
-      const bHeals = heals(b);
-      if (!beatsPair(a, b, threatA, threatB, aHeals, bHeals, battle) ||
-        beatsPair(a, b, threatA, threatB, aHeals, bHeals, battle, { atk: 0, spa: 0 })) {
+      if (!beatsPair(a, b, threatA, threatB, battle) ||
+        beatsPair(a, b, threatA, threatB, battle, { atk: 0, spa: 0 })) {
         continue;
       }
       const weight = (1 / theirs.length) * (a.hp / a.maxhp);
@@ -663,12 +793,22 @@ export function matchupTerms(battle: Battle, cache?: MatchupCache): { matchup: n
     return value;
   };
 
-  const healers = new Map<Pokemon, boolean>();
-  const heals = (pokemon: Pokemon): boolean => {
-    let value = healers.get(pokemon);
+  // Race-side PP inputs memoized per mon — loop-invariant across pairs.
+  const profiles = new Map<Pokemon, { rate: number; absorb: number }>();
+  const profileOf = (pokemon: Pokemon): { rate: number; absorb: number } => {
+    let value = profiles.get(pokemon);
     if (value === undefined) {
-      value = usableSlots(pokemon).some(slot => !!battle.dex.moves.get(slot.id).flags['heal']);
-      healers.set(pokemon, value);
+      value = healProfile(pokemon, battle);
+      profiles.set(pokemon, value);
+    }
+    return value;
+  };
+  const budgets = new Map<Pokemon, number>();
+  const budgetOf = (pokemon: Pokemon): number => {
+    let value = budgets.get(pokemon);
+    if (value === undefined) {
+      value = ppBudget(pokemon);
+      budgets.set(pokemon, value);
     }
     return value;
   };
@@ -682,15 +822,21 @@ export function matchupTerms(battle: Battle, cache?: MatchupCache): { matchup: n
     for (const b of p2Living) {
       const threatA = threat(a, b);
       const threatB = threat(b, a);
-      const boostedA = boostedFraction(threatA, a, b);
-      const boostedB = boostedFraction(threatB, b, a);
-      // A defender that can heal ~50% per turn walls anything short of a 2HKO.
-      const fracA = boostedA <= 0.5 && heals(b) ? 0 : boostedA;
-      const fracB = boostedB <= 0.5 && heals(a) ? 0 : boostedB;
-      bestAnswerToP2.set(b, Math.max(bestAnswerToP2.get(b) ?? -Infinity, fracA - fracB));
-      bestAnswerToP1.set(a, Math.max(bestAnswerToP1.get(a) ?? -Infinity, fracB - fracA));
-      const turnsA = fracA > 0 ? Math.ceil(effHp(b) / fracA) : Infinity;
-      const turnsB = fracB > 0 ? Math.ceil(effHp(a) / fracB) : Infinity;
+      const { turnsA, turnsB, effFracA, effFracB } = raceClocks(
+        {
+          hp: effHp(a), frac: boostedFraction(threatA, a, b), residual: statusResidual(a),
+          healRate: profileOf(a).rate, healAbsorb: profileOf(a).absorb, ppBudget: budgetOf(a),
+        },
+        {
+          hp: effHp(b), frac: boostedFraction(threatB, b, a), residual: statusResidual(b),
+          healRate: profileOf(b).rate, healAbsorb: profileOf(b).absorb, ppBudget: budgetOf(b),
+        },
+      );
+      // Answer margins read the race's effective offense: an attacker held
+      // by a (now finite) wall keeps its partial answer, a pinned healer
+      // stops counting as one.
+      bestAnswerToP2.set(b, Math.max(bestAnswerToP2.get(b) ?? -Infinity, effFracA - effFracB));
+      bestAnswerToP1.set(a, Math.max(bestAnswerToP1.get(a) ?? -Infinity, effFracB - effFracA));
       let sign = 0;
       if (turnsA < turnsB) sign = 1;
       else if (turnsB < turnsA) sign = -1;

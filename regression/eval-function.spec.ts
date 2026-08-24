@@ -3,8 +3,9 @@ import { Battle, Teams, toID } from '@pkmn/sim';
 import type { PokemonSet } from '@pkmn/sim';
 import {
   createMatchupCache, DOUBLES_FEATURE_WEIGHTS, evalFeatures, evaluatePosition, EVAL_WEIGHTS,
-  FEATURE_WEIGHTS, featureWeights, hazardCost, hazardRemovalEquity, matchupTerms, pairThreat, strandedMons,
-  type EvalFeatures,
+  FEATURE_WEIGHTS, featureWeights, hazardCost, hazardRemovalEquity, matchupTerms, pairThreat, raceClocks,
+  strandedMons,
+  type EvalFeatures, type RaceSide,
 } from '../src/lib/eval/eval-function';
 
 function makeSet(
@@ -283,7 +284,9 @@ test.describe('evaluatePosition', () => {
     trickroom.field.addPseudoWeather('trickroom', trickroom.sides[0].active[0]!);
 
     expect(evaluatePosition(hazardous)).toBeCloseTo(0.8043935326321168, 6);
-    expect(evaluatePosition(races)).toBeCloseTo(0.9672891743979647, 6);
+    // Re-pinned for the round-11 race clocks (was 0.9672891743979647): the
+    // Moonlight Clefable's wall is finite now, so the Salazzle side gains.
+    expect(evaluatePosition(races)).toBeCloseTo(0.9722131704913529, 6);
     expect(evaluatePosition(trickroom)).toBeCloseTo(0.1243530017715962, 6);
   });
 
@@ -907,5 +910,72 @@ test.describe('PP truth in the threat model (round 11)', () => {
     // Draining a move between evaluations must not serve the stale threat.
     battle.sides[0].active[0]!.moveSlots[0].pp = 0;
     expect(evaluatePosition(battle, cache)).toBe(evaluatePosition(battle));
+  });
+});
+
+test.describe('the healer wall is a finite race (round 11)', () => {
+  const side = (partial: Partial<RaceSide>): RaceSide =>
+    ({ hp: 1, frac: 0, residual: 0, healRate: 0, healAbsorb: 0, ppBudget: 64, ...partial });
+  // A 16-PP Recover-class healer: rate 1/2 per turn, 8 bars of total fuel.
+  const recoverer = { healRate: 0.5, healAbsorb: 8 };
+
+  test('heal PP absorbs as survival and the PP budget caps every clock', () => {
+    const attacker = side({ frac: 0.3, ppBudget: 16 });
+    // 16 Recover PP absorb 8 extra bars: 30 turns needed > 16 attacking PP.
+    expect(raceClocks(attacker, side(recoverer)).turnsA).toBe(Infinity);
+    // 2 PP absorb 1 extra bar: 7 turns, within budget.
+    expect(raceClocks(attacker, side({ healRate: 0.5, healAbsorb: 1 })).turnsA).toBe(7);
+  });
+
+  test('a status residual crumbles a borderline wall', () => {
+    const attacker = side({ frac: 0.45 });
+    const healer = side({ frac: 0.2, ...recoverer, ppBudget: 60 });
+    const burned = { ...healer, residual: 1 / 16 };
+    // 0.45 ≤ 0.5: the wall holds — the healer keeps spare-turn offense.
+    expect(raceClocks(attacker, healer).effFracB).toBeGreaterThan(0);
+    // 0.45 + 1/16 > 0.5: sustain loses ground — the healer is pinned.
+    expect(raceClocks(attacker, burned).effFracB).toBe(0);
+    expect(raceClocks(attacker, burned).turnsA)
+      .toBeLessThan(raceClocks(attacker, healer).turnsA);
+  });
+
+  test("the walling healer's counter-offense runs on spare turns only", () => {
+    const attacker = side({ frac: 0.45 });
+    const healer = side({ frac: 0.2, ...recoverer, ppBudget: 60 });
+    // Under 0.45 pressure it heals 90% of turns: 0.2 × 0.1 ⇒ 50 turns.
+    expect(raceClocks(attacker, healer).turnsB).toBe(50);
+    // Unpressured it attacks freely: ceil(1 / 0.2) = 5.
+    expect(raceClocks(side({}), healer).turnsB).toBe(5);
+  });
+
+  test('heal rates are per move, read from the dex ratio', () => {
+    // A weaker heal move (Life-Dew-class 1/4) walls less than Recover: the
+    // same 0.4 pressure leaves spare turns at rate 1/2 but pins at 1/4.
+    const attacker = side({ frac: 0.4 });
+    const strong = side({ frac: 0.2, healRate: 1 / 2, healAbsorb: 8, ppBudget: 60 });
+    const weak = side({ frac: 0.2, healRate: 1 / 4, healAbsorb: 4, ppBudget: 60 });
+    expect(raceClocks(attacker, strong).effFracB).toBeGreaterThan(0);
+    expect(raceClocks(attacker, weak).effFracB).toBe(0);
+  });
+
+  test('573756 t138: a burned, PP-drained wall loses the last-pair race', () => {
+    const endgame = (burned: boolean, recoverPP: number) => {
+      const battle = makeBattle(
+        [makeSet('Pex', 'Toxapex', ['Recover', 'Knock Off', 'Haze', 'Toxic'], 100)],
+        [makeSet('Yak', 'Zapdos-Galar', ['Stomping Tantrum'], 100)],
+      );
+      const pex = battle.sides[0].active[0]!;
+      const yak = battle.sides[1].active[0]!;
+      pex.hp = Math.floor(pex.maxhp * 0.88);
+      yak.hp = Math.floor(yak.maxhp * 0.18);
+      if (burned) pex.setStatus('brn');
+      pex.moveSlots[0].pp = recoverPP;
+      return evalFeatures(battle).matchup;
+    };
+    // Fresh PP and no burn: the wall holds and the chip race favors Toxapex.
+    expect(endgame(false, 16)).toBeGreaterThan(0);
+    // The real t138: burn breaks the sustain and 3 Recover PP cannot absorb
+    // 2HKO-class pressure — the last pair belongs to the attacker.
+    expect(endgame(true, 3)).toBeLessThan(0);
   });
 });
