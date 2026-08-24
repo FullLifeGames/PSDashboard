@@ -366,10 +366,11 @@ test.describe('sacrifice detection', () => {
     expect(analysis.p1.sacrifice).toBeUndefined();
   });
 
-  test('a certain-outcome feed whose windowed payoff clears the margin grades as a sacrifice', () => {
-    // 573756 t68 in miniature: the feed's floor equals its ev (the player
-    // accepted the known worst case), the punishing reply WAS clicked, and
-    // the payoff over the safe floor arrives inside the window.
+  test('a floor-realized feed whose windowed payoff clears the margin grades as a sacrifice', () => {
+    // 573756 t68 in miniature: the realized outcome lands on the priced
+    // floor (the player accepted the known worst case and got it), the
+    // punishing reply WAS clicked, and the payoff over the safe floor
+    // arrives inside the window.
     const feedResult: EvalResult = {
       score: 0.17, interval: 0.05, depthCompleted: 2,
       perSide: {
@@ -416,8 +417,17 @@ test.describe('sacrifice detection', () => {
     const demoted = run({ futureOutcomes: [-0.1, -0.05, null] });
     expect(demoted.p2.sacrifice).toEqual({ name: 'Weavile', hpFraction: 0.8, stayed: true });
     expect(demoted.p2.tier).toBe('inaccuracy'); // regret 0.32: mistake, demoted
-    // Certainty gate: an ev clearly above the floor is a gamble, not a feed.
-    expect(run({ playedEv: -0.35 }).p2.sacrifice).toBeUndefined();
+    // Floor gate (round 12): an ev above the floor no longer disqualifies —
+    // what matters is that the REALIZED outcome landed on the priced worst
+    // case, so the feed turn's own rolls contributed nothing positive
+    // (573756 t68 post-race: ev −0.207, floor −0.378, realized −0.378).
+    // Regret 0.196 (mistake band), payoff 0.464 ≥ 0.196 + 0.1: verifies.
+    const spread = run({ playedEv: -0.35 });
+    expect(spread.p2.sacrifice).toEqual({ name: 'Weavile', hpFraction: 0.8, stayed: true, verified: true });
+    expect(spread.p2.tier).toBeUndefined();
+    // An outcome ABOVE the floor is the turn's own luck — no feed credit
+    // (own −0.30 vs floor −0.42: the rolls bailed the line out).
+    expect(run({ playedOutcome: 0.30 }).p2.sacrifice).toBeUndefined();
     // Payoff gate: no window value beats the safe floor by the margin
     // (p1-perspective 0.3 ⇒ p2-own −0.3; peak −0.3 − (−0.154) < 0.1).
     expect(run({ futureOutcomes: [0.3, 0.3, 0.3] }).p2.sacrifice).toBeUndefined();

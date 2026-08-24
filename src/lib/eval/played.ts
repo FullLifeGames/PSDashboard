@@ -232,7 +232,8 @@ export interface SackInfo {
    * The fed body STAYED on the field (already active at turn start, never
    * entered this turn) and fainted above the low-HP threshold — a
    * deliberate-feed CANDIDATE (573756 t68). The verdict layer honors it
-   * only when the played line's outcome was priced certain (ev ≈ floor)
+   * only when the realized outcome landed on the played line's priced
+   * floor (the accepted worst case is what happened — no upside luck)
    * and the windowed payoff over the safe guarantee clears the read margin.
    */
   stayed?: true;
@@ -296,9 +297,9 @@ export function allTurnEvents(log: string): string[][] {
  *   call the game decisively won on both sides of the sack (GPL T35).
  * - STAY-AND-DIE CANDIDATE: a body active since the turn began (neither
  *   switched nor dragged in this turn) that fainted above the threshold.
- *   Marked `stayed` — the verdict layer honors it only when the played
- *   line's outcome was priced certain and the windowed payoff clears the
- *   read margin (573756 t68).
+ *   Marked `stayed` — the verdict layer honors it only when the realized
+ *   outcome landed on the played line's priced floor and the windowed
+ *   payoff clears the read margin (573756 t68).
  */
 export function detectSacks(
   events: string[],

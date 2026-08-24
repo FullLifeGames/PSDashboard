@@ -205,11 +205,11 @@ function sackClause(name: string, side: SideAnalysis): string | null {
   const pct = Math.round(side.sacrifice.hpFraction * 100);
   if (side.sacrifice.stayed) {
     if (side.sacrifice.verified) {
-      return `${name} fed ${side.sacrifice.name} (${pct}% HP) — the outcome was priced certain, ` +
+      return `${name} fed ${side.sacrifice.name} (${pct}% HP) — the line's priced floor is what happened, ` +
         `and the windowed payoff repaid the sack's full regret with a real edge on top; ` +
         `verified as a win-condition sacrifice, not graded as a misplay.`;
     }
-    return `${name} fed ${side.sacrifice.name} (${pct}% HP) — the outcome was priced certain, ` +
+    return `${name} fed ${side.sacrifice.name} (${pct}% HP) — the line's priced floor is what happened, ` +
       `and the line's payoff lands within the payoff window; graded as a sacrifice, not a misplay.`;
   }
   return side.sacrifice.healthy

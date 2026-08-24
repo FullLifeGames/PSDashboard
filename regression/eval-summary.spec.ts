@@ -150,7 +150,7 @@ test.describe('natural-language turn summaries', () => {
     expect(summary).not.toContain('inaccuracy');
   });
 
-  test('a stay-and-die feed gets the certainty wording', () => {
+  test('a stay-and-die feed gets the floor wording', () => {
     const feedResult: EvalResult = {
       score: 0.17, interval: 0.05, depthCompleted: 2,
       perSide: {

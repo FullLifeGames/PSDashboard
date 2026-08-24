@@ -91,12 +91,16 @@ export const RISK_PAYOFF_EPSILON = 0.02;
 export const PAYOFF_WINDOW = 3;
 
 /**
- * A stay-and-die feed's certainty gate: the played line's ev may exceed its
- * floor by at most this much to count as "the player accepted the known
- * worst case" (573756 t68: floor = ev exactly). Same epsilon scale as the
- * rank-tie threshold.
+ * A stay-and-die feed's floor gate: the realized outcome may exceed the
+ * played line's priced floor by at most this much to count as "the player
+ * accepted the known worst case and got it" (573756 t68: realized = floor
+ * exactly). Round 12 replaced the old certainty gate (ev ≈ floor) with
+ * this — a race-priced feed turn carries real spread, but as long as the
+ * WORST branch is what materialized, the turn's own rolls contributed
+ * nothing positive and the windowed payoff credits the plan, not the luck.
+ * Same epsilon scale as the rank-tie threshold.
  */
-export const FEED_CERTAINTY_EPSILON = 0.02;
+export const FEED_FLOOR_EPSILON = 0.02;
 
 /**
  * Both sides must have at least this many VIABLE options (within an
@@ -620,16 +624,19 @@ export function analyzeTurn(params: {
     const ownAfter = params.scoreAfter === null ? null : (key === 'p1' ? params.scoreAfter : -params.scoreAfter);
     // Shape gates: low-HP applies unconditionally; healthy only while
     // decisively ahead on both sides of the sack; a stayed feed only when
-    // the outcome was priced certain (ev ≈ floor — the player accepted the
-    // known worst case) AND the windowed payoff over the safe guarantee
-    // clears the read margin (573756 t68). Expectation-based, fails closed.
+    // the realized outcome landed on the played line's priced floor (the
+    // player accepted the known worst case and got it — the turn's own
+    // rolls contributed nothing positive) AND the windowed payoff over the
+    // safe guarantee clears the read margin (573756 t68). Fails closed.
     let sackApplies = false;
     let feedPayoff: number | null = null;
     if (sack) {
       if (sack.stayed) {
-        const certain = played !== null &&
-          played.ev - played.worstCase <= FEED_CERTAINTY_EPSILON;
-        if (certain && safe && params.playedOutcome !== null) {
+        const ownOutcome = params.playedOutcome === null ? null
+          : key === 'p1' ? params.playedOutcome : -params.playedOutcome;
+        const atFloor = played !== null && ownOutcome !== null &&
+          ownOutcome - played.worstCase <= FEED_FLOOR_EPSILON;
+        if (atFloor && safe && params.playedOutcome !== null) {
           const chain = [params.playedOutcome, ...(params.futureOutcomes ?? [])]
             .slice(0, PAYOFF_WINDOW + 1);
           let payoff: number | null = null;
@@ -651,12 +658,11 @@ export function analyzeTurn(params: {
     }
     const sacrificed = !!(tier && sackApplies && (regret ?? 0) < TIER_THRESHOLDS.blunder);
     // A stayed feed VERIFIES when its windowed payoff repaid the FULL regret
-    // with the read margin on top. Under the certainty gate, payoff − regret
-    // ≈ windowed peak − best.ev, so this bar says the line reached what the
-    // engine's best promised — the win-condition payoff is real, and no
-    // verdict band sticks (573756 t68: payoff 0.4415 ≥ regret 0.2661 + 0.1).
-    // The blunder bound above still applies: a blunder-sized feed is never
-    // excused, verified or not.
+    // with the read margin on top: the line reached what the engine's best
+    // promised, measured from the accepted floor upward — the win-condition
+    // payoff is real, and no verdict band sticks (573756 t68 post-race:
+    // payoff 0.359 ≥ regret 0.129 + 0.1). The blunder bound above still
+    // applies: a blunder-sized feed is never excused, verified or not.
     const feedVerified = sacrificed && feedPayoff !== null && regret !== null &&
       feedPayoff >= regret + RISK_PAYOFF_MARGIN;
     if (sacrificed) tier = feedVerified ? undefined : demoteTier(tier);
