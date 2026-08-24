@@ -46,8 +46,8 @@ export interface FeedbackItem {
   /** 1-based played turn; absent = whole-game item (ReportClaim territory). */
   turn?: number;
   kind: 'truth' | 'gap';
-  /** expert-…: distilled expert claims. round…-gate-…: engine deliverables pinned at a round's user gate. */
-  source: 'expert-2026-08' | 'round6-gate-2026-08';
+  /** expert-…: distilled expert claims. round…-gate-…: engine deliverables pinned at a round's user gate. user-…: the user's own expert observations. */
+  source: 'expert-2026-08' | 'round6-gate-2026-08' | 'user-2026-08';
   essence: string;
   /** truth only — pinned from the user-approved baseline. */
   expect?: TurnClaim | ReportClaim;
@@ -113,6 +113,18 @@ export const FEEDBACK_CORPUS: FeedbackItem[] = [
     expect: GOLDEN_655336,
   },
   // ---- gaps (observed baselines recorded at Gate 1, commit ef342fa) ----
+  {
+    replay: 'smogtours-gen8ou-573756', turn: 73, kind: 'gap', source: 'user-2026-08',
+    essence: "With +4 Garchomp against a 27% Corviknight the engine prices the Fire Fang correctly (koOdds accuracy 0.95 × kill 1) and books the miss as chance (+0.369 toward p1) — yet the bar never said the win was close: the pre-turn score sits at own-p2 0.596 and even the hit branch prices ≈0.86, because the post-kill sweep lies past the static horizon (the t68 family, now on the bar side). And since the decision delta (−0.24) offsets the chance delta (+0.37), the NET swing is +0.13 and the game's biggest roll never enters the key moments.",
+    observed: { attribution: ['chance'], keyMoment: false },
+    desired: 'The bar reads near-decided when the sweep math is on the board, and a chance event of this size surfaces as a key moment even when decision and chance deltas partially cancel.',
+  },
+  {
+    replay: 'smogtours-gen8ou-573756', turn: 138, kind: 'gap', source: 'user-2026-08',
+    essence: "SoulWind's loss is locked from t134 at the latest: p2's Toxapex is Struggle-locked with a healthy Zapdos-Galar behind it, and the real 1v1 table has Stomping Tantrum 2HKOing the lone 303-HP Toxapex. The engine walks the bar the WRONG way instead (own-p2 0.44 → −0.09 across t135–t138 — the losing side nominally ahead one turn before the end), prices Tantrum at own-p2 −0.107 ('punished by Toxic'), books the entire resolution as luck (chanceDelta −1.07), and calls t138 the turning point of a game decided long before.",
+    observed: { attribution: ['chance'], keyMoment: true },
+    desired: 'A locked 1v1 endgame reads as decided: the bar does not drift toward the losing side, the final-pair damage table is priced right, and resolving a decided endgame is not booked as a chance swing or the turning point.',
+  },
   {
     replay: 'smogtours-gen8ou-562428', turn: 10, kind: 'gap', source: 'expert-2026-08',
     essence: 'The no-blunder shift verdict looks right but is shallow-wrong: both sides had four or more live options and the turn was a read — a Heatran switch would have flipped the advantage. The engine never represented the real decision space. (Re-pinned 2026-08-16 round 5, user-approved: the breadth narrative landed — the summary now reads "A genuinely open turn rather than a drift — 9 of 9 options … and 11 of 13 … sat within an inaccuracy of best, so the turn hinged on out-predicting the opponent", pinned via summaryIncludes. Toward the expert; the remaining desired half is an actual read RECOMMENDATION (opponent-model territory, e.g. the Heatran switch), not just naming the breadth.)',
