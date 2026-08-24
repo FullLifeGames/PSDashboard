@@ -72,6 +72,28 @@ test.describe('game report (multi-turn root cause)', () => {
     expect(report.chanceTotal).toBeCloseTo(-0.4, 10);
   });
 
+  test('a decided game\'s resolution is not luck: post-boundary chance toward the winner leaves key moments and the luck ledger', () => {
+    // 573756 t134–138 in miniature: the winner is ahead through the whole
+    // endgame, the static bar underprices the locked 1v1, and the final KO
+    // "surprises" the model — chance toward the winner past the favor
+    // boundary is the decided game resolving, not luck. Chance AGAINST the
+    // winner stays genuine luck wherever it lands, and pre-boundary chance
+    // toward the eventual winner stays luck too (the game was still open).
+    const report = buildGameReport([
+      mk(1, 0.1, -0.2, { attribution: 'chance', chanceDelta: -0.3 }),
+      mk(2, -0.2, -0.25),
+      mk(3, -0.25, -0.05, { attribution: 'chance', chanceDelta: 0.2 }),
+      mk(4, -0.05, -0.98, { attribution: 'chance', chanceDelta: -0.9 }),
+    ], names, 'p2');
+    // Scores favor Beta from turn 2 onward: turn 4's convergence to the
+    // terminal value is resolution; turn 1's swing (pre-boundary) and turn
+    // 3's roll toward the loser are luck.
+    expect(report.turningPoint).toBe(1);
+    expect(report.keyMoments.map(moment => moment.turn)).toEqual([1]);
+    expect(report.chanceTotal).toBeCloseTo(-0.1, 10);
+    expect(report.resolutionTotal).toBeCloseTo(-0.9, 10);
+  });
+
   test('names the seeds of the loss: the loser\'s costliest choices before the tip', () => {
     const report = buildGameReport([
       mk(1, 0.1, 0.05),

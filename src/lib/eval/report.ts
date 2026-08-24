@@ -68,6 +68,12 @@ export interface GameReport {
   decisionTotals: { p1: number; p2: number };
   /** Net chance contribution across the game (p1 perspective). */
   chanceTotal: number;
+  /**
+   * Chance booked past the favor boundary toward the winner — the decided
+   * game RESOLVING (the static bar's horizon gap on a locked endgame), not
+   * luck. Kept out of `chanceTotal` and the key moments (573756 t138).
+   */
+  resolutionTotal: number;
   summary: string;
 }
 
@@ -131,10 +137,12 @@ function accuracyFor(
   return (harmonic + weighted) / 2;
 }
 
-function findTurningPoint(analyses: (TurnAnalysis | null)[], winner: 'p1' | 'p2'): number | null {
-  const series = scoreSeries(analyses);
+/**
+ * Earliest turn from which every known score favors the winner — the game's
+ * decided region. Feeds both the turning point and resolution detection.
+ */
+function favorBoundary(series: (number | undefined)[], winner: 'p1' | 'p2'): number | null {
   const favors = (score: number) => (winner === 'p1' ? score > 0 : score < 0);
-  // Earliest turn from which every known score favors the winner.
   let earliest: number | null = null;
   for (let turn = series.length - 1; turn >= 1; turn--) {
     const score = series[turn];
@@ -142,9 +150,7 @@ function findTurningPoint(analyses: (TurnAnalysis | null)[], winner: 'p1' | 'p2'
     if (!favors(score)) break;
     earliest = turn;
   }
-  if (earliest === null) return null;
-  // The play that produced that score happened on the turn before.
-  return earliest > 1 ? earliest - 1 : null;
+  return earliest;
 }
 
 export function buildGameReport(
@@ -156,8 +162,23 @@ export function buildGameReport(
 ): GameReport {
   const known = analyses.filter((entry): entry is TurnAnalysis => entry !== null);
 
+  const series = scoreSeries(analyses);
+  const boundary = winner ? favorBoundary(series, winner) : null;
+  // Chance booked inside the decided region TOWARD the winner is the game
+  // resolving: past the favor boundary the static bar underprices a locked
+  // endgame, so its terminal convergence "surprises" the model by the
+  // horizon gap (573756 t138: chanceDelta −1.02 on the final KO of a game
+  // decided at t71). Those turns leave the key moments and the luck ledger;
+  // chance AGAINST the winner stays genuine luck wherever it lands.
+  const towardWinner = (delta: number) => (winner === 'p1' ? delta > 0 : delta < 0);
+  const resolution = new Set(boundary === null ? [] : known
+    .filter(analysis => analysis.turn >= boundary && analysis.attribution === 'chance' &&
+      analysis.chanceDelta !== null && towardWinner(analysis.chanceDelta))
+    .map(analysis => analysis.turn));
+
   const keyMoments = known
-    .filter(analysis => analysis.attribution !== 'quiet' && analysis.swing !== null && Math.abs(analysis.swing) >= KEY_MOMENT_SWING)
+    .filter(analysis => analysis.attribution !== 'quiet' && analysis.swing !== null && Math.abs(analysis.swing) >= KEY_MOMENT_SWING &&
+      !resolution.has(analysis.turn))
     .sort((a, b) => Math.abs(b.swing!) - Math.abs(a.swing!))
     .slice(0, REPORT_KEY_MOMENTS)
     .sort((a, b) => a.turn - b.turn);
@@ -204,14 +225,17 @@ export function buildGameReport(
     p1: known.reduce((sum, analysis) => sum + regretOf(analysis.p1), 0),
     p2: known.reduce((sum, analysis) => sum + regretOf(analysis.p2), 0),
   };
-  const chanceTotal = known.reduce((sum, analysis) => sum + (analysis.chanceDelta ?? 0), 0);
+  const chanceTotal = known.reduce((sum, analysis) =>
+    sum + (resolution.has(analysis.turn) ? 0 : analysis.chanceDelta ?? 0), 0);
+  const resolutionTotal = known.reduce((sum, analysis) =>
+    sum + (resolution.has(analysis.turn) ? analysis.chanceDelta ?? 0 : 0), 0);
 
-  const series = scoreSeries(analyses);
   const accuracy = playedTracking
     ? { p1: accuracyFor(known, 'p1', series), p2: accuracyFor(known, 'p2', series) }
     : { p1: null, p2: null };
 
-  const turningPoint = winner ? findTurningPoint(analyses, winner) : null;
+  // The play that produced the boundary score happened on the turn before.
+  const turningPoint = boundary !== null && boundary > 1 ? boundary - 1 : null;
 
   const sentences: string[] = [];
   if (winner) {
@@ -255,6 +279,6 @@ export function buildGameReport(
 
   return {
     winner, turningPoint, keyMoments, misplays, reads, tracked: playedTracking,
-    accuracy, decisionTotals, chanceTotal, summary: sentences.join(' '),
+    accuracy, decisionTotals, chanceTotal, resolutionTotal, summary: sentences.join(' '),
   };
 }
