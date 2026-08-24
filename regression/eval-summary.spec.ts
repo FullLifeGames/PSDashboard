@@ -161,18 +161,26 @@ test.describe('natural-language turn summaries', () => {
         ],
       },
     };
-    const summary = summarizeTurn(analyzeTurn({
+    const feed = (futureOutcomes: (number | null)[]) => summarizeTurn(analyzeTurn({
       turn: 68, result: feedResult,
       played: {
         p1: { kind: 'move', name: 'Body Press', tera: false },
         p2: { kind: 'move', name: 'Knock Off', tera: false },
       },
-      playedOutcome: 0.42, futureOutcomes: [-0.1, -0.31, null],
+      playedOutcome: 0.42, futureOutcomes,
       scoreBefore: 0.17, scoreAfter: 0.31,
       sacks: { p2: { name: 'Weavile', hpFraction: 0.8, stayed: true } },
     }), names);
+    // Payoff 0.254 repays only part of the 0.32 regret: demoted, not cleared.
+    const summary = feed([-0.1, -0.05, null]);
     expect(summary).toContain('Beta fed Weavile (80% HP)');
     expect(summary).toContain('graded as a sacrifice, not a misplay');
+    // Payoff 0.464 ≥ regret 0.32 + margin 0.1: the verified wording names
+    // the repaid regret and no verdict band renders (573756 t68).
+    const verified = feed([-0.1, -0.31, null]);
+    expect(verified).toContain('Beta fed Weavile (80% HP)');
+    expect(verified).toContain('verified as a win-condition sacrifice');
+    expect(verified).not.toContain('inaccuracy');
   });
 
   test('a punished misplay keeps the reproachful safer-was framing', () => {
