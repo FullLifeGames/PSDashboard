@@ -109,7 +109,9 @@ test.describe('claim evaluator', () => {
 });
 
 test.describe('corpus validation', () => {
-  const turns = Object.fromEntries(FEEDBACK_REPLAYS.map(id => [id, 100]));
+  // Generous means above every fixture's real length: 573756 runs 139 turns
+  // and carries pins deep into its endgame (t138).
+  const turns = Object.fromEntries(FEEDBACK_REPLAYS.map(id => [id, 150]));
 
   test('the shipped corpus is well-formed against generous turn counts', () => {
     expect(validateCorpus(FEEDBACK_CORPUS, turns, false)).toEqual([]);
