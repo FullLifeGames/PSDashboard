@@ -100,7 +100,11 @@ export interface StoredEval {
 // v34: MCTS root odds grounding — koOdds payloads on MCTS rows, boundary-
 //      suspect verify coverage (uniform-outcome kill ranges re-priced by
 //      the blending sampler), mismatch diagnostics passthrough.
-export const EVAL_ENGINE_CACHE_VERSION = 34;
+// v35: effective speed is the standard speed source — the matchup and
+//      sweep tie-breaks and the Trick Room sign read stages, paralysis,
+//      Tailwind, Choice Scarf, Iron Ball, Unburden, weather abilities,
+//      and invert under Trick Room instead of comparing naked stats.
+export const EVAL_ENGINE_CACHE_VERSION = 35;
 
 export function evalStoreKey(
   cacheKey: string,

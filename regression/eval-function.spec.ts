@@ -750,3 +750,37 @@ test.describe('evaluatePosition', () => {
     expect(evaluatePosition(makeBattle(four, six))).toBeLessThan(oneDown);
   });
 });
+
+test.describe('effective speed in the eval (round 9)', () => {
+  test('a Scarf breaks a mirror matchup tie', () => {
+    // Identical Talonflame mirror: same damage both ways, no priority moves,
+    // equal turns — the pair sign is decided by speed alone. Bare mirror
+    // ties (sign 0 ⇒ matchup 0); a Scarf on p2 makes p2 faster ⇒ matchup < 0.
+    const tie = makeBattle(
+      [makeSet('T1', 'Talonflame', ['Flare Blitz'])],
+      [makeSet('T2', 'Talonflame', ['Flare Blitz'])],
+    );
+    expect(evalFeatures(tie).matchup).toBeCloseTo(0, 8);
+    const scarfed = makeBattle(
+      [makeSet('T1', 'Talonflame', ['Flare Blitz'])],
+      [makeSet('T2', 'Talonflame', ['Flare Blitz'], 50, { item: 'choicescarf' })],
+    );
+    expect(evalFeatures(scarfed).matchup).toBeLessThan(0);
+  });
+
+  test('the Trick Room sign reads effective speed', () => {
+    // Snorlax mirror under TR: bare mirror ties (<= keeps +1 for p1); an
+    // Iron Ball on p2 makes p2 the slower side ⇒ TR favors p2 (−1).
+    const mirror = makeBattle(
+      [makeSet('A', 'Snorlax', VANILLA)], [makeSet('B', 'Snorlax', VANILLA)],
+    );
+    mirror.field.addPseudoWeather('trickroom', mirror.sides[0].active[0]!);
+    expect(evalFeatures(mirror).trickRoom).toBe(1);
+    const balled = makeBattle(
+      [makeSet('A', 'Snorlax', VANILLA)],
+      [makeSet('B', 'Snorlax', VANILLA, 50, { item: 'ironball' })],
+    );
+    balled.field.addPseudoWeather('trickroom', balled.sides[0].active[0]!);
+    expect(evalFeatures(balled).trickRoom).toBe(-1);
+  });
+});

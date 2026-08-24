@@ -1,4 +1,5 @@
 import type { Battle, Pokemon, Side } from '@pkmn/sim';
+import { effectiveSpeed, movesFirst } from './speed';
 
 /**
  * All tuning in one place. Values are points on an arbitrary scale; the final
@@ -189,10 +190,10 @@ export const DOUBLES_FEATURE_WEIGHTS: Record<keyof EvalFeatures, number> = {
 export const featureWeights = (doubles: boolean): Record<keyof EvalFeatures, number> =>
   (doubles ? DOUBLES_FEATURE_WEIGHTS : FEATURE_WEIGHTS);
 
-function averageSpeed(side: Side): number {
+function averageSpeed(side: Side, battle: Battle): number {
   const living = side.pokemon.filter(pokemon => !pokemon.fainted && pokemon.hp > 0);
   if (living.length === 0) return 0;
-  return living.reduce((sum, pokemon) => sum + pokemon.storedStats.spe, 0) / living.length;
+  return living.reduce((sum, pokemon) => sum + effectiveSpeed(pokemon, battle), 0) / living.length;
 }
 
 /**
@@ -354,7 +355,7 @@ export function evalFeatures(battle: Battle, cache?: MatchupCache): EvalFeatures
   const p2 = sideFeatureValues(battle.sides[1], battle);
   let trickRoom = 0;
   if (battle.field.pseudoWeather['trickroom']) {
-    trickRoom = averageSpeed(battle.sides[0]) <= averageSpeed(battle.sides[1]) ? 1 : -1;
+    trickRoom = averageSpeed(battle.sides[0], battle) <= averageSpeed(battle.sides[1], battle) ? 1 : -1;
   }
   const terms = matchupTerms(battle, cache);
   const threat = threatGetter(battle, cache);
@@ -549,6 +550,7 @@ function beatsPair(
   threatB: PairThreat,
   aHeals: boolean,
   bHeals: boolean,
+  battle: Battle,
   aBoosts?: { atk: number; spa: number },
 ): boolean {
   const boostedA = boostedFraction(threatA, a, b, aBoosts);
@@ -559,9 +561,7 @@ function beatsPair(
   const turnsB = fracB > 0 ? Math.ceil(a.hp / a.maxhp / fracB) : Infinity;
   if (turnsA < turnsB) return true;
   if (turnsB < turnsA || turnsA === Infinity) return false;
-  if (threatA.priority !== threatB.priority) return threatA.priority;
-  return a.storedStats.spe * stageMultiplier(a.boosts.spe) >
-    b.storedStats.spe * stageMultiplier(b.boosts.spe);
+  return movesFirst(a, b, threatA, threatB, battle);
 }
 
 /** One side's sweep value (see EvalFeatures.sweep). */
@@ -586,8 +586,8 @@ function sweepValue(
       const threatA = threat(a, b);
       const threatB = threat(b, a);
       const bHeals = heals(b);
-      if (beatsPair(a, b, threatA, threatB, aHeals, bHeals) &&
-        !beatsPair(a, b, threatA, threatB, aHeals, bHeals, { atk: 0, spa: 0 })) {
+      if (beatsPair(a, b, threatA, threatB, aHeals, bHeals, battle) &&
+        !beatsPair(a, b, threatA, threatB, aHeals, bHeals, battle, { atk: 0, spa: 0 })) {
         flipped += 1;
       }
     }
@@ -656,11 +656,8 @@ export function matchupTerms(battle: Battle, cache?: MatchupCache): { matchup: n
       if (turnsA < turnsB) sign = 1;
       else if (turnsB < turnsA) sign = -1;
       else if (turnsA !== Infinity) {
-        if (threatA.priority !== threatB.priority) sign = threatA.priority ? 1 : -1;
-        else {
-          sign = Math.sign(a.storedStats.spe * stageMultiplier(a.boosts.spe) -
-            b.storedStats.spe * stageMultiplier(b.boosts.spe));
-        }
+        if (movesFirst(a, b, threatA, threatB, battle)) sign = 1;
+        else if (movesFirst(b, a, threatB, threatA, battle)) sign = -1;
       }
       const weight = a.isActive && b.isActive ? EVAL_WEIGHTS.activePair : 1;
       sum += weight * sign * effHp(a) * effHp(b);
