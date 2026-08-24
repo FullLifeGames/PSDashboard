@@ -108,7 +108,12 @@ export interface StoredEval {
 //      removal-option terms read live slot PP (a drained wall stops
 //      walling, a Struggle-locked body stops threatening; 573756's
 //      endgame). PP comes from the sim state only, never from dex pools.
-export const EVAL_ENGINE_CACHE_VERSION = 36;
+// v37: pin-efficiency discount on held heal PP — past the heal rate a
+//      race defender's healAbsorb realizes only at healRate/incoming
+//      (a pinned healer heals at a net loss and dies with PP in the
+//      tank), so healing now outprices holding (655336 t26: Slack Off
+//      over a free-turn Protect).
+export const EVAL_ENGINE_CACHE_VERSION = 37;
 
 export function evalStoreKey(
   cacheKey: string,

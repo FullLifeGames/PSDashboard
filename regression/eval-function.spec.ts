@@ -958,6 +958,23 @@ test.describe('the healer wall is a finite race (round 11)', () => {
     expect(raceClocks(attacker, weak).effFracB).toBe(0);
   });
 
+  test('held heal PP realizes only at the pin efficiency — healing now beats holding (round 12)', () => {
+    // Under 1.0 incoming a rate-1/2 healer heals at a net loss: its held
+    // PP realize at healRate/incoming = 1/2 efficiency, while HP already
+    // on the body counts in full. Same hp+absorb total (3.0 bars), but the
+    // body that already healed survives longer — the conservation that
+    // priced 655336 t26's Slack Off a mere 0.041 over a free-turn Protect
+    // is broken on purpose.
+    const attacker = side({ frac: 1.0 });
+    const held = side({ frac: 0.2, healRate: 0.5, healAbsorb: 2 });
+    const healed = side({ hp: 1.5, frac: 0.2, healRate: 0.5, healAbsorb: 1.5 });
+    expect(raceClocks(attacker, held).turnsA).toBe(2);
+    expect(raceClocks(attacker, healed).turnsA).toBe(3);
+    // Below the heal rate there is no pin and the absorb realizes in full.
+    const gentle = side({ frac: 0.4 });
+    expect(raceClocks(gentle, held).turnsA).toBe(8);
+  });
+
   test('573756 t138: a burned, PP-drained wall loses the last-pair race', () => {
     const endgame = (burned: boolean, recoverPP: number) => {
       const battle = makeBattle(
