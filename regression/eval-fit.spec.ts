@@ -253,18 +253,20 @@ test.describe('eval weight fitting (EVAL_FIT=1)', () => {
     bootstrap('DOUBLES-ONLY', doubles);
     bootstrap('GEN9-ONLY', samples.filter(s => s.genClass === 'gen9'));
 
-    // Boosts↔sweep disentanglement (round 8, design doc 2026-08-17):
-    // game-clustered 5-fold CV over three bases — M0 keeps flat boosts
-    // (sweep masked), M1 replaces boosts with sweep (boosts masked), M2
-    // carries both (known collinear, record only). Out-of-fold logloss
-    // decides; coefficient SEs cannot under collinearity. Decision tranche
-    // SINGLES-ONLY. PRE-REGISTERED adoption criterion: M1 becomes the
-    // weight candidate only if singles mean OOF logloss(M1) < M0 AND
-    // M1 < M0 in ≥ 16/20 seeds AND mean OOF brier(M1) ≤ M0.
-    const sweepIndex = FEATURE_KEYS.indexOf('sweep' as keyof EvalFeatures);
+    // Sweep v2 cells (round 9, design doc 2026-08-17): the round-8 CV showed
+    // v1 carries nothing beyond flat boosts. v2 splits each flipped pair into
+    // 2×2 cells (acts-first × in-KO-range); each training fold prices the
+    // cells itself — no guessed factors. PRE-REGISTERED hierarchy, decision
+    // tranche SINGLES-ONLY, criterion per branch: mean OOF logloss Δ < 0 AND
+    // wins ≥ 16/20 seeds AND mean OOF brier ≤ base.
+    //   1. REPLACEMENT: M1 (cells, no boosts) beats M0 (boosts, no cells).
+    //   2. ADDITIVE: else M2 (both) beats M0.
+    //   3. Otherwise STATUS QUO — cells stay weight 0.
+    const cellKeys = ['sweepFastKo', 'sweepFastChip', 'sweepSlowKo', 'sweepSlowChip'] as const;
+    const cellIndices = new Set(cellKeys.map(key => FEATURE_KEYS.indexOf(key)));
     const cvModels = [
-      { name: 'M0 boosts-only', drop: new Set([sweepIndex]) },
-      { name: 'M1 sweep-only', drop: new Set([boostsIndex]) },
+      { name: 'M0 boosts-only', drop: cellIndices },
+      { name: 'M1 cells-only', drop: new Set([boostsIndex]) },
       { name: 'M2 additive', drop: new Set<number>() },
     ];
     const cvSeeds = Array.from({ length: 20 }, (_, i) => i + 1);
@@ -285,23 +287,30 @@ test.describe('eval weight fitting (EVAL_FIT=1)', () => {
           `brier=${mean(modelRuns.map(r => r.brier)).toFixed(5)}`);
       }
       const m0 = runs.get('M0 boosts-only')!;
-      const m1 = runs.get('M1 sweep-only')!;
-      const deltas = cvSeeds.map((_, i) => m1[i].logLoss - m0[i].logLoss);
-      const wins = deltas.filter(delta => delta < 0).length;
-      const meanDelta = mean(deltas);
-      const brierOk = mean(m1.map(r => r.brier)) <= mean(m0.map(r => r.brier));
-      console.log(`  Δlogloss(M1−M0): mean=${meanDelta.toFixed(6)} · ` +
-        `M1 wins ${wins}/${cvSeeds.length} seeds · brier M1≤M0: ${brierOk}`);
-      return { meanDelta, wins, brierOk };
+      const versus = (name: string) => {
+        const model = runs.get(name)!;
+        const deltas = cvSeeds.map((_, i) => model[i].logLoss - m0[i].logLoss);
+        const wins = deltas.filter(delta => delta < 0).length;
+        const meanDelta = mean(deltas);
+        const brierOk = mean(model.map(r => r.brier)) <= mean(m0.map(r => r.brier));
+        console.log(`  Δlogloss(${name}−M0): mean=${meanDelta.toFixed(6)} · ` +
+          `wins ${wins}/${cvSeeds.length} seeds · brier ≤ M0: ${brierOk}`);
+        return { meanDelta, wins, brierOk };
+      };
+      return { m1: versus('M1 cells-only'), m2: versus('M2 additive') };
     };
     cvTranche('ALL', samples);
     const singlesCv = cvTranche('SINGLES-ONLY', singles);
     cvTranche('DOUBLES-ONLY', doubles);
     cvTranche('GEN9-ONLY', samples.filter(s => s.genClass === 'gen9'));
     if (singlesCv) {
-      const adopt = singlesCv.meanDelta < 0 && singlesCv.wins >= 16 && singlesCv.brierOk;
-      console.log(`\nCV VERDICT (singles): ${adopt ? 'REPLACEMENT CANDIDATE' : 'STATUS QUO HOLDS'} ` +
-        `(meanΔ=${singlesCv.meanDelta.toFixed(6)}, wins=${singlesCv.wins}/20, brierOk=${singlesCv.brierOk})`);
+      const passes = (r: { meanDelta: number; wins: number; brierOk: boolean }) =>
+        r.meanDelta < 0 && r.wins >= 16 && r.brierOk;
+      const verdict = passes(singlesCv.m1) ? 'REPLACEMENT CANDIDATE'
+        : passes(singlesCv.m2) ? 'ADDITIVE CANDIDATE' : 'STATUS QUO HOLDS';
+      console.log(`\nCV VERDICT (singles): ${verdict} ` +
+        `(M1 meanΔ=${singlesCv.m1.meanDelta.toFixed(6)} wins=${singlesCv.m1.wins}/20 brierOk=${singlesCv.m1.brierOk} · ` +
+        `M2 meanΔ=${singlesCv.m2.meanDelta.toFixed(6)} wins=${singlesCv.m2.wins}/20 brierOk=${singlesCv.m2.brierOk})`);
     }
 
     // Probabilistic scoring of the winprob mapping, per gametype and phase.
