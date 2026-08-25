@@ -9,8 +9,42 @@ test.describe('Replay iframe HTML', () => {
 
     expect(html).toContain("type === 'ps-seek-turn'");
     expect(html).toContain('var pendingSeek = { turn: 2, autoPlay: false };');
-    expect(html).toContain('Replays.battle.pause()');
     expect(html).not.toContain('var pendingSeek = { turn: 2, autoPlay: true };');
+  });
+
+  test('seeks like the native player: rest state before the seek, never pause() after', () => {
+    const html = generateReplayHtml({ log, seekTurn: 2 });
+
+    // scene.pause() bumps interruptionCount, which cancels the async seek
+    // chain battle.js schedules past 300ms of fast-forwarding — the old
+    // post-seek pause() was one half of the "seeking..." hang.
+    expect(html).toContain('if (!seek.autoPlay && !battle.paused) battle.pause();');
+    expect(html).toContain('battle.seekTurn(seek.turn)');
+    expect(html).not.toContain('Replays.battle.pause()');
+  });
+
+  test('the turn tracker stays silent while a seek is scrubbing', () => {
+    const html = generateReplayHtml({ log, reportTurn: true });
+
+    // Mid-seek turns echoed to the parent come back as stale seeks
+    // (turn <= current resets the scrub) — the self-sustaining reset loop
+    // that froze long jumps on "seeking..." forever.
+    expect(html).toContain('if (Replays.battle.seeking !== null) return;');
+  });
+
+  test('autoplay waits for the seek to land before playing', () => {
+    const html = generateReplayHtml({ log, seekTurn: 2, autoPlay: true });
+
+    expect(html).toContain('battle.seeking === null');
+    expect(html).toContain('battle.play()');
+  });
+
+  test('a p2 viewpoint request switches sides once the embed is ready', () => {
+    const html = generateReplayHtml({ log, viewpoint: 'p2' });
+    expect(html).toContain("var pendingViewpoint = 'p2';");
+    expect(html).toContain('Replays.battle.setViewpoint(pendingViewpoint)');
+
+    expect(generateReplayHtml({ log })).toContain('var pendingViewpoint = null;');
   });
 
   test('disables Showdown replay sound before embed code loads', () => {

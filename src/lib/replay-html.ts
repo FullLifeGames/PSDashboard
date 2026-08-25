@@ -13,8 +13,10 @@ export function generateReplayHtml(opts: {
   seekTurn?: number;
   autoPlay?: boolean;
   reportTurn?: boolean;
+  /** Viewer perspective — 'p2' renders the battle from player 2's side (the ?p2 replay-URL flag). */
+  viewpoint?: 'p1' | 'p2';
 }): string {
-  const { log, format = '', p1 = 'Player 1', p2 = 'Player 2', title, seekTurn, autoPlay = false, reportTurn = false } = opts;
+  const { log, format = '', p1 = 'Player 1', p2 = 'Player 2', title, seekTurn, autoPlay = false, reportTurn = false, viewpoint = 'p1' } = opts;
   const displayTitle = title || `${format ? `[${format}] ` : ''}${p1} vs. ${p2}`;
   // Escape forward slashes for the script tag content (PS format)
   const escapedLog = log.replace(/<\//g, '<\\/');
@@ -99,6 +101,7 @@ document.write('<script src="https://play.pokemonshowdown.com/js/replay-embed.js
 <script>
 (function replayBridge() {
   var pendingSeek = ${seekTurn != null ? `{ turn: ${seekTurn}, autoPlay: ${autoPlay ? 'true' : 'false'} }` : 'null'};
+  var pendingViewpoint = ${viewpoint === 'p2' ? "'p2'" : 'null'};
 
   function silenceAudio() {
     window.Config = Object.assign({}, window.Config || {}, {sound: false, mute: true});
@@ -113,6 +116,22 @@ document.write('<script src="https://play.pokemonshowdown.com/js/replay-embed.js
     }
   }
 
+  function applyViewpoint() {
+    if (!pendingViewpoint) return;
+    if (typeof Replays === 'undefined' || !Replays.battle) return;
+    Replays.battle.setViewpoint(pendingViewpoint);
+    pendingViewpoint = null;
+  }
+
+  function waitSeekEnd(battle) {
+    if (battle.seeking === null) {
+      battle.play();
+      silenceAudio();
+      return;
+    }
+    setTimeout(function() { waitSeekEnd(battle); }, 100);
+  }
+
   function applySeek() {
     silenceAudio();
     if (!pendingSeek) return;
@@ -120,14 +139,23 @@ document.write('<script src="https://play.pokemonshowdown.com/js/replay-embed.js
       setTimeout(applySeek, 150);
       return;
     }
-    Replays.battle.seekTurn(pendingSeek.turn);
-    if (pendingSeek.autoPlay) {
-      Replays.battle.play();
-      silenceAudio();
-    } else {
-      Replays.battle.pause();
-    }
+    applyViewpoint();
+    var battle = Replays.battle;
+    var seek = pendingSeek;
     pendingSeek = null;
+    // Parent-side retries land here after the seek finished — or while the
+    // very same seek is still scrubbing: nothing to do either way.
+    if (battle.seeking === null && battle.turn === seek.turn && !seek.autoPlay) return;
+    if (battle.seeking !== null && battle.seeking === seek.turn && !seek.autoPlay) return;
+    // The native "Go to turn" flow: establish the rest state BEFORE the
+    // seek and never touch playback after it. battle.js fast-forwards long
+    // jumps in >300ms chunks chained via setTimeout, and each continuation
+    // runs only while scene.interruptionCount is unchanged — scene.pause()
+    // bumps that counter, so the old post-seek pause() froze the chain and
+    // left the embed on its "seeking..." overlay forever.
+    if (!seek.autoPlay && !battle.paused) battle.pause();
+    battle.seekTurn(seek.turn);
+    if (seek.autoPlay) waitSeekEnd(battle);
   }
 
   function queueSeek(turn, shouldPlay) {
@@ -176,6 +204,7 @@ document.write('<script src="https://play.pokemonshowdown.com/js/replay-embed.js
       setTimeout(notifyReady, 150);
       return;
     }
+    applyViewpoint();
     parent.postMessage({ type: 'ps-replay-ready' }, '*');
     applySeek();
   })();
@@ -185,9 +214,15 @@ document.write('<script src="https://play.pokemonshowdown.com/js/replay-embed.js
 (function trackTurn() {
   var lastTurn = -1;
   setInterval(function() {
-  if (typeof Replays === 'undefined' || !Replays.battle) {
-    return;
-  }
+    if (typeof Replays === 'undefined' || !Replays.battle) {
+      return;
+    }
+    // Mid-seek turns are transient scrub positions, not the viewer's turn.
+    // Reporting them lets the parent echo a STALE turn back as a fresh seek
+    // (turn <= current resets the whole scrub), which self-sustains into an
+    // endless reset loop on any jump longer than one tracker tick — the
+    // permanent "seeking..." freeze. Report only landed turns.
+    if (Replays.battle.seeking !== null) return;
     var t = Replays.battle.turn;
     if (t !== lastTurn) {
       lastTurn = t;

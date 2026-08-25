@@ -64,6 +64,8 @@ type ReplayWindow = Window & {
       turn?: number;
       currentStep?: number;
       paused?: boolean;
+      seeking?: number | null;
+      viewpointSwitched?: boolean;
     };
   };
   __psPostedMessages?: unknown[];
@@ -747,6 +749,93 @@ test.describe('PS Dashboard', () => {
 
     await page.locator('input[type="range"]').fill('2');
     await expectReplayTurn(frame!, 2);
+  });
+
+  test('a long forward slider jump lands the scene instead of hanging on "seeking..."', async ({ page }) => {
+    test.setTimeout(150_000);
+    // A long, chatty log makes the embed fast-forward in >300ms chunks — the
+    // chained continuation that scene.pause()'s interruptionCount bump used
+    // to cancel (the old post-seek pause(): a permanent "seeking..." hang).
+    // Every log line is a DOM write while seeking, so line count is the load.
+    // Self-consistent synthetic replay: appending turns to a real fixture
+    // would reference mons its log never introduced and error the parser.
+    const seekReplay = {
+      id: 'gen9ou-seektest',
+      format: '[Gen 9] OU',
+      formatid: 'gen9ou',
+      players: ['Seeker', 'Sitter'],
+      uploadtime: 0,
+      views: 0,
+      log: [
+        '|player|p1|Seeker|',
+        '|player|p2|Sitter|',
+        '|gametype|singles',
+        '|gen|9',
+        '|tier|[Gen 9] OU',
+        '|clearpoke',
+        '|poke|p1|Pikachu, L50|',
+        '|poke|p2|Squirtle, L50|',
+        '|teampreview',
+        '|start',
+        '|switch|p1a: Pikachu|Pikachu, L50|100/100',
+        '|switch|p2a: Squirtle|Squirtle, L50|100/100',
+        '|turn|1',
+        ...Array.from({ length: 799 }, (_, i) => [
+          '|move|p1a: Pikachu|Quick Attack|p2a: Squirtle',
+          '|-damage|p2a: Squirtle|100/100',
+          '|move|p2a: Squirtle|Water Gun|p1a: Pikachu',
+          '|-damage|p1a: Pikachu|100/100',
+          '|upkeep',
+          `|turn|${i + 2}`,
+        ].join('\n')),
+      ].join('\n'),
+    };
+    await page.route('**/replay.pokemonshowdown.com/**', (route) => {
+      route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify(seekReplay),
+      });
+    });
+    await page.locator('button', { hasText: 'Load' }).click();
+    const iframeHandle = await page.locator('iframe[title="PS Replay"]').elementHandle({ timeout: 10000 });
+    const frame = await iframeHandle?.contentFrame();
+    expect(frame).toBeTruthy();
+    await expect.poll(async () => frame!.evaluate(() =>
+      !!(window as ReplayWindow).Replays?.battle
+    ), { timeout: 30_000 }).toBe(true);
+
+    // Throttle the CPU so the fast-forward genuinely crosses the 300ms chunk
+    // boundary — on a fast machine the whole seek finishes synchronously and
+    // the regression (a cancelled continuation) could never fire. The hang
+    // shows as a turn counter frozen forever; slow-but-alive seeking still
+    // arrives, so the generous poll separates the two.
+    const cdp = await page.context().newCDPSession(page);
+    await cdp.send('Emulation.setCPUThrottlingRate', { rate: 4 });
+    try {
+      await page.locator('input[type="range"]').fill('400');
+      await expect.poll(async () => frame!.evaluate(() =>
+        (window as ReplayWindow).Replays?.battle?.turn ?? -1
+      ), { timeout: 90_000 }).toBe(400);
+      // The seek must have ENDED — a stuck battle.seeking is the hang.
+      await expect.poll(async () => frame!.evaluate(() =>
+        (window as ReplayWindow).Replays?.battle?.seeking ?? null
+      ), { timeout: 15_000 }).toBeNull();
+    } finally {
+      await cdp.send('Emulation.setCPUThrottlingRate', { rate: 1 });
+    }
+  });
+
+  test('a ?p2 replay link loads the p2 perspective', async ({ page }) => {
+    await page.getByLabel('Replay URL or ID').fill('https://replay.pokemonshowdown.com/gen9ou-123?p2');
+    await page.locator('button', { hasText: 'Load' }).click();
+    const iframeHandle = await page.locator('iframe[title="PS Replay"]').elementHandle({ timeout: 10000 });
+    const frame = await iframeHandle?.contentFrame();
+    expect(frame).toBeTruthy();
+
+    await expect.poll(async () => frame!.evaluate(() =>
+      (window as ReplayWindow).Replays?.battle?.viewpointSwitched ?? false
+    ), { timeout: 30_000 }).toBe(true);
   });
 
   test('replay iframe keeps a fixed visible height without negative offset', async ({ page }) => {

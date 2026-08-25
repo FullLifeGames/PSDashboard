@@ -14,6 +14,8 @@ interface Props {
   liveAppendMode?: 'play' | 'follow-end';
   liveAppendTurn?: number | null;
   reloadKey?: string;
+  /** Viewer perspective — 'p2' renders from player 2's side (the ?p2 replay-URL flag). */
+  viewpoint?: 'p1' | 'p2';
   onTurnChange?: (turn: number) => void;
 }
 
@@ -51,6 +53,7 @@ function PSReplayFrameDocument({
   liveAppendMode = 'follow-end',
   liveAppendTurn = null,
   reloadKey = 'default',
+  viewpoint,
   onTurnChange,
 }: DocumentProps) {
   const iframeRef = useRef<HTMLIFrameElement>(null);
@@ -75,9 +78,10 @@ function PSReplayFrameDocument({
       seekTurn: initialSeek.seekTurn,
       autoPlay: initialSeek.autoPlay,
       reportTurn,
+      viewpoint,
     });
     return createBlobUrl(html);
-  }, [documentLog, format, p1, p2, title, initialSeek, reportTurn]);
+  }, [documentLog, format, p1, p2, title, initialSeek, reportTurn, viewpoint]);
 
   useEffect(() => {
     if (!blobUrl) return;

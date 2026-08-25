@@ -8,6 +8,8 @@ export interface ReplayData {
   uploadtime: number;
   views: number;
   rating?: number;
+  /** Viewer perspective requested by the loaded link (the ?p2 replay-URL flag). */
+  viewpoint?: 'p1' | 'p2';
 }
 
 export interface PokemonSnapshot {

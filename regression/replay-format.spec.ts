@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { fetchReplay, parseReplayUrl } from '../src/lib/replay-fetcher';
+import { fetchReplay, parseReplayUrl, parseReplayViewpoint } from '../src/lib/replay-fetcher';
 import {
   formatEnforcesSleepClause,
   getBranchSimulatorFormat,
@@ -142,11 +142,26 @@ test.describe('replay format inference', () => {
     expect(parseReplayUrl('http://replay.pokemonshowdown.com/gen9ou-123.json')).toBe('gen9ou-123');
     expect(parseReplayUrl('  gen9ou-123 ')).toBe('gen9ou-123');
     expect(parseReplayUrl('gen9ou-123.json')).toBe('gen9ou-123');
+    // A bare id keeps working when the Showdown query flags ride along.
+    expect(parseReplayUrl('gen9ou-123?p2')).toBe('gen9ou-123');
 
     expect(parseReplayUrl('')).toBeNull();
     expect(parseReplayUrl('   ')).toBeNull();
     expect(parseReplayUrl('https://example.com/foo')).toBeNull();
     expect(parseReplayUrl('not a replay!')).toBeNull();
+  });
+
+  test('parseReplayViewpoint reads the ?p2 perspective flag off a replay link', () => {
+    expect(parseReplayViewpoint('https://replay.pokemonshowdown.com/gen9ou-123?p2')).toBe('p2');
+    expect(parseReplayViewpoint('https://replay.pokemonshowdown.com/gen9ou-123?turn=5&p2')).toBe('p2');
+    expect(parseReplayViewpoint('gen9ou-123?p2')).toBe('p2');
+
+    expect(parseReplayViewpoint('https://replay.pokemonshowdown.com/gen9ou-123')).toBe('p1');
+    // An explicit ?p1 names the default side.
+    expect(parseReplayViewpoint('https://replay.pokemonshowdown.com/gen9ou-123?p1')).toBe('p1');
+    // The flag is the literal "p1"/"p2" query key, not any substring.
+    expect(parseReplayViewpoint('https://replay.pokemonshowdown.com/gen9ou-123?p2x')).toBe('p1');
+    expect(parseReplayViewpoint('gen9ou-p2-123')).toBe('p1');
   });
 
   test('fetchReplay rejects non-replay input with a clear message (G1/G2)', async () => {
@@ -169,6 +184,27 @@ test.describe('replay format inference', () => {
       const replay = await fetchReplay('smogtours-ubers-54583');
       expect(replay.format).toBe('[Gen 6] Ubers');
       expect(replay.formatid).toBe('gen6ubers');
+    } finally {
+      globalThis.fetch = originalFetch;
+    }
+  });
+
+  test('fetchReplay carries the ?p2 viewpoint onto the replay data', async () => {
+    const originalFetch = globalThis.fetch;
+    globalThis.fetch = (async () => new Response(JSON.stringify({
+      id: 'smogtours-gen8ou-573756',
+      format: '[Gen 8] OU',
+      players: ['A', 'B'],
+      log: '|gen|8\n|tier|[Gen 8] OU',
+      uploadtime: 0,
+      views: 0,
+    }), { status: 200, headers: { 'content-type': 'application/json' } })) as typeof fetch;
+
+    try {
+      const p2 = await fetchReplay('https://replay.pokemonshowdown.com/smogtours-gen8ou-573756?p2');
+      expect(p2.viewpoint).toBe('p2');
+      const plain = await fetchReplay('https://replay.pokemonshowdown.com/smogtours-gen8ou-573756');
+      expect(plain.viewpoint).toBeUndefined();
     } finally {
       globalThis.fetch = originalFetch;
     }

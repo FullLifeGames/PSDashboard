@@ -20,8 +20,9 @@ export function parseReplayUrl(input: string): string | null {
   const match = trimmed.match(/replay\.pokemonshowdown\.com\/([a-z0-9-]+)/i);
   if (match) return match[1].toLowerCase();
 
-  const bare = trimmed.replace(/\.(json|log)$/i, '');
-  if (/^[a-z0-9-]+$/i.test(bare)) return bare.toLowerCase();
+  // A bare id tolerates the Showdown query flags riding along (…?p2).
+  const bare = trimmed.replace(/[?#].*$/, '').replace(/\.(json|log)$/i, '');
+  if (/^[a-z0-9-]+$/i.test(bare) && bare.length > 0) return bare.toLowerCase();
 
   return null;
 }
@@ -83,6 +84,17 @@ function finalize(data: ReplayResponse): ReplayData {
   };
 }
 
+/**
+ * Reads the Showdown viewer-perspective flag off a replay link: `…?p2`
+ * renders the battle from player 2's side (`…?p1` names the default side
+ * explicitly). The flag is the literal `p1`/`p2` query key (optionally among
+ * other flags), never a substring of the id.
+ */
+export function parseReplayViewpoint(input: string): 'p1' | 'p2' {
+  const flag = input.trim().match(/[?&](p[12])(?=$|[&#=])/i);
+  return flag ? flag[1].toLowerCase() as 'p1' | 'p2' : 'p1';
+}
+
 export async function fetchReplay(urlOrId: string): Promise<ReplayData> {
   const id = parseReplayUrl(urlOrId);
   if (!id) {
@@ -91,9 +103,15 @@ export async function fetchReplay(urlOrId: string): Promise<ReplayData> {
     );
   }
 
+  // The viewer-perspective flag rides the LINK, not the payload — it applies
+  // whichever route ends up serving the battle.
+  const viewpoint = parseReplayViewpoint(urlOrId);
+  const withViewpoint = (data: ReplayData): ReplayData =>
+    viewpoint === 'p2' ? { ...data, viewpoint } : data;
+
   const jsonRes = await requestReplay(`${REPLAY_HOST}/${id}.json`);
   const data = jsonRes?.ok ? await readReplayJson(jsonRes) : null;
-  if (data && hasLog(data)) return finalize(data);
+  if (data && hasLog(data)) return withViewpoint(finalize(data));
 
   // The log lives behind a second route on the replay server, and the two do
   // not always answer alike — the JSON route can come back empty, non-JSON, or
@@ -106,7 +124,7 @@ export async function fetchReplay(urlOrId: string): Promise<ReplayData> {
     if (log.trim() && /^\|/m.test(log)) {
       // Metadata from the JSON route is still worth keeping when it arrived
       // without a log — it carries the true format id, players, and uploadtime.
-      return data ? finalize({ ...data, log }) : replayDataFromLog(log, id);
+      return data ? withViewpoint(finalize({ ...data, log })) : withViewpoint(replayDataFromLog(log, id));
     }
   }
 

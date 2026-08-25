@@ -1498,6 +1498,7 @@ function App() {
                   height={480}
                   seekTurn={simState?.turnNumber ?? branchTurn}
                   autoPlay={false}
+                  viewpoint={replayData.viewpoint}
                   liveUpdates
                   liveAppendMode={animateBranchTurns ? 'play' : 'follow-end'}
                   liveAppendTurn={latestBranchHistoryEntry?.turnNumber ?? null}
@@ -1513,6 +1514,7 @@ function App() {
                   height={480}
                   seekTurn={branchTurn}
                   autoPlay={false}
+                  viewpoint={replayData.viewpoint}
                   reloadKey={`${replayData.id}:original`}
                   onTurnChange={handleReplayTurn}
                 />
