@@ -883,6 +883,73 @@ import { brierScore, fitConstantK } from './fit-helpers';
  * static basis for this mass; the next lever, if any, is search/
  * planning-side.
  *
+ * COMPONENT KEY MOMENTS, HINDSIGHT READS, UNANSWERED ENTRIES 2026-08-25
+ * (improvement round 13 — the backlog trio t73/t13/t10 plus the registered
+ * race-margin candidate; commits 9de681d/4a33516/47febd9 + this record, NO
+ * cache bump — nothing in the round touches scores or grading):
+ * (A) RACE MARGIN IN THE PAIR WEIGHT: NEGATIVE BY DIRECT PROBE, then t26
+ *    CLOSED AS A STRUCTURAL STATIC LIMIT (user-gated). The pure margin
+ *    (upper bound of the effect) DROPS the t26 regret 0.0413 → 0.0296 —
+ *    the margin dilutes the whole sum term faster than the round-12
+ *    discount credits the heal — and reopens collateral: t23/t24
+ *    p1-inaccuracies 0.236/0.198, the t68 feed shifts (regret 0.129 →
+ *    0.095, sacrifice object gone), turning point 71 → 76, plus a NaN
+ *    path (effHp-0 pairs clock −0 turns; the tie branch divides 0.5/−0;
+ *    the binary sign code swallows that case). The matrix anatomy closes
+ *    the case: the engine already crowns Slack Off best against the known
+ *    DD (p1 mix 1.00) — [DD×Protect] 0.307 vs [DD×SlackOff] 0.266 own-p1
+ *    IS the flat HP feature; the pinned race moves no turn count on ±50%
+ *    Slowbro HP, while a synthetic probe prices heal spans at 0.45 where
+ *    race edges ARE reachable and the body threshold one half-move deeper
+ *    at ~0.12 — under the 0.2 the misplay channel needs. The heal's true
+ *    worth here is an option/variance value (burn fishing over Scald,
+ *    time for opponent error) a deterministic static cannot see; a
+ *    variance-value feature is the registered future agenda item. Fourth
+ *    pair-term attempt, closed on evidence; the golden stays (the expert
+ *    is right), drift 2 channels unchanged.
+ * (B) COMPONENT-KEYED KEY MOMENTS (9de681d, report-side): a turn
+ *    qualifies and ranks by max(|net swing|, |chance share|) against the
+ *    same 0.25 bar — the game's biggest roll surfaces even when the
+ *    decision delta partially cancelled it. 573756 t73 (chance +0.43,
+ *    net +0.18) enters and ranks by the roll: keyMoments [71,73,135,137]
+ *    (t72 displaced by the top-4 cap), 562428 gains t11, 649664 trades
+ *    t5 for t20, the 655336 golden list is untouched. t73 re-pinned gap
+ *    with keyMoment true (user-gated); the bar half (pre-turn ~0.6
+ *    own-p2, sweep past the static horizon) stays the open remainder.
+ * (C) HINDSIGHT READ (4a33516, render-time from the cached matrix, so it
+ *    reaches previously cached results): against the opponent's ACTUAL
+ *    click the matrix names the best own row when it beats the played
+ *    line in that column by ≥ the mistake band; rendered on shift turns
+ *    as "The read was there for X — against the Horn Leech actually
+ *    clicked, switching to Heatran was worth +17% more" (562428 t10: the
+ *    expert's own switch, −0.09 vs −0.44 all stay rows, gain 0.34;
+ *    equilibrium leaned → Heatran 46% all along). Renders on 4 turns
+ *    across the 6 games (shift-only); pinned into the t10 baseline —
+ *    the remaining desired is a PREDICTIVE read (opponent-model), not
+ *    hindsight.
+ * (D) UNANSWERED-MON ENTRY (4a33516 + 47febd9, root-level narrative): the
+ *    search root computes the mons the other side has no live race
+ *    answer to — beats EVERY living enemy, a wall that holds the pair
+ *    counts as an answer, and a benched answer pays the switch-in entry
+ *    toll (hazard-adjusted arrival minus one free hit from the standing
+ *    mon; the first landing measured standing pair races and 648453 t13
+ *    saw full-HP Weavile as an answer — t14's actual Weavile sacrifice
+ *    is the expert's proof of the entry economy, toll user-gated).
+ *    Carried on EvalResult (both search paths, merge takes trees[0]'s),
+ *    spoken when the played or recommended line brings such a mon in.
+ *    t13 now names the principle for the engine's own "→ Bisharp"
+ *    recommendation; the Lopunny half (BKC's actual click) stays open —
+ *    the race model still finds a toll-surviving answer to Lopunny there
+ *    (653785 t14/t15 names Lopunny-Mega itself). Scatter: 2–10 signals
+ *    per game, sentences only on entry turns.
+ * MEASUREMENT: no calibration bench by construction (round-5 precedent —
+ *    scores and grading untouched; the probe patch was reverted). 738
+ *    regression tests. Three full feedback runs on the landed state are
+ *    bit-identical in all 13 channels (meta commit/wallTimes aside);
+ *    7/7 against the re-pinned baselines. Cold-start flake hit 5× this
+ *    round (retried per protocol, never diagnosed); one run was lost to
+ *    editing src while the feedback web server ran — do not overlap.
+ *
  * FLOOR GATE, RESOLUTION BOOKING, PIN DISCOUNT 2026-08-25 (improvement
  * round 12 — the three follow-ups round 11 left open; commits
  * 98b8003/135fc23/e9d9616 + this record, cache v37):
