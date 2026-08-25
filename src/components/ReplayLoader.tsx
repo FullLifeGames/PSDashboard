@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useRef, useState } from 'react';
 import { parseTeamText } from '../lib/team-parser';
 
 interface Props {
@@ -19,10 +19,14 @@ export function ReplayLoader({ onLoad, onLoadFile, onTeamLoad, loading, error, l
 
   // Once a replay is loaded the input shows ITS link, not the default or a
   // stale draft — a replay can arrive through share links, files, or embed
-  // messages, not just typing here.
-  useEffect(() => {
+  // messages, not just typing here. Mirrored during render (the React-docs
+  // adjust-state-when-a-prop-changes form) rather than in an effect, which
+  // react-hooks/set-state-in-effect forbids.
+  const [mirroredUrl, setMirroredUrl] = useState<string | null>(null);
+  if (loadedUrl !== mirroredUrl) {
+    setMirroredUrl(loadedUrl);
     if (loadedUrl) setUrl(loadedUrl);
-  }, [loadedUrl]);
+  }
   const [teamText, setTeamText] = useState('');
   const [dragActive, setDragActive] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
