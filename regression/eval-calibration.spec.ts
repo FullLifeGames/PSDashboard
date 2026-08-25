@@ -883,6 +883,55 @@ import { brierScore, fitConstantK } from './fit-helpers';
  * static basis for this mass; the next lever, if any, is search/
  * planning-side.
  *
+ * FLOOR GATE, RESOLUTION BOOKING, PIN DISCOUNT 2026-08-25 (improvement
+ * round 12 — the three follow-ups round 11 left open; commits
+ * 98b8003/135fc23/e9d9616 + this record, cache v37):
+ * (A) FLOOR-REALIZATION GATE (98b8003, render-time): the stayed-feed
+ *    pathway's certainty gate (ev − floor ≤ 0.02) was broken by design by
+ *    round 11's race-priced cells (t68 spread 0.171). Replaced: the feed
+ *    credits when the REALIZED outcome landed on the played line's priced
+ *    worst case — the turn's own rolls contributed nothing positive, so
+ *    the windowed payoff credits the plan, not the luck; an outcome above
+ *    the floor earns nothing. Certainty-priced feeds still qualify (every
+ *    branch ≈ floor). t68 RE-VERIFIES: realized −0.378 = floor, payoff
+ *    0.359 ≥ regret 0.129 + 0.1 → tier cleared, verified sacrifice named;
+ *    gap re-pinned truth (user-gated), desired state reached.
+ * (B) PIN-EFFICIENCY DISCOUNT (e9d9616, cache v37): past the heal rate a
+ *    race defender's held heal PP realize only at healRate/incoming (a
+ *    pinned healer heals at a net loss and dies with PP in the tank), so
+ *    healing NOW beats holding — round 11's model conserved hp + absorb
+ *    across a heal click. MEASURED INERT for the 655336 t26 target:
+ *    regret bit-identical 0.0413, because the pair term consumes clocks
+ *    only as a binary verdict and its weight sign × effHp(a) × effHp(b)
+ *    even penalizes healing in a lost pair (the +0.041 is the flat HP
+ *    feature alone). KEPT at the gate (user): conceptually right,
+ *    calibration-neutral, and the identified carrier — a continuous race
+ *    margin in the pair weight, e.g. (turnsB − turnsA)/(turnsA + turnsB)
+ *    — is the registered round-13 candidate that reads exactly these
+ *    discounted clocks. 655336's KNOWN DRIFT stays (2 channels, t26).
+ * (C) RESOLUTION BOOKING (135fc23, report-side): past the favor boundary
+ *    (the earliest turn from which every known score favors the winner —
+ *    the turning point's own walk, extracted as favorBoundary) a
+ *    chance-attributed turn whose delta points TOWARD the winner is the
+ *    decided game resolving — the static bar's horizon gap on a locked
+ *    endgame, not luck. Such turns leave the key moments and chanceTotal
+ *    and sum separately as resolutionTotal; chance AGAINST the winner
+ *    stays luck everywhere, pre-boundary chance toward the winner too.
+ *    573756: t138 (−1.02) leaves the key moments (71/72/135 remain),
+ *    chanceTotal −3.18 → −1.93 (the round-11 watch item shrinks),
+ *    resolutionTotal −1.24 (t76 −0.22 + t138 −1.02). WATCH ITEM: the
+ *    boundary is sign-only — 655336 (weakly favored throughout from t5)
+ *    books its whole endgame stretch t22–27 (+2.05) as resolution; no
+ *    pinned channel breaks, but magnitude-blind favor may over-collect in
+ *    wire-to-wire games.
+ * CALIBRATION (n 806, composition 260/289/257 identical): phases 54/63/82
+ *    (identical to round 11), briers 0.2600/0.2294/0.1499 →
+ *    0.2600/0.2293/0.1500 (−1/+1 bp — neutral on the digit), buckets
+ *    59/59/70/90, singles 64%, doubles 73%, wall 18.6m. Three feedback
+ *    runs bit-identical in all 13 channels. t138 stays gap-open on the
+ *    per-turn residual only: the bar reads +0.2 (not decided), the turn
+ *    card still shows chanceDelta −1.02, Tantrum prices −0.068.
+ *
  * RACE-GROUNDED HEALER WALLS 2026-08-24 (improvement round 11 — the 573756
  * t138 endgame gap; commits c9f0eb5/9351f37 + this record, cache v36):
  * ROOT CAUSE: the static eval ignored PP entirely and its healer rule
