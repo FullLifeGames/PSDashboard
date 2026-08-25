@@ -876,15 +876,17 @@ export function matchupTerms(battle: Battle, cache?: MatchupCache): { matchup: n
 }
 
 /**
- * Living mons the OTHER side has no live answer to (round 13): no living
- * enemy wins the KO-race pair against them (strictly fewer turns, or a
- * finite tie taken on effective speed), while they win at least one pair
- * themselves — a dead-even patt threatens nothing worth naming. Entry HP is
- * hazard-adjusted exactly like the matchup term, so an "answer" that would
- * arrive inside KO range of its own rocks is none. Root-level narrative
- * input (648453 t13: with no live answer to Lopunny-Mega, any successful
- * switch into it — a U-turn included — turns profit, the opponent can only
- * sacrifice into it); never part of the score.
+ * Living mons the OTHER side has no live answer to (round 13): the mon
+ * beats EVERY living enemy's KO-race pair (strictly fewer turns, or a
+ * finite tie taken on effective speed — a wall that merely holds the pair
+ * is answer enough). A benched enemy answers by SWITCHING IN, so its race
+ * runs from entry-tolled HP: the hazard-adjusted arrival the matchup term
+ * prices, minus one free hit from the standing mon (the switch-in economy
+ * behind the expert's no-switch-ins principle — 648453 t13: Weavile "wins"
+ * the standing pair against Lopunny but not the entry, so any successful
+ * switch into Lopunny — a U-turn included — turns profit and the opponent
+ * can only sacrifice into it). Root-level narrative input; never part of
+ * the score.
  */
 export function unansweredMons(battle: Battle, cache?: MatchupCache): { p1: string[]; p2: string[] } {
   const living = (index: 0 | 1) =>
@@ -909,18 +911,21 @@ export function unansweredMons(battle: Battle, cache?: MatchupCache): { p1: stri
       healRate: profile.rate, healAbsorb: profile.absorb, ppBudget: budget,
     };
   };
-  // Same verdict the matchup term weighs: strictly first, or a finite tie
-  // taken on effective speed.
-  const wins = (a: Pokemon, b: Pokemon): boolean => {
-    const threatA = threat(a, b);
-    const threatB = threat(b, a);
-    const { turnsA, turnsB } = raceClocks(side(a, threatA, b), side(b, threatB, a));
+  // Does the standing mon beat this enemy? Race verdict as the matchup term
+  // weighs it; a benched enemy eats one free hit on the way in.
+  const beatsEntry = (standing: Pokemon, enemy: Pokemon): boolean => {
+    const threatS = threat(standing, enemy);
+    const threatE = threat(enemy, standing);
+    const sideS = side(standing, threatS, enemy);
+    const sideE = side(enemy, threatE, standing);
+    if (!enemy.isActive) sideE.hp = Math.max(0, sideE.hp - boostedFraction(threatS, standing, enemy));
+    const { turnsA, turnsB } = raceClocks(sideS, sideE);
     if (turnsA < turnsB) return true;
     if (turnsB < turnsA) return false;
-    return turnsA !== Infinity && movesFirst(a, b, threatA, threatB, battle);
+    return turnsA !== Infinity && movesFirst(standing, enemy, threatS, threatE, battle);
   };
   const unansweredOf = (mine: Pokemon[], theirs: Pokemon[]): string[] => mine
-    .filter(mon => !theirs.some(enemy => wins(enemy, mon)) && theirs.some(enemy => wins(mon, enemy)))
+    .filter(mon => theirs.every(enemy => beatsEntry(mon, enemy)))
     .map(mon => mon.species.name);
   return { p1: unansweredOf(p1Living, p2Living), p2: unansweredOf(p2Living, p1Living) };
 }

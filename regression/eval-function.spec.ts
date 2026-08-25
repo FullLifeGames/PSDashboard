@@ -924,14 +924,32 @@ test.describe('PP truth in the threat model (round 11)', () => {
       expect(unansweredMons(battle)).toEqual({ p1: ['Mewtwo'], p2: [] });
     });
 
-    test('a dead-even mirror names nobody — a patt is not an unanswered threat', () => {
-      // The Snorlax Tackle mirror is a 7-turn race both ways: neither side's
-      // mon WINS a pair, so neither is a wincon the narrative should name.
+    test('a dead-even mirror names nobody — a wall that holds the pair is an answer', () => {
+      // The Snorlax Tackle mirror is a 7-turn race both ways: neither mon
+      // BEATS the other, and holding the pair is answer enough.
       const battle = makeBattle(
         [makeSet('A', 'Snorlax', ['Tackle'])],
         [makeSet('B', 'Snorlax', ['Tackle'])],
       );
       expect(unansweredMons(battle)).toEqual({ p1: [], p2: [] });
+    });
+
+    test('a benched answer pays the entry toll; the same answer active stands (round 13 gate)', () => {
+      // The switch-in economy behind 648453 t13: a benched twin would hold
+      // the standing mirror, but it answers by SWITCHING IN — eating one
+      // free hit on the way — and from tolled HP it loses the race. The
+      // same twin already active pays no toll and the patt stands.
+      const benched = makeBattle(
+        [makeSet('Mewtwo', 'Mewtwo', ['Psystrike'], 100)],
+        [makeSet('Rattata', 'Rattata', ['Tackle']), makeSet('Twin', 'Mewtwo', ['Psystrike'], 100)],
+      );
+      expect(unansweredMons(benched)).toEqual({ p1: ['Mewtwo'], p2: [] });
+
+      const active = makeBattle(
+        [makeSet('Mewtwo', 'Mewtwo', ['Psystrike'], 100)],
+        [makeSet('Twin', 'Mewtwo', ['Psystrike'], 100), makeSet('Rattata', 'Rattata', ['Tackle'])],
+      );
+      expect(unansweredMons(active)).toEqual({ p1: [], p2: [] });
     });
   });
 });
