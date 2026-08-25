@@ -883,6 +883,68 @@ import { brierScore, fitConstantK } from './fit-helpers';
  * static basis for this mass; the next lever, if any, is search/
  * planning-side.
  *
+ * THE DECIDED SWEEP, THE NEAR-DECIDED ROLL, AND THE CLAMP ITS OWN BENCH
+ * REFUSED 2026-08-25 (improvement round 15 — NextSteps A.1, "decided
+ * detection on the bar"; commits 3986107 (feature) + 8dc3721 (t73 truth)
+ * + this record; NO cache bump — phase 2's v38 was built and reverted the
+ * same day, see below):
+ * (A) THE DECIDED SWEEP (display + prose only): pairwise unanswered
+ *    (round 13) is a threat; DECIDED is stronger — one mon WINS every
+ *    living enemy pair (the beatsEntry verdict sans entry toll:
+ *    replacements arrive on a KO, not a switch), clears the whole team
+ *    within DECIDED_MAX_TURNS=6 expected turns, and survives the
+ *    accumulated expected return fire, each pair's return fire priced at
+ *    the defender's spare-turn rate (raceClocks' action economy). Both
+ *    sides sweeping, or neither: not decided. BOTH GUARDS ARE
+ *    LOAD-BEARING: the first cut (action economy alone) read 573756 as
+ *    decided from TURN 1 of a 139-turn game — the whole enemy team priced
+ *    as pinned healers across a 32-turn paper grind. The measured anchors
+ *    split cleanly: real clean-ups run 1–5 expected turns, the false
+ *    positives 23–39.
+ * (B) THE NEAR-DECIDED ROLL (user-gated "display 95%-to-win as such"): no
+ *    sweep stands, but one boundary event ≥ NEAR_DECIDED_ODDS=0.9 against
+ *    the standing enemy active removes it and the REST clears — 573756
+ *    t73 renders "Garchomp is one 95% roll from clearing the rest —
+ *    removing Corviknight leaves no answer behind" and is PINNED TRUTH:
+ *    the probe showed a decided bar there would have LIED (Garchomp
+ *    itself at 10.9% HP, the real sweep collapsed on the miss), so the
+ *    bar half of the t73 gap resolves as the conditional stage, with the
+ *    calibrated 0.6 bar standing as the honest read of a still-open board.
+ * (C) REGIME: announcements once per side+species+stage in the game
+ *    report (decidedSeenKey, the round-14 walk regime), the per-turn card
+ *    on every turn; on decided turns a chance swing TOWARD the decided
+ *    side re-read as "the decided game resolving" (the round-12 report
+ *    booking, on the turn card); graph edge strips + node-label note.
+ *    Corpus map after the guards: 573756 near-t73 + decided t120–139
+ *    (the t138 endgame), 648453 the t23+ clean-up (four successive
+ *    carriers), 655336 the t23-Slowbro → t25-Charizard-near →
+ *    t28-Charizard sequence around the expert's t26 protect mistake,
+ *    562428 only the final turn. Watch: 649664's t3 near (Mega-Medicham
+ *    is that scary on paper) and the 648453 carrier chatter.
+ * PHASE-1 MEASUREMENT: 757 regression tests (+12), three full feedback
+ *    runs bit-identical in every machine channel, all pins hold, golden
+ *    keeps its known 2-channel t26 distance to the digit.
+ * PHASE 2 — THE REAL SCORE CLAMP: NEGATIVE by its preregistered bench,
+ *    reverted to the digit. User-gated design: root score clamped to
+ *    ±DECIDED_FLOOR=0.85 on decided boards (all three attach sites) plus
+ *    the played EXPECTATION in the turn-card deltas (analysis), cache
+ *    v38. The bench refused it (n 806, composition identical): late
+ *    brier 0.1500→0.1547 (+47bp), the 0.7–1.0 bucket 90%→85% favored
+ *    wins; sign rows unchanged (early brier even −21bp). The
+ *    per-position dump names the honest number: of 84 clamped positions
+ *    the decided side won 79.8% — SINGLES ONLY 72.5% (37/51), doubles
+ *    90.9% — against the clamp's implied ~93%. VERDICT: the decided
+ *    sweep is a strong NARRATIVE signal (it found the real clean-up
+ *    phases in five of six corpus games) but not a 93%-truth oracle over
+ *    the broad singles bed — expected-rate pair verdicts on endgames
+ *    leave a real ~20% flip mass that adversarial elements (status
+ *    tricks, crits across six turns, priority reversals) carry. The
+ *    honest t138 consequence, user-gated: the gap stays OPEN — its +0.2
+ *    bar is currently BETTER calibrated than the desired decided jump.
+ *    Registered follow-up candidate "decided sweep v2": tighten the
+ *    check against the 17 dumped flip positions (14 singles; ids in
+ *    NextSteps) before any second clamp attempt.
+ *
  * SWITCH-IN STAGE, EXPECTED-RATE RACES, ONCE-PER-MON SENTENCES 2026-08-25
  * (improvement round 14 — the t13 Lopunny remainder plus the round-13
  * repetition watch item; commit e65232e + the corpus re-pin + this record,
