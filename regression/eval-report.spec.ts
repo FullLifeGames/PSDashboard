@@ -61,6 +61,22 @@ test.describe('game report (multi-turn root cause)', () => {
     expect(report.keyMoments.map(moment => moment.turn)).toEqual([1, 3, 5]);
   });
 
+  test('a big roll qualifies and ranks a turn whose net swing partially cancelled (round 13)', () => {
+    // t2: the game's biggest roll (0.45) nets to 0.10 because the decision
+    // pushed the other way (573756 t73). It must both ENTER the key moments
+    // and RANK by the roll — displacing the weakest net-swing turn (t5)
+    // from the top four. All chance runs toward p1 (against the p2 winner),
+    // so resolution booking never absorbs it.
+    const report = buildGameReport([
+      mk(1, -0.3, 0.0, { attribution: 'p1-decision' }),
+      mk(2, 0.0, 0.1, { attribution: 'chance', chanceDelta: 0.45 }),
+      mk(3, 0.1, 0.38, { attribution: 'p2-decision' }),
+      mk(4, 0.38, 0.65, { attribution: 'both-decision' }),
+      mk(5, 0.65, 0.91, { attribution: 'p1-decision' }),
+    ], names, 'p2');
+    expect(report.keyMoments.map(moment => moment.turn)).toEqual([1, 2, 3, 4]);
+  });
+
   test('sums per-player regret and net chance', () => {
     const side = (regret: number) => ({ playedRaw: null, played: null, best: null, regret });
     const report = buildGameReport([

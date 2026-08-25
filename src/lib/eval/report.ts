@@ -9,9 +9,11 @@ import { winDeltaText, winPercent } from './winprob';
  * the result was play vs luck. Pure — no sim imports, main-bundle safe.
  */
 
-/** A key moment needs at least this much swing — the same constant that
- * selects the sweep's deepening turns (graph.ts): whatever the report
- * names ran at the configured settings. */
+/** A key moment needs at least this much swing in one COMPONENT (net swing
+ * or the chance share alone — a roll a decision partially cancelled still
+ * swung the game, 573756 t73) — the same constant that selects the sweep's
+ * deepening turns (graph.ts): whatever the report names ran at the
+ * configured settings. */
 export const KEY_MOMENT_SWING = KEY_TURN_SWING;
 /** How many key moments the report keeps. */
 export const REPORT_KEY_MOMENTS = 4;
@@ -176,10 +178,16 @@ export function buildGameReport(
       analysis.chanceDelta !== null && towardWinner(analysis.chanceDelta))
     .map(analysis => analysis.turn));
 
+  // A turn ranks by its biggest COMPONENT, not its net: the game's biggest
+  // roll can net to almost nothing when the decision delta pushes the other
+  // way (573756 t73: chance +0.43 on a net of +0.18), and a selection keyed
+  // on the net alone never surfaces it. Resolution turns stay excluded.
+  const momentScore = (analysis: TurnAnalysis): number =>
+    Math.max(Math.abs(analysis.swing ?? 0), Math.abs(analysis.chanceDelta ?? 0));
   const keyMoments = known
-    .filter(analysis => analysis.attribution !== 'quiet' && analysis.swing !== null && Math.abs(analysis.swing) >= KEY_MOMENT_SWING &&
-      !resolution.has(analysis.turn))
-    .sort((a, b) => Math.abs(b.swing!) - Math.abs(a.swing!))
+    .filter(analysis => analysis.attribution !== 'quiet' && analysis.swing !== null &&
+      momentScore(analysis) >= KEY_MOMENT_SWING && !resolution.has(analysis.turn))
+    .sort((a, b) => momentScore(b) - momentScore(a))
     .slice(0, REPORT_KEY_MOMENTS)
     .sort((a, b) => a.turn - b.turn);
 
