@@ -883,6 +883,57 @@ import { brierScore, fitConstantK } from './fit-helpers';
  * static basis for this mass; the next lever, if any, is search/
  * planning-side.
  *
+ * SWITCH-IN STAGE, EXPECTED-RATE RACES, ONCE-PER-MON SENTENCES 2026-08-25
+ * (improvement round 14 — the t13 Lopunny remainder plus the round-13
+ * repetition watch item; commit e65232e + the corpus re-pin + this record,
+ * NO cache bump and NO calibration bench — the score path never reads the
+ * new fields, and three full feedback runs were bit-identical in every
+ * channel including the alignment/koMismatch meta):
+ * (A) COIN-FLIP CHECK (user-gated "Satz + Münzwurf-Check"): the unanswered
+ *    profile's races run on EXPECTED rates — pairThreat carries the
+ *    category-max move's accuracy in new optional fields (physicalAcc/
+ *    specialAcc) the score never reads, beatsEntry weighs both fracs and
+ *    the entry toll by them, and a usable first-turn flinch move (Fake
+ *    Out) chips the standing answer for free before the race starts.
+ *    DIAGNOSIS behind it (browser probe, temporary debug payload on the
+ *    profile through FEEDBACK_DUMP): at 648453 t13 every benched p1 answer
+ *    died on arrival (hazards + one free hit — Weavile −522% via the 4x
+ *    High Jump Kick, Volcanion and Excadrill to 0, Diancie to 1.4% losing
+ *    the speed tie) and the ONLY "answer" was the standing Tornadus-T on
+ *    a full-hit 70% Hurricane clock, while the real game pulled Tornadus
+ *    and sacrificed Weavile into Lopunny — the expert's literal "no
+ *    remaining switch-ins". Under expected rates the pair flips outright
+ *    (two expected Hurricanes against two Returns from the chipped bar;
+ *    the faster Lopunny takes the 2-2 tie): t13 renders the FULL
+ *    no-live-answer sentence for BKC's ACTUALLY PLAYED switch, and the
+ *    gap converts to a TRUTH (user-gated; the pinned fragment names the
+ *    species, 'Lopunny-Mega has no live answer on the other side').
+ * (B) SWITCH-IN STAGE: a mon every benched enemy loses the entry race to
+ *    while a standing active still wins the pair is carried per side as
+ *    EntryUnanswered {species, heldBy} (optional p1Entry/p2Entry lists —
+ *    absent when empty, so round-13 caches and pins read unchanged; a 1v1
+ *    endgame never enters, the stage being trivially true there), and the
+ *    summary names the state: "no switch-in left on the other side — only
+ *    the standing X holds it, and from the bench the opponent can only
+ *    sacrifice into it." Fires across the corpus (562428 t19 Victini held
+ *    by Heatran, 649664 t21, 653785 t2/t25, 655336 t11, 573756 t75);
+ *    watch: the species-mirror reading ("Toxapex ... only the standing
+ *    Toxapex holds it").
+ * (C) ONCE PER MON AND STAGE (user-gated "nur erstes Mal"): the game
+ *    report's walk feeds its spoken keys back into analyzeTurn
+ *    (unansweredSeen / unansweredSeenKey), so each mon's entry sentence
+ *    appears on its first entry only — 573756 drops from ten identical
+ *    Zapdos-Galar sentences (t35–t136) to one; a stronger stage is a new
+ *    statement and speaks again (562428 Victini open t15 → held t19). The
+ *    per-turn card passes no set and keeps every sentence.
+ * MEASUREMENT: 745 regression tests (+7), build clean; three full feedback
+ * runs bit-identical in all 13 channels (meta-only diffs), the golden
+ * carrying only its two permanent t26 channels; confirmation run 7/7 with
+ * the t13 truth pin (after two known cold-start flakes, retried per
+ * protocol). Lesson recorded: graph.results rows carry no turn field —
+ * index i is turn i+1; an early anatomy read with a find-by-turn fallback
+ * misattributed the t14 hold to t13 until the run-B dump corrected it.
+ *
  * COMPONENT KEY MOMENTS, HINDSIGHT READS, UNANSWERED ENTRIES 2026-08-25
  * (improvement round 13 — the backlog trio t73/t13/t10 plus the registered
  * race-margin candidate; commits 9de681d/4a33516/47febd9 + this record, NO
