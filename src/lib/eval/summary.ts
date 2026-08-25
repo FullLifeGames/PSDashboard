@@ -348,12 +348,18 @@ export function summarizeTurn(
 
   // Entry-is-profit context rides along the same way (round 13): bringing
   // in a mon the opponent has no live race answer to is board logic worth
-  // naming, not a verdict (648453 t13: the Lopunny switch).
-  const unansweredClause = (side: SideAnalysis): string | null =>
-    side.unanswered
-      ? `${side.unanswered.species} has no live answer on the other side — any turn that ` +
-        'brings it in cleanly turns profit, and the opponent can only sacrifice into it.'
-      : null;
+  // naming, not a verdict (648453 t13: the Lopunny switch). The round-14
+  // switch-in stage names the one standing mon still holding the pair —
+  // the expert's literal "no remaining switch-ins" state.
+  const unansweredClause = (side: SideAnalysis): string | null => {
+    if (!side.unanswered) return null;
+    if (side.unanswered.heldBy) {
+      return `${side.unanswered.species} has no switch-in left on the other side — only the standing ` +
+        `${side.unanswered.heldBy} holds it, and from the bench the opponent can only sacrifice into it.`;
+    }
+    return `${side.unanswered.species} has no live answer on the other side — any turn that ` +
+      'brings it in cleanly turns profit, and the opponent can only sacrifice into it.';
+  };
   const p1Unanswered = unansweredClause(analysis.p1);
   const p2Unanswered = unansweredClause(analysis.p2);
   if (p1Unanswered) sentences.push(p1Unanswered);

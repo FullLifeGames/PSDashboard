@@ -90,7 +90,8 @@ export async function searchOrchestrated(
   // Root unanswered-mon profile (round 13), computed sim-side by choices().
   const attachUnanswered = (target: EvalResult) => {
     const unanswered = info.unanswered;
-    if (unanswered && (unanswered.p1.length > 0 || unanswered.p2.length > 0)) target.unanswered = unanswered;
+    if (unanswered && (unanswered.p1.length > 0 || unanswered.p2.length > 0 ||
+      (unanswered.p1Entry?.length ?? 0) > 0 || (unanswered.p2Entry?.length ?? 0) > 0)) target.unanswered = unanswered;
   };
   // Trend baseline, mirroring searchPosition: uniformly 1-ply-vs-static.
   const staticValues = values.map(row => [...row]);

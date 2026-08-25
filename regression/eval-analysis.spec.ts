@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { analyzeTurn, findPlayedOption, matchPlayedChoice, phantomStayIn, playedSetupMove, REGRET_THRESHOLD, type SideAnalysis } from '../src/lib/eval/analysis';
+import { analyzeTurn, findPlayedOption, matchPlayedChoice, phantomStayIn, playedSetupMove, REGRET_THRESHOLD, unansweredSeenKey, type SideAnalysis } from '../src/lib/eval/analysis';
 import { allTurnEvents, detectSacks, turnEvents } from '../src/lib/eval/played';
 import type { EvalResult, RankedChoice } from '../src/lib/eval/types';
 import type { TurnSnapshot } from '../src/types';
@@ -1297,6 +1297,50 @@ test.describe('narrative signals (round 5)', () => {
       },
     });
     expect(quiet.p2.unanswered).toBeUndefined();
+  });
+
+  test('a switch into a held mon names the standing holder (round 14)', () => {
+    // 648453 t13: every bench answer dies on arrival, only the standing
+    // active holds the pair — the signal carries the holder's species.
+    const result = conditionalResult(['move recover', 'switch 5', 'move splash']);
+    result.unanswered = { p1: [], p2: [], p2Entry: [{ species: 'Heatran', heldBy: 'Skarmory' }] };
+    const analysis = analyzeTurn({
+      ...conditionalParams(result),
+      played: {
+        p1: { kind: 'move' as const, name: 'Iron Head', tera: false },
+        p2: { kind: 'switch' as const, name: 'Heaty', species: 'Heatran' },
+      },
+    });
+    expect(analysis.p2.unanswered).toEqual({ species: 'Heatran', heldBy: 'Skarmory' });
+  });
+
+  test('the report walk speaks each stage once per mon (round 14)', () => {
+    // The game report names a mon's entry sentence only on its FIRST entry
+    // (573756: ten Zapdos-Galar entries, ten identical sentences). The walk
+    // passes the already-spoken keys in; the per-turn card passes nothing
+    // and keeps the sentence on every turn.
+    const spoken = conditionalResult(['move recover', 'switch 5', 'move splash']);
+    spoken.unanswered = { p1: [], p2: ['Heatran'] };
+    const params = {
+      ...conditionalParams(spoken),
+      played: {
+        p1: { kind: 'move' as const, name: 'Iron Head', tera: false },
+        p2: { kind: 'switch' as const, name: 'Heaty', species: 'Heatran' },
+      },
+    };
+    const muted = analyzeTurn({
+      ...params,
+      unansweredSeen: new Set([unansweredSeenKey('p2', { species: 'Heatran' })]),
+    });
+    expect(muted.p2.unanswered).toBeUndefined();
+
+    // A DIFFERENT stage is a new statement, not a repetition: a spoken
+    // held-pair sentence does not mute the later, stronger no-answer one.
+    const other = analyzeTurn({
+      ...params,
+      unansweredSeen: new Set([unansweredSeenKey('p2', { species: 'Heatran', heldBy: 'Skarmory' })]),
+    });
+    expect(other.p2.unanswered).toEqual({ species: 'Heatran' });
   });
 
   test('a mechanically null best names its reason and a co-optimal alternative', () => {

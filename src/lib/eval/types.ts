@@ -188,7 +188,32 @@ export interface EvalResult {
    * per side, species names) — narrative input for the entry-is-profit
    * principle (648453 t13). Absent when empty or on sub-searches.
    */
-  unanswered?: { p1: string[]; p2: string[] };
+  unanswered?: UnansweredProfile;
+}
+
+/**
+ * One switch-in-stage row (round 14): every BENCHED enemy loses the entry
+ * race to this mon, while the named standing active still holds the pair —
+ * the expert's "no remaining switch-ins" state (648453 t13: Lopunny-Mega
+ * held only by the standing Tornadus-T; the bench can only sacrifice).
+ */
+export interface EntryUnanswered {
+  species: string;
+  /** Species of the standing active that still wins (or holds) the pair. */
+  heldBy: string;
+}
+
+/**
+ * Root unanswered-mon profile. `p1`/`p2` list mons no living enemy answers
+ * at all (round 13); the optional entry lists carry the weaker round-14
+ * stage — bench exhausted, active still holding. Entry lists are present
+ * only when non-empty, so round-13 cache entries and pins read unchanged.
+ */
+export interface UnansweredProfile {
+  p1: string[];
+  p2: string[];
+  p1Entry?: EntryUnanswered[];
+  p2Entry?: EntryUnanswered[];
 }
 
 export interface EvalMatrix {
@@ -238,8 +263,8 @@ export interface EvalChoicesInfo {
   rootEnded: boolean;
   /** Per-option analytic kill odds, index-aligned with p1/p2 (round 6). */
   koOdds?: { p1: (KoOddsInfo | null)[]; p2: (KoOddsInfo | null)[] };
-  /** Root unanswered-mon profile (round 13) for the orchestrated path. */
-  unanswered?: { p1: string[]; p2: string[] };
+  /** Root unanswered-mon profile (rounds 13/14) for the orchestrated path. */
+  unanswered?: UnansweredProfile;
 }
 
 export interface EvalCellJob {

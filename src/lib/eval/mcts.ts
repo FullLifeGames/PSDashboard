@@ -6,7 +6,7 @@ import {
 import { koOddsForOptions, planCellEvents } from './cell-blend';
 import { cellKey, rankFromMatrix, toResult as rankedToResult } from './rank';
 import { leafValue, optionHints, searchOptions, SEARCH_SEEDS } from './search';
-import type { EvalResult, EvalSettings, KoOddsInfo, MctsTreeStats, SearchProgress, TeraAllowance } from './types';
+import type { EvalResult, EvalSettings, KoOddsInfo, MctsTreeStats, SearchProgress, TeraAllowance, UnansweredProfile } from './types';
 
 /**
  * DUCT (decoupled UCT) Monte-Carlo tree search — the "think deeper" mode.
@@ -194,7 +194,7 @@ function toResult(
   root: Node,
   maxDepth: number,
   koOdds?: RootKoOdds,
-  unanswered?: { p1: string[]; p2: string[] },
+  unanswered?: UnansweredProfile,
 ): EvalResult {
   if (root.ended || root.p1Options.length === 0 || root.p2Options.length === 0 || root.visits === 0) {
     return { score: root.value, interval: 0, depthCompleted: maxDepth, perSide: { p1: [], p2: [] } };
@@ -233,7 +233,8 @@ function toResult(
     }
   }
   // Round 13: root narrative payload, same contract as search.ts.
-  if (unanswered && (unanswered.p1.length > 0 || unanswered.p2.length > 0)) result.unanswered = unanswered;
+  if (unanswered && (unanswered.p1.length > 0 || unanswered.p2.length > 0 ||
+    (unanswered.p1Entry?.length ?? 0) > 0 || (unanswered.p2Entry?.length ?? 0) > 0)) result.unanswered = unanswered;
   return result;
 }
 

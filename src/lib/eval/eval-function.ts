@@ -1,5 +1,6 @@
 import type { Battle, Pokemon, Side } from '@pkmn/sim';
 import { effectiveSpeed, movesFirst } from './speed';
+import type { EntryUnanswered, UnansweredProfile } from './types';
 
 /**
  * All tuning in one place. Values are points on an arbitrary scale; the final
@@ -407,6 +408,15 @@ export interface PairThreat {
   special: number;
   /** The attacker carries a usable damaging priority move. */
   priority: boolean;
+  /**
+   * Accuracy (0–1, 1 = never misses) of the category-max move (round 14).
+   * The narrative race weighs its rates by these — a 70% Hurricane is no
+   * full-hit clock (648453 t13) — while the SCORE path never reads them:
+   * matchup and coverage stay on the raw fractions. Optional so hand-built
+   * threats in tests keep working; consumers default to 1.
+   */
+  physicalAcc?: number;
+  specialAcc?: number;
 }
 
 /**
@@ -503,6 +513,8 @@ export function singleMoveFraction(attacker: Pokemon, defender: Pokemon, moveId:
 export function pairThreat(attacker: Pokemon, defender: Pokemon, battle: Battle): PairThreat {
   let physical = 0;
   let special = 0;
+  let physicalAcc = 1;
+  let specialAcc = 1;
   let priority = false;
   // A choice-locked attacker only ever clicks its locked move again — a lock
   // into a resisted attack (or a status move) ends its threat outright.
@@ -513,12 +525,14 @@ export function pairThreat(attacker: Pokemon, defender: Pokemon, battle: Battle)
     const moveFraction = singleMoveFraction(attacker, defender, slot.id, battle);
     if (moveFraction > 0) {
       const move = battle.dex.moves.get(slot.id);
-      if (move.category === 'Physical') physical = Math.max(physical, moveFraction);
-      else special = Math.max(special, moveFraction);
+      const accuracy = move.accuracy === true ? 1 : move.accuracy / 100;
+      if (move.category === 'Physical') {
+        if (moveFraction > physical) { physical = moveFraction; physicalAcc = accuracy; }
+      } else if (moveFraction > special) { special = moveFraction; specialAcc = accuracy; }
       if (move.priority > 0) priority = true;
     }
   }
-  return { physical, special, priority };
+  return { physical, special, priority, physicalAcc, specialAcc };
 }
 
 /** Standard stage multiplier: +1 → 1.5x, −1 → 0.67x. */
@@ -876,6 +890,13 @@ export function matchupTerms(battle: Battle, cache?: MatchupCache): { matchup: n
 }
 
 /**
+ * Moves that flinch-lock a full-hit answer on the user's first field turn:
+ * the fresh entry the profile narrates gets one free chip the standing
+ * defender cannot answer (648453 t13: Lopunny's Fake Out into Tornadus-T).
+ */
+const FIRST_TURN_FLINCH_MOVES = new Set(['fakeout']);
+
+/**
  * Living mons the OTHER side has no live answer to (round 13): the mon
  * beats EVERY living enemy's KO-race pair (strictly fewer turns, or a
  * finite tie taken on effective speed — a wall that merely holds the pair
@@ -887,8 +908,21 @@ export function matchupTerms(battle: Battle, cache?: MatchupCache): { matchup: n
  * switch into Lopunny — a U-turn included — turns profit and the opponent
  * can only sacrifice into it). Root-level narrative input; never part of
  * the score.
+ *
+ * Round 14 refinements, all profile-local (the score path never changes):
+ * - Rates are EXPECTED rates (fraction × the max-move's accuracy) — a 70%
+ *   Hurricane is no full-hit one-turn clock. The entry toll weighs the
+ *   same way.
+ * - A first-turn flinch move (Fake Out) chips the standing active for free
+ *   before the race starts — the fresh entry's move the defender cannot
+ *   answer.
+ * - The SWITCH-IN stage: a mon every benched enemy loses the entry race to
+ *   while a standing active still holds the pair is carried per side in the
+ *   entry lists — the expert's literal "no remaining switch-ins" state
+ *   (648453 t13, Lopunny vs the standing Tornadus-T). Only meaningful while
+ *   the other side still has a bench, so a 1v1 endgame never enters it.
  */
-export function unansweredMons(battle: Battle, cache?: MatchupCache): { p1: string[]; p2: string[] } {
+export function unansweredMons(battle: Battle, cache?: MatchupCache): UnansweredProfile {
   const living = (index: 0 | 1) =>
     battle.sides[index].pokemon.filter(pokemon => !pokemon.fainted && pokemon.hp > 0);
   const p1Living = living(0);
@@ -898,6 +932,16 @@ export function unansweredMons(battle: Battle, cache?: MatchupCache): { p1: stri
   const threat = threatGetter(battle, cache);
   const profiles = new Map<Pokemon, { rate: number; absorb: number }>();
   const budgets = new Map<Pokemon, number>();
+  // Expected per-turn rate: the boost-adjusted fraction weighed by the
+  // category-max move's accuracy (round 14) — the profile's races run on
+  // what a turn is worth, not on the best case.
+  const expectedRate = (threatOut: PairThreat, attacker: Pokemon, defender: Pokemon): number => {
+    const physical = threatOut.physical * (threatOut.physicalAcc ?? 1) *
+      stageMultiplier(attacker.boosts.atk) / stageMultiplier(defender.boosts.def);
+    const special = threatOut.special * (threatOut.specialAcc ?? 1) *
+      stageMultiplier(attacker.boosts.spa) / stageMultiplier(defender.boosts.spd);
+    return Math.max(physical, special);
+  };
   const side = (pokemon: Pokemon, threatOut: PairThreat, enemy: Pokemon): RaceSide => {
     let profile = profiles.get(pokemon);
     if (!profile) { profile = healProfile(pokemon, battle); profiles.set(pokemon, profile); }
@@ -906,28 +950,57 @@ export function unansweredMons(battle: Battle, cache?: MatchupCache): { p1: stri
     const hp = pokemon.hp / pokemon.maxhp;
     return {
       hp: pokemon.isActive ? hp : Math.max(0, hp - hazardEntryFraction(pokemon, pokemon.side, battle)),
-      frac: boostedFraction(threatOut, pokemon, enemy),
+      frac: expectedRate(threatOut, pokemon, enemy),
       residual: statusResidual(pokemon),
       healRate: profile.rate, healAbsorb: profile.absorb, ppBudget: budget,
     };
   };
+  // The fresh entry's free chip: a usable first-turn flinch move lands once
+  // before the standing defender gets a turn (its own accuracy is sure).
+  const flinchChip = (standing: Pokemon, enemy: Pokemon): number => {
+    const slot = usableSlots(standing).find(entry => FIRST_TURN_FLINCH_MOVES.has(entry.id));
+    if (!slot) return 0;
+    return singleMoveFraction(standing, enemy, slot.id, battle) *
+      stageMultiplier(standing.boosts.atk) / stageMultiplier(enemy.boosts.def);
+  };
   // Does the standing mon beat this enemy? Race verdict as the matchup term
-  // weighs it; a benched enemy eats one free hit on the way in.
+  // weighs it; a benched enemy eats one free hit on the way in, a standing
+  // one loses its first turn to the entry's flinch move.
   const beatsEntry = (standing: Pokemon, enemy: Pokemon): boolean => {
     const threatS = threat(standing, enemy);
     const threatE = threat(enemy, standing);
     const sideS = side(standing, threatS, enemy);
     const sideE = side(enemy, threatE, standing);
-    if (!enemy.isActive) sideE.hp = Math.max(0, sideE.hp - boostedFraction(threatS, standing, enemy));
+    if (!enemy.isActive) sideE.hp = Math.max(0, sideE.hp - expectedRate(threatS, standing, enemy));
+    else sideE.hp = Math.max(0, sideE.hp - flinchChip(standing, enemy));
     const { turnsA, turnsB } = raceClocks(sideS, sideE);
     if (turnsA < turnsB) return true;
     if (turnsB < turnsA) return false;
     return turnsA !== Infinity && movesFirst(standing, enemy, threatS, threatE, battle);
   };
-  const unansweredOf = (mine: Pokemon[], theirs: Pokemon[]): string[] => mine
-    .filter(mon => theirs.every(enemy => beatsEntry(mon, enemy)))
-    .map(mon => mon.species.name);
-  return { p1: unansweredOf(p1Living, p2Living), p2: unansweredOf(p2Living, p1Living) };
+  const profile = (mine: Pokemon[], theirs: Pokemon[]): { full: string[]; entry: EntryUnanswered[] } => {
+    const full: string[] = [];
+    const entry: EntryUnanswered[] = [];
+    const hasBench = theirs.some(enemy => !enemy.isActive);
+    for (const mon of mine) {
+      const verdicts = theirs.map(enemy => ({ enemy, beats: beatsEntry(mon, enemy) }));
+      if (verdicts.every(verdict => verdict.beats)) { full.push(mon.species.name); continue; }
+      if (!hasBench) continue;
+      // Switch-in stage: only standing actives hold; every bench answer
+      // dies on arrival.
+      if (!verdicts.every(verdict => verdict.beats || verdict.enemy.isActive)) continue;
+      const holder = verdicts.find(verdict => !verdict.beats)!.enemy;
+      entry.push({ species: mon.species.name, heldBy: holder.species.name });
+    }
+    return { full, entry };
+  };
+  const p1Profile = profile(p1Living, p2Living);
+  const p2Profile = profile(p2Living, p1Living);
+  return {
+    p1: p1Profile.full, p2: p2Profile.full,
+    ...(p1Profile.entry.length > 0 ? { p1Entry: p1Profile.entry } : {}),
+    ...(p2Profile.entry.length > 0 ? { p2Entry: p2Profile.entry } : {}),
+  };
 }
 
 /** Static positional eval from p1's perspective in [-1, +1]; ±1 for ended battles. */

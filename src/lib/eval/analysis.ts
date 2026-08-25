@@ -265,10 +265,23 @@ export interface SideAnalysis {
    * on its own — the opponent can only sacrifice into it (648453 t13,
    * Lopunny-Mega). Set when the played or recommended line's entry target
    * ("→ X", a pivot's "U-turn → X" included) is on the own unanswered
-   * list; display-only, never grades.
+   * list; display-only, never grades. With `heldBy` (round 14) the mon sits
+   * in the SWITCH-IN stage instead: every bench answer dies on arrival and
+   * only the named standing active still holds the pair.
    */
-  unanswered?: { species: string };
+  unanswered?: { species: string; heldBy?: string };
 }
+
+/**
+ * Spoken-once key for the game report's entry sentences (round 14): the
+ * report walk collects the keys it has already spoken and passes them back
+ * in via `unansweredSeen`, so a mon's entry sentence appears on its FIRST
+ * entry only (573756: ten identical Zapdos-Galar sentences). Each stage is
+ * its own statement — a spoken held-pair sentence never mutes the later,
+ * stronger no-answer one.
+ */
+export const unansweredSeenKey = (side: 'p1' | 'p2', signal: { species: string; heldBy?: string }): string =>
+  `${side}:${signal.species}:${signal.heldBy ? 'held' : 'open'}`;
 
 /** Deep re-search of the played and best pairs (p1-perspective outcomes). */
 export interface VerifiedOutcomes {
@@ -573,6 +586,13 @@ export function analyzeTurn(params: {
    * only, fail closed when absent.
    */
   playedHistory?: { p1: (StreakHistoryEntry | null)[]; p2: (StreakHistoryEntry | null)[] } | null;
+  /**
+   * Entry sentences the game report has already spoken (round 14), keyed by
+   * unansweredSeenKey — the report walk passes its collected keys so each
+   * mon's stage speaks once; the per-turn card omits this and keeps the
+   * sentence on every entry turn.
+   */
+  unansweredSeen?: ReadonlySet<string> | null;
 }): TurnAnalysis {
   const playedTracking = params.playedTracking !== false;
   const sideAnalysis = (key: 'p1' | 'p2'): SideAnalysis => {
@@ -777,15 +797,24 @@ export function analyzeTurn(params: {
     // Round 13: entry-is-profit — the played or recommended line brings in
     // a mon from the root's unanswered profile (no live enemy wins the race
     // pair against it), so a clean entry is value on its own (648453 t13).
+    // Round 14: the switch-in stage rides the same match — bench exhausted,
+    // a standing active still holding — and carries the holder's species.
     let unanswered: SideAnalysis['unanswered'];
     const ownUnanswered = params.result.unanswered?.[key];
-    if (ownUnanswered && ownUnanswered.length > 0) {
+    const ownEntry = key === 'p1' ? params.result.unanswered?.p1Entry : params.result.unanswered?.p2Entry;
+    if ((ownUnanswered && ownUnanswered.length > 0) || (ownEntry && ownEntry.length > 0)) {
       const entryTarget = (label: string | undefined): string | null =>
         label?.match(/→ (.+)$/)?.[1] ?? null;
-      const species = [played?.label, best?.label]
-        .map(entryTarget)
-        .find(target => target !== null && ownUnanswered.includes(target));
-      if (species) unanswered = { species };
+      for (const target of [played?.label, best?.label].map(entryTarget)) {
+        if (target === null) continue;
+        const signal = ownUnanswered?.includes(target)
+          ? { species: target }
+          : ownEntry?.find(row => row.species === target);
+        if (!signal) continue;
+        if (params.unansweredSeen?.has(unansweredSeenKey(key, signal))) continue;
+        unanswered = signal;
+        break;
+      }
     }
 
     let bestNull: SideAnalysis['bestNull'];

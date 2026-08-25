@@ -881,4 +881,31 @@ test.describe('round-13 narrative: entry-is-profit', () => {
     }), names);
     expect(summary).not.toContain('no live answer');
   });
+
+  test('a switch into a held mon names the standing holder (round 14)', () => {
+    // 648453 t13: the bench can only sacrifice into Lopunny — the sentence
+    // names the one standing mon still holding the pair.
+    const result: EvalResult = {
+      score: 0.0, interval: 0.1, depthCompleted: 1,
+      perSide: {
+        p1: [choice('move hurricane', 'Hurricane', 0.1)],
+        p2: [choice('switch 2', '→ Lopunny-Mega', 0.05), choice('move surf', 'Surf', 0.0)],
+      },
+      unanswered: { p1: [], p2: [], p2Entry: [{ species: 'Lopunny-Mega', heldBy: 'Tornadus-Therian' }] },
+    };
+    const summary = summarizeTurn(analyzeTurn({
+      turn: 13,
+      result,
+      played: {
+        p1: { kind: 'move', name: 'Hurricane', tera: false },
+        p2: { kind: 'switch', name: 'Lop', species: 'Lopunny-Mega' },
+      },
+      playedOutcome: 0.05,
+      scoreBefore: 0.0,
+      scoreAfter: 0.05,
+    }), names);
+    expect(summary).toContain('Lopunny-Mega has no switch-in left on the other side');
+    expect(summary).toContain('only the standing Tornadus-Therian holds it');
+    expect(summary).not.toContain('no live answer');
+  });
 });

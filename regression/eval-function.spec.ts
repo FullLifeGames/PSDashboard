@@ -945,11 +945,94 @@ test.describe('PP truth in the threat model (round 11)', () => {
       );
       expect(unansweredMons(benched)).toEqual({ p1: ['Mewtwo'], p2: [] });
 
+      // Round 14: the held-pair state becomes its own stage — every benched
+      // answer (Rattata) dies on arrival, only the standing twin holds the
+      // pair. The full list stays empty; the entry stage names the holder.
       const active = makeBattle(
         [makeSet('Mewtwo', 'Mewtwo', ['Psystrike'], 100)],
         [makeSet('Twin', 'Mewtwo', ['Psystrike'], 100), makeSet('Rattata', 'Rattata', ['Tackle'])],
       );
-      expect(unansweredMons(active)).toEqual({ p1: [], p2: [] });
+      expect(unansweredMons(active)).toEqual({
+        p1: [], p2: [],
+        p1Entry: [{ species: 'Mewtwo', heldBy: 'Mewtwo' }],
+      });
+    });
+  });
+
+  test.describe('the switch-in stage and the coin-flip check (round 14)', () => {
+    // 648453 t13: the race model called the ACTIVE Tornadus-T an answer to
+    // Lopunny-Mega on a full-hit Hurricane clock while every benched answer
+    // died on arrival — the expert counts "remaining switch-ins", and the
+    // real game answered with a pure Weavile sacrifice.
+    test('pairThreat carries the accuracy of its category-max move', () => {
+      const battle = makeBattle(
+        [makeSet('A', 'Machamp', ['Dynamic Punch', 'Tackle'])],
+        [makeSet('B', 'Snorlax', ['Tackle'])],
+      );
+      const chancy = pairThreat(battle.sides[0].active[0]!, battle.sides[1].active[0]!, battle);
+      // Dynamic Punch (100 BP, 50% accuracy) is the physical max; its
+      // accuracy rides along for the narrative race. The raw fraction and
+      // the score path stay untouched.
+      expect(chancy.physicalAcc).toBeCloseTo(0.5, 5);
+      const plain = pairThreat(battle.sides[1].active[0]!, battle.sides[0].active[0]!, battle);
+      expect(plain.physicalAcc).toBe(1);
+    });
+
+    test('a no-bench endgame never enters the switch-in stage', () => {
+      // "No switch-ins left" is trivially true in a 1v1 — the stage only
+      // speaks while the other side still has a bench to switch from.
+      const battle = makeBattle(
+        [makeSet('A', 'Snorlax', ['Tackle'])],
+        [makeSet('B', 'Snorlax', ['Tackle'])],
+      );
+      expect(unansweredMons(battle)).toEqual({ p1: [], p2: [] });
+    });
+
+    test('a coin-flip nuke is no answer; the sure nuke still holds the pair', () => {
+      // Tauros two-shots Machamp (Double-Edge, clock 2). Dynamic Punch's raw
+      // fraction is a one-turn kill, but at 50% accuracy the expected rate
+      // halves to a two-turn clock — a tie the faster Tauros takes. The
+      // full-hit model called this an answer; the profile no longer does.
+      const flip = makeBattle(
+        [makeSet('X', 'Tauros', ['Double-Edge'])],
+        [makeSet('A', 'Machamp', ['Dynamic Punch']), makeSet('F', 'Caterpie', ['Tackle'], 5)],
+      );
+      expect(unansweredMons(flip)).toEqual({ p1: ['Tauros'], p2: [] });
+
+      // Close Combat carries the same punch at 100% accuracy: the standing
+      // Machamp answers in one turn — Tauros drops to the switch-in stage
+      // (the bench still dies on arrival) and Machamp wins its own race.
+      const sure = makeBattle(
+        [makeSet('X', 'Tauros', ['Double-Edge'])],
+        [makeSet('A', 'Machamp', ['Close Combat']), makeSet('F', 'Caterpie', ['Tackle'], 5)],
+      );
+      expect(unansweredMons(sure)).toEqual({
+        p1: [], p2: ['Machamp'],
+        p1Entry: [{ species: 'Tauros', heldBy: 'Machamp' }],
+      });
+    });
+
+    test("the fresh entry's Fake Out chips the standing answer for free", () => {
+      // Without Fake Out the standing Snorlax out-races Lopunny 3 clicks to
+      // 4 and holds the pair (switch-in stage). The first-turn flinch chip
+      // lands before the race starts and pulls Lopunny to a 3-3 tie the
+      // faster mon takes. Fake Out only speaks in the OWN entry scenario:
+      // Snorlax's side of the profile still reads Lopunny as a standing
+      // 4-click answer, so its own race stays won.
+      const plain = makeBattle(
+        [makeSet('X', 'Lopunny', ['Body Slam'])],
+        [makeSet('A', 'Snorlax', ['Strength']), makeSet('F', 'Caterpie', ['Tackle'], 5)],
+      );
+      expect(unansweredMons(plain)).toEqual({
+        p1: [], p2: ['Snorlax'],
+        p1Entry: [{ species: 'Lopunny', heldBy: 'Snorlax' }],
+      });
+
+      const flinch = makeBattle(
+        [makeSet('X', 'Lopunny', ['Fake Out', 'Body Slam'])],
+        [makeSet('A', 'Snorlax', ['Strength']), makeSet('F', 'Caterpie', ['Tackle'], 5)],
+      );
+      expect(unansweredMons(flinch)).toEqual({ p1: ['Lopunny'], p2: ['Snorlax'] });
     });
   });
 });
