@@ -32,7 +32,7 @@ import { summarizeAlignment, type TurnAlignmentRecord } from './lib/hax-alignmen
 import { choiceId, evalChoiceToSlotChoices, type BranchSlotChoice } from './lib/branch-choices';
 import type { RankedChoice } from './lib/eval/types';
 import { allTurnEvents, detectSacks, parseLeadSpecies, parsePlayedActions, parsePlayedActionsDoubles } from './lib/eval/played';
-import { analyzeTurn, PAYOFF_WINDOW, unansweredSeenKey, type TurnAnalysis } from './lib/eval/analysis';
+import { analyzeTurn, decidedSeenKey, PAYOFF_WINDOW, unansweredSeenKey, type TurnAnalysis } from './lib/eval/analysis';
 import { toID } from '@pkmn/dex';
 import type { StreakHistoryEntry } from './lib/eval/streaks';
 import { computeRead, parseTendencies } from './lib/eval/opponent-model';
@@ -1273,6 +1273,9 @@ function App() {
     // tenth entry stays quiet here while the per-turn card (no set passed)
     // keeps its sentence.
     const unansweredSeen = new Set<string>();
+    // Round 15: the decided/near announcements share the walk regime — the
+    // state stays on every decided turn, the sentence speaks once.
+    const decidedSeen = new Set<string>();
     const analyses = results.map((result, index) => {
       const scoreBefore = scores[index];
       if (!result || scoreBefore === null) return null;
@@ -1293,10 +1296,17 @@ function App() {
         actives: activesForTurn(index + 1),
         playedHistory: playedHistoryAll,
         unansweredSeen,
+        decidedSeen,
       });
       for (const key of ['p1', 'p2'] as const) {
         const signal = analysis[key].unanswered;
         if (signal) unansweredSeen.add(unansweredSeenKey(key, signal));
+        const decided = analysis[key].decided;
+        if (decided?.announce) decidedSeen.add(decidedSeenKey(key, { species: decided.species }));
+        const near = analysis[key].nearDecided;
+        if (near?.announce) {
+          decidedSeen.add(decidedSeenKey(key, { species: near.species, removes: near.removes }));
+        }
       }
       return analysis;
     });

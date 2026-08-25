@@ -91,7 +91,8 @@ export async function searchOrchestrated(
   const attachUnanswered = (target: EvalResult) => {
     const unanswered = info.unanswered;
     if (unanswered && (unanswered.p1.length > 0 || unanswered.p2.length > 0 ||
-      (unanswered.p1Entry?.length ?? 0) > 0 || (unanswered.p2Entry?.length ?? 0) > 0)) target.unanswered = unanswered;
+      (unanswered.p1Entry?.length ?? 0) > 0 || (unanswered.p2Entry?.length ?? 0) > 0 ||
+      unanswered.decided !== undefined || unanswered.nearDecided !== undefined)) target.unanswered = unanswered;
   };
   // Trend baseline, mirroring searchPosition: uniformly 1-ply-vs-static.
   const staticValues = values.map(row => [...row]);

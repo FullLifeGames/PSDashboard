@@ -270,6 +270,22 @@ export interface SideAnalysis {
    * only the named standing active still holds the pair.
    */
   unanswered?: { species: string; heldBy?: string };
+  /**
+   * Round 15: the board is practically decided FOR this side — one own mon
+   * clears the whole living enemy team in sequence and survives the
+   * expected return fire (the search root's decided sweep). A board STATE,
+   * not click context: present on every decided turn so display layers can
+   * book the resolution prose; `announce` is true only until the game
+   * report has spoken the sentence once (the per-turn card, which passes
+   * no seen-set, announces on every decided turn).
+   */
+  decided?: { species: string; announce: boolean };
+  /**
+   * Round 15: one high-odds click from decided — `odds` (accuracy × kill
+   * share, round 6) on the click that removes `removes`, after which
+   * `species` clears the rest (573756 t73: a 95% Fire Fang from the sweep).
+   */
+  nearDecided?: { species: string; odds: number; removes: string; announce: boolean };
 }
 
 /**
@@ -282,6 +298,15 @@ export interface SideAnalysis {
  */
 export const unansweredSeenKey = (side: 'p1' | 'p2', signal: { species: string; heldBy?: string }): string =>
   `${side}:${signal.species}:${signal.heldBy ? 'held' : 'open'}`;
+
+/**
+ * Spoken-once key for the decided/near-decided announcements (round 15),
+ * same regime as unansweredSeenKey: a `removes` target marks the near
+ * stage. Each stage (and each new removal target) is its own statement —
+ * a spoken near sentence never mutes the later full decided one.
+ */
+export const decidedSeenKey = (side: 'p1' | 'p2', signal: { species: string; removes?: string }): string =>
+  signal.removes ? `${side}:${signal.species}:near:${signal.removes}` : `${side}:${signal.species}:decided`;
 
 /** Deep re-search of the played and best pairs (p1-perspective outcomes). */
 export interface VerifiedOutcomes {
@@ -593,6 +618,13 @@ export function analyzeTurn(params: {
    * sentence on every entry turn.
    */
   unansweredSeen?: ReadonlySet<string> | null;
+  /**
+   * Decided/near-decided announcements the game report has already spoken
+   * (round 15), keyed by decidedSeenKey — same walk regime as
+   * unansweredSeen. The signal STATE stays present regardless; only
+   * `announce` flips off.
+   */
+  decidedSeen?: ReadonlySet<string> | null;
 }): TurnAnalysis {
   const playedTracking = params.playedTracking !== false;
   const sideAnalysis = (key: 'p1' | 'p2'): SideAnalysis => {
@@ -817,6 +849,28 @@ export function analyzeTurn(params: {
       }
     }
 
+    // Round 15: the decided sweep / the near-decided roll — board states,
+    // not click context: they attach to the owning side on every turn they
+    // hold (display layers book resolution prose from the state) and
+    // announce only until the game report has spoken them once.
+    let decided: SideAnalysis['decided'];
+    const ownDecided = params.result.unanswered?.decided;
+    if (ownDecided && ownDecided.side === key) {
+      decided = {
+        species: ownDecided.species,
+        announce: !params.decidedSeen?.has(decidedSeenKey(key, { species: ownDecided.species })),
+      };
+    }
+    let nearDecided: SideAnalysis['nearDecided'];
+    const ownNear = params.result.unanswered?.nearDecided;
+    if (ownNear && ownNear.side === key) {
+      nearDecided = {
+        species: ownNear.species, odds: ownNear.odds, removes: ownNear.removes,
+        announce: !params.decidedSeen?.has(
+          decidedSeenKey(key, { species: ownNear.species, removes: ownNear.removes })),
+      };
+    }
+
     let bestNull: SideAnalysis['bestNull'];
     const actives = params.actives;
     const defenderSpecies = actives ? (key === 'p1' ? actives.p2 : actives.p1) : null;
@@ -869,6 +923,8 @@ export function analyzeTurn(params: {
       ...(streakOdds ? { streakOdds } : {}),
       ...(hindsightRead ? { hindsightRead } : {}),
       ...(unanswered ? { unanswered } : {}),
+      ...(decided ? { decided } : {}),
+      ...(nearDecided ? { nearDecided } : {}),
     };
   };
 

@@ -748,7 +748,8 @@ export function searchPosition(
   const unanswered = restrictCandidates ? null : unansweredMons(battle, matchupCache);
   const attachUnanswered = (target: EvalResult) => {
     if (unanswered && (unanswered.p1.length > 0 || unanswered.p2.length > 0 ||
-      (unanswered.p1Entry?.length ?? 0) > 0 || (unanswered.p2Entry?.length ?? 0) > 0)) target.unanswered = unanswered;
+      (unanswered.p1Entry?.length ?? 0) > 0 || (unanswered.p2Entry?.length ?? 0) > 0 ||
+      unanswered.decided !== undefined || unanswered.nearDecided !== undefined)) target.unanswered = unanswered;
   };
   // Pre-deepening statics: the trend baseline. Every trend the tiebreak
   // compares is uniformly 1-ply-vs-static — mixed ply counts inside one

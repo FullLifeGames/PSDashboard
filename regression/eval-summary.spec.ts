@@ -909,3 +909,57 @@ test.describe('round-13 narrative: entry-is-profit', () => {
     expect(summary).not.toContain('no live answer');
   });
 });
+
+test.describe('the decided sweep in prose (round 15)', () => {
+  // 573756 t134–138: the locked endgame speaks — the announcement names the
+  // sweeper once, and on decided turns a chance swing TOWARD the decided
+  // side reads as the game resolving, not as luck.
+  const decidedResult = (): EvalResult => ({
+    score: -0.2, interval: 0, depthCompleted: 1,
+    perSide: {
+      p1: [choice('move tackle', 'Tackle', -0.2)],
+      p2: [choice('move stompingtantrum', 'Stomping Tantrum', 0.2)],
+    },
+    unanswered: { p1: [], p2: [], decided: { side: 'p2', species: 'Zapdos-Galar' } },
+  });
+  const summaryAt = (extra: { result?: EvalResult; scoreAfter?: number; decidedSeen?: ReadonlySet<string> }) =>
+    summarizeTurn(analyzeTurn({
+      turn: 134,
+      result: extra.result ?? decidedResult(),
+      played: {
+        p1: { kind: 'move', name: 'Tackle', tera: false },
+        p2: { kind: 'move', name: 'Stomping Tantrum', tera: false },
+      },
+      playedOutcome: -0.2,
+      scoreBefore: -0.2,
+      scoreAfter: extra.scoreAfter ?? -0.25,
+      ...(extra.decidedSeen ? { decidedSeen: extra.decidedSeen } : {}),
+    }), names);
+
+  test('the decided announcement names the sweeper and the opponent', () => {
+    const summary = summaryAt({});
+    expect(summary).toContain('From here Zapdos-Galar clears everything Alpha has left');
+    expect(summary).toContain('practically decided');
+  });
+
+  test('a chance swing toward the decided side reads as the game resolving', () => {
+    const summary = summaryAt({ scoreAfter: -0.95 });
+    expect(summary).toContain('the decided game resolving toward Beta');
+    expect(summary).not.toContain('how the turn rolled');
+    // Chance AGAINST the decided side stays genuine luck.
+    const against = summaryAt({ scoreAfter: 0.55 });
+    expect(against).toContain('how the turn rolled');
+    expect(against).not.toContain('resolving toward');
+  });
+
+  test('the near-decided roll speaks its odds and its target', () => {
+    const result = decidedResult();
+    result.unanswered = {
+      p1: [], p2: [],
+      nearDecided: { side: 'p2', species: 'Garchomp', odds: 0.95, removes: 'Corviknight' },
+    };
+    const summary = summaryAt({ result });
+    expect(summary).toContain('Garchomp is one 95% roll from clearing the rest');
+    expect(summary).toContain('removing Corviknight leaves no answer behind');
+  });
+});

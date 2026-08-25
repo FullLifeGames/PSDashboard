@@ -336,6 +336,7 @@ export function EvalPanel({
               onSelectTurn={selectTurn}
               leadScore={graph.lead?.result.score ?? null}
               evalErrors={graph.evalErrors}
+              decided={graph.results.map(result => result?.unanswered?.decided ?? null)}
             />
           )}
           {hasGraph && (showReportView || !analysis) && (

@@ -12,6 +12,13 @@ interface EvalGraphProps {
   leadScore?: number | null;
   /** evalErrors[t-1] = why turn t has no point (eval-layer failure). */
   evalErrors?: (string | null)[];
+  /**
+   * decided[t-1] = the turn's decided-sweep state (round 15): the board is
+   * practically over for `side`. Rendered as a thin strip on that side's
+   * edge (top = p1, bottom = p2) plus a node-label note — the calibrated
+   * line itself stays honest.
+   */
+  decided?: ({ side: 'p1' | 'p2'; species: string } | null)[];
 }
 
 const HEIGHT = 64;
@@ -27,7 +34,7 @@ const PAD_X = 4;
  * into a viewport-dependent ellipse (fills scale even where strokes are
  * protected), so markers looked different on desktop and mobile.
  */
-export function EvalGraph({ scores, playerNames, currentTurn, onSelectTurn, leadScore, evalErrors }: EvalGraphProps) {
+export function EvalGraph({ scores, playerNames, currentTurn, onSelectTurn, leadScore, evalErrors, decided }: EvalGraphProps) {
   const svgRef = useRef<SVGSVGElement>(null);
   const [width, setWidth] = useState(300);
   useLayoutEffect(() => {
@@ -81,6 +88,26 @@ export function EvalGraph({ scores, playerNames, currentTurn, onSelectTurn, lead
   const blunders = new Set(computeBlunders(scores));
   const hitWidth = (width - 2 * PAD_X) / Math.max(turns - first, 1);
 
+  // Round 15: consecutive decided turns of the same side become one thin
+  // strip along that side's edge; a lone decided turn draws as a dot (round
+  // linecap). The calibrated line itself is never bent.
+  const decidedSpans: { x1: number; x2: number; side: 'p1' | 'p2'; species: string }[] = [];
+  if (decided) {
+    let run: { start: number; end: number; side: 'p1' | 'p2'; species: string } | null = null;
+    const flush = () => {
+      if (run) decidedSpans.push({ x1: x(run.start), x2: x(run.end), side: run.side, species: run.species });
+      run = null;
+    };
+    decided.forEach((signal, index) => {
+      const turn = index + 1;
+      if (!signal || scores[index] === null) { flush(); return; }
+      if (run && run.side === signal.side) { run.end = turn; return; }
+      flush();
+      run = { start: turn, end: turn, side: signal.side, species: signal.species };
+    });
+    flush();
+  }
+
   const pct = (score: number) => winPercent(score);
   // A node IS the estimate before its turn; the movement INTO it was the
   // previous turn's doing. Clicks stay on the node's own turn (a shifted
@@ -90,7 +117,9 @@ export function EvalGraph({ scores, playerNames, currentTurn, onSelectTurn, lead
     const swing = blunders.has(turn) ? ' — blunder swing' : '';
     const producer = turn - 1 >= first ? (turn - 1 === 0 ? 'the lead decision' : `turn ${turn - 1}`) : null;
     const arrival = producer ? ` (what ${producer} produced)` : '';
-    return `Before turn ${turn}${arrival}: ${playerNames[0]} ${pct(score)}% · ${playerNames[1]} ${100 - pct(score)}%${swing}`;
+    const state = decided?.[turn - 1];
+    const decidedNote = state ? ` — practically decided: ${state.species}` : '';
+    return `Before turn ${turn}${arrival}: ${playerNames[0]} ${pct(score)}% · ${playerNames[1]} ${100 - pct(score)}%${swing}${decidedNote}`;
   };
 
   // The selected turn's movement: its node → the next node (what that play
@@ -110,6 +139,17 @@ export function EvalGraph({ scores, playerNames, currentTurn, onSelectTurn, lead
       aria-label={`Evaluation over ${turns} turns for ${playerNames[0]} vs ${playerNames[1]}`}
     >
       <line x1={0} y1={HEIGHT / 2} x2={width} y2={HEIGHT / 2} stroke="rgba(255,255,255,0.18)" strokeDasharray="3 3" />
+      {decidedSpans.map(span => (
+        <line
+          key={`d${span.x1}-${span.x2}-${span.side}`}
+          x1={span.x1} x2={span.x2}
+          y1={span.side === 'p1' ? 3 : HEIGHT - 3}
+          y2={span.side === 'p1' ? 3 : HEIGHT - 3}
+          stroke="#cde" strokeOpacity={0.55} strokeWidth={2.5} strokeLinecap="round"
+        >
+          <title>practically decided: {span.species}</title>
+        </line>
+      ))}
       {currentTurn >= 1 && currentTurn <= turns && (
         <line x1={x(currentTurn)} y1={2} x2={x(currentTurn)} y2={HEIGHT - 2} stroke="#8cf" strokeOpacity={0.45} />
       )}

@@ -234,7 +234,8 @@ function toResult(
   }
   // Round 13: root narrative payload, same contract as search.ts.
   if (unanswered && (unanswered.p1.length > 0 || unanswered.p2.length > 0 ||
-    (unanswered.p1Entry?.length ?? 0) > 0 || (unanswered.p2Entry?.length ?? 0) > 0)) result.unanswered = unanswered;
+    (unanswered.p1Entry?.length ?? 0) > 0 || (unanswered.p2Entry?.length ?? 0) > 0 ||
+    unanswered.decided !== undefined || unanswered.nearDecided !== undefined)) result.unanswered = unanswered;
   return result;
 }
 

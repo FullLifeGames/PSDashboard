@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { analyzeTurn, findPlayedOption, matchPlayedChoice, phantomStayIn, playedSetupMove, REGRET_THRESHOLD, unansweredSeenKey, type SideAnalysis } from '../src/lib/eval/analysis';
+import { analyzeTurn, decidedSeenKey, findPlayedOption, matchPlayedChoice, phantomStayIn, playedSetupMove, REGRET_THRESHOLD, unansweredSeenKey, type SideAnalysis } from '../src/lib/eval/analysis';
 import { allTurnEvents, detectSacks, turnEvents } from '../src/lib/eval/played';
 import type { EvalResult, RankedChoice } from '../src/lib/eval/types';
 import type { TurnSnapshot } from '../src/types';
@@ -1441,5 +1441,67 @@ test.describe('narrative signals (round 5)', () => {
       actives: { p1: 'Kyurem', p2: 'Blissey', gen: 6 },
     });
     expect(without.p1.streakOdds).toBeUndefined();
+  });
+});
+
+test.describe('the decided sweep at the analysis layer (round 15)', () => {
+  // 573756 t134–138: the board state (one mon clears the rest in sequence)
+  // attaches to its owning side on EVERY decided turn — display layers
+  // re-book the resolution prose from it — while the announcement sentence
+  // is spoken once per game report, like the round-14 entry sentences.
+  const decidedResult = (): EvalResult => ({
+    score: -0.2, interval: 0, depthCompleted: 1,
+    perSide: {
+      p1: [choice('move tackle', 'Tackle', -0.2)],
+      p2: [choice('move stompingtantrum', 'Stomping Tantrum', 0.2)],
+    },
+    unanswered: { p1: [], p2: ['Zapdos-Galar'], decided: { side: 'p2', species: 'Zapdos-Galar' } },
+  });
+  const at = (extra?: { result?: EvalResult; decidedSeen?: ReadonlySet<string> }) => analyzeTurn({
+    turn: 134,
+    result: decidedResult(),
+    played: {
+      p1: { kind: 'move' as const, name: 'Tackle', tera: false },
+      p2: { kind: 'move' as const, name: 'Stomping Tantrum', tera: false },
+    },
+    playedOutcome: -0.2,
+    scoreBefore: -0.2,
+    scoreAfter: -0.25,
+    ...extra,
+  });
+
+  test('the decided sweep attaches to its owning side and announces once', () => {
+    const analysis = at();
+    expect(analysis.p2.decided).toEqual({ species: 'Zapdos-Galar', announce: true });
+    expect(analysis.p1.decided).toBeUndefined();
+    const spoken = at({ decidedSeen: new Set([decidedSeenKey('p2', { species: 'Zapdos-Galar' })]) });
+    expect(spoken.p2.decided).toEqual({ species: 'Zapdos-Galar', announce: false });
+  });
+
+  test('the near-decided roll carries odds and target, keyed apart from decided', () => {
+    const nearResult = (): EvalResult => {
+      const result = decidedResult();
+      result.unanswered = {
+        p1: [], p2: [],
+        nearDecided: { side: 'p2', species: 'Garchomp', odds: 0.95, removes: 'Corviknight' },
+      };
+      return result;
+    };
+    const analysis = at({ result: nearResult() });
+    expect(analysis.p2.nearDecided).toEqual({
+      species: 'Garchomp', odds: 0.95, removes: 'Corviknight', announce: true,
+    });
+    expect(analysis.p2.decided).toBeUndefined();
+    // A spoken DECIDED key does not mute the near stage — different statement.
+    const other = at({
+      result: nearResult(),
+      decidedSeen: new Set([decidedSeenKey('p2', { species: 'Garchomp' })]),
+    });
+    expect(other.p2.nearDecided?.announce).toBe(true);
+    const muted = at({
+      result: nearResult(),
+      decidedSeen: new Set([decidedSeenKey('p2', { species: 'Garchomp', removes: 'Corviknight' })]),
+    });
+    expect(muted.p2.nearDecided?.announce).toBe(false);
   });
 });

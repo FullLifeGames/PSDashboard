@@ -921,7 +921,12 @@ test.describe('PP truth in the threat model (round 11)', () => {
         [makeSet('Mewtwo', 'Mewtwo', ['Psystrike'], 100)],
         [makeSet('Rattata', 'Rattata', ['Tackle']), makeSet('Raticate', 'Raticate', ['Tackle'])],
       );
-      expect(unansweredMons(battle)).toEqual({ p1: ['Mewtwo'], p2: [] });
+      // Round 15: clearing both bodies in sequence costs Mewtwo nothing —
+      // the same board is also a decided sweep.
+      expect(unansweredMons(battle)).toEqual({
+        p1: ['Mewtwo'], p2: [],
+        decided: { side: 'p1', species: 'Mewtwo' },
+      });
     });
 
     test('a dead-even mirror names nobody — a wall that holds the pair is an answer', () => {
@@ -997,7 +1002,12 @@ test.describe('PP truth in the threat model (round 11)', () => {
         [makeSet('X', 'Tauros', ['Double-Edge'])],
         [makeSet('A', 'Machamp', ['Dynamic Punch']), makeSet('F', 'Caterpie', ['Tackle'], 5)],
       );
-      expect(unansweredMons(flip)).toEqual({ p1: ['Tauros'], p2: [] });
+      // Round 15: one expected coin-flip punch is all the return fire the
+      // series carries — the two-body board is also a decided sweep.
+      expect(unansweredMons(flip)).toEqual({
+        p1: ['Tauros'], p2: [],
+        decided: { side: 'p1', species: 'Tauros' },
+      });
 
       // Close Combat carries the same punch at 100% accuracy: the standing
       // Machamp answers in one turn — Tauros drops to the switch-in stage
@@ -1009,6 +1019,7 @@ test.describe('PP truth in the threat model (round 11)', () => {
       expect(unansweredMons(sure)).toEqual({
         p1: [], p2: ['Machamp'],
         p1Entry: [{ species: 'Tauros', heldBy: 'Machamp' }],
+        decided: { side: 'p2', species: 'Machamp' },
       });
     });
 
@@ -1026,13 +1037,124 @@ test.describe('PP truth in the threat model (round 11)', () => {
       expect(unansweredMons(plain)).toEqual({
         p1: [], p2: ['Snorlax'],
         p1Entry: [{ species: 'Lopunny', heldBy: 'Snorlax' }],
+        decided: { side: 'p2', species: 'Snorlax' },
       });
 
       const flinch = makeBattle(
         [makeSet('X', 'Lopunny', ['Fake Out', 'Body Slam'])],
         [makeSet('A', 'Snorlax', ['Strength']), makeSet('F', 'Caterpie', ['Tackle'], 5)],
       );
-      expect(unansweredMons(flinch)).toEqual({ p1: ['Lopunny'], p2: ['Snorlax'] });
+      // Round 15: the series still belongs to Snorlax — the Fake Out chip
+      // is entry economy (one flinch on the FIRST field turn), and the
+      // sweep bookkeeping deliberately leaves it out of the running race.
+      expect(unansweredMons(flinch)).toEqual({
+        p1: ['Lopunny'], p2: ['Snorlax'],
+        decided: { side: 'p2', species: 'Snorlax' },
+      });
+    });
+  });
+
+  test.describe('the decided sweep and the near-decided roll (round 15)', () => {
+    // 573756 t134–138: a locked endgame read +0.2 instead of decided; the
+    // series bookkeeping is what separates a cleanup from a mere threat —
+    // a mon that wins every FRESH pair can still die to the accumulated
+    // return fire of clearing the whole team in sequence (648453 t13).
+    test('winning every fresh pair is not a decided sweep', () => {
+      // Tauros beats each Machamp pair (expected-rate 2-2 tie, faster mon
+      // takes it) — but each pair costs an expected Dynamic Punch, and two
+      // of them add up past Tauros's bar. Unanswered: yes; decided: no.
+      const battle = makeBattle(
+        [makeSet('X', 'Tauros', ['Double-Edge'])],
+        [makeSet('A', 'Machamp', ['Dynamic Punch']), makeSet('B', 'Machamp', ['Dynamic Punch'])],
+      );
+      const profile = unansweredMons(battle);
+      expect(profile.p1).toEqual(['Tauros']);
+      expect(profile.decided).toBeUndefined();
+    });
+
+    test('clearing the rest in sequence while surviving is decided', () => {
+      // Two level-5 fodder mons: every kill is one click and Tauros moves
+      // first, so the series costs nothing — the game is practically over.
+      const battle = makeBattle(
+        [makeSet('X', 'Tauros', ['Double-Edge'])],
+        [makeSet('A', 'Caterpie', ['Tackle'], 5), makeSet('B', 'Caterpie', ['Tackle'], 5)],
+      );
+      expect(unansweredMons(battle).decided).toEqual({ side: 'p1', species: 'Tauros' });
+    });
+
+    test('a slow grind is not decided even when every pair is won', () => {
+      // Three resistant, harmless walls: Tauros wins every pair but needs
+      // ~3 clicks each — past DECIDED_MAX_TURNS the opponent still has a
+      // game's worth of turns to play (573756 priced its whole enemy team
+      // as pinned healers and read decided from turn 1 without this cap).
+      const battle = makeBattle(
+        [makeSet('X', 'Tauros', ['Double-Edge'])],
+        [
+          makeSet('A', 'Klefki', ['Tackle']),
+          makeSet('B', 'Klefki', ['Tackle']),
+          makeSet('C', 'Klefki', ['Tackle']),
+        ],
+      );
+      expect(unansweredMons(battle).decided).toBeUndefined();
+    });
+
+    test('a 1v1 endgame is decided for the clear pair winner', () => {
+      // The 573756 t138 shape: the last pair's table is one-sided. Tauros
+      // takes the expected-rate race; the coin-flip Machamp does not.
+      const battle = makeBattle(
+        [makeSet('X', 'Tauros', ['Double-Edge'])],
+        [makeSet('A', 'Machamp', ['Dynamic Punch'])],
+      );
+      expect(unansweredMons(battle).decided).toEqual({ side: 'p1', species: 'Tauros' });
+    });
+
+    test('a pinned healer does not block the sweep; a two-wall standoff stays open', () => {
+      // Round-11 action economy, now on the series side: a healer whose
+      // sustain is beaten (Earthquake outdamages the outleveled Toxapex's
+      // heal rate) must heal on the turns it survives, so its return fire
+      // prices at the spare-turn rate — the sweeper's bar stays intact.
+      const cracked = makeBattle(
+        [makeSet('X', 'Garchomp', ['Earthquake'])],
+        [makeSet('A', 'Toxapex', ['Recover', 'Scald'], 30), makeSet('F', 'Caterpie', ['Tackle'], 5)],
+      );
+      expect(unansweredMons(cracked).decided).toEqual({ side: 'p1', species: 'Garchomp' });
+
+      // Two full-strength healers neither side can out-race: heal PP absorb
+      // every clock past the attackers' PP budgets — nobody sweeps, nothing
+      // is decided.
+      const walled = makeBattle(
+        [makeSet('X', 'Chansey', ['Soft-Boiled', 'Tackle'])],
+        [makeSet('A', 'Toxapex', ['Recover', 'Scald']), makeSet('F', 'Caterpie', ['Tackle'], 5)],
+      );
+      expect(unansweredMons(walled).decided).toBeUndefined();
+    });
+
+    test('a high-odds kill that unlocks the sweep reads as near-decided', () => {
+      // 573756 t73's shape: the full board is NOT sweepable (the standing
+      // glass cannon strikes first once, and with the benched puncher's
+      // expected hits that out-chips the sweeper), but one sure roll
+      // removes the active and the rest clears. The odds are the round-6
+      // boundary event: accuracy × kill share.
+      const battle = makeBattle(
+        [makeSet('X', 'Tauros', ['Double-Edge'], 50, { item: 'choiceband' })],
+        [makeSet('A', 'Alakazam', ['Psychic']), makeSet('B', 'Machamp', ['Dynamic Punch'])],
+      );
+      const profile = unansweredMons(battle);
+      expect(profile.decided).toBeUndefined();
+      expect(profile.nearDecided?.side).toBe('p1');
+      expect(profile.nearDecided?.species).toBe('Tauros');
+      expect(profile.nearDecided?.removes).toBe('Alakazam');
+      expect(profile.nearDecided?.odds ?? 0).toBeGreaterThanOrEqual(0.9);
+    });
+
+    test('a coin-flip kill is no near-decided', () => {
+      // Same board, but the active is sturdy: no ≥90% one-click removal
+      // exists, so the near stage stays silent (fail closed).
+      const battle = makeBattle(
+        [makeSet('X', 'Tauros', ['Double-Edge'])],
+        [makeSet('A', 'Machamp', ['Dynamic Punch']), makeSet('B', 'Machamp', ['Dynamic Punch'])],
+      );
+      expect(unansweredMons(battle).nearDecided).toBeUndefined();
     });
   });
 });

@@ -260,6 +260,25 @@ export function summarizeTurn(
       : `The estimate moved from ${before}% to ${after}% for ${playerNames[0]}.`);
   }
 
+  // Round 15: the decided sweep speaks right after the estimate — the board
+  // state that explains where the number is headed. Announce-gated: the
+  // game report speaks each stage once, the per-turn card on every turn.
+  const decided = analysis.p1.decided
+    ? { key: 'p1' as const, ...analysis.p1.decided }
+    : analysis.p2.decided
+      ? { key: 'p2' as const, ...analysis.p2.decided }
+      : null;
+  if (decided?.announce) {
+    const opponent = decided.key === 'p1' ? playerNames[1] : playerNames[0];
+    sentences.push(`From here ${decided.species} clears everything ${opponent} has left — ` +
+      'the game is practically decided.');
+  }
+  const nearDecided = analysis.p1.nearDecided ?? analysis.p2.nearDecided;
+  if (nearDecided?.announce) {
+    sentences.push(`${nearDecided.species} is one ${Math.round(nearDecided.odds * 100)}% roll ` +
+      `from clearing the rest — removing ${nearDecided.removes} leaves no answer behind.`);
+  }
+
   if (analysis.playedTracking === false) {
     // Played actions were never parsed (doubles) — describe the movement
     // and point at the engine lines; blame is off the table.
@@ -285,10 +304,20 @@ export function summarizeTurn(
       }
       break;
     }
-    case 'chance':
-      sentences.push('Both sides picked reasonable options — the swing came from how the turn rolled ' +
-        `(${winDeltaText(analysis.chanceDelta ?? analysis.swing ?? 0)}).`);
+    case 'chance': {
+      // Round 15: on a decided board a chance swing TOWARD the decided side
+      // is the game resolving, not luck — the same booking the game report
+      // has made since round 12, now visible on the turn itself. Chance
+      // against the decided side stays genuine luck.
+      const delta = analysis.chanceDelta ?? analysis.swing ?? 0;
+      const toward = decided !== null && (decided.key === 'p1' ? delta > 0 : delta < 0);
+      sentences.push(toward
+        ? 'Both sides picked reasonable options — the swing is the decided game resolving ' +
+          `toward ${decided.key === 'p1' ? playerNames[0] : playerNames[1]} (${winDeltaText(delta)}).`
+        : 'Both sides picked reasonable options — the swing came from how the turn rolled ' +
+          `(${winDeltaText(delta)}).`);
       break;
+    }
     case 'shift': {
       const decomposition = analysis.decisionDelta !== null && analysis.chanceDelta !== null
         ? ` (${winDeltaText(analysis.decisionDelta)} expected, ${winDeltaText(analysis.chanceDelta)} from the rolls)`

@@ -209,11 +209,43 @@ export interface EntryUnanswered {
  * stage — bench exhausted, active still holding. Entry lists are present
  * only when non-empty, so round-13 cache entries and pins read unchanged.
  */
+/**
+ * Round 15: the board says the game is practically over — one mon clears
+ * the WHOLE living enemy team in sequence and survives the accumulated
+ * expected return fire, and the other side has no such mon. Pairwise
+ * unanswered is a threat; this is stronger (648453 t13: Lopunny wins every
+ * fresh pair yet dies to the series). Narrative/display input only — the
+ * score path never reads it.
+ */
+export interface DecidedSweep {
+  side: 'p1' | 'p2';
+  species: string;
+}
+
+/**
+ * Round 15: one high-odds click from decided — a boundary event against
+ * the standing enemy active (accuracy × kill share, round 6) at or above
+ * the near threshold removes it and the REST clears in sequence (573756
+ * t73: a 95% Fire Fang away from the sweep).
+ */
+export interface NearDecidedSweep {
+  side: 'p1' | 'p2';
+  species: string;
+  /** accuracy × kill share of the unlocking click (≥ NEAR_DECIDED_ODDS). */
+  odds: number;
+  /** Species of the standing enemy active the click removes. */
+  removes: string;
+}
+
 export interface UnansweredProfile {
   p1: string[];
   p2: string[];
   p1Entry?: EntryUnanswered[];
   p2Entry?: EntryUnanswered[];
+  /** Present only when exactly one side sweeps (round-14 caches read unchanged). */
+  decided?: DecidedSweep;
+  /** Present only when no decided sweep stands and exactly one side is a roll away. */
+  nearDecided?: NearDecidedSweep;
 }
 
 export interface EvalMatrix {

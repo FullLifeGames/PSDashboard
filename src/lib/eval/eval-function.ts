@@ -1,6 +1,7 @@
 import type { Battle, Pokemon, Side } from '@pkmn/sim';
+import { boundaryEvent } from './ko-odds';
 import { effectiveSpeed, movesFirst } from './speed';
-import type { EntryUnanswered, UnansweredProfile } from './types';
+import type { DecidedSweep, EntryUnanswered, NearDecidedSweep, UnansweredProfile } from './types';
 
 /**
  * All tuning in one place. Values are points on an arbitrary scale; the final
@@ -897,6 +898,27 @@ export function matchupTerms(battle: Battle, cache?: MatchupCache): { matchup: n
 const FIRST_TURN_FLINCH_MOVES = new Set(['fakeout']);
 
 /**
+ * Near-decided odds floor (round 15, user-gated): a click only counts as
+ * "one roll from decided" when its boundary event (accuracy × kill share)
+ * is at least this sure. The user's bar: a 95%-to-win click should read
+ * that way — 0.9 keeps the stage to genuinely near-sure rolls (573756 t73
+ * prices 0.95) and leaves coin flips out.
+ */
+export const NEAR_DECIDED_ODDS = 0.9;
+
+/**
+ * Cap on the decided sweep's total clean-up clock (round 15). "Practically
+ * decided" means the board resolves NOW, not eventually: the measured
+ * anchors separate cleanly — real clean-up phases run 1–5 expected turns
+ * (573756's locked endgame: 4; 648453's t23+ clean-up: 1–5), while the
+ * false positives the uncapped check produced were 23–39-turn THEORETICAL
+ * grinds (573756 read decided from turn 1 of a 139-turn game because the
+ * whole enemy team priced as pinned healers). A slow grind leaves the
+ * opponent dozens of turns of play — that is a threat, not a decided game.
+ */
+export const DECIDED_MAX_TURNS = 6;
+
+/**
  * Living mons the OTHER side has no live answer to (round 13): the mon
  * beats EVERY living enemy's KO-race pair (strictly fewer turns, or a
  * finite tie taken on effective speed — a wall that merely holds the pair
@@ -996,10 +1018,93 @@ export function unansweredMons(battle: Battle, cache?: MatchupCache): Unanswered
   };
   const p1Profile = profile(p1Living, p2Living);
   const p2Profile = profile(p2Living, p1Living);
+  // The decided sweep (round 15): pairwise unanswered is a threat; DECIDED
+  // is stronger — one mon WINS every living enemy pair, clears the whole
+  // team within a short clock (DECIDED_MAX_TURNS), and survives the
+  // accumulated expected return fire (648453 t13: Lopunny wins every fresh
+  // pair yet dies to the series; 573756 t134+: the last pair's one-sided
+  // table is a decided endgame). Per pair the return fire is the
+  // defender's spare-turn rate (raceClocks' action economy — a healer that
+  // must heal to survive barely swings back). Replacements arrive
+  // hazard-tolled but get no free hit (they enter on a KO, not a switch);
+  // a benched sweeper pays its own entry: hazards plus one free expected
+  // hit from the standing active.
+  const sweepSurvivor = (mine: Pokemon[], theirs: Pokemon[]): string | null => {
+    const activeEnemy = theirs.find(enemy => enemy.isActive) ?? null;
+    for (const mon of mine) {
+      let turns = 0;
+      let chip = 0;
+      let blocked = false;
+      for (const enemy of theirs) {
+        const threatS = threat(mon, enemy);
+        const threatE = threat(enemy, mon);
+        const first = movesFirst(mon, enemy, threatS, threatE, battle);
+        const clocks = raceClocks(side(mon, threatS, enemy), side(enemy, threatE, mon));
+        // The sweeper must WIN every pair outright (the beatsEntry verdict,
+        // sans entry toll — replacements arrive on a KO, not a switch): a
+        // "survivor" that loses pairs but outlasts them on paper is an
+        // artifact of the spare-turn economy, not a clean-up.
+        const wins = clocks.turnsA < clocks.turnsB ||
+          (clocks.turnsA === clocks.turnsB && clocks.turnsA !== Infinity && first);
+        if (!wins) { blocked = true; break; }
+        const hits = Math.max(0, clocks.turnsA - (first ? 1 : 0));
+        turns += clocks.turnsA;
+        chip += hits * clocks.effFracB;
+      }
+      if (blocked) continue;
+      // "Practically decided" resolves NOW: a grind past the cap leaves the
+      // opponent dozens of turns of play (573756 read decided from turn 1
+      // without this).
+      if (turns > DECIDED_MAX_TURNS) continue;
+      const me = side(mon, threat(mon, theirs[0]), theirs[0]);
+      if (turns > me.ppBudget) continue;
+      const entryHit = mon.isActive || !activeEnemy ? 0
+        : expectedRate(threat(activeEnemy, mon), activeEnemy, mon);
+      if (me.hp + me.healAbsorb - entryHit - chip - me.residual * turns > 1e-9) {
+        return mon.species.name;
+      }
+    }
+    return null;
+  };
+  const p1Sweep = sweepSurvivor(p1Living, p2Living);
+  const p2Sweep = sweepSurvivor(p2Living, p1Living);
+  // Fail closed: both sides sweeping (or neither) is not decided.
+  const decided: DecidedSweep | undefined = p1Sweep !== null && p2Sweep === null
+    ? { side: 'p1', species: p1Sweep }
+    : p2Sweep !== null && p1Sweep === null
+      ? { side: 'p2', species: p2Sweep }
+      : undefined;
+  // The near stage: no decided sweep stands, but one high-odds click
+  // removes the standing active and the REST clears — the 573756 t73 shape
+  // (a 95% Fire Fang from the sweep). Own active, own click — a teammate's
+  // kill unlocking someone else's sweep stays out (narrower is honest).
+  const near = (key: 'p1' | 'p2', mine: Pokemon[], theirs: Pokemon[]): NearDecidedSweep | undefined => {
+    const attacker = mine.find(mon => mon.isActive);
+    const target = theirs.find(mon => mon.isActive);
+    if (!attacker || !target) return undefined;
+    let odds = 0;
+    for (const slot of usableSlots(attacker)) {
+      const event = boundaryEvent(battle, attacker, target, slot.id);
+      if (event && event.pKill > odds) odds = event.pKill;
+    }
+    if (odds < NEAR_DECIDED_ODDS) return undefined;
+    const rest = theirs.filter(enemy => enemy !== target);
+    const survivor = rest.length === 0 ? attacker.species.name : sweepSurvivor(mine, rest);
+    if (!survivor) return undefined;
+    return { side: key, species: survivor, odds, removes: target.species.name };
+  };
+  const nearDecided = decided ? undefined : (() => {
+    const p1Near = near('p1', p1Living, p2Living);
+    const p2Near = near('p2', p2Living, p1Living);
+    if (p1Near && p2Near) return undefined; // both one roll away — fail closed
+    return p1Near ?? p2Near;
+  })();
   return {
     p1: p1Profile.full, p2: p2Profile.full,
     ...(p1Profile.entry.length > 0 ? { p1Entry: p1Profile.entry } : {}),
     ...(p2Profile.entry.length > 0 ? { p2Entry: p2Profile.entry } : {}),
+    ...(decided ? { decided } : {}),
+    ...(nearDecided ? { nearDecided } : {}),
   };
 }
 
