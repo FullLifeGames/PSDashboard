@@ -497,6 +497,57 @@ test.describe('round-5 narrative: breadth, conditionals, null guard, forced mixe
     expect(summary).not.toContain('No single mistake');
   });
 
+  test('a shift turn names the hindsight read against the actual click (round 13)', () => {
+    const wide: EvalResult = {
+      score: 0.0, interval: 0.3, depthCompleted: 1,
+      perSide: {
+        p1: [
+          choice('move ironhead', 'Iron Head', 0.1),
+          choice('move earthpower', 'Earth Power', 0.1),
+          choice('move recover', 'Recover', 0.09),
+          choice('move toxic', 'Toxic', 0.05),
+          choice('switch 2', '→ Heatran', 0.02),
+        ],
+        p2: [
+          choice('move surf', 'Surf', 0.05),
+          choice('move icebeam', 'Ice Beam', 0.04),
+          choice('move roost', 'Roost', 0.0),
+          choice('switch 3', '→ Mandibuzz', -0.02),
+        ],
+      },
+      matrix: {
+        p1Labels: ['Iron Head', 'Earth Power', 'Recover', 'Toxic', '→ Heatran'],
+        p2Labels: ['Surf', 'Ice Beam', 'Roost', '→ Mandibuzz'],
+        p1Choices: ['move ironhead', 'move earthpower', 'move recover', 'move toxic', 'switch 2'],
+        p2Choices: ['move surf', 'move icebeam', 'move roost', 'switch 3'],
+        // p2 against the Iron Head actually clicked (row 0, own-p2 = −value):
+        // played Surf −0.30, → Mandibuzz +0.05 — a 0.35 read. p1 against the
+        // Surf actually clicked (column 0): played 0.30, best 0.32 — no read.
+        values: [
+          [0.30, 0.10, 0.12, -0.05],
+          [0.32, 0.11, 0.10, 0.08],
+          [0.20, 0.09, 0.05, 0.02],
+          [0.15, 0.05, 0.08, 0.01],
+          [0.10, 0.02, 0.03, 0.00],
+        ],
+        mixes: { p1: [0.5, 0.5, 0, 0, 0], p2: [0.6, 0.2, 0.1, 0.1] },
+      },
+    };
+    const summary = summarizeTurn(analyzeTurn({
+      turn: 10,
+      result: wide,
+      played: { p1: { kind: 'move', name: 'Iron Head', tera: false }, p2: { kind: 'move', name: 'Surf', tera: false } },
+      playedOutcome: 0.12,
+      scoreBefore: 0.0,
+      scoreAfter: 0.25,
+    }), names);
+    expect(summary).toContain('open turn');
+    expect(summary).toContain('The read was there for Beta');
+    expect(summary).toContain('switching to Mandibuzz');
+    // gain 0.35 wp-units = 18 win-probability points.
+    expect(summary).toContain('+18%');
+  });
+
   const conditionalChoice = (choiceStr: string, label: string, ev: number, punishedBy: string | null = null): RankedChoice =>
     ({ choice: choiceStr, label, worstCase: ev - 0.05, expected: ev, ev, punishedBy });
 
@@ -781,5 +832,53 @@ test.describe('streak clauses (round 6)', () => {
     const summary = summarizeTurn(analysis, names);
     expect(summary).toContain("Beta's 3rd straight attack into the boosted Snorlax");
     expect(summary).toContain('and a crit ignores those boosts');
+  });
+});
+
+test.describe('round-13 narrative: entry-is-profit', () => {
+  test('a switch into an unanswered mon names the principle', () => {
+    const result: EvalResult = {
+      score: 0.0, interval: 0.1, depthCompleted: 1,
+      perSide: {
+        p1: [choice('move tackle', 'Tackle', 0.1)],
+        p2: [choice('switch 2', '→ Lopunny-Mega', 0.05), choice('move surf', 'Surf', 0.0)],
+      },
+      unanswered: { p1: [], p2: ['Lopunny-Mega'] },
+    };
+    const summary = summarizeTurn(analyzeTurn({
+      turn: 13,
+      result,
+      played: {
+        p1: { kind: 'move', name: 'Tackle', tera: false },
+        p2: { kind: 'switch', name: 'Lop', species: 'Lopunny-Mega' },
+      },
+      playedOutcome: 0.05,
+      scoreBefore: 0.0,
+      scoreAfter: 0.05,
+    }), names);
+    expect(summary).toContain('Lopunny-Mega has no live answer on the other side');
+    expect(summary).toContain('turns profit');
+  });
+
+  test('no signal, no sentence', () => {
+    const result: EvalResult = {
+      score: 0.0, interval: 0.1, depthCompleted: 1,
+      perSide: {
+        p1: [choice('move tackle', 'Tackle', 0.1)],
+        p2: [choice('switch 2', '→ Lopunny-Mega', 0.05), choice('move surf', 'Surf', 0.0)],
+      },
+    };
+    const summary = summarizeTurn(analyzeTurn({
+      turn: 13,
+      result,
+      played: {
+        p1: { kind: 'move', name: 'Tackle', tera: false },
+        p2: { kind: 'switch', name: 'Lop', species: 'Lopunny-Mega' },
+      },
+      playedOutcome: 0.05,
+      scoreBefore: 0.0,
+      scoreAfter: 0.05,
+    }), names);
+    expect(summary).not.toContain('no live answer');
   });
 });

@@ -1,4 +1,4 @@
-import { createMatchupCache, type MatchupCache } from './eval-function';
+import { createMatchupCache, unansweredMons, type MatchupCache } from './eval-function';
 import {
   advancePosition, createRootPosition, positionBattle,
   type ChoiceOption, type SimPosition,
@@ -190,7 +190,12 @@ function topVisitedIndex(n: number[]): number {
  * thin static cells), so the score line stays bit-identical to the
  * standing records while the recommendations upgrade.
  */
-function toResult(root: Node, maxDepth: number, koOdds?: RootKoOdds): EvalResult {
+function toResult(
+  root: Node,
+  maxDepth: number,
+  koOdds?: RootKoOdds,
+  unanswered?: { p1: string[]; p2: string[] },
+): EvalResult {
   if (root.ended || root.p1Options.length === 0 || root.p2Options.length === 0 || root.visits === 0) {
     return { score: root.value, interval: 0, depthCompleted: maxDepth, perSide: { p1: [], p2: [] } };
   }
@@ -227,6 +232,8 @@ function toResult(root: Node, maxDepth: number, koOdds?: RootKoOdds): EvalResult
       }
     }
   }
+  // Round 13: root narrative payload, same contract as search.ts.
+  if (unanswered && (unanswered.p1.length > 0 || unanswered.p2.length > 0)) result.unanswered = unanswered;
   return result;
 }
 
@@ -255,6 +262,8 @@ function runMcts(
     p1: koOddsForOptions(rootBattle, 'p1', root.p1Options.map(option => option.choice)),
     p2: koOddsForOptions(rootBattle, 'p2', root.p2Options.map(option => option.choice)),
   };
+  // Round 13: root unanswered-mon profile, once per root like the ko odds.
+  const unanswered = unansweredMons(rootBattle, matchupCache);
 
   let maxDepth = 1;
   for (let iteration = 0; iteration < MCTS_ITERATIONS; iteration++) {
@@ -305,11 +314,11 @@ function runMcts(
     const done = iteration + 1;
     callbacks?.onProgress?.({ done, total: MCTS_ITERATIONS, depth: maxDepth });
     if (done % PARTIAL_EVERY === 0 && done < MCTS_ITERATIONS) {
-      callbacks?.onPartial?.(toResult(root, maxDepth, koOdds));
+      callbacks?.onPartial?.(toResult(root, maxDepth, koOdds, unanswered));
     }
   }
 
-  const result = toResult(root, maxDepth, koOdds);
+  const result = toResult(root, maxDepth, koOdds, unanswered);
   callbacks?.onPartial?.(result);
   return { root, maxDepth, result, koOdds };
 }

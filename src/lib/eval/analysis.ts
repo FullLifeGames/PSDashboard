@@ -250,6 +250,24 @@ export interface SideAnalysis {
    * narrative only — grading never sees it.
    */
   streakOdds?: StreakOdds;
+  /**
+   * The punishing counterfactual the solved matrix already knows (round 13):
+   * the own row that best answers the opponent's ACTUAL click, when it beats
+   * the played line in that column by a mistake-sized gain. The shift
+   * narrative renders it as the concrete read that was on the table
+   * (562428 t10: → Heatran into the Horn Leech). Display-only, never grades;
+   * fails closed without machine choice ids or a known opponent action.
+   */
+  hindsightRead?: { response: string; against: string; gain: number };
+  /**
+   * The turn brings in a mon the opponent has no live race answer to
+   * (round 13, root profile from the search): entering it cleanly is profit
+   * on its own — the opponent can only sacrifice into it (648453 t13,
+   * Lopunny-Mega). Set when the played or recommended line's entry target
+   * ("→ X", a pivot's "U-turn → X" included) is on the own unanswered
+   * list; display-only, never grades.
+   */
+  unanswered?: { species: string };
 }
 
 /** Deep re-search of the played and best pairs (p1-perspective outcomes). */
@@ -730,6 +748,46 @@ export function analyzeTurn(params: {
       forcedMix = { label: sideLabels[mixTop], weight: mix[mixTop] };
     }
 
+    // Round 13: the read that was on the table. Against the opponent's ACTUAL
+    // click (a known column, unlike the equilibrium the conditional reasons
+    // over) the matrix knows the best own row; when it beats the played line
+    // in that column by a mistake-sized gain, the shift narrative names the
+    // concrete counterfactual (562428 t10: → Heatran into the Horn Leech).
+    let hindsightRead: SideAnalysis['hindsightRead'];
+    if (matrix && sideChoices && sideLabels && played) {
+      const oppKey = key === 'p1' ? 'p2' as const : 'p1' as const;
+      const oppChoices = key === 'p1' ? matrix.p2Choices : matrix.p1Choices;
+      const oppPlayed = matchPlayedChoice(params.result, oppKey, params.played?.[oppKey] ?? null);
+      const column = oppPlayed && oppChoices ? oppChoices.indexOf(oppPlayed.choice) : -1;
+      const row = sideChoices.indexOf(played.choice);
+      if (column >= 0 && row >= 0) {
+        let bestRow = -1;
+        let bestValue = -Infinity;
+        for (let i = 0; i < sideChoices.length; i++) {
+          const value = ownValue(matrix, i, column);
+          if (value > bestValue) { bestValue = value; bestRow = i; }
+        }
+        const gain = bestValue - ownValue(matrix, row, column);
+        if (bestRow >= 0 && bestRow !== row && gain >= TIER_THRESHOLDS.mistake) {
+          hindsightRead = { response: sideLabels[bestRow], against: oppPlayed!.label, gain };
+        }
+      }
+    }
+
+    // Round 13: entry-is-profit — the played or recommended line brings in
+    // a mon from the root's unanswered profile (no live enemy wins the race
+    // pair against it), so a clean entry is value on its own (648453 t13).
+    let unanswered: SideAnalysis['unanswered'];
+    const ownUnanswered = params.result.unanswered?.[key];
+    if (ownUnanswered && ownUnanswered.length > 0) {
+      const entryTarget = (label: string | undefined): string | null =>
+        label?.match(/→ (.+)$/)?.[1] ?? null;
+      const species = [played?.label, best?.label]
+        .map(entryTarget)
+        .find(target => target !== null && ownUnanswered.includes(target));
+      if (species) unanswered = { species };
+    }
+
     let bestNull: SideAnalysis['bestNull'];
     const actives = params.actives;
     const defenderSpecies = actives ? (key === 'p1' ? actives.p2 : actives.p1) : null;
@@ -780,6 +838,8 @@ export function analyzeTurn(params: {
       ...(bestNull ? { bestNull } : {}),
       ...(forcedMix ? { forcedMix } : {}),
       ...(streakOdds ? { streakOdds } : {}),
+      ...(hindsightRead ? { hindsightRead } : {}),
+      ...(unanswered ? { unanswered } : {}),
     };
   };
 

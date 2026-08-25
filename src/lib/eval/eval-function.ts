@@ -875,6 +875,56 @@ export function matchupTerms(battle: Battle, cache?: MatchupCache): { matchup: n
   return { matchup: totalWeight > 0 ? sum / totalWeight : 0, coverage };
 }
 
+/**
+ * Living mons the OTHER side has no live answer to (round 13): no living
+ * enemy wins the KO-race pair against them (strictly fewer turns, or a
+ * finite tie taken on effective speed), while they win at least one pair
+ * themselves — a dead-even patt threatens nothing worth naming. Entry HP is
+ * hazard-adjusted exactly like the matchup term, so an "answer" that would
+ * arrive inside KO range of its own rocks is none. Root-level narrative
+ * input (648453 t13: with no live answer to Lopunny-Mega, any successful
+ * switch into it — a U-turn included — turns profit, the opponent can only
+ * sacrifice into it); never part of the score.
+ */
+export function unansweredMons(battle: Battle, cache?: MatchupCache): { p1: string[]; p2: string[] } {
+  const living = (index: 0 | 1) =>
+    battle.sides[index].pokemon.filter(pokemon => !pokemon.fainted && pokemon.hp > 0);
+  const p1Living = living(0);
+  const p2Living = living(1);
+  if (p1Living.length === 0 || p2Living.length === 0) return { p1: [], p2: [] };
+
+  const threat = threatGetter(battle, cache);
+  const profiles = new Map<Pokemon, { rate: number; absorb: number }>();
+  const budgets = new Map<Pokemon, number>();
+  const side = (pokemon: Pokemon, threatOut: PairThreat, enemy: Pokemon): RaceSide => {
+    let profile = profiles.get(pokemon);
+    if (!profile) { profile = healProfile(pokemon, battle); profiles.set(pokemon, profile); }
+    let budget = budgets.get(pokemon);
+    if (budget === undefined) { budget = ppBudget(pokemon); budgets.set(pokemon, budget); }
+    const hp = pokemon.hp / pokemon.maxhp;
+    return {
+      hp: pokemon.isActive ? hp : Math.max(0, hp - hazardEntryFraction(pokemon, pokemon.side, battle)),
+      frac: boostedFraction(threatOut, pokemon, enemy),
+      residual: statusResidual(pokemon),
+      healRate: profile.rate, healAbsorb: profile.absorb, ppBudget: budget,
+    };
+  };
+  // Same verdict the matchup term weighs: strictly first, or a finite tie
+  // taken on effective speed.
+  const wins = (a: Pokemon, b: Pokemon): boolean => {
+    const threatA = threat(a, b);
+    const threatB = threat(b, a);
+    const { turnsA, turnsB } = raceClocks(side(a, threatA, b), side(b, threatB, a));
+    if (turnsA < turnsB) return true;
+    if (turnsB < turnsA) return false;
+    return turnsA !== Infinity && movesFirst(a, b, threatA, threatB, battle);
+  };
+  const unansweredOf = (mine: Pokemon[], theirs: Pokemon[]): string[] => mine
+    .filter(mon => !theirs.some(enemy => wins(enemy, mon)) && theirs.some(enemy => wins(mon, enemy)))
+    .map(mon => mon.species.name);
+  return { p1: unansweredOf(p1Living, p2Living), p2: unansweredOf(p2Living, p1Living) };
+}
+
 /** Static positional eval from p1's perspective in [-1, +1]; ±1 for ended battles. */
 export function evaluatePosition(battle: Battle, cache?: MatchupCache): number {
   if (battle.ended) {

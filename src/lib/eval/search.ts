@@ -1,6 +1,7 @@
 import type { Pokemon, PRNGSeed } from '@pkmn/sim';
 import {
-  boostedFraction, createMatchupCache, evaluatePosition, pairThreat, singleMoveFraction, type MatchupCache,
+  boostedFraction, createMatchupCache, evaluatePosition, pairThreat, singleMoveFraction, unansweredMons,
+  type MatchupCache,
 } from './eval-function';
 import {
   advancePosition, advancePositionWithLog, createRootPosition, legalChoices, positionBattle,
@@ -742,6 +743,12 @@ export function searchPosition(
       }
     }
   };
+  // Root unanswered-mon profile (round 13): narrative input only, computed
+  // once — sub-searches skip it like the ko-odds maps.
+  const unanswered = restrictCandidates ? null : unansweredMons(battle, matchupCache);
+  const attachUnanswered = (target: EvalResult) => {
+    if (unanswered && (unanswered.p1.length > 0 || unanswered.p2.length > 0)) target.unanswered = unanswered;
+  };
   // Pre-deepening statics: the trend baseline. Every trend the tiebreak
   // compares is uniformly 1-ply-vs-static — mixed ply counts inside one
   // comparison are the depth-asymmetry trap.
@@ -751,6 +758,7 @@ export function searchPosition(
   let result = toResult(ranked, 1);
   attachKoDiagnostics(result);
   attachKoOdds(result);
+  attachUnanswered(result);
   callbacks?.onPartial?.(result);
 
   let stopped = false;
@@ -809,6 +817,7 @@ export function searchPosition(
     result = toResult(ranked, depth);
     attachKoDiagnostics(result);
     attachKoOdds(result);
+    attachUnanswered(result);
     callbacks?.onPartial?.(result);
   }
 
@@ -852,6 +861,7 @@ export function createLocalExecutor(serializedBattle: string): SearchExecutor {
           p1: koOddsForOptions(battle, 'p1', p1.map(option => option.choice)),
           p2: koOddsForOptions(battle, 'p2', p2.map(option => option.choice)),
         },
+        unanswered: unansweredMons(battle, matchupCache),
       };
     },
     async evalCells(jobs, onDone) {

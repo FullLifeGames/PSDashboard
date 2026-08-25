@@ -1254,6 +1254,51 @@ test.describe('narrative signals (round 5)', () => {
     expect(analyzeTurn(conditionalParams(moveTop)).p2.forcedMix).toBeUndefined();
   });
 
+  test('the matrix names the hindsight read against the opponent\'s actual click (round 13)', () => {
+    const analysis = analyzeTurn(conditionalParams(
+      conditionalResult(['move recover', 'switch 5', 'move splash'])));
+    // p2 vs the Iron Head actually clicked (column 0, own-p2): Recover −0.05,
+    // → Heatran −0.02, the played Splash −0.30 — the read was worth 0.28.
+    expect(analysis.p2.hindsightRead).toBeDefined();
+    expect(analysis.p2.hindsightRead!.response).toBe('→ Heatran');
+    expect(analysis.p2.hindsightRead!.against).toBe('Iron Head');
+    expect(analysis.p2.hindsightRead!.gain).toBeCloseTo(0.28, 10);
+    // p1 vs the Splash actually clicked: Earth Power 0.35 over Iron Head 0.30
+    // — a 0.05 edge is not a read; below the mistake band the signal stays off.
+    expect(analysis.p1.hindsightRead).toBeUndefined();
+  });
+
+  test('the hindsight read fails closed without machine choice ids', () => {
+    const analysis = analyzeTurn(conditionalParams(conditionalResult()));
+    expect(analysis.p2.hindsightRead).toBeUndefined();
+  });
+
+  test('a switch into an unanswered mon carries the entry-is-profit signal (round 13)', () => {
+    const result = conditionalResult(['move recover', 'switch 5', 'move splash']);
+    result.unanswered = { p1: [], p2: ['Heatran'] };
+    const analysis = analyzeTurn({
+      ...conditionalParams(result),
+      played: {
+        p1: { kind: 'move' as const, name: 'Iron Head', tera: false },
+        p2: { kind: 'switch' as const, name: 'Heaty', species: 'Heatran' },
+      },
+    });
+    expect(analysis.p2.unanswered).toEqual({ species: 'Heatran' });
+    expect(analysis.p1.unanswered).toBeUndefined();
+
+    // A profile that does not cover the entry target stays silent.
+    const off = conditionalResult(['move recover', 'switch 5', 'move splash']);
+    off.unanswered = { p1: [], p2: ['Blissey'] };
+    const quiet = analyzeTurn({
+      ...conditionalParams(off),
+      played: {
+        p1: { kind: 'move' as const, name: 'Iron Head', tera: false },
+        p2: { kind: 'switch' as const, name: 'Heaty', species: 'Heatran' },
+      },
+    });
+    expect(quiet.p2.unanswered).toBeUndefined();
+  });
+
   test('a mechanically null best names its reason and a co-optimal alternative', () => {
     const wisp: EvalResult = {
       score: 0.1, interval: 0, depthCompleted: 1,

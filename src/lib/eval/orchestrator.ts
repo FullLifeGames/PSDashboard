@@ -87,6 +87,11 @@ export async function searchOrchestrated(
       }
     }
   };
+  // Root unanswered-mon profile (round 13), computed sim-side by choices().
+  const attachUnanswered = (target: EvalResult) => {
+    const unanswered = info.unanswered;
+    if (unanswered && (unanswered.p1.length > 0 || unanswered.p2.length > 0)) target.unanswered = unanswered;
+  };
   // Trend baseline, mirroring searchPosition: uniformly 1-ply-vs-static.
   const staticValues = values.map(row => [...row]);
   const trendMap = new Map<number, number>();
@@ -95,6 +100,7 @@ export async function searchOrchestrated(
   let result = toResult(ranked, 1);
   attachKoDiagnostics(result);
   attachKoOdds(result);
+  attachUnanswered(result);
   callbacks?.onPartial?.(result);
 
   let stopped = false;
@@ -149,6 +155,7 @@ export async function searchOrchestrated(
     result = toResult(ranked, depth);
     attachKoDiagnostics(result);
     attachKoOdds(result);
+    attachUnanswered(result);
     callbacks?.onPartial?.(result);
   }
 

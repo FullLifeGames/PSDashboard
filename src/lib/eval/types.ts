@@ -183,6 +183,12 @@ export interface EvalResult {
    * The feedback harness counts these per replay.
    */
   koDiagnostics?: KoOddsMismatch[];
+  /**
+   * Root-position mons the OTHER side has no live race answer to (round 13,
+   * per side, species names) — narrative input for the entry-is-profit
+   * principle (648453 t13). Absent when empty or on sub-searches.
+   */
+  unanswered?: { p1: string[]; p2: string[] };
 }
 
 export interface EvalMatrix {
@@ -232,6 +238,8 @@ export interface EvalChoicesInfo {
   rootEnded: boolean;
   /** Per-option analytic kill odds, index-aligned with p1/p2 (round 6). */
   koOdds?: { p1: (KoOddsInfo | null)[]; p2: (KoOddsInfo | null)[] };
+  /** Root unanswered-mon profile (round 13) for the orchestrated path. */
+  unanswered?: { p1: string[]; p2: string[] };
 }
 
 export interface EvalCellJob {

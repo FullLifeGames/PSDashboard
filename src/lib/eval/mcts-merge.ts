@@ -96,6 +96,8 @@ export function mergeMctsTrees(trees: MctsTreeStats[], verified?: Map<number, Ev
   );
   const result = rankedToResult(ranked, Math.max(...trees.map(tree => tree.depth)));
   if (diagnostics.length > 0) result.koDiagnostics = diagnostics;
+  // Round 13: the root unanswered profile is tree-invariant — take trees[0]'s.
+  if (base.result.unanswered) result.unanswered = base.result.unanswered;
 
   // HYBRID SEMANTICS (see mcts.ts toResult): the score keeps the summed
   // visit-mean formulation — bit-comparable with the standing records —

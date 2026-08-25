@@ -306,6 +306,20 @@ export function summarizeTurn(
         : decomposition
           ? `No single mistake stands out — the choices and the rolls pushed the same way${decomposition}.`
           : 'No single mistake stands out — the swing built up without a clear culprit.');
+      // Round 13: the concrete counterfactual the matrix knows — the best
+      // answer to the opponent's ACTUAL click. One sentence, the side whose
+      // missed read cost more (562428 t10: → Heatran into the Horn Leech).
+      const reads = [
+        { name: playerNames[0], read: analysis.p1.hindsightRead },
+        { name: playerNames[1], read: analysis.p2.hindsightRead },
+      ].filter((entry): entry is { name: string; read: NonNullable<SideAnalysis['hindsightRead']> } =>
+        entry.read !== undefined);
+      const missed = reads.sort((a, b) => b.read.gain - a.read.gain)[0];
+      if (missed) {
+        sentences.push(`The read was there for ${missed.name} — against the ` +
+          `${missed.read.against} actually clicked, ${labelPhrase(missed.read.response)} ` +
+          `was worth ${winDeltaText(missed.read.gain)} more.`);
+      }
       break;
     }
     case 'unclear':
@@ -331,6 +345,19 @@ export function summarizeTurn(
   const p2Forced = forcedClause(playerNames[1], analysis.p2);
   if (p1Forced) sentences.push(p1Forced);
   if (p2Forced) sentences.push(p2Forced);
+
+  // Entry-is-profit context rides along the same way (round 13): bringing
+  // in a mon the opponent has no live race answer to is board logic worth
+  // naming, not a verdict (648453 t13: the Lopunny switch).
+  const unansweredClause = (side: SideAnalysis): string | null =>
+    side.unanswered
+      ? `${side.unanswered.species} has no live answer on the other side — any turn that ` +
+        'brings it in cleanly turns profit, and the opponent can only sacrifice into it.'
+      : null;
+  const p1Unanswered = unansweredClause(analysis.p1);
+  const p2Unanswered = unansweredClause(analysis.p2);
+  if (p1Unanswered) sentences.push(p1Unanswered);
+  if (p2Unanswered) sentences.push(p2Unanswered);
 
   // Streak cumulation rides along the same way: multi-turn expectation is
   // narrative context, never a verdict.

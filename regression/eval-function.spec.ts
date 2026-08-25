@@ -4,7 +4,7 @@ import type { PokemonSet } from '@pkmn/sim';
 import {
   createMatchupCache, DOUBLES_FEATURE_WEIGHTS, evalFeatures, evaluatePosition, EVAL_WEIGHTS,
   FEATURE_WEIGHTS, featureWeights, hazardCost, hazardRemovalEquity, matchupTerms, pairThreat, raceClocks,
-  strandedMons,
+  strandedMons, unansweredMons,
   type EvalFeatures, type RaceSide,
 } from '../src/lib/eval/eval-function';
 
@@ -910,6 +910,29 @@ test.describe('PP truth in the threat model (round 11)', () => {
     // Draining a move between evaluations must not serve the stale threat.
     battle.sides[0].active[0]!.moveSlots[0].pp = 0;
     expect(evaluatePosition(battle, cache)).toBe(evaluatePosition(battle));
+  });
+
+  test.describe('unanswered mons (round 13)', () => {
+    test('a mon no living enemy out-races is unanswered', () => {
+      // A level-100 Mewtwo one-shots both bodies; their Tackles never win a
+      // race against it. 648453 t13's principle: any successful entry of an
+      // unanswered mon turns profit — the opponent can only sacrifice.
+      const battle = makeBattle(
+        [makeSet('Mewtwo', 'Mewtwo', ['Psystrike'], 100)],
+        [makeSet('Rattata', 'Rattata', ['Tackle']), makeSet('Raticate', 'Raticate', ['Tackle'])],
+      );
+      expect(unansweredMons(battle)).toEqual({ p1: ['Mewtwo'], p2: [] });
+    });
+
+    test('a dead-even mirror names nobody — a patt is not an unanswered threat', () => {
+      // The Snorlax Tackle mirror is a 7-turn race both ways: neither side's
+      // mon WINS a pair, so neither is a wincon the narrative should name.
+      const battle = makeBattle(
+        [makeSet('A', 'Snorlax', ['Tackle'])],
+        [makeSet('B', 'Snorlax', ['Tackle'])],
+      );
+      expect(unansweredMons(battle)).toEqual({ p1: [], p2: [] });
+    });
   });
 });
 
