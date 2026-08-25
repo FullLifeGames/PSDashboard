@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { parseTeamText } from '../lib/team-parser';
 
 interface Props {
@@ -7,13 +7,22 @@ interface Props {
   onTeamLoad: (teamText: string) => void;
   loading: boolean;
   error: string | null;
+  /** Canonical link of the replay that is currently loaded — mirrored into the input. */
+  loadedUrl?: string | null;
   teamStatus?: string | null;
   teamError?: string | null;
   showGuide?: boolean;
 }
 
-export function ReplayLoader({ onLoad, onLoadFile, onTeamLoad, loading, error, teamStatus = null, teamError = null, showGuide = false }: Props) {
+export function ReplayLoader({ onLoad, onLoadFile, onTeamLoad, loading, error, loadedUrl = null, teamStatus = null, teamError = null, showGuide = false }: Props) {
   const [url, setUrl] = useState('https://replay.pokemonshowdown.com/gen9draft-2058494320');
+
+  // Once a replay is loaded the input shows ITS link, not the default or a
+  // stale draft — a replay can arrive through share links, files, or embed
+  // messages, not just typing here.
+  useEffect(() => {
+    if (loadedUrl) setUrl(loadedUrl);
+  }, [loadedUrl]);
   const [teamText, setTeamText] = useState('');
   const [dragActive, setDragActive] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);

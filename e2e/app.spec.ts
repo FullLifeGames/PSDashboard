@@ -716,6 +716,14 @@ test.describe('PS Dashboard', () => {
     await expect(page.locator('iframe')).toHaveCount(1);
   });
 
+  test('the loader input reflects the loaded replay link', async ({ page }) => {
+    await page.locator('button', { hasText: 'Load' }).click();
+    // The default draft link gives way to the canonical link of what loaded —
+    // whichever path (typed URL, file, share link) brought the replay in.
+    await expect(page.getByLabel('Replay URL or ID')).toHaveValue(
+      `https://replay.pokemonshowdown.com/${fixtureReplay.id}`, { timeout: 10000 });
+  });
+
   test('shows branch bar with slider and Branch Here button', async ({ page }) => {
     await page.locator('button', { hasText: 'Load' }).click();
     await expect(page.locator('input[type="range"]')).toBeVisible({ timeout: 10000 });
@@ -836,6 +844,8 @@ test.describe('PS Dashboard', () => {
     await expect.poll(async () => frame!.evaluate(() =>
       (window as ReplayWindow).Replays?.battle?.viewpointSwitched ?? false
     ), { timeout: 30_000 }).toBe(true);
+    // The mirrored loader link keeps the perspective flag.
+    await expect(page.getByLabel('Replay URL or ID')).toHaveValue(/\?p2$/);
   });
 
   test('replay iframe keeps a fixed visible height without negative offset', async ({ page }) => {

@@ -1031,6 +1031,12 @@ function App() {
     void loadReplay(replayId);
   }, [clearSharedBranch, loadReplay]);
 
+  // Canonical link of whatever is loaded — mirrored into the loader input,
+  // whichever path (typed URL, file, share link, embed message) loaded it.
+  const loadedReplayUrl = replayData
+    ? `https://replay.pokemonshowdown.com/${replayData.id}${replayData.viewpoint === 'p2' ? '?p2' : ''}`
+    : null;
+
   // Programmatic seeks (graph clicks) race the embed's turn echoes: while
   // the iframe is still seeking it keeps reporting the OLD turn, which
   // would knock the fresh selection straight back (the analysis flipped
@@ -1377,6 +1383,7 @@ function App() {
             onTeamLoad={handleTeamLoad}
             loading={loading}
             error={error}
+            loadedUrl={loadedReplayUrl}
             teamStatus={teamPasteStatus}
             teamError={teamPasteError || teamPasteMismatch}
             showGuide
@@ -1600,6 +1607,7 @@ function App() {
                   onTeamLoad={handleTeamLoad}
                   loading={loading}
                   error={error}
+                  loadedUrl={loadedReplayUrl}
                   teamStatus={teamPasteStatus}
                   teamError={teamPasteError || teamPasteMismatch}
                 />
