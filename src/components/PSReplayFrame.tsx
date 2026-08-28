@@ -17,6 +17,13 @@ interface Props {
   /** Viewer perspective — 'p2' renders from player 2's side (the ?p2 replay-URL flag). */
   viewpoint?: 'p1' | 'p2';
   onTurnChange?: (turn: number) => void;
+  /**
+   * Explicit one-shot seek command for live-update frames, which ignore
+   * seekTurn prop changes after mount (re-seeking on every render fought
+   * the append stream). Bump `seq` to send; `play` starts playback there —
+   * the "watch the line from its branch point" affordance.
+   */
+  seekRequest?: { turn: number; seq: number; play?: boolean } | null;
 }
 
 /**
@@ -55,6 +62,7 @@ function PSReplayFrameDocument({
   reloadKey = 'default',
   viewpoint,
   onTurnChange,
+  seekRequest = null,
 }: DocumentProps) {
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const sentLogRef = useRef<{ key: string; blobUrl: string; lines: string[] } | null>(null);
@@ -134,6 +142,20 @@ function PSReplayFrameDocument({
       window.removeEventListener('message', handler);
     };
   }, [seekTurn, autoPlay, blobUrl, liveUpdates]);
+
+  // Explicit navigation/watch seeks (seekRequest): requests issued before this
+  // frame instance mounted are stale — the initial seekTurn already positioned
+  // it — so only seq bumps AFTER mount are sent.
+  const seenSeekSeqRef = useRef<number | null>(seekRequest?.seq ?? null);
+  useEffect(() => {
+    if (!seekRequest || seekRequest.seq === seenSeekSeqRef.current) return;
+    seenSeekSeqRef.current = seekRequest.seq;
+    iframeRef.current?.contentWindow?.postMessage({
+      type: 'ps-seek-turn',
+      turn: seekRequest.turn,
+      autoPlay: !!seekRequest.play,
+    }, '*');
+  }, [seekRequest]);
 
   useEffect(() => {
     if (!liveUpdates || !blobUrl) return;

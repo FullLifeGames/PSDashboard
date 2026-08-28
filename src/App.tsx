@@ -245,11 +245,22 @@ function App() {
    *  the main line — and every recorded variation position. */
   const liveEvalView = liveTip || viewingVariation;
 
-  const navigateTo = useCallback((position: TimelinePosition) => {
+  /**
+   * One-shot seek command for the branch iframe, which ignores seekTurn prop
+   * changes after mount (re-seeking every render fought the append stream).
+   * Bumped by user navigation; the tip-follow after an executed turn skips it
+   * (the append message already positions the frame, animated when enabled).
+   */
+  const [navSeek, setNavSeek] = useState<{ turn: number; seq: number; play?: boolean } | null>(null);
+
+  const navigateTo = useCallback((position: TimelinePosition, opts?: { seek?: boolean }) => {
     const next = normalizePosition(position, maxTurn, variationSpan);
     setViewTurn(next.turn);
     setViewLine(next.line);
     setDraftChoices({ p1: [], p2: [] });
+    if (opts?.seek !== false) {
+      setNavSeek(prev => ({ turn: next.turn, seq: (prev?.seq ?? 0) + 1 }));
+    }
   }, [maxTurn, variationSpan, setViewTurn]);
 
   const discardVariation = useCallback(() => {
@@ -269,7 +280,7 @@ function App() {
   const tipTurn = variationSpan ? variationTip(variationSpan) : null;
   useEffect(() => {
     if (!branching || tipTurn === null) return;
-    navigateTo({ turn: tipTurn, line: 'variation' });
+    navigateTo({ turn: tipTurn, line: 'variation' }, { seek: false });
   }, [branching, tipTurn, navigateTo]);
 
   /**
@@ -311,6 +322,7 @@ function App() {
     setPendingConfirm(null);
     setPlayOut(null);
     setVariationScores([]);
+    setNavSeek(null);
     setBranchDivergence(null);
     branchWindowOpenRef.current = false;
     stopBranch();
@@ -1869,6 +1881,7 @@ function App() {
                   liveAppendMode={animateBranchTurns ? 'play' : 'follow-end'}
                   liveAppendTurn={latestBranchHistoryEntry?.turnNumber ?? null}
                   reloadKey={branchReloadKey}
+                  seekRequest={navSeek}
                 />
               ) : (
                 <PSReplayFrame
