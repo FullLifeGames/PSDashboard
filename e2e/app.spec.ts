@@ -1,4 +1,4 @@
-import { test, expect, type Frame } from '@playwright/test';
+import { test, expect, type Frame, type Page } from '@playwright/test';
 import { readFileSync } from 'fs';
 import { dirname, join } from 'path';
 import { fileURLToPath } from 'url';
@@ -86,6 +86,69 @@ async function expectReplayTurn(
   ), { timeout: 15_000 }).toBe(turn);
 }
 
+/** Like expectReplayTurn, but tolerant of live-append animation timing: the
+ *  appended turn may still be playing, so the battle only needs to have
+ *  REACHED the turn (it settles at the log's end on its own). */
+async function expectReplayTurnAtLeast(frame: Frame, turn: number) {
+  await expect.poll(async () => frame.evaluate(() =>
+    !!(window as ReplayWindow).Replays?.battle
+  ), { timeout: 30_000 }).toBe(true);
+  await expect.poll(async () => frame.evaluate(() =>
+    (window as ReplayWindow).Replays?.battle?.turn ?? -1
+  ), { timeout: 30_000 }).toBeGreaterThanOrEqual(turn);
+}
+
+/**
+ * Unified-timeline helper: moves the slider to `turn`, picks a move for both
+ * sides from the ALWAYS-visible pickers (variant B), executes, and waits for
+ * the rebuilt sim's history entry — after this a live variation covers
+ * `turn` and the pointer sits on its tip.
+ */
+async function startVariationAt(page: Page, turn: number, options?: { p1Move?: string | RegExp }) {
+  if (turn > 1) {
+    await page.locator('.ps-branch-bar input[type="range"]').fill(String(turn));
+    await expect(page.getByText(`T${turn}/`)).toBeVisible();
+  }
+  const p1 = page.locator('.ps-branch-side-column').first();
+  const p2 = page.locator('.ps-branch-side-column').nth(1);
+  if (options?.p1Move) {
+    await p1.locator('.ps-movebtn', { hasText: options.p1Move }).click();
+  } else {
+    await p1.locator('.ps-movebtn:enabled').first().click();
+  }
+  await p2.locator('.ps-movebtn:enabled').first().click();
+  await page.locator('.ps-execute-btn').click();
+  await expect(page.locator('.ps-panel', { hasText: 'Branch History' }))
+    .toContainText(`Turn ${turn}`, { timeout: 60_000 });
+  // A first-move KO is common — resolve the trailing forced replacement so
+  // callers always get both sides' pickers back.
+  const replacement = page.locator('.ps-switchbtn').first();
+  await replacement.waitFor({ state: 'visible', timeout: 4000 }).catch(() => {});
+  if (await replacement.isVisible().catch(() => false)) {
+    await replacement.click();
+    await expect(page.locator('.ps-panel', { hasText: 'Branch History' }))
+      .toContainText('forced replacement', { timeout: 30_000 });
+  }
+  // The side that replaced stays on its Pokémon tab — flip back to Fight.
+  for (const side of [p1, p2]) {
+    if (!(await side.locator('.ps-movebtn').first().isVisible().catch(() => false))) {
+      await side.locator('button', { hasText: 'Fight' }).first().click().catch(() => {});
+    }
+    await expect(side.locator('.ps-movebtn').first()).toBeVisible({ timeout: 30_000 });
+  }
+}
+
+/** Rebuilds the live sim at the CURRENT position without playing a move —
+ *  the snapshot picker's "Load exact choices" affordance. */
+async function materializeSimHere(page: Page, turn?: number) {
+  if (turn && turn > 1) {
+    await page.locator('.ps-branch-bar input[type="range"]').fill(String(turn));
+    await expect(page.getByText(`T${turn}/`)).toBeVisible();
+  }
+  await page.locator('button', { hasText: 'Load exact choices' }).click();
+  await expect(page.getByText(/Branching — Turn/)).toBeVisible({ timeout: 60_000 });
+}
+
 // The embed script is fetched from play.pokemonshowdown.com by every test's
 // iframe; occasional CDN stalls were the root of the flaky `Replays.battle`
 // timeouts (G25). Fetch it once per run and serve all tests from memory.
@@ -154,7 +217,7 @@ test.describe('PS Dashboard', () => {
     await expect(page.getByText('Beta', { exact: true }).first()).toBeVisible();
     await expect(page.locator('text=[Gen 9] Draft')).toBeVisible();
     await expect(page.locator('iframe[title="PS Replay"]')).toBeVisible({ timeout: 10000 });
-    await expect(page.locator('button', { hasText: 'Branch Here' })).toBeVisible();
+    await expect(page.locator('.ps-branch-bar input[type="range"]')).toBeVisible();
   });
 
   test('displayed set guesses pass the coherence vetoes (GPL Cobalion)', async ({ page }) => {
@@ -214,15 +277,15 @@ test.describe('PS Dashboard', () => {
 
   test('a replay injected while branching replaces the branch cleanly', async ({ page }) => {
     await page.locator('button', { hasText: 'Load' }).click();
-    await page.locator('button', { hasText: 'Branch Here' }).click();
-    await expect(page.getByText(/Branching.*Turn/)).toBeVisible({ timeout: 15000 });
+    await startVariationAt(page, 1);
+    await expect(page.getByText(/Branching — Turn/)).toBeVisible({ timeout: 15000 });
 
     await page.evaluate(() => window.postMessage({ type: 'ps-load-replay', replay: 'gen9doubles-test' }, '*'));
 
     await expect(page.getByText('Alice', { exact: true }).first()).toBeVisible({ timeout: 10000 });
-    await expect(page.getByText(/Branching/)).toHaveCount(0);
+    await expect(page.getByText(/Branching — Turn/)).toHaveCount(0);
     await expect(page.locator('iframe[title="PS Replay"]')).toBeVisible({ timeout: 10000 });
-    await expect(page.locator('button', { hasText: 'Branch Here' })).toBeVisible();
+    await expect(page.locator('.ps-branch-bar input[type="range"]')).toBeVisible();
   });
 
   test('evaluates a replay position from the replay view', async ({ page }) => {
@@ -563,8 +626,9 @@ test.describe('PS Dashboard', () => {
     });
     await page.reload();
     await page.locator('button', { hasText: 'Load' }).click();
-    await page.locator('button', { hasText: 'Branch Here' }).click();
-    await expect(page.getByText(/Branching — Turn 1/)).toBeVisible({ timeout: 15000 });
+    // Unified timeline: the sim materializes at turn 1 without a mode switch.
+    await materializeSimHere(page);
+    await expect(page.getByText(/Branching — Turn 1/)).toBeVisible({ timeout: 60_000 });
 
     const panel = page.locator('.ps-eval-panel');
     await panel.locator('button', { hasText: 'Evaluate' }).click();
@@ -653,9 +717,8 @@ test.describe('PS Dashboard', () => {
 
   test('branching can load a hypothetical move from the legal pool', async ({ page }) => {
     await page.locator('button', { hasText: 'Load' }).click();
-    await page.locator('button', { hasText: 'Branch Here' }).click();
-    await expect(page.getByText(/Branching.*Turn/)).toBeVisible({ timeout: 15000 });
-
+    // Variant B: the what-if controls are already there — loading the move
+    // rebuilds the sim at the viewed position with the choice pre-seeded.
     const p1Controls = page.locator('.ps-branch-side-column').first();
     const whatIf = p1Controls.getByLabel('Hypothetical move for P1');
 
@@ -724,10 +787,12 @@ test.describe('PS Dashboard', () => {
       `https://replay.pokemonshowdown.com/${fixtureReplay.id}`, { timeout: 10000 });
   });
 
-  test('shows branch bar with slider and Branch Here button', async ({ page }) => {
+  test('shows the always-visible timeline bar with slider', async ({ page }) => {
     await page.locator('button', { hasText: 'Load' }).click();
     await expect(page.locator('input[type="range"]')).toBeVisible({ timeout: 10000 });
-    await expect(page.locator('button', { hasText: 'Branch Here' })).toBeVisible();
+    // "Branch Here" is gone as a concept — the pickers are always live.
+    await expect(page.locator('button', { hasText: 'Branch Here' })).toHaveCount(0);
+    await expect(page.getByText('Timeline')).toBeVisible();
   });
 
   test('branch turn slider updates turn display', async ({ page }) => {
@@ -858,8 +923,7 @@ test.describe('PS Dashboard', () => {
 
   test('branch replay iframe keeps the same fixed visible height', async ({ page }) => {
     await page.locator('button', { hasText: 'Load' }).click();
-    await page.locator('button', { hasText: 'Branch Here' }).click();
-    await expect(page.getByText(/Branching.*Turn/)).toBeVisible({ timeout: 15000 });
+    await startVariationAt(page, 1);
 
     const branchIframe = page.locator('iframe[title="Branch Simulation"]');
     await expect(branchIframe).toBeVisible({ timeout: 10000 });
@@ -868,13 +932,13 @@ test.describe('PS Dashboard', () => {
     await expect(page.locator('iframe')).toHaveCount(1);
   });
 
-  test('branching starts from the selected slider turn', async ({ page }) => {
+  test('a move executed at the selected slider turn opens the variation there', async ({ page }) => {
     await page.locator('button', { hasText: 'Load' }).click();
-    await page.locator('input[type="range"]').fill('2');
-    await expect(page.getByText('T2/')).toBeVisible();
-    await page.locator('button', { hasText: 'Branch Here' }).click();
+    await startVariationAt(page, 2);
 
-    await expect(page.getByText(/Branching.*Turn 2/)).toBeVisible({ timeout: 15000 });
+    // The executed turn is entry "Turn 2"; the sim continues one past it.
+    await expect(page.locator('.ps-panel', { hasText: 'Branch History' })).toContainText('Turn 2');
+    await expect(page.getByText(/Branching — Turn/)).toBeVisible({ timeout: 15000 });
   });
 
   test('branch divergence: healed mid-cascade turns branch silently; the ended final turn is guarded', async ({ page }) => {
@@ -901,97 +965,89 @@ test.describe('PS Dashboard', () => {
 
     await slider.fill('56');
     await expect(page.getByText('T56/')).toBeVisible();
-    await page.locator('button', { hasText: 'Branch Here' }).click();
+    await page.locator('button', { hasText: 'Load exact choices' }).click();
     await expect(page.getByText(/Branching — Turn 56/)).toBeVisible({ timeout: 120_000 });
     await expect(page.getByText(/already ended|wedged at turn/)).toHaveCount(0);
 
     await page.locator('button', { hasText: 'Back' }).click();
     await expect(slider).toBeVisible({ timeout: 10_000 });
     await slider.fill('68');
-    const branchButton = page.locator('button', { hasText: 'Branch Here' });
-    await expect(branchButton).toBeDisabled();
-    await expect(branchButton).toHaveAttribute('title', /already over at the end position/);
+    // The end snapshot is the post-battle sentinel — materializing (or
+    // executing) there is refused with the explanation instead of a button
+    // that no longer exists.
+    await page.locator('button', { hasText: 'Load exact choices' }).click();
+    await expect(page.getByText(/already over at the end position/)).toBeVisible();
+    await expect(page.getByText(/Branching — Turn/)).toHaveCount(0);
   });
 
-  test('branch replay viewer starts on the selected turn', async ({ page }) => {
+  test('the branch sim iframe follows the played variation line', async ({ page }) => {
     await page.locator('button', { hasText: 'Load' }).click();
-    await page.locator('input[type="range"]').fill('2');
-    await page.locator('button', { hasText: 'Branch Here' }).click();
-    await expect(page.getByText(/Branching.*Turn 2/)).toBeVisible({ timeout: 15000 });
+    await startVariationAt(page, 2);
 
+    // After executing turn 2 the sim (and the pointer) stand one past it —
+    // the appended-turn animation settles there on its own.
     const iframeHandle = await page.locator('iframe[title="Branch Simulation"]').elementHandle({ timeout: 10000 });
     const frame = await iframeHandle?.contentFrame();
     expect(frame).toBeTruthy();
-    await expectReplayTurn(frame!, 2);
+    await expectReplayTurnAtLeast(frame!, 2);
   });
 
-  test('clicking Branch Here replaces replay with branch sim', async ({ page }) => {
+  test('an executed move replaces the replay iframe with the branch sim', async ({ page }) => {
     await page.locator('button', { hasText: 'Load' }).click();
-    await expect(page.locator('button', { hasText: 'Branch Here' })).toBeVisible({ timeout: 10000 });
-    await page.locator('button', { hasText: 'Branch Here' }).click();
+    await startVariationAt(page, 1);
 
-    await expect(page.getByText(/Branching.*Turn/)).toBeVisible({ timeout: 15000 });
+    await expect(page.getByText(/Branching — Turn/)).toBeVisible({ timeout: 15000 });
     await expect(page.locator('button', { hasText: 'Back' })).toBeVisible();
 
     await expect(page.locator('iframe[title="Branch Simulation"]')).toBeVisible({ timeout: 10000 });
     await expect(page.locator('iframe')).toHaveCount(1);
   });
 
-  test('branching shows P1 and P2 move controls', async ({ page }) => {
+  test('the loaded replay shows P1 and P2 move controls without any mode switch', async ({ page }) => {
     await page.locator('button', { hasText: 'Load' }).click();
-    await expect(page.locator('button', { hasText: 'Branch Here' })).toBeVisible({ timeout: 10000 });
-    await page.locator('button', { hasText: 'Branch Here' }).click();
 
-    await expect(page.getByText(/Branching.*Turn/)).toBeVisible({ timeout: 15000 });
-    await expect(page.getByText('P1', { exact: true }).first()).toBeVisible();
+    await expect(page.getByText('P1', { exact: true }).first()).toBeVisible({ timeout: 15000 });
     await expect(page.getByText('P2', { exact: true }).first()).toBeVisible();
     await expect(page.locator('button', { hasText: 'Fight' }).first()).toBeVisible();
   });
 
-  test('branch simulation shows move buttons with type info', async ({ page }) => {
+  test('always-on pickers show move buttons with type info', async ({ page }) => {
     await page.locator('button', { hasText: 'Load' }).click();
-    await expect(page.locator('button', { hasText: 'Branch Here' })).toBeVisible({ timeout: 10000 });
-    await page.locator('button', { hasText: 'Branch Here' }).click();
-    await expect(page.getByText(/Branching.*Turn/)).toBeVisible({ timeout: 15000 });
-    await expect(page.locator('.ps-movebtn').first()).toBeVisible({ timeout: 5000 });
+    await expect(page.locator('.ps-movebtn').first()).toBeVisible({ timeout: 15000 });
     // Range history: shifted when spread inference started overlaying
     // damage-consistent EVs (51–60.9%), then again when the goodness-of-fit
     // forfeit rejected this synthetic log's hand-authored damage numbers —
     // no legal spread fits them, so the degenerate solve (Bold 0-Atk
     // Garchomp) falls back to the species default and Earthquake hits real.
+    // The snapshot picker feeds the same guessed sets (nature/EV spread)
+    // into the same calc, so the pinned range carries over unchanged.
     await expect(page.locator('.ps-movebtn', { hasText: 'Earthquake' })).toContainText('69.8% - 82.2%', { timeout: 10000 });
   });
 
-  test('branch simulation can pick recommended moves without Smogon stats', async ({ page }) => {
+  test('always-on pickers can pick recommended moves without Smogon stats', async ({ page }) => {
     await page.locator('button', { hasText: 'Load' }).click();
-    await expect(page.locator('button', { hasText: 'Branch Here' })).toBeVisible({ timeout: 10000 });
-    await page.locator('button', { hasText: 'Branch Here' }).click();
-    await expect(page.getByText(/Branching.*Turn/)).toBeVisible({ timeout: 15000 });
 
     const recommendation = page.locator('button', { hasText: /Use Recommended/i }).first();
-    await expect(recommendation).toBeVisible({ timeout: 5000 });
+    await expect(recommendation).toBeVisible({ timeout: 15000 });
     await recommendation.click();
 
     await expect(page.locator('text=/\\[move /').first()).toBeVisible({ timeout: 5000 });
   });
 
-  test('branch simulation accepts custom move choices', async ({ page }) => {
+  test('always-on pickers accept custom move choices', async ({ page }) => {
     await page.locator('button', { hasText: 'Load' }).click();
-    await page.locator('button', { hasText: 'Branch Here' }).click();
-    await expect(page.getByText(/Branching.*Turn/)).toBeVisible({ timeout: 15000 });
 
     const pickers = page.locator('select[aria-label^="Choice picker"]');
-    await expect(pickers.first()).toBeVisible({ timeout: 5000 });
+    await expect(pickers.first()).toBeVisible({ timeout: 15000 });
     await pickers.first().selectOption({ index: 1 });
 
     // Pending chips now show the move identity instead of the grid slot (B1).
     await expect(page.locator('text=/\\[move .+\\]/').first()).toBeVisible({ timeout: 5000 });
   });
 
-  test('saving player edits refreshes the active branch and exposes EV controls', async ({ page }) => {
+  test('saving player edits refreshes the pickers and exposes EV controls', async ({ page }) => {
     await page.locator('button', { hasText: 'Load' }).click();
-    await page.locator('button', { hasText: 'Branch Here' }).click();
-    await expect(page.getByText(/Branching.*Turn/)).toBeVisible({ timeout: 15000 });
+    await expect(page.locator('.ps-movebtn').first()).toBeVisible({ timeout: 15000 });
 
     await page.locator('button', { hasText: 'Edit Player' }).click();
     const editor = page.getByRole('dialog', { name: 'Edit Player Team' });
@@ -1016,15 +1072,10 @@ test.describe('PS Dashboard', () => {
 
   test('saving player edits mid-branch preserves branch progress and pending choices', async ({ page }) => {
     await page.locator('button', { hasText: 'Load' }).click();
-    await page.locator('button', { hasText: 'Branch Here' }).click();
-    await expect(page.getByText(/Branching.*Turn 1/)).toBeVisible({ timeout: 15000 });
-
     const p1Controls = page.locator('.ps-branch-side-column').first();
     const p2Controls = page.locator('.ps-branch-side-column').nth(1);
-    await p1Controls.locator('.ps-movebtn', { hasText: 'Swords Dance' }).click();
-    await p2Controls.locator('button', { hasText: /Use Recommended/i }).click();
-    await page.locator('button', { hasText: 'Execute Turn' }).click();
-    await expect(page.getByText(/Branching.*Turn 2/)).toBeVisible({ timeout: 15000 });
+    await startVariationAt(page, 1, { p1Move: 'Swords Dance' });
+    await expect(page.getByText(/Branching — Turn 2/)).toBeVisible({ timeout: 15000 });
     await expect(page.locator('.ps-panel', { hasText: 'Branch History' })).toContainText('Turn 1');
 
     await page.locator('button', { hasText: /Use Recommended/i }).nth(1).click();
@@ -1049,49 +1100,46 @@ test.describe('PS Dashboard', () => {
     await expect(page.locator('button', { hasText: 'Execute Turn' })).toBeEnabled();
   });
 
-  test('clicking Branch Here gives immediate preparation feedback', async ({ page }) => {
+  test('materializing the sim gives immediate preparation feedback', async ({ page }) => {
     await page.locator('button', { hasText: 'Load' }).click();
-    await expect(page.locator('button', { hasText: 'Branch Here' })).toBeVisible({ timeout: 10000 });
-    await page.locator('button', { hasText: 'Branch Here' }).click();
-    await expect(page.getByText('Preparing branch...')).toBeVisible({ timeout: 1000 });
+    await expect(page.locator('button', { hasText: 'Load exact choices' })).toBeVisible({ timeout: 15000 });
+    await page.locator('button', { hasText: 'Load exact choices' }).click();
+    await expect(page.getByText('Preparing branch...')).toBeVisible({ timeout: 2000 });
   });
 
   test('executing a branch turn keeps the branch replay iframe mounted', async ({ page }) => {
     await page.locator('button', { hasText: 'Load' }).click();
-    await page.locator('button', { hasText: 'Branch Here' }).click();
-    await expect(page.getByText(/Branching.*Turn/)).toBeVisible({ timeout: 15000 });
+    await startVariationAt(page, 1);
 
     await page.locator('button', { hasText: /Use Recommended/i }).nth(0).click();
     await page.locator('button', { hasText: /Use Recommended/i }).nth(1).click();
     const iframe = await page.locator('iframe[title="Branch Simulation"]').elementHandle();
     await page.locator('button', { hasText: 'Execute Turn' }).click();
 
-    await expect(page.getByText(/Branching.*Turn/)).toBeVisible({ timeout: 10000 });
+    await expect(page.locator('.ps-panel', { hasText: 'Branch History' })).toContainText('Turn 2', { timeout: 15000 });
     const sameIframe = await page.locator('iframe[title="Branch Simulation"]').evaluate((el, previous) => el === previous, iframe);
     expect(sameIframe).toBe(true);
   });
 
   test('branch replay follows appended branch events and keeps iframe turn controls usable', async ({ page }) => {
     await page.locator('button', { hasText: 'Load' }).click();
-    await expect(page.locator('button', { hasText: 'Branch Here' })).toBeVisible({ timeout: 10000 });
     await expect(page.locator('iframe[title="PS Replay"]')).toBeVisible({ timeout: 10000 });
-    const branchBar = page.locator('.ps-branch-bar');
-    await branchBar.locator('input[type="range"]').fill('2');
-    await branchBar.locator('button', { hasText: 'Branch Here' }).evaluate((button: HTMLElement) => button.click());
-    await expect(page.getByText(/Branching.*Turn 2/)).toBeVisible({ timeout: 15000 });
+    await startVariationAt(page, 2);
 
     const iframeHandle = await page.locator('iframe[title="Branch Simulation"]').elementHandle({ timeout: 10000 });
     const frame = await iframeHandle?.contentFrame();
     expect(frame).toBeTruthy();
-    await expectReplayTurn(frame!, 2);
+    await expectReplayTurnAtLeast(frame!, 2);
 
     const logLength = () =>
       frame!.evaluate(() => (document.querySelector('.battle-log')?.textContent ?? '').length);
     const beforeLength = await logLength();
 
-    await page.locator('button', { hasText: /Use Recommended/i }).nth(0).click();
-    await page.locator('button', { hasText: /Use Recommended/i }).nth(1).click();
-    await page.locator('button', { hasText: 'Execute Turn' }).click();
+    const p1Side = page.locator('.ps-branch-side-column').first();
+    const p2Side = page.locator('.ps-branch-side-column').nth(1);
+    await p1Side.locator('.ps-movebtn:enabled').first().click();
+    await p2Side.locator('.ps-movebtn:enabled').first().click();
+    await page.locator('.ps-execute-btn').click();
 
     // The appended turn grows the visible log — a marker that does not
     // depend on damage rolls, KOs, or the inferred spreads.
@@ -1111,10 +1159,7 @@ test.describe('PS Dashboard', () => {
 
   test('branch execution defaults to animating the appended turn', async ({ page }) => {
     await page.locator('button', { hasText: 'Load' }).click();
-    await expect(page.locator('button', { hasText: 'Branch Here' })).toBeVisible({ timeout: 10000 });
-    await page.locator('input[type="range"]').fill('2');
-    await page.locator('button', { hasText: 'Branch Here' }).click();
-    await expect(page.getByText(/Branching.*Turn 2/)).toBeVisible({ timeout: 15000 });
+    await startVariationAt(page, 2);
 
     const animateToggle = page.getByLabel('Animate branch turns');
     await expect(animateToggle).toBeVisible();
@@ -1134,17 +1179,21 @@ test.describe('PS Dashboard', () => {
       }) as Window['postMessage'];
     });
 
-    await page.locator('button', { hasText: /Use Recommended/i }).nth(0).click();
-    await page.locator('button', { hasText: /Use Recommended/i }).nth(1).click();
-    await page.locator('button', { hasText: 'Execute Turn' }).click();
+    const p1Side = page.locator('.ps-branch-side-column').first();
+    const p2Side = page.locator('.ps-branch-side-column').nth(1);
+    await p1Side.locator('.ps-movebtn:enabled').first().click();
+    await p2Side.locator('.ps-movebtn:enabled').first().click();
+    await page.locator('.ps-execute-btn').click();
 
+    // startVariationAt already executed turn 2 (and resolved its forced
+    // replacement), so the instrumented append plays from turn 3.
     await expect.poll(async () => frame!.evaluate(() =>
       (window as ReplayWindow).__psPostedMessages?.some(message => {
         const data = message as { type?: string; playFromTurn?: number };
-        return data.type === 'ps-append-log' && data.playFromTurn === 2;
+        return data.type === 'ps-append-log' && data.playFromTurn === 3;
       }) ?? false
     )).toBe(true);
-    await expectReplayTurn(frame!, 2);
+    await expectReplayTurnAtLeast(frame!, 3);
   });
 
   test('branch replay play controls stay muted without audio errors', async ({ page }) => {
@@ -1152,18 +1201,18 @@ test.describe('PS Dashboard', () => {
     page.on('pageerror', error => pageErrors.push(error.message));
 
     await page.locator('button', { hasText: 'Load' }).click();
-    await expect(page.locator('button', { hasText: 'Branch Here' })).toBeVisible({ timeout: 10000 });
     await expect(page.locator('iframe[title="PS Replay"]')).toBeVisible({ timeout: 10000 });
-    const branchBar = page.locator('.ps-branch-bar');
-    await branchBar.locator('input[type="range"]').fill('2');
-    await branchBar.locator('button', { hasText: 'Branch Here' }).evaluate((button: HTMLElement) => button.click());
-    await expect(page.getByText(/Branching.*Turn 2/)).toBeVisible({ timeout: 15000 });
+    await startVariationAt(page, 2);
 
     const iframeHandle = await page.locator('iframe[title="Branch Simulation"]').elementHandle({ timeout: 10000 });
     const frame = await iframeHandle?.contentFrame();
     expect(frame).toBeTruthy();
-    await expectReplayTurn(frame!, 2);
+    await expectReplayTurnAtLeast(frame!, 2);
 
+    // The appended turn auto-plays (animate default) — pause first so the
+    // explicit Play click below exists in either player state.
+    const pauseButton = frame!.locator('button', { hasText: 'Pause' });
+    if (await pauseButton.isVisible().catch(() => false)) await pauseButton.click();
     await frame!.locator('button', { hasText: 'Play' }).click();
     await expect.poll(async () =>
       frame!.evaluate(() => Boolean((window as ReplayWindow).Replays?.battle && !(window as ReplayWindow).Replays?.battle?.paused))
@@ -1173,23 +1222,20 @@ test.describe('PS Dashboard', () => {
 
   test('branch replay iframe does not shrink as history grows', async ({ page }) => {
     await page.locator('button', { hasText: 'Load' }).click();
-    await page.locator('button', { hasText: 'Branch Here' }).click();
-    await expect(page.getByText(/Branching.*Turn/)).toBeVisible({ timeout: 15000 });
+    // P1 plays Swords Dance instead of the recommendation — a recommended
+    // Earthquake can crit-KO Kingambit on turn 1, which turns P2's controls
+    // into a forced-switch prompt and strands the second Use Recommended wait.
+    await startVariationAt(page, 1, { p1Move: 'Swords Dance' });
 
     const branchIframe = page.locator('iframe[title="Branch Simulation"]');
     const initialBox = await branchIframe.boundingBox();
 
-    // P1 clicks Swords Dance instead of the recommendation — a recommended
-    // Earthquake can crit-KO Kingambit on turn 1, which turns P2's controls
-    // into a forced-switch prompt and strands the second Use Recommended wait.
     const p1Controls = page.locator('.ps-branch-side-column').first();
     const p2Controls = page.locator('.ps-branch-side-column').nth(1);
-    for (let i = 0; i < 2; i++) {
-      await p1Controls.locator('.ps-movebtn', { hasText: 'Swords Dance' }).click();
-      await p2Controls.locator('button', { hasText: /Use Recommended/i }).click();
-      await page.locator('button', { hasText: 'Execute Turn' }).click();
-      await expect(page.locator('.ps-panel', { hasText: 'Branch History' })).toContainText(`Turn ${i + 1}`, { timeout: 10000 });
-    }
+    await p1Controls.locator('.ps-movebtn', { hasText: 'Swords Dance' }).click();
+    await p2Controls.locator('button', { hasText: /Use Recommended/i }).click();
+    await page.locator('button', { hasText: 'Execute Turn' }).click();
+    await expect(page.locator('.ps-panel', { hasText: 'Branch History' })).toContainText('Turn 2', { timeout: 10000 });
 
     const finalBox = await branchIframe.boundingBox();
     expect(finalBox?.height).toBe(initialBox?.height);
@@ -1200,8 +1246,7 @@ test.describe('PS Dashboard', () => {
     await page.setViewportSize({ width: 1440, height: 1000 });
     await page.locator('button', { hasText: 'Load' }).click();
     await page.locator('input[type="range"]').fill('2');
-    await page.locator('button', { hasText: 'Branch Here' }).click();
-    await expect(page.getByText(/Branching.*Turn/)).toBeVisible({ timeout: 15000 });
+    await expect(page.getByText('T2/')).toBeVisible();
 
     const p1Controls = page.locator('.ps-branch-side-column').nth(0);
     const p2Controls = page.locator('.ps-branch-side-column').nth(1);
@@ -1218,8 +1263,7 @@ test.describe('PS Dashboard', () => {
     await page.reload();
 
     await page.locator('button', { hasText: 'Load' }).click();
-    await page.locator('button', { hasText: 'Branch Here' }).click();
-    await expect(page.getByText(/Branching.*Turn/)).toBeVisible({ timeout: 15000 });
+    await startVariationAt(page, 1);
 
     const leftColumn = page.locator('.ps-main-left');
     const statsColumn = page.locator('.ps-main-right');
@@ -1238,8 +1282,7 @@ test.describe('PS Dashboard', () => {
 
   test('move buttons keep a readable fixed size', async ({ page }) => {
     await page.locator('button', { hasText: 'Load' }).click();
-    await page.locator('button', { hasText: 'Branch Here' }).click();
-    await expect(page.getByText(/Branching.*Turn/)).toBeVisible({ timeout: 15000 });
+    await expect(page.locator('.ps-movebtn').first()).toBeVisible({ timeout: 15000 });
 
     const box = await page.locator('.ps-movebtn').first().boundingBox();
     expect(box?.height).toBeGreaterThanOrEqual(58);
@@ -1248,9 +1291,7 @@ test.describe('PS Dashboard', () => {
 
   test('can switch to Pokémon tab to see switch options', async ({ page }) => {
     await page.locator('button', { hasText: 'Load' }).click();
-    await expect(page.locator('button', { hasText: 'Branch Here' })).toBeVisible({ timeout: 10000 });
-    await page.locator('button', { hasText: 'Branch Here' }).click();
-    await expect(page.getByText(/Branching.*Turn/)).toBeVisible({ timeout: 15000 });
+    await expect(page.locator('button', { hasText: 'Pokémon' }).first()).toBeVisible({ timeout: 15000 });
 
     await page.locator('button', { hasText: 'Pokémon' }).first().click();
     await expect(page.locator('.ps-switchbtn').first()).toBeVisible({ timeout: 5000 });
@@ -1258,12 +1299,9 @@ test.describe('PS Dashboard', () => {
 
   test('selecting moves for both sides enables Execute Turn', async ({ page }) => {
     await page.locator('button', { hasText: 'Load' }).click();
-    await expect(page.locator('button', { hasText: 'Branch Here' })).toBeVisible({ timeout: 10000 });
-    await page.locator('button', { hasText: 'Branch Here' }).click();
-    await expect(page.getByText(/Branching.*Turn/)).toBeVisible({ timeout: 15000 });
 
     const moveBtns = page.locator('.ps-movebtn');
-    await expect(moveBtns.first()).toBeVisible({ timeout: 5000 });
+    await expect(moveBtns.first()).toBeVisible({ timeout: 15000 });
 
     const allMoveBtns = await moveBtns.all();
     if (allMoveBtns.length >= 2) {
@@ -1277,11 +1315,9 @@ test.describe('PS Dashboard', () => {
     }
   });
 
-  test('branch mode exposes save and share controls', async ({ page }) => {
+  test('an open variation exposes save and share controls', async ({ page }) => {
     await page.locator('button', { hasText: 'Load' }).click();
-    await expect(page.locator('button', { hasText: 'Branch Here' })).toBeVisible({ timeout: 10000 });
-    await page.locator('button', { hasText: 'Branch Here' }).click();
-    await expect(page.getByText(/Branching.*Turn/)).toBeVisible({ timeout: 15000 });
+    await startVariationAt(page, 1);
 
     await expect(page.locator('button', { hasText: 'Save Branch' })).toBeVisible({ timeout: 5000 });
     await page.locator('button', { hasText: 'Copy Share Link' }).click();
@@ -1333,8 +1369,8 @@ test.describe('PS Dashboard', () => {
     await page.locator('input[type="text"]').fill('gen9doubles-test');
     await page.locator('button', { hasText: 'Load' }).click();
     await expect(page.getByText('Alice', { exact: true }).first()).toBeVisible({ timeout: 10000 });
-    await page.locator('button', { hasText: 'Branch Here' }).click();
-    await expect(page.getByText(/Branching.*Turn/)).toBeVisible({ timeout: 15000 });
+    // Doubles targeting needs the real request — materialize the sim here.
+    await materializeSimHere(page);
 
     const controls = page.locator('.ps-side-controls');
     await expect(controls).toHaveCount(4);
@@ -1356,8 +1392,8 @@ test.describe('PS Dashboard', () => {
     await page.locator('input[type="text"]').fill('gen9doubles-test');
     await page.locator('button', { hasText: 'Load' }).click();
     await expect(page.getByText('Alice', { exact: true }).first()).toBeVisible({ timeout: 10000 });
-    await page.locator('button', { hasText: 'Branch Here' }).click();
-    await expect(page.getByText(/Branching.*Turn/)).toBeVisible({ timeout: 15000 });
+    // Doubles targeting needs the real request — materialize the sim here.
+    await materializeSimHere(page);
 
     const pikachuControls = page.locator('.ps-side-controls').first();
     const bulbasaurTarget = pikachuControls.locator('.ps-target-btn[title^="Thunderbolt into Bulbasaur"]');
@@ -1373,15 +1409,14 @@ test.describe('PS Dashboard', () => {
     await expect(bulbasaurTarget).not.toHaveClass(/ps-target-btn-selected/);
   });
 
-  test('Back button returns to original replay', async ({ page }) => {
+  test('Back button discards the variation and returns to the replay', async ({ page }) => {
     await page.locator('button', { hasText: 'Load' }).click();
-    await expect(page.locator('button', { hasText: 'Branch Here' })).toBeVisible({ timeout: 10000 });
-    await page.locator('button', { hasText: 'Branch Here' }).click();
-    await expect(page.getByText(/Branching.*Turn/)).toBeVisible({ timeout: 15000 });
+    await startVariationAt(page, 1);
 
     await page.locator('button', { hasText: 'Back' }).click();
-    await expect(page.locator('button', { hasText: 'Branch Here' })).toBeVisible({ timeout: 5000 });
-    await expect(page.locator('iframe[title="PS Replay"]')).toBeVisible();
+    await expect(page.getByText(/Branching — Turn/)).toHaveCount(0);
+    await expect(page.locator('iframe[title="PS Replay"]')).toBeVisible({ timeout: 10000 });
+    await expect(page.locator('.ps-branch-bar input[type="range"]')).toBeVisible();
   });
 
   test('team paste section is available', async ({ page }) => {
@@ -1402,5 +1437,63 @@ test.describe('PS Dashboard', () => {
     await expect(page.locator('text=Battle Statistics')).toBeVisible({ timeout: 10000 });
     await expect(page.locator('.ps-stats-team')).toHaveCount(2);
     await expect(page.locator('.ps-stats-pokemon').first()).toBeVisible();
+  });
+
+  test.describe('unified timeline', () => {
+    test('navigate back inside the variation and silently truncate on a new move', async ({ page }) => {
+      test.setTimeout(120_000);
+      await page.locator('button', { hasText: 'Load' }).click();
+      // Two turns of variation: Swords Dance keeps turn 1 KO-free.
+      await startVariationAt(page, 1, { p1Move: 'Swords Dance' });
+      const p1 = page.locator('.ps-branch-side-column').first();
+      const p2 = page.locator('.ps-branch-side-column').nth(1);
+      await p1.locator('.ps-movebtn:enabled').first().click();
+      await p2.locator('.ps-movebtn:enabled').first().click();
+      await page.locator('.ps-execute-btn').click();
+      await expect(page.locator('.ps-panel', { hasText: 'Branch History' })).toContainText('Turn 2', { timeout: 60_000 });
+
+      // Step back one position: the pointer sits INSIDE the variation, the
+      // pickers come from the recorded position, and the line chip appears.
+      await page.locator('.ps-branch-bar button', { hasText: '◀' }).click();
+      await expect(page.getByText('Choices from the recorded position')).toBeVisible();
+      await expect(page.locator('.ps-line-chip')).toBeVisible();
+
+      // Deviate here: a DIFFERENT P1 move — NO confirm may appear (chess
+      // rules: truncation inside the variation is silent).
+      await p1.locator('.ps-movebtn:enabled').nth(1).click();
+      await p2.locator('.ps-movebtn:enabled').first().click();
+      await page.locator('.ps-execute-btn').click();
+      await expect(page.locator('[role="alertdialog"]')).toHaveCount(0);
+      await expect(page.locator('.ps-panel', { hasText: 'Branch History' })).toContainText('Turn 2', { timeout: 60_000 });
+    });
+
+    test('main line stays one click away and replacing from it asks first', async ({ page }) => {
+      test.setTimeout(120_000);
+      await page.locator('button', { hasText: 'Load' }).click();
+      await startVariationAt(page, 2);
+
+      // One click back to the main line — view only, nothing destroyed.
+      await page.locator('.ps-line-chip button', { hasText: 'Main line' }).click();
+      await expect(page.locator('iframe[title="PS Replay"]')).toBeVisible({ timeout: 10000 });
+      await expect(page.locator('.ps-panel', { hasText: 'Branch History' })).toContainText('Turn 2');
+
+      // Deviating ON the main line asks first; Cancel keeps the variation.
+      await page.locator('.ps-branch-bar input[type="range"]').fill('1');
+      const p1 = page.locator('.ps-branch-side-column').first();
+      const p2 = page.locator('.ps-branch-side-column').nth(1);
+      await p1.locator('.ps-movebtn:enabled').first().click();
+      await p2.locator('.ps-movebtn:enabled').first().click();
+      await page.locator('.ps-execute-btn').click();
+      const confirm = page.locator('[role="alertdialog"]');
+      await expect(confirm).toBeVisible();
+      await expect(confirm).toContainText('replace the existing variation from turn 2');
+      await confirm.locator('button', { hasText: 'Cancel' }).click();
+      await expect(page.locator('.ps-panel', { hasText: 'Branch History' })).toContainText('Turn 2');
+
+      // The variation stays one click away too.
+      await page.locator('.ps-branch-bar input[type="range"]').fill('3');
+      await page.locator('.ps-line-chip button', { hasText: 'Variation' }).click();
+      await expect(page.locator('iframe[title="Branch Simulation"]')).toBeVisible({ timeout: 10000 });
+    });
   });
 });

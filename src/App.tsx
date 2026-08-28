@@ -239,6 +239,11 @@ function App() {
   /** The pointer sits ON the live sim — pickers/executes go straight to it. */
   const liveTip = liveSimTurn !== null && viewTurn === liveSimTurn
     && (variationSpan === null || viewingVariation);
+  /** Positions whose evaluation is the LIVE single result (Evaluate button,
+   *  eval bar) rather than the main line's stored graph data: the live sim's
+   *  position — which, freshly materialized without entries, still sits on
+   *  the main line — and every recorded variation position. */
+  const liveEvalView = liveTip || viewingVariation;
 
   const navigateTo = useCallback((position: TimelinePosition) => {
     const next = normalizePosition(position, maxTurn, variationSpan);
@@ -556,6 +561,12 @@ function App() {
   ) => {
     // The ref, not the closure: see viewTurnRef (slider→click race).
     const position: TimelinePosition = { turn: viewTurnRef.current, line: viewLine };
+    // The end snapshot is the post-battle sentinel, not a playable turn —
+    // the old Branch-Here button was disabled here (B10/B12/G23).
+    if (position.line === 'main' && endSnapshotTurn !== null && position.turn >= endSnapshotTurn) {
+      setBranchDivergence('The battle is already over at the end position — pick an earlier turn to play from.');
+      return;
+    }
     const kind = classifyDeviation(variationSpan, position);
     const run = () => {
       // The overlay dies with the entries it belonged to.
@@ -578,7 +589,7 @@ function App() {
       return;
     }
     run();
-  }, [viewLine, variationSpan, rebuildAt, executeTurn]);
+  }, [viewLine, variationSpan, rebuildAt, executeTurn, endSnapshotTurn]);
 
   const handleCancelBranchPreparation = useCallback(() => {
     branchAbortRef.current?.abort();
@@ -614,8 +625,9 @@ function App() {
           const { buildChoiceLockContext } = await import('./lib/choice-lock');
           const choiceLocks = buildChoiceLockContext(activeReplay.log, { p1Team, p2Team }, observations);
           // The refresh rebuilds the VARIATION, wherever the pointer wanders —
-          // its start turn, never the currently viewed position.
-          const refreshTurn = variationStartTurn ?? viewTurn;
+          // its start turn, never the currently viewed position. Without a
+          // live runtime (fresh hypothetical), the viewed turn IS the target.
+          const refreshTurn = (branching ? variationStartTurn : null) ?? viewTurn;
           const refreshSnapshot = snapshots.length > 0
             ? snapshots[Math.min(refreshTurn - 1, snapshots.length - 1)] ?? null
             : null;
@@ -654,6 +666,7 @@ function App() {
     teamText,
     viewTurn,
     variationStartTurn,
+    branching,
     snapshots,
     usageStats.stats,
     setAssumptions.assumptions,
@@ -935,7 +948,7 @@ function App() {
         inferredSpreads: await getInferredSpreads(),
         hpEvidence,
       });
-      if (!cancelled) setPositionPicker({ simState: pickerStateFromSnapshot(snapshot, p1Team, p2Team), source: 'snapshot' });
+      if (!cancelled) setPositionPicker({ simState: pickerStateFromSnapshot(snapshot, p1Team, p2Team, replayGenNumber), source: 'snapshot' });
     })();
     return () => {
       cancelled = true;
@@ -943,6 +956,7 @@ function App() {
   }, [
     liveTip, viewingVariation, serializedAtView, variationStartTurn, startSerialized, viewTurn, snapshots, replayData,
     teamText, effectiveP1Info, effectiveP2Info, usageStats.stats, setAssumptions.assumptions, getInferredSpreads, hpEvidence,
+    replayGenNumber,
   ]);
 
   const handleEvaluate = useCallback(() => {
@@ -1224,9 +1238,12 @@ function App() {
     params: { species: string; move: string; replace: string | null },
   ) => {
     const sideInfo = side === 'p1' ? effectiveP1Info : effectiveP2Info;
-    // The hypothetical seeds a pending choice into the LIVE sim's slots —
-    // only meaningful where the sim actually stands.
-    if (!sideInfo || !simState || !liveTip) return;
+    if (!sideInfo) return;
+    // The hypothetical seeds a pending choice where the sim will stand after
+    // the refresh: the live tip, or — with no variation — the viewed turn
+    // (the refresh flow rebuilds there). Mid-variation views stay inert; the
+    // seeded slot would belong to the tip, not the viewed position.
+    if (variationSpan !== null && !liveTip) return;
 
     const speciesId = (name: string) => name.toLowerCase().replace(/[^a-z0-9]/g, '');
     const pokemon = sideInfo.pokemon.map(entry => {
@@ -1255,11 +1272,11 @@ function App() {
         p1Info: nextP1,
         p2Info: nextP2,
         history: [...history],
-        p1Choices: seedChoices(simState.p1Choices ?? [], 'p1'),
-        p2Choices: seedChoices(simState.p2Choices ?? [], 'p2'),
+        p1Choices: seedChoices((liveTip && simState?.p1Choices) || [], 'p1'),
+        p2Choices: seedChoices((liveTip && simState?.p2Choices) || [], 'p2'),
       });
     }
-  }, [effectiveP1Info, effectiveP2Info, simState, history, liveTip]);
+  }, [effectiveP1Info, effectiveP2Info, simState, history, liveTip, variationSpan]);
 
   const handleExecuteTurn = useCallback(async () => {
     await executeTurn();
@@ -1507,15 +1524,15 @@ function App() {
   // lists, and matrix render from the ANALYZED turn's cached sweep result
   // (turn 0 = the lead decision) — the branch view keeps its live result.
   const analyzedResult = useMemo(() => {
-    if (viewingVariation) return evaluation.result;
+    if (liveEvalView) return evaluation.result;
     if (analysisTurn === 0) return evaluation.graph.lead?.result ?? null;
     if (analysisTurn !== null && analysisTurn >= 1) return evaluation.graph.results[analysisTurn - 1] ?? null;
     return null;
-  }, [viewingVariation, evaluation.result, evaluation.graph, analysisTurn]);
+  }, [liveEvalView, evaluation.result, evaluation.graph, analysisTurn]);
 
   // What produced the shown result — the panel chip names it instead of
   // silently swapping numbers.
-  const analyzedSettings = !viewingVariation && analysisTurn !== null && analysisTurn >= 1
+  const analyzedSettings = !liveEvalView && analysisTurn !== null && analysisTurn >= 1
     ? evaluation.graph.settings[analysisTurn - 1] ?? null
     : null;
 
@@ -1523,7 +1540,7 @@ function App() {
   // configured settings, then one depth further (cap 3). Selecting a turn
   // never re-searches — this target is the only escalation.
   const thinkDeeperTarget = useMemo((): TurnEvalSettings | { mode: 'auto' } | null => {
-    if (viewingVariation || analysisTurn === null || analysisTurn < 1) return null;
+    if (liveEvalView || analysisTurn === null || analysisTurn < 1) return null;
     const stored = evaluation.graph.settings[analysisTurn - 1] ?? null;
     const fraction = evaluation.graph.faintedFractions[analysisTurn - 1] ?? null;
     if (!stored || needsSettingsUpgrade(stored, evaluation.prefs, fraction)) {
@@ -1552,7 +1569,7 @@ function App() {
       samples: Math.max(stored.samples, evaluation.prefs.samples) as TurnEvalSettings['samples'],
       mode: 'matrix',
     };
-  }, [viewingVariation, analysisTurn, evaluation.graph.settings, evaluation.graph.faintedFractions, evaluation.prefs]);
+  }, [liveEvalView, analysisTurn, evaluation.graph.settings, evaluation.graph.faintedFractions, evaluation.prefs]);
 
   const handleThinkDeeper = useCallback(() => {
     if (analysisTurn === null || analysisTurn < 1 || !thinkDeeperTarget) return;
@@ -1675,6 +1692,10 @@ function App() {
   const latestBranchHistoryEntry = history.length > 0 ? history[history.length - 1] : null;
 
   const showBranch = branching && simLog.length > 0;
+  // Session + branch start, NOT the viewed turn: the pointer moves constantly
+  // on the unified timeline, and a viewTurn-keyed reload would remount the
+  // sim iframe on every navigation and every executed turn (tip advance).
+  const branchReloadKey = `${branchSession}:${variationStartTurn ?? 0}`;
 
   return (
     <div className="ps-app-root">
@@ -1847,7 +1868,7 @@ function App() {
                   liveUpdates
                   liveAppendMode={animateBranchTurns ? 'play' : 'follow-end'}
                   liveAppendTurn={latestBranchHistoryEntry?.turnNumber ?? null}
-                  reloadKey={`${branchSession}:${viewTurn}`}
+                  reloadKey={branchReloadKey}
                 />
               ) : (
                 <PSReplayFrame
@@ -1927,6 +1948,11 @@ function App() {
               )}
             </div>
 
+            {branchDivergence && !showBranch && (
+              <div className="ps-panel" role="alert" style={{ marginTop: 6, padding: '6px 10px', fontSize: 11, color: '#e6b36a' }}>
+                ⚠ {branchDivergence}
+              </div>
+            )}
             {pendingConfirm && (
               <div
                 className="ps-panel"
@@ -1955,6 +1981,7 @@ function App() {
             <BranchPanel
               simState={liveTip ? simState : pickerSimState}
               source={liveTip ? 'live' : positionPicker?.source}
+              onMaterialize={() => requestDeviation(null)}
               executeError={executeError}
               executing={executing || branchPreparing}
               gen={replayGen}
@@ -1998,34 +2025,34 @@ function App() {
             {evalAvailable && (
               <EvalPanel
                 playerNames={[replayData.players[0], replayData.players[1]]}
-                status={viewingVariation ? evaluation.status : 'idle'}
+                status={liveEvalView ? evaluation.status : 'idle'}
                 result={analyzedResult}
                 resultSettings={analyzedSettings}
-                onThinkDeeper={!viewingVariation ? handleThinkDeeper : undefined}
-                thinkDeeperTarget={!viewingVariation ? thinkDeeperTarget : null}
+                onThinkDeeper={!liveEvalView ? handleThinkDeeper : undefined}
+                thinkDeeperTarget={!liveEvalView ? thinkDeeperTarget : null}
                 smogonPending={usageStats.loading || setAssumptions.loading}
                 progress={evaluation.progress}
                 reconstructProgress={evaluation.reconstructProgress}
                 error={evaluation.error}
                 prefs={evaluation.prefs}
                 onPrefsChange={evaluation.setPrefs}
-                onEvaluate={viewingVariation ? handleEvaluate : undefined}
+                onEvaluate={liveEvalView ? handleEvaluate : undefined}
                 onCancel={evaluation.cancel}
                 onPickChoice={handleExploreChoice}
                 onPickPair={handlePickPair}
-                showAuto={viewingVariation}
+                showAuto={liveEvalView}
                 showTera={replayGen === 9}
                 graph={evaluation.graph}
-                onAnalyzeGame={!viewingVariation ? handleAnalyzeGame : undefined}
+                onAnalyzeGame={!liveEvalView ? handleAnalyzeGame : undefined}
                 onSelectTurn={handleGraphSelectLine}
                 currentTurn={viewTurn}
                 currentLine={viewingVariation ? 'variation' : 'main'}
                 variation={variationSpan ? { startTurn: variationSpan.startTurn, scores: variationScores } : null}
-                analysis={!viewingVariation ? turnAnalysis : null}
-                reads={!viewingVariation ? turnReads : null}
-                leadAnalysis={!viewingVariation && analysisTurn === 0 ? leadAnalysisData : null}
-                reportLeads={!viewingVariation ? leadAnalysisData : null}
-                report={!viewingVariation ? gameReport : null}
+                analysis={!liveEvalView ? turnAnalysis : null}
+                reads={!liveEvalView ? turnReads : null}
+                leadAnalysis={!liveEvalView && analysisTurn === 0 ? leadAnalysisData : null}
+                reportLeads={!liveEvalView ? leadAnalysisData : null}
+                report={!liveEvalView ? gameReport : null}
                 doubles={replayGameType === 'doubles'}
               />
             )}

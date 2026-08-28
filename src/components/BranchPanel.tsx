@@ -27,6 +27,10 @@ interface Props {
    * like 'live' (legacy callers).
    */
   source?: PickerSource;
+  /** Rebuilds the live sim at this position WITHOUT executing a move —
+   *  offered on snapshot approximations, where doubles targeting and exact
+   *  PP need the real request. */
+  onMaterialize?: () => void;
   executeError: string | null;
   /** True while a turn is being written to the sim — blocks double executes. */
   executing: boolean;
@@ -519,7 +523,7 @@ interface SideDamage {
 const EMPTY_SIDE_DAMAGE: SideDamage = { default: [], targets: {}, spread: {} };
 
 /* ── Main BranchPanel (controls only, no iframe) ── */
-export function BranchPanel({ simState, source, executeError, executing, gen, onSetChoice, onHypotheticalMove, onExecuteTurn }: Props) {
+export function BranchPanel({ simState, source, onMaterialize, executeError, executing, gen, onSetChoice, onHypotheticalMove, onExecuteTurn }: Props) {
   const [showLog, setShowLog] = useState(false);
   const [damageBySide, setDamageBySide] = useState<{ p1: SideDamage; p2: SideDamage }>({
     p1: EMPTY_SIDE_DAMAGE,
@@ -658,10 +662,24 @@ export function BranchPanel({ simState, source, executeError, executing, gen, on
   return (
     <div>
       {source && source !== 'live' && (
-        <div style={{ fontSize: 10, color: '#9fb2cc', margin: '6px 0 2px' }}>
-          Choices {source === 'stored'
-            ? 'from the recorded position'
-            : 'from snapshot — the sim validates on execute'}
+        <div style={{ fontSize: 10, color: '#9fb2cc', margin: '6px 0 2px', display: 'flex', gap: 8, alignItems: 'baseline' }}>
+          <span>
+            Choices {source === 'stored'
+              ? 'from the recorded position'
+              : 'from snapshot — the sim validates on execute'}
+          </span>
+          {source === 'snapshot' && onMaterialize && (
+            <button
+              type="button"
+              onClick={onMaterialize}
+              disabled={executing}
+              className="ps-btn"
+              style={{ padding: '0 6px', fontSize: 10 }}
+              title="Reconstructs the simulator at this position without playing a move — exact PP, disables, and (in doubles) targets."
+            >
+              Load exact choices
+            </button>
+          )}
         </div>
       )}
       {/* Controls — stacked vertically for P1 + P2 selection */}

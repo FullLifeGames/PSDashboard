@@ -1,3 +1,4 @@
+import { Generations, Pokemon as CalcPokemon } from '@smogon/calc';
 import type { PokemonSet } from '@pkmn/sim';
 import type { PokemonSnapshot, TurnSnapshot } from '../types';
 import type {
@@ -48,23 +49,60 @@ function moveOptionsFor(
   }));
 }
 
-function pokemonInfoFromSnapshot(mon: PokemonSnapshot, activeSlot: number | null): SimPokemonInfo {
+/** Protocol snapshots carry HP on the percent scale (maxhp 100, or 0 for a
+ *  never-revealed mon) — fed raw into the damage calc that inflated shown
+ *  percentages ~3.4×. Recompute the real max HP from the guessed set. */
+function absoluteHp(
+  mon: PokemonSnapshot,
+  set: PokemonSet | undefined,
+  gen: number,
+): { hp: number; maxhp: number; hpPercent: number } {
+  const hpPercent = mon.maxhp === 0 && !mon.fainted ? 100 : mon.hpPercent;
+  try {
+    const calcGen = Generations.get(Math.min(9, Math.max(1, gen)) as 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9);
+    const poke = new CalcPokemon(calcGen, mon.speciesForme, {
+      level: mon.level || set?.level || 100,
+      nature: set?.nature || undefined,
+      evs: set?.evs,
+      ivs: set?.ivs,
+    });
+    const maxhp = poke.maxHP();
+    const hp = mon.fainted ? 0 : Math.max(1, Math.round(maxhp * hpPercent / 100));
+    return { hp, maxhp, hpPercent };
+  } catch {
+    return { hp: mon.hp, maxhp: mon.maxhp, hpPercent };
+  }
+}
+
+function pokemonInfoFromSnapshot(
+  mon: PokemonSnapshot,
+  set: PokemonSet | undefined,
+  activeSlot: number | null,
+  gen: number,
+): SimPokemonInfo {
+  const { hp, maxhp, hpPercent } = absoluteHp(mon, set, gen);
   return {
     name: mon.name,
     species: mon.speciesForme,
-    hp: mon.hp,
-    maxhp: mon.maxhp,
-    hpPercent: mon.hpPercent,
+    hp,
+    maxhp,
+    hpPercent,
     status: mon.status,
     fainted: mon.fainted,
     isActive: mon.isActive,
     activeSlot,
     moves: mon.moves.map(name => ({ name, type: '' })),
-    ability: mon.ability,
-    item: mon.item,
+    ability: mon.ability || set?.ability || '',
+    item: mon.item || set?.item || '',
+    // Raw stats are unknown without the sim, but the damage calc derives
+    // them from nature/EVs/IVs — pass the guessed set's spread through so
+    // snapshot previews match what the live sim will show.
     stats: { atk: 0, def: 0, spa: 0, spd: 0, spe: 0 },
+    nature: set?.nature || undefined,
+    evs: set?.evs,
+    ivs: set?.ivs,
     boosts: { ...mon.boosts },
-    level: mon.level,
+    level: mon.level || set?.level || 100,
     types: [],
   };
 }
@@ -79,28 +117,33 @@ export function pickerStateFromSnapshot(
   snapshot: TurnSnapshot,
   p1Team: PokemonSet[],
   p2Team: PokemonSet[],
+  gen = 9,
 ): BranchSimState {
   const build = (side: 'p1' | 'p2', team: PokemonSet[]) => {
     const pokemon = snapshot[side].pokemon;
     const actives = pokemon.filter(mon => mon.isActive && !mon.fainted);
     const setFor = (mon: PokemonSnapshot) =>
       team.find(set => set.species === mon.speciesForme || set.name === mon.name);
+    // A never-revealed bench mon (maxhp 0 on the percent scale) is a healthy
+    // switch option, not a missing one.
+    const benchPercent = (mon: PokemonSnapshot) =>
+      (mon.maxhp === 0 && !mon.fainted ? 100 : mon.hpPercent);
     const movesBySlot = actives.map((mon, index) => moveOptionsFor(mon, setFor(mon), index));
     const switchesBySlot = actives.map((_, activeSlot): BranchSwitchOption[] =>
       pokemon
-        .filter(mon => !mon.isActive && !mon.fainted && mon.hpPercent > 0)
+        .filter(mon => !mon.isActive && !mon.fainted && benchPercent(mon) > 0)
         .map((mon, index) => ({
           name: mon.name,
           species: mon.speciesForme,
           activeSlot,
           slot: index + 1,
-          hp: `${mon.hpPercent}%`,
-          hpPercent: mon.hpPercent,
+          hp: `${benchPercent(mon)}%`,
+          hpPercent: benchPercent(mon),
           fainted: false,
         })));
-    const activeSlots = actives.map((mon, index) => pokemonInfoFromSnapshot(mon, index));
+    const activeSlots = actives.map((mon, index) => pokemonInfoFromSnapshot(mon, setFor(mon), index, gen));
     const infos = pokemon.map(mon =>
-      pokemonInfoFromSnapshot(mon, mon.isActive ? actives.indexOf(mon) : null));
+      pokemonInfoFromSnapshot(mon, setFor(mon), mon.isActive ? actives.indexOf(mon) : null, gen));
     const modifiersBySlot = actives.map((_, index) => ({
       teraType: null,
       canMegaEvo: false,

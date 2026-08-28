@@ -65,6 +65,8 @@ function makeSnapshot(): TurnSnapshot {
       pokemon: [
         snapshotMon({ name: 'Zapdos', speciesForme: 'Zapdos', isActive: true, hpPercent: 78, hp: 78 }),
         snapshotMon({ name: 'Ferrothorn', speciesForme: 'Ferrothorn' }),
+        // Never revealed: percent-scale zeros, but a healthy switch option.
+        snapshotMon({ name: 'Latios', speciesForme: 'Latios', hp: 0, maxhp: 0, hpPercent: 0 }),
       ],
     },
     field: { weather: '', terrain: '', pseudoWeather: {} },
@@ -92,6 +94,13 @@ test('pickerStateFromSnapshot offers team moves and the living bench', () => {
   expect(state.field.p1SideConditions).toContain('stealthrock');
   // PP is unknown at snapshot level — 0/0 marks the approximation honestly.
   expect(state.p1MovesBySlot[0][0].maxpp).toBe(0);
+  // A never-revealed bench mon (percent-scale zeros) is a healthy option.
+  expect(state.p2SwitchesBySlot[0].map(option => option.species)).toContain('Latios');
+  expect(state.p2SwitchesBySlot[0].find(option => option.species === 'Latios')?.hpPercent).toBe(100);
+  // HP is rebuilt on the ABSOLUTE scale (snapshots carry percent bars):
+  // feeding maxhp 100 into the damage calc inflated shown percentages.
+  expect(state.p1Active!.maxhp).toBeGreaterThan(200);
+  expect(state.p1Active!.hp).toBe(state.p1Active!.maxhp);
 });
 
 test('pickerSourceLabel names all three sources', () => {

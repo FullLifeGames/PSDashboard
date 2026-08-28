@@ -100,22 +100,54 @@ Relevant files:
 
 ## UI Structure
 
-The main application surface in [`src/App.tsx`](./src/App.tsx) has two modes:
+The main application surface in [`src/App.tsx`](./src/App.tsx) is ONE unified
+timeline, chess-engine style: the replay is the main line, at most one
+variation exists, and a position pointer (`viewTurn` + `viewLine`) replaces
+the former replay/branch mode split. The pure position model lives in
+[`src/lib/timeline.ts`](./src/lib/timeline.ts) — position "turn T" always
+means the state before turn T; deviations classify as open / extend /
+truncate / replace.
 
-- original replay mode
-- branch mode
+### The timeline
 
-### Original replay mode
+- The timeline bar (slider + step buttons) is always visible and spans
+  `max(replay end, variation tip)`. Where the variation covers the viewed
+  turn, a line chip `[Main line | Variation]` switches lines view-only —
+  returning to the main line is always one click and never destroys the
+  variation.
+- `PSReplayFrame` shows the original replay for main-line positions and the
+  branch simulator log (seeked to the viewed turn) for variation positions.
+- The game graph (`EvalGraph`) overlays the variation as a gold curve
+  anchored at the branch point; its points are the evaluated variation
+  positions (fed by the auto-evals after executed turns). Gold points
+  navigate the variation, blue points the main line; a white ring marks the
+  pointer on its line.
 
-- `PSReplayFrame` renders the fetched replay log through a generated HTML document.
-- That HTML bootstraps `replay-embed.js` from Pokemon Showdown.
-- Turn updates are posted back to the parent window so the branch slider can follow the replay viewer.
+### Choices at every position (variant B)
 
-### Branch mode
+`BranchPanel` renders at EVERY position, fed by the best available source
+(the panel names it): the live sim at the variation tip; a recorded
+serialized position elsewhere in the variation (`useBranch` captures one per
+executed entry — exact, incl. live PP and disables, rebuilt via
+`src/lib/picker-state.ts`); or snapshot + guessed teams on unanalyzed
+main-line turns (approximate — the sim validates legality on execute, and a
+"Load exact choices" button materializes the sim without playing a move,
+which doubles targeting needs). Executing at a position without the live sim
+funnels through one deviation path: chess rules (silent truncation inside
+the variation, an inline confirm when replacing the variation from the main
+line), then the proven rebuild (reconstruct to the variation start + replay
+the kept entries — the same path team edits refresh through), then the move.
+"Let it play out" (`src/lib/play-out.ts`) loops the engine's top choice for
+both sides from any position until the game ends, Stop, or a 100-turn cap —
+every played turn is a normal, navigable, truncatable entry.
 
-- `PSReplayFrame` renders the branch simulator log instead of the original replay log.
-- `BranchPanel` shows move, target, and switch controls for both sides, plus a "What if it had …" row that loads a hypothetical legal move into the active set — implemented as a team edit going through the same branch-refresh path as `TeamEditor` saves, with the move pre-seeded as that slot's pending choice.
-- `BranchHistoryPanel` compares executed branch turns against the original replay line.
+- `BranchPanel` also carries the "What if it had …" row that loads a
+  hypothetical legal move into the active set — a team edit through the same
+  branch-refresh path as `TeamEditor` saves, with the move pre-seeded as that
+  slot's pending choice.
+- `BranchHistoryPanel` is the variation's clickable notation: the original
+  column jumps to the main line, the branch column to the variation, with
+  the current position highlighted.
 - `BranchSaveSharePanel` saves compact branch reports to localStorage and creates URL-hash share payloads.
 - `BattleStatsPanel` stays visible to show inferred team information.
 - `TeamEditor` lets the user override inferred fields for either player before branching.
