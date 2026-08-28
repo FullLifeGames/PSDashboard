@@ -1918,6 +1918,8 @@ function App() {
                   branchStartTurn={variationSpan?.startTurn ?? viewTurn}
                   history={history}
                   snapshots={snapshots}
+                  currentPosition={{ turn: viewTurn, line: viewingVariation ? 'variation' : 'main' }}
+                  onNavigate={navigateTo}
                 />
                 <BranchSaveSharePanel
                   replayData={replayData}
