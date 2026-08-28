@@ -31,7 +31,7 @@ import { formatEnforcesSleepClause, getBranchSimulatorFormat, getReplayGameType,
 import { resolveTeraPreference } from './lib/eval/tera';
 import { summarizeAlignment, type TurnAlignmentRecord } from './lib/hax-alignment';
 import { choiceId, evalChoiceToSlotChoices, type BranchSlotChoice } from './lib/branch-choices';
-import type { RankedChoice } from './lib/eval/types';
+import type { EvalResult, RankedChoice } from './lib/eval/types';
 import { allTurnEvents, detectSacks, parseLeadSpecies, parsePlayedActions, parsePlayedActionsDoubles } from './lib/eval/played';
 import { analyzeTurn, decidedSeenKey, PAYOFF_WINDOW, unansweredSeenKey, type TurnAnalysis } from './lib/eval/analysis';
 import { toID } from '@pkmn/dex';
@@ -43,6 +43,7 @@ import {
   classifyDeviation, keptEntries, normalizePosition, sliderMax, variationCovers, variationTip,
   type TimelinePosition, type VariationSpan, type ViewLine,
 } from './lib/timeline';
+import { nextPlayOutStep } from './lib/play-out';
 
 const TEAM_PASTE_STORAGE_KEY = 'ps-replay-interceptor:team-paste';
 
@@ -251,6 +252,7 @@ function App() {
     stopBranch();
     setBranchDivergence(null);
     setPendingConfirm(null);
+    setPlayOut(null);
     setDraftChoices({ p1: [], p2: [] });
     setVariationScores([]);
     setViewLine('main');
@@ -302,6 +304,7 @@ function App() {
     setViewLine('main');
     setDraftChoices({ p1: [], p2: [] });
     setPendingConfirm(null);
+    setPlayOut(null);
     setVariationScores([]);
     setBranchDivergence(null);
     branchWindowOpenRef.current = false;
@@ -1064,6 +1067,53 @@ function App() {
       setPendingEvalPick(null);
     }
   }, [pendingEvalPick, liveTip, simState, branching, branchPreparing, pendingConfirm, playOutEvalChoice]);
+
+  // ── "Let it play out": the engine plays BOTH sides' top choice from the
+  // current position until the game ends, the user stops, or the safety cap
+  // trips. Each executed turn is a normal history entry — navigable,
+  // evaluable, truncatable like anything else; Stop keeps what was played.
+  const [playOut, setPlayOut] = useState<{ active: boolean; executed: number } | null>(null);
+  const playOutProcessedRef = useRef<EvalResult | null>(null);
+
+  const startPlayOut = useCallback(() => {
+    // Same gates as any deviation: rebuild to here first when the live sim
+    // stands elsewhere (incl. the replace confirm on the main line).
+    if (!liveTip) requestDeviation(null);
+    if (!evaluation.prefs.auto) evaluation.setPrefs({ ...evaluation.prefs, auto: true });
+    playOutProcessedRef.current = null;
+    setPlayOut({ active: true, executed: 0 });
+    if (liveTip) handleEvaluate();
+  }, [liveTip, requestDeviation, evaluation, handleEvaluate]);
+
+  const stopPlayOut = useCallback(() => setPlayOut(null), []);
+
+  useEffect(() => {
+    if (!playOut?.active || !liveTip || executing || branchPreparing) return;
+    if (evaluation.status !== 'done' || !evaluation.result) return;
+    if (playOutProcessedRef.current === evaluation.result) return;
+    playOutProcessedRef.current = evaluation.result;
+    const step = nextPlayOutStep(evaluation.result, getBattle()?.ended ?? false, playOut.executed);
+    if (step.kind === 'done') {
+      setPlayOut(null);
+      return;
+    }
+    if (step.kind === 'pair') {
+      if (!applyEvalChoice('p1', step.p1) || !applyEvalChoice('p2', step.p2)) {
+        setPlayOut(null);
+        return;
+      }
+      setPlayOut({ active: true, executed: playOut.executed + 1 });
+      void executeTurn().then(() => handleEvaluate());
+      return;
+    }
+    // Single (forced) side: setChoice auto-executes forced replacements and
+    // the auto pref re-evaluates once the entry lands.
+    if (!applyEvalChoice(step.side, step.choice)) {
+      setPlayOut(null);
+      return;
+    }
+    setPlayOut({ active: true, executed: playOut.executed + 1 });
+  }, [playOut, liveTip, executing, branchPreparing, evaluation.status, evaluation.result, getBattle, applyEvalChoice, executeTurn, handleEvaluate]);
 
   // The sweep counts PLAYED turns. The end snapshot (lastTurn + 1, the
   // post-game state) is the branch slider's "End" sentinel, not a turn —
@@ -1893,7 +1943,7 @@ function App() {
                 <button
                   type="button"
                   className="ps-btn"
-                  onClick={() => { setPendingConfirm(null); setPendingEvalPick(null); }}
+                  onClick={() => { setPendingConfirm(null); setPendingEvalPick(null); setPlayOut(null); }}
                 >
                   Cancel
                 </button>
@@ -1978,6 +2028,31 @@ function App() {
                 report={!viewingVariation ? gameReport : null}
                 doubles={replayGameType === 'doubles'}
               />
+            )}
+            {evalAvailable && (
+              <div className="ps-panel" style={{ marginTop: 8, display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+                {playOut?.active ? (
+                  <>
+                    <span style={{ fontSize: 11, color: '#d4f5e0' }}>
+                      Engine is playing both sides… {playOut.executed} turn{playOut.executed === 1 ? '' : 's'} executed
+                    </span>
+                    <button type="button" className="ps-btn" onClick={stopPlayOut} style={{ padding: '2px 10px', fontSize: 11 }}>
+                      Stop
+                    </button>
+                  </>
+                ) : (
+                  <button
+                    type="button"
+                    className="ps-btn"
+                    onClick={startPlayOut}
+                    disabled={branchPreparing || usageStats.loading || setAssumptions.loading}
+                    title="The engine plays both sides' top choice from this position until the game ends. Stop anytime — executed turns stay in the variation."
+                    style={{ padding: '3px 10px', fontSize: 11, borderColor: 'rgba(240,199,107,0.5)' }}
+                  >
+                    &#9658; Let it play out
+                  </button>
+                )}
+              </div>
             )}
             <BattleStatsPanel
               replayData={replayData}
