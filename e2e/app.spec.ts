@@ -1032,18 +1032,21 @@ test.describe('PS Dashboard', () => {
     await expect(recommendation).toBeVisible({ timeout: 15000 });
     await recommendation.click();
 
-    await expect(page.locator('text=/\\[move /').first()).toBeVisible({ timeout: 5000 });
+    // Pending chips read as notation: the bare move name, no raw command.
+    await expect(page.locator('.ps-pending-choice').first()).toBeVisible({ timeout: 5000 });
   });
 
   test('always-on pickers accept custom move choices', async ({ page }) => {
     await page.locator('button', { hasText: 'Load' }).click();
 
+    // The free-choice dropdown lives in the Advanced row.
+    await page.locator('button', { hasText: 'Advanced' }).click();
     const pickers = page.locator('select[aria-label^="Choice picker"]');
     await expect(pickers.first()).toBeVisible({ timeout: 15000 });
     await pickers.first().selectOption({ index: 1 });
 
-    // Pending chips now show the move identity instead of the grid slot (B1).
-    await expect(page.locator('text=/\\[move .+\\]/').first()).toBeVisible({ timeout: 5000 });
+    // Pending chips show the move identity as notation (B1).
+    await expect(page.locator('.ps-pending-choice').first()).toBeVisible({ timeout: 5000 });
   });
 
   test('saving player edits refreshes the pickers and exposes EV controls', async ({ page }) => {
@@ -1081,7 +1084,7 @@ test.describe('PS Dashboard', () => {
 
     await page.locator('button', { hasText: /Use Recommended/i }).nth(1).click();
     // Pending chips show the move identity instead of the grid slot (B1).
-    await expect(p2Controls).toContainText(/\[move .+\]/);
+    await expect(p2Controls.locator('.ps-pending-choice')).toBeVisible();
 
     await page.locator('button', { hasText: 'Edit Player' }).click();
     const editor = page.getByRole('dialog', { name: 'Edit Player Team' });
@@ -1095,7 +1098,7 @@ test.describe('PS Dashboard', () => {
     await expect(page.locator('.ps-panel', { hasText: 'Variation moves' })).toContainText('Turn 1');
     await expect(p1Controls).toContainText('Stone Edge');
     await expect(p1Controls).not.toContainText('Earthquake');
-    await expect(p2Controls).toContainText(/\[move .+\]/);
+    await expect(p2Controls.locator('.ps-pending-choice')).toBeVisible();
 
     await p1Controls.locator('.ps-movebtn', { hasText: 'Stone Edge' }).click();
     await expect(page.locator('button', { hasText: 'Execute Turn' })).toBeEnabled();
