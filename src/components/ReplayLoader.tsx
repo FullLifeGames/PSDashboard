@@ -122,21 +122,21 @@ export function ReplayLoader({ onLoad, onLoadFile, onTeamLoad, loading, error, l
       )}
 
       {showGuide && (
-        <div className="ps-loader-guide" aria-label="Replay branching workflow">
+        <div className="ps-loader-guide" aria-label="Unified timeline workflow">
           <div className="ps-guide-step">
             <span>1</span>
-            <strong>Pick a branch turn</strong>
-            <small>Scrub the real Showdown replay to the exact decision point.</small>
+            <strong>Find the decision point</strong>
+            <small>Scrub the timeline to any turn — the move pickers are always there.</small>
           </div>
           <div className="ps-guide-step">
             <span>2</span>
-            <strong>Choose both sides</strong>
-            <small>Use recommendations, custom choices, switches, or edited team data.</small>
+            <strong>Play a different move</strong>
+            <small>Pick for both sides (the played move is marked) — a gold variation branches off, like in a chess engine.</small>
           </div>
           <div className="ps-guide-step">
             <span>3</span>
-            <strong>Compare outcomes</strong>
-            <small>Inspect the original line beside your alternate branch history.</small>
+            <strong>Compare the lines</strong>
+            <small>Evaluate positions, let the engine play it out, and hop between main line and variation with one click.</small>
           </div>
         </div>
       )}

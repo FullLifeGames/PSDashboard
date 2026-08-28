@@ -748,10 +748,10 @@ test.describe('PS Dashboard', () => {
     await expect(p1Controls.locator('.ps-movebtn', { hasText: 'Earthquake' })).toHaveCount(0);
   });
 
-  test('landing screen explains the replay branching workflow', async ({ page }) => {
-    await expect(page.getByText('Pick a branch turn')).toBeVisible();
-    await expect(page.getByText('Choose both sides')).toBeVisible();
-    await expect(page.getByText('Compare outcomes')).toBeVisible();
+  test('landing screen explains the unified timeline workflow', async ({ page }) => {
+    await expect(page.getByText('Find the decision point')).toBeVisible();
+    await expect(page.getByText('Play a different move')).toBeVisible();
+    await expect(page.getByText('Compare the lines')).toBeVisible();
   });
 
   test('loads a replay and shows match info', async ({ page }) => {

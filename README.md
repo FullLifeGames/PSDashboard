@@ -198,9 +198,9 @@ The app can be included in another site and handed a replay to render:
 3. Load the replay.
 4. For perfect-information analysis, open `Import/Export Sets`, correct both teams (or paste the real sets), and import — the import is remembered for this replay.
 5. Scrub to any turn using the replay viewer or the timeline slider — the move pickers for both sides are always there.
-6. Choose a move or switch for both sides — or load a hypothetical move via "What if it had …" — and execute: the simulator rebuilds at that position automatically and your variation opens (chess-style; there is no separate branch mode).
-7. Navigate freely: step back inside the variation and play a different move (the tail is cut silently, like a chess engine's current line), or jump back to the main line with one click on the line chip — the variation survives every view change and is only replaced when you execute a move on the main line and confirm.
-8. Let the engine finish a position with "Let it play out" — it plays both sides' top choice until the game ends (Stop anytime; every played turn stays navigable), with the variation drawn as a gold curve over the game graph.
+6. Choose a move or switch for both sides — the action actually taken at that turn is badged "played", and the "Advanced" toggle adds a free-choice dropdown plus "What if it had …" — then execute: the simulator rebuilds at that position automatically and your variation opens (chess-style; there is no separate branch mode). The timeline slider marks the variation's span in gold.
+7. Navigate freely: step back inside the variation and play a different move (the tail is cut silently, like a chess engine's current line), or jump back to the main line with one click on the line chip — the variation survives every view change and is only replaced when you execute a move on the main line and confirm. Stepping back past the branch point and forward again returns to your variation.
+8. Let the engine finish a position with "Let it play out" — it plays both sides' top choice until the game ends (Stop anytime; every played turn stays navigable), then the battle window plays the finished line back from your move, with the variation drawn as a gold curve over the game graph.
 9. Use `Edit Player` or `Edit Opp` if you want to override inferred details at any point.
 
 ## Repository Map

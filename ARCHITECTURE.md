@@ -116,7 +116,19 @@ truncate / replace.
   returning to the main line is always one click and never destroys the
   variation.
 - `PSReplayFrame` shows the original replay for main-line positions and the
-  branch simulator log (seeked to the viewed turn) for variation positions.
+  branch simulator log for variation positions. The branch frame ignores
+  seekTurn prop changes after mount (re-seeking fought the append stream), so
+  user navigation sends explicit one-shot `seekRequest` commands from the
+  `navigateTo` funnel — tip-follow after an executed turn skips them (the
+  append already positions, animated when enabled). The chosen line is
+  sticky: stepping back across the branch point and forward again returns to
+  the variation; only an explicit main-line click (chip, notation, graph)
+  leaves it. The timeline slider carries a gold stripe over the variation's
+  turn span.
+- Single-position eval results are tagged with the position they were
+  started at (`useEvaluation`'s `resultTag`); a run finishing after the user
+  navigated away renders as stale, is never recorded into the variation
+  overlay's scores, and auto re-evaluates under the auto pref.
 - The game graph (`EvalGraph`) overlays the variation as a gold curve
   anchored at the branch point; its points are the evaluated variation
   positions (fed by the auto-evals after executed turns). Gold points
@@ -130,24 +142,33 @@ truncate / replace.
 serialized position elsewhere in the variation (`useBranch` captures one per
 executed entry — exact, incl. live PP and disables, rebuilt via
 `src/lib/picker-state.ts`); or snapshot + guessed teams on unanalyzed
-main-line turns (approximate — the sim validates legality on execute, and a
-"Load exact choices" button materializes the sim without playing a move,
-which doubles targeting needs). Executing at a position without the live sim
+main-line turns (approximate — move types come from the dex, PP shows as a
+dash, the sim validates legality on execute, and a "Rebuild exact position"
+button materializes the sim without playing a move, which doubles targeting
+needs). The panel is compact by default (move/switch buttons, the actually
+played action badged "played", Use Recommended, Execute); an "Advanced"
+disclosure adds the free-choice dropdown and the "What if it had …" tools.
+Executing at a position without the live sim
 funnels through one deviation path: chess rules (silent truncation inside
 the variation, an inline confirm when replacing the variation from the main
 line), then the proven rebuild (reconstruct to the variation start + replay
 the kept entries — the same path team edits refresh through), then the move.
 "Let it play out" (`src/lib/play-out.ts`) loops the engine's top choice for
 both sides from any position until the game ends, Stop, or a 100-turn cap —
-every played turn is a normal, navigable, truncatable entry.
+forced-switch interludes step the acting side alone (the waiting side's
+'wait' sentinel is not a playable choice), every played turn is a normal,
+navigable, truncatable entry, the panel reports why a run ended, and a
+finished run seeks the battle window back to its start turn and plays the
+new line ("watch it from your move").
 
-- `BranchPanel` also carries the "What if it had …" row that loads a
-  hypothetical legal move into the active set — a team edit through the same
-  branch-refresh path as `TeamEditor` saves, with the move pre-seeded as that
-  slot's pending choice.
-- `BranchHistoryPanel` is the variation's clickable notation: the original
-  column jumps to the main line, the branch column to the variation, with
-  the current position highlighted.
+- `BranchPanel` also carries the "What if it had …" row (behind Advanced)
+  that loads a hypothetical legal move into the active set — a team edit
+  through the same branch-refresh path as `TeamEditor` saves, with the move
+  pre-seeded as that slot's pending choice.
+- `BranchHistoryPanel` ("Variation moves") is the variation's clickable
+  notation — headers name the actual moves (never raw sim commands): the
+  left column jumps to the main line, the right to the variation, with the
+  current position highlighted.
 - `BranchSaveSharePanel` saves compact branch reports to localStorage and creates URL-hash share payloads.
 - `BattleStatsPanel` stays visible to show inferred team information.
 - `TeamEditor` lets the user override inferred fields for either player before branching.
