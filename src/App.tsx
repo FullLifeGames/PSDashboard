@@ -256,7 +256,15 @@ function App() {
   const navigateTo = useCallback((position: TimelinePosition, opts?: { seek?: boolean }) => {
     const next = normalizePosition(position, maxTurn, variationSpan);
     setViewTurn(next.turn);
-    setViewLine(next.line);
+    // The stored line is the user's INTENT, sticky across uncovered turns:
+    // stepping back past the branch point and forward again must return to
+    // the variation, not silently strand the user on the main line. Only an
+    // explicit 'main' request (chip, notation, graph) leaves the variation.
+    const sticky: ViewLine =
+      variationSpan === null ? 'main'
+      : next.line === 'variation' ? 'variation'
+      : position.line;
+    setViewLine(sticky);
     setDraftChoices({ p1: [], p2: [] });
     if (opts?.seek !== false) {
       setNavSeek(prev => ({ turn: next.turn, seq: (prev?.seq ?? 0) + 1 }));
@@ -1934,7 +1942,7 @@ function App() {
                   </>
                 )}
               </span>
-              {variationCovers(variationSpan, viewTurn) && (
+              {variationSpan !== null && viewTurn >= variationSpan.startTurn && viewTurn <= variationTip(variationSpan) && (
                 <span className="ps-line-chip" role="group" aria-label="Line selector">
                   <button
                     type="button"
