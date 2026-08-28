@@ -77,7 +77,8 @@ Relevant files:
 When `startBranch` runs, it:
 
 1. creates a new `@pkmn/sim` battle
-2. reorders both teams so the replay lead appears first
+2. reorders both teams so the replay lead appears first (or, for a turn-0
+   lead branch, the chosen `leadOverride` lead)
 3. starts the battle and sends `default` for team preview
 4. splits the replay protocol into turn blocks
 5. replays original choices turn by turn until the target branch turn, staying in lockstep with the simulator's turn counter: a block's choices are only written when the simulator stands at that block's turn (a sim that ran ahead skips stale blocks, one that fell behind advances on defaults first, a wedged battle stops instead of feeding later turns wrong choices). Taunt-blocked moves replay from their `|cant|` line instead of defaulting to move 1.
@@ -90,6 +91,8 @@ For doubles, the branch state includes slot-indexed active Pokemon, move lists, 
 The same lockstep replay tolerates synthetic logs (e.g. video-reconstructed replays): missing `|upkeep` markers, unparseable lines (skipped during snapshot parsing), and CRLF endings (normalized at ingestion) no longer desync the reconstruction; the regression suite pins a full video-reconstructed replay turn by turn, down to a pending Future Sight surviving to its branch point.
 
 **Hax alignment (per-turn seed search).** The replayed choices are the real game's, but the simulator rolls its own RNG: a phantom crit or miss the real game never had can contaminate a turn or even end the battle early, and boundary corrections cannot revive an ended battle. So before each block commits, the reconstruction serializes a checkpoint of the live battle, trials the block's choices under a pinned 16-seed candidate list (`src/lib/hax-alignment.ts` scores each trial's emitted events against the protocol block: game end and the faint set compare first, then soft counts over misses/crits/secondaries/hit counts/`|cant|`s/confusion self-hits/move counts plus a move-order signal), and calls `battle.resetRNG` with the best candidate. The pick repeats identically on every run (ordered trials, early exit on a perfect match, ties keep the earlier seed), and reseeding every turn keeps one turn's RNG consumption from shifting the next turn's rolls. The trial runner is `trialAdvanceLog` in the forward model (a fork-based sibling of `advancePosition` that answers forced switches from the protocol's replacement species); the runtime records each block's chosen seed plus the truly emitted block's score, and the sweep surfaces those records on `window.__psDebug.haxAlignment`, a premature-end notice, and the drift report's meta section. Damage magnitude stays unscored on purpose: boundary snapshots already pin HP, and matching rolls would reward wrongly guessed spreads.
+
+**Turn-0 lead branch.** `startBranch` with target turn 0 rebuilds a FRESH game to the start of turn 1: no replayed blocks, no snapshot corrections and no choice locks (a corrected boundary would put the original leads right back on the field), and the chosen leads first in each team order. The lead decision becomes history entry 0; rebuilds of the variation (truncation, team edits) re-seed that entry from its recorded `leadChoices` instead of replaying it through the sim.
 
 After branch entry, the user can choose actions for both sides and `executeTurn` submits them to the live simulator.
 
@@ -116,8 +119,16 @@ truncate / replace.
   variation exists, a line chip `[Main line | Variation]` switches lines
   view-only and stays rendered at every turn (clicking Variation clamps
   into its covered span); returning to the main line is one click and
-  never destroys the variation. When the graph carries a lead evaluation,
-  a `T0` button opens the team-preview analysis.
+  never destroys the variation.
+- Turn 0 is a view of its own, always reachable via the `T0` button (or the
+  back arrow from turn 1): the replay frame seeks to team preview and a
+  lead picker (`LeadPanel`) replaces the turn pickers, with the real leads
+  preselected and badged. "Play from turn 0" starts a fresh game with the
+  chosen leads as a variation whose entry 0 records the lead decision
+  (`turnNumber` 0, `leadChoices` on the history entry); play then continues
+  at turn 1 like any variation. When the graph carries a lead evaluation,
+  T0 also opens the team-preview analysis. Doubles is excluded for now (two
+  leads per side).
 - `PSReplayFrame` shows the original replay for main-line positions and the
   branch simulator log for variation positions. The branch frame ignores
   seekTurn prop changes after mount (re-seeking fought the append stream), so

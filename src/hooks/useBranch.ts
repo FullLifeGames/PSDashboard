@@ -41,6 +41,12 @@ interface StartBranchOptions {
   snapshotFor?: (turn: number) => TurnSnapshot | null;
   /** Protocol-truth lock context (③) for the boundary corrections. */
   choiceLocks?: ChoiceLockContext;
+  /**
+   * Turn-0 branching (targetTurn 0): start a FRESH game with these leads.
+   * The runtime rebuilds to turn 1 without snapshot corrections, and the
+   * lead decision is recorded as history entry 0 (turnNumber 0).
+   */
+  leadOverride?: { p1: string; p2: string };
 }
 
 export interface BranchHistoryEntry {
@@ -48,6 +54,8 @@ export interface BranchHistoryEntry {
   /** 'forced' entries record single-side forced-switch interludes (B15). */
   kind?: 'turn' | 'forced';
   forcedSide?: SideId;
+  /** Turn-0 lead entry: the chosen leads, so a rebuild can re-seed them. */
+  leadChoices?: { p1: string; p2: string };
   /** Identity-based choices used to replay this entry after a team edit (B1). */
   p1SlotChoices?: (BranchSlotChoice | null)[];
   p2SlotChoices?: (BranchSlotChoice | null)[];
@@ -401,20 +409,31 @@ export function useBranch() {
     setExecuteError(null);
 
     const branchEngine = await loadBranchEngine();
+    // Turn-0 lead branch: a FRESH game (no replayed blocks, no snapshot
+    // corrections — they would put the original leads right back) rebuilt to
+    // the start of turn 1 with the chosen leads first in the team order. The
+    // leads come from the caller or — on a rebuild of an existing turn-0
+    // variation (team edit, truncation) — from the recorded lead entry,
+    // which is re-seeded here instead of replaying through the sim.
+    const isT0 = targetTurn === 0;
+    const historyLead = isT0 ? options?.replayHistory?.[0]?.leadChoices : undefined;
+    const leadOverride = isT0 ? options?.leadOverride ?? historyLead : undefined;
+    const historyToReplay = historyLead ? (options?.replayHistory ?? []).slice(1) : options?.replayHistory ?? [];
     const runtime = await branchEngine.reconstructBranchRuntime({
       format,
       p1Team,
       p2Team,
       replayLog,
-      targetTurn,
-      snapshot,
+      targetTurn: isT0 ? 1 : targetTurn,
+      snapshot: isT0 ? null : snapshot,
       playerNames: options?.playerNames,
       onProgress: options?.onProgress,
       abort: options?.abort,
-      ...(options?.snapshotFor
+      ...(options?.snapshotFor && !isT0
         ? { capturePositions: { snapshotFor: options.snapshotFor, onPosition: () => {} } }
         : {}),
-      choiceLocks: options?.choiceLocks,
+      choiceLocks: isT0 ? undefined : options?.choiceLocks,
+      leadOverride: leadOverride ? { ...leadOverride } : undefined,
     });
 
     if (options?.abort?.aborted) return;
@@ -430,8 +449,21 @@ export function useBranch() {
     let branchError = branchEngine.validateBranchRuntime(runtime);
 
     const replayedHistory: BranchHistoryEntry[] = [];
+    if (isT0 && leadOverride && !branchError) {
+      // The lead decision IS the variation's first entry: entry 0 plays
+      // "turn 0" and the position after it is the start of turn 1.
+      const startState = branchEngine.createBranchState(runtime.battleStream, runtime.log, {
+        p1Choices: [],
+        p2Choices: [],
+      });
+      replayedHistory.push({
+        ...makeHistoryEntry(0, `lead ${leadOverride.p1}`, `lead ${leadOverride.p2}`, startState),
+        leadChoices: { ...leadOverride },
+        serializedPosition: startPosition,
+      });
+    }
     if (!branchError) {
-      for (const entry of options?.replayHistory ?? []) {
+      for (const entry of historyToReplay) {
         const outcome = await replayHistoryEntry(runtime, branchEngine, entry);
         if (!outcome.ok) {
           branchError = `Rebuild stopped before branch turn ${entry.turnNumber}: ${outcome.error}`;

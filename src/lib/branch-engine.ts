@@ -1390,13 +1390,22 @@ export async function reconstructBranchRuntime(params: {
   onRawBoundary?: (blockTurn: number, battle: SimBattle) => void;
   /** Protocol-truth lock context (③): boundary corrections re-stamp from it. */
   choiceLocks?: ChoiceLockContext;
+  /**
+   * Turn-0 branching: start the game with THESE leads instead of the
+   * replay's (species/name per side; null keeps the replay lead). Only
+   * meaningful with targetTurn 1 and no snapshot corrections — a corrected
+   * boundary would put the original lead right back on the field.
+   */
+  leadOverride?: { p1: string | null; p2: string | null };
 }): Promise<BranchRuntime> {
   const { format, p1Team, p2Team, replayLog, targetTurn, snapshot, onLogLines, onProgress, abort, capturePositions } = params;
   const overallDeadline = Date.now() + (params.deadlineMs ?? 60_000);
   let timedOut = false;
   const { p1Leads, p2Leads } = extractLeads(replayLog);
-  const orderedP1 = reorderForLeads(p1Team, p1Leads);
-  const orderedP2 = reorderForLeads(p2Team, p2Leads);
+  const leadsFor = (replayLeads: PokemonIdent[], override: string | null | undefined): PokemonIdent[] =>
+    override ? [{ name: override, species: override }] : replayLeads;
+  const orderedP1 = reorderForLeads(p1Team, leadsFor(p1Leads, params.leadOverride?.p1));
+  const orderedP2 = reorderForLeads(p2Team, leadsFor(p2Leads, params.leadOverride?.p2));
 
   const battleStream = new BattleStreams.BattleStream();
   const streams = BattleStreams.getPlayerStreams(battleStream);

@@ -1525,5 +1525,45 @@ test.describe('PS Dashboard', () => {
       await page.locator('.ps-line-chip button', { hasText: 'Variation' }).click();
       await expect(page.locator('iframe[title="Branch Simulation"]')).toBeVisible({ timeout: 10000 });
     });
+
+    test('Let it play out from a main-line turn arms and actually plays', async ({ page }) => {
+      test.setTimeout(180_000);
+      await page.locator('button', { hasText: 'Load' }).click();
+      await expect(page.locator('.ps-branch-bar input[type="range"]')).toBeVisible();
+
+      // Straight from the freshly loaded replay (main line, no variation):
+      // the branch rebuild resets the eval to idle, and the loop's first
+      // evaluation must fire on its own — this sat at "0 turns played".
+      await page.locator('button', { hasText: 'Let it play out' }).click();
+      await expect(page.getByText(/Engine is playing both sides from turn 1/)).toBeVisible({ timeout: 60_000 });
+      await expect(page.getByText(/Engine is playing both sides from turn 1… [1-9]/)).toBeVisible({ timeout: 120_000 });
+      await page.locator('.ps-btn', { hasText: 'Stop' }).click();
+      await expect(page.getByText(/Play-out stopped/)).toBeVisible({ timeout: 30_000 });
+    });
+
+    test('T0 opens the lead picker and a lead variation plays from turn 0', async ({ page }) => {
+      test.setTimeout(120_000);
+      await page.locator('button', { hasText: 'Load' }).click();
+      await expect(page.locator('.ps-branch-bar input[type="range"]')).toBeVisible();
+
+      // T0 sits on the timeline whether or not a game graph exists; the view
+      // swaps the turn pickers for the lead picker with the real leads
+      // preselected and badged.
+      await page.locator('.ps-branch-bar button[title^="Turn 0"]').click();
+      await expect(page.getByText('team preview: pick each side')).toBeVisible();
+      const p1Column = page.locator('.ps-branch-side-column').first();
+      await expect(p1Column.locator('.ps-switchbtn-selected .ps-played-badge')).toBeVisible();
+
+      // A different P1 lead + play: a fresh game opens at turn 1 and the
+      // history records the lead decision as its turn-0 entry.
+      await p1Column.locator('.ps-switchbtn:not(.ps-switchbtn-selected)').first().click();
+      await page.locator('.ps-execute-btn', { hasText: 'Play from turn 0' }).click();
+      await expect(page.getByText(/Branching · Turn 1/)).toBeVisible({ timeout: 60_000 });
+      const history = page.locator('.ps-panel', { hasText: 'Variation moves' });
+      await expect(history).toContainText('Turn 0');
+      await expect(history).toContainText('lead');
+      await expect(page.locator('.ps-line-chip button', { hasText: 'Variation' })).toBeVisible();
+      await expect(page.locator('iframe[title="Branch Simulation"]')).toBeVisible({ timeout: 10000 });
+    });
   });
 });

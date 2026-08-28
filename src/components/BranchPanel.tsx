@@ -119,7 +119,8 @@ function MoveBtn({ move, dmg, spreadDamage, zMoveName, targetDamage, pendingChoi
         title={compact ? compactTitle : undefined}
       >
         <div className="ps-movebtn-name">{move.name}</div>
-        {wasPlayed && <span className="ps-played-badge" title="The action played at this position on the line you are viewing.">played</span>}
+        {/* Advanced already names the played action in the header line. */}
+        {compact && wasPlayed && <span className="ps-played-badge" title="The action played at this position on the line you are viewing.">played</span>}
         {zMoveName && (
           <div className="ps-movebtn-zmove">→ {zMoveName}</div>
         )}
@@ -212,7 +213,6 @@ function SwitchBtn({ sw, selected, disabled, disabledReason, wasPlayed, compact,
           <div>
             <div className="ps-switchbtn-name">
               {sw.name}
-              {wasPlayed && <span className="ps-played-badge" title="The action played at this position on the line you are viewing.">played</span>}
             </div>
             <div style={{ width: 60 }}>
               <div className="ps-hpbar-track" style={{ height: 4, marginTop: 2 }}>
@@ -385,7 +385,7 @@ function SideControls({ side, label, activeName, activeSpecies, activeFainted, m
           {recommendation && (
             <button
               type="button"
-              className="ps-recommendation-btn"
+              className={`ps-recommendation-btn${advanced ? '' : ' ps-recommendation-compact'}`}
               onClick={() => onChoice(moveChoiceFor(recommendation.move, recommendation.targetLoc))}
             >
               <span className="ps-recommendation-label">Use Recommended</span>
@@ -747,7 +747,7 @@ export function BranchPanel({ simState, source, acquiringExact, executeError, ex
 
   return (
     <div>
-      <div style={{ fontSize: 10, color: '#9fb2cc', margin: '6px 0 2px', display: 'flex', gap: 8, alignItems: 'baseline', flexWrap: 'wrap' }}>
+      <div style={{ fontSize: 10, color: '#9fb2cc', margin: '4px 0 2px', display: 'flex', gap: 8, alignItems: 'baseline', flexWrap: 'wrap' }}>
         {source === 'stored' && (
           <span>Choices from the reconstructed position</span>
         )}

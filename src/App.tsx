@@ -11,6 +11,7 @@ import { useSmogonSetAssumptions } from './hooks/useSmogonSetAssumptions';
 import { ReplayLoader } from './components/ReplayLoader';
 import { PSReplayFrame } from './components/PSReplayFrame';
 import { BranchPanel, type PlayedPick } from './components/BranchPanel';
+import { LeadPanel, type LeadOption } from './components/LeadPanel';
 import { BranchHistoryPanel } from './components/BranchHistoryPanel';
 import { BranchSaveSharePanel } from './components/BranchSaveSharePanel';
 import { BattleStatsPanel } from './components/BattleStatsPanel';
@@ -217,6 +218,13 @@ function App() {
   // ── Unified timeline: one pointer over main line + at most one variation ──
   const [viewLine, setViewLine] = useState<ViewLine>('main');
   /**
+   * Turn 0 as a view: the team-preview position before the leads walk out.
+   * Not a slider position (the pointer model starts at turn 1) — while set,
+   * the replay frame seeks to the preview and the lead picker replaces the
+   * turn pickers. Any turn navigation clears it.
+   */
+  const [viewT0, setViewT0] = useState(false);
+  /**
    * Draft choices for positions WITHOUT the live sim (variant B pickers):
    * collected here, executed via requestDeviation → rebuild → executeTurn.
    * Cleared on every navigation — a draft belongs to one position.
@@ -273,6 +281,7 @@ function App() {
 
   const navigateTo = useCallback((position: TimelinePosition, opts?: { seek?: boolean }) => {
     const next = normalizePosition(position, maxTurn, variationSpan);
+    setViewT0(false);
     setViewTurn(next.turn);
     // The stored line is the user's INTENT, sticky across uncovered turns:
     // stepping back past the branch point and forward again must return to
@@ -346,6 +355,7 @@ function App() {
   useEffect(() => {
     setViewTurn(1);
     setViewLine('main');
+    setViewT0(false);
     setDraftChoices({ p1: [], p2: [] });
     setPendingConfirm(null);
     setPlayOut(null);
@@ -517,6 +527,7 @@ function App() {
   const rebuildAt = useCallback(async (
     position: TimelinePosition,
     prefill: { p1Choices: (BranchSlotChoice | null)[]; p2Choices: (BranchSlotChoice | null)[] } | null,
+    leadOverride?: { p1: string; p2: string },
   ) => {
     if (!replayData || branchPreparing) return;
     const kind = classifyDeviation(variationSpan, position);
@@ -533,6 +544,9 @@ function App() {
       }
       replayHistory.push(entry);
     }
+    // Turn-0 variation: startBranch needs leads — the caller's (fresh lead
+    // branch) or the recorded lead entry's (truncation/refresh rebuild).
+    if (startTurn === 0 && !leadOverride && !replayHistory[0]?.leadChoices) return;
 
     const abortController = new AbortController();
     branchAbortRef.current = abortController;
@@ -567,6 +581,7 @@ function App() {
           abort: abortController.signal,
           snapshotFor: turn => snapshots[Math.min(turn - 1, snapshots.length - 1)] ?? null,
           choiceLocks,
+          leadOverride,
         });
         if (!abortController.signal.aborted) {
           branchWindowOpenRef.current = true;
@@ -583,8 +598,9 @@ function App() {
             setBranchDivergence(null);
           }
           // The pointer lands where the sim now stands; the tip-follow effect
-          // covers replayed histories, this covers the entry-less start.
-          if (replayHistory.length === 0) {
+          // covers replayed histories (and the turn-0 lead entry, which is
+          // seeded by startBranch), this covers the entry-less start.
+          if (replayHistory.length === 0 && startTurn > 0) {
             setViewTurn(startTurn);
             setViewLine('main');
           }
@@ -631,6 +647,28 @@ function App() {
     }
     run();
   }, [viewLine, variationSpan, rebuildAt, executeTurn, endSnapshotTurn]);
+
+  /**
+   * Turn-0 branching: replace the game's leads and play from team preview.
+   * Same chess rules as any deviation — an existing variation is replaced
+   * only after the confirm.
+   */
+  const startLeadVariation = useCallback((leads: { p1: string; p2: string }) => {
+    const run = () => {
+      setVariationScores([]);
+      void rebuildAt({ turn: 0, line: 'main' }, null, leads);
+    };
+    if (variationSpan) {
+      const turnCount = variationSpan.length;
+      setPendingConfirm({
+        message: `Start a new game from turn 0: replace the existing variation ` +
+          `from turn ${variationSpan.startTurn} (${turnCount} ${turnCount === 1 ? 'turn' : 'turns'})?`,
+        proceed: () => { setPendingConfirm(null); run(); },
+      });
+      return;
+    }
+    run();
+  }, [variationSpan, rebuildAt]);
 
   const handleCancelBranchPreparation = useCallback(() => {
     branchAbortRef.current?.abort();
@@ -734,6 +772,20 @@ function App() {
     () => (replayData ? getReplayGameType(replayData.log) : null),
     [replayData],
   );
+
+  /** T0 lead picker data: each side's team with the real leads marked —
+   *  read from the pre-turn-1 snapshot, where the actives ARE the leads. */
+  const leadOptions = useMemo<{ p1: LeadOption[]; p2: LeadOption[] }>(() => {
+    const snapshot = snapshots[0] ?? null;
+    if (!snapshot) return { p1: [], p2: [] };
+    const optionsOf = (side: typeof snapshot.p1): LeadOption[] =>
+      side.pokemon.map(pokemon => ({
+        name: pokemon.name,
+        species: pokemon.speciesForme,
+        wasLead: pokemon.isActive,
+      }));
+    return { p1: optionsOf(snapshot.p1), p2: optionsOf(snapshot.p2) };
+  }, [snapshots]);
   const evalAvailable = useMemo(
     () => !!replayData && (replayGameType === null || replayGameType === 'singles' || replayGameType === 'doubles'),
     [replayData, replayGameType],
@@ -1304,6 +1356,19 @@ function App() {
     }
   }, [playOut, finishPlayOut]);
 
+  /**
+   * A play-out started from the MAIN LINE arms before its rebuild finishes —
+   * startPlayOut cannot evaluate a sim that does not exist yet, and entering
+   * branch mode resets the eval to 'idle', which the auto-eval effect (stale
+   * only) never picks up. Without this kick the loop showed "0 turns played"
+   * forever. Fires once the live tip stands and no evaluation is in flight.
+   */
+  useEffect(() => {
+    if (!playOut?.active || !liveTip || executing || branchPreparing) return;
+    if (liveEvalStatus !== 'idle' && liveEvalStatus !== 'stale') return;
+    handleEvaluate();
+  }, [playOut?.active, liveTip, executing, branchPreparing, liveEvalStatus, handleEvaluate]);
+
   useEffect(() => {
     if (!playOut?.active || !liveTip || executing || branchPreparing) return;
     if (evaluation.status !== 'done' || !evaluation.result) return;
@@ -1665,12 +1730,18 @@ function App() {
   }, [viewingVariation, endSnapshotTurn, setViewTurn]);
 
   const handleGraphSelect = useCallback((turn: number) => {
-    // Turn 0 (team preview) has no replay position — only the analysis opens.
     if (turn >= 1) {
+      setViewT0(false);
       seekIntentRef.current = { turn, until: Date.now() + 4000 };
       // Direct, not via handleReplayTurn: an explicit selection beats the
       // echo guards (which exist to protect against the embed, not the user).
       setViewTurn(turn);
+    } else {
+      // Turn 0: the team-preview view opens — the replay frame seeks to the
+      // preview and the lead picker replaces the turn pickers. The intent
+      // guard swallows the remount echoes a line switch can trigger.
+      seekIntentRef.current = { turn: 0, until: Date.now() + 4000 };
+      setViewT0(true);
     }
     setAnalysisTurn(turn);
   }, [setViewTurn]);
@@ -1980,8 +2051,9 @@ function App() {
 
   return (
     <div className="ps-app-root">
-      {/* Header (hidden when framed by a host site) */}
-      {!embed && (
+      {/* Header (hidden when framed by a host site, and once a replay is
+          loaded — on a 1080p screen every row above the pickers counts). */}
+      {!embed && !replayData && (
         <div className="ps-app-header" style={{ borderRadius: '0 0 5px 5px' }}>
           <h1>PS Dashboard</h1>
           <span style={{ fontSize: 10, color: '#aabbcc' }}>
@@ -2152,7 +2224,7 @@ function App() {
                   p1={replayData.players[0]}
                   p2={replayData.players[1]}
                   height={480}
-                  seekTurn={viewTurn}
+                  seekTurn={viewT0 ? 0 : viewTurn}
                   autoPlay={false}
                   viewpoint={replayData.viewpoint}
                   reloadKey={`${replayData.id}:original`}
@@ -2164,23 +2236,23 @@ function App() {
             {/* Timeline bar: always visible — one slider over main line and variation */}
             <div className="ps-branch-bar">
               <span style={{ fontSize: 11, fontWeight: 'bold', whiteSpace: 'nowrap', color: '#cde' }}>Timeline</span>
-              {evaluation.graph.lead && (
-                <button
-                  type="button"
-                  className="ps-btn"
-                  onClick={() => handleGraphSelectLine(0)}
-                  title="Turn 0: the team-preview lead decision."
-                  aria-pressed={analysisTurn === 0}
-                  style={{
-                    padding: '2px 6px', fontSize: 10,
-                    ...(analysisTurn === 0 ? { borderColor: '#8cf', color: '#8cf' } : {}),
-                  }}
-                >T0</button>
-              )}
               <button
                 type="button"
-                onClick={() => navigateTo({ turn: viewTurn - 1, line: viewLine })}
-                disabled={viewTurn <= 1}
+                className="ps-btn"
+                onClick={() => handleGraphSelectLine(0)}
+                title="Turn 0: team preview. Pick different leads and play the game from the start."
+                aria-pressed={viewT0}
+                style={{
+                  padding: '2px 6px', fontSize: 10,
+                  ...(viewT0 ? { borderColor: '#8cf', color: '#8cf' } : {}),
+                }}
+              >T0</button>
+              <button
+                type="button"
+                onClick={() => (viewTurn <= 1 && !viewT0
+                  ? handleGraphSelectLine(0)
+                  : navigateTo({ turn: viewTurn - 1, line: viewLine }))}
+                disabled={viewTurn <= 1 && viewT0}
                 className="ps-btn"
                 style={{ padding: '2px 8px', fontSize: 12, lineHeight: 1 }}
               >&#9664;</button>
@@ -2190,7 +2262,8 @@ function App() {
                   // lives — without it nothing on the timeline said so.
                   const max = sliderMax(maxTurn, variationSpan);
                   const pos = (turn: number) => (max <= 1 ? 0 : ((turn - 1) / (max - 1)) * 100);
-                  const from = pos(variationSpan.startTurn);
+                  // A turn-0 variation starts left of the slider's domain.
+                  const from = Math.max(0, pos(variationSpan.startTurn));
                   const to = pos(variationTip(variationSpan));
                   return (
                     <span
@@ -2211,13 +2284,15 @@ function App() {
               </span>
               <button
                 type="button"
-                onClick={() => navigateTo({ turn: viewTurn + 1, line: viewLine })}
-                disabled={viewTurn >= sliderMax(maxTurn, variationSpan)}
+                onClick={() => navigateTo({ turn: viewT0 ? 1 : viewTurn + 1, line: viewLine })}
+                disabled={!viewT0 && viewTurn >= sliderMax(maxTurn, variationSpan)}
                 className="ps-btn"
                 style={{ padding: '2px 8px', fontSize: 12, lineHeight: 1 }}
               >&#9654;</button>
               <span style={{ fontSize: 11, color: '#aab', minWidth: 60, textAlign: 'center' }}>
-                {atEndPosition && !viewingVariation ? (
+                {viewT0 ? (
+                  <strong style={{ color: '#fff' }}>T0</strong>
+                ) : atEndPosition && !viewingVariation ? (
                   <strong style={{ color: '#fff' }}>End</strong>
                 ) : (
                   <>
@@ -2288,7 +2363,19 @@ function App() {
             )}
 
             {/* Variant B: the pickers are ALWAYS there — live sim state at the
-                tip, resolved picker state (stored/snapshot) everywhere else. */}
+                tip, resolved picker state (stored/snapshot) everywhere else.
+                On T0 the lead picker takes their place. */}
+            {viewT0 ? (
+              <LeadPanel
+                key={`${replayData.id}:${leadOptions.p1.length}`}
+                playerNames={[replayData.players[0], replayData.players[1]]}
+                p1Options={leadOptions.p1}
+                p2Options={leadOptions.p2}
+                doubles={replayGameType === 'doubles'}
+                executing={executing || branchPreparing}
+                onStart={startLeadVariation}
+              />
+            ) : (
             <BranchPanel
               simState={liveTip ? simState : pickerSimState}
               source={liveTip ? 'live' : positionPicker?.source}
@@ -2301,6 +2388,7 @@ function App() {
               onExecuteTurn={liveTip ? handleExecuteTurn : handleExecuteDraft}
               played={playedAtView}
             />
+            )}
             {(branching || variationSpan !== null) && (
               <>
                 <BranchHistoryPanel

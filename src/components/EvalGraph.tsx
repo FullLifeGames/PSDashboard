@@ -189,19 +189,24 @@ export function EvalGraph({ scores, playerNames, currentTurn, currentLine, onSel
       <line x1={PAD_X} y1={y(0.5)} x2={width - PAD_X} y2={y(0.5)} stroke="rgba(183,216,255,0.08)" />
       <line x1={PAD_X} y1={y(-0.5)} x2={width - PAD_X} y2={y(-0.5)} stroke="rgba(183,216,255,0.08)" />
       <line x1={PAD_X} y1={HEIGHT / 2} x2={width - PAD_X} y2={HEIGHT / 2} stroke="rgba(183,216,255,0.22)" />
-      {variation && (
-        <>
-          <rect
-            x={x(variation.startTurn)} y={2}
-            width={Math.max(2, x(Math.max(variationEnd, variation.startTurn + 1)) - x(variation.startTurn))}
-            height={HEIGHT - 4} fill="rgba(240,199,107,0.07)"
-          />
-          <line
-            x1={x(variation.startTurn)} x2={x(variation.startTurn)} y1={2} y2={HEIGHT - 2}
-            stroke="rgba(240,199,107,0.5)" strokeDasharray="3 3"
-          />
-        </>
-      )}
+      {variation && (() => {
+        // A turn-0 variation (lead branch) starts left of the axis — its
+        // marker clamps to the first plotted turn.
+        const markerTurn = Math.max(variation.startTurn, first);
+        return (
+          <>
+            <rect
+              x={x(markerTurn)} y={2}
+              width={Math.max(2, x(Math.max(variationEnd, markerTurn + 1)) - x(markerTurn))}
+              height={HEIGHT - 4} fill="rgba(240,199,107,0.07)"
+            />
+            <line
+              x1={x(markerTurn)} x2={x(markerTurn)} y1={2} y2={HEIGHT - 2}
+              stroke="rgba(240,199,107,0.5)" strokeDasharray="3 3"
+            />
+          </>
+        );
+      })()}
       {decidedSpans.map(span => (
         <line
           key={`d${span.x1}-${span.x2}-${span.side}`}
