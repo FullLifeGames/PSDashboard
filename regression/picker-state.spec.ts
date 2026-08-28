@@ -4,7 +4,7 @@ import type { PokemonSet } from '@pkmn/sim';
 import { buildTeamsFromReplay } from '../src/lib/team-builder';
 import { reconstructBranchRuntime } from '../src/lib/branch-engine';
 import { parseReplayLog } from '../src/lib/protocol-parser';
-import { pickerSourceLabel, pickerStateFromSerialized, pickerStateFromSnapshot } from '../src/lib/picker-state';
+import { pickerStateFromSerialized, pickerStateFromSnapshot } from '../src/lib/picker-state';
 import type { TurnSnapshot } from '../src/types';
 
 function loadFixtureReplay() {
@@ -103,8 +103,17 @@ test('pickerStateFromSnapshot offers team moves and the living bench', () => {
   expect(state.p1Active!.hp).toBe(state.p1Active!.maxhp);
 });
 
-test('pickerSourceLabel names all three sources', () => {
-  expect(pickerSourceLabel('live')).toBe('aus lebendem Sim');
-  expect(pickerSourceLabel('stored')).toBe('aus gespeicherter Stellung');
-  expect(pickerSourceLabel('snapshot')).toBe('aus Snapshot — Sim prüft beim Ausführen');
+test('pickerStateFromSnapshot fills move and species types from the dex', () => {
+  const p1Team = [set('Heatran', ['Magma Storm', 'Earth Power', 'Taunt', 'Stealth Rock']), set('Rotom-Wash', ['Volt Switch'])];
+  const p2Team = [set('Zapdos', ['Volt Switch', 'Heat Wave', 'Roost', 'Defog']), set('Ferrothorn', ['Leech Seed'])];
+  const state = pickerStateFromSnapshot(makeSnapshot(), p1Team, p2Team);
+
+  // The snapshot only knows move NAMES — the type comes from the dex so the
+  // buttons color and label exactly like the live sim's.
+  expect(state.p1MovesBySlot[0].map(move => move.type))
+    .toEqual(['Fire', 'Ground', 'Dark', 'Rock']);
+  expect(state.p2MovesBySlot[0].map(move => move.type))
+    .toEqual(['Electric', 'Fire', 'Flying', 'Flying']);
+  expect(state.p1Active?.types).toEqual(['Fire', 'Steel']);
+  expect(state.p1Active?.moves.map(move => move.type)).toEqual(['Fire', 'Ground', 'Dark', 'Rock']);
 });

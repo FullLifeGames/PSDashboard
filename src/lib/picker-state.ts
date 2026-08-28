@@ -1,4 +1,5 @@
 import { Generations, Pokemon as CalcPokemon } from '@smogon/calc';
+import { Dex } from '@pkmn/dex';
 import type { PokemonSet } from '@pkmn/sim';
 import type { PokemonSnapshot, TurnSnapshot } from '../types';
 import type {
@@ -14,10 +15,26 @@ import type {
  */
 export type PickerSource = 'live' | 'stored' | 'snapshot';
 
-export function pickerSourceLabel(source: PickerSource): string {
-  if (source === 'live') return 'aus lebendem Sim';
-  if (source === 'stored') return 'aus gespeicherter Stellung';
-  return 'aus Snapshot — Sim prüft beim Ausführen';
+function dexForGen(gen: number) {
+  return Dex.forGen(Math.min(9, Math.max(1, Math.round(gen))));
+}
+
+/** Move type from the dex — the snapshot knows names, not types, but the
+ *  picker buttons color and label by type exactly like the live sim's. */
+function moveTypeFor(name: string, gen: number): string {
+  try {
+    return dexForGen(gen).moves.get(name)?.type || '';
+  } catch {
+    return '';
+  }
+}
+
+function speciesTypesFor(species: string, gen: number): string[] {
+  try {
+    return [...(dexForGen(gen).species.get(species)?.types ?? [])];
+  } catch {
+    return [];
+  }
 }
 
 /** Exact pickers from a recorded position — no live stream needed. */
@@ -28,13 +45,17 @@ export async function pickerStateFromSerialized(serialized: string): Promise<Bra
   return createBranchStateFromBattle(battle, battle.log ?? [], { p1Choices: [], p2Choices: [] });
 }
 
+function moveNamesFor(mon: PokemonSnapshot, set: PokemonSet | undefined): string[] {
+  return set?.moves && set.moves.length > 0 ? set.moves : mon.moves;
+}
+
 function moveOptionsFor(
   mon: PokemonSnapshot,
   set: PokemonSet | undefined,
   activeSlot: number,
+  gen: number,
 ): BranchMoveOption[] {
-  const names = set?.moves && set.moves.length > 0 ? set.moves : mon.moves;
-  return names.map((name, slot) => ({
+  return moveNamesFor(mon, set).map((name, slot) => ({
     name,
     activeSlot,
     slot: slot + 1,
@@ -42,7 +63,7 @@ function moveOptionsFor(
     pp: 0,
     maxpp: 0,
     disabled: false,
-    type: '',
+    type: moveTypeFor(name, gen),
     targetType: 'normal',
     requiresTarget: false,
     targetOptions: [],
@@ -91,7 +112,7 @@ function pokemonInfoFromSnapshot(
     fainted: mon.fainted,
     isActive: mon.isActive,
     activeSlot,
-    moves: mon.moves.map(name => ({ name, type: '' })),
+    moves: moveNamesFor(mon, set).map(name => ({ name, type: moveTypeFor(name, gen) })),
     ability: mon.ability || set?.ability || '',
     item: mon.item || set?.item || '',
     // Raw stats are unknown without the sim, but the damage calc derives
@@ -103,7 +124,7 @@ function pokemonInfoFromSnapshot(
     ivs: set?.ivs,
     boosts: { ...mon.boosts },
     level: mon.level || set?.level || 100,
-    types: [],
+    types: speciesTypesFor(mon.speciesForme, gen),
   };
 }
 
@@ -128,7 +149,7 @@ export function pickerStateFromSnapshot(
     // switch option, not a missing one.
     const benchPercent = (mon: PokemonSnapshot) =>
       (mon.maxhp === 0 && !mon.fainted ? 100 : mon.hpPercent);
-    const movesBySlot = actives.map((mon, index) => moveOptionsFor(mon, setFor(mon), index));
+    const movesBySlot = actives.map((mon, index) => moveOptionsFor(mon, setFor(mon), index, gen));
     const switchesBySlot = actives.map((_, activeSlot): BranchSwitchOption[] =>
       pokemon
         .filter(mon => !mon.isActive && !mon.fainted && benchPercent(mon) > 0)
