@@ -536,6 +536,20 @@ body {
   padding: 2px 8px;
 }
 
+/* T0 lead picker: doubles slot marker on a selected lead chip (a/b). */
+.ps-lead-slot {
+  display: inline-block;
+  margin-right: 4px;
+  padding: 0 4px;
+  border-radius: 3px;
+  font-size: 8px;
+  font-weight: bold;
+  text-transform: uppercase;
+  background: rgba(108, 194, 255, 0.25);
+  border: 1px solid rgba(108, 194, 255, 0.5);
+  color: #bfe3ff;
+}
+
 .ps-recommendation-label {
   color: #fff1bd;
   font-size: 10px;

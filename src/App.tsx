@@ -527,7 +527,7 @@ function App() {
   const rebuildAt = useCallback(async (
     position: TimelinePosition,
     prefill: { p1Choices: (BranchSlotChoice | null)[]; p2Choices: (BranchSlotChoice | null)[] } | null,
-    leadOverride?: { p1: string; p2: string },
+    leadOverride?: { p1: string[]; p2: string[] },
   ) => {
     if (!replayData || branchPreparing) return;
     const kind = classifyDeviation(variationSpan, position);
@@ -653,7 +653,7 @@ function App() {
    * Same chess rules as any deviation — an existing variation is replaced
    * only after the confirm.
    */
-  const startLeadVariation = useCallback((leads: { p1: string; p2: string }) => {
+  const startLeadVariation = useCallback((leads: { p1: string[]; p2: string[] }) => {
     const run = () => {
       setVariationScores([]);
       void rebuildAt({ turn: 0, line: 'main' }, null, leads);
@@ -2371,7 +2371,7 @@ function App() {
                 playerNames={[replayData.players[0], replayData.players[1]]}
                 p1Options={leadOptions.p1}
                 p2Options={leadOptions.p2}
-                doubles={replayGameType === 'doubles'}
+                leadsPerSide={replayGameType === 'doubles' ? 2 : 1}
                 executing={executing || branchPreparing}
                 onStart={startLeadVariation}
               />

@@ -42,11 +42,12 @@ interface StartBranchOptions {
   /** Protocol-truth lock context (③) for the boundary corrections. */
   choiceLocks?: ChoiceLockContext;
   /**
-   * Turn-0 branching (targetTurn 0): start a FRESH game with these leads.
-   * The runtime rebuilds to turn 1 without snapshot corrections, and the
-   * lead decision is recorded as history entry 0 (turnNumber 0).
+   * Turn-0 branching (targetTurn 0): start a FRESH game with these leads
+   * (one per side in singles, two in doubles, slot order preserved). The
+   * runtime rebuilds to turn 1 without snapshot corrections, and the lead
+   * decision is recorded as history entry 0 (turnNumber 0).
    */
-  leadOverride?: { p1: string; p2: string };
+  leadOverride?: { p1: string[]; p2: string[] };
 }
 
 export interface BranchHistoryEntry {
@@ -54,8 +55,8 @@ export interface BranchHistoryEntry {
   /** 'forced' entries record single-side forced-switch interludes (B15). */
   kind?: 'turn' | 'forced';
   forcedSide?: SideId;
-  /** Turn-0 lead entry: the chosen leads, so a rebuild can re-seed them. */
-  leadChoices?: { p1: string; p2: string };
+  /** Turn-0 lead entry: the chosen leads (slot order), so a rebuild can re-seed them. */
+  leadChoices?: { p1: string[]; p2: string[] };
   /** Identity-based choices used to replay this entry after a team edit (B1). */
   p1SlotChoices?: (BranchSlotChoice | null)[];
   p2SlotChoices?: (BranchSlotChoice | null)[];
@@ -457,8 +458,8 @@ export function useBranch() {
         p2Choices: [],
       });
       replayedHistory.push({
-        ...makeHistoryEntry(0, `lead ${leadOverride.p1}`, `lead ${leadOverride.p2}`, startState),
-        leadChoices: { ...leadOverride },
+        ...makeHistoryEntry(0, `lead ${leadOverride.p1.join(' + ')}`, `lead ${leadOverride.p2.join(' + ')}`, startState),
+        leadChoices: { p1: [...leadOverride.p1], p2: [...leadOverride.p2] },
         serializedPosition: startPosition,
       });
     }

@@ -1392,18 +1392,19 @@ export async function reconstructBranchRuntime(params: {
   choiceLocks?: ChoiceLockContext;
   /**
    * Turn-0 branching: start the game with THESE leads instead of the
-   * replay's (species/name per side; null keeps the replay lead). Only
-   * meaningful with targetTurn 1 and no snapshot corrections — a corrected
-   * boundary would put the original lead right back on the field.
+   * replay's (species/names per side, slot order preserved — doubles sends
+   * two; null or empty keeps the replay leads). Only meaningful with
+   * targetTurn 1 and no snapshot corrections — a corrected boundary would
+   * put the original leads right back on the field.
    */
-  leadOverride?: { p1: string | null; p2: string | null };
+  leadOverride?: { p1: string[] | null; p2: string[] | null };
 }): Promise<BranchRuntime> {
   const { format, p1Team, p2Team, replayLog, targetTurn, snapshot, onLogLines, onProgress, abort, capturePositions } = params;
   const overallDeadline = Date.now() + (params.deadlineMs ?? 60_000);
   let timedOut = false;
   const { p1Leads, p2Leads } = extractLeads(replayLog);
-  const leadsFor = (replayLeads: PokemonIdent[], override: string | null | undefined): PokemonIdent[] =>
-    override ? [{ name: override, species: override }] : replayLeads;
+  const leadsFor = (replayLeads: PokemonIdent[], override: string[] | null | undefined): PokemonIdent[] =>
+    override && override.length > 0 ? override.map(name => ({ name, species: name })) : replayLeads;
   const orderedP1 = reorderForLeads(p1Team, leadsFor(p1Leads, params.leadOverride?.p1));
   const orderedP2 = reorderForLeads(p2Team, leadsFor(p2Leads, params.leadOverride?.p2));
 

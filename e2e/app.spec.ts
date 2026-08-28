@@ -1565,5 +1565,30 @@ test.describe('PS Dashboard', () => {
       await expect(page.locator('.ps-line-chip button', { hasText: 'Variation' })).toBeVisible();
       await expect(page.locator('iframe[title="Branch Simulation"]')).toBeVisible({ timeout: 10000 });
     });
+
+    test('doubles T0 picks two leads per side and plays from turn 0', async ({ page }) => {
+      test.setTimeout(120_000);
+      await page.locator('input[type="text"]').fill('gen9doubles-test');
+      await page.locator('button', { hasText: 'Load' }).click();
+      await expect(page.getByText('Alice', { exact: true }).first()).toBeVisible({ timeout: 10000 });
+
+      await page.locator('.ps-branch-bar button[title^="Turn 0"]').click();
+      await expect(page.getByText('pick both leads per side')).toBeVisible();
+      const p1Column = page.locator('.ps-branch-side-column').first();
+      // Both real leads come preselected; swapping one lead replaces the
+      // oldest pick instead of demanding a deselect first.
+      await expect(p1Column.locator('.ps-switchbtn-selected')).toHaveCount(2);
+      await p1Column.locator('.ps-switchbtn:not(.ps-switchbtn-selected)').first().click();
+      await expect(p1Column.locator('.ps-switchbtn-selected')).toHaveCount(2);
+
+      await page.locator('.ps-execute-btn', { hasText: 'Play from turn 0' }).click();
+      await expect(page.getByText(/Branching · Turn 1/)).toBeVisible({ timeout: 60_000 });
+      const history = page.locator('.ps-panel', { hasText: 'Variation moves' });
+      await expect(history).toContainText('Turn 0');
+      // Two leads per side, slot-ordered ("lead X + Y").
+      await expect(history).toContainText('+');
+      // The doubles branch opens with per-slot controls for all four actives.
+      await expect(page.locator('.ps-side-controls')).toHaveCount(4);
+    });
   });
 });

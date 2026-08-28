@@ -123,12 +123,14 @@ truncate / replace.
 - Turn 0 is a view of its own, always reachable via the `T0` button (or the
   back arrow from turn 1): the replay frame seeks to team preview and a
   lead picker (`LeadPanel`) replaces the turn pickers, with the real leads
-  preselected and badged. "Play from turn 0" starts a fresh game with the
-  chosen leads as a variation whose entry 0 records the lead decision
-  (`turnNumber` 0, `leadChoices` on the history entry); play then continues
-  at turn 1 like any variation. When the graph carries a lead evaluation,
-  T0 also opens the team-preview analysis. Doubles is excluded for now (two
-  leads per side).
+  preselected and badged. Singles picks one lead per side, doubles picks
+  two (selection order is the slot order, marked a/b on the chips; a pick
+  past the limit replaces the oldest). "Play from turn 0" starts a fresh
+  game with the chosen leads as a variation whose entry 0 records the lead
+  decision (`turnNumber` 0, `leadChoices` as slot-ordered species lists on
+  the history entry); play then continues at turn 1 like any variation.
+  When the graph carries a lead evaluation, T0 also opens the team-preview
+  analysis.
 - `PSReplayFrame` shows the original replay for main-line positions and the
   branch simulator log for variation positions. The branch frame ignores
   seekTurn prop changes after mount (re-seeking fought the append stream), so
