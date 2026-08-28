@@ -54,6 +54,9 @@ export interface BranchHistoryEntry {
   /** The resolved commands actually sent to the sim (display/share only). */
   p1Choice: string;
   p2Choice: string;
+  /** Serialized position AFTER this entry executed (unified timeline);
+   *  null when capture failed — navigation still works via the sim log. */
+  serializedPosition?: string | null;
   p1Active: SimPokemonInfo | null;
   p1ActiveSlots: (SimPokemonInfo | null)[];
   p2Active: SimPokemonInfo | null;
@@ -169,10 +172,14 @@ async function replayHistoryEntry(
     p1Choices: [],
     p2Choices: [],
   });
+  // The rebuild's own position replaces whatever the replayed entry carried —
+  // after a team edit the old capture no longer describes this battle.
+  const serializedPosition = branchEngine.captureSerializedPosition(runtime.battleStream.battle);
   return {
     ok: true,
     entry: {
       ...makeHistoryEntry(turnNumber, p1Command, p2Command, nextState),
+      serializedPosition,
       kind: entry.kind ?? 'turn',
       ...(entry.forcedSide ? { forcedSide: entry.forcedSide } : {}),
       ...(entry.p1SlotChoices ? { p1SlotChoices: entry.p1SlotChoices } : {}),
@@ -185,6 +192,10 @@ export function useBranch() {
   const [branching, setBranching] = useState(false);
   const [simState, setSimState] = useState<BranchSimState | null>(null);
   const [history, setHistory] = useState<BranchHistoryEntry[]>([]);
+  /** Turn the current branch runtime was started at (null = no runtime). */
+  const [variationStartTurn, setVariationStartTurn] = useState<number | null>(null);
+  /** Serialized position at the branch start, before entry 0. */
+  const [startSerialized, setStartSerialized] = useState<string | null>(null);
   const [executeError, setExecuteError] = useState<string | null>(null);
   const [executing, setExecuting] = useState(false);
   // Concurrent sim writes commit unintended extra turns and desync the UI
@@ -273,6 +284,7 @@ export function useBranch() {
         kind: 'turn' as const,
         p1SlotChoices,
         p2SlotChoices,
+        serializedPosition: branchEngine.captureSerializedPosition(battleStream.battle),
       }]);
       setSimState(nextState);
     } finally {
@@ -321,6 +333,7 @@ export function useBranch() {
         kind: 'forced' as const,
         forcedSide: side,
         ...(side === 'p1' ? { p1SlotChoices: slotChoices } : { p2SlotChoices: slotChoices }),
+        serializedPosition: branchEngine.captureSerializedPosition(battleStream.battle),
       }]);
       setSimState(nextState);
     } finally {
@@ -410,6 +423,9 @@ export function useBranch() {
     battleStreamRef.current = runtime.battleStream;
     streamsRef.current = runtime.streams;
     choiceErrorsRef.current = runtime.choiceErrors;
+    // Captured BEFORE any history replay — after it the battle stands at the
+    // tip, and the start position is the one every truncation returns to.
+    const startPosition = branchEngine.captureSerializedPosition(runtime.battleStream.battle);
 
     let branchError = branchEngine.validateBranchRuntime(runtime);
 
@@ -429,6 +445,8 @@ export function useBranch() {
     p2ChoicesRef.current = branchError ? [] : [...(options?.p2Choices ?? [])];
     setBranching(true);
     setHistory(replayedHistory);
+    setVariationStartTurn(targetTurn);
+    setStartSerialized(startPosition);
     setExecuteError(branchError);
     updateState(runtime.battleStream);
   }, [clearChoices, loadBranchEngine, updateState]);
@@ -440,6 +458,8 @@ export function useBranch() {
     setBranching(false);
     setSimState(null);
     setHistory([]);
+    setVariationStartTurn(null);
+    setStartSerialized(null);
     setExecuteError(null);
     streamsRef.current = null;
     battleStreamRef.current = null;
@@ -448,5 +468,9 @@ export function useBranch() {
     clearChoices();
   }, [clearChoices]);
 
-  return { branching, simState, history, executeError, executing, startBranch, setChoice, executeTurn, stopBranch, getBattle };
+  return {
+    branching, simState, history, executeError, executing,
+    variationStartTurn, startSerialized,
+    startBranch, setChoice, executeTurn, stopBranch, getBattle,
+  };
 }
