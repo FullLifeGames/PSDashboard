@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { nextPlayOutStep, PLAY_OUT_CAP } from '../src/lib/play-out';
+import { nextPlayOutStep, playOutDoneText, PLAY_OUT_CAP } from '../src/lib/play-out';
 import type { EvalResult, RankedChoice } from '../src/lib/eval/types';
 
 const ranked = (choice: string): RankedChoice =>
@@ -21,6 +21,23 @@ test('a one-sided position becomes a single (forced) step', () => {
     .toEqual({ kind: 'single', side: 'p1', choice: ranked('switch 2') });
   expect(nextPlayOutStep(result([], ['switch 3']), false, 3))
     .toEqual({ kind: 'single', side: 'p2', choice: ranked('switch 3') });
+});
+
+test('a waiting side is not a playable choice — the forced side steps alone', () => {
+  // Forced-switch interlude: the waiting side ranks only the 'wait' sentinel.
+  // Feeding that sentinel into a pair killed the loop silently (t: 2058494320).
+  expect(nextPlayOutStep(result(['wait'], ['switch 2', 'switch 3']), false, 2))
+    .toEqual({ kind: 'single', side: 'p2', choice: ranked('switch 2') });
+  expect(nextPlayOutStep(result(['switch 4'], ['wait']), false, 2))
+    .toEqual({ kind: 'single', side: 'p1', choice: ranked('switch 4') });
+  expect(nextPlayOutStep(result(['wait'], ['wait']), false, 2))
+    .toEqual({ kind: 'done', reason: 'no-choices' });
+});
+
+test('done reasons read as sentences', () => {
+  expect(playOutDoneText('ended', 1)).toBe('Play-out finished — the battle ended after 1 turn.');
+  expect(playOutDoneText('cap', PLAY_OUT_CAP)).toContain('safety cap');
+  expect(playOutDoneText('no-choices', 3)).toContain('no playable choice');
 });
 
 test('stops on end, cap, and empty positions', () => {

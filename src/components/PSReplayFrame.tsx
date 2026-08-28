@@ -145,16 +145,24 @@ function PSReplayFrameDocument({
 
   // Explicit navigation/watch seeks (seekRequest): requests issued before this
   // frame instance mounted are stale — the initial seekTurn already positioned
-  // it — so only seq bumps AFTER mount are sent.
+  // it — so only seq bumps AFTER mount are sent. Short retry window because a
+  // bump can land while the embed is still booting.
   const seenSeekSeqRef = useRef<number | null>(seekRequest?.seq ?? null);
   useEffect(() => {
     if (!seekRequest || seekRequest.seq === seenSeekSeqRef.current) return;
     seenSeekSeqRef.current = seekRequest.seq;
-    iframeRef.current?.contentWindow?.postMessage({
+    const send = () => iframeRef.current?.contentWindow?.postMessage({
       type: 'ps-seek-turn',
       turn: seekRequest.turn,
       autoPlay: !!seekRequest.play,
     }, '*');
+    send();
+    const retry = window.setInterval(send, 200);
+    const stopRetry = window.setTimeout(() => window.clearInterval(retry), 1200);
+    return () => {
+      window.clearInterval(retry);
+      window.clearTimeout(stopRetry);
+    };
   }, [seekRequest]);
 
   useEffect(() => {
