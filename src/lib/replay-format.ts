@@ -140,6 +140,31 @@ function sleepClauseSuffix(log: string | undefined, base: string): string {
   return '@@@Sleep Clause Mod';
 }
 
+/**
+ * How many Pokémon each side BRINGS at team preview (VGC: 4 of 6, Battle
+ * Stadium Singles: 3 of 6), or null for formats that bring the full team.
+ * The Dex's own rule table answers for formats it knows; current VGC
+ * regulations often postdate the bundled sim, so the format-id heuristic
+ * covers them (every VGC ruleset to date brings 4).
+ */
+export function getReplayBringCount(source: ReplayFormatSource): number | null {
+  const formatid = inferReplayFormatId(source);
+  if (!formatid) return null;
+  const format = Dex.formats.get(formatid);
+  if (format.exists) {
+    try {
+      const size = Dex.formats.getRuleTable(format).pickedTeamSize;
+      if (typeof size === 'number' && size > 0) return size;
+      return null;
+    } catch {
+      // Rule table refused (mod gaps) — fall through to the heuristic.
+    }
+  }
+  if (formatid.includes('vgc') || formatid.includes('battlestadiumdoubles')) return 4;
+  if (formatid.includes('battlestadiumsingles')) return 3;
+  return null;
+}
+
 /** The branch format carries the clause as a custom-rule suffix — is it there? */
 export function formatEnforcesSleepClause(format: string): boolean {
   if (/@@@.*sleep ?clause/i.test(format)) return true;

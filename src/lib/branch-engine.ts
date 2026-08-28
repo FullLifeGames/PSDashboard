@@ -1398,6 +1398,14 @@ export async function reconstructBranchRuntime(params: {
    * put the original leads right back on the field.
    */
   leadOverride?: { p1: string[] | null; p2: string[] | null };
+  /**
+   * Bring-limited formats (VGC's 4 of 6, BSS's 3 of 6): field ONLY these
+   * species per side. The branch runs on a bring-all base format, which
+   * would otherwise bench never-brought Pokémon for the engine — and every
+   * evaluation and play-out on the live battle — to switch into. Fail-open:
+   * a list that does not match the team exactly leaves the team whole.
+   */
+  bringOnly?: { p1: string[]; p2: string[] } | null;
 }): Promise<BranchRuntime> {
   const { format, p1Team, p2Team, replayLog, targetTurn, snapshot, onLogLines, onProgress, abort, capturePositions } = params;
   const overallDeadline = Date.now() + (params.deadlineMs ?? 60_000);
@@ -1405,8 +1413,14 @@ export async function reconstructBranchRuntime(params: {
   const { p1Leads, p2Leads } = extractLeads(replayLog);
   const leadsFor = (replayLeads: PokemonIdent[], override: string[] | null | undefined): PokemonIdent[] =>
     override && override.length > 0 ? override.map(name => ({ name, species: name })) : replayLeads;
-  const orderedP1 = reorderForLeads(p1Team, leadsFor(p1Leads, params.leadOverride?.p1));
-  const orderedP2 = reorderForLeads(p2Team, leadsFor(p2Leads, params.leadOverride?.p2));
+  const trimToBring = (team: PokemonSet[], keep: string[] | undefined): PokemonSet[] => {
+    if (!keep || keep.length === 0 || keep.length >= team.length) return team;
+    const keepIds = new Set(keep.map(toId));
+    const kept = team.filter(set => keepIds.has(toId(set.species)) || keepIds.has(toId(set.name || '')));
+    return kept.length === keep.length ? kept : team;
+  };
+  const orderedP1 = trimToBring(reorderForLeads(p1Team, leadsFor(p1Leads, params.leadOverride?.p1)), params.bringOnly?.p1);
+  const orderedP2 = trimToBring(reorderForLeads(p2Team, leadsFor(p2Leads, params.leadOverride?.p2)), params.bringOnly?.p2);
 
   const battleStream = new BattleStreams.BattleStream();
   const streams = BattleStreams.getPlayerStreams(battleStream);

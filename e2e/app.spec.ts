@@ -46,6 +46,52 @@ const doublesReplay = {
   ].join('\n'),
 };
 
+// A bring-four format: 6 at preview, 4 in the game (leads + 2 switched in).
+const vgcReplay = {
+  id: 'gen9vgc-test',
+  format: '[Gen 9] VGC 2026 Regulation I',
+  formatid: 'gen9vgc2026regi',
+  players: ['Alice', 'Bob'],
+  uploadtime: 0,
+  views: 0,
+  log: [
+    '|player|p1|Alice|',
+    '|player|p2|Bob|',
+    '|gametype|doubles',
+    '|gen|9',
+    '|tier|[Gen 9] VGC 2026 Regulation I',
+    '|clearpoke',
+    '|poke|p1|Pikachu, L50|item',
+    '|poke|p1|Eevee, L50|item',
+    '|poke|p1|Raichu, L50|',
+    '|poke|p1|Jolteon, L50|',
+    '|poke|p1|Flareon, L50|',
+    '|poke|p1|Vaporeon, L50|',
+    '|poke|p2|Bulbasaur, L50|item',
+    '|poke|p2|Charmander, L50|item',
+    '|poke|p2|Squirtle, L50|',
+    '|poke|p2|Ivysaur, L50|',
+    '|poke|p2|Charmeleon, L50|',
+    '|poke|p2|Wartortle, L50|',
+    '|c| Alice|/raw <div class="infobox"><details><summary>View team</summary>Pikachu @ Light Ball<br />Ability: Static<br />- Thunderbolt<br />- Protect<br /><br />Eevee @ Eviolite<br />Ability: Adaptability<br />- Tackle<br />- Protect<br /><br />Raichu<br />Ability: Static<br />- Thunderbolt<br />- Protect<br /><br />Jolteon<br />Ability: Volt Absorb<br />- Thunderbolt<br />- Protect<br /><br />Flareon<br />Ability: Flash Fire<br />- Ember<br />- Protect<br /><br />Vaporeon<br />Ability: Water Absorb<br />- Water Gun<br />- Protect<br /></details></div>',
+    '|c| Bob|/raw <div class="infobox"><details><summary>View team</summary>Bulbasaur @ Eviolite<br />Ability: Overgrow<br />- Vine Whip<br />- Protect<br /><br />Charmander @ Eviolite<br />Ability: Blaze<br />- Ember<br />- Protect<br /><br />Squirtle<br />Ability: Torrent<br />- Water Gun<br />- Protect<br /><br />Ivysaur<br />Ability: Overgrow<br />- Vine Whip<br />- Protect<br /><br />Charmeleon<br />Ability: Blaze<br />- Ember<br />- Protect<br /><br />Wartortle<br />Ability: Torrent<br />- Water Gun<br />- Protect<br /></details></div>',
+    '|teampreview',
+    '|',
+    '|start',
+    '|switch|p1a: Pikachu|Pikachu, L50|100/100',
+    '|switch|p1b: Eevee|Eevee, L50|100/100',
+    '|switch|p2a: Bulbasaur|Bulbasaur, L50|100/100',
+    '|switch|p2b: Charmander|Charmander, L50|100/100',
+    '|turn|1',
+    '|switch|p1a: Raichu|Raichu, L50|100/100',
+    '|switch|p2a: Squirtle|Squirtle, L50|100/100',
+    '|turn|2',
+    '|switch|p1b: Jolteon|Jolteon, L50|100/100',
+    '|switch|p2b: Ivysaur|Ivysaur, L50|100/100',
+    '|turn|3',
+  ].join('\n'),
+};
+
 const sharedBranchPayload: BranchSharePayload = {
   version: 1,
   replayId: fixtureReplay.id,
@@ -177,7 +223,10 @@ test.describe('PS Dashboard', () => {
       await route.continue().catch(() => {});
     });
     await page.route('**/replay.pokemonshowdown.com/**', (route) => {
-      const replay = route.request().url().includes(doublesReplay.id) ? doublesReplay : fixtureReplay;
+      const url = route.request().url();
+      const replay = url.includes(vgcReplay.id) ? vgcReplay
+        : url.includes(doublesReplay.id) ? doublesReplay
+        : fixtureReplay;
       route.fulfill({
         status: 200,
         contentType: 'application/json',
@@ -1589,6 +1638,34 @@ test.describe('PS Dashboard', () => {
       await expect(history).toContainText('+');
       // The doubles branch opens with per-slot controls for all four actives.
       await expect(page.locator('.ps-side-controls')).toHaveCount(4);
+    });
+
+    test('VGC T0 picks the brought four and the branch fields only them', async ({ page }) => {
+      test.setTimeout(120_000);
+      await page.locator('input[type="text"]').fill('gen9vgc-test');
+      await page.locator('button', { hasText: 'Load' }).click();
+      await expect(page.getByText('Alice', { exact: true }).first()).toBeVisible({ timeout: 10000 });
+
+      // Bring-four preview: six chips per side, the real brought four
+      // preselected (leads first).
+      await page.locator('.ps-branch-bar button[title^="Turn 0"]').click();
+      await expect(page.getByText('pick the 4 each side brings')).toBeVisible();
+      const p1Column = page.locator('.ps-branch-side-column').first();
+      await expect(p1Column.locator('.ps-switchbtn')).toHaveCount(6);
+      await expect(p1Column.locator('.ps-switchbtn-selected')).toHaveCount(4);
+      // Swap in a never-brought Pokémon — the oldest pick gives way.
+      await p1Column.locator('.ps-switchbtn:not(.ps-switchbtn-selected)', { hasText: 'Flareon' }).click();
+      await expect(p1Column.locator('.ps-switchbtn-selected')).toHaveCount(4);
+
+      await page.locator('.ps-execute-btn', { hasText: 'Play from turn 0' }).click();
+      await expect(page.getByText(/Branching · Turn 1/)).toBeVisible({ timeout: 60_000 });
+      const history = page.locator('.ps-panel', { hasText: 'Variation moves' });
+      await expect(history).toContainText('Turn 0');
+      await expect(history).toContainText('back');
+      // The live branch fields ONLY the chosen four — every evaluation and
+      // play-out runs on this battle, so each slot's bench holds exactly 2.
+      await expect(page.locator('.ps-side-controls')).toHaveCount(4);
+      await expect(page.locator('.ps-side-controls').first().locator('.ps-switchbtn')).toHaveCount(2);
     });
   });
 });

@@ -26,9 +26,9 @@ import { applyInferredSpreads, enrichTeamInfo, manualMove } from './lib/team-inf
 import { alternativeItems } from './lib/smogon-stats';
 import type { SensitivityTarget } from './lib/eval/sensitivity';
 import { applyPastedTeam, countMatchingSpecies, parsePastedTeam, type PastedSet } from './lib/team-paste';
-import type { OpponentTeamInfo } from './types';
+import type { OpponentTeamInfo, TurnSnapshot } from './types';
 import { decodeBranchShare, type BranchSharePayload } from './lib/branch-share';
-import { formatEnforcesSleepClause, getBranchSimulatorFormat, getReplayGameType, getReplayGeneration, inferReplayFormatId } from './lib/replay-format';
+import { formatEnforcesSleepClause, getBranchSimulatorFormat, getReplayBringCount, getReplayGameType, getReplayGeneration, inferReplayFormatId } from './lib/replay-format';
 import { resolveTeraPreference } from './lib/eval/tera';
 import { summarizeAlignment, type TurnAlignmentRecord } from './lib/hax-alignment';
 import { choiceId, evalChoiceToSlotChoices, type BranchSlotChoice } from './lib/branch-choices';
@@ -132,6 +132,22 @@ function SharedBranchView({
   );
 }
 
+/** Species each side actually BROUGHT, in first-seen order (the pre-turn-1
+ *  actives — the leads — come first): active in ANY snapshot counts. */
+function broughtSpeciesFor(snapshots: TurnSnapshot[], side: 'p1' | 'p2'): string[] {
+  const seen = new Set<string>();
+  const ordered: string[] = [];
+  for (const turn of snapshots) {
+    for (const pokemon of turn[side].pokemon) {
+      if (pokemon.isActive && !seen.has(pokemon.speciesForme)) {
+        seen.add(pokemon.speciesForme);
+        ordered.push(pokemon.speciesForme);
+      }
+    }
+  }
+  return ordered;
+}
+
 function App() {
   const { loading, error, replayData, snapshots, observations, speedOrders, hpEvidence, opponentInfo, p1Info, loadReplay, loadReplayFile } = useReplay();
   const { embed, requestedReplay } = useEmbedHost({ loadReplay, loadReplayFile });
@@ -203,6 +219,11 @@ function App() {
 
   const maxTurn = snapshots.length > 0 ? snapshots.length : 1;
   const replayGen = useMemo(() => replayData ? getReplayGeneration(replayData) : 9, [replayData]);
+  /** Bring-limited team preview (VGC 4 of 6, BSS 3 of 6) — null brings all. */
+  const bringCount = useMemo(
+    () => (replayData ? getReplayBringCount(replayData) : null),
+    [replayData],
+  );
 
   // The last snapshot is the post-battle end state when it holds the final
   // turn's residue instead of starting a new |turn| — it is labelled "End",
@@ -527,7 +548,7 @@ function App() {
   const rebuildAt = useCallback(async (
     position: TimelinePosition,
     prefill: { p1Choices: (BranchSlotChoice | null)[]; p2Choices: (BranchSlotChoice | null)[] } | null,
-    leadOverride?: { p1: string[]; p2: string[] },
+    leadOverride?: { p1: string[]; p2: string[]; bring?: boolean },
   ) => {
     if (!replayData || branchPreparing) return;
     const kind = classifyDeviation(variationSpan, position);
@@ -547,6 +568,19 @@ function App() {
     // Turn-0 variation: startBranch needs leads — the caller's (fresh lead
     // branch) or the recorded lead entry's (truncation/refresh rebuild).
     if (startTurn === 0 && !leadOverride && !replayHistory[0]?.leadChoices) return;
+    // Bring-limited replays (VGC 4 of 6): the interactive branch fields only
+    // what the real game brought — the bring-all base format would otherwise
+    // let evaluations and play-outs switch into never-brought Pokémon. The
+    // T0 picker carries its own selection; fail-open when the protocol does
+    // not pin every brought species.
+    let bringOnly: { p1: string[]; p2: string[] } | undefined;
+    if (bringCount !== null && startTurn > 0) {
+      const p1Brought = broughtSpeciesFor(snapshots, 'p1');
+      const p2Brought = broughtSpeciesFor(snapshots, 'p2');
+      if (p1Brought.length === bringCount && p2Brought.length === bringCount) {
+        bringOnly = { p1: p1Brought, p2: p2Brought };
+      }
+    }
 
     const abortController = new AbortController();
     branchAbortRef.current = abortController;
@@ -582,6 +616,7 @@ function App() {
           snapshotFor: turn => snapshots[Math.min(turn - 1, snapshots.length - 1)] ?? null,
           choiceLocks,
           leadOverride,
+          bringOnly,
         });
         if (!abortController.signal.aborted) {
           branchWindowOpenRef.current = true;
@@ -611,7 +646,7 @@ function App() {
       setBranchProgress(null);
       branchAbortRef.current = null;
     }
-  }, [replayData, branchPreparing, variationSpan, history, teamText, snapshots, observations, hpEvidence, getInferredSpreads, effectiveP1Info, effectiveP2Info, usageStats.stats, setAssumptions.assumptions, startBranch, getBattle, setViewTurn]);
+  }, [replayData, branchPreparing, variationSpan, history, teamText, snapshots, bringCount, observations, hpEvidence, getInferredSpreads, effectiveP1Info, effectiveP2Info, usageStats.stats, setAssumptions.assumptions, startBranch, getBattle, setViewTurn]);
 
   const requestDeviation = useCallback((
     prefill: { p1Choices: (BranchSlotChoice | null)[]; p2Choices: (BranchSlotChoice | null)[] } | null,
@@ -653,7 +688,7 @@ function App() {
    * Same chess rules as any deviation — an existing variation is replaced
    * only after the confirm.
    */
-  const startLeadVariation = useCallback((leads: { p1: string[]; p2: string[] }) => {
+  const startLeadVariation = useCallback((leads: { p1: string[]; p2: string[]; bring?: boolean }) => {
     const run = () => {
       setVariationScores([]);
       void rebuildAt({ turn: 0, line: 'main' }, null, leads);
@@ -710,6 +745,16 @@ function App() {
           const refreshSnapshot = snapshots.length > 0
             ? snapshots[Math.min(refreshTurn - 1, snapshots.length - 1)] ?? null
             : null;
+          // Bring-limited replays keep their trim through team-edit
+          // refreshes too (a T0 variation re-seeds it from its lead entry).
+          let refreshBringOnly: { p1: string[]; p2: string[] } | undefined;
+          if (bringCount !== null && refreshTurn > 0) {
+            const p1Brought = broughtSpeciesFor(snapshots, 'p1');
+            const p2Brought = broughtSpeciesFor(snapshots, 'p2');
+            if (p1Brought.length === bringCount && p2Brought.length === bringCount) {
+              refreshBringOnly = { p1: p1Brought, p2: p2Brought };
+            }
+          }
           await startBranch(getBranchSimulatorFormat(activeReplay), p1Team, p2Team, activeReplay.log, refreshTurn, refreshSnapshot, {
             replayHistory: refreshRequest.history,
             p1Choices: refreshRequest.p1Choices,
@@ -719,6 +764,7 @@ function App() {
             abort: abortController.signal,
             snapshotFor: turn => snapshots[Math.min(turn - 1, snapshots.length - 1)] ?? null,
             choiceLocks,
+            bringOnly: refreshBringOnly,
           });
           if (!abortController.signal.aborted) {
             branchWindowOpenRef.current = true;
@@ -747,6 +793,7 @@ function App() {
     variationStartTurn,
     branching,
     snapshots,
+    bringCount,
     usageStats.stats,
     setAssumptions.assumptions,
     observations,
@@ -773,18 +820,23 @@ function App() {
     [replayData],
   );
 
-  /** T0 lead picker data: each side's team with the real leads marked —
-   *  read from the pre-turn-1 snapshot, where the actives ARE the leads. */
+  /** T0 lead picker data: each side's team with the real leads marked (the
+   *  pre-turn-1 snapshot's actives ARE the leads) and, for bring-limited
+   *  formats, which Pokémon the real game brought (active in ANY snapshot). */
   const leadOptions = useMemo<{ p1: LeadOption[]; p2: LeadOption[] }>(() => {
     const snapshot = snapshots[0] ?? null;
     if (!snapshot) return { p1: [], p2: [] };
-    const optionsOf = (side: typeof snapshot.p1): LeadOption[] =>
+    const optionsOf = (side: typeof snapshot.p1, brought: Set<string>): LeadOption[] =>
       side.pokemon.map(pokemon => ({
         name: pokemon.name,
         species: pokemon.speciesForme,
         wasLead: pokemon.isActive,
+        wasBrought: brought.has(pokemon.speciesForme),
       }));
-    return { p1: optionsOf(snapshot.p1), p2: optionsOf(snapshot.p2) };
+    return {
+      p1: optionsOf(snapshot.p1, new Set(broughtSpeciesFor(snapshots, 'p1'))),
+      p2: optionsOf(snapshot.p2, new Set(broughtSpeciesFor(snapshots, 'p2'))),
+    };
   }, [snapshots]);
   const evalAvailable = useMemo(
     () => !!replayData && (replayGameType === null || replayGameType === 'singles' || replayGameType === 'doubles'),
@@ -2372,8 +2424,9 @@ function App() {
                 p1Options={leadOptions.p1}
                 p2Options={leadOptions.p2}
                 leadsPerSide={replayGameType === 'doubles' ? 2 : 1}
+                bringCount={bringCount}
                 executing={executing || branchPreparing}
-                onStart={startLeadVariation}
+                onStart={leads => startLeadVariation(bringCount !== null ? { ...leads, bring: true } : leads)}
               />
             ) : (
             <BranchPanel

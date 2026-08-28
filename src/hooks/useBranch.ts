@@ -43,11 +43,18 @@ interface StartBranchOptions {
   choiceLocks?: ChoiceLockContext;
   /**
    * Turn-0 branching (targetTurn 0): start a FRESH game with these leads
-   * (one per side in singles, two in doubles, slot order preserved). The
-   * runtime rebuilds to turn 1 without snapshot corrections, and the lead
-   * decision is recorded as history entry 0 (turnNumber 0).
+   * (one per side in singles, two in doubles, slot order preserved). With
+   * `bring` the lists are the whole brought selection (VGC 4 of 6) and the
+   * teams trim to them. The runtime rebuilds to turn 1 without snapshot
+   * corrections, and the lead decision is history entry 0 (turnNumber 0).
    */
-  leadOverride?: { p1: string[]; p2: string[] };
+  leadOverride?: { p1: string[]; p2: string[]; bring?: boolean };
+  /**
+   * Bring-limited formats (VGC 4 of 6): field only the species the real
+   * game brought — on any branch turn, so evaluations and play-outs on the
+   * live battle can never switch into a never-brought Pokémon.
+   */
+  bringOnly?: { p1: string[]; p2: string[] };
 }
 
 export interface BranchHistoryEntry {
@@ -55,8 +62,9 @@ export interface BranchHistoryEntry {
   /** 'forced' entries record single-side forced-switch interludes (B15). */
   kind?: 'turn' | 'forced';
   forcedSide?: SideId;
-  /** Turn-0 lead entry: the chosen leads (slot order), so a rebuild can re-seed them. */
-  leadChoices?: { p1: string[]; p2: string[] };
+  /** Turn-0 lead entry: the chosen leads (slot order; with `bring`, the
+   *  whole brought selection), so a rebuild can re-seed them. */
+  leadChoices?: { p1: string[]; p2: string[]; bring?: boolean };
   /** Identity-based choices used to replay this entry after a team edit (B1). */
   p1SlotChoices?: (BranchSlotChoice | null)[];
   p2SlotChoices?: (BranchSlotChoice | null)[];
@@ -420,6 +428,11 @@ export function useBranch() {
     const historyLead = isT0 ? options?.replayHistory?.[0]?.leadChoices : undefined;
     const leadOverride = isT0 ? options?.leadOverride ?? historyLead : undefined;
     const historyToReplay = historyLead ? (options?.replayHistory ?? []).slice(1) : options?.replayHistory ?? [];
+    // A T0 pick marked `bring` IS the brought selection; other branches get
+    // theirs from the caller (derived from the replay's own switches).
+    const bringOnly = leadOverride?.bring
+      ? { p1: leadOverride.p1, p2: leadOverride.p2 }
+      : options?.bringOnly;
     const runtime = await branchEngine.reconstructBranchRuntime({
       format,
       p1Team,
@@ -434,7 +447,8 @@ export function useBranch() {
         ? { capturePositions: { snapshotFor: options.snapshotFor, onPosition: () => {} } }
         : {}),
       choiceLocks: isT0 ? undefined : options?.choiceLocks,
-      leadOverride: leadOverride ? { ...leadOverride } : undefined,
+      leadOverride: leadOverride ? { p1: leadOverride.p1, p2: leadOverride.p2 } : undefined,
+      bringOnly,
     });
 
     if (options?.abort?.aborted) return;
@@ -457,9 +471,20 @@ export function useBranch() {
         p1Choices: [],
         p2Choices: [],
       });
+      // "lead A + B · back C + D" — the leads are the first active-count
+      // picks, the rest is the brought back line (VGC's 4 of 6).
+      const activeCount = runtime.battleStream.battle?.sides[0]?.active.length ?? 1;
+      const leadLabel = (list: string[]) => {
+        const back = list.slice(activeCount);
+        return `lead ${list.slice(0, activeCount).join(' + ')}${back.length > 0 ? ` · back ${back.join(' + ')}` : ''}`;
+      };
       replayedHistory.push({
-        ...makeHistoryEntry(0, `lead ${leadOverride.p1.join(' + ')}`, `lead ${leadOverride.p2.join(' + ')}`, startState),
-        leadChoices: { p1: [...leadOverride.p1], p2: [...leadOverride.p2] },
+        ...makeHistoryEntry(0, leadLabel(leadOverride.p1), leadLabel(leadOverride.p2), startState),
+        leadChoices: {
+          p1: [...leadOverride.p1],
+          p2: [...leadOverride.p2],
+          ...(leadOverride.bring ? { bring: true } : {}),
+        },
         serializedPosition: startPosition,
       });
     }

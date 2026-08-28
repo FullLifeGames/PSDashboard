@@ -94,6 +94,8 @@ The same lockstep replay tolerates synthetic logs (e.g. video-reconstructed repl
 
 **Turn-0 lead branch.** `startBranch` with target turn 0 rebuilds a FRESH game to the start of turn 1: no replayed blocks, no snapshot corrections and no choice locks (a corrected boundary would put the original leads right back on the field), and the chosen leads first in each team order. The lead decision becomes history entry 0; rebuilds of the variation (truncation, team edits) re-seed that entry from its recorded `leadChoices` instead of replaying it through the sim.
 
+**Bring limits (VGC).** The branch runs on a bring-all base format (`gen9doublesou`), which would field all six — so every INTERACTIVE branch of a bring-limited replay passes `bringOnly`: the T0 picker's own selection, or, on any later branch turn, the species the real game brought (derived from the protocol's actives; fail-open when they cannot all be pinned). The teams trim to that list before the battle starts, so evaluations and play-outs on the live battle can never switch into a never-brought Pokémon. The game-graph sweep and the single-turn eval acquire reconstruct main-line positions WITHOUT the trim on purpose: those paths feed the pinned calibration corpora, and changing their searches is a gated-round decision, not a side effect.
+
 After branch entry, the user can choose actions for both sides and `executeTurn` submits them to the live simulator.
 
 Relevant files:
@@ -125,12 +127,16 @@ truncate / replace.
   lead picker (`LeadPanel`) replaces the turn pickers, with the real leads
   preselected and badged. Singles picks one lead per side, doubles picks
   two (selection order is the slot order, marked a/b on the chips; a pick
-  past the limit replaces the oldest). "Play from turn 0" starts a fresh
-  game with the chosen leads as a variation whose entry 0 records the lead
-  decision (`turnNumber` 0, `leadChoices` as slot-ordered species lists on
-  the history entry); play then continues at turn 1 like any variation.
-  When the graph carries a lead evaluation, T0 also opens the team-preview
-  analysis.
+  past the limit replaces the oldest). Bring-limited formats (VGC's 4 of
+  6, BSS's 3 of 6 — `getReplayBringCount`, rule table first, format-id
+  heuristic for regulations newer than the bundled sim) extend the pick to
+  the whole brought selection: the real game's brought Pokémon preselect,
+  the first picks lead, the rest ride in the back. "Play from turn 0"
+  starts a fresh game with the chosen leads as a variation whose entry 0
+  records the lead decision (`turnNumber` 0, `leadChoices` as slot-ordered
+  species lists on the history entry); play then continues at turn 1 like
+  any variation. When the graph carries a lead evaluation, T0 also opens
+  the team-preview analysis.
 - `PSReplayFrame` shows the original replay for main-line positions and the
   branch simulator log for variation positions. The branch frame ignores
   seekTurn prop changes after mount (re-seeking fought the append stream), so
