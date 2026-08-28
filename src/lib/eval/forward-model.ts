@@ -37,7 +37,13 @@ export interface SimPosition {
  * parsed copy up to base length, deserialize, trim the live arrays back —
  * the battle round-trips exactly and the original string stays the cache key.
  */
-function deserializeRepaired(serialized: string): Battle {
+/**
+ * Exact-fidelity deserialize: ONLY the moveSlots padding workaround above,
+ * no invariant restoration — for callers that compare or continue a
+ * round-tripped battle against a live one and need the state untouched
+ * (the calibration harness's clone-and-correct path).
+ */
+export function deserializeBattleExact(serialized: string): Battle {
   const state = JSON.parse(serialized) as {
     sides?: { pokemon?: { moveSlots?: unknown[]; baseMoveSlots?: unknown[] }[] }[];
   };
@@ -53,6 +59,11 @@ function deserializeRepaired(serialized: string): Battle {
   for (const trim of trims) {
     battle.sides[trim.side].pokemon[trim.index].moveSlots.length = trim.length;
   }
+  return battle;
+}
+
+function deserializeRepaired(serialized: string): Battle {
+  const battle = deserializeBattleExact(serialized);
   // Correction-era invariant drift (GPL T38/T39): snapshot corrections set
   // hp/fainted per mon without maintaining side.pokemonLeft — the win-check
   // counter, so a wiped side played on behind a stale move request — or

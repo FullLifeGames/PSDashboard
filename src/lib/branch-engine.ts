@@ -1354,6 +1354,16 @@ export async function reconstructBranchRuntime(params: {
     snapshotFor(turn: number): TurnSnapshot | null;
     onPosition(turn: number, battle: SimBattle): void;
   };
+  /**
+   * Raw boundary hand-out (the calibration harness's single-pass path):
+   * fired at the START of every block iteration — the exact spot where a
+   * per-target reconstruction with targetTurn ≤ this block's turn exits
+   * its loop — and hands out the UNCORRECTED live battle. The caller
+   * clones and applies applyTargetCorrections itself, so the hand-out can
+   * never change the ongoing replay: it stays byte-identical to what any
+   * per-target run of the same replay plays.
+   */
+  onRawBoundary?: (blockTurn: number, battle: SimBattle) => void;
   /** Protocol-truth lock context (③): boundary corrections re-stamp from it. */
   choiceLocks?: ChoiceLockContext;
 }): Promise<BranchRuntime> {
@@ -1557,6 +1567,9 @@ export async function reconstructBranchRuntime(params: {
   const { turns } = parseTurnBlocks(replayLog);
 
   for (const turnBlock of turns) {
+    if (params.onRawBoundary && battleStream.battle) {
+      params.onRawBoundary(turnBlock.turn, battleStream.battle);
+    }
     if (turnBlock.turn >= targetTurn) break;
     if (abort?.aborted) break;
     if (Date.now() > overallDeadline) {
@@ -1736,6 +1749,18 @@ export async function reconstructBranchRuntime(params: {
     timedOut,
     haxAlignment,
   };
+}
+
+/**
+ * The end-of-reconstruction correction chain a per-target run applies to
+ * its final battle — for a caller-owned battle (the clone-and-correct
+ * single-pass path, see onRawBoundary). Mirrors the tail of
+ * reconstructBranchRuntime exactly: snapshot correction when a snapshot
+ * exists, then the request refresh, in that order.
+ */
+export function applyTargetCorrections(battle: SimBattle, snapshot: TurnSnapshot | null | undefined): void {
+  if (snapshot) correctBattleFromSnapshot(battle, snapshot);
+  refreshRequestsFromLiveState(battle);
 }
 
 /**

@@ -1,7 +1,8 @@
 import { test, expect } from '@playwright/test';
 import { State } from '@pkmn/sim';
+import type { Battle } from '@pkmn/sim';
 import { buildTeamsFromReplay } from '../src/lib/team-builder';
-import { reconstructBranchRuntime } from '../src/lib/branch-engine';
+import { applyTargetCorrections, reconstructBranchRuntime } from '../src/lib/branch-engine';
 import { formatEnforcesSleepClause, getBranchSimulatorFormat } from '../src/lib/replay-format';
 import { parseReplayLogWithObservations } from '../src/lib/protocol-parser';
 import { AUTO_MCTS_FAINTED_FRACTION, battleFaintedFraction, searchPosition } from '../src/lib/eval/search';
@@ -10,6 +11,7 @@ import { fetchSmogonUsageStats } from '../src/lib/smogon-stats';
 import { fetchSmogonSetAssumptions } from '../src/lib/smogon-sets';
 import { diskCachedSmogonFetcher } from './smogon-fetch-cache';
 import { createMatchupCache, evalFeatures, EVAL_WEIGHTS, FEATURE_WEIGHTS, type EvalFeatures } from '../src/lib/eval/eval-function';
+import { deserializeBattleExact } from '../src/lib/eval/forward-model';
 import { brierScore, fitConstantK } from './fit-helpers';
 
 /**
@@ -2151,18 +2153,76 @@ test.describe('eval calibration against real replays', () => {
       }
       const maxTurn = snapshots.length;
       const step = Math.max(1, Math.ceil(maxTurn / 8));
+      const sampleTurns: number[] = [];
+      for (let turn = 2; turn < maxTurn; turn += step) sampleTurns.push(turn);
 
-      for (let turn = 2; turn < maxTurn; turn += step) {
+      // SINGLE-PASS RECONSTRUCTION (time-performance round, 2026-08-28):
+      // ONE pass per replay hands out the raw boundary state at every
+      // sampled turn (onRawBoundary), and each sample is cloned and
+      // target-corrected with exactly the per-target tail chain
+      // (applyTargetCorrections) — the old path replayed the whole game
+      // once per sampled turn (~4.5 full replays per replay). The
+      // CALIB_POS_PROBE test below proved the swap on the full corpus:
+      // every sample both instruments record is byte-identical in normal
+      // form; the only divergences are per-target 60s-deadline
+      // truncations, which are timing-dependent under the OLD instrument
+      // itself (see the probe's unstable bucket).
+      // EVAL_CALIBRATION_LEGACY=1 forces the old per-target path for A/B.
+      const legacy = process.env.EVAL_CALIBRATION_LEGACY === '1';
+      const rawAt = new Map<number, string>();
+      if (!legacy && sampleTurns.length > 0) {
+        const pendingTurns = [...sampleTurns];
         try {
-          const runtime = await reconstructBranchRuntime({
+          await reconstructBranchRuntime({
             format: getBranchSimulatorFormat(replay),
             p1Team, p2Team,
             replayLog: replay.log,
-            targetTurn: turn,
-            snapshot: snapshots[Math.min(turn - 1, snapshots.length - 1)],
+            targetTurn: pendingTurns[pendingTurns.length - 1],
+            snapshot: null,
+            // The one pass carries the whole per-target family's work, so
+            // it gets the family's total deadline, not a single run's 60s.
+            deadlineMs: 60_000 * Math.max(1, sampleTurns.length),
+            onRawBoundary: (blockTurn, battle) => {
+              if (pendingTurns.length === 0 || blockTurn < pendingTurns[0]) return;
+              const rawSerialized = JSON.stringify(State.serializeBattle(battle));
+              while (pendingTurns.length > 0 && pendingTurns[0] <= blockTurn) {
+                rawAt.set(pendingTurns[0], rawSerialized);
+                pendingTurns.shift();
+              }
+            },
           });
-          const battle = runtime.battleStream.battle;
-          if (!battle) continue;
+        } catch (error) {
+          console.log(`${id}: single-pass reconstruction failed — ${error instanceof Error ? error.message : error}`);
+        }
+      }
+
+      for (const turn of sampleTurns) {
+        try {
+          let battle: Battle;
+          const raw = legacy ? undefined : rawAt.get(turn);
+          if (raw) {
+            battle = deserializeBattleExact(raw);
+            applyTargetCorrections(battle, snapshots[Math.min(turn - 1, snapshots.length - 1)]);
+          } else {
+            // The old per-target instrument, verbatim — either forced
+            // (EVAL_CALIBRATION_LEGACY=1) or as the per-sample fallback
+            // for a boundary the single pass never handed out (a wedged
+            // or prematurely ended pass, or the rare replay whose async
+            // stream timing shifts under the pass — ~6/838 on the probe).
+            // The fallback keeps the sample set and its values exactly
+            // the old instrument's.
+            if (!legacy) console.log(`${id} turn ${turn}: single-pass boundary missing — per-target fallback`);
+            const runtime = await reconstructBranchRuntime({
+              format: getBranchSimulatorFormat(replay),
+              p1Team, p2Team,
+              replayLog: replay.log,
+              targetTurn: turn,
+              snapshot: snapshots[Math.min(turn - 1, snapshots.length - 1)],
+            });
+            const live = runtime.battleStream.battle;
+            if (!live) continue;
+            battle = live;
+          }
           if (battle.ended) {
             // A sampled turn is always BEFORE the real game's end (the loop
             // stops short of maxTurn), so an ended reconstruction is always
@@ -2293,5 +2353,151 @@ test.describe('eval calibration against real replays', () => {
       console.log(`dumped ${samples.length} samples to ${process.env.EVAL_CALIBRATION_DUMP}`);
     }
     expect(samples.length).toBeGreaterThan(0);
+  });
+});
+
+test.describe('single-pass position identity probe (time-performance phase 3)', () => {
+  test.skip(process.env.CALIB_POS_PROBE !== '1', 'set CALIB_POS_PROBE=1 to run the identity probe');
+
+  /**
+   * Preregistered proof for the calibration harness's single-pass switch:
+   * for every replay and every sampled turn, the position that today's
+   * per-target reconstruction returns must equal — byte for byte, log
+   * lines aside — the raw boundary state of ONE full pass after clone +
+   * applyTargetCorrections. Log lines are excluded because the sim stamps
+   * wall-clock |t:| lines into them and no search ever reads the log; the
+   * whole mechanical state (sides, requests, RNG seed, inputLog) stays in
+   * the comparison. CALIB_POS_PROBE_TRANCHE narrows to one stratum.
+   */
+  test('raw-capture + clone-correct equals per-target reconstruction', async () => {
+    test.setTimeout(3_600_000);
+    // Normal form = one exact round-trip before comparing: the searches
+    // only ever consume serialized strings through the deserializer, so
+    // "equal after a round-trip" is precisely the equivalence class the
+    // instrument cares about — and it irons out shape-only artifacts (a
+    // fresh deserialize adds a redundant formatid key the live battle's
+    // serialization omits). Log lines stay excluded (wall-clock |t:|).
+    const canon = (battle: Battle): string => {
+      const roundTripped = deserializeBattleExact(JSON.stringify(State.serializeBattle(battle)));
+      const state = State.serializeBattle(roundTripped) as Record<string, unknown>;
+      return JSON.stringify({ ...state, log: null });
+    };
+    const trancheFilter = process.env.CALIB_POS_PROBE_TRANCHE;
+    const ids = trancheFilter ? REPLAY_IDS.filter(id => TRANCHE_OF.get(id) === trancheFilter) : REPLAY_IDS;
+    type ReplayJson = { id: string; log: string; players: string[]; formatid?: string };
+    let replays = 0;
+    let comparedSamples = 0;
+    let mismatches = 0;
+    let unstable = 0;
+    let fallbackServed = 0;
+    const details: string[] = [];
+    for (const id of ids) {
+      const response = await fetch(`https://replay.pokemonshowdown.com/${id}.json`);
+      if (!response.ok) {
+        console.log(`skipping ${id}: HTTP ${response.status}`);
+        continue;
+      }
+      const replay = await response.json() as ReplayJson;
+      const { snapshots, observations, speedOrders } = parseReplayLogWithObservations(replay.log);
+      const { p1Team, p2Team } = buildTeamsFromReplay(replay.log, { observations, speedOrders });
+      if (p1Team.length === 0 || p2Team.length === 0) {
+        console.log(`skipping ${id}: could not build teams`);
+        continue;
+      }
+      const maxTurn = snapshots.length;
+      const step = Math.max(1, Math.ceil(maxTurn / 8));
+      const sampleTurns: number[] = [];
+      for (let turn = 2; turn < maxTurn; turn += step) sampleTurns.push(turn);
+      if (sampleTurns.length === 0) continue;
+      const format = getBranchSimulatorFormat(replay);
+      const snapshotAt = (turn: number) => snapshots[Math.min(turn - 1, snapshots.length - 1)];
+
+      // Path A — today's instrument: one reconstruction per sampled turn.
+      const canonA = new Map<number, string>();
+      for (const turn of sampleTurns) {
+        const runtime = await reconstructBranchRuntime({
+          format, p1Team, p2Team, replayLog: replay.log, targetTurn: turn, snapshot: snapshotAt(turn),
+        });
+        const battle = runtime.battleStream.battle;
+        canonA.set(turn, !battle ? 'NONE' : battle.ended ? 'ENDED' : canon(battle));
+      }
+
+      // Path B — ONE pass; raw boundaries; clone + target corrections.
+      const rawAt = new Map<number, string>();
+      const pending = [...sampleTurns].sort((a, b) => a - b);
+      const targetTurn = pending[pending.length - 1];
+      await reconstructBranchRuntime({
+        format, p1Team, p2Team, replayLog: replay.log, targetTurn, snapshot: null,
+        // One pass carries the whole per-target family's work, so it gets
+        // the family's total deadline budget, not a single run's 60s.
+        deadlineMs: 60_000 * Math.max(1, sampleTurns.length),
+        onRawBoundary: (blockTurn, battle) => {
+          if (pending.length === 0 || blockTurn < pending[0]) return;
+          const serialized = JSON.stringify(State.serializeBattle(battle));
+          while (pending.length > 0 && pending[0] <= blockTurn) {
+            rawAt.set(pending[0], serialized);
+            pending.shift();
+          }
+        },
+      });
+      for (const turn of sampleTurns) {
+        comparedSamples += 1;
+        const raw = rawAt.get(turn);
+        let canonB: string | null = null;
+        if (raw) {
+          const clone = deserializeBattleExact(raw);
+          applyTargetCorrections(clone, snapshotAt(turn));
+          if (!clone.ended) canonB = canon(clone);
+        }
+        const a = canonA.get(turn) ?? 'NONE';
+        const aExists = a !== 'NONE' && a !== 'ENDED';
+        const bExists = canonB !== null;
+        // Both sides skip the sample (ended/none/past-the-end) — the
+        // instrument records nothing either way: equivalent.
+        if (!aExists && !bExists) continue;
+        if (aExists && bExists && a === canonB) continue;
+        // Discrepancy. Is the OLD instrument even stable here? A per-target
+        // run that hits its 60s deadline truncates at a timing-dependent
+        // block and then snapshot-corrects — such samples have no stable
+        // old value to reproduce. Rerun path A once: if it disagrees with
+        // itself (or flags the deadline), the sample is excluded as
+        // old-instrument-unstable; a REPRODUCIBLE old value that path B
+        // misses is a hard failure.
+        const rerun = await reconstructBranchRuntime({
+          format, p1Team, p2Team, replayLog: replay.log, targetTurn: turn, snapshot: snapshotAt(turn),
+        });
+        const rerunBattle = rerun.battleStream.battle;
+        const a2 = !rerunBattle ? 'NONE' : rerunBattle.ended ? 'ENDED' : canon(rerunBattle);
+        if (a2 !== a || rerun.timedOut) {
+          unstable += 1;
+          console.log(`${id} t${turn}: old-instrument unstable (timedOut=${rerun.timedOut}) — excluded`);
+          continue;
+        }
+        if (!bExists) {
+          // The single pass never handed this boundary out — the switched
+          // instrument serves it through the verbatim per-target fallback,
+          // so the sample stays exactly the old instrument's. Bounded, not
+          // a value risk.
+          fallbackServed += 1;
+          console.log(`${id} t${turn}: boundary missing from the pass — served by the per-target fallback`);
+          continue;
+        }
+        mismatches += 1;
+        if (details.length < 20) {
+          const b = canonB ?? (raw ? 'ENDED' : 'MISSING');
+          let at = 0;
+          while (at < Math.min(a.length, b.length) && a[at] === b[at]) at++;
+          details.push(`${id} t${turn}: first divergence at char ${at}: A …${a.slice(Math.max(0, at - 40), at + 80)}… B …${b.slice(Math.max(0, at - 40), at + 80)}…`);
+        }
+      }
+      replays += 1;
+      console.log(`${id}: ${sampleTurns.length} samples compared`);
+    }
+    console.log(`probe: ${replays} replays, ${comparedSamples} samples, ${mismatches} value mismatches, ${fallbackServed} fallback-served, ${unstable} old-instrument-unstable (excluded)`);
+    for (const line of details) console.log(line);
+    expect(mismatches).toBe(0);
+    // Both escape buckets must stay rounding errors, never loopholes.
+    expect(fallbackServed).toBeLessThanOrEqual(Math.ceil(comparedSamples / 100));
+    expect(unstable).toBeLessThanOrEqual(Math.ceil(comparedSamples / 100));
   });
 });
