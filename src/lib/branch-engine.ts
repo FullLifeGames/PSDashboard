@@ -1228,7 +1228,16 @@ export function createBranchState(
   log: string[],
   choices: BranchChoices,
 ): BranchSimState {
-  const battle = battleStream?.battle;
+  return createBranchStateFromBattle(battleStream?.battle, log, choices);
+}
+
+/** Same picker state, but from a bare Battle — used for stored positions
+ *  (deserialized without a stream) by the unified timeline's pickers. */
+export function createBranchStateFromBattle(
+  battle: SimBattle | null | undefined,
+  log: string[],
+  choices: BranchChoices,
+): BranchSimState {
   const effectiveLog = log.length > 0 ? log : (battle?.log ?? []);
   if (!battle) return emptyState([...effectiveLog], choices);
 
@@ -1284,6 +1293,21 @@ export function createBranchState(
     p2Choice: p2Choices[0] ?? null,
     p2Choices,
   };
+}
+
+/**
+ * Position record for the unified timeline: the state AFTER an executed
+ * entry, in the eval engine's stable serialization. Failure degrades to
+ * null — the entry stays navigable via the sim log, it just cannot be
+ * evaluated or picked from without a rebuild.
+ */
+export function captureSerializedPosition(battle: SimBattle | null | undefined): string | null {
+  if (!battle) return null;
+  try {
+    return serializeBattleStable(battle);
+  } catch {
+    return null;
+  }
 }
 
 /**

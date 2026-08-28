@@ -2,7 +2,9 @@ import { test, expect } from '@playwright/test';
 import { existsSync, readFileSync } from 'fs';
 import type { PokemonSet } from '@pkmn/sim';
 import { buildTeamsFromReplay } from '../src/lib/team-builder';
-import { reconstructBranchRuntime, createBranchState } from '../src/lib/branch-engine';
+import {
+  captureSerializedPosition, createBranchState, createBranchStateFromBattle, reconstructBranchRuntime,
+} from '../src/lib/branch-engine';
 import { parseReplayLog } from '../src/lib/protocol-parser';
 import { parseExportedReplay } from '../src/lib/replay-file';
 import { inferReplayFormatId } from '../src/lib/replay-format';
@@ -631,5 +633,38 @@ test.describe('hax alignment records', () => {
     // Determinism: the same replay picks the same seed schedule (draft T48).
     expect(second.haxAlignment.map(record => record.seed))
       .toEqual(first.haxAlignment.map(record => record.seed));
+  });
+});
+
+test.describe('unified timeline picker/position helpers', () => {
+  async function buildDefaultRuntime(targetTurn: number) {
+    const fixture = loadFixtureReplay();
+    const snapshots = parseReplayLog(fixture.log);
+    const { p1Team, p2Team } = buildTeamsFromReplay(fixture.log);
+    return reconstructBranchRuntime({
+      format: fixture.formatid || 'gen9ou',
+      p1Team,
+      p2Team,
+      replayLog: fixture.log,
+      targetTurn,
+      snapshot: snapshots.find(entry => entry.turn === targetTurn) ?? null,
+    });
+  }
+
+  test('createBranchStateFromBattle matches createBranchState for the same battle', async () => {
+    const runtime = await buildDefaultRuntime(3);
+    const fromStream = createBranchState(runtime.battleStream, runtime.log, { p1Choices: [], p2Choices: [] });
+    const fromBattle = createBranchStateFromBattle(runtime.battleStream.battle, runtime.log, { p1Choices: [], p2Choices: [] });
+    expect(fromBattle.p1MovesBySlot).toEqual(fromStream.p1MovesBySlot);
+    expect(fromBattle.p2SwitchesBySlot).toEqual(fromStream.p2SwitchesBySlot);
+    expect(fromBattle.turnNumber).toBe(fromStream.turnNumber);
+  });
+
+  test('captureSerializedPosition returns a parseable position and null on garbage', async () => {
+    const runtime = await buildDefaultRuntime(3);
+    const serialized = captureSerializedPosition(runtime.battleStream.battle);
+    expect(serialized).not.toBeNull();
+    expect(() => JSON.parse(serialized!)).not.toThrow();
+    expect(captureSerializedPosition(null)).toBeNull();
   });
 });
