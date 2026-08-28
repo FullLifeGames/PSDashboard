@@ -72,6 +72,17 @@ export async function perfSpan<T>(stage: string, run: () => Promise<T>): Promise
   }
 }
 
+/** Times one synchronous block — for main-thread compute sites, where the
+ * span IS blocked main-thread time (async spans only measure waiting). */
+export function perfSync<T>(stage: string, run: () => T): T {
+  const start = now();
+  try {
+    return run();
+  } finally {
+    perfAdd(stage, now() - start);
+  }
+}
+
 export function perfSummary(label: string): PerfSummary {
   return {
     label,

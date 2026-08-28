@@ -3,6 +3,7 @@ import {
   selectExpansionCells, selectTieProbeCells, toResult, TOP_EXPANSION,
   type PvStep, type Ranked, type ValueMatrix,
 } from './rank';
+import { perfSync } from './perf-trace';
 import type {
   CellBlend, EvalCellJob, EvalCellValue, EvalChoicesInfo, EvalResult, EvalSettings, EvalSubSearchJob,
   KoOddsInfo, KoOddsMismatch, SearchProgress, TeraAllowance,
@@ -98,7 +99,7 @@ export async function searchOrchestrated(
   const staticValues = values.map(row => [...row]);
   const trendMap = new Map<number, number>();
 
-  let ranked: Ranked = rankFromMatrix(matrix, rootValue);
+  let ranked: Ranked = perfSync('main:rank', () => rankFromMatrix(matrix, rootValue));
   let result = toResult(ranked, 1);
   attachKoDiagnostics(result);
   attachKoOdds(result);
@@ -148,11 +149,11 @@ export async function searchOrchestrated(
         used += 1;
         callbacks?.onProgress?.({ done: used, total: budget, depth });
       });
-      ranked = rankFromMatrix(matrix, rootValue);
+      ranked = perfSync('main:rank', () => rankFromMatrix(matrix, rootValue));
     }
     if (stopped) break;
 
-    ranked = rankFromMatrix(matrix, rootValue);
+    ranked = perfSync('main:rank', () => rankFromMatrix(matrix, rootValue));
     attachLines(matrix, ranked, pvByCell);
     result = toResult(ranked, depth);
     attachKoDiagnostics(result);
