@@ -147,6 +147,11 @@ document.write('<script src="https://play.pokemonshowdown.com/js/replay-embed.js
     // very same seek is still scrubbing: nothing to do either way.
     if (battle.seeking === null && battle.turn === seek.turn && !seek.autoPlay) return;
     if (battle.seeking !== null && battle.seeking === seek.turn && !seek.autoPlay) return;
+    // Same for play-seeks: a retry while the battle already plays at/past the
+    // requested turn (or is still scrubbing toward it — the first application
+    // armed waitSeekEnd) would restart playback mid-watch.
+    if (seek.autoPlay && !battle.paused && battle.seeking === null && battle.turn >= seek.turn) return;
+    if (seek.autoPlay && battle.seeking !== null && battle.seeking === seek.turn) return;
     // The native "Go to turn" flow: establish the rest state BEFORE the
     // seek and never touch playback after it. battle.js fast-forwards long
     // jumps in >300ms chunks chained via setTimeout, and each continuation
