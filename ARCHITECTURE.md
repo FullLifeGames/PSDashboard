@@ -141,13 +141,19 @@ truncate / replace.
 (the panel names it): the live sim at the variation tip; a recorded
 serialized position elsewhere in the variation (`useBranch` captures one per
 executed entry — exact, incl. live PP and disables, rebuilt via
-`src/lib/picker-state.ts`); or snapshot + guessed teams on unanalyzed
-main-line turns (approximate — move types come from the dex, PP shows as a
-dash, the sim validates legality on execute, and a "Rebuild exact position"
-button materializes the sim without playing a move, which doubles targeting
-needs). The panel is compact by default (move/switch buttons, the actually
-played action badged "played", Use Recommended, Execute); an "Advanced"
-disclosure adds the free-choice dropdown and the "What if it had …" tools.
+`src/lib/picker-state.ts`); or snapshot + guessed teams on main-line turns
+whose exact position is not yet known (approximate — move types come from
+the dex, PP shows as a dash, the sim validates legality on execute).
+Exactness is the app's job, not a button: every reconstruction that passes
+through the app (Evaluate's single-turn acquire, Analyze game's streamed
+boundaries) lands in a session cache of exact positions, and when the
+pointer DWELLS ~1s on an unknown main-line turn the app reconstructs it in
+the background through the same healed path — the pickers upgrade in place
+(real PP, disables, doubles targets), the source line flips to "Choices from
+the reconstructed position". The panel is compact by default (move/switch
+buttons, the actually played action badged "played", Use Recommended,
+Execute); an "Advanced" disclosure adds the free-choice dropdown and the
+"What if it had …" tools.
 Executing at a position without the live sim
 funnels through one deviation path: chess rules (silent truncation inside
 the variation, an inline confirm when replacing the variation from the main

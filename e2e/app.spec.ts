@@ -1472,7 +1472,7 @@ test.describe('PS Dashboard', () => {
       // Step back one position: the pointer sits INSIDE the variation, the
       // pickers come from the recorded position, and the line chip appears.
       await page.locator('.ps-branch-bar button', { hasText: '◀' }).click();
-      await expect(page.getByText('Choices from the recorded variation position')).toBeVisible();
+      await expect(page.getByText('Choices from the reconstructed position')).toBeVisible();
       await expect(page.locator('.ps-line-chip')).toBeVisible();
 
       // Deviate here: a DIFFERENT P1 move — NO confirm may appear (chess
