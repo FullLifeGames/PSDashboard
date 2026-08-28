@@ -10,7 +10,7 @@ import { useSmogonUsageStats } from './hooks/useSmogonUsageStats';
 import { useSmogonSetAssumptions } from './hooks/useSmogonSetAssumptions';
 import { ReplayLoader } from './components/ReplayLoader';
 import { PSReplayFrame } from './components/PSReplayFrame';
-import { BranchPanel } from './components/BranchPanel';
+import { BranchPanel, type PlayedPick } from './components/BranchPanel';
 import { BranchHistoryPanel } from './components/BranchHistoryPanel';
 import { BranchSaveSharePanel } from './components/BranchSaveSharePanel';
 import { BattleStatsPanel } from './components/BattleStatsPanel';
@@ -1039,6 +1039,41 @@ function App() {
     requestDeviation({ p1Choices: draftChoices.p1, p2Choices: draftChoices.p2 });
   }, [requestDeviation, draftChoices]);
 
+  /**
+   * What the viewed line actually played at this position — the answer to
+   * "which move did they press here?". Main line: the replay protocol's
+   * action for this turn. Variation (behind the tip): the recorded entry's
+   * choices. The tip itself has no played move yet.
+   */
+  const playedAtView = useMemo<{ p1: PlayedPick | null; p2: PlayedPick | null } | null>(() => {
+    const fromAction = (action: { kind: 'move' | 'switch'; name: string; species?: string } | null): PlayedPick | null =>
+      action ? { kind: action.kind, name: action.name, ...(action.species ? { species: action.species } : {}) } : null;
+    if (viewingVariation && variationSpan) {
+      const index = viewTurn - variationSpan.startTurn;
+      let count = 0;
+      for (const entry of history) {
+        if (entry.kind === 'forced') continue;
+        if (count === index) {
+          const fromSlots = (slots: (BranchSlotChoice | null)[] | undefined): PlayedPick | null => {
+            const first = (slots ?? []).find(Boolean) ?? null;
+            if (!first) return null;
+            return first.kind === 'move'
+              ? { kind: 'move', name: first.moveName }
+              : { kind: 'switch', name: first.pokemonName, species: first.speciesId };
+          };
+          return { p1: fromSlots(entry.p1SlotChoices), p2: fromSlots(entry.p2SlotChoices) };
+        }
+        count += 1;
+      }
+      return null;
+    }
+    const lines = snapshots[viewTurn]?.log;
+    if (!lines || lines.length === 0) return null;
+    const turn = evalIsDoubles ? parsePlayedActionsDoubles(lines) : parsePlayedActions(lines);
+    if (!turn.p1 && !turn.p2) return null;
+    return { p1: fromAction(turn.p1), p2: fromAction(turn.p2) };
+  }, [viewingVariation, variationSpan, viewTurn, history, snapshots, evalIsDoubles]);
+
   // Clicking a recommended choice pre-fills the branch pickers.
   const applyEvalChoice = useCallback((side: 'p1' | 'p2', ranked: RankedChoice): boolean => {
     if (!simState) return false;
@@ -2057,6 +2092,7 @@ function App() {
               onSetChoice={handleSetChoice}
               onHypotheticalMove={handleHypotheticalMove}
               onExecuteTurn={liveTip ? handleExecuteTurn : handleExecuteDraft}
+              played={playedAtView}
             />
             {(branching || variationSpan !== null) && (
               <>

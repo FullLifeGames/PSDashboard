@@ -180,6 +180,22 @@ body {
 .ps-line-chip button.on-vari { background: rgba(240, 199, 107, 0.25); color: #ffeeba; font-weight: bold; }
 .ps-line-chip button:disabled { opacity: 0.35; cursor: default; }
 
+/* "played" marker on the move/switch actually taken at the viewed position */
+.ps-played-badge {
+  display: inline-block;
+  margin-left: 5px;
+  padding: 0 5px;
+  border-radius: 999px;
+  font-size: 8px;
+  font-weight: bold;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  vertical-align: middle;
+  background: rgba(0, 0, 0, 0.45);
+  color: #ffeeba;
+  border: 1px solid rgba(240, 199, 107, 0.6);
+}
+
 /* Pokemon sprites */
 .ps-sprite {
   position: absolute;

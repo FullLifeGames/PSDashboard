@@ -17,6 +17,15 @@ import type { PickerSource } from '../lib/picker-state';
 import { spriteUrl } from '../lib/sprite-url';
 import { ComboBox } from './ComboBox';
 
+/** What the viewed line actually played at this position (badge on the
+ *  matching button + header note): the replay's action on the main line,
+ *  the variation's recorded choice on variation positions. */
+export interface PlayedPick {
+  kind: 'move' | 'switch';
+  name: string;
+  species?: string;
+}
+
 interface Props {
   simState: BranchSimState | null;
   /**
@@ -40,6 +49,8 @@ interface Props {
   /** "What if it had …": loads a legal move into the active set and rebuilds the branch. */
   onHypotheticalMove: (side: 'p1' | 'p2', activeSlot: number, params: { species: string; move: string; replace: string | null }) => void;
   onExecuteTurn: () => void;
+  /** The action each side actually took at this position on the viewed line. */
+  played?: { p1: PlayedPick | null; p2: PlayedPick | null } | null;
 }
 
 interface SpreadTargetDamage {
@@ -76,13 +87,15 @@ function hpBarClass(pct: number) {
 }
 
 /* ── Move button ── */
-function MoveBtn({ move, dmg, spreadDamage, zMoveName, targetDamage, pendingChoice, onClick }: {
+function MoveBtn({ move, dmg, spreadDamage, zMoveName, targetDamage, pendingChoice, wasPlayed, onClick }: {
   move: BranchMoveOption;
   dmg?: DamageResult;
   spreadDamage?: SpreadTargetDamage[];
   zMoveName?: string | null;
   targetDamage: Record<number, DamageResult | undefined>;
   pendingChoice: BranchSlotChoice | null;
+  /** This is the move the viewed line actually played at this position. */
+  wasPlayed?: boolean;
   onClick: (targetLoc?: number) => void;
 }) {
   const bg = typeBg(move.type);
@@ -101,6 +114,7 @@ function MoveBtn({ move, dmg, spreadDamage, zMoveName, targetDamage, pendingChoi
         style={{ background: bg }}
       >
         <div className="ps-movebtn-name">{move.name}</div>
+        {wasPlayed && <span className="ps-played-badge" title="This is what was actually played at this position on the line you are viewing.">played</span>}
         {zMoveName && (
           <div className="ps-movebtn-zmove">→ {zMoveName}</div>
         )}
@@ -162,8 +176,8 @@ function MoveBtn({ move, dmg, spreadDamage, zMoveName, targetDamage, pendingChoi
 }
 
 /* ── Switch button ── */
-function SwitchBtn({ sw, selected, disabled, disabledReason, onClick }: {
-  sw: BranchSwitchOption; selected: boolean; disabled: boolean; disabledReason?: string; onClick: () => void;
+function SwitchBtn({ sw, selected, disabled, disabledReason, wasPlayed, onClick }: {
+  sw: BranchSwitchOption; selected: boolean; disabled: boolean; disabledReason?: string; wasPlayed?: boolean; onClick: () => void;
 }) {
   return (
     <button
@@ -176,7 +190,10 @@ function SwitchBtn({ sw, selected, disabled, disabledReason, onClick }: {
     >
       <img src={spriteUrl(sw.species)} alt={sw.name} />
       <div>
-        <div className="ps-switchbtn-name">{sw.name}</div>
+        <div className="ps-switchbtn-name">
+          {sw.name}
+          {wasPlayed && <span className="ps-played-badge" title="This is what was actually played at this position on the line you are viewing.">played</span>}
+        </div>
         <div style={{ width: 60 }}>
           <div className="ps-hpbar-track" style={{ height: 4, marginTop: 2 }}>
             <div className={`ps-hpbar-fill ${hpBarClass(sw.hpPercent)}`} style={{ width: `${sw.hpPercent}%` }} />
@@ -189,7 +206,7 @@ function SwitchBtn({ sw, selected, disabled, disabledReason, onClick }: {
 }
 
 /* ── Controls for one side (moves/switches) ── */
-function SideControls({ side, label, activeName, activeSpecies, activeFainted, moves, switches, forceSwitch, pending, blockedSwitchKeys, modifiers, dmgResults, spreadDamageResults, targetDamageResults, gen, onChoice, onHypotheticalMove }: {
+function SideControls({ side, label, activeName, activeSpecies, activeFainted, moves, switches, forceSwitch, pending, blockedSwitchKeys, modifiers, dmgResults, spreadDamageResults, targetDamageResults, gen, advanced, played, onChoice, onHypotheticalMove }: {
   side: 'p1' | 'p2';
   label: string;
   activeName: string;
@@ -205,6 +222,9 @@ function SideControls({ side, label, activeName, activeSpecies, activeFainted, m
   spreadDamageResults: Record<number, SpreadTargetDamage[]>;
   targetDamageResults: Record<string, DamageResult | undefined>;
   gen: number;
+  /** Shows the power tools (free choice dropdown, "What if it had…"). */
+  advanced: boolean;
+  played?: PlayedPick | null;
   onChoice: (choice: BranchSlotChoice) => void;
   onHypotheticalMove: (params: { species: string; move: string; replace: string | null }) => void;
 }) {
@@ -246,6 +266,11 @@ function SideControls({ side, label, activeName, activeSpecies, activeFainted, m
     () => pickRecommendedMove(side, moves, dmgResults, targetDamageResults),
     [side, moves, dmgResults, targetDamageResults],
   );
+  const playedMoveKey = played?.kind === 'move' ? choiceId(played.name) : null;
+  const playedSwitchKey = played?.kind === 'switch' ? choiceId(played.species || played.name) : null;
+  const playedText = played
+    ? (played.kind === 'move' ? played.name : `→ ${played.name}`)
+    : null;
 
   return (
     <div className="ps-controls ps-side-controls">
@@ -260,6 +285,14 @@ function SideControls({ side, label, activeName, activeSpecies, activeFainted, m
         {pending && (
           <span className="ps-pending-choice">
             [{notationSlotChoice(pending)}]
+          </span>
+        )}
+        {playedText && !pending && (
+          <span
+            style={{ marginLeft: 6, fontSize: 10, color: '#b8c9e0' }}
+            title="What this side actually did at this position on the line you are viewing."
+          >
+            played: <strong>{playedText}</strong>
           </span>
         )}
       </div>
@@ -353,10 +386,12 @@ function SideControls({ side, label, activeName, activeSpecies, activeFainted, m
                   ]),
                 )}
                 pendingChoice={pending}
+                wasPlayed={playedMoveKey !== null && choiceId(m.name) === playedMoveKey}
                 onClick={(targetLoc) => onChoice(moveChoiceFor(m, targetLoc))}
               />
             ))}
           </div>
+          {advanced && (
           <div className="ps-custom-choice">
             <select
               className="ps-input"
@@ -437,6 +472,7 @@ function SideControls({ side, label, activeName, activeSpecies, activeFainted, m
               </>
             )}
           </div>
+          )}
         </>
       )}
 
@@ -451,6 +487,7 @@ function SideControls({ side, label, activeName, activeSpecies, activeFainted, m
                 selected={selected}
                 disabled={blockedSwitchKeys.has(switchOptionKey(sw)) && !selected}
                 disabledReason={`${sw.name} is already chosen as the switch-in for your other slot.`}
+                wasPlayed={playedSwitchKey !== null && (choiceId(sw.species) === playedSwitchKey || choiceId(sw.name) === playedSwitchKey)}
                 onClick={() => onChoice({ kind: 'switch', speciesId: choiceId(sw.species), pokemonName: sw.name })}
               />
             );
@@ -522,9 +559,30 @@ interface SideDamage {
 
 const EMPTY_SIDE_DAMAGE: SideDamage = { default: [], targets: {}, spread: {} };
 
+const ADVANCED_KEY = 'ps-replay-interceptor:picker-advanced';
+
 /* ── Main BranchPanel (controls only, no iframe) ── */
-export function BranchPanel({ simState, source, onMaterialize, executeError, executing, gen, onSetChoice, onHypotheticalMove, onExecuteTurn }: Props) {
+export function BranchPanel({ simState, source, onMaterialize, executeError, executing, gen, onSetChoice, onHypotheticalMove, onExecuteTurn, played }: Props) {
   const [showLog, setShowLog] = useState(false);
+  // Compact by default: move/switch buttons and Execute. "Advanced" adds the
+  // free-choice dropdown and the "What if it had…" tools (persisted).
+  const [advanced, setAdvanced] = useState(() => {
+    try {
+      return localStorage.getItem(ADVANCED_KEY) === '1';
+    } catch {
+      return false;
+    }
+  });
+  const toggleAdvanced = () => {
+    setAdvanced(current => {
+      try {
+        localStorage.setItem(ADVANCED_KEY, current ? '0' : '1');
+      } catch {
+        // Storage blocked — the toggle still works for this session.
+      }
+      return !current;
+    });
+  };
   const [damageBySide, setDamageBySide] = useState<{ p1: SideDamage; p2: SideDamage }>({
     p1: EMPTY_SIDE_DAMAGE,
     p2: EMPTY_SIDE_DAMAGE,
@@ -661,27 +719,38 @@ export function BranchPanel({ simState, source, onMaterialize, executeError, exe
 
   return (
     <div>
-      {source && source !== 'live' && (
-        <div style={{ fontSize: 10, color: '#9fb2cc', margin: '6px 0 2px', display: 'flex', gap: 8, alignItems: 'baseline' }}>
+      <div style={{ fontSize: 10, color: '#9fb2cc', margin: '6px 0 2px', display: 'flex', gap: 8, alignItems: 'baseline', flexWrap: 'wrap' }}>
+        {source && source !== 'live' && (
           <span>
-            Choices {source === 'stored'
-              ? 'from the recorded position'
-              : 'from snapshot — the sim validates on execute'}
+            {source === 'stored'
+              ? 'Choices from the recorded variation position'
+              : 'Choices approximated from the replay — the sim checks legality when you play a move'}
           </span>
-          {source === 'snapshot' && onMaterialize && (
-            <button
-              type="button"
-              onClick={onMaterialize}
-              disabled={executing}
-              className="ps-btn"
-              style={{ padding: '0 6px', fontSize: 10 }}
-              title="Reconstructs the simulator at this position without playing a move — exact PP, disables, and (in doubles) targets."
-            >
-              Load exact choices
-            </button>
-          )}
-        </div>
-      )}
+        )}
+        {source === 'snapshot' && onMaterialize && (
+          <button
+            type="button"
+            onClick={onMaterialize}
+            disabled={executing}
+            className="ps-btn"
+            style={{ padding: '0 6px', fontSize: 10 }}
+            title="Rebuilds the simulator at this turn WITHOUT playing a move — you get exact PP, disabled moves and (in doubles) real target buttons. Only needed when the approximation is not enough."
+          >
+            Rebuild exact position
+          </button>
+        )}
+        <span style={{ flex: 1 }} />
+        <button
+          type="button"
+          onClick={toggleAdvanced}
+          className="ps-btn"
+          style={{ padding: '0 6px', fontSize: 10 }}
+          aria-expanded={advanced}
+          title="Shows the free choice dropdown and the &quot;What if it had…&quot; move loader."
+        >
+          {advanced ? 'Advanced ▾' : 'Advanced ▸'}
+        </button>
+      </div>
       {/* Controls — stacked vertically for P1 + P2 selection */}
       {!simState.ended && (
         <div className="ps-branch-controls-shell">
@@ -705,6 +774,8 @@ export function BranchPanel({ simState, source, onMaterialize, executeError, exe
                   spreadDamageResults={damageBySide.p1.spread[slot] ?? {}}
                   targetDamageResults={damageBySide.p1.targets[slot] ?? {}}
                   gen={gen}
+                  advanced={advanced}
+                  played={slot === 0 ? played?.p1 ?? null : null}
                   onChoice={(choice) => onSetChoice('p1', choice, slot)}
                   onHypotheticalMove={(params) => onHypotheticalMove('p1', slot, params)}
                 />
@@ -730,6 +801,8 @@ export function BranchPanel({ simState, source, onMaterialize, executeError, exe
                   spreadDamageResults={damageBySide.p2.spread[slot] ?? {}}
                   targetDamageResults={damageBySide.p2.targets[slot] ?? {}}
                   gen={gen}
+                  advanced={advanced}
+                  played={slot === 0 ? played?.p2 ?? null : null}
                   onChoice={(choice) => onSetChoice('p2', choice, slot)}
                   onHypotheticalMove={(params) => onHypotheticalMove('p2', slot, params)}
                 />

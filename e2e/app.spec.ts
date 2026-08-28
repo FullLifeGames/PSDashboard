@@ -139,13 +139,13 @@ async function startVariationAt(page: Page, turn: number, options?: { p1Move?: s
 }
 
 /** Rebuilds the live sim at the CURRENT position without playing a move —
- *  the snapshot picker's "Load exact choices" affordance. */
+ *  the snapshot picker's "Rebuild exact position" affordance. */
 async function materializeSimHere(page: Page, turn?: number) {
   if (turn && turn > 1) {
     await page.locator('.ps-branch-bar input[type="range"]').fill(String(turn));
     await expect(page.getByText(`T${turn}/`)).toBeVisible();
   }
-  await page.locator('button', { hasText: 'Load exact choices' }).click();
+  await page.locator('button', { hasText: 'Rebuild exact position' }).click();
   await expect(page.getByText(/Branching — Turn/)).toBeVisible({ timeout: 60_000 });
 }
 
@@ -717,8 +717,9 @@ test.describe('PS Dashboard', () => {
 
   test('branching can load a hypothetical move from the legal pool', async ({ page }) => {
     await page.locator('button', { hasText: 'Load' }).click();
-    // Variant B: the what-if controls are already there — loading the move
-    // rebuilds the sim at the viewed position with the choice pre-seeded.
+    // Variant B: the what-if controls live in the Advanced row — open it,
+    // then loading the move rebuilds the sim with the choice pre-seeded.
+    await page.locator('button', { hasText: 'Advanced' }).click();
     const p1Controls = page.locator('.ps-branch-side-column').first();
     const whatIf = p1Controls.getByLabel('Hypothetical move for P1');
 
@@ -734,7 +735,7 @@ test.describe('PS Dashboard', () => {
     // The branch rebuilds with the move in the set and pre-selected as pending.
     await expect(page.getByText(/Branching.*Turn/)).toBeVisible({ timeout: 15000 });
     await expect(p1Controls.locator('.ps-movebtn', { hasText: 'Flamethrower' })).toBeVisible({ timeout: 15000 });
-    await expect(p1Controls).toContainText('[move Flamethrower]');
+    await expect(p1Controls).toContainText('[Flamethrower]');
 
     // Now the set is full — a second hypothetical must replace a chosen move.
     const whatIfAgain = p1Controls.getByLabel('Hypothetical move for P1');
@@ -743,7 +744,7 @@ test.describe('PS Dashboard', () => {
     await p1Controls.locator('button', { hasText: 'Load move' }).click();
 
     await expect(p1Controls.locator('.ps-movebtn', { hasText: 'Fire Blast' })).toBeVisible({ timeout: 15000 });
-    await expect(p1Controls).toContainText('[move Fire Blast]');
+    await expect(p1Controls).toContainText('[Fire Blast]');
     await expect(p1Controls.locator('.ps-movebtn', { hasText: 'Earthquake' })).toHaveCount(0);
   });
 
@@ -965,7 +966,7 @@ test.describe('PS Dashboard', () => {
 
     await slider.fill('56');
     await expect(page.getByText('T56/')).toBeVisible();
-    await page.locator('button', { hasText: 'Load exact choices' }).click();
+    await page.locator('button', { hasText: 'Rebuild exact position' }).click();
     await expect(page.getByText(/Branching — Turn 56/)).toBeVisible({ timeout: 120_000 });
     await expect(page.getByText(/already ended|wedged at turn/)).toHaveCount(0);
 
@@ -975,7 +976,7 @@ test.describe('PS Dashboard', () => {
     // The end snapshot is the post-battle sentinel — materializing (or
     // executing) there is refused with the explanation instead of a button
     // that no longer exists.
-    await page.locator('button', { hasText: 'Load exact choices' }).click();
+    await page.locator('button', { hasText: 'Rebuild exact position' }).click();
     await expect(page.getByText(/already over at the end position/)).toBeVisible();
     await expect(page.getByText(/Branching — Turn/)).toHaveCount(0);
   });
@@ -1102,8 +1103,8 @@ test.describe('PS Dashboard', () => {
 
   test('materializing the sim gives immediate preparation feedback', async ({ page }) => {
     await page.locator('button', { hasText: 'Load' }).click();
-    await expect(page.locator('button', { hasText: 'Load exact choices' })).toBeVisible({ timeout: 15000 });
-    await page.locator('button', { hasText: 'Load exact choices' }).click();
+    await expect(page.locator('button', { hasText: 'Rebuild exact position' })).toBeVisible({ timeout: 15000 });
+    await page.locator('button', { hasText: 'Rebuild exact position' }).click();
     await expect(page.getByText('Preparing branch...')).toBeVisible({ timeout: 2000 });
   });
 
@@ -1455,7 +1456,7 @@ test.describe('PS Dashboard', () => {
       // Step back one position: the pointer sits INSIDE the variation, the
       // pickers come from the recorded position, and the line chip appears.
       await page.locator('.ps-branch-bar button', { hasText: '◀' }).click();
-      await expect(page.getByText('Choices from the recorded position')).toBeVisible();
+      await expect(page.getByText('Choices from the recorded variation position')).toBeVisible();
       await expect(page.locator('.ps-line-chip')).toBeVisible();
 
       // Deviate here: a DIFFERENT P1 move — NO confirm may appear (chess
