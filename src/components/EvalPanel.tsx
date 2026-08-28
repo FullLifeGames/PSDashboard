@@ -61,6 +61,8 @@ interface EvalPanelProps {
   report?: GameReport | null;
   /** Doubles replay — selects the fitted win-probability curve for percents. */
   doubles?: boolean;
+  /** Which position the shown single result belongs to (e.g. "Turn 5 · variation"). */
+  positionLabel?: string | null;
 }
 
 // Displayed values are win probabilities ("52%") and point deltas ("−8%").
@@ -132,6 +134,7 @@ export function EvalPanel({
   prefs, onPrefsChange, onEvaluate, onCancel, onPickChoice, onPickPair, showAuto, showTera,
   graph, variation, currentLine, onAnalyzeGame, onSelectTurn, currentTurn, analysis,
   reads, leadAnalysis, reportLeads, report, doubles, resultSettings, onThinkDeeper, thinkDeeperTarget, smogonPending,
+  positionLabel,
 }: EvalPanelProps) {
   const running = status === 'searching' || status === 'reconstructing';
   const hasGraph = graph.scores.some(score => score !== null);
@@ -394,6 +397,9 @@ export function EvalPanel({
 
       {result && !showReportView && (
         <div className={status === 'stale' ? 'ps-eval-stale' : undefined}>
+          {positionLabel && (
+            <div style={{ fontSize: 10, color: '#8fa3bd', marginBottom: 2 }}>{positionLabel}</div>
+          )}
           <div className="ps-eval-labels">
             <span className="ps-eval-bar-p1">{playerNames[0]} {p1Pct}%</span>
             <span className="ps-eval-bar-p2">{playerNames[1]} {100 - p1Pct}%</span>

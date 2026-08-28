@@ -29,6 +29,13 @@ export interface EvaluateParams {
    * that as reconstructProgress state.
    */
   acquire: (reportReconstruct: (turn: number, target: number) => void) => Promise<string>;
+  /**
+   * Identity of the position this run evaluates (unified timeline). Exposed
+   * back as resultTag so consumers can tell whether the shown result still
+   * belongs to the position on screen — a run finishing AFTER the user
+   * navigated away must not display (or be recorded) as the new position's.
+   */
+  tag?: string;
 }
 
 /**
@@ -352,6 +359,8 @@ export function useEvaluation() {
   const [prefs, setPrefsState] = useState<EvalPreferences>(loadPrefs);
   const [status, setStatus] = useState<EvalStatus>('idle');
   const [result, setResult] = useState<EvalResult | null>(null);
+  /** Position tag of the run that produced `result` (see EvaluateParams.tag). */
+  const [resultTag, setResultTag] = useState<string | null>(null);
   const [progress, setProgress] = useState<SearchProgress | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [reconstructProgress, setReconstructProgress] = useState<{ turn: number; target: number } | null>(null);
@@ -395,6 +404,7 @@ export function useEvaluation() {
       if (hit && hit.depth === depth && hit.samples === samples && hit.mode === mode && teraKey(hit.tera) === teraKey(params.tera)) {
         runRef.current += 1;
         setResult(hit.result);
+        setResultTag(params.tag ?? null);
         setStatus('done');
         setError(null);
         setProgress(null);
@@ -407,6 +417,7 @@ export function useEvaluation() {
     setStatus('reconstructing');
     setError(null);
     setResult(null);
+    setResultTag(params.tag ?? null);
     setProgress(null);
     setReconstructProgress(null);
 
@@ -1056,7 +1067,7 @@ export function useEvaluation() {
 
   return {
     prefs, setPrefs,
-    status, result, progress, error, reconstructProgress,
+    status, result, resultTag, progress, error, reconstructProgress,
     evaluate, markStale, reset, cancel,
     graph, runGraphSweep, clearGraph,
   };

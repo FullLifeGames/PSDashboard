@@ -244,6 +244,15 @@ function App() {
    *  position — which, freshly materialized without entries, still sits on
    *  the main line — and every recorded variation position. */
   const liveEvalView = liveTip || viewingVariation;
+  /**
+   * Identity of the position on screen for the eval result. A run that
+   * finishes after the user navigated away carries the OLD position's tag —
+   * such a result renders as stale and is never recorded under the new turn.
+   */
+  const evalViewKey = `${viewingVariation ? 'variation' : 'main'}:${viewTurn}`;
+  const evalResultMatchesView = evaluation.resultTag === null || evaluation.resultTag === evalViewKey;
+  const liveEvalStatus: typeof evaluation.status =
+    evaluation.status === 'done' && !evalResultMatchesView ? 'stale' : evaluation.status;
 
   /**
    * One-shot seek command for the branch iframe, which ignores seekTurn prop
@@ -982,33 +991,37 @@ function App() {
   const handleEvaluate = useCallback(() => {
     if (!replayData) return;
     if (liveTip) {
-      evaluation.evaluate({ cacheKey: null, tera: effectiveTera, sleepClause: effectiveSleepClause, acquire: acquireBranchPosition });
+      evaluation.evaluate({ cacheKey: null, tera: effectiveTera, sleepClause: effectiveSleepClause, acquire: acquireBranchPosition, tag: evalViewKey });
     } else if (viewingVariation && serializedAtView) {
       // A recorded variation position: acquisition is instant — the search
       // itself still runs at the configured settings.
       const stored = serializedAtView;
-      evaluation.evaluate({ cacheKey: null, tera: effectiveTera, sleepClause: effectiveSleepClause, acquire: async () => stored });
+      evaluation.evaluate({ cacheKey: null, tera: effectiveTera, sleepClause: effectiveSleepClause, acquire: async () => stored, tag: evalViewKey });
     } else {
       evaluation.evaluate({
         cacheKey: `${replayData.id}:${viewTurn}:${setsFingerprint}`,
         tera: effectiveTera,
         sleepClause: effectiveSleepClause,
         acquire: acquireReplayPosition,
+        tag: evalViewKey,
       });
     }
-  }, [replayData, liveTip, viewingVariation, serializedAtView, evaluation, effectiveTera, effectiveSleepClause, acquireBranchPosition, acquireReplayPosition, viewTurn, setsFingerprint]);
+  }, [replayData, liveTip, viewingVariation, serializedAtView, evaluation, effectiveTera, effectiveSleepClause, acquireBranchPosition, acquireReplayPosition, viewTurn, setsFingerprint, evalViewKey]);
 
   // Every eval finishing while the pointer sits on the variation feeds the
-  // graph overlay — auto-evals after executed turns included.
+  // graph overlay — auto-evals after executed turns included. The tag guard
+  // keeps a run that finished after a navigation from landing in the wrong
+  // turn's slot (the score belongs to the position it was STARTED at).
   useEffect(() => {
     if (evaluation.status !== 'done' || !evaluation.result || !viewingVariation) return;
+    if (evaluation.resultTag !== null && evaluation.resultTag !== evalViewKey) return;
     const score = evaluation.result.score;
     setVariationScores(previous => {
       const next = [...previous];
       next[viewTurn - 1] = score;
       return next;
     });
-  }, [evaluation.status, evaluation.result, viewingVariation, viewTurn]);
+  }, [evaluation.status, evaluation.result, evaluation.resultTag, evalViewKey, viewingVariation, viewTurn]);
 
   /** Non-live positions render the resolved picker state with the DRAFT
    *  choices mirrored in — the panel's selection logic reads simState. */
@@ -1243,12 +1256,14 @@ function App() {
     clearGraph();
   }, [replayData?.id, setsFingerprint, effectiveTera, clearGraph]);
 
-  // Opt-in: keep the branch evaluation fresh after each executed turn.
+  // Opt-in: keep the branch evaluation fresh after each executed turn. Runs
+  // on the effective status, so a result that finished for a position the
+  // user has meanwhile left (tag mismatch) also re-evaluates.
   useEffect(() => {
-    if (branching && evaluation.prefs.auto && evaluation.status === 'stale' && !executing) {
+    if (branching && evaluation.prefs.auto && liveEvalStatus === 'stale' && !executing) {
       handleEvaluate();
     }
-  }, [branching, evaluation.prefs.auto, evaluation.status, executing, handleEvaluate]);
+  }, [branching, evaluation.prefs.auto, liveEvalStatus, executing, handleEvaluate]);
 
   // "What if it had …": a team edit plus the normal branch refresh, with the
   // hypothetical move pre-seeded as that slot's pending choice.
@@ -2046,7 +2061,7 @@ function App() {
             {evalAvailable && (
               <EvalPanel
                 playerNames={[replayData.players[0], replayData.players[1]]}
-                status={liveEvalView ? evaluation.status : 'idle'}
+                status={liveEvalView ? liveEvalStatus : 'idle'}
                 result={analyzedResult}
                 resultSettings={analyzedSettings}
                 onThinkDeeper={!liveEvalView ? handleThinkDeeper : undefined}
@@ -2064,7 +2079,8 @@ function App() {
                 showAuto={liveEvalView}
                 showTera={replayGen === 9}
                 graph={evaluation.graph}
-                onAnalyzeGame={!liveEvalView ? handleAnalyzeGame : undefined}
+                onAnalyzeGame={handleAnalyzeGame}
+                positionLabel={liveEvalView ? `Turn ${viewTurn} · ${viewingVariation ? 'variation' : 'main line'}` : null}
                 onSelectTurn={handleGraphSelectLine}
                 currentTurn={viewTurn}
                 currentLine={viewingVariation ? 'variation' : 'main'}
