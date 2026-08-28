@@ -2001,14 +2001,31 @@ function App() {
                 className="ps-btn"
                 style={{ padding: '2px 8px', fontSize: 12, lineHeight: 1 }}
               >&#9664;</button>
-              <input
-                type="range"
-                min={1}
-                max={sliderMax(maxTurn, variationSpan)}
-                value={viewTurn}
-                onChange={e => navigateTo({ turn: parseInt(e.target.value, 10), line: viewLine })}
-                aria-label="Timeline turn selector"
-              />
+              <span className="ps-timeline-track">
+                {variationSpan && (() => {
+                  // Gold stripe under the slider marking where the variation
+                  // lives — without it nothing on the timeline said so.
+                  const max = sliderMax(maxTurn, variationSpan);
+                  const pos = (turn: number) => (max <= 1 ? 0 : ((turn - 1) / (max - 1)) * 100);
+                  const from = pos(variationSpan.startTurn);
+                  const to = pos(variationTip(variationSpan));
+                  return (
+                    <span
+                      className="ps-timeline-stripe"
+                      style={{ left: `${from}%`, width: `${Math.max(to - from, 0.8)}%` }}
+                      title={`Variation: turns ${variationSpan.startTurn}–${variationTip(variationSpan)}`}
+                    />
+                  );
+                })()}
+                <input
+                  type="range"
+                  min={1}
+                  max={sliderMax(maxTurn, variationSpan)}
+                  value={viewTurn}
+                  onChange={e => navigateTo({ turn: parseInt(e.target.value, 10), line: viewLine })}
+                  aria-label="Timeline turn selector"
+                />
+              </span>
               <button
                 type="button"
                 onClick={() => navigateTo({ turn: viewTurn + 1, line: viewLine })}
@@ -2150,6 +2167,7 @@ function App() {
                 graph={evaluation.graph}
                 onAnalyzeGame={handleAnalyzeGame}
                 positionLabel={liveEvalView ? `Turn ${viewTurn} · ${viewingVariation ? 'variation' : 'main line'}` : null}
+                graphMaxTurn={analyzableTurns}
                 onSelectTurn={handleGraphSelectLine}
                 currentTurn={viewTurn}
                 currentLine={viewingVariation ? 'variation' : 'main'}

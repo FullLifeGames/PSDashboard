@@ -63,6 +63,8 @@ interface EvalPanelProps {
   doubles?: boolean;
   /** Which position the shown single result belongs to (e.g. "Turn 5 · variation"). */
   positionLabel?: string | null;
+  /** Full main-line length — keeps the graph's x-axis honest pre-analysis. */
+  graphMaxTurn?: number;
 }
 
 // Displayed values are win probabilities ("52%") and point deltas ("−8%").
@@ -134,7 +136,7 @@ export function EvalPanel({
   prefs, onPrefsChange, onEvaluate, onCancel, onPickChoice, onPickPair, showAuto, showTera,
   graph, variation, currentLine, onAnalyzeGame, onSelectTurn, currentTurn, analysis,
   reads, leadAnalysis, reportLeads, report, doubles, resultSettings, onThinkDeeper, thinkDeeperTarget, smogonPending,
-  positionLabel,
+  positionLabel, graphMaxTurn,
 }: EvalPanelProps) {
   const running = status === 'searching' || status === 'reconstructing';
   const hasGraph = graph.scores.some(score => score !== null);
@@ -347,7 +349,13 @@ export function EvalPanel({
               evalErrors={graph.evalErrors}
               decided={graph.results.map(result => result?.unanswered?.decided ?? null)}
               variation={variation}
+              maxTurn={graphMaxTurn}
             />
+          )}
+          {!hasGraph && variation && (
+            <div style={{ fontSize: 10, color: '#778', marginTop: 2 }}>
+              Gold = your variation. The main line has no curve yet — Analyze game fills it for comparison.
+            </div>
           )}
           {hasGraph && (showReportView || !analysis) && (
             <div style={{ fontSize: 10, color: '#778', marginTop: 2 }}>

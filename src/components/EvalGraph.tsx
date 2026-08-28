@@ -28,6 +28,12 @@ interface EvalGraphProps {
    * line itself stays honest.
    */
   decided?: ({ side: 'p1' | 'p2'; species: string } | null)[];
+  /**
+   * Full main-line length. Keeps the x-domain honest when nothing has been
+   * analyzed yet — without it a lone variation collapsed the axis to its own
+   * few turns and rendered at the far right of an empty box.
+   */
+  maxTurn?: number;
 }
 
 const HEIGHT = 72;
@@ -45,7 +51,7 @@ const VARIATION_COLOR = '#f0c76b';
  * into a viewport-dependent ellipse (fills scale even where strokes are
  * protected), so markers looked different on desktop and mobile.
  */
-export function EvalGraph({ scores, playerNames, currentTurn, currentLine, onSelectTurn, leadScore, evalErrors, decided, variation }: EvalGraphProps) {
+export function EvalGraph({ scores, playerNames, currentTurn, currentLine, onSelectTurn, leadScore, evalErrors, decided, variation, maxTurn }: EvalGraphProps) {
   const svgRef = useRef<SVGSVGElement>(null);
   const [width, setWidth] = useState(300);
   useLayoutEffect(() => {
@@ -64,7 +70,7 @@ export function EvalGraph({ scores, playerNames, currentTurn, currentLine, onSel
   const lastVariationTurn = variation
     ? variation.scores.reduce<number>((max, value, index) => (value !== null ? index + 1 : max), 0)
     : 0;
-  const lastTurn = Math.max(turns, lastVariationTurn);
+  const lastTurn = Math.max(turns, lastVariationTurn, maxTurn ?? 0);
   if (lastTurn === 0) return null;
 
   // With a lead evaluation the x-domain starts at turn 0 (team preview).
