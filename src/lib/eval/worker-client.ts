@@ -99,6 +99,21 @@ export class EvalWorkerClient {
     return this.workers;
   }
 
+  /**
+   * Least-loaded worker (ties keep the lowest index). Placement never
+   * affects results — every job is a pure function of its message — only
+   * queueing: pinning to worker 0 serialized the pair-eval phases and
+   * stacked concurrent turns' trees onto the same few workers.
+   */
+  private pickWorker(): WorkerHandle {
+    const workers = this.ensureWorkers();
+    let best = workers[0];
+    for (const handle of workers) {
+      if (handle.pending.size < best.pending.size) best = handle;
+    }
+    return best;
+  }
+
   private rpc(handle: WorkerHandle, request: DistributiveOmit<EvalWorkerRequest, 'id'>): Promise<EvalWorkerResponse> {
     const id = this.nextId++;
     return new Promise((resolve, reject) => {
@@ -111,7 +126,7 @@ export class EvalWorkerClient {
     let roundRobin = 0;
     return {
       choices: async (tera, keepPlayed, sleepClause) => {
-        const response = await this.rpc(this.ensureWorkers()[0], { type: 'choices', serializedBattle, tera, keepPlayed, sleepClause });
+        const response = await this.rpc(this.pickWorker(), { type: 'choices', serializedBattle, tera, keepPlayed, sleepClause });
         if (response.type !== 'choicesResult') throw new Error('unexpected worker response');
         return response.info;
       },
@@ -147,9 +162,19 @@ export class EvalWorkerClient {
     };
   }
 
-  evaluate(serializedBattle: string, settings: EvalSettings, handlers?: EvalRunHandlers): Promise<EvalResult> {
-    this.cancel();
-    const generation = ++this.generation;
+  evaluate(
+    serializedBattle: string,
+    settings: EvalSettings,
+    handlers?: EvalRunHandlers,
+    opts?: { exclusive?: boolean },
+  ): Promise<EvalResult> {
+    // Exclusive (the default): a fresh evaluation supersedes whatever is
+    // running — the single-result panel's semantics. The graph sweep
+    // passes exclusive: false and pipelines several independent turns
+    // through the shared pool; they all die together on the next real
+    // cancel(), whose generation bump invalidates every live() below.
+    if (opts?.exclusive !== false) this.cancel();
+    const generation = this.generation;
     const live = () => generation === this.generation;
 
     if (settings.mode === 'mcts') {
@@ -157,12 +182,11 @@ export class EvalWorkerClient {
       // offsets 0..N−1) spread across the pool and merged by summed root
       // statistics. The count never follows the pool size — results must
       // not vary by machine; small pools just run trees in rounds.
-      const workers = this.ensureWorkers();
       const doneByTree = new Array(MCTS_TREES).fill(0);
       let totalPerTree = 1;
       const completed: MctsTreeStats[] = [];
       const trees = Array.from({ length: MCTS_TREES }, (_, offset) => {
-        const handle = workers[offset % workers.length];
+        const handle = this.pickWorker();
         const id = this.nextId++;
         return new Promise<MctsTreeStats>((resolve, reject) => {
           handle.pending.set(id, {
@@ -233,7 +257,7 @@ export class EvalWorkerClient {
    * estimator disagreement into the decision/chance decomposition.
    */
   async evalPair(serializedBattle: string, p1Choice: string, p2Choice: string, settings: EvalSettings): Promise<number> {
-    const handle = this.ensureWorkers()[0];
+    const handle = this.pickWorker();
     const subSettings = playedOutcomeSettings(settings);
     if (subSettings) {
       const response = await this.rpc(handle, {

@@ -7,6 +7,7 @@ import { patchSerializedItem, selectProbeCombos, type SensitivityTarget } from '
 import type { LeadEvalData } from '../lib/eval/leads';
 import type { PlayedTurn } from '../lib/eval/played';
 import { EvalWorkerClient } from '../lib/eval/worker-client';
+import { runInLanes } from '../lib/eval/lanes';
 import { perfReport, perfReset, perfSpan } from '../lib/eval/perf-trace';
 import { evalStoreKey, loadStoredEval, saveStoredEval } from '../lib/eval-cache-store';
 import { selectKeyTurns } from '../lib/eval/graph';
@@ -29,6 +30,16 @@ export interface EvaluateParams {
    */
   acquire: (reportReconstruct: (turn: number, target: number) => void) => Promise<string>;
 }
+
+/**
+ * Turns the graph sweep evaluates concurrently. One turn's search already
+ * fans out to the worker pool, but its serial sections — the choices RPC,
+ * the four fixed MCTS trees on a six-worker pool, the played-pair/verify/
+ * sensitivity pair evals — leave workers idle; a short pipeline keeps the
+ * pool fed. Turns are mutually independent (own position, fixed seeds, own
+ * per-turn slots and cache keys), so lanes change wall-clock, never results.
+ */
+const TURN_LANES = 3;
 
 const PREFS_KEY = 'ps-replay-interceptor:eval-prefs';
 // Default line engine: 'auto' — the grid-tuned measured best (matrix d1s1
@@ -553,6 +564,9 @@ export function useEvaluation() {
     // the final state exact.
     let lastPaintAt = 0;
     const paint = (progress: { done: number; total: number } | null, force = false) => {
+      // A lane can finish a turn after this run was superseded — a stale
+      // run must never repaint over the new one's state.
+      if (runRef.current !== runId) return;
       const at = Date.now();
       if (!force && at - lastPaintAt < 200) return;
       lastPaintAt = at;
@@ -720,13 +734,20 @@ export function useEvaluation() {
     };
 
     /**
-     * One sequential pass over `turnList` at `settings`; false = cancelled.
+     * One pass over `turnList` at `settings`; false = cancelled. Turns run
+     * through a short pipeline (TURN_LANES lanes) — each turn is fully
+     * independent, so lanes only change wall-clock, never results; a
+     * turn's own verification/sensitivity chain stays inside its turn.
      * `verify` runs the depth+1 misplay verification — final-verdict passes
      * only, never the fast shaping pass (its results are provisional).
      */
     const sweepTurns = async (turnList: number[], settings: SweepSettings, verify: boolean): Promise<boolean> => {
-      for (let index = 0; index < turnList.length; index++) {
-        const turn = turnList[index];
+      let completed = 0;
+      const finishTurn = () => {
+        completed += 1;
+        paint({ done: completed, total: turnList.length });
+      };
+      const evalTurn = async (turn: number): Promise<boolean> => {
         if (runRef.current !== runId) return false;
         // Resolve 'auto' to this turn's concrete engine BEFORE any cache or
         // store-key work — stored results only ever carry concrete modes.
@@ -743,8 +764,8 @@ export function useEvaluation() {
               if (runRef.current !== runId) return false;
               if (err instanceof Error && err.message === 'cancelled') return false;
               // Reconstruction failed — leave the gap, as the eval path would.
-              paint({ done: index + 1, total: turnList.length });
-              continue;
+              finishTurn();
+              return true;
             }
             if (runRef.current !== runId) return false;
             faintedFractions[turn - 1] = fraction;
@@ -763,8 +784,8 @@ export function useEvaluation() {
         // turn (an explicit deepen, a deeper prior sweep) — every stored
         // field stands and this pass skips the turn entirely.
         if (!supersedesStored(turnSettings[turn - 1], { depth, samples, mode }, configuredMode, faintedFractions[turn - 1])) {
-          paint({ done: index + 1, total: turnList.length });
-          continue;
+          finishTurn();
+          return true;
         }
 
         let hit = cacheRef.current.get(key);
@@ -871,7 +892,10 @@ export function useEvaluation() {
               const client = clientRef.current;
               const keepPlayed = turnPlayed?.p1Slots || turnPlayed?.p2Slots ? turnPlayed : undefined;
               const result = await perfSpan(`evaluate[${mode}-d${depth}s${samples}]`, () =>
-                client.evaluate(serialized, { depth, samples, mode, tera: params.tera, keepPlayed, sleepClause: params.sleepClause }));
+                // exclusive: false — pipelined turns share the pool and
+                // must not cancel each other; the run's own cancel path
+                // still kills them all at once.
+                client.evaluate(serialized, { depth, samples, mode, tera: params.tera, keepPlayed, sleepClause: params.sleepClause }, undefined, { exclusive: false }));
               if (runRef.current !== runId) return false;
               scores[turn - 1] = result.score;
               evalErrors[turn - 1] = null;
@@ -938,8 +962,10 @@ export function useEvaluation() {
             }
           }
         }
-        paint({ done: index + 1, total: turnList.length });
-      }
+        finishTurn();
+        return true;
+      };
+      if (!(await runInLanes(TURN_LANES, turnList.length, index => evalTurn(turnList[index])))) return false;
       paint({ done: turnList.length, total: turnList.length }, true);
       return true;
     };
