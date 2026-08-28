@@ -43,7 +43,7 @@ import {
   classifyDeviation, keptEntries, normalizePosition, sliderMax, variationCovers, variationTip,
   type TimelinePosition, type VariationSpan, type ViewLine,
 } from './lib/timeline';
-import { nextPlayOutStep } from './lib/play-out';
+import { nextPlayOutStep, playOutDoneText } from './lib/play-out';
 
 const TEAM_PASTE_STORAGE_KEY = 'ps-replay-interceptor:team-paste';
 
