@@ -27,7 +27,7 @@ export function EvalGameReport({ report, playerNames, onSelectTurn, leads, setti
         style={{ color: '#667', fontSize: 9 }}
         title={settings.mode === 'mcts'
           ? 'Evaluated with the MCTS engine'
-          : `Evaluated at depth ${settings.depth} · ${settings.samples} sample${settings.samples > 1 ? 's' : ''}${settings.depth === 1 && settings.samples === 1 ? ' (fast scan)' : ''} — deepen from the turn view`}
+          : `Evaluated at depth ${settings.depth} · ${settings.samples} sample${settings.samples > 1 ? 's' : ''}${settings.depth === 1 && settings.samples === 1 ? ' (fast scan)' : ''} · deepen from the turn view`}
       >
         {settings.mode === 'mcts' ? 'MCTS' : `d${settings.depth}`}
       </span>
@@ -47,9 +47,9 @@ export function EvalGameReport({ report, playerNames, onSelectTurn, leads, setti
         <div
           className="ps-eval-analysis-row"
           style={{ fontSize: 10, color: '#aab' }}
-          title="Win-probability loss per graded turn through the Lichess accuracy curve; forced turns excluded. Harmonic + volatility-weighted aggregate — one blunder drags hard."
+          title="Win-probability loss per graded turn through the Lichess accuracy curve; forced turns excluded. Harmonic + volatility-weighted aggregate: one blunder drags hard."
         >
-          accuracy — {playerNames[0]} {report.accuracy.p1 !== null ? `${Math.round(report.accuracy.p1)}%` : '—'}
+          accuracy: {playerNames[0]} {report.accuracy.p1 !== null ? `${Math.round(report.accuracy.p1)}%` : '—'}
           {' · '}{playerNames[1]} {report.accuracy.p2 !== null ? `${Math.round(report.accuracy.p2)}%` : '—'}
         </div>
       )}
@@ -90,9 +90,9 @@ export function EvalGameReport({ report, playerNames, onSelectTurn, leads, setti
                 className="ps-btn ps-eval-report-moment"
                 onClick={() => onSelectTurn?.(misplay.turn)}
                 title={misplay.sacrifice
-                  ? 'A body was fed deliberately — a sack (nearly dead, or simplifying a won position), not a misplay'
+                  ? 'A deliberate feed: a sack (nearly dead, or simplifying a won position) rather than a misplay'
                   : misplay.riskUnpunished
-                    ? "The engine's floor priced in a reply that never came — jump to this turn's analysis"
+                    ? "The engine's floor priced in a reply that never came. Jump to this turn's analysis"
                     : "Jump to this turn's analysis"}
               >
                 <span style={{ color: '#cde' }}>T{misplay.turn}</span>
@@ -105,7 +105,7 @@ export function EvalGameReport({ report, playerNames, onSelectTurn, leads, setti
                     ? <span style={{ color: tone }}>risk (unpunished)</span>
                     : (
                       <span style={{ color: '#778' }}>
-                        {misplay.tier === 'blunder' ? 'blunder — better: ' : 'better: '}{misplay.better}
+                        {misplay.tier === 'blunder' ? 'blunder · better: ' : 'better: '}{misplay.better}
                       </span>
                     )}
                 <span style={{ color: tone }}>{winDeltaText(-misplay.regret)}</span>
@@ -129,7 +129,7 @@ export function EvalGameReport({ report, playerNames, onSelectTurn, leads, setti
               type="button"
               className="ps-btn ps-eval-report-moment"
               onClick={() => onSelectTurn?.(read.turn)}
-              title="A risk whose read won value — jump to this turn's analysis"
+              title="A risk whose read won value. Jump to this turn's analysis"
             >
               <span style={{ color: '#cde' }}>T{read.turn}</span>
               {settingsBadge(read.turn)}

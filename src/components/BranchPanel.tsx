@@ -113,7 +113,7 @@ function MoveBtn({ move, dmg, spreadDamage, zMoveName, targetDamage, pendingChoi
         style={{ background: bg }}
       >
         <div className="ps-movebtn-name">{move.name}</div>
-        {wasPlayed && <span className="ps-played-badge" title="This is what was actually played at this position on the line you are viewing.">played</span>}
+        {wasPlayed && <span className="ps-played-badge" title="The action played at this position on the line you are viewing.">played</span>}
         {zMoveName && (
           <div className="ps-movebtn-zmove">→ {zMoveName}</div>
         )}
@@ -191,7 +191,7 @@ function SwitchBtn({ sw, selected, disabled, disabledReason, wasPlayed, onClick 
       <div>
         <div className="ps-switchbtn-name">
           {sw.name}
-          {wasPlayed && <span className="ps-played-badge" title="This is what was actually played at this position on the line you are viewing.">played</span>}
+          {wasPlayed && <span className="ps-played-badge" title="The action played at this position on the line you are viewing.">played</span>}
         </div>
         <div style={{ width: 60 }}>
           <div className="ps-hpbar-track" style={{ height: 4, marginTop: 2 }}>
@@ -289,7 +289,7 @@ function SideControls({ side, label, activeName, activeSpecies, activeFainted, m
         {playedText && !pending && (
           <span
             style={{ marginLeft: 6, fontSize: 10, color: '#b8c9e0' }}
-            title="What this side actually did at this position on the line you are viewing."
+            title="What this side played at this position on the line you are viewing."
           >
             played: <strong>{playedText}</strong>
           </span>
@@ -300,7 +300,7 @@ function SideControls({ side, label, activeName, activeSpecies, activeFainted, m
         <div className="ps-force-switch-note">
           {activeFainted
             ? `${activeName} fainted! Choose who to send in:`
-            : `${activeName} is switching out — choose who to send in:`}
+            : `${activeName} is switching out. Choose who to send in:`}
         </div>
       )}
 
@@ -725,8 +725,8 @@ export function BranchPanel({ simState, source, acquiringExact, executeError, ex
         {source === 'snapshot' && (
           <span>
             {acquiringExact
-              ? 'Choices approximated — reconstructing the exact position…'
-              : 'Choices approximated from the replay — the sim checks legality when you play a move'}
+              ? 'Choices approximated · reconstructing the exact position…'
+              : 'Choices approximated from the replay; the sim checks legality when you play a move'}
           </span>
         )}
         <span style={{ flex: 1 }} />

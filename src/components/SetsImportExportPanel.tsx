@@ -82,7 +82,7 @@ export function SetsImportExportPanel({ exportText, onImport, onClose }: Props) 
         </div>
         <div style={{ fontSize: 10, color: '#8899aa', marginBottom: 8 }}>
           Both teams in Showdown export format under "=== p1 ===" / "=== p2 ===" headers.
-          Edit the text (or paste the real sets) and import — imported values show as green
+          Edit the text (or paste the real sets) and import; imported values show as green
           manual data and are remembered for this replay.
         </div>
         <textarea

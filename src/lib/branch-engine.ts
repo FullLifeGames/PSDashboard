@@ -1830,7 +1830,7 @@ export function validateBranchRuntime(runtime: BranchRuntime): string | null {
   }
 
   if (hasStaleForcedSwitchRequest(battle)) {
-    return 'The simulator demands a switch that no longer matches the battle state — the reconstruction diverged at this turn. Try a nearby turn.';
+    return 'The simulator demands a switch that no longer matches the battle state: the reconstruction diverged at this turn. Try a nearby turn.';
   }
 
   for (const side of battle.sides) {
@@ -1838,7 +1838,7 @@ export function validateBranchRuntime(runtime: BranchRuntime): string | null {
     if (!needsSwitch) continue;
     const hasBench = side.pokemon.some(pokemon => !pokemon.isActive && !pokemon.fainted);
     if (!hasBench) {
-      return `${side.name} must switch but has no healthy Pokémon left to send in — the reconstruction diverged at this turn. Try a nearby turn.`;
+      return `${side.name} must switch but has no healthy Pokémon left to send in: the reconstruction diverged at this turn. Try a nearby turn.`;
     }
   }
 

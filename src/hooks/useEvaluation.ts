@@ -141,12 +141,12 @@ export function coverageNotice(positions: (string | null)[]): string | null {
   const covered = positions.filter(Boolean).length;
   if (total === 0 || covered === total) return null;
   if (covered === 0) {
-    return 'The replay could not be reconstructed from the guessed sets — no turn has a live position to analyze. Correcting items/moves via Edit Player/Opp usually fixes it.';
+    return 'The replay could not be reconstructed from the guessed sets: no turn has a live position to analyze. Correcting items/moves via Edit Player/Opp is the common fix.';
   }
   if (covered === total - 1 && positions[total - 1] === null) {
-    return "The simulated replay reached the game's end one turn early, so the real game's final turn has no live position to analyze — the rest of the line is unaffected.";
+    return "The simulated replay reached the game's end one turn early, so the real game's final turn has no live position to analyze; the rest of the line is unaffected.";
   }
-  return `The reconstruction diverged from the real game: ${covered} of ${total} turns could be reconstructed for analysis. Correcting items/moves via Edit Player/Opp usually fixes it.`;
+  return `The reconstruction diverged from the real game: ${covered} of ${total} turns could be reconstructed for analysis. Correcting items/moves via Edit Player/Opp is the common fix.`;
 }
 
 /**

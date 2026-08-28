@@ -126,12 +126,12 @@ export function ReplayLoader({ onLoad, onLoadFile, onTeamLoad, loading, error, l
           <div className="ps-guide-step">
             <span>1</span>
             <strong>Find the decision point</strong>
-            <small>Scrub the timeline to any turn — the move pickers are always there.</small>
+            <small>Scrub the timeline to any turn; the move pickers are always there.</small>
           </div>
           <div className="ps-guide-step">
             <span>2</span>
             <strong>Play a different move</strong>
-            <small>Pick for both sides (the played move is marked) — a gold variation branches off, like in a chess engine.</small>
+            <small>Pick for both sides (the played move is marked) and a gold variation branches off, like in a chess engine.</small>
           </div>
           <div className="ps-guide-step">
             <span>3</span>
@@ -155,7 +155,7 @@ export function ReplayLoader({ onLoad, onLoadFile, onTeamLoad, loading, error, l
               onTeamLoad(parseTeamText(teamText));
             }
           }}
-          placeholder="Paste PS team export here (supports German stat names) — Ctrl+Enter saves"
+          placeholder="Paste PS team export here (supports German stat names). Ctrl+Enter saves"
           rows={6}
           className="ps-input"
           style={{ width: '100%', marginTop: 6, fontFamily: 'Consolas, monospace', fontSize: 11, resize: 'vertical' }}

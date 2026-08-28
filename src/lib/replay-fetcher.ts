@@ -44,7 +44,7 @@ async function requestReplay(url: string): Promise<Response | null> {
 function describeFailure(id: string, status: number | null): string {
   const base = status !== null
     ? `Replay "${id}" was not found (HTTP ${status}).`
-    : `Could not load "${id}" — the replay does not exist or the network request failed.`;
+    : `Could not load "${id}": the replay does not exist or the network request failed.`;
 
   // A password suffix says the link is a private replay, where "not found" has
   // its own specific causes — an incomplete copy of the link, a rotated
@@ -130,7 +130,7 @@ export async function fetchReplay(urlOrId: string): Promise<ReplayData> {
 
   if (data) {
     throw new Error(
-      `Replay "${id}" came back without a battle log — the replay server has a record for it but no replayable battle.`,
+      `Replay "${id}" came back without a battle log: the replay server has a record for it but no replayable battle.`,
     );
   }
   throw new Error(describeFailure(id, jsonRes && !jsonRes.ok ? jsonRes.status : null));

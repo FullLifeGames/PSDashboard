@@ -62,7 +62,7 @@ export function EvalMatrixView({ matrix, playerNames, onPickPair }: EvalMatrixVi
                   {playerNames[0]} \ {playerNames[1]}
                 </th>
                 {matrix.p2Labels.map((label, j) => (
-                  <th key={`c${j}`} style={headerStyle} title={`${playerNames[1]}: ${label} — equilibrium weight ${Math.round((matrix.mixes.p2[j] ?? 0) * 100)}%`}>
+                  <th key={`c${j}`} style={headerStyle} title={`${playerNames[1]}: ${label} · equilibrium weight ${Math.round((matrix.mixes.p2[j] ?? 0) * 100)}%`}>
                     {label}
                     <span style={{ color: '#778' }}>{mixBadge(matrix.mixes.p2[j])}</span>
                   </th>
@@ -72,13 +72,13 @@ export function EvalMatrixView({ matrix, playerNames, onPickPair }: EvalMatrixVi
             <tbody>
               {matrix.values.map((row, i) => (
                 <tr key={`r${i}`}>
-                  <th style={headerStyle} title={`${playerNames[0]}: ${matrix.p1Labels[i]} — equilibrium weight ${Math.round((matrix.mixes.p1[i] ?? 0) * 100)}%`}>
+                  <th style={headerStyle} title={`${playerNames[0]}: ${matrix.p1Labels[i]} · equilibrium weight ${Math.round((matrix.mixes.p1[i] ?? 0) * 100)}%`}>
                     {matrix.p1Labels[i]}
                     <span style={{ color: '#778' }}>{mixBadge(matrix.mixes.p1[i])}</span>
                   </th>
                   {row.map((value, j) => {
                     const pct = winPercent(value);
-                    const title = `${matrix.p1Labels[i]} × ${matrix.p2Labels[j]} — ` +
+                    const title = `${matrix.p1Labels[i]} × ${matrix.p2Labels[j]}: ` +
                       `${playerNames[0]} ${pct}% · ${playerNames[1]} ${100 - pct}%` +
                       (clickable ? '. Click to play exactly this pair out.' : '');
                     const cellStyle: React.CSSProperties = {

@@ -78,7 +78,7 @@ export function BranchHistoryPanel({ branchStartTurn, history, snapshots, curren
         Variation moves
         {onNavigate && history.length > 0 && (
           <span style={{ fontWeight: 'normal', fontSize: 10, color: '#8899aa', marginLeft: 8 }}>
-            click a cell to jump — left opens the main line, right the variation
+            click a cell to jump: left opens the main line, right the variation
           </span>
         )}
       </div>
@@ -105,7 +105,7 @@ export function BranchHistoryPanel({ branchStartTurn, history, snapshots, curren
                     color: '#9fb5d9',
                   }}
                 >
-                  Turn {entry.turnNumber} — forced replacement ({entry.forcedSide?.toUpperCase()}): {forcedChoice}
+                  Turn {entry.turnNumber} · forced replacement ({entry.forcedSide?.toUpperCase()}): {forcedChoice}
                 </div>
               );
             }
@@ -185,7 +185,7 @@ export function BranchHistoryPanel({ branchStartTurn, history, snapshots, curren
               background: 'rgba(240,199,107,0.06)',
             }}
           >
-            Tip of the variation — continue playing here
+            Tip of the variation: continue playing here
           </button>
         )}
       </div>

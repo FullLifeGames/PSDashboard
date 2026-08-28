@@ -34,7 +34,7 @@ export function nextPlayOutStep(result: EvalResult, battleEnded: boolean, execut
 /** Human sentence for why a play-out ended (shown in the panel notice). */
 export function playOutDoneText(reason: 'ended' | 'cap' | 'no-choices', executed: number): string {
   const turns = `${executed} turn${executed === 1 ? '' : 's'}`;
-  if (reason === 'ended') return `Play-out finished — the battle ended after ${turns}.`;
+  if (reason === 'ended') return `Play-out finished: the battle ended after ${turns}.`;
   if (reason === 'cap') return `Play-out stopped at the ${PLAY_OUT_CAP}-turn safety cap (${turns} played).`;
-  return `Play-out stopped after ${turns} — the engine offered no playable choice.`;
+  return `Play-out stopped after ${turns}: the engine offered no playable choice.`;
 }

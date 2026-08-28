@@ -159,11 +159,11 @@ export function EvalGraph({ scores, playerNames, currentTurn, currentLine, onSel
   // click felt like landing one node back) — the tooltip names the producer
   // and the selection glow shows the clicked turn's own movement.
   const label = (turn: number, score: number) => {
-    const swing = blunders.has(turn) ? ' — blunder swing' : '';
+    const swing = blunders.has(turn) ? ' · blunder swing' : '';
     const producer = turn - 1 >= first ? (turn - 1 === 0 ? 'the lead decision' : `turn ${turn - 1}`) : null;
     const arrival = producer ? ` (what ${producer} produced)` : '';
     const state = decided?.[turn - 1];
-    const decidedNote = state ? ` — practically decided: ${state.species}` : '';
+    const decidedNote = state ? ` · practically decided: ${state.species}` : '';
     return `Before turn ${turn}${arrival}: ${playerNames[0]} ${pct(score)}% · ${playerNames[1]} ${100 - pct(score)}%${swing}${decidedNote}`;
   };
 
@@ -293,8 +293,8 @@ export function EvalGraph({ scores, playerNames, currentTurn, currentLine, onSel
               the turn view then offers "Analyze this position". */}
           <title>{score === null
             ? (evalErrors?.[index]
-              ? `Turn ${index + 1} — could not be evaluated: ${evalErrors[index]} · click to open`
-              : `Turn ${index + 1} — not analyzed yet · click to open, then Analyze this position`)
+              ? `Turn ${index + 1} · could not be evaluated: ${evalErrors[index]} · click to open`
+              : `Turn ${index + 1} · not analyzed yet · click to open, then Analyze this position`)
             : label(index + 1, score)}</title>
         </rect>
       ))}

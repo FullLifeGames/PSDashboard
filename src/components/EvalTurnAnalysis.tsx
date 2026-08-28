@@ -43,7 +43,7 @@ function ExplorableLabel({ label, color = '#cde', onClick }: { label: string; co
 const RISK_DISPLAY_GAP = TIER_THRESHOLDS.mistake;
 /** Tooltip for a side's own EV percentages. */
 const evTitle = (name: string) =>
-  `${name}'s win probability with this choice against balanced play — higher is always better for ${name}.`;
+  `${name}'s win probability with this choice against balanced play; higher is better for ${name}.`;
 /** Played-vs-engine EV gaps under this are display noise — the picks are equivalent. */
 const ENGINE_EQUIVALENT_EPSILON = 0.01;
 
@@ -103,7 +103,7 @@ function KoSuffix({ odds }: { odds?: { accuracy: number; killFraction: number } 
   return (
     <span
       style={{ color: '#778' }}
-      title={`${Math.round(odds.accuracy * 100)}% to hit × ${Math.round(odds.killFraction * 100)}% of damage rolls KO — analytic odds vs the standing active.`}
+      title={`${Math.round(odds.accuracy * 100)}% to hit × ${Math.round(odds.killFraction * 100)}% of damage rolls KO · analytic odds vs the standing active.`}
     >
       · {pct}% KO
     </span>
@@ -112,13 +112,13 @@ function KoSuffix({ odds }: { odds?: { accuracy: number; killFraction: number } 
 
 function preventedText(reason: string): string {
   if (reason === 'faint') return 'fainted before its action came out';
-  if (reason === 'slp') return 'slept through the turn — the chosen action never surfaced';
-  if (reason === 'frz') return 'stayed frozen — the chosen action never surfaced';
-  if (reason === 'par') return 'was fully paralyzed — the chosen action never surfaced';
-  if (reason === 'flinch') return 'flinched — the chosen action never surfaced';
+  if (reason === 'slp') return 'slept through the turn: the chosen action never surfaced';
+  if (reason === 'frz') return 'stayed frozen: the chosen action never surfaced';
+  if (reason === 'par') return 'was fully paralyzed: the chosen action never surfaced';
+  if (reason === 'flinch') return 'flinched: the chosen action never surfaced';
   if (reason === 'recharge') return 'had to recharge';
-  if (reason.startsWith('move: ')) return `was blocked by ${reason.slice('move: '.length)} — the chosen action never surfaced`;
-  return `was prevented (${reason}) — the chosen action never surfaced`;
+  if (reason.startsWith('move: ')) return `was blocked by ${reason.slice('move: '.length)}: the chosen action never surfaced`;
+  return `was prevented (${reason}): the chosen action never surfaced`;
 }
 
 function SideRow({ name, side, onExplore }: { name: string; side: SideAnalysis; onExplore?: (choice: RankedChoice) => void }) {
@@ -133,9 +133,9 @@ function SideRow({ name, side, onExplore }: { name: string; side: SideAnalysis; 
   const playedText = side.played
     ? `${side.played.label} (${winPctText(side.played.ev)})`
     : slotText
-      ? `${slotText} — not among the engine's candidates`
+      ? `${slotText} (not among the engine's candidates)`
       : side.playedRaw
-        ? `${playedRawName} — not among the engine's options`
+        ? `${playedRawName} (not among the engine's options)`
         : side.prevented
           ? preventedText(side.prevented)
           : 'choice never surfaced';
@@ -152,7 +152,7 @@ function SideRow({ name, side, onExplore }: { name: string; side: SideAnalysis; 
         {playedGamble && side.played && (
           <span
             style={{ color: '#778' }}
-            title={`If the opponent had picked the most punishing reply, ${name} would have fallen to this win probability — a worst case, not the expected outcome.`}
+            title={`If the opponent had picked the most punishing reply, ${name} would have fallen to this win probability: a worst case, not the expected outcome.`}
           >
             · risked {winPctText(side.played.worstCase)}{side.played.punishedBy ? ` vs ${side.played.punishedBy}` : ''}
           </span>
@@ -160,7 +160,7 @@ function SideRow({ name, side, onExplore }: { name: string; side: SideAnalysis; 
         {side.playedPartial && (
           <span
             style={{ color: '#778' }}
-            title="One slot's choice was never visible (flinched or asleep) — graded charitably against the best combo the observed action allows."
+            title="One slot's choice was never visible (flinched or asleep); graded in the player's favor against the best combo the observed action allows."
           >
             · partner unseen
           </span>
@@ -177,7 +177,7 @@ function SideRow({ name, side, onExplore }: { name: string; side: SideAnalysis; 
             engine: <ExplorableLabel label={side.best.label} color="#778" onClick={onExplore && (() => onExplore(side.best!))} />
             {' '}({winPctText(side.best.ev)})
             {side.best.ev - side.played.ev < ENGINE_EQUIVALENT_EPSILON && (
-              <span title="The win-probability gap is inside noise — the engine considers both picks equally good."> · equivalent</span>
+              <span title="The win-probability gap is inside noise: the engine considers both picks equally good."> · equivalent</span>
             )}
           </span>
         )}
@@ -199,8 +199,8 @@ function SideRow({ name, side, onExplore }: { name: string; side: SideAnalysis; 
           <span
             style={{ color: '#9aa5b1' }}
             title={side.sacrifice.healthy
-              ? 'A healthy body was fed while the engine stayed decisively ahead on both sides of the sack — simplification, not graded as a misplay.'
-              : 'A nearly-dead Pokémon was fed deliberately — a low-cost sack, not graded as a misplay.'}
+              ? 'A healthy body was fed while the engine stayed decisively ahead on both sides of the sack: simplification, not graded as a misplay.'
+              : 'A nearly-dead Pokémon was fed on purpose: a low-cost sack, not graded as a misplay.'}
           >
             · sacked {side.sacrifice.name} ({Math.round(side.sacrifice.hpFraction * 100)}% HP)
           </span>
@@ -208,7 +208,7 @@ function SideRow({ name, side, onExplore }: { name: string; side: SideAnalysis; 
         {side.riskPaidOff && !side.sacrifice && (
           <span
             style={{ color: '#8c8' }}
-            title={`The safe line guaranteed ${side.safe ? winPctText(side.safe.worstCase) : '?'}; the actual pair came out ${winDeltaText(side.riskPayoff ?? 0)} better — the read won value.`}
+            title={`The safe line guaranteed ${side.safe ? winPctText(side.safe.worstCase) : '?'}; the actual pair came out ${winDeltaText(side.riskPayoff ?? 0)} better: the read won value.`}
           >
             read paid off · {winDeltaText(side.riskPayoff ?? 0)}
           </span>
@@ -216,14 +216,14 @@ function SideRow({ name, side, onExplore }: { name: string; side: SideAnalysis; 
         {regretful && !side.sacrifice && side.regret !== null && !side.riskPaidOff && (setupMove ? (
           <span
             style={{ color: '#b6a46a' }}
-            title={`${setupMove} is a setup move — its payoff lies past the search horizon, so the regret may be overstated.`}
+            title={`${setupMove} is a setup move: its payoff lies past the search horizon, so the regret may be overstated.`}
           >
             {winDeltaText(-side.regret)} regret · setup caveat
           </span>
         ) : side.riskUnpunished ? (
           <span
             style={{ color: '#b6a46a' }}
-            title={`The floor assumes ${side.played?.punishedBy ?? 'the punishing reply'} — the opponent chose differently, so the read came true.`}
+            title={`The floor assumes ${side.played?.punishedBy ?? 'the punishing reply'}; the opponent chose differently, so the read came true.`}
           >
             {winDeltaText(-side.regret)} regret · risk unpunished
           </span>
@@ -235,7 +235,7 @@ function SideRow({ name, side, onExplore }: { name: string; side: SideAnalysis; 
         {side.tier === 'inaccuracy' && side.best && (
           <span
             style={{ color: '#b6a46a' }}
-            title={`${side.best.label} was slightly better — a minor imprecision, not a mistake.`}
+            title={`${side.best.label} was a touch better: a minor imprecision, not a mistake.`}
           >
             · inaccuracy ({winDeltaText(-(side.regret ?? 0))})
           </span>
@@ -349,7 +349,7 @@ export function EvalTurnAnalysis({ analysis, playerNames, reads, onExplore }: Ev
             key={`read-${side}`}
             className="ps-eval-analysis-row"
             style={{ color: '#7da7d9' }}
-            title={'Exploitative line: the best response to how the opponent actually plays — ' +
+            title={'Exploitative line: the best response to the opponent\'s observed play, ' +
               'refutable by their perfect reply, priced by its spread. Advisory only; the grades above stay equilibrium-based.'}
           >
             <span style={{ fontWeight: 'bold' }}>{playerNames[side === 'p1' ? 0 : 1]}</span>
@@ -379,12 +379,12 @@ function LeadRow({ name, side }: { name: string; side: LeadSideAnalysis }) {
         )}
         {bad && side.best && (
           <span style={{ color: side.tier === 'blunder' ? '#ff7a7a' : '#f3a6a6' }}>
-            {side.tier} · {winDeltaText(-(side.regret ?? 0))} — better: {stripLead(side.best.label)} ({winPctText(side.best.ev)})
+            {side.tier} · {winDeltaText(-(side.regret ?? 0))} · better: {stripLead(side.best.label)} ({winPctText(side.best.ev)})
           </span>
         )}
         {side.tier === 'inaccuracy' && side.best && (
           <span style={{ color: '#b6a46a' }}>
-            · inaccuracy ({winDeltaText(-(side.regret ?? 0))}) — {stripLead(side.best.label)} was slightly better
+            · inaccuracy ({winDeltaText(-(side.regret ?? 0))}): {stripLead(side.best.label)} was a touch better
           </span>
         )}
         {!side.tier && side.played && side.best && side.played.choice !== side.best.choice && (

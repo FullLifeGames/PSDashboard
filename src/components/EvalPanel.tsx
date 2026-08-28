@@ -88,7 +88,7 @@ function ChoiceList({
         // and the punishing reply live in the tooltip.
         const evPct = winPercent(choice.ev);
         const gap = best ? choice.ev - best.ev : 0;
-        const tooltip = `Win probability ${evPct}% vs balanced play — higher is better for this side` +
+        const tooltip = `Win probability ${evPct}% vs balanced play; higher is better for this side` +
           ` · guaranteed at least ${winPercent(choice.worstCase)}%` +
           (choice.punishedBy ? ` (worst reply: ${choice.punishedBy})` : '') +
           '. Choices are ranked by their value against balanced play.' +
@@ -156,8 +156,8 @@ export function EvalPanel({
       disabled={graph.running || smogonPending}
       onClick={onThinkDeeper}
       title={smogonPending
-        ? 'Waiting for Smogon data — searching now would build the teams without the guessed sets.'
-        : 'Re-search this position (and its follow-up turn) at the named settings — the score, ranked moves, matrix, graph, and report update together.'}
+        ? 'Waiting for Smogon data: searching now would build the teams without the guessed sets.'
+        : 'Re-search this position (and its follow-up turn) at the named settings. The score, ranked moves, matrix, graph, and report update together.'}
       style={{ padding: '1px 6px', fontSize: 10 }}
     >
       {result ? 'Think deeper about this position' : 'Analyze this position'}
@@ -191,7 +191,7 @@ export function EvalPanel({
     <div className="ps-panel ps-eval-panel">
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', marginBottom: 6 }}>
         <span style={{ fontSize: 13, fontWeight: 'bold' }}>Evaluation</span>
-        <span style={{ fontSize: 10, color: '#778' }}>estimate — sim search, not an oracle</span>
+        <span style={{ fontSize: 10, color: '#778' }}>estimate from a sim search, no oracle</span>
         <span style={{ flex: 1 }} />
         <label style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 10, color: '#aabbcc' }}>
           Depth
@@ -203,7 +203,7 @@ export function EvalPanel({
               else onPrefsChange({ ...prefs, mode: 'matrix', depth: parseInt(value, 10) as EvalPreferences['depth'] });
             }}
             disabled={running}
-            title="Auto routes each turn by its position: fast matrix search while boards are full, the MCTS tree once enough Pokémon have fainted — the measured-best line configuration."
+            title="Auto routes each turn by its position: fast matrix search while boards are full, the MCTS tree once enough Pokémon have fainted; the measured-best line configuration."
           >
             <option value="1">1</option>
             <option value="2">2</option>
@@ -213,7 +213,7 @@ export function EvalPanel({
         </label>
         {prefs.mode === 'matrix' && (
           <label
-            title="Damage-roll seeds averaged per cell. Only affects cells where a KO is in range — quiet cells are roll-insensitive and always simulate once."
+            title="Damage-roll seeds averaged per cell. Only affects cells where a KO is in range; quiet cells are roll-insensitive and always simulate once."
             style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 10, color: '#aabbcc' }}
           >
             Samples
@@ -230,7 +230,7 @@ export function EvalPanel({
         )}
         {showTera && (
           <label
-            title="Auto: off when the game never terastallized; in draft/custom formats only the Pokémon that actually did keep the option. Revealed: force that per-Pokémon restriction for any format."
+            title="Auto: off when the game never terastallized; in draft/custom formats only the Pokémon that terastallized keep the option. Revealed: force that per-Pokémon restriction for any format."
             style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 10, color: '#aabbcc' }}
           >
             Tera
@@ -289,7 +289,7 @@ export function EvalPanel({
       )}
       {status === 'stale' && (
         <div style={{ fontSize: 11, color: '#b6a46a', marginBottom: 4 }}>
-          Position changed — re-evaluate.
+          Position changed; re-evaluate.
         </div>
       )}
 
@@ -314,8 +314,8 @@ export function EvalPanel({
                   onClick={onAnalyzeGame}
                   disabled={running || smogonPending}
                   title={smogonPending
-                    ? 'Waiting for Smogon data — a sweep started now would build the teams without the guessed sets.'
-                    : "Evaluate every turn of the game in the background — the line dips where the game swung. The selected turn's analysis, ranked choices, and matrix follow automatically."}
+                    ? 'Waiting for Smogon data: a sweep started now would build the teams without the guessed sets.'
+                    : "Evaluate every turn of the game in the background; the line dips where the game swung. The selected turn's analysis, ranked choices, and matrix follow automatically."}
                   style={{ padding: '1px 6px', fontSize: 10 }}
                 >
                   {hasGraph ? 'Re-analyze' : 'Analyze game'}
@@ -325,7 +325,7 @@ export function EvalPanel({
           </div>
           <div
             style={{ fontSize: 10, color: '#778', marginTop: 2 }}
-            title="Analyze game paints the whole line with a fast depth-1 scan first, then converges every turn to the settings above — report-worthy swings first. Any turn can go deeper still from its view (Think deeper); Tera applies everywhere."
+            title="Analyze game paints the whole line with a fast depth-1 scan first, then converges every turn to the settings above, report-worthy swings first. Any turn can go deeper still from its view (Think deeper); Tera applies everywhere."
           >
             line: fast scan, then {prefs.mode === 'mcts' ? 'MCTS'
               : prefs.mode === 'auto' ? 'auto (matrix early, MCTS late)'
@@ -354,12 +354,12 @@ export function EvalPanel({
           )}
           {!hasGraph && variation && (
             <div style={{ fontSize: 10, color: '#778', marginTop: 2 }}>
-              Gold = your variation. The main line has no curve yet — Analyze game fills it for comparison.
+              Gold = your variation. The main line has no curve yet; Analyze game fills it for comparison.
             </div>
           )}
           {hasGraph && (showReportView || !analysis) && (
             <div style={{ fontSize: 10, color: '#778', marginTop: 2 }}>
-              Click a point for that turn's analysis — its movement lights up on the line.
+              Click a point for that turn's analysis; its movement lights up on the line.
             </div>
           )}
           {showReportView && report && (
@@ -425,7 +425,7 @@ export function EvalPanel({
                 : `depth ${result.depthCompleted}`}
             </span>
             {result.interval > 0.25 && (
-              <span style={{ color: '#b6a46a' }} title="No safe line exists — the outcome hinges on out-predicting the opponent.">
+              <span style={{ color: '#b6a46a' }} title="No safe line exists: the outcome hinges on out-predicting the opponent.">
                 toss-up: prediction battle
               </span>
             )}

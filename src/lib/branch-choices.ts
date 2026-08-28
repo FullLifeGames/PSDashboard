@@ -122,7 +122,7 @@ function resolveCustomMove(
     const slot = parseInt(nameOrSlot, 10);
     move = moves.find(candidate => candidate.slot === slot);
     if (!move) {
-      return { ok: false, error: `No move in slot ${slot} — this Pokémon has ${moves.length} move${moves.length === 1 ? '' : 's'}.` };
+      return { ok: false, error: `No move in slot ${slot}: this Pokémon has ${moves.length} move${moves.length === 1 ? '' : 's'}.` };
     }
   } else {
     const id = choiceId(nameOrSlot);

@@ -143,7 +143,7 @@ export function ComboBox({
             ))}
             {filtered.length > MAX_VISIBLE_OPTIONS && (
               <li className="ps-combobox-option ps-combobox-more" aria-hidden="true">
-                …{filtered.length - MAX_VISIBLE_OPTIONS} more — keep typing
+                …{filtered.length - MAX_VISIBLE_OPTIONS} more; keep typing
               </li>
             )}
           </ul>

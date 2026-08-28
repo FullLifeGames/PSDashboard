@@ -35,7 +35,7 @@ test('a waiting side is not a playable choice — the forced side steps alone', 
 });
 
 test('done reasons read as sentences', () => {
-  expect(playOutDoneText('ended', 1)).toBe('Play-out finished — the battle ended after 1 turn.');
+  expect(playOutDoneText('ended', 1)).toBe('Play-out finished: the battle ended after 1 turn.');
   expect(playOutDoneText('cap', PLAY_OUT_CAP)).toContain('safety cap');
   expect(playOutDoneText('no-choices', 3)).toContain('no playable choice');
 });

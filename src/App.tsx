@@ -369,7 +369,7 @@ function App() {
     // showing "Team loaded" for garbage input (G15).
     const sets = parsePastedTeam(processed);
     if (sets.length === 0) {
-      setTeamPasteError('Could not read any Pokémon sets from the paste — expected the Showdown export format.');
+      setTeamPasteError('Could not read any Pokémon sets from the paste: expected the Showdown export format.');
       return;
     }
 
@@ -563,12 +563,12 @@ function App() {
           const branchBattle = getBattle();
           if (branchBattle?.ended) {
             setBranchDivergence('The simulated replay diverged from the real game and already ended' +
-              `${branchBattle.winner ? ` (${branchBattle.winner} won the simulated line)` : ''} — ` +
+              `${branchBattle.winner ? ` (${branchBattle.winner} won the simulated line)` : ''}: ` +
               'the guessed sets could not reproduce this position. Recommendations cannot be played out here; ' +
-              'correcting items/moves via Edit Player/Opp usually fixes the divergence.');
+              'correcting items/moves via Edit Player/Opp is the common fix.');
           } else if (branchBattle && branchBattle.turn < startTurn) {
             setBranchDivergence(`The simulated replay wedged at turn ${branchBattle.turn} on the way to ` +
-              `turn ${startTurn} — the guessed sets diverge from the real game before this position.`);
+              `turn ${startTurn}: the guessed sets diverge from the real game before this position.`);
           } else {
             setBranchDivergence(null);
           }
@@ -595,7 +595,7 @@ function App() {
     // The end snapshot is the post-battle sentinel, not a playable turn —
     // the old Branch-Here button was disabled here (B10/B12/G23).
     if (position.line === 'main' && endSnapshotTurn !== null && position.turn >= endSnapshotTurn) {
-      setBranchDivergence('The battle is already over at the end position — pick an earlier turn to play from.');
+      setBranchDivergence('The battle is already over at the end position: pick an earlier turn to play from.');
       return;
     }
     const kind = classifyDeviation(variationSpan, position);
@@ -613,7 +613,7 @@ function App() {
     if (kind === 'replace' && variationSpan) {
       const turnCount = variationSpan.length;
       setPendingConfirm({
-        message: `You are on the main line (turn ${position.turn}) — replace the existing variation ` +
+        message: `You are on the main line (turn ${position.turn}): replace the existing variation ` +
           `from turn ${variationSpan.startTurn} (${turnCount} ${turnCount === 1 ? 'turn' : 'turns'})?`,
         proceed: () => { setPendingConfirm(null); run(); },
       });
@@ -874,7 +874,7 @@ function App() {
       // decided ±1.00 — the "think deeper dropped the position to 100%"
       // report. Fail loudly instead of publishing a phantom number.
       if (!branchEngine.reconstructionReached(runtime, turn)) {
-        throw new Error(`The reconstruction diverged before turn ${turn} — the guessed sets could not reproduce this position. Correcting items/moves via Edit Player/Opp usually fixes it.`);
+        throw new Error(`The reconstruction diverged before turn ${turn}: the guessed sets could not reproduce this position. Correcting items/moves via Edit Player/Opp is the common fix.`);
       }
       const serialized = serializeLiveBattle(battle);
       storeExactPosition(turn, serialized);
@@ -945,7 +945,7 @@ function App() {
       const finalBattle = runtime.battleStream.battle;
       if (finalBattle?.ended && finalBattle.turn < turns) {
         onDiagnostic?.(
-          `The simulated battle ended at turn ${finalBattle.turn} although the real game continued — ` +
+          `The simulated battle ended at turn ${finalBattle.turn} although the real game continued: ` +
           `no candidate seed avoided the divergence, so later turns have no positions.`,
         );
       }
@@ -1136,7 +1136,7 @@ function App() {
     // divergence notice instead of letting the sim reject confusingly.
     if (getBattle()?.ended) {
       setBranchDivergence(previous => previous ??
-        'The simulated replay already ended — recommendations cannot be played out in this diverged line.');
+        'The simulated replay already ended; recommendations cannot be played out in this diverged line.');
       return;
     }
     if (!applyEvalChoice(side, ranked)) return;
@@ -1238,7 +1238,7 @@ function App() {
 
   const stopPlayOut = useCallback(() => {
     if (playOut) {
-      finishPlayOut(playOut, `Play-out stopped — ${playOut.executed} turn${playOut.executed === 1 ? '' : 's'} played (they stay in the variation).`, false);
+      finishPlayOut(playOut, `Play-out stopped: ${playOut.executed} turn${playOut.executed === 1 ? '' : 's'} played (they stay in the variation).`, false);
     }
   }, [playOut, finishPlayOut]);
 
@@ -1257,7 +1257,7 @@ function App() {
     }
     if (step.kind === 'pair') {
       if (!applyEvalChoice('p1', step.p1) || !applyEvalChoice('p2', step.p2)) {
-        finishPlayOut(playOut, `Play-out stopped after ${playOut.executed} turn${playOut.executed === 1 ? '' : 's'} — the engine's choice was not playable at this position.`, false);
+        finishPlayOut(playOut, `Play-out stopped after ${playOut.executed} turn${playOut.executed === 1 ? '' : 's'}: the engine's choice was not playable at this position.`, false);
         return;
       }
       setPlayOut({ ...playOut, executed: playOut.executed + 1 });
@@ -1267,7 +1267,7 @@ function App() {
     // Single (forced) side: setChoice auto-executes forced replacements and
     // the auto pref re-evaluates once the entry lands.
     if (!applyEvalChoice(step.side, step.choice)) {
-      finishPlayOut(playOut, `Play-out stopped after ${playOut.executed} turn${playOut.executed === 1 ? '' : 's'} — the forced replacement could not be submitted.`, false);
+      finishPlayOut(playOut, `Play-out stopped after ${playOut.executed} turn${playOut.executed === 1 ? '' : 's'}: the forced replacement could not be submitted.`, false);
       return;
     }
     setPlayOut({ ...playOut, executed: playOut.executed + 1 });
@@ -1866,7 +1866,7 @@ function App() {
   const teamPasteMismatch = useMemo(() => {
     if (!pastedSets || pastedSets.length === 0 || !p1Info) return null;
     return countMatchingSpecies(p1Info, pastedSets) === 0
-      ? 'None of the pasted Pokémon appear in this replay — the paste will be ignored for branching.'
+      ? 'None of the pasted Pokémon appear in this replay; the paste will be ignored for branching.'
       : null;
   }, [pastedSets, p1Info]);
 
@@ -1983,7 +1983,7 @@ function App() {
                 {showBranch && !branchPreparing && (
                   <>
                     <span style={{ fontSize: 11, fontWeight: 'bold', color: '#8cf' }}>
-                      Branching — Turn {simState?.turnNumber ?? '…'}
+                      Branching · Turn {simState?.turnNumber ?? '…'}
                     </span>
                     {simState?.ended && (
                       <span className="ps-ended-tag">
@@ -2282,7 +2282,7 @@ function App() {
                       className="ps-btn"
                       onClick={startPlayOut}
                       disabled={branchPreparing || usageStats.loading || setAssumptions.loading}
-                      title="The engine plays BOTH sides' best moves from the position you are viewing until the game ends, then the battle window plays the result from here. Stop anytime — played turns stay in the variation."
+                      title="The engine plays BOTH sides' best moves from the position you are viewing until the game ends, then the battle window plays the result from here. Stop anytime; played turns stay in the variation."
                       style={{ padding: '3px 10px', fontSize: 11, borderColor: 'rgba(240,199,107,0.5)' }}
                     >
                       &#9658; Let it play out
