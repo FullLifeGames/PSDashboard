@@ -342,10 +342,12 @@ export function mctsTreeSearch(
 ): MctsTreeStats {
   const { root, maxDepth, result, koOdds } = runMcts(serializedBattle, settings, callbacks, seedOffset);
   // Boundary flags for the merge's verify selection. Analytic only (one
-  // calc per damaging pair, no sim advances); identical across trees —
-  // the merge reads trees[0].
+  // calc per damaging pair, no sim advances) and identical across trees,
+  // and the merge reads trees[0] alone — so only the offset-0 tree pays
+  // the i×j calc scan (doubles: 256 cells); sibling trees ship an empty
+  // list that nothing reads.
   const boundaryCells: number[] = [];
-  if (!root.ended && root.p1Options.length > 0 && root.p2Options.length > 0) {
+  if (seedOffset === 0 && !root.ended && root.p1Options.length > 0 && root.p2Options.length > 0) {
     const battle = positionBattle(root.position);
     for (let i = 0; i < root.p1Options.length; i++) {
       for (let j = 0; j < root.p2Options.length; j++) {

@@ -1,4 +1,5 @@
 import { MCTS_TREES, mergeMctsTrees, starvedSupportCells } from './mcts-merge';
+import { perfCount } from './perf-trace';
 import { cellKey } from './rank';
 import { searchOrchestrated, type SearchExecutor } from './orchestrator';
 import type {
@@ -56,9 +57,10 @@ function poolSize(): number {
 /**
  * Coordinates the evaluation on the main thread (pure orchestrator + rank
  * math — no sim) and fans the sim work out to a pool of workers. One search
- * at a time; cancellation terminates the whole pool — a worker's synchronous
- * search never yields to onmessage, so termination is the only reliable stop
- * — and the next evaluate() rebuilds it.
+ * at a time; cancellation terminates the BUSY workers — a worker's
+ * synchronous search never yields to onmessage, so termination is the only
+ * reliable stop — while idle workers stay warm across evaluations, and
+ * ensureWorkers() refills whatever termination took.
  */
 export class EvalWorkerClient {
   private workers: WorkerHandle[] = [];
@@ -67,6 +69,7 @@ export class EvalWorkerClient {
 
   private ensureWorkers(): WorkerHandle[] {
     while (this.workers.length < poolSize()) {
+      perfCount('workerSpawn');
       const worker = new Worker(new URL('../../workers/eval-worker.ts', import.meta.url), { type: 'module' });
       const handle: WorkerHandle = { worker, pending: new Map() };
       worker.onmessage = (event: MessageEvent<EvalWorkerResponse>) => {
@@ -85,6 +88,11 @@ export class EvalWorkerClient {
         const error = new Error(event.message || 'evaluation worker crashed');
         for (const entry of handle.pending.values()) entry.reject(error);
         handle.pending.clear();
+        // A crashed worker leaves the pool — the pool outlives single
+        // evaluations now, and a dead worker would swallow the next RPC
+        // without ever answering it.
+        handle.worker.terminate();
+        this.workers = this.workers.filter(other => other !== handle);
       };
       this.workers.push(handle);
     }
@@ -251,15 +259,23 @@ export class EvalWorkerClient {
     this.generation += 1;
     if (this.workers.length === 0) return;
     const cancelled = new Error('cancelled');
-    for (const handle of this.workers) {
+    // Only BUSY workers are terminated: a synchronous search never yields
+    // to onmessage, so termination is the only reliable stop for those.
+    // Idle workers (no pending RPC) have nothing to stop and stay warm —
+    // the routine turn-to-turn path of a sweep, which used to pay a fresh
+    // worker spawn (bundle parse and all) per turn per worker.
+    this.workers = this.workers.filter(handle => {
+      if (handle.pending.size === 0) return true;
       handle.worker.terminate();
       for (const entry of handle.pending.values()) entry.reject(cancelled);
       handle.pending.clear();
-    }
-    this.workers = [];
+      return false;
+    });
   }
 
   dispose(): void {
     this.cancel();
+    for (const handle of this.workers) handle.worker.terminate();
+    this.workers = [];
   }
 }

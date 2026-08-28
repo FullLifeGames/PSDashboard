@@ -7,6 +7,7 @@ import { patchSerializedItem, selectProbeCombos, type SensitivityTarget } from '
 import type { LeadEvalData } from '../lib/eval/leads';
 import type { PlayedTurn } from '../lib/eval/played';
 import { EvalWorkerClient } from '../lib/eval/worker-client';
+import { perfReport, perfReset, perfSpan } from '../lib/eval/perf-trace';
 import { evalStoreKey, loadStoredEval, saveStoredEval } from '../lib/eval-cache-store';
 import { selectKeyTurns } from '../lib/eval/graph';
 import { AUTO_MCTS_FAINTED_FRACTION, type EvalPreferences, type EvalResult, type EvalSettings, type RankedChoice, type SearchProgress, type TeraAllowance } from '../lib/eval/types';
@@ -500,6 +501,7 @@ export function useEvaluation() {
    */
   const runGraphSweep = useCallback((params: GraphSweepParams) => {
     cancel();
+    perfReset();
     const runId = ++runRef.current;
     const { depth, samples, mode } = params.settings ?? prefsRef.current;
     // Cross-mode merge arbiter: the mode the USER configured, even when this
@@ -543,6 +545,19 @@ export function useEvaluation() {
     };
     const total = Math.max(0, to - from + 1);
     setGraph({ ...snapshot(), running: true, progress: { done: 0, total } });
+    // Painting (snapshot + setGraph) is presentation only — the sweep's
+    // own logic reads the local arrays, and every result also lands in the
+    // caches. Per-turn painting made a long sweep pay a fresh copy of ten
+    // whole-game arrays plus a React re-render for every single turn, so
+    // routine paints are throttled; forced paints keep pass boundaries and
+    // the final state exact.
+    let lastPaintAt = 0;
+    const paint = (progress: { done: number; total: number } | null, force = false) => {
+      const at = Date.now();
+      if (!force && at - lastPaintAt < 200) return;
+      lastPaintAt = at;
+      setGraph({ ...snapshot(), running: true, progress });
+    };
 
     // Lazily-run single-pass acquisition, pipelined: positions stream out of
     // the ongoing reconstruction, so the first search starts after the first
@@ -591,7 +606,7 @@ export function useEvaluation() {
         settleWaiters();
       });
     };
-    const positionFor = (turn: number): Promise<string> => {
+    const positionFor = (turn: number): Promise<string> => perfSpan('position-wait', () => {
       if (!params.acquireAll) return params.acquireFor(turn)(() => {});
       const found = arrived.get(turn);
       if (found) return Promise.resolve(found);
@@ -604,7 +619,7 @@ export function useEvaluation() {
         list.push({ resolve, reject });
         waiters.set(turn, list);
       });
-    };
+    });
 
     /**
      * Deep re-search before a misplay verdict sticks (chess.com's sacrifice
@@ -728,7 +743,7 @@ export function useEvaluation() {
               if (runRef.current !== runId) return false;
               if (err instanceof Error && err.message === 'cancelled') return false;
               // Reconstruction failed — leave the gap, as the eval path would.
-              setGraph({ ...snapshot(), running: true, progress: { done: index + 1, total: turnList.length } });
+              paint({ done: index + 1, total: turnList.length });
               continue;
             }
             if (runRef.current !== runId) return false;
@@ -748,14 +763,14 @@ export function useEvaluation() {
         // turn (an explicit deepen, a deeper prior sweep) — every stored
         // field stands and this pass skips the turn entirely.
         if (!supersedesStored(turnSettings[turn - 1], { depth, samples, mode }, configuredMode, faintedFractions[turn - 1])) {
-          setGraph({ ...snapshot(), running: true, progress: { done: index + 1, total: turnList.length } });
+          paint({ done: index + 1, total: turnList.length });
           continue;
         }
 
         let hit = cacheRef.current.get(key);
         if (!(hit && hit.depth === depth && hit.samples === samples && hit.mode === mode && teraKey(hit.tera) === teraKey(params.tera))) {
           // Second cache layer: results persisted by a previous session.
-          const stored = await loadStoredEval(storeKey);
+          const stored = await perfSpan('cache-load', () => loadStoredEval(storeKey));
           if (runRef.current !== runId) return false;
           hit = stored ? {
             result: stored.result, depth, samples, mode: mode, tera: params.tera,
@@ -783,7 +798,9 @@ export function useEvaluation() {
                 const serialized = await positionFor(turn);
                 if (runRef.current !== runId) return false;
                 clientRef.current ??= new EvalWorkerClient();
-                outcome = await clientRef.current.evalPair(serialized, p1Choice.choice, p2Choice.choice, { depth, samples, mode, tera: params.tera, sleepClause: params.sleepClause });
+                const client = clientRef.current;
+                outcome = await perfSpan('played-pair', () =>
+                  client.evalPair(serialized, p1Choice.choice, p2Choice.choice, { depth, samples, mode, tera: params.tera, sleepClause: params.sleepClause }));
               } catch (err) {
                 if (runRef.current !== runId) return false;
                 if (err instanceof Error && err.message === 'cancelled') return false;
@@ -803,7 +820,7 @@ export function useEvaluation() {
           if (verify && turnVerified === undefined) {
             turnVerified = null;
             try {
-              turnVerified = await verifyFlagged(() => positionFor(turn), hit.result, turnPlayed, resolvedSettings);
+              turnVerified = await perfSpan('verify', () => verifyFlagged(() => positionFor(turn), hit.result, turnPlayed, resolvedSettings));
             } catch (err) {
               if (runRef.current !== runId) return false;
               if (err instanceof Error && err.message === 'cancelled') return false;
@@ -821,7 +838,7 @@ export function useEvaluation() {
           if (verify && turnSensitivity === undefined) {
             turnSensitivity = null;
             try {
-              turnSensitivity = await probeSensitivity(() => positionFor(turn), hit.result, turnPlayed, resolvedSettings, turnVerified ?? null);
+              turnSensitivity = await perfSpan('sensitivity', () => probeSensitivity(() => positionFor(turn), hit.result, turnPlayed, resolvedSettings, turnVerified ?? null));
             } catch (err) {
               if (runRef.current !== runId) return false;
               if (err instanceof Error && err.message === 'cancelled') return false;
@@ -851,8 +868,10 @@ export function useEvaluation() {
             try {
               if (runRef.current !== runId) return false;
               clientRef.current ??= new EvalWorkerClient();
+              const client = clientRef.current;
               const keepPlayed = turnPlayed?.p1Slots || turnPlayed?.p2Slots ? turnPlayed : undefined;
-              const result = await clientRef.current.evaluate(serialized, { depth, samples, mode, tera: params.tera, keepPlayed, sleepClause: params.sleepClause });
+              const result = await perfSpan(`evaluate[${mode}-d${depth}s${samples}]`, () =>
+                client.evaluate(serialized, { depth, samples, mode, tera: params.tera, keepPlayed, sleepClause: params.sleepClause }));
               if (runRef.current !== runId) return false;
               scores[turn - 1] = result.score;
               evalErrors[turn - 1] = null;
@@ -866,7 +885,8 @@ export function useEvaluation() {
               const p2Choice = matchOrPhantom(result, 'p2', turnPlayed);
               if (p1Choice && p2Choice) {
                 try {
-                  outcome = await clientRef.current.evalPair(serialized, p1Choice.choice, p2Choice.choice, { depth, samples, mode, tera: params.tera, sleepClause: params.sleepClause });
+                  outcome = await perfSpan('played-pair', () =>
+                    client.evalPair(serialized, p1Choice.choice, p2Choice.choice, { depth, samples, mode, tera: params.tera, sleepClause: params.sleepClause }));
                 } catch (err) {
                   if (runRef.current !== runId) return false;
                   if (err instanceof Error && err.message === 'cancelled') return false;
@@ -880,7 +900,7 @@ export function useEvaluation() {
               if (verify) {
                 turnVerified = null;
                 try {
-                  turnVerified = await verifyFlagged(() => Promise.resolve(serialized), result, turnPlayed, resolvedSettings);
+                  turnVerified = await perfSpan('verify', () => verifyFlagged(() => Promise.resolve(serialized), result, turnPlayed, resolvedSettings));
                 } catch (err) {
                   if (runRef.current !== runId) return false;
                   if (err instanceof Error && err.message === 'cancelled') return false;
@@ -889,7 +909,7 @@ export function useEvaluation() {
                 verified[turn - 1] = turnVerified;
                 turnSensitivity = null;
                 try {
-                  turnSensitivity = await probeSensitivity(() => Promise.resolve(serialized), result, turnPlayed, resolvedSettings, turnVerified ?? null);
+                  turnSensitivity = await perfSpan('sensitivity', () => probeSensitivity(() => Promise.resolve(serialized), result, turnPlayed, resolvedSettings, turnVerified ?? null));
                 } catch (err) {
                   if (runRef.current !== runId) return false;
                   if (err instanceof Error && err.message === 'cancelled') return false;
@@ -918,8 +938,9 @@ export function useEvaluation() {
             }
           }
         }
-        setGraph({ ...snapshot(), running: true, progress: { done: index + 1, total: turnList.length } });
+        paint({ done: index + 1, total: turnList.length });
       }
+      paint({ done: turnList.length, total: turnList.length }, true);
       return true;
     };
 
@@ -939,13 +960,13 @@ export function useEvaluation() {
       // track the convergence; the monotone merge makes each pass safe.
       // Short ranges (on-demand turn analysis) go straight to full settings.
       if (rangeTurns.length > 2 && !isFast) {
-        if (!(await sweepTurns(rangeTurns, fastSettings, false))) return;
+        if (!(await perfSpan('pass1-sketch', () => sweepTurns(rangeTurns, fastSettings, false)))) return;
         const keyTurns = selectKeyTurns(scores).filter(turn => turn >= from && turn <= to);
-        if (keyTurns.length > 0 && !(await sweepTurns(keyTurns, fullSettings, true))) return;
+        if (keyTurns.length > 0 && !(await perfSpan('pass2-key-turns', () => sweepTurns(keyTurns, fullSettings, true)))) return;
         const keySet = new Set(keyTurns);
         const rest = rangeTurns.filter(turn => !keySet.has(turn));
-        if (rest.length > 0 && !(await sweepTurns(rest, fullSettings, true))) return;
-      } else if (!(await sweepTurns(rangeTurns, fullSettings, true))) {
+        if (rest.length > 0 && !(await perfSpan('pass3-rest', () => sweepTurns(rest, fullSettings, true)))) return;
+      } else if (!(await perfSpan('single-pass', () => sweepTurns(rangeTurns, fullSettings, true)))) {
         return;
       }
 
@@ -972,7 +993,8 @@ export function useEvaluation() {
             if (runRef.current !== runId) return;
             if (serialized) {
               clientRef.current ??= new EvalWorkerClient();
-              leadResult = await clientRef.current.evaluate(serialized, leadSettings);
+              const client = clientRef.current;
+              leadResult = await perfSpan('lead', () => client.evaluate(serialized, leadSettings));
               if (runRef.current !== runId) return;
               cacheRef.current.set(key, { result: leadResult, depth: lead0.depth, samples: lead0.samples, mode: lead0.mode, tera: params.tera });
               void saveStoredEval({
@@ -996,6 +1018,7 @@ export function useEvaluation() {
         // The summary ⚠ line settles once, when the line is final.
         notice = withEvalGapNotice(notice, evalErrors);
         setGraph({ ...snapshot(), running: false, progress: null });
+        perfReport(`graph sweep ${from}-${to} of ${params.turns} turns`);
       }
     })();
   }, [cancel]);

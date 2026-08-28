@@ -222,6 +222,14 @@ test.describe('MCTS koOdds payload (round 7)', () => {
     expect(pump.koOdds).toEqual({ accuracy: expect.closeTo(0.8, 5), killFraction: 1 });
   });
 
+  test('only the offset-0 tree pays the boundary-flag scan (the merge reads trees[0])', () => {
+    const root = gambleRoot();
+    const tree0 = mctsTreeSearch(root, settings, 0);
+    const tree1 = mctsTreeSearch(root, settings, 1);
+    expect(tree0.boundaryCells?.length ?? 0).toBeGreaterThan(0);
+    expect(tree1.boundaryCells).toEqual([]);
+  });
+
   test('doubles results carry no koOdds (fail-closed)', () => {
     const battle = new Battle({
       formatid: toID('gen9doublescustomgame'),
