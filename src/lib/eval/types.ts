@@ -61,6 +61,12 @@ export interface EvalPreferences {
   /** Re-run automatically after each executed branch turn. */
   auto: boolean;
   /**
+   * Evaluation as an always-on companion: Analyze game starts by itself when
+   * a replay loads, and fresh variation positions evaluate without the
+   * Evaluate button. Persisted — switching it on once keeps it on.
+   */
+  autoAnalyze: boolean;
+  /**
    * Tera enumeration: 'auto' = only when the replay terastallized (and in
    * draft/custom formats, only the Pokémon that did); 'revealed' forces the
    * per-Pokémon restriction for any format.

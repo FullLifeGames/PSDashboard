@@ -86,7 +86,7 @@ function hpBarClass(pct: number) {
 }
 
 /* ── Move button ── */
-function MoveBtn({ move, dmg, spreadDamage, zMoveName, targetDamage, pendingChoice, wasPlayed, onClick }: {
+function MoveBtn({ move, dmg, spreadDamage, zMoveName, targetDamage, pendingChoice, wasPlayed, compact, onClick }: {
   move: BranchMoveOption;
   dmg?: DamageResult;
   spreadDamage?: SpreadTargetDamage[];
@@ -95,6 +95,8 @@ function MoveBtn({ move, dmg, spreadDamage, zMoveName, targetDamage, pendingChoi
   pendingChoice: BranchSlotChoice | null;
   /** This is the move the viewed line actually played at this position. */
   wasPlayed?: boolean;
+  /** Basic view: a small chip (name + PP; type and damage in the tooltip). */
+  compact?: boolean;
   onClick: (targetLoc?: number) => void;
 }) {
   const bg = typeBg(move.type);
@@ -103,25 +105,33 @@ function MoveBtn({ move, dmg, spreadDamage, zMoveName, targetDamage, pendingChoi
   const selectedTarget = selected
     ? move.targetOptions.find(target => target.targetLoc === pendingMove?.targetLoc)
     : null;
+  const ppText = move.maxpp > 0 ? `${move.pp}/${move.maxpp}` : '—';
+  const compactTitle = `${move.type || '???'} · ${ppText} PP` +
+    (dmg && dmg.maxPercent > 0 ? ` · ${dmg.range}${dmg.koChance ? ` (${dmg.koChance})` : ''}` : '');
   return (
     <div>
       <button
         type="button"
         onClick={() => onClick(move.targetOptions[0]?.targetLoc)}
         disabled={move.disabled || (move.requiresTarget && move.targetOptions.length === 0)}
-        className={`ps-movebtn ${selected ? 'ps-movebtn-selected' : ''}`}
+        className={`ps-movebtn ${compact ? 'ps-movebtn-compact ' : ''}${selected ? 'ps-movebtn-selected' : ''}`}
         style={{ background: bg }}
+        title={compact ? compactTitle : undefined}
       >
         <div className="ps-movebtn-name">{move.name}</div>
         {wasPlayed && <span className="ps-played-badge" title="The action played at this position on the line you are viewing.">played</span>}
         {zMoveName && (
           <div className="ps-movebtn-zmove">→ {zMoveName}</div>
         )}
-        <div className="ps-movebtn-info">
-          <span className="ps-movebtn-type">{move.type || '???'}</span>
-          <span className="ps-movebtn-pp">{move.maxpp > 0 ? `${move.pp}/${move.maxpp}` : '—'}</span>
-        </div>
-        {spreadDamage && spreadDamage.length > 1 ? (
+        {compact ? (
+          <span className="ps-movebtn-pp">{ppText}</span>
+        ) : (
+          <div className="ps-movebtn-info">
+            <span className="ps-movebtn-type">{move.type || '???'}</span>
+            <span className="ps-movebtn-pp">{ppText}</span>
+          </div>
+        )}
+        {!compact && (spreadDamage && spreadDamage.length > 1 ? (
           <div className="ps-movebtn-dmg">
             {spreadDamage.map(target => (
               <span key={target.label} className="ps-movebtn-spread-target">
@@ -134,7 +144,7 @@ function MoveBtn({ move, dmg, spreadDamage, zMoveName, targetDamage, pendingChoi
             {dmg.range}
             {dmg.koChance && <span className="ps-movebtn-ko"> ({dmg.koChance})</span>}
           </div>
-        )}
+        ))}
         {selectedTarget && (
           <div className="ps-movebtn-target">
             Targeting {selectedTarget.label} {selectedTarget.name}
@@ -175,31 +185,44 @@ function MoveBtn({ move, dmg, spreadDamage, zMoveName, targetDamage, pendingChoi
 }
 
 /* ── Switch button ── */
-function SwitchBtn({ sw, selected, disabled, disabledReason, wasPlayed, onClick }: {
-  sw: BranchSwitchOption; selected: boolean; disabled: boolean; disabledReason?: string; wasPlayed?: boolean; onClick: () => void;
+function SwitchBtn({ sw, selected, disabled, disabledReason, wasPlayed, compact, onClick }: {
+  sw: BranchSwitchOption; selected: boolean; disabled: boolean; disabledReason?: string; wasPlayed?: boolean;
+  /** Basic view: a small chip (sprite + name + HP%). */
+  compact?: boolean;
+  onClick: () => void;
 }) {
   return (
     <button
       type="button"
       onClick={onClick}
       disabled={sw.fainted || disabled}
-      title={disabled ? disabledReason : undefined}
+      title={disabled ? disabledReason : compact ? `${sw.name} · ${sw.hp}` : undefined}
       aria-disabled={disabled || sw.fainted}
-      className={`ps-switchbtn ${selected ? 'ps-switchbtn-selected' : ''}`}
+      className={`ps-switchbtn ${compact ? 'ps-switchbtn-compact ' : ''}${selected ? 'ps-switchbtn-selected' : ''}`}
     >
       <img src={spriteUrl(sw.species)} alt={sw.name} />
-      <div>
+      {compact ? (
         <div className="ps-switchbtn-name">
           {sw.name}
           {wasPlayed && <span className="ps-played-badge" title="The action played at this position on the line you are viewing.">played</span>}
+          <span className="ps-switchbtn-hp"> {sw.hpPercent}%</span>
         </div>
-        <div style={{ width: 60 }}>
-          <div className="ps-hpbar-track" style={{ height: 4, marginTop: 2 }}>
-            <div className={`ps-hpbar-fill ${hpBarClass(sw.hpPercent)}`} style={{ width: `${sw.hpPercent}%` }} />
+      ) : (
+        <>
+          <div>
+            <div className="ps-switchbtn-name">
+              {sw.name}
+              {wasPlayed && <span className="ps-played-badge" title="The action played at this position on the line you are viewing.">played</span>}
+            </div>
+            <div style={{ width: 60 }}>
+              <div className="ps-hpbar-track" style={{ height: 4, marginTop: 2 }}>
+                <div className={`ps-hpbar-fill ${hpBarClass(sw.hpPercent)}`} style={{ width: `${sw.hpPercent}%` }} />
+              </div>
+            </div>
           </div>
-        </div>
-      </div>
-      <span className="ps-switchbtn-hp">{sw.hp}</span>
+          <span className="ps-switchbtn-hp">{sw.hp}</span>
+        </>
+      )}
     </button>
   );
 }
@@ -304,7 +327,9 @@ function SideControls({ side, label, activeName, activeSpecies, activeFainted, m
         </div>
       )}
 
-      {!forceSwitch && (
+      {/* Basic view: no tabs — moves and switches sit together as small
+          chips. Advanced grows them into the full tabbed picker. */}
+      {!forceSwitch && advanced && (
         <div className="ps-tab-row">
           <button
             type="button"
@@ -323,7 +348,7 @@ function SideControls({ side, label, activeName, activeSpecies, activeFainted, m
         </div>
       )}
 
-      {!forceSwitch && tab === 'fight' && moves.length > 0 && (
+      {!forceSwitch && (!advanced || tab === 'fight') && moves.length > 0 && (
         <>
           {hasAnyModifier && (
             <div className="ps-modifier-row" role="group" aria-label={`Battle gimmicks for ${label}`}>
@@ -370,7 +395,7 @@ function SideControls({ side, label, activeName, activeSpecies, activeFainted, m
               </span>
             </button>
           )}
-          <div className="ps-movegrid">
+          <div className={`ps-movegrid${advanced ? '' : ' ps-movegrid-compact'}`}>
             {moves.map((m, i) => (
               <MoveBtn
                 key={m.slot}
@@ -386,6 +411,7 @@ function SideControls({ side, label, activeName, activeSpecies, activeFainted, m
                 )}
                 pendingChoice={pending}
                 wasPlayed={playedMoveKey !== null && choiceId(m.name) === playedMoveKey}
+                compact={!advanced}
                 onClick={(targetLoc) => onChoice(moveChoiceFor(m, targetLoc))}
               />
             ))}
@@ -475,8 +501,8 @@ function SideControls({ side, label, activeName, activeSpecies, activeFainted, m
         </>
       )}
 
-      {(forceSwitch || tab === 'switch') && switches.length > 0 && (
-        <div className="ps-switchgrid">
+      {(forceSwitch || !advanced || tab === 'switch') && switches.length > 0 && (
+        <div className={`ps-switchgrid${!advanced && !forceSwitch ? ' ps-switchgrid-compact' : ''}`}>
           {switches.map(sw => {
             const selected = switchChoiceKey(pending) === switchOptionKey(sw);
             return (
@@ -487,6 +513,7 @@ function SideControls({ side, label, activeName, activeSpecies, activeFainted, m
                 disabled={blockedSwitchKeys.has(switchOptionKey(sw)) && !selected}
                 disabledReason={`${sw.name} is already chosen as the switch-in for your other slot.`}
                 wasPlayed={playedSwitchKey !== null && (choiceId(sw.species) === playedSwitchKey || choiceId(sw.name) === playedSwitchKey)}
+                compact={!advanced && !forceSwitch}
                 onClick={() => onChoice({ kind: 'switch', speciesId: choiceId(sw.species), pokemonName: sw.name })}
               />
             );
@@ -563,8 +590,10 @@ const ADVANCED_KEY = 'ps-replay-interceptor:picker-advanced';
 /* ── Main BranchPanel (controls only, no iframe) ── */
 export function BranchPanel({ simState, source, acquiringExact, executeError, executing, gen, onSetChoice, onHypotheticalMove, onExecuteTurn, played }: Props) {
   const [showLog, setShowLog] = useState(false);
-  // Compact by default: move/switch buttons and Execute. "Advanced" adds the
-  // free-choice dropdown and the "What if it had…" tools (persisted).
+  // Compact by default: small action chips (moves + switches side by side)
+  // and Execute. "Advanced" grows them into the full picker — type/damage
+  // details, the Fight/Pokémon tabs, the free-choice dropdown and the
+  // "What if it had…" tools (persisted).
   const [advanced, setAdvanced] = useState(() => {
     try {
       return localStorage.getItem(ADVANCED_KEY) === '1';
@@ -736,7 +765,7 @@ export function BranchPanel({ simState, source, acquiringExact, executeError, ex
           className="ps-btn"
           style={{ padding: '0 6px', fontSize: 10 }}
           aria-expanded={advanced}
-          title="Shows the free choice dropdown and the &quot;What if it had…&quot; move loader."
+          title="Grows the compact action chips into the full picker: type and damage details, the Fight/Pokémon tabs, the free choice dropdown, and the &quot;What if it had…&quot; move loader."
         >
           {advanced ? 'Advanced ▾' : 'Advanced ▸'}
         </button>

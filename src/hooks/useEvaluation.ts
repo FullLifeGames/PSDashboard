@@ -53,7 +53,7 @@ const PREFS_KEY = 'ps-replay-interceptor:eval-prefs';
 // through the opening, the DUCT tree once AUTO_MCTS_FAINTED_FRACTION of all
 // bodies fell). depth/samples apply when the user picks an explicit matrix
 // mode; stored user prefs always win over this default.
-const DEFAULT_PREFS: EvalPreferences = { depth: 2, samples: 3, mode: 'auto', auto: false, tera: 'auto' };
+const DEFAULT_PREFS: EvalPreferences = { depth: 2, samples: 3, mode: 'auto', auto: false, autoAnalyze: false, tera: 'auto' };
 
 function loadPrefs(): EvalPreferences {
   try {
@@ -65,6 +65,7 @@ function loadPrefs(): EvalPreferences {
       samples: parsed.samples === 1 || parsed.samples === 5 ? parsed.samples : 3,
       mode: parsed.mode === 'mcts' || parsed.mode === 'auto' ? parsed.mode : 'matrix',
       auto: !!parsed.auto,
+      autoAnalyze: !!parsed.autoAnalyze,
       tera: parsed.tera === 'on' || parsed.tera === 'off' || parsed.tera === 'revealed' ? parsed.tera : 'auto',
     };
   } catch {

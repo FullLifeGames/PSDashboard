@@ -11,7 +11,9 @@ interface Props {
   seekTurn?: number;
   autoPlay?: boolean;
   liveUpdates?: boolean;
-  liveAppendMode?: 'play' | 'follow-end';
+  /** 'hold' appends without seeking — the frame stays where it is while a
+   *  play-out streams turns in; the finish notice's watch seek moves it. */
+  liveAppendMode?: 'play' | 'follow-end' | 'hold';
   liveAppendTurn?: number | null;
   reloadKey?: string;
   /** Viewer perspective — 'p2' renders from player 2's side (the ?p2 replay-URL flag). */
@@ -179,11 +181,12 @@ function PSReplayFrameDocument({
       previous.lines.every((line, index) => line === lines[index]);
     if (canAppend && lines.length > previous.lines.length) {
       const shouldPlayAppend = liveAppendMode === 'play' && typeof liveAppendTurn === 'number';
+      const holdAppend = liveAppendMode === 'hold';
       iframeRef.current?.contentWindow?.postMessage({
         type: 'ps-append-log',
         lines: lines.slice(previous.lines.length),
-        seekTurn,
-        followEnd: !shouldPlayAppend,
+        seekTurn: holdAppend ? undefined : seekTurn,
+        followEnd: !shouldPlayAppend && !holdAppend,
         playFromTurn: shouldPlayAppend ? liveAppendTurn : undefined,
       }, '*');
     }

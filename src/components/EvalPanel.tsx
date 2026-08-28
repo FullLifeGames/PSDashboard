@@ -65,6 +65,9 @@ interface EvalPanelProps {
   positionLabel?: string | null;
   /** Full main-line length — keeps the graph's x-axis honest pre-analysis. */
   graphMaxTurn?: number;
+  /** The turn whose analysis is selected (0 = leads). Changing it — slider,
+   *  arrows, graph, the T0 button — opens that turn's view. */
+  analysisTurn?: number | null;
 }
 
 // Displayed values are win probabilities ("52%") and point deltas ("−8%").
@@ -136,7 +139,7 @@ export function EvalPanel({
   prefs, onPrefsChange, onEvaluate, onCancel, onPickChoice, onPickPair, showAuto, showTera,
   graph, variation, currentLine, onAnalyzeGame, onSelectTurn, currentTurn, analysis,
   reads, leadAnalysis, reportLeads, report, doubles, resultSettings, onThinkDeeper, thinkDeeperTarget, smogonPending,
-  positionLabel, graphMaxTurn,
+  positionLabel, graphMaxTurn, analysisTurn,
 }: EvalPanelProps) {
   const running = status === 'searching' || status === 'reconstructing';
   const hasGraph = graph.scores.some(score => score !== null);
@@ -178,6 +181,14 @@ export function EvalPanel({
   if (!!report !== hadReport) {
     setHadReport(!!report);
     if (report) setView('report');
+  }
+  // Same pattern for navigation: moving to another turn (slider, arrows,
+  // graph, the timeline's T0 button) IS the request to see that turn's
+  // evaluation — the report stays one click away via "← Game report".
+  const [seenAnalysisTurn, setSeenAnalysisTurn] = useState<number | null>(analysisTurn ?? null);
+  if ((analysisTurn ?? null) !== seenAnalysisTurn) {
+    setSeenAnalysisTurn(analysisTurn ?? null);
+    if (analysisTurn !== null && analysisTurn !== undefined && report) setView('turn');
   }
   const selectTurn = onSelectTurn
     ? (turn: number, line?: 'main' | 'variation') => {
@@ -256,6 +267,17 @@ export function EvalPanel({
             Auto
           </label>
         )}
+        <label
+          title="Evaluation as a companion: Analyze game starts by itself when a replay loads, and new variation positions evaluate without the Evaluate button. Stays on across sessions."
+          style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 10, color: '#aabbcc' }}
+        >
+          <input
+            type="checkbox"
+            checked={prefs.autoAnalyze}
+            onChange={event => onPrefsChange({ ...prefs, autoAnalyze: event.target.checked })}
+          />
+          Always on
+        </label>
         {onEvaluate && (running ? (
           <button type="button" className="ps-btn" onClick={onCancel} style={{ padding: '2px 8px', fontSize: 10 }}>
             Cancel

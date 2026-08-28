@@ -121,19 +121,18 @@ async function startVariationAt(page: Page, turn: number, options?: { p1Move?: s
   await expect(page.locator('.ps-panel', { hasText: 'Variation moves' }))
     .toContainText(`Turn ${turn}`, { timeout: 60_000 });
   // A first-move KO is common — resolve the trailing forced replacement so
-  // callers always get both sides' pickers back.
-  const replacement = page.locator('.ps-switchbtn').first();
-  await replacement.waitFor({ state: 'visible', timeout: 4000 }).catch(() => {});
-  if (await replacement.isVisible().catch(() => false)) {
-    await replacement.click();
+  // callers always get both sides' pickers back. The compact picker shows
+  // switch chips at every position, so the forced state is detected via its
+  // prompt, never via mere switch-button visibility.
+  const forcedNote = page.locator('.ps-force-switch-note').first();
+  await forcedNote.waitFor({ state: 'visible', timeout: 4000 }).catch(() => {});
+  if (await forcedNote.isVisible().catch(() => false)) {
+    const forcedControls = page.locator('.ps-side-controls', { has: page.locator('.ps-force-switch-note') }).first();
+    await forcedControls.locator('.ps-switchbtn:enabled').first().click();
     await expect(page.locator('.ps-panel', { hasText: 'Variation moves' }))
       .toContainText('forced replacement', { timeout: 30_000 });
   }
-  // The side that replaced stays on its Pokémon tab — flip back to Fight.
   for (const side of [p1, p2]) {
-    if (!(await side.locator('.ps-movebtn').first().isVisible().catch(() => false))) {
-      await side.locator('button', { hasText: 'Fight' }).first().click().catch(() => {});
-    }
     await expect(side.locator('.ps-movebtn').first()).toBeVisible({ timeout: 30_000 });
   }
 }
@@ -382,7 +381,7 @@ test.describe('PS Dashboard', () => {
     await expect(panel.locator('.ps-eval-bar')).toBeVisible({ timeout: 120_000 });
     await expect(panel.locator('.ps-eval-column').first().locator('button.ps-eval-choice').first())
       .toBeVisible({ timeout: 120_000 });
-    await expect(panel.getByRole('checkbox')).toBeChecked();
+    await expect(panel.getByRole('checkbox', { name: 'Auto' })).toBeChecked();
   });
 
   test('clicking a matrix cell branches with exactly that pair', async ({ page }) => {
@@ -978,7 +977,7 @@ test.describe('PS Dashboard', () => {
     await expect(page.getByText(/Branching · Turn 5[6-9]/)).toBeVisible({ timeout: 120_000 });
     await expect(page.getByText(/already ended|wedged at turn/)).toHaveCount(0);
 
-    await page.locator('button', { hasText: 'Back' }).click();
+    await page.locator('button', { hasText: 'Discard variation' }).click();
     await expect(slider).toBeVisible({ timeout: 10_000 });
     await slider.fill('68');
     // The end snapshot is the post-battle sentinel — playing from it (the
@@ -1007,7 +1006,7 @@ test.describe('PS Dashboard', () => {
     await startVariationAt(page, 1);
 
     await expect(page.getByText(/Branching · Turn/)).toBeVisible({ timeout: 15000 });
-    await expect(page.locator('button', { hasText: 'Back' })).toBeVisible();
+    await expect(page.locator('button', { hasText: 'Discard variation' })).toBeVisible();
 
     await expect(page.locator('iframe[title="Branch Simulation"]')).toBeVisible({ timeout: 10000 });
     await expect(page.locator('iframe')).toHaveCount(1);
@@ -1018,12 +1017,16 @@ test.describe('PS Dashboard', () => {
 
     await expect(page.getByText('P1', { exact: true }).first()).toBeVisible({ timeout: 15000 });
     await expect(page.getByText('P2', { exact: true }).first()).toBeVisible();
-    await expect(page.locator('button', { hasText: 'Fight' }).first()).toBeVisible();
+    // The basic view lists moves AND switches as compact chips — no tabs.
+    await expect(page.locator('.ps-branch-side-column').first().locator('.ps-movebtn').first()).toBeVisible();
+    await expect(page.locator('.ps-branch-side-column').first().locator('.ps-switchbtn').first()).toBeVisible();
   });
 
   test('always-on pickers show move buttons with type info', async ({ page }) => {
     await page.locator('button', { hasText: 'Load' }).click();
     await expect(page.locator('.ps-movebtn').first()).toBeVisible({ timeout: 15000 });
+    // Type and damage details live in the Advanced (full) picker.
+    await page.locator('button', { hasText: 'Advanced' }).click();
     // Range history: shifted when spread inference started overlaying
     // damage-consistent EVs (51–60.9%), then again when the goodness-of-fit
     // forfeit rejected this synthetic log's hand-authored damage numbers —
@@ -1297,19 +1300,30 @@ test.describe('PS Dashboard', () => {
     expect(statsBox?.y).toBeGreaterThan((iframeBox?.y ?? 0) + (iframeBox?.height ?? 0));
   });
 
-  test('move buttons keep a readable fixed size', async ({ page }) => {
+  test('compact move chips grow into full move buttons in Advanced', async ({ page }) => {
     await page.locator('button', { hasText: 'Load' }).click();
     await expect(page.locator('.ps-movebtn').first()).toBeVisible({ timeout: 15000 });
 
+    // Basic: small action chips to save space.
+    const chipBox = await page.locator('.ps-movebtn').first().boundingBox();
+    expect(chipBox?.height).toBeLessThanOrEqual(40);
+
+    // Advanced: the full readable move buttons with type and damage info.
+    await page.locator('button', { hasText: 'Advanced' }).click();
+    await expect(page.locator('.ps-movebtn-info').first()).toBeVisible({ timeout: 5000 });
     const box = await page.locator('.ps-movebtn').first().boundingBox();
     expect(box?.height).toBeGreaterThanOrEqual(58);
     expect(box?.width).toBeGreaterThanOrEqual(120);
   });
 
-  test('can switch to Pokémon tab to see switch options', async ({ page }) => {
+  test('switch options show as chips in basic and behind the Pokémon tab in Advanced', async ({ page }) => {
     await page.locator('button', { hasText: 'Load' }).click();
-    await expect(page.locator('button', { hasText: 'Pokémon' }).first()).toBeVisible({ timeout: 15000 });
+    // Basic: switch chips sit right next to the move chips.
+    await expect(page.locator('.ps-switchbtn').first()).toBeVisible({ timeout: 15000 });
 
+    // Advanced: the full picker keeps the Fight/Pokémon tabs.
+    await page.locator('button', { hasText: 'Advanced' }).click();
+    await expect(page.locator('button', { hasText: 'Pokémon' }).first()).toBeVisible({ timeout: 5000 });
     await page.locator('button', { hasText: 'Pokémon' }).first().click();
     await expect(page.locator('.ps-switchbtn').first()).toBeVisible({ timeout: 5000 });
   });
@@ -1396,8 +1410,7 @@ test.describe('PS Dashboard', () => {
     await expect(controls.nth(2)).toContainText('P2A');
     await expect(controls.nth(3)).toContainText('P2B');
 
-    await controls.nth(0).locator('.ps-controls-tab').nth(1).click();
-    await controls.nth(1).locator('.ps-controls-tab').nth(1).click();
+    // The compact picker lists switch chips per slot without a tab switch.
     await expect(controls.nth(0).locator('.ps-switchbtn').first()).toBeVisible({ timeout: 5000 });
     await expect(controls.nth(1).locator('.ps-switchbtn').first()).toBeVisible();
 
@@ -1426,11 +1439,11 @@ test.describe('PS Dashboard', () => {
     await expect(bulbasaurTarget).not.toHaveClass(/ps-target-btn-selected/);
   });
 
-  test('Back button discards the variation and returns to the replay', async ({ page }) => {
+  test('Discard variation drops the variation and returns to the replay', async ({ page }) => {
     await page.locator('button', { hasText: 'Load' }).click();
     await startVariationAt(page, 1);
 
-    await page.locator('button', { hasText: 'Back' }).click();
+    await page.locator('button', { hasText: 'Discard variation' }).click();
     await expect(page.getByText(/Branching · Turn/)).toHaveCount(0);
     await expect(page.locator('iframe[title="PS Replay"]')).toBeVisible({ timeout: 10000 });
     await expect(page.locator('.ps-branch-bar input[type="range"]')).toBeVisible();

@@ -111,16 +111,22 @@ truncate / replace.
 ### The timeline
 
 - The timeline bar (slider + step buttons) is always visible and spans
-  `max(replay end, variation tip)`. Where the variation covers the viewed
-  turn, a line chip `[Main line | Variation]` switches lines view-only;
-  returning to the main line is one click and never destroys the
-  variation.
+  `max(replay end, variation tip)`; the displayed total counts played turns
+  (the end snapshot is the "End" sentinel, not an extra turn). While a
+  variation exists, a line chip `[Main line | Variation]` switches lines
+  view-only and stays rendered at every turn (clicking Variation clamps
+  into its covered span); returning to the main line is one click and
+  never destroys the variation. When the graph carries a lead evaluation,
+  a `T0` button opens the team-preview analysis.
 - `PSReplayFrame` shows the original replay for main-line positions and the
   branch simulator log for variation positions. The branch frame ignores
   seekTurn prop changes after mount (re-seeking fought the append stream), so
   user navigation sends explicit one-shot `seekRequest` commands from the
   `navigateTo` funnel; tip-follow after an executed turn skips them (the
-  append already positions, animated when enabled). The chosen line is
+  append already positions, animated when enabled). Every `navigateTo` seek
+  also arms the seek-intent echo guard, so a freshly remounted replay frame
+  (leaving the variation) cannot knock the chosen turn back with its boot
+  echoes. The chosen line is
   sticky: stepping back across the branch point and forward again returns to
   the variation; only an explicit main-line click (chip, notation, graph)
   leaves it. The timeline slider carries a gold stripe over the variation's
@@ -150,10 +156,13 @@ boundaries) lands in a session cache of exact positions, and when the
 pointer DWELLS ~1s on an unknown main-line turn the app reconstructs it in
 the background through the same healed path. The pickers upgrade in place
 (real PP, disables, doubles targets), and the source line flips to "Choices
-from the reconstructed position". The panel is compact by default
-(move/switch buttons, the played action badged "played", Use Recommended,
-Execute); an "Advanced" disclosure adds the free-choice dropdown and the
-"What if it had …" tools.
+from the reconstructed position". The panel is compact by default: small
+action chips (moves with PP, switch chips beside them, no tabs; type and
+damage ride the tooltips), the played action badged "played", Use
+Recommended, Execute. The "Advanced" disclosure grows the chips into the
+full picker: type/damage details on 2x2 move buttons, the Fight/Pokémon
+tabs, the free-choice dropdown, and the "What if it had …" tools. Doubles
+target rows render in both views (targeting is correctness, not detail).
 Executing at a position without the live sim
 funnels through one deviation path: chess rules (truncation without asking
 inside the variation, an inline confirm when replacing the variation from
@@ -166,7 +175,9 @@ Forced-switch interludes step the acting side alone (the waiting side's
 'wait' sentinel is not a playable choice), every played turn is a normal,
 navigable, truncatable entry, the panel reports why a run ended, and a
 finished run seeks the battle window back to its start turn and plays the
-new line ("watch it from your move").
+new line ("watch it from your move"). While the run streams turns in, the
+branch frame appends in 'hold' mode (no seeking), so the battle window
+stays on the start position instead of flashing every appended turn.
 
 - `BranchPanel` also carries the "What if it had …" row (behind Advanced)
   that loads a hypothetical legal move into the active set: a team edit

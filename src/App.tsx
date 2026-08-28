@@ -262,6 +262,15 @@ function App() {
    */
   const [navSeek, setNavSeek] = useState<{ turn: number; seq: number; play?: boolean } | null>(null);
 
+  // Programmatic seeks (graph clicks, timeline navigation) race the embed's
+  // turn echoes: while the iframe is still seeking it keeps reporting the OLD
+  // turn, which would knock the fresh selection straight back (the analysis
+  // flipped to the previous turn under load; leaving a variation, the freshly
+  // remounted replay frame echoed its boot position over the chosen turn).
+  // Stale echoes are ignored until the embed confirms the seek or the window
+  // lapses.
+  const seekIntentRef = useRef<{ turn: number; until: number } | null>(null);
+
   const navigateTo = useCallback((position: TimelinePosition, opts?: { seek?: boolean }) => {
     const next = normalizePosition(position, maxTurn, variationSpan);
     setViewTurn(next.turn);
@@ -277,6 +286,7 @@ function App() {
     setDraftChoices({ p1: [], p2: [] });
     if (opts?.seek !== false) {
       setNavSeek(prev => ({ turn: next.turn, seq: (prev?.seq ?? 0) + 1 }));
+      seekIntentRef.current = { turn: next.turn, until: Date.now() + 4000 };
     }
   }, [maxTurn, variationSpan, setViewTurn]);
 
@@ -1127,6 +1137,11 @@ function App() {
     return applied;
   }, [simState, handleSetChoice]);
 
+  // Armed by a clicked engine line whose turn executed — see the interlude
+  // completion effect below.
+  const walkInterludeRef = useRef(false);
+  const walkProcessedRef = useRef<EvalResult | null>(null);
+
   // Chess-style walk: clicking an engine line PLAYS THE TURN OUT — the
   // clicked side commits its line, the other side answers with the engine's
   // top reply, the turn executes, and the result re-evaluates so the next
@@ -1141,14 +1156,26 @@ function App() {
     }
     if (!applyEvalChoice(side, ranked)) return;
     const other = side === 'p1' ? 'p2' : 'p1';
-    if (reply && applyEvalChoice(other, reply)) {
-      void executeTurn().then(() => handleEvaluate());
-      return;
+    // The top reply can fail to map onto the live pickers (label/slot
+    // mismatches) — walking down the ranked list keeps the click playing a
+    // full turn instead of silently stalling on a prefilled half-choice.
+    const replies = [
+      ...(reply ? [reply] : []),
+      ...(evaluation.result?.perSide[other] ?? []),
+    ].filter(candidate => candidate.choice !== 'wait');
+    for (const candidate of replies) {
+      if (applyEvalChoice(other, candidate)) {
+        // Mid-turn KOs pause the sim on a forced replacement — the walk
+        // finishes those interludes with the engine's answer (effect below).
+        walkInterludeRef.current = true;
+        void executeTurn().then(() => handleEvaluate());
+        return;
+      }
     }
     // No engine reply to commit (forced-switch positions execute through
     // setChoice on their own) — show the engine's view of what stands.
     handleEvaluate();
-  }, [applyEvalChoice, executeTurn, handleEvaluate, getBattle]);
+  }, [applyEvalChoice, executeTurn, handleEvaluate, getBattle, evaluation.result]);
 
   const [pendingEvalPick, setPendingEvalPick] =
     useState<{ side: 'p1' | 'p2'; ranked: RankedChoice; reply: RankedChoice | null } | null>(null);
@@ -1197,6 +1224,41 @@ function App() {
   /** Why the last play-out ended + where watching it starts (panel notice). */
   const [playOutNotice, setPlayOutNotice] = useState<{ text: string; watchTurn: number } | null>(null);
   const playOutProcessedRef = useRef<EvalResult | null>(null);
+
+  /**
+   * Chess-walk interlude completion: after a clicked engine line executes,
+   * a mid-turn KO leaves the sim waiting on a forced replacement — without
+   * this the "play the turn out" click visibly stopped halfway through the
+   * turn. While armed, one-sided positions (only forced replacements rank —
+   * the other side 'wait's) auto-play the engine's top answer; the first
+   * two-sided position is the next real decision point and disarms the walk.
+   */
+  useEffect(() => {
+    if (!walkInterludeRef.current || playOut?.active) return;
+    if (!liveTip || executing || branchPreparing) return;
+    if (evaluation.status !== 'done' || !evaluation.result) return;
+    if (evaluation.resultTag !== null && evaluation.resultTag !== evalViewKey) return;
+    if (walkProcessedRef.current === evaluation.result) return;
+    walkProcessedRef.current = evaluation.result;
+    const battle = getBattle();
+    if (!battle || battle.ended) {
+      walkInterludeRef.current = false;
+      return;
+    }
+    const p1 = evaluation.result.perSide.p1.find(choice => choice.choice !== 'wait') ?? null;
+    const p2 = evaluation.result.perSide.p2.find(choice => choice.choice !== 'wait') ?? null;
+    if (p1 && p2) {
+      walkInterludeRef.current = false;
+      return;
+    }
+    const single = p1 ? { side: 'p1' as const, choice: p1 } : p2 ? { side: 'p2' as const, choice: p2 } : null;
+    if (!single || !applyEvalChoice(single.side, single.choice)) {
+      walkInterludeRef.current = false;
+      return;
+    }
+    // setChoice auto-executes forced replacements; the auto pref re-evaluates
+    // once the entry lands, which re-enters this effect until two-sided.
+  }, [playOut?.active, liveTip, executing, branchPreparing, evaluation.status, evaluation.result, evaluation.resultTag, evalViewKey, getBattle, applyEvalChoice]);
 
   /** Seek the branch frame to the play-out's start and let it play — the
    *  point of the feature: watch how the game runs on from your move. The
@@ -1365,6 +1427,27 @@ function App() {
     usageStats.stats, setAssumptions.assumptions, hpEvidence, sensitivityTargetsFor,
   ]);
 
+  /**
+   * "Always on": with the autoAnalyze pref set, Analyze game starts by
+   * itself once a replay (and its Smogon data) is ready — the game graph and
+   * report are simply there. One attempt per replay + set knowledge + Tera
+   * resolution; a failed sweep does not retry-loop (Re-analyze stays manual).
+   */
+  const autoAnalyzeAttemptRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (!evaluation.prefs.autoAnalyze || !replayData || !evalAvailable) return;
+    if (usageStats.loading || setAssumptions.loading) return;
+    if (snapshots.length === 0) return;
+    if (evaluation.graph.running || evaluation.graph.scores.some(score => score !== null)) return;
+    const key = `${replayData.id}:${setsFingerprint}:${JSON.stringify(effectiveTera)}`;
+    if (autoAnalyzeAttemptRef.current === key) return;
+    autoAnalyzeAttemptRef.current = key;
+    handleAnalyzeGame();
+  }, [
+    evaluation.prefs.autoAnalyze, replayData, evalAvailable, usageStats.loading, setAssumptions.loading,
+    snapshots.length, evaluation.graph.running, evaluation.graph.scores, setsFingerprint, effectiveTera, handleAnalyzeGame,
+  ]);
+
   // Explains ONE turn: a two-turn mini sweep (turn + its follow-up) so the
   // report can price the played outcome. Runs ONLY from the explicit deepen
   // button — selecting a turn shows the stored result and never re-searches
@@ -1410,12 +1493,30 @@ function App() {
 
   // Opt-in: keep the branch evaluation fresh after each executed turn. Runs
   // on the effective status, so a result that finished for a position the
-  // user has meanwhile left (tag mismatch) also re-evaluates.
+  // user has meanwhile left (tag mismatch) also re-evaluates. Live positions
+  // only: without the liveEvalView gate, navigating onto a main-line turn
+  // (the end sentinel included) fired a stray single-turn reconstruction —
+  // the "diverged before turn 68" error on a 67-turn game.
   useEffect(() => {
-    if (branching && evaluation.prefs.auto && liveEvalStatus === 'stale' && !executing) {
+    if (branching && evaluation.prefs.auto && liveEvalView && liveEvalStatus === 'stale' && !executing) {
       handleEvaluate();
     }
-  }, [branching, evaluation.prefs.auto, liveEvalStatus, executing, handleEvaluate]);
+  }, [branching, evaluation.prefs.auto, liveEvalView, liveEvalStatus, executing, handleEvaluate]);
+
+  // "Always on" also covers the live sim: a freshly opened variation (or a
+  // navigation back to its tip) evaluates without the Evaluate button. Never
+  // while the game sweep runs — a single evaluation supersedes the run id
+  // and would silently kill the sweep.
+  useEffect(() => {
+    if (!evaluation.prefs.autoAnalyze || !evalAvailable) return;
+    if (!liveTip || executing || branchPreparing || playOut?.active) return;
+    if (evaluation.graph.running) return;
+    if (liveEvalStatus !== 'idle' && liveEvalStatus !== 'stale') return;
+    handleEvaluate();
+  }, [
+    evaluation.prefs.autoAnalyze, evalAvailable, liveTip, executing, branchPreparing,
+    playOut?.active, evaluation.graph.running, liveEvalStatus, handleEvaluate,
+  ]);
 
   // "What if it had …": a team edit plus the normal branch refresh, with the
   // hypothetical move pre-seeded as that slot's pending choice.
@@ -1545,13 +1646,6 @@ function App() {
   const loadedReplayUrl = replayData
     ? `https://replay.pokemonshowdown.com/${replayData.id}${replayData.viewpoint === 'p2' ? '?p2' : ''}`
     : null;
-
-  // Programmatic seeks (graph clicks) race the embed's turn echoes: while
-  // the iframe is still seeking it keeps reporting the OLD turn, which
-  // would knock the fresh selection straight back (the analysis flipped
-  // to the previous turn under load). Stale echoes are ignored until the
-  // embed confirms the seek or the window lapses.
-  const seekIntentRef = useRef<{ turn: number; until: number } | null>(null);
 
   const handleReplayTurn = useCallback((turn: number) => {
     if (viewingVariation || turn < 1) return;
@@ -1951,11 +2045,6 @@ function App() {
                 {usageStats.loading && (
                   <span style={{ fontSize: 10, color: '#b6a46a' }}>Smogon stats loading...</span>
                 )}
-                {usageStats.stats && (
-                  <span style={{ fontSize: 10, color: '#b6a46a' }}>
-                    Smogon {usageStats.stats.format} {usageStats.stats.month}
-                  </span>
-                )}
                 {usageStats.error && (
                   <span style={{ fontSize: 10, color: '#987' }}>Smogon stats unavailable</span>
                 )}
@@ -1998,9 +2087,6 @@ function App() {
                       />
                       Animate branch turns
                     </label>
-                    <button type="button" className="ps-btn" onClick={discardVariation} style={{ padding: '2px 8px', fontSize: 10 }}>
-                      Back
-                    </button>
                     {branchDivergence && (
                       <span
                         style={{ fontSize: 10, color: '#e6b36a', maxWidth: 520 }}
@@ -2053,7 +2139,7 @@ function App() {
                   autoPlay={false}
                   viewpoint={replayData.viewpoint}
                   liveUpdates
-                  liveAppendMode={animateBranchTurns ? 'play' : 'follow-end'}
+                  liveAppendMode={playOut?.active ? 'hold' : animateBranchTurns ? 'play' : 'follow-end'}
                   liveAppendTurn={latestBranchHistoryEntry?.turnNumber ?? null}
                   reloadKey={branchReloadKey}
                   seekRequest={navSeek}
@@ -2078,6 +2164,19 @@ function App() {
             {/* Timeline bar: always visible — one slider over main line and variation */}
             <div className="ps-branch-bar">
               <span style={{ fontSize: 11, fontWeight: 'bold', whiteSpace: 'nowrap', color: '#cde' }}>Timeline</span>
+              {evaluation.graph.lead && (
+                <button
+                  type="button"
+                  className="ps-btn"
+                  onClick={() => handleGraphSelectLine(0)}
+                  title="Turn 0: the team-preview lead decision."
+                  aria-pressed={analysisTurn === 0}
+                  style={{
+                    padding: '2px 6px', fontSize: 10,
+                    ...(analysisTurn === 0 ? { borderColor: '#8cf', color: '#8cf' } : {}),
+                  }}
+                >T0</button>
+              )}
               <button
                 type="button"
                 onClick={() => navigateTo({ turn: viewTurn - 1, line: viewLine })}
@@ -2122,21 +2221,28 @@ function App() {
                   <strong style={{ color: '#fff' }}>End</strong>
                 ) : (
                   <>
-                    T<strong style={{ color: '#fff' }}>{viewTurn}</strong>/{sliderMax(maxTurn, variationSpan)}
+                    {/* The total counts PLAYED turns — the end snapshot is the
+                        "End" sentinel, not a 68th turn of a 67-turn game. */}
+                    T<strong style={{ color: '#fff' }}>{viewTurn}</strong>/{sliderMax(endSnapshotTurn !== null ? endSnapshotTurn - 1 : maxTurn, variationSpan)}
                   </>
                 )}
               </span>
-              {variationSpan !== null && viewTurn >= variationSpan.startTurn && viewTurn <= variationTip(variationSpan) && (
+              {/* The chip stays put while a variation exists — flickering away
+                  outside the covered turns made the whole bar jump around. */}
+              {variationSpan !== null && (
                 <span className="ps-line-chip" role="group" aria-label="Line selector">
                   <button
                     type="button"
-                    className={viewLine !== 'variation' ? 'on-main' : ''}
+                    className={!viewingVariation ? 'on-main' : ''}
                     onClick={() => navigateTo({ turn: Math.min(viewTurn, maxTurn), line: 'main' })}
                   >Main line</button>
                   <button
                     type="button"
-                    className={viewLine === 'variation' ? 'on-vari' : ''}
-                    onClick={() => navigateTo({ turn: viewTurn, line: 'variation' })}
+                    className={viewingVariation ? 'on-vari' : ''}
+                    onClick={() => navigateTo({
+                      turn: Math.min(Math.max(viewTurn, variationSpan.startTurn + 1), variationTip(variationSpan)),
+                      line: 'variation',
+                    })}
                   >Variation</button>
                 </span>
               )}
@@ -2252,6 +2358,7 @@ function App() {
                 onAnalyzeGame={handleAnalyzeGame}
                 positionLabel={liveEvalView ? `Turn ${viewTurn} · ${viewingVariation ? 'variation' : 'main line'}` : null}
                 graphMaxTurn={analyzableTurns}
+                analysisTurn={analysisTurn}
                 onSelectTurn={handleGraphSelectLine}
                 currentTurn={viewTurn}
                 currentLine={viewingVariation ? 'variation' : 'main'}
