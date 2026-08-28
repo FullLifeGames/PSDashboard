@@ -138,15 +138,16 @@ async function startVariationAt(page: Page, turn: number, options?: { p1Move?: s
   }
 }
 
-/** Rebuilds the live sim at the CURRENT position without playing a move —
- *  the snapshot picker's "Rebuild exact position" affordance. */
-async function materializeSimHere(page: Page, turn?: number) {
+/** Waits for the dwell upgrade: after ~1s on a main-line turn the app
+ *  reconstructs the exact position in the background and the snapshot
+ *  approximation upgrades in place (no button — the unified timeline's
+ *  exactness promise). */
+async function waitForExactPickers(page: Page, turn?: number) {
   if (turn && turn > 1) {
     await page.locator('.ps-branch-bar input[type="range"]').fill(String(turn));
     await expect(page.getByText(`T${turn}/`)).toBeVisible();
   }
-  await page.locator('button', { hasText: 'Rebuild exact position' }).click();
-  await expect(page.getByText(/Branching — Turn/)).toBeVisible({ timeout: 60_000 });
+  await expect(page.getByText('Choices from the reconstructed position')).toBeVisible({ timeout: 90_000 });
 }
 
 // The embed script is fetched from play.pokemonshowdown.com by every test's
@@ -626,18 +627,19 @@ test.describe('PS Dashboard', () => {
     });
     await page.reload();
     await page.locator('button', { hasText: 'Load' }).click();
-    // Unified timeline: the sim materializes at turn 1 without a mode switch.
-    await materializeSimHere(page);
-    await expect(page.getByText(/Branching — Turn 1/)).toBeVisible({ timeout: 60_000 });
+    // Unified timeline: playing a move puts the live sim at the tip — the
+    // Evaluate button and choice clicks work from there.
+    await startVariationAt(page, 1);
+    await expect(page.getByText(/Branching — Turn 2/)).toBeVisible({ timeout: 60_000 });
 
     const panel = page.locator('.ps-eval-panel');
-    await panel.locator('button', { hasText: 'Evaluate' }).click();
+    await panel.locator('button', { hasText: /^Evaluate$|^Re-evaluate$/ }).click();
     await expect(panel.locator('.ps-eval-bar')).toBeVisible({ timeout: 120_000 });
 
     // One click commits the line, answers with the engine's reply, and
     // executes — the walk continues from the next position.
     await panel.locator('.ps-eval-column').nth(0).locator('.ps-eval-choice').first().click();
-    await expect(page.getByText(/Branching — Turn 2/)).toBeVisible({ timeout: 60_000 });
+    await expect(page.getByText(/Branching — Turn 3/)).toBeVisible({ timeout: 60_000 });
   });
 
   test('exports both sides and applies an imported set as manual data (Import/Export Sets)', async ({ page }) => {
@@ -966,18 +968,25 @@ test.describe('PS Dashboard', () => {
 
     await slider.fill('56');
     await expect(page.getByText('T56/')).toBeVisible();
-    await page.locator('button', { hasText: 'Rebuild exact position' }).click();
-    await expect(page.getByText(/Branching — Turn 56/)).toBeVisible({ timeout: 120_000 });
+    // Executing a turn here funnels through the same healed reconstruction
+    // the old materialize button used — t56 must arrive LIVE and play.
+    const p1 = page.locator('.ps-branch-side-column').first();
+    const p2 = page.locator('.ps-branch-side-column').nth(1);
+    await p1.locator('.ps-movebtn:enabled').first().click();
+    await p2.locator('.ps-movebtn:enabled').first().click();
+    await page.locator('.ps-execute-btn').click();
+    await expect(page.getByText(/Branching — Turn 5[6-9]/)).toBeVisible({ timeout: 120_000 });
     await expect(page.getByText(/already ended|wedged at turn/)).toHaveCount(0);
 
     await page.locator('button', { hasText: 'Back' }).click();
     await expect(slider).toBeVisible({ timeout: 10_000 });
     await slider.fill('68');
-    // The end snapshot is the post-battle sentinel — materializing (or
-    // executing) there is refused with the explanation instead of a button
-    // that no longer exists.
-    await page.locator('button', { hasText: 'Rebuild exact position' }).click();
+    // The end snapshot is the post-battle sentinel — playing from it (the
+    // play-out button included) is refused with the explanation, and no
+    // play-out arms.
+    await page.locator('button', { hasText: 'Let it play out' }).click();
     await expect(page.getByText(/already over at the end position/)).toBeVisible();
+    await expect(page.getByText(/Engine is playing both sides/)).toHaveCount(0);
     await expect(page.getByText(/Branching — Turn/)).toHaveCount(0);
   });
 
@@ -1104,11 +1113,15 @@ test.describe('PS Dashboard', () => {
     await expect(page.locator('button', { hasText: 'Execute Turn' })).toBeEnabled();
   });
 
-  test('materializing the sim gives immediate preparation feedback', async ({ page }) => {
+  test('snapshot pickers upgrade to the exact position on dwell — no button', async ({ page }) => {
     await page.locator('button', { hasText: 'Load' }).click();
-    await expect(page.locator('button', { hasText: 'Rebuild exact position' })).toBeVisible({ timeout: 15000 });
-    await page.locator('button', { hasText: 'Rebuild exact position' }).click();
-    await expect(page.getByText('Preparing branch...')).toBeVisible({ timeout: 2000 });
+    // The approximation renders first (PP unknown = dash) …
+    await expect(page.getByText(/Choices approximated/)).toBeVisible({ timeout: 15000 });
+    await expect(page.locator('button', { hasText: 'Rebuild exact position' })).toHaveCount(0);
+    // … and after settling, the background reconstruction upgrades it in
+    // place: real PP appears and the source line says so.
+    await expect(page.getByText('Choices from the reconstructed position')).toBeVisible({ timeout: 90_000 });
+    await expect(page.locator('.ps-movebtn-pp').first()).toHaveText(/\d+\/\d+/);
   });
 
   test('executing a branch turn keeps the branch replay iframe mounted', async ({ page }) => {
@@ -1373,8 +1386,8 @@ test.describe('PS Dashboard', () => {
     await page.locator('input[type="text"]').fill('gen9doubles-test');
     await page.locator('button', { hasText: 'Load' }).click();
     await expect(page.getByText('Alice', { exact: true }).first()).toBeVisible({ timeout: 10000 });
-    // Doubles targeting needs the real request — materialize the sim here.
-    await materializeSimHere(page);
+    // Doubles targeting needs the real request — the dwell upgrade delivers it.
+    await waitForExactPickers(page);
 
     const controls = page.locator('.ps-side-controls');
     await expect(controls).toHaveCount(4);
@@ -1396,8 +1409,8 @@ test.describe('PS Dashboard', () => {
     await page.locator('input[type="text"]').fill('gen9doubles-test');
     await page.locator('button', { hasText: 'Load' }).click();
     await expect(page.getByText('Alice', { exact: true }).first()).toBeVisible({ timeout: 10000 });
-    // Doubles targeting needs the real request — materialize the sim here.
-    await materializeSimHere(page);
+    // Doubles targeting needs the real request — the dwell upgrade delivers it.
+    await waitForExactPickers(page);
 
     const pikachuControls = page.locator('.ps-side-controls').first();
     const bulbasaurTarget = pikachuControls.locator('.ps-target-btn[title^="Thunderbolt into Bulbasaur"]');

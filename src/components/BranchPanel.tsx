@@ -31,15 +31,14 @@ interface Props {
   /**
    * Where this position's choices come from (unified timeline, variant B):
    * 'live' = the branch sim stands here; 'stored' = rebuilt from a recorded
-   * position; 'snapshot' = approximated from replay snapshot + guessed teams
-   * (the sim validates legality when the move executes). Undefined renders
-   * like 'live' (legacy callers).
+   * or reconstructed exact position; 'snapshot' = approximated from replay
+   * snapshot + guessed teams (the sim validates legality when the move
+   * executes). Undefined renders like 'live' (legacy callers).
    */
   source?: PickerSource;
-  /** Rebuilds the live sim at this position WITHOUT executing a move —
-   *  offered on snapshot approximations, where doubles targeting and exact
-   *  PP need the real request. */
-  onMaterialize?: () => void;
+  /** The app is reconstructing this position's exact choices right now —
+   *  the snapshot approximation upgrades in place when it lands. */
+  acquiringExact?: boolean;
   executeError: string | null;
   /** True while a turn is being written to the sim — blocks double executes. */
   executing: boolean;
@@ -562,7 +561,7 @@ const EMPTY_SIDE_DAMAGE: SideDamage = { default: [], targets: {}, spread: {} };
 const ADVANCED_KEY = 'ps-replay-interceptor:picker-advanced';
 
 /* ── Main BranchPanel (controls only, no iframe) ── */
-export function BranchPanel({ simState, source, onMaterialize, executeError, executing, gen, onSetChoice, onHypotheticalMove, onExecuteTurn, played }: Props) {
+export function BranchPanel({ simState, source, acquiringExact, executeError, executing, gen, onSetChoice, onHypotheticalMove, onExecuteTurn, played }: Props) {
   const [showLog, setShowLog] = useState(false);
   // Compact by default: move/switch buttons and Execute. "Advanced" adds the
   // free-choice dropdown and the "What if it had…" tools (persisted).
@@ -720,24 +719,15 @@ export function BranchPanel({ simState, source, onMaterialize, executeError, exe
   return (
     <div>
       <div style={{ fontSize: 10, color: '#9fb2cc', margin: '6px 0 2px', display: 'flex', gap: 8, alignItems: 'baseline', flexWrap: 'wrap' }}>
-        {source && source !== 'live' && (
+        {source === 'stored' && (
+          <span>Choices from the reconstructed position</span>
+        )}
+        {source === 'snapshot' && (
           <span>
-            {source === 'stored'
-              ? 'Choices from the recorded variation position'
+            {acquiringExact
+              ? 'Choices approximated — reconstructing the exact position…'
               : 'Choices approximated from the replay — the sim checks legality when you play a move'}
           </span>
-        )}
-        {source === 'snapshot' && onMaterialize && (
-          <button
-            type="button"
-            onClick={onMaterialize}
-            disabled={executing}
-            className="ps-btn"
-            style={{ padding: '0 6px', fontSize: 10 }}
-            title="Rebuilds the simulator at this turn WITHOUT playing a move — you get exact PP, disabled moves and (in doubles) real target buttons. Only needed when the approximation is not enough."
-          >
-            Rebuild exact position
-          </button>
         )}
         <span style={{ flex: 1 }} />
         <button

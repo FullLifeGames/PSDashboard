@@ -800,6 +800,34 @@ function App() {
     return serializeLiveBattle(battle);
   }, [getBattle]);
 
+  /**
+   * Exact main-line positions the app has already reconstructed, keyed like
+   * the eval cache (replay:turn:sets). In the unified timeline exactness is
+   * the app's job, not a button: every acquisition (Evaluate, Analyze game's
+   * streamed boundaries, the dwell rebuild below) lands here, and the pickers
+   * upgrade from approximate to exact the moment a position is known.
+   */
+  const exactPositionsRef = useRef(new Map<string, string>());
+  const failedExactRef = useRef(new Set<string>());
+  const [exactPositionsVersion, setExactPositionsVersion] = useState(0);
+  const exactKeyFor = useCallback(
+    (turn: number) => (replayData ? `${replayData.id}:${turn}:${setsFingerprint}` : null),
+    [replayData, setsFingerprint],
+  );
+  const storeExactPosition = useCallback((turn: number, serialized: string) => {
+    const key = exactKeyFor(turn);
+    if (!key || exactPositionsRef.current.get(key) === serialized) return;
+    exactPositionsRef.current.set(key, serialized);
+    setExactPositionsVersion(version => version + 1);
+  }, [exactKeyFor]);
+  useEffect(() => {
+    // New replay or new set knowledge: yesterday's reconstructions no longer
+    // describe these positions (keys differ, but the memory should go too).
+    exactPositionsRef.current.clear();
+    failedExactRef.current.clear();
+    setExactPositionsVersion(version => version + 1);
+  }, [replayData?.id, setsFingerprint]);
+
   const makeReplayAcquire = useCallback((turn: number) =>
     async (reportReconstruct: (turn: number, target: number) => void) => {
       if (!replayData) throw new Error('Load a replay first.');
@@ -848,8 +876,10 @@ function App() {
       if (!branchEngine.reconstructionReached(runtime, turn)) {
         throw new Error(`The reconstruction diverged before turn ${turn} — the guessed sets could not reproduce this position. Correcting items/moves via Edit Player/Opp usually fixes it.`);
       }
-      return serializeLiveBattle(battle);
-    }, [replayData, teamText, effectiveP1Info, effectiveP2Info, usageStats.stats, setAssumptions.assumptions, snapshots, observations, hpEvidence, getInferredSpreads]);
+      const serialized = serializeLiveBattle(battle);
+      storeExactPosition(turn, serialized);
+      return serialized;
+    }, [replayData, teamText, effectiveP1Info, effectiveP2Info, usageStats.stats, setAssumptions.assumptions, snapshots, observations, hpEvidence, getInferredSpreads, storeExactPosition]);
 
   // Per-block seed/residual records of the last sweep reconstruction —
   // instrumentation only (debug handle + drift report), never verdicts.
@@ -897,6 +927,7 @@ function App() {
             try {
               const serialized = serializeLiveBattle(battle);
               positions[turn - 1] = serialized;
+              storeExactPosition(turn, serialized);
               onPosition?.(turn, serialized);
             } catch {
               // A broken boundary becomes a graph gap, not a failed sweep.
@@ -923,10 +954,11 @@ function App() {
       if (!invalid && battle && branchEngine.reconstructionReached(runtime, turns)) {
         const serialized = serializeLiveBattle(battle);
         positions[turns - 1] = serialized;
+        storeExactPosition(turns, serialized);
         onPosition?.(turns, serialized);
       }
       return positions;
-    }, [replayData, teamText, effectiveP1Info, effectiveP2Info, usageStats.stats, setAssumptions.assumptions, snapshots, observations, hpEvidence, getInferredSpreads]);
+    }, [replayData, teamText, effectiveP1Info, effectiveP2Info, usageStats.stats, setAssumptions.assumptions, snapshots, observations, hpEvidence, getInferredSpreads, storeExactPosition]);
 
   const acquireReplayPosition = useMemo(() => makeReplayAcquire(viewTurn), [makeReplayAcquire, viewTurn]);
 
@@ -943,7 +975,12 @@ function App() {
       setPositionPicker(null);
       return;
     }
-    const stored = viewingVariation ? serializedAtView : (viewTurn === variationStartTurn ? startSerialized : null);
+    const exactMainLine = !viewingVariation && exactKeyFor(viewTurn)
+      ? exactPositionsRef.current.get(exactKeyFor(viewTurn)!) ?? null
+      : null;
+    const stored = viewingVariation
+      ? serializedAtView
+      : (viewTurn === variationStartTurn ? startSerialized : null) ?? exactMainLine;
     (async () => {
       if (stored) {
         const { pickerStateFromSerialized } = await import('./lib/picker-state');
@@ -987,7 +1024,7 @@ function App() {
   }, [
     liveTip, viewingVariation, serializedAtView, variationStartTurn, startSerialized, viewTurn, snapshots, replayData,
     teamText, effectiveP1Info, effectiveP2Info, usageStats.stats, setAssumptions.assumptions, getInferredSpreads, hpEvidence,
-    replayGenNumber,
+    replayGenNumber, exactKeyFor, exactPositionsVersion,
   ]);
 
   const handleEvaluate = useCallback(() => {
@@ -1173,6 +1210,12 @@ function App() {
   }, [navigateTo, tipTurn]);
 
   const startPlayOut = useCallback(() => {
+    // The post-battle sentinel has nothing to play — surface the existing
+    // refusal instead of arming a loop that can never start.
+    if (!liveTip && !viewingVariation && atEndPosition) {
+      requestDeviation(null);
+      return;
+    }
     // Same gates as any deviation: rebuild to here first when the live sim
     // stands elsewhere (incl. the replace confirm on the main line).
     if (!liveTip) requestDeviation(null);
@@ -1184,7 +1227,7 @@ function App() {
     setPlayOutNotice(null);
     setPlayOut({ active: true, executed: 0, startTurn: viewTurn, prevAuto });
     if (liveTip) handleEvaluate();
-  }, [liveTip, requestDeviation, evaluation, handleEvaluate, viewTurn]);
+  }, [liveTip, viewingVariation, atEndPosition, requestDeviation, evaluation, handleEvaluate, viewTurn]);
 
   const finishPlayOut = useCallback((current: NonNullable<typeof playOut>, text: string, watch: boolean) => {
     if (!current.prevAuto) evaluation.setPrefs({ ...evaluation.prefs, auto: false });
@@ -1229,6 +1272,47 @@ function App() {
     }
     setPlayOut({ ...playOut, executed: playOut.executed + 1 });
   }, [playOut, liveTip, executing, branchPreparing, evaluation.status, evaluation.result, evaluation.resultTag, evalViewKey, getBattle, applyEvalChoice, executeTurn, handleEvaluate, finishPlayOut]);
+
+  /**
+   * The unified timeline's exactness promise, without a button: when the
+   * pointer DWELLS on a main-line turn whose exact position is unknown, the
+   * app quietly reconstructs it in the background (the same healed path
+   * Evaluate acquires through) and the pickers upgrade in place. Scrubbing
+   * stays free — the timer only fires once the user settles, and never while
+   * the sim, an evaluation, or a play-out is busy.
+   */
+  const [exactAcquiringTurn, setExactAcquiringTurn] = useState<number | null>(null);
+  const exactAcquireBusyRef = useRef(false);
+  useEffect(() => {
+    if (!replayData || liveTip || viewingVariation || atEndPosition) return;
+    if (usageStats.loading || setAssumptions.loading) return;
+    if (executing || branchPreparing || playOut?.active) return;
+    if (evaluation.status === 'reconstructing' || evaluation.status === 'searching' || evaluation.graph.running) return;
+    const key = exactKeyFor(viewTurn);
+    if (!key || exactPositionsRef.current.has(key) || failedExactRef.current.has(key)) return;
+    const turn = viewTurn;
+    const timer = window.setTimeout(() => {
+      if (exactAcquireBusyRef.current) return;
+      exactAcquireBusyRef.current = true;
+      setExactAcquiringTurn(turn);
+      void makeReplayAcquire(turn)(() => {})
+        .catch(() => {
+          // The approximation stays usable — the sim still validates on
+          // execute. Remember the failure so a diverging replay does not
+          // re-run the reconstruction on every render tick.
+          failedExactRef.current.add(key);
+        })
+        .finally(() => {
+          exactAcquireBusyRef.current = false;
+          setExactAcquiringTurn(current => (current === turn ? null : current));
+        });
+    }, 900);
+    return () => window.clearTimeout(timer);
+  }, [
+    replayData, liveTip, viewingVariation, atEndPosition, viewTurn, exactKeyFor, exactPositionsVersion,
+    usageStats.loading, setAssumptions.loading, executing, branchPreparing, playOut?.active,
+    evaluation.status, evaluation.graph.running, makeReplayAcquire,
+  ]);
 
   // The sweep counts PLAYED turns. The end snapshot (lastTurn + 1, the
   // post-game state) is the branch slider's "End" sentinel, not a turn —
@@ -2102,7 +2186,7 @@ function App() {
             <BranchPanel
               simState={liveTip ? simState : pickerSimState}
               source={liveTip ? 'live' : positionPicker?.source}
-              onMaterialize={() => requestDeviation(null)}
+              acquiringExact={!liveTip && exactAcquiringTurn === viewTurn}
               executeError={executeError}
               executing={executing || branchPreparing}
               gen={replayGen}
