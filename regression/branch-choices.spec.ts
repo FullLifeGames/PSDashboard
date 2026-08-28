@@ -5,6 +5,8 @@ import {
   conflictingSwitchTargets,
   describeSlotChoice,
   evalChoiceToSlotChoices,
+  notationSideLabel,
+  notationSlotChoice,
   requiredChoicesForActiveSlots,
   switchChoiceKey,
   switchOptionKey,
@@ -60,6 +62,17 @@ test.describe('branch choice helpers', () => {
     expect(describeSlotChoice(moveBy('Flamethrower', -2))).toBe('move Flamethrower -2');
     expect(describeSlotChoice(switchTo('Skarmory'))).toBe('switch Skarmory');
     expect(describeSlotChoice(null)).toBe('');
+  });
+
+  test('notation labels read as move names, never raw sim commands', () => {
+    expect(notationSlotChoice(moveBy('Ice Beam'))).toBe('Ice Beam');
+    expect(notationSlotChoice(switchTo('Kyurem'))).toBe('→ Kyurem');
+    expect(notationSideLabel([moveBy('Ice Beam')], 'move 1')).toBe('Ice Beam');
+    expect(notationSideLabel([moveBy('Icy Wind', 1), switchTo('Skarmory')], 'move 2 +1, switch 3'))
+      .toBe('Icy Wind +1 + → Skarmory');
+    // Entries recorded before identity-based choices existed fall back raw.
+    expect(notationSideLabel(undefined, 'move 1')).toBe('move 1');
+    expect(notationSideLabel([null], 'switch 2')).toBe('switch 2');
   });
 });
 

@@ -41,6 +41,28 @@ export function describeSlotChoice(choice: BranchSlotChoice | null | undefined):
   return `move ${choice.moveName}${target}${modifier}`;
 }
 
+/**
+ * Notation form of a slot choice: the move NAME the user clicked, or
+ * "→ Pokémon" for a switch — never the raw sim command ("move 1",
+ * "switch 2") the history stores for replaying.
+ */
+export function notationSlotChoice(choice: BranchSlotChoice | null | undefined): string {
+  if (!choice) return '';
+  if (choice.kind === 'switch') return `→ ${choice.pokemonName}`;
+  const target = choice.targetLoc !== undefined ? ` ${formatTargetLoc(choice.targetLoc)}` : '';
+  const modifier = choice.modifier ? ` (${MODIFIER_LABELS[choice.modifier]})` : '';
+  return `${choice.moveName}${target}${modifier}`;
+}
+
+/** One side's notation for a history entry — slots joined, raw fallback. */
+export function notationSideLabel(
+  slotChoices: (BranchSlotChoice | null)[] | undefined,
+  rawCommand: string,
+): string {
+  const parts = (slotChoices ?? []).filter(Boolean).map(choice => notationSlotChoice(choice));
+  return parts.length > 0 ? parts.join(' + ') : rawCommand;
+}
+
 export function switchChoiceKey(choice: BranchSlotChoice | null | undefined): string | null {
   if (!choice || choice.kind !== 'switch') return null;
   return `${choice.speciesId}|${choiceId(choice.pokemonName)}`;

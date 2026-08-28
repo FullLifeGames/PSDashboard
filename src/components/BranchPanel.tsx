@@ -6,7 +6,7 @@ import type { DamageResult } from '../lib/damage-calc';
 import {
   branchSideChoicesReady,
   choiceId,
-  describeSlotChoice,
+  notationSlotChoice,
   requiredChoicesForActiveSlots,
   switchChoiceKey,
   switchOptionKey,
@@ -259,7 +259,7 @@ function SideControls({ side, label, activeName, activeSpecies, activeFainted, m
         )}
         {pending && (
           <span className="ps-pending-choice">
-            [{describeSlotChoice(pending)}]
+            [{notationSlotChoice(pending)}]
           </span>
         )}
       </div>

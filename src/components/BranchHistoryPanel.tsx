@@ -1,5 +1,6 @@
 import type { TurnSnapshot } from '../types';
 import type { BranchHistoryEntry } from '../hooks/useBranch';
+import { notationSideLabel } from '../lib/branch-choices';
 import type { TimelinePosition } from '../lib/timeline';
 
 interface Props {
@@ -74,10 +75,10 @@ export function BranchHistoryPanel({ branchStartTurn, history, snapshots, curren
   return (
     <div className="ps-panel" style={{ marginTop: 8, flex: '0 0 auto' }}>
       <div style={{ fontSize: 13, fontWeight: 'bold', marginBottom: 8 }}>
-        Branch History
+        Variation moves
         {onNavigate && history.length > 0 && (
           <span style={{ fontWeight: 'normal', fontSize: 10, color: '#8899aa', marginLeft: 8 }}>
-            click a cell to jump — original opens the main line, branch the variation
+            click a cell to jump — left opens the main line, right the variation
           </span>
         )}
       </div>
@@ -89,7 +90,9 @@ export function BranchHistoryPanel({ branchStartTurn, history, snapshots, curren
       <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
         {rows.map(({ entry, originalTurn, variationTurn }, index) => {
             if (entry.kind === 'forced' || originalTurn === null || variationTurn === null) {
-              const forcedChoice = entry.forcedSide === 'p1' ? entry.p1Choice : entry.p2Choice;
+              const forcedChoice = entry.forcedSide === 'p1'
+                ? notationSideLabel(entry.p1SlotChoices, entry.p1Choice)
+                : notationSideLabel(entry.p2SlotChoices, entry.p2Choice);
               return (
                 <div
                   key={`forced-${entry.turnNumber}-${index}`}
@@ -125,8 +128,10 @@ export function BranchHistoryPanel({ branchStartTurn, history, snapshots, curren
             >
               <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, marginBottom: 6 }}>
                 <strong style={{ fontSize: 12 }}>Turn {entry.turnNumber}</strong>
-                <span style={{ fontSize: 10, color: '#9fb5d9' }}>
-                  P1 {entry.p1Choice} | P2 {entry.p2Choice}
+                <span style={{ fontSize: 10, color: '#cddcf2' }}>
+                  {notationSideLabel(entry.p1SlotChoices, entry.p1Choice)}
+                  <span style={{ color: '#667' }}> | </span>
+                  {notationSideLabel(entry.p2SlotChoices, entry.p2Choice)}
                 </span>
               </div>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
@@ -142,7 +147,7 @@ export function BranchHistoryPanel({ branchStartTurn, history, snapshots, curren
                     cursor: onNavigate ? 'pointer' : 'default',
                   }}
                 >
-                  <div style={{ color: '#8899aa', marginBottom: 3 }}>Original replay (turn {originalTurn})</div>
+                  <div style={{ color: '#8899aa', marginBottom: 3 }}>Main line (turn {originalTurn})</div>
                   <div>P1: {original.p1}</div>
                   <div>P2: {original.p2}</div>
                 </button>
@@ -158,7 +163,7 @@ export function BranchHistoryPanel({ branchStartTurn, history, snapshots, curren
                     cursor: onNavigate ? 'pointer' : 'default',
                   }}
                 >
-                  <div style={{ color: '#8899aa', marginBottom: 3 }}>Branch result</div>
+                  <div style={{ color: '#8899aa', marginBottom: 3 }}>Variation result</div>
                   <div>P1: {branch.p1}</div>
                   <div>P2: {branch.p2}</div>
                 </button>

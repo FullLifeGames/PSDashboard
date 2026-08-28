@@ -118,7 +118,7 @@ async function startVariationAt(page: Page, turn: number, options?: { p1Move?: s
   }
   await p2.locator('.ps-movebtn:enabled').first().click();
   await page.locator('.ps-execute-btn').click();
-  await expect(page.locator('.ps-panel', { hasText: 'Branch History' }))
+  await expect(page.locator('.ps-panel', { hasText: 'Variation moves' }))
     .toContainText(`Turn ${turn}`, { timeout: 60_000 });
   // A first-move KO is common — resolve the trailing forced replacement so
   // callers always get both sides' pickers back.
@@ -126,7 +126,7 @@ async function startVariationAt(page: Page, turn: number, options?: { p1Move?: s
   await replacement.waitFor({ state: 'visible', timeout: 4000 }).catch(() => {});
   if (await replacement.isVisible().catch(() => false)) {
     await replacement.click();
-    await expect(page.locator('.ps-panel', { hasText: 'Branch History' }))
+    await expect(page.locator('.ps-panel', { hasText: 'Variation moves' }))
       .toContainText('forced replacement', { timeout: 30_000 });
   }
   // The side that replaced stays on its Pokémon tab — flip back to Fight.
@@ -937,7 +937,7 @@ test.describe('PS Dashboard', () => {
     await startVariationAt(page, 2);
 
     // The executed turn is entry "Turn 2"; the sim continues one past it.
-    await expect(page.locator('.ps-panel', { hasText: 'Branch History' })).toContainText('Turn 2');
+    await expect(page.locator('.ps-panel', { hasText: 'Variation moves' })).toContainText('Turn 2');
     await expect(page.getByText(/Branching — Turn/)).toBeVisible({ timeout: 15000 });
   });
 
@@ -1076,7 +1076,7 @@ test.describe('PS Dashboard', () => {
     const p2Controls = page.locator('.ps-branch-side-column').nth(1);
     await startVariationAt(page, 1, { p1Move: 'Swords Dance' });
     await expect(page.getByText(/Branching — Turn 2/)).toBeVisible({ timeout: 15000 });
-    await expect(page.locator('.ps-panel', { hasText: 'Branch History' })).toContainText('Turn 1');
+    await expect(page.locator('.ps-panel', { hasText: 'Variation moves' })).toContainText('Turn 1');
 
     await page.locator('button', { hasText: /Use Recommended/i }).nth(1).click();
     // Pending chips show the move identity instead of the grid slot (B1).
@@ -1091,7 +1091,7 @@ test.describe('PS Dashboard', () => {
     await editor.locator('button', { hasText: /^Save$/ }).click();
 
     await expect(page.getByText(/Branching.*Turn 2/)).toBeVisible({ timeout: 15000 });
-    await expect(page.locator('.ps-panel', { hasText: 'Branch History' })).toContainText('Turn 1');
+    await expect(page.locator('.ps-panel', { hasText: 'Variation moves' })).toContainText('Turn 1');
     await expect(p1Controls).toContainText('Stone Edge');
     await expect(p1Controls).not.toContainText('Earthquake');
     await expect(p2Controls).toContainText(/\[move .+\]/);
@@ -1116,7 +1116,7 @@ test.describe('PS Dashboard', () => {
     const iframe = await page.locator('iframe[title="Branch Simulation"]').elementHandle();
     await page.locator('button', { hasText: 'Execute Turn' }).click();
 
-    await expect(page.locator('.ps-panel', { hasText: 'Branch History' })).toContainText('Turn 2', { timeout: 15000 });
+    await expect(page.locator('.ps-panel', { hasText: 'Variation moves' })).toContainText('Turn 2', { timeout: 15000 });
     const sameIframe = await page.locator('iframe[title="Branch Simulation"]').evaluate((el, previous) => el === previous, iframe);
     expect(sameIframe).toBe(true);
   });
@@ -1235,7 +1235,7 @@ test.describe('PS Dashboard', () => {
     await p1Controls.locator('.ps-movebtn', { hasText: 'Swords Dance' }).click();
     await p2Controls.locator('button', { hasText: /Use Recommended/i }).click();
     await page.locator('button', { hasText: 'Execute Turn' }).click();
-    await expect(page.locator('.ps-panel', { hasText: 'Branch History' })).toContainText('Turn 2', { timeout: 10000 });
+    await expect(page.locator('.ps-panel', { hasText: 'Variation moves' })).toContainText('Turn 2', { timeout: 10000 });
 
     const finalBox = await branchIframe.boundingBox();
     expect(finalBox?.height).toBe(initialBox?.height);
@@ -1450,7 +1450,7 @@ test.describe('PS Dashboard', () => {
       await p1.locator('.ps-movebtn:enabled').first().click();
       await p2.locator('.ps-movebtn:enabled').first().click();
       await page.locator('.ps-execute-btn').click();
-      await expect(page.locator('.ps-panel', { hasText: 'Branch History' })).toContainText('Turn 2', { timeout: 60_000 });
+      await expect(page.locator('.ps-panel', { hasText: 'Variation moves' })).toContainText('Turn 2', { timeout: 60_000 });
 
       // Step back one position: the pointer sits INSIDE the variation, the
       // pickers come from the recorded position, and the line chip appears.
@@ -1464,7 +1464,7 @@ test.describe('PS Dashboard', () => {
       await p2.locator('.ps-movebtn:enabled').first().click();
       await page.locator('.ps-execute-btn').click();
       await expect(page.locator('[role="alertdialog"]')).toHaveCount(0);
-      await expect(page.locator('.ps-panel', { hasText: 'Branch History' })).toContainText('Turn 2', { timeout: 60_000 });
+      await expect(page.locator('.ps-panel', { hasText: 'Variation moves' })).toContainText('Turn 2', { timeout: 60_000 });
     });
 
     test('main line stays one click away and replacing from it asks first', async ({ page }) => {
@@ -1475,7 +1475,7 @@ test.describe('PS Dashboard', () => {
       // One click back to the main line — view only, nothing destroyed.
       await page.locator('.ps-line-chip button', { hasText: 'Main line' }).click();
       await expect(page.locator('iframe[title="PS Replay"]')).toBeVisible({ timeout: 10000 });
-      await expect(page.locator('.ps-panel', { hasText: 'Branch History' })).toContainText('Turn 2');
+      await expect(page.locator('.ps-panel', { hasText: 'Variation moves' })).toContainText('Turn 2');
 
       // Deviating ON the main line asks first; Cancel keeps the variation.
       await page.locator('.ps-branch-bar input[type="range"]').fill('1');
@@ -1488,7 +1488,7 @@ test.describe('PS Dashboard', () => {
       await expect(confirm).toBeVisible();
       await expect(confirm).toContainText('replace the existing variation from turn 2');
       await confirm.locator('button', { hasText: 'Cancel' }).click();
-      await expect(page.locator('.ps-panel', { hasText: 'Branch History' })).toContainText('Turn 2');
+      await expect(page.locator('.ps-panel', { hasText: 'Variation moves' })).toContainText('Turn 2');
 
       // The variation stays one click away too.
       await page.locator('.ps-branch-bar input[type="range"]').fill('3');
