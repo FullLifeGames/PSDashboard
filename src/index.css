@@ -159,6 +159,27 @@ body {
 .ps-pokeball-status { border-color: #d0b000; background: radial-gradient(circle at 40% 35%, #ffe080 0%, #c8a800 100%); }
 .ps-pokeball-fainted { border-color: #888; background: #444; opacity: 0.5; }
 
+/* ── unified timeline: line chip ── */
+.ps-line-chip {
+  display: inline-flex;
+  border: 1px solid var(--ps-border-strong);
+  border-radius: 999px;
+  overflow: hidden;
+}
+.ps-line-chip button {
+  font-family: inherit;
+  font-size: 10px;
+  letter-spacing: 0.4px;
+  padding: 3px 10px;
+  cursor: pointer;
+  background: transparent;
+  border: 0;
+  color: var(--ps-muted);
+}
+.ps-line-chip button.on-main { background: rgba(124, 183, 232, 0.25); color: #dff; font-weight: bold; }
+.ps-line-chip button.on-vari { background: rgba(240, 199, 107, 0.25); color: #ffeeba; font-weight: bold; }
+.ps-line-chip button:disabled { opacity: 0.35; cursor: default; }
+
 /* Pokemon sprites */
 .ps-sprite {
   position: absolute;

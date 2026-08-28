@@ -40,9 +40,14 @@ interface EvalPanelProps {
   /** Gen 9 only — other gens have no Tera to gate. */
   showTera: boolean;
   graph: EvalGraphState;
+  /** Variation overlay for the game graph (unified timeline): the gold
+   *  curve's scores, indexed like the main scores (scores[turn − 1]). */
+  variation?: { startTurn: number; scores: (number | null)[] } | null;
+  /** Which line the pointer sits on — the graph's ring marker follows it. */
+  currentLine?: 'main' | 'variation';
   /** Replay view only — starts the whole-game background sweep. */
   onAnalyzeGame?: () => void;
-  onSelectTurn?: (turn: number) => void;
+  onSelectTurn?: (turn: number, line?: 'main' | 'variation') => void;
   currentTurn: number;
   /** Analysis of the graph-selected turn (replay view only). */
   analysis: TurnAnalysis | null;
@@ -125,7 +130,7 @@ function ChoiceList({
 export function EvalPanel({
   playerNames, status, result, progress, reconstructProgress, error,
   prefs, onPrefsChange, onEvaluate, onCancel, onPickChoice, onPickPair, showAuto, showTera,
-  graph, onAnalyzeGame, onSelectTurn, currentTurn, analysis,
+  graph, variation, currentLine, onAnalyzeGame, onSelectTurn, currentTurn, analysis,
   reads, leadAnalysis, reportLeads, report, doubles, resultSettings, onThinkDeeper, thinkDeeperTarget, smogonPending,
 }: EvalPanelProps) {
   const running = status === 'searching' || status === 'reconstructing';
@@ -170,8 +175,8 @@ export function EvalPanel({
     if (report) setView('report');
   }
   const selectTurn = onSelectTurn
-    ? (turn: number) => {
-      onSelectTurn(turn);
+    ? (turn: number, line?: 'main' | 'variation') => {
+      onSelectTurn(turn, line);
       setView('turn');
     }
     : undefined;
@@ -283,11 +288,11 @@ export function EvalPanel({
         </div>
       )}
 
-      {onAnalyzeGame && (
+      {(onAnalyzeGame || hasGraph || variation) && (
         <div style={{ margin: '6px 0' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 10, color: '#aabbcc' }}>
             <span style={{ fontWeight: 'bold', fontSize: 11, color: '#cde' }}>Game graph</span>
-            {graph.running ? (
+            {onAnalyzeGame && (graph.running ? (
               <>
                 <span style={{ color: '#fd6' }}>
                   analyzing… turn {graph.progress?.done ?? 0}/{graph.progress?.total ?? '?'}
@@ -311,7 +316,7 @@ export function EvalPanel({
                   {hasGraph ? 'Re-analyze' : 'Analyze game'}
                 </button>
               </>
-            )}
+            ))}
           </div>
           <div
             style={{ fontSize: 10, color: '#778', marginTop: 2 }}
@@ -328,15 +333,17 @@ export function EvalPanel({
               ⚠ {graph.notice}
             </div>
           )}
-          {hasGraph && (
+          {(hasGraph || variation) && (
             <EvalGraph
               scores={graph.scores}
               playerNames={playerNames}
               currentTurn={currentTurn}
+              currentLine={currentLine}
               onSelectTurn={selectTurn}
               leadScore={graph.lead?.result.score ?? null}
               evalErrors={graph.evalErrors}
               decided={graph.results.map(result => result?.unanswered?.decided ?? null)}
+              variation={variation}
             />
           )}
           {hasGraph && (showReportView || !analysis) && (

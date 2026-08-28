@@ -13,11 +13,20 @@ import {
   type BranchSlotChoice,
 } from '../lib/branch-choices';
 import { pickRecommendedMove } from '../lib/recommendation';
+import type { PickerSource } from '../lib/picker-state';
 import { spriteUrl } from '../lib/sprite-url';
 import { ComboBox } from './ComboBox';
 
 interface Props {
   simState: BranchSimState | null;
+  /**
+   * Where this position's choices come from (unified timeline, variant B):
+   * 'live' = the branch sim stands here; 'stored' = rebuilt from a recorded
+   * position; 'snapshot' = approximated from replay snapshot + guessed teams
+   * (the sim validates legality when the move executes). Undefined renders
+   * like 'live' (legacy callers).
+   */
+  source?: PickerSource;
   executeError: string | null;
   /** True while a turn is being written to the sim — blocks double executes. */
   executing: boolean;
@@ -93,7 +102,7 @@ function MoveBtn({ move, dmg, spreadDamage, zMoveName, targetDamage, pendingChoi
         )}
         <div className="ps-movebtn-info">
           <span className="ps-movebtn-type">{move.type || '???'}</span>
-          <span className="ps-movebtn-pp">{move.pp}/{move.maxpp}</span>
+          <span className="ps-movebtn-pp">{move.maxpp > 0 ? `${move.pp}/${move.maxpp}` : '—'}</span>
         </div>
         {spreadDamage && spreadDamage.length > 1 ? (
           <div className="ps-movebtn-dmg">
@@ -510,7 +519,7 @@ interface SideDamage {
 const EMPTY_SIDE_DAMAGE: SideDamage = { default: [], targets: {}, spread: {} };
 
 /* ── Main BranchPanel (controls only, no iframe) ── */
-export function BranchPanel({ simState, executeError, executing, gen, onSetChoice, onHypotheticalMove, onExecuteTurn }: Props) {
+export function BranchPanel({ simState, source, executeError, executing, gen, onSetChoice, onHypotheticalMove, onExecuteTurn }: Props) {
   const [showLog, setShowLog] = useState(false);
   const [damageBySide, setDamageBySide] = useState<{ p1: SideDamage; p2: SideDamage }>({
     p1: EMPTY_SIDE_DAMAGE,
@@ -648,6 +657,13 @@ export function BranchPanel({ simState, executeError, executing, gen, onSetChoic
 
   return (
     <div>
+      {source && source !== 'live' && (
+        <div style={{ fontSize: 10, color: '#9fb2cc', margin: '6px 0 2px' }}>
+          Choices {source === 'stored'
+            ? 'from the recorded position'
+            : 'from snapshot — the sim validates on execute'}
+        </div>
+      )}
       {/* Controls — stacked vertically for P1 + P2 selection */}
       {!simState.ended && (
         <div className="ps-branch-controls-shell">
