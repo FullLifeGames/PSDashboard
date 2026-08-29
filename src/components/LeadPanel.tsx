@@ -20,6 +20,9 @@ interface Props {
   /** Bring-limited formats (VGC 4 of 6, BSS 3 of 6): total picks per side.
    *  Null brings the whole team, so only the leads are picked. */
   bringCount: number | null;
+  /** A lead variation's recorded turn-0 choice: returning to T0 shows THAT
+   *  selection instead of the real game's defaults. */
+  pickedLeads?: { p1: string[]; p2: string[] } | null;
   /** True while the sim rebuilds or executes — blocks the start button. */
   executing: boolean;
   onStart: (leads: { p1: string[]; p2: string[] }) => void;
@@ -90,16 +93,35 @@ function LeadColumn({ label, options, selected, leadsPerSide, maxPicks, onToggle
  * slots in doubles) and, in bring-limited formats, the whole brought
  * selection; then play the game from the start as a variation.
  */
-export function LeadPanel({ playerNames, p1Options, p2Options, leadsPerSide, bringCount, executing, onStart }: Props) {
+export function LeadPanel({ playerNames, p1Options, p2Options, leadsPerSide, bringCount, pickedLeads, executing, onStart }: Props) {
   const maxPicks = bringCount ?? leadsPerSide;
-  // The real game's choice preselects: leads first (slot order), then the
-  // rest of what was actually brought.
-  const initialFor = (options: LeadOption[]) => [
-    ...options.filter(option => option.wasLead),
-    ...options.filter(option => !option.wasLead && option.wasBrought),
-  ].slice(0, maxPicks).map(option => option.species);
-  const [p1Leads, setP1Leads] = useState<string[]>(() => initialFor(p1Options));
-  const [p2Leads, setP2Leads] = useState<string[]>(() => initialFor(p2Options));
+  // A recorded variation choice wins; otherwise the real game's choice
+  // preselects: leads first (slot order), then the rest of the bring.
+  const fromPicked = (options: LeadOption[], picked: string[] | undefined) => {
+    const known = new Set(options.map(option => option.species));
+    const kept = (picked ?? []).filter(species => known.has(species)).slice(0, maxPicks);
+    return kept.length === maxPicks ? kept : null;
+  };
+  const initialFor = (options: LeadOption[], picked: string[] | undefined) =>
+    fromPicked(options, picked) ?? [
+      ...options.filter(option => option.wasLead),
+      ...options.filter(option => !option.wasLead && option.wasBrought),
+    ].slice(0, maxPicks).map(option => option.species);
+  const [p1Leads, setP1Leads] = useState<string[]>(() => initialFor(p1Options, pickedLeads?.p1));
+  const [p2Leads, setP2Leads] = useState<string[]>(() => initialFor(p2Options, pickedLeads?.p2));
+  // Returning to T0 after the variation recorded a choice: mirror it in
+  // place (render adjustment, not an effect — the props settle mid-render).
+  const pickedKey = JSON.stringify(pickedLeads ?? null);
+  const [seenPickedKey, setSeenPickedKey] = useState(pickedKey);
+  if (pickedKey !== seenPickedKey) {
+    setSeenPickedKey(pickedKey);
+    if (pickedLeads) {
+      const p1 = fromPicked(p1Options, pickedLeads.p1);
+      const p2 = fromPicked(p2Options, pickedLeads.p2);
+      if (p1) setP1Leads(p1);
+      if (p2) setP2Leads(p2);
+    }
+  }
 
   if (p1Options.length === 0 || p2Options.length === 0) {
     return (

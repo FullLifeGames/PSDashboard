@@ -1629,6 +1629,28 @@ test.describe('PS Dashboard', () => {
       await expect(page.locator('iframe[title="Branch Simulation"]')).toBeVisible({ timeout: 10000 });
     });
 
+    test('Let it play out from the T0 view seeds the lead variation', async ({ page }) => {
+      test.setTimeout(180_000);
+      await page.locator('button', { hasText: 'Load' }).click();
+      await expect(page.locator('.ps-branch-bar input[type="range"]')).toBeVisible();
+      await page.locator('.ps-branch-bar button[title^="Turn 0"]').click();
+      await expect(page.getByText('team preview: pick each side')).toBeVisible();
+
+      // The run must INCLUDE the lead decision: branching at the shared
+      // turn-1 prefix produced a variation whose moves list started at
+      // turn 1 and whose first turn fell back to the main line.
+      await page.locator('button', { hasText: 'Let it play out' }).click();
+      const history = page.locator('.ps-panel', { hasText: 'Variation moves' });
+      await expect(history).toContainText('Turn 0', { timeout: 60_000 });
+      await expect(history).toContainText('lead');
+
+      // When the run ends the pointer returns to turn 1 — a VARIATION
+      // position (the line chip stays on gold), not a main-line fallback.
+      await expect(page.getByText(/Play-out (finished|stopped)/)).toBeVisible({ timeout: 120_000 });
+      await expect(page.getByText('T1/')).toBeVisible();
+      await expect(page.locator('.ps-line-chip button.on-vari')).toBeVisible();
+    });
+
     test('doubles T0 picks two leads per side and plays from turn 0', async ({ page }) => {
       test.setTimeout(120_000);
       await page.locator('input[type="text"]').fill('gen9doubles-test');

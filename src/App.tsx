@@ -700,8 +700,9 @@ function App() {
    * Same chess rules as any deviation — an existing variation is replaced
    * only after the confirm.
    */
-  const startLeadVariation = useCallback((leads: { p1: string[]; p2: string[]; bring?: boolean }) => {
+  const startLeadVariation = useCallback((leads: { p1: string[]; p2: string[]; bring?: boolean }, opts?: { onStart?: () => void }) => {
     const run = () => {
+      opts?.onStart?.();
       setVariationScores([]);
       void rebuildAt({ turn: 0, line: 'main' }, null, leads);
     };
@@ -854,6 +855,20 @@ function App() {
     () => !!replayData && (replayGameType === null || replayGameType === 'singles' || replayGameType === 'doubles'),
     [replayData, replayGameType],
   );
+
+  /** The lead picker's default selection: the real game's leads, then the
+   *  rest of its bring; unknown slots fill in option order (an engine run
+   *  needs a complete selection even when the protocol reveals less). */
+  const defaultLeadSelection = useCallback((): { p1: string[]; p2: string[]; bring?: boolean } => {
+    const max = bringCount ?? (replayGameType === 'doubles' ? 2 : 1);
+    const pick = (options: LeadOption[]) => [
+      ...options.filter(option => option.wasLead),
+      ...options.filter(option => !option.wasLead && option.wasBrought),
+      ...options.filter(option => !option.wasLead && !option.wasBrought),
+    ].slice(0, max).map(option => option.species);
+    const leads = { p1: pick(leadOptions.p1), p2: pick(leadOptions.p2) };
+    return bringCount !== null ? { ...leads, bring: true } : leads;
+  }, [bringCount, replayGameType, leadOptions]);
   const evalIsDoubles = replayGameType === 'doubles';
 
   const setsFingerprint = useMemo(
@@ -1397,6 +1412,32 @@ function App() {
   }, [navigateTo, tipTurn]);
 
   const startPlayOut = useCallback(() => {
+    // Turn 0: the run INCLUDES the lead decision. Branching at the shared
+    // turn-1 prefix instead produced a variation without its turn 0 — the
+    // moves list started at turn 1 and viewing turn 1 fell back to the main
+    // line (coverage begins one turn after the branch point).
+    if (viewT0) {
+      const arm = () => {
+        const prevAuto = evaluation.prefs.auto;
+        if (!prevAuto) evaluation.setPrefs({ ...evaluation.prefs, auto: true });
+        playOutProcessedRef.current = null;
+        setPlayOutNotice(null);
+        setPlayOut({ active: true, executed: 0, turns: 0, startTurn: 1, prevAuto });
+      };
+      if (variationSpan?.startTurn === 0) {
+        // A lead variation stands: keep its turn-0 decision, cut the tail
+        // (the chess truncate), and let the engine play the game again.
+        arm();
+        setVariationScores(previous => previous.map((value, index) => (index + 1 > 1 ? null : value)));
+        void rebuildAt({ turn: 1, line: 'variation' }, null);
+        return;
+      }
+      // No lead variation yet: seed one with the picker's default (the real
+      // game's leads and bring). The replace-confirm still guards an
+      // existing variation — arming waits for the user's yes.
+      startLeadVariation(defaultLeadSelection(), { onStart: arm });
+      return;
+    }
     // The post-battle sentinel has nothing to play — surface the existing
     // refusal instead of arming a loop that can never start.
     if (!liveTip && !viewingVariation && atEndPosition) {
@@ -1414,7 +1455,7 @@ function App() {
     setPlayOutNotice(null);
     setPlayOut({ active: true, executed: 0, turns: 0, startTurn: viewTurn, prevAuto });
     if (liveTip) handleEvaluate();
-  }, [liveTip, viewingVariation, atEndPosition, requestDeviation, evaluation, handleEvaluate, viewTurn]);
+  }, [viewT0, variationSpan, rebuildAt, startLeadVariation, defaultLeadSelection, liveTip, viewingVariation, atEndPosition, requestDeviation, evaluation, handleEvaluate, viewTurn]);
 
   const finishPlayOut = useCallback((current: NonNullable<typeof playOut>, text: string, opts?: { returnToStart?: boolean }) => {
     if (!current.prevAuto) evaluation.setPrefs({ ...evaluation.prefs, auto: false });
@@ -2464,18 +2505,7 @@ function App() {
             {/* Variant B: the pickers are ALWAYS there — live sim state at the
                 tip, resolved picker state (stored/snapshot) everywhere else.
                 On T0 the lead picker takes their place. */}
-            {viewT0 ? (
-              <LeadPanel
-                key={`${replayData.id}:${leadOptions.p1.length}`}
-                playerNames={[replayData.players[0], replayData.players[1]]}
-                p1Options={leadOptions.p1}
-                p2Options={leadOptions.p2}
-                leadsPerSide={replayGameType === 'doubles' ? 2 : 1}
-                bringCount={bringCount}
-                executing={executing || branchPreparing}
-                onStart={leads => startLeadVariation(bringCount !== null ? { ...leads, bring: true } : leads)}
-              />
-            ) : playOut?.active ? (
+            {playOut?.active ? (
               /* A steady stand-in while the engine plays: the per-turn picker
                  churn was the "everything keeps switching" complaint, and a
                  click here mid-run would corrupt the loop anyway. */
@@ -2483,6 +2513,18 @@ function App() {
                 <span className="ps-spinner" aria-hidden="true" />{' '}
                 The engine is picking both sides&rsquo; moves — the pickers come back when it stops.
               </div>
+            ) : viewT0 ? (
+              <LeadPanel
+                key={`${replayData.id}:${leadOptions.p1.length}`}
+                playerNames={[replayData.players[0], replayData.players[1]]}
+                p1Options={leadOptions.p1}
+                p2Options={leadOptions.p2}
+                leadsPerSide={replayGameType === 'doubles' ? 2 : 1}
+                bringCount={bringCount}
+                pickedLeads={variationSpan?.startTurn === 0 ? history[0]?.leadChoices ?? null : null}
+                executing={executing || branchPreparing}
+                onStart={leads => startLeadVariation(bringCount !== null ? { ...leads, bring: true } : leads)}
+              />
             ) : (
             <BranchPanel
               simState={liveTip ? simState : pickerSimState}
