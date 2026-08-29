@@ -11,41 +11,19 @@ import { runInLanes } from '../lib/eval/lanes';
 import { perfReport, perfReset, perfSpan } from '../lib/eval/perf-trace';
 import { evalStoreKey, loadStoredEval, saveStoredEval } from '../lib/eval-cache-store';
 import { selectKeyTurns } from '../lib/eval/graph';
-import type { EvalPreferences, EvalResult, EvalSettings, RankedChoice, SearchProgress, TeraAllowance } from '../lib/eval/types';
+import type { EvalPreferences, EvalResult, EvalSettings, RankedChoice, TeraAllowance } from '../lib/eval/types';
 import { teraKey } from '../lib/eval/tera';
 import {
   usePrefsState, resolveAutoTurnSettings, serializedFaintedFraction, supersedesStored,
   type EngineMode, type TurnEvalSettings,
 } from './evaluation/prefs';
+import { useSingleEval, type CachedEval } from './evaluation/single-eval';
 
 export {
   needsSettingsUpgrade, resolveAutoTurnSettings, serializedFaintedFraction, supersedesStored,
 } from './evaluation/prefs';
 export type { EngineMode, TurnEvalSettings } from './evaluation/prefs';
-
-export type EvalStatus = 'idle' | 'reconstructing' | 'searching' | 'done' | 'stale' | 'error';
-
-export interface EvaluateParams {
-  /** Cache key for replay-view positions; null disables caching (branch mode). */
-  cacheKey: string | null;
-  /** Resolved Tera allowance (the panel pref resolved against the replay). */
-  tera: TeraAllowance;
-  /** Sleep Clause enforced for this replay (resolved from the branch format). */
-  sleepClause?: boolean;
-  /**
-   * Produces the serialized position. A reconstruction-based acquire calls
-   * reportReconstruct(turn, target) as it replays turns; the hook surfaces
-   * that as reconstructProgress state.
-   */
-  acquire: (reportReconstruct: (turn: number, target: number) => void) => Promise<string>;
-  /**
-   * Identity of the position this run evaluates (unified timeline). Exposed
-   * back as resultTag so consumers can tell whether the shown result still
-   * belongs to the position on screen — a run finishing AFTER the user
-   * navigated away must not display (or be recorded) as the new position's.
-   */
-  tag?: string;
-}
+export type { EvalStatus, EvaluateParams } from './evaluation/single-eval';
 
 /**
  * Turns the graph sweep evaluates concurrently. One turn's search already
@@ -130,22 +108,6 @@ export function withEvalGapNotice(
   if (failed.length === 0) return acquisition;
   const sentence = `${failed.length} turn${failed.length === 1 ? '' : 's'} had a live position but could not be evaluated (first error: "${failed[0]}").`;
   return acquisition ? `${acquisition} ${sentence}` : sentence;
-}
-
-interface CachedEval {
-  result: EvalResult;
-  // Engine-typed: the UI only offers depth 1/2, but sweeps cache whatever
-  // EvalSettings the engine ran with.
-  depth: EvalSettings['depth'];
-  samples: EvalSettings['samples'];
-  mode: EngineMode;
-  tera: TeraAllowance;
-  /** Engine expectation of the actually played pair (set by graph sweeps). */
-  playedOutcome?: number | null;
-  /** Depth+1 re-search of flagged misplays (null = checked, nothing flagged). */
-  verified?: TurnVerification | null;
-  /** Item-sensitivity probes for still-flagged sides (null = checked, none needed). */
-  sensitivity?: TurnSensitivity | null;
 }
 
 export interface GraphSweepParams {
@@ -233,13 +195,6 @@ export interface EvalGraphState {
 
 export function useEvaluation() {
   const { prefs, prefsRef, persistPrefs } = usePrefsState();
-  const [status, setStatus] = useState<EvalStatus>('idle');
-  const [result, setResult] = useState<EvalResult | null>(null);
-  /** Position tag of the run that produced `result` (see EvaluateParams.tag). */
-  const [resultTag, setResultTag] = useState<string | null>(null);
-  const [progress, setProgress] = useState<SearchProgress | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const [reconstructProgress, setReconstructProgress] = useState<{ turn: number; target: number } | null>(null);
   const [graph, setGraph] = useState<EvalGraphState>({
     scores: [], results: [], settings: [], faintedFractions: [], played: [], playedOutcome: [], verified: [], sensitivity: [], evalErrors: [], lead: null,
     notice: null, running: false, progress: null,
@@ -250,8 +205,6 @@ export function useEvaluation() {
   /** Latest graph arrays, so partial (range) sweeps merge instead of wiping. */
   const graphDataRef = useRef<Pick<EvalGraphState, 'scores' | 'results' | 'settings' | 'faintedFractions' | 'played' | 'playedOutcome' | 'verified' | 'sensitivity' | 'evalErrors' | 'lead'> | null>(null);
   const runRef = useRef(0);
-  const resultRef = useRef(result);
-  resultRef.current = result;
 
   useEffect(() => () => {
     runRef.current += 1;
@@ -259,126 +212,18 @@ export function useEvaluation() {
     clientRef.current = null;
   }, []);
 
-  const cancel = useCallback(() => {
-    runRef.current += 1;
-    clientRef.current?.cancel();
-    setProgress(null);
-    setReconstructProgress(null);
-    setStatus(prev => {
-      if (prev !== 'searching' && prev !== 'reconstructing') return prev;
-      return resultRef.current ? 'stale' : 'idle';
-    });
+  /** cancel clears the sweep's running flag; the bumped run counter stops its work. */
+  const stopGraphPaint = useCallback(() => {
     setGraph(prev => (prev.running ? { ...prev, running: false, progress: null } : prev));
   }, []);
-
-  const evaluate = useCallback((params: EvaluateParams) => {
-    const { depth, samples, mode } = prefsRef.current;
-    if (params.cacheKey) {
-      const hit = cacheRef.current.get(params.cacheKey);
-      if (hit && hit.depth === depth && hit.samples === samples && hit.mode === mode && teraKey(hit.tera) === teraKey(params.tera)) {
-        runRef.current += 1;
-        setResult(hit.result);
-        setResultTag(params.tag ?? null);
-        setStatus('done');
-        setError(null);
-        setProgress(null);
-        setReconstructProgress(null);
-        return;
-      }
-    }
-
-    const runId = ++runRef.current;
-    setStatus('reconstructing');
-    setError(null);
-    setResult(null);
-    setResultTag(params.tag ?? null);
-    setProgress(null);
-    setReconstructProgress(null);
-
-    void (async () => {
-      try {
-        // 'auto' needs the position before the engine is known — acquire
-        // first and resolve; concrete modes keep the stored-eval fast path
-        // that skips reconstruction entirely.
-        let serialized: string | null = null;
-        let resolved: TurnEvalSettings = mode === 'auto' ? resolveAutoTurnSettings(0) : { depth, samples, mode };
-        if (mode === 'auto') {
-          serialized = await params.acquire((turn, target) => {
-            if (runRef.current === runId) setReconstructProgress({ turn, target });
-          });
-          if (runRef.current !== runId) return;
-          resolved = resolveAutoTurnSettings(serializedFaintedFraction(serialized));
-        }
-        // Persistent cache: a result from a previous session for the same
-        // position + settings skips reconstruction and search entirely.
-        if (params.cacheKey) {
-          const stored = await loadStoredEval(evalStoreKey(params.cacheKey, resolved.depth, resolved.samples, resolved.mode, params.tera));
-          if (runRef.current !== runId) return;
-          if (stored) {
-            cacheRef.current.set(params.cacheKey, {
-              result: stored.result, depth: resolved.depth, samples: resolved.samples, mode: resolved.mode, tera: params.tera,
-              ...(stored.playedOutcome !== undefined ? { playedOutcome: stored.playedOutcome } : {}),
-            });
-            setResult(stored.result);
-            setStatus('done');
-            return;
-          }
-        }
-
-        if (serialized === null) {
-          serialized = await params.acquire((turn, target) => {
-            if (runRef.current === runId) setReconstructProgress({ turn, target });
-          });
-          if (runRef.current !== runId) return;
-        }
-        setStatus('searching');
-        setReconstructProgress(null);
-
-        clientRef.current ??= new EvalWorkerClient();
-        const final = await clientRef.current.evaluate(serialized, { depth: resolved.depth, samples: resolved.samples, mode: resolved.mode, tera: params.tera, sleepClause: params.sleepClause }, {
-          onProgress: update => {
-            if (runRef.current === runId) setProgress(update);
-          },
-          onPartial: partial => {
-            if (runRef.current === runId) setResult(partial);
-          },
-        });
-        if (runRef.current !== runId) return;
-        setResult(final);
-        setStatus('done');
-        setProgress(null);
-        if (params.cacheKey) {
-          cacheRef.current.set(params.cacheKey, { result: final, depth: resolved.depth, samples: resolved.samples, mode: resolved.mode, tera: params.tera });
-          void saveStoredEval({
-            key: evalStoreKey(params.cacheKey, resolved.depth, resolved.samples, resolved.mode, params.tera),
-            result: final, depth: resolved.depth, samples: resolved.samples, mode: resolved.mode, tera: params.tera, savedAt: Date.now(),
-          });
-        }
-      } catch (err) {
-        if (runRef.current !== runId) return;
-        if (err instanceof Error && err.message === 'cancelled') return;
-        setStatus('error');
-        setError(err instanceof Error ? err.message : String(err));
-        setProgress(null);
-        setReconstructProgress(null);
-      }
-    })();
-  }, [prefsRef]);
-
-  const markStale = useCallback(() => {
-    setStatus(prev => (prev === 'done' ? 'stale' : prev));
-  }, []);
+  const {
+    status, result, resultTag, progress, error, reconstructProgress,
+    evaluate, cancel, markStale, reset,
+  } = useSingleEval({ runRef, clientRef, cacheRef, prefsRef, stopGraphPaint });
 
   const setPrefs = useCallback((next: EvalPreferences) => {
     if (persistPrefs(next)) markStale();
   }, [persistPrefs, markStale]);
-
-  const reset = useCallback(() => {
-    cancel();
-    setStatus('idle');
-    setResult(null);
-    setError(null);
-  }, [cancel]);
 
   /**
    * Sequential background sweep evaluating turns for the game graph — the
