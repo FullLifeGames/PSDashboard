@@ -26,17 +26,11 @@ import { SharedBranchView } from './components/SharedBranchView';
 import { useSharedBranch } from './hooks/useSharedBranch';
 import { broughtSpeciesFor, formatEnforcesSleepClause, getBranchSimulatorFormat, getReplayBringCount, getReplayGameType, getReplayGeneration, inferReplayFormatId, replayBringOnly, speciesBaseId } from './lib/replay-format';
 import { resolveTeraPreference } from './lib/eval/tera';
-import { summarizeAlignment } from './lib/hax-alignment';
 import { useEvalAcquire } from './hooks/useEvalAcquire';
+import { useGameAnalysis } from './hooks/useGameAnalysis';
 import { choiceId, evalChoiceToSlotChoices, requiredChoicesForActiveSlots, type BranchSlotChoice } from './lib/branch-choices';
 import type { EvalResult, RankedChoice } from './lib/eval/types';
-import { allTurnEvents, detectSacks, parseLeadSpecies, parsePlayedActions, parsePlayedActionsDoubles } from './lib/eval/played';
-import { analyzeTurn, decidedSeenKey, PAYOFF_WINDOW, unansweredSeenKey, type TurnAnalysis } from './lib/eval/analysis';
-import { toID } from '@pkmn/dex';
-import type { StreakHistoryEntry } from './lib/eval/streaks';
-import { computeRead, parseTendencies } from './lib/eval/opponent-model';
-import { analyzeLeads } from './lib/eval/leads';
-import { buildGameReport, type GameReport } from './lib/eval/report';
+import { parseLeadSpecies, parsePlayedActions, parsePlayedActionsDoubles } from './lib/eval/played';
 import {
   classifyDeviation, keptEntries, normalizePosition, sliderMax, variationCovers, variationTip,
   type TimelinePosition, type VariationSpan, type ViewLine,
@@ -1390,108 +1384,11 @@ function App() {
     });
   }, [viewingVariation, viewTurn, analyzableTurns]);
 
-  const leadAnalysisData = useMemo(() => {
-    const lead = evaluation.graph.lead;
-    if (!lead) return null;
-    return analyzeLeads(lead.result, lead.played);
-  }, [evaluation.graph.lead]);
-
-  // Tendencies and the turn-event index depend only on the loaded replay —
-  // computed once, not per turn click or graph update.
-  const tendencies = useMemo(() => (replayData
-    ? { p1: parseTendencies(replayData.log, 'p1'), p2: parseTendencies(replayData.log, 'p2') }
-    : null), [replayData]);
-  const turnEventsIndex = useMemo(
-    () => (replayData ? allTurnEvents(replayData.log) : []),
-    [replayData],
-  );
-
-  // Null-move guard board context (round 5 ⑥): the PRE-TURN active species
-  // per side, singles only — anything but exactly one live active passes
-  // null and keeps the guard off (fail closed, doubles out of scope).
-  const activesForTurn = useCallback((turn: number) => {
-    const snapshot = snapshots[turn - 1] ?? null;
-    if (!snapshot) return null;
-    const activeOf = (side: typeof snapshot.p1): string | null => {
-      const active = side.pokemon.filter(pokemon => pokemon.isActive && !pokemon.fainted);
-      return active.length === 1 ? active[0].speciesForme : null;
-    };
-    return { p1: activeOf(snapshot.p1), p2: activeOf(snapshot.p2), gen: replayGen };
-  }, [snapshots, replayGen]);
-
-  // Streak-detector history (round 6 ②, narrative channel): per side per
-  // turn, who attacked whom with what — read from the replay's own
-  // snapshots and protocol lines, render-time only. Gaps push null (breaks
-  // streaks; the detector fails closed).
-  const playedHistoryAll = useMemo(() => {
-    const sides = { p1: [] as (StreakHistoryEntry | null)[], p2: [] as (StreakHistoryEntry | null)[] };
-    const turns = evaluation.graph.played.length;
-    for (let t = 1; t <= turns; t++) {
-      const playedTurn = evaluation.graph.played[t - 1];
-      const snapshot = snapshots[t - 1] ?? null;
-      const events = turnEventsIndex[t] ?? [];
-      const firstMover = events.find(line => line.startsWith('|move|'))?.split('|')[2]?.slice(0, 2) ?? null;
-      for (const side of ['p1', 'p2'] as const) {
-        const action = playedTurn?.[side] ?? null;
-        const own = snapshot?.[side].pokemon.find(pokemon => pokemon.isActive && !pokemon.fainted) ?? null;
-        const opp = snapshot?.[side === 'p1' ? 'p2' : 'p1'].pokemon.find(pokemon => pokemon.isActive && !pokemon.fainted) ?? null;
-        if (!action || action.kind !== 'move' || !own || !opp) {
-          sides[side].push(null);
-          continue;
-        }
-        sides[side].push({
-          attacker: own.speciesForme,
-          moveId: toID(action.name) || null,
-          defender: opp.speciesForme,
-          movedFirst: firstMover === side,
-          attackerAbility: toID(own.ability),
-          defenderAbility: toID(opp.ability),
-          defenderItem: toID(opp.item),
-          defenderBoosts: { def: opp.boosts['def'] ?? 0, spd: opp.boosts['spd'] ?? 0 },
-        });
-      }
-    }
-    return sides;
-  }, [evaluation.graph.played, snapshots, turnEventsIndex]);
-
-  // Exploitative Read lens: best response to the opponent model over the
-  // already-solved matrix — advisory only, verdicts stay equilibrium-graded.
-  const turnReads = useMemo(() => {
-    if (analysisTurn === null || analysisTurn < 1 || !tendencies) return null;
-    const result = evaluation.graph.results[analysisTurn - 1];
-    if (!result?.matrix) return null;
-    return {
-      p1: computeRead(result.matrix, 'p1', tendencies.p2),
-      p2: computeRead(result.matrix, 'p2', tendencies.p1),
-    };
-  }, [analysisTurn, evaluation.graph, tendencies]);
-
-  const turnAnalysis = useMemo(() => {
-    if (analysisTurn === null) return null;
-    const result = evaluation.graph.results[analysisTurn - 1];
-    const scoreBefore = evaluation.graph.scores[analysisTurn - 1];
-    if (!result || scoreBefore === null) return null;
-    return analyzeTurn({
-      turn: analysisTurn,
-      result,
-      played: evaluation.graph.played[analysisTurn - 1] ?? null,
-      playedOutcome: evaluation.graph.playedOutcome[analysisTurn - 1] ?? null,
-      futureOutcomes: evaluation.graph.playedOutcome
-        .slice(analysisTurn, analysisTurn + PAYOFF_WINDOW)
-        .map(value => value ?? null),
-      verified: evaluation.graph.verified[analysisTurn - 1] ?? null,
-      sensitivity: evaluation.graph.sensitivity[analysisTurn - 1] ?? null,
-      scoreBefore,
-      scoreAfter: evaluation.graph.scores[analysisTurn] ?? null,
-      playedTracking: true,
-      ...(replayData
-        ? { sacks: detectSacks(turnEventsIndex[analysisTurn] ?? [], snapshots[analysisTurn - 1] ?? null) }
-        : {}),
-      ...(turnReads ? { reads: turnReads } : {}),
-      actives: activesForTurn(analysisTurn),
-      playedHistory: playedHistoryAll,
-    });
-  }, [analysisTurn, evaluation.graph, replayData, snapshots, turnReads, turnEventsIndex, activesForTurn, playedHistoryAll]);
+  // Per-turn and game-level analysis (reads, turn card, lead analysis,
+  // game report, the feedback harness's window handle).
+  const { turnReads, turnAnalysis, leadAnalysisData, gameReport } = useGameAnalysis({
+    replayData, snapshots, evaluation, analysisTurn, sweepAlignment, replayGen,
+  });
 
   // ONE place for everything: in replay view the advantage bar, ranked
   // lists, and matrix render from the ANALYZED turn's cached sweep result
@@ -1550,98 +1447,6 @@ function App() {
     // turn's engine from its position, exactly like Analyze game.
     analyzeTurnNow(analysisTurn, 'depth' in thinkDeeperTarget ? thinkDeeperTarget : undefined);
   }, [analysisTurn, thinkDeeperTarget, analyzeTurnNow]);
-
-  const replayWinner = useMemo<'p1' | 'p2' | null>(() => {
-    if (!replayData) return null;
-    const name = replayData.log.match(/\|win\|(.+)/)?.[1]?.trim();
-    if (!name) return null;
-    if (name === replayData.players[0]) return 'p1';
-    if (name === replayData.players[1]) return 'p2';
-    return null;
-  }, [replayData]);
-
-  // Game-level root cause, once enough of the game is swept. The memo keeps
-  // the per-turn analyses next to the report: the feedback drift harness
-  // (and manual debugging) read both through the window handle below.
-  const gameReportDataRef = useRef<{ report: GameReport; analyses: (TurnAnalysis | null)[] } | null>(null);
-  const gameReportData = useMemo(() => {
-    if (!replayData) {
-      gameReportDataRef.current = null;
-      return null;
-    }
-    const { results, scores, played, playedOutcome, verified, sensitivity, running } = evaluation.graph;
-    // While a sweep runs, the LAST report stays up — recomputing waits for
-    // completion (per-tick rebuilds are expensive), but returning null here
-    // made the report blink on every turn click once selection started
-    // triggering 2-turn upgrade sweeps.
-    if (running) return gameReportDataRef.current;
-    // The report walk speaks each entry sentence once (round 14): keys of
-    // already-spoken unanswered stages accumulate turn by turn, so a mon's
-    // tenth entry stays quiet here while the per-turn card (no set passed)
-    // keeps its sentence.
-    const unansweredSeen = new Set<string>();
-    // Round 15: the decided/near announcements share the walk regime — the
-    // state stays on every decided turn, the sentence speaks once.
-    const decidedSeen = new Set<string>();
-    const analyses = results.map((result, index) => {
-      const scoreBefore = scores[index];
-      if (!result || scoreBefore === null) return null;
-      const analysis = analyzeTurn({
-        turn: index + 1,
-        result,
-        played: played[index] ?? null,
-        playedOutcome: playedOutcome[index] ?? null,
-        futureOutcomes: playedOutcome
-          .slice(index + 1, index + 1 + PAYOFF_WINDOW)
-          .map(value => value ?? null),
-        verified: verified[index] ?? null,
-        sensitivity: sensitivity[index] ?? null,
-        scoreBefore,
-        scoreAfter: scores[index + 1] ?? null,
-        playedTracking: true,
-        sacks: detectSacks(turnEventsIndex[index + 1] ?? [], snapshots[index] ?? null),
-        actives: activesForTurn(index + 1),
-        playedHistory: playedHistoryAll,
-        unansweredSeen,
-        decidedSeen,
-      });
-      for (const key of ['p1', 'p2'] as const) {
-        const signal = analysis[key].unanswered;
-        if (signal) unansweredSeen.add(unansweredSeenKey(key, signal));
-        const decided = analysis[key].decided;
-        if (decided?.announce) decidedSeen.add(decidedSeenKey(key, { species: decided.species }));
-        const near = analysis[key].nearDecided;
-        if (near?.announce) {
-          decidedSeen.add(decidedSeenKey(key, { species: near.species, removes: near.removes }));
-        }
-      }
-      return analysis;
-    });
-    if (analyses.filter(Boolean).length < 3) {
-      gameReportDataRef.current = null;
-      return null;
-    }
-    const report = buildGameReport(
-      analyses, [replayData.players[0], replayData.players[1]], replayWinner, true,
-    );
-    const data = { report, analyses };
-    gameReportDataRef.current = data;
-    return data;
-  }, [replayData, snapshots, evaluation.graph, replayWinner, turnEventsIndex, activesForTurn, playedHistoryAll]);
-  const gameReport = gameReportData?.report ?? null;
-
-  // Structured handle for the feedback drift harness: the SAME objects the
-  // UI renders — no recomputation, no behavior change.
-  useEffect(() => {
-    (window as Window & { __psDebug?: unknown }).__psDebug = {
-      graph: evaluation.graph,
-      analyses: gameReportData?.analyses ?? null,
-      gameReport: gameReportData?.report ?? null,
-      haxAlignment: sweepAlignment
-        ? { records: sweepAlignment, summary: summarizeAlignment(sweepAlignment) }
-        : null,
-    };
-  }, [evaluation.graph, gameReportData, sweepAlignment]);
 
   const simLog = useMemo(() => {
     const raw = simState?.log ?? [];
