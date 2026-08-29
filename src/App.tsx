@@ -2,14 +2,13 @@ import { useEffect, useState, useCallback, useMemo, useRef } from 'react';
 import { useReplay } from './hooks/useReplay';
 import { useEmbedHost } from './hooks/useEmbedHost';
 import { useBranch } from './hooks/useBranch';
-import type { BranchHistoryEntry, BranchSimState } from './hooks/useBranch';
-import type { PickerSource } from './lib/picker-state';
+import type { BranchHistoryEntry } from './hooks/useBranch';
 import { useSmogonUsageStats } from './hooks/useSmogonUsageStats';
 import { useSmogonSetAssumptions } from './hooks/useSmogonSetAssumptions';
 import { ReplayLoader } from './components/ReplayLoader';
 import { PSReplayFrame } from './components/PSReplayFrame';
-import { BranchPanel, type PlayedPick } from './components/BranchPanel';
-import { LeadPanel, type LeadOption } from './components/LeadPanel';
+import { BranchPanel } from './components/BranchPanel';
+import { LeadPanel } from './components/LeadPanel';
 import { BranchHistoryPanel } from './components/BranchHistoryPanel';
 import { BranchSaveSharePanel } from './components/BranchSaveSharePanel';
 import { BattleStatsPanel } from './components/BattleStatsPanel';
@@ -23,15 +22,18 @@ import { useTeamKnowledge } from './hooks/useTeamKnowledge';
 import type { OpponentTeamInfo } from './types';
 import { SharedBranchView } from './components/SharedBranchView';
 import { useSharedBranch } from './hooks/useSharedBranch';
-import { broughtSpeciesFor, formatEnforcesSleepClause, getBranchSimulatorFormat, getReplayBringCount, getReplayGameType, getReplayGeneration, inferReplayFormatId, replayBringOnly, speciesBaseId } from './lib/replay-format';
+import { formatEnforcesSleepClause, getBranchSimulatorFormat, getReplayBringCount, getReplayGameType, getReplayGeneration, inferReplayFormatId, replayBringOnly } from './lib/replay-format';
 import { resolveTeraPreference } from './lib/eval/tera';
 import { useEvalAcquire } from './hooks/useEvalAcquire';
 import { useGameAnalysis } from './hooks/useGameAnalysis';
 import { choiceId, evalChoiceToSlotChoices, requiredChoicesForActiveSlots, type BranchSlotChoice } from './lib/branch-choices';
 import type { EvalResult, RankedChoice } from './lib/eval/types';
 import { parseLeadSpecies, parsePlayedActions, parsePlayedActionsDoubles } from './lib/eval/played';
-import { classifyDeviation, keptEntries, sliderMax, variationTip, type TimelinePosition } from './lib/timeline';
+import { sliderMax, variationTip } from './lib/timeline';
 import { useTimeline } from './hooks/useTimeline';
+import { useDeviation } from './hooks/useDeviation';
+import { useBranchRefresh } from './hooks/useBranchRefresh';
+import { usePlayedAtView, usePositionPicker } from './hooks/usePositionPicker';
 import { nextPlayOutStep, playOutDoneText } from './lib/play-out';
 
 /** View-side gates for the acquisition hook: whether the dwell rebuild may
@@ -80,11 +82,6 @@ function App() {
    * baffling errors ("more choices than unfainted Pokémon"); instead the
    * divergence is surfaced and play-outs are refused.
    */
-  const [branchDivergence, setBranchDivergence] = useState<string | null>(null);
-  const [branchPreparing, setBranchPreparing] = useState(false);
-  const [branchProgress, setBranchProgress] = useState<{ turn: number; target: number } | null>(null);
-  const branchAbortRef = useRef<AbortController | null>(null);
-  const [branchSession, setBranchSession] = useState(0);
   const [animateBranchTurns, setAnimateBranchTurns] = useState(true);
   const { sharedBranch, sharedBranchError, clearSharedBranch } = useSharedBranch();
   const [pendingBranchRefresh, setPendingBranchRefresh] = useState<{
@@ -185,6 +182,47 @@ function App() {
   const liveEvalStatus: typeof evaluation.status =
     evaluation.status === 'done' && !evalResultMatchesView ? 'stale' : evaluation.status;
 
+  // ----- Position evaluation (singles + doubles) -----
+  const replayGameType = useMemo(
+    () => (replayData ? getReplayGameType(replayData.log) : null),
+    [replayData],
+  );
+  const evalIsDoubles = replayGameType === 'doubles';
+
+  // One team-source bundle for every acquisition path; deps are the inner
+  // stable values (the Smogon hook objects are fresh per render).
+  const teamSources = useMemo(() => ({
+    teamText, effectiveP1Info, effectiveP2Info,
+    usageStats: { stats: usageStats.stats },
+    setAssumptions: { assumptions: setAssumptions.assumptions },
+    hpEvidence, getInferredSpreads,
+  }), [teamText, effectiveP1Info, effectiveP2Info, usageStats.stats, setAssumptions.assumptions, hpEvidence, getInferredSpreads]);
+
+  // Deviation machinery: the rebuild road, the chess-rule requests, the
+  // shared preparation session, and the picker draft plumbing.
+  const deviationTimeline = useMemo(() => ({
+    viewTurnRef, viewLine, endSnapshotTurn, variationSpan, setVariationScores,
+    setViewTurn, setViewLine, liveTip,
+  }), [viewTurnRef, viewLine, endSnapshotTurn, variationSpan, setVariationScores, setViewTurn, setViewLine, liveTip]);
+  const deviationBranch = useMemo(() => ({
+    startBranch, getBattle, executeTurn, setChoice, history,
+  }), [startBranch, getBattle, executeTurn, setChoice, history]);
+  const {
+    branchDivergence, setBranchDivergence, branchPreparing, branchProgress, branchSession,
+    cancelPreparation, session, rebuildAt, requestDeviation, startLeadVariation,
+    handleSetChoice, handleExecuteDraft, leadOptions, defaultLeadSelection,
+  } = useDeviation({
+    replayData, snapshots, observations, sources: teamSources, bringOnlyLists, bringCount,
+    replayGameType, timeline: deviationTimeline, branch: deviationBranch,
+    branchWindowOpenRef, setPendingConfirm, draftChoices, setDraftChoices,
+  });
+  const clearRefreshRequest = useCallback(() => setPendingBranchRefresh(null), []);
+  useBranchRefresh({
+    replayData, snapshots, observations, sources: teamSources, bringOnlyLists,
+    branching, variationStartTurn, startBranch, viewTurn, session, branchWindowOpenRef,
+    request: pendingBranchRefresh, clearRequest: clearRefreshRequest,
+  });
+
   const discardVariation = useCallback(() => {
     branchWindowOpenRef.current = false;
     stopBranch();
@@ -196,7 +234,7 @@ function App() {
     setVariationScores([]);
     setViewLine('main');
     setViewTurn(current => Math.min(current, maxTurn));
-  }, [stopBranch, maxTurn, setViewTurn, setViewLine, setVariationScores]);
+  }, [stopBranch, maxTurn, setViewTurn, setViewLine, setVariationScores, setBranchDivergence]);
 
   // A freshly loaded replay must start clean: slider at turn 1 (B11), no live
   // branch, and no team edits carried over from the previous replay. Host
@@ -211,318 +249,13 @@ function App() {
     setBranchDivergence(null);
     branchWindowOpenRef.current = false;
     stopBranch();
-  }, [replayData?.id, stopBranch, resetPointer]);
+  }, [replayData?.id, stopBranch, resetPointer, setBranchDivergence]);
 
-  /**
-   * Rebuilds the live sim at `position` and prefills the pickers: the proven
-   * team-edit-refresh path (reconstruct to the variation start + replay the
-   * kept history entries), now the single road every deviation takes. Only
-   * an EXECUTED move truncates — callers invoke this at execute time, never
-   * for navigation.
-   */
-  const rebuildAt = useCallback(async (
-    position: TimelinePosition,
-    prefill: { p1Choices: (BranchSlotChoice | null)[]; p2Choices: (BranchSlotChoice | null)[] } | null,
-    leadOverride?: { p1: string[]; p2: string[]; bring?: boolean },
-  ) => {
-    if (!replayData || branchPreparing) return;
-    const kind = classifyDeviation(variationSpan, position);
-    const insideVariation = (kind === 'extend' || kind === 'truncate') && variationSpan !== null;
-    const startTurn = insideVariation ? variationSpan!.startTurn : position.turn;
-    // Kept entries: forced interludes ride along with the turn they resolve —
-    // keep them until the NEXT turn entry past the cut (mirrors alignHistoryRows).
-    let keepTurns = insideVariation ? keptEntries(variationSpan!, position) : 0;
-    const replayHistory: BranchHistoryEntry[] = [];
-    for (const entry of history) {
-      if (entry.kind !== 'forced') {
-        if (keepTurns === 0) break;
-        keepTurns -= 1;
-      }
-      replayHistory.push(entry);
-    }
-    // Turn-0 variation: startBranch needs leads — the caller's (fresh lead
-    // branch) or the recorded lead entry's (truncation/refresh rebuild).
-    if (startTurn === 0 && !leadOverride && !replayHistory[0]?.leadChoices) return;
-    // Bring-limited replays (VGC 4 of 6): the interactive branch fields only
-    // what the real game brought — the bring-all base format would otherwise
-    // let evaluations and play-outs switch into never-brought Pokémon. The
-    // T0 picker carries its own selection; per-side fail-open when the
-    // protocol does not pin a side's full selection.
-    const bringOnly = startTurn > 0 ? bringOnlyLists ?? undefined : undefined;
-
-    const abortController = new AbortController();
-    branchAbortRef.current = abortController;
-    setBranchPreparing(true);
-    setBranchProgress(null);
-    await new Promise(resolve => setTimeout(resolve, 0));
-
-    try {
-      const { buildTeamsFromReplay } = await import('./lib/team-builder');
-      const { p1Team, p2Team } = buildTeamsFromReplay(replayData.log, {
-        userTeamText: teamText || undefined,
-        p1Info: effectiveP1Info,
-        p2Info: effectiveP2Info,
-        usageStats: usageStats.stats,
-        setAssumptions: setAssumptions.assumptions,
-        inferredSpreads: await getInferredSpreads(),
-        hpEvidence,
-      });
-      if (p1Team.length > 0 && p2Team.length > 0) {
-        setBranchSession(session => session + 1);
-        const { buildChoiceLockContext } = await import('./lib/choice-lock');
-        const choiceLocks = buildChoiceLockContext(replayData.log, { p1Team, p2Team }, observations);
-        const selectedSnapshot = snapshots.length > 0
-          ? snapshots[Math.min(startTurn - 1, snapshots.length - 1)] ?? null
-          : null;
-        await startBranch(getBranchSimulatorFormat(replayData), p1Team, p2Team, replayData.log, startTurn, selectedSnapshot, {
-          replayHistory,
-          p1Choices: prefill?.p1Choices ?? [],
-          p2Choices: prefill?.p2Choices ?? [],
-          playerNames: [replayData.players[0], replayData.players[1]],
-          onProgress: (turn, target) => setBranchProgress({ turn, target }),
-          abort: abortController.signal,
-          snapshotFor: turn => snapshots[Math.min(turn - 1, snapshots.length - 1)] ?? null,
-          choiceLocks,
-          leadOverride,
-          bringOnly,
-        });
-        if (!abortController.signal.aborted) {
-          branchWindowOpenRef.current = true;
-          const branchBattle = getBattle();
-          if (branchBattle?.ended) {
-            setBranchDivergence('The simulated replay diverged from the real game and already ended' +
-              `${branchBattle.winner ? ` (${branchBattle.winner} won the simulated line)` : ''}: ` +
-              'the guessed sets could not reproduce this position. Recommendations cannot be played out here; ' +
-              'correcting items/moves via Edit Player/Opp is the common fix.');
-          } else if (branchBattle && branchBattle.turn < startTurn) {
-            setBranchDivergence(`The simulated replay wedged at turn ${branchBattle.turn} on the way to ` +
-              `turn ${startTurn}: the guessed sets diverge from the real game before this position.`);
-          } else {
-            setBranchDivergence(null);
-          }
-          // The pointer lands where the sim now stands; the tip-follow effect
-          // covers replayed histories (and the turn-0 lead entry, which is
-          // seeded by startBranch), this covers the entry-less start.
-          if (replayHistory.length === 0 && startTurn > 0) {
-            setViewTurn(startTurn);
-            setViewLine('main');
-          }
-        }
-      }
-    } finally {
-      setBranchPreparing(false);
-      setBranchProgress(null);
-      branchAbortRef.current = null;
-    }
-  }, [replayData, branchPreparing, variationSpan, history, teamText, snapshots, bringOnlyLists, observations, hpEvidence, getInferredSpreads, effectiveP1Info, effectiveP2Info, usageStats.stats, setAssumptions.assumptions, startBranch, getBattle, setViewTurn, setViewLine]);
-
-  const requestDeviation = useCallback((
-    prefill: { p1Choices: (BranchSlotChoice | null)[]; p2Choices: (BranchSlotChoice | null)[] } | null,
-  ) => {
-    // The ref, not the closure: see viewTurnRef (slider→click race).
-    const position: TimelinePosition = { turn: viewTurnRef.current, line: viewLine };
-    // The end snapshot is the post-battle sentinel, not a playable turn —
-    // the old Branch-Here button was disabled here (B10/B12/G23).
-    if (position.line === 'main' && endSnapshotTurn !== null && position.turn >= endSnapshotTurn) {
-      setBranchDivergence('The battle is already over at the end position: pick an earlier turn to play from.');
-      return;
-    }
-    const kind = classifyDeviation(variationSpan, position);
-    const run = () => {
-      // The overlay dies with the entries it belonged to.
-      if (kind === 'replace' || kind === 'open') {
-        setVariationScores([]);
-      } else if (kind === 'truncate') {
-        setVariationScores(previous => previous.map((value, index) => (index + 1 > position.turn ? null : value)));
-      }
-      void rebuildAt(position, prefill).then(() => {
-        if (prefill) void executeTurn();
-      });
-    };
-    if (kind === 'replace' && variationSpan) {
-      const turnCount = variationSpan.length;
-      setPendingConfirm({
-        message: `You are on the main line (turn ${position.turn}): replace the existing variation ` +
-          `from turn ${variationSpan.startTurn} (${turnCount} ${turnCount === 1 ? 'turn' : 'turns'})?`,
-        proceed: () => { setPendingConfirm(null); run(); },
-      });
-      return;
-    }
-    run();
-  }, [viewLine, variationSpan, rebuildAt, executeTurn, endSnapshotTurn, viewTurnRef, setVariationScores]);
-
-  /**
-   * Turn-0 branching: replace the game's leads and play from team preview.
-   * Same chess rules as any deviation — an existing variation is replaced
-   * only after the confirm.
-   */
-  const startLeadVariation = useCallback((leads: { p1: string[]; p2: string[]; bring?: boolean }, opts?: { onStart?: () => void }) => {
-    const run = () => {
-      opts?.onStart?.();
-      setVariationScores([]);
-      void rebuildAt({ turn: 0, line: 'main' }, null, leads);
-    };
-    if (variationSpan) {
-      const turnCount = variationSpan.length;
-      setPendingConfirm({
-        message: `Start a new game from turn 0: replace the existing variation ` +
-          `from turn ${variationSpan.startTurn} (${turnCount} ${turnCount === 1 ? 'turn' : 'turns'})?`,
-        proceed: () => { setPendingConfirm(null); run(); },
-      });
-      return;
-    }
-    run();
-  }, [variationSpan, rebuildAt, setVariationScores]);
-
-  const handleCancelBranchPreparation = useCallback(() => {
-    branchAbortRef.current?.abort();
-  }, []);
-
-  useEffect(() => {
-    if (!pendingBranchRefresh || !replayData) return;
-
-    let cancelled = false;
-    const refreshRequest = pendingBranchRefresh;
-    const activeReplay = replayData;
-
-    async function refreshBranch() {
-      const abortController = new AbortController();
-      branchAbortRef.current = abortController;
-      setBranchPreparing(true);
-      setBranchProgress(null);
-      await new Promise(resolve => setTimeout(resolve, 0));
-
-      try {
-        const { buildTeamsFromReplay } = await import('./lib/team-builder');
-        const { p1Team, p2Team } = buildTeamsFromReplay(activeReplay.log, {
-          userTeamText: teamText || undefined,
-          p1Info: refreshRequest.p1Info,
-          p2Info: refreshRequest.p2Info,
-          usageStats: usageStats.stats,
-          setAssumptions: setAssumptions.assumptions,
-          inferredSpreads: await getInferredSpreads(refreshRequest.p1Info, refreshRequest.p2Info),
-          hpEvidence,
-        });
-        if (!cancelled && p1Team.length > 0 && p2Team.length > 0) {
-          setBranchSession(session => session + 1);
-          const { buildChoiceLockContext } = await import('./lib/choice-lock');
-          const choiceLocks = buildChoiceLockContext(activeReplay.log, { p1Team, p2Team }, observations);
-          // The refresh rebuilds the VARIATION, wherever the pointer wanders —
-          // its start turn, never the currently viewed position. Without a
-          // live runtime (fresh hypothetical), the viewed turn IS the target.
-          const refreshTurn = (branching ? variationStartTurn : null) ?? viewTurn;
-          const refreshSnapshot = snapshots.length > 0
-            ? snapshots[Math.min(refreshTurn - 1, snapshots.length - 1)] ?? null
-            : null;
-          // Bring-limited replays keep their trim through team-edit
-          // refreshes too (a T0 variation re-seeds it from its lead entry).
-          const refreshBringOnly = refreshTurn > 0 ? bringOnlyLists ?? undefined : undefined;
-          await startBranch(getBranchSimulatorFormat(activeReplay), p1Team, p2Team, activeReplay.log, refreshTurn, refreshSnapshot, {
-            replayHistory: refreshRequest.history,
-            p1Choices: refreshRequest.p1Choices,
-            p2Choices: refreshRequest.p2Choices,
-            playerNames: [activeReplay.players[0], activeReplay.players[1]],
-            onProgress: (turn, target) => setBranchProgress({ turn, target }),
-            abort: abortController.signal,
-            snapshotFor: turn => snapshots[Math.min(turn - 1, snapshots.length - 1)] ?? null,
-            choiceLocks,
-            bringOnly: refreshBringOnly,
-          });
-          if (!abortController.signal.aborted) {
-            branchWindowOpenRef.current = true;
-          }
-        }
-      } finally {
-        if (!cancelled) {
-          setBranchPreparing(false);
-          setBranchProgress(null);
-          setPendingBranchRefresh(null);
-        }
-        branchAbortRef.current = null;
-      }
-    }
-
-    void refreshBranch();
-    return () => {
-      cancelled = true;
-    };
-  }, [
-    pendingBranchRefresh,
-    replayData,
-    getInferredSpreads,
-    teamText,
-    viewTurn,
-    variationStartTurn,
-    branching,
-    snapshots,
-    bringOnlyLists,
-    usageStats.stats,
-    setAssumptions.assumptions,
-    observations,
-    hpEvidence,
-    startBranch,
-  ]);
-
-  const handleSetChoice = useCallback((side: 'p1' | 'p2', choice: BranchSlotChoice, activeSlot?: number) => {
-    if (!liveTip) {
-      const slot = activeSlot ?? 0;
-      setDraftChoices(previous => {
-        const next = { p1: [...previous.p1], p2: [...previous.p2] };
-        next[side][slot] = choice;
-        return next;
-      });
-      return;
-    }
-    setChoice(side, choice, activeSlot);
-  }, [liveTip, setChoice]);
-
-  // ----- Position evaluation (singles + doubles) -----
-  const replayGameType = useMemo(
-    () => (replayData ? getReplayGameType(replayData.log) : null),
-    [replayData],
-  );
-
-  /** T0 lead picker data: each side's team with the real leads marked (the
-   *  pre-turn-1 snapshot's actives ARE the leads) and, for bring-limited
-   *  formats, which Pokémon the real game brought (active in ANY snapshot). */
-  const leadOptions = useMemo<{ p1: LeadOption[]; p2: LeadOption[] }>(() => {
-    const snapshot = snapshots[0] ?? null;
-    if (!snapshot) return { p1: [], p2: [] };
-    // Base-species matching: the preview lists "Zamazenta-*" while the
-    // active reveals "Zamazenta-Crowned" — same body, same badge.
-    const optionsOf = (side: typeof snapshot.p1, broughtBases: Set<string>): LeadOption[] =>
-      side.pokemon.map(pokemon => ({
-        name: pokemon.name,
-        species: pokemon.speciesForme,
-        wasLead: pokemon.isActive,
-        wasBrought: broughtBases.has(speciesBaseId(pokemon.speciesForme)),
-      }));
-    const basesOf = (sideKey: 'p1' | 'p2') =>
-      new Set(broughtSpeciesFor(snapshots, sideKey).map(name => speciesBaseId(name)));
-    return {
-      p1: optionsOf(snapshot.p1, basesOf('p1')),
-      p2: optionsOf(snapshot.p2, basesOf('p2')),
-    };
-  }, [snapshots]);
   const evalAvailable = useMemo(
     () => !!replayData && (replayGameType === null || replayGameType === 'singles' || replayGameType === 'doubles'),
     [replayData, replayGameType],
   );
 
-  /** The lead picker's default selection: the real game's leads, then the
-   *  rest of its bring; unknown slots fill in option order (an engine run
-   *  needs a complete selection even when the protocol reveals less). */
-  const defaultLeadSelection = useCallback((): { p1: string[]; p2: string[]; bring?: boolean } => {
-    const max = bringCount ?? (replayGameType === 'doubles' ? 2 : 1);
-    const pick = (options: LeadOption[]) => [
-      ...options.filter(option => option.wasLead),
-      ...options.filter(option => !option.wasLead && option.wasBrought),
-      ...options.filter(option => !option.wasLead && !option.wasBrought),
-    ].slice(0, max).map(option => option.species);
-    const leads = { p1: pick(leadOptions.p1), p2: pick(leadOptions.p2) };
-    return bringCount !== null ? { ...leads, bring: true } : leads;
-  }, [bringCount, replayGameType, leadOptions]);
-  const evalIsDoubles = replayGameType === 'doubles';
 
   // Tera resolution: 'auto' turns enumeration off when the game never
   // terastallized, and in draft/custom formats (per-Pokémon Tera rights)
@@ -543,14 +276,6 @@ function App() {
     [replayData],
   );
 
-  // One team-source bundle for every acquisition path; deps are the inner
-  // stable values (the Smogon hook objects are fresh per render).
-  const teamSources = useMemo(() => ({
-    teamText, effectiveP1Info, effectiveP2Info,
-    usageStats: { stats: usageStats.stats },
-    setAssumptions: { assumptions: setAssumptions.assumptions },
-    hpEvidence, getInferredSpreads,
-  }), [teamText, effectiveP1Info, effectiveP2Info, usageStats.stats, setAssumptions.assumptions, hpEvidence, getInferredSpreads]);
   const { dwellEnabled, smogonPending } = acquireGates({
     liveTip, viewingVariation, atEndPosition, executing, branchPreparing,
     playOut, evaluation, usageStats, setAssumptions,
@@ -564,68 +289,15 @@ function App() {
     bringOnlyLists, getBattle, viewTurn, dwellEnabled, smogonPending,
   });
 
-  /**
-   * Picker state for the viewed position when the live sim is elsewhere
-   * (variant B): exact from the recorded position where one exists, else
-   * approximate from snapshot + guessed teams. Live-tip positions render
-   * the sim's own state and skip this entirely.
-   */
-  const [positionPicker, setPositionPicker] = useState<{ simState: BranchSimState; source: PickerSource } | null>(null);
-  useEffect(() => {
-    let cancelled = false;
-    if (liveTip) {
-      setPositionPicker(null);
-      return;
-    }
-    const exactMainLine = !viewingVariation ? getExact(viewTurn) : null;
-    const stored = viewingVariation
-      ? serializedAtView
-      : (viewTurn === variationStartTurn ? startSerialized : null) ?? exactMainLine;
-    (async () => {
-      if (stored) {
-        const { pickerStateFromSerialized } = await import('./lib/picker-state');
-        try {
-          const state = await pickerStateFromSerialized(stored);
-          if (!cancelled) setPositionPicker({ simState: state, source: 'stored' });
-          return;
-        } catch {
-          // Fall through to the snapshot approximation.
-        }
-      }
-      if (viewingVariation) {
-        // A variation position without a usable capture has no snapshot
-        // either — the pickers stay empty until a rebuild passes through.
-        if (!cancelled) setPositionPicker(null);
-        return;
-      }
-      const snapshot = snapshots[Math.min(viewTurn - 1, snapshots.length - 1)] ?? null;
-      if (!snapshot || !replayData) {
-        if (!cancelled) setPositionPicker(null);
-        return;
-      }
-      const [{ buildTeamsFromReplay }, { pickerStateFromSnapshot }] = await Promise.all([
-        import('./lib/team-builder'),
-        import('./lib/picker-state'),
-      ]);
-      const { p1Team, p2Team } = buildTeamsFromReplay(replayData.log, {
-        userTeamText: teamText || undefined,
-        p1Info: effectiveP1Info,
-        p2Info: effectiveP2Info,
-        usageStats: usageStats.stats,
-        setAssumptions: setAssumptions.assumptions,
-        inferredSpreads: await getInferredSpreads(),
-        hpEvidence,
-      });
-      if (!cancelled) setPositionPicker({ simState: pickerStateFromSnapshot(snapshot, p1Team, p2Team, replayGenNumber, bringOnlyLists), source: 'snapshot' });
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [
-    liveTip, viewingVariation, serializedAtView, variationStartTurn, startSerialized, viewTurn, snapshots, replayData,
-    teamText, effectiveP1Info, effectiveP2Info, usageStats.stats, setAssumptions.assumptions, getInferredSpreads, hpEvidence,
-    replayGenNumber, getExact, exactPositionsVersion, bringOnlyLists,
-  ]);
+  const { positionPicker, pickerSimState } = usePositionPicker({
+    replayData, snapshots, sources: teamSources, bringOnlyLists, replayGenNumber,
+    liveTip, viewingVariation, serializedAtView, viewTurn, variationStartTurn, startSerialized,
+    getExact, exactPositionsVersion, draftChoices,
+  });
+  const playedAtView = usePlayedAtView({
+    viewingVariation, variationSpan, viewTurn, history, snapshots, doubles: evalIsDoubles,
+    parseSingles: parsePlayedActions, parseDoubles: parsePlayedActionsDoubles,
+  });
 
   const handleEvaluate = useCallback(() => {
     if (!replayData) return;
@@ -661,55 +333,6 @@ function App() {
       return next;
     });
   }, [evaluation.status, evaluation.result, evaluation.resultTag, evalViewKey, viewingVariation, viewTurn, setVariationScores]);
-
-  /** Non-live positions render the resolved picker state with the DRAFT
-   *  choices mirrored in — the panel's selection logic reads simState. */
-  const pickerSimState = useMemo(() => (positionPicker ? {
-    ...positionPicker.simState,
-    p1Choice: draftChoices.p1[0] ?? null,
-    p1Choices: draftChoices.p1,
-    p2Choice: draftChoices.p2[0] ?? null,
-    p2Choices: draftChoices.p2,
-  } : null), [positionPicker, draftChoices]);
-
-  const handleExecuteDraft = useCallback(() => {
-    requestDeviation({ p1Choices: draftChoices.p1, p2Choices: draftChoices.p2 });
-  }, [requestDeviation, draftChoices]);
-
-  /**
-   * What the viewed line actually played at this position — the answer to
-   * "which move did they press here?". Main line: the replay protocol's
-   * action for this turn. Variation (behind the tip): the recorded entry's
-   * choices. The tip itself has no played move yet.
-   */
-  const playedAtView = useMemo<{ p1: PlayedPick | null; p2: PlayedPick | null } | null>(() => {
-    const fromAction = (action: { kind: 'move' | 'switch'; name: string; species?: string } | null): PlayedPick | null =>
-      action ? { kind: action.kind, name: action.name, ...(action.species ? { species: action.species } : {}) } : null;
-    if (viewingVariation && variationSpan) {
-      const index = viewTurn - variationSpan.startTurn;
-      let count = 0;
-      for (const entry of history) {
-        if (entry.kind === 'forced') continue;
-        if (count === index) {
-          const fromSlots = (slots: (BranchSlotChoice | null)[] | undefined): PlayedPick | null => {
-            const first = (slots ?? []).find(Boolean) ?? null;
-            if (!first) return null;
-            return first.kind === 'move'
-              ? { kind: 'move', name: first.moveName }
-              : { kind: 'switch', name: first.pokemonName, species: first.speciesId };
-          };
-          return { p1: fromSlots(entry.p1SlotChoices), p2: fromSlots(entry.p2SlotChoices) };
-        }
-        count += 1;
-      }
-      return null;
-    }
-    const lines = snapshots[viewTurn]?.log;
-    if (!lines || lines.length === 0) return null;
-    const turn = evalIsDoubles ? parsePlayedActionsDoubles(lines) : parsePlayedActions(lines);
-    if (!turn.p1 && !turn.p2) return null;
-    return { p1: fromAction(turn.p1), p2: fromAction(turn.p2) };
-  }, [viewingVariation, variationSpan, viewTurn, history, snapshots, evalIsDoubles]);
 
   // Clicking a recommended choice pre-fills the branch pickers.
   const applyEvalChoice = useCallback((side: 'p1' | 'p2', ranked: RankedChoice): boolean => {
@@ -774,7 +397,7 @@ function App() {
     // No engine reply to commit (forced-switch positions execute through
     // setChoice on their own) — show the engine's view of what stands.
     handleEvaluate();
-  }, [applyEvalChoice, executeTurn, handleEvaluate, getBattle, evaluation.result]);
+  }, [applyEvalChoice, executeTurn, handleEvaluate, getBattle, evaluation.result, setBranchDivergence]);
 
   const [pendingEvalPick, setPendingEvalPick] =
     useState<{ side: 'p1' | 'p2'; ranked: RankedChoice; reply: RankedChoice | null } | null>(null);
@@ -1347,7 +970,7 @@ function App() {
                     <button
                       type="button"
                       className="ps-btn"
-                      onClick={handleCancelBranchPreparation}
+                      onClick={cancelPreparation}
                       style={{ padding: '2px 8px', fontSize: 10 }}
                     >
                       Cancel
