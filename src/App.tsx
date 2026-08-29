@@ -27,7 +27,8 @@ import { alternativeItems } from './lib/smogon-stats';
 import type { SensitivityTarget } from './lib/eval/sensitivity';
 import { applyPastedTeam, countMatchingSpecies, parsePastedTeam, type PastedSet } from './lib/team-paste';
 import type { OpponentTeamInfo } from './types';
-import { decodeBranchShare, type BranchSharePayload } from './lib/branch-share';
+import { SharedBranchView } from './components/SharedBranchView';
+import { useSharedBranch } from './hooks/useSharedBranch';
 import { broughtSpeciesFor, formatEnforcesSleepClause, getBranchSimulatorFormat, getReplayBringCount, getReplayGameType, getReplayGeneration, inferReplayFormatId, replayBringOnly, speciesBaseId } from './lib/replay-format';
 import { resolveTeraPreference } from './lib/eval/tera';
 import { summarizeAlignment, type TurnAlignmentRecord } from './lib/hax-alignment';
@@ -47,90 +48,6 @@ import {
 import { nextPlayOutStep, playOutDoneText } from './lib/play-out';
 
 const TEAM_PASTE_STORAGE_KEY = 'ps-replay-interceptor:team-paste';
-
-function SharedBranchView({
-  branch,
-  onLoadOriginal,
-  onClear,
-}: {
-  branch: BranchSharePayload;
-  onLoadOriginal: (replayId: string) => void;
-  onClear: () => void;
-}) {
-  return (
-    <div className="ps-main-layout">
-      <div className="ps-main-left">
-        <div className="ps-topbar">
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8, flex: 1, minWidth: 0 }}>
-            <span className="ps-format-tag">{branch.format}</span>
-            <span style={{ fontSize: 11, color: '#8ac' }}>{branch.players[0]}</span>
-            <span style={{ fontSize: 10, color: '#556' }}>vs</span>
-            <span style={{ fontSize: 11, color: '#c8a' }}>{branch.players[1]}</span>
-          </div>
-          <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
-            <span style={{ fontSize: 11, fontWeight: 'bold', color: '#8cf' }}>
-              Shared Branch
-            </span>
-            <button
-              type="button"
-              className="ps-btn"
-              onClick={() => onLoadOriginal(branch.replayId)}
-              style={{ padding: '2px 8px', fontSize: 10 }}
-            >
-              Load Original Replay
-            </button>
-            <button
-              type="button"
-              className="ps-btn"
-              onClick={onClear}
-              style={{ padding: '2px 8px', fontSize: 10 }}
-            >
-              New Replay
-            </button>
-          </div>
-        </div>
-        <div className="ps-iframe-wrap">
-          <PSReplayFrame
-            log={branch.finalLog}
-            format={branch.format}
-            p1={branch.players[0]}
-            p2={branch.players[1]}
-            title="Shared Branch Replay"
-            height={480}
-            seekTurn={branch.branchTurn}
-            autoPlay={false}
-            reloadKey={`shared:${branch.replayId}:${branch.createdAt}`}
-          />
-        </div>
-        <div className="ps-panel ps-shared-branch-panel">
-          <div style={{ fontSize: 13, fontWeight: 'bold', marginBottom: 8 }}>Branch Choices</div>
-          <div style={{ fontSize: 11, color: '#aebdd0', marginBottom: 8 }}>
-            Branch started from turn {branch.branchTurn}. This read-only view replays the shared alternate line.
-          </div>
-          <div className="ps-shared-choice-list">
-            {branch.choices.length > 0 ? branch.choices.map(choice => (
-              <div key={`${choice.turnNumber}-${choice.p1Choice}-${choice.p2Choice}`} className="ps-shared-choice-row">
-                Turn {choice.turnNumber}: P1 {choice.p1Choice} / P2 {choice.p2Choice}
-              </div>
-            )) : (
-              <div className="ps-shared-choice-row">No executed branch choices were stored.</div>
-            )}
-          </div>
-        </div>
-      </div>
-      <div className="ps-main-right">
-        <div className="ps-panel" style={{ marginTop: 10 }}>
-          <div style={{ fontSize: 13, fontWeight: 'bold', marginBottom: 8 }}>Replay Source</div>
-          <div style={{ fontSize: 11, color: '#aebdd0', lineHeight: 1.5 }}>
-            Replay id: <strong style={{ color: '#fff' }}>{branch.replayId}</strong>
-            <br />
-            Created: {new Date(branch.createdAt).toLocaleString()}
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}
 
 function App() {
   const { loading, error, replayData, snapshots, observations, speedOrders, hpEvidence, opponentInfo, p1Info, loadReplay, loadReplayFile } = useReplay();
@@ -191,8 +108,7 @@ function App() {
   const [branchSession, setBranchSession] = useState(0);
   const [analysisTurn, setAnalysisTurn] = useState<number | null>(null);
   const [animateBranchTurns, setAnimateBranchTurns] = useState(true);
-  const [sharedBranch, setSharedBranch] = useState<BranchSharePayload | null>(null);
-  const [sharedBranchError, setSharedBranchError] = useState<string | null>(null);
+  const { sharedBranch, sharedBranchError, clearSharedBranch } = useSharedBranch();
   const [pendingBranchRefresh, setPendingBranchRefresh] = useState<{
     p1Info: OpponentTeamInfo;
     p2Info: OpponentTeamInfo;
@@ -509,37 +425,6 @@ function App() {
     setSolvedSpreads(value);
     return value;
   }, [replayData, observations, speedOrders, teamText, effectiveP1Info, effectiveP2Info, usageStats.stats, setAssumptions.assumptions]);
-
-  // Share links must also work in an already-open tab (G17) — listen for
-  // hash changes instead of only parsing on the initial load.
-  useEffect(() => {
-    const applyHash = () => {
-      const match = window.location.hash.match(/^#branch=(.+)$/);
-      if (!match) {
-        setSharedBranch(null);
-        return;
-      }
-
-      try {
-        const decoded = decodeBranchShare(match[1]);
-        if (decoded.version !== 1 || !decoded.finalLog || !decoded.replayId) {
-          throw new Error('unsupported payload');
-        }
-        setSharedBranch(decoded);
-        setSharedBranchError(null);
-      } catch {
-        // A damaged link gets a readable message instead of a raw JSON parse
-        // error, and the broken hash leaves the URL (G18).
-        setSharedBranch(null);
-        setSharedBranchError('This share link is invalid or damaged. Ask for a fresh link.');
-        window.history.replaceState(null, '', `${window.location.pathname}${window.location.search}`);
-      }
-    };
-
-    applyHash();
-    window.addEventListener('hashchange', applyHash);
-    return () => window.removeEventListener('hashchange', applyHash);
-  }, []);
 
   /**
    * Rebuilds the live sim at `position` and prefills the pickers: the proven
@@ -1822,12 +1707,6 @@ function App() {
     pendingStoredSetsRef.current = null;
     applySetsText(stored);
   }, [p1Info, opponentInfo, applySetsText]);
-
-  const clearSharedBranch = useCallback(() => {
-    window.history.replaceState(null, '', `${window.location.pathname}${window.location.search}`);
-    setSharedBranch(null);
-    setSharedBranchError(null);
-  }, []);
 
   const handleLoadSharedOriginal = useCallback((replayId: string) => {
     clearSharedBranch();
