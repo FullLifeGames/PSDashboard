@@ -26,7 +26,8 @@ import { SharedBranchView } from './components/SharedBranchView';
 import { useSharedBranch } from './hooks/useSharedBranch';
 import { broughtSpeciesFor, formatEnforcesSleepClause, getBranchSimulatorFormat, getReplayBringCount, getReplayGameType, getReplayGeneration, inferReplayFormatId, replayBringOnly, speciesBaseId } from './lib/replay-format';
 import { resolveTeraPreference } from './lib/eval/tera';
-import { summarizeAlignment, type TurnAlignmentRecord } from './lib/hax-alignment';
+import { summarizeAlignment } from './lib/hax-alignment';
+import { useEvalAcquire } from './hooks/useEvalAcquire';
 import { choiceId, evalChoiceToSlotChoices, requiredChoicesForActiveSlots, type BranchSlotChoice } from './lib/branch-choices';
 import type { EvalResult, RankedChoice } from './lib/eval/types';
 import { allTurnEvents, detectSacks, parseLeadSpecies, parsePlayedActions, parsePlayedActionsDoubles } from './lib/eval/played';
@@ -41,6 +42,26 @@ import {
   type TimelinePosition, type VariationSpan, type ViewLine,
 } from './lib/timeline';
 import { nextPlayOutStep, playOutDoneText } from './lib/play-out';
+
+/** View-side gates for the acquisition hook: whether the dwell rebuild may
+ *  arm (main-line position, nothing busy) and whether Smogon data is due. */
+function acquireGates(args: {
+  liveTip: boolean;
+  viewingVariation: boolean;
+  atEndPosition: boolean;
+  executing: boolean;
+  branchPreparing: boolean;
+  playOut: { active: boolean } | null;
+  evaluation: ReturnType<typeof useEvaluation>;
+  usageStats: { loading: boolean };
+  setAssumptions: { loading: boolean };
+}) {
+  const dwellEnabled = !args.liveTip && !args.viewingVariation && !args.atEndPosition
+    && !args.executing && !args.branchPreparing && !args.playOut?.active
+    && args.evaluation.status !== 'reconstructing' && args.evaluation.status !== 'searching'
+    && !args.evaluation.graph.running;
+  return { dwellEnabled, smogonPending: args.usageStats.loading || args.setAssumptions.loading };
+}
 
 function App() {
   const { loading, error, replayData, snapshots, observations, speedOrders, hpEvidence, opponentInfo, p1Info, loadReplay, loadReplayFile } = useReplay();
@@ -225,6 +246,16 @@ function App() {
   // to the start turn) keep the run alive.
   const playOutRef = useRef<{ active: boolean } | null>(null);
   const stopPlayOutRef = useRef<((opts?: { returnToStart?: boolean }) => void) | null>(null);
+
+  // ── "Let it play out": the engine plays BOTH sides' top choice from the
+  // current position until the game ends, the user stops, or the safety cap
+  // trips. Each executed turn is a normal history entry — navigable,
+  // evaluable, truncatable like anything else; Stop keeps what was played.
+  // (Declared up here so render-time deriveds below may read it.)
+  const [playOut, setPlayOut] = useState<{ active: boolean; executed: number; turns: number; startTurn: number; prevAuto: boolean } | null>(null);
+  /** Why the last play-out ended + where watching it starts (panel notice). */
+  const [playOutNotice, setPlayOutNotice] = useState<{ text: string; watchTurn: number } | null>(null);
+  const playOutProcessedRef = useRef<EvalResult | null>(null);
 
   const navigateTo = useCallback((position: TimelinePosition, opts?: { seek?: boolean; internal?: boolean }) => {
     if (!opts?.internal && playOutRef.current?.active) {
@@ -647,181 +678,26 @@ function App() {
     [replayData],
   );
 
-  const acquireBranchPosition = useCallback(async () => {
-    const battle = getBattle();
-    if (!battle) throw new Error('No live branch battle to evaluate.');
-    const { serializeLiveBattle } = await import('./lib/eval/serialize');
-    return serializeLiveBattle(battle);
-  }, [getBattle]);
-
-  /**
-   * Exact main-line positions the app has already reconstructed, keyed like
-   * the eval cache (replay:turn:sets). In the unified timeline exactness is
-   * the app's job, not a button: every acquisition (Evaluate, Analyze game's
-   * streamed boundaries, the dwell rebuild below) lands here, and the pickers
-   * upgrade from approximate to exact the moment a position is known.
-   */
-  const exactPositionsRef = useRef(new Map<string, string>());
-  const failedExactRef = useRef(new Set<string>());
-  const [exactPositionsVersion, setExactPositionsVersion] = useState(0);
-  const exactKeyFor = useCallback(
-    (turn: number) => (replayData ? `${replayData.id}:${turn}:${setsFingerprint}` : null),
-    [replayData, setsFingerprint],
-  );
-  const storeExactPosition = useCallback((turn: number, serialized: string) => {
-    const key = exactKeyFor(turn);
-    if (!key || exactPositionsRef.current.get(key) === serialized) return;
-    exactPositionsRef.current.set(key, serialized);
-    setExactPositionsVersion(version => version + 1);
-  }, [exactKeyFor]);
-  useEffect(() => {
-    // New replay or new set knowledge: yesterday's reconstructions no longer
-    // describe these positions (keys differ, but the memory should go too).
-    exactPositionsRef.current.clear();
-    failedExactRef.current.clear();
-    setExactPositionsVersion(version => version + 1);
-  }, [replayData?.id, setsFingerprint]);
-
-  const makeReplayAcquire = useCallback((turn: number) =>
-    async (reportReconstruct: (turn: number, target: number) => void) => {
-      if (!replayData) throw new Error('Load a replay first.');
-      const { buildTeamsFromReplay } = await import('./lib/team-builder');
-      const branchEngine = await import('./lib/branch-engine');
-      const { serializeLiveBattle } = await import('./lib/eval/serialize');
-      const { p1Team, p2Team } = buildTeamsFromReplay(replayData.log, {
-        userTeamText: teamText || undefined,
-        p1Info: effectiveP1Info,
-        p2Info: effectiveP2Info,
-        usageStats: usageStats.stats,
-        setAssumptions: setAssumptions.assumptions,
-        inferredSpreads: await getInferredSpreads(),
-        hpEvidence,
-      });
-      if (p1Team.length === 0 || p2Team.length === 0) throw new Error('Could not build both teams for this replay.');
-      const { buildChoiceLockContext } = await import('./lib/choice-lock');
-      const runtime = await branchEngine.reconstructBranchRuntime({
-        format: getBranchSimulatorFormat(replayData),
-        p1Team,
-        p2Team,
-        replayLog: replayData.log,
-        targetTurn: turn,
-        snapshot: snapshots.length > 0 ? snapshots[Math.min(turn - 1, snapshots.length - 1)] : null,
-        playerNames: [replayData.players[0], replayData.players[1]],
-        onProgress: reportReconstruct,
-        choiceLocks: buildChoiceLockContext(replayData.log, { p1Team, p2Team }, observations),
-        // Bring-limited replays: the evaluated position fields only the
-        // brought species — a bring-all bench offered the search switches
-        // into Pokémon the real game never had (A.3c).
-        bringOnly: bringOnlyLists ?? undefined,
-        // The sweep's healing, on the single-turn path too: per-turn
-        // boundary corrections keep a diverging choice replay in lockstep
-        // with the protocol, so the cascade zone (draft t56+) arrives LIVE
-        // instead of prematurely ended — this is what re-enabled the
-        // think-deeper button (the 2026-08-11 hide).
-        capturePositions: {
-          snapshotFor: boundary => snapshots[Math.min(boundary - 1, snapshots.length - 1)] ?? null,
-          onPosition: () => {},
-        },
-      });
-      const invalid = branchEngine.validateBranchRuntime(runtime);
-      if (invalid) throw new Error(invalid);
-      const battle = runtime.battleStream.battle;
-      if (!battle) throw new Error('Reconstruction produced no battle.');
-      // Backstop for replays healing cannot save: an ended (or short)
-      // arrival is a divergence artifact, and evaluating it would report a
-      // decided ±1.00 — the "think deeper dropped the position to 100%"
-      // report. Fail loudly instead of publishing a phantom number.
-      if (!branchEngine.reconstructionReached(runtime, turn)) {
-        throw new Error(`The reconstruction diverged before turn ${turn}: the guessed sets could not reproduce this position. Correcting items/moves via Edit Player/Opp is the common fix.`);
-      }
-      const serialized = serializeLiveBattle(battle);
-      storeExactPosition(turn, serialized);
-      return serialized;
-    }, [replayData, teamText, effectiveP1Info, effectiveP2Info, usageStats.stats, setAssumptions.assumptions, snapshots, observations, hpEvidence, getInferredSpreads, storeExactPosition, bringOnlyLists]);
-
-  // Per-block seed/residual records of the last sweep reconstruction —
-  // instrumentation only (debug handle + drift report), never verdicts.
-  const [sweepAlignment, setSweepAlignment] = useState<TurnAlignmentRecord[] | null>(null);
-
-  // Single-pass sweep acquisition: one reconstruction captures every turn
-  // boundary, instead of one O(turn) replay per turn (quadratic polling).
-  const makeSweepAcquireAll = useCallback((turns: number) =>
-    async (
-      report: (turn: number, target: number) => void,
-      onPosition?: (turn: number, serialized: string) => void,
-      onDiagnostic?: (message: string) => void,
-    ): Promise<(string | null)[]> => {
-      if (!replayData) throw new Error('Load a replay first.');
-      setSweepAlignment(null);
-      const { buildTeamsFromReplay } = await import('./lib/team-builder');
-      const branchEngine = await import('./lib/branch-engine');
-      const { serializeLiveBattle } = await import('./lib/eval/serialize');
-      const { p1Team, p2Team } = buildTeamsFromReplay(replayData.log, {
-        userTeamText: teamText || undefined,
-        p1Info: effectiveP1Info,
-        p2Info: effectiveP2Info,
-        usageStats: usageStats.stats,
-        setAssumptions: setAssumptions.assumptions,
-        inferredSpreads: await getInferredSpreads(),
-        hpEvidence,
-      });
-      if (p1Team.length === 0 || p2Team.length === 0) throw new Error('Could not build both teams for this replay.');
-      const { buildChoiceLockContext } = await import('./lib/choice-lock');
-      const positions: (string | null)[] = new Array(turns).fill(null);
-      const runtime = await branchEngine.reconstructBranchRuntime({
-        format: getBranchSimulatorFormat(replayData),
-        p1Team,
-        p2Team,
-        replayLog: replayData.log,
-        targetTurn: turns,
-        snapshot: snapshots.length > 0 ? snapshots[Math.min(turns - 1, snapshots.length - 1)] : null,
-        playerNames: [replayData.players[0], replayData.players[1]],
-        onProgress: report,
-        choiceLocks: buildChoiceLockContext(replayData.log, { p1Team, p2Team }, observations),
-        // Same bring trim as the single-turn path — every swept position
-        // fields only what the real game brought (A.3c).
-        bringOnly: bringOnlyLists ?? undefined,
-        capturePositions: {
-          snapshotFor: turn => snapshots[Math.min(turn - 1, snapshots.length - 1)] ?? null,
-          onPosition: (turn, battle) => {
-            if (turn > turns) return;
-            try {
-              const serialized = serializeLiveBattle(battle);
-              positions[turn - 1] = serialized;
-              storeExactPosition(turn, serialized);
-              onPosition?.(turn, serialized);
-            } catch {
-              // A broken boundary becomes a graph gap, not a failed sweep.
-            }
-          },
-        },
-      });
-      // The boundary captures above already delivered every turn the replay
-      // reached; this final store only covers the target turn itself — and
-      // only when the reconstruction ARRIVED there live. A diverged run that
-      // cascaded into an early end would otherwise be stored as the last
-      // turn's position and scored as a decided ±1: one phantom point at the
-      // far right with every other turn a gap (the empty-graph report).
-      setSweepAlignment(runtime.haxAlignment);
-      const finalBattle = runtime.battleStream.battle;
-      if (finalBattle?.ended && finalBattle.turn < turns) {
-        onDiagnostic?.(
-          `The simulated battle ended at turn ${finalBattle.turn} although the real game continued: ` +
-          `no candidate seed avoided the divergence, so later turns have no positions.`,
-        );
-      }
-      const invalid = branchEngine.validateBranchRuntime(runtime);
-      const battle = runtime.battleStream.battle;
-      if (!invalid && battle && branchEngine.reconstructionReached(runtime, turns)) {
-        const serialized = serializeLiveBattle(battle);
-        positions[turns - 1] = serialized;
-        storeExactPosition(turns, serialized);
-        onPosition?.(turns, serialized);
-      }
-      return positions;
-    }, [replayData, teamText, effectiveP1Info, effectiveP2Info, usageStats.stats, setAssumptions.assumptions, snapshots, observations, hpEvidence, getInferredSpreads, storeExactPosition, bringOnlyLists]);
-
-  const acquireReplayPosition = useMemo(() => makeReplayAcquire(viewTurn), [makeReplayAcquire, viewTurn]);
+  // One team-source bundle for every acquisition path; deps are the inner
+  // stable values (the Smogon hook objects are fresh per render).
+  const teamSources = useMemo(() => ({
+    teamText, effectiveP1Info, effectiveP2Info,
+    usageStats: { stats: usageStats.stats },
+    setAssumptions: { assumptions: setAssumptions.assumptions },
+    hpEvidence, getInferredSpreads,
+  }), [teamText, effectiveP1Info, effectiveP2Info, usageStats.stats, setAssumptions.assumptions, hpEvidence, getInferredSpreads]);
+  const { dwellEnabled, smogonPending } = acquireGates({
+    liveTip, viewingVariation, atEndPosition, executing, branchPreparing,
+    playOut, evaluation, usageStats, setAssumptions,
+  });
+  const {
+    acquireBranchPosition, makeReplayAcquire, acquireReplayPosition,
+    makeSweepAcquireAll, sweepAlignment, exactAcquiringTurn,
+    getExact, exactPositionsVersion,
+  } = useEvalAcquire({
+    replayData, snapshots, observations, sources: teamSources, setsFingerprint,
+    bringOnlyLists, getBattle, viewTurn, dwellEnabled, smogonPending,
+  });
 
   /**
    * Picker state for the viewed position when the live sim is elsewhere
@@ -836,9 +712,7 @@ function App() {
       setPositionPicker(null);
       return;
     }
-    const exactMainLine = !viewingVariation && exactKeyFor(viewTurn)
-      ? exactPositionsRef.current.get(exactKeyFor(viewTurn)!) ?? null
-      : null;
+    const exactMainLine = !viewingVariation ? getExact(viewTurn) : null;
     const stored = viewingVariation
       ? serializedAtView
       : (viewTurn === variationStartTurn ? startSerialized : null) ?? exactMainLine;
@@ -885,7 +759,7 @@ function App() {
   }, [
     liveTip, viewingVariation, serializedAtView, variationStartTurn, startSerialized, viewTurn, snapshots, replayData,
     teamText, effectiveP1Info, effectiveP2Info, usageStats.stats, setAssumptions.assumptions, getInferredSpreads, hpEvidence,
-    replayGenNumber, exactKeyFor, exactPositionsVersion, bringOnlyLists,
+    replayGenNumber, getExact, exactPositionsVersion, bringOnlyLists,
   ]);
 
   const handleEvaluate = useCallback(() => {
@@ -1076,15 +950,6 @@ function App() {
     }
   }, [pendingEvalPick, liveTip, simState, branching, branchPreparing, pendingConfirm, playOutEvalChoice]);
 
-  // ── "Let it play out": the engine plays BOTH sides' top choice from the
-  // current position until the game ends, the user stops, or the safety cap
-  // trips. Each executed turn is a normal history entry — navigable,
-  // evaluable, truncatable like anything else; Stop keeps what was played.
-  const [playOut, setPlayOut] = useState<{ active: boolean; executed: number; turns: number; startTurn: number; prevAuto: boolean } | null>(null);
-  /** Why the last play-out ended + where watching it starts (panel notice). */
-  const [playOutNotice, setPlayOutNotice] = useState<{ text: string; watchTurn: number } | null>(null);
-  const playOutProcessedRef = useRef<EvalResult | null>(null);
-
   /**
    * Chess-walk interlude completion: after a clicked engine line executes,
    * a mid-turn KO leaves the sim waiting on a forced replacement — without
@@ -1256,47 +1121,6 @@ function App() {
     if (evaluation.status !== 'error') return;
     finishPlayOut(playOut, `Play-out stopped after ${playOut.turns} turn${playOut.turns === 1 ? '' : 's'}: the evaluation failed here${evaluation.error ? ` (${evaluation.error})` : ''}.`);
   }, [playOut, executing, branchPreparing, evaluation.status, evaluation.error, finishPlayOut]);
-
-  /**
-   * The unified timeline's exactness promise, without a button: when the
-   * pointer DWELLS on a main-line turn whose exact position is unknown, the
-   * app quietly reconstructs it in the background (the same healed path
-   * Evaluate acquires through) and the pickers upgrade in place. Scrubbing
-   * stays free — the timer only fires once the user settles, and never while
-   * the sim, an evaluation, or a play-out is busy.
-   */
-  const [exactAcquiringTurn, setExactAcquiringTurn] = useState<number | null>(null);
-  const exactAcquireBusyRef = useRef(false);
-  useEffect(() => {
-    if (!replayData || liveTip || viewingVariation || atEndPosition) return;
-    if (usageStats.loading || setAssumptions.loading) return;
-    if (executing || branchPreparing || playOut?.active) return;
-    if (evaluation.status === 'reconstructing' || evaluation.status === 'searching' || evaluation.graph.running) return;
-    const key = exactKeyFor(viewTurn);
-    if (!key || exactPositionsRef.current.has(key) || failedExactRef.current.has(key)) return;
-    const turn = viewTurn;
-    const timer = window.setTimeout(() => {
-      if (exactAcquireBusyRef.current) return;
-      exactAcquireBusyRef.current = true;
-      setExactAcquiringTurn(turn);
-      void makeReplayAcquire(turn)(() => {})
-        .catch(() => {
-          // The approximation stays usable — the sim still validates on
-          // execute. Remember the failure so a diverging replay does not
-          // re-run the reconstruction on every render tick.
-          failedExactRef.current.add(key);
-        })
-        .finally(() => {
-          exactAcquireBusyRef.current = false;
-          setExactAcquiringTurn(current => (current === turn ? null : current));
-        });
-    }, 900);
-    return () => window.clearTimeout(timer);
-  }, [
-    replayData, liveTip, viewingVariation, atEndPosition, viewTurn, exactKeyFor, exactPositionsVersion,
-    usageStats.loading, setAssumptions.loading, executing, branchPreparing, playOut?.active,
-    evaluation.status, evaluation.graph.running, makeReplayAcquire,
-  ]);
 
   // The sweep counts PLAYED turns. The end snapshot (lastTurn + 1, the
   // post-game state) is the branch slider's "End" sentinel, not a turn —
@@ -2224,7 +2048,7 @@ function App() {
                 resultSettings={analyzedSettings}
                 onThinkDeeper={!liveEvalView ? handleThinkDeeper : undefined}
                 thinkDeeperTarget={!liveEvalView ? thinkDeeperTarget : null}
-                smogonPending={usageStats.loading || setAssumptions.loading}
+                smogonPending={smogonPending}
                 progress={evaluation.progress}
                 reconstructProgress={evaluation.reconstructProgress}
                 error={evaluation.error}
