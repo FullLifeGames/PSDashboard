@@ -1,5 +1,4 @@
 import { useEffect, useState, useCallback, useMemo, useRef } from 'react';
-import type { PokemonSet } from '@pkmn/sim';
 import { useReplay } from './hooks/useReplay';
 import { finalPlayedTurn } from './lib/replay-turns';
 import { useEmbedHost } from './hooks/useEmbedHost';
@@ -15,17 +14,13 @@ import { LeadPanel, type LeadOption } from './components/LeadPanel';
 import { BranchHistoryPanel } from './components/BranchHistoryPanel';
 import { BranchSaveSharePanel } from './components/BranchSaveSharePanel';
 import { BattleStatsPanel } from './components/BattleStatsPanel';
-import { applyTeamSheetToInfo } from './lib/team-sheets';
 import { TeamEditor } from './components/TeamEditor';
 import { SetsImportExportPanel } from './components/SetsImportExportPanel';
 import { EvalPanel } from './components/EvalPanel';
 import { needsSettingsUpgrade, resolveAutoTurnSettings, useEvaluation, type TurnEvalSettings } from './hooks/useEvaluation';
-import { buildSetsExport, parseSetsImport } from './lib/sets-io';
-import { parseTeamText } from './lib/team-parser';
-import { applyInferredSpreads, enrichTeamInfo, manualMove } from './lib/team-info';
-import { alternativeItems } from './lib/smogon-stats';
-import type { SensitivityTarget } from './lib/eval/sensitivity';
-import { applyPastedTeam, countMatchingSpecies, parsePastedTeam, type PastedSet } from './lib/team-paste';
+import { buildSetsExport } from './lib/sets-io';
+import { manualMove } from './lib/team-info';
+import { useTeamKnowledge } from './hooks/useTeamKnowledge';
 import type { OpponentTeamInfo } from './types';
 import { SharedBranchView } from './components/SharedBranchView';
 import { useSharedBranch } from './hooks/useSharedBranch';
@@ -47,8 +42,6 @@ import {
 } from './lib/timeline';
 import { nextPlayOutStep, playOutDoneText } from './lib/play-out';
 
-const TEAM_PASTE_STORAGE_KEY = 'ps-replay-interceptor:team-paste';
-
 function App() {
   const { loading, error, replayData, snapshots, observations, speedOrders, hpEvidence, opponentInfo, p1Info, loadReplay, loadReplayFile } = useReplay();
   const { embed, requestedReplay } = useEmbedHost({ loadReplay, loadReplayFile });
@@ -67,14 +60,6 @@ function App() {
   }, [p1Info, opponentInfo]);
   const setAssumptions = useSmogonSetAssumptions(replayData?.formatid, revealedSpecies);
 
-  const [teamText, setTeamText] = useState('');
-  const [pastedSets, setPastedSets] = useState<PastedSet[] | null>(null);
-  const [teamPasteError, setTeamPasteError] = useState<string | null>(null);
-  const [editorSide, setEditorSide] = useState<'p1' | 'p2' | null>(null);
-  const [setsPanelOpen, setSetsPanelOpen] = useState(false);
-  const pendingStoredSetsRef = useRef<string | null>(null);
-  const [editedP1Info, setEditedP1Info] = useState<OpponentTeamInfo | null>(null);
-  const [editedP2Info, setEditedP2Info] = useState<OpponentTeamInfo | null>(null);
   /**
    * Honest divergence notice: guessed sets can make the branch replay
    * DIVERGE from the real game — in the worst case the simulated game ends
@@ -116,6 +101,31 @@ function App() {
     p1Choices: (BranchSlotChoice | null)[];
     p2Choices: (BranchSlotChoice | null)[];
   } | null>(null);
+
+  // Edited team knowledge changes the sim's inputs — refresh a live branch
+  // with the same history and pending choices.
+  const handleTeamsEdited = useCallback((next: { p1: OpponentTeamInfo; p2: OpponentTeamInfo }) => {
+    if (branchWindowOpenRef.current || simState) {
+      setPendingBranchRefresh({
+        p1Info: next.p1,
+        p2Info: next.p2,
+        history: [...history],
+        p1Choices: [...(simState?.p1Choices ?? [])],
+        p2Choices: [...(simState?.p2Choices ?? [])],
+      });
+    }
+  }, [history, simState]);
+  const {
+    teamText, teamPasteStatus, teamPasteError, handleTeamLoad,
+    editedP1Info, editedP2Info, setEditedP1Info, setEditedP2Info,
+    editorSide, setEditorSide, setsPanelOpen, setSetsPanelOpen,
+    effectiveP1Info, effectiveP2Info, statsP1Info, statsP2Info,
+    setsFingerprint, replayGenNumber, getInferredSpreads, sensitivityTargetsFor,
+    applySetsText, saveTeam,
+  } = useTeamKnowledge({
+    replayData, p1Info, opponentInfo, observations, speedOrders, hpEvidence,
+    usageStats, setAssumptions, onTeamsEdited: handleTeamsEdited,
+  });
 
   const maxTurn = snapshots.length > 0 ? snapshots.length : 1;
   const replayGen = useMemo(() => replayData ? getReplayGeneration(replayData) : 9, [replayData]);
@@ -305,126 +315,7 @@ function App() {
     setBranchDivergence(null);
     branchWindowOpenRef.current = false;
     stopBranch();
-    setEditedP1Info(null);
-    setEditedP2Info(null);
-    setEditorSide(null);
-    // Sets imported for this replay earlier are re-applied once the fresh
-    // inference is available (see the effect below).
-    pendingStoredSetsRef.current = replayData?.id
-      ? localStorage.getItem(`ps-replay-interceptor:sets:${replayData.id}`)
-      : null;
   }, [replayData?.id, stopBranch, setViewTurn]);
-
-  const handleTeamLoad = useCallback((rawText: string) => {
-    const processed = parseTeamText(rawText);
-    if (!processed.trim()) {
-      setTeamText('');
-      setPastedSets(null);
-      setTeamPasteError(null);
-      localStorage.removeItem(TEAM_PASTE_STORAGE_KEY);
-      return;
-    }
-
-    // Reject pastes that contain no recognizable sets instead of silently
-    // showing "Team loaded" for garbage input (G15).
-    const sets = parsePastedTeam(processed);
-    if (sets.length === 0) {
-      setTeamPasteError('Could not read any Pokémon sets from the paste: expected the Showdown export format.');
-      return;
-    }
-
-    setTeamText(processed);
-    setPastedSets(sets);
-    setTeamPasteError(null);
-    try {
-      localStorage.setItem(TEAM_PASTE_STORAGE_KEY, processed);
-    } catch {
-      // Storage full/blocked — the paste still works for this session.
-    }
-  }, []);
-
-  // A paste should survive a reload (G15).
-  useEffect(() => {
-    const saved = localStorage.getItem(TEAM_PASTE_STORAGE_KEY);
-    if (!saved?.trim()) return;
-    const sets = parsePastedTeam(saved);
-    if (sets.length === 0) return;
-    setTeamText(saved);
-    setPastedSets(sets);
-  }, []);
-
-  // Lazily loaded hidden-power module (Dex dependency) for the display-side
-  // HP-type resolver; the enrich memos re-run once it arrives.
-  const [hpModule, setHpModule] = useState<typeof import('./lib/hidden-power') | null>(null);
-  const replayGenNumber = useMemo(() =>
-    parseInt(replayData?.log.match(/^\|gen\|(\d)/m)?.[1] ?? '9', 10), [replayData]);
-  const hpResolverFor = useCallback((side: 'p1' | 'p2') => {
-    if (!hpModule) return undefined;
-    const sideEvidence = hpEvidence.filter(entry => entry.attackerSide === side);
-    return (species: string) =>
-      hpModule.resolveHiddenPowerType(sideEvidence, usageStats.stats, species, replayGenNumber);
-  }, [hpModule, hpEvidence, usageStats.stats, replayGenNumber]);
-
-  const effectiveP1Info = useMemo(() => {
-    if (editedP1Info) return editedP1Info;
-    const base = p1Info ? enrichTeamInfo(p1Info, usageStats.stats, setAssumptions.assumptions, hpResolverFor('p1')) : null;
-    // A pasted team overlays the player's side as green "manual" data (G15).
-    if (base && pastedSets && pastedSets.length > 0) {
-      return applyPastedTeam(base, pastedSets).info;
-    }
-    return base;
-  }, [editedP1Info, p1Info, usageStats.stats, setAssumptions.assumptions, pastedSets, hpResolverFor]);
-
-  const effectiveP2Info = useMemo(() => {
-    if (editedP2Info) return editedP2Info;
-    return opponentInfo ? enrichTeamInfo(opponentInfo, usageStats.stats, setAssumptions.assumptions, hpResolverFor('p2')) : null;
-  }, [editedP2Info, opponentInfo, usageStats.stats, setAssumptions.assumptions, hpResolverFor]);
-
-  useEffect(() => {
-    if (!replayData) return;
-    void import('./lib/team-builder');
-    void import('./lib/branch-engine');
-    // The display-side HP-type resolver pulls @pkmn/sim's Dex — keep it out
-    // of the main chunk and hand the loaded module to the enrich memos.
-    void import('./lib/hidden-power').then(module => setHpModule(module));
-  }, [replayData]);
-
-  // The damage-consistent spread solve is deterministic per replay but runs
-  // thousands of calc calls — cache it across the build call sites instead of
-  // re-solving on every branch/eval build. Lazy (ref, not useMemo) so
-  // team-builder stays out of the main bundle.
-  const spreadSolveRef = useRef<{ key: unknown[]; value: Map<string, import('./lib/spread-inference').SpreadCandidate> } | null>(null);
-  // Mirror of the latest solve for the stats panel's provenance display.
-  const [solvedSpreads, setSolvedSpreads] = useState<Map<string, import('./lib/spread-inference').SpreadCandidate> | null>(null);
-  useEffect(() => {
-    spreadSolveRef.current = null;
-    setSolvedSpreads(null);
-  }, [replayData]);
-  const getInferredSpreads = useCallback(async (
-    p1InfoOverride?: OpponentTeamInfo | null,
-    p2InfoOverride?: OpponentTeamInfo | null,
-  ) => {
-    if (!replayData || (observations.length === 0 && speedOrders.length === 0)) return undefined;
-    const info1 = p1InfoOverride ?? effectiveP1Info;
-    const info2 = p2InfoOverride ?? effectiveP2Info;
-    const key = [replayData, observations, speedOrders, teamText, info1, info2, usageStats.stats, setAssumptions.assumptions];
-    const cached = spreadSolveRef.current;
-    if (cached && cached.key.length === key.length && cached.key.every((entry, index) => entry === key[index])) {
-      return cached.value;
-    }
-    const { solveReplaySpreads } = await import('./lib/team-builder');
-    const value = solveReplaySpreads(replayData.log, observations, {
-      userTeamText: teamText || undefined,
-      p1Info: info1,
-      p2Info: info2,
-      usageStats: usageStats.stats,
-      setAssumptions: setAssumptions.assumptions,
-      speedOrders,
-    });
-    spreadSolveRef.current = { key, value };
-    setSolvedSpreads(value);
-    return value;
-  }, [replayData, observations, speedOrders, teamText, effectiveP1Info, effectiveP2Info, usageStats.stats, setAssumptions.assumptions]);
 
   /**
    * Rebuilds the live sim at `position` and prefills the pickers: the proven
@@ -737,11 +628,6 @@ function App() {
   }, [bringCount, replayGameType, leadOptions]);
   const evalIsDoubles = replayGameType === 'doubles';
 
-  const setsFingerprint = useMemo(
-    () => JSON.stringify([editedP1Info, editedP2Info, teamText]),
-    [editedP1Info, editedP2Info, teamText],
-  );
-
   // Tera resolution: 'auto' turns enumeration off when the game never
   // terastallized, and in draft/custom formats (per-Pokémon Tera rights)
   // restricts it to the species that actually did — a global switch would
@@ -760,45 +646,6 @@ function App() {
     () => (replayData ? formatEnforcesSleepClause(getBranchSimulatorFormat(replayData)) : false),
     [replayData],
   );
-
-  // Posted open team sheets, surfaced in the stats panel as 'sheet'
-  // knowledge (the extraction needs the sim's Teams parser — lazy import).
-  const [sheetTeams, setSheetTeams] = useState<{ p1: PokemonSet[] | null; p2: PokemonSet[] | null }>({ p1: null, p2: null });
-  useEffect(() => {
-    let stale = false;
-    setSheetTeams({ p1: null, p2: null });
-    if (!replayData) return;
-    void import('./lib/team-builder').then(({ extractTeamSheets }) => {
-      if (!stale) setSheetTeams(extractTeamSheets(replayData.log));
-    });
-    return () => { stale = true; };
-  }, [replayData]);
-  const statsP1Info = useMemo(
-    () => (effectiveP1Info
-      ? applyInferredSpreads(applyTeamSheetToInfo(effectiveP1Info, sheetTeams.p1), 'p1', solvedSpreads)
-      : null),
-    [effectiveP1Info, sheetTeams, solvedSpreads],
-  );
-  const statsP2Info = useMemo(
-    () => (effectiveP2Info
-      ? applyInferredSpreads(applyTeamSheetToInfo(effectiveP2Info, sheetTeams.p2), 'p2', solvedSpreads)
-      : null),
-    [effectiveP2Info, sheetTeams, solvedSpreads],
-  );
-
-  // Guessed-item mons + their usage-plausible alternatives — the search
-  // space for the sensitivity probes (flagged-verdict honesty).
-  const sensitivityTargetsFor = useCallback((side: 'p1' | 'p2'): SensitivityTarget[] => {
-    const info = side === 'p1' ? statsP1Info : statsP2Info;
-    if (!info) return [];
-    return info.pokemon
-      .filter(mon => mon.item.source === 'guessed' && mon.item.value)
-      .map(mon => ({
-        species: mon.species,
-        items: alternativeItems(usageStats.stats, mon.species, mon.item.value, mon.ruledOut),
-      }))
-      .filter(target => target.items.length > 0);
-  }, [statsP1Info, statsP2Info, usageStats.stats]);
 
   const acquireBranchPosition = useCallback(async () => {
     const battle = getBattle();
@@ -1642,71 +1489,11 @@ function App() {
         p2Choices: seedChoices((liveTip && simState?.p2Choices) || [], 'p2'),
       });
     }
-  }, [effectiveP1Info, effectiveP2Info, simState, history, liveTip, variationSpan]);
+  }, [effectiveP1Info, effectiveP2Info, setEditedP1Info, setEditedP2Info, simState, history, liveTip, variationSpan]);
 
   const handleExecuteTurn = useCallback(async () => {
     await executeTurn();
   }, [executeTurn]);
-
-  const handleSaveTeam = useCallback((side: 'p1' | 'p2', info: OpponentTeamInfo) => {
-    const nextP1Info = side === 'p1' ? info : effectiveP1Info;
-    const nextP2Info = side === 'p2' ? info : effectiveP2Info;
-
-    if (side === 'p1') {
-      setEditedP1Info(info);
-    } else {
-      setEditedP2Info(info);
-    }
-    setEditorSide(null);
-
-    if ((branchWindowOpenRef.current || simState) && nextP1Info && nextP2Info) {
-      setPendingBranchRefresh({
-        p1Info: nextP1Info,
-        p2Info: nextP2Info,
-        history: [...history],
-        p1Choices: [...(simState?.p1Choices ?? [])],
-        p2Choices: [...(simState?.p2Choices ?? [])],
-      });
-    }
-  }, [effectiveP1Info, effectiveP2Info, history, simState]);
-
-  /** Applies a sets-import text to both sides; returns an error message or null. */
-  const applySetsText = useCallback((text: string): string | null => {
-    if (!replayData || !effectiveP1Info || !effectiveP2Info) return 'Load a replay first.';
-    let parsed: ReturnType<typeof parseSetsImport>;
-    try {
-      parsed = parseSetsImport(text);
-    } catch (err) {
-      return err instanceof Error ? err.message : 'Could not parse the sets text.';
-    }
-    const nextP1 = parsed.p1.length > 0 ? applyPastedTeam(effectiveP1Info, parsed.p1).info : effectiveP1Info;
-    const nextP2 = parsed.p2.length > 0 ? applyPastedTeam(effectiveP2Info, parsed.p2).info : effectiveP2Info;
-    setEditedP1Info(nextP1);
-    setEditedP2Info(nextP2);
-    try {
-      localStorage.setItem(`ps-replay-interceptor:sets:${replayData.id}`, text);
-    } catch {
-      // Storage full/blocked — the import still applies for this session.
-    }
-    if (branchWindowOpenRef.current || simState) {
-      setPendingBranchRefresh({
-        p1Info: nextP1,
-        p2Info: nextP2,
-        history: [...history],
-        p1Choices: [...(simState?.p1Choices ?? [])],
-        p2Choices: [...(simState?.p2Choices ?? [])],
-      });
-    }
-    return null;
-  }, [replayData, effectiveP1Info, effectiveP2Info, history, simState]);
-
-  // Re-apply this replay's stored sets once the fresh inference exists.
-  useEffect(() => {
-    if (!pendingStoredSetsRef.current || !p1Info || !opponentInfo) return;
-    const stored = pendingStoredSetsRef.current;
-    pendingStoredSetsRef.current = null;
-    applySetsText(stored);
-  }, [p1Info, opponentInfo, applySetsText]);
 
   const handleLoadSharedOriginal = useCallback((replayId: string) => {
     clearSharedBranch();
@@ -2032,19 +1819,6 @@ function App() {
     };
   }, [evaluation.graph, gameReportData, sweepAlignment]);
 
-  const teamPasteStatus = useMemo(() => {
-    if (!pastedSets || pastedSets.length === 0) return null;
-    if (!p1Info) return `Team loaded (${pastedSets.length} Pokémon)`;
-    const matched = countMatchingSpecies(p1Info, pastedSets);
-    return `Team loaded (${pastedSets.length} Pokémon, ${matched} match this replay)`;
-  }, [pastedSets, p1Info]);
-  const teamPasteMismatch = useMemo(() => {
-    if (!pastedSets || pastedSets.length === 0 || !p1Info) return null;
-    return countMatchingSpecies(p1Info, pastedSets) === 0
-      ? 'None of the pasted Pokémon appear in this replay; the paste will be ignored for branching.'
-      : null;
-  }, [pastedSets, p1Info]);
-
   const simLog = useMemo(() => {
     const raw = simState?.log ?? [];
     if (raw.length === 0) return '';
@@ -2107,7 +1881,7 @@ function App() {
             error={error}
             loadedUrl={loadedReplayUrl}
             teamStatus={teamPasteStatus}
-            teamError={teamPasteError || teamPasteMismatch}
+            teamError={teamPasteError}
             showGuide
           />
         </div>
@@ -2435,7 +2209,7 @@ function App() {
                 error={error}
                 loadedUrl={loadedReplayUrl}
                 teamStatus={teamPasteStatus}
-                teamError={teamPasteError || teamPasteMismatch}
+                teamError={teamPasteError}
               />
             )}
           </div>
@@ -2560,7 +2334,7 @@ function App() {
           title="Edit Player Team"
           teamInfo={effectiveP1Info}
           gen={replayGen}
-          onSave={(info) => handleSaveTeam('p1', info)}
+          onSave={(info) => saveTeam('p1', info)}
           onClose={() => setEditorSide(null)}
         />
       )}
@@ -2570,7 +2344,7 @@ function App() {
           title="Edit Opponent Team"
           teamInfo={effectiveP2Info}
           gen={replayGen}
-          onSave={(info) => handleSaveTeam('p2', info)}
+          onSave={(info) => saveTeam('p2', info)}
           onClose={() => setEditorSide(null)}
         />
       )}
