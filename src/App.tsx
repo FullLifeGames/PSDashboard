@@ -26,15 +26,16 @@ import { formatEnforcesSleepClause, getBranchSimulatorFormat, getReplayBringCoun
 import { resolveTeraPreference } from './lib/eval/tera';
 import { useEvalAcquire } from './hooks/useEvalAcquire';
 import { useGameAnalysis } from './hooks/useGameAnalysis';
-import { choiceId, evalChoiceToSlotChoices, requiredChoicesForActiveSlots, type BranchSlotChoice } from './lib/branch-choices';
-import type { EvalResult, RankedChoice } from './lib/eval/types';
+import { choiceId, type BranchSlotChoice } from './lib/branch-choices';
+import type { EvalResult } from './lib/eval/types';
 import { parseLeadSpecies, parsePlayedActions, parsePlayedActionsDoubles } from './lib/eval/played';
 import { sliderMax, variationTip } from './lib/timeline';
 import { useTimeline } from './hooks/useTimeline';
 import { useDeviation } from './hooks/useDeviation';
 import { useBranchRefresh } from './hooks/useBranchRefresh';
 import { usePlayedAtView, usePositionPicker } from './hooks/usePositionPicker';
-import { nextPlayOutStep, playOutDoneText } from './lib/play-out';
+import { useEngineWalk } from './hooks/useEngineWalk';
+import { usePlayOut } from './hooks/usePlayOut';
 
 /** View-side gates for the acquisition hook: whether the dwell rebuild may
  *  arm (main-line position, nothing busy) and whether Smogon data is due. */
@@ -334,281 +335,25 @@ function App() {
     });
   }, [evaluation.status, evaluation.result, evaluation.resultTag, evalViewKey, viewingVariation, viewTurn, setVariationScores]);
 
-  // Clicking a recommended choice pre-fills the branch pickers.
-  const applyEvalChoice = useCallback((side: 'p1' | 'p2', ranked: RankedChoice): boolean => {
-    if (!simState) return false;
-    const movesBySlot = side === 'p1' ? simState.p1MovesBySlot : simState.p2MovesBySlot;
-    const switchesBySlot = side === 'p1' ? simState.p1SwitchesBySlot : simState.p2SwitchesBySlot;
-    // The engine's choice string carries one part per slot WITH choices —
-    // a doubles forced replacement is a single part that belongs to the
-    // forced slot, so the mask aligns parts with the request's slots.
-    const activeSlots = side === 'p1' ? simState.p1ActiveSlots : simState.p2ActiveSlots;
-    const forcedSlots = side === 'p1' ? simState.p1ForceSwitches : simState.p2ForceSwitches;
-    const mask = requiredChoicesForActiveSlots(
-      activeSlots.map(active => (active ? { fainted: active.fainted } : null)),
-      forcedSlots,
-    );
-    const slotChoices = evalChoiceToSlotChoices(ranked.choice, movesBySlot, switchesBySlot, ranked.label, mask);
-    if (!slotChoices) return false;
-    let applied = false;
-    slotChoices.forEach((choice, activeSlot) => {
-      if (!choice) return;
-      handleSetChoice(side, choice, activeSlot);
-      applied = true;
-    });
-    return applied;
-  }, [simState, handleSetChoice]);
+  // Engine walk: clicking a line plays the turn out; queued picks follow
+  // a rebuild; interludes finish forced replacements.
+  const {
+    applyEvalChoice, handleExploreChoice, handlePickPair, clearPendingPick,
+  } = useEngineWalk({
+    simState, liveTip, branching, branchPreparing, executing,
+    confirmOpen: pendingConfirm !== null, playOutActive: playOut?.active ?? false,
+    evaluation, evalViewKey, getBattle, executeTurn, handleEvaluate, handleSetChoice,
+    requestDeviation, setBranchDivergence,
+  });
 
-  // Armed by a clicked engine line whose turn executed — see the interlude
-  // completion effect below.
-  const walkInterludeRef = useRef(false);
-  const walkProcessedRef = useRef<EvalResult | null>(null);
-
-  // Chess-style walk: clicking an engine line PLAYS THE TURN OUT — the
-  // clicked side commits its line, the other side answers with the engine's
-  // top reply, the turn executes, and the result re-evaluates so the next
-  // recommendations are already waiting for the next click.
-  const playOutEvalChoice = useCallback((side: 'p1' | 'p2', ranked: RankedChoice, reply: RankedChoice | null) => {
-    // A diverged/finished branch sim cannot accept choices — refuse with the
-    // divergence notice instead of letting the sim reject confusingly.
-    if (getBattle()?.ended) {
-      setBranchDivergence(previous => previous ??
-        'The simulated replay already ended; recommendations cannot be played out in this diverged line.');
-      return;
-    }
-    if (!applyEvalChoice(side, ranked)) return;
-    const other = side === 'p1' ? 'p2' : 'p1';
-    // The top reply can fail to map onto the live pickers (label/slot
-    // mismatches) — walking down the ranked list keeps the click playing a
-    // full turn instead of silently stalling on a prefilled half-choice.
-    const replies = [
-      ...(reply ? [reply] : []),
-      ...(evaluation.result?.perSide[other] ?? []),
-    ].filter(candidate => candidate.choice !== 'wait');
-    for (const candidate of replies) {
-      if (applyEvalChoice(other, candidate)) {
-        // Mid-turn KOs pause the sim on a forced replacement — the walk
-        // finishes those interludes with the engine's answer (effect below).
-        walkInterludeRef.current = true;
-        void executeTurn().then(() => handleEvaluate());
-        return;
-      }
-    }
-    // No engine reply to commit (forced-switch positions execute through
-    // setChoice on their own) — show the engine's view of what stands.
-    handleEvaluate();
-  }, [applyEvalChoice, executeTurn, handleEvaluate, getBattle, evaluation.result, setBranchDivergence]);
-
-  const [pendingEvalPick, setPendingEvalPick] =
-    useState<{ side: 'p1' | 'p2'; ranked: RankedChoice; reply: RankedChoice | null } | null>(null);
-
-  const handleExploreChoice = useCallback((side: 'p1' | 'p2', ranked: RankedChoice, reply?: RankedChoice | null) => {
-    // The walk re-evaluates after every executed turn — surface that as the
-    // visible Auto setting rather than a hidden mode.
-    if (!evaluation.prefs.auto) evaluation.setPrefs({ ...evaluation.prefs, auto: true });
-    if (liveTip && simState) {
-      playOutEvalChoice(side, ranked, reply ?? null);
-      return;
-    }
-    // Any other position: the deviation flow rebuilds the sim there (chess
-    // rules incl. the replace confirm) and the pending pick plays out once
-    // the pointer sits on the live tip again.
-    setPendingEvalPick({ side, ranked, reply: reply ?? null });
-    requestDeviation(null);
-  }, [liveTip, simState, playOutEvalChoice, requestDeviation, evaluation]);
-
-  // A matrix cell names BOTH sides' choices — play exactly that pair out
-  // (draft T48: "what would Shadow Ball into Knock Off look like?").
-  const handlePickPair = useCallback((p1: { choice: string; label: string }, p2: { choice: string; label: string }) => {
-    const rankedLike = (entry: { choice: string; label: string }): RankedChoice =>
-      ({ choice: entry.choice, label: entry.label, worstCase: 0, expected: 0, ev: 0, punishedBy: null });
-    handleExploreChoice('p1', rankedLike(p1), rankedLike(p2));
-  }, [handleExploreChoice]);
-
-  useEffect(() => {
-    if (!pendingEvalPick) return;
-    // Wait until the rebuild landed the pointer ON the live sim — applying
-    // earlier would play the pick into whatever position the OLD sim held.
-    if (liveTip && simState && !branchPreparing && pendingConfirm === null) {
-      playOutEvalChoice(pendingEvalPick.side, pendingEvalPick.ranked, pendingEvalPick.reply);
-      setPendingEvalPick(null);
-    } else if (!branching && !branchPreparing && pendingConfirm === null) {
-      // Branch entry failed or was cancelled — drop the stale pick.
-      setPendingEvalPick(null);
-    }
-  }, [pendingEvalPick, liveTip, simState, branching, branchPreparing, pendingConfirm, playOutEvalChoice]);
-
-  /**
-   * Chess-walk interlude completion: after a clicked engine line executes,
-   * a mid-turn KO leaves the sim waiting on a forced replacement — without
-   * this the "play the turn out" click visibly stopped halfway through the
-   * turn. While armed, one-sided positions (only forced replacements rank —
-   * the other side 'wait's) auto-play the engine's top answer; the first
-   * two-sided position is the next real decision point and disarms the walk.
-   */
-  useEffect(() => {
-    if (!walkInterludeRef.current || playOut?.active) return;
-    if (!liveTip || executing || branchPreparing) return;
-    if (evaluation.status !== 'done' || !evaluation.result) return;
-    if (evaluation.resultTag !== null && evaluation.resultTag !== evalViewKey) return;
-    if (walkProcessedRef.current === evaluation.result) return;
-    walkProcessedRef.current = evaluation.result;
-    const battle = getBattle();
-    if (!battle || battle.ended) {
-      walkInterludeRef.current = false;
-      return;
-    }
-    const p1 = evaluation.result.perSide.p1.find(choice => choice.choice !== 'wait') ?? null;
-    const p2 = evaluation.result.perSide.p2.find(choice => choice.choice !== 'wait') ?? null;
-    if (p1 && p2) {
-      walkInterludeRef.current = false;
-      return;
-    }
-    const single = p1 ? { side: 'p1' as const, choice: p1 } : p2 ? { side: 'p2' as const, choice: p2 } : null;
-    if (!single || !applyEvalChoice(single.side, single.choice)) {
-      walkInterludeRef.current = false;
-      return;
-    }
-    // setChoice auto-executes forced replacements; the auto pref re-evaluates
-    // once the entry lands, which re-enters this effect until two-sided.
-  }, [playOut?.active, liveTip, executing, branchPreparing, evaluation.status, evaluation.result, evaluation.resultTag, evalViewKey, getBattle, applyEvalChoice]);
-
-  /** Seek the branch frame to the play-out's start and let it play — the
-   *  point of the feature: watch how the game runs on from your move. The
-   *  pointer moves to the tip (so the branch frame is the one on screen and
-   *  the next choice stays at hand) while the movie starts at `turn`. */
-  const watchFrom = useCallback((turn: number) => {
-    if (tipTurn !== null) navigateTo({ turn: tipTurn, line: 'variation' }, { seek: false, internal: true });
-    window.setTimeout(() => {
-      setNavSeek(prev => ({ turn, seq: (prev?.seq ?? 0) + 1, play: true }));
-    }, 250);
-  }, [navigateTo, tipTurn, setNavSeek]);
-
-  const startPlayOut = useCallback(() => {
-    // Turn 0: the run INCLUDES the lead decision. Branching at the shared
-    // turn-1 prefix instead produced a variation without its turn 0 — the
-    // moves list started at turn 1 and viewing turn 1 fell back to the main
-    // line (coverage begins one turn after the branch point).
-    if (viewT0) {
-      const arm = () => {
-        const prevAuto = evaluation.prefs.auto;
-        if (!prevAuto) evaluation.setPrefs({ ...evaluation.prefs, auto: true });
-        playOutProcessedRef.current = null;
-        setPlayOutNotice(null);
-        setPlayOut({ active: true, executed: 0, turns: 0, startTurn: 1, prevAuto });
-      };
-      if (variationSpan?.startTurn === 0) {
-        // A lead variation stands: keep its turn-0 decision, cut the tail
-        // (the chess truncate), and let the engine play the game again.
-        arm();
-        setVariationScores(previous => previous.map((value, index) => (index + 1 > 1 ? null : value)));
-        void rebuildAt({ turn: 1, line: 'variation' }, null);
-        return;
-      }
-      // No lead variation yet: seed one with the picker's default (the real
-      // game's leads and bring). The replace-confirm still guards an
-      // existing variation — arming waits for the user's yes.
-      startLeadVariation(defaultLeadSelection(), { onStart: arm });
-      return;
-    }
-    // The post-battle sentinel has nothing to play — surface the existing
-    // refusal instead of arming a loop that can never start.
-    if (!liveTip && !viewingVariation && atEndPosition) {
-      requestDeviation(null);
-      return;
-    }
-    // Same gates as any deviation: rebuild to here first when the live sim
-    // stands elsewhere (incl. the replace confirm on the main line).
-    if (!liveTip) requestDeviation(null);
-    const prevAuto = evaluation.prefs.auto;
-    // The loop advances on completed evals — auto keeps them coming after
-    // forced interludes; the user's own setting is restored at the end.
-    if (!prevAuto) evaluation.setPrefs({ ...evaluation.prefs, auto: true });
-    playOutProcessedRef.current = null;
-    setPlayOutNotice(null);
-    setPlayOut({ active: true, executed: 0, turns: 0, startTurn: viewTurn, prevAuto });
-    if (liveTip) handleEvaluate();
-  }, [viewT0, variationSpan, rebuildAt, startLeadVariation, defaultLeadSelection, liveTip, viewingVariation, atEndPosition, requestDeviation, evaluation, handleEvaluate, viewTurn, setVariationScores]);
-
-  const finishPlayOut = useCallback((current: NonNullable<typeof playOut>, text: string, opts?: { returnToStart?: boolean }) => {
-    if (!current.prevAuto) evaluation.setPrefs({ ...evaluation.prefs, auto: false });
-    playOutRef.current = null;
-    setPlayOut(null);
-    setPlayOutNotice({ text, watchTurn: current.startTurn });
-    // The engine's play dragged the pointer along to the tip; hand the view
-    // back to the turn the run started from — the user replays the line
-    // from there themselves (the Watch button, or just pressing play).
-    if ((opts?.returnToStart ?? true) && current.turns > 0) {
-      navigateTo({ turn: current.startTurn, line: 'variation' }, { seek: true, internal: true });
-    }
-  }, [evaluation, navigateTo]);
-
-  const stopPlayOut = useCallback((opts?: { returnToStart?: boolean }) => {
-    if (playOut) {
-      finishPlayOut(playOut, `Play-out stopped: ${playOut.turns} turn${playOut.turns === 1 ? '' : 's'} played (they stay in the variation).`, opts);
-    }
-  }, [playOut, finishPlayOut]);
-
-  // Keep the render-independent mirrors in sync (navigateTo reads them —
-  // it is declared before the play-out state exists).
-  playOutRef.current = playOut;
-  stopPlayOutRef.current = stopPlayOut;
-
-  /**
-   * A play-out started from the MAIN LINE arms before its rebuild finishes —
-   * startPlayOut cannot evaluate a sim that does not exist yet, and entering
-   * branch mode resets the eval to 'idle', which the auto-eval effect (stale
-   * only) never picks up. Without this kick the loop showed "0 turns played"
-   * forever. Fires once the live tip stands and no evaluation is in flight.
-   */
-  useEffect(() => {
-    if (!playOut?.active || !liveTip || executing || branchPreparing) return;
-    if (liveEvalStatus !== 'idle' && liveEvalStatus !== 'stale') return;
-    handleEvaluate();
-  }, [playOut?.active, liveTip, executing, branchPreparing, liveEvalStatus, handleEvaluate]);
-
-  useEffect(() => {
-    if (!playOut?.active || !liveTip || executing || branchPreparing) return;
-    if (evaluation.status !== 'done' || !evaluation.result) return;
-    // A result finished for another position (navigation race, pre-play-out
-    // leftovers) must never be played from here — the tip's own eval follows.
-    if (evaluation.resultTag !== null && evaluation.resultTag !== evalViewKey) return;
-    if (playOutProcessedRef.current === evaluation.result) return;
-    playOutProcessedRef.current = evaluation.result;
-    const step = nextPlayOutStep(evaluation.result, getBattle()?.ended ?? false, playOut.executed);
-    if (step.kind === 'done') {
-      finishPlayOut(playOut, playOutDoneText(step.reason, playOut.turns));
-      return;
-    }
-    if (step.kind === 'pair') {
-      if (!applyEvalChoice('p1', step.p1) || !applyEvalChoice('p2', step.p2)) {
-        finishPlayOut(playOut, `Play-out stopped after ${playOut.turns} turn${playOut.turns === 1 ? '' : 's'}: the engine's choice was not playable at this position.`);
-        return;
-      }
-      setPlayOut({ ...playOut, executed: playOut.executed + 1, turns: playOut.turns + 1 });
-      void executeTurn().then(() => handleEvaluate());
-      return;
-    }
-    // Single (forced) side: setChoice auto-executes forced replacements and
-    // the auto pref re-evaluates once the entry lands. Counts as a step for
-    // the safety cap, not as a played turn.
-    if (!applyEvalChoice(step.side, step.choice)) {
-      finishPlayOut(playOut, `Play-out stopped after ${playOut.turns} turn${playOut.turns === 1 ? '' : 's'}: the forced replacement could not be submitted.`);
-      return;
-    }
-    setPlayOut({ ...playOut, executed: playOut.executed + 1 });
-  }, [playOut, liveTip, executing, branchPreparing, evaluation.status, evaluation.result, evaluation.resultTag, evalViewKey, getBattle, applyEvalChoice, executeTurn, handleEvaluate, finishPlayOut]);
-
-  /**
-   * The loop advances on COMPLETED evaluations — an evaluation that fails
-   * (worker error, reconstruction refusal) used to leave "Engine is
-   * playing…" stuck forever with no message. End the run with its reason.
-   */
-  useEffect(() => {
-    if (!playOut?.active || executing || branchPreparing) return;
-    if (evaluation.status !== 'error') return;
-    finishPlayOut(playOut, `Play-out stopped after ${playOut.turns} turn${playOut.turns === 1 ? '' : 's'}: the evaluation failed here${evaluation.error ? ` (${evaluation.error})` : ''}.`);
-  }, [playOut, executing, branchPreparing, evaluation.status, evaluation.error, finishPlayOut]);
+  // "Let it play out": the engine plays both sides from the viewed position.
+  const { startPlayOut, stopPlayOut, watchFrom } = usePlayOut({
+    playOut, setPlayOut, setPlayOutNotice, playOutProcessedRef, playOutRef, stopPlayOutRef,
+    evaluation, evalViewKey, liveEvalStatus, liveTip, viewingVariation, atEndPosition, viewT0,
+    viewTurn, variationSpan, tipTurn, navigateTo, setNavSeek, setVariationScores,
+    executing, branchPreparing, getBattle, executeTurn, handleEvaluate, applyEvalChoice,
+    rebuildAt, requestDeviation, startLeadVariation, defaultLeadSelection,
+  });
 
   const handleAnalyzeGame = useCallback(() => {
     if (!replayData) return;
@@ -1191,7 +936,7 @@ function App() {
                 <button
                   type="button"
                   className="ps-btn"
-                  onClick={() => { setPendingConfirm(null); setPendingEvalPick(null); setPlayOut(null); }}
+                  onClick={() => { setPendingConfirm(null); clearPendingPick(); setPlayOut(null); }}
                 >
                   Cancel
                 </button>
