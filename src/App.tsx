@@ -15,6 +15,10 @@ import { BattleStatsPanel } from './components/BattleStatsPanel';
 import { TeamEditor } from './components/TeamEditor';
 import { SetsImportExportPanel } from './components/SetsImportExportPanel';
 import { EvalPanel } from './components/EvalPanel';
+import { AppTopBar } from './components/AppTopBar';
+import { TimelineBar } from './components/TimelineBar';
+import { PlayOutBar } from './components/PlayOutBar';
+import { ConfirmBanner } from './components/ConfirmBanner';
 import { useEvaluation } from './hooks/useEvaluation';
 import { buildSetsExport } from './lib/sets-io';
 import { manualMove } from './lib/team-info';
@@ -28,7 +32,6 @@ import { useGameAnalysis } from './hooks/useGameAnalysis';
 import { choiceId, type BranchSlotChoice } from './lib/branch-choices';
 import type { EvalResult } from './lib/eval/types';
 import { parsePlayedActions, parsePlayedActionsDoubles } from './lib/eval/played';
-import { sliderMax, variationTip } from './lib/timeline';
 import { useTimeline } from './hooks/useTimeline';
 import { useDeviation } from './hooks/useDeviation';
 import { useBranchRefresh } from './hooks/useBranchRefresh';
@@ -461,93 +464,21 @@ function App() {
           {/* Left column: iframe */}
           <div className="ps-main-left">
             {/* Match info + loader collapsed into one bar */}
-            <div className="ps-topbar">
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8, flex: 1, minWidth: 0 }}>
-                <span className="ps-format-tag">{replayData.format}</span>
-                <span style={{ fontSize: 11, color: '#8ac' }}>{replayData.players[0]}</span>
-                <span style={{ fontSize: 10, color: '#556' }}>vs</span>
-                <span style={{ fontSize: 11, color: '#c8a' }}>{replayData.players[1]}</span>
-                {usageStats.loading && (
-                  <span style={{ fontSize: 10, color: '#b6a46a' }}>Smogon stats loading...</span>
-                )}
-                {usageStats.error && (
-                  <span style={{ fontSize: 10, color: '#987' }}>Smogon stats unavailable</span>
-                )}
-                {setAssumptions.loading && (
-                  <span style={{ fontSize: 10, color: '#b6a46a' }}>Smogon sets loading...</span>
-                )}
-              </div>
-              <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
-                {branchPreparing && (
-                  <>
-                    <span style={{ fontSize: 11, fontWeight: 'bold', color: '#fd6' }}>
-                      Preparing branch...
-                      {branchProgress ? ` (turn ${branchProgress.turn}/${branchProgress.target})` : ''}
-                    </span>
-                    <button
-                      type="button"
-                      className="ps-btn"
-                      onClick={cancelPreparation}
-                      style={{ padding: '2px 8px', fontSize: 10 }}
-                    >
-                      Cancel
-                    </button>
-                  </>
-                )}
-                {showBranch && !branchPreparing && (
-                  <>
-                    <span style={{ fontSize: 11, fontWeight: 'bold', color: '#8cf' }}>
-                      Branching · Turn {simState?.turnNumber ?? '…'}
-                    </span>
-                    {simState?.ended && (
-                      <span className="ps-ended-tag">
-                        {simState.winner ? `${simState.winner} wins!` : 'Ended'}
-                      </span>
-                    )}
-                    <label style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 10, color: '#aabbcc' }}>
-                      <input
-                        type="checkbox"
-                        checked={animateBranchTurns}
-                        onChange={event => setAnimateBranchTurns(event.target.checked)}
-                      />
-                      Animate branch turns
-                    </label>
-                    {branchDivergence && (
-                      <span
-                        style={{ fontSize: 10, color: '#e6b36a', maxWidth: 520 }}
-                        title={branchDivergence}
-                      >
-                        ⚠ {branchDivergence}
-                      </span>
-                    )}
-                  </>
-                )}
-                <button
-                  type="button"
-                  onClick={() => setEditorSide('p1')}
-                  className="ps-btn"
-                  style={{ padding: '2px 8px', fontSize: 10 }}
-                >
-                  Edit Player
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setEditorSide('p2')}
-                  className="ps-btn"
-                  style={{ padding: '2px 8px', fontSize: 10 }}
-                >
-                  Edit Opp
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setSetsPanelOpen(true)}
-                  className="ps-btn"
-                  style={{ padding: '2px 8px', fontSize: 10 }}
-                >
-                  Import/Export Sets
-                </button>
-              </div>
-            </div>
+            <AppTopBar
+              replayData={replayData}
+              usageStats={usageStats}
+              setAssumptions={setAssumptions}
+              branchPreparing={branchPreparing}
+              branchProgress={branchProgress}
+              showBranch={showBranch}
+              simState={simState}
+              animateBranchTurns={animateBranchTurns}
+              branchDivergence={branchDivergence}
+              onCancelPreparation={cancelPreparation}
+              onAnimateChange={setAnimateBranchTurns}
+              onEditSide={setEditorSide}
+              onOpenSets={() => setSetsPanelOpen(true)}
+            />
 
             {/* Single iframe */}
             <div className="ps-iframe-wrap">
@@ -587,105 +518,20 @@ function App() {
             </div>
 
             {/* Timeline bar: always visible — one slider over main line and variation */}
-            <div className="ps-branch-bar">
-              <span style={{ fontSize: 11, fontWeight: 'bold', whiteSpace: 'nowrap', color: '#cde' }}>Timeline</span>
-              <button
-                type="button"
-                className="ps-btn"
-                onClick={() => handleGraphSelectLine(0)}
-                title="Turn 0: team preview. Pick different leads and play the game from the start."
-                aria-pressed={viewT0}
-                style={{
-                  padding: '2px 6px', fontSize: 10,
-                  ...(viewT0 ? { borderColor: '#8cf', color: '#8cf' } : {}),
-                }}
-              >T0</button>
-              <button
-                type="button"
-                onClick={() => (viewTurn <= 1 && !viewT0
-                  ? handleGraphSelectLine(0)
-                  : navigateTo({ turn: viewTurn - 1, line: viewLine }))}
-                disabled={viewTurn <= 1 && viewT0}
-                className="ps-btn"
-                style={{ padding: '2px 8px', fontSize: 12, lineHeight: 1 }}
-              >&#9664;</button>
-              <span className="ps-timeline-track">
-                {variationSpan && (() => {
-                  // Gold stripe under the slider marking where the variation
-                  // lives — without it nothing on the timeline said so.
-                  const max = sliderMax(maxTurn, variationSpan);
-                  const pos = (turn: number) => (max <= 1 ? 0 : ((turn - 1) / (max - 1)) * 100);
-                  // A turn-0 variation starts left of the slider's domain.
-                  const from = Math.max(0, pos(variationSpan.startTurn));
-                  const to = pos(variationTip(variationSpan));
-                  return (
-                    <span
-                      className="ps-timeline-stripe"
-                      style={{ left: `${from}%`, width: `${Math.max(to - from, 0.8)}%` }}
-                      title={`Variation: turns ${variationSpan.startTurn}–${variationTip(variationSpan)}`}
-                    />
-                  );
-                })()}
-                <input
-                  type="range"
-                  min={1}
-                  max={sliderMax(maxTurn, variationSpan)}
-                  value={viewTurn}
-                  onChange={e => navigateTo({ turn: parseInt(e.target.value, 10), line: viewLine })}
-                  aria-label="Timeline turn selector"
-                />
-              </span>
-              <button
-                type="button"
-                onClick={() => navigateTo({ turn: viewT0 ? 1 : viewTurn + 1, line: viewLine })}
-                disabled={!viewT0 && viewTurn >= sliderMax(maxTurn, variationSpan)}
-                className="ps-btn"
-                style={{ padding: '2px 8px', fontSize: 12, lineHeight: 1 }}
-              >&#9654;</button>
-              <span style={{ fontSize: 11, color: '#aab', minWidth: 60, textAlign: 'center' }}>
-                {viewT0 ? (
-                  <strong style={{ color: '#fff' }}>T0</strong>
-                ) : atEndPosition && !viewingVariation ? (
-                  <strong style={{ color: '#fff' }}>End</strong>
-                ) : (
-                  <>
-                    {/* The total counts PLAYED turns — the end snapshot is the
-                        "End" sentinel, not a 68th turn of a 67-turn game. */}
-                    T<strong style={{ color: '#fff' }}>{viewTurn}</strong>/{sliderMax(endSnapshotTurn !== null ? endSnapshotTurn - 1 : maxTurn, variationSpan)}
-                  </>
-                )}
-              </span>
-              {/* The chip stays put while a variation exists — flickering away
-                  outside the covered turns made the whole bar jump around. */}
-              {variationSpan !== null && (
-                <span className="ps-line-chip" role="group" aria-label="Line selector">
-                  <button
-                    type="button"
-                    className={!viewingVariation ? 'on-main' : ''}
-                    onClick={() => navigateTo({ turn: Math.min(viewTurn, maxTurn), line: 'main' })}
-                  >Main line</button>
-                  <button
-                    type="button"
-                    className={viewingVariation ? 'on-vari' : ''}
-                    onClick={() => navigateTo({
-                      turn: Math.min(Math.max(viewTurn, variationSpan.startTurn + 1), variationTip(variationSpan)),
-                      line: 'variation',
-                    })}
-                  >Variation</button>
-                </span>
-              )}
-              {(variationSpan !== null || branching) && (
-                <button
-                  type="button"
-                  className="ps-btn ps-btn-red"
-                  onClick={discardVariation}
-                  title="Drops every played variation move."
-                  style={{ padding: '3px 10px', fontSize: 11 }}
-                >
-                  Discard variation
-                </button>
-              )}
-            </div>
+            <TimelineBar
+              viewT0={viewT0}
+              viewTurn={viewTurn}
+              viewLine={viewLine}
+              variationSpan={variationSpan}
+              maxTurn={maxTurn}
+              endSnapshotTurn={endSnapshotTurn}
+              atEndPosition={atEndPosition}
+              viewingVariation={viewingVariation}
+              branching={branching}
+              onNavigate={navigateTo}
+              onGraphSelectLine={handleGraphSelectLine}
+              onDiscard={discardVariation}
+            />
 
             {branchDivergence && !showBranch && (
               <div className="ps-panel" role="alert" style={{ marginTop: 6, padding: '6px 10px', fontSize: 11, color: '#e6b36a' }}>
@@ -693,26 +539,11 @@ function App() {
               </div>
             )}
             {pendingConfirm && (
-              <div
-                className="ps-panel"
-                role="alertdialog"
-                style={{
-                  marginTop: 6, padding: '7px 10px', display: 'flex', gap: 10, alignItems: 'center',
-                  fontSize: 11, borderColor: 'rgba(204,68,85,0.5)',
-                }}
-              >
-                <span>{pendingConfirm.message}</span>
-                <button type="button" className="ps-btn ps-btn-red" onClick={pendingConfirm.proceed}>
-                  Replace
-                </button>
-                <button
-                  type="button"
-                  className="ps-btn"
-                  onClick={() => { setPendingConfirm(null); clearPendingPick(); setPlayOut(null); }}
-                >
-                  Cancel
-                </button>
-              </div>
+              <ConfirmBanner
+                message={pendingConfirm.message}
+                onProceed={pendingConfirm.proceed}
+                onCancel={() => { setPendingConfirm(null); clearPendingPick(); setPlayOut(null); }}
+              />
             )}
 
             {/* Variant B: the pickers are ALWAYS there — live sim state at the
@@ -824,53 +655,16 @@ function App() {
               />
             )}
             {evalAvailable && (
-              <div className="ps-panel" style={{ marginTop: 8, display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
-                {playOut?.active ? (
-                  <>
-                    <span className="ps-spinner" aria-hidden="true" />
-                    {/* The detailed progress line lives in the Evaluation
-                        panel (beside the growing graph) — one place, not two. */}
-                    <span style={{ fontSize: 11, color: '#f0c76b' }}>
-                      Engine play-out running
-                    </span>
-                    <button type="button" className="ps-btn" onClick={() => stopPlayOut()} style={{ padding: '2px 10px', fontSize: 11 }}>
-                      Stop
-                    </button>
-                  </>
-                ) : (
-                  <>
-                    <button
-                      type="button"
-                      className="ps-btn"
-                      onClick={startPlayOut}
-                      disabled={branchPreparing || usageStats.loading || setAssumptions.loading}
-                      title="The engine plays BOTH sides' best moves from the position you are viewing until the game ends. The view stays on this turn while it runs; when it stops, press play (or Watch) to see the finished line. Stop anytime; played turns stay in the variation."
-                      style={{ padding: '3px 10px', fontSize: 11, borderColor: 'rgba(240,199,107,0.5)' }}
-                    >
-                      &#9658; Let it play out
-                    </button>
-                    <span style={{ fontSize: 10, color: '#8fa3bd' }}>
-                      engine finishes the game from turn {viewTurn}; watch the result from here afterwards
-                    </span>
-                  </>
-                )}
-                {playOutNotice && !playOut?.active && (
-                  <span role="status" style={{ fontSize: 10, color: '#d4f5e0', display: 'inline-flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
-                    {playOutNotice.text}
-                    {variationSpan !== null && (
-                      <button
-                        type="button"
-                        className="ps-btn"
-                        onClick={() => watchFrom(playOutNotice.watchTurn)}
-                        title="Seek the battle window to where the play-out started and play it."
-                        style={{ padding: '1px 8px', fontSize: 10 }}
-                      >
-                        &#9658; Watch from turn {playOutNotice.watchTurn}
-                      </button>
-                    )}
-                  </span>
-                )}
-              </div>
+              <PlayOutBar
+                playOut={playOut}
+                playOutNotice={playOutNotice}
+                hasVariation={variationSpan !== null}
+                viewTurn={viewTurn}
+                startDisabled={branchPreparing || usageStats.loading || setAssumptions.loading}
+                onStartPlayOut={startPlayOut}
+                onStopPlayOut={stopPlayOut}
+                onWatchFrom={watchFrom}
+              />
             )}
             <BattleStatsPanel
               replayData={replayData}
