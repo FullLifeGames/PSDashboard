@@ -277,34 +277,6 @@ export const ratchetOverrides = [
   },
   {
     "files": [
-      "src/App.tsx"
-    ],
-    "rules": {
-      "max-lines": [
-        "error",
-        {
-          "max": 810,
-          "skipBlankLines": true,
-          "skipComments": true
-        }
-      ],
-      "max-lines-per-function": [
-        "error",
-        {
-          "max": 750,
-          "skipBlankLines": true,
-          "skipComments": true,
-          "IIFEs": true
-        }
-      ],
-      "complexity": [
-        "error",
-        128
-      ]
-    }
-  },
-  {
-    "files": [
       "src/components/BranchHistoryPanel.tsx"
     ],
     "rules": {
