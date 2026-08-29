@@ -1,6 +1,5 @@
 import { useEffect, useState, useCallback, useMemo, useRef } from 'react';
 import { useReplay } from './hooks/useReplay';
-import { finalPlayedTurn } from './lib/replay-turns';
 import { useEmbedHost } from './hooks/useEmbedHost';
 import { useBranch } from './hooks/useBranch';
 import type { BranchHistoryEntry, BranchSimState } from './hooks/useBranch';
@@ -31,10 +30,8 @@ import { useGameAnalysis } from './hooks/useGameAnalysis';
 import { choiceId, evalChoiceToSlotChoices, requiredChoicesForActiveSlots, type BranchSlotChoice } from './lib/branch-choices';
 import type { EvalResult, RankedChoice } from './lib/eval/types';
 import { parseLeadSpecies, parsePlayedActions, parsePlayedActionsDoubles } from './lib/eval/played';
-import {
-  classifyDeviation, keptEntries, normalizePosition, sliderMax, variationCovers, variationTip,
-  type TimelinePosition, type VariationSpan, type ViewLine,
-} from './lib/timeline';
+import { classifyDeviation, keptEntries, sliderMax, variationTip, type TimelinePosition } from './lib/timeline';
+import { useTimeline } from './hooks/useTimeline';
 import { nextPlayOutStep, playOutDoneText } from './lib/play-out';
 
 /** View-side gates for the acquisition hook: whether the dwell rebuild may
@@ -84,29 +81,10 @@ function App() {
    * divergence is surfaced and play-outs are refused.
    */
   const [branchDivergence, setBranchDivergence] = useState<string | null>(null);
-  const [viewTurn, setViewTurnState] = useState(1);
-  /**
-   * Synchronous mirror of viewTurn: a slider change followed by an
-   * immediate "Branch Here" click can fire BEFORE React commits the
-   * re-render, so the click handler's closure still holds the old turn
-   * (the branch then starts on the wrong turn — seen as e2e flake under
-   * CPU load, but a real race for fast human hands too). Handlers that
-   * act on the selected turn read the ref, never the closure state.
-   */
-  const viewTurnRef = useRef(1);
-  const setViewTurn = useCallback((value: number | ((turn: number) => number)) => {
-    // The REF is authoritative and written synchronously in the event —
-    // a setState updater only runs at the NEXT render, which is exactly
-    // the window the race lives in.
-    const next = typeof value === 'function' ? value(viewTurnRef.current) : value;
-    viewTurnRef.current = next;
-    setViewTurnState(next);
-  }, []);
   const [branchPreparing, setBranchPreparing] = useState(false);
   const [branchProgress, setBranchProgress] = useState<{ turn: number; target: number } | null>(null);
   const branchAbortRef = useRef<AbortController | null>(null);
   const [branchSession, setBranchSession] = useState(0);
-  const [analysisTurn, setAnalysisTurn] = useState<number | null>(null);
   const [animateBranchTurns, setAnimateBranchTurns] = useState(true);
   const { sharedBranch, sharedBranchError, clearSharedBranch } = useSharedBranch();
   const [pendingBranchRefresh, setPendingBranchRefresh] = useState<{
@@ -142,7 +120,6 @@ function App() {
     usageStats, setAssumptions, onTeamsEdited: handleTeamsEdited,
   });
 
-  const maxTurn = snapshots.length > 0 ? snapshots.length : 1;
   const replayGen = useMemo(() => replayData ? getReplayGeneration(replayData) : 9, [replayData]);
   /** Bring-limited team preview (VGC 4 of 6, BSS 3 of 6) — null brings all. */
   const bringCount = useMemo(
@@ -157,87 +134,11 @@ function App() {
     [replayData, snapshots],
   );
 
-  // The last snapshot is the post-battle end state when it holds the final
-  // turn's residue instead of starting a new |turn| — it is labelled "End",
-  // kept stable against iframe echoes, and blocked as a branch target
-  // (B10/B12/G23).
-  const endSnapshotTurn = useMemo(() => {
-    if (snapshots.length < 2) return null;
-    const last = snapshots[snapshots.length - 1];
-    return last.log.some(line => line.startsWith('|turn|')) ? null : last.turn;
-  }, [snapshots]);
-  const atEndPosition = endSnapshotTurn !== null && viewTurn >= endSnapshotTurn;
-
-  // ── Unified timeline: one pointer over main line + at most one variation ──
-  const [viewLine, setViewLine] = useState<ViewLine>('main');
-  /**
-   * Turn 0 as a view: the team-preview position before the leads walk out.
-   * Not a slider position (the pointer model starts at turn 1) — while set,
-   * the replay frame seeks to the preview and the lead picker replaces the
-   * turn pickers. Any turn navigation clears it.
-   */
-  const [viewT0, setViewT0] = useState(false);
-  /**
-   * Draft choices for positions WITHOUT the live sim (variant B pickers):
-   * collected here, executed via requestDeviation → rebuild → executeTurn.
-   * Cleared on every navigation — a draft belongs to one position.
-   */
-  const [draftChoices, setDraftChoices] = useState<{ p1: (BranchSlotChoice | null)[]; p2: (BranchSlotChoice | null)[] }>({ p1: [], p2: [] });
-  /** Inline confirm for main-line deviations that would replace the variation. */
-  const [pendingConfirm, setPendingConfirm] = useState<{ message: string; proceed: () => void } | null>(null);
-  /** The variation as a pure span: null until a turn actually executed.
-   *  Forced interludes do not consume a turn (mirrors alignHistoryRows). */
-  const variationSpan = useMemo<VariationSpan | null>(() => {
-    if (variationStartTurn === null) return null;
-    const turnEntries = history.filter(entry => entry.kind !== 'forced').length;
-    return turnEntries > 0 ? { startTurn: variationStartTurn, length: turnEntries } : null;
-  }, [variationStartTurn, history]);
-  const viewingVariation = viewLine === 'variation' && variationCovers(variationSpan, viewTurn);
-  /** Where the live sim stands (the tip of what has been replayed/executed). */
-  const liveSimTurn = branching && variationStartTurn !== null
-    ? variationStartTurn + (variationSpan?.length ?? 0)
-    : null;
-  /** The pointer sits ON the live sim — pickers/executes go straight to it. */
-  const liveTip = liveSimTurn !== null && viewTurn === liveSimTurn
-    && (variationSpan === null || viewingVariation);
-  /** Positions whose evaluation is the LIVE single result (Evaluate button,
-   *  eval bar) rather than the main line's stored graph data: the live sim's
-   *  position — which, freshly materialized without entries, still sits on
-   *  the main line — and every recorded variation position. */
-  const liveEvalView = liveTip || viewingVariation;
-  /**
-   * Identity of the position on screen for the eval result. A run that
-   * finishes after the user navigated away carries the OLD position's tag —
-   * such a result renders as stale and is never recorded under the new turn.
-   */
-  const evalViewKey = `${viewingVariation ? 'variation' : 'main'}:${viewTurn}`;
-  const evalResultMatchesView = evaluation.resultTag === null || evaluation.resultTag === evalViewKey;
-  const liveEvalStatus: typeof evaluation.status =
-    evaluation.status === 'done' && !evalResultMatchesView ? 'stale' : evaluation.status;
-
-  /**
-   * One-shot seek command for the branch iframe, which ignores seekTurn prop
-   * changes after mount (re-seeking every render fought the append stream).
-   * Bumped by user navigation; the tip-follow after an executed turn skips it
-   * (the append message already positions the frame, animated when enabled).
-   */
-  const [navSeek, setNavSeek] = useState<{ turn: number; seq: number; play?: boolean } | null>(null);
-
-  // Programmatic seeks (graph clicks, timeline navigation) race the embed's
-  // turn echoes: while the iframe is still seeking it keeps reporting the OLD
-  // turn, which would knock the fresh selection straight back (the analysis
-  // flipped to the previous turn under load; leaving a variation, the freshly
-  // remounted replay frame echoed its boot position over the chosen turn).
-  // Stale echoes are ignored until the embed confirms the seek or the window
-  // lapses.
-  const seekIntentRef = useRef<{ turn: number; until: number } | null>(null);
-
-  // Mirrors for the play-out state and its stop, declared before navigateTo
-  // (the state itself lives further down): user navigation while the engine
-  // plays must STOP the run — the loop only advances while the pointer sits
-  // on the live tip, so a silent stall with "Engine is playing…" frozen was
-  // the alternative. Internal navigations (tip-follow, the finish's return
-  // to the start turn) keep the run alive.
+  // Mirrors for the play-out state and its stop: user navigation while the
+  // engine plays must STOP the run — the loop only advances while the
+  // pointer sits on the live tip, so a silent stall with "Engine is
+  // playing…" frozen was the alternative. Internal navigations (tip-follow,
+  // the finish's return to the start turn) keep the run alive.
   const playOutRef = useRef<{ active: boolean } | null>(null);
   const stopPlayOutRef = useRef<((opts?: { returnToStart?: boolean }) => void) | null>(null);
 
@@ -251,28 +152,38 @@ function App() {
   const [playOutNotice, setPlayOutNotice] = useState<{ text: string; watchTurn: number } | null>(null);
   const playOutProcessedRef = useRef<EvalResult | null>(null);
 
-  const navigateTo = useCallback((position: TimelinePosition, opts?: { seek?: boolean; internal?: boolean }) => {
-    if (!opts?.internal && playOutRef.current?.active) {
+  /**
+   * Draft choices for positions WITHOUT the live sim (variant B pickers):
+   * collected here, executed via requestDeviation → rebuild → executeTurn.
+   * Cleared on every navigation — a draft belongs to one position.
+   */
+  const [draftChoices, setDraftChoices] = useState<{ p1: (BranchSlotChoice | null)[]; p2: (BranchSlotChoice | null)[] }>({ p1: [], p2: [] });
+  /** Inline confirm for main-line deviations that would replace the variation. */
+  const [pendingConfirm, setPendingConfirm] = useState<{ message: string; proceed: () => void } | null>(null);
+
+  const interruptPlayOut = useCallback(() => {
+    if (playOutRef.current?.active) {
       stopPlayOutRef.current?.({ returnToStart: false });
     }
-    const next = normalizePosition(position, maxTurn, variationSpan);
-    setViewT0(false);
-    setViewTurn(next.turn);
-    // The stored line is the user's INTENT, sticky across uncovered turns:
-    // stepping back past the branch point and forward again must return to
-    // the variation, not silently strand the user on the main line. Only an
-    // explicit 'main' request (chip, notation, graph) leaves the variation.
-    const sticky: ViewLine =
-      variationSpan === null ? 'main'
-      : next.line === 'variation' ? 'variation'
-      : position.line;
-    setViewLine(sticky);
+  }, []);
+  const clearDraftChoices = useCallback(() => {
     setDraftChoices({ p1: [], p2: [] });
-    if (opts?.seek !== false) {
-      setNavSeek(prev => ({ turn: next.turn, seq: (prev?.seq ?? 0) + 1 }));
-      seekIntentRef.current = { turn: next.turn, until: Date.now() + 4000 };
-    }
-  }, [maxTurn, variationSpan, setViewTurn]);
+  }, []);
+
+  // ── Unified timeline: one pointer over main line + at most one variation ──
+  const {
+    viewTurn, viewTurnRef, setViewTurn, viewLine, setViewLine, viewT0,
+    navSeek, setNavSeek, variationScores, setVariationScores, resetPointer,
+    maxTurn, endSnapshotTurn, atEndPosition, variationSpan, viewingVariation,
+    liveSimTurn, liveTip, liveEvalView, evalViewKey, tipTurn, serializedAtView, analyzableTurns,
+    navigateTo, handleReplayTurn, handleGraphSelectLine, analysisTurn,
+  } = useTimeline({
+    replayId: replayData?.id, snapshots, branching, variationStartTurn, history,
+    interruptPlayOut, onNavigate: clearDraftChoices,
+  });
+  const evalResultMatchesView = evaluation.resultTag === null || evaluation.resultTag === evalViewKey;
+  const liveEvalStatus: typeof evaluation.status =
+    evaluation.status === 'done' && !evalResultMatchesView ? 'stale' : evaluation.status;
 
   const discardVariation = useCallback(() => {
     branchWindowOpenRef.current = false;
@@ -285,62 +196,22 @@ function App() {
     setVariationScores([]);
     setViewLine('main');
     setViewTurn(current => Math.min(current, maxTurn));
-  }, [stopBranch, maxTurn, setViewTurn]);
-
-  // Executed turns move the pointer WITH the play — the tip is where the
-  // next choice happens (chess: the board follows the line you play).
-  const tipTurn = variationSpan ? variationTip(variationSpan) : null;
-  useEffect(() => {
-    if (!branching || tipTurn === null) return;
-    navigateTo({ turn: tipTurn, line: 'variation' }, { seek: false, internal: true });
-  }, [branching, tipTurn, navigateTo]);
-
-  /**
-   * Recorded position for the VIEWED variation turn: the state after the
-   * (viewTurn − startTurn)-th turn entry plus its trailing forced interludes.
-   * Null when capture failed or the pointer is elsewhere.
-   */
-  const serializedAtView = useMemo(() => {
-    if (!viewingVariation || !variationSpan) return null;
-    const wanted = viewTurn - variationSpan.startTurn;
-    let consumed = 0;
-    let last: string | null = null;
-    for (const entry of history) {
-      if (entry.kind !== 'forced') {
-        if (consumed === wanted) break;
-        consumed += 1;
-      }
-      if (consumed <= wanted) last = entry.serializedPosition ?? null;
-    }
-    return consumed === wanted ? last : null;
-  }, [viewingVariation, variationSpan, viewTurn, history]);
-
-  /**
-   * Variation evals for the graph overlay: variationScores[turn − 1] = score
-   * of the variation position before that turn. Session-scoped — filled by
-   * whatever evaluation runs while the pointer sits on the variation, and
-   * cut with the entries it belonged to.
-   */
-  const [variationScores, setVariationScores] = useState<(number | null)[]>([]);
+  }, [stopBranch, maxTurn, setViewTurn, setViewLine, setVariationScores]);
 
   // A freshly loaded replay must start clean: slider at turn 1 (B11), no live
   // branch, and no team edits carried over from the previous replay. Host
   // pages can inject replays repeatedly via ps-load-replay, so the previous
   // game's state must never leak into the next one.
   useEffect(() => {
-    setViewTurn(1);
-    setViewLine('main');
-    setViewT0(false);
+    resetPointer();
     setDraftChoices({ p1: [], p2: [] });
     setPendingConfirm(null);
     setPlayOut(null);
     setPlayOutNotice(null);
-    setVariationScores([]);
-    setNavSeek(null);
     setBranchDivergence(null);
     branchWindowOpenRef.current = false;
     stopBranch();
-  }, [replayData?.id, stopBranch, setViewTurn]);
+  }, [replayData?.id, stopBranch, resetPointer]);
 
   /**
    * Rebuilds the live sim at `position` and prefills the pickers: the proven
@@ -443,7 +314,7 @@ function App() {
       setBranchProgress(null);
       branchAbortRef.current = null;
     }
-  }, [replayData, branchPreparing, variationSpan, history, teamText, snapshots, bringOnlyLists, observations, hpEvidence, getInferredSpreads, effectiveP1Info, effectiveP2Info, usageStats.stats, setAssumptions.assumptions, startBranch, getBattle, setViewTurn]);
+  }, [replayData, branchPreparing, variationSpan, history, teamText, snapshots, bringOnlyLists, observations, hpEvidence, getInferredSpreads, effectiveP1Info, effectiveP2Info, usageStats.stats, setAssumptions.assumptions, startBranch, getBattle, setViewTurn, setViewLine]);
 
   const requestDeviation = useCallback((
     prefill: { p1Choices: (BranchSlotChoice | null)[]; p2Choices: (BranchSlotChoice | null)[] } | null,
@@ -478,7 +349,7 @@ function App() {
       return;
     }
     run();
-  }, [viewLine, variationSpan, rebuildAt, executeTurn, endSnapshotTurn]);
+  }, [viewLine, variationSpan, rebuildAt, executeTurn, endSnapshotTurn, viewTurnRef, setVariationScores]);
 
   /**
    * Turn-0 branching: replace the game's leads and play from team preview.
@@ -501,7 +372,7 @@ function App() {
       return;
     }
     run();
-  }, [variationSpan, rebuildAt]);
+  }, [variationSpan, rebuildAt, setVariationScores]);
 
   const handleCancelBranchPreparation = useCallback(() => {
     branchAbortRef.current?.abort();
@@ -789,7 +660,7 @@ function App() {
       next[viewTurn - 1] = score;
       return next;
     });
-  }, [evaluation.status, evaluation.result, evaluation.resultTag, evalViewKey, viewingVariation, viewTurn]);
+  }, [evaluation.status, evaluation.result, evaluation.resultTag, evalViewKey, viewingVariation, viewTurn, setVariationScores]);
 
   /** Non-live positions render the resolved picker state with the DRAFT
    *  choices mirrored in — the panel's selection logic reads simState. */
@@ -988,7 +859,7 @@ function App() {
     window.setTimeout(() => {
       setNavSeek(prev => ({ turn, seq: (prev?.seq ?? 0) + 1, play: true }));
     }, 250);
-  }, [navigateTo, tipTurn]);
+  }, [navigateTo, tipTurn, setNavSeek]);
 
   const startPlayOut = useCallback(() => {
     // Turn 0: the run INCLUDES the lead decision. Branching at the shared
@@ -1034,7 +905,7 @@ function App() {
     setPlayOutNotice(null);
     setPlayOut({ active: true, executed: 0, turns: 0, startTurn: viewTurn, prevAuto });
     if (liveTip) handleEvaluate();
-  }, [viewT0, variationSpan, rebuildAt, startLeadVariation, defaultLeadSelection, liveTip, viewingVariation, atEndPosition, requestDeviation, evaluation, handleEvaluate, viewTurn]);
+  }, [viewT0, variationSpan, rebuildAt, startLeadVariation, defaultLeadSelection, liveTip, viewingVariation, atEndPosition, requestDeviation, evaluation, handleEvaluate, viewTurn, setVariationScores]);
 
   const finishPlayOut = useCallback((current: NonNullable<typeof playOut>, text: string, opts?: { returnToStart?: boolean }) => {
     if (!current.prevAuto) evaluation.setPrefs({ ...evaluation.prefs, auto: false });
@@ -1115,17 +986,6 @@ function App() {
     if (evaluation.status !== 'error') return;
     finishPlayOut(playOut, `Play-out stopped after ${playOut.turns} turn${playOut.turns === 1 ? '' : 's'}: the evaluation failed here${evaluation.error ? ` (${evaluation.error})` : ''}.`);
   }, [playOut, executing, branchPreparing, evaluation.status, evaluation.error, finishPlayOut]);
-
-  // The sweep counts PLAYED turns. The end snapshot (lastTurn + 1, the
-  // post-game state) is the branch slider's "End" sentinel, not a turn —
-  // counting it made the sweep chase a final position that cannot exist
-  // and report "67 of 68 turns reconstructed" on a faithful replay. The
-  // final played turn itself still analyzes like any other turn: its
-  // actions live in the trailing block, which playedFor reads (GPL).
-  const analyzableTurns = useMemo(
-    () => (snapshots.length > 0 ? finalPlayedTurn(snapshots) : 1),
-    [snapshots],
-  );
 
   const handleAnalyzeGame = useCallback(() => {
     if (!replayData) return;
@@ -1323,66 +1183,6 @@ function App() {
   const loadedReplayUrl = replayData
     ? `https://replay.pokemonshowdown.com/${replayData.id}${replayData.viewpoint === 'p2' ? '?p2' : ''}`
     : null;
-
-  const handleReplayTurn = useCallback((turn: number) => {
-    if (viewingVariation || turn < 1) return;
-    const intent = seekIntentRef.current;
-    if (intent && Date.now() < intent.until) {
-      if (turn !== intent.turn) return;
-      seekIntentRef.current = null;
-    }
-    setViewTurn(current => {
-      // The embed can only report real turns; when the end position is
-      // selected its echo (last turn) must not knock the slider back (B12).
-      if (endSnapshotTurn !== null && current >= endSnapshotTurn && turn >= endSnapshotTurn - 1) {
-        return current;
-      }
-      return turn;
-    });
-  }, [viewingVariation, endSnapshotTurn, setViewTurn]);
-
-  const handleGraphSelect = useCallback((turn: number) => {
-    // Selecting a turn is user navigation — it bypasses navigateTo, so the
-    // same "navigation stops the engine's run" rule applies here.
-    if (playOutRef.current?.active) stopPlayOutRef.current?.({ returnToStart: false });
-    if (turn >= 1) {
-      setViewT0(false);
-      seekIntentRef.current = { turn, until: Date.now() + 4000 };
-      // Direct, not via handleReplayTurn: an explicit selection beats the
-      // echo guards (which exist to protect against the embed, not the user).
-      setViewTurn(turn);
-    } else {
-      // Turn 0: the team-preview view opens — the replay frame seeks to the
-      // preview and the lead picker replaces the turn pickers. The intent
-      // guard swallows the remount echoes a line switch can trigger.
-      seekIntentRef.current = { turn: 0, until: Date.now() + 4000 };
-      setViewT0(true);
-    }
-    setAnalysisTurn(turn);
-  }, [setViewTurn]);
-
-  /** Graph clicks name their line explicitly — gold points navigate the
-   *  variation, blue points the main line (mockup lesson: line membership
-   *  must be unambiguous at every interaction surface). */
-  const handleGraphSelectLine = useCallback((turn: number, line?: 'main' | 'variation') => {
-    if (line === 'variation') {
-      navigateTo({ turn, line: 'variation' });
-      return;
-    }
-    setViewLine('main');
-    handleGraphSelect(turn);
-  }, [navigateTo, handleGraphSelect]);
-
-  // The analysis follows the replay position — selecting a turn (slider,
-  // graph click, stepping) IS the analysis request; there is no separate
-  // "open" state. A lead selection (turn 0) survives until the slider moves.
-  useEffect(() => {
-    if (viewingVariation) return;
-    setAnalysisTurn(prev => {
-      const turn = Math.min(Math.max(1, viewTurn), analyzableTurns);
-      return turn === prev ? prev : turn;
-    });
-  }, [viewingVariation, viewTurn, analyzableTurns]);
 
   // Per-turn and game-level analysis (reads, turn card, lead analysis,
   // game report, the feedback harness's window handle).
