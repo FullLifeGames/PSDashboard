@@ -1,6 +1,7 @@
 import { Generations, Pokemon as CalcPokemon } from '@smogon/calc';
 import { Dex } from '@pkmn/dex';
 import type { PokemonSet } from '@pkmn/sim';
+import { speciesBaseId } from './replay-format';
 import type { PokemonSnapshot, TurnSnapshot } from '../types';
 import type {
   BranchMoveOption, BranchSimState, BranchSwitchOption, SimPokemonInfo,
@@ -139,6 +140,10 @@ export function pickerStateFromSnapshot(
   p1Team: PokemonSet[],
   p2Team: PokemonSet[],
   gen = 9,
+  /** Bring-limited replays: bench options list only the brought species
+   *  (base-species match — actives reveal formes the preview does not).
+   *  Null (or an empty side) leaves the bench unfiltered. */
+  bringOnly?: { p1: string[]; p2: string[] } | null,
 ): BranchSimState {
   const build = (side: 'p1' | 'p2', team: PokemonSet[]) => {
     const pokemon = snapshot[side].pokemon;
@@ -149,10 +154,13 @@ export function pickerStateFromSnapshot(
     // switch option, not a missing one.
     const benchPercent = (mon: PokemonSnapshot) =>
       (mon.maxhp === 0 && !mon.fainted ? 100 : mon.hpPercent);
+    const broughtBases = (bringOnly?.[side] ?? []).map(name => speciesBaseId(name));
+    const inBring = (mon: PokemonSnapshot) =>
+      broughtBases.length === 0 || broughtBases.includes(speciesBaseId(mon.speciesForme));
     const movesBySlot = actives.map((mon, index) => moveOptionsFor(mon, setFor(mon), index, gen));
     const switchesBySlot = actives.map((_, activeSlot): BranchSwitchOption[] =>
       pokemon
-        .filter(mon => !mon.isActive && !mon.fainted && benchPercent(mon) > 0)
+        .filter(mon => !mon.isActive && !mon.fainted && benchPercent(mon) > 0 && inBring(mon))
         .map((mon, index) => ({
           name: mon.name,
           species: mon.speciesForme,

@@ -1,5 +1,5 @@
 import { Dex } from '@pkmn/sim';
-import type { ReplayData } from '../types';
+import type { ReplayData, TurnSnapshot } from '../types';
 
 type ReplayFormatSource = Partial<Pick<ReplayData, 'id' | 'format' | 'formatid' | 'log'>>;
 
@@ -163,6 +163,59 @@ export function getReplayBringCount(source: ReplayFormatSource): number | null {
   if (formatid.includes('vgc') || formatid.includes('battlestadiumdoubles')) return 4;
   if (formatid.includes('battlestadiumsingles')) return 3;
   return null;
+}
+
+/**
+ * Base-species identity for bring matching: the protocol reveals ACTIVE
+ * formes (Zamazenta-Crowned, Terapagos-Stellar) while team preview and the
+ * built sets may carry the base name or the "-*" unknown-forme marker.
+ * Species clause keeps one base per side in bring-limited formats, so the
+ * base id is a safe secondary key there.
+ */
+export function speciesBaseId(name: string): string {
+  const species = Dex.species.get(name);
+  return toId(species.exists ? species.baseSpecies || species.name : name);
+}
+
+/**
+ * The species each side actually fielded, in first-appearance order — the
+ * protocol's ground truth for a bring-limited format's selection. One entry
+ * per BODY: an in-battle forme change (Terapagos-Terastal → -Stellar) keeps
+ * its first-seen name instead of counting twice (the VGC-tranche sighting
+ * caught exactly that).
+ */
+export function broughtSpeciesFor(snapshots: TurnSnapshot[], side: 'p1' | 'p2'): string[] {
+  const seenBases = new Set<string>();
+  const ordered: string[] = [];
+  for (const turn of snapshots) {
+    for (const pokemon of turn[side].pokemon) {
+      if (!pokemon.isActive) continue;
+      const base = speciesBaseId(pokemon.speciesForme);
+      if (seenBases.has(base)) continue;
+      seenBases.add(base);
+      ordered.push(pokemon.speciesForme);
+    }
+  }
+  return ordered;
+}
+
+/**
+ * The bring lists for a bring-limited replay, or null for bring-all
+ * formats AND whenever either side's full selection cannot be pinned from
+ * the protocol (short games). BOTH sides or neither: evaluating a pinned
+ * four against an unpinned six overrates the open side — the A.3c A/B
+ * gate flipped a won game (452654) to the loser on exactly that
+ * asymmetry, so symmetric-wrong beats asymmetric-wrong.
+ */
+export function replayBringOnly(
+  source: ReplayFormatSource,
+  snapshots: TurnSnapshot[],
+): { p1: string[]; p2: string[] } | null {
+  const bringCount = getReplayBringCount(source);
+  if (bringCount === null) return null;
+  const p1 = broughtSpeciesFor(snapshots, 'p1');
+  const p2 = broughtSpeciesFor(snapshots, 'p2');
+  return p1.length === bringCount && p2.length === bringCount ? { p1, p2 } : null;
 }
 
 /** The branch format carries the clause as a custom-rule suffix — is it there? */

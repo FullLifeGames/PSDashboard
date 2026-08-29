@@ -3,7 +3,7 @@ import { State } from '@pkmn/sim';
 import type { Battle } from '@pkmn/sim';
 import { buildTeamsFromReplay } from '../src/lib/team-builder';
 import { applyTargetCorrections, reconstructBranchRuntime } from '../src/lib/branch-engine';
-import { formatEnforcesSleepClause, getBranchSimulatorFormat } from '../src/lib/replay-format';
+import { formatEnforcesSleepClause, getBranchSimulatorFormat, replayBringOnly } from '../src/lib/replay-format';
 import { parseReplayLogWithObservations } from '../src/lib/protocol-parser';
 import { AUTO_MCTS_FAINTED_FRACTION, battleFaintedFraction, searchPosition } from '../src/lib/eval/search';
 import { mctsSearch } from '../src/lib/eval/mcts';
@@ -2156,6 +2156,11 @@ test.describe('eval calibration against real replays', () => {
       const sampleTurns: number[] = [];
       for (let turn = 2; turn < maxTurn; turn += step) sampleTurns.push(turn);
 
+      // A.3c: bring-limited replays (the VGC tranche) reconstruct with only
+      // the brought species per side — the same trim the app's sweep and
+      // single-turn acquire apply. Per-side fail-open, null for bring-all.
+      const bringOnly = replayBringOnly(replay, snapshots) ?? undefined;
+
       // SINGLE-PASS RECONSTRUCTION (time-performance round, 2026-08-28):
       // ONE pass per replay hands out the raw boundary state at every
       // sampled turn (onRawBoundary), and each sample is cloned and
@@ -2179,6 +2184,7 @@ test.describe('eval calibration against real replays', () => {
             replayLog: replay.log,
             targetTurn: pendingTurns[pendingTurns.length - 1],
             snapshot: null,
+            bringOnly,
             // The one pass carries the whole per-target family's work, so
             // it gets the family's total deadline, not a single run's 60s.
             deadlineMs: 60_000 * Math.max(1, sampleTurns.length),
@@ -2218,6 +2224,7 @@ test.describe('eval calibration against real replays', () => {
               replayLog: replay.log,
               targetTurn: turn,
               snapshot: snapshots[Math.min(turn - 1, snapshots.length - 1)],
+              bringOnly,
             });
             const live = runtime.battleStream.battle;
             if (!live) continue;
@@ -2411,12 +2418,14 @@ test.describe('single-pass position identity probe (time-performance phase 3)', 
       if (sampleTurns.length === 0) continue;
       const format = getBranchSimulatorFormat(replay);
       const snapshotAt = (turn: number) => snapshots[Math.min(turn - 1, snapshots.length - 1)];
+      // Same bring trim as the calibration instrument (A.3c) — both paths.
+      const bringOnly = replayBringOnly(replay, snapshots) ?? undefined;
 
       // Path A — today's instrument: one reconstruction per sampled turn.
       const canonA = new Map<number, string>();
       for (const turn of sampleTurns) {
         const runtime = await reconstructBranchRuntime({
-          format, p1Team, p2Team, replayLog: replay.log, targetTurn: turn, snapshot: snapshotAt(turn),
+          format, p1Team, p2Team, replayLog: replay.log, targetTurn: turn, snapshot: snapshotAt(turn), bringOnly,
         });
         const battle = runtime.battleStream.battle;
         canonA.set(turn, !battle ? 'NONE' : battle.ended ? 'ENDED' : canon(battle));
@@ -2427,7 +2436,7 @@ test.describe('single-pass position identity probe (time-performance phase 3)', 
       const pending = [...sampleTurns].sort((a, b) => a - b);
       const targetTurn = pending[pending.length - 1];
       await reconstructBranchRuntime({
-        format, p1Team, p2Team, replayLog: replay.log, targetTurn, snapshot: null,
+        format, p1Team, p2Team, replayLog: replay.log, targetTurn, snapshot: null, bringOnly,
         // One pass carries the whole per-target family's work, so it gets
         // the family's total deadline budget, not a single run's 60s.
         deadlineMs: 60_000 * Math.max(1, sampleTurns.length),
@@ -2464,7 +2473,7 @@ test.describe('single-pass position identity probe (time-performance phase 3)', 
         // old-instrument-unstable; a REPRODUCIBLE old value that path B
         // misses is a hard failure.
         const rerun = await reconstructBranchRuntime({
-          format, p1Team, p2Team, replayLog: replay.log, targetTurn: turn, snapshot: snapshotAt(turn),
+          format, p1Team, p2Team, replayLog: replay.log, targetTurn: turn, snapshot: snapshotAt(turn), bringOnly,
         });
         const rerunBattle = rerun.battleStream.battle;
         const a2 = !rerunBattle ? 'NONE' : rerunBattle.ended ? 'ENDED' : canon(rerunBattle);

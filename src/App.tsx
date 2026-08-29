@@ -26,9 +26,9 @@ import { applyInferredSpreads, enrichTeamInfo, manualMove } from './lib/team-inf
 import { alternativeItems } from './lib/smogon-stats';
 import type { SensitivityTarget } from './lib/eval/sensitivity';
 import { applyPastedTeam, countMatchingSpecies, parsePastedTeam, type PastedSet } from './lib/team-paste';
-import type { OpponentTeamInfo, TurnSnapshot } from './types';
+import type { OpponentTeamInfo } from './types';
 import { decodeBranchShare, type BranchSharePayload } from './lib/branch-share';
-import { formatEnforcesSleepClause, getBranchSimulatorFormat, getReplayBringCount, getReplayGameType, getReplayGeneration, inferReplayFormatId } from './lib/replay-format';
+import { broughtSpeciesFor, formatEnforcesSleepClause, getBranchSimulatorFormat, getReplayBringCount, getReplayGameType, getReplayGeneration, inferReplayFormatId, replayBringOnly, speciesBaseId } from './lib/replay-format';
 import { resolveTeraPreference } from './lib/eval/tera';
 import { summarizeAlignment, type TurnAlignmentRecord } from './lib/hax-alignment';
 import { choiceId, evalChoiceToSlotChoices, requiredChoicesForActiveSlots, type BranchSlotChoice } from './lib/branch-choices';
@@ -132,22 +132,6 @@ function SharedBranchView({
   );
 }
 
-/** Species each side actually BROUGHT, in first-seen order (the pre-turn-1
- *  actives — the leads — come first): active in ANY snapshot counts. */
-function broughtSpeciesFor(snapshots: TurnSnapshot[], side: 'p1' | 'p2'): string[] {
-  const seen = new Set<string>();
-  const ordered: string[] = [];
-  for (const turn of snapshots) {
-    for (const pokemon of turn[side].pokemon) {
-      if (pokemon.isActive && !seen.has(pokemon.speciesForme)) {
-        seen.add(pokemon.speciesForme);
-        ordered.push(pokemon.speciesForme);
-      }
-    }
-  }
-  return ordered;
-}
-
 function App() {
   const { loading, error, replayData, snapshots, observations, speedOrders, hpEvidence, opponentInfo, p1Info, loadReplay, loadReplayFile } = useReplay();
   const { embed, requestedReplay } = useEmbedHost({ loadReplay, loadReplayFile });
@@ -223,6 +207,13 @@ function App() {
   const bringCount = useMemo(
     () => (replayData ? getReplayBringCount(replayData) : null),
     [replayData],
+  );
+  /** Per-side bring lists from the protocol (null = bring-all format;
+   *  [] on a side = its full selection never entered, that side stays
+   *  whole). Shared by every branch, sweep, and preview reconstruction. */
+  const bringOnlyLists = useMemo(
+    () => (replayData ? replayBringOnly(replayData, snapshots) : null),
+    [replayData, snapshots],
   );
 
   // The last snapshot is the post-battle end state when it holds the final
@@ -583,16 +574,9 @@ function App() {
     // Bring-limited replays (VGC 4 of 6): the interactive branch fields only
     // what the real game brought — the bring-all base format would otherwise
     // let evaluations and play-outs switch into never-brought Pokémon. The
-    // T0 picker carries its own selection; fail-open when the protocol does
-    // not pin every brought species.
-    let bringOnly: { p1: string[]; p2: string[] } | undefined;
-    if (bringCount !== null && startTurn > 0) {
-      const p1Brought = broughtSpeciesFor(snapshots, 'p1');
-      const p2Brought = broughtSpeciesFor(snapshots, 'p2');
-      if (p1Brought.length === bringCount && p2Brought.length === bringCount) {
-        bringOnly = { p1: p1Brought, p2: p2Brought };
-      }
-    }
+    // T0 picker carries its own selection; per-side fail-open when the
+    // protocol does not pin a side's full selection.
+    const bringOnly = startTurn > 0 ? bringOnlyLists ?? undefined : undefined;
 
     const abortController = new AbortController();
     branchAbortRef.current = abortController;
@@ -658,7 +642,7 @@ function App() {
       setBranchProgress(null);
       branchAbortRef.current = null;
     }
-  }, [replayData, branchPreparing, variationSpan, history, teamText, snapshots, bringCount, observations, hpEvidence, getInferredSpreads, effectiveP1Info, effectiveP2Info, usageStats.stats, setAssumptions.assumptions, startBranch, getBattle, setViewTurn]);
+  }, [replayData, branchPreparing, variationSpan, history, teamText, snapshots, bringOnlyLists, observations, hpEvidence, getInferredSpreads, effectiveP1Info, effectiveP2Info, usageStats.stats, setAssumptions.assumptions, startBranch, getBattle, setViewTurn]);
 
   const requestDeviation = useCallback((
     prefill: { p1Choices: (BranchSlotChoice | null)[]; p2Choices: (BranchSlotChoice | null)[] } | null,
@@ -760,14 +744,7 @@ function App() {
             : null;
           // Bring-limited replays keep their trim through team-edit
           // refreshes too (a T0 variation re-seeds it from its lead entry).
-          let refreshBringOnly: { p1: string[]; p2: string[] } | undefined;
-          if (bringCount !== null && refreshTurn > 0) {
-            const p1Brought = broughtSpeciesFor(snapshots, 'p1');
-            const p2Brought = broughtSpeciesFor(snapshots, 'p2');
-            if (p1Brought.length === bringCount && p2Brought.length === bringCount) {
-              refreshBringOnly = { p1: p1Brought, p2: p2Brought };
-            }
-          }
+          const refreshBringOnly = refreshTurn > 0 ? bringOnlyLists ?? undefined : undefined;
           await startBranch(getBranchSimulatorFormat(activeReplay), p1Team, p2Team, activeReplay.log, refreshTurn, refreshSnapshot, {
             replayHistory: refreshRequest.history,
             p1Choices: refreshRequest.p1Choices,
@@ -806,7 +783,7 @@ function App() {
     variationStartTurn,
     branching,
     snapshots,
-    bringCount,
+    bringOnlyLists,
     usageStats.stats,
     setAssumptions.assumptions,
     observations,
@@ -839,16 +816,20 @@ function App() {
   const leadOptions = useMemo<{ p1: LeadOption[]; p2: LeadOption[] }>(() => {
     const snapshot = snapshots[0] ?? null;
     if (!snapshot) return { p1: [], p2: [] };
-    const optionsOf = (side: typeof snapshot.p1, brought: Set<string>): LeadOption[] =>
+    // Base-species matching: the preview lists "Zamazenta-*" while the
+    // active reveals "Zamazenta-Crowned" — same body, same badge.
+    const optionsOf = (side: typeof snapshot.p1, broughtBases: Set<string>): LeadOption[] =>
       side.pokemon.map(pokemon => ({
         name: pokemon.name,
         species: pokemon.speciesForme,
         wasLead: pokemon.isActive,
-        wasBrought: brought.has(pokemon.speciesForme),
+        wasBrought: broughtBases.has(speciesBaseId(pokemon.speciesForme)),
       }));
+    const basesOf = (sideKey: 'p1' | 'p2') =>
+      new Set(broughtSpeciesFor(snapshots, sideKey).map(name => speciesBaseId(name)));
     return {
-      p1: optionsOf(snapshot.p1, new Set(broughtSpeciesFor(snapshots, 'p1'))),
-      p2: optionsOf(snapshot.p2, new Set(broughtSpeciesFor(snapshots, 'p2'))),
+      p1: optionsOf(snapshot.p1, basesOf('p1')),
+      p2: optionsOf(snapshot.p2, basesOf('p2')),
     };
   }, [snapshots]);
   const evalAvailable = useMemo(
@@ -996,6 +977,10 @@ function App() {
         playerNames: [replayData.players[0], replayData.players[1]],
         onProgress: reportReconstruct,
         choiceLocks: buildChoiceLockContext(replayData.log, { p1Team, p2Team }, observations),
+        // Bring-limited replays: the evaluated position fields only the
+        // brought species — a bring-all bench offered the search switches
+        // into Pokémon the real game never had (A.3c).
+        bringOnly: bringOnlyLists ?? undefined,
         // The sweep's healing, on the single-turn path too: per-turn
         // boundary corrections keep a diverging choice replay in lockstep
         // with the protocol, so the cascade zone (draft t56+) arrives LIVE
@@ -1020,7 +1005,7 @@ function App() {
       const serialized = serializeLiveBattle(battle);
       storeExactPosition(turn, serialized);
       return serialized;
-    }, [replayData, teamText, effectiveP1Info, effectiveP2Info, usageStats.stats, setAssumptions.assumptions, snapshots, observations, hpEvidence, getInferredSpreads, storeExactPosition]);
+    }, [replayData, teamText, effectiveP1Info, effectiveP2Info, usageStats.stats, setAssumptions.assumptions, snapshots, observations, hpEvidence, getInferredSpreads, storeExactPosition, bringOnlyLists]);
 
   // Per-block seed/residual records of the last sweep reconstruction —
   // instrumentation only (debug handle + drift report), never verdicts.
@@ -1061,6 +1046,9 @@ function App() {
         playerNames: [replayData.players[0], replayData.players[1]],
         onProgress: report,
         choiceLocks: buildChoiceLockContext(replayData.log, { p1Team, p2Team }, observations),
+        // Same bring trim as the single-turn path — every swept position
+        // fields only what the real game brought (A.3c).
+        bringOnly: bringOnlyLists ?? undefined,
         capturePositions: {
           snapshotFor: turn => snapshots[Math.min(turn - 1, snapshots.length - 1)] ?? null,
           onPosition: (turn, battle) => {
@@ -1099,7 +1087,7 @@ function App() {
         onPosition?.(turns, serialized);
       }
       return positions;
-    }, [replayData, teamText, effectiveP1Info, effectiveP2Info, usageStats.stats, setAssumptions.assumptions, snapshots, observations, hpEvidence, getInferredSpreads, storeExactPosition]);
+    }, [replayData, teamText, effectiveP1Info, effectiveP2Info, usageStats.stats, setAssumptions.assumptions, snapshots, observations, hpEvidence, getInferredSpreads, storeExactPosition, bringOnlyLists]);
 
   const acquireReplayPosition = useMemo(() => makeReplayAcquire(viewTurn), [makeReplayAcquire, viewTurn]);
 
@@ -1157,7 +1145,7 @@ function App() {
         inferredSpreads: await getInferredSpreads(),
         hpEvidence,
       });
-      if (!cancelled) setPositionPicker({ simState: pickerStateFromSnapshot(snapshot, p1Team, p2Team, replayGenNumber), source: 'snapshot' });
+      if (!cancelled) setPositionPicker({ simState: pickerStateFromSnapshot(snapshot, p1Team, p2Team, replayGenNumber, bringOnlyLists), source: 'snapshot' });
     })();
     return () => {
       cancelled = true;
@@ -1165,7 +1153,7 @@ function App() {
   }, [
     liveTip, viewingVariation, serializedAtView, variationStartTurn, startSerialized, viewTurn, snapshots, replayData,
     teamText, effectiveP1Info, effectiveP2Info, usageStats.stats, setAssumptions.assumptions, getInferredSpreads, hpEvidence,
-    replayGenNumber, exactKeyFor, exactPositionsVersion,
+    replayGenNumber, exactKeyFor, exactPositionsVersion, bringOnlyLists,
   ]);
 
   const handleEvaluate = useCallback(() => {
@@ -1618,7 +1606,10 @@ function App() {
           hpEvidence,
         });
         if (p1Team.length === 0 || p2Team.length === 0) return null;
-        return branchEngine.serializePreviewPosition(getBranchSimulatorFormat(replayData), p1Team, p2Team);
+        // Bring-limited replays: the lead analysis enumerates pairs over
+        // the four actually brought, not the whole six (A.3c). Per-side
+        // fail-open keeps an unpinned side's full pool.
+        return branchEngine.serializePreviewPosition(getBranchSimulatorFormat(replayData), p1Team, p2Team, bringOnlyLists);
       },
       playedLeads: parseLeadSpecies(replayData.log),
       sensitivityTargetsFor,
@@ -1626,7 +1617,7 @@ function App() {
   }, [
     replayData, evaluation, analyzableTurns, effectiveTera, effectiveSleepClause, setsFingerprint, makeReplayAcquire,
     makeSweepAcquireAll, snapshots, getInferredSpreads, evalIsDoubles, teamText, effectiveP1Info, effectiveP2Info,
-    usageStats.stats, setAssumptions.assumptions, hpEvidence, sensitivityTargetsFor,
+    usageStats.stats, setAssumptions.assumptions, hpEvidence, sensitivityTargetsFor, bringOnlyLists,
   ]);
 
   /**

@@ -3,6 +3,7 @@ import type { ID, PokemonSet } from '@pkmn/sim';
 import type { PokemonSnapshot, TurnSnapshot } from '../types';
 import type { BranchSlotChoice } from './branch-choices';
 import { protocolChoiceLock, type ChoiceLockContext } from './choice-lock';
+import { speciesBaseId } from './replay-format';
 import { CHOICE_ITEMS } from './eval/sensitivity';
 import { serializeBattleStable, trialAdvanceLog } from './eval/forward-model';
 import {
@@ -184,6 +185,34 @@ function sleep(ms: number) {
 
 function toId(name: string): string {
   return name.toLowerCase().replace(/[^a-z0-9]/g, '');
+}
+
+/**
+ * Fields only the brought species (VGC's 4 of 6, BSS's 3 of 6). Resolution
+ * is per NAME: the exact species/nickname id first, then a UNIQUE
+ * base-species match — the protocol reveals ACTIVE formes
+ * (Zamazenta-Crowned) while built sets may carry the base name, and
+ * 7-8-set teams holding both forme siblings must keep the exact one only.
+ * Any unresolved or ambiguous name fails the side open (team stays whole).
+ * Filtering preserves team order, so leads stay in front.
+ */
+function trimTeamToBring(team: PokemonSet[], keep: string[] | undefined): PokemonSet[] {
+  if (!keep || keep.length === 0 || keep.length >= team.length) return team;
+  const claimed = new Set<PokemonSet>();
+  for (const name of keep) {
+    const nameId = toId(name);
+    const exact = team.find(set =>
+      !claimed.has(set) && (toId(set.species) === nameId || toId(set.name || '') === nameId));
+    if (exact) {
+      claimed.add(exact);
+      continue;
+    }
+    const base = speciesBaseId(name);
+    const byBase = team.filter(set => !claimed.has(set) && speciesBaseId(set.species) === base);
+    if (byBase.length !== 1) return team;
+    claimed.add(byBase[0]);
+  }
+  return team.filter(set => claimed.has(set));
 }
 
 const BATTLE_ONLY_FORME_SUFFIXES = ['terastal', 'stellar', 'tera'];
@@ -1320,6 +1349,11 @@ export function serializePreviewPosition(
   format: string,
   p1Team: PokemonSet[],
   p2Team: PokemonSet[],
+  /** Bring-limited replays: the preview holds only the brought species, so
+   *  the lead enumeration prices real pairs instead of a phantom pool.
+   *  Callers pass both sides or nothing; an unmatchable list keeps its
+   *  side whole (same trim as the branch reconstruction). */
+  bringOnly?: { p1: string[]; p2: string[] } | null,
 ): string | null {
   try {
     const battle = new Battle({
@@ -1328,8 +1362,8 @@ export function serializePreviewPosition(
       // WITHOUT team preview — every draft replay lost its turn 0 that way.
       formatid: format as ID,
       seed: '1,2,3,4',
-      p1: { name: 'p1', team: Teams.pack(p1Team) },
-      p2: { name: 'p2', team: Teams.pack(p2Team) },
+      p1: { name: 'p1', team: Teams.pack(trimTeamToBring(p1Team, bringOnly?.p1)) },
+      p2: { name: 'p2', team: Teams.pack(trimTeamToBring(p2Team, bringOnly?.p2)) },
     });
     if (battle.sides[0]?.requestState !== 'teampreview') return null;
     return serializeBattleStable(battle);
@@ -1416,14 +1450,8 @@ export async function reconstructBranchRuntime(params: {
   const { p1Leads, p2Leads } = extractLeads(replayLog);
   const leadsFor = (replayLeads: PokemonIdent[], override: string[] | null | undefined): PokemonIdent[] =>
     override && override.length > 0 ? override.map(name => ({ name, species: name })) : replayLeads;
-  const trimToBring = (team: PokemonSet[], keep: string[] | undefined): PokemonSet[] => {
-    if (!keep || keep.length === 0 || keep.length >= team.length) return team;
-    const keepIds = new Set(keep.map(toId));
-    const kept = team.filter(set => keepIds.has(toId(set.species)) || keepIds.has(toId(set.name || '')));
-    return kept.length === keep.length ? kept : team;
-  };
-  const orderedP1 = trimToBring(reorderForLeads(p1Team, leadsFor(p1Leads, params.leadOverride?.p1)), params.bringOnly?.p1);
-  const orderedP2 = trimToBring(reorderForLeads(p2Team, leadsFor(p2Leads, params.leadOverride?.p2)), params.bringOnly?.p2);
+  const orderedP1 = trimTeamToBring(reorderForLeads(p1Team, leadsFor(p1Leads, params.leadOverride?.p1)), params.bringOnly?.p1);
+  const orderedP2 = trimTeamToBring(reorderForLeads(p2Team, leadsFor(p2Leads, params.leadOverride?.p2)), params.bringOnly?.p2);
 
   const battleStream = new BattleStreams.BattleStream();
   const streams = BattleStreams.getPlayerStreams(battleStream);

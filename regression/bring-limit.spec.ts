@@ -1,6 +1,7 @@
 import { test, expect } from '@playwright/test';
-import { createBranchState, reconstructBranchRuntime } from '../src/lib/branch-engine';
-import { getReplayBringCount } from '../src/lib/replay-format';
+import { createBranchState, reconstructBranchRuntime, serializePreviewPosition } from '../src/lib/branch-engine';
+import { getReplayBringCount, replayBringOnly } from '../src/lib/replay-format';
+import { parseReplayLogWithObservations } from '../src/lib/protocol-parser';
 import type { PokemonSet } from '@pkmn/sim';
 
 function mon(name: string, move: string): PokemonSet {
@@ -99,5 +100,118 @@ test.describe('bring-limited team preview (VGC 4 of 6)', () => {
     const battle = runtime.battleStream.battle!;
     expect(battle.sides[0].pokemon).toHaveLength(6);
     expect(battle.sides[1].pokemon).toHaveLength(4);
+  });
+
+  test('replayBringOnly pins both sides or neither and dedupes battle formes', () => {
+    // A forme change mid-game (Terapagos-Terastal → -Stellar) is ONE brought
+    // body (the VGC-tranche sighting caught it counted twice). A side whose
+    // fourth never entered leaves the WHOLE replay unpinned: the A/B gate
+    // showed a pinned four against an unpinned six flips games (452654).
+    const log = [
+      '|player|p1|Alice|',
+      '|player|p2|Bob|',
+      '|gametype|doubles',
+      '|gen|9',
+      '|tier|[Gen 9] VGC 2026 Regulation I',
+      '|poke|p1|Terapagos, L50|',
+      '|poke|p1|Pikachu, L50|',
+      '|poke|p1|Eevee, L50|',
+      '|poke|p1|Raichu, L50|',
+      '|poke|p1|Jolteon, L50|',
+      '|poke|p1|Flareon, L50|',
+      '|poke|p2|Bulbasaur, L50|',
+      '|poke|p2|Charmander, L50|',
+      '|poke|p2|Squirtle, L50|',
+      '|poke|p2|Ivysaur, L50|',
+      '|poke|p2|Charmeleon, L50|',
+      '|poke|p2|Wartortle, L50|',
+      '|teampreview',
+      '|start',
+      '|switch|p1a: Terapagos|Terapagos-Terastal, L50|100/100',
+      '|switch|p1b: Pikachu|Pikachu, L50|100/100',
+      '|switch|p2a: Bulbasaur|Bulbasaur, L50|100/100',
+      '|switch|p2b: Charmander|Charmander, L50|100/100',
+      '|turn|1',
+      '|switch|p1a: Terapagos|Terapagos-Stellar, L50|100/100',
+      '|switch|p1b: Eevee|Eevee, L50|100/100',
+      '|switch|p2a: Squirtle|Squirtle, L50|100/100',
+      '|turn|2',
+      '|switch|p1a: Raichu|Raichu, L50|100/100',
+      '|turn|3',
+    ].join('\n');
+    const { snapshots } = parseReplayLogWithObservations(log);
+    // p2's fourth never entered — the whole replay stays unpinned.
+    expect(replayBringOnly({ formatid: 'gen9vgc2026regi', log }, snapshots)).toBeNull();
+
+    // With p2's fourth revealed, both sides pin — and Terapagos counts once
+    // (first-seen forme name) despite entering as two formes.
+    const fullLog = `${log}\n|switch|p2b: Ivysaur|Ivysaur, L50|100/100\n|turn|4`;
+    const fullSnapshots = parseReplayLogWithObservations(fullLog).snapshots;
+    const brought = replayBringOnly({ formatid: 'gen9vgc2026regi', log: fullLog }, fullSnapshots);
+    expect(brought).not.toBeNull();
+    expect([...brought!.p1].sort()).toEqual(['Eevee', 'Pikachu', 'Raichu', 'Terapagos-Terastal']);
+    expect([...brought!.p2].sort()).toEqual(['Bulbasaur', 'Charmander', 'Ivysaur', 'Squirtle']);
+    // Bring-all formats never produce a bring list.
+    expect(replayBringOnly({ formatid: 'gen9doublesou', log: fullLog }, fullSnapshots)).toBeNull();
+  });
+
+  test('brought forme names resolve onto their base-species sets, exact match first', async () => {
+    // The protocol reveals the ACTIVE forme (Zamazenta-Crowned) while the
+    // built set may carry the base name — the unique base match resolves
+    // it. A team holding BOTH forme siblings as separate sets keeps the
+    // exact match only (the sighting found 7-8-set VGC teams).
+    const withBase = [mon('Zamazenta', 'Iron Head'), ...p1Team.slice(1)];
+    const runtime = await reconstructBranchRuntime({
+      format: 'gen9doublesou',
+      p1Team: withBase,
+      p2Team,
+      replayLog: vgcLog,
+      targetTurn: 1,
+      bringOnly: {
+        p1: ['Eevee', 'Raichu', 'Zamazenta-Crowned', 'Jolteon'],
+        p2: ['Squirtle', 'Ivysaur', 'Bulbasaur', 'Charmander'],
+      },
+    });
+    const names = runtime.battleStream.battle!.sides[0].pokemon.map(pokemon => pokemon.species.name);
+    expect(names).toHaveLength(4);
+    expect(names).toContain('Zamazenta');
+
+    const withSiblings = [...p1Team.slice(0, 5), mon('Zamazenta', 'Iron Head'), mon('Zamazenta-Crowned', 'Behemoth Bash')];
+    const siblingRuntime = await reconstructBranchRuntime({
+      format: 'gen9doublesou',
+      p1Team: withSiblings,
+      p2Team,
+      replayLog: vgcLog,
+      targetTurn: 1,
+      bringOnly: {
+        p1: ['Pikachu', 'Eevee', 'Zamazenta-Crowned', 'Raichu'],
+        p2: ['Squirtle', 'Ivysaur', 'Bulbasaur', 'Charmander'],
+      },
+    });
+    const siblingNames = siblingRuntime.battleStream.battle!.sides[0].pokemon.map(pokemon => pokemon.species.name);
+    expect(siblingNames).toHaveLength(4);
+    expect(siblingNames).toContain('Zamazenta-Crowned');
+    expect(siblingNames).not.toContain('Zamazenta');
+  });
+
+  test('the team-preview position honors the bring limit for the lead analysis', async () => {
+    const { createRootPosition, legalChoices } = await import('../src/lib/eval/forward-model');
+    const serialized = serializePreviewPosition('gen9doublesou', p1Team, p2Team, {
+      p1: ['Pikachu', 'Eevee', 'Raichu', 'Jolteon'],
+      p2: ['Bulbasaur', 'Charmander', 'Squirtle', 'Ivysaur'],
+    });
+    expect(serialized).not.toBeNull();
+    const root = createRootPosition(serialized!);
+    // Four brought per side: the lead enumeration prices real pairs only.
+    const options = legalChoices(root, 'p1');
+    expect(options).toHaveLength(6);
+    expect(options.every(option => !option.label.includes('Flareon'))).toBe(true);
+    // An unpinned side ([]) keeps its whole pool.
+    const open = serializePreviewPosition('gen9doublesou', p1Team, p2Team, {
+      p1: ['Pikachu', 'Eevee', 'Raichu', 'Jolteon'],
+      p2: [],
+    });
+    expect(open).not.toBeNull();
+    expect(legalChoices(createRootPosition(open!), 'p2')).toHaveLength(15);
   });
 });

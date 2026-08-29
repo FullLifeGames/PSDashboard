@@ -113,7 +113,12 @@ export interface StoredEval {
 //      (a pinned healer heals at a net loss and dies with PP in the
 //      tank), so healing now outprices holding (655336 t26: Slack Off
 //      over a free-turn Protect).
-export const EVAL_ENGINE_CACHE_VERSION = 37;
+// v38: bring-limited positions field only the brought species (A.3c) —
+//      sweep and single-turn reconstructions of VGC/BSS replays trim to
+//      the protocol-pinned bring per side (per-side fail-open), and the
+//      turn-0 preview enumerates lead pairs over the real four. Singles
+//      and bring-all formats are byte-identical to v37.
+export const EVAL_ENGINE_CACHE_VERSION = 38;
 
 export function evalStoreKey(
   cacheKey: string,
