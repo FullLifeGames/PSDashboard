@@ -506,8 +506,9 @@ test.describe('PS Dashboard', () => {
     await expect(panel.locator('.ps-eval-report')).toBeVisible();
     await expect(panel.locator('.ps-eval-report')).toContainText('Game report');
 
-    // Turn 0: the team-preview lead evaluation adds its own graph point.
-    await expect(panel.locator('.ps-eval-graph title:has-text("Leads:")')).toHaveCount(1, { timeout: 60_000 });
+    // Turn 0: the team-preview lead evaluation adds its own graph point
+    // (the tooltip opens with "Team preview:" and names the best lead).
+    await expect(panel.locator('.ps-eval-graph title:has-text("Team preview:")')).toHaveCount(1, { timeout: 60_000 });
 
     // Selecting a point switches to that turn's view (played-vs-best).
     await panel.locator('.ps-eval-graph rect[data-turn="1"]').click();
