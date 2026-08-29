@@ -46,6 +46,23 @@ export async function buildReplayTeams(
   });
 }
 
+/** Turn-0 team preview for the lead analysis, bring-trimmed (A.3c). */
+export function makePreviewAcquire(
+  replayData: ReplayData,
+  sources: TeamBuildSources,
+  bringOnlyLists: { p1: string[]; p2: string[] } | null,
+) {
+  return async (): Promise<string | null> => {
+    const branchEngine = await import('./branch-engine');
+    const { p1Team, p2Team } = await buildReplayTeams(replayData, sources);
+    if (p1Team.length === 0 || p2Team.length === 0) return null;
+    // Bring-limited replays: the lead analysis enumerates pairs over the
+    // brought species, not the whole six. Per-side fail-open keeps an
+    // unpinned side's full pool.
+    return branchEngine.serializePreviewPosition(getBranchSimulatorFormat(replayData), p1Team, p2Team, bringOnlyLists);
+  };
+}
+
 /** Reconstruct the main line to a turn with choice locks and per-boundary
  *  capture — the shared core of the single-turn and sweep acquisitions. */
 export async function reconstructReplayRuntime(args: {

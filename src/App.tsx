@@ -15,20 +15,19 @@ import { BattleStatsPanel } from './components/BattleStatsPanel';
 import { TeamEditor } from './components/TeamEditor';
 import { SetsImportExportPanel } from './components/SetsImportExportPanel';
 import { EvalPanel } from './components/EvalPanel';
-import { needsSettingsUpgrade, resolveAutoTurnSettings, useEvaluation, type TurnEvalSettings } from './hooks/useEvaluation';
+import { useEvaluation } from './hooks/useEvaluation';
 import { buildSetsExport } from './lib/sets-io';
 import { manualMove } from './lib/team-info';
 import { useTeamKnowledge } from './hooks/useTeamKnowledge';
 import type { OpponentTeamInfo } from './types';
 import { SharedBranchView } from './components/SharedBranchView';
 import { useSharedBranch } from './hooks/useSharedBranch';
-import { formatEnforcesSleepClause, getBranchSimulatorFormat, getReplayBringCount, getReplayGameType, getReplayGeneration, inferReplayFormatId, replayBringOnly } from './lib/replay-format';
-import { resolveTeraPreference } from './lib/eval/tera';
+import { getReplayBringCount, getReplayGameType, getReplayGeneration, replayBringOnly } from './lib/replay-format';
 import { useEvalAcquire } from './hooks/useEvalAcquire';
 import { useGameAnalysis } from './hooks/useGameAnalysis';
 import { choiceId, type BranchSlotChoice } from './lib/branch-choices';
 import type { EvalResult } from './lib/eval/types';
-import { parseLeadSpecies, parsePlayedActions, parsePlayedActionsDoubles } from './lib/eval/played';
+import { parsePlayedActions, parsePlayedActionsDoubles } from './lib/eval/played';
 import { sliderMax, variationTip } from './lib/timeline';
 import { useTimeline } from './hooks/useTimeline';
 import { useDeviation } from './hooks/useDeviation';
@@ -36,6 +35,7 @@ import { useBranchRefresh } from './hooks/useBranchRefresh';
 import { usePlayedAtView, usePositionPicker } from './hooks/usePositionPicker';
 import { useEngineWalk } from './hooks/useEngineWalk';
 import { usePlayOut } from './hooks/usePlayOut';
+import { useEvalView } from './hooks/useEvalView';
 
 /** View-side gates for the acquisition hook: whether the dwell rebuild may
  *  arm (main-line position, nothing busy) and whether Smogon data is due. */
@@ -159,6 +159,18 @@ function App() {
   /** Inline confirm for main-line deviations that would replace the variation. */
   const [pendingConfirm, setPendingConfirm] = useState<{ message: string; proceed: () => void } | null>(null);
 
+  // The transient interaction state dies with the previous replay —
+  // render-phase adjustment on the replay id (the react-hooks gate forbids
+  // plain setState resets inside the load-sync effect below).
+  const [transientsReplayId, setTransientsReplayId] = useState(replayData?.id);
+  if (transientsReplayId !== replayData?.id) {
+    setTransientsReplayId(replayData?.id);
+    setDraftChoices({ p1: [], p2: [] });
+    setPendingConfirm(null);
+    setPlayOut(null);
+    setPlayOutNotice(null);
+  }
+
   const interruptPlayOut = useCallback(() => {
     if (playOutRef.current?.active) {
       stopPlayOutRef.current?.({ returnToStart: false });
@@ -243,39 +255,10 @@ function App() {
   // game's state must never leak into the next one.
   useEffect(() => {
     resetPointer();
-    setDraftChoices({ p1: [], p2: [] });
-    setPendingConfirm(null);
-    setPlayOut(null);
-    setPlayOutNotice(null);
     setBranchDivergence(null);
     branchWindowOpenRef.current = false;
     stopBranch();
   }, [replayData?.id, stopBranch, resetPointer, setBranchDivergence]);
-
-  const evalAvailable = useMemo(
-    () => !!replayData && (replayGameType === null || replayGameType === 'singles' || replayGameType === 'doubles'),
-    [replayData, replayGameType],
-  );
-
-
-  // Tera resolution: 'auto' turns enumeration off when the game never
-  // terastallized, and in draft/custom formats (per-Pokémon Tera rights)
-  // restricts it to the species that actually did — a global switch would
-  // recommend illegal Teras and price floors against impossible threats.
-  const effectiveTera = useMemo(
-    () => (replayData
-      ? resolveTeraPreference(evaluation.prefs.tera, inferReplayFormatId(replayData), replayData.log)
-      : false),
-    [replayData, evaluation.prefs.tera],
-  );
-
-  // Sleep Clause resolution: the branch format carries it (declared |rule|
-  // lines, or the singles default for rule-less logs) — the eval candidate
-  // filter needs it as a flag because serialization strips custom rules.
-  const effectiveSleepClause = useMemo(
-    () => (replayData ? formatEnforcesSleepClause(getBranchSimulatorFormat(replayData)) : false),
-    [replayData],
-  );
 
   const { dwellEnabled, smogonPending } = acquireGates({
     liveTip, viewingVariation, atEndPosition, executing, branchPreparing,
@@ -300,40 +283,20 @@ function App() {
     parseSingles: parsePlayedActions, parseDoubles: parsePlayedActionsDoubles,
   });
 
-  const handleEvaluate = useCallback(() => {
-    if (!replayData) return;
-    if (liveTip) {
-      evaluation.evaluate({ cacheKey: null, tera: effectiveTera, sleepClause: effectiveSleepClause, acquire: acquireBranchPosition, tag: evalViewKey });
-    } else if (viewingVariation && serializedAtView) {
-      // A recorded variation position: acquisition is instant — the search
-      // itself still runs at the configured settings.
-      const stored = serializedAtView;
-      evaluation.evaluate({ cacheKey: null, tera: effectiveTera, sleepClause: effectiveSleepClause, acquire: async () => stored, tag: evalViewKey });
-    } else {
-      evaluation.evaluate({
-        cacheKey: `${replayData.id}:${viewTurn}:${setsFingerprint}`,
-        tera: effectiveTera,
-        sleepClause: effectiveSleepClause,
-        acquire: acquireReplayPosition,
-        tag: evalViewKey,
-      });
-    }
-  }, [replayData, liveTip, viewingVariation, serializedAtView, evaluation, effectiveTera, effectiveSleepClause, acquireBranchPosition, acquireReplayPosition, viewTurn, setsFingerprint, evalViewKey]);
-
-  // Every eval finishing while the pointer sits on the variation feeds the
-  // graph overlay — auto-evals after executed turns included. The tag guard
-  // keeps a run that finished after a navigation from landing in the wrong
-  // turn's slot (the score belongs to the position it was STARTED at).
-  useEffect(() => {
-    if (evaluation.status !== 'done' || !evaluation.result || !viewingVariation) return;
-    if (evaluation.resultTag !== null && evaluation.resultTag !== evalViewKey) return;
-    const score = evaluation.result.score;
-    setVariationScores(previous => {
-      const next = [...previous];
-      next[viewTurn - 1] = score;
-      return next;
-    });
-  }, [evaluation.status, evaluation.result, evaluation.resultTag, evalViewKey, viewingVariation, viewTurn, setVariationScores]);
+  // Evaluation view glue: format switches, Evaluate, sweeps, invalidations,
+  // and the think-deeper ladder.
+  const {
+    evalAvailable, handleEvaluate, handleAnalyzeGame,
+    analyzedResult, analyzedSettings, thinkDeeperTarget, handleThinkDeeper,
+  } = useEvalView({
+    replayData, snapshots, evaluation, replayGameType, evalIsDoubles,
+    viewTurn, viewLine, viewingVariation, liveTip, liveEvalView, evalViewKey, serializedAtView,
+    liveEvalStatus, analysisTurn, analyzableTurns, branching, executing, branchPreparing,
+    playOutActive: playOut?.active ?? false, smogonPending,
+    acquire: { acquireBranchPosition, acquireReplayPosition, makeReplayAcquire, makeSweepAcquireAll },
+    sources: teamSources, bringOnlyLists, setsFingerprint, sensitivityTargetsFor,
+    editedP1Info, editedP2Info, historyLength: history.length, setVariationScores,
+  });
 
   // Engine walk: clicking a line plays the turn out; queued picks follow
   // a rebuild; interludes finish forced replacements.
@@ -354,140 +317,6 @@ function App() {
     executing, branchPreparing, getBattle, executeTurn, handleEvaluate, applyEvalChoice,
     rebuildAt, requestDeviation, startLeadVariation, defaultLeadSelection,
   });
-
-  const handleAnalyzeGame = useCallback(() => {
-    if (!replayData) return;
-    evaluation.runGraphSweep({
-      turns: analyzableTurns,
-      tera: effectiveTera,
-      sleepClause: effectiveSleepClause,
-      cacheKeyFor: turn => `${replayData.id}:${turn}:${setsFingerprint}`,
-      acquireFor: makeReplayAcquire,
-      acquireAll: makeSweepAcquireAll(analyzableTurns),
-      // snapshots[turn] carries the block ENDING at |turn|turn+1 — i.e. the
-      // actions actually played on `turn`. Doubles logs carry two actions
-      // per side and use the per-slot parser.
-      playedFor: turn => (evalIsDoubles
-        ? parsePlayedActionsDoubles(snapshots[turn]?.log ?? [])
-        : parsePlayedActions(snapshots[turn]?.log ?? [])),
-      // Turn 0: the lead decision at team preview.
-      acquirePreview: async () => {
-        const { buildTeamsFromReplay } = await import('./lib/team-builder');
-        const branchEngine = await import('./lib/branch-engine');
-        const { p1Team, p2Team } = buildTeamsFromReplay(replayData.log, {
-          userTeamText: teamText || undefined,
-          p1Info: effectiveP1Info,
-          p2Info: effectiveP2Info,
-          usageStats: usageStats.stats,
-          setAssumptions: setAssumptions.assumptions,
-          inferredSpreads: await getInferredSpreads(),
-          hpEvidence,
-        });
-        if (p1Team.length === 0 || p2Team.length === 0) return null;
-        // Bring-limited replays: the lead analysis enumerates pairs over
-        // the four actually brought, not the whole six (A.3c). Per-side
-        // fail-open keeps an unpinned side's full pool.
-        return branchEngine.serializePreviewPosition(getBranchSimulatorFormat(replayData), p1Team, p2Team, bringOnlyLists);
-      },
-      playedLeads: parseLeadSpecies(replayData.log),
-      sensitivityTargetsFor,
-    });
-  }, [
-    replayData, evaluation, analyzableTurns, effectiveTera, effectiveSleepClause, setsFingerprint, makeReplayAcquire,
-    makeSweepAcquireAll, snapshots, getInferredSpreads, evalIsDoubles, teamText, effectiveP1Info, effectiveP2Info,
-    usageStats.stats, setAssumptions.assumptions, hpEvidence, sensitivityTargetsFor, bringOnlyLists,
-  ]);
-
-  /**
-   * "Always on": with the autoAnalyze pref set, Analyze game starts by
-   * itself once a replay (and its Smogon data) is ready — the game graph and
-   * report are simply there. One attempt per replay + set knowledge + Tera
-   * resolution; a failed sweep does not retry-loop (Re-analyze stays manual).
-   */
-  const autoAnalyzeAttemptRef = useRef<string | null>(null);
-  useEffect(() => {
-    if (!evaluation.prefs.autoAnalyze || !replayData || !evalAvailable) return;
-    if (usageStats.loading || setAssumptions.loading) return;
-    if (snapshots.length === 0) return;
-    if (evaluation.graph.running || evaluation.graph.scores.some(score => score !== null)) return;
-    const key = `${replayData.id}:${setsFingerprint}:${JSON.stringify(effectiveTera)}`;
-    if (autoAnalyzeAttemptRef.current === key) return;
-    autoAnalyzeAttemptRef.current = key;
-    handleAnalyzeGame();
-  }, [
-    evaluation.prefs.autoAnalyze, replayData, evalAvailable, usageStats.loading, setAssumptions.loading,
-    snapshots.length, evaluation.graph.running, evaluation.graph.scores, setsFingerprint, effectiveTera, handleAnalyzeGame,
-  ]);
-
-  // Explains ONE turn: a two-turn mini sweep (turn + its follow-up) so the
-  // report can price the played outcome. Runs ONLY from the explicit deepen
-  // button — selecting a turn shows the stored result and never re-searches
-  // (silent score swaps read as disagreement between the report and the
-  // turn view).
-  const analyzeTurnNow = useCallback((turn: number, settings?: TurnEvalSettings) => {
-    if (!replayData) return;
-    evaluation.runGraphSweep({
-      turns: analyzableTurns,
-      from: turn,
-      to: Math.min(turn + 1, analyzableTurns),
-      tera: effectiveTera,
-      sleepClause: effectiveSleepClause,
-      cacheKeyFor: sweepTurn => `${replayData.id}:${sweepTurn}:${setsFingerprint}`,
-      acquireFor: makeReplayAcquire,
-      playedFor: sweepTurn => (evalIsDoubles
-        ? parsePlayedActionsDoubles(snapshots[sweepTurn]?.log ?? [])
-        : parsePlayedActions(snapshots[sweepTurn]?.log ?? [])),
-      sensitivityTargetsFor,
-      settings,
-    });
-  }, [replayData, evaluation, analyzableTurns, effectiveTera, effectiveSleepClause, setsFingerprint, makeReplayAcquire, snapshots, evalIsDoubles, sensitivityTargetsFor]);
-
-  // Any position change invalidates a displayed result.
-  const { markStale: markEvalStale, reset: resetEval, clearGraph } = evaluation;
-  useEffect(() => {
-    markEvalStale();
-  }, [viewTurn, viewLine, history.length, editedP1Info, editedP2Info, markEvalStale]);
-
-  // A different replay or entering/leaving branch mode is a new position context.
-  useEffect(() => {
-    resetEval();
-  }, [replayData?.id, branching, resetEval]);
-
-  // The graph is tied to a specific replay + set knowledge + Tera mode.
-  // The SELECTION survives the reset — analysisTurn mirrors the slider and
-  // simply has nothing to show until fresh data arrives (nulling it here
-  // raced the mirror effect whenever usage stats landed after load, leaving
-  // the merged panel permanently empty).
-  useEffect(() => {
-    clearGraph();
-  }, [replayData?.id, setsFingerprint, effectiveTera, clearGraph]);
-
-  // Opt-in: keep the branch evaluation fresh after each executed turn. Runs
-  // on the effective status, so a result that finished for a position the
-  // user has meanwhile left (tag mismatch) also re-evaluates. Live positions
-  // only: without the liveEvalView gate, navigating onto a main-line turn
-  // (the end sentinel included) fired a stray single-turn reconstruction —
-  // the "diverged before turn 68" error on a 67-turn game.
-  useEffect(() => {
-    if (branching && evaluation.prefs.auto && liveEvalView && liveEvalStatus === 'stale' && !executing) {
-      handleEvaluate();
-    }
-  }, [branching, evaluation.prefs.auto, liveEvalView, liveEvalStatus, executing, handleEvaluate]);
-
-  // "Always on" also covers the live sim: a freshly opened variation (or a
-  // navigation back to its tip) evaluates without the Evaluate button. Never
-  // while the game sweep runs — a single evaluation supersedes the run id
-  // and would silently kill the sweep.
-  useEffect(() => {
-    if (!evaluation.prefs.autoAnalyze || !evalAvailable) return;
-    if (!liveTip || executing || branchPreparing || playOut?.active) return;
-    if (evaluation.graph.running) return;
-    if (liveEvalStatus !== 'idle' && liveEvalStatus !== 'stale') return;
-    handleEvaluate();
-  }, [
-    evaluation.prefs.autoAnalyze, evalAvailable, liveTip, executing, branchPreparing,
-    playOut?.active, evaluation.graph.running, liveEvalStatus, handleEvaluate,
-  ]);
 
   // "What if it had …": a team edit plus the normal branch refresh, with the
   // hypothetical move pre-seeded as that slot's pending choice.
@@ -558,63 +387,6 @@ function App() {
     replayData, snapshots, evaluation, analysisTurn, sweepAlignment, replayGen,
   });
 
-  // ONE place for everything: in replay view the advantage bar, ranked
-  // lists, and matrix render from the ANALYZED turn's cached sweep result
-  // (turn 0 = the lead decision) — the branch view keeps its live result.
-  const analyzedResult = useMemo(() => {
-    if (liveEvalView) return evaluation.result;
-    if (analysisTurn === 0) return evaluation.graph.lead?.result ?? null;
-    if (analysisTurn !== null && analysisTurn >= 1) return evaluation.graph.results[analysisTurn - 1] ?? null;
-    return null;
-  }, [liveEvalView, evaluation.result, evaluation.graph, analysisTurn]);
-
-  // What produced the shown result — the panel chip names it instead of
-  // silently swapping numbers.
-  const analyzedSettings = !liveEvalView && analysisTurn !== null && analysisTurn >= 1
-    ? evaluation.graph.settings[analysisTurn - 1] ?? null
-    : null;
-
-  // The explicit deepening ladder: a sketch (or gap) first rises to the
-  // configured settings, then one depth further (cap 3). Selecting a turn
-  // never re-searches — this target is the only escalation.
-  const thinkDeeperTarget = useMemo((): TurnEvalSettings | { mode: 'auto' } | null => {
-    if (liveEvalView || analysisTurn === null || analysisTurn < 1) return null;
-    const stored = evaluation.graph.settings[analysisTurn - 1] ?? null;
-    const fraction = evaluation.graph.faintedFractions[analysisTurn - 1] ?? null;
-    if (!stored || needsSettingsUpgrade(stored, evaluation.prefs, fraction)) {
-      if (evaluation.prefs.mode === 'auto') {
-        // Rise to the turn's auto-resolved engine; a gap turn's routing
-        // signal is unknown until swept — the sweep resolves it itself.
-        return fraction !== null ? resolveAutoTurnSettings(fraction) : { mode: 'auto' };
-      }
-      return { depth: evaluation.prefs.depth, samples: evaluation.prefs.samples, mode: evaluation.prefs.mode };
-    }
-    // From an MCTS turn the button crosses into the matrix ladder at depth
-    // 2 — the same rung the early d1s1 line escalates to. The escalation-
-    // keep rule (supersedesStored) makes the product survive later sweeps.
-    if (stored.mode === 'mcts') {
-      return {
-        depth: 2,
-        samples: Math.max(stored.samples, evaluation.prefs.samples) as TurnEvalSettings['samples'],
-        mode: 'matrix',
-      };
-    }
-    // The matrix ladder caps at the engine's depth 3.
-    if (stored.depth >= 3) return null;
-    return {
-      depth: (stored.depth + 1) as 2 | 3,
-      // Never shed samples on the way up — a d3s3 run must supersede d2s5.
-      samples: Math.max(stored.samples, evaluation.prefs.samples) as TurnEvalSettings['samples'],
-      mode: 'matrix',
-    };
-  }, [liveEvalView, analysisTurn, evaluation.graph.settings, evaluation.graph.faintedFractions, evaluation.prefs]);
-
-  const handleThinkDeeper = useCallback(() => {
-    if (analysisTurn === null || analysisTurn < 1 || !thinkDeeperTarget) return;
-    // The 'auto' sentinel means "no override" — the sweep resolves the
-    // turn's engine from its position, exactly like Analyze game.
-    analyzeTurnNow(analysisTurn, 'depth' in thinkDeeperTarget ? thinkDeeperTarget : undefined);
-  }, [analysisTurn, thinkDeeperTarget, analyzeTurnNow]);
 
   const simLog = useMemo(() => {
     const raw = simState?.log ?? [];
