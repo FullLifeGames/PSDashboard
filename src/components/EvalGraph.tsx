@@ -1,6 +1,7 @@
 import { useLayoutEffect, useRef, useState } from 'react';
 import { computeBlunders } from '../lib/eval/graph';
 import { winPercent } from '../lib/eval/winprob';
+import type { LeadAnalysis } from '../lib/eval/leads';
 
 interface EvalGraphProps {
   /** scores[t-1] = score at turn t (p1 perspective, [-1,1]); null = gap. */
@@ -19,6 +20,8 @@ interface EvalGraphProps {
   variation?: { startTurn: number; scores: (number | null)[] } | null;
   /** Turn 0 (team preview) game value — adds a leads point before turn 1. */
   leadScore?: number | null;
+  /** Best and played lead per side — the T0 diamond's tooltip names them. */
+  leadDetail?: LeadAnalysis | null;
   /** evalErrors[t-1] = why turn t has no point (eval-layer failure). */
   evalErrors?: (string | null)[];
   /**
@@ -51,7 +54,7 @@ const VARIATION_COLOR = '#f0c76b';
  * into a viewport-dependent ellipse (fills scale even where strokes are
  * protected), so markers looked different on desktop and mobile.
  */
-export function EvalGraph({ scores, playerNames, currentTurn, currentLine, onSelectTurn, leadScore, evalErrors, decided, variation, maxTurn }: EvalGraphProps) {
+export function EvalGraph({ scores, playerNames, currentTurn, currentLine, onSelectTurn, leadScore, leadDetail, evalErrors, decided, variation, maxTurn }: EvalGraphProps) {
   const svgRef = useRef<SVGSVGElement>(null);
   const [width, setWidth] = useState(300);
   useLayoutEffect(() => {
@@ -267,7 +270,22 @@ export function EvalGraph({ scores, playerNames, currentTurn, currentLine, onSel
             style={onSelectTurn ? { cursor: 'pointer' } : undefined}
             onClick={onSelectTurn ? () => onSelectTurn(0) : undefined}
           >
-            <title>{`Leads: ${playerNames[0]} ${pct(leadScore!)}% · ${playerNames[1]} ${100 - pct(leadScore!)}%`}</title>
+            <title>{(() => {
+              const lines = [`Team preview: ${playerNames[0]} ${pct(leadScore!)}% · ${playerNames[1]} ${100 - pct(leadScore!)}%`];
+              const stripLead = (label: string) => label.replace(/^Lead /, '');
+              for (const side of ['p1', 'p2'] as const) {
+                const detail = leadDetail?.[side];
+                if (!detail?.best) continue;
+                const name = playerNames[side === 'p1' ? 0 : 1];
+                const best = stripLead(detail.best.label);
+                const played = detail.played ? stripLead(detail.played.label) : null;
+                lines.push(played === best
+                  ? `${name} best lead: ${best} (played)`
+                  : `${name} best lead: ${best}${played ? ` · played: ${played}` : ''}`);
+              }
+              lines.push('Click to open the lead analysis.');
+              return lines.join('\n');
+            })()}</title>
           </rect>
         </>
       )}

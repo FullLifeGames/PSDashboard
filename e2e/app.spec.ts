@@ -383,6 +383,12 @@ test.describe('PS Dashboard', () => {
     expect(debugShape!.analyses).not.toBeNull();
     expect(debugShape!.hasReport).toBe(true);
 
+    // Turn 0 rides along in singles too: the sweep's last act evaluates the
+    // team-preview decision, and the graph's T0 diamond names the best lead.
+    const t0Hit = panel.locator('.ps-eval-graph rect[data-turn="0"]');
+    await expect(t0Hit).toBeVisible({ timeout: 30_000 });
+    await expect(t0Hit.locator('title')).toContainText('best lead');
+
     await panel.locator('.ps-eval-graph rect[data-turn="1"]').click();
     await expect(panel.locator('.ps-eval-bar')).toBeVisible({ timeout: 120_000 });
     await expect(panel.locator('.ps-eval-bar-p1')).toContainText('%');
@@ -1086,12 +1092,12 @@ test.describe('PS Dashboard', () => {
     await expect(page.locator('.ps-movebtn', { hasText: 'Earthquake' })).toContainText('69.8% - 82.2%', { timeout: 10000 });
   });
 
-  test('always-on pickers can pick recommended moves without Smogon stats', async ({ page }) => {
+  test('always-on pickers can pick moves without Smogon stats', async ({ page }) => {
     await page.locator('button', { hasText: 'Load' }).click();
 
-    const recommendation = page.locator('button', { hasText: /Use Recommended/i }).first();
-    await expect(recommendation).toBeVisible({ timeout: 15000 });
-    await recommendation.click();
+    const firstMove = page.locator('.ps-movebtn').first();
+    await expect(firstMove).toBeVisible({ timeout: 15000 });
+    await firstMove.click();
 
     // Pending chips read as notation: the bare move name, no raw command.
     await expect(page.locator('.ps-pending-choice').first()).toBeVisible({ timeout: 5000 });
@@ -1143,7 +1149,7 @@ test.describe('PS Dashboard', () => {
     await expect(page.getByText(/Branching · Turn 2/)).toBeVisible({ timeout: 15000 });
     await expect(page.locator('.ps-panel', { hasText: 'Variation moves' })).toContainText('Turn 1');
 
-    await page.locator('button', { hasText: /Use Recommended/i }).nth(1).click();
+    await p2Controls.locator('.ps-movebtn').first().click();
     // Pending chips show the move identity instead of the grid slot (B1).
     await expect(p2Controls.locator('.ps-pending-choice')).toBeVisible();
 
@@ -1180,8 +1186,10 @@ test.describe('PS Dashboard', () => {
     await page.locator('button', { hasText: 'Load' }).click();
     await startVariationAt(page, 1);
 
-    await page.locator('button', { hasText: /Use Recommended/i }).nth(0).click();
-    await page.locator('button', { hasText: /Use Recommended/i }).nth(1).click();
+    // Swords Dance for P1 (no damage — a max-damage pick can crit-KO and
+    // turn P2's controls into a forced-switch prompt), any move for P2.
+    await page.locator('.ps-branch-side-column').first().locator('.ps-movebtn', { hasText: 'Swords Dance' }).click();
+    await page.locator('.ps-branch-side-column').nth(1).locator('.ps-movebtn').first().click();
     const iframe = await page.locator('iframe[title="Branch Simulation"]').elementHandle();
     await page.locator('button', { hasText: 'Execute Turn' }).click();
 
@@ -1291,9 +1299,8 @@ test.describe('PS Dashboard', () => {
 
   test('branch replay iframe does not shrink as history grows', async ({ page }) => {
     await page.locator('button', { hasText: 'Load' }).click();
-    // P1 plays Swords Dance instead of the recommendation — a recommended
-    // Earthquake can crit-KO Kingambit on turn 1, which turns P2's controls
-    // into a forced-switch prompt and strands the second Use Recommended wait.
+    // P1 plays Swords Dance — a max-damage Earthquake can crit-KO Kingambit
+    // on turn 1, which turns P2's controls into a forced-switch prompt.
     await startVariationAt(page, 1, { p1Move: 'Swords Dance' });
 
     const branchIframe = page.locator('iframe[title="Branch Simulation"]');
@@ -1302,7 +1309,7 @@ test.describe('PS Dashboard', () => {
     const p1Controls = page.locator('.ps-branch-side-column').first();
     const p2Controls = page.locator('.ps-branch-side-column').nth(1);
     await p1Controls.locator('.ps-movebtn', { hasText: 'Swords Dance' }).click();
-    await p2Controls.locator('button', { hasText: /Use Recommended/i }).click();
+    await p2Controls.locator('.ps-movebtn').first().click();
     await page.locator('button', { hasText: 'Execute Turn' }).click();
     await expect(page.locator('.ps-panel', { hasText: 'Variation moves' })).toContainText('Turn 2', { timeout: 10000 });
 
@@ -1585,7 +1592,14 @@ test.describe('PS Dashboard', () => {
       // evaluation must fire on its own — this sat at "0 turns played".
       await page.locator('button', { hasText: 'Let it play out' }).click();
       await expect(page.getByText(/Engine is playing both sides from turn 1/)).toBeVisible({ timeout: 60_000 });
-      await expect(page.getByText(/Engine is playing both sides from turn 1… [1-9]/)).toBeVisible({ timeout: 120_000 });
+      // Proof it actually played: a live counter past zero, or (the small
+      // fixture game can finish first) the completion notice with turns.
+      await expect.poll(async () => {
+        const body = await page.textContent('body');
+        return /Engine is playing both sides from turn 1 — [1-9]/.test(body ?? '') ||
+          /after [1-9]\d* turns?/.test(body ?? '') ||
+          /: [1-9]\d* turns? played/.test(body ?? '');
+      }, { timeout: 120_000 }).toBe(true);
       await page.locator('.ps-btn', { hasText: 'Stop' }).click();
       await expect(page.getByText(/Play-out stopped/)).toBeVisible({ timeout: 30_000 });
     });

@@ -63,6 +63,9 @@ interface EvalPanelProps {
   doubles?: boolean;
   /** Which position the shown single result belongs to (e.g. "Turn 5 · variation"). */
   positionLabel?: string | null;
+  /** "Let it play out" is running: one steady progress block replaces the
+   *  per-turn result churn (the graph keeps growing underneath). */
+  playOutProgress?: { startTurn: number; turns: number; atTurn: number | null } | null;
   /** Full main-line length — keeps the graph's x-axis honest pre-analysis. */
   graphMaxTurn?: number;
   /** The turn whose analysis is selected (0 = leads). Changing it — slider,
@@ -139,7 +142,7 @@ export function EvalPanel({
   prefs, onPrefsChange, onEvaluate, onCancel, onPickChoice, onPickPair, showAuto, showTera,
   graph, variation, currentLine, onAnalyzeGame, onSelectTurn, currentTurn, analysis,
   reads, leadAnalysis, reportLeads, report, doubles, resultSettings, onThinkDeeper, thinkDeeperTarget, smogonPending,
-  positionLabel, graphMaxTurn, analysisTurn,
+  positionLabel, graphMaxTurn, analysisTurn, playOutProgress,
 }: EvalPanelProps) {
   const running = status === 'searching' || status === 'reconstructing';
   const hasGraph = graph.scores.some(score => score !== null);
@@ -289,12 +292,24 @@ export function EvalPanel({
         ))}
       </div>
 
-      {status === 'reconstructing' && (
+      {playOutProgress && (
+        <div className="ps-playout-progress" role="status">
+          <span className="ps-spinner" aria-hidden="true" />
+          <span>
+            Engine is playing both sides from turn {playOutProgress.startTurn} —{' '}
+            {playOutProgress.turns} turn{playOutProgress.turns === 1 ? '' : 's'} played
+            {playOutProgress.atTurn !== null && playOutProgress.atTurn > playOutProgress.startTurn
+              ? `, now at turn ${playOutProgress.atTurn}` : ''}.
+            The gold line below grows as it plays.
+          </span>
+        </div>
+      )}
+      {!playOutProgress && status === 'reconstructing' && (
         <div style={{ fontSize: 11, color: '#fd6' }}>
           Rebuilding position…{reconstructProgress ? ` (turn ${reconstructProgress.turn}/${reconstructProgress.target})` : ''}
         </div>
       )}
-      {status === 'searching' && (
+      {!playOutProgress && status === 'searching' && (
         <>
           <div style={{ fontSize: 11, color: '#fd6' }}>
             Searching… depth {progress?.depth ?? 1}
@@ -309,7 +324,7 @@ export function EvalPanel({
           Evaluation failed: {error}
         </div>
       )}
-      {status === 'stale' && (
+      {!playOutProgress && status === 'stale' && (
         <div style={{ fontSize: 11, color: '#b6a46a', marginBottom: 4 }}>
           Position changed; re-evaluate.
         </div>
@@ -368,6 +383,7 @@ export function EvalPanel({
               currentLine={currentLine}
               onSelectTurn={selectTurn}
               leadScore={graph.lead?.result.score ?? null}
+              leadDetail={reportLeads ?? null}
               evalErrors={graph.evalErrors}
               decided={graph.results.map(result => result?.unanswered?.decided ?? null)}
               variation={variation}
@@ -425,7 +441,7 @@ export function EvalPanel({
         </div>
       )}
 
-      {result && !showReportView && (
+      {result && !showReportView && !playOutProgress && (
         <div className={status === 'stale' ? 'ps-eval-stale' : undefined}>
           {positionLabel && (
             <div style={{ fontSize: 10, color: '#8fa3bd', marginBottom: 2 }}>{positionLabel}</div>

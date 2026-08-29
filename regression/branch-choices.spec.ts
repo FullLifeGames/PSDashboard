@@ -121,6 +121,57 @@ test.describe('engine choice → branch slot choices', () => {
     expect(evalChoiceToSlotChoices('switch 3', [[]], [[bench('Amoonguss', 5)]])).toBeNull();
   });
 
+  test('a forced-replacement choice maps onto the forced slot, not slot 0', () => {
+    // Doubles wedge (VGC play-out): slot b's Pokémon fainted while slot a
+    // pivoted out the same turn. The engine emits the one-part choice
+    // "switch 2" FOR THE FORCED SLOT — without the mask it landed on slot 0,
+    // reserved the species there, and locked the only legal button.
+    expect(evalChoiceToSlotChoices(
+      'switch 2',
+      [[], []],
+      [[], [bench('Incineroar', 2)]],
+      '→ Incineroar',
+      [false, true],
+    )).toEqual([null, { kind: 'switch', speciesId: 'incineroar', pokemonName: 'Incineroar' }]);
+  });
+
+  test('the mask keeps aligned and full-width strings working as before', () => {
+    // Two parts, two actionable slots: positional, same as without a mask.
+    expect(evalChoiceToSlotChoices(
+      'move protect, switch 3',
+      [[move('Protect', 0, 1)], []],
+      [[], [bench('Amoonguss', 3)]],
+      undefined,
+      [true, true],
+    )).toEqual([
+      { kind: 'move', moveId: 'protect', moveName: 'Protect' },
+      { kind: 'switch', speciesId: 'amoonguss', pokemonName: 'Amoonguss' },
+    ]);
+    // Full-width string with an explicit pass on the non-actionable slot.
+    expect(evalChoiceToSlotChoices(
+      'pass, move protect',
+      [[], [move('Protect', 1, 1)]],
+      [[], []],
+      undefined,
+      [false, true],
+    )).toEqual([null, { kind: 'move', moveId: 'protect', moveName: 'Protect' }]);
+    // Singles stay singles.
+    expect(evalChoiceToSlotChoices('move bugbite', [[move('Bug Bite', 0, 1)]], [[]], undefined, [true]))
+      .toEqual([{ kind: 'move', moveId: 'bugbite', moveName: 'Bug Bite' }]);
+  });
+
+  test('a mask/part mismatch refuses instead of guessing a slot', () => {
+    // Two parts but only one slot may act, and the string is not full-width
+    // either (three slots): a guessed placement could play the wrong slot.
+    expect(evalChoiceToSlotChoices(
+      'move protect, switch 2',
+      [[move('Protect', 0, 1)], [], []],
+      [[], [bench('Amoonguss', 2)], []],
+      undefined,
+      [false, true, false],
+    )).toBeNull();
+  });
+
   test('a pass slot stays empty and an unresolvable part rejects the whole pick', () => {
     expect(evalChoiceToSlotChoices('pass, move protect', [[], [move('Protect', 1, 1)]], [[], []]))
       .toEqual([null, { kind: 'move', moveId: 'protect', moveName: 'Protect' }]);

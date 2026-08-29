@@ -192,29 +192,52 @@ const EVAL_MODIFIERS = ['terastallize', 'mega', 'ultra'] as const;
  * Switch parts resolve by the label's species ("→ Muk-Alola") when the
  * label is provided — the engine's slot numbers index ITS battle's bench,
  * which is not guaranteed to share the branch reconstruction's order.
+ *
+ * `actionableSlots` aligns parts with slots: the engine emits one part per
+ * slot WITH choices and skips slots the sim auto-passes, so a doubles
+ * forced replacement arrives as a single part that belongs to the FORCED
+ * slot, not slot 0 (the VGC play-out wedge: the pick landed on the wrong
+ * slot, reserved the species there, and locked the only legal button).
+ * With the mask, parts map onto the slots that expect a choice; a
+ * full-width string (explicit `pass` per slot) still maps positionally,
+ * and any other count mismatch refuses rather than guessing a slot.
  */
 export function evalChoiceToSlotChoices(
   evalChoice: string,
   movesBySlot: BranchMoveOption[][],
   switchesBySlot: BranchSwitchOption[][],
   label?: string,
+  actionableSlots?: boolean[],
 ): (BranchSlotChoice | null)[] | null {
   // Pivot pairs ("move uturn > switch 4"): the branch UI prefills the MOVE;
   // the sim raises the follow-up switch as its own prompt afterwards.
   const parts = evalChoice.split(' > ')[0].split(',').map(part => part.trim());
   const labelParts = label ? splitCombinedLabel(label) : [];
-  const choices: (BranchSlotChoice | null)[] = [];
-  for (let slot = 0; slot < parts.length; slot++) {
-    const tokens = parts[slot].split(' ');
+  let slotFor = (part: number) => part;
+  let width = parts.length;
+  if (actionableSlots) {
+    const actionable = actionableSlots.flatMap((expects, index) => (expects ? [index] : []));
+    if (actionable.length === parts.length) {
+      slotFor = (part: number) => actionable[part];
+      width = actionableSlots.length;
+    } else if (parts.length === actionableSlots.length) {
+      width = actionableSlots.length;
+    } else {
+      return null;
+    }
+  }
+  const choices: (BranchSlotChoice | null)[] = new Array<BranchSlotChoice | null>(width).fill(null);
+  for (let part = 0; part < parts.length; part++) {
+    const slot = slotFor(part);
+    const tokens = parts[part].split(' ');
     if (tokens[0] === 'pass') {
-      choices.push(null);
       continue;
     }
     if (tokens[0] === 'switch') {
-      const species = labelParts[slot]?.startsWith('→ ') ? labelParts[slot].slice(2) : null;
+      const species = labelParts[part]?.startsWith('→ ') ? labelParts[part].slice(2) : null;
       const resolved = resolveCustomSwitch(species ?? tokens[1], switchesBySlot[slot] ?? []);
       if (!resolved.ok) return null;
-      choices.push(resolved.choice);
+      choices[slot] = resolved.choice;
       continue;
     }
     if (tokens[0] !== 'move') return null;
@@ -222,7 +245,7 @@ export function evalChoiceToSlotChoices(
     const locToken = tokens.slice(2).find(token => /^-?\d+$/.test(token));
     const resolved = resolveCustomMove(tokens[1], locToken, movesBySlot[slot] ?? []);
     if (!resolved.ok || resolved.choice.kind !== 'move') return null;
-    choices.push(modifier ? { ...resolved.choice, modifier } : resolved.choice);
+    choices[slot] = modifier ? { ...resolved.choice, modifier } : resolved.choice;
   }
   return choices;
 }

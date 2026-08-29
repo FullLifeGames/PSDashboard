@@ -12,7 +12,6 @@ import {
   switchOptionKey,
   type BranchSlotChoice,
 } from '../lib/branch-choices';
-import { pickRecommendedMove } from '../lib/recommendation';
 import type { PickerSource } from '../lib/picker-state';
 import { spriteUrl } from '../lib/sprite-url';
 import { ComboBox } from './ComboBox';
@@ -228,8 +227,7 @@ function SwitchBtn({ sw, selected, disabled, disabledReason, wasPlayed, compact,
 }
 
 /* ── Controls for one side (moves/switches) ── */
-function SideControls({ side, label, activeName, activeSpecies, activeFainted, moves, switches, forceSwitch, pending, blockedSwitchKeys, modifiers, dmgResults, spreadDamageResults, targetDamageResults, gen, advanced, played, onChoice, onHypotheticalMove }: {
-  side: 'p1' | 'p2';
+function SideControls({ label, activeName, activeSpecies, activeFainted, moves, switches, forceSwitch, pending, blockedSwitchKeys, modifiers, dmgResults, spreadDamageResults, targetDamageResults, gen, advanced, played, onChoice, onHypotheticalMove }: {
   label: string;
   activeName: string;
   activeSpecies: string;
@@ -284,10 +282,6 @@ function SideControls({ side, label, activeName, activeSpecies, activeFainted, m
   useEffect(() => {
     if (modifier && !modifierAvailable) setModifier(null);
   }, [modifier, modifierAvailable]);
-  const recommendation = useMemo(
-    () => pickRecommendedMove(side, moves, dmgResults, targetDamageResults),
-    [side, moves, dmgResults, targetDamageResults],
-  );
   const playedMoveKey = played?.kind === 'move' ? choiceId(played.name) : null;
   const playedSwitchKey = played?.kind === 'switch' ? choiceId(played.species || played.name) : null;
   const playedText = played
@@ -381,19 +375,6 @@ function SideControls({ side, label, activeName, activeSpecies, activeFainted, m
                 />
               )}
             </div>
-          )}
-          {recommendation && (
-            <button
-              type="button"
-              className={`ps-recommendation-btn${advanced ? '' : ' ps-recommendation-compact'}`}
-              onClick={() => onChoice(moveChoiceFor(recommendation.move, recommendation.targetLoc))}
-            >
-              <span className="ps-recommendation-label">Use Recommended</span>
-              <span className="ps-recommendation-move">
-                {recommendation.move.name}
-                {recommendation.range && recommendation.range !== '-' ? ` ${recommendation.range}` : ''}
-              </span>
-            </button>
           )}
           <div className={`ps-movegrid${advanced ? '' : ' ps-movegrid-compact'}`}>
             {moves.map((m, i) => (
@@ -730,10 +711,14 @@ export function BranchPanel({ simState, source, acquiringExact, executeError, ex
   const p2RequiredChoices = requiredChoicesForActiveSlots(p2ActiveSlots, simState.p2ForceSwitches);
   const bothChosen = branchSideChoicesReady(simState.p1Choices, p1RequiredChoices) &&
     branchSideChoicesReady(simState.p2Choices, p2RequiredChoices);
-  const blockedSwitchKeys = (choices: (BranchSlotChoice | null)[], activeSlot: number) => {
+  const blockedSwitchKeys = (choices: (BranchSlotChoice | null)[], required: boolean[], activeSlot: number) => {
     const blocked = new Set<string>();
     choices.forEach((choice, index) => {
       if (index === activeSlot) return;
+      // A pending choice on a slot the request does not let act (a stale
+      // pick during the other slot's forced replacement) must not reserve
+      // a species — it locked the forced slot's only legal switch-in.
+      if (!required[index]) return;
       const target = switchChoiceKey(choice);
       if (target !== null) blocked.add(target);
     });
@@ -778,7 +763,7 @@ export function BranchPanel({ simState, source, acquiringExact, executeError, ex
               {p1ActiveSlots.map((active, slot) => (
                 <SideControls
                   key={`p1-${slot}`}
-                  side="p1"
+
                   label={p1ActiveSlots.length > 1 ? `P1${String.fromCharCode(65 + slot)}` : 'P1'}
                   activeName={active?.name || '???'}
                   activeSpecies={active?.species || ''}
@@ -787,7 +772,7 @@ export function BranchPanel({ simState, source, acquiringExact, executeError, ex
                   switches={p1SwitchesBySlot[slot] ?? EMPTY_SWITCHES}
                   forceSwitch={simState.p1ForceSwitches[slot] ?? false}
                   pending={simState.p1Choices[slot] ?? null}
-                  blockedSwitchKeys={blockedSwitchKeys(simState.p1Choices, slot)}
+                  blockedSwitchKeys={blockedSwitchKeys(simState.p1Choices, p1RequiredChoices, slot)}
                   modifiers={simState.p1ModifiersBySlot[slot] ?? EMPTY_MODIFIERS}
                   dmgResults={damageBySide.p1.default[slot] ?? []}
                   spreadDamageResults={damageBySide.p1.spread[slot] ?? {}}
@@ -805,7 +790,7 @@ export function BranchPanel({ simState, source, acquiringExact, executeError, ex
               {p2ActiveSlots.map((active, slot) => (
                 <SideControls
                   key={`p2-${slot}`}
-                  side="p2"
+
                   label={p2ActiveSlots.length > 1 ? `P2${String.fromCharCode(65 + slot)}` : 'P2'}
                   activeName={active?.name || '???'}
                   activeSpecies={active?.species || ''}
@@ -814,7 +799,7 @@ export function BranchPanel({ simState, source, acquiringExact, executeError, ex
                   switches={p2SwitchesBySlot[slot] ?? EMPTY_SWITCHES}
                   forceSwitch={simState.p2ForceSwitches[slot] ?? false}
                   pending={simState.p2Choices[slot] ?? null}
-                  blockedSwitchKeys={blockedSwitchKeys(simState.p2Choices, slot)}
+                  blockedSwitchKeys={blockedSwitchKeys(simState.p2Choices, p2RequiredChoices, slot)}
                   modifiers={simState.p2ModifiersBySlot[slot] ?? EMPTY_MODIFIERS}
                   dmgResults={damageBySide.p2.default[slot] ?? []}
                   spreadDamageResults={damageBySide.p2.spread[slot] ?? {}}

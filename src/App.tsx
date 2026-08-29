@@ -31,7 +31,7 @@ import { decodeBranchShare, type BranchSharePayload } from './lib/branch-share';
 import { formatEnforcesSleepClause, getBranchSimulatorFormat, getReplayBringCount, getReplayGameType, getReplayGeneration, inferReplayFormatId } from './lib/replay-format';
 import { resolveTeraPreference } from './lib/eval/tera';
 import { summarizeAlignment, type TurnAlignmentRecord } from './lib/hax-alignment';
-import { choiceId, evalChoiceToSlotChoices, type BranchSlotChoice } from './lib/branch-choices';
+import { choiceId, evalChoiceToSlotChoices, requiredChoicesForActiveSlots, type BranchSlotChoice } from './lib/branch-choices';
 import type { EvalResult, RankedChoice } from './lib/eval/types';
 import { allTurnEvents, detectSacks, parseLeadSpecies, parsePlayedActions, parsePlayedActionsDoubles } from './lib/eval/played';
 import { analyzeTurn, decidedSeenKey, PAYOFF_WINDOW, unansweredSeenKey, type TurnAnalysis } from './lib/eval/analysis';
@@ -300,7 +300,19 @@ function App() {
   // lapses.
   const seekIntentRef = useRef<{ turn: number; until: number } | null>(null);
 
-  const navigateTo = useCallback((position: TimelinePosition, opts?: { seek?: boolean }) => {
+  // Mirrors for the play-out state and its stop, declared before navigateTo
+  // (the state itself lives further down): user navigation while the engine
+  // plays must STOP the run — the loop only advances while the pointer sits
+  // on the live tip, so a silent stall with "Engine is playing…" frozen was
+  // the alternative. Internal navigations (tip-follow, the finish's return
+  // to the start turn) keep the run alive.
+  const playOutRef = useRef<{ active: boolean } | null>(null);
+  const stopPlayOutRef = useRef<((opts?: { returnToStart?: boolean }) => void) | null>(null);
+
+  const navigateTo = useCallback((position: TimelinePosition, opts?: { seek?: boolean; internal?: boolean }) => {
+    if (!opts?.internal && playOutRef.current?.active) {
+      stopPlayOutRef.current?.({ returnToStart: false });
+    }
     const next = normalizePosition(position, maxTurn, variationSpan);
     setViewT0(false);
     setViewTurn(next.turn);
@@ -338,7 +350,7 @@ function App() {
   const tipTurn = variationSpan ? variationTip(variationSpan) : null;
   useEffect(() => {
     if (!branching || tipTurn === null) return;
-    navigateTo({ turn: tipTurn, line: 'variation' }, { seek: false });
+    navigateTo({ turn: tipTurn, line: 'variation' }, { seek: false, internal: true });
   }, [branching, tipTurn, navigateTo]);
 
   /**
@@ -1230,12 +1242,21 @@ function App() {
     if (!simState) return false;
     const movesBySlot = side === 'p1' ? simState.p1MovesBySlot : simState.p2MovesBySlot;
     const switchesBySlot = side === 'p1' ? simState.p1SwitchesBySlot : simState.p2SwitchesBySlot;
-    const slotChoices = evalChoiceToSlotChoices(ranked.choice, movesBySlot, switchesBySlot, ranked.label);
+    // The engine's choice string carries one part per slot WITH choices —
+    // a doubles forced replacement is a single part that belongs to the
+    // forced slot, so the mask aligns parts with the request's slots.
+    const activeSlots = side === 'p1' ? simState.p1ActiveSlots : simState.p2ActiveSlots;
+    const forcedSlots = side === 'p1' ? simState.p1ForceSwitches : simState.p2ForceSwitches;
+    const mask = requiredChoicesForActiveSlots(
+      activeSlots.map(active => (active ? { fainted: active.fainted } : null)),
+      forcedSlots,
+    );
+    const slotChoices = evalChoiceToSlotChoices(ranked.choice, movesBySlot, switchesBySlot, ranked.label, mask);
     if (!slotChoices) return false;
     let applied = false;
     slotChoices.forEach((choice, activeSlot) => {
       if (!choice) return;
-      handleSetChoice(side, choice, slotChoices.length > 1 ? activeSlot : undefined);
+      handleSetChoice(side, choice, activeSlot);
       applied = true;
     });
     return applied;
@@ -1324,7 +1345,7 @@ function App() {
   // current position until the game ends, the user stops, or the safety cap
   // trips. Each executed turn is a normal history entry — navigable,
   // evaluable, truncatable like anything else; Stop keeps what was played.
-  const [playOut, setPlayOut] = useState<{ active: boolean; executed: number; startTurn: number; prevAuto: boolean } | null>(null);
+  const [playOut, setPlayOut] = useState<{ active: boolean; executed: number; turns: number; startTurn: number; prevAuto: boolean } | null>(null);
   /** Why the last play-out ended + where watching it starts (panel notice). */
   const [playOutNotice, setPlayOutNotice] = useState<{ text: string; watchTurn: number } | null>(null);
   const playOutProcessedRef = useRef<EvalResult | null>(null);
@@ -1369,7 +1390,7 @@ function App() {
    *  pointer moves to the tip (so the branch frame is the one on screen and
    *  the next choice stays at hand) while the movie starts at `turn`. */
   const watchFrom = useCallback((turn: number) => {
-    if (tipTurn !== null) navigateTo({ turn: tipTurn, line: 'variation' }, { seek: false });
+    if (tipTurn !== null) navigateTo({ turn: tipTurn, line: 'variation' }, { seek: false, internal: true });
     window.setTimeout(() => {
       setNavSeek(prev => ({ turn, seq: (prev?.seq ?? 0) + 1, play: true }));
     }, 250);
@@ -1391,22 +1412,33 @@ function App() {
     if (!prevAuto) evaluation.setPrefs({ ...evaluation.prefs, auto: true });
     playOutProcessedRef.current = null;
     setPlayOutNotice(null);
-    setPlayOut({ active: true, executed: 0, startTurn: viewTurn, prevAuto });
+    setPlayOut({ active: true, executed: 0, turns: 0, startTurn: viewTurn, prevAuto });
     if (liveTip) handleEvaluate();
   }, [liveTip, viewingVariation, atEndPosition, requestDeviation, evaluation, handleEvaluate, viewTurn]);
 
-  const finishPlayOut = useCallback((current: NonNullable<typeof playOut>, text: string, watch: boolean) => {
+  const finishPlayOut = useCallback((current: NonNullable<typeof playOut>, text: string, opts?: { returnToStart?: boolean }) => {
     if (!current.prevAuto) evaluation.setPrefs({ ...evaluation.prefs, auto: false });
+    playOutRef.current = null;
     setPlayOut(null);
     setPlayOutNotice({ text, watchTurn: current.startTurn });
-    if (watch && current.executed > 0) watchFrom(current.startTurn);
-  }, [evaluation, watchFrom]);
+    // The engine's play dragged the pointer along to the tip; hand the view
+    // back to the turn the run started from — the user replays the line
+    // from there themselves (the Watch button, or just pressing play).
+    if ((opts?.returnToStart ?? true) && current.turns > 0) {
+      navigateTo({ turn: current.startTurn, line: 'variation' }, { seek: true, internal: true });
+    }
+  }, [evaluation, navigateTo]);
 
-  const stopPlayOut = useCallback(() => {
+  const stopPlayOut = useCallback((opts?: { returnToStart?: boolean }) => {
     if (playOut) {
-      finishPlayOut(playOut, `Play-out stopped: ${playOut.executed} turn${playOut.executed === 1 ? '' : 's'} played (they stay in the variation).`, false);
+      finishPlayOut(playOut, `Play-out stopped: ${playOut.turns} turn${playOut.turns === 1 ? '' : 's'} played (they stay in the variation).`, opts);
     }
   }, [playOut, finishPlayOut]);
+
+  // Keep the render-independent mirrors in sync (navigateTo reads them —
+  // it is declared before the play-out state exists).
+  playOutRef.current = playOut;
+  stopPlayOutRef.current = stopPlayOut;
 
   /**
    * A play-out started from the MAIN LINE arms before its rebuild finishes —
@@ -1431,26 +1463,38 @@ function App() {
     playOutProcessedRef.current = evaluation.result;
     const step = nextPlayOutStep(evaluation.result, getBattle()?.ended ?? false, playOut.executed);
     if (step.kind === 'done') {
-      finishPlayOut(playOut, playOutDoneText(step.reason, playOut.executed), true);
+      finishPlayOut(playOut, playOutDoneText(step.reason, playOut.turns));
       return;
     }
     if (step.kind === 'pair') {
       if (!applyEvalChoice('p1', step.p1) || !applyEvalChoice('p2', step.p2)) {
-        finishPlayOut(playOut, `Play-out stopped after ${playOut.executed} turn${playOut.executed === 1 ? '' : 's'}: the engine's choice was not playable at this position.`, false);
+        finishPlayOut(playOut, `Play-out stopped after ${playOut.turns} turn${playOut.turns === 1 ? '' : 's'}: the engine's choice was not playable at this position.`);
         return;
       }
-      setPlayOut({ ...playOut, executed: playOut.executed + 1 });
+      setPlayOut({ ...playOut, executed: playOut.executed + 1, turns: playOut.turns + 1 });
       void executeTurn().then(() => handleEvaluate());
       return;
     }
     // Single (forced) side: setChoice auto-executes forced replacements and
-    // the auto pref re-evaluates once the entry lands.
+    // the auto pref re-evaluates once the entry lands. Counts as a step for
+    // the safety cap, not as a played turn.
     if (!applyEvalChoice(step.side, step.choice)) {
-      finishPlayOut(playOut, `Play-out stopped after ${playOut.executed} turn${playOut.executed === 1 ? '' : 's'}: the forced replacement could not be submitted.`, false);
+      finishPlayOut(playOut, `Play-out stopped after ${playOut.turns} turn${playOut.turns === 1 ? '' : 's'}: the forced replacement could not be submitted.`);
       return;
     }
     setPlayOut({ ...playOut, executed: playOut.executed + 1 });
   }, [playOut, liveTip, executing, branchPreparing, evaluation.status, evaluation.result, evaluation.resultTag, evalViewKey, getBattle, applyEvalChoice, executeTurn, handleEvaluate, finishPlayOut]);
+
+  /**
+   * The loop advances on COMPLETED evaluations — an evaluation that fails
+   * (worker error, reconstruction refusal) used to leave "Engine is
+   * playing…" stuck forever with no message. End the run with its reason.
+   */
+  useEffect(() => {
+    if (!playOut?.active || executing || branchPreparing) return;
+    if (evaluation.status !== 'error') return;
+    finishPlayOut(playOut, `Play-out stopped after ${playOut.turns} turn${playOut.turns === 1 ? '' : 's'}: the evaluation failed here${evaluation.error ? ` (${evaluation.error})` : ''}.`);
+  }, [playOut, executing, branchPreparing, evaluation.status, evaluation.error, finishPlayOut]);
 
   /**
    * The unified timeline's exactness promise, without a button: when the
@@ -1782,6 +1826,9 @@ function App() {
   }, [viewingVariation, endSnapshotTurn, setViewTurn]);
 
   const handleGraphSelect = useCallback((turn: number) => {
+    // Selecting a turn is user navigation — it bypasses navigateTo, so the
+    // same "navigation stops the engine's run" rule applies here.
+    if (playOutRef.current?.active) stopPlayOutRef.current?.({ returnToStart: false });
     if (turn >= 1) {
       setViewT0(false);
       seekIntentRef.current = { turn, until: Date.now() + 4000 };
@@ -2428,6 +2475,14 @@ function App() {
                 executing={executing || branchPreparing}
                 onStart={leads => startLeadVariation(bringCount !== null ? { ...leads, bring: true } : leads)}
               />
+            ) : playOut?.active ? (
+              /* A steady stand-in while the engine plays: the per-turn picker
+                 churn was the "everything keeps switching" complaint, and a
+                 click here mid-run would corrupt the loop anyway. */
+              <div className="ps-panel" role="status" style={{ fontSize: 11, color: '#aabbcc' }}>
+                <span className="ps-spinner" aria-hidden="true" />{' '}
+                The engine is picking both sides&rsquo; moves — the pickers come back when it stops.
+              </div>
             ) : (
             <BranchPanel
               simState={liveTip ? simState : pickerSimState}
@@ -2498,6 +2553,7 @@ function App() {
                 graph={evaluation.graph}
                 onAnalyzeGame={handleAnalyzeGame}
                 positionLabel={liveEvalView ? `Turn ${viewTurn} · ${viewingVariation ? 'variation' : 'main line'}` : null}
+                playOutProgress={playOut?.active ? { startTurn: playOut.startTurn, turns: playOut.turns, atTurn: liveSimTurn } : null}
                 graphMaxTurn={analyzableTurns}
                 analysisTurn={analysisTurn}
                 onSelectTurn={handleGraphSelectLine}
@@ -2507,7 +2563,7 @@ function App() {
                 analysis={!liveEvalView ? turnAnalysis : null}
                 reads={!liveEvalView ? turnReads : null}
                 leadAnalysis={!liveEvalView && analysisTurn === 0 ? leadAnalysisData : null}
-                reportLeads={!liveEvalView ? leadAnalysisData : null}
+                reportLeads={leadAnalysisData}
                 report={!liveEvalView ? gameReport : null}
                 doubles={replayGameType === 'doubles'}
               />
@@ -2516,10 +2572,13 @@ function App() {
               <div className="ps-panel" style={{ marginTop: 8, display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
                 {playOut?.active ? (
                   <>
+                    <span className="ps-spinner" aria-hidden="true" />
+                    {/* The detailed progress line lives in the Evaluation
+                        panel (beside the growing graph) — one place, not two. */}
                     <span style={{ fontSize: 11, color: '#f0c76b' }}>
-                      Engine is playing both sides from turn {playOut.startTurn}… {playOut.executed} turn{playOut.executed === 1 ? '' : 's'} played
+                      Engine play-out running
                     </span>
-                    <button type="button" className="ps-btn" onClick={stopPlayOut} style={{ padding: '2px 10px', fontSize: 11 }}>
+                    <button type="button" className="ps-btn" onClick={() => stopPlayOut()} style={{ padding: '2px 10px', fontSize: 11 }}>
                       Stop
                     </button>
                   </>
@@ -2530,13 +2589,13 @@ function App() {
                       className="ps-btn"
                       onClick={startPlayOut}
                       disabled={branchPreparing || usageStats.loading || setAssumptions.loading}
-                      title="The engine plays BOTH sides' best moves from the position you are viewing until the game ends, then the battle window plays the result from here. Stop anytime; played turns stay in the variation."
+                      title="The engine plays BOTH sides' best moves from the position you are viewing until the game ends. The view stays on this turn while it runs; when it stops, press play (or Watch) to see the finished line. Stop anytime; played turns stay in the variation."
                       style={{ padding: '3px 10px', fontSize: 11, borderColor: 'rgba(240,199,107,0.5)' }}
                     >
                       &#9658; Let it play out
                     </button>
                     <span style={{ fontSize: 10, color: '#8fa3bd' }}>
-                      engine finishes the game from turn {viewTurn}, then it plays back here
+                      engine finishes the game from turn {viewTurn}; watch the result from here afterwards
                     </span>
                   </>
                 )}

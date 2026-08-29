@@ -507,35 +507,6 @@ body {
 .ps-controls-tab:hover { background: rgba(255,255,255,0.15); }
 .ps-controls-tab-active { background: linear-gradient(180deg, #7cb7e8 0%, #517fae 100%); color: #fff; }
 
-.ps-recommendation-btn {
-  width: 100%;
-  align-items: center;
-  display: flex;
-  gap: 8px;
-  justify-content: space-between;
-  margin-bottom: 8px;
-  border: 1px solid rgba(255, 224, 102, 0.45);
-  border-radius: 6px;
-  background:
-    linear-gradient(180deg, rgba(111, 87, 31, 0.92) 0%, rgba(65, 52, 25, 0.92) 100%);
-  box-shadow: inset 0 1px 0 rgba(255,255,255,0.12);
-  color: #ffe8a3;
-  cursor: pointer;
-  font-family: inherit;
-  font-size: 11px;
-  font-weight: bold;
-  padding: 6px 8px;
-  text-align: left;
-}
-.ps-recommendation-btn:hover {
-  filter: brightness(1.12);
-}
-/* Basic view: the recommendation shrinks to a single slim row. */
-.ps-recommendation-compact {
-  margin-bottom: 4px;
-  padding: 2px 8px;
-}
-
 /* T0 lead picker: doubles slot marker on a selected lead chip (a/b). */
 .ps-lead-slot {
   display: inline-block;
@@ -548,19 +519,6 @@ body {
   background: rgba(108, 194, 255, 0.25);
   border: 1px solid rgba(108, 194, 255, 0.5);
   color: #bfe3ff;
-}
-
-.ps-recommendation-label {
-  color: #fff1bd;
-  font-size: 10px;
-  letter-spacing: 0.02em;
-  text-transform: uppercase;
-}
-
-.ps-recommendation-move {
-  color: #ffffff;
-  font-size: 11px;
-  text-align: right;
 }
 
 .ps-custom-choice {
@@ -1078,14 +1036,6 @@ body {
   .ps-custom-choice .ps-btn {
     width: 100%;
   }
-  .ps-recommendation-btn {
-    align-items: flex-start;
-    flex-direction: column;
-    gap: 3px;
-  }
-  .ps-recommendation-move {
-    text-align: left;
-  }
 }
 
 /* Inputs */
@@ -1488,4 +1438,30 @@ button.ps-eval-choice:hover,
   height: 100%;
   background: #8cf;
   transition: width 0.2s;
+}
+
+/* "Let it play out": one steady progress line instead of per-turn churn. */
+.ps-playout-progress {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 11px;
+  color: #f0c76b;
+  margin-bottom: 4px;
+}
+.ps-spinner {
+  width: 11px;
+  height: 11px;
+  flex: 0 0 auto;
+  border-radius: 50%;
+  border: 2px solid rgba(240, 199, 107, 0.35);
+  border-top-color: #f0c76b;
+  display: inline-block;
+  animation: ps-spin 0.9s linear infinite;
+}
+@keyframes ps-spin {
+  to { transform: rotate(360deg); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .ps-spinner { animation: none; }
 }

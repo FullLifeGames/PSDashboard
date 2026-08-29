@@ -74,4 +74,26 @@ test.describe('lead (turn 0) analysis', () => {
     // Formats without team preview produce no turn 0.
     expect(serializePreviewPosition('gen3customgame', team, team)).toBeNull();
   });
+
+  test('clause-suffixed singles formats keep their team preview (draft replays)', async () => {
+    // Draft replays branch as "gen9customgame@@@Sleep Clause Mod" — running
+    // the format string through toID mangled the custom rules into an
+    // unknown format with no preview, so every draft game silently lost its
+    // turn-0 evaluation (the graph's missing T0 diamond in singles).
+    const { serializePreviewPosition } = await import('../src/lib/branch-engine');
+    const { createRootPosition, legalChoices } = await import('../src/lib/eval/forward-model');
+    const set = (species: string): PokemonSet => ({
+      name: species, species, item: '', ability: 'No Ability', moves: ['Tackle'],
+      nature: 'Hardy',
+      evs: { hp: 252, atk: 252, def: 0, spa: 0, spd: 4, spe: 0 },
+      ivs: { hp: 31, atk: 31, def: 31, spa: 31, spd: 31, spe: 31 },
+      level: 100, gender: '',
+    });
+    const team = [set('Garchomp'), set('Rotom-Wash'), set('Skarmory')];
+    const serialized = serializePreviewPosition('gen9customgame@@@Sleep Clause Mod', team, team);
+    expect(serialized).not.toBeNull();
+    const options = legalChoices(createRootPosition(serialized!), 'p1');
+    expect(options).toHaveLength(3);
+    expect(options.map(option => option.label)).toContain('Lead Garchomp');
+  });
 });

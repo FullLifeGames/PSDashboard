@@ -1,5 +1,5 @@
-import { Battle, BattleStreams, Dex, Teams, toID } from '@pkmn/sim';
-import type { PokemonSet } from '@pkmn/sim';
+import { Battle, BattleStreams, Dex, Teams } from '@pkmn/sim';
+import type { ID, PokemonSet } from '@pkmn/sim';
 import type { PokemonSnapshot, TurnSnapshot } from '../types';
 import type { BranchSlotChoice } from './branch-choices';
 import { protocolChoiceLock, type ChoiceLockContext } from './choice-lock';
@@ -1323,7 +1323,10 @@ export function serializePreviewPosition(
 ): string | null {
   try {
     const battle = new Battle({
-      formatid: toID(format),
+      // The raw format string, never toID: clause suffixes ride along as
+      // "@@@Sleep Clause Mod", and toID mangles them into an unknown format
+      // WITHOUT team preview — every draft replay lost its turn 0 that way.
+      formatid: format as ID,
       seed: '1,2,3,4',
       p1: { name: 'p1', team: Teams.pack(p1Team) },
       p2: { name: 'p2', team: Teams.pack(p2Team) },
