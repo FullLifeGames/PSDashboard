@@ -1,8 +1,9 @@
 import type { PokemonSet } from '@pkmn/sim';
 import { Teams } from '@pkmn/sim';
 import { inferOpponentTeam } from './opponent-inferrer';
-import { getSpeciesUsageSet, type SmogonUsageStats } from './smogon-stats';
-import { getSpeciesSetAssumption, type SmogonSetAssumptions } from './smogon-sets';
+import { getSpeciesUsageSet } from './smogon/usage-lookup';
+import type { SmogonUsageStats } from './smogon/stats-types';
+import { getSpeciesSetAssumption, type SmogonSetAssumptions } from './smogon/sets-lookup';
 import { evBudget, inferSpreads, legalizeEvs, type SpreadCandidate } from './spread-inference';
 import { withHiddenPowerType } from './hidden-power';
 import {

@@ -1,7 +1,7 @@
 import type { PokemonSet } from '@pkmn/sim';
 import { Dex } from '@pkmn/sim';
-import type { SpeciesUsageSet } from '../smogon-stats';
-import { getSpeciesSetAssumption } from '../smogon-sets';
+import type { SpeciesUsageSet } from '../smogon/stats-types';
+import { getSpeciesSetAssumption } from '../smogon/sets-lookup';
 import { applyCoherenceVetoes, selectCuratedSet, type MoveCandidate } from '../set-coherence';
 import { itemSetValue } from '../team-info';
 import type { SpreadCandidate } from '../spread-inference';

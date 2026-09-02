@@ -4,37 +4,12 @@ import { Smogon } from '@pkmn/smogon';
 import type { ID } from '@pkmn/data';
 import { toId } from './ids';
 import { ouFallbackFormat } from './smogon/format-fallback';
+import type { PokemonSetAssumption, SetAssumption, SetSpreadAssumption, SmogonSetAssumptions } from './smogon/sets-lookup';
 
-export interface SetAssumption {
-  value: string;
-  sourceDetail: string;
-}
-
-export interface SetSpreadAssumption extends SetAssumption {
-  nature: string;
-  evs: { hp: number; atk: number; def: number; spa: number; spd: number; spe: number };
-}
-
-export interface PokemonSetAssumption {
-  species: string;
-  sourceDetail: string;
-  ability?: SetAssumption;
-  item?: SetAssumption;
-  moves: SetAssumption[];
-  spread?: SetSpreadAssumption;
-  /**
-   * The species' OTHER published sets (this entry is the first). Coherent-set
-   * selection scores all of them against revealed evidence — curated sets are
-   * internally coherent by construction, unlike marginal assembly.
-   */
-  alternatives?: PokemonSetAssumption[];
-}
-
-export interface SmogonSetAssumptions {
-  format: string;
-  source: string;
-  pokemon: Record<string, PokemonSetAssumption>;
-}
+export type {
+  PokemonSetAssumption, SetAssumption, SetSpreadAssumption, SmogonSetAssumptions,
+} from './smogon/sets-lookup';
+export { getSpeciesSetAssumption } from './smogon/sets-lookup';
 
 type SmogonFetcher = ConstructorParameters<typeof Smogon>[0];
 type AssumptionSet = {
@@ -148,13 +123,4 @@ export async function fetchSmogonSetAssumptions(params: {
 
   cache.set(cacheKey, request);
   return request;
-}
-
-export function getSpeciesSetAssumption(
-  assumptions: SmogonSetAssumptions | null | undefined,
-  species: string,
-): PokemonSetAssumption | undefined {
-  if (!assumptions) return undefined;
-  return assumptions.pokemon[toId(species)] ??
-    Object.values(assumptions.pokemon).find(entry => toId(entry.species) === toId(species));
 }

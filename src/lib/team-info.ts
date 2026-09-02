@@ -1,5 +1,6 @@
-import { getSpeciesUsageSet, type SmogonUsageStats, type UsageProbability, type UsageSpread } from './smogon-stats';
-import { getSpeciesSetAssumption, type SetAssumption, type SetSpreadAssumption, type SmogonSetAssumptions } from './smogon-sets';
+import { getSpeciesUsageSet } from './smogon/usage-lookup';
+import type { SmogonUsageStats, UsageProbability, UsageSpread } from './smogon/stats-types';
+import { getSpeciesSetAssumption, type SetAssumption, type SetSpreadAssumption, type SmogonSetAssumptions } from './smogon/sets-lookup';
 import { applyCoherenceVetoes, selectCuratedSet, type MoveCandidate } from './set-coherence';
 import type { OpponentTeamInfo, PokemonEvs, PokemonEvsInfo, PokemonFieldInfo, PokemonMoveInfo, RevealedPokemonInfo } from '../types';
 import { toId } from './ids';

@@ -2,10 +2,7 @@ import type {
   ChaosStatsPayload, PkmnStatsPayload, PokemonUsageStats, SmogonUsageStats, UsageProbability, UsageSpread,
 } from './stats-types';
 import { toId } from '../ids';
-
-export function sourceDetail(format: string, month: string): string {
-  return `Smogon ${format} ${month}`;
-}
+import { sourceDetail } from './usage-lookup';
 
 export function dataPkmnStatsUrl(format: string): string {
   return `https://data.pkmn.cc/stats/${format}.json`;
