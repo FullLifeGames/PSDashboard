@@ -277,34 +277,6 @@ export const ratchetOverrides = [
   },
   {
     "files": [
-      "src/lib/eval/analysis.ts"
-    ],
-    "rules": {
-      "max-lines": [
-        "error",
-        {
-          "max": 600,
-          "skipBlankLines": true,
-          "skipComments": true
-        }
-      ],
-      "max-lines-per-function": [
-        "error",
-        {
-          "max": 350,
-          "skipBlankLines": true,
-          "skipComments": true,
-          "IIFEs": true
-        }
-      ],
-      "complexity": [
-        "error",
-        178
-      ]
-    }
-  },
-  {
-    "files": [
       "src/lib/eval/cell-blend.ts"
     ],
     "rules": {
