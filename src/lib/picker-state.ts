@@ -4,7 +4,7 @@ import type { PokemonSet } from '@pkmn/sim';
 import { speciesBaseId } from './replay-format';
 import type { PokemonSnapshot, TurnSnapshot } from '../types';
 import type {
-  BranchMoveOption, BranchSimState, BranchSwitchOption, SimPokemonInfo,
+  BranchMoveOption, BranchSimState, BranchSlotModifiers, BranchSwitchOption, SimPokemonInfo,
 } from './branch-engine';
 
 /**
@@ -135,54 +135,57 @@ function pokemonInfoFromSnapshot(
  * moves), switches from the snapshot's living bench. Legality is settled by
  * the sim at execute time via the existing error path.
  */
-export function pickerStateFromSnapshot(
-  snapshot: TurnSnapshot,
-  p1Team: PokemonSet[],
-  p2Team: PokemonSet[],
-  gen = 9,
-  /** Bring-limited replays: bench options list only the brought species
-   *  (base-species match — actives reveal formes the preview does not).
-   *  Null (or an empty side) leaves the bench unfiltered. */
-  bringOnly?: { p1: string[]; p2: string[] } | null,
-): BranchSimState {
-  const build = (side: 'p1' | 'p2', team: PokemonSet[]) => {
-    const pokemon = snapshot[side].pokemon;
-    const actives = pokemon.filter(mon => mon.isActive && !mon.fainted);
-    const setFor = (mon: PokemonSnapshot) =>
-      team.find(set => set.species === mon.speciesForme || set.name === mon.name);
-    // A never-revealed bench mon (maxhp 0 on the percent scale) is a healthy
-    // switch option, not a missing one.
-    const benchPercent = (mon: PokemonSnapshot) =>
-      (mon.maxhp === 0 && !mon.fainted ? 100 : mon.hpPercent);
-    const broughtBases = (bringOnly?.[side] ?? []).map(name => speciesBaseId(name));
-    const inBring = (mon: PokemonSnapshot) =>
-      broughtBases.length === 0 || broughtBases.includes(speciesBaseId(mon.speciesForme));
-    const movesBySlot = actives.map((mon, index) => moveOptionsFor(mon, setFor(mon), index, gen));
-    const switchesBySlot = actives.map((_, activeSlot): BranchSwitchOption[] =>
-      pokemon
-        .filter(mon => !mon.isActive && !mon.fainted && benchPercent(mon) > 0 && inBring(mon))
-        .map((mon, index) => ({
-          name: mon.name,
-          species: mon.speciesForme,
-          activeSlot,
-          slot: index + 1,
-          hp: `${benchPercent(mon)}%`,
-          hpPercent: benchPercent(mon),
-          fainted: false,
-        })));
-    const activeSlots = actives.map((mon, index) => pokemonInfoFromSnapshot(mon, setFor(mon), index, gen));
-    const infos = pokemon.map(mon =>
-      pokemonInfoFromSnapshot(mon, setFor(mon), mon.isActive ? actives.indexOf(mon) : null, gen));
-    const modifiersBySlot = actives.map((_, index) => ({
-      teraType: null,
-      canMegaEvo: false,
-      canUltraBurst: false,
-      zMoves: (movesBySlot[index] ?? []).map(() => null),
-    }));
-    return { movesBySlot, switchesBySlot, activeSlots, infos, modifiersBySlot };
-  };
-  const p1 = build('p1', p1Team);
-  const p2 = build('p2', p2Team);
+interface SnapshotSideOptions {
+  movesBySlot: BranchMoveOption[][];
+  switchesBySlot: BranchSwitchOption[][];
+  activeSlots: SimPokemonInfo[];
+  infos: SimPokemonInfo[];
+  modifiersBySlot: BranchSlotModifiers[];
+}
+
+/** One side's approximate pickers: moves per active slot, the living bench, and the infos. */
+function snapshotSideOptions(
+  snapshot: TurnSnapshot, side: 'p1' | 'p2', team: PokemonSet[], gen: number,
+  bringOnly: { p1: string[]; p2: string[] } | null | undefined,
+): SnapshotSideOptions {
+  const pokemon = snapshot[side].pokemon;
+  const actives = pokemon.filter(mon => mon.isActive && !mon.fainted);
+  const setFor = (mon: PokemonSnapshot) =>
+    team.find(set => set.species === mon.speciesForme || set.name === mon.name);
+  // A never-revealed bench mon (maxhp 0 on the percent scale) is a healthy
+  // switch option, not a missing one.
+  const benchPercent = (mon: PokemonSnapshot) =>
+    (mon.maxhp === 0 && !mon.fainted ? 100 : mon.hpPercent);
+  const broughtBases = (bringOnly?.[side] ?? []).map(name => speciesBaseId(name));
+  const inBring = (mon: PokemonSnapshot) =>
+    broughtBases.length === 0 || broughtBases.includes(speciesBaseId(mon.speciesForme));
+  const movesBySlot = actives.map((mon, index) => moveOptionsFor(mon, setFor(mon), index, gen));
+  const switchesBySlot = actives.map((_, activeSlot): BranchSwitchOption[] =>
+    pokemon
+      .filter(mon => !mon.isActive && !mon.fainted && benchPercent(mon) > 0 && inBring(mon))
+      .map((mon, index) => ({
+        name: mon.name,
+        species: mon.speciesForme,
+        activeSlot,
+        slot: index + 1,
+        hp: `${benchPercent(mon)}%`,
+        hpPercent: benchPercent(mon),
+        fainted: false,
+      })));
+  const activeSlots = actives.map((mon, index) => pokemonInfoFromSnapshot(mon, setFor(mon), index, gen));
+  const infos = pokemon.map(mon =>
+    pokemonInfoFromSnapshot(mon, setFor(mon), mon.isActive ? actives.indexOf(mon) : null, gen));
+  const modifiersBySlot = actives.map((_, index) => ({
+    teraType: null,
+    canMegaEvo: false,
+    canUltraBurst: false,
+    zMoves: (movesBySlot[index] ?? []).map(() => null),
+  }));
+  return { movesBySlot, switchesBySlot, activeSlots, infos, modifiersBySlot };
+}
+
+/** The picker state around both sides' options: a waiting, un-ended position at the snapshot's turn. */
+function snapshotPickerState(snapshot: TurnSnapshot, p1: SnapshotSideOptions, p2: SnapshotSideOptions): BranchSimState {
   return {
     p1Moves: p1.movesBySlot[0] ?? [],
     p1MovesBySlot: p1.movesBySlot,
@@ -220,4 +223,19 @@ export function pickerStateFromSnapshot(
     p2Choice: null,
     p2Choices: [],
   };
+}
+
+export function pickerStateFromSnapshot(
+  snapshot: TurnSnapshot,
+  p1Team: PokemonSet[],
+  p2Team: PokemonSet[],
+  gen = 9,
+  /** Bring-limited replays: bench options list only the brought species
+   *  (base-species match — actives reveal formes the preview does not).
+   *  Null (or an empty side) leaves the bench unfiltered. */
+  bringOnly?: { p1: string[]; p2: string[] } | null,
+): BranchSimState {
+  const p1 = snapshotSideOptions(snapshot, 'p1', p1Team, gen, bringOnly);
+  const p2 = snapshotSideOptions(snapshot, 'p2', p2Team, gen, bringOnly);
+  return snapshotPickerState(snapshot, p1, p2);
 }
