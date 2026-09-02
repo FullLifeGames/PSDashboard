@@ -1,5 +1,6 @@
-import type { OpponentTeamInfo, PokemonEvs, RevealedPokemonInfo, StatId } from '../types';
+import type { OpponentTeamInfo, PokemonEvs, RevealedPokemonInfo } from '../types';
 import { itemSetValue } from './team-info';
+import { EV_STATS } from './team-editor';
 import { parsePastedTeam, type PastedSet } from './team-paste';
 
 /**
@@ -9,13 +10,8 @@ import { parsePastedTeam, type PastedSet } from './team-paste';
  * round-trips through parseSetsImport. Dependency-free like team-paste.
  */
 
-const STAT_LABELS: { id: StatId; label: string }[] = [
-  { id: 'hp', label: 'HP' }, { id: 'atk', label: 'Atk' }, { id: 'def', label: 'Def' },
-  { id: 'spa', label: 'SpA' }, { id: 'spd', label: 'SpD' }, { id: 'spe', label: 'Spe' },
-];
-
 function statLine(prefix: 'EVs' | 'IVs', values: PokemonEvs, defaultValue: number): string | null {
-  const parts = STAT_LABELS
+  const parts = EV_STATS
     .filter(stat => values[stat.id] !== defaultValue)
     .map(stat => `${values[stat.id]} ${stat.label}`);
   return parts.length > 0 ? `${prefix}: ${parts.join(' / ')}` : null;
