@@ -57,11 +57,23 @@ export function deserializeRepaired(serialized: string): Battle {
   // counter, so a wiped side played on behind a stale move request — or
   // isActive, so the bench enumeration offered "switch 1" onto the active.
   // Restore both from ground truth on every deserialize.
+  restoreSideInvariants(battle);
+  return battle;
+}
+
+/**
+ * Per-mon corrections change fainted/hp/actives without maintaining the
+ * side-level derived state the sim runs on: `pokemonLeft` is the WIN-CHECK
+ * counter (drifted high, a wiped side plays on behind a stale move request
+ * — GPL T38), and `isActive` drives bench enumeration (drifted false on
+ * the active, "switch 1" targeted the field — GPL T39). Recompute both
+ * from ground truth after every correction pass and every deserialize.
+ */
+export function restoreSideInvariants(battle: Battle): void {
   for (const side of battle.sides) {
     side.pokemonLeft = side.pokemon.filter(pokemon => !pokemon.fainted && pokemon.hp > 0).length;
     for (const pokemon of side.pokemon) {
       pokemon.isActive = side.active.includes(pokemon);
     }
   }
-  return battle;
 }

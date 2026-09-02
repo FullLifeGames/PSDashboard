@@ -149,19 +149,6 @@ function treeCellValue(root: Node, i: number, j: number): number {
   return (total + child.value) / (child.visits + 1);
 }
 
-/** Most-visited index (ties keep the lower index — the old rank order). */
-export function topVisitedIndex(n: number[]): number {
-  let best = -1;
-  let bestN = 0;
-  for (let index = 0; index < n.length; index++) {
-    if (n[index] > bestN) {
-      bestN = n[index];
-      best = index;
-    }
-  }
-  return best;
-}
-
 /** The tree-informed root matrix: cell values from the tree, ended flags from the expanded children. */
 export function treeMatrix(root: Node): { values: number[][]; ended: boolean[][] } {
   const values = root.p1Options.map((_, i) =>

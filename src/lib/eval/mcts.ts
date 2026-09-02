@@ -4,7 +4,8 @@ import { koOddsForOptions, planCellEvents } from './cell-blend';
 import { cellKey, rankFromMatrix, toResult as rankedToResult } from './rank';
 import { SEARCH_SEEDS } from './search';
 import { attachKoOdds, hasUnansweredContent, koOddsMapsFor } from './search/root-payload';
-import { makeNode, pick, principalVariation, topVisitedIndex, treeMatrix, type Node } from './search/mcts-node';
+import { topVisitedIndex } from './mcts-merge';
+import { makeNode, pick, principalVariation, treeMatrix, type Node } from './search/mcts-node';
 import type { EvalResult, EvalSettings, KoOddsInfo, MctsTreeStats, SearchProgress, TeraAllowance, UnansweredProfile } from './types';
 
 /**

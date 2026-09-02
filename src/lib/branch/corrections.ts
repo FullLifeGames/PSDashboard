@@ -2,6 +2,7 @@ import { Dex } from '@pkmn/sim';
 import type { PokemonSnapshot, TurnSnapshot } from '../../types';
 import { protocolChoiceLock, type ChoiceLockContext } from '../choice-lock';
 import { CHOICE_ITEMS } from '../eval/sensitivity';
+import { restoreSideInvariants } from '../eval/forward-model';
 import type { SimBattle, SimPokemon, SimSide } from './types';
 import { normalizeBattleOnlyFormeId } from './team-order';
 import { findFirstAvailableSwitchSlot, findPokemonOnSide, findSlotBySpecies } from './protocol-choices';
@@ -188,23 +189,6 @@ export function correctHpFromSnapshot(battle: SimBattle, snapshot: TurnSnapshot)
     }
   }
   restoreSideInvariants(battle);
-}
-
-/**
- * Per-mon corrections change fainted/hp/actives without maintaining the
- * side-level derived state the sim runs on: `pokemonLeft` is the WIN-CHECK
- * counter (drifted high, a wiped side plays on behind a stale move request
- * — GPL T38), and `isActive` drives bench enumeration (drifted false on
- * the active, "switch 1" targeted the field — GPL T39). Recompute both
- * from ground truth after every correction pass.
- */
-export function restoreSideInvariants(battle: SimBattle) {
-  for (const side of battle.sides) {
-    side.pokemonLeft = side.pokemon.filter(pokemon => !pokemon.fainted && pokemon.hp > 0).length;
-    for (const pokemon of side.pokemon) {
-      pokemon.isActive = side.active.includes(pokemon);
-    }
-  }
 }
 
 function snapshotConditionDuration(value: unknown): number | undefined {

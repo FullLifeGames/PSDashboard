@@ -119,26 +119,28 @@ function verifiedDiagnostics(verified: Map<number, EvalCellValue> | undefined): 
 function visitMeanScore(trees: MctsTreeStats[], base: MctsTreeStats): { score: number; interval: number } {
   const sum = (key: 'p1N' | 'p1W' | 'p2N' | 'p2W'): number[] =>
     base[key].map((_, index) => trees.reduce((total, tree) => total + (tree[key][index] ?? 0), 0));
-  const topVisited = (n: number[]): number => {
-    let best = -1;
-    let bestN = 0;
-    for (let index = 0; index < n.length; index++) {
-      if (n[index] > bestN) {
-        bestN = n[index];
-        best = index;
-      }
-    }
-    return best;
-  };
   const p1N = sum('p1N');
   const p1W = sum('p1W');
   const p2N = sum('p2N');
   const p2W = sum('p2W');
-  const i = topVisited(p1N);
-  const j = topVisited(p2N);
+  const i = topVisitedIndex(p1N);
+  const j = topVisitedIndex(p2N);
   const v1 = i >= 0 ? p1W[i] / p1N[i] : base.rootValue;
   const v2 = j >= 0 ? p2W[j] / p2N[j] : base.rootValue;
   return { score: (v1 + v2) / 2, interval: Math.abs(v2 - v1) };
+}
+
+/** Most-visited index (ties keep the lower index — the old rank order). */
+export function topVisitedIndex(n: number[]): number {
+  let best = -1;
+  let bestN = 0;
+  for (let index = 0; index < n.length; index++) {
+    if (n[index] > bestN) {
+      bestN = n[index];
+      best = index;
+    }
+  }
+  return best;
 }
 
 /** The follow-up line comes from a tree that agrees on the top choice. */
