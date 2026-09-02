@@ -46,21 +46,13 @@ export function buildTeamsFromReplay(
   const p1Info = options?.p1Info || inferOpponentTeam(log, 'p1');
   const p2Info = options?.p2Info || inferOpponentTeam(log, 'p2');
   const embeddedTeams = extractEmbeddedShowteamExports(log);
-
-  let userTeam: PokemonSet[] | null = null;
-  if (options?.userTeamText?.trim()) {
-    const imported = Teams.import(options.userTeamText);
-    if (imported && imported.length > 0) {
-      userTeam = imported;
-    }
-  }
+  const userTeam = importedUserTeam(options?.userTeamText);
 
   const p1KnownTeam = userTeam || embeddedTeams.p1 || null;
   const p2KnownTeam = embeddedTeams.p2 || null;
+  const { gen, formatHint } = formatHintFor(log);
   // Pokémon Champions uses its own EV system (32 per stat, 66 total) —
   // standard-scale guesses/fallbacks must be clamped to the format budget.
-  const gen = log.match(/^\|gen\|(\d)/m)?.[1] ?? '9';
-  const formatHint = /^\|tier\|.*champions/im.test(log) ? `gen${gen}champions` : `gen${gen}`;
   const champions = evBudget(formatHint).perStat !== 252;
   const legalize = (team: PokemonSet[]): PokemonSet[] =>
     (champions ? team.map(set => ({ ...set, evs: legalizeEvs(set.evs, formatHint) })) : team)
@@ -78,13 +70,45 @@ export function buildTeamsFromReplay(
       .map(built => withHiddenPowerType(built, hpFor('p2'), options?.usageStats, parseInt(gen, 10))),
   });
 
-  let inferred = options?.inferredSpreads;
-  if (!inferred && ((options?.observations?.length ?? 0) > 0 || (options?.speedOrders?.length ?? 0) > 0)) {
-    const base = build();
-    inferred = inferSpreads(options?.observations ?? [], { p1: base.p1Team, p2: base.p2Team },
-      formatHint, options?.speedOrders ?? []);
-  }
-  return build(inferred);
+  return build(inferredSpreadsFor(options, build, formatHint));
+}
+
+type BuildOptions = Parameters<typeof buildTeamsFromReplay>[1];
+
+/** A pasted user team, when the text parses to at least one set. */
+function importedUserTeam(userTeamText: string | undefined): PokemonSet[] | null {
+  if (!userTeamText?.trim()) return null;
+  const imported = Teams.import(userTeamText);
+  return imported && imported.length > 0 ? imported : null;
+}
+
+/** The generation digit and the format hint (Champions gets its own EV budget). */
+function formatHintFor(log: string): { gen: string; formatHint: string } {
+  const gen = log.match(/^\|gen\|(\d)/m)?.[1] ?? '9';
+  const formatHint = /^\|tier\|.*champions/im.test(log) ? `gen${gen}champions` : `gen${gen}`;
+  return { gen, formatHint };
+}
+
+function hasSpreadEvidence(options: BuildOptions): boolean {
+  return (options?.observations?.length ?? 0) > 0 || (options?.speedOrders?.length ?? 0) > 0;
+}
+
+/**
+ * Precomputed spreads win; otherwise raw observations solve against a base
+ * build (guesses first, then the solver, then the caller rebuilds with the
+ * overlay).
+ */
+function inferredSpreadsFor(
+  options: BuildOptions,
+  build: () => { p1Team: PokemonSet[]; p2Team: PokemonSet[] },
+  formatHint: string,
+): Map<string, SpreadCandidate> | undefined {
+  const inferred = options?.inferredSpreads;
+  if (inferred) return inferred;
+  if (!hasSpreadEvidence(options)) return undefined;
+  const base = build();
+  return inferSpreads(options?.observations ?? [], { p1: base.p1Team, p2: base.p2Team },
+    formatHint, options?.speedOrders ?? []);
 }
 
 /**
@@ -155,10 +179,31 @@ export function extractTeamSheets(log: string): { p1: PokemonSet[] | null; p2: P
   return extractEmbeddedShowteamExports(log);
 }
 
-function extractEmbeddedShowteamExports(log: string): { p1: PokemonSet[] | null; p2: PokemonSet[] | null } {
+type SideTeams = { p1: PokemonSet[] | null; p2: PokemonSet[] | null };
+
+/** A `/raw` chat line carrying a "View team" export: the poster's name and the parsed team. */
+function chatTeamExport(line: string): { poster: string; team: PokemonSet[] } | null {
+  const chatMatch = line.match(/^\|c\|([^|]+)\|\/raw\s+([\s\S]+)$/);
+  if (!chatMatch || !chatMatch[2].includes('<summary>View team</summary>')) return null;
+  const imported = Teams.import(showteamHtmlToText(chatMatch[2]));
+  if (!imported || imported.length === 0) return null;
+  return { poster: chatMatch[1], team: imported };
+}
+
+/** Sheets win over chat exports; unassigned chat exports fill the sides in posting order. */
+function mergeSheetSources(fromShowteam: SideTeams, fromChat: SideTeams, unassigned: PokemonSet[][]): SideTeams {
+  if (!fromChat.p1 && unassigned[0]) fromChat.p1 = unassigned[0];
+  if (!fromChat.p2 && unassigned[1]) fromChat.p2 = unassigned[1];
+  return {
+    p1: fromShowteam.p1 || fromChat.p1,
+    p2: fromShowteam.p2 || fromChat.p2,
+  };
+}
+
+function extractEmbeddedShowteamExports(log: string): SideTeams {
   const playerByName = new Map<string, 'p1' | 'p2'>();
-  const fromShowteam: { p1: PokemonSet[] | null; p2: PokemonSet[] | null } = { p1: null, p2: null };
-  const fromChat: { p1: PokemonSet[] | null; p2: PokemonSet[] | null } = { p1: null, p2: null };
+  const fromShowteam: SideTeams = { p1: null, p2: null };
+  const fromChat: SideTeams = { p1: null, p2: null };
   const unassigned: PokemonSet[][] = [];
 
   for (const rawLine of log.split('\n')) {
@@ -180,26 +225,17 @@ function extractEmbeddedShowteamExports(log: string): { p1: PokemonSet[] | null;
       continue;
     }
 
-    const chatMatch = line.match(/^\|c\|([^|]+)\|\/raw\s+([\s\S]+)$/);
-    if (!chatMatch || !chatMatch[2].includes('<summary>View team</summary>')) continue;
-
-    const imported = Teams.import(showteamHtmlToText(chatMatch[2]));
-    if (!imported || imported.length === 0) continue;
-
-    const side = playerByName.get(toId(chatMatch[1]));
+    const chat = chatTeamExport(line);
+    if (!chat) continue;
+    const side = playerByName.get(toId(chat.poster));
     if (side) {
-      fromChat[side] = imported;
+      fromChat[side] = chat.team;
     } else {
-      unassigned.push(imported);
+      unassigned.push(chat.team);
     }
   }
 
-  if (!fromChat.p1 && unassigned[0]) fromChat.p1 = unassigned[0];
-  if (!fromChat.p2 && unassigned[1]) fromChat.p2 = unassigned[1];
-  return {
-    p1: fromShowteam.p1 || fromChat.p1,
-    p2: fromShowteam.p2 || fromChat.p2,
-  };
+  return mergeSheetSources(fromShowteam, fromChat, unassigned);
 }
 
 function showteamHtmlToText(html: string): string {
