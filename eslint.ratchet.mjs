@@ -701,22 +701,6 @@ export const ratchetOverrides = [
   },
   {
     "files": [
-      "src/lib/replay-html.ts"
-    ],
-    "rules": {
-      "max-lines-per-function": [
-        "error",
-        {
-          "max": 230,
-          "skipBlankLines": true,
-          "skipComments": true,
-          "IIFEs": true
-        }
-      ]
-    }
-  },
-  {
-    "files": [
       "src/lib/set-coherence.ts"
     ],
     "rules": {
@@ -750,64 +734,12 @@ export const ratchetOverrides = [
   },
   {
     "files": [
-      "src/lib/smogon-stats.ts"
-    ],
-    "rules": {
-      "max-lines": [
-        "error",
-        {
-          "max": 370,
-          "skipBlankLines": true,
-          "skipComments": true
-        }
-      ]
-    }
-  },
-  {
-    "files": [
-      "src/lib/spread-inference.ts"
-    ],
-    "rules": {
-      "max-lines": [
-        "error",
-        {
-          "max": 320,
-          "skipBlankLines": true,
-          "skipComments": true
-        }
-      ],
-      "max-lines-per-function": [
-        "error",
-        {
-          "max": 200,
-          "skipBlankLines": true,
-          "skipComments": true,
-          "IIFEs": true
-        }
-      ],
-      "complexity": [
-        "error",
-        24
-      ]
-    }
-  },
-  {
-    "files": [
       "src/lib/team-builder.ts"
     ],
     "rules": {
-      "max-lines-per-function": [
-        "error",
-        {
-          "max": 110,
-          "skipBlankLines": true,
-          "skipComments": true,
-          "IIFEs": true
-        }
-      ],
       "complexity": [
         "error",
-        103
+        30
       ]
     }
   },
