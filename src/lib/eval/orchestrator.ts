@@ -48,7 +48,12 @@ function cellJobs(p1: EvalChoiceOption[], p2: EvalChoiceOption[], samples: numbe
   return jobs;
 }
 
-/** Writes the executor's cell values into the matrix, collecting the blends and the diagnostics. */
+/**
+ * Writes the executor's cell values into the matrix, collecting the blends
+ * and the diagnostics. The executor returns chunks in completion order, so
+ * the diagnostics are sorted by cell: the values are index-addressed and
+ * the blends are looked up by key, but the diagnostic list is read as is.
+ */
 function collectCells(
   cellValues: CellValue[],
   matrix: ValueMatrix,
@@ -61,6 +66,7 @@ function collectCells(
     if (cell.blend) blends.set(cellKey(cell.i, cell.j), cell.blend);
     if (cell.diagnostic) diagnostics.push(cell.diagnostic);
   }
+  diagnostics.sort((a, b) => a.i - b.i || a.j - b.j);
 }
 
 /**
