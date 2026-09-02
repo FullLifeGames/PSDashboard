@@ -29,6 +29,34 @@ interface SheetPokemon {
  * NICKNAME|SPECIES|ITEM|ABILITY|MOVES|NATURE|EVS|GENDER|IVS|SHINY|LEVEL|MISC
  * where MISC = HAPPINESS,HPTYPE,POKEBALL,GMAX,DMAXLEVEL,TERATYPE.
  */
+/** The packed entry's trailing fields: tera type from MISC, level, gender. */
+function sheetEntryDetails(fields: string[]): Pick<SheetPokemon, 'teraType' | 'level' | 'gender'> {
+  const misc = (fields[11] ?? '').split(',');
+  return {
+    teraType: misc[5]?.trim() ?? '',
+    level: parseInt(fields[10] ?? '', 10) || 100,
+    gender: fields[7] === 'M' || fields[7] === 'F' ? fields[7] : '',
+  };
+}
+
+/** One packed sheet entry; null when it names no species. */
+function sheetEntry(entry: string): SheetPokemon | null {
+  const fields = entry.split('|');
+  const nickname = fields[0]?.trim() ?? '';
+  const species = (fields[1]?.trim() || nickname);
+  if (!species) return null;
+  return {
+    species: splitPackedName(species),
+    item: splitPackedName(fields[2] ?? ''),
+    ability: splitPackedName(fields[3] ?? ''),
+    moves: (fields[4] ?? '')
+      .split(',')
+      .map(move => splitPackedName(move))
+      .filter(Boolean),
+    ...sheetEntryDetails(fields),
+  };
+}
+
 export function parseShowteamSheet(log: string, side: 'p1' | 'p2'): SheetPokemon[] | null {
   const prefix = `|showteam|${side}|`;
   const line = log.split('\n')
@@ -40,24 +68,8 @@ export function parseShowteamSheet(log: string, side: 'p1' | 'p2'): SheetPokemon
   const pokemon: SheetPokemon[] = [];
 
   for (const entry of entries) {
-    const fields = entry.split('|');
-    const nickname = fields[0]?.trim() ?? '';
-    const species = (fields[1]?.trim() || nickname);
-    if (!species) continue;
-    const misc = (fields[11] ?? '').split(',');
-
-    pokemon.push({
-      species: splitPackedName(species),
-      item: splitPackedName(fields[2] ?? ''),
-      ability: splitPackedName(fields[3] ?? ''),
-      moves: (fields[4] ?? '')
-        .split(',')
-        .map(move => splitPackedName(move))
-        .filter(Boolean),
-      teraType: misc[5]?.trim() ?? '',
-      level: parseInt(fields[10] ?? '', 10) || 100,
-      gender: fields[7] === 'M' || fields[7] === 'F' ? fields[7] : '',
-    });
+    const parsed = sheetEntry(entry);
+    if (parsed) pokemon.push(parsed);
   }
 
   return pokemon.length > 0 ? pokemon : null;
@@ -165,13 +177,18 @@ function inferBootsFromHazards(
     if (tookRockDamageOnEntry(lines, index, nickname)) continue;
 
     const pokemon = findPokemonByNickname(pokemonMap, nickname, lines, side);
-    if (!pokemon) continue;
-    if (pokemon.item.value && pokemon.item.value !== '(has item)') continue;
-    if (toId(pokemon.ability.value) === 'magicguard') continue;
-    // A rocks chip elsewhere in the game disproves Boots outright.
-    if (pokemon.ruledOut?.items.includes('heavydutyboots')) continue;
+    if (!pokemon || !canGuessBoots(pokemon)) continue;
     pokemon.item = guessedField('Heavy-Duty Boots', undefined, 'No Stealth Rock damage on switch-in');
   }
+}
+
+/** Boots stay a guess only while nothing known about the holder rules them out. */
+function canGuessBoots(pokemon: RevealedPokemonInfo): boolean {
+  if (pokemon.item.value && pokemon.item.value !== '(has item)') return false;
+  if (toId(pokemon.ability.value) === 'magicguard') return false;
+  // A rocks chip elsewhere in the game disproves Boots outright.
+  if (pokemon.ruledOut?.items.includes('heavydutyboots')) return false;
+  return true;
 }
 
 /** Entry-hazard damage resolves before the next action — scan until then. */
