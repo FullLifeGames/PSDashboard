@@ -1,6 +1,6 @@
 import { playedSetupMove, type SideAnalysis, type TurnAnalysis, type VerdictTier } from './analysis';
 import { KEY_TURN_SWING } from './graph';
-import { koPhrase, labelPhrase } from './summary';
+import { koPhrase, labelPhrase } from './prose/phrases';
 import { winDeltaText, winPercent } from './winprob';
 
 /**
@@ -79,6 +79,9 @@ export interface GameReport {
   summary: string;
 }
 
+type Winner = 'p1' | 'p2' | null;
+type Side = 'p1' | 'p2';
+
 /**
  * Score series by turn: s[t] = score at the start of turn t, plus one final
  * entry after the last analyzed turn. Unknown turns stay undefined.
@@ -155,46 +158,48 @@ function favorBoundary(series: (number | undefined)[], winner: 'p1' | 'p2'): num
   return earliest;
 }
 
-export function buildGameReport(
-  analyses: (TurnAnalysis | null)[],
-  playerNames: [string, string],
-  winner: 'p1' | 'p2' | null,
-  /** False = played actions unavailable (doubles): no seeds, no clean-play claim. */
-  playedTracking = true,
-): GameReport {
-  const known = analyses.filter((entry): entry is TurnAnalysis => entry !== null);
-
-  const series = scoreSeries(analyses);
-  const boundary = winner ? favorBoundary(series, winner) : null;
-  // Chance booked inside the decided region TOWARD the winner is the game
-  // resolving: past the favor boundary the static bar underprices a locked
-  // endgame, so its terminal convergence "surprises" the model by the
-  // horizon gap (573756 t138: chanceDelta −1.02 on the final KO of a game
-  // decided at t71). Those turns leave the key moments and the luck ledger;
-  // chance AGAINST the winner stays genuine luck wherever it lands.
+/**
+ * Chance booked inside the decided region TOWARD the winner is the game
+ * resolving: past the favor boundary the static bar underprices a locked
+ * endgame, so its terminal convergence "surprises" the model by the
+ * horizon gap (573756 t138: chanceDelta −1.02 on the final KO of a game
+ * decided at t71). Those turns leave the key moments and the luck ledger;
+ * chance AGAINST the winner stays genuine luck wherever it lands.
+ */
+function resolutionTurns(known: TurnAnalysis[], boundary: number | null, winner: Winner): Set<number> {
   const towardWinner = (delta: number) => (winner === 'p1' ? delta > 0 : delta < 0);
-  const resolution = new Set(boundary === null ? [] : known
+  return new Set(boundary === null ? [] : known
     .filter(analysis => analysis.turn >= boundary && analysis.attribution === 'chance' &&
       analysis.chanceDelta !== null && towardWinner(analysis.chanceDelta))
     .map(analysis => analysis.turn));
+}
 
-  // A turn ranks by its biggest COMPONENT, not its net: the game's biggest
-  // roll can net to almost nothing when the decision delta pushes the other
-  // way (573756 t73: chance +0.43 on a net of +0.18), and a selection keyed
-  // on the net alone never surfaces it. Resolution turns stay excluded.
-  const momentScore = (analysis: TurnAnalysis): number =>
-    Math.max(Math.abs(analysis.swing ?? 0), Math.abs(analysis.chanceDelta ?? 0));
-  const keyMoments = known
+/**
+ * A turn ranks by its biggest COMPONENT, not its net: the game's biggest
+ * roll can net to almost nothing when the decision delta pushes the other
+ * way (573756 t73: chance +0.43 on a net of +0.18), and a selection keyed
+ * on the net alone never surfaces it. Resolution turns stay excluded.
+ */
+const momentScore = (analysis: TurnAnalysis): number =>
+  Math.max(Math.abs(analysis.swing ?? 0), Math.abs(analysis.chanceDelta ?? 0));
+
+function keyMomentsFor(known: TurnAnalysis[], resolution: Set<number>): TurnAnalysis[] {
+  return known
     .filter(analysis => analysis.attribution !== 'quiet' && analysis.swing !== null &&
       momentScore(analysis) >= KEY_MOMENT_SWING && !resolution.has(analysis.turn))
     .sort((a, b) => momentScore(b) - momentScore(a))
     .slice(0, REPORT_KEY_MOMENTS)
     .sort((a, b) => a.turn - b.turn);
+}
 
-  // Selected PER SIDE — a global top list lets one player's numbers (often
-  // a winner's unpunished risks) crowd the other's out entirely.
-  const badTier = (side: SideAnalysis) => side.tier === 'mistake' || side.tier === 'blunder';
-  const misplaysFor = (side: 'p1' | 'p2'): GameMisplay[] => known
+const badTier = (side: SideAnalysis) => side.tier === 'mistake' || side.tier === 'blunder';
+
+/**
+ * Selected PER SIDE — a global top list lets one player's numbers (often
+ * a winner's unpunished risks) crowd the other's out entirely.
+ */
+function misplaysFor(known: TurnAnalysis[], side: Side): GameMisplay[] {
+  return known
     .filter(analysis => badTier(analysis[side]) &&
       analysis[side].played && analysis[side].best && !analysis[side].riskPaidOff)
     .map(analysis => ({
@@ -211,10 +216,10 @@ export function buildGameReport(
     }))
     .sort((a, b) => b.regret - a.regret)
     .slice(0, REPORT_MISPLAYS_PER_SIDE);
-  const misplays = !playedTracking ? [] : [...misplaysFor('p1'), ...misplaysFor('p2')]
-    .sort((a, b) => a.turn - b.turn || a.side.localeCompare(b.side));
+}
 
-  const readsFor = (side: 'p1' | 'p2'): GameRead[] => known
+function readsFor(known: TurnAnalysis[], side: Side): GameRead[] {
+  return known
     .filter(analysis => analysis[side].riskPaidOff && analysis[side].played)
     .map(analysis => ({
       turn: analysis.turn,
@@ -224,11 +229,16 @@ export function buildGameReport(
     }))
     .sort((a, b) => b.payoff - a.payoff)
     .slice(0, REPORT_READS_PER_SIDE);
-  const reads = !playedTracking ? [] : [...readsFor('p1'), ...readsFor('p2')]
-    .sort((a, b) => a.turn - b.turn || a.side.localeCompare(b.side));
+}
 
-  // Paid-off reads are not decision errors — they stay out of the totals.
-  const regretOf = (side: SideAnalysis) => (side.riskPaidOff ? 0 : side.regret ?? 0);
+/** Paid-off reads are not decision errors — they stay out of the totals. */
+const regretOf = (side: SideAnalysis) => (side.riskPaidOff ? 0 : side.regret ?? 0);
+
+/** Summed regret per player, the net chance outside the resolution turns, and the resolution itself. */
+function gameTotals(
+  known: TurnAnalysis[],
+  resolution: Set<number>,
+): { decisionTotals: { p1: number; p2: number }; chanceTotal: number; resolutionTotal: number } {
   const decisionTotals = {
     p1: known.reduce((sum, analysis) => sum + regretOf(analysis.p1), 0),
     p2: known.reduce((sum, analysis) => sum + regretOf(analysis.p2), 0),
@@ -237,46 +247,74 @@ export function buildGameReport(
     sum + (resolution.has(analysis.turn) ? 0 : analysis.chanceDelta ?? 0), 0);
   const resolutionTotal = known.reduce((sum, analysis) =>
     sum + (resolution.has(analysis.turn) ? analysis.chanceDelta ?? 0 : 0), 0);
+  return { decisionTotals, chanceTotal, resolutionTotal };
+}
 
-  const accuracy = playedTracking
-    ? { p1: accuracyFor(known, 'p1', series), p2: accuracyFor(known, 'p2', series) }
-    : { p1: null, p2: null };
+/**
+ * The loser's two biggest punished misplays up to the turning point. An
+ * unpunished risk cost nothing — it cannot have seeded the loss; a
+ * deliberate low-cost sack likewise.
+ */
+function seedsOfTheLoss(known: TurnAnalysis[], loser: Side, turningPoint: number | null): TurnAnalysis[] {
+  return known
+    .filter(analysis => (turningPoint === null || analysis.turn <= turningPoint) &&
+      badTier(analysis[loser]) && analysis[loser].played && analysis[loser].best &&
+      !analysis[loser].riskUnpunished && !analysis[loser].sacrifice)
+    .sort((a, b) => (b[loser].regret ?? 0) - (a[loser].regret ?? 0))
+    .slice(0, 2)
+    .sort((a, b) => a.turn - b.turn);
+}
 
-  // The play that produced the boundary score happened on the turn before.
-  const turningPoint = boundary !== null && boundary > 1 ? boundary - 1 : null;
+/** One seed, as "turn N (played, regret — safer was better)"; the played move's analytic odds ground the claim (round 6). */
+function seedPhrase(analysis: TurnAnalysis, loser: Side): string {
+  const side = analysis[loser];
+  const setup = playedSetupMove(side) ? '; a setup move the engine may undervalue' : '';
+  const better = side.bestNull?.alternative?.label ?? side.best!.label;
+  const oddsBit = side.played!.koOdds ? ` (${koPhrase(side.played!.koOdds)})` : '';
+  return `turn ${analysis.turn} (${labelPhrase(side.played!.label)}${oddsBit}, ` +
+    `${winDeltaText(-(side.regret ?? 0))} — safer was ${labelPhrase(better)}${setup})`;
+}
 
+/** The winner's story: who won, when it tipped, and the seeds of the loss (or the loser's clean play). */
+function winnerSentences(
+  known: TurnAnalysis[],
+  playerNames: [string, string],
+  winner: Side,
+  turningPoint: number | null,
+  playedTracking: boolean,
+  decisionTotals: { p1: number; p2: number },
+): string[] {
+  const sentences: string[] = [];
+  sentences.push(`${playerNames[winner === 'p1' ? 0 : 1]} won.`);
+  sentences.push(turningPoint !== null
+    ? `The game tipped for good on turn ${turningPoint}.`
+    : `${playerNames[winner === 'p1' ? 0 : 1]} led from start to finish.`);
+
+  const loser = winner === 'p1' ? 'p2' : 'p1';
+  const loserName = playerNames[loser === 'p1' ? 0 : 1];
+  const seeds = !playedTracking ? [] : seedsOfTheLoss(known, loser, turningPoint);
+  if (seeds.length > 0) {
+    const parts = seeds.map(analysis => seedPhrase(analysis, loser));
+    sentences.push(`The seeds of the loss: ${parts.join(' and ')}.`);
+  } else if (playedTracking && decisionTotals[loser] < CLEAN_PLAY_TOTAL) {
+    sentences.push(`${loserName}'s play was clean — the loss came from matchup and variance, not blunders.`);
+  }
+  return sentences;
+}
+
+/** The report's prose: the winner's story (or the unfinished note), then the luck line. */
+function reportSummary(
+  known: TurnAnalysis[],
+  playerNames: [string, string],
+  winner: Winner,
+  turningPoint: number | null,
+  playedTracking: boolean,
+  decisionTotals: { p1: number; p2: number },
+  chanceTotal: number,
+): string {
   const sentences: string[] = [];
   if (winner) {
-    sentences.push(`${playerNames[winner === 'p1' ? 0 : 1]} won.`);
-    sentences.push(turningPoint !== null
-      ? `The game tipped for good on turn ${turningPoint}.`
-      : `${playerNames[winner === 'p1' ? 0 : 1]} led from start to finish.`);
-
-    const loser = winner === 'p1' ? 'p2' : 'p1';
-    const loserName = playerNames[loser === 'p1' ? 0 : 1];
-    const seeds = !playedTracking ? [] : known
-      .filter(analysis => (turningPoint === null || analysis.turn <= turningPoint) &&
-        badTier(analysis[loser]) && analysis[loser].played && analysis[loser].best &&
-        // An unpunished risk cost nothing — it cannot have seeded the loss;
-        // a deliberate low-cost sack likewise.
-        !analysis[loser].riskUnpunished && !analysis[loser].sacrifice)
-      .sort((a, b) => (b[loser].regret ?? 0) - (a[loser].regret ?? 0))
-      .slice(0, 2)
-      .sort((a, b) => a.turn - b.turn);
-    if (seeds.length > 0) {
-      const parts = seeds.map(analysis => {
-        const side = analysis[loser];
-        const setup = playedSetupMove(side) ? '; a setup move the engine may undervalue' : '';
-        const better = side.bestNull?.alternative?.label ?? side.best!.label;
-        // Round 6: the played move's analytic odds ground the claim.
-        const oddsBit = side.played!.koOdds ? ` (${koPhrase(side.played!.koOdds)})` : '';
-        return `turn ${analysis.turn} (${labelPhrase(side.played!.label)}${oddsBit}, ` +
-          `${winDeltaText(-(side.regret ?? 0))} — safer was ${labelPhrase(better)}${setup})`;
-      });
-      sentences.push(`The seeds of the loss: ${parts.join(' and ')}.`);
-    } else if (playedTracking && decisionTotals[loser] < CLEAN_PLAY_TOTAL) {
-      sentences.push(`${loserName}'s play was clean — the loss came from matchup and variance, not blunders.`);
-    }
+    sentences.push(...winnerSentences(known, playerNames, winner, turningPoint, playedTracking, decisionTotals));
   } else if (known.length > 0) {
     sentences.push('No winner recorded — the game may be unfinished.');
   }
@@ -284,9 +322,38 @@ export function buildGameReport(
   if (Math.abs(chanceTotal) >= 0.25) {
     sentences.push(`Luck ran ${chanceTotal > 0 ? 'for' : 'against'} ${playerNames[0]} overall (${winDeltaText(chanceTotal)}).`);
   }
+  return sentences.join(' ');
+}
+
+export function buildGameReport(
+  analyses: (TurnAnalysis | null)[],
+  playerNames: [string, string],
+  winner: 'p1' | 'p2' | null,
+  /** False = played actions unavailable (doubles): no seeds, no clean-play claim. */
+  playedTracking = true,
+): GameReport {
+  const known = analyses.filter((entry): entry is TurnAnalysis => entry !== null);
+
+  const series = scoreSeries(analyses);
+  const boundary = winner ? favorBoundary(series, winner) : null;
+  const resolution = resolutionTurns(known, boundary, winner);
+  const keyMoments = keyMomentsFor(known, resolution);
+  const misplays = !playedTracking ? [] : [...misplaysFor(known, 'p1'), ...misplaysFor(known, 'p2')]
+    .sort((a, b) => a.turn - b.turn || a.side.localeCompare(b.side));
+  const reads = !playedTracking ? [] : [...readsFor(known, 'p1'), ...readsFor(known, 'p2')]
+    .sort((a, b) => a.turn - b.turn || a.side.localeCompare(b.side));
+  const { decisionTotals, chanceTotal, resolutionTotal } = gameTotals(known, resolution);
+
+  const accuracy = playedTracking
+    ? { p1: accuracyFor(known, 'p1', series), p2: accuracyFor(known, 'p2', series) }
+    : { p1: null, p2: null };
+
+  // The play that produced the boundary score happened on the turn before.
+  const turningPoint = boundary !== null && boundary > 1 ? boundary - 1 : null;
+  const summary = reportSummary(known, playerNames, winner, turningPoint, playedTracking, decisionTotals, chanceTotal);
 
   return {
     winner, turningPoint, keyMoments, misplays, reads, tracked: playedTracking,
-    accuracy, decisionTotals, chanceTotal, resolutionTotal, summary: sentences.join(' '),
+    accuracy, decisionTotals, chanceTotal, resolutionTotal, summary,
   };
 }
