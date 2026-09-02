@@ -1,7 +1,7 @@
 import { Dex } from '@pkmn/sim';
 import type { PokemonIdent, SimBattle, SimPokemon, SimSide, TurnBlock } from './types';
 import { formatTargetLoc, normalizeBattleOnlyFormeId, slotLetter } from './team-order';
-import { toId } from '../ids';
+import { sideIndex, toId } from '../ids';
 
 export function parseTurnBlocks(log: string): { preGame: string[]; turns: TurnBlock[] } {
   const lines = log.split('\n');
@@ -107,7 +107,7 @@ export function protocolTargetLoc(
   const match = targetIdent?.match(/^(p[12])([a-d]):/);
   if (!match) return 0;
 
-  const sourceSideIdx = sourceSide === 'p1' ? 0 : 1;
+  const sourceSideIdx = sideIndex(sourceSide);
   const targetSideIdx = match[1] === 'p1' ? 0 : 1;
   const targetActiveSlot = match[2].charCodeAt(0) - 'a'.charCodeAt(0);
   const source = battle.sides[sourceSideIdx].active[sourceActiveSlot];
@@ -211,7 +211,7 @@ export function getChoiceForSlot(
   activeSlot: number,
   battle: SimBattle,
 ): string {
-  const sideIdx = side === 'p1' ? 0 : 1;
+  const sideIdx = sideIndex(side);
   const ident = `${side}${slotLetter(activeSlot)}:`;
 
   for (const line of events) {
@@ -254,7 +254,7 @@ export function getChoiceForSlot(
 }
 
 export function getMainChoice(events: string[], side: 'p1' | 'p2', battle: SimBattle): string {
-  const sideIdx = side === 'p1' ? 0 : 1;
+  const sideIdx = sideIndex(side);
   const actives = battle.sides[sideIdx].active;
   const choices = actives.map((_, activeSlot) => getChoiceForSlot(events, side, activeSlot, battle));
   return choices.length > 0 ? choices.join(', ') : 'move 1';

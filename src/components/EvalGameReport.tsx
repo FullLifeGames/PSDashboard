@@ -3,6 +3,7 @@ import type { LeadAnalysis } from '../lib/eval/leads';
 import type { TurnEvalSettings } from '../hooks/useEvaluation';
 import { winDeltaText } from '../lib/eval/winprob';
 import { attributionBadge } from './eval-badges';
+import { sideIndex } from '../lib/ids';
 
 interface EvalGameReportProps {
   report: GameReport;
@@ -68,7 +69,7 @@ function LeadChips({ leads, playerNames, onSelectTurn }: { leads: LeadAnalysis; 
             title="Jump to the team-preview analysis"
           >
             <span style={{ color: '#cde' }}>T0</span>
-            <span style={{ color: tone }}>{playerNames[side === 'p1' ? 0 : 1]}</span>
+            <span style={{ color: tone }}>{playerNames[sideIndex(side)]}</span>
             <span style={{ color: '#aab' }}>led {lead.played ? strip(lead.played.label) : '?'}</span>
             <span style={{ color: '#778' }}>better: {lead.best ? strip(lead.best.label) : '?'}</span>
             <span style={{ color: tone }}>{winDeltaText(-(lead.regret ?? 0))}</span>
@@ -98,7 +99,7 @@ function MisplayChip({ misplay, playerNames, onSelectTurn, settingsFor }: {
     >
       <span style={{ color: '#cde' }}>T{misplay.turn}</span>
       <SettingsBadge turn={misplay.turn} settingsFor={settingsFor} />
-      <span style={{ color: tone }}>{playerNames[misplay.side === 'p1' ? 0 : 1]}</span>
+      <span style={{ color: tone }}>{playerNames[sideIndex(misplay.side)]}</span>
       <span style={{ color: '#aab' }}>{misplay.played}</span>
       {misplay.sacrifice
         ? <span style={{ color: tone }}>sack</span>
@@ -125,7 +126,7 @@ function MisplayChips({ report, playerNames, onSelectTurn, settingsFor }: EvalGa
         .filter(side => !report.misplays.some(misplay => misplay.side === side))
         .map(side => (
           <span key={side} style={{ color: '#778', fontSize: 10, alignSelf: 'center' }}>
-            {playerNames[side === 'p1' ? 0 : 1]}: no clear misplays
+            {playerNames[sideIndex(side)]}: no clear misplays
           </span>
         ))}
     </div>
@@ -146,7 +147,7 @@ function ReadChips({ report, playerNames, onSelectTurn, settingsFor }: EvalGameR
         >
           <span style={{ color: '#cde' }}>T{read.turn}</span>
           <SettingsBadge turn={read.turn} settingsFor={settingsFor} />
-          <span style={{ color: '#8c8' }}>{playerNames[read.side === 'p1' ? 0 : 1]}</span>
+          <span style={{ color: '#8c8' }}>{playerNames[sideIndex(read.side)]}</span>
           <span style={{ color: '#aab' }}>{read.played}</span>
           <span style={{ color: '#8c8' }}>read paid off {winDeltaText(read.payoff)}</span>
         </button>

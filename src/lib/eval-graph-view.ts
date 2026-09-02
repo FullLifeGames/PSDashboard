@@ -1,6 +1,7 @@
 import { computeBlunders } from './eval/graph';
 import { winPercent } from './eval/winprob';
 import type { LeadAnalysis } from './eval/leads';
+import { sideIndex } from './ids';
 
 export const GRAPH_HEIGHT = 72;
 export const GRAPH_PAD_X = 6;
@@ -166,7 +167,7 @@ export function leadTooltip(playerNames: [string, string], leadScore: number, le
   for (const side of ['p1', 'p2'] as const) {
     const detail = leadDetail?.[side];
     if (!detail?.best) continue;
-    const name = playerNames[side === 'p1' ? 0 : 1];
+    const name = playerNames[sideIndex(side)];
     const best = stripLead(detail.best.label);
     const played = detail.played ? stripLead(detail.played.label) : null;
     lines.push(played === best

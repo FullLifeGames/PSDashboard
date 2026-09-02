@@ -2,6 +2,7 @@ import { playedSetupMove, type SideAnalysis, type TurnAnalysis, type VerdictTier
 import { KEY_TURN_SWING } from './graph';
 import { koPhrase, labelPhrase } from './prose/phrases';
 import { winDeltaText, winPercent } from './winprob';
+import { sideIndex } from '../ids';
 
 /**
  * Multi-turn root-cause analysis over a completed graph sweep: where the
@@ -285,13 +286,13 @@ function winnerSentences(
   decisionTotals: { p1: number; p2: number },
 ): string[] {
   const sentences: string[] = [];
-  sentences.push(`${playerNames[winner === 'p1' ? 0 : 1]} won.`);
+  sentences.push(`${playerNames[sideIndex(winner)]} won.`);
   sentences.push(turningPoint !== null
     ? `The game tipped for good on turn ${turningPoint}.`
-    : `${playerNames[winner === 'p1' ? 0 : 1]} led from start to finish.`);
+    : `${playerNames[sideIndex(winner)]} led from start to finish.`);
 
   const loser = winner === 'p1' ? 'p2' : 'p1';
-  const loserName = playerNames[loser === 'p1' ? 0 : 1];
+  const loserName = playerNames[sideIndex(loser)];
   const seeds = !playedTracking ? [] : seedsOfTheLoss(known, loser, turningPoint);
   if (seeds.length > 0) {
     const parts = seeds.map(analysis => seedPhrase(analysis, loser));

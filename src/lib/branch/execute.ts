@@ -2,7 +2,7 @@ import type { BranchSlotChoice } from '../branch-choices';
 import type { BranchChoiceErrorLog, BranchExecuteResult, BranchRuntime, SimBattle, SimPokemon } from './types';
 import { normalizeBattleOnlyFormeId, slotLetter } from './team-order';
 import { targetLocSuffixForChoice } from './protocol-choices';
-import { toId } from '../ids';
+import { sideIndex, toId } from '../ids';
 
 export function sleep(ms: number) {
   return new Promise(resolve => setTimeout(resolve, ms));
@@ -36,7 +36,7 @@ function resolveMoveSlotChoice(
   activeSlot: number,
   choice: Extract<BranchSlotChoice, { kind: 'move' }>,
 ): ResolvedSideCommand {
-  const sideIdx = side === 'p1' ? 0 : 1;
+  const sideIdx = sideIndex(side);
   const active = battle.sides[sideIdx].active[activeSlot];
   if (!active || active.fainted) {
     return { ok: false, error: `No active Pokémon in ${side.toUpperCase()}${slotLetter(activeSlot).toUpperCase()} can use ${choice.moveName}.` };
@@ -63,7 +63,7 @@ function resolveSwitchSlotChoice(
   side: 'p1' | 'p2',
   choice: Extract<BranchSlotChoice, { kind: 'switch' }>,
 ): ResolvedSideCommand {
-  const sideIdx = side === 'p1' ? 0 : 1;
+  const sideIdx = sideIndex(side);
   const bench = battle.sides[sideIdx].pokemon;
   const nameId = toId(choice.pokemonName);
 

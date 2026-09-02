@@ -6,7 +6,7 @@ import { restoreSideInvariants } from '../eval/forward-model';
 import type { SimBattle, SimPokemon, SimSide } from './types';
 import { normalizeBattleOnlyFormeId } from './team-order';
 import { findFirstAvailableSwitchSlot, findPokemonOnSide, findSlotBySpecies } from './protocol-choices';
-import { toId } from '../ids';
+import { sideIndex, toId } from '../ids';
 
 export function repointActiveSlot(side: SimSide, activeSlot: number, target: SimPokemon): boolean {
   if (side.active[activeSlot] === target) return false;
@@ -82,7 +82,7 @@ export function restampProtocolLocks(battle: SimBattle, context: ChoiceLockConte
   for (const sideId of ['p1', 'p2'] as const) {
     const lock = protocolChoiceLock(context.trails, sideId, turn);
     if (!lock) continue;
-    const side = battle.sides[sideId === 'p1' ? 0 : 1];
+    const side = battle.sides[sideIndex(sideId)];
     // Singles only — the trail tracker follows one active per side.
     if (side.active.length !== 1) continue;
     const active = side.active[0];

@@ -4,6 +4,7 @@ import { findConsistentOptions, findPlayedOption } from '../analysis';
 import type { PlayedAction } from '../played';
 import type { TeraAllowance } from '../types';
 import { combinedOptionHints, isCombined, singlesOptionHints } from './hints';
+import { sideIndex } from '../../ids';
 
 /**
  * The engine's option lists: legal choices with guaranteed no-ops dropped,
@@ -138,7 +139,7 @@ function dropNoopMoves(
   options: ChoiceOption[],
   sleepClause?: boolean,
 ): ChoiceOption[] {
-  const own = battle.sides[side === 'p1' ? 0 : 1];
+  const own = battle.sides[sideIndex(side)];
   const foe = battle.sides[side === 'p1' ? 1 : 0];
   const foeSleeps = sleepClauseActive(battle, sleepClause) &&
     foe.pokemon.some(pokemon => !pokemon.fainted && pokemon.status === 'slp');
@@ -188,7 +189,7 @@ export function expandPivotPairs(position: SimPosition, side: 'p1' | 'p2', optio
   if (isCombined(options)) return options;
   if (!options.some(option => PIVOT_MOVE_IDS.has(option.choice.split(' ')[1]))) return options;
   const battle = positionBattle(position);
-  const sideState = battle.sides[side === 'p1' ? 0 : 1];
+  const sideState = battle.sides[sideIndex(side)];
   const bench = sideState.pokemon
     .map((pokemon, index) => ({ pokemon, slot: index + 1 }))
     .filter(({ pokemon }) => !pokemon.isActive && !pokemon.fainted);

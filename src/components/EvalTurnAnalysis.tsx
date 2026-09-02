@@ -7,6 +7,7 @@ import { attributionBadge } from './eval-badges';
 import { EngineRow } from './eval/analysis-bits';
 import { SideRow } from './eval/SideRow';
 import { evTitle } from './eval/turn-copy';
+import { sideIndex } from '../lib/ids';
 
 export { MiniBar } from './eval/analysis-bits';
 
@@ -33,7 +34,7 @@ function ReadRows({ reads, playerNames }: Pick<EvalTurnAnalysisProps, 'reads' | 
             title={'Exploitative line: the best response to the opponent\'s observed play, ' +
               'refutable by their perfect reply, priced by its spread. Advisory only; the grades above stay equilibrium-based.'}
           >
-            <span style={{ fontWeight: 'bold' }}>{playerNames[side === 'p1' ? 0 : 1]}</span>
+            <span style={{ fontWeight: 'bold' }}>{playerNames[sideIndex(side)]}</span>
             <span>{formatRead(read)}</span>
           </div>
         );

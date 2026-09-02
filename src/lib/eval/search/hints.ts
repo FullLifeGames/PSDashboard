@@ -1,6 +1,7 @@
 import type { Pokemon } from '@pkmn/sim';
 import { boostedFraction, pairThreat, singleMoveFraction } from '../eval-function';
 import { positionBattle, type ChoiceOption, type SimPosition } from '../forward-model';
+import { sideIndex } from '../../ids';
 
 /**
  * Static per-option threat hints — the machinery candidate restriction
@@ -31,7 +32,7 @@ interface HintBoard {
 
 function hintBoard(position: SimPosition, side: 'p1' | 'p2'): HintBoard {
   const battle = positionBattle(position);
-  const sideState = battle.sides[side === 'p1' ? 0 : 1];
+  const sideState = battle.sides[sideIndex(side)];
   const foeActives = sideState.foe.active;
   const foes = foeActives.filter((foe): foe is Pokemon => !!foe && !foe.fainted);
   const actors = sideState.active.filter((active): active is Pokemon => !!active && !active.fainted);
@@ -110,7 +111,7 @@ export function combinedOptionHints(
 /** Static hints for singles options: damage fraction for moves, threat differential for switches. */
 export function singlesOptionHints(position: SimPosition, side: 'p1' | 'p2', options: ChoiceOption[]): number[] {
   const battle = positionBattle(position);
-  const sideState = battle.sides[side === 'p1' ? 0 : 1];
+  const sideState = battle.sides[sideIndex(side)];
   const opponent = battle.sides[side === 'p1' ? 1 : 0].active[0];
   const active = sideState.active[0];
   const hint = (option: ChoiceOption): number => {
