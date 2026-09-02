@@ -677,26 +677,9 @@ export const ratchetOverrides = [
       "src/lib/opponent-inferrer.ts"
     ],
     "rules": {
-      "max-lines": [
-        "error",
-        {
-          "max": 430,
-          "skipBlankLines": true,
-          "skipComments": true
-        }
-      ],
-      "max-lines-per-function": [
-        "error",
-        {
-          "max": 270,
-          "skipBlankLines": true,
-          "skipComments": true,
-          "IIFEs": true
-        }
-      ],
       "complexity": [
         "error",
-        136
+        19
       ]
     }
   },
@@ -713,26 +696,6 @@ export const ratchetOverrides = [
           "skipComments": true,
           "IIFEs": true
         }
-      ]
-    }
-  },
-  {
-    "files": [
-      "src/lib/protocol-parser.ts"
-    ],
-    "rules": {
-      "max-lines-per-function": [
-        "error",
-        {
-          "max": 220,
-          "skipBlankLines": true,
-          "skipComments": true,
-          "IIFEs": true
-        }
-      ],
-      "complexity": [
-        "error",
-        93
       ]
     }
   },
