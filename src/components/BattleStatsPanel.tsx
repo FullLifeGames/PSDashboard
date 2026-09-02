@@ -8,36 +8,13 @@ import type {
   RevealedPokemonInfo,
 } from '../types';
 import { spriteUrl } from '../lib/sprite-url';
+import { typeBg } from '../lib/type-colors';
 
 interface Props {
   replayData: ReplayData;
   p1Info: OpponentTeamInfo | null;
   p2Info: OpponentTeamInfo | null;
 }
-
-const TYPE_BG: Record<string, string> = {
-  Normal: '#A8A878',
-  Fire: '#F08030',
-  Water: '#6890F0',
-  Electric: '#F8D030',
-  Grass: '#78C850',
-  Ice: '#98D8D8',
-  Fighting: '#C03028',
-  Poison: '#A040A0',
-  Ground: '#E0C068',
-  Flying: '#A890F0',
-  Psychic: '#F85888',
-  Bug: '#A8B820',
-  Rock: '#B8A038',
-  Ghost: '#705898',
-  Dragon: '#7038F8',
-  Dark: '#705848',
-  Steel: '#B8B8D0',
-  Fairy: '#EE99AC',
-  Stellar: '#40B5A5',
-  '???': '#68A090',
-};
-
 
 function sourceAccent(source: KnowledgeSource): string {
   switch (source) {
@@ -198,7 +175,7 @@ function PokemonEntry({ poke, isRandomFormat }: { poke: RevealedPokemonInfo; isR
             <MetaTag
               field={poke.teraType}
               className="ps-stats-tag"
-              background={TYPE_BG[poke.teraType.value] || '#68A090'}
+              background={typeBg(poke.teraType.value)}
             >
               {`Tera ${poke.teraType.value}`}
             </MetaTag>

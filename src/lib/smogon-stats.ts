@@ -2,6 +2,7 @@ import type { PokemonFieldInfo, PokemonMoveInfo } from '../types';
 import type { PokemonUsageStats, SmogonUsageStats, SpeciesUsageSet, UsageProbability } from './smogon/stats-types';
 import { dataPkmnStatsUrl, parseSmogonChaosStats, sourceDetail } from './smogon/stats-parse';
 import { toId } from './ids';
+import { ouFallbackFormat } from './smogon/format-fallback';
 
 export type { PokemonUsageStats, SmogonUsageStats, SpeciesUsageSet, UsageProbability, UsageSpread } from './smogon/stats-types';
 export { parseSmogonChaosStats, parseSpread } from './smogon/stats-parse';
@@ -15,12 +16,7 @@ export function getSmogonStatsFormat(formatId: string | undefined): string {
   // species the Smogon doubles ladder never sees (e.g. Annihilape).
   const vgcYear = id.match(/vgc(\d{4})/);
   if (vgcYear) return `${id.match(/^gen\d+/)?.[0] ?? 'gen9'}vgc${vgcYear[1]}`;
-  if (id.includes('doubles') || id.includes('vgc')) return 'gen9doublesou';
-  if (/^gen\d+draft/.test(id)) return id.replace(/draft.*$/, 'ou');
-  // Custom Game is never in the usage stats — assume the generation's OU.
-  const customGame = id.match(/^(gen\d+)customgame$/);
-  if (customGame) return `${customGame[1]}ou`;
-  return id || 'gen9ou';
+  return ouFallbackFormat(id);
 }
 
 /**

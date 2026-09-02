@@ -24,33 +24,24 @@ const STAT_KEYS: Record<string, keyof PokemonEvs> = {
   hp: 'hp', atk: 'atk', def: 'def', spa: 'spa', spd: 'spd', spe: 'spe',
 };
 
-function parseEvLine(line: string): PokemonEvs | undefined {
-  const evs: PokemonEvs = { ...EMPTY_EVS };
+/** One `EVs:` or `IVs:` line over a base table: listed stats clamp to [0, max], the rest keep the base. */
+function parseStatLine(line: string, prefix: RegExp, base: PokemonEvs, max: number): PokemonEvs | undefined {
+  const values: PokemonEvs = { ...base };
   let any = false;
-  for (const part of line.replace(/^EVs:/i, '').split('/')) {
+  for (const part of line.replace(prefix, '').split('/')) {
     const match = part.trim().match(/^(\d+)\s+(HP|Atk|Def|SpA|SpD|Spe)$/i);
     if (!match) continue;
     const key = STAT_KEYS[match[2].toLowerCase()];
     if (!key) continue;
-    evs[key] = Math.min(252, Math.max(0, parseInt(match[1], 10)));
+    values[key] = Math.min(max, Math.max(0, parseInt(match[1], 10)));
     any = true;
   }
-  return any ? evs : undefined;
+  return any ? values : undefined;
 }
 
-function parseIvLine(line: string): PokemonEvs | undefined {
-  const ivs: PokemonEvs = { hp: 31, atk: 31, def: 31, spa: 31, spd: 31, spe: 31 };
-  let any = false;
-  for (const part of line.replace(/^IVs:/i, '').split('/')) {
-    const match = part.trim().match(/^(\d+)\s+(HP|Atk|Def|SpA|SpD|Spe)$/i);
-    if (!match) continue;
-    const key = STAT_KEYS[match[2].toLowerCase()];
-    if (!key) continue;
-    ivs[key] = Math.min(31, Math.max(0, parseInt(match[1], 10)));
-    any = true;
-  }
-  return any ? ivs : undefined;
-}
+const parseEvLine = (line: string) => parseStatLine(line, /^EVs:/i, EMPTY_EVS, 252);
+const parseIvLine = (line: string) =>
+  parseStatLine(line, /^IVs:/i, { hp: 31, atk: 31, def: 31, spa: 31, spd: 31, spe: 31 }, 31);
 
 function parseHeader(header: string): { species: string; nickname?: string; item?: string } | null {
   const [nameSide, itemSide] = header.split('@').map(part => part.trim());

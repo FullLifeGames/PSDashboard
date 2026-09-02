@@ -3,6 +3,7 @@ import { Dex } from '@pkmn/dex';
 import { Smogon } from '@pkmn/smogon';
 import type { ID } from '@pkmn/data';
 import { toId } from './ids';
+import { ouFallbackFormat } from './smogon/format-fallback';
 
 export interface SetAssumption {
   value: string;
@@ -55,12 +56,7 @@ function genFromFormat(formatId: string | undefined): number {
 function normalizeFormat(formatId: string | undefined): string {
   const id = toId(formatId || 'gen9ou');
   if (id.includes('nationaldexdoubles')) return 'gen9nationaldexdoubles';
-  if (id.includes('doubles') || id.includes('vgc')) return 'gen9doublesou';
-  if (/^gen\d+draft/.test(id)) return id.replace(/draft.*$/, 'ou');
-  // Custom Game has no published sets — assume the generation's OU.
-  const customGame = id.match(/^(gen\d+)customgame$/);
-  if (customGame) return `${customGame[1]}ou`;
-  return id || 'gen9ou';
+  return ouFallbackFormat(id);
 }
 
 function sourceDetail(format: string): string {

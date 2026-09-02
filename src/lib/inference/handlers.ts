@@ -3,6 +3,7 @@ import { revealedField, unknownEvs, unknownField } from '../team-info';
 import { canHaveDancer, findPokemon, ruleOut, type InferrerState } from './inferrer-state';
 import { parseDetails } from './lookup';
 import { toId } from '../ids';
+import type { PokemonFieldInfo } from '../../types';
 
 /** Items whose `[from] item:` damage hits the attacker instead of the holder. */
 const ATTACKER_PUNISH_ITEMS = new Set(['rockyhelmet', 'jabocaberry', 'rowapberry']);
@@ -112,6 +113,20 @@ export function ruleOutFromDamage(state: InferrerState, line: string) {
   }
 }
 
+/** A newly seen team member: the details line's identity, everything else unknown. */
+function revealedPokemon(parsed: { species: string; level: number; gender: string }, item: PokemonFieldInfo) {
+  return {
+    species: parsed.species,
+    moves: [],
+    ability: unknownField(),
+    item,
+    teraType: unknownField(),
+    evs: unknownEvs(),
+    level: parsed.level,
+    gender: parsed.gender,
+  };
+}
+
 /** Team preview: |poke|p2|Species, L50, M|item */
 export function addFromPreview(state: InferrerState, line: string) {
   if (!line.startsWith(`|poke|${state.opponentSide}|`)) return;
@@ -120,16 +135,7 @@ export function addFromPreview(state: InferrerState, line: string) {
   const hasItem = parts[4] === 'item';
   const parsed = parseDetails(details);
   if (parsed && !state.pokemonMap.has(parsed.species)) {
-    state.pokemonMap.set(parsed.species, {
-      species: parsed.species,
-      moves: [],
-      ability: unknownField(),
-      item: hasItem ? revealedField('(has item)') : unknownField(),
-      teraType: unknownField(),
-      evs: unknownEvs(),
-      level: parsed.level,
-      gender: parsed.gender,
-    });
+    state.pokemonMap.set(parsed.species, revealedPokemon(parsed, hasItem ? revealedField('(has item)') : unknownField()));
   }
 }
 
@@ -141,16 +147,7 @@ export function addFromSwitch(state: InferrerState, line: string) {
   const details = parts[3];
   const parsed = parseDetails(details);
   if (parsed && !state.pokemonMap.has(parsed.species)) {
-    state.pokemonMap.set(parsed.species, {
-      species: parsed.species,
-      moves: [],
-      ability: unknownField(),
-      item: unknownField(),
-      teraType: unknownField(),
-      evs: unknownEvs(),
-      level: parsed.level,
-      gender: parsed.gender,
-    });
+    state.pokemonMap.set(parsed.species, revealedPokemon(parsed, unknownField()));
   }
 }
 

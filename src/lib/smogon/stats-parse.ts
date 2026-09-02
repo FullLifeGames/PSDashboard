@@ -54,11 +54,20 @@ function probabilityRows(
   const rows = numericEntries(entries);
   const denominator = bestDenominator(rawCount, rows);
   const bucketTotal = rows.reduce((total, [, count]) => total + count, 0);
+  return usageRows(rows, detail, kind, count => normalizeUsageValue(count, denominator, bucketTotal));
+}
 
+/** Display-named, positive, sorted usage rows; `probabilityOf` prices one raw entry. */
+function usageRows(
+  rows: [string, number][],
+  detail: string,
+  kind: 'abilities' | 'items' | 'moves',
+  probabilityOf: (count: number) => number,
+): UsageProbability[] {
   return rows
     .map(([value, count]) => ({
       value: lookupDisplayName(kind, value),
-      probability: normalizeUsageValue(count, denominator, bucketTotal),
+      probability: probabilityOf(count),
       sourceDetail: detail,
     }))
     .filter(entry => entry.value && entry.probability > 0 && toId(entry.value) !== 'nothing')
@@ -76,14 +85,7 @@ function fractionalProbabilityRows(
   detail: string,
   kind: 'abilities' | 'items' | 'moves',
 ): UsageProbability[] {
-  return numericEntries(entries)
-    .map(([value, probability]) => ({
-      value: lookupDisplayName(kind, value),
-      probability: normalizeFractionalProbability(probability),
-      sourceDetail: detail,
-    }))
-    .filter(entry => entry.value && entry.probability > 0 && toId(entry.value) !== 'nothing')
-    .sort((a, b) => b.probability - a.probability || a.value.localeCompare(b.value));
+  return usageRows(numericEntries(entries), detail, kind, normalizeFractionalProbability);
 }
 
 export function parseSpread(spread: string): Pick<UsageSpread, 'nature' | 'evs'> | null {
@@ -112,7 +114,15 @@ function spreadRows(
   const rows = numericEntries(entries);
   const denominator = bestDenominator(rawCount, rows);
   const bucketTotal = rows.reduce((total, [, count]) => total + count, 0);
+  return spreadRowsOf(rows, detail, count => normalizeUsageValue(count, denominator, bucketTotal));
+}
 
+/** Parsed, positive, sorted spread rows; `probabilityOf` prices one raw entry. */
+function spreadRowsOf(
+  rows: [string, number][],
+  detail: string,
+  probabilityOf: (count: number) => number,
+): UsageSpread[] {
   return rows
     .map(([value, count]) => {
       const spread = parseSpread(value);
@@ -120,7 +130,7 @@ function spreadRows(
       return {
         value,
         ...spread,
-        probability: normalizeUsageValue(count, denominator, bucketTotal),
+        probability: probabilityOf(count),
         sourceDetail: detail,
       };
     })
@@ -132,19 +142,7 @@ function fractionalSpreadRows(
   entries: Record<string, number | string> | undefined,
   detail: string,
 ): UsageSpread[] {
-  return numericEntries(entries)
-    .map(([value, probability]) => {
-      const spread = parseSpread(value);
-      if (!spread) return null;
-      return {
-        value,
-        ...spread,
-        probability: normalizeFractionalProbability(probability),
-        sourceDetail: detail,
-      };
-    })
-    .filter((spread): spread is UsageSpread => !!spread && spread.probability > 0)
-    .sort((a, b) => b.probability - a.probability || a.value.localeCompare(b.value));
+  return spreadRowsOf(numericEntries(entries), detail, normalizeFractionalProbability);
 }
 
 function parseDataPkmnStats(
