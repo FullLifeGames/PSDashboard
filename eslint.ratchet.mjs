@@ -274,45 +274,5 @@ export const ratchetOverrides = [
         }
       ]
     }
-  },
-  {
-    "files": [
-      "src/lib/eval/report.ts"
-    ],
-    "rules": {
-      "max-lines-per-function": [
-        "error",
-        {
-          "max": 110,
-          "skipBlankLines": true,
-          "skipComments": true,
-          "IIFEs": true
-        }
-      ],
-      "complexity": [
-        "error",
-        22
-      ]
-    }
-  },
-  {
-    "files": [
-      "src/lib/eval/summary.ts"
-    ],
-    "rules": {
-      "max-lines-per-function": [
-        "error",
-        {
-          "max": 130,
-          "skipBlankLines": true,
-          "skipComments": true,
-          "IIFEs": true
-        }
-      ],
-      "complexity": [
-        "error",
-        54
-      ]
-    }
   }
 ];
