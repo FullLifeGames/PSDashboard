@@ -202,6 +202,39 @@ const EVAL_MODIFIERS = ['terastallize', 'mega', 'ultra'] as const;
  * full-width string (explicit `pass` per slot) still maps positionally,
  * and any other count mismatch refuses rather than guessing a slot.
  */
+/** Maps choice parts onto slots: by the actionable mask, positionally, or not at all. */
+function partSlotMapping(
+  partCount: number, actionableSlots: boolean[] | undefined,
+): { slotFor: (part: number) => number; width: number } | null {
+  if (!actionableSlots) return { slotFor: part => part, width: partCount };
+  const actionable = actionableSlots.flatMap((expects, index) => (expects ? [index] : []));
+  if (actionable.length === partCount) {
+    return { slotFor: part => actionable[part], width: actionableSlots.length };
+  }
+  if (partCount === actionableSlots.length) {
+    return { slotFor: part => part, width: actionableSlots.length };
+  }
+  return null;
+}
+
+/** One part's slot choice; a pass keeps the slot empty, an unresolvable part refuses. */
+function resolvePartChoice(
+  tokens: string[], labelPart: string | undefined, moves: BranchMoveOption[], switches: BranchSwitchOption[],
+): { ok: true; choice: BranchSlotChoice | null } | { ok: false } {
+  if (tokens[0] === 'pass') return { ok: true, choice: null };
+  if (tokens[0] === 'switch') {
+    const species = labelPart?.startsWith('→ ') ? labelPart.slice(2) : null;
+    const resolved = resolveCustomSwitch(species ?? tokens[1], switches);
+    return resolved.ok ? { ok: true, choice: resolved.choice } : { ok: false };
+  }
+  if (tokens[0] !== 'move') return { ok: false };
+  const modifier = EVAL_MODIFIERS.find(candidate => tokens.includes(candidate));
+  const locToken = tokens.slice(2).find(token => /^-?\d+$/.test(token));
+  const resolved = resolveCustomMove(tokens[1], locToken, moves);
+  if (!resolved.ok || resolved.choice.kind !== 'move') return { ok: false };
+  return { ok: true, choice: modifier ? { ...resolved.choice, modifier } : resolved.choice };
+}
+
 export function evalChoiceToSlotChoices(
   evalChoice: string,
   movesBySlot: BranchMoveOption[][],
@@ -213,39 +246,15 @@ export function evalChoiceToSlotChoices(
   // the sim raises the follow-up switch as its own prompt afterwards.
   const parts = evalChoice.split(' > ')[0].split(',').map(part => part.trim());
   const labelParts = label ? splitCombinedLabel(label) : [];
-  let slotFor = (part: number) => part;
-  let width = parts.length;
-  if (actionableSlots) {
-    const actionable = actionableSlots.flatMap((expects, index) => (expects ? [index] : []));
-    if (actionable.length === parts.length) {
-      slotFor = (part: number) => actionable[part];
-      width = actionableSlots.length;
-    } else if (parts.length === actionableSlots.length) {
-      width = actionableSlots.length;
-    } else {
-      return null;
-    }
-  }
-  const choices: (BranchSlotChoice | null)[] = new Array<BranchSlotChoice | null>(width).fill(null);
+  const mapping = partSlotMapping(parts.length, actionableSlots);
+  if (!mapping) return null;
+  const choices: (BranchSlotChoice | null)[] = new Array<BranchSlotChoice | null>(mapping.width).fill(null);
   for (let part = 0; part < parts.length; part++) {
-    const slot = slotFor(part);
+    const slot = mapping.slotFor(part);
     const tokens = parts[part].split(' ');
-    if (tokens[0] === 'pass') {
-      continue;
-    }
-    if (tokens[0] === 'switch') {
-      const species = labelParts[part]?.startsWith('→ ') ? labelParts[part].slice(2) : null;
-      const resolved = resolveCustomSwitch(species ?? tokens[1], switchesBySlot[slot] ?? []);
-      if (!resolved.ok) return null;
-      choices[slot] = resolved.choice;
-      continue;
-    }
-    if (tokens[0] !== 'move') return null;
-    const modifier = EVAL_MODIFIERS.find(candidate => tokens.includes(candidate));
-    const locToken = tokens.slice(2).find(token => /^-?\d+$/.test(token));
-    const resolved = resolveCustomMove(tokens[1], locToken, movesBySlot[slot] ?? []);
-    if (!resolved.ok || resolved.choice.kind !== 'move') return null;
-    choices[slot] = modifier ? { ...resolved.choice, modifier } : resolved.choice;
+    const resolved = resolvePartChoice(tokens, labelParts[part], movesBySlot[slot] ?? [], switchesBySlot[slot] ?? []);
+    if (!resolved.ok) return null;
+    if (resolved.choice) choices[slot] = resolved.choice;
   }
   return choices;
 }
