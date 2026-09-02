@@ -11,23 +11,45 @@ import type { Battle, Pokemon } from '@pkmn/sim';
  */
 const stageMultiplier = (stage: number) => (stage >= 0 ? (2 + stage) / 2 : 2 / (2 - stage));
 
-export function effectiveSpeed(pokemon: Pokemon, battle: Battle): number {
-  let speed = pokemon.storedStats.spe * stageMultiplier(pokemon.boosts.spe);
+/** Paralysis (gen-dependent) and Quick Feet, applied in that order. */
+function applyStatusSpeed(speed: number, pokemon: Pokemon, battle: Battle): number {
+  let value = speed;
+  const ability = pokemon.ability;
+  if (pokemon.status === 'par' && ability !== 'quickfeet') value *= battle.gen >= 7 ? 0.5 : 0.25;
+  if (pokemon.status && ability === 'quickfeet') value *= 1.5;
+  return value;
+}
+
+/** Tailwind, Choice Scarf, Iron Ball, and Unburden, applied in that order. */
+function applyFieldAndItemSpeed(speed: number, pokemon: Pokemon): number {
+  let value = speed;
   const ability = pokemon.ability;
   const item = pokemon.item;
-  if (pokemon.status === 'par' && ability !== 'quickfeet') speed *= battle.gen >= 7 ? 0.5 : 0.25;
-  if (pokemon.status && ability === 'quickfeet') speed *= 1.5;
-  if (pokemon.side.sideConditions['tailwind']) speed *= 2;
-  if (item === 'choicescarf') speed *= 1.5;
-  if (item === 'ironball') speed *= 0.5;
-  if (ability === 'unburden' && !item) speed *= 2;
+  if (pokemon.side.sideConditions['tailwind']) value *= 2;
+  if (item === 'choicescarf') value *= 1.5;
+  if (item === 'ironball') value *= 0.5;
+  if (ability === 'unburden' && !item) value *= 2;
+  return value;
+}
+
+/** The weather and terrain speed abilities, applied in that order. */
+function applyWeatherSpeed(speed: number, pokemon: Pokemon, battle: Battle): number {
+  let value = speed;
+  const ability = pokemon.ability;
   const weather = battle.field.weather;
-  if (ability === 'swiftswim' && (weather === 'raindance' || weather === 'primordialsea')) speed *= 2;
-  if (ability === 'chlorophyll' && (weather === 'sunnyday' || weather === 'desolateland')) speed *= 2;
-  if (ability === 'sandrush' && weather === 'sandstorm') speed *= 2;
-  if (ability === 'slushrush' && (weather === 'hail' || weather === 'snow')) speed *= 2;
-  if (ability === 'surgesurfer' && battle.field.terrain === 'electricterrain') speed *= 2;
-  return speed;
+  if (ability === 'swiftswim' && (weather === 'raindance' || weather === 'primordialsea')) value *= 2;
+  if (ability === 'chlorophyll' && (weather === 'sunnyday' || weather === 'desolateland')) value *= 2;
+  if (ability === 'sandrush' && weather === 'sandstorm') value *= 2;
+  if (ability === 'slushrush' && (weather === 'hail' || weather === 'snow')) value *= 2;
+  if (ability === 'surgesurfer' && battle.field.terrain === 'electricterrain') value *= 2;
+  return value;
+}
+
+export function effectiveSpeed(pokemon: Pokemon, battle: Battle): number {
+  let speed = pokemon.storedStats.spe * stageMultiplier(pokemon.boosts.spe);
+  speed = applyStatusSpeed(speed, pokemon, battle);
+  speed = applyFieldAndItemSpeed(speed, pokemon);
+  return applyWeatherSpeed(speed, pokemon, battle);
 }
 
 /**

@@ -49,6 +49,8 @@ const PROTECT_MOVE_IDS = new Set([
 
 const HAZARD_IDS = ['stealthrock', 'spikes', 'toxicspikes', 'stickyweb'];
 
+type DexMove = ReturnType<Battle['dex']['moves']['get']>;
+
 /** The move id a singles choice names, or null for switches/team orders. */
 function moveIdOf(choice: string): string | null {
   const head = choice.split(' > ')[0].trim();
@@ -71,6 +73,66 @@ function defenderShielded(defender: Pokemon): boolean {
 }
 
 /**
+ * The defender a side's move will actually hit given the opponent's
+ * choice; null when the model cannot know it (a hazard-tolled entry, a
+ * pivot pair's mid-turn change, no living active).
+ */
+function eventDefender(battle: Battle, oppIndex: 0 | 1, oppChoice: string): Pokemon | null {
+  const switchMatch = /^switch\s+(\d+)/.exec(oppChoice.trim());
+  if (switchMatch) {
+    const oppSide = battle.sides[oppIndex];
+    // Entry hazards make the incoming mon's HP at hit time unknowable here.
+    if (Object.keys(oppSide.sideConditions ?? {}).some(id => HAZARD_IDS.includes(id))) return null;
+    const incoming = oppSide.pokemon[Number(switchMatch[1]) - 1];
+    if (!incoming || incoming.fainted) return null;
+    return incoming;
+  }
+  if (oppChoice.includes(' > ')) return null; // pivot pair: the defender changes mid-turn
+  const active = battle.sides[oppIndex].active[0];
+  if (!active || active.fainted) return null;
+  return active;
+}
+
+type SideEventPlan = { kind: 'fail' } | { kind: 'skip' } | { kind: 'event'; event: CellEvent };
+
+/**
+ * A move the odds model could not price: an unpriceable DAMAGING roll move
+ * leaves randomness the fold cannot see — fail the cell. A can't-miss
+ * damaging move without an event has no priceable roll (occurrence
+ * deviations are caught at classify time).
+ */
+function unpricedMovePlan(move: DexMove): SideEventPlan {
+  const damaging = move.exists && move.category !== 'Status';
+  const rollFlagged = RANDOM_CALL_MOVES.has(move.id) ||
+    (typeof move.accuracy === 'number' && move.accuracy < 100);
+  if (damaging && rollFlagged) return { kind: 'fail' };
+  return { kind: 'skip' };
+}
+
+/** One side's boundary event for the cell: fail when a guard trips, skip when the side has no priceable roll. */
+function planSideEvent(battle: Battle, side: 'p1' | 'p2', moveId: string, oppChoice: string): SideEventPlan {
+  const sideIndex = side === 'p1' ? 0 : 1;
+  const oppIndex = sideIndex === 0 ? 1 : 0;
+  const attacker = battle.sides[sideIndex].active[0];
+  if (!attacker || attacker.fainted) return { kind: 'fail' };
+  if (attackerPrevented(attacker)) return { kind: 'fail' };
+
+  // The defender this move will actually hit.
+  const defender = eventDefender(battle, oppIndex, oppChoice);
+  if (!defender) return { kind: 'fail' };
+  if (defenderShielded(defender)) return { kind: 'fail' };
+
+  const event = boundaryEvent(battle, attacker, defender, moveId);
+  const move = battle.dex.moves.get(moveId);
+  if (event === null) return unpricedMovePlan(move);
+  if (event.accuracy < 1 || (event.killFraction > 0 && event.killFraction < 1)) {
+    return { kind: 'event', event: { side, moveId: move.id, defenderIdent: `${defender.side.id}a: ${defender.name}`, event } };
+  }
+  // Fully deterministic event (certain hit, certain outcome): no event.
+  return { kind: 'skip' };
+}
+
+/**
  * Plan the boundary events of one root cell, or refuse: 'none' when the
  * pair is deterministic as far as priceable rolls go, 'fail' when any
  * guard trips (the caller keeps the plain seed average).
@@ -87,61 +149,17 @@ export function planCellEvents(battle: Battle, p1Choice: string, p2Choice: strin
   for (const side of ['p1', 'p2'] as const) {
     const moveId = moveIds[side];
     if (!moveId) continue; // a switching side has no event
-    const sideIndex = side === 'p1' ? 0 : 1;
-    const oppIndex = sideIndex === 0 ? 1 : 0;
-    const attacker = battle.sides[sideIndex].active[0];
-    if (!attacker || attacker.fainted) return { kind: 'fail' };
-    if (attackerPrevented(attacker)) return { kind: 'fail' };
-
-    // The defender this move will actually hit.
-    const oppChoice = side === 'p1' ? p2Choice : p1Choice;
-    let defender: Pokemon;
-    const switchMatch = /^switch\s+(\d+)/.exec(oppChoice.trim());
-    if (switchMatch) {
-      const oppSide = battle.sides[oppIndex];
-      // Entry hazards make the incoming mon's HP at hit time unknowable here.
-      if (Object.keys(oppSide.sideConditions ?? {}).some(id => HAZARD_IDS.includes(id))) return { kind: 'fail' };
-      const incoming = oppSide.pokemon[Number(switchMatch[1]) - 1];
-      if (!incoming || incoming.fainted) return { kind: 'fail' };
-      defender = incoming;
-    } else if (oppChoice.includes(' > ')) {
-      return { kind: 'fail' }; // pivot pair: the defender changes mid-turn
-    } else {
-      const active = battle.sides[oppIndex].active[0];
-      if (!active || active.fainted) return { kind: 'fail' };
-      defender = active;
-    }
-    if (defenderShielded(defender)) return { kind: 'fail' };
-
-    const event = boundaryEvent(battle, attacker, defender, moveId);
-    const move = battle.dex.moves.get(moveId);
-    if (event === null) {
-      // An unpriceable DAMAGING roll move leaves randomness the fold cannot
-      // see — fail the cell. A can't-miss damaging move without an event has
-      // no priceable roll (occurrence deviations are caught at classify time).
-      const damaging = move.exists && move.category !== 'Status';
-      const rollFlagged = RANDOM_CALL_MOVES.has(move.id) ||
-        (typeof move.accuracy === 'number' && move.accuracy < 100);
-      if (damaging && rollFlagged) return { kind: 'fail' };
-      continue;
-    }
-    if (event.accuracy < 1 || (event.killFraction > 0 && event.killFraction < 1)) {
-      events.push({ side, moveId: move.id, defenderIdent: `${defender.side.id}a: ${defender.name}`, event });
-    }
-    // Fully deterministic event (certain hit, certain outcome): no event.
+    const plan = planSideEvent(battle, side, moveId, side === 'p1' ? p2Choice : p1Choice);
+    if (plan.kind === 'fail') return { kind: 'fail' };
+    if (plan.kind === 'event') events.push(plan.event);
   }
 
   if (events.length === 0) return { kind: 'none' };
   return { kind: 'events', events }; // p1 before p2 by loop order
 }
 
-/**
- * Read a seed child's outcome class from its advance log, or null when the
- * lines deviate from the kill-truncation occurrence model (flinch, full
- * paralysis, ambiguous faints — anything the fold did not predict).
- * Key = event sides' outcomes in p1→p2 order joined with '|'.
- */
-export function classifyChild(log: string[], events: CellEvent[]): string | null {
+/** Each event side's single move line index; null when a side's move line is duplicated (ambiguous). */
+function eventMoveIndices(log: string[], events: CellEvent[]): Map<'p1' | 'p2', number> | null {
   const moveIndex = new Map<'p1' | 'p2', number>();
   for (const ev of events) {
     const prefix = `|move|${ev.side}a:`;
@@ -154,6 +172,45 @@ export function classifyChild(log: string[], events: CellEvent[]): string | null
     }
     if (found !== null) moveIndex.set(ev.side, found);
   }
+  return moveIndex;
+}
+
+/**
+ * hit-kill: the event's defender faints after this move and before the
+ * other event side's move (a later faint belongs to something else).
+ */
+function killedBefore(log: string[], index: number, otherIndex: number | undefined, faintLine: string): boolean {
+  for (let at = index + 1; at < log.length; at++) {
+    if (otherIndex !== undefined && otherIndex > index && at >= otherIndex) break;
+    if (log[at] === faintLine) return true;
+  }
+  return false;
+}
+
+/** The side's outcome from its move line: a miss line after it, else the defender's faint decides. */
+function sideOutcome(
+  log: string[],
+  events: CellEvent[],
+  moveIndex: Map<'p1' | 'p2', number>,
+  ev: CellEvent,
+  index: number,
+): EventOutcome {
+  const missPrefix = `|-miss|${ev.side}a:`;
+  if (log.some((line, at) => at > index && line.startsWith(missPrefix))) return 'miss';
+  const other = events.find(entry => entry.side !== ev.side);
+  const otherIndex = other ? moveIndex.get(other.side) : undefined;
+  return killedBefore(log, index, otherIndex, `|faint|${ev.defenderIdent}`) ? 'hit-kill' : 'hit-nokill';
+}
+
+/**
+ * Read a seed child's outcome class from its advance log, or null when the
+ * lines deviate from the kill-truncation occurrence model (flinch, full
+ * paralysis, ambiguous faints — anything the fold did not predict).
+ * Key = event sides' outcomes in p1→p2 order joined with '|'.
+ */
+export function classifyChild(log: string[], events: CellEvent[]): string | null {
+  const moveIndex = eventMoveIndices(log, events);
+  if (!moveIndex) return null;
   // Any |cant| on an event side is an unmodeled skip.
   for (const ev of events) {
     const cantPrefix = `|cant|${ev.side}a:`;
@@ -164,25 +221,7 @@ export function classifyChild(log: string[], events: CellEvent[]): string | null
   for (const ev of events) {
     const index = moveIndex.get(ev.side);
     if (index === undefined) continue;
-    const missPrefix = `|-miss|${ev.side}a:`;
-    if (log.some((line, at) => at > index && line.startsWith(missPrefix))) {
-      outcomes.set(ev.side, 'miss');
-      continue;
-    }
-    // hit-kill: the event's defender faints after this move and before the
-    // other event side's move (a later faint belongs to something else).
-    const other = events.find(entry => entry.side !== ev.side);
-    const otherIndex = other ? moveIndex.get(other.side) : undefined;
-    const faintLine = `|faint|${ev.defenderIdent}`;
-    let killed = false;
-    for (let at = index + 1; at < log.length; at++) {
-      if (otherIndex !== undefined && otherIndex > index && at >= otherIndex) break;
-      if (log[at] === faintLine) {
-        killed = true;
-        break;
-      }
-    }
-    outcomes.set(ev.side, killed ? 'hit-kill' : 'hit-nokill');
+    outcomes.set(ev.side, sideOutcome(log, events, moveIndex, ev, index));
   }
   // Event sides without a move line are valid only as kill-truncation.
   for (const ev of events) {

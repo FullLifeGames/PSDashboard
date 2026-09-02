@@ -22,6 +22,8 @@ export interface BoundaryEvent {
   pKill: number;
 }
 
+type DexMove = ReturnType<Battle['dex']['moves']['get']>;
+
 /** Moves that call a RANDOM move — the seed decides what actually happens. */
 export const RANDOM_CALL_MOVES = new Set(['sleeptalk', 'metronome', 'assist', 'copycat']);
 
@@ -108,53 +110,56 @@ function killShare(damage: unknown, hp: number): number | null {
   return rolls.filter(roll => roll >= hp).length / rolls.length;
 }
 
-/**
- * The analytic odds of one attacking move against one defender, or null
- * when the model cannot price it (the caller keeps the seed average).
- */
-export function boundaryEvent(
-  battle: Battle, attacker: Pokemon, defender: Pokemon, moveId: string,
-): BoundaryEvent | null {
-  const genNum = battle.gen;
-  if (genNum <= 2 || genNum > 9) return null;
-  const move = battle.dex.moves.get(moveId);
-  if (!move.exists) return null;
-  if (RANDOM_CALL_MOVES.has(move.id) || UNPRICEABLE_MOVE_IDS.has(move.id)) return null;
-  if (move.multihit) return null;
-  if (move.ohko) return null;
-  if ((move.critRatio ?? 1) > 2) return null;
-  if (attacker.ability === 'parentalbond') return null;
+/** The guards that make the one-turn model refuse a pair: unknown or unpriceable moves, crit and accuracy modifiers it cannot fold. */
+function unpriceable(attacker: Pokemon, defender: Pokemon, move: DexMove): boolean {
+  if (!move.exists) return true;
+  if (RANDOM_CALL_MOVES.has(move.id) || UNPRICEABLE_MOVE_IDS.has(move.id)) return true;
+  if (move.multihit) return true;
+  if (move.ohko) return true;
+  if ((move.critRatio ?? 1) > 2) return true;
+  if (attacker.ability === 'parentalbond') return true;
   for (const mon of [attacker, defender]) {
-    if (ACCURACY_ITEMS.has(mon.item)) return null;
-    if (ACCURACY_ABILITIES.has(mon.ability)) return null;
-    if (mon.volatiles['focusenergy']) return null;
+    if (ACCURACY_ITEMS.has(mon.item)) return true;
+    if (ACCURACY_ABILITIES.has(mon.ability)) return true;
+    if (mon.volatiles['focusenergy']) return true;
   }
+  return false;
+}
 
-  // Accuracy first — shared by damaging and status branches.
+/** The weather overrides on a move's base accuracy (Thunder/Hurricane in rain and sun, Blizzard in hail). */
+function weatherAccuracy(move: DexMove, base: number, weather: string): number {
+  let value = base;
+  const rainish = weather === 'raindance' || weather === 'primordialsea';
+  const sunny = weather === 'sunnyday' || weather === 'desolateland';
+  const hailish = weather === 'hail' || weather === 'snow' || weather === 'snowscape';
+  if ((move.id === 'thunder' || move.id === 'hurricane') && rainish) value = 1;
+  if ((move.id === 'thunder' || move.id === 'hurricane') && sunny) value = 0.5;
+  if (move.id === 'blizzard' && hailish) value = 1;
+  return value;
+}
+
+/** Accuracy after weather and stage modifiers; No Guard on either side makes the move sure. */
+function moveAccuracy(battle: Battle, move: DexMove, attacker: Pokemon, defender: Pokemon): number {
   let accuracy: number;
   if (move.accuracy === true) {
     accuracy = 1;
   } else {
-    let base = move.accuracy / 100;
-    const weather = battle.field.weather ?? '';
-    const rainish = weather === 'raindance' || weather === 'primordialsea';
-    const sunny = weather === 'sunnyday' || weather === 'desolateland';
-    const hailish = weather === 'hail' || weather === 'snow' || weather === 'snowscape';
-    if ((move.id === 'thunder' || move.id === 'hurricane') && rainish) base = 1;
-    if ((move.id === 'thunder' || move.id === 'hurricane') && sunny) base = 0.5;
-    if (move.id === 'blizzard' && hailish) base = 1;
+    const base = weatherAccuracy(move, move.accuracy / 100, battle.field.weather ?? '');
     const stages = (attacker.boosts.accuracy ?? 0) - (defender.boosts.evasion ?? 0);
     accuracy = Math.min(1, base * stageMultiplier(stages));
   }
   if (attacker.ability === 'noguard' || defender.ability === 'noguard') accuracy = 1;
+  return accuracy;
+}
 
-  if (move.category === 'Status') {
-    // Accuracy-only event: the hit/miss split is pure table arithmetic;
-    // the status effect's consequences live inside the outcome classes.
-    if (accuracy >= 1) return null;
-    return { accuracy, killFraction: 0, pKill: 0 };
-  }
-
+/** The crit-weighted kill share of the 16 damage rolls, or null when the calc cannot price the pair. */
+function damageKillFraction(
+  genNum: number,
+  battle: Battle,
+  move: DexMove,
+  attacker: Pokemon,
+  defender: Pokemon,
+): number | null {
   try {
     const gen = Generations.get(genNum as 3 | 4 | 5 | 6 | 7 | 8 | 9);
     const atkPoke = toCalcPokemon(gen, attacker, battle.dex);
@@ -165,9 +170,35 @@ export function boundaryEvent(
     if (normal === null || crit === null) return null;
     const c = critRate(genNum, move.critRatio ?? 1);
     if (c === null) return null;
-    const killFraction = (1 - c) * normal + c * crit;
-    return { accuracy, killFraction, pKill: accuracy * killFraction };
+    return (1 - c) * normal + c * crit;
   } catch {
     return null;
   }
+}
+
+/**
+ * The analytic odds of one attacking move against one defender, or null
+ * when the model cannot price it (the caller keeps the seed average).
+ */
+export function boundaryEvent(
+  battle: Battle, attacker: Pokemon, defender: Pokemon, moveId: string,
+): BoundaryEvent | null {
+  const genNum = battle.gen;
+  if (genNum <= 2 || genNum > 9) return null;
+  const move = battle.dex.moves.get(moveId);
+  if (unpriceable(attacker, defender, move)) return null;
+
+  // Accuracy first — shared by damaging and status branches.
+  const accuracy = moveAccuracy(battle, move, attacker, defender);
+
+  if (move.category === 'Status') {
+    // Accuracy-only event: the hit/miss split is pure table arithmetic;
+    // the status effect's consequences live inside the outcome classes.
+    if (accuracy >= 1) return null;
+    return { accuracy, killFraction: 0, pKill: 0 };
+  }
+
+  const killFraction = damageKillFraction(genNum, battle, move, attacker, defender);
+  if (killFraction === null) return null;
+  return { accuracy, killFraction, pKill: accuracy * killFraction };
 }
