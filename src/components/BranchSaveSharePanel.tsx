@@ -22,6 +22,72 @@ function shareUrl(encoded: string): string {
   return `${base}#branch=${encoded}`;
 }
 
+function ShareLinkField({ link }: { link: string }) {
+  return (
+    <input
+      readOnly
+      value={link}
+      aria-label="Branch share link"
+      style={{
+        width: '100%',
+        marginTop: 8,
+        fontSize: 10,
+        color: '#cde',
+        background: 'rgba(0,0,0,0.22)',
+        border: '1px solid rgba(255,255,255,0.12)',
+        borderRadius: 4,
+        padding: 5,
+      }}
+      onFocus={event => event.currentTarget.select()}
+    />
+  );
+}
+
+function SavedBranchRow({ entry, onOpen, onRemove }: {
+  entry: BranchSharePayload;
+  onOpen: (entry: BranchSharePayload) => void;
+  onRemove: (entry: BranchSharePayload) => void;
+}) {
+  return (
+    <div
+      style={{
+        display: 'flex',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        gap: 8,
+        fontSize: 10,
+        color: '#b8c7dc',
+        borderTop: '1px solid rgba(255,255,255,0.08)',
+        paddingTop: 4,
+      }}
+    >
+      <span style={{ flex: 1, minWidth: 0 }}>
+        Turn {entry.branchTurn} branch, {entry.choices.length} choices
+        <span style={{ marginLeft: 6, color: '#8899aa' }}>{new Date(entry.createdAt).toLocaleString()}</span>
+      </span>
+      <span style={{ display: 'flex', gap: 4, flex: '0 0 auto' }}>
+        <button
+          type="button"
+          className="ps-btn"
+          onClick={() => onOpen(entry)}
+          style={{ padding: '2px 8px', fontSize: 10 }}
+        >
+          Open
+        </button>
+        <button
+          type="button"
+          className="ps-btn"
+          onClick={() => onRemove(entry)}
+          aria-label={`Delete saved branch from turn ${entry.branchTurn}`}
+          style={{ padding: '2px 8px', fontSize: 10 }}
+        >
+          Delete
+        </button>
+      </span>
+    </div>
+  );
+}
+
 export function BranchSaveSharePanel({ replayData, branchTurn, history, finalLog }: Props) {
   const [saved, setSaved] = useState<BranchSharePayload[]>(() => loadSavedBranches(replayData.id));
   const [link, setLink] = useState('');
@@ -79,24 +145,7 @@ export function BranchSaveSharePanel({ replayData, branchTurn, history, finalLog
         </div>
       </div>
 
-      {link && (
-        <input
-          readOnly
-          value={link}
-          aria-label="Branch share link"
-          style={{
-            width: '100%',
-            marginTop: 8,
-            fontSize: 10,
-            color: '#cde',
-            background: 'rgba(0,0,0,0.22)',
-            border: '1px solid rgba(255,255,255,0.12)',
-            borderRadius: 4,
-            padding: 5,
-          }}
-          onFocus={event => event.currentTarget.select()}
-        />
-      )}
+      {link && <ShareLinkField link={link} />}
 
       {copied && (
         <div style={{ marginTop: 4, fontSize: 10, color: '#8fd19e' }}>Copied to clipboard.</div>
@@ -105,43 +154,7 @@ export function BranchSaveSharePanel({ replayData, branchTurn, history, finalLog
       {saved.length > 0 && (
         <div style={{ marginTop: 8, display: 'flex', flexDirection: 'column', gap: 4, maxHeight: 180, overflowY: 'auto' }}>
           {saved.map(entry => (
-            <div
-              key={`${entry.createdAt}-${entry.branchTurn}`}
-              style={{
-                display: 'flex',
-                justifyContent: 'space-between',
-                alignItems: 'center',
-                gap: 8,
-                fontSize: 10,
-                color: '#b8c7dc',
-                borderTop: '1px solid rgba(255,255,255,0.08)',
-                paddingTop: 4,
-              }}
-            >
-              <span style={{ flex: 1, minWidth: 0 }}>
-                Turn {entry.branchTurn} branch, {entry.choices.length} choices
-                <span style={{ marginLeft: 6, color: '#8899aa' }}>{new Date(entry.createdAt).toLocaleString()}</span>
-              </span>
-              <span style={{ display: 'flex', gap: 4, flex: '0 0 auto' }}>
-                <button
-                  type="button"
-                  className="ps-btn"
-                  onClick={() => openSaved(entry)}
-                  style={{ padding: '2px 8px', fontSize: 10 }}
-                >
-                  Open
-                </button>
-                <button
-                  type="button"
-                  className="ps-btn"
-                  onClick={() => removeSaved(entry)}
-                  aria-label={`Delete saved branch from turn ${entry.branchTurn}`}
-                  style={{ padding: '2px 8px', fontSize: 10 }}
-                >
-                  Delete
-                </button>
-              </span>
-            </div>
+            <SavedBranchRow key={`${entry.createdAt}-${entry.branchTurn}`} entry={entry} onOpen={openSaved} onRemove={removeSaved} />
           ))}
         </div>
       )}

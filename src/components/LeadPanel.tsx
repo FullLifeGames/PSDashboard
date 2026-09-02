@@ -1,5 +1,5 @@
-import { useState } from 'react';
 import { spriteUrl } from '../lib/sprite-url';
+import { useLeadSelection } from '../hooks/useLeadSelection';
 
 /** One team slot offered as a lead: identity plus what the real game did. */
 export interface LeadOption {
@@ -30,6 +30,50 @@ interface Props {
 
 const SLOT_LABELS = ['a', 'b', 'c'];
 
+function columnPrompt(maxPicks: number, leadsPerSide: number): string {
+  return maxPicks > leadsPerSide
+    ? `Who comes along? Pick ${maxPicks} — the first ${leadsPerSide > 1 ? `${leadsPerSide} lead` : 'one leads'}`
+    : leadsPerSide > 1
+      ? `Who leads? Pick ${leadsPerSide} (order sets the slots)`
+      : 'Who leads?';
+}
+
+function LeadOptionButton({ option, slot, leadsPerSide, showBadges, onToggle }: {
+  option: LeadOption;
+  slot: number;
+  leadsPerSide: number;
+  showBadges: boolean;
+  onToggle: (species: string) => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={() => onToggle(option.species)}
+      className={`ps-switchbtn ps-switchbtn-compact ${slot >= 0 ? 'ps-switchbtn-selected' : ''}`}
+      aria-pressed={slot >= 0}
+      title={option.wasLead
+        ? `${option.name} led the real game.`
+        : option.wasBrought
+          ? `${option.name} was brought in the real game.`
+          : option.name}
+    >
+      <img src={spriteUrl(option.species)} alt={option.name} />
+      <div className="ps-switchbtn-name">
+        {slot >= 0 && showBadges && (
+          <span
+            className="ps-lead-slot"
+            title={slot < leadsPerSide ? `Leads in slot ${SLOT_LABELS[slot]}.` : 'Comes along in the back.'}
+          >
+            {slot < leadsPerSide ? SLOT_LABELS[slot] : slot + 1}
+          </span>
+        )}
+        {option.name}
+        {option.wasLead && <span className="ps-played-badge" title="This Pokémon led the real game.">played</span>}
+      </div>
+    </button>
+  );
+}
+
 function LeadColumn({ label, options, selected, leadsPerSide, maxPicks, onToggle }: {
   label: string;
   options: LeadOption[];
@@ -38,53 +82,34 @@ function LeadColumn({ label, options, selected, leadsPerSide, maxPicks, onToggle
   maxPicks: number;
   onToggle: (species: string) => void;
 }) {
-  const prompt = maxPicks > leadsPerSide
-    ? `Who comes along? Pick ${maxPicks} — the first ${leadsPerSide > 1 ? `${leadsPerSide} lead` : 'one leads'}`
-    : leadsPerSide > 1
-      ? `Who leads? Pick ${leadsPerSide} (order sets the slots)`
-      : 'Who leads?';
   return (
     <div className="ps-controls ps-side-controls">
       <div className="ps-whatdo">
         <span className="ps-side-label">{label}</span>
-        {' '}{prompt}
+        {' '}{columnPrompt(maxPicks, leadsPerSide)}
       </div>
       <div className="ps-switchgrid ps-switchgrid-compact">
-        {options.map(option => {
-          const slot = selected.indexOf(option.species);
-          const showBadges = maxPicks > 1;
-          return (
-            <button
-              key={option.species}
-              type="button"
-              onClick={() => onToggle(option.species)}
-              className={`ps-switchbtn ps-switchbtn-compact ${slot >= 0 ? 'ps-switchbtn-selected' : ''}`}
-              aria-pressed={slot >= 0}
-              title={option.wasLead
-                ? `${option.name} led the real game.`
-                : option.wasBrought
-                  ? `${option.name} was brought in the real game.`
-                  : option.name}
-            >
-              <img src={spriteUrl(option.species)} alt={option.name} />
-              <div className="ps-switchbtn-name">
-                {slot >= 0 && showBadges && (
-                  <span
-                    className="ps-lead-slot"
-                    title={slot < leadsPerSide ? `Leads in slot ${SLOT_LABELS[slot]}.` : 'Comes along in the back.'}
-                  >
-                    {slot < leadsPerSide ? SLOT_LABELS[slot] : slot + 1}
-                  </span>
-                )}
-                {option.name}
-                {option.wasLead && <span className="ps-played-badge" title="This Pokémon led the real game.">played</span>}
-              </div>
-            </button>
-          );
-        })}
+        {options.map(option => (
+          <LeadOptionButton
+            key={option.species}
+            option={option}
+            slot={selected.indexOf(option.species)}
+            leadsPerSide={leadsPerSide}
+            showBadges={maxPicks > 1}
+            onToggle={onToggle}
+          />
+        ))}
       </div>
     </div>
   );
+}
+
+function panelIntro(bringCount: number | null, leadsPerSide: number): string {
+  return bringCount !== null
+    ? `Turn 0 · team preview: pick the ${bringCount} each side brings — the first ${leadsPerSide > 1 ? `${leadsPerSide} lead` : 'one leads'} — and play the game from the start.`
+    : leadsPerSide > 1
+      ? 'Turn 0 · team preview: pick both leads per side (selection order is the slot order) and play the game from the start.'
+      : 'Turn 0 · team preview: pick each side’s lead and play the game from the start.';
 }
 
 /**
@@ -95,33 +120,7 @@ function LeadColumn({ label, options, selected, leadsPerSide, maxPicks, onToggle
  */
 export function LeadPanel({ playerNames, p1Options, p2Options, leadsPerSide, bringCount, pickedLeads, executing, onStart }: Props) {
   const maxPicks = bringCount ?? leadsPerSide;
-  // A recorded variation choice wins; otherwise the real game's choice
-  // preselects: leads first (slot order), then the rest of the bring.
-  const fromPicked = (options: LeadOption[], picked: string[] | undefined) => {
-    const known = new Set(options.map(option => option.species));
-    const kept = (picked ?? []).filter(species => known.has(species)).slice(0, maxPicks);
-    return kept.length === maxPicks ? kept : null;
-  };
-  const initialFor = (options: LeadOption[], picked: string[] | undefined) =>
-    fromPicked(options, picked) ?? [
-      ...options.filter(option => option.wasLead),
-      ...options.filter(option => !option.wasLead && option.wasBrought),
-    ].slice(0, maxPicks).map(option => option.species);
-  const [p1Leads, setP1Leads] = useState<string[]>(() => initialFor(p1Options, pickedLeads?.p1));
-  const [p2Leads, setP2Leads] = useState<string[]>(() => initialFor(p2Options, pickedLeads?.p2));
-  // Returning to T0 after the variation recorded a choice: mirror it in
-  // place (render adjustment, not an effect — the props settle mid-render).
-  const pickedKey = JSON.stringify(pickedLeads ?? null);
-  const [seenPickedKey, setSeenPickedKey] = useState(pickedKey);
-  if (pickedKey !== seenPickedKey) {
-    setSeenPickedKey(pickedKey);
-    if (pickedLeads) {
-      const p1 = fromPicked(p1Options, pickedLeads.p1);
-      const p2 = fromPicked(p2Options, pickedLeads.p2);
-      if (p1) setP1Leads(p1);
-      if (p2) setP2Leads(p2);
-    }
-  }
+  const { p1Leads, p2Leads, toggleP1, toggleP2 } = useLeadSelection({ p1Options, p2Options, pickedLeads, maxPicks });
 
   if (p1Options.length === 0 || p2Options.length === 0) {
     return (
@@ -131,24 +130,11 @@ export function LeadPanel({ playerNames, p1Options, p2Options, leadsPerSide, bri
     );
   }
 
-  // Click toggles; a click past the limit replaces the OLDEST pick, so
-  // swapping one Pokémon never needs a deselect first.
-  const toggle = (setter: typeof setP1Leads) => (species: string) => {
-    setter(previous => (previous.includes(species)
-      ? previous.filter(entry => entry !== species)
-      : [...previous, species].slice(-maxPicks)));
-  };
-
   const ready = p1Leads.length === maxPicks && p2Leads.length === maxPicks;
-  const intro = bringCount !== null
-    ? `Turn 0 · team preview: pick the ${bringCount} each side brings — the first ${leadsPerSide > 1 ? `${leadsPerSide} lead` : 'one leads'} — and play the game from the start.`
-    : leadsPerSide > 1
-      ? 'Turn 0 · team preview: pick both leads per side (selection order is the slot order) and play the game from the start.'
-      : 'Turn 0 · team preview: pick each side’s lead and play the game from the start.';
   return (
     <div>
       <div style={{ fontSize: 10, color: '#9fb2cc', margin: '4px 0 2px' }}>
-        {intro}
+        {panelIntro(bringCount, leadsPerSide)}
       </div>
       <div className="ps-branch-controls-shell">
         <div className="ps-branch-controls-grid">
@@ -159,7 +145,7 @@ export function LeadPanel({ playerNames, p1Options, p2Options, leadsPerSide, bri
               selected={p1Leads}
               leadsPerSide={leadsPerSide}
               maxPicks={maxPicks}
-              onToggle={toggle(setP1Leads)}
+              onToggle={toggleP1}
             />
           </div>
           <div className="ps-side-divider" />
@@ -170,7 +156,7 @@ export function LeadPanel({ playerNames, p1Options, p2Options, leadsPerSide, bri
               selected={p2Leads}
               leadsPerSide={leadsPerSide}
               maxPicks={maxPicks}
-              onToggle={toggle(setP2Leads)}
+              onToggle={toggleP2}
             />
           </div>
         </div>

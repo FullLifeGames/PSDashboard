@@ -1,5 +1,7 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
-import { generateReplayHtml, createBlobUrl, revokeBlobUrl } from '../lib/replay-html';
+import { useRef, useState } from 'react';
+import {
+  useLiveAppend, useReplayBlobUrl, useSeekRequests, useSeekTurn, useTurnReports, type SeekRequest,
+} from '../hooks/useReplayFrame';
 
 interface Props {
   log: string;
@@ -25,7 +27,7 @@ interface Props {
    * the append stream). Bump `seq` to send; `play` starts playback there —
    * the "watch the line from its branch point" affordance.
    */
-  seekRequest?: { turn: number; seq: number; play?: boolean } | null;
+  seekRequest?: SeekRequest | null;
 }
 
 /**
@@ -48,6 +50,22 @@ export function PSReplayFrame(props: Props) {
   return <PSReplayFrameDocument key={key} {...props} documentLog={props.log} />;
 }
 
+function EmptyFrame({ height }: { height: number }) {
+  return (
+    <div style={{
+      height,
+      background: '#1a2a4c',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      color: '#556',
+      fontSize: 13,
+    }}>
+      No battle log loaded
+    </div>
+  );
+}
+
 function PSReplayFrameDocument({
   log,
   documentLog: initialDocumentLog,
@@ -67,146 +85,18 @@ function PSReplayFrameDocument({
   seekRequest = null,
 }: DocumentProps) {
   const iframeRef = useRef<HTMLIFrameElement>(null);
-  const sentLogRef = useRef<{ key: string; blobUrl: string; lines: string[] } | null>(null);
-  const didInitialLiveSeekRef = useRef(false);
-  const lastReportedTurnRef = useRef<number | null>(null);
   const reportTurn = !!onTurnChange;
   const [documentLog] = useState(initialDocumentLog);
   const [initialSeek] = useState(() => ({ seekTurn, autoPlay }));
 
-  const blobUrl = useMemo(() => {
-    if (!documentLog.trim()) {
-      return null;
-    }
-
-    const html = generateReplayHtml({
-      log: documentLog,
-      format,
-      p1,
-      p2,
-      title,
-      seekTurn: initialSeek.seekTurn,
-      autoPlay: initialSeek.autoPlay,
-      reportTurn,
-      viewpoint,
-    });
-    return createBlobUrl(html);
-  }, [documentLog, format, p1, p2, title, initialSeek, reportTurn, viewpoint]);
-
-  useEffect(() => {
-    if (!blobUrl) return;
-    return () => revokeBlobUrl(blobUrl);
-  }, [blobUrl]);
-
-  // Listen for turn change messages from the iframe
-  useEffect(() => {
-    if (!onTurnChange) return;
-
-    const handler = (e: MessageEvent) => {
-      if (e.data && e.data.type === 'ps-turn' && typeof e.data.turn === 'number') {
-        lastReportedTurnRef.current = e.data.turn;
-        onTurnChange(e.data.turn);
-      }
-    };
-
-    window.addEventListener('message', handler);
-    return () => window.removeEventListener('message', handler);
-  }, [onTurnChange]);
-
-  useEffect(() => {
-    lastReportedTurnRef.current = null;
-  }, [blobUrl]);
-
-  useEffect(() => {
-    if (seekTurn == null) return;
-    if (liveUpdates && didInitialLiveSeekRef.current) return;
-    // When the seekTurn change is just the echo of a turn the iframe itself
-    // reported (user pressed Play/Next inside the embed), re-seeking would
-    // pause playback after every turn (B9a) — skip it.
-    if (!liveUpdates && lastReportedTurnRef.current === seekTurn) return;
-    const sendSeek = () => iframeRef.current?.contentWindow?.postMessage({
-      type: 'ps-seek-turn',
-      turn: seekTurn,
-      autoPlay: !!autoPlay,
-    }, '*');
-    didInitialLiveSeekRef.current = true;
-    sendSeek();
-    const retry = window.setInterval(sendSeek, 200);
-    const stopRetry = window.setTimeout(() => window.clearInterval(retry), 1200);
-
-    const handler = (event: MessageEvent) => {
-      if (event.data?.type === 'ps-replay-ready') sendSeek();
-    };
-    window.addEventListener('message', handler);
-    return () => {
-      window.clearInterval(retry);
-      window.clearTimeout(stopRetry);
-      window.removeEventListener('message', handler);
-    };
-  }, [seekTurn, autoPlay, blobUrl, liveUpdates]);
-
-  // Explicit navigation/watch seeks (seekRequest): requests issued before this
-  // frame instance mounted are stale — the initial seekTurn already positioned
-  // it — so only seq bumps AFTER mount are sent. Short retry window because a
-  // bump can land while the embed is still booting.
-  const seenSeekSeqRef = useRef<number | null>(seekRequest?.seq ?? null);
-  useEffect(() => {
-    if (!seekRequest || seekRequest.seq === seenSeekSeqRef.current) return;
-    seenSeekSeqRef.current = seekRequest.seq;
-    const send = () => iframeRef.current?.contentWindow?.postMessage({
-      type: 'ps-seek-turn',
-      turn: seekRequest.turn,
-      autoPlay: !!seekRequest.play,
-    }, '*');
-    send();
-    const retry = window.setInterval(send, 200);
-    const stopRetry = window.setTimeout(() => window.clearInterval(retry), 1200);
-    return () => {
-      window.clearInterval(retry);
-      window.clearTimeout(stopRetry);
-    };
-  }, [seekRequest]);
-
-  useEffect(() => {
-    if (!liveUpdates || !blobUrl) return;
-
-    const lines = log.split('\n').filter(Boolean);
-    const previous = sentLogRef.current;
-    if (!previous || previous.key !== reloadKey || previous.blobUrl !== blobUrl) {
-      sentLogRef.current = { key: reloadKey, blobUrl, lines };
-      return;
-    }
-
-    const canAppend = previous.lines.length <= lines.length &&
-      previous.lines.every((line, index) => line === lines[index]);
-    if (canAppend && lines.length > previous.lines.length) {
-      const shouldPlayAppend = liveAppendMode === 'play' && typeof liveAppendTurn === 'number';
-      const holdAppend = liveAppendMode === 'hold';
-      iframeRef.current?.contentWindow?.postMessage({
-        type: 'ps-append-log',
-        lines: lines.slice(previous.lines.length),
-        seekTurn: holdAppend ? undefined : seekTurn,
-        followEnd: !shouldPlayAppend && !holdAppend,
-        playFromTurn: shouldPlayAppend ? liveAppendTurn : undefined,
-      }, '*');
-    }
-    sentLogRef.current = { key: reloadKey, blobUrl, lines };
-  }, [liveUpdates, reloadKey, blobUrl, log, seekTurn, liveAppendMode, liveAppendTurn]);
+  const blobUrl = useReplayBlobUrl({ documentLog, format, p1, p2, title, initialSeek, reportTurn, viewpoint });
+  const lastReportedTurnRef = useTurnReports(onTurnChange, blobUrl);
+  useSeekTurn({ iframeRef, seekTurn, autoPlay, blobUrl, liveUpdates, lastReportedTurnRef });
+  useSeekRequests(iframeRef, seekRequest);
+  useLiveAppend({ iframeRef, liveUpdates, reloadKey, blobUrl, log, seekTurn, liveAppendMode, liveAppendTurn });
 
   if (!blobUrl) {
-    return (
-      <div style={{
-        height,
-        background: '#1a2a4c',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        color: '#556',
-        fontSize: 13,
-      }}>
-        No battle log loaded
-      </div>
-    );
+    return <EmptyFrame height={height} />;
   }
 
   return (
