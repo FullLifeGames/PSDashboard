@@ -572,34 +572,6 @@ export const ratchetOverrides = [
   },
   {
     "files": [
-      "src/hooks/useBranch.ts"
-    ],
-    "rules": {
-      "max-lines": [
-        "error",
-        {
-          "max": 440,
-          "skipBlankLines": true,
-          "skipComments": true
-        }
-      ],
-      "max-lines-per-function": [
-        "error",
-        {
-          "max": 280,
-          "skipBlankLines": true,
-          "skipComments": true,
-          "IIFEs": true
-        }
-      ],
-      "complexity": [
-        "error",
-        46
-      ]
-    }
-  },
-  {
-    "files": [
       "src/lib/branch-choices.ts"
     ],
     "rules": {
