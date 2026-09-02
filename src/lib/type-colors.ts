@@ -1,5 +1,5 @@
 /** Pokémon Showdown's type colors, the badge backgrounds across the UI. */
-export const TYPE_BG: Record<string, string> = {
+const TYPE_BG: Record<string, string> = {
   Normal: '#A8A878',
   Fire: '#F08030',
   Water: '#6890F0',
