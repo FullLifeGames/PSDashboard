@@ -1,6 +1,7 @@
 import { Dex } from '@pkmn/sim';
 import type { RevealedPokemonInfo } from '../../types';
-import { findPokemonByNickname, toId } from './lookup';
+import { findPokemonByNickname } from './lookup';
+import { toId } from '../ids';
 
 /** The scan state one team inference carries from line to line. */
 export interface InferrerState {

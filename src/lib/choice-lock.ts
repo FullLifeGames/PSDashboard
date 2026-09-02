@@ -12,12 +12,11 @@ import type { DamageObservation } from '../types';
 import { CHOICE_ITEMS } from './eval/sensitivity';
 import { typedHiddenPowerId } from './hidden-power';
 import { inferOpponentTeam } from './opponent-inferrer';
+import { toId } from './ids';
 
 export interface ProtocolLock { species: string; moveId: string }
 export interface TrailState { species: string; moves: string[]; itemDisturbed: boolean }
 export type ChoiceLockTrails = Record<'p1' | 'p2', Map<number, TrailState | null>>;
-
-const toId = (value: string) => value.toLowerCase().replace(/[^a-z0-9]/g, '');
 
 /**
  * One forward walk over the log; the state AT each `|turn|N` marker is the

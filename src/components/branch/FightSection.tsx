@@ -2,12 +2,13 @@ import type { BranchMoveOption, BranchSwitchOption } from '../../hooks/useBranch
 import type { BranchSlotModifiers } from '../../lib/branch-engine';
 import type { DamageResult } from '../../lib/damage-calc';
 import type { SpreadTargetDamage } from '../../lib/branch-damage';
-import { choiceId, switchOptionKey, type BranchSlotChoice } from '../../lib/branch-choices';
+import { switchOptionKey, type BranchSlotChoice } from '../../lib/branch-choices';
 import type { Gimmick } from '../../hooks/useSideControlsState';
 import { ComboBox } from '../ComboBox';
 import { MoveBtn } from './ChoiceButtons';
 import { moveChoiceFor, pickedChoice, type ChoiceContext } from './choice-context';
 import type { PlayedPick } from './SideControls';
+import { toId } from '../../lib/ids';
 
 export interface WhatIfState {
   whatIfMove: string;
@@ -92,7 +93,7 @@ function ModifierRow({ label, modifiers, gimmick }: { label: string; modifiers: 
 function MoveGrid({ moves, advanced, dmgResults, spreadDamageResults, targetDamageResults, modifiers, pending, played, ctx, onChoice }: Pick<FightSectionProps,
   'moves' | 'advanced' | 'dmgResults' | 'spreadDamageResults' | 'targetDamageResults' | 'modifiers' | 'pending' | 'played' | 'onChoice'>
   & { ctx: ChoiceContext }) {
-  const playedMoveKey = played?.kind === 'move' ? choiceId(played.name) : null;
+  const playedMoveKey = played?.kind === 'move' ? toId(played.name) : null;
   return (
     <div className={`ps-movegrid${advanced ? '' : ' ps-movegrid-compact'}`}>
       {moves.map((m, i) => (
@@ -109,7 +110,7 @@ function MoveGrid({ moves, advanced, dmgResults, spreadDamageResults, targetDama
             ]),
           )}
           pendingChoice={pending}
-          wasPlayed={playedMoveKey !== null && choiceId(m.name) === playedMoveKey}
+          wasPlayed={playedMoveKey !== null && toId(m.name) === playedMoveKey}
           compact={!advanced}
           onClick={(targetLoc) => onChoice(moveChoiceFor(m, targetLoc, ctx))}
         />
@@ -166,7 +167,7 @@ function WhatIfRow({ label, moves, activeSpecies, movePool, whatIf, onHypothetic
   return (
     <>
       <ComboBox
-        options={movePool.filter(name => !moves.some(known => choiceId(known.name) === choiceId(name)))}
+        options={movePool.filter(name => !moves.some(known => toId(known.name) === toId(name)))}
         value={whatIfMove}
         onChange={setWhatIfMove}
         onSelect={setWhatIfMove}
@@ -189,12 +190,12 @@ function WhatIfRow({ label, moves, activeSpecies, movePool, whatIf, onHypothetic
         className="ps-btn"
         disabled={
           !whatIfMove.trim() ||
-          !movePool.some(name => choiceId(name) === choiceId(whatIfMove))
+          !movePool.some(name => toId(name) === toId(whatIfMove))
         }
         onClick={() => {
           onHypotheticalMove({
             species: activeSpecies,
-            move: movePool.find(name => choiceId(name) === choiceId(whatIfMove)) ?? whatIfMove.trim(),
+            move: movePool.find(name => toId(name) === toId(whatIfMove)) ?? whatIfMove.trim(),
             replace: moves.length >= 4 ? (whatIfReplace ?? moves[moves.length - 1].name) : null,
           });
           setWhatIfMove('');

@@ -1,7 +1,8 @@
 import type { BranchSlotChoice } from '../branch-choices';
 import type { BranchChoiceErrorLog, BranchExecuteResult, BranchRuntime, SimBattle, SimPokemon } from './types';
-import { normalizeBattleOnlyFormeId, slotLetter, toId } from './team-order';
+import { normalizeBattleOnlyFormeId, slotLetter } from './team-order';
 import { targetLocSuffixForChoice } from './protocol-choices';
+import { toId } from '../ids';
 
 export function sleep(ms: number) {
   return new Promise(resolve => setTimeout(resolve, ms));

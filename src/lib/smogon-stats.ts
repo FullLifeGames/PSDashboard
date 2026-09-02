@@ -1,6 +1,7 @@
 import type { PokemonFieldInfo, PokemonMoveInfo } from '../types';
 import type { PokemonUsageStats, SmogonUsageStats, SpeciesUsageSet, UsageProbability } from './smogon/stats-types';
-import { dataPkmnStatsUrl, parseSmogonChaosStats, sourceDetail, toId } from './smogon/stats-parse';
+import { dataPkmnStatsUrl, parseSmogonChaosStats, sourceDetail } from './smogon/stats-parse';
+import { toId } from './ids';
 
 export type { PokemonUsageStats, SmogonUsageStats, SpeciesUsageSet, UsageProbability, UsageSpread } from './smogon/stats-types';
 export { parseSmogonChaosStats, parseSpread } from './smogon/stats-parse';

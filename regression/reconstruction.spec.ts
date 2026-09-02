@@ -8,10 +8,7 @@ import {
 import { parseReplayLog } from '../src/lib/protocol-parser';
 import { parseExportedReplay } from '../src/lib/replay-file';
 import { inferReplayFormatId } from '../src/lib/replay-format';
-
-function toId(name: string): string {
-  return name.toLowerCase().replace(/[^a-z0-9]/g, '');
-}
+import { toId } from '../src/lib/ids';
 
 function loadFixtureReplay() {
   return JSON.parse(readFileSync('e2e/fixtures/replay.json', 'utf-8')) as {

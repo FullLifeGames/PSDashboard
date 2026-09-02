@@ -1,5 +1,6 @@
 import type { BranchMoveOption, BranchSwitchOption } from './branch-engine';
 import { splitCombinedLabel } from './eval/analysis';
+import { toId } from './ids';
 
 export interface BranchChoiceActive {
   fainted: boolean;
@@ -24,10 +25,6 @@ const MODIFIER_LABELS: Record<BranchMoveModifier, string> = {
   zmove: 'Z',
   ultra: 'Ultra',
 };
-
-export function choiceId(value: string): string {
-  return value.toLowerCase().replace(/[^a-z0-9]/g, '');
-}
 
 function formatTargetLoc(targetLoc: number): string {
   return targetLoc > 0 ? `+${targetLoc}` : `${targetLoc}`;
@@ -65,11 +62,11 @@ export function notationSideLabel(
 
 export function switchChoiceKey(choice: BranchSlotChoice | null | undefined): string | null {
   if (!choice || choice.kind !== 'switch') return null;
-  return `${choice.speciesId}|${choiceId(choice.pokemonName)}`;
+  return `${choice.speciesId}|${toId(choice.pokemonName)}`;
 }
 
 export function switchOptionKey(option: Pick<BranchSwitchOption, 'species' | 'name'>): string {
-  return `${choiceId(option.species)}|${choiceId(option.name)}`;
+  return `${toId(option.species)}|${toId(option.name)}`;
 }
 
 export function requiredChoicesForActiveSlots(
@@ -125,8 +122,8 @@ function resolveCustomMove(
       return { ok: false, error: `No move in slot ${slot}: this Pokémon has ${moves.length} move${moves.length === 1 ? '' : 's'}.` };
     }
   } else {
-    const id = choiceId(nameOrSlot);
-    move = moves.find(candidate => choiceId(candidate.name) === id);
+    const id = toId(nameOrSlot);
+    move = moves.find(candidate => toId(candidate.name) === id);
     if (!move) {
       return { ok: false, error: `"${nameOrSlot}" is not one of this Pokémon's moves.` };
     }
@@ -136,7 +133,7 @@ function resolveCustomMove(
     return { ok: false, error: `${move.name} is disabled and can't be used right now.` };
   }
 
-  const baseChoice = { kind: 'move' as const, moveId: choiceId(move.name), moveName: move.name };
+  const baseChoice = { kind: 'move' as const, moveId: toId(move.name), moveName: move.name };
 
   if (move.targetOptions.length > 0) {
     if (targetRaw !== undefined) {
@@ -168,15 +165,15 @@ function resolveCustomSwitch(
       return { ok: false, error: `No Pokémon can switch in from slot ${slot}.` };
     }
   } else {
-    const id = choiceId(nameOrSlot);
-    target = switches.find(candidate => choiceId(candidate.name) === id || choiceId(candidate.species) === id);
+    const id = toId(nameOrSlot);
+    target = switches.find(candidate => toId(candidate.name) === id || toId(candidate.species) === id);
     if (!target) {
       return { ok: false, error: `"${nameOrSlot}" is not available to switch in.` };
     }
   }
   return {
     ok: true,
-    choice: { kind: 'switch', speciesId: choiceId(target.species), pokemonName: target.name },
+    choice: { kind: 'switch', speciesId: toId(target.species), pokemonName: target.name },
   };
 }
 

@@ -1,8 +1,9 @@
 import type { BranchMoveOption, BranchSwitchOption } from '../../hooks/useBranch';
 import type { DamageResult } from '../../lib/damage-calc';
 import type { SpreadTargetDamage } from '../../lib/branch-damage';
-import { choiceId, type BranchSlotChoice } from '../../lib/branch-choices';
+import type { BranchSlotChoice } from '../../lib/branch-choices';
 import { spriteUrl } from '../../lib/sprite-url';
+import { toId } from '../../lib/ids';
 
 /* ── PS type colors ── */
 const TYPE_BG: Record<string, string> = {
@@ -145,7 +146,7 @@ export function MoveBtn({ move, dmg, spreadDamage, zMoveName, targetDamage, pend
 }) {
   const bg = typeBg(move.type);
   const pendingMove = pendingChoice?.kind === 'move' ? pendingChoice : null;
-  const selected = pendingMove?.moveId === choiceId(move.name);
+  const selected = pendingMove?.moveId === toId(move.name);
   const selectedTarget = selected
     ? move.targetOptions.find(target => target.targetLoc === pendingMove?.targetLoc)
     : null;

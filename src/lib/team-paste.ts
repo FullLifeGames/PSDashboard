@@ -1,5 +1,6 @@
 import type { OpponentTeamInfo, PokemonEvs } from '../types';
 import { EMPTY_EVS, itemSetValue, manualEvs, manualField, manualMove } from './team-info';
+import { toId } from './ids';
 
 /**
  * Lightweight Showdown-export parser for pasted teams (G15). Deliberately
@@ -22,10 +23,6 @@ export interface PastedSet {
 const STAT_KEYS: Record<string, keyof PokemonEvs> = {
   hp: 'hp', atk: 'atk', def: 'def', spa: 'spa', spd: 'spd', spe: 'spe',
 };
-
-function toId(name: string): string {
-  return name.toLowerCase().replace(/[^a-z0-9]/g, '');
-}
 
 function parseEvLine(line: string): PokemonEvs | undefined {
   const evs: PokemonEvs = { ...EMPTY_EVS };

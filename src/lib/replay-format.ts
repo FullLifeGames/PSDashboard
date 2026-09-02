@@ -1,11 +1,11 @@
 import { Dex } from '@pkmn/sim';
 import type { ReplayData, TurnSnapshot } from '../types';
+import { toId } from './ids';
 
 type ReplayFormatSource = Partial<Pick<ReplayData, 'id' | 'format' | 'formatid' | 'log'>>;
 
-function toId(value: string | undefined): string {
-  return (value || '').toLowerCase().replace(/[^a-z0-9]+/g, '');
-}
+/** Optional-input wrapper: an absent field normalizes to the empty id. */
+const optionalId = (value: string | undefined): string => toId(value ?? '');
 
 /**
  * Splits Showdown's `-{password}pw` suffix off a private replay id
@@ -39,7 +39,7 @@ function extractGen(source: ReplayFormatSource & { formatid?: string }): string 
   const fromLog = source.log?.match(/^\|gen\|(\d+)/m)?.[1];
   if (fromLog) return fromLog;
 
-  const fromFormat = toId(source.format || extractTier(source.log)).match(/gen(\d+)/)?.[1];
+  const fromFormat = optionalId(source.format || extractTier(source.log)).match(/gen(\d+)/)?.[1];
   if (fromFormat) return fromFormat;
 
   return '9';
@@ -47,7 +47,7 @@ function extractGen(source: ReplayFormatSource & { formatid?: string }): string 
 
 export function getReplayGameType(log: string | undefined): string | null {
   const raw = log?.match(/^\|gametype\|([^|\n]+)/m)?.[1];
-  return raw ? toId(raw) : null;
+  return raw ? optionalId(raw) : null;
 }
 
 /**
@@ -65,16 +65,16 @@ function normalizeInferredFormatId(id: string, source: ReplayFormatSource): stri
 }
 
 export function inferReplayFormatId(source: ReplayFormatSource): string {
-  const explicit = toId(source.formatid);
+  const explicit = optionalId(source.formatid);
   if (explicit) return normalizeInferredFormatId(explicit, source);
 
-  const fromReplayId = toId(stripReplayNumber(source.id));
+  const fromReplayId = optionalId(stripReplayNumber(source.id));
   if (fromReplayId) return normalizeInferredFormatId(fromReplayId, source);
 
-  const fromTier = toId(extractTier(source.log));
+  const fromTier = optionalId(extractTier(source.log));
   if (fromTier) return normalizeInferredFormatId(fromTier, source);
 
-  const fromFormat = toId(source.format);
+  const fromFormat = optionalId(source.format);
   if (fromFormat) return normalizeInferredFormatId(fromFormat, source);
 
   return `gen${extractGen(source)}ou`;
@@ -100,7 +100,7 @@ function logShowsSecondSleep(log: string): boolean {
   let lastMoveWasRest = false;
   for (const line of log.split('\n')) {
     if (line.startsWith('|move|')) {
-      lastMoveWasRest = toId(line.split('|')[3]) === 'rest';
+      lastMoveWasRest = optionalId(line.split('|')[3]) === 'rest';
       continue;
     }
     const status = line.match(/^\|-status\|(p[12])[a-d]?: ([^|\n]+)\|slp/);
@@ -174,7 +174,7 @@ export function getReplayBringCount(source: ReplayFormatSource): number | null {
  */
 export function speciesBaseId(name: string): string {
   const species = Dex.species.get(name);
-  return toId(species.exists ? species.baseSpecies || species.name : name);
+  return optionalId(species.exists ? species.baseSpecies || species.name : name);
 }
 
 /**

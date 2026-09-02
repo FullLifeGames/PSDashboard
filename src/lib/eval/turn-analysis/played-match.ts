@@ -4,6 +4,7 @@ import { Dex } from '@pkmn/dex';
 import type { EvalResult, RankedChoice } from '../types';
 import type { PlayedAction, PlayedTurn } from '../played';
 import type { SideAnalysis } from './types';
+import { toId } from '../../ids';
 
 /**
  * Matching the protocol's played actions into the engine's ranked lists:
@@ -11,8 +12,6 @@ import type { SideAnalysis } from './types';
  * hidden), the stay-in phantom for sides KO'd before acting, and the
  * condensed "why" between a played and a recommended choice.
  */
-
-const choiceKeyOf = (name: string): string => name.toLowerCase().replace(/[^a-z0-9]/g, '');
 
 /**
  * Pure self-boosting moves. The maximin worst case prices a setup turn as
@@ -33,7 +32,7 @@ const SETUP_MOVES = new Set([
 export function playedSetupMove(side: SideAnalysis): string | null {
   const actions = side.playedSlots?.filter((action): action is PlayedAction => action !== null) ??
     (side.playedRaw ? [side.playedRaw] : []);
-  const setup = actions.find(action => action.kind === 'move' && SETUP_MOVES.has(choiceKeyOf(action.name)));
+  const setup = actions.find(action => action.kind === 'move' && SETUP_MOVES.has(toId(action.name)));
   return setup?.name ?? null;
 }
 
@@ -62,7 +61,7 @@ function slotMatches(choicePart: string, labelPart: string, action: PlayedAction
     return false;
   }
   const tokens = choicePart.split(' ');
-  if (tokens[0] !== 'move' || tokens[1] !== choiceKeyOf(action.name)) return false;
+  if (tokens[0] !== 'move' || tokens[1] !== toId(action.name)) return false;
   // Every gimmick marker must agree — a mega move must match the mega
   // variant, never the base option (VGC 2026 brought Megas back to gen 9).
   if (tokens.includes('terastallize') !== !!action.tera) return false;
@@ -233,7 +232,7 @@ export function matchPlayedChoice(
   const options = result.perSide[side];
   if (action.kind === 'move') {
     const gimmick = action.tera ? ' terastallize' : action.mega ? ' mega' : action.ultra ? ' ultra' : '';
-    const choice = `move ${choiceKeyOf(action.name)}${gimmick}`;
+    const choice = `move ${toId(action.name)}${gimmick}`;
     return options.find(option => option.choice === choice) ?? null;
   }
   // Labels carry species names; the nickname is only a fallback for logs

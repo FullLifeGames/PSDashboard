@@ -1,10 +1,7 @@
 import type {
   ChaosStatsPayload, PkmnStatsPayload, PokemonUsageStats, SmogonUsageStats, UsageProbability, UsageSpread,
 } from './stats-types';
-
-export function toId(name: string): string {
-  return name.toLowerCase().replace(/[^a-z0-9]/g, '');
-}
+import { toId } from '../ids';
 
 export function sourceDetail(format: string, month: string): string {
   return `Smogon ${format} ${month}`;

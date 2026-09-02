@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import type { SmogonSetAssumptions } from '../lib/smogon-sets';
+import { toId } from '../lib/ids';
 
 interface SmogonSetAssumptionsState {
   key?: string;
@@ -13,10 +14,6 @@ const EMPTY_STATE: SmogonSetAssumptionsState = {
   loading: false,
   error: null,
 };
-
-function toId(name: string): string {
-  return name.toLowerCase().replace(/[^a-z0-9]/g, '');
-}
 
 export function useSmogonSetAssumptions(
   formatid: string | undefined,

@@ -1,4 +1,5 @@
 import { useEffect, useId, useMemo, useState } from 'react';
+import { toId } from '../lib/ids';
 
 interface Props {
   options: string[];
@@ -17,10 +18,6 @@ interface Props {
 }
 
 const MAX_VISIBLE_OPTIONS = 100;
-
-function toId(name: string): string {
-  return name.toLowerCase().replace(/[^a-z0-9]/g, '');
-}
 
 /** Prefix matches first, then substring matches; the raw list for an empty query. */
 function filterOptions(options: string[], value: string): string[] {

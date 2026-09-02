@@ -2,6 +2,7 @@ import { Dex } from '@pkmn/sim';
 import type { PokemonSet } from '@pkmn/sim';
 import { getSpeciesUsageStats, type SmogonUsageStats } from './smogon-stats';
 import type { HiddenPowerEvidence } from '../types';
+import { toId } from './ids';
 
 /**
  * Typeless "Hidden Power" resolution (round 2, agenda item ⑤): the replay
@@ -15,8 +16,6 @@ export const HP_TYPES = [
   'Bug', 'Dark', 'Dragon', 'Electric', 'Fighting', 'Fire', 'Flying', 'Ghost',
   'Grass', 'Ground', 'Ice', 'Poison', 'Psychic', 'Rock', 'Steel', 'Water',
 ] as const;
-
-const toId = (value: string) => value.toLowerCase().replace(/[^a-z0-9]/g, '');
 
 type Marker = HiddenPowerEvidence['marker'];
 

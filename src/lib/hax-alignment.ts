@@ -1,4 +1,5 @@
 import type { PRNGSeed } from '@pkmn/sim';
+import { toId } from './ids';
 
 /**
  * Hax alignment: the replay reconstruction replays the real game's choices,
@@ -13,8 +14,6 @@ import type { PRNGSeed } from '@pkmn/sim';
  * PURE module: type-only sim imports. App.tsx imports it statically; a
  * runtime @pkmn/sim import here would drag the sim into the main chunk.
  */
-
-const toId = (name: string) => name.toLowerCase().replace(/[^a-z0-9]/g, '');
 
 /** `${side}:${nameId}` — slot letters dropped so a diverged doubles slot
  *  layout cannot fake a mismatch. */

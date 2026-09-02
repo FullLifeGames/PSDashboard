@@ -15,10 +15,6 @@ export function normalizeBattleOnlyForme(species: string): string {
   return species;
 }
 
-export function toId(value: string): string {
-  return value.toLowerCase().replace(/[^a-z0-9]/g, '');
-}
-
 export function parseDetails(details: string): { species: string; level: number; gender: string } | null {
   if (!details) return null;
   const parts = details.split(', ');

@@ -1,4 +1,5 @@
 import type { TeraAllowance } from './types';
+import { toId } from '../ids';
 
 /**
  * Tera-rights resolution. Draft leagues grant Terastallization to specific
@@ -74,12 +75,10 @@ export function resolveTeraPreference(
   return true;
 }
 
-const slug = (name: string) => name.toLowerCase().replace(/[^a-z0-9]/g, '');
-
 /** Stable, store-key-safe encoding of an allowance. */
 export function teraKey(tera: TeraAllowance | undefined): string {
   if (tera === undefined || tera === true) return '1';
   if (tera === false) return '0';
-  const encode = (list: string[]) => [...list].map(slug).sort().join('.');
+  const encode = (list: string[]) => [...list].map(toId).sort().join('.');
   return `r-${encode(tera.p1)}-${encode(tera.p2)}`;
 }

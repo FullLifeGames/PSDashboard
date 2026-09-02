@@ -1,7 +1,6 @@
 import { test, expect } from '@playwright/test';
 import {
   branchSideChoicesReady,
-  choiceId,
   conflictingSwitchTargets,
   describeSlotChoice,
   evalChoiceToSlotChoices,
@@ -13,15 +12,16 @@ import {
   type BranchSlotChoice,
 } from '../src/lib/branch-choices';
 import type { BranchMoveOption, BranchSwitchOption, BranchTargetOption } from '../src/lib/branch-engine';
+import { toId } from '../src/lib/ids';
 
 function switchTo(species: string, name = species): BranchSlotChoice {
-  return { kind: 'switch', speciesId: choiceId(species), pokemonName: name };
+  return { kind: 'switch', speciesId: toId(species), pokemonName: name };
 }
 
 function moveBy(name: string, targetLoc?: number): BranchSlotChoice {
   return {
     kind: 'move',
-    moveId: choiceId(name),
+    moveId: toId(name),
     moveName: name,
     ...(targetLoc !== undefined ? { targetLoc } : {}),
   };

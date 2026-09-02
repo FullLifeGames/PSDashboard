@@ -1,5 +1,6 @@
 import type { SimBattle, SimPokemon } from './types';
-import { normalizeBattleOnlyFormeId, slotLetter, toId } from './team-order';
+import { normalizeBattleOnlyFormeId, slotLetter } from './team-order';
+import { toId } from '../ids';
 
 export function replayLogPrefixThroughTurn(replayLog: string, targetTurn: number): string[] {
   const prefix: string[] = [];

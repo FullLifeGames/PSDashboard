@@ -4,7 +4,6 @@ import type { BranchSlotModifiers } from '../../lib/branch-engine';
 import type { DamageResult } from '../../lib/damage-calc';
 import type { SpreadTargetDamage } from '../../lib/branch-damage';
 import {
-  choiceId,
   notationSlotChoice,
   switchChoiceKey,
   switchOptionKey,
@@ -13,6 +12,7 @@ import {
 import { useGimmick, useMovePool } from '../../hooks/useSideControlsState';
 import { SwitchBtn } from './ChoiceButtons';
 import { FightSection, type WhatIfState } from './FightSection';
+import { toId } from '../../lib/ids';
 
 /** What the viewed line actually played at this position (badge on the
  *  matching button + header note): the replay's action on the main line,
@@ -99,7 +99,7 @@ function TabRow({ tab, setTab }: { tab: 'fight' | 'switch'; setTab: (tab: 'fight
 
 function SwitchGrid({ switches, advanced, forceSwitch, pending, blockedSwitchKeys, played, onChoice }: Pick<SideControlsProps,
   'switches' | 'advanced' | 'forceSwitch' | 'pending' | 'blockedSwitchKeys' | 'played' | 'onChoice'>) {
-  const playedSwitchKey = played?.kind === 'switch' ? choiceId(played.species || played.name) : null;
+  const playedSwitchKey = played?.kind === 'switch' ? toId(played.species || played.name) : null;
   return (
     <div className={`ps-switchgrid${!advanced && !forceSwitch ? ' ps-switchgrid-compact' : ''}`}>
       {switches.map(sw => {
@@ -111,9 +111,9 @@ function SwitchGrid({ switches, advanced, forceSwitch, pending, blockedSwitchKey
             selected={selected}
             disabled={blockedSwitchKeys.has(switchOptionKey(sw)) && !selected}
             disabledReason={`${sw.name} is already chosen as the switch-in for your other slot.`}
-            wasPlayed={playedSwitchKey !== null && (choiceId(sw.species) === playedSwitchKey || choiceId(sw.name) === playedSwitchKey)}
+            wasPlayed={playedSwitchKey !== null && (toId(sw.species) === playedSwitchKey || toId(sw.name) === playedSwitchKey)}
             compact={!advanced && !forceSwitch}
-            onClick={() => onChoice({ kind: 'switch', speciesId: choiceId(sw.species), pokemonName: sw.name })}
+            onClick={() => onChoice({ kind: 'switch', speciesId: toId(sw.species), pokemonName: sw.name })}
           />
         );
       })}

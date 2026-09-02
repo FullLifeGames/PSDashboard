@@ -1,7 +1,8 @@
 import type { Battle, Pokemon, Side } from '@pkmn/sim';
 import type { TeraAllowance } from '../types';
-import { choiceKey, sideIndex } from './ids';
+import { sideIndex } from './ids';
 import { positionBattle, type ChoiceOption, type SimPosition } from './position';
+import { toId } from '../../ids';
 
 /**
  * The legal choices of one side at a position: team preview leads, the
@@ -44,7 +45,7 @@ function requestMoveKey(move: ActiveRequestSlot['moves'][number]): string {
   // Happiness moves display with computed BP ("Return 102") — the entry's
   // id is the token the sim accepts; the display name is only the label.
   const id = 'id' in move ? (move as { id?: string }).id : undefined;
-  return id || choiceKey(move.move);
+  return id || toId(move.move);
 }
 
 /** The once-per-battle gimmicks the request offers this slot. */

@@ -2,6 +2,7 @@ import type { Battle, Pokemon, Side, Field } from '@pkmn/client';
 import type { GenerationNum } from '@pkmn/data';
 import type { PokemonSnapshot, SideSnapshot, FieldSnapshot } from '../../types';
 import { flushSpeedOrder, gens, speedContaminatedAt, type ClientIdent, type ParserState, type PendingMove } from './parser-state';
+import { toId } from '../ids';
 
 const SCREEN_IDS = ['reflect', 'lightscreen', 'auroraveil'];
 
@@ -90,7 +91,7 @@ export function handleMove(state: ParserState, line: string) {
   const ident = parts[2] ?? '';
   const side: 'p1' | 'p2' = ident.startsWith('p1') ? 'p1' : 'p2';
   const mover = ident ? battle.getPokemon(ident as ClientIdent) : undefined;
-  const moveId = (parts[3] ?? '').toLowerCase().replace(/[^a-z0-9]/g, '');
+  const moveId = toId(parts[3] ?? '');
   const { cleanFirst, cleanSecond } = speedCleanliness(state, ident, moveId);
   const speciesForme = mover?.speciesForme ?? '';
   state.lastMove = pendingMoveFor(parts, moveId, side, speciesForme, cleanFirst);

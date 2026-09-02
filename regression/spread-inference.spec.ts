@@ -2,6 +2,7 @@ import { test, expect } from '@playwright/test';
 import { Generations, Pokemon, Move, calculate } from '@smogon/calc';
 import type { PokemonSet } from '@pkmn/sim';
 import { inferSpreads } from '../src/lib/spread-inference';
+import { toId } from '../src/lib/ids';
 import type { DamageObservation } from '../src/types';
 
 const gen = Generations.get(9);
@@ -28,7 +29,7 @@ function observe(moveName: string, defEvs: Partial<Record<'hp' | 'def' | 'spd', 
     attackerSpecies: 'Landorus-Therian',
     defenderSpecies: 'Uxie',
     attackerSide: 'p2',
-    moveId: moveName.toLowerCase().replace(/[^a-z0-9]/g, ''),
+    moveId: toId(moveName),
     observedFraction: mid / defender.maxHP(),
     attackerBoosts: {}, defenderBoosts: {}, attackerStatus: '',
     screens: [], weather: '',

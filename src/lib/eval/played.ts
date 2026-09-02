@@ -4,6 +4,7 @@
  */
 
 import type { TurnSnapshot } from '../../types';
+import { toId } from '../ids';
 
 export interface PlayedAction {
   kind: 'move' | 'switch';
@@ -58,8 +59,6 @@ const slotOf = (pokemonRef: string): { side: SideId; slot: number } | null => {
 
 const nickname = (pokemonRef: string): string => pokemonRef.replace(/^p[12][a-c]: /, '');
 
-const choiceKey = (name: string): string => name.toLowerCase().replace(/[^a-z0-9]/g, '');
-
 /** The U-turn family — moves whose follow-up switch is part of the choice. */
 const PIVOT_MOVE_NAMES = new Set([
   'uturn', 'voltswitch', 'flipturn', 'partingshot', 'teleport', 'batonpass',
@@ -109,7 +108,7 @@ function noteSwitch(scan: PlayedScan, side: SideId, ref: string, species: string
     // record which Pokémon the player brought in (grading distinguishes
     // "U-turn → the wall" from "U-turn → the wincon").
     const action = scan.actions[side];
-    if (action && action.kind === 'move' && PIVOT_MOVE_NAMES.has(choiceKey(action.name)) &&
+    if (action && action.kind === 'move' && PIVOT_MOVE_NAMES.has(toId(action.name)) &&
       action.pivotTarget === undefined) {
       action.pivotTarget = species;
     }
@@ -262,8 +261,6 @@ export function parsePlayedActionsDoubles(lines: string[]): PlayedTurn {
   return { p1: null, p2: null, p1Slots: scan.slots.p1, p2Slots: scan.slots.p2 };
 }
 
-const normalizeName = (name: string) => name.toLowerCase().replace(/[^a-z0-9]/g, '');
-
 /** A Pokémon fed to the opponent while nearly dead — its loss cost almost nothing. */
 export interface SackInfo {
   name: string;
@@ -350,10 +347,10 @@ function sackForFaint(
   entered: Entered,
   dragged: Set<string>,
 ): SackInfo | undefined {
-  const nameId = normalizeName(name);
+  const nameId = toId(name);
   const snapshotSide = side === 'p1' ? snapshotBefore.p1 : snapshotBefore.p2;
   const pokemon = snapshotSide.pokemon.find(entry =>
-    normalizeName(entry.name) === nameId || normalizeName(entry.speciesForme) === nameId);
+    toId(entry.name) === nameId || toId(entry.speciesForme) === nameId);
   if (pokemon?.fainted) return undefined;
   if (pokemon && pokemon.hpPercent / 100 <= SACK_HP_THRESHOLD) {
     return { name, hpFraction: pokemon.hpPercent / 100 };

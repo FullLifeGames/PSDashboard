@@ -1,5 +1,6 @@
 import type { RevealedPokemonInfo, StatId } from '../types';
 import { manualMove } from './team-info';
+import { toId } from './ids';
 
 export interface EditorPools {
   items: string[];
@@ -7,10 +8,6 @@ export interface EditorPools {
   natures: readonly string[];
   movesBySpecies: Record<string, string[]>;
   abilitiesBySpecies: Record<string, string[]>;
-}
-
-export function toId(name: string): string {
-  return name.toLowerCase().replace(/[^a-z0-9]/g, '');
 }
 
 export function sourceLabel(source: RevealedPokemonInfo['ability']['source'], probability?: number) {

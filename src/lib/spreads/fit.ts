@@ -5,6 +5,7 @@ import { WEATHER_BY_ID } from '../damage-calc';
 import { typedHiddenPowerId } from '../hidden-power';
 import { evBudget, ZERO_EVS, type EvBudget } from './ev-budget';
 import type { CandidateRung, SpreadCandidate } from './ladder';
+import { toId } from '../ids';
 
 /**
  * A violated move-order constraint outweighs any damage-fit error: the log
@@ -21,8 +22,6 @@ const OBSERVATION_SLACK = 0.02;
 const WEATHER_ALIASES: Record<string, string> = {
   sand: 'sandstorm', rain: 'raindance', sun: 'sunnyday',
 };
-
-export const toId = (name: string) => name.toLowerCase().replace(/[^a-z0-9]/g, '');
 
 const weatherFor = (raw: string) => WEATHER_BY_ID[WEATHER_ALIASES[toId(raw)] ?? toId(raw)];
 

@@ -1,5 +1,6 @@
 import type { PokemonEvs } from '../../types';
 import { capToBudget, ZERO_EVS, type EvBudget } from './ev-budget';
+import { toId } from '../ids';
 
 export interface SpreadCandidate {
   evs: PokemonEvs;
@@ -10,8 +11,6 @@ export interface CandidateRung {
   evs: PokemonEvs;
   nature: string;
 }
-
-const toId = (name: string) => name.toLowerCase().replace(/[^a-z0-9]/g, '');
 
 /** The stat a nature boosts — for deciding whether a rung must neutralize it. */
 const NATURE_PLUS: Record<string, keyof PokemonEvs> = {

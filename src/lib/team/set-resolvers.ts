@@ -6,13 +6,10 @@ import { applyCoherenceVetoes, selectCuratedSet, type MoveCandidate } from '../s
 import { itemSetValue } from '../team-info';
 import type { SpreadCandidate } from '../spread-inference';
 import type { KnowledgeSource, PokemonEvs, RevealedPokemonInfo } from '../../types';
+import { toId } from '../ids';
 
 type SmogonSet = ReturnType<typeof getSpeciesSetAssumption>;
 type CuratedSet = ReturnType<typeof selectCuratedSet>;
-
-function toId(name: string): string {
-  return name.toLowerCase().replace(/[^a-z0-9]/g, '');
-}
 
 /** User-edited or in-game-revealed spread fields: they outrank every guess and every sheet. */
 export interface EditedFields {

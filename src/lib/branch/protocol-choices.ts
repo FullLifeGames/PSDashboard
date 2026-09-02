@@ -1,6 +1,7 @@
 import { Dex } from '@pkmn/sim';
 import type { PokemonIdent, SimBattle, SimPokemon, SimSide, TurnBlock } from './types';
-import { formatTargetLoc, normalizeBattleOnlyFormeId, slotLetter, toId } from './team-order';
+import { formatTargetLoc, normalizeBattleOnlyFormeId, slotLetter } from './team-order';
+import { toId } from '../ids';
 
 export function parseTurnBlocks(log: string): { preGame: string[]; turns: TurnBlock[] } {
   const lines = log.split('\n');

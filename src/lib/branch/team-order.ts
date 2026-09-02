@@ -1,10 +1,7 @@
 import type { PokemonSet } from '@pkmn/sim';
 import { speciesBaseId } from '../replay-format';
 import type { PokemonIdent } from './types';
-
-export function toId(name: string): string {
-  return name.toLowerCase().replace(/[^a-z0-9]/g, '');
-}
+import { toId } from '../ids';
 
 /**
  * Fields only the brought species (VGC's 4 of 6, BSS's 3 of 6). Resolution

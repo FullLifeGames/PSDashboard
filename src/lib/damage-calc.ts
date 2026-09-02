@@ -1,5 +1,6 @@
 import { Generations, Pokemon, Move, Field, calculate } from '@smogon/calc';
 import type { SimPokemonInfo, BranchMoveOption } from '../hooks/useBranch';
+import { toId } from './ids';
 
 type CalcPokemonOptions = ConstructorParameters<typeof Pokemon>[2];
 type CalcBoosts = NonNullable<CalcPokemonOptions>['boosts'];
@@ -31,7 +32,7 @@ export interface DamageCalcContext {
 }
 
 function toConditionId(value: string | undefined): string {
-  return (value || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+  return toId(value ?? '');
 }
 
 export const WEATHER_BY_ID: Record<string, NonNullable<CalcWeather>> = {

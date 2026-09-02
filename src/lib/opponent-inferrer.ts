@@ -1,11 +1,12 @@
 import type { OpponentTeamInfo, RevealedPokemonInfo } from '../types';
 import { guessedField, revealedField, unknownEvs, unknownField } from './team-info';
 import { createInferrerState } from './inference/inferrer-state';
-import { findPokemonByNickname, toId } from './inference/lookup';
+import { findPokemonByNickname } from './inference/lookup';
 import {
   addFromPreview, addFromSwitch, noteEntry, noteGravity, noteMoveOrBoundary, recordAbility, recordAbilityAttribution,
   recordConsumedItem, recordHealItem, recordItem, recordItemDamage, recordMega, recordMove, recordTera, ruleOutFromDamage,
 } from './inference/handlers';
+import { toId } from './ids';
 
 /** "SitrusBerry" / "HighHorsepower" (packed names) → "Sitrus Berry" / "High Horsepower". */
 function splitPackedName(value: string): string {

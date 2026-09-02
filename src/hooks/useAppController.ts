@@ -8,7 +8,8 @@ import { useEngineController } from './controller/engine-controller';
 import type { EngineController } from './controller/engine-controller';
 import { useGameAnalysis } from './useGameAnalysis';
 import { manualMove } from '../lib/team-info';
-import { choiceId, type BranchSlotChoice } from '../lib/branch-choices';
+import type { BranchSlotChoice } from '../lib/branch-choices';
+import { toId } from '../lib/ids';
 
 /** The refresh request that re-runs the branch with the edited teams and the
  *  hypothetical move seeded as the acting slot's pending choice. */
@@ -26,7 +27,7 @@ function seededRefreshRequest(args: {
   const seedChoices = (choices: (BranchSlotChoice | null)[], seedSide: 'p1' | 'p2') => {
     const next = [...choices];
     if (seedSide === side) {
-      next[activeSlot] = { kind: 'move' as const, moveId: choiceId(move), moveName: move };
+      next[activeSlot] = { kind: 'move' as const, moveId: toId(move), moveName: move };
     }
     return next;
   };
@@ -59,9 +60,8 @@ function useHypotheticalMove(ctx: ReplayContext, board: BoardController) {
     // seeded slot would belong to the tip, not the viewed position.
     if (variationSpan !== null && !liveTip) return;
 
-    const speciesId = (name: string) => name.toLowerCase().replace(/[^a-z0-9]/g, '');
     const pokemon = sideInfo.pokemon.map(entry => {
-      if (speciesId(entry.species) !== speciesId(params.species)) return entry;
+      if (toId(entry.species) !== toId(params.species)) return entry;
       const withoutReplaced = params.replace
         ? entry.moves.filter(move => move.name !== params.replace)
         : entry.moves.slice(0, 3);

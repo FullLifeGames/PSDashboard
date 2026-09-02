@@ -2,6 +2,7 @@ import { getSpeciesUsageSet, type SmogonUsageStats, type UsageProbability, type 
 import { getSpeciesSetAssumption, type SetAssumption, type SetSpreadAssumption, type SmogonSetAssumptions } from './smogon-sets';
 import { applyCoherenceVetoes, selectCuratedSet, type MoveCandidate } from './set-coherence';
 import type { OpponentTeamInfo, PokemonEvs, PokemonEvsInfo, PokemonFieldInfo, PokemonMoveInfo, RevealedPokemonInfo } from '../types';
+import { toId } from './ids';
 
 export const EMPTY_EVS: PokemonEvs = { hp: 0, atk: 0, def: 0, spa: 0, spd: 0, spe: 0 };
 
@@ -51,11 +52,10 @@ export function applyInferredSpreads(
   inferred: Map<string, { evs: PokemonEvs; nature: string }> | null,
 ): OpponentTeamInfo {
   if (!inferred || inferred.size === 0) return info;
-  const idOfSpecies = (species: string) => species.toLowerCase().replace(/[^a-z0-9]/g, '');
   return {
     ...info,
     pokemon: info.pokemon.map(pokemon => {
-      const candidate = inferred.get(`${side}:${idOfSpecies(pokemon.species)}`);
+      const candidate = inferred.get(`${side}:${toId(pokemon.species)}`);
       if (!candidate) return pokemon;
       const evsGuessed = pokemon.evs.source === 'guessed' || pokemon.evs.source === 'unknown';
       const natureGuessed = !pokemon.nature || pokemon.nature.source === 'guessed' || pokemon.nature.source === 'unknown';
@@ -101,11 +101,9 @@ function guessedMoveFromSet(move: SetAssumption): PokemonMoveInfo {
   };
 }
 
-const idOf = (name: string) => name.toLowerCase().replace(/[^a-z0-9]/g, '');
-
 function allowedSetFallback(setFallback: SetAssumption | undefined, ruledOut?: string[]): SetAssumption | undefined {
   if (!setFallback) return undefined;
-  return (ruledOut ?? []).includes(idOf(setFallback.value)) ? undefined : setFallback;
+  return (ruledOut ?? []).includes(toId(setFallback.value)) ? undefined : setFallback;
 }
 
 /**
@@ -172,7 +170,7 @@ function normalizeNatureField(
  * one (G12).
  */
 function moveDedupKey(name: string): string {
-  const id = name.toLowerCase().replace(/[^a-z0-9]/g, '');
+  const id = toId(name);
   return id.startsWith('hiddenpower') ? 'hiddenpower' : id;
 }
 
@@ -191,17 +189,17 @@ type CuratedSet = ReturnType<typeof selectCuratedSet>;
  */
 function curatedSetFor(pokemon: RevealedPokemonInfo, usageSet: SpeciesUsage, smogonSet: SmogonSet): CuratedSet | null {
   const proven = (field: PokemonFieldInfo) =>
-    field.source === 'revealed' || field.source === 'manual' ? idOf(field.value) : '';
+    field.source === 'revealed' || field.source === 'manual' ? toId(field.value) : '';
   return smogonSet ? selectCuratedSet([smogonSet, ...(smogonSet.alternatives ?? [])], {
     revealedMoves: pokemon.moves
       .filter(move => move.source === 'revealed' || move.source === 'manual')
-      .map(move => idOf(move.name)),
+      .map(move => toId(move.name)),
     revealedItem: proven(pokemon.item),
     revealedAbility: proven(pokemon.ability),
     ruledOutItems: pokemon.ruledOut?.items ?? [],
     ruledOutAbilities: pokemon.ruledOut?.abilities ?? [],
     usageProbability: moveId =>
-      usageSet?.moves.find(move => idOf(move.value) === moveId)?.probability ?? 0,
+      usageSet?.moves.find(move => toId(move.value) === moveId)?.probability ?? 0,
   }) : null;
 }
 
@@ -241,7 +239,7 @@ function assembleMovePool(
  */
 function vetoedMoves(pool: MoveCandidate[], infoFor: Map<string, PokemonMoveInfo>, itemValue: string): PokemonMoveInfo[] {
   const moves: PokemonMoveInfo[] = [];
-  for (const candidate of applyCoherenceVetoes(pool, { itemId: idOf(itemSetValue(itemValue)) })) {
+  for (const candidate of applyCoherenceVetoes(pool, { itemId: toId(itemSetValue(itemValue)) })) {
     const move = infoFor.get(candidate.name);
     if (!move) continue;
     if (!candidate.guessed || moves.length < 4) moves.push(move);
@@ -260,7 +258,7 @@ function withTypedHiddenPower(
 ): PokemonMoveInfo[] {
   return hpTypeResolver
     ? moves.map(move => {
-      if (idOf(move.name) !== 'hiddenpower') return move;
+      if (toId(move.name) !== 'hiddenpower') return move;
       const resolved = hpTypeResolver(species);
       return resolved ? { ...move, name: resolved, sourceDetail: 'HP type via evidence/usage' } : move;
     })

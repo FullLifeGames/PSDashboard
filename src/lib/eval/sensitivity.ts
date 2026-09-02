@@ -5,6 +5,8 @@
  * like any other serialized position.
  */
 
+import { toId } from '../ids';
+
 export interface SensitivityTarget {
   species: string;
   /** Usage-plausible alternative items (rule-outs already applied), in order. */
@@ -23,7 +25,6 @@ interface SerializedBattleShape {
   sides?: { pokemon?: SerializedMon[] }[];
 }
 
-const toId = (value: string) => value.toLowerCase().replace(/[^a-z0-9]/g, '');
 export const CHOICE_ITEMS = new Set(['choiceband', 'choicespecs', 'choicescarf']);
 
 const sideIndex = (side: 'p1' | 'p2') => (side === 'p1' ? 0 : 1);

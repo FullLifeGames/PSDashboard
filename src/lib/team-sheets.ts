@@ -2,6 +2,7 @@ import type { PokemonSet } from '@pkmn/sim';
 import type {
   OpponentTeamInfo, PokemonEvs, PokemonFieldInfo, PokemonMoveInfo, RevealedPokemonInfo,
 } from '../types';
+import { toId } from './ids';
 
 /**
  * Display overlay for posted open team sheets: knowledge the engine already
@@ -11,8 +12,6 @@ import type {
  */
 
 const SHEET_DETAIL = 'from the team sheet posted in the replay chat';
-
-const toId = (name: string): string => name.toLowerCase().replace(/[^a-z0-9]/g, '');
 
 /** Proven or user-stated knowledge always beats the sheet. */
 const locked = (source: string): boolean => source === 'revealed' || source === 'manual';

@@ -9,10 +9,7 @@ import {
   assembleMoves, buildSheetSet, editedFields, findUserMatch, resolveAbility, resolveItem, resolveSpread, selectCuratedFor,
 } from './team/set-resolvers';
 import type { DamageObservation, HiddenPowerEvidence, OpponentTeamInfo, RevealedPokemonInfo, SpeedOrderObservation } from '../types';
-
-function toId(name: string): string {
-  return name.toLowerCase().replace(/[^a-z0-9]/g, '');
-}
+import { toId } from './ids';
 
 /** Usage-move candidates fetched per species — vetoes refill from the tail. */
 const USAGE_MOVE_POOL = 10;

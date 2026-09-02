@@ -1,7 +1,8 @@
 import type { Battle, PRNGSeed, Side } from '@pkmn/sim';
-import { choiceKey, sideIndex } from './ids';
+import { sideIndex } from './ids';
 import { toPosition, type SimPosition } from './position';
 import { applyChoice, forkBattle, resolveForcedSwitches } from './switches';
+import { toId } from '../../ids';
 
 /**
  * One-turn advances under a fixed seed: the search's advance (greedy
@@ -52,12 +53,12 @@ export interface TrialAdvanceResult {
 
 /** First bench slot matching the species/name id, or null. */
 function benchSlotForSpecies(battle: Battle, sideIdx: 0 | 1, species: string): number | null {
-  const wanted = choiceKey(species);
+  const wanted = toId(species);
   const side = battle.sides[sideIdx];
   for (let index = 0; index < side.pokemon.length; index++) {
     const pokemon = side.pokemon[index];
     if (pokemon.isActive || pokemon.fainted) continue;
-    if (choiceKey(pokemon.species?.name || '') === wanted || choiceKey(pokemon.name || '') === wanted) {
+    if (toId(pokemon.species?.name || '') === wanted || toId(pokemon.name || '') === wanted) {
       return index + 1;
     }
   }

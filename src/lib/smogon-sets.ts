@@ -2,6 +2,7 @@ import { Generations } from '@pkmn/data';
 import { Dex } from '@pkmn/dex';
 import { Smogon } from '@pkmn/smogon';
 import type { ID } from '@pkmn/data';
+import { toId } from './ids';
 
 export interface SetAssumption {
   value: string;
@@ -45,10 +46,6 @@ type AssumptionSet = {
 
 const gens = new Generations(Dex);
 const cache = new Map<string, Promise<SmogonSetAssumptions | null>>();
-
-function toId(name: string): string {
-  return name.toLowerCase().replace(/[^a-z0-9]/g, '');
-}
 
 function genFromFormat(formatId: string | undefined): number {
   const match = toId(formatId || 'gen9ou').match(/^gen(\d+)/);

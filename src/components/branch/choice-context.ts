@@ -1,7 +1,8 @@
 import type { BranchMoveOption, BranchSwitchOption } from '../../hooks/useBranch';
 import type { BranchSlotModifiers } from '../../lib/branch-engine';
 import type { BranchMoveModifier } from '../../lib/branch-choices';
-import { choiceId, type BranchSlotChoice } from '../../lib/branch-choices';
+import type { BranchSlotChoice } from '../../lib/branch-choices';
+import { toId } from '../../lib/ids';
 
 /** What turning a button click into a choice needs: the active gimmick and the side's options. */
 export interface ChoiceContext {
@@ -16,7 +17,7 @@ export function withModifier(choice: BranchSlotChoice, ctx: ChoiceContext): Bran
   if (choice.kind !== 'move' || !modifier || !modifierAvailable) return choice;
   // A Z toggle only applies to moves that actually have a Z option.
   if (modifier === 'zmove') {
-    const moveIndex = moves.findIndex(candidate => choiceId(candidate.name) === choice.moveId);
+    const moveIndex = moves.findIndex(candidate => toId(candidate.name) === choice.moveId);
     if (moveIndex < 0 || !modifiers.zMoves[moveIndex]) return choice;
   }
   return { ...choice, modifier };
@@ -25,7 +26,7 @@ export function withModifier(choice: BranchSlotChoice, ctx: ChoiceContext): Bran
 export function moveChoiceFor(move: BranchMoveOption, targetLoc: number | undefined, ctx: ChoiceContext): BranchSlotChoice {
   return withModifier({
     kind: 'move',
-    moveId: choiceId(move.name),
+    moveId: toId(move.name),
     moveName: move.name,
     ...(targetLoc !== undefined ? { targetLoc } : {}),
   }, ctx);
@@ -44,7 +45,7 @@ export function pickedChoice(value: string, switches: BranchSwitchOption[], ctx:
   if (kind === 'switch') {
     const target = switches.find(candidate => candidate.slot === slot);
     if (!target) return null;
-    return { kind: 'switch', speciesId: choiceId(target.species), pokemonName: target.name };
+    return { kind: 'switch', speciesId: toId(target.species), pokemonName: target.name };
   }
   return null;
 }
