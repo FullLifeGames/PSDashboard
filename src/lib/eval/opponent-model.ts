@@ -35,59 +35,72 @@ export interface PlayerTendencies {
   repeatBias: number;
 }
 
+/** The running counts of one side's tendency scan. */
+interface TendencyScan {
+  moves: number;
+  switches: number;
+  repeats: number;
+  repeatChances: number;
+  lastMove: string | null;
+  settledThisTurn: boolean;
+  moved: boolean;
+  /** Leads before |turn|1 are not choices. */
+  started: boolean;
+  /** Replacements after own faints are forced, not chosen. */
+  pendingFaints: number;
+}
+
+/** Books one protocol line into the scan: turn markers, forced replacements, then the first move or non-pivot switch. */
+function noteTendencyLine(scan: TendencyScan, line: string, side: 'p1' | 'p2'): void {
+  if (line.startsWith('|turn|')) {
+    scan.started = true;
+    scan.settledThisTurn = false;
+    scan.moved = false;
+    return;
+  }
+  if (line.startsWith(`|faint|${side}`)) {
+    scan.pendingFaints += 1;
+    return;
+  }
+  if (line.startsWith(`|switch|${side}`) && scan.pendingFaints > 0) {
+    scan.pendingFaints -= 1;
+    return;
+  }
+  if (!scan.started || scan.settledThisTurn) return;
+  if (line.startsWith(`|move|${side}`)) {
+    const move = line.split('|')[3] ?? '';
+    scan.moves += 1;
+    if (scan.lastMove !== null) {
+      scan.repeatChances += 1;
+      if (move === scan.lastMove) scan.repeats += 1;
+    }
+    scan.lastMove = move;
+    scan.settledThisTurn = true;
+    scan.moved = true;
+  } else if (line.startsWith(`|switch|${side}`) && !line.includes('[from]') && !scan.moved) {
+    scan.switches += 1;
+    scan.lastMove = null;
+    scan.settledThisTurn = true;
+  }
+}
+
 /**
  * Per-side action tendencies from the replay protocol: the first |move| or
  * non-pivot |switch| after each |turn| marker is that side's main choice.
  */
 export function parseTendencies(log: string, side: 'p1' | 'p2'): PlayerTendencies {
-  let moves = 0;
-  let switches = 0;
-  let repeats = 0;
-  let repeatChances = 0;
-  let lastMove: string | null = null;
-  let settledThisTurn = false;
-  let moved = false;
-  let started = false; // leads before |turn|1 are not choices
-  let pendingFaints = 0; // replacements after own faints are forced, not chosen
+  const scan: TendencyScan = {
+    moves: 0, switches: 0, repeats: 0, repeatChances: 0, lastMove: null,
+    settledThisTurn: false, moved: false, started: false, pendingFaints: 0,
+  };
 
-  for (const line of log.split('\n')) {
-    if (line.startsWith('|turn|')) {
-      started = true;
-      settledThisTurn = false;
-      moved = false;
-      continue;
-    }
-    if (line.startsWith(`|faint|${side}`)) {
-      pendingFaints += 1;
-      continue;
-    }
-    if (line.startsWith(`|switch|${side}`) && pendingFaints > 0) {
-      pendingFaints -= 1;
-      continue;
-    }
-    if (!started || settledThisTurn) continue;
-    if (line.startsWith(`|move|${side}`)) {
-      const move = line.split('|')[3] ?? '';
-      moves += 1;
-      if (lastMove !== null) {
-        repeatChances += 1;
-        if (move === lastMove) repeats += 1;
-      }
-      lastMove = move;
-      settledThisTurn = true;
-      moved = true;
-    } else if (line.startsWith(`|switch|${side}`) && !line.includes('[from]') && !moved) {
-      switches += 1;
-      lastMove = null;
-      settledThisTurn = true;
-    }
-  }
+  for (const line of log.split('\n')) noteTendencyLine(scan, line, side);
 
-  const total = moves + switches;
+  const total = scan.moves + scan.switches;
   return {
-    attackRate: total > 0 ? moves / total : 0.5,
-    switchRate: total > 0 ? switches / total : 0.5,
-    repeatBias: repeatChances > 0 ? repeats / repeatChances : 0,
+    attackRate: total > 0 ? scan.moves / total : 0.5,
+    switchRate: total > 0 ? scan.switches / total : 0.5,
+    repeatBias: scan.repeatChances > 0 ? scan.repeats / scan.repeatChances : 0,
   };
 }
 
@@ -98,6 +111,50 @@ export function parseTendencies(log: string, side: 'p1' | 'p2'): PlayerTendencie
  */
 const isSwitchChoice = (choiceId: string | undefined, label: string): boolean =>
   choiceId !== undefined ? /^(?:switch |team )/.test(choiceId) : (label.startsWith('→') || label.startsWith('Lead '));
+
+/**
+ * Status-quo-biased reference for MY play: humans click what is best
+ * against the field AS IT STANDS, discounting switch-outs — softmaxing
+ * against my full equilibrium mix would find only indifference (that is
+ * what equilibrium support means). My mix restricted to move options,
+ * renormalized; uniform over moves as fallback; full mix if I can only switch.
+ */
+function statusQuoMix(rawMyMix: number[], myLabels: string[], myChoices: string[] | undefined): number[] {
+  const moveIndices = myLabels.map((label, index) => ({ label, index }))
+    .filter(entry => !isSwitchChoice(myChoices?.[entry.index], entry.label))
+    .map(entry => entry.index);
+  const myMix = new Array<number>(myLabels.length).fill(0);
+  if (moveIndices.length > 0) {
+    let mass = 0;
+    for (const index of moveIndices) mass += rawMyMix[index] ?? 0;
+    for (const index of moveIndices) {
+      myMix[index] = mass > 0 ? (rawMyMix[index] ?? 0) / mass : 1 / moveIndices.length;
+    }
+  } else {
+    for (let index = 0; index < myMix.length; index++) myMix[index] = rawMyMix[index] ?? 0;
+  }
+  return myMix;
+}
+
+/**
+ * Tendency prior: reallocate mass between move-kind and switch-kind option
+ * groups toward the player's observed rates; within-group shape stands.
+ */
+function applyTendencies(
+  probs: number[],
+  tendencies: PlayerTendencies,
+  choices: string[] | undefined,
+  labels: string[],
+): number[] {
+  const switchMass = probs.reduce((sum, p, index) => sum + (isSwitchChoice(choices?.[index], labels[index]) ? p : 0), 0);
+  const moveMass = 1 - switchMass;
+  if (!(switchMass > 0 && moveMass > 0)) return probs;
+  const scaled = probs.map((p, index) => isSwitchChoice(choices?.[index], labels[index])
+    ? p * (tendencies.switchRate / switchMass)
+    : p * (tendencies.attackRate / moveMass));
+  const total = scaled.reduce((sum, p) => sum + p, 0);
+  return scaled.map(p => p / total);
+}
 
 /**
  * The opponent model for `side`'s Read: probabilities over the OTHER side's
@@ -115,25 +172,7 @@ export function modelOpponent(
   const myChoices = side === 'p1' ? matrix.p1Choices : matrix.p2Choices;
   const equilibrium = matrix.mixes[opponent];
 
-  // Status-quo-biased reference for MY play: humans click what is best
-  // against the field AS IT STANDS, discounting switch-outs — softmaxing
-  // against my full equilibrium mix would find only indifference (that is
-  // what equilibrium support means). My mix restricted to move options,
-  // renormalized; uniform over moves as fallback; full mix if I can only switch.
-  const rawMyMix = matrix.mixes[side];
-  const moveIndices = myLabels.map((label, index) => ({ label, index }))
-    .filter(entry => !isSwitchChoice(myChoices?.[entry.index], entry.label))
-    .map(entry => entry.index);
-  const myMix = new Array<number>(myLabels.length).fill(0);
-  if (moveIndices.length > 0) {
-    let mass = 0;
-    for (const index of moveIndices) mass += rawMyMix[index] ?? 0;
-    for (const index of moveIndices) {
-      myMix[index] = mass > 0 ? (rawMyMix[index] ?? 0) / mass : 1 / moveIndices.length;
-    }
-  } else {
-    for (let index = 0; index < myMix.length; index++) myMix[index] = rawMyMix[index] ?? 0;
-  }
+  const myMix = statusQuoMix(matrix.mixes[side], myLabels, myChoices);
 
   // The opponent's own EV per option against the status-quo reference.
   const ownEv = labels.map((_, index) => {
@@ -152,21 +191,40 @@ export function modelOpponent(
   let probs = labels.map((_, index) =>
     READ_LAMBDA * (equilibrium[index] ?? 0) + (1 - READ_LAMBDA) * (weights[index] / weightTotal));
 
-  // Tendency prior: reallocate mass between move-kind and switch-kind option
-  // groups toward the player's observed rates; within-group shape stands.
-  if (tendencies) {
-    const switchMass = probs.reduce((sum, p, index) => sum + (isSwitchChoice(choices?.[index], labels[index]) ? p : 0), 0);
-    const moveMass = 1 - switchMass;
-    if (switchMass > 0 && moveMass > 0) {
-      probs = probs.map((p, index) => isSwitchChoice(choices?.[index], labels[index])
-        ? p * (tendencies.switchRate / switchMass)
-        : p * (tendencies.attackRate / moveMass));
-      const total = probs.reduce((sum, p) => sum + p, 0);
-      probs = probs.map(p => p / total);
-    }
-  }
+  if (tendencies) probs = applyTendencies(probs, tendencies, choices, labels);
 
   return { probs, confidence: Math.max(...probs) };
+}
+
+/** The argmax rows against the model and against the equilibrium (first encounter wins ties). */
+function bestResponses(
+  myLabels: string[],
+  oppLabels: string[],
+  model: OpponentModel,
+  oppEquilibrium: number[],
+  ownValue: (mine: number, theirs: number) => number,
+): { bestRead: number; bestReadEv: number; bestEquilibrium: number } {
+  let bestRead = 0;
+  let bestReadEv = -Infinity;
+  let bestEquilibrium = 0;
+  let bestEquilibriumEv = -Infinity;
+  for (let mine = 0; mine < myLabels.length; mine++) {
+    let modelEv = 0;
+    let equilibriumEv = 0;
+    for (let theirs = 0; theirs < oppLabels.length; theirs++) {
+      modelEv += model.probs[theirs] * ownValue(mine, theirs);
+      equilibriumEv += (oppEquilibrium[theirs] ?? 0) * ownValue(mine, theirs);
+    }
+    if (modelEv > bestReadEv) {
+      bestReadEv = modelEv;
+      bestRead = mine;
+    }
+    if (equilibriumEv > bestEquilibriumEv) {
+      bestEquilibriumEv = equilibriumEv;
+      bestEquilibrium = mine;
+    }
+  }
+  return { bestRead, bestReadEv, bestEquilibrium };
 }
 
 /**
@@ -190,26 +248,7 @@ export function computeRead(
     side === 'p1' ? matrix.values[mine][theirs] : -matrix.values[theirs][mine];
 
   const oppEquilibrium = matrix.mixes[side === 'p1' ? 'p2' : 'p1'];
-  let bestRead = 0;
-  let bestReadEv = -Infinity;
-  let bestEquilibrium = 0;
-  let bestEquilibriumEv = -Infinity;
-  for (let mine = 0; mine < myLabels.length; mine++) {
-    let modelEv = 0;
-    let equilibriumEv = 0;
-    for (let theirs = 0; theirs < oppLabels.length; theirs++) {
-      modelEv += model.probs[theirs] * ownValue(mine, theirs);
-      equilibriumEv += (oppEquilibrium[theirs] ?? 0) * ownValue(mine, theirs);
-    }
-    if (modelEv > bestReadEv) {
-      bestReadEv = modelEv;
-      bestRead = mine;
-    }
-    if (equilibriumEv > bestEquilibriumEv) {
-      bestEquilibriumEv = equilibriumEv;
-      bestEquilibrium = mine;
-    }
-  }
+  const { bestRead, bestReadEv, bestEquilibrium } = bestResponses(myLabels, oppLabels, model, oppEquilibrium, ownValue);
 
   if (bestRead === bestEquilibrium) return null;
 

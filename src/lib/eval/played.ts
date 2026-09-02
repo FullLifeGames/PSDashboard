@@ -42,16 +42,18 @@ export interface PlayedTurn {
   prevented?: { p1?: string; p2?: string };
 }
 
-const sideOf = (pokemonRef: string): 'p1' | 'p2' | null => {
+type SideId = 'p1' | 'p2';
+
+const sideOf = (pokemonRef: string): SideId | null => {
   if (pokemonRef.startsWith('p1')) return 'p1';
   if (pokemonRef.startsWith('p2')) return 'p2';
   return null;
 };
 
-const slotOf = (pokemonRef: string): { side: 'p1' | 'p2'; slot: number } | null => {
+const slotOf = (pokemonRef: string): { side: SideId; slot: number } | null => {
   const match = pokemonRef.match(/^(p[12])([a-c])/);
   if (!match) return null;
-  return { side: match[1] as 'p1' | 'p2', slot: match[2].charCodeAt(0) - 97 };
+  return { side: match[1] as SideId, slot: match[2].charCodeAt(0) - 97 };
 };
 
 const nickname = (pokemonRef: string): string => pokemonRef.replace(/^p[12][a-c]: /, '');
@@ -64,6 +66,72 @@ const PIVOT_MOVE_NAMES = new Set([
   'chillyreception', 'shedtail',
 ]);
 
+/** The singles scan: per side the settled action, the gimmick flags, and why a choice never surfaced. */
+interface PlayedScan {
+  actions: { p1: PlayedAction | null; p2: PlayedAction | null };
+  settled: Record<SideId, boolean>;
+  tera: Record<SideId, boolean>;
+  mega: Record<SideId, boolean>;
+  ultra: Record<SideId, boolean>;
+  prevented: { p1?: string; p2?: string };
+}
+
+function noteGimmick(scan: PlayedScan, tag: string, side: SideId): void {
+  if (tag === '-terastallize') scan.tera[side] = true;
+  else if (tag === '-mega') scan.mega[side] = true;
+  else scan.ultra[side] = true;
+}
+
+/**
+ * The side's queued choice was cancelled (or never shown) — whatever
+ * follows for it (replacements) is not the chosen action. Record WHY
+ * when no action had surfaced yet, so the report can say so.
+ */
+function notePrevented(scan: PlayedScan, tag: string, side: SideId, reason: string | undefined): void {
+  if (!scan.settled[side] && scan.actions[side] === null && scan.prevented[side] === undefined) {
+    scan.prevented[side] = tag === 'faint' ? 'faint' : (reason ?? 'prevented');
+  }
+  scan.settled[side] = true;
+}
+
+function noteMove(scan: PlayedScan, side: SideId, name: string): void {
+  if (scan.settled[side]) return;
+  scan.actions[side] = {
+    kind: 'move', name, tera: scan.tera[side],
+    ...(scan.mega[side] ? { mega: true } : {}), ...(scan.ultra[side] ? { ultra: true } : {}),
+  };
+  scan.settled[side] = true;
+}
+
+function noteSwitch(scan: PlayedScan, side: SideId, ref: string, species: string): void {
+  if (scan.settled[side]) {
+    // A switch after the side's own PIVOT move is the pair's other half —
+    // record which Pokémon the player brought in (grading distinguishes
+    // "U-turn → the wall" from "U-turn → the wincon").
+    const action = scan.actions[side];
+    if (action && action.kind === 'move' && PIVOT_MOVE_NAMES.has(choiceKey(action.name)) &&
+      action.pivotTarget === undefined) {
+      action.pivotTarget = species;
+    }
+    return;
+  }
+  scan.actions[side] = { kind: 'switch', name: nickname(ref), species };
+  scan.settled[side] = true;
+}
+
+/** Dispatches one protocol line with a side to its handler; other tags are not choices. */
+function notePlayedLine(scan: PlayedScan, tag: string, side: SideId, parts: string[]): void {
+  if (tag === '-terastallize' || tag === '-mega' || tag === '-burst') {
+    noteGimmick(scan, tag, side);
+  } else if (tag === 'faint' || tag === 'cant') {
+    notePrevented(scan, tag, side, parts[3]);
+  } else if (tag === 'move') {
+    noteMove(scan, side, parts[3] ?? '');
+  } else if (tag === 'switch') {
+    noteSwitch(scan, side, parts[2] ?? '', (parts[3] ?? '').split(',')[0].trim());
+  }
+}
+
 /**
  * Per side, the chosen action is its first `|move|` or `|switch|` line —
  * with the protocol's traps excluded: switches after the side already moved
@@ -72,72 +140,24 @@ const PIVOT_MOVE_NAMES = new Set([
  * never surfaced (the side stays unknown rather than guessed).
  */
 export function parsePlayedActions(lines: string[]): PlayedTurn {
-  const actions: { p1: PlayedAction | null; p2: PlayedAction | null } = { p1: null, p2: null };
-  const settled = { p1: false, p2: false };
-  const tera = { p1: false, p2: false };
-  const mega = { p1: false, p2: false };
-  const ultra = { p1: false, p2: false };
-  const prevented: { p1?: string; p2?: string } = {};
+  const scan: PlayedScan = {
+    actions: { p1: null, p2: null },
+    settled: { p1: false, p2: false },
+    tera: { p1: false, p2: false },
+    mega: { p1: false, p2: false },
+    ultra: { p1: false, p2: false },
+    prevented: {},
+  };
 
   for (const line of lines) {
     const parts = line.split('|');
     const tag = parts[1];
     if (!tag) continue;
-
-    if (tag === '-terastallize' || tag === '-mega' || tag === '-burst') {
-      const side = sideOf(parts[2] ?? '');
-      if (side) {
-        if (tag === '-terastallize') tera[side] = true;
-        else if (tag === '-mega') mega[side] = true;
-        else ultra[side] = true;
-      }
-      continue;
-    }
-    if (tag === 'faint' || tag === 'cant') {
-      // The side's queued choice was cancelled (or never shown) — whatever
-      // follows for it (replacements) is not the chosen action. Record WHY
-      // when no action had surfaced yet, so the report can say so.
-      const side = sideOf(parts[2] ?? '');
-      if (side) {
-        if (!settled[side] && actions[side] === null && prevented[side] === undefined) {
-          prevented[side] = tag === 'faint' ? 'faint' : (parts[3] ?? 'prevented');
-        }
-        settled[side] = true;
-      }
-      continue;
-    }
-    if (tag === 'move') {
-      const side = sideOf(parts[2] ?? '');
-      if (!side || settled[side]) continue;
-      actions[side] = {
-        kind: 'move', name: parts[3] ?? '', tera: tera[side],
-        ...(mega[side] ? { mega: true } : {}), ...(ultra[side] ? { ultra: true } : {}),
-      };
-      settled[side] = true;
-      continue;
-    }
-    if (tag === 'switch') {
-      const side = sideOf(parts[2] ?? '');
-      if (!side) continue;
-      const species = (parts[3] ?? '').split(',')[0].trim();
-      if (settled[side]) {
-        // A switch after the side's own PIVOT move is the pair's other half —
-        // record which Pokémon the player brought in (grading distinguishes
-        // "U-turn → the wall" from "U-turn → the wincon").
-        const action = actions[side];
-        if (action && action.kind === 'move' && PIVOT_MOVE_NAMES.has(choiceKey(action.name)) &&
-          action.pivotTarget === undefined) {
-          action.pivotTarget = species;
-        }
-        continue;
-      }
-      actions[side] = { kind: 'switch', name: nickname(parts[2] ?? ''), species };
-      settled[side] = true;
-      continue;
-    }
+    const side = sideOf(parts[2] ?? '');
+    if (side) notePlayedLine(scan, tag, side, parts);
   }
 
-  return { ...actions, ...(prevented.p1 || prevented.p2 ? { prevented } : {}) };
+  return { ...scan.actions, ...(scan.prevented.p1 || scan.prevented.p2 ? { prevented: scan.prevented } : {}) };
 }
 
 /**
@@ -165,16 +185,70 @@ export function parseLeadSpecies(log: string): { p1: string[]; p2: string[] } {
   return leads;
 }
 
+/** The doubles scan: per side and slot the settled action and the gimmick flags. */
+interface DoublesScan {
+  slots: Record<SideId, (PlayedAction | null)[]>;
+  settled: Record<SideId, boolean[]>;
+  tera: Record<SideId, boolean[]>;
+  mega: Record<SideId, boolean[]>;
+  ultra: Record<SideId, boolean[]>;
+}
+
+type SlotRef = { side: SideId; slot: number };
+
+/** A slot's move with its target location, unless the slot already settled. */
+function noteDoublesMove(scan: DoublesScan, ref: SlotRef, parts: string[]): void {
+  if (scan.settled[ref.side][ref.slot]) return;
+  const target = slotOf(parts[4] ?? '');
+  const targetLoc = target === null || target.slot > 1
+    ? null
+    : target.side === ref.side ? -(target.slot + 1) : target.slot + 1;
+  scan.slots[ref.side][ref.slot] = {
+    kind: 'move', name: parts[3] ?? '', tera: scan.tera[ref.side][ref.slot],
+    ...(scan.mega[ref.side][ref.slot] ? { mega: true } : {}),
+    ...(scan.ultra[ref.side][ref.slot] ? { ultra: true } : {}),
+    targetLoc,
+  };
+  scan.settled[ref.side][ref.slot] = true;
+}
+
+/** A slot's switch-in, unless the slot already settled. */
+function noteDoublesSwitch(scan: DoublesScan, ref: SlotRef, parts: string[]): void {
+  if (scan.settled[ref.side][ref.slot]) return;
+  const species = (parts[3] ?? '').split(',')[0].trim();
+  scan.slots[ref.side][ref.slot] = { kind: 'switch', name: nickname(parts[2] ?? ''), species };
+  scan.settled[ref.side][ref.slot] = true;
+}
+
+/** The same settle rules as the singles scan, applied per slot. */
+function noteDoublesLine(scan: DoublesScan, tag: string, ref: SlotRef, parts: string[]): void {
+  if (tag === '-terastallize') {
+    scan.tera[ref.side][ref.slot] = true;
+  } else if (tag === '-mega') {
+    scan.mega[ref.side][ref.slot] = true;
+  } else if (tag === '-burst') {
+    scan.ultra[ref.side][ref.slot] = true;
+  } else if (tag === 'faint' || tag === 'cant') {
+    scan.settled[ref.side][ref.slot] = true;
+  } else if (tag === 'move') {
+    noteDoublesMove(scan, ref, parts);
+  } else if (tag === 'switch') {
+    noteDoublesSwitch(scan, ref, parts);
+  }
+}
+
 /**
  * Doubles variant: the same settle rules applied per SLOT (a/b), plus move
  * target locations so combined engine choices can be matched exactly.
  */
 export function parsePlayedActionsDoubles(lines: string[]): PlayedTurn {
-  const slots: Record<'p1' | 'p2', (PlayedAction | null)[]> = { p1: [null, null], p2: [null, null] };
-  const settled: Record<'p1' | 'p2', boolean[]> = { p1: [false, false], p2: [false, false] };
-  const tera: Record<'p1' | 'p2', boolean[]> = { p1: [false, false], p2: [false, false] };
-  const mega: Record<'p1' | 'p2', boolean[]> = { p1: [false, false], p2: [false, false] };
-  const ultra: Record<'p1' | 'p2', boolean[]> = { p1: [false, false], p2: [false, false] };
+  const scan: DoublesScan = {
+    slots: { p1: [null, null], p2: [null, null] },
+    settled: { p1: [false, false], p2: [false, false] },
+    tera: { p1: [false, false], p2: [false, false] },
+    mega: { p1: [false, false], p2: [false, false] },
+    ultra: { p1: [false, false], p2: [false, false] },
+  };
 
   for (const line of lines) {
     const parts = line.split('|');
@@ -182,37 +256,10 @@ export function parsePlayedActionsDoubles(lines: string[]): PlayedTurn {
     if (!tag) continue;
     const ref = slotOf(parts[2] ?? '');
     if (!ref || ref.slot > 1) continue;
-
-    if (tag === '-terastallize') {
-      tera[ref.side][ref.slot] = true;
-    } else if (tag === '-mega') {
-      mega[ref.side][ref.slot] = true;
-    } else if (tag === '-burst') {
-      ultra[ref.side][ref.slot] = true;
-    } else if (tag === 'faint' || tag === 'cant') {
-      settled[ref.side][ref.slot] = true;
-    } else if (tag === 'move') {
-      if (settled[ref.side][ref.slot]) continue;
-      const target = slotOf(parts[4] ?? '');
-      const targetLoc = target === null || target.slot > 1
-        ? null
-        : target.side === ref.side ? -(target.slot + 1) : target.slot + 1;
-      slots[ref.side][ref.slot] = {
-        kind: 'move', name: parts[3] ?? '', tera: tera[ref.side][ref.slot],
-        ...(mega[ref.side][ref.slot] ? { mega: true } : {}),
-        ...(ultra[ref.side][ref.slot] ? { ultra: true } : {}),
-        targetLoc,
-      };
-      settled[ref.side][ref.slot] = true;
-    } else if (tag === 'switch') {
-      if (settled[ref.side][ref.slot]) continue;
-      const species = (parts[3] ?? '').split(',')[0].trim();
-      slots[ref.side][ref.slot] = { kind: 'switch', name: nickname(parts[2] ?? ''), species };
-      settled[ref.side][ref.slot] = true;
-    }
+    noteDoublesLine(scan, tag, ref, parts);
   }
 
-  return { p1: null, p2: null, p1Slots: slots.p1, p2Slots: slots.p2 };
+  return { p1: null, p2: null, p1Slots: scan.slots.p1, p2Slots: scan.slots.p2 };
 }
 
 const normalizeName = (name: string) => name.toLowerCase().replace(/[^a-z0-9]/g, '');
@@ -285,6 +332,48 @@ export function allTurnEvents(log: string): string[][] {
   return byTurn;
 }
 
+/** Latest deliberate switch-in per slot ident this turn (drags excluded). */
+type Entered = Map<string, { name: string; hpFraction: number }>;
+
+/**
+ * The sack a faint line reads as, in shape order: the low-HP feed (pre-turn
+ * snapshot at or below the threshold), the healthy simplification
+ * candidate (deliberately switched in this turn above the threshold), or
+ * the stay-and-die candidate (active since the turn began, above the
+ * threshold); undefined when the faint is a plain loss.
+ */
+function sackForFaint(
+  side: SideId,
+  slot: string,
+  name: string,
+  snapshotBefore: TurnSnapshot,
+  entered: Entered,
+  dragged: Set<string>,
+): SackInfo | undefined {
+  const nameId = normalizeName(name);
+  const snapshotSide = side === 'p1' ? snapshotBefore.p1 : snapshotBefore.p2;
+  const pokemon = snapshotSide.pokemon.find(entry =>
+    normalizeName(entry.name) === nameId || normalizeName(entry.speciesForme) === nameId);
+  if (pokemon?.fainted) return undefined;
+  if (pokemon && pokemon.hpPercent / 100 <= SACK_HP_THRESHOLD) {
+    return { name, hpFraction: pokemon.hpPercent / 100 };
+  }
+  // The healthy candidate stands on the switch line alone — a body first
+  // REVEALED by the sack switch-in is absent from the pre-turn snapshot.
+  const fed = entered.get(`${side}${slot}`);
+  if (fed && fed.hpFraction > SACK_HP_THRESHOLD) {
+    return { name, hpFraction: fed.hpFraction, healthy: true };
+  }
+  // STAY-AND-DIE CANDIDATE: active since the turn began (neither switched
+  // nor dragged in this turn) and above the low-HP threshold. The verdict
+  // layer decides whether certainty + payoff justify the feed framing.
+  if (!fed && !dragged.has(`${side}${slot}`) && pokemon &&
+    pokemon.hpPercent / 100 > SACK_HP_THRESHOLD) {
+    return { name, hpFraction: pokemon.hpPercent / 100, stayed: true };
+  }
+  return undefined;
+}
+
 /**
  * Detects per-side sacrifices in one turn's events. Three shapes:
  * - LOW-HP FEED: an own Pokémon fainted that already stood at
@@ -307,8 +396,7 @@ export function detectSacks(
 ): { p1?: SackInfo; p2?: SackInfo } {
   if (!snapshotBefore) return {};
   const sacks: { p1?: SackInfo; p2?: SackInfo } = {};
-  /** Latest deliberate switch-in per slot ident this turn (drags excluded). */
-  const entered = new Map<string, { name: string; hpFraction: number }>();
+  const entered: Entered = new Map();
   /** Slots force-dragged in this turn — a drag is never a deliberate feed. */
   const dragged = new Set<string>();
 
@@ -328,31 +416,10 @@ export function detectSacks(
     }
     const match = line.match(/^\|faint\|(p[12])([a-d]):\s*(.+)$/);
     if (!match) continue;
-    const side = match[1] as 'p1' | 'p2';
+    const side = match[1] as SideId;
     if (sacks[side]) continue;
-    const name = match[3].trim();
-    const nameId = normalizeName(name);
-    const snapshotSide = side === 'p1' ? snapshotBefore.p1 : snapshotBefore.p2;
-    const pokemon = snapshotSide.pokemon.find(entry =>
-      normalizeName(entry.name) === nameId || normalizeName(entry.speciesForme) === nameId);
-    if (pokemon?.fainted) continue;
-    if (pokemon && pokemon.hpPercent / 100 <= SACK_HP_THRESHOLD) {
-      sacks[side] = { name, hpFraction: pokemon.hpPercent / 100 };
-      continue;
-    }
-    // The healthy candidate stands on the switch line alone — a body first
-    // REVEALED by the sack switch-in is absent from the pre-turn snapshot.
-    const fed = entered.get(`${side}${match[2]}`);
-    if (fed && fed.hpFraction > SACK_HP_THRESHOLD) {
-      sacks[side] = { name, hpFraction: fed.hpFraction, healthy: true };
-    }
-    // STAY-AND-DIE CANDIDATE: active since the turn began (neither switched
-    // nor dragged in this turn) and above the low-HP threshold. The verdict
-    // layer decides whether certainty + payoff justify the feed framing.
-    if (!fed && !dragged.has(`${side}${match[2]}`) && pokemon &&
-      pokemon.hpPercent / 100 > SACK_HP_THRESHOLD) {
-      sacks[side] = { name, hpFraction: pokemon.hpPercent / 100, stayed: true };
-    }
+    const sack = sackForFaint(side, match[2], match[3].trim(), snapshotBefore, entered, dragged);
+    if (sack) sacks[side] = sack;
   }
 
   return sacks;

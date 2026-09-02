@@ -33,12 +33,84 @@ export interface StreakOdds {
   event: 'freeze' | 'paralysis' | 'burn' | 'flinch' | 'crit';
 }
 
+type GenDex = ReturnType<typeof Dex.forGen>;
+type DexMove = ReturnType<GenDex['moves']['get']>;
+
 /** Sentences fire only at streak milestones — a 4th repeat is not news. */
 const isMilestone = (n: number) => n >= 3 && (n === 3 || n === 5 || n % 5 === 0);
 
 const SECONDARY_EVENTS: Record<string, StreakOdds['event']> = {
   frz: 'freeze', par: 'paralysis', brn: 'burn', flinch: 'flinch',
 };
+
+/** The same attacker repeating the same move into the same defender, counted back from the current turn. */
+function sameMoveRun(entries: (StreakHistoryEntry | null)[], last: StreakHistoryEntry): number {
+  let run = 0;
+  for (let index = entries.length - 1; index >= 0; index--) {
+    const at = entries[index];
+    if (!at || !at.moveId || at.attacker !== last.attacker || at.moveId !== last.moveId || at.defender !== last.defender) break;
+    run += 1;
+  }
+  return run;
+}
+
+/**
+ * Secondary fishing at a milestone: the odds when the streak fishes for a
+ * narratable, unsuppressed secondary; null when that story exists but
+ * nothing comes of it (a flinch chain that lost the speed race, a zero
+ * rate); undefined when there is no secondary story to tell.
+ */
+function secondaryStreak(
+  move: DexMove,
+  last: StreakHistoryEntry,
+  entries: (StreakHistoryEntry | null)[],
+  run: number,
+): StreakOdds | null | undefined {
+  if (!(move.exists && isMilestone(run))) return undefined;
+  const secondaries = move.secondaries ?? (move.secondary ? [move.secondary] : []);
+  const fished = secondaries.find(secondary => {
+    if (!secondary?.chance) return false;
+    const status = secondary.status ?? secondary.volatileStatus;
+    return status !== undefined && status in SECONDARY_EVENTS;
+  });
+  const suppressed = last.defenderAbility === 'shielddust' || last.defenderItem === 'covertcloak';
+  if (!(fished && !suppressed)) return undefined;
+  const event = SECONDARY_EVENTS[(fished.status ?? fished.volatileStatus)!];
+  const streak = entries.slice(entries.length - run) as StreakHistoryEntry[];
+  const flinchable = event !== 'flinch' || streak.every(at => at.movedFirst);
+  let perTurn = (fished.chance! / 100) * (last.attackerAbility === 'serenegrace' ? 2 : 1);
+  perTurn = Math.min(1, perTurn);
+  if (flinchable && perTurn > 0) {
+    return {
+      moveLabel: move.name,
+      defenderSpecies: last.defender,
+      n: run,
+      perTurn,
+      cumulative: 1 - (1 - perTurn) ** run,
+      event,
+    };
+  }
+  return null;
+}
+
+/**
+ * Repeated attacks (any damaging moves) into a defender whose relevant
+ * defensive boost is up on every streak turn — the crit is exactly the
+ * roll those boosts cannot answer. Counted back from the current turn.
+ */
+function boostedAttackRun(dex: GenDex, last: StreakHistoryEntry, entries: (StreakHistoryEntry | null)[]): number {
+  let attackRun = 0;
+  for (let index = entries.length - 1; index >= 0; index--) {
+    const at = entries[index];
+    if (!at || !at.moveId || at.attacker !== last.attacker || at.defender !== last.defender) break;
+    const atMove = dex.moves.get(at.moveId);
+    if (!atMove.exists || atMove.category === 'Status') break;
+    const boost = atMove.category === 'Physical' ? at.defenderBoosts.def : at.defenderBoosts.spd;
+    if (boost <= 0) break;
+    attackRun += 1;
+  }
+  return attackRun;
+}
 
 /**
  * Detect a narratable streak in a side's played-move history (entries
@@ -54,54 +126,15 @@ export function detectStreakOdds(gen: number, entries: (StreakHistoryEntry | nul
 
   // Secondary detector: the same attacker repeating the same move into the
   // same defender fishes for the move's secondary.
-  let sameMoveRun = 0;
-  for (let index = entries.length - 1; index >= 0; index--) {
-    const at = entries[index];
-    if (!at || !at.moveId || at.attacker !== last.attacker || at.moveId !== last.moveId || at.defender !== last.defender) break;
-    sameMoveRun += 1;
-  }
+  const run = sameMoveRun(entries, last);
   const move = dex.moves.get(last.moveId);
-  if (move.exists && isMilestone(sameMoveRun)) {
-    const secondaries = move.secondaries ?? (move.secondary ? [move.secondary] : []);
-    const fished = secondaries.find(secondary => {
-      if (!secondary?.chance) return false;
-      const status = secondary.status ?? secondary.volatileStatus;
-      return status !== undefined && status in SECONDARY_EVENTS;
-    });
-    const suppressed = last.defenderAbility === 'shielddust' || last.defenderItem === 'covertcloak';
-    if (fished && !suppressed) {
-      const event = SECONDARY_EVENTS[(fished.status ?? fished.volatileStatus)!];
-      const run = entries.slice(entries.length - sameMoveRun) as StreakHistoryEntry[];
-      const flinchable = event !== 'flinch' || run.every(at => at.movedFirst);
-      let perTurn = (fished.chance! / 100) * (last.attackerAbility === 'serenegrace' ? 2 : 1);
-      perTurn = Math.min(1, perTurn);
-      if (flinchable && perTurn > 0) {
-        return {
-          moveLabel: move.name,
-          defenderSpecies: last.defender,
-          n: sameMoveRun,
-          perTurn,
-          cumulative: 1 - (1 - perTurn) ** sameMoveRun,
-          event,
-        };
-      }
-      return null;
-    }
-  }
+  const secondary = secondaryStreak(move, last, entries, run);
+  if (secondary !== undefined) return secondary;
 
   // Crit detector: repeated attacks (any damaging moves) into a defender
   // whose relevant defensive boost is up on every streak turn — the crit is
   // exactly the roll those boosts cannot answer.
-  let attackRun = 0;
-  for (let index = entries.length - 1; index >= 0; index--) {
-    const at = entries[index];
-    if (!at || !at.moveId || at.attacker !== last.attacker || at.defender !== last.defender) break;
-    const atMove = dex.moves.get(at.moveId);
-    if (!atMove.exists || atMove.category === 'Status') break;
-    const boost = atMove.category === 'Physical' ? at.defenderBoosts.def : at.defenderBoosts.spd;
-    if (boost <= 0) break;
-    attackRun += 1;
-  }
+  const attackRun = boostedAttackRun(dex, last, entries);
   if (!isMilestone(attackRun)) return null;
   const perTurn = gen >= 7 ? 1 / 24 : 1 / 16;
   return {

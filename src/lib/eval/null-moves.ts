@@ -21,6 +21,10 @@ const STATUS_TEXT: Record<string, string> = {
   frz: 'frozen',
 };
 
+type GenDex = ReturnType<typeof Dex.forGen>;
+type DexMove = ReturnType<GenDex['moves']['get']>;
+type DexSpecies = ReturnType<GenDex['species']['get']>;
+
 /**
  * Types immune to a major status, by generation. The @pkmn/dex type chart
  * only carries type-vs-type entries (no status keys), so this table is the
@@ -37,6 +41,64 @@ function statusImmuneTypes(status: string, gen: number): string[] {
     case 'frz': return ['Ice'];
     default: return [];
   }
+}
+
+/** The attacker's possible abilities (empty when the species is unknown) — they only ever SUPPRESS verdicts. */
+function attackerAbilities(dex: GenDex, attackerSpecies: string | null): string[] {
+  const attacker = attackerSpecies ? dex.species.get(attackerSpecies) : null;
+  return attacker?.exists ? Object.values(attacker.abilities) : [];
+}
+
+/**
+ * The move's type-chart immunity against the defender's types, and whether
+ * an attacker ability the species may carry breaks it (Scrappy and gen 9's
+ * Mind's Eye hit Ghosts with Normal/Fighting moves).
+ */
+function typeImmunityOf(
+  dex: GenDex,
+  move: DexMove,
+  types: readonly string[],
+  mayHave: (ability: string) => boolean,
+): { typeImmune: boolean; immunityBroken: boolean } {
+  const ignoreImmunity = move.ignoreImmunity === true ||
+    (typeof move.ignoreImmunity === 'object' && move.ignoreImmunity !== null &&
+      (move.ignoreImmunity as Record<string, boolean>)[move.type] === true);
+  const typeImmune = !ignoreImmunity && !dex.getImmunity(move.type, types as never);
+  const immunityBroken = (move.type === 'Normal' || move.type === 'Fighting') &&
+    types.includes('Ghost') && (mayHave('Scrappy') || mayHave("Mind's Eye"));
+  return { typeImmune, immunityBroken };
+}
+
+/** Why a status move provably does nothing: the status immunity, the move's own type immunity, powder, or Leech Seed. */
+function statusNullReason(
+  move: DexMove,
+  defender: DexSpecies,
+  types: readonly string[],
+  gen: number,
+  mayHave: (ability: string) => boolean,
+  immunity: { typeImmune: boolean; immunityBroken: boolean },
+): string | null {
+  if (move.status) {
+    const blocked = statusImmuneTypes(move.status, gen)
+      .find(type => types.includes(type));
+    const corroded = (move.status === 'psn' || move.status === 'tox') && mayHave('Corrosion');
+    if (blocked && !corroded) {
+      return `${defender.name} cannot be ${STATUS_TEXT[move.status] ?? move.status} (${blocked}-type)`;
+    }
+    // Thunder Wave is the canonical status move WITHOUT ignoreImmunity: the
+    // move's own type immunity applies (Ground blocks it).
+    if (immunity.typeImmune && !immunity.immunityBroken) {
+      return `${defender.name} is immune to ${move.type}-type moves`;
+    }
+  }
+  if (move.flags.powder && gen >= 6 && types.includes('Grass')) {
+    return `powder moves do not affect Grass-types like ${defender.name}`;
+  }
+  // The sim implements this one as onTryImmunity — no data field carries it.
+  if (move.id === 'leechseed' && types.includes('Grass')) {
+    return `Leech Seed cannot affect Grass-types like ${defender.name}`;
+  }
+  return null;
 }
 
 /**
@@ -62,43 +124,14 @@ export function nullMoveReason(params: {
   if (!defender.exists) return null;
   const types = defender.types;
 
-  const attacker = params.attackerSpecies ? dex.species.get(params.attackerSpecies) : null;
-  const attackerAbilities = attacker?.exists ? Object.values(attacker.abilities) : [];
-  const mayHave = (ability: string) => attackerAbilities.includes(ability);
-
-  const ignoreImmunity = move.ignoreImmunity === true ||
-    (typeof move.ignoreImmunity === 'object' && move.ignoreImmunity !== null &&
-      (move.ignoreImmunity as Record<string, boolean>)[move.type] === true);
-  const typeImmune = !ignoreImmunity && !dex.getImmunity(move.type, types as never);
-  // Scrappy (and gen 9's Mind's Eye) hit Ghosts with Normal/Fighting moves.
-  const immunityBroken = (move.type === 'Normal' || move.type === 'Fighting') &&
-    types.includes('Ghost') && (mayHave('Scrappy') || mayHave("Mind's Eye"));
+  const abilities = attackerAbilities(dex, params.attackerSpecies);
+  const mayHave = (ability: string) => abilities.includes(ability);
+  const immunity = typeImmunityOf(dex, move, types, mayHave);
 
   if (move.category !== 'Status') {
-    return typeImmune && !immunityBroken
+    return immunity.typeImmune && !immunity.immunityBroken
       ? `${defender.name} is immune to ${move.type}-type moves`
       : null;
   }
-
-  if (move.status) {
-    const blocked = statusImmuneTypes(move.status, params.gen)
-      .find(type => (types as readonly string[]).includes(type));
-    const corroded = (move.status === 'psn' || move.status === 'tox') && mayHave('Corrosion');
-    if (blocked && !corroded) {
-      return `${defender.name} cannot be ${STATUS_TEXT[move.status] ?? move.status} (${blocked}-type)`;
-    }
-    // Thunder Wave is the canonical status move WITHOUT ignoreImmunity: the
-    // move's own type immunity applies (Ground blocks it).
-    if (typeImmune && !immunityBroken) {
-      return `${defender.name} is immune to ${move.type}-type moves`;
-    }
-  }
-  if (move.flags.powder && params.gen >= 6 && types.includes('Grass')) {
-    return `powder moves do not affect Grass-types like ${defender.name}`;
-  }
-  // The sim implements this one as onTryImmunity — no data field carries it.
-  if (move.id === 'leechseed' && types.includes('Grass')) {
-    return `Leech Seed cannot affect Grass-types like ${defender.name}`;
-  }
-  return null;
+  return statusNullReason(move, defender, types, params.gen, mayHave, immunity);
 }

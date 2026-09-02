@@ -16,27 +16,40 @@ const sideOf = (ref: string): 'p1' | 'p2' | null =>
 
 const nicknameOf = (ref: string): string => ref.replace(/^p[12][a-c]: /, '');
 
+type SpeciesByNick = Record<'p1' | 'p2', Map<string, string>>;
+type Revealed = { p1: string[]; p2: string[] };
+
+/** A switch-family line maps the slot's nickname to its species. */
+function noteSwitchLine(parts: string[], species: SpeciesByNick): void {
+  const side = sideOf(parts[2] ?? '');
+  if (!side) return;
+  const name = (parts[3] ?? '').split(',')[0].trim();
+  if (name) species[side].set(nicknameOf(parts[2] ?? ''), name);
+}
+
+/** A terastallize line reveals the nickname's species (the nickname itself when no switch named it). */
+function noteTeraLine(parts: string[], species: SpeciesByNick, revealed: Revealed): void {
+  const side = sideOf(parts[2] ?? '');
+  if (!side) return;
+  const nick = nicknameOf(parts[2] ?? '');
+  const name = species[side].get(nick) ?? nick;
+  if (!revealed[side].includes(name)) revealed[side].push(name);
+}
+
 /**
  * The species that actually terastallized in the replay, per side —
  * `|-terastallize|` names nicknames, resolved through the switch lines.
  */
 export function parseRevealedTeraSpecies(log: string): { p1: string[]; p2: string[] } {
-  const species: Record<'p1' | 'p2', Map<string, string>> = { p1: new Map(), p2: new Map() };
+  const species: SpeciesByNick = { p1: new Map(), p2: new Map() };
   const revealed = { p1: [] as string[], p2: [] as string[] };
   for (const line of log.split('\n')) {
     const parts = line.split('|');
     const tag = parts[1];
     if (tag === 'switch' || tag === 'drag' || tag === 'replace') {
-      const side = sideOf(parts[2] ?? '');
-      if (!side) continue;
-      const name = (parts[3] ?? '').split(',')[0].trim();
-      if (name) species[side].set(nicknameOf(parts[2] ?? ''), name);
+      noteSwitchLine(parts, species);
     } else if (tag === '-terastallize') {
-      const side = sideOf(parts[2] ?? '');
-      if (!side) continue;
-      const nick = nicknameOf(parts[2] ?? '');
-      const name = species[side].get(nick) ?? nick;
-      if (!revealed[side].includes(name)) revealed[side].push(name);
+      noteTeraLine(parts, species, revealed);
     }
   }
   return revealed;
