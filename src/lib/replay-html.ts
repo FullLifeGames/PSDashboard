@@ -4,27 +4,7 @@
  * which handles all rendering, animations, and playback controls.
  */
 
-export function generateReplayHtml(opts: {
-  log: string;
-  format?: string;
-  p1?: string;
-  p2?: string;
-  title?: string;
-  seekTurn?: number;
-  autoPlay?: boolean;
-  reportTurn?: boolean;
-  /** Viewer perspective — 'p2' renders the battle from player 2's side (the ?p2 replay-URL flag). */
-  viewpoint?: 'p1' | 'p2';
-}): string {
-  const { log, format = '', p1 = 'Player 1', p2 = 'Player 2', title, seekTurn, autoPlay = false, reportTurn = false, viewpoint = 'p1' } = opts;
-  const displayTitle = title || `${format ? `[${format}] ` : ''}${p1} vs. ${p2}`;
-  // Escape forward slashes for the script tag content (PS format)
-  const escapedLog = log.replace(/<\//g, '<\\/');
-
-  return `<!DOCTYPE html>
-<meta charset="utf-8" />
-<title>${displayTitle}</title>
-<style>
+const REPLAY_STYLES = `<style>
 html,body {font-family:Verdana, sans-serif;font-size:10pt;margin:0;padding:0;}
 body{padding:12px 0;background:#344b6c;}
 .battle-log {font-family:Verdana, sans-serif;font-size:10pt;}
@@ -39,8 +19,10 @@ body{padding:12px 0;background:#344b6c;}
 .spacer {margin-top:0.5em;}
 .subtle {color:#3A4A66;}
 .wrapper {max-width:1180px;margin:0 auto;}
-</style>
-<script>
+</style>`;
+
+/** Mutes the embed before it loads: every media handle it can reach becomes a silent stub. */
+const SILENT_AUDIO_SCRIPT = `<script>
 window.Config = Object.assign({}, window.Config || {}, {sound: false, mute: true});
 window.__psMakeSilentMedia = function makeSilentMediaHandle() {
   return {
@@ -85,24 +67,15 @@ if (window.HTMLMediaElement && window.HTMLMediaElement.prototype) {
     return Promise.resolve();
   };
 }
-</script>
-<div class="wrapper replay-wrapper">
-<input type="hidden" name="replayid" value="branch-sim" />
-<div class="battle"></div><div class="battle-log"></div><div class="replay-controls"></div><div class="replay-controls-2"></div>
-<h1 style="font-weight:normal;text-align:center"><strong>${displayTitle}</strong></h1>
-<script type="text/plain" class="battle-log-data">
-${escapedLog}
-</script>
-</div>
-<script>
+</script>`;
+
+const EMBED_LOADER_SCRIPT = `<script>
 let daily = Math.floor(Date.now()/1000/60/60/24);
 document.write('<script src="https://play.pokemonshowdown.com/js/replay-embed.js?version'+daily+'"></'+'script>');
-</script>
-<script>
-(function replayBridge() {
-  var pendingSeek = ${seekTurn != null ? `{ turn: ${seekTurn}, autoPlay: ${autoPlay ? 'true' : 'false'} }` : 'null'};
-  var pendingViewpoint = ${viewpoint === 'p2' ? "'p2'" : 'null'};
+</script>`;
 
+/** The parent bridge: seek and append messages in, ready and turn reports out. */
+const REPLAY_BRIDGE_BODY = `
   function silenceAudio() {
     window.Config = Object.assign({}, window.Config || {}, {sound: false, mute: true});
     if (window.__psPatchBattleSound) window.__psPatchBattleSound();
@@ -214,7 +187,20 @@ document.write('<script src="https://play.pokemonshowdown.com/js/replay-embed.js
     applySeek();
   })();
 })();
-</script>${reportTurn ? `
+</script>`;
+
+function replayBridgeScript(seekTurn: number | undefined, autoPlay: boolean, viewpoint: 'p1' | 'p2'): string {
+  const pendingSeek = seekTurn != null ? `{ turn: ${seekTurn}, autoPlay: ${autoPlay ? 'true' : 'false'} }` : 'null';
+  const pendingViewpoint = viewpoint === 'p2' ? "'p2'" : 'null';
+  return `<script>
+(function replayBridge() {
+  var pendingSeek = ${pendingSeek};
+  var pendingViewpoint = ${pendingViewpoint};
+${REPLAY_BRIDGE_BODY}`;
+}
+
+/** Reports landed turns to the parent (never mid-seek scrub positions). */
+const TURN_TRACKER_SCRIPT = `
 <script>
 (function trackTurn() {
   var lastTurn = -1;
@@ -235,7 +221,40 @@ document.write('<script src="https://play.pokemonshowdown.com/js/replay-embed.js
     }
   }, 200);
 })();
-</script>` : ''}`;
+</script>`;
+
+export function generateReplayHtml(opts: {
+  log: string;
+  format?: string;
+  p1?: string;
+  p2?: string;
+  title?: string;
+  seekTurn?: number;
+  autoPlay?: boolean;
+  reportTurn?: boolean;
+  /** Viewer perspective — 'p2' renders the battle from player 2's side (the ?p2 replay-URL flag). */
+  viewpoint?: 'p1' | 'p2';
+}): string {
+  const { log, format = '', p1 = 'Player 1', p2 = 'Player 2', title, seekTurn, autoPlay = false, reportTurn = false, viewpoint = 'p1' } = opts;
+  const displayTitle = title || `${format ? `[${format}] ` : ''}${p1} vs. ${p2}`;
+  // Escape forward slashes for the script tag content (PS format)
+  const escapedLog = log.replace(/<\//g, '<\\/');
+
+  return `<!DOCTYPE html>
+<meta charset="utf-8" />
+<title>${displayTitle}</title>
+${REPLAY_STYLES}
+${SILENT_AUDIO_SCRIPT}
+<div class="wrapper replay-wrapper">
+<input type="hidden" name="replayid" value="branch-sim" />
+<div class="battle"></div><div class="battle-log"></div><div class="replay-controls"></div><div class="replay-controls-2"></div>
+<h1 style="font-weight:normal;text-align:center"><strong>${displayTitle}</strong></h1>
+<script type="text/plain" class="battle-log-data">
+${escapedLog}
+</script>
+</div>
+${EMBED_LOADER_SCRIPT}
+${replayBridgeScript(seekTurn, autoPlay, viewpoint)}${reportTurn ? TURN_TRACKER_SCRIPT : ''}`;
 }
 
 /**
