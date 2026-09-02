@@ -94,6 +94,31 @@ const UNSEEN_MOVE_PROBABILITY = 0.01;
  * fit < revealed-move count, i.e. it contradicts what we saw — yields null
  * and the caller falls back to marginal assembly plus the pairwise vetoes.
  */
+interface CandidateIds {
+  moveIds: string[];
+  itemId: string;
+  abilityId: string;
+}
+
+function candidateIds(candidate: PokemonSetAssumption): CandidateIds {
+  return {
+    moveIds: candidate.moves.map(move => Dex.moves.get(move.value).id as string),
+    itemId: candidate.item ? (Dex.items.get(candidate.item.value).id as string) : '',
+    abilityId: candidate.ability ? (Dex.abilities.get(candidate.ability.value).id as string) : '',
+  };
+}
+
+/** Two points per revealed move, item, and ability the candidate carries. */
+function fitScore(ids: CandidateIds, evidence: CuratedEvidence): number {
+  let fit = 0;
+  for (const revealed of evidence.revealedMoves) {
+    if (ids.moveIds.includes(revealed)) fit += 2;
+  }
+  if (evidence.revealedItem && ids.itemId === evidence.revealedItem) fit += 2;
+  if (evidence.revealedAbility && ids.abilityId === evidence.revealedAbility) fit += 2;
+  return fit;
+}
+
 export function selectCuratedSet(
   candidates: PokemonSetAssumption[],
   evidence: CuratedEvidence,
@@ -102,21 +127,14 @@ export function selectCuratedSet(
   let bestFit = -Infinity;
   let bestTiebreak = -Infinity;
   for (const candidate of candidates) {
-    const moveIds = candidate.moves.map(move => Dex.moves.get(move.value).id as string);
-    const itemId = candidate.item ? (Dex.items.get(candidate.item.value).id as string) : '';
-    const abilityId = candidate.ability ? (Dex.abilities.get(candidate.ability.value).id as string) : '';
-    if (itemId && evidence.ruledOutItems.includes(itemId)) continue;
-    if (abilityId && evidence.ruledOutAbilities.includes(abilityId)) continue;
+    const ids = candidateIds(candidate);
+    if (ids.itemId && evidence.ruledOutItems.includes(ids.itemId)) continue;
+    if (ids.abilityId && evidence.ruledOutAbilities.includes(ids.abilityId)) continue;
 
-    let fit = 0;
-    for (const revealed of evidence.revealedMoves) {
-      if (moveIds.includes(revealed)) fit += 2;
-    }
-    if (evidence.revealedItem && itemId === evidence.revealedItem) fit += 2;
-    if (evidence.revealedAbility && abilityId === evidence.revealedAbility) fit += 2;
+    const fit = fitScore(ids, evidence);
     if (fit < evidence.revealedMoves.length) continue;
 
-    const tiebreak = moveIds.reduce((sum, id) =>
+    const tiebreak = ids.moveIds.reduce((sum, id) =>
       sum + Math.log(Math.max(evidence.usageProbability(id), UNSEEN_MOVE_PROBABILITY)), 0);
     if (fit > bestFit || (fit === bestFit && tiebreak > bestTiebreak)) {
       best = candidate;
@@ -127,23 +145,17 @@ export function selectCuratedSet(
   return best;
 }
 
-export function applyCoherenceVetoes(
-  candidates: MoveCandidate[],
-  context: CoherenceContext,
-): MoveCandidate[] {
-  // Boost context comes from the WHOLE pool (usage order can list the attack
-  // before the boost) — boost moves themselves are never vetoed by these rows.
-  const served = new Set<string>();
-  for (const candidate of candidates) {
-    const serves = BOOST_SERVES[Dex.moves.get(candidate.name).id];
-    if (serves) served.add(serves);
-  }
-  const restrictiveItem = CHOICE_ITEMS.has(context.itemId) ? 'choice'
-    : context.itemId === 'assaultvest' ? 'av' : null;
+interface DamagingKeeps {
+  keptScalings: Set<string>;
+  damagingKept: Set<MoveCandidate>;
+}
 
-  // Pass 1 decides the DAMAGING keeps (rows 1 and 2), so a status rule can
-  // ask what the kept attacks scale with — Iron Defense is only coherent
-  // while a Defense-scaling attack survives.
+/**
+ * Pass 1 decides the DAMAGING keeps (rows 1 and 2), so a status rule can
+ * ask what the kept attacks scale with — Iron Defense is only coherent
+ * while a Defense-scaling attack survives.
+ */
+function keepDamagingMoves(candidates: MoveCandidate[], served: Set<string>): DamagingKeeps {
   const keptDamageTypes = new Set<string>();
   const keptScalings = new Set<string>();
   const damagingKept = new Set<MoveCandidate>();
@@ -169,8 +181,13 @@ export function applyCoherenceVetoes(
     if (keptDamageTypes.has(facts.type)) continue;
     keep();
   }
+  return { keptScalings, damagingKept };
+}
 
-  // Pass 2 assembles in pool order; status rows run against the kept attacks.
+/** Pass 2 assembles in pool order; status rows run against the kept attacks. */
+function assembleKeptMoves(
+  candidates: MoveCandidate[], restrictiveItem: 'choice' | 'av' | null, keeps: DamagingKeeps,
+): MoveCandidate[] {
   const kept: MoveCandidate[] = [];
   for (const candidate of candidates) {
     const facts = factsOf(candidate.name);
@@ -183,11 +200,29 @@ export function applyCoherenceVetoes(
       if (restrictiveItem === 'choice' && !TRICK_FAMILY.has(facts.id)) continue;
       // Row 3: a defense-boost enabler without its payoff attack (Iron
       // Defense whose Body Press was vetoed or never offered).
-      if (DEF_BOOSTS.has(facts.id) && !keptScalings.has('def')) continue;
+      if (DEF_BOOSTS.has(facts.id) && !keeps.keptScalings.has('def')) continue;
       kept.push(candidate);
       continue;
     }
-    if (damagingKept.has(candidate)) kept.push(candidate);
+    if (keeps.damagingKept.has(candidate)) kept.push(candidate);
   }
   return kept;
+}
+
+export function applyCoherenceVetoes(
+  candidates: MoveCandidate[],
+  context: CoherenceContext,
+): MoveCandidate[] {
+  // Boost context comes from the WHOLE pool (usage order can list the attack
+  // before the boost) — boost moves themselves are never vetoed by these rows.
+  const served = new Set<string>();
+  for (const candidate of candidates) {
+    const serves = BOOST_SERVES[Dex.moves.get(candidate.name).id];
+    if (serves) served.add(serves);
+  }
+  const restrictiveItem = CHOICE_ITEMS.has(context.itemId) ? 'choice'
+    : context.itemId === 'assaultvest' ? 'av' : null;
+
+  const keeps = keepDamagingMoves(candidates, served);
+  return assembleKeptMoves(candidates, restrictiveItem, keeps);
 }
