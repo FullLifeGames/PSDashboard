@@ -105,7 +105,20 @@ Relevant files:
 
 ## UI Structure
 
-The main application surface in [`src/App.tsx`](./src/App.tsx) is ONE unified
+[`src/App.tsx`](./src/App.tsx) is a thin composition: it calls
+[`useAppController`](./src/hooks/useAppController.ts) and renders the loader,
+the shared-branch view, the workspace, and the modals from the controller's
+grouped surfaces. The controller stacks four hooks in
+[`src/hooks/controller/`](./src/hooks/controller/), each with an explicit
+input contract: the replay context (replay, embed host, branch simulator,
+evaluation handle, Smogon knowledge, team knowledge, format metadata), the
+transient interaction state (play-out run, draft choices, pending confirm,
+reset per replay), the board (timeline pointer, deviation and rebuild road,
+branch refresh, the load reset), and the engine (position acquisition,
+evaluation view glue, the engine walk, the play-out loop). Every hook call
+keeps the order the original App() had, so effects fire as before.
+
+The main application surface is ONE unified
 timeline, chess-engine style: the replay is the main line, at most one
 variation exists, and a position pointer (`viewTurn` + `viewLine`) replaces
 the former replay/branch mode split. The pure position model lives in
@@ -214,7 +227,9 @@ Relevant files:
 
 - [`src/components/PSReplayFrame.tsx`](./src/components/PSReplayFrame.tsx)
 - [`src/lib/replay-html.ts`](./src/lib/replay-html.ts)
-- [`src/components/BranchPanel.tsx`](./src/components/BranchPanel.tsx)
+- [`src/components/BranchPanel.tsx`](./src/components/BranchPanel.tsx) with [`src/components/branch/`](./src/components/branch/)
+- [`src/components/ReplayWorkspace.tsx`](./src/components/ReplayWorkspace.tsx) and [`src/components/WorkspaceEvalColumn.tsx`](./src/components/WorkspaceEvalColumn.tsx)
+- [`src/components/EvalPanel.tsx`](./src/components/EvalPanel.tsx) with [`src/components/eval/`](./src/components/eval/)
 - [`src/components/BranchHistoryPanel.tsx`](./src/components/BranchHistoryPanel.tsx)
 - [`src/components/BattleStatsPanel.tsx`](./src/components/BattleStatsPanel.tsx)
 - [`src/components/TeamEditor.tsx`](./src/components/TeamEditor.tsx)
@@ -286,6 +301,8 @@ If the project continues, the cleanest next architectural move would be to keep 
 3. UI rendering and controls
 
 That makes it much easier to measure reconstruction accuracy, expand replay regression tests, and keep the frontend moving without coupling it to simulator internals.
+
+The UI layer now holds that line: App() is composition over controller hooks, every hook and component sits under the lint ceilings (300 lines per file, 60 per function, complexity 15), and the remaining steps of the plan split the app-level libraries and the evaluation engine into publishable workspace packages.
 
 ## Evaluation Engine
 

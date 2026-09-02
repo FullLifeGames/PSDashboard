@@ -206,11 +206,13 @@ The app can be included in another site and handed a replay to render:
 
 ## Repository Map
 
-- [`src/App.tsx`](./src/App.tsx) hosts the main application flow.
+- [`src/App.tsx`](./src/App.tsx) composes the app: one controller hook, the loader and shared-branch screens, the workspace, and the modals.
+- [`src/hooks/useAppController.ts`](./src/hooks/useAppController.ts) wires the app state in four layers under [`src/hooks/controller/`](./src/hooks/controller/): the replay context (replay, branch simulator, evaluation handle, Smogon and team knowledge), the transient interaction state, the board (timeline pointer, deviation and rebuild, branch refresh), and the engine (position acquisition, evaluation view, engine walk, play-out). Each layer is a hook with an explicit input contract; hook call order follows the original App() top to bottom.
+- [`src/components/ReplayWorkspace.tsx`](./src/components/ReplayWorkspace.tsx) and [`src/components/WorkspaceEvalColumn.tsx`](./src/components/WorkspaceEvalColumn.tsx) render the loaded-replay layout from the controller's grouped surfaces: top bar, battle frame, timeline bar, picker region, branch panels, the evaluation column.
 - [`src/hooks/useReplay.ts`](./src/hooks/useReplay.ts) loads the replay (fetched or file-based) and derives snapshots plus inferred team data.
 - [`src/hooks/useEmbedHost.ts`](./src/hooks/useEmbedHost.ts) implements `?replay=`/`?embed=1` and the host-page postMessage protocol.
 - [`src/lib/replay-file.ts`](./src/lib/replay-file.ts) parses exported replay HTML files and raw protocol logs into replay data.
-- [`src/hooks/useBranch.ts`](./src/hooks/useBranch.ts) manages React state for the live branch simulator.
+- [`src/hooks/useBranch.ts`](./src/hooks/useBranch.ts) manages React state for the live branch simulator; [`src/hooks/branch/`](./src/hooks/branch/) holds its execute side (turns, forced-switch interludes, choice recording) and session side (rebuild at a turn, battle access, teardown).
 - [`src/lib/branch-engine.ts`](./src/lib/branch-engine.ts) reconstructs the battle up to a selected turn in a pure, directly testable module.
 - [`src/lib/protocol-parser.ts`](./src/lib/protocol-parser.ts) converts replay protocol logs into turn snapshots.
 - [`src/lib/opponent-inferrer.ts`](./src/lib/opponent-inferrer.ts) extracts revealed team information from the replay log.
@@ -225,12 +227,14 @@ The app can be included in another site and handed a replay to render:
 - [`src/lib/spread-inference.ts`](./src/lib/spread-inference.ts) solves damage-consistent EV spreads from replay observations against `@smogon/calc` roll ranges (hard-constrained by observed speed races, forfeiting solves that misfit their own evidence), legalized to the format's EV budget (standard 508/252, Pokémon Champions 66/32).
 - [`scripts/build-fit-corpus.mjs`](./scripts/build-fit-corpus.mjs) builds the manifest-pinned weight-fitting corpus (ReplayScouter tournament data, direct Smogon-thread scraping for gen9 singles, doubles, and VGC (official tournament replays carry a `smogtours-` room prefix the scraper understands), plus ladder samples); the manifest is committed, the replay cache is not.
 - [`scripts/build-versions-index.mjs`](./scripts/build-versions-index.mjs) renders the `/versions/` page listing the nightly and the hosted release builds; the Pages workflow feeds it a manifest of the releases it unpacked.
-- [`src/hooks/useEvaluation.ts`](./src/hooks/useEvaluation.ts) coordinates single evaluations, two-pass game sweeps, per-turn caching (memory + IndexedDB), and evaluation preferences.
+- [`src/hooks/useEvaluation.ts`](./src/hooks/useEvaluation.ts) composes the evaluation surface; [`src/hooks/evaluation/`](./src/hooks/evaluation/) holds the preferences, the single-position evaluate path, and the graph sweep as staged runners (types, verification and sensitivity probes, cache-hit install, per-turn evaluation, the lane runner, the three-pass orchestration), with per-turn caching in memory and IndexedDB.
 - [`src/lib/team-paste.ts`](./src/lib/team-paste.ts) parses pasted Showdown exports (including natures, IVs, and levels) and overlays them as manual knowledge.
 - [`src/lib/sets-io.ts`](./src/lib/sets-io.ts) builds and parses the side-headered both-teams text format for the Import/Export Sets panel.
 - [`src/lib/pokemon-options.ts`](./src/lib/pokemon-options.ts) serves legal move/item/ability/tera/nature pools for dropdowns (loaded lazily to keep dex data out of the entry chunk).
 - [`src/components/PSReplayFrame.tsx`](./src/components/PSReplayFrame.tsx) renders the Showdown replay viewer in an iframe.
-- [`src/components/BranchPanel.tsx`](./src/components/BranchPanel.tsx) renders move and switch controls for the active branch.
+- [`src/components/BranchPanel.tsx`](./src/components/BranchPanel.tsx) renders move and switch controls for the active branch; [`src/components/branch/`](./src/components/branch/) holds the choice buttons, the per-side controls with their Fight section, and the status parts, with the damage preview in [`src/lib/branch-damage.ts`](./src/lib/branch-damage.ts).
+- [`src/components/EvalPanel.tsx`](./src/components/EvalPanel.tsx) renders the evaluation column; [`src/components/eval/`](./src/components/eval/) holds its controls, status, graph section, result block, and the turn-analysis cells.
+- [`src/components/TeamEditor.tsx`](./src/components/TeamEditor.tsx) edits either team inside [`src/components/ModalDialog.tsx`](./src/components/ModalDialog.tsx); the fields live in [`src/components/team-editor/`](./src/components/team-editor/) and the draft state in [`src/hooks/useTeamDraft.ts`](./src/hooks/useTeamDraft.ts).
 - [`src/components/LeadPanel.tsx`](./src/components/LeadPanel.tsx) renders the T0 lead picker (team preview as a playable position).
 - [`src/components/BranchSaveSharePanel.tsx`](./src/components/BranchSaveSharePanel.tsx) saves branch summaries locally and creates compact share links.
 - [`src/components/BattleStatsPanel.tsx`](./src/components/BattleStatsPanel.tsx) shows inferred team information for both players.
@@ -245,6 +249,7 @@ The app can be included in another site and handed a replay to render:
 
 - The current app path uses the Showdown iframe viewer plus the `useBranch` simulator hook.
 - The production bundle is large because the simulator and learnset data are included client-side.
+- Size and complexity ceilings are lint errors (`max-lines` 300, `max-lines-per-function` 60, `complexity` 15 under `src/`; test suites have their own). Older files sit on generated shrink-only pins in `eslint.ratchet.mjs`; `node scripts/update-lint-ratchet.mjs` re-measures them and refuses to raise a pin. New files must be born under the targets.
 
 ## Next Priorities
 
