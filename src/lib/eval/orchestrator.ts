@@ -1,13 +1,14 @@
 import {
-  applyTrendExtrapolation, applyTrendTiebreak, attachLines, cellKey, rankFromMatrix, reblendValue,
-  selectExpansionCells, selectTieProbeCells, toResult, TOP_EXPANSION,
-  type PvStep, type Ranked, type ValueMatrix,
+  applyTrendExtrapolation, applyTrendTiebreak, attachLines, cellKey, rankFromMatrix, selectExpansionCells,
+  selectTieProbeCells, toResult, TOP_EXPANSION, type PvStep, type Ranked, type ValueMatrix,
 } from './rank';
 import { perfSync } from './perf-trace';
 import type {
-  CellBlend, EvalCellJob, EvalCellValue, EvalChoicesInfo, EvalResult, EvalSettings, EvalSubSearchJob,
-  KoOddsInfo, KoOddsMismatch, SearchProgress, TeraAllowance,
+  CellBlend, EvalCellJob, EvalCellValue, EvalChoiceOption, EvalChoicesInfo, EvalResult, EvalSettings,
+  EvalSubSearchJob, KoOddsMismatch, SearchProgress, TeraAllowance,
 } from './types';
+import { attachRootPayload, koOddsMapsFor, type RootPayload } from './search/root-payload';
+import { recordDeepenedCell, type DeepeningState } from './search/deepening';
 
 /**
  * Async search orchestration over an abstract executor. Pure — no @pkmn/sim
@@ -36,6 +37,110 @@ export interface OrchestratorCallbacks {
   shouldStop?(): boolean;
 }
 
+/** One cell job per (i, j) pair, row-major. */
+function cellJobs(p1: EvalChoiceOption[], p2: EvalChoiceOption[], samples: number): CellJob[] {
+  const jobs: CellJob[] = [];
+  for (let i = 0; i < p1.length; i++) {
+    for (let j = 0; j < p2.length; j++) {
+      jobs.push({ i, j, p1Choice: p1[i].choice, p2Choice: p2[j].choice, samples });
+    }
+  }
+  return jobs;
+}
+
+/** Writes the executor's cell values into the matrix, collecting the blends and the diagnostics. */
+function collectCells(
+  cellValues: CellValue[],
+  matrix: ValueMatrix,
+  blends: Map<number, CellBlend>,
+  diagnostics: KoOddsMismatch[],
+): void {
+  for (const cell of cellValues) {
+    matrix.values[cell.i][cell.j] = cell.value;
+    matrix.ended[cell.i][cell.j] = cell.ended;
+    if (cell.blend) blends.set(cellKey(cell.i, cell.j), cell.blend);
+    if (cell.diagnostic) diagnostics.push(cell.diagnostic);
+  }
+}
+
+/**
+ * The root payload from the executor's choices info: kill odds and the
+ * unanswered-mon profile are computed sim-side by choices(); the shared
+ * helpers keep this module sim-free.
+ */
+function orchestratedPayload(info: ChoicesInfo, diagnostics: KoOddsMismatch[]): RootPayload {
+  const koOddsMaps = info.koOdds ? koOddsMapsFor(info.p1, info.p2, info.koOdds) : null;
+  return { diagnostics, koOddsMaps, unanswered: info.unanswered };
+}
+
+/** The orchestrated search's deepening state: the shared record plus the executor-side context. */
+interface Orchestration extends DeepeningState {
+  executor: SearchExecutor;
+  settings: EvalSettings;
+  callbacks: OrchestratorCallbacks | undefined;
+  rootValue: number;
+  p1: EvalChoiceOption[];
+  p2: EvalChoiceOption[];
+  ranked: Ranked;
+}
+
+/**
+ * Mirrors searchPosition: expansion iterates because deepening a cell
+ * shifts a row's worst case onto still-shallow siblings. Each batch of
+ * wanted cells runs in parallel through the executor and is booked on
+ * return; true when the caller asked to stop mid-level.
+ */
+async function deepenLevelAsync(state: Orchestration, depth: number): Promise<boolean> {
+  const expandedThisLevel = new Set<number>();
+  const budget = TOP_EXPANSION * 2;
+  let used = 0;
+  while (used < budget) {
+    if (state.callbacks?.shouldStop?.()) return true;
+    const wanted = selectExpansionCells(state.matrix, state.ranked, budget - used)
+      .filter(([i, j]) => !expandedThisLevel.has(cellKey(i, j)));
+    if (wanted.length === 0) break;
+
+    const subs = await Promise.all(wanted.map(([i, j]) => state.executor.subSearch({
+      i, j, p1Choice: state.p1[i].choice, p2Choice: state.p2[j].choice,
+      // keepPlayed is a root-position hint — meaningless one turn deeper.
+      settings: { ...state.settings, depth: (depth - 1) as 1 | 2, samples: 1, keepPlayed: undefined },
+    })));
+    subs.forEach((sub, index) => {
+      const [i, j] = wanted[index];
+      recordDeepenedCell(state, i, j, sub, depth, expandedThisLevel);
+      used += 1;
+      state.callbacks?.onProgress?.({ done: used, total: budget, depth });
+    });
+    state.ranked = perfSync('main:rank', () => rankFromMatrix(state.matrix, state.rootValue));
+  }
+  return false;
+}
+
+/**
+ * Horizon-trend tiebreak, mirroring searchPosition: singles-shaped lists
+ * only; probes are one-ply sub-searches of the tied rows' decisive cells.
+ */
+async function applyTrendLayersAsync(state: Orchestration, result: EvalResult, stopped: boolean): Promise<void> {
+  const combined = state.p1.some(option => option.choice.includes(',')) ||
+    state.p2.some(option => option.choice.includes(','));
+  if (!(!stopped && !combined)) return;
+  const probes = selectTieProbeCells(state.matrix, result, state.trendMap);
+  if (probes.length > 0) {
+    const subs = await Promise.all(probes.map(([i, j]) => state.executor.subSearch({
+      i, j, p1Choice: state.p1[i].choice, p2Choice: state.p2[j].choice,
+      settings: { ...state.settings, depth: 1, samples: 1, keepPlayed: undefined },
+    })));
+    subs.forEach((sub, index) => {
+      const [i, j] = probes[index];
+      state.trendMap.set(cellKey(i, j), sub.score - state.staticValues[i][j]);
+    });
+  }
+  // 2b, mirroring searchPosition: corrected values (no re-solve) before
+  // the ordering-only tiebreak runs on what remains tied.
+  applyTrendExtrapolation(state.matrix, result, state.trendMap);
+  applyTrendTiebreak(state.matrix, result, state.trendMap);
+}
+
 export async function searchOrchestrated(
   executor: SearchExecutor,
   settings: EvalSettings,
@@ -48,13 +153,7 @@ export async function searchOrchestrated(
   }
 
   const { p1, p2, rootValue } = info;
-  const jobs: CellJob[] = [];
-  for (let i = 0; i < p1.length; i++) {
-    for (let j = 0; j < p2.length; j++) {
-      jobs.push({ i, j, p1Choice: p1[i].choice, p2Choice: p2[j].choice, samples: settings.samples });
-    }
-  }
-
+  const jobs = cellJobs(p1, p2, settings.samples);
   const total = Math.max(jobs.length, 1);
   const values: number[][] = p1.map(() => p2.map(() => 0));
   const ended: boolean[][] = p1.map(() => p2.map(() => false));
@@ -64,123 +163,32 @@ export async function searchOrchestrated(
   const diagnostics: KoOddsMismatch[] = [];
   const cellValues = await executor.evalCells(jobs, completed =>
     callbacks?.onProgress?.({ done: Math.min(completed, total), total, depth: 1 }));
-  for (const cell of cellValues) {
-    values[cell.i][cell.j] = cell.value;
-    ended[cell.i][cell.j] = cell.ended;
-    if (cell.blend) blends.set(cellKey(cell.i, cell.j), cell.blend);
-    if (cell.diagnostic) diagnostics.push(cell.diagnostic);
-  }
-  const attachKoDiagnostics = (target: EvalResult) => {
-    if (diagnostics.length > 0) target.koDiagnostics = diagnostics;
-  };
-  // Mirrors searchPosition's attachKoOdds (duplicated: no imports from
-  // search.ts — this module stays sim-free).
-  const koOddsMaps = info.koOdds ? {
-    p1: new Map<string, KoOddsInfo | null>(p1.map((option, index) => [option.choice, info.koOdds!.p1[index] ?? null])),
-    p2: new Map<string, KoOddsInfo | null>(p2.map((option, index) => [option.choice, info.koOdds!.p2[index] ?? null])),
-  } : null;
-  const attachKoOdds = (target: EvalResult) => {
-    if (!koOddsMaps) return;
-    for (const side of ['p1', 'p2'] as const) {
-      for (const row of target.perSide[side]) {
-        const odds = koOddsMaps[side].get(row.choice);
-        if (odds) row.koOdds = odds;
-      }
-    }
-  };
-  // Root unanswered-mon profile (round 13), computed sim-side by choices().
-  const attachUnanswered = (target: EvalResult) => {
-    const unanswered = info.unanswered;
-    if (unanswered && (unanswered.p1.length > 0 || unanswered.p2.length > 0 ||
-      (unanswered.p1Entry?.length ?? 0) > 0 || (unanswered.p2Entry?.length ?? 0) > 0 ||
-      unanswered.decided !== undefined || unanswered.nearDecided !== undefined)) target.unanswered = unanswered;
-  };
+  collectCells(cellValues, matrix, blends, diagnostics);
+  const payload = orchestratedPayload(info, diagnostics);
   // Trend baseline, mirroring searchPosition: uniformly 1-ply-vs-static.
-  const staticValues = values.map(row => [...row]);
-  const trendMap = new Map<number, number>();
-
-  let ranked: Ranked = perfSync('main:rank', () => rankFromMatrix(matrix, rootValue));
-  let result = toResult(ranked, 1);
-  attachKoDiagnostics(result);
-  attachKoOdds(result);
-  attachUnanswered(result);
+  const state: Orchestration = {
+    matrix, blends, staticValues: values.map(row => [...row]), trendMap: new Map<number, number>(),
+    pvByCell: new Map<number, PvStep[]>(), executor, settings, callbacks, rootValue, p1, p2,
+    ranked: perfSync('main:rank', () => rankFromMatrix(matrix, rootValue)),
+  };
+  let result = toResult(state.ranked, 1);
+  attachRootPayload(result, payload);
   callbacks?.onPartial?.(result);
 
   let stopped = false;
-  const pvByCell = new Map<number, PvStep[]>();
-  for (let depth = 2; depth <= settings.depth && !stopped; depth++) {
+  for (let depth = 2; depth <= settings.depth; depth++) {
     if (callbacks?.shouldStop?.()) break;
-
-    // Mirrors searchPosition: expansion iterates because deepening a cell
-    // shifts a row's worst case onto still-shallow siblings.
-    const expandedThisLevel = new Set<number>();
-    const budget = TOP_EXPANSION * 2;
-    let used = 0;
-    while (used < budget && !stopped) {
-      if (callbacks?.shouldStop?.()) {
-        stopped = true;
-        break;
-      }
-      const wanted = selectExpansionCells(matrix, ranked, budget - used)
-        .filter(([i, j]) => !expandedThisLevel.has(cellKey(i, j)));
-      if (wanted.length === 0) break;
-
-      const subs = await Promise.all(wanted.map(([i, j]) => executor.subSearch({
-        i, j, p1Choice: p1[i].choice, p2Choice: p2[j].choice,
-        // keepPlayed is a root-position hint — meaningless one turn deeper.
-        settings: { ...settings, depth: (depth - 1) as 1 | 2, samples: 1, keepPlayed: undefined },
-      })));
-      subs.forEach((sub, index) => {
-        const [i, j] = wanted[index];
-        if (depth === 2) trendMap.set(cellKey(i, j), sub.score - staticValues[i][j]);
-        // Mirrors searchPosition: a blended cell re-blends through the
-        // first-seed child's class instead of being overwritten.
-        const cellBlend = blends.get(cellKey(i, j));
-        values[i][j] = cellBlend ? reblendValue(cellBlend, sub.score) : sub.score;
-        expandedThisLevel.add(cellKey(i, j));
-        const subTopP1 = sub.perSide.p1[0];
-        const subTopP2 = sub.perSide.p2[0];
-        if (subTopP1 || subTopP2) {
-          pvByCell.set(cellKey(i, j), [
-            { p1: subTopP1?.label ?? '—', p2: subTopP2?.label ?? '—' },
-            ...(subTopP1?.line ?? []),
-          ]);
-        }
-        used += 1;
-        callbacks?.onProgress?.({ done: used, total: budget, depth });
-      });
-      ranked = perfSync('main:rank', () => rankFromMatrix(matrix, rootValue));
+    if (await deepenLevelAsync(state, depth)) {
+      stopped = true;
+      break;
     }
-    if (stopped) break;
-
-    ranked = perfSync('main:rank', () => rankFromMatrix(matrix, rootValue));
-    attachLines(matrix, ranked, pvByCell);
-    result = toResult(ranked, depth);
-    attachKoDiagnostics(result);
-    attachKoOdds(result);
-    attachUnanswered(result);
+    state.ranked = perfSync('main:rank', () => rankFromMatrix(matrix, rootValue));
+    attachLines(matrix, state.ranked, state.pvByCell);
+    result = toResult(state.ranked, depth);
+    attachRootPayload(result, payload);
     callbacks?.onPartial?.(result);
   }
 
-  // Horizon-trend tiebreak, mirroring searchPosition: singles-shaped lists
-  // only; probes are one-ply sub-searches of the tied rows' decisive cells.
-  const combined = p1.some(option => option.choice.includes(',')) || p2.some(option => option.choice.includes(','));
-  if (!stopped && !combined) {
-    const probes = selectTieProbeCells(matrix, result, trendMap);
-    if (probes.length > 0) {
-      const subs = await Promise.all(probes.map(([i, j]) => executor.subSearch({
-        i, j, p1Choice: p1[i].choice, p2Choice: p2[j].choice,
-        settings: { ...settings, depth: 1, samples: 1, keepPlayed: undefined },
-      })));
-      subs.forEach((sub, index) => {
-        const [i, j] = probes[index];
-        trendMap.set(cellKey(i, j), sub.score - staticValues[i][j]);
-      });
-    }
-    // 2b, mirroring searchPosition: corrected values (no re-solve) before
-    // the ordering-only tiebreak runs on what remains tied.
-    applyTrendExtrapolation(matrix, result, trendMap);
-    applyTrendTiebreak(matrix, result, trendMap);
-  }
+  await applyTrendLayersAsync(state, result, stopped);
   return result;
 }
