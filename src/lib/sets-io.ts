@@ -27,16 +27,16 @@ function knownValue(field: { value: string } | undefined): string {
   return value && !value.startsWith('(') ? value : '';
 }
 
-function exportSet(pokemon: RevealedPokemonInfo): string {
+/** `Species (M) @ Item` — the export block's first line. */
+function headerLine(pokemon: RevealedPokemonInfo): string {
   const gender = pokemon.gender === 'M' || pokemon.gender === 'F' ? ` (${pokemon.gender})` : '';
   const item = itemSetValue(pokemon.item?.value ?? '');
-  const lines = [`${pokemon.species}${gender}${item ? ` @ ${item}` : ''}`];
+  return `${pokemon.species}${gender}${item ? ` @ ${item}` : ''}`;
+}
 
-  const ability = knownValue(pokemon.ability);
-  if (ability) lines.push(`Ability: ${ability}`);
-  if (pokemon.level && pokemon.level !== 100) lines.push(`Level: ${pokemon.level}`);
-  const teraType = knownValue(pokemon.teraType);
-  if (teraType) lines.push(`Tera Type: ${teraType}`);
+/** EVs, Nature, IVs — in Showdown's export order, only the known ones. */
+function spreadLines(pokemon: RevealedPokemonInfo): string[] {
+  const lines: string[] = [];
   if (pokemon.evs && pokemon.evs.source !== 'unknown') {
     const evLine = statLine('EVs', pokemon.evs.value, 0);
     if (evLine) lines.push(evLine);
@@ -47,6 +47,18 @@ function exportSet(pokemon: RevealedPokemonInfo): string {
     const ivLine = statLine('IVs', pokemon.ivs.value, 31);
     if (ivLine) lines.push(ivLine);
   }
+  return lines;
+}
+
+function exportSet(pokemon: RevealedPokemonInfo): string {
+  const lines = [headerLine(pokemon)];
+
+  const ability = knownValue(pokemon.ability);
+  if (ability) lines.push(`Ability: ${ability}`);
+  if (pokemon.level && pokemon.level !== 100) lines.push(`Level: ${pokemon.level}`);
+  const teraType = knownValue(pokemon.teraType);
+  if (teraType) lines.push(`Tera Type: ${teraType}`);
+  lines.push(...spreadLines(pokemon));
   for (const move of pokemon.moves) lines.push(`- ${move.name}`);
 
   return lines.join('\n');
