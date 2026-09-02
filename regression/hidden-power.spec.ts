@@ -1,9 +1,9 @@
 import { test, expect } from '@playwright/test';
 import { resolveHiddenPowerType, withHiddenPowerType } from '../packages/replay-core/src/hidden-power';
 import { parseSmogonChaosStats } from '../src/lib/smogon-stats';
-import { reconstructBranchRuntime } from '../src/lib/branch-engine';
-import { matchPlayedChoice } from '../src/lib/eval/analysis';
-import type { EvalResult } from '../src/lib/eval/analysis';
+import { reconstructBranchRuntime } from '../packages/eval-engine/src/branch-engine';
+import { matchPlayedChoice } from '../packages/eval-engine/src/analysis';
+import type { EvalResult } from '../packages/eval-engine/src/analysis';
 import type { HiddenPowerEvidence } from '../packages/replay-core/src/types';
 import type { PokemonSet } from '@pkmn/sim';
 

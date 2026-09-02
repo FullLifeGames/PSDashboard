@@ -1,8 +1,8 @@
 /// <reference lib="webworker" />
-import { mctsSearch, mctsTreeSearch } from '../lib/eval/mcts';
-import type { SearchExecutor } from '../lib/eval/orchestrator';
-import { createLocalExecutor, searchPosition } from '../lib/eval/search';
-import type { EvalWorkerRequest, EvalWorkerResponse } from '../lib/eval/types';
+import {
+  mctsSearch, mctsTreeSearch, type SearchExecutor, createLocalExecutor, searchPosition, type EvalWorkerRequest,
+  type EvalWorkerResponse,
+} from '@fulllifegames/eval-engine';
 
 const scope = self as unknown as DedicatedWorkerGlobalScope;
 const post = (message: EvalWorkerResponse) => scope.postMessage(message);

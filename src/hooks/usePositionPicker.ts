@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import type { ReplayData, TurnSnapshot } from '@fulllifegames/replay-core';
-import type { BranchSlotChoice } from '../lib/branch-choices';
+import type { BranchSlotChoice } from '@fulllifegames/eval-engine';
 import type { PickerSource } from '../lib/picker-state';
 import { buildReplayTeams, type TeamBuildSources } from '../lib/eval-acquire';
 import type { VariationSpan } from '../lib/timeline';

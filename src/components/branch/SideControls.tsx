@@ -1,14 +1,10 @@
 import { useState } from 'react';
 import type { BranchMoveOption, BranchSwitchOption } from '../../hooks/useBranch';
-import type { BranchSlotModifiers } from '../../lib/branch-engine';
-import type { DamageResult } from '../../lib/damage-calc';
-import type { SpreadTargetDamage } from '../../lib/branch-damage';
 import {
-  notationSlotChoice,
-  switchChoiceKey,
-  switchOptionKey,
+  type BranchSlotModifiers, type DamageResult, notationSlotChoice, switchChoiceKey, switchOptionKey,
   type BranchSlotChoice,
-} from '../../lib/branch-choices';
+} from '@fulllifegames/eval-engine';
+import type { SpreadTargetDamage } from '../../lib/branch-damage';
 import { useGimmick, useMovePool } from '../../hooks/useSideControlsState';
 import { SwitchBtn } from './ChoiceButtons';
 import { FightSection, type WhatIfState } from './FightSection';

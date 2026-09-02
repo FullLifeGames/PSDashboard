@@ -4,11 +4,11 @@ import type { PokemonSet } from '@pkmn/sim';
 import {
   classifyChild, foldClassWeights, observeOrder, planCellEvents, koOddsForOptions,
   BOUNDARY_DRAW_BUDGET, PROBE_SEEDS, type CellEvent,
-} from '../src/lib/eval/cell-blend';
-import { reblendValue } from '../src/lib/eval/rank';
-import { advancePositionWithLog, createRootPosition } from '../src/lib/eval/forward-model';
-import { createLocalExecutor, searchPosition } from '../src/lib/eval/search';
-import { searchOrchestrated } from '../src/lib/eval/orchestrator';
+} from '../packages/eval-engine/src/cell-blend';
+import { reblendValue } from '../packages/eval-engine/src/rank';
+import { advancePositionWithLog, createRootPosition } from '../packages/eval-engine/src/forward-model';
+import { createLocalExecutor, searchPosition } from '../packages/eval-engine/src/search';
+import { searchOrchestrated } from '../packages/eval-engine/src/orchestrator';
 
 function makeSet(name: string, species: string, moves: string[], level = 50, item = '', ability = 'No Ability'): PokemonSet {
   return {

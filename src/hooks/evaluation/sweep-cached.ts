@@ -1,6 +1,5 @@
-import type { TurnSensitivity, TurnVerification } from '../../lib/eval/analysis';
+import { type TurnSensitivity, type TurnVerification, perfSpan } from '@fulllifegames/eval-engine';
 import { EvalWorkerClient } from '../../lib/eval/worker-client';
-import { perfSpan } from '../../lib/eval/perf-trace';
 import { saveStoredEval } from '../../lib/eval-cache-store';
 import { aborted, guardedStage, isCancelled, matchOrPhantom, type SweepEnv, type TurnStageArgs } from './sweep-types';
 import { probeSensitivity, verifyFlagged } from './sweep-verify';

@@ -1,11 +1,9 @@
 import { toID } from '@pkmn/dex';
 import type { ReplayData, TurnSnapshot } from '@fulllifegames/replay-core';
-import { analyzeTurn, decidedSeenKey, PAYOFF_WINDOW, unansweredSeenKey, type TurnAnalysis } from './eval/analysis';
-import { detectSacks, type PlayedTurn } from './eval/played';
-import type { StreakHistoryEntry } from './eval/streaks';
-import { buildGameReport, type GameReport } from './eval/report';
-import { computeRead } from './eval/opponent-model';
-import type { EvalResult } from './eval/types';
+import {
+  analyzeTurn, decidedSeenKey, PAYOFF_WINDOW, unansweredSeenKey, type TurnAnalysis, detectSacks,
+  type PlayedTurn, type StreakHistoryEntry, buildGameReport, type GameReport, computeRead, type EvalResult,
+} from '@fulllifegames/eval-engine';
 
 /** The graph slices the analyses read — matches useEvaluation's graph. */
 export interface AnalysisGraphData {

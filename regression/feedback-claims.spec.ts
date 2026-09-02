@@ -1,6 +1,6 @@
 import { test, expect } from '@playwright/test';
-import type { TurnAnalysis, TurnAttribution, VerdictTier } from '../src/lib/eval/analysis';
-import type { GameReport } from '../src/lib/eval/report';
+import type { TurnAnalysis, TurnAttribution, VerdictTier } from '../packages/eval-engine/src/analysis';
+import type { GameReport } from '../packages/eval-engine/src/report';
 import { FEEDBACK_CORPUS, FEEDBACK_REPLAYS, type FeedbackItem, type ReportClaim } from '../e2e-feedback/corpus';
 import { evaluateItem, validateCorpus } from '../e2e-feedback/claims';
 import { renderReport } from '../e2e-feedback/report';

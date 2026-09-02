@@ -1,9 +1,10 @@
 import { useCallback, useMemo, useRef, useState } from 'react';
-import type { TurnSensitivity, TurnVerification } from '../../lib/eval/analysis';
+import {
+  type TurnSensitivity, type TurnVerification, type EvalPreferences, type EvalResult, type EvalSettings,
+  type SearchProgress, type TeraAllowance, teraKey,
+} from '@fulllifegames/eval-engine';
 import { EvalWorkerClient } from '../../lib/eval/worker-client';
 import { evalStoreKey, loadStoredEval, saveStoredEval } from '../../lib/eval-cache-store';
-import type { EvalPreferences, EvalResult, EvalSettings, SearchProgress, TeraAllowance } from '../../lib/eval/types';
-import { teraKey } from '../../lib/eval/tera';
 import { resolveAutoTurnSettings, serializedFaintedFraction, type EngineMode, type TurnEvalSettings } from './prefs';
 
 export type EvalStatus = 'idle' | 'reconstructing' | 'searching' | 'done' | 'stale' | 'error';

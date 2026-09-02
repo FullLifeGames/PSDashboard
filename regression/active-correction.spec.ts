@@ -4,9 +4,9 @@ import {
   reconstructBranchRuntime,
   executeBranchChoices,
   correctActivesFromProtocol,
-} from '../src/lib/branch-engine';
-import { buildChoiceLockContext } from '../src/lib/choice-lock';
-import { createRootPosition, legalChoices, serializeBattleStable } from '../src/lib/eval/forward-model';
+} from '../packages/eval-engine/src/branch-engine';
+import { buildChoiceLockContext } from '../packages/eval-engine/src/choice-lock';
+import { createRootPosition, legalChoices, serializeBattleStable } from '../packages/eval-engine/src/forward-model';
 
 function makeSet(name: string, species: string, moves: string[]): PokemonSet {
   return {

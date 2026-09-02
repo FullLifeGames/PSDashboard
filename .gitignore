@@ -43,3 +43,6 @@ docs
 NextSteps*.md
 FeedbackEval.xlsx
 deploy.ps1
+
+# TypeScript incremental build state (composite packages write theirs into dist/)
+*.tsbuildinfo

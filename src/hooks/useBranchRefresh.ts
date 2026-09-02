@@ -2,7 +2,7 @@ import { useEffect, type MutableRefObject } from 'react';
 import {
   type DamageObservation, type OpponentTeamInfo, type ReplayData, type TurnSnapshot, getBranchSimulatorFormat,
 } from '@fulllifegames/replay-core';
-import type { BranchSlotChoice } from '../lib/branch-choices';
+import type { BranchSlotChoice } from '@fulllifegames/eval-engine';
 import { snapshotAt, type TeamBuildSources } from '../lib/eval-acquire';
 import { prepareBranchInputs } from '../lib/branch-build';
 import type { BranchHistoryEntry, useBranch } from './useBranch';

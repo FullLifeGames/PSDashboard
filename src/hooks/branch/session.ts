@@ -1,9 +1,7 @@
 import { useCallback } from 'react';
 import type { PokemonSet } from '@pkmn/sim';
 import type { TurnSnapshot } from '@fulllifegames/replay-core';
-import type { ChoiceLockContext } from '../../lib/choice-lock';
-import type { BranchRuntime } from '../../lib/branch-engine';
-import type { BranchSlotChoice } from '../../lib/branch-choices';
+import type { ChoiceLockContext, BranchRuntime, BranchSlotChoice } from '@fulllifegames/eval-engine';
 import {
   makeHistoryEntry, requiredChoices,
   type BranchEngineModule, type BranchHistoryEntry, type BranchRefs, type BranchSetters, type BattleStream, type SideId,
@@ -311,7 +309,7 @@ export function useBranchSession(
   const { setBranching, setSimState, setHistory, setVariationStartTurn, setStartSerialized, setExecuteError } = setters;
 
   const loadBranchEngine = useCallback(async () => {
-    branchEngineRef.current ??= await import('../../lib/branch-engine');
+    branchEngineRef.current ??= await import('../../lib/lazy/branch-engine');
     return branchEngineRef.current;
   }, [branchEngineRef]);
 

@@ -4,7 +4,7 @@ import {
   type SpreadCandidate, getBranchSimulatorFormat,
 } from '@fulllifegames/replay-core';
 
-type BranchEngineModule = typeof import('./branch-engine');
+type BranchEngineModule = typeof import('./lazy/branch-engine');
 type ReconstructOptions = Parameters<BranchEngineModule['reconstructBranchRuntime']>[0];
 export type CaptureBattle = Parameters<NonNullable<ReconstructOptions['capturePositions']>['onPosition']>[1];
 
@@ -54,7 +54,7 @@ export function makePreviewAcquire(
   bringOnlyLists: { p1: string[]; p2: string[] } | null,
 ) {
   return async (): Promise<string | null> => {
-    const branchEngine = await import('./branch-engine');
+    const branchEngine = await import('./lazy/branch-engine');
     const { p1Team, p2Team } = await buildReplayTeams(replayData, sources);
     if (p1Team.length === 0 || p2Team.length === 0) return null;
     // Bring-limited replays: the lead analysis enumerates pairs over the
@@ -77,8 +77,8 @@ export async function reconstructReplayRuntime(args: {
   onProgress: (turn: number, target: number) => void;
   onPosition?: (turn: number, battle: CaptureBattle) => void;
 }) {
-  const branchEngine = await import('./branch-engine');
-  const { buildChoiceLockContext } = await import('./choice-lock');
+  const branchEngine = await import('./lazy/branch-engine');
+  const { buildChoiceLockContext } = await import('./lazy/choice-lock');
   const { replayData, p1Team, p2Team } = args;
   const runtime = await branchEngine.reconstructBranchRuntime({
     format: getBranchSimulatorFormat(replayData),

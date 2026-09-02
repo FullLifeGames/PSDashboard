@@ -1,11 +1,9 @@
 import { useEffect, useMemo, useState } from 'react';
 import type { ReplayData, TurnSnapshot } from '@fulllifegames/replay-core';
-import { allTurnEvents } from '../lib/eval/played';
-import { parseTendencies } from '../lib/eval/opponent-model';
-import { analyzeLeads } from '../lib/eval/leads';
-import type { GameReport } from '../lib/eval/report';
-import type { TurnAnalysis } from '../lib/eval/analysis';
-import { summarizeAlignment, type TurnAlignmentRecord } from '../lib/hax-alignment';
+import {
+  allTurnEvents, parseTendencies, analyzeLeads, type GameReport, type TurnAnalysis, summarizeAlignment,
+  type TurnAlignmentRecord,
+} from '@fulllifegames/eval-engine';
 import {
   analyzeTurnAt, buildPlayedHistory, computeGameReportData, computeTurnReads,
   type TurnAnalysisContext,

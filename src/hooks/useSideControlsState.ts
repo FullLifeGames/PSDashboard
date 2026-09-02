@@ -1,6 +1,5 @@
 import { useEffect, useState } from 'react';
-import type { BranchSlotModifiers } from '../lib/branch-engine';
-import type { BranchMoveModifier } from '../lib/branch-choices';
+import type { BranchSlotModifiers, BranchMoveModifier } from '@fulllifegames/eval-engine';
 
 /** Legal move pool for "What if it had …" — loaded lazily per active species. */
 export function useMovePool(activeSpecies: string, gen: number): string[] {

@@ -1,7 +1,7 @@
 import { test, expect } from '@playwright/test';
 import { BattleStreams, Teams } from '@pkmn/sim';
 import type { PokemonSet } from '@pkmn/sim';
-import { createBranchState } from '../src/lib/branch-engine';
+import { createBranchState } from '../packages/eval-engine/src/branch-engine';
 import {
   fillUsageMoves,
   getSpeciesUsageSet,

@@ -1,6 +1,6 @@
 import { test, expect } from '@playwright/test';
-import { rankFromMatrix, toResult, type ValueMatrix } from '../src/lib/eval/rank';
-import { computeRead, modelOpponent, parseTendencies, READ_CONFIDENCE, READ_LAMBDA } from '../src/lib/eval/opponent-model';
+import { rankFromMatrix, toResult, type ValueMatrix } from '../packages/eval-engine/src/rank';
+import { computeRead, modelOpponent, parseTendencies, READ_CONFIDENCE, READ_LAMBDA } from '../packages/eval-engine/src/opponent-model';
 
 /**
  * The exploitative Read lens: a boundedly-rational opponent model (softmax

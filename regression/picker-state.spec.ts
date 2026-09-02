@@ -2,7 +2,7 @@ import { expect, test } from '@playwright/test';
 import { readFileSync } from 'fs';
 import type { PokemonSet } from '@pkmn/sim';
 import { buildTeamsFromReplay } from '../packages/replay-core/src/team-builder';
-import { reconstructBranchRuntime } from '../src/lib/branch-engine';
+import { reconstructBranchRuntime } from '../packages/eval-engine/src/branch-engine';
 import { parseReplayLog } from '../packages/replay-core/src/protocol-parser';
 import { pickerStateFromSerialized, pickerStateFromSnapshot } from '../src/lib/picker-state';
 import type { TurnSnapshot } from '../packages/replay-core/src/types';
@@ -26,7 +26,7 @@ test('pickerStateFromSerialized rebuilds exact move lists with live PP', async (
     targetTurn: 3,
     snapshot: snapshots.find(entry => entry.turn === 3) ?? null,
   });
-  const { serializeLiveBattle } = await import('../src/lib/eval/serialize');
+  const { serializeLiveBattle } = await import('../packages/eval-engine/src/serialize');
   const serialized = serializeLiveBattle(runtime.battleStream.battle!);
 
   const state = await pickerStateFromSerialized(serialized);

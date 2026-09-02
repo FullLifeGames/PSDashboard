@@ -1,6 +1,5 @@
 import { useCallback, useRef, useState } from 'react';
-import type { BranchSlotChoice } from '../../lib/branch-choices';
-import type { EvalResult } from '../../lib/eval/types';
+import type { BranchSlotChoice, EvalResult } from '@fulllifegames/eval-engine';
 
 export interface PlayOutState {
   active: boolean;

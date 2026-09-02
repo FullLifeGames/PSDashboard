@@ -1,12 +1,9 @@
 import {
-  matchPlayedSide, phantomStayIn,
-  type TurnSensitivity, type TurnVerification,
-} from '../../lib/eval/analysis';
-import type { SensitivityTarget } from '../../lib/eval/sensitivity';
-import type { LeadEvalData } from '../../lib/eval/leads';
-import type { PlayedTurn } from '../../lib/eval/played';
+  matchPlayedSide, phantomStayIn, type TurnSensitivity, type TurnVerification, type SensitivityTarget,
+  type LeadEvalData, type PlayedTurn, type EvalPreferences, type EvalResult, type EvalSettings,
+  type RankedChoice, type TeraAllowance,
+} from '@fulllifegames/eval-engine';
 import type { EvalWorkerClient } from '../../lib/eval/worker-client';
-import type { EvalPreferences, EvalResult, EvalSettings, RankedChoice, TeraAllowance } from '../../lib/eval/types';
 import type { EngineMode, TurnEvalSettings } from './prefs';
 import type { CachedEval } from './single-eval';
 

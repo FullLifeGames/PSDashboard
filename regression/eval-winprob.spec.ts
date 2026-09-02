@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { DISPLAY_K, winPercent, winProbability, WINPROB_K, wpUnits } from '../src/lib/eval/winprob';
+import { DISPLAY_K, winPercent, winProbability, WINPROB_K, wpUnits } from '../packages/eval-engine/src/winprob';
 
 test.describe('win probability mapping', () => {
   test('an even score is a coin flip in both game types', () => {

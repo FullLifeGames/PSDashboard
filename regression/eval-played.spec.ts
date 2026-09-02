@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { parsePlayedActions, parsePlayedActionsDoubles } from '../src/lib/eval/played';
+import { parsePlayedActions, parsePlayedActionsDoubles } from '../packages/eval-engine/src/played';
 
 test.describe('played-action parsing', () => {
   test('both sides move', () => {

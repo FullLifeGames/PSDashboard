@@ -1,8 +1,7 @@
-import type { TurnAnalysis } from '../lib/eval/analysis';
-import type { LeadAnalysis, LeadSideAnalysis } from '../lib/eval/leads';
-import type { RankedChoice, ReadRecommendation } from '../lib/eval/types';
-import { formatRead, summarizeTurn } from '../lib/eval/summary';
-import { winDeltaText, winPctText } from '../lib/eval/winprob';
+import {
+  type TurnAnalysis, type LeadAnalysis, type LeadSideAnalysis, type RankedChoice, type ReadRecommendation,
+  formatRead, summarizeTurn, winDeltaText, winPctText,
+} from '@fulllifegames/eval-engine';
 import { attributionBadge } from './eval-badges';
 import { EngineRow } from './eval/analysis-bits';
 import { SideRow } from './eval/SideRow';

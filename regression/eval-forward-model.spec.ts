@@ -3,8 +3,8 @@ import { Battle, State, Teams, toID } from '@pkmn/sim';
 import type { PokemonSet } from '@pkmn/sim';
 import {
   advancePosition, createRootPosition, legalChoices, positionBattle,
-} from '../src/lib/eval/forward-model';
-import { evaluatePosition } from '../src/lib/eval/eval-function';
+} from '../packages/eval-engine/src/forward-model';
+import { evaluatePosition } from '../packages/eval-engine/src/eval-function';
 
 function makeSet(name: string, species: string, moves: string[], level = 50): PokemonSet {
   return {
@@ -418,7 +418,7 @@ test.describe('one-sided forced switch (waiting side)', () => {
   });
 
   test('a full search on a mid-switch position completes without sim rejections', async () => {
-    const { searchPosition } = await import('../src/lib/eval/search');
+    const { searchPosition } = await import('../packages/eval-engine/src/search');
     const result = searchPosition(serialize(midSwitchBattle()), { depth: 1, samples: 1, tera: false });
     expect(result.perSide.p1).toEqual([
       expect.objectContaining({ choice: 'wait', label: '(waiting)' }),
@@ -565,7 +565,7 @@ test.describe('concealed trapping (Magnet Pull family)', () => {
 
     // The real regression: a full search on the position must not die on a
     // guaranteed-reject switch cell.
-    const { searchPosition } = await import('../src/lib/eval/search');
+    const { searchPosition } = await import('../packages/eval-engine/src/search');
     const result = searchPosition(root.serialized, { depth: 1, samples: 1, tera: false });
     expect(result.perSide.p2.some(option => option.choice.startsWith('switch'))).toBe(false);
   });

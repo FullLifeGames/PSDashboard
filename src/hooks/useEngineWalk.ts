@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useRef, useState, type MutableRefObject } from 'react';
-import type { EvalResult, RankedChoice } from '../lib/eval/types';
-import { evalChoiceToSlotChoices, requiredChoicesForActiveSlots, type BranchSlotChoice } from '../lib/branch-choices';
+import {
+  type EvalResult, type RankedChoice, evalChoiceToSlotChoices, requiredChoicesForActiveSlots,
+  type BranchSlotChoice,
+} from '@fulllifegames/eval-engine';
 import type { BranchSimState, useBranch } from './useBranch';
 import type { useEvaluation } from './useEvaluation';
 

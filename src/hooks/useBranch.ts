@@ -1,6 +1,5 @@
 import { useState, useCallback, useMemo, useRef } from 'react';
-import type { BranchChoiceErrorLog, BranchSimState } from '../lib/branch-engine';
-import type { BranchSlotChoice } from '../lib/branch-choices';
+import type { BranchChoiceErrorLog, BranchSimState, BranchSlotChoice } from '@fulllifegames/eval-engine';
 import type { BattleStream, BranchEngineModule, BranchHistoryEntry, BranchRefs, PlayerStreams } from './branch/shared';
 import { useBranchExecute } from './branch/execute';
 import { useBranchSession } from './branch/session';
@@ -10,7 +9,7 @@ export type {
   BranchSwitchOption,
   BranchSimState,
   SimPokemonInfo,
-} from '../lib/branch-engine';
+} from '@fulllifegames/eval-engine';
 export type { BranchHistoryEntry } from './branch/shared';
 
 /**

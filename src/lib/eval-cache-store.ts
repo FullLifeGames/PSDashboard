@@ -1,6 +1,6 @@
-import type { EvalResult, TeraAllowance } from './eval/types';
-import type { TurnSensitivity, TurnVerification } from './eval/analysis';
-import { teraKey } from './eval/tera';
+import {
+  type EvalResult, type TeraAllowance, type TurnSensitivity, type TurnVerification, teraKey,
+} from '@fulllifegames/eval-engine';
 
 /**
  * IndexedDB persistence for evaluation results, keyed by position + settings.

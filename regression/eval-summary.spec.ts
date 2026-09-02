@@ -1,7 +1,7 @@
 import { test, expect } from '@playwright/test';
-import { analyzeTurn, type TurnAnalysis } from '../src/lib/eval/analysis';
-import { formatRead, summarizeTurn } from '../src/lib/eval/summary';
-import type { EvalResult, RankedChoice } from '../src/lib/eval/types';
+import { analyzeTurn, type TurnAnalysis } from '../packages/eval-engine/src/analysis';
+import { formatRead, summarizeTurn } from '../packages/eval-engine/src/summary';
+import type { EvalResult, RankedChoice } from '../packages/eval-engine/src/types';
 
 const choice = (choiceStr: string, label: string, worstCase: number, line?: { p1: string; p2: string }[]): RankedChoice =>
   ({ choice: choiceStr, label, worstCase, expected: worstCase, ev: worstCase, punishedBy: 'Reply', ...(line ? { line } : {}) });

@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { createBranchState, reconstructBranchRuntime } from '../src/lib/branch-engine';
+import { createBranchState, reconstructBranchRuntime } from '../packages/eval-engine/src/branch-engine';
 import type { PokemonSet } from '@pkmn/sim';
 import type { TurnSnapshot } from '../packages/replay-core/src/types';
 

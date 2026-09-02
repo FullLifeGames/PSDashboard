@@ -1,6 +1,6 @@
 import { test, expect } from '@playwright/test';
 import { buildTeamsFromReplay } from '../packages/replay-core/src/team-builder';
-import { reconstructBranchRuntime, executeBranchChoices } from '../src/lib/branch-engine';
+import { reconstructBranchRuntime, executeBranchChoices } from '../packages/eval-engine/src/branch-engine';
 import { parseReplayLog } from '../packages/replay-core/src/protocol-parser';
 
 // @pkmn/client reports weather by display name ("Sand", not "Sandstorm").

@@ -1,6 +1,6 @@
 import { test, expect } from '@playwright/test';
-import { calcSingleDamageRange } from '../src/lib/damage-calc';
-import type { SimPokemonInfo, BranchMoveOption } from '../src/lib/branch-engine';
+import { calcSingleDamageRange } from '../packages/eval-engine/src/damage-calc';
+import type { SimPokemonInfo, BranchMoveOption } from '../packages/eval-engine/src/branch-engine';
 
 function mon(overrides: Partial<SimPokemonInfo> & { species: string }): SimPokemonInfo {
   return {

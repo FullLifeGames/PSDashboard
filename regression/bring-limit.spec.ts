@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { createBranchState, reconstructBranchRuntime, serializePreviewPosition } from '../src/lib/branch-engine';
+import { createBranchState, reconstructBranchRuntime, serializePreviewPosition } from '../packages/eval-engine/src/branch-engine';
 import { getReplayBringCount, replayBringOnly } from '../packages/replay-core/src/replay-format';
 import { parseReplayLogWithObservations } from '../packages/replay-core/src/protocol-parser';
 import type { PokemonSet } from '@pkmn/sim';
@@ -195,7 +195,7 @@ test.describe('bring-limited team preview (VGC 4 of 6)', () => {
   });
 
   test('the team-preview position honors the bring limit for the lead analysis', async () => {
-    const { createRootPosition, legalChoices } = await import('../src/lib/eval/forward-model');
+    const { createRootPosition, legalChoices } = await import('../packages/eval-engine/src/forward-model');
     const serialized = serializePreviewPosition('gen9doublesou', p1Team, p2Team, {
       p1: ['Pikachu', 'Eevee', 'Raichu', 'Jolteon'],
       p2: ['Bulbasaur', 'Charmander', 'Squirtle', 'Ivysaur'],

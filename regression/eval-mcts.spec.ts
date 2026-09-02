@@ -1,12 +1,12 @@
 import { test, expect } from '@playwright/test';
 import { Battle, State, Teams, toID } from '@pkmn/sim';
 import type { PokemonSet } from '@pkmn/sim';
-import { analyzeTurn, matchPlayedChoice } from '../src/lib/eval/analysis';
-import { mctsSearch, mctsTreeSearch, MCTS_ITERATIONS } from '../src/lib/eval/mcts';
-import { mergeMctsTrees, MCTS_TREES, starvedSupportCells } from '../src/lib/eval/mcts-merge';
-import { createLocalExecutor, searchPosition } from '../src/lib/eval/search';
-import { cellKey } from '../src/lib/eval/rank';
-import type { EvalResult, SearchProgress } from '../src/lib/eval/types';
+import { analyzeTurn, matchPlayedChoice } from '../packages/eval-engine/src/analysis';
+import { mctsSearch, mctsTreeSearch, MCTS_ITERATIONS } from '../packages/eval-engine/src/mcts';
+import { mergeMctsTrees, MCTS_TREES, starvedSupportCells } from '../packages/eval-engine/src/mcts-merge';
+import { createLocalExecutor, searchPosition } from '../packages/eval-engine/src/search';
+import { cellKey } from '../packages/eval-engine/src/rank';
+import type { EvalResult, SearchProgress } from '../packages/eval-engine/src/types';
 
 function makeSet(name: string, species: string, moves: string[], level = 50): PokemonSet {
   return {

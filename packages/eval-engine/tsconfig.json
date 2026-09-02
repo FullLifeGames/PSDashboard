@@ -1,0 +1,37 @@
+{
+  "compilerOptions": {
+    "composite": true,
+    "rootDir": "src",
+    "outDir": "dist",
+    "tsBuildInfoFile": "./dist/tsconfig.tsbuildinfo",
+    "declaration": true,
+    "declarationMap": true,
+    "target": "ES2023",
+    "useDefineForClassFields": true,
+    "lib": ["ES2023", "DOM", "DOM.Iterable"],
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "types": [],
+    "skipLibCheck": true,
+    "verbatimModuleSyntax": true,
+    "moduleDetection": "force",
+
+    /* Linting (the app's settings, so the moved files check under the same rules) */
+    "strict": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "erasableSyntaxOnly": true,
+    "noFallthroughCasesInSwitch": true,
+    "noUncheckedSideEffectImports": true,
+
+    /* replay-core by name: its sources for Playwright and the editor, its
+       built declarations for tsc -b through the project reference. */
+    "paths": {
+      "@fulllifegames/replay-core": ["../replay-core/src/index.ts"]
+    }
+  },
+  "include": ["src"],
+  "references": [
+    { "path": "../replay-core" }
+  ]
+}

@@ -1,7 +1,7 @@
 import { test, expect } from '@playwright/test';
 import { Battle, Teams, toID } from '@pkmn/sim';
 import type { PokemonSet } from '@pkmn/sim';
-import { effectiveSpeed, movesFirst } from '../src/lib/eval/speed';
+import { effectiveSpeed, movesFirst } from '../packages/eval-engine/src/speed';
 
 function makeSet(
   name: string,

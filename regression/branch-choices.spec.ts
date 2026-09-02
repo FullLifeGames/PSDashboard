@@ -10,8 +10,8 @@ import {
   switchChoiceKey,
   switchOptionKey,
   type BranchSlotChoice,
-} from '../src/lib/branch-choices';
-import type { BranchMoveOption, BranchSwitchOption, BranchTargetOption } from '../src/lib/branch-engine';
+} from '../packages/eval-engine/src/branch-choices';
+import type { BranchMoveOption, BranchSwitchOption, BranchTargetOption } from '../packages/eval-engine/src/branch-engine';
 import { toId } from '../packages/replay-core/src/ids';
 
 function switchTo(species: string, name = species): BranchSlotChoice {

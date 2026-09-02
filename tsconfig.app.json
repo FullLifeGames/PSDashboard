@@ -27,11 +27,13 @@
     /* Workspace packages: their sources by name; tsc -b reads the referenced
        projects' declarations, Vite aliases the same entry files. */
     "paths": {
-      "@fulllifegames/replay-core": ["./packages/replay-core/src/index.ts"]
+      "@fulllifegames/replay-core": ["./packages/replay-core/src/index.ts"],
+      "@fulllifegames/eval-engine": ["./packages/eval-engine/src/index.ts"]
     }
   },
   "include": ["src"],
   "references": [
-    { "path": "./packages/replay-core" }
+    { "path": "./packages/replay-core" },
+    { "path": "./packages/eval-engine" }
   ]
 }

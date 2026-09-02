@@ -1,7 +1,7 @@
 import { test, expect } from '@playwright/test';
 import { Battle, Teams, toID } from '@pkmn/sim';
 import type { PokemonSet } from '@pkmn/sim';
-import { boundaryEvent } from '../src/lib/eval/ko-odds';
+import { boundaryEvent } from '../packages/eval-engine/src/ko-odds';
 
 function makeSet(name: string, species: string, moves: string[], level = 50, item = '', ability = 'No Ability'): PokemonSet {
   return {

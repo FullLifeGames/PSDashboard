@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { perfAdd, perfCount, perfEnabled, perfReset, perfSpan, perfSummary } from '../src/lib/eval/perf-trace';
+import { perfAdd, perfCount, perfEnabled, perfReset, perfSpan, perfSummary } from '../packages/eval-engine/src/perf-trace';
 
 test.describe('perf-trace', () => {
   test('aggregates stages and counters and resets clean', async () => {

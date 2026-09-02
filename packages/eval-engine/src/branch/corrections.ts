@@ -1,8 +1,8 @@
 import { Dex } from '@pkmn/sim';
 import { type PokemonSnapshot, type TurnSnapshot, sideIndex, toId } from '@fulllifegames/replay-core';
 import { protocolChoiceLock, type ChoiceLockContext } from '../choice-lock';
-import { CHOICE_ITEMS } from '../eval/sensitivity';
-import { restoreSideInvariants } from '../eval/forward-model';
+import { CHOICE_ITEMS } from '../sensitivity';
+import { restoreSideInvariants } from '../forward-model';
 import type { SimBattle, SimPokemon, SimSide } from './types';
 import { normalizeBattleOnlyFormeId } from './team-order';
 import { findFirstAvailableSwitchSlot, findPokemonOnSide, findSlotBySpecies } from './protocol-choices';

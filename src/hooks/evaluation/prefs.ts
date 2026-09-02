@@ -1,5 +1,5 @@
 import { useCallback, useRef, useState } from 'react';
-import { AUTO_MCTS_FAINTED_FRACTION, type EvalPreferences, type EvalSettings } from '../../lib/eval/types';
+import { AUTO_MCTS_FAINTED_FRACTION, type EvalPreferences, type EvalSettings } from '@fulllifegames/eval-engine';
 
 const PREFS_KEY = 'ps-replay-interceptor:eval-prefs';
 // Default line engine: 'auto' — the grid-tuned measured best (matrix d1s1

@@ -1,7 +1,7 @@
 import { Battle, BattleStreams, Dex, Teams } from '@pkmn/sim';
 import type { ID, PokemonSet } from '@pkmn/sim';
 import type { BranchSlotChoice } from '../branch-choices';
-import { serializeBattleStable } from '../eval/forward-model';
+import { serializeBattleStable } from '../forward-model';
 import type {
   BranchChoices, BranchMoveOption, BranchSimState, BranchSlotModifiers, BranchSwitchOption, BranchTargetOption,
   SimBattle, SimPokemon, SimSide,

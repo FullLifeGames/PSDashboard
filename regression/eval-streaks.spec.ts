@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { detectStreakOdds, type StreakHistoryEntry } from '../src/lib/eval/streaks';
+import { detectStreakOdds, type StreakHistoryEntry } from '../packages/eval-engine/src/streaks';
 
 const entry = (over: Partial<StreakHistoryEntry> = {}): StreakHistoryEntry => ({
   attacker: 'Kyurem', moveId: 'icebeam', defender: 'Blissey', movedFirst: true,

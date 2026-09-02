@@ -1,0 +1,28 @@
+{
+  "name": "@fulllifegames/eval-engine",
+  "version": "0.1.0",
+  "description": "Position evaluation for Pokémon Showdown replays: reconstruction, search, per-turn analysis, and the game report.",
+  "license": "MIT",
+  "type": "module",
+  "sideEffects": false,
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "dependencies": {
+    "@fulllifegames/replay-core": "*"
+  },
+  "peerDependencies": {
+    "@pkmn/dex": "^0.10.11",
+    "@pkmn/sim": "^0.10.11",
+    "@smogon/calc": "^0.11.0"
+  }
+}

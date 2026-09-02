@@ -1,9 +1,8 @@
 import type { ReactNode } from 'react';
-import type { EvalPreferences, EvalResult, RankedChoice, ReadRecommendation } from '../../lib/eval/types';
-import type { TurnAnalysis } from '../../lib/eval/analysis';
-import type { GameReport } from '../../lib/eval/report';
+import type {
+  EvalPreferences, EvalResult, RankedChoice, ReadRecommendation, TurnAnalysis, GameReport, LeadAnalysis,
+} from '@fulllifegames/eval-engine';
 import type { EvalGraphState } from '../../hooks/useEvaluation';
-import type { LeadAnalysis } from '../../lib/eval/leads';
 import { EvalGameReport } from '../EvalGameReport';
 import { EvalGraph } from '../EvalGraph';
 import { EvalLeadAnalysis, EvalTurnAnalysis } from '../EvalTurnAnalysis';

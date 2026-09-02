@@ -1,5 +1,5 @@
 import { useCallback, useEffect, type Dispatch, type MutableRefObject, type SetStateAction } from 'react';
-import type { EvalResult, RankedChoice } from '../lib/eval/types';
+import type { EvalResult, RankedChoice } from '@fulllifegames/eval-engine';
 import { nextPlayOutStep, playOutDoneText } from '../lib/play-out';
 import type { VariationSpan } from '../lib/timeline';
 import type { useBranch } from './useBranch';

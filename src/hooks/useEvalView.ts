@@ -6,9 +6,10 @@ import {
 import { needsSettingsUpgrade, resolveAutoTurnSettings, type TurnEvalSettings, useEvaluation } from './useEvaluation';
 import type { useEvalAcquire } from './useEvalAcquire';
 import { makePreviewAcquire, type TeamBuildSources } from '../lib/eval-acquire';
-import { resolveTeraPreference } from '../lib/eval/tera';
-import { parseLeadSpecies, parsePlayedActions, parsePlayedActionsDoubles } from '../lib/eval/played';
-import type { SensitivityTarget } from '../lib/eval/sensitivity';
+import {
+  resolveTeraPreference, parseLeadSpecies, parsePlayedActions, parsePlayedActionsDoubles,
+  type SensitivityTarget,
+} from '@fulllifegames/eval-engine';
 
 type Evaluation = ReturnType<typeof useEvaluation>;
 type Acquire = ReturnType<typeof useEvalAcquire>;

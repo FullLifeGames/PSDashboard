@@ -1,6 +1,4 @@
-import { TIER_THRESHOLDS, type SideAnalysis } from '../../lib/eval/analysis';
-import type { RankedChoice } from '../../lib/eval/types';
-import { winPctText } from '../../lib/eval/winprob';
+import { TIER_THRESHOLDS, type SideAnalysis, type RankedChoice, winPctText } from '@fulllifegames/eval-engine';
 
 /**
  * Every displayed value is a WIN PROBABILITY for the named player — "52%"

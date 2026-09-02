@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { parseRevealedTeraSpecies, resolveTeraPreference, teraKey } from '../src/lib/eval/tera';
+import { parseRevealedTeraSpecies, resolveTeraPreference, teraKey } from '../packages/eval-engine/src/tera';
 
 const draftLog = [
   '|player|p1|Bene|1|',

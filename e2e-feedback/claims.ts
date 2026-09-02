@@ -1,6 +1,6 @@
-import type { GameReport } from '../src/lib/eval/report';
-import type { TurnAnalysis } from '../src/lib/eval/analysis';
-import { summarizeTurn } from '../src/lib/eval/summary';
+import type { GameReport } from '../packages/eval-engine/src/report';
+import type { TurnAnalysis } from '../packages/eval-engine/src/analysis';
+import { summarizeTurn } from '../packages/eval-engine/src/summary';
 import { BASELINE_PINNED, FEEDBACK_REPLAYS, type FeedbackItem, type ReportClaim, type TurnClaim } from './corpus';
 
 /**

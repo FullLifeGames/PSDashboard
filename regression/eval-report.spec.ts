@@ -1,7 +1,7 @@
 import { test, expect } from '@playwright/test';
-import type { TurnAnalysis } from '../src/lib/eval/analysis';
-import { buildGameReport } from '../src/lib/eval/report';
-import type { RankedChoice } from '../src/lib/eval/types';
+import type { TurnAnalysis } from '../packages/eval-engine/src/analysis';
+import { buildGameReport } from '../packages/eval-engine/src/report';
+import type { RankedChoice } from '../packages/eval-engine/src/types';
 
 const names: [string, string] = ['Alpha', 'Beta'];
 

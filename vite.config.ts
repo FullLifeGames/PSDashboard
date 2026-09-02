@@ -18,6 +18,7 @@ export default defineConfig({
   resolve: {
     alias: {
       '@fulllifegames/replay-core': workspaceSource('replay-core'),
+      '@fulllifegames/eval-engine': workspaceSource('eval-engine'),
     },
   },
 

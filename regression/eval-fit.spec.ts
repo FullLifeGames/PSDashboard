@@ -2,14 +2,14 @@ import { test } from '@playwright/test';
 import { existsSync, readFileSync, writeFileSync } from 'fs';
 import { join } from 'path';
 import { buildTeamsFromReplay } from '../packages/replay-core/src/team-builder';
-import { reconstructBranchRuntime } from '../src/lib/branch-engine';
+import { reconstructBranchRuntime } from '../packages/eval-engine/src/branch-engine';
 import { getBranchSimulatorFormat } from '../packages/replay-core/src/replay-format';
 import { parseReplayLogWithObservations } from '../packages/replay-core/src/protocol-parser';
 import {
   createMatchupCache, evalFeatures, evaluatePosition, EVAL_WEIGHTS, FEATURE_WEIGHTS,
   type EvalFeatures,
-} from '../src/lib/eval/eval-function';
-import { battleFaintedFraction } from '../src/lib/eval/search';
+} from '../packages/eval-engine/src/eval-function';
+import { battleFaintedFraction } from '../packages/eval-engine/src/search';
 import { brierScore, crossValidate, fitConstantK, fitLogistic, fitPhaseK, logLossScore, mulberry32, phaseBucket } from './fit-helpers';
 
 /**

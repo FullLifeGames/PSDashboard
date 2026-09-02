@@ -1,7 +1,7 @@
 import { test, expect } from '@playwright/test';
 import type { PokemonSet } from '@pkmn/sim';
-import { reconstructBranchRuntime, resolveSideChoices } from '../src/lib/branch-engine';
-import type { BranchSlotChoice } from '../src/lib/branch-choices';
+import { reconstructBranchRuntime, resolveSideChoices } from '../packages/eval-engine/src/branch-engine';
+import type { BranchSlotChoice } from '../packages/eval-engine/src/branch-choices';
 
 function pikachu(moves: string[]): PokemonSet {
   return {

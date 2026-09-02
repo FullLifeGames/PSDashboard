@@ -1,4 +1,4 @@
-import type { EvalResult, RankedChoice } from './eval/types';
+import type { EvalResult, RankedChoice } from '@fulllifegames/eval-engine';
 
 /** Safety ceiling per play-out run (spec: 100 executed entries). */
 export const PLAY_OUT_CAP = 100;

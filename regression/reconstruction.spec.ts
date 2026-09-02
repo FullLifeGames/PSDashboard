@@ -4,7 +4,7 @@ import type { PokemonSet } from '@pkmn/sim';
 import { buildTeamsFromReplay } from '../packages/replay-core/src/team-builder';
 import {
   captureSerializedPosition, createBranchState, createBranchStateFromBattle, reconstructBranchRuntime,
-} from '../src/lib/branch-engine';
+} from '../packages/eval-engine/src/branch-engine';
 import { parseReplayLog } from '../packages/replay-core/src/protocol-parser';
 import { parseExportedReplay } from '../src/lib/replay-file';
 import { inferReplayFormatId } from '../packages/replay-core/src/replay-format';

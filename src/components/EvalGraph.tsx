@@ -1,5 +1,5 @@
 import { useLayoutEffect, useRef, useState } from 'react';
-import type { LeadAnalysis } from '../lib/eval/leads';
+import type { LeadAnalysis } from '@fulllifegames/eval-engine';
 import {
   decidedSpans, graphBlunders, graphScales, GRAPH_HEIGHT as HEIGHT, GRAPH_PAD_X as PAD_X, highlightEdge, hitTitle,
   lastVariationTurnOf, leadTooltip, mainLinePaths, ringScore, variationHitTitle, variationOverlay,

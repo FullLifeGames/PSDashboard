@@ -1,6 +1,5 @@
 import type { TurnSnapshot, SideId } from '@fulllifegames/replay-core';
-import type { BranchSlotChoice } from './branch-choices';
-import type { SimPokemonInfo } from './branch-engine';
+import type { BranchSlotChoice, SimPokemonInfo } from '@fulllifegames/eval-engine';
 
 export interface BranchHistoryEntry {
   turnNumber: number;

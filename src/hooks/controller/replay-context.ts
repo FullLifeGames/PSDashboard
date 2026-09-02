@@ -13,7 +13,7 @@ import {
   type OpponentTeamInfo, type ReplayData, type TurnSnapshot, getReplayBringCount, getReplayGameType,
   getReplayGeneration, replayBringOnly,
 } from '@fulllifegames/replay-core';
-import type { BranchSlotChoice } from '../../lib/branch-choices';
+import type { BranchSlotChoice } from '@fulllifegames/eval-engine';
 
 interface PendingBranchRefresh {
   p1Info: OpponentTeamInfo;

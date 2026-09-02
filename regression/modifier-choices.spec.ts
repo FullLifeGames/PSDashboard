@@ -5,8 +5,8 @@ import {
   executeBranchChoices,
   reconstructBranchRuntime,
   resolveSideChoices,
-} from '../src/lib/branch-engine';
-import { describeSlotChoice, type BranchSlotChoice } from '../src/lib/branch-choices';
+} from '../packages/eval-engine/src/branch-engine';
+import { describeSlotChoice, type BranchSlotChoice } from '../packages/eval-engine/src/branch-choices';
 
 const p1Team: PokemonSet[] = [
   {

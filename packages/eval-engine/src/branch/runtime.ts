@@ -1,4 +1,4 @@
-import { serializeBattleStable, trialAdvanceLog } from '../eval/forward-model';
+import { serializeBattleStable, trialAdvanceLog } from '../forward-model';
 import {
   ALIGNMENT_SEEDS, chooseAlignedSeed, extractProtocolEvents, scoreAlignment,
   type SeedChoice,

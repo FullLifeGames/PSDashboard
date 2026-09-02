@@ -1,6 +1,6 @@
 import { test, expect } from '@playwright/test';
 import type { PokemonSet } from '@pkmn/sim';
-import { reconstructBranchRuntime, executeBranchChoices } from '../src/lib/branch-engine';
+import { reconstructBranchRuntime, executeBranchChoices } from '../packages/eval-engine/src/branch-engine';
 import { parseReplayLog } from '../packages/replay-core/src/protocol-parser';
 
 // When a replayed protocol choice is rejected mid-reconstruction (typically a

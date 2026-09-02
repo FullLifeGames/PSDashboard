@@ -1,6 +1,5 @@
 import { useState } from 'react';
-import type { EvalMatrix } from '../lib/eval/types';
-import { winPercent } from '../lib/eval/winprob';
+import { type EvalMatrix, winPercent } from '@fulllifegames/eval-engine';
 
 interface EvalMatrixViewProps {
   matrix: EvalMatrix;

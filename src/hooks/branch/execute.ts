@@ -1,5 +1,5 @@
 import { useCallback } from 'react';
-import type { BranchSlotChoice } from '../../lib/branch-choices';
+import type { BranchSlotChoice } from '@fulllifegames/eval-engine';
 import {
   forceSwitches, hasAllChoices, makeHistoryEntry, requiredChoices,
   type BranchEngineModule, type BranchRefs, type BranchSetters, type LiveBattle, type SideId,

@@ -2,8 +2,8 @@ import { test, expect } from '@playwright/test';
 import { readFileSync } from 'fs';
 import { dirname, join } from 'path';
 import { fileURLToPath } from 'url';
-import { calcSingleDamageRange } from '../src/lib/damage-calc';
-import { createBranchState, reconstructBranchRuntime } from '../src/lib/branch-engine';
+import { calcSingleDamageRange } from '../packages/eval-engine/src/damage-calc';
+import { createBranchState, reconstructBranchRuntime } from '../packages/eval-engine/src/branch-engine';
 import { buildTeamsFromReplay } from '../packages/replay-core/src/team-builder';
 import type { BranchMoveOption, SimPokemonInfo } from '../src/hooks/useBranch';
 

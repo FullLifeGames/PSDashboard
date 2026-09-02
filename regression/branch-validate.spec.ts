@@ -1,6 +1,6 @@
 import { test, expect } from '@playwright/test';
 import type { PokemonSet } from '@pkmn/sim';
-import { reconstructBranchRuntime, validateBranchRuntime } from '../src/lib/branch-engine';
+import { reconstructBranchRuntime, validateBranchRuntime } from '../packages/eval-engine/src/branch-engine';
 
 const p1Team: PokemonSet[] = [
   {

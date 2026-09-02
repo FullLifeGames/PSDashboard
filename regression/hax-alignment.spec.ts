@@ -5,8 +5,8 @@ import {
   extractProtocolEvents, scoreAlignment, compareAlignment, isPerfectAlignment,
   summarizeAlignment, ALIGNMENT_SEEDS, chooseAlignedSeed,
   type AlignmentScore, type TurnAlignmentRecord,
-} from '../src/lib/hax-alignment';
-import { serializeBattleStable, trialAdvanceLog } from '../src/lib/eval/forward-model';
+} from '../packages/eval-engine/src/hax-alignment';
+import { serializeBattleStable, trialAdvanceLog } from '../packages/eval-engine/src/forward-model';
 
 test.describe('extractProtocolEvents', () => {
   test('reads faints, win, and normalizes idents without slot letters', () => {

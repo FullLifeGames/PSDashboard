@@ -58,7 +58,7 @@ function lockedMoveId(pokemon: Pokemon): string | null {
  * prices as threatless (573756: the Struggle-locked Toxapex kept pricing as
  * a full wall while it recoiled itself out).
  */
-export function usableSlots(pokemon: Pokemon) {
+export function usableSlots(pokemon: Pokemon): Pokemon['moveSlots'] {
   return pokemon.moveSlots.filter(slot => (slot.pp ?? 1) > 0);
 }
 

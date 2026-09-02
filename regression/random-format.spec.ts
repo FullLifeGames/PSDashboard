@@ -1,6 +1,6 @@
 import { test, expect } from '@playwright/test';
 import type { PokemonSet } from '@pkmn/sim';
-import { reconstructBranchRuntime, executeBranchChoices } from '../src/lib/branch-engine';
+import { reconstructBranchRuntime, executeBranchChoices } from '../packages/eval-engine/src/branch-engine';
 
 // Random Battle branching (B2): the runtime must start the real random format
 // with the reconstructed teams and execute turns. The browser-only `global`

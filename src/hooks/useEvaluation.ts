@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef } from 'react';
 import { EvalWorkerClient } from '../lib/eval/worker-client';
-import type { EvalPreferences } from '../lib/eval/types';
+import type { EvalPreferences } from '@fulllifegames/eval-engine';
 import { usePrefsState } from './evaluation/prefs';
 import { useSingleEval, type CachedEval } from './evaluation/single-eval';
 import { useGraphState, useGraphSweepRunner } from './evaluation/graph-sweep';

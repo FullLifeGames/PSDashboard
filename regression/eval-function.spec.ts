@@ -6,7 +6,7 @@ import {
   FEATURE_WEIGHTS, featureWeights, hazardCost, hazardRemovalEquity, matchupTerms, pairThreat, raceClocks,
   strandedMons, unansweredMons,
   type EvalFeatures, type RaceSide,
-} from '../src/lib/eval/eval-function';
+} from '../packages/eval-engine/src/eval-function';
 
 function makeSet(
   name: string,

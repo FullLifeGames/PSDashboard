@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { nullMoveReason } from '../src/lib/eval/null-moves';
+import { nullMoveReason } from '../packages/eval-engine/src/null-moves';
 
 /**
  * Mechanical-null detection for recommended moves (round 5 ⑥, 653785 t19):

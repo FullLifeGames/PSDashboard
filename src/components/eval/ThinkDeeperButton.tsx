@@ -1,5 +1,5 @@
 import type { TurnEvalSettings } from '../../hooks/useEvaluation';
-import type { EvalResult } from '../../lib/eval/types';
+import type { EvalResult } from '@fulllifegames/eval-engine';
 
 /**
  * One escalation control for both faces of the turn view: a gap turn gets

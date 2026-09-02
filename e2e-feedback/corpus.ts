@@ -1,7 +1,7 @@
 import { readFileSync } from 'fs';
 import { dirname, join } from 'path';
 import { fileURLToPath } from 'url';
-import type { TurnAttribution, VerdictTier } from '../src/lib/eval/analysis';
+import type { TurnAttribution, VerdictTier } from '../packages/eval-engine/src/analysis';
 
 /**
  * Ground truth distilled from the expert feedback round of 2026-08.

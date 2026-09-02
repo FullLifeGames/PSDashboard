@@ -28,7 +28,7 @@ import { readFileSync } from 'fs';
 import { dirname, join } from 'path';
 import { fileURLToPath } from 'url';
 import { buildTeamsFromReplay } from '../packages/replay-core/src/team-builder';
-import { createBranchState, reconstructBranchRuntime } from '../src/lib/branch-engine';
+import { createBranchState, reconstructBranchRuntime } from '../packages/eval-engine/src/branch-engine';
 import { inferOpponentTeam } from '../packages/replay-core/src/opponent-inferrer';
 import { parseExportedReplay } from '../src/lib/replay-file';
 import { parseReplayLogWithObservations } from '../packages/replay-core/src/protocol-parser';

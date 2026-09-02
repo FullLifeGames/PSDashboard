@@ -1,13 +1,10 @@
 import { useCallback, useRef, useState } from 'react';
-import type { TurnSensitivity, TurnVerification } from '../../lib/eval/analysis';
-import type { LeadEvalData } from '../../lib/eval/leads';
-import type { PlayedTurn } from '../../lib/eval/played';
+import {
+  type TurnSensitivity, type TurnVerification, type LeadEvalData, type PlayedTurn, perfReport, perfReset,
+  perfSpan, selectKeyTurns, type EvalPreferences, type EvalResult, type EvalSettings, teraKey,
+} from '@fulllifegames/eval-engine';
 import { EvalWorkerClient } from '../../lib/eval/worker-client';
-import { perfReport, perfReset, perfSpan } from '../../lib/eval/perf-trace';
 import { evalStoreKey, loadStoredEval, saveStoredEval } from '../../lib/eval-cache-store';
-import { selectKeyTurns } from '../../lib/eval/graph';
-import type { EvalPreferences, EvalResult, EvalSettings } from '../../lib/eval/types';
-import { teraKey } from '../../lib/eval/tera';
 import { resolveAutoTurnSettings, type TurnEvalSettings } from './prefs';
 import type { CachedEval } from './single-eval';
 import type { GraphSweepParams, SweepData, SweepEnv, SweepSettings } from './sweep-types';

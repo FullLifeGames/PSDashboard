@@ -6,7 +6,7 @@ import {
 } from '@fulllifegames/replay-core';
 import { parseSetsImport } from '../lib/sets-io';
 import { buildSensitivityTargets } from '../lib/team-knowledge';
-import type { SensitivityTarget } from '../lib/eval/sensitivity';
+import type { SensitivityTarget } from '@fulllifegames/eval-engine';
 import type { useSmogonUsageStats } from './useSmogonUsageStats';
 import type { useSmogonSetAssumptions } from './useSmogonSetAssumptions';
 import { useHpResolver, useSheetTeams, useSpreadSolve, useTeamPaste } from './useTeamSources';

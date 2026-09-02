@@ -1,5 +1,5 @@
 import type { ClaimResult } from './claims';
-import type { AlignmentSummary } from '../src/lib/hax-alignment';
+import type { AlignmentSummary } from '../packages/eval-engine/src/hax-alignment';
 
 /**
  * Renders the drift run. The JSON's `results` array is STABLE — no wall

@@ -1,9 +1,9 @@
 import { test } from '@playwright/test';
 import { Battle, State, Teams, toID } from '@pkmn/sim';
 import type { PokemonSet } from '@pkmn/sim';
-import { advancePosition, createRootPosition } from '../src/lib/eval/forward-model';
-import { mctsSearch } from '../src/lib/eval/mcts';
-import { searchPosition } from '../src/lib/eval/search';
+import { advancePosition, createRootPosition } from '../packages/eval-engine/src/forward-model';
+import { mctsSearch } from '../packages/eval-engine/src/mcts';
+import { searchPosition } from '../packages/eval-engine/src/search';
 
 function makeSet(name: string, species: string, moves: string[], level = 50): PokemonSet {
   return {

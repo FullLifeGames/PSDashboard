@@ -1,9 +1,9 @@
 import { test, expect } from '@playwright/test';
 import { Battle, State, Teams, toID } from '@pkmn/sim';
 import type { PokemonSet } from '@pkmn/sim';
-import { searchOrchestrated, type CellJob, type SearchExecutor, type SubSearchJob } from '../src/lib/eval/orchestrator';
-import { createLocalExecutor, searchPosition } from '../src/lib/eval/search';
-import type { EvalResult, SearchProgress } from '../src/lib/eval/types';
+import { searchOrchestrated, type CellJob, type SearchExecutor, type SubSearchJob } from '../packages/eval-engine/src/orchestrator';
+import { createLocalExecutor, searchPosition } from '../packages/eval-engine/src/search';
+import type { EvalResult, SearchProgress } from '../packages/eval-engine/src/types';
 
 function makeSet(name: string, species: string, moves: string[], level = 50): PokemonSet {
   return {

@@ -1,10 +1,8 @@
 import type { BattleStreams } from '@pkmn/sim';
-import type { BranchChoiceErrorLog, BranchSimState } from '../../lib/branch-engine';
 import {
-  branchSideChoicesReady,
-  requiredChoicesForActiveSlots,
+  type BranchChoiceErrorLog, type BranchSimState, branchSideChoicesReady, requiredChoicesForActiveSlots,
   type BranchSlotChoice,
-} from '../../lib/branch-choices';
+} from '@fulllifegames/eval-engine';
 import { sideIndex, type SideId } from '@fulllifegames/replay-core';
 import type { BranchHistoryEntry } from '../../lib/branch-history';
 
@@ -13,7 +11,7 @@ export type { BranchHistoryEntry };
 export type { SideId };
 export type BattleStream = BattleStreams.BattleStream;
 export type PlayerStreams = ReturnType<typeof BattleStreams.getPlayerStreams>;
-export type BranchEngineModule = typeof import('../../lib/branch-engine');
+export type BranchEngineModule = typeof import('../../lib/lazy/branch-engine');
 export type LiveBattle = NonNullable<BattleStream['battle']>;
 
 /** The mutable runtime the branch hook owns: the sim streams, its log, and the pending choices. */

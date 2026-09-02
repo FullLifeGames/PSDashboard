@@ -1,5 +1,5 @@
 import { alternativeItems } from './smogon-stats';
-import type { SensitivityTarget } from './eval/sensitivity';
+import type { SensitivityTarget } from '@fulllifegames/eval-engine';
 import type { OpponentTeamInfo } from '@fulllifegames/replay-core';
 
 /** Guessed-item mons + their usage-plausible alternatives — the search

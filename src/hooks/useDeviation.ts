@@ -2,7 +2,7 @@ import { useCallback, useMemo, useRef, useState, type MutableRefObject } from 'r
 import {
   type DamageObservation, type ReplayData, type TurnSnapshot, getBranchSimulatorFormat,
 } from '@fulllifegames/replay-core';
-import type { BranchSlotChoice } from '../lib/branch-choices';
+import type { BranchSlotChoice } from '@fulllifegames/eval-engine';
 import { classifyDeviation, keptEntries, type TimelinePosition } from '../lib/timeline';
 import { snapshotAt, type TeamBuildSources } from '../lib/eval-acquire';
 import { divergenceNoticeFor, keptHistorySlice, prepareBranchInputs } from '../lib/branch-build';

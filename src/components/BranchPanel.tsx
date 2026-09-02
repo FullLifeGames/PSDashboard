@@ -1,12 +1,9 @@
 import { useEffect, useState, useMemo } from 'react';
 import type { BranchSimState, BranchMoveOption, BranchSwitchOption, SimPokemonInfo } from '../hooks/useBranch';
-import type { BranchSlotModifiers } from '../lib/branch-engine';
 import {
-  branchSideChoicesReady,
-  requiredChoicesForActiveSlots,
-  switchChoiceKey,
+  type BranchSlotModifiers, branchSideChoicesReady, requiredChoicesForActiveSlots, switchChoiceKey,
   type BranchSlotChoice,
-} from '../lib/branch-choices';
+} from '@fulllifegames/eval-engine';
 import type { PickerSource } from '../lib/picker-state';
 import { computePreviewDamage, EMPTY_SIDE_DAMAGE, type DamagePreviewInputs, type SideDamage } from '../lib/branch-damage';
 import { SideControls, type PlayedPick } from './branch/SideControls';
@@ -112,7 +109,7 @@ function usePreviewDamage(inputs: DamagePreviewInputs) {
     let cancelled = false;
 
     async function calculatePreviewDamage() {
-      const { calcSingleDamageRange } = await import('../lib/damage-calc');
+      const { calcSingleDamageRange } = await import('../lib/lazy/damage-calc');
       if (cancelled) return;
       if (!cancelled) {
         setDamageBySide(computePreviewDamage(

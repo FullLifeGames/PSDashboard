@@ -1,4 +1,4 @@
-import type { SearchProgress } from '../../lib/eval/types';
+import type { SearchProgress } from '@fulllifegames/eval-engine';
 import type { EvalStatus as EvalStatusKind } from '../../hooks/useEvaluation';
 
 export interface PlayOutProgress {

@@ -1,6 +1,6 @@
 import { test, expect } from '@playwright/test';
 import { coverageNotice, needsSettingsUpgrade, recordEvalError, resolveAutoTurnSettings, serializedFaintedFraction, supersedesStored, verificationDeepSettings, withEvalGapNotice } from '../src/hooks/useEvaluation';
-import { AUTO_MCTS_FAINTED_FRACTION } from '../src/lib/eval/types';
+import { AUTO_MCTS_FAINTED_FRACTION } from '../packages/eval-engine/src/types';
 
 test.describe('coverage notice (acquisition pass)', () => {
   // The notice describes the RECONSTRUCTION pass — one fast replay of the
@@ -203,8 +203,8 @@ test.describe('verification deep tier', () => {
     expect(deep?.keepPlayed).toBeUndefined();
   });
 });
-import { computeBlunders, selectKeyTurns, BLUNDER_SWING, KEY_TURN_SWING } from '../src/lib/eval/graph';
-import { KEY_MOMENT_SWING } from '../src/lib/eval/report';
+import { computeBlunders, selectKeyTurns, BLUNDER_SWING, KEY_TURN_SWING } from '../packages/eval-engine/src/graph';
+import { KEY_MOMENT_SWING } from '../packages/eval-engine/src/report';
 
 test.describe('key-turn coverage matches the report', () => {
   test('every report-worthy swing gets the deepening pass', () => {

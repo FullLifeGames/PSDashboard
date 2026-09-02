@@ -1,8 +1,8 @@
 import { test, expect } from '@playwright/test';
 import { Battle, State, Teams, toID } from '@pkmn/sim';
 import type { PokemonSet } from '@pkmn/sim';
-import { patchSerializedItem, selectProbeCombos } from '../src/lib/eval/sensitivity';
-import { createRootPosition, positionBattle } from '../src/lib/eval/forward-model';
+import { patchSerializedItem, selectProbeCombos } from '../packages/eval-engine/src/sensitivity';
+import { createRootPosition, positionBattle } from '../packages/eval-engine/src/forward-model';
 
 function makeSet(name: string, species: string, moves: string[], item = ''): PokemonSet {
   return {

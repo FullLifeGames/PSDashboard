@@ -1,4 +1,4 @@
-import type { EvalPreferences, EvalResult } from '../../lib/eval/types';
+import type { EvalPreferences, EvalResult } from '@fulllifegames/eval-engine';
 import type { EvalStatus } from '../../hooks/useEvaluation';
 
 interface PrefsProps {

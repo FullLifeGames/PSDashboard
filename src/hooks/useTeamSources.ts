@@ -65,7 +65,7 @@ export function useHpResolver(
   useEffect(() => {
     if (!replayData) return;
     void import('../lib/lazy/team-builder');
-    void import('../lib/branch-engine');
+    void import('../lib/lazy/branch-engine');
     // The display-side HP-type resolver pulls @pkmn/sim's Dex — keep it out
     // of the main chunk and hand the loaded module to the enrich memos.
     void import('../lib/lazy/hidden-power').then(module => setHpModule(module));

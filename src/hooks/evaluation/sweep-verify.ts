@@ -1,11 +1,8 @@
 import {
-  REGRET_THRESHOLD,
-  type SensitivityProbe, type TurnSensitivity, type TurnVerification,
-} from '../../lib/eval/analysis';
-import { patchSerializedItem, selectProbeCombos } from '../../lib/eval/sensitivity';
-import type { PlayedTurn } from '../../lib/eval/played';
+  REGRET_THRESHOLD, type SensitivityProbe, type TurnSensitivity, type TurnVerification, patchSerializedItem,
+  selectProbeCombos, type PlayedTurn, type EvalResult, type EvalSettings, type RankedChoice,
+} from '@fulllifegames/eval-engine';
 import { EvalWorkerClient } from '../../lib/eval/worker-client';
-import type { EvalResult, EvalSettings, RankedChoice } from '../../lib/eval/types';
 import { matchOrPhantom, type SweepEnv } from './sweep-types';
 
 /**

@@ -1,6 +1,6 @@
-import { diffChoices, playedSetupMove, type SideAnalysis } from '../../lib/eval/analysis';
-import type { RankedChoice } from '../../lib/eval/types';
-import { winDeltaText, winPctText } from '../../lib/eval/winprob';
+import {
+  diffChoices, playedSetupMove, type SideAnalysis, type RankedChoice, winDeltaText, winPctText,
+} from '@fulllifegames/eval-engine';
 import { ExplorableLabel, KoSuffix, MiniBar } from './analysis-bits';
 import { comparisonTarget, ENGINE_EQUIVALENT_EPSILON, evTitle, playedTextFor, RISK_DISPLAY_GAP } from './turn-copy';
 

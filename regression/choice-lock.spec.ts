@@ -1,14 +1,14 @@
 import { readFileSync } from 'fs';
 import { test, expect } from '@playwright/test';
 import type { PokemonSet } from '@pkmn/sim';
-import { buildChoiceLockContext, buildChoiceLockTrails, corroborateChoiceItem, protocolChoiceLock } from '../src/lib/choice-lock';
+import { buildChoiceLockContext, buildChoiceLockTrails, corroborateChoiceItem, protocolChoiceLock } from '../packages/eval-engine/src/choice-lock';
 import { parseReplayLogWithObservations } from '../packages/replay-core/src/protocol-parser';
 import { parseSmogonChaosStats } from '../src/lib/smogon-stats';
 import { buildTeamsFromReplay } from '../packages/replay-core/src/team-builder';
-import { reconstructBranchRuntime } from '../src/lib/branch-engine';
+import { reconstructBranchRuntime } from '../packages/eval-engine/src/branch-engine';
 import { getBranchSimulatorFormat } from '../packages/replay-core/src/replay-format';
-import { searchOptions } from '../src/lib/eval/search';
-import { createRootPosition, serializeBattleStable } from '../src/lib/eval/forward-model';
+import { searchOptions } from '../packages/eval-engine/src/search';
+import { createRootPosition, serializeBattleStable } from '../packages/eval-engine/src/forward-model';
 
 const log = (lines: string[]) => lines.join('\n');
 

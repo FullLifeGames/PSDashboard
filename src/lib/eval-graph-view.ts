@@ -1,6 +1,4 @@
-import { computeBlunders } from './eval/graph';
-import { winPercent } from './eval/winprob';
-import type { LeadAnalysis } from './eval/leads';
+import { computeBlunders, winPercent, type LeadAnalysis } from '@fulllifegames/eval-engine';
 import { sideIndex } from '@fulllifegames/replay-core';
 
 export const GRAPH_HEIGHT = 72;

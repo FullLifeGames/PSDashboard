@@ -4,7 +4,7 @@ import { useEvalView } from '../useEvalView';
 import { useEngineWalk } from '../useEngineWalk';
 import { usePlayOut } from '../usePlayOut';
 import { useEvaluation } from '../useEvaluation';
-import { parsePlayedActions, parsePlayedActionsDoubles } from '../../lib/eval/played';
+import { parsePlayedActions, parsePlayedActionsDoubles } from '@fulllifegames/eval-engine';
 import type { ReplayContext } from './replay-context';
 import type { Transients } from './transients';
 import type { BoardController } from './board-controller';

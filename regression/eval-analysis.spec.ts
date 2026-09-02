@@ -1,7 +1,7 @@
 import { test, expect } from '@playwright/test';
-import { analyzeTurn, decidedSeenKey, findPlayedOption, matchPlayedChoice, phantomStayIn, playedSetupMove, REGRET_THRESHOLD, unansweredSeenKey, type SideAnalysis } from '../src/lib/eval/analysis';
-import { allTurnEvents, detectSacks, turnEvents } from '../src/lib/eval/played';
-import type { EvalResult, RankedChoice } from '../src/lib/eval/types';
+import { analyzeTurn, decidedSeenKey, findPlayedOption, matchPlayedChoice, phantomStayIn, playedSetupMove, REGRET_THRESHOLD, unansweredSeenKey, type SideAnalysis } from '../packages/eval-engine/src/analysis';
+import { allTurnEvents, detectSacks, turnEvents } from '../packages/eval-engine/src/played';
+import type { EvalResult, RankedChoice } from '../packages/eval-engine/src/types';
 import type { TurnSnapshot } from '../packages/replay-core/src/types';
 
 const choice = (choiceStr: string, label: string, worstCase: number): RankedChoice =>
@@ -1032,8 +1032,8 @@ test.describe('doubles combined matching', () => {
   };
 
   test('matches per-slot moves with targets, spreads, tera, and switches', async () => {
-    const { matchPlayedSide } = await import('../src/lib/eval/analysis');
-    const match = (slots: import('../src/lib/eval/played').PlayedTurn['p1Slots']) =>
+    const { matchPlayedSide } = await import('../packages/eval-engine/src/analysis');
+    const match = (slots: import('../packages/eval-engine/src/played').PlayedTurn['p1Slots']) =>
       matchPlayedSide(combined, 'p1', { p1: null, p2: null, p1Slots: slots })?.choice ?? null;
 
     expect(match([
@@ -1106,7 +1106,7 @@ test.describe('choice diffing (the condensed why)', () => {
   const ranked = (choiceStr: string, label: string): RankedChoice => choice(choiceStr, label, 0);
 
   test('a skipped gimmick names the gimmick alone', async () => {
-    const { diffChoices } = await import('../src/lib/eval/analysis');
+    const { diffChoices } = await import('../packages/eval-engine/src/analysis');
     expect(diffChoices(
       ranked('move bugbite 1, move closecombat 1', 'Bug Bite→Politoed + Close Combat→Politoed'),
       ranked('move bugbite 1 mega, move closecombat 1', 'Mega + Bug Bite→Politoed + Close Combat→Politoed'),
@@ -1118,7 +1118,7 @@ test.describe('choice diffing (the condensed why)', () => {
   });
 
   test('a target-only difference names the move', async () => {
-    const { diffChoices } = await import('../src/lib/eval/analysis');
+    const { diffChoices } = await import('../packages/eval-engine/src/analysis');
     expect(diffChoices(
       ranked('move closecombat 1, move protect', 'Close Combat→Politoed + Protect'),
       ranked('move closecombat 2, move protect', 'Close Combat→Incineroar + Protect'),
@@ -1126,7 +1126,7 @@ test.describe('choice diffing (the condensed why)', () => {
   });
 
   test('one differing doubles slot condenses; a singles whole-action does not', async () => {
-    const { diffChoices } = await import('../src/lib/eval/analysis');
+    const { diffChoices } = await import('../packages/eval-engine/src/analysis');
     expect(diffChoices(
       ranked('move protect, move surf 1', 'Protect + Surf→Incineroar'),
       ranked('move protect, switch 3', 'Protect + → Amoonguss'),
@@ -1138,7 +1138,7 @@ test.describe('choice diffing (the condensed why)', () => {
   });
 
   test('more than one difference stays uncondensed', async () => {
-    const { diffChoices } = await import('../src/lib/eval/analysis');
+    const { diffChoices } = await import('../packages/eval-engine/src/analysis');
     expect(diffChoices(
       ranked('move bugbite 1, move closecombat 1', 'Bug Bite→Politoed + Close Combat→Politoed'),
       ranked('move bugbite 2 mega, switch 3', 'Mega + Bug Bite→Incineroar + → Amoonguss'),

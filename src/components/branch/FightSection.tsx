@@ -1,8 +1,8 @@
 import type { BranchMoveOption, BranchSwitchOption } from '../../hooks/useBranch';
-import type { BranchSlotModifiers } from '../../lib/branch-engine';
-import type { DamageResult } from '../../lib/damage-calc';
+import {
+  type BranchSlotModifiers, type DamageResult, switchOptionKey, type BranchSlotChoice,
+} from '@fulllifegames/eval-engine';
 import type { SpreadTargetDamage } from '../../lib/branch-damage';
-import { switchOptionKey, type BranchSlotChoice } from '../../lib/branch-choices';
 import type { Gimmick } from '../../hooks/useSideControlsState';
 import { ComboBox } from '../ComboBox';
 import { MoveBtn } from './ChoiceButtons';

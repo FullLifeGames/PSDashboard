@@ -1,7 +1,5 @@
-import type { GameReport } from '../lib/eval/report';
-import type { LeadAnalysis } from '../lib/eval/leads';
+import { type GameReport, type LeadAnalysis, winDeltaText } from '@fulllifegames/eval-engine';
 import type { TurnEvalSettings } from '../hooks/useEvaluation';
-import { winDeltaText } from '../lib/eval/winprob';
 import { attributionBadge } from './eval-badges';
 import { sideIndex } from '@fulllifegames/replay-core';
 

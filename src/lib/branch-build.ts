@@ -6,7 +6,7 @@ import { buildReplayTeams, type TeamBuildSources } from './eval-acquire';
 export interface BranchInputs {
   p1Team: PokemonSet[];
   p2Team: PokemonSet[];
-  choiceLocks: Awaited<ReturnType<typeof import('./choice-lock')['buildChoiceLockContext']>>;
+  choiceLocks: Awaited<ReturnType<typeof import('./lazy/choice-lock')['buildChoiceLockContext']>>;
 }
 
 /** Team build plus choice locks for a branch start — the shared prelude of
@@ -20,7 +20,7 @@ export async function prepareBranchInputs(
 ): Promise<BranchInputs | null> {
   const { p1Team, p2Team } = await buildReplayTeams(replayData, sources, overrides);
   if (p1Team.length === 0 || p2Team.length === 0) return null;
-  const { buildChoiceLockContext } = await import('./choice-lock');
+  const { buildChoiceLockContext } = await import('./lazy/choice-lock');
   return {
     p1Team,
     p2Team,

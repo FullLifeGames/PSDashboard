@@ -2,16 +2,16 @@ import { test, expect } from '@playwright/test';
 import { State } from '@pkmn/sim';
 import type { Battle } from '@pkmn/sim';
 import { buildTeamsFromReplay } from '../packages/replay-core/src/team-builder';
-import { applyTargetCorrections, reconstructBranchRuntime } from '../src/lib/branch-engine';
+import { applyTargetCorrections, reconstructBranchRuntime } from '../packages/eval-engine/src/branch-engine';
 import { formatEnforcesSleepClause, getBranchSimulatorFormat, replayBringOnly } from '../packages/replay-core/src/replay-format';
 import { parseReplayLogWithObservations } from '../packages/replay-core/src/protocol-parser';
-import { AUTO_MCTS_FAINTED_FRACTION, battleFaintedFraction, searchPosition } from '../src/lib/eval/search';
-import { mctsSearch } from '../src/lib/eval/mcts';
+import { AUTO_MCTS_FAINTED_FRACTION, battleFaintedFraction, searchPosition } from '../packages/eval-engine/src/search';
+import { mctsSearch } from '../packages/eval-engine/src/mcts';
 import { fetchSmogonUsageStats } from '../src/lib/smogon-stats';
 import { fetchSmogonSetAssumptions } from '../src/lib/smogon-sets';
 import { diskCachedSmogonFetcher } from './smogon-fetch-cache';
-import { createMatchupCache, evalFeatures, EVAL_WEIGHTS, FEATURE_WEIGHTS, type EvalFeatures } from '../src/lib/eval/eval-function';
-import { deserializeBattleExact } from '../src/lib/eval/forward-model';
+import { createMatchupCache, evalFeatures, EVAL_WEIGHTS, FEATURE_WEIGHTS, type EvalFeatures } from '../packages/eval-engine/src/eval-function';
+import { deserializeBattleExact } from '../packages/eval-engine/src/forward-model';
 import { brierScore, fitConstantK } from './fit-helpers';
 
 /**

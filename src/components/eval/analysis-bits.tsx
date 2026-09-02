@@ -1,6 +1,4 @@
-import type { SideAnalysis } from '../../lib/eval/analysis';
-import type { RankedChoice } from '../../lib/eval/types';
-import { winPctText } from '../../lib/eval/winprob';
+import { type SideAnalysis, type RankedChoice, winPctText } from '@fulllifegames/eval-engine';
 import { evTitle } from './turn-copy';
 
 /** The engine's line as a click-to-explore button, or a plain span. */

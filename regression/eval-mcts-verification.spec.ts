@@ -2,13 +2,13 @@ import { test, expect } from '@playwright/test';
 import { readFileSync } from 'fs';
 import { State } from '@pkmn/sim';
 import { buildTeamsFromReplay } from '../packages/replay-core/src/team-builder';
-import { reconstructBranchRuntime } from '../src/lib/branch-engine';
+import { reconstructBranchRuntime } from '../packages/eval-engine/src/branch-engine';
 import { formatEnforcesSleepClause, getBranchSimulatorFormat } from '../packages/replay-core/src/replay-format';
 import { parseReplayLogWithObservations } from '../packages/replay-core/src/protocol-parser';
-import { createLocalExecutor } from '../src/lib/eval/search';
-import { mctsTreeSearch } from '../src/lib/eval/mcts';
-import { mergeMctsTrees, MCTS_TREES, starvedSupportCells } from '../src/lib/eval/mcts-merge';
-import { cellKey } from '../src/lib/eval/rank';
+import { createLocalExecutor } from '../packages/eval-engine/src/search';
+import { mctsTreeSearch } from '../packages/eval-engine/src/mcts';
+import { mergeMctsTrees, MCTS_TREES, starvedSupportCells } from '../packages/eval-engine/src/mcts-merge';
+import { cellKey } from '../packages/eval-engine/src/rank';
 
 /**
  * Starved-support verification on a REAL position — the draft game's t56

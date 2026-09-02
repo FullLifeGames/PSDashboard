@@ -2,14 +2,14 @@ import { test, expect } from '@playwright/test';
 import { Battle, State, Teams, toID } from '@pkmn/sim';
 type DeserializeFn = typeof State.deserializeBattle;
 import type { PokemonSet } from '@pkmn/sim';
-import { battleFaintedFraction, optionHints, searchOptions, searchPosition, subSearchDepth1 } from '../src/lib/eval/search';
-import { mctsSearch, mctsTreeSearch, wideningWindow, WIDENING_BASE, WIDENING_VISITS_PER_SLOT } from '../src/lib/eval/mcts';
-import { mergeMctsTrees, starvedSupportCells, VERIFY_SAMPLES } from '../src/lib/eval/mcts-merge';
-import { cellKey } from '../src/lib/eval/rank';
-import type { MctsTreeStats } from '../src/lib/eval/types';
-import { advancePosition, createRootPosition, legalChoices, positionBattle } from '../src/lib/eval/forward-model';
-import { boostedFraction, pairThreat } from '../src/lib/eval/eval-function';
-import type { EvalResult, SearchProgress } from '../src/lib/eval/types';
+import { battleFaintedFraction, optionHints, searchOptions, searchPosition, subSearchDepth1 } from '../packages/eval-engine/src/search';
+import { mctsSearch, mctsTreeSearch, wideningWindow, WIDENING_BASE, WIDENING_VISITS_PER_SLOT } from '../packages/eval-engine/src/mcts';
+import { mergeMctsTrees, starvedSupportCells, VERIFY_SAMPLES } from '../packages/eval-engine/src/mcts-merge';
+import { cellKey } from '../packages/eval-engine/src/rank';
+import type { MctsTreeStats } from '../packages/eval-engine/src/types';
+import { advancePosition, createRootPosition, legalChoices, positionBattle } from '../packages/eval-engine/src/forward-model';
+import { boostedFraction, pairThreat } from '../packages/eval-engine/src/eval-function';
+import type { EvalResult, SearchProgress } from '../packages/eval-engine/src/types';
 
 function makeSet(name: string, species: string, moves: string[], level = 50): PokemonSet {
   return {

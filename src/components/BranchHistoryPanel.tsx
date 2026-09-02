@@ -1,6 +1,6 @@
 import type { TurnSnapshot } from '@fulllifegames/replay-core';
 import type { BranchHistoryEntry } from '../hooks/useBranch';
-import { notationSideLabel } from '../lib/branch-choices';
+import { notationSideLabel } from '@fulllifegames/eval-engine';
 import type { TimelinePosition } from '../lib/timeline';
 import { activeSummary, alignHistoryRows, branchSummary, type SideSummary } from '../lib/branch-history';
 

@@ -5,11 +5,11 @@ import { parseExportedReplay } from '../src/lib/replay-file';
 import { formatEnforcesSleepClause, inferReplayFormatId, getBranchSimulatorFormat } from '../packages/replay-core/src/replay-format';
 import { parseReplayLogWithObservations } from '../packages/replay-core/src/protocol-parser';
 import { buildTeamsFromReplay } from '../packages/replay-core/src/team-builder';
-import { reconstructBranchRuntime } from '../src/lib/branch-engine';
-import { searchPosition } from '../src/lib/eval/search';
-import { analyzeTurn, TIER_THRESHOLDS } from '../src/lib/eval/analysis';
-import { detectSacks, parsePlayedActions, turnEvents } from '../src/lib/eval/played';
-import { resolveTeraPreference } from '../src/lib/eval/tera';
+import { reconstructBranchRuntime } from '../packages/eval-engine/src/branch-engine';
+import { searchPosition } from '../packages/eval-engine/src/search';
+import { analyzeTurn, TIER_THRESHOLDS } from '../packages/eval-engine/src/analysis';
+import { detectSacks, parsePlayedActions, turnEvents } from '../packages/eval-engine/src/played';
+import { resolveTeraPreference } from '../packages/eval-engine/src/tera';
 
 /**
  * End-to-end pin of the GPL game-report findings that drove this plan:

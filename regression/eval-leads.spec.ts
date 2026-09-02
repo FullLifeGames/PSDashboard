@@ -1,8 +1,8 @@
 import { test, expect } from '@playwright/test';
 import type { PokemonSet } from '@pkmn/sim';
-import { analyzeLeads, leadSpeciesOf, matchLeadOption } from '../src/lib/eval/leads';
-import { parseLeadSpecies } from '../src/lib/eval/played';
-import type { EvalResult, RankedChoice } from '../src/lib/eval/types';
+import { analyzeLeads, leadSpeciesOf, matchLeadOption } from '../packages/eval-engine/src/leads';
+import { parseLeadSpecies } from '../packages/eval-engine/src/played';
+import type { EvalResult, RankedChoice } from '../packages/eval-engine/src/types';
 
 const option = (choice: string, label: string, ev: number): RankedChoice =>
   ({ choice, label, worstCase: ev, expected: ev, ev, punishedBy: 'Lead X + Y' });
@@ -56,8 +56,8 @@ test.describe('lead (turn 0) analysis', () => {
   });
 
   test('serializePreviewPosition yields a searchable turn-0 position (or null without preview)', async () => {
-    const { serializePreviewPosition } = await import('../src/lib/branch-engine');
-    const { createRootPosition, legalChoices } = await import('../src/lib/eval/forward-model');
+    const { serializePreviewPosition } = await import('../packages/eval-engine/src/branch-engine');
+    const { createRootPosition, legalChoices } = await import('../packages/eval-engine/src/forward-model');
     const set = (species: string): PokemonSet => ({
       name: species, species, item: '', ability: 'No Ability', moves: ['Tackle'],
       nature: 'Hardy',
@@ -80,8 +80,8 @@ test.describe('lead (turn 0) analysis', () => {
     // the format string through toID mangled the custom rules into an
     // unknown format with no preview, so every draft game silently lost its
     // turn-0 evaluation (the graph's missing T0 diamond in singles).
-    const { serializePreviewPosition } = await import('../src/lib/branch-engine');
-    const { createRootPosition, legalChoices } = await import('../src/lib/eval/forward-model');
+    const { serializePreviewPosition } = await import('../packages/eval-engine/src/branch-engine');
+    const { createRootPosition, legalChoices } = await import('../packages/eval-engine/src/forward-model');
     const set = (species: string): PokemonSet => ({
       name: species, species, item: '', ability: 'No Ability', moves: ['Tackle'],
       nature: 'Hardy',

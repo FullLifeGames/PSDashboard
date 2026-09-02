@@ -1,4 +1,4 @@
-import type { TurnAnalysis } from '../lib/eval/analysis';
+import type { TurnAnalysis } from '@fulllifegames/eval-engine';
 
 interface Badge {
   text: string;

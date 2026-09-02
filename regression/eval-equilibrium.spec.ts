@@ -2,7 +2,7 @@ import { test, expect } from '@playwright/test';
 import {
   applyTrendExtrapolation, applyTrendTiebreak, cellKey, rankFromMatrix, selectTieProbeCells,
   solveMatrixGame, toResult, TIE_EPSILON, TREND_LAMBDA, TREND_MARGIN, type ValueMatrix,
-} from '../src/lib/eval/rank';
+} from '../packages/eval-engine/src/rank';
 
 // Pins the regret-matching solver against games with known solutions. The
 // solver is pure math (no sim), deterministic, and reads the AVERAGE

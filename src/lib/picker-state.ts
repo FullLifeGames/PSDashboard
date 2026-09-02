@@ -4,7 +4,7 @@ import type { PokemonSet } from '@pkmn/sim';
 import { speciesBaseId, type PokemonSnapshot, type TurnSnapshot } from '@fulllifegames/replay-core';
 import type {
   BranchMoveOption, BranchSimState, BranchSlotModifiers, BranchSwitchOption, SimPokemonInfo,
-} from './branch-engine';
+} from '@fulllifegames/eval-engine';
 
 /**
  * Data sources for the always-visible pickers (spec: input variant B).
@@ -39,8 +39,8 @@ function speciesTypesFor(species: string, gen: number): string[] {
 
 /** Exact pickers from a recorded position — no live stream needed. */
 export async function pickerStateFromSerialized(serialized: string): Promise<BranchSimState> {
-  const { deserializeBattleExact } = await import('./eval/forward-model');
-  const { createBranchStateFromBattle } = await import('./branch-engine');
+  const { deserializeBattleExact } = await import('./lazy/forward-model');
+  const { createBranchStateFromBattle } = await import('./lazy/branch-engine');
   const battle = deserializeBattleExact(serialized);
   return createBranchStateFromBattle(battle, battle.log ?? [], { p1Choices: [], p2Choices: [] });
 }

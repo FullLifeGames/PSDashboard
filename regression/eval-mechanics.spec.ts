@@ -1,8 +1,8 @@
 import { test, expect } from '@playwright/test';
 import { Battle, State, Teams, toID } from '@pkmn/sim';
 import type { PokemonSet } from '@pkmn/sim';
-import { advancePosition, createRootPosition, positionBattle, serializeBattleStable } from '../src/lib/eval/forward-model';
-import { evaluatePosition } from '../src/lib/eval/eval-function';
+import { advancePosition, createRootPosition, positionBattle, serializeBattleStable } from '../packages/eval-engine/src/forward-model';
+import { evaluatePosition } from '../packages/eval-engine/src/eval-function';
 
 /**
  * Mechanics the expert-feedback round put on trial (2026-08-15, 655336

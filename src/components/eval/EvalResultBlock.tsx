@@ -1,9 +1,8 @@
 import type { ReactNode } from 'react';
-import type { EvalResult, RankedChoice } from '../../lib/eval/types';
+import { type EvalResult, type RankedChoice, winDeltaText, winPercent } from '@fulllifegames/eval-engine';
 import type { EvalStatus, TurnEvalSettings } from '../../hooks/useEvaluation';
 import { EvalMatrixView } from '../EvalMatrixView';
 import { MiniBar } from '../EvalTurnAnalysis';
-import { winDeltaText, winPercent } from '../../lib/eval/winprob';
 
 // Displayed values are win probabilities ("52%") and point deltas ("−8%").
 

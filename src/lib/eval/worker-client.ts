@@ -1,10 +1,8 @@
-import { MCTS_TREES, mergeMctsTrees, starvedSupportCells } from './mcts-merge';
-import { perfAdd, perfCount, perfSync } from './perf-trace';
-import { cellKey } from './rank';
-import { searchOrchestrated, type SearchExecutor } from './orchestrator';
-import type {
-  EvalCellValue, EvalResult, EvalSettings, EvalWorkerRequest, EvalWorkerResponse, MctsTreeStats, SearchProgress,
-} from './types';
+import {
+  MCTS_TREES, mergeMctsTrees, starvedSupportCells, perfAdd, perfCount, perfSync, cellKey, searchOrchestrated,
+  type SearchExecutor, type EvalCellValue, type EvalResult, type EvalSettings, type EvalWorkerRequest,
+  type EvalWorkerResponse, type MctsTreeStats, type SearchProgress,
+} from '@fulllifegames/eval-engine';
 
 export interface EvalRunHandlers {
   onProgress?(progress: SearchProgress): void;

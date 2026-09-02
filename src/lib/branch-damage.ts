@@ -1,5 +1,4 @@
-import type { BranchMoveOption, BranchSimState, SimPokemonInfo } from './branch-engine';
-import type { DamageResult } from './damage-calc';
+import type { BranchMoveOption, BranchSimState, SimPokemonInfo, DamageResult } from '@fulllifegames/eval-engine';
 
 export interface SpreadTargetDamage {
   label: string;
@@ -16,7 +15,7 @@ export const EMPTY_SIDE_DAMAGE: SideDamage = { default: [], targets: {}, spread:
 
 const EMPTY_MOVES: BranchMoveOption[] = [];
 
-type CalcSingleDamageRange = typeof import('./damage-calc')['calcSingleDamageRange'];
+type CalcSingleDamageRange = typeof import('./lazy/damage-calc')['calcSingleDamageRange'];
 type DamageContext = Parameters<CalcSingleDamageRange>[3];
 
 export interface DamagePreviewInputs {

@@ -4,7 +4,7 @@ import { buildTeamsFromReplay } from '../packages/replay-core/src/team-builder';
 import {
   reconstructBranchRuntime, reconstructionReached, validateBranchRuntime,
   type BranchRuntime,
-} from '../src/lib/branch-engine';
+} from '../packages/eval-engine/src/branch-engine';
 import { getBranchSimulatorFormat } from '../packages/replay-core/src/replay-format';
 import { parseReplayLogWithObservations } from '../packages/replay-core/src/protocol-parser';
 import { finalPlayedTurn } from '../packages/replay-core/src/replay-turns';

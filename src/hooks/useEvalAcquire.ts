@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { DamageObservation, ReplayData, TurnSnapshot } from '@fulllifegames/replay-core';
-import type { TurnAlignmentRecord } from '../lib/hax-alignment';
+import type { TurnAlignmentRecord } from '@fulllifegames/eval-engine';
 import type { useBranch } from './useBranch';
 import { buildReplayTeams, reconstructReplayRuntime, type TeamBuildSources } from '../lib/eval-acquire';
 
@@ -66,14 +66,14 @@ function useReplayAcquire(args: {
   const acquireBranchPosition = useCallback(async () => {
     const battle = getBattle();
     if (!battle) throw new Error('No live branch battle to evaluate.');
-    const { serializeLiveBattle } = await import('../lib/eval/serialize');
+    const { serializeLiveBattle } = await import('../lib/lazy/serialize');
     return serializeLiveBattle(battle);
   }, [getBattle]);
 
   const makeReplayAcquire = useCallback((turn: number) =>
     async (reportReconstruct: (turn: number, target: number) => void) => {
       if (!replayData) throw new Error('Load a replay first.');
-      const { serializeLiveBattle } = await import('../lib/eval/serialize');
+      const { serializeLiveBattle } = await import('../lib/lazy/serialize');
       const { p1Team, p2Team } = await buildReplayTeams(replayData, sources);
       if (p1Team.length === 0 || p2Team.length === 0) throw new Error('Could not build both teams for this replay.');
       const { runtime, branchEngine } = await reconstructReplayRuntime({
@@ -131,7 +131,7 @@ function useSweepAcquire(args: {
     ): Promise<(string | null)[]> => {
       if (!replayData) throw new Error('Load a replay first.');
       setSweepAlignment(null);
-      const { serializeLiveBattle } = await import('../lib/eval/serialize');
+      const { serializeLiveBattle } = await import('../lib/lazy/serialize');
       const { p1Team, p2Team } = await buildReplayTeams(replayData, sources);
       if (p1Team.length === 0 || p2Team.length === 0) throw new Error('Could not build both teams for this replay.');
       const positions: (string | null)[] = new Array(turns).fill(null);

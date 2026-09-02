@@ -8,8 +8,8 @@ import {
   type BranchMoveOption,
   type BranchSwitchOption,
   type BranchTargetOption,
-} from '../src/lib/branch-engine';
-import { resolveCustomChoice } from '../src/lib/branch-choices';
+} from '../packages/eval-engine/src/branch-engine';
+import { resolveCustomChoice } from '../packages/eval-engine/src/branch-choices';
 
 const p1Team: PokemonSet[] = [
   {

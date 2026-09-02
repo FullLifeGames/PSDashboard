@@ -1,11 +1,10 @@
-import type { TurnSensitivity, TurnVerification } from '../../lib/eval/analysis';
-import type { PlayedTurn } from '../../lib/eval/played';
+import {
+  type TurnSensitivity, type TurnVerification, type PlayedTurn, perfSpan, type EvalResult, type EvalSettings,
+  teraKey,
+} from '@fulllifegames/eval-engine';
 import { EvalWorkerClient } from '../../lib/eval/worker-client';
 import { runInLanes } from '../../lib/eval/lanes';
-import { perfSpan } from '../../lib/eval/perf-trace';
 import { evalStoreKey, loadStoredEval, saveStoredEval } from '../../lib/eval-cache-store';
-import type { EvalResult, EvalSettings } from '../../lib/eval/types';
-import { teraKey } from '../../lib/eval/tera';
 import { resolveAutoTurnSettings, serializedFaintedFraction, supersedesStored, type EngineMode } from './prefs';
 import type { CachedEval } from './single-eval';
 import {
