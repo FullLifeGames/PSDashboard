@@ -26,8 +26,8 @@ Relevant files:
 - [`src/hooks/useEmbedHost.ts`](./src/hooks/useEmbedHost.ts)
 - [`src/lib/replay-fetcher.ts`](./src/lib/replay-fetcher.ts)
 - [`src/lib/replay-file.ts`](./src/lib/replay-file.ts)
-- [`src/lib/protocol-parser.ts`](./src/lib/protocol-parser.ts)
-- [`src/lib/opponent-inferrer.ts`](./src/lib/opponent-inferrer.ts)
+- [`src/lib/protocol-parser.ts`](./src/lib/protocol-parser.ts) with [`src/lib/protocol/`](./src/lib/protocol/)
+- [`src/lib/opponent-inferrer.ts`](./src/lib/opponent-inferrer.ts) with [`src/lib/inference/`](./src/lib/inference/)
 
 ### 2. Snapshot creation
 
@@ -52,7 +52,7 @@ The current precedence is:
 
 1. revealed information from the replay (and the user's manual edits)
 2. the user's pasted team for `p1`, when provided, and Open Team Sheets
-3. damage-consistent inferred spreads ([`src/lib/spread-inference.ts`](./src/lib/spread-inference.ts)): a deterministic solver checks standard EV-spread candidates against `@smogon/calc` roll ranges for every observation a Pokémon appears in, replacing guessed spreads only where at least two observations demand it, and only in the dimensions the evidence can measure (offense from attacking observations, bulk from defending ones). Speed constraints come from the replay's own races: same-turn move order and KO-before-acting evidence (the KO proves the victim chose a move; a chosen switch would have resolved before the attack) become hard constraints over the built configuration, with directional exclusions keeping observations a modifier only strengthens; solves whose best candidate misfits the observations beyond a per-observation threshold forfeit back to the prior instead of standing on a least-bad fabrication, unless the solve repairs a speed violation. Every candidate is legalized to the format's EV budget before scoring (508 total / 252 per stat; Pokémon Champions formats, detected from the `|tier|` line, use 66/32), least-evidenced stats give way first with Speed last, and winners top up their unspent budget in unmeasured non-Speed stats; the sim never fields an over- or under-statted spread. The solve runs once per replay and is cached across all team-build call sites; the stats panel shows solved spreads as "fits observed damage"
+3. damage-consistent inferred spreads ([`src/lib/spread-inference.ts`](./src/lib/spread-inference.ts) with [`src/lib/spreads/`](./src/lib/spreads/)): a deterministic solver checks standard EV-spread candidates against `@smogon/calc` roll ranges for every observation a Pokémon appears in, replacing guessed spreads only where at least two observations demand it, and only in the dimensions the evidence can measure (offense from attacking observations, bulk from defending ones). Speed constraints come from the replay's own races: same-turn move order and KO-before-acting evidence (the KO proves the victim chose a move; a chosen switch would have resolved before the attack) become hard constraints over the built configuration, with directional exclusions keeping observations a modifier only strengthens; solves whose best candidate misfits the observations beyond a per-observation threshold forfeit back to the prior instead of standing on a least-bad fabrication, unless the solve repairs a speed violation. Every candidate is legalized to the format's EV budget before scoring (508 total / 252 per stat; Pokémon Champions formats, detected from the `|tier|` line, use 66/32), least-evidenced stats give way first with Speed last, and winners top up their unspent budget in unmeasured non-Speed stats; the sim never fields an over- or under-statted spread. The solve runs once per replay and is cached across all team-build call sites; the stats panel shows solved spreads as "fits observed damage"
 4. Smogon usage-stat guesses for anything still unknown, when monthly stats can be fetched. Formats without a stats file (Custom Game, niche metas) fall back to the generation's OU stats. Guessed moves assemble as coherent sets ([`src/lib/set-coherence.ts`](./src/lib/set-coherence.ts)): published sets are scored against the revealed evidence (fit per revealed move/item/ability, rule-outs disqualifying, usage marginals as the tiebreak) and the winner fills unrevealed slots as one unit; marginal fills pass pairwise vetoes (big attacks the set's boosts do not serve, orphaned defense-boost enablers without their payoff attack, same-type damaging redundancy, and status fills under a Choice/Assault Vest guess all fall), with the deeper usage pool refilling the slots. The stats-panel enrichment (`team-info.ts`) and the simulator team builder run the SAME selection and vetoes, so the display never shows a set the engine would not play
 5. `@pkmn/smogon` set assumptions for remaining gaps (Custom Game also maps to the generation's OU here)
 
@@ -64,15 +64,15 @@ This is the most important approximation point in the current implementation. Th
 
 Relevant files:
 
-- [`src/lib/team-builder.ts`](./src/lib/team-builder.ts)
+- [`src/lib/team-builder.ts`](./src/lib/team-builder.ts) with [`src/lib/team/set-resolvers.ts`](./src/lib/team/set-resolvers.ts)
 - [`src/lib/team-info.ts`](./src/lib/team-info.ts)
-- [`src/lib/smogon-stats.ts`](./src/lib/smogon-stats.ts)
+- [`src/lib/smogon-stats.ts`](./src/lib/smogon-stats.ts) with [`src/lib/smogon/`](./src/lib/smogon/)
 - [`src/lib/smogon-sets.ts`](./src/lib/smogon-sets.ts)
 - [`src/lib/team-parser.ts`](./src/lib/team-parser.ts)
 
 ### 4. Branch reconstruction
 
-`src/lib/branch-engine.ts` is the core reconstruction module. `useBranch` wraps it with React state for the UI.
+`src/lib/branch-engine.ts` is the facade of the core reconstruction engine. The engine itself lives in `src/lib/branch/`: types, team ordering, protocol choice extraction, boundary corrections, log sync, state builders, choice execution, and the staged reconstruction pipeline over one session. `useBranch` wraps it with React state for the UI.
 
 When `startBranch` runs, it:
 
@@ -101,7 +101,7 @@ After branch entry, the user can choose actions for both sides and `executeTurn`
 Relevant files:
 
 - [`src/hooks/useBranch.ts`](./src/hooks/useBranch.ts)
-- [`src/lib/branch-engine.ts`](./src/lib/branch-engine.ts)
+- [`src/lib/branch-engine.ts`](./src/lib/branch-engine.ts) with [`src/lib/branch/`](./src/lib/branch/)
 
 ## UI Structure
 
