@@ -288,34 +288,6 @@ export const ratchetOverrides = [
   },
   {
     "files": [
-      "src/lib/eval/eval-function.ts"
-    ],
-    "rules": {
-      "max-lines": [
-        "error",
-        {
-          "max": 690,
-          "skipBlankLines": true,
-          "skipComments": true
-        }
-      ],
-      "max-lines-per-function": [
-        "error",
-        {
-          "max": 130,
-          "skipBlankLines": true,
-          "skipComments": true,
-          "IIFEs": true
-        }
-      ],
-      "complexity": [
-        "error",
-        21
-      ]
-    }
-  },
-  {
-    "files": [
       "src/lib/eval/forward-model.ts"
     ],
     "rules": {
