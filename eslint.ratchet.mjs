@@ -277,61 +277,13 @@ export const ratchetOverrides = [
   },
   {
     "files": [
-      "src/components/BranchHistoryPanel.tsx"
-    ],
-    "rules": {
-      "max-lines-per-function": [
-        "error",
-        {
-          "max": 130,
-          "skipBlankLines": true,
-          "skipComments": true,
-          "IIFEs": true
-        }
-      ],
-      "complexity": [
-        "error",
-        17
-      ]
-    }
-  },
-  {
-    "files": [
-      "src/components/BranchPanel.tsx"
-    ],
-    "rules": {
-      "max-lines": [
-        "error",
-        {
-          "max": 780,
-          "skipBlankLines": true,
-          "skipComments": true
-        }
-      ],
-      "max-lines-per-function": [
-        "error",
-        {
-          "max": 300,
-          "skipBlankLines": true,
-          "skipComments": true,
-          "IIFEs": true
-        }
-      ],
-      "complexity": [
-        "error",
-        52
-      ]
-    }
-  },
-  {
-    "files": [
       "src/components/BranchSaveSharePanel.tsx"
     ],
     "rules": {
       "max-lines-per-function": [
         "error",
         {
-          "max": 120,
+          "max": 70,
           "skipBlankLines": true,
           "skipComments": true,
           "IIFEs": true
@@ -341,59 +293,7 @@ export const ratchetOverrides = [
   },
   {
     "files": [
-      "src/components/ComboBox.tsx"
-    ],
-    "rules": {
-      "max-lines-per-function": [
-        "error",
-        {
-          "max": 120,
-          "skipBlankLines": true,
-          "skipComments": true,
-          "IIFEs": true
-        }
-      ]
-    }
-  },
-  {
-    "files": [
-      "src/components/EvalGameReport.tsx"
-    ],
-    "rules": {
-      "max-lines-per-function": [
-        "error",
-        {
-          "max": 150,
-          "skipBlankLines": true,
-          "skipComments": true,
-          "IIFEs": true
-        }
-      ]
-    }
-  },
-  {
-    "files": [
-      "src/components/EvalGraph.tsx"
-    ],
-    "rules": {
-      "max-lines-per-function": [
-        "error",
-        {
-          "max": 280,
-          "skipBlankLines": true,
-          "skipComments": true,
-          "IIFEs": true
-        }
-      ],
-      "complexity": [
-        "error",
-        32
-      ]
-    }
-  },
-  {
-    "files": [
-      "src/components/EvalMatrixView.tsx"
+      "src/components/EvalPanel.tsx"
     ],
     "rules": {
       "max-lines-per-function": [
@@ -409,164 +309,12 @@ export const ratchetOverrides = [
   },
   {
     "files": [
-      "src/components/EvalPanel.tsx"
-    ],
-    "rules": {
-      "max-lines": [
-        "error",
-        {
-          "max": 440,
-          "skipBlankLines": true,
-          "skipComments": true
-        }
-      ],
-      "max-lines-per-function": [
-        "error",
-        {
-          "max": 330,
-          "skipBlankLines": true,
-          "skipComments": true,
-          "IIFEs": true
-        }
-      ],
-      "complexity": [
-        "error",
-        98
-      ]
-    }
-  },
-  {
-    "files": [
       "src/components/EvalTurnAnalysis.tsx"
     ],
     "rules": {
-      "max-lines": [
-        "error",
-        {
-          "max": 370,
-          "skipBlankLines": true,
-          "skipComments": true
-        }
-      ],
-      "max-lines-per-function": [
-        "error",
-        {
-          "max": 180,
-          "skipBlankLines": true,
-          "skipComments": true,
-          "IIFEs": true
-        }
-      ],
       "complexity": [
         "error",
-        63
-      ]
-    }
-  },
-  {
-    "files": [
-      "src/components/LeadPanel.tsx"
-    ],
-    "rules": {
-      "max-lines-per-function": [
-        "error",
-        {
-          "max": 90,
-          "skipBlankLines": true,
-          "skipComments": true,
-          "IIFEs": true
-        }
-      ],
-      "complexity": [
-        "error",
-        18
-      ]
-    }
-  },
-  {
-    "files": [
-      "src/components/PSReplayFrame.tsx"
-    ],
-    "rules": {
-      "max-lines-per-function": [
-        "error",
-        {
-          "max": 170,
-          "skipBlankLines": true,
-          "skipComments": true,
-          "IIFEs": true
-        }
-      ]
-    }
-  },
-  {
-    "files": [
-      "src/components/ReplayLoader.tsx"
-    ],
-    "rules": {
-      "max-lines-per-function": [
-        "error",
-        {
-          "max": 160,
-          "skipBlankLines": true,
-          "skipComments": true,
-          "IIFEs": true
-        }
-      ]
-    }
-  },
-  {
-    "files": [
-      "src/components/SetsImportExportPanel.tsx"
-    ],
-    "rules": {
-      "max-lines-per-function": [
-        "error",
-        {
-          "max": 120,
-          "skipBlankLines": true,
-          "skipComments": true,
-          "IIFEs": true
-        }
-      ]
-    }
-  },
-  {
-    "files": [
-      "src/components/TeamEditor.tsx"
-    ],
-    "rules": {
-      "max-lines": [
-        "error",
-        {
-          "max": 410,
-          "skipBlankLines": true,
-          "skipComments": true
-        }
-      ],
-      "max-lines-per-function": [
-        "error",
-        {
-          "max": 370,
-          "skipBlankLines": true,
-          "skipComments": true,
-          "IIFEs": true
-        }
-      ],
-      "complexity": [
-        "error",
-        28
-      ]
-    }
-  },
-  {
-    "files": [
-      "src/components/eval-badges.ts"
-    ],
-    "rules": {
-      "complexity": [
-        "error",
-        17
+        16
       ]
     }
   },
