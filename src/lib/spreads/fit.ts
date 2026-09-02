@@ -45,7 +45,7 @@ function genOf(formatid: string) {
 
 export const keyOf = (side: 'p1' | 'p2', species: string) => `${side}:${toId(species)}`;
 
-export function setOf(ctx: SolveContext, side: 'p1' | 'p2', species: string): PokemonSet | undefined {
+function setOf(ctx: SolveContext, side: 'p1' | 'p2', species: string): PokemonSet | undefined {
   return ctx.sets[side].find(entry => toId(entry.species) === toId(species) || toId(entry.name || '') === toId(species));
 }
 

@@ -15,7 +15,7 @@
 
 const FLAG_KEY = 'ps-replay-interceptor:perf';
 
-export interface PerfStage {
+interface PerfStage {
   ms: number;
   count: number;
 }

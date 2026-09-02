@@ -13,7 +13,7 @@ import type { OpponentTeamInfo, ReplayData, TurnSnapshot } from '../../types';
 import type { BranchSlotChoice } from '../../lib/branch-choices';
 import { getReplayBringCount, getReplayGameType, getReplayGeneration, replayBringOnly } from '../../lib/replay-format';
 
-export interface PendingBranchRefresh {
+interface PendingBranchRefresh {
   p1Info: OpponentTeamInfo;
   p2Info: OpponentTeamInfo;
   history: BranchHistoryEntry[];

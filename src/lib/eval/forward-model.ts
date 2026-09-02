@@ -8,4 +8,3 @@ export { createRootPosition, positionBattle } from './forward/position';
 export type { ChoiceOption, SimPosition } from './forward/position';
 export { legalChoices } from './forward/choices';
 export { advancePosition, advancePositionWithLog, trialAdvanceLog } from './forward/advance';
-export type { TrialAdvanceResult } from './forward/advance';

@@ -8,7 +8,7 @@ const BATTLE_ONLY_FORME_SUFFIXES = [
   '-Primal', '-Ultra', '-Gmax',
 ];
 
-export function normalizeBattleOnlyForme(species: string): string {
+function normalizeBattleOnlyForme(species: string): string {
   for (const suffix of BATTLE_ONLY_FORME_SUFFIXES) {
     if (species.endsWith(suffix)) return species.slice(0, -suffix.length);
   }

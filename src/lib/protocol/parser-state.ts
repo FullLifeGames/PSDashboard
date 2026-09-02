@@ -7,7 +7,7 @@ export const gens = new Generations(Dex);
 
 export type ClientIdent = Parameters<Battle['getPokemon']>[0];
 
-export interface TurnMover {
+interface TurnMover {
   side: 'p1' | 'p2';
   species: string;
   cleanFirst: boolean;

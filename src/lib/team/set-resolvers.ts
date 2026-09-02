@@ -36,7 +36,7 @@ export function editedFields(info: RevealedPokemonInfo): EditedFields {
  * Enriched infos carry usage GUESSES in value — a 58% Leftovers guess must
  * never beat a sheet's Choice Scarf.
  */
-export function known(field: { value: string; source: KnowledgeSource }): string {
+function known(field: { value: string; source: KnowledgeSource }): string {
   return field.source === 'revealed' || field.source === 'manual' ? field.value : '';
 }
 

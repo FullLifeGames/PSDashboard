@@ -12,7 +12,6 @@ export type {
   SimPokemonInfo,
 } from '../lib/branch-engine';
 export type { BranchHistoryEntry } from './branch/shared';
-export type { StartBranchOptions } from './branch/session';
 
 /**
  * The branch simulator: one live @pkmn/sim battle rebuilt at a replay turn,

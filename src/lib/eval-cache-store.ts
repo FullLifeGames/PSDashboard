@@ -118,7 +118,7 @@ export interface StoredEval {
 //      the protocol-pinned bring per side (per-side fail-open), and the
 //      turn-0 preview enumerates lead pairs over the real four. Singles
 //      and bring-all formats are byte-identical to v37.
-export const EVAL_ENGINE_CACHE_VERSION = 38;
+const EVAL_ENGINE_CACHE_VERSION = 38;
 
 export function evalStoreKey(
   cacheKey: string,

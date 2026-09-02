@@ -2,7 +2,7 @@ import type { SimBattle, SimPokemon } from './types';
 import { normalizeBattleOnlyFormeId, slotLetter } from './team-order';
 import { toId } from '../ids';
 
-export function replayLogPrefixThroughTurn(replayLog: string, targetTurn: number): string[] {
+function replayLogPrefixThroughTurn(replayLog: string, targetTurn: number): string[] {
   const prefix: string[] = [];
   let foundTargetTurn = false;
 

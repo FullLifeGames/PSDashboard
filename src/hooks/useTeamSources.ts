@@ -7,7 +7,7 @@ import type { SpreadCandidate } from '../lib/spread-inference';
 import type { useSmogonUsageStats } from './useSmogonUsageStats';
 import type { useSmogonSetAssumptions } from './useSmogonSetAssumptions';
 
-export const TEAM_PASTE_STORAGE_KEY = 'ps-replay-interceptor:team-paste';
+const TEAM_PASTE_STORAGE_KEY = 'ps-replay-interceptor:team-paste';
 
 /** A paste should survive a reload (G15) — read once at first render. */
 function restoreTeamPaste(): { text: string; sets: PastedSet[] } | null {

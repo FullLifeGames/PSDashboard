@@ -11,7 +11,7 @@ import { conditionalNote, displayBest, koPhrase, nullNote, oddsNote, phrase } fr
  */
 
 /** A flagged risk that won value over the safe guarantee — praised, not blamed. */
-export function readClause(name: string, side: SideAnalysis, opponent: SideAnalysis): string | null {
+function readClause(name: string, side: SideAnalysis, opponent: SideAnalysis): string | null {
   if (!side.riskPaidOff || !side.played || !side.safe) return null;
   const came = opponent.played ? `; ${phrase(opponent.played.label)} came instead` : '';
   const priced = side.played.punishedBy ? ` The floor priced in ${side.played.punishedBy}${came}.` : '';
@@ -89,7 +89,7 @@ function punishedMisplayClause(
     `safer was ${phrase(shown.label)} (${winPctText(shown.ev)})${line}.${reasons}`;
 }
 
-export function mistakeClause(name: string, side: SideAnalysis, opponent: SideAnalysis): string | null {
+function mistakeClause(name: string, side: SideAnalysis, opponent: SideAnalysis): string | null {
   if (side.sacrifice) return null; // the sack note carries the turn instead
   if ((side.tier !== 'mistake' && side.tier !== 'blunder') || !side.played || !side.best) return null;
   const difference = diffChoices(side.played, side.best);

@@ -15,7 +15,7 @@ import { matchPlayedChoice, matchPlayedSlots, phantomStayIn } from './played-mat
  */
 
 /** The played action matched into the ranked list, with the doubles and phantom flags. */
-export interface PlayedMatch {
+interface PlayedMatch {
   played: RankedChoice | null;
   /** A slot's choice stayed hidden: `played` is the charitable consistent combo. */
   playedPartial: boolean;
@@ -24,7 +24,7 @@ export interface PlayedMatch {
 }
 
 /** Doubles per slot (charitable on hidden slots), singles by choice id, then the stay-in phantom. */
-export function matchPlayedForSide(
+function matchPlayedForSide(
   params: AnalyzeTurnParams,
   key: Side,
   playedSlots: (PlayedAction | null)[] | undefined,
@@ -56,7 +56,7 @@ export function matchPlayedForSide(
  * equilibrium regret (the deep pair values are an exploitative lens, not a
  * fairer grade when they agree).
  */
-export function verifiedRegret(
+function verifiedRegret(
   params: AnalyzeTurnParams,
   key: Side,
   played: RankedChoice | null,
@@ -76,16 +76,16 @@ export function verifiedRegret(
   return { regret, verifiedAtDepth };
 }
 
-export const demoteTier = (current: VerdictTier | undefined): VerdictTier | undefined =>
+const demoteTier = (current: VerdictTier | undefined): VerdictTier | undefined =>
   current === 'blunder' ? 'mistake' : current === 'mistake' ? 'inaccuracy' : undefined;
 
-export const tierOf = (regretValue: number): VerdictTier | undefined =>
+const tierOf = (regretValue: number): VerdictTier | undefined =>
   regretValue >= TIER_THRESHOLDS.blunder ? 'blunder'
     : regretValue >= TIER_THRESHOLDS.mistake ? 'mistake'
       : regretValue >= TIER_THRESHOLDS.inaccuracy ? 'inaccuracy' : undefined;
 
 /** The regret's band, softened one tier in a decided position (own perspective). */
-export function baseTier(regret: number | null, key: Side, scoreBefore: number): VerdictTier | undefined {
+function baseTier(regret: number | null, key: Side, scoreBefore: number): VerdictTier | undefined {
   let tier: VerdictTier | undefined;
   if (regret !== null) {
     tier = tierOf(regret);
@@ -129,7 +129,7 @@ export function bestWindowPayoff(chain: (number | null | undefined)[], key: Side
  * contributed nothing positive; 573756 t68). Null when the floor gate
  * fails or no safe line exists.
  */
-export function stayedFeedPayoff(
+function stayedFeedPayoff(
   params: AnalyzeTurnParams,
   key: Side,
   played: RankedChoice | null,
@@ -146,7 +146,7 @@ export function stayedFeedPayoff(
 }
 
 /** What the sack gates decided: whether the leniency applies and, for a stayed feed, its windowed payoff. */
-export interface SackGate {
+interface SackGate {
   sackApplies: boolean;
   feedPayoff: number | null;
 }
@@ -161,7 +161,7 @@ export interface SackGate {
  * windowed payoff over the safe guarantee clears the read margin (573756
  * t68). Fails closed.
  */
-export function sackGate(
+function sackGate(
   params: AnalyzeTurnParams,
   key: Side,
   sack: SackInfo | undefined,
@@ -188,7 +188,7 @@ export function sackGate(
 }
 
 /** The sack verdict on the tier: demoted one band, cleared for a verified feed, never excusing a blunder. */
-export interface SackVerdict {
+interface SackVerdict {
   sacrificed: boolean;
   feedVerified: boolean;
   tier: VerdictTier | undefined;
@@ -205,7 +205,7 @@ export interface SackVerdict {
  * accepted floor upward (573756 t68 post-race: payoff 0.359 ≥ regret
  * 0.129 + 0.1), and no verdict band sticks.
  */
-export function sackVerdict(tier: VerdictTier | undefined, regret: number | null, gate: SackGate): SackVerdict {
+function sackVerdict(tier: VerdictTier | undefined, regret: number | null, gate: SackGate): SackVerdict {
   const sacrificed = !!(tier && gate.sackApplies && (regret ?? 0) < TIER_THRESHOLDS.blunder);
   const feedVerified = sacrificed && gate.feedPayoff !== null && regret !== null &&
     gate.feedPayoff >= regret + RISK_PAYOFF_MARGIN;
@@ -218,7 +218,7 @@ export function sackVerdict(tier: VerdictTier | undefined, regret: number | null
  * verdict HINGES on hidden information — soften to the most charitable
  * probed band (acquit-only) and record the hinge.
  */
-export function sensitivityAcquittal(
+function sensitivityAcquittal(
   tier: VerdictTier | undefined,
   probes: SensitivityProbe[] | undefined,
 ): { tier: VerdictTier | undefined; sensitivity: SideAnalysis['sensitivity'] } {

@@ -12,7 +12,7 @@ const GERMAN_STAT_MAP: Record<string, string> = {
   // SpA is the same in both languages
 };
 
-export function preprocessGermanTeam(rawText: string): string {
+function preprocessGermanTeam(rawText: string): string {
   return rawText.replace(
     /\b(KP|Ang|Vert|SpV|Init)\b/g,
     (match) => GERMAN_STAT_MAP[match] || match

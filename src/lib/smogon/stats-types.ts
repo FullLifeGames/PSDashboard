@@ -33,7 +33,7 @@ export interface SpeciesUsageSet {
   sourceDetail: string;
 }
 
-export interface ChaosPokemonStats {
+interface ChaosPokemonStats {
   'Raw count'?: number;
   Abilities?: Record<string, number | string>;
   Items?: Record<string, number | string>;
@@ -45,7 +45,7 @@ export interface ChaosStatsPayload {
   data?: Record<string, ChaosPokemonStats>;
 }
 
-export interface PkmnPokemonStats {
+interface PkmnPokemonStats {
   count?: number | string;
   abilities?: Record<string, number | string>;
   items?: Record<string, number | string>;

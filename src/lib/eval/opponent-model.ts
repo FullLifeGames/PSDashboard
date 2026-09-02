@@ -15,7 +15,7 @@ import type { EvalMatrix, ReadRecommendation } from './types';
 /** RNR anchor: this share of the model is always the equilibrium mix. */
 export const READ_LAMBDA = 0.3;
 /** Softmax temperature over the opponent's own EVs (wp-units). */
-export const READ_TAU = 4;
+const READ_TAU = 4;
 /** Reads only surface when the model's top probability reaches this. */
 export const READ_CONFIDENCE = 0.55;
 

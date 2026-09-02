@@ -208,7 +208,7 @@ const FIRST_TURN_FLINCH_MOVES = new Set(['fakeout']);
  * that way — 0.9 keeps the stage to genuinely near-sure rolls (573756 t73
  * prices 0.95) and leaves coin flips out.
  */
-export const NEAR_DECIDED_ODDS = 0.9;
+const NEAR_DECIDED_ODDS = 0.9;
 
 /**
  * Cap on the decided sweep's total clean-up clock (round 15). "Practically
@@ -220,7 +220,7 @@ export const NEAR_DECIDED_ODDS = 0.9;
  * whole enemy team priced as pinned healers). A slow grind leaves the
  * opponent dozens of turns of play — that is a threat, not a decided game.
  */
-export const DECIDED_MAX_TURNS = 6;
+const DECIDED_MAX_TURNS = 6;
 
 /**
  * Living mons the OTHER side has no live answer to (round 13): the mon

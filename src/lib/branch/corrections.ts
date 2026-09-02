@@ -8,7 +8,7 @@ import { normalizeBattleOnlyFormeId } from './team-order';
 import { findFirstAvailableSwitchSlot, findPokemonOnSide, findSlotBySpecies } from './protocol-choices';
 import { sideIndex, toId } from '../ids';
 
-export function repointActiveSlot(side: SimSide, activeSlot: number, target: SimPokemon): boolean {
+function repointActiveSlot(side: SimSide, activeSlot: number, target: SimPokemon): boolean {
   if (side.active[activeSlot] === target) return false;
 
   const previous = side.active[activeSlot];
@@ -78,7 +78,7 @@ export function correctActivesFromProtocol(
 }
 
 /** Spec 1b's stamp: protocol trail + eligibility + set sanity, never sim history. */
-export function restampProtocolLocks(battle: SimBattle, context: ChoiceLockContext, turn: number) {
+function restampProtocolLocks(battle: SimBattle, context: ChoiceLockContext, turn: number) {
   for (const sideId of ['p1', 'p2'] as const) {
     const lock = protocolChoiceLock(context.trails, sideId, turn);
     if (!lock) continue;
@@ -136,7 +136,7 @@ export function buildForcedSwitchChoice(
  * snapshot disagrees, so a matching reconstruction keeps its own toxic stage
  * and sleep counter.
  */
-export function correctStatusFromSnapshot(battlePokemon: SimPokemon, snapshotStatus: string) {
+function correctStatusFromSnapshot(battlePokemon: SimPokemon, snapshotStatus: string) {
   const status = snapshotStatus as SimPokemon['status'];
   if (battlePokemon.status === status) return;
 
@@ -161,7 +161,7 @@ export function correctStatusFromSnapshot(battlePokemon: SimPokemon, snapshotSta
   }
 }
 
-export function correctHpFromSnapshot(battle: SimBattle, snapshot: TurnSnapshot) {
+function correctHpFromSnapshot(battle: SimBattle, snapshot: TurnSnapshot) {
   for (let sideIndex = 0; sideIndex < 2; sideIndex++) {
     const snapshotSide = sideIndex === 0 ? snapshot.p1 : snapshot.p2;
     const battleSide = battle.sides[sideIndex];
@@ -252,7 +252,7 @@ function weatherIdFromSnapshot(weather: string): string {
   return weatherCondition.exists ? weatherCondition.id : toId(weather);
 }
 
-export function correctFieldFromSnapshot(battle: SimBattle, snapshot: TurnSnapshot) {
+function correctFieldFromSnapshot(battle: SimBattle, snapshot: TurnSnapshot) {
   battle.turn = snapshot.turn;
   const weather = weatherIdFromSnapshot(snapshot.field.weather);
   if ((battle.field.weather as string) !== weather) {
@@ -285,7 +285,7 @@ export function correctFieldFromSnapshot(battle: SimBattle, snapshot: TurnSnapsh
  * benched-dead while the protocol had it casting Future Sight two turns
  * later. The snapshot knows who really stood on the field; put them back.
  */
-export function correctActivesFromSnapshot(battle: SimBattle, snapshot: TurnSnapshot) {
+function correctActivesFromSnapshot(battle: SimBattle, snapshot: TurnSnapshot) {
   for (let sideIdx = 0; sideIdx < 2; sideIdx++) {
     const snapshotSide = sideIdx === 0 ? snapshot.p1 : snapshot.p2;
     const side = battle.sides[sideIdx];
@@ -348,7 +348,7 @@ export function repairStaleForcedSwitchRequest(battle: SimBattle) {
  * holds, or cleared for one that does (a repointed mon beside a standing
  * Imprison would otherwise play through the block).
  */
-export function runDisablePass(battle: SimBattle) {
+function runDisablePass(battle: SimBattle) {
   for (const side of battle.sides) {
     for (const pokemon of side.active) {
       if (!pokemon || pokemon.fainted) continue;

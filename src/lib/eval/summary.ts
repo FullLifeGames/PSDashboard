@@ -1,6 +1,6 @@
 import { BREADTH_MIN_OPTIONS, CHANCE_THRESHOLD, type SideAnalysis, type TurnAnalysis } from './analysis';
 import { winDeltaText, winPercent } from './winprob';
-import { labelPhrase, playedBest } from './prose/phrases';
+import { phrase, playedBest } from './prose/phrases';
 import {
   forcedClause, inaccuracyClause, sackClause, sensitivityClause, sideClause, streakClause, unansweredClause,
 } from './prose/clauses';
@@ -14,7 +14,7 @@ import {
  * in prose/.
  */
 
-export { formatRead, koPhrase, labelPhrase } from './prose/phrases';
+export { formatRead } from './prose/phrases';
 
 type PlayerNames = [string, string];
 type Decided = { key: 'p1' | 'p2'; species: string; announce: boolean } | null;
@@ -100,7 +100,7 @@ function hindsightSentence(analysis: TurnAnalysis, playerNames: PlayerNames): st
   const missed = reads.sort((a, b) => b.read.gain - a.read.gain)[0];
   if (!missed) return null;
   return `The read was there for ${missed.name} — against the ` +
-    `${missed.read.against} actually clicked, ${labelPhrase(missed.read.response)} ` +
+    `${missed.read.against} actually clicked, ${phrase(missed.read.response)} ` +
     `was worth ${winDeltaText(missed.read.gain)} more.`;
 }
 

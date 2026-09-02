@@ -9,9 +9,7 @@ import { winPctText } from '../winprob';
  */
 
 /** Choice labels read as prose: "→ Dragapult" becomes "switching to Dragapult". */
-export const labelPhrase = (label: string) => (label.startsWith('→ ') ? `switching to ${label.slice(2)}` : label);
-
-export const phrase = labelPhrase;
+export const phrase = (label: string) => (label.startsWith('→ ') ? `switching to ${label.slice(2)}` : label);
 
 export const playedBest = (side: SideAnalysis) =>
   side.played !== null && side.best !== null && side.played.choice === side.best.choice;

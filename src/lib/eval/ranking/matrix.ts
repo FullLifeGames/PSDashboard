@@ -6,7 +6,7 @@ import type { CellBlend, EvalMatrix, RankedChoice } from '../types';
  * no @pkmn/sim imports, main-bundle safe.
  */
 
-export interface RankOption {
+interface RankOption {
   choice: string;
   label: string;
 }

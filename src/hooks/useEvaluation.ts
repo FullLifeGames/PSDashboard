@@ -8,12 +8,12 @@ import { useGraphState, useGraphSweepRunner } from './evaluation/graph-sweep';
 export {
   needsSettingsUpgrade, resolveAutoTurnSettings, serializedFaintedFraction, supersedesStored,
 } from './evaluation/prefs';
-export type { EngineMode, TurnEvalSettings } from './evaluation/prefs';
-export type { EvalStatus, EvaluateParams } from './evaluation/single-eval';
+export type { TurnEvalSettings } from './evaluation/prefs';
+export type { EvalStatus } from './evaluation/single-eval';
 export { verificationDeepSettings } from './evaluation/sweep-verify';
 export { recordEvalError } from './evaluation/sweep-types';
 export { coverageNotice, withEvalGapNotice } from './evaluation/graph-sweep';
-export type { EvalGraphState, GraphSweepParams } from './evaluation/graph-sweep';
+export type { EvalGraphState } from './evaluation/graph-sweep';
 
 /**
  * The evaluation surface: panel preferences, the single-position evaluate

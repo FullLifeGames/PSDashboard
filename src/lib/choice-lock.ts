@@ -15,7 +15,7 @@ import { inferOpponentTeam } from './opponent-inferrer';
 import { toId } from './ids';
 
 export interface ProtocolLock { species: string; moveId: string }
-export interface TrailState { species: string; moves: string[]; itemDisturbed: boolean }
+interface TrailState { species: string; moves: string[]; itemDisturbed: boolean }
 export type ChoiceLockTrails = Record<'p1' | 'p2', Map<number, TrailState | null>>;
 
 /**

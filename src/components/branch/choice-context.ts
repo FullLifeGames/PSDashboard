@@ -12,7 +12,7 @@ export interface ChoiceContext {
   modifiers: BranchSlotModifiers;
 }
 
-export function withModifier(choice: BranchSlotChoice, ctx: ChoiceContext): BranchSlotChoice {
+function withModifier(choice: BranchSlotChoice, ctx: ChoiceContext): BranchSlotChoice {
   const { modifier, modifierAvailable, moves, modifiers } = ctx;
   if (choice.kind !== 'move' || !modifier || !modifierAvailable) return choice;
   // A Z toggle only applies to moves that actually have a Z option.

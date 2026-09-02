@@ -16,12 +16,12 @@ import type { SideGrading } from './grading';
  */
 
 /** How many ranked options sit within an inaccuracy of best — the side's real decision breadth. */
-export const viableCountFor = (best: RankedChoice | null, options: RankedChoice[]): number | undefined =>
+const viableCountFor = (best: RankedChoice | null, options: RankedChoice[]): number | undefined =>
   best === null ? undefined :
     options.filter(option => best.ev - option.ev <= TIER_THRESHOLDS.inaccuracy).length;
 
 /** The side's view of the solved root matrix: own rows and labels, the opponent's labels, the equilibrium mix. */
-export interface MatrixView {
+interface MatrixView {
   matrix: EvalMatrix | undefined;
   sideChoices: string[] | undefined;
   sideLabels: string[] | undefined;
@@ -33,7 +33,7 @@ export interface MatrixView {
   mixTop: number;
 }
 
-export function matrixView(params: AnalyzeTurnParams, key: Side): MatrixView {
+function matrixView(params: AnalyzeTurnParams, key: Side): MatrixView {
   const matrix = params.result.matrix;
   const pick = <T>(p1: T, p2: T): T => (key === 'p1' ? p1 : p2);
   const sideChoices = pick(matrix?.p1Choices, matrix?.p2Choices);
@@ -75,7 +75,7 @@ function splitReplies(
  * choice earns its keep. Only on tiered turns — where a recommendation
  * renders.
  */
-export function conditionalFor(
+function conditionalFor(
   tier: VerdictTier | undefined,
   view: MatrixView,
   best: RankedChoice | null,
@@ -89,7 +89,7 @@ export function conditionalFor(
 }
 
 /** A near-pure equilibrium SWITCH (≥ FORCED_MIX_THRESHOLD with more than one option): a forced expectation named in prose. */
-export function forcedMixFor(view: MatrixView, options: RankedChoice[]): SideAnalysis['forcedMix'] {
+function forcedMixFor(view: MatrixView, options: RankedChoice[]): SideAnalysis['forcedMix'] {
   const { matrix, sideChoices, sideLabels, mix, mixTop } = view;
   if (matrix && sideChoices && sideLabels && mix && options.length > 1 && mixTop >= 0 &&
     mix[mixTop] >= FORCED_MIX_THRESHOLD && sideChoices[mixTop]?.startsWith('switch')) {
@@ -134,7 +134,7 @@ function bestRowAgainst(
  * in that column by a mistake-sized gain, the shift narrative names the
  * concrete counterfactual (562428 t10: → Heatran into the Horn Leech).
  */
-export function hindsightReadFor(
+function hindsightReadFor(
   params: AnalyzeTurnParams,
   key: Side,
   view: MatrixView,
@@ -181,7 +181,7 @@ const entrySignal = (target: string, ownUnanswered: string[] | undefined, ownEnt
  * standing active still holding — and carries the holder's species. A
  * stage the game report has already spoken (unansweredSeen) stays silent.
  */
-export function unansweredFor(
+function unansweredFor(
   params: AnalyzeTurnParams,
   key: Side,
   played: RankedChoice | null,
@@ -205,7 +205,7 @@ export function unansweredFor(
  * (display layers book resolution prose from the state) and announce only
  * until the game report has spoken them once.
  */
-export function decidedSignals(
+function decidedSignals(
   params: AnalyzeTurnParams,
   key: Side,
 ): { decided: SideAnalysis['decided']; nearDecided: SideAnalysis['nearDecided'] } {
@@ -235,7 +235,7 @@ export function decidedSignals(
  * epsilon replaces it for display; with no such option the caveat stays.
  * Grading untouched; fails closed without board context.
  */
-export function bestNullFor(
+function bestNullFor(
   params: AnalyzeTurnParams,
   key: Side,
   best: RankedChoice | null,
@@ -263,7 +263,7 @@ export function bestNullFor(
 }
 
 /** Round 6 ②: a streak ending THIS turn, read from the render-time history (index t−1 = turn t, current included). */
-export function streakFor(params: AnalyzeTurnParams, key: Side): SideAnalysis['streakOdds'] {
+function streakFor(params: AnalyzeTurnParams, key: Side): SideAnalysis['streakOdds'] {
   if (params.playedHistory && params.actives) {
     return detectStreakOdds(params.actives.gen, params.playedHistory[key].slice(0, params.turn)) ?? undefined;
   }

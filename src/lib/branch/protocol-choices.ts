@@ -98,7 +98,7 @@ export function findPokemonOnSide(side: SimSide, species: string): SimPokemon | 
   ) ?? null;
 }
 
-export function protocolTargetLoc(
+function protocolTargetLoc(
   battle: SimBattle,
   sourceSide: 'p1' | 'p2',
   sourceActiveSlot: number,
@@ -124,7 +124,7 @@ export function targetTypeForMove(active: SimPokemon | null | undefined, moveNam
   return request.moves.find(move => move.id === moveId)?.target || Dex.moves.get(moveName).target || '';
 }
 
-export function shouldAppendTargetLoc(
+function shouldAppendTargetLoc(
   battle: SimBattle,
   active: SimPokemon | null | undefined,
   moveName: string,
@@ -153,7 +153,7 @@ export function targetLocSuffixForChoice(
   return fallbackTargetLoc ? ` ${formatTargetLoc(fallbackTargetLoc)}` : '';
 }
 
-export function firstLegalTargetLoc(battle: SimBattle, active: SimPokemon, targetType: string): number | null {
+function firstLegalTargetLoc(battle: SimBattle, active: SimPokemon, targetType: string): number | null {
   if (active.side.active.length < 2 || !battle.actions.targetTypeChoices(targetType)) return null;
   for (let loc = 1; loc <= battle.activePerHalf; loc++) {
     for (const targetLoc of [loc, -loc]) {
@@ -163,7 +163,7 @@ export function firstLegalTargetLoc(battle: SimBattle, active: SimPokemon, targe
   return null;
 }
 
-export function defaultMoveChoice(battle: SimBattle, active: SimPokemon | null | undefined): string {
+function defaultMoveChoice(battle: SimBattle, active: SimPokemon | null | undefined): string {
   if (!active || active.fainted) return 'pass';
   const firstMove = active.moveSlots[0];
   if (!firstMove) return 'pass';
@@ -172,7 +172,7 @@ export function defaultMoveChoice(battle: SimBattle, active: SimPokemon | null |
   return `move 1${targetLoc ? ` ${formatTargetLoc(targetLoc)}` : ''}`;
 }
 
-export function moveChoiceForActive(active: SimPokemon | null | undefined, moveName: string): string {
+function moveChoiceForActive(active: SimPokemon | null | undefined, moveName: string): string {
   if (!active) return `move ${toId(moveName)}`;
   const moveId = toId(moveName);
   const requestMoves = active.getMoveRequestData().moves;
@@ -195,7 +195,7 @@ export function moveChoiceForActive(active: SimPokemon | null | undefined, moveN
  * the sim actually offering the gimmick so an unknown item can never
  * produce a rejected choice.
  */
-export function gimmickSuffixForSlot(events: string[], ident: string, active: SimPokemon | null | undefined): string {
+function gimmickSuffixForSlot(events: string[], ident: string, active: SimPokemon | null | undefined): string {
   if (!active) return '';
   for (const line of events) {
     if (line.startsWith(`|-terastallize|${ident}`) && active.canTerastallize) return ' terastallize';
@@ -205,7 +205,7 @@ export function gimmickSuffixForSlot(events: string[], ident: string, active: Si
   return '';
 }
 
-export function getChoiceForSlot(
+function getChoiceForSlot(
   events: string[],
   side: 'p1' | 'p2',
   activeSlot: number,

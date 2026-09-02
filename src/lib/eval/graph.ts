@@ -33,7 +33,7 @@ export function computeBlunders(scores: (number | null)[]): number[] {
 }
 
 /** How many turns the deepening pass of a two-pass sweep may take on. */
-export const KEY_TURN_CAP = 16;
+const KEY_TURN_CAP = 16;
 
 /**
  * Swing that earns the deepening pass — the SAME constant the report's key

@@ -26,7 +26,7 @@ export type CellEventPlan =
   | { kind: 'fail' }                    // a guard tripped — keep today's path
   | { kind: 'events'; events: CellEvent[] };
 
-export type EventOutcome = 'miss' | 'hit-kill' | 'hit-nokill' | 'none';
+type EventOutcome = 'miss' | 'hit-kill' | 'hit-nokill' | 'none';
 
 /**
  * Fixed probe seeds for boundary cells whose analytic classes went

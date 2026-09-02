@@ -15,7 +15,7 @@ function hpFractionOf(text: string): number | null {
   return denom > 0 ? parseInt(match[1], 10) / denom : null;
 }
 
-export function snapshotPokemon(mon: Pokemon): PokemonSnapshot {
+function snapshotPokemon(mon: Pokemon): PokemonSnapshot {
   return {
     name: mon.name,
     speciesForme: mon.speciesForme,
@@ -35,7 +35,7 @@ export function snapshotPokemon(mon: Pokemon): PokemonSnapshot {
   };
 }
 
-export function snapshotSide(side: Side): SideSnapshot {
+function snapshotSide(side: Side): SideSnapshot {
   return {
     name: side.name as string,
     id: side.n === 0 ? 'p1' : 'p2',
@@ -44,7 +44,7 @@ export function snapshotSide(side: Side): SideSnapshot {
   };
 }
 
-export function snapshotField(field: Field): FieldSnapshot {
+function snapshotField(field: Field): FieldSnapshot {
   return {
     weather: field.weather || '',
     terrain: field.terrain || '',

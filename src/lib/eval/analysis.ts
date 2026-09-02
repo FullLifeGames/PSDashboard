@@ -13,16 +13,16 @@ import type { AnalyzeTurnParams, Side, SideAnalysis, TurnAnalysis } from './turn
  */
 
 export {
-  BREADTH_MIN_OPTIONS, CHANCE_THRESHOLD, CONDITIONAL_MIX_MIN, DECIDED_SCORE, FEED_FLOOR_EPSILON, FORCED_MIX_THRESHOLD,
-  HEALTHY_SACK_FLOOR, PAYOFF_WINDOW, REGRET_THRESHOLD, RISK_PAYOFF_EPSILON, RISK_PAYOFF_MARGIN, TIER_THRESHOLDS,
+  BREADTH_MIN_OPTIONS, CHANCE_THRESHOLD,
+  PAYOFF_WINDOW, REGRET_THRESHOLD, TIER_THRESHOLDS,
   decidedSeenKey, unansweredSeenKey,
 } from './turn-analysis/types';
 export type {
   AnalyzeTurnParams, SensitivityProbe, SideAnalysis, TurnAnalysis, TurnAttribution, TurnSensitivity, TurnVerification,
-  VerdictTier, VerifiedOutcomes,
+  VerdictTier,
 } from './turn-analysis/types';
 export {
-  diffChoices, findConsistentOptions, findPlayedOption, matchPlayedChoice, matchPlayedSide, matchPlayedSlots,
+  diffChoices, findConsistentOptions, findPlayedOption, matchPlayedChoice, matchPlayedSide,
   phantomStayIn, playedSetupMove, splitCombinedLabel,
 } from './turn-analysis/played-match';
 

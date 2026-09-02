@@ -1,6 +1,6 @@
 import { playedSetupMove, type SideAnalysis, type TurnAnalysis, type VerdictTier } from './analysis';
 import { KEY_TURN_SWING } from './graph';
-import { koPhrase, labelPhrase } from './prose/phrases';
+import { koPhrase, phrase } from './prose/phrases';
 import { winDeltaText, winPercent } from './winprob';
 import { sideIndex } from '../ids';
 
@@ -17,14 +17,14 @@ import { sideIndex } from '../ids';
  * configured settings. */
 export const KEY_MOMENT_SWING = KEY_TURN_SWING;
 /** How many key moments the report keeps. */
-export const REPORT_KEY_MOMENTS = 4;
+const REPORT_KEY_MOMENTS = 4;
 /** How many misplays the report lists per player. */
-export const REPORT_MISPLAYS_PER_SIDE = 2;
+const REPORT_MISPLAYS_PER_SIDE = 2;
 /** How many paid-off reads the report lists per player. */
-export const REPORT_READS_PER_SIDE = 2;
+const REPORT_READS_PER_SIDE = 2;
 
 /** One risk whose read won value, ready for display. */
-export interface GameRead {
+interface GameRead {
   turn: number;
   side: 'p1' | 'p2';
   played: string;
@@ -32,10 +32,10 @@ export interface GameRead {
   payoff: number;
 }
 /** Below this summed regret a player's game counts as clean. */
-export const CLEAN_PLAY_TOTAL = 0.2;
+const CLEAN_PLAY_TOTAL = 0.2;
 
 /** One regretted decision, ready for display. */
-export interface GameMisplay {
+interface GameMisplay {
   turn: number;
   side: 'p1' | 'p2';
   regret: number;
@@ -272,8 +272,8 @@ function seedPhrase(analysis: TurnAnalysis, loser: Side): string {
   const setup = playedSetupMove(side) ? '; a setup move the engine may undervalue' : '';
   const better = side.bestNull?.alternative?.label ?? side.best!.label;
   const oddsBit = side.played!.koOdds ? ` (${koPhrase(side.played!.koOdds)})` : '';
-  return `turn ${analysis.turn} (${labelPhrase(side.played!.label)}${oddsBit}, ` +
-    `${winDeltaText(-(side.regret ?? 0))} — safer was ${labelPhrase(better)}${setup})`;
+  return `turn ${analysis.turn} (${phrase(side.played!.label)}${oddsBit}, ` +
+    `${winDeltaText(-(side.regret ?? 0))} — safer was ${phrase(better)}${setup})`;
 }
 
 /** The winner's story: who won, when it tipped, and the seeds of the loss (or the loser's clean play). */

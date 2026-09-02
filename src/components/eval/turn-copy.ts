@@ -20,7 +20,7 @@ export const evTitle = (name: string) =>
 export const ENGINE_EQUIVALENT_EPSILON = 0.01;
 
 /** `|cant|` reasons → honest copy: the player DID choose; this swallowed it. */
-export function preventedText(reason: string): string {
+function preventedText(reason: string): string {
   if (reason === 'faint') return 'fainted before its action came out';
   if (reason === 'slp') return 'slept through the turn: the chosen action never surfaced';
   if (reason === 'frz') return 'stayed frozen: the chosen action never surfaced';

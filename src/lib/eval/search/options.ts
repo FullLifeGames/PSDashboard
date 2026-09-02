@@ -13,14 +13,14 @@ import { sideIndex } from '../../ids';
  */
 
 /** Sub-matrix cap for candidate restriction (base moves always survive). */
-export const RESTRICT_K = 8;
+const RESTRICT_K = 8;
 
 /**
  * Combined-option cap for doubles. Unlike the singles sub-search cap this is
  * mandatory everywhere (root included): the raw slot product reaches hundreds
  * of options per side, and a full matrix over it would take minutes.
  */
-export const RESTRICT_K_DOUBLES = 16;
+const RESTRICT_K_DOUBLES = 16;
 /** Distinct move-pair cores competing on hints before gimmick variants enter. */
 const BASE_CORE_BUDGET = 12;
 /** Top cores whose Tera/Mega/Ultra variants fill the remaining slots. */

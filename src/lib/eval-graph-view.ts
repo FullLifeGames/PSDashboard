@@ -127,7 +127,7 @@ const pct = (score: number) => winPercent(score);
  * click felt like landing one node back) — the tooltip names the producer
  * and the selection glow shows the clicked turn's own movement.
  */
-export function nodeLabel(args: {
+function nodeLabel(args: {
   turn: number; score: number; blunders: Set<number>; first: number;
   decided: DecidedSignal[] | undefined; playerNames: [string, string];
 }): string {

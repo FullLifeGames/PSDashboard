@@ -15,7 +15,7 @@ export const TREND_LAMBDA = 0.5;
  * tie structurally with near-zero trends — folding noise into values would
  * churn every endgame ranking the pruned sub-search path must mirror.
  */
-export const TREND_SHIFT_FLOOR = 0.005;
+const TREND_SHIFT_FLOOR = 0.005;
 
 /**
  * The mix-weighted one-ply trend of a tied row's decisive cells (terminal

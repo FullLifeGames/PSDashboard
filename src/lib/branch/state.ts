@@ -11,7 +11,6 @@ import { targetTypeForMove } from './protocol-choices';
 import { forceSwitches } from './corrections';
 import { extractPokemonInfo, makePokemonInfo } from './pokemon-info';
 
-export { makePokemonInfo } from './pokemon-info';
 
 function makeMoves(
   active: SimPokemon | null | undefined,

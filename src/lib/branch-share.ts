@@ -1,7 +1,7 @@
 import type { BranchHistoryEntry } from './branch-history';
 import type { ReplayData } from '../types';
 
-export interface BranchShareChoice {
+interface BranchShareChoice {
   turnNumber: number;
   p1Choice: string;
   p2Choice: string;

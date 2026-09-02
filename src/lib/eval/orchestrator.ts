@@ -18,7 +18,7 @@ import { recordDeepenedCell, type DeepeningState } from './search/deepening';
  * this module to `searchPosition`'s exact behavior.
  */
 
-export type ChoicesInfo = EvalChoicesInfo;
+type ChoicesInfo = EvalChoicesInfo;
 export type CellJob = EvalCellJob;
 export type CellValue = EvalCellValue;
 export type SubSearchJob = EvalSubSearchJob;

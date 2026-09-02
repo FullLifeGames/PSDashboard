@@ -9,7 +9,7 @@ import {
   type BranchEngineModule, type BranchHistoryEntry, type BranchRefs, type BranchSetters, type BattleStream, type SideId,
 } from './shared';
 
-export interface StartBranchOptions {
+interface StartBranchOptions {
   replayHistory?: BranchHistoryEntry[];
   p1Choices?: (BranchSlotChoice | null)[];
   p2Choices?: (BranchSlotChoice | null)[];

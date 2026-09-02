@@ -14,7 +14,7 @@ import { BASELINE_PINNED, FEEDBACK_REPLAYS, type FeedbackItem, type ReportClaim,
  * a replay could not be graded at all (wedged sweep, empty extraction), so
  * the report carries the breakage instead of silently omitting the items.
  */
-export type ClaimStatus = 'ok' | 'drift' | 'gap-open' | 'gap-moved' | 'pending' | 'error';
+type ClaimStatus = 'ok' | 'drift' | 'gap-open' | 'gap-moved' | 'pending' | 'error';
 
 export interface ClaimResult {
   item: FeedbackItem;
@@ -23,7 +23,7 @@ export interface ClaimResult {
   details: string[];
 }
 
-export function isReportClaim(claim: TurnClaim | ReportClaim): claim is ReportClaim {
+function isReportClaim(claim: TurnClaim | ReportClaim): claim is ReportClaim {
   return 'keyMoments' in claim;
 }
 

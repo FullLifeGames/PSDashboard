@@ -124,18 +124,6 @@ export function calcSingleDamageRange(
   }
 }
 
-/**
- * Calculate damage ranges for all available moves of an attacker against a defender.
- */
-export function calcDamageRanges(
-  attacker: SimPokemonInfo,
-  defender: SimPokemonInfo,
-  moves: BranchMoveOption[],
-  context: DamageCalcContext = {},
-): DamageResult[] {
-  return moves.map(move => calcSingleDamageRange(attacker, defender, move, context));
-}
-
 function emptyDamageResult(moveName: string): DamageResult {
   return {
     moveName,

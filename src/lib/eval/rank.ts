@@ -7,9 +7,8 @@
  */
 
 export { cellKey, reblendValue, TOP_EXPANSION } from './ranking/matrix';
-export type { PvStep, Ranked, RankOption, ValueMatrix } from './ranking/matrix';
-export { EQUILIBRIUM_ITERATIONS, solveMatrixGame } from './ranking/solve';
-export type { MatrixSolution } from './ranking/solve';
+export type { PvStep, Ranked, ValueMatrix } from './ranking/matrix';
+export { solveMatrixGame } from './ranking/solve';
 export { attachLines, rankFromMatrix, selectExpansionCells, toResult } from './ranking/order';
 export { coreOf, GIMMICK_TOKENS, selectTieProbeCells, TIE_EPSILON, TREND_MARGIN } from './ranking/ties';
-export { applyTrendExtrapolation, applyTrendTiebreak, TREND_LAMBDA, TREND_SHIFT_FLOOR } from './ranking/trend';
+export { applyTrendExtrapolation, applyTrendTiebreak, TREND_LAMBDA } from './ranking/trend';

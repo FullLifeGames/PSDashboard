@@ -8,7 +8,7 @@ import { resolveAutoTurnSettings, serializedFaintedFraction, type EngineMode, ty
 
 export type EvalStatus = 'idle' | 'reconstructing' | 'searching' | 'done' | 'stale' | 'error';
 
-export interface EvaluateParams {
+interface EvaluateParams {
   /** Cache key for replay-view positions; null disables caching (branch mode). */
   cacheKey: string | null;
   /** Resolved Tera allowance (the panel pref resolved against the replay). */

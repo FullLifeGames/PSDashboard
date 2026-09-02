@@ -3,7 +3,7 @@
  * the value matrix. Pure, deterministic.
  */
 
-export const EQUILIBRIUM_ITERATIONS = 4000;
+const EQUILIBRIUM_ITERATIONS = 4000;
 
 export interface MatrixSolution {
   /** Solved value of the zero-sum game (p1 perspective). */

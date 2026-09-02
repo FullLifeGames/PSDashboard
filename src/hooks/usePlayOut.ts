@@ -9,7 +9,7 @@ import type { LeadSelection } from './useDeviation';
 type Branch = ReturnType<typeof useBranch>;
 type Evaluation = ReturnType<typeof useEvaluation>;
 
-export interface PlayOutState {
+interface PlayOutState {
   active: boolean;
   executed: number;
   turns: number;

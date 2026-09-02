@@ -12,14 +12,14 @@ import type { MatchupCache } from './score/threat';
 
 export { DOUBLES_FEATURE_WEIGHTS, EVAL_WEIGHTS, FEATURE_WEIGHTS, featureWeights } from './score/weights';
 export type { EvalFeatures } from './score/weights';
-export { hazardCost, hazardEntryFraction, hazardRemovalEquity, strandedMons } from './score/hazards';
+export { hazardCost, hazardRemovalEquity, strandedMons } from './score/hazards';
 export { boostedFraction, createMatchupCache, pairThreat, singleMoveFraction } from './score/threat';
-export type { MatchupCache, PairThreat } from './score/threat';
+export type { MatchupCache } from './score/threat';
 export { raceClocks } from './score/races';
-export type { RaceClocks, RaceSide } from './score/races';
+export type { RaceSide } from './score/races';
 export { matchupTerms } from './score/matchup';
 export { evalFeatures } from './score/features';
-export { DECIDED_MAX_TURNS, NEAR_DECIDED_ODDS, unansweredMons } from './score/unanswered';
+export { unansweredMons } from './score/unanswered';
 
 /** Static positional eval from p1's perspective in [-1, +1]; ±1 for ended battles. */
 export function evaluatePosition(battle: Battle, cache?: MatchupCache): number {

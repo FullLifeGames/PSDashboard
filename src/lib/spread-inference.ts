@@ -7,7 +7,6 @@ import {
   type SolveContext,
 } from './spreads/fit';
 
-export type { EvBudget } from './spreads/ev-budget';
 export { evBudget, legalizeEvs } from './spreads/ev-budget';
 export type { SpreadCandidate } from './spreads/ladder';
 

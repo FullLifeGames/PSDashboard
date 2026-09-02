@@ -288,7 +288,7 @@ export interface SackInfo {
 }
 
 /** Below this pre-turn HP fraction a faint reads as a sacrifice, not a loss. */
-export const SACK_HP_THRESHOLD = 0.15;
+const SACK_HP_THRESHOLD = 0.15;
 
 /**
  * The protocol lines strictly between `|turn|N` and `|turn|N+1` (or the log

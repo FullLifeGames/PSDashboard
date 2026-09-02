@@ -13,7 +13,7 @@ import type { CachedEval } from './single-eval';
 import type { GraphSweepParams, SweepData, SweepEnv, SweepSettings } from './sweep-types';
 import { sweepTurns } from './sweep-core';
 
-export type { GraphSweepParams, SweepSettings } from './sweep-types';
+export type { GraphSweepParams } from './sweep-types';
 
 /**
  * Why the game line is short, worded by shape. The counts describe the

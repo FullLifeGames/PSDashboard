@@ -29,15 +29,15 @@ export const MCTS_TREES = 4;
  * through its whole subtree). Suspect cells get re-priced by the matrix
  * mode's multi-seed cell sampler before the verdict stands.
  */
-export const VERIFY_MIN_VISITS = 8;
+const VERIFY_MIN_VISITS = 8;
 /** Minimum independent chance samples (trees that expanded the cell). */
-export const VERIFY_MIN_TREES = 3;
+const VERIFY_MIN_TREES = 3;
 /** Per-tree mean spread beyond which a cell's transition is chance-suspect. */
 const VERIFY_SPREAD = 0.15;
 /** Fixed seeds per verified cell — matrix-zone grade, deterministic. */
 export const VERIFY_SAMPLES = 3;
 /** Verification budget: at most this many cell jobs per search. */
-export const VERIFY_CELL_CAP = 12;
+const VERIFY_CELL_CAP = 12;
 /** Mix weight from which an option counts as equilibrium support. */
 const SUPPORT_MIX = 0.05;
 

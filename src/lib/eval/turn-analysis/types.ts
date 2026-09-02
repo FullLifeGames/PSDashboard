@@ -307,7 +307,7 @@ export const decidedSeenKey = (side: 'p1' | 'p2', signal: { species: string; rem
   signal.removes ? `${side}:${signal.species}:near:${signal.removes}` : `${side}:${signal.species}:decided`;
 
 /** Deep re-search of the played and best pairs (p1-perspective outcomes). */
-export interface VerifiedOutcomes {
+interface VerifiedOutcomes {
   playedDeep: number;
   bestDeep: number;
 }

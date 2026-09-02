@@ -16,7 +16,7 @@ export interface LeadSelection { p1: string[]; p2: string[]; bring?: boolean }
 export type DeviationTimeline = Pick<Timeline,
   'viewTurnRef' | 'viewLine' | 'endSnapshotTurn' | 'variationSpan' | 'setVariationScores'
   | 'setViewTurn' | 'setViewLine' | 'liveTip'>;
-export type DeviationBranch = Pick<Branch, 'startBranch' | 'getBattle' | 'executeTurn' | 'setChoice' | 'history'>;
+type DeviationBranch = Pick<Branch, 'startBranch' | 'getBattle' | 'executeTurn' | 'setChoice' | 'history'>;
 
 export interface DeviationInputs {
   replayData: ReplayData | null;
