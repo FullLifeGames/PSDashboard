@@ -1,13 +1,14 @@
 import type { PokemonSet } from '@pkmn/sim';
-import { Dex, Teams } from '@pkmn/sim';
+import { Teams } from '@pkmn/sim';
 import { inferOpponentTeam } from './opponent-inferrer';
 import { getSpeciesUsageSet, type SmogonUsageStats } from './smogon-stats';
 import { getSpeciesSetAssumption, type SmogonSetAssumptions } from './smogon-sets';
-import { applyCoherenceVetoes, selectCuratedSet, type MoveCandidate } from './set-coherence';
-import { itemSetValue } from './team-info';
 import { evBudget, inferSpreads, legalizeEvs, type SpreadCandidate } from './spread-inference';
 import { withHiddenPowerType } from './hidden-power';
-import type { DamageObservation, HiddenPowerEvidence, KnowledgeSource, OpponentTeamInfo, PokemonEvs, RevealedPokemonInfo, SpeedOrderObservation } from '../types';
+import {
+  assembleMoves, buildSheetSet, editedFields, findUserMatch, resolveAbility, resolveItem, resolveSpread, selectCuratedFor,
+} from './team/set-resolvers';
+import type { DamageObservation, HiddenPowerEvidence, OpponentTeamInfo, RevealedPokemonInfo, SpeedOrderObservation } from '../types';
 
 function toId(name: string): string {
   return name.toLowerCase().replace(/[^a-z0-9]/g, '');
@@ -112,122 +113,31 @@ function buildSet(
   setAssumptions?: SmogonSetAssumptions | null,
   inferred?: SpreadCandidate,
 ): PokemonSet {
-  const editedEvs = info.evs?.source === 'manual' || info.evs?.source === 'revealed'
-    ? sanitizeEvs(info.evs.value)
-    : null;
-  const editedNature = (info.nature?.source === 'manual' || info.nature?.source === 'revealed') && info.nature.value
-    ? (info.nature.value as PokemonSet['nature'])
-    : null;
-  const editedIvs = info.ivs?.source === 'manual' || info.ivs?.source === 'revealed'
-    ? info.ivs.value
-    : null;
-  // Only knowledge that outranks a team sheet: seen in game or user-edited.
-  // Enriched infos carry usage GUESSES in value — a 58% Leftovers guess must
-  // never beat a sheet's Choice Scarf.
-  const known = (field: { value: string; source: KnowledgeSource }) =>
-    field.source === 'revealed' || field.source === 'manual' ? field.value : '';
-  const userMatch = userTeam?.find(candidate => {
-    const candidateId = toId(candidate.species);
-    const infoId = toId(info.species);
-    return candidateId === infoId ||
-      toId(candidate.name || '') === infoId ||
-      candidateId === toId(info.species.split('-')[0]) ||
-      infoId === toId(candidate.species.split('-')[0]);
-  });
-
+  const edited = editedFields(info);
+  const userMatch = findUserMatch(userTeam, info.species);
   const usageSet = getSpeciesUsageSet(usageStats, info.species, info.ruledOut, USAGE_MOVE_POOL);
   const smogonSet = getSpeciesSetAssumption(setAssumptions, info.species);
-  const allowed = (value: string | undefined, ruledOut?: string[]) =>
-    value && !(ruledOut ?? []).includes(toId(value)) ? value : '';
 
-  if (userMatch) {
-    // A full team sheet normally defines the moveset — but a manual edit
-    // (team editor, sets import, hypothetical move) must beat the sheet, or
-    // "load Draco Meteor on Kyurem" silently vanishes on sheet replays.
-    const hasManualMoves = info.moves.some(move => move.source === 'manual');
-    const infoMoveNames = info.moves.map(move => move.name);
-    const moves = hasManualMoves
-      ? mergeMoveLists(userMatch.moves, infoMoveNames)
-      : mergeMoveLists(infoMoveNames, userMatch.moves);
-    // Open Team Sheets omit EVs/nature — fall back to usage spreads instead of
-    // simulating an all-zero spread (B3/B6).
-    const fallbackSpread = usageSet?.spread || smogonSet?.spread || null;
-    const matchEvs = hasNonZeroEvs(userMatch.evs) ? userMatch.evs : fallbackSpread?.evs || userMatch.evs;
-    return {
-      ...userMatch,
-      moves: moves.length > 0 ? moves : userMatch.moves,
-      ability: known(info.ability) || userMatch.ability,
-      item: cleanItem(known(info.item), userMatch.item),
-      teraType: known(info.teraType) || userMatch.teraType,
-      nature: (editedNature || userMatch.nature || fallbackSpread?.nature || 'Hardy') as PokemonSet['nature'],
-      evs: editedEvs || matchEvs,
-      ivs: editedIvs || userMatch.ivs,
-      level: info.level || userMatch.level || 100,
-      gender: (info.gender || userMatch.gender || '') as '' | 'M' | 'F',
-    };
-  }
-  // Coherent-set selection: score every published set against the revealed
-  // evidence — a winning curated set fills the unrevealed slots as one
-  // internally coherent unit instead of independent marginals.
-  const curated = smogonSet ? selectCuratedSet([smogonSet, ...(smogonSet.alternatives ?? [])], {
-    revealedMoves: info.moves
-      .filter(move => move.source === 'revealed' || move.source === 'manual')
-      .map(move => toId(move.name)),
-    revealedItem: toId(known(info.item)),
-    revealedAbility: toId(known(info.ability)),
-    ruledOutItems: info.ruledOut?.items ?? [],
-    ruledOutAbilities: info.ruledOut?.abilities ?? [],
-    usageProbability: moveId =>
-      usageSet?.moves.find(move => toId(move.value) === moveId)?.probability ?? 0,
-  }) : null;
+  if (userMatch) return buildSheetSet(info, userMatch, edited, usageSet, smogonSet);
 
-  const curatedItem = curated ? allowed(curated.item?.value, info.ruledOut?.items) : '';
-  const item = cleanItem(known(info.item), curatedItem) ||
-    cleanItem(info.item.value, usageSet?.item?.value || allowed(smogonSet?.item?.value, info.ruledOut?.items));
-  // Move assembly: revealed/manual knowledge first (immune to vetoes), then
-  // the winning curated set's moves, then usage fills. Coherence vetoes drop
-  // jointly implausible fills, and the deeper usage pool refills the slots.
-  const pool: MoveCandidate[] = info.moves.map(move => ({
-    name: move.name,
-    guessed: move.source !== 'revealed' && move.source !== 'manual',
-  }));
-  const pooled = new Set(pool.map(candidate => toId(candidate.name)));
-  for (const fill of [
-    ...(curated?.moves ?? []),
-    ...(usageSet?.moves ?? []),
-    ...(curated ? [] : (smogonSet?.moves ?? [])),
-  ]) {
-    if (pooled.has(toId(fill.value))) continue;
-    pooled.add(toId(fill.value));
-    pool.push({ name: fill.value, guessed: true });
-  }
-  const moves = applyCoherenceVetoes(pool, { itemId: toId(item) })
-    .slice(0, 4)
-    .map(candidate => candidate.name);
-  const spread = usageSet?.spread;
-  const setSpread = smogonSet?.spread;
-  const curatedAbility = curated ? allowed(curated.ability?.value, info.ruledOut?.abilities) : '';
+  const curated = selectCuratedFor(info, smogonSet, usageSet);
+  const item = resolveItem(info, curated, usageSet, smogonSet);
+  const moves = assembleMoves(info, curated, usageSet, smogonSet, item);
+  const spread = resolveSpread(info.species, edited, inferred, curated, usageSet, smogonSet);
 
   return {
     name: info.species,
     species: info.species,
     item,
-    ability: known(info.ability) || curatedAbility || info.ability.value ||
-      usageSet?.ability?.value || allowed(smogonSet?.ability?.value, info.ruledOut?.abilities) ||
-      defaultAbility(info.species, info.ruledOut?.abilities),
+    ability: resolveAbility(info, curated, usageSet, smogonSet),
     moves: moves.length > 0 ? moves : ['Tackle'],
-    // Damage-consistent spreads beat usage guesses, never edited/revealed EVs.
-    nature: (editedNature || inferred?.nature || curated?.spread?.nature || spread?.nature || setSpread?.nature || 'Hardy') as PokemonSet['nature'],
-    evs: editedEvs || inferred?.evs || curated?.spread?.evs || spread?.evs || setSpread?.evs || defaultEvsFor(info.species),
-    ivs: editedIvs || { hp: 31, atk: 31, def: 31, spa: 31, spd: 31, spe: 31 },
+    nature: spread.nature,
+    evs: spread.evs,
+    ivs: spread.ivs,
     level: info.level || 100,
     gender: (info.gender || '') as '' | 'M' | 'F',
     teraType: info.teraType.value || undefined,
   };
-}
-
-function hasNonZeroEvs(evs: PokemonSet['evs'] | undefined): boolean {
-  return !!evs && Object.values(evs).some(value => (value ?? 0) > 0);
 }
 
 /**
@@ -238,74 +148,6 @@ function hasNonZeroEvs(evs: PokemonSet['evs'] | undefined): boolean {
 function withHappinessAssumption(set: PokemonSet): PokemonSet {
   if (set.happiness !== undefined) return set;
   return set.moves.some(move => toId(move) === 'frustration') ? { ...set, happiness: 0 } : set;
-}
-
-/**
- * Species-shaped last-resort spread (no usage data, no inference, no sets):
- * max the HIGHER base offense, plus Speed on fast species and HP otherwise.
- * The old flat 252 HP / 252 Atk default put physical EVs on special
- * attackers and left base-123-Speed Noivern outsped by everything (GPL).
- */
-function defaultEvsFor(species: string): PokemonSet['evs'] {
-  const data = Dex.species.get(species);
-  const stats = data.exists ? data.baseStats : null;
-  const offense: 'atk' | 'spa' = stats && stats.spa > stats.atk ? 'spa' : 'atk';
-  const secondary: 'spe' | 'hp' = stats && stats.spe >= 80 ? 'spe' : 'hp';
-  const evs = { hp: 0, atk: 0, def: 0, spa: 0, spd: 4, spe: 0 };
-  evs[offense] = 252;
-  evs[secondary] = 252;
-  return evs;
-}
-
-function sanitizeEv(value: number | undefined): number {
-  if (!Number.isFinite(value)) return 0;
-  return Math.min(252, Math.max(0, Math.round(value ?? 0)));
-}
-
-function sanitizeEvs(evs: PokemonEvs): PokemonEvs {
-  return {
-    hp: sanitizeEv(evs.hp),
-    atk: sanitizeEv(evs.atk),
-    def: sanitizeEv(evs.def),
-    spa: sanitizeEv(evs.spa),
-    spd: sanitizeEv(evs.spd),
-    spe: sanitizeEv(evs.spe),
-  };
-}
-
-function cleanItem(replayItem: string, fallback: string): string {
-  return itemSetValue(replayItem) || fallback;
-}
-
-/**
- * A packed set with an empty ability gives the sim Pokémon NO ability at all
- * (custom games skip team validation) — the GPL reconstruction's Uxie died to
- * an Earthquake it should have been immune to. Slot 0 is Showdown's own
- * teambuilder default when nothing better is known; protocol rule-outs walk
- * to the next slot (a Bronzong that took an Earthquake is not Levitate).
- */
-function defaultAbility(species: string, ruledOut?: string[]): string {
-  const abilities = (Dex.species.get(species).abilities ?? {}) as unknown as Record<string, string | undefined>;
-  for (const slot of ['0', '1', 'H'] as const) {
-    const ability = abilities[slot];
-    if (ability && !(ruledOut ?? []).includes(toId(ability))) return ability;
-  }
-  // Every slot ruled out (single-ability species with contradictory evidence,
-  // e.g. a video log's mis-read): keep slot 0 — a wrong ability beats none.
-  return abilities['0'] || '';
-}
-
-/** `primary` defines the set; `fill` only tops it up to four moves. */
-function mergeMoveLists(fill: string[], primary: string[]): string[] {
-  const result = [...primary];
-  for (const move of fill) {
-    if (!result.some(existing => toId(existing) === toId(move))) {
-      if (result.length < 4) {
-        result.push(move);
-      }
-    }
-  }
-  return result.slice(0, 4);
 }
 
 /** Public: the open-team-sheet sets both players posted, if any. */
