@@ -277,117 +277,6 @@ export const ratchetOverrides = [
   },
   {
     "files": [
-      "src/lib/eval/cell-blend.ts"
-    ],
-    "rules": {
-      "complexity": [
-        "error",
-        33
-      ]
-    }
-  },
-  {
-    "files": [
-      "src/lib/eval/forward-model.ts"
-    ],
-    "rules": {
-      "max-lines": [
-        "error",
-        {
-          "max": 450,
-          "skipBlankLines": true,
-          "skipComments": true
-        }
-      ],
-      "max-lines-per-function": [
-        "error",
-        {
-          "max": 90,
-          "skipBlankLines": true,
-          "skipComments": true,
-          "IIFEs": true
-        }
-      ],
-      "complexity": [
-        "error",
-        56
-      ]
-    }
-  },
-  {
-    "files": [
-      "src/lib/eval/ko-odds.ts"
-    ],
-    "rules": {
-      "complexity": [
-        "error",
-        40
-      ]
-    }
-  },
-  {
-    "files": [
-      "src/lib/eval/null-moves.ts"
-    ],
-    "rules": {
-      "complexity": [
-        "error",
-        33
-      ]
-    }
-  },
-  {
-    "files": [
-      "src/lib/eval/opponent-model.ts"
-    ],
-    "rules": {
-      "complexity": [
-        "error",
-        18
-      ]
-    }
-  },
-  {
-    "files": [
-      "src/lib/eval/played.ts"
-    ],
-    "rules": {
-      "complexity": [
-        "error",
-        38
-      ]
-    }
-  },
-  {
-    "files": [
-      "src/lib/eval/rank.ts"
-    ],
-    "rules": {
-      "max-lines": [
-        "error",
-        {
-          "max": 390,
-          "skipBlankLines": true,
-          "skipComments": true
-        }
-      ],
-      "max-lines-per-function": [
-        "error",
-        {
-          "max": 80,
-          "skipBlankLines": true,
-          "skipComments": true,
-          "IIFEs": true
-        }
-      ],
-      "complexity": [
-        "error",
-        26
-      ]
-    }
-  },
-  {
-    "files": [
       "src/lib/eval/report.ts"
     ],
     "rules": {
@@ -408,28 +297,6 @@ export const ratchetOverrides = [
   },
   {
     "files": [
-      "src/lib/eval/speed.ts"
-    ],
-    "rules": {
-      "complexity": [
-        "error",
-        24
-      ]
-    }
-  },
-  {
-    "files": [
-      "src/lib/eval/streaks.ts"
-    ],
-    "rules": {
-      "complexity": [
-        "error",
-        34
-      ]
-    }
-  },
-  {
-    "files": [
       "src/lib/eval/summary.ts"
     ],
     "rules": {
@@ -445,17 +312,6 @@ export const ratchetOverrides = [
       "complexity": [
         "error",
         54
-      ]
-    }
-  },
-  {
-    "files": [
-      "src/lib/eval/tera.ts"
-    ],
-    "rules": {
-      "complexity": [
-        "error",
-        16
       ]
     }
   }
