@@ -1,7 +1,10 @@
 import { useLayoutEffect, useRef, useState } from 'react';
-import { computeBlunders } from '../lib/eval/graph';
-import { winPercent } from '../lib/eval/winprob';
 import type { LeadAnalysis } from '../lib/eval/leads';
+import {
+  decidedSpans, graphBlunders, graphScales, GRAPH_HEIGHT as HEIGHT, GRAPH_PAD_X as PAD_X, highlightEdge, hitTitle,
+  lastVariationTurnOf, leadTooltip, mainLinePaths, ringScore, variationHitTitle, variationOverlay,
+  type DecidedSignal, type DecidedSpan, type GapLink, type GraphScales, type VariationPoint, type VariationSeries,
+} from '../lib/eval-graph-view';
 
 interface EvalGraphProps {
   /** scores[t-1] = score at turn t (p1 perspective, [-1,1]); null = gap. */
@@ -17,7 +20,7 @@ interface EvalGraphProps {
    * filled only for played variation positions. Gaps stay gaps — no
    * invented values.
    */
-  variation?: { startTurn: number; scores: (number | null)[] } | null;
+  variation?: VariationSeries | null;
   /** Turn 0 (team preview) game value — adds a leads point before turn 1. */
   leadScore?: number | null;
   /** Best and played lead per side — the T0 diamond's tooltip names them. */
@@ -30,7 +33,7 @@ interface EvalGraphProps {
    * edge (top = p1, bottom = p2) plus a node-label note — the calibrated
    * line itself stays honest.
    */
-  decided?: ({ side: 'p1' | 'p2'; species: string } | null)[];
+  decided?: DecidedSignal[];
   /**
    * Full main-line length. Keeps the x-domain honest when nothing has been
    * analyzed yet — without it a lone variation collapsed the axis to its own
@@ -39,22 +42,18 @@ interface EvalGraphProps {
   maxTurn?: number;
 }
 
-const HEIGHT = 72;
-const PAD_X = 6;
 const MAIN_COLOR = '#7cb7e8';
 const VARIATION_COLOR = '#f0c76b';
 
+type SelectTurn = EvalGraphProps['onSelectTurn'];
+
 /**
- * Chess-style evaluation line over the whole game. Single series (no legend
- * needed); point color carries the polarity via the app's player colors;
- * blunder markers add a shape ring plus tooltip text, never color alone.
- *
  * The viewBox tracks the rendered width 1:1 (ResizeObserver) — a fixed
  * viewBox stretched with preserveAspectRatio="none" turned every circle
  * into a viewport-dependent ellipse (fills scale even where strokes are
  * protected), so markers looked different on desktop and mobile.
  */
-export function EvalGraph({ scores, playerNames, currentTurn, currentLine, onSelectTurn, leadScore, leadDetail, evalErrors, decided, variation, maxTurn }: EvalGraphProps) {
+function useMeasuredWidth() {
   const svgRef = useRef<SVGSVGElement>(null);
   const [width, setWidth] = useState(300);
   useLayoutEffect(() => {
@@ -67,150 +66,45 @@ export function EvalGraph({ scores, playerNames, currentTurn, currentLine, onSel
     observer.observe(svg);
     return () => observer.disconnect();
   }, []);
+  return { svgRef, width };
+}
 
-  const turns = scores.length;
-  // The x-domain stretches past the replay when the variation is longer.
-  const lastVariationTurn = variation
-    ? variation.scores.reduce<number>((max, value, index) => (value !== null ? index + 1 : max), 0)
-    : 0;
-  const lastTurn = Math.max(turns, lastVariationTurn, maxTurn ?? 0);
-  if (lastTurn === 0) return null;
-
-  // With a lead evaluation the x-domain starts at turn 0 (team preview).
-  const hasLead = leadScore !== null && leadScore !== undefined;
-  const first = hasLead ? 0 : 1;
-  const x = (turn: number) => lastTurn === first
-    ? width / 2
-    : PAD_X + ((turn - first) / (lastTurn - first)) * (width - 2 * PAD_X);
-  const y = (score: number) => HEIGHT / 2 - score * (HEIGHT / 2 - 7);
-
-  // Consecutive non-null runs become path segments; gaps get a faint dashed
-  // connector so an isolated final point (late-game reconstruction gaps end
-  // in the decided ±1 position) reads as the line's ending, not debris.
-  const segments: string[] = [];
-  const gapLinks: { x1: number; y1: number; x2: number; y2: number }[] = [];
-  let current: string[] = [];
-  let previousPoint: { x: number; y: number } | null = null;
-  let inGap = false;
-  scores.forEach((score, index) => {
-    if (score === null) {
-      if (current.length > 1) segments.push(`M ${current.join(' L ')}`);
-      current = [];
-      inGap = previousPoint !== null;
-      return;
-    }
-    const px = x(index + 1);
-    const py = y(score);
-    if (inGap && previousPoint) {
-      gapLinks.push({ x1: previousPoint.x, y1: previousPoint.y, x2: px, y2: py });
-      inGap = false;
-    }
-    current.push(`${px.toFixed(1)},${py.toFixed(1)}`);
-    previousPoint = { x: px, y: py };
-  });
-  if (current.length > 1) segments.push(`M ${current.join(' L ')}`);
-
-  const blunders = new Set(computeBlunders(scores));
-  const hitWidth = (width - 2 * PAD_X) / Math.max(lastTurn - first, 1);
-
-  // Variation overlay: anchored at the branch point's main value; points
-  // are only the ACTUALLY evaluated variation positions.
-  const variationPoints: { turn: number; px: number; py: number; score: number }[] = [];
-  let variationPath = '';
-  if (variation) {
-    const anchorScore = scores[variation.startTurn - 1];
-    const coords: string[] = anchorScore !== null && anchorScore !== undefined
-      ? [`${x(variation.startTurn).toFixed(1)},${y(anchorScore).toFixed(1)}`]
-      : [];
-    variation.scores.forEach((score, index) => {
-      const turn = index + 1;
-      if (score === null || score === undefined || turn <= variation.startTurn) return;
-      const px = x(turn);
-      const py = y(score);
-      coords.push(`${px.toFixed(1)},${py.toFixed(1)}`);
-      variationPoints.push({ turn, px, py, score });
-    });
-    if (coords.length > 1) variationPath = `M ${coords.join(' L ')}`;
-  }
-  const variationEnd = variationPoints.length > 0
-    ? variationPoints[variationPoints.length - 1].turn
-    : (variation ? variation.startTurn + 1 : 0);
-
-  // Round 15: consecutive decided turns of the same side become one thin
-  // strip along that side's edge; a lone decided turn draws as a dot (round
-  // linecap). The calibrated line itself is never bent.
-  const decidedSpans: { x1: number; x2: number; side: 'p1' | 'p2'; species: string }[] = [];
-  if (decided) {
-    let run: { start: number; end: number; side: 'p1' | 'p2'; species: string } | null = null;
-    const flush = () => {
-      if (run) decidedSpans.push({ x1: x(run.start), x2: x(run.end), side: run.side, species: run.species });
-      run = null;
-    };
-    decided.forEach((signal, index) => {
-      const turn = index + 1;
-      if (!signal || scores[index] === null) { flush(); return; }
-      if (run && run.side === signal.side) { run.end = turn; return; }
-      flush();
-      run = { start: turn, end: turn, side: signal.side, species: signal.species };
-    });
-    flush();
-  }
-
-  const pct = (score: number) => winPercent(score);
-  // A node IS the estimate before its turn; the movement INTO it was the
-  // previous turn's doing. Clicks stay on the node's own turn (a shifted
-  // click felt like landing one node back) — the tooltip names the producer
-  // and the selection glow shows the clicked turn's own movement.
-  const label = (turn: number, score: number) => {
-    const swing = blunders.has(turn) ? ' · blunder swing' : '';
-    const producer = turn - 1 >= first ? (turn - 1 === 0 ? 'the lead decision' : `turn ${turn - 1}`) : null;
-    const arrival = producer ? ` (what ${producer} produced)` : '';
-    const state = decided?.[turn - 1];
-    const decidedNote = state ? ` · practically decided: ${state.species}` : '';
-    return `Before turn ${turn}${arrival}: ${playerNames[0]} ${pct(score)}% · ${playerNames[1]} ${100 - pct(score)}%${swing}${decidedNote}`;
-  };
-
-  // The selected turn's movement: its node → the next node (what that play
-  // produced), drawn as a thicker glow under the line.
-  const edgeFrom = currentTurn >= 1 ? scores[currentTurn - 1] : (hasLead ? leadScore! : null);
-  const edgeTo = currentTurn >= 0 && currentTurn < turns ? scores[currentTurn] : null;
-  const highlight = edgeFrom !== null && edgeFrom !== undefined && edgeTo !== null && currentTurn >= first
-    ? { x1: x(currentTurn), y1: y(edgeFrom), x2: x(currentTurn + 1), y2: y(edgeTo) }
-    : null;
-
+/* Mockup look: inset dark panel, emphasized zero line, faint ±0.5 grid. */
+function GraphFrame({ width, y }: { width: number; y: GraphScales['y'] }) {
   return (
-    <svg
-      ref={svgRef}
-      className="ps-eval-graph"
-      viewBox={`0 0 ${width} ${HEIGHT}`}
-      role="img"
-      aria-label={`Evaluation over ${turns} turns for ${playerNames[0]} vs ${playerNames[1]}`}
-    >
-      {/* Mockup look: inset dark panel, emphasized zero line, faint ±0.5 grid. */}
+    <>
       <rect x={0.5} y={0.5} width={Math.max(width - 1, 1)} height={HEIGHT - 1} rx={6}
         fill="rgba(0,0,0,0.18)" stroke="rgba(183,216,255,0.16)" />
       <line x1={PAD_X} y1={y(0.5)} x2={width - PAD_X} y2={y(0.5)} stroke="rgba(183,216,255,0.08)" />
       <line x1={PAD_X} y1={y(-0.5)} x2={width - PAD_X} y2={y(-0.5)} stroke="rgba(183,216,255,0.08)" />
       <line x1={PAD_X} y1={HEIGHT / 2} x2={width - PAD_X} y2={HEIGHT / 2} stroke="rgba(183,216,255,0.22)" />
-      {variation && (() => {
-        // A turn-0 variation (lead branch) starts left of the axis — its
-        // marker clamps to the first plotted turn.
-        const markerTurn = Math.max(variation.startTurn, first);
-        return (
-          <>
-            <rect
-              x={x(markerTurn)} y={2}
-              width={Math.max(2, x(Math.max(variationEnd, markerTurn + 1)) - x(markerTurn))}
-              height={HEIGHT - 4} fill="rgba(240,199,107,0.07)"
-            />
-            <line
-              x1={x(markerTurn)} x2={x(markerTurn)} y1={2} y2={HEIGHT - 2}
-              stroke="rgba(240,199,107,0.5)" strokeDasharray="3 3"
-            />
-          </>
-        );
-      })()}
-      {decidedSpans.map(span => (
+    </>
+  );
+}
+
+/* A turn-0 variation (lead branch) starts left of the axis — its
+   marker clamps to the first plotted turn. */
+function VariationBand({ variation, first, variationEnd, x }: { variation: VariationSeries; first: number; variationEnd: number; x: GraphScales['x'] }) {
+  const markerTurn = Math.max(variation.startTurn, first);
+  return (
+    <>
+      <rect
+        x={x(markerTurn)} y={2}
+        width={Math.max(2, x(Math.max(variationEnd, markerTurn + 1)) - x(markerTurn))}
+        height={HEIGHT - 4} fill="rgba(240,199,107,0.07)"
+      />
+      <line
+        x1={x(markerTurn)} x2={x(markerTurn)} y1={2} y2={HEIGHT - 2}
+        stroke="rgba(240,199,107,0.5)" strokeDasharray="3 3"
+      />
+    </>
+  );
+}
+
+function DecidedStrips({ spans }: { spans: DecidedSpan[] }) {
+  return (
+    <>
+      {spans.map(span => (
         <line
           key={`d${span.x1}-${span.x2}-${span.side}`}
           x1={span.x1} x2={span.x2}
@@ -221,15 +115,13 @@ export function EvalGraph({ scores, playerNames, currentTurn, currentLine, onSel
           <title>practically decided: {span.species}</title>
         </line>
       ))}
-      {currentTurn >= 1 && currentTurn <= lastTurn && (
-        <line x1={x(currentTurn)} y1={2} x2={x(currentTurn)} y2={HEIGHT - 2} stroke="#8cf" strokeOpacity={0.3} />
-      )}
-      {highlight && (
-        <line
-          x1={highlight.x1} y1={highlight.y1} x2={highlight.x2} y2={highlight.y2}
-          stroke="#8cf" strokeOpacity={0.55} strokeWidth={3.5} strokeLinecap="round"
-        />
-      )}
+    </>
+  );
+}
+
+function MainLine({ segments, gapLinks }: { segments: string[]; gapLinks: GapLink[] }) {
+  return (
+    <>
       {segments.map(d => (
         <path key={d} d={d} fill="none" stroke={MAIN_COLOR} strokeWidth={1.6} strokeLinejoin="round" />
       ))}
@@ -240,55 +132,60 @@ export function EvalGraph({ scores, playerNames, currentTurn, currentLine, onSel
           stroke={MAIN_COLOR} strokeOpacity={0.35} strokeDasharray="3 2"
         />
       ))}
-      {variationPath && (
-        <path d={variationPath} fill="none" stroke={VARIATION_COLOR} strokeWidth={1.8} strokeLinejoin="round" />
+    </>
+  );
+}
+
+function VariationLine({ path, points }: { path: string; points: VariationPoint[] }) {
+  return (
+    <>
+      {path && (
+        <path d={path} fill="none" stroke={VARIATION_COLOR} strokeWidth={1.8} strokeLinejoin="round" />
       )}
-      {variationPoints.map(point => (
+      {points.map(point => (
         <circle key={`v${point.turn}`} cx={point.px} cy={point.py} r={2.2} fill={VARIATION_COLOR} />
       ))}
-      {hasLead && (
-        <>
-          {scores[0] !== null && (
-            <line
-              x1={x(0)} y1={y(leadScore!)} x2={x(1)} y2={y(scores[0])}
-              stroke="#cde" strokeOpacity={0.5} strokeDasharray="3 2"
-            />
-          )}
-          {/* Diamond, not circle — the lead decision is a different kind of
-              point, drawn larger so it reads as its own clickable stop. */}
-          <rect
-            x={x(0) - 3.4} y={y(leadScore!) - 3.4} width={6.8} height={6.8}
-            transform={`rotate(45 ${x(0)} ${y(leadScore!)})`}
-            fill={leadScore! >= 0 ? '#8ac' : '#c8a'}
-            stroke="#cde" strokeWidth={1}
-            style={{ pointerEvents: 'none' }}
-          />
-          <rect
-            data-turn={0}
-            x={x(0) - hitWidth / 2} y={0} width={hitWidth} height={HEIGHT}
-            fill="transparent"
-            style={onSelectTurn ? { cursor: 'pointer' } : undefined}
-            onClick={onSelectTurn ? () => onSelectTurn(0) : undefined}
-          >
-            <title>{(() => {
-              const lines = [`Team preview: ${playerNames[0]} ${pct(leadScore!)}% · ${playerNames[1]} ${100 - pct(leadScore!)}%`];
-              const stripLead = (label: string) => label.replace(/^Lead /, '');
-              for (const side of ['p1', 'p2'] as const) {
-                const detail = leadDetail?.[side];
-                if (!detail?.best) continue;
-                const name = playerNames[side === 'p1' ? 0 : 1];
-                const best = stripLead(detail.best.label);
-                const played = detail.played ? stripLead(detail.played.label) : null;
-                lines.push(played === best
-                  ? `${name} best lead: ${best} (played)`
-                  : `${name} best lead: ${best}${played ? ` · played: ${played}` : ''}`);
-              }
-              lines.push('Click to open the lead analysis.');
-              return lines.join('\n');
-            })()}</title>
-          </rect>
-        </>
+    </>
+  );
+}
+
+function LeadPoint({ scores, leadScore, leadDetail, playerNames, hitWidth, scales: { x, y }, onSelectTurn }: {
+  scores: (number | null)[]; leadScore: number; leadDetail?: LeadAnalysis | null; playerNames: [string, string];
+  hitWidth: number; scales: GraphScales; onSelectTurn: SelectTurn;
+}) {
+  return (
+    <>
+      {scores[0] !== null && (
+        <line
+          x1={x(0)} y1={y(leadScore)} x2={x(1)} y2={y(scores[0])}
+          stroke="#cde" strokeOpacity={0.5} strokeDasharray="3 2"
+        />
       )}
+      {/* Diamond, not circle — the lead decision is a different kind of
+          point, drawn larger so it reads as its own clickable stop. */}
+      <rect
+        x={x(0) - 3.4} y={y(leadScore) - 3.4} width={6.8} height={6.8}
+        transform={`rotate(45 ${x(0)} ${y(leadScore)})`}
+        fill={leadScore >= 0 ? '#8ac' : '#c8a'}
+        stroke="#cde" strokeWidth={1}
+        style={{ pointerEvents: 'none' }}
+      />
+      <rect
+        data-turn={0}
+        x={x(0) - hitWidth / 2} y={0} width={hitWidth} height={HEIGHT}
+        fill="transparent"
+        style={onSelectTurn ? { cursor: 'pointer' } : undefined}
+        onClick={onSelectTurn ? () => onSelectTurn(0) : undefined}
+      >
+        <title>{leadTooltip(playerNames, leadScore, leadDetail)}</title>
+      </rect>
+    </>
+  );
+}
+
+function MainPoints({ scores, blunders, scales: { x, y } }: { scores: (number | null)[]; blunders: Set<number>; scales: GraphScales }) {
+  return (
+    <>
       {scores.map((score, index) => score === null ? null : (
         <circle
           key={`p${index}`}
@@ -300,6 +197,16 @@ export function EvalGraph({ scores, playerNames, currentTurn, currentLine, onSel
           strokeWidth={blunders.has(index + 1) ? 1.6 : 0}
         />
       ))}
+    </>
+  );
+}
+
+function MainHits({ scores, hitWidth, x, onSelectTurn, titleArgs }: {
+  scores: (number | null)[]; hitWidth: number; x: GraphScales['x']; onSelectTurn: SelectTurn;
+  titleArgs: { evalErrors: (string | null)[] | undefined; blunders: Set<number>; first: number; decided: DecidedSignal[] | undefined; playerNames: [string, string] };
+}) {
+  return (
+    <>
       {scores.map((score, index) => (
         <rect
           key={`h${index}`}
@@ -312,19 +219,22 @@ export function EvalGraph({ scores, playerNames, currentTurn, currentLine, onSel
           style={onSelectTurn ? { cursor: 'pointer' } : undefined}
           onClick={onSelectTurn ? () => onSelectTurn(index + 1, 'main') : undefined}
         >
-          {/* Gap turns (reconstruction wedges, unswept ends) stay clickable —
-              the turn view then offers "Analyze this position". */}
-          <title>{score === null
-            ? (evalErrors?.[index]
-              ? `Turn ${index + 1} · could not be evaluated: ${evalErrors[index]} · click to open`
-              : `Turn ${index + 1} · not analyzed yet · click to open, then Analyze this position`)
-            : label(index + 1, score)}</title>
+          <title>{hitTitle({ ...titleArgs, index, score })}</title>
         </rect>
       ))}
-      {/* Variation hits render AFTER the main hits so they win the overlap;
-          narrower than a full column — the main line stays clickable around
-          each gold point. */}
-      {variationPoints.map(point => (
+    </>
+  );
+}
+
+/* Variation hits render AFTER the main hits so they win the overlap;
+   narrower than a full column — the main line stays clickable around
+   each gold point. */
+function VariationHits({ points, hitWidth, playerNames, onSelectTurn }: {
+  points: VariationPoint[]; hitWidth: number; playerNames: [string, string]; onSelectTurn: SelectTurn;
+}) {
+  return (
+    <>
+      {points.map(point => (
         <rect
           key={`vh${point.turn}`}
           data-turn={point.turn}
@@ -337,23 +247,75 @@ export function EvalGraph({ scores, playerNames, currentTurn, currentLine, onSel
           style={onSelectTurn ? { cursor: 'pointer' } : undefined}
           onClick={onSelectTurn ? () => onSelectTurn(point.turn, 'variation') : undefined}
         >
-          <title>{`Variation, before turn ${point.turn}: ${playerNames[0]} ${pct(point.score)}% · ${playerNames[1]} ${100 - pct(point.score)}%`}</title>
+          <title>{variationHitTitle(playerNames, point)}</title>
         </rect>
       ))}
+    </>
+  );
+}
+
+/**
+ * Chess-style evaluation line over the whole game. Single series (no legend
+ * needed); point color carries the polarity via the app's player colors;
+ * blunder markers add a shape ring plus tooltip text, never color alone.
+ */
+export function EvalGraph({ scores, playerNames, currentTurn, currentLine, onSelectTurn, leadScore, leadDetail, evalErrors, decided, variation, maxTurn }: EvalGraphProps) {
+  const { svgRef, width } = useMeasuredWidth();
+
+  const turns = scores.length;
+  const lastTurn = Math.max(turns, lastVariationTurnOf(variation), maxTurn ?? 0);
+  if (lastTurn === 0) return null;
+
+  // With a lead evaluation the x-domain starts at turn 0 (team preview).
+  const hasLead = leadScore !== null && leadScore !== undefined;
+  const first = hasLead ? 0 : 1;
+  const scales = graphScales(width, first, lastTurn);
+  const { x, y } = scales;
+  const { segments, gapLinks } = mainLinePaths(scores, scales);
+  const blunders = graphBlunders(scores);
+  const hitWidth = (width - 2 * PAD_X) / Math.max(lastTurn - first, 1);
+  const overlay = variationOverlay(variation, scores, scales);
+  const spans = decidedSpans(decided, scores, x);
+  const highlight = highlightEdge({ currentTurn, scores, hasLead, leadScore, first, scales });
+  const ring = ringScore({ currentLine, variation, scores, currentTurn, hasLead, leadScore, first });
+  const titleArgs = { evalErrors, blunders, first, decided, playerNames };
+
+  return (
+    <svg
+      ref={svgRef}
+      className="ps-eval-graph"
+      viewBox={`0 0 ${width} ${HEIGHT}`}
+      role="img"
+      aria-label={`Evaluation over ${turns} turns for ${playerNames[0]} vs ${playerNames[1]}`}
+    >
+      <GraphFrame width={width} y={y} />
+      {variation && <VariationBand variation={variation} first={first} variationEnd={overlay.end} x={x} />}
+      <DecidedStrips spans={spans} />
+      {currentTurn >= 1 && currentTurn <= lastTurn && (
+        <line x1={x(currentTurn)} y1={2} x2={x(currentTurn)} y2={HEIGHT - 2} stroke="#8cf" strokeOpacity={0.3} />
+      )}
+      {highlight && (
+        <line
+          x1={highlight.x1} y1={highlight.y1} x2={highlight.x2} y2={highlight.y2}
+          stroke="#8cf" strokeOpacity={0.55} strokeWidth={3.5} strokeLinecap="round"
+        />
+      )}
+      <MainLine segments={segments} gapLinks={gapLinks} />
+      <VariationLine path={overlay.path} points={overlay.points} />
+      {hasLead && (
+        <LeadPoint scores={scores} leadScore={leadScore} leadDetail={leadDetail} playerNames={playerNames} hitWidth={hitWidth} scales={scales} onSelectTurn={onSelectTurn} />
+      )}
+      <MainPoints scores={scores} blunders={blunders} scales={scales} />
+      <MainHits scores={scores} hitWidth={hitWidth} x={x} onSelectTurn={onSelectTurn} titleArgs={titleArgs} />
+      <VariationHits points={overlay.points} hitWidth={hitWidth} playerNames={playerNames} onSelectTurn={onSelectTurn} />
       {/* Ring marker: the pointer's position on ITS line. */}
-      {(() => {
-        const score = currentLine === 'variation'
-          ? variation?.scores[currentTurn - 1] ?? null
-          : (currentTurn >= 1 ? scores[currentTurn - 1] ?? null : (hasLead && currentTurn === 0 ? leadScore! : null));
-        if (score === null || score === undefined || currentTurn < first) return null;
-        return (
-          <circle
-            cx={x(currentTurn)} cy={y(score)} r={4.5}
-            fill="none" stroke="#fff" strokeWidth={1.6}
-            style={{ pointerEvents: 'none' }}
-          />
-        );
-      })()}
+      {ring !== null && (
+        <circle
+          cx={x(currentTurn)} cy={y(ring)} r={4.5}
+          fill="none" stroke="#fff" strokeWidth={1.6}
+          style={{ pointerEvents: 'none' }}
+        />
+      )}
     </svg>
   );
 }
