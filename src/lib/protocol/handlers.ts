@@ -1,7 +1,7 @@
 import type { Battle, Pokemon, Side, Field } from '@pkmn/client';
 import type { GenerationNum } from '@pkmn/data';
 import type { PokemonSnapshot, SideSnapshot, FieldSnapshot } from '../../types';
-import { flushSpeedOrder, gens, speedContaminatedAt, type ClientIdent, type ParserState } from './parser-state';
+import { flushSpeedOrder, gens, speedContaminatedAt, type ClientIdent, type ParserState, type PendingMove } from './parser-state';
 
 const SCREEN_IDS = ['reflect', 'lightscreen', 'auroraveil'];
 
@@ -60,6 +60,29 @@ export function handleGen(state: ParserState, line: string) {
   if (parsed >= 1 && parsed <= 9) state.genNum = parsed as GenerationNum;
 }
 
+/**
+ * Nonzero priority breaks the race premise in EITHER role — order
+ * across priority brackets says nothing about speed.
+ */
+function speedCleanliness(state: ParserState, ident: string, moveId: string): { cleanFirst: boolean; cleanSecond: boolean } {
+  const priority = gens.get(state.genNum).moves.get(moveId)?.priority ?? 0;
+  const cleanFirst = priority === 0 && !speedContaminatedAt(state, ident, 'first');
+  const cleanSecond = priority === 0 && !speedContaminatedAt(state, ident, 'second');
+  return { cleanFirst, cleanSecond };
+}
+
+function pendingMoveFor(
+  parts: string[], moveId: string, side: 'p1' | 'p2', speciesForme: string, cleanFirst: boolean,
+): PendingMove | null {
+  return parts[2] && parts[4]
+    ? {
+      attacker: parts[2], target: parts[4], moveId,
+      crit: false, observationIndex: null, damageCount: 0,
+      speedClean: cleanFirst, attackerSide: side, attackerSpecies: speciesForme,
+    }
+    : null;
+}
+
 export function handleMove(state: ParserState, line: string) {
   const { battle } = state;
   const parts = line.split('|');
@@ -68,21 +91,12 @@ export function handleMove(state: ParserState, line: string) {
   const side: 'p1' | 'p2' = ident.startsWith('p1') ? 'p1' : 'p2';
   const mover = ident ? battle.getPokemon(ident as ClientIdent) : undefined;
   const moveId = (parts[3] ?? '').toLowerCase().replace(/[^a-z0-9]/g, '');
-  const priority = gens.get(state.genNum).moves.get(moveId)?.priority ?? 0;
-  // Nonzero priority breaks the race premise in EITHER role — order
-  // across priority brackets says nothing about speed.
-  const cleanFirst = priority === 0 && !speedContaminatedAt(state, ident, 'first');
-  const cleanSecond = priority === 0 && !speedContaminatedAt(state, ident, 'second');
-  state.lastMove = parts[2] && parts[4]
-    ? {
-      attacker: parts[2], target: parts[4], moveId,
-      crit: false, observationIndex: null, damageCount: 0,
-      speedClean: cleanFirst, attackerSide: side, attackerSpecies: mover?.speciesForme ?? '',
-    }
-    : null;
+  const { cleanFirst, cleanSecond } = speedCleanliness(state, ident, moveId);
+  const speciesForme = mover?.speciesForme ?? '';
+  state.lastMove = pendingMoveFor(parts, moveId, side, speciesForme, cleanFirst);
   if (state.singles && ident) {
     state.actedThisTurn.add(ident);
-    state.turnMovers.push({ side, species: mover?.speciesForme ?? '', cleanFirst, cleanSecond });
+    state.turnMovers.push({ side, species: speciesForme, cleanFirst, cleanSecond });
   }
 }
 
