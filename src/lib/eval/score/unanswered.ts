@@ -1,10 +1,11 @@
 import type { Battle, Pokemon } from '@pkmn/sim';
 import { boundaryEvent } from '../ko-odds';
 import { movesFirst } from '../speed';
+import { stageMultiplier } from '../stat-stages';
 import type { DecidedSweep, EntryUnanswered, NearDecidedSweep, UnansweredProfile } from '../types';
 import { hazardEntryFraction } from './hazards';
 import {
-  livingMons, singleMoveFraction, stageMultiplier, threatGetter, usableSlots,
+  livingMons, singleMoveFraction, threatGetter, usableSlots,
   type MatchupCache, type PairThreat, type ThreatGetter,
 } from './threat';
 import { healProfile, ppBudget, raceClocks, statusResidual, type HealProfile, type RaceSide } from './races';

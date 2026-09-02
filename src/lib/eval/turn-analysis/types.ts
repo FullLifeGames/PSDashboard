@@ -1,6 +1,7 @@
 import type { EvalResult, KoOddsInfo, RankedChoice, ReadRecommendation } from '../types';
 import type { StreakHistoryEntry, StreakOdds } from '../streaks';
 import type { PlayedAction, PlayedTurn, SackInfo } from '../played';
+import type { SideId } from '../../ids';
 
 /**
  * The turn analysis' vocabulary: the verdict bands and their tuning
@@ -9,7 +10,7 @@ import type { PlayedAction, PlayedTurn, SackInfo } from '../played';
  * parameter shape. Types and constants only.
  */
 
-export type Side = 'p1' | 'p2';
+export type Side = SideId;
 
 /**
  * Chess-style verdict bands on the EV-regret, in WP-UNITS (0.1 = 5% win

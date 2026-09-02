@@ -4,7 +4,7 @@
  */
 
 import type { TurnSnapshot } from '../../types';
-import { toId } from '../ids';
+import { toId, type SideId } from '../ids';
 
 export interface PlayedAction {
   kind: 'move' | 'switch';
@@ -42,8 +42,6 @@ export interface PlayedTurn {
    */
   prevented?: { p1?: string; p2?: string };
 }
-
-type SideId = 'p1' | 'p2';
 
 const sideOf = (pokemonRef: string): SideId | null => {
   if (pokemonRef.startsWith('p1')) return 'p1';

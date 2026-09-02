@@ -1,8 +1,7 @@
 import type { Battle, Pokemon, Side } from '@pkmn/sim';
 import type { TeraAllowance } from '../types';
-import { sideIndex } from './ids';
 import { positionBattle, type ChoiceOption, type SimPosition } from './position';
-import { toId } from '../../ids';
+import { sideIndex, toId } from '../../ids';
 
 /**
  * The legal choices of one side at a position: team preview leads, the

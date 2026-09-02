@@ -5,8 +5,9 @@ import {
   requiredChoicesForActiveSlots,
   type BranchSlotChoice,
 } from '../../lib/branch-choices';
+import { sideIndex, type SideId } from '../../lib/ids';
 
-export type SideId = 'p1' | 'p2';
+export type { SideId };
 export type BattleStream = BattleStreams.BattleStream;
 export type PlayerStreams = ReturnType<typeof BattleStreams.getPlayerStreams>;
 export type BranchEngineModule = typeof import('../../lib/branch-engine');
@@ -58,10 +59,6 @@ export interface BranchSetters {
   setHistory: React.Dispatch<React.SetStateAction<BranchHistoryEntry[]>>;
   setExecuteError: React.Dispatch<React.SetStateAction<string | null>>;
   setExecuting: React.Dispatch<React.SetStateAction<boolean>>;
-}
-
-export function sideIndex(side: SideId): 0 | 1 {
-  return side === 'p1' ? 0 : 1;
 }
 
 export function forceSwitches(battle: LiveBattle, side: SideId): boolean[] {

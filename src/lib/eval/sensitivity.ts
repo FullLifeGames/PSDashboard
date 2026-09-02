@@ -5,7 +5,7 @@
  * like any other serialized position.
  */
 
-import { toId } from '../ids';
+import { sideIndex, toId } from '../ids';
 
 export interface SensitivityTarget {
   species: string;
@@ -26,8 +26,6 @@ interface SerializedBattleShape {
 }
 
 export const CHOICE_ITEMS = new Set(['choiceband', 'choicespecs', 'choicescarf']);
-
-const sideIndex = (side: 'p1' | 'p2') => (side === 'p1' ? 0 : 1);
 
 const monSpecies = (mon: SerializedMon): string => mon.set?.species ?? '';
 

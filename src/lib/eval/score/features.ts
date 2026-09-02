@@ -2,7 +2,7 @@ import type { Battle, Pokemon, Side } from '@pkmn/sim';
 import { effectiveSpeed } from '../speed';
 import { EVAL_WEIGHTS, type EvalFeatures } from './weights';
 import { hazardCost, hazardRemovalEquity, strandedMons } from './hazards';
-import { threatGetter, type MatchupCache } from './threat';
+import { livingOf, threatGetter, type MatchupCache } from './threat';
 import { matchupTerms, sweepCells } from './matchup';
 
 /**
@@ -30,7 +30,7 @@ function itemMultiplier(pokemon: Pokemon): number {
 }
 
 function averageSpeed(side: Side, battle: Battle): number {
-  const living = side.pokemon.filter(pokemon => !pokemon.fainted && pokemon.hp > 0);
+  const living = livingOf(side);
   if (living.length === 0) return 0;
   return living.reduce((sum, pokemon) => sum + effectiveSpeed(pokemon, battle), 0) / living.length;
 }

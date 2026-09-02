@@ -52,7 +52,7 @@ const ACCURACY_ABILITIES = new Set([
 ]);
 
 /** Modern accuracy stage multiplier: stage s ≥ 0 → (3+s)/3, s < 0 → 3/(3−s). */
-function stageMultiplier(stages: number): number {
+function accuracyStageMultiplier(stages: number): number {
   const s = Math.max(-6, Math.min(6, stages));
   return s >= 0 ? (3 + s) / 3 : 3 / (3 - s);
 }
@@ -146,7 +146,7 @@ function moveAccuracy(battle: Battle, move: DexMove, attacker: Pokemon, defender
   } else {
     const base = weatherAccuracy(move, move.accuracy / 100, battle.field.weather ?? '');
     const stages = (attacker.boosts.accuracy ?? 0) - (defender.boosts.evasion ?? 0);
-    accuracy = Math.min(1, base * stageMultiplier(stages));
+    accuracy = Math.min(1, base * accuracyStageMultiplier(stages));
   }
   if (attacker.ability === 'noguard' || defender.ability === 'noguard') accuracy = 1;
   return accuracy;

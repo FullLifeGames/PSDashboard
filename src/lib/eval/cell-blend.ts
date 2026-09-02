@@ -1,6 +1,7 @@
 import type { Battle, Pokemon, PRNGSeed } from '@pkmn/sim';
 import { boundaryEvent, RANDOM_CALL_MOVES, type BoundaryEvent } from './ko-odds';
 import type { KoOddsInfo } from './types';
+import { sideIndex } from '../ids';
 
 /**
  * Root-cell boundary-event planning and outcome-class arithmetic (round 6
@@ -111,9 +112,9 @@ function unpricedMovePlan(move: DexMove): SideEventPlan {
 
 /** One side's boundary event for the cell: fail when a guard trips, skip when the side has no priceable roll. */
 function planSideEvent(battle: Battle, side: 'p1' | 'p2', moveId: string, oppChoice: string): SideEventPlan {
-  const sideIndex = side === 'p1' ? 0 : 1;
-  const oppIndex = sideIndex === 0 ? 1 : 0;
-  const attacker = battle.sides[sideIndex].active[0];
+  const own = sideIndex(side);
+  const oppIndex = own === 0 ? 1 : 0;
+  const attacker = battle.sides[own].active[0];
   if (!attacker || attacker.fainted) return { kind: 'fail' };
   if (attackerPrevented(attacker)) return { kind: 'fail' };
 
@@ -302,9 +303,9 @@ export function foldClassWeights(events: CellEvent[], first: 'p1' | 'p2'): Map<s
  * real information: a kill exists and is not guaranteed.
  */
 export function koOddsForOptions(battle: Battle, side: 'p1' | 'p2', choices: string[]): (KoOddsInfo | null)[] {
-  const sideIndex = side === 'p1' ? 0 : 1;
-  const attacker = battle.sides[sideIndex].active[0];
-  const defender = battle.sides[sideIndex === 0 ? 1 : 0].active[0];
+  const own = sideIndex(side);
+  const attacker = battle.sides[own].active[0];
+  const defender = battle.sides[own === 0 ? 1 : 0].active[0];
   return choices.map(choice => {
     if (choice.includes(',')) return null;
     const moveId = moveIdOf(choice);

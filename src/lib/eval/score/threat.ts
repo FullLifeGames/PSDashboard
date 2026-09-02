@@ -1,4 +1,5 @@
-import type { Battle, Pokemon } from '@pkmn/sim';
+import type { Battle, Pokemon, Side } from '@pkmn/sim';
+import { stageMultiplier } from '../stat-stages';
 
 /**
  * The HP- and boost-independent threat proxy: one attacker→defender
@@ -7,8 +8,9 @@ import type { Battle, Pokemon } from '@pkmn/sim';
  */
 
 /** Living mons of one side (fainted or zero-HP bodies excluded). */
-export const livingMons = (battle: Battle, index: number): Pokemon[] =>
-  battle.sides[index].pokemon.filter(pokemon => !pokemon.fainted && pokemon.hp > 0);
+export const livingOf = (side: Side): Pokemon[] =>
+  side.pokemon.filter(pokemon => !pokemon.fainted && pokemon.hp > 0);
+export const livingMons = (battle: Battle, index: number): Pokemon[] => livingOf(battle.sides[index]);
 
 /** HP- and boost-independent threat estimate of one attacker→defender direction. */
 export interface PairThreat {
@@ -155,9 +157,6 @@ export function pairThreat(attacker: Pokemon, defender: Pokemon, battle: Battle)
   }
   return { physical, special, priority, physicalAcc, specialAcc };
 }
-
-/** Standard stage multiplier: +1 → 1.5x, −1 → 0.67x. */
-export const stageMultiplier = (stage: number) => (stage >= 0 ? (2 + stage) / 2 : 2 / (2 - stage));
 
 /**
  * The memoized threat with the CURRENT boost stages applied. Stages stay

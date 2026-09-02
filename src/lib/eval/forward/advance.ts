@@ -1,8 +1,7 @@
 import type { Battle, PRNGSeed, Side } from '@pkmn/sim';
-import { sideIndex } from './ids';
 import { toPosition, type SimPosition } from './position';
 import { applyChoice, forkBattle, resolveForcedSwitches } from './switches';
-import { toId } from '../../ids';
+import { sideIndex, toId } from '../../ids';
 
 /**
  * One-turn advances under a fixed seed: the search's advance (greedy

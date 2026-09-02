@@ -1,4 +1,5 @@
 import type { Battle, Pokemon } from '@pkmn/sim';
+import { stageMultiplier } from './stat-stages';
 
 /**
  * Effective speed for move-order decisions: stored speed through the stage
@@ -9,7 +10,6 @@ import type { Battle, Pokemon } from '@pkmn/sim';
  * Lock suppression, Protosynthesis/Quark Drive, Slow Start, Lagging
  * Tail/Full Incense (move-order, not speed), Quick Powder.
  */
-const stageMultiplier = (stage: number) => (stage >= 0 ? (2 + stage) / 2 : 2 / (2 - stage));
 
 /** Paralysis (gen-dependent) and Quick Feet, applied in that order. */
 function applyStatusSpeed(speed: number, pokemon: Pokemon, battle: Battle): number {

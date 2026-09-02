@@ -42,10 +42,8 @@ export function sweepCells(
   battle: Battle,
   threat: (attacker: Pokemon, defender: Pokemon) => PairThreat,
 ): SweepCells {
-  const living = (index: number) =>
-    battle.sides[index].pokemon.filter(pokemon => !pokemon.fainted && pokemon.hp > 0);
-  const mine = living(sideIndex);
-  const theirs = living(1 - sideIndex);
+  const mine = livingMons(battle, sideIndex);
+  const theirs = livingMons(battle, 1 - sideIndex);
   const cells: SweepCells = { fastKo: 0, fastChip: 0, slowKo: 0, slowChip: 0 };
   if (theirs.length === 0) return cells;
   for (const a of mine) {
