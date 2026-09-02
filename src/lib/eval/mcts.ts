@@ -99,7 +99,7 @@ function selectAndExpand(
 ): { path: PathStep[]; leaf: number; depth: number } {
   const path: PathStep[] = [];
   let node = root;
-  let leaf = node.value;
+  let leaf: number;
   let depth = 1;
   for (;;) {
     if (node.ended || node.p1Options.length === 0 || node.p2Options.length === 0) {

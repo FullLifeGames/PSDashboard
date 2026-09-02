@@ -81,7 +81,7 @@ function makeSlotModifiers(battle: SimBattle, active: SimPokemon | null | undefi
   const teraType = active.canTerastallize || null;
   const canMegaEvo = !!active.canMegaEvo;
   const canUltraBurst = !!active.canUltraBurst;
-  let zMoves: (string | null)[] = [];
+  let zMoves: (string | null)[];
   try {
     zMoves = (battle.actions.canZMove(active) ?? []).map(option => option?.move ?? null);
   } catch {

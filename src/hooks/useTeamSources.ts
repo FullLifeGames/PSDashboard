@@ -103,6 +103,7 @@ export function useSpreadSolve(inputs: {
   const [solvedSpreads, setSolvedSpreads] = useState<Map<string, SpreadCandidate> | null>(null);
   useEffect(() => {
     spreadSolveRef.current = null;
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- the reset on a replay change; moving it to render time is a hook refactor for a UI round
     setSolvedSpreads(null);
   }, [replayData]);
 
@@ -141,6 +142,7 @@ export function useSheetTeams(replayData: ReplayData | null) {
   const [sheetTeams, setSheetTeams] = useState<{ p1: PokemonSet[] | null; p2: PokemonSet[] | null }>({ p1: null, p2: null });
   useEffect(() => {
     let stale = false;
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- the reset on a replay change; moving it to render time is a hook refactor for a UI round
     setSheetTeams({ p1: null, p2: null });
     if (!replayData) return;
     void import('../lib/team-builder').then(({ extractTeamSheets }) => {
