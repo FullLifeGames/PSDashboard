@@ -51,14 +51,68 @@ export interface ProtocolEvents {
   confusionSelfHits: Map<string, number>;
 }
 
+const bump = (map: Map<string, number>, key: string) =>
+  map.set(key, (map.get(key) ?? 0) + 1);
+
+/** A protocol field, empty when the line is short. */
+const field = (parts: string[], index: number): string => parts[index] ?? '';
+
+/** Faints and game end — the hard channels. True when the tag was one of them. */
+function recordHardEvent(events: ProtocolEvents, tag: string, parts: string[]): boolean {
+  if (tag === 'faint') {
+    events.faints.add(normalizeIdent(field(parts, 2)));
+  } else if (tag === 'win') {
+    events.ended = true;
+    events.winner = parts[2] ?? null;
+  } else if (tag === 'tie') {
+    events.ended = true;
+  } else {
+    return false;
+  }
+  return true;
+}
+
+/** Move order and misses. True when the tag was one of them. */
+function recordMoveEvent(events: ProtocolEvents, lastMove: Map<string, string>, tag: string, parts: string[], line: string): boolean {
+  if (tag === 'move') {
+    const ident = normalizeIdent(field(parts, 2));
+    const moveId = toId(field(parts, 3));
+    events.moveOrder.push(`${ident}:${moveId}`);
+    lastMove.set(ident, moveId);
+    if (line.includes('[miss]')) bump(events.misses, `${ident}:${moveId}`);
+  } else if (tag === '-miss') {
+    const ident = normalizeIdent(field(parts, 2));
+    bump(events.misses, `${ident}:${lastMove.get(ident) ?? ''}`);
+  } else {
+    return false;
+  }
+  return true;
+}
+
+/** Crits, secondaries, hit counts, cants, confusion self-hits — the soft channels. */
+function recordSecondaryEvent(events: ProtocolEvents, tag: string, parts: string[], line: string) {
+  const ident = normalizeIdent(field(parts, 2));
+  if (tag === '-crit') {
+    bump(events.crits, ident);
+  } else if (tag === '-status') {
+    bump(events.secondaries, `${ident}:status:${field(parts, 3)}`);
+  } else if (tag === '-boost' || tag === '-unboost') {
+    bump(events.secondaries, `${ident}:${tag.slice(1)}:${field(parts, 3)}:${field(parts, 4)}`);
+  } else if (tag === '-hitcount') {
+    bump(events.hitCounts, `${ident}:${field(parts, 3)}`);
+  } else if (tag === 'cant') {
+    bump(events.cants, `${ident}:${toId(field(parts, 3))}`);
+  } else if (tag === '-damage' && line.includes('[from] confusion')) {
+    bump(events.confusionSelfHits, ident);
+  }
+}
+
 export function extractProtocolEvents(lines: string[]): ProtocolEvents {
   const events: ProtocolEvents = {
     faints: new Set(), ended: false, winner: null, moveOrder: [],
     misses: new Map(), crits: new Map(), secondaries: new Map(),
     hitCounts: new Map(), cants: new Map(), confusionSelfHits: new Map(),
   };
-  const bump = (map: Map<string, number>, key: string) =>
-    map.set(key, (map.get(key) ?? 0) + 1);
   const lastMove = new Map<string, string>();
   // Sim battle logs interleave |split|SIDE + secret line + public line;
   // replay protocol carries only the public form. Skip marker + secret so
@@ -69,36 +123,9 @@ export function extractProtocolEvents(lines: string[]): ProtocolEvents {
     const tag = parts[1] ?? '';
     if (tag === 'split') { skipSecret = true; continue; }
     if (skipSecret) { skipSecret = false; continue; }
-    if (tag === 'faint') {
-      events.faints.add(normalizeIdent(parts[2] ?? ''));
-    } else if (tag === 'win') {
-      events.ended = true;
-      events.winner = parts[2] ?? null;
-    } else if (tag === 'tie') {
-      events.ended = true;
-    } else if (tag === 'move') {
-      const ident = normalizeIdent(parts[2] ?? '');
-      const moveId = toId(parts[3] ?? '');
-      events.moveOrder.push(`${ident}:${moveId}`);
-      lastMove.set(ident, moveId);
-      if (line.includes('[miss]')) bump(events.misses, `${ident}:${moveId}`);
-    } else if (tag === '-miss') {
-      const ident = normalizeIdent(parts[2] ?? '');
-      bump(events.misses, `${ident}:${lastMove.get(ident) ?? ''}`);
-    } else if (tag === '-crit') {
-      bump(events.crits, normalizeIdent(parts[2] ?? ''));
-    } else if (tag === '-status') {
-      bump(events.secondaries, `${normalizeIdent(parts[2] ?? '')}:status:${parts[3] ?? ''}`);
-    } else if (tag === '-boost' || tag === '-unboost') {
-      bump(events.secondaries,
-        `${normalizeIdent(parts[2] ?? '')}:${tag.slice(1)}:${parts[3] ?? ''}:${parts[4] ?? ''}`);
-    } else if (tag === '-hitcount') {
-      bump(events.hitCounts, `${normalizeIdent(parts[2] ?? '')}:${parts[3] ?? ''}`);
-    } else if (tag === 'cant') {
-      bump(events.cants, `${normalizeIdent(parts[2] ?? '')}:${toId(parts[3] ?? '')}`);
-    } else if (tag === '-damage' && line.includes('[from] confusion')) {
-      bump(events.confusionSelfHits, normalizeIdent(parts[2] ?? ''));
-    }
+    if (recordHardEvent(events, tag, parts)) continue;
+    if (recordMoveEvent(events, lastMove, tag, parts, line)) continue;
+    recordSecondaryEvent(events, tag, parts, line);
   }
   return events;
 }
