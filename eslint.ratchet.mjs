@@ -9,7 +9,8 @@
 export const ratchetBase = [
   {
     "files": [
-      "src/**/*.{ts,tsx}"
+      "src/**/*.{ts,tsx}",
+      "packages/*/src/**/*.ts"
     ],
     "rules": {
       "max-lines": [

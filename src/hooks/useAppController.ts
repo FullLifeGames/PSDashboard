@@ -7,9 +7,8 @@ import type { BoardController } from './controller/board-controller';
 import { useEngineController } from './controller/engine-controller';
 import type { EngineController } from './controller/engine-controller';
 import { useGameAnalysis } from './useGameAnalysis';
-import { manualMove } from '../lib/team-info';
+import { manualMove, toId } from '@fulllifegames/replay-core';
 import type { BranchSlotChoice } from '../lib/branch-choices';
-import { toId } from '../lib/ids';
 
 /** The refresh request that re-runs the branch with the edited teams and the
  *  hypothetical move seeded as the acting slot's pending choice. */

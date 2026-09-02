@@ -1,5 +1,4 @@
-import type { TurnSnapshot } from '../types';
-import type { SideId } from './ids';
+import type { TurnSnapshot, SideId } from '@fulllifegames/replay-core';
 import type { BranchSlotChoice } from './branch-choices';
 import type { SimPokemonInfo } from './branch-engine';
 

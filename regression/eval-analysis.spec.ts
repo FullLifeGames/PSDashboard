@@ -2,7 +2,7 @@ import { test, expect } from '@playwright/test';
 import { analyzeTurn, decidedSeenKey, findPlayedOption, matchPlayedChoice, phantomStayIn, playedSetupMove, REGRET_THRESHOLD, unansweredSeenKey, type SideAnalysis } from '../src/lib/eval/analysis';
 import { allTurnEvents, detectSacks, turnEvents } from '../src/lib/eval/played';
 import type { EvalResult, RankedChoice } from '../src/lib/eval/types';
-import type { TurnSnapshot } from '../src/types';
+import type { TurnSnapshot } from '../packages/replay-core/src/types';
 
 const choice = (choiceStr: string, label: string, worstCase: number): RankedChoice =>
   ({ choice: choiceStr, label, worstCase, expected: worstCase, ev: worstCase, punishedBy: 'Reply' });

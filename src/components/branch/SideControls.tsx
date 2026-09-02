@@ -12,7 +12,7 @@ import {
 import { useGimmick, useMovePool } from '../../hooks/useSideControlsState';
 import { SwitchBtn } from './ChoiceButtons';
 import { FightSection, type WhatIfState } from './FightSection';
-import { toId } from '../../lib/ids';
+import { toId } from '@fulllifegames/replay-core';
 
 /** What the viewed line actually played at this position (badge on the
  *  matching button + header note): the replay's action on the main line,

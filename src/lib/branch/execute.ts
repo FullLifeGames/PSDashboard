@@ -2,7 +2,7 @@ import type { BranchSlotChoice } from '../branch-choices';
 import type { BranchChoiceErrorLog, BranchExecuteResult, BranchRuntime, SimBattle, SimPokemon } from './types';
 import { normalizeBattleOnlyFormeId, slotLetter } from './team-order';
 import { targetLocSuffixForChoice } from './protocol-choices';
-import { sideIndex, toId } from '../ids';
+import { sideIndex, toId } from '@fulllifegames/replay-core';
 
 export function sleep(ms: number) {
   return new Promise(resolve => setTimeout(resolve, ms));

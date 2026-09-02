@@ -2,7 +2,7 @@ import { EvalPanel } from './EvalPanel';
 import { PlayOutBar } from './PlayOutBar';
 import { BattleStatsPanel } from './BattleStatsPanel';
 import type { AppController } from '../hooks/useAppController';
-import type { ReplayData } from '../types';
+import type { ReplayData } from '@fulllifegames/replay-core';
 
 interface WorkspaceColumnProps {
   app: AppController;

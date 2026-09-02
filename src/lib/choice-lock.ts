@@ -8,11 +8,8 @@
 
 import { calculate, Field, Generations, Move, Pokemon } from '@smogon/calc';
 import type { PokemonSet } from '@pkmn/sim';
-import type { DamageObservation } from '../types';
+import { type DamageObservation, typedHiddenPowerId, inferOpponentTeam, toId } from '@fulllifegames/replay-core';
 import { CHOICE_ITEMS } from './eval/sensitivity';
-import { typedHiddenPowerId } from './hidden-power';
-import { inferOpponentTeam } from './opponent-inferrer';
-import { toId } from './ids';
 
 export interface ProtocolLock { species: string; moveId: string }
 interface TrailState { species: string; moves: string[]; itemDisturbed: boolean }

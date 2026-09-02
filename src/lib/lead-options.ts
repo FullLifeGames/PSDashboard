@@ -1,5 +1,4 @@
-import type { TurnSnapshot } from '../types';
-import { broughtSpeciesFor, speciesBaseId } from './replay-format';
+import { type TurnSnapshot, broughtSpeciesFor, speciesBaseId } from '@fulllifegames/replay-core';
 
 /** One team slot offered as a lead: identity plus what the real game did. */
 export interface LeadOption {

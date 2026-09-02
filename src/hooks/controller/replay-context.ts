@@ -9,9 +9,11 @@ import { useSmogonSetAssumptions } from '../useSmogonSetAssumptions';
 import { useSharedBranch } from '../useSharedBranch';
 import { useTeamKnowledge } from '../useTeamKnowledge';
 import type { TeamKnowledge } from '../useTeamKnowledge';
-import type { OpponentTeamInfo, ReplayData, TurnSnapshot } from '../../types';
+import {
+  type OpponentTeamInfo, type ReplayData, type TurnSnapshot, getReplayBringCount, getReplayGameType,
+  getReplayGeneration, replayBringOnly,
+} from '@fulllifegames/replay-core';
 import type { BranchSlotChoice } from '../../lib/branch-choices';
-import { getReplayBringCount, getReplayGameType, getReplayGeneration, replayBringOnly } from '../../lib/replay-format';
 
 interface PendingBranchRefresh {
   p1Info: OpponentTeamInfo;

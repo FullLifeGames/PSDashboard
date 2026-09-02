@@ -1,7 +1,7 @@
 import type { EvalResult, KoOddsInfo, RankedChoice, ReadRecommendation } from '../types';
 import type { StreakHistoryEntry, StreakOdds } from '../streaks';
 import type { PlayedAction, PlayedTurn, SackInfo } from '../played';
-import type { SideId } from '../../ids';
+import type { SideId } from '@fulllifegames/replay-core';
 
 /**
  * The turn analysis' vocabulary: the verdict bands and their tuning

@@ -1,5 +1,5 @@
 import { useRef, useState } from 'react';
-import { parseTeamText } from '../lib/team-parser';
+import { parseTeamText } from '@fulllifegames/replay-core';
 import { AlertBox } from './AlertBox';
 
 interface Props {

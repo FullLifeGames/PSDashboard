@@ -1,5 +1,5 @@
 import type { PokemonSet } from '@pkmn/sim';
-import type { DamageObservation, PokemonEvs, SpeedOrderObservation } from '../types';
+import type { DamageObservation, PokemonEvs, SpeedOrderObservation } from './types';
 import { evTotal, type EvBudget } from './spreads/ev-budget';
 import { candidateLadder, type CandidateRung, type SpreadCandidate } from './spreads/ladder';
 import {

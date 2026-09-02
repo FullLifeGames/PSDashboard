@@ -5,7 +5,7 @@ import {
   requiredChoicesForActiveSlots,
   type BranchSlotChoice,
 } from '../../lib/branch-choices';
-import { sideIndex, type SideId } from '../../lib/ids';
+import { sideIndex, type SideId } from '@fulllifegames/replay-core';
 import type { BranchHistoryEntry } from '../../lib/branch-history';
 
 export type { BranchHistoryEntry };

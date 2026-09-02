@@ -1,5 +1,5 @@
 import type { TeraAllowance } from './types';
-import { toId } from '../ids';
+import { toId } from '@fulllifegames/replay-core';
 
 /**
  * Tera-rights resolution. Draft leagues grant Terastallization to specific

@@ -3,7 +3,7 @@
  * team builder, the hidden-power resolver, and the team-info enrichment
  * read usage through these; smogon-stats.ts fetches and re-exports them.
  */
-import type { PokemonFieldInfo, PokemonMoveInfo } from '../../types';
+import type { PokemonFieldInfo, PokemonMoveInfo } from '../types';
 import type { PokemonUsageStats, SmogonUsageStats, SpeciesUsageSet, UsageProbability } from './stats-types';
 import { toId } from '../ids';
 

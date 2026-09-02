@@ -1,7 +1,7 @@
 import { test, expect } from '@playwright/test';
-import { applyPastedTeam, countMatchingSpecies, parsePastedTeam } from '../src/lib/team-paste';
-import { parseTeamText } from '../src/lib/team-parser';
-import type { OpponentTeamInfo } from '../src/types';
+import { applyPastedTeam, countMatchingSpecies, parsePastedTeam } from '../packages/replay-core/src/team-paste';
+import { parseTeamText } from '../packages/replay-core/src/team-parser';
+import type { OpponentTeamInfo } from '../packages/replay-core/src/types';
 
 const showdownExport = [
   'Shinyhead (Toxtricity) (M) @ Throat Spray',

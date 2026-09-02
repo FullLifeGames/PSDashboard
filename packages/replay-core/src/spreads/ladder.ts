@@ -1,4 +1,4 @@
-import type { PokemonEvs } from '../../types';
+import type { PokemonEvs } from '../types';
 import { capToBudget, ZERO_EVS, type EvBudget } from './ev-budget';
 import { toId } from '../ids';
 

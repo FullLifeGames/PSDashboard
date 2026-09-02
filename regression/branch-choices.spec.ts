@@ -12,7 +12,7 @@ import {
   type BranchSlotChoice,
 } from '../src/lib/branch-choices';
 import type { BranchMoveOption, BranchSwitchOption, BranchTargetOption } from '../src/lib/branch-engine';
-import { toId } from '../src/lib/ids';
+import { toId } from '../packages/replay-core/src/ids';
 
 function switchTo(species: string, name = species): BranchSlotChoice {
   return { kind: 'switch', speciesId: toId(species), pokemonName: name };

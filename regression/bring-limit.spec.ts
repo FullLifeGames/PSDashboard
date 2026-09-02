@@ -1,7 +1,7 @@
 import { test, expect } from '@playwright/test';
 import { createBranchState, reconstructBranchRuntime, serializePreviewPosition } from '../src/lib/branch-engine';
-import { getReplayBringCount, replayBringOnly } from '../src/lib/replay-format';
-import { parseReplayLogWithObservations } from '../src/lib/protocol-parser';
+import { getReplayBringCount, replayBringOnly } from '../packages/replay-core/src/replay-format';
+import { parseReplayLogWithObservations } from '../packages/replay-core/src/protocol-parser';
 import type { PokemonSet } from '@pkmn/sim';
 
 function mon(name: string, move: string): PokemonSet {

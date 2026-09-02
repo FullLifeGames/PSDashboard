@@ -1,8 +1,8 @@
 import { test, expect } from '@playwright/test';
-import { inferOpponentTeam } from '../src/lib/opponent-inferrer';
-import { applyInferredSpreads, enrichPokemonInfo, guessedEvs, INFERRED_SPREAD_DETAIL, manualEvs, unknownField } from '../src/lib/team-info';
+import { inferOpponentTeam } from '../packages/replay-core/src/opponent-inferrer';
+import { applyInferredSpreads, enrichPokemonInfo, guessedEvs, INFERRED_SPREAD_DETAIL, manualEvs, unknownField } from '../packages/replay-core/src/team-info';
 import { spriteUrl } from '../src/lib/sprite-url';
-import type { RevealedPokemonInfo } from '../src/types';
+import type { RevealedPokemonInfo } from '../packages/replay-core/src/types';
 import { alternativeItems, type SmogonUsageStats } from '../src/lib/smogon-stats';
 
 const megaLog = [

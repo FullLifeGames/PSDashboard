@@ -1,9 +1,9 @@
 import { test, expect } from '@playwright/test';
 import { Generations, Pokemon, Move, calculate } from '@smogon/calc';
 import type { PokemonSet } from '@pkmn/sim';
-import { inferSpreads } from '../src/lib/spread-inference';
-import { toId } from '../src/lib/ids';
-import type { DamageObservation } from '../src/types';
+import { inferSpreads } from '../packages/replay-core/src/spread-inference';
+import { toId } from '../packages/replay-core/src/ids';
+import type { DamageObservation } from '../packages/replay-core/src/types';
 
 const gen = Generations.get(9);
 

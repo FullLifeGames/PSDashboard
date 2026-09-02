@@ -1,4 +1,12 @@
 {
   "$schema": "https://unpkg.com/knip@6/schema.json",
-  "entry": ["src/workers/eval-worker.ts", "scripts/*.mjs"]
+  "ignore": [".remember/**"],
+  "workspaces": {
+    ".": {
+      "entry": ["src/workers/eval-worker.ts", "scripts/*.mjs"]
+    },
+    "packages/*": {
+      "project": ["src/**/*.ts"]
+    }
+  }
 }

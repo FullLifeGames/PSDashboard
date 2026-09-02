@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import type { SmogonSetAssumptions } from '../lib/smogon-sets';
-import { toId } from '../lib/ids';
+import { toId } from '@fulllifegames/replay-core';
 
 interface SmogonSetAssumptionsState {
   key?: string;

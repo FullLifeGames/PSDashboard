@@ -2,7 +2,7 @@ import { playedSetupMove, type SideAnalysis, type TurnAnalysis, type VerdictTier
 import { KEY_TURN_SWING } from './graph';
 import { koPhrase, phrase } from './prose/phrases';
 import { winDeltaText, winPercent } from './winprob';
-import { sideIndex } from '../ids';
+import { sideIndex } from '@fulllifegames/replay-core';
 
 /**
  * Multi-turn root-cause analysis over a completed graph sweep: where the

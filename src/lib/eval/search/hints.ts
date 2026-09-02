@@ -1,7 +1,7 @@
 import type { Pokemon } from '@pkmn/sim';
 import { boostedFraction, pairThreat, singleMoveFraction } from '../eval-function';
 import { positionBattle, type ChoiceOption, type SimPosition } from '../forward-model';
-import { sideIndex } from '../../ids';
+import { sideIndex } from '@fulllifegames/replay-core';
 
 /**
  * Static per-option threat hints — the machinery candidate restriction

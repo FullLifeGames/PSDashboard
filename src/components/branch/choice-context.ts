@@ -2,7 +2,7 @@ import type { BranchMoveOption, BranchSwitchOption } from '../../hooks/useBranch
 import type { BranchSlotModifiers } from '../../lib/branch-engine';
 import type { BranchMoveModifier } from '../../lib/branch-choices';
 import type { BranchSlotChoice } from '../../lib/branch-choices';
-import { toId } from '../../lib/ids';
+import { toId } from '@fulllifegames/replay-core';
 
 /** What turning a button click into a choice needs: the active gimmick and the side's options. */
 export interface ChoiceContext {

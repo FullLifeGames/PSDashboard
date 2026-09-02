@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react';
-import type { OpponentTeamInfo, PokemonEvs, RevealedPokemonInfo, StatId } from '../types';
-import { EMPTY_EVS, manualEvs, manualField } from '../lib/team-info';
+import {
+  type OpponentTeamInfo, type PokemonEvs, type RevealedPokemonInfo, type StatId, EMPTY_EVS, manualEvs,
+  manualField,
+} from '@fulllifegames/replay-core';
 import { canonicalMove, clampEv, withAddedMove, type EditorPools } from '../lib/team-editor';
 
 /** Legal pools load lazily — the editor stays usable as free text until then. */

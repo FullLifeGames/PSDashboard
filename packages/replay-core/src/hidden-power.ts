@@ -2,7 +2,7 @@ import { Dex } from '@pkmn/sim';
 import type { PokemonSet } from '@pkmn/sim';
 import { getSpeciesUsageStats } from './smogon/usage-lookup';
 import type { SmogonUsageStats } from './smogon/stats-types';
-import type { HiddenPowerEvidence } from '../types';
+import type { HiddenPowerEvidence } from './types';
 import { toId } from './ids';
 
 /**

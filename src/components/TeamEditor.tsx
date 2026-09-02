@@ -1,4 +1,4 @@
-import type { OpponentTeamInfo } from '../types';
+import type { OpponentTeamInfo } from '@fulllifegames/replay-core';
 import { useEditorPools, useTeamDraft } from '../hooks/useTeamDraft';
 import { ModalDialog } from './ModalDialog';
 import { PokemonRow } from './team-editor/PokemonRow';

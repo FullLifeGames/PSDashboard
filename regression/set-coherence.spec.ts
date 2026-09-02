@@ -2,7 +2,7 @@ import { test, expect } from '@playwright/test';
 import {
   applyCoherenceVetoes, selectCuratedSet,
   type CuratedEvidence, type MoveCandidate,
-} from '../src/lib/set-coherence';
+} from '../packages/replay-core/src/set-coherence';
 import type { PokemonSetAssumption } from '../src/lib/smogon-sets';
 
 /**

@@ -1,9 +1,9 @@
 import { test, expect } from '@playwright/test';
 import { readFileSync } from 'fs';
 import { State } from '@pkmn/sim';
-import { formatEnforcesSleepClause, inferReplayFormatId, getBranchSimulatorFormat } from '../src/lib/replay-format';
-import { parseReplayLogWithObservations } from '../src/lib/protocol-parser';
-import { buildTeamsFromReplay } from '../src/lib/team-builder';
+import { formatEnforcesSleepClause, inferReplayFormatId, getBranchSimulatorFormat } from '../packages/replay-core/src/replay-format';
+import { parseReplayLogWithObservations } from '../packages/replay-core/src/protocol-parser';
+import { buildTeamsFromReplay } from '../packages/replay-core/src/team-builder';
 import { reconstructBranchRuntime } from '../src/lib/branch-engine';
 import { searchPosition } from '../src/lib/eval/search';
 import { resolveTeraPreference } from '../src/lib/eval/tera';

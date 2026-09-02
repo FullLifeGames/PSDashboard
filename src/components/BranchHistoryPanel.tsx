@@ -1,4 +1,4 @@
-import type { TurnSnapshot } from '../types';
+import type { TurnSnapshot } from '@fulllifegames/replay-core';
 import type { BranchHistoryEntry } from '../hooks/useBranch';
 import { notationSideLabel } from '../lib/branch-choices';
 import type { TimelinePosition } from '../lib/timeline';

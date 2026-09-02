@@ -1,7 +1,7 @@
 import { test, expect } from '@playwright/test';
-import { buildTeamsFromReplay } from '../src/lib/team-builder';
+import { buildTeamsFromReplay } from '../packages/replay-core/src/team-builder';
 import { reconstructBranchRuntime, executeBranchChoices } from '../src/lib/branch-engine';
-import { parseReplayLog } from '../src/lib/protocol-parser';
+import { parseReplayLog } from '../packages/replay-core/src/protocol-parser';
 
 // The snapshot correction assigns `pokemon.status` directly. Toxic damage is
 // `statusState.stage * maxhp/16`, so without a synced statusState the stage is

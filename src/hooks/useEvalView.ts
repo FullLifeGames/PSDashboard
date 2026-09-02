@@ -1,9 +1,11 @@
 import { useCallback, useEffect, useMemo, useRef, type Dispatch, type SetStateAction } from 'react';
-import type { OpponentTeamInfo, ReplayData, TurnSnapshot } from '../types';
+import {
+  type OpponentTeamInfo, type ReplayData, type TurnSnapshot, formatEnforcesSleepClause,
+  getBranchSimulatorFormat, inferReplayFormatId,
+} from '@fulllifegames/replay-core';
 import { needsSettingsUpgrade, resolveAutoTurnSettings, type TurnEvalSettings, useEvaluation } from './useEvaluation';
 import type { useEvalAcquire } from './useEvalAcquire';
 import { makePreviewAcquire, type TeamBuildSources } from '../lib/eval-acquire';
-import { formatEnforcesSleepClause, getBranchSimulatorFormat, inferReplayFormatId } from '../lib/replay-format';
 import { resolveTeraPreference } from '../lib/eval/tera';
 import { parseLeadSpecies, parsePlayedActions, parsePlayedActionsDoubles } from '../lib/eval/played';
 import type { SensitivityTarget } from '../lib/eval/sensitivity';

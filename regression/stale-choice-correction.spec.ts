@@ -1,7 +1,7 @@
 import { test, expect } from '@playwright/test';
 import type { PokemonSet } from '@pkmn/sim';
 import { reconstructBranchRuntime, executeBranchChoices } from '../src/lib/branch-engine';
-import { parseReplayLog } from '../src/lib/protocol-parser';
+import { parseReplayLog } from '../packages/replay-core/src/protocol-parser';
 
 // When a replayed protocol choice is rejected mid-reconstruction (typically a
 // team edit removed the move the replay used), the sim keeps the OTHER side's

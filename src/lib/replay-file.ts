@@ -1,5 +1,4 @@
-import type { ReplayData } from '../types';
-import { getReplayDisplayFormat, inferReplayFormatId } from './replay-format';
+import { type ReplayData, getReplayDisplayFormat, inferReplayFormatId } from '@fulllifegames/replay-core';
 
 const LOG_DATA_PATTERN = /<script[^>]*class="battle-log-data"[^>]*>([\s\S]*?)<\/script>/i;
 const REPLAY_ID_PATTERN = /<input[^>]*name="replayid"[^>]*value="([a-z0-9-]+)"/i;

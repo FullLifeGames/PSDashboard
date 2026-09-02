@@ -8,7 +8,7 @@ import {
   saveBranchPayload,
   type BranchSharePayload,
 } from '../lib/branch-share';
-import type { ReplayData } from '../types';
+import type { ReplayData } from '@fulllifegames/replay-core';
 
 interface Props {
   replayData: ReplayData;

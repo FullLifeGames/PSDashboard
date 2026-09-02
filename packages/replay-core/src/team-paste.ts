@@ -1,4 +1,4 @@
-import type { OpponentTeamInfo, PokemonEvs } from '../types';
+import type { OpponentTeamInfo, PokemonEvs } from './types';
 import { EMPTY_EVS, itemSetValue, manualEvs, manualField, manualMove } from './team-info';
 import { toId } from './ids';
 

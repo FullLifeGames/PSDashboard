@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import type { DamageObservation, HiddenPowerEvidence, OpponentTeamInfo, ReplayData, SpeedOrderObservation } from '../types';
-import { applyPastedTeam, countMatchingSpecies } from '../lib/team-paste';
-import { applyInferredSpreads, enrichTeamInfo } from '../lib/team-info';
-import { applyTeamSheetToInfo } from '../lib/team-sheets';
+import {
+  type DamageObservation, type HiddenPowerEvidence, type OpponentTeamInfo, type ReplayData,
+  type SpeedOrderObservation, applyPastedTeam, countMatchingSpecies, applyInferredSpreads, enrichTeamInfo,
+  applyTeamSheetToInfo,
+} from '@fulllifegames/replay-core';
 import { parseSetsImport } from '../lib/sets-io';
 import { buildSensitivityTargets } from '../lib/team-knowledge';
 import type { SensitivityTarget } from '../lib/eval/sensitivity';

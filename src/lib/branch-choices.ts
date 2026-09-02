@@ -1,6 +1,6 @@
 import type { BranchMoveOption, BranchSwitchOption } from './branch-engine';
 import { splitCombinedLabel } from './eval/analysis';
-import { toId } from './ids';
+import { toId } from '@fulllifegames/replay-core';
 
 export interface BranchChoiceActive {
   fainted: boolean;

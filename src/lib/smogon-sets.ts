@@ -2,14 +2,15 @@ import { Generations } from '@pkmn/data';
 import { Dex } from '@pkmn/dex';
 import { Smogon } from '@pkmn/smogon';
 import type { ID } from '@pkmn/data';
-import { toId } from './ids';
+import {
+  toId, type PokemonSetAssumption, type SetAssumption, type SetSpreadAssumption, type SmogonSetAssumptions,
+} from '@fulllifegames/replay-core';
 import { ouFallbackFormat } from './smogon/format-fallback';
-import type { PokemonSetAssumption, SetAssumption, SetSpreadAssumption, SmogonSetAssumptions } from './smogon/sets-lookup';
 
 export type {
   PokemonSetAssumption, SetAssumption, SetSpreadAssumption, SmogonSetAssumptions,
-} from './smogon/sets-lookup';
-export { getSpeciesSetAssumption } from './smogon/sets-lookup';
+} from '@fulllifegames/replay-core';
+export { getSpeciesSetAssumption } from '@fulllifegames/replay-core';
 
 type SmogonFetcher = ConstructorParameters<typeof Smogon>[0];
 type AssumptionSet = {

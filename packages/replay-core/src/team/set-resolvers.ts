@@ -5,7 +5,7 @@ import { getSpeciesSetAssumption } from '../smogon/sets-lookup';
 import { applyCoherenceVetoes, selectCuratedSet, type MoveCandidate } from '../set-coherence';
 import { itemSetValue } from '../team-info';
 import type { SpreadCandidate } from '../spread-inference';
-import type { KnowledgeSource, PokemonEvs, RevealedPokemonInfo } from '../../types';
+import type { KnowledgeSource, PokemonEvs, RevealedPokemonInfo } from '../types';
 import { toId } from '../ids';
 
 type SmogonSet = ReturnType<typeof getSpeciesSetAssumption>;

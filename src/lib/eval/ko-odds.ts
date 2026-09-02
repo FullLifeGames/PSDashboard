@@ -1,6 +1,6 @@
 import { Generations, Move as CalcMove, Pokemon as CalcPokemon, Field, calculate } from '@smogon/calc';
 import type { Battle, Pokemon } from '@pkmn/sim';
-import { TERRAIN_BY_ID, WEATHER_BY_ID } from '../calc-field';
+import { TERRAIN_BY_ID, WEATHER_BY_ID } from '@fulllifegames/replay-core';
 
 /**
  * Analytic one-turn boundary-event odds (round 6 expectation grounding).

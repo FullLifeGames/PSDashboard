@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { enrichTeamInfo, unknownEvs } from '../src/lib/team-info';
+import { enrichTeamInfo, unknownEvs } from '../packages/replay-core/src/team-info';
 import {
   buildSmogonStatsUrls,
   fetchSmogonUsageStats,
@@ -8,7 +8,7 @@ import {
   parseSpread,
   type SmogonUsageStats,
 } from '../src/lib/smogon-stats';
-import type { OpponentTeamInfo } from '../src/types';
+import type { OpponentTeamInfo } from '../packages/replay-core/src/types';
 
 const usageStats: SmogonUsageStats = {
   format: 'gen9ou',

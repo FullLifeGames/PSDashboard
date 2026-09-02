@@ -1,6 +1,7 @@
-import type { ReplayData } from '../types';
+import {
+  type ReplayData, getReplayDisplayFormat, inferReplayFormatId, splitReplayPassword,
+} from '@fulllifegames/replay-core';
 import { replayDataFromLog } from './replay-file';
-import { getReplayDisplayFormat, inferReplayFormatId, splitReplayPassword } from './replay-format';
 
 type ReplayResponse = Omit<ReplayData, 'formatid'> & Partial<Pick<ReplayData, 'formatid'>>;
 

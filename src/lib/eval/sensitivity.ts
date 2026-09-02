@@ -5,7 +5,7 @@
  * like any other serialized position.
  */
 
-import { sideIndex, toId } from '../ids';
+import { sideIndex, toId } from '@fulllifegames/replay-core';
 
 export interface SensitivityTarget {
   species: string;

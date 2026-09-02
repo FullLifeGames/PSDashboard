@@ -1,10 +1,10 @@
 import { test, expect } from '@playwright/test';
 import { readFileSync } from 'fs';
 import { State } from '@pkmn/sim';
-import { buildTeamsFromReplay } from '../src/lib/team-builder';
+import { buildTeamsFromReplay } from '../packages/replay-core/src/team-builder';
 import { reconstructBranchRuntime } from '../src/lib/branch-engine';
-import { formatEnforcesSleepClause, getBranchSimulatorFormat } from '../src/lib/replay-format';
-import { parseReplayLogWithObservations } from '../src/lib/protocol-parser';
+import { formatEnforcesSleepClause, getBranchSimulatorFormat } from '../packages/replay-core/src/replay-format';
+import { parseReplayLogWithObservations } from '../packages/replay-core/src/protocol-parser';
 import { createLocalExecutor } from '../src/lib/eval/search';
 import { mctsTreeSearch } from '../src/lib/eval/mcts';
 import { mergeMctsTrees, MCTS_TREES, starvedSupportCells } from '../src/lib/eval/mcts-merge';

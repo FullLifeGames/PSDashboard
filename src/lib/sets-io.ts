@@ -1,7 +1,8 @@
-import type { OpponentTeamInfo, PokemonEvs, RevealedPokemonInfo } from '../types';
-import { itemSetValue } from './team-info';
+import {
+  type OpponentTeamInfo, type PokemonEvs, type RevealedPokemonInfo, itemSetValue, parsePastedTeam,
+  type PastedSet,
+} from '@fulllifegames/replay-core';
 import { EV_STATS } from './team-editor';
-import { parsePastedTeam, type PastedSet } from './team-paste';
 
 /**
  * Text import/export for both players' sets (perfect-information analysis).

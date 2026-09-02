@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import type { ReplayData, TurnSnapshot } from '../types';
+import type { ReplayData, TurnSnapshot } from '@fulllifegames/replay-core';
 import { allTurnEvents } from '../lib/eval/played';
 import { parseTendencies } from '../lib/eval/opponent-model';
 import { analyzeLeads } from '../lib/eval/leads';

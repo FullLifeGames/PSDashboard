@@ -4,7 +4,7 @@ import { findConsistentOptions, findPlayedOption } from '../analysis';
 import type { PlayedAction } from '../played';
 import type { TeraAllowance } from '../types';
 import { combinedOptionHints, isCombined, singlesOptionHints } from './hints';
-import { sideIndex } from '../../ids';
+import { sideIndex } from '@fulllifegames/replay-core';
 
 /**
  * The engine's option lists: legal choices with guaranteed no-ops dropped,

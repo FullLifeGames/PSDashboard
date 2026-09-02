@@ -1,5 +1,5 @@
 import type { PokemonSet } from '@pkmn/sim';
-import type { DamageObservation, OpponentTeamInfo, ReplayData } from '../types';
+import type { DamageObservation, OpponentTeamInfo, ReplayData } from '@fulllifegames/replay-core';
 import type { BranchHistoryEntry } from './branch-history';
 import { buildReplayTeams, type TeamBuildSources } from './eval-acquire';
 

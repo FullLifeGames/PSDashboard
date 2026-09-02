@@ -1,5 +1,5 @@
 import { Dex } from '@pkmn/sim';
-import type { RevealedPokemonInfo } from '../../types';
+import type { RevealedPokemonInfo } from '../types';
 import { findPokemonByNickname } from './lookup';
 import { toId } from '../ids';
 

@@ -1,9 +1,7 @@
-import type { RevealedPokemonInfo } from '../../types';
-import { itemSetValue } from '../../lib/team-info';
+import { type RevealedPokemonInfo, itemSetValue, toId } from '@fulllifegames/replay-core';
 import { EV_STATS, sourceLabel, type EditorPools } from '../../lib/team-editor';
 import type { TeamDraft } from '../../hooks/useTeamDraft';
 import { ComboBox } from '../ComboBox';
-import { toId } from '../../lib/ids';
 
 interface FieldProps {
   entry: RevealedPokemonInfo;

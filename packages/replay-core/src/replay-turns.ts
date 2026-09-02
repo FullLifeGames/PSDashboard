@@ -1,4 +1,4 @@
-import type { TurnSnapshot } from '../types';
+import type { TurnSnapshot } from './types';
 
 /**
  * The last turn the game actually PLAYED. The protocol parser pushes one

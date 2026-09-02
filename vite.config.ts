@@ -1,11 +1,25 @@
+import { fileURLToPath } from 'node:url'
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
+
+/**
+ * The workspace packages resolve to their sources: dev, HMR, and the build
+ * see one module graph rooted in packages/<name>/src. The built dist/ of a
+ * package is for its consumers, never for the app.
+ */
+const workspaceSource = (name: string) => fileURLToPath(new URL(`./packages/${name}/src/index.ts`, import.meta.url))
 
 export default defineConfig({
   plugins: [react(), tailwindcss()],
 
   base: "./",
+
+  resolve: {
+    alias: {
+      '@fulllifegames/replay-core': workspaceSource('replay-core'),
+    },
+  },
 
   /**
    * @pkmn/sim's battle serializer encodes every object reference as

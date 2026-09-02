@@ -20,8 +20,8 @@ const LINE_OPTS = { skipBlankLines: true, skipComments: true };
 
 const SCOPES = [
   {
-    files: ['src/**/*.{ts,tsx}'],
-    globs: ['src/**/*.{ts,tsx}'],
+    files: ['src/**/*.{ts,tsx}', 'packages/*/src/**/*.ts'],
+    globs: ['src/**/*.{ts,tsx}', 'packages/*/src/**/*.ts'],
     targets: { 'max-lines': 300, 'max-lines-per-function': 60, complexity: 15 },
   },
   {

@@ -1,12 +1,11 @@
 import { Dex } from '@pkmn/sim';
-import type { PokemonSnapshot, TurnSnapshot } from '../../types';
+import { type PokemonSnapshot, type TurnSnapshot, sideIndex, toId } from '@fulllifegames/replay-core';
 import { protocolChoiceLock, type ChoiceLockContext } from '../choice-lock';
 import { CHOICE_ITEMS } from '../eval/sensitivity';
 import { restoreSideInvariants } from '../eval/forward-model';
 import type { SimBattle, SimPokemon, SimSide } from './types';
 import { normalizeBattleOnlyFormeId } from './team-order';
 import { findFirstAvailableSwitchSlot, findPokemonOnSide, findSlotBySpecies } from './protocol-choices';
-import { sideIndex, toId } from '../ids';
 
 function repointActiveSlot(side: SimSide, activeSlot: number, target: SimPokemon): boolean {
   if (side.active[activeSlot] === target) return false;

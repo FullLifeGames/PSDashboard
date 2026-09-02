@@ -1,6 +1,6 @@
 import { useCallback } from 'react';
 import type { PokemonSet } from '@pkmn/sim';
-import type { TurnSnapshot } from '../../types';
+import type { TurnSnapshot } from '@fulllifegames/replay-core';
 import type { ChoiceLockContext } from '../../lib/choice-lock';
 import type { BranchRuntime } from '../../lib/branch-engine';
 import type { BranchSlotChoice } from '../../lib/branch-choices';

@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { parseReplayLog, parseReplayLogWithObservations } from '../src/lib/protocol-parser';
+import { parseReplayLog, parseReplayLogWithObservations } from '../packages/replay-core/src/protocol-parser';
 
 const obsHeader = [
   '|player|p1|Alice|',

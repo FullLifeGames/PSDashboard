@@ -1,7 +1,7 @@
 import type { Battle, Pokemon, Side } from '@pkmn/sim';
 import type { TeraAllowance } from '../types';
 import { positionBattle, type ChoiceOption, type SimPosition } from './position';
-import { sideIndex, toId } from '../../ids';
+import { sideIndex, toId } from '@fulllifegames/replay-core';
 
 /**
  * The legal choices of one side at a position: team preview leads, the

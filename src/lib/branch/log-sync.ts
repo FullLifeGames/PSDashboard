@@ -1,6 +1,6 @@
 import type { SimBattle, SimPokemon } from './types';
 import { normalizeBattleOnlyFormeId, slotLetter } from './team-order';
-import { toId } from '../ids';
+import { toId } from '@fulllifegames/replay-core';
 
 function replayLogPrefixThroughTurn(replayLog: string, targetTurn: number): string[] {
   const prefix: string[] = [];

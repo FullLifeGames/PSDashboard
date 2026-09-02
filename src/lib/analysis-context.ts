@@ -1,5 +1,5 @@
 import { toID } from '@pkmn/dex';
-import type { ReplayData, TurnSnapshot } from '../types';
+import type { ReplayData, TurnSnapshot } from '@fulllifegames/replay-core';
 import { analyzeTurn, decidedSeenKey, PAYOFF_WINDOW, unansweredSeenKey, type TurnAnalysis } from './eval/analysis';
 import { detectSacks, type PlayedTurn } from './eval/played';
 import type { StreakHistoryEntry } from './eval/streaks';

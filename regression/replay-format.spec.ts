@@ -6,7 +6,7 @@ import {
   getReplayGameType,
   inferReplayFormatId,
   splitReplayPassword,
-} from '../src/lib/replay-format';
+} from '../packages/replay-core/src/replay-format';
 
 const vgcReplay = {
   id: 'gen9championsvgc2026regmb-2639020147',

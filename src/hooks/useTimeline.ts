@@ -1,11 +1,10 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { finalPlayedTurn } from '../lib/replay-turns';
+import { finalPlayedTurn, type TurnSnapshot } from '@fulllifegames/replay-core';
 import {
   normalizePosition, variationCovers, variationTip,
   type TimelinePosition, type VariationSpan, type ViewLine,
 } from '../lib/timeline';
 import type { BranchHistoryEntry } from './useBranch';
-import type { TurnSnapshot } from '../types';
 
 export interface TimelineInputs {
   replayId: string | undefined;

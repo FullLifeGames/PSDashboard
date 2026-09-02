@@ -1,5 +1,5 @@
 import type { PRNGSeed } from '@pkmn/sim';
-import { toId } from './ids';
+import { toId } from '@fulllifegames/replay-core';
 
 /**
  * Hax alignment: the replay reconstruction replays the real game's choices,

@@ -1,5 +1,5 @@
 import type { BranchHistoryEntry } from './branch-history';
-import type { ReplayData } from '../types';
+import type { ReplayData } from '@fulllifegames/replay-core';
 
 interface BranchShareChoice {
   turnNumber: number;

@@ -7,7 +7,7 @@ import { attributionBadge } from './eval-badges';
 import { EngineRow } from './eval/analysis-bits';
 import { SideRow } from './eval/SideRow';
 import { evTitle } from './eval/turn-copy';
-import { sideIndex } from '../lib/ids';
+import { sideIndex } from '@fulllifegames/replay-core';
 
 export { MiniBar } from './eval/analysis-bits';
 

@@ -1,6 +1,6 @@
 import { test, expect } from '@playwright/test';
 import type { PokemonSet } from '@pkmn/sim';
-import { inferOpponentTeam } from '../src/lib/opponent-inferrer';
+import { inferOpponentTeam } from '../packages/replay-core/src/opponent-inferrer';
 import { executeBranchChoices, reconstructBranchRuntime } from '../src/lib/branch-engine';
 
 const poisonHealLog = [

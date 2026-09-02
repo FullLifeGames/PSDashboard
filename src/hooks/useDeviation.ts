@@ -1,8 +1,9 @@
 import { useCallback, useMemo, useRef, useState, type MutableRefObject } from 'react';
-import type { DamageObservation, ReplayData, TurnSnapshot } from '../types';
+import {
+  type DamageObservation, type ReplayData, type TurnSnapshot, getBranchSimulatorFormat,
+} from '@fulllifegames/replay-core';
 import type { BranchSlotChoice } from '../lib/branch-choices';
 import { classifyDeviation, keptEntries, type TimelinePosition } from '../lib/timeline';
-import { getBranchSimulatorFormat } from '../lib/replay-format';
 import { snapshotAt, type TeamBuildSources } from '../lib/eval-acquire';
 import { divergenceNoticeFor, keptHistorySlice, prepareBranchInputs } from '../lib/branch-build';
 import { buildLeadOptions, defaultLeadSelectionFor } from '../lib/lead-options';

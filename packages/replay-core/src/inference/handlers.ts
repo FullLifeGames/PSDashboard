@@ -3,7 +3,7 @@ import { revealedField, unknownEvs, unknownField } from '../team-info';
 import { canHaveDancer, findPokemon, ruleOut, type InferrerState } from './inferrer-state';
 import { parseDetails } from './lookup';
 import { toId } from '../ids';
-import type { PokemonFieldInfo } from '../../types';
+import type { PokemonFieldInfo } from '../types';
 
 /** Items whose `[from] item:` damage hits the attacker instead of the holder. */
 const ATTACKER_PUNISH_ITEMS = new Set(['rockyhelmet', 'jabocaberry', 'rowapberry']);

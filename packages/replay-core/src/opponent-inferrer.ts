@@ -1,4 +1,4 @@
-import type { OpponentTeamInfo, RevealedPokemonInfo } from '../types';
+import type { OpponentTeamInfo, RevealedPokemonInfo } from './types';
 import { guessedField, revealedField, unknownEvs, unknownField } from './team-info';
 import { createInferrerState } from './inference/inferrer-state';
 import { findPokemonByNickname } from './inference/lookup';

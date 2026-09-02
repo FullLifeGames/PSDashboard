@@ -1,4 +1,4 @@
-import type { DamageObservation, HiddenPowerEvidence, SpeedOrderObservation, TurnSnapshot } from '../types';
+import type { DamageObservation, HiddenPowerEvidence, SpeedOrderObservation, TurnSnapshot } from './types';
 import { createParserState, flushSpeedOrder } from './protocol/parser-state';
 import {
   appendFinalSnapshot, feedLine, handleActionBoundary, handleCrit, handleDamage, handleGametype, handleGen, handleMove,

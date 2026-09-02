@@ -1,4 +1,4 @@
-import type { RevealedPokemonInfo } from '../../types';
+import type { RevealedPokemonInfo } from '@fulllifegames/replay-core';
 import type { EditorPools } from '../../lib/team-editor';
 import type { TeamDraft } from '../../hooks/useTeamDraft';
 import { AbilityField, EvGrid, ItemField, MovesField, NatureField, TeraField } from './fields';

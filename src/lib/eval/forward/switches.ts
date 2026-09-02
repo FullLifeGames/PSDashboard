@@ -2,7 +2,7 @@ import { PRNG } from '@pkmn/sim';
 import type { Battle, PRNGSeed, Side } from '@pkmn/sim';
 import { evaluatePosition } from '../eval-function';
 import type { SimPosition } from './position';
-import { sideIndex } from '../../ids';
+import { sideIndex } from '@fulllifegames/replay-core';
 import { deserializeRepaired, serializeBattleStable } from './serialize';
 
 /**

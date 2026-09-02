@@ -1,7 +1,7 @@
 import { test, expect } from '@playwright/test';
 import { createBranchState, reconstructBranchRuntime } from '../src/lib/branch-engine';
 import type { PokemonSet } from '@pkmn/sim';
-import type { TurnSnapshot } from '../src/types';
+import type { TurnSnapshot } from '../packages/replay-core/src/types';
 
 const p1Team: PokemonSet[] = [
   {

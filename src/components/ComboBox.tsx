@@ -1,5 +1,5 @@
 import { useEffect, useId, useMemo, useState } from 'react';
-import { toId } from '../lib/ids';
+import { toId } from '@fulllifegames/replay-core';
 
 interface Props {
   options: string[];

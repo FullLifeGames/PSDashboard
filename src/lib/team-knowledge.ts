@@ -1,6 +1,6 @@
 import { alternativeItems } from './smogon-stats';
 import type { SensitivityTarget } from './eval/sensitivity';
-import type { OpponentTeamInfo } from '../types';
+import type { OpponentTeamInfo } from '@fulllifegames/replay-core';
 
 /** Guessed-item mons + their usage-plausible alternatives — the search
  *  space for the sensitivity probes (flagged-verdict honesty). */

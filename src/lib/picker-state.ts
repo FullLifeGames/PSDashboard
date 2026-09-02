@@ -1,8 +1,7 @@
 import { Generations, Pokemon as CalcPokemon } from '@smogon/calc';
 import { Dex } from '@pkmn/dex';
 import type { PokemonSet } from '@pkmn/sim';
-import { speciesBaseId } from './replay-format';
-import type { PokemonSnapshot, TurnSnapshot } from '../types';
+import { speciesBaseId, type PokemonSnapshot, type TurnSnapshot } from '@fulllifegames/replay-core';
 import type {
   BranchMoveOption, BranchSimState, BranchSlotModifiers, BranchSwitchOption, SimPokemonInfo,
 } from './branch-engine';

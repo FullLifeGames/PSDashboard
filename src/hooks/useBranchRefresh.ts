@@ -1,7 +1,8 @@
 import { useEffect, type MutableRefObject } from 'react';
-import type { DamageObservation, OpponentTeamInfo, ReplayData, TurnSnapshot } from '../types';
+import {
+  type DamageObservation, type OpponentTeamInfo, type ReplayData, type TurnSnapshot, getBranchSimulatorFormat,
+} from '@fulllifegames/replay-core';
 import type { BranchSlotChoice } from '../lib/branch-choices';
-import { getBranchSimulatorFormat } from '../lib/replay-format';
 import { snapshotAt, type TeamBuildSources } from '../lib/eval-acquire';
 import { prepareBranchInputs } from '../lib/branch-build';
 import type { BranchHistoryEntry, useBranch } from './useBranch';

@@ -4,7 +4,7 @@ import { Dex } from '@pkmn/dex';
 import type { EvalResult, RankedChoice } from '../types';
 import type { PlayedAction, PlayedTurn } from '../played';
 import type { SideAnalysis } from './types';
-import { toId } from '../../ids';
+import { toId } from '@fulllifegames/replay-core';
 
 /**
  * Matching the protocol's played actions into the engine's ranked lists:

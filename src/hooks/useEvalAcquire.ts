@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import type { DamageObservation, ReplayData, TurnSnapshot } from '../types';
+import type { DamageObservation, ReplayData, TurnSnapshot } from '@fulllifegames/replay-core';
 import type { TurnAlignmentRecord } from '../lib/hax-alignment';
 import type { useBranch } from './useBranch';
 import { buildReplayTeams, reconstructReplayRuntime, type TeamBuildSources } from '../lib/eval-acquire';

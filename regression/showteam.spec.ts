@@ -1,6 +1,6 @@
 import { test, expect } from '@playwright/test';
-import { buildTeamsFromReplay } from '../src/lib/team-builder';
-import { inferOpponentTeam, parseShowteamSheet } from '../src/lib/opponent-inferrer';
+import { buildTeamsFromReplay } from '../packages/replay-core/src/team-builder';
+import { inferOpponentTeam, parseShowteamSheet } from '../packages/replay-core/src/opponent-inferrer';
 import type { SmogonUsageStats } from '../src/lib/smogon-stats';
 
 // Real |showteam| payload shape from a VGC Open Team Sheets replay (B3):

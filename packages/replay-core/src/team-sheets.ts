@@ -1,7 +1,7 @@
 import type { PokemonSet } from '@pkmn/sim';
 import type {
   OpponentTeamInfo, PokemonEvs, PokemonFieldInfo, PokemonMoveInfo, RevealedPokemonInfo,
-} from '../types';
+} from './types';
 import { toId } from './ids';
 
 /**

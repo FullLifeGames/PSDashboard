@@ -9,7 +9,7 @@ import { TimelineBar } from './TimelineBar';
 import { ConfirmBanner } from './ConfirmBanner';
 import { WorkspaceEvalColumn } from './WorkspaceEvalColumn';
 import type { AppController } from '../hooks/useAppController';
-import type { ReplayData } from '../types';
+import type { ReplayData } from '@fulllifegames/replay-core';
 
 interface WorkspaceProps {
   app: AppController;

@@ -3,7 +3,7 @@ import type { LeadAnalysis } from '../lib/eval/leads';
 import type { TurnEvalSettings } from '../hooks/useEvaluation';
 import { winDeltaText } from '../lib/eval/winprob';
 import { attributionBadge } from './eval-badges';
-import { sideIndex } from '../lib/ids';
+import { sideIndex } from '@fulllifegames/replay-core';
 
 interface EvalGameReportProps {
   report: GameReport;

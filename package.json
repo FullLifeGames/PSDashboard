@@ -3,6 +3,9 @@
   "private": true,
   "version": "0.6.1",
   "type": "module",
+  "workspaces": [
+    "packages/*"
+  ],
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
@@ -15,6 +18,7 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@fulllifegames/replay-core": "*",
     "@pkmn/client": "^0.7.3",
     "@pkmn/data": "^0.10.11",
     "@pkmn/dex": "^0.10.11",

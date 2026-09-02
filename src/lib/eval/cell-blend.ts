@@ -1,7 +1,7 @@
 import type { Battle, Pokemon, PRNGSeed } from '@pkmn/sim';
 import { boundaryEvent, RANDOM_CALL_MOVES, type BoundaryEvent } from './ko-odds';
 import type { KoOddsInfo } from './types';
-import { sideIndex } from '../ids';
+import { sideIndex } from '@fulllifegames/replay-core';
 
 /**
  * Root-cell boundary-event planning and outcome-class arithmetic (round 6

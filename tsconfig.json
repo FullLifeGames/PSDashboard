@@ -1,7 +1,15 @@
 {
   "files": [],
+  "compilerOptions": {
+    // Read by Playwright (closest tsconfig.json for src/ and the suites): the
+    // workspace packages resolve to their sources, as in the app project.
+    "paths": {
+      "@fulllifegames/replay-core": ["./packages/replay-core/src/index.ts"]
+    }
+  },
   "references": [
     { "path": "./tsconfig.app.json" },
-    { "path": "./tsconfig.node.json" }
+    { "path": "./tsconfig.node.json" },
+    { "path": "./packages/replay-core" }
   ]
 }

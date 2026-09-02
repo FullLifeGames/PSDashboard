@@ -1,13 +1,12 @@
-import type { SmogonUsageStats } from './smogon/stats-types';
+import { type SmogonUsageStats, toId } from '@fulllifegames/replay-core';
 import { dataPkmnStatsUrl, parseSmogonChaosStats } from './smogon/stats-parse';
-import { toId } from './ids';
 import { ouFallbackFormat } from './smogon/format-fallback';
 
-export type { PokemonUsageStats, SmogonUsageStats, SpeciesUsageSet, UsageProbability, UsageSpread } from './smogon/stats-types';
+export type { PokemonUsageStats, SmogonUsageStats, SpeciesUsageSet, UsageProbability, UsageSpread } from '@fulllifegames/replay-core';
 export { parseSmogonChaosStats, parseSpread } from './smogon/stats-parse';
 export {
   alternativeItems, fillUsageMoves, getSpeciesUsageSet, getSpeciesUsageStats, guessedFieldFromUsage,
-} from './smogon/usage-lookup';
+} from '@fulllifegames/replay-core';
 
 const usageCache = new Map<string, Promise<SmogonUsageStats | null>>();
 

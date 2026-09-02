@@ -3,8 +3,8 @@ import { readFileSync } from 'fs';
 import { join } from 'path';
 import { FEEDBACK_CORPUS, FEEDBACK_REPLAYS } from '../e2e-feedback/corpus';
 import { validateCorpus } from '../e2e-feedback/claims';
-import { parseReplayLogWithObservations } from '../src/lib/protocol-parser';
-import { finalPlayedTurn } from '../src/lib/replay-turns';
+import { parseReplayLogWithObservations } from '../packages/replay-core/src/protocol-parser';
+import { finalPlayedTurn } from '../packages/replay-core/src/replay-turns';
 
 /**
  * The committed feedback fixtures must stay parseable and long enough for

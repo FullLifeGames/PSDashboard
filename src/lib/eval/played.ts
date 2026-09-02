@@ -3,8 +3,7 @@
  * no @pkmn/sim imports, main-bundle safe.
  */
 
-import type { TurnSnapshot } from '../../types';
-import { toId, type SideId } from '../ids';
+import { type TurnSnapshot, toId, type SideId } from '@fulllifegames/replay-core';
 
 export interface PlayedAction {
   kind: 'move' | 'switch';

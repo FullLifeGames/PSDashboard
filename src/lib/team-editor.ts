@@ -1,6 +1,4 @@
-import type { RevealedPokemonInfo, StatId } from '../types';
-import { manualMove } from './team-info';
-import { toId } from './ids';
+import { type RevealedPokemonInfo, type StatId, manualMove, toId } from '@fulllifegames/replay-core';
 
 export interface EditorPools {
   items: string[];

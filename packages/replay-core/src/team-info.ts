@@ -2,7 +2,7 @@ import { getSpeciesUsageSet } from './smogon/usage-lookup';
 import type { SmogonUsageStats, UsageProbability, UsageSpread } from './smogon/stats-types';
 import { getSpeciesSetAssumption, type SetAssumption, type SetSpreadAssumption, type SmogonSetAssumptions } from './smogon/sets-lookup';
 import { applyCoherenceVetoes, selectCuratedSet, type MoveCandidate } from './set-coherence';
-import type { OpponentTeamInfo, PokemonEvs, PokemonEvsInfo, PokemonFieldInfo, PokemonMoveInfo, RevealedPokemonInfo } from '../types';
+import type { OpponentTeamInfo, PokemonEvs, PokemonEvsInfo, PokemonFieldInfo, PokemonMoveInfo, RevealedPokemonInfo } from './types';
 import { toId } from './ids';
 
 export const EMPTY_EVS: PokemonEvs = { hp: 0, atk: 0, def: 0, spa: 0, spd: 0, spe: 0 };

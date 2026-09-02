@@ -1,7 +1,7 @@
 import type { Battle, PRNGSeed, Side } from '@pkmn/sim';
 import { toPosition, type SimPosition } from './position';
 import { applyChoice, forkBattle, resolveForcedSwitches } from './switches';
-import { sideIndex, toId } from '../../ids';
+import { sideIndex, toId } from '@fulllifegames/replay-core';
 
 /**
  * One-turn advances under a fixed seed: the search's advance (greedy

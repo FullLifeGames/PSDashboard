@@ -9,7 +9,7 @@ import { withHiddenPowerType } from './hidden-power';
 import {
   assembleMoves, buildSheetSet, editedFields, findUserMatch, resolveAbility, resolveItem, resolveSpread, selectCuratedFor,
 } from './team/set-resolvers';
-import type { DamageObservation, HiddenPowerEvidence, OpponentTeamInfo, RevealedPokemonInfo, SpeedOrderObservation } from '../types';
+import type { DamageObservation, HiddenPowerEvidence, OpponentTeamInfo, RevealedPokemonInfo, SpeedOrderObservation } from './types';
 import { toId } from './ids';
 
 /** Usage-move candidates fetched per species — vetoes refill from the tail. */

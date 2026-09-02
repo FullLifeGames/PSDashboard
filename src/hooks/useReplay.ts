@@ -1,7 +1,7 @@
 import { useState, useCallback } from 'react';
 import { fetchReplay } from '../lib/replay-fetcher';
 import { parseExportedReplay } from '../lib/replay-file';
-import type { DamageObservation, HiddenPowerEvidence, ReplayData, SpeedOrderObservation, TurnSnapshot, OpponentTeamInfo } from '../types';
+import type { DamageObservation, HiddenPowerEvidence, ReplayData, SpeedOrderObservation, TurnSnapshot, OpponentTeamInfo } from '@fulllifegames/replay-core';
 
 export interface ReplayState {
   loading: boolean;
@@ -42,8 +42,8 @@ export function useReplay() {
     try {
       const data = await task();
       const [{ parseReplayLogWithObservations }, { inferOpponentTeam }] = await Promise.all([
-        import('../lib/protocol-parser'),
-        import('../lib/opponent-inferrer'),
+        import('../lib/lazy/protocol-parser'),
+        import('../lib/lazy/opponent-inferrer'),
       ]);
       const { snapshots, observations, speedOrders, hpEvidence } = parseReplayLogWithObservations(data.log);
       const p1Info = inferOpponentTeam(data.log, 'p1');

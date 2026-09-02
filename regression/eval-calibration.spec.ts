@@ -1,10 +1,10 @@
 import { test, expect } from '@playwright/test';
 import { State } from '@pkmn/sim';
 import type { Battle } from '@pkmn/sim';
-import { buildTeamsFromReplay } from '../src/lib/team-builder';
+import { buildTeamsFromReplay } from '../packages/replay-core/src/team-builder';
 import { applyTargetCorrections, reconstructBranchRuntime } from '../src/lib/branch-engine';
-import { formatEnforcesSleepClause, getBranchSimulatorFormat, replayBringOnly } from '../src/lib/replay-format';
-import { parseReplayLogWithObservations } from '../src/lib/protocol-parser';
+import { formatEnforcesSleepClause, getBranchSimulatorFormat, replayBringOnly } from '../packages/replay-core/src/replay-format';
+import { parseReplayLogWithObservations } from '../packages/replay-core/src/protocol-parser';
 import { AUTO_MCTS_FAINTED_FRACTION, battleFaintedFraction, searchPosition } from '../src/lib/eval/search';
 import { mctsSearch } from '../src/lib/eval/mcts';
 import { fetchSmogonUsageStats } from '../src/lib/smogon-stats';

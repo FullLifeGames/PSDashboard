@@ -6,7 +6,7 @@ import type {
   PokemonMoveInfo,
   ReplayData,
   RevealedPokemonInfo,
-} from '../types';
+} from '@fulllifegames/replay-core';
 import { spriteUrl } from '../lib/sprite-url';
 import { typeBg } from '../lib/type-colors';
 

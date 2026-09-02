@@ -1,11 +1,11 @@
 import { expect, test } from '@playwright/test';
 import { readFileSync } from 'fs';
 import type { PokemonSet } from '@pkmn/sim';
-import { buildTeamsFromReplay } from '../src/lib/team-builder';
+import { buildTeamsFromReplay } from '../packages/replay-core/src/team-builder';
 import { reconstructBranchRuntime } from '../src/lib/branch-engine';
-import { parseReplayLog } from '../src/lib/protocol-parser';
+import { parseReplayLog } from '../packages/replay-core/src/protocol-parser';
 import { pickerStateFromSerialized, pickerStateFromSnapshot } from '../src/lib/picker-state';
-import type { TurnSnapshot } from '../src/types';
+import type { TurnSnapshot } from '../packages/replay-core/src/types';
 
 function loadFixtureReplay() {
   return JSON.parse(readFileSync('e2e/fixtures/replay.json', 'utf-8')) as {

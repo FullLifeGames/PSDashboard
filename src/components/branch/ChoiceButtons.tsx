@@ -3,7 +3,7 @@ import type { DamageResult } from '../../lib/damage-calc';
 import type { SpreadTargetDamage } from '../../lib/branch-damage';
 import type { BranchSlotChoice } from '../../lib/branch-choices';
 import { spriteUrl } from '../../lib/sprite-url';
-import { toId } from '../../lib/ids';
+import { toId } from '@fulllifegames/replay-core';
 import { typeBg } from '../../lib/type-colors';
 
 function hpBarClass(pct: number) {

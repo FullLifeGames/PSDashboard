@@ -1,8 +1,7 @@
-import type {
-  ChaosStatsPayload, PkmnStatsPayload, PokemonUsageStats, SmogonUsageStats, UsageProbability, UsageSpread,
-} from './stats-types';
-import { toId } from '../ids';
-import { sourceDetail } from './usage-lookup';
+import {
+  type ChaosStatsPayload, type PkmnStatsPayload, type PokemonUsageStats, type SmogonUsageStats,
+  type UsageProbability, type UsageSpread, toId, sourceDetail,
+} from '@fulllifegames/replay-core';
 
 export function dataPkmnStatsUrl(format: string): string {
   return `https://data.pkmn.cc/stats/${format}.json`;

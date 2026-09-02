@@ -1,13 +1,14 @@
 import type { PokemonSet } from '@pkmn/sim';
-import type { DamageObservation, HiddenPowerEvidence, OpponentTeamInfo, ReplayData, TurnSnapshot } from '../types';
-import type { SpreadCandidate } from './spread-inference';
-import { getBranchSimulatorFormat } from './replay-format';
+import {
+  type DamageObservation, type HiddenPowerEvidence, type OpponentTeamInfo, type ReplayData, type TurnSnapshot,
+  type SpreadCandidate, getBranchSimulatorFormat,
+} from '@fulllifegames/replay-core';
 
 type BranchEngineModule = typeof import('./branch-engine');
 type ReconstructOptions = Parameters<BranchEngineModule['reconstructBranchRuntime']>[0];
 export type CaptureBattle = Parameters<NonNullable<ReconstructOptions['capturePositions']>['onPosition']>[1];
 
-type BuildOptions = NonNullable<Parameters<typeof import('./team-builder')['buildTeamsFromReplay']>[1]>;
+type BuildOptions = NonNullable<Parameters<typeof import('./lazy/team-builder')['buildTeamsFromReplay']>[1]>;
 
 /** Everything a replay team build needs, assembled once per render. */
 export interface TeamBuildSources {
@@ -34,7 +35,7 @@ export async function buildReplayTeams(
   sources: TeamBuildSources,
   overrides?: { p1: OpponentTeamInfo | null; p2: OpponentTeamInfo | null },
 ): Promise<{ p1Team: PokemonSet[]; p2Team: PokemonSet[] }> {
-  const { buildTeamsFromReplay } = await import('./team-builder');
+  const { buildTeamsFromReplay } = await import('./lazy/team-builder');
   return buildTeamsFromReplay(replayData.log, {
     userTeamText: sources.teamText || undefined,
     p1Info: overrides ? overrides.p1 : sources.effectiveP1Info,

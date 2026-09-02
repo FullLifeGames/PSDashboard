@@ -2,11 +2,11 @@ import { readFileSync } from 'fs';
 import { test, expect } from '@playwright/test';
 import type { PokemonSet } from '@pkmn/sim';
 import { buildChoiceLockContext, buildChoiceLockTrails, corroborateChoiceItem, protocolChoiceLock } from '../src/lib/choice-lock';
-import { parseReplayLogWithObservations } from '../src/lib/protocol-parser';
+import { parseReplayLogWithObservations } from '../packages/replay-core/src/protocol-parser';
 import { parseSmogonChaosStats } from '../src/lib/smogon-stats';
-import { buildTeamsFromReplay } from '../src/lib/team-builder';
+import { buildTeamsFromReplay } from '../packages/replay-core/src/team-builder';
 import { reconstructBranchRuntime } from '../src/lib/branch-engine';
-import { getBranchSimulatorFormat } from '../src/lib/replay-format';
+import { getBranchSimulatorFormat } from '../packages/replay-core/src/replay-format';
 import { searchOptions } from '../src/lib/eval/search';
 import { createRootPosition, serializeBattleStable } from '../src/lib/eval/forward-model';
 

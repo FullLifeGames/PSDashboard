@@ -8,7 +8,7 @@ import { ComboBox } from '../ComboBox';
 import { MoveBtn } from './ChoiceButtons';
 import { moveChoiceFor, pickedChoice, type ChoiceContext } from './choice-context';
 import type { PlayedPick } from './SideControls';
-import { toId } from '../../lib/ids';
+import { toId } from '@fulllifegames/replay-core';
 
 export interface WhatIfState {
   whatIfMove: string;

@@ -1,6 +1,6 @@
 import { BattleStreams, Teams } from '@pkmn/sim';
 import type { PokemonSet } from '@pkmn/sim';
-import type { TurnSnapshot } from '../../types';
+import type { TurnSnapshot } from '@fulllifegames/replay-core';
 import type { ChoiceLockContext } from '../choice-lock';
 import type { TurnAlignmentRecord } from '../hax-alignment';
 import type { BranchChoiceErrorLog, PokemonIdent, SimBattle } from './types';

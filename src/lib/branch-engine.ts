@@ -1,4 +1,4 @@
-import type { TurnSnapshot } from '../types';
+import type { TurnSnapshot } from '@fulllifegames/replay-core';
 import type { BranchRuntime, SimBattle } from './branch/types';
 import { correctBattleFromSnapshot, hasStaleForcedSwitchRequest, refreshRequestsFromLiveState } from './branch/corrections';
 

@@ -27,15 +27,15 @@ test.describe('species-shaped default spreads', () => {
 import { readFileSync } from 'fs';
 import { dirname, join } from 'path';
 import { fileURLToPath } from 'url';
-import { buildTeamsFromReplay } from '../src/lib/team-builder';
+import { buildTeamsFromReplay } from '../packages/replay-core/src/team-builder';
 import { createBranchState, reconstructBranchRuntime } from '../src/lib/branch-engine';
-import { inferOpponentTeam } from '../src/lib/opponent-inferrer';
+import { inferOpponentTeam } from '../packages/replay-core/src/opponent-inferrer';
 import { parseExportedReplay } from '../src/lib/replay-file';
-import { parseReplayLogWithObservations } from '../src/lib/protocol-parser';
-import { enrichTeamInfo } from '../src/lib/team-info';
+import { parseReplayLogWithObservations } from '../packages/replay-core/src/protocol-parser';
+import { enrichTeamInfo } from '../packages/replay-core/src/team-info';
 import { parseSmogonChaosStats, type SmogonUsageStats } from '../src/lib/smogon-stats';
 import type { SmogonSetAssumptions } from '../src/lib/smogon-sets';
-import type { OpponentTeamInfo } from '../src/types';
+import type { OpponentTeamInfo } from '../packages/replay-core/src/types';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -442,7 +442,7 @@ test.describe('team builder edited assumptions', () => {
 
 test.describe('team sheet display overlay', () => {
   test('fills unproven fields from the sheet, never overriding proof or edits', async () => {
-    const { applyTeamSheetToInfo } = await import('../src/lib/team-sheets');
+    const { applyTeamSheetToInfo } = await import('../packages/replay-core/src/team-sheets');
     const field = (value: string, source: 'revealed' | 'guessed' | 'unknown') => ({ value, source } as const);
     const info = {
       pokemon: [{
@@ -531,7 +531,7 @@ test.describe('team sheet display overlay', () => {
   });
 
   test('extractTeamSheets finds the chat-posted infobox sheets', async () => {
-    const { extractTeamSheets } = await import('../src/lib/team-builder');
+    const { extractTeamSheets } = await import('../packages/replay-core/src/team-builder');
     const log = [
       '|player|p1|Alice|1|',
       '|player|p2|Bob|2|',

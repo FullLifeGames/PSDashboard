@@ -8,7 +8,7 @@ import { ratchetBase, ratchetOverrides } from './eslint.ratchet.mjs'
 import { importZones } from './eslint.zones.mjs'
 
 export default defineConfig([
-  globalIgnores(['dist', '.remember']),
+  globalIgnores(['dist', 'packages/*/dist', '.remember']),
   {
     files: ['**/*.{ts,tsx}'],
     extends: [

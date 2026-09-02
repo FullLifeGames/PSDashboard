@@ -1,7 +1,6 @@
 import type { PokemonSet } from '@pkmn/sim';
-import { speciesBaseId } from '../replay-format';
+import { speciesBaseId, toId } from '@fulllifegames/replay-core';
 import type { PokemonIdent } from './types';
-import { toId } from '../ids';
 
 /**
  * Fields only the brought species (VGC's 4 of 6, BSS's 3 of 6). Resolution

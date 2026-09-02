@@ -1,9 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { PokemonSet } from '@pkmn/sim';
-import type { DamageObservation, HiddenPowerEvidence, OpponentTeamInfo, ReplayData, SpeedOrderObservation } from '../types';
-import { parsePastedTeam, type PastedSet } from '../lib/team-paste';
-import { parseTeamText } from '../lib/team-parser';
-import type { SpreadCandidate } from '../lib/spread-inference';
+import {
+  type DamageObservation, type HiddenPowerEvidence, type OpponentTeamInfo, type ReplayData,
+  type SpeedOrderObservation, parsePastedTeam, type PastedSet, parseTeamText, type SpreadCandidate,
+} from '@fulllifegames/replay-core';
 import type { useSmogonUsageStats } from './useSmogonUsageStats';
 import type { useSmogonSetAssumptions } from './useSmogonSetAssumptions';
 
@@ -61,14 +61,14 @@ export function useHpResolver(
   hpEvidence: HiddenPowerEvidence[],
   usageStats: ReturnType<typeof useSmogonUsageStats>,
 ) {
-  const [hpModule, setHpModule] = useState<typeof import('../lib/hidden-power') | null>(null);
+  const [hpModule, setHpModule] = useState<typeof import('../lib/lazy/hidden-power') | null>(null);
   useEffect(() => {
     if (!replayData) return;
-    void import('../lib/team-builder');
+    void import('../lib/lazy/team-builder');
     void import('../lib/branch-engine');
     // The display-side HP-type resolver pulls @pkmn/sim's Dex — keep it out
     // of the main chunk and hand the loaded module to the enrich memos.
-    void import('../lib/hidden-power').then(module => setHpModule(module));
+    void import('../lib/lazy/hidden-power').then(module => setHpModule(module));
   }, [replayData]);
 
   const replayGenNumber = parseInt(replayData?.log.match(/^\|gen\|(\d)/m)?.[1] ?? '9', 10);
@@ -119,7 +119,7 @@ export function useSpreadSolve(inputs: {
     if (cached && cached.key.length === key.length && cached.key.every((entry, index) => entry === key[index])) {
       return cached.value;
     }
-    const { solveReplaySpreads } = await import('../lib/team-builder');
+    const { solveReplaySpreads } = await import('../lib/lazy/team-builder');
     const value = solveReplaySpreads(replayData.log, observations, {
       userTeamText: teamText || undefined,
       p1Info: info1,
@@ -145,7 +145,7 @@ export function useSheetTeams(replayData: ReplayData | null) {
     // eslint-disable-next-line react-hooks/set-state-in-effect -- the reset on a replay change; moving it to render time is a hook refactor for a UI round
     setSheetTeams({ p1: null, p2: null });
     if (!replayData) return;
-    void import('../lib/team-builder').then(({ extractTeamSheets }) => {
+    void import('../lib/lazy/team-builder').then(({ extractTeamSheets }) => {
       if (!stale) setSheetTeams(extractTeamSheets(replayData.log));
     });
     return () => { stale = true; };
