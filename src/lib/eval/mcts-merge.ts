@@ -1,12 +1,14 @@
 import { cellKey, rankFromMatrix, toResult as rankedToResult } from './rank';
-import type { EvalCellJob, EvalCellValue, EvalResult, KoOddsInfo, KoOddsMismatch, MctsTreeStats } from './types';
+import { attachKoOdds, koOddsMapsFor } from './search/root-payload';
+import type { EvalCellJob, EvalCellValue, EvalResult, KoOddsMismatch, MctsTreeStats, RankedChoice } from './types';
 
 /**
  * Root parallelization for the MCTS mode: N independent trees (each with a
  * rotated seed offset) run on separate workers and merge here by POOLED
  * root-cell statistics, ranked by the same equilibrium solve the matrix
  * mode runs (visit counts allocate search effort; they are not the
- * verdict). Pure — rank.ts only, no sim imports, main-thread safe.
+ * verdict). Pure — rank.ts and the sim-free payload helpers only, no sim
+ * imports, main-thread safe.
  */
 
 /**
@@ -39,20 +41,19 @@ export const VERIFY_CELL_CAP = 12;
 /** Mix weight from which an option counts as equilibrium support. */
 const SUPPORT_MIX = 0.05;
 
-/**
- * Merges parallel trees into one result. Order of `trees` must be fixed.
- * `verified` (cellKey → sampled cell) REPLACES starved cells' pooled values
- * before the solve: a multi-seed matrix-grade mean outranks the 1-2 chance
- * outcomes the tree happened to draw there. The score is untouched by
- * design — it stays the summed-marginal visit mean (hybrid semantics).
- */
-export function mergeMctsTrees(trees: MctsTreeStats[], verified?: Map<number, EvalCellValue>): EvalResult {
-  const base = trees[0];
-  if (trees.length === 1 && !verified) return base.result;
+interface PooledCell {
+  visits: number;
+  total: number;
+  value: number;
+  ended: boolean;
+}
 
-  // Pool per-cell reward totals across trees; ONE static prior per cell
-  // (the per-tree results already carry it, the pool re-applies it once).
-  const pooled = new Map<number, { visits: number; total: number; value: number; ended: boolean }>();
+/**
+ * Pool per-cell reward totals across trees; ONE static prior per cell (the
+ * per-tree results already carry it, the pool re-applies it once).
+ */
+function pooledCells(trees: MctsTreeStats[]): Map<number, PooledCell> {
+  const pooled = new Map<number, PooledCell>();
   for (const tree of trees) {
     for (const cell of tree.cells) {
       const entry = pooled.get(cell.key);
@@ -64,6 +65,19 @@ export function mergeMctsTrees(trees: MctsTreeStats[], verified?: Map<number, Ev
       }
     }
   }
+  return pooled;
+}
+
+/**
+ * The pooled root matrix. `verified` (cellKey → sampled cell) REPLACES
+ * starved cells' pooled values before the solve: a multi-seed matrix-grade
+ * mean outranks the 1-2 chance outcomes the tree happened to draw there.
+ */
+function pooledMatrix(
+  base: MctsTreeStats,
+  pooled: Map<number, PooledCell>,
+  verified: Map<number, EvalCellValue> | undefined,
+): { values: number[][]; ended: boolean[][] } {
   const values = base.p1Options.map((_, i) => base.p2Options.map((_, j) => {
     const entry = pooled.get(cellKey(i, j));
     if (!entry) return base.rootValue;
@@ -79,29 +93,30 @@ export function mergeMctsTrees(trees: MctsTreeStats[], verified?: Map<number, Ev
       }
     }
   }
-  // Round 7: the verify sampler's mismatch diagnostics survive the merge —
-  // sorted (i, j) because the pooled executor returns chunks in completion
-  // order. Blend payloads are dropped on purpose: MCTS has no deepening,
-  // so reblendValue has no call site here.
-  const diagnostics = verified
+  return { values, ended };
+}
+
+/**
+ * Round 7: the verify sampler's mismatch diagnostics survive the merge —
+ * sorted (i, j) because the pooled executor returns chunks in completion
+ * order. Blend payloads are dropped on purpose: MCTS has no deepening,
+ * so reblendValue has no call site here.
+ */
+function verifiedDiagnostics(verified: Map<number, EvalCellValue> | undefined): KoOddsMismatch[] {
+  return verified
     ? [...verified.values()]
       .map(value => value.diagnostic)
       .filter((diagnostic): diagnostic is KoOddsMismatch => Boolean(diagnostic))
       .sort((a, b) => a.i - b.i || a.j - b.j)
     : [];
+}
 
-  const ranked = rankFromMatrix(
-    { p1Options: base.p1Options, p2Options: base.p2Options, values, ended },
-    base.rootValue,
-  );
-  const result = rankedToResult(ranked, Math.max(...trees.map(tree => tree.depth)));
-  if (diagnostics.length > 0) result.koDiagnostics = diagnostics;
-  // Round 13: the root unanswered profile is tree-invariant — take trees[0]'s.
-  if (base.result.unanswered) result.unanswered = base.result.unanswered;
-
-  // HYBRID SEMANTICS (see mcts.ts toResult): the score keeps the summed
-  // visit-mean formulation — bit-comparable with the standing records —
-  // while the rankings above carry the pooled equilibrium.
+/**
+ * HYBRID SEMANTICS (see mcts.ts toResult): the score keeps the summed
+ * visit-mean formulation — bit-comparable with the standing records —
+ * while the rankings carry the pooled equilibrium.
+ */
+function visitMeanScore(trees: MctsTreeStats[], base: MctsTreeStats): { score: number; interval: number } {
   const sum = (key: 'p1N' | 'p1W' | 'p2N' | 'p2W'): number[] =>
     base[key].map((_, index) => trees.reduce((total, tree) => total + (tree[key][index] ?? 0), 0));
   const topVisited = (n: number[]): number => {
@@ -123,31 +138,130 @@ export function mergeMctsTrees(trees: MctsTreeStats[], verified?: Map<number, Ev
   const j = topVisited(p2N);
   const v1 = i >= 0 ? p1W[i] / p1N[i] : base.rootValue;
   const v2 = j >= 0 ? p2W[j] / p2N[j] : base.rootValue;
-  result.score = (v1 + v2) / 2;
-  result.interval = Math.abs(v2 - v1);
+  return { score: (v1 + v2) / 2, interval: Math.abs(v2 - v1) };
+}
 
-  // The follow-up line comes from a tree that agrees on the top choice.
+/** The follow-up line comes from a tree that agrees on the top choice. */
+function attachDonorLine(trees: MctsTreeStats[], result: EvalResult): void {
   if (result.perSide.p1.length > 0) {
     const donor = trees.find(tree =>
       tree.result.perSide.p1[0]?.choice === result.perSide.p1[0].choice && tree.result.perSide.p1[0].line);
     if (donor) result.perSide.p1[0].line = donor.result.perSide.p1[0].line;
   }
+}
+
+/**
+ * Merges parallel trees into one result. Order of `trees` must be fixed.
+ * `verified` (cellKey → sampled cell) REPLACES starved cells' pooled values
+ * before the solve: a multi-seed matrix-grade mean outranks the 1-2 chance
+ * outcomes the tree happened to draw there. The score is untouched by
+ * design — it stays the summed-marginal visit mean (hybrid semantics).
+ */
+export function mergeMctsTrees(trees: MctsTreeStats[], verified?: Map<number, EvalCellValue>): EvalResult {
+  const base = trees[0];
+  if (trees.length === 1 && !verified) return base.result;
+
+  const pooled = pooledCells(trees);
+  const { values, ended } = pooledMatrix(base, pooled, verified);
+  const diagnostics = verifiedDiagnostics(verified);
+
+  const ranked = rankFromMatrix(
+    { p1Options: base.p1Options, p2Options: base.p2Options, values, ended },
+    base.rootValue,
+  );
+  const result = rankedToResult(ranked, Math.max(...trees.map(tree => tree.depth)));
+  if (diagnostics.length > 0) result.koDiagnostics = diagnostics;
+  // Round 13: the root unanswered profile is tree-invariant — take trees[0]'s.
+  if (base.result.unanswered) result.unanswered = base.result.unanswered;
+
+  const { score, interval } = visitMeanScore(trees, base);
+  result.score = score;
+  result.interval = interval;
+  attachDonorLine(trees, result);
 
   // Round 7: analytic per-option kill odds, shipped by the trees (this
-  // module stays sim-free — same duplication rationale as orchestrator.ts).
-  if (base.koOdds) {
-    const oddsMaps = {
-      p1: new Map<string, KoOddsInfo | null>(base.p1Options.map((option, index) => [option.choice, base.koOdds!.p1[index] ?? null])),
-      p2: new Map<string, KoOddsInfo | null>(base.p2Options.map((option, index) => [option.choice, base.koOdds!.p2[index] ?? null])),
-    };
-    for (const side of ['p1', 'p2'] as const) {
-      for (const row of result.perSide[side]) {
-        const odds = oddsMaps[side].get(row.choice);
-        if (odds) row.koOdds = odds;
-      }
+  // module stays sim-free — the shared payload helpers are sim-free too).
+  if (base.koOdds) attachKoOdds(result, koOddsMapsFor(base.p1Options, base.p2Options, base.koOdds));
+  return result;
+}
+
+interface PoolStats {
+  /** key → prior-blended mean per expanding tree. */
+  perTree: Map<number, number[]>;
+  pooledVisits: Map<number, number>;
+  endedCells: Set<number>;
+}
+
+function poolStats(trees: MctsTreeStats[]): PoolStats {
+  const perTree = new Map<number, number[]>();
+  const pooledVisits = new Map<number, number>();
+  const endedCells = new Set<number>();
+  for (const tree of trees) {
+    for (const cell of tree.cells) {
+      pooledVisits.set(cell.key, (pooledVisits.get(cell.key) ?? 0) + cell.visits);
+      if (cell.ended) endedCells.add(cell.key);
+      const means = perTree.get(cell.key) ?? [];
+      means.push((cell.total + cell.value) / (cell.visits + 1));
+      perTree.set(cell.key, means);
     }
   }
-  return result;
+  return { perTree, pooledVisits, endedCells };
+}
+
+/** The chance-suspect predicate over the pool: boundary cells, starved cells, thin trees, disagreeing trees. */
+function suspectFor(trees: MctsTreeStats[], stats: PoolStats, boundary: Set<number>): (key: number) => boolean {
+  return (key: number): boolean => {
+    // A boundary cell's fixed per-tree outcomes cannot represent its
+    // accuracy×killFraction split — suspect regardless of visit stats.
+    if (boundary.has(key)) return true;
+    if ((stats.pooledVisits.get(key) ?? 0) < VERIFY_MIN_VISITS) return true;
+    const means = stats.perTree.get(key) ?? [];
+    if (means.length < Math.min(VERIFY_MIN_TREES, trees.length)) return true;
+    return Math.max(...means) - Math.min(...means) > VERIFY_SPREAD;
+  };
+}
+
+/**
+ * Support per side: equilibrium mass, with the ranked top three injected
+ * at a nominal mass so a starved row the solve DEMOTED on noise still
+ * verifies (the demotion may itself be the artifact).
+ */
+function supportMass(
+  mix: number[],
+  ranked: EvalResult['perSide']['p1'],
+  byChoice: Map<string, number>,
+): Map<number, number> {
+  const mass = new Map<number, number>();
+  mix.forEach((weight, index) => {
+    if (weight >= SUPPORT_MIX) mass.set(index, weight);
+  });
+  for (const entry of ranked.slice(0, 3)) {
+    const index = byChoice.get(entry.choice);
+    if (index !== undefined && !mass.has(index)) mass.set(index, SUPPORT_MIX / 2);
+  }
+  return mass;
+}
+
+/**
+ * Punisher cells: each top entry's floor is a single cell — if that cell
+ * is starved, the floor (and punishedBy) is a coin flip too. `key` maps
+ * (own index, opponent index) onto the cell key for the entry's side.
+ */
+function addPunisherCells(
+  candidates: Map<number, number>,
+  entries: RankedChoice[],
+  ownByChoice: Map<string, number>,
+  oppByLabel: Map<string, number>,
+  key: (own: number, opp: number) => number,
+): void {
+  for (const entry of entries.slice(0, 3)) {
+    const own = ownByChoice.get(entry.choice);
+    const opp = entry.punishedBy !== null ? oppByLabel.get(entry.punishedBy) : undefined;
+    if (own !== undefined && opp !== undefined) {
+      const cell = key(own, opp);
+      candidates.set(cell, Math.max(candidates.get(cell) ?? 0, SUPPORT_MIX * SUPPORT_MIX));
+    }
+  }
 }
 
 /**
@@ -162,51 +276,14 @@ export function starvedSupportCells(trees: MctsTreeStats[], merged: EvalResult):
   const base = trees[0];
   const mixes = merged.matrix?.mixes;
   if (!mixes) return [];
-  const perTree = new Map<number, number[]>(); // key → prior-blended mean per expanding tree
-  const pooledVisits = new Map<number, number>();
-  const endedCells = new Set<number>();
-  for (const tree of trees) {
-    for (const cell of tree.cells) {
-      pooledVisits.set(cell.key, (pooledVisits.get(cell.key) ?? 0) + cell.visits);
-      if (cell.ended) endedCells.add(cell.key);
-      const means = perTree.get(cell.key) ?? [];
-      means.push((cell.total + cell.value) / (cell.visits + 1));
-      perTree.set(cell.key, means);
-    }
-  }
+  const stats = poolStats(trees);
   const boundary = new Set(trees[0].boundaryCells ?? []);
-  const suspect = (key: number): boolean => {
-    // A boundary cell's fixed per-tree outcomes cannot represent its
-    // accuracy×killFraction split — suspect regardless of visit stats.
-    if (boundary.has(key)) return true;
-    if ((pooledVisits.get(key) ?? 0) < VERIFY_MIN_VISITS) return true;
-    const means = perTree.get(key) ?? [];
-    if (means.length < Math.min(VERIFY_MIN_TREES, trees.length)) return true;
-    return Math.max(...means) - Math.min(...means) > VERIFY_SPREAD;
-  };
+  const suspect = suspectFor(trees, stats, boundary);
 
-  // Support per side: equilibrium mass, with the ranked top three injected
-  // at a nominal mass so a starved row the solve DEMOTED on noise still
-  // verifies (the demotion may itself be the artifact).
-  const support = (
-    mix: number[],
-    ranked: EvalResult['perSide']['p1'],
-    byChoice: Map<string, number>,
-  ): Map<number, number> => {
-    const mass = new Map<number, number>();
-    mix.forEach((weight, index) => {
-      if (weight >= SUPPORT_MIX) mass.set(index, weight);
-    });
-    for (const entry of ranked.slice(0, 3)) {
-      const index = byChoice.get(entry.choice);
-      if (index !== undefined && !mass.has(index)) mass.set(index, SUPPORT_MIX / 2);
-    }
-    return mass;
-  };
   const p1ByChoice = new Map(base.p1Options.map((option, index) => [option.choice, index]));
   const p2ByChoice = new Map(base.p2Options.map((option, index) => [option.choice, index]));
-  const p1Mass = support(mixes.p1, merged.perSide.p1, p1ByChoice);
-  const p2Mass = support(mixes.p2, merged.perSide.p2, p2ByChoice);
+  const p1Mass = supportMass(mixes.p1, merged.perSide.p1, p1ByChoice);
+  const p2Mass = supportMass(mixes.p2, merged.perSide.p2, p2ByChoice);
 
   const candidates = new Map<number, number>(); // cellKey → priority mass
   for (const [i, massI] of p1Mass) {
@@ -214,33 +291,17 @@ export function starvedSupportCells(trees: MctsTreeStats[], merged: EvalResult):
       candidates.set(cellKey(i, j), massI * massJ);
     }
   }
-  // Punisher cells: each top entry's floor is a single cell — if that cell
-  // is starved, the floor (and punishedBy) is a coin flip too.
   const p1ByLabel = new Map(base.p1Options.map((option, index) => [option.label, index]));
   const p2ByLabel = new Map(base.p2Options.map((option, index) => [option.label, index]));
-  for (const entry of merged.perSide.p1.slice(0, 3)) {
-    const i = p1ByChoice.get(entry.choice);
-    const j = entry.punishedBy !== null ? p2ByLabel.get(entry.punishedBy) : undefined;
-    if (i !== undefined && j !== undefined) {
-      const key = cellKey(i, j);
-      candidates.set(key, Math.max(candidates.get(key) ?? 0, SUPPORT_MIX * SUPPORT_MIX));
-    }
-  }
-  for (const entry of merged.perSide.p2.slice(0, 3)) {
-    const j = p2ByChoice.get(entry.choice);
-    const i = entry.punishedBy !== null ? p1ByLabel.get(entry.punishedBy) : undefined;
-    if (i !== undefined && j !== undefined) {
-      const key = cellKey(i, j);
-      candidates.set(key, Math.max(candidates.get(key) ?? 0, SUPPORT_MIX * SUPPORT_MIX));
-    }
-  }
+  addPunisherCells(candidates, merged.perSide.p1, p1ByChoice, p2ByLabel, (own, opp) => cellKey(own, opp));
+  addPunisherCells(candidates, merged.perSide.p2, p2ByChoice, p1ByLabel, (own, opp) => cellKey(opp, own));
 
   return [...candidates.entries()]
     // Boundary cells bypass the ended exclusion: a game-ending kill range
     // is ended in its drawn class precisely because the pool cannot see
     // the other one. sampleCell's own ended semantics (ALL children ended)
     // replace the pooled flag through the verified merge.
-    .filter(([key]) => suspect(key) && (boundary.has(key) || !endedCells.has(key)))
+    .filter(([key]) => suspect(key) && (boundary.has(key) || !stats.endedCells.has(key)))
     .sort((a, b) => b[1] - a[1])
     .slice(0, VERIFY_CELL_CAP)
     .map(([key]) => {
