@@ -1,29 +1,18 @@
 import { useEffect, useState, useMemo } from 'react';
-import type { BranchSimState, BranchMoveOption, BranchSwitchOption } from '../hooks/useBranch';
+import type { BranchSimState, BranchMoveOption, BranchSwitchOption, SimPokemonInfo } from '../hooks/useBranch';
 import type { BranchSlotModifiers } from '../lib/branch-engine';
-import type { BranchMoveModifier } from '../lib/branch-choices';
-import type { DamageResult } from '../lib/damage-calc';
 import {
   branchSideChoicesReady,
-  choiceId,
-  notationSlotChoice,
   requiredChoicesForActiveSlots,
   switchChoiceKey,
-  switchOptionKey,
   type BranchSlotChoice,
 } from '../lib/branch-choices';
 import type { PickerSource } from '../lib/picker-state';
-import { spriteUrl } from '../lib/sprite-url';
-import { ComboBox } from './ComboBox';
+import { computePreviewDamage, EMPTY_SIDE_DAMAGE, type DamagePreviewInputs, type SideDamage } from '../lib/branch-damage';
+import { SideControls, type PlayedPick } from './branch/SideControls';
+import { ExecuteRow, PickerSourceLine, RawLogToggle } from './branch/PanelStatus';
 
-/** What the viewed line actually played at this position (badge on the
- *  matching button + header note): the replay's action on the main line,
- *  the variation's recorded choice on variation positions. */
-export interface PlayedPick {
-  kind: 'move' | 'switch';
-  name: string;
-  species?: string;
-}
+export type { PlayedPick } from './branch/SideControls';
 
 interface Props {
   simState: BranchSimState | null;
@@ -51,21 +40,6 @@ interface Props {
   played?: { p1: PlayedPick | null; p2: PlayedPick | null } | null;
 }
 
-interface SpreadTargetDamage {
-  label: string;
-  result: DamageResult;
-}
-
-/* ── PS type colors ── */
-const TYPE_BG: Record<string, string> = {
-  Normal:   '#A8A878', Fire:     '#F08030', Water:    '#6890F0',
-  Electric: '#F8D030', Grass:    '#78C850', Ice:      '#98D8D8',
-  Fighting: '#C03028', Poison:   '#A040A0', Ground:   '#E0C068',
-  Flying:   '#A890F0', Psychic:  '#F85888', Bug:      '#A8B820',
-  Rock:     '#B8A038', Ghost:    '#705898', Dragon:   '#7038F8',
-  Dark:     '#705848', Steel:    '#B8B8D0', Fairy:    '#EE99AC',
-  Stellar:  '#40B5A5', '???':    '#68A090',
-};
 const EMPTY_MOVES: BranchMoveOption[] = [];
 const EMPTY_SWITCHES: BranchSwitchOption[] = [];
 const EMPTY_MODIFIERS: BranchSlotModifiers = {
@@ -75,506 +49,15 @@ const EMPTY_MODIFIERS: BranchSlotModifiers = {
   zMoves: [],
 };
 
-function typeBg(type: string) { return TYPE_BG[type] || '#68A090'; }
-
-
-function hpBarClass(pct: number) {
-  if (pct > 50) return 'ps-hpbar-green';
-  if (pct > 20) return 'ps-hpbar-yellow';
-  return 'ps-hpbar-red';
-}
-
-/* ── Move button ── */
-function MoveBtn({ move, dmg, spreadDamage, zMoveName, targetDamage, pendingChoice, wasPlayed, compact, onClick }: {
-  move: BranchMoveOption;
-  dmg?: DamageResult;
-  spreadDamage?: SpreadTargetDamage[];
-  zMoveName?: string | null;
-  targetDamage: Record<number, DamageResult | undefined>;
-  pendingChoice: BranchSlotChoice | null;
-  /** This is the move the viewed line actually played at this position. */
-  wasPlayed?: boolean;
-  /** Basic view: a small chip (name + PP; type and damage in the tooltip). */
-  compact?: boolean;
-  onClick: (targetLoc?: number) => void;
-}) {
-  const bg = typeBg(move.type);
-  const pendingMove = pendingChoice?.kind === 'move' ? pendingChoice : null;
-  const selected = pendingMove?.moveId === choiceId(move.name);
-  const selectedTarget = selected
-    ? move.targetOptions.find(target => target.targetLoc === pendingMove?.targetLoc)
-    : null;
-  const ppText = move.maxpp > 0 ? `${move.pp}/${move.maxpp}` : '—';
-  const compactTitle = `${move.type || '???'} · ${ppText} PP` +
-    (dmg && dmg.maxPercent > 0 ? ` · ${dmg.range}${dmg.koChance ? ` (${dmg.koChance})` : ''}` : '');
-  return (
-    <div>
-      <button
-        type="button"
-        onClick={() => onClick(move.targetOptions[0]?.targetLoc)}
-        disabled={move.disabled || (move.requiresTarget && move.targetOptions.length === 0)}
-        className={`ps-movebtn ${compact ? 'ps-movebtn-compact ' : ''}${selected ? 'ps-movebtn-selected' : ''}`}
-        style={{ background: bg }}
-        title={compact ? compactTitle : undefined}
-      >
-        <div className="ps-movebtn-name">{move.name}</div>
-        {/* Advanced already names the played action in the header line. */}
-        {compact && wasPlayed && <span className="ps-played-badge" title="The action played at this position on the line you are viewing.">played</span>}
-        {zMoveName && (
-          <div className="ps-movebtn-zmove">→ {zMoveName}</div>
-        )}
-        {compact ? (
-          <span className="ps-movebtn-pp">{ppText}</span>
-        ) : (
-          <div className="ps-movebtn-info">
-            <span className="ps-movebtn-type">{move.type || '???'}</span>
-            <span className="ps-movebtn-pp">{ppText}</span>
-          </div>
-        )}
-        {!compact && (spreadDamage && spreadDamage.length > 1 ? (
-          <div className="ps-movebtn-dmg">
-            {spreadDamage.map(target => (
-              <span key={target.label} className="ps-movebtn-spread-target">
-                {target.label} {target.result.range}
-              </span>
-            ))}
-          </div>
-        ) : dmg && dmg.maxPercent > 0 && (
-          <div className="ps-movebtn-dmg">
-            {dmg.range}
-            {dmg.koChance && <span className="ps-movebtn-ko"> ({dmg.koChance})</span>}
-          </div>
-        ))}
-        {selectedTarget && (
-          <div className="ps-movebtn-target">
-            Targeting {selectedTarget.label} {selectedTarget.name}
-          </div>
-        )}
-      </button>
-      {move.targetOptions.length > 0 && (
-        <div className="ps-target-row">
-          {move.targetOptions.map(target => {
-            const damage = targetDamage[target.targetLoc];
-            const targetSelected = !!selected && pendingMove?.targetLoc === target.targetLoc;
-            return (
-              <button
-                key={target.targetLoc}
-                type="button"
-                onClick={() => onClick(target.targetLoc)}
-                disabled={move.disabled}
-                className={`ps-target-btn ${targetSelected ? 'ps-target-btn-selected' : ''}`}
-                title={`${move.name} into ${target.name} (${target.hpPercent}%)`}
-                aria-pressed={targetSelected}
-              >
-                <span className="ps-target-main">
-                  <span className="ps-target-slot">{target.label}</span>
-                  {' '}
-                  <span className="ps-target-name">{target.name}</span>
-                </span>
-                <span className="ps-target-meta">
-                  {target.hpPercent}% HP
-                  {damage?.maxPercent ? ` · ${damage.range}` : ''}
-                </span>
-              </button>
-            );
-          })}
-        </div>
-      )}
-    </div>
-  );
-}
-
-/* ── Switch button ── */
-function SwitchBtn({ sw, selected, disabled, disabledReason, wasPlayed, compact, onClick }: {
-  sw: BranchSwitchOption; selected: boolean; disabled: boolean; disabledReason?: string; wasPlayed?: boolean;
-  /** Basic view: a small chip (sprite + name + HP%). */
-  compact?: boolean;
-  onClick: () => void;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      disabled={sw.fainted || disabled}
-      title={disabled ? disabledReason : compact ? `${sw.name} · ${sw.hp}` : undefined}
-      aria-disabled={disabled || sw.fainted}
-      className={`ps-switchbtn ${compact ? 'ps-switchbtn-compact ' : ''}${selected ? 'ps-switchbtn-selected' : ''}`}
-    >
-      <img src={spriteUrl(sw.species)} alt={sw.name} />
-      {compact ? (
-        <div className="ps-switchbtn-name">
-          {sw.name}
-          {wasPlayed && <span className="ps-played-badge" title="The action played at this position on the line you are viewing.">played</span>}
-          <span className="ps-switchbtn-hp"> {sw.hpPercent}%</span>
-        </div>
-      ) : (
-        <>
-          <div>
-            <div className="ps-switchbtn-name">
-              {sw.name}
-            </div>
-            <div style={{ width: 60 }}>
-              <div className="ps-hpbar-track" style={{ height: 4, marginTop: 2 }}>
-                <div className={`ps-hpbar-fill ${hpBarClass(sw.hpPercent)}`} style={{ width: `${sw.hpPercent}%` }} />
-              </div>
-            </div>
-          </div>
-          <span className="ps-switchbtn-hp">{sw.hp}</span>
-        </>
-      )}
-    </button>
-  );
-}
-
-/* ── Controls for one side (moves/switches) ── */
-function SideControls({ label, activeName, activeSpecies, activeFainted, moves, switches, forceSwitch, pending, blockedSwitchKeys, modifiers, dmgResults, spreadDamageResults, targetDamageResults, gen, advanced, played, onChoice, onHypotheticalMove }: {
-  label: string;
-  activeName: string;
-  activeSpecies: string;
-  activeFainted: boolean;
-  moves: BranchMoveOption[];
-  switches: BranchSwitchOption[];
-  forceSwitch: boolean;
-  pending: BranchSlotChoice | null;
-  blockedSwitchKeys: Set<string>;
-  modifiers: BranchSlotModifiers;
-  dmgResults: DamageResult[];
-  spreadDamageResults: Record<number, SpreadTargetDamage[]>;
-  targetDamageResults: Record<string, DamageResult | undefined>;
-  gen: number;
-  /** Shows the power tools (free choice dropdown, "What if it had…"). */
-  advanced: boolean;
-  played?: PlayedPick | null;
-  onChoice: (choice: BranchSlotChoice) => void;
-  onHypotheticalMove: (params: { species: string; move: string; replace: string | null }) => void;
-}) {
-  const [tab, setTab] = useState<'fight' | 'switch'>(forceSwitch ? 'switch' : 'fight');
-  const [modifier, setModifier] = useState<BranchMoveModifier | null>(null);
-  const [whatIfMove, setWhatIfMove] = useState('');
-  const [whatIfReplace, setWhatIfReplace] = useState<string | null>(null);
-  const [movePool, setMovePool] = useState<string[]>([]);
-
-  // Legal move pool for "What if it had …" — loaded lazily per active species.
-  useEffect(() => {
-    let alive = true;
-    setMovePool([]);
-    if (!activeSpecies) return;
-    void import('../lib/pokemon-options')
-      .then(options => options.getMovePool(activeSpecies, gen))
-      .then(pool => {
-        if (alive) setMovePool(pool);
-      });
-    return () => {
-      alive = false;
-    };
-  }, [activeSpecies, gen]);
-  const hasZMoves = modifiers.zMoves.some(Boolean);
-  const hasAnyModifier = !!modifiers.teraType || modifiers.canMegaEvo || modifiers.canUltraBurst || hasZMoves;
-  const modifierAvailable =
-    (modifier === 'terastallize' && !!modifiers.teraType) ||
-    (modifier === 'mega' && modifiers.canMegaEvo) ||
-    (modifier === 'ultra' && modifiers.canUltraBurst) ||
-    (modifier === 'zmove' && hasZMoves);
-
-  // The toggle is local component state — once the gimmick is spent (or the
-  // active Pokémon changed and can't use it), it must not silently stick to
-  // future move choices ("Thundurus can't Terastallize" after an earlier Tera).
-  useEffect(() => {
-    if (modifier && !modifierAvailable) setModifier(null);
-  }, [modifier, modifierAvailable]);
-  const playedMoveKey = played?.kind === 'move' ? choiceId(played.name) : null;
-  const playedSwitchKey = played?.kind === 'switch' ? choiceId(played.species || played.name) : null;
-  const playedText = played
-    ? (played.kind === 'move' ? played.name : `→ ${played.name}`)
-    : null;
-
-  return (
-    <div className="ps-controls ps-side-controls">
-      <div className="ps-whatdo">
-        <span className="ps-side-label">{label}</span>
-        {' '}
-        {forceSwitch ? (
-          <>Choose a replacement{activeFainted ? <> for <strong>{activeName}</strong></> : null}</>
-        ) : (
-          <>What will <strong>{activeName}</strong> do?</>
-        )}
-        {pending && (
-          <span className="ps-pending-choice">
-            [{notationSlotChoice(pending)}]
-          </span>
-        )}
-        {playedText && !pending && (
-          <span
-            style={{ marginLeft: 6, fontSize: 10, color: '#b8c9e0' }}
-            title="What this side played at this position on the line you are viewing."
-          >
-            played: <strong>{playedText}</strong>
-          </span>
-        )}
-      </div>
-
-      {forceSwitch && (
-        <div className="ps-force-switch-note">
-          {activeFainted
-            ? `${activeName} fainted! Choose who to send in:`
-            : `${activeName} is switching out. Choose who to send in:`}
-        </div>
-      )}
-
-      {/* Basic view: no tabs — moves and switches sit together as small
-          chips. Advanced grows them into the full tabbed picker. */}
-      {!forceSwitch && advanced && (
-        <div className="ps-tab-row">
-          <button
-            type="button"
-            className={`ps-controls-tab ${tab === 'fight' ? 'ps-controls-tab-active' : ''}`}
-            onClick={() => setTab('fight')}
-          >
-            Fight
-          </button>
-          <button
-            type="button"
-            className={`ps-controls-tab ${tab === 'switch' ? 'ps-controls-tab-active' : ''}`}
-            onClick={() => setTab('switch')}
-          >
-            Pokémon
-          </button>
-        </div>
-      )}
-
-      {!forceSwitch && (!advanced || tab === 'fight') && moves.length > 0 && (
-        <>
-          {hasAnyModifier && (
-            <div className="ps-modifier-row" role="group" aria-label={`Battle gimmicks for ${label}`}>
-              {modifiers.teraType && (
-                <ModifierToggle
-                  label={`Tera (${modifiers.teraType})`}
-                  active={modifier === 'terastallize'}
-                  onToggle={() => setModifier(current => current === 'terastallize' ? null : 'terastallize')}
-                />
-              )}
-              {modifiers.canMegaEvo && (
-                <ModifierToggle
-                  label="Mega Evolve"
-                  active={modifier === 'mega'}
-                  onToggle={() => setModifier(current => current === 'mega' ? null : 'mega')}
-                />
-              )}
-              {modifiers.canUltraBurst && (
-                <ModifierToggle
-                  label="Ultra Burst"
-                  active={modifier === 'ultra'}
-                  onToggle={() => setModifier(current => current === 'ultra' ? null : 'ultra')}
-                />
-              )}
-              {hasZMoves && (
-                <ModifierToggle
-                  label="Z-Move"
-                  active={modifier === 'zmove'}
-                  onToggle={() => setModifier(current => current === 'zmove' ? null : 'zmove')}
-                />
-              )}
-            </div>
-          )}
-          <div className={`ps-movegrid${advanced ? '' : ' ps-movegrid-compact'}`}>
-            {moves.map((m, i) => (
-              <MoveBtn
-                key={m.slot}
-                move={m}
-                dmg={dmgResults[i]}
-                spreadDamage={spreadDamageResults[m.slot]}
-                zMoveName={modifier === 'zmove' ? modifiers.zMoves[m.slot - 1] ?? null : null}
-                targetDamage={Object.fromEntries(
-                  m.targetOptions.map(target => [
-                    target.targetLoc,
-                    targetDamageResults[`${m.slot}:${target.targetLoc}`],
-                  ]),
-                )}
-                pendingChoice={pending}
-                wasPlayed={playedMoveKey !== null && choiceId(m.name) === playedMoveKey}
-                compact={!advanced}
-                onClick={(targetLoc) => onChoice(moveChoiceFor(m, targetLoc))}
-              />
-            ))}
-          </div>
-          {advanced && (
-          <div className="ps-custom-choice">
-            <select
-              className="ps-input"
-              aria-label={`Choice picker for ${label}`}
-              value=""
-              onChange={event => onPickChoice(event.target.value)}
-            >
-              <option value="" disabled>All choices…</option>
-              <optgroup label="Moves">
-                {moves.filter(move => !move.disabled).flatMap(move => (
-                  move.targetOptions.length > 0
-                    ? move.targetOptions.map(target => (
-                      <option key={`m-${move.slot}-${target.targetLoc}`} value={`move:${move.slot}:${target.targetLoc}`}>
-                        {move.name} → {target.label} {target.name}
-                      </option>
-                    ))
-                    : [
-                      <option key={`m-${move.slot}`} value={`move:${move.slot}`}>
-                        {move.name}
-                      </option>,
-                    ]
-                ))}
-              </optgroup>
-              {switches.length > 0 && (
-                <optgroup label="Switch to">
-                  {switches.map(sw => (
-                    <option
-                      key={`s-${sw.slot}`}
-                      value={`switch:${sw.slot}`}
-                      disabled={blockedSwitchKeys.has(switchOptionKey(sw))}
-                    >
-                      Switch: {sw.name} ({sw.hpPercent}% HP)
-                    </option>
-                  ))}
-                </optgroup>
-              )}
-            </select>
-            {/* Shares the picker's row — a second row pushed Execute Turn below the fold. */}
-            {movePool.length > 0 && (
-              <>
-                <ComboBox
-                  options={movePool.filter(name => !moves.some(known => choiceId(known.name) === choiceId(name)))}
-                  value={whatIfMove}
-                  onChange={setWhatIfMove}
-                  onSelect={setWhatIfMove}
-                  placeholder="What if it had…"
-                  ariaLabel={`Hypothetical move for ${label}`}
-                />
-                {moves.length >= 4 && (
-                  <select
-                    className="ps-input"
-                    aria-label={`Replaced move for ${label}`}
-                    value={whatIfReplace ?? moves[moves.length - 1].name}
-                    onChange={event => setWhatIfReplace(event.target.value)}
-                    style={{ flex: '0 1 110px' }}
-                  >
-                    {moves.map(known => <option key={known.slot} value={known.name}>{known.name}</option>)}
-                  </select>
-                )}
-                <button
-                  type="button"
-                  className="ps-btn"
-                  disabled={
-                    !whatIfMove.trim() ||
-                    !movePool.some(name => choiceId(name) === choiceId(whatIfMove))
-                  }
-                  onClick={() => {
-                    onHypotheticalMove({
-                      species: activeSpecies,
-                      move: movePool.find(name => choiceId(name) === choiceId(whatIfMove)) ?? whatIfMove.trim(),
-                      replace: moves.length >= 4 ? (whatIfReplace ?? moves[moves.length - 1].name) : null,
-                    });
-                    setWhatIfMove('');
-                  }}
-                >
-                  Load move
-                </button>
-              </>
-            )}
-          </div>
-          )}
-        </>
-      )}
-
-      {(forceSwitch || !advanced || tab === 'switch') && switches.length > 0 && (
-        <div className={`ps-switchgrid${!advanced && !forceSwitch ? ' ps-switchgrid-compact' : ''}`}>
-          {switches.map(sw => {
-            const selected = switchChoiceKey(pending) === switchOptionKey(sw);
-            return (
-              <SwitchBtn
-                key={sw.slot}
-                sw={sw}
-                selected={selected}
-                disabled={blockedSwitchKeys.has(switchOptionKey(sw)) && !selected}
-                disabledReason={`${sw.name} is already chosen as the switch-in for your other slot.`}
-                wasPlayed={playedSwitchKey !== null && (choiceId(sw.species) === playedSwitchKey || choiceId(sw.name) === playedSwitchKey)}
-                compact={!advanced && !forceSwitch}
-                onClick={() => onChoice({ kind: 'switch', speciesId: choiceId(sw.species), pokemonName: sw.name })}
-              />
-            );
-          })}
-        </div>
-      )}
-    </div>
-  );
-
-  function withModifier(choice: BranchSlotChoice): BranchSlotChoice {
-    if (choice.kind !== 'move' || !modifier || !modifierAvailable) return choice;
-    // A Z toggle only applies to moves that actually have a Z option.
-    if (modifier === 'zmove') {
-      const moveIndex = moves.findIndex(candidate => choiceId(candidate.name) === choice.moveId);
-      if (moveIndex < 0 || !modifiers.zMoves[moveIndex]) return choice;
-    }
-    return { ...choice, modifier };
-  }
-
-  function moveChoiceFor(move: BranchMoveOption, targetLoc?: number): BranchSlotChoice {
-    return withModifier({
-      kind: 'move',
-      moveId: choiceId(move.name),
-      moveName: move.name,
-      ...(targetLoc !== undefined ? { targetLoc } : {}),
-    });
-  }
-
-  function onPickChoice(value: string) {
-    const [kind, slotText, targetText] = value.split(':');
-    const slot = parseInt(slotText, 10);
-    if (kind === 'move') {
-      const move = moves.find(candidate => candidate.slot === slot);
-      if (!move) return;
-      const targetLoc = targetText !== undefined ? parseInt(targetText, 10) : undefined;
-      onChoice(moveChoiceFor(move, targetLoc));
-      return;
-    }
-    if (kind === 'switch') {
-      const target = switches.find(candidate => candidate.slot === slot);
-      if (!target) return;
-      onChoice({ kind: 'switch', speciesId: choiceId(target.species), pokemonName: target.name });
-    }
-  }
-}
-
-function ModifierToggle({ label, active, onToggle }: {
-  label: string;
-  active: boolean;
-  onToggle: () => void;
-}) {
-  return (
-    <button
-      type="button"
-      className={`ps-modifier-toggle ${active ? 'ps-modifier-toggle-active' : ''}`}
-      aria-pressed={active}
-      onClick={onToggle}
-    >
-      {label}
-    </button>
-  );
-}
-
-interface SideDamage {
-  default: DamageResult[][];
-  targets: Record<number, Record<string, DamageResult | undefined>>;
-  spread: Record<number, Record<number, SpreadTargetDamage[]>>;
-}
-
-const EMPTY_SIDE_DAMAGE: SideDamage = { default: [], targets: {}, spread: {} };
-
 const ADVANCED_KEY = 'ps-replay-interceptor:picker-advanced';
 
-/* ── Main BranchPanel (controls only, no iframe) ── */
-export function BranchPanel({ simState, source, acquiringExact, executeError, executing, gen, onSetChoice, onHypotheticalMove, onExecuteTurn, played }: Props) {
-  const [showLog, setShowLog] = useState(false);
-  // Compact by default: small action chips (moves + switches side by side)
-  // and Execute. "Advanced" grows them into the full picker — type/damage
-  // details, the Fight/Pokémon tabs, the free-choice dropdown and the
-  // "What if it had…" tools (persisted).
+/**
+ * Compact by default: small action chips (moves + switches side by side)
+ * and Execute. "Advanced" grows them into the full picker — type/damage
+ * details, the Fight/Pokémon tabs, the free-choice dropdown and the
+ * "What if it had…" tools (persisted).
+ */
+function useAdvancedToggle() {
   const [advanced, setAdvanced] = useState(() => {
     try {
       return localStorage.getItem(ADVANCED_KEY) === '1';
@@ -592,11 +75,11 @@ export function BranchPanel({ simState, source, acquiringExact, executeError, ex
       return !current;
     });
   };
-  const [damageBySide, setDamageBySide] = useState<{ p1: SideDamage; p2: SideDamage }>({
-    p1: EMPTY_SIDE_DAMAGE,
-    p2: EMPTY_SIDE_DAMAGE,
-  });
+  return { advanced, toggleAdvanced };
+}
 
+/** Per-slot views of the sim state (singles fall back to the single-active fields). */
+function useSlots(simState: BranchSimState | null) {
   const p1ActiveSlots = useMemo(
     () => simState?.p1ActiveSlots ?? (simState?.p1Active ? [simState.p1Active] : []),
     [simState],
@@ -615,85 +98,27 @@ export function BranchPanel({ simState, source, acquiringExact, executeError, ex
   );
   const p1SwitchesBySlot = simState?.p1SwitchesBySlot ?? [simState?.p1Switches ?? EMPTY_SWITCHES];
   const p2SwitchesBySlot = simState?.p2SwitchesBySlot ?? [simState?.p2Switches ?? EMPTY_SWITCHES];
-  const fieldState = simState?.field ?? null;
+  return { p1ActiveSlots, p2ActiveSlots, p1MovesBySlot, p2MovesBySlot, p1SwitchesBySlot, p2SwitchesBySlot };
+}
 
+/** The damage preview per side, recomputed whenever the actives, moves, field, or gen change. */
+function usePreviewDamage(inputs: DamagePreviewInputs) {
+  const { p1ActiveSlots, p2ActiveSlots, p1MovesBySlot, p2MovesBySlot, fieldState, gen } = inputs;
+  const [damageBySide, setDamageBySide] = useState<{ p1: SideDamage; p2: SideDamage }>({
+    p1: EMPTY_SIDE_DAMAGE,
+    p2: EMPTY_SIDE_DAMAGE,
+  });
   useEffect(() => {
     let cancelled = false;
 
     async function calculatePreviewDamage() {
       const { calcSingleDamageRange } = await import('../lib/damage-calc');
       if (cancelled) return;
-
-      const gameType = p1ActiveSlots.length > 1 || p2ActiveSlots.length > 1 ? 'Doubles' as const : 'Singles' as const;
-      const contextFor = (attacker: 'p1' | 'p2') => ({
-        gameType,
-        gen,
-        weather: fieldState?.weather,
-        terrain: fieldState?.terrain,
-        attackerSideConditions: attacker === 'p1' ? fieldState?.p1SideConditions : fieldState?.p2SideConditions,
-        defenderSideConditions: attacker === 'p1' ? fieldState?.p2SideConditions : fieldState?.p1SideConditions,
-      });
-      const targetBySideSlot = {
-        p1: new Map(p1ActiveSlots.map((active, index) => [`p1:${index}`, active])),
-        p2: new Map(p2ActiveSlots.map((active, index) => [`p2:${index}`, active])),
-      };
-
-      const makeSideDamage = (side: 'p1' | 'p2'): SideDamage => {
-        const activeSlots = side === 'p1' ? p1ActiveSlots : p2ActiveSlots;
-        const movesBySlot = side === 'p1' ? p1MovesBySlot : p2MovesBySlot;
-        const enemySide = side === 'p1' ? 'p2' : 'p1';
-        const enemyActives = (side === 'p1' ? p2ActiveSlots : p1ActiveSlots)
-          .map((active, index) => ({ active, index }))
-          .filter((entry): entry is { active: NonNullable<typeof entry.active>; index: number } =>
-            !!entry.active && !entry.active.fainted && entry.active.hp > 0);
-        const context = contextFor(side);
-
-        const defaults: DamageResult[][] = [];
-        const spread: SideDamage['spread'] = {};
-        const targets: SideDamage['targets'] = {};
-
-        activeSlots.forEach((active, activeSlot) => {
-          const moves = movesBySlot[activeSlot] ?? EMPTY_MOVES;
-          defaults[activeSlot] = [];
-          spread[activeSlot] = {};
-          targets[activeSlot] = {};
-          if (!active || moves.length === 0) return;
-
-          const targetEntries: [string, DamageResult][] = [];
-          moves.forEach((move, moveIndex) => {
-            for (const target of move.targetOptions) {
-              const defender = targetBySideSlot[target.side].get(`${target.side}:${target.activeSlot}`);
-              if (defender) {
-                targetEntries.push([`${move.slot}:${target.targetLoc}`, calcSingleDamageRange(active, defender, move, context)]);
-              }
-            }
-
-            if (enemyActives.length === 0) return;
-            // Untargeted moves (spread/self/singles): one range per living enemy (G6).
-            const perTarget = enemyActives.map(enemy => ({
-              label: `${enemySide.toUpperCase()}${String.fromCharCode(65 + enemy.index)}`,
-              result: calcSingleDamageRange(active, enemy.active, move, context),
-            }));
-            const best = perTarget.reduce((currentBest, candidate) =>
-              candidate.result.maxPercent > currentBest.result.maxPercent ? candidate : currentBest,
-            perTarget[0]);
-            defaults[activeSlot][moveIndex] = best.result;
-            if (move.targetOptions.length === 0 && perTarget.length > 1 &&
-              perTarget.some(target => target.result.maxPercent > 0)) {
-              spread[activeSlot][move.slot] = perTarget;
-            }
-          });
-          targets[activeSlot] = Object.fromEntries(targetEntries);
-        });
-
-        return { default: defaults, targets, spread };
-      };
-
       if (!cancelled) {
-        setDamageBySide({
-          p1: makeSideDamage('p1'),
-          p2: makeSideDamage('p2'),
-        });
+        setDamageBySide(computePreviewDamage(
+          { p1ActiveSlots, p2ActiveSlots, p1MovesBySlot, p2MovesBySlot, fieldState, gen },
+          calcSingleDamageRange,
+        ));
       }
     }
 
@@ -702,6 +127,103 @@ export function BranchPanel({ simState, source, acquiringExact, executeError, ex
       cancelled = true;
     };
   }, [p1ActiveSlots, p2ActiveSlots, p1MovesBySlot, p2MovesBySlot, fieldState, gen]);
+  return damageBySide;
+}
+
+function blockedSwitchKeys(choices: (BranchSlotChoice | null)[], required: boolean[], activeSlot: number): Set<string> {
+  const blocked = new Set<string>();
+  choices.forEach((choice, index) => {
+    if (index === activeSlot) return;
+    // A pending choice on a slot the request does not let act (a stale
+    // pick during the other slot's forced replacement) must not reserve
+    // a species — it locked the forced slot's only legal switch-in.
+    if (!required[index]) return;
+    const target = switchChoiceKey(choice);
+    if (target !== null) blocked.add(target);
+  });
+  return blocked;
+}
+
+function pendingLabelFor(simState: BranchSimState, bothChosen: boolean, isMultiActive: boolean): string {
+  return bothChosen
+    ? 'Execute Turn'
+    : isMultiActive
+      ? 'Select all active choices'
+      : `Select ${!simState.p1Choice ? 'P1' : ''}${!simState.p1Choice && !simState.p2Choice ? ' & ' : ''}${!simState.p2Choice ? 'P2' : ''} choice`;
+}
+
+interface SideColumnProps {
+  side: 'p1' | 'p2';
+  simState: BranchSimState;
+  activeSlots: (SimPokemonInfo | null)[];
+  movesBySlot: BranchMoveOption[][];
+  switchesBySlot: BranchSwitchOption[][];
+  requiredChoices: boolean[];
+  damage: SideDamage;
+  gen: number;
+  advanced: boolean;
+  played: PlayedPick | null | undefined;
+  onSetChoice: Props['onSetChoice'];
+  onHypotheticalMove: Props['onHypotheticalMove'];
+}
+
+/** The identity part of one slot's controls: label and the active Pokémon. */
+function slotIdentity(side: 'p1' | 'p2', slot: number, activeSlots: (SimPokemonInfo | null)[], active: SimPokemonInfo | null) {
+  const prefix = side === 'p1' ? 'P1' : 'P2';
+  return {
+    label: activeSlots.length > 1 ? `${prefix}${String.fromCharCode(65 + slot)}` : prefix,
+    activeName: active?.name || '???',
+    activeSpecies: active?.species || '',
+    activeFainted: active?.fainted ?? true,
+  };
+}
+
+/** The choice part of one slot's controls: options, pending state, gimmicks, damage. */
+function slotChoiceProps(props: SideColumnProps, slot: number) {
+  const { side, simState, movesBySlot, switchesBySlot, requiredChoices, damage } = props;
+  const forceSwitches = side === 'p1' ? simState.p1ForceSwitches : simState.p2ForceSwitches;
+  const choices = side === 'p1' ? simState.p1Choices : simState.p2Choices;
+  const modifiersBySlot = side === 'p1' ? simState.p1ModifiersBySlot : simState.p2ModifiersBySlot;
+  return {
+    moves: movesBySlot[slot] ?? EMPTY_MOVES,
+    switches: switchesBySlot[slot] ?? EMPTY_SWITCHES,
+    forceSwitch: forceSwitches[slot] ?? false,
+    pending: choices[slot] ?? null,
+    blockedSwitchKeys: blockedSwitchKeys(choices, requiredChoices, slot),
+    modifiers: modifiersBySlot[slot] ?? EMPTY_MODIFIERS,
+    dmgResults: damage.default[slot] ?? [],
+    spreadDamageResults: damage.spread[slot] ?? {},
+    targetDamageResults: damage.targets[slot] ?? {},
+  };
+}
+
+function SideColumn(props: SideColumnProps) {
+  const { side, activeSlots, gen, advanced, played, onSetChoice, onHypotheticalMove } = props;
+  return (
+    <div className="ps-branch-side-column">
+      {activeSlots.map((active, slot) => (
+        <SideControls
+          key={`${side}-${slot}`}
+          {...slotIdentity(side, slot, activeSlots, active)}
+          {...slotChoiceProps(props, slot)}
+          gen={gen}
+          advanced={advanced}
+          played={slot === 0 ? played ?? null : null}
+          onChoice={(choice) => onSetChoice(side, choice, slot)}
+          onHypotheticalMove={(params) => onHypotheticalMove(side, slot, params)}
+        />
+      ))}
+    </div>
+  );
+}
+
+/* ── Main BranchPanel (controls only, no iframe) ── */
+export function BranchPanel({ simState, source, acquiringExact, executeError, executing, gen, onSetChoice, onHypotheticalMove, onExecuteTurn, played }: Props) {
+  const { advanced, toggleAdvanced } = useAdvancedToggle();
+  const slots = useSlots(simState);
+  const { p1ActiveSlots, p2ActiveSlots, p1MovesBySlot, p2MovesBySlot, p1SwitchesBySlot, p2SwitchesBySlot } = slots;
+  const fieldState = simState?.field ?? null;
+  const damageBySide = usePreviewDamage({ p1ActiveSlots, p2ActiveSlots, p1MovesBySlot, p2MovesBySlot, fieldState, gen });
 
   if (!simState) return null;
 
@@ -711,149 +233,49 @@ export function BranchPanel({ simState, source, acquiringExact, executeError, ex
   const p2RequiredChoices = requiredChoicesForActiveSlots(p2ActiveSlots, simState.p2ForceSwitches);
   const bothChosen = branchSideChoicesReady(simState.p1Choices, p1RequiredChoices) &&
     branchSideChoicesReady(simState.p2Choices, p2RequiredChoices);
-  const blockedSwitchKeys = (choices: (BranchSlotChoice | null)[], required: boolean[], activeSlot: number) => {
-    const blocked = new Set<string>();
-    choices.forEach((choice, index) => {
-      if (index === activeSlot) return;
-      // A pending choice on a slot the request does not let act (a stale
-      // pick during the other slot's forced replacement) must not reserve
-      // a species — it locked the forced slot's only legal switch-in.
-      if (!required[index]) return;
-      const target = switchChoiceKey(choice);
-      if (target !== null) blocked.add(target);
-    });
-    return blocked;
-  };
-  const pendingLabel = bothChosen
-    ? 'Execute Turn'
-    : isMultiActive
-      ? 'Select all active choices'
-      : `Select ${!simState.p1Choice ? 'P1' : ''}${!simState.p1Choice && !simState.p2Choice ? ' & ' : ''}${!simState.p2Choice ? 'P2' : ''} choice`;
+  const pendingLabel = pendingLabelFor(simState, bothChosen, isMultiActive);
+  const columnProps = { simState, gen, advanced, onSetChoice, onHypotheticalMove };
 
   return (
     <div>
-      <div style={{ fontSize: 10, color: '#9fb2cc', margin: '4px 0 2px', display: 'flex', gap: 8, alignItems: 'baseline', flexWrap: 'wrap' }}>
-        {source === 'stored' && (
-          <span>Choices from the reconstructed position</span>
-        )}
-        {source === 'snapshot' && (
-          <span>
-            {acquiringExact
-              ? 'Choices approximated · reconstructing the exact position…'
-              : 'Choices approximated from the replay; the sim checks legality when you play a move'}
-          </span>
-        )}
-        <span style={{ flex: 1 }} />
-        <button
-          type="button"
-          onClick={toggleAdvanced}
-          className="ps-btn"
-          style={{ padding: '0 6px', fontSize: 10 }}
-          aria-expanded={advanced}
-          title="Grows the compact action chips into the full picker: type and damage details, the Fight/Pokémon tabs, the free choice dropdown, and the &quot;What if it had…&quot; move loader."
-        >
-          {advanced ? 'Advanced ▾' : 'Advanced ▸'}
-        </button>
-      </div>
+      <PickerSourceLine source={source} acquiringExact={acquiringExact} advanced={advanced} onToggleAdvanced={toggleAdvanced} />
       {/* Controls — stacked vertically for P1 + P2 selection */}
       {!simState.ended && (
         <div className="ps-branch-controls-shell">
           <div className="ps-branch-controls-grid">
-            <div className="ps-branch-side-column">
-              {p1ActiveSlots.map((active, slot) => (
-                <SideControls
-                  key={`p1-${slot}`}
-
-                  label={p1ActiveSlots.length > 1 ? `P1${String.fromCharCode(65 + slot)}` : 'P1'}
-                  activeName={active?.name || '???'}
-                  activeSpecies={active?.species || ''}
-                  activeFainted={active?.fainted ?? true}
-                  moves={p1MovesBySlot[slot] ?? EMPTY_MOVES}
-                  switches={p1SwitchesBySlot[slot] ?? EMPTY_SWITCHES}
-                  forceSwitch={simState.p1ForceSwitches[slot] ?? false}
-                  pending={simState.p1Choices[slot] ?? null}
-                  blockedSwitchKeys={blockedSwitchKeys(simState.p1Choices, p1RequiredChoices, slot)}
-                  modifiers={simState.p1ModifiersBySlot[slot] ?? EMPTY_MODIFIERS}
-                  dmgResults={damageBySide.p1.default[slot] ?? []}
-                  spreadDamageResults={damageBySide.p1.spread[slot] ?? {}}
-                  targetDamageResults={damageBySide.p1.targets[slot] ?? {}}
-                  gen={gen}
-                  advanced={advanced}
-                  played={slot === 0 ? played?.p1 ?? null : null}
-                  onChoice={(choice) => onSetChoice('p1', choice, slot)}
-                  onHypotheticalMove={(params) => onHypotheticalMove('p1', slot, params)}
-                />
-              ))}
-            </div>
+            <SideColumn
+              side="p1"
+              activeSlots={p1ActiveSlots}
+              movesBySlot={p1MovesBySlot}
+              switchesBySlot={p1SwitchesBySlot}
+              requiredChoices={p1RequiredChoices}
+              damage={damageBySide.p1}
+              played={played?.p1}
+              {...columnProps}
+            />
             <div className="ps-side-divider" />
-            <div className="ps-branch-side-column">
-              {p2ActiveSlots.map((active, slot) => (
-                <SideControls
-                  key={`p2-${slot}`}
-
-                  label={p2ActiveSlots.length > 1 ? `P2${String.fromCharCode(65 + slot)}` : 'P2'}
-                  activeName={active?.name || '???'}
-                  activeSpecies={active?.species || ''}
-                  activeFainted={active?.fainted ?? true}
-                  moves={p2MovesBySlot[slot] ?? EMPTY_MOVES}
-                  switches={p2SwitchesBySlot[slot] ?? EMPTY_SWITCHES}
-                  forceSwitch={simState.p2ForceSwitches[slot] ?? false}
-                  pending={simState.p2Choices[slot] ?? null}
-                  blockedSwitchKeys={blockedSwitchKeys(simState.p2Choices, p2RequiredChoices, slot)}
-                  modifiers={simState.p2ModifiersBySlot[slot] ?? EMPTY_MODIFIERS}
-                  dmgResults={damageBySide.p2.default[slot] ?? []}
-                  spreadDamageResults={damageBySide.p2.spread[slot] ?? {}}
-                  targetDamageResults={damageBySide.p2.targets[slot] ?? {}}
-                  gen={gen}
-                  advanced={advanced}
-                  played={slot === 0 ? played?.p2 ?? null : null}
-                  onChoice={(choice) => onSetChoice('p2', choice, slot)}
-                  onHypotheticalMove={(params) => onHypotheticalMove('p2', slot, params)}
-                />
-              ))}
-            </div>
+            <SideColumn
+              side="p2"
+              activeSlots={p2ActiveSlots}
+              movesBySlot={p2MovesBySlot}
+              switchesBySlot={p2SwitchesBySlot}
+              requiredChoices={p2RequiredChoices}
+              damage={damageBySide.p2}
+              played={played?.p2}
+              {...columnProps}
+            />
           </div>
-
-          {executeError && (
-            <div className="ps-choice-error ps-execute-error" role="alert">
-              {executeError}
-            </div>
-          )}
-
-          {/* Execute turn button */}
-          {!isForceSwitch && (
-            <div className="ps-execute-wrap">
-              <button
-                type="button"
-                onClick={onExecuteTurn}
-                disabled={!bothChosen || executing}
-                className="ps-execute-btn"
-                style={{ background: bothChosen && !executing ? '#cc4455' : '#555' }}
-              >
-                {executing ? 'Executing…' : pendingLabel}
-              </button>
-            </div>
-          )}
+          <ExecuteRow
+            executeError={executeError}
+            isForceSwitch={isForceSwitch}
+            bothChosen={bothChosen}
+            executing={executing}
+            pendingLabel={pendingLabel}
+            onExecuteTurn={onExecuteTurn}
+          />
         </div>
       )}
-
-      {/* Raw battle log toggle */}
-      <div style={{ marginTop: 8 }}>
-        <button
-          type="button"
-          onClick={() => setShowLog(!showLog)}
-          className="ps-log-toggle"
-        >
-          {showLog ? 'Hide' : 'Show'} Raw Protocol Log
-        </button>
-        {showLog && (
-          <div className="ps-log" style={{ marginTop: 6 }}>
-            {simState.log
-              .filter(l => l && !l.startsWith('|split|') && !l.startsWith('|c|') && !l.startsWith('|t:|'))
-              .join('\n')}
-          </div>
-        )}
-      </div>
+      <RawLogToggle log={simState.log} />
     </div>
   );
 }
