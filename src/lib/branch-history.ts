@@ -1,5 +1,32 @@
 import type { TurnSnapshot } from '../types';
-import type { BranchHistoryEntry } from '../hooks/useBranch';
+import type { SideId } from './ids';
+import type { BranchSlotChoice } from './branch-choices';
+import type { SimPokemonInfo } from './branch-engine';
+
+export interface BranchHistoryEntry {
+  turnNumber: number;
+  /** 'forced' entries record single-side forced-switch interludes (B15). */
+  kind?: 'turn' | 'forced';
+  forcedSide?: SideId;
+  /** Turn-0 lead entry: the chosen leads (slot order; with `bring`, the
+   *  whole brought selection), so a rebuild can re-seed them. */
+  leadChoices?: { p1: string[]; p2: string[]; bring?: boolean };
+  /** Identity-based choices used to replay this entry after a team edit (B1). */
+  p1SlotChoices?: (BranchSlotChoice | null)[];
+  p2SlotChoices?: (BranchSlotChoice | null)[];
+  /** The resolved commands actually sent to the sim (display/share only). */
+  p1Choice: string;
+  p2Choice: string;
+  /** Serialized position AFTER this entry executed (unified timeline);
+   *  null when capture failed — navigation still works via the sim log. */
+  serializedPosition?: string | null;
+  p1Active: SimPokemonInfo | null;
+  p1ActiveSlots: (SimPokemonInfo | null)[];
+  p2Active: SimPokemonInfo | null;
+  p2ActiveSlots: (SimPokemonInfo | null)[];
+  p1Pokemon: SimPokemonInfo[];
+  p2Pokemon: SimPokemonInfo[];
+}
 
 /** "Shinyhead (Toxtricity)" — nickname and species together so the original
  *  and branch columns stay comparable (G11). */

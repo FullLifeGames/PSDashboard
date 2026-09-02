@@ -1,15 +1,6 @@
 import { spriteUrl } from '../lib/sprite-url';
 import { useLeadSelection } from '../hooks/useLeadSelection';
-
-/** One team slot offered as a lead: identity plus what the real game did. */
-export interface LeadOption {
-  name: string;
-  species: string;
-  /** This Pokémon led the real game. */
-  wasLead: boolean;
-  /** This Pokémon was brought (active at some point) in the real game. */
-  wasBrought: boolean;
-}
+import type { LeadOption } from '../lib/lead-options';
 
 interface Props {
   playerNames: [string, string];

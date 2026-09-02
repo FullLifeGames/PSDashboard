@@ -1,42 +1,20 @@
 import type { BattleStreams } from '@pkmn/sim';
-import type { BranchChoiceErrorLog, BranchSimState, SimPokemonInfo } from '../../lib/branch-engine';
+import type { BranchChoiceErrorLog, BranchSimState } from '../../lib/branch-engine';
 import {
   branchSideChoicesReady,
   requiredChoicesForActiveSlots,
   type BranchSlotChoice,
 } from '../../lib/branch-choices';
 import { sideIndex, type SideId } from '../../lib/ids';
+import type { BranchHistoryEntry } from '../../lib/branch-history';
+
+export type { BranchHistoryEntry };
 
 export type { SideId };
 export type BattleStream = BattleStreams.BattleStream;
 export type PlayerStreams = ReturnType<typeof BattleStreams.getPlayerStreams>;
 export type BranchEngineModule = typeof import('../../lib/branch-engine');
 export type LiveBattle = NonNullable<BattleStream['battle']>;
-
-export interface BranchHistoryEntry {
-  turnNumber: number;
-  /** 'forced' entries record single-side forced-switch interludes (B15). */
-  kind?: 'turn' | 'forced';
-  forcedSide?: SideId;
-  /** Turn-0 lead entry: the chosen leads (slot order; with `bring`, the
-   *  whole brought selection), so a rebuild can re-seed them. */
-  leadChoices?: { p1: string[]; p2: string[]; bring?: boolean };
-  /** Identity-based choices used to replay this entry after a team edit (B1). */
-  p1SlotChoices?: (BranchSlotChoice | null)[];
-  p2SlotChoices?: (BranchSlotChoice | null)[];
-  /** The resolved commands actually sent to the sim (display/share only). */
-  p1Choice: string;
-  p2Choice: string;
-  /** Serialized position AFTER this entry executed (unified timeline);
-   *  null when capture failed — navigation still works via the sim log. */
-  serializedPosition?: string | null;
-  p1Active: SimPokemonInfo | null;
-  p1ActiveSlots: (SimPokemonInfo | null)[];
-  p2Active: SimPokemonInfo | null;
-  p2ActiveSlots: (SimPokemonInfo | null)[];
-  p1Pokemon: SimPokemonInfo[];
-  p2Pokemon: SimPokemonInfo[];
-}
 
 /** The mutable runtime the branch hook owns: the sim streams, its log, and the pending choices. */
 export interface BranchRefs {

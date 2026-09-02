@@ -1,5 +1,5 @@
 import { Generations, Pokemon, Move, Field, calculate } from '@smogon/calc';
-import type { SimPokemonInfo, BranchMoveOption } from '../hooks/useBranch';
+import type { SimPokemonInfo, BranchMoveOption } from './branch-engine';
 import { toId } from './ids';
 import { TERRAIN_BY_ID, WEATHER_BY_ID } from './calc-field';
 

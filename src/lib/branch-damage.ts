@@ -1,4 +1,4 @@
-import type { BranchMoveOption, BranchSimState, SimPokemonInfo } from '../hooks/useBranch';
+import type { BranchMoveOption, BranchSimState, SimPokemonInfo } from './branch-engine';
 import type { DamageResult } from './damage-calc';
 
 export interface SpreadTargetDamage {

@@ -1,4 +1,4 @@
-import type { BranchHistoryEntry } from '../hooks/useBranch';
+import type { BranchHistoryEntry } from './branch-history';
 import type { ReplayData } from '../types';
 
 export interface BranchShareChoice {

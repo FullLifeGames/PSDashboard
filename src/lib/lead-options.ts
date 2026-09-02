@@ -1,6 +1,15 @@
 import type { TurnSnapshot } from '../types';
 import { broughtSpeciesFor, speciesBaseId } from './replay-format';
-import type { LeadOption } from '../components/LeadPanel';
+
+/** One team slot offered as a lead: identity plus what the real game did. */
+export interface LeadOption {
+  name: string;
+  species: string;
+  /** This Pokémon led the real game. */
+  wasLead: boolean;
+  /** This Pokémon was brought (active at some point) in the real game. */
+  wasBrought: boolean;
+}
 
 /** T0 lead picker data: each side's team with the real leads marked (the
  *  pre-turn-1 snapshot's actives ARE the leads) and, for bring-limited

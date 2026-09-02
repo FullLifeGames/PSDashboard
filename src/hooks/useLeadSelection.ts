@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import type { LeadOption } from '../components/LeadPanel';
+import type { LeadOption } from '../lib/lead-options';
 
 /**
  * Each side's picked leads (and, in bring-limited formats, the whole
