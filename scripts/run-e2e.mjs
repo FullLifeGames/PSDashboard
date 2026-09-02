@@ -1,32 +1,69 @@
 import { spawn } from 'node:child_process';
+import { readFile, stat } from 'node:fs/promises';
 
 const host = '127.0.0.1';
 const port = '5174';
 const baseUrl = `http://${host}:${port}`;
-const viteArgs = [
-  './node_modules/vite/bin/vite.js',
-  '--host',
-  host,
-  '--port',
-  port,
-  '--strictPort',
-];
+const viteBin = './node_modules/vite/bin/vite.js';
+const viteArgs = [viteBin, '--host', host, '--port', port, '--strictPort'];
 
-const server = spawn(process.execPath, viteArgs, {
-  stdio: 'inherit',
-  windowsHide: true,
-});
-
+let server = null;
 let serverExited = false;
-const serverExit = new Promise(resolve => {
-  server.on('exit', (code, signal) => {
-    serverExited = true;
-    resolve({ code, signal });
-  });
-});
+let serverExit = Promise.resolve({ code: null, signal: null });
 
 function delay(ms) {
   return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+/** The packages vite.config.ts pre-bundles (optimizeDeps.include) — the ones the app reaches through lazy imports. */
+const PREBUNDLED_DEPS = ['@pkmn/client', '@pkmn/data', '@pkmn/dex', '@pkmn/sim', '@pkmn/smogon', '@smogon/calc'];
+const METADATA_PATH = './node_modules/.vite/deps/_metadata.json';
+
+/**
+ * Wait for the dependency optimizer to settle before the first test opens
+ * a page. With a cold or outdated cache Vite bundles at startup and sends
+ * every open page a reload when it finishes, which aborted the dynamic
+ * imports of whichever test was running at that moment. The optimizer
+ * writes the metadata file last, so a complete and unchanging file means
+ * the reload (if any) already went out to nobody.
+ */
+async function waitForDependencyCache() {
+  await fetch(`${baseUrl}/src/main.tsx`).catch(() => {});
+  const deadline = Date.now() + 60_000;
+  let lastMtime = 0;
+  let stableSince = 0;
+  while (Date.now() < deadline) {
+    try {
+      const { mtimeMs } = await stat(METADATA_PATH);
+      const metadata = JSON.parse(await readFile(METADATA_PATH, 'utf8'));
+      const optimized = Object.keys(metadata.optimized ?? {});
+      if (PREBUNDLED_DEPS.every(dep => optimized.includes(dep))) {
+        if (mtimeMs !== lastMtime) {
+          lastMtime = mtimeMs;
+          stableSince = Date.now();
+        } else if (Date.now() - stableSince >= 1500) {
+          return;
+        }
+      }
+    } catch {
+      // Not written yet.
+    }
+    await delay(250);
+  }
+  console.warn('The dependency cache did not settle in time; starting the tests anyway.');
+}
+
+function startServer() {
+  server = spawn(process.execPath, viteArgs, {
+    stdio: 'inherit',
+    windowsHide: true,
+  });
+  serverExit = new Promise(resolve => {
+    server.on('exit', (code, signal) => {
+      serverExited = true;
+      resolve({ code, signal });
+    });
+  });
 }
 
 async function waitForServer() {
@@ -50,7 +87,7 @@ async function waitForServer() {
 }
 
 async function stopServer() {
-  if (serverExited || !server.pid) return;
+  if (!server || serverExited || !server.pid) return;
 
   if (process.platform === 'win32') {
     await new Promise(resolve => {
@@ -70,7 +107,9 @@ async function stopServer() {
 }
 
 async function run() {
+  startServer();
   await waitForServer();
+  await waitForDependencyCache();
 
   const testArgs = ['./node_modules/@playwright/test/cli.js', 'test', ...process.argv.slice(2)];
   const tests = spawn(process.execPath, testArgs, {

@@ -25,6 +25,16 @@ export default defineConfig({
   build: {
     rolldownOptions: { output: { keepNames: true } },
   },
+  /**
+   * Pre-bundle every package the app reaches through a lazy import (the
+   * protocol parser, move pools, branch engine, damage calc). Discovered
+   * on first use instead, Vite bundled them mid-session and reloaded the
+   * page, which tore apart the dynamic import of whichever e2e test was
+   * running at that moment ("Failed to fetch dynamically imported module").
+   */
+  optimizeDeps: {
+    include: ['@pkmn/client', '@pkmn/data', '@pkmn/dex', '@pkmn/sim', '@pkmn/smogon', '@smogon/calc'],
+  },
   worker: {
     rolldownOptions: { output: { keepNames: true } },
   },
