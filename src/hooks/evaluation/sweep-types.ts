@@ -130,3 +130,22 @@ export interface TurnStageArgs {
 
 export const aborted = (env: SweepEnv) => env.runRef.current !== env.runId;
 export const isCancelled = (err: unknown) => err instanceof Error && err.message === 'cancelled';
+
+/**
+ * One awaited sweep stage under the run's cancellation contract: a run
+ * that changed hands or a cancelled worker call ends the turn with
+ * 'abort'; any other failure keeps the stage's null result, so the turn
+ * stays silent in that channel. The run is checked again after the
+ * await, because it can change hands while the stage is in flight.
+ */
+export async function guardedStage<T>(env: SweepEnv, run: () => Promise<T>): Promise<T | null | 'abort'> {
+  let value: T | null = null;
+  try {
+    value = await run();
+  } catch (err) {
+    if (aborted(env)) return 'abort';
+    if (isCancelled(err)) return 'abort';
+  }
+  if (aborted(env)) return 'abort';
+  return value;
+}

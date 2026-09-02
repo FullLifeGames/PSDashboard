@@ -133,6 +133,13 @@ async function executeRebuild(
   }
 }
 
+/** The replace-confirm text: the caller's lead-in, then the variation about to go. */
+function replaceVariationMessage(leadIn: string, span: { startTurn: number; length: number }): string {
+  const turnCount = span.length;
+  return `${leadIn}: replace the existing variation ` +
+    `from turn ${span.startTurn} (${turnCount} ${turnCount === 1 ? 'turn' : 'turns'})?`;
+}
+
 export function useDeviation(inputs: DeviationInputs) {
   const {
     replayData, snapshots, observations, sources, bringOnlyLists, bringCount, replayGameType,
@@ -246,10 +253,8 @@ function useDeviationRequests(args: {
       });
     };
     if (kind === 'replace' && variationSpan) {
-      const turnCount = variationSpan.length;
       setPendingConfirm({
-        message: `You are on the main line (turn ${position.turn}): replace the existing variation ` +
-          `from turn ${variationSpan.startTurn} (${turnCount} ${turnCount === 1 ? 'turn' : 'turns'})?`,
+        message: replaceVariationMessage(`You are on the main line (turn ${position.turn})`, variationSpan),
         proceed: () => { setPendingConfirm(null); run(); },
       });
       return;
@@ -269,10 +274,8 @@ function useDeviationRequests(args: {
       void rebuildAt({ turn: 0, line: 'main' }, null, leads);
     };
     if (variationSpan) {
-      const turnCount = variationSpan.length;
       setPendingConfirm({
-        message: `Start a new game from turn 0: replace the existing variation ` +
-          `from turn ${variationSpan.startTurn} (${turnCount} ${turnCount === 1 ? 'turn' : 'turns'})?`,
+        message: replaceVariationMessage('Start a new game from turn 0', variationSpan),
         proceed: () => { setPendingConfirm(null); run(); },
       });
       return;

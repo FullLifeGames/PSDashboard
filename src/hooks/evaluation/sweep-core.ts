@@ -9,6 +9,7 @@ import { teraKey } from '../../lib/eval/tera';
 import { resolveAutoTurnSettings, serializedFaintedFraction, supersedesStored, type EngineMode } from './prefs';
 import type { CachedEval } from './single-eval';
 import {
+  guardedStage,
   aborted, isCancelled, matchOrPhantom, recordEvalError,
   type SweepEnv, type SweepSettings, type TurnEngine, type TurnStageArgs,
 } from './sweep-types';
@@ -86,14 +87,10 @@ async function computeFreshPlayedOutcome(
   const p1Choice = matchOrPhantom(result, 'p1', turnPlayed);
   const p2Choice = matchOrPhantom(result, 'p2', turnPlayed);
   if (p1Choice && p2Choice) {
-    try {
-      outcome = await perfSpan('played-pair', () =>
-        client.evalPair(serialized, p1Choice.choice, p2Choice.choice, { depth, samples, mode, tera: env.params.tera, sleepClause: env.params.sleepClause }));
-    } catch (err) {
-      if (aborted(env)) return 'abort';
-      if (isCancelled(err)) return 'abort';
-    }
-    if (aborted(env)) return 'abort';
+    const paired = await guardedStage(env, () => perfSpan('played-pair', () =>
+      client.evalPair(serialized, p1Choice.choice, p2Choice.choice, { depth, samples, mode, tera: env.params.tera, sleepClause: env.params.sleepClause })));
+    if (paired === 'abort') return 'abort';
+    outcome = paired;
   }
   return { value: outcome };
 }
@@ -103,23 +100,13 @@ async function verifyAndProbeFresh(
   env: SweepEnv, serialized: string, result: EvalResult, turnPlayed: PlayedTurn | null,
   resolvedSettings: EvalSettings, turn: number,
 ): Promise<'abort' | { turnVerified: TurnVerification | null; turnSensitivity: TurnSensitivity | null }> {
-  let turnVerified: TurnVerification | null = null;
-  try {
-    turnVerified = await perfSpan('verify', () => verifyFlagged(env, () => Promise.resolve(serialized), result, turnPlayed, resolvedSettings));
-  } catch (err) {
-    if (aborted(env)) return 'abort';
-    if (isCancelled(err)) return 'abort';
-  }
-  if (aborted(env)) return 'abort';
+  const turnVerified = await guardedStage(env, () =>
+    perfSpan('verify', () => verifyFlagged(env, () => Promise.resolve(serialized), result, turnPlayed, resolvedSettings)));
+  if (turnVerified === 'abort') return 'abort';
   env.data.verified[turn - 1] = turnVerified;
-  let turnSensitivity: TurnSensitivity | null = null;
-  try {
-    turnSensitivity = await perfSpan('sensitivity', () => probeSensitivity(env, () => Promise.resolve(serialized), result, turnPlayed, resolvedSettings, turnVerified ?? null));
-  } catch (err) {
-    if (aborted(env)) return 'abort';
-    if (isCancelled(err)) return 'abort';
-  }
-  if (aborted(env)) return 'abort';
+  const turnSensitivity = await guardedStage(env, () =>
+    perfSpan('sensitivity', () => probeSensitivity(env, () => Promise.resolve(serialized), result, turnPlayed, resolvedSettings, turnVerified ?? null)));
+  if (turnSensitivity === 'abort') return 'abort';
   env.data.sensitivity[turn - 1] = turnSensitivity;
   return { turnVerified, turnSensitivity };
 }

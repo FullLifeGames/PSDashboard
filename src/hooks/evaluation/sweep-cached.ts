@@ -2,7 +2,7 @@ import type { TurnSensitivity, TurnVerification } from '../../lib/eval/analysis'
 import { EvalWorkerClient } from '../../lib/eval/worker-client';
 import { perfSpan } from '../../lib/eval/perf-trace';
 import { saveStoredEval } from '../../lib/eval-cache-store';
-import { aborted, isCancelled, matchOrPhantom, type SweepEnv, type TurnStageArgs } from './sweep-types';
+import { aborted, guardedStage, isCancelled, matchOrPhantom, type SweepEnv, type TurnStageArgs } from './sweep-types';
 import { probeSensitivity, verifyFlagged } from './sweep-verify';
 
 /**
@@ -52,14 +52,10 @@ async function backfillVerification(
   const { depth, samples, mode } = engine;
   let turnVerified: TurnVerification | null | undefined = hit.verified;
   if (verify && turnVerified === undefined) {
-    turnVerified = null;
-    try {
-      turnVerified = await perfSpan('verify', () => verifyFlagged(env, () => env.positionFor(turn), hit.result, turnPlayed, resolvedSettings));
-    } catch (err) {
-      if (aborted(env)) return 'abort';
-      if (isCancelled(err)) return 'abort';
-    }
-    if (aborted(env)) return 'abort';
+    const verified = await guardedStage(env, () =>
+      perfSpan('verify', () => verifyFlagged(env, () => env.positionFor(turn), hit.result, turnPlayed, resolvedSettings)));
+    if (verified === 'abort') return 'abort';
+    turnVerified = verified;
     env.cacheRef.current.set(key, { ...env.cacheRef.current.get(key) ?? hit, verified: turnVerified });
     void saveStoredEval({
       key: storeKey, result: hit.result, depth, samples, mode: mode, tera: env.params.tera,
@@ -78,14 +74,10 @@ async function backfillSensitivity(
   const { depth, samples, mode } = engine;
   let turnSensitivity: TurnSensitivity | null | undefined = hit.sensitivity;
   if (verify && turnSensitivity === undefined) {
-    turnSensitivity = null;
-    try {
-      turnSensitivity = await perfSpan('sensitivity', () => probeSensitivity(env, () => env.positionFor(turn), hit.result, turnPlayed, resolvedSettings, turnVerified ?? null));
-    } catch (err) {
-      if (aborted(env)) return 'abort';
-      if (isCancelled(err)) return 'abort';
-    }
-    if (aborted(env)) return 'abort';
+    const sensitivity = await guardedStage(env, () =>
+      perfSpan('sensitivity', () => probeSensitivity(env, () => env.positionFor(turn), hit.result, turnPlayed, resolvedSettings, turnVerified ?? null)));
+    if (sensitivity === 'abort') return 'abort';
+    turnSensitivity = sensitivity;
     env.cacheRef.current.set(key, { ...env.cacheRef.current.get(key) ?? hit, sensitivity: turnSensitivity });
     void saveStoredEval({
       key: storeKey, result: hit.result, depth, samples, mode: mode, tera: env.params.tera,
