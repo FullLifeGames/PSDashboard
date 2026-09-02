@@ -74,20 +74,25 @@ function assumption(value: string | undefined, detail: string): SetAssumption | 
   return value ? { value, sourceDetail: detail } : undefined;
 }
 
+function evsWithDefaults(evs: NonNullable<AssumptionSet['evs']>): SetSpreadAssumption['evs'] {
+  return {
+    hp: evs.hp ?? 0,
+    atk: evs.atk ?? 0,
+    def: evs.def ?? 0,
+    spa: evs.spa ?? 0,
+    spd: evs.spd ?? 0,
+    spe: evs.spe ?? 0,
+  };
+}
+
 function spreadAssumption(set: AssumptionSet, detail: string): SetSpreadAssumption | undefined {
   if (!set.nature && !set.evs) return undefined;
-  const evs = set.evs ?? {};
+  const nature = set.nature || 'Hardy';
+  const evs = evsWithDefaults(set.evs ?? {});
   return {
-    value: `${set.nature || 'Hardy'}:${evs.hp ?? 0}/${evs.atk ?? 0}/${evs.def ?? 0}/${evs.spa ?? 0}/${evs.spd ?? 0}/${evs.spe ?? 0}`,
-    nature: set.nature || 'Hardy',
-    evs: {
-      hp: evs.hp ?? 0,
-      atk: evs.atk ?? 0,
-      def: evs.def ?? 0,
-      spa: evs.spa ?? 0,
-      spd: evs.spd ?? 0,
-      spe: evs.spe ?? 0,
-    },
+    value: `${nature}:${evs.hp}/${evs.atk}/${evs.def}/${evs.spa}/${evs.spd}/${evs.spe}`,
+    nature,
+    evs,
     sourceDetail: detail,
   };
 }
