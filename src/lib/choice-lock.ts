@@ -88,6 +88,74 @@ const TYPE_BOOST_ITEMS: Record<string, string> = {
  * CANNOT explain; everything else ambiguous (evidence never blocks by
  * absence).
  */
+type CalcGen = ReturnType<typeof Generations.get>;
+
+function calcAttacker(gen: CalcGen, attackerSet: PokemonSet, obs: DamageObservation, withItem: string): Pokemon {
+  return new Pokemon(gen, attackerSet.species, {
+    level: attackerSet.level || 100, ability: attackerSet.ability || undefined,
+    item: withItem || undefined, nature: attackerSet.nature, evs: attackerSet.evs,
+    ivs: attackerSet.ivs, boosts: obs.attackerBoosts,
+    status: (obs.attackerStatus || undefined) as never,
+  });
+}
+
+function calcDefender(gen: CalcGen, defenderSet: PokemonSet | undefined, obs: DamageObservation): Pokemon {
+  return new Pokemon(gen, defenderSet?.species ?? obs.defenderSpecies, {
+    level: defenderSet?.level || 100, nature: defenderSet?.nature,
+    evs: defenderSet?.evs, ivs: defenderSet?.ivs, boosts: obs.defenderBoosts,
+  });
+}
+
+/** Whether the roll range (± slack) under `withItem` contains the observed fraction; null when the calc cannot judge. */
+function explainsObservation(
+  gen: CalcGen, attackerSet: PokemonSet, defenderSet: PokemonSet | undefined, obs: DamageObservation,
+  calcMoveId: string, withItem: string,
+): boolean | null {
+  try {
+    const attacker = calcAttacker(gen, attackerSet, obs, withItem);
+    const defender = calcDefender(gen, defenderSet, obs);
+    const result = calculate(gen, attacker, defender, new Move(gen, calcMoveId), new Field({}));
+    const rolls = (Array.isArray(result.damage) ? (result.damage as number[]).flat() : [Number(result.damage)]).map(Number);
+    const maxHp = defender.maxHP();
+    if (rolls.length === 0 || maxHp <= 0) return null;
+    const min = Math.min(...rolls) / maxHp - OBSERVATION_SLACK;
+    const max = Math.max(...rolls) / maxHp + OBSERVATION_SLACK;
+    return obs.observedFraction >= min && obs.observedFraction <= max;
+  } catch {
+    return null; // Unknown move/species for this gen: cannot judge.
+  }
+}
+
+/** The rival hypotheses: no item, plus the move type's ×1.2 bluff item when one exists. */
+function rivalItemsFor(gen: CalcGen, calcMoveId: string): string[] {
+  const moveType = (() => {
+    try { return new Move(gen, calcMoveId).type; } catch { return undefined; }
+  })();
+  const bluff = moveType ? TYPE_BOOST_ITEMS[moveType] : undefined;
+  return ['', ...(bluff ? [bluff] : [])];
+}
+
+/** One observation's verdict on the Choice item hypothesis. */
+function judgeObservation(
+  gen: CalcGen, attackerSet: PokemonSet, defenderSet: PokemonSet | undefined, obs: DamageObservation, item: string,
+): 'contradicted' | 'choice-only' | 'skip' {
+  // Typeless "hiddenpower" calcs as the set's resolved variant (same seam
+  // as spread-inference — the IV-default type would judge with wrong rolls).
+  const calcMoveId = obs.moveId === 'hiddenpower'
+    ? typedHiddenPowerId(attackerSet.moves) ?? obs.moveId
+    : obs.moveId;
+  const explains = (withItem: string) => explainsObservation(gen, attackerSet, defenderSet, obs, calcMoveId, withItem);
+  const rivals = rivalItemsFor(gen, calcMoveId);
+  const choiceFits = explains(item);
+  if (choiceFits === null) return 'skip';
+  const rivalFits = rivals.map(explains).some(fit => fit === true);
+  if (!choiceFits) {
+    // Nothing explains it (crit slack, unknown context) — cannot judge.
+    return rivalFits ? 'contradicted' : 'skip';
+  }
+  return rivalFits ? 'skip' : 'choice-only';
+}
+
 export function corroborateChoiceItem(
   side: 'p1' | 'p2',
   species: string,
@@ -106,46 +174,9 @@ export function corroborateChoiceItem(
     if (obs.attackerSide !== side || toId(obs.attackerSpecies) !== speciesId) continue;
     const defenderTeam = side === 'p1' ? teams.p2Team : teams.p1Team;
     const defenderSet = defenderTeam.find(candidate => toId(candidate.species) === toId(obs.defenderSpecies));
-    // Typeless "hiddenpower" calcs as the set's resolved variant (same seam
-    // as spread-inference — the IV-default type would judge with wrong rolls).
-    const calcMoveId = obs.moveId === 'hiddenpower'
-      ? typedHiddenPowerId(attackerSet.moves) ?? obs.moveId
-      : obs.moveId;
-    const explains = (withItem: string): boolean | null => {
-      try {
-        const attacker = new Pokemon(gen, attackerSet.species, {
-          level: attackerSet.level || 100, ability: attackerSet.ability || undefined,
-          item: withItem || undefined, nature: attackerSet.nature, evs: attackerSet.evs,
-          ivs: attackerSet.ivs, boosts: obs.attackerBoosts,
-          status: (obs.attackerStatus || undefined) as never,
-        });
-        const defender = new Pokemon(gen, defenderSet?.species ?? obs.defenderSpecies, {
-          level: defenderSet?.level || 100, nature: defenderSet?.nature,
-          evs: defenderSet?.evs, ivs: defenderSet?.ivs, boosts: obs.defenderBoosts,
-        });
-        const result = calculate(gen, attacker, defender, new Move(gen, calcMoveId), new Field({}));
-        const rolls = (Array.isArray(result.damage) ? (result.damage as number[]).flat() : [Number(result.damage)]).map(Number);
-        const maxHp = defender.maxHP();
-        if (rolls.length === 0 || maxHp <= 0) return null;
-        const min = Math.min(...rolls) / maxHp - OBSERVATION_SLACK;
-        const max = Math.max(...rolls) / maxHp + OBSERVATION_SLACK;
-        return obs.observedFraction >= min && obs.observedFraction <= max;
-      } catch {
-        return null; // Unknown move/species for this gen: cannot judge.
-      }
-    };
-    const moveType = (() => {
-      try { return new Move(gen, calcMoveId).type; } catch { return undefined; }
-    })();
-    const bluff = moveType ? TYPE_BOOST_ITEMS[moveType] : undefined;
-    const choiceFits = explains(item);
-    if (choiceFits === null) continue;
-    const rivalFits = [explains(''), ...(bluff ? [explains(bluff)] : [])].some(fit => fit === true);
-    if (!choiceFits) {
-      if (rivalFits) return 'contradicted';
-      continue; // Nothing explains it (crit slack, unknown context) — cannot judge.
-    }
-    if (!rivalFits) sawChoiceOnly = true;
+    const verdict = judgeObservation(gen, attackerSet, defenderSet, obs, item);
+    if (verdict === 'contradicted') return 'contradicted';
+    if (verdict === 'choice-only') sawChoiceOnly = true;
   }
   return sawChoiceOnly ? 'corroborated' : 'ambiguous';
 }
