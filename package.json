@@ -19,7 +19,7 @@
     "@pkmn/data": "^0.10.11",
     "@pkmn/dex": "^0.10.11",
     "@pkmn/sim": "^0.10.11",
-    "@pkmn/smogon": "^0.5.31",
+    "@pkmn/smogon": "^0.6.0",
     "@smogon/calc": "^0.11.0",
     "react": "^19.2.8",
     "react-dom": "^19.2.8"
