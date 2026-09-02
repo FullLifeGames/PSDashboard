@@ -277,49 +277,6 @@ export const ratchetOverrides = [
   },
   {
     "files": [
-      "src/components/BranchSaveSharePanel.tsx"
-    ],
-    "rules": {
-      "max-lines-per-function": [
-        "error",
-        {
-          "max": 70,
-          "skipBlankLines": true,
-          "skipComments": true,
-          "IIFEs": true
-        }
-      ]
-    }
-  },
-  {
-    "files": [
-      "src/components/EvalPanel.tsx"
-    ],
-    "rules": {
-      "max-lines-per-function": [
-        "error",
-        {
-          "max": 80,
-          "skipBlankLines": true,
-          "skipComments": true,
-          "IIFEs": true
-        }
-      ]
-    }
-  },
-  {
-    "files": [
-      "src/components/EvalTurnAnalysis.tsx"
-    ],
-    "rules": {
-      "complexity": [
-        "error",
-        16
-      ]
-    }
-  },
-  {
-    "files": [
       "src/lib/branch-choices.ts"
     ],
     "rules": {

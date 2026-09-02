@@ -85,14 +85,11 @@ export function EvalTurnAnalysis({ analysis, playerNames, reads, onExplore }: Ev
 
 const stripLead = (label: string) => label.replace(/^Lead /, '');
 
-/** The lead verdict chips: agreement, the graded miss, the inaccuracy, or the engine's differing pick. */
-function LeadVerdict({ name, side }: { name: string; side: LeadSideAnalysis }) {
+/** The graded lead miss or inaccuracy. */
+function LeadGrade({ side }: { side: LeadSideAnalysis }) {
   const bad = side.tier === 'mistake' || side.tier === 'blunder';
   return (
     <>
-      {side.played && side.best && side.played.choice === side.best.choice && (
-        <span style={{ color: '#8c8' }}>✓ the engine's leads</span>
-      )}
       {bad && side.best && (
         <span style={{ color: side.tier === 'blunder' ? '#ff7a7a' : '#f3a6a6' }}>
           {side.tier} · {winDeltaText(-(side.regret ?? 0))} · better: {stripLead(side.best.label)} ({winPctText(side.best.ev)})
@@ -103,6 +100,18 @@ function LeadVerdict({ name, side }: { name: string; side: LeadSideAnalysis }) {
           · inaccuracy ({winDeltaText(-(side.regret ?? 0))}): {stripLead(side.best.label)} was a touch better
         </span>
       )}
+    </>
+  );
+}
+
+/** The lead verdict chips: agreement, the graded miss, the inaccuracy, or the engine's differing pick. */
+function LeadVerdict({ name, side }: { name: string; side: LeadSideAnalysis }) {
+  return (
+    <>
+      {side.played && side.best && side.played.choice === side.best.choice && (
+        <span style={{ color: '#8c8' }}>✓ the engine's leads</span>
+      )}
+      <LeadGrade side={side} />
       {!side.tier && side.played && side.best && side.played.choice !== side.best.choice && (
         <span style={{ color: '#778' }} title={evTitle(name)}>
           engine: {stripLead(side.best.label)} ({winPctText(side.best.ev)})

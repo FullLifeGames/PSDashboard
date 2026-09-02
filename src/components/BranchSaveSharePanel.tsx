@@ -88,18 +88,10 @@ function SavedBranchRow({ entry, onOpen, onRemove }: {
   );
 }
 
-export function BranchSaveSharePanel({ replayData, branchTurn, history, finalLog }: Props) {
-  const [saved, setSaved] = useState<BranchSharePayload[]>(() => loadSavedBranches(replayData.id));
+/** The share link of the current branch and whether the clipboard took it. */
+function useShareLink(payload: BranchSharePayload) {
   const [link, setLink] = useState('');
   const [copied, setCopied] = useState(false);
-
-  const payload = useMemo(() => makeBranchSharePayload({
-    replay: replayData,
-    branchTurn,
-    history,
-    finalLog,
-  }), [replayData, branchTurn, history, finalLog]);
-
   const createLink = async () => {
     const nextLink = shareUrl(encodeBranchShare(payload));
     setLink(nextLink);
@@ -111,6 +103,19 @@ export function BranchSaveSharePanel({ replayData, branchTurn, history, finalLog
       setCopied(false);
     }
   };
+  return { link, copied, createLink };
+}
+
+export function BranchSaveSharePanel({ replayData, branchTurn, history, finalLog }: Props) {
+  const [saved, setSaved] = useState<BranchSharePayload[]>(() => loadSavedBranches(replayData.id));
+
+  const payload = useMemo(() => makeBranchSharePayload({
+    replay: replayData,
+    branchTurn,
+    history,
+    finalLog,
+  }), [replayData, branchTurn, history, finalLog]);
+  const { link, copied, createLink } = useShareLink(payload);
 
   const saveBranch = () => {
     setSaved(saveBranchPayload(payload));

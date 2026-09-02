@@ -99,10 +99,35 @@ function useReportView(report: GameReport | null | undefined, analysisTurn: numb
   return { view, setView };
 }
 
+/** The header row and the run-state block, both fed straight from the panel props. */
+function PanelHeader({ running, ...props }: EvalPanelProps & { running: boolean }) {
+  return (
+    <>
+      <EvalControls
+        prefs={props.prefs}
+        onPrefsChange={props.onPrefsChange}
+        running={running}
+        showAuto={props.showAuto}
+        showTera={props.showTera}
+        onEvaluate={props.onEvaluate}
+        onCancel={props.onCancel}
+        result={props.result}
+        status={props.status}
+      />
+      <EvalStatusBlock
+        playOutProgress={props.playOutProgress}
+        status={props.status}
+        reconstructProgress={props.reconstructProgress}
+        progress={props.progress}
+        error={props.error}
+      />
+    </>
+  );
+}
+
 export function EvalPanel(props: EvalPanelProps) {
   const {
-    playerNames, status, result, progress, reconstructProgress, error,
-    prefs, onPrefsChange, onEvaluate, onCancel, onPickChoice, onPickPair, showAuto, showTera,
+    playerNames, status, result, onPickChoice, onPickPair,
     graph, variation, onAnalyzeGame, onSelectTurn, resultSettings, onThinkDeeper, thinkDeeperTarget, smogonPending,
     positionLabel, analysisTurn, playOutProgress, report, doubles,
   } = props;
@@ -129,24 +154,7 @@ export function EvalPanel(props: EvalPanelProps) {
 
   return (
     <div className="ps-panel ps-eval-panel">
-      <EvalControls
-        prefs={prefs}
-        onPrefsChange={onPrefsChange}
-        running={running}
-        showAuto={showAuto}
-        showTera={showTera}
-        onEvaluate={onEvaluate}
-        onCancel={onCancel}
-        result={result}
-        status={status}
-      />
-      <EvalStatusBlock
-        playOutProgress={playOutProgress}
-        status={status}
-        reconstructProgress={reconstructProgress}
-        progress={progress}
-        error={error}
-      />
+      <PanelHeader {...props} running={running} />
       {(onAnalyzeGame || hasGraph || variation) && (
         <GameGraphSection
           {...props}
