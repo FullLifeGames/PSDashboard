@@ -5,6 +5,7 @@ import reactRefresh from 'eslint-plugin-react-refresh'
 import tseslint from 'typescript-eslint'
 import { defineConfig, globalIgnores } from 'eslint/config'
 import { ratchetBase, ratchetOverrides } from './eslint.ratchet.mjs'
+import { importZones } from './eslint.zones.mjs'
 
 export default defineConfig([
   globalIgnores(['dist', '.remember']),
@@ -25,4 +26,6 @@ export default defineConfig([
   // shrink-only pins for legacy files (see scripts/update-lint-ratchet.mjs).
   ...ratchetBase,
   ...ratchetOverrides,
+  // Import zones: the package layering as lint errors (see eslint.zones.mjs).
+  ...importZones,
 ])
