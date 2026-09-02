@@ -327,46 +327,6 @@ export const ratchetOverrides = [
   },
   {
     "files": [
-      "src/lib/eval/mcts-merge.ts"
-    ],
-    "rules": {
-      "max-lines-per-function": [
-        "error",
-        {
-          "max": 90,
-          "skipBlankLines": true,
-          "skipComments": true,
-          "IIFEs": true
-        }
-      ],
-      "complexity": [
-        "error",
-        23
-      ]
-    }
-  },
-  {
-    "files": [
-      "src/lib/eval/mcts.ts"
-    ],
-    "rules": {
-      "max-lines-per-function": [
-        "error",
-        {
-          "max": 70,
-          "skipBlankLines": true,
-          "skipComments": true,
-          "IIFEs": true
-        }
-      ],
-      "complexity": [
-        "error",
-        24
-      ]
-    }
-  },
-  {
-    "files": [
       "src/lib/eval/null-moves.ts"
     ],
     "rules": {
@@ -384,26 +344,6 @@ export const ratchetOverrides = [
       "complexity": [
         "error",
         18
-      ]
-    }
-  },
-  {
-    "files": [
-      "src/lib/eval/orchestrator.ts"
-    ],
-    "rules": {
-      "max-lines-per-function": [
-        "error",
-        {
-          "max": 130,
-          "skipBlankLines": true,
-          "skipComments": true,
-          "IIFEs": true
-        }
-      ],
-      "complexity": [
-        "error",
-        29
       ]
     }
   },
@@ -468,34 +408,6 @@ export const ratchetOverrides = [
   },
   {
     "files": [
-      "src/lib/eval/search.ts"
-    ],
-    "rules": {
-      "max-lines": [
-        "error",
-        {
-          "max": 680,
-          "skipBlankLines": true,
-          "skipComments": true
-        }
-      ],
-      "max-lines-per-function": [
-        "error",
-        {
-          "max": 120,
-          "skipBlankLines": true,
-          "skipComments": true,
-          "IIFEs": true
-        }
-      ],
-      "complexity": [
-        "error",
-        45
-      ]
-    }
-  },
-  {
-    "files": [
       "src/lib/eval/speed.ts"
     ],
     "rules": {
@@ -544,22 +456,6 @@ export const ratchetOverrides = [
       "complexity": [
         "error",
         16
-      ]
-    }
-  },
-  {
-    "files": [
-      "src/lib/eval/worker-client.ts"
-    ],
-    "rules": {
-      "max-lines-per-function": [
-        "error",
-        {
-          "max": 80,
-          "skipBlankLines": true,
-          "skipComments": true,
-          "IIFEs": true
-        }
       ]
     }
   }
