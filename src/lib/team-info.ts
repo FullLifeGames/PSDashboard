@@ -180,21 +180,19 @@ function moveDedupKey(name: string): string {
  * slots) — mirrors the team builder's USAGE_MOVE_POOL. */
 const GUESS_MOVE_POOL = 10;
 
-export function enrichPokemonInfo(
-  pokemon: RevealedPokemonInfo,
-  usageStats?: SmogonUsageStats | null,
-  setAssumptions?: SmogonSetAssumptions | null,
-  hpTypeResolver?: (species: string) => string | null,
-): RevealedPokemonInfo {
-  const usageSet = getSpeciesUsageSet(usageStats, pokemon.species, pokemon.ruledOut, GUESS_MOVE_POOL);
-  const smogonSet = getSpeciesSetAssumption(setAssumptions, pokemon.species);
+type SpeciesUsage = ReturnType<typeof getSpeciesUsageSet>;
+type SmogonSet = ReturnType<typeof getSpeciesSetAssumption>;
+type CuratedSet = ReturnType<typeof selectCuratedSet>;
+
+/**
+ * The same coherent-set selection the simulator's team builder runs — the
+ * panel's fills and the sim's fills come from one winner (or one shared
+ * marginal fallback), never from two different guessers (GPL Body Press).
+ */
+function curatedSetFor(pokemon: RevealedPokemonInfo, usageSet: SpeciesUsage, smogonSet: SmogonSet): CuratedSet | null {
   const proven = (field: PokemonFieldInfo) =>
     field.source === 'revealed' || field.source === 'manual' ? idOf(field.value) : '';
-
-  // The same coherent-set selection the simulator's team builder runs — the
-  // panel's fills and the sim's fills come from one winner (or one shared
-  // marginal fallback), never from two different guessers (GPL Body Press).
-  const curated = smogonSet ? selectCuratedSet([smogonSet, ...(smogonSet.alternatives ?? [])], {
+  return smogonSet ? selectCuratedSet([smogonSet, ...(smogonSet.alternatives ?? [])], {
     revealedMoves: pokemon.moves
       .filter(move => move.source === 'revealed' || move.source === 'manual')
       .map(move => idOf(move.name)),
@@ -205,10 +203,21 @@ export function enrichPokemonInfo(
     usageProbability: moveId =>
       usageSet?.moves.find(move => idOf(move.value) === moveId)?.probability ?? 0,
   }) : null;
+}
 
-  // The item resolves BEFORE the moves — the Choice/AV veto rows read it.
-  const item = normalizeItemField(pokemon.item, usageSet?.item, curated?.item ?? smogonSet?.item, pokemon.ruledOut?.items, !!curated);
+/** The curated set's fields, falling back to the marginal set assumption. */
+function setFallbacks(curated: CuratedSet | null, smogonSet: SmogonSet) {
+  return {
+    item: curated?.item ?? smogonSet?.item,
+    ability: curated?.ability ?? smogonSet?.ability,
+    spread: curated?.spread ?? smogonSet?.spread,
+  };
+}
 
+/** The move pool in offer order: known, curated, usage, then marginal set moves when nothing curated won. */
+function assembleMovePool(
+  pokemon: RevealedPokemonInfo, curated: CuratedSet | null, usageSet: SpeciesUsage, smogonSet: SmogonSet,
+): { pool: MoveCandidate[]; infoFor: Map<string, PokemonMoveInfo> } {
   const infoFor = new Map<string, PokemonMoveInfo>();
   const pool: MoveCandidate[] = [];
   const pooled = new Set<string>();
@@ -223,35 +232,64 @@ export function enrichPokemonInfo(
   for (const move of curated?.moves ?? []) offer(guessedMoveFromSet(move));
   for (const move of usageSet?.moves ?? []) offer(guessedMove(move));
   if (!curated) for (const move of smogonSet?.moves ?? []) offer(guessedMoveFromSet(move));
+  return { pool, infoFor };
+}
 
-  // Known moves always stay; vetoed guesses drop and the pool's tail refills
-  // the display up to four slots.
+/**
+ * Known moves always stay; vetoed guesses drop and the pool's tail refills
+ * the display up to four slots.
+ */
+function vetoedMoves(pool: MoveCandidate[], infoFor: Map<string, PokemonMoveInfo>, itemValue: string): PokemonMoveInfo[] {
   const moves: PokemonMoveInfo[] = [];
-  for (const candidate of applyCoherenceVetoes(pool, { itemId: idOf(itemSetValue(item.value)) })) {
+  for (const candidate of applyCoherenceVetoes(pool, { itemId: idOf(itemSetValue(itemValue)) })) {
     const move = infoFor.get(candidate.name);
     if (!move) continue;
     if (!candidate.guessed || moves.length < 4) moves.push(move);
   }
+  return moves;
+}
 
-  // Display follows computed data (⑤): the sim substitutes a typeless
-  // "Hidden Power" with the evidence/usage variant — show that same name so
-  // the visible sheet and the simulated set agree. The revealed status
-  // stays; only the name gains the typed suffix, marked by its detail.
-  const typedMoves = hpTypeResolver
+/**
+ * Display follows computed data (⑤): the sim substitutes a typeless
+ * "Hidden Power" with the evidence/usage variant — show that same name so
+ * the visible sheet and the simulated set agree. The revealed status
+ * stays; only the name gains the typed suffix, marked by its detail.
+ */
+function withTypedHiddenPower(
+  moves: PokemonMoveInfo[], species: string, hpTypeResolver: ((species: string) => string | null) | undefined,
+): PokemonMoveInfo[] {
+  return hpTypeResolver
     ? moves.map(move => {
       if (idOf(move.name) !== 'hiddenpower') return move;
-      const resolved = hpTypeResolver(pokemon.species);
+      const resolved = hpTypeResolver(species);
       return resolved ? { ...move, name: resolved, sourceDetail: 'HP type via evidence/usage' } : move;
     })
     : moves;
+}
+
+export function enrichPokemonInfo(
+  pokemon: RevealedPokemonInfo,
+  usageStats?: SmogonUsageStats | null,
+  setAssumptions?: SmogonSetAssumptions | null,
+  hpTypeResolver?: (species: string) => string | null,
+): RevealedPokemonInfo {
+  const usageSet = getSpeciesUsageSet(usageStats, pokemon.species, pokemon.ruledOut, GUESS_MOVE_POOL);
+  const smogonSet = getSpeciesSetAssumption(setAssumptions, pokemon.species);
+  const curated = curatedSetFor(pokemon, usageSet, smogonSet);
+  const fallback = setFallbacks(curated, smogonSet);
+
+  // The item resolves BEFORE the moves — the Choice/AV veto rows read it.
+  const item = normalizeItemField(pokemon.item, usageSet?.item, fallback.item, pokemon.ruledOut?.items, !!curated);
+  const { pool, infoFor } = assembleMovePool(pokemon, curated, usageSet, smogonSet);
+  const moves = vetoedMoves(pool, infoFor, item.value);
 
   return {
     ...pokemon,
-    ability: normalizeAbilityField(pokemon.ability, usageSet?.ability, curated?.ability ?? smogonSet?.ability, pokemon.ruledOut?.abilities, !!curated),
+    ability: normalizeAbilityField(pokemon.ability, usageSet?.ability, fallback.ability, pokemon.ruledOut?.abilities, !!curated),
     item,
-    evs: normalizeEvsField(pokemon.evs, usageSet?.spread, curated?.spread ?? smogonSet?.spread, !!curated),
-    nature: normalizeNatureField(pokemon.nature, usageSet?.spread, curated?.spread ?? smogonSet?.spread, !!curated),
-    moves: typedMoves,
+    evs: normalizeEvsField(pokemon.evs, usageSet?.spread, fallback.spread, !!curated),
+    nature: normalizeNatureField(pokemon.nature, usageSet?.spread, fallback.spread, !!curated),
+    moves: withTypedHiddenPower(moves, pokemon.species, hpTypeResolver),
   };
 }
 
