@@ -1,7 +1,7 @@
 import { Generations, Pokemon, Move, Field, calculate } from '@smogon/calc';
 import type { PokemonSet } from '@pkmn/sim';
 import type { DamageObservation, PokemonEvs, SpeedOrderObservation } from '../../types';
-import { WEATHER_BY_ID } from '../damage-calc';
+import { WEATHER_BY_ID } from '../calc-field';
 import { typedHiddenPowerId } from '../hidden-power';
 import { evBudget, ZERO_EVS, type EvBudget } from './ev-budget';
 import type { CandidateRung, SpreadCandidate } from './ladder';

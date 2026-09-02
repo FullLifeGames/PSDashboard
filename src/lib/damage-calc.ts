@@ -1,6 +1,7 @@
 import { Generations, Pokemon, Move, Field, calculate } from '@smogon/calc';
 import type { SimPokemonInfo, BranchMoveOption } from '../hooks/useBranch';
 import { toId } from './ids';
+import { TERRAIN_BY_ID, WEATHER_BY_ID } from './calc-field';
 
 type CalcPokemonOptions = ConstructorParameters<typeof Pokemon>[2];
 type CalcBoosts = NonNullable<CalcPokemonOptions>['boosts'];
@@ -8,9 +9,6 @@ type CalcStatus = NonNullable<CalcPokemonOptions>['status'];
 type CalcStats = NonNullable<CalcPokemonOptions>['evs'];
 type CalcGender = NonNullable<CalcPokemonOptions>['gender'];
 type CalcTeraType = NonNullable<CalcPokemonOptions>['teraType'];
-type CalcFieldOptions = ConstructorParameters<typeof Field>[0];
-type CalcWeather = NonNullable<CalcFieldOptions>['weather'];
-type CalcTerrain = NonNullable<CalcFieldOptions>['terrain'];
 
 export interface DamageResult {
   moveName: string;
@@ -34,25 +32,6 @@ export interface DamageCalcContext {
 function toConditionId(value: string | undefined): string {
   return toId(value ?? '');
 }
-
-export const WEATHER_BY_ID: Record<string, NonNullable<CalcWeather>> = {
-  raindance: 'Rain',
-  primordialsea: 'Heavy Rain',
-  sunnyday: 'Sun',
-  desolateland: 'Harsh Sunshine',
-  sandstorm: 'Sand',
-  hail: 'Hail',
-  snow: 'Snow',
-  snowscape: 'Snow',
-  deltastream: 'Strong Winds',
-};
-
-export const TERRAIN_BY_ID: Record<string, NonNullable<CalcTerrain>> = {
-  electricterrain: 'Electric',
-  grassyterrain: 'Grassy',
-  psychicterrain: 'Psychic',
-  mistyterrain: 'Misty',
-};
 
 function calcGeneration(context: DamageCalcContext) {
   const genNumber = context.gen && context.gen >= 1 && context.gen <= 9 ? context.gen : 9;
