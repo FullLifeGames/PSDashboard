@@ -1,25 +1,11 @@
-import { Dex } from '@pkmn/sim';
 import type { OpponentTeamInfo, RevealedPokemonInfo } from '../types';
 import { guessedField, revealedField, unknownEvs, unknownField } from './team-info';
-
-// Battle-only formes must merge into the base species instead of creating a
-// seventh team card (B16). Longer suffixes first ('-Mega-X' before '-Mega').
-const BATTLE_ONLY_FORME_SUFFIXES = [
-  '-Terastal', '-Stellar', '-Tera',
-  '-Mega-X', '-Mega-Y', '-Mega',
-  '-Primal', '-Ultra', '-Gmax',
-];
-
-function normalizeBattleOnlyForme(species: string): string {
-  for (const suffix of BATTLE_ONLY_FORME_SUFFIXES) {
-    if (species.endsWith(suffix)) return species.slice(0, -suffix.length);
-  }
-  return species;
-}
-
-function toId(value: string): string {
-  return value.toLowerCase().replace(/[^a-z0-9]/g, '');
-}
+import { createInferrerState } from './inference/inferrer-state';
+import { findPokemonByNickname, toId } from './inference/lookup';
+import {
+  addFromPreview, addFromSwitch, noteEntry, noteGravity, noteMoveOrBoundary, recordAbility, recordAbilityAttribution,
+  recordConsumedItem, recordHealItem, recordItem, recordItemDamage, recordMega, recordMove, recordTera, ruleOutFromDamage,
+} from './inference/handlers';
 
 /** "SitrusBerry" / "HighHorsepower" (packed names) → "Sitrus Berry" / "High Horsepower". */
 function splitPackedName(value: string): string {
@@ -116,356 +102,40 @@ function applyTeamSheet(pokemonMap: Map<string, RevealedPokemonInfo>, sheet: She
   }
 }
 
-/** Items whose `[from] item:` damage hits the attacker instead of the holder. */
-const ATTACKER_PUNISH_ITEMS = new Set(['rockyhelmet', 'jabocaberry', 'rowapberry']);
-/** `|-item|` sources that mean the holder ACQUIRED the item mid-game — not its set item. */
-const SWAP_ITEM_SOURCES =
-  /\[from\] (?:move: (?:Trick|Switcheroo|Thief|Covet|Bestow)|ability: (?:Magician|Pickpocket|Symbiosis))/;
-/** Swap moves whose resolving-move context pairs giver and receiver (no [of] emitted). */
-const SWAP_PAIR_MOVES = new Set(['trick', 'switcheroo', 'thief', 'covet']);
-/** A landed Ground move from a possible immunity-breaker proves nothing about Levitate. */
-const MOLD_BREAKER_ABILITIES = new Set(['moldbreaker', 'teravolt', 'turboblaze']);
-
 /**
  * Extracts revealed information about the opponent's team from the replay log.
  * Parses |poke|, |switch|, |move|, |-ability|, |-item|, |-terastallize| lines for p2.
+ * Every line runs through the handlers in this fixed order; unlike the
+ * protocol parser several of them may fire for one line.
  */
 export function inferOpponentTeam(log: string, opponentSide: 'p1' | 'p2' = 'p2'): OpponentTeamInfo {
   const lines = log.split('\n');
-  const pokemonMap = new Map<string, RevealedPokemonInfo>();
-  // Each ident's latest move target — resolves Rocky Helmet reveals in
-  // video-reconstructed logs that drop the [of] attribution.
-  const lastMoveTarget = new Map<string, string>();
-  // The move action currently resolving. Bare |-damage| lines are attributed
-  // to it ONLY until an action boundary (miss/immune/switch/turn/...) —
-  // a stale attribution would let a confusion self-hit or Future Sight
-  // resolution "prove" that an immune-blocked Earthquake landed.
-  let pendingMove: { attacker: string; moveName: string } | null = null;
-  // Ident → species for BOTH sides (the attacker of a rule-out line can be
-  // on either side).
-  const identSpecies = new Map<string, string>();
-  // Distinct PLAIN move names each opponent ident used since it last entered
-  // the field — two of them disprove a Choice lock; a plain Status move
-  // disproves Assault Vest. `[from]`-attributed lines (Sleep Talk calls,
-  // bounces, Dancer copies) never count: they are not the holder's choice.
-  const plainMovesSince = new Map<string, Set<string>>();
-  // Opponent nickname → species, fed by the same switch/drag lines as
-  // identSpecies — serves the rule-out path without re-scanning the log
-  // (the full scan remains only as the fallback for synthetic logs).
-  const nicknameSpecies = new Map<string, string>();
-  // Idents whose current item arrived via a swap (Trick & co) — later item
-  // reveals/consumptions for them show the acquired item, not the set item.
-  // The value is the swap's resolving-move action (object identity): within
-  // the SAME action the counterpart line may still credit the giver's
-  // original; from a later action the ident only gives away acquired items.
-  const swappedIdents = new Map<string, object | null>();
-  let gravityActive = false;
-
-  const canHaveDancer = (ident: string): boolean => {
-    const species = identSpecies.get(ident);
-    if (!species) return false;
-    return Object.values(Dex.species.get(species).abilities ?? {})
-      .some(ability => toId(String(ability)) === 'dancer');
-  };
-
-  const ruleOut = (nickname: string, kind: 'abilities' | 'items', id: string) => {
-    const known = nicknameSpecies.get(nickname);
-    const pokemon = (known ? pokemonMap.get(known) : undefined) ??
-      findPokemonByNickname(pokemonMap, nickname, lines, opponentSide);
-    if (!pokemon) return;
-    const ruledOut = (pokemon.ruledOut ??= { abilities: [], items: [] });
-    if (!ruledOut[kind].includes(id)) ruledOut[kind].push(id);
-  };
+  const state = createInferrerState(lines, opponentSide);
 
   for (const line of lines) {
-    if (line.startsWith('|move|')) {
-      const parts = line.split('|');
-      if (parts[2]) {
-        pendingMove = { attacker: parts[2], moveName: parts[3] ?? '' };
-        if (parts[4] && /^p[12][a-d]?:/.test(parts[4])) {
-          lastMoveTarget.set(parts[2], parts[4]);
-        }
-        if (parts[2].startsWith(opponentSide) && !line.includes('[from]') && parts[3]) {
-          const nickname = parts[2].split(': ')[1]?.trim();
-          if (nickname) {
-            const used = plainMovesSince.get(parts[2]) ?? new Set<string>();
-            used.add(toId(parts[3]));
-            plainMovesSince.set(parts[2], used);
-            if (used.size >= 2 && !canHaveDancer(parts[2])) {
-              for (const item of ['choiceband', 'choicespecs', 'choicescarf']) {
-                ruleOut(nickname, 'items', item);
-              }
-            }
-            if (Dex.moves.get(parts[3]).category === 'Status') {
-              ruleOut(nickname, 'items', 'assaultvest');
-            }
-          }
-        }
-      }
-    } else if (
-      /^\|(?:-miss|-immune|-fail|-end|turn|upkeep|cant|faint)\|/.test(line) ||
-      (line.startsWith('|-activate|') && line.includes('confusion'))
-    ) {
-      pendingMove = null;
-    }
-
-    if (line.startsWith('|-fieldstart|') && line.includes('Gravity')) gravityActive = true;
-    if (line.startsWith('|-fieldend|') && line.includes('Gravity')) gravityActive = false;
-    if (line.startsWith('|switch|') || line.startsWith('|drag|')) {
-      pendingMove = null;
-      const parts = line.split('|');
-      const parsed = parseDetails(parts[3]);
-      if (parts[2]) {
-        if (parsed) {
-          identSpecies.set(parts[2], parsed.species);
-          if (parts[2].startsWith(opponentSide)) {
-            const nickname = parts[2].split(': ')[1]?.trim();
-            if (nickname) nicknameSpecies.set(nickname, parsed.species);
-          }
-        }
-        plainMovesSince.delete(parts[2]);
-      }
-    }
-
-    // Disproving evidence: a Pokémon that TAKES hazard/status/weather/recoil
-    // damage cannot be Magic Guard; rocks chip rules out Heavy-Duty Boots; a
-    // landed Ground move rules out Levitate (T25 — Clefable was simmed with
-    // Magic Guard while visibly taking Stealth Rock damage).
-    if (line.startsWith(`|-damage|${opponentSide}`)) {
-      const nickname = line.split('|')[2]?.split(': ')[1]?.trim();
-      if (nickname) {
-        if (/\[from\] (Stealth Rock|Spikes)\b/.test(line)) {
-          ruleOut(nickname, 'abilities', 'magicguard');
-          ruleOut(nickname, 'items', 'heavydutyboots');
-        } else if (/\[from\] (psn|tox|brn|Sandstorm|Hail)\b/.test(line) || line.includes('[from] item: Life Orb')) {
-          ruleOut(nickname, 'abilities', 'magicguard');
-        } else if (!line.includes('[from]') && pendingMove && !gravityActive) {
-          const move = Dex.moves.get(pendingMove.moveName);
-          const ignore = move.ignoreImmunity as boolean | Record<string, boolean> | undefined;
-          const ignoresGround = ignore === true || (typeof ignore === 'object' && !!ignore?.Ground);
-          const attackerSpecies = identSpecies.get(pendingMove.attacker);
-          const possiblyMoldBreaker = attackerSpecies
-            ? Object.values(Dex.species.get(attackerSpecies).abilities ?? {})
-              .some(ability => MOLD_BREAKER_ABILITIES.has(toId(String(ability))))
-            : false;
-          if (move.type === 'Ground' && !ignoresGround && !possiblyMoldBreaker) {
-            ruleOut(nickname, 'abilities', 'levitate');
-          }
-        }
-      }
-    }
-    // Team preview: |poke|p2|Species, L50, M|item
-    if (line.startsWith(`|poke|${opponentSide}|`)) {
-      const parts = line.split('|');
-      const details = parts[3];
-      const hasItem = parts[4] === 'item';
-      const parsed = parseDetails(details);
-      if (parsed && !pokemonMap.has(parsed.species)) {
-        pokemonMap.set(parsed.species, {
-          species: parsed.species,
-          moves: [],
-          ability: unknownField(),
-          item: hasItem ? revealedField('(has item)') : unknownField(),
-          teraType: unknownField(),
-          evs: unknownEvs(),
-          level: parsed.level,
-          gender: parsed.gender,
-        });
-      }
-    }
-
-    // Switch: |switch|p2a: Nickname|Species, L50, M|100/100
-    if (line.startsWith(`|switch|${opponentSide}`) || line.startsWith(`|drag|${opponentSide}`)) {
-      const parts = line.split('|');
-      const details = parts[3];
-      const parsed = parseDetails(details);
-      if (parsed && !pokemonMap.has(parsed.species)) {
-        pokemonMap.set(parsed.species, {
-          species: parsed.species,
-          moves: [],
-          ability: unknownField(),
-          item: unknownField(),
-          teraType: unknownField(),
-          evs: unknownEvs(),
-          level: parsed.level,
-          gender: parsed.gender,
-        });
-      }
-    }
-
-    // Move: |move|p2a: Nickname|Move Name|target
-    if (line.startsWith(`|move|${opponentSide}`)) {
-      const parts = line.split('|');
-      const identParts = parts[2].split(': ');
-      const nickname = identParts[1];
-      const moveName = parts[3];
-
-      // Find which pokemon this is by looking at current active
-      const pokemon = findPokemonByNickname(pokemonMap, nickname, lines, opponentSide);
-      if (pokemon && !pokemon.moves.some(move => move.name === moveName)) {
-        pokemon.moves.push({ name: moveName, source: 'revealed' });
-      }
-    }
-
-    // Ability: |-ability|p2a: Nickname|Ability Name
-    if (line.startsWith(`|-ability|${opponentSide}`)) {
-      const parts = line.split('|');
-      const identParts = parts[2].split(': ');
-      const nickname = identParts[1];
-      const abilityName = parts[3];
-      const pokemon = findPokemonByNickname(pokemonMap, nickname, lines, opponentSide);
-      if (pokemon && !pokemon.ability.value) {
-        pokemon.ability = revealedField(abilityName);
-      }
-    }
-
-    // Item: |-item|pXa: Nickname|Item Name[|tags]. A swap-ACQUIRED item
-    // ([from] Trick/Switcheroo/Thief/Covet/Bestow or Magician/Pickpocket/
-    // Symbiosis) is NOT the holder's set item — crediting Vileplume with the
-    // scarf a Trick planted on it manufactured a choice lock that hid its
-    // real moves (GPL T11). The same line DOES reveal the GIVER's set item:
-    // whatever arrived came off the other party of the resolving swap.
-    if (line.startsWith('|-item|')) {
-      const parts = line.split('|');
-      const ident = parts[2] ?? '';
-      const nickname = ident.split(': ')[1];
-      const itemName = parts[3];
-      const swapAcquired = SWAP_ITEM_SOURCES.test(line);
-      if (ident.startsWith(opponentSide) && nickname) {
-        if (swapAcquired) {
-          swappedIdents.set(ident, pendingMove);
-        } else if (!swappedIdents.has(ident)) {
-          const pokemon = findPokemonByNickname(pokemonMap, nickname, lines, opponentSide);
-          if (pokemon) {
-            pokemon.item = revealedField(itemName);
-          }
-        }
-      }
-      if (swapAcquired && itemName) {
-        // Giver: the [of] ident when present, else the OTHER party of the
-        // resolving swap move (Trick swaps emit no [of]).
-        const ofIdent = line.match(/\[of\] (p[12][a-d]?: [^|\n]+)/)?.[1]?.trim() ?? null;
-        const pairedMove = pendingMove && SWAP_PAIR_MOVES.has(toId(pendingMove.moveName)) ? pendingMove : null;
-        const giver = ofIdent ?? (pairedMove
-          ? (pairedMove.attacker === ident
-            ? lastMoveTarget.get(pairedMove.attacker) ?? null
-            : pairedMove.attacker)
-          : null);
-        // A giver that swap-acquired in an EARLIER action only gives away
-        // acquired goods; its counterpart line in THIS action still counts.
-        const priorSwap = giver !== null && swappedIdents.has(giver) && swappedIdents.get(giver) !== pendingMove;
-        if (giver && giver.startsWith(opponentSide) && !priorSwap) {
-          const giverNickname = giver.split(': ')[1];
-          const pokemon = giverNickname
-            ? findPokemonByNickname(pokemonMap, giverNickname, lines, opponentSide)
-            : null;
-          if (pokemon && !pokemon.item.value) {
-            pokemon.item = revealedField(itemName);
-          }
-        }
-      }
-    }
-
-    // End item (consumed): |-enditem|p2a: Nickname|Item Name. After a swap
-    // the mon consumes/loses the ACQUIRED item — never its set item.
-    if (line.startsWith(`|-enditem|${opponentSide}`)) {
-      const parts = line.split('|');
-      const ident = parts[2] ?? '';
-      const identParts = parts[2].split(': ');
-      const nickname = identParts[1];
-      const itemName = parts[3];
-      const pokemon = findPokemonByNickname(pokemonMap, nickname, lines, opponentSide);
-      if (pokemon && !pokemon.item.value && !swappedIdents.has(ident)) {
-        pokemon.item = revealedField(`${itemName} (consumed)`);
-      }
-    }
-
-    // Heal messages reveal held items: |-heal|p2a: Nick|50/100|[from] item: Leftovers (G19)
-    if (line.startsWith(`|-heal|${opponentSide}`) && line.includes('[from] item:')) {
-      const parts = line.split('|');
-      const nickname = parts[2].split(': ')[1];
-      const itemName = line.match(/\[from\] item:\s*([^|\n]+)/)?.[1]?.trim();
-      const pokemon = findPokemonByNickname(pokemonMap, nickname, lines, opponentSide);
-      if (pokemon && itemName && (!pokemon.item.value || pokemon.item.value === '(has item)')) {
-        pokemon.item = revealedField(itemName);
-      }
-    }
-
-    // Item damage reveals the holder: Life Orb/Black Sludge recoil hurts the
-    // holder itself, but Rocky Helmet hurts the ATTACKER — its holder is the
-    // [of] Pokémon, or in video-reconstructed logs that drop [of], the target
-    // of the damaged Pokémon's own move.
-    if (line.startsWith('|-damage|') && line.includes('[from] item:')) {
-      const damagedIdent = line.split('|')[2] ?? '';
-      const itemName = line.match(/\[from\] item:\s*([^|\n[]+)/)?.[1]?.trim();
-      const ofIdent = line.match(/\[of\]\s*(p[12][a-d]?):\s*([^|\n]+)/);
-      let owner: string | null = damagedIdent;
-      if (ofIdent) {
-        owner = `${ofIdent[1]}: ${ofIdent[2].trim()}`;
-      } else if (itemName && ATTACKER_PUNISH_ITEMS.has(toId(itemName))) {
-        owner = lastMoveTarget.get(damagedIdent) ?? null;
-      }
-      const ownerMatch = owner?.match(/^(p[12])[a-d]?:\s*(.+)$/);
-      if (itemName && ownerMatch && ownerMatch[1] === opponentSide) {
-        const pokemon = findPokemonByNickname(pokemonMap, ownerMatch[2].trim(), lines, opponentSide);
-        if (pokemon && (!pokemon.item.value || pokemon.item.value === '(has item)')) {
-          pokemon.item = revealedField(itemName);
-        }
-      }
-    }
-
-    // Mega evolution reveals the stone: |-mega|p2a: Nick|Lopunny|Lopunnite (G19)
-    if (line.startsWith(`|-mega|${opponentSide}`)) {
-      const parts = line.split('|');
-      const nickname = parts[2].split(': ')[1];
-      const stone = parts[4]?.trim();
-      const pokemon = findPokemonByNickname(pokemonMap, nickname, lines, opponentSide);
-      if (pokemon && stone && (!pokemon.item.value || pokemon.item.value === '(has item)')) {
-        pokemon.item = revealedField(stone);
-      }
-    }
-
-    // Terastallize: |-terastallize|p2a: Nickname|Type
-    if (line.startsWith(`|-terastallize|${opponentSide}`)) {
-      const parts = line.split('|');
-      const identParts = parts[2].split(': ');
-      const nickname = identParts[1];
-      const teraType = parts[3];
-      const pokemon = findPokemonByNickname(pokemonMap, nickname, lines, opponentSide);
-      if (pokemon) {
-        pokemon.teraType = revealedField(teraType);
-      }
-    }
-
-    // Effect attributions reveal abilities: `[from] ability: Poison Heal` on
-    // heal/damage/status lines (N1). With `[of] pXa: Nick` the ability belongs
-    // to that Pokémon (e.g. Rough Skin recoil), otherwise to the affected one.
-    const abilityAttribution = line.match(/\[from\] ability:\s*([^|\n[]+)/);
-    if (abilityAttribution) {
-      const abilityName = abilityAttribution[1].trim();
-      const ofIdent = line.match(/\[of\]\s*(p[12])[a-d]?:\s*([^|\n]+)/);
-      let ownerNickname: string | null = null;
-      if (ofIdent) {
-        if (ofIdent[1] === opponentSide) ownerNickname = ofIdent[2].trim();
-      } else {
-        const subject = line.match(/^\|-[a-z]+\|(p[12])[a-d]?:\s*([^|]+)\|/);
-        if (subject && subject[1] === opponentSide) ownerNickname = subject[2].trim();
-      }
-      if (ownerNickname) {
-        const pokemon = findPokemonByNickname(pokemonMap, ownerNickname, lines, opponentSide);
-        if (pokemon && !pokemon.ability.value) {
-          pokemon.ability = revealedField(abilityName);
-        }
-      }
-    }
+    noteMoveOrBoundary(state, line);
+    noteGravity(state, line);
+    noteEntry(state, line);
+    ruleOutFromDamage(state, line);
+    addFromPreview(state, line);
+    addFromSwitch(state, line);
+    recordMove(state, line);
+    recordAbility(state, line);
+    recordItem(state, line);
+    recordConsumedItem(state, line);
+    recordHealItem(state, line);
+    recordItemDamage(state, line);
+    recordMega(state, line);
+    recordTera(state, line);
+    recordAbilityAttribution(state, line);
   }
 
-  inferBootsFromHazards(lines, opponentSide, pokemonMap);
+  inferBootsFromHazards(lines, opponentSide, state.pokemonMap);
 
   const sheet = parseShowteamSheet(log, opponentSide);
-  if (sheet) applyTeamSheet(pokemonMap, sheet);
+  if (sheet) applyTeamSheet(state.pokemonMap, sheet);
 
-  return { pokemon: Array.from(pokemonMap.values()) };
+  return { pokemon: Array.from(state.pokemonMap.values()) };
 }
 
 /**
@@ -492,17 +162,7 @@ function inferBootsFromHazards(
     if (!switchMatch) continue;
     const nickname = switchMatch[1].trim();
 
-    // Entry-hazard damage resolves before the next action — scan until then.
-    let tookRockDamage = false;
-    for (let lookahead = index + 1; lookahead < lines.length; lookahead++) {
-      const next = lines[lookahead];
-      if (next.startsWith('|move|') || next.startsWith('|turn|') || next.startsWith('|upkeep')) break;
-      if (next.includes('[from] Stealth Rock') && next.includes(`: ${nickname}|`)) {
-        tookRockDamage = true;
-        break;
-      }
-    }
-    if (tookRockDamage) continue;
+    if (tookRockDamageOnEntry(lines, index, nickname)) continue;
 
     const pokemon = findPokemonByNickname(pokemonMap, nickname, lines, side);
     if (!pokemon) continue;
@@ -514,39 +174,14 @@ function inferBootsFromHazards(
   }
 }
 
-function parseDetails(details: string): { species: string; level: number; gender: string } | null {
-  if (!details) return null;
-  const parts = details.split(', ');
-  const species = normalizeBattleOnlyForme(parts[0].trim());
-  let level = 100;
-  let gender = '';
-  for (const part of parts.slice(1)) {
-    if (part.startsWith('L')) {
-      level = parseInt(part.slice(1), 10);
-    } else if (part === 'M' || part === 'F') {
-      gender = part;
+/** Entry-hazard damage resolves before the next action — scan until then. */
+function tookRockDamageOnEntry(lines: string[], index: number, nickname: string): boolean {
+  for (let lookahead = index + 1; lookahead < lines.length; lookahead++) {
+    const next = lines[lookahead];
+    if (next.startsWith('|move|') || next.startsWith('|turn|') || next.startsWith('|upkeep')) break;
+    if (next.includes('[from] Stealth Rock') && next.includes(`: ${nickname}|`)) {
+      return true;
     }
   }
-  return { species, level, gender };
-}
-
-function findPokemonByNickname(
-  pokemonMap: Map<string, RevealedPokemonInfo>,
-  nickname: string,
-  lines: string[],
-  side: string,
-): RevealedPokemonInfo | undefined {
-  // Look for a switch line that maps this nickname to a species
-  for (const line of lines) {
-    if ((line.startsWith(`|switch|${side}`) || line.startsWith(`|drag|${side}`)) &&
-        line.includes(`: ${nickname}|`)) {
-      const parts = line.split('|');
-      const details = parts[3];
-      const parsed = parseDetails(details);
-      if (parsed) {
-        return pokemonMap.get(parsed.species);
-      }
-    }
-  }
-  return undefined;
+  return false;
 }
