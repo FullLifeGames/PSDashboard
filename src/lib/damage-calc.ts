@@ -77,6 +77,38 @@ function calcField(context: DamageCalcContext): Field {
   });
 }
 
+type CalcGen = ReturnType<typeof calcGeneration>;
+
+/** A calc Pokémon from the branch's live info: the same fields for attacker and defender. */
+function calcPokemonFrom(gen: CalcGen, info: SimPokemonInfo): Pokemon {
+  return new Pokemon(gen, info.species, {
+    level: info.level,
+    ability: info.ability || undefined,
+    item: info.item || undefined,
+    nature: info.nature || undefined,
+    evs: info.evs as CalcStats,
+    ivs: info.ivs as CalcStats,
+    gender: (info.gender || undefined) as CalcGender,
+    teraType: (info.teraType || undefined) as CalcTeraType,
+    boosts: info.boosts as CalcBoosts,
+    curHP: info.hp,
+    status: (info.status || undefined) as CalcStatus,
+  } satisfies CalcPokemonOptions);
+}
+
+function percentOfMaxHp(damage: number, maxhp: number): number {
+  return maxhp > 0 ? Math.round(damage / maxhp * 1000) / 10 : 0;
+}
+
+function koChanceFor(minPct: number, maxPct: number, dmg: number | number[] | number[][], hp: number): string {
+  if (maxPct >= 100) {
+    return minPct >= 100 ? 'guaranteed OHKO' : `${estimateKoProb(dmg, hp)}% OHKO`;
+  }
+  if (maxPct >= 50) return 'possible 2HKO';
+  if (maxPct >= 33) return 'possible 3HKO';
+  return '';
+}
+
 export function calcSingleDamageRange(
   attacker: SimPokemonInfo,
   defender: SimPokemonInfo,
@@ -85,33 +117,8 @@ export function calcSingleDamageRange(
 ): DamageResult {
   try {
     const gen = calcGeneration(context);
-    const atkPoke = new Pokemon(gen, attacker.species, {
-      level: attacker.level,
-      ability: attacker.ability || undefined,
-      item: attacker.item || undefined,
-      nature: attacker.nature || undefined,
-      evs: attacker.evs as CalcStats,
-      ivs: attacker.ivs as CalcStats,
-      gender: (attacker.gender || undefined) as CalcGender,
-      teraType: (attacker.teraType || undefined) as CalcTeraType,
-      boosts: attacker.boosts as CalcBoosts,
-      curHP: attacker.hp,
-      status: (attacker.status || undefined) as CalcStatus,
-    } satisfies CalcPokemonOptions);
-
-    const defPoke = new Pokemon(gen, defender.species, {
-      level: defender.level,
-      ability: defender.ability || undefined,
-      item: defender.item || undefined,
-      nature: defender.nature || undefined,
-      evs: defender.evs as CalcStats,
-      ivs: defender.ivs as CalcStats,
-      gender: (defender.gender || undefined) as CalcGender,
-      teraType: (defender.teraType || undefined) as CalcTeraType,
-      boosts: defender.boosts as CalcBoosts,
-      curHP: defender.hp,
-      status: (defender.status || undefined) as CalcStatus,
-    } satisfies CalcPokemonOptions);
+    const atkPoke = calcPokemonFrom(gen, attacker);
+    const defPoke = calcPokemonFrom(gen, defender);
 
     const result = calculate(
       gen,
@@ -122,26 +129,15 @@ export function calcSingleDamageRange(
     );
     const dmg = result.damage;
     const flat = Array.isArray(dmg) ? dmg.flat().map(Number) : [Number(dmg)];
-    const minDmg = Math.min(...flat);
-    const maxDmg = Math.max(...flat);
-    const minPct = defender.maxhp > 0 ? Math.round(minDmg / defender.maxhp * 1000) / 10 : 0;
-    const maxPct = defender.maxhp > 0 ? Math.round(maxDmg / defender.maxhp * 1000) / 10 : 0;
-
-    let koChance = '';
-    if (maxPct >= 100) {
-      koChance = minPct >= 100 ? 'guaranteed OHKO' : `${estimateKoProb(dmg, defender.hp)}% OHKO`;
-    } else if (maxPct >= 50) {
-      koChance = 'possible 2HKO';
-    } else if (maxPct >= 33) {
-      koChance = 'possible 3HKO';
-    }
+    const minPct = percentOfMaxHp(Math.min(...flat), defender.maxhp);
+    const maxPct = percentOfMaxHp(Math.max(...flat), defender.maxhp);
 
     return {
       moveName: moveOption.name,
       minPercent: minPct,
       maxPercent: maxPct,
       range: `${minPct}% - ${maxPct}%`,
-      koChance,
+      koChance: koChanceFor(minPct, maxPct, dmg, defender.hp),
     };
   } catch {
     return emptyDamageResult(moveOption.name);
