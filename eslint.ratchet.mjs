@@ -107,7 +107,7 @@ export const ratchetOverrides = [
   },
   {
     "files": [
-      "regression/doubles-branch.spec.ts"
+      "packages/eval-engine/test/doubles-branch.spec.ts"
     ],
     "rules": {
       "max-lines": [
@@ -122,7 +122,7 @@ export const ratchetOverrides = [
   },
   {
     "files": [
-      "regression/eval-analysis.spec.ts"
+      "packages/eval-engine/test/eval-analysis.spec.ts"
     ],
     "rules": {
       "max-lines": [
@@ -137,6 +137,69 @@ export const ratchetOverrides = [
         "error",
         {
           "max": 470,
+          "skipBlankLines": true,
+          "skipComments": true,
+          "IIFEs": true
+        }
+      ]
+    }
+  },
+  {
+    "files": [
+      "packages/eval-engine/test/eval-function.spec.ts"
+    ],
+    "rules": {
+      "max-lines": [
+        "error",
+        {
+          "max": 930,
+          "skipBlankLines": true,
+          "skipComments": true
+        }
+      ],
+      "max-lines-per-function": [
+        "error",
+        {
+          "max": 470,
+          "skipBlankLines": true,
+          "skipComments": true,
+          "IIFEs": true
+        }
+      ]
+    }
+  },
+  {
+    "files": [
+      "packages/eval-engine/test/eval-search.spec.ts"
+    ],
+    "rules": {
+      "max-lines": [
+        "error",
+        {
+          "max": 900,
+          "skipBlankLines": true,
+          "skipComments": true
+        }
+      ]
+    }
+  },
+  {
+    "files": [
+      "packages/eval-engine/test/eval-summary.spec.ts"
+    ],
+    "rules": {
+      "max-lines": [
+        "error",
+        {
+          "max": 890,
+          "skipBlankLines": true,
+          "skipComments": true
+        }
+      ],
+      "max-lines-per-function": [
+        "error",
+        {
+          "max": 400,
           "skipBlankLines": true,
           "skipComments": true,
           "IIFEs": true
@@ -163,69 +226,6 @@ export const ratchetOverrides = [
       "complexity": [
         "error",
         32
-      ]
-    }
-  },
-  {
-    "files": [
-      "regression/eval-function.spec.ts"
-    ],
-    "rules": {
-      "max-lines": [
-        "error",
-        {
-          "max": 930,
-          "skipBlankLines": true,
-          "skipComments": true
-        }
-      ],
-      "max-lines-per-function": [
-        "error",
-        {
-          "max": 470,
-          "skipBlankLines": true,
-          "skipComments": true,
-          "IIFEs": true
-        }
-      ]
-    }
-  },
-  {
-    "files": [
-      "regression/eval-search.spec.ts"
-    ],
-    "rules": {
-      "max-lines": [
-        "error",
-        {
-          "max": 900,
-          "skipBlankLines": true,
-          "skipComments": true
-        }
-      ]
-    }
-  },
-  {
-    "files": [
-      "regression/eval-summary.spec.ts"
-    ],
-    "rules": {
-      "max-lines": [
-        "error",
-        {
-          "max": 890,
-          "skipBlankLines": true,
-          "skipComments": true
-        }
-      ],
-      "max-lines-per-function": [
-        "error",
-        {
-          "max": 400,
-          "skipBlankLines": true,
-          "skipComments": true,
-          "IIFEs": true
-        }
       ]
     }
   },

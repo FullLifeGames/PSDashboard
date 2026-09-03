@@ -38,6 +38,9 @@
     "dist",
     "README.md"
   ],
+  "scripts": {
+    "test": "playwright test -c ../../playwright.regression.config.ts --project eval-engine"
+  },
   "publishConfig": {
     "access": "public"
   },

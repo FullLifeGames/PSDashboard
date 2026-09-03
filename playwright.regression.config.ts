@@ -15,5 +15,6 @@ export default defineConfig({
   projects: [
     { name: 'app', testDir: './regression' },
     { name: 'replay-core', testDir: './packages/replay-core/test' },
+    { name: 'eval-engine', testDir: './packages/eval-engine/test' },
   ],
 });
