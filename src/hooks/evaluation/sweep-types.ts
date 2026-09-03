@@ -4,6 +4,7 @@ import {
   type RankedChoice, type TeraAllowance,
 } from '@fulllifegames/eval-engine';
 import type { EvalWorkerClient } from '../../lib/eval/worker-client';
+import type { StoredEval } from '../../lib/eval-cache-store';
 import type { EngineMode, TurnEvalSettings } from './prefs';
 import type { CachedEval } from './single-eval';
 
@@ -75,6 +76,12 @@ export interface GraphSweepParams {
    * panel preferences — meant for short ranges.
    */
   settings?: TurnEvalSettings;
+  /**
+   * This replay's store-key prefix (evalStorePrefix): the run reads every
+   * persisted eval under it once, before the first pass, instead of one
+   * store read per turn. Absent = single reads.
+   */
+  storePrefix?: string;
 }
 
 /** The sweep's working arrays plus the lead/notice slots — mutated in place, painted via snapshots. */
@@ -105,6 +112,8 @@ export interface SweepEnv {
   data: SweepData;
   paint(progress: { done: number; total: number } | null, force?: boolean): void;
   positionFor(turn: number): Promise<string>;
+  /** The store's evals for this replay, read once at run start (null = read unavailable, single reads instead). */
+  prefetched: Map<string, StoredEval> | null;
 }
 
 /** A concrete per-turn engine after 'auto' resolution. */

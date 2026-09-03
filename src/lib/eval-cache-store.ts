@@ -130,6 +130,11 @@ export function evalStoreKey(
   return `v${EVAL_ENGINE_CACHE_VERSION}|${cacheKey}|d${depth}s${samples}m${mode}t${teraKey(tera)}`;
 }
 
+/** The key prefix shared by every turn, engine, and set fingerprint of one replay. */
+export function evalStorePrefix(replayId: string): string {
+  return `v${EVAL_ENGINE_CACHE_VERSION}|${replayId}:`;
+}
+
 const DB_NAME = 'ps-replay-interceptor-eval';
 const STORE = 'evals';
 const MAX_AGE_MS = 30 * 24 * 60 * 60 * 1000;
@@ -187,6 +192,32 @@ export async function loadStoredEval(key: string): Promise<StoredEval | null> {
       request.onsuccess = () => {
         const value = request.result as StoredEval | undefined;
         resolve(value && value.key === key ? value : null);
+      };
+      request.onerror = () => resolve(null);
+    } catch {
+      resolve(null);
+    }
+  });
+}
+
+/**
+ * One transaction for every stored eval of a replay (all turns, engines,
+ * and set fingerprints): the graph sweep reads the store once instead of
+ * once per turn (five seconds of serial reads on a 139-turn game). null
+ * means the store is unavailable or the read failed; the caller then
+ * falls back to single reads.
+ */
+export async function loadStoredEvalsByPrefix(prefix: string): Promise<Map<string, StoredEval> | null> {
+  const db = await openDb();
+  if (!db) return null;
+  return new Promise(resolve => {
+    try {
+      const range = IDBKeyRange.bound(prefix, `${prefix}\uffff`);
+      const request = db.transaction(STORE, 'readonly').objectStore(STORE).getAll(range);
+      request.onsuccess = () => {
+        const map = new Map<string, StoredEval>();
+        for (const value of request.result as StoredEval[]) map.set(value.key, value);
+        resolve(map);
       };
       request.onerror = () => resolve(null);
     } catch {

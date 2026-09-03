@@ -412,8 +412,7 @@ test.describe('PS Dashboard', () => {
     test.setTimeout(240_000);
     await page.evaluate(() => {
       localStorage.setItem('ps-replay-interceptor:eval-pool', '2');
-      localStorage.setItem('ps-replay-interceptor:eval-prefs',
-        JSON.stringify({ depth: 1, samples: 1, auto: false, tera: 'auto' }));
+      localStorage.setItem('ps-replay-interceptor:eval-prefs', JSON.stringify({ depth: 1, samples: 1, auto: false, tera: 'auto' }));
     });
     await page.reload();
     await page.locator('button', { hasText: 'Load' }).click();
@@ -443,8 +442,7 @@ test.describe('PS Dashboard', () => {
     test.setTimeout(240_000);
     await page.evaluate(() => {
       localStorage.setItem('ps-replay-interceptor:eval-pool', '2');
-      localStorage.setItem('ps-replay-interceptor:eval-prefs',
-        JSON.stringify({ depth: 1, samples: 1, auto: false, tera: 'auto' }));
+      localStorage.setItem('ps-replay-interceptor:eval-prefs', JSON.stringify({ depth: 1, samples: 1, auto: false, tera: 'auto' }));
     });
     await page.reload();
     await page.locator('button', { hasText: 'Load' }).click();
@@ -488,8 +486,8 @@ test.describe('PS Dashboard', () => {
     test.setTimeout(240_000);
     await page.evaluate(() => {
       localStorage.setItem('ps-replay-interceptor:eval-pool', '2');
-      localStorage.setItem('ps-replay-interceptor:eval-prefs',
-        JSON.stringify({ depth: 1, samples: 1, auto: false, tera: 'auto' }));
+      localStorage.setItem('ps-replay-interceptor:perf', '1');
+      localStorage.setItem('ps-replay-interceptor:eval-prefs', JSON.stringify({ depth: 1, samples: 1, auto: false, tera: 'auto' }));
     });
     await page.reload();
     await page.locator('button', { hasText: 'Load' }).click();
@@ -501,6 +499,12 @@ test.describe('PS Dashboard', () => {
     expect(await panel.locator('.ps-eval-graph circle').count()).toBeGreaterThan(0);
     // The sweep finishes and offers a re-run.
     await expect(panel.locator('button', { hasText: 'Re-analyze' })).toBeVisible({ timeout: 60_000 });
+
+    // One IndexedDB read per sweep: the run prefetches the replay's stored
+    // evals instead of reading once per turn (the perf flag set above
+    // mirrors the stage table on window.__EVAL_PERF__).
+    const perf = await page.evaluate(() => (window as unknown as { __EVAL_PERF__?: { stages: Record<string, { count: number }> } }).__EVAL_PERF__);
+    expect(perf?.stages['cache-load']?.count).toBe(1);
 
     // A completed sweep produces the game-level report.
     await expect(panel.locator('.ps-eval-report')).toBeVisible();

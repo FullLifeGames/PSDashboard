@@ -6,6 +6,7 @@ import {
 import { needsSettingsUpgrade, resolveAutoTurnSettings, type TurnEvalSettings, useEvaluation } from './useEvaluation';
 import type { useEvalAcquire } from './useEvalAcquire';
 import { makePreviewAcquire, type TeamBuildSources } from '../lib/eval-acquire';
+import { evalStorePrefix } from '../lib/eval-cache-store';
 import {
   resolveTeraPreference, parseLeadSpecies, parsePlayedActions, parsePlayedActionsDoubles,
   type SensitivityTarget,
@@ -135,6 +136,7 @@ function useSweepRuns(inputs: EvalViewInputs, format: EvalFormat) {
       tera: effectiveTera,
       sleepClause: effectiveSleepClause,
       cacheKeyFor: turn => `${replayData.id}:${turn}:${setsFingerprint}`,
+      storePrefix: evalStorePrefix(replayData.id),
       acquireFor: acquire.makeReplayAcquire,
       acquireAll: acquire.makeSweepAcquireAll(analyzableTurns),
       // snapshots[turn] carries the block ENDING at |turn|turn+1 — i.e. the
@@ -159,6 +161,7 @@ function useSweepRuns(inputs: EvalViewInputs, format: EvalFormat) {
       tera: effectiveTera,
       sleepClause: effectiveSleepClause,
       cacheKeyFor: sweepTurn => `${replayData.id}:${sweepTurn}:${setsFingerprint}`,
+      storePrefix: evalStorePrefix(replayData.id),
       acquireFor: acquire.makeReplayAcquire,
       playedFor,
       sensitivityTargetsFor,

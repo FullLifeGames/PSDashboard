@@ -4,7 +4,7 @@ import {
   perfSpan, selectKeyTurns, type EvalPreferences, type EvalResult, type EvalSettings, teraKey,
 } from '@fulllifegames/eval-engine';
 import { EvalWorkerClient } from '../../lib/eval/worker-client';
-import { evalStoreKey, loadStoredEval, saveStoredEval } from '../../lib/eval-cache-store';
+import { evalStoreKey, loadStoredEval, loadStoredEvalsByPrefix, saveStoredEval } from '../../lib/eval-cache-store';
 import { resolveAutoTurnSettings, type TurnEvalSettings } from './prefs';
 import type { CachedEval } from './single-eval';
 import type { GraphSweepParams, SweepData, SweepEnv, SweepSettings } from './sweep-types';
@@ -189,7 +189,7 @@ async function loadLeadResult(
 ): Promise<'abort' | EvalResult | null> {
   let hit = env.cacheRef.current.get(key);
   if (!(hit && hit.depth === lead0.depth && hit.samples === lead0.samples && hit.mode === lead0.mode && teraKey(hit.tera) === teraKey(env.params.tera))) {
-    const stored = await loadStoredEval(storeKey);
+    const stored = env.prefetched ? (env.prefetched.get(storeKey) ?? null) : await loadStoredEval(storeKey);
     if (env.runRef.current !== env.runId) return 'abort';
     hit = stored ? { result: stored.result, depth: lead0.depth, samples: lead0.samples, mode: lead0.mode, tera: env.params.tera } : undefined;
     if (hit) env.cacheRef.current.set(key, hit);
@@ -257,6 +257,17 @@ async function evaluateLead(
 }
 
 /**
+ * One store read for the whole run: every persisted eval of this replay
+ * (all turns, engines, fingerprints) instead of one read per turn. false
+ * = the run changed hands while the read was in flight.
+ */
+async function prefetchStore(env: SweepEnv): Promise<boolean> {
+  const { storePrefix } = env.params;
+  env.prefetched = storePrefix ? await perfSpan('cache-load', () => loadStoredEvalsByPrefix(storePrefix)) : null;
+  return env.runRef.current === env.runId;
+}
+
+/**
  * Three-pass sweep: a fast depth-1 pass shapes the whole graph in
  * seconds, the configured settings then deepen the report-worthy
  * swings (both sides of each — analysis compares across them), and
@@ -272,6 +283,7 @@ async function runSweep(env: SweepEnv, opts: {
   paintFinal: (running: boolean) => void;
 }): Promise<void> {
   const { from, to, depth, samples, mode, paintFinal } = opts;
+  if (!(await prefetchStore(env))) return;
   const rangeTurns: number[] = [];
   for (let turn = from; turn <= to; turn++) rangeTurns.push(turn);
   const fullSettings: SweepSettings = { depth, samples, mode, tera: env.params.tera, sleepClause: env.params.sleepClause };
@@ -372,6 +384,7 @@ export function useGraphSweepRunner(env: {
     const sweepEnv: SweepEnv = {
       params, runId, runRef, clientRef, cacheRef, configuredMode, data, paint,
       positionFor: makePositionSource(params, data),
+      prefetched: null,
     };
     void runSweep(sweepEnv, { from, to, depth, samples, mode, paintFinal });
   }, [cancel, prefsRef, runRef, clientRef, cacheRef, setGraph, graphDataRef]);

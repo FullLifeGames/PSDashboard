@@ -57,14 +57,16 @@ async function resolveTurnEngine(
   return { depth, samples, mode };
 }
 
-/** The two cache layers: the in-memory hit, then results persisted by a previous session. */
+/** The two cache layers: the in-memory hit, then the run's prefetched store (one store read when no prefetch could run). */
 async function loadTurnHit(
   env: SweepEnv, key: string, storeKey: string, engine: TurnEngine,
 ): Promise<'abort' | CachedEval | undefined> {
   const { depth, samples, mode } = engine;
   let hit = env.cacheRef.current.get(key);
   if (!(hit && hit.depth === depth && hit.samples === samples && hit.mode === mode && teraKey(hit.tera) === teraKey(env.params.tera))) {
-    const stored = await perfSpan('cache-load', () => loadStoredEval(storeKey));
+    const stored = env.prefetched
+      ? (env.prefetched.get(storeKey) ?? null)
+      : await perfSpan('cache-load', () => loadStoredEval(storeKey));
     if (aborted(env)) return 'abort';
     hit = stored ? {
       result: stored.result, depth, samples, mode: mode, tera: env.params.tera,
