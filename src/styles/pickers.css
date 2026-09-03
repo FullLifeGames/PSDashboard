@@ -1,0 +1,487 @@
+/* Pickers: the branch panel with its side controls, move, switch, and target pickers, gimmick toggles, execute row, choice errors, and the raw protocol log (BranchPanel, LeadPanel, components/branch/). */
+
+/* PS HP bar */
+.ps-hpbar-track {
+  height: 6px;
+  background: #555;
+  border-radius: 3px;
+  overflow: hidden;
+  margin-top: 2px;
+  border: 1px solid rgba(0,0,0,0.3);
+}
+
+.ps-hpbar-fill {
+  height: 100%;
+  transition: width 0.4s ease;
+  border-radius: 2px;
+}
+
+.ps-hpbar-green { background: linear-gradient(180deg, #00e800 0%, #00c000 100%); }
+.ps-hpbar-yellow { background: linear-gradient(180deg, #f0d000 0%, #c8a800 100%); }
+.ps-hpbar-red { background: linear-gradient(180deg, #f02020 0%, #c00000 100%); }
+
+/* "played" marker on the move/switch actually taken at the viewed position */
+.ps-played-badge {
+  display: inline-block;
+  margin-left: 5px;
+  padding: 0 5px;
+  border-radius: 999px;
+  font-size: 8px;
+  font-weight: bold;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  vertical-align: middle;
+  background: rgba(0, 0, 0, 0.45);
+  color: #ffeeba;
+  border: 1px solid rgba(240, 199, 107, 0.6);
+}
+
+/* ── PS Controls Panel ── */
+.ps-controls {
+  background:
+    linear-gradient(180deg, rgba(48, 55, 72, 0.98) 0%, rgba(35, 39, 51, 0.98) 100%);
+  border-radius: 0 0 5px 5px;
+  padding: 7px 12px;
+}
+
+.ps-side-controls {
+  flex: 1;
+  border-top: 1px solid rgba(255,255,255,0.06);
+}
+
+.ps-whatdo {
+  font-size: 12px;
+  color: #ddd;
+  margin-bottom: 6px;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 5px;
+}
+.ps-whatdo strong { color: #fff; }
+
+.ps-side-label {
+  border: 1px solid rgba(124,183,232,0.36);
+  border-radius: 999px;
+  color: #cbe6ff;
+  font-size: 9px;
+  font-weight: bold;
+  letter-spacing: 0.04em;
+  padding: 1px 7px;
+  text-transform: uppercase;
+}
+
+.ps-pending-choice {
+  color: #8fd19e;
+  font-family: 'Consolas', 'Courier New', monospace;
+  font-size: 10px;
+  margin-left: auto;
+}
+
+.ps-force-switch-note {
+  background: rgba(240,199,107,0.11);
+  border: 1px solid rgba(240,199,107,0.28);
+  border-radius: 5px;
+  color: #ffdc80;
+  font-size: 11px;
+  font-weight: bold;
+  margin-bottom: 7px;
+  padding: 6px 8px;
+}
+
+.ps-tab-row {
+  display: flex;
+  gap: 5px;
+  margin-bottom: 7px;
+}
+
+/* Move buttons 2x2 grid */
+.ps-movegrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(120px, 1fr));
+  gap: 6px;
+}
+
+.ps-movebtn {
+  width: 100%;
+  min-height: 64px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  border: 1px solid rgba(255,255,255,0.22);
+  border-radius: 6px;
+  padding: 8px 10px;
+  cursor: pointer;
+  text-align: center;
+  color: #fff;
+  text-shadow: 0 1px 2px rgba(0,0,0,0.5);
+  transition: filter 0.15s, transform 0.1s, box-shadow 0.15s;
+  position: relative;
+  overflow: hidden;
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,0.24),
+    0 4px 10px rgba(0,0,0,0.2);
+}
+.ps-movebtn:hover:not(:disabled) {
+  filter: brightness(1.15);
+  transform: translateY(-1px);
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,0.3),
+    0 7px 14px rgba(0,0,0,0.25);
+}
+.ps-movebtn:active:not(:disabled) { transform: scale(0.98); }
+.ps-movebtn:disabled { opacity: 0.35; cursor: not-allowed; }
+.ps-movebtn-selected {
+  outline: 3px solid #fff;
+  outline-offset: -1px;
+  filter: brightness(1.2);
+}
+.ps-movebtn-name { font-size: 12px; font-weight: bold; line-height: 1.2; }
+.ps-movebtn-info { display: flex; justify-content: space-between; align-items: center; margin-top: 2px; }
+.ps-movebtn-type { font-size: 9px; font-weight: bold; text-transform: uppercase; opacity: 0.9; }
+.ps-movebtn-pp { font-size: 9px; opacity: 0.75; }
+.ps-movebtn-dmg { font-size: 9px; margin-top: 2px; opacity: 0.9; }
+.ps-movebtn-ko { font-weight: bold; color: #ffe066; text-shadow: 0 0 4px rgba(255,200,0,0.5); }
+.ps-movebtn-target {
+  margin-top: 4px;
+  font-size: 10px;
+  font-weight: bold;
+  line-height: 1.2;
+  color: #fff7c7;
+}
+
+/* Basic view: small action chips instead of the 2x2 detail grid. */
+.ps-movegrid-compact {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+.ps-movebtn-compact {
+  width: auto;
+  min-height: 0;
+  flex-direction: row;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 8px;
+}
+.ps-movebtn-compact .ps-movebtn-name { font-size: 11px; }
+.ps-target-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(116px, 1fr));
+  gap: 4px;
+  margin-top: 4px;
+}
+
+.ps-target-btn {
+  background: rgba(0,0,0,0.26);
+  border: 1px solid rgba(255,255,255,0.22);
+  border-radius: 6px;
+  color: #f5f5f5;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  font-family: inherit;
+  font-size: 9px;
+  font-weight: bold;
+  min-height: 38px;
+  padding: 5px 7px;
+  text-align: left;
+}
+
+.ps-target-btn:hover:not(:disabled) {
+  background: rgba(124,183,232,0.22);
+  border-color: rgba(124,183,232,0.45);
+}
+
+.ps-target-btn-selected {
+  background: rgba(124,183,232,0.36);
+  border-color: #d8f0ff;
+  box-shadow:
+    0 0 0 2px rgba(124,183,232,0.35),
+    inset 0 1px 0 rgba(255,255,255,0.18);
+}
+
+.ps-target-btn:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
+}
+
+.ps-target-main {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  min-width: 0;
+}
+
+.ps-target-slot {
+  color: #a9d7ff;
+  flex: 0 0 auto;
+  font-size: 9px;
+}
+
+.ps-target-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ps-target-meta {
+  color: #c9d4e6;
+  font-size: 8px;
+  line-height: 1.2;
+}
+
+/* Switch buttons */
+.ps-switchgrid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+}
+.ps-switchbtn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: rgba(255,255,255,0.1);
+  border: 1px solid rgba(255,255,255,0.12);
+  border-radius: 6px;
+  padding: 6px 8px;
+  color: #fff;
+  cursor: pointer;
+  transition: background 0.15s;
+  text-align: left;
+}
+.ps-switchbtn:hover:not(:disabled) { background: rgba(255,255,255,0.16); }
+.ps-switchbtn:disabled { opacity: 0.3; cursor: not-allowed; }
+.ps-switchbtn-selected { border-color: #6cc2ff; background: rgba(76,119,166,0.38); }
+.ps-switchbtn img { width: 32px; height: 32px; image-rendering: pixelated; object-fit: contain; }
+.ps-switchbtn-name { font-size: 11px; font-weight: bold; }
+.ps-switchbtn-hp { font-size: 9px; color: #aaa; }
+
+/* Basic view: switch chips share the row with the move chips. */
+.ps-switchgrid-compact {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 4px;
+}
+.ps-switchbtn-compact { padding: 2px 8px; gap: 4px; }
+.ps-switchbtn-compact img { width: 20px; height: 20px; }
+.ps-switchbtn-compact .ps-switchbtn-name { font-size: 10px; }
+
+/* Tab buttons */
+.ps-controls-tab {
+  background: rgba(255,255,255,0.09);
+  border: 1px solid rgba(255,255,255,0.12);
+  border-radius: 999px;
+  padding: 6px 16px;
+  color: #ddd;
+  cursor: pointer;
+  font-size: 11px;
+  font-weight: bold;
+  font-family: inherit;
+  transition: background 0.15s;
+}
+.ps-controls-tab:hover { background: rgba(255,255,255,0.15); }
+.ps-controls-tab-active { background: linear-gradient(180deg, #7cb7e8 0%, #517fae 100%); color: #fff; }
+
+/* T0 lead picker: doubles slot marker on a selected lead chip (a/b). */
+.ps-lead-slot {
+  display: inline-block;
+  margin-right: 4px;
+  padding: 0 4px;
+  border-radius: 3px;
+  font-size: 8px;
+  font-weight: bold;
+  text-transform: uppercase;
+  background: rgba(108, 194, 255, 0.25);
+  border: 1px solid rgba(108, 194, 255, 0.5);
+  color: #bfe3ff;
+}
+
+.ps-custom-choice {
+  display: flex;
+  gap: 6px;
+  margin-top: 8px;
+  padding: 6px;
+  background: rgba(0,0,0,0.18);
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 6px;
+}
+.ps-custom-choice .ps-input {
+  flex: 1;
+  min-width: 0;
+  font-size: 11px;
+  padding: 5px 8px;
+}
+.ps-custom-choice .ps-btn {
+  flex: 0 0 auto;
+  font-size: 10px;
+  padding: 5px 8px;
+}
+
+/* Battle gimmick toggles (Tera/Mega/Z/Ultra, G7) */
+.ps-modifier-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 7px;
+}
+.ps-modifier-toggle {
+  background: rgba(0,0,0,0.25);
+  border: 1px solid rgba(255,255,255,0.18);
+  border-radius: 999px;
+  color: #cde;
+  cursor: pointer;
+  font-family: inherit;
+  font-size: 10px;
+  font-weight: bold;
+  padding: 4px 10px;
+  transition: background 0.15s, border-color 0.15s;
+}
+.ps-modifier-toggle:hover { border-color: rgba(255,255,255,0.4); }
+.ps-modifier-toggle-active {
+  background: linear-gradient(180deg, #8a5fd0 0%, #6a3fb0 100%);
+  border-color: rgba(210,180,255,0.6);
+  color: #fff;
+}
+.ps-movebtn-zmove {
+  font-size: 10px;
+  font-weight: bold;
+  color: #ffe9a8;
+  text-shadow: 0 1px 1px rgba(0,0,0,0.5);
+}
+
+/* Per-target ranges for untargeted (spread) moves in doubles */
+.ps-movebtn-spread-target {
+  display: inline-block;
+  margin-right: 6px;
+  white-space: nowrap;
+}
+.ps-movebtn-spread-target:last-child { margin-right: 0; }
+
+/* Rejected choice / failed execute feedback */
+.ps-choice-error {
+  background: rgba(224,102,112,0.12);
+  border: 1px solid rgba(224,102,112,0.35);
+  border-radius: 5px;
+  color: #f3a6a6;
+  font-size: 11px;
+  margin-top: 6px;
+  padding: 6px 8px;
+}
+.ps-execute-error {
+  font-weight: bold;
+}
+
+/* Execute turn button — sticky so the CTA never hides below the fold (G14) */
+.ps-execute-wrap {
+  position: sticky;
+  bottom: 8px;
+  z-index: 5;
+}
+
+.ps-execute-btn {
+  width: 100%;
+  padding: 7px;
+  border: 1px solid rgba(255,255,255,0.14);
+  border-radius: 6px;
+  font-size: 13px;
+  font-weight: bold;
+  font-family: inherit;
+  cursor: pointer;
+  transition: background 0.15s, transform 0.1s;
+  margin-top: 6px;
+  color: #fff;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.12), 0 5px 12px rgba(0,0,0,0.2);
+}
+.ps-execute-btn:hover:not(:disabled) { transform: scale(1.01); }
+.ps-execute-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+.ps-branch-controls-shell {
+  border: 1px solid rgba(255,255,255,0.12);
+  border-radius: 7px;
+  box-shadow: var(--ps-shadow);
+  margin-top: 4px;
+  overflow: hidden;
+}
+
+.ps-branch-controls-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 1px minmax(0, 1fr);
+  align-items: stretch;
+}
+
+.ps-branch-side-column {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.ps-branch-side-column .ps-side-controls {
+  height: 100%;
+}
+
+.ps-side-divider {
+  min-height: 1px;
+  background: linear-gradient(180deg, transparent, rgba(255,255,255,0.2), transparent);
+}
+
+.ps-execute-wrap {
+  background:
+    linear-gradient(180deg, rgba(35,39,51,0.98) 0%, rgba(28,31,43,0.98) 100%);
+  padding: 2px 10px 8px;
+}
+
+.ps-log-toggle {
+  background: none;
+  border: none;
+  color: #9aa8ba;
+  cursor: pointer;
+  font-family: inherit;
+  font-size: 10px;
+  padding: 0;
+}
+
+.ps-log-toggle:hover {
+  color: #c8d7eb;
+}
+
+/* Log area */
+.ps-log {
+  background: rgba(0,0,0,0.3);
+  border-radius: 4px;
+  padding: 8px;
+  max-height: 200px;
+  overflow-y: auto;
+  font-family: 'Consolas', 'Courier New', monospace;
+  font-size: 11px;
+  color: #ccc;
+  white-space: pre-wrap;
+}
+.ps-log::-webkit-scrollbar { width: 6px; }
+.ps-log::-webkit-scrollbar-track { background: transparent; }
+.ps-log::-webkit-scrollbar-thumb { background: #555; border-radius: 3px; }
+
+@media (max-width: 1050px) {
+  .ps-branch-controls-grid {
+    grid-template-columns: 1fr;
+  }
+  .ps-side-divider {
+    height: 1px;
+    background: linear-gradient(90deg, transparent, rgba(255,255,255,0.18), transparent);
+  }
+}
+
+@media (max-width: 640px) {
+  .ps-movegrid,
+  .ps-switchgrid {
+    grid-template-columns: 1fr;
+  }
+  .ps-custom-choice {
+    flex-direction: column;
+  }
+  .ps-custom-choice .ps-btn {
+    width: 100%;
+  }
+}

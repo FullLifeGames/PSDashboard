@@ -1,0 +1,57 @@
+/* Timeline: the turn slider track with the gold variation stripe and the main/variation line chip inside the branch bar (TimelineBar). */
+
+/* ── unified timeline: line chip ── */
+.ps-line-chip {
+  display: inline-flex;
+  border: 1px solid var(--ps-border-strong);
+  border-radius: 999px;
+  overflow: hidden;
+}
+.ps-line-chip button {
+  font-family: inherit;
+  font-size: 10px;
+  letter-spacing: 0.4px;
+  padding: 3px 10px;
+  cursor: pointer;
+  background: transparent;
+  border: 0;
+  color: var(--ps-muted);
+}
+.ps-line-chip button.on-main { background: rgba(124, 183, 232, 0.25); color: #dff; font-weight: bold; }
+.ps-line-chip button.on-vari { background: rgba(240, 199, 107, 0.25); color: #ffeeba; font-weight: bold; }
+.ps-line-chip button:disabled { opacity: 0.35; cursor: default; }
+
+/* Slider wrapper carrying the gold variation stripe */
+.ps-timeline-track {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+}
+.ps-timeline-track input[type="range"] {
+  flex: 1;
+  min-width: 0;
+  position: relative;
+  z-index: 1;
+}
+.ps-timeline-stripe {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  height: 5px;
+  border-radius: 999px;
+  background: rgba(240, 199, 107, 0.55);
+  pointer-events: none;
+}
+
+@media (max-width: 640px) {
+  /* Branch bar wraps: controls stay on top, the slider gets its own
+     full-width row with a real touch target (B18). */
+  .ps-branch-bar input[type="range"],
+  .ps-branch-bar .ps-timeline-track {
+    flex: 1 1 100%;
+    order: 10;
+    min-height: 28px;
+  }
+}

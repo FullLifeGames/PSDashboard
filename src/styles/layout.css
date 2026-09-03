@@ -1,0 +1,167 @@
+/* Layout: the loaded-replay workspace (app root, the two columns, the top bar, the replay frame, the branch bar shell) and the breakpoints that stack it (ReplayWorkspace, AppTopBar, TimelineBar, WorkspaceEvalColumn). */
+
+/* ── App layout ── */
+.ps-app-root {
+  max-width: 1400px;
+  margin: 0 auto;
+  padding: 0 10px 16px;
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.ps-main-layout {
+  display: flex;
+  gap: 10px;
+  flex: 1;
+  min-height: 0;
+  margin-top: 6px;
+}
+
+.ps-main-left {
+  flex: 1 1 0;
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+  padding-bottom: 12px;
+  /* Breathing room against the column's own scrollbar (the Advanced
+     button sat flush under it — overlay scrollbars cover ~10px). */
+  padding-right: 10px;
+}
+
+.ps-main-right {
+  flex: 0 0 380px;
+  min-width: 320px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  overflow-y: auto;
+  max-height: calc(100vh - 60px);
+}
+
+.ps-topbar {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background:
+    linear-gradient(180deg, rgba(32,48,80,0.92) 0%, rgba(24,37,62,0.92) 100%);
+  border: 1px solid var(--ps-border);
+  border-radius: 7px 7px 0 0;
+  padding: 4px 10px;
+  gap: 8px;
+}
+
+.ps-format-tag {
+  font-size: 10px;
+  padding: 2px 8px;
+  border-radius: 3px;
+  background: rgba(100,140,200,0.3);
+  color: #aac;
+  white-space: nowrap;
+}
+
+.ps-ended-tag {
+  font-size: 10px;
+  padding: 2px 6px;
+  border-radius: 3px;
+  background: #1b5e20;
+  color: #a5d6a7;
+  font-weight: bold;
+}
+
+.ps-iframe-wrap {
+  flex: 0 0 auto;
+  border-radius: 0 0 7px 7px;
+  overflow: hidden;
+  border: 2px solid rgba(103,143,194,0.82);
+  border-top: none;
+  box-shadow: var(--ps-shadow);
+}
+.ps-iframe-wrap iframe {
+  display: block;
+  min-height: 480px;
+}
+
+.ps-branch-bar input[type="range"] {
+  flex: 1;
+  min-width: 0;
+}
+
+.ps-branch-bar {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  background:
+    linear-gradient(180deg, rgba(32,48,80,0.92) 0%, rgba(24,37,62,0.92) 100%);
+  border: 1px solid var(--ps-border);
+  border-radius: 7px;
+  padding: 4px 10px;
+  margin-top: 6px;
+  box-shadow: 0 6px 16px rgba(6,12,24,0.16);
+}
+
+/* The 900px breakpoint left 901–1050px cramped (G22) — stack earlier. */
+@media (max-width: 1050px) {
+  .ps-app-root {
+    height: auto;
+    min-height: 100vh;
+    padding: 0 7px 16px;
+  }
+  .ps-main-layout {
+    flex-direction: column;
+    flex: none;
+    min-height: auto;
+    overflow: visible;
+  }
+  .ps-main-left {
+    flex: none;
+    min-height: auto;
+    overflow-y: visible;
+    padding-bottom: 0;
+  }
+  .ps-main-right {
+    flex: none;
+    min-width: 0;
+    max-height: none;
+    overflow-y: visible;
+  }
+  .ps-topbar,
+  .ps-branch-bar {
+    flex-wrap: wrap;
+    align-items: flex-start;
+  }
+  .ps-topbar > div,
+  .ps-branch-bar > input[type="range"] {
+    min-width: 0;
+  }
+  .ps-main-right {
+    width: 100%;
+  }
+}
+
+@media (max-width: 640px) {
+  .ps-topbar {
+    align-items: stretch;
+    flex-direction: column;
+  }
+  .ps-topbar > div {
+    flex-wrap: wrap;
+  }
+  .ps-branch-bar .ps-btn {
+    min-height: 40px;
+    min-width: 40px;
+  }
+  /* The Showdown embed keeps its desktop layout; a scrollable container with
+     a minimum width keeps the battle log reachable on phones (B9b). */
+  .ps-iframe-wrap {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+  .ps-iframe-wrap iframe {
+    min-width: 640px;
+  }
+}

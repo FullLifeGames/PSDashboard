@@ -1,0 +1,74 @@
+/* Base: design tokens, the page background, the app header, and the panel shell every column uses (App, ReplayLoader, every panel). */
+
+:root {
+  --ps-bg-deep: #18243a;
+  --ps-bg: #344b6c;
+  --ps-bg-soft: #415f88;
+  --ps-surface: rgba(29, 44, 72, 0.88);
+  --ps-surface-strong: rgba(20, 31, 52, 0.94);
+  --ps-border: rgba(183, 216, 255, 0.16);
+  --ps-border-strong: rgba(183, 216, 255, 0.32);
+  --ps-text: #eef6ff;
+  --ps-muted: #9fb2cc;
+  --ps-accent: #7cb7e8;
+  --ps-accent-warm: #f0c76b;
+  --ps-danger: #cc4455;
+  --ps-shadow: 0 16px 36px rgba(6, 12, 24, 0.28);
+}
+
+/* ── PS-faithful base ── */
+body {
+  margin: 0;
+  background:
+    radial-gradient(circle at 15% 0%, rgba(119, 171, 219, 0.22), transparent 34rem),
+    radial-gradient(circle at 85% 6%, rgba(245, 200, 106, 0.11), transparent 28rem),
+    linear-gradient(180deg, var(--ps-bg-soft) 0%, var(--ps-bg) 38%, var(--ps-bg-deep) 100%);
+  color: var(--ps-text);
+  font-family: Verdana, Geneva, sans-serif;
+}
+
+#root {
+  min-height: 100vh;
+}
+
+/* ── App chrome ── */
+.ps-app-header {
+  background:
+    linear-gradient(180deg, rgba(84,119,169,0.96) 0%, rgba(50,73,111,0.96) 100%);
+  padding: 10px 16px;
+  border: 1px solid rgba(255,255,255,0.16);
+  border-top: none;
+  box-shadow: 0 10px 26px rgba(7,15,30,0.22);
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.ps-app-header h1 {
+  font-size: 16px;
+  font-weight: bold;
+  color: #fff;
+  text-shadow: 0 1px 3px rgba(0,0,0,0.4);
+  margin: 0;
+}
+
+.ps-panel {
+  flex-shrink: 0;
+  background:
+    linear-gradient(180deg, rgba(33,50,82,0.92) 0%, rgba(24,37,62,0.92) 100%);
+  border: 1px solid var(--ps-border);
+  border-radius: 7px;
+  padding: 12px;
+  box-shadow: 0 8px 22px rgba(6,12,24,0.18);
+}
+
+@media (max-width: 640px) {
+  .ps-app-header {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 3px;
+    padding: 9px 12px;
+  }
+  .ps-app-header h1 {
+    font-size: 15px;
+  }
+}

@@ -1,0 +1,21 @@
+/* Shared branch: the read-only screen a share link opens (SharedBranchView). */
+
+.ps-shared-branch-panel {
+  margin-top: 8px;
+}
+
+.ps-shared-choice-list {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.ps-shared-choice-row {
+  background: rgba(0,0,0,0.18);
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 6px;
+  color: #dbe7f7;
+  font-family: 'Consolas', 'Courier New', monospace;
+  font-size: 11px;
+  padding: 7px 8px;
+}
