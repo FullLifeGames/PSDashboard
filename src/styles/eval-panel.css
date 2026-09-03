@@ -16,21 +16,15 @@
   font-weight: bold;
   margin-bottom: 3px;
 }
-.ps-eval-bar-p1 {
-  color: #8ac;
-  min-width: 0;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
+.ps-eval-bar-p1,
 .ps-eval-bar-p2 {
-  color: #c8a;
   min-width: 0;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  text-align: right;
 }
+.ps-eval-bar-p1 { color: #8ac; }
+.ps-eval-bar-p2 { color: #c8a; text-align: right; }
 .ps-eval-bar {
   position: relative;
   height: 10px;
@@ -111,13 +105,16 @@ button.ps-eval-choice:hover,
   background: rgba(0, 0, 0, 0.25);
   border-radius: 3px;
 }
-.ps-eval-analysis {
+.ps-eval-analysis,
+.ps-eval-report {
   margin-top: 6px;
   padding: 6px;
   background: rgba(0, 0, 0, 0.2);
   border-radius: 3px;
   display: flex;
   flex-direction: column;
+}
+.ps-eval-analysis {
   gap: 3px;
   font-size: 11px;
 }
@@ -127,12 +124,6 @@ button.ps-eval-choice:hover,
   color: #bcd;
 }
 .ps-eval-report {
-  margin-top: 6px;
-  padding: 6px;
-  background: rgba(0, 0, 0, 0.2);
-  border-radius: 3px;
-  display: flex;
-  flex-direction: column;
   gap: 4px;
 }
 .ps-eval-report-moments {

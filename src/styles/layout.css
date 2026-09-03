@@ -128,6 +128,7 @@
     min-width: 0;
     max-height: none;
     overflow-y: visible;
+    width: 100%;
   }
   .ps-topbar,
   .ps-branch-bar {
@@ -137,9 +138,6 @@
   .ps-topbar > div,
   .ps-branch-bar > input[type="range"] {
     min-width: 0;
-  }
-  .ps-main-right {
-    width: 100%;
   }
 }
 
