@@ -887,6 +887,41 @@ import { brierScore, fitConstantK } from './fit-helpers';
  * static basis for this mass; the next lever, if any, is search/
  * planning-side.
  *
+ * LOSSLESS PERF BASE ROUND 2026-09-03 (improvement round 31, the first
+ * round of docs/superpowers/plans/2026-09-02-perf-and-quality-plan.md;
+ * commits 9ec06fa pool, 41c5e05 store prefetch, 3f0d9a4 slice runner,
+ * ebf18aa identity pins, 043512c parsed-state fork, d48a117 README).
+ * No engine number moved; the sweep and this bench got faster.
+ * - Worker pool by physical cores (src/lib/eval/pool-size.ts): never
+ *   below min(cores-2, 6), about cores/2, cap 12, memory brake 0.6 GB per
+ *   worker, sweep lanes = half the pool (min 3). Pool-invariant results
+ *   by construction (2026-09-02: seven runs hash-identical).
+ * - One IndexedDB range read per sweep (loadStoredEvalsByPrefix) instead
+ *   of one read per turn; the whole-game e2e pins cache-load at one read.
+ * - This bench in parallel slices (scripts/run-calibration.mjs +
+ *   calibration-lib.mjs): the harness sorts samples by (id, turn) before
+ *   aggregating, so one process and N slices print the same digits
+ *   (tournament-0811: 208 samples byte-identical, 567 s against 100 s).
+ *   The shared Smogon disk cache now publishes entries atomically: under
+ *   seven concurrent cold-cache processes two replays had read half-
+ *   written payloads and evaluated with different fills.
+ * - Forks start from a parsed, history-free state (forward/parsed-state.ts:
+ *   parsed once per position, log/inputLog/messageLog stripped, a fresh
+ *   log per battle; the forced-switch mid-turn snapshot parsed once per
+ *   iteration). Identity: the recorded fixture (children as hash + facts +
+ *   log delta, the d1 matrix, one MCTS tree, two positions with history)
+ *   holds on the new path; 510 engine specs unchanged. Probe on 573756:
+ *   fork t120 1.94 to 1.45 ms, one MCTS tree 1360 to 1004 ms (t70 2794 to
+ *   2114 ms), a child's serialized state 99 KB to 40 KB.
+ * GATES: this bench A/B with six slices, pre-change (3f0d9a4) against
+ *   post-change (043512c): sign 52/63/79 (singles 62, doubles 73), Brier 0.2613/0.2289/0.1560, K 1.79, n 822, every printed digit equal;
+ *   wall 462 s and 473 s against
+ *   12.5 min single-process in round 16. Feedback corpus: three runs
+ *   byte-identical in all six full dumps and the drift file against the
+ *   pre-round dumps at 883e33b; 573756 wall 67/66/66 s (96 s at
+ *   883e33b, plan target 65 s). e2e 73/73, regression 825 bestanden, 6 übersprungen in
+ *   three projects, pack smoke green.
+ *
  * THE DECIDED SWEEP, THE NEAR-DECIDED ROLL, AND THE CLAMP ITS OWN BENCH
  * REFUSED 2026-08-25 (improvement round 15 — NextSteps A.1, "decided
  * detection on the bar"; commits 3986107 (feature) + 8dc3721 (t73 truth)
