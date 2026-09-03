@@ -1,13 +1,15 @@
 /**
- * Public surface of @fulllifegames/replay-core. Generated for the workspace split: every
- * module the app, the worker, or the sibling package reaches, with its full
- * export list. Phase 7 curates it.
+ * Public surface of @fulllifegames/replay-core. Curated: the names the app, the worker, the
+ * sibling package, and the worked example reach, plus every type their
+ * signatures mention. Widen it by adding a line here and refreshing
+ * regression/fixtures/api/replay-core.txt (UPDATE_API_SNAPSHOT=1); the
+ * suites import package sources directly and never depend on this list.
  */
 export { WEATHER_BY_ID, TERRAIN_BY_ID } from './calc-field.ts';
 export { resolveHiddenPowerType, typedHiddenPowerId, withHiddenPowerType, HP_TYPES } from './hidden-power.ts';
 export { toId, sideIndex } from './ids.ts';
 export type { SideId } from './ids.ts';
-export { parseShowteamSheet, inferOpponentTeam } from './opponent-inferrer.ts';
+export { inferOpponentTeam } from './opponent-inferrer.ts';
 export { parseReplayLog, parseReplayLogWithObservations } from './protocol-parser.ts';
 export {
   splitReplayPassword, getReplayGameType, inferReplayFormatId, getReplayDisplayFormat, getReplayGeneration,
@@ -27,12 +29,10 @@ export {
   sourceDetail, getSpeciesUsageStats, getSpeciesUsageSet, alternativeItems, guessedFieldFromUsage,
   fillUsageMoves,
 } from './smogon/usage-lookup.ts';
-export { inferSpreads, evBudget, legalizeEvs } from './spread-inference.ts';
 export type { SpreadCandidate } from './spread-inference.ts';
 export { buildTeamsFromReplay, solveReplaySpreads, extractTeamSheets } from './team-builder.ts';
 export {
-  unknownField, revealedField, guessedField, manualField, unknownEvs, guessedEvs, manualEvs, manualMove,
-  applyInferredSpreads, itemSetValue, enrichPokemonInfo, enrichTeamInfo, EMPTY_EVS, INFERRED_SPREAD_DETAIL,
+  manualField, manualEvs, manualMove, applyInferredSpreads, itemSetValue, enrichTeamInfo, EMPTY_EVS,
 } from './team-info.ts';
 export { parseTeamText } from './team-parser.ts';
 export { parsePastedTeam, applyPastedTeam, countMatchingSpecies } from './team-paste.ts';
