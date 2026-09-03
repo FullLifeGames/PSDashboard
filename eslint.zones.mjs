@@ -6,10 +6,13 @@
 //
 // The ratchet next to this file is generated; this file is maintained by
 // hand. Packages import each other by name; nothing in a package reaches
-// src/; the app imports the packages by name, never their files.
+// src/; the app imports the packages by name, never their files. A package's
+// tests (packages/<name>/test/) import their own sources relatively and the
+// sibling package by name; two directories up leaves the package.
 
 const UI_LAYER = '(^|/)(hooks|components|workers|App|main)(/|$)';
 const OUT_OF_PACKAGE = '^(\\.\\./)+(src|packages)/';
+const OUT_OF_TEST_DIR = '^(\\.\\./){2,}';
 
 const zone = (files, regex, message) => ({
   files,
@@ -20,6 +23,10 @@ export const importZones = [
   zone(['packages/*/src/**/*.ts'], `${UI_LAYER}|${OUT_OF_PACKAGE}`,
     'Packages import each other by name and never reach src/ or the UI layer.'),
   zone(['packages/replay-core/src/**/*.ts'], '^@fulllifegames/eval-engine',
+    'replay-core sits below the engine.'),
+  zone(['packages/*/test/**/*.ts'], OUT_OF_TEST_DIR,
+    'Package tests import their own sources relatively (../src/...) and the sibling package by name; nothing outside the package.'),
+  zone(['packages/replay-core/test/**/*.ts'], '^@fulllifegames/eval-engine',
     'replay-core sits below the engine.'),
   zone(['src/**/*.{ts,tsx}'], '^(\\.\\./)+packages/',
     'The app imports the packages by name (@fulllifegames/replay-core, @fulllifegames/eval-engine), never their files.'),

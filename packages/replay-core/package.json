@@ -37,6 +37,9 @@
     "dist",
     "README.md"
   ],
+  "scripts": {
+    "test": "playwright test -c ../../playwright.regression.config.ts --project replay-core"
+  },
   "publishConfig": {
     "access": "public"
   },

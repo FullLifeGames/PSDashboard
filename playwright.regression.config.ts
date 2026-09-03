@@ -1,5 +1,10 @@
 import { defineConfig } from '@playwright/test';
 
+/**
+ * Three projects, one run: the app's own specs plus the integration and
+ * measurement-chain specs under regression/, and each package's suite under
+ * packages/<name>/test/ (also runnable alone: npm test -w packages/<name>).
+ */
 export default defineConfig({
   testDir: './regression',
   timeout: 60_000,
@@ -8,6 +13,7 @@ export default defineConfig({
     headless: true,
   },
   projects: [
-    { name: 'reconstruction' },
+    { name: 'app', testDir: './regression' },
+    { name: 'replay-core', testDir: './packages/replay-core/test' },
   ],
 });
