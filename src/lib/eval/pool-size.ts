@@ -9,7 +9,7 @@
  * (Chrome reports at most 8, so the brake only bites on small machines).
  */
 export const POOL_MAX = 12;
-export const POOL_GB_PER_WORKER = 0.6;
+const POOL_GB_PER_WORKER = 0.6;
 const LEGACY_MAX = 6;
 /** Optional cap in localStorage (the e2e suite sets it to 2: many pages run in parallel there). */
 const STORAGE_CAP_KEY = 'ps-replay-interceptor:eval-pool';
