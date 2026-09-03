@@ -889,6 +889,198 @@ import { brierScore, fitConstantK } from './fit-helpers';
  * static basis for this mass; the next lever, if any, is search/
  * planning-side.
  *
+ * ENDGAME TRUTH ROUND 2026-09-03 (improvement round 32 of the perf-and-
+ * quality plan; spec docs/superpowers/specs/2026-09-03-round-32-p4-q3-
+ * design.md; commits 50b4247 lethal fit, ce035c7 / cda99c2 / f710cdb
+ * verify depth in three cuts, 9784fc4 ladder, 070b9b9 cache v39 + decided
+ * field, cc8dceb re-pins). The plan's two items were SIGHTED with a
+ * throwaway probe before any build and both came out negative; the round
+ * then followed the user's question "why does a clearly decided endgame
+ * (573756 t138) not look decided?" down to four layers and fixed three.
+ * SIGHTING P4 (alpha-beta column order in subSearchDepth1): on the 144
+ *   child positions of 573756 t10/t30 the index order already evaluates
+ *   53 to 56% of the sub-search cells; every one of ten orderings (hints,
+ *   previous-row killer, best-row killer, adaptive column minima, their
+ *   combinations) evaluates MORE (t10: 2355 today against 2468 to 2932),
+ *   the oracle with the true values only 39 to 42% (1890 / 1753). Outputs
+ *   identical under every ordering (the plan's tie rules were right); the
+ *   gain is not there because searchOptions lists moves before switches
+ *   and the first row already sets a good bound. Sub-search 83 ms mean,
+ *   2.4 to 2.5 ms per cell. No build.
+ * SIGHTING Q3 (iteration budget by position class): 69 MCTS turns of
+ *   573756 cost 1.8 to 2.7 ms per iteration per tree in the 4x4 endgame
+ *   (62 turns sit in the 10-to-25-cell class), 2.6 to 4.2 ms above 25
+ *   cells; the plan's classes (x2 at <= 25 cells, x4 at <= 9) double the
+ *   tree CPU (1.98x against +25% allowed). Horizon t130 to t137 with four
+ *   trees: own-p2 moves at most +0.05 from 600 to 4800 iterations (t135
+ *   -0.07), depth 5-6 to 7-9 plies, trees agree to +-0.01. H_b: the
+ *   budget does not move the motif case; no class budget built.
+ * DIAGNOSIS t138 (four layers, reproduced in a node probe with the app's
+ *   Smogon fills; the bare reconstruction without fills is NOT app-
+ *   faithful, and the feedback harness (usage stats, no set assumptions)
+ *   is a third team path of its own):
+ *   1. Spread fitter: a knock-out line records the REMAINING HP as the
+ *      damage fraction, and observationError read it as an exact reading,
+ *      so every knock-out punished the rungs whose weakest roll exceeds
+ *      the remainder and pulled the solve toward a bulkier defender and a
+ *      weaker attacker (7 to 43% of the corpus' direct damage lines are
+ *      knock-outs). 573756's p1 Toxapex: the Smogon prior was specially
+ *      defensive, the fit made it Bold 252 Def (rung error 0.0355, of
+ *      which 0.0300 from the lethal t139 Tantrum; the specially defensive
+ *      rungs 0.091 with 0.089 from that one line); the sim's Stomping
+ *      Tantrum did 136 (45%) where the real hit did 180 (59%).
+ *   2. Chance fixation per tree (Q2's territory): under the bulky set the
+ *      tree finds a REAL p1 win (Knock Off removes the Choice Band, three
+ *      Recovers, Toxic, Knock Off; Zapdos dies to the second poison tick),
+ *      trees 0/3 win it, 1/2 lose it (-0.37/0.92/0.91/-0.35 at 600
+ *      iterations, -0.81/0.97/0.97/-0.80 at 2400); merged own-p2 0.199 =
+ *      the app's 0.195 to the digit. The +0.2 bar was a coin flip inside
+ *      the sim, not a horizon problem. With the corrected set the four
+ *      trees agree at 0.95.
+ *   3. Verify step (round 7): starvedSupportCells flags boundary cells
+ *      regardless of visit stats and pooledMatrix REPLACED their tree value
+ *      with the three-seed one-ply sampler value; with the corrected set
+ *      the four trees read (Knock Off x Tantrum) at -0.96 each with 185 to
+ *      209 visits per tree while the sampler statics read +0.03 / -0.06,
+ *      so the verified ranking showed the losing side's rows at 54% under
+ *      a 98% bar.
+ *   4. Think-deeper ladder: from an MCTS turn the button offered a matrix
+ *      pass at depth 2 then 3 (three plies where the tree saw seven), and
+ *      needsSettingsUpgrade kept that product over the tree ("settled, not
+ *      stale"); the depth-3 matrix read the decided endgame at 51% and
+ *      ranked Recover and Toxic over Knock Off; "Let it play out" took its
+ *      moves from that ranking (it plays each side's top actionable row).
+ * FIXES:
+ *   - replay-core (50b4247): DamageObservation.lethal (parser: the line
+ *     ends at 0 HP); observationError scores a lethal line only against
+ *     the rung's best roll (rungs that cannot reach the remainder are
+ *     refuted, overkill rungs are consistent). 573756 with fills: p1
+ *     Toxapex solves to 252 HP / 252 SpD / 0 Def (rung errors after: SpD
+ *     rungs 0.0001, Bold 0.0077); without fills Def 252 -> 0 and Melmetal
+ *     Atk 0 -> 252 (the attacker side of the same bias). On the harness
+ *     team path the rule re-fits 24 sets across the six corpus replays,
+ *     mostly knock-out scorers from "defensive" back to "offensive":
+ *     573756 p2 Garchomp Bold 252 HP/252 Def -> 252 Atk, Weavile Bold
+ *     252/252 -> Jolly 252 Atk/252 Spe, Melmetal 252 SpD -> 252 Atk,
+ *     Zapdos-Galar Jolly -> Adamant; 562428 Victini 252 HP -> 252 Atk;
+ *     655336 Bisharp, Dragonite, Heatran likewise; 649664 unchanged.
+ *     Pins: parser lethal line, fitter lower bound (an uninvested truth
+ *     under a lethal 5% line that the old reading forfeited), 573756 both
+ *     sides.
+ *   - eval-engine (ce035c7, cda99c2, f710cdb): verifiedValue in mcts-merge
+ *     decides what a verified cell contributes. Final rule: every starved,
+ *     thin, or disagreeing pool and every continuation below
+ *     VERIFY_DEPTH_FLOOR (0.9) takes the sampler's value, exactly round 7;
+ *     only a rich, agreeing pool that has played the cell out to |0.9| or
+ *     beyond keeps its depth (without a blend the pooled value; with a
+ *     blend whose classes leave exactly one open, the ended classes' exact
+ *     leaves against the pool's continuation). Cell selection unchanged;
+ *     CellBlendClass carries `ended`. The first cut (rich = keep depth
+ *     everywhere) was measured on the golden 655336 and withdrawn twice:
+ *     with two open classes (hit / miss) the pool's continuation replaced
+ *     the class the trees never drew (t23's 90% High Jump Kick); and a
+ *     middlegame mean is not a verdict (t24: 528 visits agreed at +0.52
+ *     for Dragon Claw x Return while the static read +0.08, regrading a
+ *     fine Dragon Dance as a blunder; t26: disagreeing plain cells kept
+ *     the pool and lost the Protect misplay the expert named). Probe on
+ *     the harness team path: 655336 t13/t23/t24/t26 every verified cell
+ *     back to the sampler; 573756 t138's three Tantrum cells (-0.94 to
+ *     -0.99 over 490 to 760 visits, statics near zero) re-blend and the
+ *     SoulWind rows read 3/2/1/1% under a 95% bar. Merge pins moved to
+ *     eval-mcts-merge.spec.ts (eval-search.spec.ts sat at its 900-line
+ *     ratchet pin, now 760) with five new ones; the draft t56 end-to-end
+ *     pin holds throughout.
+ *   - app (9784fc4): the ladder ends at the tree (no rung from an MCTS
+ *     turn; stored escalations keep their precedence); the GPL e2e pins
+ *     "no button, badge MCTS" at turn 38.
+ *   - harness (070b9b9): every dump line carries `decided` (the root's
+ *     decided-sweep side or null) so round 15's 17 flip positions can be
+ *     re-derived from any run (Q4 enabler). Cache v38 -> v39 (sets change
+ *     wherever a knock-out was observed).
+ * BENCH (this harness, EVAL_CALIBRATION_MODE=auto + SMOGON=1, six slices;
+ *   A = adf3777 in .calibration/r31-after, B = 070b9b9 in r32-after, 377 s
+ *   wall; the verify and ladder changes do not reach this bench, which
+ *   runs single trees without a merge): full records A 52/63/79 (singles
+ *   62, doubles 73), Brier 0.2613/0.2289/0.1560, K 1.79, n 822 -> B
+ *   53/62/79 (61, 73), Brier 0.2614/0.2298/0.1561, K 1.76, n 816; bucket
+ *   0.7-1.0 88% (n 128) -> 87% (n 127). Pre-registered rule (late Brier
+ *   <= A + 10 bp, bucket >= A - 2 points, sign >= A - 1 point): +1 bp,
+ *   -1 point, +1/-1/0 -> the fit is ADOPTED. Joined n 814 (identical
+ *   positions): late Brier 0.1581 -> 0.1572 (9 bp better), 17 exclusive
+ *   flips (A right 10, B right 7, most within +-0.1 of zero; the two large
+ *   late flips go one each way: 751443 t23 A 0.975 / B -0.976 with p1
+ *   winning, 752733 t32 A 0.847 / B -0.977 with p2 winning). Doubles
+ *   byte-identical (the parser records no doubles observations, so no
+ *   doubles set moved). Join gap: 8 A-only samples in three replays whose
+ *   reconstruction now ends before the sampled turn (the known premature-
+ *   end class; the new sets shift which turns survive), 2 B-only gained.
+ *   `decided` in B: 83 of 816 samples (p1 30, p2 53), the decided side
+ *   won 72.3% (round 15 measured 79.8% / singles 72.5%: the sweep stays
+ *   narrative, no >= 90% floor).
+ * FEEDBACK (three runs on f710cdb byte-identical in all six full dumps
+ *   and the drift file; 573756 wall 66/66/67 s): four claims move against
+ *   the adf3777 dumps, all four from the fitter. A worktree run of 50b4247
+ *   alone shows the same four, and the final verify rule changes exactly
+ *   one thing over the fitter alone: 573756 t138's rows, 55/55/55/14% ->
+ *   3/2/1/1%. The four: 573756 t138 gap MOVED, the card reads quiet (no
+ *   chance booking), own-p2 0.947 (0.195 before), t137 0.81, t136 0.20,
+ *   t135 0.47, so the pre-registered expectation (>= 0.9, rows <= 10%, no
+ *   chance swing, t137 >= 0.75) holds; 573756 t68 truth -> DRIFT, p2's
+ *   Knock Off grades inaccuracy (regret 0.115) because the stayed-
+ *   sacrifice detection no longer fires under the re-fitted sets (Weavile
+ *   Jolly 252 Atk / 252 Spe instead of Bold 252 HP / 252 Def); 573756 t73
+ *   truth -> DRIFT, attribution shift and no near-decided sentence: after
+ *   the Fire Fang miss the bank reads own-p2 0.76 (LordEnz wins in the sim
+ *   with or without the roll), so the roll is no longer decisive to the
+ *   engine; golden 655336 drifts in new channels, the t26 Protect misplay
+ *   the expert named IS recognized now (regret 0.041 -> 0.330) while t13's
+ *   p2 switch grades mistake (0.297) and t5 leaves the two-per-side
+ *   misplay list (still a mistake by tier), t23/t24 as in the baseline.
+ *   653785 t19, 649664, 562428, 648453: no claim change. Side effect in
+ *   the 573756 report: the resolution now books at t136/t137 (chanceTotal
+ *   -1.93 -> -3.64, resolutionTotal -1.24 -> -3.00), key moments
+ *   [71, 73, 135, 137] -> [71, 73, 74, 77]. Re-pins are at the USER GATE
+ *   (spec 7.3); until then the corpus stays as pinned and the drift report
+ *   shows the moves.
+ *   RE-PINS at the user gate (2026-09-03 20:33): t138 gap -> TRUTH
+ *   (attribution quiet, no key moment; the desired text is fulfilled),
+ *   t68 and t73 truth -> GAP (observed inaccuracy / shift, desired
+ *   restated), golden 655336 stays with its three moved channels booked
+ *   as known drift in the essence. Fourth run: t138 ok, t68/t73 gap-
+ *   open, the golden's three channels, everything else as pinned, all
+ *   six full dumps byte-identical to the third run. The user's read of
+ *   the golden: t5's Trick was defensible against Sucker Punch and
+ *   Pursuit, t13's paid-off read stands, Dragon Dance at t24 is a fine
+ *   move and the t23 sack deserved respect. The depth probe
+ *   (docs/perf/probes/2026-09-03-r32/depth-check.spec.ts) settled the
+ *   verify question: evaluated at ONE depth the t24 children agree
+ *   (d3s3 Dragon Dance 0.39 against Dragon Claw 0.33, four trees 0.54
+ *   against 0.66), so the broad rule's blunder came from mixing a deep
+ *   cell with starved, near-static siblings, not from a misclassified
+ *   golden; the t23 sack reads below Dragon Claw at every depth (d3s3
+ *   0.04 against 0.60, trees 0.53 against 0.74), the variance-value
+ *   limit. A second probe (t73-check.spec.ts) traced the t73 under-read
+ *   to the fit: it satisfied t72's Magnezone-before-Garchomp order by
+ *   giving Garchomp 0 Spe (240, below Kyurem's 289) instead of inferring
+ *   Magnezone's Choice Scarf, so the hit child prices 0.53 to 0.68 with
+ *   Kyurem outspeeding the surviving Garchomp. Scarf inference from
+ *   impossible move orders is the registered next candidate.
+ * LESSONS: bit-identical is not right, and deeper is not truer: the motif
+ *   case was 30% a set error whose cause was a lower bound scored as a
+ *   reading; a verification that replaces a deep value with a one-ply
+ *   snapshot can set the panel against its own bar, but a tree's mean
+ *   over a middlegame is not a verdict either, so root corrections keep
+ *   the tree's continuation only where the tree has played the cell out;
+ *   an escalation ladder must never lead into a shorter horizon; the
+ *   sighting probe (a day's worth of measurement) saved two builds; a
+ *   "rich" pool by the round-7 floor (8 visits) is not depth; the golden
+ *   is the cheapest oracle for a verify change, so run it before the
+ *   corpus; and there are three team paths (production with fills,
+ *   harness with usage stats only, bare reconstruction), so a probe must
+ *   say which one it stands on. The choice-lock corroboration still reads
+ *   every fraction as an exact reading; that consumer is left for its own
+ *   round.
+ *
  * LOSSLESS PERF BASE ROUND 2026-09-03 (improvement round 31, the first
  * round of docs/superpowers/plans/2026-09-02-perf-and-quality-plan.md;
  * commits 9ec06fa pool, 41c5e05 store prefetch, 3f0d9a4 slice runner,
