@@ -106,8 +106,9 @@ const configuredTarget = (
  * be re-run at full settings (the explicit deepen button offers exactly
  * that). Deeper/heavier stored results never downgrade (a depth-2 result
  * stays shown under depth-1 prefs); that includes a matrix escalation of
- * depth ≥ 2 sitting on an MCTS-target turn — think-deeper's cross-engine
- * product is settled, not stale. Auto prefs resolve through the turn's
+ * depth ≥ 2 sitting on an MCTS-target turn (a think-deeper product stored
+ * before round 32, when the ladder still crossed engines): settled, not
+ * stale. Auto prefs resolve through the turn's
  * fainted fraction; with the fraction unknown the answer is conservative
  * (no upgrade claimed — the next sweep resolves it).
  */

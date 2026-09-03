@@ -285,15 +285,10 @@ function resolveThinkDeeperTarget(
     }
     return { depth: prefs.depth, samples: prefs.samples, mode: prefs.mode };
   }
-  // From an MCTS turn the button crosses into the matrix ladder at depth 2 —
-  // the same rung the early d1s1 line escalates to.
-  if (stored.mode === 'mcts') {
-    return {
-      depth: 2,
-      samples: Math.max(stored.samples, prefs.samples) as TurnEvalSettings['samples'],
-      mode: 'matrix',
-    };
-  }
+  // A tree turn is the deepest engine the panel has: a matrix rung would
+  // see three plies where the tree saw seven (573756 t138), so no rung is
+  // offered. Escalations stored before round 32 keep their precedence.
+  if (stored.mode === 'mcts') return null;
   // The matrix ladder caps at the engine's depth 3.
   if (stored.depth >= 3) return null;
   return {

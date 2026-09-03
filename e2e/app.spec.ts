@@ -667,14 +667,11 @@ test.describe('PS Dashboard', () => {
     await panel.locator('.ps-eval-graph rect[data-turn="38"]').click();
     await expect(panel.locator('.ps-eval-analysis')).toContainText('Turn 38', { timeout: 15_000 });
     await expect(panel.getByTitle('What produced the numbers shown for this turn.')).toHaveText('MCTS');
-    // The cross-engine ladder: from an MCTS turn, think-deeper crosses into
-    // the matrix ladder at depth 2 — same rung the early d1s1 line offers.
-    // CLICK it: the d2s3 matrix pass must actually LAND (supersede the
-    // stored MCTS result) — the badge is the proof, and a silently skipped
-    // sweep is exactly the bug this guards against.
-    await panel.locator('button', { hasText: 'Think deeper about this position (depth 2)' }).click();
-    await expect(panel.getByTitle('What produced the numbers shown for this turn.'))
-      .toHaveText('depth 2 · 3 samples', { timeout: 180_000 });
+    // Round 32: a tree turn offers no matrix rung (it would see three plies
+    // where the tree saw seven); the badge stays MCTS and no ladder button
+    // renders for this turn.
+    await expect(panel.locator('button', { hasText: 'Think deeper about this position' })).toHaveCount(0);
+    await expect(panel.getByTitle('What produced the numbers shown for this turn.')).toHaveText('MCTS');
   });
 
   test('branch mode: clicking a recommendation plays the turn out', async ({ page }) => {

@@ -175,13 +175,13 @@ An exploitative "Read" lens looks past equilibrium. A boundedly rational opponen
 
 ### Think deeper
 
-Selecting a turn never re-searches; it shows the stored result with its settings badge. Deepening is the explicit "Think deeper about this position" button: a sketch or a gap first rises to your configured settings, then one depth further (cap 3, never shedding samples on the way up), with the score, ranked moves, matrix, graph, and report updating together. The single-turn re-search acquires through the same per-turn snapshot healing as the sweep, with a loud reached-guard for replays that healing cannot repair. Graph writes are monotone, so a later re-analyze can never downgrade an explicitly deepened turn back to the fast scan.
+Selecting a turn never re-searches; it shows the stored result with its settings badge. Deepening is the explicit "Think deeper about this position" button: a sketch or a gap first rises to your configured settings, then one depth further (cap 3, never shedding samples on the way up), with the score, ranked moves, matrix, graph, and report updating together. The ladder ends at the tree: a turn the MCTS engine drew offers no button, since a matrix pass would see three plies where the tree saw seven. The single-turn re-search acquires through the same per-turn snapshot healing as the sweep, with a loud reached-guard for replays that healing cannot repair. Graph writes are monotone, so a later re-analyze can never downgrade an explicitly deepened turn back to the fast scan.
 
 ### MCTS mode
 
 The MCTS mode carries its own corpus calibration: hint-ordered expansion under progressive widening (the restriction's own static hints decide which options may open, so the doubles 16x16 root no longer starves its iteration budget), and equilibrium rankings over tree-informed root cells. Chance-suspect support cells (a root cell fixes one chance outcome per tree, so a lucky miss can masquerade as a good line) are re-verified by the matrix-grade multi-seed sampler before the verdict stands. On the honest-fills rig the depth-1 matrix ties or beats the pure tree overall, which is why Auto, not pure MCTS, is the default line.
 
-The default Auto line routes to the tree once a quarter of all bodies have fallen, and the honesty features follow the line everywhere. Misplay verification, item-sensitivity probes, and the "Think deeper" ladder work regardless of which engine drew the turn: a flagged MCTS turn re-adjudicates as matrix pairs at the same deep tier the matrix line gets, and deepening an MCTS turn crosses into the matrix ladder at depth 2, where monotone graph writes keep that product safe from later sweeps. Only root pivot pairs remain matrix-side.
+The default Auto line routes to the tree once a quarter of all bodies have fallen, and the honesty features follow the line everywhere. Misplay verification and item-sensitivity probes work regardless of which engine drew the turn: a flagged MCTS turn re-adjudicates as matrix pairs at the same deep tier the matrix line gets. The "Think deeper" ladder stops at the tree (see above). Only root pivot pairs remain matrix-side.
 
 ### The game report
 
