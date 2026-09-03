@@ -117,8 +117,8 @@ test('reblendValue swaps the first leaf inside its class only', () => {
   const blend = {
     firstLeaf: 1,
     classes: [
-      { weight: 0.43, leafSum: 2, count: 2, hasFirst: true },   // leaves 1, 1
-      { weight: 0.57, leafSum: -1, count: 1, hasFirst: false },
+      { weight: 0.43, leafSum: 2, count: 2, hasFirst: true, ended: false },   // leaves 1, 1
+      { weight: 0.57, leafSum: -1, count: 1, hasFirst: false, ended: true },
     ],
   };
   // Deepened first child: 0.5 → class mean (0.5 + 1)/2 = 0.75.

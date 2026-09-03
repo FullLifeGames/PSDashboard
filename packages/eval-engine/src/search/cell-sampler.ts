@@ -106,7 +106,7 @@ function blendFromClasses(
     if (!cls) continue;
     const normalized = weight / weightTotal; // 1.0 total when nothing is missing
     value += normalized * (cls.leafSum / cls.count);
-    blendClasses.push({ weight: normalized, leafSum: cls.leafSum, count: cls.count, hasFirst: cls.hasFirst });
+    blendClasses.push({ weight: normalized, leafSum: cls.leafSum, count: cls.count, hasFirst: cls.hasFirst, ended: cls.ended });
   }
   const blend: CellBlend = { classes: blendClasses, firstLeaf: draws[0].leaf };
   const ended = draws.every(draw => draw.ended);

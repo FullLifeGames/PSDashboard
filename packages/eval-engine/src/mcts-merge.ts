@@ -7,8 +7,10 @@ import type { EvalCellJob, EvalCellValue, EvalResult, KoOddsMismatch, MctsTreeSt
  * rotated seed offset) run on separate workers and merge here by POOLED
  * root-cell statistics, ranked by the same equilibrium solve the matrix
  * mode runs (visit counts allocate search effort; they are not the
- * verdict). Pure — rank.ts and the sim-free payload helpers only, no sim
- * imports, main-thread safe.
+ * verdict). Verification re-prices the suspect cells the solve leans on
+ * and keeps the pool's depth where the pool is rich (verifiedValue). Pure —
+ * rank.ts and the sim-free payload helpers only, no sim imports,
+ * main-thread safe.
  */
 
 /**
@@ -69,14 +71,60 @@ function pooledCells(trees: MctsTreeStats[]): Map<number, PooledCell> {
 }
 
 /**
- * The pooled root matrix. `verified` (cellKey → sampled cell) REPLACES
- * starved cells' pooled values before the solve: a multi-seed matrix-grade
- * mean outranks the 1-2 chance outcomes the tree happened to draw there.
+ * The pool's continuation for one root cell: the trees whose drawn child
+ * did not end the game, pooled with each tree's own prior, plus the visit
+ * count, the number of such trees, and the spread of their per-tree means.
+ */
+function poolContinuation(trees: MctsTreeStats[], key: number): { value: number; visits: number; trees: number; spread: number } {
+  let total = 0;
+  let weight = 0;
+  let visits = 0;
+  const means: number[] = [];
+  for (const tree of trees) {
+    const cell = tree.cells.find(entry => entry.key === key);
+    if (!cell || cell.ended) continue;
+    total += cell.total + cell.value;
+    weight += cell.visits + 1;
+    visits += cell.visits;
+    means.push((cell.total + cell.value) / (cell.visits + 1));
+  }
+  const spread = means.length > 0 ? Math.max(...means) - Math.min(...means) : 0;
+  return { value: weight > 0 ? total / weight : NaN, visits, trees: means.length, spread };
+}
+
+/**
+ * The value a verified cell contributes (round 32). The sampler's job is
+ * the ROOT chance split; the trees' job is depth. Starved or thin pools
+ * take the sampler's value as before. A rich pool keeps its depth: with a
+ * blend, the analytic classes weight the ended classes' exact leaves
+ * against the pool's continuation for the open ones (573756 t138: a 5%
+ * crit-kill class must not turn a played-out −0.96 into the one-ply static
+ * +0.03); without a blend the pooled value stands untouched. Disagreeing
+ * trees on a blended cell keep the sampler's blend (draft t56: the pool's
+ * draws cannot be assigned to classes here).
+ */
+function verifiedValue(trees: MctsTreeStats[], key: number, cell: EvalCellValue, pooledValue: number): number {
+  const pool = poolContinuation(trees, key);
+  const rich = pool.visits >= VERIFY_MIN_VISITS && pool.trees >= Math.min(VERIFY_MIN_TREES, trees.length);
+  if (!rich) return cell.value;
+  if (!cell.blend) return pooledValue;
+  if (pool.spread > VERIFY_SPREAD) return cell.value;
+  let value = 0;
+  for (const cls of cell.blend.classes) value += cls.weight * (cls.ended ? cls.leafSum / cls.count : pool.value);
+  return value;
+}
+
+/**
+ * The pooled root matrix. `verified` (cellKey → sampled cell) re-prices the
+ * suspect cells before the solve: a starved cell takes the multi-seed
+ * matrix-grade mean (it outranks the 1-2 chance outcomes the tree happened
+ * to draw there), a rich pool keeps its depth (verifiedValue).
  */
 function pooledMatrix(
   base: MctsTreeStats,
   pooled: Map<number, PooledCell>,
   verified: Map<number, EvalCellValue> | undefined,
+  trees: MctsTreeStats[],
 ): { values: number[][]; ended: boolean[][] } {
   const values = base.p1Options.map((_, i) => base.p2Options.map((_, j) => {
     const entry = pooled.get(cellKey(i, j));
@@ -88,7 +136,7 @@ function pooledMatrix(
   if (verified) {
     for (const cell of verified.values()) {
       if (cell.i < values.length && cell.j < (values[cell.i]?.length ?? 0)) {
-        values[cell.i][cell.j] = cell.value;
+        values[cell.i][cell.j] = verifiedValue(trees, cellKey(cell.i, cell.j), cell, values[cell.i][cell.j]);
         ended[cell.i][cell.j] = cell.ended;
       }
     }
@@ -99,8 +147,8 @@ function pooledMatrix(
 /**
  * Round 7: the verify sampler's mismatch diagnostics survive the merge —
  * sorted (i, j) because the pooled executor returns chunks in completion
- * order. Blend payloads are dropped on purpose: MCTS has no deepening,
- * so reblendValue has no call site here.
+ * order. Blend payloads feed verifiedValue (round 32); MCTS has no
+ * deepening, so reblendValue has no call site here.
  */
 function verifiedDiagnostics(verified: Map<number, EvalCellValue> | undefined): KoOddsMismatch[] {
   return verified
@@ -154,17 +202,17 @@ function attachDonorLine(trees: MctsTreeStats[], result: EvalResult): void {
 
 /**
  * Merges parallel trees into one result. Order of `trees` must be fixed.
- * `verified` (cellKey → sampled cell) REPLACES starved cells' pooled values
- * before the solve: a multi-seed matrix-grade mean outranks the 1-2 chance
- * outcomes the tree happened to draw there. The score is untouched by
- * design — it stays the summed-marginal visit mean (hybrid semantics).
+ * `verified` (cellKey → sampled cell) re-prices the suspect cells before
+ * the solve: a starved cell takes the multi-seed matrix-grade mean, a rich
+ * pool keeps its depth (verifiedValue). The score is untouched by design —
+ * it stays the summed-marginal visit mean (hybrid semantics).
  */
 export function mergeMctsTrees(trees: MctsTreeStats[], verified?: Map<number, EvalCellValue>): EvalResult {
   const base = trees[0];
   if (trees.length === 1 && !verified) return base.result;
 
   const pooled = pooledCells(trees);
-  const { values, ended } = pooledMatrix(base, pooled, verified);
+  const { values, ended } = pooledMatrix(base, pooled, verified, trees);
   const diagnostics = verifiedDiagnostics(verified);
 
   const ranked = rankFromMatrix(

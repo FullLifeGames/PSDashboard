@@ -176,7 +176,7 @@ export const ratchetOverrides = [
       "max-lines": [
         "error",
         {
-          "max": 900,
+          "max": 760,
           "skipBlankLines": true,
           "skipComments": true
         }

@@ -94,6 +94,8 @@ export interface CellBlendClass {
   count: number;
   /** The first-seed child (the one deepening expands) lives in this class. */
   hasFirst: boolean;
+  /** Every sampled child of this class ended the game (its leaves are exact +-1). */
+  ended: boolean;
 }
 
 /**
