@@ -118,7 +118,12 @@ export interface StoredEval {
 //      the protocol-pinned bring per side (per-side fail-open), and the
 //      turn-0 preview enumerates lead pairs over the real four. Singles
 //      and bring-all formats are byte-identical to v37.
-const EVAL_ENGINE_CACHE_VERSION = 38;
+// v39: knock-out hits are lower bounds in the spread fit (a KO line only
+//      says "at least the remainder"; read as a reading it pulled every
+//      solve toward a bulkier defender and a weaker attacker: 573756's
+//      p1 Toxapex fitted as Bold 252 Def, Melmetal at 0 Atk). Sets, and
+//      with them positions, change wherever a knock-out was observed.
+const EVAL_ENGINE_CACHE_VERSION = 39;
 
 export function evalStoreKey(
   cacheKey: string,

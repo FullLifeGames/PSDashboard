@@ -1,6 +1,7 @@
 // Shared aggregation over calibration dumps (EVAL_CALIBRATION_DUMP JSONL,
 // one sample per line: id, turn, tranche, phase, gameType, score,
-// faintedFraction, p1Won). Three consumers: the harness itself prints the
+// faintedFraction, p1Won, and since round 32 decided: the root's
+// decided-sweep side or null). Three consumers: the harness itself prints the
 // same aggregate lines, scripts/run-calibration.mjs merges slice dumps and
 // summarizes them, scripts/paired-calibration.mjs joins two dumps. The math
 // replicates regression/fit-helpers.ts exactly (pooled constant-K logistic

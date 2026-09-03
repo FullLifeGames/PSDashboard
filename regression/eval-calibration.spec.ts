@@ -28,7 +28,9 @@ import { brierScore, fitConstantK } from './fit-helpers';
  * the dumps into one summary) ·
  * EVAL_CALIBRATION_TRANCHE=<name> (one corpus stratum only; slices then
  * index the filtered list) ·
- * EVAL_CALIBRATION_DUMP=<path> (per-position JSONL for paired analysis) ·
+ * EVAL_CALIBRATION_DUMP=<path> (per-position JSONL for paired analysis;
+ * since round 32 every line also carries `decided`, the root's
+ * decided-sweep side or null) ·
  * EVAL_CALIBRATION_SOURCE=fit (swap the universe to the weight-fitting
  * corpus' disk cache for FIT-SIDE dumps — mapping fits train there and
  * grade here; refuses to run without a dump path) ·
@@ -2087,6 +2089,8 @@ interface Sample {
   /** Fainted bodies / total bodies at the sampled position. */
   faintedFraction: number;
   p1Won: boolean;
+  /** The root's decided-sweep side (round 15 profile), null when no sweep stands. Round 32. */
+  decided: 'p1' | 'p2' | null;
   /**
    * EVAL_CALIBRATION_FEATURES=1: the static eval's scaled feature vector
    * (fit-spec g construction, FEATURE_WEIGHTS key order) — for offline
@@ -2094,6 +2098,10 @@ interface Sample {
    */
   g?: number[];
 }
+
+/** The root's decided-sweep side for the dump line (round 32), null when no sweep stands. */
+const decidedSideOf = (result: ReturnType<typeof searchPosition>): Sample['decided'] =>
+  result.unanswered?.decided?.side ?? null;
 
 test.describe('eval calibration against real replays', () => {
   test.skip(!process.env.EVAL_CALIBRATION, 'set EVAL_CALIBRATION=1 to run the calibration sweep');
@@ -2303,10 +2311,11 @@ test.describe('eval calibration against real replays', () => {
           const useMcts = mode === 'mcts' ||
             (mode === 'auto' && faintedFraction >= AUTO_MCTS_FAINTED_FRACTION);
           const runSearch = useMcts ? mctsSearch : searchPosition;
-          const { score } = runSearch(serialized, {
+          const result = runSearch(serialized, {
             depth, samples: sampleCount, tera: false,
             sleepClause: formatEnforcesSleepClause(getBranchSimulatorFormat(replay)),
           });
+          const { score } = result;
           if (Number.isNaN(score)) {
             // A NaN would silently poison every aggregate — surface it loudly.
             console.log(`NaN score: ${id} turn ${turn}`);
@@ -2322,6 +2331,10 @@ test.describe('eval calibration against real replays', () => {
             score,
             faintedFraction,
             p1Won,
+            // Round 32 enabler for Q4: the root's decided-sweep side, so the
+            // clamp and flip positions of round 15 can be re-derived (their
+            // 17 ids are no longer on record anywhere).
+            decided: decidedSideOf(result),
             ...(g ? { g } : {}),
           });
         } catch (error) {
