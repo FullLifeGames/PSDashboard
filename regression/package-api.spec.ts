@@ -42,6 +42,59 @@ function compilerSurface(name: string): string[] {
     .sort();
 }
 
+interface Manifest {
+  name: string;
+  license: string;
+  type: string;
+  sideEffects: boolean;
+  exports: { '.': Record<string, string> };
+  files: string[];
+  publishConfig?: { access?: string };
+  dependencies?: Record<string, string>;
+  peerDependencies?: Record<string, string>;
+}
+
+const readJson = <T>(path: string): T => JSON.parse(readFileSync(path, 'utf8')) as T;
+
+test.describe('Package hygiene', () => {
+  const rootLicense = readFileSync(resolve(repoRoot, 'LICENSE'), 'utf8');
+  const examples: Record<string, string> = { 'replay-core': 'parse-replay.mjs', 'eval-engine': 'evaluate-turn.mjs' };
+
+  for (const { name } of PACKAGES) {
+    const dir = resolve(repoRoot, 'packages', name);
+
+    test(`${name}: the manifest is ready to publish`, () => {
+      const manifest = readJson<Manifest>(resolve(dir, 'package.json'));
+      expect(manifest.name).toBe(`@fulllifegames/${name}`);
+      expect(manifest.license).toBe('MIT');
+      expect(manifest.type).toBe('module');
+      expect(manifest.sideEffects).toBe(false);
+      expect(manifest.publishConfig?.access).toBe('public');
+      // The types condition has to come first: consumers resolve conditions in order.
+      expect(Object.keys(manifest.exports['.'])).toEqual(['types', 'default']);
+      expect(manifest.files).toEqual(['dist', 'README.md']);
+      // Workspace references stay "*" in the tree; the publish script writes the caret range.
+      for (const [dep, range] of Object.entries(manifest.dependencies ?? {})) {
+        expect(dep.startsWith('@fulllifegames/'), `${dep} is not a workspace package`).toBe(true);
+        expect(range).toBe('*');
+      }
+      for (const range of Object.values(manifest.peerDependencies ?? {})) expect(range).toMatch(/^\^\d/);
+    });
+
+    test(`${name}: LICENSE is the repository license`, () => {
+      expect(readFileSync(resolve(dir, 'LICENSE'), 'utf8')).toBe(rootLicense);
+    });
+
+    test(`${name}: the README carries the example verbatim`, () => {
+      const lf = (text: string) => text.replace(/\r\n/g, '\n');
+      const example = lf(readFileSync(resolve(dir, 'examples', examples[name]), 'utf8'));
+      const readme = lf(readFileSync(resolve(dir, 'README.md'), 'utf8'));
+      expect(readme).toContain('```js\n' + example + '```');
+      expect(readme).toContain(`examples/${examples[name]}`);
+    });
+  }
+});
+
 test.describe('Package API surface', () => {
   for (const { name, runtime } of PACKAGES) {
     test(`${name}: the barrel matches the pinned surface`, () => {

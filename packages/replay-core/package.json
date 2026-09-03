@@ -2,9 +2,29 @@
   "name": "@fulllifegames/replay-core",
   "version": "0.1.0",
   "description": "Pokémon Showdown replay parsing: protocol logs in, turn snapshots, revealed teams, and simulator sets out.",
+  "keywords": [
+    "pokemon",
+    "pokemon-showdown",
+    "replay",
+    "parser",
+    "protocol",
+    "teams"
+  ],
+  "homepage": "https://github.com/FullLifeGames/PSDashboard/tree/master/packages/replay-core#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/FullLifeGames/PSDashboard.git",
+    "directory": "packages/replay-core"
+  },
+  "bugs": {
+    "url": "https://github.com/FullLifeGames/PSDashboard/issues"
+  },
   "license": "MIT",
   "type": "module",
   "sideEffects": false,
+  "engines": {
+    "node": ">=20"
+  },
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "exports": {
@@ -17,6 +37,9 @@
     "dist",
     "README.md"
   ],
+  "publishConfig": {
+    "access": "public"
+  },
   "peerDependencies": {
     "@pkmn/client": "^0.7.3",
     "@pkmn/data": "^0.10.11",

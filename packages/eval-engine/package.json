@@ -2,9 +2,30 @@
   "name": "@fulllifegames/eval-engine",
   "version": "0.1.0",
   "description": "Position evaluation for Pokémon Showdown replays: reconstruction, search, per-turn analysis, and the game report.",
+  "keywords": [
+    "pokemon",
+    "pokemon-showdown",
+    "replay",
+    "evaluation",
+    "search",
+    "analysis",
+    "mcts"
+  ],
+  "homepage": "https://github.com/FullLifeGames/PSDashboard/tree/master/packages/eval-engine#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/FullLifeGames/PSDashboard.git",
+    "directory": "packages/eval-engine"
+  },
+  "bugs": {
+    "url": "https://github.com/FullLifeGames/PSDashboard/issues"
+  },
   "license": "MIT",
   "type": "module",
   "sideEffects": false,
+  "engines": {
+    "node": ">=20"
+  },
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "exports": {
@@ -17,6 +38,9 @@
     "dist",
     "README.md"
   ],
+  "publishConfig": {
+    "access": "public"
+  },
   "dependencies": {
     "@fulllifegames/replay-core": "*"
   },
