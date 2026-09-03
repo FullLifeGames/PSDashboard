@@ -101,7 +101,7 @@ npx playwright install
 npm install
 ```
 
-One install covers the npm workspace: the app at the root and the two library packages under `packages/`, linked into `node_modules/@fulllifegames/`.
+One install covers the npm workspace: the app at the root and the two library packages under `packages/`, linked into `node_modules/@fulllifegames/`. The packages also publish to npm as `@fulllifegames/replay-core` and `@fulllifegames/eval-engine`; their READMEs carry the install line and a worked Node example each.
 
 ### Run the app
 
@@ -118,7 +118,10 @@ npm run lint
 npm run build
 npm run test:e2e
 npm run test:regression
+npm run pack:smoke
 ```
+
+`npm run pack:smoke` packs both library packages, installs the tarballs into a throwaway Node project next to the sim family, runs the README examples there, and type-checks a NodeNext consumer against the shipped declarations. Ten seconds, no registry.
 
 ## Releases And Hosted Builds
 
@@ -140,6 +143,16 @@ git push
 The workflow then builds the app, creates the `v<version>` tag on that commit, and publishes a
 GitHub Release carrying `ps-dashboard-<version>.zip` (the built `dist/`) plus auto-generated notes.
 A push that does not change the version costs a ~6-second version check and stops there.
+
+The same release publishes the library packages. A `publish` job runs after the release and calls
+[`scripts/publish-packages.mjs`](./scripts/publish-packages.mjs): it writes the root version into
+`packages/*/package.json`, selects the packages whose files changed since the previous release tag (a
+first publish always qualifies), turns the workspace `"*"` reference into a caret range, and runs
+`npm publish` for the selection. Unchanged packages keep their older npm version, which the caret
+ranges still resolve. The job needs the `NPM_TOKEN` repository secret (an npm automation token that
+may publish under the `@fulllifegames` scope); without it the job prints a notice and ends green, so
+the GitHub release never waits on npm. `node scripts/publish-packages.mjs --dry-run` prints the plan
+and the tarball contents locally without touching the registry.
 
 ### Where builds are hosted
 
@@ -232,6 +245,9 @@ The repository is an npm workspace: the app at the root plus two library package
 - [`packages/replay-core/src/spread-inference.ts`](./packages/replay-core/src/spread-inference.ts) solves damage-consistent EV spreads from replay observations against `@smogon/calc` roll ranges (hard-constrained by observed speed races, forfeiting solves that misfit their own evidence), legalized to the format's EV budget (standard 508/252, Pokémon Champions 66/32); [`packages/replay-core/src/spreads/`](./packages/replay-core/src/spreads/) holds the EV budget, the candidate ladder, and the fit context.
 - [`scripts/build-fit-corpus.mjs`](./scripts/build-fit-corpus.mjs) builds the manifest-pinned weight-fitting corpus (ReplayScouter tournament data, direct Smogon-thread scraping for gen9 singles, doubles, and VGC (official tournament replays carry a `smogtours-` room prefix the scraper understands), plus ladder samples); the manifest is committed, the replay cache is not.
 - [`scripts/build-versions-index.mjs`](./scripts/build-versions-index.mjs) renders the `/versions/` page listing the nightly and the hosted release builds; the Pages workflow feeds it a manifest of the releases it unpacked.
+- [`scripts/publish-packages.mjs`](./scripts/publish-packages.mjs) publishes the changed library packages at the root version from the release workflow (`--dry-run` for the plan, `--pack <dir> --all` for tarballs); [`scripts/pack-smoke.mjs`](./scripts/pack-smoke.mjs) is the consumer-side check behind `npm run pack:smoke`.
+- [`packages/replay-core/examples/`](./packages/replay-core/examples/) and [`packages/eval-engine/examples/`](./packages/eval-engine/examples/) hold the worked Node examples the package READMEs embed verbatim; they run from the repository after `npm run build` and inside the pack smoke.
+- [`regression/package-api.spec.ts`](./regression/package-api.spec.ts) pins each package's public surface (`regression/fixtures/api/<name>.txt`, refreshed with `UPDATE_API_SNAPSHOT=1`) and the publish hygiene: manifest fields, LICENSE copies, and the README examples.
 - [`src/hooks/useEvaluation.ts`](./src/hooks/useEvaluation.ts) composes the evaluation surface; [`src/hooks/evaluation/`](./src/hooks/evaluation/) holds the preferences, the single-position evaluate path, and the graph sweep as staged runners (types, verification and sensitivity probes, cache-hit install, per-turn evaluation, the lane runner, the three-pass orchestration), with per-turn caching in memory and IndexedDB.
 - [`packages/replay-core/src/team-paste.ts`](./packages/replay-core/src/team-paste.ts) parses pasted Showdown exports (including natures, IVs, and levels) and overlays them as manual knowledge.
 - [`src/lib/sets-io.ts`](./src/lib/sets-io.ts) builds and parses the side-headered both-teams text format for the Import/Export Sets panel.
@@ -258,6 +274,7 @@ The repository is an npm workspace: the app at the root plus two library package
 - Size and complexity ceilings are lint errors (`max-lines` 300, `max-lines-per-function` 60, `complexity` 15 under `src/` and `packages/*/src/`; test suites have their own). Older files sit on generated shrink-only pins in `eslint.ratchet.mjs`; `node scripts/update-lint-ratchet.mjs` re-measures them and refuses to raise a pin. New files must be born under the targets.
 - Import zones in `eslint.zones.mjs` make the package layering a lint error: a package never reaches `src/` or the UI layer, `replay-core` never imports the engine, the app imports the packages by name and never their files, nothing under `src/lib` imports the UI layer, and components use the hook facades rather than their internals. A dynamic import of package code goes through `src/lib/lazy/`.
 - `npm run knip` lists unused files, dependencies, exports, and types; keep its report empty (internal helpers stay unexported).
+- Each package barrel (`packages/*/src/index.ts`) is the public API: the names the app, the worker, the sibling package, and the worked example use, plus the types their signatures mention. Widening it is a one-line edit followed by `UPDATE_API_SNAPSHOT=1 npm run test:regression -- regression/package-api.spec.ts` and a look at the fixture diff. Package sources import each other with `.ts` specifiers; `tsc -b` rewrites them to `.js` in the emitted JavaScript so the packages run in Node without a bundler.
 - Direct dependencies track their latest registry versions; `npm outdated` is the check, and each upgrade lands behind the normal gates (the sim family behind a full feedback-corpus comparison, because new dex data can move scores). Two documented exceptions: `typescript` stays on the 6.0 line until typescript-eslint's peer range admits the native 7.x compiler (7.0 ships no JavaScript API for the parser), and `@types/node` follows the Node major the pages workflow runs (24), not the newest types on the registry.
 
 ## Next Priorities
