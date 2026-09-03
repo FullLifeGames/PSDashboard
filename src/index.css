@@ -31,83 +31,6 @@ body {
   min-height: 100vh;
 }
 
-/* ── PS Battle Scene ── */
-.ps-battle-scene {
-  position: relative;
-  width: 100%;
-  aspect-ratio: 16 / 9;
-  border-radius: 5px;
-  overflow: hidden;
-  background:
-    linear-gradient(180deg,
-      #90c8f8 0%,
-      #b0d8ff 30%,
-      #78b860 45%,
-      #60a040 55%,
-      #589038 70%,
-      #487830 100%
-    );
-}
-
-.ps-battle-scene::before {
-  content: '';
-  position: absolute;
-  bottom: 0;
-  left: 0;
-  right: 0;
-  height: 55%;
-  background:
-    repeating-linear-gradient(
-      90deg,
-      transparent,
-      transparent 48px,
-      rgba(0,0,0,0.03) 48px,
-      rgba(0,0,0,0.03) 50px
-    ),
-    linear-gradient(180deg,
-      #78b860 0%,
-      #60a040 30%,
-      #589838 60%,
-      #508830 100%
-    );
-  border-top: 2px solid #88c868;
-}
-
-/* ── PS Stat Box ── */
-.ps-statbar {
-  position: absolute;
-  z-index: 10;
-  background: linear-gradient(180deg, rgba(32,48,80,0.92) 0%, rgba(24,32,56,0.95) 100%);
-  border: 1px solid rgba(255,255,255,0.15);
-  border-radius: 5px;
-  padding: 3px 8px 5px;
-  min-width: 180px;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.4);
-}
-
-.ps-statbar-opponent {
-  top: 8%;
-  left: 5%;
-}
-
-.ps-statbar-player {
-  bottom: 12%;
-  right: 5%;
-}
-
-.ps-statbar-name {
-  font-size: 12px;
-  font-weight: bold;
-  color: #fff;
-  white-space: nowrap;
-}
-
-.ps-statbar-level {
-  font-size: 10px;
-  color: #aab;
-  margin-left: 4px;
-}
-
 /* PS HP bar */
 .ps-hpbar-track {
   height: 6px;
@@ -127,37 +50,6 @@ body {
 .ps-hpbar-green { background: linear-gradient(180deg, #00e800 0%, #00c000 100%); }
 .ps-hpbar-yellow { background: linear-gradient(180deg, #f0d000 0%, #c8a800 100%); }
 .ps-hpbar-red { background: linear-gradient(180deg, #f02020 0%, #c00000 100%); }
-
-/* Status badges */
-.ps-status {
-  display: inline-block;
-  font-size: 8px;
-  font-weight: bold;
-  padding: 0 4px;
-  border-radius: 3px;
-  color: #fff;
-  margin-left: 4px;
-  vertical-align: middle;
-  letter-spacing: 0.5px;
-}
-.ps-status-brn { background: #e67a20; }
-.ps-status-psn { background: #a040a0; }
-.ps-status-tox { background: #8030a0; }
-.ps-status-par { background: #d0b020; color: #333; }
-.ps-status-slp { background: #888; }
-.ps-status-frz { background: #68c8d8; color: #333; }
-
-/* Pokeball team icons */
-.ps-pokeball {
-  width: 12px;
-  height: 12px;
-  border-radius: 50%;
-  border: 2px solid;
-  display: inline-block;
-}
-.ps-pokeball-alive { border-color: #00c000; background: radial-gradient(circle at 40% 35%, #fff 0%, #ccc 100%); }
-.ps-pokeball-status { border-color: #d0b000; background: radial-gradient(circle at 40% 35%, #ffe080 0%, #c8a800 100%); }
-.ps-pokeball-fainted { border-color: #888; background: #444; opacity: 0.5; }
 
 /* ── unified timeline: line chip ── */
 .ps-line-chip {
@@ -195,68 +87,6 @@ body {
   color: #ffeeba;
   border: 1px solid rgba(240, 199, 107, 0.6);
 }
-
-/* Pokemon sprites */
-.ps-sprite {
-  position: absolute;
-  image-rendering: pixelated;
-  z-index: 5;
-}
-.ps-sprite-opponent {
-  top: 10%;
-  right: 12%;
-  width: 96px;
-  height: 96px;
-}
-.ps-sprite-player {
-  bottom: 5%;
-  left: 10%;
-  width: 120px;
-  height: 120px;
-}
-
-/* Side conditions */
-.ps-sidecond {
-  position: absolute;
-  z-index: 8;
-  display: flex;
-  gap: 3px;
-  flex-wrap: wrap;
-  max-width: 45%;
-}
-.ps-sidecond-opponent { top: 35%; left: 5%; }
-.ps-sidecond-player { bottom: 32%; right: 5%; }
-
-.ps-sidecond-tag {
-  font-size: 9px;
-  padding: 1px 5px;
-  border-radius: 3px;
-  background: rgba(0,0,0,0.6);
-  color: #ffd866;
-  border: 1px solid rgba(255,216,102,0.3);
-  white-space: nowrap;
-}
-
-/* Weather/terrain overlay */
-.ps-field-overlay {
-  position: absolute;
-  top: 4px;
-  left: 50%;
-  transform: translateX(-50%);
-  z-index: 12;
-  display: flex;
-  gap: 4px;
-}
-
-.ps-field-tag {
-  font-size: 9px;
-  padding: 2px 8px;
-  border-radius: 10px;
-  font-weight: bold;
-  white-space: nowrap;
-}
-.ps-field-weather { background: rgba(100,180,255,0.35); color: #c0e0ff; border: 1px solid rgba(100,180,255,0.4); }
-.ps-field-terrain { background: rgba(100,200,100,0.35); color: #c0ffc0; border: 1px solid rgba(100,200,100,0.4); }
 
 /* ── PS Controls Panel ── */
 .ps-controls {
@@ -619,26 +449,6 @@ body {
 }
 .ps-execute-btn:hover:not(:disabled) { transform: scale(1.01); }
 .ps-execute-btn:disabled { opacity: 0.4; cursor: not-allowed; }
-
-/* Boost badges */
-.ps-boost {
-  font-size: 8px;
-  padding: 0 3px;
-  border-radius: 2px;
-  color: #fff;
-  margin-right: 2px;
-  display: inline-block;
-}
-.ps-boost-up { background: #3080d0; }
-.ps-boost-down { background: #d03030; }
-
-/* ── Replay frame ── */
-.ps-replay-frame {
-  background: #2a3a5c;
-  border: 2px solid #8aa;
-  border-radius: 8px;
-  overflow: hidden;
-}
 
 .ps-branch-controls-shell {
   border: 1px solid rgba(255,255,255,0.12);
