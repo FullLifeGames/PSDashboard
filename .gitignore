@@ -46,3 +46,6 @@ deploy.ps1
 
 # TypeScript incremental build state (composite packages write theirs into dist/)
 *.tsbuildinfo
+
+# Calibration slice runs (scripts/run-calibration.mjs): dumps, logs, summaries
+.calibration/

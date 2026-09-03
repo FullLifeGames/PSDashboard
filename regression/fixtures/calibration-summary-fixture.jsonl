@@ -1,0 +1,12 @@
+{"id":"gen9ou-2","turn":9,"tranche":"ladder","phase":"mid","gameType":"singles","score":-0.42,"faintedFraction":0.5,"p1Won":false}
+{"id":"gen9ou-1","turn":4,"tranche":"ladder","phase":"early","gameType":"singles","score":0.31,"faintedFraction":0.08,"p1Won":true}
+{"id":"gen9vgc-1","turn":2,"tranche":"vgc","phase":"early","gameType":"doubles","score":-0.15,"faintedFraction":0,"p1Won":true}
+{"id":"gen9ou-1","turn":11,"tranche":"ladder","phase":"late","gameType":"singles","score":0.77,"faintedFraction":0.75,"p1Won":true}
+{"id":"gen9vgc-2","turn":6,"tranche":"vgc","phase":"mid","gameType":"doubles","score":0.52,"faintedFraction":0.375,"p1Won":false}
+{"id":"gen9ou-2","turn":3,"tranche":"ladder","phase":"early","gameType":"singles","score":-0.05,"faintedFraction":0,"p1Won":false}
+{"id":"gen9vgc-1","turn":9,"tranche":"vgc","phase":"late","gameType":"doubles","score":-0.88,"faintedFraction":0.625,"p1Won":false}
+{"id":"gen9ou-1","turn":7,"tranche":"ladder","phase":"mid","gameType":"singles","score":0.21,"faintedFraction":0.25,"p1Won":true}
+{"id":"gen9vgc-2","turn":3,"tranche":"vgc","phase":"early","gameType":"doubles","score":0.44,"faintedFraction":0.125,"p1Won":false}
+{"id":"gen9ou-2","turn":14,"tranche":"ladder","phase":"late","gameType":"singles","score":-0.63,"faintedFraction":0.83,"p1Won":false}
+{"id":"gen9vgc-1","turn":5,"tranche":"vgc","phase":"mid","gameType":"doubles","score":0.09,"faintedFraction":0.25,"p1Won":true}
+{"id":"gen9vgc-2","turn":10,"tranche":"vgc","phase":"late","gameType":"doubles","score":0.95,"faintedFraction":0.875,"p1Won":true}

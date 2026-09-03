@@ -23,7 +23,9 @@ import { brierScore, fitConstantK } from './fit-helpers';
  * EVAL_CALIBRATION_SAMPLES=3 (seeds per cell, default 1 — the app default
  * line is d2s3, so the harness must be able to measure it) ·
  * EVAL_CALIBRATION_SLICE=a/b (only replays with index % b === a — long
- * engine configs split into slices whose JSONL dumps concatenate cleanly) ·
+ * engine configs split into slices whose JSONL dumps concatenate cleanly;
+ * node scripts/run-calibration.mjs runs the slices in parallel and merges
+ * the dumps into one summary) ·
  * EVAL_CALIBRATION_TRANCHE=<name> (one corpus stratum only; slices then
  * index the filtered list) ·
  * EVAL_CALIBRATION_DUMP=<path> (per-position JSONL for paired analysis) ·
@@ -2293,6 +2295,11 @@ test.describe('eval calibration against real replays', () => {
       }
       console.log(`${id}: sampled (winner: ${winnerName})`);
     }
+
+    // Aggregate in (id, turn) order, compared in code units: the slice
+    // runner's merge (scripts/calibration-lib.mjs) sums in the same order,
+    // so a merged run and a single-process run print the same digits.
+    samples.sort((a, b) => (a.id !== b.id ? (a.id < b.id ? -1 : 1) : a.turn - b.turn));
 
     for (const phase of ['early', 'mid', 'late'] as const) {
       const inPhase = samples.filter(sample => sample.phase === phase);

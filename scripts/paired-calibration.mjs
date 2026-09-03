@@ -3,43 +3,14 @@
 // Joins the two dumps on id#turn (identical positions only), reproduces the
 // harness aggregates for each side, shows the disagreement structure, and
 // computes counterfactual hybrid lines (file A early, file B once
-// faintedFraction crosses a threshold) plus score blends. Replicates the
-// fit-helpers.ts methodology exactly: pooled constant-K logistic fit via
-// 500-iteration GD, Brier under that K — so numbers here are comparable to
-// the printed sweep output.
-import { readFileSync } from 'node:fs';
+// faintedFraction crosses a threshold) plus score blends. The math lives in
+// scripts/calibration-lib.mjs, which replicates the fit-helpers.ts
+// methodology exactly (pooled constant-K logistic fit via 500-iteration GD,
+// Brier under that K), so numbers here are comparable to the printed sweep
+// output.
+import { load, record, right } from './calibration-lib.mjs';
 
-const sigmoid = z => 1 / (1 + Math.exp(-z));
-const probOf = (s, k) => sigmoid(k * s.score);
-
-function fitConstantK(samples) {
-  let k = 1.5;
-  for (let iter = 0; iter < 500; iter++) {
-    let grad = 0;
-    for (const s of samples) grad += (probOf(s, k) - (s.won ? 1 : 0)) * s.score / samples.length;
-    k -= 1.0 * grad;
-  }
-  return k;
-}
-const brier = (samples, k) =>
-  samples.reduce((sum, s) => sum + (probOf(s, k) - (s.won ? 1 : 0)) ** 2, 0) / samples.length;
-
-const load = path => readFileSync(path, 'utf8').trim().split('\n').map(line => JSON.parse(line));
 const key = s => `${s.id}#${s.turn}`;
-const right = s => (s.score > 0) === s.p1Won;
-
-function record(samples, label) {
-  const pct = subset => subset.length === 0 ? ' -' :
-    (100 * subset.filter(right).length / subset.length).toFixed(0);
-  const phases = ['early', 'mid', 'late'].map(p => samples.filter(s => s.phase === p));
-  const types = ['singles', 'doubles'].map(t => samples.filter(s => s.gameType === t));
-  const k = fitConstantK(samples.map(s => ({ score: s.score, won: s.p1Won })));
-  const briers = phases.map(subset =>
-    subset.length === 0 ? '-' : brier(subset.map(s => ({ score: s.score, won: s.p1Won })), k).toFixed(4));
-  const cells = [...phases, ...types].map(pct).join('/');
-  const ns = [...phases, ...types].map(s => s.length).join('/');
-  console.log(`${label.padEnd(46)} ${cells}  brier ${briers.join('/')}  n ${ns} (total ${samples.length}, K ${k.toFixed(2)})`);
-}
 
 const [aPath, bPath] = process.argv.slice(2);
 if (!aPath || !bPath) {
