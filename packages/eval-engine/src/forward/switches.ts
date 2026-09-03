@@ -1,14 +1,14 @@
 import { PRNG } from '@pkmn/sim';
 import type { Battle, PRNGSeed, Side } from '@pkmn/sim';
 import { evaluatePosition } from '../eval-function.ts';
-import type { SimPosition } from './position.ts';
 import { sideIndex } from '@fulllifegames/replay-core';
-import { deserializeRepaired, serializeBattleStable } from './serialize.ts';
+import { deserializeFromParsed, parseSearchState, type ParsedSearchState } from './parsed-state.ts';
+import { serializeBattleStable } from './serialize.ts';
 
 /**
  * Choice submission and forced-switch resolution: applying a choice to a
- * forked battle, repairing fainted actives after snapshot corrections, and
- * the greedy mid-turn replacement pick.
+ * battle, repairing fainted actives after snapshot corrections, and the
+ * greedy mid-turn replacement pick. Forking lives in position.ts.
  */
 
 const REPAIR_SEED: PRNGSeed = '1,2,3,4';
@@ -38,17 +38,6 @@ export function repairFaintedActives(battle: Battle): void {
   }
   battle.makeRequest('switch');
   resolveForcedSwitches(battle, REPAIR_SEED);
-}
-
-/**
- * Deserializes a fresh copy of the position and seeds its PRNG so the
- * advance is reproducible.
- */
-export function forkBattle(position: SimPosition, seed: PRNGSeed): Battle {
-  const battle = deserializeRepaired(position.serialized);
-  battle.prng = new PRNG(seed);
-  repairFaintedActives(battle);
-  return battle;
 }
 
 export function applyChoice(battle: Battle, side: 'p1' | 'p2', choice: string): void {
@@ -108,14 +97,19 @@ function answerFollowUp(
   return false;
 }
 
-/** The assignment whose entry statically evaluates best for the choosing side (the first one when alone). */
-function bestAssignment(side: Side, midTurn: string, seed: PRNGSeed, assignments: string[]): string {
+/**
+ * The assignment whose entry statically evaluates best for the choosing
+ * side (the first one when alone). Every trial deserializes from the one
+ * parsed mid-turn state instead of re-parsing the serialized string.
+ */
+function bestAssignment(side: Side, midTurn: () => ParsedSearchState, seed: PRNGSeed, assignments: string[]): string {
   let best = assignments[0];
   if (assignments.length > 1) {
     const perspective = side.id === 'p1' ? 1 : -1;
+    const mid = midTurn();
     let bestValue = -Infinity;
     for (const candidate of assignments) {
-      const trial = deserializeRepaired(midTurn);
+      const trial = deserializeFromParsed(mid);
       trial.prng = new PRNG(seed);
       if (!trial.choose(side.id as 'p1' | 'p2', candidate)) continue;
       const value = perspective * evaluatePosition(trial);
@@ -145,7 +139,11 @@ export function resolveForcedSwitches(
       .filter(side => side.requestState === 'switch' && !side.isChoiceDone());
     if (pending.length === 0) return;
 
+    // The mid-turn snapshot is taken once, before any side answers, and
+    // parsed at most once: every trial of this iteration starts from it.
     const midTurn = serializeBattleStable(battle);
+    let parsedMid: ParsedSearchState | null = null;
+    const mid = () => (parsedMid ??= parseSearchState(midTurn));
     for (const side of pending) {
       const request = side.activeRequest as { forceSwitch?: boolean[] } | null;
       const forcedCount = Math.max(1, (request?.forceSwitch ?? []).filter(Boolean).length);
@@ -156,7 +154,7 @@ export function resolveForcedSwitches(
         .map(({ slot }) => slot);
       if (benchSlots.length === 0) continue;
 
-      const best = bestAssignment(side, midTurn, seed, switchAssignments(forcedCount, benchSlots));
+      const best = bestAssignment(side, mid, seed, switchAssignments(forcedCount, benchSlots));
       applyChoice(battle, side.id as 'p1' | 'p2', best);
     }
   }

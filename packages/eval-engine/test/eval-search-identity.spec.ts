@@ -9,6 +9,7 @@ import {
 } from '../src/forward-model';
 import { searchPosition } from '../src/search';
 import { mctsTreeSearch } from '../src/mcts';
+import { deserializeFromParsed, parseSearchState } from '../src/forward/parsed-state';
 import doublesTeams from './fixtures/doubles-identity-fixture';
 
 /**
@@ -158,5 +159,31 @@ test.describe('fork and search identity', () => {
       return;
     }
     expect(captured).toEqual(JSON.parse(readFileSync(FIXTURE, 'utf-8')));
+  });
+
+  test('forks start from an empty log and leave the shared parsed state untouched', () => {
+    const root = withHistory(createRootPosition(serialize(makeSixVsSix())), 3);
+    const p1 = legalChoices(root, 'p1')[0].choice;
+    const p2 = legalChoices(root, 'p2')[0].choice;
+    const first = advancePositionWithLog(root, p1, p2, '1,2,3,4');
+    const second = advancePositionWithLog(root, p1, p2, '1,2,3,4');
+    // A child's log holds its own advance only, never a sibling's lines.
+    expect(scrubLog(second.log)).toEqual(scrubLog(first.log));
+    expect((JSON.parse(second.child.serialized) as { log: string[] }).log).toEqual(scrubLog(second.log));
+    expect(second.log.length).toBeGreaterThan(0);
+
+    // The parsed state is shared by every fork and must read the same after
+    // two of them played a full turn from it.
+    const parsed = parseSearchState(root.serialized);
+    const before = JSON.stringify(parsed);
+    const battles = [deserializeFromParsed(parsed), deserializeFromParsed(parsed)];
+    for (const battle of battles) {
+      battle.choose('p1', p1);
+      battle.choose('p2', p2);
+      expect(battle.log.length).toBeGreaterThan(0);
+    }
+    expect(battles[0].log).not.toBe(battles[1].log);
+    expect(JSON.stringify(parsed)).toBe(before);
+    expect(parsed.state.log).toEqual([]);
   });
 });

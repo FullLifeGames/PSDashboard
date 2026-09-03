@@ -2,8 +2,9 @@ import { State } from '@pkmn/sim';
 import type { Battle } from '@pkmn/sim';
 
 /**
- * Battle serialization for positions: the stable string identity and the
- * two deserializers (exact, and repaired for the search's invariants).
+ * Battle serialization for positions: the stable string identity, the
+ * exact deserializer, and the side-invariant restore the search's own
+ * deserializer (parsed-state.ts) shares.
  */
 
 /**
@@ -47,17 +48,6 @@ export function deserializeBattleExact(serialized: string): Battle {
   for (const trim of trims) {
     battle.sides[trim.side].pokemon[trim.index].moveSlots.length = trim.length;
   }
-  return battle;
-}
-
-export function deserializeRepaired(serialized: string): Battle {
-  const battle = deserializeBattleExact(serialized);
-  // Correction-era invariant drift (GPL T38/T39): snapshot corrections set
-  // hp/fainted per mon without maintaining side.pokemonLeft — the win-check
-  // counter, so a wiped side played on behind a stale move request — or
-  // isActive, so the bench enumeration offered "switch 1" onto the active.
-  // Restore both from ground truth on every deserialize.
-  restoreSideInvariants(battle);
   return battle;
 }
 

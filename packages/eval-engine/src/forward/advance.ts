@@ -1,6 +1,6 @@
 import type { Battle, PRNGSeed, Side } from '@pkmn/sim';
-import { toPosition, type SimPosition } from './position.ts';
-import { applyChoice, forkBattle, resolveForcedSwitches } from './switches.ts';
+import { forkBattle, toPosition, type SimPosition } from './position.ts';
+import { applyChoice, resolveForcedSwitches } from './switches.ts';
 import { sideIndex, toId } from '@fulllifegames/replay-core';
 
 /**
