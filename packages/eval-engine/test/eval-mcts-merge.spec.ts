@@ -201,23 +201,39 @@ test.describe('starved support cells are verified before the verdict', () => {
     expect(merged.matrix!.values[0][0]).toBeGreaterThan(-0.97);
   });
 
-  test('a rich cell without a blend keeps the pooled value, a starved one takes the sampler (round 32)', () => {
-    // No blend = no priceable roll at the root: the one-ply sampler has
-    // nothing the played-out pool lacks, so a rich pool stands untouched. A
-    // starved cell (one visit per tree) still takes the sampler as before.
-    const richPlain = (offset: number) => mk({ p1N: [30, 3], p1W: [-9, 1.5], p2N: [30, 3], p2W: [-9, 1.5] }, [
-      { key: cellKey(0, 0), visits: 20, total: -6 + offset * 0.2, value: -0.3, ended: false },
+  test('a played-out cell without a blend keeps the pooled value; a middlegame or starved one takes the sampler (round 32)', () => {
+    // Depth outranks the one-ply sampler only where the pool has played the
+    // cell out (|continuation| at or beyond the depth floor). A rich
+    // middlegame pool at −0.3 keeps the round-7 sampler (655336 t24/t26), a
+    // starved cell (one visit per tree) takes the sampler as before.
+    const richPlain = (offset: number, mean: number) => mk({ p1N: [30, 3], p1W: [30 * mean, 1.5], p2N: [30, 3], p2W: [30 * mean, 1.5] }, [
+      { key: cellKey(0, 0), visits: 20, total: 20 * mean + offset * 0.2, value: mean, ended: false },
       { key: cellKey(1, 0), visits: 1, total: 0.5, value: 0.5, ended: false },
     ]);
-    const trees = [richPlain(0), richPlain(1), richPlain(2)];
-    const pooledOnly = mergeMctsTrees(trees);
     const verified = new Map([
       [cellKey(0, 0), { i: 0, j: 0, value: 0.4, ended: false }],
       [cellKey(1, 0), { i: 1, j: 0, value: -0.8, ended: false }],
     ]);
-    const merged = mergeMctsTrees(trees, verified);
+    const playedOut = [richPlain(0, -0.95), richPlain(1, -0.95), richPlain(2, -0.95)];
+    const pooledOnly = mergeMctsTrees(playedOut);
+    const merged = mergeMctsTrees(playedOut, verified);
     expect(merged.matrix!.values[0][0]).toBeCloseTo(pooledOnly.matrix!.values[0][0], 10);
     expect(merged.matrix!.values[1][0]).toBeCloseTo(-0.8, 10);
+    const middlegame = [richPlain(0, -0.3), richPlain(1, -0.3), richPlain(2, -0.3)];
+    expect(mergeMctsTrees(middlegame, verified).matrix!.values[0][0]).toBeCloseTo(0.4, 10);
+  });
+
+  test('a rich, agreeing boundary cell below the depth floor keeps the sampler blend (round 32)', () => {
+    // 655336 t24: 528 visits agreed at +0.52 for Dragon Claw × Return while
+    // the sampler's static read +0.08; a middlegame mean over exploration is
+    // not a verdict, so the round-7 sampler stands.
+    const mid = (offset: number) => mk({ p1N: [40, 2], p1W: [20, 1], p2N: [40, 2], p2W: [20, 1] }, [
+      { key: cellKey(0, 0), visits: 30, total: 15.6 - offset * 0.1, value: 0.5, ended: false },
+    ]);
+    const trees = [mid(0), mid(1), mid(2), mid(3)];
+    const blend = { firstLeaf: 0.08, classes: [{ weight: 1, leafSum: 1.12, count: 14, hasFirst: true, ended: false }] };
+    const verified = new Map([[cellKey(0, 0), { i: 0, j: 0, value: 0.08, ended: false, blend }]]);
+    expect(mergeMctsTrees(trees, verified).matrix!.values[0][0]).toBeCloseTo(0.08, 10);
   });
 
   test('a rich, agreeing cell with two open classes keeps the sampler blend (round 32)', () => {

@@ -8,7 +8,8 @@ import type { EvalCellJob, EvalCellValue, EvalResult, KoOddsMismatch, MctsTreeSt
  * root-cell statistics, ranked by the same equilibrium solve the matrix
  * mode runs (visit counts allocate search effort; they are not the
  * verdict). Verification re-prices the suspect cells the solve leans on
- * and keeps the pool's depth where the pool is rich (verifiedValue). Pure —
+ * and keeps the pool's depth where the pool has played a cell out
+ * (verifiedValue). Pure —
  * rank.ts and the sim-free payload helpers only, no sim imports,
  * main-thread safe.
  */
@@ -36,6 +37,16 @@ const VERIFY_MIN_VISITS = 8;
 const VERIFY_MIN_TREES = 3;
 /** Per-tree mean spread beyond which a cell's transition is chance-suspect. */
 const VERIFY_SPREAD = 0.15;
+/**
+ * A pool whose continuation has reached this magnitude has played the cell
+ * out to a (near-)terminal verdict; only there does the tree's depth
+ * outrank the sampler's one-ply static (573756 t138: −0.94 to −0.99 over
+ * 490 to 760 visits against statics near zero). Below it a rich pool is a
+ * middlegame mean over exploration, not a verdict, and the round-7 sampler
+ * stands (655336 t24: 528 visits agreed at +0.52 while the static read
+ * +0.08, and the tree's number regraded a fine Dragon Dance as a blunder).
+ */
+const VERIFY_DEPTH_FLOOR = 0.9;
 /** Fixed seeds per verified cell — matrix-zone grade, deterministic. */
 export const VERIFY_SAMPLES = 3;
 /** Verification budget: at most this many cell jobs per search. */
@@ -94,25 +105,25 @@ function poolContinuation(trees: MctsTreeStats[], key: number): { value: number;
 
 /**
  * The value a verified cell contributes (round 32). The sampler's job is
- * the ROOT chance split; the trees' job is depth. Starved or thin pools
- * take the sampler's value as before. A rich pool keeps its depth: with a
- * blend whose classes leave exactly ONE open, the ended classes contribute
- * their exact leaves and the open class the pool's continuation (573756
- * t138: a 5% crit-kill class must not turn a played-out −0.96 into the
- * one-ply static +0.03); without a blend the pooled value stands untouched.
- * The pool's open draws can be assigned to a class only in that one-open-
- * class shape: with two open classes (hit / miss) every tree may have drawn
- * the same one, and the other class's leaves would be replaced by a
- * continuation it never had (655336 t23: a 90% High Jump Kick's miss
- * class), so those cells and disagreeing trees on a blended cell keep the
- * sampler's blend (draft t56: the draws cannot be assigned to classes).
+ * the ROOT chance split; the trees' job is depth, and depth counts only
+ * where the pool has played the cell out. Starved or thin pools and
+ * disagreeing trees take the sampler's value as before (round 7; draft
+ * t56's draws cannot be assigned to classes here). A rich, agreeing pool
+ * whose continuation sits at or beyond VERIFY_DEPTH_FLOOR keeps that
+ * depth: without a blend the pooled value stands, with a blend whose
+ * classes leave exactly ONE open the ended classes contribute their exact
+ * leaves and the open class the pool's continuation (573756 t138: a
+ * played-out −0.96 must not become the one-ply static +0.03). The pool's
+ * open draws can be assigned to a class only in that one-open-class shape:
+ * with two open classes (hit / miss) every tree may have drawn the same
+ * one, so those cells keep the sampler's blend too. Everything below the
+ * floor is round 7 unchanged.
  */
 function verifiedValue(trees: MctsTreeStats[], key: number, cell: EvalCellValue, pooledValue: number): number {
   const pool = poolContinuation(trees, key);
   const rich = pool.visits >= VERIFY_MIN_VISITS && pool.trees >= Math.min(VERIFY_MIN_TREES, trees.length);
-  if (!rich) return cell.value;
+  if (!rich || pool.spread > VERIFY_SPREAD || Math.abs(pool.value) < VERIFY_DEPTH_FLOOR) return cell.value;
   if (!cell.blend) return pooledValue;
-  if (pool.spread > VERIFY_SPREAD) return cell.value;
   if (cell.blend.classes.filter(cls => !cls.ended).length !== 1) return cell.value;
   let value = 0;
   for (const cls of cell.blend.classes) value += cls.weight * (cls.ended ? cls.leafSum / cls.count : pool.value);
@@ -123,7 +134,7 @@ function verifiedValue(trees: MctsTreeStats[], key: number, cell: EvalCellValue,
  * The pooled root matrix. `verified` (cellKey → sampled cell) re-prices the
  * suspect cells before the solve: a starved cell takes the multi-seed
  * matrix-grade mean (it outranks the 1-2 chance outcomes the tree happened
- * to draw there), a rich pool keeps its depth (verifiedValue).
+ * to draw there), a played-out pool keeps its depth (verifiedValue).
  */
 function pooledMatrix(
   base: MctsTreeStats,
@@ -208,8 +219,8 @@ function attachDonorLine(trees: MctsTreeStats[], result: EvalResult): void {
 /**
  * Merges parallel trees into one result. Order of `trees` must be fixed.
  * `verified` (cellKey → sampled cell) re-prices the suspect cells before
- * the solve: a starved cell takes the multi-seed matrix-grade mean, a rich
- * pool keeps its depth (verifiedValue). The score is untouched by design —
+ * the solve: a starved cell takes the multi-seed matrix-grade mean, a
+ * played-out pool keeps its depth (verifiedValue). The score is untouched by design —
  * it stays the summed-marginal visit mean (hybrid semantics).
  */
 export function mergeMctsTrees(trees: MctsTreeStats[], verified?: Map<number, EvalCellValue>): EvalResult {
