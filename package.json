@@ -9,8 +9,11 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
+    "build:packages": "tsc -b packages/replay-core packages/eval-engine",
     "lint": "eslint .",
     "knip": "knip",
+    "pack:smoke": "node ./scripts/pack-smoke.mjs",
+    "publish:packages": "node ./scripts/publish-packages.mjs",
     "test:e2e": "node ./scripts/run-e2e.mjs",
     "test:build": "playwright test -c playwright.build.config.ts",
     "test:feedback": "playwright test -c playwright.feedback.config.ts",
