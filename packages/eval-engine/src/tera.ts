@@ -1,4 +1,4 @@
-import type { TeraAllowance } from './types';
+import type { TeraAllowance } from './types.ts';
 import { toId } from '@fulllifegames/replay-core';
 
 /**

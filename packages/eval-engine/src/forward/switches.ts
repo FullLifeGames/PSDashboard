@@ -1,9 +1,9 @@
 import { PRNG } from '@pkmn/sim';
 import type { Battle, PRNGSeed, Side } from '@pkmn/sim';
-import { evaluatePosition } from '../eval-function';
-import type { SimPosition } from './position';
+import { evaluatePosition } from '../eval-function.ts';
+import type { SimPosition } from './position.ts';
 import { sideIndex } from '@fulllifegames/replay-core';
-import { deserializeRepaired, serializeBattleStable } from './serialize';
+import { deserializeRepaired, serializeBattleStable } from './serialize.ts';
 
 /**
  * Choice submission and forced-switch resolution: applying a choice to a

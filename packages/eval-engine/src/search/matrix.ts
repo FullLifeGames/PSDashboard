@@ -1,9 +1,9 @@
-import type { MatchupCache } from '../eval-function';
-import { positionBattle, type ChoiceOption, type SimPosition } from '../forward-model';
-import { cellKey, type ValueMatrix } from '../rank';
-import type { CellBlend, EvalResult, KoOddsMismatch, SearchProgress } from '../types';
-import { countFainted } from './leaf';
-import { sampleCell } from './cell-sampler';
+import type { MatchupCache } from '../eval-function.ts';
+import { positionBattle, type ChoiceOption, type SimPosition } from '../forward-model.ts';
+import { cellKey, type ValueMatrix } from '../rank.ts';
+import type { CellBlend, EvalResult, KoOddsMismatch, SearchProgress } from '../types.ts';
+import { countFainted } from './leaf.ts';
+import { sampleCell } from './cell-sampler.ts';
 
 /**
  * The root matrix over both option lists, and the memoized alpha/beta

@@ -1,9 +1,9 @@
-import { BREADTH_MIN_OPTIONS, CHANCE_THRESHOLD, type SideAnalysis, type TurnAnalysis } from './analysis';
-import { winDeltaText, winPercent } from './winprob';
-import { phrase, playedBest } from './prose/phrases';
+import { BREADTH_MIN_OPTIONS, CHANCE_THRESHOLD, type SideAnalysis, type TurnAnalysis } from './analysis.ts';
+import { winDeltaText, winPercent } from './winprob.ts';
+import { phrase, playedBest } from './prose/phrases.ts';
 import {
   forcedClause, inaccuracyClause, sackClause, sensitivityClause, sideClause, streakClause, unansweredClause,
-} from './prose/clauses';
+} from './prose/clauses.ts';
 
 /**
  * Annotator-style natural-language rendering of a turn analysis. Pure
@@ -14,7 +14,7 @@ import {
  * in prose/.
  */
 
-export { formatRead } from './prose/phrases';
+export { formatRead } from './prose/phrases.ts';
 
 type PlayerNames = [string, string];
 type Decided = { key: 'p1' | 'p2'; species: string; announce: boolean } | null;

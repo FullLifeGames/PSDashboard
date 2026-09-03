@@ -7,8 +7,8 @@
 // Re-exported for engine-side consumers (the calibration harness's auto
 // dispatch); the constant itself lives in types.ts so the UI can share it
 // without importing the sim.
-export { AUTO_MCTS_FAINTED_FRACTION } from './types';
-export { battleFaintedFraction, SEARCH_SEEDS } from './search/leaf';
-export { optionHints } from './search/hints';
-export { searchOptions } from './search/options';
-export { createLocalExecutor, searchPosition, subSearchDepth1 } from './search/position';
+export { AUTO_MCTS_FAINTED_FRACTION } from './types.ts';
+export { battleFaintedFraction, SEARCH_SEEDS } from './search/leaf.ts';
+export { optionHints } from './search/hints.ts';
+export { searchOptions } from './search/options.ts';
+export { createLocalExecutor, searchPosition, subSearchDepth1 } from './search/position.ts';

@@ -1,5 +1,5 @@
 import type { Battle, Pokemon } from '@pkmn/sim';
-import { stageMultiplier } from './stat-stages';
+import { stageMultiplier } from './stat-stages.ts';
 
 /**
  * Effective speed for move-order decisions: stored speed through the stage

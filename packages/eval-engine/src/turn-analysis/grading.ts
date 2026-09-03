@@ -1,10 +1,10 @@
-import type { RankedChoice } from '../types';
-import type { PlayedAction, SackInfo } from '../played';
+import type { RankedChoice } from '../types.ts';
+import type { PlayedAction, SackInfo } from '../played.ts';
 import {
   DECIDED_SCORE, FEED_FLOOR_EPSILON, HEALTHY_SACK_FLOOR, PAYOFF_WINDOW, REGRET_THRESHOLD, RISK_PAYOFF_MARGIN,
   TIER_THRESHOLDS, type AnalyzeTurnParams, type SensitivityProbe, type Side, type SideAnalysis, type VerdictTier,
-} from './types';
-import { matchPlayedChoice, matchPlayedSlots, phantomStayIn } from './played-match';
+} from './types.ts';
+import { matchPlayedChoice, matchPlayedSlots, phantomStayIn } from './played-match.ts';
 
 /**
  * The grading half of one side's turn, stage by stage in analyzeTurn's

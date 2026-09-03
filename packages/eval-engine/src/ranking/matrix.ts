@@ -1,4 +1,4 @@
-import type { CellBlend, EvalMatrix, RankedChoice } from '../types';
+import type { CellBlend, EvalMatrix, RankedChoice } from '../types.ts';
 
 /**
  * The value matrix the ranking runs over, the ranked record it produces,

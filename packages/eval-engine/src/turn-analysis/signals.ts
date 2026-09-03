@@ -1,13 +1,13 @@
-import type { EntryUnanswered, EvalMatrix, RankedChoice } from '../types';
-import { nullMoveReason } from '../null-moves';
-import { detectStreakOdds } from '../streaks';
-import { TIE_EPSILON } from '../rank';
+import type { EntryUnanswered, EvalMatrix, RankedChoice } from '../types.ts';
+import { nullMoveReason } from '../null-moves.ts';
+import { detectStreakOdds } from '../streaks.ts';
+import { TIE_EPSILON } from '../rank.ts';
 import {
   CONDITIONAL_MIX_MIN, FORCED_MIX_THRESHOLD, TIER_THRESHOLDS, decidedSeenKey, unansweredSeenKey,
   type AnalyzeTurnParams, type Side, type SideAnalysis, type VerdictTier,
-} from './types';
-import { matchPlayedChoice } from './played-match';
-import type { SideGrading } from './grading';
+} from './types.ts';
+import { matchPlayedChoice } from './played-match.ts';
+import type { SideGrading } from './grading.ts';
 
 /**
  * Narrative signals (round 5 ⑥ onward): computed here where the full

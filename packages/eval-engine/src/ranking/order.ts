@@ -1,6 +1,6 @@
-import type { EvalMatrix, EvalResult, RankedChoice } from '../types';
-import { cellKey, type PvStep, type Ranked, type ValueMatrix } from './matrix';
-import { solveMatrixGame, type MatrixSolution } from './solve';
+import type { EvalMatrix, EvalResult, RankedChoice } from '../types.ts';
+import { cellKey, type PvStep, type Ranked, type ValueMatrix } from './matrix.ts';
+import { solveMatrixGame, type MatrixSolution } from './solve.ts';
 
 /**
  * Ranking over a value matrix: per-side rows priced by the equilibrium,

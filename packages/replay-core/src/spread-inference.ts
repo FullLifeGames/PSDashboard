@@ -1,14 +1,14 @@
 import type { PokemonSet } from '@pkmn/sim';
-import type { DamageObservation, PokemonEvs, SpeedOrderObservation } from './types';
-import { evTotal, type EvBudget } from './spreads/ev-budget';
-import { candidateLadder, type CandidateRung, type SpreadCandidate } from './spreads/ladder';
+import type { DamageObservation, PokemonEvs, SpeedOrderObservation } from './types.ts';
+import { evTotal, type EvBudget } from './spreads/ev-budget.ts';
+import { candidateLadder, type CandidateRung, type SpreadCandidate } from './spreads/ladder.ts';
 import {
   buildSolveContext, keyOf, observationError, physicalAttackerFor, priorDistance, speedError, spreadFor,
   type SolveContext,
-} from './spreads/fit';
+} from './spreads/fit.ts';
 
-export { evBudget, legalizeEvs } from './spreads/ev-budget';
-export type { SpreadCandidate } from './spreads/ladder';
+export { evBudget, legalizeEvs } from './spreads/ev-budget.ts';
+export type { SpreadCandidate } from './spreads/ladder.ts';
 
 /**
  * Damage-consistent spread inference: the replay's observed damage fractions

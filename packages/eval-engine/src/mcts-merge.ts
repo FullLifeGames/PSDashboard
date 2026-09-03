@@ -1,6 +1,6 @@
-import { cellKey, rankFromMatrix, toResult as rankedToResult } from './rank';
-import { attachKoOdds, koOddsMapsFor } from './search/root-payload';
-import type { EvalCellJob, EvalCellValue, EvalResult, KoOddsMismatch, MctsTreeStats, RankedChoice } from './types';
+import { cellKey, rankFromMatrix, toResult as rankedToResult } from './rank.ts';
+import { attachKoOdds, koOddsMapsFor } from './search/root-payload.ts';
+import type { EvalCellJob, EvalCellValue, EvalResult, KoOddsMismatch, MctsTreeStats, RankedChoice } from './types.ts';
 
 /**
  * Root parallelization for the MCTS mode: N independent trees (each with a

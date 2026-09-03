@@ -1,6 +1,6 @@
 import type { Battle, Pokemon, Side } from '@pkmn/sim';
-import type { TeraAllowance } from '../types';
-import { positionBattle, type ChoiceOption, type SimPosition } from './position';
+import type { TeraAllowance } from '../types.ts';
+import { positionBattle, type ChoiceOption, type SimPosition } from './position.ts';
 import { sideIndex, toId } from '@fulllifegames/replay-core';
 
 /**

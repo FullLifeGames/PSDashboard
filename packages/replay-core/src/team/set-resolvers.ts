@@ -1,12 +1,12 @@
 import type { PokemonSet } from '@pkmn/sim';
 import { Dex } from '@pkmn/sim';
-import type { SpeciesUsageSet } from '../smogon/stats-types';
-import { getSpeciesSetAssumption } from '../smogon/sets-lookup';
-import { applyCoherenceVetoes, selectCuratedSet, type MoveCandidate } from '../set-coherence';
-import { itemSetValue } from '../team-info';
-import type { SpreadCandidate } from '../spread-inference';
-import type { KnowledgeSource, PokemonEvs, RevealedPokemonInfo } from '../types';
-import { toId } from '../ids';
+import type { SpeciesUsageSet } from '../smogon/stats-types.ts';
+import { getSpeciesSetAssumption } from '../smogon/sets-lookup.ts';
+import { applyCoherenceVetoes, selectCuratedSet, type MoveCandidate } from '../set-coherence.ts';
+import { itemSetValue } from '../team-info.ts';
+import type { SpreadCandidate } from '../spread-inference.ts';
+import type { KnowledgeSource, PokemonEvs, RevealedPokemonInfo } from '../types.ts';
+import { toId } from '../ids.ts';
 
 type SmogonSet = ReturnType<typeof getSpeciesSetAssumption>;
 type CuratedSet = ReturnType<typeof selectCuratedSet>;

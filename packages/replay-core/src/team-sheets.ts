@@ -1,8 +1,8 @@
 import type { PokemonSet } from '@pkmn/sim';
 import type {
   OpponentTeamInfo, PokemonEvs, PokemonFieldInfo, PokemonMoveInfo, RevealedPokemonInfo,
-} from './types';
-import { toId } from './ids';
+} from './types.ts';
+import { toId } from './ids.ts';
 
 /**
  * Display overlay for posted open team sheets: knowledge the engine already

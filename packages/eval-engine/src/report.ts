@@ -1,7 +1,7 @@
-import { playedSetupMove, type SideAnalysis, type TurnAnalysis, type VerdictTier } from './analysis';
-import { KEY_TURN_SWING } from './graph';
-import { koPhrase, phrase } from './prose/phrases';
-import { winDeltaText, winPercent } from './winprob';
+import { playedSetupMove, type SideAnalysis, type TurnAnalysis, type VerdictTier } from './analysis.ts';
+import { KEY_TURN_SWING } from './graph.ts';
+import { koPhrase, phrase } from './prose/phrases.ts';
+import { winDeltaText, winPercent } from './winprob.ts';
 import { sideIndex } from '@fulllifegames/replay-core';
 
 /**

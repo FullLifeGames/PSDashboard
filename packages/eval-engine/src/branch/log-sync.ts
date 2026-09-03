@@ -1,5 +1,5 @@
-import type { SimBattle, SimPokemon } from './types';
-import { normalizeBattleOnlyFormeId, slotLetter } from './team-order';
+import type { SimBattle, SimPokemon } from './types.ts';
+import { normalizeBattleOnlyFormeId, slotLetter } from './team-order.ts';
 import { toId } from '@fulllifegames/replay-core';
 
 function replayLogPrefixThroughTurn(replayLog: string, targetTurn: number): string[] {

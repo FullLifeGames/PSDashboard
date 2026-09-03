@@ -3,7 +3,7 @@
  * main-bundle safe.
  */
 
-import { TIER_THRESHOLDS } from './analysis';
+import { TIER_THRESHOLDS } from './analysis.ts';
 
 /**
  * Score swing between consecutive evaluated turns that marks a blunder.

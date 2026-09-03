@@ -1,5 +1,5 @@
-import { cellKey, reblendValue, type PvStep, type ValueMatrix } from '../rank';
-import type { CellBlend, EvalResult } from '../types';
+import { cellKey, reblendValue, type PvStep, type ValueMatrix } from '../rank.ts';
+import type { CellBlend, EvalResult } from '../types.ts';
 
 /**
  * The deepening bookkeeping the sync search and the orchestrator share:

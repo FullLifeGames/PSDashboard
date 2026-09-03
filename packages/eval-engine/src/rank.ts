@@ -6,9 +6,9 @@
  * ordering, the tie groups, and the trend layers.
  */
 
-export { cellKey, reblendValue, TOP_EXPANSION } from './ranking/matrix';
-export type { PvStep, Ranked, ValueMatrix } from './ranking/matrix';
-export { solveMatrixGame } from './ranking/solve';
-export { attachLines, rankFromMatrix, selectExpansionCells, toResult } from './ranking/order';
-export { coreOf, GIMMICK_TOKENS, selectTieProbeCells, TIE_EPSILON, TREND_MARGIN } from './ranking/ties';
-export { applyTrendExtrapolation, applyTrendTiebreak, TREND_LAMBDA } from './ranking/trend';
+export { cellKey, reblendValue, TOP_EXPANSION } from './ranking/matrix.ts';
+export type { PvStep, Ranked, ValueMatrix } from './ranking/matrix.ts';
+export { solveMatrixGame } from './ranking/solve.ts';
+export { attachLines, rankFromMatrix, selectExpansionCells, toResult } from './ranking/order.ts';
+export { coreOf, GIMMICK_TOKENS, selectTieProbeCells, TIE_EPSILON, TREND_MARGIN } from './ranking/ties.ts';
+export { applyTrendExtrapolation, applyTrendTiebreak, TREND_LAMBDA } from './ranking/trend.ts';

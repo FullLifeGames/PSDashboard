@@ -1,7 +1,7 @@
-import { gradeSide, gradingFields } from './turn-analysis/grading';
-import { signalFields, signalSide } from './turn-analysis/signals';
-import { attributionFor, markRisk } from './turn-analysis/risk';
-import type { AnalyzeTurnParams, Side, SideAnalysis, TurnAnalysis } from './turn-analysis/types';
+import { gradeSide, gradingFields } from './turn-analysis/grading.ts';
+import { signalFields, signalSide } from './turn-analysis/signals.ts';
+import { attributionFor, markRisk } from './turn-analysis/risk.ts';
+import type { AnalyzeTurnParams, Side, SideAnalysis, TurnAnalysis } from './turn-analysis/types.ts';
 
 /**
  * Turns a sweep's cached per-turn data into a chess-style turn explanation:
@@ -16,15 +16,15 @@ export {
   BREADTH_MIN_OPTIONS, CHANCE_THRESHOLD,
   PAYOFF_WINDOW, REGRET_THRESHOLD, TIER_THRESHOLDS,
   decidedSeenKey, unansweredSeenKey,
-} from './turn-analysis/types';
+} from './turn-analysis/types.ts';
 export type {
   AnalyzeTurnParams, SensitivityProbe, SideAnalysis, TurnAnalysis, TurnAttribution, TurnSensitivity, TurnVerification,
   VerdictTier,
-} from './turn-analysis/types';
+} from './turn-analysis/types.ts';
 export {
   diffChoices, findConsistentOptions, findPlayedOption, matchPlayedChoice, matchPlayedSide,
   phantomStayIn, playedSetupMove, splitCombinedLabel,
-} from './turn-analysis/played-match';
+} from './turn-analysis/played-match.ts';
 
 /** One side's record: the grading stages, then the narrative signals, keys in the report's order. */
 function analyzeSide(params: AnalyzeTurnParams, key: Side): SideAnalysis {

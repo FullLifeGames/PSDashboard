@@ -1,6 +1,6 @@
-import type { PokemonEvs } from '../types';
-import { capToBudget, ZERO_EVS, type EvBudget } from './ev-budget';
-import { toId } from '../ids';
+import type { PokemonEvs } from '../types.ts';
+import { capToBudget, ZERO_EVS, type EvBudget } from './ev-budget.ts';
+import { toId } from '../ids.ts';
 
 export interface SpreadCandidate {
   evs: PokemonEvs;

@@ -3,8 +3,8 @@
  * seeded advances live in forward/; this module keeps the public names.
  */
 
-export { deserializeBattleExact, restoreSideInvariants, serializeBattleStable } from './forward/serialize';
-export { createRootPosition, positionBattle } from './forward/position';
-export type { ChoiceOption, SimPosition } from './forward/position';
-export { legalChoices } from './forward/choices';
-export { advancePosition, advancePositionWithLog, trialAdvanceLog } from './forward/advance';
+export { deserializeBattleExact, restoreSideInvariants, serializeBattleStable } from './forward/serialize.ts';
+export { createRootPosition, positionBattle } from './forward/position.ts';
+export type { ChoiceOption, SimPosition } from './forward/position.ts';
+export { legalChoices } from './forward/choices.ts';
+export { advancePosition, advancePositionWithLog, trialAdvanceLog } from './forward/advance.ts';

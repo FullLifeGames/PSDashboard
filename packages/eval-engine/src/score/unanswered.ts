@@ -1,14 +1,14 @@
 import type { Battle, Pokemon } from '@pkmn/sim';
-import { boundaryEvent } from '../ko-odds';
-import { movesFirst } from '../speed';
-import { stageMultiplier } from '../stat-stages';
-import type { DecidedSweep, EntryUnanswered, NearDecidedSweep, UnansweredProfile } from '../types';
-import { hazardEntryFraction } from './hazards';
+import { boundaryEvent } from '../ko-odds.ts';
+import { movesFirst } from '../speed.ts';
+import { stageMultiplier } from '../stat-stages.ts';
+import type { DecidedSweep, EntryUnanswered, NearDecidedSweep, UnansweredProfile } from '../types.ts';
+import { hazardEntryFraction } from './hazards.ts';
 import {
   livingMons, singleMoveFraction, threatGetter, usableSlots,
   type MatchupCache, type PairThreat, type ThreatGetter,
-} from './threat';
-import { healProfile, ppBudget, raceClocks, statusResidual, type HealProfile, type RaceSide } from './races';
+} from './threat.ts';
+import { healProfile, ppBudget, raceClocks, statusResidual, type HealProfile, type RaceSide } from './races.ts';
 
 /**
  * The root's unanswered-mon profile: mons no living enemy answers, the

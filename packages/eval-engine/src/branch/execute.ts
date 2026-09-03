@@ -1,7 +1,7 @@
-import type { BranchSlotChoice } from '../branch-choices';
-import type { BranchChoiceErrorLog, BranchExecuteResult, BranchRuntime, SimBattle, SimPokemon } from './types';
-import { normalizeBattleOnlyFormeId, slotLetter } from './team-order';
-import { targetLocSuffixForChoice } from './protocol-choices';
+import type { BranchSlotChoice } from '../branch-choices.ts';
+import type { BranchChoiceErrorLog, BranchExecuteResult, BranchRuntime, SimBattle, SimPokemon } from './types.ts';
+import { normalizeBattleOnlyFormeId, slotLetter } from './team-order.ts';
+import { targetLocSuffixForChoice } from './protocol-choices.ts';
 import { sideIndex, toId } from '@fulllifegames/replay-core';
 
 export function sleep(ms: number) {

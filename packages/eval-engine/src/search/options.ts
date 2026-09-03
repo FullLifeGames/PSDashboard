@@ -1,9 +1,9 @@
-import { legalChoices, positionBattle, type ChoiceOption, type SimPosition } from '../forward-model';
-import { coreOf, GIMMICK_TOKENS } from '../rank';
-import { findConsistentOptions, findPlayedOption } from '../analysis';
-import type { PlayedAction } from '../played';
-import type { TeraAllowance } from '../types';
-import { combinedOptionHints, isCombined, singlesOptionHints } from './hints';
+import { legalChoices, positionBattle, type ChoiceOption, type SimPosition } from '../forward-model.ts';
+import { coreOf, GIMMICK_TOKENS } from '../rank.ts';
+import { findConsistentOptions, findPlayedOption } from '../analysis.ts';
+import type { PlayedAction } from '../played.ts';
+import type { TeraAllowance } from '../types.ts';
+import { combinedOptionHints, isCombined, singlesOptionHints } from './hints.ts';
 import { sideIndex } from '@fulllifegames/replay-core';
 
 /**

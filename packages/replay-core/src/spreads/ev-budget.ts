@@ -1,4 +1,4 @@
-import type { PokemonEvs } from '../types';
+import type { PokemonEvs } from '../types.ts';
 
 export const ZERO_EVS: PokemonEvs = { hp: 0, atk: 0, def: 0, spa: 0, spd: 0, spe: 0 };
 

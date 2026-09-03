@@ -1,9 +1,9 @@
-import type { DamageObservation, HiddenPowerEvidence, SpeedOrderObservation, TurnSnapshot } from './types';
-import { createParserState, flushSpeedOrder } from './protocol/parser-state';
+import type { DamageObservation, HiddenPowerEvidence, SpeedOrderObservation, TurnSnapshot } from './types.ts';
+import { createParserState, flushSpeedOrder } from './protocol/parser-state.ts';
 import {
   appendFinalSnapshot, feedLine, handleActionBoundary, handleCrit, handleDamage, handleGametype, handleGen, handleMove,
   handleResisted, handleSuperEffective, isActionBoundary,
-} from './protocol/handlers';
+} from './protocol/handlers.ts';
 
 export function parseReplayLog(log: string): TurnSnapshot[] {
   return parseReplayLogWithObservations(log).snapshots;

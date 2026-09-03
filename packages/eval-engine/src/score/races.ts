@@ -1,5 +1,5 @@
 import type { Battle, Pokemon } from '@pkmn/sim';
-import { usableSlots } from './threat';
+import { usableSlots } from './threat.ts';
 
 /**
  * KO-race clocks for one pair: heal PP as survival, the healer's action

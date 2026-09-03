@@ -1,11 +1,11 @@
 import { Generations, Pokemon, Move, Field, calculate } from '@smogon/calc';
 import type { PokemonSet } from '@pkmn/sim';
-import type { DamageObservation, PokemonEvs, SpeedOrderObservation } from '../types';
-import { WEATHER_BY_ID } from '../calc-field';
-import { typedHiddenPowerId } from '../hidden-power';
-import { evBudget, ZERO_EVS, type EvBudget } from './ev-budget';
-import type { CandidateRung, SpreadCandidate } from './ladder';
-import { toId } from '../ids';
+import type { DamageObservation, PokemonEvs, SpeedOrderObservation } from '../types.ts';
+import { WEATHER_BY_ID } from '../calc-field.ts';
+import { typedHiddenPowerId } from '../hidden-power.ts';
+import { evBudget, ZERO_EVS, type EvBudget } from './ev-budget.ts';
+import type { CandidateRung, SpreadCandidate } from './ladder.ts';
+import { toId } from '../ids.ts';
 
 /**
  * A violated move-order constraint outweighs any damage-fit error: the log

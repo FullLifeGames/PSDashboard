@@ -1,9 +1,9 @@
 import { Dex } from '@pkmn/sim';
 import type { PokemonSet } from '@pkmn/sim';
-import { getSpeciesUsageStats } from './smogon/usage-lookup';
-import type { SmogonUsageStats } from './smogon/stats-types';
-import type { HiddenPowerEvidence } from './types';
-import { toId } from './ids';
+import { getSpeciesUsageStats } from './smogon/usage-lookup.ts';
+import type { SmogonUsageStats } from './smogon/stats-types.ts';
+import type { HiddenPowerEvidence } from './types.ts';
+import { toId } from './ids.ts';
 
 /**
  * Typeless "Hidden Power" resolution (round 2, agenda item ⑤): the replay

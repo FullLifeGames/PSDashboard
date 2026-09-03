@@ -1,4 +1,4 @@
-import type { PlayedAction } from './played';
+import type { PlayedAction } from './played.ts';
 
 /**
  * Which Pokémon may Terastallize in the search: a global switch, or per-side

@@ -1,8 +1,8 @@
 import type { Battle, Pokemon, Side, Field } from '@pkmn/client';
 import type { GenerationNum } from '@pkmn/data';
-import type { PokemonSnapshot, SideSnapshot, FieldSnapshot } from '../types';
-import { flushSpeedOrder, gens, speedContaminatedAt, type ClientIdent, type ParserState, type PendingMove } from './parser-state';
-import { toId } from '../ids';
+import type { PokemonSnapshot, SideSnapshot, FieldSnapshot } from '../types.ts';
+import { flushSpeedOrder, gens, speedContaminatedAt, type ClientIdent, type ParserState, type PendingMove } from './parser-state.ts';
+import { toId } from '../ids.ts';
 
 const SCREEN_IDS = ['reflect', 'lightscreen', 'auroraveil'];
 

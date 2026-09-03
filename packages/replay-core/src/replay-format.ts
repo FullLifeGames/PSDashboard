@@ -1,6 +1,6 @@
 import { Dex } from '@pkmn/sim';
-import type { ReplayData, TurnSnapshot } from './types';
-import { toId } from './ids';
+import type { ReplayData, TurnSnapshot } from './types.ts';
+import { toId } from './ids.ts';
 
 type ReplayFormatSource = Partial<Pick<ReplayData, 'id' | 'format' | 'formatid' | 'log'>>;
 

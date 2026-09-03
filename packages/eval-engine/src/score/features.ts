@@ -1,9 +1,9 @@
 import type { Battle, Pokemon, Side } from '@pkmn/sim';
-import { effectiveSpeed } from '../speed';
-import { EVAL_WEIGHTS, type EvalFeatures } from './weights';
-import { hazardCost, hazardRemovalEquity, strandedMons } from './hazards';
-import { livingOf, threatGetter, type MatchupCache } from './threat';
-import { matchupTerms, sweepCells } from './matchup';
+import { effectiveSpeed } from '../speed.ts';
+import { EVAL_WEIGHTS, type EvalFeatures } from './weights.ts';
+import { hazardCost, hazardRemovalEquity, strandedMons } from './hazards.ts';
+import { livingOf, threatGetter, type MatchupCache } from './threat.ts';
+import { matchupTerms, sweepCells } from './matchup.ts';
 
 /**
  * The raw feature vector: per-side bodies, boosts, hazards, screens,

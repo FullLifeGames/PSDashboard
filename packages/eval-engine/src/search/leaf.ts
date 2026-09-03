@@ -1,8 +1,8 @@
 import type { PRNGSeed } from '@pkmn/sim';
-import { evaluatePosition, type MatchupCache } from '../eval-function';
-import type { positionBattle } from '../forward-model';
-import { RANDOM_CALL_MOVES } from '../ko-odds';
-import { wpUnits } from '../winprob';
+import { evaluatePosition, type MatchupCache } from '../eval-function.ts';
+import type { positionBattle } from '../forward-model.ts';
+import { RANDOM_CALL_MOVES } from '../ko-odds.ts';
+import { wpUnits } from '../winprob.ts';
 
 /**
  * The search's value space and its chance schedule: the fixed seed list,

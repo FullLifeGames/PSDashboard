@@ -1,9 +1,9 @@
-import type { RankedChoice, ReadRecommendation } from '../types';
+import type { RankedChoice, ReadRecommendation } from '../types.ts';
 import {
   CHANCE_THRESHOLD, DECIDED_SCORE, PAYOFF_WINDOW, RISK_PAYOFF_EPSILON, RISK_PAYOFF_MARGIN, TIER_THRESHOLDS,
   type AnalyzeTurnParams, type Side, type SideAnalysis, type TurnAttribution,
-} from './types';
-import { bestWindowPayoff } from './grading';
+} from './types.ts';
+import { bestWindowPayoff } from './grading.ts';
 
 /**
  * A flagged risk whose punishing reply was never clicked reads differently

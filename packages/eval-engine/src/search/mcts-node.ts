@@ -1,10 +1,10 @@
-import type { MatchupCache } from '../eval-function';
-import { positionBattle, type ChoiceOption, type SimPosition } from '../forward-model';
-import { cellKey } from '../rank';
-import type { EvalSettings, TeraAllowance } from '../types';
-import { leafValue } from './leaf';
-import { optionHints } from './hints';
-import { searchOptions } from './options';
+import type { MatchupCache } from '../eval-function.ts';
+import { positionBattle, type ChoiceOption, type SimPosition } from '../forward-model.ts';
+import { cellKey } from '../rank.ts';
+import type { EvalSettings, TeraAllowance } from '../types.ts';
+import { leafValue } from './leaf.ts';
+import { optionHints } from './hints.ts';
+import { searchOptions } from './options.ts';
 
 /**
  * The MCTS node machinery: node creation over the shared option lists and

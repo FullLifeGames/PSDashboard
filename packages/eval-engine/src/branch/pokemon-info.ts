@@ -1,5 +1,5 @@
 import { Dex } from '@pkmn/sim';
-import type { PokemonStatTable, SimPokemon, SimPokemonInfo, SimSide } from './types';
+import type { PokemonStatTable, SimPokemon, SimPokemonInfo, SimSide } from './types.ts';
 
 function statTableWithDefaults(
   value: Partial<PokemonStatTable> | undefined,

@@ -1,5 +1,5 @@
 import { Generations, Pokemon, Move, Field, calculate } from '@smogon/calc';
-import type { SimPokemonInfo, BranchMoveOption } from './branch-engine';
+import type { SimPokemonInfo, BranchMoveOption } from './branch-engine.ts';
 import { toId, TERRAIN_BY_ID, WEATHER_BY_ID } from '@fulllifegames/replay-core';
 
 type CalcPokemonOptions = ConstructorParameters<typeof Pokemon>[2];

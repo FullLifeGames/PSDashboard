@@ -1,9 +1,9 @@
 import { Dex } from '@pkmn/sim';
-import { revealedField, unknownEvs, unknownField } from '../team-info';
-import { canHaveDancer, findPokemon, ruleOut, type InferrerState } from './inferrer-state';
-import { parseDetails } from './lookup';
-import { toId } from '../ids';
-import type { PokemonFieldInfo } from '../types';
+import { revealedField, unknownEvs, unknownField } from '../team-info.ts';
+import { canHaveDancer, findPokemon, ruleOut, type InferrerState } from './inferrer-state.ts';
+import { parseDetails } from './lookup.ts';
+import { toId } from '../ids.ts';
+import type { PokemonFieldInfo } from '../types.ts';
 
 /** Items whose `[from] item:` damage hits the attacker instead of the holder. */
 const ATTACKER_PUNISH_ITEMS = new Set(['rockyhelmet', 'jabocaberry', 'rowapberry']);

@@ -1,9 +1,9 @@
 import type { Battle, Pokemon } from '@pkmn/sim';
-import { movesFirst } from '../speed';
-import { EVAL_WEIGHTS } from './weights';
-import { hazardEntryFraction } from './hazards';
-import { boostedFraction, livingMons, threatGetter, type MatchupCache, type PairThreat } from './threat';
-import { healProfile, ppBudget, raceClocks, raceSide, statusResidual, type RaceClocks, type RaceSide } from './races';
+import { movesFirst } from '../speed.ts';
+import { EVAL_WEIGHTS } from './weights.ts';
+import { hazardEntryFraction } from './hazards.ts';
+import { boostedFraction, livingMons, threatGetter, type MatchupCache, type PairThreat } from './threat.ts';
+import { healProfile, ppBudget, raceClocks, raceSide, statusResidual, type RaceClocks, type RaceSide } from './races.ts';
 
 /**
  * The aggregated 1v1 terms: every living pair raced on its clocks, the

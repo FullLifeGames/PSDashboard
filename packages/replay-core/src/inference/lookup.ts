@@ -1,4 +1,4 @@
-import type { RevealedPokemonInfo } from '../types';
+import type { RevealedPokemonInfo } from '../types.ts';
 
 // Battle-only formes must merge into the base species instead of creating a
 // seventh team card (B16). Longer suffixes first ('-Mega-X' before '-Mega').

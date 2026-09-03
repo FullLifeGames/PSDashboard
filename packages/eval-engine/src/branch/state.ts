@@ -1,15 +1,15 @@
 import { Battle, BattleStreams, Dex, Teams } from '@pkmn/sim';
 import type { ID, PokemonSet } from '@pkmn/sim';
-import type { BranchSlotChoice } from '../branch-choices';
-import { serializeBattleStable } from '../forward-model';
+import type { BranchSlotChoice } from '../branch-choices.ts';
+import { serializeBattleStable } from '../forward-model.ts';
 import type {
   BranchChoices, BranchMoveOption, BranchSimState, BranchSlotModifiers, BranchSwitchOption, BranchTargetOption,
   SimBattle, SimPokemon, SimSide,
-} from './types';
-import { slotLetter, trimTeamToBring } from './team-order';
-import { targetTypeForMove } from './protocol-choices';
-import { forceSwitches } from './corrections';
-import { extractPokemonInfo, makePokemonInfo } from './pokemon-info';
+} from './types.ts';
+import { slotLetter, trimTeamToBring } from './team-order.ts';
+import { targetTypeForMove } from './protocol-choices.ts';
+import { forceSwitches } from './corrections.ts';
+import { extractPokemonInfo, makePokemonInfo } from './pokemon-info.ts';
 
 
 function makeMoves(

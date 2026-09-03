@@ -1,5 +1,5 @@
-import type { EvalResult, RankedChoice } from '../types';
-import { cellKey, type ValueMatrix } from './matrix';
+import type { EvalResult, RankedChoice } from '../types.ts';
+import { cellKey, type ValueMatrix } from './matrix.ts';
 
 /**
  * Tied leading rows: the coin-flip prefix the static ranking cannot split,

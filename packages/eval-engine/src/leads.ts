@@ -1,5 +1,5 @@
-import { TIER_THRESHOLDS, type VerdictTier } from './analysis';
-import type { EvalResult, RankedChoice } from './types';
+import { TIER_THRESHOLDS, type VerdictTier } from './analysis.ts';
+import type { EvalResult, RankedChoice } from './types.ts';
 
 /**
  * Turn-0 (team preview) analysis: the lead decision graded like any other

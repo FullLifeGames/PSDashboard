@@ -1,6 +1,6 @@
 import type { BattleStreams } from '@pkmn/sim';
-import type { BranchSlotChoice } from '../branch-choices';
-import type { TurnAlignmentRecord } from '../hax-alignment';
+import type { BranchSlotChoice } from '../branch-choices.ts';
+import type { TurnAlignmentRecord } from '../hax-alignment.ts';
 
 export type SimBattle = NonNullable<BattleStreams.BattleStream['battle']>;
 export type SimSide = SimBattle['sides'][number];

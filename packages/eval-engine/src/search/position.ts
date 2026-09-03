@@ -1,21 +1,21 @@
-import { createMatchupCache, unansweredMons, type MatchupCache } from '../eval-function';
+import { createMatchupCache, unansweredMons, type MatchupCache } from '../eval-function.ts';
 import {
   advancePosition, createRootPosition, positionBattle, type ChoiceOption, type SimPosition,
-} from '../forward-model';
+} from '../forward-model.ts';
 import {
   applyTrendExtrapolation, applyTrendTiebreak, attachLines, cellKey, rankFromMatrix, selectExpansionCells,
   selectTieProbeCells, toResult, TOP_EXPANSION, type PvStep, type Ranked,
-} from '../rank';
-import { koOddsForOptions } from '../cell-blend';
-import type { CellValue, SearchExecutor } from '../orchestrator';
-import type { EvalResult, EvalSettings, RankedChoice } from '../types';
-import { countFainted, leafValue, SEARCH_SEEDS } from './leaf';
-import { sampleCell } from './cell-sampler';
-import { isCombined } from './hints';
-import { expandPivotPairs, restrictOptions, searchOptions } from './options';
-import { attachRootPayload, koOddsMapsFor, type RootPayload } from './root-payload';
-import { recordDeepenedCell, type DeepeningState } from './deepening';
-import { buildMatrix, cellValueMemo, maximinRows, minimaxColumns, type Matrix, type SearchCallbacks } from './matrix';
+} from '../rank.ts';
+import { koOddsForOptions } from '../cell-blend.ts';
+import type { CellValue, SearchExecutor } from '../orchestrator.ts';
+import type { EvalResult, EvalSettings, RankedChoice } from '../types.ts';
+import { countFainted, leafValue, SEARCH_SEEDS } from './leaf.ts';
+import { sampleCell } from './cell-sampler.ts';
+import { isCombined } from './hints.ts';
+import { expandPivotPairs, restrictOptions, searchOptions } from './options.ts';
+import { attachRootPayload, koOddsMapsFor, type RootPayload } from './root-payload.ts';
+import { recordDeepenedCell, type DeepeningState } from './deepening.ts';
+import { buildMatrix, cellValueMemo, maximinRows, minimaxColumns, type Matrix, type SearchCallbacks } from './matrix.ts';
 
 /**
  * The sync search: the pruned depth-1 sub-search, the full root search with

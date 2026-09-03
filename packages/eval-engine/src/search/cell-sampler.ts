@@ -1,11 +1,11 @@
 import type { PRNGSeed } from '@pkmn/sim';
-import type { MatchupCache } from '../eval-function';
-import { advancePosition, advancePositionWithLog, positionBattle, type SimPosition } from '../forward-model';
+import type { MatchupCache } from '../eval-function.ts';
+import { advancePosition, advancePositionWithLog, positionBattle, type SimPosition } from '../forward-model.ts';
 import {
   BOUNDARY_DRAW_BUDGET, classifyChild, foldClassWeights, observeOrder, planCellEvents, PROBE_SEEDS, type CellEvent,
-} from '../cell-blend';
-import type { CellBlend, CellBlendClass, KoOddsMismatch } from '../types';
-import { countFainted, leafValue, rollSensitivePair, SEARCH_SEEDS } from './leaf';
+} from '../cell-blend.ts';
+import type { CellBlend, CellBlendClass, KoOddsMismatch } from '../types.ts';
+import { countFainted, leafValue, rollSensitivePair, SEARCH_SEEDS } from './leaf.ts';
 
 /**
  * One matrix cell's value from seeded sims: the plain seed average, or the

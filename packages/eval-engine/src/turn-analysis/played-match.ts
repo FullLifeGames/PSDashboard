@@ -1,9 +1,9 @@
 // Data-only Dex (move priorities for the stay-in phantom) — this module is
 // in the app's MAIN bundle; @pkmn/sim must never be imported here.
 import { Dex } from '@pkmn/dex';
-import type { EvalResult, RankedChoice } from '../types';
-import type { PlayedAction, PlayedTurn } from '../played';
-import type { SideAnalysis } from './types';
+import type { EvalResult, RankedChoice } from '../types.ts';
+import type { PlayedAction, PlayedTurn } from '../played.ts';
+import type { SideAnalysis } from './types.ts';
 import { toId } from '@fulllifegames/replay-core';
 
 /**

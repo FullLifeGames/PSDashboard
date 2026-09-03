@@ -1,12 +1,12 @@
-import { createMatchupCache, unansweredMons, type MatchupCache } from './eval-function';
-import { advancePosition, createRootPosition, positionBattle } from './forward-model';
-import { koOddsForOptions, planCellEvents } from './cell-blend';
-import { cellKey, rankFromMatrix, toResult as rankedToResult } from './rank';
-import { SEARCH_SEEDS } from './search';
-import { attachKoOdds, hasUnansweredContent, koOddsMapsFor } from './search/root-payload';
-import { topVisitedIndex } from './mcts-merge';
-import { makeNode, pick, principalVariation, treeMatrix, type Node } from './search/mcts-node';
-import type { EvalResult, EvalSettings, KoOddsInfo, MctsTreeStats, SearchProgress, TeraAllowance, UnansweredProfile } from './types';
+import { createMatchupCache, unansweredMons, type MatchupCache } from './eval-function.ts';
+import { advancePosition, createRootPosition, positionBattle } from './forward-model.ts';
+import { koOddsForOptions, planCellEvents } from './cell-blend.ts';
+import { cellKey, rankFromMatrix, toResult as rankedToResult } from './rank.ts';
+import { SEARCH_SEEDS } from './search.ts';
+import { attachKoOdds, hasUnansweredContent, koOddsMapsFor } from './search/root-payload.ts';
+import { topVisitedIndex } from './mcts-merge.ts';
+import { makeNode, pick, principalVariation, treeMatrix, type Node } from './search/mcts-node.ts';
+import type { EvalResult, EvalSettings, KoOddsInfo, MctsTreeStats, SearchProgress, TeraAllowance, UnansweredProfile } from './types.ts';
 
 /**
  * DUCT (decoupled UCT) Monte-Carlo tree search — the "think deeper" mode.
@@ -22,7 +22,7 @@ import type { EvalResult, EvalSettings, KoOddsInfo, MctsTreeStats, SearchProgres
 export const MCTS_ITERATIONS = 600;
 const PARTIAL_EVERY = 150;
 
-export { WIDENING_BASE, WIDENING_VISITS_PER_SLOT, wideningWindow } from './search/mcts-node';
+export { WIDENING_BASE, WIDENING_VISITS_PER_SLOT, wideningWindow } from './search/mcts-node.ts';
 
 export interface MctsCallbacks {
   onProgress?(progress: SearchProgress): void;

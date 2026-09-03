@@ -1,5 +1,5 @@
-import type { SideAnalysis } from '../analysis';
-import { winPctText } from '../winprob';
+import type { SideAnalysis } from '../analysis.ts';
+import { winPctText } from '../winprob.ts';
 
 /**
  * The phrase helpers the turn summary and the game report share: choice

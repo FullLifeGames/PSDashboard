@@ -1,6 +1,6 @@
-import type { EvalResult, KoOddsInfo, RankedChoice, ReadRecommendation } from '../types';
-import type { StreakHistoryEntry, StreakOdds } from '../streaks';
-import type { PlayedAction, PlayedTurn, SackInfo } from '../played';
+import type { EvalResult, KoOddsInfo, RankedChoice, ReadRecommendation } from '../types.ts';
+import type { StreakHistoryEntry, StreakOdds } from '../streaks.ts';
+import type { PlayedAction, PlayedTurn, SackInfo } from '../played.ts';
 import type { SideId } from '@fulllifegames/replay-core';
 
 /**

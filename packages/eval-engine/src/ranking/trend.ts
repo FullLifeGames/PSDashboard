@@ -1,6 +1,6 @@
-import type { EvalResult } from '../types';
-import { cellKey, type ValueMatrix } from './matrix';
-import { MIN_TREND_WEIGHT, tieGroups, TREND_MARGIN, type TieRow } from './ties';
+import type { EvalResult } from '../types.ts';
+import { cellKey, type ValueMatrix } from './matrix.ts';
+import { MIN_TREND_WEIGHT, tieGroups, TREND_MARGIN, type TieRow } from './ties.ts';
 
 /**
  * The horizon-trend layers over tied rows: value extrapolation (2b) and the

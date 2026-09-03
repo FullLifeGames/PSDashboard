@@ -1,4 +1,4 @@
-import type { EvalChoiceOption, EvalResult, KoOddsInfo, KoOddsMismatch, UnansweredProfile } from '../types';
+import type { EvalChoiceOption, EvalResult, KoOddsInfo, KoOddsMismatch, UnansweredProfile } from '../types.ts';
 
 /**
  * The root's narrative payload shared by every search path (sync matrix,

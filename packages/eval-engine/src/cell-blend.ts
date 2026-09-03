@@ -1,6 +1,6 @@
 import type { Battle, Pokemon, PRNGSeed } from '@pkmn/sim';
-import { boundaryEvent, RANDOM_CALL_MOVES, type BoundaryEvent } from './ko-odds';
-import type { KoOddsInfo } from './types';
+import { boundaryEvent, RANDOM_CALL_MOVES, type BoundaryEvent } from './ko-odds.ts';
+import type { KoOddsInfo } from './types.ts';
 import { sideIndex } from '@fulllifegames/replay-core';
 
 /**

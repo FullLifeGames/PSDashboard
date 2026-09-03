@@ -1,22 +1,22 @@
-import { serializeBattleStable, trialAdvanceLog } from '../forward-model';
+import { serializeBattleStable, trialAdvanceLog } from '../forward-model.ts';
 import {
   ALIGNMENT_SEEDS, chooseAlignedSeed, extractProtocolEvents, scoreAlignment,
   type SeedChoice,
-} from '../hax-alignment';
-import type { BranchRuntime, SimBattle, TurnBlock } from './types';
-import { collectForcedSwitchSpecies, getMainChoice, parseTurnBlocks } from './protocol-choices';
+} from '../hax-alignment.ts';
+import type { BranchRuntime, SimBattle, TurnBlock } from './types.ts';
+import { collectForcedSwitchSpecies, getMainChoice, parseTurnBlocks } from './protocol-choices.ts';
 import {
   buildForcedSwitchChoice, correctActivesFromProtocol, correctBattleFromSnapshot, hasForceSwitch,
   refreshRequestsFromLiveState, repairStaleForcedSwitchRequest,
-} from './corrections';
-import { replaceLogWithReplayPrefix, syncLogActivesFromBattle } from './log-sync';
+} from './corrections.ts';
+import { replaceLogWithReplayPrefix, syncLogActivesFromBattle } from './log-sync.ts';
 import {
   advanceSimToTurn, commitRejectedChoicesWithDefaults, openSession, orderTeams, startBattle, stopRequested,
   waitForBattle, waitForLog, waitForLogIdle,
   type ReconstructionSession, type ReconstructParams,
-} from './runtime-session';
+} from './runtime-session.ts';
 
-export type { ReconstructParams } from './runtime-session';
+export type { ReconstructParams } from './runtime-session.ts';
 
 type ExpectedEvents = ReturnType<typeof extractProtocolEvents>;
 

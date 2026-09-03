@@ -2,7 +2,7 @@
 // team-info's enrichment — importing @pkmn/sim here would drag the whole
 // simulator across the dynamic-import boundary (team-builder stays lazy).
 import { Dex } from '@pkmn/dex';
-import type { PokemonSetAssumption } from './smogon/sets-lookup';
+import type { PokemonSetAssumption } from './smogon/sets-lookup.ts';
 
 /**
  * Pairwise coherence vetoes for guessed set assembly. Marginal fills (top

@@ -2,7 +2,7 @@
  * The published-set assumption model and its pure lookup: no network, no
  * cache. smogon-sets.ts fetches the sets and re-exports these names.
  */
-import { toId } from '../ids';
+import { toId } from '../ids.ts';
 
 export interface SetAssumption {
   value: string;

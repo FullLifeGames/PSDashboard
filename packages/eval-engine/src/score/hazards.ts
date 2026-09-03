@@ -1,6 +1,6 @@
 import type { Battle, Pokemon, Side } from '@pkmn/sim';
-import { EVAL_WEIGHTS } from './weights';
-import { usableSlots } from './threat';
+import { EVAL_WEIGHTS } from './weights.ts';
+import { usableSlots } from './threat.ts';
 
 /**
  * Hazards priced by their victims: the per-mon entry fraction, the capped

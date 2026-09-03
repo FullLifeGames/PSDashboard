@@ -1,6 +1,6 @@
-import type { OpponentTeamInfo, PokemonEvs } from './types';
-import { EMPTY_EVS, itemSetValue, manualEvs, manualField, manualMove } from './team-info';
-import { toId } from './ids';
+import type { OpponentTeamInfo, PokemonEvs } from './types.ts';
+import { EMPTY_EVS, itemSetValue, manualEvs, manualField, manualMove } from './team-info.ts';
+import { toId } from './ids.ts';
 
 /**
  * Lightweight Showdown-export parser for pasted teams (G15). Deliberately

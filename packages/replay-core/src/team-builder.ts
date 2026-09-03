@@ -1,16 +1,16 @@
 import type { PokemonSet } from '@pkmn/sim';
 import { Teams } from '@pkmn/sim';
-import { inferOpponentTeam } from './opponent-inferrer';
-import { getSpeciesUsageSet } from './smogon/usage-lookup';
-import type { SmogonUsageStats } from './smogon/stats-types';
-import { getSpeciesSetAssumption, type SmogonSetAssumptions } from './smogon/sets-lookup';
-import { evBudget, inferSpreads, legalizeEvs, type SpreadCandidate } from './spread-inference';
-import { withHiddenPowerType } from './hidden-power';
+import { inferOpponentTeam } from './opponent-inferrer.ts';
+import { getSpeciesUsageSet } from './smogon/usage-lookup.ts';
+import type { SmogonUsageStats } from './smogon/stats-types.ts';
+import { getSpeciesSetAssumption, type SmogonSetAssumptions } from './smogon/sets-lookup.ts';
+import { evBudget, inferSpreads, legalizeEvs, type SpreadCandidate } from './spread-inference.ts';
+import { withHiddenPowerType } from './hidden-power.ts';
 import {
   assembleMoves, buildSheetSet, editedFields, findUserMatch, resolveAbility, resolveItem, resolveSpread, selectCuratedFor,
-} from './team/set-resolvers';
-import type { DamageObservation, HiddenPowerEvidence, OpponentTeamInfo, RevealedPokemonInfo, SpeedOrderObservation } from './types';
-import { toId } from './ids';
+} from './team/set-resolvers.ts';
+import type { DamageObservation, HiddenPowerEvidence, OpponentTeamInfo, RevealedPokemonInfo, SpeedOrderObservation } from './types.ts';
+import { toId } from './ids.ts';
 
 /** Usage-move candidates fetched per species — vetoes refill from the tail. */
 const USAGE_MOVE_POOL = 10;

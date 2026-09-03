@@ -1,7 +1,7 @@
 import { Battle } from '@pkmn/client';
 import { Generations, type GenerationNum } from '@pkmn/data';
 import { Dex } from '@pkmn/dex';
-import type { DamageObservation, HiddenPowerEvidence, SpeedOrderObservation, TurnSnapshot } from '../types';
+import type { DamageObservation, HiddenPowerEvidence, SpeedOrderObservation, TurnSnapshot } from '../types.ts';
 
 export const gens = new Generations(Dex);
 

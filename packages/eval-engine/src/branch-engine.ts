@@ -1,19 +1,19 @@
 import type { TurnSnapshot } from '@fulllifegames/replay-core';
-import type { BranchRuntime, SimBattle } from './branch/types';
-import { correctBattleFromSnapshot, hasStaleForcedSwitchRequest, refreshRequestsFromLiveState } from './branch/corrections';
+import type { BranchRuntime, SimBattle } from './branch/types.ts';
+import { correctBattleFromSnapshot, hasStaleForcedSwitchRequest, refreshRequestsFromLiveState } from './branch/corrections.ts';
 
 export type {
   BranchChoiceErrorLog, BranchExecuteResult, BranchFieldState, BranchMoveOption, BranchRuntime, BranchSimState,
   BranchSlotModifiers, BranchSwitchOption, BranchTargetOption, PokemonStatTable, SimPokemonInfo,
-} from './branch/types';
-export { correctActivesFromProtocol } from './branch/corrections';
+} from './branch/types.ts';
+export { correctActivesFromProtocol } from './branch/corrections.ts';
 export {
   captureSerializedPosition, createBranchState, createBranchStateFromBattle, serializePreviewPosition,
-} from './branch/state';
-export { annotateNicknames, executeBranchChoices, resolveSideChoices } from './branch/execute';
-export type { ResolvedSideCommand } from './branch/execute';
-export { reconstructBranchRuntime } from './branch/runtime';
-export type { ReconstructParams } from './branch/runtime';
+} from './branch/state.ts';
+export { annotateNicknames, executeBranchChoices, resolveSideChoices } from './branch/execute.ts';
+export type { ResolvedSideCommand } from './branch/execute.ts';
+export { reconstructBranchRuntime } from './branch/runtime.ts';
+export type { ReconstructParams } from './branch/runtime.ts';
 
 // @pkmn/sim's random-format rulesets reference Node's `global` object (e.g.
 // `global.Config?.potd` in rulesets), which doesn't exist in browsers and made

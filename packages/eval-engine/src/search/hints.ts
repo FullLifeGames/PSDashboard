@@ -1,6 +1,6 @@
 import type { Pokemon } from '@pkmn/sim';
-import { boostedFraction, pairThreat, singleMoveFraction } from '../eval-function';
-import { positionBattle, type ChoiceOption, type SimPosition } from '../forward-model';
+import { boostedFraction, pairThreat, singleMoveFraction } from '../eval-function.ts';
+import { positionBattle, type ChoiceOption, type SimPosition } from '../forward-model.ts';
 import { sideIndex } from '@fulllifegames/replay-core';
 
 /**

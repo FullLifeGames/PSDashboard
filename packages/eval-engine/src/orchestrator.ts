@@ -1,14 +1,14 @@
 import {
   applyTrendExtrapolation, applyTrendTiebreak, attachLines, cellKey, rankFromMatrix, selectExpansionCells,
   selectTieProbeCells, toResult, TOP_EXPANSION, type PvStep, type Ranked, type ValueMatrix,
-} from './rank';
-import { perfSync } from './perf-trace';
+} from './rank.ts';
+import { perfSync } from './perf-trace.ts';
 import type {
   CellBlend, EvalCellJob, EvalCellValue, EvalChoiceOption, EvalChoicesInfo, EvalResult, EvalSettings,
   EvalSubSearchJob, KoOddsMismatch, SearchProgress, TeraAllowance,
-} from './types';
-import { attachRootPayload, koOddsMapsFor, type RootPayload } from './search/root-payload';
-import { recordDeepenedCell, type DeepeningState } from './search/deepening';
+} from './types.ts';
+import { attachRootPayload, koOddsMapsFor, type RootPayload } from './search/root-payload.ts';
+import { recordDeepenedCell, type DeepeningState } from './search/deepening.ts';
 
 /**
  * Async search orchestration over an abstract executor. Pure — no @pkmn/sim

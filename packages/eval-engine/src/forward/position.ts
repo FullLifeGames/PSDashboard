@@ -1,6 +1,6 @@
 import type { Battle } from '@pkmn/sim';
-import { deserializeRepaired, serializeBattleStable } from './serialize';
-import { repairFaintedActives } from './switches';
+import { deserializeRepaired, serializeBattleStable } from './serialize.ts';
+import { repairFaintedActives } from './switches.ts';
 
 /**
  * The immutable search position: a lazily serialized/deserialized battle

@@ -1,7 +1,7 @@
 import type { Battle } from '@pkmn/sim';
-import { EVAL_WEIGHTS, featureWeights, type EvalFeatures } from './score/weights';
-import { evalFeatures } from './score/features';
-import type { MatchupCache } from './score/threat';
+import { EVAL_WEIGHTS, featureWeights, type EvalFeatures } from './score/weights.ts';
+import { evalFeatures } from './score/features.ts';
+import type { MatchupCache } from './score/threat.ts';
 
 /**
  * The static positional evaluation, p1's perspective in [-1, +1]. The
@@ -10,16 +10,16 @@ import type { MatchupCache } from './score/threat';
  * terms, the feature vector, and the unanswered-mon profile.
  */
 
-export { DOUBLES_FEATURE_WEIGHTS, EVAL_WEIGHTS, FEATURE_WEIGHTS, featureWeights } from './score/weights';
-export type { EvalFeatures } from './score/weights';
-export { hazardCost, hazardRemovalEquity, strandedMons } from './score/hazards';
-export { boostedFraction, createMatchupCache, pairThreat, singleMoveFraction } from './score/threat';
-export type { MatchupCache } from './score/threat';
-export { raceClocks } from './score/races';
-export type { RaceSide } from './score/races';
-export { matchupTerms } from './score/matchup';
-export { evalFeatures } from './score/features';
-export { unansweredMons } from './score/unanswered';
+export { DOUBLES_FEATURE_WEIGHTS, EVAL_WEIGHTS, FEATURE_WEIGHTS, featureWeights } from './score/weights.ts';
+export type { EvalFeatures } from './score/weights.ts';
+export { hazardCost, hazardRemovalEquity, strandedMons } from './score/hazards.ts';
+export { boostedFraction, createMatchupCache, pairThreat, singleMoveFraction } from './score/threat.ts';
+export type { MatchupCache } from './score/threat.ts';
+export { raceClocks } from './score/races.ts';
+export type { RaceSide } from './score/races.ts';
+export { matchupTerms } from './score/matchup.ts';
+export { evalFeatures } from './score/features.ts';
+export { unansweredMons } from './score/unanswered.ts';
 
 /** Static positional eval from p1's perspective in [-1, +1]; ±1 for ended battles. */
 export function evaluatePosition(battle: Battle, cache?: MatchupCache): number {

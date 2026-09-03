@@ -1,7 +1,7 @@
-import { diffChoices, playedSetupMove, type SideAnalysis } from '../analysis';
-import type { RankedChoice } from '../types';
-import { winDeltaText, winPctText } from '../winprob';
-import { conditionalNote, displayBest, koPhrase, nullNote, oddsNote, phrase } from './phrases';
+import { diffChoices, playedSetupMove, type SideAnalysis } from '../analysis.ts';
+import type { RankedChoice } from '../types.ts';
+import { winDeltaText, winPctText } from '../winprob.ts';
+import { conditionalNote, displayBest, koPhrase, nullNote, oddsNote, phrase } from './phrases.ts';
 
 /**
  * The per-side clauses of the turn summary: paid-off reads, misplays,

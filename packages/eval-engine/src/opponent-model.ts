@@ -1,4 +1,4 @@
-import type { EvalMatrix, ReadRecommendation } from './types';
+import type { EvalMatrix, ReadRecommendation } from './types.ts';
 
 /**
  * The exploitative "Read" lens: a boundedly-rational opponent model and a

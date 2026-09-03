@@ -1,13 +1,13 @@
 import { BattleStreams, Teams } from '@pkmn/sim';
 import type { PokemonSet } from '@pkmn/sim';
 import type { TurnSnapshot } from '@fulllifegames/replay-core';
-import type { ChoiceLockContext } from '../choice-lock';
-import type { TurnAlignmentRecord } from '../hax-alignment';
-import type { BranchChoiceErrorLog, PokemonIdent, SimBattle } from './types';
-import { reorderForLeads, trimTeamToBring } from './team-order';
-import { extractLeads } from './protocol-choices';
-import { hasForceSwitch } from './corrections';
-import { safeStreamWrite, sleep } from './execute';
+import type { ChoiceLockContext } from '../choice-lock.ts';
+import type { TurnAlignmentRecord } from '../hax-alignment.ts';
+import type { BranchChoiceErrorLog, PokemonIdent, SimBattle } from './types.ts';
+import { reorderForLeads, trimTeamToBring } from './team-order.ts';
+import { extractLeads } from './protocol-choices.ts';
+import { hasForceSwitch } from './corrections.ts';
+import { safeStreamWrite, sleep } from './execute.ts';
 
 export interface ReconstructParams {
   format: string;

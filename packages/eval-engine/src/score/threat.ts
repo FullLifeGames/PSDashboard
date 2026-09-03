@@ -1,5 +1,5 @@
 import type { Battle, Pokemon, Side } from '@pkmn/sim';
-import { stageMultiplier } from '../stat-stages';
+import { stageMultiplier } from '../stat-stages.ts';
 
 /**
  * The HP- and boost-independent threat proxy: one attacker→defender
