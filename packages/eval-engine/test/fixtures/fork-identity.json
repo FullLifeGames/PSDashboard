@@ -1,0 +1,2551 @@
+{
+  "singles": {
+    "root": "f5329a10d3972bf671a4a544a238308a9e159be80d3d14edd66048db1cbd13b8",
+    "children": [
+      {
+        "p1": "move dracometeor",
+        "p2": "move powerwhip",
+        "seed": "1,2,3,4",
+        "state": "6d559da00820d1ef1c321279fb341dd5a2bf18aede130a559592990739a3e879",
+        "facts": {
+          "turn": 5,
+          "ended": false,
+          "prng": "62891,40560,22227,62965",
+          "sides": [
+            {
+              "pokemonLeft": 5,
+              "active": [
+                "[Pokemon:p1a]"
+              ],
+              "hp": [
+                180,
+                524,
+                380,
+                0,
+                400,
+                704
+              ],
+              "fainted": [
+                false,
+                false,
+                false,
+                true,
+                false,
+                false
+              ],
+              "status": [
+                "",
+                "",
+                "",
+                "",
+                "",
+                ""
+              ]
+            },
+            {
+              "pokemonLeft": 5,
+              "active": [
+                "[Pokemon:p2a]"
+              ],
+              "hp": [
+                311,
+                304,
+                0,
+                374,
+                304,
+                404
+              ],
+              "fainted": [
+                false,
+                false,
+                true,
+                false,
+                false,
+                false
+              ],
+              "status": [
+                "",
+                "",
+                "",
+                "",
+                "",
+                ""
+              ]
+            }
+          ]
+        },
+        "log": [
+          "|",
+          "|move|p1a: Kyurem|Draco Meteor|p2a: Ferrothorn",
+          "|-resisted|p2a: Ferrothorn",
+          "|split|p2",
+          "|-damage|p2a: Ferrothorn|311/352",
+          "|-damage|p2a: Ferrothorn|311/352",
+          "|-unboost|p1a: Kyurem|spa|2",
+          "|move|p2a: Ferrothorn|Power Whip|p1a: Kyurem",
+          "|-resisted|p1a: Kyurem",
+          "|split|p1",
+          "|-damage|p1a: Kyurem|180/454",
+          "|-damage|p1a: Kyurem|180/454",
+          "|",
+          "|upkeep",
+          "|turn|5"
+        ]
+      },
+      {
+        "p1": "move dracometeor",
+        "p2": "move powerwhip",
+        "seed": "5,6,7,8",
+        "state": "f6f09e8d5c5ad97bf420c0bff8a36c645947058ab05b4d016e3d6acfd0913d54",
+        "facts": {
+          "turn": 5,
+          "ended": false,
+          "prng": "49988,3828,17110,61724",
+          "sides": [
+            {
+              "pokemonLeft": 5,
+              "active": [
+                "[Pokemon:p1a]"
+              ],
+              "hp": [
+                177,
+                524,
+                380,
+                0,
+                400,
+                704
+              ],
+              "fainted": [
+                false,
+                false,
+                false,
+                true,
+                false,
+                false
+              ],
+              "status": [
+                "",
+                "",
+                "",
+                "",
+                "",
+                ""
+              ]
+            },
+            {
+              "pokemonLeft": 5,
+              "active": [
+                "[Pokemon:p2a]"
+              ],
+              "hp": [
+                352,
+                304,
+                0,
+                374,
+                304,
+                404
+              ],
+              "fainted": [
+                false,
+                false,
+                true,
+                false,
+                false,
+                false
+              ],
+              "status": [
+                "",
+                "",
+                "",
+                "",
+                "",
+                ""
+              ]
+            }
+          ]
+        },
+        "log": [
+          "|",
+          "|move|p1a: Kyurem|Draco Meteor|p2a: Ferrothorn|[miss]",
+          "|-miss|p1a: Kyurem|p2a: Ferrothorn",
+          "|move|p2a: Ferrothorn|Power Whip|p1a: Kyurem",
+          "|-resisted|p1a: Kyurem",
+          "|split|p1",
+          "|-damage|p1a: Kyurem|177/454",
+          "|-damage|p1a: Kyurem|177/454",
+          "|",
+          "|upkeep",
+          "|turn|5"
+        ]
+      },
+      {
+        "p1": "move dracometeor",
+        "p2": "move powerwhip terastallize",
+        "seed": "1,2,3,4",
+        "state": "c514ffa43b079ff253cafcc356838e31ac079fb6335f465cb2b1d1a9d52da1be",
+        "facts": {
+          "turn": 5,
+          "ended": false,
+          "prng": "62891,40560,22227,62965",
+          "sides": [
+            {
+              "pokemonLeft": 5,
+              "active": [
+                "[Pokemon:p1a]"
+              ],
+              "hp": [
+                151,
+                524,
+                380,
+                0,
+                400,
+                704
+              ],
+              "fainted": [
+                false,
+                false,
+                false,
+                true,
+                false,
+                false
+              ],
+              "status": [
+                "",
+                "",
+                "",
+                "",
+                "",
+                ""
+              ]
+            },
+            {
+              "pokemonLeft": 5,
+              "active": [
+                "[Pokemon:p2a]"
+              ],
+              "hp": [
+                270,
+                304,
+                0,
+                374,
+                304,
+                404
+              ],
+              "fainted": [
+                false,
+                false,
+                true,
+                false,
+                false,
+                false
+              ],
+              "status": [
+                "",
+                "",
+                "",
+                "",
+                "",
+                ""
+              ]
+            }
+          ]
+        },
+        "log": [
+          "|",
+          "|-terastallize|p2a: Ferrothorn|Grass",
+          "|move|p1a: Kyurem|Draco Meteor|p2a: Ferrothorn",
+          "|split|p2",
+          "|-damage|p2a: Ferrothorn|270/352",
+          "|-damage|p2a: Ferrothorn|270/352",
+          "|-unboost|p1a: Kyurem|spa|2",
+          "|move|p2a: Ferrothorn|Power Whip|p1a: Kyurem",
+          "|-resisted|p1a: Kyurem",
+          "|split|p1",
+          "|-damage|p1a: Kyurem|151/454",
+          "|-damage|p1a: Kyurem|151/454",
+          "|",
+          "|upkeep",
+          "|turn|5"
+        ]
+      },
+      {
+        "p1": "move dracometeor",
+        "p2": "move powerwhip terastallize",
+        "seed": "5,6,7,8",
+        "state": "15fcf4e11110aa22cf75e4723c1a0289b431857fb44c1c2a562a27dba5e17fdb",
+        "facts": {
+          "turn": 5,
+          "ended": false,
+          "prng": "49988,3828,17110,61724",
+          "sides": [
+            {
+              "pokemonLeft": 5,
+              "active": [
+                "[Pokemon:p1a]"
+              ],
+              "hp": [
+                147,
+                524,
+                380,
+                0,
+                400,
+                704
+              ],
+              "fainted": [
+                false,
+                false,
+                false,
+                true,
+                false,
+                false
+              ],
+              "status": [
+                "",
+                "",
+                "",
+                "",
+                "",
+                ""
+              ]
+            },
+            {
+              "pokemonLeft": 5,
+              "active": [
+                "[Pokemon:p2a]"
+              ],
+              "hp": [
+                352,
+                304,
+                0,
+                374,
+                304,
+                404
+              ],
+              "fainted": [
+                false,
+                false,
+                true,
+                false,
+                false,
+                false
+              ],
+              "status": [
+                "",
+                "",
+                "",
+                "",
+                "",
+                ""
+              ]
+            }
+          ]
+        },
+        "log": [
+          "|",
+          "|-terastallize|p2a: Ferrothorn|Grass",
+          "|move|p1a: Kyurem|Draco Meteor|p2a: Ferrothorn|[miss]",
+          "|-miss|p1a: Kyurem|p2a: Ferrothorn",
+          "|move|p2a: Ferrothorn|Power Whip|p1a: Kyurem",
+          "|-resisted|p1a: Kyurem",
+          "|split|p1",
+          "|-damage|p1a: Kyurem|147/454",
+          "|-damage|p1a: Kyurem|147/454",
+          "|",
+          "|upkeep",
+          "|turn|5"
+        ]
+      },
+      {
+        "p1": "move dracometeor terastallize",
+        "p2": "move powerwhip",
+        "seed": "1,2,3,4",
+        "state": "e61cc51bdbca1d6ffa3065dd6bec90cd21542696ee2e4e92c8eb5083f7b5bea8",
+        "facts": {
+          "turn": 5,
+          "ended": false,
+          "prng": "62891,40560,22227,62965",
+          "sides": [
+            {
+              "pokemonLeft": 5,
+              "active": [
+                "[Pokemon:p1a]"
+              ],
+              "hp": [
+                180,
+                524,
+                380,
+                0,
+                400,
+                704
+              ],
+              "fainted": [
+                false,
+                false,
+                false,
+                true,
+                false,
+                false
+              ],
+              "status": [
+                "",
+                "",
+                "",
+                "",
+                "",
+                ""
+              ]
+            },
+            {
+              "pokemonLeft": 5,
+              "active": [
+                "[Pokemon:p2a]"
+              ],
+              "hp": [
+                297,
+                304,
+                0,
+                374,
+                304,
+                404
+              ],
+              "fainted": [
+                false,
+                false,
+                true,
+                false,
+                false,
+                false
+              ],
+              "status": [
+                "",
+                "",
+                "",
+                "",
+                "",
+                ""
+              ]
+            }
+          ]
+        },
+        "log": [
+          "|",
+          "|-terastallize|p1a: Kyurem|Dragon",
+          "|move|p1a: Kyurem|Draco Meteor|p2a: Ferrothorn",
+          "|-resisted|p2a: Ferrothorn",
+          "|split|p2",
+          "|-damage|p2a: Ferrothorn|297/352",
+          "|-damage|p2a: Ferrothorn|297/352",
+          "|-unboost|p1a: Kyurem|spa|2",
+          "|move|p2a: Ferrothorn|Power Whip|p1a: Kyurem",
+          "|-resisted|p1a: Kyurem",
+          "|split|p1",
+          "|-damage|p1a: Kyurem|180/454",
+          "|-damage|p1a: Kyurem|180/454",
+          "|",
+          "|upkeep",
+          "|turn|5"
+        ]
+      },
+      {
+        "p1": "move dracometeor terastallize",
+        "p2": "move powerwhip",
+        "seed": "5,6,7,8",
+        "state": "8e4a3f92ebe0b275f30f65b67da9763cb4ccd62781033bb8f21b4eb1c6a33eb4",
+        "facts": {
+          "turn": 5,
+          "ended": false,
+          "prng": "49988,3828,17110,61724",
+          "sides": [
+            {
+              "pokemonLeft": 5,
+              "active": [
+                "[Pokemon:p1a]"
+              ],
+              "hp": [
+                177,
+                524,
+                380,
+                0,
+                400,
+                704
+              ],
+              "fainted": [
+                false,
+                false,
+                false,
+                true,
+                false,
+                false
+              ],
+              "status": [
+                "",
+                "",
+                "",
+                "",
+                "",
+                ""
+              ]
+            },
+            {
+              "pokemonLeft": 5,
+              "active": [
+                "[Pokemon:p2a]"
+              ],
+              "hp": [
+                352,
+                304,
+                0,
+                374,
+                304,
+                404
+              ],
+              "fainted": [
+                false,
+                false,
+                true,
+                false,
+                false,
+                false
+              ],
+              "status": [
+                "",
+                "",
+                "",
+                "",
+                "",
+                ""
+              ]
+            }
+          ]
+        },
+        "log": [
+          "|",
+          "|-terastallize|p1a: Kyurem|Dragon",
+          "|move|p1a: Kyurem|Draco Meteor|p2a: Ferrothorn|[miss]",
+          "|-miss|p1a: Kyurem|p2a: Ferrothorn",
+          "|move|p2a: Ferrothorn|Power Whip|p1a: Kyurem",
+          "|-resisted|p1a: Kyurem",
+          "|split|p1",
+          "|-damage|p1a: Kyurem|177/454",
+          "|-damage|p1a: Kyurem|177/454",
+          "|",
+          "|upkeep",
+          "|turn|5"
+        ]
+      },
+      {
+        "p1": "move dracometeor terastallize",
+        "p2": "move powerwhip terastallize",
+        "seed": "1,2,3,4",
+        "state": "b8985f7161f02d2be7383585cf81082f46eb25bedb3f3b6d45c781351b7bafaa",
+        "facts": {
+          "turn": 5,
+          "ended": false,
+          "prng": "62891,40560,22227,62965",
+          "sides": [
+            {
+              "pokemonLeft": 5,
+              "active": [
+                "[Pokemon:p1a]"
+              ],
+              "hp": [
+                151,
+                524,
+                380,
+                0,
+                400,
+                704
+              ],
+              "fainted": [
+                false,
+                false,
+                false,
+                true,
+                false,
+                false
+              ],
+              "status": [
+                "",
+                "",
+                "",
+                "",
+                "",
+                ""
+              ]
+            },
+            {
+              "pokemonLeft": 5,
+              "active": [
+                "[Pokemon:p2a]"
+              ],
+              "hp": [
+                242,
+                304,
+                0,
+                374,
+                304,
+                404
+              ],
+              "fainted": [
+                false,
+                false,
+                true,
+                false,
+                false,
+                false
+              ],
+              "status": [
+                "",
+                "",
+                "",
+                "",
+                "",
+                ""
+              ]
+            }
+          ]
+        },
+        "log": [
+          "|",
+          "|-terastallize|p1a: Kyurem|Dragon",
+          "|-terastallize|p2a: Ferrothorn|Grass",
+          "|move|p1a: Kyurem|Draco Meteor|p2a: Ferrothorn",
+          "|split|p2",
+          "|-damage|p2a: Ferrothorn|242/352",
+          "|-damage|p2a: Ferrothorn|242/352",
+          "|-unboost|p1a: Kyurem|spa|2",
+          "|move|p2a: Ferrothorn|Power Whip|p1a: Kyurem",
+          "|-resisted|p1a: Kyurem",
+          "|split|p1",
+          "|-damage|p1a: Kyurem|151/454",
+          "|-damage|p1a: Kyurem|151/454",
+          "|",
+          "|upkeep",
+          "|turn|5"
+        ]
+      },
+      {
+        "p1": "move dracometeor terastallize",
+        "p2": "move powerwhip terastallize",
+        "seed": "5,6,7,8",
+        "state": "b82a79417f3e9289ef120bc188292a88f7f73ec261309b3e520fc5e2bbc2ea87",
+        "facts": {
+          "turn": 5,
+          "ended": false,
+          "prng": "49988,3828,17110,61724",
+          "sides": [
+            {
+              "pokemonLeft": 5,
+              "active": [
+                "[Pokemon:p1a]"
+              ],
+              "hp": [
+                147,
+                524,
+                380,
+                0,
+                400,
+                704
+              ],
+              "fainted": [
+                false,
+                false,
+                false,
+                true,
+                false,
+                false
+              ],
+              "status": [
+                "",
+                "",
+                "",
+                "",
+                "",
+                ""
+              ]
+            },
+            {
+              "pokemonLeft": 5,
+              "active": [
+                "[Pokemon:p2a]"
+              ],
+              "hp": [
+                352,
+                304,
+                0,
+                374,
+                304,
+                404
+              ],
+              "fainted": [
+                false,
+                false,
+                true,
+                false,
+                false,
+                false
+              ],
+              "status": [
+                "",
+                "",
+                "",
+                "",
+                "",
+                ""
+              ]
+            }
+          ]
+        },
+        "log": [
+          "|",
+          "|-terastallize|p1a: Kyurem|Dragon",
+          "|-terastallize|p2a: Ferrothorn|Grass",
+          "|move|p1a: Kyurem|Draco Meteor|p2a: Ferrothorn|[miss]",
+          "|-miss|p1a: Kyurem|p2a: Ferrothorn",
+          "|move|p2a: Ferrothorn|Power Whip|p1a: Kyurem",
+          "|-resisted|p1a: Kyurem",
+          "|split|p1",
+          "|-damage|p1a: Kyurem|147/454",
+          "|-damage|p1a: Kyurem|147/454",
+          "|",
+          "|upkeep",
+          "|turn|5"
+        ]
+      },
+      {
+        "p1": "move icebeam",
+        "p2": "move powerwhip",
+        "seed": "1,2,3,4",
+        "state": "0d13061dd76af3e48f4b9442f5d9565fb76fe08290594626bee102e258300edb",
+        "facts": {
+          "turn": 5,
+          "ended": false,
+          "prng": "62891,40560,22227,62965",
+          "sides": [
+            {
+              "pokemonLeft": 5,
+              "active": [
+                "[Pokemon:p1a]"
+              ],
+              "hp": [
+                180,
+                524,
+                380,
+                0,
+                400,
+                704
+              ],
+              "fainted": [
+                false,
+                false,
+                false,
+                true,
+                false,
+                false
+              ],
+              "status": [
+                "",
+                "",
+                "",
+                "",
+                "",
+                ""
+              ]
+            },
+            {
+              "pokemonLeft": 5,
+              "active": [
+                "[Pokemon:p2a]"
+              ],
+              "hp": [
+                295,
+                304,
+                0,
+                374,
+                304,
+                404
+              ],
+              "fainted": [
+                false,
+                false,
+                true,
+                false,
+                false,
+                false
+              ],
+              "status": [
+                "",
+                "",
+                "",
+                "",
+                "",
+                ""
+              ]
+            }
+          ]
+        },
+        "log": [
+          "|",
+          "|move|p1a: Kyurem|Ice Beam|p2a: Ferrothorn",
+          "|split|p2",
+          "|-damage|p2a: Ferrothorn|295/352",
+          "|-damage|p2a: Ferrothorn|295/352",
+          "|move|p2a: Ferrothorn|Power Whip|p1a: Kyurem",
+          "|-resisted|p1a: Kyurem",
+          "|split|p1",
+          "|-damage|p1a: Kyurem|180/454",
+          "|-damage|p1a: Kyurem|180/454",
+          "|",
+          "|upkeep",
+          "|turn|5"
+        ]
+      },
+      {
+        "p1": "move icebeam",
+        "p2": "move powerwhip",
+        "seed": "5,6,7,8",
+        "state": "747fb0ef3972d5f2557f60a2f5eb6cbd22c2627c83d6eb6f92973d36ab6c8926",
+        "facts": {
+          "turn": 5,
+          "ended": false,
+          "prng": "38182,58147,23247,34089",
+          "sides": [
+            {
+              "pokemonLeft": 5,
+              "active": [
+                "[Pokemon:p1a]"
+              ],
+              "hp": [
+                174,
+                524,
+                380,
+                0,
+                400,
+                704
+              ],
+              "fainted": [
+                false,
+                false,
+                false,
+                true,
+                false,
+                false
+              ],
+              "status": [
+                "",
+                "",
+                "",
+                "",
+                "",
+                ""
+              ]
+            },
+            {
+              "pokemonLeft": 5,
+              "active": [
+                "[Pokemon:p2a]"
+              ],
+              "hp": [
+                289,
+                304,
+                0,
+                374,
+                304,
+                404
+              ],
+              "fainted": [
+                false,
+                false,
+                true,
+                false,
+                false,
+                false
+              ],
+              "status": [
+                "",
+                "",
+                "",
+                "",
+                "",
+                ""
+              ]
+            }
+          ]
+        },
+        "log": [
+          "|",
+          "|move|p1a: Kyurem|Ice Beam|p2a: Ferrothorn",
+          "|split|p2",
+          "|-damage|p2a: Ferrothorn|289/352",
+          "|-damage|p2a: Ferrothorn|289/352",
+          "|move|p2a: Ferrothorn|Power Whip|p1a: Kyurem",
+          "|-resisted|p1a: Kyurem",
+          "|split|p1",
+          "|-damage|p1a: Kyurem|174/454",
+          "|-damage|p1a: Kyurem|174/454",
+          "|",
+          "|upkeep",
+          "|turn|5"
+        ]
+      },
+      {
+        "p1": "move icebeam",
+        "p2": "move powerwhip terastallize",
+        "seed": "1,2,3,4",
+        "state": "277105c615f6a4eeb60a8fe4c7a9e7e2d738a6543594f2d22b16f642be65d88d",
+        "facts": {
+          "turn": 5,
+          "ended": false,
+          "prng": "62891,40560,22227,62965",
+          "sides": [
+            {
+              "pokemonLeft": 5,
+              "active": [
+                "[Pokemon:p1a]"
+              ],
+              "hp": [
+                151,
+                524,
+                380,
+                0,
+                400,
+                704
+              ],
+              "fainted": [
+                false,
+                false,
+                false,
+                true,
+                false,
+                false
+              ],
+              "status": [
+                "",
+                "",
+                "",
+                "",
+                "",
+                ""
+              ]
+            },
+            {
+              "pokemonLeft": 5,
+              "active": [
+                "[Pokemon:p2a]"
+              ],
+              "hp": [
+                238,
+                304,
+                0,
+                374,
+                304,
+                404
+              ],
+              "fainted": [
+                false,
+                false,
+                true,
+                false,
+                false,
+                false
+              ],
+              "status": [
+                "",
+                "",
+                "",
+                "",
+                "",
+                ""
+              ]
+            }
+          ]
+        },
+        "log": [
+          "|",
+          "|-terastallize|p2a: Ferrothorn|Grass",
+          "|move|p1a: Kyurem|Ice Beam|p2a: Ferrothorn",
+          "|-supereffective|p2a: Ferrothorn",
+          "|split|p2",
+          "|-damage|p2a: Ferrothorn|238/352",
+          "|-damage|p2a: Ferrothorn|238/352",
+          "|move|p2a: Ferrothorn|Power Whip|p1a: Kyurem",
+          "|-resisted|p1a: Kyurem",
+          "|split|p1",
+          "|-damage|p1a: Kyurem|151/454",
+          "|-damage|p1a: Kyurem|151/454",
+          "|",
+          "|upkeep",
+          "|turn|5"
+        ]
+      },
+      {
+        "p1": "move icebeam",
+        "p2": "move powerwhip terastallize",
+        "seed": "5,6,7,8",
+        "state": "2e66a19d899e28b016e7674379c91760dfa8517a2392a06c4b54c1bd30d58dd8",
+        "facts": {
+          "turn": 5,
+          "ended": false,
+          "prng": "38182,58147,23247,34089",
+          "sides": [
+            {
+              "pokemonLeft": 5,
+              "active": [
+                "[Pokemon:p1a]"
+              ],
+              "hp": [
+                143,
+                524,
+                380,
+                0,
+                400,
+                704
+              ],
+              "fainted": [
+                false,
+                false,
+                false,
+                true,
+                false,
+                false
+              ],
+              "status": [
+                "",
+                "",
+                "",
+                "",
+                "",
+                ""
+              ]
+            },
+            {
+              "pokemonLeft": 5,
+              "active": [
+                "[Pokemon:p2a]"
+              ],
+              "hp": [
+                226,
+                304,
+                0,
+                374,
+                304,
+                404
+              ],
+              "fainted": [
+                false,
+                false,
+                true,
+                false,
+                false,
+                false
+              ],
+              "status": [
+                "",
+                "",
+                "",
+                "",
+                "",
+                ""
+              ]
+            }
+          ]
+        },
+        "log": [
+          "|",
+          "|-terastallize|p2a: Ferrothorn|Grass",
+          "|move|p1a: Kyurem|Ice Beam|p2a: Ferrothorn",
+          "|-supereffective|p2a: Ferrothorn",
+          "|split|p2",
+          "|-damage|p2a: Ferrothorn|226/352",
+          "|-damage|p2a: Ferrothorn|226/352",
+          "|move|p2a: Ferrothorn|Power Whip|p1a: Kyurem",
+          "|-resisted|p1a: Kyurem",
+          "|split|p1",
+          "|-damage|p1a: Kyurem|143/454",
+          "|-damage|p1a: Kyurem|143/454",
+          "|",
+          "|upkeep",
+          "|turn|5"
+        ]
+      }
+    ],
+    "matrix": {
+      "score": -0.37554897580626423,
+      "interval": 0,
+      "depthCompleted": 1,
+      "p1": [
+        {
+          "choice": "switch 5",
+          "ev": -0.3755020070202101,
+          "expected": -0.24227456154514865,
+          "worstCase": -0.37554897580626423,
+          "punishedBy": "Spikes"
+        },
+        {
+          "choice": "switch 2",
+          "ev": -0.38386174314946336,
+          "expected": -0.2562871331245633,
+          "worstCase": -0.3839016797461615,
+          "punishedBy": "Spikes"
+        },
+        {
+          "choice": "switch 3",
+          "ev": -0.3862309533666625,
+          "expected": -0.2645377754377095,
+          "worstCase": -0.38626843598023664,
+          "punishedBy": "Spikes"
+        },
+        {
+          "choice": "switch 6",
+          "ev": -0.39095979239780704,
+          "expected": -0.2978543479994077,
+          "worstCase": -0.5737349548377126,
+          "punishedBy": "Power Whip"
+        },
+        {
+          "choice": "move icebeam",
+          "ev": -0.41527617313759063,
+          "expected": -0.3085361543573773,
+          "worstCase": -0.41531192177027687,
+          "punishedBy": "Spikes"
+        },
+        {
+          "choice": "move earthpower",
+          "ev": -0.4266946251769117,
+          "expected": -0.3010774064405487,
+          "worstCase": -0.4267349746880188,
+          "punishedBy": "Spikes"
+        },
+        {
+          "choice": "move protect",
+          "ev": -0.4488270570982392,
+          "expected": -0.32039422333406015,
+          "worstCase": -0.4488733322463353,
+          "punishedBy": "Spikes"
+        },
+        {
+          "choice": "move dracometeor",
+          "ev": -0.45638004200602805,
+          "expected": -0.3240286735567827,
+          "worstCase": -0.45642245769170353,
+          "punishedBy": "Spikes"
+        }
+      ],
+      "p2": [
+        {
+          "choice": "move spikes",
+          "ev": 0.37556026879898835,
+          "expected": 0.4105046641398976,
+          "worstCase": 0.37554897580626423,
+          "punishedBy": "→ Corviknight"
+        },
+        {
+          "choice": "move powerwhip",
+          "ev": 0.23555612796321568,
+          "expected": 0.3364961404694923,
+          "worstCase": 0.2355062233121692,
+          "punishedBy": "→ Corviknight"
+        },
+        {
+          "choice": "move gyroball",
+          "ev": 0.233733800090456,
+          "expected": 0.3190318869569651,
+          "worstCase": 0.2337004170853343,
+          "punishedBy": "→ Corviknight"
+        },
+        {
+          "choice": "switch 6",
+          "ev": 0.22327147675269943,
+          "expected": 0.24307772067003985,
+          "worstCase": 0.2232665239535203,
+          "punishedBy": "→ Snorlax"
+        },
+        {
+          "choice": "switch 4",
+          "ev": 0.2232705216480769,
+          "expected": 0.25227248100328625,
+          "worstCase": 0.21182065214843027,
+          "punishedBy": "→ Snorlax"
+        },
+        {
+          "choice": "switch 2",
+          "ev": 0.2232680055390184,
+          "expected": 0.2422080447692922,
+          "worstCase": 0.21182065214843027,
+          "punishedBy": "→ Snorlax"
+        },
+        {
+          "choice": "move protect",
+          "ev": 0.21183636694967858,
+          "expected": 0.2616646783184782,
+          "worstCase": 0.21182065214843027,
+          "punishedBy": "→ Corviknight"
+        },
+        {
+          "choice": "switch 5",
+          "ev": 0.21183099917285922,
+          "expected": 0.24973465946814655,
+          "worstCase": 0.21182065214843027,
+          "punishedBy": "→ Snorlax"
+        }
+      ]
+    },
+    "mcts": {
+      "score": -0.33663146480275197,
+      "visits": 600,
+      "depth": 4,
+      "rootValue": -0.30292430063470865,
+      "p1N": [
+        44,
+        84,
+        55,
+        66,
+        93,
+        65,
+        104,
+        89
+      ],
+      "p1W": [
+        -17.306103106691904,
+        -25.456830739039777,
+        -19.63547730083388,
+        -21.86773633190039,
+        -27.165415902011507,
+        -21.768551921540713,
+        -29.269754017466603,
+        -26.3954893489383
+      ],
+      "p2N": [
+        97,
+        100,
+        189,
+        45,
+        37,
+        46,
+        36,
+        50
+      ],
+      "p2W": [
+        -32.32748593477215,
+        -33.59557885636817,
+        -74.05454456754421,
+        -10.595481967884195,
+        -7.493356023227605,
+        -11.00914567102033,
+        -7.2362051366201845,
+        -12.553560510986207
+      ],
+      "cells": [
+        [
+          10007,
+          7,
+          -1.9140119080949614,
+          -0.2498539435476378,
+          false
+        ],
+        [
+          60000,
+          20,
+          -4.697546811791026,
+          -0.21182065214843027,
+          false
+        ],
+        [
+          5,
+          5,
+          -1.3339939758637334,
+          -0.2838697772628943,
+          false
+        ],
+        [
+          20001,
+          9,
+          -3.5857369011757347,
+          -0.3547493587902243,
+          false
+        ],
+        [
+          60001,
+          16,
+          -3.9293703057948397,
+          -0.234872356322687,
+          false
+        ],
+        [
+          10005,
+          10,
+          -2.8691879346222207,
+          -0.2833353324191147,
+          false
+        ],
+        [
+          7,
+          3,
+          -1.1183006143929664,
+          -0.30292430063470865,
+          false
+        ],
+        [
+          20000,
+          9,
+          -3.3820068129946796,
+          -0.34026314394560897,
+          false
+        ],
+        [
+          30002,
+          16,
+          -6.856971584569428,
+          -0.4488733322463353,
+          false
+        ],
+        [
+          60002,
+          34,
+          -13.276058579498768,
+          -0.37554897580626423,
+          false
+        ],
+        [
+          10001,
+          10,
+          -4.053824094967027,
+          -0.3537892866023983,
+          false
+        ],
+        [
+          20007,
+          4,
+          -1.0676558922445962,
+          -0.2204275626865806,
+          false
+        ],
+        [
+          30000,
+          16,
+          -5.097233138815849,
+          -0.30292430063470865,
+          false
+        ],
+        [
+          50003,
+          6,
+          -1.5146981367973211,
+          -0.2232665239535203,
+          false
+        ],
+        [
+          50001,
+          11,
+          -4.188769285273966,
+          -0.354182196548403,
+          false
+        ],
+        [
+          2,
+          14,
+          -6.226542900527772,
+          -0.4568445587400627,
+          false
+        ],
+        [
+          10000,
+          11,
+          -3.351874368447023,
+          -0.3035605107268481,
+          false
+        ],
+        [
+          20005,
+          3,
+          -0.8731010185140404,
+          -0.2756426719704974,
+          false
+        ],
+        [
+          50007,
+          5,
+          -0.9031818481436427,
+          -0.2232665239535203,
+          false
+        ],
+        [
+          40004,
+          7,
+          -1.2794520624249,
+          -0.21182065214843027,
+          false
+        ],
+        [
+          40002,
+          29,
+          -11.542421175232574,
+          -0.3839016797461615,
+          false
+        ],
+        [
+          40003,
+          6,
+          -1.4007763789232066,
+          -0.2232665239535203,
+          false
+        ],
+        [
+          30001,
+          14,
+          -4.571572750253619,
+          -0.30292430063470865,
+          false
+        ],
+        [
+          60004,
+          9,
+          -2.070666728890704,
+          -0.2232665239535203,
+          false
+        ],
+        [
+          70006,
+          6,
+          -1.3257790155968663,
+          -0.2232665239535203,
+          false
+        ],
+        [
+          70005,
+          9,
+          -2.3103962324421095,
+          -0.2232665239535203,
+          false
+        ],
+        [
+          20002,
+          22,
+          -8.933007342254145,
+          -0.4261396359040017,
+          false
+        ],
+        [
+          70007,
+          14,
+          -3.584707906051659,
+          -0.2232665239535203,
+          false
+        ],
+        [
+          40001,
+          18,
+          -4.9793638312040125,
+          -0.25547438255348287,
+          false
+        ],
+        [
+          6,
+          2,
+          -0.532769878456378,
+          -0.28903268363347634,
+          false
+        ],
+        [
+          50002,
+          23,
+          -9.230788136920578,
+          -0.38626843598023664,
+          false
+        ],
+        [
+          60003,
+          10,
+          -2.300096174963812,
+          -0.21182065214843027,
+          false
+        ],
+        [
+          70004,
+          4,
+          -0.8792459676898257,
+          -0.2232665239535203,
+          false
+        ],
+        [
+          1,
+          9,
+          -4.885650083750383,
+          -0.5415443700596294,
+          false
+        ],
+        [
+          30007,
+          6,
+          -1.6308931700067608,
+          -0.30292430063470865,
+          false
+        ],
+        [
+          20006,
+          4,
+          -0.9086225859355868,
+          -0.24914235940884255,
+          false
+        ],
+        [
+          70003,
+          8,
+          -1.5994850231936892,
+          -0.2232665239535203,
+          false
+        ],
+        [
+          10004,
+          8,
+          -0.8956141294450976,
+          -0.16034774852509015,
+          false
+        ],
+        [
+          40005,
+          8,
+          -1.2805589938079114,
+          -0.21182065214843027,
+          false
+        ],
+        [
+          10006,
+          7,
+          -0.7529753897473648,
+          -0.16986975463205356,
+          false
+        ],
+        [
+          70002,
+          26,
+          -8.03549428035705,
+          -0.3909755351901836,
+          false
+        ],
+        [
+          40000,
+          12,
+          -4.070753046634353,
+          -0.32990094316505403,
+          false
+        ],
+        [
+          30004,
+          5,
+          -1.3664917746841962,
+          -0.29673465061789417,
+          false
+        ],
+        [
+          60007,
+          5,
+          -1.0500415071778213,
+          -0.2232665239535203,
+          false
+        ],
+        [
+          50006,
+          3,
+          -0.6826537371023723,
+          -0.2232665239535203,
+          false
+        ],
+        [
+          70000,
+          9,
+          -5.259089319658511,
+          -0.5737349548377125,
+          false
+        ],
+        [
+          60005,
+          7,
+          -1.332620126534734,
+          -0.2232665239535203,
+          false
+        ],
+        [
+          40006,
+          7,
+          -1.3273227489107433,
+          -0.21182065214843027,
+          false
+        ],
+        [
+          10002,
+          25,
+          -9.953260568183905,
+          -0.41287708042212923,
+          false
+        ],
+        [
+          30003,
+          3,
+          -0.6776457023809342,
+          -0.30292430063470865,
+          false
+        ],
+        [
+          40007,
+          6,
+          -1.2847676648738027,
+          -0.2232665239535203,
+          false
+        ],
+        [
+          30006,
+          4,
+          -1.09272799805597,
+          -0.30292430063470865,
+          false
+        ],
+        [
+          3,
+          3,
+          -0.7832750137958345,
+          -0.30292430063470865,
+          false
+        ],
+        [
+          0,
+          5,
+          -1.6556088352298342,
+          -0.34511054536615227,
+          false
+        ],
+        [
+          10003,
+          6,
+          -1.6660823455321823,
+          -0.30292430063470865,
+          false
+        ],
+        [
+          20003,
+          3,
+          -0.6534231922972147,
+          -0.30292430063470865,
+          false
+        ],
+        [
+          70001,
+          13,
+          -3.401291603948601,
+          -0.30439180108267816,
+          false
+        ],
+        [
+          50000,
+          15,
+          -4.813373601200891,
+          -0.29933229306160736,
+          false
+        ],
+        [
+          60006,
+          3,
+          -0.6133537828149025,
+          -0.21182065214843027,
+          false
+        ],
+        [
+          30005,
+          2,
+          -0.5742002131336295,
+          -0.30292430063470865,
+          false
+        ],
+        [
+          4,
+          3,
+          -0.7699618046749956,
+          -0.2633894410328913,
+          false
+        ],
+        [
+          50005,
+          2,
+          -0.4350871761019506,
+          -0.21182065214843027,
+          false
+        ],
+        [
+          20004,
+          1,
+          -0.231923555417885,
+          -0.231923555417885,
+          false
+        ]
+      ]
+    }
+  },
+  "doubles": {
+    "root": "182bae5936fd1d1c07ba32f9adb58edeb0d270720403fcb646894eab1c905d1e",
+    "children": [
+      {
+        "p1": "move tackle 2",
+        "p2": "move ember 2",
+        "seed": "1,2,3,4",
+        "state": "cff384017ba7634592c85eb64528284cce4de5c5e3f7ea754ca435f0eaec2694",
+        "facts": {
+          "turn": 4,
+          "ended": false,
+          "prng": "62891,40560,22227,62965",
+          "sides": [
+            {
+              "pokemonLeft": 1,
+              "active": [
+                "[Pokemon:p1a]",
+                "[Pokemon:p1b]"
+              ],
+              "hp": [
+                0,
+                108
+              ],
+              "fainted": [
+                true,
+                false
+              ],
+              "status": [
+                "fnt",
+                ""
+              ]
+            },
+            {
+              "pokemonLeft": 1,
+              "active": [
+                "[Pokemon:p2a]",
+                "[Pokemon:p2b]"
+              ],
+              "hp": [
+                0,
+                38
+              ],
+              "fainted": [
+                true,
+                false
+              ],
+              "status": [
+                "fnt",
+                ""
+              ]
+            }
+          ]
+        },
+        "log": [
+          "|",
+          "|move|p2b: Charmander|Ember|p1b: Eevee",
+          "|split|p1",
+          "|-damage|p1b: Eevee|108/130",
+          "|-damage|p1b: Eevee|108/130",
+          "|move|p1b: Eevee|Tackle|p2b: Charmander",
+          "|split|p2",
+          "|-damage|p2b: Charmander|38/114",
+          "|-damage|p2b: Charmander|38/114",
+          "|",
+          "|upkeep",
+          "|turn|4"
+        ]
+      },
+      {
+        "p1": "move tackle 2",
+        "p2": "move ember 2",
+        "seed": "5,6,7,8",
+        "state": "64ab3c7c316772fd87943c117cfdfa115fabfec8d2f2dc933ee15d48f852fff9",
+        "facts": {
+          "turn": 4,
+          "ended": false,
+          "prng": "38182,58147,23247,34089",
+          "sides": [
+            {
+              "pokemonLeft": 1,
+              "active": [
+                "[Pokemon:p1a]",
+                "[Pokemon:p1b]"
+              ],
+              "hp": [
+                0,
+                106
+              ],
+              "fainted": [
+                true,
+                false
+              ],
+              "status": [
+                "fnt",
+                ""
+              ]
+            },
+            {
+              "pokemonLeft": 1,
+              "active": [
+                "[Pokemon:p2a]",
+                "[Pokemon:p2b]"
+              ],
+              "hp": [
+                0,
+                34
+              ],
+              "fainted": [
+                true,
+                false
+              ],
+              "status": [
+                "fnt",
+                ""
+              ]
+            }
+          ]
+        },
+        "log": [
+          "|",
+          "|move|p2b: Charmander|Ember|p1b: Eevee",
+          "|split|p1",
+          "|-damage|p1b: Eevee|106/130",
+          "|-damage|p1b: Eevee|106/130",
+          "|move|p1b: Eevee|Tackle|p2b: Charmander",
+          "|split|p2",
+          "|-damage|p2b: Charmander|34/114",
+          "|-damage|p2b: Charmander|34/114",
+          "|",
+          "|upkeep",
+          "|turn|4"
+        ]
+      },
+      {
+        "p1": "move tackle 2",
+        "p2": "move ember 2 terastallize",
+        "seed": "1,2,3,4",
+        "state": "e6c1a1e874991bba0eab656cdd6b416c85be75283aa271aa9560b05994fb0ad7",
+        "facts": {
+          "turn": 4,
+          "ended": false,
+          "prng": "62891,40560,22227,62965",
+          "sides": [
+            {
+              "pokemonLeft": 1,
+              "active": [
+                "[Pokemon:p1a]",
+                "[Pokemon:p1b]"
+              ],
+              "hp": [
+                0,
+                88
+              ],
+              "fainted": [
+                true,
+                false
+              ],
+              "status": [
+                "fnt",
+                ""
+              ]
+            },
+            {
+              "pokemonLeft": 1,
+              "active": [
+                "[Pokemon:p2a]",
+                "[Pokemon:p2b]"
+              ],
+              "hp": [
+                0,
+                38
+              ],
+              "fainted": [
+                true,
+                false
+              ],
+              "status": [
+                "fnt",
+                ""
+              ]
+            }
+          ]
+        },
+        "log": [
+          "|",
+          "|-terastallize|p2b: Charmander|Fire",
+          "|move|p2b: Charmander|Ember|p1b: Eevee",
+          "|split|p1",
+          "|-damage|p1b: Eevee|88/130",
+          "|-damage|p1b: Eevee|88/130",
+          "|move|p1b: Eevee|Tackle|p2b: Charmander",
+          "|split|p2",
+          "|-damage|p2b: Charmander|38/114",
+          "|-damage|p2b: Charmander|38/114",
+          "|",
+          "|upkeep",
+          "|turn|4"
+        ]
+      },
+      {
+        "p1": "move tackle 2",
+        "p2": "move ember 2 terastallize",
+        "seed": "5,6,7,8",
+        "state": "36c29409d076d4211679278e6c0deb793202c991a1531f150cff7b105f3daaa1",
+        "facts": {
+          "turn": 4,
+          "ended": false,
+          "prng": "38182,58147,23247,34089",
+          "sides": [
+            {
+              "pokemonLeft": 1,
+              "active": [
+                "[Pokemon:p1a]",
+                "[Pokemon:p1b]"
+              ],
+              "hp": [
+                0,
+                84
+              ],
+              "fainted": [
+                true,
+                false
+              ],
+              "status": [
+                "fnt",
+                ""
+              ]
+            },
+            {
+              "pokemonLeft": 1,
+              "active": [
+                "[Pokemon:p2a]",
+                "[Pokemon:p2b]"
+              ],
+              "hp": [
+                0,
+                34
+              ],
+              "fainted": [
+                true,
+                false
+              ],
+              "status": [
+                "fnt",
+                ""
+              ]
+            }
+          ]
+        },
+        "log": [
+          "|",
+          "|-terastallize|p2b: Charmander|Fire",
+          "|move|p2b: Charmander|Ember|p1b: Eevee",
+          "|split|p1",
+          "|-damage|p1b: Eevee|84/130",
+          "|-damage|p1b: Eevee|84/130",
+          "|move|p1b: Eevee|Tackle|p2b: Charmander",
+          "|split|p2",
+          "|-damage|p2b: Charmander|34/114",
+          "|-damage|p2b: Charmander|34/114",
+          "|",
+          "|upkeep",
+          "|turn|4"
+        ]
+      },
+      {
+        "p1": "move tackle 2 terastallize",
+        "p2": "move ember 2",
+        "seed": "1,2,3,4",
+        "state": "c5e55c68972c1d45dcd8dda07df83cf3ccb0a4c190ac8716fc13a3cdffb11bc3",
+        "facts": {
+          "turn": 4,
+          "ended": false,
+          "prng": "62891,40560,22227,62965",
+          "sides": [
+            {
+              "pokemonLeft": 1,
+              "active": [
+                "[Pokemon:p1a]",
+                "[Pokemon:p1b]"
+              ],
+              "hp": [
+                0,
+                108
+              ],
+              "fainted": [
+                true,
+                false
+              ],
+              "status": [
+                "fnt",
+                ""
+              ]
+            },
+            {
+              "pokemonLeft": 1,
+              "active": [
+                "[Pokemon:p2a]",
+                "[Pokemon:p2b]"
+              ],
+              "hp": [
+                0,
+                13
+              ],
+              "fainted": [
+                true,
+                false
+              ],
+              "status": [
+                "fnt",
+                ""
+              ]
+            }
+          ]
+        },
+        "log": [
+          "|",
+          "|-terastallize|p1b: Eevee|Normal",
+          "|move|p2b: Charmander|Ember|p1b: Eevee",
+          "|split|p1",
+          "|-damage|p1b: Eevee|108/130",
+          "|-damage|p1b: Eevee|108/130",
+          "|move|p1b: Eevee|Tackle|p2b: Charmander",
+          "|split|p2",
+          "|-damage|p2b: Charmander|13/114",
+          "|-damage|p2b: Charmander|13/114",
+          "|",
+          "|upkeep",
+          "|turn|4"
+        ]
+      },
+      {
+        "p1": "move tackle 2 terastallize",
+        "p2": "move ember 2",
+        "seed": "5,6,7,8",
+        "state": "355e8230d94b8ea050a8be9384cc9223c88c2474ef7998d091db2f3cc1e2472c",
+        "facts": {
+          "turn": 4,
+          "ended": false,
+          "prng": "38182,58147,23247,34089",
+          "sides": [
+            {
+              "pokemonLeft": 1,
+              "active": [
+                "[Pokemon:p1a]",
+                "[Pokemon:p1b]"
+              ],
+              "hp": [
+                0,
+                106
+              ],
+              "fainted": [
+                true,
+                false
+              ],
+              "status": [
+                "fnt",
+                ""
+              ]
+            },
+            {
+              "pokemonLeft": 1,
+              "active": [
+                "[Pokemon:p2a]",
+                "[Pokemon:p2b]"
+              ],
+              "hp": [
+                0,
+                9
+              ],
+              "fainted": [
+                true,
+                false
+              ],
+              "status": [
+                "fnt",
+                ""
+              ]
+            }
+          ]
+        },
+        "log": [
+          "|",
+          "|-terastallize|p1b: Eevee|Normal",
+          "|move|p2b: Charmander|Ember|p1b: Eevee",
+          "|split|p1",
+          "|-damage|p1b: Eevee|106/130",
+          "|-damage|p1b: Eevee|106/130",
+          "|move|p1b: Eevee|Tackle|p2b: Charmander",
+          "|split|p2",
+          "|-damage|p2b: Charmander|9/114",
+          "|-damage|p2b: Charmander|9/114",
+          "|",
+          "|upkeep",
+          "|turn|4"
+        ]
+      },
+      {
+        "p1": "move tackle 2 terastallize",
+        "p2": "move ember 2 terastallize",
+        "seed": "1,2,3,4",
+        "state": "f0c1b744ce85b6819327b3f94b01e96ec4697db8afcabc088e11a50cf64c3a81",
+        "facts": {
+          "turn": 4,
+          "ended": false,
+          "prng": "62891,40560,22227,62965",
+          "sides": [
+            {
+              "pokemonLeft": 1,
+              "active": [
+                "[Pokemon:p1a]",
+                "[Pokemon:p1b]"
+              ],
+              "hp": [
+                0,
+                88
+              ],
+              "fainted": [
+                true,
+                false
+              ],
+              "status": [
+                "fnt",
+                ""
+              ]
+            },
+            {
+              "pokemonLeft": 1,
+              "active": [
+                "[Pokemon:p2a]",
+                "[Pokemon:p2b]"
+              ],
+              "hp": [
+                0,
+                13
+              ],
+              "fainted": [
+                true,
+                false
+              ],
+              "status": [
+                "fnt",
+                ""
+              ]
+            }
+          ]
+        },
+        "log": [
+          "|",
+          "|-terastallize|p2b: Charmander|Fire",
+          "|-terastallize|p1b: Eevee|Normal",
+          "|move|p2b: Charmander|Ember|p1b: Eevee",
+          "|split|p1",
+          "|-damage|p1b: Eevee|88/130",
+          "|-damage|p1b: Eevee|88/130",
+          "|move|p1b: Eevee|Tackle|p2b: Charmander",
+          "|split|p2",
+          "|-damage|p2b: Charmander|13/114",
+          "|-damage|p2b: Charmander|13/114",
+          "|",
+          "|upkeep",
+          "|turn|4"
+        ]
+      },
+      {
+        "p1": "move tackle 2 terastallize",
+        "p2": "move ember 2 terastallize",
+        "seed": "5,6,7,8",
+        "state": "fe818685f904d2a457d3b962a7f5ad570c99043fdf700fd2eeda0d0cabc5bfad",
+        "facts": {
+          "turn": 4,
+          "ended": false,
+          "prng": "38182,58147,23247,34089",
+          "sides": [
+            {
+              "pokemonLeft": 1,
+              "active": [
+                "[Pokemon:p1a]",
+                "[Pokemon:p1b]"
+              ],
+              "hp": [
+                0,
+                84
+              ],
+              "fainted": [
+                true,
+                false
+              ],
+              "status": [
+                "fnt",
+                ""
+              ]
+            },
+            {
+              "pokemonLeft": 1,
+              "active": [
+                "[Pokemon:p2a]",
+                "[Pokemon:p2b]"
+              ],
+              "hp": [
+                0,
+                9
+              ],
+              "fainted": [
+                true,
+                false
+              ],
+              "status": [
+                "fnt",
+                ""
+              ]
+            }
+          ]
+        },
+        "log": [
+          "|",
+          "|-terastallize|p2b: Charmander|Fire",
+          "|-terastallize|p1b: Eevee|Normal",
+          "|move|p2b: Charmander|Ember|p1b: Eevee",
+          "|split|p1",
+          "|-damage|p1b: Eevee|84/130",
+          "|-damage|p1b: Eevee|84/130",
+          "|move|p1b: Eevee|Tackle|p2b: Charmander",
+          "|split|p2",
+          "|-damage|p2b: Charmander|9/114",
+          "|-damage|p2b: Charmander|9/114",
+          "|",
+          "|upkeep",
+          "|turn|4"
+        ]
+      },
+      {
+        "p1": "move protect",
+        "p2": "move ember 2",
+        "seed": "1,2,3,4",
+        "state": "8677c812e70777c76c64c5a6981b8b7f85d3d8a3e09adb1b122c159764c4dfb6",
+        "facts": {
+          "turn": 4,
+          "ended": false,
+          "prng": "30982,33910,19571,50263",
+          "sides": [
+            {
+              "pokemonLeft": 1,
+              "active": [
+                "[Pokemon:p1a]",
+                "[Pokemon:p1b]"
+              ],
+              "hp": [
+                0,
+                130
+              ],
+              "fainted": [
+                true,
+                false
+              ],
+              "status": [
+                "fnt",
+                ""
+              ]
+            },
+            {
+              "pokemonLeft": 1,
+              "active": [
+                "[Pokemon:p2a]",
+                "[Pokemon:p2b]"
+              ],
+              "hp": [
+                0,
+                74
+              ],
+              "fainted": [
+                true,
+                false
+              ],
+              "status": [
+                "fnt",
+                ""
+              ]
+            }
+          ]
+        },
+        "log": [
+          "|",
+          "|move|p1b: Eevee|Protect|p1b: Eevee",
+          "|-singleturn|p1b: Eevee|Protect",
+          "|move|p2b: Charmander|Ember|p1b: Eevee",
+          "|-activate|p1b: Eevee|move: Protect",
+          "|",
+          "|upkeep",
+          "|turn|4"
+        ]
+      },
+      {
+        "p1": "move protect",
+        "p2": "move ember 2",
+        "seed": "5,6,7,8",
+        "state": "fe8219dc38e9e580beab3d0966ee1b373c49f4efea9238f87e3fe1a57b1c0727",
+        "facts": {
+          "turn": 4,
+          "ended": false,
+          "prng": "61872,34750,8741,59883",
+          "sides": [
+            {
+              "pokemonLeft": 1,
+              "active": [
+                "[Pokemon:p1a]",
+                "[Pokemon:p1b]"
+              ],
+              "hp": [
+                0,
+                130
+              ],
+              "fainted": [
+                true,
+                false
+              ],
+              "status": [
+                "fnt",
+                ""
+              ]
+            },
+            {
+              "pokemonLeft": 1,
+              "active": [
+                "[Pokemon:p2a]",
+                "[Pokemon:p2b]"
+              ],
+              "hp": [
+                0,
+                74
+              ],
+              "fainted": [
+                true,
+                false
+              ],
+              "status": [
+                "fnt",
+                ""
+              ]
+            }
+          ]
+        },
+        "log": [
+          "|",
+          "|move|p1b: Eevee|Protect|p1b: Eevee",
+          "|-singleturn|p1b: Eevee|Protect",
+          "|move|p2b: Charmander|Ember|p1b: Eevee",
+          "|-activate|p1b: Eevee|move: Protect",
+          "|",
+          "|upkeep",
+          "|turn|4"
+        ]
+      },
+      {
+        "p1": "move protect",
+        "p2": "move ember 2 terastallize",
+        "seed": "1,2,3,4",
+        "state": "91cbc1f0a29c4fd06d380dcc18037249e75a8023fe870c2383e643e2eb0a2b72",
+        "facts": {
+          "turn": 4,
+          "ended": false,
+          "prng": "30982,33910,19571,50263",
+          "sides": [
+            {
+              "pokemonLeft": 1,
+              "active": [
+                "[Pokemon:p1a]",
+                "[Pokemon:p1b]"
+              ],
+              "hp": [
+                0,
+                130
+              ],
+              "fainted": [
+                true,
+                false
+              ],
+              "status": [
+                "fnt",
+                ""
+              ]
+            },
+            {
+              "pokemonLeft": 1,
+              "active": [
+                "[Pokemon:p2a]",
+                "[Pokemon:p2b]"
+              ],
+              "hp": [
+                0,
+                74
+              ],
+              "fainted": [
+                true,
+                false
+              ],
+              "status": [
+                "fnt",
+                ""
+              ]
+            }
+          ]
+        },
+        "log": [
+          "|",
+          "|-terastallize|p2b: Charmander|Fire",
+          "|move|p1b: Eevee|Protect|p1b: Eevee",
+          "|-singleturn|p1b: Eevee|Protect",
+          "|move|p2b: Charmander|Ember|p1b: Eevee",
+          "|-activate|p1b: Eevee|move: Protect",
+          "|",
+          "|upkeep",
+          "|turn|4"
+        ]
+      },
+      {
+        "p1": "move protect",
+        "p2": "move ember 2 terastallize",
+        "seed": "5,6,7,8",
+        "state": "d1d5326a261e0249776ecbd7754afe7f43e810fccedcc174ed907c436477e796",
+        "facts": {
+          "turn": 4,
+          "ended": false,
+          "prng": "61872,34750,8741,59883",
+          "sides": [
+            {
+              "pokemonLeft": 1,
+              "active": [
+                "[Pokemon:p1a]",
+                "[Pokemon:p1b]"
+              ],
+              "hp": [
+                0,
+                130
+              ],
+              "fainted": [
+                true,
+                false
+              ],
+              "status": [
+                "fnt",
+                ""
+              ]
+            },
+            {
+              "pokemonLeft": 1,
+              "active": [
+                "[Pokemon:p2a]",
+                "[Pokemon:p2b]"
+              ],
+              "hp": [
+                0,
+                74
+              ],
+              "fainted": [
+                true,
+                false
+              ],
+              "status": [
+                "fnt",
+                ""
+              ]
+            }
+          ]
+        },
+        "log": [
+          "|",
+          "|-terastallize|p2b: Charmander|Fire",
+          "|move|p1b: Eevee|Protect|p1b: Eevee",
+          "|-singleturn|p1b: Eevee|Protect",
+          "|move|p2b: Charmander|Ember|p1b: Eevee",
+          "|-activate|p1b: Eevee|move: Protect",
+          "|",
+          "|upkeep",
+          "|turn|4"
+        ]
+      }
+    ],
+    "matrix": {
+      "score": 0.7870029960337255,
+      "interval": 0,
+      "depthCompleted": 1,
+      "p1": [
+        {
+          "choice": "move protect",
+          "ev": 0.7870029960337254,
+          "expected": 0.7870029960337255,
+          "worstCase": 0.7870029960337255,
+          "punishedBy": "Ember"
+        },
+        {
+          "choice": "move tackle 2",
+          "ev": 0.6852717629308608,
+          "expected": 0.7361310204853496,
+          "worstCase": 0.6852590449369738,
+          "punishedBy": "Ember"
+        }
+      ],
+      "p2": [
+        {
+          "choice": "move ember 2",
+          "ev": -0.7361183024914625,
+          "expected": -0.6852590449369738,
+          "worstCase": -0.7361310204853496,
+          "punishedBy": "Protect"
+        },
+        {
+          "choice": "move protect",
+          "ev": -0.7870029960337254,
+          "expected": -0.7870029960337255,
+          "worstCase": -0.7870029960337255,
+          "punishedBy": "Tackle"
+        }
+      ]
+    },
+    "mcts": {
+      "score": 0.861678894324754,
+      "visits": 600,
+      "depth": 8,
+      "rootValue": 0.7870029960337255,
+      "p1N": [
+        136,
+        464
+      ],
+      "p1W": [
+        107.56859049573616,
+        405.31633595813804
+      ],
+      "p2N": [
+        326,
+        274
+      ],
+      "p2W": [
+        277.044972025703,
+        235.83995442817138
+      ],
+      "cells": [
+        [
+          0,
+          67,
+          56.26277201866788,
+          0.6852590449369738,
+          false
+        ],
+        [
+          10001,
+          205,
+          184.53413595110308,
+          0.7870029960337255,
+          false
+        ],
+        [
+          10000,
+          259,
+          220.78220000703516,
+          0.7870029960337255,
+          false
+        ],
+        [
+          1,
+          69,
+          51.30581847706832,
+          0.7870029960337255,
+          false
+        ]
+      ]
+    }
+  }
+}
