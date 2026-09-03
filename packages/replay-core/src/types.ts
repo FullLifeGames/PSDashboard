@@ -65,6 +65,11 @@ export interface DamageObservation {
   moveId: string;
   /** Damage dealt as a fraction of the defender's max HP (HP-bar precision). */
   observedFraction: number;
+  /**
+   * The hit took the defender's remaining HP (|-damage|...|0 fnt): the
+   * recorded fraction is a LOWER BOUND on the damage, not a reading.
+   */
+  lethal: boolean;
   attackerBoosts: Record<string, number>;
   defenderBoosts: Record<string, number>;
   attackerStatus: string;

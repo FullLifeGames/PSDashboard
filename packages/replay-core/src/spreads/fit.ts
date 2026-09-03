@@ -154,9 +154,15 @@ export function observationError(ctx: SolveContext, obs: DamageObservation, cand
     const range = rollRange(ctx, obs, attackerSpread, defenderSpread);
     if (!range) return 0;
     const { min, max } = range;
-    const distance = obs.observedFraction < min
-      ? min - obs.observedFraction
-      : obs.observedFraction > max ? obs.observedFraction - max : 0;
+    // A lethal hit only says "at least this much": rungs whose best roll
+    // could not reach the remaining HP are refuted, overkill rungs are
+    // consistent. Read as a reading, every knock-out pulled the solve
+    // toward "bulkier defender, weaker attacker" (573756 p1 Toxapex).
+    const distance = obs.lethal
+      ? (obs.observedFraction > max ? obs.observedFraction - max : 0)
+      : obs.observedFraction < min
+        ? min - obs.observedFraction
+        : obs.observedFraction > max ? obs.observedFraction - max : 0;
     return Math.max(0, distance - OBSERVATION_SLACK) ** 2;
   } catch {
     // Unknown move/species for this gen: the observation cannot judge.

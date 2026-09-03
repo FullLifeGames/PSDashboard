@@ -91,7 +91,7 @@ test.describe('choice-item damage corroboration', () => {
   };
   const observation = (fraction: number) => [{
     attackerSpecies: 'Keldeo', defenderSpecies: 'Mew', attackerSide: 'p1' as const,
-    moveId: 'hydropump', observedFraction: fraction,
+    moveId: 'hydropump', observedFraction: fraction, lethal: false,
     attackerBoosts: {}, defenderBoosts: {}, attackerStatus: '', screens: [], weather: '',
   }];
 
@@ -141,7 +141,7 @@ test.describe('choice-lock context', () => {
     };
     const context = buildChoiceLockContext(contextLog, teams, [{
       attackerSpecies: 'Keldeo', defenderSpecies: 'Mew', attackerSide: 'p1',
-      moveId: 'hydropump', observedFraction: 0.55,
+      moveId: 'hydropump', observedFraction: 0.55, lethal: false,
       attackerBoosts: {}, defenderBoosts: {}, attackerStatus: '', screens: [], weather: '',
     }]);
     expect(context.eligibility.p1['keldeo']).toBe(false);

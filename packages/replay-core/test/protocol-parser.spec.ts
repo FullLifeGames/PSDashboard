@@ -64,8 +64,26 @@ test.describe('damage observations', () => {
       attackerSide: 'p1',
       moveId: 'tackle',
       attackerStatus: '',
+      lethal: false,
     });
     expect(observations[0].observedFraction).toBeCloseTo(0.24, 5);
+  });
+
+  test('a knock-out hit is recorded as a lethal lower bound', () => {
+    // The line only says the hit took everything that was left: the
+    // recorded fraction is the remaining HP, the flag tells the fitter to
+    // read it as a lower bound rather than a damage reading.
+    const log = [
+      ...obsHeader,
+      '|move|p1a: Lax|Tackle|p2a: Chomp',
+      '|-damage|p2a: Chomp|0 fnt',
+      '|faint|p2a: Chomp',
+      '|turn|2',
+    ].join('\n');
+    const { observations } = parseReplayLogWithObservations(log);
+    expect(observations).toHaveLength(1);
+    expect(observations[0].lethal).toBe(true);
+    expect(observations[0].observedFraction).toBeCloseTo(1, 5);
   });
 
   test('crits, [from] damage, multi-hits, and doubles yield no observations', () => {

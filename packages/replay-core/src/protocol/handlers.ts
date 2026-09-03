@@ -215,6 +215,7 @@ function recordDamageObservation(state: ParserState, parts: string[], defenderId
         attackerSide: lastMove.attacker.startsWith('p1') ? 'p1' : 'p2',
         moveId: lastMove.moveId,
         observedFraction,
+        lethal: newFraction === 0,
         attackerBoosts: { ...attacker.boosts },
         defenderBoosts: { ...defender.boosts },
         attackerStatus: attacker.status || '',

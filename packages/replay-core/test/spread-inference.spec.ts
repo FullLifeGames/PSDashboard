@@ -2,6 +2,7 @@ import { test, expect } from '@playwright/test';
 import { Generations, Pokemon, Move, calculate } from '@smogon/calc';
 import type { PokemonSet } from '@pkmn/sim';
 import { inferSpreads } from '../src/spread-inference';
+import { buildSolveContext, observationError } from '../src/spreads/fit';
 import { toId } from '../src/ids';
 import type { DamageObservation } from '../src/types';
 
@@ -16,7 +17,7 @@ const set = (species: string, moves: string[]): PokemonSet => ({
 });
 
 /** A mid-roll hit computed forward with the TRUE spreads — the ground truth. */
-function observe(moveName: string, defEvs: Partial<Record<'hp' | 'def' | 'spd', number>>, defNature: string): DamageObservation {
+function observe(moveName: string, defEvs: Partial<Record<'hp' | 'def' | 'spd', number>>, defNature: string, lethal = false): DamageObservation {
   const attacker = new Pokemon(gen, 'Landorus-Therian', {
     level: 50, nature: 'Hardy',
     evs: { hp: 252, atk: 252, def: 0, spa: 0, spd: 4, spe: 0 },
@@ -31,6 +32,7 @@ function observe(moveName: string, defEvs: Partial<Record<'hp' | 'def' | 'spd', 
     attackerSide: 'p2',
     moveId: toId(moveName),
     observedFraction: mid / defender.maxHP(),
+    lethal,
     attackerBoosts: {}, defenderBoosts: {}, attackerStatus: '',
     screens: [], weather: '',
   };
@@ -68,6 +70,34 @@ test.describe('damage-consistent spread inference', () => {
     // One observation is not enough to solve anything.
     const single = inferSpreads([observe('U-turn', {}, 'Hardy')], sets, 'gen9customgame');
     expect(single.get('p1:uxie')).toBeUndefined();
+  });
+
+  test('a lethal hit is a lower bound: overkill rungs are not refuted, short rungs are', () => {
+    // Truth: an uninvested Uxie. Two clean hits say so; the third hit
+    // knocked out an Uxie that had 5% left. Read as a damage reading,
+    // "5%" punishes every rung whose weakest roll exceeds 5% and pulls the
+    // solve toward bulk (573756: p1 Toxapex was fitted as physically
+    // defensive off its own knock-out); read as a bound it refutes nothing.
+    const clean = [observe('U-turn', {}, 'Hardy'), observe('Knock Off', {}, 'Hardy')];
+    const lethal: DamageObservation = { ...observe('Knock Off', {}, 'Hardy', true), observedFraction: 0.05 };
+    const inferred = inferSpreads([...clean, lethal], sets, 'gen9customgame');
+    const uxie = inferred.get('p1:uxie');
+    expect(uxie).toBeTruthy();
+    expect(uxie!.evs.def).toBe(0);
+    expect(uxie!.evs.hp).toBe(0);
+    // Control: the same line read as an exact 5% does not reproduce the truth.
+    const misread = inferSpreads([...clean, { ...lethal, lethal: false }], sets, 'gen9customgame').get('p1:uxie');
+    expect(misread === undefined || misread.evs.hp > 0 || misread.evs.def > 0).toBe(true);
+    // Direct: 5% left is overkill for every rung, so the line refutes none;
+    // a mid roll left refutes the rung whose best roll cannot reach it.
+    const ctx = buildSolveContext([...clean, lethal], sets, 'gen9customgame', []);
+    const uninvested = { nature: 'Hardy', evs: { hp: 0, atk: 0, def: 0, spa: 0, spd: 0, spe: 0 } };
+    const bulky = { nature: 'Bold', evs: { hp: 252, atk: 0, def: 252, spa: 0, spd: 0, spe: 0 } };
+    expect(observationError(ctx, lethal, 'p1:uxie', uninvested)).toBe(0);
+    expect(observationError(ctx, lethal, 'p1:uxie', bulky)).toBe(0);
+    const midLeft = { ...lethal, observedFraction: clean[1].observedFraction };
+    expect(observationError(ctx, midLeft, 'p1:uxie', uninvested)).toBe(0);
+    expect(observationError(ctx, midLeft, 'p1:uxie', bulky)).toBeGreaterThan(0);
   });
 
   test('solving bulk preserves Speed and nature but never exceeds the EV budget', () => {
@@ -190,6 +220,7 @@ test.describe('goodness-of-fit forfeit', () => {
       attackerSide: 'p2' as const,
       moveId: 'knockoff',
       observedFraction: Number(fraction),
+      lethal: false,
       attackerBoosts: {}, defenderBoosts: {}, attackerStatus: '',
       screens: [], weather: '',
     }));
@@ -222,6 +253,7 @@ test.describe('goodness-of-fit forfeit', () => {
       attackerSpecies: 'Manectric', defenderSpecies: 'Landorus-Therian',
       attackerSide: 'p1', moveId: 'hiddenpower',
       observedFraction: mid / trueDefender.maxHP(),
+      lethal: false,
       attackerBoosts: {}, defenderBoosts: {}, attackerStatus: '', screens: [], weather: '',
     };
     const typedSets = {
