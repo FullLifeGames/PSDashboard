@@ -220,6 +220,24 @@ test.describe('starved support cells are verified before the verdict', () => {
     expect(merged.matrix!.values[1][0]).toBeCloseTo(-0.8, 10);
   });
 
+  test('a rich, agreeing cell with two open classes keeps the sampler blend (round 32)', () => {
+    // Hit and miss both continue the game. Every tree may have drawn the
+    // hit, so the pool's continuation says nothing about the miss class;
+    // substituting it would erase the 10% miss (655336 t23, the round-7
+    // healing). The sampler's blend stands.
+    const rich = (offset: number) => mk({ p1N: [40, 2], p1W: [-38, 1], p2N: [40, 2], p2W: [-38, 1] }, [
+      { key: cellKey(0, 0), visits: 30, total: -28.8 - offset * 0.1, value: -0.9, ended: false },
+    ]);
+    const trees = [rich(0), rich(1), rich(2), rich(3)];
+    const blend = { firstLeaf: -0.2, classes: [
+      { weight: 0.9, leafSum: -0.6, count: 3, hasFirst: true, ended: false },
+      { weight: 0.1, leafSum: 0.3, count: 1, hasFirst: false, ended: false },
+    ] };
+    const verified = new Map([[cellKey(0, 0), { i: 0, j: 0, value: -0.15, ended: false, blend }]]);
+    const merged = mergeMctsTrees(trees, verified);
+    expect(merged.matrix!.values[0][0]).toBeCloseTo(-0.15, 10);
+  });
+
   test('a disagreeing boundary cell keeps the sampler blend (the round-7 case)', () => {
     // One tree rode the other outcome of a root roll: the pool's means are
     // −0.9 / 0.3 / −0.9 and cannot be assigned to classes here, so the

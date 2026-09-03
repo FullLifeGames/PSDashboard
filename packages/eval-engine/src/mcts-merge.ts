@@ -96,12 +96,16 @@ function poolContinuation(trees: MctsTreeStats[], key: number): { value: number;
  * The value a verified cell contributes (round 32). The sampler's job is
  * the ROOT chance split; the trees' job is depth. Starved or thin pools
  * take the sampler's value as before. A rich pool keeps its depth: with a
- * blend, the analytic classes weight the ended classes' exact leaves
- * against the pool's continuation for the open ones (573756 t138: a 5%
- * crit-kill class must not turn a played-out −0.96 into the one-ply static
- * +0.03); without a blend the pooled value stands untouched. Disagreeing
- * trees on a blended cell keep the sampler's blend (draft t56: the pool's
- * draws cannot be assigned to classes here).
+ * blend whose classes leave exactly ONE open, the ended classes contribute
+ * their exact leaves and the open class the pool's continuation (573756
+ * t138: a 5% crit-kill class must not turn a played-out −0.96 into the
+ * one-ply static +0.03); without a blend the pooled value stands untouched.
+ * The pool's open draws can be assigned to a class only in that one-open-
+ * class shape: with two open classes (hit / miss) every tree may have drawn
+ * the same one, and the other class's leaves would be replaced by a
+ * continuation it never had (655336 t23: a 90% High Jump Kick's miss
+ * class), so those cells and disagreeing trees on a blended cell keep the
+ * sampler's blend (draft t56: the draws cannot be assigned to classes).
  */
 function verifiedValue(trees: MctsTreeStats[], key: number, cell: EvalCellValue, pooledValue: number): number {
   const pool = poolContinuation(trees, key);
@@ -109,6 +113,7 @@ function verifiedValue(trees: MctsTreeStats[], key: number, cell: EvalCellValue,
   if (!rich) return cell.value;
   if (!cell.blend) return pooledValue;
   if (pool.spread > VERIFY_SPREAD) return cell.value;
+  if (cell.blend.classes.filter(cls => !cls.ended).length !== 1) return cell.value;
   let value = 0;
   for (const cls of cell.blend.classes) value += cls.weight * (cls.ended ? cls.leafSum / cls.count : pool.value);
   return value;
