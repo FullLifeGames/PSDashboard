@@ -114,6 +114,16 @@ The fixture is a synthetic four-turn game, so its unrevealed move slots fall bac
 
 The barrel is the API: it lists what the app, its worker, and the examples use, plus every type those signatures mention. `regression/fixtures/api/eval-engine.txt` in the repository pins that list, so widening the surface is a one-line edit to `src/index.ts` plus a snapshot refresh.
 
+## Tests
+
+The package's own suite lives under `test/` (white-box against `src/`; not part of the published package). From the repository root:
+
+```sh
+npm test -w packages/eval-engine
+```
+
+`npm run test:regression` at the root runs it together with the app's suite.
+
 ## Versioning and publishing
 
 Both packages carry the repository's version. A release publishes a package only when its files changed since the previous release, and the dependency on `@fulllifegames/replay-core` becomes a caret range at publish time.

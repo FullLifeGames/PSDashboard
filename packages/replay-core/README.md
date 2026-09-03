@@ -112,6 +112,16 @@ The fixture is a synthetic four-turn game with nothing to guess from, so unrevea
 
 The barrel is the API: it lists what the app, the evaluation engine, and the example use, plus every type those signatures mention. `regression/fixtures/api/replay-core.txt` in the repository pins that list, so widening the surface is a one-line edit to `src/index.ts` plus a snapshot refresh.
 
+## Tests
+
+The package's own suite lives under `test/` (white-box against `src/`; not part of the published package). From the repository root:
+
+```sh
+npm test -w packages/replay-core
+```
+
+`npm run test:regression` at the root runs it together with the app's suite.
+
 ## Versioning and publishing
 
 Both packages carry the repository's version. A release publishes a package only when its files changed since the previous release.
