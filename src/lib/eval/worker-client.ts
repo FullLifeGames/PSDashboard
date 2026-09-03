@@ -3,6 +3,7 @@ import {
   type SearchExecutor, type EvalCellValue, type EvalResult, type EvalSettings, type EvalWorkerRequest,
   type EvalWorkerResponse, type MctsTreeStats, type SearchProgress,
 } from '@fulllifegames/eval-engine';
+import { evalPoolSize } from './pool-size';
 
 export interface EvalRunHandlers {
   onProgress?(progress: SearchProgress): void;
@@ -38,20 +39,6 @@ export function playedOutcomeSettings(settings: EvalSettings): EvalSettings | nu
   return { depth, samples: 1, tera: settings.tera, mode: 'matrix' };
 }
 
-function poolSize(): number {
-  const cores = typeof navigator !== 'undefined' ? navigator.hardwareConcurrency ?? 4 : 4;
-  const size = Math.max(1, Math.min(cores - 2, 6));
-  try {
-    // Optional cap (used by the e2e suite, where many pages run in parallel).
-    const raw = typeof localStorage !== 'undefined' ? localStorage.getItem('ps-replay-interceptor:eval-pool') : null;
-    const cap = raw ? parseInt(raw, 10) : NaN;
-    if (Number.isFinite(cap) && cap >= 1) return Math.min(cap, size);
-  } catch {
-    // Storage unavailable — use the computed size.
-  }
-  return size;
-}
-
 /**
  * Coordinates the evaluation on the main thread (pure orchestrator + rank
  * math — no sim) and fans the sim work out to a pool of workers. One search
@@ -66,7 +53,7 @@ export class EvalWorkerClient {
   private generation = 0;
 
   private ensureWorkers(): WorkerHandle[] {
-    while (this.workers.length < poolSize()) {
+    while (this.workers.length < evalPoolSize()) {
       perfCount('workerSpawn');
       const worker = new Worker(new URL('../../workers/eval-worker.ts', import.meta.url), { type: 'module' });
       const handle: WorkerHandle = { worker, pending: new Map() };

@@ -4,6 +4,7 @@ import {
 } from '@fulllifegames/eval-engine';
 import { EvalWorkerClient } from '../../lib/eval/worker-client';
 import { runInLanes } from '../../lib/eval/lanes';
+import { evalPoolSize, lanesForPool } from '../../lib/eval/pool-size';
 import { evalStoreKey, loadStoredEval, saveStoredEval } from '../../lib/eval-cache-store';
 import { resolveAutoTurnSettings, serializedFaintedFraction, supersedesStored, type EngineMode } from './prefs';
 import type { CachedEval } from './single-eval';
@@ -17,13 +18,14 @@ import { installCachedTurn } from './sweep-cached';
 
 /**
  * Turns the graph sweep evaluates concurrently. One turn's search already
- * fans out to the worker pool, but its serial sections — the choices RPC,
- * the four fixed MCTS trees on a six-worker pool, the played-pair/verify/
- * sensitivity pair evals — leave workers idle; a short pipeline keeps the
- * pool fed. Turns are mutually independent (own position, fixed seeds, own
- * per-turn slots and cache keys), so lanes change wall-clock, never results.
+ * fans out to the worker pool, but its serial sections (the choices RPC,
+ * the four fixed MCTS trees, the played-pair/verify/sensitivity pair evals)
+ * leave workers idle; a short pipeline keeps the pool fed. Half the pool
+ * (pool-size.ts), so a bigger pool also pipelines more turns. Turns are
+ * mutually independent (own position, fixed seeds, own per-turn slots and
+ * cache keys), so lanes change wall-clock, never results.
  */
-const TURN_LANES = 3;
+const TURN_LANES = lanesForPool(evalPoolSize());
 
 /**
  * Resolve 'auto' to this turn's concrete engine BEFORE any cache or
