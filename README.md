@@ -1,294 +1,112 @@
 # PS Dashboard
 
-PS Dashboard is an early-stage web app for replay-based "what if?" analysis on Pokemon Showdown battles. It loads a Showdown replay, reconstructs the battle state up to a chosen turn, and then lets you branch from that point by selecting alternative moves or switches for both sides.
+[![Deploy GitHub Pages](https://github.com/FullLifeGames/PSDashboard/actions/workflows/pages.yml/badge.svg)](https://github.com/FullLifeGames/PSDashboard/actions/workflows/pages.yml) [![Release](https://img.shields.io/github/v/release/FullLifeGames/PSDashboard)](https://github.com/FullLifeGames/PSDashboard/releases/latest)
 
-- **Production** (current official release): <https://fulllifegames.com/Tools/PSDashboard/>
-- **Nightly** (tracks `master`): <https://fulllifegames.github.io/PSDashboard/>
-- **Every hosted build**: <https://fulllifegames.github.io/PSDashboard/versions/>
+Chess-style analysis for Pokémon Showdown replays. Load a replay, scrub to any turn, read the engine's evaluation, and play out your own line from there.
 
-The current implementation is a working prototype: an exploratory simulator built from replay evidence plus inferred hidden information, still short of a frame-perfect replay recreation.
+- **Use it:** [release](https://fulllifegames.com/Tools/PSDashboard/) · [nightly](https://fulllifegames.github.io/PSDashboard/) · [all hosted builds](https://fulllifegames.github.io/PSDashboard/versions/)
+- **Read more:** [ARCHITECTURE.md](./ARCHITECTURE.md) for how the code is layered · [EVALUATION.md](./EVALUATION.md) for what the engine computes and how far to trust it
 
-## Current Capabilities
+## What it does
 
-- Load a Pokemon Showdown replay from a replay URL or replay ID, with input validation and readable error messages. Smogtours ids are normalized to their real formats (`smogtours-gen3ou-…` → `gen3ou`), and private replay links load from the full `-…pw` password link (the loader keeps the password for the fetch and out of the inferred format). When a replay's JSON route comes back unusable, the loader retries the replay server's `.log` route before giving up.
-- Load a locally exported replay by dropping a "Download replay" `.html` file (or a raw protocol log) onto the loader panel or picking it via `Browse file`. Every feature (stats, branching, sharing) works on file-based replays. Synthetic logs survive ingestion too: the loader normalizes CRLF line endings, skips unparseable protocol lines instead of failing the replay, and keeps the reconstruction in lockstep with logs that lack `|upkeep` markers (e.g. video-reconstructed replays).
-- Hidden-information guesses merge usage stats per species across a fallback chain: the format's own file first (VGC formats map to their year-level stats), then the Smogon doubles ladder for VGC, the generation's OU, and Ubers, so a Pokémon missing from one file (banned in OU, absent from a niche meta) still gets guessed moves, items, and abilities.
-- Deep-link and embed support: `?replay=<id|url>` auto-loads a replay on startup, and `?embed=1` hides the app chrome so the dashboard can run inside another site's iframe (see "Embedding" below).
-- Render the original replay inside an embedded Pokemon Showdown replay viewer with two-way turn sync (playback runs through without self-pausing; the end position is labelled `End`).
-- Parse the replay protocol into per-turn snapshots.
-- Infer both teams from replay data, including revealed moves, items, abilities, levels, gender, and tera type when shown, plus ability reveals from effect attributions (e.g. Poison Heal heals), item reveals from heal messages, mega stones, and item-damage lines (Life Orb recoil names its holder; Rocky Helmet chip names the `[of]` Pokémon, or in logs that drop that tag, the target of the damaged Pokémon's last move), and a Heavy-Duty Boots inference for Pokemon that switch into Stealth Rock without taking damage. Unrevealed abilities that no stats file can guess default to the species' slot-0 ability instead of simulating a Pokémon with no ability at all.
-- Rule out what the protocol disproves: hazard, status, weather, or Life Orb damage rules out Magic Guard, Stealth Rock chip rules out Heavy-Duty Boots, a landed Ground move rules out Levitate, two distinct plain moves without switching rule out every Choice item (with a Dancer-species guard; called moves like Sleep Talk's never count), and a plain status move rules out Assault Vest. A usage guess can therefore never contradict what the replay showed (the T25 case: a Clefable the replay shows taking Stealth Rock is never simulated as Magic Guard), and guessed Choice items stop fabricating move locks that derail late-game reconstruction. Rule-outs walk to the next candidate instead of dropping to nothing, and the Levitate inference demands proof: it only attributes damage inside the current move action (a confusion self-hit or a resolving Future Sight proves nothing), and Gravity, immunity-ignoring moves, and attackers whose species can carry Mold Breaker never count as evidence.
-- Fit hidden EV spreads to the damage the replay showed: every clean singles hit becomes a damage observation, and a deterministic solver checks standard spread candidates against `@smogon/calc` roll ranges, replacing usage-guessed spreads only where at least two observations demand it, never touching revealed or edited spreads, and never claiming what the evidence cannot measure (offense only from attacking observations, bulk only from defending ones). Speed is measured from the replay's own races: same-turn move order and KOs landed before the victim ever acted (a chosen switch would have resolved first) become hard speed constraints, with directional exclusions that keep only what a modifier strengthens: an attacker outrunning a Tailwind-doubled victim outruns its base speed a fortiori, a paralyzed Pokémon moving first won at a quarter speed, while Trick Room turns and priority races prove nothing. Solves that misfit their own evidence forfeit back to the usage prior instead of standing on a least-bad fabrication (video-reconstructed HP bars can fit no legal spread), unless the solve is what repairs a speed violation. Every candidate is legalized before scoring: spreads respect the format's EV budget (508 total, 252 per stat; Pokémon Champions formats use their own 66-total/32-per-stat system), leftovers top up unmeasured non-Speed stats, and the sim never fields an over- or under-statted guess. Solved spreads flow into every simulator team and show in the stats panel as "fits observed damage", so branches stop KOing Pokémon that survived the same hit in the replay.
-- Parse Open Team Sheets (`|showteam|`) and embedded "View team" chat exports as revealed team data.
-- Accept a pasted player team export (validated, shown as manual data in the stats panel, persisted across reloads). German stat abbreviations are normalized.
-- Fetch optional usage stats (via the CORS-safe `data.pkmn.cc` mirror) and `@pkmn/smogon` set assumptions for unrevealed abilities, items, moves, natures, and EV spreads. Guessed sets assemble as coherent wholes instead of stacking independent marginals: published sets are scored against the revealed evidence and the winner fills the unrevealed slots as one unit, while marginal fills pass pairwise vetoes: a big attack the set's boost does not serve falls (Swords Dance Cobalion never guesses Body Press), an orphaned defense-boost falls with its vetoed payoff (no Iron Defense without a surviving Body Press), same-type damaging redundancy collapses, and a Choice or Assault Vest guess suppresses guessed status fills. The stats panel and the simulator run the SAME guesser, so what you see is what the engine plays. "Analyze game" waits for the Smogon fetches, so a sweep can never bake stats-less teams unnoticed.
-- Display whether team data is revealed from the replay, guessed from usage stats, or manually edited.
-- Edit reconstructed information for both players before or during branching (edits rebuild the branch and replay its history).
-- Edit teams with legal dropdown pools: species-legal moves (learnset-based, prevo chain included), gen-legal items, the species' real abilities, tera types (gen 9), and natures. Moves and items use a filterable combobox (click an option to select it, arrow keys + Enter for keyboard use), validated against the pools.
-- Export both teams' current sets as text (Showdown format under `=== p1 ===` / `=== p2 ===` headers) and import corrected sets back. Imported values apply as green manual knowledge, rebuild a live branch in place, and persist per replay for repeated perfect-information "what if I did a, b, or c" analysis. Natures, IVs, and levels round-trip.
-- Try hypothetical moves while branching ("What if it had Flamethrower?"): picked from the legal move pool, loaded into the set (adding or replacing a move), and pre-selected as that slot's pending choice with damage previews included.
-- A chess-style position evaluation panel sits beside the battle in the right column by default, on the replay view and inside a branch, no toggle needed: a sim-backed search plays out every legal choice pair on forked battles (depth 1–2, a DUCT Monte-Carlo tree search mode, or the default Auto mode that routes each position by its own fainted fraction: matrix search while boards are full, the tree once a quarter of all bodies have fallen, the grid-tuned best line on the stratified calibration bed, re-baselined on ~800 positions with Smogon-informed sets; deterministic fixed-seed sampling with KO-boundary roll grouping, parallelized across a worker pool), then solves the resulting choice matrix as a matrix game via regret matching. Choices rank by expected value against the opponent's equilibrium mix, the position score lives in win-probability units end to end (the sigmoid fitted to real game outcomes applies once at the search leaf, so averaging values averages probabilities, which is what makes variance worth something when you are behind), and the mapping is phase-aware: the same positional edge claims less early and more as bodies drop, because the fitted confidence-per-point grows with the fainted fraction, the measured cure for the eval's early-game overconfidence. Displayed percentages then pass through a second, corpus-graded calibration stage: averaging and equilibrium selection re-inflate the aggregated root score, so the shown win% is the sigmoid-mapped honest number (fitted on the weight corpus, validated out-of-sample on the calibration bed; a finished position still reads 100/0, and regret/swing differences stay in raw win-probability units). The maximin floor stays visible as the "safe" line, and each choice shows its EV, worst case, the punishing reply, and (at depth 2+) the followup line explaining the "why". Pivot moves are first-class pairs at the root: U-turn, Volt Switch, Flip Turn, Parting Shot, Teleport, Baton Pass, Chilly Reception, and Shed Tail enumerate as "U-turn → Clefable"-style move-plus-incoming choices over the live bench (in the ranked lists AND the matrix, on both the in-process and worker-pool paths; a parity test keeps them from diverging), so the engine can say WHICH incoming Pokémon makes the pivot safe; EV-tied leading rows fold in their one-ply horizon trend, so a decaying stall line no longer shades out an equivalent building switch. The eval is matchup-aware: a per-pair 1v1 threat estimate (movesets, type chart, stats, speed, the big items and immunity abilities, priority, recovery walls) makes early positions readable before anything faints. The eval prices hazards per living victim (a Boots or Magic Guard team shrugs off rocks it is never charged for; grounding comes from the sim itself, Gravity grounds fliers, and Toxic Spikes immunity from the type chart), a living hazard remover holds an option on the net board state (Rapid Spin nets its side's full relief, Defog nets relief minus the side's own hazards across the field, and a net-negative option is never exercised, so switching into the Defogger reads as the play that clears the rocks rather than a walk deeper into them), benched Pokémon fight through their entry damage (a 4×-rock-weak sweeper behind rocks presses less than its raw pairs claim, unless it holds Boots), a benched body whose HP cannot survive re-entering through its own side's hazards is priced as finished (half a body of fodder value, its fatal entry never charged twice) unless a living teammate can still clear them (Boots, Magic Guard, and airborne-vs-Spikes mons are never stranded), guaranteed-failing clicks like Stealth Rock with rocks already up are dropped from the candidate list outright, coverage gaps, Choice items locked into bad moves, and status-dampened setup all carry terms, and the weights are calibrated per gametype against a pinned corpus of 2,100 tournament and ladder games: doubles runs its own fitted weights, where the data confirms what VGC players know, that speed control (Tailwind, Trick Room) is worth several times its singles value. Positions with no safe line are labeled as toss-ups (the maximin interval is wide; the turn hinges on prediction). Tera enumeration is a setting: Auto infers "banned" from a replay that never terastallized, and a Revealed mode, the automatic behavior in draft and custom formats, restricts Tera to the Pokémon that terastallized in the replay, so a one-Tera draft game is not analyzed as if everyone could Tera. Ranked choices read like the eval bar: rank number, a mini gauge, and the equilibrium EV as a win percentage, with the guaranteed floor and the punishing reply in the tooltip. Clicking any engine line (from the replay view or inside a branch, singles or doubles) plays the turn out chess-style: the clicked side commits its line, the other side answers with the engine's top reply, the turn executes, and the result re-evaluates so the next recommendations are already waiting (the click also arms the visible Auto setting; stale results from a previous position are never clickable). Doubles replays evaluate too: the engine searches combined two-slot choices (per-slot targets, spread moves, and one Tera/Mega Evolution/Ultra Burst per turn), restricted per side to a core-deduplicated candidate list so the joint matrix stays tractable: static threat hints plus setup, support, spread, and Fake Out bonuses rank the combos, distinct move cores fill the budget before gimmick variants of the same core, and the combination played in the real game (plus its gimmick siblings) is always kept so its regret stays computable. Turns where a slot's action stayed hidden (a flinch, a fainted partner) are graded charitably on the visible slot alone. The score is a heuristic estimate for spotting swings and blunders, no oracle.
-- Analyze the whole game into a chess-style evaluation graph (`Analyze game` in the eval panel): a background sweep evaluates every turn in three passes (a fast depth-1 scan shapes the whole line in seconds, your configured settings then deepen every report-worthy swing, and finally the whole line converges to your settings; the settings ARE the line, with per-turn d1/d2/MCTS badges on the report chips and the turn view tracking the convergence), acquires all positions from a single replay reconstruction instead of one per turn, draws the win-probability line with markers on the turns whose play created each blunder-sized swing (the marker, the turn analysis, and the report chips all point at the same turn), bridges evaluation gaps with a dashed connector so a decided ending never floats detached at the edge, renders identically on desktop and mobile (the graph's geometry tracks its rendered size instead of stretching a fixed canvas), and clicking a point jumps the replay to that turn and opens that turn's analysis. Navigation works in reverse too: selecting a turn on the timeline (slider, arrows) opens that turn's analysis without a graph click, the always-present T0 button opens the team-preview view (lead analysis when the graph has one), and the "Always on" toggle makes evaluation a companion: Analyze game starts by itself when a replay loads and fresh variation positions evaluate without the Evaluate button (persisted; off by default). The sweep also grades the team-preview decision: turn 0 evaluates every lead pair (doubles) or lead (singles), appears as its own diamond before turn 1 on the graph, and clicking it opens a lead analysis of what each player brought vs the engine's preferred leads. Each turn's analysis shows what each player played vs the engine's preferred choice (with regret when they differ and the prevention line at depth 2+), plus a decomposition of the swing into a decision part and a chance part (rolls/crits, with the played pair valued at the sweep's own search depth so the split never leaks estimator disagreement), and a plain-language summary sentence leading the numbers. The analysis explains the "why" in condensed form: aligned worst-case comparison rows for played vs best (each with its punishing reply and a mini gauge) and a one-phrase difference when the choices differ in exactly one detail ("The difference: only the Mega Evolution"). Verdicts are banded chess-style on equilibrium-EV regret (inaccuracy, mistake, blunder) with one-tier leniency in decided positions (garbage time does not stack blunders), and every flagged mistake or blunder is re-searched one depth deeper before the verdict sticks: the deeper look can acquit a move, never convict it. Verdicts are also honest about hidden information: a verdict that survives the deep pass gets sensitivity-probed against the opponent's guessed items (the next usage-plausible alternatives, rule-outs respected, swapped directly into the position). If some plausible item flips the verdict, it softens to the most charitable probed tier and says so ("hinges on Heatran's item (Choice Scarf: mistake · Leftovers: fine)"), because a grade that depends on information the player could not have is not a grade. Verdicts are honest about prediction too: a flagged regret whose priced-in punisher the opponent never clicked is a "risk (unpunished)", never a misplay, and when the actual pair beat the safe line's guarantee by a clear margin it becomes a "read paid off", praised in green, with the payoff allowed to cash in over the following turns instead of one; setup moves carry a search-horizon caveat, and the maximin alternative is framed as the "safe" line rather than "better" (its guarantee holds the current assessment, nothing more). Feeding a Pokémon to the opponent is graded as what it is: a faint from ≤15% HP reads as a deliberate sacrifice (softened one verdict tier, framed neutrally as "a low-cost trade", excluded from the loss's seeds, and shown as its own gray chip), a HEALTHY body switched in and fed reads as a simplification sack, but only while the engine's own scores call the game decisively won on both sides of it (trading surplus material for certainty is fine play; feeding a healthy body from a close position is not), and a body that STAYED in and died above the threshold reads as a deliberate feed, but only when the realized outcome landed on the played line's priced floor (the player accepted the known worst case and got it) and the line's payoff inside the payoff window clears the safe guarantee (the Weavile sac that enables a Garchomp sweep grades as the sacrifice it was, never a blunder). A blunder-sized throw is never forgiven by any of the three labels. A side KO'd before it ever acted is priced through a charitable stand-in: the KO logic proves it chose a move (a switch would have resolved first) and every priority-0 move is outcome-equivalent, so the turn grades the stay-in itself against the engine's best escape instead of reading "unclear", while sleep, flinch, and full-paralysis turns keep the no-blame verdict, since there the hidden choice may have mattered. An exploitative "Read" lens looks past equilibrium: a boundedly-rational opponent model (softmax over the opponent's own payoffs, anchored to the equilibrium mix, sharpened by their observed attack/switch tendencies from this very replay, forced replacements excluded) surfaces a "Read:" line whenever a confident prediction makes a non-equilibrium choice the better pick, with the payoff breakdown per predicted reply; the model is advice, never part of the grade, but a flagged risk that matches it upgrades from "risk (unpunished)" to "a read against the opponent's tendencies". Reads work in both engine modes, matrix and MCTS. Selecting a turn never re-searches; it shows the stored result with its settings badge, and deepening is the explicit "Think deeper about this position" button: a sketch or gap first rises to your configured settings, then one depth further (cap 3, never shedding samples on the way up), with the score, ranked moves, matrix, graph, and report updating together. The single-turn re-search acquires through the same per-turn snapshot healing as the sweep (with a loud reached-guard for replays healing cannot repair), and graph writes are monotone, so a later re-analyze can never downgrade an explicitly deepened turn back to the fast scan. The MCTS mode carries its own corpus calibration: hint-ordered expansion under progressive widening (the restriction's own static hints decide which options may open, so the doubles 16×16 root no longer starves its iteration budget), and equilibrium rankings over tree-informed root cells whose chance-suspect support cells (a root cell fixes one chance outcome per tree, so a lucky miss can masquerade as a good line) are re-verified by the matrix-grade multi-seed sampler before the verdict stands; on the honest fills rig the depth-1 matrix ties or beats the pure tree overall, which is exactly why Auto, not pure MCTS, is the default line. The default Auto line routes to it once a quarter of all bodies have fallen, and the honesty features follow the line everywhere: misplay verification, item-sensitivity probes, and the "Think deeper" ladder work regardless of which engine drew the turn (a flagged MCTS turn re-adjudicates as matrix pairs at the same deep tier the matrix line gets, and deepening an MCTS turn crosses into the matrix ladder at depth 2, where monotone graph writes keep that product safe from later sweeps); only root pivot pairs remain matrix-side. Once a sweep covers enough of the game, a game report tells the multi-turn story: who won and where the game tipped for good, a chess-style accuracy score per player (computed from per-turn win-probability loss, volatility-weighted so one wild turn cannot define a game, only shown once enough decided turns exist), the losing side's costliest choices before the tipping point ("the seeds of the loss"; unpunished risks never count), the lead matchup as turn-0 chips, each side's biggest misplays (tier-labeled) and paid-off reads as clickable chips (selected per player so one side's numbers cannot crowd the other's out, with an explicit "no clear misplays" note), summed regret per player, the net luck contribution (with a decided game's resolution booked apart from luck: once every score favors the eventual winner, chance that does no more than walk the bar to the final result is the model catching up, not the dice deciding), and clickable key moments, selected by a turn's biggest component (net swing or the chance share alone), so the game's biggest roll surfaces even when decision and chance partially cancelled each other. Every analyzed turn's engine lines are jump-off points into the play-out walk. Results are cached per turn, merged across partial sweeps, and reused by single-position evaluations.
-- One unified, chess-engine-style timeline instead of separate replay/branch modes: the replay is the main line, executing a different move at ANY turn opens the (single) variation right there, turn 0 is playable too (the T0 view shows team preview with a lead picker, one lead per side in singles and both slots in doubles, and bring-limited formats like VGC pick the whole bring-four with the leads first; "Play from turn 0" starts a fresh game with the chosen selection as a variation whose first history entry records the decision), every reconstruction of a bring-limited replay fields only what was actually brought — interactive branches, the game-graph sweep, single-turn evaluations, and the turn-0 lead analysis alike (both sides or neither: when the protocol never revealed a side's full selection the whole replay stays untrimmed, because a pinned four against an unpinned six overrates the open side), so the engine never searches switches into a never-brought Pokémon, navigation between and within both lines is always view-only and lossless (a line chip returns to the main line in one click), stepping back inside the variation and playing a different move cuts the tail without asking, replacing the variation from the main line asks first, the game graph overlays the variation as a gold curve (points fed by the auto-evals, clickable like the blue main line, with a ring marking the current position), and "Let it play out" has the engine finish any position playing both sides. Under the hood a deviation rebuilds the controllable simulator at that point, including Random Battle replays and older generations. Branch reconstructions replay the protocol's Tera/Mega/Ultra markers as real choice modifiers, stay turn-synced with the simulator (choices only ever land on the turn that produced them, taunt-blocked moves replay from their `|cant|` line), and correct HP, status, and the active Pokémon against the replay snapshot at every turn boundary, so a late-game branch opens on the position the analysis was describing instead of a drifted one, with pending state like Future Sight intact. Corrected Pokémon enter fresh (no choice locks inherited from a diverged history) and then regain the locks the replay text itself proves (one committed move on a choice item since the real entry; a guessed Choice item must also survive the damage record), corrections rebuild the sim's requests and disable flags, and the side-level invariants the sim runs on (the win-check counter, the active flags) are restored after every correction pass and on every evaluation deserialize, so a KO of the last body ends the game in every searched line. Branch errors name species next to draft nicknames ("Sludge Shadow (Muk-Alola) is no longer available…"). When the guessed sets cannot faithfully replay a line (the simulated game wedges or even ends before the requested turn), the branch says so with an explicit divergence notice (and a pointer to Edit Player/Opp) instead of letting clicks fail cryptically against a finished simulation.
-- Pick moves or switches for both players and advance the branch turn by turn. Choices are stored by move identity, so forced-switch interludes and team edits can never execute a different move than the one clicked.
-- Use Tera / Mega Evolution / Ultra Burst / Z-Move toggles where the format and the reconstructed sets allow them.
-- Use slot-aware and target-aware controls for doubles battles, including blocking duplicate simultaneous switch targets, plus a dropdown listing every legal choice.
-- View damage estimates computed with the replay's generation, the exact reconstructed sets (abilities, items, EVs), and field conditions, including per-target previews for targeted and spread moves in doubles.
-- Get loud, actionable errors: invalid choices are rejected with messages, failed turns keep your selections, and stuck reconstructions explain themselves instead of dead-ending.
-- Animate newly executed branch turns, or disable animation to jump straight to the result.
-- Compare branch history (including forced replacements) against the original replay line.
-- Save branches locally (open and delete them again) and create share links that also work in an already-open tab.
-- Show a battle statistics panel for both teams, with placeholders for unrevealed Random Battle slots. Knowledge is provenance-tagged: revealed (proven by the protocol), sheet (from an open team sheet posted in the replay chat, authoritative for items, abilities, moves, and EVs the protocol never showed, like a Choice Scarf on a Pokémon that never moved), guessed (usage statistics), and manual (your edits). Proven and manual knowledge always outrank the sheet; the sheet outranks guesses and the "has item" preview marker. The same precedence governs the simulator teams used for branching and evaluation, so a usage guess can never overwrite a sheet-known item.
+- **Load any replay.** A Showdown URL or id (private `-…pw` links and smogtours ids included), or a downloaded replay `.html` or raw protocol log dropped onto the page.
+- **See both teams.** The app reads what the protocol reveals, fills the rest from usage stats and Smogon sets, fits EV spreads to the damage the replay showed, and labels every field as revealed, sheet, guessed, or manual.
+- **Read the position like a chess engine.** A sim-backed search plays out every legal choice pair, solves the result as a matrix game, and reports a win probability calibrated on real game outcomes. Singles and doubles, VGC bring-four included.
+- **Grade the whole game.** `Analyze game` draws the win-probability graph, bands every turn as inaccuracy, mistake, or blunder, splits each swing into decision and luck, and writes a report with accuracy scores, key moments, and paid-off reads.
+- **Play your own line.** Execute a different move at any turn, turn 0 included, and the variation opens right there. Step back, try another move, or let the engine finish the game for both sides.
+- **Fix the hidden information.** Edit sets in place or import both teams as text; edits rebuild the variation and persist per replay.
+- **Embed it.** A deep link loads a replay on startup, embed mode hides the chrome, and a `postMessage` handoff feeds in replays you host yourself.
 
-## What "Works" Today
+## Quick start
 
-As of the current repository state:
+1. Paste a replay URL or id, or drop an exported replay file onto the loader.
+2. Scrub to a turn. Pause there for a second and the app rebuilds the exact position: PP, disabled moves, doubles targets.
+3. Read the evaluation column: the score, the ranked lines, the safe line, and the punishing reply.
+4. Click an engine line, or pick a move for each side and execute. The variation opens and the timeline marks it in gold.
+5. `Analyze game` grades every turn. Click a graph point to jump to that turn's analysis.
+6. `Import/Export Sets`, `Edit Player`, and `Edit Opp` fix the hidden information when a guess is wrong.
 
-- `npm run lint` passes.
-- `npm run build` succeeds.
-- `npm run test:build` passes: a production-build smoke suite that drives the MINIFIED bundle (the dev suite runs unminified sources, which once hid a build-only failure: `@pkmn/sim` serializes battle references by `constructor.name`, so mangled class names broke every worker search and the eval graph came out empty in the built app while dev looked perfect; `keepNames` on the app and worker bundles fixes it).
-- `npm run test:e2e` passes with 73 browser tests (the replay JSON and the Showdown embed script are served from fixtures/cache, so the suite is CDN-independent).
-- `npm run test:feedback` (on demand, never a standard gate): the expert-feedback drift suite. Six pinned smogtours replays are analyzed through the real app in a browser and graded against a corpus distilled from an experienced player's review. Hermetic (replays and Smogon data served from committed recordings), deterministic (repeat runs on the same browser build are bit-identical; a new Chromium moves the last floating-point digit, so a Playwright upgrade re-anchors the comparison), and warn-only by design: drift against the expert-approved truths is an analysis point in `docs/reports/feedback-drift.md`, never a failing test; the only reds are harness breakage. Gap items track the known weaknesses the improvement rounds target, and gaps explain themselves: every turn whose evaluation fails carries its reason into the report, the ⚠ notice, and the turn view. A silent hole counts as harness breakage, never as an accepted outcome. The drift file compares claim statuses and harness counters; for a byte-level comparison of the whole analysis run with `FEEDBACK_DUMP=1`, which rewrites the six full dumps in `docs/reports/`.
-- `npm run test:regression` passes with 813 tests in three Playwright projects: the app's own specs plus the integration and measurement-chain specs under `regression/`, and each package's suite under `packages/replay-core/test/` and `packages/eval-engine/test/`, also runnable alone with `npm test -w packages/<name>` (plus documented known-divergence skips, an opt-in `EVAL_BENCH=1` throughput benchmark, an opt-in `EVAL_CALIBRATION=1` sweep scoring the eval's sign-accuracy, confidence calibration, per-phase Brier scores, and win-probability fit against 40 real replays including doubles and VGC, with `EVAL_CALIBRATION_DEPTH=2` and `EVAL_CALIBRATION_MODE=mcts` levers so every engine mode earns numbers on the same corpus; two identical seeded runs are bit-identical, so every adoption gates against exact paired comparisons; and an opt-in `EVAL_FIT=1` weight-fitting harness that regresses the eval's feature weights against a manifest-pinned corpus of 2,100+ tournament and ladder replays across gen9 singles, old-gen singles, doubles, and VGC tranches, with cluster-bootstrap standard errors, phase/gen-class splits, and a phase-conditioned win-probability fit; adopted weights must also pass the calibration gate, and the header history records every adoption and every rejected experiment with its evidence) covering replay reconstruction (including a video-reconstructed synthetic replay pinned turn-by-turn), identity-based choice resolution, execute error paths, gimmick availability, damage-calc generation/set alignment, team sheets, team paste (including natures, IVs, and levels), sets import/export round-trips, legal option pools, position evaluation (static eval, forward model, equilibrium ranking, maximin search with deepening, doubles combined choices, team-preview leads, played-vs-best analysis, verdict tiers, win probability, accuracy, reports, narrative signals: decision breadth, equilibrium-conditional recommendations, a null-move guard, forced-mix naming, analytic odds grounding, streak cumulation, hindsight reads against the opponent's actual click, entry-is-profit switch context with expected-rate races (the max-move's accuracy and a Fake Out entry chip) plus the switch-in stage naming the one standing holder, spoken once per mon and stage in the game report, and the decided sweep (one mon that wins every living enemy pair and clears the rest within a short expected clock reads the board as practically decided, with a near-decided stage when one ≥90% boundary-event roll unlocks that sweep; announced once per game report, re-labeling a decided turn's chance swing as the game resolving, and stripped on the eval graph; display and prose only, since its own calibration bench measured the decided side winning ~80% of clamped positions and refused a real score clamp); analytic boundary-event odds and root-cell class blending (a KO-range roll prices at its true probability instead of its fixed-seed frequency, on MCTS results too, where boundary cells count as chance-suspect for the verify sampler regardless of visit statistics and ranked rows carry the same koOdds payloads), sacrifice detection (low-HP, healthy-simplification, and certainty-gated stay-and-die feeds), stranded-bench pricing, sensitivity probes, the Read lens, per-turn eval-gap visibility, and searched-mechanics honesty pins), protocol rule-outs and damage observations, protocol-proven choice-lock restoration with damage corroboration, hidden-power typing from effectiveness evidence and usage, spread inference with format EV budgets, Tera allowances, stats parsing, exported replay file parsing, save/share, inference quality, and an end-to-end spec pinning the GPL replay's verdicts.
-
-The browser test suite validates the main happy path with a mocked replay fixture:
-
-- load replay
-- render replay iframe
-- navigate the unified timeline (main line + variation, line chip, clickable notation)
-- show the always-visible move and switch controls at any position
-- enable turn execution after both choices are selected; executing rebuilds the sim there
-- truncate inside the variation without asking, confirm before replacing it from the main line
-- return to the original replay
-
-## Where Accuracy Is Still Limited
-
-This project does not yet recreate the original battle frame-perfectly. The current branch state is rebuilt from:
-
-1. the replay protocol
-2. an inferred team model
-3. optional Smogon usage-stat fallbacks for hidden information
-4. a post-reconstruction HP/status correction step
-5. a per-turn seed search that aligns the simulator's RNG (crits, misses, secondary effects, faints) with what the real game's protocol recorded, so replayed positions no longer carry phantom rolls the real game disproves
-
-That means branch outcomes can diverge from the original replay when hidden information matters. Important limitations today:
-
-- Hidden moves, EVs, IVs, natures, and some items/abilities can be guessed when they were not revealed in the replay. EV spreads are fitted to observed damage where the replay provides enough clean hits, but "the defender is bulkier" and "the attacker is weaker" can fit the same damage line; the solve guarantees pair consistency with the replay rather than ground-truth per-Pokémon spreads.
-- Probability-backed guesses come from the `data.pkmn.cc` usage-stat mirror (the only endpoint that sends CORS headers in a browser). When it has no data for a format, `@pkmn/smogon` set data provides non-probability set assumptions before the app falls back to unknown/default simulator values.
-- HP and status are corrected from the snapshot at branch start, but other hidden or volatile state may still differ. Reconstructions that end up in an unplayable state are detected and reported instead of dead-ending.
-- Damage previews match the sim's generation and sets, but the preview numbers ignore an *armed* Tera toggle; they update once the terastallized turn executes.
-- Doubles battles have multi-active reconstruction, explicit target reconstruction, redirection/retargeting fixtures, and protocol correction for `switch`/`drag` active-slot evidence, but unusual targeting effects and some volatile state can still diverge.
-- Save/share links are compact branch reports today; they do not yet fully restore and replay an alternate line from scratch.
-- Replay viewing and sprite rendering depend on Pokemon Showdown-hosted assets. On phones the embed keeps its desktop layout inside a horizontally scrollable container.
-- The automated tests use a mocked replay response and do not yet cover a large replay corpus or difficult edge cases.
-
-## Local Development
-
-### Requirements
-
-- Node.js 24 (the version the pages workflow builds with)
-- npm
-
-If Playwright browsers are missing locally, install them once with:
-
-```bash
-npx playwright install
-```
-
-### Install
-
-```bash
-npm install
-```
-
-One install covers the npm workspace: the app at the root and the two library packages under `packages/`, linked into `node_modules/@fulllifegames/`. The packages also publish to npm as `@fulllifegames/replay-core` and `@fulllifegames/eval-engine`; their READMEs carry the install line and a worked Node example each.
-
-### Run the app
-
-```bash
-npm run dev
-```
-
-Open the local Vite URL shown in the terminal.
-
-### Quality checks
-
-```bash
-npm run lint
-npm run build
-npm run test:e2e
-npm run test:regression
-npm test -w packages/replay-core
-npm test -w packages/eval-engine
-npm run pack:smoke
-```
-
-`npm run test:regression` runs three Playwright projects in one go: the app's own specs plus the integration and measurement-chain specs under `regression/`, and the package suites under `packages/*/test/`. `npm test -w packages/<name>` runs one package's suite alone; both commands run from the repository root.
-
-`npm run pack:smoke` packs both library packages, installs the tarballs into a throwaway Node project next to the sim family, runs the README examples there, and type-checks a NodeNext consumer against the shipped declarations. Ten seconds, no registry.
-
-## Releases And Hosted Builds
-
-Two workflows in [`.github/workflows/`](./.github/workflows/) publish the app. Neither needs to be
-triggered by hand.
-
-### Cutting a release
-
-[`release.yml`](./.github/workflows/release.yml) runs on every push to `master` but only acts when
-the `version` in `package.json` has no matching `v<version>` tag yet. Bumping the version cuts a
-release; nothing else does:
-
-```bash
-npm version patch --no-git-tag-version   # or edit package.json directly
-git commit -am "0.5.3 release bump"
-git push
-```
-
-The workflow then builds the app, creates the `v<version>` tag on that commit, and publishes a
-GitHub Release carrying `ps-dashboard-<version>.zip` (the built `dist/`) plus auto-generated notes.
-A push that does not change the version costs a ~6-second version check and stops there.
-
-The same release publishes the library packages. A `publish` job runs after the release and calls
-[`scripts/publish-packages.mjs`](./scripts/publish-packages.mjs): it writes the root version into
-`packages/*/package.json`, selects the packages whose files changed since the previous release tag (a
-first publish always qualifies), turns the workspace `"*"` reference into a caret range, and runs
-`npm publish` for the selection. Unchanged packages keep their older npm version, which the caret
-ranges still resolve. The job needs the `NPM_TOKEN` repository secret (an npm automation token that
-may publish under the `@fulllifegames` scope); without it the job prints a notice and ends green, so
-the GitHub release never waits on npm. `node scripts/publish-packages.mjs --dry-run` prints the plan
-and the tarball contents locally without touching the registry.
-
-### Where builds are hosted
-
-Production runs at **<https://fulllifegames.com/Tools/PSDashboard/>** and is updated by hand from an
-official release; no workflow deploys to it. Everything below is the GitHub Pages site, which is
-where the automated builds live.
-
-[`pages.yml`](./.github/workflows/pages.yml) deploys on every push to `master` and again whenever a
-release is published. It serves two channels from one site:
-
-| URL | Channel | Updated |
-| --- | --- | --- |
-| `/` | Nightly (current `master`) | Every push |
-| `/latest/` | Newest official release | Every release |
-| `/v0.5.2/` | That release, frozen | Never |
-| `/versions/` | Index of hosted builds, and a link out to production | Every deploy |
-
-The workflow never recompiles a frozen build from old source: it downloads each release's
-`ps-dashboard-<version>.zip` and unpacks it, so a pinned build stays byte-for-byte what shipped.
-The ten most recent releases are hosted; older ones remain downloadable from their release page.
-Releases predating the pipeline (`v0.1.0`, `v0.1.1`) carry no zip and are skipped.
-
-This only works because [`vite.config.ts`](./vite.config.ts) sets `base: "./"`, which makes every
-asset reference relative so a build runs from any subdirectory. Switching `base` to an absolute
-path would break every versioned copy without a visible error: they would load the nightly's
-bundles instead.
+The score is an estimate for spotting swings and blunders, not an oracle. [EVALUATION.md](./EVALUATION.md) lists what the engine knows, what it guesses, and where it goes wrong.
 
 ## Embedding
 
-The app can be included in another site and handed a replay to render:
+- **Deep link:** `?replay=gen3customgame-2115579570` loads that replay on startup, standalone or inside an iframe.
+- **Embed mode:** `?embed=1` hides the header and the loader. Combine both: `?embed=1&replay=<id>`.
+- **postMessage** for replays you host yourself (exported HTML files, raw logs):
 
-- **Deep link:** `https://…/?replay=gen3customgame-2115579570` auto-loads that replay on startup (works standalone and inside an iframe).
-- **Embed mode:** add `?embed=1` to hide the header and loader chrome (combined: `?embed=1&replay=<id>`).
-- **postMessage handoff** for replays that are not hosted (exported HTML files, raw logs):
+```html
+<iframe id="dashboard" src="https://…/?embed=1"></iframe>
+<script>
+  window.addEventListener('message', (event) => {
+    if (event.data?.type === 'ps-embed-ready') {
+      // A replay id/URL, a raw protocol log, or a full exported replay HTML document:
+      document.getElementById('dashboard').contentWindow
+        .postMessage({ type: 'ps-load-replay', replay: 'gen3customgame-2115579570' }, '*');
+    }
+    if (event.data?.type === 'ps-replay-loaded') console.log('loaded', event.data.id);
+    if (event.data?.type === 'ps-replay-error') console.warn(event.data.message);
+  });
+</script>
+```
 
-  ```html
-  <iframe id="dashboard" src="https://…/?embed=1"></iframe>
-  <script>
-    window.addEventListener('message', (event) => {
-      if (event.data?.type === 'ps-embed-ready') {
-        // A replay id/URL, a raw protocol log, or a full exported replay HTML document:
-        document.getElementById('dashboard').contentWindow
-          .postMessage({ type: 'ps-load-replay', replay: 'gen3customgame-2115579570' }, '*');
-      }
-      if (event.data?.type === 'ps-replay-loaded') console.log('loaded', event.data.id);
-      if (event.data?.type === 'ps-replay-error') console.warn(event.data.message);
-    });
-  </script>
-  ```
+The app posts `ps-embed-ready` once it accepts replays and answers every `ps-load-replay` with `ps-replay-loaded` (`id`, `format`) or `ps-replay-error` (`message`). [examples/embed-host.html](./examples/embed-host.html) is a runnable host page: start `npm run dev` and open `http://localhost:5173/examples/embed-host.html`.
 
-  The app posts `ps-embed-ready` to its parent once it can receive replays, and answers every `ps-load-replay` with `ps-replay-loaded` (`id`, `format`) or `ps-replay-error` (`message`).
+## Development
 
-  A runnable host-page demo lives in [`examples/embed-host.html`](./examples/embed-host.html): with the dev server running, open `http://localhost:5173/examples/embed-host.html`, pick an exported replay file (or click the demo button), and the embedded dashboard renders it.
+Node.js 24 and npm. One install covers the npm workspace: the app at the root and two library packages under [packages/](./packages/). [@fulllifegames/replay-core](./packages/replay-core/) turns a replay log into snapshots, revealed teams, and simulator sets; [@fulllifegames/eval-engine](./packages/eval-engine/) rebuilds positions, searches them, grades the played turns, and writes the report. Each package README carries its install line and a worked Node example.
 
-## How To Use The Prototype
+```bash
+npm install
+npx playwright install   # once, for the browser suites
+npm run dev              # local Vite server
+```
 
-1. Paste a replay URL or replay ID into the loader, or drop an exported replay `.html` file onto the loader panel.
-2. Optionally expand the team section and paste your own exported team to improve reconstruction.
-3. Load the replay.
-4. For perfect-information analysis, open `Import/Export Sets`, correct both teams (or paste the real sets), and import; the import is remembered for this replay.
-5. Scrub to any turn using the replay viewer or the timeline slider. The move pickers for both sides are always there. Settle on a turn for a second and the app reconstructs the exact position in the background: PP, disabled moves, and (in doubles) target buttons upgrade in place, no button needed.
-6. Choose a move or switch for both sides. The basic view lists compact action chips (moves and switches side by side, type and damage in the tooltips); the "Advanced" toggle grows them into the full picker with type/damage details, the Fight/Pokémon tabs, a free-choice dropdown, and "What if it had …". The action taken in the real game carries a "played" badge. Then execute: the simulator rebuilds at that position and your variation opens (chess-style; there is no separate branch mode). The timeline slider marks the variation's span in gold.
-7. Navigate as you like: step back inside the variation and play a different move (the tail is cut without asking, like a chess engine's current line), or jump back to the main line with one click on the line chip. The variation survives every view change and is only replaced when you execute a move on the main line and confirm. Stepping back past the branch point and forward again returns to your variation.
-8. Let the engine finish a position with "Let it play out": it plays both sides' top choice until the game ends (Stop anytime; every played turn stays navigable). While it runs, the battle window holds your position instead of flashing every new turn; when it finishes, the window plays the whole line back from your move, with the variation drawn as a gold curve over the game graph. Clicking a single engine line plays that turn out the same way, and mid-turn KOs resolve with the engine's replacement instead of stopping halfway.
-9. Use `Edit Player` or `Edit Opp` if you want to override inferred details at any point.
+| Command | What it checks |
+| --- | --- |
+| `npm run lint` | ESLint with size and complexity ceilings and import zones |
+| `npm run build` | the production bundle |
+| `npm run test:regression` | unit and reconstruction pins in three Playwright projects: app, replay-core, eval-engine |
+| `npm run test:e2e` | browser flows against fixture replays |
+| `npm run test:build` | the minified bundle, driven in a browser |
+| `npm run test:feedback` | the expert-feedback drift report, on demand |
+| `npm run knip` | unused files, exports, and dependencies |
+| `npm test -w packages/<name>` | one package's own suite (replay-core or eval-engine) |
+| `npm run pack:smoke` | packs both packages and runs their README examples from the tarballs |
 
-## Repository Map
+Sample inputs: [replay.txt](./replay.txt) holds a replay URL, [team.txt](./team.txt) a team export with German stat labels.
 
-The repository is an npm workspace: the app at the root plus two library packages under [`packages/`](./packages/). [`@fulllifegames/replay-core`](./packages/replay-core/) turns a replay log into snapshots, revealed teams, and simulator sets; [`@fulllifegames/eval-engine`](./packages/eval-engine/) rebuilds positions, searches them, grades the played turns, and writes the report. The app imports both by name. Vite and the test runner resolve the names to the package sources, and `tsc -b` builds each package's declarations into its `dist/` for outside consumers.
+### Contributing
 
-- [`src/App.tsx`](./src/App.tsx) composes the app: one controller hook, the loader and shared-branch screens, the workspace, and the modals.
-- [`src/hooks/useAppController.ts`](./src/hooks/useAppController.ts) wires the app state in four layers under [`src/hooks/controller/`](./src/hooks/controller/): the replay context (replay, branch simulator, evaluation handle, Smogon and team knowledge), the transient interaction state, the board (timeline pointer, deviation and rebuild, branch refresh), and the engine (position acquisition, evaluation view, engine walk, play-out). Each layer is a hook with an explicit input contract; hook call order follows the original App() top to bottom.
-- [`src/components/ReplayWorkspace.tsx`](./src/components/ReplayWorkspace.tsx) and [`src/components/WorkspaceEvalColumn.tsx`](./src/components/WorkspaceEvalColumn.tsx) render the loaded-replay layout from the controller's grouped surfaces: top bar, battle frame, timeline bar, picker region, branch panels, the evaluation column.
-- [`src/hooks/useReplay.ts`](./src/hooks/useReplay.ts) loads the replay (fetched or file-based) and derives snapshots plus inferred team data.
-- [`src/hooks/useEmbedHost.ts`](./src/hooks/useEmbedHost.ts) implements `?replay=`/`?embed=1` and the host-page postMessage protocol.
-- [`src/lib/replay-file.ts`](./src/lib/replay-file.ts) parses exported replay HTML files and raw protocol logs into replay data.
-- [`src/hooks/useBranch.ts`](./src/hooks/useBranch.ts) manages React state for the live branch simulator; [`src/hooks/branch/`](./src/hooks/branch/) holds its execute side (turns, forced-switch interludes, choice recording) and session side (rebuild at a turn, battle access, teardown).
-- [`packages/eval-engine/src/branch-engine.ts`](./packages/eval-engine/src/branch-engine.ts) is the facade of the reconstruction engine inside the eval-engine package. [`packages/eval-engine/src/branch/`](./packages/eval-engine/src/branch/) holds its types, team ordering, protocol choice extraction, boundary corrections, log sync, state builders, choice execution, and the staged reconstruction pipeline over one session.
-- [`packages/replay-core/src/protocol-parser.ts`](./packages/replay-core/src/protocol-parser.ts) converts replay protocol logs into turn snapshots; [`packages/replay-core/src/protocol/`](./packages/replay-core/src/protocol/) holds the scan state and the per-tag handlers.
-- [`packages/replay-core/src/opponent-inferrer.ts`](./packages/replay-core/src/opponent-inferrer.ts) extracts revealed team information from the replay log; [`packages/replay-core/src/inference/`](./packages/replay-core/src/inference/) holds the lookup helpers, the scan state, and the per-line handlers.
-- [`packages/replay-core/src/team-builder.ts`](./packages/replay-core/src/team-builder.ts) builds simulator teams from replay evidence, pasted teams, and usage-stat guesses; [`packages/replay-core/src/team/set-resolvers.ts`](./packages/replay-core/src/team/set-resolvers.ts) resolves each set field with its precedence chain.
-- [`src/lib/smogon-stats.ts`](./src/lib/smogon-stats.ts) fetches and normalizes Smogon monthly usage probabilities and re-exports the pure lookups; [`src/lib/smogon/`](./src/lib/smogon/) holds the payload parsers and the format fallback, while the usage types and the lookups live in the replay-core package under [`packages/replay-core/src/smogon/`](./packages/replay-core/src/smogon/).
-- [`src/lib/smogon-sets.ts`](./src/lib/smogon-sets.ts) fetches normalized fallback set assumptions through `@pkmn/smogon`.
-- [`packages/replay-core/src/team-info.ts`](./packages/replay-core/src/team-info.ts) enriches revealed team data while preserving revealed/guessed/manual source labels.
-- [`packages/eval-engine/src/branch-choices.ts`](./packages/eval-engine/src/branch-choices.ts) defines the identity-based choice model shared by the UI and the engine.
-- [`packages/eval-engine/src/damage-calc.ts`](./packages/eval-engine/src/damage-calc.ts) computes damage previews with `@smogon/calc` using the replay generation, sim sets, and field state.
-- [`packages/replay-core/src/ids.ts`](./packages/replay-core/src/ids.ts) holds the one Showdown id normalizer (`toId`) and the side-id helpers every layer reads; [`packages/replay-core/src/calc-field.ts`](./packages/replay-core/src/calc-field.ts) maps sim weather and terrain ids onto `@smogon/calc` labels for the damage previews, the kill-odds pricing, and the spread fit.
-- [`packages/eval-engine/src/`](./packages/eval-engine/src/) contains the evaluation engine, the `@fulllifegames/eval-engine` workspace package (each large module is a facade over a stage folder: `forward/`, `score/`, `search/`, `ranking/`, `turn-analysis/`, `prose/`): a sim forward model (including team-preview lead choices, pivot-pair follow-ups, and locked-release targeting on round-tripped states), a static positional eval with a boost-aware matchup threat term weighted by hazard entry costs, victim-aware hazard pricing with removal option value, coverage/item/choice-lock terms, and per-gametype corpus-fitted weights, maximin search with iterative deepening over no-op-filtered candidates and pivot pairs enumerated at the root, a regret-matching matrix-game solver for equilibrium EVs with horizon-trend folding for tied leading rows, a corpus-calibrated DUCT-MCTS mode with equilibrium rankings over verified tree-informed root cells, a pure async orchestrator fanned out over a worker pool (parity-tested against the sync path, pivot pairs included), per-Pokémon Tera allowances, a per-gametype phase-aware outcome-fitted win-probability mapping applied once at the search leaf, played-action and lead parsing (singles and per-slot doubles), sacrifice detection (low-HP feeds and score-gated healthy simplification sacks), a stay-in phantom for sides KO'd before acting, item-sensitivity probes for flagged verdicts, an exploitative opponent model behind the Read lens, per-turn analysis with tiered verdicts and deeper verification, natural-language summaries, and the game report with per-player accuracy and per-turn engine badges.
-- [`packages/replay-core/src/set-coherence.ts`](./packages/replay-core/src/set-coherence.ts) scores published sets against revealed evidence and applies the pairwise coherence vetoes shared by the stats-panel display and the simulator team builder.
-- [`packages/replay-core/src/spread-inference.ts`](./packages/replay-core/src/spread-inference.ts) solves damage-consistent EV spreads from replay observations against `@smogon/calc` roll ranges (hard-constrained by observed speed races, forfeiting solves that misfit their own evidence), legalized to the format's EV budget (standard 508/252, Pokémon Champions 66/32); [`packages/replay-core/src/spreads/`](./packages/replay-core/src/spreads/) holds the EV budget, the candidate ladder, and the fit context.
-- [`scripts/build-fit-corpus.mjs`](./scripts/build-fit-corpus.mjs) builds the manifest-pinned weight-fitting corpus (ReplayScouter tournament data, direct Smogon-thread scraping for gen9 singles, doubles, and VGC (official tournament replays carry a `smogtours-` room prefix the scraper understands), plus ladder samples); the manifest is committed, the replay cache is not.
-- [`scripts/build-versions-index.mjs`](./scripts/build-versions-index.mjs) renders the `/versions/` page listing the nightly and the hosted release builds; the Pages workflow feeds it a manifest of the releases it unpacked.
-- [`scripts/publish-packages.mjs`](./scripts/publish-packages.mjs) publishes the changed library packages at the root version from the release workflow (`--dry-run` for the plan, `--pack <dir> --all` for tarballs); [`scripts/pack-smoke.mjs`](./scripts/pack-smoke.mjs) is the consumer-side check behind `npm run pack:smoke`.
-- [`packages/replay-core/examples/`](./packages/replay-core/examples/) and [`packages/eval-engine/examples/`](./packages/eval-engine/examples/) hold the worked Node examples the package READMEs embed verbatim; they run from the repository after `npm run build` and inside the pack smoke.
-- [`regression/package-api.spec.ts`](./regression/package-api.spec.ts) pins each package's public surface (`regression/fixtures/api/<name>.txt`, refreshed with `UPDATE_API_SNAPSHOT=1`) and the publish hygiene: manifest fields, LICENSE copies, and the README examples.
-- [`src/styles/`](./src/styles/) holds the app's stylesheet in nine domain files (base, layout, loader, timeline, pickers, forms, stats-panel, eval-panel, shared-branch), each headed by the components it serves; [`src/index.css`](./src/index.css) imports Tailwind and each of them once. [`regression/css-audit.spec.ts`](./regression/css-audit.spec.ts) fails on a class no source file uses and on an import list that drifts from the files.
-- [`packages/replay-core/test/`](./packages/replay-core/test/) and [`packages/eval-engine/test/`](./packages/eval-engine/test/) hold each package's own regression specs: white-box against `../src`, the sibling package by name, fixtures package-local. [`regression/`](./regression/) keeps the app specs, the app-plus-package integration specs, the measurement chains (calibration, fit, feedback corpus), and the API snapshot.
-- [`src/hooks/useEvaluation.ts`](./src/hooks/useEvaluation.ts) composes the evaluation surface; [`src/hooks/evaluation/`](./src/hooks/evaluation/) holds the preferences, the single-position evaluate path, and the graph sweep as staged runners (types, verification and sensitivity probes, cache-hit install, per-turn evaluation, the lane runner, the three-pass orchestration), with per-turn caching in memory and IndexedDB.
-- [`packages/replay-core/src/team-paste.ts`](./packages/replay-core/src/team-paste.ts) parses pasted Showdown exports (including natures, IVs, and levels) and overlays them as manual knowledge.
-- [`src/lib/sets-io.ts`](./src/lib/sets-io.ts) builds and parses the side-headered both-teams text format for the Import/Export Sets panel.
-- [`src/lib/pokemon-options.ts`](./src/lib/pokemon-options.ts) serves legal move/item/ability/tera/nature pools for dropdowns (loaded lazily to keep dex data out of the entry chunk).
-- [`src/lib/lazy/`](./src/lib/lazy/) holds the lazy-load boundaries into the packages: one re-export module per part the app loads through `import()` (reconstruction, choice locks, damage previews, serialization, the forward model, the protocol parser, the opponent inferrer, the team builder, hidden-power), so the sim-bound code stays out of the entry chunk.
-- [`src/components/PSReplayFrame.tsx`](./src/components/PSReplayFrame.tsx) renders the Showdown replay viewer in an iframe.
-- [`src/components/BranchPanel.tsx`](./src/components/BranchPanel.tsx) renders move and switch controls for the active branch; [`src/components/branch/`](./src/components/branch/) holds the choice buttons, the per-side controls with their Fight section, and the status parts, with the damage preview in [`src/lib/branch-damage.ts`](./src/lib/branch-damage.ts).
-- [`src/components/EvalPanel.tsx`](./src/components/EvalPanel.tsx) renders the evaluation column; [`src/components/eval/`](./src/components/eval/) holds its controls, status, graph section, result block, and the turn-analysis cells.
-- [`src/components/TeamEditor.tsx`](./src/components/TeamEditor.tsx) edits either team inside [`src/components/ModalDialog.tsx`](./src/components/ModalDialog.tsx); the fields live in [`src/components/team-editor/`](./src/components/team-editor/) and the draft state in [`src/hooks/useTeamDraft.ts`](./src/hooks/useTeamDraft.ts).
-- [`src/components/LeadPanel.tsx`](./src/components/LeadPanel.tsx) renders the T0 lead picker (team preview as a playable position).
-- [`src/components/BranchSaveSharePanel.tsx`](./src/components/BranchSaveSharePanel.tsx) saves branch summaries locally and creates compact share links.
-- [`src/components/BattleStatsPanel.tsx`](./src/components/BattleStatsPanel.tsx) shows inferred team information for both players; the type badge colors it shares with the choice buttons live in [`src/lib/type-colors.ts`](./src/lib/type-colors.ts).
-- [`ARCHITECTURE.md`](./ARCHITECTURE.md) explains the current internal flow in more detail.
+- New files stay under the lint ceilings: 300 lines per file, 60 per function, complexity 15. Older files sit on shrink-only pins in `eslint.ratchet.mjs`; `node scripts/update-lint-ratchet.mjs` re-measures them and refuses to raise a pin.
+- `eslint.zones.mjs` makes the layering a lint error: a package never reaches `src/`, replay-core never imports the engine, the app imports the packages by name (dynamic imports go through `src/lib/lazy/`), and nothing under `src/lib` imports the UI.
+- Keep the knip report empty; internal helpers stay unexported.
+- Package barrels (`packages/*/src/index.ts`) are the public API. Widening one is a one-line edit followed by `UPDATE_API_SNAPSHOT=1 npm run test:regression -- regression/package-api.spec.ts`; package sources import each other with `.ts` specifiers.
+- A new package behavior gets its spec under `packages/<name>/test/` (imports `../src/<module>`); a spec that needs app code stays under `regression/`.
+- Direct dependencies track their latest registry versions (`npm outdated`), with two exceptions: TypeScript stays on 6.x until typescript-eslint admits the 7.x compiler, and `@types/node` follows the Node major the workflows run.
 
-## Sample Inputs In The Repo
+## Releases and hosting
 
-- [`replay.txt`](./replay.txt) contains a sample replay URL.
-- [`team.txt`](./team.txt) contains a sample team export with German stat labels.
+Bumping `version` in `package.json` on `master` cuts a release. The [release workflow](./.github/workflows/release.yml) builds the app, tags `v<version>`, and publishes a GitHub Release with `ps-dashboard-<version>.zip`.
 
-## Notes For Contributors
+```bash
+npm version patch --no-git-tag-version
+git commit -am "<version> release bump"
+git push
+```
 
-- The current app path uses the Showdown iframe viewer plus the `useBranch` simulator hook.
-- The production bundle is large because the simulator and learnset data are included client-side.
-- Size and complexity ceilings are lint errors (`max-lines` 300, `max-lines-per-function` 60, `complexity` 15 under `src/` and `packages/*/src/`; test suites have their own). Older files sit on generated shrink-only pins in `eslint.ratchet.mjs`; `node scripts/update-lint-ratchet.mjs` re-measures them and refuses to raise a pin. New files must be born under the targets.
-- Import zones in `eslint.zones.mjs` make the package layering a lint error: a package never reaches `src/` or the UI layer, `replay-core` never imports the engine, the app imports the packages by name and never their files, nothing under `src/lib` imports the UI layer, and components use the hook facades rather than their internals. A dynamic import of package code goes through `src/lib/lazy/`.
-- `npm run knip` lists unused files, dependencies, exports, and types; keep its report empty (internal helpers stay unexported).
-- Each package barrel (`packages/*/src/index.ts`) is the public API: the names the app, the worker, the sibling package, and the worked example use, plus the types their signatures mention. Widening it is a one-line edit followed by `UPDATE_API_SNAPSHOT=1 npm run test:regression -- regression/package-api.spec.ts` and a look at the fixture diff. Package sources import each other with `.ts` specifiers; `tsc -b` rewrites them to `.js` in the emitted JavaScript so the packages run in Node without a bundler.
-- A new package behavior gets its spec next to the package under `packages/<name>/test/` (imports: `../src/<module>` for the package's own code, the sibling package by name). A spec that needs app code (the Smogon fetchers, replay files, hooks) stays under `regression/` as an integration test.
-- Direct dependencies track their latest registry versions; `npm outdated` is the check, and each upgrade lands behind the normal gates (the sim family behind a full feedback-corpus comparison, because new dex data can move scores). Two documented exceptions: `typescript` stays on the 6.0 line until typescript-eslint's peer range admits the native 7.x compiler (7.0 ships no JavaScript API for the parser), and `@types/node` follows the Node major the pages workflow runs (24), not the newest types on the registry.
+The same release publishes the changed library packages: [scripts/publish-packages.mjs](./scripts/publish-packages.mjs) writes the root version into both manifests, selects the packages whose files changed since the previous tag, and runs `npm publish`. The job needs the `NPM_TOKEN` secret and otherwise ends green with a notice; `node scripts/publish-packages.mjs --dry-run` prints the plan locally.
 
-## Next Priorities
+The [pages workflow](./.github/workflows/pages.yml) deploys on every push to `master` and on every release:
 
-- Turn branch share links into full replayable branch restores.
-- Pre-apply an armed Tera toggle to the damage previews.
-- Improve reconstruction fidelity for unusual targeting effects and volatile hidden battle state.
-- Expand the replay regression suite with many more real replays and expected snapshots.
-- Continue reducing async chunk size for `@pkmn/dex`, learnsets, and protocol parsing.
-- Add deeper branch comparison tools.
+| URL | Channel |
+| --- | --- |
+| `/` | nightly, current `master` |
+| `/latest/` | the newest release |
+| `/v<version>/` | that release, frozen; the ten most recent stay hosted |
+| `/versions/` | index of every hosted build |
+
+The workflow unpacks frozen builds from the release zip and never rebuilds them from old source; [scripts/build-versions-index.mjs](./scripts/build-versions-index.mjs) renders the `/versions/` index from the manifest of unpacked releases. `vite.config.ts` keeps `base: "./"` so a build runs from any subdirectory; an absolute base would break every versioned copy. A maintainer copies a release to fulllifegames.com by hand; no workflow deploys there.
+
+## License
+
+[MIT](./LICENSE)
