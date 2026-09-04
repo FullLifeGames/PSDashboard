@@ -891,6 +891,84 @@ import { brierScore, fitConstantK } from './fit-helpers';
  * static basis for this mass; the next lever, if any, is search/
  * planning-side.
  *
+ * PUBLISHED-SET AND ENDGAME ROUND 2026-09-04 (improvement round 33 of the
+ * perf-and-quality plan; spec docs/superpowers/specs/2026-09-04-round-33-
+ * design.md; Block 0 a4f1a69 hosts / 2fccf7f bound fetch / 2557567 top bar
+ * / 43529ae harness fixtures; Block 1 a792d74 + 6d43377 keep-the-prior fit
+ * / e3ae604 Ubers fallback / 72e175f revealed-attack default / dd12462
+ * fitted label / 92c60ba re-pins; Block 2 31434e6 choice-lock lower bound
+ * / 628595a weighted disagreement / ef72c0a class pools / 73625dd depth-2
+ * verify + row completion / 12ad69a last-pair race + fixed damage /
+ * 1689c24 cache v40 / 4b013eb dossier / f0191ce re-pins).
+ * FINDING (Block 0 sighting): the app's set assumptions had NEVER loaded in
+ *   a browser. @pkmn/smogon calls this.fetch(url); window.fetch throws
+ *   "Illegal invocation" on a foreign this, and the per-species catch
+ *   swallowed it. Round 32's attribution of the user's 252-Def Toxapex to
+ *   the data.pkmn.cc 301 was wrong: the harness had never requested a set
+ *   file either (no smogonMisses, only stats). Node's fetch does not check
+ *   this, so this bench (EVAL_CALIBRATION_SMOGON=1) always had the sets.
+ *   Fix: a bound fetcher, per-species error collection (a total failure
+ *   rejects and is not cached), the top-bar notice, a host fallback
+ *   (data.pkmn.cc, then the GitHub Pages mirror; 404 is an answer), the
+ *   harness serving both hosts from one fixture name, and the gen6/gen8
+ *   OU + Ubers set files pinned. The corpus now measures the app's team
+ *   path: six items moved (t73, 648453 t20/t13, 649664 t8/t23, the
+ *   golden's channels), re-pinned after Block 1 at the user gate.
+ * BLOCK 1 (sets and builder): the fit keeps a prior's offense when the
+ *   attacker was seen only in knock-outs (lower bounds cannot measure
+ *   it) and its Speed when no rung repairs an observed order; kept stats
+ *   shave last, a kept plus nature stays. 573756 p2 Garchomp, fitted to
+ *   252 HP / 252 SpD / 0 Atk off a Choice Specs Magnezone guess, is the
+ *   curated Jolly 252 Atk / 252 Spe again and outspeeds Kyurem; the
+ *   round-15 near-decided sentence renders at t73 once more. The Ubers
+ *   file supplies a banned species' set (Kyurem, gen8ubers), revealed
+ *   attacks pick the default spread's offense side, the stats panel says
+ *   "fitted". Bench (r32-after -> r33-block1, 816 joined): sign 53/62/79
+ *   -> 54/62/79, brier 0.2614/0.2298/0.1561 -> 0.2604/0.2294/0.1561,
+ *   four exclusive flips all for the new side, doubles unchanged.
+ * BLOCK 2 (engine, cache v40): knock-out hits corroborate Choice items as
+ *   lower bounds; tree disagreement is the visit-weighted mean absolute
+ *   deviation (VERIFY_DISAGREEMENT 0.075; a 54-visit outlier beside 600
+ *   agreeing visits no longer hands 573756 t137 to the one-ply static);
+ *   root cells record their drawn outcome class and the verify merge
+ *   pools depth per class (a rich hit class keeps its depth while the
+ *   thin miss class keeps the sampler); verified cells get a depth-1
+ *   sub-search on the first-seed child and their rows complete under the
+ *   same cap (655336 t24's depth mismatch); the last pair is priced by
+ *   its race clocks (0.6 + 0.1 per turn of margin, cap 0.9, in win-prob
+ *   units; 573756's bar reads -0.92 from t136 instead of -0.77 at t137,
+ *   t138 stays quiet), and the threat proxy prices fixed-damage moves
+ *   (a Seismic Toss user had raced as a wall and lost to a level-30
+ *   Eevee). Bench A (r33-block1 -> r33-block2): sign 54/62/79/61/73 ->
+ *   54/63/80/62/74, brier 0.2604/0.2294/0.1561 -> 0.2600/0.2294/0.1564
+ *   (late +3 bp, exactly the pre-registered limit), bucket 0.7-1.0 88 ->
+ *   87% (one of 129), five exclusive flips all for A. The pre-registered
+ *   lastPair subset is VOID: the bench holds six one-body-per-side
+ *   positions, all already decided (brier 0.0000 both sides) -- the
+ *   static fires where it should in the corpus but the bench cannot
+ *   judge it; the round-34 solver is the instrument. Variant B (sweep
+ *   flag, measured, not adopted): brier 0.2603/0.2303/0.1545, on the 85
+ *   lastPair|decided positions late 0.1204 -> 0.1085, flips 1 for / 2
+ *   against. User gate: A accepted as built, VERIFY_CELL_CAP stays 12
+ *   (573756 pass-3 wall 55 -> 67 s, +22%; the small games +10 s).
+ * DOSSIER (round-15 sighting, docs/perf/2026-09-04-decided-losses.md):
+ *   84 decided positions in the block-1 dump, the decided side won 62
+ *   (73.8%); of the 22 losses 17 are pairs the clocks called won (tera
+ *   immunity, setup plus tera, unseen coverage on the standing enemy),
+ *   5 forfeits, 0 rolls. Decided needs tera and setup awareness before a
+ *   clamp can lean on it (Q4); the solver measures exactly these pairs.
+ * FEEDBACK: three byte-identical runs per block; Block 2 moved 649664
+ *   t23 to p1-read (Hydro Pump as the paid-off read) and lifted the t16
+ *   odds-prose carrier out of its band -- no corpus turn renders the
+ *   clause after this round (eval-summary.spec keeps it); the golden
+ *   655336 stays with eight channels booked. 573756 t68 stays a gap:
+ *   the floor gate misses by 0.056 (realized -0.287 against the priced
+ *   floor -0.343) where the pre-registered rule allowed an epsilon only
+ *   under 0.05; the payoff half holds (0.529 over the safe floor).
+ * GATES: regression 871, replay-core 43, eval-engine 537, e2e 74 (one
+ *   viewer-seeking flake, green alone and on the rerun), build, test:
+ *   build, lint, tsc -b, knip.
+ *
  * ENDGAME TRUTH ROUND 2026-09-03 (improvement round 32 of the perf-and-
  * quality plan; spec docs/superpowers/specs/2026-09-03-round-32-p4-q3-
  * design.md; commits 50b4247 lethal fit, ce035c7 / cda99c2 / f710cdb

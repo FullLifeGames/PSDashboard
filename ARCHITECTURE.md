@@ -66,8 +66,8 @@ Relevant files:
 
 - [`packages/replay-core/src/team-builder.ts`](./packages/replay-core/src/team-builder.ts) with [`packages/replay-core/src/team/set-resolvers.ts`](./packages/replay-core/src/team/set-resolvers.ts)
 - [`packages/replay-core/src/team-info.ts`](./packages/replay-core/src/team-info.ts)
-- [`src/lib/smogon-stats.ts`](./src/lib/smogon-stats.ts) with [`src/lib/smogon/`](./src/lib/smogon/)
-- [`src/lib/smogon-sets.ts`](./src/lib/smogon-sets.ts)
+- [`src/lib/smogon-stats.ts`](./src/lib/smogon-stats.ts) with [`src/lib/smogon/`](./src/lib/smogon/): the usage-stat fetcher, the format fallback chain, and [`hosts.ts`](./src/lib/smogon/hosts.ts), which tries the Smogon data hosts in order (data.pkmn.cc, then its GitHub Pages mirror; a 404 is an answer) and normalizes `@pkmn/smogon`'s double-slash paths
+- [`src/lib/smogon-sets.ts`](./src/lib/smogon-sets.ts): set assumptions through `@pkmn/smogon` with a bound fetcher (the library calls `this.fetch`, which a browser's `window.fetch` refuses on a foreign `this`), per-species error collection (a total failure rejects and is never cached), and the generation Ubers file as the fallback for species the format lacks
 - [`packages/replay-core/src/team-parser.ts`](./packages/replay-core/src/team-parser.ts)
 - [`packages/replay-core/src/team-paste.ts`](./packages/replay-core/src/team-paste.ts): pasted Showdown exports (natures, IVs, and levels included) overlaid as manual knowledge
 - [`packages/replay-core/src/smogon/`](./packages/replay-core/src/smogon/): the usage types and the pure lookups the app-side fetchers feed
