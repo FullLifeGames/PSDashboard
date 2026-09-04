@@ -2443,6 +2443,10 @@ interface Sample {
   quality: 'hq' | 'std';
   /** Round 34: a crit taken, a miss, or a par/frz/flinch skip against the score's favored side after the sample. */
   luckAgainstFavored: boolean;
+  /** Round 35: the proven forced-win mass at the sample (null without a proof at or above MIN_FORCED_MASS). */
+  forcedWinMass: number | null;
+  /** Round 35: the proof's deepest proven line in own moves. */
+  forcedWinTurns: number | null;
   /**
    * EVAL_CALIBRATION_FEATURES=1: the static eval's scaled feature vector
    * (fit-spec g construction, FEATURE_WEIGHTS key order) — for offline
@@ -2452,6 +2456,12 @@ interface Sample {
 }
 
 /** The root's decided-sweep side for the dump line (round 32), null when no sweep stands. */
+/** Round 35: the proven forced win behind a sample's score, when the bar stands. */
+const forcedWinFields = (result: ReturnType<typeof searchPosition>): Pick<Sample, 'forcedWinMass' | 'forcedWinTurns'> => ({
+  forcedWinMass: result.forcedWin?.mass ?? null,
+  forcedWinTurns: result.forcedWin?.turns ?? null,
+});
+
 const decidedSideOf = (result: ReturnType<typeof searchPosition>): Sample['decided'] =>
   result.unanswered?.decided?.side ?? null;
 
@@ -2732,6 +2742,7 @@ test.describe('eval calibration against real replays', () => {
             rating,
             quality: qualityOf(id, rating),
             luckAgainstFavored: luckFlag(replay.log, turn, score),
+            ...forcedWinFields(result),
             ...(g ? { g } : {}),
           };
           samples.push(sample);
