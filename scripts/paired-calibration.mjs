@@ -8,23 +8,24 @@
 // methodology exactly (pooled constant-K logistic fit via 500-iteration GD,
 // Brier under that K), so numbers here are comparable to the printed sweep
 // output.
-import { load, record, right } from './calibration-lib.mjs';
+import { filterQuality, load, record, right, takeQualityArg } from './calibration-lib.mjs';
 
 const key = s => `${s.id}#${s.turn}`;
 
-const [aPath, bPath] = process.argv.slice(2);
+const { argv, quality } = takeQualityArg(process.argv.slice(2));
+const [aPath, bPath] = argv;
 if (!aPath || !bPath) {
-  console.error('usage: node scripts/paired-calibration.mjs <a.jsonl> <b.jsonl>');
+  console.error('usage: node scripts/paired-calibration.mjs <a.jsonl> <b.jsonl> [--quality hq|std]');
   process.exit(1);
 }
-const a = load(aPath);
-const b = load(bPath);
+const a = filterQuality(load(aPath), quality);
+const b = filterQuality(load(bPath), quality);
 const bByKey = new Map(b.map(s => [key(s), s]));
 const joined = a
   .filter(s => bByKey.has(key(s)))
   .map(s => ({ a: s, b: bByKey.get(key(s)) }));
 
-console.log(`A(${aPath}) n=${a.length}  B(${bPath}) n=${b.length}  joined n=${joined.length}\n`);
+console.log(`A(${aPath}) n=${a.length}  B(${bPath}) n=${b.length}  joined n=${joined.length}${quality ? ` (quality ${quality})` : ''}\n`);
 
 console.log('=== full-set records (reproduce the printed numbers) ===');
 record(a, 'A (full)');

@@ -4,16 +4,17 @@
 // or in B (a field recorded on one side only still selects the subset),
 // prints both sides' records plus the "favored side wins" rate (sign of
 // the score against p1Won) per side. Round 33: lastPair and decided.
-import { load, record, right } from './calibration-lib.mjs';
+import { filterQuality, load, record, right, takeQualityArg } from './calibration-lib.mjs';
 
-const [aPath, bPath, ...fields] = process.argv.slice(2);
+const { argv, quality } = takeQualityArg(process.argv.slice(2));
+const [aPath, bPath, ...fields] = argv;
 if (!aPath || !bPath || fields.length === 0) {
-  console.error('usage: node scripts/subset-calibration.mjs <a.jsonl> <b.jsonl> <field...>');
+  console.error('usage: node scripts/subset-calibration.mjs <a.jsonl> <b.jsonl> <field...> [--quality hq|std]');
   process.exit(1);
 }
 const key = s => `${s.id}#${s.turn}`;
-const b = new Map(load(bPath).map(s => [key(s), s]));
-const joined = load(aPath)
+const b = new Map(filterQuality(load(bPath), quality).map(s => [key(s), s]));
+const joined = filterQuality(load(aPath), quality)
   .filter(s => b.has(key(s)) && fields.some(f => s[f] || b.get(key(s))[f]))
   .map(s => ({ a: s, b: b.get(key(s)) }));
 console.log(`subset ${fields.join('|')}: n=${joined.length}`);

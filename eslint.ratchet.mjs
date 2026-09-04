@@ -97,7 +97,7 @@ export const ratchetOverrides = [
       "max-lines-per-function": [
         "error",
         {
-          "max": 1120,
+          "max": 1100,
           "skipBlankLines": true,
           "skipComments": true,
           "IIFEs": true
@@ -214,7 +214,7 @@ export const ratchetOverrides = [
     "rules": {
       "complexity": [
         "error",
-        62
+        55
       ]
     }
   },

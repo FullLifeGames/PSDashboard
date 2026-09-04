@@ -99,6 +99,16 @@ export function summarize(samples) {
     if (subset.length === 0) continue;
     lines.push(`${phase} brier=${brier(subset, pooledK).toFixed(4)}`);
   }
+  const briers = subset => ['early', 'mid', 'late'].map(phase => {
+    const inPhase = subset.filter(s => s.phase === phase).map(asOutcome);
+    return inPhase.length === 0 ? '-' : brier(inPhase, pooledK).toFixed(4);
+  }).join('/');
+  const pct = subset => (100 * subset.filter(right).length / subset.length).toFixed(0);
+  // Round 34: the hq tranche and the luck-adjusted view, same K as the full bank.
+  const hq = samples.filter(s => s.quality === 'hq');
+  if (hq.length > 0) lines.push(`hq: n=${hq.length} sign-accuracy=${pct(hq)}% brier early/mid/late=${briers(hq)}`);
+  const clean = samples.filter(s => !s.luckAgainstFavored);
+  lines.push(`luck-adjusted: n=${clean.length} excluded=${samples.length - clean.length} brier early/mid/late=${briers(clean)}`);
   const buckets = [[0, 0.2], [0.2, 0.4], [0.4, 0.7], [0.7, 1.01]];
   for (const [lo, hi] of buckets) {
     const inBucket = samples.filter(sample => Math.abs(sample.score) >= lo && Math.abs(sample.score) < hi);
@@ -110,4 +120,16 @@ export function summarize(samples) {
     );
   }
   return lines;
+}
+
+/** Samples of one quality tranche ('hq' or 'std'); dumps from before round 34 carry no quality and pass through untouched. */
+export const filterQuality = (samples, quality) => quality ? samples.filter(s => s.quality === quality) : samples;
+
+/** Pulls `--quality <hq|std>` out of an argv list. */
+export function takeQualityArg(argv) {
+  const index = argv.indexOf('--quality');
+  if (index < 0) return { argv, quality: null };
+  const quality = argv[index + 1];
+  if (quality !== 'hq' && quality !== 'std') throw new Error('--quality expects hq or std');
+  return { argv: [...argv.slice(0, index), ...argv.slice(index + 2)], quality };
 }

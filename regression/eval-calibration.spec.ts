@@ -14,7 +14,8 @@ import { createMatchupCache, evalFeatures, EVAL_WEIGHTS, FEATURE_WEIGHTS, type E
 import { setLastPairSweep } from '../packages/eval-engine/src/score/last-pair';
 import { livingMons } from '../packages/eval-engine/src/score/threat';
 import { deserializeBattleExact } from '../packages/eval-engine/src/forward-model';
-import { brierScore, fitConstantK } from './fit-helpers';
+import { hasLuckAgainst, luckAgainstFavored } from './luck-events';
+import { summaryLines } from './calibration-summary';
 
 /**
  * Informational calibration run against real finished replays: does the
@@ -2365,6 +2366,12 @@ interface Sample {
   decided: 'p1' | 'p2' | null;
   /** Round 33: one living body per side at the sample — the last-pair static's subset. */
   lastPair: boolean;
+  /** Round 34: the replay's ladder rating (null for tournament replays and unrated games). */
+  rating: number | null;
+  /** Round 34: 'hq' for smogtours replays or rating >= HQ_RATING, the pre-registration tranche from round 35. */
+  quality: 'hq' | 'std';
+  /** Round 34: a crit taken, a miss, or a par/frz/flinch skip against the score's favored side after the sample. */
+  luckAgainstFavored: boolean;
   /**
    * EVAL_CALIBRATION_FEATURES=1: the static eval's scaled feature vector
    * (fit-spec g construction, FEATURE_WEIGHTS key order) — for offline
@@ -2388,6 +2395,33 @@ function applyCalibrationLevers(): void {
 
 /** One living body per side at the sample: the last-pair static's subset (round 33). */
 const lastPairAt = (battle: Battle): boolean => livingMons(battle, 0).length === 1 && livingMons(battle, 1).length === 1;
+
+/** Round 34: the pre-registration tranche threshold for ladder replays. */
+const HQ_RATING = 1700;
+
+/** smogtours replays and high-rated ladder games form the hq tranche (round 34). */
+const qualityOf = (id: string, rating: number | null): Sample['quality'] =>
+  id.startsWith('smogtours') || (rating ?? 0) >= HQ_RATING ? 'hq' : 'std';
+
+/** Luck against the side the score favors, from the sample turn to the end; a zero score favors nobody. */
+const luckFlag = (log: string, turn: number, score: number): boolean =>
+  score !== 0 && hasLuckAgainst(luckAgainstFavored(log, turn, score > 0 ? 'p1' : 'p2'));
+
+/** Bodies alive on both sides at the sample, the solver's scope test without importing the solver. */
+const livingTotal = (battle: Battle): number => livingMons(battle, 0).length + livingMons(battle, 1).length;
+
+/**
+ * EVAL_CALIBRATION_POSITIONS=<dir>: the serialized position of every
+ * sample the round-34 endgame bench can use (last pair, decided sweep, or
+ * at most three living bodies), one JSON file per id#turn.
+ */
+async function exportPosition(dir: string | undefined, sample: Sample, serialized: string, living: number): Promise<void> {
+  if (!dir || !(sample.lastPair || sample.decided !== null || living <= 3)) return;
+  const fs = await import('node:fs');
+  fs.mkdirSync(dir, { recursive: true });
+  const { id, turn, gameType, tranche, quality, p1Won, score, decided, lastPair } = sample;
+  fs.writeFileSync(`${dir}/${id}#${turn}.json`, JSON.stringify({ id, turn, serialized, gameType, tranche, quality, p1Won, score, decided, lastPair }));
+}
 
 test.describe('eval calibration against real replays', () => {
   test.skip(!process.env.EVAL_CALIBRATION, 'set EVAL_CALIBRATION=1 to run the calibration sweep');
@@ -2438,7 +2472,7 @@ test.describe('eval calibration against real replays', () => {
     // that information gap so the delta can be measured (T3 experiment A).
     const smogonFills = process.env.EVAL_CALIBRATION_SMOGON === '1';
     const smogonFetcher = smogonFills ? diskCachedSmogonFetcher() : undefined;
-    type ReplayJson = { id: string; log: string; players: string[]; formatid?: string };
+    type ReplayJson = { id: string; log: string; players: string[]; formatid?: string; rating?: number };
     for (const id of replayIds) {
       let replay: ReplayJson;
       if (fs) {
@@ -2609,7 +2643,8 @@ test.describe('eval calibration against real replays', () => {
             continue;
           }
           const fraction = turn / maxTurn;
-          samples.push({
+          const rating = replay.rating ?? null;
+          const sample: Sample = {
             id,
             turn,
             tranche: trancheOf.get(id) ?? 'unknown',
@@ -2623,8 +2658,13 @@ test.describe('eval calibration against real replays', () => {
             // 17 ids are no longer on record anywhere).
             decided: decidedSideOf(result),
             lastPair: lastPairAt(battle),
+            rating,
+            quality: qualityOf(id, rating),
+            luckAgainstFavored: luckFlag(replay.log, turn, score),
             ...(g ? { g } : {}),
-          });
+          };
+          samples.push(sample);
+          await exportPosition(process.env.EVAL_CALIBRATION_POSITIONS, sample, serialized, livingTotal(battle));
         } catch (error) {
           console.log(`${id} turn ${turn}: ${error instanceof Error ? error.message : error}`);
         }
@@ -2637,61 +2677,10 @@ test.describe('eval calibration against real replays', () => {
     // so a merged run and a single-process run print the same digits.
     samples.sort((a, b) => (a.id !== b.id ? (a.id < b.id ? -1 : 1) : a.turn - b.turn));
 
-    for (const phase of ['early', 'mid', 'late'] as const) {
-      const inPhase = samples.filter(sample => sample.phase === phase);
-      if (inPhase.length === 0) continue;
-      const correct = inPhase.filter(sample => (sample.score > 0) === sample.p1Won).length;
-      const meanAbs = inPhase.reduce((sum, sample) => sum + Math.abs(sample.score), 0) / inPhase.length;
-      console.log(
-        `${phase}: n=${inPhase.length} sign-accuracy=${(100 * correct / inPhase.length).toFixed(0)}% ` +
-        `mean|score|=${meanAbs.toFixed(2)}`,
-      );
-    }
-
-    // Per-gametype accuracy: the doubles scoring path has its own candidate
-    // restriction and combined-choice space — it must be measured separately.
-    for (const gameType of ['singles', 'doubles'] as const) {
-      const inType = samples.filter(sample => sample.gameType === gameType);
-      if (inType.length === 0) continue;
-      const correct = inType.filter(sample => (sample.score > 0) === sample.p1Won).length;
-      console.log(
-        `${gameType}: n=${inType.length} sign-accuracy=${(100 * correct / inType.length).toFixed(0)}%`,
-      );
-    }
-
-    // Logistic fit of P(p1 wins | score) = 1/(1+exp(−K·score)) via the shared
-    // helper. The pooled K feeds src/lib/eval/winprob.ts (pinned by hand after
-    // each fit worth adopting).
-    const asOutcome = (s: Sample) => ({ score: s.score, faintedFraction: s.faintedFraction, won: s.p1Won });
-    const fitK = (subset: Sample[]): number => fitConstantK(subset.map(asOutcome));
-    console.log(
-      `winprob K: pooled=${fitK(samples).toFixed(2)} ` +
-      `singles=${fitK(samples.filter(sample => sample.gameType === 'singles')).toFixed(2)} ` +
-      `doubles=${fitK(samples.filter(sample => sample.gameType === 'doubles')).toFixed(2)}`,
-    );
-
-    // Brier per phase bucket under the pooled constant K — the calibration
-    // evidence sign accuracy cannot see (it is invariant under monotone maps).
-    const pooledK = fitConstantK(samples.map(asOutcome));
-    for (const phase of ['early', 'mid', 'late'] as const) {
-      const subset = samples.filter(s => s.phase === phase).map(asOutcome);
-      if (subset.length === 0) continue;
-      console.log(`${phase} brier=${brierScore(subset, pooledK).toFixed(4)}`);
-    }
-
-    // Calibration by confidence: within a |score| bucket, how often does the
-    // favored side actually win? Well-calibrated means accuracy grows with
-    // magnitude (informs the tanh scale, not just the sign).
-    const buckets: [number, number][] = [[0, 0.2], [0.2, 0.4], [0.4, 0.7], [0.7, 1.01]];
-    for (const [lo, hi] of buckets) {
-      const inBucket = samples.filter(sample => Math.abs(sample.score) >= lo && Math.abs(sample.score) < hi);
-      if (inBucket.length === 0) continue;
-      const correct = inBucket.filter(sample => (sample.score > 0) === sample.p1Won).length;
-      console.log(
-        `|score| ${lo.toFixed(1)}–${hi > 1 ? '1.0' : hi.toFixed(1)}: n=${inBucket.length} ` +
-        `favored-side-wins=${(100 * correct / inBucket.length).toFixed(0)}%`,
-      );
-    }
+    // The aggregate lines live in regression/calibration-summary.ts (round
+    // 34), digit for digit the block that stood here through round 33 and
+    // the same characters scripts/calibration-lib.mjs summarize() prints.
+    for (const line of summaryLines(samples)) console.log(line);
     // Per-position dump for offline paired analysis (engine-vs-engine joins,
     // hybrid counterfactuals). Purely observational — never changes the run.
     if (process.env.EVAL_CALIBRATION_DUMP) {
