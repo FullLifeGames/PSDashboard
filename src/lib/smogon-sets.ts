@@ -24,6 +24,19 @@ type AssumptionSet = {
 
 const gens = new Generations(Dex);
 const cache = new Map<string, Promise<SmogonSetAssumptions | null>>();
+/** Cache identity per custom fetcher: two fakes serving different files must not share an entry. */
+const fetcherIds = new WeakMap<object, number>();
+let nextFetcherId = 1;
+
+function fetcherKey(fetcher: SmogonFetcher | undefined): string {
+  if (!fetcher) return 'global';
+  let id = fetcherIds.get(fetcher);
+  if (id === undefined) {
+    id = nextFetcherId++;
+    fetcherIds.set(fetcher, id);
+  }
+  return `custom${id}`;
+}
 
 /**
  * fetch as a free function: @pkmn/smogon calls `this.fetch(url)`, and a
@@ -45,6 +58,29 @@ function normalizeFormat(formatId: string | undefined): string {
 
 function sourceDetail(format: string): string {
   return `Smogon sets ${format}`;
+}
+
+/** The generation's Ubers file (Doubles Ubers for doubles and VGC): where a banned species' set lives. */
+function fallbackFormat(format: string): string | null {
+  const gen = format.match(/^gen\d+/)?.[0];
+  if (!gen) return null;
+  const fallback = format.includes('doubles') || format.includes('vgc') ? `${gen}doublesubers` : `${gen}ubers`;
+  return fallback === format ? null : fallback;
+}
+
+/**
+ * The species' sets from one file; a file that is not there reads as no
+ * sets. The fetch wrapper hands a 404 through, and @pkmn/smogon then
+ * calls json() on it: a test fake throws "404", a real 404 page fails to
+ * parse. Network failures ("Failed to fetch") stay failures.
+ */
+async function setsFrom(smogon: Smogon, gen: ReturnType<typeof gens.get>, name: string, format: string): Promise<AssumptionSet[]> {
+  try {
+    return await smogon.sets(gen, name, format as ID) as AssumptionSet[];
+  } catch (error) {
+    if (error instanceof Error && /404|Unexpected token|JSON/.test(error.message)) return [];
+    throw error;
+  }
 }
 
 function assumption(value: string | undefined, detail: string): SetAssumption | undefined {
@@ -98,7 +134,7 @@ export async function fetchSmogonSetAssumptions(params: {
   const species = [...new Set(params.species.filter(Boolean).map(name => name.trim()))];
   if (species.length === 0) return null;
 
-  const cacheKey = `${format}:${species.map(toId).sort().join(',')}:${params.fetcher ? 'custom' : 'global'}`;
+  const cacheKey = `${format}:${species.map(toId).sort().join(',')}:${fetcherKey(params.fetcher)}`;
   const cached = cache.get(cacheKey);
   if (cached) return cached;
 
@@ -106,18 +142,25 @@ export async function fetchSmogonSetAssumptions(params: {
     const gen = gens.get(genFromFormat(format));
     const fetcher = withSmogonFallback((params.fetcher ?? boundFetch) as SmogonFetch);
     const smogon = new Smogon(fetcher as unknown as SmogonFetcher, true);
-    const detail = sourceDetail(format);
+    const fallback = fallbackFormat(format);
     const pokemon: Record<string, PokemonSetAssumption> = {};
     const errors: string[] = [];
+    const formats = new Set<string>();
 
     await Promise.all(species.map(async name => {
       try {
-        const sets = await smogon.sets(gen, name, format as ID);
+        let sourceFormat = format;
+        let sets = await setsFrom(smogon, gen, name, format);
+        if (sets.length === 0 && fallback) {
+          sets = await setsFrom(smogon, gen, name, fallback);
+          sourceFormat = fallback;
+        }
         const first = sets[0];
         if (!first) return; // No published set for this species: absence, not failure.
-        const entry = normalizeSet(name, first as AssumptionSet, detail);
-        const alternatives = sets.slice(1, 8)
-          .map(set => normalizeSet(name, set as AssumptionSet, detail));
+        formats.add(sourceFormat);
+        const detail = sourceDetail(sourceFormat);
+        const entry = normalizeSet(name, first, detail);
+        const alternatives = sets.slice(1, 8).map(set => normalizeSet(name, set, detail));
         if (alternatives.length > 0) entry.alternatives = alternatives;
         pokemon[toId(name)] = entry;
       } catch (error) {
@@ -132,6 +175,7 @@ export async function fetchSmogonSetAssumptions(params: {
       source: 'https://data.pkmn.cc',
       pokemon,
       ...(errors.length > 0 ? { errors } : {}),
+      formats: [format, ...[...formats].filter(entry => entry !== format)],
     } : null;
   })();
 

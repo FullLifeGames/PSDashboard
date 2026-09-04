@@ -111,6 +111,49 @@ test.describe('Smogon set assumptions', () => {
     expect(assumptions?.errors).toBeUndefined();
   });
 
+  const byUrl = (files: Record<string, unknown>) => async (url: string) => {
+    const match = url.match(/\/sets\/([a-z0-9]+)\.json$/);
+    const file = match ? files[match[1]] : undefined;
+    if (!file) return { ok: false, status: 404, json: async () => { throw new Error('404'); } } as unknown as Response;
+    return { ok: true, status: 200, json: async () => file } as unknown as Response;
+  };
+  const kyuremSet = { Kyurem: { 'Dragon Dance': { nature: 'Jolly', evs: { hp: 56, def: 236, spe: 216 }, moves: ['Substitute', 'Roost', 'Icicle Spear', 'Dragon Dance'] } } };
+  const toxapexSet = { Toxapex: { Wall: { nature: 'Calm', evs: { hp: 248, spd: 252 }, moves: ['Recover'] } } };
+
+  test('a species missing from the format file takes the generation Ubers set', async () => {
+    const assumptions = await fetchSmogonSetAssumptions({
+      formatId: 'gen8ou', species: ['Toxapex', 'Kyurem'], fetcher: byUrl({ gen8ou: toxapexSet, gen8ubers: kyuremSet }) as never,
+    });
+    expect(assumptions?.pokemon.kyurem?.spread?.evs).toMatchObject({ hp: 56, def: 236, spe: 216 });
+    expect(assumptions?.pokemon.kyurem?.sourceDetail).toBe('Smogon sets gen8ubers');
+    expect(assumptions?.pokemon.toxapex?.sourceDetail).toBe('Smogon sets gen8ou');
+    expect(assumptions?.formats).toEqual(['gen8ou', 'gen8ubers']);
+  });
+
+  test('a species in both files keeps the format set', async () => {
+    const assumptions = await fetchSmogonSetAssumptions({
+      formatId: 'gen8ou', species: ['Toxapex'],
+      fetcher: byUrl({ gen8ou: toxapexSet, gen8ubers: { Toxapex: { Other: { nature: 'Bold', evs: { def: 252 }, moves: ['Haze'] } } } }) as never,
+    });
+    expect(assumptions?.pokemon.toxapex?.spread?.nature).toBe('Calm');
+    expect(assumptions?.formats).toEqual(['gen8ou']);
+  });
+
+  test('doubles formats fall back to Doubles Ubers', async () => {
+    const assumptions = await fetchSmogonSetAssumptions({
+      formatId: 'gen9vgc2026regi', species: ['Kyurem'], fetcher: byUrl({ gen9doublesou: {}, gen9doublesubers: kyuremSet }) as never,
+    });
+    expect(assumptions?.pokemon.kyurem?.sourceDetail).toBe('Smogon sets gen9doublesubers');
+  });
+
+  test('a missing fallback file is absence, not failure', async () => {
+    const assumptions = await fetchSmogonSetAssumptions({
+      formatId: 'gen8ou', species: ['Toxapex', 'Kyurem'], fetcher: byUrl({ gen8ou: toxapexSet }) as never,
+    });
+    expect(assumptions?.pokemon.kyurem).toBeUndefined();
+    expect(assumptions?.errors).toBeUndefined();
+  });
+
   test('uses set assumptions after revealed data and before unknown defaults', () => {
     const enriched = enrichPokemonInfo(sampleInfo, null, {
       format: 'gen9ou',
