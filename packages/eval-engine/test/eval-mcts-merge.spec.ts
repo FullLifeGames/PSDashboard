@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { mergeMctsTrees, starvedSupportCells, VERIFY_SAMPLES } from '../src/mcts-merge';
+import { mergeMctsTrees, starvedSupportCells, VERIFY_DISAGREEMENT, VERIFY_SAMPLES, weightedDisagreement } from '../src/mcts-merge';
 import { cellKey } from '../src/rank';
 import type { MctsTreeStats } from '../src/types';
 
@@ -269,5 +269,44 @@ test.describe('starved support cells are verified before the verdict', () => {
     const verified = new Map([[cellKey(0, 0), { i: 0, j: 0, value: -0.15, ended: false, blend }]]);
     const merged = mergeMctsTrees(trees, verified);
     expect(merged.matrix!.values[0][0]).toBeCloseTo(-0.15, 10);
+  });
+});
+
+test.describe('tree disagreement is visit-weighted (round 33)', () => {
+  test('a thin outlier tree does not make a cell suspect', () => {
+    // 573756 t137 Recover × Struggle: three trees near −0.84 with ~200 visits, one at −0.50 with 54.
+    const entries = [
+      { mean: -0.84, weight: 188 }, { mean: -0.86, weight: 210 }, { mean: -0.84, weight: 205 }, { mean: -0.50, weight: 55 },
+    ];
+    expect(weightedDisagreement(entries)).toBeLessThan(VERIFY_DISAGREEMENT);
+  });
+
+  test("draft t56's lucky-miss tree still reads as disagreement", () => {
+    const entries = [
+      { mean: -0.38, weight: 30 }, { mean: 0.37, weight: 30 }, { mean: -0.34, weight: 30 }, { mean: -0.37, weight: 30 },
+    ];
+    expect(weightedDisagreement(entries)).toBeGreaterThan(VERIFY_DISAGREEMENT);
+  });
+
+  test('two equal camps at the old spread sit exactly at the threshold', () => {
+    expect(weightedDisagreement([{ mean: 0.1, weight: 10 }, { mean: 0.25, weight: 10 }])).toBeCloseTo(VERIFY_DISAGREEMENT, 10);
+  });
+
+  test('a played-out pool with one thin outlier keeps its depth in the merge (573756 t137)', () => {
+    // Four trees on (Safe,X): three deep at about −0.94 with 200 visits, one
+    // thin at −0.70 with 54; the sampler's one-ply static reads +0.06. The
+    // old max−min rule (0.24 > 0.15) handed the cell to the static.
+    const options = (labels: string[]) => labels.map(label => ({ choice: label, label }));
+    const emptyResult = { score: 0, interval: 0, depthCompleted: 2, perSide: { p1: [], p2: [] } };
+    const mk = (visits: number, mean: number): MctsTreeStats => ({
+      p1Options: options(['Safe', 'Sack']), p2Options: options(['X', 'Y']),
+      p1N: [visits, 2], p1W: [visits * mean, 1], p2N: [visits, 2], p2W: [visits * mean, 1],
+      visits: visits + 2, depth: 2, rootValue: 0.5, result: emptyResult,
+      cells: [{ key: cellKey(0, 0), visits, total: mean * (visits + 1) + 0.8, value: -0.8, ended: false }],
+    });
+    const trees = [mk(187, -0.93), mk(209, -0.95), mk(204, -0.93), mk(54, -0.70)];
+    const verified = new Map([[cellKey(0, 0), { i: 0, j: 0, value: 0.06, ended: false }]]);
+    const merged = mergeMctsTrees(trees, verified);
+    expect(merged.matrix!.values[0][0]).toBeLessThan(-0.85);
   });
 });

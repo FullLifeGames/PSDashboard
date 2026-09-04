@@ -29,14 +29,29 @@ export const MCTS_TREES = 4;
  * has too few visits, when too few trees expanded it, or when the trees
  * that did DISAGREE (draft t56: [Ice Beam × Draco Meteor] per-tree means
  * −0.38/+0.37/−0.34/−0.37 — one tree rode a missed 90% Draco Meteor
- * through its whole subtree). Suspect cells get re-priced by the matrix
- * mode's multi-seed cell sampler before the verdict stands.
+ * through its whole subtree; disagreement is visit-weighted since round
+ * 33, so a thin outlier beside three deep trees does not count). Suspect
+ * cells get re-priced by the matrix mode's multi-seed cell sampler before
+ * the verdict stands.
  */
 const VERIFY_MIN_VISITS = 8;
 /** Minimum independent chance samples (trees that expanded the cell). */
 const VERIFY_MIN_TREES = 3;
-/** Per-tree mean spread beyond which a cell's transition is chance-suspect. */
-const VERIFY_SPREAD = 0.15;
+/**
+ * Per-tree disagreement beyond which a cell's transition is chance-suspect:
+ * the visit-weighted mean absolute deviation of the per-tree means from
+ * the pool mean (round 33). Two equal camps 0.15 apart read 0.075, the
+ * old max-min threshold's shape; a thin outlier (573756 t137: 54 visits
+ * at 25 % beside 600 at 8 %) no longer tips a cell.
+ */
+export const VERIFY_DISAGREEMENT = 0.075;
+
+export function weightedDisagreement(entries: { mean: number; weight: number }[]): number {
+  const weight = entries.reduce((sum, entry) => sum + entry.weight, 0);
+  if (weight <= 0) return 0;
+  const mean = entries.reduce((sum, entry) => sum + entry.mean * entry.weight, 0) / weight;
+  return entries.reduce((sum, entry) => sum + Math.abs(entry.mean - mean) * entry.weight, 0) / weight;
+}
 /**
  * A pool whose continuation has reached this magnitude has played the cell
  * out to a (near-)terminal verdict; only there does the tree's depth
@@ -84,23 +99,23 @@ function pooledCells(trees: MctsTreeStats[]): Map<number, PooledCell> {
 /**
  * The pool's continuation for one root cell: the trees whose drawn child
  * did not end the game, pooled with each tree's own prior, plus the visit
- * count, the number of such trees, and the spread of their per-tree means.
+ * count, the number of such trees, and the visit-weighted disagreement
+ * of their per-tree means.
  */
-function poolContinuation(trees: MctsTreeStats[], key: number): { value: number; visits: number; trees: number; spread: number } {
+function poolContinuation(trees: MctsTreeStats[], key: number): { value: number; visits: number; trees: number; disagreement: number } {
   let total = 0;
   let weight = 0;
   let visits = 0;
-  const means: number[] = [];
+  const entries: { mean: number; weight: number }[] = [];
   for (const tree of trees) {
     const cell = tree.cells.find(entry => entry.key === key);
     if (!cell || cell.ended) continue;
     total += cell.total + cell.value;
     weight += cell.visits + 1;
     visits += cell.visits;
-    means.push((cell.total + cell.value) / (cell.visits + 1));
+    entries.push({ mean: (cell.total + cell.value) / (cell.visits + 1), weight: cell.visits + 1 });
   }
-  const spread = means.length > 0 ? Math.max(...means) - Math.min(...means) : 0;
-  return { value: weight > 0 ? total / weight : NaN, visits, trees: means.length, spread };
+  return { value: weight > 0 ? total / weight : NaN, visits, trees: entries.length, disagreement: weightedDisagreement(entries) };
 }
 
 /**
@@ -122,7 +137,7 @@ function poolContinuation(trees: MctsTreeStats[], key: number): { value: number;
 function verifiedValue(trees: MctsTreeStats[], key: number, cell: EvalCellValue, pooledValue: number): number {
   const pool = poolContinuation(trees, key);
   const rich = pool.visits >= VERIFY_MIN_VISITS && pool.trees >= Math.min(VERIFY_MIN_TREES, trees.length);
-  if (!rich || pool.spread > VERIFY_SPREAD || Math.abs(pool.value) < VERIFY_DEPTH_FLOOR) return cell.value;
+  if (!rich || pool.disagreement > VERIFY_DISAGREEMENT || Math.abs(pool.value) < VERIFY_DEPTH_FLOOR) return cell.value;
   if (!cell.blend) return pooledValue;
   if (cell.blend.classes.filter(cls => !cls.ended).length !== 1) return cell.value;
   let value = 0;
@@ -252,38 +267,38 @@ export function mergeMctsTrees(trees: MctsTreeStats[], verified?: Map<number, Ev
 }
 
 interface PoolStats {
-  /** key → prior-blended mean per expanding tree. */
-  perTree: Map<number, number[]>;
+  /** key → prior-blended mean and weight (visits + 1) per expanding tree. */
+  perTree: Map<number, { mean: number; weight: number }[]>;
   pooledVisits: Map<number, number>;
   endedCells: Set<number>;
 }
 
 function poolStats(trees: MctsTreeStats[]): PoolStats {
-  const perTree = new Map<number, number[]>();
+  const perTree = new Map<number, { mean: number; weight: number }[]>();
   const pooledVisits = new Map<number, number>();
   const endedCells = new Set<number>();
   for (const tree of trees) {
     for (const cell of tree.cells) {
       pooledVisits.set(cell.key, (pooledVisits.get(cell.key) ?? 0) + cell.visits);
       if (cell.ended) endedCells.add(cell.key);
-      const means = perTree.get(cell.key) ?? [];
-      means.push((cell.total + cell.value) / (cell.visits + 1));
-      perTree.set(cell.key, means);
+      const entries = perTree.get(cell.key) ?? [];
+      entries.push({ mean: (cell.total + cell.value) / (cell.visits + 1), weight: cell.visits + 1 });
+      perTree.set(cell.key, entries);
     }
   }
   return { perTree, pooledVisits, endedCells };
 }
 
-/** The chance-suspect predicate over the pool: boundary cells, starved cells, thin trees, disagreeing trees. */
+/** The chance-suspect predicate over the pool: boundary cells, starved cells, thin trees, disagreeing trees (visit-weighted). */
 function suspectFor(trees: MctsTreeStats[], stats: PoolStats, boundary: Set<number>): (key: number) => boolean {
   return (key: number): boolean => {
     // A boundary cell's fixed per-tree outcomes cannot represent its
     // accuracy×killFraction split — suspect regardless of visit stats.
     if (boundary.has(key)) return true;
     if ((stats.pooledVisits.get(key) ?? 0) < VERIFY_MIN_VISITS) return true;
-    const means = stats.perTree.get(key) ?? [];
-    if (means.length < Math.min(VERIFY_MIN_TREES, trees.length)) return true;
-    return Math.max(...means) - Math.min(...means) > VERIFY_SPREAD;
+    const entries = stats.perTree.get(key) ?? [];
+    if (entries.length < Math.min(VERIFY_MIN_TREES, trees.length)) return true;
+    return weightedDisagreement(entries) > VERIFY_DISAGREEMENT;
   };
 }
 
