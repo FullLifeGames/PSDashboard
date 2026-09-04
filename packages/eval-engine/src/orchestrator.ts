@@ -2,11 +2,12 @@ import {
   applyTrendExtrapolation, applyTrendTiebreak, attachLines, cellKey, rankFromMatrix, selectExpansionCells,
   selectTieProbeCells, toResult, TOP_EXPANSION, type PvStep, type Ranked, type ValueMatrix,
 } from './rank.ts';
-import { perfSync } from './perf-trace.ts';
+import { perfSpan, perfSync } from './perf-trace.ts';
 import type {
   CellBlend, EvalCellJob, EvalCellValue, EvalChoiceOption, EvalChoicesInfo, EvalResult, EvalSettings,
-  EvalSubSearchJob, KoOddsMismatch, SearchProgress, TeraAllowance,
+  EvalSubSearchJob, ForcedWinInput, ForcedWinOutcome, KoOddsMismatch, SearchProgress, TeraAllowance,
 } from './types.ts';
+import { applyForcedWin, forcedWinInput } from './search/forced-win-apply.ts';
 import { attachRootPayload, koOddsMapsFor, type RootPayload } from './search/root-payload.ts';
 import { recordDeepenedCell, type DeepeningState } from './search/deepening.ts';
 
@@ -29,6 +30,8 @@ export interface SearchExecutor {
   evalCells(jobs: CellJob[], onDone?: (completed: number) => void): Promise<CellValue[]>;
   /** Advance from the root by the job's pair (first fixed seed) and search the child. */
   subSearch(job: SubSearchJob): Promise<EvalResult>;
+  /** Round 35: the forced-win prover on the root, given the finished result's input. */
+  prove(input: ForcedWinInput): Promise<ForcedWinOutcome | null>;
 }
 
 export interface OrchestratorCallbacks {
@@ -196,5 +199,8 @@ export async function searchOrchestrated(
   }
 
   await applyTrendLayersAsync(state, result, stopped);
+  if (!callbacks?.shouldStop?.()) {
+    applyForcedWin(result, await perfSpan('prover', () => executor.prove(forcedWinInput(result, settings))));
+  }
   return result;
 }

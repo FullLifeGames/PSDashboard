@@ -1188,7 +1188,8 @@
           "worstCase": 0.14127014890325018,
           "punishedBy": "→ Snorlax"
         }
-      ]
+      ],
+      "forcedWin": null
     },
     "mcts": {
       "score": -0.2972081559274813,
@@ -2459,7 +2460,7 @@
       }
     ],
     "matrix": {
-      "score": 0.9,
+      "score": 1,
       "interval": 0,
       "depthCompleted": 1,
       "p1": [
@@ -2493,7 +2494,15 @@
           "worstCase": -0.9,
           "punishedBy": "Tackle"
         }
-      ]
+      ],
+      "forcedWin": {
+        "side": "p1",
+        "turns": 4,
+        "mass": 1,
+        "caveat": "sampled-rolls",
+        "engineScore": 0.9,
+        "states": 8
+      }
     },
     "mcts": {
       "score": 0.9197728733326007,

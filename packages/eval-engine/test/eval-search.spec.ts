@@ -6,6 +6,7 @@ import { battleFaintedFraction, optionHints, searchOptions, searchPosition, subS
 import { mctsSearch, mctsTreeSearch, wideningWindow, WIDENING_BASE, WIDENING_VISITS_PER_SLOT } from '../src/mcts';
 import { advancePosition, createRootPosition, legalChoices, positionBattle } from '../src/forward-model';
 import { boostedFraction, pairThreat } from '../src/eval-function';
+import { PROVER_BUDGET } from '../src/endgame/prover';
 import type { EvalResult, SearchProgress } from '../src/types';
 
 function makeSet(name: string, species: string, moves: string[], level = 50): PokemonSet {
@@ -124,6 +125,8 @@ test.describe('depth-1 search', () => {
       forks += 1;
       return original.call(State, serialized);
     }) as DeserializeFn;
+    // Round 35: a zero prover budget keeps this count about the matrix sampler.
+    const proverStates = PROVER_BUDGET.states; PROVER_BUDGET.states = 0;
     try {
       // 2x2 all-quiet matrix (Protect/Substitute): every cell needs one sim.
       const quiet = serialize(makeBattle(
@@ -153,6 +156,7 @@ test.describe('depth-1 search', () => {
       expect(extraDraws).toBeLessThan(cells * 2);      // but not all of them
     } finally {
       State.deserializeBattle = original;
+      PROVER_BUDGET.states = proverStates;
     }
   });
 
@@ -179,7 +183,8 @@ test.describe('depth-1 search', () => {
       const focused = subSearchDepth1(root, { depth: 1, samples: 1, tera: false });
       // The full search scores at the solved game value, the pruned sub-search
       // at the maximin midpoint — both live inside the same [v1, v2] interval.
-      expect(Math.abs(focused.score - full.score)).toBeLessThanOrEqual(full.interval + 1e-9);
+      // Round 35: the focused sub-search never runs the prover; compare the engine's own score.
+      expect(Math.abs(focused.score - (full.forcedWin?.engineScore ?? full.score))).toBeLessThanOrEqual(full.interval + 1e-9);
       expect(focused.interval).toBe(full.interval);
       expect(focused.perSide.p1[0].choice).toBe(full.perSide.p1[0].choice);
       expect(focused.perSide.p1[0].worstCase).toBe(full.perSide.p1[0].worstCase);
@@ -263,7 +268,8 @@ test.describe('iterative deepening', () => {
     const depth1 = searchPosition(twoTurnWin(), { depth: 1, samples: 1 });
     const depth2 = searchPosition(twoTurnWin(), { depth: 2, samples: 1 });
     expect(depth2.depthCompleted).toBe(2);
-    expect(depth2.score).toBeGreaterThan(depth1.score);
+    // Round 35: both depths carry the forced-win bar; the engine's own score still deepens.
+    expect(depth2.forcedWin?.engineScore ?? depth2.score).toBeGreaterThan(depth1.forcedWin?.engineScore ?? depth1.score);
     expect(depth2.perSide.p1[0].choice).toBe('move seismictoss');
   });
 
@@ -627,8 +633,9 @@ test.describe('accuracy and random-call roll sensitivity', () => {
       [makeSet('P', 'Pikachu', ['Growl'], 5)],
     );
     const result = searchPosition(serialize(risky), { depth: 1, samples: 1, tera: false });
-    expect(result.score).toBeGreaterThan(0.2);
-    expect(result.score).toBeLessThan(0.999);
+    // Round 35: the prover bars the win (Pikachu cannot hurt Machamp); the cell pricing must still price the miss.
+    expect(result.forcedWin?.engineScore ?? result.score).toBeGreaterThan(0.2);
+    expect(result.forcedWin?.engineScore ?? result.score).toBeLessThan(0.999);
 
     // The same KO behind a sure move stays exact.
     const sure = makeBattle(

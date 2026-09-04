@@ -15,6 +15,9 @@ import { isCombined } from './hints.ts';
 import { expandPivotPairs, restrictOptions, searchOptions } from './options.ts';
 import { attachRootPayload, koOddsMapsFor, type RootPayload } from './root-payload.ts';
 import { recordDeepenedCell, type DeepeningState } from './deepening.ts';
+import { forcedWinFor } from './forced-win.ts';
+import { applyForcedWin, forcedWinInput } from './forced-win-apply.ts';
+import { perfSync } from '../perf-trace.ts';
 import { buildMatrix, cellValueMemo, maximinRows, minimaxColumns, type Matrix, type SearchCallbacks } from './matrix.ts';
 
 /**
@@ -244,6 +247,9 @@ export function searchPosition(
   }
 
   applyTrendLayers(state, result, p1Options, p2Options, restrictCandidates, stopped);
+  if (!restrictCandidates) {
+    applyForcedWin(result, perfSync('prover', () => forcedWinFor(root, forcedWinInput(result, settings))));
+  }
   return result;
 }
 
@@ -295,6 +301,9 @@ export function createLocalExecutor(serializedBattle: string): SearchExecutor {
     async subSearch(job) {
       const child = advancePosition(root, job.p1Choice, job.p2Choice, SEARCH_SEEDS[0]);
       return subSearch(child.serialized, job.settings, matchupCache);
+    },
+    async prove(input) {
+      return forcedWinFor(root, input);
     },
   };
 }

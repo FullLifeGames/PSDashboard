@@ -110,6 +110,15 @@ test.describe('search orchestrator', () => {
     }
   });
 
+  test('parity includes the forced win: both paths bar the same proof', async () => {
+    const root = threeTurnWin();
+    const sync = searchPosition(root, { depth: 1, samples: 1, tera: false });
+    const orchestrated = await searchOrchestrated(createLocalExecutor(root), { depth: 1, samples: 1, tera: false });
+    expect(orchestrated.forcedWin).toEqual(sync.forcedWin);
+    expect(orchestrated.score).toBe(sync.score);
+    console.log(`threeTurnWin forcedWin: ${JSON.stringify(sync.forcedWin)}`);
+  });
+
   test('progress covers the matrix and partials arrive per depth', async () => {
     const root = threeTurnWin();
     const progress: SearchProgress[] = [];
@@ -151,6 +160,9 @@ test.describe('search orchestrator', () => {
             p2: [{ choice: 'move reply', label: 'Reply', worstCase: 0, expected: 0, ev: 0, punishedBy: null }],
           },
         };
+      },
+      async prove() {
+        return null;
       },
     };
 

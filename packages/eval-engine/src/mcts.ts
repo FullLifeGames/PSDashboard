@@ -7,6 +7,9 @@ import { SEARCH_SEEDS } from './search.ts';
 import { attachKoOdds, hasUnansweredContent, koOddsMapsFor } from './search/root-payload.ts';
 import { topVisitedIndex } from './mcts-merge.ts';
 import { makeNode, pick, principalVariation, treeMatrix, type Node } from './search/mcts-node.ts';
+import { forcedWinFor } from './search/forced-win.ts';
+import { applyForcedWin, forcedWinInput } from './search/forced-win-apply.ts';
+import { perfSync } from './perf-trace.ts';
 import type { EvalResult, EvalSettings, KoOddsInfo, MctsTreeStats, SearchProgress, TeraAllowance, UnansweredProfile } from './types.ts';
 
 /**
@@ -240,7 +243,9 @@ export function mctsSearch(
   settings: EvalSettings,
   callbacks?: MctsCallbacks,
 ): EvalResult {
-  return runMcts(serializedBattle, settings, callbacks).result;
+  const { result } = runMcts(serializedBattle, settings, callbacks);
+  applyForcedWin(result, perfSync('prover', () => forcedWinFor(createRootPosition(serializedBattle), forcedWinInput(result, settings))));
+  return result;
 }
 
 /** One parallel tree's run: root statistics plus its own ranked result. */

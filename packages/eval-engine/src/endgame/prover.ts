@@ -243,8 +243,9 @@ function openFields(root: Battle, side: Side, cells: CellProof[], cache: Matchup
   return { ...(open ? { open } : {}), openValue: sum / weight };
 }
 
-export function proveForcedWin(serializedBattle: string, request: ProveRequest): ForcedWinProof {
-  const root = createRootPosition(serializedBattle);
+/** Proves from a serialized battle or a root position the caller already holds (no second deserialization). */
+export function proveForcedWin(rootOrSerialized: string | SimPosition, request: ProveRequest): ForcedWinProof {
+  const root = typeof rootOrSerialized === 'string' ? createRootPosition(rootOrSerialized) : rootOrSerialized;
   const battle = positionBattle(root);
   const budget = { ...PROVER_BUDGET, ...request.budget };
   const prover = new ForcedWinProver(request.side, { tera: request.tera, sleepClause: request.sleepClause }, budget, request.spent ?? 0);

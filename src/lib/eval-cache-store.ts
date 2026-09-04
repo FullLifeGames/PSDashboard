@@ -132,7 +132,8 @@ export interface StoredEval {
 //      moved in round 33 (published Smogon sets, the Ubers fallback, the
 //      revealed-attack default, the keep-the-prior fit). Scores move in
 //      every endgame and wherever an MCTS verdict leaned on a verified cell.
-const EVAL_ENGINE_CACHE_VERSION = 40;
+// v41: round 35, the forced-win bar on the score.
+const EVAL_ENGINE_CACHE_VERSION = 41;
 
 export function evalStoreKey(
   cacheKey: string,

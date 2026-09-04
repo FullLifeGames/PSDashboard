@@ -45,6 +45,9 @@ scope.onmessage = async (event: MessageEvent<EvalWorkerRequest>) => {
     } else if (message.type === 'subsearch') {
       const result = await executorFor(message.serializedBattle).subSearch(message.job);
       post({ type: 'result', id: message.id, result });
+    } else if (message.type === 'prove') {
+      const outcome = await executorFor(message.serializedBattle).prove(message.input);
+      post({ type: 'proveResult', id: message.id, outcome });
     }
   } catch (error) {
     post({ type: 'error', id: message.id, message: error instanceof Error ? error.message : String(error) });

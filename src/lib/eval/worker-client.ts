@@ -1,5 +1,6 @@
 import {
   MCTS_TREES, mergeMctsTrees, rowCompletedCells, starvedSupportCells, perfAdd, perfCount, perfSync, cellKey, searchOrchestrated,
+  applyForcedWin, forcedWinInput,
   type SearchExecutor, type EvalCellValue, type EvalResult, type EvalSettings, type EvalWorkerRequest,
   type EvalWorkerResponse, type MctsTreeStats, type SearchProgress,
 } from '@fulllifegames/eval-engine';
@@ -144,6 +145,11 @@ export class EvalWorkerClient {
         if (response.type !== 'result') throw new Error('unexpected worker response');
         return response.result;
       },
+      prove: async input => {
+        const response = await this.rpc(this.pickWorker(), { type: 'prove', serializedBattle, input });
+        if (response.type !== 'proveResult') throw new Error('unexpected worker response');
+        return response.outcome;
+      },
     };
   }
 
@@ -252,6 +258,27 @@ export class EvalWorkerClient {
    * visit-mean either way; only rankings sharpen.
    */
   private async verifiedMerge(
+    serializedBattle: string,
+    allTrees: MctsTreeStats[],
+    settings: EvalSettings,
+    handlers: EvalRunHandlers | undefined,
+    live: () => boolean,
+  ): Promise<EvalResult> {
+    const result = await this.verifiedMergeInner(serializedBattle, allTrees, settings, handlers, live);
+    return this.withForcedWin(serializedBattle, result, settings, live);
+  }
+
+  /** Round 35: the forced-win prover on the merged tree result, one worker, after the verify round. */
+  private async withForcedWin(serializedBattle: string, result: EvalResult, settings: EvalSettings, live: () => boolean): Promise<EvalResult> {
+    if (!live()) return result;
+    const started = Date.now();
+    const outcome = await this.createPooledExecutor(serializedBattle).prove(forcedWinInput(result, settings));
+    perfAdd('prover', Date.now() - started);
+    if (live()) applyForcedWin(result, outcome);
+    return result;
+  }
+
+  private async verifiedMergeInner(
     serializedBattle: string,
     allTrees: MctsTreeStats[],
     settings: EvalSettings,

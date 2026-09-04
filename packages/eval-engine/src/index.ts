@@ -6,7 +6,7 @@
  * suites import package sources directly and never depend on this list.
  */
 export {
-  analyzeTurn, PAYOFF_WINDOW, REGRET_THRESHOLD, TIER_THRESHOLDS, decidedSeenKey, unansweredSeenKey,
+  analyzeTurn, PAYOFF_WINDOW, REGRET_THRESHOLD, TIER_THRESHOLDS, decidedSeenKey, forcedWinSeenKey, unansweredSeenKey,
   diffChoices, matchPlayedSide, phantomStayIn, playedSetupMove,
 } from './analysis.ts';
 export type {
@@ -36,6 +36,11 @@ export type { DamageResult, DamageCalcContext } from './damage-calc.ts';
 export { deserializeBattleExact } from './forward-model.ts';
 export { ENDGAME_CAPS, endgameScope, solveEndgame } from './endgame/solver.ts';
 export type { EndgameCaps, EndgameFlag, EndgameResult } from './endgame/solver.ts';
+export { PROVER_BUDGET, proveForcedWin } from './endgame/prover.ts';
+export type { ProveRequest, ProverBudget } from './endgame/prover.ts';
+export { forcedWinFor } from './search/forced-win.ts';
+export { applyForcedWin, forcedWinInput } from './search/forced-win-apply.ts';
+export { MIN_FORCED_MASS, SPOKEN_MASS } from './types.ts';
 export { computeBlunders, selectKeyTurns } from './graph.ts';
 export { summarizeAlignment } from './hax-alignment.ts';
 export type { AlignmentScore, TurnAlignmentRecord, AlignmentSummary } from './hax-alignment.ts';
@@ -70,6 +75,7 @@ export { AUTO_MCTS_FAINTED_FRACTION } from './types.ts';
 export type {
   TeraAllowance, EvalSettings, EvalPreferences, KoOddsInfo, CellBlendClass, CellBlend, KoOddsMismatch,
   RankedChoice, EvalResult, EntryUnanswered, DecidedSweep, NearDecidedSweep, UnansweredProfile, EvalMatrix,
+  ForcedWin, ForcedWinCaveat, ForcedWinOpen, ForcedWinInput, ForcedWinOutcome, ForcedWinProof,
   ReadRecommendation, SearchProgress, EvalChoiceOption, EvalChoicesInfo, EvalCellJob, EvalCellValue,
   EvalSubSearchJob, MctsTreeStats, EvalWorkerRequest, EvalWorkerResponse,
 } from './types.ts';

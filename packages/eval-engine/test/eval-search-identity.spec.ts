@@ -138,7 +138,10 @@ function capture(root: SimPosition): unknown {
   return {
     root: sha256(stripHistory(root.serialized)),
     children,
-    matrix: { score: matrix.score, interval: matrix.interval, depthCompleted: matrix.depthCompleted, p1: rows('p1'), p2: rows('p2') },
+    matrix: {
+      score: matrix.score, interval: matrix.interval, depthCompleted: matrix.depthCompleted, p1: rows('p1'), p2: rows('p2'),
+      forcedWin: matrix.forcedWin ?? null,
+    },
     mcts: {
       score: tree.result.score, visits: tree.visits, depth: tree.depth, rootValue: tree.rootValue,
       p1N: tree.p1N, p1W: tree.p1W, p2N: tree.p2N, p2W: tree.p2W,

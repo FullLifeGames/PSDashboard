@@ -79,9 +79,11 @@ test.describe('DUCT-MCTS search', () => {
   });
 
   test('sees deeper than the static depth-1 matrix', () => {
+    // Round 35: the forced-win bar lifts both to the proven mass; the
+    // engines' own scores (before the bar) still tell the depths apart.
     const matrix = searchPosition(threeTurnWin(), { depth: 1, samples: 1, tera: false });
     const mcts = mctsSearch(threeTurnWin(), { depth: 1, samples: 1, tera: false, mode: 'mcts' });
-    expect(mcts.score).toBeGreaterThan(matrix.score);
+    expect(mcts.forcedWin?.engineScore ?? mcts.score).toBeGreaterThan(matrix.forcedWin?.engineScore ?? matrix.score);
   });
 
   test('is deterministic and reports progress', () => {

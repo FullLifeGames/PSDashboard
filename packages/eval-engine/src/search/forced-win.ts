@@ -2,7 +2,7 @@ import type { Battle } from '@pkmn/sim';
 import { endgameScope } from '../endgame/solver.ts';
 import { proveForcedWin } from '../endgame/prover.ts';
 import { createMatchupCache } from '../eval-function.ts';
-import { createRootPosition, positionBattle } from '../forward-model.ts';
+import { positionBattle, type SimPosition } from '../forward-model.ts';
 import { lastPairRace } from '../score/last-pair.ts';
 import { MIN_FORCED_MASS, type ForcedWinInput, type ForcedWinOutcome } from '../types.ts';
 
@@ -27,11 +27,11 @@ export function forcedWinSides(battle: Battle, input: ForcedWinInput): Side[] {
 }
 
 /** The proof for the first side that reaches the threshold, or null; the states spent carry over between attempts. */
-export function forcedWinFor(serializedBattle: string, input: ForcedWinInput): ForcedWinOutcome | null {
-  const battle = positionBattle(createRootPosition(serializedBattle));
+export function forcedWinFor(root: SimPosition, input: ForcedWinInput): ForcedWinOutcome | null {
+  const battle = positionBattle(root);
   let spent = 0;
   for (const side of forcedWinSides(battle, input)) {
-    const proof = proveForcedWin(serializedBattle, {
+    const proof = proveForcedWin(root, {
       side, rootOrder: input.rootOrder[side], tera: input.tera, sleepClause: input.sleepClause, spent,
     });
     if (proof.mass >= MIN_FORCED_MASS) return { side, proof };

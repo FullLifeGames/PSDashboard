@@ -87,7 +87,7 @@ test.describe('forced-win trigger and bar (round 35)', () => {
       [makeSet('Egg', 'Chansey', ['Soft-Boiled'])],
     ), { p2: [1] });
     const result = resultWith(0.4, ['move seismictoss', 'move protect'], ['move softboiled']);
-    const outcome = forcedWinFor(serialized, forcedWinInput(result, { depth: 1, samples: 1, tera: false }));
+    const outcome = forcedWinFor(createRootPosition(serialized), forcedWinInput(result, { depth: 1, samples: 1, tera: false }));
     expect(outcome?.side).toBe('p1');
     expect(outcome?.proof.mass).toBe(1);
     applyForcedWin(result, outcome);
@@ -126,7 +126,7 @@ test.describe('forced-win trigger and bar (round 35)', () => {
     battle.faintMessages();
     const serialized = serializeAt(battle, { p2: [1] });
     const result = resultWith(0.1, [], []);
-    const outcome = forcedWinFor(serialized, forcedWinInput(result, { depth: 1, samples: 1, tera: false }));
+    const outcome = forcedWinFor(createRootPosition(serialized), forcedWinInput(result, { depth: 1, samples: 1, tera: false }));
     expect(outcome?.side).toBe('p1');
     expect(outcome?.proof.caveat).toBe('sampled-rolls');
   });
