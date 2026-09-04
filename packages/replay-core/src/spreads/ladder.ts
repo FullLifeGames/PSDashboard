@@ -36,9 +36,8 @@ const NATURE_PLUS: Record<string, keyof PokemonEvs> = {
  *
  * `keep` names prior stats the evidence cannot measure at all (an offense
  * seen only in knock-outs, a Speed no rung can bring in line with the
- * observed order): they stay at the prior's value, are protected in the
- * budget like a rung's own claims, and a rung whose protected total would
- * exceed the budget is not a candidate (573756: the 0-Atk sweeper).
+ * observed order): they stay at the prior's value and give way last in
+ * the budget, after the rung's own claims (573756: the 0-Atk sweeper).
  */
 type RungOption = { evs?: Partial<PokemonEvs>; nature?: string };
 
@@ -87,23 +86,28 @@ function measuredStats(offenseStat: 'atk' | 'spa', hasAttackerObs: boolean, hasD
 }
 
 /**
+ * The rung's nature from its option natures; null when two options claim a
+ * nature (they conflict) or when a kept stat's plus nature must stay.
+ */
+function rungNature(options: RungOption[], keepNature: boolean, priorNature: string): string | null {
+  const natures = options.map(option => option.nature).filter((nature): nature is string => !!nature);
+  if (natures.length > 1 || (keepNature && natures.length > 0)) return null;
+  return natures[0] ?? priorNature;
+}
+
+/**
  * One rung's legal spread: the prior with the rung's overrides, rung-claimed
- * and kept stats protected, prior carry-overs giving way first (capToBudget).
- * Null when the protected stats alone exceed the budget — the rung cannot
- * claim its bulk beside what the evidence leaves untouched.
+ * stats protected, prior carry-overs giving way first, kept prior stats
+ * last (capToBudget).
  */
 function composeRung(
   prior: SpreadCandidate, overrides: Partial<PokemonEvs>, keep: ReadonlySet<keyof PokemonEvs>, budget: EvBudget,
-): PokemonEvs | null {
-  const composed = { ...ZERO_EVS, ...prior.evs, ...overrides };
+): PokemonEvs {
   const protectedStats = new Set((Object.entries(overrides) as [keyof PokemonEvs, number][])
     .filter(([, value]) => (value ?? 0) > 0)
     .map(([stat]) => stat));
-  for (const stat of keep) {
-    if (overrides[stat] === undefined && (prior.evs[stat] ?? 0) > 0) protectedStats.add(stat);
-  }
-  const protectedTotal = [...protectedStats].reduce((sum, stat) => sum + Math.min(budget.perStat, composed[stat] ?? 0), 0);
-  return protectedTotal > budget.total ? null : capToBudget(composed, protectedStats, budget);
+  const kept = new Set([...keep].filter(stat => overrides[stat] === undefined && (prior.evs[stat] ?? 0) > 0));
+  return capToBudget({ ...ZERO_EVS, ...prior.evs, ...overrides }, protectedStats, budget, kept);
 }
 
 export function candidateLadder(
@@ -126,6 +130,9 @@ export function candidateLadder(
   const measured = measuredStats(offenseStat, hasAttackerObs, hasDefenderObs, hasSpeedObs);
   const priorPlus = NATURE_PLUS[toId(prior.nature)];
   const priorNature = priorPlus && measured.has(priorPlus) ? 'Hardy' : prior.nature;
+  // A kept stat keeps its plus nature too: a bulk or offense nature would
+  // lower the very stat the evidence cannot measure.
+  const keepNature = priorPlus !== undefined && keep.has(priorPlus);
 
   // Every rung is LEGALIZED before scoring (composeRung).
   const rungs: CandidateRung[] = [{
@@ -135,9 +142,9 @@ export function candidateLadder(
   for (const o of offense) {
     for (const b of bulk) {
       for (const s of speed) {
-        if ([o.nature, b.nature, s.nature].filter(Boolean).length > 1) continue;
-        const evs = composeRung(prior, { ...b.evs, ...s.evs, ...o.evs }, keep, budget);
-        if (evs) rungs.push({ evs, nature: o.nature ?? b.nature ?? s.nature ?? priorNature });
+        const nature = rungNature([o, b, s], keepNature, priorNature);
+        if (nature === null) continue;
+        rungs.push({ evs: composeRung(prior, { ...b.evs, ...s.evs, ...o.evs }, keep, budget), nature });
       }
     }
   }

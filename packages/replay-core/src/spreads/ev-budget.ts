@@ -17,20 +17,24 @@ export const evTotal = (evs: PokemonEvs): number =>
  * unprotected offense, then bulk, then HP), Speed last (damage evidence
  * never justifies stripping Speed, so it only gives way when the budget
  * leaves no other room), and rung-claimed (protected) stats after all
- * unprotected ones; a protected Speed (a prior Speed the evidence cannot
- * measure) joins the protected group. The old unlegalized composition let
- * a prior's 252 Spe ride along with 252/252 overrides — a 756-EV spread
+ * unprotected ones. Kept stats (a prior investment the evidence cannot
+ * measure at all, see the ladder) give way last of all: a rung's claims
+ * shrink before a kept stat does. The old unlegalized composition let a
+ * prior's 252 Spe ride along with 252/252 overrides — a 756-EV spread
  * the sim then played.
  */
-export function capToBudget(evs: PokemonEvs, protectedStats: Set<keyof PokemonEvs>, budget: EvBudget): PokemonEvs {
+export function capToBudget(
+  evs: PokemonEvs, protectedStats: Set<keyof PokemonEvs>, budget: EvBudget, kept: ReadonlySet<keyof PokemonEvs> = new Set(),
+): PokemonEvs {
   const out: PokemonEvs = { ...evs };
   for (const stat of Object.keys(out) as (keyof PokemonEvs)[]) {
     out[stat] = Math.min(budget.perStat, Math.max(0, out[stat] ?? 0));
   }
   const shaveOrder: (keyof PokemonEvs)[] = [
-    ...(['atk', 'spa', 'def', 'spd', 'hp'] as (keyof PokemonEvs)[]).filter(stat => !protectedStats.has(stat)),
-    ...(protectedStats.has('spe') ? [] : ['spe' as const]),
-    ...(['spd', 'def', 'hp', 'spa', 'atk', 'spe'] as (keyof PokemonEvs)[]).filter(stat => protectedStats.has(stat)),
+    ...(['atk', 'spa', 'def', 'spd', 'hp'] as (keyof PokemonEvs)[]).filter(stat => !protectedStats.has(stat) && !kept.has(stat)),
+    ...(kept.has('spe') ? [] : ['spe' as const]),
+    ...(['spd', 'def', 'hp', 'spa', 'atk'] as (keyof PokemonEvs)[]).filter(stat => protectedStats.has(stat) && !kept.has(stat)),
+    ...(['spd', 'def', 'hp', 'spa', 'atk', 'spe'] as (keyof PokemonEvs)[]).filter(stat => kept.has(stat)),
   ];
   for (const stat of shaveOrder) {
     const over = evTotal(out) - budget.total;
