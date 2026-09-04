@@ -29,7 +29,8 @@ interface ProfileContext {
  * category-max move's accuracy (round 14) — the profile's races run on
  * what a turn is worth, not on the best case.
  */
-function expectedRate(threatOut: PairThreat, attacker: Pokemon, defender: Pokemon): number {
+/** Per-turn expected damage fraction: the category-max move at its accuracy, stage-adjusted (round 14). */
+export function expectedRate(threatOut: PairThreat, attacker: Pokemon, defender: Pokemon): number {
   const physical = threatOut.physical * (threatOut.physicalAcc ?? 1) *
     stageMultiplier(attacker.boosts.atk) / stageMultiplier(defender.boosts.def);
   const special = threatOut.special * (threatOut.specialAcc ?? 1) *

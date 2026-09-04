@@ -106,21 +106,44 @@ function bulkMultiplier(defender: Pokemon, move: DexMove): number {
 }
 
 /**
- * Best expected damage (as a fraction of the defender's max HP) among the
- * attacker's actual moves — standard damage formula with STAB, the type
- * chart, and the big item/ability modifiers. Status and fixed-damage moves
- * are invisible to this proxy.
+ * Fixed damage the proxy can price without a base power (round 33: the
+ * last-pair race must see a Seismic Toss Chansey as an attacker). Level
+ * moves deal the user's level, the halving moves half the target's
+ * current HP; the reactive family (Counter, Mirror Coat, Metal Burst) and
+ * self-sacrifice stay at 0.
  */
+function fixedDamage(move: DexMove, attacker: Pokemon, defender: Pokemon): number {
+  switch (move.id) {
+    case 'seismictoss':
+    case 'nightshade':
+    case 'psywave':
+      return attacker.level;
+    case 'superfang':
+    case 'naturesmadness':
+    case 'ruination':
+      return Math.floor(defender.hp / 2);
+    case 'dragonrage':
+      return 40;
+    case 'sonicboom':
+      return 20;
+    default:
+      return 0;
+  }
+}
+
 /**
  * Expected damage of one specific move as a fraction of the defender's max
- * HP under the proxy's rules — 0 for status/fixed-damage/immune moves.
+ * HP under the proxy's rules — standard damage formula with STAB, the type
+ * chart, and the big item/ability modifiers; fixed-damage moves at their
+ * fixed amount; 0 for status, reactive, and immune moves.
  */
 export function singleMoveFraction(attacker: Pokemon, defender: Pokemon, moveId: string, battle: Battle): number {
   const move = battle.dex.moves.get(moveId);
-  if (!move.exists || move.category === 'Status' || !move.basePower) return 0;
+  if (!move.exists || move.category === 'Status') return 0;
   const blanked = ABILITY_IMMUNITIES[defender.ability] ?? [];
   if (blanked.includes(move.type)) return 0;
   if (!battle.dex.getImmunity(move.type, defender.types)) return 0;
+  if (!move.basePower) return fixedDamage(move, attacker, defender) / defender.maxhp;
   const typeMult = Math.pow(2, battle.dex.getEffectiveness(move.type, defender.types));
   const stab = attacker.types.includes(move.type) ? 1.5 : 1;
   const offense = offenseMultiplier(attacker, defender, move);

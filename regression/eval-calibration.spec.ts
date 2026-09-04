@@ -11,6 +11,8 @@ import { fetchSmogonUsageStats } from '../src/lib/smogon-stats';
 import { fetchSmogonSetAssumptions } from '../src/lib/smogon-sets';
 import { diskCachedSmogonFetcher } from './smogon-fetch-cache';
 import { createMatchupCache, evalFeatures, EVAL_WEIGHTS, FEATURE_WEIGHTS, type EvalFeatures } from '../packages/eval-engine/src/eval-function';
+import { setLastPairSweep } from '../packages/eval-engine/src/score/last-pair';
+import { livingMons } from '../packages/eval-engine/src/score/threat';
 import { deserializeBattleExact } from '../packages/eval-engine/src/forward-model';
 import { brierScore, fitConstantK } from './fit-helpers';
 
@@ -2283,6 +2285,8 @@ interface Sample {
   p1Won: boolean;
   /** The root's decided-sweep side (round 15 profile), null when no sweep stands. Round 32. */
   decided: 'p1' | 'p2' | null;
+  /** Round 33: one living body per side at the sample — the last-pair static's subset. */
+  lastPair: boolean;
   /**
    * EVAL_CALIBRATION_FEATURES=1: the static eval's scaled feature vector
    * (fit-spec g construction, FEATURE_WEIGHTS key order) — for offline
@@ -2295,6 +2299,18 @@ interface Sample {
 const decidedSideOf = (result: ReturnType<typeof searchPosition>): Sample['decided'] =>
   result.unanswered?.decided?.side ?? null;
 
+/**
+ * Engine levers the bench reads from the environment (round 33):
+ * EVAL_LAST_PAIR_SWEEP=1 turns on the last-pair static's sweep variant
+ * (variant B, measured, adopted nowhere).
+ */
+function applyCalibrationLevers(): void {
+  if (process.env.EVAL_LAST_PAIR_SWEEP === '1') setLastPairSweep(true);
+}
+
+/** One living body per side at the sample: the last-pair static's subset (round 33). */
+const lastPairAt = (battle: Battle): boolean => livingMons(battle, 0).length === 1 && livingMons(battle, 1).length === 1;
+
 test.describe('eval calibration against real replays', () => {
   test.skip(!process.env.EVAL_CALIBRATION, 'set EVAL_CALIBRATION=1 to run the calibration sweep');
 
@@ -2302,6 +2318,7 @@ test.describe('eval calibration against real replays', () => {
     // 60 min: a half-corpus mcts slice with per-result equilibrium solves
     // crossed the old 40-min budget by minutes (2026-08-11).
     test.setTimeout(3_600_000);
+    applyCalibrationLevers();
     const samples: Sample[] = [];
     const sampleCount = Math.max(1, parseInt(process.env.EVAL_CALIBRATION_SAMPLES ?? '1', 10) || 1);
     // EVAL_CALIBRATION_SOURCE=fit swaps the replay universe to the
@@ -2527,6 +2544,7 @@ test.describe('eval calibration against real replays', () => {
             // clamp and flip positions of round 15 can be re-derived (their
             // 17 ids are no longer on record anywhere).
             decided: decidedSideOf(result),
+            lastPair: lastPairAt(battle),
             ...(g ? { g } : {}),
           });
         } catch (error) {

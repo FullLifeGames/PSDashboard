@@ -2,6 +2,7 @@ import type { PRNGSeed } from '@pkmn/sim';
 import { evaluatePosition, type MatchupCache } from '../eval-function.ts';
 import type { positionBattle } from '../forward-model.ts';
 import { RANDOM_CALL_MOVES } from '../ko-odds.ts';
+import { lastPairRace, lastPairValue } from '../score/last-pair.ts';
 import { wpUnits } from '../winprob.ts';
 
 /**
@@ -40,11 +41,14 @@ export function battleFaintedFraction(battle: ReturnType<typeof positionBattle>)
  * instead of being flattened by score-space means. Ended battles clamp to
  * exact ±1 (the sigmoid saturates near but not at ±1). Shared by the sync
  * search, the executor (worker path), and MCTS — all engine modes must live
- * in the same value space.
+ * in the same value space. Round 33: the last pair is priced by its race
+ * (last-pair.ts), after the sigmoid, in the same units.
  */
 export function leafValue(battle: ReturnType<typeof positionBattle>, matchupCache: MatchupCache): number {
   const raw = evaluatePosition(battle, matchupCache);
   if (battle.ended) return raw > 0 ? 1 : raw < 0 ? -1 : 0;
+  const race = lastPairRace(battle, matchupCache);
+  if (race) return lastPairValue(race);
   return wpUnits(raw, battle.gameType === 'doubles', battleFaintedFraction(battle));
 }
 
