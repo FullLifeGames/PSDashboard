@@ -123,7 +123,16 @@ export interface StoredEval {
 //      solve toward a bulkier defender and a weaker attacker: 573756's
 //      p1 Toxapex fitted as Bold 252 Def, Melmetal at 0 Atk). Sets, and
 //      with them positions, change wherever a knock-out was observed.
-const EVAL_ENGINE_CACHE_VERSION = 39;
+// v40: the last pair is priced by its race (a burned, healing-only Toxapex
+//      no longer outscores a Choice Band Zapdos-Galar on HP alone), the
+//      threat proxy sees fixed-damage moves, the verify step pools tree
+//      depth per outcome class and prices verified cells one ply deeper
+//      with their rows completed, tree disagreement is visit-weighted, and
+//      knock-out hits corroborate Choice items as lower bounds. Teams also
+//      moved in round 33 (published Smogon sets, the Ubers fallback, the
+//      revealed-attack default, the keep-the-prior fit). Scores move in
+//      every endgame and wherever an MCTS verdict leaned on a verified cell.
+const EVAL_ENGINE_CACHE_VERSION = 40;
 
 export function evalStoreKey(
   cacheKey: string,
