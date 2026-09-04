@@ -1,6 +1,7 @@
+import type { PRNGSeed } from '@pkmn/sim';
 import { createMatchupCache, unansweredMons, type MatchupCache } from './eval-function.ts';
-import { advancePosition, createRootPosition, positionBattle } from './forward-model.ts';
-import { koOddsForOptions, planCellEvents } from './cell-blend.ts';
+import { advancePosition, advancePositionWithLog, createRootPosition, positionBattle } from './forward-model.ts';
+import { classifyChild, koOddsForOptions, planCellEvents, type CellEvent } from './cell-blend.ts';
 import { cellKey, rankFromMatrix, toResult as rankedToResult } from './rank.ts';
 import { SEARCH_SEEDS } from './search.ts';
 import { attachKoOdds, hasUnansweredContent, koOddsMapsFor } from './search/root-payload.ts';
@@ -85,6 +86,35 @@ interface PathStep {
 }
 
 /**
+ * Round 33: the root's drawn outcome classes. A root cell fixes one chance
+ * outcome per tree; naming that outcome (miss / hit-kill / hit-nokill, per
+ * cell-blend.ts) lets the merge pool the trees' depth per class. Events are
+ * planned once per root cell (one calc), the class read from the advance
+ * log; unrecognized draws stay unkeyed.
+ */
+interface RootClasses {
+  battle: ReturnType<typeof positionBattle>;
+  events: Map<number, CellEvent[] | null>;
+  keys: Map<number, string>;
+}
+
+/** Expands a root child with its log and records the drawn class when the cell is a boundary cell. */
+function expandRootChild(root: Node, key: number, i: number, j: number, seed: PRNGSeed, classes: RootClasses) {
+  let events = classes.events.get(key);
+  if (events === undefined) {
+    const plan = planCellEvents(classes.battle, root.p1Options[i].choice, root.p2Options[j].choice);
+    events = plan.kind === 'events' ? plan.events : null;
+    classes.events.set(key, events);
+  }
+  const { child, log } = advancePositionWithLog(root.position, root.p1Options[i].choice, root.p2Options[j].choice, seed);
+  if (events) {
+    const classKey = classifyChild(log, events);
+    if (classKey !== null) classes.keys.set(key, classKey);
+  }
+  return child;
+}
+
+/**
  * Selection: descend through existing children via decoupled UCB, expanding
  * at most one child. Returns the joint path, the leaf value the descent
  * ended on, and the depth it reached.
@@ -96,6 +126,7 @@ function selectAndExpand(
   tera: TeraAllowance,
   matchupCache: MatchupCache,
   sleepClause: boolean | undefined,
+  classes: RootClasses,
 ): { path: PathStep[]; leaf: number; depth: number } {
   const path: PathStep[] = [];
   let node = root;
@@ -116,7 +147,11 @@ function selectAndExpand(
       // The offset rotates the seed schedule so parallel trees explore
       // different chance outcomes.
       const seed = SEARCH_SEEDS[(iteration + seedOffset) % SEARCH_SEEDS.length];
-      const position = advancePosition(node.position, node.p1Options[i].choice, node.p2Options[j].choice, seed);
+      // Root expansions keep their advance log for the outcome class
+      // (advancePosition is advancePositionWithLog(...).child: same child).
+      const position = node === root
+        ? expandRootChild(root, key, i, j, seed, classes)
+        : advancePosition(node.position, node.p1Options[i].choice, node.p2Options[j].choice, seed);
       child = makeNode(position, tera, matchupCache, undefined, sleepClause);
       node.children.set(key, child);
       leaf = child.value;
@@ -161,7 +196,7 @@ function runMcts(
   settings: EvalSettings,
   callbacks?: MctsCallbacks,
   seedOffset = 0,
-): { root: Node; maxDepth: number; result: EvalResult; koOdds?: RootKoOdds } {
+): { root: Node; maxDepth: number; result: EvalResult; koOdds?: RootKoOdds; rootClassKeys: Map<number, string> } {
   const matchupCache = createMatchupCache();
   const tera = settings.tera ?? true;
   // keepPlayed applies to the root only — children have their own spaces.
@@ -171,6 +206,7 @@ function runMcts(
       root,
       maxDepth: 1,
       result: { score: root.value, interval: 0, depthCompleted: 1, perSide: { p1: [], p2: [] } },
+      rootClassKeys: new Map(),
     };
   }
 
@@ -183,11 +219,12 @@ function runMcts(
   };
   // Round 13: root unanswered-mon profile, once per root like the ko odds.
   const unanswered = unansweredMons(rootBattle, matchupCache);
+  const classes: RootClasses = { battle: rootBattle, events: new Map(), keys: new Map() };
 
   let maxDepth = 1;
   for (let iteration = 0; iteration < MCTS_ITERATIONS; iteration++) {
     if (callbacks?.shouldStop?.()) break;
-    const { path, leaf, depth } = selectAndExpand(root, iteration, seedOffset, tera, matchupCache, settings.sleepClause);
+    const { path, leaf, depth } = selectAndExpand(root, iteration, seedOffset, tera, matchupCache, settings.sleepClause, classes);
     maxDepth = Math.max(maxDepth, depth);
     backpropagate(path, leaf);
     reportIteration(callbacks, root, iteration + 1, maxDepth, koOdds, unanswered);
@@ -195,7 +232,7 @@ function runMcts(
 
   const result = toResult(root, maxDepth, koOdds, unanswered);
   callbacks?.onPartial?.(result);
-  return { root, maxDepth, result, koOdds };
+  return { root, maxDepth, result, koOdds, rootClassKeys: classes.keys };
 }
 
 export function mctsSearch(
@@ -213,7 +250,7 @@ export function mctsTreeSearch(
   seedOffset: number,
   callbacks?: MctsCallbacks,
 ): MctsTreeStats {
-  const { root, maxDepth, result, koOdds } = runMcts(serializedBattle, settings, callbacks, seedOffset);
+  const { root, maxDepth, result, koOdds, rootClassKeys } = runMcts(serializedBattle, settings, callbacks, seedOffset);
   // Boundary flags for the merge's verify selection. Analytic only (one
   // calc per damaging pair, no sim advances) and identical across trees,
   // and the merge reads trees[0] alone — so only the offset-0 tree pays
@@ -249,6 +286,7 @@ export function mctsTreeSearch(
       total: child.p1W.reduce((sum, w) => sum + w, 0) + child.value,
       value: child.value,
       ended: child.ended,
+      ...(rootClassKeys.has(key) ? { classKey: rootClassKeys.get(key) } : {}),
     })),
     result,
   };

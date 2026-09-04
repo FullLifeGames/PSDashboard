@@ -8,6 +8,8 @@ import {
 import { reblendValue } from '../src/rank';
 import { advancePositionWithLog, createRootPosition } from '../src/forward-model';
 import { createLocalExecutor, searchPosition } from '../src/search';
+import { sampleCell } from '../src/search/cell-sampler';
+import { createMatchupCache } from '../src/eval-function';
 import { searchOrchestrated } from '../src/orchestrator';
 
 function makeSet(name: string, species: string, moves: string[], level = 50, item = '', ability = 'No Ability'): PokemonSet {
@@ -117,8 +119,8 @@ test('reblendValue swaps the first leaf inside its class only', () => {
   const blend = {
     firstLeaf: 1,
     classes: [
-      { weight: 0.43, leafSum: 2, count: 2, hasFirst: true, ended: false },   // leaves 1, 1
-      { weight: 0.57, leafSum: -1, count: 1, hasFirst: false, ended: true },
+      { key: 'hit-nokill', weight: 0.43, leafSum: 2, count: 2, hasFirst: true, ended: false },   // leaves 1, 1
+      { key: 'hit-kill', weight: 0.57, leafSum: -1, count: 1, hasFirst: false, ended: true },
     ],
   };
   // Deepened first child: 0.5 → class mean (0.5 + 1)/2 = 0.75.
@@ -211,6 +213,22 @@ test.describe('root-cell blend integration', () => {
     [makeSet('Machamp', 'Machamp', ['Hydro Pump', 'Seismic Toss'], 100)],
     [makeSet('Pikachu', 'Pikachu', ['Tackle', 'Growl'], 30)],
   ));
+
+  test('the blend classes carry the fold keys (round 33)', () => {
+    // The merge pools MCTS trees per outcome class by these keys.
+    const battle = makeBattle(
+      [makeSet('Deo', 'Deoxys-Speed', ['Hydro Pump', 'Seismic Toss'], 100)],
+      [makeSet('Pika', 'Pikachu', ['Tackle', 'Growl'], 30)],
+    );
+    battle.sides[0].active[0]!.hp = 1;
+    const sample = sampleCell(createRootPosition(serialize(battle)), 0, 'move hydropump', 'move tackle', 3, createMatchupCache(), true);
+    const plan = planCellEvents(battle, 'move hydropump', 'move tackle');
+    expect(plan.kind).toBe('events');
+    const expected = foldClassWeights((plan as { events: CellEvent[] }).events, 'p1');
+    const keys = sample.blend!.classes.map(cls => cls.key).sort();
+    expect(keys.length).toBeGreaterThan(0);
+    for (const key of keys) expect([...expected.keys()]).toContain(key);
+  });
 
   test('a boundary cell prices at analytic weights, not seed frequency', () => {
     const result = searchPosition(mutualRoot(), { depth: 1, samples: 5 });

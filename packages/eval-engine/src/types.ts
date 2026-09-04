@@ -86,6 +86,8 @@ export interface KoOddsInfo {
 
 /** One outcome class of a blended boundary cell (round 6). */
 export interface CellBlendClass {
+  /** The fold's class key (cell-blend.ts): 'miss', 'hit-kill', 'hit-nokill', or two sides joined with '|' ('hit-kill|none'). */
+  key: string;
   /** Analytic weight (normalized over the classes that were sampled). */
   weight: number;
   /** Sum of the sampled children's leaf values in this class. */
@@ -366,7 +368,15 @@ export interface MctsTreeStats {
    * sum of every leaf value backed through the cell (expansion included),
    * `value` the child's creation-time static (the one-visit prior).
    */
-  cells: { key: number; visits: number; total: number; value: number; ended: boolean }[];
+  cells: {
+    key: number; visits: number; total: number; value: number; ended: boolean;
+    /**
+     * The drawn child's outcome class on a boundary cell, when the
+     * classifier recognized it (round 33) — lets the merge pool trees per
+     * class instead of trusting one open class only.
+     */
+    classKey?: string;
+  }[];
   /** This tree's own ranked result (PV/punisher donor for the merge). */
   result: EvalResult;
 }

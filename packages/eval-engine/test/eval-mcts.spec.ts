@@ -222,6 +222,24 @@ test.describe('MCTS koOdds payload (round 7)', () => {
     expect(pump.koOdds).toEqual({ accuracy: expect.closeTo(0.8, 5), killFraction: 1 });
   });
 
+  test('root cells carry their drawn outcome class on boundary cells only, deterministically (round 33)', () => {
+    const root = gambleRoot();
+    const tree = mctsTreeSearch(root, settings, 1);
+    const i = tree.p1Options.findIndex(option => option.choice === 'move hydropump');
+    const toss = tree.p1Options.findIndex(option => option.choice === 'move seismictoss');
+    const j = tree.p2Options.findIndex(option => option.choice === 'move tackle');
+    expect(i).toBeGreaterThanOrEqual(0);
+    expect(j).toBeGreaterThanOrEqual(0);
+    const pump = tree.cells.find(cell => cell.key === cellKey(i, j));
+    expect(pump).toBeTruthy();
+    expect(['miss', 'hit-kill', 'hit-nokill']).toContain(pump!.classKey);
+    const certain = tree.cells.find(cell => cell.key === cellKey(toss, j));
+    expect(certain?.classKey).toBeUndefined();
+    // Same offset, same draws, same keys.
+    const again = mctsTreeSearch(root, settings, 1);
+    expect(again.cells.map(cell => [cell.key, cell.classKey])).toEqual(tree.cells.map(cell => [cell.key, cell.classKey]));
+  });
+
   test('only the offset-0 tree pays the boundary-flag scan (the merge reads trees[0])', () => {
     const root = gambleRoot();
     const tree0 = mctsTreeSearch(root, settings, 0);

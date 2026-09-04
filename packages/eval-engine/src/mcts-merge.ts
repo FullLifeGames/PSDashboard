@@ -100,9 +100,14 @@ function pooledCells(trees: MctsTreeStats[]): Map<number, PooledCell> {
  * The pool's continuation for one root cell: the trees whose drawn child
  * did not end the game, pooled with each tree's own prior, plus the visit
  * count, the number of such trees, and the visit-weighted disagreement
- * of their per-tree means.
+ * of their per-tree means. With `classKey` only the trees that drew that
+ * outcome class count (round 33); `acceptUnkeyed` lets trees without a
+ * recorded class join (the one-open-class shape, where every open draw
+ * must belong to that class).
  */
-function poolContinuation(trees: MctsTreeStats[], key: number): { value: number; visits: number; trees: number; disagreement: number } {
+function poolContinuation(
+  trees: MctsTreeStats[], key: number, classKey?: string, acceptUnkeyed = false,
+): { value: number; visits: number; trees: number; disagreement: number } {
   let total = 0;
   let weight = 0;
   let visits = 0;
@@ -110,6 +115,7 @@ function poolContinuation(trees: MctsTreeStats[], key: number): { value: number;
   for (const tree of trees) {
     const cell = tree.cells.find(entry => entry.key === key);
     if (!cell || cell.ended) continue;
+    if (classKey !== undefined && cell.classKey !== classKey && !(acceptUnkeyed && cell.classKey === undefined)) continue;
     total += cell.total + cell.value;
     weight += cell.visits + 1;
     visits += cell.visits;
@@ -118,30 +124,45 @@ function poolContinuation(trees: MctsTreeStats[], key: number): { value: number;
   return { value: weight > 0 ? total / weight : NaN, visits, trees: entries.length, disagreement: weightedDisagreement(entries) };
 }
 
+/** A class pool rich enough to carry depth: VERIFY_MIN_VISITS visits over at least two trees (four trees split across classes). */
+const VERIFY_MIN_CLASS_TREES = 2;
+
+/** A pool that has played its cell out and agrees: its depth outranks the one-ply sampler. */
+function deepPool(pool: ReturnType<typeof poolContinuation>, minTrees: number): boolean {
+  return pool.visits >= VERIFY_MIN_VISITS && pool.trees >= minTrees &&
+    pool.disagreement <= VERIFY_DISAGREEMENT && Math.abs(pool.value) >= VERIFY_DEPTH_FLOOR;
+}
+
 /**
- * The value a verified cell contributes (round 32). The sampler's job is
- * the ROOT chance split; the trees' job is depth, and depth counts only
- * where the pool has played the cell out. Starved or thin pools and
- * disagreeing trees take the sampler's value as before (round 7; draft
- * t56's draws cannot be assigned to classes here). A rich, agreeing pool
- * whose continuation sits at or beyond VERIFY_DEPTH_FLOOR keeps that
- * depth: without a blend the pooled value stands, with a blend whose
- * classes leave exactly ONE open the ended classes contribute their exact
- * leaves and the open class the pool's continuation (573756 t138: a
- * played-out −0.96 must not become the one-ply static +0.03). The pool's
- * open draws can be assigned to a class only in that one-open-class shape:
- * with two open classes (hit / miss) every tree may have drawn the same
- * one, so those cells keep the sampler's blend too. Everything below the
- * floor is round 7 unchanged.
+ * The value a verified cell contributes (rounds 32 and 33). The sampler's
+ * job is the ROOT chance split; the trees' job is depth, and depth counts
+ * only where the pool has played the cell out (VERIFY_DEPTH_FLOOR) and
+ * agrees. Without a blend a rich, agreeing, played-out pool stands and
+ * everything else takes the sampler's value (round 7). With a blend every
+ * class is priced on its own (round 33): an ended class contributes its
+ * exact leaves; an open class takes the pool of the trees that DREW that
+ * class (cells[].classKey) when that pool is deep, and the sampler's class
+ * mean otherwise (573756 t137: three trees played the hit out to −0.96
+ * while the one miss tree sat at +0.2 — the hit class keeps its depth,
+ * the miss class keeps the sampler). Trees without a recorded class join
+ * a pool only in the one-open-class shape, where every open draw must
+ * belong to that class (round 32's rule as the special case).
  */
 function verifiedValue(trees: MctsTreeStats[], key: number, cell: EvalCellValue, pooledValue: number): number {
-  const pool = poolContinuation(trees, key);
-  const rich = pool.visits >= VERIFY_MIN_VISITS && pool.trees >= Math.min(VERIFY_MIN_TREES, trees.length);
-  if (!rich || pool.disagreement > VERIFY_DISAGREEMENT || Math.abs(pool.value) < VERIFY_DEPTH_FLOOR) return cell.value;
-  if (!cell.blend) return pooledValue;
-  if (cell.blend.classes.filter(cls => !cls.ended).length !== 1) return cell.value;
+  if (!cell.blend) {
+    const pool = poolContinuation(trees, key);
+    return deepPool(pool, Math.min(VERIFY_MIN_TREES, trees.length)) ? pooledValue : cell.value;
+  }
+  const open = cell.blend.classes.filter(cls => !cls.ended);
   let value = 0;
-  for (const cls of cell.blend.classes) value += cls.weight * (cls.ended ? cls.leafSum / cls.count : pool.value);
+  for (const cls of cell.blend.classes) {
+    if (cls.ended) {
+      value += cls.weight * (cls.leafSum / cls.count);
+      continue;
+    }
+    const pool = poolContinuation(trees, key, cls.key, open.length === 1);
+    value += cls.weight * (deepPool(pool, VERIFY_MIN_CLASS_TREES) ? pool.value : cls.leafSum / cls.count);
+  }
   return value;
 }
 

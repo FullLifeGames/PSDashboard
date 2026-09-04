@@ -192,8 +192,8 @@ test.describe('starved support cells are verified before the verdict', () => {
     ]);
     const trees = [rich(0), rich(1), rich(2), rich(3)];
     const blend = { firstLeaf: 0.03, classes: [
-      { weight: 0.05, leafSum: -1, count: 1, hasFirst: false, ended: true },
-      { weight: 0.95, leafSum: 0.09, count: 3, hasFirst: true, ended: false },
+      { key: 'hit-kill', weight: 0.05, leafSum: -1, count: 1, hasFirst: false, ended: true },
+      { key: 'hit-nokill', weight: 0.95, leafSum: 0.09, count: 3, hasFirst: true, ended: false },
     ] };
     const verified = new Map([[cellKey(0, 0), { i: 0, j: 0, value: -0.02, ended: false, blend }]]);
     const merged = mergeMctsTrees(trees, verified);
@@ -231,7 +231,7 @@ test.describe('starved support cells are verified before the verdict', () => {
       { key: cellKey(0, 0), visits: 30, total: 15.6 - offset * 0.1, value: 0.5, ended: false },
     ]);
     const trees = [mid(0), mid(1), mid(2), mid(3)];
-    const blend = { firstLeaf: 0.08, classes: [{ weight: 1, leafSum: 1.12, count: 14, hasFirst: true, ended: false }] };
+    const blend = { firstLeaf: 0.08, classes: [{ key: 'hit-nokill', weight: 1, leafSum: 1.12, count: 14, hasFirst: true, ended: false }] };
     const verified = new Map([[cellKey(0, 0), { i: 0, j: 0, value: 0.08, ended: false, blend }]]);
     expect(mergeMctsTrees(trees, verified).matrix!.values[0][0]).toBeCloseTo(0.08, 10);
   });
@@ -246,8 +246,8 @@ test.describe('starved support cells are verified before the verdict', () => {
     ]);
     const trees = [rich(0), rich(1), rich(2), rich(3)];
     const blend = { firstLeaf: -0.2, classes: [
-      { weight: 0.9, leafSum: -0.6, count: 3, hasFirst: true, ended: false },
-      { weight: 0.1, leafSum: 0.3, count: 1, hasFirst: false, ended: false },
+      { key: 'hit-nokill', weight: 0.9, leafSum: -0.6, count: 3, hasFirst: true, ended: false },
+      { key: 'miss', weight: 0.1, leafSum: 0.3, count: 1, hasFirst: false, ended: false },
     ] };
     const verified = new Map([[cellKey(0, 0), { i: 0, j: 0, value: -0.15, ended: false, blend }]]);
     const merged = mergeMctsTrees(trees, verified);
@@ -263,8 +263,8 @@ test.describe('starved support cells are verified before the verdict', () => {
     ]);
     const trees = [split(-0.9), split(0.3), split(-0.9)];
     const blend = { firstLeaf: -0.2, classes: [
-      { weight: 0.9, leafSum: -0.6, count: 3, hasFirst: true, ended: false },
-      { weight: 0.1, leafSum: 0.3, count: 1, hasFirst: false, ended: false },
+      { key: 'hit-nokill', weight: 0.9, leafSum: -0.6, count: 3, hasFirst: true, ended: false },
+      { key: 'miss', weight: 0.1, leafSum: 0.3, count: 1, hasFirst: false, ended: false },
     ] };
     const verified = new Map([[cellKey(0, 0), { i: 0, j: 0, value: -0.15, ended: false, blend }]]);
     const merged = mergeMctsTrees(trees, verified);
@@ -308,5 +308,50 @@ test.describe('tree disagreement is visit-weighted (round 33)', () => {
     const verified = new Map([[cellKey(0, 0), { i: 0, j: 0, value: 0.06, ended: false }]]);
     const merged = mergeMctsTrees(trees, verified);
     expect(merged.matrix!.values[0][0]).toBeLessThan(-0.85);
+  });
+});
+
+test.describe('per-class continuation (round 33)', () => {
+  const options = (labels: string[]) => labels.map(label => ({ choice: label, label }));
+  const emptyResult = { score: 0, interval: 0, depthCompleted: 2, perSide: { p1: [], p2: [] } };
+  const mk = (cells: MctsTreeStats['cells']): MctsTreeStats => ({
+    p1Options: options(['Safe', 'Sack']), p2Options: options(['X', 'Y']),
+    p1N: [40, 2], p1W: [-30, 1], p2N: [40, 2], p2W: [-30, 1],
+    visits: 42, depth: 2, rootValue: 0.5, cells, result: emptyResult,
+  });
+  // Fire Fang × Recover in miniature: hit-nokill (0.95·(1−k)) and miss (0.05) both open.
+  // Trees 1–3 drew the hit and played it out to about −0.96; tree 4 drew the miss and sits at +0.2.
+  const cell = (visits: number, mean: number, classKey?: string) => ({
+    key: cellKey(0, 0), visits, total: mean * (visits + 1) - (-0.1), value: -0.1, ended: false,
+    ...(classKey ? { classKey } : {}),
+  });
+  const blend = { firstLeaf: -0.1, classes: [
+    { key: 'hit-nokill', weight: 0.8, leafSum: -0.3, count: 3, hasFirst: true, ended: false },
+    { key: 'miss', weight: 0.2, leafSum: 0.6, count: 3, hasFirst: false, ended: false },
+  ] };
+
+  test('a rich hit class keeps its tree depth while the thin miss class takes the sampler mean', () => {
+    const trees = [
+      mk([cell(120, -0.96, 'hit-nokill')]), mk([cell(110, -0.95, 'hit-nokill')]),
+      mk([cell(130, -0.97, 'hit-nokill')]), mk([cell(40, 0.2, 'miss')]),
+    ];
+    const merged = mergeMctsTrees(trees, new Map([[cellKey(0, 0), { i: 0, j: 0, value: -0.04, ended: false, blend }]]));
+    // 0.8 · pooled hit continuation (≈ −0.96) + 0.2 · sampler miss mean (0.2)
+    expect(merged.matrix!.values[0][0]).toBeCloseTo(0.8 * -0.96 + 0.2 * 0.2, 1);
+    // The old one-open-class rule kept the sampler's −0.15 here: two open classes, no assignment.
+    expect(merged.matrix!.values[0][0]).toBeLessThan(-0.6);
+  });
+
+  test('unkeyed trees join the only open class, never a two-class blend', () => {
+    const unkeyed = [mk([cell(120, -0.96)]), mk([cell(110, -0.95)]), mk([cell(130, -0.97)])];
+    const oneOpen = { firstLeaf: -0.1, classes: [
+      { key: 'hit-kill', weight: 0.3, leafSum: -1, count: 1, hasFirst: false, ended: true },
+      { key: 'hit-nokill', weight: 0.7, leafSum: -0.3, count: 3, hasFirst: true, ended: false },
+    ] };
+    const one = mergeMctsTrees(unkeyed, new Map([[cellKey(0, 0), { i: 0, j: 0, value: -0.37, ended: false, blend: oneOpen }]]));
+    expect(one.matrix!.values[0][0]).toBeCloseTo(0.3 * -1 + 0.7 * -0.96, 1);
+    const two = mergeMctsTrees(unkeyed, new Map([[cellKey(0, 0), { i: 0, j: 0, value: -0.04, ended: false, blend }]]));
+    // The sampler's own blend mean: 0.8 · (−0.3/3) + 0.2 · (0.6/3).
+    expect(two.matrix!.values[0][0]).toBeCloseTo(-0.04, 10);
   });
 });
