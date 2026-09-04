@@ -1,28 +1,35 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'fs';
 import { dirname, join } from 'path';
 import { fileURLToPath } from 'url';
-import type { Page } from '@playwright/test';
+import type { Page, Route } from '@playwright/test';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 const FIXTURES = join(__dirname, 'fixtures');
 const SMOGON_DIR = join(FIXTURES, 'smogon');
 
-/** Record mode: unpinned data.pkmn.cc responses are fetched live and saved. */
+/** Record mode: unpinned Smogon data responses are fetched live and saved. */
 export const RECORD = process.env.FEEDBACK_RECORD === '1';
 
 export interface HermeticLog {
   /** Non-cosmetic external requests that were neither pinned nor recordable. */
   violations: string[];
-  /** data.pkmn.cc requests with no pin outside record mode. */
+  /** Smogon data requests (data.pkmn.cc or its GitHub Pages mirror) with no pin outside record mode. */
   smogonMisses: string[];
 }
 
-const pathKey = (url: URL) => url.pathname.replace(/[^a-z0-9.]+/gi, '_');
+const SMOGON_HOSTS = ['https://data.pkmn.cc', 'https://pkmn.github.io/smogon/data'] as const;
+
+/** One fixture name for both hosts: the path below the host, double slashes collapsed. */
+const pathKey = (url: URL) => {
+  const path = url.hostname === 'pkmn.github.io' ? url.pathname.replace(/^\/smogon\/data/, '') : url.pathname;
+  return path.replace(/\/{2,}/g, '/').replace(/[^a-z0-9.]+/gi, '_');
+};
 
 /**
- * Pins every input: the replay JSON from its fixture, data.pkmn.cc from
- * recordings (404s recorded too — absence is an input), the replay-embed
+ * Pins every input: the replay JSON from its fixture, data.pkmn.cc and its
+ * GitHub Pages mirror from recordings (404s recorded too — absence is an
+ * input), the replay-embed
  * script as an inert stub, play.pokemonshowdown.com assets (sprites/audio)
  * silently dropped as cosmetic. Everything else external is a violation.
  * Playwright routes: the LAST registered route wins — catch-all first.
@@ -48,7 +55,7 @@ export async function installHermeticRoutes(page: Page, replayId: string): Promi
     }
     return route.fulfill({ status: 200, contentType: 'application/json', body: replayFixture });
   });
-  await page.route('https://data.pkmn.cc/**', async route => {
+  const serveSmogon = async (route: Route) => {
     const url = new URL(route.request().url());
     const file = join(SMOGON_DIR, `${pathKey(url)}.json`);
     const missMarker = join(SMOGON_DIR, `${pathKey(url)}.404`);
@@ -70,6 +77,7 @@ export async function installHermeticRoutes(page: Page, replayId: string): Promi
     }
     log.smogonMisses.push(url.href);
     return route.fulfill({ status: 404, body: '' });
-  });
+  };
+  for (const host of SMOGON_HOSTS) await page.route(`${host}/**`, serveSmogon);
   return log;
 }

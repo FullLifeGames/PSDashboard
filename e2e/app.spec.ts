@@ -1,8 +1,9 @@
-import { test, expect, type Frame, type Page } from '@playwright/test';
+import { test, expect, type Frame, type Page, type Route } from '@playwright/test';
 import { readFileSync } from 'fs';
 import { dirname, join } from 'path';
 import { fileURLToPath } from 'url';
 import { encodeBranchShare, type BranchSharePayload } from '../src/lib/branch-share';
+import { emptySmogon, routeSmogon } from './smogon-routes';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -233,8 +234,7 @@ async function routeOfflineFixtures(page: Page): Promise<void> {
       body: JSON.stringify(replay),
     });
   });
-  await page.route('https://data.pkmn.cc/**', route =>
-    route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({}) }));
+  await routeSmogon(page, emptySmogon);
 }
 
 test.describe('PS Dashboard', () => {
@@ -271,8 +271,7 @@ test.describe('PS Dashboard', () => {
 
   test('shows a notice when the Smogon sets fail to load', async ({ page }) => {
     // Both data hosts unreachable: the fallback runs dry and the top bar says so.
-    await page.route('https://data.pkmn.cc/**', route => route.abort());
-    await page.route('https://pkmn.github.io/smogon/data/**', route => route.abort());
+    await routeSmogon(page, route => route.abort());
     await page.locator('button', { hasText: 'Load' }).click();
     await expect(page.getByText('Smogon sets unavailable')).toBeVisible({ timeout: 15000 });
     await expect(page.getByText('Smogon stats unavailable')).toBeVisible();
@@ -282,7 +281,7 @@ test.describe('PS Dashboard', () => {
     // Deterministic usage payload: Body Press tops the marginals while the
     // replay reveals Swords Dance — the panel must show the vetoed assembly
     // the simulator builds, never a second raw-usage guess (the GPL split).
-    await page.route('https://data.pkmn.cc/**', (route) => {
+    const cobalionUsage = (route: Route) => {
       if (route.request().url().includes('/stats/')) {
         route.fulfill({
           status: 200, contentType: 'application/json',
@@ -301,7 +300,8 @@ test.describe('PS Dashboard', () => {
         return;
       }
       route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({}) });
-    });
+    };
+    await routeSmogon(page, cobalionUsage);
     await page.locator('input[aria-label="Load exported replay file"]')
       .setInputFiles(join(__dirname, 'fixtures', 'gpl-replay.html'));
 
@@ -655,8 +655,7 @@ test.describe('PS Dashboard', () => {
     await page.reload();
     // Offline usage payloads: deterministic teams, and the Smogon-loading
     // guard settles so Analyze game is clickable.
-    await page.route('https://data.pkmn.cc/**', route =>
-      route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({}) }));
+    await routeSmogon(page, emptySmogon);
     await page.locator('input[aria-label="Load exported replay file"]')
       .setInputFiles(join(__dirname, 'fixtures', 'gpl-replay.html'));
 

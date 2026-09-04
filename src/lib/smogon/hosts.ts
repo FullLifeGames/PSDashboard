@@ -4,7 +4,7 @@
  * since 2026-09-03; browsers follow it, but a redirecting domain is one
  * more thing that can break. The wrapper tries the hosts in order.
  */
-export const SMOGON_DATA_HOSTS = ['https://data.pkmn.cc', 'https://pkmn.github.io/smogon/data'] as const;
+const SMOGON_DATA_HOSTS = ['https://data.pkmn.cc', 'https://pkmn.github.io/smogon/data'] as const;
 
 export type SmogonFetch = (input: string, init?: RequestInit) => Promise<Response>;
 

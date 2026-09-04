@@ -2,6 +2,7 @@ import { test, expect } from '@playwright/test';
 import { readFileSync } from 'fs';
 import { dirname, join } from 'path';
 import { fileURLToPath } from 'url';
+import { emptySmogon, routeSmogon } from '../e2e/smogon-routes';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const fixtureReplay = JSON.parse(
@@ -29,8 +30,7 @@ test.describe('production build', () => {
     await page.route('**/replay.pokemonshowdown.com/**', route => route.fulfill({
       status: 200, contentType: 'application/json', body: JSON.stringify(fixtureReplay),
     }));
-    await page.route('https://data.pkmn.cc/**', route =>
-      route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({}) }));
+    await routeSmogon(page, emptySmogon);
     await page.goto('/');
   });
 
