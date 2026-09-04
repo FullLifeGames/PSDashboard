@@ -37,6 +37,17 @@ const FIT_FORFEIT_PER_OBSERVATION = 0.01;
 /** Minimum observations before a spread claim beats the existing guess. */
 const MIN_OBSERVATIONS = 2;
 
+/**
+ * A move order the ladder cannot reproduce (every rung violates it as much
+ * as the prior does) measures nothing about this mon's Speed: the missing
+ * piece is elsewhere (573756: a Choice Scarf the build does not carry).
+ * Such evidence must not let the budget shave the prior's Speed for bulk.
+ */
+function speedRepairable(ctx: SolveContext, key: string, ladder: CandidateRung[], prior: SpreadCandidate): boolean {
+  const priorViolation = speedError(ctx, key, prior);
+  return priorViolation === 0 || ladder.some(rung => speedError(ctx, key, rung) < priorViolation);
+}
+
 /** The ladder rung with the least error; ties break toward the prior. */
 function bestRung(ctx: SolveContext, key: string, ladder: CandidateRung[], monObservations: DamageObservation[]): CandidateRung | null {
   let best: CandidateRung | null = null;
@@ -95,22 +106,33 @@ function solveOne(ctx: SolveContext, key: string) {
   // Speed evidence stands alone: one proven move order is worth solving
   // for even when no damage line ever measured the mon.
   if (monObservations.length < MIN_OBSERVATIONS && monSpeedOrders.length === 0) return;
-  const hasAttackerObs = monObservations.some(obs => keyOf(obs.attackerSide, obs.attackerSpecies) === key);
+  const attackerObs = monObservations.filter(obs => keyOf(obs.attackerSide, obs.attackerSpecies) === key);
+  // Knock-outs are lower bounds (fit.ts): they refute rungs whose best roll
+  // falls short, but an attacker seen only in knock-outs has no measured
+  // offense — the prior's investment stands instead of yielding to bulk.
+  const hasOffenseEvidence = attackerObs.some(obs => !obs.lethal);
   const hasDefenderObs = monObservations.some(obs =>
     keyOf(obs.attackerSide === 'p1' ? 'p2' : 'p1', obs.defenderSpecies) === key);
   const prior = ctx.priors.get(key);
   if (!prior) return;
   const physicalAttacker = physicalAttackerFor(ctx, key);
-  const ladder = candidateLadder(prior, physicalAttacker, hasAttackerObs, hasDefenderObs, monSpeedOrders.length > 0, ctx.budget);
+  const offenseStat: keyof PokemonEvs = physicalAttacker ? 'atk' : 'spa';
+  const keep = new Set<keyof PokemonEvs>();
+  if (attackerObs.length > 0 && !hasOffenseEvidence) keep.add(offenseStat);
+  const hasSpeedObs = monSpeedOrders.length > 0;
+  let ladder = candidateLadder(prior, physicalAttacker, hasOffenseEvidence, hasDefenderObs, hasSpeedObs, ctx.budget, keep);
+  if (hasSpeedObs && !speedRepairable(ctx, key, ladder, prior)) {
+    keep.add('spe');
+    ladder = candidateLadder(prior, physicalAttacker, hasOffenseEvidence, hasDefenderObs, false, ctx.budget, keep);
+  }
   const best = bestRung(ctx, key, ladder, monObservations);
   if (!best) return;
   if (forfeitsToPrior(ctx, key, best, prior, monObservations)) {
     ctx.solved.delete(key);
     return;
   }
-  const offenseStat: keyof PokemonEvs = physicalAttacker ? 'atk' : 'spa';
   const measured = new Set<keyof PokemonEvs>([
-    ...(hasAttackerObs ? [offenseStat] : []),
+    ...(hasOffenseEvidence ? [offenseStat] : []),
     ...(hasDefenderObs ? (['hp', 'def', 'spd'] as (keyof PokemonEvs)[]) : []),
   ]);
   ctx.solved.set(key, { evs: topUpUnmeasured(best, offenseStat, measured, ctx.budget), nature: best.nature });

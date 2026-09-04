@@ -267,3 +267,96 @@ test.describe('goodness-of-fit forfeit', () => {
     expect(lando!.evs.spd).toBe(252);
   });
 });
+
+test.describe('evidence that cannot measure keeps the prior', () => {
+  type Side = { species: string; side: 'p1' | 'p2'; nature: string; evs: PokemonSet['evs']; item?: string };
+  const mon = (species: string, side: 'p1' | 'p2', nature: string, evs: PokemonSet['evs'], item = ''): Side => ({ species, side, nature, evs, item });
+  const asSet = (m: Side, moves: string[]): PokemonSet => ({
+    name: m.species, species: m.species, item: m.item ?? '', ability: '', moves,
+    nature: m.nature, evs: m.evs,
+    ivs: { hp: 31, atk: 31, def: 31, spa: 31, spd: 31, spe: 31 },
+    level: 100, gender: '',
+  });
+  /** A mid-roll hit computed forward with the TRUE spreads of both sides (level 100). */
+  function hit(attacker: Side, defender: Side, moveName: string, lethal = false): DamageObservation {
+    const a = new Pokemon(gen, attacker.species, { level: 100, nature: attacker.nature, evs: attacker.evs, item: attacker.item || undefined });
+    const d = new Pokemon(gen, defender.species, { level: 100, nature: defender.nature, evs: defender.evs });
+    const result = calculate(gen, a, d, new Move(gen, moveName));
+    const rolls = (Array.isArray(result.damage) ? (result.damage as number[]).flat() : [Number(result.damage)]).map(Number);
+    const mid = rolls[Math.floor(rolls.length / 2)];
+    return {
+      attackerSpecies: attacker.species, defenderSpecies: defender.species, attackerSide: attacker.side,
+      moveId: toId(moveName), observedFraction: mid / d.maxHP(), lethal,
+      attackerBoosts: {}, defenderBoosts: {}, attackerStatus: '', screens: [], weather: '',
+    };
+  }
+  const offensive = { hp: 0, atk: 252, def: 0, spa: 0, spd: 4, spe: 252 };
+  const bulky = { hp: 252, atk: 0, def: 0, spa: 0, spd: 252, spe: 4 };
+
+  for (const formatid of ['gen9ou', 'gen9doublesou']) {
+    test(`knock-outs alone keep the prior's offense investment (${formatid})`, () => {
+      // Prior: the curated Swords Dance Garchomp (252 Atk / 252 Spe). It was
+      // seen attacking twice, both hits knock-outs (lower bounds any Atk
+      // reaches), and it took one Magnezone hit whose damage a bulky spread
+      // explains better. 573756: the old solve traded the whole offense
+      // for bulk (252 HP / 252 SpD / 0 Atk) and fielded a 0-Atk sweeper.
+      const garchomp = mon('Garchomp', 'p2', 'Jolly', offensive);
+      const magnezone = mon('Magnezone', 'p1', 'Modest', { hp: 0, atk: 0, def: 4, spa: 252, spd: 0, spe: 252 }, 'Choice Specs');
+      const clefable = mon('Clefable', 'p1', 'Bold', { hp: 252, atk: 0, def: 252, spa: 0, spd: 4, spe: 0 });
+      const sets = {
+        p1: [asSet(magnezone, ['Flash Cannon']), asSet(clefable, ['Moonblast'])],
+        p2: [asSet(garchomp, ['Earthquake', 'Swords Dance'])],
+      };
+      const observations = [
+        { ...hit(garchomp, clefable, 'Earthquake'), observedFraction: 0.3, lethal: true },
+        { ...hit(garchomp, magnezone, 'Earthquake'), observedFraction: 0.5, lethal: true },
+        hit(magnezone, { ...garchomp, evs: bulky }, 'Flash Cannon'),
+      ];
+      const solved = inferSpreads(observations, sets, formatid).get('p2:garchomp');
+      const evs = solved?.evs ?? sets.p2[0].evs;
+      expect(evs.atk).toBe(252);
+      // Control: the same Magnezone line with a CLEAN Garchomp hit measured
+      // at 0 Atk lets the offense go — that evidence can tell.
+      const measured = [
+        hit({ ...garchomp, evs: bulky }, clefable, 'Earthquake'),
+        hit({ ...garchomp, evs: bulky }, magnezone, 'Earthquake'),
+        hit(magnezone, { ...garchomp, evs: bulky }, 'Flash Cannon'),
+      ];
+      const weak = inferSpreads(measured, sets, formatid).get('p2:garchomp');
+      expect(weak?.evs.atk).toBe(0);
+    });
+  }
+
+  test('a move order no rung can repair keeps the prior Speed', () => {
+    // Garchomp moved after a Toxapex (base 35: even 252+ Speed stays below
+    // an uninvested Garchomp) — the real Toxapex must have carried a Scarf
+    // the build does not know. Every rung violates the order alike, so the
+    // order measures nothing about Garchomp; the old solve let the budget
+    // shave the prior's 252 Spe to 0 for the bulk rung the damage lines
+    // asked for. Garchomp carries the most lines, so the greedy solve
+    // takes it first and its bulk, not the attackers' offense, explains them.
+    const garchomp = mon('Garchomp', 'p2', 'Jolly', offensive);
+    const toxapex = mon('Toxapex', 'p1', 'Bold', { hp: 252, atk: 0, def: 252, spa: 0, spd: 4, spe: 0 });
+    const clefable = mon('Clefable', 'p1', 'Bold', { hp: 252, atk: 0, def: 252, spa: 0, spd: 4, spe: 0 });
+    const magnezone = mon('Magnezone', 'p1', 'Modest', { hp: 0, atk: 0, def: 4, spa: 252, spd: 0, spe: 252 }, 'Choice Specs');
+    const sets = {
+      p1: [asSet(toxapex, ['Scald']), asSet(clefable, ['Moonblast']), asSet(magnezone, ['Flash Cannon'])],
+      p2: [asSet(garchomp, ['Earthquake'])],
+    };
+    const order = { firstSide: 'p1' as const, firstSpecies: 'Toxapex', secondSide: 'p2' as const, secondSpecies: 'Garchomp', turn: 4 };
+    const observations = [
+      hit(clefable, { ...garchomp, evs: bulky }, 'Moonblast'),
+      hit(clefable, { ...garchomp, evs: bulky }, 'Moonblast'),
+      hit(magnezone, { ...garchomp, evs: bulky }, 'Flash Cannon'),
+      hit(magnezone, { ...garchomp, evs: bulky }, 'Flash Cannon'),
+    ];
+    const solved = inferSpreads(observations, sets, 'gen9ou', [order]).get('p2:garchomp');
+    const evs = solved?.evs ?? sets.p2[0].evs;
+    expect(evs.spe).toBe(252);
+    expect(solved?.nature ?? sets.p2[0].nature).toBe('Jolly');
+    // Control: without the order the same lines buy full bulk and Speed gives way.
+    const free = inferSpreads(observations, sets, 'gen9ou', []).get('p2:garchomp');
+    expect(free?.evs.spd).toBe(252);
+    expect(free?.evs.spe ?? 0).toBeLessThan(252);
+  });
+});

@@ -17,8 +17,10 @@ export const evTotal = (evs: PokemonEvs): number =>
  * unprotected offense, then bulk, then HP), Speed last (damage evidence
  * never justifies stripping Speed, so it only gives way when the budget
  * leaves no other room), and rung-claimed (protected) stats after all
- * unprotected ones. The old unlegalized composition let a prior's 252 Spe
- * ride along with 252/252 overrides — a 756-EV spread the sim then played.
+ * unprotected ones; a protected Speed (a prior Speed the evidence cannot
+ * measure) joins the protected group. The old unlegalized composition let
+ * a prior's 252 Spe ride along with 252/252 overrides — a 756-EV spread
+ * the sim then played.
  */
 export function capToBudget(evs: PokemonEvs, protectedStats: Set<keyof PokemonEvs>, budget: EvBudget): PokemonEvs {
   const out: PokemonEvs = { ...evs };
@@ -27,8 +29,8 @@ export function capToBudget(evs: PokemonEvs, protectedStats: Set<keyof PokemonEv
   }
   const shaveOrder: (keyof PokemonEvs)[] = [
     ...(['atk', 'spa', 'def', 'spd', 'hp'] as (keyof PokemonEvs)[]).filter(stat => !protectedStats.has(stat)),
-    'spe',
-    ...(['spd', 'def', 'hp', 'spa', 'atk'] as (keyof PokemonEvs)[]).filter(stat => protectedStats.has(stat)),
+    ...(protectedStats.has('spe') ? [] : ['spe' as const]),
+    ...(['spd', 'def', 'hp', 'spa', 'atk', 'spe'] as (keyof PokemonEvs)[]).filter(stat => protectedStats.has(stat)),
   ];
   for (const stat of shaveOrder) {
     const over = evTotal(out) - budget.total;
