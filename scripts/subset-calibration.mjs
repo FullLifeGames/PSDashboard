@@ -1,6 +1,7 @@
 // Paired records on a subset of the joined positions:
 //   node scripts/subset-calibration.mjs <a.jsonl> <b.jsonl> <field> [<field> ...]
-// Joins on id#turn, keeps positions where ANY named field is truthy in A,
+// Joins on id#turn, keeps positions where ANY named field is truthy in A
+// or in B (a field recorded on one side only still selects the subset),
 // prints both sides' records plus the "favored side wins" rate (sign of
 // the score against p1Won) per side. Round 33: lastPair and decided.
 import { load, record, right } from './calibration-lib.mjs';
@@ -13,7 +14,7 @@ if (!aPath || !bPath || fields.length === 0) {
 const key = s => `${s.id}#${s.turn}`;
 const b = new Map(load(bPath).map(s => [key(s), s]));
 const joined = load(aPath)
-  .filter(s => b.has(key(s)) && fields.some(f => s[f]))
+  .filter(s => b.has(key(s)) && fields.some(f => s[f] || b.get(key(s))[f]))
   .map(s => ({ a: s, b: b.get(key(s)) }));
 console.log(`subset ${fields.join('|')}: n=${joined.length}`);
 record(joined.map(p => p.a), 'A (subset)');
