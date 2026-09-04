@@ -21,6 +21,9 @@ type ChoiceLockTrails
 type DamageCalcContext
 type DamageResult
 type DecidedSweep
+type EndgameCaps
+type EndgameFlag
+type EndgameResult
 type EntryUnanswered
 type EvalCellJob
 type EvalCellValue
@@ -73,6 +76,7 @@ type TurnVerification
 type UnansweredProfile
 type VerdictTier
 value AUTO_MCTS_FAINTED_FRACTION
+value ENDGAME_CAPS
 value MCTS_TREES
 value PAYOFF_WINDOW
 value REGRET_THRESHOLD
@@ -98,6 +102,7 @@ value decidedSeenKey
 value deserializeBattleExact
 value detectSacks
 value diffChoices
+value endgameScope
 value evalChoiceToSlotChoices
 value executeBranchChoices
 value formatRead
@@ -132,6 +137,7 @@ value selectKeyTurns
 value selectProbeCombos
 value serializeLiveBattle
 value serializePreviewPosition
+value solveEndgame
 value starvedSupportCells
 value summarizeAlignment
 value summarizeTurn

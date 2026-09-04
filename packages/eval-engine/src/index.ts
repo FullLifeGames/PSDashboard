@@ -34,6 +34,8 @@ export type { ChoiceLockTrails, ChoiceLockContext } from './choice-lock.ts';
 export { calcSingleDamageRange } from './damage-calc.ts';
 export type { DamageResult, DamageCalcContext } from './damage-calc.ts';
 export { deserializeBattleExact } from './forward-model.ts';
+export { ENDGAME_CAPS, endgameScope, solveEndgame } from './endgame/solver.ts';
+export type { EndgameCaps, EndgameFlag, EndgameResult } from './endgame/solver.ts';
 export { computeBlunders, selectKeyTurns } from './graph.ts';
 export { summarizeAlignment } from './hax-alignment.ts';
 export type { AlignmentScore, TurnAlignmentRecord, AlignmentSummary } from './hax-alignment.ts';

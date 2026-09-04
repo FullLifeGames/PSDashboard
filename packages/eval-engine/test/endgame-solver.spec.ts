@@ -5,6 +5,10 @@ import { advancePosition, createRootPosition, positionBattle } from '../src/forw
 import { endgameKey } from '../src/endgame/key';
 import { endgameChildren } from '../src/endgame/children';
 import { searchOptions } from '../src/search/options';
+import { ENDGAME_CAPS, endgameScope, solveEndgame } from '../src/endgame/solver';
+import { createMatchupCache } from '../src/eval-function';
+import { leafValue } from '../src/search/leaf';
+import { LAST_PAIR_CAP } from '../src/score/last-pair';
 
 function makeSet(
   name: string,
@@ -117,5 +121,100 @@ test.describe('endgame children (round 34)', () => {
     const { children, unpriced } = endgameChildren(root, p1Choice, p2Choice);
     expect(children).toHaveLength(1);
     expect(unpriced).toBe(false);
+  });
+});
+
+const SMALL = { states: 2000, wallMs: 30_000 };
+
+test.describe('endgame solver (round 34)', () => {
+  test('a fixed-damage race resolves to the side that needs fewer hits, speed tie or not', () => {
+    const battle = makeBattle(
+      [makeSet('Toss', 'Machamp', ['Seismic Toss'])],
+      [makeSet('Shade', 'Machamp', ['Night Shade'])],
+    );
+    battle.sides[0].active[0]!.sethp(250);
+    battle.sides[1].active[0]!.sethp(200);
+    const result = solveEndgame(serialize(battle), SMALL);
+    expect(result.scope).toBe(true);
+    expect(result.exact).toBe(true);
+    expect(result.flags).toEqual([]);
+    expect(result.value).toBe(1);
+    expect(result.pv[0]).toContain('Seismic Toss');
+  });
+  test('a speed tie with mutual sure KOs is worth zero', () => {
+    const battle = makeBattle(
+      [makeSet('A', 'Machamp', ['Close Combat'])],
+      [makeSet('B', 'Machamp', ['Close Combat'])],
+    );
+    for (const side of battle.sides) side.active[0]!.sethp(1);
+    const result = solveEndgame(serialize(battle), SMALL);
+    expect(result.exact).toBe(true);
+    expect(result.value).toBeCloseTo(0, 6);
+  });
+  test('an accuracy roll prices the kill at its odds', () => {
+    const battle = makeBattle(
+      [makeSet('Jolt', 'Jolteon', ['Thunder'])],
+      [makeSet('Champ', 'Machamp', ['Close Combat'])],
+    );
+    for (const side of battle.sides) side.active[0]!.sethp(1);
+    const result = solveEndgame(serialize(battle), SMALL);
+    expect(result.exact).toBe(true);
+    expect(result.value).toBeCloseTo(0.4, 6);
+  });
+  test('the turn cap marks the result capped and inexact', () => {
+    const battle = makeBattle(
+      [makeSet('Pex', 'Toxapex', ['Recover', 'Toxic'])],
+      [makeSet('Zap', 'Zapdos', ['Thunderbolt', 'Roost'])],
+    );
+    const result = solveEndgame(serialize(battle), { ...SMALL, turns: 1 });
+    expect(result.exact).toBe(false);
+    expect(result.flags).toContain('capped');
+    expect(result.depth).toBe(0);
+  });
+  test('doubles: one living body per side solves a fixed-damage race exactly', () => {
+    const battle = makeBattle(
+      [makeSet('Toss', 'Machamp', ['Seismic Toss']), makeSet('Pika', 'Pikachu', ['Tackle'], 5)],
+      [makeSet('Shade', 'Machamp', ['Night Shade']), makeSet('Chu', 'Pikachu', ['Tackle'], 5)],
+      'gen9doublescustomgame',
+    );
+    for (const side of battle.sides) side.active[1]!.faint();
+    battle.faintMessages();
+    battle.sides[0].active[0]!.sethp(250);
+    battle.sides[1].active[0]!.sethp(200);
+    const result = solveEndgame(serialize(battle), SMALL);
+    expect(result.scope).toBe(true);
+    expect(result.exact).toBe(true);
+    expect(result.value).toBe(1);
+  });
+  test('two against one terminates within the caps and reports its flags', () => {
+    const battle = makeBattle(
+      [makeSet('Pex', 'Toxapex', ['Recover', 'Scald']), makeSet('Blob', 'Blissey', ['Soft-Boiled', 'Seismic Toss'])],
+      [makeSet('Champ', 'Machamp', ['Close Combat', 'Knock Off'])],
+    );
+    const result = solveEndgame(serialize(battle), { states: 300, wallMs: 30_000 });
+    expect(result.scope).toBe(true);
+    expect(Number.isFinite(result.value)).toBe(true);
+    expect(Math.abs(result.value)).toBeLessThanOrEqual(1);
+    expect(result.states).toBeGreaterThan(0);
+    for (const flag of result.flags) expect(['capped', 'unpriced', 'loop']).toContain(flag);
+  });
+  test('a level gap reads a full win where the last-pair static stops at its cap', () => {
+    const battle = makeBattle(
+      [makeSet('Champ', 'Machamp', ['Close Combat'])],
+      [makeSet('Eevee', 'Eevee', ['Tackle'], 30)],
+    );
+    expect(leafValue(battle, createMatchupCache())).toBeLessThanOrEqual(LAST_PAIR_CAP + 1e-9);
+    const result = solveEndgame(serialize(battle), SMALL);
+    expect(result.exact).toBe(true);
+    expect(result.value).toBe(1);
+  });
+  test('scope: four living bodies are out, the default caps are the documented ones', () => {
+    const battle = makeBattle(
+      [makeSet('A', 'Machamp', ['Close Combat']), makeSet('B', 'Blissey', ['Soft-Boiled'])],
+      [makeSet('C', 'Machamp', ['Close Combat']), makeSet('D', 'Blissey', ['Soft-Boiled'])],
+    );
+    expect(endgameScope(battle)).toBe(false);
+    expect(solveEndgame(serialize(battle)).scope).toBe(false);
+    expect(ENDGAME_CAPS).toEqual({ turns: 30, states: 20000, wallMs: 120000 });
   });
 });

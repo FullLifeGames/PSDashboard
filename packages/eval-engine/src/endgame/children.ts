@@ -13,7 +13,7 @@ import { effectiveSpeed } from '../speed.ts';
  * and a plain median child where no class plan exists. A cell whose
  * draws disagree on a KO the plan could not price flags `unpriced`.
  */
-export interface EndgameChild { position: SimPosition; weight: number; ended: boolean }
+interface EndgameChild { position: SimPosition; weight: number; ended: boolean }
 export interface EndgameChildren { children: EndgameChild[]; unpriced: boolean }
 
 interface Draw { position: SimPosition; log: string[]; ended: boolean; measure: number; fainted: number }
