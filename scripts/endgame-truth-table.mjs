@@ -13,7 +13,8 @@ if (paths.length === 0) {
 }
 const rows = paths.flatMap(path => readFileSync(path, 'utf8').split('\n').filter(l => l.trim()).map(l => JSON.parse(l)));
 const prob = v => (v + 1) / 2;
-const ESTIMATORS = ['static', 'staticB', 'd1', 'd2', 'd3', 'mcts'];
+// Round 35: `prover` is the sweep's auto mode with the forced-win bar (mass column alongside).
+const ESTIMATORS = ['static', 'staticB', 'd1', 'd2', 'd3', 'mcts', 'prover'];
 const DECIDED_WP = 0.8;
 
 const inScope = rows.filter(r => r.scope);
@@ -54,10 +55,11 @@ if (decided.length > 0) {
 }
 
 console.log('## Positions\n');
-console.log('| name | type | exact | flags | value | static | staticB | d1 | d2 | d3 | mcts | states | depth | ms |');
-console.log('|---|---|---|---|---|---|---|---|---|---|---|---|---|---|');
+console.log('| name | type | exact | flags | value | static | staticB | d1 | d2 | d3 | mcts | prover | mass | states | depth | ms |');
+console.log('|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|');
 for (const r of rows) {
   const e = r.estimators ?? {};
   const f = key => (e[key] === undefined ? '-' : e[key].toFixed(3));
-  console.log(`| ${r.name} | ${r.gameType} | ${r.exact ? 'yes' : 'no'} | ${r.flags.join(',') || '-'} | ${r.scope ? r.value.toFixed(3) : '-'} | ${ESTIMATORS.map(f).join(' | ')} | ${r.states} | ${r.depth} | ${r.ms} |`);
+  const mass = e.proverMass === undefined || e.proverMass === null ? '-' : e.proverMass.toFixed(3);
+  console.log(`| ${r.name} | ${r.gameType} | ${r.exact ? 'yes' : 'no'} | ${r.flags.join(',') || '-'} | ${r.scope ? r.value.toFixed(3) : '-'} | ${ESTIMATORS.map(f).join(' | ')} | ${mass} | ${r.states} | ${r.depth} | ${r.ms} |`);
 }

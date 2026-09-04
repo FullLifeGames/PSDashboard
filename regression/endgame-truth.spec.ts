@@ -6,7 +6,7 @@ import { createRootPosition, positionBattle } from '../packages/eval-engine/src/
 import { createMatchupCache } from '../packages/eval-engine/src/eval-function';
 import { leafValue } from '../packages/eval-engine/src/search/leaf';
 import { setLastPairSweep } from '../packages/eval-engine/src/score/last-pair';
-import { searchPosition } from '../packages/eval-engine/src/search';
+import { AUTO_MCTS_FAINTED_FRACTION, battleFaintedFraction, searchPosition } from '../packages/eval-engine/src/search';
 import { mctsSearch } from '../packages/eval-engine/src/mcts';
 
 /**
@@ -22,7 +22,11 @@ interface BankPosition {
   tranche: string; quality: string; p1Won: boolean; score: number; decided: 'p1' | 'p2' | null; lastPair: boolean;
 }
 interface Item { name: string; source: 'bank' | 'synthetic'; gameType: 'singles' | 'doubles'; decided: 'p1' | 'p2' | null; serialized: string }
-interface Estimates { static: number; staticB: number; d1: number; d2: number; d3: number; mcts: number }
+interface Estimates {
+  static: number; staticB: number; d1: number; d2: number; d3: number; mcts: number;
+  /** Round 35: the sweep's auto mode with the forced-win bar, and the proven mass behind it. */
+  prover: number; proverMass: number | null;
+}
 
 const DEFAULT_DIR = '.calibration/r34-after/positions';
 
@@ -47,6 +51,10 @@ function estimate(serialized: string): Estimates {
   setLastPairSweep(true);
   const staticB = leafValue(battle, createMatchupCache());
   setLastPairSweep(false);
+  const proverSettings = { depth: 1 as const, samples: 1 as const, tera: false as const };
+  const proverScore = battleFaintedFraction(battle) >= AUTO_MCTS_FAINTED_FRACTION
+    ? mctsSearch(serialized, proverSettings)
+    : searchPosition(serialized, proverSettings);
   return {
     static: staticValue,
     staticB,
@@ -54,6 +62,8 @@ function estimate(serialized: string): Estimates {
     d2: searchPosition(serialized, { depth: 2, samples: 3, tera: false }).score,
     d3: searchPosition(serialized, { depth: 3, samples: 3, tera: false }).score,
     mcts: mctsSearch(serialized, { depth: 1, samples: 1, tera: false }).score,
+    prover: proverScore.score,
+    proverMass: proverScore.forcedWin?.mass ?? null,
   };
 }
 

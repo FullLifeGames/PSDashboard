@@ -108,8 +108,20 @@ test.describe('forced-win prover (round 35)', () => {
   });
 
   test('a surviving defender along the line labels the proof barring a crit', () => {
-    // Seismic Toss (100) needs two hits on a 150-HP Chansey; Soft-Boiled
-    // would out-heal a single Toss, so this Chansey only knows Splash.
+    // Thunderbolt kills the Machamp on some rolls and leaves it in range
+    // on the rest; it cannot hurt back (Splash), so both classes prove and
+    // the survived hit, unpriced for a crit, labels the proof.
+    const serialized = serializeAt(makeBattle(
+      [{ ...makeSet('Jolt', 'Jolteon', ['Thunderbolt']), evs: { hp: 0, atk: 0, def: 0, spa: 252, spd: 0, spe: 252 } }],
+      [makeSet('Champ', 'Machamp', ['Splash'])],
+    ), { p2: [165] });
+    const proof = proveForcedWin(serialized, { side: 'p1', rootOrder: ['move thunderbolt'], tera: false });
+    expect(proof.mass).toBe(1);
+    expect(proof.turns).toBe(2);
+    expect(proof.caveat).toBe('barring-crit');
+  });
+
+  test('fixed damage cannot crit, so a Seismic Toss line proves without the label', () => {
     const serialized = serializeAt(makeBattle(
       [makeSet('Champ', 'Machamp', ['Seismic Toss'])],
       [makeSet('Egg', 'Chansey', ['Splash'])],
@@ -117,7 +129,7 @@ test.describe('forced-win prover (round 35)', () => {
     const proof = proveForcedWin(serialized, { side: 'p1', rootOrder: ['move seismictoss'], tera: false });
     expect(proof.mass).toBe(1);
     expect(proof.turns).toBe(2);
-    expect(proof.caveat).toBe('barring-crit');
+    expect(proof.caveat).toBe('none');
   });
 
   test('doubles: a plain-path proof carries the sampled-rolls label', () => {

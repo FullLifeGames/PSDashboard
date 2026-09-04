@@ -60,11 +60,12 @@ function firstMoveId(choice: string): string | null {
   return null;
 }
 
-function damaging(battle: Battle, choice: string): boolean {
+/** A move whose damage can crit: base power, not fixed damage or OHKO. */
+function critable(battle: Battle, choice: string): boolean {
   const id = firstMoveId(choice);
   if (!id) return false;
   const move = battle.dex.moves.get(id);
-  return move.exists && (move.basePower > 0 || Boolean(move.damage) || Boolean(move.ohko));
+  return move.exists && move.basePower > 0;
 }
 
 /**
@@ -207,11 +208,11 @@ class ForcedWinProver {
     return { cell, proofs, proven: { mass, turns: turns + 1, caveat } };
   }
 
-  /** A defender hit by a damaging move and still standing in a PROVEN child: the class plan never priced a crit there. */
+  /** A defender hit by a critable move and still standing in a PROVEN child: the class plan never priced a crit there. */
   private survivedHit(root: Battle, cell: Cell, proofs: Proven[]): boolean {
     for (const side of ['p1', 'p2'] as const) {
       const choice = side === 'p1' ? cell.p1Choice : cell.p2Choice;
-      if (!damaging(root, choice)) continue;
+      if (!critable(root, choice)) continue;
       const defender = root.sides[sideIndex(other(side))].active[0];
       if (!defender) continue;
       for (const [index, child] of cell.children.entries()) {
