@@ -84,7 +84,7 @@ test.describe('Smogon set assumptions', () => {
 
   test('calls fetch as a free function (window.fetch throws on a foreign this)', async () => {
     // Mirrors the browser: a fetch that refuses a foreign `this`.
-    const strictFetch = function (this: unknown, url: string) {
+    const strictFetch = function (this: unknown) {
       if (this !== undefined && this !== globalThis) throw new TypeError("Failed to execute 'fetch' on 'Window': Illegal invocation");
       return Promise.resolve({ ok: true, status: 200, json: async () => ({ Toxapex: { Wall: { nature: 'Calm', evs: { hp: 248, spd: 252 }, moves: ['Recover'] } } }) } as unknown as Response);
     };

@@ -3,7 +3,7 @@ import type { BranchSimState } from '../hooks/useBranch';
 interface AppTopBarProps {
   replayData: { format: string; players: string[] };
   usageStats: { loading: boolean; error: string | null };
-  setAssumptions: { loading: boolean };
+  setAssumptions: { loading: boolean; error: string | null };
   branchPreparing: boolean;
   branchProgress: { turn: number; target: number } | null;
   showBranch: boolean;
@@ -31,6 +31,9 @@ function TopBarMatchInfo({ replayData, usageStats, setAssumptions }: Pick<AppTop
       )}
       {setAssumptions.loading && (
         <span style={{ fontSize: 10, color: '#b6a46a' }}>Smogon sets loading...</span>
+      )}
+      {setAssumptions.error && (
+        <span style={{ fontSize: 10, color: '#987' }}>Smogon sets unavailable</span>
       )}
     </div>
   );

@@ -209,37 +209,37 @@ test.beforeAll(async () => {
   }
 });
 
+/** The offline routes every dashboard test starts from: cached replay embed, fixture replays, empty Smogon data. */
+async function routeOfflineFixtures(page: Page): Promise<void> {
+  await page.route('**/play.pokemonshowdown.com/js/replay-embed.js*', async (route) => {
+    if (replayEmbedCache) {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/javascript',
+        body: replayEmbedCache,
+      });
+      return;
+    }
+    await route.continue().catch(() => {});
+  });
+  await page.route('**/replay.pokemonshowdown.com/**', (route) => {
+    const url = route.request().url();
+    const replay = url.includes(vgcReplay.id) ? vgcReplay
+      : url.includes(doublesReplay.id) ? doublesReplay
+      : fixtureReplay;
+    route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify(replay),
+    });
+  });
+  await page.route('https://data.pkmn.cc/**', route =>
+    route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({}) }));
+}
+
 test.describe('PS Dashboard', () => {
   test.beforeEach(async ({ page }) => {
-    await page.route('**/play.pokemonshowdown.com/js/replay-embed.js*', async (route) => {
-      if (replayEmbedCache) {
-        await route.fulfill({
-          status: 200,
-          contentType: 'application/javascript',
-          body: replayEmbedCache,
-        });
-        return;
-      }
-      await route.continue().catch(() => {});
-    });
-    await page.route('**/replay.pokemonshowdown.com/**', (route) => {
-      const url = route.request().url();
-      const replay = url.includes(vgcReplay.id) ? vgcReplay
-        : url.includes(doublesReplay.id) ? doublesReplay
-        : fixtureReplay;
-      route.fulfill({
-        status: 200,
-        contentType: 'application/json',
-        body: JSON.stringify(replay),
-      });
-    });
-    await page.route('https://data.pkmn.cc/**', (route) => {
-      route.fulfill({
-        status: 200,
-        contentType: 'application/json',
-        body: JSON.stringify({}),
-      });
-    });
+    await routeOfflineFixtures(page);
     await page.goto('/');
   });
 
@@ -267,6 +267,15 @@ test.describe('PS Dashboard', () => {
     await expect(page.locator('text=[Gen 9] Draft')).toBeVisible();
     await expect(page.locator('iframe[title="PS Replay"]')).toBeVisible({ timeout: 10000 });
     await expect(page.locator('.ps-branch-bar input[type="range"]')).toBeVisible();
+  });
+
+  test('shows a notice when the Smogon sets fail to load', async ({ page }) => {
+    // Both data hosts unreachable: the fallback runs dry and the top bar says so.
+    await page.route('https://data.pkmn.cc/**', route => route.abort());
+    await page.route('https://pkmn.github.io/smogon/data/**', route => route.abort());
+    await page.locator('button', { hasText: 'Load' }).click();
+    await expect(page.getByText('Smogon sets unavailable')).toBeVisible({ timeout: 15000 });
+    await expect(page.getByText('Smogon stats unavailable')).toBeVisible();
   });
 
   test('displayed set guesses pass the coherence vetoes (GPL Cobalion)', async ({ page }) => {
