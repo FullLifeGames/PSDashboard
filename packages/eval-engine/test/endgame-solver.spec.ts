@@ -122,6 +122,36 @@ test.describe('endgame children (round 34)', () => {
     expect(children).toHaveLength(1);
     expect(unpriced).toBe(false);
   });
+  test('class children carry their analytic share and key; the plain path says so (round 35)', () => {
+    const battle = makeBattle(
+      [makeSet('Jolt', 'Jolteon', ['Thunder'])],
+      [makeSet('Champ', 'Machamp', ['Close Combat'])],
+    );
+    // Both at 1 HP like the weights test above: every hit kills, the miss lets Machamp answer.
+    for (const side of battle.sides) side.active[0]!.sethp(1);
+    const { children, plain } = endgameChildren(createRootPosition(serialize(battle)), 'move thunder', 'move closecombat');
+    expect(plain).toBe(false);
+    expect(children.map(child => child.key).sort()).toEqual(['p1:hit-kill', 'p1:miss']);
+    expect(children.reduce((sum, child) => sum + child.share, 0)).toBeCloseTo(1, 6);
+    for (const child of children) expect(child.share).toBeCloseTo(child.weight, 6);
+  });
+  test('the doubles plain path reports plain with share 1 and no key (round 35)', () => {
+    const battle = makeBattle(
+      [makeSet('Champ', 'Machamp', ['Seismic Toss']), makeSet('Pika', 'Pikachu', ['Tackle'], 5)],
+      [makeSet('Blob', 'Blissey', ['Soft-Boiled']), makeSet('Chu', 'Pikachu', ['Tackle'], 5)],
+      'gen9doublescustomgame',
+    );
+    for (const side of battle.sides) side.active[1]!.faint();
+    battle.faintMessages();
+    const root = createRootPosition(serialize(battle));
+    const p1Choice = searchOptions(root, 'p1', { tera: false })[0].choice;
+    const p2Choice = searchOptions(root, 'p2', { tera: false })[0].choice;
+    const { children, plain } = endgameChildren(root, p1Choice, p2Choice);
+    expect(plain).toBe(true);
+    expect(children).toHaveLength(1);
+    expect(children[0].share).toBe(1);
+    expect(children[0].key).toBeUndefined();
+  });
 });
 
 const SMALL = { states: 2000, wallMs: 30_000 };

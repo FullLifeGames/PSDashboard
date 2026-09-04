@@ -12,9 +12,20 @@ import { effectiveSpeed } from '../speed.ts';
  * child per class (the draw whose damage sits closest to the class mean),
  * and a plain median child where no class plan exists. A cell whose
  * draws disagree on a KO the plan could not price flags `unpriced`.
+ * Round 35: `share` keeps the analytic weight for the prover, `plain`
+ * marks the median path.
  */
-interface EndgameChild { position: SimPosition; weight: number; ended: boolean }
-export interface EndgameChildren { children: EndgameChild[]; unpriced: boolean }
+interface EndgameChild {
+  position: SimPosition;
+  /** Weight normalized over the drawn classes (the solver's blend). */
+  weight: number;
+  /** Analytic class weight before that normalization (the prover's mass); 1 on the plain path. */
+  share: number;
+  ended: boolean;
+  /** Group key `${order}:${classKey}` on the class path; absent on the plain path. */
+  key?: string;
+}
+export interface EndgameChildren { children: EndgameChild[]; unpriced: boolean; plain: boolean }
 
 interface Draw { position: SimPosition; log: string[]; ended: boolean; measure: number; fainted: number }
 
@@ -134,9 +145,9 @@ function classChildren(
   const weightTotal = present.reduce((sum, [, weight]) => sum + weight, 0);
   const children = present.map(([key, weight]) => {
     const pick = nearestMean(grouped!.get(key)!);
-    return { position: pick.position, weight: weight / weightTotal, ended: pick.ended };
+    return { position: pick.position, weight: weight / weightTotal, share: weight, ended: pick.ended, key };
   });
-  return { children, unpriced: present.length < expected.size };
+  return { children, unpriced: present.length < expected.size, plain: false };
 }
 
 /** The plain path: the median of three draws for damaging pairs, one draw otherwise. */
@@ -145,7 +156,7 @@ function plainChildren(root: SimPosition, battle: Battle, rootHp: number, p1Choi
   const draws = SEARCH_SEEDS.slice(0, count).map(seed => drawChild(root, rootHp, p1Choice, p2Choice, seed));
   const pick = median(draws);
   const unpriced = draws.some(draw => draw.fainted !== draws[0].fainted || draw.ended !== draws[0].ended);
-  return { children: [{ position: pick.position, weight: 1, ended: pick.ended }], unpriced };
+  return { children: [{ position: pick.position, weight: 1, share: 1, ended: pick.ended }], unpriced, plain: true };
 }
 
 export function endgameChildren(root: SimPosition, p1Choice: string, p2Choice: string): EndgameChildren {
