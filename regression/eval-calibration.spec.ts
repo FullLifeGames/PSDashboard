@@ -892,6 +892,77 @@ import { summaryLines } from './calibration-summary';
  * static basis for this mass; the next lever, if any, is search/
  * planning-side.
  *
+ * ENDGAME SOLVER ROUND 2026-09-04 (improvement round 34 of the perf-and-
+ * quality plan; spec docs/superpowers/specs/2026-09-04-round-34-design.md;
+ * Block 0 983ed57 luck events / ca2289d bank fields, export, summary
+ * helper; Block 1 6925507 memo key / cfa8b35 cell children / a6828ad
+ * solver; Block 2 5a039a1 fixtures / 28980a4 truth bench). No score path
+ * touched, cache stays v40, no feedback gate applies.
+ * BLOCK 0 (bank): every sample carries rating, quality ('hq' = smogtours or
+ *   ladder rating >= 1700, the pre-registration tranche from round 35),
+ *   and luckAgainstFavored (a crit taken, an own miss, or a par/frz/flinch
+ *   skip against the score's favored side from the sample turn on,
+ *   regression/luck-events.ts). The printed aggregate lives in
+ *   regression/calibration-summary.ts, digit for digit the old block plus
+ *   two lines under the pooled K; calibration-lib.mjs summarize() prints
+ *   the same characters (slice-0 log and merged summary compared line for
+ *   line). DETERMINISM GATE PASSED: r33-block2 -> r34-after, 816 joined,
+ *   max |score diff| 0, zero sign flips, records identical
+ *   (54/63/80/62/74, brier 0.2600/0.2294/0.1564, K 1.76). New lines:
+ *   hq n=547 (410 smogtours + 137 ladder; 384 rated samples, 1403..1831)
+ *   sign 65% brier 0.2540/0.2168/0.1684; luck-adjusted n=482 excluded=334
+ *   brier 0.2434/0.2084/0.1490 (early -166 bp, mid -210 bp, late -74 bp
+ *   against the full bank: luck against the favored side costs the bank
+ *   more than a third of its positions and a sizable slice of its Brier).
+ *   EVAL_CALIBRATION_POSITIONS exported 90 positions (6 last pair, 84
+ *   decided; 25 of them with at most three living bodies).
+ * BLOCK 1 (solver, packages/eval-engine/src/endgame/): exact value of a
+ *   position with at most three living bodies under best play, singles
+ *   and doubles: turn-boundary states, the choice-pair matrix's
+ *   equilibrium over the children's values, recursion to the end, memo on
+ *   the serialized board minus log, requests, PRNG, turn, and effect order
+ *   (the last move stays: Choice lock, Encore, Torment read it). Chance
+ *   per cell as outcome classes with analytic weights (the root blend's
+ *   planner and fold), one representative child per class (nearest the
+ *   class mean), a singles speed tie as two order classes of one half,
+ *   the plain median of three draws where no plan exists (all doubles
+ *   cells), `unpriced` when the draws disagree on a knock-out. Caps 30
+ *   turns / 20000 states / 120 s, `capped` with the leaf as stand-in;
+ *   `loop` on re-entry; exact only with no flag. Unit values: toss race
+ *   250 vs 200 HP = 1, mutual OHKO tie = 0, Thunder 70 % = 0.4, level gap
+ *   = 1 where the race static stops at 0.9, doubles 1v1 race = 1.
+ * BLOCK 2 (truth bench, docs/perf/2026-09-04-endgame-truth.md): 116
+ *   items (90 bank, 26 synthetic), 51 in scope, 14 exact (13 synthetic +
+ *   1 bank), 23 capped, 36 unpriced, 0 loop; every three-body bank
+ *   position hit the 120 s cap (200..5500 states, depth up to 29), two of
+ *   the six last pairs ran past 30 turns; solver wall 3013 s. Estimators
+ *   on the 14 exact rows, brier / sign hits: static 0.0947 12/14, staticB
+ *   0.0947 12/14, d1 0.0632 13/14, d2 0.0714 13/14, d3 0.0714 13/14, mcts
+ *   0.0664 14/14; doubles (n=6) d2/d3 0.0000, static 0.1218. Three exact
+ *   singles rows are speed ties (value 0) where every search reads +1
+ *   (a fixed seed orders the tie) and the race static -0.6 (no tie
+ *   value). Named: thunder-70 exact 0.4 = d1..d3 (class blend), mcts 1.0;
+ *   fixed-vs-ghost exact -1, static and d1..d3 0.0 (horizon), mcts
+ *   -0.955; level-gap exact 1 vs static cap 0.9; struggle-lock exact -1
+ *   vs static +0.36 and d1..d3 +0.2 (PP blind), mcts -0.996;
+ *   two-v-one-switch-loop exact -1 vs static +0.64 and d1..d3 +0.69
+ *   (bodies without an attack), mcts -0.04; healer walls exact -1, static
+ *   -0.9 (cap). Bank last pair 749828#23: value -1 (unpriced, 7 states),
+ *   static +0.6 and the decided sweep on the wrong side, d1 -1. Variant B
+ *   differs on three bank rows: right once, wrong twice, none exact.
+ *   Q4 reference VOID: one decided position exact (1.0 for its side);
+ *   over all 19 decided in scope, capped values counted, 9 at or beyond
+ *   0.8 for the decided side, 4 against. CONSEQUENCE for round 35: no
+ *   score change from these numbers; candidates are speed ties as chance
+ *   (searches and static both wrong on a coin flip), a tie value and a PP
+ *   horizon for the race static, the tie split in doubles, crits as a
+ *   class, and a larger-cap solver run on the 25 bank positions before
+ *   any verdict on the last-pair static or Q4.
+ * GATES: eval-engine 547 (+13), regression specs luck-events 4, summary 2,
+ *   fixtures 1, truth dry run; tsc -b, lint (ratchet tightened: the
+ *   calibration spec's complexity pin 62 -> 55), knip, pack:smoke, API
+ *   snapshot +6 lines.
+ *
  * PUBLISHED-SET AND ENDGAME ROUND 2026-09-04 (improvement round 33 of the
  * perf-and-quality plan; spec docs/superpowers/specs/2026-09-04-round-33-
  * design.md; Block 0 a4f1a69 hosts / 2fccf7f bound fetch / 2557567 top bar
