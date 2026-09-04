@@ -9,6 +9,7 @@ import {
   type SmogonUsageStats,
 } from '../src/lib/smogon-stats';
 import type { OpponentTeamInfo } from '../packages/replay-core/src/types';
+import { smogonDataPath, withSmogonFallback } from '../src/lib/smogon/hosts';
 
 const usageStats: SmogonUsageStats = {
   format: 'gen9ou',
@@ -399,5 +400,45 @@ test.describe('coherent move enrichment', () => {
     expect(enriched.item).toEqual({
       value: 'Heavy-Duty Boots', source: 'guessed', sourceDetail: 'Smogon sets gen9ou',
     });
+  });
+});
+
+test.describe('Smogon data host fallback', () => {
+  const okJson = (body: unknown) => new Response(JSON.stringify(body), { status: 200, headers: { 'content-type': 'application/json' } });
+
+  test('maps both hosts onto one data path and collapses double slashes', () => {
+    expect(smogonDataPath('https://data.pkmn.cc//sets/gen8ou.json')).toBe('/sets/gen8ou.json');
+    expect(smogonDataPath('https://pkmn.github.io/smogon/data/stats/gen8ou.json')).toBe('/stats/gen8ou.json');
+    expect(smogonDataPath('https://replay.pokemonshowdown.com/x.json')).toBeNull();
+  });
+
+  test('a network failure on the primary host falls through to the mirror', async () => {
+    const asked: string[] = [];
+    const fetcher = withSmogonFallback(async url => {
+      asked.push(url);
+      if (url.startsWith('https://data.pkmn.cc')) throw new TypeError('Failed to fetch');
+      return okJson({ mirror: true });
+    });
+    const response = await fetcher('https://data.pkmn.cc//sets/gen8ou.json');
+    expect(await response.json()).toEqual({ mirror: true });
+    expect(asked).toEqual(['https://data.pkmn.cc/sets/gen8ou.json', 'https://pkmn.github.io/smogon/data/sets/gen8ou.json']);
+  });
+
+  test('a 404 is an answer, not a reason to try the mirror', async () => {
+    const asked: string[] = [];
+    const fetcher = withSmogonFallback(async url => {
+      asked.push(url);
+      return new Response('', { status: 404 });
+    });
+    const response = await fetcher('https://data.pkmn.cc/sets/gen8nosuchformat.json');
+    expect(response.status).toBe(404);
+    expect(asked).toHaveLength(1);
+  });
+
+  test('foreign URLs pass through untouched', async () => {
+    const asked: string[] = [];
+    const fetcher = withSmogonFallback(async url => { asked.push(url); return okJson({}); });
+    await fetcher('https://replay.pokemonshowdown.com/x.json');
+    expect(asked).toEqual(['https://replay.pokemonshowdown.com/x.json']);
   });
 });
