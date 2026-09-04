@@ -23,6 +23,33 @@ test.describe('species-shaped default spreads', () => {
     expect(snorlax.evs.hp).toBe(252);
     expect(snorlax.evs.spe).toBe(0);
   });
+
+  test('revealed attacks pick the offense side of the last-resort spread', () => {
+    // Kyurem: base Atk and SpA both 130 (the base-stat rule says physical).
+    // With only special attacks revealed, the default must invest SpA.
+    const log = [
+      '|player|p1|Alice|', '|player|p2|Bob|', '|gen|8', '|gametype|singles',
+      '|poke|p2|Kyurem|', '|poke|p2|Dragapult|',
+      '|start',
+      '|switch|p2a: Kyurem|Kyurem|100/100',
+      '|turn|1',
+      '|move|p2a: Kyurem|Freeze-Dry|p1a: Toxapex',
+      '|turn|2',
+      '|switch|p2a: Dragapult|Dragapult|100/100',
+      '|turn|3',
+      '|move|p2a: Dragapult|Dragon Darts|p1a: Toxapex',
+      '|move|p2a: Dragapult|Will-O-Wisp|p1a: Toxapex',
+      '|turn|4',
+    ].join('\n');
+    const { p2Team } = buildTeamsFromReplay(log);
+    const kyurem = p2Team.find(set => set.species === 'Kyurem')!;
+    expect(kyurem.evs.spa).toBe(252);
+    expect(kyurem.evs.atk).toBe(0);
+    expect(kyurem.evs.spe).toBe(252);
+    // Dragapult (base Atk 120 over SpA 100): a physical attack plus a status move keeps Atk.
+    const dragapult = p2Team.find(set => set.species === 'Dragapult')!;
+    expect(dragapult.evs.atk).toBe(252);
+  });
 });
 import { readFileSync } from 'fs';
 import { dirname, join } from 'path';

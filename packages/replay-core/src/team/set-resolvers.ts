@@ -178,20 +178,21 @@ function spreadNature(
 
 function spreadEvs(
   species: string, edited: EditedFields, inferred: SpreadCandidate | undefined, curated: CuratedSet | null,
-  spread: UsageSpreadLike, setSpread: UsageSpreadLike,
+  spread: UsageSpreadLike, setSpread: UsageSpreadLike, revealedMoves: string[],
 ): PokemonSet['evs'] {
-  return edited.editedEvs || inferred?.evs || curated?.spread?.evs || spread?.evs || setSpread?.evs || defaultEvsFor(species);
+  return edited.editedEvs || inferred?.evs || curated?.spread?.evs || spread?.evs || setSpread?.evs ||
+    defaultEvsFor(species, revealedMoves);
 }
 
 export function resolveSpread(
   species: string, edited: EditedFields, inferred: SpreadCandidate | undefined, curated: CuratedSet | null,
-  usageSet: SpeciesUsageSet | null, smogonSet: SmogonSet,
+  usageSet: SpeciesUsageSet | null, smogonSet: SmogonSet, revealedMoves: string[] = [],
 ): { nature: PokemonSet['nature']; evs: PokemonSet['evs']; ivs: PokemonSet['ivs'] } {
   const spread = usageSet?.spread;
   const setSpread = smogonSet?.spread;
   return {
     nature: spreadNature(edited, inferred, curated, spread, setSpread),
-    evs: spreadEvs(species, edited, inferred, curated, spread, setSpread),
+    evs: spreadEvs(species, edited, inferred, curated, spread, setSpread, revealedMoves),
     ivs: edited.editedIvs || { hp: 31, atk: 31, def: 31, spa: 31, spd: 31, spe: 31 },
   };
 }
@@ -200,16 +201,29 @@ function hasNonZeroEvs(evs: PokemonSet['evs'] | undefined): boolean {
   return !!evs && Object.values(evs).some(value => (value ?? 0) > 0);
 }
 
+/** The offense side the revealed attacks agree on; null when none or both categories were shown. */
+function revealedOffense(revealedMoves: string[]): 'atk' | 'spa' | null {
+  const categories = new Set(
+    revealedMoves.map(name => Dex.moves.get(name))
+      .filter(move => move.exists && move.category !== 'Status')
+      .map(move => move.category),
+  );
+  if (categories.size !== 1) return null;
+  return categories.has('Special') ? 'spa' : 'atk';
+}
+
 /**
  * Species-shaped last-resort spread (no usage data, no inference, no sets):
  * max the HIGHER base offense, plus Speed on fast species and HP otherwise.
  * The old flat 252 HP / 252 Atk default put physical EVs on special
  * attackers and left base-123-Speed Noivern outsped by everything (GPL).
+ * Revealed attacks name the offense side first (573756's Kyurem showed
+ * only Freeze-Dry and defaulted to 252 Atk).
  */
-function defaultEvsFor(species: string): PokemonSet['evs'] {
+function defaultEvsFor(species: string, revealedMoves: string[]): PokemonSet['evs'] {
   const data = Dex.species.get(species);
   const stats = data.exists ? data.baseStats : null;
-  const offense: 'atk' | 'spa' = stats && stats.spa > stats.atk ? 'spa' : 'atk';
+  const offense: 'atk' | 'spa' = revealedOffense(revealedMoves) ?? (stats && stats.spa > stats.atk ? 'spa' : 'atk');
   const secondary: 'spe' | 'hp' = stats && stats.spe >= 80 ? 'spe' : 'hp';
   const evs = { hp: 0, atk: 0, def: 0, spa: 0, spd: 4, spe: 0 };
   evs[offense] = 252;

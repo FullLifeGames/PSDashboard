@@ -145,7 +145,8 @@ function buildSet(
   const curated = selectCuratedFor(info, smogonSet, usageSet);
   const item = resolveItem(info, curated, usageSet, smogonSet);
   const moves = assembleMoves(info, curated, usageSet, smogonSet, item);
-  const spread = resolveSpread(info.species, edited, inferred, curated, usageSet, smogonSet);
+  const revealedMoves = info.moves.filter(move => move.source === 'revealed').map(move => move.name);
+  const spread = resolveSpread(info.species, edited, inferred, curated, usageSet, smogonSet, revealedMoves);
 
   return {
     name: info.species,
