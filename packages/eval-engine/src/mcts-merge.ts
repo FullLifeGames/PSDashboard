@@ -1,6 +1,6 @@
 import { cellKey, rankFromMatrix, toResult as rankedToResult } from './rank.ts';
 import { attachKoOdds, koOddsMapsFor } from './search/root-payload.ts';
-import type { EvalCellJob, EvalCellValue, EvalResult, KoOddsMismatch, MctsTreeStats, RankedChoice } from './types.ts';
+import type { CellBlendClass, EvalCellJob, EvalCellValue, EvalResult, KoOddsMismatch, MctsTreeStats, RankedChoice } from './types.ts';
 
 /**
  * Root parallelization for the MCTS mode: N independent trees (each with a
@@ -66,6 +66,8 @@ const VERIFY_DEPTH_FLOOR = 0.9;
 export const VERIFY_SAMPLES = 3;
 /** Verification budget: at most this many cell jobs per search. */
 const VERIFY_CELL_CAP = 12;
+/** Pooled visits from which a cell counts as rich for row completion. */
+export const ROW_RICH_VISITS = 50;
 /** Mix weight from which an option counts as equilibrium support. */
 const SUPPORT_MIX = 0.05;
 
@@ -151,17 +153,23 @@ function deepPool(pool: ReturnType<typeof poolContinuation>, minTrees: number): 
 function verifiedValue(trees: MctsTreeStats[], key: number, cell: EvalCellValue, pooledValue: number): number {
   if (!cell.blend) {
     const pool = poolContinuation(trees, key);
-    return deepPool(pool, Math.min(VERIFY_MIN_TREES, trees.length)) ? pooledValue : cell.value;
+    // The sampler's value, one ply deeper where the verify step deepened it (round 33).
+    return deepPool(pool, Math.min(VERIFY_MIN_TREES, trees.length)) ? pooledValue : cell.deepened ?? cell.value;
   }
-  const open = cell.blend.classes.filter(cls => !cls.ended);
+  const { blend } = cell;
+  // A deepened first-seed child re-blends inside its class only (reblendValue's rule).
+  const classMean = (cls: CellBlendClass) => cell.deepened !== undefined && cls.hasFirst
+    ? (cls.leafSum - blend.firstLeaf + cell.deepened) / cls.count
+    : cls.leafSum / cls.count;
+  const open = blend.classes.filter(cls => !cls.ended);
   let value = 0;
-  for (const cls of cell.blend.classes) {
+  for (const cls of blend.classes) {
     if (cls.ended) {
-      value += cls.weight * (cls.leafSum / cls.count);
+      value += cls.weight * classMean(cls);
       continue;
     }
     const pool = poolContinuation(trees, key, cls.key, open.length === 1);
-    value += cls.weight * (deepPool(pool, VERIFY_MIN_CLASS_TREES) ? pool.value : cls.leafSum / cls.count);
+    value += cls.weight * (deepPool(pool, VERIFY_MIN_CLASS_TREES) ? pool.value : classMean(cls));
   }
   return value;
 }
@@ -416,4 +424,47 @@ export function starvedSupportCells(trees: MctsTreeStats[], merged: EvalResult):
         samples: VERIFY_SAMPLES,
       };
     });
+}
+
+/** A cell job for one (i, j) of the base tree's option grid. */
+function cellJob(base: MctsTreeStats, i: number, j: number): EvalCellJob {
+  return { i, j, p1Choice: base.p1Options[i].choice, p2Choice: base.p2Options[j].choice, samples: VERIFY_SAMPLES };
+}
+
+/**
+ * Row completion (round 33): a verify row or column that holds a rich cell
+ * (ROW_RICH_VISITS pooled visits) and a starved one compares depths. Every
+ * other support cell of that row and column joins the jobs, behind the
+ * starved ones and under the same cap, so the whole line is priced by the
+ * same estimator (655336 t24: one deep Dragon Claw cell beside a one-ply
+ * Dragon Dance sibling read as a blunder). Rich cells keep their depth,
+ * ended cells stay out.
+ */
+export function rowCompletedCells(trees: MctsTreeStats[], merged: EvalResult, jobs: EvalCellJob[]): EvalCellJob[] {
+  const base = trees[0];
+  const mixes = merged.matrix?.mixes;
+  if (!mixes || jobs.length === 0) return jobs;
+  const stats = poolStats(trees);
+  const rich = (i: number, j: number) => (stats.pooledVisits.get(cellKey(i, j)) ?? 0) >= ROW_RICH_VISITS;
+  const p1ByChoice = new Map(base.p1Options.map((option, index) => [option.choice, index]));
+  const p2ByChoice = new Map(base.p2Options.map((option, index) => [option.choice, index]));
+  const p1Mass = supportMass(mixes.p1, merged.perSide.p1, p1ByChoice);
+  const p2Mass = supportMass(mixes.p2, merged.perSide.p2, p2ByChoice);
+  const taken = new Set(jobs.map(job => cellKey(job.i, job.j)));
+  const extra = new Map<number, number>();
+  const consider = (i: number, j: number, mass: number) => {
+    const key = cellKey(i, j);
+    if (taken.has(key) || rich(i, j) || stats.endedCells.has(key)) return;
+    extra.set(key, Math.max(extra.get(key) ?? 0, mass));
+  };
+  for (const job of jobs) {
+    const rowRich = [...p2Mass.keys()].some(j => rich(job.i, j));
+    const columnRich = [...p1Mass.keys()].some(i => rich(i, job.j));
+    if (rowRich) for (const [j, massJ] of p2Mass) consider(job.i, j, (p1Mass.get(job.i) ?? SUPPORT_MIX / 2) * massJ);
+    if (columnRich) for (const [i, massI] of p1Mass) consider(i, job.j, massI * (p2Mass.get(job.j) ?? SUPPORT_MIX / 2));
+  }
+  const completions = [...extra.entries()]
+    .sort((a, b) => b[1] - a[1] || a[0] - b[0])
+    .map(([key]) => cellJob(base, Math.floor(key / 10_000), key % 10_000));
+  return [...jobs, ...completions].slice(0, VERIFY_CELL_CAP);
 }

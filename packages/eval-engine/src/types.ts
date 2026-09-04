@@ -328,6 +328,13 @@ export interface EvalCellValue {
   blend?: CellBlend;
   /** Probe budget exhausted with analytic classes unsampled. */
   diagnostic?: KoOddsMismatch;
+  /**
+   * Round 33: the first-seed child's depth-2 value (a depth-1 sub-search
+   * on that child), set by the verify step in the MCTS mode. Below the
+   * depth floor it replaces the one-ply sampler value; blended cells
+   * re-blend it through the first-seed class (as reblendValue does).
+   */
+  deepened?: number;
 }
 
 export interface EvalSubSearchJob {

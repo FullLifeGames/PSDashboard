@@ -39,7 +39,7 @@ export { summarizeAlignment } from './hax-alignment.ts';
 export type { AlignmentScore, TurnAlignmentRecord, AlignmentSummary } from './hax-alignment.ts';
 export { analyzeLeads } from './leads.ts';
 export type { LeadSideAnalysis, LeadAnalysis, LeadEvalData } from './leads.ts';
-export { mergeMctsTrees, starvedSupportCells, MCTS_TREES } from './mcts-merge.ts';
+export { mergeMctsTrees, rowCompletedCells, starvedSupportCells, MCTS_TREES } from './mcts-merge.ts';
 export { mctsSearch, mctsTreeSearch } from './mcts.ts';
 export type { MctsCallbacks } from './mcts.ts';
 export { parseTendencies, computeRead } from './opponent-model.ts';

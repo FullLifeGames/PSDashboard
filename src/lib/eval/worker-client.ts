@@ -1,5 +1,5 @@
 import {
-  MCTS_TREES, mergeMctsTrees, starvedSupportCells, perfAdd, perfCount, perfSync, cellKey, searchOrchestrated,
+  MCTS_TREES, mergeMctsTrees, rowCompletedCells, starvedSupportCells, perfAdd, perfCount, perfSync, cellKey, searchOrchestrated,
   type SearchExecutor, type EvalCellValue, type EvalResult, type EvalSettings, type EvalWorkerRequest,
   type EvalWorkerResponse, type MctsTreeStats, type SearchProgress,
 } from '@fulllifegames/eval-engine';
@@ -209,7 +209,7 @@ export class EvalWorkerClient {
         }
       },
     ));
-    return Promise.all(trees).then(allTrees => this.verifiedMerge(serializedBattle, allTrees, handlers, live));
+    return Promise.all(trees).then(allTrees => this.verifiedMerge(serializedBattle, allTrees, settings, handlers, live));
   }
 
   /** Posts one MCTS tree to the least-loaded worker; progress streams while the evaluation is live. */
@@ -254,16 +254,35 @@ export class EvalWorkerClient {
   private async verifiedMerge(
     serializedBattle: string,
     allTrees: MctsTreeStats[],
+    settings: EvalSettings,
     handlers: EvalRunHandlers | undefined,
     live: () => boolean,
   ): Promise<EvalResult> {
     const merged = perfSync('main:mcts-merge', () => mergeMctsTrees(allTrees));
     if (!live()) return merged;
-    const jobs = perfSync('main:starved-cells', () => starvedSupportCells(allTrees, merged));
+    const jobs = perfSync('main:starved-cells', () => {
+      const starved = starvedSupportCells(allTrees, merged);
+      return rowCompletedCells(allTrees, merged, starved);
+    });
     if (jobs.length === 0) return merged;
     handlers?.onPartial?.(merged);
     try {
-      const values = await this.createPooledExecutor(serializedBattle).evalCells(jobs);
+      const executor = this.createPooledExecutor(serializedBattle);
+      const values = await executor.evalCells(jobs);
+      if (!live()) return merged;
+      // Round 33: one more ply for every verified cell that did not end —
+      // a depth-1 sub-search on the first-seed child (the matrix mode's
+      // depth-2 estimator), so a verified row is priced at one depth.
+      const jobByKey = new Map(jobs.map(job => [cellKey(job.i, job.j), job]));
+      const subSettings: EvalSettings = { depth: 1, samples: 1, tera: settings.tera, sleepClause: settings.sleepClause };
+      const deepenStart = Date.now();
+      await Promise.all(values.map(async value => {
+        const job = jobByKey.get(cellKey(value.i, value.j));
+        if (value.ended || !job) return;
+        const sub = await executor.subSearch({ i: value.i, j: value.j, p1Choice: job.p1Choice, p2Choice: job.p2Choice, settings: subSettings });
+        value.deepened = sub.score;
+      }));
+      perfAdd('verify-deepen', Date.now() - deepenStart);
       if (!live()) return merged;
       return perfSync('main:mcts-merge', () =>
         mergeMctsTrees(allTrees, new Map(values.map(value => [cellKey(value.i, value.j), value]))));

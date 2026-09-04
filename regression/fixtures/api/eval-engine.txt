@@ -125,6 +125,7 @@ value reconstructionReached
 value requiredChoicesForActiveSlots
 value resolveSideChoices
 value resolveTeraPreference
+value rowCompletedCells
 value searchOrchestrated
 value searchPosition
 value selectKeyTurns

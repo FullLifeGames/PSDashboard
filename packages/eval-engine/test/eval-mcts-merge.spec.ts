@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { mergeMctsTrees, starvedSupportCells, VERIFY_DISAGREEMENT, VERIFY_SAMPLES, weightedDisagreement } from '../src/mcts-merge';
+import { mergeMctsTrees, rowCompletedCells, starvedSupportCells, VERIFY_DISAGREEMENT, VERIFY_SAMPLES, weightedDisagreement } from '../src/mcts-merge';
 import { cellKey } from '../src/rank';
 import type { MctsTreeStats } from '../src/types';
 
@@ -353,5 +353,56 @@ test.describe('per-class continuation (round 33)', () => {
     const two = mergeMctsTrees(unkeyed, new Map([[cellKey(0, 0), { i: 0, j: 0, value: -0.04, ended: false, blend }]]));
     // The sampler's own blend mean: 0.8 · (−0.3/3) + 0.2 · (0.6/3).
     expect(two.matrix!.values[0][0]).toBeCloseTo(-0.04, 10);
+  });
+});
+
+test.describe('row completion for the verify step (round 33)', () => {
+  const options = (labels: string[]) => labels.map(label => ({ choice: label, label }));
+  const emptyResult = { score: 0, interval: 0, depthCompleted: 2, perSide: { p1: [], p2: [] } };
+  // Row A: (A,X) rich at 60 pooled visits, (A,Y) starved (one visit per
+  // tree), (A,Z) middling (15 pooled: trusted, not rich). Row B: rich all along.
+  const cell = (i: number, j: number, visits: number, mean: number) =>
+    ({ key: cellKey(i, j), visits, total: mean * (visits + 1) - mean, value: mean, ended: false });
+  const mk = (): MctsTreeStats => ({
+    p1Options: options(['A', 'B']), p2Options: options(['X', 'Y', 'Z']),
+    p1N: [26, 60], p1W: [-5, -12], p2N: [40, 21, 25], p2W: [-8, -4, -5],
+    visits: 86, depth: 2, rootValue: 0.1, result: emptyResult,
+    cells: [
+      cell(0, 0, 20, -0.2), cell(0, 1, 1, 0.4), cell(0, 2, 5, -0.2),
+      cell(1, 0, 20, -0.2), cell(1, 1, 20, -0.2), cell(1, 2, 20, -0.2),
+    ],
+  });
+  const trees = [mk(), mk(), mk()];
+
+  test('support cells sharing a row or column with a rich cell join the verify jobs behind the starved ones', () => {
+    const merged = mergeMctsTrees(trees);
+    const starved = starvedSupportCells(trees, merged);
+    const starvedPairs = starved.map(job => `${job.p1Choice}×${job.p2Choice}`);
+    expect(starvedPairs).toEqual(['A×Y']);
+    const jobs = rowCompletedCells(trees, merged, starved);
+    const pairs = jobs.map(job => `${job.p1Choice}×${job.p2Choice}`);
+    expect(pairs.slice(0, starved.length)).toEqual(starvedPairs); // originals first
+    expect(pairs).toContain('A×Z');     // same row as the rich (A,X), not rich itself
+    expect(pairs).not.toContain('A×X'); // rich cells are never re-priced here
+    expect(pairs).not.toContain('B×Y'); // rich
+    expect(jobs.length).toBeLessThanOrEqual(12);
+    for (const job of jobs) expect(job.samples).toBe(VERIFY_SAMPLES);
+    // No starved jobs: nothing to complete.
+    expect(rowCompletedCells(trees, merged, [])).toEqual([]);
+  });
+
+  test('a deepened value replaces the one-ply sampler below the depth floor', () => {
+    const merged = mergeMctsTrees(trees, new Map([[cellKey(0, 1), { i: 0, j: 1, value: -0.11, deepened: 0.21, ended: false }]]));
+    expect(merged.matrix!.values[0][1]).toBeCloseTo(0.21, 10);
+  });
+
+  test('a blended cell re-blends the deepened first-seed child through its class', () => {
+    const blend = { firstLeaf: -0.1, classes: [
+      { key: 'hit-nokill', weight: 0.8, leafSum: -0.3, count: 3, hasFirst: true, ended: false },
+      { key: 'miss', weight: 0.2, leafSum: 0.6, count: 3, hasFirst: false, ended: false },
+    ] };
+    const merged = mergeMctsTrees(trees, new Map([[cellKey(0, 1), { i: 0, j: 1, value: -0.04, deepened: 0.5, ended: false, blend }]]));
+    // hasFirst class mean becomes (−0.3 − (−0.1) + 0.5) / 3 = 0.1; the miss class keeps 0.2.
+    expect(merged.matrix!.values[0][1]).toBeCloseTo(0.8 * 0.1 + 0.2 * 0.2, 10);
   });
 });
