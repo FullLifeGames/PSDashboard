@@ -2,8 +2,9 @@ import type { EntryUnanswered, EvalMatrix, RankedChoice } from '../types.ts';
 import { nullMoveReason } from '../null-moves.ts';
 import { detectStreakOdds } from '../streaks.ts';
 import { TIE_EPSILON } from '../rank.ts';
+import { SPOKEN_MASS } from '../types.ts';
 import {
-  CONDITIONAL_MIX_MIN, FORCED_MIX_THRESHOLD, TIER_THRESHOLDS, decidedSeenKey, unansweredSeenKey,
+  CONDITIONAL_MIX_MIN, FORCED_MIX_THRESHOLD, TIER_THRESHOLDS, decidedSeenKey, forcedWinSeenKey, unansweredSeenKey,
   type AnalyzeTurnParams, type Side, type SideAnalysis, type VerdictTier,
 } from './types.ts';
 import { matchPlayedChoice } from './played-match.ts';
@@ -205,10 +206,21 @@ function unansweredFor(
  * (display layers book resolution prose from the state) and announce only
  * until the game report has spoken them once.
  */
+/** Round 35: the forced win for this side, spoken once by the report; when it speaks, the decided stages stay quiet. */
+function forcedWinSignal(params: AnalyzeTurnParams, key: Side): SideAnalysis['forcedWin'] {
+  const forced = params.result.forcedWin;
+  if (!forced || forced.side !== key) return undefined;
+  return {
+    turns: forced.turns, mass: forced.mass, caveat: forced.caveat,
+    ...(forced.open ? { open: forced.open } : {}),
+    announce: !params.decidedSeen?.has(forcedWinSeenKey(key)),
+  };
+}
+
 function decidedSignals(
   params: AnalyzeTurnParams,
   key: Side,
-): { decided: SideAnalysis['decided']; nearDecided: SideAnalysis['nearDecided'] } {
+): { decided: SideAnalysis['decided']; nearDecided: SideAnalysis['nearDecided']; forcedWin: SideAnalysis['forcedWin'] } {
   let decided: SideAnalysis['decided'];
   const ownDecided = params.result.unanswered?.decided;
   if (ownDecided && ownDecided.side === key) {
@@ -226,7 +238,13 @@ function decidedSignals(
         decidedSeenKey(key, { species: ownNear.species, removes: ownNear.removes })),
     };
   }
-  return { decided, nearDecided };
+  const forcedWin = forcedWinSignal(params, key);
+  if (forcedWin?.announce && forcedWin.mass >= SPOKEN_MASS) {
+    // The proof speaks for the board; the decided stages keep their state, quietly.
+    if (decided) decided = { ...decided, announce: false };
+    if (nearDecided) nearDecided = { ...nearDecided, announce: false };
+  }
+  return { decided, nearDecided, forcedWin };
 }
 
 /**
@@ -279,6 +297,7 @@ export interface SideSignals {
   unanswered: SideAnalysis['unanswered'];
   decided: SideAnalysis['decided'];
   nearDecided: SideAnalysis['nearDecided'];
+  forcedWin: SideAnalysis['forcedWin'];
   bestNull: SideAnalysis['bestNull'];
   streakOdds: SideAnalysis['streakOdds'];
 }
@@ -290,10 +309,10 @@ export function signalSide(params: AnalyzeTurnParams, key: Side, g: SideGrading)
   const forcedMix = forcedMixFor(view, g.options);
   const hindsightRead = hindsightReadFor(params, key, view, g.played);
   const unanswered = unansweredFor(params, key, g.played, g.best);
-  const { decided, nearDecided } = decidedSignals(params, key);
+  const { decided, nearDecided, forcedWin } = decidedSignals(params, key);
   const bestNull = bestNullFor(params, key, g.best, g.options);
   const streakOdds = streakFor(params, key);
-  return { viableCount, conditional, forcedMix, hindsightRead, unanswered, decided, nearDecided, bestNull, streakOdds };
+  return { viableCount, conditional, forcedMix, hindsightRead, unanswered, decided, nearDecided, forcedWin, bestNull, streakOdds };
 }
 
 /** The signal half of the side record, keys in the report's order. */
@@ -308,5 +327,6 @@ export function signalFields(s: SideSignals): Partial<SideAnalysis> {
     ...(s.unanswered ? { unanswered: s.unanswered } : {}),
     ...(s.decided ? { decided: s.decided } : {}),
     ...(s.nearDecided ? { nearDecided: s.nearDecided } : {}),
+    ...(s.forcedWin ? { forcedWin: s.forcedWin } : {}),
   };
 }

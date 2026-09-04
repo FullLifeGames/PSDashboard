@@ -1,5 +1,6 @@
 import { BREADTH_MIN_OPTIONS, CHANCE_THRESHOLD, type SideAnalysis, type TurnAnalysis } from './analysis.ts';
 import { winDeltaText, winPercent } from './winprob.ts';
+import { SPOKEN_MASS } from './types.ts';
 import { phrase, playedBest } from './prose/phrases.ts';
 import {
   forcedClause, inaccuracyClause, sackClause, sensitivityClause, sideClause, streakClause, unansweredClause,
@@ -41,6 +42,20 @@ function estimateSentence(analysis: TurnAnalysis, playerNames: PlayerNames): str
     : `The estimate moved from ${before}% to ${after}% for ${playerNames[0]}.`;
 }
 
+/** Round 35: the forced-win sentence, spoken at or above SPOKEN_MASS; the four forms of the spec. */
+function forcedWinSentence(side: SideAnalysis, player: string): string | null {
+  const forced = side.forcedWin;
+  if (!forced?.announce || forced.mass < SPOKEN_MASS) return null;
+  const tail = forced.caveat === 'barring-crit' ? ', barring a crit' : forced.caveat === 'sampled-rolls' ? ' on the sampled rolls' : '';
+  const head = `${player} wins in ${forced.turns} against every reply`;
+  if (forced.mass >= 1) return `${head}${tail}.`;
+  if (forced.open) {
+    const verb = forced.open.kind === 'hit' ? 'lands' : 'knocks out';
+    return `${head} if the ${Math.round(forced.open.odds * 100)}% ${forced.open.label} ${verb}${tail}.`;
+  }
+  return `${head} in ${Math.round(forced.mass * 100)}% of the rolls${tail}.`;
+}
+
 /**
  * Round 15: the decided sweep speaks right after the estimate — the board
  * state that explains where the number is headed. Announce-gated: the
@@ -48,6 +63,9 @@ function estimateSentence(analysis: TurnAnalysis, playerNames: PlayerNames): str
  */
 function decidedSentences(analysis: TurnAnalysis, playerNames: PlayerNames, decided: Decided): string[] {
   const sentences: string[] = [];
+  const forced = [forcedWinSentence(analysis.p1, playerNames[0]), forcedWinSentence(analysis.p2, playerNames[1])]
+    .filter((sentence): sentence is string => sentence !== null);
+  sentences.push(...forced);
   if (decided?.announce) {
     const opponent = decided.key === 'p1' ? playerNames[1] : playerNames[0];
     sentences.push(`From here ${decided.species} clears everything ${opponent} has left — ` +

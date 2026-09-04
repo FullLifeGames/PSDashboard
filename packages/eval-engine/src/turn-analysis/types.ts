@@ -1,4 +1,4 @@
-import type { EvalResult, KoOddsInfo, RankedChoice, ReadRecommendation } from '../types.ts';
+import type { EvalResult, ForcedWinCaveat, ForcedWinOpen, KoOddsInfo, RankedChoice, ReadRecommendation } from '../types.ts';
 import type { StreakHistoryEntry, StreakOdds } from '../streaks.ts';
 import type { PlayedAction, PlayedTurn, SackInfo } from '../played.ts';
 import type { SideId } from '@fulllifegames/replay-core';
@@ -284,6 +284,14 @@ export interface SideAnalysis {
    * `species` clears the rest (573756 t73: a 95% Fire Fang from the sweep).
    */
   nearDecided?: { species: string; odds: number; removes: string; announce: boolean };
+  /**
+   * Round 35: a forced win proven from this root FOR this side (the sim
+   * played every reply out): `turns` the deepest proven line, `mass` the
+   * proven share of the outcome classes, `caveat` what the class model
+   * leaves out. `announce` is true until the game report has spoken it
+   * once (forcedWinSeenKey); the per-turn card announces every turn.
+   */
+  forcedWin?: { turns: number; mass: number; caveat: ForcedWinCaveat; open?: ForcedWinOpen; announce: boolean };
 }
 
 /**
@@ -305,6 +313,9 @@ export const unansweredSeenKey = (side: 'p1' | 'p2', signal: { species: string; 
  */
 export const decidedSeenKey = (side: 'p1' | 'p2', signal: { species: string; removes?: string }): string =>
   signal.removes ? `${side}:${signal.species}:near:${signal.removes}` : `${side}:${signal.species}:decided`;
+
+/** Spoken-once key for the forced-win sentence (round 35), same walk regime as decidedSeenKey. */
+export const forcedWinSeenKey = (side: 'p1' | 'p2'): string => `${side}:forced`;
 
 /** Deep re-search of the played and best pairs (p1-perspective outcomes). */
 interface VerifiedOutcomes {

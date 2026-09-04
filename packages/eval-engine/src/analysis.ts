@@ -15,7 +15,7 @@ import type { AnalyzeTurnParams, Side, SideAnalysis, TurnAnalysis } from './turn
 export {
   BREADTH_MIN_OPTIONS, CHANCE_THRESHOLD,
   PAYOFF_WINDOW, REGRET_THRESHOLD, TIER_THRESHOLDS,
-  decidedSeenKey, unansweredSeenKey,
+  decidedSeenKey, forcedWinSeenKey, unansweredSeenKey,
 } from './turn-analysis/types.ts';
 export type {
   AnalyzeTurnParams, SensitivityProbe, SideAnalysis, TurnAnalysis, TurnAttribution, TurnSensitivity, TurnVerification,
