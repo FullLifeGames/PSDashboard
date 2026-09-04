@@ -103,6 +103,18 @@ test.describe('choice-item damage corroboration', () => {
     expect(corroborateChoiceItem('p1', 'Keldeo', 'Choice Specs', teams, observation(0.55), 6)).toBe('contradicted');
   });
 
+  test('a knock-out reads as a lower bound: below the choice band it neither contradicts nor corroborates', () => {
+    const lethal = observation(0.55).map(obs => ({ ...obs, lethal: true }));
+    // 0.55 sits inside the unboosted band; a knock-out at 0.55 only says
+    // "at least 0.55", which both hypotheses explain.
+    expect(corroborateChoiceItem('p1', 'Keldeo', 'Choice Specs', teams, lethal, 6)).toBe('ambiguous');
+  });
+
+  test('a knock-out above the unboosted maximum still corroborates the choice item', () => {
+    const lethal = observation(0.85).map(obs => ({ ...obs, lethal: true }));
+    expect(corroborateChoiceItem('p1', 'Keldeo', 'Choice Specs', teams, lethal, 6)).toBe('corroborated');
+  });
+
   test('no usable observations stays ambiguous (stamp proceeds on the guess)', () => {
     expect(corroborateChoiceItem('p1', 'Keldeo', 'Choice Specs', teams, [], 6)).toBe('ambiguous');
   });

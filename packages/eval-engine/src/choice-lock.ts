@@ -116,6 +116,9 @@ function explainsObservation(
     if (rolls.length === 0 || maxHp <= 0) return null;
     const min = Math.min(...rolls) / maxHp - OBSERVATION_SLACK;
     const max = Math.max(...rolls) / maxHp + OBSERVATION_SLACK;
+    // A knock-out line only says "at least the remainder" (round 32's
+    // spread-fit rule): the hypothesis must reach the fraction, not land on it.
+    if (obs.lethal) return obs.observedFraction <= max;
     return obs.observedFraction >= min && obs.observedFraction <= max;
   } catch {
     return null; // Unknown move/species for this gen: cannot judge.
