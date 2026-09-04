@@ -33,6 +33,8 @@ export interface SmogonSetAssumptions {
   format: string;
   source: string;
   pokemon: Record<string, PokemonSetAssumption>;
+  /** Per-species fetch failures ("Toxapex: Failed to fetch"); absent when every species resolved or was merely absent. */
+  errors?: string[];
 }
 
 export function getSpeciesSetAssumption(

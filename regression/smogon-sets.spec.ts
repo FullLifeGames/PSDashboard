@@ -82,6 +82,35 @@ test.describe('Smogon set assumptions', () => {
     });
   });
 
+  test('calls fetch as a free function (window.fetch throws on a foreign this)', async () => {
+    // Mirrors the browser: a fetch that refuses a foreign `this`.
+    const strictFetch = function (this: unknown, url: string) {
+      if (this !== undefined && this !== globalThis) throw new TypeError("Failed to execute 'fetch' on 'Window': Illegal invocation");
+      return Promise.resolve({ ok: true, status: 200, json: async () => ({ Toxapex: { Wall: { nature: 'Calm', evs: { hp: 248, spd: 252 }, moves: ['Recover'] } } }) } as unknown as Response);
+    };
+    const assumptions = await fetchSmogonSetAssumptions({ formatId: 'gen8ou', species: ['Toxapex'], fetcher: strictFetch as never });
+    expect(assumptions?.pokemon.toxapex?.spread?.evs.spd).toBe(252);
+  });
+
+  test('rejects when every species failed, and does not cache the failure', async () => {
+    let calls = 0;
+    const failing = async () => { calls += 1; throw new TypeError('Failed to fetch'); };
+    await expect(fetchSmogonSetAssumptions({ formatId: 'gen8ou', species: ['Toxapex', 'Corviknight'], fetcher: failing })).rejects.toThrow(/Failed to fetch/);
+    const before = calls;
+    await expect(fetchSmogonSetAssumptions({ formatId: 'gen8ou', species: ['Toxapex', 'Corviknight'], fetcher: failing })).rejects.toThrow();
+    expect(calls).toBeGreaterThan(before);
+  });
+
+  test('a species without an entry is not an error', async () => {
+    const assumptions = await fetchSmogonSetAssumptions({
+      formatId: 'gen8ou', species: ['Toxapex', 'Kyurem'],
+      fetcher: async () => ({ json: async () => ({ Toxapex: { Wall: { nature: 'Calm', evs: { hp: 248, spd: 252 }, moves: ['Recover'] } } }) }),
+    });
+    expect(assumptions?.pokemon.toxapex).toBeTruthy();
+    expect(assumptions?.pokemon.kyurem).toBeUndefined();
+    expect(assumptions?.errors).toBeUndefined();
+  });
+
   test('uses set assumptions after revealed data and before unknown defaults', () => {
     const enriched = enrichPokemonInfo(sampleInfo, null, {
       format: 'gen9ou',

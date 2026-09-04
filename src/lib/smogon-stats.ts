@@ -1,6 +1,7 @@
 import { type SmogonUsageStats, toId } from '@fulllifegames/replay-core';
 import { dataPkmnStatsUrl, parseSmogonChaosStats } from './smogon/stats-parse';
 import { ouFallbackFormat } from './smogon/format-fallback';
+import { withSmogonFallback, type SmogonFetch } from './smogon/hosts';
 
 export type { PokemonUsageStats, SmogonUsageStats, SpeciesUsageSet, UsageProbability, UsageSpread } from '@fulllifegames/replay-core';
 export { parseSmogonChaosStats, parseSpread } from './smogon/stats-parse';
@@ -58,7 +59,7 @@ export async function fetchSmogonUsageStats(
   const cached = usageCache.get(cacheKey);
   if (cached) return cached;
 
-  const fetcher = options?.fetcher ?? fetch;
+  const fetcher = withSmogonFallback((options?.fetcher ?? fetch) as SmogonFetch);
   const request = (async () => {
     // Fetch every candidate and merge per species: the format's own file
     // wins, the generation's OU fills species it lacks. A niche format's

@@ -6,6 +6,7 @@ import {
   toId, type PokemonSetAssumption, type SetAssumption, type SetSpreadAssumption, type SmogonSetAssumptions,
 } from '@fulllifegames/replay-core';
 import { ouFallbackFormat } from './smogon/format-fallback';
+import { withSmogonFallback, type SmogonFetch } from './smogon/hosts';
 
 export type {
   PokemonSetAssumption, SetAssumption, SetSpreadAssumption, SmogonSetAssumptions,
@@ -23,6 +24,13 @@ type AssumptionSet = {
 
 const gens = new Generations(Dex);
 const cache = new Map<string, Promise<SmogonSetAssumptions | null>>();
+
+/**
+ * fetch as a free function: @pkmn/smogon calls `this.fetch(url)`, and a
+ * browser's window.fetch throws "Illegal invocation" on a foreign `this`
+ * (round 33: the set assumptions had never loaded in any browser).
+ */
+const boundFetch: SmogonFetch = (input, init) => fetch(input, init);
 
 function genFromFormat(formatId: string | undefined): number {
   const match = toId(formatId || 'gen9ou').match(/^gen(\d+)/);
@@ -96,32 +104,41 @@ export async function fetchSmogonSetAssumptions(params: {
 
   const request = (async () => {
     const gen = gens.get(genFromFormat(format));
-    const smogon = new Smogon(params.fetcher ?? fetch, true);
+    const fetcher = withSmogonFallback((params.fetcher ?? boundFetch) as SmogonFetch);
+    const smogon = new Smogon(fetcher as unknown as SmogonFetcher, true);
     const detail = sourceDetail(format);
     const pokemon: Record<string, PokemonSetAssumption> = {};
+    const errors: string[] = [];
 
     await Promise.all(species.map(async name => {
       try {
         const sets = await smogon.sets(gen, name, format as ID);
         const first = sets[0];
-        if (!first) return;
+        if (!first) return; // No published set for this species: absence, not failure.
         const entry = normalizeSet(name, first as AssumptionSet, detail);
         const alternatives = sets.slice(1, 8)
           .map(set => normalizeSet(name, set as AssumptionSet, detail));
         if (alternatives.length > 0) entry.alternatives = alternatives;
         pokemon[toId(name)] = entry;
-      } catch {
-        // A missing Smogon set should never block replay loading.
+      } catch (error) {
+        errors.push(`${name}: ${error instanceof Error ? error.message : String(error)}`);
       }
     }));
 
+    // Every species failed: the source is down, not the species absent.
+    if (errors.length === species.length) throw new Error(`Smogon sets unavailable: ${errors[0]}`);
     return Object.keys(pokemon).length > 0 ? {
       format,
       source: 'https://data.pkmn.cc',
       pokemon,
+      ...(errors.length > 0 ? { errors } : {}),
     } : null;
   })();
 
   cache.set(cacheKey, request);
+  // A failure is never cached: the next load retries.
+  request.catch(() => {
+    if (cache.get(cacheKey) === request) cache.delete(cacheKey);
+  });
   return request;
 }
