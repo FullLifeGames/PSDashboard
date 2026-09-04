@@ -49,6 +49,7 @@ test.describe('calibration lib', () => {
       'early brier=0.3017',
       'mid brier=0.2527',
       'late brier=0.0213',
+      'luck-adjusted: n=12 excluded=0 brier early/mid/late=0.3017/0.2527/0.0213',
       '|score| 0.0–0.2: n=3 favored-side-wins=67%',
       '|score| 0.2–0.4: n=2 favored-side-wins=100%',
       '|score| 0.4–0.7: n=4 favored-side-wins=50%',
