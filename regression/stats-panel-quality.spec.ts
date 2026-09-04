@@ -2,6 +2,7 @@ import { test, expect } from '@playwright/test';
 import { inferOpponentTeam } from '../packages/replay-core/src/opponent-inferrer';
 import { applyInferredSpreads, enrichPokemonInfo, guessedEvs, INFERRED_SPREAD_DETAIL, manualEvs, unknownField } from '../packages/replay-core/src/team-info';
 import { spriteUrl } from '../src/lib/sprite-url';
+import { sourceLabel } from '../src/lib/provenance-labels';
 import type { RevealedPokemonInfo } from '../packages/replay-core/src/types';
 import { alternativeItems, type SmogonUsageStats } from '../src/lib/smogon-stats';
 
@@ -464,5 +465,14 @@ test.describe('stats panel data quality (WP11)', () => {
     expect(hiddenPowerEntries).toHaveLength(1);
     expect(hiddenPowerEntries[0].source).toBe('revealed');
     expect(enriched.moves.some(move => move.name === 'Thunderbolt')).toBe(true);
+  });
+});
+
+test.describe('provenance labels', () => {
+  test('a damage-fitted spread reads fitted, a usage guess reads guessed with its share', () => {
+    expect(sourceLabel('guessed', undefined, INFERRED_SPREAD_DETAIL)).toBe('fitted');
+    expect(sourceLabel('guessed', 0.318)).toBe('guessed 31.8%');
+    expect(sourceLabel('guessed')).toBe('guessed');
+    expect(sourceLabel('revealed', undefined, INFERRED_SPREAD_DETAIL)).toBe('revealed');
   });
 });

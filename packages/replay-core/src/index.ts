@@ -33,6 +33,7 @@ export type { SpreadCandidate } from './spread-inference.ts';
 export { buildTeamsFromReplay, solveReplaySpreads, extractTeamSheets } from './team-builder.ts';
 export {
   manualField, manualEvs, manualMove, applyInferredSpreads, itemSetValue, enrichTeamInfo, EMPTY_EVS,
+  INFERRED_SPREAD_DETAIL,
 } from './team-info.ts';
 export { parseTeamText } from './team-parser.ts';
 export { parsePastedTeam, applyPastedTeam, countMatchingSpecies } from './team-paste.ts';

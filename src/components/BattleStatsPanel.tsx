@@ -1,5 +1,4 @@
 import type {
-  KnowledgeSource,
   OpponentTeamInfo,
   PokemonEvsInfo,
   PokemonFieldInfo,
@@ -7,6 +6,7 @@ import type {
   ReplayData,
   RevealedPokemonInfo,
 } from '@fulllifegames/replay-core';
+import { sourceAccent, sourceLabel } from '../lib/provenance-labels';
 import { spriteUrl } from '../lib/sprite-url';
 import { typeBg } from '../lib/type-colors';
 
@@ -14,41 +14,6 @@ interface Props {
   replayData: ReplayData;
   p1Info: OpponentTeamInfo | null;
   p2Info: OpponentTeamInfo | null;
-}
-
-function sourceAccent(source: KnowledgeSource): string {
-  switch (source) {
-    case 'revealed':
-      return '#6cc2ff';
-    case 'guessed':
-      return '#f3c969';
-    case 'manual':
-      return '#78df9b';
-    case 'sheet':
-      return '#b48ef0';
-    default:
-      return '#8899aa';
-  }
-}
-
-function formatProbability(probability: number | undefined): string {
-  if (probability === undefined) return '';
-  return `${Math.round(probability * 1000) / 10}%`;
-}
-
-function sourceLabel(source: KnowledgeSource, probability?: number): string {
-  switch (source) {
-    case 'revealed':
-      return 'revealed';
-    case 'guessed':
-      return probability === undefined ? 'guessed' : `guessed ${formatProbability(probability)}`;
-    case 'manual':
-      return 'manual';
-    case 'sheet':
-      return 'sheet';
-    default:
-      return 'unknown';
-  }
 }
 
 function formatFieldValue(field: PokemonFieldInfo): string {
@@ -99,7 +64,7 @@ function MetaTag({
         border: `1px solid ${sourceAccent(field.source)}`,
         boxShadow: 'inset 0 0 0 1px rgba(0,0,0,0.15)',
       }}
-      title={field.sourceDetail || sourceLabel(field.source, field.probability)}
+      title={field.sourceDetail || sourceLabel(field.source, field.probability, field.sourceDetail)}
     >
       {value}
       <span
@@ -110,7 +75,7 @@ function MetaTag({
           ...(background ? { background: 'rgba(0,0,0,0.45)', padding: '0 3px', borderRadius: 2 } : {}),
         }}
       >
-        {sourceLabel(field.source, field.probability)}
+        {sourceLabel(field.source, field.probability, field.sourceDetail)}
       </span>
     </span>
   );
@@ -164,11 +129,11 @@ function PokemonEntry({ poke, isRandomFormat }: { poke: RevealedPokemonInfo; isR
               border: `1px solid ${sourceAccent(poke.evs.source)}`,
               boxShadow: 'inset 0 0 0 1px rgba(0,0,0,0.15)',
             }}
-            title={poke.evs.sourceDetail || sourceLabel(poke.evs.source, poke.evs.probability)}
+            title={poke.evs.sourceDetail || sourceLabel(poke.evs.source, poke.evs.probability, poke.evs.sourceDetail)}
           >
             {formatEvs(poke.evs, isRandomFormat)}
             <span style={{ marginLeft: 6, color: sourceAccent(poke.evs.source), fontSize: 9, textTransform: 'uppercase' }}>
-              {sourceLabel(poke.evs.source, poke.evs.probability)}
+              {sourceLabel(poke.evs.source, poke.evs.probability, poke.evs.sourceDetail)}
             </span>
           </span>
           {poke.teraType.value && (
