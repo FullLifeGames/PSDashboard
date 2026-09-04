@@ -67,7 +67,7 @@ export const VERIFY_SAMPLES = 3;
 /** Verification budget: at most this many cell jobs per search. */
 const VERIFY_CELL_CAP = 12;
 /** Pooled visits from which a cell counts as rich for row completion. */
-export const ROW_RICH_VISITS = 50;
+const ROW_RICH_VISITS = 50;
 /** Mix weight from which an option counts as equilibrium support. */
 const SUPPORT_MIX = 0.05;
 
