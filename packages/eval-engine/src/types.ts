@@ -199,6 +199,8 @@ export interface EvalResult {
    * principle (648453 t13). Absent when empty or on sub-searches.
    */
   unanswered?: UnansweredProfile;
+  /** Round 35: the forced win proven from this root, when one stands at or above MIN_FORCED_MASS; the score already carries its bar. */
+  forcedWin?: ForcedWin;
 }
 
 /**
@@ -246,6 +248,65 @@ export interface NearDecidedSweep {
   /** Species of the standing enemy active the click removes. */
   removes: string;
 }
+
+export type ForcedWinCaveat = 'none' | 'barring-crit' | 'sampled-rolls';
+
+/** The heaviest open outcome class of the proven root cell, for the sentence (own side's event only). */
+export interface ForcedWinOpen {
+  side: 'p1' | 'p2';
+  moveId: string;
+  /** Display name of the move ("Fire Fang"). */
+  label: string;
+  /** Analytic share of the proven outcome of this event (0.95 = the hit lands). */
+  odds: number;
+  /** 'hit' when the open class is a miss, 'kill' when it is a survived hit. */
+  kind: 'hit' | 'kill';
+}
+
+/**
+ * Round 35: a forced win proven in the sim from the root: one own line
+ * against every reply, per outcome class. `mass` is the proven share of
+ * the outcome classes (a lower bound under the class model, caveat
+ * named); `turns` the deepest proven line in own moves. `engineScore`
+ * keeps the search's score before the bar. Present only at or above
+ * MIN_FORCED_MASS.
+ */
+export interface ForcedWin {
+  side: 'p1' | 'p2';
+  turns: number;
+  mass: number;
+  caveat: ForcedWinCaveat;
+  open?: ForcedWinOpen;
+  engineScore: number;
+  /** Prover states expanded (both side attempts). */
+  states: number;
+}
+
+/** Proofs below this mass change nothing (round 35). */
+export const MIN_FORCED_MASS = 0.5;
+/** Proofs at or above this mass are spoken (round 35). */
+export const SPOKEN_MASS = 0.9;
+
+/** What the prover needs from a finished search (main-thread safe). */
+export interface ForcedWinInput {
+  score: number;
+  unanswered?: UnansweredProfile;
+  rootOrder: { p1: string[]; p2: string[] };
+  tera?: TeraAllowance;
+  sleepClause?: boolean;
+}
+
+export interface ForcedWinProof {
+  mass: number;
+  turns: number;
+  caveat: ForcedWinCaveat;
+  open?: ForcedWinOpen;
+  /** p1-perspective static of the open root children, share-weighted; null without open root children. */
+  openValue: number | null;
+  states: number;
+}
+
+export interface ForcedWinOutcome { side: 'p1' | 'p2'; proof: ForcedWinProof }
 
 export interface UnansweredProfile {
   p1: string[];
@@ -393,7 +454,8 @@ export type EvalWorkerRequest =
   | { type: 'mctstree'; id: number; serializedBattle: string; settings: EvalSettings; seedOffset: number }
   | { type: 'choices'; id: number; serializedBattle: string; tera: TeraAllowance; keepPlayed?: EvalSettings['keepPlayed']; sleepClause?: boolean }
   | { type: 'cells'; id: number; serializedBattle: string; jobs: EvalCellJob[] }
-  | { type: 'subsearch'; id: number; serializedBattle: string; job: EvalSubSearchJob };
+  | { type: 'subsearch'; id: number; serializedBattle: string; job: EvalSubSearchJob }
+  | { type: 'prove'; id: number; serializedBattle: string; input: ForcedWinInput };
 
 export type EvalWorkerResponse =
   | { type: 'progress'; id: number; progress: SearchProgress }
@@ -402,4 +464,5 @@ export type EvalWorkerResponse =
   | { type: 'mctsTreeResult'; id: number; tree: MctsTreeStats }
   | { type: 'choicesResult'; id: number; info: EvalChoicesInfo }
   | { type: 'cellsResult'; id: number; values: EvalCellValue[] }
+  | { type: 'proveResult'; id: number; outcome: ForcedWinOutcome | null }
   | { type: 'error'; id: number; message: string };

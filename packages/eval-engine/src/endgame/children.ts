@@ -25,7 +25,14 @@ interface EndgameChild {
   /** Group key `${order}:${classKey}` on the class path; absent on the plain path. */
   key?: string;
 }
-export interface EndgameChildren { children: EndgameChild[]; unpriced: boolean; plain: boolean }
+export interface EndgameChildren {
+  children: EndgameChild[];
+  unpriced: boolean;
+  /** True when the plain (median) path ran. */
+  plain: boolean;
+  /** Plain path only: the draws disagreed on damage, faints, or the end (chance moved the cell). */
+  spread: boolean;
+}
 
 interface Draw { position: SimPosition; log: string[]; ended: boolean; measure: number; fainted: number }
 
@@ -147,7 +154,7 @@ function classChildren(
     const pick = nearestMean(grouped!.get(key)!);
     return { position: pick.position, weight: weight / weightTotal, share: weight, ended: pick.ended, key };
   });
-  return { children, unpriced: present.length < expected.size, plain: false };
+  return { children, unpriced: present.length < expected.size, plain: false, spread: false };
 }
 
 /** The plain path: the median of three draws for damaging pairs, one draw otherwise. */
@@ -156,7 +163,8 @@ function plainChildren(root: SimPosition, battle: Battle, rootHp: number, p1Choi
   const draws = SEARCH_SEEDS.slice(0, count).map(seed => drawChild(root, rootHp, p1Choice, p2Choice, seed));
   const pick = median(draws);
   const unpriced = draws.some(draw => draw.fainted !== draws[0].fainted || draw.ended !== draws[0].ended);
-  return { children: [{ position: pick.position, weight: 1, share: 1, ended: pick.ended }], unpriced, plain: true };
+  const spread = unpriced || draws.some(draw => draw.measure !== draws[0].measure);
+  return { children: [{ position: pick.position, weight: 1, share: 1, ended: pick.ended }], unpriced, plain: true, spread };
 }
 
 export function endgameChildren(root: SimPosition, p1Choice: string, p2Choice: string): EndgameChildren {
