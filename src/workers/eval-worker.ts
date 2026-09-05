@@ -3,7 +3,6 @@ import {
   mctsSearch, mctsTreeSearch, type SearchExecutor, createLocalExecutor, searchPosition, type EvalWorkerRequest,
   type EvalWorkerResponse,
 } from '@fulllifegames/eval-engine';
-import { handleReplayJob } from '../lib/replay-jobs/handlers';
 import { isReplayJob, type ReplayJobRequest, type ReplayJobResponse } from '../lib/replay-jobs/types';
 
 const scope = self as unknown as DedicatedWorkerGlobalScope;
@@ -29,8 +28,11 @@ function executorFor(serializedBattle: string): SearchExecutor {
 scope.onmessage = async (event: MessageEvent<EvalWorkerRequest | ReplayJobRequest>) => {
   const message = event.data;
   // The replay jobs (spread solve, reconstruction) ride the same script in
-  // their own worker instance — see ReplayWorkerClient.
+  // their own worker instance (ReplayWorkerClient). Their handlers load on
+  // demand: they carry replay-core's team builder, the standalone dex, and
+  // the learnsets, which the evaluation pool never needs.
   if (isReplayJob(message)) {
+    const { handleReplayJob } = await import('../lib/replay-jobs/handlers');
     await handleReplayJob(message, postReplay);
     return;
   }

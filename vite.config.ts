@@ -50,7 +50,16 @@ export default defineConfig({
   optimizeDeps: {
     include: ['@pkmn/client', '@pkmn/data', '@pkmn/dex', '@pkmn/sim', '@pkmn/smogon', '@smogon/calc'],
   },
+  /**
+   * ES-module workers so the worker build can code-split: the replay jobs
+   * (spread solve, reconstruction) reach replay-core's team builder and
+   * with it the standalone dex plus the learnsets. As an iife every dynamic
+   * import is inlined and the eval pool's script grew from 7 to 12 MB —
+   * parsed by every one of the 12 evaluation workers. As ES modules the
+   * replay handlers become a chunk only the replay worker instance loads.
+   */
   worker: {
+    format: 'es',
     rolldownOptions: { output: { keepNames: true } },
   },
 })
