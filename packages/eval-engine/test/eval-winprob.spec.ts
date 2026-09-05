@@ -48,6 +48,11 @@ test.describe('win probability mapping', () => {
     // Exact ±1 is an ENDED evaluation — a finished game displays finished.
     expect(winPercent(1)).toBe(100);
     expect(winPercent(-1)).toBe(0);
+    // An ended row weighted by an equilibrium mix keeps a one-bit rounding
+    // remnant (573756 t139: every reply to Stomping Tantrum ends at 1, the
+    // mix sums to 0.9999999999999999); that is still the finished game.
+    expect(winPercent(0.9999999999999999)).toBe(100);
+    expect(winPercent(-0.9999999999999999)).toBe(0);
     // Near-certain but NOT ended stays honestly below 100.
     expect(winPercent(0.999)).toBeLessThan(100);
     expect(winPercent(0.999)).toBeGreaterThan(80);

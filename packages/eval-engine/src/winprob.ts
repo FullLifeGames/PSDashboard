@@ -59,11 +59,16 @@ export const DISPLAY_K = 1.85;
  * Rounded percent for display: sigmoid(DISPLAY_K · score) over wp-unit
  * scores. Exact ±1 is an ENDED evaluation (only finished games reach it —
  * the leaf sigmoid saturates near but never at ±1), and a finished game
- * displays finished: literal 100/0.
+ * displays finished: literal 100/0. A row of ended cells weighted by an
+ * equilibrium mix keeps a one-bit rounding remnant (0.9999999999999999),
+ * which is still the finished game; ENDED_EPSILON absorbs it, far below
+ * anything an unfinished evaluation reaches.
  */
+const ENDED_EPSILON = 1e-9;
+
 export const winPercent = (score: number): number => {
-  if (score >= 1) return 100;
-  if (score <= -1) return 0;
+  if (score >= 1 - ENDED_EPSILON) return 100;
+  if (score <= -1 + ENDED_EPSILON) return 0;
   return Math.round(100 / (1 + Math.exp(-DISPLAY_K * score)));
 };
 
