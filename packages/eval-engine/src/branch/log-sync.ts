@@ -24,6 +24,18 @@ export function replaceLogWithReplayPrefix(log: string[], replayLog: string, tar
   log.splice(0, log.length, ...replayLogPrefixThroughTurn(replayLog, targetTurn));
 }
 
+/**
+ * The protocol log a reconstruction arriving at `targetTurn` hands to the
+ * branch: the replay's own lines through `|turn|N`, plus switch lines for
+ * actives the corrections repointed (the tail of finishReconstruction).
+ * An adopted position (round 38) rebuilds it from the same two steps.
+ */
+export function branchLogForPosition(replayLog: string, targetTurn: number, battle: SimBattle): string[] {
+  const log = replayLogPrefixThroughTurn(replayLog, targetTurn);
+  syncLogActivesFromBattle(log, battle, targetTurn);
+  return log;
+}
+
 interface LoggedActive {
   side: 'p1' | 'p2';
   activeSlot: number;

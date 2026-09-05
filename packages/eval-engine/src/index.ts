@@ -21,12 +21,12 @@ export type { BranchChoiceActive, BranchMoveModifier, BranchSlotChoice } from '.
 export {
   applyTargetCorrections, reconstructionReached, validateBranchRuntime, correctActivesFromProtocol,
   captureSerializedPosition, createBranchState, createBranchStateFromBattle, serializePreviewPosition,
-  annotateNicknames, executeBranchChoices, resolveSideChoices, reconstructBranchRuntime,
+  annotateNicknames, executeBranchChoices, resolveSideChoices, reconstructBranchRuntime, adoptSerializedRuntime,
 } from './branch-engine.ts';
 export type {
   BranchChoiceErrorLog, BranchExecuteResult, BranchFieldState, BranchMoveOption, BranchRuntime, BranchSimState,
   BranchSlotModifiers, BranchSwitchOption, BranchTargetOption, PokemonStatTable, SimPokemonInfo,
-  ResolvedSideCommand, ReconstructParams,
+  ResolvedSideCommand, ReconstructParams, AdoptParams,
 } from './branch-engine.ts';
 export type { BranchChoices } from './branch/types.ts';
 export { buildChoiceLockContext } from './choice-lock.ts';

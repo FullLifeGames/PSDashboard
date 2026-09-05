@@ -88,13 +88,23 @@ export function orderTeams(params: ReconstructParams): { orderedP1: PokemonSet[]
   return { orderedP1, orderedP2 };
 }
 
-/** The battle stream, its log and error pumps, and the guarded write. */
+/** The sim streams a runtime runs on: the battle stream, its log and error pumps, and the guarded write. */
+export type SessionStreams = Pick<
+  ReconstructionSession, 'battleStream' | 'streams' | 'collectedLog' | 'choiceErrors' | 'recordStreamError' | 'writeSim'
+>;
+
+/** Everything one reconstruction run shares between its stages. */
 export function openSession(params: ReconstructParams, overallDeadline: number): ReconstructionSession {
+  const haxAlignment: TurnAlignmentRecord[] = [];
+  return { params, ...openStreams(params.onLogLines), haxAlignment, overallDeadline, timedOut: false };
+}
+
+/** The battle stream, its log and error pumps, and the guarded write — shared with adopted positions. */
+export function openStreams(onLogLines?: (lines: string[]) => void): SessionStreams {
   const battleStream = new BattleStreams.BattleStream();
   const streams = BattleStreams.getPlayerStreams(battleStream);
   const collectedLog: string[] = [];
   const choiceErrors: BranchChoiceErrorLog = { count: 0, last: null };
-  const haxAlignment: TurnAlignmentRecord[] = [];
 
   // A sim crash (old-gen mods throw on odd states) rejects these detached
   // stream pumps — record it as a choice error so the turn-sync guard reacts
@@ -109,7 +119,7 @@ export function openSession(params: ReconstructParams, overallDeadline: number):
       for await (const chunk of streams.omniscient) {
         const lines = chunk.split('\n').filter(line => line.trim());
         collectedLog.push(...lines);
-        params.onLogLines?.(lines);
+        onLogLines?.(lines);
       }
     } catch (error) {
       recordStreamError(error);
@@ -138,12 +148,7 @@ export function openSession(params: ReconstructParams, overallDeadline: number):
   // turn-sync guard skips or stops instead of taking the process down.
   const writeSim = (payload: string) => safeStreamWrite(streams.omniscient, payload, recordStreamError);
 
-  return {
-    params, battleStream, streams, collectedLog, choiceErrors, haxAlignment,
-    overallDeadline,
-    timedOut: false,
-    recordStreamError, writeSim,
-  };
+  return { battleStream, streams, collectedLog, choiceErrors, recordStreamError, writeSim };
 }
 
 export async function waitForBattle(

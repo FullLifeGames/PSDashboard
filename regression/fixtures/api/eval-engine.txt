@@ -1,3 +1,4 @@
+type AdoptParams
 type AlignmentScore
 type AlignmentSummary
 type AnalyzeTurnParams
@@ -96,6 +97,7 @@ value PROVER_BUDGET
 value REGRET_THRESHOLD
 value SPOKEN_MASS
 value TIER_THRESHOLDS
+value adoptSerializedRuntime
 value allTurnEvents
 value analyzeLeads
 value analyzeTurn

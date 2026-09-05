@@ -14,6 +14,8 @@ export { annotateNicknames, executeBranchChoices, resolveSideChoices } from './b
 export type { ResolvedSideCommand } from './branch/execute.ts';
 export { reconstructBranchRuntime } from './branch/runtime.ts';
 export type { ReconstructParams } from './branch/runtime.ts';
+export { adoptSerializedRuntime } from './branch/adopt.ts';
+export type { AdoptParams } from './branch/adopt.ts';
 
 // @pkmn/sim's random-format rulesets reference Node's `global` object (e.g.
 // `global.Config?.potd` in rulesets), which doesn't exist in browsers and made

@@ -5,10 +5,10 @@
 export {
   applyTargetCorrections, reconstructionReached, validateBranchRuntime, correctActivesFromProtocol,
   captureSerializedPosition, createBranchState, createBranchStateFromBattle, serializePreviewPosition,
-  annotateNicknames, executeBranchChoices, resolveSideChoices, reconstructBranchRuntime,
+  annotateNicknames, executeBranchChoices, resolveSideChoices, reconstructBranchRuntime, adoptSerializedRuntime,
 } from '@fulllifegames/eval-engine';
 export type {
   BranchChoiceErrorLog, BranchExecuteResult, BranchFieldState, BranchMoveOption, BranchRuntime, BranchSimState,
   BranchSlotModifiers, BranchSwitchOption, BranchTargetOption, PokemonStatTable, SimPokemonInfo,
-  ResolvedSideCommand, ReconstructParams,
+  ResolvedSideCommand, ReconstructParams, AdoptParams,
 } from '@fulllifegames/eval-engine';
