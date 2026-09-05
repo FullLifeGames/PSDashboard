@@ -172,6 +172,13 @@ function correctHpFromSnapshot(battle: SimBattle, snapshot: TurnSnapshot) {
       );
 
       if (battlePokemon && snapshotPokemon.maxhp > 0) {
+        // The protocol reports only the actives. A benched body's snapshot
+        // HP is its last sighting: Regenerator's switch-out heal and a
+        // silent Natural Cure live only in the sim, whose active was
+        // corrected at every boundary before it left. The bench keeps the
+        // sim's HP, status and boosts; only a faint-state disagreement is
+        // resolved from the snapshot (round 40, 573756 Toxapex 70 % → 100 %).
+        if (!snapshotPokemon.isActive && battlePokemon.fainted === snapshotPokemon.fainted) continue;
         const ratio = snapshotPokemon.hpPercent / 100;
         battlePokemon.hp = Math.max(0, Math.round(ratio * battlePokemon.maxhp));
         battlePokemon.fainted = snapshotPokemon.fainted;
