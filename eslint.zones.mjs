@@ -38,6 +38,8 @@ export const importZones = [
       'Root specs import the packages by name (@fulllifegames/replay-core, @fulllifegames/eval-engine); only the measurement chains read package internals.'),
     ignores: ['regression/eval-calibration.spec.ts', 'regression/eval-fit.spec.ts', 'regression/endgame-truth.spec.ts'],
   },
+  zone(['ui/**/*.{ts,tsx}'], '^(\\.\\./)+packages/',
+    'The app suite imports components, hooks, and src/lib directly and the packages by name, never their files.'),
   zone(['src/lib/**/*.{ts,tsx}'], UI_LAYER,
     'Library code must not import the UI layer (hooks, components, App, workers).'),
   zone(['src/components/**/*.{ts,tsx}'], '(^|/)(hooks/branch|hooks/controller|hooks/evaluation)(/|$)',

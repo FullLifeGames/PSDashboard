@@ -25,8 +25,8 @@ const SCOPES = [
     targets: { 'max-lines': 300, 'max-lines-per-function': 60, complexity: 15 },
   },
   {
-    files: ['regression/**/*.ts', 'e2e/**/*.ts', 'e2e-feedback/**/*.ts', 'packages/*/test/**/*.ts'],
-    globs: ['regression/**/*.ts', 'e2e/**/*.ts', 'e2e-feedback/**/*.ts', 'packages/*/test/**/*.ts'],
+    files: ['regression/**/*.ts', 'e2e/**/*.ts', 'e2e-feedback/**/*.ts', 'packages/*/test/**/*.ts', 'ui/**/*.{ts,tsx}'],
+    globs: ['regression/**/*.ts', 'e2e/**/*.ts', 'e2e-feedback/**/*.ts', 'packages/*/test/**/*.ts', 'ui/**/*.{ts,tsx}'],
     targets: { 'max-lines': 600, 'max-lines-per-function': 300, complexity: 20 },
   },
 ];

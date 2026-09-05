@@ -38,7 +38,7 @@
     "README.md"
   ],
   "scripts": {
-    "test": "vitest run --config ../../vitest.config.ts --project replay-core"
+    "test": "vitest run --root ../.. --config vitest.config.ts --project replay-core"
   },
   "publishConfig": {
     "access": "public"

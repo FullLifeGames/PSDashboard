@@ -39,7 +39,7 @@
     "README.md"
   ],
   "scripts": {
-    "test": "vitest run --config ../../vitest.config.ts --project eval-engine"
+    "test": "vitest run --root ../.. --config vitest.config.ts --project eval-engine"
   },
   "publishConfig": {
     "access": "public"

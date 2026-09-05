@@ -41,7 +41,8 @@ export const ratchetBase = [
       "regression/**/*.ts",
       "e2e/**/*.ts",
       "e2e-feedback/**/*.ts",
-      "packages/*/test/**/*.ts"
+      "packages/*/test/**/*.ts",
+      "ui/**/*.{ts,tsx}"
     ],
     "rules": {
       "max-lines": [
