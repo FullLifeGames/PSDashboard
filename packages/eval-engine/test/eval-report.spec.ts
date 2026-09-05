@@ -351,6 +351,15 @@ test.describe('win-reason detection', () => {
     expect(report.conversion).toEqual({ kind: 'decided', turn: 2, species: 'Zapdos-Galar' });
   });
 
+  test('a one-turn forced win reads singular', () => {
+    const report = buildGameReport([
+      mk(1, 0.05, -0.3),
+      mk(2, -0.3, -0.5, { p2: { playedRaw: null, played: null, best: null, safe: null, regret: 0, forcedWin: { turns: 1, mass: 1, caveat: 'none', announce: true } } }),
+      mk(3, -0.5, -0.8),
+    ], names, 'p2');
+    expect(report.summary).toContain('every reply lost within 1 turn.');
+  });
+
   test('a forced win below the spoken mass stays silent', () => {
     const report = buildGameReport([
       mk(1, 0.05, -0.3),

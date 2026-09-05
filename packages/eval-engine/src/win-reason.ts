@@ -87,7 +87,7 @@ export function conversionFor(
       return {
         conversion: { kind: 'forced', turn: analysis.turn, provenTurns: forced.turns },
         sentence: `From turn ${analysis.turn} the win was forced — ` +
-          `every reply lost within ${forced.turns} turns${tail}.`,
+          `every reply lost within ${forced.turns} turn${forced.turns === 1 ? '' : 's'}${tail}.`,
       };
     }
     if (side.decided) {
