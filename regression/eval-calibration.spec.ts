@@ -895,12 +895,12 @@ import { summaryLines } from './calibration-summary';
  * CHOICE SCARF INFERENCE ROUND 2026-09-05 (improvement round 37 of the
  * perf-and-quality plan; spec
  * docs/superpowers/specs/2026-09-05-round-37-design.md; worktree r37 on
- * d8a2cb7, rebased onto master after round 38; 45073eb doubles orders +
- * copied actions / 2011fe9 cleanliness rules / a0c70a8 solver decisions /
- * 152905e builder, panel, cache v42 / f20d669 Pursuit-on-U-turn + Sleep Talk
- * after |cant| / 43a990f, 0391aa4, baef0c8 a Scarf that changed hands /
- * 77bb716 pre-solve decisions carried through a forfeited full solve /
- * f607353 EVALUATION.md). The parser reads every opposite-side pair of a
+ * d8a2cb7, rebased onto master after round 38; dd17225 doubles orders +
+ * copied actions / c51e2cf cleanliness rules / a985797 solver decisions /
+ * 430011c builder, panel, cache v42 / 8e5f8aa Pursuit-on-U-turn + Sleep Talk
+ * after |cant| / ca6bc8c, 8f707cd, 5389826 a Scarf that changed hands /
+ * 2d4b00a pre-solve decisions carried through a forfeited full solve /
+ * f5f20e0 EVALUATION.md). The parser reads every opposite-side pair of a
  * turn's movers as a race (doubles turns included), drops copied actions
  * (Dancer, Instruct, bounced or snatched status moves), a Pursuit fired at a
  * switch as first mover, a slot After You or Quash rearranged, and every
@@ -952,7 +952,7 @@ import { summaryLines } from './calibration-summary';
  * Landorus-Therian -> Choice Band, 912047 Chi-Yu -> Choice Specs), 45
  * changed sets in 31 replays (the rest are Speed spreads under new doubles
  * evidence or dropped singles orders); the app path (solveReplaySpreads)
- * agrees with the harness build since 77bb716.
+ * agrees with the harness build since 2d4b00a.
  * HAND CHECK: 8 of 9 Scarf-ins plausible against the log (573756 Magnezone;
  * Kyurem before Zamazenta; Gholdengo before Darkrai, Iron Moth, and
  * Ogerpon-Wellspring; Glimmora knocking out Dragapult before it acted;
@@ -968,7 +968,7 @@ import { summaryLines } from './calibration-summary';
  * against r37 140/135/152/115 s, inconsistent within each side; the full r37
  * run at 19:58 on a quiet machine read 66 s, the 65-67 s of rounds 31 to 35.
  * To be repeated on a quiet machine before the verdict is booked.
- * FEEDBACK: four runs (three on baef0c8, one on 77bb716) identical on every
+ * FEEDBACK: four runs (three on 5389826, one on 2d4b00a) identical on every
  * drift channel and every dump except the sensitivity probe's species label
  * (648453 t13 in one pair, 655336 in another; identical values, a labeling
  * race the base run shows too); no pinned channel moved. Against the base
@@ -983,12 +983,16 @@ import { summaryLines } from './calibration-summary';
  * Adamant; the eight booked golden channels change shape: t26 key moment
  * attributed p1-read instead of p2-decision, t27 shift gone, extra read
  * 26:p1).
- * VERDICT: AT THE USER GATE. The preregistered bank line is failed by one
- * game whose inferred set is right; the sets are demonstrably truer
- * (Magnezone, Darkrai, Typhlosion-Hisui, Chi-Yu, Landorus-Therian) and no
- * pinned channel moved. Options: adopt as built, or the plan's fallback
- * (SCARF_INFERENCE = false in speedKnowledgeFor, parser rules and doubles
- * evidence stay, cache stays v42).
+ * VERDICT: ADOPTED (user gate 2026-09-05 21:58). The preregistered bank line
+ * is failed by one game whose inferred set is right; the sets are
+ * demonstrably truer (Magnezone, Darkrai, Typhlosion-Hisui, Chi-Yu,
+ * Landorus-Therian) and no pinned channel moved. Registered follow-ups
+ * (NextSteps A.1, round-37 items): the engine's price of a Choice-locked
+ * cleaner, the Speed prior the ladder gives up once an order is explained,
+ * an item that changes hands as a per-span set state, and the cost
+ * measurement on a quiet machine. The branch was rebased onto master twice
+ * (round 38, then the Vitest migration); the hashes above are the final
+ * ones.
  *
  * FORCED-WIN PROVER ROUND 2026-09-04/05 (improvement round 35 of the perf-
  * and-quality plan; spec docs/superpowers/specs/2026-09-04-round-35-design.md;
