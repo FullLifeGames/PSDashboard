@@ -962,12 +962,13 @@ import { summaryLines } from './calibration-summary';
  * Kyurem, Landorus-Therian behind Landorus-Incarnate, doubles); 2663107495
  * Gholdengo keeps a Scarf on contradictory evidence (t1 before, t10 behind
  * Ogerpon-Wellspring) at its Hardy 60 Spe prior.
- * COST (573756 alone, base and r37 interleaved): no usable number. Four
- * interleaved runs at 20:16 and 20:44 ran under the second session's load
- * (six vitest workers plus vite, CPU 79-100%) and read base 90/119/101/126 s
- * against r37 140/135/152/115 s, inconsistent within each side; the full r37
- * run at 19:58 on a quiet machine read 66 s, the 65-67 s of rounds 31 to 35.
- * To be repeated on a quiet machine before the verdict is booked.
+ * COST (573756 alone, master e2f7fac and r37 4d63f2b interleaved on a quiet
+ * machine, 22:17): 51 s and 51 s, twice each (the first four interleaved
+ * runs at 20:16 and 20:44 had run under the second session's vitest load and
+ * read 90 to 152 s either way; no cost from the round). Four feedback runs
+ * on the final tree: regression 1044 passed on Vitest, feedback run 7
+ * byte-identical to round 2 including the sensitivity data, e2e 73 of 74
+ * with the known viewer-seeking flake (green alone).
  * FEEDBACK: four runs (three on 5389826, one on 2d4b00a) identical on every
  * drift channel and every dump except the sensitivity probe's species label
  * (648453 t13 in one pair, 655336 in another; identical values, a labeling
