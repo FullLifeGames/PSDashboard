@@ -10,6 +10,7 @@ import { decideScarfs, type SpeedKnowledgeMap } from './spreads/scarf.ts';
 
 export { evBudget, legalizeEvs } from './spreads/ev-budget.ts';
 export type { SpreadCandidate } from './spreads/ladder.ts';
+export type { SpeedKnowledge, SpeedKnowledgeMap } from './spreads/scarf.ts';
 
 /**
  * Damage-consistent spread inference: the replay's observed damage fractions

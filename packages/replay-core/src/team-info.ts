@@ -2,6 +2,7 @@ import { getSpeciesUsageSet } from './smogon/usage-lookup.ts';
 import type { SmogonUsageStats, UsageProbability, UsageSpread } from './smogon/stats-types.ts';
 import { getSpeciesSetAssumption, type SetAssumption, type SetSpreadAssumption, type SmogonSetAssumptions } from './smogon/sets-lookup.ts';
 import { applyCoherenceVetoes, selectCuratedSet, type MoveCandidate } from './set-coherence.ts';
+import type { SpreadCandidate } from './spreads/ladder.ts';
 import type { OpponentTeamInfo, PokemonEvs, PokemonEvsInfo, PokemonFieldInfo, PokemonMoveInfo, RevealedPokemonInfo } from './types.ts';
 import { toId } from './ids.ts';
 
@@ -41,16 +42,27 @@ export function manualMove(name: string): PokemonMoveInfo {
 
 /** Provenance label the stats panel shows for damage-solved spreads. */
 export const INFERRED_SPREAD_DETAIL = 'fits observed damage';
+/** Provenance details for items the move-order evidence decided (round 37). */
+export const INFERRED_ITEM_DETAIL = 'moved first, Choice Scarf inferred';
+export const RULED_OUT_ITEM_DETAIL = 'moved second, Choice Scarf ruled out';
+
+/** A guessed or unknown item gives way to the item the solver decided. */
+function overlayItem(pokemon: RevealedPokemonInfo, candidate: SpreadCandidate): PokemonFieldInfo {
+  const itemGuessed = pokemon.item.source === 'guessed' || pokemon.item.source === 'unknown';
+  if (!candidate.item || !itemGuessed) return pokemon.item;
+  return guessedField(candidate.item, undefined, candidate.itemReason === 'moved-first' ? INFERRED_ITEM_DETAIL : RULED_OUT_ITEM_DETAIL);
+}
 
 /**
- * Display overlay for damage-consistent spreads: mirrors the simulator
- * precedence (edited/revealed/sheet beat inference; inference beats usage
- * guesses), so what the panel shows is what the sim runs.
+ * Display overlay for damage-consistent spreads and the items the
+ * move-order evidence decided: mirrors the simulator precedence
+ * (edited/revealed/sheet beat inference; inference beats usage guesses),
+ * so what the panel shows is what the sim runs.
  */
 export function applyInferredSpreads(
   info: OpponentTeamInfo,
   side: 'p1' | 'p2',
-  inferred: Map<string, { evs: PokemonEvs; nature: string }> | null,
+  inferred: Map<string, SpreadCandidate> | null,
 ): OpponentTeamInfo {
   if (!inferred || inferred.size === 0) return info;
   return {
@@ -58,11 +70,13 @@ export function applyInferredSpreads(
     pokemon: info.pokemon.map(pokemon => {
       const candidate = inferred.get(`${side}:${toId(pokemon.species)}`);
       if (!candidate) return pokemon;
+      const item = overlayItem(pokemon, candidate);
       const evsGuessed = pokemon.evs.source === 'guessed' || pokemon.evs.source === 'unknown';
       const natureGuessed = !pokemon.nature || pokemon.nature.source === 'guessed' || pokemon.nature.source === 'unknown';
-      if (!evsGuessed) return pokemon;
+      if (!evsGuessed) return { ...pokemon, item };
       return {
         ...pokemon,
+        item,
         evs: guessedEvs({ ...candidate.evs }, undefined, INFERRED_SPREAD_DETAIL),
         ...(natureGuessed
           ? { nature: guessedField(candidate.nature, undefined, INFERRED_SPREAD_DETAIL) }

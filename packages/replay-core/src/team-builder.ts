@@ -7,13 +7,12 @@ import { getSpeciesSetAssumption, type SmogonSetAssumptions } from './smogon/set
 import { evBudget, inferSpreads, legalizeEvs, type SpreadCandidate } from './spread-inference.ts';
 import { withHiddenPowerType } from './hidden-power.ts';
 import {
-  assembleMoves, buildSheetSet, editedFields, findUserMatch, resolveAbility, resolveItem, resolveSpread, selectCuratedFor,
+  assembleMoves, buildSheetSet, editedFields, findUserMatch, resolveAbility, resolveItem, resolveItemWithout, resolveSpread,
+  selectCuratedFor, USAGE_MOVE_POOL,
 } from './team/set-resolvers.ts';
+import { resolveInferredItems, speedKnowledgeFor } from './team/inferred-items.ts';
 import type { DamageObservation, HiddenPowerEvidence, OpponentTeamInfo, RevealedPokemonInfo, SpeedOrderObservation } from './types.ts';
 import { toId } from './ids.ts';
-
-/** Usage-move candidates fetched per species — vetoes refill from the tail. */
-const USAGE_MOVE_POOL = 10;
 
 /**
  * Build PokemonSet arrays for both sides from a replay's protocol log.
@@ -40,14 +39,29 @@ export function buildTeamsFromReplay(
     /** Typeless-HP effectiveness readings — type evidence for the resolver. */
     hpEvidence?: HiddenPowerEvidence[];
   },
-): { p1Team: PokemonSet[]; p2Team: PokemonSet[] } {
-  const p1Info = options?.p1Info || inferOpponentTeam(log, 'p1');
-  const p2Info = options?.p2Info || inferOpponentTeam(log, 'p2');
-  const embeddedTeams = extractEmbeddedShowteamExports(log);
-  const userTeam = importedUserTeam(options?.userTeamText);
+): BuiltTeams {
+  return buildTeams(log, options).teams;
+}
 
-  const p1KnownTeam = userTeam || embeddedTeams.p1 || null;
-  const p2KnownTeam = embeddedTeams.p2 || null;
+type BuildOptions = Parameters<typeof buildTeamsFromReplay>[1];
+type BuiltTeams = { p1Team: PokemonSet[]; p2Team: PokemonSet[] };
+type SideInfos = { p1: OpponentTeamInfo; p2: OpponentTeamInfo };
+
+function infosFor(log: string, options: BuildOptions): SideInfos {
+  return { p1: options?.p1Info || inferOpponentTeam(log, 'p1'), p2: options?.p2Info || inferOpponentTeam(log, 'p2') };
+}
+
+/** The user's pasted team, else the sheets embedded in the log. */
+function knownTeamsFor(log: string, userTeamText: string | undefined): SideTeams {
+  const embeddedTeams = extractEmbeddedShowteamExports(log);
+  const userTeam = importedUserTeam(userTeamText);
+  return { p1: userTeam || embeddedTeams.p1 || null, p2: embeddedTeams.p2 || null };
+}
+
+/** The build plus the spreads it solved on the way (round 37: their item decisions ride into the app's solve). */
+function buildTeams(log: string, options: BuildOptions): { teams: BuiltTeams; inferred: Map<string, SpreadCandidate> | undefined } {
+  const infos = infosFor(log, options);
+  const knownTeams = knownTeamsFor(log, options?.userTeamText);
   const { gen, formatHint } = formatHintFor(log);
   // Pokémon Champions uses its own EV system (32 per stat, 66 total) —
   // standard-scale guesses/fallbacks must be clamped to the format budget.
@@ -58,20 +72,19 @@ export function buildTeamsFromReplay(
   const hpFor = (side: 'p1' | 'p2') =>
     (options?.hpEvidence ?? []).filter(entry => entry.attackerSide === side);
   const build = (inferred?: Map<string, SpreadCandidate>) => ({
-    p1Team: legalize(p1Info.pokemon.map(pokemon => buildSet(
-      pokemon, p1KnownTeam, options?.usageStats, options?.setAssumptions,
+    p1Team: legalize(infos.p1.pokemon.map(pokemon => buildSet(
+      pokemon, knownTeams.p1, options?.usageStats, options?.setAssumptions,
       inferred?.get(`p1:${toId(pokemon.species)}`))))
       .map(built => withHiddenPowerType(built, hpFor('p1'), options?.usageStats, parseInt(gen, 10))),
-    p2Team: legalize(p2Info.pokemon.map(pokemon => buildSet(
-      pokemon, p2KnownTeam, options?.usageStats, options?.setAssumptions,
+    p2Team: legalize(infos.p2.pokemon.map(pokemon => buildSet(
+      pokemon, knownTeams.p2, options?.usageStats, options?.setAssumptions,
       inferred?.get(`p2:${toId(pokemon.species)}`))))
       .map(built => withHiddenPowerType(built, hpFor('p2'), options?.usageStats, parseInt(gen, 10))),
   });
 
-  return build(inferredSpreadsFor(options, build, formatHint));
+  const inferred = inferredSpreadsFor(options, build, formatHint, infos, knownTeams);
+  return { teams: build(inferred), inferred };
 }
-
-type BuildOptions = Parameters<typeof buildTeamsFromReplay>[1];
 
 /** A pasted user team, when the text parses to at least one set. */
 function importedUserTeam(userTeamText: string | undefined): PokemonSet[] | null {
@@ -94,19 +107,23 @@ function hasSpreadEvidence(options: BuildOptions): boolean {
 /**
  * Precomputed spreads win; otherwise raw observations solve against a base
  * build (guesses first, then the solver, then the caller rebuilds with the
- * overlay).
+ * overlay). The solver's item decisions come back resolved to concrete
+ * items (round 37).
  */
 function inferredSpreadsFor(
   options: BuildOptions,
-  build: () => { p1Team: PokemonSet[]; p2Team: PokemonSet[] },
+  build: () => BuiltTeams,
   formatHint: string,
+  infos: SideInfos,
+  knownTeams: SideTeams,
 ): Map<string, SpreadCandidate> | undefined {
   const inferred = options?.inferredSpreads;
   if (inferred) return inferred;
   if (!hasSpreadEvidence(options)) return undefined;
   const base = build();
-  return inferSpreads(options?.observations ?? [], { p1: base.p1Team, p2: base.p2Team },
-    formatHint, options?.speedOrders ?? []);
+  const solved = inferSpreads(options?.observations ?? [], { p1: base.p1Team, p2: base.p2Team },
+    formatHint, options?.speedOrders ?? [], speedKnowledgeFor(infos, knownTeams, options?.usageStats));
+  return resolveInferredItems(solved, infos, options?.usageStats, options?.setAssumptions);
 }
 
 /**
@@ -121,11 +138,27 @@ export function solveReplaySpreads(
   observations: DamageObservation[],
   options?: Omit<NonNullable<Parameters<typeof buildTeamsFromReplay>[1]>, 'observations' | 'inferredSpreads'>,
 ): Map<string, SpreadCandidate> {
-  if (observations.length === 0 && (options?.speedOrders?.length ?? 0) === 0) return new Map();
-  const base = buildTeamsFromReplay(log, options);
-  const gen = log.match(/^\|gen\|(\d)/m)?.[1] ?? '9';
-  const formatHint = /^\|tier\|.*champions/im.test(log) ? `gen${gen}champions` : `gen${gen}`;
-  return inferSpreads(observations, { p1: base.p1Team, p2: base.p2Team }, formatHint, options?.speedOrders ?? []);
+  const { speedOrders = [], usageStats, setAssumptions, userTeamText } = options ?? {};
+  if (observations.length === 0 && speedOrders.length === 0) return new Map();
+  const infos = infosFor(log, options);
+  const { teams: base, inferred: preSolved } = buildTeams(log, { ...options, p1Info: infos.p1, p2Info: infos.p2 });
+  const solved = inferSpreads(observations, { p1: base.p1Team, p2: base.p2Team }, formatHintFor(log).formatHint,
+    speedOrders, speedKnowledgeFor(infos, knownTeamsFor(log, userTeamText), usageStats));
+  carryItemDecisions(solved, preSolved);
+  return resolveInferredItems(solved, infos, usageStats, setAssumptions);
+}
+
+/**
+ * The base build's speed-only solve already decided the items and built
+ * them into its sets, so the full solve sees them as set items; the
+ * decisions ride into the result from that pre-solve.
+ */
+function carryItemDecisions(solved: Map<string, SpreadCandidate>, preSolved: Map<string, SpreadCandidate> | undefined) {
+  for (const [key, candidate] of preSolved ?? []) {
+    if (candidate.item === undefined) continue;
+    const entry = solved.get(key) ?? candidate;
+    if (entry.item === undefined) solved.set(key, { ...entry, item: candidate.item, itemReason: candidate.itemReason });
+  }
 }
 
 function buildSet(
@@ -143,7 +176,11 @@ function buildSet(
   if (userMatch) return buildSheetSet(info, userMatch, edited, usageSet, smogonSet);
 
   const curated = selectCuratedFor(info, smogonSet, usageSet);
-  const item = resolveItem(info, curated, usageSet, smogonSet);
+  // A dropped Scarf ('' from the solver) resolves without it: the guessed
+  // Scarf must not return through the usage marginal (round 37).
+  const item = inferred?.item === ''
+    ? resolveItemWithout(info, usageStats, setAssumptions, 'choicescarf')
+    : resolveItem(info, curated, usageSet, smogonSet, inferred?.item ?? '');
   const moves = assembleMoves(info, curated, usageSet, smogonSet, item);
   const revealedMoves = info.moves.filter(move => move.source === 'revealed').map(move => move.name);
   const spread = resolveSpread(info.species, edited, inferred, curated, usageSet, smogonSet, revealedMoves);

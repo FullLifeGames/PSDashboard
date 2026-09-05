@@ -22,6 +22,8 @@ type SideSnapshot
 type SmogonSetAssumptions
 type SmogonUsageStats
 type SpeciesUsageSet
+type SpeedKnowledge
+type SpeedKnowledgeMap
 type SpeedOrderObservation
 type SpreadCandidate
 type StatId
@@ -30,7 +32,9 @@ type UsageProbability
 type UsageSpread
 value EMPTY_EVS
 value HP_TYPES
+value INFERRED_ITEM_DETAIL
 value INFERRED_SPREAD_DETAIL
+value RULED_OUT_ITEM_DETAIL
 value TERRAIN_BY_ID
 value WEATHER_BY_ID
 value alternativeItems

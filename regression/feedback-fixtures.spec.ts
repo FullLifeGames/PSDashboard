@@ -5,6 +5,7 @@ import { FEEDBACK_CORPUS, FEEDBACK_REPLAYS } from '../e2e-feedback/corpus';
 import { validateCorpus } from '../e2e-feedback/claims';
 import { parseReplayLogWithObservations, finalPlayedTurn, buildTeamsFromReplay } from '@fulllifegames/replay-core';
 import { fetchSmogonSetAssumptions } from '../src/lib/smogon-sets';
+import { fetchSmogonUsageStats } from '../src/lib/smogon-stats';
 
 /**
  * The committed feedback fixtures must stay parseable and long enough for
@@ -73,4 +74,20 @@ test('573756: the set fixtures feed the curated Toxapex and Corviknight sets', a
   expect(toxapex.evs.def).toBe(0);
   const corviknight = p1Team.find(set => set.species === 'Corviknight')!;
   expect([corviknight.evs.hp, corviknight.evs.def, corviknight.evs.spd]).toEqual([248, 136, 124]);
+});
+
+/**
+ * Round 37: 573756 t72, Magnezone (base 60) attacked before Garchomp. No
+ * legal Magnezone spread reaches a Garchomp's slowest common spread, so the
+ * solver gives it the Choice Scarf and the Timid 252 Speed that carries it.
+ */
+test('573756: Magnezone holds the Choice Scarf the move order proves', async () => {
+  const replay = JSON.parse(readFileSync(join('e2e-feedback', 'fixtures', 'smogtours-gen8ou-573756.json'), 'utf-8')) as { log: string };
+  const { observations, speedOrders } = parseReplayLogWithObservations(replay.log);
+  const usageStats = await fetchSmogonUsageStats('gen8ou', { fetcher: fixtureFetcher as never });
+  const { p1Team } = buildTeamsFromReplay(replay.log, { observations, speedOrders, usageStats });
+  const magnezone = p1Team.find(set => set.species === 'Magnezone')!;
+  expect(magnezone.item).toBe('Choice Scarf');
+  expect(magnezone.nature).toBe('Timid');
+  expect(magnezone.evs.spe).toBe(252);
 });

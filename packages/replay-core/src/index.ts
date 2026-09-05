@@ -30,11 +30,11 @@ export {
   sourceDetail, getSpeciesUsageStats, getSpeciesUsageSet, alternativeItems, guessedFieldFromUsage,
   fillUsageMoves,
 } from './smogon/usage-lookup.ts';
-export type { SpreadCandidate } from './spread-inference.ts';
+export type { SpeedKnowledge, SpeedKnowledgeMap, SpreadCandidate } from './spread-inference.ts';
 export { buildTeamsFromReplay, solveReplaySpreads, extractTeamSheets } from './team-builder.ts';
 export {
   manualField, manualEvs, manualMove, applyInferredSpreads, itemSetValue, enrichTeamInfo, enrichPokemonInfo,
-  unknownEvs, EMPTY_EVS, INFERRED_SPREAD_DETAIL,
+  unknownEvs, EMPTY_EVS, INFERRED_SPREAD_DETAIL, INFERRED_ITEM_DETAIL, RULED_OUT_ITEM_DETAIL,
 } from './team-info.ts';
 export { parseTeamText } from './team-parser.ts';
 export { parsePastedTeam, applyPastedTeam, countMatchingSpecies } from './team-paste.ts';

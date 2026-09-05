@@ -1,7 +1,8 @@
 import type { PokemonSet } from '@pkmn/sim';
 import { Dex } from '@pkmn/sim';
-import type { SpeciesUsageSet } from '../smogon/stats-types.ts';
-import { getSpeciesSetAssumption } from '../smogon/sets-lookup.ts';
+import type { SmogonUsageStats, SpeciesUsageSet } from '../smogon/stats-types.ts';
+import { getSpeciesSetAssumption, type SmogonSetAssumptions } from '../smogon/sets-lookup.ts';
+import { getSpeciesUsageSet } from '../smogon/usage-lookup.ts';
 import { applyCoherenceVetoes, selectCuratedSet, type MoveCandidate } from '../set-coherence.ts';
 import { itemSetValue } from '../team-info.ts';
 import type { SpreadCandidate } from '../spread-inference.ts';
@@ -10,6 +11,9 @@ import { toId } from '../ids.ts';
 
 type SmogonSet = ReturnType<typeof getSpeciesSetAssumption>;
 type CuratedSet = ReturnType<typeof selectCuratedSet>;
+
+/** Usage-move candidates fetched per species — vetoes refill from the tail. */
+export const USAGE_MOVE_POOL = 10;
 
 /** User-edited or in-game-revealed spread fields: they outrank every guess and every sheet. */
 export interface EditedFields {
@@ -126,10 +130,31 @@ export function selectCuratedFor(info: RevealedPokemonInfo, smogonSet: SmogonSet
   }) : null;
 }
 
-export function resolveItem(info: RevealedPokemonInfo, curated: CuratedSet | null, usageSet: SpeciesUsageSet | null, smogonSet: SmogonSet): string {
+/**
+ * Known beats everything; an item the move-order evidence inferred (round
+ * 37) beats the curated set and the usage marginal.
+ */
+export function resolveItem(
+  info: RevealedPokemonInfo, curated: CuratedSet | null, usageSet: SpeciesUsageSet | null, smogonSet: SmogonSet, inferredItem = '',
+): string {
   const curatedItem = curated ? allowed(curated.item?.value, info.ruledOut?.items) : '';
-  return cleanItem(known(info.item), curatedItem) ||
+  return itemSetValue(known(info.item)) || itemSetValue(inferredItem) || curatedItem ||
     cleanItem(info.item.value, usageSet?.item?.value || allowed(smogonSet?.item?.value, info.ruledOut?.items));
+}
+
+/** The item the build would pick if `excludedItemId` were ruled out (round 37: the replacement for a dropped Scarf). */
+export function resolveItemWithout(
+  info: RevealedPokemonInfo, usageStats: SmogonUsageStats | null | undefined, setAssumptions: SmogonSetAssumptions | null | undefined,
+  excludedItemId: string,
+): string {
+  const ruledOut = { abilities: info.ruledOut?.abilities ?? [], items: [...(info.ruledOut?.items ?? []), excludedItemId] };
+  const stripped: RevealedPokemonInfo = {
+    ...info, ruledOut,
+    item: known(info.item) ? info.item : { value: '', source: 'unknown' },
+  };
+  const usageSet = getSpeciesUsageSet(usageStats, info.species, ruledOut, USAGE_MOVE_POOL);
+  const smogonSet = getSpeciesSetAssumption(setAssumptions, info.species);
+  return resolveItem(stripped, selectCuratedFor(stripped, smogonSet, usageSet), usageSet, smogonSet);
 }
 
 /**
