@@ -3,11 +3,15 @@ import type { PokemonSet } from '@pkmn/sim';
 import { type DamageObservation, type ReplayData, type TurnSnapshot, getBranchSimulatorFormat } from '@fulllifegames/replay-core';
 import type { BranchRuntime, ReconstructParams, TurnAlignmentRecord } from '@fulllifegames/eval-engine';
 import { buildReplayTeams, type TeamBuildSources } from '../lib/eval-acquire';
+import { throttleLatest } from '../lib/eval/throttle-latest';
 import type { ReplayWorkerClient } from '../lib/replay-jobs/client';
 import type { ReconstructJob, ReconstructOutcome } from '../lib/replay-jobs/types';
 
 type Report = (turn: number, target: number) => void;
 type Teams = { p1Team: PokemonSet[]; p2Team: PokemonSet[] };
+
+/** A streamed sweep pass stores one position per message; the pickers repaint at most this often. */
+const VERSION_REPAINT_MS = 100;
 
 /**
  * The exact store's API. Render-stable on purpose: the acquisitions built
@@ -48,6 +52,9 @@ function useExactPositions(replayData: ReplayData | null, setsFingerprint: strin
     smogonPendingRef.current = smogonPending;
   }, [smogonPending]);
   const [exactPositionsVersion, setExactPositionsVersion] = useState(0);
+  const [bumpVersion] = useState(() =>
+    throttleLatest<null>(() => setExactPositionsVersion(version => version + 1), VERSION_REPAINT_MS));
+  useEffect(() => () => bumpVersion.cancel(), [bumpVersion]);
   const store = useCallback(() => {
     if (storeRef.current.identity !== storeIdentity) {
       storeRef.current = { identity: storeIdentity, positions: new Map(), failed: new Set() };
@@ -64,7 +71,7 @@ function useExactPositions(replayData: ReplayData | null, setsFingerprint: strin
       const key = exactKeyFor(turn);
       if (!key || smogonPendingRef.current || store().positions.get(key) === serialized) return;
       store().positions.set(key, serialized);
-      setExactPositionsVersion(version => version + 1);
+      bumpVersion.push(null);
     },
     getExact: turn => {
       const key = exactKeyFor(turn);
@@ -73,7 +80,7 @@ function useExactPositions(replayData: ReplayData | null, setsFingerprint: strin
     hasStored: key => store().positions.has(key),
     hasFailed: key => store().failed.has(key),
     markFailed: key => { store().failed.add(key); },
-  }), [exactKeyFor, store]);
+  }), [exactKeyFor, store, bumpVersion]);
   return { exact, exactPositionsVersion };
 }
 
