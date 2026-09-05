@@ -138,7 +138,11 @@ export interface StoredEval {
 // v42: round 37, a Choice Scarf inferred or dropped from move orders no
 //      plausible spread reproduces, and speed evidence in doubles. Sets
 //      move wherever an order decided an item or a doubles turn proved one.
-const EVAL_ENGINE_CACHE_VERSION = 42;
+// v43: round 40, the log's maximum HP pins the HP EVs, a move order the
+//      prior satisfies keeps its Speed, benched bodies keep the sim's HP
+//      (Regenerator), and a death after the mon's own miss is no sack.
+//      Sets and positions move in every server-log replay.
+const EVAL_ENGINE_CACHE_VERSION = 43;
 
 export function evalStoreKey(
   cacheKey: string,
