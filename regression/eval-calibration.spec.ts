@@ -892,6 +892,104 @@ import { summaryLines } from './calibration-summary';
  * static basis for this mass; the next lever, if any, is search/
  * planning-side.
  *
+ * CHOICE SCARF INFERENCE ROUND 2026-09-05 (improvement round 37 of the
+ * perf-and-quality plan; spec
+ * docs/superpowers/specs/2026-09-05-round-37-design.md; worktree r37 on
+ * d8a2cb7, rebased onto master after round 38; 45073eb doubles orders +
+ * copied actions / 2011fe9 cleanliness rules / a0c70a8 solver decisions /
+ * 152905e builder, panel, cache v42 / f20d669 Pursuit-on-U-turn + Sleep Talk
+ * after |cant| / 43a990f, 0391aa4, baef0c8 a Scarf that changed hands /
+ * 77bb716 pre-solve decisions carried through a forfeited full solve /
+ * f607353 EVALUATION.md). The parser reads every opposite-side pair of a
+ * turn's movers as a race (doubles turns included), drops copied actions
+ * (Dancer, Instruct, bounced or snatched status moves), a Pursuit fired at a
+ * switch as first mover, a slot After You or Quash rearranged, and every
+ * order that something other than Speed explains: Prankster status moves,
+ * Gale Wings at full HP, Triage heals, Grassy Glide on its terrain, a Quick
+ * Claw, Quick Draw, or Custap Berry that fired, a weather or terrain ability
+ * the species can carry unless the protocol revealed another, Unburden after
+ * a lost item, Stall and Mycelium Might moving last, and the races a mon
+ * lost while its Choice Scarf differed from the set's (Knock Off, Trick).
+ * The spread solver reads an order the first mover cannot reach at full
+ * Speed against every plausible spread of the second (usage spreads with >=
+ * 5% share, thinned to the tempo camp at 80%, or the known spread) as a
+ * Choice Scarf on the first mover when the Scarf closes the gap and the
+ * species runs Speed-invested spreads, and drops a guessed Scarf whose
+ * holder would then be faster than an observed order allows; known items,
+ * sheet sets, and ruled-out Choice items are never touched. The builder
+ * carries the decision into the set (a dropped Scarf resolves to the next
+ * usage item), the panel shows "inferred" (detail "moved first, Choice Scarf
+ * inferred") or the guess with "moved second, Choice Scarf ruled out", and
+ * the sensitivity probes skip an inferred Scarf.
+ * EVIDENCE (fit corpus, 2128 replays, base against r37): singles orders
+ * 20233 -> 19606 (792 dropped: weather ability 205, Prankster 102, Unburden
+ * 71, Gale Wings 43, Grassy Glide 39, Triage 25, Custap 19, Pursuit
+ * knock-outs on a switching target 13, Stall/Mycelium 6, Surge Surfer 4,
+ * Quick Claw 2, Magic Bounce copies 2, a traced Chlorophyll 1, races lost
+ * after a Scarf change 260; 165 Sleep-Talk-first pairs gained), doubles 0 ->
+ * 3794 in 626 replays. The design probe's false-order counter fell 178 ->
+ * 10, and those ten are the probe's own coarseness (no HP check for Gale
+ * Wings, no item-loss check for Unburden, a traced Adaptability the client
+ * knows).
+ * BANK (auto, 816 against 814, paired against r37-a = d8a2cb7): full late
+ * brier 0.1562 -> 0.1585; hq (paired, n=546) sign 54/64/77 -> 53/63/77,
+ * brier 0.2561/0.2164/0.1674 -> 0.2570/0.2166/0.1699 (late +25 bp against
+ * the preregistered +10 bp: FAILED); luck-adjusted late 0.1487 -> 0.1503
+ * (+16 bp, failed); sign late 80 = 80 full and 77 = 77 hq; 148 positions in
+ * 33 replays moved (singles 100, doubles 48), 3 sign flips. Attribution
+ * (fixed K 1.76): one game, smogtours-gen9ou-750540, carries +0.238 of the
+ * +0.364 late-hq sum (t18 0.11 -> 0.58 toward the loser); its inferred Scarf
+ * on Darkrai is right (t13 knock-out on Deoxys-Speed before it acted,
+ * unreachable without a Scarf; the real Darkrai used one move per stay) and
+ * the engine prices the Choice-locked cleaner worse than the wrong Life Orb
+ * set. Without it +0.126 over small items (749601 +0.052, 938644 +0.035,
+ * 752755 +0.027 with Grimmsnarl at 252 -> 0 Spe under the Prankster rule,
+ * 914633 +0.020, 750953 +0.018, against 751543 -0.036); the large gains sit
+ * in std doubles (2663100395 -0.088, 2660818097 -0.079).
+ * DECISIONS (bank universe, 133 replays with evidence): 10 item decisions in
+ * the 33 moved replays (8 Scarf-in: 750540 Darkrai, 750953 Typhlosion-Hisui,
+ * 2658665571 Kyurem, four Gholdengo, 751244 Glimmora; 2 Scarf-out: 914633
+ * Landorus-Therian -> Choice Band, 912047 Chi-Yu -> Choice Specs), 45
+ * changed sets in 31 replays (the rest are Speed spreads under new doubles
+ * evidence or dropped singles orders); the app path (solveReplaySpreads)
+ * agrees with the harness build since 77bb716.
+ * HAND CHECK: 8 of 9 Scarf-ins plausible against the log (573756 Magnezone;
+ * Kyurem before Zamazenta; Gholdengo before Darkrai, Iron Moth, and
+ * Ogerpon-Wellspring; Glimmora knocking out Dragapult before it acted;
+ * Typhlosion-Hisui before Ogerpon-Wellspring), one wrong (939635 Landorus:
+ * Zapdos-Galar had lost its Scarf to Knock Off the same turn), which became
+ * the changed-hands rule; both Scarf-outs right (Chi-Yu behind Sneasler and
+ * Kyurem, Landorus-Therian behind Landorus-Incarnate, doubles); 2663107495
+ * Gholdengo keeps a Scarf on contradictory evidence (t1 before, t10 behind
+ * Ogerpon-Wellspring) at its Hardy 60 Spe prior.
+ * COST (573756 alone, base and r37 interleaved): no usable number. Four
+ * interleaved runs at 20:16 and 20:44 ran under the second session's load
+ * (six vitest workers plus vite, CPU 79-100%) and read base 90/119/101/126 s
+ * against r37 140/135/152/115 s, inconsistent within each side; the full r37
+ * run at 19:58 on a quiet machine read 66 s, the 65-67 s of rounds 31 to 35.
+ * To be repeated on a quiet machine before the verdict is booked.
+ * FEEDBACK: four runs (three on baef0c8, one on 77bb716) identical on every
+ * drift channel and every dump except the sensitivity probe's species label
+ * (648453 t13 in one pair, 655336 in another; identical values, a labeling
+ * race the base run shows too); no pinned channel moved. Against the base
+ * three dumps move: 573756 (turns 1-73, the Scarf Magnezone counts from turn
+ * 1; t72 Flash Cannon regret 0.14 -> 0; but Garchomp falls to 252 HP/252
+ * Atk/4 Spe once the t72 order is explained, the t73 hit child prices -0.46
+ * instead of near -1 and the denied-early-end sentence drops; the log's 409
+ * HP put the real Garchomp near 208 HP EVs, so at most 48 Spe EVs, 277
+ * Jolly, under Kyurem), 648453 (all 35 turns, report fields, cause open),
+ * and 655336 (golden: Latias tricks its Scarf onto Bisharp, the
+ * changed-hands rule drops t5, Latias becomes Timid 248 HP and Bisharp
+ * Adamant; the eight booked golden channels change shape: t26 key moment
+ * attributed p1-read instead of p2-decision, t27 shift gone, extra read
+ * 26:p1).
+ * VERDICT: AT THE USER GATE. The preregistered bank line is failed by one
+ * game whose inferred set is right; the sets are demonstrably truer
+ * (Magnezone, Darkrai, Typhlosion-Hisui, Chi-Yu, Landorus-Therian) and no
+ * pinned channel moved. Options: adopt as built, or the plan's fallback
+ * (SCARF_INFERENCE = false in speedKnowledgeFor, parser rules and doubles
+ * evidence stay, cache stays v42).
+ *
  * FORCED-WIN PROVER ROUND 2026-09-04/05 (improvement round 35 of the perf-
  * and-quality plan; spec docs/superpowers/specs/2026-09-04-round-35-design.md;
  * ac3c708 class shares / 2dbf677 prover / a1e7022 trigger and bar /
