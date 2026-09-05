@@ -1,6 +1,9 @@
-import { playedSetupMove, type SideAnalysis, type TurnAnalysis, type VerdictTier } from './analysis.ts';
+import type { SideAnalysis, TurnAnalysis, VerdictTier } from './analysis.ts';
 import { KEY_TURN_SWING } from './graph.ts';
-import { koPhrase, phrase } from './prose/phrases.ts';
+import {
+  LUCK_TOTAL_THRESHOLD, badTier, closeGameFallback, conversionFor, matchupClause, momentScore, seedPhrase,
+  seedsOfTheLoss, tipClause, winPathFor, type WinConversion, type WinPath, type WinPathResult,
+} from './win-reason.ts';
 import { winDeltaText, winPercent } from './winprob.ts';
 import { sideIndex } from '@fulllifegames/replay-core';
 
@@ -77,6 +80,10 @@ export interface GameReport {
    * luck. Kept out of `chanceTotal` and the key moments (573756 t138).
    */
   resolutionTotal: number;
+  /** How the winner sealed it: the first proven forced win or decided sweep. Absent without a signal. */
+  conversion?: WinConversion;
+  /** The dominant edge the summary credits the win to ('close' = the fallback sentence). Absent when the seeds tell the story or no winner is known. */
+  winPath?: WinPath;
   summary: string;
 }
 
@@ -175,15 +182,7 @@ function resolutionTurns(known: TurnAnalysis[], boundary: number | null, winner:
     .map(analysis => analysis.turn));
 }
 
-/**
- * A turn ranks by its biggest COMPONENT, not its net: the game's biggest
- * roll can net to almost nothing when the decision delta pushes the other
- * way (573756 t73: chance +0.43 on a net of +0.18), and a selection keyed
- * on the net alone never surfaces it. Resolution turns stay excluded.
- */
-const momentScore = (analysis: TurnAnalysis): number =>
-  Math.max(Math.abs(analysis.swing ?? 0), Math.abs(analysis.chanceDelta ?? 0));
-
+/** Selection by the biggest component (momentScore, win-reason.ts); resolution turns stay excluded. */
 function keyMomentsFor(known: TurnAnalysis[], resolution: Set<number>): TurnAnalysis[] {
   return known
     .filter(analysis => analysis.attribution !== 'quiet' && analysis.swing !== null &&
@@ -192,8 +191,6 @@ function keyMomentsFor(known: TurnAnalysis[], resolution: Set<number>): TurnAnal
     .slice(0, REPORT_KEY_MOMENTS)
     .sort((a, b) => a.turn - b.turn);
 }
-
-const badTier = (side: SideAnalysis) => side.tier === 'mistake' || side.tier === 'blunder';
 
 /**
  * Selected PER SIDE — a global top list lets one player's numbers (often
@@ -251,32 +248,39 @@ function gameTotals(
   return { decisionTotals, chanceTotal, resolutionTotal };
 }
 
-/**
- * The loser's two biggest punished misplays up to the turning point. An
- * unpunished risk cost nothing — it cannot have seeded the loss; a
- * deliberate low-cost sack likewise.
- */
-function seedsOfTheLoss(known: TurnAnalysis[], loser: Side, turningPoint: number | null): TurnAnalysis[] {
-  return known
-    .filter(analysis => (turningPoint === null || analysis.turn <= turningPoint) &&
-      badTier(analysis[loser]) && analysis[loser].played && analysis[loser].best &&
-      !analysis[loser].riskUnpunished && !analysis[loser].sacrifice)
-    .sort((a, b) => (b[loser].regret ?? 0) - (a[loser].regret ?? 0))
-    .slice(0, 2)
-    .sort((a, b) => a.turn - b.turn);
+/** The winner-side pieces of the story (win-reason.ts), resolved once for the summary and the report fields. */
+interface WinStory {
+  seeds: TurnAnalysis[];
+  conversion: ReturnType<typeof conversionFor>;
+  path: WinPathResult | null;
 }
 
-/** One seed, as "turn N (played, regret — safer was better)"; the played move's analytic odds ground the claim (round 6). */
-function seedPhrase(analysis: TurnAnalysis, loser: Side): string {
-  const side = analysis[loser];
-  const setup = playedSetupMove(side) ? '; a setup move the engine may undervalue' : '';
-  const better = side.bestNull?.alternative?.label ?? side.best!.label;
-  const oddsBit = side.played!.koOdds ? ` (${koPhrase(side.played!.koOdds)})` : '';
-  return `turn ${analysis.turn} (${phrase(side.played!.label)}${oddsBit}, ` +
-    `${winDeltaText(-(side.regret ?? 0))} — safer was ${phrase(better)}${setup})`;
+function winStoryFor(args: {
+  known: TurnAnalysis[];
+  series: (number | undefined)[];
+  boundary: number | null;
+  playerNames: [string, string];
+  winner: Side;
+  turningPoint: number | null;
+  playedTracking: boolean;
+  chanceTotal: number;
+}): WinStory {
+  const { known, winner, turningPoint, playedTracking } = args;
+  const loser = winner === 'p1' ? 'p2' : 'p1';
+  const seeds = !playedTracking ? [] : seedsOfTheLoss(known, loser, turningPoint);
+  const conversion = conversionFor(known, winner, args.playerNames);
+  const path = winPathFor({
+    known, series: args.series, boundary: args.boundary, winner, playerNames: args.playerNames,
+    chanceTotal: args.chanceTotal, playedTracking, seedsSpoken: seeds.length > 0,
+  });
+  // Nothing else explained a tipped game: say so instead of saying nothing.
+  if (!path && !conversion && seeds.length === 0 && turningPoint !== null) {
+    return { seeds, conversion, path: closeGameFallback(args.playerNames[sideIndex(winner)]) };
+  }
+  return { seeds, conversion, path };
 }
 
-/** The winner's story: who won, when it tipped, and the seeds of the loss (or the loser's clean play). */
+/** The winner's story: who won, when and how it tipped, the conversion, the seeds (or clean play), and the winning edge. */
 function winnerSentences(
   known: TurnAnalysis[],
   playerNames: [string, string],
@@ -284,22 +288,30 @@ function winnerSentences(
   turningPoint: number | null,
   playedTracking: boolean,
   decisionTotals: { p1: number; p2: number },
+  story: WinStory,
+  series: (number | undefined)[],
 ): string[] {
+  const winnerName = playerNames[sideIndex(winner)];
   const sentences: string[] = [];
-  sentences.push(`${playerNames[sideIndex(winner)]} won.`);
+  sentences.push(`${winnerName} won.`);
   sentences.push(turningPoint !== null
-    ? `The game tipped for good on turn ${turningPoint}.`
-    : `${playerNames[sideIndex(winner)]} led from start to finish.`);
+    ? `The game tipped for good on turn ${turningPoint}${tipClause(known, winner, winnerName, turningPoint)}.`
+    : `${winnerName} led from start to finish${matchupClause(series, winner)}.`);
+  if (story.conversion) sentences.push(story.conversion.sentence);
 
   const loser = winner === 'p1' ? 'p2' : 'p1';
   const loserName = playerNames[sideIndex(loser)];
-  const seeds = !playedTracking ? [] : seedsOfTheLoss(known, loser, turningPoint);
-  if (seeds.length > 0) {
-    const parts = seeds.map(analysis => seedPhrase(analysis, loser));
+  if (story.seeds.length > 0) {
+    const parts = story.seeds.map(analysis => seedPhrase(analysis, loser));
     sentences.push(`The seeds of the loss: ${parts.join(' and ')}.`);
   } else if (playedTracking && decisionTotals[loser] < CLEAN_PLAY_TOTAL) {
-    sentences.push(`${loserName}'s play was clean — the loss came from matchup and variance, not blunders.`);
+    // With a win-path sentence following, the explaining is its job — the
+    // clean line keeps the praise and drops its matchup-and-variance tail.
+    sentences.push(story.path
+      ? `${loserName}'s play was clean.`
+      : `${loserName}'s play was clean — the loss came from matchup and variance, not blunders.`);
   }
+  if (story.path) sentences.push(story.path.sentence);
   return sentences;
 }
 
@@ -312,15 +324,17 @@ function reportSummary(
   playedTracking: boolean,
   decisionTotals: { p1: number; p2: number },
   chanceTotal: number,
+  story: WinStory | null,
+  series: (number | undefined)[],
 ): string {
   const sentences: string[] = [];
-  if (winner) {
-    sentences.push(...winnerSentences(known, playerNames, winner, turningPoint, playedTracking, decisionTotals));
+  if (winner && story) {
+    sentences.push(...winnerSentences(known, playerNames, winner, turningPoint, playedTracking, decisionTotals, story, series));
   } else if (known.length > 0) {
     sentences.push('No winner recorded — the game may be unfinished.');
   }
 
-  if (Math.abs(chanceTotal) >= 0.25) {
+  if (!story?.path?.foldLuck && Math.abs(chanceTotal) >= LUCK_TOTAL_THRESHOLD) {
     sentences.push(`Luck ran ${chanceTotal > 0 ? 'for' : 'against'} ${playerNames[0]} overall (${winDeltaText(chanceTotal)}).`);
   }
   return sentences.join(' ');
@@ -351,10 +365,15 @@ export function buildGameReport(
 
   // The play that produced the boundary score happened on the turn before.
   const turningPoint = boundary !== null && boundary > 1 ? boundary - 1 : null;
-  const summary = reportSummary(known, playerNames, winner, turningPoint, playedTracking, decisionTotals, chanceTotal);
+  const story = winner === null ? null : winStoryFor({
+    known, series, boundary, playerNames, winner, turningPoint, playedTracking, chanceTotal,
+  });
+  const summary = reportSummary(known, playerNames, winner, turningPoint, playedTracking, decisionTotals, chanceTotal, story, series);
 
   return {
     winner, turningPoint, keyMoments, misplays, reads, tracked: playedTracking,
     accuracy, decisionTotals, chanceTotal, resolutionTotal, summary,
+    ...(story?.conversion ? { conversion: story.conversion.conversion } : {}),
+    ...(story?.path ? { winPath: story.path.winPath } : {}),
   };
 }

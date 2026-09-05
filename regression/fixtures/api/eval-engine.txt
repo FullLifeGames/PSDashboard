@@ -83,6 +83,8 @@ type TurnSensitivity
 type TurnVerification
 type UnansweredProfile
 type VerdictTier
+type WinConversion
+type WinPath
 value AUTO_MCTS_FAINTED_FRACTION
 value ENDGAME_CAPS
 value ENDGAME_MAX_BODIES
