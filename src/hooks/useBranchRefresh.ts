@@ -6,6 +6,7 @@ import type { BranchSlotChoice } from '@fulllifegames/eval-engine';
 import { snapshotAt, type TeamBuildSources } from '../lib/eval-acquire';
 import { prepareBranchInputs } from '../lib/branch-build';
 import type { BranchHistoryEntry, useBranch } from './useBranch';
+import type { AcquireRuntime } from './branch/session';
 import type { BranchSession } from './useDeviation';
 
 type Branch = ReturnType<typeof useBranch>;
@@ -27,6 +28,7 @@ interface RefreshContext {
   bringOnly?: { p1: string[]; p2: string[] };
   session: BranchSession;
   startBranch: Branch['startBranch'];
+  acquireRuntime: AcquireRuntime;
   branchWindowOpenRef: MutableRefObject<boolean>;
   isCancelled: () => boolean;
   clearRequest: () => void;
@@ -53,6 +55,7 @@ async function runRefresh(ctx: RefreshContext, request: BranchRefreshRequest) {
         snapshotFor: turn => snapshotAt(ctx.snapshots, turn),
         choiceLocks: inputs.choiceLocks,
         bringOnly: ctx.bringOnly,
+        acquireRuntime: ctx.acquireRuntime,
       });
       if (!abortController.signal.aborted) {
         ctx.branchWindowOpenRef.current = true;
@@ -80,6 +83,7 @@ export function useBranchRefresh(args: {
   branching: boolean;
   variationStartTurn: number | null;
   startBranch: Branch['startBranch'];
+  acquireRuntime: AcquireRuntime;
   viewTurn: number;
   session: BranchSession;
   branchWindowOpenRef: MutableRefObject<boolean>;
@@ -88,7 +92,7 @@ export function useBranchRefresh(args: {
 }) {
   const {
     replayData, snapshots, observations, sources, bringOnlyLists, branching, variationStartTurn,
-    startBranch, viewTurn, session, branchWindowOpenRef, request, clearRequest,
+    startBranch, acquireRuntime, viewTurn, session, branchWindowOpenRef, request, clearRequest,
   } = args;
   useEffect(() => {
     if (!request || !replayData) return;
@@ -99,7 +103,7 @@ export function useBranchRefresh(args: {
       // Bring-limited replays keep their trim through team-edit refreshes
       // too (a T0 variation re-seeds it from its lead entry).
       bringOnly: refreshTurn > 0 ? bringOnlyLists ?? undefined : undefined,
-      session, startBranch, branchWindowOpenRef,
+      session, startBranch, acquireRuntime, branchWindowOpenRef,
       isCancelled: () => cancelled,
       clearRequest,
     }, request);
@@ -108,6 +112,6 @@ export function useBranchRefresh(args: {
     };
   }, [
     request, replayData, snapshots, observations, sources, bringOnlyLists, branching,
-    variationStartTurn, startBranch, viewTurn, session, branchWindowOpenRef, clearRequest,
+    variationStartTurn, startBranch, acquireRuntime, viewTurn, session, branchWindowOpenRef, clearRequest,
   ]);
 }

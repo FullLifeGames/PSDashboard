@@ -8,6 +8,7 @@ import { snapshotAt, type TeamBuildSources } from '../lib/eval-acquire';
 import { divergenceNoticeFor, keptHistorySlice, prepareBranchInputs } from '../lib/branch-build';
 import { buildLeadOptions, defaultLeadSelectionFor } from '../lib/lead-options';
 import type { BranchHistoryEntry, useBranch } from './useBranch';
+import type { AcquireRuntime } from './branch/session';
 import type { Timeline } from './useTimeline';
 
 type Branch = ReturnType<typeof useBranch>;
@@ -29,6 +30,8 @@ export interface DeviationInputs {
   replayGameType: string | null;
   timeline: DeviationTimeline;
   branch: DeviationBranch;
+  /** The position source's runtime strategy: adopt a stored position, else reconstruct in the worker. */
+  acquireRuntime: AcquireRuntime;
   branchWindowOpenRef: MutableRefObject<boolean>;
   setPendingConfirm: (confirm: { message: string; proceed: () => void } | null) => void;
   draftChoices: { p1: (BranchSlotChoice | null)[]; p2: (BranchSlotChoice | null)[] };
@@ -84,6 +87,7 @@ interface RebuildContext {
   bringOnly?: { p1: string[]; p2: string[] };
   session: BranchSession;
   branch: Pick<Branch, 'startBranch' | 'getBattle'>;
+  acquireRuntime: AcquireRuntime;
   branchWindowOpenRef: MutableRefObject<boolean>;
   setBranchDivergence: (notice: string | null) => void;
   landPointer: (startTurn: number) => void;
@@ -117,6 +121,7 @@ async function executeRebuild(
         choiceLocks: inputs.choiceLocks,
         leadOverride,
         bringOnly: ctx.bringOnly,
+        acquireRuntime: ctx.acquireRuntime,
       });
       if (!abortController.signal.aborted) {
         ctx.branchWindowOpenRef.current = true;
@@ -144,7 +149,7 @@ function replaceVariationMessage(leadIn: string, span: { startTurn: number; leng
 export function useDeviation(inputs: DeviationInputs) {
   const {
     replayData, snapshots, observations, sources, bringOnlyLists, bringCount, replayGameType,
-    timeline, branch, branchWindowOpenRef, setPendingConfirm, draftChoices, setDraftChoices,
+    timeline, branch, acquireRuntime, branchWindowOpenRef, setPendingConfirm, draftChoices, setDraftChoices,
   } = inputs;
   const { branchPreparing, branchProgress, branchSession, handles: session } = useBranchSession();
   const [branchDivergence, setBranchDivergence] = useState<string | null>(null);
@@ -177,13 +182,16 @@ export function useDeviation(inputs: DeviationInputs) {
       // only what the real game brought. The T0 picker carries its own
       // selection; per-side fail-open when the protocol does not pin a side.
       bringOnly: startTurn > 0 ? bringOnlyLists ?? undefined : undefined,
-      session, branch, branchWindowOpenRef, setBranchDivergence,
+      session, branch, acquireRuntime, branchWindowOpenRef, setBranchDivergence,
       landPointer: (turn) => {
         timeline.setViewTurn(turn);
         timeline.setViewLine('main');
       },
     }, startTurn, replayHistory, prefill, leadOverride);
-  }, [replayData, session, variationSpan, branch, snapshots, observations, sources, bringOnlyLists, branchWindowOpenRef, timeline]);
+  }, [
+    replayData, session, variationSpan, branch, acquireRuntime, snapshots, observations, sources, bringOnlyLists,
+    branchWindowOpenRef, timeline,
+  ]);
 
   const requests = useDeviationRequests({
     timeline, rebuildAt, executeTurn: branch.executeTurn, setPendingConfirm, setBranchDivergence,
@@ -204,11 +212,7 @@ export function useDeviation(inputs: DeviationInputs) {
     requests.requestDeviation({ p1Choices: draftChoices.p1, p2Choices: draftChoices.p2 });
   }, [requests, draftChoices]);
 
-  const leadOptions = useMemo(() => buildLeadOptions(snapshots), [snapshots]);
-  const defaultLeadSelection = useCallback(
-    () => defaultLeadSelectionFor(leadOptions, bringCount, replayGameType),
-    [leadOptions, bringCount, replayGameType],
-  );
+  const { leadOptions, defaultLeadSelection } = useLeadDefaults(snapshots, bringCount, replayGameType);
 
   return {
     session, branchDivergence, setBranchDivergence,
@@ -216,6 +220,16 @@ export function useDeviation(inputs: DeviationInputs) {
     cancelPreparation: session.cancelPreparation,
     rebuildAt, ...requests, handleSetChoice, handleExecuteDraft, leadOptions, defaultLeadSelection,
   };
+}
+
+/** The lead picker's options and the real game's selection as its default. */
+function useLeadDefaults(snapshots: TurnSnapshot[], bringCount: number | null, replayGameType: string | null) {
+  const leadOptions = useMemo(() => buildLeadOptions(snapshots), [snapshots]);
+  const defaultLeadSelection = useCallback(
+    () => defaultLeadSelectionFor(leadOptions, bringCount, replayGameType),
+    [leadOptions, bringCount, replayGameType],
+  );
+  return { leadOptions, defaultLeadSelection };
 }
 
 /** The chess rules of leaving the line: an explicit deviation request from

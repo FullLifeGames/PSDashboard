@@ -9,6 +9,8 @@ import { useSmogonSetAssumptions } from '../useSmogonSetAssumptions';
 import { useSharedBranch } from '../useSharedBranch';
 import { useTeamKnowledge } from '../useTeamKnowledge';
 import type { TeamKnowledge } from '../useTeamKnowledge';
+import { useReplayWorker } from '../useReplayWorker';
+import { usePositionSource } from '../usePositionSource';
 import {
   type OpponentTeamInfo, type ReplayData, type TurnSnapshot, getReplayBringCount, getReplayGameType,
   getReplayGeneration, replayBringOnly,
@@ -117,6 +119,7 @@ function useTeamSources(
  * Call order matches the pre-split App() exactly.
  */
 export function useReplayContext() {
+  const replayWorker = useReplayWorker();
   const replay = useReplaySurface();
   const branch = useBranch();
   const evaluation = useEvaluation();
@@ -129,10 +132,17 @@ export function useReplayContext() {
     replayData: replay.replayData, p1Info: replay.p1Info, opponentInfo: replay.opponentInfo,
     observations: replay.observations, speedOrders: replay.speedOrders, hpEvidence: replay.hpEvidence,
     usageStats: smogon.usageStats, setAssumptions: smogon.setAssumptions,
-    onTeamsEdited: refreshQueue.handleTeamsEdited,
+    onTeamsEdited: refreshQueue.handleTeamsEdited, replayWorker,
   });
   const meta = useFormatMeta(replay.replayData, replay.snapshots);
   const teamSources = useTeamSources(knowledge, smogon, replay.hpEvidence);
+  // Every exact position (Evaluate, the sweep, the dwell, a branch start)
+  // comes from one source: the store, else the replay worker.
+  const positions = usePositionSource({
+    replayData: replay.replayData, snapshots: replay.snapshots, observations: replay.observations,
+    sources: teamSources, setsFingerprint: knowledge.setsFingerprint, bringOnlyLists: meta.bringOnlyLists,
+    smogonPending: smogon.usageStats.loading || smogon.setAssumptions.loading, replayWorker,
+  });
   const { loadReplay } = replay;
   const handleLoadSharedOriginal = useCallback((replayId: string) => {
     clearSharedBranch();
@@ -142,7 +152,7 @@ export function useReplayContext() {
     replay, branch, evaluation, branchWindowOpenRef, smogon,
     animateBranchTurns, setAnimateBranchTurns,
     shared: { sharedBranch, sharedBranchError, clearSharedBranch, handleLoadSharedOriginal },
-    refreshQueue, knowledge, meta, teamSources,
+    refreshQueue, knowledge, meta, teamSources, positions,
   };
 }
 

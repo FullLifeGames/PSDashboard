@@ -6,6 +6,8 @@ import {
 } from '@fulllifegames/replay-core';
 import type { useSmogonUsageStats } from './useSmogonUsageStats';
 import type { useSmogonSetAssumptions } from './useSmogonSetAssumptions';
+import type { TeamBuildOptions } from '../lib/eval-acquire';
+import type { ReplayWorkerClient } from '../lib/replay-jobs/client';
 
 const TEAM_PASTE_STORAGE_KEY = 'ps-replay-interceptor:team-paste';
 
@@ -83,10 +85,21 @@ export function useHpResolver(
   return { hpResolverFor, replayGenNumber };
 }
 
+/** One solve, in flight or settled, and the inputs it answers for. */
+interface SpreadSolveEntry {
+  refs: unknown[];
+  content: string;
+  value: Promise<Map<string, SpreadCandidate>>;
+}
+
 /** The damage-consistent spread solve: deterministic per replay but runs
- *  thousands of calc calls — cached across the build call sites instead of
- *  re-solving on every branch/eval build. Lazy (ref, not useMemo) so
- *  team-builder stays out of the main bundle. */
+ *  thousands of calc calls — it runs in the replay worker (round 38) and is
+ *  cached across the build call sites instead of re-solving on every
+ *  branch/eval build. Inputs count by identity where they are big and
+ *  stable (replay, evidence, Smogon payloads) and by content where they are
+ *  small and re-created per render (the team infos, the paste): an identity
+ *  churn alone (the HP module arriving, a memo re-forming) never re-solves.
+ *  Concurrent callers share the running promise. */
 export function useSpreadSolve(inputs: {
   replayData: ReplayData | null;
   observations: DamageObservation[];
@@ -96,9 +109,10 @@ export function useSpreadSolve(inputs: {
   effectiveP2Info: OpponentTeamInfo | null;
   usageStats: ReturnType<typeof useSmogonUsageStats>;
   setAssumptions: ReturnType<typeof useSmogonSetAssumptions>;
+  replayWorker: ReplayWorkerClient;
 }) {
-  const { replayData, observations, speedOrders, teamText, effectiveP1Info, effectiveP2Info, usageStats, setAssumptions } = inputs;
-  const spreadSolveRef = useRef<{ key: unknown[]; value: Map<string, SpreadCandidate> } | null>(null);
+  const { replayData, observations, speedOrders, teamText, effectiveP1Info, effectiveP2Info, usageStats, setAssumptions, replayWorker } = inputs;
+  const spreadSolveRef = useRef<SpreadSolveEntry | null>(null);
   // Mirror of the latest solve for the stats panel's provenance display.
   const [solvedSpreads, setSolvedSpreads] = useState<Map<string, SpreadCandidate> | null>(null);
   useEffect(() => {
@@ -110,28 +124,45 @@ export function useSpreadSolve(inputs: {
   const getInferredSpreads = useCallback(async (
     p1InfoOverride?: OpponentTeamInfo | null,
     p2InfoOverride?: OpponentTeamInfo | null,
+    opts?: TeamBuildOptions,
   ) => {
     if (!replayData || (observations.length === 0 && speedOrders.length === 0)) return undefined;
     const info1 = p1InfoOverride ?? effectiveP1Info;
     const info2 = p2InfoOverride ?? effectiveP2Info;
-    const key = [replayData, observations, speedOrders, teamText, info1, info2, usageStats.stats, setAssumptions.assumptions];
+    const refs = [replayData, observations, speedOrders, usageStats.stats, setAssumptions.assumptions];
+    const content = JSON.stringify([teamText, info1, info2]);
     const cached = spreadSolveRef.current;
-    if (cached && cached.key.length === key.length && cached.key.every((entry, index) => entry === key[index])) {
+    if (cached && cached.content === content && cached.refs.every((entry, index) => entry === refs[index])) {
       return cached.value;
     }
-    const { solveReplaySpreads } = await import('../lib/lazy/team-builder');
-    const value = solveReplaySpreads(replayData.log, observations, {
+    // Only the settled Smogon knowledge is worth a solve (the dwell, the
+    // sweep, and the play-out wait for it anyway), and a caller that only
+    // wants the cached state never starts one.
+    if (opts?.cachedOnly || usageStats.loading || setAssumptions.loading) return undefined;
+    const value = replayWorker.solveSpreads({
+      log: replayData.log,
+      observations,
+      speedOrders,
       userTeamText: teamText || undefined,
       p1Info: info1,
       p2Info: info2,
       usageStats: usageStats.stats,
       setAssumptions: setAssumptions.assumptions,
-      speedOrders,
     });
-    spreadSolveRef.current = { key, value };
-    setSolvedSpreads(value);
+    const entry: SpreadSolveEntry = { refs, content, value };
+    spreadSolveRef.current = entry;
+    value
+      .then(solved => {
+        if (spreadSolveRef.current === entry) setSolvedSpreads(solved);
+      })
+      .catch(() => {
+        if (spreadSolveRef.current === entry) spreadSolveRef.current = null;
+      });
     return value;
-  }, [replayData, observations, speedOrders, teamText, effectiveP1Info, effectiveP2Info, usageStats.stats, setAssumptions.assumptions]);
+  }, [
+    replayData, observations, speedOrders, teamText, effectiveP1Info, effectiveP2Info,
+    usageStats.stats, usageStats.loading, setAssumptions.assumptions, setAssumptions.loading, replayWorker,
+  ]);
 
   return { solvedSpreads, getInferredSpreads };
 }

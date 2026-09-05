@@ -6,6 +6,7 @@ import {
 } from '@fulllifegames/replay-core';
 import { parseSetsImport } from '../lib/sets-io';
 import { buildSensitivityTargets } from '../lib/team-knowledge';
+import type { ReplayWorkerClient } from '../lib/replay-jobs/client';
 import type { SensitivityTarget } from '@fulllifegames/eval-engine';
 import type { useSmogonUsageStats } from './useSmogonUsageStats';
 import type { useSmogonSetAssumptions } from './useSmogonSetAssumptions';
@@ -22,6 +23,8 @@ export interface TeamKnowledgeInputs {
   setAssumptions: ReturnType<typeof useSmogonSetAssumptions>;
   /** Edited team knowledge changes the sim's inputs — App refreshes a live branch. */
   onTeamsEdited: (next: { p1: OpponentTeamInfo; p2: OpponentTeamInfo }) => void;
+  /** The spread solve runs off the main thread (round 38). */
+  replayWorker: ReplayWorkerClient;
 }
 
 /** Manual team edits and the editor/sets-panel UI state, reset per replay. */
@@ -101,7 +104,10 @@ function useSetsIO(args: {
 }
 
 export function useTeamKnowledge(inputs: TeamKnowledgeInputs) {
-  const { replayData, p1Info, opponentInfo, observations, speedOrders, hpEvidence, usageStats, setAssumptions, onTeamsEdited } = inputs;
+  const {
+    replayData, p1Info, opponentInfo, observations, speedOrders, hpEvidence, usageStats, setAssumptions, onTeamsEdited,
+    replayWorker,
+  } = inputs;
   const paste = useTeamPaste();
   const edits = useTeamEdits(replayData?.id);
   const { hpResolverFor, replayGenNumber } = useHpResolver(replayData, hpEvidence, usageStats);
@@ -124,7 +130,7 @@ export function useTeamKnowledge(inputs: TeamKnowledgeInputs) {
 
   const { solvedSpreads, getInferredSpreads } = useSpreadSolve({
     replayData, observations, speedOrders, teamText: paste.teamText,
-    effectiveP1Info, effectiveP2Info, usageStats, setAssumptions,
+    effectiveP1Info, effectiveP2Info, usageStats, setAssumptions, replayWorker,
   });
 
   const { applySetsText } = useSetsIO({

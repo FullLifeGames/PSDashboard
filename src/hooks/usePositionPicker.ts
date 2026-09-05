@@ -102,9 +102,13 @@ async function resolvePickerState(args: {
   }
   const snapshot = snapshots[Math.min(viewTurn - 1, snapshots.length - 1)] ?? null;
   if (!snapshot || !replayData) return null;
+  // The approximation needs the guessed moves and items, not a spread
+  // solve: it takes the solved spreads when a solve already exists and
+  // never starts one (the solve used to run three times during a load,
+  // once per arriving Smogon payload, before the dwell even fired).
   const [{ pickerStateFromSnapshot }, teams] = await Promise.all([
     import('../lib/picker-state'),
-    buildReplayTeams(replayData, sources),
+    buildReplayTeams(replayData, sources, undefined, { cachedOnly: true }),
   ]);
   return { simState: pickerStateFromSnapshot(snapshot, teams.p1Team, teams.p2Team, replayGenNumber, bringOnlyLists), source: 'snapshot' };
 }

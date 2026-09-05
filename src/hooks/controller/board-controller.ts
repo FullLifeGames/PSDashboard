@@ -34,14 +34,15 @@ function useDeviationLayer(ctx: ReplayContext, transients: Transients, timeline:
   const deviationBranch = useMemo(() => ({
     startBranch, getBattle, executeTurn, setChoice, history,
   }), [startBranch, getBattle, executeTurn, setChoice, history]);
+  const { acquireRuntime } = ctx.positions;
   const deviation = useDeviation({
     replayData, snapshots, observations, sources: teamSources, bringOnlyLists, bringCount,
-    replayGameType, timeline: deviationTimeline, branch: deviationBranch,
+    replayGameType, timeline: deviationTimeline, branch: deviationBranch, acquireRuntime,
     branchWindowOpenRef, setPendingConfirm, draftChoices, setDraftChoices,
   });
   useBranchRefresh({
     replayData, snapshots, observations, sources: teamSources, bringOnlyLists,
-    branching, variationStartTurn, startBranch, viewTurn, session: deviation.session, branchWindowOpenRef,
+    branching, variationStartTurn, startBranch, acquireRuntime, viewTurn, session: deviation.session, branchWindowOpenRef,
     request: ctx.refreshQueue.pendingBranchRefresh, clearRequest: ctx.refreshQueue.clearRefreshRequest,
   });
   return deviation;

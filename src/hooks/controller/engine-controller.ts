@@ -30,10 +30,10 @@ function acquireGates(args: {
 }
 
 function useAcquireLayer(ctx: ReplayContext, transients: Transients, board: BoardController) {
-  const { replayData, snapshots, observations } = ctx.replay;
+  const { replayData, snapshots } = ctx.replay;
   const { getBattle, executing, variationStartTurn, startSerialized } = ctx.branch;
-  const { evaluation, teamSources } = ctx;
-  const { setsFingerprint, replayGenNumber } = ctx.knowledge;
+  const { evaluation, teamSources, positions } = ctx;
+  const { replayGenNumber } = ctx.knowledge;
   const { bringOnlyLists } = ctx.meta;
   const { playOut, draftChoices } = transients;
   const { liveTip, viewingVariation, atEndPosition, viewTurn, serializedAtView } = board.timeline;
@@ -43,10 +43,7 @@ function useAcquireLayer(ctx: ReplayContext, transients: Transients, board: Boar
     liveTip, viewingVariation, atEndPosition, executing, branchPreparing,
     playOut, evaluation, usageStats: ctx.smogon.usageStats, setAssumptions: ctx.smogon.setAssumptions,
   });
-  const acquire = useEvalAcquire({
-    replayData, snapshots, observations, sources: teamSources, setsFingerprint,
-    bringOnlyLists, getBattle, viewTurn, dwellEnabled, smogonPending,
-  });
+  const acquire = useEvalAcquire({ replayData, source: positions, getBattle, viewTurn, dwellEnabled, smogonPending });
   const { positionPicker, pickerSimState } = usePositionPicker({
     replayData, snapshots, sources: teamSources, bringOnlyLists, replayGenNumber,
     liveTip, viewingVariation, serializedAtView, viewTurn, variationStartTurn, startSerialized,

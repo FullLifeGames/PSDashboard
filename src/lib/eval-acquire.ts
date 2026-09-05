@@ -21,7 +21,13 @@ export interface TeamBuildSources {
   getInferredSpreads: (
     p1InfoOverride?: OpponentTeamInfo | null,
     p2InfoOverride?: OpponentTeamInfo | null,
+    opts?: TeamBuildOptions,
   ) => Promise<Map<string, SpreadCandidate> | undefined>;
+}
+
+export interface TeamBuildOptions {
+  /** Use the solved spreads only when a matching solve already exists — never start one (the pickers). */
+  cachedOnly?: boolean;
 }
 
 export function snapshotAt(snapshots: TurnSnapshot[], turn: number): TurnSnapshot | null {
@@ -34,6 +40,7 @@ export async function buildReplayTeams(
   replayData: ReplayData,
   sources: TeamBuildSources,
   overrides?: { p1: OpponentTeamInfo | null; p2: OpponentTeamInfo | null },
+  opts?: TeamBuildOptions,
 ): Promise<{ p1Team: PokemonSet[]; p2Team: PokemonSet[] }> {
   const { buildTeamsFromReplay } = await import('./lazy/team-builder');
   return buildTeamsFromReplay(replayData.log, {
@@ -42,7 +49,7 @@ export async function buildReplayTeams(
     p2Info: overrides ? overrides.p2 : sources.effectiveP2Info,
     usageStats: sources.usageStats.stats,
     setAssumptions: sources.setAssumptions.assumptions,
-    inferredSpreads: await sources.getInferredSpreads(overrides?.p1, overrides?.p2),
+    inferredSpreads: await sources.getInferredSpreads(overrides?.p1, overrides?.p2, opts),
     hpEvidence: sources.hpEvidence,
   });
 }

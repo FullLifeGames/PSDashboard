@@ -1,13 +1,21 @@
 import { useCallback } from 'react';
 import type { PokemonSet } from '@pkmn/sim';
 import type { TurnSnapshot } from '@fulllifegames/replay-core';
-import type { ChoiceLockContext, BranchRuntime, BranchSlotChoice } from '@fulllifegames/eval-engine';
+import type { ChoiceLockContext, BranchRuntime, BranchSlotChoice, ReconstructParams } from '@fulllifegames/eval-engine';
 import {
   makeHistoryEntry, requiredChoices,
   type BranchEngineModule, type BranchHistoryEntry, type BranchRefs, type BranchSetters, type BattleStream, type SideId,
 } from './shared';
 
+/**
+ * Where the branch's runtime comes from (round 38): the app hands in the
+ * position source, which adopts a stored position or reconstructs in the
+ * worker; without it the runtime is reconstructed here on the main thread.
+ */
+export type AcquireRuntime = (params: ReconstructParams, plan: { isT0: boolean }) => Promise<BranchRuntime>;
+
 interface StartBranchOptions {
+  acquireRuntime?: AcquireRuntime;
   replayHistory?: BranchHistoryEntry[];
   p1Choices?: (BranchSlotChoice | null)[];
   p2Choices?: (BranchSlotChoice | null)[];
@@ -176,7 +184,7 @@ interface StartArgs {
 function reconstructForStart(branchEngine: BranchEngineModule, args: StartArgs, plan: StartPlan): Promise<BranchRuntime> {
   const { format, p1Team, p2Team, replayLog, targetTurn, snapshot, options } = args;
   const { isT0, leadOverride, bringOnly } = plan;
-  return branchEngine.reconstructBranchRuntime({
+  const params: ReconstructParams = {
     format,
     p1Team,
     p2Team,
@@ -192,7 +200,24 @@ function reconstructForStart(branchEngine: BranchEngineModule, args: StartArgs, 
     choiceLocks: isT0 ? undefined : options?.choiceLocks,
     leadOverride: leadOverride ? { p1: leadOverride.p1, p2: leadOverride.p2 } : undefined,
     bringOnly,
-  });
+  };
+  return options?.acquireRuntime ? options.acquireRuntime(params, { isT0 }) : branchEngine.reconstructBranchRuntime(params);
+}
+
+/**
+ * The start's runtime, or null when the preparation was cancelled on the
+ * way: an aborted main-thread reconstruction returns early, a terminated
+ * worker job throws — both end the start quietly.
+ */
+async function reconstructOrAbort(branchEngine: BranchEngineModule, args: StartArgs, plan: StartPlan): Promise<BranchRuntime | null> {
+  const aborted = () => args.options?.abort?.aborted === true;
+  try {
+    const runtime = await reconstructForStart(branchEngine, args, plan);
+    return aborted() ? null : runtime;
+  } catch (error) {
+    if (aborted()) return null;
+    throw error;
+  }
 }
 
 /** The lead decision IS the variation's first entry: entry 0 plays
@@ -266,9 +291,8 @@ function useStartBranch(
     const branchEngine = await loadBranchEngine();
     const plan = resolveStartPlan(targetTurn, options);
     const { isT0, leadOverride, historyToReplay } = plan;
-    const runtime = await reconstructForStart(branchEngine, { format, p1Team, p2Team, replayLog, targetTurn, snapshot, options }, plan);
-
-    if (options?.abort?.aborted) return;
+    const runtime = await reconstructOrAbort(branchEngine, { format, p1Team, p2Team, replayLog, targetTurn, snapshot, options }, plan);
+    if (!runtime) return;
 
     logRef.current = runtime.log;
     battleStreamRef.current = runtime.battleStream;

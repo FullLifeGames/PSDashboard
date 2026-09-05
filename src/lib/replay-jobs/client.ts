@@ -59,6 +59,11 @@ export class ReplayWorkerClient {
     return new Map(response.entries);
   }
 
+  /** Spawns the worker ahead of the first job, so its bundle parse overlaps the replay load. */
+  warm(): void {
+    this.ensureWorker();
+  }
+
   /** Terminates the worker and rejects every job; a later job spawns anew. */
   dispose(): void {
     const cancelled = new Error(CANCELLED);
