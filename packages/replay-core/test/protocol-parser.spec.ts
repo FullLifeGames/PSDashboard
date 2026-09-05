@@ -510,24 +510,26 @@ test.describe('speed-order cleanliness', () => {
     expect(orders(singlesLog(['Hawlucha, M', 'Dragapult, F'], firstThenDraco('Acrobatics'), ['|-enditem|p1a: A|Grassy Seed']))).toEqual([]);
   });
 
-  test('a Choice Scarf that changed hands voids its holder\'s races for the whole game', () => {
-    const body = ['|move|p1a: A|Body Slam|p2a: B', '|move|p2a: B|Draco Meteor|p1a: A'];
-    // Knocked off before the race: the set still says Scarf, the race ran without it.
-    expect(orders(singlesLog(['Snorlax, M', 'Dragapult, F'], body, [
-      '|-enditem|p2a: B|Choice Scarf|[from] move: Knock Off|[of] p1a: A',
-    ]))).toEqual([]);
-    // Tricked onto the first mover: it ran with a Scarf the set never carried.
-    expect(orders(singlesLog(['Snorlax, M', 'Dragapult, F'], body, [
-      '|-item|p1a: A|Choice Scarf|[from] move: Trick',
-    ]))).toEqual([]);
-    // Knocked off after the race: the race is dropped too (the solver reads every order against one set).
-    expect(orders(singlesLog(['Snorlax, M', 'Dragapult, F'], [
-      ...body, '|turn|2', '|-enditem|p2a: B|Choice Scarf|[from] move: Knock Off|[of] p1a: A',
+  test('a Choice Scarf that changed hands voids the races that ran with an item the set does not carry', () => {
+    const mons: [string, string] = ['Snorlax, M', 'Dragapult, F'];
+    const race = ['|move|p1a: A|Body Slam|p2a: B', '|move|p2a: B|Draco Meteor|p1a: A'];
+    const turns = (log: string) => parseReplayLogWithObservations(log).speedOrders.map(o => o.turn);
+    // Knocked off at turn 2: the race of turn 1 ran with the Scarf the set carries, the race of turn 3 without it.
+    expect(turns(singlesLog(mons, [
+      ...race, '|turn|2', '|-enditem|p2a: B|Choice Scarf|[from] move: Knock Off|[of] p1a: A', '|turn|3', ...race,
+    ]))).toEqual([1]);
+    // Knocked off before any race: nothing stands.
+    expect(orders(singlesLog(mons, race, ['|-enditem|p2a: B|Choice Scarf|[from] move: Knock Off|[of] p1a: A']))).toEqual([]);
+    // Tricked onto the first mover at turn 2: the race of turn 1 ran without the Scarf the set now carries.
+    expect(turns(singlesLog(mons, [
+      ...race, '|turn|2', '|-item|p1a: A|Choice Scarf|[from] move: Trick', '|turn|3', ...race,
+    ]))).toEqual([3]);
+    // Given away: which item the set carries is open, so no race of the giver counts.
+    expect(orders(singlesLog(mons, race, [
+      '|-item|p2a: B|Choice Scarf|[from] ability: Frisk|[of] p1a: A', '|-item|p2a: B|Leftovers|[from] move: Trick',
     ]))).toEqual([]);
     // Frisk only reveals the Scarf: the race stands.
-    expect(orders(singlesLog(['Snorlax, M', 'Dragapult, F'], body, [
-      '|-item|p2a: B|Choice Scarf|[from] ability: Frisk|[of] p1a: A',
-    ]))).toEqual(['Snorlax>Dragapult']);
+    expect(orders(singlesLog(mons, race, ['|-item|p2a: B|Choice Scarf|[from] ability: Frisk|[of] p1a: A']))).toEqual(['Snorlax>Dragapult']);
   });
 });
 
