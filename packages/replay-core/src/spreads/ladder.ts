@@ -5,6 +5,9 @@ import { toId } from '../ids.ts';
 export interface SpreadCandidate {
   evs: PokemonEvs;
   nature: string;
+  /** An item the move-order evidence decided (round 37): 'Choice Scarf', or '' for "not the guessed Scarf". */
+  item?: string;
+  itemReason?: 'moved-first' | 'moved-second';
 }
 
 export interface CandidateRung {

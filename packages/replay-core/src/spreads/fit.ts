@@ -5,6 +5,7 @@ import { WEATHER_BY_ID } from '../calc-field.ts';
 import { typedHiddenPowerId } from '../hidden-power.ts';
 import { evBudget, ZERO_EVS, type EvBudget } from './ev-budget.ts';
 import type { CandidateRung, SpreadCandidate } from './ladder.ts';
+import type { ItemDecision } from './scarf.ts';
 import { toId } from '../ids.ts';
 
 /**
@@ -35,6 +36,10 @@ export interface SolveContext {
   byMon: Map<string, DamageObservation[]>;
   /** Observed same-turn move order, indexed per participant. */
   speedByMon: Map<string, SpeedOrderObservation[]>;
+  /** The orders with sets on both sides, in observation order (round 37: the Scarf decisions walk them). */
+  speedOrders: SpeedOrderObservation[];
+  /** Choice Scarf decisions from the move orders, keyed like `solved` (round 37). */
+  scarf: Map<string, ItemDecision>;
   priors: Map<string, SpreadCandidate>;
 }
 
@@ -68,6 +73,8 @@ export function buildSolveContext(
     solved: new Map<string, SpreadCandidate>(),
     byMon: new Map<string, DamageObservation[]>(),
     speedByMon: new Map<string, SpeedOrderObservation[]>(),
+    speedOrders: [],
+    scarf: new Map<string, ItemDecision>(),
     priors: new Map<string, SpreadCandidate>(),
   };
   const { byMon, speedByMon } = ctx;
@@ -89,6 +96,7 @@ export function buildSolveContext(
     if (firstKey === secondKey) continue;
     speedByMon.set(firstKey, [...(speedByMon.get(firstKey) ?? []), order]);
     speedByMon.set(secondKey, [...(speedByMon.get(secondKey) ?? []), order]);
+    ctx.speedOrders.push(order);
   }
   return ctx;
 }
@@ -170,19 +178,30 @@ export function observationError(ctx: SolveContext, obs: DamageObservation, cand
   }
 }
 
-function effectiveSpeed(ctx: SolveContext, side: 'p1' | 'p2', species: string, spread: SpreadCandidate): number {
+/** The Speed stat of a spread on the set's level and IVs, 0 when the calc cannot build the species. */
+export function speedStat(ctx: SolveContext, side: 'p1' | 'p2', species: string, spread: SpreadCandidate): number {
   const set = setOf(ctx, side, species);
-  try {
-    const mon = new Pokemon(ctx.gen, set?.species ?? species, {
-      level: set?.level || 100,
-      nature: spread.nature,
-      evs: spread.evs,
-      ivs: set?.ivs,
-    });
-    return mon.stats.spe * (toId(set?.item ?? '') === 'choicescarf' ? 1.5 : 1);
-  } catch {
-    return 0;
+  const name = set?.species ?? species;
+  for (const candidate of [name, name.split('-')[0]]) {
+    try {
+      return new Pokemon(ctx.gen, candidate, { level: set?.level || 100, nature: spread.nature, evs: spread.evs, ivs: set?.ivs }).stats.spe;
+    } catch {
+      // Unknown forme: try the base species.
+    }
   }
+  return 0;
+}
+
+/** A move-order decision beats the set's item: a Scarf inferred in, or a guessed Scarf dropped. */
+function holdsScarf(ctx: SolveContext, side: 'p1' | 'p2', species: string): boolean {
+  const decision = ctx.scarf.get(keyOf(side, species));
+  if (decision === 'holds') return true;
+  if (decision === 'lacks') return false;
+  return toId(setOf(ctx, side, species)?.item ?? '') === 'choicescarf';
+}
+
+function effectiveSpeed(ctx: SolveContext, side: 'p1' | 'p2', species: string, spread: SpreadCandidate): number {
+  return speedStat(ctx, side, species, spread) * (holdsScarf(ctx, side, species) ? 1.5 : 1);
 }
 
 export function speedError(ctx: SolveContext, key: string, candidate: SpreadCandidate): number {

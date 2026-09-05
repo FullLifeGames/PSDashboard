@@ -6,6 +6,7 @@ import {
   buildSolveContext, keyOf, observationError, physicalAttackerFor, priorDistance, speedError, spreadFor,
   type SolveContext,
 } from './spreads/fit.ts';
+import { decideScarfs, type SpeedKnowledgeMap } from './spreads/scarf.ts';
 
 export { evBudget, legalizeEvs } from './spreads/ev-budget.ts';
 export type { SpreadCandidate } from './spreads/ladder.ts';
@@ -138,13 +139,21 @@ function solveOne(ctx: SolveContext, key: string) {
   ctx.solved.set(key, { evs: topUpUnmeasured(best, offenseStat, measured, ctx.budget), nature: best.nature });
 }
 
+/**
+ * `knowledge` (round 37) says per mon what the solver may assume about its
+ * item and Speed; the Choice Scarf decisions fall before the ladder and
+ * ride out on the candidates as `item`, so the builder and the panel carry
+ * the same item. Without it, the built sets' priors are the only reference.
+ */
 export function inferSpreads(
   observations: DamageObservation[],
   sets: { p1: PokemonSet[]; p2: PokemonSet[] },
   formatid: string,
   speedOrders: SpeedOrderObservation[] = [],
+  knowledge: SpeedKnowledgeMap = new Map(),
 ): Map<string, SpreadCandidate> {
   const ctx = buildSolveContext(observations, sets, formatid, speedOrders);
+  ctx.scarf = decideScarfs(ctx, knowledge);
 
   // Greedy by observation count, then a refinement pass: the first pass can
   // solve a mon against a still-wrong partner guess; the second re-solves
@@ -158,5 +167,15 @@ export function inferSpreads(
   for (const key of order) solveOne(ctx, key);
   for (const key of order) solveOne(ctx, key);
 
+  // A decided mon carries its item even when no spread was solved for it.
+  for (const [key, decision] of ctx.scarf) {
+    const [side, species] = key.split(':') as ['p1' | 'p2', string];
+    const base = ctx.solved.get(key) ?? spreadFor(ctx, side, species);
+    ctx.solved.set(key, {
+      ...base,
+      item: decision === 'holds' ? 'Choice Scarf' : '',
+      itemReason: decision === 'holds' ? 'moved-first' : 'moved-second',
+    });
+  }
   return ctx.solved;
 }

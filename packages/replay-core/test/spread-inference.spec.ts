@@ -4,7 +4,8 @@ import type { PokemonSet } from '@pkmn/sim';
 import { inferSpreads } from '../src/spread-inference';
 import { buildSolveContext, observationError } from '../src/spreads/fit';
 import { toId } from '../src/ids';
-import type { DamageObservation } from '../src/types';
+import type { SpeedKnowledge } from '../src/spreads/scarf';
+import type { DamageObservation, PokemonEvs } from '../src/types';
 
 const gen = Generations.get(9);
 
@@ -207,6 +208,115 @@ describe('speed-order constraints', () => {
     const solved = inferSpreads([], sets, 'gen9', [flipped]);
     const valiant = solved.get('p2:ironvaliant');
     expect(valiant).toBeTruthy();
+  });
+
+  // Round 37: Choice Scarf decisions from orders no plausible spread of the
+  // first mover reproduces. Usage spreads stand in for the Smogon stats.
+  const usage = (entries: [string, number, number][]) =>
+    entries.map(([nature, spe, probability]) => ({ nature, probability, evs: { hp: 0, atk: 0, def: 0, spa: 252, spd: 4, spe } }));
+  const knowledge = (entries: [string, Partial<SpeedKnowledge>][]): Map<string, SpeedKnowledge> => new Map(entries.map(([key, value]) => [key, {
+    itemKnown: false, scarfRuledOut: false, spreadKnown: false, spreads: [], ...value,
+  }]));
+  const speOf = (species: string, candidate: { nature: string; evs: PokemonEvs } | undefined, fallback: PokemonSet) =>
+    new Pokemon(gen, species, { level: 100, nature: candidate?.nature ?? fallback.nature, evs: candidate?.evs ?? fallback.evs }).stats.spe;
+  const magOrder = { firstSide: 'p1' as const, firstSpecies: 'Magnezone', secondSide: 'p2' as const, secondSpecies: 'Garchomp', turn: 72 };
+  const tuskOrder = { firstSide: 'p1' as const, firstSpecies: 'Gholdengo', secondSide: 'p2' as const, secondSpecies: 'Great Tusk', turn: 6 };
+  const jolly = (set: PokemonSet): PokemonSet => ({ ...set, nature: 'Jolly' });
+
+  test('a mover that cannot reach the order at full Speed holds a Choice Scarf (573756 Magnezone)', () => {
+    // Magnezone (base 60, 240 at most) moved before a Jolly 252 Garchomp (333). Garchomp's usage:
+    // Jolly and Adamant 252 dominate, a Careful 16-Spe wall is a 10% remainder outside the camp.
+    const sets = { p1: [{ ...speedSet('Magnezone', 0), moves: ['Flash Cannon'] }], p2: [jolly(speedSet('Garchomp', 252))] };
+    const solved = inferSpreads([], sets, 'gen8', [magOrder], knowledge([
+      ['p1:magnezone', { spreads: usage([['Timid', 252, 0.44], ['Bold', 176, 0.1]]) }],
+      ['p2:garchomp', { spreads: usage([['Jolly', 252, 0.5], ['Adamant', 252, 0.3], ['Careful', 16, 0.1]]) }],
+    ]));
+    const magnezone = solved.get('p1:magnezone')!;
+    expect(magnezone.item).toBe('Choice Scarf');
+    expect(magnezone.itemReason).toBe('moved-first');
+    // Neutral 252 with the Scarf (328) stays under 333: the plus nature carries the order.
+    expect(magnezone.nature).toBe('Timid');
+    expect(magnezone.evs.spe).toBe(252);
+    // Garchomp keeps its prior Speed: the order is explained by the Scarf.
+    expect(speOf('Garchomp', solved.get('p2:garchomp'), sets.p2[0])).toBe(333);
+  });
+
+  test('a species that never invests in Speed gets no Scarf (Ho-Oh)', () => {
+    const sets = { p1: [speedSet('Ho-Oh', 0)], p2: [speedSet('Koraidon', 252)] };
+    const hoOhOrder = { firstSide: 'p1' as const, firstSpecies: 'Ho-Oh', secondSide: 'p2' as const, secondSpecies: 'Koraidon', turn: 3 };
+    const solved = inferSpreads([], sets, 'gen9', [hoOhOrder], knowledge([
+      ['p1:hooh', { spreads: usage([['Impish', 0, 0.6], ['Careful', 8, 0.3]]) }],
+      ['p2:koraidon', { spreads: usage([['Jolly', 252, 0.9]]) }],
+    ]));
+    expect(solved.get('p1:hooh')?.item).toBeUndefined();
+  });
+
+  test('an opponent with a common slow spread makes the order reachable: no Scarf', () => {
+    // Gholdengo (293 at most) before a Great Tusk whose usage splits into a 252-Spe sweeper and a 0-Spe wall (210).
+    const sets = { p1: [speedSet('Gholdengo', 0)], p2: [speedSet('Great Tusk', 252)] };
+    const solved = inferSpreads([], sets, 'gen9', [tuskOrder], knowledge([
+      ['p1:gholdengo', { spreads: usage([['Timid', 252, 0.6]]) }],
+      ['p2:greattusk', { spreads: usage([['Jolly', 252, 0.5], ['Impish', 0, 0.4]]) }],
+    ]));
+    expect(solved.get('p1:gholdengo')?.item).toBeUndefined();
+  });
+
+  test('a confident fast guess counts like knowledge (camp rule)', () => {
+    // Same pair, but the wall is a 6% oddity: Tusk is measured at its Jolly 252 (300) and Gholdengo holds the Scarf.
+    const sets = { p1: [speedSet('Gholdengo', 0)], p2: [speedSet('Great Tusk', 252)] };
+    const solved = inferSpreads([], sets, 'gen9', [tuskOrder], knowledge([
+      ['p1:gholdengo', { spreads: usage([['Timid', 252, 0.6]]) }],
+      ['p2:greattusk', { spreads: usage([['Jolly', 252, 0.9], ['Impish', 0, 0.06]]) }],
+    ]));
+    expect(solved.get('p1:gholdengo')?.item).toBe('Choice Scarf');
+  });
+
+  test('a known opponent spread beats the usage floor', () => {
+    const sets = { p1: [speedSet('Gholdengo', 0)], p2: [jolly(speedSet('Great Tusk', 252))] };
+    const solved = inferSpreads([], sets, 'gen9', [tuskOrder], knowledge([
+      ['p1:gholdengo', { spreads: usage([['Timid', 252, 0.6]]) }],
+      ['p2:greattusk', { spreadKnown: true, spreads: usage([['Jolly', 252, 0.5], ['Impish', 0, 0.4]]) }],
+    ]));
+    expect(solved.get('p1:gholdengo')?.item).toBe('Choice Scarf');
+  });
+
+  test('a known mover spread caps its top speed: no Scarf on 0 Speed EVs', () => {
+    const sets = { p1: [speedSet('Magnezone', 0)], p2: [speedSet('Garchomp', 252)] };
+    const solved = inferSpreads([], sets, 'gen8', [magOrder], knowledge([
+      ['p1:magnezone', { spreadKnown: true }],
+      ['p2:garchomp', { spreads: usage([['Jolly', 252, 0.9]]) }],
+    ]));
+    expect(solved.get('p1:magnezone')?.item).toBeUndefined();
+  });
+
+  test('a guessed Scarf the order contradicts is dropped (Kyogre)', () => {
+    // Koraidon (405 at most) moved before a Kyogre built with a guessed Scarf (306 × 1.5 = 459); without the Scarf a common spread fits.
+    const sets = { p1: [speedSet('Koraidon', 252)], p2: [speedSet('Kyogre', 252, 'Choice Scarf')] };
+    const kyogreOrder = { firstSide: 'p1' as const, firstSpecies: 'Koraidon', secondSide: 'p2' as const, secondSpecies: 'Kyogre', turn: 4 };
+    const solved = inferSpreads([], sets, 'gen9', [kyogreOrder], knowledge([
+      ['p1:koraidon', { spreads: usage([['Jolly', 252, 0.9]]) }],
+      ['p2:kyogre', { spreads: usage([['Timid', 252, 0.5], ['Modest', 0, 0.3]]) }],
+    ]));
+    const kyogre = solved.get('p2:kyogre')!;
+    expect(kyogre.item).toBe('');
+    expect(kyogre.itemReason).toBe('moved-second');
+  });
+
+  test('known items and ruled-out Scarfs are never touched', () => {
+    const sets = { p1: [speedSet('Magnezone', 0)], p2: [speedSet('Garchomp', 252)] };
+    for (const known of [{ itemKnown: true }, { scarfRuledOut: true }]) {
+      const solved = inferSpreads([], sets, 'gen8', [magOrder], knowledge([
+        ['p1:magnezone', { ...known, spreads: usage([['Timid', 252, 0.44]]) }],
+        ['p2:garchomp', { spreads: usage([['Jolly', 252, 0.9]]) }],
+      ]));
+      expect(solved.get('p1:magnezone')?.item).toBeUndefined();
+    }
+  });
+
+  test('without knowledge the solver behaves as before', () => {
+    const sets = { p1: [speedSet('Noivern', 0)], p2: [speedSet('Iron Valiant', 252)] };
+    const solved = inferSpreads([], sets, 'gen9', [order]);
+    expect(solved.get('p1:noivern')?.item).toBeUndefined();
   });
 });
 
