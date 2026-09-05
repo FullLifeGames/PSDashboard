@@ -3,9 +3,12 @@ import {
   mctsSearch, mctsTreeSearch, type SearchExecutor, createLocalExecutor, searchPosition, type EvalWorkerRequest,
   type EvalWorkerResponse,
 } from '@fulllifegames/eval-engine';
+import { handleReplayJob } from '../lib/replay-jobs/handlers';
+import { isReplayJob, type ReplayJobRequest, type ReplayJobResponse } from '../lib/replay-jobs/types';
 
 const scope = self as unknown as DedicatedWorkerGlobalScope;
 const post = (message: EvalWorkerResponse) => scope.postMessage(message);
+const postReplay = (message: ReplayJobResponse) => scope.postMessage(message);
 /** MCTS iterations between two progress messages. */
 const PROGRESS_EVERY = 10;
 
@@ -23,8 +26,14 @@ function executorFor(serializedBattle: string): SearchExecutor {
   return executor;
 }
 
-scope.onmessage = async (event: MessageEvent<EvalWorkerRequest>) => {
+scope.onmessage = async (event: MessageEvent<EvalWorkerRequest | ReplayJobRequest>) => {
   const message = event.data;
+  // The replay jobs (spread solve, reconstruction) ride the same script in
+  // their own worker instance — see ReplayWorkerClient.
+  if (isReplayJob(message)) {
+    await handleReplayJob(message, postReplay);
+    return;
+  }
   try {
     if (message.type === 'search') {
       const run = message.settings.mode === 'mcts' ? mctsSearch : searchPosition;
