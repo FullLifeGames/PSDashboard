@@ -39,8 +39,8 @@ export type { EndgameCaps, EndgameFlag, EndgameResult } from './endgame/solver.t
 export { PROVER_BUDGET, proveForcedWin } from './endgame/prover.ts';
 export type { ProveRequest, ProverBudget } from './endgame/prover.ts';
 export { forcedWinFor } from './search/forced-win.ts';
-export { applyForcedWin, forcedWinInput } from './search/forced-win-apply.ts';
-export { MIN_FORCED_MASS, SPOKEN_MASS } from './types.ts';
+export { applyForcedWin, forcedWinInput, forcedWinPossible } from './search/forced-win-apply.ts';
+export { ENDGAME_MAX_BODIES, MIN_FORCED_MASS, SPOKEN_MASS } from './types.ts';
 export { computeBlunders, selectKeyTurns } from './graph.ts';
 export { summarizeAlignment } from './hax-alignment.ts';
 export type { AlignmentScore, TurnAlignmentRecord, AlignmentSummary } from './hax-alignment.ts';

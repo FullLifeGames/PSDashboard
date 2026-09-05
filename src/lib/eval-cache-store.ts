@@ -13,6 +13,8 @@ export interface StoredEval {
   /** Full cache key (replay:turn:sets-fingerprint + settings suffix). */
   key: string;
   result: EvalResult;
+  /** Round 35: false marks a sketch result (no forced-win prover); a full pass never reuses it. */
+  prove?: boolean;
   depth: number;
   samples: number;
   mode: string;

@@ -10,14 +10,15 @@ import { MIN_FORCED_MASS, type ForcedWinCaveat } from '../packages/eval-engine/s
  * first sighting against the round-34 solver values. Findings: fixed damage
  * proves without the crit label (toss-race-2v3 in 2); a speed tie reads one
  * half however many ties precede the deciding one (toss-race-even, the
- * 2HKO tie); focus-blast-range proves 98% over ten turns (Gengar is immune
- * to Seismic Toss, the miss chain runs into the depth cap); the two walls
- * without an attack lose in 3 (one-v-two-breaker, where the solver capped
- * at 0.294); the heal wars (healer-vs-band, healer-burned, choice-locked,
- * fixed-vs-ghost) and the PP lock lie past the depth cap or behind unpriced
- * cells, so they fail honestly; doubles proofs carry the sampled-rolls
- * label, and the doubles tie reads the sampled order (doubles-ohko-tie);
- * the doubles spread cells stay unpriced (draws disagree on the KO).
+ * 2HKO tie); the two walls without an attack lose in 3 (one-v-two-breaker,
+ * where the solver capped at 0.294); with classes the draws never showed
+ * left open, the burned heal war, the PP lock, and the Scarf lock prove
+ * for p2 over four to five turns on the sampled rolls (healer-burned 0.93,
+ * struggle-lock 0.997, choice-locked 0.97); focus-blast-range (a ten-turn
+ * miss chain), healer-vs-band, fixed-vs-ghost, and the sack fail at the
+ * cells budget or the depth cap, honestly; doubles proofs carry the
+ * sampled-rolls label, the doubles tie reads the sampled order
+ * (doubles-ohko-tie), and the doubles spread cells stay unpriced.
  */
 interface Expected { side: 'p1' | 'p2'; mass: number | null; turns?: number; caveat?: ForcedWinCaveat; digits?: number }
 
@@ -35,14 +36,14 @@ const EXPECTED: Record<string, Expected> = {
   'toss-race-even': { side: 'p1', mass: 0.5, turns: 2 },
   'thunder-70': { side: 'p1', mass: 0.7, turns: 1, caveat: 'none' },
   'doubles-thunder-70': { side: 'p1', mass: 0.7, turns: 1, caveat: 'none' },
-  'focus-blast-range': { side: 'p1', mass: 0.98, digits: 2, turns: 10, caveat: 'barring-crit' },
   'toxic-stall': { side: 'p2', mass: 1, turns: 2, caveat: 'none' },
   'one-v-two-breaker': { side: 'p1', mass: 1, turns: 3, caveat: 'none' },
   'two-v-one-sack': { side: 'p1', mass: null },
-  'struggle-lock': { side: 'p2', mass: null },
+  'focus-blast-range': { side: 'p1', mass: null },
+  'struggle-lock': { side: 'p2', mass: 0.997, digits: 3, turns: 5, caveat: 'sampled-rolls' },
   'healer-vs-band': { side: 'p2', mass: null },
-  'healer-burned': { side: 'p2', mass: null },
-  'choice-locked': { side: 'p2', mass: null },
+  'healer-burned': { side: 'p2', mass: 0.926, digits: 3, turns: 4, caveat: 'sampled-rolls' },
+  'choice-locked': { side: 'p2', mass: 0.974, digits: 3, turns: 3, caveat: 'sampled-rolls' },
   'fixed-vs-ghost': { side: 'p2', mass: null },
   'setup-vs-heal': { side: 'p1', mass: null },
   'two-v-one-switch-loop': { side: 'p2', mass: null },

@@ -85,6 +85,7 @@ type UnansweredProfile
 type VerdictTier
 value AUTO_MCTS_FAINTED_FRACTION
 value ENDGAME_CAPS
+value ENDGAME_MAX_BODIES
 value MCTS_TREES
 value MIN_FORCED_MASS
 value PAYOFF_WINDOW
@@ -119,6 +120,7 @@ value evalChoiceToSlotChoices
 value executeBranchChoices
 value forcedWinFor
 value forcedWinInput
+value forcedWinPossible
 value forcedWinSeenKey
 value formatRead
 value matchPlayedSide

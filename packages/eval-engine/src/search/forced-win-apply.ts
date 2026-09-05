@@ -1,4 +1,6 @@
-import { MIN_FORCED_MASS, type EvalResult, type EvalSettings, type ForcedWinInput, type ForcedWinOutcome } from '../types.ts';
+import {
+  ENDGAME_MAX_BODIES, MIN_FORCED_MASS, type EvalResult, type EvalSettings, type ForcedWinInput, type ForcedWinOutcome,
+} from '../types.ts';
 
 /**
  * The prover's contract with a finished search (round 35), sim-free so the
@@ -12,6 +14,28 @@ export function forcedWinInput(result: EvalResult, settings: EvalSettings): Forc
     ...(settings.tera !== undefined ? { tera: settings.tera } : {}),
     ...(settings.sleepClause !== undefined ? { sleepClause: settings.sleepClause } : {}),
   };
+}
+
+interface SerializedBodies { ended?: boolean; sides?: { pokemon?: { fainted?: boolean }[] }[] }
+
+/**
+ * Sim-free mirror of the prover's trigger, for the main thread: a named
+ * decided or near side, at most ENDGAME_MAX_BODIES living bodies, or the
+ * last pair. Conservative: true wherever the sim-side check could fire,
+ * false only where a worker round trip would certainly return nothing.
+ */
+export function forcedWinPossible(serializedBattle: string, input: ForcedWinInput): boolean {
+  if (input.unanswered?.decided || input.unanswered?.nearDecided) return true;
+  let battle: SerializedBodies;
+  try {
+    battle = JSON.parse(serializedBattle) as SerializedBodies;
+  } catch {
+    return true;
+  }
+  if (battle.ended) return false;
+  const living = (battle.sides ?? []).map(side => (side.pokemon ?? []).filter(mon => !mon.fainted).length);
+  if (living.length !== 2) return true;
+  return living[0] + living[1] <= ENDGAME_MAX_BODIES || (living[0] === 1 && living[1] === 1);
 }
 
 /** The bar: mass toward the proven side, the rest at the open branch's static; matrix and ranking untouched. */

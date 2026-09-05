@@ -247,7 +247,7 @@ export function searchPosition(
   }
 
   applyTrendLayers(state, result, p1Options, p2Options, restrictCandidates, stopped);
-  if (!restrictCandidates) {
+  if (!restrictCandidates && settings.prove !== false) {
     applyForcedWin(result, perfSync('prover', () => forcedWinFor(root, forcedWinInput(result, settings))));
   }
   return result;

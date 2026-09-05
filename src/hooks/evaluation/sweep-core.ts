@@ -1,6 +1,6 @@
 import {
   type TurnSensitivity, type TurnVerification, type PlayedTurn, perfSpan, type EvalResult, type EvalSettings,
-  teraKey,
+  teraKey, type TeraAllowance,
 } from '@fulllifegames/eval-engine';
 import { EvalWorkerClient } from '../../lib/eval/worker-client';
 import { runInLanes } from '../../lib/eval/lanes';
@@ -54,8 +54,17 @@ async function resolveTurnEngine(
     }
     ({ depth, samples, mode } = resolveAutoTurnSettings(fraction));
   }
-  return { depth, samples, mode };
+  return { depth, samples, mode, ...(settings.prove === false ? { prove: false } : {}) };
 }
+
+/** A cached result serves a request unless it is a sketch (no prover) and the request is not. */
+const proveMatches = (hit: { prove?: boolean }, engine: TurnEngine): boolean => hit.prove !== false || engine.prove === false;
+/** The sketch marker a cache entry or a settings object carries (round 35). */
+const sketchFields = (engine: { prove?: boolean }): { prove?: false } => (engine.prove === false ? { prove: false } : {});
+/** The in-memory hit serves when engine, tera, and the sketch marker agree. */
+const memoryHitMatches = (hit: CachedEval | undefined, engine: TurnEngine, tera: TeraAllowance): hit is CachedEval =>
+  hit !== undefined && hit.depth === engine.depth && hit.samples === engine.samples && hit.mode === engine.mode
+  && teraKey(hit.tera) === teraKey(tera) && proveMatches(hit, engine);
 
 /** The two cache layers: the in-memory hit, then the run's prefetched store (one store read when no prefetch could run). */
 async function loadTurnHit(
@@ -63,13 +72,15 @@ async function loadTurnHit(
 ): Promise<'abort' | CachedEval | undefined> {
   const { depth, samples, mode } = engine;
   let hit = env.cacheRef.current.get(key);
-  if (!(hit && hit.depth === depth && hit.samples === samples && hit.mode === mode && teraKey(hit.tera) === teraKey(env.params.tera))) {
-    const stored = env.prefetched
+  if (!memoryHitMatches(hit, engine, env.params.tera)) {
+    let stored = env.prefetched
       ? (env.prefetched.get(storeKey) ?? null)
       : await perfSpan('cache-load', () => loadStoredEval(storeKey));
     if (aborted(env)) return 'abort';
+    if (stored && !proveMatches(stored, engine)) stored = null;
     hit = stored ? {
       result: stored.result, depth, samples, mode: mode, tera: env.params.tera,
+      ...sketchFields(stored),
       ...(stored.playedOutcome !== undefined ? { playedOutcome: stored.playedOutcome } : {}),
       ...(stored.verified !== undefined ? { verified: stored.verified } : {}),
       ...(stored.sensitivity !== undefined ? { sensitivity: stored.sensitivity } : {}),
@@ -129,7 +140,9 @@ async function runFreshEvaluation(
     // exclusive: false — pipelined turns share the pool and
     // must not cancel each other; the run's own cancel path
     // still kills them all at once.
-    client.evaluate(serialized, { depth, samples, mode, tera: env.params.tera, keepPlayed, sleepClause: env.params.sleepClause }, undefined, { exclusive: false }));
+    client.evaluate(serialized, {
+      depth, samples, mode, tera: env.params.tera, keepPlayed, sleepClause: env.params.sleepClause, ...sketchFields(engine),
+    }, undefined, { exclusive: false }));
   if (aborted(env)) return false;
   data.scores[turn - 1] = result.score;
   data.evalErrors[turn - 1] = null;
@@ -148,13 +161,13 @@ async function runFreshEvaluation(
     ({ turnVerified, turnSensitivity } = stage);
   }
   env.cacheRef.current.set(key, {
-    result, depth, samples, mode: mode, tera: env.params.tera,
+    result, depth, samples, mode: mode, tera: env.params.tera, ...sketchFields(engine),
     playedOutcome: outcomeStage.value,
     ...(turnVerified !== undefined ? { verified: turnVerified } : {}),
     ...(turnSensitivity !== undefined ? { sensitivity: turnSensitivity } : {}),
   });
   void saveStoredEval({
-    key: storeKey, result, depth, samples, mode: mode, tera: env.params.tera,
+    key: storeKey, result, depth, samples, mode: mode, tera: env.params.tera, ...sketchFields(engine),
     playedOutcome: outcomeStage.value,
     ...(turnVerified !== undefined ? { verified: turnVerified } : {}),
     ...(turnSensitivity !== undefined ? { sensitivity: turnSensitivity } : {}),
@@ -201,13 +214,14 @@ async function evalTurn(
     finishTurn();
     return true;
   }
-  const { depth, samples, mode } = resolution;
+  const { depth, samples, mode, prove } = resolution;
   const key = env.params.cacheKeyFor(turn);
   const storeKey = evalStoreKey(key, depth, samples, mode, env.params.tera);
   const turnPlayed = env.params.playedFor(turn);
   env.data.played[turn - 1] = turnPlayed;
+  const engine: TurnEngine = { depth, samples, mode, ...sketchFields({ prove }) };
   const resolvedSettings: EvalSettings = {
-    depth, samples, mode, tera: env.params.tera, sleepClause: env.params.sleepClause,
+    depth, samples, mode, tera: env.params.tera, sleepClause: env.params.sleepClause, ...sketchFields(engine),
   };
 
   // Monotone merge: the graph already holds a deeper result for this
@@ -218,9 +232,9 @@ async function evalTurn(
     return true;
   }
 
-  const hit = await loadTurnHit(env, key, storeKey, { depth, samples, mode });
+  const hit = await loadTurnHit(env, key, storeKey, engine);
   if (hit === 'abort') return false;
-  const stageArgs = { key, storeKey, turn, turnPlayed, engine: { depth, samples, mode }, resolvedSettings };
+  const stageArgs = { key, storeKey, turn, turnPlayed, engine, resolvedSettings };
   if (hit) {
     if (!(await installCachedTurn(env, { ...stageArgs, hit }, verify))) return false;
   } else if (!(await evaluateFreshTurn(env, stageArgs, verify))) {

@@ -33,6 +33,8 @@ interface EvaluateParams {
 
 export interface CachedEval {
   result: EvalResult;
+  /** Round 35: false marks a sketch result (no forced-win prover); a full pass never reuses it. */
+  prove?: boolean;
   // Engine-typed: the UI only offers depth 1/2, but sweeps cache whatever
   // EvalSettings the engine ran with.
   depth: EvalSettings['depth'];

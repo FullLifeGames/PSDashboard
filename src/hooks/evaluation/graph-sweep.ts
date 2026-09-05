@@ -287,7 +287,8 @@ async function runSweep(env: SweepEnv, opts: {
   const rangeTurns: number[] = [];
   for (let turn = from; turn <= to; turn++) rangeTurns.push(turn);
   const fullSettings: SweepSettings = { depth, samples, mode, tera: env.params.tera, sleepClause: env.params.sleepClause };
-  const fastSettings: SweepSettings = { depth: 1, samples: 1, mode: 'matrix', tera: env.params.tera, sleepClause: env.params.sleepClause };
+  // The sketch skips the forced-win prover (round 35): every sketch is replaced by the full pass.
+  const fastSettings: SweepSettings = { depth: 1, samples: 1, mode: 'matrix', tera: env.params.tera, sleepClause: env.params.sleepClause, prove: false };
   const isFast = depth === 1 && samples === 1 && mode === 'matrix';
 
   if (rangeTurns.length > 2 && !isFast) {

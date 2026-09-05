@@ -133,7 +133,7 @@ function bookDraws(
 
 /** The class path: null when any draw falls outside the plan (the caller takes the plain path). */
 function classChildren(
-  root: SimPosition, rootHp: number, events: CellEvent[], p1Choice: string, p2Choice: string, tie: boolean,
+  root: SimPosition, rootHp: number, events: CellEvent[], p1Choice: string, p2Choice: string, tie: boolean, drawBudget: number,
 ): EndgameChildren | null {
   const draws: Draw[] = SEARCH_SEEDS.map(seed => drawChild(root, rootHp, p1Choice, p2Choice, seed));
   const order = tie ? null : (events.length > 0 ? observeOrder(draws.map(draw => draw.log), events) : 'p1');
@@ -143,7 +143,7 @@ function classChildren(
   // boundary budget the root blend uses.
   let probe = 0;
   let grouped = bookDraws(draws, expected, events, tie, order);
-  while (grouped && [...expected.keys()].some(key => !grouped!.has(key)) && draws.length < BOUNDARY_DRAW_BUDGET && probe < PROBE_SEEDS.length) {
+  while (grouped && [...expected.keys()].some(key => !grouped!.has(key)) && draws.length < drawBudget && probe < PROBE_SEEDS.length) {
     draws.push(drawChild(root, rootHp, p1Choice, p2Choice, PROBE_SEEDS[probe++]));
     grouped = bookDraws(draws, expected, events, tie, order);
   }
@@ -167,13 +167,18 @@ function plainChildren(root: SimPosition, battle: Battle, rootHp: number, p1Choi
   return { children: [{ position: pick.position, weight: 1, share: 1, ended: pick.ended }], unpriced, plain: true, spread };
 }
 
-export function endgameChildren(root: SimPosition, p1Choice: string, p2Choice: string): EndgameChildren {
+/**
+ * `drawBudget` caps the draws a class cell may take chasing classes the base
+ * draws never showed (the root blend's BOUNDARY_DRAW_BUDGET by default, the
+ * solver's exactness; the prover passes less and leaves rare classes open).
+ */
+export function endgameChildren(root: SimPosition, p1Choice: string, p2Choice: string, drawBudget = BOUNDARY_DRAW_BUDGET): EndgameChildren {
   const battle = positionBattle(root);
   const rootHp = totalHp(battle);
   const plan = planCellEvents(battle, p1Choice, p2Choice);
   const tie = speedTie(battle, p1Choice, p2Choice);
   if (plan.kind === 'events' || (plan.kind === 'none' && tie)) {
-    const grouped = classChildren(root, rootHp, plan.kind === 'events' ? plan.events : [], p1Choice, p2Choice, tie);
+    const grouped = classChildren(root, rootHp, plan.kind === 'events' ? plan.events : [], p1Choice, p2Choice, tie, drawBudget);
     if (grouped) return grouped;
   }
   return plainChildren(root, battle, rootHp, p1Choice, p2Choice);

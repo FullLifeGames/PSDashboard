@@ -29,6 +29,12 @@ export interface EvalSettings {
    * so played-vs-best regret stays computable.
    */
   keepPlayed?: { p1Slots?: (PlayedAction | null)[]; p2Slots?: (PlayedAction | null)[] } | null;
+  /**
+   * Round 35: false skips the forced-win prover after the root search. The
+   * graph sweep's sketch pass sets it (every sketch is replaced by the full
+   * pass, so its proof would only cost); everything else proves.
+   */
+  prove?: boolean;
 }
 
 /**
@@ -282,6 +288,8 @@ export interface ForcedWin {
   states: number;
 }
 
+/** The endgame scope (rounds 34 and 35): at most this many living bodies on the board. */
+export const ENDGAME_MAX_BODIES = 3;
 /** Proofs below this mass change nothing (round 35). */
 export const MIN_FORCED_MASS = 0.5;
 /** Proofs at or above this mass are spoken (round 35). */
@@ -304,6 +312,8 @@ export interface ForcedWinProof {
   /** p1-perspective static of the open root children, share-weighted; null without open root children. */
   openValue: number | null;
   states: number;
+  /** Matrix cells drawn (both side attempts); the prover's cost. */
+  cells: number;
 }
 
 export interface ForcedWinOutcome { side: 'p1' | 'p2'; proof: ForcedWinProof }

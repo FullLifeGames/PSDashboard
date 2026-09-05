@@ -1,4 +1,5 @@
 import type { Battle } from '@pkmn/sim';
+import { ENDGAME_MAX_BODIES } from '../types.ts';
 import { createMatchupCache, type MatchupCache } from '../eval-function.ts';
 import { createRootPosition, positionBattle, type SimPosition } from '../forward-model.ts';
 import { solveMatrixGame } from '../ranking/solve.ts';
@@ -37,7 +38,7 @@ export interface EndgameResult {
   pv: string[];
 }
 
-const MAX_BODIES = 3;
+const MAX_BODIES = ENDGAME_MAX_BODIES;
 const PV_LIMIT = 12;
 
 export function endgameScope(battle: Battle): boolean {

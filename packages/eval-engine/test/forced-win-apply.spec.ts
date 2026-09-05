@@ -1,7 +1,7 @@
 import { test, expect } from '@playwright/test';
 import { Battle, State, Teams, toID } from '@pkmn/sim';
 import type { PokemonSet } from '@pkmn/sim';
-import { applyForcedWin, forcedWinInput } from '../src/search/forced-win-apply';
+import { applyForcedWin, forcedWinInput, forcedWinPossible } from '../src/search/forced-win-apply';
 import { forcedWinFor, forcedWinSides } from '../src/search/forced-win';
 import { createRootPosition, positionBattle } from '../src/forward-model';
 import type { EvalResult, RankedChoice } from '../src/types';
@@ -79,6 +79,29 @@ test.describe('forced-win trigger and bar (round 35)', () => {
       score: 0.1, rootOrder: { p1: [], p2: [] },
       unanswered: { p1: [], p2: [], nearDecided: { side: 'p1', species: 'Machamp', odds: 0.95, removes: 'Chansey' } },
     })).toEqual(['p1']);
+  });
+
+  test('forcedWinPossible mirrors the trigger without the sim: profiles, small boards, the last pair', () => {
+    const noProfile = { score: 0.5, rootOrder: { p1: [], p2: [] } };
+    const full = JSON.stringify(State.serializeBattle(makeBattle(
+      [makeSet('A', 'Machamp', ['Seismic Toss']), makeSet('B', 'Chansey', ['Soft-Boiled']), makeSet('C', 'Snorlax', ['Rest'])],
+      [makeSet('D', 'Machamp', ['Seismic Toss']), makeSet('E', 'Chansey', ['Soft-Boiled']), makeSet('F', 'Snorlax', ['Rest'])],
+    )));
+    expect(forcedWinPossible(full, noProfile)).toBe(false);
+    expect(forcedWinPossible(full, { ...noProfile, unanswered: { p1: [], p2: [], decided: { side: 'p1', species: 'Machamp' } } })).toBe(true);
+    expect(forcedWinPossible(full, {
+      ...noProfile, unanswered: { p1: [], p2: [], nearDecided: { side: 'p2', species: 'Machamp', odds: 0.9, removes: 'Chansey' } },
+    })).toBe(true);
+    const pair = serializeAt(makeBattle([makeSet('Champ', 'Machamp', ['Seismic Toss'])], [makeSet('Egg', 'Chansey', ['Soft-Boiled'])]), { p2: [1] });
+    expect(forcedWinPossible(pair, noProfile)).toBe(true);
+    const twoVsOne = makeBattle(
+      [makeSet('A', 'Machamp', ['Seismic Toss']), makeSet('B', 'Chansey', ['Soft-Boiled'])],
+      [makeSet('D', 'Machamp', ['Seismic Toss']), makeSet('E', 'Chansey', ['Soft-Boiled'])],
+    );
+    twoVsOne.sides[1].pokemon[1].faint();
+    twoVsOne.faintMessages();
+    expect(forcedWinPossible(JSON.stringify(State.serializeBattle(twoVsOne)), noProfile)).toBe(true);
+    expect(forcedWinPossible('not json', noProfile)).toBe(true);
   });
 
   test('forcedWinFor proves the endgame for the favored side and the bar lifts the score to the mass', () => {

@@ -244,7 +244,9 @@ export function mctsSearch(
   callbacks?: MctsCallbacks,
 ): EvalResult {
   const { result } = runMcts(serializedBattle, settings, callbacks);
-  applyForcedWin(result, perfSync('prover', () => forcedWinFor(createRootPosition(serializedBattle), forcedWinInput(result, settings))));
+  if (settings.prove !== false) {
+    applyForcedWin(result, perfSync('prover', () => forcedWinFor(createRootPosition(serializedBattle), forcedWinInput(result, settings))));
+  }
   return result;
 }
 

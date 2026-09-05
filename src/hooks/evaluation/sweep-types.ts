@@ -121,6 +121,8 @@ export interface TurnEngine {
   depth: EvalSettings['depth'];
   samples: EvalSettings['samples'];
   mode: EngineMode;
+  /** Round 35: false marks a sketch that skips the forced-win prover (see EvalSettings.prove). */
+  prove?: boolean;
 }
 
 /** What every per-turn stage needs about the turn it works on. */

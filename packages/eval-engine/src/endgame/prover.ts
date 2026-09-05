@@ -18,11 +18,18 @@ import { endgameKey } from './key.ts';
  * the proven MASS (the analytic share of the classes proven along every
  * reply), a lower bound on the win probability under the class model.
  * Crits sit outside the model (caveat 'barring-crit'); plain-path cells
- * (doubles, guards) prove over the sampled rolls only. A states cap keeps
- * it cheap and deterministic; no wall clock.
+ * (doubles, guards) prove over the sampled rolls only. A cells cap (matrix
+ * cells drawn, the cost that scales with the reply count) and a states cap
+ * keep it cheap and deterministic; no wall clock.
  */
-export interface ProverBudget { states: number; depth: number }
-export const PROVER_BUDGET: ProverBudget = { states: 200, depth: 12 };
+export interface ProverBudget { states: number; cells: number; depth: number }
+export const PROVER_BUDGET: ProverBudget = { states: 200, cells: 30, depth: 12 };
+/**
+ * Draws per class cell: the base draws plus a few probes. A class the draws
+ * never show stays OPEN (its share leaves the mass), so the prover needs
+ * fewer probes than the solver, which prices every class.
+ */
+const PROVER_DRAW_BUDGET = 6;
 /** Own candidates tried at the root (ranking order) and at inner nodes (odds order). */
 const ROOT_CANDIDATES = 3;
 const INNER_CANDIDATES = 2;
@@ -34,8 +41,8 @@ export interface ProveRequest {
   tera?: TeraAllowance;
   sleepClause?: boolean;
   budget?: Partial<ProverBudget>;
-  /** States already spent by an earlier attempt on this position. */
-  spent?: number;
+  /** States and cells already spent by an earlier attempt on this position. */
+  spent?: { states: number; cells: number };
 }
 
 type Side = 'p1' | 'p2';
@@ -124,12 +131,17 @@ class ForcedWinProver {
   private readonly opts: ProverOptions;
   private readonly budget: ProverBudget;
   states: number;
+  cells: number;
+  /** The cells cap of the root candidate under trial (its share of what is left). */
+  private cap: number;
 
-  constructor(side: Side, opts: ProverOptions, budget: ProverBudget, spent: number) {
+  constructor(side: Side, opts: ProverOptions, budget: ProverBudget, spent: { states: number; cells: number }) {
     this.side = side;
     this.opts = opts;
     this.budget = budget;
-    this.states = spent;
+    this.states = spent.states;
+    this.cells = spent.cells;
+    this.cap = budget.cells;
   }
 
   prove(position: SimPosition, ply: number): Proven {
@@ -154,8 +166,12 @@ class ForcedWinProver {
     const replies = searchOptions(position, other(this.side), this.opts);
     if (own.length === 0 || replies.length === 0) return { proven: NONE, cells: [] };
     const ordered = rootOrder && rootOrder.length > 0 ? orderByRanking(own, rootOrder) : orderByOdds(battle, this.side, own);
+    const candidates = ordered.slice(0, rootOrder ? ROOT_CANDIDATES : INNER_CANDIDATES);
     let best: ReplyProof = { proven: NONE, cells: [] };
-    for (const candidate of ordered.slice(0, rootOrder ? ROOT_CANDIDATES : INNER_CANDIDATES)) {
+    for (const [index, candidate] of candidates.entries()) {
+      // Root candidates share the cells budget in equal slices of what is
+      // left, so a fruitless first candidate cannot starve the second.
+      if (rootOrder) this.cap = this.cells + Math.floor((this.budget.cells - this.cells) / (candidates.length - index));
       const attempt = this.replies(position, candidate.choice, replies, ply);
       if (attempt.proven.mass > best.proven.mass) best = attempt;
       if (best.proven.mass >= 1) break;
@@ -166,9 +182,11 @@ class ForcedWinProver {
   /** The AND node: every reply, worst static first; the running minimum stops at the first escape. */
   private replies(position: SimPosition, ownChoice: string, replies: ChoiceOption[], ply: number): ReplyProof {
     const battle = positionBattle(position);
+    if (this.cells + replies.length > this.cap) return { proven: NONE, cells: [] };
+    this.cells += replies.length;
     const cells: Cell[] = replies.map(reply => {
       const [p1Choice, p2Choice] = this.side === 'p1' ? [ownChoice, reply.choice] : [reply.choice, ownChoice];
-      return { reply, p1Choice, p2Choice, ...endgameChildren(position, p1Choice, p2Choice) };
+      return { reply, p1Choice, p2Choice, ...endgameChildren(position, p1Choice, p2Choice, PROVER_DRAW_BUDGET) };
     });
     cells.sort((a, b) => this.ownStatic(a) - this.ownStatic(b));
     const proofs: CellProof[] = [];
@@ -193,7 +211,10 @@ class ForcedWinProver {
   }
 
   private cell(root: Battle, cell: Cell, ply: number): CellProof {
-    if (cell.unpriced) return { cell, proofs: [], proven: NONE };
+    // A plain cell whose draws disagree on a knock-out has no class to
+    // prove per; a class cell with a class the draws never showed keeps
+    // that class open (its share never enters the mass) and proves the rest.
+    if (cell.unpriced && cell.plain) return { cell, proofs: [], proven: NONE };
     const proofs = cell.children.map(child => this.prove(child.position, ply + 1));
     let mass = 0;
     let turns = 0;
@@ -249,10 +270,11 @@ export function proveForcedWin(rootOrSerialized: string | SimPosition, request: 
   const root = typeof rootOrSerialized === 'string' ? createRootPosition(rootOrSerialized) : rootOrSerialized;
   const battle = positionBattle(root);
   const budget = { ...PROVER_BUDGET, ...request.budget };
-  const prover = new ForcedWinProver(request.side, { tera: request.tera, sleepClause: request.sleepClause }, budget, request.spent ?? 0);
-  if (battle.ended || prover.states >= budget.states) return { ...NONE, openValue: null, states: prover.states };
+  const spent = request.spent ?? { states: 0, cells: 0 };
+  const prover = new ForcedWinProver(request.side, { tera: request.tera, sleepClause: request.sleepClause }, budget, spent);
+  if (battle.ended || prover.states >= budget.states) return { ...NONE, openValue: null, states: prover.states, cells: prover.cells };
   prover.states += 1;
   const { proven, cells } = prover.expand(root, 0, request.rootOrder);
   const fields = openFields(battle, request.side, cells, createMatchupCache());
-  return { ...proven, ...fields, states: prover.states };
+  return { ...proven, ...fields, states: prover.states, cells: prover.cells };
 }

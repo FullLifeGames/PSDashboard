@@ -199,8 +199,14 @@ export async function searchOrchestrated(
   }
 
   await applyTrendLayersAsync(state, result, stopped);
-  if (!callbacks?.shouldStop?.()) {
-    applyForcedWin(result, await perfSpan('prover', () => executor.prove(forcedWinInput(result, settings))));
-  }
+  await proveRoot(executor, result, settings, callbacks);
   return result;
+}
+
+/** Round 35: the forced-win prover on the finished root, unless the settings skip it or the search was stopped. */
+async function proveRoot(
+  executor: SearchExecutor, result: EvalResult, settings: EvalSettings, callbacks?: OrchestratorCallbacks,
+): Promise<void> {
+  if (settings.prove === false || callbacks?.shouldStop?.()) return;
+  applyForcedWin(result, await perfSpan('prover', () => executor.prove(forcedWinInput(result, settings))));
 }
