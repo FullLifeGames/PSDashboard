@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect, describe } from 'vitest';
 import { buildTeamsFromReplay, solveReplaySpreads } from '../packages/replay-core/src/team-builder';
 import { inferOpponentTeam } from '../packages/replay-core/src/opponent-inferrer';
 import { parseReplayLogWithObservations } from '../packages/replay-core/src/protocol-parser';
@@ -13,7 +13,7 @@ import { buildSensitivityTargets } from '../src/lib/team-knowledge';
  * from a guessed set) reaches the built set AND the stats panel overlay
  * with the same value, so the sim and the panel never disagree on an item.
  */
-test.describe('Choice Scarf inference reaches the build and the panel', () => {
+describe('Choice Scarf inference reaches the build and the panel', () => {
   const log = (extra: string[] = []) => [
     '|player|p1|Alice|', '|player|p2|Bob|', '|gen|8', '|tier|[Gen 8] OU',
     '|poke|p1|Magnezone|', '|poke|p1|Garchomp, M|', '|poke|p2|Corviknight, M|',

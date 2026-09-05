@@ -435,7 +435,7 @@ describe('speed-order evidence', () => {
 
 // Round 37: conditional priority, quick items, field speed, always-last
 // abilities, and a Scarf that changed hands explain an order without Speed.
-test.describe('speed-order cleanliness', () => {
+describe('speed-order cleanliness', () => {
   const singlesLog = (mons: [string, string], body: string[], pre: string[] = []) => [
     '|player|p1|Alice|', '|player|p2|Bob|', '|teamsize|p1|2', '|teamsize|p2|2',
     '|gen|9', '|gametype|singles', '|tier|[Gen 9] OU', '|start',
