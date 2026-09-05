@@ -312,6 +312,45 @@ describe('speed-order evidence', () => {
     }]);
   });
 
+  test('a Sleep Talk after the sleep line is still the mover\'s action', () => {
+    const { speedOrders } = parseReplayLogWithObservations(speedLog([
+      '|move|p2a: Val|Moonblast|p1a: Fast',
+      '|cant|p1a: Fast|slp',
+      '|move|p1a: Fast|Sleep Talk|p1a: Fast',
+      '|move|p1a: Fast|Air Slash|p2a: Val|[from] move: Sleep Talk',
+      '|turn|2',
+    ]));
+    expect(speedOrders).toEqual([{
+      firstSide: 'p2', firstSpecies: 'Iron Valiant', secondSide: 'p1', secondSpecies: 'Noivern', turn: 1,
+    }]);
+  });
+
+  test('a Pursuit on a U-turn user moved second: the U-turn won the race', () => {
+    const { speedOrders } = parseReplayLogWithObservations(speedLog([
+      '|move|p1a: Fast|U-turn|p2a: Val',
+      '|-damage|p2a: Val|80/100',
+      '|-activate|p1a: Fast|move: Pursuit',
+      '|move|p2a: Val|Pursuit|p1a: Fast|[from]Pursuit',
+      '|-damage|p1a: Fast|50/100',
+      '|switch|p1a: Wall|Corviknight, M|100/100',
+      '|turn|2',
+    ]));
+    expect(speedOrders).toEqual([{
+      firstSide: 'p1', firstSpecies: 'Noivern', secondSide: 'p2', secondSpecies: 'Iron Valiant', turn: 1,
+    }]);
+  });
+
+  test('a Pursuit knock-out on a switching target is no race', () => {
+    const { speedOrders } = parseReplayLogWithObservations(speedLog([
+      '|-activate|p1a: Fast|move: Pursuit',
+      '|move|p2a: Val|Pursuit|p1a: Fast|[from]Pursuit',
+      '|-damage|p1a: Fast|0 fnt',
+      '|faint|p1a: Fast',
+      '|turn|2',
+    ]));
+    expect(speedOrders).toEqual([]);
+  });
+
   // Round 37: doubles turns prove every opposite-side pair, copied actions
   // and rearranged slots do not.
   const doublesLog = (body: string[]) => [

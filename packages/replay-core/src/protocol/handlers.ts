@@ -2,7 +2,7 @@ import type { Battle, Pokemon, Side, Field } from '@pkmn/client';
 import type { GenerationNum } from '@pkmn/data';
 import type { PokemonSnapshot, SideSnapshot, FieldSnapshot } from '../types.ts';
 import { flushSpeedOrder, gens, speedContaminatedAt, type ClientIdent, type ParserState, type PendingMove } from './parser-state.ts';
-import { firstMoverContaminated, foreignAction, secondMoverContaminated } from './speed-evidence.ts';
+import { firstMoverContaminated, foreignAction, secondMoverContaminated, switchTriggered } from './speed-evidence.ts';
 import { toId } from '../ids.ts';
 
 const SCREEN_IDS = ['reflect', 'lightscreen', 'auroraveil'];
@@ -94,17 +94,18 @@ export function handleMove(state: ParserState, line: string) {
   const side: 'p1' | 'p2' = ident.startsWith('p1') ? 'p1' : 'p2';
   const mover = ident ? battle.getPokemon(ident as ClientIdent) : undefined;
   const moveId = toId(parts[3] ?? '');
-  // A copied or switch-triggered action (Dancer, Instruct, a bounced
-  // status move, Pursuit on a switch) is a real hit for the damage fit
-  // but no race; a mover's second line (Sleep Talk's called move) is the
-  // same action as its first.
+  // A copied action (Dancer, Instruct, a bounced status move) is a real hit
+  // for the damage fit but no race; a Pursuit on a switching target fired at
+  // the switch, so it claims no first place; a mover's second line (Sleep
+  // Talk's called move) is the same action as its first.
   const race = !foreignAction(line);
-  const { cleanFirst, cleanSecond } = speedCleanliness(state, ident, moveId);
+  const clean = speedCleanliness(state, ident, moveId);
+  const cleanFirst = clean.cleanFirst && !switchTriggered(line);
   const speciesForme = mover?.speciesForme ?? '';
   state.lastMove = pendingMoveFor(parts, moveId, side, speciesForme, cleanFirst && race);
-  if (ident && race && !state.actedThisTurn.has(ident)) {
+  if (ident && race && !state.turnMovers.some(entry => entry.ident === ident)) {
     state.actedThisTurn.add(ident);
-    state.turnMovers.push({ side, species: speciesForme, ident, cleanFirst, cleanSecond });
+    state.turnMovers.push({ side, species: speciesForme, ident, cleanFirst, cleanSecond: clean.cleanSecond });
   }
 }
 

@@ -11,7 +11,8 @@ import { toId } from '../ids.ts';
  * act early; Stall and Mycelium Might make a second mover act last.
  */
 
-const NOT_A_RACE = /\[from\]\s?(?:ability: |move: )?(?:Dancer|Instruct|Magic Bounce|Magic Coat|Snatch|Pursuit)/;
+const NOT_A_RACE = /\[from\]\s?(?:ability: |move: )?(?:Dancer|Instruct|Magic Bounce|Magic Coat|Snatch)/;
+const AT_THE_SWITCH = /\[from\]\s?Pursuit/;
 
 const WEATHER_ABILITY: Record<string, RegExp> = {
   swiftswim: /^(?:Rain|Heavy Rain)$/,
@@ -23,6 +24,15 @@ const WEATHER_ABILITY: Record<string, RegExp> = {
 /** A move line that was not this mover's own place in the turn order. */
 export function foreignAction(line: string): boolean {
   return NOT_A_RACE.test(line);
+}
+
+/**
+ * A Pursuit on a switching target fires at the switch: no claim to have
+ * moved first, but still the mover's action (a U-turn user that moved
+ * before it did win the race).
+ */
+export function switchTriggered(line: string): boolean {
+  return AT_THE_SWITCH.test(line);
 }
 
 /**
