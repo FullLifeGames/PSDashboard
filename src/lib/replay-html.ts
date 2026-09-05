@@ -21,9 +21,21 @@ body{padding:12px 0;background:#344b6c;}
 .wrapper {max-width:1180px;margin:0 auto;}
 </style>`;
 
+/**
+ * Showdown's route table (play.pokemonshowdown.com/config/config.js). The
+ * embed loader appends its dependencies as dynamic scripts, which run in
+ * any order, and battledata.js reads `window.Config ? Config.routes.client
+ * : default` at load time: a predefined Config WITHOUT routes crashes it
+ * before Dex exists. Our mute stub therefore carries the routes; config.js
+ * keeps its own when it has already run.
+ */
+const PS_CONFIG_DEFAULTS = "{routes: {root: 'pokemonshowdown.com', client: 'play.pokemonshowdown.com', "
+  + "dex: 'dex.pokemonshowdown.com', replays: 'replay.pokemonshowdown.com', users: 'pokemonshowdown.com/users', "
+  + "teams: 'teams.pokemonshowdown.com'}}";
+
 /** Mutes the embed before it loads: every media handle it can reach becomes a silent stub. */
 const SILENT_AUDIO_SCRIPT = `<script>
-window.Config = Object.assign({}, window.Config || {}, {sound: false, mute: true});
+window.Config = Object.assign({}, ${PS_CONFIG_DEFAULTS}, window.Config || {}, {sound: false, mute: true});
 window.__psMakeSilentMedia = function makeSilentMediaHandle() {
   return {
     autoplay: false,
@@ -77,7 +89,7 @@ document.write('<script src="https://play.pokemonshowdown.com/js/replay-embed.js
 /** The parent bridge: seek and append messages in, ready and turn reports out. */
 const REPLAY_BRIDGE_BODY = `
   function silenceAudio() {
-    window.Config = Object.assign({}, window.Config || {}, {sound: false, mute: true});
+    window.Config = Object.assign({}, ${PS_CONFIG_DEFAULTS}, window.Config || {}, {sound: false, mute: true});
     if (window.__psPatchBattleSound) window.__psPatchBattleSound();
     if (typeof Replays !== 'undefined' && Replays.battle && Replays.battle.sound) {
       Replays.battle.sound.muted = true;

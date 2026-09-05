@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import { runInNewContext } from 'node:vm';
 import { generateReplayHtml } from '../src/lib/replay-html';
 
 const log = '|start\n|turn|1\n|turn|2';
@@ -45,6 +46,34 @@ test.describe('Replay iframe HTML', () => {
     expect(html).toContain('Replays.battle.setViewpoint(pendingViewpoint)');
 
     expect(generateReplayHtml({ log })).toContain('var pendingViewpoint = null;');
+  });
+
+  test('predefines Showdown\'s Config.routes so battledata.js survives loading before config.js', () => {
+    // replay-embed.js appends its dependencies as dynamic scripts, which the
+    // browser may execute in any order. battledata.js (client 0.11.2) reads
+    // `window.Config ? Config.routes.client : default` at load time: a
+    // predefined Config WITHOUT routes crashes it, and Dex never exists.
+    const html = generateReplayHtml({ log, seekTurn: 2, viewpoint: 'p2', reportTurn: true });
+    const scripts = [...html.matchAll(/<script>([\s\S]*?)<\/script>/g)].map(match => match[1])
+      .filter(body => !body.includes('replay-embed.js'));
+    expect(scripts.length).toBeGreaterThanOrEqual(3);
+    const run = (window: Record<string, unknown>) => {
+      const sandbox: Record<string, unknown> = {
+        ...window, setInterval: () => 0, setTimeout: () => 0, parent: { postMessage() {} }, addEventListener() {},
+      };
+      sandbox.window = sandbox;
+      for (const body of scripts) runInNewContext(body, sandbox);
+      return sandbox.Config as { routes: Record<string, string>; sound: boolean; mute: boolean };
+    };
+    // A page that predefines nothing: our stub carries Showdown's own route table.
+    const fresh = run({});
+    expect(fresh.routes.client).toBe('play.pokemonshowdown.com');
+    expect(fresh.routes.replays).toBe('replay.pokemonshowdown.com');
+    expect(fresh.mute).toBe(true);
+    // config.js already ran: its routes win over our defaults, the mute stays.
+    const configured = run({ Config: { routes: { client: 'mirror.example', root: 'example' }, sound: true } });
+    expect(configured.routes.client).toBe('mirror.example');
+    expect(configured.sound).toBe(false);
   });
 
   test('disables Showdown replay sound before embed code loads', () => {
