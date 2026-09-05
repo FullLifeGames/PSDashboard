@@ -17,7 +17,7 @@
 
 /** |cant| reasons that are dice: full paralysis, flinch, freeze, sleep.
  * (Rest sleep is fixed-length — a documented over-inclusion.) */
-const CHANCE_CANT = new Set(['slp', 'par', 'frz', 'flinch']);
+export const CHANCE_CANT: ReadonlySet<string> = new Set(['slp', 'par', 'frz', 'flinch']);
 
 function diceLine(line: string): boolean {
   if (line.startsWith('|-crit|') || line.startsWith('|-miss|')) return true;

@@ -145,6 +145,15 @@ function stayedFeedPayoff(
   return bestWindowPayoff(chain, key, safe.worstCase).payoff;
 }
 
+/**
+ * The body's own action failed by dice while its move carried a knock-out:
+ * a hit would have kept it alive, so nobody fed it (573756 t73, round 40).
+ * Without knock-out odds on the played line the feed reading stands.
+ */
+function deniedByDice(sack: SackInfo, played: RankedChoice | null): boolean {
+  return sack.rolled !== undefined && (played?.koOdds?.killFraction ?? 0) > 0;
+}
+
 /** What the sack gates decided: whether the leniency applies and, for a stayed feed, its windowed payoff. */
 interface SackGate {
   sackApplies: boolean;
@@ -159,7 +168,9 @@ interface SackGate {
  * game ends and gap turns fail closed); a stayed feed only when the
  * realized outcome landed on the played line's priced floor AND the
  * windowed payoff over the safe guarantee clears the read margin (573756
- * t68). Fails closed.
+ * t68). Fails closed. Before any shape: a body whose own action the dice
+ * failed while its move carried a knock-out was not fed — a hit would have
+ * kept it alive (573756 t73, round 40) — so no shape applies.
  */
 function sackGate(
   params: AnalyzeTurnParams,
@@ -170,7 +181,7 @@ function sackGate(
 ): SackGate {
   let sackApplies = false;
   let feedPayoff: number | null = null;
-  if (sack) {
+  if (sack && !deniedByDice(sack, played)) {
     if (sack.stayed) {
       const payoff = stayedFeedPayoff(params, key, played, safe);
       sackApplies = payoff !== null && payoff >= RISK_PAYOFF_MARGIN;

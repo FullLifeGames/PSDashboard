@@ -4,6 +4,7 @@
  */
 
 import { type TurnSnapshot, toId, type SideId } from '@fulllifegames/replay-core';
+import { CHANCE_CANT } from './dice-events.ts';
 
 export interface PlayedAction {
   kind: 'move' | 'switch';
@@ -284,6 +285,15 @@ export interface SackInfo {
    * top, so the verdict cleared entirely instead of demoting one band.
    */
   verified?: true;
+  /**
+   * The fainted body's OWN action this turn failed by dice — its move
+   * missed, or a dice |cant| (full paralysis, flinch, freeze, sleep) held
+   * it. The verdict layer refuses the feed framing when that move carried a
+   * knock-out: a hit would have kept the body alive (573756 t73: +4
+   * Garchomp at 11 % moved first, Fire Fang missed, Body Press killed it —
+   * a roll, not a trade).
+   */
+  rolled?: 'miss' | 'cant';
 }
 
 /** Below this pre-turn HP fraction a faint reads as a sacrifice, not a loss. */
@@ -393,6 +403,8 @@ export function detectSacks(
   const entered: Entered = new Map();
   /** Slots force-dragged in this turn — a drag is never a deliberate feed. */
   const dragged = new Set<string>();
+  /** Slots whose own action the dice failed this turn (a miss, a dice |cant|). */
+  const rolled = new Map<string, 'miss' | 'cant'>();
 
   for (const line of events) {
     const switchMatch = line.match(/^\|switch\|(p[12][a-d]): ([^|]+)\|[^|]*\|(\d+)\/(\d+)/);
@@ -408,12 +420,25 @@ export function detectSacks(
       dragged.add(dragMatch[1]);
       continue;
     }
+    const missMatch = (line.startsWith('|move|') && line.includes('|[miss]') ? line : '').match(/^\|move\|(p[12][a-d]):/)
+      ?? line.match(/^\|-miss\|(p[12][a-d]):/);
+    if (missMatch) {
+      rolled.set(missMatch[1], 'miss');
+      continue;
+    }
+    const cantMatch = line.match(/^\|cant\|(p[12][a-d]):[^|]*\|([^|]*)/);
+    if (cantMatch) {
+      if (CHANCE_CANT.has(cantMatch[2])) rolled.set(cantMatch[1], 'cant');
+      continue;
+    }
     const match = line.match(/^\|faint\|(p[12])([a-d]):\s*(.+)$/);
     if (!match) continue;
     const side = match[1] as SideId;
     if (sacks[side]) continue;
     const sack = sackForFaint(side, match[2], match[3].trim(), snapshotBefore, entered, dragged);
-    if (sack) sacks[side] = sack;
+    if (!sack) continue;
+    const roll = rolled.get(`${side}${match[2]}`);
+    sacks[side] = roll ? { ...sack, rolled: roll } : sack;
   }
 
   return sacks;
