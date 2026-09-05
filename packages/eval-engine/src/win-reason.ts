@@ -56,7 +56,7 @@ export interface WinPathResult {
 }
 
 /** A win-path factor must reach a mistake-sized edge before it may claim the game. */
-export const WIN_PATH_FLOOR = TIER_THRESHOLDS.mistake;
+const WIN_PATH_FLOOR = TIER_THRESHOLDS.mistake;
 /** Net chance worth a luck sentence — shared with the report's luck line. */
 export const LUCK_TOTAL_THRESHOLD = 0.25;
 /** How many turns before the favor boundary the grind detector looks at. */
