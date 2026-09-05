@@ -58,7 +58,7 @@ export function installFakeWorker(answer?: EvalScript): typeof FakeWorker {
   return FakeWorker;
 }
 
-type ReplayScript = (request: ReplayJobRequest) => ReplayJobResponse[];
+type ReplayScript = (request: ReplayJobRequest) => ReplayJobResponse[] | Promise<ReplayJobResponse[]>;
 
 /**
  * A replay worker client over a scripted WorkerLike: every job request is
@@ -75,9 +75,11 @@ export function fakeReplayWorkerClient(script: ReplayScript) {
       onerror: null,
       postMessage(request) {
         requests.push(request);
-        for (const response of script(request)) {
-          queueMicrotask(() => worker.onmessage?.({ data: { ...response, id: request.id } }));
-        }
+        void Promise.resolve(script(request)).then(responses => {
+          for (const response of responses) {
+            queueMicrotask(() => worker.onmessage?.({ data: { ...response, id: request.id } }));
+          }
+        });
       },
       terminate() {},
     };
@@ -85,4 +87,28 @@ export function fakeReplayWorkerClient(script: ReplayScript) {
   };
   const client = new ReplayWorkerClient(spawn);
   return { client, requests, spawnCount: () => spawns };
+}
+
+/**
+ * A replay worker client whose "worker" is the real job handler running on
+ * the test's own thread: reconstructions and spread solves happen for real,
+ * only the thread boundary is gone. For the controller layers, which need
+ * positions that adopt into live branches.
+ */
+export function realReplayWorkerClient() {
+  const requests: ReplayJobRequest[] = [];
+  const spawn = (): WorkerLike => {
+    const worker: WorkerLike = {
+      onmessage: null,
+      onerror: null,
+      postMessage(request) {
+        requests.push(request);
+        void import('../../src/lib/replay-jobs/handlers').then(({ handleReplayJob }) =>
+          handleReplayJob(request, response => worker.onmessage?.({ data: response })));
+      },
+      terminate() {},
+    };
+    return worker;
+  };
+  return { client: new ReplayWorkerClient(spawn), requests };
 }
