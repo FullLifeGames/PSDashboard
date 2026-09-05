@@ -892,6 +892,104 @@ import { summaryLines } from './calibration-summary';
  * static basis for this mass; the next lever, if any, is search/
  * planning-side.
  *
+ * TURN-73 ROUND 2026-09-05 (improvement round 40; spec
+ * docs/superpowers/specs/2026-09-05-round-40-design.md; worktree r40 on
+ * 0e65d2c while the second session committed on master; d0a32f3 HP EVs
+ * from the log's maximum HP + a satisfied order keeps its Speed / 6adf7da
+ * a death after the mon's own miss or dice cant is no sack / 5895ab5 the
+ * bench keeps the sim's HP / 1d12b4c cache v43). The user's turn: 573756
+ * t73, a +4 Garchomp at 11% one 95% Fire Fang from clearing Corviknight,
+ * the miss, Body Press taking it. The app called Body Press an inaccuracy
+ * (Defog 23% vs 18%), named Scale Shot LordEnz's best move over Fire
+ * Fang, wrote "sacked Penal Battalion — a low-cost trade", and booked the
+ * miss as −4% chance AGAINST SoulWind. The probe
+ * (docs/perf/probes/2026-09-05-t73/t73-probe.spec.ts, app team path, the
+ * sweep's four trees + verify + deepen) reproduced all of it — regret
+ * 0.166, chance −0.083, Scale Shot −0.651 vs Fire Fang −0.649 own-p2 —
+ * and found the hit child (Corviknight down, Kyurem in) priced 29% for
+ * SoulWind while the miss child priced 19%: the sim held the HIT to be
+ * the better outcome for the defender. Four causes, each with evidence:
+ * (1) the spread fitter had Garchomp at 265 Speed under Kyurem's 280 —
+ * since round 37 its prior (Jolly 252/252, 333) satisfies every observed
+ * order, which the solver counted as MEASURED Speed, so a 252-HP rung won
+ * the damage lines and the budget shaved the Speed to 4; the fit table
+ * showed every candidate from 265 to 333 at error 0 (the evidence is
+ * silent on Speed), and the log's 409/409 pins 208 HP EVs, so 208 + 48 +
+ * 252 = 508 is the real set and the 252-HP rung contradicts the log.
+ * (2) The verify step deepened the equilibrium column's cells on the
+ * first-seed child (the 10% miss vanished; three rows collapsed to
+ * −0.824) and left the Defog row unverified at −0.658 — rows compared at
+ * unequal depth, the tier an artefact (open, A.1 depth consistency).
+ * (3) detectSacks read any faint under 15% as a deliberate feed. (4)
+ * correctHpFromSnapshot wrote every body's HP from the spectator
+ * snapshot, bench included: both Toxapex sat at 70% and 81% while the
+ * real ones had regenerated to full (Regenerator is silent in the
+ * protocol). Overrides confirmed the hypothesis before any code moved:
+ * Garchomp 208/48/252 Jolly alone → hit child 7.7% (matrix d2 0.0%),
+ * regret 0.013, Fire Fang best, chance +0.19; with the likely real
+ * Kyurem (56/200/252 Timid) chance +0.31.
+ * FIXES: observedMaxHp reads every switch/drag line's exact maximum HP
+ * (percent logs skipped), hpEvsForMaxHp inverts the HP formula (exact at
+ * level 100, nearest the prior below), the solver fixes those EVs in
+ * every rung, never shaves them, keeps them when the damage fit forfeits,
+ * and under the observation minimum sets them inside the prior without a
+ * ladder. speedMeasured replaces speedRepairable: only an order that
+ * REFUTES the prior and that some rung repairs opens the Speed rungs;
+ * satisfied and unrepairable orders both keep the prior's Speed and
+ * speed nature. The prior rung legalizes around the same kept and fixed
+ * stats. SackInfo.rolled marks a faint whose slot's own action failed by
+ * dice ([miss], |-miss|, dice |cant|) and sackGate applies no shape when
+ * the played move carried a knock-out chance. Benched bodies keep the
+ * sim's HP, status and boosts; only a faint-state disagreement is
+ * resolved from the snapshot.
+ * RESULT (probe on the final r40 code, app path): Garchomp Jolly
+ * 208/44/0/0/4/252 (333), Kyurem Jolly 56/0/236/0/0/216 (308, 405 HP),
+ * Corviknight 248 HP, both Toxapex 100%; t73 Fire Fang is p2's best row
+ * and Body Press p1's (regret 0.000 both), the sack carries rolled, the
+ * miss books chance +0.503 toward SoulWind, t74 root 33.8% (was 18.7%),
+ * hit child 8.2% (matrix d2 0.0%). Still open: the pre-roll bar reads
+ * 19.5% where the played pair prices 8.7% — the root cell does not see
+ * the sweep the child search sees (t68 family, A.1). A second lesson from
+ * the fit corpus (2122 replays, bare build path, master vs r40): the first
+ * cut let bulk rungs keep their nature after the budget shaved their EV
+ * claim beside the kept Speed (1633 nature changes, "Bold Rayquaza, 0
+ * Def"); a rung the budget cannot express is now not offered at all.
+ * BENCH (paired, identical positions n=813; A .calibration/r40-a on
+ * 0e65d2c = the round-37 numbers, B .calibration/r40-b on the final
+ * code): sign 53/62/80 → 53/62/79, brier 0.2605/0.2293/0.1591 →
+ * 0.2610/0.2301/0.1529 (early +5 bp, mid +8 bp, late −62 bp); hq n=545:
+ * 53/63/77 → 53/63/75, brier 0.2569/0.2167/0.1708 → 0.2597/0.2177/0.1624
+ * (early +28 bp, mid +10 bp, late −84 bp); luck-adjusted (full)
+ * 0.2444/0.2088/0.1503 → 0.2452/0.2084/0.1458 (late −45 bp); doubles K
+ * 2.32 → 2.29. Tranches: tournament-0811 late 0.1825 → 0.1656 and early
+ * 0.2640 → 0.2696, ladder-ou-0802 late 0.1287 → 0.1240, tournament-0811b
+ * flat. 31 exclusive sign flips, A right 18, B right 13; disagreement is
+ * symmetric in every phase (mid singles A-only 8 vs B-only 6, late 3 vs
+ * 3). The preregistered line (hq paired and luck-adjusted not worse)
+ * holds late by a wide margin, is flat mid, and misses early by 28 bp hq
+ * where both sides sit at a 53% coin flip. Sets moved (fit corpus, 2122
+ * replays, bare build path without Smogon data, master vs final r40):
+ * 4885 of 25959 sets in 1168 replays — HP changed on 2933, Speed up on
+ * 1352 and down on 93, nature on 1543 (the bare path's neutralized
+ * priors, not the app's usage priors); mean EV total 409 → 406, bodies
+ * under 300 EVs 5918 → 6151, the top-up refusing measured stats (C).
+ * GATES: tsc, lint (ratchet), knip, Vitest 1297 green (149 files), e2e 74/74,
+ * three feedback sweeps byte-identical on the drift JSON and report (183 s
+ * each on a loaded machine; the app path). Against a base sweep on master
+ * 34afc82 the channels move as the round intends: 573756 t73 reads
+ * attribution chance and enters the key moments ([71, 73, 131, 136]; the
+ * pin expects quiet and no key moment — the desired side of the gap),
+ * Body Press and Fire Fang are both best rows, no sack line, the
+ * denied-early-end sentence stands; 648453 t13 moves p1-decision → quiet
+ * (toward its desired 'no mistake tier'); 649664 t8 (truth pin: Fire
+ * Blast best, attribution shift or p1-read) keeps Fire Blast as the best
+ * row (regret 0) but the pre-turn score sits at −0.105 instead of −0.185,
+ * so the +0.145 swing falls under the shift threshold and the turn reads
+ * quiet; the golden 655336 trades its known-drift channels once more (t25
+ * chance and t26 p1-read out, t27 p1-read in). No pin moved; re-pins at
+ * the user gate. Wall clock: the 573756 sweep 52 s to 1.5 min under the
+ * bank's load (no quiet-machine number this round).
+ *
  * CHOICE SCARF INFERENCE ROUND 2026-09-05 (improvement round 37 of the
  * perf-and-quality plan; spec
  * docs/superpowers/specs/2026-09-05-round-37-design.md; worktree r37 on
