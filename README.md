@@ -73,8 +73,6 @@ npm run dev              # local Vite server
 | `npm test -w packages/<name>` | one package's own suite (replay-core or eval-engine) |
 | `npm run pack:smoke` | packs both packages and runs their README examples from the tarballs |
 
-Sample inputs: [replay.txt](./replay.txt) holds a replay URL, [team.txt](./team.txt) a team export with German stat labels.
-
 ### Contributing
 
 - New files stay under the lint ceilings: 300 lines per file, 60 per function, complexity 15. Older files sit on shrink-only pins in `eslint.ratchet.mjs`; `node scripts/update-lint-ratchet.mjs` re-measures them and refuses to raise a pin.
