@@ -100,6 +100,9 @@ function PSReplayFrameDocument({
   }
 
   return (
+    // No sandbox: a same-origin blob document with allow-scripts can strip
+    // its own sandboxing (Firefox warns about exactly that combination), so
+    // the attribute bought console noise, not isolation.
     <iframe
       ref={iframeRef}
       src={blobUrl}
@@ -119,7 +122,6 @@ function PSReplayFrameDocument({
         background: '#344b6c',
         marginTop: 0,
       }}
-      sandbox="allow-scripts allow-same-origin"
       title={title || 'PS Replay'}
     />
   );

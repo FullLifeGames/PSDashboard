@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { readFileSync } from 'node:fs';
+import { readFileSync, writeFileSync } from 'node:fs';
 import { generateReplayHtml } from '../src/lib/replay-html';
 
 interface ReplayHtmlSnapshot {
@@ -9,11 +9,19 @@ interface ReplayHtmlSnapshot {
 
 // Captured from the single-template generator before its split into
 // sections: the page must stay byte-identical for every option combination
-// (no seek, a seek with autoplay and the p2 viewpoint, a turn-0 seek, and a
-// log that needs the closing-tag escape).
-const snapshot = JSON.parse(
-  readFileSync(new URL('./fixtures/replay-html.snapshot.json', import.meta.url), 'utf8'),
-) as ReplayHtmlSnapshot;
+// (no seek, a seek with autoplay and the p2 viewpoint, a turn-0 seek, a
+// log that needs the closing-tag escape, and the FontAwesome override).
+// Changing the template is a deliberate act: rerun with
+// UPDATE_REPLAY_HTML_SNAPSHOT=1 and review the fixture diff.
+const fixtureUrl = new URL('./fixtures/replay-html.snapshot.json', import.meta.url);
+const snapshot = JSON.parse(readFileSync(fixtureUrl, 'utf8')) as ReplayHtmlSnapshot;
+
+if (process.env.UPDATE_REPLAY_HTML_SNAPSHOT) {
+  snapshot.out = Object.fromEntries(
+    Object.entries(snapshot.cases).map(([name, opts]) => [name, generateReplayHtml(opts)]),
+  );
+  writeFileSync(fixtureUrl, `${JSON.stringify(snapshot, null, 2)}\n`);
+}
 
 test.describe('Replay iframe HTML snapshot', () => {
   for (const [name, opts] of Object.entries(snapshot.cases)) {

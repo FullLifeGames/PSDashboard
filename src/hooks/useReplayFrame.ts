@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef } from 'react';
 import { generateReplayHtml, createBlobUrl, revokeBlobUrl } from '../lib/replay-html';
+import { localFontAwesomeUrl } from '../lib/replay-compat';
 
 type FrameRef = React.RefObject<HTMLIFrameElement | null>;
 
@@ -33,6 +34,7 @@ export function useReplayBlobUrl(args: {
       autoPlay: initialSeek.autoPlay,
       reportTurn,
       viewpoint,
+      fontAwesomeWoff2Url: localFontAwesomeUrl(),
     });
     return createBlobUrl(html);
   }, [documentLog, format, p1, p2, title, initialSeek, reportTurn, viewpoint]);

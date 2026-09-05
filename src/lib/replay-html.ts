@@ -4,6 +4,8 @@
  * which handles all rendering, animations, and playback controls.
  */
 
+import { fontAwesomeOverrideStyle, POINTER_SOURCE_SHIM_SCRIPT } from './replay-compat';
+
 const REPLAY_STYLES = `<style>
 html,body {font-family:Verdana, sans-serif;font-size:10pt;margin:0;padding:0;}
 body{padding:12px 0;background:#344b6c;}
@@ -246,8 +248,13 @@ export function generateReplayHtml(opts: {
   reportTurn?: boolean;
   /** Viewer perspective — 'p2' renders the battle from player 2's side (the ?p2 replay-URL flag). */
   viewpoint?: 'p1' | 'p2';
+  /** Replaces the embed's FontAwesome face (see replay-compat.ts). */
+  fontAwesomeWoff2Url?: string;
 }): string {
-  const { log, format = '', p1 = 'Player 1', p2 = 'Player 2', title, seekTurn, autoPlay = false, reportTurn = false, viewpoint = 'p1' } = opts;
+  const {
+    log, format = '', p1 = 'Player 1', p2 = 'Player 2', title, seekTurn, autoPlay = false,
+    reportTurn = false, viewpoint = 'p1', fontAwesomeWoff2Url,
+  } = opts;
   const displayTitle = title || `${format ? `[${format}] ` : ''}${p1} vs. ${p2}`;
   // Escape forward slashes for the script tag content (PS format)
   const escapedLog = log.replace(/<\//g, '<\\/');
@@ -257,6 +264,7 @@ export function generateReplayHtml(opts: {
 <title>${displayTitle}</title>
 ${REPLAY_STYLES}
 ${SILENT_AUDIO_SCRIPT}
+${POINTER_SOURCE_SHIM_SCRIPT}
 <div class="wrapper replay-wrapper">
 <input type="hidden" name="replayid" value="branch-sim" />
 <div class="battle"></div><div class="battle-log"></div><div class="replay-controls"></div><div class="replay-controls-2"></div>
@@ -266,7 +274,7 @@ ${escapedLog}
 </script>
 </div>
 ${EMBED_LOADER_SCRIPT}
-${replayBridgeScript(seekTurn, autoPlay, viewpoint)}${reportTurn ? TURN_TRACKER_SCRIPT : ''}`;
+${fontAwesomeWoff2Url ? `${fontAwesomeOverrideStyle(fontAwesomeWoff2Url)}\n` : ''}${replayBridgeScript(seekTurn, autoPlay, viewpoint)}${reportTurn ? TURN_TRACKER_SCRIPT : ''}`;
 }
 
 /**

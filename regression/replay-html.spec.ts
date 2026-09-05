@@ -106,4 +106,74 @@ test.describe('Replay iframe HTML', () => {
     expect(html).toContain("type: 'ps-replay-ready'");
     expect(html).toContain('notifyReady');
   });
+
+  test('replaces the embed FontAwesome face with the given woff2 behind the loader', () => {
+    const html = generateReplayHtml({ log, fontAwesomeWoff2Url: 'https://host.test/fonts/fa.woff2' });
+
+    // Same family/weight/style as font-awesome.css: for duplicate @font-face
+    // descriptors the later rule wins, and the embed appends its stylesheets
+    // to <head> — a rule in the body always cascades after them. The upstream
+    // woff2 (stale glyph bboxes, one Firefox sanitizer warning per glyph) is
+    // then never fetched.
+    expect(html).toContain("font-family: 'FontAwesome'");
+    expect(html).toContain("src: url('https://host.test/fonts/fa.woff2') format('woff2')");
+    expect(html).toContain('font-weight: normal');
+    expect(html).toContain('font-style: normal');
+    expect(html.indexOf('@font-face')).toBeGreaterThan(html.indexOf('replay-embed.js'));
+  });
+
+  test('leaves the embed fonts alone when no replacement woff2 is given', () => {
+    expect(generateReplayHtml({ log })).not.toContain('@font-face');
+  });
+
+  test('answers mozInputSource reads from pointer events instead of the deprecated getter', () => {
+    const html = generateReplayHtml({ log });
+    const scripts = [...html.matchAll(/<script>([\s\S]*?)<\/script>/g)].map(match => match[1])
+      .filter(body => !body.includes('replay-embed.js'));
+    expect(html.indexOf('mozInputSource')).toBeLessThan(html.indexOf('replay-embed.js'));
+
+    // A Gecko-like prototype: reading the native accessor is what Firefox
+    // logs its deprecation for — the shim must replace it, keeping the
+    // touch semantics battle-tooltips.ts relies on (=== 5 suppresses the
+    // tooltip a stray tap would open).
+    const proto: Record<string, unknown> = {};
+    Object.defineProperty(proto, 'mozInputSource', {
+      configurable: true,
+      get() { throw new Error('deprecated native getter invoked'); },
+    });
+    const listeners: Record<string, (e: unknown) => void> = {};
+    const sandbox: Record<string, unknown> = {
+      MouseEvent: Object.assign(() => {}, { prototype: proto }),
+      addEventListener: (type: string, fn: (e: unknown) => void) => { listeners[type] = fn; },
+      setInterval: () => 0, setTimeout: () => 0, parent: { postMessage() {} },
+    };
+    sandbox.window = sandbox;
+    for (const body of scripts) runInNewContext(body, sandbox);
+
+    const get = Object.getOwnPropertyDescriptor(proto, 'mozInputSource')?.get as
+      (this: { pointerType?: string }) => number;
+    expect(get.call({ pointerType: 'touch' })).toBe(5);
+    expect(get.call({ pointerType: 'pen' })).toBe(2);
+    expect(get.call({ pointerType: 'mouse' })).toBe(1);
+    // Firefox fires compat mouseover as a plain MouseEvent; the preceding
+    // pointerover carries the source that the getter must remember.
+    listeners['pointerover']({ pointerType: 'touch' });
+    expect(get.call({})).toBe(5);
+  });
+
+  test('does not invent mozInputSource where the platform has none', () => {
+    const html = generateReplayHtml({ log });
+    const scripts = [...html.matchAll(/<script>([\s\S]*?)<\/script>/g)].map(match => match[1])
+      .filter(body => !body.includes('replay-embed.js'));
+
+    const proto: Record<string, unknown> = {};
+    const sandbox: Record<string, unknown> = {
+      MouseEvent: Object.assign(() => {}, { prototype: proto }),
+      addEventListener() {}, setInterval: () => 0, setTimeout: () => 0, parent: { postMessage() {} },
+    };
+    sandbox.window = sandbox;
+    for (const body of scripts) runInNewContext(body, sandbox);
+
+    expect(Object.getOwnPropertyDescriptor(proto, 'mozInputSource')).toBeUndefined();
+  });
 });
