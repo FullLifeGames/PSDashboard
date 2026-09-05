@@ -93,6 +93,46 @@ test.describe('forced-win prover (round 35)', () => {
     expect(proof.openValue).toBe(-1);
   });
 
+  test('the greedy probe spends a few cells on a hopeless position and no full proof', () => {
+    // Protect and Substitute on both sides: no line ends, so the probe fails
+    // every candidate inside its own budget and the tree search never starts.
+    const serialized = serializeAt(makeBattle(
+      [makeSet('A', 'Snorlax', ['Protect', 'Substitute'])],
+      [makeSet('B', 'Chansey', ['Protect', 'Substitute'])],
+    ), {});
+    const proof = proveForcedWin(serialized, { side: 'p1', rootOrder: ['move protect', 'move substitute'], tera: false });
+    expect(proof.mass).toBe(0);
+    expect(proof.states).toBe(0);
+    expect(proof.cells).toBeLessThanOrEqual(PROVER_BUDGET.probeCells);
+  });
+
+  test('a two-turn proof against four replies fits the budget after the probe', () => {
+    // Seismic Toss twice against a 150-HP Chansey with four harmless moves:
+    // four replies at the root, four children each proving in one more turn.
+    const serialized = serializeAt(makeBattle(
+      [makeSet('Champ', 'Machamp', ['Seismic Toss'])],
+      [makeSet('Egg', 'Chansey', ['Splash', 'Growl', 'Tail Whip', 'Defense Curl'])],
+    ), { p2: [150] });
+    const proof = proveForcedWin(serialized, { side: 'p1', rootOrder: ['move seismictoss'], tera: false });
+    expect(proof.mass).toBe(1);
+    expect(proof.turns).toBe(2);
+    expect(proof.cells).toBeLessThanOrEqual(PROVER_BUDGET.cells);
+  });
+
+  test('a class no draw showed inherits the proof of the class that dominates it', () => {
+    // Toxic hits 90% of the time; the inner cells draw three seeds, which
+    // often never miss. A miss of the opponent's move is never better for
+    // them than the hit, so the missing class inherits the hit class's proof
+    // and the two Seismic Tosses prove with the full mass.
+    const serialized = serializeAt(makeBattle(
+      [makeSet('Champ', 'Machamp', ['Seismic Toss'])],
+      [makeSet('Egg', 'Chansey', ['Toxic', 'Splash', 'Growl', 'Tail Whip'])],
+    ), { p2: [150] });
+    const proof = proveForcedWin(serialized, { side: 'p1', rootOrder: ['move seismictoss'], tera: false });
+    expect(proof.mass).toBe(1);
+    expect(proof.turns).toBe(2);
+  });
+
   test('a two-turn win needs the budget; one state cannot prove it', () => {
     const serialized = serializeAt(makeBattle(
       [makeSet('Champ', 'Machamp', ['Seismic Toss'])],

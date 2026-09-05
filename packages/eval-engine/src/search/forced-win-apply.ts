@@ -1,5 +1,5 @@
 import {
-  ENDGAME_MAX_BODIES, MIN_FORCED_MASS, type EvalResult, type EvalSettings, type ForcedWinInput, type ForcedWinOutcome,
+  ENDGAME_MAX_BODIES, MIN_FORCED_MASS, PROVER_SCORE_FLOOR, type EvalResult, type EvalSettings, type ForcedWinInput, type ForcedWinOutcome,
 } from '../types.ts';
 
 /**
@@ -25,7 +25,8 @@ interface SerializedBodies { ended?: boolean; sides?: { pokemon?: { fainted?: bo
  * false only where a worker round trip would certainly return nothing.
  */
 export function forcedWinPossible(serializedBattle: string, input: ForcedWinInput): boolean {
-  if (input.unanswered?.decided || input.unanswered?.nearDecided) return true;
+  const named = Boolean(input.unanswered?.decided || input.unanswered?.nearDecided);
+  if (named && Math.abs(input.score) >= PROVER_SCORE_FLOOR) return true;
   let battle: SerializedBodies;
   try {
     battle = JSON.parse(serializedBattle) as SerializedBodies;

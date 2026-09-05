@@ -292,6 +292,14 @@ export interface ForcedWin {
 export const ENDGAME_MAX_BODIES = 3;
 /** Proofs below this mass change nothing; a proof at exactly this mass (a coin flip) stays on the result without a bar (round 35). */
 export const MIN_FORCED_MASS = 0.5;
+/**
+ * Outside the small endgame the prover runs only when the search already
+ * reads the board at this score or beyond (round 35 follow-up): on the
+ * 90-position bank no proof stood below 0.6, one of ten between 0.6 and
+ * 0.8, and 24 of 50 at 0.8 or more, while 42 of 573756's 51 decided turns
+ * sit below 0.6 and would only pay the probe.
+ */
+export const PROVER_SCORE_FLOOR = 0.6;
 /** Proofs at or above this mass are spoken (round 35). */
 export const SPOKEN_MASS = 0.9;
 

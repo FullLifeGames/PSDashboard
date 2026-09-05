@@ -32,6 +32,10 @@ export interface EndgameChildren {
   plain: boolean;
   /** Plain path only: the draws disagreed on damage, faints, or the end (chance moved the cell). */
   spread: boolean;
+  /** Class path: the expected classes no draw showed, with their analytic share (round 35: the prover inherits proofs across dominated classes). */
+  missing: { key: string; share: number }[];
+  /** Class path: the cell's priced events, in the order the class keys join their outcomes. */
+  events: CellEvent[];
 }
 
 interface Draw { position: SimPosition; log: string[]; ended: boolean; measure: number; fainted: number }
@@ -154,7 +158,8 @@ function classChildren(
     const pick = nearestMean(grouped!.get(key)!);
     return { position: pick.position, weight: weight / weightTotal, share: weight, ended: pick.ended, key };
   });
-  return { children, unpriced: present.length < expected.size, plain: false, spread: false };
+  const missing = [...expected].filter(([key]) => !grouped!.has(key)).map(([key, share]) => ({ key, share }));
+  return { children, unpriced: missing.length > 0, plain: false, spread: false, missing, events };
 }
 
 /** The plain path: the median of three draws for damaging pairs, one draw otherwise. */
@@ -164,7 +169,7 @@ function plainChildren(root: SimPosition, battle: Battle, rootHp: number, p1Choi
   const pick = median(draws);
   const unpriced = draws.some(draw => draw.fainted !== draws[0].fainted || draw.ended !== draws[0].ended);
   const spread = unpriced || draws.some(draw => draw.measure !== draws[0].measure);
-  return { children: [{ position: pick.position, weight: 1, share: 1, ended: pick.ended }], unpriced, plain: true, spread };
+  return { children: [{ position: pick.position, weight: 1, share: 1, ended: pick.ended }], unpriced, plain: true, spread, missing: [], events: [] };
 }
 
 /**

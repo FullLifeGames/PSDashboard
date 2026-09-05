@@ -13,12 +13,15 @@ import { MIN_FORCED_MASS, type ForcedWinCaveat } from '../packages/eval-engine/s
  * 2HKO tie); the two walls without an attack lose in 3 (one-v-two-breaker,
  * where the solver capped at 0.294); with classes the draws never showed
  * left open, the burned heal war, the PP lock, and the Scarf lock prove
- * for p2 over four to five turns on the sampled rolls (healer-burned 0.93,
- * struggle-lock 0.997, choice-locked 0.97); focus-blast-range (a ten-turn
- * miss chain), healer-vs-band, fixed-vs-ghost, and the sack fail at the
- * cells budget or the depth cap, honestly; doubles proofs carry the
- * sampled-rolls label, the doubles tie reads the sampled order
- * (doubles-ohko-tie), and the doubles spread cells stay unpriced.
+ * for p2 over three to five turns on the sampled rolls (healer-burned and
+ * choice-locked at mass 1 once a missing class inherits the proof of the
+ * class that dominates it, struggle-lock 0.997); the greedy probe lets
+ * focus-blast-range (a twelve-turn miss chain) spend the full budget and
+ * prove 0.9999, while the six-turn heal war healer-vs-band lies beyond the
+ * probe's five turns; fixed-vs-ghost and the sack fail at the depth cap or
+ * at unpriced cells, honestly; doubles proofs carry the sampled-rolls
+ * label, the doubles tie reads the sampled order (doubles-ohko-tie), and
+ * the doubles spread cells stay unpriced.
  */
 interface Expected { side: 'p1' | 'p2'; mass: number | null; turns?: number; caveat?: ForcedWinCaveat; digits?: number }
 
@@ -36,14 +39,14 @@ const EXPECTED: Record<string, Expected> = {
   'toss-race-even': { side: 'p1', mass: 0.5, turns: 2 },
   'thunder-70': { side: 'p1', mass: 0.7, turns: 1, caveat: 'none' },
   'doubles-thunder-70': { side: 'p1', mass: 0.7, turns: 1, caveat: 'none' },
-  'toxic-stall': { side: 'p2', mass: 1, turns: 2, caveat: 'none' },
-  'one-v-two-breaker': { side: 'p1', mass: 1, turns: 3, caveat: 'none' },
+  'toxic-stall': { side: 'p2', mass: 1, turns: 2, caveat: 'barring-crit' },
+  'one-v-two-breaker': { side: 'p1', mass: 1, turns: 4, caveat: 'barring-crit' },
   'two-v-one-sack': { side: 'p1', mass: null },
-  'focus-blast-range': { side: 'p1', mass: null },
+  'focus-blast-range': { side: 'p1', mass: 1, digits: 3, turns: 12, caveat: 'sampled-rolls' },
   'struggle-lock': { side: 'p2', mass: 0.997, digits: 3, turns: 5, caveat: 'sampled-rolls' },
   'healer-vs-band': { side: 'p2', mass: null },
-  'healer-burned': { side: 'p2', mass: 0.926, digits: 3, turns: 4, caveat: 'sampled-rolls' },
-  'choice-locked': { side: 'p2', mass: 0.974, digits: 3, turns: 3, caveat: 'sampled-rolls' },
+  'healer-burned': { side: 'p2', mass: 1, turns: 4, caveat: 'sampled-rolls' },
+  'choice-locked': { side: 'p2', mass: 1, turns: 3, caveat: 'sampled-rolls' },
   'fixed-vs-ghost': { side: 'p2', mass: null },
   'setup-vs-heal': { side: 'p1', mass: null },
   'two-v-one-switch-loop': { side: 'p2', mass: null },

@@ -72,11 +72,16 @@ test.describe('forced-win trigger and bar (round 35)', () => {
     )))));
     expect(forcedWinSides(full, { score: 0.5, rootOrder: { p1: [], p2: [] } })).toEqual([]);
     expect(forcedWinSides(full, {
-      score: -0.5, rootOrder: { p1: [], p2: [] },
+      score: -0.7, rootOrder: { p1: [], p2: [] },
       unanswered: { p1: [], p2: [], decided: { side: 'p2', species: 'Machamp' } },
     })).toEqual(['p2']);
+    // A named side with a lukewarm score stays out on a full board: no bank proof ever stood there.
     expect(forcedWinSides(full, {
-      score: 0.1, rootOrder: { p1: [], p2: [] },
+      score: -0.5, rootOrder: { p1: [], p2: [] },
+      unanswered: { p1: [], p2: [], decided: { side: 'p2', species: 'Machamp' } },
+    })).toEqual([]);
+    expect(forcedWinSides(full, {
+      score: 0.6, rootOrder: { p1: [], p2: [] },
       unanswered: { p1: [], p2: [], nearDecided: { side: 'p1', species: 'Machamp', odds: 0.95, removes: 'Chansey' } },
     })).toEqual(['p1']);
   });
@@ -88,9 +93,10 @@ test.describe('forced-win trigger and bar (round 35)', () => {
       [makeSet('D', 'Machamp', ['Seismic Toss']), makeSet('E', 'Chansey', ['Soft-Boiled']), makeSet('F', 'Snorlax', ['Rest'])],
     )));
     expect(forcedWinPossible(full, noProfile)).toBe(false);
-    expect(forcedWinPossible(full, { ...noProfile, unanswered: { p1: [], p2: [], decided: { side: 'p1', species: 'Machamp' } } })).toBe(true);
+    expect(forcedWinPossible(full, { ...noProfile, unanswered: { p1: [], p2: [], decided: { side: 'p1', species: 'Machamp' } } })).toBe(false);
+    expect(forcedWinPossible(full, { ...noProfile, score: 0.7, unanswered: { p1: [], p2: [], decided: { side: 'p1', species: 'Machamp' } } })).toBe(true);
     expect(forcedWinPossible(full, {
-      ...noProfile, unanswered: { p1: [], p2: [], nearDecided: { side: 'p2', species: 'Machamp', odds: 0.9, removes: 'Chansey' } },
+      ...noProfile, score: -0.9, unanswered: { p1: [], p2: [], nearDecided: { side: 'p2', species: 'Machamp', odds: 0.9, removes: 'Chansey' } },
     })).toBe(true);
     const pair = serializeAt(makeBattle([makeSet('Champ', 'Machamp', ['Seismic Toss'])], [makeSet('Egg', 'Chansey', ['Soft-Boiled'])]), { p2: [1] });
     expect(forcedWinPossible(pair, noProfile)).toBe(true);
