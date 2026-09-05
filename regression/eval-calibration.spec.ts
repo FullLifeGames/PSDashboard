@@ -892,6 +892,60 @@ import { summaryLines } from './calibration-summary';
  * static basis for this mass; the next lever, if any, is search/
  * planning-side.
  *
+ * FORCED-WIN PROVER ROUND 2026-09-04/05 (improvement round 35 of the perf-
+ * and-quality plan; spec docs/superpowers/specs/2026-09-04-round-35-design.md;
+ * ac3c708 class shares / 2dbf677 prover / a1e7022 trigger and bar /
+ * c6b3ccb wiring + cache v41 / da47b69 prose / 66836bd fixtures + truth
+ * column / 2d470f8 bank fields / 6e95ae8 cells budget / 295be63 coin-flip
+ * rule). An AND/OR proof search runs after every root search where the
+ * board is small (at most three living bodies or the last pair) or the
+ * decided sweep names a side: the favored side's ranking candidates against
+ * every reply, per outcome class, down to a won battle; the proven MASS
+ * (share of the classes proven along every reply) bars the score
+ * (mass toward the side, the rest at the open branches' static) when it
+ * exceeds one half, and the turn card speaks it from 0.9 ("X wins in N
+ * against every reply", "if the 95% Fire Fang lands", "barring a crit",
+ * "on the sampled rolls"). Budget: 30 matrix cells per position shared
+ * between the top three root candidates, six draws per class cell (a class
+ * the draws never show stays open), states 200, depth 12, no wall clock;
+ * the sweep's sketch pass skips it, the main thread skips the worker round
+ * trip where the trigger cannot fire.
+ * BANK (auto, 816, paired against r34-after): late brier 0.1564 -> 0.1563,
+ * hq late 0.1664 -> 0.1663 (preregistered: not worse), luck-adjusted late
+ * 0.1490 -> 0.1488, sign hits identical 54/63/80 (hq 54/64/77); 22 samples
+ * carry a proof (19 at mass 1, 21 right; the one loss, gen9ou-2663114316
+ * t22, is a guessed Rocky Helmet on Hatterene whose recoil kills the 3-HP
+ * Kingambit in the sim while the real Hatterene held none, and the engine
+ * read -0.97 there before the prover); decided-loss dossier unchanged at 23.
+ * COST (573756 alone, base and prover interleaved on one machine): 65 s and
+ * 65 s; the first, states-only budget had cost 2 s per failing position on
+ * the bank and up to 20 s per position at nine replies.
+ * FEEDBACK: three runs byte-identical, no pinned channel moved, no re-pins;
+ * proofs at 573756 t139 (p2 in 1, barring a crit, 98.8% -> 100%), 653785
+ * t26 (p2 in 2), 655336 t28 (p1 in 1), 562428 t23 (p1 in 1), 649664 t24
+ * (p1 0.8 in 3). 573756 t138 stays unproven (Close Combat cell unpriced)
+ * and t73 too.
+ * TRUTH BENCH (r35-truth2/3 dumps, 116 items, solver caps as round 34): the
+ * prover column equals d1 since the bar sits inside every root search; d1's
+ * brier against the 14 exactly solved positions falls 0.0632 -> 0.0243; the
+ * seven bank positions the searches missed by a full sign in round 34
+ * (749828#23, 2663112349#37, 2658663604#20, 752301#30, 751170#26,
+ * 752324#65, 752733#32) all prove, six at mass 1 and 2658663604#20 at
+ * 0.958; the synthetic heal wars healer-burned (0.93 in 4), struggle-lock
+ * (0.997 in 5), choice-locked (0.97 in 3) prove for p2 as the solver said,
+ * focus-blast-range (a ten-turn miss chain) and healer-vs-band fall at the
+ * cells budget.
+ * USER GATE 2026-09-05: adopt, with the coin-flip rule (a proof at exactly
+ * one half stays on the result but moves no score; toss-race-even read -0.8
+ * under the bar against an exact 0). GATES: eval-engine specs (prover 9,
+ * apply 8, summary 7), regression/forced-win.spec.ts 26, parity, identity
+ * fixture, API snapshot, 945 regression, e2e 73 (the p2 replay-link test
+ * passes alone), tsc -b, lint, knip. LESSONS: the feedback suite's full
+ * dumps exist only with FEEDBACK_DUMP=1 (a stale dump read as "no proofs
+ * in the app"); wall-time gates need base and candidate interleaved; four
+ * Playwright slices started at once in a fresh worktree race on the
+ * transform cache.
+ *
  * ENDGAME SOLVER ROUND 2026-09-04 (improvement round 34 of the perf-and-
  * quality plan; spec docs/superpowers/specs/2026-09-04-round-34-design.md;
  * Block 0 983ed57 luck events / ca2289d bank fields, export, summary
