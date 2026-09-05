@@ -391,6 +391,82 @@ describe('speed-order evidence', () => {
       '|turn|2',
     ]))).toEqual(['Iron Valiant>Noivern']);
   });
+
+  // Round 37: conditional priority, quick items, field speed, and
+  // always-last abilities explain an order without Speed.
+  const singlesLog = (mons: [string, string], body: string[], pre: string[] = []) => [
+    '|player|p1|Alice|', '|player|p2|Bob|', '|teamsize|p1|2', '|teamsize|p2|2',
+    '|gen|9', '|gametype|singles', '|tier|[Gen 9] OU', '|start',
+    `|switch|p1a: A|${mons[0]}|100/100`, `|switch|p2a: B|${mons[1]}|100/100`,
+    ...pre, '|turn|1', ...body, '|turn|2',
+  ].join('\n');
+  const orders = (log: string) => parseReplayLogWithObservations(log).speedOrders.map(o => `${o.firstSpecies}>${o.secondSpecies}`);
+  const firstThenDraco = (move: string) => [`|move|p1a: A|${move}|p2a: B`, '|move|p2a: B|Draco Meteor|p1a: A'];
+
+  test('a Prankster status move first proves nothing', () => {
+    expect(orders(singlesLog(['Grimmsnarl, M', 'Dragapult, F'], [
+      '|move|p1a: A|Reflect|p1a: A', '|-sidestart|p1: Alice|Reflect', '|move|p2a: B|Draco Meteor|p1a: A',
+    ]))).toEqual([]);
+  });
+
+  test('a Prankster attack first is a race', () => {
+    expect(orders(singlesLog(['Grimmsnarl, M', 'Snorlax, M'], [
+      '|move|p1a: A|Spirit Break|p2a: B', '|move|p2a: B|Body Slam|p1a: A',
+    ]))).toEqual(['Grimmsnarl>Snorlax']);
+  });
+
+  test('Gale Wings excuses a Flying move first at full HP, not below it', () => {
+    expect(orders(singlesLog(['Talonflame, M', 'Dragapult, F'], firstThenDraco('Brave Bird')))).toEqual([]);
+    expect(orders(singlesLog(['Talonflame, M', 'Dragapult, F'], firstThenDraco('Brave Bird'), ['|-damage|p1a: A|50/100']))).toEqual(['Talonflame>Dragapult']);
+  });
+
+  test('Grassy Glide under Grassy Terrain excuses the order, without the terrain it is a race', () => {
+    const terrain = ['|-fieldstart|move: Grassy Terrain|[from] ability: Grassy Surge|[of] p1a: A'];
+    expect(orders(singlesLog(['Rillaboom, M', 'Dragapult, F'], firstThenDraco('Grassy Glide'), terrain))).toEqual([]);
+    expect(orders(singlesLog(['Rillaboom, M', 'Dragapult, F'], firstThenDraco('Grassy Glide')))).toEqual(['Rillaboom>Dragapult']);
+  });
+
+  test('a Quick Claw activation excuses the order', () => {
+    expect(orders(singlesLog(['Snorlax, M', 'Dragapult, F'], [
+      '|-activate|p1a: A|item: Quick Claw', '|move|p1a: A|Body Slam|p2a: B', '|move|p2a: B|Draco Meteor|p1a: A',
+    ]))).toEqual([]);
+  });
+
+  test('a Custap Berry excuses the order', () => {
+    expect(orders(singlesLog(['Snorlax, M', 'Dragapult, F'], [
+      '|-enditem|p1a: A|Custap Berry|[eat]', '|move|p1a: A|Body Slam|p2a: B', '|move|p2a: B|Draco Meteor|p1a: A',
+    ]))).toEqual([]);
+  });
+
+  test('a Swift Swim species moving first in rain proves nothing, out of rain it does', () => {
+    expect(orders(singlesLog(['Kingdra, M', 'Dragapult, F'], firstThenDraco('Waterfall'), ['|-weather|RainDance']))).toEqual([]);
+    expect(orders(singlesLog(['Kingdra, M', 'Dragapult, F'], firstThenDraco('Waterfall')))).toEqual(['Kingdra>Dragapult']);
+  });
+
+  test('a revealed other ability lifts the weather suspicion', () => {
+    expect(orders(singlesLog(['Kingdra, M', 'Dragapult, F'], firstThenDraco('Waterfall'), [
+      '|-weather|RainDance', '|-ability|p1a: A|Sniper',
+    ]))).toEqual(['Kingdra>Dragapult']);
+  });
+
+  test('a Stall species moving second proves nothing', () => {
+    expect(orders(singlesLog(['Snorlax, M', 'Sableye, F'], [
+      '|move|p1a: A|Body Slam|p2a: B', '|move|p2a: B|Knock Off|p1a: A',
+    ]))).toEqual([]);
+  });
+
+  test('Mycelium Might slows a status move, not an attack', () => {
+    expect(orders(singlesLog(['Snorlax, M', 'Toedscruel, F'], [
+      '|move|p1a: A|Body Slam|p2a: B', '|move|p2a: B|Spore|p1a: A',
+    ]))).toEqual([]);
+    expect(orders(singlesLog(['Snorlax, M', 'Toedscruel, F'], [
+      '|move|p1a: A|Body Slam|p2a: B', '|move|p2a: B|Earth Power|p1a: A',
+    ]))).toEqual(['Snorlax>Toedscruel']);
+  });
+
+  test('an Unburden species that lost its item proves nothing', () => {
+    expect(orders(singlesLog(['Hawlucha, M', 'Dragapult, F'], firstThenDraco('Acrobatics'), ['|-enditem|p1a: A|Grassy Seed']))).toEqual([]);
+  });
 });
 
 describe('KO-before-acting speed evidence', () => {

@@ -2,7 +2,7 @@ import type { Battle, Pokemon, Side, Field } from '@pkmn/client';
 import type { GenerationNum } from '@pkmn/data';
 import type { PokemonSnapshot, SideSnapshot, FieldSnapshot } from '../types.ts';
 import { flushSpeedOrder, gens, speedContaminatedAt, type ClientIdent, type ParserState, type PendingMove } from './parser-state.ts';
-import { foreignAction } from './speed-evidence.ts';
+import { firstMoverContaminated, foreignAction, secondMoverContaminated } from './speed-evidence.ts';
 import { toId } from '../ids.ts';
 
 const SCREEN_IDS = ['reflect', 'lightscreen', 'auroraveil'];
@@ -64,12 +64,13 @@ export function handleGen(state: ParserState, line: string) {
 
 /**
  * Nonzero priority breaks the race premise in EITHER role — order
- * across priority brackets says nothing about speed.
+ * across priority brackets says nothing about speed. The round-37 rules
+ * add what lets a first mover act early or a second mover act last.
  */
 function speedCleanliness(state: ParserState, ident: string, moveId: string): { cleanFirst: boolean; cleanSecond: boolean } {
   const priority = gens.get(state.genNum).moves.get(moveId)?.priority ?? 0;
-  const cleanFirst = priority === 0 && !speedContaminatedAt(state, ident, 'first');
-  const cleanSecond = priority === 0 && !speedContaminatedAt(state, ident, 'second');
+  const cleanFirst = priority === 0 && !speedContaminatedAt(state, ident, 'first') && !firstMoverContaminated(state, ident, moveId);
+  const cleanSecond = priority === 0 && !speedContaminatedAt(state, ident, 'second') && !secondMoverContaminated(state, ident, moveId);
   return { cleanFirst, cleanSecond };
 }
 
@@ -133,7 +134,7 @@ function faintProvesOrder(state: ParserState, victim: string, lastMove: PendingM
   return victim === lastMove.target && victim !== lastMove.attacker &&
     victim.slice(0, 2) !== lastMove.attacker.slice(0, 2) &&
     lastMove.speedClean && !state.actedThisTurn.has(victim) && !state.reordered.has(victim) &&
-    !speedContaminatedAt(state, victim, 'second');
+    !speedContaminatedAt(state, victim, 'second') && !secondMoverContaminated(state, victim, null);
 }
 
 /**
