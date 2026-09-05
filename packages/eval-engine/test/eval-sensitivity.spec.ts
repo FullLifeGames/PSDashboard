@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect, describe } from 'vitest';
 import { Battle, State, Teams, toID } from '@pkmn/sim';
 import type { PokemonSet } from '@pkmn/sim';
 import { patchSerializedItem, selectProbeCombos } from '../src/sensitivity';
@@ -30,7 +30,7 @@ function makeBattle(p1Sets: PokemonSet[], p2Sets: PokemonSet[]): Battle {
 
 const serialize = (battle: Battle) => JSON.stringify(State.serializeBattle(battle));
 
-test.describe('sensitivity probe plumbing', () => {
+describe('sensitivity probe plumbing', () => {
   test('patchSerializedItem swaps the item and survives deserialization', () => {
     const serialized = serialize(makeBattle(
       [makeSet('A', 'Garchomp', ['Earthquake'])],

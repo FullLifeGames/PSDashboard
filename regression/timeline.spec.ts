@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test';
+import { test, expect } from 'vitest';
 import {
   classifyDeviation, keptEntries, normalizePosition, sliderMax, variationCovers, variationTip,
   type TimelinePosition, type VariationSpan,

@@ -38,7 +38,7 @@
     "README.md"
   ],
   "scripts": {
-    "test": "playwright test -c ../../playwright.regression.config.ts --project replay-core"
+    "test": "vitest run --config ../../vitest.config.ts --project replay-core"
   },
   "publishConfig": {
     "access": "public"

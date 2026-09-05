@@ -65,7 +65,7 @@ npm run dev              # local Vite server
 | --- | --- |
 | `npm run lint` | ESLint with size and complexity ceilings and import zones |
 | `npm run build` | the production bundle |
-| `npm run test:regression` | unit and reconstruction pins in three Playwright projects: app, replay-core, eval-engine |
+| `npm run test:regression` | unit and reconstruction pins in three Vitest projects: app, replay-core, eval-engine (`npx vitest` for watch mode, `--changed` for the tests behind your edits) |
 | `npm run test:e2e` | browser flows against fixture replays |
 | `npm run test:build` | the minified bundle, driven in a browser |
 | `npm run test:feedback` | the expert-feedback drift report, on demand |

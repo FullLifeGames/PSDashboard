@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect, describe } from 'vitest';
 import type { PokemonSet } from '@pkmn/sim';
 import { reconstructBranchRuntime, resolveSideChoices } from '../src/branch-engine';
 import type { BranchSlotChoice } from '../src/branch-choices';
@@ -59,7 +59,7 @@ async function makeSinglesRuntime(p1Moves: string[]) {
   });
 }
 
-test.describe('identity-based choice resolution (B1)', () => {
+describe('identity-based choice resolution (B1)', () => {
   test('resolves the same move id to different slots depending on the current moveset', async () => {
     const original = await makeSinglesRuntime(['Thunderbolt', 'Protect']);
     const resolvedOriginal = resolveSideChoices(original.battleStream.battle!, 'p1', [protectChoice], [true]);

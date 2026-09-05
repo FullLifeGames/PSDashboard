@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect, describe } from 'vitest';
 import { fetchReplay, parseReplayUrl, parseReplayViewpoint } from '../src/lib/replay-fetcher';
 import {
   formatEnforcesSleepClause,
@@ -41,7 +41,7 @@ const vgcReplay = {
   views: 0,
 };
 
-test.describe('replay format inference', () => {
+describe('replay format inference', () => {
   test('infers missing Showdown format ids from replay ids', () => {
     expect(inferReplayFormatId(vgcReplay)).toBe('gen9championsvgc2026regmb');
     expect(getReplayGameType(vgcReplay.log)).toBe('doubles');

@@ -1,4 +1,4 @@
-import { test } from '@playwright/test';
+import { test, describe } from 'vitest';
 import { Battle, State, Teams, toID } from '@pkmn/sim';
 import type { PokemonSet } from '@pkmn/sim';
 import { advancePosition, createRootPosition } from '../src/forward-model';
@@ -53,11 +53,9 @@ function makeSixVsSix(): Battle {
   );
 }
 
-test.describe('eval engine benchmark', () => {
-  test.skip(!process.env.EVAL_BENCH, 'set EVAL_BENCH=1 to run the benchmark');
+describe.skipIf(!process.env.EVAL_BENCH)('eval engine benchmark', () => {
 
-  test('measures forward-model and search throughput', () => {
-    test.setTimeout(300_000);
+  test('measures forward-model and search throughput', { timeout: 300000 }, () => {
     const root = createRootPosition(serialize(makeSixVsSix()));
 
     const forks = 50;

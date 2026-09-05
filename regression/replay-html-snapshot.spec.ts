@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect, describe } from 'vitest';
 import { readFileSync, writeFileSync } from 'node:fs';
 import { generateReplayHtml } from '../src/lib/replay-html';
 
@@ -23,7 +23,7 @@ if (process.env.UPDATE_REPLAY_HTML_SNAPSHOT) {
   writeFileSync(fixtureUrl, `${JSON.stringify(snapshot, null, 2)}\n`);
 }
 
-test.describe('Replay iframe HTML snapshot', () => {
+describe('Replay iframe HTML snapshot', () => {
   for (const [name, opts] of Object.entries(snapshot.cases)) {
     test(`renders the ${name} case byte-identically`, () => {
       expect(generateReplayHtml(opts)).toBe(snapshot.out[name]);

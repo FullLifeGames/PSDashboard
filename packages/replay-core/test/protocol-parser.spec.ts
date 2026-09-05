@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect, describe } from 'vitest';
 import { parseReplayLog, parseReplayLogWithObservations } from '../src/protocol-parser';
 
 const obsHeader = [
@@ -14,7 +14,7 @@ const obsHeader = [
   '|turn|1',
 ];
 
-test.describe('protocol parser fault tolerance', () => {
+describe('protocol parser fault tolerance', () => {
   test('a malformed event after a faint does not kill the whole parse', () => {
     // The gpl-pipeline shape: video-reconstructed logs can emit impossible
     // orderings — here a |-fail| targeting a mon that just fainted, which
@@ -48,7 +48,7 @@ test.describe('protocol parser fault tolerance', () => {
   });
 });
 
-test.describe('damage observations', () => {
+describe('damage observations', () => {
   test('a clean singles hit yields one observation with its context', () => {
     const log = [
       ...obsHeader,
@@ -163,7 +163,7 @@ test.describe('damage observations', () => {
   });
 });
 
-test.describe('speed-order evidence', () => {
+describe('speed-order evidence', () => {
   const speedLog = (body: string[]) => [
     '|player|p1|Alice|', '|player|p2|Bob|',
     '|teamsize|p1|2', '|teamsize|p2|2',
@@ -301,7 +301,7 @@ test.describe('speed-order evidence', () => {
   });
 });
 
-test.describe('KO-before-acting speed evidence', () => {
+describe('KO-before-acting speed evidence', () => {
   const koLog = (body: string[]) => [
     '|player|p1|Alice|', '|player|p2|Bob|',
     '|teamsize|p1|2', '|teamsize|p2|2',
@@ -396,7 +396,7 @@ test.describe('KO-before-acting speed evidence', () => {
   });
 });
 
-test.describe('hidden-power evidence', () => {
+describe('hidden-power evidence', () => {
   const base = [
     '|player|p1|Alice|', '|player|p2|Bob|', '|gen|6', '|gametype|singles',
     '|poke|p1|Manectric|', '|poke|p2|Skarmory|',

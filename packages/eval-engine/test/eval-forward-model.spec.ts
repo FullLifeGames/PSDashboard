@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect, describe } from 'vitest';
 import { Battle, State, Teams, toID } from '@pkmn/sim';
 import type { PokemonSet } from '@pkmn/sim';
 import {
@@ -58,7 +58,7 @@ function makePreviewBattle(formatid: string, p1Sets: PokemonSet[], p2Sets: Pokem
   });
 }
 
-test.describe('sim forward model', () => {
+describe('sim forward model', () => {
   test('legal choices mirror the request: moves, tera variants, switches', () => {
     const root = createRootPosition(serialize(makeBattle(
       [makeSet('Snorlax', 'Snorlax', ['Protect', 'Substitute']), makeSet('Chansey', 'Chansey', ['Protect'])],
@@ -387,7 +387,7 @@ test.describe('sim forward model', () => {
   });
 });
 
-test.describe('one-sided forced switch (waiting side)', () => {
+describe('one-sided forced switch (waiting side)', () => {
   const midSwitchBattle = () => {
     // Seismic Toss at level 100 deals a fixed 100: Pikachu at level 30
     // faints, p2 must pick a replacement, p1 can only wait.
@@ -427,7 +427,7 @@ test.describe('one-sided forced switch (waiting side)', () => {
   });
 });
 
-test.describe('team preview (turn 0)', () => {
+describe('team preview (turn 0)', () => {
   const quad = [
     makeSet('Machamp', 'Machamp', ['Karate Chop'], 100),
     makeSet('Snorlax', 'Snorlax', ['Tackle'], 100),
@@ -464,7 +464,7 @@ test.describe('team preview (turn 0)', () => {
   });
 });
 
-test.describe('happiness-move choice tokens (return102 family)', () => {
+describe('happiness-move choice tokens (return102 family)', () => {
   // Gen 6 requests display happiness moves with their computed base power
   // ("Return 102" at the default 255 happiness) while the entry's `id`
   // stays `return`. Tokens built from the display name produced
@@ -520,7 +520,7 @@ test.describe('happiness-move choice tokens (return102 family)', () => {
   });
 });
 
-test.describe('concealed trapping (Magnet Pull family)', () => {
+describe('concealed trapping (Magnet Pull family)', () => {
   // The sim marks a Magnet-Pull-trapped Steel type `trapped: 'hidden'` and
   // deliberately keeps the REQUEST silent — the player has not seen the
   // trapper's ability. The switch validation still rejects, so offering the

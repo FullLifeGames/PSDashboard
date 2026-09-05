@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect, describe } from 'vitest';
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -56,7 +56,7 @@ interface Manifest {
 
 const readJson = <T>(path: string): T => JSON.parse(readFileSync(path, 'utf8')) as T;
 
-test.describe('Package hygiene', () => {
+describe('Package hygiene', () => {
   const rootLicense = readFileSync(resolve(repoRoot, 'LICENSE'), 'utf8');
   const examples: Record<string, string> = { 'replay-core': 'parse-replay.mjs', 'eval-engine': 'evaluate-turn.mjs' };
 
@@ -95,7 +95,7 @@ test.describe('Package hygiene', () => {
   }
 });
 
-test.describe('Package API surface', () => {
+describe('Package API surface', () => {
   for (const { name, runtime } of PACKAGES) {
     test(`${name}: the barrel matches the pinned surface`, () => {
       const actual = compilerSurface(name).join('\n') + '\n';

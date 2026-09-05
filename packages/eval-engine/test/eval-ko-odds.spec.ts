@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect, describe } from 'vitest';
 import { Battle, Teams, toID } from '@pkmn/sim';
 import type { PokemonSet } from '@pkmn/sim';
 import { boundaryEvent } from '../src/ko-odds';
@@ -29,7 +29,7 @@ function makeBattle(p1Sets: PokemonSet[], p2Sets: PokemonSet[], formatid = 'gen9
 
 const actives = (battle: Battle) => ({ atk: battle.sides[0].active[0]!, def: battle.sides[1].active[0]! });
 
-test.describe('boundaryEvent arithmetic', () => {
+describe('boundaryEvent arithmetic', () => {
   test('a guaranteed fixed-damage KO prices accuracy 1, killFraction 1', () => {
     // Level-100 Seismic Toss = flat 100 into a level-30 Pikachu (< 100 max HP).
     const battle = makeBattle(

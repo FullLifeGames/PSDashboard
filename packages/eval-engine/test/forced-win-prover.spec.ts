@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect, describe } from 'vitest';
 import { Battle, State, Teams, toID } from '@pkmn/sim';
 import type { PokemonSet } from '@pkmn/sim';
 import { proveForcedWin, PROVER_BUDGET } from '../src/endgame/prover';
@@ -41,7 +41,7 @@ const tossVsEgg = () => serializeAt(makeBattle(
   [makeSet('Egg', 'Chansey', ['Soft-Boiled'])],
 ), { p2: [1] });
 
-test.describe('forced-win prover (round 35)', () => {
+describe('forced-win prover (round 35)', () => {
   test('a certain knock-out proves in one turn with no caveat', () => {
     const proof = proveForcedWin(tossVsEgg(), { side: 'p1', rootOrder: ['move seismictoss', 'move protect'], tera: false });
     expect(proof.mass).toBe(1);

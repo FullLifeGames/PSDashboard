@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect, describe } from 'vitest';
 import { Battle, Teams, toID } from '@pkmn/sim';
 import type { PokemonSet } from '@pkmn/sim';
 import { effectiveSpeed, movesFirst } from '../src/speed';
@@ -35,7 +35,7 @@ function makeBattle(p1Sets: PokemonSet[], p2Sets: PokemonSet[], formatid = 'gen9
 
 const VANILLA = ['Protect', 'Substitute'];
 
-test.describe('effectiveSpeed', () => {
+describe('effectiveSpeed', () => {
   test('base is storedStats.spe, stages multiply', () => {
     const battle = makeBattle([makeSet('A', 'Snorlax', VANILLA)], [makeSet('B', 'Snorlax', VANILLA)]);
     const mon = battle.sides[0].active[0]!;
@@ -107,7 +107,7 @@ test.describe('effectiveSpeed', () => {
   });
 });
 
-test.describe('movesFirst', () => {
+describe('movesFirst', () => {
   const NO_PRIO = { priority: false };
   const PRIO = { priority: true };
 

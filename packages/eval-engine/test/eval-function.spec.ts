@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect, describe } from 'vitest';
 import { Battle, Teams, toID } from '@pkmn/sim';
 import type { PokemonSet } from '@pkmn/sim';
 import {
@@ -56,7 +56,7 @@ function makeDoublesBattle(p1Sets: PokemonSet[], p2Sets: PokemonSet[]): Battle {
   return battle;
 }
 
-test.describe('full-HP matchup damping', () => {
+describe('full-HP matchup damping', () => {
   test('matchupEarlyDamp scales the matchup feature at full rosters only', () => {
     const battle = makeBattle(
       [makeSet('Sala', 'Salazzle', ['Sludge Wave', 'Flamethrower'])],
@@ -73,7 +73,7 @@ test.describe('full-HP matchup damping', () => {
   });
 });
 
-test.describe('stranded bench pricing', () => {
+describe('stranded bench pricing', () => {
   // p1: active Snorlax (full HP ⇒ bodies 1.0) + bench Charizard (4x rock
   // weak ⇒ rocks entry fraction 0.5). p2: lone Snorlax ⇒ bodies 1.0.
   // features.bodies = p1 − p2 = the Charizard contribution alone.
@@ -134,7 +134,7 @@ test.describe('stranded bench pricing', () => {
   });
 });
 
-test.describe('win-condition sweep cells', () => {
+describe('win-condition sweep cells', () => {
   test('a fast non-OHKO flip lands in fastChip alone', () => {
     // +2 Dragapult vs Talonflame + Weavile. Measured pair fractions (empirical
     // pin 2026-08-24): Darts→Talon 0.3534 (+2: 0.7067), Darts→Weavile 0.3942
@@ -242,7 +242,7 @@ test.describe('win-condition sweep cells', () => {
   });
 });
 
-test.describe('evaluatePosition', () => {
+describe('evaluatePosition', () => {
   test('doubles positions score with the doubles-fitted weights', () => {
     // Per-gametype calibration (2026-08-08 corpus fit): speed control is
     // worth far more in doubles. The doubles dot product must use the
@@ -838,7 +838,7 @@ test.describe('evaluatePosition', () => {
   });
 });
 
-test.describe('effective speed in the eval (round 9)', () => {
+describe('effective speed in the eval (round 9)', () => {
   test('a Scarf breaks a mirror matchup tie', () => {
     // Identical Talonflame mirror: same damage both ways, no priority moves,
     // equal turns — the pair sign is decided by speed alone. Bare mirror
@@ -872,7 +872,7 @@ test.describe('effective speed in the eval (round 9)', () => {
   });
 });
 
-test.describe('PP truth in the threat model (round 11)', () => {
+describe('PP truth in the threat model (round 11)', () => {
   // PP is read LIVE from the sim's move slots, never derived from dex base
   // PP: pools differ across rule sets (Showdown effectively always runs
   // maxed PP Ups; Pokémon Champions runs different counts), and the sim's
@@ -912,7 +912,7 @@ test.describe('PP truth in the threat model (round 11)', () => {
     expect(evaluatePosition(battle, cache)).toBe(evaluatePosition(battle));
   });
 
-  test.describe('unanswered mons (round 13)', () => {
+  describe('unanswered mons (round 13)', () => {
     test('a mon no living enemy out-races is unanswered', () => {
       // A level-100 Mewtwo one-shots both bodies; their Tackles never win a
       // race against it. 648453 t13's principle: any successful entry of an
@@ -964,7 +964,7 @@ test.describe('PP truth in the threat model (round 11)', () => {
     });
   });
 
-  test.describe('the switch-in stage and the coin-flip check (round 14)', () => {
+  describe('the switch-in stage and the coin-flip check (round 14)', () => {
     // 648453 t13: the race model called the ACTIVE Tornadus-T an answer to
     // Lopunny-Mega on a full-hit Hurricane clock while every benched answer
     // died on arrival — the expert counts "remaining switch-ins", and the
@@ -1054,7 +1054,7 @@ test.describe('PP truth in the threat model (round 11)', () => {
     });
   });
 
-  test.describe('the decided sweep and the near-decided roll (round 15)', () => {
+  describe('the decided sweep and the near-decided roll (round 15)', () => {
     // 573756 t134–138: a locked endgame read +0.2 instead of decided; the
     // series bookkeeping is what separates a cleanup from a mere threat —
     // a mon that wins every FRESH pair can still die to the accumulated
@@ -1159,7 +1159,7 @@ test.describe('PP truth in the threat model (round 11)', () => {
   });
 });
 
-test.describe('the healer wall is a finite race (round 11)', () => {
+describe('the healer wall is a finite race (round 11)', () => {
   const side = (partial: Partial<RaceSide>): RaceSide =>
     ({ hp: 1, frac: 0, residual: 0, healRate: 0, healAbsorb: 0, ppBudget: 64, ...partial });
   // A 16-PP Recover-class healer: rate 1/2 per turn, 8 bars of total fuel.

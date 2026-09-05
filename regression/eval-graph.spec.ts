@@ -1,8 +1,8 @@
-import { test, expect } from '@playwright/test';
+import { test, expect, describe } from 'vitest';
 import { coverageNotice, needsSettingsUpgrade, recordEvalError, resolveAutoTurnSettings, serializedFaintedFraction, supersedesStored, verificationDeepSettings, withEvalGapNotice } from '../src/hooks/useEvaluation';
 import { AUTO_MCTS_FAINTED_FRACTION } from '../packages/eval-engine/src/types';
 
-test.describe('coverage notice (acquisition pass)', () => {
+describe('coverage notice (acquisition pass)', () => {
   // The notice describes the RECONSTRUCTION pass — one fast replay of the
   // game that hands out every turn's position, settling seconds after
   // "Analyze game" while the evaluations still stream. Its wording must
@@ -41,7 +41,7 @@ test.describe('coverage notice (acquisition pass)', () => {
   });
 });
 
-test.describe('eval-gap visibility helpers', () => {
+describe('eval-gap visibility helpers', () => {
   test('recordEvalError keeps the reason only while the turn is scoreless', () => {
     const evalErrors: (string | null)[] = [null, null, null];
     const scores: (number | null)[] = [null, 0.4, null];
@@ -67,7 +67,7 @@ test.describe('eval-gap visibility helpers', () => {
   });
 });
 
-test.describe('settings upgrade decision (merged flow)', () => {
+describe('settings upgrade decision (merged flow)', () => {
   const prefs = { depth: 2, samples: 3, mode: 'matrix', auto: false, tera: 'auto' } as const;
   test('shallower stored settings upgrade; deeper never downgrade', () => {
     expect(needsSettingsUpgrade(null, prefs)).toBe(true);
@@ -84,7 +84,7 @@ test.describe('settings upgrade decision (merged flow)', () => {
   });
 });
 
-test.describe('graph merge monotonicity', () => {
+describe('graph merge monotonicity', () => {
   test('a shallower pass never overwrites deeper stored data', () => {
     // The re-analyze fast pass (d1s1) used to clobber a deepened turn's
     // graph entry until the key-turn pass restored some of them.
@@ -128,7 +128,7 @@ test.describe('graph merge monotonicity', () => {
   });
 });
 
-test.describe('auto mode resolution', () => {
+describe('auto mode resolution', () => {
   test('auto is the pinned d1s1 line: matrix below the threshold, MCTS at or above', () => {
     expect(resolveAutoTurnSettings(0)).toEqual({ depth: 1, samples: 1, mode: 'matrix' });
     expect(resolveAutoTurnSettings(AUTO_MCTS_FAINTED_FRACTION - 0.001)).toEqual({ depth: 1, samples: 1, mode: 'matrix' });
@@ -182,7 +182,7 @@ test.describe('auto mode resolution', () => {
   });
 });
 
-test.describe('verification deep tier', () => {
+describe('verification deep tier', () => {
   test('flags adjudicate one depth up in matrix pair space, from any line engine', () => {
     // Matrix lines rise one depth; the engine cap (3) ends the ladder.
     expect(verificationDeepSettings({ depth: 1, samples: 1, mode: 'matrix' }))
@@ -206,7 +206,7 @@ test.describe('verification deep tier', () => {
 import { computeBlunders, selectKeyTurns, BLUNDER_SWING, KEY_TURN_SWING } from '../packages/eval-engine/src/graph';
 import { KEY_MOMENT_SWING } from '../packages/eval-engine/src/report';
 
-test.describe('key-turn coverage matches the report', () => {
+describe('key-turn coverage matches the report', () => {
   test('every report-worthy swing gets the deepening pass', () => {
     // GPL finding: the report named T14/T36 (+15% ≈ 0.29–0.34 swings) while
     // selectKeyTurns still used the 0.4 blunder threshold — the whole
@@ -219,7 +219,7 @@ test.describe('key-turn coverage matches the report', () => {
   });
 });
 
-test.describe('eval graph blunder detection', () => {
+describe('eval graph blunder detection', () => {
   test('flags the turn whose play created the swing, not the turn after', () => {
     const scores = [0.1, 0.15, -0.3, -0.25, 0.4];
     // The -0.45 swing shows between the turn-2 and turn-3 points — it was

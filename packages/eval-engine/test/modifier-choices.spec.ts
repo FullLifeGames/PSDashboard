@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect, describe } from 'vitest';
 import type { PokemonSet } from '@pkmn/sim';
 import {
   createBranchState,
@@ -43,7 +43,7 @@ const singlesLog = [
   '|turn|1',
 ].join('\n');
 
-test.describe('battle gimmick choices (G7)', () => {
+describe('battle gimmick choices (G7)', () => {
   test('describes modifier choices in pending chips', () => {
     const tera: BranchSlotChoice = { kind: 'move', moveId: 'earthquake', moveName: 'Earthquake', modifier: 'terastallize' };
     expect(describeSlotChoice(tera)).toBe('move Earthquake (Tera)');

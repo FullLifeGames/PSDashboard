@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect, describe } from 'vitest';
 import { readFileSync } from 'fs';
 import { buildTeamsFromReplay, solveReplaySpreads } from '../packages/replay-core/src/team-builder';
 import { parseReplayLogWithObservations } from '../packages/replay-core/src/protocol-parser';
@@ -21,9 +21,8 @@ function loadDraftReplay(): ReplayData {
   return JSON.parse(readFileSync('e2e/fixtures/draft-replay.json', 'utf-8')) as ReplayData;
 }
 
-test.describe('replay jobs in the worker', () => {
-  test('reconstruct hands out the same positions, log, and verdicts as the main-thread path', async () => {
-    test.setTimeout(300_000);
+describe('replay jobs in the worker', () => {
+  test('reconstruct hands out the same positions, log, and verdicts as the main-thread path', { timeout: 300000 }, async () => {
     const replay = loadDraftReplay();
     const { snapshots, observations, speedOrders } = parseReplayLogWithObservations(replay.log);
     const { p1Team, p2Team } = buildTeamsFromReplay(replay.log, { observations, speedOrders });
@@ -63,8 +62,7 @@ test.describe('replay jobs in the worker', () => {
     expect(responses.some(response => response.type === 'replayError')).toBe(false);
   });
 
-  test('solveSpreads hands out the same map as solveReplaySpreads', async () => {
-    test.setTimeout(120_000);
+  test('solveSpreads hands out the same map as solveReplaySpreads', { timeout: 120000 }, async () => {
     const replay = loadDraftReplay();
     const { observations, speedOrders } = parseReplayLogWithObservations(replay.log);
     const direct = solveReplaySpreads(replay.log, observations, { speedOrders });

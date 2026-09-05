@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect, describe } from 'vitest';
 import {
   applyCoherenceVetoes, selectCuratedSet,
   type CuratedEvidence, type MoveCandidate,
@@ -17,7 +17,7 @@ const guessed = (name: string): MoveCandidate => ({ name, guessed: true });
 const revealed = (name: string): MoveCandidate => ({ name, guessed: false });
 const names = (list: MoveCandidate[]) => list.map(entry => entry.name);
 
-test.describe('set-coherence vetoes', () => {
+describe('set-coherence vetoes', () => {
   test('a guessed attack the boost does not serve falls (SD Cobalion + Body Press)', () => {
     // Body Press deals physical damage with the DEFENSE stat — Swords Dance
     // does not serve it; the archetypes are disjoint.
@@ -128,7 +128,7 @@ test.describe('set-coherence vetoes', () => {
   });
 });
 
-test.describe('coherent-set selection', () => {
+describe('coherent-set selection', () => {
   const set = (moves: string[], item?: string): PokemonSetAssumption => ({
     species: 'Noivern', sourceDetail: 't',
     moves: moves.map(value => ({ value, sourceDetail: 't' })),

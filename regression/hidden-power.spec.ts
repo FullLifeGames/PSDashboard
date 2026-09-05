@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect, describe } from 'vitest';
 import { resolveHiddenPowerType, withHiddenPowerType } from '../packages/replay-core/src/hidden-power';
 import { parseSmogonChaosStats } from '../src/lib/smogon-stats';
 import { reconstructBranchRuntime } from '../packages/eval-engine/src/branch-engine';
@@ -20,7 +20,7 @@ const usage = parseSmogonChaosStats({
 const ev = (defender: string, marker: HiddenPowerEvidence['marker']): HiddenPowerEvidence =>
   ({ attackerSide: 'p1', attackerSpecies: 'Manectric', defenderSpecies: defender, marker });
 
-test.describe('hidden-power type resolution', () => {
+describe('hidden-power type resolution', () => {
   test('usage alone picks the top variant', () => {
     expect(resolveHiddenPowerType([], usage, 'Manectric', 6)).toBe('Hidden Power Ice');
   });
@@ -44,7 +44,7 @@ test.describe('hidden-power type resolution', () => {
   });
 });
 
-test.describe('set substitution', () => {
+describe('set substitution', () => {
   const baseSet: PokemonSet = {
     name: 'Manectric', species: 'Manectric', item: '', ability: 'Static',
     moves: ['Thunderbolt', 'Hidden Power', 'Volt Switch', 'Overheat'],
@@ -68,7 +68,7 @@ test.describe('set substitution', () => {
 // substituted typed set must still understand the generic id everywhere the
 // protocol meets the sim — the 653785 regression: rejected replay choices
 // cost two reconstructed turns and flipped the re-pinned t19 verdict.
-test.describe('generic protocol Hidden Power against a typed set', () => {
+describe('generic protocol Hidden Power against a typed set', () => {
   test('the choice replay maps Hidden Power onto the typed slot (no rejects, no divergence)', async () => {
     const typedSet: PokemonSet = {
       name: 'Manectric', species: 'Manectric', item: '', ability: 'Static',

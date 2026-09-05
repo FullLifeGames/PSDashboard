@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect, describe } from 'vitest';
 import {
   decodeBranchShare,
   deleteSavedBranch,
@@ -33,7 +33,7 @@ const history: BranchHistoryEntry[] = [{
   p2Pokemon: [],
 }];
 
-test.describe('branch save/share payloads', () => {
+describe('branch save/share payloads', () => {
   test('round-trips compact share payloads without battle snapshots', () => {
     const payload = makeBranchSharePayload({
       replay,

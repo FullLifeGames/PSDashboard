@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test';
+import { test, expect } from 'vitest';
 import { readFileSync } from 'fs';
 import type { PokemonSet } from '@pkmn/sim';
 import { buildTeamsFromReplay } from '../packages/replay-core/src/team-builder';

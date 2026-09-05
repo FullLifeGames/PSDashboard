@@ -1,7 +1,7 @@
-import { test, expect } from '@playwright/test';
+import { test, expect, describe } from 'vitest';
 import { parsePlayedActions, parsePlayedActionsDoubles } from '../src/played';
 
-test.describe('played-action parsing', () => {
+describe('played-action parsing', () => {
   test('both sides move', () => {
     const played = parsePlayedActions([
       '|move|p1a: Kyurem|Draco Meteor|p2a: Cryogonal',
@@ -105,7 +105,7 @@ test.describe('played-action parsing', () => {
   });
 });
 
-test.describe('doubles played-action parsing', () => {
+describe('doubles played-action parsing', () => {
   test('per-slot actions with foe/ally target locations', () => {
     const played = parsePlayedActionsDoubles([
       '|move|p1a: Flutter Mane|Moonblast|p2b: Chien-Pao',
@@ -151,7 +151,7 @@ test.describe('doubles played-action parsing', () => {
   });
 });
 
-test.describe('mega evolution tracking', () => {
+describe('mega evolution tracking', () => {
   test('doubles: |-mega| marks the slot and the move carries the flag', () => {
     const played = parsePlayedActionsDoubles([
       '|-mega|p1a: Lacksatives|Lucario|Lucarionite',
@@ -175,7 +175,7 @@ test.describe('mega evolution tracking', () => {
   });
 });
 
-test.describe('pivot pair targets', () => {
+describe('pivot pair targets', () => {
   test('the follow-up switch after a pivot move records the pair target', () => {
     const played = parsePlayedActions([
       '|move|p1a: Mien|U-turn|p2a: Chomp',

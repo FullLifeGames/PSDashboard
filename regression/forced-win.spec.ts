@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect, describe } from 'vitest';
 import { State } from '@pkmn/sim';
 import { ENDGAME_FIXTURES } from './endgame-fixtures';
 import { proveForcedWin } from '../packages/eval-engine/src/endgame/prover';
@@ -55,7 +55,7 @@ const EXPECTED: Record<string, Expected> = {
   'doubles-1v2-spread': { side: 'p1', mass: null },
 };
 
-test.describe('forced-win prover over the synthetic endgames (round 35)', () => {
+describe('forced-win prover over the synthetic endgames (round 35)', () => {
   for (const fixture of ENDGAME_FIXTURES) {
     const expected = EXPECTED[fixture.name];
     const title = expected ? (expected.mass === null ? 'no proof' : `mass ${expected.mass}`) : 'unlisted';

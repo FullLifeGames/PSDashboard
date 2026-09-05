@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect, describe } from 'vitest';
 import type { PokemonSet } from '@pkmn/sim';
 import { reconstructBranchRuntime, validateBranchRuntime } from '../src/branch-engine';
 
@@ -42,7 +42,7 @@ const twoTurnLog = [
   '|turn|2',
 ].join('\n');
 
-test.describe('branch runtime validation (B7/B17)', () => {
+describe('branch runtime validation (B7/B17)', () => {
   test('accepts a healthy reconstruction', async () => {
     const runtime = await reconstructBranchRuntime({
       format: 'gen9ou',

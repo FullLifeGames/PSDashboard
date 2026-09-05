@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect, describe } from 'vitest';
 import { analyzeTurn, type TurnAnalysis } from '../src/analysis';
 import { formatRead, summarizeTurn } from '../src/summary';
 import type { EvalResult, RankedChoice } from '../src/types';
@@ -25,7 +25,7 @@ const result: EvalResult = {
 
 const names: [string, string] = ['Alpha', 'Beta'];
 
-test.describe('natural-language turn summaries', () => {
+describe('natural-language turn summaries', () => {
   test('a decision turn names the player, both options, and the follow-up line', () => {
     const summary = summarizeTurn(analyzeTurn({
       turn: 20,
@@ -462,7 +462,7 @@ test.describe('natural-language turn summaries', () => {
   });
 });
 
-test.describe('round-5 narrative: breadth, conditionals, null guard, forced mixes', () => {
+describe('round-5 narrative: breadth, conditionals, null guard, forced mixes', () => {
   test('a wide culprit-free swing reads as an open turn, not a drift', () => {
     const wide: EvalResult = {
       score: 0.0, interval: 0.3, depthCompleted: 1,
@@ -671,7 +671,7 @@ test.describe('round-5 narrative: breadth, conditionals, null guard, forced mixe
   });
 });
 
-test.describe('forced-mix dedup against the conditional', () => {
+describe('forced-mix dedup against the conditional', () => {
   const conditionalDedupChoice = (choiceStr: string, label: string, ev: number, punishedBy: string | null = null): RankedChoice =>
     ({ choice: choiceStr, label, worstCase: ev - 0.05, expected: ev, ev, punishedBy });
 
@@ -711,7 +711,7 @@ test.describe('forced-mix dedup against the conditional', () => {
   });
 });
 
-test.describe('odds grounding (round 6)', () => {
+describe('odds grounding (round 6)', () => {
   test('a punished mistake grounds the played move\'s kill odds', () => {
     const punished: EvalResult = {
       score: 0.1, interval: 0.05, depthCompleted: 2,
@@ -800,7 +800,7 @@ test.describe('odds grounding (round 6)', () => {
   });
 });
 
-test.describe('streak clauses (round 6)', () => {
+describe('streak clauses (round 6)', () => {
   const base: TurnAnalysis = {
     turn: 30, scoreBefore: 0.1, scoreAfter: 0.1, swing: 0,
     playedOutcome: null, decisionDelta: null, chanceDelta: null,
@@ -835,7 +835,7 @@ test.describe('streak clauses (round 6)', () => {
   });
 });
 
-test.describe('round-13 narrative: entry-is-profit', () => {
+describe('round-13 narrative: entry-is-profit', () => {
   test('a switch into an unanswered mon names the principle', () => {
     const result: EvalResult = {
       score: 0.0, interval: 0.1, depthCompleted: 1,
@@ -910,7 +910,7 @@ test.describe('round-13 narrative: entry-is-profit', () => {
   });
 });
 
-test.describe('the decided sweep in prose (round 15)', () => {
+describe('the decided sweep in prose (round 15)', () => {
   // 573756 t134–138: the locked endgame speaks — the announcement names the
   // sweeper once, and on decided turns a chance swing TOWARD the decided
   // side reads as the game resolving, not as luck.

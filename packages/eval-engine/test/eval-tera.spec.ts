@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect, describe } from 'vitest';
 import { parseRevealedTeraSpecies, resolveTeraPreference, teraKey } from '../src/tera';
 
 const draftLog = [
@@ -14,7 +14,7 @@ const draftLog = [
   '|turn|2',
 ].join('\n');
 
-test.describe('tera allowance', () => {
+describe('tera allowance', () => {
   test('revealed tera resolves nicknames to species per side', () => {
     expect(parseRevealedTeraSpecies(draftLog)).toEqual({ p1: [], p2: ['Rhydon'] });
   });

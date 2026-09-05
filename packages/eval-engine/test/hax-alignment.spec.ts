@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect, describe } from 'vitest';
 import { Battle, Teams } from '@pkmn/sim';
 import type { PokemonSet } from '@pkmn/sim';
 import {
@@ -8,7 +8,7 @@ import {
 } from '../src/hax-alignment';
 import { serializeBattleStable, trialAdvanceLog } from '../src/forward-model';
 
-test.describe('extractProtocolEvents', () => {
+describe('extractProtocolEvents', () => {
   test('reads faints, win, and normalizes idents without slot letters', () => {
     const events = extractProtocolEvents([
       '|move|p1a: Sweeper|Ice Beam|p2a: Wall',
@@ -61,7 +61,7 @@ test.describe('extractProtocolEvents', () => {
   });
 });
 
-test.describe('scoreAlignment + compareAlignment', () => {
+describe('scoreAlignment + compareAlignment', () => {
   const block = (lines: string[]) => extractProtocolEvents(lines);
 
   test('extra sim event counts exactly like a missing one (symmetry)', () => {
@@ -98,7 +98,7 @@ test.describe('scoreAlignment + compareAlignment', () => {
   });
 });
 
-test.describe('seed list + summary', () => {
+describe('seed list + summary', () => {
   test('ALIGNMENT_SEEDS pins 16 distinct seeds with legacy continuity at index 0', () => {
     expect(ALIGNMENT_SEEDS.length).toBe(16);
     expect(ALIGNMENT_SEEDS[0]).toBe('1,2,3,4');
@@ -143,7 +143,7 @@ function hydroPosition(): { serialized: string } {
   return { serialized: serializeBattleStable(battle) };
 }
 
-test.describe('trialAdvanceLog', () => {
+describe('trialAdvanceLog', () => {
   test('returns only the lines this advance emitted', () => {
     const result = trialAdvanceLog(hydroPosition(), 'move 1', 'move 1', ALIGNMENT_SEEDS[0]);
     expect(result.log.length).toBeGreaterThan(0);
@@ -173,7 +173,7 @@ test.describe('trialAdvanceLog', () => {
   });
 });
 
-test.describe('chooseAlignedSeed', () => {
+describe('chooseAlignedSeed', () => {
   const missBlock = [
     '|move|p1a: Keldeo|Hydro Pump|p2a: Blissey',
     '|-miss|p1a: Keldeo|p2a: Blissey',

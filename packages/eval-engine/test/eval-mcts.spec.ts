@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect, describe } from 'vitest';
 import { Battle, State, Teams, toID } from '@pkmn/sim';
 import type { PokemonSet } from '@pkmn/sim';
 import { analyzeTurn, matchPlayedChoice } from '../src/analysis';
@@ -69,7 +69,7 @@ const mutualRoot = () => {
   return serialize(battle);
 };
 
-test.describe('DUCT-MCTS search', () => {
+describe('DUCT-MCTS search', () => {
   test('finds the winning line and prefers it', () => {
     const result = mctsSearch(threeTurnWin(), { depth: 1, samples: 1, tera: false, mode: 'mcts' });
     expect(result.perSide.p1[0].choice).toBe('move seismictoss');
@@ -202,7 +202,7 @@ test.describe('DUCT-MCTS search', () => {
   });
 });
 
-test.describe('MCTS koOdds payload (round 7)', () => {
+describe('MCTS koOdds payload (round 7)', () => {
   const settings = { depth: 1, samples: 1, tera: false, mode: 'mcts' } as const;
 
   test('sync results carry analytic koOdds on boundary rows only', () => {

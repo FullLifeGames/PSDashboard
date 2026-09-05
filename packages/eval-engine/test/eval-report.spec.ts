@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect, describe } from 'vitest';
 import type { TurnAnalysis } from '../src/analysis';
 import { buildGameReport } from '../src/report';
 import type { RankedChoice } from '../src/types';
@@ -26,7 +26,7 @@ const mk = (turn: number, scoreBefore: number, scoreAfter: number | null, over: 
 const tierOf = (regret: number) =>
   regret >= 0.3 ? { tier: 'blunder' as const } : regret >= 0.15 ? { tier: 'mistake' as const } : {};
 
-test.describe('game report (multi-turn root cause)', () => {
+describe('game report (multi-turn root cause)', () => {
   test('finds the turn whose play made the winning advantage permanent', () => {
     const report = buildGameReport([
       mk(1, 0.2, 0.1),
@@ -314,7 +314,7 @@ test.describe('game report (multi-turn root cause)', () => {
   });
 });
 
-test.describe('null-swapped recommendations (round 5)', () => {
+describe('null-swapped recommendations (round 5)', () => {
   test('misplay rows and the seeds sentence use the co-optimal alternative', () => {
     const played = ranked('move splash', 'Splash', -0.3);
     const best = ranked('move willowisp', 'Will-O-Wisp', 0.2);

@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect, describe } from 'vitest';
 import { Battle, State, Teams, toID } from '@pkmn/sim';
 import type { PokemonSet, PRNGSeed } from '@pkmn/sim';
 import { advancePosition, createRootPosition, positionBattle } from '../src/forward-model';
@@ -42,7 +42,7 @@ function makeBattle(p1Sets: PokemonSet[], p2Sets: PokemonSet[], formatid = 'gen9
 
 const serialize = (battle: Battle): string => JSON.stringify(State.serializeBattle(battle));
 
-test.describe('endgame key (round 34)', () => {
+describe('endgame key (round 34)', () => {
   test('two move orders reaching the same board share one key, different PP do not', () => {
     // Setup moves without chance: Iron Defense, Swords Dance, Swords Dance
     // equals Swords Dance, Iron Defense, Swords Dance (same PP, same
@@ -66,7 +66,7 @@ test.describe('endgame key (round 34)', () => {
   });
 });
 
-test.describe('endgame children (round 34)', () => {
+describe('endgame children (round 34)', () => {
   test('a deterministic pair yields one child with weight 1 and no unpriced flag', () => {
     // Chansey, not Blissey: Blissey ties Machamp on base speed, which is a
     // priced order split of its own (the next tests cover it).
@@ -156,7 +156,7 @@ test.describe('endgame children (round 34)', () => {
 
 const SMALL = { states: 2000, wallMs: 30_000 };
 
-test.describe('endgame solver (round 34)', () => {
+describe('endgame solver (round 34)', () => {
   test('a fixed-damage race resolves to the side that needs fewer hits, speed tie or not', () => {
     const battle = makeBattle(
       [makeSet('Toss', 'Machamp', ['Seismic Toss'])],

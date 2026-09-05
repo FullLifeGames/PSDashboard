@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect, describe } from 'vitest';
 import { existsSync, readFileSync } from 'fs';
 import type { PokemonSet } from '@pkmn/sim';
 import { buildTeamsFromReplay } from '../packages/replay-core/src/team-builder';
@@ -123,7 +123,7 @@ async function waitForBranchLog(
   throw new Error(`Timed out waiting for branch log. Tail:\n${runtime.log.slice(-20).join('\n')}`);
 }
 
-test.describe('Replay reconstruction regression suite', () => {
+describe('Replay reconstruction regression suite', () => {
   test('reconstructs a stable checkpoint from the fixture replay', async () => {
     const fixture = loadFixtureReplay();
     await expectReplayCheckpointToReconstruct({
@@ -166,8 +166,8 @@ test.describe('Replay reconstruction regression suite', () => {
     expect(runtime.battleStream.battle?.turn).toBe(targetTurn);
   });
 
-  test('reconstructs stable checkpoints from a real saved replay', async () => {
-    test.skip(!existsSync(SAVED_REPLAY_HTML), 'local saved replay HTML is gitignored and not present');
+  test('reconstructs stable checkpoints from a real saved replay', async ({ skip }) => {
+    skip(!existsSync(SAVED_REPLAY_HTML), 'local saved replay HTML is gitignored and not present');
     const log = loadHtmlReplayLog(SAVED_REPLAY_HTML);
     for (const targetTurn of [3, 5]) {
       await expectReplayCheckpointToReconstruct({
@@ -178,7 +178,7 @@ test.describe('Replay reconstruction regression suite', () => {
     }
   });
 
-  test.fixme('documents a known divergence after the first fixture turn', async () => {
+  test.skip('documents a known divergence after the first fixture turn', async () => {
     const fixture = loadFixtureReplay();
     await expectReplayCheckpointToReconstruct({
       format: fixture.formatid || 'gen9ou',
@@ -187,8 +187,8 @@ test.describe('Replay reconstruction regression suite', () => {
     });
   });
 
-  test.fixme('documents a known deeper-turn divergence in the saved replay', async () => {
-    test.skip(!existsSync(SAVED_REPLAY_HTML), 'local saved replay HTML is gitignored and not present');
+  test.skip('documents a known deeper-turn divergence in the saved replay', async ({ skip }) => {
+    skip(!existsSync(SAVED_REPLAY_HTML), 'local saved replay HTML is gitignored and not present');
     const log = loadHtmlReplayLog(SAVED_REPLAY_HTML);
     await expectReplayCheckpointToReconstruct({
       format: 'gen9draft',
@@ -532,7 +532,7 @@ test.describe('Replay reconstruction regression suite', () => {
   });
 });
 
-test.describe('Turn-synchronized replay of a video-reconstructed log', () => {
+describe('Turn-synchronized replay of a video-reconstructed log', () => {
   // Synthetic GPL log (gpl-pipeline video reconstruction): no |upkeep| markers,
   // Sleep Talk/Rest loops, and a taunt-blocked turn 1. Before the turn-sync
   // guard the block replayer ran ~5 turns ahead of the simulator here, so
@@ -572,8 +572,7 @@ test.describe('Turn-synchronized replay of a video-reconstructed log', () => {
     expect(runtime.battleStream.battle?.sides[0].active[0]?.species.name).toBe('Uxie');
   });
 
-  test('carries the pending Future Sight to the branch point at turn 25', async () => {
-    test.setTimeout(120_000);
+  test('carries the pending Future Sight to the branch point at turn 25', { timeout: 120000 }, async () => {
     const replay = loadGplReplay();
     const { p1Team, p2Team } = buildTeamsFromReplay(replay.log);
     const snapshots = parseReplayLog(replay.log);
@@ -603,7 +602,7 @@ test.describe('Turn-synchronized replay of a video-reconstructed log', () => {
   });
 });
 
-test.describe('hax alignment records', () => {
+describe('hax alignment records', () => {
   test('reconstruction records one aligned turn per replayed block, deterministically', async () => {
     const replay = loadFixtureReplay();
     const { p1Team, p2Team } = buildTeamsFromReplay(replay.log);
@@ -633,7 +632,7 @@ test.describe('hax alignment records', () => {
   });
 });
 
-test.describe('unified timeline picker/position helpers', () => {
+describe('unified timeline picker/position helpers', () => {
   async function buildDefaultRuntime(targetTurn: number) {
     const fixture = loadFixtureReplay();
     const snapshots = parseReplayLog(fixture.log);

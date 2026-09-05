@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect, describe } from 'vitest';
 import { Battle, State, Teams, toID } from '@pkmn/sim';
 import type { PokemonSet } from '@pkmn/sim';
 import {
@@ -41,7 +41,7 @@ const serialize = (battle: Battle) => JSON.stringify(State.serializeBattle(battl
 const event = (side: 'p1' | 'p2', accuracy: number, killFraction: number, defenderIdent: string): CellEvent =>
   ({ side, moveId: 'testmove', defenderIdent, event: { accuracy, killFraction, pKill: accuracy * killFraction } });
 
-test.describe('foldClassWeights', () => {
+describe('foldClassWeights', () => {
   test('the t23 shape: kill truncates the second actor', () => {
     // p1 Scald: 100% acc, 43% kill. p2 HJK: 90% acc, 100% kill. p1 first.
     const events = [event('p1', 1, 0.43, 'p2a: Medicham'), event('p2', 0.9, 1, 'p1a: Keldeo')];
@@ -60,7 +60,7 @@ test.describe('foldClassWeights', () => {
   });
 });
 
-test.describe('classifyChild', () => {
+describe('classifyChild', () => {
   const events = [event('p1', 1, 0.43, 'p2a: Medicham'), event('p2', 0.9, 1, 'p1a: Keldeo')];
   test('kill before the second move classifies as truncation', () => {
     const key = classifyChild([
@@ -99,7 +99,7 @@ test.describe('classifyChild', () => {
   });
 });
 
-test.describe('observeOrder', () => {
+describe('observeOrder', () => {
   const events = [event('p1', 1, 0.43, 'p2a: B'), event('p2', 0.9, 1, 'p1a: A')];
   test('a lone mover votes as first (kill truncation)', () => {
     expect(observeOrder([
@@ -127,7 +127,7 @@ test('reblendValue swaps the first leaf inside its class only', () => {
   expect(reblendValue(blend, 0.5)).toBeCloseTo(0.43 * 0.75 + 0.57 * -1, 9);
 });
 
-test.describe('planCellEvents guards', () => {
+describe('planCellEvents guards', () => {
   test('a paralyzed attacker fails closed', () => {
     const battle = makeBattle(
       [makeSet('Machamp', 'Machamp', ['Hydro Pump'], 100)],
@@ -193,7 +193,7 @@ test('probe constants: eleven fixed seeds under a 16-draw budget', () => {
   expect(BOUNDARY_DRAW_BUDGET).toBe(16);
 });
 
-test.describe('root-cell blend integration', () => {
+describe('root-cell blend integration', () => {
   // Mutual-OHKO cell with exact ±1 leaves: p1's 80% Hydro Pump always kills
   // on a hit (+1); on a miss the surviving Pikachu's Tackle kills the 1-HP
   // attacker (−1). Analytic value = 0.8·1 + 0.2·(−1) = 0.6 exactly. The

@@ -1,7 +1,7 @@
-import { test, expect } from '@playwright/test';
+import { test, expect, describe } from 'vitest';
 import { perfAdd, perfCount, perfEnabled, perfReset, perfSpan, perfSummary } from '../src/perf-trace';
 
-test.describe('perf-trace', () => {
+describe('perf-trace', () => {
   test('aggregates stages and counters and resets clean', async () => {
     perfReset();
     perfAdd('stage', 5);

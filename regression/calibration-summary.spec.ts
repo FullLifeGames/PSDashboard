@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect, describe } from 'vitest';
 import { summaryLines, type SummarySample } from './calibration-summary';
 
 const sample = (over: Partial<SummarySample>): SummarySample => ({
@@ -6,7 +6,7 @@ const sample = (over: Partial<SummarySample>): SummarySample => ({
   quality: 'std', luckAgainstFavored: false, ...over,
 });
 
-test.describe('calibration summary lines (round 34)', () => {
+describe('calibration summary lines (round 34)', () => {
   test('prints the hq and luck-adjusted lines after the phase briers', () => {
     const samples = [
       sample({ id: 'a', quality: 'hq' }),

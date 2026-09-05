@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect, describe } from 'vitest';
 import { readFileSync } from 'fs';
 import { dirname, join } from 'path';
 import { fileURLToPath } from 'url';
@@ -72,7 +72,7 @@ const earthquake: BranchMoveOption = {
   maxpp: 16,
 };
 
-test.describe('target-specific damage previews', () => {
+describe('target-specific damage previews', () => {
   test('calculates different preview ranges for different selected targets', () => {
     const intoBulbasaur = calcSingleDamageRange(pikachu, bulbasaur, thunderbolt);
     const intoSquirtle = calcSingleDamageRange(pikachu, squirtle, thunderbolt);

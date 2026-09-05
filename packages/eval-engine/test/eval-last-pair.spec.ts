@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect, describe } from 'vitest';
 import { Battle, Teams, toID } from '@pkmn/sim';
 import type { PokemonSet } from '@pkmn/sim';
 import { createMatchupCache, evaluatePosition, singleMoveFraction } from '../src/eval-function';
@@ -42,7 +42,7 @@ function makeBattle(p1Sets: PokemonSet[], p2Sets: PokemonSet[], formatid = 'gen9
 const staticLeaf = (battle: Battle) =>
   wpUnits(evaluatePosition(battle, createMatchupCache()), battle.gameType === 'doubles', battleFaintedFraction(battle));
 
-test.describe('last-pair race static (round 33)', () => {
+describe('last-pair race static (round 33)', () => {
   test('the race winner reads the base plus the clock margin, capped', () => {
     // A burned Toxapex with no damaging move (Recover, Haze) against a
     // Choice Band Zapdos-Galar: the wall never lands, the Band breaks the

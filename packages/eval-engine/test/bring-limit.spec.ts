@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect, describe } from 'vitest';
 import { createBranchState, reconstructBranchRuntime, serializePreviewPosition } from '../src/branch-engine';
 import { getReplayBringCount, replayBringOnly, parseReplayLogWithObservations } from '@fulllifegames/replay-core';
 import type { PokemonSet } from '@pkmn/sim';
@@ -40,7 +40,7 @@ const vgcLog = [
   '|turn|1',
 ].join('\n');
 
-test.describe('bring-limited team preview (VGC 4 of 6)', () => {
+describe('bring-limited team preview (VGC 4 of 6)', () => {
   test('getReplayBringCount answers from the rule table and the format-id heuristic', () => {
     // Regulations newer than the bundled sim resolve via the heuristic.
     expect(getReplayBringCount({ formatid: 'gen9vgc2026regi' })).toBe(4);

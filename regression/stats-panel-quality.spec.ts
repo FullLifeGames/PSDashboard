@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect, describe } from 'vitest';
 import { inferOpponentTeam } from '../packages/replay-core/src/opponent-inferrer';
 import { applyInferredSpreads, enrichPokemonInfo, guessedEvs, INFERRED_SPREAD_DETAIL, manualEvs, unknownField } from '../packages/replay-core/src/team-info';
 import { spriteUrl } from '../src/lib/sprite-url';
@@ -35,7 +35,7 @@ const healLog = [
   '|turn|2',
 ].join('\n');
 
-test.describe('stats panel data quality (WP11)', () => {
+describe('stats panel data quality (WP11)', () => {
   test('mega formes merge into the base species instead of a seventh card (B16)', () => {
     const info = inferOpponentTeam(megaLog, 'p2');
     const speciesList = info.pokemon.map(pokemon => pokemon.species);
@@ -468,7 +468,7 @@ test.describe('stats panel data quality (WP11)', () => {
   });
 });
 
-test.describe('provenance labels', () => {
+describe('provenance labels', () => {
   test('a damage-fitted spread reads fitted, a usage guess reads guessed with its share', () => {
     expect(sourceLabel('guessed', undefined, INFERRED_SPREAD_DETAIL)).toBe('fitted');
     expect(sourceLabel('guessed', 0.318)).toBe('guessed 31.8%');

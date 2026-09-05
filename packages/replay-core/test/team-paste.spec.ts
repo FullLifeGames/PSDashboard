@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect, describe } from 'vitest';
 import { applyPastedTeam, countMatchingSpecies, parsePastedTeam } from '../src/team-paste';
 import { parseTeamText } from '../src/team-parser';
 import type { OpponentTeamInfo } from '../src/types';
@@ -48,7 +48,7 @@ const baseInfo: OpponentTeamInfo = {
   ],
 };
 
-test.describe('team paste pipeline (G15)', () => {
+describe('team paste pipeline (G15)', () => {
   test('parses nature, IVs, and level lines (perfect-information import)', () => {
     const sets = parsePastedTeam([
       'Garchomp @ Loaded Dice',

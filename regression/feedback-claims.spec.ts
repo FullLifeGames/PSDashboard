@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect, describe } from 'vitest';
 import type { TurnAnalysis, TurnAttribution, VerdictTier } from '../packages/eval-engine/src/analysis';
 import type { GameReport } from '../packages/eval-engine/src/report';
 import { FEEDBACK_CORPUS, FEEDBACK_REPLAYS, type FeedbackItem, type ReportClaim } from '../e2e-feedback/corpus';
@@ -44,7 +44,7 @@ const analysesWith = (a: TurnAnalysis): (TurnAnalysis | null)[] => {
   return list;
 };
 
-test.describe('claim evaluator', () => {
+describe('claim evaluator', () => {
   test('an unpinned truth item is pending, never ok', () => {
     const result = evaluateItem(truthAt(12), analysesWith(analysis(12, 'p1-read')), report());
     expect(result.status).toBe('pending');
@@ -108,7 +108,7 @@ test.describe('claim evaluator', () => {
   });
 });
 
-test.describe('corpus validation', () => {
+describe('corpus validation', () => {
   // Generous means above every fixture's real length: 573756 runs 139 turns
   // and carries pins deep into its endgame (t138).
   const turns = Object.fromEntries(FEEDBACK_REPLAYS.map(id => [id, 150]));
@@ -134,7 +134,7 @@ test.describe('corpus validation', () => {
   });
 });
 
-test.describe('drift report rendering', () => {
+describe('drift report rendering', () => {
   test('markdown carries every item; json is stable (no volatile fields in results)', () => {
     const results = [
       evaluateItem(truthAt(12, { attribution: ['p1-read'] }), analysesWith(analysis(12, 'p1-read')), report()),
@@ -187,7 +187,7 @@ test.describe('drift report rendering', () => {
   });
 });
 
-test.describe('narrative pins (round 5)', () => {
+describe('narrative pins (round 5)', () => {
   test('summaryIncludes renders the summary and requires every fragment', () => {
     const a = analysis(12, 'shift');
     const ok = evaluateItem(

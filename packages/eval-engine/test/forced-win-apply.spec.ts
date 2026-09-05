@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect, describe } from 'vitest';
 import { Battle, State, Teams, toID } from '@pkmn/sim';
 import type { PokemonSet } from '@pkmn/sim';
 import { applyForcedWin, forcedWinInput, forcedWinPossible } from '../src/search/forced-win-apply';
@@ -45,7 +45,7 @@ const resultWith = (score: number, p1: string[], p2: string[], extra: Partial<Ev
   ...extra,
 });
 
-test.describe('forced-win trigger and bar (round 35)', () => {
+describe('forced-win trigger and bar (round 35)', () => {
   test('forcedWinInput carries score, profile, ranking order and the search allowance', () => {
     const result = resultWith(0.3, ['move seismictoss', 'move protect'], ['move softboiled'], {
       unanswered: { p1: [], p2: [], decided: { side: 'p1', species: 'Machamp' } },

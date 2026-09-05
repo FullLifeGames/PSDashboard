@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect, describe } from 'vitest';
 import { buildTeamsFromReplay, parseReplayLog } from '@fulllifegames/replay-core';
 import { reconstructBranchRuntime, executeBranchChoices } from '../src/branch-engine';
 
@@ -42,7 +42,7 @@ const toxicReplayLog = [
   '|turn|2',
 ].join('\n');
 
-test.describe('status snapshot correction', () => {
+describe('status snapshot correction', () => {
   test('corrected Toxic keeps dealing residual damage in the branch', async () => {
     const snapshots = parseReplayLog(toxicReplayLog);
     const snapshot = snapshots.find(entry => entry.turn === 2);

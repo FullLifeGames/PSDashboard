@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect, describe } from 'vitest';
 import { rankFromMatrix, toResult, type ValueMatrix } from '../src/rank';
 import { computeRead, modelOpponent, parseTendencies, READ_CONFIDENCE, READ_LAMBDA } from '../src/opponent-model';
 
@@ -24,7 +24,7 @@ const matrix: ValueMatrix = {
   ended: [[false, false], [false, false]],
 };
 
-test.describe('opponent model and read solve', () => {
+describe('opponent model and read solve', () => {
   test('the softmax base concentrates on the opponent high-EV column', () => {
     const ranked = rankFromMatrix(matrix, 0);
     const solved = toResult(ranked, 1).matrix!;

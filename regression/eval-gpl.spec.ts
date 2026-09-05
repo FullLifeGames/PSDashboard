@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect, describe } from 'vitest';
 import { readFileSync } from 'fs';
 import { State } from '@pkmn/sim';
 import { parseExportedReplay } from '../src/lib/replay-file';
@@ -22,9 +22,8 @@ import { resolveTeraPreference } from '../packages/eval-engine/src/tera';
  * Assertions stay coarse (tiers, flags) so weight tuning cannot break them.
  */
 
-test.describe('GPL replay end-to-end verdicts', () => {
-  test('the four findings hold on the committed fixture', async () => {
-    test.setTimeout(240_000);
+describe('GPL replay end-to-end verdicts', () => {
+  test('the four findings hold on the committed fixture', { timeout: 240000 }, async () => {
     const replay = parseExportedReplay(readFileSync('e2e/fixtures/gpl-replay.html', 'utf-8'), 'gpl-replay.html');
     const formatid = inferReplayFormatId(replay);
     const { snapshots, observations, speedOrders } = parseReplayLogWithObservations(replay.log);

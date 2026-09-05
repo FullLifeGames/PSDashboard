@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect, describe } from 'vitest';
 import { readFileSync } from 'fs';
 import { buildTeamsFromReplay, getBranchSimulatorFormat, parseReplayLogWithObservations, finalPlayedTurn } from '@fulllifegames/replay-core';
 import {
@@ -21,7 +21,7 @@ import {
 const stub = (battle: unknown, timedOut = false) =>
   ({ battleStream: { battle }, timedOut } as unknown as BranchRuntime);
 
-test.describe('sweep end-position guard', () => {
+describe('sweep end-position guard', () => {
   test('only a live battle standing at or past the turn may stand in for it', () => {
     expect(reconstructionReached(stub({ turn: 40, ended: false }), 40)).toBe(true);
     expect(reconstructionReached(stub({ turn: 41, ended: false }), 40)).toBe(true);
@@ -36,8 +36,7 @@ test.describe('sweep end-position guard', () => {
     expect(reconstructionReached(stub({ turn: 40, ended: false }, true), 40)).toBe(false);
   });
 
-  test('the draft replay without healing ends prematurely — valid to branch, unusable as the final position', async () => {
-    test.setTimeout(600_000);
+  test('the draft replay without healing ends prematurely — valid to branch, unusable as the final position', { timeout: 600000 }, async () => {
     const replay = JSON.parse(readFileSync(new URL('./fixtures/draft-replay.json', import.meta.url), 'utf-8')) as {
       id: string; format: string; formatid?: string; players: string[]; log: string;
     };
@@ -85,8 +84,7 @@ test.describe('sweep end-position guard', () => {
     expect(finalPlayedTurn([])).toBe(1);
   });
 
-  test('the HEALED single-turn acquire arrives live in the cascade zone (think-deeper re-enabled on this)', async () => {
-    test.setTimeout(600_000);
+  test('the HEALED single-turn acquire arrives live in the cascade zone (think-deeper re-enabled on this)', { timeout: 600000 }, async () => {
     const replay = JSON.parse(readFileSync(new URL('./fixtures/draft-replay.json', import.meta.url), 'utf-8')) as {
       id: string; format: string; formatid?: string; players: string[]; log: string;
     };

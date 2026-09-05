@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect, describe } from 'vitest';
 import { enrichTeamInfo, unknownEvs } from '../packages/replay-core/src/team-info';
 import {
   buildSmogonStatsUrls,
@@ -46,7 +46,7 @@ const usageStats: SmogonUsageStats = {
   },
 };
 
-test.describe('Smogon usage stat enrichment', () => {
+describe('Smogon usage stat enrichment', () => {
   test('only queries the client-safe data.pkmn.cc endpoint (smogon.com never sends CORS headers)', () => {
     const urls = buildSmogonStatsUrls('gen9ou');
 
@@ -277,7 +277,7 @@ test.describe('Smogon usage stat enrichment', () => {
  * GPL finding was Cobalion showing Body Press next to revealed Swords Dance
  * while the built team had already vetoed it.
  */
-test.describe('coherent move enrichment', () => {
+describe('coherent move enrichment', () => {
   const detail = 'Smogon gen9ou 2026-03';
   const monInfo = (species: string, moves: OpponentTeamInfo['pokemon'][number]['moves']) => ({
     pokemon: [{
@@ -403,7 +403,7 @@ test.describe('coherent move enrichment', () => {
   });
 });
 
-test.describe('Smogon data host fallback', () => {
+describe('Smogon data host fallback', () => {
   const okJson = (body: unknown) => new Response(JSON.stringify(body), { status: 200, headers: { 'content-type': 'application/json' } });
 
   test('maps both hosts onto one data path and collapses double slashes', () => {

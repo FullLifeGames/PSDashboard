@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect, describe } from 'vitest';
 import { Battle, State, Teams, toID } from '@pkmn/sim';
 import type { PokemonSet } from '@pkmn/sim';
 import { createHash } from 'node:crypto';
@@ -150,9 +150,8 @@ function capture(root: SimPosition): unknown {
   };
 }
 
-test.describe('fork and search identity', () => {
-  test('children, the depth-1 matrix, and one MCTS tree match the recorded reference', () => {
-    test.setTimeout(120_000);
+describe('fork and search identity', () => {
+  test('children, the depth-1 matrix, and one MCTS tree match the recorded reference', { timeout: 120000 }, () => {
     const singles = withHistory(createRootPosition(serialize(makeSixVsSix())), 3);
     const doubles = withHistory(createRootPosition(serialize(makeBattle('gen9doublescustomgame', doublesTeams.p1Team, doublesTeams.p2Team))), 2);
     // JSON round trip: the fixture cannot tell -0 from 0, and neither should the comparison.

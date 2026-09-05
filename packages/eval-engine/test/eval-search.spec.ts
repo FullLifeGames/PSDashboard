@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect, describe } from 'vitest';
 import { Battle, State, Teams, toID } from '@pkmn/sim';
 type DeserializeFn = typeof State.deserializeBattle;
 import type { PokemonSet } from '@pkmn/sim';
@@ -65,7 +65,7 @@ const doublesRoot = () => serialize(makeDoublesBattle(
 ));
 
 // Level-100 Machamp: Seismic Toss does a flat 100. Level-30 Pikachu has < 100 max HP.
-test.describe('depth-1 search', () => {
+describe('depth-1 search', () => {
   test('a guaranteed KO into a win ranks first with a winning score', () => {
     const root = serialize(makeBattle(
       [makeSet('Machamp', 'Machamp', ['Seismic Toss', 'Protect'], 100)],
@@ -256,7 +256,7 @@ test.describe('depth-1 search', () => {
   });
 });
 
-test.describe('iterative deepening', () => {
+describe('iterative deepening', () => {
   // p2 has two level-30 Pokémon, each KO'd by one level-100 Seismic Toss.
   // Depth 1 sees one KO; depth 2 sees the full win and must raise the score.
   const twoTurnWin = () => serialize(makeBattle(
@@ -317,7 +317,7 @@ test.describe('iterative deepening', () => {
   });
 });
 
-test.describe('doubles search', () => {
+describe('doubles search', () => {
   test('the root is restricted to a tractable option list and stays deterministic', () => {
     const root = doublesRoot();
     const result = searchPosition(root, { depth: 1, samples: 1, tera: false });
@@ -336,7 +336,7 @@ test.describe('doubles search', () => {
   });
 });
 
-test.describe('doubles candidate hints', () => {
+describe('doubles candidate hints', () => {
   const vgcSet = (species: string, moves: string[], item = ''): PokemonSet => ({
     name: species, species, item, ability: 'No Ability', moves,
     nature: 'Adamant',
@@ -414,7 +414,7 @@ test.describe('doubles candidate hints', () => {
   });
 });
 
-test.describe('mcts hint-ordered expansion with progressive widening', () => {
+describe('mcts hint-ordered expansion with progressive widening', () => {
   const wideSet = (species: string, moves: string[], item = ''): PokemonSet => ({
     name: species, species, item, ability: 'No Ability', moves,
     nature: 'Adamant',
@@ -528,7 +528,7 @@ test.describe('mcts hint-ordered expansion with progressive widening', () => {
   });
 });
 
-test.describe('team preview search (turn 0)', () => {
+describe('team preview search (turn 0)', () => {
   test('the engine ranks lead pairs and favors the pressuring lead', () => {
     // Machamp is the only mon that wins pairs — with the active-pair
     // emphasis, cells where it leads score higher, so every top lead
@@ -564,7 +564,7 @@ test.describe('team preview search (turn 0)', () => {
   });
 });
 
-test.describe('no-op candidate filter', () => {
+describe('no-op candidate filter', () => {
   test('guaranteed-failing field moves are dropped from the option list', () => {
     // GPL T25: Stealth Rock with rocks already up is a guaranteed |-fail|
     // — its cell equals a pass, yet it ranked with a real-looking ev.
@@ -623,7 +623,7 @@ test.describe('no-op candidate filter', () => {
   });
 });
 
-test.describe('accuracy and random-call roll sensitivity', () => {
+describe('accuracy and random-call roll sensitivity', () => {
   test('a game-ending cell behind an accuracy roll is never priced as certain (draft T64)', () => {
     // Machamp's Dynamic Punch (50%) KOs the last foe when it hits: one seed
     // that hit once priced the win as a CERTAIN +1.00 — the seed spread
@@ -676,7 +676,7 @@ test.describe('accuracy and random-call roll sensitivity', () => {
   });
 });
 
-test.describe('battleFaintedFraction', () => {
+describe('battleFaintedFraction', () => {
   test('counts both sides against the full roster', () => {
     const battle = makeBattle(
       [makeSet('A', 'Snorlax', ['Tackle']), makeSet('A2', 'Chansey', ['Tackle'])],
@@ -689,7 +689,7 @@ test.describe('battleFaintedFraction', () => {
   });
 });
 
-test.describe('doubles keepPlayed', () => {
+describe('doubles keepPlayed', () => {
   test('the played combo survives the restriction and gets ranked', () => {
     const keepPlayed = {
       p1Slots: [
@@ -709,7 +709,7 @@ test.describe('doubles keepPlayed', () => {
   });
 });
 
-test.describe('pivot pairs', () => {
+describe('pivot pairs', () => {
   const pivotBattle = () => makeBattle(
     [
       makeSet('Mien', 'Mienshao', ['U-turn', 'Close Combat']),
@@ -765,7 +765,7 @@ test.describe('pivot pairs', () => {
   });
 });
 
-test.describe('hidden-disable candidate filter', () => {
+describe('hidden-disable candidate filter', () => {
   test('Taunt-disabled moves stay out of the candidates (visible-disable family)', () => {
     // Taunt/Encore/Disable/choice locks disable VISIBLY (request carries the
     // flag) — pinned here so the Imprison concealment fix is never mistaken
@@ -817,7 +817,7 @@ test.describe('hidden-disable candidate filter', () => {
   });
 });
 
-test.describe('serialized-state round-trip repair', () => {
+describe('serialized-state round-trip repair', () => {
   test('a transformed mon with fewer copied moves than base moves still deserializes', () => {
     // Transform copies the TARGET's moveSlots; a reconstructed target with
     // only 2 revealed moves leaves the transformed mon with moveSlots shorter
@@ -844,7 +844,7 @@ test.describe('serialized-state round-trip repair', () => {
   });
 });
 
-test.describe('mid-charge candidates', () => {
+describe('mid-charge candidates', () => {
   test('a singles mid-charge active offers exactly the locked release, and it applies', () => {
     const battle = makeBattle(
       [makeSet('Beamer', 'Nihilego', ['Meteor Beam', 'Power Gem'], 100)],
@@ -912,7 +912,7 @@ test.describe('mid-charge candidates', () => {
   });
 });
 
-test.describe('side-invariant repair on deserialize', () => {
+describe('side-invariant repair on deserialize', () => {
   test('pokemonLeft and isActive restore from ground truth (GPL T38/T39)', () => {
     const battle = makeBattle(
       [makeSet('Machamp', 'Machamp', ['Seismic Toss'], 100)],

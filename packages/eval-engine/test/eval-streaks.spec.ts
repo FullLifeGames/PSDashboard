@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect, describe } from 'vitest';
 import { detectStreakOdds, type StreakHistoryEntry } from '../src/streaks';
 
 const entry = (over: Partial<StreakHistoryEntry> = {}): StreakHistoryEntry => ({
@@ -7,7 +7,7 @@ const entry = (over: Partial<StreakHistoryEntry> = {}): StreakHistoryEntry => ({
   defenderBoosts: { def: 0, spd: 0 }, ...over,
 });
 
-test.describe('secondary fishing', () => {
+describe('secondary fishing', () => {
   test('five Ice Beams compound freeze to 1 − 0.9^5', () => {
     const result = detectStreakOdds(6, [entry(), entry(), entry(), entry(), entry()]);
     expect(result).not.toBeNull();
@@ -41,7 +41,7 @@ test.describe('secondary fishing', () => {
   });
 });
 
-test.describe('crit vs boost wall', () => {
+describe('crit vs boost wall', () => {
   test('attacks into a boosted special wall accumulate crit odds', () => {
     // Different moves are fine — the crit streak keys on attacker+defender.
     const e = (moveId: string) => entry({ moveId, defenderBoosts: { def: 0, spd: 2 }, defenderAbility: 'shielddust' });

@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect, describe } from 'vitest';
 import type { PokemonSet } from '@pkmn/sim';
 import { analyzeLeads, leadSpeciesOf, matchLeadOption } from '../src/leads';
 import { parseLeadSpecies } from '../src/played';
@@ -22,7 +22,7 @@ const leadResult: EvalResult = {
   },
 };
 
-test.describe('lead (turn 0) analysis', () => {
+describe('lead (turn 0) analysis', () => {
   test('lead labels parse and match as unordered sets', () => {
     expect(leadSpeciesOf('Lead Scizor + Sneasler')).toEqual(['Scizor', 'Sneasler']);
     expect(leadSpeciesOf('Lead Heatran')).toEqual(['Heatran']);

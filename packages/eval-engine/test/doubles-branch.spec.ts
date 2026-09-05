@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect, describe } from 'vitest';
 import { createBranchState, reconstructBranchRuntime } from '../src/branch-engine';
 import type { PokemonSet } from '@pkmn/sim';
 import type { TurnSnapshot } from '@fulllifegames/replay-core';
@@ -583,7 +583,7 @@ const staleTrickRoomSnapshot: TurnSnapshot = {
   log: [],
 };
 
-test.describe('Doubles branch reconstruction', () => {
+describe('Doubles branch reconstruction', () => {
   test('uses replay nicknames to reconstruct duplicate-species doubles leads', async () => {
     const logLines: string[] = [];
     const runtime = await reconstructBranchRuntime({

@@ -1,7 +1,7 @@
-import { test, expect } from '@playwright/test';
+import { test, expect, describe } from 'vitest';
 import { runInLanes } from '../src/lib/eval/lanes';
 
-test.describe('runInLanes', () => {
+describe('runInLanes', () => {
   test('runs every job exactly once and returns true', async () => {
     const seen: number[] = [];
     const ok = await runInLanes(3, 7, async index => {

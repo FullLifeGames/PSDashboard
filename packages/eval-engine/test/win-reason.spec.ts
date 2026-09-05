@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect, describe } from 'vitest';
 import type { TurnAnalysis } from '../src/analysis';
 import { diceEventTurns } from '../src/dice-events';
 import { buildGameReport } from '../src/report';
@@ -23,7 +23,7 @@ const mk = (turn: number, scoreBefore: number, scoreAfter: number | null, over: 
   ...over,
 });
 
-test.describe('win-reason detection', () => {
+describe('win-reason detection', () => {
   // Winner p2 throughout: p2-favoring scores are NEGATIVE (p1 perspective).
 
   test('speaks the decided sweep as the winner\'s conversion', () => {
@@ -299,7 +299,7 @@ test.describe('win-reason detection', () => {
   });
 });
 
-test.describe('dice-anchored luck claims', () => {
+describe('dice-anchored luck claims', () => {
   // Winner p2; diceTurns marks turns whose protocol carries a visible dice
   // event. The gate is asymmetric: only an actively CONTRADICTING dice
   // ledger (≥ an inaccuracy the other way) demotes the luck claims —
@@ -380,7 +380,7 @@ test.describe('dice-anchored luck claims', () => {
   });
 });
 
-test.describe('denied early end', () => {
+describe('denied early end', () => {
   // Winner p2 (negative scores). Turn 3 holds p2's one-roll sweep
   // (nearDecided) and the roll visibly fails: the protocol shows a dice
   // event and the turn's chance runs against p2. The game then runs on.
@@ -474,7 +474,7 @@ test.describe('denied early end', () => {
   });
 });
 
-test.describe('dice event turns (protocol classifier)', () => {
+describe('dice event turns (protocol classifier)', () => {
   test('crits, misses, chance-cant reasons, and rolled statuses mark a turn', () => {
     const turns = diceEventTurns([
       [],

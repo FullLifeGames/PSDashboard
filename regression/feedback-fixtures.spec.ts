@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect } from 'vitest';
 import { existsSync, readFileSync } from 'fs';
 import { join } from 'path';
 import { FEEDBACK_CORPUS, FEEDBACK_REPLAYS } from '../e2e-feedback/corpus';

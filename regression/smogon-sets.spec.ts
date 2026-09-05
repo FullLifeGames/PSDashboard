@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect, describe } from 'vitest';
 import { fetchSmogonSetAssumptions } from '../src/lib/smogon-sets';
 import { enrichPokemonInfo, unknownEvs } from '../packages/replay-core/src/team-info';
 import type { RevealedPokemonInfo } from '../packages/replay-core/src/types';
@@ -14,7 +14,7 @@ const sampleInfo: RevealedPokemonInfo = {
   gender: '',
 };
 
-test.describe('Smogon set assumptions', () => {
+describe('Smogon set assumptions', () => {
   test('normalizes @pkmn/smogon set data into fallback assumptions', async () => {
     const payload = {
       'Great Tusk': {

@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect, describe } from 'vitest';
 import { mergeMctsTrees, rowCompletedCells, starvedSupportCells, VERIFY_DISAGREEMENT, VERIFY_SAMPLES, weightedDisagreement } from '../src/mcts-merge';
 import { cellKey } from '../src/rank';
 import type { MctsTreeStats } from '../src/types';
@@ -12,7 +12,7 @@ import type { MctsTreeStats } from '../src/types';
  * its size pin.
  */
 
-test.describe('mcts merge pools tree-informed cells', () => {
+describe('mcts merge pools tree-informed cells', () => {
   const options = (labels: string[]) => labels.map(labelText => ({ choice: labelText, label: labelText }));
   const emptyResult = { score: 0, interval: 0, depthCompleted: 1, perSide: { p1: [], p2: [] } };
   test('the merged ranking solves the pooled matrix', () => {
@@ -47,7 +47,7 @@ test.describe('mcts merge pools tree-informed cells', () => {
   });
 });
 
-test.describe('starved support cells are verified before the verdict', () => {
+describe('starved support cells are verified before the verdict', () => {
   // Draft t56 mechanism in miniature: each root cell fixes ONE chance
   // outcome per tree, so a 1-2 visit cell can carry a lucky sample (the
   // Draco Meteor that missed) and the equilibrium solve trusts it at face
@@ -272,7 +272,7 @@ test.describe('starved support cells are verified before the verdict', () => {
   });
 });
 
-test.describe('tree disagreement is visit-weighted (round 33)', () => {
+describe('tree disagreement is visit-weighted (round 33)', () => {
   test('a thin outlier tree does not make a cell suspect', () => {
     // 573756 t137 Recover × Struggle: three trees near −0.84 with ~200 visits, one at −0.50 with 54.
     const entries = [
@@ -311,7 +311,7 @@ test.describe('tree disagreement is visit-weighted (round 33)', () => {
   });
 });
 
-test.describe('per-class continuation (round 33)', () => {
+describe('per-class continuation (round 33)', () => {
   const options = (labels: string[]) => labels.map(label => ({ choice: label, label }));
   const emptyResult = { score: 0, interval: 0, depthCompleted: 2, perSide: { p1: [], p2: [] } };
   const mk = (cells: MctsTreeStats['cells']): MctsTreeStats => ({
@@ -356,7 +356,7 @@ test.describe('per-class continuation (round 33)', () => {
   });
 });
 
-test.describe('row completion for the verify step (round 33)', () => {
+describe('row completion for the verify step (round 33)', () => {
   const options = (labels: string[]) => labels.map(label => ({ choice: label, label }));
   const emptyResult = { score: 0, interval: 0, depthCompleted: 2, perSide: { p1: [], p2: [] } };
   // Row A: (A,X) rich at 60 pooled visits, (A,Y) starved (one visit per

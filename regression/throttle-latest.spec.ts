@@ -1,9 +1,9 @@
-import { test, expect } from '@playwright/test';
+import { test, expect, describe } from 'vitest';
 import { throttleLatest } from '../src/lib/eval/throttle-latest';
 
 const wait = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
-test.describe('throttleLatest', () => {
+describe('throttleLatest', () => {
   test('delivers the first value at once and only the LATEST held value after the interval', async () => {
     const seen: number[] = [];
     const throttle = throttleLatest<number>(value => seen.push(value), 40);

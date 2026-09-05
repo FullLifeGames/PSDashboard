@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test';
+import { test, expect } from 'vitest';
 import { nextPlayOutStep, playOutDoneText, PLAY_OUT_CAP } from '../src/lib/play-out';
 import type { EvalResult, RankedChoice } from '../packages/eval-engine/src/types';
 

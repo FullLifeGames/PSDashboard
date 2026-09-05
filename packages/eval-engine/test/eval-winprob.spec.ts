@@ -1,7 +1,7 @@
-import { test, expect } from '@playwright/test';
+import { test, expect, describe } from 'vitest';
 import { DISPLAY_K, winPercent, winProbability, WINPROB_K, wpUnits } from '../src/winprob';
 
-test.describe('win probability mapping', () => {
+describe('win probability mapping', () => {
   test('an even score is a coin flip in both game types', () => {
     expect(winProbability(0)).toBeCloseTo(0.5, 10);
     expect(winProbability(0, true)).toBeCloseTo(0.5, 10);

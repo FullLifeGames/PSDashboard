@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect, describe } from 'vitest';
 import { nullMoveReason } from '../src/null-moves';
 
 /**
@@ -11,7 +11,7 @@ import { nullMoveReason } from '../src/null-moves';
 const reason = (choice: string, defenderSpecies: string, gen = 6, attackerSpecies: string | null = null) =>
   nullMoveReason({ choice, gen, attackerSpecies, defenderSpecies });
 
-test.describe('nullMoveReason', () => {
+describe('nullMoveReason', () => {
   test('Will-O-Wisp cannot burn a Fire-type', () => {
     expect(reason('move willowisp', 'Charizard-Mega-X')).toContain('cannot be burned');
     expect(reason('move willowisp', 'Charizard-Mega-X')).toContain('Fire-type');

@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect, describe } from 'vitest';
 import { readFileSync } from 'fs';
 import {
   buildTeamsFromReplay, getBranchSimulatorFormat, parseReplayLogWithObservations, type ReplayData,
@@ -78,9 +78,8 @@ async function play(runtime: BranchRuntime, p1: string, p2: string) {
   });
 }
 
-test.describe('adoptSerializedRuntime', () => {
-  test('renders the same pickers and protocol log as the live reconstruction, then plays on identically', async () => {
-    test.setTimeout(300_000);
+describe('adoptSerializedRuntime', () => {
+  test('renders the same pickers and protocol log as the live reconstruction, then plays on identically', { timeout: 300000 }, async () => {
     const { replay, runtime: live, snapshotAt } = await liveRuntime(TURN);
     const adopted = adoptSerializedRuntime({
       serialized: serialized(live), replayLog: replay.log, targetTurn: TURN, snapshot: snapshotAt(TURN),
@@ -100,8 +99,7 @@ test.describe('adoptSerializedRuntime', () => {
     }
   });
 
-  test('rejected choices surface as the same errors after adoption', async () => {
-    test.setTimeout(300_000);
+  test('rejected choices surface as the same errors after adoption', { timeout: 300000 }, async () => {
     const { replay, runtime: live, snapshotAt } = await liveRuntime(TURN);
     const adopted = adoptSerializedRuntime({
       serialized: serialized(live), replayLog: replay.log, targetTurn: TURN, snapshot: snapshotAt(TURN),
@@ -112,8 +110,7 @@ test.describe('adoptSerializedRuntime', () => {
     expect(adopted.choiceErrors.count).toBe(live.choiceErrors.count);
   });
 
-  test('a sweep-captured boundary adopts to the same playable position as a single-turn arrival', async () => {
-    test.setTimeout(300_000);
+  test('a sweep-captured boundary adopts to the same playable position as a single-turn arrival', { timeout: 300000 }, async () => {
     const [{ replay, captured, snapshotAt }, { runtime: arrival }] = await Promise.all([liveRuntime(TURN + 1), liveRuntime(TURN)]);
     const boundary = captured.get(TURN);
     expect(boundary).toBeTruthy();
@@ -132,8 +129,7 @@ test.describe('adoptSerializedRuntime', () => {
     }
   });
 
-  test('a worker-provided log is taken verbatim', async () => {
-    test.setTimeout(300_000);
+  test('a worker-provided log is taken verbatim', { timeout: 300000 }, async () => {
     const { replay, runtime: live, snapshotAt } = await liveRuntime(TURN);
     const adopted = adoptSerializedRuntime({
       serialized: serialized(live), replayLog: replay.log, targetTurn: TURN, snapshot: snapshotAt(TURN),

@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect, describe } from 'vitest';
 import type { PokemonSet } from '@pkmn/sim';
 import { reconstructBranchRuntime, executeBranchChoices } from '../src/branch-engine';
 
@@ -47,7 +47,7 @@ const randomBattleLog = [
   '|turn|1',
 ].join('\n');
 
-test.describe('random battle branching (B2)', () => {
+describe('random battle branching (B2)', () => {
   test('starts a gen9randombattle branch with reconstructed teams and executes turns', async () => {
     const runtime = await reconstructBranchRuntime({
       format: 'gen9randombattle',

@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect, describe } from 'vitest';
 import { hasLuckAgainst, luckAgainstFavored } from './luck-events';
 
 const LOG = [
@@ -17,7 +17,7 @@ const LOG = [
   '|cant|p1a: Garchomp|flinch',
 ].join('\n');
 
-test.describe('luck events against the favored side (round 34)', () => {
+describe('luck events against the favored side (round 34)', () => {
   test('counts crits taken, own misses, and para/freeze/flinch skips from the sample turn on', () => {
     expect(luckAgainstFavored(LOG, 4, 'p1')).toEqual({ crit: 1, miss: 0, cant: 2 });
     expect(luckAgainstFavored(LOG, 4, 'p2')).toEqual({ crit: 0, miss: 1, cant: 0 });

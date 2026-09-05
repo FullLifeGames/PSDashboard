@@ -1,4 +1,4 @@
-import { test } from '@playwright/test';
+import { test, describe } from 'vitest';
 import { existsSync, readFileSync, writeFileSync } from 'fs';
 import { join } from 'path';
 import { buildTeamsFromReplay } from '../packages/replay-core/src/team-builder';
@@ -95,11 +95,10 @@ function impliedWeights(fit: { beta: number[]; sigma: number[] }): number[] {
   return perUnit.map(value => (reference !== 0 ? (value / reference) * bodiesHand : NaN));
 }
 
-test.describe('eval weight fitting (EVAL_FIT=1)', () => {
-  test('fit feature weights on the pinned corpus and report', async () => {
-    test.skip(!process.env.EVAL_FIT, 'weight fitting is opt-in: EVAL_FIT=1');
-    test.skip(!existsSync(MANIFEST_PATH), 'run node scripts/build-fit-corpus.mjs first');
-    test.setTimeout(7_200_000);
+describe('eval weight fitting (EVAL_FIT=1)', () => {
+  test('fit feature weights on the pinned corpus and report', { timeout: 7200000 }, async ({ skip }) => {
+    skip(!process.env.EVAL_FIT, 'weight fitting is opt-in: EVAL_FIT=1');
+    skip(!existsSync(MANIFEST_PATH), 'run node scripts/build-fit-corpus.mjs first');
 
     const manifest = JSON.parse(readFileSync(MANIFEST_PATH, 'utf-8')) as {
       replays: { id: string; format: string; source: 'tournament' | 'ladder' }[];

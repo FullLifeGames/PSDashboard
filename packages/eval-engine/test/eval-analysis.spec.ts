@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect, describe } from 'vitest';
 import { analyzeTurn, decidedSeenKey, findPlayedOption, matchPlayedChoice, phantomStayIn, playedSetupMove, REGRET_THRESHOLD, unansweredSeenKey, type SideAnalysis } from '../src/analysis';
 import { allTurnEvents, detectSacks, turnEvents } from '../src/played';
 import type { EvalResult, RankedChoice } from '../src/types';
@@ -44,7 +44,7 @@ const sackSnapshot = (hpPercent: number): TurnSnapshot => ({
   log: [],
 });
 
-test.describe('verdict tiers in wp-units', () => {
+describe('verdict tiers in wp-units', () => {
   test('bands sit at 5/10/20% win-probability loss', () => {
     const at = (playedEv: number) => analyzeTurn({
       turn: 5,
@@ -69,7 +69,7 @@ test.describe('verdict tiers in wp-units', () => {
   });
 });
 
-test.describe('read-aware risk phrasing', () => {
+describe('read-aware risk phrasing', () => {
   test('a risk matching the read is marked as a read on tendencies', () => {
     const at = (readLabel?: string, choiceId?: string) => analyzeTurn({
       turn: 20,
@@ -104,7 +104,7 @@ test.describe('read-aware risk phrasing', () => {
   });
 });
 
-test.describe('sensitivity probes', () => {
+describe('sensitivity probes', () => {
   test('a sensitivity probe that clears the verdict softens it and records the hinge', () => {
     const analysis = analyzeTurn({
       turn: 20, result,
@@ -132,7 +132,7 @@ test.describe('sensitivity probes', () => {
   });
 });
 
-test.describe('sacrifice detection', () => {
+describe('sacrifice detection', () => {
   test('turnEvents slices the lines strictly between turn markers', () => {
     const log = ['|start', '|turn|1', '|move|a', '|turn|2', '|move|b', '|win|X'].join('\n');
     expect(turnEvents(log, 1)).toEqual(['|move|a']);
@@ -462,7 +462,7 @@ test.describe('sacrifice detection', () => {
   });
 });
 
-test.describe('turn analysis assembly', () => {
+describe('turn analysis assembly', () => {
   test('matches moves, tera variants, and switches (nickname or species)', () => {
     expect(matchPlayedChoice(result, 'p1', { kind: 'move', name: 'Draco Meteor', tera: false })?.choice).toBe('move dracometeor');
     expect(matchPlayedChoice(result, 'p2', { kind: 'move', name: 'Freeze-Dry', tera: true })?.choice).toBe('move freezedry terastallize');
@@ -1016,7 +1016,7 @@ test.describe('turn analysis assembly', () => {
   });
 });
 
-test.describe('doubles combined matching', () => {
+describe('doubles combined matching', () => {
   const combined: EvalResult = {
     score: 0.1,
     interval: 0,
@@ -1084,7 +1084,7 @@ test.describe('doubles combined matching', () => {
   });
 });
 
-test.describe('setup-move detection', () => {
+describe('setup-move detection', () => {
   const side = (over: Partial<SideAnalysis>): SideAnalysis =>
     ({ playedRaw: null, played: null, best: null, regret: null, ...over });
 
@@ -1102,7 +1102,7 @@ test.describe('setup-move detection', () => {
   });
 });
 
-test.describe('choice diffing (the condensed why)', () => {
+describe('choice diffing (the condensed why)', () => {
   const ranked = (choiceStr: string, label: string): RankedChoice => choice(choiceStr, label, 0);
 
   test('a skipped gimmick names the gimmick alone', async () => {
@@ -1146,7 +1146,7 @@ test.describe('choice diffing (the condensed why)', () => {
   });
 });
 
-test.describe('pivot pair matching', () => {
+describe('pivot pair matching', () => {
   const options = [
     { choice: 'move uturn > switch 2', label: 'U-turn → Noivern' },
     { choice: 'move uturn > switch 3', label: 'U-turn → Clefable' },
@@ -1166,7 +1166,7 @@ test.describe('pivot pair matching', () => {
   });
 });
 
-test.describe('narrative signals (round 5)', () => {
+describe('narrative signals (round 5)', () => {
   /** Two p1 attacks vs three p2 options; p2's equilibrium leans the switch. */
   const conditionalResult = (p2Choices?: string[]): EvalResult => ({
     score: 0.05, interval: 0.02, depthCompleted: 1,
@@ -1444,7 +1444,7 @@ test.describe('narrative signals (round 5)', () => {
   });
 });
 
-test.describe('the decided sweep at the analysis layer (round 15)', () => {
+describe('the decided sweep at the analysis layer (round 15)', () => {
   // 573756 t134–138: the board state (one mon clears the rest in sequence)
   // attaches to its owning side on EVERY decided turn — display layers
   // re-book the resolution prose from it — while the announcement sentence

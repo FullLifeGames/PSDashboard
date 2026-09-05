@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect, describe } from 'vitest';
 import { buildTeamsFromReplay } from '../packages/replay-core/src/team-builder';
 import { inferOpponentTeam, parseShowteamSheet } from '../packages/replay-core/src/opponent-inferrer';
 import type { SmogonUsageStats } from '../src/lib/smogon-stats';
@@ -25,7 +25,7 @@ const showteamLog = [
   '|turn|1',
 ].join('\n');
 
-test.describe('open team sheets (|showteam|) parsing (B3)', () => {
+describe('open team sheets (|showteam|) parsing (B3)', () => {
   test('parseShowteamSheet extracts sets with readable names', () => {
     const sheet = parseShowteamSheet(showteamLog, 'p2');
     expect(sheet).not.toBeNull();

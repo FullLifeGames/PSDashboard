@@ -1,5 +1,5 @@
 import { readFileSync } from 'fs';
-import { test, expect } from '@playwright/test';
+import { test, expect, describe } from 'vitest';
 import type { PokemonSet } from '@pkmn/sim';
 import { buildChoiceLockContext, buildChoiceLockTrails, corroborateChoiceItem, protocolChoiceLock } from '../packages/eval-engine/src/choice-lock';
 import { parseReplayLogWithObservations } from '../packages/replay-core/src/protocol-parser';
@@ -20,7 +20,7 @@ const set = (species: string, item: string, moves: string[]): PokemonSet => ({
   level: 100, gender: '',
 });
 
-test.describe('protocol choice-lock trails', () => {
+describe('protocol choice-lock trails', () => {
   test('a single repeated move since entry locks; a second distinct move disproves', () => {
     const trails = buildChoiceLockTrails(log([
       '|switch|p1a: Keldeo|Keldeo|100/100',
@@ -80,7 +80,7 @@ test.describe('protocol choice-lock trails', () => {
   });
 });
 
-test.describe('choice-item damage corroboration', () => {
+describe('choice-item damage corroboration', () => {
   // Bands measured once (gen6, Keldeo Hydro Pump vs the shared inline
   // spread on Mew, ± the 0.02 HP-bar slack): Specs 0.766-0.947,
   // Mystic Water 0.608-0.762, unboosted 0.502-0.639 — disjoint, so the
@@ -120,7 +120,7 @@ test.describe('choice-item damage corroboration', () => {
   });
 });
 
-test.describe('choice-lock context', () => {
+describe('choice-lock context', () => {
   const contextLog = [
     '|player|p1|Alice|', '|player|p2|Bob|', '|gen|6', '|tier|[Gen 6] OU',
     '|poke|p1|Keldeo|', '|poke|p2|Chansey|',
@@ -144,7 +144,7 @@ test.describe('choice-lock context', () => {
     expect(context.trails.p1.get(1)).toBeTruthy();
   });
 
-  test('a contradicted guessed choice item loses eligibility', () => {
+  test('a contradicted guessed choice item loses eligibility', { timeout: 240000 }, () => {
     // The 0.55 fraction sits strictly inside the unboosted band and outside
     // both boost bands (measured in the corroboration block above).
     const teams = {
@@ -165,7 +165,6 @@ test('649664: after its t23 Hydro Pump, Keldeo @ Specs is a locked side (the cor
   // its first Hydro Pump during t23 — so t24 is the protocol-locked boundary
   // the t23 grading plays through (the corpus-gap claim "the pump was
   // forced, not a gamble" lives on this follow-up position).
-  test.setTimeout(240_000);
   const replay = JSON.parse(readFileSync('e2e-feedback/fixtures/smogtours-gen6ou-649664.json', 'utf-8')) as {
     id: string; format: string; formatid?: string; players: string[]; log: string;
   };

@@ -1,8 +1,8 @@
-import { test, expect } from '@playwright/test';
+import { test, expect, describe } from 'vitest';
 import { ENDGAME_FIXTURES } from './endgame-fixtures';
 import { endgameScope } from '../packages/eval-engine/src/endgame/solver';
 
-test.describe('synthetic endgames (round 34)', () => {
+describe('synthetic endgames (round 34)', () => {
   test('every fixture builds a live battle inside the solver scope with a unique name', () => {
     const names = new Set<string>();
     for (const fixture of ENDGAME_FIXTURES) {

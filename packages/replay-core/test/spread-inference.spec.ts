@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect, describe } from 'vitest';
 import { Generations, Pokemon, Move, calculate } from '@smogon/calc';
 import type { PokemonSet } from '@pkmn/sim';
 import { inferSpreads } from '../src/spread-inference';
@@ -43,7 +43,7 @@ const sets = {
   p2: [set('Landorus-Therian', ['U-turn', 'Knock Off'])],
 };
 
-test.describe('damage-consistent spread inference', () => {
+describe('damage-consistent spread inference', () => {
   test('recovers a physically bulky defender from its observed damage', () => {
     const observations = [
       observe('U-turn', { hp: 252, def: 252 }, 'Bold'),
@@ -163,7 +163,7 @@ test.describe('damage-consistent spread inference', () => {
   });
 });
 
-test.describe('speed-order constraints', () => {
+describe('speed-order constraints', () => {
   const speedSet = (species: string, spe: number, item = ''): PokemonSet => ({
     name: species, species, item, ability: '', moves: ['Protect'],
     nature: 'Hardy',
@@ -210,7 +210,7 @@ test.describe('speed-order constraints', () => {
   });
 });
 
-test.describe('goodness-of-fit forfeit', () => {
+describe('goodness-of-fit forfeit', () => {
   test('contradictory observations keep the prior instead of a least-bad spread', () => {
     // Two readings of the SAME pairing that no spread can satisfy at once
     // (video-read HP bars): 10% and 60% from one un-boosted Knock Off.
@@ -268,7 +268,7 @@ test.describe('goodness-of-fit forfeit', () => {
   });
 });
 
-test.describe('evidence that cannot measure keeps the prior', () => {
+describe('evidence that cannot measure keeps the prior', () => {
   type Side = { species: string; side: 'p1' | 'p2'; nature: string; evs: PokemonSet['evs']; item?: string };
   const mon = (species: string, side: 'p1' | 'p2', nature: string, evs: PokemonSet['evs'], item = ''): Side => ({ species, side, nature, evs, item });
   const asSet = (m: Side, moves: string[]): PokemonSet => ({

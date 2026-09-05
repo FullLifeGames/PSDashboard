@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect, describe } from 'vitest';
 import { calcSingleDamageRange } from '../src/damage-calc';
 import type { SimPokemonInfo, BranchMoveOption } from '../src/branch-engine';
 
@@ -42,7 +42,7 @@ function move(name: string, type: string): BranchMoveOption {
   };
 }
 
-test.describe('damage calc follows the replay generation (B5)', () => {
+describe('damage calc follows the replay generation (B5)', () => {
   test('gen 3 Explosion halves defense while gen 9 does not', () => {
     const registeel = mon({ species: 'Registeel', evs: { hp: 252, atk: 252, def: 0, spa: 0, spd: 4, spe: 0 }, nature: 'Adamant' });
     const swampert = mon({ species: 'Swampert', evs: { hp: 252, atk: 0, def: 252, spa: 0, spd: 4, spe: 0 } });
@@ -68,7 +68,7 @@ test.describe('damage calc follows the replay generation (B5)', () => {
   });
 });
 
-test.describe('damage calc applies the sim set modifiers (B6)', () => {
+describe('damage calc applies the sim set modifiers (B6)', () => {
   test('Technician boosts low-power moves by 1.5x', () => {
     const base = { species: 'Scizor', evs: { hp: 0, atk: 252, def: 0, spa: 0, spd: 4, spe: 252 }, nature: 'Adamant' } as const;
     const garchomp = mon({ species: 'Garchomp' });
@@ -90,7 +90,7 @@ test.describe('damage calc applies the sim set modifiers (B6)', () => {
   });
 });
 
-test.describe('damage calc respects field conditions', () => {
+describe('damage calc respects field conditions', () => {
   test('Reflect halves physical damage on the defender side', () => {
     const garchomp = mon({ species: 'Garchomp', evs: { hp: 0, atk: 252, def: 0, spa: 0, spd: 4, spe: 252 }, nature: 'Jolly' });
     const tyranitar = mon({ species: 'Tyranitar' });

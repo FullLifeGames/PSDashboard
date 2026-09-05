@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect, describe } from 'vitest';
 import { readFileSync } from 'fs';
 import { State } from '@pkmn/sim';
 import { formatEnforcesSleepClause, inferReplayFormatId, getBranchSimulatorFormat, parseReplayLogWithObservations, buildTeamsFromReplay } from '@fulllifegames/replay-core';
@@ -18,9 +18,8 @@ import { resolveTeraPreference } from '../src/tera';
  * cannot break them.
  */
 
-test.describe('draft replay end-to-end verdicts', () => {
-  test('T50: the trend layers surface the Heatran switch over the Recover stall', async () => {
-    test.setTimeout(240_000);
+describe('draft replay end-to-end verdicts', () => {
+  test('T50: the trend layers surface the Heatran switch over the Recover stall', { timeout: 240000 }, async () => {
     const replay = JSON.parse(readFileSync(new URL('./fixtures/draft-replay.json', import.meta.url), 'utf-8')) as {
       id: string; log: string; players: string[];
     };

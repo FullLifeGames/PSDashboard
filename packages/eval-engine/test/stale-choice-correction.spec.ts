@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect, describe } from 'vitest';
 import type { PokemonSet } from '@pkmn/sim';
 import { reconstructBranchRuntime, executeBranchChoices } from '../src/branch-engine';
 import { parseReplayLog } from '@fulllifegames/replay-core';
@@ -57,7 +57,7 @@ const replayLog = [
   '|turn|2',
 ].join('\n');
 
-test.describe('rejected replay choices', () => {
+describe('rejected replay choices', () => {
   test('a rejected protocol choice does not leave the other side\'s choice pending', async () => {
     const snapshots = parseReplayLog(replayLog);
     const snapshot = snapshots.find(entry => entry.turn === 2);

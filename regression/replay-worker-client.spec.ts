@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect, describe } from 'vitest';
 import { ReplayWorkerClient, type WorkerLike } from '../src/lib/replay-jobs/client';
 import type { ReconstructJob, ReconstructOutcome, ReplayJobRequest, ReplayJobResponse, SolveSpreadsJob } from '../src/lib/replay-jobs/types';
 
@@ -44,7 +44,7 @@ const outcome = (turn: number): ReconstructOutcome => ({
 });
 const idOf = (request: ReplayJobRequest) => request.id;
 
-test.describe('ReplayWorkerClient', () => {
+describe('ReplayWorkerClient', () => {
   test('routes a reconstruct job, streams progress and positions, resolves the outcome', async () => {
     const { client, workers } = makeClient();
     const progress: [number, number][] = [];

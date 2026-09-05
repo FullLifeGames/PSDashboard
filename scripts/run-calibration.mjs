@@ -75,9 +75,8 @@ function runSlice(index, slices, outDir, env) {
     const log = createWriteStream(join(outDir, `slice-${index}.log`));
     const started = Date.now();
     const child = spawn(process.execPath, [
-      join(ROOT, 'node_modules', '@playwright', 'test', 'cli.js'), 'test',
-      '-c', 'playwright.regression.config.ts', '--project=app', '--reporter=list',
-      '--output', join(outDir, `playwright-slice-${index}`),
+      join(ROOT, 'node_modules', 'vitest', 'vitest.mjs'), 'run',
+      '--config', 'vitest.config.ts', '--project', 'app', '--reporter', 'verbose',
       SPEC,
     ], {
       cwd: ROOT,

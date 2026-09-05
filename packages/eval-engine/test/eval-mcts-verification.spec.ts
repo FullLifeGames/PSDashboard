@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect, describe } from 'vitest';
 import { readFileSync } from 'fs';
 import { State } from '@pkmn/sim';
 import { buildTeamsFromReplay, formatEnforcesSleepClause, getBranchSimulatorFormat, parseReplayLogWithObservations } from '@fulllifegames/replay-core';
@@ -26,9 +26,8 @@ import { cellKey } from '../src/rank';
  * re-merge) on the position that caught it.
  */
 
-test.describe('mcts starved-support verification (draft t56)', () => {
-  test('verification demotes the chance-phantom sack and restores the real punisher order', async () => {
-    test.setTimeout(600_000);
+describe('mcts starved-support verification (draft t56)', () => {
+  test('verification demotes the chance-phantom sack and restores the real punisher order', { timeout: 600000 }, async () => {
     const replay = JSON.parse(readFileSync(new URL('./fixtures/draft-replay.json', import.meta.url), 'utf-8')) as {
       id: string; format: string; formatid?: string; players: string[]; log: string;
     };

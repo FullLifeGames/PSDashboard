@@ -1,10 +1,10 @@
-import { test, expect } from '@playwright/test';
+import { test, expect, describe } from 'vitest';
 import { runInNewContext } from 'node:vm';
 import { generateReplayHtml } from '../src/lib/replay-html';
 
 const log = '|start\n|turn|1\n|turn|2';
 
-test.describe('Replay iframe HTML', () => {
+describe('Replay iframe HTML', () => {
   test('accepts seek messages without autoplaying by default', () => {
     const html = generateReplayHtml({ log, seekTurn: 2 });
 

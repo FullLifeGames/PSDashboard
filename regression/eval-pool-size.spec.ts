@@ -1,7 +1,7 @@
-import { test, expect } from '@playwright/test';
+import { test, expect, describe } from 'vitest';
 import { POOL_MAX, computePoolSize, evalPoolSize, lanesForPool } from '../src/lib/eval/pool-size';
 
-test.describe('eval worker pool sizing', () => {
+describe('eval worker pool sizing', () => {
   test('never below the old rule, scales to the physical-core estimate, capped at 12', () => {
     expect(computePoolSize(8, 8, undefined)).toBe(6);    // 4C/8T laptop: unchanged
     expect(computePoolSize(16, 8, undefined)).toBe(8);   // 8C/16T

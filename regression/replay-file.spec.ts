@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect, describe } from 'vitest';
 import { looksLikeReplayFileContent, parseExportedReplay } from '../src/lib/replay-file';
 
 // Mirrors the structure of a real "Download replay" export from
@@ -53,7 +53,7 @@ const rawLog = [
   '|turn|1',
 ].join('\n');
 
-test.describe('exported replay file parsing', () => {
+describe('exported replay file parsing', () => {
   test('parses a downloaded replay HTML export into ReplayData', () => {
     const replay = parseExportedReplay(exportedHtml, 'Gen9Draft-2026-01-06-alpha-beta.html');
 

@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect, describe } from 'vitest';
 import type { PokemonSet } from '@pkmn/sim';
 import { inferOpponentTeam } from '@fulllifegames/replay-core';
 import { executeBranchChoices, reconstructBranchRuntime } from '../src/branch-engine';
@@ -46,7 +46,7 @@ const bootsLog = [
   '|turn|4',
 ].join('\n');
 
-test.describe('follow-up fixes from user testing (round 2)', () => {
+describe('follow-up fixes from user testing (round 2)', () => {
   test('reveals abilities from [from] ability: attributions (N1 — Poison Heal)', () => {
     const info = inferOpponentTeam(poisonHealLog, 'p1');
     const gliscor = info.pokemon.find(pokemon => pokemon.species === 'Gliscor');
@@ -107,7 +107,7 @@ const singlesLog = [
   '|turn|1',
 ].join('\n');
 
-test.describe('concurrent execute protection (N4/N6)', () => {
+describe('concurrent execute protection (N4/N6)', () => {
   test('two overlapping executes commit exactly one turn', async () => {
     const runtime = await reconstructBranchRuntime({
       format: 'gen9ou',

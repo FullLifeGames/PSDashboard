@@ -1,7 +1,7 @@
-import { test, expect } from '@playwright/test';
+import { test, expect, describe } from 'vitest';
 import { evalStoreKey, evalStorePrefix, loadStoredEvalsByPrefix } from '../src/lib/eval-cache-store';
 
-test.describe('eval cache store keys', () => {
+describe('eval cache store keys', () => {
   test('the store prefix covers every turn and engine of one replay and nothing else', () => {
     const prefix = evalStorePrefix('smogtours-gen8ou-573756');
     expect(prefix).toMatch(/^v\d+\|smogtours-gen8ou-573756:$/);

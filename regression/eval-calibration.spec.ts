@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect, describe } from 'vitest';
 import { State } from '@pkmn/sim';
 import type { Battle } from '@pkmn/sim';
 import { buildTeamsFromReplay } from '../packages/replay-core/src/team-builder';
@@ -2585,13 +2585,11 @@ async function exportPosition(dir: string | undefined, sample: Sample, serialize
   fs.writeFileSync(`${dir}/${id}#${turn}.json`, JSON.stringify({ id, turn, serialized, gameType, tranche, quality, p1Won, score, decided, lastPair }));
 }
 
-test.describe('eval calibration against real replays', () => {
-  test.skip(!process.env.EVAL_CALIBRATION, 'set EVAL_CALIBRATION=1 to run the calibration sweep');
+describe.skipIf(!process.env.EVAL_CALIBRATION)('eval calibration against real replays', () => {
 
-  test('score sign tracks the actual winner', async () => {
+  test('score sign tracks the actual winner', { timeout: 3600000 }, async () => {
     // 60 min: a half-corpus mcts slice with per-result equilibrium solves
     // crossed the old 40-min budget by minutes (2026-08-11).
-    test.setTimeout(3_600_000);
     applyCalibrationLevers();
     const samples: Sample[] = [];
     const sampleCount = Math.max(1, parseInt(process.env.EVAL_CALIBRATION_SAMPLES ?? '1', 10) || 1);
@@ -2858,8 +2856,7 @@ test.describe('eval calibration against real replays', () => {
   });
 });
 
-test.describe('single-pass position identity probe (time-performance phase 3)', () => {
-  test.skip(process.env.CALIB_POS_PROBE !== '1', 'set CALIB_POS_PROBE=1 to run the identity probe');
+describe.skipIf(process.env.CALIB_POS_PROBE !== '1')('single-pass position identity probe (time-performance phase 3)', () => {
 
   /**
    * Preregistered proof for the calibration harness's single-pass switch:
@@ -2871,8 +2868,7 @@ test.describe('single-pass position identity probe (time-performance phase 3)', 
    * whole mechanical state (sides, requests, RNG seed, inputLog) stays in
    * the comparison. CALIB_POS_PROBE_TRANCHE narrows to one stratum.
    */
-  test('raw-capture + clone-correct equals per-target reconstruction', async () => {
-    test.setTimeout(3_600_000);
+  test('raw-capture + clone-correct equals per-target reconstruction', { timeout: 3600000 }, async () => {
     // Normal form = one exact round-trip before comparing: the searches
     // only ever consume serialized strings through the deserializer, so
     // "equal after a round-trip" is precisely the equivalence class the

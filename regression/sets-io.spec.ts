@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect, describe } from 'vitest';
 import { buildSetsExport, parseSetsImport } from '../src/lib/sets-io';
 import type { OpponentTeamInfo } from '../packages/replay-core/src/types';
 
@@ -31,7 +31,7 @@ const p2Info: OpponentTeamInfo = {
   }],
 };
 
-test.describe('sets import/export', () => {
+describe('sets import/export', () => {
   test('exports both sides as side-headered Showdown blocks', () => {
     const text = buildSetsExport({ p1Name: 'Alice', p2Name: 'Bob', p1Info, p2Info });
 

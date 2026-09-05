@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect, describe } from 'vitest';
 import { analyzeTurn } from '../src/analysis';
 import { summarizeTurn } from '../src/summary';
 import type { EvalResult, RankedChoice } from '../src/types';
@@ -8,7 +8,7 @@ const choice = (choiceStr: string, label: string, worstCase: number): RankedChoi
 
 const names: [string, string] = ['Alpha', 'Beta'];
 
-test.describe('the forced win in prose (round 35)', () => {
+describe('the forced win in prose (round 35)', () => {
   const forcedResult = (forcedWin: EvalResult['forcedWin']): EvalResult => ({
     score: 0.95, interval: 0, depthCompleted: 1,
     perSide: {

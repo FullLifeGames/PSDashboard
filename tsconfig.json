@@ -1,8 +1,10 @@
 {
   "files": [],
   "compilerOptions": {
-    // Read by Playwright (closest tsconfig.json for src/ and the suites): the
-    // workspace packages resolve to their sources, as in the app project.
+    // Read by the editor and by Playwright's browser suites (closest
+    // tsconfig.json for src/ and the suites): the workspace packages resolve
+    // to their sources, as in the app project. vitest.config.ts carries the
+    // same map as a resolve alias for the Node suites.
     "paths": {
       "@fulllifegames/replay-core": ["./packages/replay-core/src/index.ts"],
       "@fulllifegames/eval-engine": ["./packages/eval-engine/src/index.ts"]

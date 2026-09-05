@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect, describe } from 'vitest';
 import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
 import { join, relative } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -83,7 +83,7 @@ function fragments(texts: string[]): { prefixes: Set<string>; suffixes: Set<stri
 
 const escape = (value: string) => value.replace(/[-/\\^$*+?.()|[\]{}]/g, '\\$&');
 
-test.describe('stylesheet audit', () => {
+describe('stylesheet audit', () => {
   test('every class selector is used by a source file', () => {
     const classes = new Set<string>();
     for (const file of stylesheets()) for (const cls of classSelectors(readFileSync(file, 'utf8'))) classes.add(cls);

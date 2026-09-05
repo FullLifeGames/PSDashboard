@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect, describe } from 'vitest';
 import { mkdtempSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -33,7 +33,7 @@ const SORTED_ORDER = [
   'gen9vgc-1#2', 'gen9vgc-1#5', 'gen9vgc-1#9', 'gen9vgc-2#3', 'gen9vgc-2#6', 'gen9vgc-2#10',
 ];
 
-test.describe('calibration lib', () => {
+describe('calibration lib', () => {
   test('summarize prints the harness aggregate, line for line (counts checked by hand)', () => {
     const samples = sortSamples(load(FIXTURE) as Sample[]);
     expect(samples).toHaveLength(12);

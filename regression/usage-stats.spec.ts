@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect, describe } from 'vitest';
 import { BattleStreams, Teams } from '@pkmn/sim';
 import type { PokemonSet } from '@pkmn/sim';
 import { createBranchState } from '../packages/eval-engine/src/branch-engine';
@@ -124,7 +124,7 @@ async function createDoublesBattle() {
   return { battleStream, log };
 }
 
-test.describe('usage stats and doubles support', () => {
+describe('usage stats and doubles support', () => {
   test('parses Smogon chaos stats into probability-backed guesses', () => {
     const stats = parseSmogonChaosStats(SAMPLE_CHAOS, {
       format: 'gen9ou',

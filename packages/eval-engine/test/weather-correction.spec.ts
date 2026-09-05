@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect, describe } from 'vitest';
 import { buildTeamsFromReplay, parseReplayLog } from '@fulllifegames/replay-core';
 import { reconstructBranchRuntime, executeBranchChoices } from '../src/branch-engine';
 
@@ -40,7 +40,7 @@ const sandstormReplayLog = [
   '|turn|2',
 ].join('\n');
 
-test.describe('weather snapshot correction', () => {
+describe('weather snapshot correction', () => {
   test('keeps ability weather intact through branch reconstruction and residuals', async () => {
     const snapshots = parseReplayLog(sandstormReplayLog);
     const snapshot = snapshots.find(entry => entry.turn === 2);

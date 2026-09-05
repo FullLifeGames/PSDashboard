@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect, describe } from 'vitest';
 import type { PokemonSet } from '@pkmn/sim';
 import {
   reconstructBranchRuntime,
@@ -37,7 +37,7 @@ const singlesLog = [
   '|turn|1',
 ].join('\n');
 
-test.describe('correctActivesFromProtocol', () => {
+describe('correctActivesFromProtocol', () => {
   // When the sim resolves a random switch (e.g. a Whirlwind drag) differently
   // than the replay protocol, the correction must keep side.pokemon aligned
   // with side.active — otherwise the sim's next real switch swaps stale
@@ -165,7 +165,7 @@ test.describe('correctActivesFromProtocol', () => {
   });
 });
 
-test.describe('protocol lock restamp after correction', () => {
+describe('protocol lock restamp after correction', () => {
   const keldeoLog = [
     '|player|p1|Alice|', '|player|p2|Bob|', '|gen|6', '|tier|[Gen 6] OU',
     '|poke|p1|Keldeo|', '|poke|p2|Chansey|',

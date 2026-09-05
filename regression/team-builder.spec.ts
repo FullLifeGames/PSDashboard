@@ -1,6 +1,6 @@
-import { test, expect } from '@playwright/test';
+import { test, expect, describe } from 'vitest';
 
-test.describe('species-shaped default spreads', () => {
+describe('species-shaped default spreads', () => {
   test('the last-resort spread follows base stats, not a flat physical template', () => {
     // No usage stats, no sheets, no damage observations: the default must
     // still make species sense — special attackers get SpA, fast species
@@ -84,7 +84,7 @@ const baseLog = [
   '|turn|1',
 ].join('\n');
 
-test.describe('team builder edited assumptions', () => {
+describe('team builder edited assumptions', () => {
   test('a usage-guessed item never overrides the team sheet', () => {
     // The chat-posted sheet says Choice Scarf; an enriched info carries a
     // usage GUESS (Leftovers) in value. Sheet must win; a revealed item must
@@ -467,7 +467,7 @@ test.describe('team builder edited assumptions', () => {
   });
 });
 
-test.describe('team sheet display overlay', () => {
+describe('team sheet display overlay', () => {
   test('fills unproven fields from the sheet, never overriding proof or edits', async () => {
     const { applyTeamSheetToInfo } = await import('../packages/replay-core/src/team-sheets');
     const field = (value: string, source: 'revealed' | 'guessed' | 'unknown') => ({ value, source } as const);
@@ -571,7 +571,7 @@ test.describe('team sheet display overlay', () => {
   });
 });
 
-test.describe('happiness assumption for guessed sets', () => {
+describe('happiness assumption for guessed sets', () => {
   // Showdown's teambuilder assumption: Frustration users run 0 happiness
   // (BP 102). Nothing set `happiness` at all, so the sim default 255 made
   // every guessed Frustration hit at BP 1. Return needs no action — the
@@ -602,7 +602,7 @@ test.describe('happiness assumption for guessed sets', () => {
   });
 });
 
-test.describe('hidden-power substitution in built teams', () => {
+describe('hidden-power substitution in built teams', () => {
   test('a revealed typeless HP becomes the usage/evidence variant', () => {
     const log = [
       '|player|p1|Alice|', '|player|p2|Bob|', '|gen|6', '|tier|[Gen 6] OU',

@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect, describe } from 'vitest';
 import {
   applyTrendExtrapolation, applyTrendTiebreak, cellKey, rankFromMatrix, selectTieProbeCells,
   solveMatrixGame, toResult, TIE_EPSILON, TREND_LAMBDA, TREND_MARGIN, type ValueMatrix,
@@ -7,7 +7,7 @@ import {
 // Pins the regret-matching solver against games with known solutions. The
 // solver is pure math (no sim), deterministic, and reads the AVERAGE
 // strategies — the only thing regret matching guarantees converges.
-test.describe('zero-sum matrix game solver', () => {
+describe('zero-sum matrix game solver', () => {
   test('matching pennies solves to the uniform mix at value 0', () => {
     const { value, p1Mix, p2Mix } = solveMatrixGame([[1, -1], [-1, 1]]);
     expect(Math.abs(value)).toBeLessThan(0.02);
@@ -51,7 +51,7 @@ test.describe('zero-sum matrix game solver', () => {
   });
 });
 
-test.describe('equilibrium-aware ranking', () => {
+describe('equilibrium-aware ranking', () => {
   const matrixOf = (values: number[][]): ValueMatrix => ({
     p1Options: values.map((_, i) => ({ choice: `p1c${i}`, label: `P1 ${i}` })),
     p2Options: (values[0] ?? []).map((_, j) => ({ choice: `p2c${j}`, label: `P2 ${j}` })),
@@ -97,7 +97,7 @@ test.describe('equilibrium-aware ranking', () => {
   });
 });
 
-test.describe('horizon-trend tiebreak', () => {
+describe('horizon-trend tiebreak', () => {
   const matrixOf = (values: number[][], ended?: boolean[][]): ValueMatrix => ({
     p1Options: values.map((_, i) => ({ choice: `p1c${i}`, label: `P1 ${i}` })),
     p2Options: (values[0] ?? []).map((_, j) => ({ choice: `p2c${j}`, label: `P2 ${j}` })),
@@ -210,7 +210,7 @@ test.describe('horizon-trend tiebreak', () => {
   });
 });
 
-test.describe('horizon-trend extrapolation (2b)', () => {
+describe('horizon-trend extrapolation (2b)', () => {
   const matrixOf = (values: number[][], ended?: boolean[][]): ValueMatrix => ({
     p1Options: values.map((_, i) => ({ choice: `p1c${i}`, label: `P1 ${i}` })),
     p2Options: (values[0] ?? []).map((_, j) => ({ choice: `p2c${j}`, label: `P2 ${j}` })),

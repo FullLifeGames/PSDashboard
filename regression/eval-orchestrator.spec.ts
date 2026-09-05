@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect, describe } from 'vitest';
 import { Battle, State, Teams, toID } from '@pkmn/sim';
 import type { PokemonSet } from '@pkmn/sim';
 import { searchOrchestrated, type CellJob, type SearchExecutor, type SubSearchJob } from '../packages/eval-engine/src/orchestrator';
@@ -40,7 +40,7 @@ const threeTurnWin = () => serialize(makeBattle(
   ],
 ));
 
-test.describe('search orchestrator', () => {
+describe('search orchestrator', () => {
   test('parity: orchestrated search over a local executor equals the sync search', async () => {
     for (const settings of [
       { depth: 1, samples: 3 },
@@ -176,7 +176,7 @@ test.describe('search orchestrator', () => {
   });
 });
 
-test.describe('depth-matched played outcome', () => {
+describe('depth-matched played outcome', () => {
   test('routes the played pair to the same estimator as the sweep cells', async () => {
     const { playedOutcomeSettings } = await import('../src/lib/eval/worker-client');
     // Depth-1 matrix cells ARE static evals — the plain cell path matches.

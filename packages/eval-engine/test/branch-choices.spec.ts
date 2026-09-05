@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect, describe } from 'vitest';
 import {
   branchSideChoicesReady,
   conflictingSwitchTargets,
@@ -27,7 +27,7 @@ function moveBy(name: string, targetLoc?: number): BranchSlotChoice {
   };
 }
 
-test.describe('branch choice helpers', () => {
+describe('branch choice helpers', () => {
   test('requires every live active slot unless a force switch request narrows the choice set', () => {
     expect(requiredChoicesForActiveSlots([{ fainted: false }, { fainted: false }], []))
       .toEqual([true, true]);
@@ -76,7 +76,7 @@ test.describe('branch choice helpers', () => {
   });
 });
 
-test.describe('engine choice → branch slot choices', () => {
+describe('engine choice → branch slot choices', () => {
   const target = (targetLoc: number): BranchTargetOption =>
     ({ label: `${targetLoc}`, targetLoc, side: 'p2', activeSlot: 0, name: 'Foe', species: 'Foe', hpPercent: 100 });
   const move = (name: string, activeSlot: number, slot: number, targets: number[] = []): BranchMoveOption => ({

@@ -301,7 +301,7 @@ The current codebase has been validated with:
 - `npm run lint`
 - `npm run build`
 - `npx playwright test`
-- `npm run test:regression` (three Playwright projects: the root specs plus each package's suite)
+- `npm run test:regression` (three Vitest projects: the root specs plus each package's suite; the browser suites stay on Playwright)
 - `npm test -w packages/replay-core`, `npm test -w packages/eval-engine` (one package's suite alone): [`packages/replay-core/test/`](./packages/replay-core/test/) and [`packages/eval-engine/test/`](./packages/eval-engine/test/) hold each package's own specs, white-box against `../src`, the sibling package by name, fixtures package-local; [`regression/`](./regression/) keeps the app specs, the app-plus-package integration specs, the measurement chains (calibration, fit, feedback corpus), and the API snapshot ([`regression/package-api.spec.ts`](./regression/package-api.spec.ts))
 - `npm run pack:smoke` ([`scripts/pack-smoke.mjs`](./scripts/pack-smoke.mjs)): packs both packages, installs the tarballs into a throwaway Node project, and runs the worked examples under [`packages/replay-core/examples/`](./packages/replay-core/examples/) and [`packages/eval-engine/examples/`](./packages/eval-engine/examples/), the ones the package READMEs embed verbatim
 - `EVAL_FIT=1` on the weight-fitting corpus that [`scripts/build-fit-corpus.mjs`](./scripts/build-fit-corpus.mjs) builds (ReplayScouter tournament data, Smogon-thread scraping for gen9 singles, doubles, and VGC, ladder samples); the manifest is committed, the replay cache is not

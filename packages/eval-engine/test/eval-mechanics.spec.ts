@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect, describe } from 'vitest';
 import { Battle, State, Teams, toID } from '@pkmn/sim';
 import type { PokemonSet } from '@pkmn/sim';
 import { advancePosition, createRootPosition, positionBattle, serializeBattleStable } from '../src/forward-model';
@@ -41,7 +41,7 @@ function makeBattle(p1Sets: PokemonSet[], p2Sets: PokemonSet[]): Battle {
 
 const serialize = (battle: Battle) => JSON.stringify(State.serializeBattle(battle));
 
-test.describe('searched mechanics stay honest', () => {
+describe('searched mechanics stay honest', () => {
   test('Intimidate drops the foe attack on a searched switch-in', () => {
     const root = createRootPosition(serialize(makeBattle(
       [makeSet('Snorlax', 'Snorlax', ['Protect']), makeSet('Gyarados', 'Gyarados', ['Protect'], { ability: 'Intimidate' })],

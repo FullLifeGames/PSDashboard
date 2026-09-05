@@ -1,10 +1,10 @@
-import { test, expect } from '@playwright/test';
+import { test, expect, describe } from 'vitest';
 import {
   assignFolds, brierScore, crossValidate, fitConstantK, fitLogistic, fitPhaseK,
   logLossScore, maskColumns, phaseBucket, probOf, type CvSample,
 } from './fit-helpers';
 
-test.describe('fit helpers', () => {
+describe('fit helpers', () => {
   const synth = (k0: number, k1: number, n = 400) => {
     // Deterministic synthetic corpus: outcomes drawn by thresholding the
     // model probability against an LCG — recoverable ground truth.
@@ -44,7 +44,7 @@ test.describe('fit helpers', () => {
   });
 });
 
-test.describe('cv helpers (round 8)', () => {
+describe('cv helpers (round 8)', () => {
   const games = Array.from({ length: 23 }, (_, i) => `g${i}`);
 
   test('assignFolds is deterministic, complete, and balanced', () => {

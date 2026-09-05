@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect, describe } from 'vitest';
 import { Battle, Teams, toID } from '@pkmn/sim';
 import type { PokemonSet } from '@pkmn/sim';
 import {
@@ -75,7 +75,7 @@ async function waitFor(predicate: () => boolean, timeoutMs = 2000) {
   }
 }
 
-test.describe('executeBranchChoices', () => {
+describe('executeBranchChoices', () => {
   test('rejects an invalid choice without advancing the battle', async () => {
     const runtime = await reconstructBranchRuntime({
       format: 'gen9ou',
@@ -182,7 +182,7 @@ function makeSwitch(slot: number, name: string): BranchSwitchOption {
   };
 }
 
-test.describe('resolveCustomChoice', () => {
+describe('resolveCustomChoice', () => {
   const moves = [
     makeMove({ name: 'Thunderbolt', slot: 1 }),
     makeMove({ name: 'Volt Switch', slot: 2 }),
@@ -252,7 +252,7 @@ test.describe('resolveCustomChoice', () => {
   });
 });
 
-test.describe('error message nickname annotation', () => {
+describe('error message nickname annotation', () => {
   test('annotates nicknames with species in simulator error messages', () => {
     const battle = new Battle({
       formatid: toID('gen9customgame'),

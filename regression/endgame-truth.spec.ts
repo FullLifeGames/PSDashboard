@@ -1,4 +1,4 @@
-import { test } from '@playwright/test';
+import { test, describe } from 'vitest';
 import { State } from '@pkmn/sim';
 import { ENDGAME_FIXTURES } from './endgame-fixtures';
 import { solveEndgame, type EndgameResult } from '../packages/eval-engine/src/endgame/solver';
@@ -74,11 +74,9 @@ function sliceOf<T>(items: T[]): T[] {
   return Number.isFinite(limit) ? sliced.slice(0, limit) : sliced;
 }
 
-test.describe('endgame truth bench (round 34)', () => {
-  test.skip(process.env.EVAL_ENDGAME_TRUTH !== '1', 'set EVAL_ENDGAME_TRUTH=1 to run the endgame bench');
+describe.skipIf(process.env.EVAL_ENDGAME_TRUTH !== '1')('endgame truth bench (round 34)', () => {
 
-  test('every estimator against the solver', async () => {
-    test.setTimeout(4 * 3_600_000);
+  test('every estimator against the solver', { timeout: 14400000 }, async () => {
     const items = sliceOf([...(await bankItems(process.env.EVAL_ENDGAME_POSITIONS ?? DEFAULT_DIR)), ...syntheticItems()]);
     const fs = process.env.EVAL_ENDGAME_DUMP ? await import('node:fs') : null;
     for (const item of items) {

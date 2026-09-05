@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect, describe } from 'vitest';
 import {
   NATURES,
   getAbilityPool,
@@ -7,7 +7,7 @@ import {
   getTeraTypePool,
 } from '../src/lib/pokemon-options';
 
-test.describe('legal option pools', () => {
+describe('legal option pools', () => {
   test('move pool contains gen-legal moves and excludes illegal ones', async () => {
     const garchomp = await getMovePool('Garchomp', 9);
     expect(garchomp).toContain('Earthquake');
