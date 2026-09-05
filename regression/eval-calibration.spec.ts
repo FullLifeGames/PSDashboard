@@ -945,6 +945,33 @@ import { summaryLines } from './calibration-summary';
  * in the app"); wall-time gates need base and candidate interleaved; four
  * Playwright slices started at once in a fresh worktree race on the
  * transform cache.
+ * FOLLOW-UP 2026-09-05 (a61b0f9 display, e019a73 replay iframe, deb8e96
+ * prover): winPercent reads a value within a billionth of +-1 as the
+ * finished game (an ended row weighted by the equilibrium mix kept a
+ * one-bit remnant and showed 86% next to a 100% bar); the replay iframe
+ * predefines Showdown's route table (client 0.11.2 reads Config.routes
+ * while battledata.js loads, and dynamic scripts run in any order). The
+ * prover gained a GREEDY PROBE (one line per root candidate against the
+ * reply that leaves the opponent the most HP, at most 16 cells and five
+ * turns per side; only a line that ends in a win starts the full search,
+ * now 100 cells with the probe's cells reused), DOMINANCE INHERITANCE (a
+ * class no draw showed takes the proof of the drawn class that is at least
+ * as bad for the side: the opponent's miss from their hit, the side's
+ * knock-out from its survived hit; a 90% Toxic had left 10% of certain wins
+ * open), inner cells at the base draws only, and a SCORE FLOOR of 0.6 for
+ * decided boards above three bodies (no bank proof ever stood below it;
+ * 42 of 573756's 51 decided turns did). BANK (r35-after4 vs r34-after):
+ * late brier 0.1564 -> 0.1562, hq late 0.1664 -> 0.1665, luck-adjusted late 0.1490 -> 0.1487,
+ * sign hits identical 54/63/80 (hq 54/64/77); 33 of 816 samples carry a proof (27 at mass 1,
+ * 30 (the three losses were wrong before the prover: gen9ou-2663114316 t18 and t22, smogtours-gen9ou-751443 t23) right). 573756: t139 p2 in 1 at mass 1 as before, and t138 p2 in 4
+ * at mass 0.88 (the bar reads about 97%, below the spoken 0.9; Toxapex's
+ * Recover-first defense leaves an open branch the class model does not
+ * price). Prover time inside the sweep 13 s over 140 calls (25 s at the
+ * first probe build); wall on 573756 about +10 s with the machine drifting
+ * 10 s between runs. FEEDBACK: three runs byte-identical (runs 2, 3, and 8 of a series in which runs 1 and 4 to 7 fell to stale dev servers and a browser crash), no pinned channel moved. Synthetic fixtures: 27 of
+ * 90 bank positions prove (22 before), healer-burned and choice-locked at
+ * mass 1, focus-blast-range 0.9999 in 12; healer-vs-band (six turns) lies
+ * beyond the probe. User gate: adopt.
  *
  * ENDGAME SOLVER ROUND 2026-09-04 (improvement round 34 of the perf-and-
  * quality plan; spec docs/superpowers/specs/2026-09-04-round-34-design.md;
