@@ -130,12 +130,20 @@ export function conversionFor(
   return null;
 }
 
-/** The tip turn's mechanism, when it has one the seeds don't already tell: the winner's read, or a winner-ward roll. */
+/**
+ * The tip turn's mechanism, when it has one the seeds don't already tell:
+ * the winner's read, or a winner-ward roll the protocol shows. A chance
+ * entry without a visible dice event stays unnamed — the ledger is a
+ * residual, and 573756 t70 booked the engine disagreeing with itself
+ * across two evaluations (Swords Dance priced a turn late) as a "roll".
+ * Without dice info at all the clause stays ungated, like the luck line.
+ */
 export function tipClause(
   known: TurnAnalysis[],
   winner: Side,
   winnerName: string,
   turningPoint: number | null,
+  diceTurns: ReadonlySet<number> | null,
 ): string {
   const analysis = known.find(entry => entry.turn === turningPoint);
   if (!analysis) return '';
@@ -143,7 +151,8 @@ export function tipClause(
   if (analysis.attribution === `${winner}-read` && played) {
     return `, when ${winnerName}'s read (${phrase(played.label)}) paid off`;
   }
-  if (analysis.attribution === 'chance' && toward(winner, analysis.chanceDelta ?? 0) > 0) {
+  const diceShown = diceTurns === null || diceTurns.has(analysis.turn);
+  if (analysis.attribution === 'chance' && diceShown && toward(winner, analysis.chanceDelta ?? 0) > 0) {
     return `, on a roll that went ${winnerName}'s way`;
   }
   return '';

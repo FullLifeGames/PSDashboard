@@ -362,6 +362,22 @@ test.describe('dice-anchored luck claims', () => {
     ], names, 'p2');
     expect(report.summary).toContain('The rolls decided it');
   });
+
+  test('the tip\'s roll clause needs a visible dice event on the tip turn', () => {
+    // 573756 t70: a chance-attributed tip whose ledger entry is the engine
+    // disagreeing with itself across two evaluations — no die fell.
+    const analyses = [
+      mk(1, 0.1, 0.05),
+      mk(2, 0.05, -0.3, { attribution: 'chance', chanceDelta: -0.35 }),
+      mk(3, -0.3, -0.5),
+      mk(4, -0.5, -0.8),
+    ];
+    const unmarked = buildGameReport(analyses, names, 'p2', true, new Set([4]));
+    expect(unmarked.summary).toContain('tipped for good on turn 2.');
+    expect(unmarked.summary).not.toContain('on a roll');
+    const marked = buildGameReport(analyses, names, 'p2', true, new Set([2]));
+    expect(marked.summary).toContain('tipped for good on turn 2, on a roll that went Beta\'s way.');
+  });
 });
 
 test.describe('denied early end', () => {

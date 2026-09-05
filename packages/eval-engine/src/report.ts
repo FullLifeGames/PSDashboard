@@ -258,6 +258,8 @@ interface WinStory {
   seeds: TurnAnalysis[];
   conversion: ReturnType<typeof conversionFor>;
   denied: DeniedEnd | null;
+  /** The tip turn's mechanism clause ('' when it has none the report may name). */
+  tip: string;
   path: WinPathResult | null;
 }
 
@@ -278,20 +280,20 @@ function winStoryFor(args: {
   const seeds = !playedTracking ? [] : seedsOfTheLoss(known, loser, turningPoint);
   const conversion = conversionFor(known, winner, args.playerNames);
   const denied = deniedEndFor(known, args.diceTurns);
+  const tip = tipClause(known, winner, args.playerNames[sideIndex(winner)], turningPoint, args.diceTurns);
   const path = winPathFor({
     known, series: args.series, boundary: args.boundary, winner, playerNames: args.playerNames,
     chanceTotal: args.chanceTotal, diceAnchor: args.diceAnchor, playedTracking, seedsSpoken: seeds.length > 0,
   });
   // Nothing else explained a tipped game: say so instead of saying nothing.
   if (!path && !conversion && seeds.length === 0 && turningPoint !== null) {
-    return { seeds, conversion, denied, path: closeGameFallback(args.playerNames[sideIndex(winner)]) };
+    return { seeds, conversion, denied, tip, path: closeGameFallback(args.playerNames[sideIndex(winner)]) };
   }
-  return { seeds, conversion, denied, path };
+  return { seeds, conversion, denied, tip, path };
 }
 
 /** The winner's story: who won, when and how it tipped, the conversion, the seeds (or clean play), and the winning edge. */
 function winnerSentences(
-  known: TurnAnalysis[],
   playerNames: [string, string],
   winner: Side,
   turningPoint: number | null,
@@ -304,7 +306,7 @@ function winnerSentences(
   const sentences: string[] = [];
   sentences.push(`${winnerName} won.`);
   sentences.push(turningPoint !== null
-    ? `The game tipped for good on turn ${turningPoint}${tipClause(known, winner, winnerName, turningPoint)}.`
+    ? `The game tipped for good on turn ${turningPoint}${story.tip}.`
     : `${winnerName} led from start to finish${matchupClause(series, winner)}.`);
   if (story.conversion) sentences.push(story.conversion.sentence);
 
@@ -340,7 +342,7 @@ function reportSummary(
 ): string {
   const sentences: string[] = [];
   if (winner && story) {
-    sentences.push(...winnerSentences(known, playerNames, winner, turningPoint, playedTracking, decisionTotals, story, series));
+    sentences.push(...winnerSentences(playerNames, winner, turningPoint, playedTracking, decisionTotals, story, series));
   } else if (known.length > 0) {
     sentences.push('No winner recorded — the game may be unfinished.');
   }

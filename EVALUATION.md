@@ -191,7 +191,7 @@ The default Auto line routes to the tree once a quarter of all bodies have falle
 
 Once a sweep covers enough of the game, a game report tells the multi-turn story:
 
-- who won and where the game tipped for good,
+- who won and where the game tipped for good, with the tip's mechanism named only when the report can vouch for it: the winner's paid-off read, or a roll the protocol actually shows on that turn — a chance entry without a visible dice event stays unnamed, because the chance ledger is a residual and can also hold the engine disagreeing with itself across two evaluations,
 - a chess-style accuracy score per player, computed from per-turn win-probability loss and volatility-weighted so one wild turn cannot define a game, shown only once enough decided turns exist,
 - the losing side's costliest choices before the tipping point, "the seeds of the loss"; unpunished risks never count,
 - the lead matchup as turn-0 chips,
