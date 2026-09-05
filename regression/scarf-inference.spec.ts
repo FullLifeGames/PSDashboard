@@ -1,10 +1,9 @@
 import { test, expect, describe } from 'vitest';
-import { buildTeamsFromReplay, solveReplaySpreads } from '../packages/replay-core/src/team-builder';
-import { inferOpponentTeam } from '../packages/replay-core/src/opponent-inferrer';
-import { parseReplayLogWithObservations } from '../packages/replay-core/src/protocol-parser';
-import { applyInferredSpreads, INFERRED_ITEM_DETAIL, RULED_OUT_ITEM_DETAIL } from '../packages/replay-core/src/team-info';
-import type { SmogonUsageStats } from '../packages/replay-core/src/smogon/stats-types';
-import type { OpponentTeamInfo, RevealedPokemonInfo } from '../packages/replay-core/src/types';
+import {
+  buildTeamsFromReplay, solveReplaySpreads, inferOpponentTeam, parseReplayLogWithObservations, applyInferredSpreads,
+  INFERRED_ITEM_DETAIL, RULED_OUT_ITEM_DETAIL,
+} from '@fulllifegames/replay-core';
+import type { SmogonUsageStats, OpponentTeamInfo, RevealedPokemonInfo } from '@fulllifegames/replay-core';
 import { sourceLabel } from '../src/lib/provenance-labels';
 import { buildSensitivityTargets } from '../src/lib/team-knowledge';
 

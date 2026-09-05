@@ -895,12 +895,14 @@ import { summaryLines } from './calibration-summary';
  * CHOICE SCARF INFERENCE ROUND 2026-09-05 (improvement round 37 of the
  * perf-and-quality plan; spec
  * docs/superpowers/specs/2026-09-05-round-37-design.md; worktree r37 on
- * d8a2cb7, rebased onto master after round 38; dd17225 doubles orders +
- * copied actions / c51e2cf cleanliness rules / a985797 solver decisions /
- * 430011c builder, panel, cache v42 / 8e5f8aa Pursuit-on-U-turn + Sleep Talk
- * after |cant| / ca6bc8c, 8f707cd, 5389826 a Scarf that changed hands /
- * 2d4b00a pre-solve decisions carried through a forfeited full solve /
- * f5f20e0 EVALUATION.md). The parser reads every opposite-side pair of a
+ * d8a2cb7, rebased onto master after round 38 and again after the second
+ * session's Vitest move; a9c3295 doubles orders + copied actions / 0a23625
+ * cleanliness rules / d783aeb solver decisions / cfc904b builder, panel,
+ * cache v42 / d8843b0 Pursuit-on-U-turn + Sleep Talk after |cant| / 7419394,
+ * b4afcf8, 14f9f36 a Scarf that changed hands / ef4b5ad pre-solve decisions
+ * carried through a forfeited full solve / e43e0f8 EVALUATION.md; the
+ * measurements below ran on the same trees before the second rebase, which
+ * touched no engine source). The parser reads every opposite-side pair of a
  * turn's movers as a race (doubles turns included), drops copied actions
  * (Dancer, Instruct, bounced or snatched status moves), a Pursuit fired at a
  * switch as first mover, a slot After You or Quash rearranged, and every
@@ -952,7 +954,7 @@ import { summaryLines } from './calibration-summary';
  * Landorus-Therian -> Choice Band, 912047 Chi-Yu -> Choice Specs), 45
  * changed sets in 31 replays (the rest are Speed spreads under new doubles
  * evidence or dropped singles orders); the app path (solveReplaySpreads)
- * agrees with the harness build since 2d4b00a.
+ * agrees with the harness build since ef4b5ad.
  * HAND CHECK: 8 of 9 Scarf-ins plausible against the log (573756 Magnezone;
  * Kyurem before Zamazenta; Gholdengo before Darkrai, Iron Moth, and
  * Ogerpon-Wellspring; Glimmora knocking out Dragapult before it acted;
@@ -962,14 +964,14 @@ import { summaryLines } from './calibration-summary';
  * Kyurem, Landorus-Therian behind Landorus-Incarnate, doubles); 2663107495
  * Gholdengo keeps a Scarf on contradictory evidence (t1 before, t10 behind
  * Ogerpon-Wellspring) at its Hardy 60 Spe prior.
- * COST (573756 alone, master e2f7fac and r37 4d63f2b interleaved on a quiet
+ * COST (573756 alone, master e2f7fac and r37 e08abf9 interleaved on a quiet
  * machine, 22:17): 51 s and 51 s, twice each (the first four interleaved
  * runs at 20:16 and 20:44 had run under the second session's vitest load and
  * read 90 to 152 s either way; no cost from the round). Four feedback runs
  * on the final tree: regression 1044 passed on Vitest, feedback run 7
  * byte-identical to round 2 including the sensitivity data, e2e 73 of 74
  * with the known viewer-seeking flake (green alone).
- * FEEDBACK: four runs (three on 5389826, one on 2d4b00a) identical on every
+ * FEEDBACK: four runs (three on 14f9f36, one on ef4b5ad) identical on every
  * drift channel and every dump except the sensitivity probe's species label
  * (648453 t13 in one pair, 655336 in another; identical values, a labeling
  * race the base run shows too); no pinned channel moved. Against the base
