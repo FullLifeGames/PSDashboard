@@ -69,7 +69,8 @@ describe('useTimelineController', () => {
     expect(result.current.board.timeline.liveTip).toBe(true);
     expect(result.current.board.timeline.liveSimTurn).toBe(2);
     expect(result.current.ctx.branchWindowOpenRef.current).toBe(true);
-    expect(result.current.ctx.positions.getExact(2)).not.toBeNull();
+    // The store entry lands with the reconstruction result, a tick behind the branch flag on a loaded machine.
+    await waitFor(() => expect(result.current.ctx.positions.getExact(2)).not.toBeNull());
 
     act(() => result.current.transients.setPendingConfirm({ message: 'x', proceed: () => {} }));
     act(() => result.current.board.discardVariation());
