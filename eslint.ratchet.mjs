@@ -84,30 +84,6 @@ export const ratchetOverrides = [
   },
   {
     "files": [
-      "e2e/app.spec.ts"
-    ],
-    "rules": {
-      "max-lines": [
-        "error",
-        {
-          "max": 1300,
-          "skipBlankLines": true,
-          "skipComments": true
-        }
-      ],
-      "max-lines-per-function": [
-        "error",
-        {
-          "max": 1100,
-          "skipBlankLines": true,
-          "skipComments": true,
-          "IIFEs": true
-        }
-      ]
-    }
-  },
-  {
-    "files": [
       "packages/eval-engine/test/doubles-branch.spec.ts"
     ],
     "rules": {
