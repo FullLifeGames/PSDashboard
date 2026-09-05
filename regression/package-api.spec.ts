@@ -96,17 +96,19 @@ describe('Package hygiene', () => {
 });
 
 describe('Package API surface', () => {
+  // A Windows checkout may hand the pin back with CRLF endings; the surface is compared line by line, not byte by byte.
+  const pinned = (name: string) => readFileSync(fixturePath(name), 'utf8').replace(/\r\n/g, '\n');
   for (const { name, runtime } of PACKAGES) {
     test(`${name}: the barrel matches the pinned surface`, () => {
       const actual = compilerSurface(name).join('\n') + '\n';
       const path = fixturePath(name);
       if (process.env.UPDATE_API_SNAPSHOT) writeFileSync(path, actual);
       expect(existsSync(path), `missing ${path}; run with UPDATE_API_SNAPSHOT=1 to create it`).toBe(true);
-      expect(actual).toBe(readFileSync(path, 'utf8'));
+      expect(actual).toBe(pinned(name));
     });
 
     test(`${name}: the runtime exports match the pinned values`, () => {
-      const pinnedValues = readFileSync(fixturePath(name), 'utf8')
+      const pinnedValues = pinned(name)
         .split('\n')
         .filter(line => line.startsWith('value '))
         .map(line => line.slice('value '.length))

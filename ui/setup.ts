@@ -11,6 +11,14 @@ configure({ asyncUtilTimeout: 5_000 });
 // no-op here (and would otherwise throw on the missing method).
 Element.prototype.scrollIntoView ??= () => {};
 
+// jsdom has no layout observer either; the evaluation graph measures its
+// width through one and keeps its default width when nothing reports.
+globalThis.ResizeObserver ??= class {
+  observe() {}
+  unobserve() {}
+  disconnect() {}
+};
+
 // Testing Library unmounts on its own only when the runner exposes global
 // hooks; Vitest does not, so every test unmounts here. jsdom keeps one window
 // per test file, so the preferences and picker toggles the hooks persist in

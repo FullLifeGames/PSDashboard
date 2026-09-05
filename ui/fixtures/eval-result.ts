@@ -84,7 +84,7 @@ export function gameReport(overrides: Partial<GameReport> = {}): GameReport {
     misplays: [],
     reads: [],
     tracked: true,
-    accuracy: { p1: 0.92, p2: 0.81 },
+    accuracy: { p1: 92, p2: 81 },
     decisionTotals: { p1: -0.12, p2: -0.31 },
     chanceTotal: 0.08,
     resolutionTotal: 0.15,

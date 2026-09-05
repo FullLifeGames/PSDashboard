@@ -28,8 +28,9 @@ export function switchOption(species: string, overrides: Partial<BranchSwitchOpt
   return { name: species, species, activeSlot: 0, slot: 2, hp: '300/300', hpPercent: 100, fainted: false, ...overrides };
 }
 
+/** A move target as the sim labels it: the slot ("P2A"), then the Pokémon standing there. */
 export function targetOption(side: 'p1' | 'p2', activeSlot: number, species: string, targetLoc: number): BranchTargetOption {
-  return { label: species, targetLoc, side, activeSlot, name: species, species, hpPercent: 100 };
+  return { label: `${side.toUpperCase()}${String.fromCharCode(65 + activeSlot)}`, targetLoc, side, activeSlot, name: species, species, hpPercent: 100 };
 }
 
 export const NO_MODIFIERS: BranchSlotModifiers = { teraType: null, canMegaEvo: false, canUltraBurst: false, zMoves: [] };
@@ -60,14 +61,16 @@ function sideState(side: 'p1' | 'p2', kind: FormatKind) {
     isActive: true, activeSlot: slot, moves: (MOVES[species] ?? []).map(([name, type]) => ({ name, type })),
   }));
   const benchMons = layout.bench.map(species => pokemon(species));
-  const movesBySlot = activeSlots.map((mon, slot) => (MOVES[mon.species] ?? [['Tackle', 'Normal']]).map(([name, type], index) => moveOption(name, {
-    activeSlot: slot, slot: index + 1, type,
+  const movesBySlot = activeSlots.map((mon, slot) => (MOVES[mon.species] ?? [['Tackle', 'Normal']]).map(([name, type], index) => {
     // Doubles: single-target attacks name their targets, spread and self moves do not.
-    requiresTarget: kind === 'doubles' && !['Protect', 'Tailwind', 'Rage Powder', 'Swords Dance', 'Stealth Rock', 'Leech Seed'].includes(name),
-    targetOptions: kind === 'doubles'
-      ? enemyActive.map((species, enemySlot) => targetOption(other, enemySlot, species, enemySlot + 1))
-      : [],
-  })));
+    const requiresTarget = kind === 'doubles' && !['Protect', 'Tailwind', 'Rage Powder', 'Swords Dance', 'Stealth Rock', 'Leech Seed'].includes(name);
+    return moveOption(name, {
+      activeSlot: slot, slot: index + 1, type, requiresTarget,
+      targetOptions: requiresTarget
+        ? enemyActive.map((species, enemySlot) => targetOption(other, enemySlot, species, enemySlot + 1))
+        : [],
+    });
+  }));
   const switchesBySlot = activeSlots.map((_, slot) => benchMons.map((mon, index) => switchOption(mon.species, {
     activeSlot: slot, slot: layout.active.length + index + 1,
   })));

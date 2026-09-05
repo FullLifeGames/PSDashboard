@@ -3,6 +3,7 @@ import { replayFixture } from './replay';
 import { simState } from './sim-state';
 import { evalGraph, evalResult, gameReport } from './eval-result';
 import { teamInfo } from './team-info';
+import { leadAnalysis, misplayedSide, sideAnalysis, turnAnalysis } from './analysis';
 import { fakeReplayWorkerClient, installFakeWorker } from './worker';
 
 // The factories behind the app suite: every call returns a fresh object, both
@@ -33,6 +34,14 @@ describe('fixture factories', () => {
     expect(evalResult('singles').perSide.p1[0].koOdds).toEqual({ accuracy: 1, killFraction: 0.43 });
     expect(evalGraph().scores).toHaveLength(10);
     expect(gameReport({ winner: 'p2' }).winner).toBe('p2');
+  });
+
+  test('analyses grade a quiet turn, a misplay in either band, and the lead decision', () => {
+    expect(turnAnalysis(4)).toMatchObject({ turn: 4, attribution: 'quiet', p1: { regret: 0 }, p2: { played: { label: 'Leech Seed' } } });
+    expect(misplayedSide().tier).toBe('mistake');
+    expect(misplayedSide('blunder').regret).toBeCloseTo(0.5);
+    expect(leadAnalysis().p2.tier).toBe('mistake');
+    expect(sideAnalysis({ tier: 'inaccuracy' }).tier).toBe('inaccuracy');
   });
 
   test('team info offers six revealed species in singles and four in doubles', () => {
