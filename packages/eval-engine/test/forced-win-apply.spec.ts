@@ -125,6 +125,13 @@ test.describe('forced-win trigger and bar (round 35)', () => {
     expect(result.forcedWin?.engineScore).toBe(0.2);
   });
 
+  test('a coin flip (mass exactly one half) keeps the proof on the result but moves no score', () => {
+    const result = resultWith(0.2, ['move tackle'], ['move tackle']);
+    applyForcedWin(result, { side: 'p1', proof: { mass: 0.5, turns: 1, caveat: 'none', openValue: -1, states: 1, cells: 1 } });
+    expect(result.score).toBe(0.2);
+    expect(result.forcedWin).toEqual({ side: 'p1', turns: 1, mass: 0.5, caveat: 'none', engineScore: 0.2, states: 1 });
+  });
+
   test('a mass below the threshold and a null outcome change nothing', () => {
     const result = resultWith(0.2, ['move thunder'], ['move closecombat']);
     applyForcedWin(result, { side: 'p1', proof: { mass: 0.4, turns: 1, caveat: 'none', openValue: -1, states: 3 } });

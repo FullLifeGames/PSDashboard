@@ -38,7 +38,12 @@ export function forcedWinPossible(serializedBattle: string, input: ForcedWinInpu
   return living[0] + living[1] <= ENDGAME_MAX_BODIES || (living[0] === 1 && living[1] === 1);
 }
 
-/** The bar: mass toward the proven side, the rest at the open branch's static; matrix and ranking untouched. */
+/**
+ * The bar: mass toward the proven side, the rest at the open branch's
+ * static; matrix and ranking untouched. A proof at exactly MIN_FORCED_MASS
+ * (a coin flip: both sides prove one half) stays on the result but moves
+ * no score, since it says nothing about who is favored (user gate, round 35).
+ */
 export function applyForcedWin(result: EvalResult, outcome: ForcedWinOutcome | null): void {
   if (!outcome || outcome.proof.mass < MIN_FORCED_MASS) return;
   const { side, proof } = outcome;
@@ -49,5 +54,5 @@ export function applyForcedWin(result: EvalResult, outcome: ForcedWinOutcome | n
     ...(proof.open ? { open: proof.open } : {}),
     engineScore: result.score, states: proof.states,
   };
-  result.score = proof.mass * sign + (1 - proof.mass) * openValue;
+  if (proof.mass > MIN_FORCED_MASS) result.score = proof.mass * sign + (1 - proof.mass) * openValue;
 }

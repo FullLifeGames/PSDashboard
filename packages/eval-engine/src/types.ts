@@ -290,7 +290,7 @@ export interface ForcedWin {
 
 /** The endgame scope (rounds 34 and 35): at most this many living bodies on the board. */
 export const ENDGAME_MAX_BODIES = 3;
-/** Proofs below this mass change nothing (round 35). */
+/** Proofs below this mass change nothing; a proof at exactly this mass (a coin flip) stays on the result without a bar (round 35). */
 export const MIN_FORCED_MASS = 0.5;
 /** Proofs at or above this mass are spoken (round 35). */
 export const SPOKEN_MASS = 0.9;
