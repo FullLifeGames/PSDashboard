@@ -1,6 +1,6 @@
 # PS Dashboard
 
-[![Deploy GitHub Pages](https://github.com/FullLifeGames/PSDashboard/actions/workflows/pages.yml/badge.svg)](https://github.com/FullLifeGames/PSDashboard/actions/workflows/pages.yml) [![Release](https://img.shields.io/github/v/release/FullLifeGames/PSDashboard)](https://github.com/FullLifeGames/PSDashboard/releases/latest)
+[![Deploy GitHub Pages](https://github.com/FullLifeGames/PSDashboard/actions/workflows/pages.yml/badge.svg)](https://github.com/FullLifeGames/PSDashboard/actions/workflows/pages.yml) [![Tests](https://github.com/FullLifeGames/PSDashboard/actions/workflows/test.yml/badge.svg)](https://github.com/FullLifeGames/PSDashboard/actions/workflows/test.yml) [![Release](https://img.shields.io/github/v/release/FullLifeGames/PSDashboard)](https://github.com/FullLifeGames/PSDashboard/releases/latest)
 
 Chess-style analysis for Pokémon Showdown replays. Load a replay, scrub to any turn, read the engine's evaluation, and play out your own line from there.
 
@@ -65,8 +65,9 @@ npm run dev              # local Vite server
 | --- | --- |
 | `npm run lint` | ESLint with size and complexity ceilings and import zones |
 | `npm run build` | the production bundle |
-| `npm run test:regression` | unit and reconstruction pins in three Vitest projects: app, replay-core, eval-engine (`npx vitest` for watch mode, `--changed` for the tests behind your edits) |
-| `npm run test:e2e` | browser flows against fixture replays |
+| `npm run test:regression` | unit, hook, component, and reconstruction pins in four Vitest projects: app, replay-core, eval-engine, ui (`npx vitest` for watch mode, `--changed` for the tests behind your edits) |
+| `npm run test:ui` | the app suite alone: components and hooks under jsdom with Testing Library, `ui/` |
+| `npm run test:e2e` | browser flows against fixture replays, one file per theme under `e2e/` |
 | `npm run test:build` | the minified bundle, driven in a browser |
 | `npm run test:feedback` | the expert-feedback drift report, on demand |
 | `npm run knip` | unused files, exports, and dependencies |
@@ -80,6 +81,7 @@ npm run dev              # local Vite server
 - Keep the knip report empty; internal helpers stay unexported.
 - Package barrels (`packages/*/src/index.ts`) are the public API. Widening one is a one-line edit followed by `UPDATE_API_SNAPSHOT=1 npm run test:regression -- regression/package-api.spec.ts`; package sources import each other with `.ts` specifiers.
 - A new package behavior gets its spec under `packages/<name>/test/` (imports `../src/<module>`, fixtures package-local); a spec that needs app code stays under `regression/` and imports the packages by name, like the app. Only the measurement chains (calibration, fit, endgame truth) read package internals.
+- A component or hook gets its spec under `ui/` (jsdom, Testing Library; the fixtures under `ui/fixtures/` build positions, results, analyses, and the worker fakes, and the controller specs run the real hooks). Pure helpers under `src/lib` or `src/components/*.ts` stay under `regression/`. `npx tsc -p ui/tsconfig.json --noEmit` type-checks the app suite; a browser flow goes into the matching theme file under `e2e/`.
 - Direct dependencies track their latest registry versions (`npm outdated`), with two exceptions: TypeScript stays on 6.x until typescript-eslint admits the 7.x compiler, and `@types/node` follows the Node major the workflows run.
 
 ## Releases and hosting

@@ -247,6 +247,7 @@ Relevant files:
 - [`src/components/BranchSaveSharePanel.tsx`](./src/components/BranchSaveSharePanel.tsx): local branch saves and compact share links
 - [`src/lib/type-colors.ts`](./src/lib/type-colors.ts): the type badge colors the stats panel and the choice buttons share
 - [`src/styles/`](./src/styles/): the stylesheet in domain files (base, layout, loader, timeline, pickers, forms, stats-panel, eval-panel, shared-branch), imported once each by `src/index.css` after Tailwind; `regression/css-audit.spec.ts` keeps them free of classes no source uses
+- [`ui/`](./ui/): the app suite, mirroring `src/components/` and `src/hooks/` with one spec per file under jsdom (Vitest project `ui`, Testing Library, the fixtures under `ui/fixtures/`)
 
 ## Approximation Points
 
@@ -300,8 +301,9 @@ The current codebase has been validated with:
 
 - `npm run lint`
 - `npm run build`
-- `npx playwright test`
-- `npm run test:regression` (three Vitest projects: the root specs plus each package's suite; the browser suites stay on Playwright)
+- `npm run test:e2e` (Playwright): the browser flows, one file per theme under [`e2e/`](./e2e/) (loader, embed, eval, eval-graph, timeline, branch, pickers) over the shared steps in [`e2e/helpers.ts`](./e2e/helpers.ts)
+- `npm run test:regression` (four Vitest projects: the root specs, each package's suite, and the app suite; the browser suites stay on Playwright)
+- `npm run test:ui` (the app suite alone): [`ui/`](./ui/) holds a spec next to every component and hook under jsdom with Testing Library; the fixtures under [`ui/fixtures/`](./ui/fixtures/) build positions, results, analyses, and the worker fakes, and the controller and workspace specs run the real hooks with the replay job handler on the test thread; `npx tsc -p ui/tsconfig.json --noEmit` type-checks it. [`.github/workflows/test.yml`](./.github/workflows/test.yml) runs the Node suites and the browser flows on every push and pull request.
 - `npm test -w packages/replay-core`, `npm test -w packages/eval-engine` (one package's suite alone): [`packages/replay-core/test/`](./packages/replay-core/test/) and [`packages/eval-engine/test/`](./packages/eval-engine/test/) hold each package's own specs, white-box against `../src`, the sibling package by name, fixtures package-local; [`regression/`](./regression/) keeps the app specs, the app-plus-package integration specs, the measurement chains (calibration, fit, feedback corpus), and the API snapshot ([`regression/package-api.spec.ts`](./regression/package-api.spec.ts)); root specs import the packages by name over the curated barrels, so they consume the public API the way the app does, and only the three measurement chains (calibration, fit, endgame truth) read package internals
 - `npm run pack:smoke` ([`scripts/pack-smoke.mjs`](./scripts/pack-smoke.mjs)): packs both packages, installs the tarballs into a throwaway Node project, and runs the worked examples under [`packages/replay-core/examples/`](./packages/replay-core/examples/) and [`packages/eval-engine/examples/`](./packages/eval-engine/examples/), the ones the package READMEs embed verbatim
 - `EVAL_FIT=1` on the weight-fitting corpus that [`scripts/build-fit-corpus.mjs`](./scripts/build-fit-corpus.mjs) builds (ReplayScouter tournament data, Smogon-thread scraping for gen9 singles, doubles, and VGC, ladder samples); the manifest is committed, the replay cache is not
