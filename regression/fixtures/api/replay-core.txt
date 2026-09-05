@@ -40,6 +40,7 @@ value applyTeamSheetToInfo
 value broughtSpeciesFor
 value buildTeamsFromReplay
 value countMatchingSpecies
+value enrichPokemonInfo
 value enrichTeamInfo
 value extractTeamSheets
 value fillUsageMoves
@@ -73,4 +74,5 @@ value speciesBaseId
 value splitReplayPassword
 value toId
 value typedHiddenPowerId
+value unknownEvs
 value withHiddenPowerType

@@ -1,6 +1,6 @@
 import { test, expect, describe } from 'vitest';
 import { ENDGAME_FIXTURES } from './endgame-fixtures';
-import { endgameScope } from '../packages/eval-engine/src/endgame/solver';
+import { endgameScope } from '@fulllifegames/eval-engine';
 
 describe('synthetic endgames (round 34)', () => {
   test('every fixture builds a live battle inside the solver scope with a unique name', () => {

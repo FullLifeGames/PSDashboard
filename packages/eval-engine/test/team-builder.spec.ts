@@ -52,23 +52,11 @@ describe('species-shaped default spreads', () => {
   });
 });
 import { readFileSync } from 'fs';
-import { dirname, join } from 'path';
-import { fileURLToPath } from 'url';
-import { buildTeamsFromReplay } from '../packages/replay-core/src/team-builder';
-import { createBranchState, reconstructBranchRuntime } from '../packages/eval-engine/src/branch-engine';
-import { inferOpponentTeam } from '../packages/replay-core/src/opponent-inferrer';
-import { parseExportedReplay } from '../src/lib/replay-file';
-import { parseReplayLogWithObservations } from '../packages/replay-core/src/protocol-parser';
-import { enrichTeamInfo } from '../packages/replay-core/src/team-info';
-import { parseSmogonChaosStats, type SmogonUsageStats } from '../src/lib/smogon-stats';
-import type { SmogonSetAssumptions } from '../src/lib/smogon-sets';
-import type { OpponentTeamInfo } from '../packages/replay-core/src/types';
-
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = dirname(__filename);
+import { buildTeamsFromReplay, inferOpponentTeam, parseReplayLogWithObservations, enrichTeamInfo, type SmogonUsageStats, type SmogonSetAssumptions, type OpponentTeamInfo, type ReplayData } from '@fulllifegames/replay-core';
+import { createBranchState, reconstructBranchRuntime } from '../src/branch-engine';
 
 const fixtureReplay = JSON.parse(
-  readFileSync(join(__dirname, '..', 'e2e', 'fixtures', 'replay.json'), 'utf-8'),
+  readFileSync(new URL('./fixtures/replay.json', import.meta.url), 'utf-8'),
 );
 
 const baseLog = [
@@ -202,7 +190,7 @@ describe('team builder edited assumptions', () => {
   });
 
   test('observations drive the overlay end-to-end on the GPL replay', () => {
-    const replay = parseExportedReplay(readFileSync('e2e/fixtures/gpl-replay.html', 'utf-8'), 'gpl-replay.html');
+    const replay = JSON.parse(readFileSync(new URL('./fixtures/gpl-replay.json', import.meta.url), 'utf-8')) as ReplayData;
     const { observations } = parseReplayLogWithObservations(replay.log);
     expect(observations.length).toBeGreaterThan(5);
 
@@ -469,7 +457,7 @@ describe('team builder edited assumptions', () => {
 
 describe('team sheet display overlay', () => {
   test('fills unproven fields from the sheet, never overriding proof or edits', async () => {
-    const { applyTeamSheetToInfo } = await import('../packages/replay-core/src/team-sheets');
+    const { applyTeamSheetToInfo } = await import('@fulllifegames/replay-core');
     const field = (value: string, source: 'revealed' | 'guessed' | 'unknown') => ({ value, source } as const);
     const info = {
       pokemon: [{
@@ -558,7 +546,7 @@ describe('team sheet display overlay', () => {
   });
 
   test('extractTeamSheets finds the chat-posted infobox sheets', async () => {
-    const { extractTeamSheets } = await import('../packages/replay-core/src/team-builder');
+    const { extractTeamSheets } = await import('@fulllifegames/replay-core');
     const log = [
       '|player|p1|Alice|1|',
       '|player|p2|Bob|2|',
@@ -616,9 +604,23 @@ describe('hidden-power substitution in built teams', () => {
       '|turn|2',
     ].join('\n');
     const { observations, speedOrders, hpEvidence } = parseReplayLogWithObservations(log);
-    const usageStats = parseSmogonChaosStats({
-      data: { Manectric: { 'Raw count': 100, Moves: { hiddenpowerice: 60 }, Abilities: {}, Items: {}, Spreads: {} } },
-    }, { format: 'gen6ou', month: 'test' });
+    const usageStats: SmogonUsageStats = {
+      format: 'gen6ou',
+      month: 'test',
+      source: 'https://www.smogon.com/stats/test/chaos/gen6ou-0.json',
+      pokemon: {
+        manectric: {
+          species: 'Manectric',
+          rawCount: 100,
+          abilities: [],
+          items: [],
+          moves: [
+            { value: 'hiddenpowerice', probability: 0.6, sourceDetail: 'Smogon gen6ou test' },
+          ],
+          spreads: [],
+        },
+      },
+    };
     const { p1Team } = buildTeamsFromReplay(log, { observations, speedOrders, usageStats, hpEvidence });
     const manectric = p1Team.find(built => built.species === 'Manectric')!;
     expect(manectric.moves).toContain('Hidden Power Ice');

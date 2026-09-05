@@ -1,5 +1,5 @@
 import { test, expect, describe } from 'vitest';
-import { enrichTeamInfo, unknownEvs } from '../packages/replay-core/src/team-info';
+import { enrichTeamInfo, unknownEvs, type OpponentTeamInfo } from '@fulllifegames/replay-core';
 import {
   buildSmogonStatsUrls,
   fetchSmogonUsageStats,
@@ -8,7 +8,6 @@ import {
   parseSpread,
   type SmogonUsageStats,
 } from '../src/lib/smogon-stats';
-import type { OpponentTeamInfo } from '../packages/replay-core/src/types';
 import { smogonDataPath, withSmogonFallback } from '../src/lib/smogon/hosts';
 
 const usageStats: SmogonUsageStats = {

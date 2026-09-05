@@ -1,6 +1,6 @@
 import { test, expect, describe } from 'vitest';
 import { buildSetsExport, parseSetsImport } from '../src/lib/sets-io';
-import type { OpponentTeamInfo } from '../packages/replay-core/src/types';
+import type { OpponentTeamInfo } from '@fulllifegames/replay-core';
 
 const p1Info: OpponentTeamInfo = {
   pokemon: [{

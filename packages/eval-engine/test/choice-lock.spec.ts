@@ -1,14 +1,11 @@
 import { readFileSync } from 'fs';
 import { test, expect, describe } from 'vitest';
 import type { PokemonSet } from '@pkmn/sim';
-import { buildChoiceLockContext, buildChoiceLockTrails, corroborateChoiceItem, protocolChoiceLock } from '../packages/eval-engine/src/choice-lock';
-import { parseReplayLogWithObservations } from '../packages/replay-core/src/protocol-parser';
-import { parseSmogonChaosStats } from '../src/lib/smogon-stats';
-import { buildTeamsFromReplay } from '../packages/replay-core/src/team-builder';
-import { reconstructBranchRuntime } from '../packages/eval-engine/src/branch-engine';
-import { getBranchSimulatorFormat } from '../packages/replay-core/src/replay-format';
-import { searchOptions } from '../packages/eval-engine/src/search';
-import { createRootPosition, serializeBattleStable } from '../packages/eval-engine/src/forward-model';
+import { buildChoiceLockContext, buildChoiceLockTrails, corroborateChoiceItem, protocolChoiceLock } from '../src/choice-lock';
+import { parseReplayLogWithObservations, type SmogonUsageStats, buildTeamsFromReplay, getBranchSimulatorFormat } from '@fulllifegames/replay-core';
+import { reconstructBranchRuntime } from '../src/branch-engine';
+import { searchOptions } from '../src/search';
+import { createRootPosition, serializeBattleStable } from '../src/forward-model';
 
 const log = (lines: string[]) => lines.join('\n');
 
@@ -144,7 +141,7 @@ describe('choice-lock context', () => {
     expect(context.trails.p1.get(1)).toBeTruthy();
   });
 
-  test('a contradicted guessed choice item loses eligibility', { timeout: 240000 }, () => {
+  test('a contradicted guessed choice item loses eligibility', () => {
     // The 0.55 fraction sits strictly inside the unboosted band and outside
     // both boost bands (measured in the corroboration block above).
     const teams = {
@@ -160,19 +157,17 @@ describe('choice-lock context', () => {
   });
 });
 
-test('649664: after its t23 Hydro Pump, Keldeo @ Specs is a locked side (the corpus gap\'s mechanism)', async () => {
+test('649664: after its t23 Hydro Pump, Keldeo @ Specs is a locked side (the corpus gap\'s mechanism)', { timeout: 240000 }, async () => {
   // Protocol facts: Keldeo enters at the end of t22 (Excadrill faints), fires
   // its first Hydro Pump during t23 — so t24 is the protocol-locked boundary
   // the t23 grading plays through (the corpus-gap claim "the pump was
   // forced, not a gamble" lives on this follow-up position).
-  const replay = JSON.parse(readFileSync('e2e-feedback/fixtures/smogtours-gen6ou-649664.json', 'utf-8')) as {
+  const replay = JSON.parse(readFileSync(new URL('./fixtures/smogtours-gen6ou-649664.json', import.meta.url), 'utf-8')) as {
     id: string; format: string; formatid?: string; players: string[]; log: string;
   };
   const { snapshots, observations, speedOrders } = parseReplayLogWithObservations(replay.log);
-  const usageStats = parseSmogonChaosStats(
-    JSON.parse(readFileSync('e2e-feedback/fixtures/smogon/_stats_gen6ou.json.json', 'utf-8')),
-    { format: 'gen6ou', month: 'pinned' },
-  );
+  // The pinned gen6ou usage stats, parsed once and cut to this replay's twelve species.
+  const usageStats = JSON.parse(readFileSync(new URL('./fixtures/usage-gen6ou-649664.json', import.meta.url), 'utf-8')) as SmogonUsageStats;
   const { p1Team, p2Team } = buildTeamsFromReplay(replay.log, { observations, speedOrders, usageStats });
   const choiceLocks = buildChoiceLockContext(replay.log, { p1Team, p2Team }, observations);
   const runtime = await reconstructBranchRuntime({

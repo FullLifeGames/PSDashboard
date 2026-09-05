@@ -1,8 +1,7 @@
 import { test, expect, describe } from 'vitest';
 import { State } from '@pkmn/sim';
 import { ENDGAME_FIXTURES } from './endgame-fixtures';
-import { proveForcedWin } from '../packages/eval-engine/src/endgame/prover';
-import { MIN_FORCED_MASS, type ForcedWinCaveat } from '../packages/eval-engine/src/types';
+import { proveForcedWin, MIN_FORCED_MASS, type ForcedWinCaveat } from '@fulllifegames/eval-engine';
 
 /**
  * The forced-win prover over the synthetic endgames (round 35): the proofs

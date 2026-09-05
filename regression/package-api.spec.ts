@@ -3,8 +3,8 @@ import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import ts from 'typescript';
-import * as replayCore from '../packages/replay-core/src/index';
-import * as evalEngine from '../packages/eval-engine/src/index';
+import * as replayCore from '@fulllifegames/replay-core';
+import * as evalEngine from '@fulllifegames/eval-engine';
 
 /**
  * The public surface of each workspace package, pinned twice: the names the

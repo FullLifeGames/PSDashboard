@@ -1,15 +1,12 @@
 import { test, expect, describe } from 'vitest';
 import { readFileSync } from 'fs';
 import { State } from '@pkmn/sim';
-import { parseExportedReplay } from '../src/lib/replay-file';
-import { formatEnforcesSleepClause, inferReplayFormatId, getBranchSimulatorFormat } from '../packages/replay-core/src/replay-format';
-import { parseReplayLogWithObservations } from '../packages/replay-core/src/protocol-parser';
-import { buildTeamsFromReplay } from '../packages/replay-core/src/team-builder';
-import { reconstructBranchRuntime } from '../packages/eval-engine/src/branch-engine';
-import { searchPosition } from '../packages/eval-engine/src/search';
-import { analyzeTurn, TIER_THRESHOLDS } from '../packages/eval-engine/src/analysis';
-import { detectSacks, parsePlayedActions, turnEvents } from '../packages/eval-engine/src/played';
-import { resolveTeraPreference } from '../packages/eval-engine/src/tera';
+import { type ReplayData, formatEnforcesSleepClause, inferReplayFormatId, getBranchSimulatorFormat, parseReplayLogWithObservations, buildTeamsFromReplay } from '@fulllifegames/replay-core';
+import { reconstructBranchRuntime } from '../src/branch-engine';
+import { searchPosition } from '../src/search';
+import { analyzeTurn, TIER_THRESHOLDS } from '../src/analysis';
+import { detectSacks, parsePlayedActions, turnEvents } from '../src/played';
+import { resolveTeraPreference } from '../src/tera';
 
 /**
  * End-to-end pin of the GPL game-report findings that drove this plan:
@@ -24,7 +21,7 @@ import { resolveTeraPreference } from '../packages/eval-engine/src/tera';
 
 describe('GPL replay end-to-end verdicts', () => {
   test('the four findings hold on the committed fixture', { timeout: 240000 }, async () => {
-    const replay = parseExportedReplay(readFileSync('e2e/fixtures/gpl-replay.html', 'utf-8'), 'gpl-replay.html');
+    const replay = JSON.parse(readFileSync(new URL('./fixtures/gpl-replay.json', import.meta.url), 'utf-8')) as ReplayData;
     const formatid = inferReplayFormatId(replay);
     const { snapshots, observations, speedOrders } = parseReplayLogWithObservations(replay.log);
     const { p1Team, p2Team } = buildTeamsFromReplay(replay.log, { observations, speedOrders });

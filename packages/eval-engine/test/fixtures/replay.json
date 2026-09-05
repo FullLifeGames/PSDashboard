@@ -1,0 +1,9 @@
+{
+  "id": "gen9ou-test-123",
+  "format": "[Gen 9] OU",
+  "formatid": "gen9ou",
+  "players": ["TestPlayer1", "TestPlayer2"],
+  "log": "|j|☆TestPlayer1\n|j|☆TestPlayer2\n|gametype|singles\n|player|p1|TestPlayer1|266\n|player|p2|TestPlayer2|266\n|teamsize|p1|6\n|teamsize|p2|6\n|gen|9\n|tier|[Gen 9] OU\n|rule|Species Clause: Limit one of each Pokémon\n|rule|Sleep Clause Mod: Limit one foe put to sleep\n|rule|Evasion Clause: No evasion moves\n|rule|OHKO Clause: No one-hit KO moves\n|rule|Endless Battle Clause: Forcing endless battles is banned\n|clearpoke\n|poke|p1|Garchomp, M|item\n|poke|p1|Dragapult, M|item\n|poke|p1|Heatran, M|item\n|poke|p1|Rillaboom, M|item\n|poke|p1|Toxapex, F|item\n|poke|p1|Corviknight, M|item\n|poke|p2|Kingambit, M|item\n|poke|p2|Great Tusk|item\n|poke|p2|Gholdengo|item\n|poke|p2|Iron Valiant|item\n|poke|p2|Slowking-Galar, M|item\n|poke|p2|Zamazenta|item\n|teampreview\n|\n|start\n|switch|p1a: Garchomp|Garchomp, M|100/100\n|switch|p2a: Kingambit|Kingambit, M|100/100\n|turn|1\n|move|p1a: Garchomp|Earthquake|p2a: Kingambit\n|-damage|p2a: Kingambit|55/100\n|move|p2a: Kingambit|Sucker Punch|p1a: Garchomp\n|-damage|p1a: Garchomp|72/100\n|upkeep\n|turn|2\n|move|p1a: Garchomp|Swords Dance|p1a: Garchomp\n|-boost|p1a: Garchomp|atk|2\n|move|p2a: Kingambit|Iron Head|p1a: Garchomp\n|-damage|p1a: Garchomp|42/100\n|upkeep\n|turn|3\n|move|p1a: Garchomp|Scale Shot|p2a: Kingambit\n|-damage|p2a: Kingambit|0 fnt\n|faint|p2a: Kingambit\n|upkeep\n|switch|p2a: Great Tusk|Great Tusk|100/100\n|turn|4",
+  "uploadtime": 1704499200,
+  "views": 42
+}

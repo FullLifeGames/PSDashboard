@@ -9,7 +9,7 @@ import {
   savedBranchKey,
 } from '../src/lib/branch-share';
 import type { BranchHistoryEntry } from '../src/hooks/useBranch';
-import type { ReplayData } from '../packages/replay-core/src/types';
+import type { ReplayData } from '@fulllifegames/replay-core';
 
 const replay: ReplayData = {
   id: 'gen9ou-123',

@@ -1,7 +1,7 @@
 import { test, expect, describe } from 'vitest';
-import { buildTeamsFromReplay } from '../packages/replay-core/src/team-builder';
-import { inferOpponentTeam, parseShowteamSheet } from '../packages/replay-core/src/opponent-inferrer';
-import type { SmogonUsageStats } from '../src/lib/smogon-stats';
+import { buildTeamsFromReplay } from '../src/team-builder';
+import { inferOpponentTeam, parseShowteamSheet } from '../src/opponent-inferrer';
+import type { SmogonUsageStats } from '../src/smogon/stats-types';
 
 // Real |showteam| payload shape from a VGC Open Team Sheets replay (B3):
 // packed team format with CamelCase names and pipes inside the payload.

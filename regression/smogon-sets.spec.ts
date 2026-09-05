@@ -1,7 +1,6 @@
 import { test, expect, describe } from 'vitest';
 import { fetchSmogonSetAssumptions } from '../src/lib/smogon-sets';
-import { enrichPokemonInfo, unknownEvs } from '../packages/replay-core/src/team-info';
-import type { RevealedPokemonInfo } from '../packages/replay-core/src/types';
+import { enrichPokemonInfo, unknownEvs, type RevealedPokemonInfo } from '@fulllifegames/replay-core';
 
 const sampleInfo: RevealedPokemonInfo = {
   species: 'Great Tusk',

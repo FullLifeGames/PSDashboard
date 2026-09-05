@@ -1,12 +1,9 @@
 import { test, expect, describe } from 'vitest';
 import { readFileSync } from 'fs';
-import { buildTeamsFromReplay, solveReplaySpreads } from '../packages/replay-core/src/team-builder';
-import { parseReplayLogWithObservations } from '../packages/replay-core/src/protocol-parser';
-import { getBranchSimulatorFormat } from '../packages/replay-core/src/replay-format';
-import { serializeLiveBattle } from '../packages/eval-engine/src/serialize';
+import { buildTeamsFromReplay, solveReplaySpreads, parseReplayLogWithObservations, getBranchSimulatorFormat, type ReplayData } from '@fulllifegames/replay-core';
+import { serializeLiveBattle } from '@fulllifegames/eval-engine';
 import { reconstructReplayRuntime } from '../src/lib/eval-acquire';
 import { handleReplayJob } from '../src/lib/replay-jobs/handlers';
-import type { ReplayData } from '../packages/replay-core/src/types';
 import type { ReplayJobResponse } from '../src/lib/replay-jobs/types';
 
 /**

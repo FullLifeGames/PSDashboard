@@ -2,9 +2,8 @@ import { test, expect, describe } from 'vitest';
 import { readFileSync } from 'fs';
 import { dirname, join } from 'path';
 import { fileURLToPath } from 'url';
-import { calcSingleDamageRange } from '../packages/eval-engine/src/damage-calc';
-import { createBranchState, reconstructBranchRuntime } from '../packages/eval-engine/src/branch-engine';
-import { buildTeamsFromReplay } from '../packages/replay-core/src/team-builder';
+import { calcSingleDamageRange, createBranchState, reconstructBranchRuntime } from '@fulllifegames/eval-engine';
+import { buildTeamsFromReplay } from '@fulllifegames/replay-core';
 import type { BranchMoveOption, SimPokemonInfo } from '../src/hooks/useBranch';
 
 const __filename = fileURLToPath(import.meta.url);

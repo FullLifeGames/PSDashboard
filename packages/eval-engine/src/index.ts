@@ -1,9 +1,10 @@
 /**
  * Public surface of @fulllifegames/eval-engine. Curated: the names the app, the worker, the
- * sibling package, and the worked example reach, plus every type their
- * signatures mention. Widen it by adding a line here and refreshing
- * regression/fixtures/api/eval-engine.txt (UPDATE_API_SNAPSHOT=1); the
- * suites import package sources directly and never depend on this list.
+ * sibling package, the worked example, and the root suite reach, plus every
+ * type their signatures mention. Widen it by adding a line here and refreshing
+ * regression/fixtures/api/eval-engine.txt (UPDATE_API_SNAPSHOT=1). The
+ * package's own tests import the sources directly; the root suite imports by
+ * name, so it consumes this list like any other user.
  */
 export {
   analyzeTurn, PAYOFF_WINDOW, REGRET_THRESHOLD, TIER_THRESHOLDS, decidedSeenKey, forcedWinSeenKey, unansweredSeenKey,
@@ -41,7 +42,7 @@ export type { ProveRequest, ProverBudget } from './endgame/prover.ts';
 export { forcedWinFor } from './search/forced-win.ts';
 export { applyForcedWin, forcedWinInput, forcedWinPossible } from './search/forced-win-apply.ts';
 export { ENDGAME_MAX_BODIES, MIN_FORCED_MASS, SPOKEN_MASS } from './types.ts';
-export { computeBlunders, selectKeyTurns } from './graph.ts';
+export { BLUNDER_SWING, KEY_TURN_SWING, computeBlunders, selectKeyTurns } from './graph.ts';
 export { summarizeAlignment } from './hax-alignment.ts';
 export type { AlignmentScore, TurnAlignmentRecord, AlignmentSummary } from './hax-alignment.ts';
 export { analyzeLeads } from './leads.ts';
@@ -59,7 +60,7 @@ export {
 } from './played.ts';
 export type { PlayedAction, PlayedTurn, SackInfo } from './played.ts';
 export { cellKey } from './rank.ts';
-export { buildGameReport } from './report.ts';
+export { KEY_MOMENT_SWING, buildGameReport } from './report.ts';
 export type { GameReport } from './report.ts';
 export type { WinConversion, WinPath } from './win-reason.ts';
 export type { DeniedEnd } from './denied-end.ts';

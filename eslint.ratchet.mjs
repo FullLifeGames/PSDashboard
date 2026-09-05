@@ -209,6 +209,54 @@ export const ratchetOverrides = [
   },
   {
     "files": [
+      "packages/eval-engine/test/reconstruction.spec.ts"
+    ],
+    "rules": {
+      "max-lines-per-function": [
+        "error",
+        {
+          "max": 380,
+          "skipBlankLines": true,
+          "skipComments": true,
+          "IIFEs": true
+        }
+      ]
+    }
+  },
+  {
+    "files": [
+      "packages/eval-engine/test/team-builder.spec.ts"
+    ],
+    "rules": {
+      "max-lines-per-function": [
+        "error",
+        {
+          "max": 330,
+          "skipBlankLines": true,
+          "skipComments": true,
+          "IIFEs": true
+        }
+      ]
+    }
+  },
+  {
+    "files": [
+      "packages/replay-core/test/stats-panel-quality.spec.ts"
+    ],
+    "rules": {
+      "max-lines-per-function": [
+        "error",
+        {
+          "max": 380,
+          "skipBlankLines": true,
+          "skipComments": true,
+          "IIFEs": true
+        }
+      ]
+    }
+  },
+  {
+    "files": [
       "regression/eval-calibration.spec.ts"
     ],
     "rules": {
@@ -226,54 +274,6 @@ export const ratchetOverrides = [
       "complexity": [
         "error",
         32
-      ]
-    }
-  },
-  {
-    "files": [
-      "regression/reconstruction.spec.ts"
-    ],
-    "rules": {
-      "max-lines-per-function": [
-        "error",
-        {
-          "max": 380,
-          "skipBlankLines": true,
-          "skipComments": true,
-          "IIFEs": true
-        }
-      ]
-    }
-  },
-  {
-    "files": [
-      "regression/stats-panel-quality.spec.ts"
-    ],
-    "rules": {
-      "max-lines-per-function": [
-        "error",
-        {
-          "max": 390,
-          "skipBlankLines": true,
-          "skipComments": true,
-          "IIFEs": true
-        }
-      ]
-    }
-  },
-  {
-    "files": [
-      "regression/team-builder.spec.ts"
-    ],
-    "rules": {
-      "max-lines-per-function": [
-        "error",
-        {
-          "max": 330,
-          "skipBlankLines": true,
-          "skipComments": true,
-          "IIFEs": true
-        }
       ]
     }
   }

@@ -20,9 +20,9 @@ import { recordDeepenedCell, type DeepeningState } from './search/deepening.ts';
  */
 
 type ChoicesInfo = EvalChoicesInfo;
-export type CellJob = EvalCellJob;
+type CellJob = EvalCellJob;
 export type CellValue = EvalCellValue;
-export type SubSearchJob = EvalSubSearchJob;
+type SubSearchJob = EvalSubSearchJob;
 
 export interface SearchExecutor {
   choices(tera: TeraAllowance, keepPlayed?: EvalSettings['keepPlayed'], sleepClause?: boolean): Promise<ChoicesInfo>;

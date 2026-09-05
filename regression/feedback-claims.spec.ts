@@ -1,6 +1,5 @@
 import { test, expect, describe } from 'vitest';
-import type { TurnAnalysis, TurnAttribution, VerdictTier } from '../packages/eval-engine/src/analysis';
-import type { GameReport } from '../packages/eval-engine/src/report';
+import type { TurnAnalysis, TurnAttribution, VerdictTier, GameReport } from '@fulllifegames/eval-engine';
 import { FEEDBACK_CORPUS, FEEDBACK_REPLAYS, type FeedbackItem, type ReportClaim } from '../e2e-feedback/corpus';
 import { evaluateItem, validateCorpus } from '../e2e-feedback/claims';
 import { renderReport } from '../e2e-feedback/report';

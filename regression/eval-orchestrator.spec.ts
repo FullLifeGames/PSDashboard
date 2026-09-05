@@ -1,9 +1,7 @@
 import { test, expect, describe } from 'vitest';
 import { Battle, State, Teams, toID } from '@pkmn/sim';
 import type { PokemonSet } from '@pkmn/sim';
-import { searchOrchestrated, type CellJob, type SearchExecutor, type SubSearchJob } from '../packages/eval-engine/src/orchestrator';
-import { createLocalExecutor, searchPosition } from '../packages/eval-engine/src/search';
-import type { EvalResult, SearchProgress } from '../packages/eval-engine/src/types';
+import { searchOrchestrated, type SearchExecutor, createLocalExecutor, searchPosition, type EvalCellJob, type EvalResult, type EvalSubSearchJob, type SearchProgress } from '@fulllifegames/eval-engine';
 
 function makeSet(name: string, species: string, moves: string[], level = 50): PokemonSet {
   return {
@@ -135,7 +133,7 @@ describe('search orchestrator', () => {
   test('a fake executor drives the orchestration without any sim', async () => {
     // 2x2 matrix: p1's "a" is safe (0.2 worst case), "b" is punished (-0.5).
     const values: Record<string, number> = { '0,0': 0.2, '0,1': 0.3, '1,0': 0.6, '1,1': -0.5 };
-    const subSearches: SubSearchJob[] = [];
+    const subSearches: EvalSubSearchJob[] = [];
     const executor: SearchExecutor = {
       async choices() {
         return {
@@ -145,10 +143,10 @@ describe('search orchestrator', () => {
           rootEnded: false,
         };
       },
-      async evalCells(jobs: CellJob[]) {
+      async evalCells(jobs: EvalCellJob[]) {
         return jobs.map(job => ({ i: job.i, j: job.j, value: values[`${job.i},${job.j}`], ended: false }));
       },
-      async subSearch(job: SubSearchJob): Promise<EvalResult> {
+      async subSearch(job: EvalSubSearchJob): Promise<EvalResult> {
         subSearches.push(job);
         // Deepening confirms the static value exactly, so iteration converges.
         return {

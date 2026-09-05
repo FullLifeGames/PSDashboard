@@ -1,6 +1,6 @@
 import { test, expect, describe } from 'vitest';
 import { coverageNotice, needsSettingsUpgrade, recordEvalError, resolveAutoTurnSettings, serializedFaintedFraction, supersedesStored, verificationDeepSettings, withEvalGapNotice } from '../src/hooks/useEvaluation';
-import { AUTO_MCTS_FAINTED_FRACTION } from '../packages/eval-engine/src/types';
+import { AUTO_MCTS_FAINTED_FRACTION, computeBlunders, selectKeyTurns, BLUNDER_SWING, KEY_TURN_SWING, KEY_MOMENT_SWING } from '@fulllifegames/eval-engine';
 
 describe('coverage notice (acquisition pass)', () => {
   // The notice describes the RECONSTRUCTION pass — one fast replay of the
@@ -203,8 +203,6 @@ describe('verification deep tier', () => {
     expect(deep?.keepPlayed).toBeUndefined();
   });
 });
-import { computeBlunders, selectKeyTurns, BLUNDER_SWING, KEY_TURN_SWING } from '../packages/eval-engine/src/graph';
-import { KEY_MOMENT_SWING } from '../packages/eval-engine/src/report';
 
 describe('key-turn coverage matches the report', () => {
   test('every report-worthy swing gets the deepening pass', () => {

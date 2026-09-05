@@ -1,6 +1,6 @@
 import { test, expect } from 'vitest';
 import { nextPlayOutStep, playOutDoneText, PLAY_OUT_CAP } from '../src/lib/play-out';
-import type { EvalResult, RankedChoice } from '../packages/eval-engine/src/types';
+import type { EvalResult, RankedChoice } from '@fulllifegames/eval-engine';
 
 const ranked = (choice: string): RankedChoice =>
   ({ choice, label: choice, worstCase: 0, expected: 0, ev: 0, punishedBy: null });

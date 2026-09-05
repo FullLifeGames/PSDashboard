@@ -1,11 +1,9 @@
 import { test, expect } from 'vitest';
 import { readFileSync } from 'fs';
 import type { PokemonSet } from '@pkmn/sim';
-import { buildTeamsFromReplay } from '../packages/replay-core/src/team-builder';
-import { reconstructBranchRuntime } from '../packages/eval-engine/src/branch-engine';
-import { parseReplayLog } from '../packages/replay-core/src/protocol-parser';
+import { buildTeamsFromReplay, parseReplayLog, type TurnSnapshot } from '@fulllifegames/replay-core';
+import { reconstructBranchRuntime } from '@fulllifegames/eval-engine';
 import { pickerStateFromSerialized, pickerStateFromSnapshot } from '../src/lib/picker-state';
-import type { TurnSnapshot } from '../packages/replay-core/src/types';
 
 function loadFixtureReplay() {
   return JSON.parse(readFileSync('e2e/fixtures/replay.json', 'utf-8')) as {
@@ -26,7 +24,7 @@ test('pickerStateFromSerialized rebuilds exact move lists with live PP', async (
     targetTurn: 3,
     snapshot: snapshots.find(entry => entry.turn === 3) ?? null,
   });
-  const { serializeLiveBattle } = await import('../packages/eval-engine/src/serialize');
+  const { serializeLiveBattle } = await import('@fulllifegames/eval-engine');
   const serialized = serializeLiveBattle(runtime.battleStream.battle!);
 
   const state = await pickerStateFromSerialized(serialized);

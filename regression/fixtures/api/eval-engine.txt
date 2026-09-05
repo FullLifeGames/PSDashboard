@@ -88,8 +88,11 @@ type VerdictTier
 type WinConversion
 type WinPath
 value AUTO_MCTS_FAINTED_FRACTION
+value BLUNDER_SWING
 value ENDGAME_CAPS
 value ENDGAME_MAX_BODIES
+value KEY_MOMENT_SWING
+value KEY_TURN_SWING
 value MCTS_TREES
 value MIN_FORCED_MASS
 value PAYOFF_WINDOW

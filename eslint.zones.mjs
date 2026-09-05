@@ -30,6 +30,14 @@ export const importZones = [
     'replay-core sits below the engine.'),
   zone(['src/**/*.{ts,tsx}'], '^(\\.\\./)+packages/',
     'The app imports the packages by name (@fulllifegames/replay-core, @fulllifegames/eval-engine), never their files.'),
+  // The root suite consumes the packages the way the app does: by name over
+  // the curated barrel. The three measurement chains read engine internals
+  // (feature weights, leaf values, sweep setters) and stay white-box.
+  {
+    ...zone(['regression/**/*.ts'], '^(\\.\\./)+packages/',
+      'Root specs import the packages by name (@fulllifegames/replay-core, @fulllifegames/eval-engine); only the measurement chains read package internals.'),
+    ignores: ['regression/eval-calibration.spec.ts', 'regression/eval-fit.spec.ts', 'regression/endgame-truth.spec.ts'],
+  },
   zone(['src/lib/**/*.{ts,tsx}'], UI_LAYER,
     'Library code must not import the UI layer (hooks, components, App, workers).'),
   zone(['src/components/**/*.{ts,tsx}'], '(^|/)(hooks/branch|hooks/controller|hooks/evaluation)(/|$)',

@@ -1,24 +1,21 @@
 import { test, expect, describe } from 'vitest';
 import { existsSync, readFileSync } from 'fs';
+import { fileURLToPath } from 'node:url';
 import type { PokemonSet } from '@pkmn/sim';
-import { buildTeamsFromReplay } from '../packages/replay-core/src/team-builder';
+import { buildTeamsFromReplay, parseReplayLog, type ReplayData, inferReplayFormatId, toId } from '@fulllifegames/replay-core';
 import {
   captureSerializedPosition, createBranchState, createBranchStateFromBattle, reconstructBranchRuntime,
-} from '../packages/eval-engine/src/branch-engine';
-import { parseReplayLog } from '../packages/replay-core/src/protocol-parser';
-import { parseExportedReplay } from '../src/lib/replay-file';
-import { inferReplayFormatId } from '../packages/replay-core/src/replay-format';
-import { toId } from '../packages/replay-core/src/ids';
+} from '../src/branch-engine';
 
 function loadFixtureReplay() {
-  return JSON.parse(readFileSync('e2e/fixtures/replay.json', 'utf-8')) as {
+  return JSON.parse(readFileSync(new URL('./fixtures/replay.json', import.meta.url), 'utf-8')) as {
     formatid: string;
     log: string;
   };
 }
 
 // Saved from a real battle; gitignored (Gen9Draft-*), so tests using it skip when absent.
-const SAVED_REPLAY_HTML = 'Gen9Draft-2026-01-06-2shy2shine-calleddxnnis.html';
+const SAVED_REPLAY_HTML = fileURLToPath(new URL('../../../Gen9Draft-2026-01-06-2shy2shine-calleddxnnis.html', import.meta.url));
 
 function loadHtmlReplayLog(path: string): string {
   const html = readFileSync(path, 'utf-8');
@@ -538,7 +535,7 @@ describe('Turn-synchronized replay of a video-reconstructed log', () => {
   // guard the block replayer ran ~5 turns ahead of the simulator here, so
   // pending state like Future Sight silently vanished from every branch.
   function loadGplReplay() {
-    return parseExportedReplay(readFileSync('e2e/fixtures/gpl-replay.html', 'utf-8'), 'gpl-replay.html');
+    return JSON.parse(readFileSync(new URL('./fixtures/gpl-replay.json', import.meta.url), 'utf-8')) as ReplayData;
   }
 
   test('reveals Life Orb and Rocky Helmet from item-damage lines in the log', () => {

@@ -2,8 +2,8 @@ import { test, expect, describe } from 'vitest';
 import {
   applyCoherenceVetoes, selectCuratedSet,
   type CuratedEvidence, type MoveCandidate,
-} from '../packages/replay-core/src/set-coherence';
-import type { PokemonSetAssumption } from '../src/lib/smogon-sets';
+} from '../src/set-coherence';
+import type { PokemonSetAssumption } from '../src/smogon/sets-lookup';
 
 /**
  * Pairwise coherence vetoes: guessed sets are assembled from independent

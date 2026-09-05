@@ -1,9 +1,10 @@
 /**
  * Public surface of @fulllifegames/replay-core. Curated: the names the app, the worker, the
- * sibling package, and the worked example reach, plus every type their
- * signatures mention. Widen it by adding a line here and refreshing
- * regression/fixtures/api/replay-core.txt (UPDATE_API_SNAPSHOT=1); the
- * suites import package sources directly and never depend on this list.
+ * sibling package, the worked example, and the root suite reach, plus every
+ * type their signatures mention. Widen it by adding a line here and refreshing
+ * regression/fixtures/api/replay-core.txt (UPDATE_API_SNAPSHOT=1). The
+ * package's own tests import the sources directly; the root suite imports by
+ * name, so it consumes this list like any other user.
  */
 export { WEATHER_BY_ID, TERRAIN_BY_ID } from './calc-field.ts';
 export { resolveHiddenPowerType, typedHiddenPowerId, withHiddenPowerType, HP_TYPES } from './hidden-power.ts';
@@ -32,8 +33,8 @@ export {
 export type { SpreadCandidate } from './spread-inference.ts';
 export { buildTeamsFromReplay, solveReplaySpreads, extractTeamSheets } from './team-builder.ts';
 export {
-  manualField, manualEvs, manualMove, applyInferredSpreads, itemSetValue, enrichTeamInfo, EMPTY_EVS,
-  INFERRED_SPREAD_DETAIL,
+  manualField, manualEvs, manualMove, applyInferredSpreads, itemSetValue, enrichTeamInfo, enrichPokemonInfo,
+  unknownEvs, EMPTY_EVS, INFERRED_SPREAD_DETAIL,
 } from './team-info.ts';
 export { parseTeamText } from './team-parser.ts';
 export { parsePastedTeam, applyPastedTeam, countMatchingSpecies } from './team-paste.ts';

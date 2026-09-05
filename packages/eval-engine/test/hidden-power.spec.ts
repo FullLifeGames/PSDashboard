@@ -1,21 +1,30 @@
 import { test, expect, describe } from 'vitest';
-import { resolveHiddenPowerType, withHiddenPowerType } from '../packages/replay-core/src/hidden-power';
-import { parseSmogonChaosStats } from '../src/lib/smogon-stats';
-import { reconstructBranchRuntime } from '../packages/eval-engine/src/branch-engine';
-import { matchPlayedChoice } from '../packages/eval-engine/src/analysis';
-import type { EvalResult } from '../packages/eval-engine/src/analysis';
-import type { HiddenPowerEvidence } from '../packages/replay-core/src/types';
+import { resolveHiddenPowerType, withHiddenPowerType, type SmogonUsageStats, type HiddenPowerEvidence } from '@fulllifegames/replay-core';
+import { reconstructBranchRuntime } from '../src/branch-engine';
+import { matchPlayedChoice } from '../src/analysis';
+import type { EvalResult } from '../src/analysis';
 import type { PokemonSet } from '@pkmn/sim';
 
-const usage = parseSmogonChaosStats({
-  data: {
-    Manectric: {
-      'Raw count': 100,
-      Moves: { hiddenpowerice: 60, hiddenpowergrass: 30, thunderbolt: 90 },
-      Abilities: {}, Items: {}, Spreads: {},
+// Manectric usage as parseSmogonChaosStats reads it: Thunderbolt 90 %, HP Ice 60 %, HP Grass 30 %.
+const usage: SmogonUsageStats = {
+  format: 'gen6ou',
+  month: 'test',
+  source: 'https://www.smogon.com/stats/test/chaos/gen6ou-0.json',
+  pokemon: {
+    manectric: {
+      species: 'Manectric',
+      rawCount: 100,
+      abilities: [],
+      items: [],
+      moves: [
+        { value: 'thunderbolt', probability: 0.9, sourceDetail: 'Smogon gen6ou test' },
+        { value: 'hiddenpowerice', probability: 0.6, sourceDetail: 'Smogon gen6ou test' },
+        { value: 'hiddenpowergrass', probability: 0.3, sourceDetail: 'Smogon gen6ou test' },
+      ],
+      spreads: [],
     },
   },
-}, { format: 'gen6ou', month: 'test' });
+};
 
 const ev = (defender: string, marker: HiddenPowerEvidence['marker']): HiddenPowerEvidence =>
   ({ attackerSide: 'p1', attackerSpecies: 'Manectric', defenderSpecies: defender, marker });

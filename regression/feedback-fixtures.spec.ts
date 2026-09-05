@@ -3,9 +3,7 @@ import { existsSync, readFileSync } from 'fs';
 import { join } from 'path';
 import { FEEDBACK_CORPUS, FEEDBACK_REPLAYS } from '../e2e-feedback/corpus';
 import { validateCorpus } from '../e2e-feedback/claims';
-import { parseReplayLogWithObservations } from '../packages/replay-core/src/protocol-parser';
-import { finalPlayedTurn } from '../packages/replay-core/src/replay-turns';
-import { buildTeamsFromReplay } from '../packages/replay-core/src/team-builder';
+import { parseReplayLogWithObservations, finalPlayedTurn, buildTeamsFromReplay } from '@fulllifegames/replay-core';
 import { fetchSmogonSetAssumptions } from '../src/lib/smogon-sets';
 
 /**

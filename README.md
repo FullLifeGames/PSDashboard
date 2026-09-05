@@ -79,7 +79,7 @@ npm run dev              # local Vite server
 - `eslint.zones.mjs` makes the layering a lint error: a package never reaches `src/`, replay-core never imports the engine, the app imports the packages by name (dynamic imports go through `src/lib/lazy/`), and nothing under `src/lib` imports the UI.
 - Keep the knip report empty; internal helpers stay unexported.
 - Package barrels (`packages/*/src/index.ts`) are the public API. Widening one is a one-line edit followed by `UPDATE_API_SNAPSHOT=1 npm run test:regression -- regression/package-api.spec.ts`; package sources import each other with `.ts` specifiers.
-- A new package behavior gets its spec under `packages/<name>/test/` (imports `../src/<module>`); a spec that needs app code stays under `regression/`.
+- A new package behavior gets its spec under `packages/<name>/test/` (imports `../src/<module>`, fixtures package-local); a spec that needs app code stays under `regression/` and imports the packages by name, like the app. Only the measurement chains (calibration, fit, endgame truth) read package internals.
 - Direct dependencies track their latest registry versions (`npm outdated`), with two exceptions: TypeScript stays on 6.x until typescript-eslint admits the 7.x compiler, and `@types/node` follows the Node major the workflows run.
 
 ## Releases and hosting
