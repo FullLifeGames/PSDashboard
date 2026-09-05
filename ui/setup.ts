@@ -7,6 +7,10 @@ import { cleanup, configure } from '@testing-library/react';
 // one-second default to settle under that load.
 configure({ asyncUtilTimeout: 5_000 });
 
+// jsdom lays nothing out, so the combo box's "keep the highlight in view" is a
+// no-op here (and would otherwise throw on the missing method).
+Element.prototype.scrollIntoView ??= () => {};
+
 // Testing Library unmounts on its own only when the runner exposes global
 // hooks; Vitest does not, so every test unmounts here. jsdom keeps one window
 // per test file, so the preferences and picker toggles the hooks persist in
