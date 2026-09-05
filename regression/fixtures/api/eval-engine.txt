@@ -116,6 +116,7 @@ value createLocalExecutor
 value decidedSeenKey
 value deserializeBattleExact
 value detectSacks
+value diceEventTurns
 value diffChoices
 value endgameScope
 value evalChoiceToSlotChoices

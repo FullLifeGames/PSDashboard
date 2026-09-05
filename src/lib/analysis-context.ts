@@ -1,7 +1,7 @@
 import { toID } from '@pkmn/dex';
 import type { ReplayData, TurnSnapshot } from '@fulllifegames/replay-core';
 import {
-  analyzeTurn, decidedSeenKey, forcedWinSeenKey, PAYOFF_WINDOW, SPOKEN_MASS, unansweredSeenKey, type TurnAnalysis, detectSacks,
+  analyzeTurn, decidedSeenKey, diceEventTurns, forcedWinSeenKey, PAYOFF_WINDOW, SPOKEN_MASS, unansweredSeenKey, type TurnAnalysis, detectSacks,
   type PlayedTurn, type StreakHistoryEntry, buildGameReport, type GameReport, computeRead, type EvalResult,
 } from '@fulllifegames/eval-engine';
 
@@ -163,6 +163,8 @@ export function computeGameReportData(args: {
   if (analyses.filter(Boolean).length < 3) return null;
   const report = buildGameReport(
     analyses, [args.replayData.players[0], args.replayData.players[1]], args.winner, true,
+    // Protocol dice anchor for the luck claims (crits, misses, rolled statuses).
+    diceEventTurns(args.context.turnEventsIndex),
   );
   return { report, analyses };
 }

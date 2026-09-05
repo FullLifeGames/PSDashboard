@@ -1,10 +1,10 @@
 import type { SideAnalysis, TurnAnalysis, VerdictTier } from './analysis.ts';
 import { KEY_TURN_SWING } from './graph.ts';
 import {
-  LUCK_TOTAL_THRESHOLD, badTier, closeGameFallback, conversionFor, matchupClause, momentScore, seedPhrase,
-  seedsOfTheLoss, tipClause, winPathFor, type WinConversion, type WinPath, type WinPathResult,
+  LUCK_TOTAL_THRESHOLD, badTier, closeGameFallback, conversionFor, luckSentence, matchupClause, momentScore,
+  seedPhrase, seedsOfTheLoss, tipClause, winPathFor, type WinConversion, type WinPath, type WinPathResult,
 } from './win-reason.ts';
-import { winDeltaText, winPercent } from './winprob.ts';
+import { winPercent } from './winprob.ts';
 import { sideIndex } from '@fulllifegames/replay-core';
 
 /**
@@ -80,6 +80,8 @@ export interface GameReport {
    * luck. Kept out of `chanceTotal` and the key moments (573756 t138).
    */
   resolutionTotal: number;
+  /** Chance summed over the protocol's dice-event turns (p1 perspective, resolution excluded) — the luck claims' anchor. Absent without dice info. */
+  diceAnchorTotal?: number;
   /** How the winner sealed it: the first proven forced win or decided sweep. Absent without a signal. */
   conversion?: WinConversion;
   /** The dominant edge the summary credits the win to ('close' = the fallback sentence). Absent when the seeds tell the story or no winner is known. */
@@ -264,6 +266,7 @@ function winStoryFor(args: {
   turningPoint: number | null;
   playedTracking: boolean;
   chanceTotal: number;
+  diceAnchor: number | null;
 }): WinStory {
   const { known, winner, turningPoint, playedTracking } = args;
   const loser = winner === 'p1' ? 'p2' : 'p1';
@@ -271,7 +274,7 @@ function winStoryFor(args: {
   const conversion = conversionFor(known, winner, args.playerNames);
   const path = winPathFor({
     known, series: args.series, boundary: args.boundary, winner, playerNames: args.playerNames,
-    chanceTotal: args.chanceTotal, playedTracking, seedsSpoken: seeds.length > 0,
+    chanceTotal: args.chanceTotal, diceAnchor: args.diceAnchor, playedTracking, seedsSpoken: seeds.length > 0,
   });
   // Nothing else explained a tipped game: say so instead of saying nothing.
   if (!path && !conversion && seeds.length === 0 && turningPoint !== null) {
@@ -324,6 +327,7 @@ function reportSummary(
   playedTracking: boolean,
   decisionTotals: { p1: number; p2: number },
   chanceTotal: number,
+  diceAnchor: number | null,
   story: WinStory | null,
   series: (number | undefined)[],
 ): string {
@@ -335,9 +339,20 @@ function reportSummary(
   }
 
   if (!story?.path?.foldLuck && Math.abs(chanceTotal) >= LUCK_TOTAL_THRESHOLD) {
-    sentences.push(`Luck ran ${chanceTotal > 0 ? 'for' : 'against'} ${playerNames[0]} overall (${winDeltaText(chanceTotal)}).`);
+    sentences.push(luckSentence(chanceTotal, diceAnchor, playerNames));
   }
   return sentences.join(' ');
+}
+
+/** The luck claims' anchor: the chance ledger summed over the dice-event turns only (resolution excluded). */
+function diceAnchorFor(
+  known: TurnAnalysis[],
+  diceTurns: ReadonlySet<number> | null,
+  resolution: Set<number>,
+): number | null {
+  if (diceTurns === null) return null;
+  return known.reduce((sum, analysis) =>
+    sum + (diceTurns.has(analysis.turn) && !resolution.has(analysis.turn) ? analysis.chanceDelta ?? 0 : 0), 0);
 }
 
 export function buildGameReport(
@@ -346,6 +361,8 @@ export function buildGameReport(
   winner: 'p1' | 'p2' | null,
   /** False = played actions unavailable (doubles): no seeds, no clean-play claim. */
   playedTracking = true,
+  /** Turns with a protocol-visible dice event (dice-events.ts); null = no dice info, luck claims stay ungated. */
+  diceTurns: ReadonlySet<number> | null = null,
 ): GameReport {
   const known = analyses.filter((entry): entry is TurnAnalysis => entry !== null);
 
@@ -363,16 +380,19 @@ export function buildGameReport(
     ? { p1: accuracyFor(known, 'p1', series), p2: accuracyFor(known, 'p2', series) }
     : { p1: null, p2: null };
 
+  const diceAnchor = diceAnchorFor(known, diceTurns, resolution);
+
   // The play that produced the boundary score happened on the turn before.
   const turningPoint = boundary !== null && boundary > 1 ? boundary - 1 : null;
   const story = winner === null ? null : winStoryFor({
-    known, series, boundary, playerNames, winner, turningPoint, playedTracking, chanceTotal,
+    known, series, boundary, playerNames, winner, turningPoint, playedTracking, chanceTotal, diceAnchor,
   });
-  const summary = reportSummary(known, playerNames, winner, turningPoint, playedTracking, decisionTotals, chanceTotal, story, series);
+  const summary = reportSummary(known, playerNames, winner, turningPoint, playedTracking, decisionTotals, chanceTotal, diceAnchor, story, series);
 
   return {
     winner, turningPoint, keyMoments, misplays, reads, tracked: playedTracking,
     accuracy, decisionTotals, chanceTotal, resolutionTotal, summary,
+    ...(diceAnchor !== null ? { diceAnchorTotal: diceAnchor } : {}),
     ...(story?.conversion ? { conversion: story.conversion.conversion } : {}),
     ...(story?.path ? { winPath: story.path.winPath } : {}),
   };

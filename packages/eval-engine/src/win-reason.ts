@@ -71,6 +71,36 @@ const NEGLIGIBLE_REGRET = 0.02;
 const toward = (winner: Side, delta: number): number => (winner === 'p1' ? delta : -delta);
 const other = (side: Side): Side => (side === 'p1' ? 'p2' : 'p1');
 
+/**
+ * The visible dice ACTIVELY contradict the chance ledger's direction — at
+ * least an inaccuracy of dice-turn chance runs the other way. Asymmetric on
+ * purpose: a weak or empty anchor proves nothing (damage rolls leave no
+ * protocol marker), so only a contradiction demotes a luck claim.
+ */
+const diceContradict = (chanceTotal: number, diceAnchor: number | null): boolean =>
+  diceAnchor !== null && Math.abs(diceAnchor) >= TIER_THRESHOLDS.inaccuracy &&
+  chanceTotal !== 0 && Math.sign(diceAnchor) !== Math.sign(chanceTotal);
+
+/**
+ * The luck line: named "luck" only while the visible dice don't dispute it.
+ * Contradicted, it keeps the number but says what it is — the ledger's
+ * residual — and names where the dice actually went (the draft game: two
+ * crits and two Flame Body burns into the winner under a net toward them).
+ */
+export function luckSentence(
+  chanceTotal: number,
+  diceAnchor: number | null,
+  playerNames: PlayerNames,
+): string {
+  if (diceContradict(chanceTotal, diceAnchor)) {
+    const beneficiary = playerNames[chanceTotal > 0 ? 0 : 1];
+    const diceName = playerNames[(diceAnchor ?? 0) > 0 ? 0 : 1];
+    return `Chance swings favored ${beneficiary} overall (${winDeltaText(Math.abs(chanceTotal))}), ` +
+      `while the visible dice favored ${diceName}.`;
+  }
+  return `Luck ran ${chanceTotal > 0 ? 'for' : 'against'} ${playerNames[0]} overall (${winDeltaText(chanceTotal)}).`;
+}
+
 /** First forced-win (spoken mass) or decided signal on the WINNER's side, in turn order; forced wins a same-turn tie. */
 export function conversionFor(
   known: TurnAnalysis[],
@@ -222,14 +252,39 @@ export interface WinPathArgs {
   playerNames: PlayerNames;
   /** Net chance outside the resolution turns (p1 perspective). */
   chanceTotal: number;
+  /** Chance summed over the protocol's dice-event turns (p1 perspective), null without dice info. */
+  diceAnchor: number | null;
   playedTracking: boolean;
   /** The seeds sentence already tells the decisions story — don't tell it twice. */
   seedsSpoken: boolean;
 }
 
+/** The ranked factor candidates: each edge that clears its floor, in specificity order (ties keep the earlier). */
+function factorCandidates(
+  args: WinPathArgs,
+  punished: { p1: number; p2: number },
+  readsSize: number,
+  grind: Grind | null,
+): { factor: WinPath['factor']; size: number }[] {
+  const { winner, playedTracking } = args;
+  const loser = other(winner);
+  const luck = toward(winner, args.chanceTotal);
+  const candidates: { factor: WinPath['factor']; size: number }[] = [];
+  if (grind && grind.size >= WIN_PATH_FLOOR) candidates.push({ factor: 'grind', size: grind.size });
+  if (playedTracking && punished[loser] - punished[winner] >= WIN_PATH_FLOOR) {
+    candidates.push({ factor: 'decisions', size: punished[loser] - punished[winner] });
+  }
+  if (playedTracking && readsSize >= WIN_PATH_FLOOR) candidates.push({ factor: 'reads', size: readsSize });
+  // "The rolls decided it" needs the visible dice on board with the claim.
+  if (luck >= LUCK_TOTAL_THRESHOLD && !diceContradict(args.chanceTotal, args.diceAnchor)) {
+    candidates.push({ factor: 'variance', size: luck });
+  }
+  return candidates;
+}
+
 /** The dominant edge behind the win, spoken as one sentence; null when the seeds cover it or nothing clears the floor. */
 export function winPathFor(args: WinPathArgs): WinPathResult | null {
-  const { known, winner, playedTracking, seedsSpoken } = args;
+  const { known, winner, seedsSpoken } = args;
   const loser = other(winner);
   const winnerName = args.playerNames[sideIndex(winner)];
   const loserName = args.playerNames[sideIndex(loser)];
@@ -240,19 +295,10 @@ export function winPathFor(args: WinPathArgs): WinPathResult | null {
   const reads = paidReads(known, winner);
   const readsSize = reads.reduce((sum, read) => sum + read.payoff, 0);
   const grind = grindFor(known, args.series, args.boundary, winner);
-  const luck = toward(winner, args.chanceTotal);
 
-  const candidates: { factor: WinPath['factor']; size: number }[] = [];
-  if (grind && grind.size >= WIN_PATH_FLOOR) candidates.push({ factor: 'grind', size: grind.size });
-  if (playedTracking && punished[loser] - punished[winner] >= WIN_PATH_FLOOR) {
-    candidates.push({ factor: 'decisions', size: punished[loser] - punished[winner] });
-  }
-  if (playedTracking && readsSize >= WIN_PATH_FLOOR) candidates.push({ factor: 'reads', size: readsSize });
-  if (luck >= LUCK_TOTAL_THRESHOLD) candidates.push({ factor: 'variance', size: luck });
-
-  // Earlier factors are the more specific story — a tie keeps them.
-  const top = candidates.reduce((best, entry) => (entry.size > best.size ? entry : best),
-    { factor: null as WinPath['factor'] | null, size: -Infinity });
+  const top = factorCandidates(args, punished, readsSize, grind)
+    .reduce((best, entry) => (entry.size > best.size ? entry : best),
+      { factor: null as WinPath['factor'] | null, size: -Infinity });
   if (top.factor === null || (top.factor === 'decisions' && seedsSpoken)) return null;
 
   if (top.factor === 'grind') {
