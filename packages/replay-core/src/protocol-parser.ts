@@ -4,7 +4,7 @@ import {
   appendFinalSnapshot, feedLine, handleActionBoundary, handleCrit, handleDamage, handleGametype, handleGen, handleMove,
   handleResisted, handleSuperEffective, isActionBoundary,
 } from './protocol/handlers.ts';
-import { noteActivation } from './protocol/speed-evidence.ts';
+import { dropScarfMovers, noteActivation } from './protocol/speed-evidence.ts';
 
 export function parseReplayLog(log: string): TurnSnapshot[] {
   return parseReplayLogWithObservations(log).snapshots;
@@ -24,7 +24,7 @@ function dispatch(state: ParserState, line: string) {
     handleResisted(state, line);
   } else if (line.startsWith('|-crit|')) {
     handleCrit(state);
-  } else if (line.startsWith('|-activate|') || line.startsWith('|-enditem|')) {
+  } else if (/^\|-(?:activate|enditem|item)\|/.test(line)) {
     noteActivation(state, line);
     if (isActionBoundary(line)) handleActionBoundary(state, line);
   } else if (isActionBoundary(line)) {
@@ -54,6 +54,7 @@ export function parseReplayLogWithObservations(log: string): {
     feedLine(state, line);
   }
   flushSpeedOrder(state);
+  dropScarfMovers(state);
   appendFinalSnapshot(state);
 
   const { snapshots, observations, speedOrders, hpEvidence } = state;

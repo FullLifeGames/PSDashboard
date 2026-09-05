@@ -431,8 +431,11 @@ describe('speed-order evidence', () => {
     ]))).toEqual(['Iron Valiant>Noivern']);
   });
 
-  // Round 37: conditional priority, quick items, field speed, and
-  // always-last abilities explain an order without Speed.
+});
+
+// Round 37: conditional priority, quick items, field speed, always-last
+// abilities, and a Scarf that changed hands explain an order without Speed.
+test.describe('speed-order cleanliness', () => {
   const singlesLog = (mons: [string, string], body: string[], pre: string[] = []) => [
     '|player|p1|Alice|', '|player|p2|Bob|', '|teamsize|p1|2', '|teamsize|p2|2',
     '|gen|9', '|gametype|singles', '|tier|[Gen 9] OU', '|start',
@@ -505,6 +508,26 @@ describe('speed-order evidence', () => {
 
   test('an Unburden species that lost its item proves nothing', () => {
     expect(orders(singlesLog(['Hawlucha, M', 'Dragapult, F'], firstThenDraco('Acrobatics'), ['|-enditem|p1a: A|Grassy Seed']))).toEqual([]);
+  });
+
+  test('a Choice Scarf that changed hands voids its holder\'s races for the whole game', () => {
+    const body = ['|move|p1a: A|Body Slam|p2a: B', '|move|p2a: B|Draco Meteor|p1a: A'];
+    // Knocked off before the race: the set still says Scarf, the race ran without it.
+    expect(orders(singlesLog(['Snorlax, M', 'Dragapult, F'], body, [
+      '|-enditem|p2a: B|Choice Scarf|[from] move: Knock Off|[of] p1a: A',
+    ]))).toEqual([]);
+    // Tricked onto the first mover: it ran with a Scarf the set never carried.
+    expect(orders(singlesLog(['Snorlax, M', 'Dragapult, F'], body, [
+      '|-item|p1a: A|Choice Scarf|[from] move: Trick',
+    ]))).toEqual([]);
+    // Knocked off after the race: the race is dropped too (the solver reads every order against one set).
+    expect(orders(singlesLog(['Snorlax, M', 'Dragapult, F'], [
+      ...body, '|turn|2', '|-enditem|p2a: B|Choice Scarf|[from] move: Knock Off|[of] p1a: A',
+    ]))).toEqual([]);
+    // Frisk only reveals the Scarf: the race stands.
+    expect(orders(singlesLog(['Snorlax, M', 'Dragapult, F'], body, [
+      '|-item|p2a: B|Choice Scarf|[from] ability: Frisk|[of] p1a: A',
+    ]))).toEqual(['Snorlax>Dragapult']);
   });
 });
 

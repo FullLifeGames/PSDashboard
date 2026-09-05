@@ -38,7 +38,9 @@ export function switchTriggered(line: string): boolean {
 /**
  * After You and Quash mark their target as rearranged for the turn; a
  * Quick Claw, Quick Draw, or Custap Berry activation marks the holder as
- * having acted early.
+ * having acted early; a Choice Scarf that comes or goes (Knock Off, Trick,
+ * a theft) marks the holder for the whole game, because the solver reads
+ * every race against the set's item.
  */
 export function noteActivation(state: ParserState, line: string): void {
   const parts = line.split('|');
@@ -48,6 +50,25 @@ export function noteActivation(state: ParserState, line: string): void {
   if (line.startsWith('|-activate|') && /^move: (?:After You|Quash)$/.test(effect)) state.reordered.add(ident);
   if (line.startsWith('|-activate|') && /^(?:item: Quick Claw|ability: Quick Draw)$/.test(effect)) state.quickActed.add(ident);
   if (line.startsWith('|-enditem|') && effect === 'Custap Berry') state.quickActed.add(ident);
+  if (scarfChangesHands(state, line, ident, effect)) {
+    const mon = state.battle.getPokemon(ident as ClientIdent);
+    if (mon) state.scarfMoved.add(`${ident.slice(0, 2)}:${mon.speciesForme}`);
+  }
+}
+
+/** A Choice Scarf removed, or one arriving by a move or a stealing ability (Frisk only reveals). */
+function scarfChangesHands(state: ParserState, line: string, ident: string, item: string): boolean {
+  if (line.startsWith('|-enditem|')) return item === 'Choice Scarf';
+  if (!line.startsWith('|-item|') || !line.includes('[from]') || line.includes('ability: Frisk')) return false;
+  const before = state.battle.getPokemon(ident as ClientIdent)?.item ?? '';
+  return item === 'Choice Scarf' || before === 'choicescarf';
+}
+
+/** The orders a mon with a changing Scarf took part in are no evidence about the set's item. */
+export function dropScarfMovers(state: ParserState): void {
+  if (state.scarfMoved.size === 0) return;
+  state.speedOrders = state.speedOrders.filter(order =>
+    !state.scarfMoved.has(`${order.firstSide}:${order.firstSpecies}`) && !state.scarfMoved.has(`${order.secondSide}:${order.secondSpecies}`));
 }
 
 /**

@@ -52,6 +52,8 @@ export interface ParserState {
   reordered: Set<string>;
   /** Idents that acted early on a Quick Claw, Quick Draw, or Custap Berry this turn (round 37). */
   quickActed: Set<string>;
+  /** `side:species` of mons whose Choice Scarf came or went during the game (round 37): their races measure a changing item. */
+  scarfMoved: Set<string>;
   lastMove: PendingMove | null;
   // Take initial snapshot at turn 0 (before any turns)
   capturedInitial: boolean;
@@ -73,6 +75,7 @@ export function createParserState(): ParserState {
     actedThisTurn: new Set<string>(),
     reordered: new Set<string>(),
     quickActed: new Set<string>(),
+    scarfMoved: new Set<string>(),
     lastMove: null,
     capturedInitial: false,
   };
