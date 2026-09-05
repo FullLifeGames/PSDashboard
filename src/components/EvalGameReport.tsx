@@ -154,6 +154,29 @@ function ReadChips({ report, playerNames, onSelectTurn, settingsFor }: EvalGameR
   );
 }
 
+function DeniedEndChip({ report, playerNames, onSelectTurn, settingsFor }: EvalGameReportProps) {
+  const denied = report.deniedEnd;
+  if (!denied) return null;
+  return (
+    <div className="ps-eval-report-moments">
+      <button
+        type="button"
+        className="ps-btn ps-eval-report-moment"
+        onClick={() => onSelectTurn?.(denied.turn)}
+        title={`One roll from ending the game: removing ${denied.removes} leaves no answer behind — the roll failed. Jump to this turn's analysis`}
+      >
+        <span style={{ color: '#cde' }}>T{denied.turn}</span>
+        <SettingsBadge turn={denied.turn} settingsFor={settingsFor} />
+        <span style={{ color: '#b6a46a' }}>{playerNames[sideIndex(denied.side)]}</span>
+        {denied.move && <span style={{ color: '#aab' }}>{denied.move}</span>}
+        <span style={{ color: '#b6a46a' }}>
+          one {Math.round(denied.odds * 100)}% roll from ending it — {denied.move ? 'missed' : 'failed'}
+        </span>
+      </button>
+    </div>
+  );
+}
+
 function KeyMomentChips({ report, playerNames, onSelectTurn, settingsFor }: EvalGameReportProps) {
   if (report.keyMoments.length === 0) return null;
   return (
@@ -192,6 +215,7 @@ export function EvalGameReport(props: EvalGameReportProps) {
       {leads && <LeadChips leads={leads} playerNames={playerNames} onSelectTurn={onSelectTurn} />}
       <MisplayChips {...props} />
       <ReadChips {...props} />
+      <DeniedEndChip {...props} />
       <KeyMomentChips {...props} />
     </div>
   );

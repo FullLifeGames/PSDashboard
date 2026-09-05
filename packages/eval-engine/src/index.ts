@@ -62,6 +62,7 @@ export { cellKey } from './rank.ts';
 export { buildGameReport } from './report.ts';
 export type { GameReport } from './report.ts';
 export type { WinConversion, WinPath } from './win-reason.ts';
+export type { DeniedEnd } from './denied-end.ts';
 export { diceEventTurns } from './dice-events.ts';
 export type { PairThreat, MatchupCache } from './score/threat.ts';
 export { createLocalExecutor, searchPosition } from './search.ts';

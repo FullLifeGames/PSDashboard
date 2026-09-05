@@ -1,4 +1,5 @@
 import type { SideAnalysis, TurnAnalysis, VerdictTier } from './analysis.ts';
+import { type DeniedEnd, deniedEndFor, deniedEndSentence } from './denied-end.ts';
 import { KEY_TURN_SWING } from './graph.ts';
 import {
   LUCK_TOTAL_THRESHOLD, badTier, closeGameFallback, conversionFor, luckSentence, matchupClause, momentScore,
@@ -84,6 +85,8 @@ export interface GameReport {
   diceAnchorTotal?: number;
   /** How the winner sealed it: the first proven forced win or decided sweep. Absent without a signal. */
   conversion?: WinConversion;
+  /** A one-roll sweep that visibly failed while the game ran on — the denied early end (denied-end.ts). */
+  deniedEnd?: DeniedEnd;
   /** The dominant edge the summary credits the win to ('close' = the fallback sentence). Absent when the seeds tell the story or no winner is known. */
   winPath?: WinPath;
   summary: string;
@@ -254,6 +257,7 @@ function gameTotals(
 interface WinStory {
   seeds: TurnAnalysis[];
   conversion: ReturnType<typeof conversionFor>;
+  denied: DeniedEnd | null;
   path: WinPathResult | null;
 }
 
@@ -267,20 +271,22 @@ function winStoryFor(args: {
   playedTracking: boolean;
   chanceTotal: number;
   diceAnchor: number | null;
+  diceTurns: ReadonlySet<number> | null;
 }): WinStory {
   const { known, winner, turningPoint, playedTracking } = args;
   const loser = winner === 'p1' ? 'p2' : 'p1';
   const seeds = !playedTracking ? [] : seedsOfTheLoss(known, loser, turningPoint);
   const conversion = conversionFor(known, winner, args.playerNames);
+  const denied = deniedEndFor(known, args.diceTurns);
   const path = winPathFor({
     known, series: args.series, boundary: args.boundary, winner, playerNames: args.playerNames,
     chanceTotal: args.chanceTotal, diceAnchor: args.diceAnchor, playedTracking, seedsSpoken: seeds.length > 0,
   });
   // Nothing else explained a tipped game: say so instead of saying nothing.
   if (!path && !conversion && seeds.length === 0 && turningPoint !== null) {
-    return { seeds, conversion, path: closeGameFallback(args.playerNames[sideIndex(winner)]) };
+    return { seeds, conversion, denied, path: closeGameFallback(args.playerNames[sideIndex(winner)]) };
   }
-  return { seeds, conversion, path };
+  return { seeds, conversion, denied, path };
 }
 
 /** The winner's story: who won, when and how it tipped, the conversion, the seeds (or clean play), and the winning edge. */
@@ -304,6 +310,7 @@ function winnerSentences(
 
   const loser = winner === 'p1' ? 'p2' : 'p1';
   const loserName = playerNames[sideIndex(loser)];
+  if (story.denied) sentences.push(deniedEndSentence(story.denied, winner, loserName));
   if (story.seeds.length > 0) {
     const parts = story.seeds.map(analysis => seedPhrase(analysis, loser));
     sentences.push(`The seeds of the loss: ${parts.join(' and ')}.`);
@@ -355,6 +362,16 @@ function diceAnchorFor(
     sum + (diceTurns.has(analysis.turn) && !resolution.has(analysis.turn) ? analysis.chanceDelta ?? 0 : 0), 0);
 }
 
+/** The report's optional story-and-anchor fields, absent when unset. */
+function optionalFields(story: WinStory | null, diceAnchor: number | null): Partial<GameReport> {
+  return {
+    ...(diceAnchor !== null ? { diceAnchorTotal: diceAnchor } : {}),
+    ...(story?.conversion ? { conversion: story.conversion.conversion } : {}),
+    ...(story?.denied ? { deniedEnd: story.denied } : {}),
+    ...(story?.path ? { winPath: story.path.winPath } : {}),
+  };
+}
+
 export function buildGameReport(
   analyses: (TurnAnalysis | null)[],
   playerNames: [string, string],
@@ -385,15 +402,13 @@ export function buildGameReport(
   // The play that produced the boundary score happened on the turn before.
   const turningPoint = boundary !== null && boundary > 1 ? boundary - 1 : null;
   const story = winner === null ? null : winStoryFor({
-    known, series, boundary, playerNames, winner, turningPoint, playedTracking, chanceTotal, diceAnchor,
+    known, series, boundary, playerNames, winner, turningPoint, playedTracking, chanceTotal, diceAnchor, diceTurns,
   });
   const summary = reportSummary(known, playerNames, winner, turningPoint, playedTracking, decisionTotals, chanceTotal, diceAnchor, story, series);
 
   return {
     winner, turningPoint, keyMoments, misplays, reads, tracked: playedTracking,
     accuracy, decisionTotals, chanceTotal, resolutionTotal, summary,
-    ...(diceAnchor !== null ? { diceAnchorTotal: diceAnchor } : {}),
-    ...(story?.conversion ? { conversion: story.conversion.conversion } : {}),
-    ...(story?.path ? { winPath: story.path.winPath } : {}),
+    ...optionalFields(story, diceAnchor),
   };
 }

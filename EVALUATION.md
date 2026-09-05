@@ -198,6 +198,7 @@ Once a sweep covers enough of the game, a game report tells the multi-turn story
 - each side's biggest misplays (tier-labeled) and paid-off reads as clickable chips, selected per player so one side's numbers cannot crowd the other's out, with an explicit "no clear misplays" note,
 - summed regret per player,
 - the net luck contribution, with a decided game's resolution booked apart from luck: once every score favors the eventual winner, chance that does no more than walk the bar to the final result is the model catching up, not the dice deciding,
+- the denied early end, when the protocol shows one: a side stood one roll from clearing everything left, the roll visibly failed, and the game ran on — named in the summary with the odds and the wait ("one 95% roll from clearing the rest, but Fire Fang missed — the win waited another 66 turns") and as a clickable chip, so the aggregate luck line cannot hide the one roll that went the other way,
 - clickable key moments, selected by a turn's biggest component (net swing or the chance share alone), so the game's biggest roll surfaces even when decision and chance partially cancelled each other.
 
 ## 4. The timeline

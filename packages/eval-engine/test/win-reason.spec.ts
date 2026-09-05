@@ -364,6 +364,100 @@ test.describe('dice-anchored luck claims', () => {
   });
 });
 
+test.describe('denied early end', () => {
+  // Winner p2 (negative scores). Turn 3 holds p2's one-roll sweep
+  // (nearDecided) and the roll visibly fails: the protocol shows a dice
+  // event and the turn's chance runs against p2. The game then runs on.
+
+  const nearSide = (playedOver: Partial<NonNullable<TurnAnalysis['p2']['played']>> | null = {}) => ({
+    playedRaw: null,
+    played: playedOver === null
+      ? null
+      : { ...ranked('move firefang', 'Fire Fang', -0.5), koOdds: { accuracy: 0.95, killFraction: 1 }, ...playedOver },
+    best: null,
+    safe: null,
+    regret: 0,
+    nearDecided: { species: 'Garchomp', odds: 0.95, removes: 'Corviknight', announce: true },
+  });
+
+  const deniedAnalyses = (lastTurn: number, t3over: Partial<TurnAnalysis> = {}) => [
+    mk(1, 0.1, -0.2),
+    mk(2, -0.2, -0.5),
+    mk(3, -0.5, -0.45, { chanceDelta: 0.19, p2: nearSide(), ...t3over }),
+    ...Array.from({ length: lastTurn - 3 }, (_, i) =>
+      mk(4 + i, -0.45 - i * 0.03, -0.45 - (i + 1) * 0.03)),
+  ];
+
+  test('speaks the winner\'s failed one-roll sweep and how long the win waited', () => {
+    const report = buildGameReport(deniedAnalyses(12), names, 'p2', true, new Set([3]));
+    expect(report.summary).toContain('Turn 3 nearly ended it far earlier: Garchomp stood one 95% roll ' +
+      'from clearing the rest, but Fire Fang missed — the win waited another 9 turns.');
+    expect(report.deniedEnd).toEqual({
+      turn: 3, side: 'p2', species: 'Garchomp', removes: 'Corviknight',
+      odds: 0.95, move: 'Fire Fang', turnsRemaining: 9,
+    });
+  });
+
+  test('a denied end for the eventual loser reads as the game turning', () => {
+    const report = buildGameReport([
+      mk(1, 0.1, 0.3),
+      mk(2, 0.3, 0.5),
+      mk(3, 0.5, 0.45, {
+        chanceDelta: -0.19,
+        p1: {
+          playedRaw: null, played: null, best: null, safe: null, regret: 0,
+          nearDecided: { species: 'Machamp', odds: 0.9, removes: 'Chansey', announce: true },
+        },
+      }),
+      mk(4, 0.45, 0.2),
+      mk(5, 0.2, -0.1),
+      ...Array.from({ length: 7 }, (_, i) => mk(6 + i, -0.1 - i * 0.1, -0.1 - (i + 1) * 0.1)),
+    ], names, 'p2', true, new Set([3]));
+    expect(report.summary).toContain('Turn 3 nearly ended it the other way: Machamp stood one 90% roll ' +
+      'from clearing the rest, but the roll failed — Alpha went on to lose.');
+    expect(report.deniedEnd).toEqual({
+      turn: 3, side: 'p1', species: 'Machamp', removes: 'Chansey',
+      odds: 0.9, turnsRemaining: 9,
+    });
+  });
+
+  test('without a protocol dice event on the turn the claim stays unmade', () => {
+    const onOtherTurn = buildGameReport(deniedAnalyses(12), names, 'p2', true, new Set([1]));
+    expect(onOtherTurn.summary).not.toContain('nearly ended it');
+    expect(onOtherTurn.deniedEnd).toBeUndefined();
+    const noDiceInfo = buildGameReport(deniedAnalyses(12), names, 'p2');
+    expect(noDiceInfo.summary).not.toContain('nearly ended it');
+    expect(noDiceInfo.deniedEnd).toBeUndefined();
+  });
+
+  test('the chance ledger must run against the denied side by at least an inaccuracy', () => {
+    const towardSide = buildGameReport(deniedAnalyses(12, { chanceDelta: -0.19 }), names, 'p2', true, new Set([3]));
+    expect(towardSide.summary).not.toContain('nearly ended it');
+    const belowFloor = buildGameReport(deniedAnalyses(12, { chanceDelta: 0.05 }), names, 'p2', true, new Set([3]));
+    expect(belowFloor.summary).not.toContain('nearly ended it');
+  });
+
+  test('a failed roll right before the end is no denied early end', () => {
+    const shortGame = buildGameReport(deniedAnalyses(10), names, 'p2', true, new Set([3]));
+    expect(shortGame.summary).not.toContain('nearly ended it');
+    expect(shortGame.deniedEnd).toBeUndefined();
+    const justLongEnough = buildGameReport(deniedAnalyses(11), names, 'p2', true, new Set([3]));
+    expect(justLongEnough.summary).toContain('nearly ended it far earlier');
+  });
+
+  test('the played move is named only when it carries the near-decided roll', () => {
+    const otherOdds = buildGameReport(
+      deniedAnalyses(12, { p2: nearSide({ koOdds: { accuracy: 0.7, killFraction: 1 } }) }),
+      names, 'p2', true, new Set([3]));
+    expect(otherOdds.summary).toContain('but the roll failed — the win waited another 9 turns.');
+    expect(otherOdds.deniedEnd?.move).toBeUndefined();
+    const noPlayed = buildGameReport(
+      deniedAnalyses(12, { p2: nearSide(null) }),
+      names, 'p2', true, new Set([3]));
+    expect(noPlayed.summary).toContain('but the roll failed');
+  });
+});
+
 test.describe('dice event turns (protocol classifier)', () => {
   test('crits, misses, chance-cant reasons, and rolled statuses mark a turn', () => {
     const turns = diceEventTurns([
