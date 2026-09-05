@@ -2,6 +2,7 @@ import type { Battle, Pokemon, Side, Field } from '@pkmn/client';
 import type { GenerationNum } from '@pkmn/data';
 import type { PokemonSnapshot, SideSnapshot, FieldSnapshot } from '../types.ts';
 import { flushSpeedOrder, gens, speedContaminatedAt, type ClientIdent, type ParserState, type PendingMove } from './parser-state.ts';
+import { foreignAction } from './speed-evidence.ts';
 import { toId } from '../ids.ts';
 
 const SCREEN_IDS = ['reflect', 'lightscreen', 'auroraveil'];
@@ -92,12 +93,17 @@ export function handleMove(state: ParserState, line: string) {
   const side: 'p1' | 'p2' = ident.startsWith('p1') ? 'p1' : 'p2';
   const mover = ident ? battle.getPokemon(ident as ClientIdent) : undefined;
   const moveId = toId(parts[3] ?? '');
+  // A copied or switch-triggered action (Dancer, Instruct, a bounced
+  // status move, Pursuit on a switch) is a real hit for the damage fit
+  // but no race; a mover's second line (Sleep Talk's called move) is the
+  // same action as its first.
+  const race = !foreignAction(line);
   const { cleanFirst, cleanSecond } = speedCleanliness(state, ident, moveId);
   const speciesForme = mover?.speciesForme ?? '';
-  state.lastMove = pendingMoveFor(parts, moveId, side, speciesForme, cleanFirst);
-  if (state.singles && ident) {
+  state.lastMove = pendingMoveFor(parts, moveId, side, speciesForme, cleanFirst && race);
+  if (ident && race && !state.actedThisTurn.has(ident)) {
     state.actedThisTurn.add(ident);
-    state.turnMovers.push({ side, species: speciesForme, cleanFirst, cleanSecond });
+    state.turnMovers.push({ side, species: speciesForme, ident, cleanFirst, cleanSecond });
   }
 }
 
@@ -119,6 +125,18 @@ export function isActionBoundary(line: string): boolean {
 }
 
 /**
+ * The knocked-out target of the pending move lost a race: it is on the
+ * other side (Earthquake and Explosion hit the partner too), had not
+ * acted, was not rearranged, and nothing slows it regardless of Speed.
+ */
+function faintProvesOrder(state: ParserState, victim: string, lastMove: PendingMove): boolean {
+  return victim === lastMove.target && victim !== lastMove.attacker &&
+    victim.slice(0, 2) !== lastMove.attacker.slice(0, 2) &&
+    lastMove.speedClean && !state.actedThisTurn.has(victim) && !state.reordered.has(victim) &&
+    !speedContaminatedAt(state, victim, 'second');
+}
+
+/**
  * KO before the victim ever acted: a chosen switch would have resolved
  * BEFORE the attack and left a line, so the victim chose a move and
  * lost the speed race — the attacker was faster (GPL T36: Noivern KO'd
@@ -127,11 +145,9 @@ export function isActionBoundary(line: string): boolean {
  */
 function recordFaintSpeedEvidence(state: ParserState, line: string) {
   const { lastMove, battle } = state;
-  if (!(state.singles && line.startsWith('|faint|') && lastMove)) return;
+  if (!(line.startsWith('|faint|') && lastMove)) return;
   const victim = line.split('|')[2] ?? '';
-  if (victim === lastMove.target && victim !== lastMove.attacker &&
-    lastMove.speedClean && !state.actedThisTurn.has(victim) &&
-    !speedContaminatedAt(state, victim, 'second')) {
+  if (faintProvesOrder(state, victim, lastMove)) {
     const victimMon = battle.getPokemon(victim as ClientIdent);
     if (victimMon) {
       state.speedOrders.push({

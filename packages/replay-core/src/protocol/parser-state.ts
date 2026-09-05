@@ -10,6 +10,7 @@ export type ClientIdent = Parameters<Battle['getPokemon']>[0];
 interface TurnMover {
   side: 'p1' | 'p2';
   species: string;
+  ident: string;
   cleanFirst: boolean;
   cleanSecond: boolean;
 }
@@ -40,12 +41,17 @@ export interface ParserState {
   currentTurnLines: string[];
   singles: boolean;
   genNum: GenerationNum;
-  // Speed-order evidence: the first two |move| lines of a singles turn prove
-  // effective speed order — but only when nothing else could explain it.
+  // Speed-order evidence: the |move| lines of a turn prove effective speed
+  // order between opposite sides — but only when nothing else could
+  // explain it.
   speedTurn: number;
   turnMovers: TurnMover[];
   switchedThisTurn: Set<string>;
   actedThisTurn: Set<string>;
+  /** Idents whose slot After You or Quash rearranged this turn (round 37). */
+  reordered: Set<string>;
+  /** Idents that acted early on a Quick Claw, Quick Draw, or Custap Berry this turn (round 37). */
+  quickActed: Set<string>;
   lastMove: PendingMove | null;
   // Take initial snapshot at turn 0 (before any turns)
   capturedInitial: boolean;
@@ -65,6 +71,8 @@ export function createParserState(): ParserState {
     turnMovers: [],
     switchedThisTurn: new Set<string>(),
     actedThisTurn: new Set<string>(),
+    reordered: new Set<string>(),
+    quickActed: new Set<string>(),
     lastMove: null,
     capturedInitial: false,
   };
@@ -98,17 +106,32 @@ export function speedContaminatedAt(state: ParserState, ident: string, role: 'fi
   return mon.status === 'par' || (mon.boosts.spe ?? 0) < 0;
 }
 
+/**
+ * Every opposite-side pair of the turn's movers in action order is a
+ * race the earlier one won (round 37: doubles turns carry up to four
+ * movers; a singles turn still yields its one pair). A pair drops when
+ * the earlier mover is not clean as a first mover, the later one not as
+ * a second, or either slot was rearranged.
+ */
 export function flushSpeedOrder(state: ParserState) {
-  const [first, second] = state.turnMovers;
-  if (first && second && first.cleanFirst && second.cleanSecond &&
-    first.side !== second.side && first.species && second.species) {
-    state.speedOrders.push({
-      firstSide: first.side, firstSpecies: first.species,
-      secondSide: second.side, secondSpecies: second.species,
-      turn: state.speedTurn,
-    });
+  const movers = state.turnMovers;
+  for (let i = 0; i < movers.length; i++) {
+    for (let j = i + 1; j < movers.length; j++) {
+      const first = movers[i];
+      const second = movers[j];
+      if (first.side === second.side || !first.species || !second.species) continue;
+      if (!first.cleanFirst || !second.cleanSecond) continue;
+      if (state.reordered.has(first.ident) || state.reordered.has(second.ident)) continue;
+      state.speedOrders.push({
+        firstSide: first.side, firstSpecies: first.species,
+        secondSide: second.side, secondSpecies: second.species,
+        turn: state.speedTurn,
+      });
+    }
   }
   state.turnMovers = [];
   state.switchedThisTurn = new Set();
   state.actedThisTurn = new Set();
+  state.reordered = new Set();
+  state.quickActed = new Set();
 }

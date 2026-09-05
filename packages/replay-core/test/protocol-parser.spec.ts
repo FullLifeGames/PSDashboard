@@ -299,6 +299,98 @@ describe('speed-order evidence', () => {
     expect(speedOrders).toHaveLength(1);
     expect(speedOrders[0].turn).toBe(1);
   });
+
+  test('a Sleep Talk follow-up line is the same action, not a second mover', () => {
+    const { speedOrders } = parseReplayLogWithObservations(speedLog([
+      '|move|p1a: Fast|Sleep Talk|p1a: Fast',
+      '|move|p1a: Fast|Air Slash|p2a: Val|[from]Sleep Talk',
+      '|move|p2a: Val|Moonblast|p1a: Fast',
+      '|turn|2',
+    ]));
+    expect(speedOrders).toEqual([{
+      firstSide: 'p1', firstSpecies: 'Noivern', secondSide: 'p2', secondSpecies: 'Iron Valiant', turn: 1,
+    }]);
+  });
+
+  // Round 37: doubles turns prove every opposite-side pair, copied actions
+  // and rearranged slots do not.
+  const doublesLog = (body: string[]) => [
+    '|player|p1|Alice|', '|player|p2|Bob|',
+    '|teamsize|p1|4', '|teamsize|p2|4',
+    '|gen|9', '|gametype|doubles', '|tier|[Gen 9] VGC 2026',
+    '|start',
+    '|switch|p1a: Fast|Noivern, F|100/100',
+    '|switch|p1b: Slow|Snorlax, M|100/100',
+    '|switch|p2a: Val|Iron Valiant|100/100',
+    '|switch|p2b: Ori|Oricorio|100/100',
+    '|turn|1',
+    ...body,
+  ].join('\n');
+  const pairs = (log: string) => parseReplayLogWithObservations(log).speedOrders.map(o => `${o.firstSpecies}>${o.secondSpecies}`);
+
+  test('a doubles turn proves every opposite-side pair in action order', () => {
+    // Fast > Val, Fast > Ori, Val > Slow, Ori > Slow; Fast > Slow and Val > Ori are same-side.
+    expect(pairs(doublesLog([
+      '|move|p1a: Fast|Air Slash|p2a: Val',
+      '|move|p2a: Val|Moonblast|p1a: Fast',
+      '|move|p2b: Ori|Revelation Dance|p1b: Slow',
+      '|move|p1b: Slow|Body Slam|p2b: Ori',
+      '|turn|2',
+    ]))).toEqual(['Noivern>Iron Valiant', 'Noivern>Oricorio', 'Iron Valiant>Snorlax', 'Oricorio>Snorlax']);
+  });
+
+  test('a partner knocked out by a spread move is no speed evidence', () => {
+    expect(pairs(doublesLog([
+      '|move|p1a: Fast|Earthquake|p1b: Slow|[spread] p1b,p2a,p2b',
+      '|-damage|p1b: Slow|0 fnt',
+      '|faint|p1b: Slow',
+      '|turn|2',
+    ]))).toEqual([]);
+  });
+
+  test('a knock-out across the field before the victim acted proves the order in doubles', () => {
+    expect(pairs(doublesLog([
+      '|move|p1a: Fast|Draco Meteor|p2b: Ori',
+      '|-damage|p2b: Ori|0 fnt',
+      '|faint|p2b: Ori',
+      '|turn|2',
+    ]))).toEqual(['Noivern>Oricorio']);
+  });
+
+  test('a Dancer copy is not the copier\'s action', () => {
+    const { speedOrders } = parseReplayLogWithObservations(doublesLog([
+      '|move|p1a: Fast|Fiery Dance|p2a: Val',
+      '|move|p2b: Ori|Fiery Dance|p1a: Fast|[from] ability: Dancer',
+      '|move|p2b: Ori|Revelation Dance|p1a: Fast',
+      '|turn|2',
+    ]));
+    expect(speedOrders).toEqual([{
+      firstSide: 'p1', firstSpecies: 'Noivern', secondSide: 'p2', secondSpecies: 'Oricorio', turn: 1,
+    }]);
+  });
+
+  test('a Pursuit on a switching target moved at the switch, not at its Speed', () => {
+    expect(pairs(doublesLog([
+      '|-activate|p1a: Fast|move: Pursuit',
+      '|move|p2a: Val|Pursuit|p1a: Fast|[from]Pursuit',
+      '|-damage|p1a: Fast|40/100',
+      '|switch|p1a: Wall|Corviknight, M|100/100',
+      '|move|p1b: Slow|Body Slam|p2b: Ori',
+      '|move|p2b: Ori|Revelation Dance|p1b: Slow',
+      '|turn|2',
+    ]))).toEqual(['Snorlax>Oricorio']);
+  });
+
+  test('After You moves the target out of the race', () => {
+    // Val > Fast stands; Ori's position was arranged, so no pair with Ori.
+    expect(pairs(doublesLog([
+      '|move|p2a: Val|After You|p2b: Ori',
+      '|-activate|p2b: Ori|move: After You',
+      '|move|p2b: Ori|Revelation Dance|p1a: Fast',
+      '|move|p1a: Fast|Air Slash|p2a: Val',
+      '|turn|2',
+    ]))).toEqual(['Iron Valiant>Noivern']);
+  });
 });
 
 describe('KO-before-acting speed evidence', () => {
