@@ -4,10 +4,15 @@ import {
   type SearchProgress, type TeraAllowance, teraKey,
 } from '@fulllifegames/eval-engine';
 import { EvalWorkerClient } from '../../lib/eval/worker-client';
+import { throttleLatest } from '../../lib/eval/throttle-latest';
 import { evalStoreKey, loadStoredEval, saveStoredEval } from '../../lib/eval-cache-store';
 import { resolveAutoTurnSettings, serializedFaintedFraction, type EngineMode, type TurnEvalSettings } from './prefs';
 
 export type EvalStatus = 'idle' | 'reconstructing' | 'searching' | 'done' | 'stale' | 'error';
+
+/** Panel repaint cadence for streamed search progress and partial results. */
+const PROGRESS_INTERVAL_MS = 100;
+const PARTIAL_INTERVAL_MS = 250;
 
 interface EvaluateParams {
   /** Cache key for replay-view positions; null disables caching (branch mode). */
@@ -114,14 +119,26 @@ async function searchAndInstall(
   io.setReconstructProgress(null);
 
   io.clientRef.current ??= new EvalWorkerClient();
-  const final = await io.clientRef.current.evaluate(serialized, { depth: resolved.depth, samples: resolved.samples, mode: resolved.mode, tera: params.tera, sleepClause: params.sleepClause }, {
-    onProgress: update => {
-      if (io.runRef.current === runId) io.setProgress(update);
-    },
-    onPartial: partial => {
-      if (io.runRef.current === runId) io.setResult(partial);
-    },
-  });
+  // The workers stream progress and partials far faster than a panel can
+  // show them; each delivery is a render. Only the latest matters, so a
+  // burst collapses to one repaint per interval (round 38). The final
+  // result supersedes anything still held — cancel, never flush.
+  const progress = throttleLatest<SearchProgress>(update => {
+    if (io.runRef.current === runId) io.setProgress(update);
+  }, PROGRESS_INTERVAL_MS);
+  const partials = throttleLatest<EvalResult>(partial => {
+    if (io.runRef.current === runId) io.setResult(partial);
+  }, PARTIAL_INTERVAL_MS);
+  let final: EvalResult;
+  try {
+    final = await io.clientRef.current.evaluate(serialized, { depth: resolved.depth, samples: resolved.samples, mode: resolved.mode, tera: params.tera, sleepClause: params.sleepClause }, {
+      onProgress: update => progress.push(update),
+      onPartial: partial => partials.push(partial),
+    });
+  } finally {
+    progress.cancel();
+    partials.cancel();
+  }
   if (io.runRef.current !== runId) return;
   io.setResult(final);
   io.setStatus('done');

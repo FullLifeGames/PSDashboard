@@ -6,6 +6,8 @@ import {
 
 const scope = self as unknown as DedicatedWorkerGlobalScope;
 const post = (message: EvalWorkerResponse) => scope.postMessage(message);
+/** MCTS iterations between two progress messages. */
+const PROGRESS_EVERY = 10;
 
 // One executor (with its matchup cache and lazily deserialized root) is
 // reused across every message about the same position.
@@ -33,7 +35,14 @@ scope.onmessage = async (event: MessageEvent<EvalWorkerRequest>) => {
       post({ type: 'result', id: message.id, result });
     } else if (message.type === 'mctstree') {
       const tree = mctsTreeSearch(message.serializedBattle, message.settings, message.seedOffset, {
-        onProgress: progress => post({ type: 'progress', id: message.id, progress }),
+        // Every iteration reports; one message per ten (plus the last) is
+        // all a progress bar can show, and each message is a main-thread
+        // clone plus a render (round 38: the play-out's frozen panel).
+        onProgress: progress => {
+          if (progress.done % PROGRESS_EVERY === 0 || progress.done >= progress.total) {
+            post({ type: 'progress', id: message.id, progress });
+          }
+        },
       });
       post({ type: 'mctsTreeResult', id: message.id, tree });
     } else if (message.type === 'choices') {
