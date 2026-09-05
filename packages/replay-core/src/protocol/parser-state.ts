@@ -15,6 +15,14 @@ interface TurnMover {
   cleanSecond: boolean;
 }
 
+/** A turn span in which a mon's Choice Scarf differed from its set's (round 37). */
+export interface ScarfSpan {
+  from: number;
+  to: number;
+  /** The first-mover role is poisoned too (a Scarf given away: which item the set carries is open). */
+  both: boolean;
+}
+
 /** The pending move context: crits and multi-hits disqualify its damage. */
 export interface PendingMove {
   attacker: string;
@@ -55,9 +63,11 @@ export interface ParserState {
   /**
    * Per `side:species`, the turn span whose races measure a Choice Scarf the
    * set does not carry (round 37): from a loss on, up to a gain, the whole
-   * game when the Scarf was given away.
+   * game and both roles when the Scarf was given away. Only the race lost
+   * (the second-mover role) is false evidence; moving first without the
+   * set's Scarf only understates the win.
    */
-  scarfMoved: Map<string, { from: number; to: number }>;
+  scarfMoved: Map<string, ScarfSpan>;
   lastMove: PendingMove | null;
   // Take initial snapshot at turn 0 (before any turns)
   capturedInitial: boolean;
@@ -79,7 +89,7 @@ export function createParserState(): ParserState {
     actedThisTurn: new Set<string>(),
     reordered: new Set<string>(),
     quickActed: new Set<string>(),
-    scarfMoved: new Map<string, { from: number; to: number }>(),
+    scarfMoved: new Map<string, ScarfSpan>(),
     lastMove: null,
     capturedInitial: false,
   };

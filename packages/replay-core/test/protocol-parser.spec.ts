@@ -518,11 +518,18 @@ test.describe('speed-order cleanliness', () => {
     expect(turns(singlesLog(mons, [
       ...race, '|turn|2', '|-enditem|p2a: B|Choice Scarf|[from] move: Knock Off|[of] p1a: A', '|turn|3', ...race,
     ]))).toEqual([1]);
+    // A race the knocked-off mon still WON stands: without the Scarf it only understates the win.
+    expect(turns(singlesLog(mons, [
+      ...race, '|turn|2', '|-enditem|p2a: B|Choice Scarf|[from] move: Knock Off|[of] p1a: A', '|turn|3',
+      '|move|p2a: B|Draco Meteor|p1a: A', '|move|p1a: A|Body Slam|p2a: B',
+    ]))).toEqual([1, 3]);
     // Knocked off before any race: nothing stands.
     expect(orders(singlesLog(mons, race, ['|-enditem|p2a: B|Choice Scarf|[from] move: Knock Off|[of] p1a: A']))).toEqual([]);
-    // Tricked onto the first mover at turn 2: the race of turn 1 ran without the Scarf the set now carries.
+    // Tricked onto A at turn 2: the race A lost at turn 1 ran without the Scarf the set now carries (dropped),
+    // the race A won at turn 3 stands.
     expect(turns(singlesLog(mons, [
-      ...race, '|turn|2', '|-item|p1a: A|Choice Scarf|[from] move: Trick', '|turn|3', ...race,
+      '|move|p2a: B|Draco Meteor|p1a: A', '|move|p1a: A|Body Slam|p2a: B',
+      '|turn|2', '|-item|p1a: A|Choice Scarf|[from] move: Trick', '|turn|3', ...race,
     ]))).toEqual([3]);
     // Given away: which item the set carries is open, so no race of the giver counts.
     expect(orders(singlesLog(mons, race, [
