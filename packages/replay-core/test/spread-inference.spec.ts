@@ -469,4 +469,116 @@ describe('evidence that cannot measure keeps the prior', () => {
     expect(free?.evs.spd).toBe(252);
     expect(free?.evs.spe ?? 0).toBeLessThan(252);
   });
+
+  test('a move order the prior already satisfies keeps the prior Speed and nature (round 40)', () => {
+    // 573756 after round 37: Garchomp (Jolly 252 Spe) moved before a
+    // Clefable its prior outruns anyway. Nothing measured its Speed
+    // downward, yet the old solve counted Speed as measured, let a 252-HP
+    // rung win the damage lines and shaved the Speed to 4 for the
+    // knock-out-only offense it keeps — a Garchomp Kyurem outspeeds, and
+    // turn 73's hit branch priced 29% for the defender instead of near 0.
+    const garchomp = mon('Garchomp', 'p2', 'Jolly', offensive);
+    const clefable = mon('Clefable', 'p1', 'Bold', { hp: 252, atk: 0, def: 252, spa: 0, spd: 4, spe: 0 });
+    const magnezone = mon('Magnezone', 'p1', 'Modest', { hp: 0, atk: 0, def: 4, spa: 252, spd: 0, spe: 252 }, 'Choice Specs');
+    const sets = {
+      p1: [asSet(clefable, ['Moonblast']), asSet(magnezone, ['Flash Cannon'])],
+      p2: [asSet(garchomp, ['Earthquake', 'Swords Dance'])],
+    };
+    const order = { firstSide: 'p2' as const, firstSpecies: 'Garchomp', secondSide: 'p1' as const, secondSpecies: 'Clefable', turn: 70 };
+    const bulkyFast = { hp: 252, atk: 252, def: 0, spa: 0, spd: 0, spe: 4 };
+    const observations = [
+      { ...hit(garchomp, clefable, 'Earthquake'), observedFraction: 0.6, lethal: true },
+      hit(clefable, { ...garchomp, evs: bulkyFast }, 'Moonblast'),
+      hit(magnezone, { ...garchomp, evs: bulkyFast }, 'Flash Cannon'),
+      hit(magnezone, { ...garchomp, evs: bulkyFast }, 'Flash Cannon'),
+    ];
+    const solved = inferSpreads(observations, sets, 'gen9ou', [order]).get('p2:garchomp');
+    expect(solved?.evs.spe).toBe(252);
+    expect(solved?.nature).toBe('Jolly');
+    // Control: without any order, damage-fitted bulk may still take the Speed (unchanged rule).
+    const free = inferSpreads(observations, sets, 'gen9ou', []).get('p2:garchomp');
+    expect(free?.evs.hp).toBe(252);
+    expect(free?.evs.spe ?? 0).toBeLessThan(252);
+  });
+
+  test("the log's max HP fixes the HP EVs, and Speed outlasts a knock-out-only offense (573756 Garchomp)", () => {
+    // The real Garchomp switched in at 409/409: 208 HP EVs, so the budget
+    // holds 252 Spe and 48 Atk — the published Swords Dance set's bulkier
+    // sibling. The ladder's 252-HP rung (420 HP) contradicts the log.
+    const truth = { hp: 208, atk: 48, def: 0, spa: 0, spd: 0, spe: 252 };
+    const garchomp = mon('Garchomp', 'p2', 'Jolly', offensive);
+    const clefable = mon('Clefable', 'p1', 'Bold', { hp: 252, atk: 0, def: 252, spa: 0, spd: 4, spe: 0 });
+    const magnezone = mon('Magnezone', 'p1', 'Modest', { hp: 0, atk: 0, def: 4, spa: 252, spd: 0, spe: 252 }, 'Choice Specs');
+    const sets = {
+      p1: [asSet(clefable, ['Moonblast']), asSet(magnezone, ['Flash Cannon'])],
+      p2: [asSet(garchomp, ['Earthquake', 'Swords Dance'])],
+    };
+    const order = { firstSide: 'p2' as const, firstSpecies: 'Garchomp', secondSide: 'p1' as const, secondSpecies: 'Clefable', turn: 70 };
+    const observations = [
+      { ...hit(garchomp, clefable, 'Earthquake'), observedFraction: 0.6, lethal: true },
+      hit(clefable, { ...garchomp, evs: truth }, 'Moonblast'),
+      hit(magnezone, { ...garchomp, evs: truth }, 'Flash Cannon'),
+    ];
+    const maxHp = new Map([['p2:garchomp', { maxhp: 409, level: 100 }]]);
+    const solved = inferSpreads(observations, sets, 'gen9ou', [order], new Map(), maxHp).get('p2:garchomp');
+    expect(solved?.evs).toEqual(truth);
+    expect(solved?.nature).toBe('Jolly');
+    // The measurement stands alone: no damage line, no order, still 208 HP inside the budget.
+    const alone = inferSpreads([], sets, 'gen9ou', [], new Map(), maxHp).get('p2:garchomp');
+    expect(alone?.evs.hp).toBe(208);
+    expect(alone?.evs.spe).toBe(252);
+    expect(Object.values(alone?.evs ?? {}).reduce((sum, value) => sum + value, 0)).toBeLessThanOrEqual(508);
+    // A percent log (100/100) measures nothing: the solve is the round-39 one.
+    expect(inferSpreads([], sets, 'gen9ou', [], new Map(), new Map()).get('p2:garchomp')).toBeUndefined();
+  });
+
+  test('a bulk rung the budget cannot express beside the kept stats is not offered (no nature-only bulk)', () => {
+    // Prior Jolly 252 Atk / 252 Spe, offense kept (knock-outs only), Speed
+    // kept (a satisfied order). The special lines ask for SpD bulk, but
+    // 252 HP + 252 SpD cannot sit beside the two kept stats: the old ladder
+    // shaved the claim to 4 SpD and kept the Calm nature standing on
+    // nothing. Such a rung is no longer offered; the prior's Jolly stands.
+    const garchomp = mon('Garchomp', 'p2', 'Jolly', offensive);
+    const clefable = mon('Clefable', 'p1', 'Bold', { hp: 252, atk: 0, def: 252, spa: 0, spd: 4, spe: 0 });
+    const magnezone = mon('Magnezone', 'p1', 'Modest', { hp: 0, atk: 0, def: 4, spa: 252, spd: 0, spe: 252 }, 'Choice Specs');
+    const sets = {
+      p1: [asSet(clefable, ['Moonblast']), asSet(magnezone, ['Flash Cannon'])],
+      p2: [asSet(garchomp, ['Earthquake'])],
+    };
+    const order = { firstSide: 'p2' as const, firstSpecies: 'Garchomp', secondSide: 'p1' as const, secondSpecies: 'Clefable', turn: 70 };
+    const specialWall = { hp: 252, atk: 0, def: 0, spa: 0, spd: 252, spe: 4 };
+    const observations = [
+      { ...hit(garchomp, clefable, 'Earthquake'), observedFraction: 0.6, lethal: true },
+      hit(clefable, { ...garchomp, evs: specialWall, nature: 'Calm' }, 'Moonblast'),
+      hit(clefable, { ...garchomp, evs: specialWall, nature: 'Calm' }, 'Moonblast'),
+      hit(magnezone, { ...garchomp, evs: specialWall, nature: 'Calm' }, 'Flash Cannon'),
+    ];
+    const solved = inferSpreads(observations, sets, 'gen9ou', [order]).get('p2:garchomp');
+    expect(solved?.nature ?? 'Jolly').toBe('Jolly');
+    expect(solved?.evs.spe ?? 252).toBe(252);
+    expect(solved?.evs.atk ?? 252).toBe(252);
+  });
+
+  test('a fixed HP is never shaved for a bulk rung the damage lines ask for', () => {
+    // Truth: 208 HP / 252 SpD; the lines want SpD, the log fixes HP at 208.
+    const truth = { hp: 208, atk: 0, def: 0, spa: 0, spd: 252, spe: 48 };
+    const garchomp = mon('Garchomp', 'p2', 'Jolly', offensive);
+    const clefable = mon('Clefable', 'p1', 'Bold', { hp: 252, atk: 0, def: 252, spa: 0, spd: 4, spe: 0 });
+    const magnezone = mon('Magnezone', 'p1', 'Modest', { hp: 0, atk: 0, def: 4, spa: 252, spd: 0, spe: 252 }, 'Choice Specs');
+    const sets = {
+      p1: [asSet(clefable, ['Moonblast']), asSet(magnezone, ['Flash Cannon'])],
+      p2: [asSet(garchomp, ['Earthquake'])],
+    };
+    const observations = [
+      hit(clefable, { ...garchomp, evs: truth }, 'Moonblast'),
+      hit(clefable, { ...garchomp, evs: truth }, 'Moonblast'),
+      hit(magnezone, { ...garchomp, evs: truth }, 'Flash Cannon'),
+      hit(magnezone, { ...garchomp, evs: truth }, 'Flash Cannon'),
+    ];
+    const maxHp = new Map([['p2:garchomp', { maxhp: 409, level: 100 }]]);
+    const solved = inferSpreads(observations, sets, 'gen9ou', [], new Map(), maxHp).get('p2:garchomp');
+    expect(solved?.evs.hp).toBe(208);
+    expect(solved?.evs.spd).toBe(252);
+    expect(Object.values(solved?.evs ?? {}).reduce((sum, value) => sum + value, 0)).toBeLessThanOrEqual(508);
+  });
 });

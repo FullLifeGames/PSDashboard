@@ -1,12 +1,13 @@
 import type { PokemonSet } from '@pkmn/sim';
 import type { DamageObservation, PokemonEvs, SpeedOrderObservation } from './types.ts';
-import { evTotal, type EvBudget } from './spreads/ev-budget.ts';
+import { capToBudget, evTotal, ZERO_EVS, type EvBudget } from './spreads/ev-budget.ts';
 import { candidateLadder, type CandidateRung, type SpreadCandidate } from './spreads/ladder.ts';
 import {
-  buildSolveContext, keyOf, observationError, physicalAttackerFor, priorDistance, speedError, spreadFor,
+  buildSolveContext, hpBasisOf, keyOf, observationError, physicalAttackerFor, priorDistance, setOf, speedError, spreadFor,
   type SolveContext,
 } from './spreads/fit.ts';
 import { decideScarfs, type SpeedKnowledgeMap } from './spreads/scarf.ts';
+import { hpEvsForMaxHp, type ObservedMaxHp } from './spreads/max-hp.ts';
 
 export { evBudget, legalizeEvs } from './spreads/ev-budget.ts';
 export type { SpreadCandidate } from './spreads/ladder.ts';
@@ -40,14 +41,37 @@ const FIT_FORFEIT_PER_OBSERVATION = 0.01;
 const MIN_OBSERVATIONS = 2;
 
 /**
- * A move order the ladder cannot reproduce (every rung violates it as much
- * as the prior does) measures nothing about this mon's Speed: the missing
- * piece is elsewhere (573756: a Choice Scarf the build does not carry).
- * Such evidence must not let the budget shave the prior's Speed for bulk.
+ * A move order measures Speed only when it REFUTES the prior and some rung
+ * repairs it. An order the prior already satisfies measures nothing
+ * downward (573756 after round 37: five satisfied Garchomp orders let the
+ * budget shave the prior's 252 Spe to 4 for a 252-HP rung — a Garchomp
+ * Kyurem outspeeds), and an order no rung can reproduce measures nothing
+ * at all (the Choice Scarf the build does not carry). Both keep the prior's
+ * Speed and speed nature; only a refuted, repairable order opens the Speed
+ * rungs.
  */
-function speedRepairable(ctx: SolveContext, key: string, ladder: CandidateRung[], prior: SpreadCandidate): boolean {
+function speedMeasured(ctx: SolveContext, key: string, ladder: CandidateRung[], prior: SpreadCandidate): boolean {
   const priorViolation = speedError(ctx, key, prior);
-  return priorViolation === 0 || ladder.some(rung => speedError(ctx, key, rung) < priorViolation);
+  return priorViolation > 0 && ladder.some(rung => speedError(ctx, key, rung) < priorViolation);
+}
+
+/**
+ * The HP EVs the log's maximum HP pins for this mon (round 40), or
+ * undefined without a usable sighting. A reading, not a fit: it holds even
+ * when the damage evidence forfeits to the prior.
+ */
+function measuredHpEvs(ctx: SolveContext, key: string): number | undefined {
+  const seen = ctx.maxHp.get(key);
+  if (!seen) return undefined;
+  const [side, species] = key.split(':') as ['p1' | 'p2', string];
+  const basis = hpBasisOf(ctx, side, species);
+  if (!basis) return undefined;
+  return hpEvsForMaxHp(basis.baseHp, seen.level, seen.maxhp, ctx.priors.get(key)?.evs.hp ?? 0, basis.iv);
+}
+
+/** The prior with the measured HP in place, legalized around it. */
+function priorWithFixedHp(prior: SpreadCandidate, hp: number, budget: EvBudget): PokemonEvs {
+  return capToBudget({ ...ZERO_EVS, ...prior.evs, hp }, new Set(), budget, new Set(), new Set(['hp']));
 }
 
 /** The ladder rung with the least error; ties break toward the prior. */
@@ -102,40 +126,79 @@ function topUpUnmeasured(best: CandidateRung, offenseStat: keyof PokemonEvs, mea
   return evs;
 }
 
+/** What one mon's evidence can and cannot measure. */
+interface MonEvidence {
+  observations: DamageObservation[];
+  /** Clean (non-lethal) attacker lines exist: offense is measurable. */
+  hasOffenseEvidence: boolean;
+  /** The mon attacked at all (knock-outs alone keep the prior's offense). */
+  attacked: boolean;
+  hasDefenderObs: boolean;
+  hasSpeedObs: boolean;
+  /** HP EVs the log's maximum HP pinned (round 40). */
+  fixedHp: number | undefined;
+}
+
+function evidenceFor(ctx: SolveContext, key: string): MonEvidence {
+  const observations = ctx.byMon.get(key) ?? [];
+  const attackerObs = observations.filter(obs => keyOf(obs.attackerSide, obs.attackerSpecies) === key);
+  return {
+    observations,
+    // Knock-outs are lower bounds (fit.ts): they refute rungs whose best roll
+    // falls short, but an attacker seen only in knock-outs has no measured
+    // offense — the prior's investment stands instead of yielding to bulk.
+    hasOffenseEvidence: attackerObs.some(obs => !obs.lethal),
+    attacked: attackerObs.length > 0,
+    hasDefenderObs: observations.some(obs => keyOf(obs.attackerSide === 'p1' ? 'p2' : 'p1', obs.defenderSpecies) === key),
+    hasSpeedObs: (ctx.speedByMon.get(key) ?? []).length > 0,
+    fixedHp: measuredHpEvs(ctx, key),
+  };
+}
+
+/** The ladder for one mon: Speed rungs only where an order measured Speed, else the prior's Speed is kept. */
+function ladderFor(
+  ctx: SolveContext, key: string, prior: SpreadCandidate, physicalAttacker: boolean, evidence: MonEvidence,
+  keep: Set<keyof PokemonEvs>,
+): CandidateRung[] {
+  const fixed: Partial<PokemonEvs> = evidence.fixedHp === undefined ? {} : { hp: evidence.fixedHp };
+  const build = (hasSpeedObs: boolean) =>
+    candidateLadder(prior, physicalAttacker, evidence.hasOffenseEvidence, evidence.hasDefenderObs, hasSpeedObs, ctx.budget, keep, fixed);
+  const ladder = build(evidence.hasSpeedObs);
+  if (!evidence.hasSpeedObs || speedMeasured(ctx, key, ladder, prior)) return ladder;
+  keep.add('spe');
+  return build(false);
+}
+
 function solveOne(ctx: SolveContext, key: string) {
-  const monObservations = ctx.byMon.get(key) ?? [];
-  const monSpeedOrders = ctx.speedByMon.get(key) ?? [];
-  // Speed evidence stands alone: one proven move order is worth solving
-  // for even when no damage line ever measured the mon.
-  if (monObservations.length < MIN_OBSERVATIONS && monSpeedOrders.length === 0) return;
-  const attackerObs = monObservations.filter(obs => keyOf(obs.attackerSide, obs.attackerSpecies) === key);
-  // Knock-outs are lower bounds (fit.ts): they refute rungs whose best roll
-  // falls short, but an attacker seen only in knock-outs has no measured
-  // offense — the prior's investment stands instead of yielding to bulk.
-  const hasOffenseEvidence = attackerObs.some(obs => !obs.lethal);
-  const hasDefenderObs = monObservations.some(obs =>
-    keyOf(obs.attackerSide === 'p1' ? 'p2' : 'p1', obs.defenderSpecies) === key);
+  const evidence = evidenceFor(ctx, key);
   const prior = ctx.priors.get(key);
   if (!prior) return;
+  // Speed evidence stands alone: one proven move order is worth solving
+  // for even when no damage line ever measured the mon. The log's maximum
+  // HP (round 40) stands alone too, but as a reading only: under the
+  // observation minimum it sets the HP inside the prior and runs no ladder.
+  if (evidence.observations.length < MIN_OBSERVATIONS && !evidence.hasSpeedObs) {
+    if (evidence.fixedHp !== undefined) {
+      ctx.solved.set(key, { evs: priorWithFixedHp(prior, evidence.fixedHp, ctx.budget), nature: prior.nature });
+    }
+    return;
+  }
   const physicalAttacker = physicalAttackerFor(ctx, key);
   const offenseStat: keyof PokemonEvs = physicalAttacker ? 'atk' : 'spa';
   const keep = new Set<keyof PokemonEvs>();
-  if (attackerObs.length > 0 && !hasOffenseEvidence) keep.add(offenseStat);
-  const hasSpeedObs = monSpeedOrders.length > 0;
-  let ladder = candidateLadder(prior, physicalAttacker, hasOffenseEvidence, hasDefenderObs, hasSpeedObs, ctx.budget, keep);
-  if (hasSpeedObs && !speedRepairable(ctx, key, ladder, prior)) {
-    keep.add('spe');
-    ladder = candidateLadder(prior, physicalAttacker, hasOffenseEvidence, hasDefenderObs, false, ctx.budget, keep);
-  }
-  const best = bestRung(ctx, key, ladder, monObservations);
+  if (evidence.attacked && !evidence.hasOffenseEvidence) keep.add(offenseStat);
+  const best = bestRung(ctx, key, ladderFor(ctx, key, prior, physicalAttacker, evidence, keep), evidence.observations);
   if (!best) return;
-  if (forfeitsToPrior(ctx, key, best, prior, monObservations)) {
-    ctx.solved.delete(key);
+  if (forfeitsToPrior(ctx, key, best, prior, evidence.observations)) {
+    // The prior stands — with the log's HP where the log measured it.
+    if (evidence.fixedHp === undefined) ctx.solved.delete(key);
+    else ctx.solved.set(key, { evs: priorWithFixedHp(prior, evidence.fixedHp, ctx.budget), nature: prior.nature });
     return;
   }
   const measured = new Set<keyof PokemonEvs>([
-    ...(hasOffenseEvidence ? [offenseStat] : []),
-    ...(hasDefenderObs ? (['hp', 'def', 'spd'] as (keyof PokemonEvs)[]) : []),
+    ...(evidence.hasOffenseEvidence ? [offenseStat] : []),
+    ...(evidence.hasDefenderObs ? (['hp', 'def', 'spd'] as (keyof PokemonEvs)[]) : []),
+    ...(evidence.fixedHp === undefined ? [] : (['hp'] as (keyof PokemonEvs)[])),
   ]);
   ctx.solved.set(key, { evs: topUpUnmeasured(best, offenseStat, measured, ctx.budget), nature: best.nature });
 }
@@ -152,14 +215,20 @@ export function inferSpreads(
   formatid: string,
   speedOrders: SpeedOrderObservation[] = [],
   knowledge: SpeedKnowledgeMap = new Map(),
+  maxHp: Map<string, ObservedMaxHp> = new Map(),
 ): Map<string, SpreadCandidate> {
-  const ctx = buildSolveContext(observations, sets, formatid, speedOrders);
+  const ctx = buildSolveContext(observations, sets, formatid, speedOrders, maxHp);
   ctx.scarf = decideScarfs(ctx, knowledge);
 
   // Greedy by observation count, then a refinement pass: the first pass can
   // solve a mon against a still-wrong partner guess; the second re-solves
   // everything against the first pass's answers (deterministic order).
-  const order = [...new Set([...ctx.byMon.keys(), ...ctx.speedByMon.keys()])].sort((a, b) =>
+  // A mon the log measured (maximum HP) joins even without a damage line.
+  const measuredKeys = [...ctx.maxHp.keys()].filter(key => {
+    const [side, species] = key.split(':') as ['p1' | 'p2', string];
+    return setOf(ctx, side, species) !== undefined;
+  });
+  const order = [...new Set([...ctx.byMon.keys(), ...ctx.speedByMon.keys(), ...measuredKeys])].sort((a, b) =>
     ((ctx.byMon.get(b)?.length ?? 0) - (ctx.byMon.get(a)?.length ?? 0)) || a.localeCompare(b));
   for (const key of order) {
     const [side, species] = key.split(':') as ['p1' | 'p2', string];

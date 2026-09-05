@@ -5,6 +5,7 @@ import { getSpeciesUsageSet } from './smogon/usage-lookup.ts';
 import type { SmogonUsageStats } from './smogon/stats-types.ts';
 import { getSpeciesSetAssumption, type SmogonSetAssumptions } from './smogon/sets-lookup.ts';
 import { evBudget, inferSpreads, legalizeEvs, type SpreadCandidate } from './spread-inference.ts';
+import { observedMaxHp } from './spreads/max-hp.ts';
 import { withHiddenPowerType } from './hidden-power.ts';
 import {
   assembleMoves, buildSheetSet, editedFields, findUserMatch, resolveAbility, resolveItem, resolveItemWithout, resolveSpread,
@@ -82,7 +83,7 @@ function buildTeams(log: string, options: BuildOptions): { teams: BuiltTeams; in
       .map(built => withHiddenPowerType(built, hpFor('p2'), options?.usageStats, parseInt(gen, 10))),
   });
 
-  const inferred = inferredSpreadsFor(options, build, formatHint, infos, knownTeams);
+  const inferred = inferredSpreadsFor(log, options, build, formatHint, infos, knownTeams);
   return { teams: build(inferred), inferred };
 }
 
@@ -111,6 +112,7 @@ function hasSpreadEvidence(options: BuildOptions): boolean {
  * items (round 37).
  */
 function inferredSpreadsFor(
+  log: string,
   options: BuildOptions,
   build: () => BuiltTeams,
   formatHint: string,
@@ -122,7 +124,7 @@ function inferredSpreadsFor(
   if (!hasSpreadEvidence(options)) return undefined;
   const base = build();
   const solved = inferSpreads(options?.observations ?? [], { p1: base.p1Team, p2: base.p2Team },
-    formatHint, options?.speedOrders ?? [], speedKnowledgeFor(infos, knownTeams, options?.usageStats));
+    formatHint, options?.speedOrders ?? [], speedKnowledgeFor(infos, knownTeams, options?.usageStats), observedMaxHp(log));
   return resolveInferredItems(solved, infos, options?.usageStats, options?.setAssumptions);
 }
 
@@ -143,7 +145,7 @@ export function solveReplaySpreads(
   const infos = infosFor(log, options);
   const { teams: base, inferred: preSolved } = buildTeams(log, { ...options, p1Info: infos.p1, p2Info: infos.p2 });
   const solved = inferSpreads(observations, { p1: base.p1Team, p2: base.p2Team }, formatHintFor(log).formatHint,
-    speedOrders, speedKnowledgeFor(infos, knownTeamsFor(log, userTeamText), usageStats));
+    speedOrders, speedKnowledgeFor(infos, knownTeamsFor(log, userTeamText), usageStats), observedMaxHp(log));
   carryItemDecisions(solved, preSolved);
   return resolveInferredItems(solved, infos, usageStats, setAssumptions);
 }

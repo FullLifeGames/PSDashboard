@@ -21,10 +21,13 @@ export const evTotal = (evs: PokemonEvs): number =>
  * measure at all, see the ladder) give way last of all: a rung's claims
  * shrink before a kept stat does. The old unlegalized composition let a
  * prior's 252 Spe ride along with 252/252 overrides — a 756-EV spread
- * the sim then played.
+ * the sim then played. Fixed stats (round 40: HP EVs the log's maximum HP
+ * measured exactly) are never shaved at all — they are a reading, not a
+ * claim.
  */
 export function capToBudget(
   evs: PokemonEvs, protectedStats: Set<keyof PokemonEvs>, budget: EvBudget, kept: ReadonlySet<keyof PokemonEvs> = new Set(),
+  fixed: ReadonlySet<keyof PokemonEvs> = new Set(),
 ): PokemonEvs {
   const out: PokemonEvs = { ...evs };
   for (const stat of Object.keys(out) as (keyof PokemonEvs)[]) {
@@ -35,7 +38,7 @@ export function capToBudget(
     ...(kept.has('spe') ? [] : ['spe' as const]),
     ...(['spd', 'def', 'hp', 'spa', 'atk'] as (keyof PokemonEvs)[]).filter(stat => protectedStats.has(stat) && !kept.has(stat)),
     ...(['spd', 'def', 'hp', 'spa', 'atk', 'spe'] as (keyof PokemonEvs)[]).filter(stat => kept.has(stat)),
-  ];
+  ].filter(stat => !fixed.has(stat));
   for (const stat of shaveOrder) {
     const over = evTotal(out) - budget.total;
     if (over <= 0) break;

@@ -6,6 +6,7 @@ import { typedHiddenPowerId } from '../hidden-power.ts';
 import { evBudget, ZERO_EVS, type EvBudget } from './ev-budget.ts';
 import type { CandidateRung, SpreadCandidate } from './ladder.ts';
 import type { ItemDecision } from './scarf.ts';
+import type { ObservedMaxHp } from './max-hp.ts';
 import { toId } from '../ids.ts';
 
 /**
@@ -40,6 +41,8 @@ export interface SolveContext {
   speedOrders: SpeedOrderObservation[];
   /** Choice Scarf decisions from the move orders, keyed like `solved` (round 37). */
   scarf: Map<string, ItemDecision>;
+  /** Maximum HP per mon as the log printed it (round 40: pins the HP EVs). */
+  maxHp: Map<string, ObservedMaxHp>;
   priors: Map<string, SpreadCandidate>;
 }
 
@@ -50,8 +53,16 @@ function genOf(formatid: string) {
 
 export const keyOf = (side: 'p1' | 'p2', species: string) => `${side}:${toId(species)}`;
 
-function setOf(ctx: SolveContext, side: 'p1' | 'p2', species: string): PokemonSet | undefined {
+export function setOf(ctx: SolveContext, side: 'p1' | 'p2', species: string): PokemonSet | undefined {
   return ctx.sets[side].find(entry => toId(entry.species) === toId(species) || toId(entry.name || '') === toId(species));
+}
+
+/** The species' base HP (the set's species, else the key's) and its HP IV, for the max-HP inversion. */
+export function hpBasisOf(ctx: SolveContext, side: 'p1' | 'p2', species: string): { baseHp: number; iv: number } | undefined {
+  const set = setOf(ctx, side, species);
+  const data = ctx.gen.species.get(toId(set?.species ?? species) as Parameters<typeof ctx.gen.species.get>[0]);
+  if (!data) return undefined;
+  return { baseHp: data.baseStats.hp, iv: set?.ivs?.hp ?? 31 };
 }
 
 /**
@@ -65,6 +76,7 @@ export function buildSolveContext(
   sets: { p1: PokemonSet[]; p2: PokemonSet[] },
   formatid: string,
   speedOrders: SpeedOrderObservation[],
+  maxHp: Map<string, ObservedMaxHp> = new Map(),
 ): SolveContext {
   const ctx: SolveContext = {
     gen: genOf(formatid),
@@ -75,6 +87,7 @@ export function buildSolveContext(
     speedByMon: new Map<string, SpeedOrderObservation[]>(),
     speedOrders: [],
     scarf: new Map<string, ItemDecision>(),
+    maxHp,
     priors: new Map<string, SpreadCandidate>(),
   };
   const { byMon, speedByMon } = ctx;

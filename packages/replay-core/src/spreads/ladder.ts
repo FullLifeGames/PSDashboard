@@ -98,19 +98,32 @@ function rungNature(options: RungOption[], keepNature: boolean, priorNature: str
   return natures[0] ?? priorNature;
 }
 
+/** The stats a measurement fixed (round 40: HP from the log's maximum HP). */
+const fixedStats = (fixed: Partial<PokemonEvs>): Set<keyof PokemonEvs> =>
+  new Set((Object.keys(fixed) as (keyof PokemonEvs)[]).filter(stat => fixed[stat] !== undefined));
+
+/** Every positive claim of the rung survived the budget in full (fixed stats override their claims). */
+function expressed(evs: PokemonEvs, claimed: Partial<PokemonEvs>, fixed: Partial<PokemonEvs>): boolean {
+  return (Object.entries(claimed) as [keyof PokemonEvs, number | undefined][])
+    .every(([stat, value]) => !value || fixed[stat] !== undefined || (evs[stat] ?? 0) >= value);
+}
+
 /**
  * One rung's legal spread: the prior with the rung's overrides, rung-claimed
  * stats protected, prior carry-overs giving way first, kept prior stats
- * last (capToBudget).
+ * last (capToBudget). A fixed stat overrides the rung's claim on it and is
+ * never shaved.
  */
 function composeRung(
   prior: SpreadCandidate, overrides: Partial<PokemonEvs>, keep: ReadonlySet<keyof PokemonEvs>, budget: EvBudget,
+  fixed: Partial<PokemonEvs>,
 ): PokemonEvs {
-  const protectedStats = new Set((Object.entries(overrides) as [keyof PokemonEvs, number][])
+  const claimed = { ...overrides, ...fixed };
+  const protectedStats = new Set((Object.entries(claimed) as [keyof PokemonEvs, number][])
     .filter(([, value]) => (value ?? 0) > 0)
     .map(([stat]) => stat));
-  const kept = new Set([...keep].filter(stat => overrides[stat] === undefined && (prior.evs[stat] ?? 0) > 0));
-  return capToBudget({ ...ZERO_EVS, ...prior.evs, ...overrides }, protectedStats, budget, kept);
+  const kept = new Set([...keep].filter(stat => claimed[stat] === undefined && (prior.evs[stat] ?? 0) > 0));
+  return capToBudget({ ...ZERO_EVS, ...prior.evs, ...claimed }, protectedStats, budget, kept, fixedStats(fixed));
 }
 
 export function candidateLadder(
@@ -121,6 +134,7 @@ export function candidateLadder(
   hasSpeedObs: boolean,
   budget: EvBudget,
   keep: ReadonlySet<keyof PokemonEvs> = new Set(),
+  fixed: Partial<PokemonEvs> = {},
 ): CandidateRung[] {
   const max = budget.perStat;
   const offenseStat = physicalAttacker ? 'atk' : 'spa';
@@ -137,9 +151,12 @@ export function candidateLadder(
   // lower the very stat the evidence cannot measure.
   const keepNature = priorPlus !== undefined && keep.has(priorPlus);
 
-  // Every rung is LEGALIZED before scoring (composeRung).
+  // Every rung is LEGALIZED before scoring (composeRung). The prior rung
+  // legalizes around the same kept and fixed stats as the composed ones:
+  // with the log's HP in place its carry-overs give way in the same order.
+  const priorKept = new Set([...keep].filter(stat => fixed[stat] === undefined && (prior.evs[stat] ?? 0) > 0));
   const rungs: CandidateRung[] = [{
-    evs: capToBudget({ ...ZERO_EVS, ...prior.evs }, new Set(), budget),
+    evs: capToBudget({ ...ZERO_EVS, ...prior.evs, ...fixed }, new Set(), budget, priorKept, fixedStats(fixed)),
     nature: prior.nature,
   }];
   for (const o of offense) {
@@ -147,7 +164,14 @@ export function candidateLadder(
       for (const s of speed) {
         const nature = rungNature([o, b, s], keepNature, priorNature);
         if (nature === null) continue;
-        rungs.push({ evs: composeRung(prior, { ...b.evs, ...s.evs, ...o.evs }, keep, budget), nature });
+        const claimed = { ...b.evs, ...s.evs, ...o.evs };
+        const evs = composeRung(prior, claimed, keep, budget, fixed);
+        // A rung the budget cannot express next to the kept and fixed stats
+        // is not offered: a shaved claim would leave its nature standing on
+        // nothing (round 40: "Calm 252 HP / 4 SpD / 252 Spe" once Speed
+        // stays kept). The prior rung is the fallback.
+        if (!expressed(evs, claimed, fixed)) continue;
+        rungs.push({ evs, nature });
       }
     }
   }

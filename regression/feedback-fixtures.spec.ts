@@ -59,7 +59,8 @@ const fixtureFetcher = async (url: string) => {
  * Round 33: the corpus runs with the published sets the app now loads.
  * 573756 under gen8ou sets: p1's Toxapex takes the specially defensive
  * curated set (SpD 252, Def 0 fitted from the physical knock-outs), and
- * Corviknight the curated 248/136/124 spread.
+ * Corviknight the curated 248/136/124 spread. Round 40: the log's 303/303
+ * pins Toxapex at 248 HP EVs; the SpD claim stands beside it.
  */
 test('573756: the set fixtures feed the curated Toxapex and Corviknight sets', async () => {
   for (const name of ['_sets_gen6ou.json.json', '_sets_gen8ou.json.json']) {
@@ -70,8 +71,7 @@ test('573756: the set fixtures feed the curated Toxapex and Corviknight sets', a
   const setAssumptions = await fetchSmogonSetAssumptions({ formatId: 'gen8ou', species: ['Toxapex', 'Corviknight'], fetcher: fixtureFetcher as never });
   const { p1Team } = buildTeamsFromReplay(replay.log, { observations, speedOrders, setAssumptions });
   const toxapex = p1Team.find(set => set.species === 'Toxapex')!;
-  expect(toxapex.evs.spd).toBe(252);
-  expect(toxapex.evs.def).toBe(0);
+  expect([toxapex.evs.hp, toxapex.evs.def, toxapex.evs.spd]).toEqual([248, 0, 252]);
   const corviknight = p1Team.find(set => set.species === 'Corviknight')!;
   expect([corviknight.evs.hp, corviknight.evs.def, corviknight.evs.spd]).toEqual([248, 136, 124]);
 });
