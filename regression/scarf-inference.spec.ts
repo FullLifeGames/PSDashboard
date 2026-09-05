@@ -1,6 +1,7 @@
 import { test, expect } from '@playwright/test';
-import { buildTeamsFromReplay } from '../packages/replay-core/src/team-builder';
+import { buildTeamsFromReplay, solveReplaySpreads } from '../packages/replay-core/src/team-builder';
 import { inferOpponentTeam } from '../packages/replay-core/src/opponent-inferrer';
+import { parseReplayLogWithObservations } from '../packages/replay-core/src/protocol-parser';
 import { applyInferredSpreads, INFERRED_ITEM_DETAIL, RULED_OUT_ITEM_DETAIL } from '../packages/replay-core/src/team-info';
 import type { SmogonUsageStats } from '../packages/replay-core/src/smogon/stats-types';
 import type { OpponentTeamInfo, RevealedPokemonInfo } from '../packages/replay-core/src/types';
@@ -71,6 +72,28 @@ test.describe('Choice Scarf inference reaches the build and the panel', () => {
     const raw = new Map([['p1:garchomp', { ...scarfOut.get('p1:garchomp')!, item: '' }]]);
     const { p1Team } = buildTeamsFromReplay(log(), { inferredSpreads: raw, usageStats: usage });
     expect(p1Team.find(set => set.species === 'Garchomp')?.item).toBe('Rocky Helmet');
+  });
+
+  test('the app path carries a Scarf decision the full solve forfeited on misfit damage', () => {
+    // 750540: Darkrai moved before Deoxys-Speed (impossible without a Scarf), and its damage lines contradict each
+    // other, so the full solve forfeits Darkrai back to the prior. The speed-only pre-solve decided the Scarf; the
+    // app's solved map must still say so, or the app builds Life Orb while the harness builds the Scarf.
+    const raceLog = [
+      '|player|p1|Alice|', '|player|p2|Bob|', '|gen|9', '|tier|[Gen 9] OU',
+      '|poke|p1|Deoxys-Speed|', '|poke|p2|Darkrai|',
+      '|start', '|switch|p1a: Deoxys|Deoxys-Speed|100/100', '|switch|p2a: Darkrai|Darkrai|100/100', '|turn|1',
+      '|move|p2a: Darkrai|Dark Pulse|p1a: Deoxys', '|-damage|p1a: Deoxys|0 fnt', '|faint|p1a: Deoxys', '|turn|2',
+    ].join('\n');
+    const { speedOrders } = parseReplayLogWithObservations(raceLog);
+    expect(speedOrders).toHaveLength(1);
+    const contradictory = ['0.10', '0.60'].map(fraction => ({
+      attackerSpecies: 'Darkrai', defenderSpecies: 'Deoxys-Speed', attackerSide: 'p2' as const, moveId: 'darkpulse',
+      observedFraction: Number(fraction), lethal: false, attackerBoosts: {}, defenderBoosts: {}, attackerStatus: '', screens: [], weather: '',
+    }));
+    const solved = solveReplaySpreads(raceLog, contradictory, { speedOrders });
+    expect(solved.get('p2:darkrai')?.item).toBe('Choice Scarf');
+    const { p2Team } = buildTeamsFromReplay(raceLog, { inferredSpreads: solved });
+    expect(p2Team.find(set => set.species === 'Darkrai')?.item).toBe('Choice Scarf');
   });
 
   test('sensitivity probes skip an inferred Scarf and keep a dropped one out of the alternatives', () => {

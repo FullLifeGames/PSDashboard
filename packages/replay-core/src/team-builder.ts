@@ -156,8 +156,10 @@ export function solveReplaySpreads(
 function carryItemDecisions(solved: Map<string, SpreadCandidate>, preSolved: Map<string, SpreadCandidate> | undefined) {
   for (const [key, candidate] of preSolved ?? []) {
     if (candidate.item === undefined) continue;
-    const entry = solved.get(key) ?? candidate;
-    if (entry.item === undefined) solved.set(key, { ...entry, item: candidate.item, itemReason: candidate.itemReason });
+    const entry = solved.get(key);
+    // A mon the full solve forfeited (misfit damage) keeps the pre-solve's spread and item.
+    if (!entry) solved.set(key, candidate);
+    else if (entry.item === undefined) solved.set(key, { ...entry, item: candidate.item, itemReason: candidate.itemReason });
   }
 }
 
