@@ -94,7 +94,7 @@ git commit -am "<version> release bump"
 git push
 ```
 
-The same release publishes the changed library packages: [scripts/publish-packages.mjs](./scripts/publish-packages.mjs) writes the root version into both manifests, selects the packages whose files changed since the previous tag, and runs `npm publish`. The job needs the `NPM_TOKEN` secret and otherwise ends green with a notice; `node scripts/publish-packages.mjs --dry-run` prints the plan locally.
+The same release publishes the changed library packages: [scripts/publish-packages.mjs](./scripts/publish-packages.mjs) writes the root version into both manifests, selects the packages whose files changed since the previous tag, and runs `npm publish`. npm authenticates the job through trusted publishing, so there is no npm secret: each package names this repository and `release.yml` as its publisher, and the published versions carry a provenance attestation. `node scripts/publish-packages.mjs --dry-run` prints the plan locally.
 
 The [pages workflow](./.github/workflows/pages.yml) deploys on every push to `master` and on every release:
 

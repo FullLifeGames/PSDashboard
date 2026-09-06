@@ -16,7 +16,9 @@
  *
  * --registry-latest <name>=<version> answers "what is on npm" without the
  * network (tests, air-gapped dry runs). Runs from the repository root; the
- * publish itself expects npm to be authenticated (NODE_AUTH_TOKEN in CI).
+ * publish itself expects npm to be authenticated - in CI through trusted
+ * publishing (release.yml holds the OIDC permission), locally through
+ * `npm login`.
  */
 import { spawnSync } from 'node:child_process';
 import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';

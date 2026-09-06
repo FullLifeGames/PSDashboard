@@ -89,48 +89,42 @@ jobs:
             "ps-dashboard-$VERSION.zip"
 
   # The library packages ride the same release: scripts/publish-packages.mjs
-  # publishes the ones whose files changed since the previous release tag,
-  # at the root version. Without the NPM_TOKEN secret the job reports that
-  # and ends green, so the GitHub release never depends on npm.
+  # publishes the ones whose files changed since the previous release tag, at
+  # the root version. npm authenticates this job through trusted publishing:
+  # each package names this repository and this workflow file as its publisher
+  # on npmjs.com, and npm trades the job's OIDC token for a short-lived
+  # credential. No npm secret is involved, and the published versions carry a
+  # provenance attestation. A package that has no trusted publisher configured
+  # fails here rather than passing quietly.
   publish:
     name: Publish packages
     needs: [check, release]
     if: needs.check.outputs.should_release == 'true'
     runs-on: ubuntu-latest
-    env:
-      NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
+    permissions:
+      # The token npm exchanges for its publish credential.
+      id-token: write
+      contents: read
     steps:
-      - name: Look for the npm token
-        id: token
-        run: |
-          if [ -n "$NPM_TOKEN" ]; then
-            echo "configured=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "configured=false" >> "$GITHUB_OUTPUT"
-            echo "::notice::NPM_TOKEN is not configured - skipping the npm publish."
-          fi
-
       - name: Check out repository
-        if: steps.token.outputs.configured == 'true'
         uses: actions/checkout@v7
         with:
           # The previous release tag decides which packages changed.
           fetch-depth: 0
 
       - name: Set up Node.js
-        if: steps.token.outputs.configured == 'true'
         uses: actions/setup-node@v7
         with:
           node-version: 24
           cache: npm
           registry-url: https://registry.npmjs.org
 
+      # Trusted publishing wants npm 11.5.1 or newer; Node 24 still ships 11.3.
+      - name: Update npm
+        run: npm install -g npm@latest
+
       - name: Install dependencies
-        if: steps.token.outputs.configured == 'true'
         run: npm ci
 
       - name: Publish the changed packages
-        if: steps.token.outputs.configured == 'true'
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
         run: node scripts/publish-packages.mjs
