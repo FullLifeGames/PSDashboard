@@ -894,10 +894,10 @@ import { summaryLines } from './calibration-summary';
  *
  * TURN-73 ROUND 2026-09-05 (improvement round 40; spec
  * docs/superpowers/specs/2026-09-05-round-40-design.md; worktree r40 on
- * 0e65d2c while the second session committed on master; d0a32f3 HP EVs
- * from the log's maximum HP + a satisfied order keeps its Speed / 6adf7da
- * a death after the mon's own miss or dice cant is no sack / 5895ab5 the
- * bench keeps the sim's HP / 1d12b4c cache v43). The user's turn: 573756
+ * 0e65d2c while the second session committed on master; 694fac7 HP EVs
+ * from the log's maximum HP + a satisfied order keeps its Speed / 8dc7908
+ * a death after the mon's own miss or dice cant is no sack / 1e0d18a the
+ * bench keeps the sim's HP / b9670dc cache v43). The user's turn: 573756
  * t73, a +4 Garchomp at 11% one 95% Fire Fang from clearing Corviknight,
  * the miss, Body Press taking it. The app called Body Press an inaccuracy
  * (Defog 23% vs 18%), named Scale Shot LordEnz's best move over Fire
@@ -989,6 +989,34 @@ import { summaryLines } from './calibration-summary';
  * chance and t26 p1-read out, t27 p1-read in). No pin moved; re-pins at
  * the user gate. Wall clock: the 573756 sweep 52 s to 1.5 min under the
  * bank's load (no quiet-machine number this round).
+ *
+ * VERDICT 2026-09-06 (user gate 07:36): ADOPTED as built. Re-pins booked
+ * (3e6d185, dbffb5f): 573756 t73 observed becomes chance + key moment (the
+ * desired side of its gap; the open half is the pre-roll bar, A.1), 648453
+ * t13 observed becomes quiet (the no-tier half of its desired), 649664 t8
+ * accepts quiet beside shift and p1-read (Fire Blast stays the best and
+ * played row, which is the pin's substance), and the golden 655336 books
+ * its traded known-drift channels. Rebased onto master 34afc82 (no
+ * conflicts, zero file overlap with the second session's test round) and
+ * fast-forwarded; gates re-run on the rebased tree: tsc, lint, knip and
+ * Vitest 1380 green (168 files, the app suite included).
+ * KNOWN DEFECT, registered at the gate (NextSteps A.1, round-40 rests):
+ * the keep-plus-fixed interaction can starve a MEASURED offense. When an
+ * order the prior already satisfies keeps Speed AND the log pins a large
+ * HP (fixed + kept + claim > 508), every offense rung composes below its
+ * claim, the round-40 feasibility rule drops it, and only 0-offense rungs
+ * remain — so clean damage lines that measure 252 Atk end at 0 Atk and the
+ * fork no longer reproduces the observed damage (the module's pair-
+ * consistency guarantee). Reproduced independently three times: Garchomp
+ * prior Jolly 0/252/0/0/4/252, truth Adamant 252/252/0/0/0/4, log 420/420,
+ * one satisfied order, two clean Earthquakes → r40 solves Jolly
+ * 252/0/0/0/4/252 (sim Earthquake 75% of the observed hit) where 0e65d2c
+ * solved 252/252/0/0/0/4. Blast radius over the fit corpus (bare build
+ * path, master vs this round): 963 of 25959 sets lose a 252+ offense to 0.
+ * The bank above MEASURED this behavior, so the adopted numbers already
+ * carry its cost; the fix (let a kept, unmeasured stat yield to a measured
+ * claim instead of dropping the rung) is the first candidate of round 41
+ * and should move the bank further.
  *
  * CHOICE SCARF INFERENCE ROUND 2026-09-05 (improvement round 37 of the
  * perf-and-quality plan; spec
