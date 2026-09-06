@@ -126,7 +126,7 @@ npm test -w packages/eval-engine
 
 ## Versioning and publishing
 
-Both packages carry the repository's version. A release publishes a package only when its files changed since the previous release, and the dependency on `@fulllifegames/replay-core` becomes a caret range at publish time.
+Both packages carry the repository's version. A release publishes a package only when its files changed since the previous release, and the dependency on `@fulllifegames/replay-core` becomes a caret range at publish time. npm receives the package from the release workflow through trusted publishing, so every published version carries a provenance attestation.
 
 ## Where it comes from
 

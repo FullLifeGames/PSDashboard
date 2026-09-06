@@ -124,7 +124,7 @@ npm test -w packages/replay-core
 
 ## Versioning and publishing
 
-Both packages carry the repository's version. A release publishes a package only when its files changed since the previous release.
+Both packages carry the repository's version. A release publishes a package only when its files changed since the previous release, and npm receives it from the release workflow through trusted publishing, so every published version carries a provenance attestation.
 
 ## Where it comes from
 

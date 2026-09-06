@@ -40,7 +40,6 @@ docs
 # Pinned Smogon payloads for the calibration harness's fills lever
 .smogon-cache/
 
-NextSteps*.md
 FeedbackEval.xlsx
 deploy.ps1
 
