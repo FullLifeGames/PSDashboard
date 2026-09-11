@@ -142,7 +142,11 @@ export interface StoredEval {
 //      prior satisfies keeps its Speed, benched bodies keep the sim's HP
 //      (Regenerator), and a death after the mon's own miss is no sack.
 //      Sets and positions move in every server-log replay.
-const EVAL_ENGINE_CACHE_VERSION = 43;
+// v44: round 41, a kept Speed gives way to an offense claim the budget
+//      cannot express beside the log's HP, and two kept stats over the
+//      budget offer both shaving orders. Sets move where a body lost its
+//      measured offense under round 40.
+const EVAL_ENGINE_CACHE_VERSION = 44;
 
 export function evalStoreKey(
   cacheKey: string,
