@@ -136,6 +136,10 @@ Runde-37-Beobachtungen (Scarf-Inferenz, 05.09.):
 - [ ] Sonden über den ganzen Fit-Korpus mit Fills und Löser dauern über eine Stunde (Entscheidungs-Sonde abgebrochen); die Bank-Sonde (134 Replays, vom Netz mit Scratchpad-Cache) läuft in neun Minuten → Sonden künftig auf das Bank-Universum begrenzen, Fit-Korpus nur parser-seitig.
 - [ ] Sonden-Dateien in `regression/` NIE liegen lassen, während `npm run test:regression` startet: die Suite sammelt sie ein (zweimal passiert, eine Stunde Laufzeit verloren).
 
+QA-Kampagne 07/2026 (Rest, am 11.09. aus dem archivierten Fix-Plan `docs/completed/qa-campaign-2026-07.md` übernommen):
+
+- [ ] Die Schadensvorschau im Branch rechnet einen gesetzten Tera-Toggle nicht vorab ein: die Fight-Sektion setzt den Modifier, `branch-damage.ts` kennt ihn nicht, der Calc sieht den Tera-Typ erst nach der Ausführung (`SimPokemonInfo.teraType`). Seit Juli bewusst offen; handeln, wenn ein Tera-Klick in der Vorschau als falsche KO-Zahl auffällt (Hebel: den Modifier als Tera-Typ in die Vorschau-Info geben).
+
 Runde-41-Beobachtungen (Fitter, 11.09.):
 
 - [ ] Adamant-Sperre unter gehaltenem Tempo bei ausreichendem Budget: Prior Jolly, erfüllte Reihenfolge, saubere Linien eines Adamant-Angreifers, kein HP-Zwang → der Fitter bleibt bei Jolly 252 Atk (10 % unter dem beobachteten Schaden), weil `keepNature` die Adamant-Sprosse sperrt; Runde 40 hat das bewusst so gesetzt. Handeln, wenn der Set-Diff solche Körper häuft.
