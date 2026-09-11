@@ -892,6 +892,99 @@ import { summaryLines } from './calibration-summary';
  * static basis for this mass; the next lever, if any, is search/
  * planning-side.
  *
+ * FORCED-SWITCH NODES ROUND 2026-09-11 (improvement round 42; spec
+ * docs/superpowers/specs/2026-09-11-round-42-design.md; branch r42 on
+ * master 0926aa9; 74f6cdd the advance can stop at the forced-switch
+ * request / 99d3bb1 doubles pass assignments / e0a1759 the replacement
+ * after a knock-out is a decision node of the MCTS tree / 2293bca cache
+ * v45 / 26e1a01 the draft t56 play-out pin). Roadmap Q1: inside the tree
+ * every knock-out was resolved greedily — each bench body forked, the
+ * board read statically after its entry, the best entry taken — so the
+ * search never valued a sacrifice order (round 19: the draft play-out fed
+ * Heatran at t62 and kept Muk-Alola), and that probe was 49% of a tree at
+ * a quarter of all bodies fainted (perf evaluation P2). NOW the advance
+ * stops at the first switch request no pivot follow-up answers
+ * (answerFollowUps: 'boundary' | 'pending' | 'mixed', a follow-up beside an
+ * open request resolves greedily as before, so no position carries a
+ * half-answered request), the mid-turn position becomes a node whose
+ * option lists legalChoices already knew (the fallen side's bench, or the
+ * doubles assignments, against the waiting side's `wait` sentinel; a
+ * double knock-out is a normal k1×k2 node), Node.boundary tells turn
+ * boundaries from mid-turn nodes and depth counts boundaries only.
+ * Doubles: two forced slots with one living body offered NOTHING before
+ * (combineSlots dropped the shared target) while the greedy resolver knew
+ * "switch 3, pass" — the assignments now live in forward/assignments.ts
+ * for both. Matrix cells, the verify sampler, the played pair, play-outs,
+ * the prover and the calibration harness keep the greedy resolution.
+ * SIGHTING (docs/perf/probes/2026-09-11-r42/): the sim issues no switch
+ * request for a forced slot without a bench (the slot stays empty), and
+ * a U-turn that knocks out asks the pivot side first and the fallen side
+ * after the pivot switch, never both at once.
+ * PERF (2026-09-03 probe, same evening): MCTS tree t70 1755 → 814 ms
+ * (−54%), t120 567 → 571 ms, matrix 192/352 → 184/349 ms. Identity
+ * fixture: children and the d1 matrix byte-identical in both formats,
+ * only the mcts section moved (singles score −0.2972 → −0.2929, depth 4,
+ * doubles unchanged).
+ * PLAY-OUT (draft t56, p1 Kyurem Ice Beam, p2 → Slowking, offline
+ * fixtures): master switches Heatran into Mienshao's Knock Off at t62,
+ * loses it at t64, gets Muk-Alola as the forced replacement and crawls 21
+ * turns to a p2 win with Dragapult at 5%; r42 sacks Muk-Alola at t58–t60,
+ * brings Heatran last at t64 and ends the game at t65 with Overheat at
+ * 59% — the round-19 line. Pinned in e2e/branch.spec.ts by the order of
+ * p2's switch targets (voluntary rows and forced rows).
+ * BENCH (paired, n=816; A .calibration/r41-b, engine unchanged since the
+ * round-41 verdict; B .calibration/r42-b): sign 53/62/79/61/72 →
+ * 53/62/78/61/71, brier 0.2612/0.2296/0.1518 → 0.2611/0.2287/0.1536 (mid
+ * −9 bp, LATE +18 bp); hq n=548 0.2600/0.2167/0.1607 →
+ * 0.2598/0.2154/0.1622 (mid −13, late +15); luck-adjusted
+ * 0.2452/0.2084/0.1458 → 0.2450/0.2087/0.1471 (late +13); bucket 0.7–1.0
+ * 88% → 87% (n 130 → 127); ten exclusive flips, A right 6, B right 4;
+ * late mean |s| 0.53 → 0.52. Strata: ladder-ou-0802 late 0.1240 → 0.1348
+ * (+108), ladder-dou-0804 late 0.0811 → 0.0862 (+51, sign 94 → 88),
+ * tournament-0811b mid 0.1934 → 0.1890 (−44) and late 0.1201 → 0.1174
+ * (−27), draft late +51, the rest flat. The preregistered line (late brier
+ * and the 0.7–1.0 bucket not worse) is MISSED; the late loss sits in a
+ * few confident late positions that lose confidence while staying right
+ * (2663102863 t8 0.851 → 0.287 alone ≈ +7 bp of the late brier).
+ * THREE MORE CUTS, each measured on the bank and parked on its own
+ * branch, none passes the line: (1) PRIOR (r42-prior, 7886d9a,
+ * .calibration/r42a-b — the mid-turn node keeps the greedy resolution's
+ * static as leaf and prior, because the matchup term weights only pairs
+ * of two actives and a board with an empty slot reads less decisive):
+ * 53/63/79/61/73, brier 0.2613/0.2279/0.1533 (mid −17, late +15), hq
+ * 0.2599/0.2145/0.1630 (mid −22, late +23), flips A 3 / B 5 — but the
+ * tree costs 1980 ms at t70 again and the draft play-out sends Heatran
+ * first at t60 and LOSES the game at t72: the greedy prior takes back
+ * the freedom that finds the Muk line. (2) FREE MID-TURN ITERATIONS
+ * (r42-budget, 8cf1787, .calibration/r42b-b — only boundary expansions
+ * charge the 600, raw cap 2×): 0.2610/0.2285/0.1541 (late +23), hq late
+ * 0.1649 (+42), bank slices +50% — more search at mid-turn nodes hurts
+ * late, the depth hypothesis is refuted. (3) MAX-BACKUP on the prior
+ * (r42-maxbackup, ea313c8, .calibration/r42c-b — a one-sided mid-turn
+ * node backs its chooser's best replacement up the tree and into the
+ * root cell instead of the visit mean over every body tried):
+ * 53/62/80/61/73, 0.2611/0.2280/0.1541 (mid −16, late +23), hq
+ * 0.2599/0.2144/0.1627 (mid −23, late +20), luck-adjusted
+ * 0.2448/0.2107/0.1489 (mid +23, late +31), flips A 5 / B 8. Every
+ * variant loses 15–23 bp late and gains 9–17 bp mid: the late loss is
+ * structural to searching the replacement, not to any one value rule.
+ * FEEDBACK: three sweeps byte-identical on all six full dumps (drift JSON
+ * and report differ only in date and wall time); against the master base
+ * of the same evening ONE channel moves, 649664 t23 (gap) attribution
+ * p1-read → chance (still a gap); 573756 moves t114–t136 by about −0.1
+ * toward LordEnz (19 scores > 0.05; t116 shift → p1-read, t124 p1-read →
+ * shift, t134 quiet → chance, t135 chance → shift), t138 unmoved; KO-odds
+ * mismatches 202/58/206/123/89/51 → 209/58/208/126/87/53; wall 573756 51
+ * → 62 s (not interleaved, load-bound). No truth or golden channel moved.
+ * GATES: tsc, lint (ratchet), knip, Vitest 1397 green (170 files; the new
+ * eval-mcts-forced-switch.spec.ts, 9 tests); e2e 75/75 green with the
+ * new pin (28 s alone).
+ * VERDICT: open at the user gate. Adopt as built (the sack order, the mid
+ * gain, −54% tree cost; the late line missed by +18 bp with the loss
+ * structural across four cuts), or the preregistered fallback
+ * FORCED_SWITCH_NODES = false in mcts.ts (the advance mode and the doubles
+ * assignments stay; the play-out pin must then go).
+ *
  * OFFENSE-VS-KEPT-SPEED ROUND 2026-09-11 (improvement round 41; spec
  * docs/superpowers/specs/2026-09-11-round-41-design.md; branch r41 on
  * master ba2ce5b; d72690b a kept Speed gives way to an offense claim the
