@@ -56,6 +56,54 @@ test.describe('PS Dashboard', () => {
     await expect(page.getByText(/Branching · Turn/)).toHaveCount(0);
   });
 
+  test('the draft t56 play-out sends Muk-Alola before Heatran (round 42)', async ({ page }) => {
+    // Round 19 finding, round 42 pin: from turn 56 (p1 Kyurem Ice Beam, p2
+    // into Slowking) the play-out used to send Heatran into Mienshao's Knock
+    // Off at turn 62 and lose it, then crawl 21 turns to a 5% win. With the
+    // forced switch searched as a tree node the engine sacks Muk-Alola first
+    // (turn 58) and keeps Heatran for the finish (turn 65, 59% HP left).
+    // Nicknames in the history rows: Sludge Shadow = Muk-Alola, Fire Shadow = Heatran.
+    test.setTimeout(600_000);
+    const draftReplay = JSON.parse(readFileSync(fixturePath('draft-replay.json'), 'utf-8'));
+    await page.route('**/replay.pokemonshowdown.com/**', route => route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify(draftReplay),
+    }));
+    await page.locator('button', { hasText: 'Load' }).click();
+    const slider = page.locator('input[type="range"]');
+    await expect(slider).toBeVisible({ timeout: 10000 });
+    await expect(page.getByText('puffelmaedchen', { exact: true }).first()).toBeVisible({ timeout: 15_000 });
+    await slider.fill('56');
+    await expect(page.getByText('T56/')).toBeVisible();
+    const p1 = page.locator('.ps-branch-side-column').first();
+    const p2 = page.locator('.ps-branch-side-column').nth(1);
+    await p1.locator('.ps-movebtn', { hasText: 'Ice Beam' }).click();
+    await p2.locator('.ps-switchbtn', { hasText: 'Slow Shadow' }).click();
+    await page.locator('.ps-execute-btn').click();
+    await expect(page.locator('.ps-panel', { hasText: 'Variation moves' })).toContainText('Turn 56', { timeout: 120_000 });
+
+    await page.locator('button', { hasText: 'Let it play out' }).click();
+    await expect(page.getByText(/Play-out finished|Play-out stopped/)).toBeVisible({ timeout: 500_000 });
+    const lines = (await page.locator('.ps-panel', { hasText: 'Variation moves' }).innerText()).split('\n');
+    // P2's switch targets in play order: the right half of a turn's move row
+    // when it is a switch, and the forced-replacement rows of P2.
+    const p2Switches: string[] = [];
+    lines.forEach((line, index) => {
+      const forced = /forced replacement \(P2\): → (.+)$/.exec(line);
+      if (forced) p2Switches.push(forced[1].trim());
+      if (/^Turn \d+$/.test(line.trim())) {
+        const p2Part = (lines[index + 1] ?? '').split(' | ')[1] ?? '';
+        if (p2Part.startsWith('→ ')) p2Switches.push(p2Part.slice(2).trim());
+      }
+    });
+    const muk = p2Switches.findIndex(name => name.startsWith('Sludge Shadow'));
+    const heatran = p2Switches.findIndex(name => name.startsWith('Fire Shadow'));
+    expect(muk, `p2 switches: ${p2Switches.join(', ')}`).toBeGreaterThanOrEqual(0);
+    expect(heatran, `p2 switches: ${p2Switches.join(', ')}`).toBeGreaterThanOrEqual(0);
+    expect(muk, `p2 switches: ${p2Switches.join(', ')}`).toBeLessThan(heatran);
+  });
+
   test('the branch sim iframe follows the played variation line', async ({ page }) => {
     await page.locator('button', { hasText: 'Load' }).click();
     await startVariationAt(page, 2);
