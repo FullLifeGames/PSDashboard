@@ -979,11 +979,17 @@ import { summaryLines } from './calibration-summary';
  * GATES: tsc, lint (ratchet), knip, Vitest 1397 green (170 files; the new
  * eval-mcts-forced-switch.spec.ts, 9 tests); e2e 75/75 green with the
  * new pin (28 s alone).
- * VERDICT: open at the user gate. Adopt as built (the sack order, the mid
- * gain, −54% tree cost; the late line missed by +18 bp with the loss
- * structural across four cuts), or the preregistered fallback
- * FORCED_SWITCH_NODES = false in mcts.ts (the advance mode and the doubles
- * assignments stay; the play-out pin must then go).
+ * VERDICT 2026-09-11 (user gate, evening): ADOPTED as built. The user
+ * read the late loss for what the paired bed shows — confident, correct
+ * endgame reads that hedge (85% → 65%) rather than wrong ones (late sign
+ * 79 → 78, flips 6:4), against a sacrifice order the old tree never finds
+ * and half the tree cost — and took the preregistered line as a guard
+ * against misread endgames, which did not happen. Fast-forwarded to
+ * master; one re-pin: 649664 t23 (gap) observed p1-read → chance, the
+ * root before Keldeo's click now reads −0.89 (was −0.37) and the paid-off
+ * read framing dissolves into the roll; desired unchanged. The three
+ * measured cuts stay parked on their branches with their bank runs;
+ * the late hedging is booked as a watch item for round 43 (Q2).
  *
  * OFFENSE-VS-KEPT-SPEED ROUND 2026-09-11 (improvement round 41; spec
  * docs/superpowers/specs/2026-09-11-round-41-design.md; branch r41 on
