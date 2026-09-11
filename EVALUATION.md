@@ -84,7 +84,7 @@ Hypothetical moves work while branching ("What if it had Flamethrower?"): pick o
 A chess-style evaluation panel sits beside the battle in the right column by default, on the replay view and inside a variation, with no toggle. A sim-backed search plays out every legal choice pair on forked battles, then solves the resulting choice matrix as a matrix game via regret matching. Three engine modes exist:
 
 - depth 1 to 2: the full joint matrix, with deeper cells valued by a shallower sub-search,
-- MCTS: a DUCT Monte-Carlo tree search,
+- MCTS: a DUCT Monte-Carlo tree search; a forced switch after a knock-out is a decision node of its own inside the tree (the replaced side picks from its bench with lookahead, the other side waits), while the root matrix, the verify sampler, play-outs and the prover keep resolving replacements greedily by the static pick,
 - Auto, the default: each position routes by its own fainted fraction, matrix search while boards are full, the tree once a quarter of all bodies have fallen. This is the grid-tuned best line on the stratified calibration bed, re-baselined on about 800 positions with Smogon-informed sets.
 
 Sampling is deterministic with fixed seeds and KO-boundary roll grouping, and the work fans out across a worker pool sized by the machine's cores. Pool size and lane count only move wall-clock; the numbers are the same on every machine.

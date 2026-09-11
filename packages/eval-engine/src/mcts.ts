@@ -30,7 +30,7 @@ const PARTIAL_EVERY = 150;
  * pre-registered for a failed gate is this constant at false (greedy
  * resolution inside the tree, everything else unchanged).
  */
-export const FORCED_SWITCH_NODES = true;
+const FORCED_SWITCH_NODES = true;
 
 export { WIDENING_BASE, WIDENING_VISITS_PER_SLOT, wideningWindow } from './search/mcts-node.ts';
 

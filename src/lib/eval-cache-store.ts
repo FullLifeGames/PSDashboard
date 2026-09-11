@@ -146,7 +146,12 @@ export interface StoredEval {
 //      cannot express beside the log's HP, and two kept stats over the
 //      budget offer both shaving orders. Sets move where a body lost its
 //      measured offense under round 40.
-const EVAL_ENGINE_CACHE_VERSION = 44;
+// v45: round 42, a forced switch after a knock-out is a decision node of
+//      the MCTS tree (the replaced side picks from its bench with lookahead,
+//      the other side waits) instead of the greedy static pick, and doubles
+//      option lists offer the pass assignments. Every tree-evaluated
+//      position moves (Auto past a quarter of all bodies fainted).
+const EVAL_ENGINE_CACHE_VERSION = 45;
 
 export function evalStoreKey(
   cacheKey: string,
