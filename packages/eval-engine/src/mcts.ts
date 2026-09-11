@@ -1,6 +1,6 @@
 import type { PRNGSeed } from '@pkmn/sim';
 import { createMatchupCache, unansweredMons, type MatchupCache } from './eval-function.ts';
-import { advancePosition, advancePositionWithLog, createRootPosition, positionBattle } from './forward-model.ts';
+import { advancePositionWithLog, createRootPosition, positionBattle } from './forward-model.ts';
 import { classifyChild, koOddsForOptions, planCellEvents, type CellEvent } from './cell-blend.ts';
 import { cellKey, rankFromMatrix, toResult as rankedToResult } from './rank.ts';
 import { SEARCH_SEEDS } from './search.ts';
@@ -25,6 +25,12 @@ import type { EvalResult, EvalSettings, KoOddsInfo, MctsTreeStats, SearchProgres
 
 export const MCTS_ITERATIONS = 600;
 const PARTIAL_EVERY = 150;
+/**
+ * Round 42: forced switches are decision nodes. The fallback the roadmap
+ * pre-registered for a failed gate is this constant at false (greedy
+ * resolution inside the tree, everything else unchanged).
+ */
+export const FORCED_SWITCH_NODES = true;
 
 export { WIDENING_BASE, WIDENING_VISITS_PER_SLOT, wideningWindow } from './search/mcts-node.ts';
 
@@ -109,12 +115,13 @@ function expandRootChild(root: Node, key: number, i: number, j: number, seed: PR
     events = plan.kind === 'events' ? plan.events : null;
     classes.events.set(key, events);
   }
-  const { child, log } = advancePositionWithLog(root.position, root.p1Options[i].choice, root.p2Options[j].choice, seed);
+  const { child, log, pendingSwitch } = advancePositionWithLog(
+    root.position, root.p1Options[i].choice, root.p2Options[j].choice, seed, { stopAtForcedSwitch: FORCED_SWITCH_NODES });
   if (events) {
     const classKey = classifyChild(log, events);
     if (classKey !== null) classes.keys.set(key, classKey);
   }
-  return child;
+  return { child, pendingSwitch };
 }
 
 /**
@@ -148,22 +155,22 @@ function selectAndExpand(
     if (!child) {
       // Expansion: the cell's chance outcome is fixed at creation time.
       // The offset rotates the seed schedule so parallel trees explore
-      // different chance outcomes.
+      // different chance outcomes. Round 42: the advance stops at a
+      // knock-out's switch request, so the child may be a mid-turn node.
       const seed = SEARCH_SEEDS[(iteration + seedOffset) % SEARCH_SEEDS.length];
-      // Root expansions keep their advance log for the outcome class
-      // (advancePosition is advancePositionWithLog(...).child: same child).
-      const position = node === root
+      // Root expansions keep their advance log for the outcome class.
+      const expanded = node === root
         ? expandRootChild(root, key, i, j, seed, classes)
-        : advancePosition(node.position, node.p1Options[i].choice, node.p2Options[j].choice, seed);
-      child = makeNode(position, tera, matchupCache, undefined, sleepClause);
+        : advancePositionWithLog(node.position, node.p1Options[i].choice, node.p2Options[j].choice, seed, { stopAtForcedSwitch: FORCED_SWITCH_NODES });
+      child = makeNode(expanded.child, tera, matchupCache, undefined, sleepClause, !expanded.pendingSwitch);
       node.children.set(key, child);
       leaf = child.value;
       child.visits += 1;
-      depth += 1;
+      if (child.boundary) depth += 1;
       break;
     }
     node = child;
-    depth += 1;
+    if (node.boundary) depth += 1;
   }
   return { path, leaf, depth };
 }
@@ -297,4 +304,9 @@ export function mctsTreeSearch(
     })),
     result,
   };
+}
+
+/** The searched root node itself — for tests that inspect the tree's structure. */
+export function mctsRoot(serializedBattle: string, settings: EvalSettings, seedOffset = 0): Node {
+  return runMcts(serializedBattle, settings, undefined, seedOffset).root;
 }

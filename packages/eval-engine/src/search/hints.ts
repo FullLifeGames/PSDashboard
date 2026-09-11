@@ -115,6 +115,8 @@ export function singlesOptionHints(position: SimPosition, side: 'p1' | 'p2', opt
   const opponent = battle.sides[side === 'p1' ? 1 : 0].active[0];
   const active = sideState.active[0];
   const hint = (option: ChoiceOption): number => {
+    // The waiting side's sentinel (mid-turn nodes, round 42): nothing to rank.
+    if (option.choice === 'wait') return 0;
     if (!opponent || opponent.fainted) return 0;
     if (option.choice.startsWith('move ')) {
       if (!active || active.fainted) return 0;

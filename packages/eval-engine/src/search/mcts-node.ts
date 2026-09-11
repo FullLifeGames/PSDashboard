@@ -39,6 +39,12 @@ const hintOrder = (hints: number[]): number[] =>
 export interface Node {
   position: SimPosition;
   ended: boolean;
+  /**
+   * Round 42: a turn boundary (or game end) against a mid-turn node at an
+   * open forced-switch request, where one side picks its replacement and
+   * the other waits. Depth counts boundaries only.
+   */
+  boundary: boolean;
   /** Static eval, p1 perspective. */
   value: number;
   p1Options: ChoiceOption[];
@@ -60,6 +66,7 @@ export function makeNode(
   matchupCache: MatchupCache,
   keepPlayed?: EvalSettings['keepPlayed'],
   sleepClause?: boolean,
+  boundary = true,
 ): Node {
   const battle = positionBattle(position);
   const ended = battle.ended;
@@ -68,6 +75,7 @@ export function makeNode(
   return {
     position,
     ended,
+    boundary,
     // Same wp-unit value space as the matrix mode — mode switches must not
     // change what a number means.
     value: leafValue(battle, matchupCache),

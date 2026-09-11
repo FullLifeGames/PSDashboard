@@ -4,6 +4,10 @@ import type { PokemonSet } from '@pkmn/sim';
 import {
   advancePositionWithLog, createRootPosition, legalChoices, positionBattle,
 } from '../src/forward-model';
+import { mctsRoot, mctsTreeSearch } from '../src/mcts';
+import { mergeMctsTrees } from '../src/mcts-merge';
+import { cellKey } from '../src/rank';
+import type { Node } from '../src/search/mcts-node';
 
 /**
  * Round 42: forced switches as decision nodes. The forward model's
@@ -142,5 +146,68 @@ describe('doubles forced switches in the option lists (round 42)', () => {
     const stopped = advancePositionWithLog(root, 'move seismictoss 1, move protect', TACKLES, '1,2,3,4', { stopAtForcedSwitch: true });
     expect(stopped.pendingSwitch).toBe(true);
     expect(legalChoices(stopped.child, 'p2').map(option => option.choice)).toEqual(['switch 3']);
+  });
+});
+
+const SETTINGS = { depth: 1 as const, samples: 1 as const, tera: false as const };
+
+/** Depth in turns: boundary nodes on the deepest root-to-leaf path (the root counts as one). */
+function boundaryDepth(node: Node): number {
+  let deepest = 0;
+  for (const child of node.children.values()) deepest = Math.max(deepest, boundaryDepth(child));
+  return (node.boundary ? 1 : 0) + deepest;
+}
+
+function cellChild(root: Node, p1Choice: string, p2Choice: string): Node | undefined {
+  const i = root.p1Options.findIndex(option => option.choice === p1Choice);
+  const j = root.p2Options.findIndex(option => option.choice === p2Choice);
+  expect(i).toBeGreaterThanOrEqual(0);
+  expect(j).toBeGreaterThanOrEqual(0);
+  return root.children.get(cellKey(i, j));
+}
+
+describe('MCTS: forced switches are decision nodes (round 42)', () => {
+  test('singles: the knock-out cell is a mid-turn node with the bench against wait; its children are boundaries', () => {
+    const root = mctsRoot(explosionRoot().serialized, SETTINGS);
+    expect(root.boundary).toBe(true);
+    const mid = cellChild(root, 'move explosion', 'move substitute');
+    expect(mid).toBeDefined();
+    expect(mid!.boundary).toBe(false);
+    expect(mid!.p1Options.map(option => option.choice)).toEqual(['switch 2', 'switch 3']);
+    expect(mid!.p2Options).toEqual([{ choice: 'wait', label: '(waiting)' }]);
+    expect(mid!.children.size).toBeGreaterThan(0);
+    for (const child of mid!.children.values()) expect(child.boundary).toBe(true);
+  });
+
+  test('depth counts turns, not plies, and the search is deterministic', () => {
+    const serialized = explosionRoot().serialized;
+    const stats = mctsTreeSearch(serialized, { ...SETTINGS, mode: 'mcts' }, 0);
+    const root = mctsRoot(serialized, { ...SETTINGS, mode: 'mcts' }, 0);
+    expect(stats.depth).toBe(boundaryDepth(root));
+    const again = mctsRoot(serialized, { ...SETTINGS, mode: 'mcts' }, 0);
+    expect({ n: again.p1N, w: again.p1W, n2: again.p2N, w2: again.p2W, visits: again.visits })
+      .toEqual({ n: root.p1N, w: root.p1W, n2: root.p2N, w2: root.p2W, visits: root.visits });
+  });
+
+  test('doubles: the double knock-out cell is a mid-turn node over the pass assignments', () => {
+    const root = mctsRoot(doubleKoRoot(['Eevee']).serialized, SETTINGS);
+    const mid = cellChild(root, DOUBLE_KO, TACKLES);
+    expect(mid).toBeDefined();
+    expect(mid!.boundary).toBe(false);
+    expect(mid!.p1Options).toEqual([{ choice: 'wait', label: '(waiting)' }]);
+    expect(mid!.p2Options.map(option => option.choice)).toEqual(['switch 3, pass', 'pass, switch 3']);
+    for (const child of mid!.children.values()) expect(child.boundary).toBe(true);
+  });
+
+  test('root-parallel trees over mid-turn children still merge and rank every root row', () => {
+    const serialized = explosionRoot().serialized;
+    const trees = [0, 1, 2, 3].map(offset => mctsTreeSearch(serialized, { ...SETTINGS, mode: 'mcts' }, offset));
+    const explosionRow = trees[0].p1Options.findIndex(option => option.choice === 'move explosion');
+    const explosionCells = trees[0].cells.filter(cell => Math.floor(cell.key / 10_000) === explosionRow);
+    expect(explosionCells.length).toBeGreaterThan(0);
+    expect(explosionCells.every(cell => cell.ended === false)).toBe(true);
+    const merged = mergeMctsTrees(trees);
+    expect(merged.perSide.p1.map(row => row.choice).sort()).toEqual(trees[0].p1Options.map(option => option.choice).sort());
+    expect(merged.perSide.p2.map(row => row.choice).sort()).toEqual(trees[0].p2Options.map(option => option.choice).sort());
   });
 });
