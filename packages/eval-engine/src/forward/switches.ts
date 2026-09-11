@@ -2,6 +2,7 @@ import { PRNG } from '@pkmn/sim';
 import type { Battle, PRNGSeed, Side } from '@pkmn/sim';
 import { evaluatePosition } from '../eval-function.ts';
 import { sideIndex } from '@fulllifegames/replay-core';
+import { switchAssignments } from './assignments.ts';
 import { deserializeFromParsed, parseSearchState, type ParsedSearchState } from './parsed-state.ts';
 import { serializeBattleStable } from './serialize.ts';
 
@@ -50,31 +51,6 @@ export function applyChoice(battle: Battle, side: 'p1' | 'p2', choice: string): 
     const error = battle.sides[sideIndex(side)].choice.error || 'choice rejected';
     throw new Error(`${side} "${choice}": ${error}`);
   }
-}
-
-/**
- * Resolves any open forced-switch requests (mid-turn KOs) by greedily
- * picking the replacement whose entry statically evaluates best for the
- * choosing side. Runs until the battle is back at a turn boundary or over.
- */
-/**
- * All ways to assign distinct bench replacements to the forced slots, as
- * ready-to-send choice strings. With fewer replacements than forced slots
- * the remainder passes.
- */
-function switchAssignments(forcedCount: number, benchSlots: number[]): string[] {
-  if (forcedCount <= 1) return benchSlots.map(slot => `switch ${slot}`);
-  const assignments: string[] = [];
-  if (benchSlots.length === 1) {
-    return [`switch ${benchSlots[0]}, pass`, `pass, switch ${benchSlots[0]}`];
-  }
-  for (const first of benchSlots) {
-    for (const second of benchSlots) {
-      if (first === second) continue;
-      assignments.push(`switch ${first}, switch ${second}`);
-    }
-  }
-  return assignments;
 }
 
 /** Slots the request forces to switch (at least one — a singles request carries no table). */

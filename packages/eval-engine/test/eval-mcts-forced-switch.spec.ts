@@ -97,3 +97,50 @@ describe('forward model: stop at the forced-switch request (round 42)', () => {
     expect(positionBattle(done.child).sides[1].active[0]!.name).toBe('Eevee');
   });
 });
+
+/** Doubles: Machamp and Snorlax knock out both p2 actives; the bench holds `benchNames`. */
+const doubleKoRoot = (benchNames: string[]) => createRootPosition(serialize(makeBattle('gen9doublescustomgame',
+  [
+    makeSet('Machamp', 'Machamp', ['Seismic Toss', 'Protect'], 100),
+    makeSet('Snorlax', 'Snorlax', ['Seismic Toss', 'Protect'], 100),
+  ],
+  [
+    makeSet('Pikachu', 'Pikachu', ['Tackle'], 30),
+    makeSet('Vulpix', 'Vulpix', ['Tackle'], 30),
+    ...benchNames.map(name => makeSet(name, name, ['Tackle'], 30)),
+  ],
+)));
+const DOUBLE_KO = 'move seismictoss 1, move seismictoss 2';
+const TACKLES = 'move tackle 1, move tackle 1';
+
+describe('doubles forced switches in the option lists (round 42)', () => {
+  test('two forced slots with one replacement offer both pass assignments', () => {
+    const stopped = advancePositionWithLog(doubleKoRoot(['Eevee']), DOUBLE_KO, TACKLES, '1,2,3,4', { stopAtForcedSwitch: true });
+    expect(stopped.pendingSwitch).toBe(true);
+    expect(legalChoices(stopped.child, 'p1')).toEqual([{ choice: 'wait', label: '(waiting)' }]);
+    expect(legalChoices(stopped.child, 'p2')).toEqual([
+      { choice: 'switch 3, pass', label: '→ Eevee + pass' },
+      { choice: 'pass, switch 3', label: 'pass + → Eevee' },
+    ]);
+    for (const option of legalChoices(stopped.child, 'p2')) {
+      const next = advancePositionWithLog(stopped.child, 'wait', option.choice, '1,2,3,4', { stopAtForcedSwitch: true });
+      expect(next.pendingSwitch).toBe(false);
+      expect(positionBattle(next.child).turn).toBe(2);
+    }
+  });
+
+  test('two forced slots with two replacements keep the ordered pairs', () => {
+    const stopped = advancePositionWithLog(doubleKoRoot(['Eevee', 'Growlithe']), DOUBLE_KO, TACKLES, '1,2,3,4', { stopAtForcedSwitch: true });
+    expect(legalChoices(stopped.child, 'p2').map(option => option.choice)).toEqual(['switch 3, switch 4', 'switch 4, switch 3']);
+  });
+
+  test('one forced slot beside a living partner still offers the bare switch', () => {
+    const root = createRootPosition(serialize(makeBattle('gen9doublescustomgame',
+      [makeSet('Machamp', 'Machamp', ['Seismic Toss', 'Protect'], 100), makeSet('Snorlax', 'Snorlax', ['Protect'], 100)],
+      [makeSet('Pikachu', 'Pikachu', ['Tackle'], 30), makeSet('Eevee', 'Eevee', ['Tackle'], 30), makeSet('Vulpix', 'Vulpix', ['Tackle'], 30)],
+    )));
+    const stopped = advancePositionWithLog(root, 'move seismictoss 1, move protect', TACKLES, '1,2,3,4', { stopAtForcedSwitch: true });
+    expect(stopped.pendingSwitch).toBe(true);
+    expect(legalChoices(stopped.child, 'p2').map(option => option.choice)).toEqual(['switch 3']);
+  });
+});

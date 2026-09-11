@@ -1,6 +1,7 @@
 import type { Battle, Pokemon, Side } from '@pkmn/sim';
 import type { TeraAllowance } from '../types.ts';
 import { positionBattle, type ChoiceOption, type SimPosition } from './position.ts';
+import { switchAssignments } from './assignments.ts';
 import { sideIndex, toId } from '@fulllifegames/replay-core';
 
 /**
@@ -207,6 +208,15 @@ function combineSlots(perSlot: SlotChoice[][]): ChoiceOption[] {
   return combined;
 }
 
+/** Labels one assignment's parts: a bench switch by species, a pass as "pass". */
+function assignmentLabel(sideState: Side, choice: string): string {
+  return choice.split(',').map(part => {
+    const tokens = part.trim().split(' ');
+    if (tokens[0] !== 'switch') return 'pass';
+    return `→ ${sideState.pokemon[parseInt(tokens[1], 10) - 1].species.name}`;
+  }).join(' + ');
+}
+
 /**
  * Doubles: per-slot choices, then the combined product. Slots the sim
  * auto-passes (fainted/empty) are skipped entirely — explicit `pass`
@@ -220,6 +230,14 @@ function doublesChoices(
   side: 'p1' | 'p2',
   tera: TeraAllowance | undefined,
 ): ChoiceOption[] {
+  // Round 42: more forced slots than living replacements — the product
+  // over per-slot switches drops every pair with a shared target and left
+  // nothing; the sim wants a pass for each slot no body can fill.
+  const forcedCount = forceSwitch.filter(Boolean).length;
+  const bench = benchSwitches(sideState).map(entry => entry.bench!);
+  if (forcedCount > 1 && bench.length < forcedCount) {
+    return switchAssignments(forcedCount, bench).map(choice => ({ choice, label: assignmentLabel(sideState, choice) }));
+  }
   const perSlot: SlotChoice[][] = [];
   for (let slot = 0; slot < slotCount; slot++) {
     const slotTera = teraAllowed(tera, side, sideState.active[slot] ?? null);
