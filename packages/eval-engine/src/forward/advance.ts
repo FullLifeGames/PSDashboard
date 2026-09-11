@@ -1,6 +1,6 @@
 import type { Battle, PRNGSeed, Side } from '@pkmn/sim';
 import { forkBattle, toPosition, type SimPosition } from './position.ts';
-import { applyChoice, resolveForcedSwitches } from './switches.ts';
+import { answerFollowUps, applyChoice, resolveForcedSwitches } from './switches.ts';
 import { sideIndex, toId } from '@fulllifegames/replay-core';
 
 /**
@@ -22,25 +22,42 @@ export function advancePosition(
   return advancePositionWithLog(position, p1Choice, p2Choice, seed).child;
 }
 
+export interface AdvanceOptions {
+  /**
+   * Round 42: stop at the first forced-switch request no pivot follow-up
+   * answers, so the tree can search the replacement as a decision node
+   * instead of taking the greedy static pick. Default: resolve greedily.
+   */
+  stopAtForcedSwitch?: boolean;
+}
+
 /**
  * advancePosition plus the battle.log delta of THIS advance only — the
- * cell-blend classifier reads outcome classes from these lines.
+ * cell-blend classifier reads outcome classes from these lines. With
+ * `stopAtForcedSwitch` the child may sit at an open switch request
+ * (`pendingSwitch`); its log then ends at that request.
  */
 export function advancePositionWithLog(
   position: SimPosition,
   p1Choice: string,
   p2Choice: string,
   seed: PRNGSeed,
-): { child: SimPosition; log: string[] } {
+  opts?: AdvanceOptions,
+): { child: SimPosition; log: string[]; pendingSwitch: boolean } {
   const battle = forkBattle(position, seed);
   const logStart = battle.log.length;
   applyChoice(battle, 'p1', p1Choice);
   applyChoice(battle, 'p2', p2Choice);
-  resolveForcedSwitches(battle, seed, {
-    p1: p1Choice.split(' > ')[1],
-    p2: p2Choice.split(' > ')[1],
-  });
-  return { child: toPosition(battle), log: battle.log.slice(logStart) };
+  const followUps = { p1: p1Choice.split(' > ')[1], p2: p2Choice.split(' > ')[1] };
+  let pendingSwitch = false;
+  if (opts?.stopAtForcedSwitch) {
+    const stand = answerFollowUps(battle, followUps);
+    if (stand === 'pending') pendingSwitch = true;
+    else if (stand === 'mixed') resolveForcedSwitches(battle, seed, followUps);
+  } else {
+    resolveForcedSwitches(battle, seed, followUps);
+  }
+  return { child: toPosition(battle), log: battle.log.slice(logStart), pendingSwitch };
 }
 
 export interface TrialAdvanceResult {

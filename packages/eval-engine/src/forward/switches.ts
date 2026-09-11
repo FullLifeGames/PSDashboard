@@ -77,6 +77,19 @@ function switchAssignments(forcedCount: number, benchSlots: number[]): string[] 
   return assignments;
 }
 
+/** Slots the request forces to switch (at least one — a singles request carries no table). */
+function forcedSlotCount(side: Side): number {
+  const request = side.activeRequest as { forceSwitch?: boolean[] } | null;
+  return Math.max(1, (request?.forceSwitch ?? []).filter(Boolean).length);
+}
+
+/** Sides with an open forced-switch request (mid-turn), in side order. */
+function pendingSwitchSides(battle: Battle): Side[] {
+  return battle.sides
+    .slice(0, 2)
+    .filter(side => side.requestState === 'switch' && !side.isChoiceDone());
+}
+
 /**
  * A pivot pair's declared follow-up answers this side's first switch
  * request. Consumed once; true when the sim accepted it, false after a
@@ -95,6 +108,35 @@ function answerFollowUp(
   if (battle.choose(side.id as 'p1' | 'p2', followUp)) return true;
   side.clearChoice();
   return false;
+}
+
+/**
+ * Round 42: the tree's stop-at-request resolution. Pivot follow-ups are
+ * answered exactly as the greedy path answers them; a request without a
+ * follow-up (a knock-out's replacement, or a rejected follow-up) stays
+ * open and becomes a decision node. Returns where the battle stands:
+ * 'boundary' (turn boundary or game over), 'pending' (an open request the
+ * caller turns into a node), or 'mixed' (an answerable follow-up beside an
+ * open request — nothing was submitted; the caller resolves the turn
+ * greedily so no position ever carries a half-answered request).
+ */
+export function answerFollowUps(
+  battle: Battle,
+  followUps: { p1?: string; p2?: string },
+): 'boundary' | 'pending' | 'mixed' {
+  for (let guard = 0; guard < 6; guard++) {
+    if (battle.ended) return 'boundary';
+    const pending = pendingSwitchSides(battle);
+    if (pending.length === 0) return 'boundary';
+    const answerable = pending.filter(side =>
+      !!followUps[side.id as 'p1' | 'p2'] && forcedSlotCount(side) === 1);
+    if (answerable.length === 0) return 'pending';
+    if (answerable.length < pending.length) return 'mixed';
+    for (const side of pending) {
+      if (!answerFollowUp(battle, side, 1, followUps)) return 'pending';
+    }
+  }
+  return 'pending';
 }
 
 /**
@@ -134,9 +176,7 @@ export function resolveForcedSwitches(
 ): void {
   for (let guard = 0; guard < 6; guard++) {
     if (battle.ended) return;
-    const pending = battle.sides
-      .slice(0, 2)
-      .filter(side => side.requestState === 'switch' && !side.isChoiceDone());
+    const pending = pendingSwitchSides(battle);
     if (pending.length === 0) return;
 
     // The mid-turn snapshot is taken once, before any side answers, and
@@ -145,8 +185,7 @@ export function resolveForcedSwitches(
     let parsedMid: ParsedSearchState | null = null;
     const mid = () => (parsedMid ??= parseSearchState(midTurn));
     for (const side of pending) {
-      const request = side.activeRequest as { forceSwitch?: boolean[] } | null;
-      const forcedCount = Math.max(1, (request?.forceSwitch ?? []).filter(Boolean).length);
+      const forcedCount = forcedSlotCount(side);
       if (answerFollowUp(battle, side, forcedCount, followUps)) continue;
       const benchSlots = side.pokemon
         .map((pokemon, index) => ({ pokemon, slot: index + 1 }))
