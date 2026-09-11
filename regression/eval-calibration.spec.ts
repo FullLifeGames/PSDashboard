@@ -961,7 +961,11 @@ import { summaryLines } from './calibration-summary';
  * +0.503 → +0.404), t76 quiet → chance (−0.23) and t77 chance → quiet,
  * 52 of 139 scores move (max 0.19 at t77), KO-odds mismatches 200 → 202;
  * no pin moved, no other replay moved. e2e 74/74 green (1.8 min).
- * VERDICT: at the user gate (11.09.), narrow reading recommended; the wide reading stays a registered candidate with the numbers above (its own feedback gate if adopted).
+ * VERDICT 2026-09-11 (user gate, afternoon): ADOPTED as built, the narrow
+ * reading. Fast-forwarded to master (5bee071 plus this entry); no pin
+ * moved, so no re-pins. The wide reading stays a registered candidate
+ * (NextSteps A.1) with the numbers above and its own feedback gate if it
+ * is ever adopted; its measurement branch r41-wide keeps the bank run.
  *
  * TURN-73 ROUND 2026-09-05 (improvement round 40; spec
  * docs/superpowers/specs/2026-09-05-round-40-design.md; worktree r40 on
