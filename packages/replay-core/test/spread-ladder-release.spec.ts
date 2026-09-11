@@ -88,3 +88,40 @@ describe('a kept Speed gives way to a measured offense (round 41)', () => {
     expect(solved?.evs.atk).toBe(0);
   });
 });
+
+describe('two kept stats over the budget (round 41)', () => {
+  const sets = {
+    p1: [asSet(clefable, ['Moonblast'])],
+    p2: [asSet(garchomp, ['Earthquake', 'Swords Dance'])],
+  };
+  const shaved = { ...garchomp, evs: { hp: 252, atk: 4, def: 0, spa: 0, spd: 0, spe: 252 } };
+  const full = { ...garchomp, nature: 'Hardy', evs: { hp: 252, atk: 252, def: 0, spa: 0, spd: 0, spe: 4 } };
+  const maxRoll = (attacker: Side) => hit(attacker, clefable, 'Earthquake', true, 15).observedFraction;
+
+  test('a knock-out the shaved offense cannot reach frees the kept Speed', () => {
+    // Knock-out-only offense (kept), the log's 420 HP (fixed), a satisfied
+    // order (Speed kept): 252 + 252 + 252 do not fit. Round 40 shaved the
+    // kept Atk to 4 by the kept order (Jolly 252/4/0/0/0/252) with nothing
+    // measuring it; a knock-out that a 4-Atk body cannot deal now picks the
+    // body that can (knock-out lines are lower bounds).
+    expect(maxRoll(full)).toBeGreaterThan(maxRoll(shaved) + 0.04);
+    const ko = (maxRoll(shaved) + 0.02 + maxRoll(full)) / 2;
+    const observations = [
+      { ...hit(garchomp, clefable, 'Earthquake', true), observedFraction: ko },
+      hit(clefable, full, 'Moonblast'),
+    ];
+    const solved = inferSpreads(observations, sets, 'gen9ou', [beforeClefable], new Map(), maxHp420).get('p2:garchomp');
+    expect(solved?.evs).toEqual(full.evs);
+    expect(solved?.nature).toBe('Hardy');
+  });
+
+  test('a knock-out both bodies reach keeps the round-40 body (the prior nature breaks the tie)', () => {
+    const observations = [
+      { ...hit(garchomp, clefable, 'Earthquake', true), observedFraction: maxRoll(shaved) - 0.05 },
+      hit(clefable, full, 'Moonblast'),
+    ];
+    const solved = inferSpreads(observations, sets, 'gen9ou', [beforeClefable], new Map(), maxHp420).get('p2:garchomp');
+    expect(solved?.evs).toEqual(shaved.evs);
+    expect(solved?.nature).toBe('Jolly');
+  });
+});

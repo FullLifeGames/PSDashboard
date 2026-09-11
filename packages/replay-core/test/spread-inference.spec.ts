@@ -514,8 +514,12 @@ describe('evidence that cannot measure keeps the prior', () => {
       p2: [asSet(garchomp, ['Earthquake', 'Swords Dance'])],
     };
     const order = { firstSide: 'p2' as const, firstSpecies: 'Garchomp', secondSide: 'p1' as const, secondSpecies: 'Clefable', turn: 70 };
+    // The knock-out sits where the 48-Atk truth can deal it (its top roll on
+    // this Clefable is about 37%): round 41 reads a knock-out above the kept
+    // body's reach as the offense measured upward, and the first cut of this
+    // test had it at 60%, beyond its own truth.
     const observations = [
-      { ...hit(garchomp, clefable, 'Earthquake'), observedFraction: 0.6, lethal: true },
+      { ...hit(garchomp, clefable, 'Earthquake'), observedFraction: 0.3, lethal: true },
       hit(clefable, { ...garchomp, evs: truth }, 'Moonblast'),
       hit(magnezone, { ...garchomp, evs: truth }, 'Flash Cannon'),
     ];

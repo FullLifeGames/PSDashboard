@@ -149,14 +149,24 @@ const keepsNature = (keep: ReadonlySet<keyof PokemonEvs>, priorPlus: keyof Pokem
 /**
  * The prior rung: the prior legalized around the same kept and fixed stats
  * as the composed ones (with the log's HP in place its carry-overs give way
- * in the same order). Every rung is LEGALIZED before scoring.
+ * in the same order). Every rung is LEGALIZED before scoring. Round 41:
+ * when a kept offense and a kept Speed do not both fit beside the fixed
+ * stats, the kept order shaves the offense; a second prior rung lets the
+ * Speed give way instead, its speed nature neutralized. Knock-out lower
+ * bounds and move orders decide between them; at equal error the prior's
+ * own nature wins the tie (priorDistance).
  */
 function priorRungs(ctx: LadderContext): CandidateRung[] {
   const { prior, keep, fixed, budget } = ctx;
+  const evs = { ...ZERO_EVS, ...prior.evs, ...fixed };
   const kept = new Set([...keep].filter(stat => fixed[stat] === undefined && (prior.evs[stat] ?? 0) > 0));
-  return [{
-    evs: capToBudget({ ...ZERO_EVS, ...prior.evs, ...fixed }, new Set(), budget, kept, fixedStats(fixed)),
-    nature: prior.nature,
+  const first: CandidateRung = { evs: capToBudget(evs, new Set(), budget, kept, fixedStats(fixed)), nature: prior.nature };
+  const offenseShaved = (first.evs[ctx.offenseStat] ?? 0) < (prior.evs[ctx.offenseStat] ?? 0);
+  if (!kept.has(ctx.offenseStat) || !kept.has('spe') || !offenseShaved) return [first];
+  const released = new Set([...kept].filter(stat => stat !== 'spe'));
+  return [first, {
+    evs: capToBudget(evs, new Set(), budget, released, fixedStats(fixed)),
+    nature: ctx.priorPlus === 'spe' ? 'Hardy' : prior.nature,
   }];
 }
 
