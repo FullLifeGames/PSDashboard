@@ -892,6 +892,77 @@ import { summaryLines } from './calibration-summary';
  * static basis for this mass; the next lever, if any, is search/
  * planning-side.
  *
+ * OFFENSE-VS-KEPT-SPEED ROUND 2026-09-11 (improvement round 41; spec
+ * docs/superpowers/specs/2026-09-11-round-41-design.md; branch r41 on
+ * master ba2ce5b; d72690b a kept Speed gives way to an offense claim the
+ * budget cannot express / e30c1c5 both shaving orders when a kept offense
+ * and a kept Speed exceed the budget / 07db6ac cache v44 / 889a132 the
+ * release is for the offense claim's own room). The registered defect of
+ * round 40's diff review: with the log's HP fixed and a satisfied order
+ * keeping Speed, an offense rung whose claim the budget cannot express
+ * beside them was dropped by the round-40 feasibility rule, so the ladder
+ * held only 0-offense rungs and clean damage lines that measured 252 Atk
+ * ended at 0 Atk. The sighting probe (docs/perf/probes/2026-09-11-r41/
+ * repro.vt.ts) reproduced it: prior Jolly 0/252/0/0/4/252, truth Adamant
+ * 252/252/0/0/0/4, log 420/420, one satisfied order, two clean
+ * Earthquakes → Jolly 252/0/0/0/4/252 (without the order: Adamant
+ * 252/252/0/0/0/4). The probe also found the sibling: a knock-out-only
+ * offense (kept) beside the fixed HP and the kept Speed is shaved to 4 by
+ * the kept order with nothing measuring it (Jolly 252/4/0/0/0/252).
+ * FIXES (ladder.ts only): rule 1 — when the composed offense stat falls
+ * below its claim beside the kept Speed, the ladder offers the rung again
+ * with the Speed released (its plus nature neutralized, the offense-plus
+ * rung available); the 0-offense rungs stay, bestRung decides, and a
+ * released body still pays 1000 per violated order. Rule 2 — when a kept
+ * offense and a kept Speed do not both fit beside the fixed stats, a
+ * second prior rung lets the Speed give way instead (Hardy); knock-out
+ * lower bounds and orders decide, the prior's nature wins ties. A kept
+ * offense never gives way (round 33) and a bulk claim never releases
+ * Speed, not even beside an offense claim the budget did express: the
+ * first cut released for any rung claiming offense, and the fit corpus
+ * showed that reading stripping Speed from 162 bodies with an unchanged
+ * offense (Deoxys-Speed 0/0/0/252/4/252 → 252/0/0/252/0/4), so the
+ * trigger was narrowed to the offense claim's own room. The round-40
+ * test's knock-out line moved from 60% to 30%, the reach of its own
+ * 48-Atk truth.
+ * REACH (fit corpus, 2122 replays, bare build path): the 963 starvations
+ * of round 40 reproduce exactly (0e65d2c 252 → master 0). The narrow
+ * reading restores 20 of them and moves 140 sets in 81 replays (rule 2:
+ * 4 sets, Great Tusk 252/4/0/0/0/252 → 252/252/0/0/0/4); the wide reading
+ * restores 186 and moves 640 sets in 363 replays; the other 777 belong to
+ * other families (bulk claims outweighing offense lines without a kept
+ * Speed, budgets left unfilled under measured stats — the top-up rest —
+ * and orders that really need the Speed). On the HARNESS path (usage
+ * stats + set assumptions, the bank's 129 replays, 1586 sets) the narrow
+ * reading moves NO set and the wide reading 51 sets in 23 replays (15
+ * offenses restored — Weavile 0/0/0/0/0/252 → 0/252/0/0/4/252, Ogerpon-
+ * Wellspring likewise — and 19 bodies that lose Speed to a bulk claim
+ * beside an unchanged offense). On the FEEDBACK path (usage fixtures, set
+ * assumptions for four species) the narrow reading moves one set:
+ * 573756's Kyurem, Jolly 56/0/236/0/0/216 → Hardy 56/0/0/252/0/200 — the
+ * 0-SpA body of round 40's rests gets its measured Special Attack back
+ * (fixed 405 HP + kept Speed starved the offense claim); 573756's
+ * Garchomp is unchanged on the pin path (Hardy 208/48/0/0/0/252).
+ * BENCH (paired, n=816; A .calibration/r40-b = the adopted round-40
+ * numbers, engine unchanged since dbffb5f; B .calibration/r41-b): every
+ * score identical — the narrow round is invisible to the bank by
+ * construction. The wide reading (.calibration/r41-wide-b, measurement
+ * branch r41-wide): brier 0.2612/0.2296/0.1518 → 0.2609/0.2296/0.1529
+ * (early −3 bp, late +11 bp), hq n=548 0.2600/0.2167/0.1607 →
+ * 0.2597/0.2168/0.1616 (late +9 bp), luck-adjusted 0.2452/0.2084/0.1458 →
+ * 0.2445/0.2084/0.1455; sign 53/62/79 → 53/62/79; three exclusive flips,
+ * A right 2, B right 1 — flat within noise, the preregistered line (no
+ * phase worse than 20 bp hq) holds for both readings.
+ * GATES: tsc, lint (ratchet), knip, Vitest 1388 green (169 files; the new
+ * spread-ladder-release.spec.ts, 7 tests); three feedback sweeps
+ * byte-identical on all six full dumps (drift JSON and report differ
+ * only in commit, date and wall time); against the master base of the
+ * same morning only 573756 moves: t73 keeps chance + key moment (chance
+ * +0.503 → +0.404), t76 quiet → chance (−0.23) and t77 chance → quiet,
+ * 52 of 139 scores move (max 0.19 at t77), KO-odds mismatches 200 → 202;
+ * no pin moved, no other replay moved. e2e 74/74 green (1.8 min).
+ * VERDICT: at the user gate (11.09.), narrow reading recommended; the wide reading stays a registered candidate with the numbers above (its own feedback gate if adopted).
+ *
  * TURN-73 ROUND 2026-09-05 (improvement round 40; spec
  * docs/superpowers/specs/2026-09-05-round-40-design.md; worktree r40 on
  * 0e65d2c while the second session committed on master; 694fac7 HP EVs
