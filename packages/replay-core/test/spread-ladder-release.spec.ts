@@ -75,6 +75,20 @@ describe('a kept Speed gives way to a measured offense (round 41)', () => {
     expect(noOrder?.evs).toEqual(bulkyAttacker);
   });
 
+  test('a bulk claim beside an expressed offense claim does not release the kept Speed', () => {
+    // No HP reading: the offense rung fits beside the kept Speed (the prior
+    // itself), only the 252-HP claim riding with it is shaved. Round 41
+    // releases Speed for the offense claim's own room, never for a bulk
+    // claim (573756 t73 before round 40: a bulk rung stripped the Speed).
+    // The fit corpus measured the wider rule at 162 bodies that lost their
+    // Speed to a bulk claim beside an unchanged offense; that reading is a
+    // registered candidate, not this round's rule.
+    const defenderLines = [hit(clefable, truth, 'Moonblast'), hit(toxapex, truth, 'Scald')];
+    const solved = inferSpreads([...observations, ...defenderLines], sets, 'gen9ou', [beforeClefable]).get('p2:garchomp');
+    expect(solved?.evs.spe ?? 252).toBe(252);
+    expect(solved?.nature ?? 'Jolly').toBe('Jolly');
+  });
+
   test('the released Speed must still satisfy the observed orders', () => {
     // Garchomp moved before a Jolly 252 Spe Lucario (306): the prior's 333
     // satisfies it, the released bodies (241 Hardy, 265 Jolly) do not. The

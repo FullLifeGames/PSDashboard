@@ -184,7 +184,7 @@ function offeredRung(ctx: LadderContext, options: RungOption[]): CandidateRung |
     const nature = rungNature(options, keepsNature(ctx.keep, ctx.priorPlus), ctx.priorNature);
     return nature === null ? null : { evs, nature };
   }
-  return releasedRung(ctx, options, claimed);
+  return releasedRung(ctx, options, claimed, evs);
 }
 
 /**
@@ -193,14 +193,16 @@ function offeredRung(ctx: LadderContext, options: RungOption[]): CandidateRung |
  * clean damage lines measure the offense; with the log's HP fixed, only
  * one of the two fits, and the measured one wins the room. The released
  * Speed loses its plus nature like a measured stat left uninvested, which
- * frees the offense-plus rung. Bulk claims never release Speed (573756
- * t73: the 252-HP rung must not strip it) and a kept offense never gives
- * way (round 33). bestRung decides between the released body and the
- * 0-offense rungs; its order check prices a released body that no longer
- * moves first.
+ * frees the offense-plus rung. The release is for the offense claim's own
+ * room: a bulk claim never releases Speed, not even beside an offense
+ * claim the budget did express (573756 t73: the 252-HP rung must not
+ * strip it), and a kept offense never gives way (round 33). bestRung
+ * decides between the released body and the 0-offense rungs; its order
+ * check prices a released body that no longer moves first.
  */
-function releasedRung(ctx: LadderContext, options: RungOption[], claimed: Partial<PokemonEvs>): CandidateRung | null {
-  if (!ctx.keep.has('spe') || (claimed[ctx.offenseStat] ?? 0) <= 0) return null;
+function releasedRung(ctx: LadderContext, options: RungOption[], claimed: Partial<PokemonEvs>, kept: PokemonEvs): CandidateRung | null {
+  const offenseStarved = (kept[ctx.offenseStat] ?? 0) < (claimed[ctx.offenseStat] ?? 0);
+  if (!ctx.keep.has('spe') || !offenseStarved) return null;
   const released = new Set([...ctx.keep].filter(stat => stat !== 'spe'));
   const nature = rungNature(options, keepsNature(released, ctx.priorPlus), ctx.priorPlus === 'spe' ? 'Hardy' : ctx.priorNature);
   if (nature === null) return null;
