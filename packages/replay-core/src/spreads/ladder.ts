@@ -40,7 +40,9 @@ const NATURE_PLUS: Record<string, keyof PokemonEvs> = {
  * `keep` names prior stats the evidence cannot measure at all (an offense
  * seen only in knock-outs, a Speed no rung can bring in line with the
  * observed order): they stay at the prior's value and give way last in
- * the budget, after the rung's own claims (573756: the 0-Atk sweeper).
+ * the budget, after the rung's own claims (573756: the 0-Atk sweeper). A
+ * kept Speed gives way to an offense claim the budget cannot express
+ * beside it (round 41); a kept offense never gives way.
  */
 type RungOption = { evs?: Partial<PokemonEvs>; nature?: string };
 
@@ -126,6 +128,76 @@ function composeRung(
   return capToBudget({ ...ZERO_EVS, ...prior.evs, ...claimed }, protectedStats, budget, kept, fixedStats(fixed));
 }
 
+/** What every rung of one ladder shares. */
+interface LadderContext {
+  prior: SpreadCandidate;
+  budget: EvBudget;
+  fixed: Partial<PokemonEvs>;
+  keep: ReadonlySet<keyof PokemonEvs>;
+  offenseStat: 'atk' | 'spa';
+  priorPlus: keyof PokemonEvs | undefined;
+  priorNature: string;
+}
+
+/**
+ * A kept stat keeps its plus nature too: a bulk or offense nature would
+ * lower the very stat the evidence cannot measure.
+ */
+const keepsNature = (keep: ReadonlySet<keyof PokemonEvs>, priorPlus: keyof PokemonEvs | undefined): boolean =>
+  priorPlus !== undefined && keep.has(priorPlus);
+
+/**
+ * The prior rung: the prior legalized around the same kept and fixed stats
+ * as the composed ones (with the log's HP in place its carry-overs give way
+ * in the same order). Every rung is LEGALIZED before scoring.
+ */
+function priorRungs(ctx: LadderContext): CandidateRung[] {
+  const { prior, keep, fixed, budget } = ctx;
+  const kept = new Set([...keep].filter(stat => fixed[stat] === undefined && (prior.evs[stat] ?? 0) > 0));
+  return [{
+    evs: capToBudget({ ...ZERO_EVS, ...prior.evs, ...fixed }, new Set(), budget, kept, fixedStats(fixed)),
+    nature: prior.nature,
+  }];
+}
+
+/**
+ * One combination's rung, composed beside the kept stats and offered only
+ * when the budget expresses every claim: a shaved claim would leave its
+ * nature standing on nothing (round 40: "Calm 252 HP / 4 SpD / 252 Spe"
+ * once Speed stays kept). When it cannot, the released form (round 41) is
+ * the fallback; the prior rung stands behind both.
+ */
+function offeredRung(ctx: LadderContext, options: RungOption[]): CandidateRung | null {
+  const claimed: Partial<PokemonEvs> = Object.assign({}, ...options.map(option => option.evs ?? {}));
+  const evs = composeRung(ctx.prior, claimed, ctx.keep, ctx.budget, ctx.fixed);
+  if (expressed(evs, claimed, ctx.fixed)) {
+    const nature = rungNature(options, keepsNature(ctx.keep, ctx.priorPlus), ctx.priorNature);
+    return nature === null ? null : { evs, nature };
+  }
+  return releasedRung(ctx, options, claimed);
+}
+
+/**
+ * Round 41: a kept Speed gives way to an offense claim the budget cannot
+ * express beside it. A satisfied order measures nothing downward while
+ * clean damage lines measure the offense; with the log's HP fixed, only
+ * one of the two fits, and the measured one wins the room. The released
+ * Speed loses its plus nature like a measured stat left uninvested, which
+ * frees the offense-plus rung. Bulk claims never release Speed (573756
+ * t73: the 252-HP rung must not strip it) and a kept offense never gives
+ * way (round 33). bestRung decides between the released body and the
+ * 0-offense rungs; its order check prices a released body that no longer
+ * moves first.
+ */
+function releasedRung(ctx: LadderContext, options: RungOption[], claimed: Partial<PokemonEvs>): CandidateRung | null {
+  if (!ctx.keep.has('spe') || (claimed[ctx.offenseStat] ?? 0) <= 0) return null;
+  const released = new Set([...ctx.keep].filter(stat => stat !== 'spe'));
+  const nature = rungNature(options, keepsNature(released, ctx.priorPlus), ctx.priorPlus === 'spe' ? 'Hardy' : ctx.priorNature);
+  if (nature === null) return null;
+  const evs = composeRung(ctx.prior, claimed, released, ctx.budget, ctx.fixed);
+  return expressed(evs, claimed, ctx.fixed) ? { evs, nature } : null;
+}
+
 export function candidateLadder(
   prior: SpreadCandidate,
   physicalAttacker: boolean,
@@ -138,40 +210,22 @@ export function candidateLadder(
 ): CandidateRung[] {
   const max = budget.perStat;
   const offenseStat = physicalAttacker ? 'atk' : 'spa';
-  const offensePlus = physicalAttacker ? 'Adamant' : 'Modest';
-  const offense = offenseRungs(offenseStat, offensePlus, max, hasAttackerObs);
+  const offense = offenseRungs(offenseStat, physicalAttacker ? 'Adamant' : 'Modest', max, hasAttackerObs);
   const bulk = bulkRungs(max, hasDefenderObs);
-  const speedPlus = physicalAttacker ? 'Jolly' : 'Timid';
-  const speed = speedRungs(speedPlus, max, hasSpeedObs);
+  const speed = speedRungs(physicalAttacker ? 'Jolly' : 'Timid', max, hasSpeedObs);
 
   const measured = measuredStats(offenseStat, hasAttackerObs, hasDefenderObs, hasSpeedObs);
   const priorPlus = NATURE_PLUS[toId(prior.nature)];
-  const priorNature = priorPlus && measured.has(priorPlus) ? 'Hardy' : prior.nature;
-  // A kept stat keeps its plus nature too: a bulk or offense nature would
-  // lower the very stat the evidence cannot measure.
-  const keepNature = priorPlus !== undefined && keep.has(priorPlus);
-
-  // Every rung is LEGALIZED before scoring (composeRung). The prior rung
-  // legalizes around the same kept and fixed stats as the composed ones:
-  // with the log's HP in place its carry-overs give way in the same order.
-  const priorKept = new Set([...keep].filter(stat => fixed[stat] === undefined && (prior.evs[stat] ?? 0) > 0));
-  const rungs: CandidateRung[] = [{
-    evs: capToBudget({ ...ZERO_EVS, ...prior.evs, ...fixed }, new Set(), budget, priorKept, fixedStats(fixed)),
-    nature: prior.nature,
-  }];
+  const ctx: LadderContext = {
+    prior, budget, fixed, keep, offenseStat, priorPlus,
+    priorNature: priorPlus && measured.has(priorPlus) ? 'Hardy' : prior.nature,
+  };
+  const rungs = priorRungs(ctx);
   for (const o of offense) {
     for (const b of bulk) {
       for (const s of speed) {
-        const nature = rungNature([o, b, s], keepNature, priorNature);
-        if (nature === null) continue;
-        const claimed = { ...b.evs, ...s.evs, ...o.evs };
-        const evs = composeRung(prior, claimed, keep, budget, fixed);
-        // A rung the budget cannot express next to the kept and fixed stats
-        // is not offered: a shaved claim would leave its nature standing on
-        // nothing (round 40: "Calm 252 HP / 4 SpD / 252 Spe" once Speed
-        // stays kept). The prior rung is the fallback.
-        if (!expressed(evs, claimed, fixed)) continue;
-        rungs.push({ evs, nature });
+        const rung = offeredRung(ctx, [o, b, s]);
+        if (rung) rungs.push(rung);
       }
     }
   }
