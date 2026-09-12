@@ -892,6 +892,95 @@ import { summaryLines } from './calibration-summary';
  * static basis for this mass; the next lever, if any, is search/
  * planning-side.
  *
+ * SMALL-TODOS ROUND 2026-09-12 (improvement round 45; no spec — three
+ * bounded items from NextSteps A.2–A.4; branch r45 on master 5e19415:
+ * d62a656 the fast play-out option / e30e72a the unknown-forme marker
+ * merge / the bookkeeping commit; the probe-chase threshold 6d10308
+ * (cache v47) is measured on the same base and PARKED on branch
+ * r45-threshold, see (3)). Verdict at the user gate.
+ * (1) TEAM BUILDER (e30e72a): team preview hides some formes behind
+ * "-*" (Urshifu-*, Zamazenta-*, Greninja-*); the battle's first switch
+ * line reveals the forme, and the inferrer kept BOTH as team entries, so
+ * 36 sides in 32 of the bank's 129 replays fielded a phantom seventh
+ * body (round 21 sighted 110359 p2 with seven sets): a bench mon that
+ * never enters and never faints, a living body to the static eval and a
+ * seventh of every fainted fraction for the rest of the game. The marker
+ * entry now becomes the revealed forme (its preview position, its "(has
+ * item)" marker and everything booked on it kept); a team sheet naming
+ * the forme sets it on a marker that never entered. Harness-path set
+ * diff over the bank (docs/perf/probes/2026-09-12-r45/diff-teams.txt):
+ * 36 sides lose the marker (7 → 6 sets, 452654 p1 8 → 6), 37 entries
+ * dropped, none added, 7 merged Zamazenta sets re-fit (0/252/0/0/0/168
+ * → 0/252/0/0/4/252: the phantom shared the solver key `p2:zamazenta`
+ * with the real body).
+ * (2) FAST PLAY-OUT (d62a656): a session checkbox beside the launcher
+ * pins every evaluation of a run to the depth-1 matrix instead of the
+ * Auto line (an engine override on useEvaluation, set before the run's
+ * first evaluation, released with the run); no score path, never stored.
+ * BENCH for (1)+(2) (paired, n=816, joined 813; A .calibration/r45-base
+ * on master 5e19415, B .calibration/r45-ac): sign 53/62/78/61/71 →
+ * 54/61/82/64/70, brier 0.2611/0.2287/0.1536 → 0.2564/0.2242/0.1285
+ * (early −47, mid −45, LATE −251 bp); hq n=548 0.2598/0.2154/0.1622 →
+ * 0.2491/0.2031/0.1286 (late −336); luck-adjusted 0.2450/0.2087/0.1471
+ * → 0.2344/0.2016/0.1186; bucket 0.4–0.7 68 → 77 %, 0.7–1.0 87 → 88 %; K
+ * pooled 1.80 → 2.19. SPLIT by the set diff (split-marker.mjs): the 97
+ * replays without a marker (601 positions) are BYTE-IDENTICAL; the 32
+ * marker replays (215 positions, joined 212) carry the whole gain:
+ * 49/66/69/59/80 → 51/65/85/66/68, brier 0.2674/0.2242/0.1994 →
+ * 0.2592/0.2024/0.1083, K 1.25 → 2.67, late singles B-only-right 14
+ * against A-only-right 4 (751207 t14 −0.674 → 1.000 with p1 the winner,
+ * 750267 t37 0.899 → −0.148 with p2 the winner); the 25 doubles
+ * positions among them lose three exclusive flips (with a pinned bring
+ * the trimmed VGC teams change only their bench ORDER, the merged entry
+ * sits at its preview position).
+ * FEEDBACK for (1)+(2): one capture (run-ac) byte-identical to the
+ * master base on all six full dumps, no channel of 13 moved, notices,
+ * errors, alignment and KO-odds mismatch counts unchanged (the corpus
+ * holds no marker species; the option is off by default); the three
+ * identical captures under the threshold below establish the day's
+ * determinism.
+ * (3) PROBE-CHASE THRESHOLD (NextSteps A.3, plan rank 16; 6d10308 on
+ * branch r45-threshold, cache v47): a root boundary class at or under
+ * 15 % analytic weight (PROBE_CHASE_MIN_WEIGHT) is neither chased with
+ * the eleven fixed probe seeds nor reported when no draw shows it; its
+ * mass renormalizes over the drawn classes as an unfound class always
+ * did. MEASURED: draw probe (docs/perf/probes/2026-09-12-r45/draws.vt.ts,
+ * 38 harness-sampled positions of the six feedback replays, d1s1 root,
+ * nude teams) 111 boundary cells, 940 draws → 171 (−82 %), 64 mismatch
+ * diagnostics with 71 missing classes → 0 (every one a tail class). Bank
+ * (.calibration/r45-b, the threshold on top of (1)+(2)): the 601
+ * non-marker positions move by at most 1 bp (0.2555/0.2317/0.1361 →
+ * 0.2554/0.2316/0.1361, no exclusive flip) — inert on the bank.
+ * Feedback: captures 1, 2 and 4 byte-identical on all six dumps (capture
+ * 3 was a harness miss: the first test of the run opened an empty graph,
+ * zero turns, no notice, no sweep — the Vite cold-start race the e2e
+ * runner guards against and the feedback config does not); against the
+ * base no channel of 13 moved and KO-odds mismatches fell
+ * 209/58/208/126/87/53 → 1/0/3/2/5/6, but root scores move where a probe
+ * used to find a tail class (648453 t10 −0.125 → −0.069 and t1 0.118 →
+ * 0.154, max |Δ| 0.057; 573756 max 0.0014) and the six reports move in
+ * their numbers. e2e: the round-42 play-out pin (draft t56, Muk-Alola
+ * before Heatran) FAILS deterministically under the threshold — p2's
+ * replacements read Slow Shadow (Slowking), Fire Shadow (Heatran), Ghost
+ * Shadow, Slow Shadow, Ghost Shadow, Muk-Alola never enters — and passes
+ * in 30 s with the threshold's two files reverted (e2e-pin-head.log,
+ * e2e-pin-nothreshold.log in the probe folder). The threshold buys draws
+ * and a clean diagnostic list at the price that a root cell no longer
+ * prices an 85–90 % move's miss unless a base draw shows it, and the
+ * tree's verified cells move enough to reorder a pinned sack line:
+ * PARKED, not recommended; the registered successor (on-demand draws at
+ * the root blend, the round-43 A.1 candidate) would price such classes
+ * exactly and retire the threshold.
+ * GATES on r45 (d62a656 + e30e72a): tsc, lint (ratchet: PlayOutBar split
+ * into a running row and a start row), knip, Vitest all projects green,
+ * e2e 75/75 (2.1 min).
+ * VERDICT: open at the user gate. Recommendation: fast-forward r45 (the
+ * marker merge and the fast play-out); leave r45-threshold parked.
+ * FOLLOW-UP: the fit corpus carries the same phantom bodies (every gen-9
+ * team preview with a Zamazenta or Urshifu), so the feature weights and
+ * the phase-aware K were fitted against them — a re-fit is the first
+ * candidate after this round.
+ *
  * CHANCE NODES ROUND 2026-09-12 (improvement round 43; spec
  * docs/superpowers/specs/2026-09-12-round-43-design.md; branch r43 on
  * master acd88d4; a42e634 the scripted PRNG / 7bae1d3 kill-roll counts on
