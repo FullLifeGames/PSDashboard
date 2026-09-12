@@ -16,12 +16,16 @@ interface EvalShape {
   auto: boolean;
 }
 
-/** The slice of the evaluation surface the play-out reads, plus a spy on the preference writes. */
-function evaluationOf(shape: Partial<EvalShape>, setPrefs = vi.fn()) {
+/** The slice of the evaluation surface the play-out reads, plus spies on the preference and engine-override writes. */
+function evaluationOf(shape: Partial<EvalShape>, setPrefs = vi.fn(), setEngineOverride = vi.fn()) {
   const prefs = { depth: 1 as const, samples: 1 as const, mode: 'matrix' as const, auto: shape.auto ?? false, autoAnalyze: false, tera: 'auto' as const };
   return {
-    evaluation: { prefs, setPrefs, status: shape.status ?? 'idle', result: shape.result ?? null, resultTag: shape.resultTag ?? null, error: shape.error ?? null } as unknown as Evaluation,
+    evaluation: {
+      prefs, setPrefs, setEngineOverride,
+      status: shape.status ?? 'idle', result: shape.result ?? null, resultTag: shape.resultTag ?? null, error: shape.error ?? null,
+    } as unknown as Evaluation,
     setPrefs,
+    setEngineOverride,
   };
 }
 
@@ -30,7 +34,7 @@ type Wiring = Omit<PlayOutInputs, 'playOut' | 'setPlayOut' | 'setPlayOutNotice' 
 function wiring(overrides: Partial<Wiring> = {}): Wiring {
   return {
     evalViewKey: 'variation:3', liveEvalStatus: 'idle', liveTip: true, viewingVariation: true, atEndPosition: false,
-    viewT0: false, viewTurn: 3, variationSpan: null, tipTurn: 3,
+    viewT0: false, viewTurn: 3, variationSpan: null, tipTurn: 3, fastPlayOut: false,
     navigateTo: vi.fn(), setNavSeek: vi.fn(), setVariationScores: vi.fn(), executing: false, branchPreparing: false,
     getBattle: vi.fn(() => ({ ended: false }) as unknown as ReturnType<PlayOutInputs['getBattle']>),
     executeTurn: vi.fn(async () => {}), handleEvaluate: vi.fn(), applyEvalChoice: vi.fn(() => true),
@@ -177,6 +181,28 @@ describe('usePlayOut', () => {
     act(() => vi.advanceTimersByTime(250));
     const updater = (wired.setNavSeek as ReturnType<typeof vi.fn>).mock.calls[0][0] as (prev: null) => unknown;
     expect(updater(null)).toEqual({ turn: 2, seq: 1, play: true });
+  });
+
+  test('the fast option pins the run to the depth-1 matrix before its first evaluation and releases the engine when the run ends', () => {
+    const { evaluation, setPrefs, setEngineOverride } = evaluationOf({});
+    const wired = wiring({ fastPlayOut: true });
+    const { result, rerender } = setup(evaluation, wired);
+    act(() => result.current.playOut.startPlayOut());
+    expect(setEngineOverride).toHaveBeenCalledWith({ depth: 1, samples: 1, mode: 'matrix' });
+    const pinnedAt = setEngineOverride.mock.invocationCallOrder[0];
+    expect(pinnedAt).toBeLessThan((wired.handleEvaluate as ReturnType<typeof vi.fn>).mock.invocationCallOrder[0]);
+
+    (wired.getBattle as ReturnType<typeof vi.fn>).mockReturnValue({ ended: true });
+    rerender({ evaluation: evaluationOf({ status: 'done', result: evalResult(), resultTag: 'variation:3' }, setPrefs, setEngineOverride).evaluation, wiring: wired });
+    expect(result.current.transients.playOut).toBeNull();
+    expect(setEngineOverride).toHaveBeenLastCalledWith(null);
+  });
+
+  test('without the fast option the run never pins an engine', () => {
+    const { evaluation, setEngineOverride } = evaluationOf({});
+    const { result } = setup(evaluation);
+    act(() => result.current.playOut.startPlayOut());
+    expect(setEngineOverride.mock.calls.every(([override]) => override === null)).toBe(true);
   });
 
   test('from turn 0 the run includes the lead decision: a default lead variation is seeded first', () => {

@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef } from 'react';
 import { EvalWorkerClient } from '../lib/eval/worker-client';
 import type { EvalPreferences } from '@fulllifegames/eval-engine';
-import { usePrefsState } from './evaluation/prefs';
+import { usePrefsState, type TurnEvalSettings } from './evaluation/prefs';
 import { useSingleEval, type CachedEval } from './evaluation/single-eval';
 import { useGraphState, useGraphSweepRunner } from './evaluation/graph-sweep';
 
@@ -28,6 +28,13 @@ export function useEvaluation() {
   const clientRef = useRef<EvalWorkerClient | null>(null);
   const cacheRef = useRef(new Map<string, CachedEval>());
   const runRef = useRef(0);
+  // A concrete engine pinned over the prefs for single evaluations — the
+  // fast play-out sets it for the length of its run and releases it after.
+  // A ref, not a pref: never stored, never shown as the panel's setting.
+  const engineOverrideRef = useRef<TurnEvalSettings | null>(null);
+  const setEngineOverride = useCallback((override: TurnEvalSettings | null) => {
+    engineOverrideRef.current = override;
+  }, []);
 
   useEffect(() => () => {
     runRef.current += 1;
@@ -38,7 +45,7 @@ export function useEvaluation() {
   const {
     status, result, resultTag, progress, error, reconstructProgress,
     evaluate, cancel, markStale, reset,
-  } = useSingleEval({ runRef, clientRef, cacheRef, prefsRef, stopGraphPaint });
+  } = useSingleEval({ runRef, clientRef, cacheRef, prefsRef, engineOverrideRef, stopGraphPaint });
 
   const setPrefs = useCallback((next: EvalPreferences) => {
     if (persistPrefs(next)) markStale();
@@ -47,7 +54,7 @@ export function useEvaluation() {
   const runGraphSweep = useGraphSweepRunner({ runRef, clientRef, cacheRef, prefsRef, cancel, setGraph, graphDataRef });
 
   return {
-    prefs, setPrefs,
+    prefs, setPrefs, setEngineOverride,
     status, result, resultTag, progress, error, reconstructProgress,
     evaluate, markStale, reset, cancel,
     graph, runGraphSweep, clearGraph,

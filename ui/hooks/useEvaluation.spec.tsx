@@ -117,6 +117,23 @@ describe('useEvaluation single position', () => {
     expect(script.calls[1].settings.mode).toBe('mcts');
   });
 
+  test('an engine override pins the single evaluation until it is released; the stored prefs stay what they were', async () => {
+    const { result } = renderHook(() => useEvaluation());
+    act(() => result.current.setPrefs({ ...matrixPrefs, mode: 'auto' }));
+    act(() => result.current.setEngineOverride({ depth: 1, samples: 1, mode: 'matrix' }));
+    // Four of six bodies fainted: auto would route to the tree here.
+    act(() => result.current.evaluate({ cacheKey: null, tera: false, acquire: async () => position(4), tag: 'a' }));
+    await waitFor(() => expect(result.current.status).toBe('done'));
+    expect(script.calls[0].settings).toMatchObject({ depth: 1, samples: 1, mode: 'matrix' });
+    expect(result.current.prefs.mode).toBe('auto');
+    expect(JSON.parse(localStorage.getItem(PREFS_KEY)!).mode).toBe('auto');
+
+    act(() => result.current.setEngineOverride(null));
+    act(() => result.current.evaluate({ cacheKey: null, tera: false, acquire: async () => position(4), tag: 'b' }));
+    await waitFor(() => expect(script.calls).toHaveLength(2));
+    expect(script.calls[1].settings.mode).toBe('mcts');
+  });
+
   test('cancel drops an in-flight search and a late answer never lands', async () => {
     let finish: (result: EvalResult) => void = () => {};
     script.evaluate = () => new Promise(resolve => { finish = resolve; });

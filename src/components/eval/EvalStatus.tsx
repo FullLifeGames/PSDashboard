@@ -5,6 +5,8 @@ export interface PlayOutProgress {
   startTurn: number;
   turns: number;
   atTurn: number | null;
+  /** The run uses the depth-1 matrix on every turn (the fast option). */
+  fast?: boolean;
 }
 
 function PlayOutProgressLine({ playOutProgress }: { playOutProgress: PlayOutProgress }) {
@@ -17,6 +19,7 @@ function PlayOutProgressLine({ playOutProgress }: { playOutProgress: PlayOutProg
         {playOutProgress.atTurn !== null && playOutProgress.atTurn > playOutProgress.startTurn
           ? `, now at turn ${playOutProgress.atTurn}` : ''}.
         The gold line below grows as it plays.
+        {playOutProgress.fast ? ' Fast mode: every turn is a depth-1 matrix search.' : ''}
       </span>
     </div>
   );

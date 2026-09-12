@@ -5,7 +5,7 @@ import type {
 } from '@fulllifegames/eval-engine';
 import type { EvalGraphState, EvalStatus, TurnEvalSettings } from '../hooks/useEvaluation';
 import { EvalControls } from './eval/EvalControls';
-import { EvalStatus as EvalStatusBlock } from './eval/EvalStatus';
+import { EvalStatus as EvalStatusBlock, type PlayOutProgress } from './eval/EvalStatus';
 import { GameGraphSection } from './eval/GameGraphSection';
 import { EvalResultBlock } from './eval/EvalResultBlock';
 import { ThinkDeeperButton } from './eval/ThinkDeeperButton';
@@ -65,7 +65,7 @@ interface EvalPanelProps {
   positionLabel?: string | null;
   /** "Let it play out" is running: one steady progress block replaces the
    *  per-turn result churn (the graph keeps growing underneath). */
-  playOutProgress?: { startTurn: number; turns: number; atTurn: number | null } | null;
+  playOutProgress?: PlayOutProgress | null;
   /** Full main-line length — keeps the graph's x-axis honest pre-analysis. */
   graphMaxTurn?: number;
   /** The turn whose analysis is selected (0 = leads). Changing it — slider,

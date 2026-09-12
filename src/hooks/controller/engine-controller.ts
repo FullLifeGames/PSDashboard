@@ -100,7 +100,7 @@ function usePlayLayer(
   const { evaluation } = ctx;
   const {
     playOut, setPlayOut, setPlayOutNotice, playOutProcessedRef, playOutRef, stopPlayOutRef,
-    pendingConfirm,
+    pendingConfirm, fastPlayOut,
   } = transients;
   const {
     liveTip, viewingVariation, atEndPosition, viewT0, viewTurn, variationSpan, tipTurn,
@@ -124,7 +124,7 @@ function usePlayLayer(
   // "Let it play out": the engine plays both sides from the viewed position.
   const playOutControls = usePlayOut({
     playOut, setPlayOut, setPlayOutNotice, playOutProcessedRef, playOutRef, stopPlayOutRef,
-    evaluation, evalViewKey, liveEvalStatus: board.liveEvalStatus, liveTip, viewingVariation, atEndPosition, viewT0,
+    evaluation, fastPlayOut, evalViewKey, liveEvalStatus: board.liveEvalStatus, liveTip, viewingVariation, atEndPosition, viewT0,
     viewTurn, variationSpan, tipTurn, navigateTo, setNavSeek, setVariationScores,
     executing, branchPreparing, getBattle, executeTurn, handleEvaluate, applyEvalChoice: walk.applyEvalChoice,
     rebuildAt, requestDeviation, startLeadVariation, defaultLeadSelection,

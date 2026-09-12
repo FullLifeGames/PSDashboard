@@ -36,6 +36,13 @@ export function useTransients(replayId: string | undefined) {
   /** Why the last play-out ended + where watching it starts (panel notice). */
   const [playOutNotice, setPlayOutNotice] = useState<{ text: string; watchTurn: number } | null>(null);
   const playOutProcessedRef = useRef<EvalResult | null>(null);
+  /**
+   * "Fast play-out": every evaluation of a run uses the depth-1 matrix
+   * instead of the Auto line. A session option the user ticks on purpose —
+   * never stored, and it survives a replay change like any other choice
+   * the user made for this session.
+   */
+  const [fastPlayOut, setFastPlayOut] = useState(false);
 
   /**
    * Draft choices for positions WITHOUT the live sim (variant B pickers):
@@ -69,7 +76,7 @@ export function useTransients(replayId: string | undefined) {
 
   return {
     playOutRef, stopPlayOutRef, playOut, setPlayOut, playOutNotice, setPlayOutNotice,
-    playOutProcessedRef, draftChoices, setDraftChoices, pendingConfirm, setPendingConfirm,
+    playOutProcessedRef, fastPlayOut, setFastPlayOut, draftChoices, setDraftChoices, pendingConfirm, setPendingConfirm,
     interruptPlayOut, clearDraftChoices,
   };
 }

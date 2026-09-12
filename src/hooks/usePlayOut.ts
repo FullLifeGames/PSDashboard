@@ -1,6 +1,6 @@
 import { useCallback, useEffect, type Dispatch, type MutableRefObject, type SetStateAction } from 'react';
 import type { EvalResult, RankedChoice } from '@fulllifegames/eval-engine';
-import { nextPlayOutStep, playOutDoneText } from '../lib/play-out';
+import { FAST_PLAY_OUT_SETTINGS, nextPlayOutStep, playOutDoneText } from '../lib/play-out';
 import type { VariationSpan } from '../lib/timeline';
 import type { useBranch } from './useBranch';
 import type { useEvaluation } from './useEvaluation';
@@ -26,6 +26,8 @@ export interface PlayOutInputs {
   playOutRef: MutableRefObject<{ active: boolean } | null>;
   stopPlayOutRef: MutableRefObject<((opts?: { returnToStart?: boolean }) => void) | null>;
   evaluation: Evaluation;
+  /** Session option: every evaluation of the run uses the depth-1 matrix instead of the Auto line. */
+  fastPlayOut: boolean;
   evalViewKey: string;
   liveEvalStatus: Evaluation['status'];
   liveTip: boolean;
@@ -55,6 +57,7 @@ function usePlayOutFinish(args: PlayOutInputs) {
   const { evaluation, setPlayOut, setPlayOutNotice, playOutRef, navigateTo, setNavSeek, tipTurn, playOut } = args;
   const finishPlayOut = useCallback((current: PlayOutState, text: string, opts?: { returnToStart?: boolean }) => {
     if (!current.prevAuto) evaluation.setPrefs({ ...evaluation.prefs, auto: false });
+    evaluation.setEngineOverride(null);
     playOutRef.current = null;
     setPlayOut(null);
     setPlayOutNotice({ text, watchTurn: current.startTurn });
@@ -87,11 +90,14 @@ function usePlayOutFinish(args: PlayOutInputs) {
 /** Arms the loop from whatever position the pointer holds (T0 included). */
 function useStartPlayOut(args: PlayOutInputs) {
   const {
-    evaluation, setPlayOut, setPlayOutNotice, playOutProcessedRef, setVariationScores,
+    evaluation, fastPlayOut, setPlayOut, setPlayOutNotice, playOutProcessedRef, setVariationScores,
     viewT0, variationSpan, rebuildAt, startLeadVariation, defaultLeadSelection,
     liveTip, viewingVariation, atEndPosition, requestDeviation, handleEvaluate, viewTurn,
   } = args;
   return useCallback(() => {
+    // The fast option pins the engine BEFORE the first evaluation is asked
+    // for; the finish (or a replay change) releases it.
+    const pinEngine = () => evaluation.setEngineOverride(fastPlayOut ? FAST_PLAY_OUT_SETTINGS : null);
     // Turn 0: the run INCLUDES the lead decision. Branching at the shared
     // turn-1 prefix instead produced a variation without its turn 0 — the
     // moves list started at turn 1 and viewing turn 1 fell back to the main
@@ -100,6 +106,7 @@ function useStartPlayOut(args: PlayOutInputs) {
       const arm = () => {
         const prevAuto = evaluation.prefs.auto;
         if (!prevAuto) evaluation.setPrefs({ ...evaluation.prefs, auto: true });
+        pinEngine();
         playOutProcessedRef.current = null;
         setPlayOutNotice(null);
         setPlayOut({ active: true, executed: 0, turns: 0, startTurn: 1, prevAuto });
@@ -131,13 +138,14 @@ function useStartPlayOut(args: PlayOutInputs) {
     // The loop advances on completed evals — auto keeps them coming after
     // forced interludes; the user's own setting is restored at the end.
     if (!prevAuto) evaluation.setPrefs({ ...evaluation.prefs, auto: true });
+    pinEngine();
     playOutProcessedRef.current = null;
     setPlayOutNotice(null);
     setPlayOut({ active: true, executed: 0, turns: 0, startTurn: viewTurn, prevAuto });
     if (liveTip) handleEvaluate();
   }, [
     viewT0, variationSpan, rebuildAt, startLeadVariation, defaultLeadSelection, liveTip,
-    viewingVariation, atEndPosition, requestDeviation, evaluation, handleEvaluate, viewTurn,
+    viewingVariation, atEndPosition, requestDeviation, evaluation, fastPlayOut, handleEvaluate, viewTurn,
     setPlayOut, setPlayOutNotice, playOutProcessedRef, setVariationScores,
   ]);
 }
@@ -226,6 +234,12 @@ export function usePlayOut(inputs: PlayOutInputs) {
   const { finishPlayOut, stopPlayOut, watchFrom } = usePlayOutFinish(inputs);
   const startPlayOut = useStartPlayOut(inputs);
   usePlayOutLoop(inputs, finishPlayOut);
+  // The pinned engine lives exactly as long as the run: a replay change
+  // drops the run without the finish path and must release it too.
+  const { setEngineOverride } = inputs.evaluation;
+  useEffect(() => {
+    if (!playOut?.active) setEngineOverride(null);
+  }, [playOut?.active, setEngineOverride]);
   // Keep the render-independent mirrors in sync post-commit (navigateTo's
   // interrupt reads them at event time; a render-phase write would trip the
   // react-hooks refs rule).

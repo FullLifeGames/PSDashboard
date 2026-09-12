@@ -7,8 +7,8 @@ type Props = Parameters<typeof PlayOutBar>[0];
 
 function props(overrides: Partial<Props> = {}): Props {
   return {
-    playOut: null, playOutNotice: null, hasVariation: false, viewTurn: 4, startDisabled: false,
-    onStartPlayOut: vi.fn(), onStopPlayOut: vi.fn(), onWatchFrom: vi.fn(), ...overrides,
+    playOut: null, playOutNotice: null, hasVariation: false, viewTurn: 4, startDisabled: false, fastPlayOut: false,
+    onStartPlayOut: vi.fn(), onStopPlayOut: vi.fn(), onWatchFrom: vi.fn(), onFastPlayOutChange: vi.fn(), ...overrides,
   };
 }
 
@@ -44,6 +44,22 @@ describe('PlayOutBar', () => {
     const without = props({ playOutNotice: notice, hasVariation: false });
     render(<PlayOutBar {...without} />);
     expect(screen.getAllByRole('button', { name: /Watch from turn/ })).toHaveLength(1);
+  });
+
+  test('the fast option is a checkbox beside the start button; a running fast play-out says so', async () => {
+    const wired = props();
+    const { rerender } = render(<PlayOutBar {...wired} />);
+    const fast = screen.getByRole('checkbox', { name: /Fast play-out/ });
+    expect(fast).not.toBeChecked();
+    await userEvent.click(fast);
+    expect(wired.onFastPlayOutChange).toHaveBeenCalledWith(true);
+
+    rerender(<PlayOutBar {...wired} fastPlayOut playOut={{ active: true }} />);
+    expect(screen.getByText(/Engine play-out running/)).toHaveTextContent('fast');
+    expect(screen.queryByRole('checkbox', { name: /Fast play-out/ })).toBeNull();
+
+    rerender(<PlayOutBar {...wired} playOut={{ active: true }} />);
+    expect(screen.getByText(/Engine play-out running/)).not.toHaveTextContent('fast');
   });
 
   test('the notice hides while a new run is active', () => {

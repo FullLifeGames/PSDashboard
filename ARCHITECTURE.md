@@ -220,6 +220,15 @@ finished run seeks the battle window back to its start turn and plays the
 new line ("watch it from your move"). While the run streams turns in, the
 branch frame appends in 'hold' mode (no seeking), so the battle window
 stays on the start position instead of flashing every appended turn.
+The "Fast play-out" checkbox beside the launcher (a session option, never
+stored) pins every evaluation of the run to the depth-1 matrix instead of
+the Auto line, which routes to the tree once a quarter of all bodies
+fainted: several times faster in the endgame, and weaker there, because
+the tree looks several turns ahead where the matrix looks one. The pin is
+an engine override on `useEvaluation` that the single evaluate path reads
+over the panel preferences (the sweep never sees it); it is set before the
+run's first evaluation and dies with the run, whether it finishes, is
+stopped, or a replay change drops it.
 
 - `BranchPanel` also carries the "What if it had …" row (behind Advanced)
   that loads a hypothetical legal move into the active set: a team edit

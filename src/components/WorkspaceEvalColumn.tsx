@@ -33,7 +33,7 @@ function EvalSection({ app, replayData }: WorkspaceColumnProps) {
     thinkDeeperTarget, handleThinkDeeper,
   } = app.engine.evalView;
   const { handleExploreChoice, handlePickPair } = app.engine.walk;
-  const { playOut } = app.transients;
+  const { playOut, fastPlayOut } = app.transients;
   return (
     <EvalPanel
       playerNames={[replayData.players[0], replayData.players[1]]}
@@ -57,7 +57,7 @@ function EvalSection({ app, replayData }: WorkspaceColumnProps) {
       graph={evaluation.graph}
       onAnalyzeGame={handleAnalyzeGame}
       positionLabel={liveEvalView ? `Turn ${viewTurn} · ${viewingVariation ? 'variation' : 'main line'}` : null}
-      playOutProgress={playOut?.active ? { startTurn: playOut.startTurn, turns: playOut.turns, atTurn: liveSimTurn } : null}
+      playOutProgress={playOut?.active ? { startTurn: playOut.startTurn, turns: playOut.turns, atTurn: liveSimTurn, fast: fastPlayOut } : null}
       graphMaxTurn={analyzableTurns}
       analysisTurn={analysisTurn}
       onSelectTurn={handleGraphSelectLine}
@@ -73,7 +73,7 @@ function EvalSection({ app, replayData }: WorkspaceColumnProps) {
 /** Right column: evaluation beside the battle (chess-style), then stats. */
 export function WorkspaceEvalColumn({ app, replayData }: WorkspaceColumnProps) {
   const { evalAvailable } = app.engine.evalView;
-  const { playOut, playOutNotice } = app.transients;
+  const { playOut, playOutNotice, fastPlayOut, setFastPlayOut } = app.transients;
   const { viewTurn, variationSpan } = app.board.timeline;
   const { branchPreparing } = app.board.deviation;
   const { usageStats, setAssumptions } = app.ctx.smogon;
@@ -89,9 +89,11 @@ export function WorkspaceEvalColumn({ app, replayData }: WorkspaceColumnProps) {
           hasVariation={variationSpan !== null}
           viewTurn={viewTurn}
           startDisabled={branchPreparing || usageStats.loading || setAssumptions.loading}
+          fastPlayOut={fastPlayOut}
           onStartPlayOut={startPlayOut}
           onStopPlayOut={stopPlayOut}
           onWatchFrom={watchFrom}
+          onFastPlayOutChange={setFastPlayOut}
         />
       )}
       <BattleStatsPanel

@@ -3,6 +3,14 @@ import type { EvalResult, RankedChoice } from '@fulllifegames/eval-engine';
 /** Safety ceiling per play-out run (spec: 100 executed entries). */
 export const PLAY_OUT_CAP = 100;
 
+/**
+ * The "fast play-out" engine: the depth-1 matrix on every turn instead of
+ * the Auto line, which routes to the tree once a quarter of all bodies
+ * fell. A session option the user asks for: several times faster in the
+ * endgame, and weaker there (the tree looks several turns ahead).
+ */
+export const FAST_PLAY_OUT_SETTINGS = { depth: 1, samples: 1, mode: 'matrix' } as const;
+
 export type PlayOutStep =
   | { kind: 'pair'; p1: RankedChoice; p2: RankedChoice }
   | { kind: 'single'; side: 'p1' | 'p2'; choice: RankedChoice }
