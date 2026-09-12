@@ -18,9 +18,15 @@ import { SEARCH_SEEDS } from './leaf.ts';
  * every expansion out of a mid-turn node. From the third ply on the
  * iteration-rotated seed fixes one outcome per cell as before, so sibling
  * trees still diverge deeper down. The roadmap's fallback for a failed
- * gate is CHANCE_NODES = false (today's tree, unchanged).
+ * gate is CHANCE_NODES = false (today's tree, unchanged) — and that is
+ * where the round-43 verdict left it: the chance nodes cost 12 to 15 bp
+ * of late Brier on the paired bank (the visits split across the classes
+ * halve the main line's depth over two plies), +44 to +70 % tree time in
+ * doubles, and the round-42 play-out line; the on-demand draws of the
+ * solver and the prover stayed. The machinery below is kept, switched
+ * off, for the next attempt at pricing chance in the tree.
  */
-const CHANCE_NODES = true;
+export const CHANCE_NODES = false;
 const CHANCE_MAX_DEPTH = 2;
 const TREE_FORCED_CAP = 6;
 const GROUP_SEEDS = SEARCH_SEEDS.slice(0, 3);

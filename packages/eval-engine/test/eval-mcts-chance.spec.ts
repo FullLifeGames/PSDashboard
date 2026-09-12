@@ -7,12 +7,15 @@ import { mergeMctsTrees } from '../src/mcts-merge';
 import { cellKey } from '../src/rank';
 import { chanceValue, isChanceNode, type ChanceNode, type TreeChild } from '../src/search/chance-node';
 import { treeMatrix, type Node } from '../src/search/mcts-node';
+import { CHANCE_NODES } from '../src/search/expansion';
 
 /**
  * Round 43: chance nodes in the first two plies. A boundary cell with a
  * class plan expands into one child per outcome class, the descent
  * follows the largest deficit, the cell reads as the weighted blend, and
- * doubles pairs group empirically by who fell.
+ * doubles pairs group empirically by who fell. The round-43 verdict left
+ * the switch off (the solver and the prover keep the on-demand draws), so
+ * these tree-level tests run only when CHANCE_NODES is on again.
  */
 
 function makeSet(name: string, species: string, moves: string[], level = 100): PokemonSet {
@@ -78,7 +81,7 @@ function chanceNodes(node: Node, depth = 1, found: { depth: number; node: Chance
   return found;
 }
 
-describe('MCTS chance nodes (round 43)', () => {
+describe.runIf(CHANCE_NODES)('MCTS chance nodes (round 43)', () => {
   test('the Thunder cell is a chance node with the hit-kill and miss classes; the kill is a mid-turn child', () => {
     const root = mctsRoot(thunderRoot().serialized, SETTINGS);
     const { child } = cellOf(root, THUNDER, TOSS);

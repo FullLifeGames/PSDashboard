@@ -151,12 +151,12 @@ export interface StoredEval {
 //      the other side waits) instead of the greedy static pick, and doubles
 //      option lists offer the pass assignments. Every tree-evaluated
 //      position moves (Auto past a quarter of all bodies fainted).
-// v46: round 43, chance nodes in the first two plies of the MCTS tree (one
-//      child per outcome class, drawn on demand through a scripted PRNG,
-//      the cell as the weighted blend; doubles group three fixed seeds by
-//      who fell) and the prover's missing classes drawn on demand. Every
-//      tree-evaluated position and every proof with a formerly open class
-//      moves.
+// v46: round 43, the endgame solver and the forced-win prover draw an
+//      outcome class the base seeds never showed on demand (the simulator's
+//      accuracy, crit and damage rolls scripted for that one move) instead
+//      of chasing it with probe seeds. Every proof and every solved endgame
+//      with a formerly open class moves; the tree is unchanged (the chance
+//      nodes measured in this round stay switched off).
 const EVAL_ENGINE_CACHE_VERSION = 46;
 
 export function evalStoreKey(
