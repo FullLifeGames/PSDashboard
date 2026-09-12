@@ -38,8 +38,10 @@ function makeBattle(p1Sets: PokemonSet[], p2Sets: PokemonSet[], formatid = 'gen9
 
 const serialize = (battle: Battle) => JSON.stringify(State.serializeBattle(battle));
 
-const event = (side: 'p1' | 'p2', accuracy: number, killFraction: number, defenderIdent: string): CellEvent =>
-  ({ side, moveId: 'testmove', defenderIdent, event: { accuracy, killFraction, pKill: accuracy * killFraction } });
+const event = (side: 'p1' | 'p2', accuracy: number, killFraction: number, defenderIdent: string): CellEvent => ({
+  side, moveId: 'testmove', defenderIdent,
+  event: { accuracy, killFraction, pKill: accuracy * killFraction, normalKillRolls: Math.round(killFraction * 16), critKillRolls: Math.round(killFraction * 16) },
+});
 
 describe('foldClassWeights', () => {
   test('the t23 shape: kill truncates the second actor', () => {

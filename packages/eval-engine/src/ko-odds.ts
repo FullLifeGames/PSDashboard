@@ -20,6 +20,10 @@ export interface BoundaryEvent {
   killFraction: number;
   /** accuracy × killFraction. */
   pKill: number;
+  /** Round 43: of the 16 damage rolls, how many knock out without a crit (0 for status moves; 0 or 16 for fixed damage). */
+  normalKillRolls: number;
+  /** Round 43: of the 16 damage rolls, how many knock out with a crit. */
+  critKillRolls: number;
 }
 
 type DexMove = ReturnType<Battle['dex']['moves']['get']>;
@@ -152,14 +156,16 @@ function moveAccuracy(battle: Battle, move: DexMove, attacker: Pokemon, defender
   return accuracy;
 }
 
-/** The crit-weighted kill share of the 16 damage rolls, or null when the calc cannot price the pair. */
+interface KillRolls { killFraction: number; normalKillRolls: number; critKillRolls: number }
+
+/** The crit-weighted kill share of the 16 damage rolls with its roll counts, or null when the calc cannot price the pair. */
 function damageKillFraction(
   genNum: number,
   battle: Battle,
   move: DexMove,
   attacker: Pokemon,
   defender: Pokemon,
-): number | null {
+): KillRolls | null {
   try {
     const gen = Generations.get(genNum as 3 | 4 | 5 | 6 | 7 | 8 | 9);
     const atkPoke = toCalcPokemon(gen, attacker, battle.dex);
@@ -170,7 +176,11 @@ function damageKillFraction(
     if (normal === null || crit === null) return null;
     const c = critRate(genNum, move.critRatio ?? 1);
     if (c === null) return null;
-    return (1 - c) * normal + c * crit;
+    return {
+      killFraction: (1 - c) * normal + c * crit,
+      normalKillRolls: Math.round(normal * 16),
+      critKillRolls: Math.round(crit * 16),
+    };
   } catch {
     return null;
   }
@@ -195,10 +205,10 @@ export function boundaryEvent(
     // Accuracy-only event: the hit/miss split is pure table arithmetic;
     // the status effect's consequences live inside the outcome classes.
     if (accuracy >= 1) return null;
-    return { accuracy, killFraction: 0, pKill: 0 };
+    return { accuracy, killFraction: 0, pKill: 0, normalKillRolls: 0, critKillRolls: 0 };
   }
 
-  const killFraction = damageKillFraction(genNum, battle, move, attacker, defender);
-  if (killFraction === null) return null;
-  return { accuracy, killFraction, pKill: accuracy * killFraction };
+  const rolls = damageKillFraction(genNum, battle, move, attacker, defender);
+  if (rolls === null) return null;
+  return { accuracy, ...rolls, pKill: accuracy * rolls.killFraction };
 }
