@@ -979,6 +979,20 @@ import { summaryLines } from './calibration-summary';
  * r45-threshold stays parked with .calibration/r45-b as its measurement
  * stand; no re-pin, no cache bump on master (the sets fingerprint keys
  * the marker teams), no push.
+ * INCIDENT 2026-09-12 15:25 (after the landing): `git worktree remove
+ * --force` on the round's worktree followed its junctions and deleted
+ * their targets in the main checkout — every bank stand under
+ * .calibration (r31 to r45, the replay caches), the 63 pinned Smogon
+ * payloads under .smogon-cache, the fit corpus, packages/* and part of
+ * node_modules — until an "Invalid argument" stopped it. Tracked files
+ * came back from HEAD, node_modules from npm ci, the fit corpus from the
+ * 12 Aug copy (2123 of 2127 manifest replays). The numbers above stand in
+ * this ledger and under docs/perf/probes/2026-09-12-r45/ (paired-*.txt);
+ * the dumps themselves, r45-b included, are gone: every later A/B needs a
+ * fresh base on the same day, and the Smogon pins re-establish on the
+ * next EVAL_CALIBRATION_SMOGON run (upstream may have moved since 4 Sep,
+ * so pre-incident ledger lines compare with that caveat). Rule: remove
+ * junctions non-recursively before any worktree removal (NextSteps D).
  * FOLLOW-UP: the fit corpus carries the same phantom bodies (every gen-9
  * team preview with a Zamazenta or Urshifu), so the feature weights and
  * the phase-aware K were fitted against them — a re-fit is the first
