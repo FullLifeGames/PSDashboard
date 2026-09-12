@@ -974,8 +974,11 @@ import { summaryLines } from './calibration-summary';
  * GATES on r45 (d62a656 + e30e72a): tsc, lint (ratchet: PlayOutBar split
  * into a running row and a start row), knip, Vitest all projects green,
  * e2e 75/75 (2.1 min).
- * VERDICT: open at the user gate. Recommendation: fast-forward r45 (the
- * marker merge and the fast play-out); leave r45-threshold parked.
+ * VERDICT 2026-09-12 (user gate, 15:20, "Agreed"): ADOPTED — r45
+ * fast-forwarded to master (d62a656, e30e72a, 0f4c832 and this commit);
+ * r45-threshold stays parked with .calibration/r45-b as its measurement
+ * stand; no re-pin, no cache bump on master (the sets fingerprint keys
+ * the marker teams), no push.
  * FOLLOW-UP: the fit corpus carries the same phantom bodies (every gen-9
  * team preview with a Zamazenta or Urshifu), so the feature weights and
  * the phase-aware K were fitted against them — a re-fit is the first
