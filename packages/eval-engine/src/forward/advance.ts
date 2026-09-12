@@ -1,5 +1,6 @@
 import type { Battle, PRNGSeed, Side } from '@pkmn/sim';
 import { forkBattle, toPosition, type SimPosition } from './position.ts';
+import type { RollScripts } from './scripted-prng.ts';
 import { answerFollowUps, applyChoice, resolveForcedSwitches } from './switches.ts';
 import { sideIndex, toId } from '@fulllifegames/replay-core';
 
@@ -29,6 +30,8 @@ export interface AdvanceOptions {
    * instead of taking the greedy static pick. Default: resolve greedily.
    */
   stopAtForcedSwitch?: boolean;
+  /** Round 43: dice on demand for the named moves (scripted-prng.ts); the log still decides the outcome class. */
+  scripts?: RollScripts;
 }
 
 /**
@@ -44,7 +47,7 @@ export function advancePositionWithLog(
   seed: PRNGSeed,
   opts?: AdvanceOptions,
 ): { child: SimPosition; log: string[]; pendingSwitch: boolean } {
-  const battle = forkBattle(position, seed);
+  const battle = forkBattle(position, seed, opts?.scripts);
   const logStart = battle.log.length;
   applyChoice(battle, 'p1', p1Choice);
   applyChoice(battle, 'p2', p2Choice);

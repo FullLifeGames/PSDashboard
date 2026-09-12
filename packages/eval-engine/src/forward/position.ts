@@ -3,6 +3,7 @@ import type { Battle, PRNGSeed } from '@pkmn/sim';
 import { deserializeFromParsed, parseSearchState, type ParsedSearchState } from './parsed-state.ts';
 import { serializeBattleStable } from './serialize.ts';
 import { repairFaintedActives } from './switches.ts';
+import { ScriptedPRNG, type RollScripts } from './scripted-prng.ts';
 
 /**
  * The immutable search position: a lazily serialized/deserialized battle
@@ -87,11 +88,18 @@ export function positionBattle(position: SimPosition): Battle {
 
 /**
  * A fresh battle from the position's parsed state, seeded so the advance is
- * reproducible. Siblings share the parsed state, never a battle.
+ * reproducible. Siblings share the parsed state, never a battle. Round 43:
+ * with scripts the dice of the named moves answer on demand.
  */
-export function forkBattle(position: SimPosition, seed: PRNGSeed): Battle {
+export function forkBattle(position: SimPosition, seed: PRNGSeed, scripts?: RollScripts): Battle {
   const battle = deserializeFromParsed(positionParsed(position));
-  battle.prng = new PRNG(seed);
+  if (scripts && scripts.size > 0) {
+    const prng = new ScriptedPRNG(seed, scripts);
+    prng.attach(battle);
+    battle.prng = prng;
+  } else {
+    battle.prng = new PRNG(seed);
+  }
   repairFaintedActives(battle);
   return battle;
 }
