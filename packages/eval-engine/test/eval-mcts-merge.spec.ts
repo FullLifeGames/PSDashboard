@@ -406,3 +406,57 @@ describe('row completion for the verify step (round 33)', () => {
     expect(merged.matrix!.values[0][1]).toBeCloseTo(0.8 * 0.1 + 0.2 * 0.2, 10);
   });
 });
+
+describe('chance cells pool per class (round 43)', () => {
+  const options = (labels: string[]) => labels.map(labelText => ({ choice: labelText, label: labelText }));
+  const emptyResult = { score: 0, interval: 0, depthCompleted: 1, perSide: { p1: [], p2: [] } };
+  const mk = (cells: MctsTreeStats['cells']): MctsTreeStats => ({
+    p1Options: options(['Thunder', 'Bolt']), p2Options: options(['X', 'Y']),
+    p1N: [10, 0], p1W: [5, 0], p2N: [10, 0], p2W: [5, 0], visits: 10, depth: 2,
+    rootValue: 0.1, cells, result: emptyResult,
+  });
+  // Two trees, the Thunder×X cell a chance node: hit-kill 0.7 (deep, +0.9 leaves), miss 0.3 (thin, −0.5 leaves).
+  const classes = (killTotal: number, killVisits: number, missTotal: number, missVisits: number) => [
+    { key: 'hit-kill', weight: 0.7, visits: killVisits, total: killTotal, value: 0.8, ended: false },
+    { key: 'miss', weight: 0.3, visits: missVisits, total: missTotal, value: -0.4, ended: false },
+  ];
+  const t1 = mk([{ key: cellKey(0, 0), visits: 11, total: 7.2 - 1.0 + 0.44, value: 0.44, ended: false, classes: classes(7.2, 8, -1.0, 2) }]);
+  const t2 = mk([{ key: cellKey(0, 0), visits: 11, total: 6.3 - 1.5 + 0.44, value: 0.44, ended: false, classes: classes(6.3, 7, -1.5, 3) }]);
+
+  test('the pooled matrix blends the per-class pools with the class weights', () => {
+    const merged = mergeMctsTrees([t1, t2]);
+    const kill = (7.2 + 0.8 + 6.3 + 0.8) / (8 + 1 + 7 + 1);
+    const miss = (-1.0 - 0.4 - 1.5 - 0.4) / (2 + 1 + 3 + 1);
+    expect(merged.matrix!.values[0][0]).toBeCloseTo(0.7 * kill + 0.3 * miss, 10);
+  });
+
+  test('verifiedValue takes a deep class pool from the classes and the sampler mean for the thin one', () => {
+    // The hit-kill pool is deep (|mean| ≥ 0.9 needs values near 1): rebuild with leaves at 0.95.
+    const deep = (total: number, visits: number) => [
+      { key: 'hit-kill', weight: 0.7, visits, total, value: 0.95, ended: false },
+      { key: 'miss', weight: 0.3, visits: 2, total: -0.2, value: -0.1, ended: false },
+    ];
+    const d1 = mk([{ key: cellKey(0, 0), visits: 11, total: 0, value: 0.6, ended: false, classes: deep(7.6, 8) }]);
+    const d2 = mk([{ key: cellKey(0, 0), visits: 11, total: 0, value: 0.6, ended: false, classes: deep(6.65, 7) }]);
+    const verified = new Map([[cellKey(0, 0), {
+      i: 0, j: 0, value: 0.5, ended: false,
+      blend: {
+        firstLeaf: 0.2,
+        classes: [
+          { key: 'hit-kill', weight: 0.7, leafSum: 0.6, count: 3, hasFirst: true, ended: false },
+          { key: 'miss', weight: 0.3, leafSum: -0.6, count: 2, hasFirst: false, ended: false },
+        ],
+      },
+    }]]);
+    const merged = mergeMctsTrees([d1, d2], verified);
+    const killPool = (7.6 + 0.95 + 6.65 + 0.95) / (8 + 1 + 7 + 1); // ≈ 0.95: deep, agreeing
+    const missSampler = -0.6 / 2;
+    expect(merged.matrix!.values[0][0]).toBeCloseTo(0.7 * killPool + 0.3 * missSampler, 10);
+  });
+
+  test('trees without classes pool as before', () => {
+    const plain = mk([{ key: cellKey(0, 0), visits: 8, total: 4.8, value: 0.5, ended: false }]);
+    const merged = mergeMctsTrees([plain, plain]);
+    expect(merged.matrix!.values[0][0]).toBeCloseTo((4.8 + 4.8 + 0.5) / 17, 10);
+  });
+});

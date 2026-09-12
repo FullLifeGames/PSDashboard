@@ -1,6 +1,7 @@
 import { cellKey, rankFromMatrix, toResult as rankedToResult } from './rank.ts';
 import { attachKoOdds, koOddsMapsFor } from './search/root-payload.ts';
 import type { CellBlendClass, EvalCellJob, EvalCellValue, EvalResult, KoOddsMismatch, MctsTreeStats, RankedChoice } from './types.ts';
+import { cellContribution, pooledChanceValue, type TreeCell } from './search/merge-pool.ts';
 
 /**
  * Root parallelization for the MCTS mode: N independent trees (each with a
@@ -76,6 +77,8 @@ interface PooledCell {
   total: number;
   value: number;
   ended: boolean;
+  /** Round 43: the per-tree cells, for the per-class pool of chance cells. */
+  cells: TreeCell[];
 }
 
 /**
@@ -90,8 +93,9 @@ function pooledCells(trees: MctsTreeStats[]): Map<number, PooledCell> {
       if (entry) {
         entry.visits += cell.visits;
         entry.total += cell.total;
+        entry.cells.push(cell);
       } else {
-        pooled.set(cell.key, { visits: cell.visits, total: cell.total, value: cell.value, ended: cell.ended });
+        pooled.set(cell.key, { visits: cell.visits, total: cell.total, value: cell.value, ended: cell.ended, cells: [cell] });
       }
     }
   }
@@ -105,7 +109,8 @@ function pooledCells(trees: MctsTreeStats[]): Map<number, PooledCell> {
  * of their per-tree means. With `classKey` only the trees that drew that
  * outcome class count (round 33); `acceptUnkeyed` lets trees without a
  * recorded class join (the one-open-class shape, where every open draw
- * must belong to that class).
+ * must belong to that class). Round 43: a chance cell (cells[].classes)
+ * contributes the pool of the named class itself (merge-pool.ts).
  */
 function poolContinuation(
   trees: MctsTreeStats[], key: number, classKey?: string, acceptUnkeyed = false,
@@ -115,13 +120,12 @@ function poolContinuation(
   let visits = 0;
   const entries: { mean: number; weight: number }[] = [];
   for (const tree of trees) {
-    const cell = tree.cells.find(entry => entry.key === key);
-    if (!cell || cell.ended) continue;
-    if (classKey !== undefined && cell.classKey !== classKey && !(acceptUnkeyed && cell.classKey === undefined)) continue;
-    total += cell.total + cell.value;
-    weight += cell.visits + 1;
-    visits += cell.visits;
-    entries.push({ mean: (cell.total + cell.value) / (cell.visits + 1), weight: cell.visits + 1 });
+    const own = cellContribution(tree.cells.find(entry => entry.key === key), classKey, acceptUnkeyed);
+    if (!own) continue;
+    total += own.mean * own.weight;
+    weight += own.weight;
+    visits += own.visits;
+    entries.push({ mean: own.mean, weight: own.weight });
   }
   return { value: weight > 0 ? total / weight : NaN, visits, trees: entries.length, disagreement: weightedDisagreement(entries) };
 }
@@ -189,7 +193,8 @@ function pooledMatrix(
   const values = base.p1Options.map((_, i) => base.p2Options.map((_, j) => {
     const entry = pooled.get(cellKey(i, j));
     if (!entry) return base.rootValue;
-    return (entry.total + entry.value) / (entry.visits + 1);
+    // Round 43: a chance cell pools per class across the trees (merge-pool.ts).
+    return pooledChanceValue(entry.cells) ?? (entry.total + entry.value) / (entry.visits + 1);
   }));
   const ended = base.p1Options.map((_, i) =>
     base.p2Options.map((_, j) => pooled.get(cellKey(i, j))?.ended ?? false));
