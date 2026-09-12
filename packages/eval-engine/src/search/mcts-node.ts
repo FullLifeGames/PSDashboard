@@ -3,6 +3,7 @@ import { positionBattle, type ChoiceOption, type SimPosition } from '../forward-
 import { cellKey } from '../rank.ts';
 import type { EvalSettings, TeraAllowance } from '../types.ts';
 import { leafValue } from './leaf.ts';
+import { chanceEnded, chanceValue, isChanceNode, type TreeChild } from './chance-node.ts';
 import { optionHints } from './hints.ts';
 import { searchOptions } from './options.ts';
 
@@ -37,6 +38,8 @@ const hintOrder = (hints: number[]): number[] =>
     .map(entry => entry.index);
 
 export interface Node {
+  /** Round 43: tells a decision node from a chance node in the children map. */
+  kind: 'decision';
   position: SimPosition;
   ended: boolean;
   /**
@@ -57,7 +60,7 @@ export interface Node {
   p1Order: number[];
   p2Order: number[];
   visits: number;
-  children: Map<number, Node>;
+  children: Map<number, TreeChild>;
 }
 
 export function makeNode(
@@ -73,6 +76,7 @@ export function makeNode(
   const p1Options = ended ? [] : searchOptions(position, 'p1', { tera, keep: keepPlayed?.p1Slots, sleepClause });
   const p2Options = ended ? [] : searchOptions(position, 'p2', { tera, keep: keepPlayed?.p2Slots, sleepClause });
   return {
+    kind: 'decision',
     position,
     ended,
     boundary,
@@ -124,21 +128,22 @@ export function principalVariation(node: Node): { p1: string; p2: string }[] {
   let current = node;
   for (let step = 0; step < PV_MAX_STEPS; step++) {
     if (current.ended || current.p1Options.length === 0 || current.p2Options.length === 0) break;
-    let bestKey = -1;
+    let best: TreeChild | undefined;
     let bestVisits = 0;
     let bestI = 0;
     let bestJ = 0;
     for (const [key, child] of current.children) {
       if (child.visits > bestVisits) {
         bestVisits = child.visits;
-        bestKey = key;
+        best = child;
         bestI = Math.floor(key / 10_000);
         bestJ = key % 10_000;
       }
     }
-    if (bestKey < 0 || bestVisits < PV_MIN_VISITS) break;
+    if (!best || bestVisits < PV_MIN_VISITS) break;
     steps.push({ p1: current.p1Options[bestI].label, p2: current.p2Options[bestJ].label });
-    current = current.children.get(bestKey)!;
+    // Round 43: a chance node passes the line on through its heaviest class.
+    current = isChanceNode(best) ? best.classes[0].child : best;
   }
   return steps;
 }
@@ -153,15 +158,19 @@ export function principalVariation(node: Node): { p1: string; p2: string }[] {
 function treeCellValue(root: Node, i: number, j: number): number {
   const child = root.children.get(cellKey(i, j));
   if (!child) return root.value;
+  // Round 43: a chance cell reads as the weighted blend of its class means.
+  if (isChanceNode(child)) return chanceValue(child);
   const total = child.p1W.reduce((sum, w) => sum + w, 0) + child.value;
   return (total + child.value) / (child.visits + 1);
 }
+
+const childEnded = (child: TreeChild | undefined): boolean => (child ? (isChanceNode(child) ? chanceEnded(child) : child.ended) : false);
 
 /** The tree-informed root matrix: cell values from the tree, ended flags from the expanded children. */
 export function treeMatrix(root: Node): { values: number[][]; ended: boolean[][] } {
   const values = root.p1Options.map((_, i) =>
     root.p2Options.map((_, j) => treeCellValue(root, i, j)));
   const ended = root.p1Options.map((_, i) =>
-    root.p2Options.map((_, j) => root.children.get(cellKey(i, j))?.ended ?? false));
+    root.p2Options.map((_, j) => childEnded(root.children.get(cellKey(i, j)))));
   return { values, ended };
 }

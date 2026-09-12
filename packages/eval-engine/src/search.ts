@@ -8,7 +8,7 @@
 // dispatch); the constant itself lives in types.ts so the UI can share it
 // without importing the sim.
 export { AUTO_MCTS_FAINTED_FRACTION } from './types.ts';
-export { battleFaintedFraction, SEARCH_SEEDS } from './search/leaf.ts';
+export { battleFaintedFraction } from './search/leaf.ts';
 export { optionHints } from './search/hints.ts';
 export { searchOptions } from './search/options.ts';
 export { createLocalExecutor, searchPosition, subSearchDepth1 } from './search/position.ts';

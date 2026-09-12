@@ -224,7 +224,7 @@ describe('MCTS koOdds payload (round 7)', () => {
     expect(pump.koOdds).toEqual({ accuracy: expect.closeTo(0.8, 5), killFraction: 1 });
   });
 
-  test('root cells carry their drawn outcome class on boundary cells only, deterministically (round 33)', () => {
+  test('root cells carry their outcome classes on boundary cells only, deterministically (rounds 33 and 43)', () => {
     const root = gambleRoot();
     const tree = mctsTreeSearch(root, settings, 1);
     const i = tree.p1Options.findIndex(option => option.choice === 'move hydropump');
@@ -234,12 +234,18 @@ describe('MCTS koOdds payload (round 7)', () => {
     expect(j).toBeGreaterThanOrEqual(0);
     const pump = tree.cells.find(cell => cell.key === cellKey(i, j));
     expect(pump).toBeTruthy();
-    expect(['miss', 'hit-kill', 'hit-nokill']).toContain(pump!.classKey);
+    // Round 43: a root boundary cell is a chance node over its classes (cells[].classes); a
+    // single-child boundary cell keeps the drawn class as classKey (round 33).
+    const pumpKeys = pump!.classes ? pump!.classes.map(cls => cls.key) : [pump!.classKey];
+    expect(pumpKeys.length).toBeGreaterThan(0);
+    for (const key of pumpKeys) expect(['miss', 'hit-kill', 'hit-nokill']).toContain(key);
     const certain = tree.cells.find(cell => cell.key === cellKey(toss, j));
     expect(certain?.classKey).toBeUndefined();
+    expect(certain?.classes).toBeUndefined();
     // Same offset, same draws, same keys.
     const again = mctsTreeSearch(root, settings, 1);
-    expect(again.cells.map(cell => [cell.key, cell.classKey])).toEqual(tree.cells.map(cell => [cell.key, cell.classKey]));
+    const keysOf = (cells: typeof tree.cells) => cells.map(cell => [cell.key, cell.classKey, cell.classes?.map(cls => cls.key)]);
+    expect(keysOf(again.cells)).toEqual(keysOf(tree.cells));
   });
 
   test('only the offset-0 tree pays the boundary-flag scan (the merge reads trees[0])', () => {

@@ -1,16 +1,16 @@
-import type { PRNGSeed } from '@pkmn/sim';
-import { createMatchupCache, unansweredMons, type MatchupCache } from './eval-function.ts';
-import { advancePositionWithLog, createRootPosition, positionBattle } from './forward-model.ts';
-import { classifyChild, koOddsForOptions, planCellEvents, type CellEvent } from './cell-blend.ts';
+import { createMatchupCache, unansweredMons } from './eval-function.ts';
+import { createRootPosition, positionBattle } from './forward-model.ts';
+import { koOddsForOptions, planCellEvents } from './cell-blend.ts';
 import { cellKey, rankFromMatrix, toResult as rankedToResult } from './rank.ts';
-import { SEARCH_SEEDS } from './search.ts';
 import { attachKoOdds, hasUnansweredContent, koOddsMapsFor } from './search/root-payload.ts';
 import { topVisitedIndex } from './mcts-merge.ts';
 import { makeNode, pick, principalVariation, treeMatrix, type Node } from './search/mcts-node.ts';
+import { cellStats, isChanceNode, pickClass } from './search/chance-node.ts';
+import { expandCell, type ExpansionContext, type RootClassBook } from './search/expansion.ts';
 import { forcedWinFor } from './search/forced-win.ts';
 import { applyForcedWin, forcedWinInput } from './search/forced-win-apply.ts';
 import { perfSync } from './perf-trace.ts';
-import type { EvalResult, EvalSettings, KoOddsInfo, MctsTreeStats, SearchProgress, TeraAllowance, UnansweredProfile } from './types.ts';
+import type { EvalResult, EvalSettings, KoOddsInfo, MctsTreeStats, SearchProgress, UnansweredProfile } from './types.ts';
 
 /**
  * DUCT (decoupled UCT) Monte-Carlo tree search — the "think deeper" mode.
@@ -18,9 +18,11 @@ import type { EvalResult, EvalSettings, KoOddsInfo, MctsTreeStats, SearchProgres
  * statistics (the correct formulation for simultaneous moves), new leaves
  * are valued by the static eval (no rollouts, foul-play style), and values
  * backpropagate along the joint path. Fully deterministic: chance is fixed
- * per-cell at creation time from the iteration-indexed seed list. The node
- * machinery (creation, the UCB pick, the principal variation, the
- * tree-informed matrix) lives in search/mcts-node.ts.
+ * per-cell at creation time from the iteration-indexed seed list from the
+ * third ply on; the first two plies price chance as nodes over the outcome
+ * classes (search/expansion.ts, round 43). The node machinery (creation,
+ * the UCB pick, the principal variation, the tree-informed matrix) lives
+ * in search/mcts-node.ts.
  */
 
 export const MCTS_ITERATIONS = 600;
@@ -95,48 +97,12 @@ interface PathStep {
 }
 
 /**
- * Round 33: the root's drawn outcome classes. A root cell fixes one chance
- * outcome per tree; naming that outcome (miss / hit-kill / hit-nokill, per
- * cell-blend.ts) lets the merge pool the trees' depth per class. Events are
- * planned once per root cell (one calc), the class read from the advance
- * log; unrecognized draws stay unkeyed.
- */
-interface RootClasses {
-  battle: ReturnType<typeof positionBattle>;
-  events: Map<number, CellEvent[] | null>;
-  keys: Map<number, string>;
-}
-
-/** Expands a root child with its log and records the drawn class when the cell is a boundary cell. */
-function expandRootChild(root: Node, key: number, i: number, j: number, seed: PRNGSeed, classes: RootClasses) {
-  let events = classes.events.get(key);
-  if (events === undefined) {
-    const plan = planCellEvents(classes.battle, root.p1Options[i].choice, root.p2Options[j].choice);
-    events = plan.kind === 'events' ? plan.events : null;
-    classes.events.set(key, events);
-  }
-  const { child, log, pendingSwitch } = advancePositionWithLog(
-    root.position, root.p1Options[i].choice, root.p2Options[j].choice, seed, { stopAtForcedSwitch: FORCED_SWITCH_NODES });
-  if (events) {
-    const classKey = classifyChild(log, events);
-    if (classKey !== null) classes.keys.set(key, classKey);
-  }
-  return { child, pendingSwitch };
-}
-
-/**
  * Selection: descend through existing children via decoupled UCB, expanding
  * at most one child. Returns the joint path, the leaf value the descent
  * ended on, and the depth it reached.
  */
 function selectAndExpand(
-  root: Node,
-  iteration: number,
-  seedOffset: number,
-  tera: TeraAllowance,
-  matchupCache: MatchupCache,
-  sleepClause: boolean | undefined,
-  classes: RootClasses,
+  root: Node, iteration: number, seedOffset: number, ctx: ExpansionContext, book: RootClassBook,
 ): { path: PathStep[]; leaf: number; depth: number } {
   const path: PathStep[] = [];
   let node = root;
@@ -151,25 +117,20 @@ function selectAndExpand(
     const j = pick(node.p2N, node.p2W, node.visits, false, node.p2Order);
     path.push({ node, i, j });
     const key = cellKey(i, j);
-    let child = node.children.get(key);
-    if (!child) {
-      // Expansion: the cell's chance outcome is fixed at creation time.
-      // The offset rotates the seed schedule so parallel trees explore
-      // different chance outcomes. Round 42: the advance stops at a
-      // knock-out's switch request, so the child may be a mid-turn node.
-      const seed = SEARCH_SEEDS[(iteration + seedOffset) % SEARCH_SEEDS.length];
-      // Root expansions keep their advance log for the outcome class.
-      const expanded = node === root
-        ? expandRootChild(root, key, i, j, seed, classes)
-        : advancePositionWithLog(node.position, node.p1Options[i].choice, node.p2Options[j].choice, seed, { stopAtForcedSwitch: FORCED_SWITCH_NODES });
-      child = makeNode(expanded.child, tera, matchupCache, undefined, sleepClause, !expanded.pendingSwitch);
-      node.children.set(key, child);
-      leaf = child.value;
-      child.visits += 1;
-      if (child.boundary) depth += 1;
+    const existing = node.children.get(key);
+    if (!existing) {
+      // Expansion (search/expansion.ts): the first two plies draw fixed
+      // worlds and may open a chance node; deeper cells fix one outcome
+      // from the iteration-rotated seed as before.
+      const expanded = expandCell(node, i, j, depth, iteration, seedOffset, ctx, node === root ? book : undefined);
+      node.children.set(key, expanded.child);
+      if (!isChanceNode(expanded.child)) expanded.child.visits += 1;
+      leaf = expanded.leaf;
+      if (expanded.boundary) depth += 1;
       break;
     }
-    node = child;
+    // Round 43: a chance node hands the descent to the class with the largest deficit.
+    node = isChanceNode(existing) ? pickClass(existing).child : existing;
     if (node.boundary) depth += 1;
   }
   return { path, leaf, depth };
@@ -229,12 +190,13 @@ function runMcts(
   };
   // Round 13: root unanswered-mon profile, once per root like the ko odds.
   const unanswered = unansweredMons(rootBattle, matchupCache);
-  const classes: RootClasses = { battle: rootBattle, events: new Map(), keys: new Map() };
+  const ctx: ExpansionContext = { tera, matchupCache, sleepClause: settings.sleepClause, stopAtForcedSwitch: FORCED_SWITCH_NODES };
+  const book: RootClassBook = { battle: rootBattle, events: new Map(), keys: new Map() };
 
   let maxDepth = 1;
   for (let iteration = 0; iteration < MCTS_ITERATIONS; iteration++) {
     if (callbacks?.shouldStop?.()) break;
-    const { path, leaf, depth } = selectAndExpand(root, iteration, seedOffset, tera, matchupCache, settings.sleepClause, classes);
+    const { path, leaf, depth } = selectAndExpand(root, iteration, seedOffset, ctx, book);
     maxDepth = Math.max(maxDepth, depth);
     backpropagate(path, leaf);
     reportIteration(callbacks, root, iteration + 1, maxDepth, koOdds, unanswered);
@@ -242,7 +204,7 @@ function runMcts(
 
   const result = toResult(root, maxDepth, koOdds, unanswered);
   callbacks?.onPartial?.(result);
-  return { root, maxDepth, result, koOdds, rootClassKeys: classes.keys };
+  return { root, maxDepth, result, koOdds, rootClassKeys: book.keys };
 }
 
 export function mctsSearch(
@@ -294,14 +256,7 @@ export function mctsTreeSearch(
     boundaryCells,
     // Root-cell stats for the merged equilibrium (Map order is insertion
     // order — deterministic under the fixed seed schedule).
-    cells: [...root.children.entries()].map(([key, child]) => ({
-      key,
-      visits: child.visits,
-      total: child.p1W.reduce((sum, w) => sum + w, 0) + child.value,
-      value: child.value,
-      ended: child.ended,
-      ...(rootClassKeys.has(key) ? { classKey: rootClassKeys.get(key) } : {}),
-    })),
+    cells: [...root.children.entries()].map(([key, child]) => cellStats(key, child, rootClassKeys.get(key))),
     result,
   };
 }

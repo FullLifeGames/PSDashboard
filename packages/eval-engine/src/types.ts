@@ -462,6 +462,13 @@ export interface MctsTreeStats {
      * class instead of trusting one open class only.
      */
     classKey?: string;
+    /**
+     * Round 43: a root chance cell's outcome classes with their subtree
+     * stats (`total` = leaves backed through the class, `value` = the
+     * class child's static, one prior each); the merge pools them per
+     * class. Absent on single-child cells.
+     */
+    classes?: { key: string; weight: number; visits: number; total: number; value: number; ended: boolean }[];
   }[];
   /** This tree's own ranked result (PV/punisher donor for the merge). */
   result: EvalResult;
