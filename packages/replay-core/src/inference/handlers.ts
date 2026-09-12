@@ -1,7 +1,7 @@
 import { Dex } from '@pkmn/sim';
 import { revealedField, unknownEvs, unknownField } from '../team-info.ts';
 import { canHaveDancer, findPokemon, ruleOut, type InferrerState } from './inferrer-state.ts';
-import { parseDetails } from './lookup.ts';
+import { parseDetails, revealMarkerForme, unknownFormeMarkerFor } from './lookup.ts';
 import { toId } from '../ids.ts';
 import type { PokemonFieldInfo } from '../types.ts';
 
@@ -139,16 +139,21 @@ export function addFromPreview(state: InferrerState, line: string) {
   }
 }
 
-/** Switch: |switch|p2a: Nickname|Species, L50, M|100/100 */
+/**
+ * Switch: |switch|p2a: Nickname|Species, L50, M|100/100. A forme the team
+ * preview hid behind "-*" (Urshifu-*, Zamazenta-*) is revealed here: the
+ * marker entry becomes that forme instead of a seventh body (round 21
+ * sighted 110359 p2 with seven sets).
+ */
 export function addFromSwitch(state: InferrerState, line: string) {
   const side = state.opponentSide;
   if (!(line.startsWith(`|switch|${side}`) || line.startsWith(`|drag|${side}`))) return;
   const parts = line.split('|');
-  const details = parts[3];
-  const parsed = parseDetails(details);
-  if (parsed && !state.pokemonMap.has(parsed.species)) {
-    state.pokemonMap.set(parsed.species, revealedPokemon(parsed, unknownField()));
-  }
+  const parsed = parseDetails(parts[3]);
+  if (!parsed || state.pokemonMap.has(parsed.species)) return;
+  const marker = unknownFormeMarkerFor(state.pokemonMap, parsed.species);
+  if (marker) revealMarkerForme(state.pokemonMap, marker, parsed);
+  else state.pokemonMap.set(parsed.species, revealedPokemon(parsed, unknownField()));
 }
 
 /** Move: |move|p2a: Nickname|Move Name|target */

@@ -104,6 +104,9 @@ function applyTeamSheet(pokemonMap: Map<string, RevealedPokemonInfo>, sheet: She
       continue;
     }
 
+    // The sheet names the forme a "-*" preview marker hid, and the battle
+    // may never show it (the mon stayed benched).
+    if (info.species.endsWith('-*')) info.species = sheetMon.species;
     const knownMoveIds = new Set(info.moves.map(move => toId(move.name)));
     for (const move of sheetMon.moves) {
       if (knownMoveIds.has(toId(move))) continue;
