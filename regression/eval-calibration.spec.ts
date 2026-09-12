@@ -892,6 +892,90 @@ import { summaryLines } from './calibration-summary';
  * static basis for this mass; the next lever, if any, is search/
  * planning-side.
  *
+ * CHANCE NODES ROUND 2026-09-12 (improvement round 43; spec
+ * docs/superpowers/specs/2026-09-12-round-43-design.md; branch r43 on
+ * master acd88d4; a42e634 the scripted PRNG / 7bae1d3 kill-roll counts on
+ * the boundary event / a98b3dc outcome children on demand / 351a9fc the
+ * solver and the prover draw missing classes on demand / 6582922 chance
+ * nodes in the first two plies / 1b3fcc1 the merge pools per class /
+ * 6478f20 unplanned pairs grouped at the root ply only / 3e25179 cache
+ * v46). Roadmap Q2 plus the speed-tie split and the prover's open
+ * classes. FINDING: round 42 lost 18 bp late with correct reads that
+ * hedged (2663102863 t8 0.851 → 0.287) because a tree cell fixes one
+ * roll per tree; the prover left classes open that no probe seed showed,
+ * and inner cells could not probe at all. MECHANISM: a ScriptedPRNG
+ * answers the accuracy roll (randomChance(·, 100)), the crit roll
+ * (denominators 24/16/8/4/3/2), the damage roll (the first direct
+ * random(16), a delegation flag keeps the gen-3-to-5 crit denominator
+ * apart) and the speed-tie order (shuffle over the tied move actions) of
+ * one named move, so a class the base seed never showed is drawn on
+ * demand (median kill roll, median non-kill roll, a crit only when no
+ * normal roll kills, the edge roll as the retry) and confirmed on its
+ * log; outcome-children.ts serves the tree, the endgame solver and the
+ * prover (the probe seeds are gone, the draw budget caps forced draws).
+ * In the first two plies a boundary cell with a class plan is a chance
+ * node over its classes (the descent takes the class with the largest
+ * deficit weight × visits − own visits, the cell reads as the weighted
+ * blend of the class means), a doubles or guarded pair groups three
+ * fixed seeds by who fell, every tree draws the same worlds there and
+ * the merge pools per class (cells[].classes); from the third ply on the
+ * rotated seed fixes one outcome per cell as before. Matrix, verify
+ * sampler and children stay byte-identical (identity fixture: only the
+ * mcts section moved, singles −0.2929 → −0.2930, doubles 0.9198 →
+ * 0.9281).
+ * PROVER: the synthetic forced-win table is line-for-line identical in
+ * mass, turns and caveat (struggle-lock 0.997, focus-blast-range 1,
+ * thunder-70 0.7; only states 16 → 19 and 3 → 4); the truth bench's
+ * synthetic coverage moves unpriced 13 → 6 and exactly solved 13 → 19
+ * (focus-blast-range, healer-vs-band, struggle-lock, choice-locked,
+ * two-v-one-switch-loop, doubles-healer-vs-band now exact).
+ * PERF (2026-09-03 probe, PERF_PROBE_DIR lever for the bank's doubles
+ * replay): singles 573756 tree t70 1017 → 1244 ms (+22%), t120 676 → 799
+ * (+18%); doubles 2663102863 tree t6 1344 → 2713 (+102%), t7 +145%, t8
+ * 1460 → 3420 (+134%), t9 +152% — over the preregistered +40%. Ladder
+ * step 1 (grouping at the root ply only, 6478f20): t6 +18%, t7 +34%, t8
+ * +37%, t9 +46% against the morning base; interleaved on one machine
+ * state flat 1435 / 1078 against chance 2061 / 1830 ms (t8 +44%, t9
+ * +70%). Step 2 (CHANCE_MAX_DEPTH 1) cannot help doubles: every doubles
+ * pair lacks a class plan, so the whole surcharge is the three root draws
+ * plus one makeNode per class child. The doubles line stays MISSED.
+ * BENCH (paired, n=816; A .calibration/r42-b; B .calibration/r43-b on the
+ * ladder-1 stand): sign 53/62/78/61/71 → 53/61/79/61/71, brier
+ * 0.2611/0.2287/0.1536 → 0.2610/0.2293/0.1548 (mid +6, LATE +12 bp); hq
+ * n=548 0.2598/0.2154/0.1622 → 0.2600/0.2141/0.1637 (mid −13, late +15);
+ * luck-adjusted 0.2450/0.2087/0.1471 → 0.2449/0.2091/0.1482 (late +11);
+ * bucket 0.7–1.0 87% → 88% (n 127 → 120); three exclusive flips, B right
+ * 2 (2660802611 t10, 749601 t22), A right 1 (2630461565 t4, doubles mid
+ * 0.215 → −0.317). Strata: tournament-0811b late 0.1174 → 0.1240 (+66),
+ * ladder-dou-0804 mid 0.0986 → 0.1221 (+235) and late 0.0862 → 0.0856,
+ * ladder-ou-0802 late 0.1348 → 0.1337. 2663102863 t8 0.287 → 0.662: the
+ * named position's certainty is back, the late line is not — against
+ * r41-b late 0.1518 → 0.1548 and hq 0.1607 → 0.1637 (+30 bp each). The
+ * preregistered line (hq late ≥ 3 bp better and full late not worse) is
+ * MISSED.
+ * FEEDBACK: three sweeps byte-identical on all six full dumps (drift JSON
+ * and report differ only in date and wall time); against the master base
+ * of the same morning the expected channels 573756 t68/t73/t138 and
+ * 649664 t23 stand unmoved, 653785 t19 (gap) open → moved (attribution
+ * shift where quiet is expected), the golden 655336 trades its t27
+ * key-moment attribution p1-read → shift and loses the "extra read 27:p1"
+ * channel (eight → seven); KO-odds mismatches 209/58/208/126/87/53 →
+ * 212/57/202/123/86/47; wall 573756 61 → 71/71/81 s (not interleaved, the
+ * machine ran 18% slower on unchanged code by noon).
+ * PLAY-OUT: the round-42 pin (e2e/branch.spec.ts, draft t56, Muk-Alola
+ * before Heatran) fails deterministically — p2's switches read Slowking,
+ * Gengar, Heatran, Slowking, Gengar, Slowking, Gengar, Muk-Alola never
+ * enters, p2 still wins at t68 instead of t65; with CHANCE_NODES = false
+ * (the solver and the prover keep their on-demand draws) the pin is green
+ * again in 34 s instead of 1.3 min. The movement belongs to the tree part.
+ * GATES: tsc, lint (ratchet), knip, Vitest 1421 green (173 files; the new
+ * scripted-prng, outcome-children and eval-mcts-chance specs); e2e 74/75,
+ * the play-out pin being the one miss.
+ * VERDICT: open at the user gate (reject, fallback CHANCE_NODES = false
+ * with its own bank run, or rework: class children built on first
+ * descent, the third root draw only when the first two disagree, doubles
+ * without grouping).
+ *
  * FORCED-SWITCH NODES ROUND 2026-09-11 (improvement round 42; spec
  * docs/superpowers/specs/2026-09-11-round-42-design.md; branch r42 on
  * master 0926aa9; 74f6cdd the advance can stop at the forced-switch
