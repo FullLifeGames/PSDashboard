@@ -17,7 +17,7 @@ import { countFainted, rollSensitivePair } from './leaf.ts';
  * endgame solver and the prover.
  */
 
-export interface OutcomeChild {
+interface OutcomeChild {
   position: SimPosition;
   /** Group key `${order}:${classKey}` on the class path; the faint signature on the empirical path. */
   key: string;
@@ -83,7 +83,7 @@ export function drawChild(
 }
 
 /** The draw whose damage measure sits closest to the group's mean; ties keep the earliest draw. */
-export function nearestMean(draws: Draw[]): Draw {
+function nearestMean(draws: Draw[]): Draw {
   const mean = draws.reduce((sum, draw) => sum + draw.measure, 0) / draws.length;
   let best = draws[0];
   for (const draw of draws) if (Math.abs(draw.measure - mean) < Math.abs(best.measure - mean)) best = draw;

@@ -41,10 +41,11 @@ export interface ProverBudget {
 }
 export const PROVER_BUDGET: ProverBudget = { states: 200, cells: 100, depth: 12, probeCells: 16, probeDepth: 5 };
 /**
- * Draws per class cell at the root: the base draws plus a few probes, so
- * the open class the sentence and the bar name is found. A class the draws
- * never show stays OPEN (its share leaves the mass), so inner cells take
- * the base draws only: the cost of a proof lives in its inner cells.
+ * Forced draws per class cell (round 43): a class the five base seeds
+ * never showed is drawn on demand; the cap bounds those draws, retries
+ * included. Root cells may take six, inner cells three, so a cell with a
+ * tie and three classes still closes; a class beyond the cap stays OPEN
+ * (its share leaves the mass).
  */
 const PROVER_DRAW_BUDGET = 6;
 const PROVER_INNER_DRAW_BUDGET = 3;
