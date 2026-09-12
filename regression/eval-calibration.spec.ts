@@ -971,10 +971,37 @@ import { summaryLines } from './calibration-summary';
  * GATES: tsc, lint (ratchet), knip, Vitest 1421 green (173 files; the new
  * scripted-prng, outcome-children and eval-mcts-chance specs); e2e 74/75,
  * the play-out pin being the one miss.
- * VERDICT: open at the user gate (reject, fallback CHANCE_NODES = false
- * with its own bank run, or rework: class children built on first
- * descent, the third root draw only when the first two disagree, doubles
- * without grouping).
+ * VERDICT 2026-09-12 (user gate, 12:40): FALLBACK, as the plan
+ * preregistered — CHANCE_NODES = false (9ff493c), the solver and the
+ * prover keep their on-demand draws, the tree part stays on the branch
+ * switched off. The user took the recommendation: the bank's late loss
+ * reads as structure (the class visits halve the main line's depth over
+ * two plies; the doubles identity depth fell 8 → 7), the cost and the
+ * play-out line come on top, and a rework would be a new spec (search
+ * the heaviest class deep, price the others statically), not a screw.
+ * FALLBACK BENCH (paired, A .calibration/r42-b, B .calibration/r43-flat):
+ * identical to four digits in every line — 53/62/78/61/71, brier
+ * 0.2611/0.2287/0.1536, hq 0.2598/0.2154/0.1622, luck-adjusted
+ * 0.2450/0.2087/0.1471, bucket 0.7–1.0 87% (n 127), no exclusive flip;
+ * five late positions move by thousandths as proofs with a formerly open
+ * class close (750540 t22 −0.994 → −0.929, 2115579570 t26 0.973 →
+ * 1.000, draft t65 −0.996 → −1.000, 2658661545 t20 −0.997 → −1.000).
+ * The on-demand draws are inert on the bank; their gain is the truth
+ * bench's coverage. FALLBACK FEEDBACK: three sweeps byte-identical on
+ * all six full dumps and on the drift report but for the commit stamp;
+ * against the master base no channel and no mismatch count moves (wall
+ * 573756 61 → 51 s); two full dumps move without a claim: 573756 t138
+ * p2 proof mass 0.6406 → 0.6628 (score −0.9641 → −0.9663), 649664 t23
+ * p1 proof caveat sampled-rolls → barring-crit with the t23 root 0.92 →
+ * 0.7875 (the cell prices classes now instead of falling to the plain
+ * path after one draw outside the plan; the crit stays open). Identity:
+ * the flat tree is byte-identical to the round-42 fixture (acd88d4).
+ * GATES on the fallback: Vitest green with the six tree-level chance
+ * tests skipped behind the switch, tsc, lint, knip, the play-out pin
+ * green in 24 s. Fast-forwarded to master; no re-pin; the
+ * r42-prior/budget/maxbackup branches and their bank folders deleted as
+ * the round-42 verdict foresaw; the tree part's bank run stays in
+ * .calibration/r43-b beside .calibration/r43-flat.
  *
  * FORCED-SWITCH NODES ROUND 2026-09-11 (improvement round 42; spec
  * docs/superpowers/specs/2026-09-11-round-42-design.md; branch r42 on
