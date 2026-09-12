@@ -1164,6 +1164,15 @@ describe('pivot pair matching', () => {
     const matched = findPlayedOption(options, [{ kind: 'move', name: 'U-turn' }]);
     expect(matched?.label).toBe('U-turn → Noivern');
   });
+
+  test('the singles match reads the pair rows too (draft t1: U-turn → Kyurem stood alone)', () => {
+    const pairResult: EvalResult = { score: 0, interval: 0, depthCompleted: 1,
+      perSide: { p1: options.map(option => choice(option.choice, option.label, 0)), p2: [] } };
+    const uturn = (pivotTarget?: string) => ({ kind: 'move' as const, name: 'U-turn', tera: false, pivotTarget });
+    expect(matchPlayedChoice(pairResult, 'p1', uturn('Clefable'))?.label).toBe('U-turn → Clefable');
+    expect(matchPlayedChoice(pairResult, 'p1', uturn())?.label).toBe('U-turn → Noivern');
+    expect(matchPlayedChoice(pairResult, 'p1', { kind: 'move', name: 'Close Combat', tera: false })?.label).toBe('Close Combat');
+  });
 });
 
 describe('narrative signals (round 5)', () => {

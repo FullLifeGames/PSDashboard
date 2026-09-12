@@ -230,11 +230,11 @@ export function matchPlayedChoice(
 ): RankedChoice | null {
   if (!action) return null;
   const options = result.perSide[side];
-  if (action.kind === 'move') {
-    const gimmick = action.tera ? ' terastallize' : action.mega ? ' mega' : action.ultra ? ' ultra' : '';
-    const choice = `move ${toId(action.name)}${gimmick}`;
-    return options.find(option => option.choice === choice) ?? null;
-  }
+  // Moves go through the slot matcher: the root matrix lists a pivot ONLY
+  // as pairs ("move uturn > switch 2"), so an exact-choice lookup left a
+  // played U-turn unmatched (draft t1 read "not among the engine's
+  // options" while "U-turn → Kyurem" sat in the matrix).
+  if (action.kind === 'move') return findPlayedOption(options, [action]);
   // Labels carry species names; the nickname is only a fallback for logs
   // where the species could not be parsed.
   return (action.species ? options.find(option => option.label === `→ ${action.species}`) : undefined) ??
