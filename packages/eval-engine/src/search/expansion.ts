@@ -24,6 +24,8 @@ const CHANCE_NODES = true;
 const CHANCE_MAX_DEPTH = 2;
 const TREE_FORCED_CAP = 6;
 const GROUP_SEEDS = SEARCH_SEEDS.slice(0, 3);
+/** Empirical grouping of unplanned pairs only up to this ply (the class path runs to CHANCE_MAX_DEPTH). */
+const GROUP_MAX_DEPTH = 1;
 
 export interface ExpansionContext {
   tera: TeraAllowance;
@@ -72,10 +74,19 @@ function singleChild(
   return { child: made, leaf: made.value, boundary: made.boundary };
 }
 
-/** Class path where a plan or a tie exists, empirical grouping where the plan fails, null for a deterministic singles pair. */
-function groupedDraw(position: SimPosition, p1Choice: string, p2Choice: string, ctx: ExpansionContext): OutcomeChildren | null {
+/**
+ * Class path where a plan or a tie exists, empirical grouping where the plan
+ * fails, null for a deterministic singles pair. The empirical grouping
+ * (doubles, guarded pairs: three draws per cell) runs at the root ply only;
+ * the perf gate measured it at +102 to +152 % tree cost on the doubles
+ * probe when the second ply grouped as well (2026-09-12 ladder step 1).
+ */
+function groupedDraw(position: SimPosition, p1Choice: string, p2Choice: string, depth: number, ctx: ExpansionContext): OutcomeChildren | null {
   const plan = planCellEvents(positionBattle(position), p1Choice, p2Choice);
-  if (plan.kind === 'fail') return groupedChildren(position, p1Choice, p2Choice, { seeds: GROUP_SEEDS, stopAtForcedSwitch: ctx.stopAtForcedSwitch });
+  if (plan.kind === 'fail') {
+    if (depth > GROUP_MAX_DEPTH) return null;
+    return groupedChildren(position, p1Choice, p2Choice, { seeds: GROUP_SEEDS, stopAtForcedSwitch: ctx.stopAtForcedSwitch });
+  }
   return classChildren(position, p1Choice, p2Choice, { baseSeeds: [SEARCH_SEEDS[0]], forcedCap: TREE_FORCED_CAP, stopAtForcedSwitch: ctx.stopAtForcedSwitch });
 }
 
@@ -89,7 +100,7 @@ export function expandCell(
     return singleChild(node, p1Choice, p2Choice, SEARCH_SEEDS[(iteration + seedOffset) % SEARCH_SEEDS.length], ctx, book, key);
   }
   if (!node.boundary) return singleChild(node, p1Choice, p2Choice, SEARCH_SEEDS[0], ctx, book, key);
-  const grouped = groupedDraw(node.position, p1Choice, p2Choice, ctx);
+  const grouped = groupedDraw(node.position, p1Choice, p2Choice, depth, ctx);
   if (!grouped || grouped.children.length === 0) return singleChild(node, p1Choice, p2Choice, SEARCH_SEEDS[0], ctx, book, key);
   // Class-path keys drop their order prefix (the sampler's class keys); faint signatures of the empirical path stay whole.
   const bareKey = (groupKey: string) => (grouped.events.length > 0 ? classKeyOf(groupKey, grouped.tie) : groupKey);
