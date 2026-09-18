@@ -3,7 +3,7 @@
 Nur offene Schritte, als priorisierte Checkliste: Die oberste Iteration ist die nächste Sitzung, das oberste offene Kästchen darin das nächste TODO. Jedes TODO nennt das Problem an einer Spielszene und das Erfolgsmaß. Die TODOs der Iterationen 1 bis 3 tragen ihre Umsetzungsschritte hier; für alle anderen stehen sie als Checkliste im Backlog-Plan unter derselben Nummer.
 
 - **Iterationen** bündeln die TODOs einer Sitzung. Eine Iteration wird beim Start zur Runde mit der nächsten freien Rundennummer: Iteration 1 wird Runde 46. Score-berührende TODOs derselben Iteration bekommen je ihre eigene Messung (D3), nie eine gemeinsame.
-- **T-Nummern** (T01 bis T45) sind feste Namen, vergeben am 18.09. in Prioritäts-Reihenfolge. Wandert ein TODO in der Liste, behält es seine Nummer; ein neues TODO bekommt die nächste freie (ab T46). „braucht T01“ heißt: T01 muss vorher gelaufen sein.
+- **T-Nummern** (T01 bis T45) sind feste Namen, vergeben am 18.09. in Prioritäts-Reihenfolge. Wandert ein TODO in der Liste, behält es seine Nummer; ein neues TODO bekommt die nächste freie (ab T47; T46 kam am 18.09. in Runde 46 dazu). „braucht T01“ heißt: T01 muss vorher gelaufen sein.
 - **Backlog-Plan** (je TODO: Idee, Schritte mit Dateien, volles Gate, Doubles-Abdeckung, offene Entscheidungen, Zahlen, Code-Belege): `docs/superpowers/plans/2026-09-18-backlog-plans.md`.
 - **Erledigtes**: `docs/completed/` nach Gebiet (Index, Eintragsformat und Prozess in `docs/completed/README.md`).
 - **Maschinen-Quellen**: Ledger in `regression/eval-calibration.spec.ts`, Pins in `e2e-feedback/corpus.ts`, Memory-Notizen.
@@ -63,17 +63,19 @@ Die Sitzung bringt die Messbasis in Ordnung. T01 zuerst: Seine Feedback-Dumps si
 
   *Erfolg:* Die Zeile erscheint im Feedback-Lauf als OK statt als GAP open, alle anderen Kanäle unverändert.
 
-- [ ] **T04 · choicelock im Bank-Pfad bereinigen** (Messbasis, Mini-Runde, mini, score-berührend D3, braucht T01)
+- [x] **T04 · choicelock im Bank-Pfad bereinigen** (Messbasis, Mini-Runde, mini, score-berührend D3, braucht T01)
+
+  Ergebnis (18.09., am User-Gate übernommen: „so wie die App“): Der Lock war nur das Symptom. Der Bank-Läufer glich das laufende Spiel nie mit dem Replay ab, nur die gemessene Kopie, und seit Runde 40 behalten ausgewechselte Pokémon die HP des Simulators. In jeder zweiten Singles-Stellung der Bank lag mindestens ein Bank-Pokémon mehr als 10 Punkte neben dem echten Wert (751533 Zug 26: Kyurem real 48 %, in der Bank 1 %). Die Bank misst jetzt mit den Parametern der App; die Engine ist unberührt. Neue Basis `.calibration/base-20260918-live` (833 Stellungen, Vorzeichen 54/65/84, Brier 0,2565/0,2205/0,1229, K 2,27, hq 0,2467/0,1930/0,1239); der alte Weg bleibt über `EVAL_CALIBRATION_RAW=1`. Zahlen, Sonden und die Einordnung der Runden 40 bis 45 stehen im Ledger (BANK INSTRUMENT 2026-09-18).
 
   Bank-Stellung 573756 t138: Zapdos ist in Close Combat gesperrt. In der App ist dasselbe Zapdos frei. Die Bank misst damit eine andere Stellung, als der User sieht; wie viele der 816 Bank-Stellungen betroffen sind, ist offen. Erst klären, welcher Pfad recht hat, dann den anderen nachziehen.
 
-  - [ ] Stelle die Abweichung mit einer Sonde nach: lade 573756 t138 einmal über den Kalibrierungs-Pfad und einmal über den App-Pfad und vergleiche die Volatiles und das Item des Zapdos.
-  - [ ] Zähle über den Bank-Positions-Export, wie viele Stellungen mit einem choicelock in die Bewertung gehen und wie viele davon auf dem App-Pfad keinen tragen.
-  - [ ] Schreibe den roten Test für den Fall, den es heute nicht gibt: der Aktive steht schon richtig, trägt aber einen Lock ohne Protokoll-Beleg.
-  - [ ] Ziehe den unterlegenen Pfad nach: `repointActiveSlot` steigt sofort aus, wenn der Ziel-Aktive schon steht, und nur dieser Pfad löscht den Lock.
-  - [ ] Miss den Set- und Positions-Diff auf allen drei Pfaden (nackt, Harness, Feedback) vor der Bank, weil sonst eine blinde Bank gemessen wird.
-  - [ ] Fahre die gepaarte Bank und drei Feedback-Läufe und lege bewegte Kanäle dem User vor.
-  - [ ] Vor dem Bau klären: 2 offene Entscheidungen (Plan T04).
+  - [x] (`docs/perf/probes/2026-09-18-r46/t04/lock-diff.vt.ts`: t138 ist die einzige von 138 Grenzen mit abweichendem Lock-Bild; Ursache per `lock-trace`: Toxapex stirbt im Sim einen Zug zu früh, aus „move struggle“ wird ein Ersatz-Close-Combat) Stelle die Abweichung mit einer Sonde nach: lade 573756 t138 einmal über den Kalibrierungs-Pfad und einmal über den App-Pfad und vergleiche die Volatiles und das Item des Zapdos.
+  - [x] (über eine eigene Rekonstruktion statt über den Export, der nur Endspiel-Stellungen trägt: Lock-Bilder weichen an 6 von 775 gemessenen Zügen ab, in beide Richtungen; die 11 Locks auf Bank-Pokémon im Export sitzen alle auf besiegten Körpern) Zähle über den Bank-Positions-Export, wie viele Stellungen mit einem choicelock in die Bewertung gehen und wie viele davon auf dem App-Pfad keinen tragen.
+  - [x] (entfällt: die Ursache liegt nicht in `corrections.ts`, sondern im Bank-Läufer; der Test, der die Voraussetzung der Runde-40-Regel pinnt, wandert nach T46) Schreibe den roten Test für den Fall, den es heute nicht gibt: der Aktive steht schon richtig, trägt aber einen Lock ohne Protokoll-Beleg.
+  - [x] (058a0ab: unterlegen war der Bank-Läufer; `passInstrument` gibt dem Einmal-Pass und seinem Rückfall die App-Parameter (Abgleich an jeder Zug-Grenze, Choice-Lock-Kontext)) Ziehe den unterlegenen Pfad nach: `repointActiveSlot` steigt sofort aus, wenn der Ziel-Aktive schon steht, und nur dieser Pfad löscht den Lock.
+  - [x] (`position-diff.vt.ts` und `bench-hp-truth.vt.ts`: Bank-HP 8,1 / 7,4 Punkte neben der letzten Sichtung gegen 2,4 / 1,8 mit den App-Parametern; die Sets bewegen sich nicht, der Team-Bau ist unberührt) Miss den Set- und Positions-Diff auf allen drei Pfaden (nackt, Harness, Feedback) vor der Bank, weil sonst eine blinde Bank gemessen wird.
+  - [x] (alt gegen neu auf 814 gemeinsamen Stellungen: Mitte −40 bp (hq −101), spät flach, 576 Scores bewegt; RAW-Schalter byte-gleich zur Basis, zwei Läufe der neuen Vorgabe byte-gleich. Keine Feedback-Läufe, weil kein App-Pfad und keine Engine-Datei berührt ist; Regression, lint, knip, `tsc -b` grün) Fahre die gepaarte Bank und drei Feedback-Läufe und lege bewegte Kanäle dem User vor.
+  - [x] (beantwortet: die App hat recht; es war weder der Lock noch das geratene Item, sondern der fehlende Abgleich des laufenden Spiels) Vor dem Bau klären: 2 offene Entscheidungen (Plan T04).
 
   *Erfolg:* Beide Pfade zeigen dasselbe Volatile-Bild, die Zahl der betroffenen Bank-Stellungen steht im Ledger.
 
@@ -83,7 +85,7 @@ Die Sitzung bringt die Messbasis in Ordnung. T01 zuerst: Seine Feedback-Dumps si
 
   Falle: `EVAL_FIT=1` allein liest die alte Aufnahme. Vor dem Lauf `.fit-corpus/samples-cache.json` (Stand 09.08.) löschen.
 
-  - [ ] Lösche die Aufnahme-Datei des Fit von Hand, weil ihr Stempel nur Schema, Feature-Schlüssel, Gewichte und Manifest-Kennungen deckt und die Team-Bau-Änderungen der Runden 40, 41 und 45 nicht bemerkt; ohne das Löschen liest der Lauf die alten Phantom-Merkmale vom 09.08.
+  - [x] (18.09.: nicht gelöscht, sondern als `.fit-corpus/samples-cache-2026-08-09.keep.json` aufgehoben; der Stempel der alten Aufnahme passt ohnehin nicht mehr (zehn gegen dreizehn Feature-Schlüssel). Neu seit 4923967: die Aufnahme schneidet VGC-Teams auf die gebrachten vier, wie App und Bank) Lösche die Aufnahme-Datei des Fit von Hand, weil ihr Stempel nur Schema, Feature-Schlüssel, Gewichte und Manifest-Kennungen deckt und die Team-Bau-Änderungen der Runden 40, 41 und 45 nicht bemerkt; ohne das Löschen liest der Lauf die alten Phantom-Merkmale vom 09.08.
   - [ ] Halte fest, dass der Korpus so vollständig ist wie in den Runden 40 und 41 (2122 Logs, fünf Manifest-Einträge ohne Datei), damit die neuen Zahlen mit den alten vergleichbar bleiben.
   - [ ] Fahre den Fit neu mit `EVAL_FIT=1` und sichere die ganze Konsole als Datei im Sonden-Ordner; die Aufnahme dauert über eine Stunde, der Test-Timeout steht auf zwei Stunden.
   - [ ] Lies drei Dinge aus dem Bericht: implizierte Feature-Gewichte je Tranche mit Bootstrap-Fehler, Phasen-K je Spielart, und Brier je Phase gegen konstantes K.
@@ -94,7 +96,7 @@ Die Sitzung bringt die Messbasis in Ordnung. T01 zuerst: Seine Feedback-Dumps si
 
 ## Iteration 2 · Q6 und Re-Fit-Übernahme
 
-T06 ist render-only, T07 score-berührend: zwei getrennte Gates. T07 braucht die Aufnahme aus T05. Entschieden am 18.09. (User): Die Re-Fit-Übernahme landet vor Q4, weil das Phasen-K jeden Score bewegt und Q4 sonst zweimal gemessen würde. Am Ende der Sitzung T08 abgekoppelt über Nacht starten, dann vergleicht der Nachtlauf schon gegen die neuen Gewichte.
+T06 ist render-only, T46 und T07 sind score-berührend: getrennte Gates. T07 braucht die Aufnahme aus T05. Entschieden am 18.09. (User): Die Re-Fit-Übernahme landet vor Q4, weil das Phasen-K jeden Score bewegt und Q4 sonst zweimal gemessen würde. Am Ende der Sitzung T08 abgekoppelt über Nacht starten, dann vergleicht der Nachtlauf schon gegen die neuen Gewichte.
 
 - [ ] **T06 · Q6 · Prädiktiver Read vor dem Klick** (Bericht, Runde, klein, verlustfrei D4, braucht T01)
 
@@ -115,6 +117,14 @@ T06 ist render-only, T07 score-berührend: zwei getrennte Gates. T07 braucht die
 
   *Erfolg:* Höchstens ein Satz je zehn Zügen im Korpus (Singles und Doubles getrennt gezählt), 562428 t10 trägt den Satz mit dem Heatran-Wechsel, kein anderer Pin bewegt sich ungefragt.
 
+- [ ] **T46 · Bank-HP: wer im selben Zug getroffen wird und geht** (Messbasis, Runde, klein, score-berührend D3)
+
+  913994 Zug 5: Rillaboom nimmt zwei Treffer (100 → 61 → 22 %) und geht im selben Zug per U-turn. Ab Zug 6 liest die App 100 %, wahr sind 22 %. Der Abgleich mit dem Replay läuft an der Zug-Grenze und fasst seit Runde 40 nur das Pokémon auf dem Feld an: Wer innerhalb eines Zuges Schaden nimmt und das Feld verlässt, wird nie korrigiert und behält den Würfel des Simulators. Das trifft App, Bank und Fit gleich. Vorschlag aus der Sichtung: die HP eines Bank-Pokémon auf das Fenster von der letzten Sichtung bis zu einer Regenerator-Heilung darüber klemmen, statt den Körper ganz dem Simulator zu lassen. Dazu gehört der Test, der die Voraussetzung der Runde-40-Regel pinnt (`packages/eval-engine/test/bench-hp.spec.ts`: dasselbe Log einmal mit und einmal ohne Abgleich an jeder Grenze).
+
+  Hinweis: Steht vor T07, weil die Änderung jede Stellung mit einem Pivot bewegt, in der Bank wie in der Fit-Aufnahme. Landet sie nach der Nachtaufnahme aus T05, braucht T07 eine Kontroll-Aufnahme. Der User kann die Reihenfolge drehen.
+
+  *Erfolg:* Auf dem App-Weg sinkt die Zahl der Bank-Körper, die mehr als 10 Punkte neben der letzten Sichtung liegen (heute 144 von 1821 in Singles, 16 von 453 in Doubles, ein Teil davon echtes Regenerator), 573756 behält seine zwei regenerierten Toxapex, Bank in der vorregistrierten Linie. *Plan T46:* noch nicht ausgeschrieben; Sonde `docs/perf/probes/2026-09-18-r46/t04/bench-hp-truth.vt.ts`.
+
 - [ ] **T07 · Re-Fit: K und Gewichte übernehmen** (Re-Fit, Runde, mittel, score-berührend D3, braucht T05, T01)
 
   Entschieden am 18.09. (User): Die Übernahme läuft vor Q4. Das Phasen-K sitzt am Suchblatt und bewegt jeden Score, und die Decided-Erkennung löst den Beweiser erst ab Score 0,6 aus: Wer Q4 vor dem Re-Fit misst, misst es danach noch einmal. Die K-Abbildung kommt in jedem Fall (vorregistrierte Regel aus Runde 45), ein Feature-Gewicht nur bei gepaartem Gewinn auf der hq-Tranche, `DISPLAY_K` nach der Prüfung aus T05. `DISPLAY_K` bewegt die Prozent-Sätze aller sechs Feedback-Dumps: Re-Pins am User-Gate.
@@ -133,7 +143,7 @@ T06 ist render-only, T07 score-berührend: zwei getrennte Gates. T07 braucht die
 
   Der Prüfstand hat in Runde 34 nur 14 von 51 Stellungen exakt gelöst; jede Bank-Stellung mit drei Körpern lief in den 120-s-Deckel. Q4, die Rennen-Statik und die Richter-Probe 2 haben deshalb keine exakte Bank-Referenz. Einmal über Nacht mit großen Deckeln rechnen, abgekoppelt, und danach nachschlagen.
 
-  - [ ] Nimm den Positions-Export aus T01 (`.calibration/base-<datum>/positions`); der alte Ordner `.calibration/r34-after/positions` ist beim Worktree-Vorfall gelöscht worden. Läuft der Nachtlauf erst nach T07, exportiere auf dem neuen Stand frisch.
+  - [ ] Nimm den Positions-Export der neuen Basis (`.calibration/base-20260918-live/positions`, 110 Stellungen, die Vorgabe des Prüfstands); der alte Ordner `.calibration/r34-after/positions` ist beim Worktree-Vorfall gelöscht worden. Läuft der Nachtlauf erst nach T07, exportiere auf dem neuen Stand frisch.
   - [ ] Fahre einen Trockenlauf mit `EVAL_ENDGAME_LIMIT` über zwei Bank-Stellungen und miss die Wanduhr je Stellung, damit die Nachtlauf-Dauer geschätzt ist, bevor der Lauf startet.
   - [ ] Setze die Deckel für den Lauf hoch (heute 30 Züge, 20000 Zustände, 120 s; Vorschlag 200000 Zustände und 20 min Wanduhr) und übergib sie als Teil-Deckel an `solveEndgame`, ohne die Vorgabe im Produktionspfad zu ändern.
   - [ ] Starte vier Slices abgekoppelt (nohup plus Marker-Datei), weil das Hintergrund-Werkzeug nach zehn Minuten endet, und lege keine Sonden-Dateien in regression/ ab, solange die Regressionssuite laufen könnte.
@@ -488,7 +498,7 @@ Wer an einem Thema arbeitet, findet hier die verwandten TODOs.
 
 | Thema | TODOs |
 | --- | --- |
-| Messbasis | T01, T04 |
+| Messbasis | T01, T04, T46 |
 | Werkzeug | T02, T43 |
 | Bericht | T03, T06, T10, T11, T17, T18, T19, T22, T36, T44 |
 | Re-Fit | T05, T07 |
@@ -590,7 +600,7 @@ Geparkte Branches:
 - **D10** Diagnosen am Battle-State über den echten App-Pfad (Browser-Probe mit debug-Feld plus `FEEDBACK_DUMP`); nackte node-Rekonstruktion ist nicht harness-treu; `graph.results[]` hat kein turn-Feld (Index i = Turn i+1).
 - **D11** Während Feedback-, e2e- und Kalibrierungsläufen nichts im Repo anfassen, auch keine Root-Markdown-Dateien (Vite reloadet, HMR zerschießt den Lauf); das gilt, bis Port 5176 leer ist. Browser-Messungen im eigenen Worktree, wenn eine zweite Session aktiv ist. Läufe über zehn Minuten abgekoppelt starten (nohup plus Marker-Datei), das Hintergrund-Tool endet sonst.
 - **D12** Feedback-Läufe: `npm run test:feedback` startet seit Runde 46 über `scripts/run-e2e.mjs --dev-port 5176` (wartet auf Vites Abhängigkeits-Cache, verweigert einen belegten Port, räumt den Server am Ende ab). Weiter von Hand: drift-json vorher löschen (ein roter Lauf schreibt den Bericht zweimal, die zweite Fassung ist unvollständig), Läufe über zehn Minuten detached starten. Meldet der Starter „Port busy“, den Besitzer per `netstat` suchen und seine Kommandozeile prüfen, bevor etwas beendet wird.
-- **D13** Bank: `node scripts/run-calibration.mjs --slices 6 --out .calibration/<name>` (volle Bank 326 bis 473 s; weitere Flags `--env KEY=VALUE` und `--tranche`). A/B = zwei Ausgabeordner, dazwischen `scripts/paired-calibration.mjs` (dort `--quality hq|std`). Positions-Export über `--env EVAL_CALIBRATION_POSITIONS=<dir>`. Ist ein Slice-Lauf ungleich einem Ein-Prozess-Lauf, zuerst die mtimes von `.smogon-cache` prüfen.
+- **D13** Bank: `node scripts/run-calibration.mjs --slices 6 --out .calibration/<name>` (volle Bank 210 bis 340 s; seit Runde 46 misst sie mit den Parametern der App, also mit Abgleich an jeder Zug-Grenze; `--env EVAL_CALIBRATION_RAW=1` ist das Instrument von vor Runde 46, `EVAL_CALIBRATION_LEGACY=1` ein Lauf je Stichprobe mit den heutigen Parametern; Basis `.calibration/base-20260918-live`, 833 Stellungen. Alle Bank-Zahlen in dieser Datei und im Backlog-Plan, die älter sind als der 18.09., stammen vom alten Instrument und gelten nur als Vergleich innerhalb ihrer Runde; weitere Flags `--env KEY=VALUE` und `--tranche`). A/B = zwei Ausgabeordner, dazwischen `scripts/paired-calibration.mjs` (dort `--quality hq|std`). Positions-Export über `--env EVAL_CALIBRATION_POSITIONS=<dir>`. Ist ein Slice-Lauf ungleich einem Ein-Prozess-Lauf, zuerst die mtimes von `.smogon-cache` prüfen.
 - **D14** Perf-Umbauten an der Engine tragen ihre Identität dreifach: Fixture `fork-identity.json` (neu aufnehmen nur mit `PERF_IDENTITY_RECORD=1` auf dem Vorher-Code), Engine-Suite, Kalibrierung A/B ziffern-gleich. Die A-Seite einer A/B-Messung läuft auf dem Vorher-Code (Stash oder Worktree), nie auf einer Mischung. Perf-Sonde vor und nach am selben Tag: `PERF_PROBE=1 PERF_PROBE_LABEL=before|after npx playwright test -c docs/perf/probes/2026-09-03/probe.config.ts`.
 - **D15** Worktree-Abbau (Vorfall 12.09. 15:25): Junctions (node_modules, .calibration, .smogon-cache, .fit-corpus) VOR `git worktree remove` einzeln und nicht-rekursiv löschen (PowerShell `[System.IO.Directory]::Delete('<worktree>\<junction>')`), dann per Reparse-Point-Scan prüfen, dass keine mehr existiert. `git worktree remove --force` folgt Junctions und löscht ihre Ziele. Seither: jede Bank-A/B mit frischer Basis am selben Tag; Vergleiche mit Ledger-Zahlen vor dem 12.09. nur mit diesem Vorbehalt. Memory `worktree-junction-removal`.
 - **D16** `ALIGNMENT_SEEDS[0]` bleibt `'1,2,3,4'`; jede Listen-Änderung ist ein Cache-Version-Event. master steht auf Cache v46, `r45-threshold` trägt v47: Wer zuerst landet, nimmt die nächste Nummer.
