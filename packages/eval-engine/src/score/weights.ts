@@ -21,7 +21,12 @@ export const EVAL_WEIGHTS = {
    * points × the diminishing schedule. Offensive stages (atk/spa/spe) carry
    * games; defensive stages read at half weight. Shape follows poke-engine's
    * field-tested curve — the payoff of a setup turn must live in the STATIC
-   * eval, deeper search cannot see past its horizon.
+   * eval, deeper search cannot see past its horizon. The 18 Sep re-fit
+   * implies 39 ± 6 in singles and the paired bank agrees (hq singles
+   * −4/−27/−5 bp), but the verdicts do not: at 39 the stall game 573756 goes
+   * from 14 inaccuracies and no mistake to 40 and 7, every one of them "set
+   * up instead of stalling on". A standing stage is priced without asking
+   * whether it bites the wall in front of it; the weight stays until it does.
    */
   boostStage: { offensive: 12, defensive: 6 },
   /** Cumulative stage multipliers (index = |stage|): +2 is twice +1, the tail flattens. */
