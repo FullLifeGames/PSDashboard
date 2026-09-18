@@ -17,43 +17,47 @@ Hinter jedem Titel stehen Thema, Art, Größe (mini, klein, mittel, groß), Gate
 
 Die Sitzung bringt die Messbasis in Ordnung. T01 zuerst: Seine Feedback-Dumps sind die Vorher-Seite für T02, seine Bank-Basis die Vorher-Seite für T04 (frische Basis am selben Tag, D3). Am Ende der Sitzung T05 abgekoppelt über Nacht starten.
 
-- [ ] **T01 · Messbasis neu aufbauen** (Messbasis, Vorarbeit, klein, kein Score-Touch)
+- [x] **T01 · Messbasis neu aufbauen** (Messbasis, Vorarbeit, klein, kein Score-Touch)
 
   Seit dem Worktree-Vorfall vom 12.09. sind `.calibration` und `.smogon-cache` leer: kein Bank-Stand, kein Positions-Export, keine Bank-Replays auf der Platte. Die sechs Feedback-Dumps unter `docs/reports` stammen vom 12.09., 14:10 bis 14:12 (Basis der Runde 45, laut Ledger byte-gleich zu master): Für Zählungen taugen sie, ein Byte-Gate braucht frische Dumps vom selben Tag. Fast jedes TODO unten beginnt mit einer Zählung oder einer A/B-Messung und braucht diesen Boden.
 
-  - [ ] Räume Port 5176 (`netstat`-PID, `taskkill //T`), lösche `docs/reports/feedback-drift.json` und fahre drei Feedback-Läufe mit `FEEDBACK_DUMP=1` auf master; prüfe die mtime der sechs Dumps und dass sie untereinander byte-gleich sind.
-  - [ ] Fahre die Bank auf master abgekoppelt (nohup plus Marker-Datei): `node scripts/run-calibration.mjs --slices 6 --out .calibration/base-<datum> --env EVAL_CALIBRATION_POSITIONS=.calibration/base-<datum>/positions`. Der Läufer setzt `EVAL_CALIBRATION_MODE=auto` und `EVAL_CALIBRATION_SMOGON=1` selbst und pinnt dabei `.smogon-cache` neu.
-  - [ ] Fahre die Bank ein zweites Mal in einen zweiten Ordner und vergleiche beide mit `scripts/paired-calibration.mjs`: Sie müssen ziffern-gleich sein (der erste Lauf füllt den kalten Smogon-Cache, das Kaltstart-Rennen vom 03.09. ist der bekannte Stolperstein).
-  - [ ] Lege die 129 Bank-Replays wieder ab, auf beiden Wegen: Unter `.calibration/replays` liest die nackte Set-Sonde (`sets-diff.spec.ts`, Vorgabe `SETS_DIR`, ohne Smogon-Daten), unter `.calibration/replay-cache` liest die Harness-Sonde (`bank-sets.spec.ts`, Vorgabe `REPLAY_CACHE`, Ausgangsliste `bank-ids.json`); ohne den zweiten Ordner zieht die Harness-Sonde jedes Replay erneut aus dem Netz.
-  - [ ] Richte die Vorgabe des Prüfstands auf den neuen Positions-Export (oder übergib `EVAL_ENDGAME_POSITIONS`), damit T08 und T37 ohne Umweg starten.
-  - [ ] Trage Datum, Commit, Ordnernamen und die Kopfzahlen der Bank (Brier früh, mittel, spät, hq, K) als Basis-Vermerk in den Ledger ein.
+  - [x] (48db172: drei Läufe byte-gleich in allen sechs Dumps und im Drift-JSON, byte-gleich zur Runde-45-Aufnahme `run-ac`, 0 von 13 Kanälen bewegt, 206 bis 227 s, Ablage `docs/perf/probes/2026-09-18-r46/base-run1..3`) Räume Port 5176 (`netstat`-PID, `taskkill //T`), lösche `docs/reports/feedback-drift.json` und fahre drei Feedback-Läufe mit `FEEDBACK_DUMP=1` auf master; prüfe die mtime der sechs Dumps und dass sie untereinander byte-gleich sind.
+  - [x] (48db172: `.calibration/base-20260918`, 816 Stellungen, 338 s, Smogon-Cache neu gepinnt mit 11 Treffern und einem 404, kein 599) Fahre die Bank auf master abgekoppelt (nohup plus Marker-Datei): `node scripts/run-calibration.mjs --slices 6 --out .calibration/base-<datum> --env EVAL_CALIBRATION_POSITIONS=.calibration/base-<datum>/positions`. Der Läufer setzt `EVAL_CALIBRATION_MODE=auto` und `EVAL_CALIBRATION_SMOGON=1` selbst und pinnt dabei `.smogon-cache` neu.
+  - [x] (48db172: `.calibration/base-20260918-b`, `merged.jsonl` und `summary.txt` byte-gleich; die Positions-Exporte unterscheiden sich nur in den `|t:|`-Zeitstempeln des Sim-Logs) Fahre die Bank ein zweites Mal in einen zweiten Ordner und vergleiche beide mit `scripts/paired-calibration.mjs`: Sie müssen ziffern-gleich sein (der erste Lauf füllt den kalten Smogon-Cache, das Kaltstart-Rennen vom 03.09. ist der bekannte Stolperstein).
+  - [x] (129 von 129 geladen, beide Ordner gefüllt, 1,9 MB) Lege die 129 Bank-Replays wieder ab, auf beiden Wegen: Unter `.calibration/replays` liest die nackte Set-Sonde (`sets-diff.spec.ts`, Vorgabe `SETS_DIR`, ohne Smogon-Daten), unter `.calibration/replay-cache` liest die Harness-Sonde (`bank-sets.spec.ts`, Vorgabe `REPLAY_CACHE`, Ausgangsliste `bank-ids.json`); ohne den zweiten Ordner zieht die Harness-Sonde jedes Replay erneut aus dem Netz.
+  - [x] (48db172: Vorgabe `.calibration/base-20260918/positions`, 95 Stellungen; ein fehlender Ordner meldet sich jetzt, statt still nur die Fixtures zu fahren) Richte die Vorgabe des Prüfstands auf den neuen Positions-Export (oder übergib `EVAL_ENDGAME_POSITIONS`), damit T08 und T37 ohne Umweg starten.
+  - [x] (48db172: Ledger-Eintrag MEASUREMENT BASE 2026-09-18; Kopfzahlen 54/61/82, Brier 0,2564/0,2242/0,1285, K 2,19, hq 0,2491/0,2031/0,1286, zeichengleich zum übernommenen Runde-45-Stand) Trage Datum, Commit, Ordnernamen und die Kopfzahlen der Bank (Brier früh, mittel, spät, hq, K) als Basis-Vermerk in den Ledger ein.
 
   *Erfolg:* Zwei Bank-Läufe auf master sind ziffern-gleich, drei Feedback-Läufe byte-gleich, Positions-Export und Bank-Replays liegen wieder auf der Platte, der Stand steht mit Datum im Ledger.
 
-- [ ] **T02 · Harness-Hygiene: Feedback-Starter und knip-Gate** (Werkzeug, Mini-Runde, klein, verlustfrei D4)
+- [x] **T02 · Harness-Hygiene: Feedback-Starter und knip-Gate** (Werkzeug, Mini-Runde, klein, verlustfrei D4)
 
   Ein Feedback-Lauf startet, Vite bündelt noch seine Abhängigkeiten, die Seite lädt neu, der Graph bleibt leer: „sweep produced no scores“ (Runde 45: einer von fünf Läufen). Nach dem Lauf bleibt der Vite-Server auf Port 5176 stehen, der nächste Lauf stirbt am Port, und am 05.09. überschrieb eine verwaiste Seite per HMR drei Dumps. Die Feedback-Suite bekommt den Starter der e2e-Suite (`scripts/run-e2e.mjs`). Im selben Durchgang wird das knip-Gate grün (`@testing-library/dom`).
 
-  - [ ] Zähle die Kaltstart-Ausfälle in den Lauf-Protokollen der Runde 45 und halte die Quote als Vorher-Zahl fest.
-  - [ ] Erweitere den e2e-Starter um den Port als Argument (scripts/run-e2e.mjs:5 hat 5174 fest verdrahtet); die Playwright-Config reicht er schon durch (Zeile 114 hängt alle CLI-Argumente an, so startet die CSS-Sonde per -c), damit e2e und Feedback denselben Startweg nehmen.
-  - [ ] Hänge die Feedback-Suite an den Starter: den webServer-Block aus der Config nehmen und das npm-Skript `test:feedback` auf den Starter umstellen.
-  - [ ] Ergänze im Starter einen Port-Vorcheck, der einen belegten Port meldet und den Lauf abbricht, statt gegen einen Waisen-Server zu testen.
-  - [ ] Belege den Teardown: nach einem Lauf horcht kein Prozess mehr auf dem Port, geprüft per netstat und im Lauf-Protokoll festgehalten.
-  - [ ] Streiche `@testing-library/dom` aus den devDependencies, weil keine Quelle es direkt importiert und jest-dom, react und user-event es als Peer ziehen; prüfe nach der Installation, dass das Paket weiter unter node_modules steht.
-  - [ ] Lass `tsc -b`, lint, knip, die Regression und die volle e2e-Suite laufen; e2e deckt den geänderten Starter selbst mit ab.
-  - [ ] Fahre drei Feedback-Läufe mit `FEEDBACK_DUMP=1` und vergleiche die sechs Dumps byte-genau gegen eine frische Basis desselben Tages.
-  - [ ] Vor dem Bau klären: 2 offene Entscheidungen (Plan T02).
+  - [x] (Vorher-Zahl: 1 von 25 Feedback-Protokollen unter `docs/perf/probes/`, in der Byte-Serie der Runde 45 einer von fünf: `feedback-run3.log`, erstes Replay 573756, leerer Graph) Zähle die Kaltstart-Ausfälle in den Lauf-Protokollen der Runde 45 und halte die Quote als Vorher-Zahl fest.
+  - [x] (99b00f2: eigene Fahne `--dev-port` oder `PS_DEV_PORT`, wird aus der Argumentliste genommen, weil Playwright kein `--port` kennt und eine nackte Zahl als Testfilter läse) Erweitere den e2e-Starter um den Port als Argument (scripts/run-e2e.mjs:5 hat 5174 fest verdrahtet); die Playwright-Config reicht er schon durch (Zeile 114 hängt alle CLI-Argumente an, so startet die CSS-Sonde per -c), damit e2e und Feedback denselben Startweg nehmen.
+  - [x] (99b00f2: webServer-Block entfernt, `test:feedback` startet über den Starter; beide Configs öffnen die Seite als `http://127.0.0.1:<port>`, also auf dem Socket, den der Starter besitzt; knip kennt die Suite-Configs über den Playwright-Plugin-Eintrag) Hänge die Feedback-Suite an den Starter: den webServer-Block aus der Config nehmen und das npm-Skript `test:feedback` auf den Starter umstellen.
+  - [x] (99b00f2: Verbindungsprobe auf 127.0.0.1 und ::1, meldet und bricht ab, räumt nie selbst; von Hand geprüft mit einem Schein-Listener je Adresse) Ergänze im Starter einen Port-Vorcheck, der einen belegten Port meldet und den Lauf abbricht, statt gegen einen Waisen-Server zu testen.
+  - [x] (sechs Feedback-Läufe und zwei e2e-Läufe über den Starter: nach jedem Lauf kein Listener auf 5176 oder 5174, nie ein Kill nötig; neu dazu: SIGINT, SIGTERM und SIGHUP räumen Playwright und Vite ab. Unter Windows nicht automatisiert geprüft, ein erzwungener Kill des Starters läuft an jedem Handler vorbei) Belege den Teardown: nach einem Lauf horcht kein Prozess mehr auf dem Port, geprüft per netstat und im Lauf-Protokoll festgehalten.
+  - [x] (entfällt: knip 6.34 ist auf dem Stand vor T02 schon grün, es zählt Peers benutzter Pakete als benutzt; das Paket bleibt in den devDependencies, `package-lock.json` unberührt) Streiche `@testing-library/dom` aus den devDependencies, weil keine Quelle es direkt importiert und jest-dom, react und user-event es als Peer ziehen; prüfe nach der Installation, dass das Paket weiter unter node_modules steht.
+  - [x] (`tsc -b`, lint, knip sauber; Regression 1425 Tests grün; e2e 75 von 75 in 134 s) Lass `tsc -b`, lint, knip, die Regression und die volle e2e-Suite laufen; e2e deckt den geänderten Starter selbst mit ab.
+  - [x] (drei Läufe auf dem Endstand byte-gleich untereinander und zur Basis von heute früh, 0 von 13 Kanälen bewegt, je 175 s; Ablage `docs/perf/probes/2026-09-18-r46/t02b-run1..3`) Fahre drei Feedback-Läufe mit `FEEDBACK_DUMP=1` und vergleiche die sechs Dumps byte-genau gegen eine frische Basis desselben Tages.
+  - [x] (Port: melden und abbrechen, nie räumen, weil der Port einer Nachbarsitzung gehören kann. `@testing-library/dom`: bleibt, siehe oben) Vor dem Bau klären: 2 offene Entscheidungen (Plan T02).
+
+  Rest: Startet ein Sweep nie, meldet `e2e-feedback/feedback-drift.spec.ts` weiter „sweep produced no scores“ (die Warteschleife erklärt ihn nach 30 s für beendet). Ein eigener Grund „sweep never started“ wäre ein Dreizeiler im roten Pfad; offen, bis der User ihn will. Vites Ausgabe steht seit T02 im Lauf-Protokoll, ein nächster leerer Graph ist damit zuzuordnen.
 
   *Erfolg:* Fünf Feedback-Läufe hintereinander ohne leeren Graphen, kein Listener auf dem Feedback-Port nach dem Lauf, knip ohne Befund.
 
-- [ ] **T03 · 653785 t19 als Wahrheit schließen** (Bericht, Mini-Runde, mini, Korpus-Re-Pin am User-Gate)
+- [x] **T03 · 653785 t19 als Wahrheit schließen** (Bericht, Mini-Runde, mini, Korpus-Re-Pin am User-Gate)
+
+  Ergebnis am User-Gate (18.09.): kein Wechsel auf truth. Die Will-O-Wisp-Hälfte ist erledigt, aber der gespielte Zug selbst ist der Punkt: 3d wechselt das todgeweihte Weavile (63/281) in die Stealth Rocks, es stirbt beim Reinkommen, Flare Blitz geht ins Leere, und Lopunny-Mega kommt gratis rein (BKC antwortet in Zug 20 genauso mit Landorus-Therian). Die Engine liest den Zug ruhig und empfiehlt den Wechsel auf Tornadus-Therian, der den Flare Blitz frisst. Der Eintrag bleibt `gap` mit neuem `desired` (Hazard-Sack erkennen und gutschreiben); die Szene wandert nach T17.
 
   Der Drift-Bericht meldet 653785 Zug 19 in jedem Lauf als offene Lücke, obwohl beide gewünschten Hälften seit Runde 5 stehen (Wechsel auf Weavile mit Regret 0,0021, die Empfehlung ist ein Wechsel, Will-O-Wisp taucht nicht mehr auf). Der Eintrag wechselt von gap auf truth; dann prüft der Drift-Lauf ihn aktiv.
 
-  - [ ] Bestätige am aktuellen Dump, dass Zug 19 quiet liest, p1 kein Band trägt und die beste Zeile ein Wechsel ist statt eines wirkungslosen Zuges.
-  - [ ] Formuliere den Wahrheits-Eintrag mit expect auf side p1, tier none und attribution quiet und häng die Historie des Eintrags unverändert an.
-  - [ ] Weis nach, dass die Null-Zug-Garantie ohne diesen Korpus-Eintrag weiterlebt, weil sie einen eigenen Unit-Anker hat.
-  - [ ] Leg dem User den Wechsel von gap auf truth vor und trag ihn erst nach dem Ja ein.
+  - [x] (Dump von heute: quiet, p1 ohne Band, Regret 0,0021, beste Zeile → Tornadus-Therian, Will-O-Wisp auf Rang 7 von 8) Bestätige am aktuellen Dump, dass Zug 19 quiet liest, p1 kein Band trägt und die beste Zeile ein Wechsel ist statt eines wirkungslosen Zuges.
+  - [x] (entworfen und am Gate verworfen; stattdessen essence-Nachtrag und neues desired im gap-Eintrag) Formuliere den Wahrheits-Eintrag mit expect auf side p1, tier none und attribution quiet und häng die Historie des Eintrags unverändert an.
+  - [x] (`eval-null-moves.spec.ts` mit 11 Tests, dazu die bestNull-Tests in `eval-analysis.spec.ts`; der Wächter ist bewusst Singles-only, das Schweigen in Doubles ist gepinnt) Weis nach, dass die Null-Zug-Garantie ohne diesen Korpus-Eintrag weiterlebt, weil sie einen eigenen Unit-Anker hat.
+  - [x] (User 18.09.: nein, der Hazard-Sack fehlt noch) Leg dem User den Wechsel von gap auf truth vor und trag ihn erst nach dem Ja ein.
   - [ ] Fahr einen Feedback-Lauf und prüfe, dass die Zeile als OK erscheint statt als GAP open.
   - [ ] Vor dem Bau klären: 2 offene Entscheidungen (Plan T03).
 
@@ -214,7 +218,7 @@ Beide fassen `search/cell-sampler.ts` an: eine Spec, zwei getrennt gemessene Com
 
 ## Iteration 6 · Die 573756-Gaps: Bar vor dem Wurf und Opfer-Satz
 
-T16 ist score-berührend, fasst Verify und Merge an (`mcts-merge.ts`, `worker-client.ts`) und misst zuerst die Golden 655336 (D7). T17 ist render-only. Zusammen schließen sie 573756 t73, 573756 t68 und 648453 t13.
+T16 ist score-berührend, fasst Verify und Merge an (`mcts-merge.ts`, `worker-client.ts`) und misst zuerst die Golden 655336 (D7). T17 ist render-only. Zusammen schließen sie 573756 t73, 573756 t68 und 648453 t13; T17 nimmt seit dem 18.09. auch 653785 t19 mit.
 
 - [ ] **T16 · Gleiche Tiefe in der Wurzel-Matrix** (Zufall preisen, Runde, mittel, score-berührend D3, braucht T14)
 
@@ -224,11 +228,11 @@ T16 ist score-berührend, fasst Verify und Merge an (`mcts-merge.ts`, `worker-cl
 
 - [ ] **T17 · Lob ohne Fehler-Band: Opfer-Satz und Read-Gutschrift** (Bericht, Runde, mittel, verlustfrei D4, braucht T01)
 
-  573756 Zug 68: SoulWind opfert Weavile an Corviknight und macht damit den Garchomp-Sweep möglich. Die Engine sagt nichts dazu: Knock Off hat Regret 0,0735, also kein Fehler-Band, und ohne Fehler-Band gibt es keinen Opfer-Satz. 648453 Zug 13: BKC wechselt auf Lopunny-Mega, der Zug trägt das Spiel, die Karte sagt quiet. Die Engine kann heute nur loben, was sie vorher getadelt hat. Sie soll auch loben können, was sie nie getadelt hat.
+  573756 Zug 68: SoulWind opfert Weavile an Corviknight und macht damit den Garchomp-Sweep möglich. Die Engine sagt nichts dazu: Knock Off hat Regret 0,0735, also kein Fehler-Band, und ohne Fehler-Band gibt es keinen Opfer-Satz. 648453 Zug 13: BKC wechselt auf Lopunny-Mega, der Zug trägt das Spiel, die Karte sagt quiet. 653785 Zug 19 (User 18.09.): 3d wechselt ein Weavile mit 63/281 in die Stealth Rocks, es stirbt beim Reinkommen, der Flare Blitz von Charizard-Mega-X geht ins Leere, und Lopunny-Mega kommt gratis rein; die Engine liest quiet und empfiehlt den Wechsel auf Tornadus-Therian, der den Flare Blitz frisst. Die Engine kann heute nur loben, was sie vorher getadelt hat. Sie soll auch loben können, was sie nie getadelt hat.
 
   Hinweis: Verwandt mit T36 (Züge kreditieren, die erst die tiefe Bewertung rechtfertigt): beide zusammen entscheiden, sonst bauen zwei Runden dieselbe Gutschrift.
 
-  *Erfolg:* 573756 t68 trägt den verifizierten Opfer-Satz ohne Fehler-Band, 648453 t13 liest p2-read, die Kollateral-Zählung nennt jeden weiteren bewegten Zug. *Plan T17:* 8 Schritte, 4 offene Entscheidungen.
+  *Erfolg:* 573756 t68 trägt den verifizierten Opfer-Satz ohne Fehler-Band, 648453 t13 liest p2-read, 653785 t19 nennt den Hazard-Sack (oder die Spec begründet, warum er eine eigene Runde braucht), die Kollateral-Zählung nennt jeden weiteren bewegten Zug. *Plan T17:* 8 Schritte, 4 offene Entscheidungen.
 
 ## Iteration 7 · Kleine sichtbare Korrekturen
 
@@ -526,7 +530,7 @@ Jeder Gap hat sein TODO. Die Pins selbst stehen in `e2e-feedback/corpus.ts`; Re-
 | 573756 t73 (seit Runde 32) | chance und Key Moment sind seit Runde 40 gepinnt (dbffb5f). Offen ist die Bar vor dem Wurf: 19,5 % gegen 8,7 % des gespielten Paars. Der Pin trägt diese Hälfte weiter im `desired`. | T16 |
 | 648453 t13 (seit Runde 33) | HP Ice liest inaccuracy (Regret 0,1288), kein Mistake mehr. Offen ist p2-read für BKCs Lopunny-Wechsel. Das Sensitivitäts-Etikett wackelt zwischen Läufen. | T17, T27 |
 | 562428 t10 | Breite (Runde 5) und Rückblick-Read (Runde 13) stehen. Offen ist das prädiktive Framing. | T06 |
-| 653785 t19 | Beide gewünschten Hälften stehen seit Runde 5. Der Eintrag ist noch `gap` und meldet sich in jedem Drift-Bericht. | T03 |
+| 653785 t19 | Die Null-Zug-Hälfte steht seit Runde 5. Offen (User 18.09.): der Hazard-Sack. 3d wechselt das todgeweihte Weavile in die Stealth Rocks, Flare Blitz geht ins Leere, Lopunny-Mega kommt gratis rein; die Engine liest quiet und empfiehlt Tornadus-Therian in den Flare Blitz. | T17 |
 | 649664 t23 | observed steht seit Runde 42 auf chance. Die Bar liest 0,79 statt 0,92, weil der Crit offen bleibt. Der Odds-Satz rendert in keinem Korpus-Zug mehr. | T19, T23, T18 |
 | Draft-Spiel t48, 573756 t70 | Chance-Buchung ohne Würfel: Der Read-Payoff verpufft (t48), die Setup-Auszahlung kommt eine Bewertung zu spät (t70, liest heute quiet mit −0,145). | T22 |
 | VGC Bo3 2634199230 t5 | Read-Lob auf einem verlorenen Zug (User-Befund 06.09.), nie nachgestellt. | T11 |
@@ -564,7 +568,7 @@ Umgebung:
 
 - [ ] Browser-Build ist Teil des Feedback-Ankers: Ein Chromium-Wechsel verschiebt die letzte Gleitkomma-Stelle (573756 t81 Verify-Auswahl) → jedes Playwright-Upgrade ist eine Re-Verankerung mit `FEEDBACK_DUMP=1`; Stand `@playwright/test ^1.62.1`.
 - [ ] TypeScript bleibt auf 6.x, bis typescript-eslint den nativen Compiler parst; `@types/node` folgt dem CI-Node-Major (24) → Peer-Range beobachten.
-- [ ] Screenshot-Sonde `docs/probes/2026-09-03-css/` (32 Tests, 34 Screens, 0 Pixel Toleranz; Start über `node scripts/run-e2e.mjs -c docs/probes/2026-09-03-css/shots.config.ts`) → als Pixel-Gate für jede UI-Runde wiederverwenden; Baseline mit `--update-snapshots` neu aufnehmen, wenn Copy oder Layout sich bewusst ändern.
+- [ ] Screenshot-Sonde `docs/probes/2026-09-03-css/` (32 Tests, 34 Screens, 0 Pixel Toleranz; Start über `node scripts/run-e2e.mjs -c docs/probes/2026-09-03-css/shots.config.ts`; ihre baseURL steht fest auf Port 5174, `--dev-port` erreicht sie nicht) → als Pixel-Gate für jede UI-Runde wiederverwenden; Baseline mit `--update-snapshots` neu aufnehmen, wenn Copy oder Layout sich bewusst ändern.
 
 Geparkte Branches:
 
@@ -585,7 +589,7 @@ Geparkte Branches:
 - **D9** Sonden nie unter `regression/` ablegen (die Suite sammelt sie ein; zweimal je eine Stunde verloren), sondern als `.vt.ts` unter `docs/perf/probes/<datum>/` mit eigener Vitest-Config (Vorbild `docs/perf/probes/2026-09-12-r45/vitest.probe.config.ts`). Sonden auf das Bank-Universum begrenzen (neun Minuten); den Fit-Korpus nur parser-seitig anfassen (mit Fills und Löser über eine Stunde).
 - **D10** Diagnosen am Battle-State über den echten App-Pfad (Browser-Probe mit debug-Feld plus `FEEDBACK_DUMP`); nackte node-Rekonstruktion ist nicht harness-treu; `graph.results[]` hat kein turn-Feld (Index i = Turn i+1).
 - **D11** Während Feedback-, e2e- und Kalibrierungsläufen nichts im Repo anfassen, auch keine Root-Markdown-Dateien (Vite reloadet, HMR zerschießt den Lauf); das gilt, bis Port 5176 leer ist. Browser-Messungen im eigenen Worktree, wenn eine zweite Session aktiv ist. Läufe über zehn Minuten abgekoppelt starten (nohup plus Marker-Datei), das Hintergrund-Tool endet sonst.
-- **D12** Feedback-Läufe: Port 5176 vorher räumen (`netstat`-PID, `taskkill //T`), drift-json vorher löschen, detached starten, Kaltstart-Flake („sweep produced no scores“) einmal wiederholen statt diagnostizieren. Entfällt mit T02.
+- **D12** Feedback-Läufe: `npm run test:feedback` startet seit Runde 46 über `scripts/run-e2e.mjs --dev-port 5176` (wartet auf Vites Abhängigkeits-Cache, verweigert einen belegten Port, räumt den Server am Ende ab). Weiter von Hand: drift-json vorher löschen (ein roter Lauf schreibt den Bericht zweimal, die zweite Fassung ist unvollständig), Läufe über zehn Minuten detached starten. Meldet der Starter „Port busy“, den Besitzer per `netstat` suchen und seine Kommandozeile prüfen, bevor etwas beendet wird.
 - **D13** Bank: `node scripts/run-calibration.mjs --slices 6 --out .calibration/<name>` (volle Bank 326 bis 473 s; weitere Flags `--env KEY=VALUE` und `--tranche`). A/B = zwei Ausgabeordner, dazwischen `scripts/paired-calibration.mjs` (dort `--quality hq|std`). Positions-Export über `--env EVAL_CALIBRATION_POSITIONS=<dir>`. Ist ein Slice-Lauf ungleich einem Ein-Prozess-Lauf, zuerst die mtimes von `.smogon-cache` prüfen.
 - **D14** Perf-Umbauten an der Engine tragen ihre Identität dreifach: Fixture `fork-identity.json` (neu aufnehmen nur mit `PERF_IDENTITY_RECORD=1` auf dem Vorher-Code), Engine-Suite, Kalibrierung A/B ziffern-gleich. Die A-Seite einer A/B-Messung läuft auf dem Vorher-Code (Stash oder Worktree), nie auf einer Mischung. Perf-Sonde vor und nach am selben Tag: `PERF_PROBE=1 PERF_PROBE_LABEL=before|after npx playwright test -c docs/perf/probes/2026-09-03/probe.config.ts`.
 - **D15** Worktree-Abbau (Vorfall 12.09. 15:25): Junctions (node_modules, .calibration, .smogon-cache, .fit-corpus) VOR `git worktree remove` einzeln und nicht-rekursiv löschen (PowerShell `[System.IO.Directory]::Delete('<worktree>\<junction>')`), dann per Reparse-Point-Scan prüfen, dass keine mehr existiert. `git worktree remove --force` folgt Junctions und löscht ihre Ziele. Seither: jede Bank-A/B mit frischer Basis am selben Tag; Vergleiche mit Ledger-Zahlen vor dem 12.09. nur mit diesem Vorbehalt. Memory `worktree-junction-removal`.
