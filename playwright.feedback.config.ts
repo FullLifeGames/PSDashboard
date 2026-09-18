@@ -6,7 +6,10 @@ import { defineConfig } from '@playwright/test';
  * harness breakage only. Deterministic by construction — retries would
  * only mask a determinism loss, so there are none. One worker: a single
  * sweep already saturates the eval worker pool.
- * Run: npm run test:feedback (on demand; never a standard gate)
+ * Run: npm run test:feedback (on demand; never a standard gate). The dev
+ * server comes from scripts/run-e2e.mjs --dev-port 5176: it waits until
+ * Vite has bundled its dependencies before the first page opens, and it
+ * refuses a port somebody else holds.
  */
 export default defineConfig({
   testDir: './e2e-feedback',
@@ -15,17 +18,11 @@ export default defineConfig({
   workers: 1,
   reporter: [['list']],
   use: {
-    baseURL: 'http://localhost:5176',
+    baseURL: `http://127.0.0.1:${process.env.PS_DEV_PORT ?? 5176}`,
     headless: true,
     screenshot: 'only-on-failure',
   },
   projects: [
     { name: 'chromium', use: { browserName: 'chromium' } },
   ],
-  webServer: {
-    command: 'npm run dev -- --port 5176 --strictPort',
-    url: 'http://localhost:5176',
-    reuseExistingServer: false,
-    timeout: 120_000,
-  },
 });

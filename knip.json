@@ -9,7 +9,10 @@
         "src/workers/eval-worker.ts",
         "scripts/*.mjs",
         "ui/fixtures/*.ts"
-      ]
+      ],
+      "playwright": {
+        "config": ["playwright.config.ts", "playwright.*.config.ts"]
+      }
     },
     "packages/*": {
       "entry": [
