@@ -1,7 +1,7 @@
 import { test, describe } from 'vitest';
 import { State } from '@pkmn/sim';
 import { ENDGAME_FIXTURES } from './endgame-fixtures';
-import { solveEndgame, type EndgameResult } from '../packages/eval-engine/src/endgame/solver';
+import { solveEndgame, type EndgameCaps, type EndgameResult } from '../packages/eval-engine/src/endgame/solver';
 import { createRootPosition, positionBattle } from '../packages/eval-engine/src/forward-model';
 import { createMatchupCache } from '../packages/eval-engine/src/eval-function';
 import { leafValue } from '../packages/eval-engine/src/search/leaf';
@@ -17,7 +17,11 @@ import { mctsSearch } from '../packages/eval-engine/src/mcts';
  * the bank run's EVAL_CALIBRATION_POSITIONS on the live instrument of round
  * 46; the round-34 export was lost in the 12 Sep worktree incident);
  * EVAL_ENDGAME_SLICE i/N splits the items; EVAL_ENDGAME_DUMP appends one
- * JSONL line per item; EVAL_ENDGAME_LIMIT caps the item count for dry runs.
+ * JSONL line per item; EVAL_ENDGAME_LIMIT caps the item count for dry runs;
+ * EVAL_ENDGAME_CAPS widens the solver's caps for a long run, for this bench
+ * only ("states=200000,wallMs=1200000,turns=60"; the production default
+ * stays 20000 states, 120 s, 30 turns); EVAL_ENDGAME_SOURCE=bank leaves the
+ * synthetic fixtures out.
  */
 interface BankPosition {
   id: string; turn: number; serialized: string; gameType: 'singles' | 'doubles';
@@ -72,6 +76,17 @@ function estimate(serialized: string): Estimates {
   };
 }
 
+/** EVAL_ENDGAME_CAPS as partial solver caps; unknown keys and non-numbers are dropped. */
+function capsFromEnv(): Partial<EndgameCaps> {
+  const caps: Partial<EndgameCaps> = {};
+  for (const part of (process.env.EVAL_ENDGAME_CAPS ?? '').split(',')) {
+    const [key, raw] = part.split('=');
+    const value = Number(raw);
+    if ((key === 'turns' || key === 'states' || key === 'wallMs') && Number.isFinite(value) && value > 0) caps[key] = value;
+  }
+  return caps;
+}
+
 function sliceOf<T>(items: T[]): T[] {
   const slice = process.env.EVAL_ENDGAME_SLICE?.match(/^(\d+)\/(\d+)$/);
   const sliced = slice ? items.filter((_, index) => index % parseInt(slice[2], 10) === parseInt(slice[1], 10)) : items;
@@ -81,14 +96,17 @@ function sliceOf<T>(items: T[]): T[] {
 
 describe.skipIf(process.env.EVAL_ENDGAME_TRUTH !== '1')('endgame truth bench (round 34)', () => {
 
-  test('every estimator against the solver', { timeout: 14400000 }, async () => {
-    const items = sliceOf([...(await bankItems(process.env.EVAL_ENDGAME_POSITIONS ?? DEFAULT_DIR)), ...syntheticItems()]);
+  test('every estimator against the solver', { timeout: 43200000 }, async () => {
+    const bank = await bankItems(process.env.EVAL_ENDGAME_POSITIONS ?? DEFAULT_DIR);
+    const items = sliceOf(process.env.EVAL_ENDGAME_SOURCE === 'bank' ? bank : [...bank, ...syntheticItems()]);
+    const caps = capsFromEnv();
+    if (Object.keys(caps).length > 0) console.log(`solver caps for this run: ${JSON.stringify(caps)}`);
     const fs = process.env.EVAL_ENDGAME_DUMP ? await import('node:fs') : null;
     for (const item of items) {
       const started = Date.now();
       let exact: EndgameResult;
       try {
-        exact = solveEndgame(item.serialized);
+        exact = solveEndgame(item.serialized, caps);
       } catch (error) {
         console.log(`${item.name}: solver error ${error instanceof Error ? error.message : error}`);
         continue;
