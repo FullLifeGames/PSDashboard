@@ -893,6 +893,36 @@ import { summaryLines } from './calibration-summary';
  * static basis for this mass; the next lever, if any, is search/
  * planning-side.
  *
+ * RE-FIT CAPTURE 2026-09-18 (improvement round 46, T05; a report, nothing
+ * adopted; docs/perf/probes/2026-09-18-r46/fit-run1-report.txt). Fresh
+ * capture on 1fa4b7e, the first since the forme-marker merge of round 45,
+ * with the bring-only trim (4923967: VGC samples carried two bodies per
+ * side that never played): 2111 of 2122 logs reconstruct, 12821 samples
+ * (9 Aug: 12636 from the same 2111 games), 46 min. Path: the naked
+ * reconstruction (no usage stats, no set assumptions, no hpEvidence) with
+ * the live correction at every boundary. The 9 Aug capture is kept as
+ * .fit-corpus/samples-cache-2026-08-09.keep.json.
+ * PHASE K: singles k0 2.51 k1 1.18 (production 2.28 / 1.49), doubles k0
+ * 2.58 k1 1.15 (production 2.98 / 0.88); constant K 2.80 and 2.85 (9 Aug:
+ * 2.61 and 3.15). Phase K is at least as good as constant K in every
+ * bucket of both game types again (0 to 19 bp Brier).
+ * IMPLIED WEIGHTS with bootstrap SE over games. SINGLES-ONLY, the decision
+ * tranche: boosts 39.4 ± 6.1 (hand 12), matchup 220 ± 44 (120), coverage
+ * 48 ± 40 (40), screens 55 ± 47 (5), choiceMismatch 2 ± 41 (40), hazards
+ * 0.8 ± 0.1 (0.75); tailwind and trickRoom carry no singles signal (SE 351
+ * and 75). DOUBLES-ONLY: boosts 29.9 ± 5.4 (doubles weight 27), tailwind
+ * 55.9 ± 21.5 (68), trickRoom 53.0 ± 24.0 (87), screens 100.7 ± 33.3 (5),
+ * matchup 126 ± 45 (120), coverage 110 ± 53 (40), choiceMismatch −134 ±
+ * 125 (40). SWEEP CELLS: the CV verdict reads STATUS QUO HOLDS (M1 0/20
+ * seeds, M2 2/20, Brier not better), the cells stay at 0.
+ * DISPLAY K, orientation only (in-sample on base-20260918-live,
+ * docs/perf/probes/2026-09-18-r46/display-k.txt): 1.85 against the bank's
+ * pooled 2.27 reads Brier 0.1996 against 0.1988. By phase 1.85 is the
+ * better constant early (0.2524 / 0.2565) and mid (0.2195 / 0.2205), 2.27
+ * late (0.1301 / 0.1229); the phases' own K are 0.73 / 1.82 / 3.31. One
+ * constant cannot serve both ends; the decision procedure (train on the
+ * fit corpus, grade on the bank, as on 11 Aug) belongs to T07.
+ *
  * BANK INSTRUMENT 2026-09-18 (improvement round 46, T04; harness only, no
  * engine touch, no cache bump; adopted at the user gate: the bank
  * measures like the app). FINDING: T04 chased a Zapdos-Galar locked into
