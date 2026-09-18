@@ -13,11 +13,11 @@ import { mctsSearch } from '../packages/eval-engine/src/mcts';
  * The endgame truth bench (round 34): every estimator against the solver
  * on the bank's exported endgame positions and the synthetic fixtures.
  * EVAL_ENDGAME_TRUTH=1 runs it; EVAL_ENDGAME_POSITIONS names the export
- * directory (default .calibration/base-20260918/positions, written by the
- * bank run's EVAL_CALIBRATION_POSITIONS; the round-34 export was lost in
- * the 12 Sep worktree incident); EVAL_ENDGAME_SLICE
- * i/N splits the items; EVAL_ENDGAME_DUMP appends one JSONL line per item;
- * EVAL_ENDGAME_LIMIT caps the item count for dry runs.
+ * directory (default .calibration/base-20260918-live/positions, written by
+ * the bank run's EVAL_CALIBRATION_POSITIONS on the live instrument of round
+ * 46; the round-34 export was lost in the 12 Sep worktree incident);
+ * EVAL_ENDGAME_SLICE i/N splits the items; EVAL_ENDGAME_DUMP appends one
+ * JSONL line per item; EVAL_ENDGAME_LIMIT caps the item count for dry runs.
  */
 interface BankPosition {
   id: string; turn: number; serialized: string; gameType: 'singles' | 'doubles';
@@ -30,7 +30,7 @@ interface Estimates {
   prover: number; proverMass: number | null;
 }
 
-const DEFAULT_DIR = '.calibration/base-20260918/positions';
+const DEFAULT_DIR = '.calibration/base-20260918-live/positions';
 
 async function bankItems(dir: string): Promise<Item[]> {
   const fs = await import('node:fs');

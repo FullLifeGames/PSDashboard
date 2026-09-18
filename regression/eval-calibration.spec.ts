@@ -3,6 +3,7 @@ import { State } from '@pkmn/sim';
 import type { Battle } from '@pkmn/sim';
 import { buildTeamsFromReplay } from '../packages/replay-core/src/team-builder';
 import { applyTargetCorrections, reconstructBranchRuntime } from '../packages/eval-engine/src/branch-engine';
+import { buildChoiceLockContext } from '../packages/eval-engine/src/choice-lock';
 import { formatEnforcesSleepClause, getBranchSimulatorFormat, replayBringOnly } from '../packages/replay-core/src/replay-format';
 import { parseReplayLogWithObservations } from '../packages/replay-core/src/protocol-parser';
 import { AUTO_MCTS_FAINTED_FRACTION, battleFaintedFraction, searchPosition } from '../packages/eval-engine/src/search';
@@ -892,10 +893,69 @@ import { summaryLines } from './calibration-summary';
  * static basis for this mass; the next lever, if any, is search/
  * planning-side.
  *
+ * BANK INSTRUMENT 2026-09-18 (improvement round 46, T04; harness only, no
+ * engine touch, no cache bump; adopted at the user gate: the bank
+ * measures like the app). FINDING: T04 chased a Zapdos-Galar locked into
+ * Close Combat at 573756 t138 on the bank path and free in the app. The
+ * lock is a sim artefact (Toxapex dies a turn early in the sim, the block's
+ * "move struggle" becomes a filler Close Combat), and the cause is wider
+ * than locks: the raw single pass of 28 Aug corrects only the CLONED sample
+ * and never the live battle, while round 40 (1e0d18a) left benched bodies
+ * to the sim on the premise that the active was corrected at every boundary
+ * before it left. Every app path meets that premise through
+ * capturePositions (the replay worker, the acquire path, the branch entry's
+ * empty capture, the fit harness); the bank did not, so its bench carried
+ * the sim's own rolls. PROBES (docs/perf/probes/2026-09-18-r46/t04, Node
+ * rebuilds of both parameter sets over the bank's sampled turns; truth =
+ * the protocol's last sighting, blind to switch-out heals): mean bench
+ * error 8.1 points singles / 7.4 doubles on the raw pass against 2.4 / 1.8
+ * with the app parameters; 293 of 574 singles positions and 76 of 247
+ * doubles positions carried a body more than 10 points off (app parameters
+ * 121 and 16); 751533 t26 Kyurem 48% in the replay, 1% in the bank.
+ * Choice-lock pictures differ at only 6 of 775 sampled turns, both ways.
+ * Items, status, PP and volatiles move with the instrument too (59, 43,
+ * 143 and 12 of 497 singles positions) and were not checked against a
+ * truth.
+ * CHANGE: passInstrument gives the pass the app's parameters (choice-lock
+ * context, capturePositions, target one turn past the last sample) and the
+ * per-sample fallback the same; EVAL_CALIBRATION_RAW=1 restores the raw
+ * pass. IDENTITY: RAW=1 is byte-identical to base-20260918 (twice, before
+ * and after the default flipped); two runs of the new default are
+ * byte-identical (r46-live, r46-live-b) and so is the base below.
+ * NEW BASE: .calibration/base-20260918-live (the code of this commit,
+ * cache v46, 219 s), n=833: premature-end skips 18 → 4, per-target
+ * fallbacks 15 → 4, 19 samples gained, 2 lost (2630685175 t6 and t8).
+ * sign 54/65/84 (singles 66, doubles 72); brier 0.2565/0.2205/0.1229; K
+ * pooled 2.27 (singles 2.22, doubles 2.36); n 260/292/281/585/248. hq
+ * (--quality hq) n=559: 54/70/82/68/74, brier 0.2467/0.1930/0.1239, K
+ * 2.86; luck-adjusted n=502 (331 excluded): 0.2325/0.1952/0.1164. The
+ * endgame export holds 110 positions and regression/endgame-truth.spec.ts
+ * reads it.
+ * OLD AGAINST NEW on the 814 joined positions (paired-live-full.txt,
+ * paired-live-hq.txt): 576 scores move, 32 by more than 0.2. brier
+ * 0.2567/0.2249/0.1256 → 0.2562/0.2209/0.1255, sign mid 61 → 65, mid
+ * singles exclusive flips 3 against 13; hq 0.2491/0.2031/0.1286 →
+ * 0.2463/0.1930/0.1296. The movement sits in the MIDDLE (−40 bp, hq −101);
+ * late is flat (hq +10 bp is inside the bed's noise) and the tranches
+ * disagree in sign (tournament-0811 mid −147 bp, ladder-ou-0802 late +74).
+ * WHAT THIS MEANS FOR ROUNDS 40 TO 45: rounds 41 to 45 paired both sides
+ * on the same skewed boards, so their verdicts stand as comparisons and
+ * their absolute lines carry this caveat; the narrow one (round 43's
+ * chance nodes, +12 to +15 bp late) is re-measured by T35 anyway. Round 40
+ * is different: 1e0d18a sat between its A and B sides, so A held the bench
+ * at the last sighting and B let it drift; the round's bank line graded
+ * the package of four fixes on a bed that one of them had just skewed, and
+ * the bank share of that fix is unknown. OPEN (NextSteps T46): the app
+ * path keeps its own residue, a body that takes damage and leaves within
+ * one turn (U-turn, a pivot after a hit) is never corrected (913994
+ * Rillaboom 22% in the replay, 100% on the app path).
+ *
  * MEASUREMENT BASE 2026-09-18 (improvement round 46, T01; no engine
  * touch; master 0b36c03, cache v46). The 12 Sep incident below took every
- * bank stand and every Smogon pin, so these dumps are the base: every A/B
- * from here pairs against a run of this shape on its own day.
+ * bank stand and every Smogon pin. Measured on the RAW instrument and
+ * superseded the same day by the entry above; these dumps stay as the
+ * bridge to the pre-incident lines. Every A/B pairs against a fresh run of
+ * the day.
  * BANK: two six-slice runs on the same commit, A .calibration/
  * base-20260918 (cold Smogon cache, 338 s wall) and B .calibration/
  * base-20260918-b (warm, 335 s), both EVAL_CALIBRATION_MODE=auto
@@ -1326,7 +1386,9 @@ import { summaryLines } from './calibration-summary';
  * (NextSteps A.1) with the numbers above and its own feedback gate if it
  * is ever adopted; its measurement branch r41-wide keeps the bank run.
  *
- * TURN-73 ROUND 2026-09-05 (improvement round 40; spec
+ * TURN-73 ROUND 2026-09-05 (improvement round 40; round-46 note: this
+ * round's bank line was measured on the raw instrument, whose bench its
+ * own fix 1e0d18a had just set adrift, see BANK INSTRUMENT 2026-09-18; spec
  * docs/superpowers/specs/2026-09-05-round-40-design.md; worktree r40 on
  * 0e65d2c while the second session committed on master; 694fac7 HP EVs
  * from the log's maximum HP + a satisfied order keeps its Speed / 8dc7908
@@ -3238,6 +3300,69 @@ const luckFlag = (log: string, turn: number, score: number): boolean =>
 const livingTotal = (battle: Battle): number => livingMons(battle, 0).length + livingMons(battle, 1).length;
 
 /**
+ * The reconstruction instrument (round 46, T04). The pass runs with the
+ * APP's parameters: the choice-lock context plus capturePositions, which
+ * snapshot-corrects the LIVE battle at every boundary.
+ * EVAL_CALIBRATION_RAW=1 brings back the raw single pass of 28 Aug, which
+ * corrects only the cloned sample. Since round 40 the snapshot correction
+ * leaves benched bodies to the sim on the premise that the active was
+ * corrected at every boundary before it left; without the live correction
+ * the bench drifts with the sim's own rolls (mean 8 points off the last
+ * sighting against the app's 2, docs/perf/probes/2026-09-18-r46/t04).
+ */
+function passInstrument(
+  replayLog: string,
+  teams: Parameters<typeof buildChoiceLockContext>[1],
+  observations: Parameters<typeof buildChoiceLockContext>[2],
+  snapshots: ReturnType<typeof parseReplayLogWithObservations>['snapshots'],
+) {
+  const snapshotFor = (turn: number) => snapshots[Math.min(turn - 1, snapshots.length - 1)] ?? null;
+  if (process.env.EVAL_CALIBRATION_RAW === '1') {
+    return {
+      perTarget: {},
+      singlePass: (sampleTurns: number[], rawAt: Map<number, string>) => {
+        const pendingTurns = [...sampleTurns];
+        return {
+          targetTurn: pendingTurns[pendingTurns.length - 1],
+          snapshot: null,
+          onRawBoundary: (blockTurn: number, battle: Battle) => {
+            if (pendingTurns.length === 0 || blockTurn < pendingTurns[0]) return;
+            const rawSerialized = JSON.stringify(State.serializeBattle(battle));
+            while (pendingTurns.length > 0 && pendingTurns[0] <= blockTurn) {
+              rawAt.set(pendingTurns[0], rawSerialized);
+              pendingTurns.shift();
+            }
+          },
+        };
+      },
+    };
+  }
+  const choiceLocks = buildChoiceLockContext(replayLog, teams, observations);
+  return {
+    // The branch entry's trick: an empty capture turns on the live
+    // correction at every boundary of a per-target pass too.
+    perTarget: { choiceLocks, capturePositions: { snapshotFor, onPosition: () => {} } },
+    singlePass: (sampleTurns: number[], rawAt: Map<number, string>) => {
+      // The capture path hands out boundaries BEFORE the target turn, so
+      // the live pass aims one turn past the last sample.
+      const targetTurn = sampleTurns[sampleTurns.length - 1] + 1;
+      return {
+        targetTurn,
+        snapshot: snapshotFor(targetTurn),
+        choiceLocks,
+        capturePositions: {
+          snapshotFor,
+          onPosition: (boundaryTurn: number, battle: Battle) => {
+            if (!sampleTurns.includes(boundaryTurn) || rawAt.has(boundaryTurn)) return;
+            rawAt.set(boundaryTurn, JSON.stringify(State.serializeBattle(battle)));
+          },
+        },
+      };
+    },
+  };
+}
+
+/**
  * EVAL_CALIBRATION_POSITIONS=<dir>: the serialized position of every
  * sample the round-34 endgame bench can use (last pair, decided sweep, or
  * at most three living bodies), one JSON file per id#turn.
@@ -3353,40 +3478,38 @@ describe.skipIf(!process.env.EVAL_CALIBRATION)('eval calibration against real re
       const bringOnly = replayBringOnly(replay, snapshots) ?? undefined;
 
       // SINGLE-PASS RECONSTRUCTION (time-performance round, 2026-08-28):
-      // ONE pass per replay hands out the raw boundary state at every
-      // sampled turn (onRawBoundary), and each sample is cloned and
-      // target-corrected with exactly the per-target tail chain
-      // (applyTargetCorrections) — the old path replayed the whole game
-      // once per sampled turn (~4.5 full replays per replay). The
-      // CALIB_POS_PROBE test below proved the swap on the full corpus:
-      // every sample both instruments record is byte-identical in normal
-      // form; the only divergences are per-target 60s-deadline
-      // truncations, which are timing-dependent under the OLD instrument
-      // itself (see the probe's unstable bucket).
-      // EVAL_CALIBRATION_LEGACY=1 forces the old per-target path for A/B.
+      // ONE pass per replay hands out the boundary state at every sampled
+      // turn, and each sample is cloned and target-corrected with exactly
+      // the per-target tail chain (applyTargetCorrections) — the old path
+      // replayed the whole game once per sampled turn (~4.5 full replays
+      // per replay). Since round 46 the pass carries the app's parameters
+      // (passInstrument above: live correction at every boundary plus the
+      // choice-lock context). The switches:
+      //   default                     one pass, app parameters
+      //   EVAL_CALIBRATION_RAW=1      the measurement base before round 46:
+      //                               the raw pass of 28 Aug (onRawBoundary,
+      //                               only the clone is corrected)
+      //   EVAL_CALIBRATION_LEGACY=1   one reconstruction per sampled turn,
+      //                               with TODAY's parameters
+      //   both                        the pure per-target path of 28 Aug
+      // The CALIB_POS_PROBE test below proved the 28 Aug swap (per-target
+      // against the RAW pass) and says nothing about the default; the
+      // default's evidence is the paired runs and the bench-HP probe under
+      // docs/perf/probes/2026-09-18-r46/t04.
       const legacy = process.env.EVAL_CALIBRATION_LEGACY === '1';
+      const instrument = passInstrument(replay.log, { p1Team, p2Team }, observations, snapshots);
       const rawAt = new Map<number, string>();
       if (!legacy && sampleTurns.length > 0) {
-        const pendingTurns = [...sampleTurns];
         try {
           await reconstructBranchRuntime({
             format: getBranchSimulatorFormat(replay),
             p1Team, p2Team,
             replayLog: replay.log,
-            targetTurn: pendingTurns[pendingTurns.length - 1],
-            snapshot: null,
             bringOnly,
             // The one pass carries the whole per-target family's work, so
             // it gets the family's total deadline, not a single run's 60s.
             deadlineMs: 60_000 * Math.max(1, sampleTurns.length),
-            onRawBoundary: (blockTurn, battle) => {
-              if (pendingTurns.length === 0 || blockTurn < pendingTurns[0]) return;
-              const rawSerialized = JSON.stringify(State.serializeBattle(battle));
-              while (pendingTurns.length > 0 && pendingTurns[0] <= blockTurn) {
-                rawAt.set(pendingTurns[0], rawSerialized);
-                pendingTurns.shift();
-              }
-            },
+            ...instrument.singlePass(sampleTurns, rawAt),
           });
         } catch (error) {
           console.log(`${id}: single-pass reconstruction failed — ${error instanceof Error ? error.message : error}`);
@@ -3401,13 +3524,14 @@ describe.skipIf(!process.env.EVAL_CALIBRATION)('eval calibration against real re
             battle = deserializeBattleExact(raw);
             applyTargetCorrections(battle, snapshots[Math.min(turn - 1, snapshots.length - 1)]);
           } else {
-            // The old per-target instrument, verbatim — either forced
+            // One reconstruction for this sample — either forced
             // (EVAL_CALIBRATION_LEGACY=1) or as the per-sample fallback
             // for a boundary the single pass never handed out (a wedged
             // or prematurely ended pass, or the rare replay whose async
-            // stream timing shifts under the pass — ~6/838 on the probe).
-            // The fallback keeps the sample set and its values exactly
-            // the old instrument's.
+            // stream timing shifts under the pass). It carries the same
+            // instrument parameters as the pass on purpose, so the few
+            // fallback samples (4 per bank run, 15 on the raw pass) sit
+            // on the same board as the rest.
             if (!legacy) console.log(`${id} turn ${turn}: single-pass boundary missing — per-target fallback`);
             const runtime = await reconstructBranchRuntime({
               format: getBranchSimulatorFormat(replay),
@@ -3416,6 +3540,7 @@ describe.skipIf(!process.env.EVAL_CALIBRATION)('eval calibration against real re
               targetTurn: turn,
               snapshot: snapshots[Math.min(turn - 1, snapshots.length - 1)],
               bringOnly,
+              ...instrument.perTarget,
             });
             const live = runtime.battleStream.battle;
             if (!live) continue;
@@ -3577,7 +3702,9 @@ describe.skipIf(process.env.CALIB_POS_PROBE !== '1')('single-pass position ident
       // Same bring trim as the calibration instrument (A.3c) — both paths.
       const bringOnly = replayBringOnly(replay, snapshots) ?? undefined;
 
-      // Path A — today's instrument: one reconstruction per sampled turn.
+      // Path A — the instrument before 28 Aug: one reconstruction per
+      // sampled turn, without the app parameters (the RAW family; the
+      // bank's default since round 46 is not what this probe compares).
       const canonA = new Map<number, string>();
       for (const turn of sampleTurns) {
         const runtime = await reconstructBranchRuntime({
