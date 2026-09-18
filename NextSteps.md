@@ -58,7 +58,7 @@ Die Sitzung bringt die Messbasis in Ordnung. T01 zuerst: Seine Feedback-Dumps si
   - [x] (entworfen und am Gate verworfen; stattdessen essence-Nachtrag und neues desired im gap-Eintrag) Formuliere den Wahrheits-Eintrag mit expect auf side p1, tier none und attribution quiet und häng die Historie des Eintrags unverändert an.
   - [x] (`eval-null-moves.spec.ts` mit 11 Tests, dazu die bestNull-Tests in `eval-analysis.spec.ts`; der Wächter ist bewusst Singles-only, das Schweigen in Doubles ist gepinnt) Weis nach, dass die Null-Zug-Garantie ohne diesen Korpus-Eintrag weiterlebt, weil sie einen eigenen Unit-Anker hat.
   - [x] (User 18.09.: nein, der Hazard-Sack fehlt noch) Leg dem User den Wechsel von gap auf truth vor und trag ihn erst nach dem Ja ein.
-  - [ ] Fahr einen Feedback-Lauf und prüfe, dass die Zeile als OK erscheint statt als GAP open.
+  - [x] (f6c901c, Läufe von 12:02 bis 12:11: die Zeile bleibt wie am Gate entschieden GAP open und trägt das neue desired, 0 von 13 Kanälen bewegt, Dumps byte-gleich zur Basis) Fahr einen Feedback-Lauf und prüfe, dass die Zeile als OK erscheint statt als GAP open.
   - [ ] Vor dem Bau klären: 2 offene Entscheidungen (Plan T03).
 
   *Erfolg:* Die Zeile erscheint im Feedback-Lauf als OK statt als GAP open, alle anderen Kanäle unverändert.
