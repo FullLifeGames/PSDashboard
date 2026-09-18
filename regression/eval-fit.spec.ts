@@ -3,7 +3,7 @@ import { existsSync, readFileSync, writeFileSync } from 'fs';
 import { join } from 'path';
 import { buildTeamsFromReplay } from '../packages/replay-core/src/team-builder';
 import { reconstructBranchRuntime } from '../packages/eval-engine/src/branch-engine';
-import { getBranchSimulatorFormat } from '../packages/replay-core/src/replay-format';
+import { getBranchSimulatorFormat, replayBringOnly } from '../packages/replay-core/src/replay-format';
 import { parseReplayLogWithObservations } from '../packages/replay-core/src/protocol-parser';
 import {
   createMatchupCache, evalFeatures, evaluatePosition, EVAL_WEIGHTS, FEATURE_WEIGHTS,
@@ -65,6 +65,9 @@ const CACHE_DIR = '.fit-corpus';
  * weights) still require deleting the file by hand.
  */
 const SAMPLES_CACHE = join(CACHE_DIR, 'samples-cache.json');
+
+/** The brought species per side, or undefined where the format brings the whole team. */
+const bringOnlyFor = (...args: Parameters<typeof replayBringOnly>) => replayBringOnly(...args) ?? undefined;
 const FEATURE_KEYS = Object.keys(FEATURE_WEIGHTS) as (keyof EvalFeatures)[];
 const cacheStamp = (manifest: { replays: { id: string }[] }) => JSON.stringify({
   schema: 2, // FitSample gained faintedFraction/genClass — bump forces one recapture
@@ -140,10 +143,18 @@ describe('eval weight fitting (EVAL_FIT=1)', () => {
         const wanted = new Set<number>();
         for (let turn = 2; turn < maxTurn; turn += step) wanted.add(turn);
 
+        // Bring-limited replays (VGC: four of six) reconstruct with the
+        // brought species only, the trim the app and the bank apply; without
+        // it every sample carried two bodies per side that never played
+        // (round 46). Per-side fail-open, null for bring-all formats.
+        const replayMeta = { id: entry.id, format: replay.format ?? entry.format, formatid: replay.formatid, log: replay.log };
+        const bringOnly = bringOnlyFor(replayMeta as Parameters<typeof replayBringOnly>[0], snapshots);
+
         // Single-pass capture: one reconstruction yields every sampled turn.
         await reconstructBranchRuntime({
-          format: getBranchSimulatorFormat({ id: entry.id, format: replay.format ?? entry.format, formatid: replay.formatid, log: replay.log } as Parameters<typeof getBranchSimulatorFormat>[0]),
+          format: getBranchSimulatorFormat(replayMeta as Parameters<typeof getBranchSimulatorFormat>[0]),
           p1Team, p2Team,
+          bringOnly,
           replayLog: replay.log,
           targetTurn: maxTurn - 1,
           snapshot: snapshots[Math.min(maxTurn - 2, snapshots.length - 1)],
