@@ -3,6 +3,7 @@ import { nullMoveReason } from '../null-moves.ts';
 import { detectStreakOdds } from '../streaks.ts';
 import { TIE_EPSILON } from '../rank.ts';
 import { SPOKEN_MASS } from '../types.ts';
+import { LIKELIEST_CLICK_MIN, PREDICTIVE_READ_CONFIDENCE, modelOpponent, type OpponentModel } from '../opponent-model.ts';
 import {
   CONDITIONAL_MIX_MIN, FORCED_MIX_THRESHOLD, TIER_THRESHOLDS, decidedSeenKey, forcedWinSeenKey, unansweredSeenKey,
   type AnalyzeTurnParams, type Side, type SideAnalysis, type VerdictTier,
@@ -149,9 +150,51 @@ function hindsightReadFor(
   const { bestRow, bestValue } = bestRowAgainst(view, matrix, sideChoices.length, column);
   const gain = bestValue - view.ownValue(matrix, row, column);
   if (bestRow >= 0 && bestRow !== row && gain >= TIER_THRESHOLDS.mistake) {
-    return { response: sideLabels[bestRow], against: oppPlayed!.label, gain };
+    // Round 47: the click the model favoured was findable before it came.
+    const model = opponentModelFor(params, key, matrix);
+    const likeliest = model && favouriteOf(model) === column && model.confidence >= LIKELIEST_CLICK_MIN
+      ? { likeliest: model.confidence }
+      : {};
+    return { response: sideLabels[bestRow], against: oppPlayed!.label, gain, ...likeliest };
   }
   return undefined;
+}
+
+/** The side's model of the OTHER side's click, sharpened by that player's tendencies; null without tendencies (fail closed). */
+function opponentModelFor(params: AnalyzeTurnParams, key: Side, matrix: EvalMatrix): OpponentModel | null {
+  if (!params.tendencies || matrix.p1Labels.length < 2 || matrix.p2Labels.length < 2) return null;
+  return modelOpponent(matrix, key, params.tendencies[key === 'p1' ? 'p2' : 'p1']);
+}
+
+/** Index of the model's favourite (first encounter wins ties). */
+const favouriteOf = (model: OpponentModel): number => model.probs.indexOf(model.confidence);
+
+/**
+ * Round 47: the read before the click. The opponent model is sure of its
+ * favourite X (PREDICTIVE_READ_CONFIDENCE), and against X an own row beats
+ * the DISPLAYED recommendation (the null-swapped alternative where one
+ * shows) by a mistake-sized gain — "if you expect X, Y is the move"
+ * (649664 t11: Hurricane into the expected Hydro Pump). Needs no played
+ * actions; fails closed without tendencies or machine choice ids.
+ */
+function predictiveReadFor(
+  params: AnalyzeTurnParams,
+  key: Side,
+  view: MatrixView,
+  best: RankedChoice | null,
+  bestNull: SideAnalysis['bestNull'],
+): SideAnalysis['predictiveRead'] {
+  const { matrix, sideChoices, sideLabels, oppLabels } = view;
+  if (!(matrix && sideChoices && sideLabels && oppLabels && best)) return undefined;
+  const model = opponentModelFor(params, key, matrix);
+  if (!model || model.confidence < PREDICTIVE_READ_CONFIDENCE) return undefined;
+  const shownRow = bestNull?.alternative ? sideLabels.indexOf(bestNull.alternative.label) : sideChoices.indexOf(best.choice);
+  if (shownRow < 0) return undefined;
+  const column = favouriteOf(model);
+  const { bestRow, bestValue } = bestRowAgainst(view, matrix, sideChoices.length, column);
+  const gain = bestValue - view.ownValue(matrix, shownRow, column);
+  if (bestRow < 0 || bestRow === shownRow || gain < TIER_THRESHOLDS.mistake) return undefined;
+  return { expect: oppLabels[column], confidence: model.confidence, response: sideLabels[bestRow], gain, over: sideLabels[shownRow] };
 }
 
 /** "→ X" (a pivot's "U-turn → X" included) names the entry target of a line. */
@@ -294,6 +337,7 @@ export interface SideSignals {
   conditional: SideAnalysis['conditional'];
   forcedMix: SideAnalysis['forcedMix'];
   hindsightRead: SideAnalysis['hindsightRead'];
+  predictiveRead: SideAnalysis['predictiveRead'];
   unanswered: SideAnalysis['unanswered'];
   decided: SideAnalysis['decided'];
   nearDecided: SideAnalysis['nearDecided'];
@@ -311,8 +355,9 @@ export function signalSide(params: AnalyzeTurnParams, key: Side, g: SideGrading)
   const unanswered = unansweredFor(params, key, g.played, g.best);
   const { decided, nearDecided, forcedWin } = decidedSignals(params, key);
   const bestNull = bestNullFor(params, key, g.best, g.options);
+  const predictiveRead = predictiveReadFor(params, key, view, g.best, bestNull);
   const streakOdds = streakFor(params, key);
-  return { viableCount, conditional, forcedMix, hindsightRead, unanswered, decided, nearDecided, forcedWin, bestNull, streakOdds };
+  return { viableCount, conditional, forcedMix, hindsightRead, predictiveRead, unanswered, decided, nearDecided, forcedWin, bestNull, streakOdds };
 }
 
 /** The signal half of the side record, keys in the report's order. */
@@ -324,6 +369,7 @@ export function signalFields(s: SideSignals): Partial<SideAnalysis> {
     ...(s.forcedMix ? { forcedMix: s.forcedMix } : {}),
     ...(s.streakOdds ? { streakOdds: s.streakOdds } : {}),
     ...(s.hindsightRead ? { hindsightRead: s.hindsightRead } : {}),
+    ...(s.predictiveRead ? { predictiveRead: s.predictiveRead } : {}),
     ...(s.unanswered ? { unanswered: s.unanswered } : {}),
     ...(s.decided ? { decided: s.decided } : {}),
     ...(s.nearDecided ? { nearDecided: s.nearDecided } : {}),

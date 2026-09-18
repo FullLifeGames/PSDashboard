@@ -2,6 +2,7 @@ import type { EvalResult, ForcedWinCaveat, ForcedWinOpen, KoOddsInfo, RankedChoi
 import type { StreakHistoryEntry, StreakOdds } from '../streaks.ts';
 import type { PlayedAction, PlayedTurn, SackInfo } from '../played.ts';
 import type { SideId } from '@fulllifegames/replay-core';
+import type { PlayerTendencies } from '../opponent-model.ts';
 
 /**
  * The turn analysis' vocabulary: the verdict bands and their tuning
@@ -256,7 +257,23 @@ export interface SideAnalysis {
    * (562428 t10: → Heatran into the Horn Leech). Display-only, never grades;
    * fails closed without machine choice ids or a known opponent action.
    */
-  hindsightRead?: { response: string; against: string; gain: number };
+  hindsightRead?: {
+    response: string; against: string; gain: number;
+    /**
+     * Round 47: the opponent model's share of the actual click, set when
+     * that click was the model's favourite (≥ LIKELIEST_CLICK_MIN) — the
+     * read was findable, not just there in hindsight (562428 t10).
+     */
+    likeliest?: number;
+  };
+  /**
+   * Round 47: the read BEFORE the click. The opponent model's favourite
+   * `expect` holds at least PREDICTIVE_READ_CONFIDENCE, and against it the
+   * own row `response` beats the displayed recommendation `over` by a
+   * mistake-sized `gain`. Needs the players' tendencies; display-only,
+   * never grades.
+   */
+  predictiveRead?: { expect: string; confidence: number; response: string; gain: number; over: string };
   /**
    * The turn brings in a mon the opponent has no live race answer to
    * (round 13, root profile from the search): entering it cleanly is profit
@@ -374,6 +391,12 @@ export interface AnalyzeTurnParams {
   sacks?: { p1?: SackInfo; p2?: SackInfo };
   /** Per-side opponent-model best responses (opponent-model.ts computeRead). */
   reads?: { p1?: ReadRecommendation | null; p2?: ReadRecommendation | null };
+  /**
+   * Each player's OWN action tendencies from this replay (parseTendencies) —
+   * the opponent model behind the predictive read and the hindsight's
+   * likeliest-click note. Absent keeps both out (fail closed).
+   */
+  tendencies?: { p1: PlayerTendencies; p2: PlayerTendencies } | null;
   /**
    * Per-side item-sensitivity probes for flagged turns (useEvaluation).
    * Acquit-only: a probe can soften the side's verdict, never harshen it.

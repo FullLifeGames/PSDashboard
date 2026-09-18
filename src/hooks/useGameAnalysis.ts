@@ -6,7 +6,7 @@ import {
 } from '@fulllifegames/eval-engine';
 import {
   analyzeTurnAt, buildPlayedHistory, computeGameReportData, computeTurnReads,
-  type TurnAnalysisContext,
+  type ReplayTendencies, type TurnAnalysisContext,
 } from '../lib/analysis-context';
 import type { useEvaluation } from './useEvaluation';
 
@@ -56,8 +56,9 @@ function useGameReportData(args: {
   replayData: ReplayData | null;
   graph: Evaluation['graph'];
   context: TurnAnalysisContext;
+  tendencies: ReplayTendencies | null;
 }) {
-  const { replayData, graph, context } = args;
+  const { replayData, graph, context, tendencies } = args;
   const replayWinner = useMemo<'p1' | 'p2' | null>(() => {
     if (!replayData) return null;
     const name = replayData.log.match(/\|win\|(.+)/)?.[1]?.trim();
@@ -74,8 +75,8 @@ function useGameReportData(args: {
   const computed = useMemo(() => {
     if (!replayData) return null;
     if (graph.running) return 'hold' as const;
-    return computeGameReportData({ replayData, graph, context, winner: replayWinner });
-  }, [replayData, graph, context, replayWinner]);
+    return computeGameReportData({ replayData, graph, context, winner: replayWinner, tendencies });
+  }, [replayData, graph, context, replayWinner, tendencies]);
   const [held, setHeld] = useState<{ report: GameReport; analyses: (TurnAnalysis | null)[] } | null>(null);
   if (computed !== 'hold' && computed !== held) setHeld(computed);
   return computed === 'hold' ? held : computed;
@@ -103,9 +104,9 @@ export function useGameAnalysis(inputs: {
     if (analysisTurn === null) return null;
     return analyzeTurnAt({
       turn: analysisTurn, graph: evaluation.graph, context,
-      includeSacks: !!replayData, reads: turnReads,
+      includeSacks: !!replayData, reads: turnReads, tendencies,
     });
-  }, [analysisTurn, evaluation.graph, context, replayData, turnReads]);
+  }, [analysisTurn, evaluation.graph, context, replayData, turnReads, tendencies]);
 
   const leadAnalysisData = useMemo(() => {
     const lead = evaluation.graph.lead;
@@ -113,7 +114,7 @@ export function useGameAnalysis(inputs: {
     return analyzeLeads(lead.result, lead.played);
   }, [evaluation.graph.lead]);
 
-  const gameReportData = useGameReportData({ replayData, graph: evaluation.graph, context });
+  const gameReportData = useGameReportData({ replayData, graph: evaluation.graph, context, tendencies });
 
   // Structured handle for the feedback drift harness: the SAME objects the
   // UI renders — no recomputation, no behavior change.

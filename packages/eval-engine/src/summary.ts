@@ -117,9 +117,30 @@ function hindsightSentence(analysis: TurnAnalysis, playerNames: PlayerNames): st
     entry.read !== undefined);
   const missed = reads.sort((a, b) => b.read.gain - a.read.gain)[0];
   if (!missed) return null;
-  return `The read was there for ${missed.name} — against the ` +
-    `${missed.read.against} actually clicked, ${phrase(missed.read.response)} ` +
+  // Round 47: a click the opponent model favoured was findable before it came.
+  const lead = missed.read.likeliest !== undefined
+    ? `${missed.read.against} was the likeliest click on the opponent model ` +
+      `(${Math.round(missed.read.likeliest * 100)}%), and against it`
+    : `against the ${missed.read.against} actually clicked,`;
+  return `The read was there for ${missed.name} — ${lead} ${phrase(missed.read.response)} ` +
     `was worth ${winDeltaText(missed.read.gain)} more.`;
+}
+
+/**
+ * Round 47: the read before the click — the opponent model is sure of its
+ * favourite, and an own row beats the displayed recommendation against it
+ * by a mistake-sized gain. One sentence per turn: the side with more to gain.
+ */
+function predictiveSentence(analysis: TurnAnalysis, playerNames: PlayerNames): string | null {
+  const reads = [
+    { name: playerNames[0], read: analysis.p1.predictiveRead },
+    { name: playerNames[1], read: analysis.p2.predictiveRead },
+  ].filter((entry): entry is { name: string; read: NonNullable<SideAnalysis['predictiveRead']> } =>
+    entry.read !== undefined);
+  const top = reads.sort((a, b) => b.read.gain - a.read.gain)[0];
+  if (!top) return null;
+  return `If ${top.name} expects ${top.read.expect} (${Math.round(top.read.confidence * 100)}% on the opponent model), ` +
+    `${phrase(top.read.response)} is the move — ${winDeltaText(top.read.gain)} over ${phrase(top.read.over)} against it.`;
 }
 
 /**
@@ -207,6 +228,9 @@ export function summarizeTurn(
   const sentences: string[] = [estimateSentence(analysis, playerNames)];
   const decided = decidedSide(analysis);
   sentences.push(...decidedSentences(analysis, playerNames, decided));
+  // Before the played-tracking split: the read needs no played actions.
+  const predictive = predictiveSentence(analysis, playerNames);
+  if (predictive) sentences.push(predictive);
 
   if (analysis.playedTracking === false) {
     // Played actions were never parsed (doubles) — describe the movement

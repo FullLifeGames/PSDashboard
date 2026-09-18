@@ -23,6 +23,8 @@ export interface TurnAnalysisContext {
 }
 
 type TurnReads = NonNullable<Parameters<typeof analyzeTurn>[0]['reads']>;
+/** Each player's own tendencies from the replay log (parseTendencies). */
+export type ReplayTendencies = NonNullable<Parameters<typeof analyzeTurn>[0]['tendencies']>;
 
 /** One argument assembly for analyzeTurn — the per-turn view and the report
  *  walk used to paste the same block at two sites. */
@@ -32,6 +34,7 @@ export function analyzeTurnAt(args: {
   context: TurnAnalysisContext;
   includeSacks: boolean;
   reads?: TurnReads | null;
+  tendencies?: ReplayTendencies | null;
   unansweredSeen?: Set<string>;
   decidedSeen?: Set<string>;
 }): TurnAnalysis | null {
@@ -56,6 +59,7 @@ export function analyzeTurnAt(args: {
       ? { sacks: detectSacks(context.turnEventsIndex[turn] ?? [], context.snapshots[turn - 1] ?? null) }
       : {}),
     ...(args.reads ? { reads: args.reads } : {}),
+    ...(args.tendencies ? { tendencies: args.tendencies } : {}),
     actives: context.activesForTurn(turn),
     playedHistory: context.playedHistory,
     ...(args.unansweredSeen ? { unansweredSeen: args.unansweredSeen } : {}),
@@ -113,7 +117,7 @@ export function buildPlayedHistory(
 export function computeTurnReads(
   turn: number,
   graph: AnalysisGraphData,
-  tendencies: { p1: Parameters<typeof computeRead>[2]; p2: Parameters<typeof computeRead>[2] } | null,
+  tendencies: ReplayTendencies | null,
 ): { p1: ReturnType<typeof computeRead>; p2: ReturnType<typeof computeRead> } | null {
   if (turn < 1 || !tendencies) return null;
   const result = graph.results[turn - 1];
@@ -132,6 +136,8 @@ export function computeGameReportData(args: {
   graph: AnalysisGraphData;
   context: TurnAnalysisContext;
   winner: 'p1' | 'p2' | null;
+  /** Round 47: the walk reads the opponent model like the turn card, so the dump and the pins see the card's text. */
+  tendencies: ReplayTendencies | null;
 }): { report: GameReport; analyses: (TurnAnalysis | null)[] } | null {
   // The report walk speaks each entry sentence once: keys of already-spoken
   // unanswered stages accumulate turn by turn, so a mon's tenth entry stays
@@ -144,6 +150,7 @@ export function computeGameReportData(args: {
     const analysis = analyzeTurnAt({
       turn: index + 1, graph: args.graph, context: args.context,
       includeSacks: true, unansweredSeen, decidedSeen,
+      reads: computeTurnReads(index + 1, args.graph, args.tendencies), tendencies: args.tendencies,
     });
     if (!analysis) return null;
     for (const key of ['p1', 'p2'] as const) {

@@ -18,6 +18,14 @@ export const READ_LAMBDA = 0.3;
 const READ_TAU = 4;
 /** Reads only surface when the model's top probability reaches this. */
 export const READ_CONFIDENCE = 0.55;
+/**
+ * Round 47: the summary's predictive sentence ("If you expect X, Y is the
+ * move") needs a surer favourite than the turn card's Read row. Measured on
+ * the six feedback dumps: 4 of 279 turns speak at 0.6 with a mistake-sized gain.
+ */
+export const PREDICTIVE_READ_CONFIDENCE = 0.6;
+/** Round 47: the hindsight read calls the actual click the likeliest one only when the model's favourite holds this share. */
+export const LIKELIEST_CLICK_MIN = 0.3;
 
 export interface OpponentModel {
   /** Aligned with the opponent's label array in the matrix. */
