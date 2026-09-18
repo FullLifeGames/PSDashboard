@@ -86,3 +86,85 @@ describe('bench HP after a switch-out', () => {
     expect(toxapex.hp).toBe(0);
   });
 });
+
+/**
+ * Round 47 (T46): the round-40 rule left a benched body to the sim on the
+ * premise that the active was corrected at every boundary before it left.
+ * A body that is hit and leaves within the SAME turn never meets a boundary
+ * (913994 t5: Rillaboom 100 → 22 %, U-turn, the app read 100 % from then
+ * on). The bench now reads the last sighting; a Regenerator holder gets its
+ * third on top.
+ */
+const pivotTeam = (species: 'Scizor' | 'Alomomola'): PokemonSet[] => [
+  species === 'Scizor'
+    ? {
+      name: 'Scizor', species: 'Scizor', item: '', ability: 'Technician', moves: ['U-turn', 'Bullet Punch'],
+      nature: 'Adamant', evs: { hp: 248, atk: 252, def: 0, spa: 0, spd: 8, spe: 0 }, ivs, level: 100,
+    }
+    : {
+      name: 'Alomomola', species: 'Alomomola', item: '', ability: 'Regenerator', moves: ['Flip Turn', 'Wish'],
+      nature: 'Relaxed', evs: { hp: 252, atk: 0, def: 252, spa: 0, spd: 4, spe: 0 }, ivs, level: 100,
+    },
+  p1Team[1],
+];
+const pivotLog = (species: 'Scizor' | 'Alomomola', gender: string, move: string, hpLeft: number) => [
+  '|gametype|singles',
+  '|player|p1|Alice||',
+  '|player|p2|Bob||',
+  '|gen|9',
+  '|tier|[Gen 9] OU',
+  '|clearpoke',
+  `|poke|p1|${species}, ${gender}|`,
+  '|poke|p1|Gliscor, M|',
+  '|poke|p2|Rotom|',
+  '|start',
+  `|switch|p1a: ${species}|${species}, ${gender}|100/100`,
+  '|switch|p2a: Rotom|Rotom|100/100',
+  '|turn|1',
+  `|move|p2a: Rotom|Thunderbolt|p1a: ${species}`,
+  `|-damage|p1a: ${species}|${hpLeft}/100`,
+  `|move|p1a: ${species}|${move}|p2a: Rotom`,
+  '|-damage|p2a: Rotom|80/100',
+  `|switch|p1a: Gliscor|Gliscor, M|100/100|[from] ${move}`,
+  '|upkeep',
+  '|turn|2',
+  '|move|p2a: Rotom|Protect|p2a: Rotom',
+  '|-singleturn|p2a: Rotom|Protect',
+  '|move|p1a: Gliscor|Protect|p1a: Gliscor',
+  '|-singleturn|p1a: Gliscor|Protect',
+  '|upkeep',
+  '|turn|3',
+].join('\n');
+
+describe('bench HP of a body that was hit and left in the same turn (round 47)', () => {
+  const benchFraction = async (species: 'Scizor' | 'Alomomola', log: string, everyBoundary: boolean) => {
+    const snapshots = parseReplayLog(log);
+    const snapshotFor = (turn: number) => snapshots.find(entry => entry.turn === turn) ?? null;
+    const runtime = await reconstructBranchRuntime({
+      format: 'gen9ou', p1Team: pivotTeam(species), p2Team, replayLog: log, targetTurn: 3, snapshot: snapshotFor(3),
+      ...(everyBoundary ? { capturePositions: { snapshotFor, onPosition: () => {} } } : {}),
+    });
+    const body = runtime.battleStream.battle!.sides[0].pokemon.find(pokemon => pokemon.species.name === species)!;
+    return body.hp / body.maxhp;
+  };
+
+  test('the protocol HP at the departure stands, not the sim roll of the hit', async () => {
+    // The protocol saw Scizor leave at 22 %; the sim's own Thunderbolt leaves it near 60 %.
+    const log = pivotLog('Scizor', 'M', 'U-turn', 22);
+    expect(await benchFraction('Scizor', log, false)).toBeCloseTo(0.22, 2);
+  });
+
+  test('a Regenerator holder gets its third on top of the last sighting', async () => {
+    // Alomomola left at 20 %: 20 % plus a third, whatever the sim rolled for the hit.
+    const log = pivotLog('Alomomola', 'F', 'Flip Turn', 20);
+    const fraction = await benchFraction('Alomomola', log, false);
+    expect(fraction).toBeGreaterThan(0.52);
+    expect(fraction).toBeLessThan(0.545);
+  });
+
+  test('the bench reads the same with and without a correction at every boundary', async () => {
+    // The round-40 premise, pinned: the rule no longer leans on the capture path.
+    const log = pivotLog('Scizor', 'M', 'U-turn', 22);
+    expect(await benchFraction('Scizor', log, true)).toBeCloseTo(await benchFraction('Scizor', log, false), 8);
+  });
+});

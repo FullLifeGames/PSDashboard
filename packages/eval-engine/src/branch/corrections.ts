@@ -160,6 +160,42 @@ function correctStatusFromSnapshot(battlePokemon: SimPokemon, snapshotStatus: st
   }
 }
 
+/** A living benched body's HP: the last sighting, plus Regenerator's switch-out third for a holder. */
+function benchHpFromSighting(battlePokemon: SimPokemon, hpPercent: number): number {
+  const sighting = Math.round((hpPercent / 100) * battlePokemon.maxhp);
+  const regenerated = battlePokemon.baseAbility === 'regenerator' ? Math.trunc(battlePokemon.baseMaxhp / 3) : 0;
+  return Math.min(battlePokemon.maxhp, Math.max(1, sighting + regenerated));
+}
+
+type SnapshotPokemon = TurnSnapshot['p1']['pokemon'][number];
+
+/**
+ * One body against its snapshot entry. The protocol reports only the
+ * actives. A benched body's snapshot HP is its last sighting, taken as it
+ * left the field: the bench reads that sighting, plus the third Regenerator
+ * restores on the way out (round 40, 573756 Toxapex 70 % → 100 %). The sim's
+ * own bench HP is no witness: a body that is hit and leaves within one turn
+ * never meets a boundary correction (round 47, 913994 t5: Rillaboom left at
+ * 22 % and read 100 %). Status and boosts of the bench stay with the sim (a
+ * silent Natural Cure lives only there); only a faint-state disagreement is
+ * resolved from the snapshot.
+ */
+function correctBodyFromSnapshot(battlePokemon: SimPokemon, snapshotPokemon: SnapshotPokemon) {
+  if (!snapshotPokemon.isActive && battlePokemon.fainted === snapshotPokemon.fainted) {
+    if (!snapshotPokemon.fainted) battlePokemon.hp = benchHpFromSighting(battlePokemon, snapshotPokemon.hpPercent);
+    return;
+  }
+  battlePokemon.hp = Math.max(0, Math.round((snapshotPokemon.hpPercent / 100) * battlePokemon.maxhp));
+  battlePokemon.fainted = snapshotPokemon.fainted;
+  battlePokemon.faintQueued = snapshotPokemon.fainted;
+  if (snapshotPokemon.fainted) battlePokemon.hp = 0;
+  if (!snapshotPokemon.fainted && battlePokemon.hp <= 0 && snapshotPokemon.hpPercent > 0) battlePokemon.hp = 1;
+  correctStatusFromSnapshot(battlePokemon, snapshotPokemon.status || '');
+  for (const stat of ['atk', 'def', 'spa', 'spd', 'spe', 'accuracy', 'evasion'] as const) {
+    battlePokemon.boosts[stat] = snapshotPokemon.boosts[stat] ?? 0;
+  }
+}
+
 function correctHpFromSnapshot(battle: SimBattle, snapshot: TurnSnapshot) {
   for (let sideIndex = 0; sideIndex < 2; sideIndex++) {
     const snapshotSide = sideIndex === 0 ? snapshot.p1 : snapshot.p2;
@@ -170,28 +206,7 @@ function correctHpFromSnapshot(battle: SimBattle, snapshot: TurnSnapshot) {
         toId(pokemon.species?.name || '') === toId(snapshotPokemon.speciesForme) ||
         toId(pokemon.name || '') === toId(snapshotPokemon.name)
       );
-
-      if (battlePokemon && snapshotPokemon.maxhp > 0) {
-        // The protocol reports only the actives. A benched body's snapshot
-        // HP is its last sighting: Regenerator's switch-out heal and a
-        // silent Natural Cure live only in the sim, whose active was
-        // corrected at every boundary before it left. The bench keeps the
-        // sim's HP, status and boosts; only a faint-state disagreement is
-        // resolved from the snapshot (round 40, 573756 Toxapex 70 % → 100 %).
-        if (!snapshotPokemon.isActive && battlePokemon.fainted === snapshotPokemon.fainted) continue;
-        const ratio = snapshotPokemon.hpPercent / 100;
-        battlePokemon.hp = Math.max(0, Math.round(ratio * battlePokemon.maxhp));
-        battlePokemon.fainted = snapshotPokemon.fainted;
-        battlePokemon.faintQueued = snapshotPokemon.fainted;
-        if (snapshotPokemon.fainted) battlePokemon.hp = 0;
-        if (!snapshotPokemon.fainted && battlePokemon.hp <= 0 && snapshotPokemon.hpPercent > 0) {
-          battlePokemon.hp = 1;
-        }
-        correctStatusFromSnapshot(battlePokemon, snapshotPokemon.status || '');
-        for (const stat of ['atk', 'def', 'spa', 'spd', 'spe', 'accuracy', 'evasion'] as const) {
-          battlePokemon.boosts[stat] = snapshotPokemon.boosts[stat] ?? 0;
-        }
-      }
+      if (battlePokemon && snapshotPokemon.maxhp > 0) correctBodyFromSnapshot(battlePokemon, snapshotPokemon);
     }
   }
   restoreSideInvariants(battle);

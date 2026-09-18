@@ -157,7 +157,12 @@ export interface StoredEval {
 //      of chasing it with probe seeds. Every proof and every solved endgame
 //      with a formerly open class moves; the tree is unchanged (the chance
 //      nodes measured in this round stay switched off).
-const EVAL_ENGINE_CACHE_VERSION = 46;
+// v47: round 47, a benched body reads its last protocol sighting (plus the
+//      third Regenerator restores on the way out) instead of the sim's own
+//      bench HP. Every position moves whose bench holds a body that was hit
+//      and left within one turn, or whose departure the sim rolled apart
+//      from the log (38 of 2306 benched bodies on the bank).
+const EVAL_ENGINE_CACHE_VERSION = 47;
 
 export function evalStoreKey(
   cacheKey: string,
