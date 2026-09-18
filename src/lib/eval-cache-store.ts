@@ -162,10 +162,7 @@ export interface StoredEval {
 //      bench HP. Every position moves whose bench holds a body that was hit
 //      and left within one turn, or whose departure the sim rolled apart
 //      from the log (38 of 2306 benched bodies on the bank).
-// v48: round 47, the re-fit of 18 Sep: the singles leaf mapping reads
-//      k0 2.51 k1 1.18 (was 2.28 / 1.49). Every singles value moves; doubles
-//      values are unchanged (their K stays, and no feature weight moved).
-const EVAL_ENGINE_CACHE_VERSION = 48;
+const EVAL_ENGINE_CACHE_VERSION = 47;
 
 export function evalStoreKey(
   cacheKey: string,

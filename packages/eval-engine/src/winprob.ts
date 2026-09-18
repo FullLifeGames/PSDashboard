@@ -14,11 +14,14 @@
  * overconfidence this mapping now prices. faintedFraction defaults to 0,
  * so any caller without phase context gets the (conservative) early K.
  * RE-FIT 2026-09-18 (round 47, the first capture since the forme-marker
- * merge, 12,821 positions of 2,111 games): singles k0=2.51 k1=1.18
- * (n=10,001), adopted; neutral on the bank (hq +4/−3/−7 bp). The doubles
- * refit (k0=2.58 k1=1.15, n=2,820) lost mid and late on the bank (hq
- * +54/+71 bp on n=49/45) and stays at the 9 Aug values, as a fit-corpus
- * doubles K did on 11 Aug (composition-specific, does not transfer).
+ * merge, 12,821 positions of 2,111 games): NOTHING ADOPTED. fitPhaseK stops
+ * after 500 fixed gradient steps, short of the maximum: it reports singles
+ * 2.51/1.18 and doubles 2.58/1.15 where the likelihood peaks at 1.86/3.73
+ * and 1.99/3.67, and the pins below are such intermediate states too. On
+ * the bank none of the three separates from the pins (paired Brier with a
+ * bootstrap over games: 500-step singles K +2 bp [−4, +9], the maxima −2
+ * bp [−19, +14], early better, hq mid and doubles late worse). See the
+ * ledger (RE-FIT VERDICT 2026-09-18) and NextSteps T47/T48.
  *
  * Since the win-prob-space conversion, the LEAF sigmoid applies once, at
  * the search leaf (`wpUnits`): every downstream value — cell averages, the
@@ -35,7 +38,7 @@
  * wp-units.
  */
 export const WINPROB_K = {
-  singles: { k0: 2.51, k1: 1.18 },
+  singles: { k0: 2.28, k1: 1.49 },
   doubles: { k0: 2.98, k1: 0.88 },
 } as const;
 

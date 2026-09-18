@@ -893,6 +893,118 @@ import { summaryLines } from './calibration-summary';
  * static basis for this mass; the next lever, if any, is search/
  * planning-side.
  *
+ * RE-FIT VERDICT 2026-09-18 (improvement round 47, T07; NOTHING ADOPTED,
+ * K and every weight stand, cache stays v47; tables under
+ * docs/perf/probes/2026-09-18-r47/bank/). Source: the capture below. Every
+ * candidate alone, paired against a fresh base of the day (r47-t46, the
+ * state after the bench-HP rule; an identity rerun read byte-identical).
+ * Deltas in bp under one fixed K (2.29, the base's pooled K), hq tranche,
+ * early / mid / late; negative = better.
+ * - SINGLES K 2.28/1.49 -> 2.51/1.18: +4 / -3 / -7 (full +11 / +9 / -9).
+ *   Adopted at the first gate (ae9351e) and taken back the same evening:
+ *   FINDING: fitPhaseK (regression/fit-helpers.ts) stops after 500 fixed
+ *   gradient steps, short of the maximum. It reports singles 2.512/1.176
+ *   and doubles 2.582/1.150 where Newton and 20000 steps agree on
+ *   1.858/3.733 and 1.987/3.666 (the k1 column carries 11 times less
+ *   curvature than k0). On its own corpus the 500-step singles value reads
+ *   Brier 0.20817, the old pin 0.20800, the maximum 0.20754: the "re-fit"
+ *   was an intermediate state, and so is every K pin before it.
+ * - THE MAXIMA on the bank (r47-kconv, both game types; bands = 90 % of a
+ *   paired bootstrap over games, 2000 draws): all -2 [-19, +14]; early -29
+ *   [-59, -2], hq mid +22 [-1, +46], hq singles mid +24 [+1, +50], doubles
+ *   late +54 [+5, +114]. Confidence moves from the endgame into the
+ *   opening; no gain. The 500-step singles K reads all +2 [-4, +9]. The
+ *   bank cannot tell these maps apart.
+ * - DOUBLES K 2.98/0.88 -> 2.58/1.15: -30 / +54 / +71 on n=40/49/45; with
+ *   bands hq mid [+4, +107], hq late [-0, +167], all doubles -3 [-35, +27].
+ *   Stays.
+ * - SINGLES boosts 12 -> 39 (fit 39.4 ± 6.1): -4 / -27 / -5 (full -7 /
+ *   -43 / -12; full singles mid band [-74, -12], confirmed on the fit
+ *   corpus out of sample, -13 bp [-21, -4]). The bank says yes. The
+ *   feedback corpus says no: verdict tiers over the six dumps go from 38
+ *   inaccuracies and 2 mistakes to 68 and 8, and the whole rise sits in
+ *   the stall game 573756 (14/0 -> 40/7; with the new K alone 14/0): forty
+ *   turns of "switch to Landorus-Therian" and "Dragon Dance was better"
+ *   while both players stall on. A standing stage is priced without asking
+ *   whether it bites the wall in front of it. NOT adopted at the user
+ *   gate; NextSteps T49. LESSON: the bank grades the bar, not the
+ *   verdicts; a weight change needs the tier census of the feedback dumps
+ *   next to the paired Brier.
+ * - SINGLES matchup 120 -> 220: +36 / -15 / +5; the early cell's band is
+ *   [-12, +85]: rejected on noise, not on evidence. Stays for now.
+ * - DOUBLES screens 5 -> 101: +126 / +52 / +1 (full +181 / +163 / +26).
+ *   Stays. Sweep cells stay at 0 (CV: STATUS QUO HOLDS).
+ * LESSON: a point estimate per phase cell is no verdict. The 10 bp lines
+ * of the registered rules sit inside the noise of a 45-to-190-position
+ * cell; the verdict table needs bands over games (NextSteps T47) before
+ * the next adoption, and the fitter needs to converge (T48).
+ * DISPLAY K by the 11 Aug procedure (TRAIN 680 positions of 107 fit-corpus
+ * games, .calibration/r47-displayk-fit-konly, taken on the 500-step K
+ * state; GRADE on the bank): the constant fits 2.22 and reads all -7,
+ * early +38, mid +9, late -66 bp: early loses, 1.85 STAYS. A PHASE-AWARE
+ * display K (k0 1.93, k1 0.92; on 11 Aug k1 fitted negative) grades all
+ * -17, early +16, mid +2, late -68, hq -29 (hq early +9), luck-adjusted
+ * -41: the first conditional display map that wins out of sample, short
+ * of the "no phase loses 10 bp" line by the early cell. NextSteps T51.
+ * CALIBRATION ALTERNATIVES (a research workflow of the same evening, four
+ * offline measurements with an adversarial reviewer each,
+ * docs/perf/2026-09-18-calibration-alternatives.md): an own K per format
+ * loses 6.2 bp out of sample, per source 2.2 bp, per generation 1.3 bp
+ * (inside its error); partial pooling does not rescue it (+0.2 bp); an
+ * isotonic shape loses 15 bp [8, 24]. What carries is the game state, not
+ * the label: K over fainted bodies. One format-dependent candidate
+ * survives: shrunk doubles weights per format, -4.2 bp Brier on 7 of 8
+ * seeds, with the shrinkage chosen on the test data (NextSteps T50).
+ *
+ * BENCH HP 2026-09-18 (improvement round 47, T46; 518504f, cache v47).
+ * FINDING: since round 40 the snapshot correction left benched bodies to
+ * the sim, on the premise that the active was corrected at every boundary
+ * before it left. A body that is hit and leaves within one turn never
+ * meets a boundary (913994 t5: Rillaboom 100 -> 22 %, U-turn, read 100 %
+ * from then on). Probe over the bank's app path (docs/perf/probes/
+ * 2026-09-18-r47/t46/): of 2306 benched living bodies 167 sat more than 10
+ * points off the last sighting; 133 of those are Regenerator heals (129
+ * exactly at sighting + a third), 38 rows are errors (16 hit-then-left, 13
+ * left clean but the sim had rolled apart, 5 + 4 Regenerator bodies healed
+ * from a wrong departure HP). RULE: a living benched body reads the last
+ * sighting, plus trunc(maxhp/3) when it holds Regenerator; status and
+ * boosts stay with the sim. 649664 confirms it to the hit point (Tornadus
+ * 10/305 out, 111/305 in; 11/362 out, 131/362 in). After: no error row
+ * left. Paired bank against r47-t06 (byte-identical to base-20260918-live):
+ * full 0.2565/0.2205/0.1229 -> 0.2565/0.2196/0.1222, hq 0.2467/0.1930/
+ * 0.1239 -> 0.2468/0.1916/0.1227 (+1 / -14 / -12 bp), luck-adjusted
+ * 0.2325/0.1952/0.1164 -> 0.2329/0.1946/0.1166; 119 of 833 positions move,
+ * 13 by more than 0.05. Three feedback runs byte-identical, every pin
+ * holds, the golden 655336 does not move; 44 channel lines. The engine pin
+ * GPL t35 follows its rule: Rhydon stands at its true 100 % (the log's
+ * turn-36 switch line) instead of the sim's 88 %, the score after the
+ * Salazzle sack reads 0.383 under HEALTHY_SACK_FLOOR, the turn reads as an
+ * inaccuracy without the stamp and never as a mistake. No control capture
+ * of the fit (user gate): 38 of 2306 bodies. SIDE FINDING: detectSacks
+ * reads the snapshot's bench HP and does not know Regenerator (649664 t9
+ * "Tornadus 3 %", true 36 %).
+ *
+ * PREDICTIVE READ 2026-09-18 (improvement round 47, T06, roadmap Q6;
+ * 5ae949b; render-only, no cache bump). Count before the build on the six
+ * full dumps (279 turns, docs/perf/probes/2026-09-18-r47/t06/): the
+ * registered triggers (model favourite >= 0.6, the best row in its column
+ * differs from the displayed recommendation, gain >= 0.2) fire on 4 turns;
+ * 562428 t10 cannot fire (the model holds Horn Leech at 0.35, and the
+ * engine already recommends the switch: -> Landorus-Therian 0.52, ->
+ * Heatran 0.45 in the mix; Heatran gains 0.036 over Landorus against Horn
+ * Leech, the known 0.34 is the distance to staying in). USER GATE: build
+ * the sentence as registered, and let the hindsight read say "X was the
+ * likeliest click on the opponent model" when the model favoured the
+ * actual click at 0.3 or more (4 of the 11 spoken hindsight reads, t10
+ * among them). The report walk now receives reads and tendencies (no
+ * wording flips: one riskUnpunished side in the corpus, no matching read).
+ * 7 of 279 summaries read differently, 16 dump paths moved, all of them
+ * the two new fields; three feedback runs byte-identical, the bank
+ * byte-identical. Doubles: on 248 bank positions (depth-1 matrices) the
+ * model holds a favourite >= 0.6 on 10 of 496 sides and the sentence fires
+ * once; pair rows blow up the option space, the sentence stays silent
+ * there. Open: isSwitchChoice reads a pair row by its first slot only.
+ *
  * RE-FIT CAPTURE 2026-09-18 (improvement round 46, T05; a report, nothing
  * adopted; docs/perf/probes/2026-09-18-r46/fit-run1-report.txt). Fresh
  * capture on 1fa4b7e, the first since the forme-marker merge of round 45,
