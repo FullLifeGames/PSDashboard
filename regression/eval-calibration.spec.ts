@@ -892,6 +892,49 @@ import { summaryLines } from './calibration-summary';
  * static basis for this mass; the next lever, if any, is search/
  * planning-side.
  *
+ * MEASUREMENT BASE 2026-09-18 (improvement round 46, T01; no engine
+ * touch; master 0b36c03, cache v46). The 12 Sep incident below took every
+ * bank stand and every Smogon pin, so these dumps are the base: every A/B
+ * from here pairs against a run of this shape on its own day.
+ * BANK: two six-slice runs on the same commit, A .calibration/
+ * base-20260918 (cold Smogon cache, 338 s wall) and B .calibration/
+ * base-20260918-b (warm, 335 s), both EVAL_CALIBRATION_MODE=auto
+ * EVAL_CALIBRATION_SMOGON=1. n=816 on both sides, joined 816; merged.jsonl
+ * and summary.txt byte-identical (docs/perf/probes/2026-09-18-r46/
+ * paired-base-full.txt, paired-base-hq.txt).
+ * RECORD: sign 54/61/82 (singles 64, doubles 70); brier 0.2564/0.2242/
+ * 0.1285; K pooled 2.19 (singles 2.15, doubles 2.25); n 260/292/264/569/
+ * 247. hq (--quality hq) n=549: 54/64/80/64/72, brier 0.2491/0.2031/
+ * 0.1286, K 2.72; the summary's own hq line, under the pooled K, reads
+ * 0.2451/0.2030/0.1331. luck-adjusted n=481 (335 excluded): brier
+ * 0.2344/0.2016/0.1186.
+ * AGAINST ROUND 45: every full-set record line, full and hq, is
+ * character-identical to the adopted stand's B side in docs/perf/probes/
+ * 2026-09-12-r45/paired-ac-full.txt and paired-ac-hq.txt (the tranche
+ * lines too, except tournament-0811b, which round 45 printed on its
+ * 813-position join). The bank asked for 12 Smogon URLs (11 payloads and
+ * one cached 404, sets-gen9doublesubers) and reads the pre-incident
+ * digits from them, so the "upstream may have moved" caveat below is
+ * lifted for the bank; no 599 pin. The backlog plan's T01 background
+ * quotes 0.2562/0.2242/0.1284: that is the parked threshold stand r45-b,
+ * not master.
+ * POSITIONS: A and B each exported 95 endgame positions (last pair,
+ * decided, or at most three living bodies) under <out>/positions; the two
+ * exports differ only in the sim's |t:| timestamp lines (2915 of them).
+ * regression/endgame-truth.spec.ts now defaults to .calibration/
+ * base-20260918/positions and says so when the directory is missing. The
+ * export carries today's team build: re-export after any cache bump.
+ * REPLAYS: the 129 bank ids are back on disk under .calibration/
+ * replay-cache (the harness-path set probe) and .calibration/replays (the
+ * naked set probe), 129 of 129 served. The bank itself still fetches
+ * every replay from the replay server on every run; a refused fetch logs
+ * "skipping" and costs positions, so n=816 is the first number to read.
+ * FEEDBACK: three FEEDBACK_DUMP=1 runs on the same commit, byte-identical
+ * on all six full dumps and on the drift JSON without its meta, and
+ * byte-identical to the round-45 capture run-ac (0 of 13 channels moved);
+ * 206 to 227 s per run, no empty first graph in three runs, no listener
+ * left on port 5176 (docs/perf/probes/2026-09-18-r46/base-run1..3).
+ *
  * SMALL-TODOS ROUND 2026-09-12 (improvement round 45; no spec — three
  * bounded items from NextSteps A.2–A.4; branch r45 on master 5e19415:
  * d62a656 the fast play-out option / e30e72a the unknown-forme marker

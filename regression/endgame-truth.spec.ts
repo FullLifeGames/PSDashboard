@@ -13,7 +13,9 @@ import { mctsSearch } from '../packages/eval-engine/src/mcts';
  * The endgame truth bench (round 34): every estimator against the solver
  * on the bank's exported endgame positions and the synthetic fixtures.
  * EVAL_ENDGAME_TRUTH=1 runs it; EVAL_ENDGAME_POSITIONS names the export
- * directory (default .calibration/r34-after/positions); EVAL_ENDGAME_SLICE
+ * directory (default .calibration/base-20260918/positions, written by the
+ * bank run's EVAL_CALIBRATION_POSITIONS; the round-34 export was lost in
+ * the 12 Sep worktree incident); EVAL_ENDGAME_SLICE
  * i/N splits the items; EVAL_ENDGAME_DUMP appends one JSONL line per item;
  * EVAL_ENDGAME_LIMIT caps the item count for dry runs.
  */
@@ -28,12 +30,15 @@ interface Estimates {
   prover: number; proverMass: number | null;
 }
 
-const DEFAULT_DIR = '.calibration/r34-after/positions';
+const DEFAULT_DIR = '.calibration/base-20260918/positions';
 
 async function bankItems(dir: string): Promise<Item[]> {
   const fs = await import('node:fs');
   const path = await import('node:path');
-  if (!fs.existsSync(dir)) return [];
+  if (!fs.existsSync(dir)) {
+    console.log(`no bank positions at ${dir}: running the synthetic fixtures only`);
+    return [];
+  }
   return fs.readdirSync(dir).filter(file => file.endsWith('.json')).sort().map(file => {
     const bank = JSON.parse(fs.readFileSync(path.join(dir, file), 'utf-8')) as BankPosition;
     return { name: `${bank.id}#${bank.turn}`, source: 'bank' as const, gameType: bank.gameType, decided: bank.decided, serialized: bank.serialized };
