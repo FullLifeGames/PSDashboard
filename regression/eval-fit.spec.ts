@@ -10,7 +10,9 @@ import {
   type EvalFeatures,
 } from '../packages/eval-engine/src/eval-function';
 import { battleFaintedFraction } from '../packages/eval-engine/src/search';
-import { brierScore, crossValidate, fitConstantK, fitLogistic, fitPhaseK, logLossScore, mulberry32, phaseBucket } from './fit-helpers';
+import {
+  bootstrapPhaseK, brierScore, crossValidate, fitConstantK, fitLogistic, fitPhaseK, logLossScore, mulberry32, phaseBucket,
+} from './fit-helpers';
 
 /**
  * Weight-fitting harness (WP 7): fits the static eval's linear feature
@@ -326,12 +328,17 @@ describe('eval weight fitting (EVAL_FIT=1)', () => {
     // Probabilistic scoring of the winprob mapping, per gametype and phase.
     for (const gameType of ['singles', 'doubles'] as const) {
       const subset = samples.filter(s => s.gameType === gameType)
-        .map(s => ({ score: s.score, faintedFraction: s.faintedFraction, won: s.p1Won }));
+        .map(s => ({ score: s.score, faintedFraction: s.faintedFraction, won: s.p1Won, game: s.game }));
       if (subset.length < 100) continue;
       const constant = fitConstantK(subset);
       const phase = fitPhaseK(subset);
       console.log(`\nwinprob ${gameType}: constant K=${constant.toFixed(2)} ` +
         `phase k0=${phase.k0.toFixed(2)} k1=${phase.k1.toFixed(2)} (n=${subset.length})`);
+      // Round 48: the phase fit is the maximum now; its spread over games says how far a pin may sit from it.
+      const spread = bootstrapPhaseK(subset, 200, 48);
+      console.log(`  bootstrap over games: k0 ±${spread.k0.se.toFixed(2)} [${spread.k0.lo.toFixed(2)}, ${spread.k0.hi.toFixed(2)}] ` +
+        `k1 ±${spread.k1.se.toFixed(2)} [${spread.k1.lo.toFixed(2)}, ${spread.k1.hi.toFixed(2)}] · K at fainted ` +
+        spread.at.map(entry => `${entry.ff.toFixed(2)}: ${entry.k.toFixed(2)} [${entry.lo.toFixed(2)}, ${entry.hi.toFixed(2)}]`).join(', '));
       for (const bucket of ['early', 'mid', 'late'] as const) {
         const inBucket = subset.filter(s => phaseBucket(s.faintedFraction) === bucket);
         if (inBucket.length < 30) continue;

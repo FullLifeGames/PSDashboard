@@ -1,6 +1,6 @@
 import { test, expect, describe } from 'vitest';
 import {
-  assignFolds, brierScore, crossValidate, fitConstantK, fitLogistic, fitPhaseK,
+  assignFolds, bootstrapPhaseK, brierScore, crossValidate, fitConstantK, fitLogistic, fitPhaseK,
   logLossScore, maskColumns, phaseBucket, probOf, type CvSample,
 } from './fit-helpers';
 
@@ -30,6 +30,65 @@ describe('fit helpers', () => {
     expect(k1).toBeGreaterThan(1.0); // slope direction recovered
     const constant = fitConstantK(samples);
     expect(brierScore(samples, k0, k1)).toBeLessThanOrEqual(brierScore(samples, constant) + 1e-9);
+  });
+
+  // Round 48: the phase fit used to stop after 500 fixed gradient steps, a fifth of the way along its slow
+  // direction (the k1 column carries a tenth of k0's curvature). Every K pin read an intermediate state.
+  test('the phase fit runs to the maximum: the gradient vanishes and long gradient descent agrees', () => {
+    const samples = synth(1.0, 3.0);
+    const { k0, k1 } = fitPhaseK(samples);
+    const gradient = (a: number, b: number) => {
+      let g0 = 0;
+      let g1 = 0;
+      for (const s of samples) {
+        const err = probOf(s, a, b) - (s.won ? 1 : 0);
+        g0 += err * s.score / samples.length;
+        g1 += err * s.score * s.faintedFraction / samples.length;
+      }
+      return [g0, g1];
+    };
+    expect(Math.hypot(...gradient(k0, k1))).toBeLessThan(1e-8);
+    let a = 1.5;
+    let b = 0;
+    for (let iter = 0; iter < 200000; iter++) {
+      const [g0, g1] = gradient(a, b);
+      a -= g0;
+      b -= g1;
+    }
+    expect(k0).toBeCloseTo(a, 4);
+    expect(k1).toBeCloseTo(b, 4);
+  });
+
+  test('a large sample gives its known (k0, k1) back', () => {
+    const { k0, k1 } = fitPhaseK(synth(1.8, 3.5, 20000));
+    expect(Math.abs(k0 - 1.8)).toBeLessThan(0.15);
+    expect(Math.abs(k1 - 3.5)).toBeLessThan(0.15);
+  });
+
+  test('the phase fit stays finite where the data carry no slope or no limit', () => {
+    // One phase only: no curvature along k1, the slope stays where it started.
+    const flat = synth(2.0, 0).map(s => ({ ...s, faintedFraction: 0 }));
+    const onePhase = fitPhaseK(flat);
+    expect(onePhase.k1).toBe(0);
+    expect(onePhase.k0).toBeCloseTo(fitConstantK(flat), 3);
+    // Perfectly separable outcomes push K up without bound: the fit stops finite.
+    const separable = synth(2.0, 1.0).map(s => ({ ...s, won: s.score > 0 }));
+    const { k0, k1 } = fitPhaseK(separable);
+    expect(Number.isFinite(k0) && Number.isFinite(k1)).toBe(true);
+  });
+
+  test('the bootstrap over games brackets the phase fit and reproduces from its seed', () => {
+    const samples = synth(1.5, 2.5, 1200).map((sample, i) => ({ ...sample, game: `g${i % 150}` }));
+    const point = fitPhaseK(samples);
+    const spread = bootstrapPhaseK(samples, 60, 3);
+    expect(bootstrapPhaseK(samples, 60, 3)).toEqual(spread);
+    expect(spread.k0.se).toBeGreaterThan(0);
+    expect(spread.k0.lo).toBeLessThan(point.k0);
+    expect(spread.k0.hi).toBeGreaterThan(point.k0);
+    expect(spread.k1.lo).toBeLessThan(point.k1);
+    expect(spread.k1.hi).toBeGreaterThan(point.k1);
+    expect(spread.at.map(entry => entry.ff)).toEqual([0, 1 / 3, 2 / 3]);
+    expect(spread.at[1].k).toBeCloseTo(point.k0 + point.k1 / 3, 12);
   });
 
   test('log-loss is finite even for extreme scores', () => {

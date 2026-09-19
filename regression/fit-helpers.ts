@@ -22,7 +22,13 @@ export function logLossScore(samples: OutcomeSample[], k0: number, k1 = 0): numb
   }, 0) / samples.length;
 }
 
-/** 500-iteration GD — replaces the two inline fitters (eval-fit, eval-calibration). */
+/**
+ * 500-iteration GD — replaces the two inline fitters (eval-fit, eval-calibration).
+ * One parameter, so the fixed step count does reach the maximum (checked in
+ * round 47 on the bank and six of its subsets: K equal to four decimals against
+ * Newton, 0.0 bp Brier apart). scripts/calibration-lib.mjs carries a copy that
+ * must stay equal to the last bit.
+ */
 export function fitConstantK(samples: OutcomeSample[]): number {
   let k = 1.5;
   for (let iter = 0; iter < 500; iter++) {
@@ -33,21 +39,95 @@ export function fitConstantK(samples: OutcomeSample[]): number {
   return k;
 }
 
+/**
+ * Newton on the log-likelihood, run to a standstill (round 48). The 500 fixed
+ * gradient steps this replaces stopped a fifth of the way along the slow
+ * direction: the k1 column carries a tenth of k0's curvature (condition
+ * number 34 to 41 on the fit corpus, about 8800 steps needed), so every K pin
+ * up to round 47 read an intermediate state (singles 2.51/1.18 where the
+ * maximum is 1.86/3.73). The damping keeps a one-phase sample at k1 = 0, the
+ * step cap and the halving keep separable outcomes finite.
+ */
 export function fitPhaseK(samples: OutcomeSample[]): { k0: number; k1: number } {
   let k0 = 1.5;
   let k1 = 0;
-  for (let iter = 0; iter < 500; iter++) {
+  let loss = logLossScore(samples, k0, k1);
+  for (let iter = 0; iter < 100; iter++) {
     let g0 = 0;
     let g1 = 0;
+    let h00 = 0;
+    let h01 = 0;
+    let h11 = 0;
     for (const s of samples) {
-      const err = probOf(s, k0, k1) - (s.won ? 1 : 0);
-      g0 += err * s.score / samples.length;
-      g1 += err * s.score * s.faintedFraction / samples.length;
+      const p = probOf(s, k0, k1);
+      const err = p - (s.won ? 1 : 0);
+      const curvature = p * (1 - p) * s.score * s.score;
+      g0 += err * s.score;
+      g1 += err * s.score * s.faintedFraction;
+      h00 += curvature;
+      h01 += curvature * s.faintedFraction;
+      h11 += curvature * s.faintedFraction * s.faintedFraction;
     }
-    k0 -= 1.0 * g0;
-    k1 -= 1.0 * g1;
+    const damping = 1e-9 * (h00 + h11) + 1e-12;
+    const det = (h00 + damping) * (h11 + damping) - h01 * h01;
+    let d0 = ((h11 + damping) * g0 - h01 * g1) / det;
+    let d1 = ((h00 + damping) * g1 - h01 * g0) / det;
+    const shrink = Math.min(1, 10 / Math.hypot(d0, d1));
+    d0 *= shrink;
+    d1 *= shrink;
+    let next = logLossScore(samples, k0 - d0, k1 - d1);
+    for (let halving = 0; halving < 30 && next > loss; halving++) {
+      d0 /= 2;
+      d1 /= 2;
+      next = logLossScore(samples, k0 - d0, k1 - d1);
+    }
+    k0 -= d0;
+    k1 -= d1;
+    loss = next;
+    if (Math.hypot(d0, d1) < 1e-10) break;
   }
   return { k0, k1 };
+}
+
+export interface PhaseKSpread {
+  k0: { se: number; lo: number; hi: number };
+  k1: { se: number; lo: number; hi: number };
+  /** K at faintedFraction 0, 1/3 and 2/3: k0 and k1 trade off against each other, the K they imply is the steadier reading. */
+  at: { ff: number; k: number; lo: number; hi: number }[];
+}
+
+/** Game-clustered bootstrap of the phase fit: standard errors and 90 % bands (round 48). */
+export function bootstrapPhaseK(
+  samples: (OutcomeSample & { game: string })[], draws: number, seed: number,
+): PhaseKSpread {
+  const byGame = new Map<string, OutcomeSample[]>();
+  for (const sample of samples) byGame.set(sample.game, [...(byGame.get(sample.game) ?? []), sample]);
+  const games = [...byGame.keys()].sort();
+  const rng = mulberry32(seed);
+  const fits: { k0: number; k1: number }[] = [];
+  for (let draw = 0; draw < draws; draw++) {
+    const resample: OutcomeSample[] = [];
+    for (let pick = 0; pick < games.length; pick++) resample.push(...byGame.get(games[Math.floor(rng() * games.length)])!);
+    fits.push(fitPhaseK(resample));
+  }
+  const spread = (values: number[]) => {
+    const sorted = [...values].sort((x, y) => x - y);
+    const mean = values.reduce((sum, value) => sum + value, 0) / values.length;
+    return {
+      se: Math.sqrt(values.reduce((sum, value) => sum + (value - mean) ** 2, 0) / values.length),
+      lo: sorted[Math.floor(0.05 * values.length)],
+      hi: sorted[Math.ceil(0.95 * values.length) - 1],
+    };
+  };
+  const point = fitPhaseK(samples);
+  return {
+    k0: spread(fits.map(fit => fit.k0)),
+    k1: spread(fits.map(fit => fit.k1)),
+    at: [0, 1 / 3, 2 / 3].map(ff => {
+      const { lo, hi } = spread(fits.map(fit => fit.k0 + fit.k1 * ff));
+      return { ff, k: point.k0 + point.k1 * ff, lo, hi };
+    }),
+  };
 }
 
 export const phaseBucket = (ff: number): 'early' | 'mid' | 'late' =>
@@ -67,7 +147,12 @@ export function mulberry32(seed: number) {
 export interface LogisticSample { g: number[]; won: boolean }
 export interface CvSample extends LogisticSample { game: string }
 
-/** Logistic regression on standardized features; deterministic fixed-iteration GD. */
+/**
+ * Logistic regression on standardized features; deterministic fixed-iteration GD.
+ * The standardization keeps the problem well conditioned: on the 18 Sep capture
+ * 500 steps, 5000 steps and Newton give the same implied weights to one decimal
+ * (round 48 sighting, all / singles / doubles).
+ */
 export function fitLogistic(samples: LogisticSample[]): {
   beta: number[]; intercept: number; sigma: number[]; mu: number[];
 } {
