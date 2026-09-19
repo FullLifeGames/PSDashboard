@@ -894,6 +894,59 @@ import { summaryLines } from './calibration-summary';
  * static basis for this mass; the next lever, if any, is search/
  * planning-side.
  *
+ * DECIDED V2 2026-09-19 (improvement round 50, T09; 36d830a and 2a79040,
+ * render-only, cache stays v48; spec
+ * docs/superpowers/specs/2026-09-19-round-50-design.md, probes under
+ * docs/perf/probes/2026-09-19-r50/). COUNT on the base of the day
+ * (.calibration/r49-fullkey): the decided sweep names a side on 103 of 833
+ * positions (67 replays) and that side wins 79 = 76.7 % (singles 78.5,
+ * doubles 73.7, hq 84.5; fit corpus 59/79 = 74.7 %). 24 losses: 6 forfeits,
+ * 1 crit, 17 lost pairs (the priority loan in movesFirst, Tera and setup,
+ * the one-on-one pair view in doubles). THE PLAN'S LEVERS, counted on a
+ * rebuild of the sweep that matches the engine on all 110 exported
+ * positions: strict pair wins + clock 4 + reserve reach 100 % on 14
+ * positions and drop 65 of 79 right calls; clock 4 alone 77.8 %; strict
+ * alone 84.1 % (doubles 95.7, singles unchanged); every reserve drops right
+ * and wrong calls in the same proportion. WHAT SEPARATES is the finished
+ * score. Named side at DECIDED_SCORE (0.7) or beyond: bank 54/57 = 94.7 %
+ * (singles 32/34, doubles 22/23, hq 39/40), fit corpus 44/49 = 89.8 %,
+ * pooled 92.5 % [88, 97] over replays; flat between floors 0.5 and 0.8.
+ * Below 0.6 the sweep is a coin flip (21/41), against the score's sign
+ * 3/15. CLAMP pre-count: a floor of 0.85 on every sweep costs late +182 bp
+ * (round 15 again); under the held rule it moves 2 bp. Held sweeps win
+ * 94.7 % where the bank K promises 88.8 %; equally high bars without a held
+ * sweep win 84.3 % against 86.6 % promised.
+ * BUILT (user gate "1a 2a 3b 4a"): heldDecided(result) is the sweep where
+ * the score backs it. The turn card, the once-per-game sentence, the
+ * chance prose on a decided board and the graph strip read it; the
+ * conversion sentence takes the first forced or held turn from which the
+ * bar holds for the winner to the last known turn. The raw sweep stays on
+ * the profile: the prover's trigger and cached results are untouched, the
+ * near stage stays outside (573756 t73 stands at 0.596). INSTRUMENT: every
+ * dump line carries decidedHeld and both summaries end on "decided: n=103
+ * named-side-wins=76.7% | held by the bar: n=57 named-side-wins=94.7%".
+ * GATES (D4): bank .calibration/r50-held digit-identical to r49-fullkey on
+ * all 833 lines apart from the new field; three feedback runs
+ * byte-identical over ten dumps and the drift report; against the base of
+ * the day only decided marks, announce flags and the conversion move, no
+ * engine number, tier census unmoved (singles 38/2/0, doubles 7/5/0, zero
+ * moved turns). Conversions: 573756 t92 -> t137, 648453 t17 -> forced t35,
+ * 653785 t23 -> forced t26 (the report no longer dates the sweep before its
+ * own tip at t24), VGC 2629703929 t10 -> t13, 912045 t8 -> t9, VGC
+ * 2630685175 loses the sentence (its bar stood at -0.74). Marks gone:
+ * 649664 t15 to t22 (Medicham-Mega against the bar), 2629703929 t3 to t8
+ * (Chi-Yu, the wrong side), 573756 t92 to t136 bar t124. Regression, e2e
+ * 75/75 on the second run, lint, tsc -b, pack:smoke. E2E NOTE: the first
+ * full run failed "branch replay play controls stay muted" on two page
+ * errors from the replay iframe ("$ is not defined"); alone the test passed
+ * 10 of 12 on the branch and 6 of 6 on the base, the iframe code is
+ * untouched: the script-order lottery of the embed, booked as a signal.
+ * LIMIT: 573756 t134 to t136, the sweep is right and the bar reads 0.33 to
+ * 0.60 (the Struggle plan runs twelve plies); the sentence waits for t137.
+ * MOVED ON: the honest first strike to T33 (probe: singles 78.5 -> 83.6 %,
+ * 5 losses and 5 right calls fewer, 749828 t23 is its red test), the clamp
+ * to T55 (parked).
+ *
  * MATCHUP MEMO KEY 2026-09-19 (improvement round 49; 5af4dcd and 49df993,
  * cache v48; found while wiring doubles replays into the feedback run,
  * probes under docs/perf/probes/2026-09-19-r49/). FINDING: the memoized
