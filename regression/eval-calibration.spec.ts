@@ -893,6 +893,31 @@ import { summaryLines } from './calibration-summary';
  * static basis for this mass; the next lever, if any, is search/
  * planning-side.
  *
+ * SOLVER NIGHT RUN 2026-09-18/19 (improvement round 47, T08; fa8c613 and
+ * 61b8078, bench only, no score path; docs/perf/2026-09-04-endgame-truth.md
+ * section "Round 47", dumps under docs/perf/probes/2026-09-18-r47/). 110
+ * bank positions and 25 late positions of the feedback replays, caps 60
+ * turns / 200000 states / 20 min. 55 in scope, 5 exact (round 34: one), 44
+ * capped, EVERY ONE BY THE WALL CLOCK at 877 to 33204 states (median 6408,
+ * about 5 states a second; no run came near 200000), 49 unpriced. Wide
+ * caps do not buy truth: the clock and unpriced chance bound it. On the 11
+ * fully expanded rows (exact or unpriced only) d1 to MCTS and the prover
+ * read the solver's value to three decimals, the race static 9 of 11
+ * signs. Q4 REFERENCE: 9 fully expanded decided positions, 6 for the
+ * decided side and 3 against it (751443#23 and 2663112349#37 exact,
+ * 749828#23); with capped values as estimates 17 of 30 at 0.8 or beyond, 6
+ * against, all six in singles. 749828#23 CLASSIFIED: movesFirst (speed.ts)
+ * lets any usable priority move outrank speed and lends the first strike to
+ * the side's best move, and reads dex priority only: Primarina's Aqua Jet
+ * counts, Rillaboom's Grassy Glide under Grassy Terrain does not, so the
+ * static (+0.600) and the decided sweep (p1) name the wrong side where the
+ * searches, the prover and the game say p2 (NextSteps T33). 573756 t138
+ * does not solve in 20 minutes (8436 states, value -0.902); the solver
+ * follows the app's late bar (t137 -0.900, t139 -1.000). EVAL_ENDGAME_SOLVED
+ * looks solver rows up by item name: a later engine state regrades its
+ * estimators against this night in ninety seconds (done once on 41698be,
+ * solver fields identical on all 135 rows).
+ *
  * RE-FIT VERDICT 2026-09-18 (improvement round 47, T07; NOTHING ADOPTED,
  * K and every weight stand, cache stays v47; tables under
  * docs/perf/probes/2026-09-18-r47/bank/). Source: the capture below. Every

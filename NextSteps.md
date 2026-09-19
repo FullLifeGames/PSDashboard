@@ -1,8 +1,8 @@
-# Next Steps (Stand 18.09.2026 abends, Runde 47 läuft: T06, T46, T07 fertig, T08 rechnet über Nacht)
+# Next Steps (Stand 19.09.2026, nach Runde 47)
 
-Nur offene Schritte, als priorisierte Checkliste: Die oberste Iteration ist die nächste Sitzung, das oberste offene Kästchen darin das nächste TODO. Jedes TODO nennt das Problem an einer Spielszene und das Erfolgsmaß. Die TODOs der Iterationen 2 und 3 tragen ihre Umsetzungsschritte hier; für alle anderen stehen sie als Checkliste im Backlog-Plan unter derselben Nummer.
+Nur offene Schritte, als priorisierte Checkliste: Die oberste Iteration ist die nächste Sitzung, das oberste offene Kästchen darin das nächste TODO. Jedes TODO nennt das Problem an einer Spielszene und das Erfolgsmaß. Die TODOs der Iteration 3 tragen ihre Umsetzungsschritte hier; für alle anderen stehen sie als Checkliste im Backlog-Plan unter derselben Nummer.
 
-- **Iterationen** bündeln die TODOs einer Sitzung. Eine Iteration wird beim Start zur Runde mit der nächsten freien Rundennummer: Iteration 1 war Runde 46, Iteration 2 wird Runde 47. Score-berührende TODOs derselben Iteration bekommen je ihre eigene Messung (D3), nie eine gemeinsame.
+- **Iterationen** bündeln die TODOs einer Sitzung. Eine Iteration wird beim Start zur Runde mit der nächsten freien Rundennummer: Iteration 1 war Runde 46, Iteration 2 war Runde 47, Iteration 2a wird Runde 48. Score-berührende TODOs derselben Iteration bekommen je ihre eigene Messung (D3), nie eine gemeinsame.
 - **T-Nummern** (T01 bis T45) sind feste Namen, vergeben am 18.09. in Prioritäts-Reihenfolge. Wandert ein TODO in der Liste, behält es seine Nummer; ein neues TODO bekommt die nächste freie (ab T52; T46 kam am 18.09. in Runde 46 dazu, T47 bis T51 in Runde 47). „braucht T01“ heißt: T01 muss vorher gelaufen sein.
 - **Backlog-Plan** (je TODO: Idee, Schritte mit Dateien, volles Gate, Doubles-Abdeckung, offene Entscheidungen, Zahlen, Code-Belege): `docs/superpowers/plans/2026-09-18-backlog-plans.md`.
 - **Erledigtes**: `docs/completed/` nach Gebiet (Index, Eintragsformat und Prozess in `docs/completed/README.md`).
@@ -12,67 +12,6 @@ Nur offene Schritte, als priorisierte Checkliste: Die oberste Iteration ist die 
 Die Schritte sind ein erster Entwurf vom 18.09. (Code-Stand dcf9526, jeder Code-Beleg per Grep geprüft). Jede Runde bekommt vor dem Bau weiterhin ihr Brainstorming und ihre Spec; die Schritte hier sind deren Startpunkt, und die Spec darf sie ersetzen. Ältere Dokumente nennen Q6 und Q4 gemeinsam „Runde 46“; hier sind es T06 und T09 in den Iterationen 2 und 3.
 
 Hinter jedem Titel stehen Thema, Art, Größe (mini, klein, mittel, groß), Gate (score-berührend = D3, verlustfrei = D4, sonst ausgeschrieben) und „braucht“ = muss vorher gelaufen sein.
-
-## Iteration 2 · Q6 und Re-Fit-Übernahme (Runde 47, läuft seit 18.09.)
-
-T06 ist render-only, T46 und T07 sind score-berührend: getrennte Gates. T07 braucht die Aufnahme aus T05. Entschieden am 18.09. (User): Die Re-Fit-Übernahme landet vor Q4, weil das Phasen-K jeden Score bewegt und Q4 sonst zweimal gemessen würde. Am Ende der Sitzung T08 abgekoppelt über Nacht starten, dann vergleicht der Nachtlauf schon gegen die neuen Gewichte.
-
-- [x] **T06 · Q6 · Prädiktiver Read vor dem Klick** (5ae949b; Re-Pin 562428 t10 als truth cd713ce) (Bericht, Runde, klein, verlustfrei D4, braucht T01)
-
-  562428 Zug 10: Der Bericht nennt die Breite des Zugs und im Rückblick den Read („The read was there for … switching to Heatran“). Vor dem Klick sagt er nichts, obwohl die Read-Linse die beste Antwort auf den wahrscheinlichsten Gegnerzug schon rechnet. Ziel ist ein Satz der Form „Wenn du X erwartest, ist Y der Zug“, der selten feuert.
-
-  Falle: Der Bericht-Lauf bekommt heute kein `reads`-Feld, nur die Zug-Karte. Die Feedback-Pins sehen den Satz erst, wenn der Lauf `reads` mitbekommt, und das kann bestehende Read-Formulierungen bewegen.
-
-  - [x] Schreibe Brainstorming und Spec für den Satz (`docs/superpowers/specs/2026-09-18-round-47-design.md`, User-Gate 1a): Wortlaut, die drei Auslöser (Modell-Konfidenz, Gewinn der besten Antwort, Y ist nicht die angezeigte Empfehlung), Sprechort (Zug-Karte und Bericht-Lauf) und die Doubles-Abdeckung.
-  - [x] Zähle zuerst auf den vorhandenen Voll-Dumps, wie oft der Satz feuern würde (4 von 279 Zügen; 562428 t10 feuert nicht, das Modell gibt Horn Leech 0,35): rechne je Zug aus `graph.results[t-1].matrix` und `parseTendencies` über den Fixture-Log `computeRead` neu und miss die Trefferquote gegen das Ziel von höchstens einem Satz je zehn Zügen, getrennt für Singles und Doubles.
-  - [x] Miss die Nebenwirkung der Verdrahtung (null Formulierungen kippen): der Bericht-Lauf übergibt heute kein reads-Feld, also zähle auf denselben Dumps, auf wie vielen Zügen `riskUnpunished` mit einem passenden Read zusammenfällt und die Formulierung von „a read“ auf „a read against the opponent's tendencies“ kippen würde.
-  - [x] Schreibe die roten Tests zuerst (`packages/eval-engine/test/predictive-read.spec.ts`): ein Fall, in dem der Satz steht, und drei Fälle, in denen er schweigt (Konfidenz zu niedrig, Gewinn unter dem Fehler-Band, Y ist schon die Empfehlung), dazu ein Doubles-Matrix-Fall.
-  - [x] Baue das Signal je Seite (aus den Tendenzen und der Matrix statt aus `params.reads`, 5ae949b) in `signals.ts`, lege die zwei Schwellen neben `READ_CONFIDENCE` ab und sprich den Satz in `summary.ts` direkt vor der Rückblick-Zeile.
-  - [x] Reiche reads in den Bericht-Lauf durch (5ae949b), damit Dump und Pins denselben Text sehen wie die Zug-Karte, und halte die Reihenfolge der Sätze stabil.
-  - [x] Prüfe Doubles (statt am VGC-Replay auf 248 Doubles-Stellungen der Bank: ein Satz, das Modell ist auf 10 von 496 Seiten sicher) und an einem Doubles-Matrix-Test, ob der Satz dort richtig feuert oder sauber schweigt, und schreibe die Zahl in die Spec.
-  - [x] Fahre die verlustfreien Gates (alle grün; 16 bewegte Dump-Pfade, 7 von 279 Zug-Texten): drei byte-identische Feedback-Läufe mit `FEEDBACK_DUMP=1`, Kalibrierung ziffern-gleich ohne Cache-Bump, `npm run test:regression`, e2e, lint, `tsc -b`, und liste jeden bewegten Kanal einzeln auf.
-  - [x] Lege dem User am Gate die bewegten Kanäle vor und setze erst danach den Pin 562428 t10 neu (cd713ce: truth, `summaryIncludes` um „likeliest click“) (`summaryIncludes` um den prädiktiven Satz, Wechsel von gap auf truth zur Entscheidung des Users).
-  - [x] Vor dem Bau klären: 3 offene Entscheidungen (Plan T06), geklärt am User-Gate 18.09.
-
-  *Erfolg:* Höchstens ein Satz je zehn Zügen im Korpus (Singles und Doubles getrennt gezählt), 562428 t10 trägt den Satz mit dem Heatran-Wechsel, kein anderer Pin bewegt sich ungefragt.
-
-- [x] **T46 · Bank-HP: wer im selben Zug getroffen wird und geht** (518504f, Cache v47) (Messbasis, Runde, klein, score-berührend D3)
-
-  913994 Zug 5: Rillaboom nimmt zwei Treffer (100 → 61 → 22 %) und geht im selben Zug per U-turn. Ab Zug 6 liest die App 100 %, wahr sind 22 %. Der Abgleich mit dem Replay läuft an der Zug-Grenze und fasst seit Runde 40 nur das Pokémon auf dem Feld an: Wer innerhalb eines Zuges Schaden nimmt und das Feld verlässt, wird nie korrigiert und behält den Würfel des Simulators. Das trifft App, Bank und Fit gleich. Vorschlag aus der Sichtung: die HP eines Bank-Pokémon auf das Fenster von der letzten Sichtung bis zu einer Regenerator-Heilung darüber klemmen, statt den Körper ganz dem Simulator zu lassen. Dazu gehört der Test, der die Voraussetzung der Runde-40-Regel pinnt (`packages/eval-engine/test/bench-hp.spec.ts`: dasselbe Log einmal mit und einmal ohne Abgleich an jeder Grenze).
-
-  Hinweis: Steht vor T07, weil die Änderung jede Stellung mit einem Pivot bewegt, in der Bank wie in der Fit-Aufnahme. Landet sie nach der Nachtaufnahme aus T05, braucht T07 eine Kontroll-Aufnahme. Der User kann die Reihenfolge drehen.
-
-  *Erfolg:* Auf dem App-Weg sinkt die Zahl der Bank-Körper, die mehr als 10 Punkte neben der letzten Sichtung liegen (heute 144 von 1821 in Singles, 16 von 453 in Doubles, ein Teil davon echtes Regenerator), 573756 behält seine zwei regenerierten Toxapex, Bank in der vorregistrierten Linie. *Plan T46:* noch nicht ausgeschrieben; Sonde `docs/perf/probes/2026-09-18-r46/t04/bench-hp-truth.vt.ts`.
-
-- [x] **T07 · Re-Fit: K und Gewichte übernehmen** (nichts übernommen; ae9351e und die Rücknahme 2cb3e18; Ledger RE-FIT VERDICT 2026-09-18) (Re-Fit, Runde, mittel, score-berührend D3, braucht T05, T01)
-
-  Entschieden am 18.09. (User): Die Übernahme läuft vor Q4. Das Phasen-K sitzt am Suchblatt und bewegt jeden Score, und die Decided-Erkennung löst den Beweiser erst ab Score 0,6 aus: Wer Q4 vor dem Re-Fit misst, misst es danach noch einmal. Die K-Abbildung kommt in jedem Fall (vorregistrierte Regel aus Runde 45), ein Feature-Gewicht nur bei gepaartem Gewinn auf der hq-Tranche, `DISPLAY_K` nach der Prüfung aus T05. `DISPLAY_K` bewegt die Prozent-Sätze aller sechs Feedback-Dumps: Re-Pins am User-Gate.
-
-  Hinweis: Nach den Fitter-Runden (T25, T26) folgt eine Kontroll-Aufnahme: eine zweite Übernahme nur, wenn sich Gewichte oder K über ihren Bootstrap-Fehler hinaus bewegen, sonst ein Vermerk im Ledger (letzter Schritt von T26).
-
-  - [x] Lies den Bericht aus T05 und registriere die Verdikt-Regel vor dem ersten Bank-Lauf (Spec der Runde; User-Gate 4a: `DISPLAY_K` als eigener Schritt): die K-Abbildung in jedem Fall, ein Feature-Gewicht nur bei gepaartem Gewinn auf der hq-Tranche, glücksbereinigte Zeile mitlesen. Kläre am User-Gate, ob `DISPLAY_K` im selben Commit mitgeht.
-  - [x] Übernimm ein Feature-Gewicht nur bei gepaartem Bank-Gewinn auf der hq-Tranche mit mitgelesener glücksbereinigter Zeile; sonst übernimm nur die K-Abbildung. Ergebnis: Matchup 220 und Doubles-Screens 101 verlieren; Boosts 39 gewinnt auf der Bank (hq Singles −4/−27/−5 bp), flutet aber 573756 mit Urteilen (14 Ungenauigkeiten und 0 Fehler → 40 und 7) und bleibt deshalb bei 12 (→ T49).
-  - [x] Bump den Cache, weil die K-Abbildung am Suchblatt hängt und jeden Zellwert bewegt, und fahre die gepaarte Bank mit frischer Basis am selben Tag. Ergebnis: Das Singles-K 2,51/1,18 war auf der Bank neutral und wurde am Abend zurückgenommen: `fitPhaseK` hört nach 500 festen Schritten auf, das echte Maximum liegt bei 1,86/3,73 (Doubles 1,99/3,67), und auch das Maximum gewinnt auf der Bank nichts (gesamt −2 bp, Band [−19, +14]). Das Doubles-K aus dem Fit verlor Mitte und spät. K bleibt 2,28/1,49 und 2,98/0,88, der Cache bleibt v47 (→ T47, T48).
-  - [x] Schließe die Gates (drei byte-identische Feedback-Läufe mit `FEEDBACK_DUMP=1`, `npm run test:regression`, e2e, lint, npx `tsc -b`) und lege Kanal-Bewegungen und Re-Pins dem User vor. Der Endstand ist code-gleich zum T46-Commit 518504f, dessen Gates gelten. `DISPLAY_K`: Die Konstante 2,22 verliert früh (+38 bp) und bleibt 1,85; die phasenabhängige Variante ist T51.
-  - [x] Vor dem Bau klären: 2 offene Entscheidungen (Plan T07): jeder Kandidat einzeln gemessen, `DISPLAY_K` als eigener Schritt.
-
-  *Erfolg:* Das gefittete Bank-K nähert sich der Anzeige-Konstante, die hq-Tranche verliert in keiner Phase, jede übernommene Zahl steht mit Bootstrap-Fehler im Ledger.
-
-- [ ] **T08 · Löser-Nachtlauf mit großen Deckeln (über Nacht)** (läuft seit 18.09. 19:37 auf Stand ae9351e; Auswertung ist der erste Schritt der nächsten Sitzung) (Endspiel, Sichtung, klein, kein Score-Touch, braucht T01)
-
-  Der Prüfstand hat in Runde 34 nur 14 von 51 Stellungen exakt gelöst; jede Bank-Stellung mit drei Körpern lief in den 120-s-Deckel. Q4, die Rennen-Statik und die Richter-Probe 2 haben deshalb keine exakte Bank-Referenz. Einmal über Nacht mit großen Deckeln rechnen, abgekoppelt, und danach nachschlagen.
-
-  - [x] Nimm den Positions-Export (genommen: `.calibration/r47-konly/positions`, 110 Stellungen, dieselbe Dateiliste wie `.calibration/base-20260918-live/positions`, die Vorgabe des Prüfstands); der alte Ordner `.calibration/r34-after/positions` ist beim Worktree-Vorfall gelöscht worden. Läuft der Nachtlauf erst nach T07, exportiere auf dem neuen Stand frisch.
-  - [x] Fahre einen Trockenlauf (`docs/perf/probes/2026-09-18-r47/nightrun-dry`: acht Stellungen, eine im Bereich, 63 s bis zum 60-s-Deckel) mit `EVAL_ENDGAME_LIMIT` über zwei Bank-Stellungen und miss die Wanduhr je Stellung, damit die Nachtlauf-Dauer geschätzt ist, bevor der Lauf startet.
-  - [x] Setze die Deckel für den Lauf hoch (fa8c613: `EVAL_ENDGAME_CAPS="states=200000,wallMs=1200000,turns=60"`, dazu `EVAL_ENDGAME_SOURCE=bank`; heute 30 Züge, 20000 Zustände, 120 s; Vorschlag 200000 Zustände und 20 min Wanduhr) und übergib sie als Teil-Deckel an `solveEndgame`, ohne die Vorgabe im Produktionspfad zu ändern.
-  - [x] Starte vier Slices abgekoppelt (`docs/perf/probes/2026-09-18-r47/nightrun.sh`; Ausgaben unter `nightrun/` und `nightrun-feedback/`, je Slice `endgame-<i>.jsonl`, `slice-<i>.log`, `slice-<i>.done`, am Ende `nightrun.done`; nohup plus Marker-Datei), weil das Hintergrund-Werkzeug nach zehn Minuten endet, und lege keine Sonden-Dateien in regression/ ab, solange die Regressionssuite laufen könnte.
-  - [ ] Baue die Tabelle mit dem vorhandenen Skript und schreibe den Bericht als neuen Abschnitt in die Prüfstand-Datei, so wie Runde 35 es getan hat.
-  - [ ] Werte 749828#23 einzeln aus (Löser −1 ungepreist bei 7 Zuständen, Beweiser −1 mit Masse 1, Statik +0,6, Decided-Sweep p1) und schreibe auf, welche der drei Quellen die Stellung falsch liest.
-  - [ ] Exportiere zusätzlich die Positionen der sechs Feedback-Replays (erledigt: `docs/perf/probes/2026-09-18-r47/t08/feedback-positions-night`, 25 Stellungen, 573756 ab Zug 128; sie rechnen im zweiten Nachtlauf `nightrun-feedback/`) und löse 573756 t138 exakt, um den offenen Zweig des Beweisers zu benennen.
-  - [ ] Trage den Befund als Q4-Referenzzeile nach (exakter Wert gegen die vom Sweep entschiedene Seite) und melde, ob die Rennen-Statik ein Bank-Verdikt bekommen kann.
-  - [x] Vor dem Bau klären: 3 offene Entscheidungen (Plan T08): Deckel wie vorgeschlagen plus 60 Züge, volle Optionsmenge, Stand nach T07.
-
-  *Erfolg:* Jede der 25 Bank-Stellungen mit höchstens drei Körpern trägt `exact` oder ein benanntes Etikett, 749828#23 ist eingeordnet, Q4 hat eine Zeile „exakt gegen decided“ mit mehr als einer Stellung.
 
 ## Iteration 2a · Verdikt mit Fehlerbalken und K zu Ende gefittet
 
@@ -94,9 +33,11 @@ Entstanden am 18.09. in Runde 47. User-Entscheid: vor Q4, mit derselben Logik wi
 
 Eine große Runde für sich: Brainstorming, Spec, Messung auf dem frischen Bank-Dump, Bau, gepaarter Bench.
 
-- [ ] **T09 · Q4 · Decided v2: erst messen, dann den Score klammern** (Endspiel, Runde, groß, score-berührend D3, braucht T01, T07, T48, T08 soweit fertig)
+- [ ] **T09 · Q4 · Decided v2: erst messen, dann den Score klammern** (Endspiel, Runde, groß, score-berührend D3, braucht T48)
 
   573756 ab Zug 135: Der Bericht sagt „practically decided“, der Balken steht bei 26 bis 40 % für SoulWind. Auf der Bank gewinnt die als entschieden gelesene Seite nur 72 bis 80 %. In 749828 Zug 23 nennt die Erkennung p1, Löser und Beweiser beweisen p2. Die Erkennung soll erst „entschieden“ sagen, wenn sie auch gegen einen Volltreffer und einen verlorenen Zug recht behält. Die Score-Klammer (der Score springt auf einen festen Wert, sobald die Erkennung „entschieden“ sagt) kommt erst, wenn die gemessene Quote sie trägt.
+
+  Referenz aus dem Nachtlauf der Runde 47 (`docs/perf/2026-09-04-endgame-truth.md`, Abschnitt „Round 47“): Von 9 voll aufgeklappten decided-Stellungen stehen 6 für die entschiedene Seite und 3 dagegen (751443#23 und 2663112349#37 exakt für die andere Seite, 749828#23 mit −1,000); mit den gedeckelten Schätzwerten 17 von 30 ab 0,8 und 6 dagegen, alle sechs in Singles. Wo der Löser prüfen kann, nennt die Erkennung in einem von drei Fällen die falsche Seite. Spätere Stände benoten sich gegen diese Zeilen mit `EVAL_ENDGAME_SOLVED` in anderthalb Minuten.
 
   Hinweis: Seit Runde 35 ist jede Änderung hier score-berührend: Die Erkennung löst den Beweiser oberhalb von drei Körpern aus (`search/forced-win.ts`, `PROVER_SCORE_FLOOR` 0,6). Die Roadmap führt Q4 noch als nicht score-berührend. Die alten Quoten stammen von vor dem Formen-Marker-Fix und müssen neu gezählt werden.
 
@@ -329,11 +270,13 @@ Erst das Doubles-Gate, dann die Item-Achse, getrennt gemessen (D8). Der größte
 
 ## Iteration 14 · Endspiel-Statik
 
-T33 braucht die exakten Bank-Werte aus dem Nachtlauf (T08). T34 ist ein Mini am selben Beweiser-Pfad und wird getrennt gemessen.
+Die exakten Bank-Werte aus dem Nachtlauf der Runde 47 liegen vor (5 exakt, 11 voll aufgeklappt; Nachschlagen mit `EVAL_ENDGAME_SOLVED`). T34 ist ein Mini am selben Beweiser-Pfad und wird getrennt gemessen.
 
-- [ ] **T33 · Rennen-Statik: PP, Körper ohne Angriff, Deckel** (Endspiel, Runde, groß, score-berührend D3, braucht T08)
+- [ ] **T33 · Rennen-Statik: PP, Körper ohne Angriff, Deckel, Priorität** (Endspiel, Runde, groß, score-berührend D3)
 
   Zapdos mit einem PP Thunderbolt gegen Toxapex mit Recover: Löser −0,995, Statik +0,36. Chansey mit Seismic Toss gegen Gengar: Löser −1, Statik und Matrix 0,0. Zwei Wände ohne Angriffszug gegen Garchomp: Statik +0,64, Wahrheit −1. Level 100 gegen Level 30: 0,9 statt 1,0. Die Statik soll wissen: Leere Angriffs-PP heißen kein Schaden, ein Körper ohne Angriffszug gewinnt nichts, und wo nur eine Seite Schaden macht, ist das Rennen entschieden.
+
+  Aus dem Nachtlauf der Runde 47: 749828 Zug 23, Primarina (98/364) gegen Rillaboom (65/341) im Grassy Terrain. Die Statik liest +0,6 für Primarina, der Decided-Sweep nennt p1, Suche, Beweiser und Spielausgang sagen p2. Ursache ist `movesFirst` (`packages/eval-engine/src/speed.ts`): Ein Prioritätszug schlägt das Tempo und verleiht den Erstschlag dem besten Zug der Seite, und gelesen wird nur die Dex-Priorität. Primarinas Aqua Jet zählt, Rillabooms Grassy Glide (Priorität erst durch das Terrain) nicht. Auf den 11 voll aufgeklappten Stellungen des Nachtlaufs trifft die Statik 9 Vorzeichen, jede Suche 11. Ein Bank-Verdikt für die Statik bleibt außer Reichweite (5 exakte Bank-Stellungen); der Prüfstand bleibt das Instrument.
 
   *Erfolg:* `struggle-lock`, `fixed-vs-ghost` und `two-v-one-switch-loop` lesen in der Statik das richtige Vorzeichen, `level-gap` liest 1,0, später Bank-Brier in der vorregistrierten Linie. Der Prüfstand ist das Instrument, die Bank nur die Nicht-Verschlechterungs-Linie. *Plan T33:* 8 Schritte, 4 offene Entscheidungen.
 
@@ -369,7 +312,7 @@ Zwei Punkte ohne Score-Touch. T37 entscheidet mit Ja oder Nein, ob Iteration 17 
 
   *Erfolg:* Der Grind-Satz im Draft-Spiel nennt mindestens einen der Heatran-Züge t24, t50 oder t63, kein Korpus-Pin bewegt sich, die Sweep-Wanduhr verschlechtert sich nicht messbar. *Plan T36:* 9 Schritte, 4 offene Entscheidungen.
 
-- [ ] **T37 · Choke-Erkennung prüfen: drei Proben vor dem Richter** (Richter und Bank, Sichtung, mittel, kein Score-Touch, braucht T01, T08 für Probe 2 auf Bank-Stellungen)
+- [ ] **T37 · Choke-Erkennung prüfen: drei Proben vor dem Richter** (Richter und Bank, Sichtung, mittel, kein Score-Touch)
 
   Ein Richter, der Spielerfehler erkennen soll, muss selbst geprüft sein. Stand: Über die sechs Feedback-Dumps stehen 2 mistakes und 0 blunders gegen 36 inaccuracies in 558 Seiten-Zügen; 573756 liefert in 139 Zügen keinen einzigen Fehler-Zug. In 655336 nennt der Experte zwei Fehler von p2 (Trick in Zug 5, Protect in Zug 26), die Engine findet nur den Trick. Drei Proben: gegen die Experten-Pins, gegen exakt gelöste Endspiele, gegen den eigenen Score-Verlauf.
 
@@ -455,11 +398,11 @@ Wer an einem Thema arbeitet, findet hier die verwandten TODOs.
 
 | Thema | TODOs |
 | --- | --- |
-| Messbasis | T01, T04, T46, T47 |
-| Werkzeug | T02, T43 |
-| Bericht | T03, T06, T10, T11, T17, T18, T19, T22, T36, T44, T51 |
-| Re-Fit | T05, T07, T48, T49, T50 |
-| Endspiel | T08, T09, T33, T34 |
+| Messbasis | T47 |
+| Werkzeug | T43 |
+| Bericht | T10, T11, T17, T18, T19, T22, T36, T44, T51 |
+| Re-Fit | T48, T49, T50 |
+| Endspiel | T09, T33, T34 |
 | Sets und Spreads | T12, T13, T25, T26, T27, T28, T29, T30, T31, T32 |
 | Zufall preisen | T14, T15, T16, T23, T24, T35 |
 | Oberfläche | T20 |
