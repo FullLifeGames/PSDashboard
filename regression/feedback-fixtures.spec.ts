@@ -1,9 +1,11 @@
 import { test, expect } from 'vitest';
 import { existsSync, readFileSync } from 'fs';
 import { join } from 'path';
-import { FEEDBACK_CORPUS, FEEDBACK_REPLAYS } from '../e2e-feedback/corpus';
+import { FEEDBACK_CENSUS_REPLAYS, FEEDBACK_CORPUS, FEEDBACK_REPLAYS } from '../e2e-feedback/corpus';
 import { validateCorpus } from '../e2e-feedback/claims';
-import { parseReplayLogWithObservations, finalPlayedTurn, buildTeamsFromReplay } from '@fulllifegames/replay-core';
+import {
+  parseReplayLogWithObservations, finalPlayedTurn, buildTeamsFromReplay, getReplayGameType, replayBringOnly,
+} from '@fulllifegames/replay-core';
 import { fetchSmogonSetAssumptions } from '../src/lib/smogon-sets';
 import { fetchSmogonUsageStats } from '../src/lib/smogon-stats';
 
@@ -90,4 +92,46 @@ test('573756: Magnezone holds the Choice Scarf the move order proves', async () 
   expect(magnezone.item).toBe('Choice Scarf');
   expect(magnezone.nature).toBe('Timid');
   expect(magnezone.evs.spe).toBe(252);
+});
+
+/**
+ * Round 49: the census replays are doubles games without corpus items. The
+ * drift run turns red on any data.pkmn.cc request that has no pin, and a
+ * red census replay leaves no row in the report, so the always-on half
+ * checks here what the run would trip over: the fixture's shape, ten played
+ * turns, the game type, a readable bring of four on both sides of a VGC
+ * game (without it the app evaluates six bodies a side), and a pin (body or
+ * 404 marker) behind every Smogon URL the replay's format asks for.
+ */
+test('census fixtures are doubles games with every Smogon input pinned', async () => {
+  expect(FEEDBACK_CENSUS_REPLAYS.filter(id => (FEEDBACK_REPLAYS as readonly string[]).includes(id))).toEqual([]);
+  expect(FEEDBACK_CORPUS.filter(item => (FEEDBACK_CENSUS_REPLAYS as readonly string[]).includes(item.replay))).toEqual([]);
+  for (const id of FEEDBACK_CENSUS_REPLAYS) {
+    const replay = JSON.parse(readFileSync(join('e2e-feedback', 'fixtures', `${id}.json`), 'utf-8')) as {
+      id: string; log: string; players: string[]; formatid: string;
+    };
+    expect(replay.id).toBe(id);
+    expect(replay.players.length).toBeGreaterThanOrEqual(2);
+    expect(getReplayGameType(replay.log)).toBe('doubles');
+    const { snapshots, observations, speedOrders } = parseReplayLogWithObservations(replay.log);
+    expect(finalPlayedTurn(snapshots)).toBeGreaterThanOrEqual(10);
+    if (replay.formatid.includes('vgc')) {
+      const bring = replayBringOnly(replay, snapshots);
+      expect([bring?.p1.length, bring?.p2.length]).toEqual([4, 4]);
+    }
+
+    const unpinned: string[] = [];
+    const pinnedFetcher = async (url: string) => {
+      const path = url.replace(/^https:\/\/(data\.pkmn\.cc|pkmn\.github\.io\/smogon\/data)/, '').replace(/\/{2,}/g, '/');
+      const key = join('e2e-feedback', 'fixtures', 'smogon', path.replace(/[^a-z0-9.]+/gi, '_'));
+      if (!existsSync(`${key}.json`) && !existsSync(`${key}.404`)) unpinned.push(path);
+      return fixtureFetcher(url);
+    };
+    const usageStats = await fetchSmogonUsageStats(replay.formatid, { fetcher: pinnedFetcher as never });
+    const { p1Team, p2Team } = buildTeamsFromReplay(replay.log, { observations, speedOrders, usageStats });
+    expect(Math.min(p1Team.length, p2Team.length)).toBeGreaterThan(0);
+    const species = [...new Set([...p1Team, ...p2Team].map(set => set.species))];
+    await fetchSmogonSetAssumptions({ formatId: replay.formatid, species, fetcher: pinnedFetcher as never });
+    expect(unpinned).toEqual([]);
+  }
 });

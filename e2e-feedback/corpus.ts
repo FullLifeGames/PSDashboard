@@ -75,6 +75,26 @@ export const FEEDBACK_REPLAYS = [
   'smogtours-gen6ou-655336',
 ] as const;
 
+/**
+ * Census-only replays (round 49): doubles games that run through the same
+ * drift run so their dumps exist for the tier census (scripts/tier-census.mjs,
+ * standing rule D21). They carry NO corpus items: nothing about them is an
+ * expert claim, and the drift report grades nothing on them. All four come
+ * from the calibration bank, with the Smogon inputs the bank measures them
+ * with. The drift run appends them after FEEDBACK_REPLAYS, so the six pinned
+ * replays keep their place in every report.
+ * - 2629703929: VGC, both sides bring a visible four, Tailwind, long endgame.
+ * - 2630685175: VGC, Trick Room.
+ * - 912045: Doubles OU, tournament, Tailwind and Trick Room, long endgame.
+ * - 2663093831: Doubles OU, ladder, no speed control.
+ */
+export const FEEDBACK_CENSUS_REPLAYS = [
+  'gen9vgc2026regi-2629703929',
+  'gen9vgc2026regi-2630685175',
+  'smogtours-gen9doublesou-912045',
+  'gen9doublesou-2663093831',
+] as const;
+
 export const FEEDBACK_CORPUS: FeedbackItem[] = [
   // ---- truth (pins approved by the user at Gate 1, 2026-08-14) ----
   {

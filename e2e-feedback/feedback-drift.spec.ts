@@ -8,7 +8,7 @@ import type { GameReport } from '../packages/eval-engine/src/report';
 import type { AlignmentSummary } from '../packages/eval-engine/src/hax-alignment';
 import { parseReplayLogWithObservations } from '../packages/replay-core/src/protocol-parser';
 import { finalPlayedTurn } from '../packages/replay-core/src/replay-turns';
-import { FEEDBACK_CORPUS, FEEDBACK_REPLAYS } from './corpus';
+import { FEEDBACK_CENSUS_REPLAYS, FEEDBACK_CORPUS, FEEDBACK_REPLAYS } from './corpus';
 import { evaluateItem, validateCorpus, type ClaimResult } from './claims';
 import { installHermeticRoutes, RECORD } from './hermetic';
 import { renderReport, type DriftMeta } from './report';
@@ -47,9 +47,10 @@ const koMismatchByReplay: Record<string, number> = {};
 
 /** A replay that cannot be graded still shows up — as ERROR rows, never silence. */
 function pushErrorResults(replayId: string, details: string[]) {
-  for (const item of FEEDBACK_CORPUS.filter(entry => entry.replay === replayId)) {
-    results.push({ item, status: 'error', details });
-  }
+  const items = FEEDBACK_CORPUS.filter(entry => entry.replay === replayId);
+  for (const item of items) results.push({ item, status: 'error', details });
+  // A census-only replay has no rows to carry the failure: the notice line does.
+  if (items.length === 0) noticeByReplay[replayId] = `harness failure: ${details.join(' · ')}`;
 }
 
 interface SweepPoll {
@@ -116,7 +117,8 @@ test('corpus is well-formed against the real fixtures', () => {
   expect(validateCorpus(FEEDBACK_CORPUS, turnsByReplay)).toEqual([]);
 });
 
-for (const replayId of FEEDBACK_REPLAYS) {
+// The census replays (doubles, no corpus items) run last: the pinned six keep their place in every report.
+for (const replayId of [...FEEDBACK_REPLAYS, ...FEEDBACK_CENSUS_REPLAYS]) {
   test(`drift: ${replayId}`, async ({ page }) => {
     const log = await installHermeticRoutes(page, replayId);
     const fixture = JSON.parse(readFileSync(join(__dirname, 'fixtures', `${replayId}.json`), 'utf-8')) as { players: string[] };
