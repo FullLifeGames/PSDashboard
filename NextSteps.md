@@ -3,7 +3,7 @@
 Nur offene Schritte, als priorisierte Checkliste: Die oberste Iteration ist die nächste Sitzung, das oberste offene Kästchen darin das nächste TODO. Jedes TODO nennt das Problem an einer Spielszene und das Erfolgsmaß. Die Umsetzungsschritte jedes TODOs stehen als Checkliste im Backlog-Plan unter derselben Nummer; beim Start einer Iteration wandern sie hierher.
 
 - **Iterationen** bündeln die TODOs einer Sitzung. Eine Iteration wird beim Start zur Runde mit der nächsten freien Rundennummer: Iteration 1 war Runde 46, Iteration 2 war Runde 47, Iteration 2a war Runde 48, Iteration 2b war Runde 49, Iteration 3 war Runde 50, Iteration 4 war Runde 51, Iteration 4a wird Runde 52. Score-berührende TODOs derselben Iteration bekommen je ihre eigene Messung (D3), nie eine gemeinsame.
-- **T-Nummern** (T01 bis T45) sind feste Namen, vergeben am 18.09. in Prioritäts-Reihenfolge. Wandert ein TODO in der Liste, behält es seine Nummer; ein neues TODO bekommt die nächste freie (ab T65; T46 kam am 18.09. in Runde 46 dazu, T47 bis T51 in Runde 47, T52 und T53 in Runde 48, T54 in Runde 49, T55 in Runde 50, T56 bis T64 in Runde 51). „braucht T01“ heißt: T01 muss vorher gelaufen sein.
+- **T-Nummern** (T01 bis T45) sind feste Namen, vergeben am 18.09. in Prioritäts-Reihenfolge. Wandert ein TODO in der Liste, behält es seine Nummer; ein neues TODO bekommt die nächste freie (ab T66; T46 kam am 18.09. in Runde 46 dazu, T47 bis T51 in Runde 47, T52 und T53 in Runde 48, T54 in Runde 49, T55 in Runde 50, T56 bis T64 in Runde 51, T65 am 19.09. nach deren Gate). „braucht T01“ heißt: T01 muss vorher gelaufen sein.
 - **Backlog-Plan** (je TODO: Idee, Schritte mit Dateien, volles Gate, Doubles-Abdeckung, offene Entscheidungen, Zahlen, Code-Belege): `docs/superpowers/plans/2026-09-18-backlog-plans.md`.
 - **Erledigtes**: `docs/completed/` nach Gebiet (Index, Eintragsformat und Prozess in `docs/completed/README.md`).
 - **Maschinen-Quellen**: Ledger in `regression/eval-calibration.spec.ts`, Pins in `e2e-feedback/corpus.ts`, Memory-Notizen.
@@ -59,7 +59,15 @@ Zwei Sichtungen haben denselben Befund unabhängig gefunden (T10 an den Zellen, 
 
 ## Iteration 5 · Wurzel: Klassen auf Ansage und Speed-Ties
 
-Beide fassen `search/cell-sampler.ts` an: eine Spec, zwei getrennt gemessene Commits. Der Play-out-Pin läuft zuerst einzeln (D7). In Doubles greift beides erst, wenn T58 den Zellenplan für Paar-Züge geöffnet hat (heute 0 von 75 565 Wurzelzellen mit Plan).
+Alle drei fassen `search/cell-sampler.ts` an: eine Spec, drei getrennt gemessene Commits. T65 ist der kleinste und kam am 19.09. nach dem Gate der Runde 51 dazu. Der Play-out-Pin läuft zuerst einzeln (D7). In Doubles greift beides erst, wenn T58 den Zellenplan für Paar-Züge geöffnet hat (heute 0 von 75 565 Wurzelzellen mit Plan).
+
+- [ ] **T65 · Eine Zuck-Zeile wirft die Zelle nicht mehr auf eine Ziehung zurück** (Zufall preisen, Mini-Runde, klein, score-berührend D3)
+
+  GPL Zug 13, Stone Edge von Hand in Cobalions Set: Die Zelle Air Slash gegen Stone Edge soll Treffer, Fehlschlag und K. o. anteilig mischen. In der ersten Ziehung zuckt Cobalion zurück (Noivern ist schneller, Air Slash lässt zu 30 % zurückzucken). Die `cant`-Zeile lässt `classifyChild` aussteigen (`cell-blend.ts:215`), und `blendCellSample` fällt auf `fallback()` zurück: den Mittelwert über die Basis-Ziehungen, bei einem Seed über genau eine (`search/cell-sampler.ts`). Die Engine schreibt −0,2224 in die Zelle; das Mittel über 400 Seeds ist −0,4339, die Streuung einer Ziehung 0,19. Stone Edge landet auf Platz vier, obwohl dieselbe Zeile „tötet sicher, wenn er trifft“ anzeigt. Wie ein Tester, der das Auto einmal startet, einen Aussetzer erwischt und „springt nicht an“ notiert. Eine gelungene Mischung zieht 12 bis 16 Seeds (`BOUNDARY_DRAW_BUDGET`); der Rückfall soll auf Ereignis-Zellen ebenfalls nachziehen und dann schlicht mitteln.
+
+  Hinweis: Die kleine Schwester von T24. T24 preist das Zurückzucken als eigene Klasse; diese Runde nimmt nur dem Rückfall die Ein-Ziehungs-Lotterie (User-Gate 19.09. 22:46, vorgezogen). Erster Schritt ist eine Zählung: Wie oft feuert der Rückfall über Bank und Feedback-Spiele, und aus welchem Grund (`cant`-Zeile, Reihenfolge nicht beobachtbar, Gewicht 0)? Auf dem ausgelieferten Set von Zug 13 feuert er nie (22 von 22 Ereignis-Zellen mischen). T14 fasst dieselbe Funktion an: eine Spec, getrennt gemessene Commits, der Play-out-Pin zuerst (D7). In Doubles läuft der Zellenplan erst nach T58; bis dahin bewegt diese Runde nur Singles und sagt das im Gate.
+
+  *Erfolg:* Die Zelle Air Slash gegen Stone Edge liegt höchstens 0,1 vom 400-Seed-Mittel (heute 0,21), Stone Edge steht im nachgetragenen Set unter den ersten zwei Zeilen, auf den Dumps bewegen sich nur Züge mit einer Rückfall-Zelle, der Play-out-Pin hält, die Bank bleibt in der vorregistrierten Linie, die Matrixzeit verschränkt gemessen im vorregistrierten Rahmen. *Plan T65:* 7 Schritte, 3 offene Entscheidungen.
 
 - [ ] **T14 · Klassen auf Ansage an der Wurzel** (Zufall preisen, Runde, mittel, score-berührend D3, braucht T01)
 
@@ -97,7 +105,7 @@ T16 ist score-berührend, fasst Verify und Merge an (`mcts-merge.ts`, `worker-cl
 
 ## Iteration 7 · Kleine sichtbare Korrekturen
 
-Vier kleine Punkte mit einem gemeinsamen Schluss-Gate, drei davon render-only; T59 kam in Runde 51 dazu. Prosa ist nur an drei Stellen byte-gepinnt (`summaryIncludes` für 573756 t8, 573756 t73, 562428 t10); die Golden 655336 pinnt keine Prosa.
+Fünf kleine Punkte mit einem gemeinsamen Schluss-Gate, vier davon render-only; T59 und T64 kamen in Runde 51 dazu. Prosa ist nur an drei Stellen byte-gepinnt (`summaryIncludes` für 573756 t8, 573756 t73, 562428 t10); die Golden 655336 pinnt keine Prosa.
 
 - [ ] **T18 · Kleine Sätze im Spielbericht aufräumen** (Bericht, Mini-Runde, mittel, verlustfrei D4, braucht T01)
 
@@ -128,6 +136,14 @@ Vier kleine Punkte mit einem gemeinsamen Schluss-Gate, drei davon render-only; T
   Hinweis: Der Bo3-Verdacht aus dem alten Text ist widerlegt (das Log ist ein Spiel, Showdown schreibt je Bo3-Spiel ein eigenes Replay), das Payoff-Fenster ist unbeteiligt (`riskPayoffTurn` ist nicht gesetzt). Die Ursache der falschen Zelle liegt bei T58; diese Runde hält nur das Lob zurück. `riskPaidOff` hält den Regret heute auch aus den Entscheidungs-Summen (`report.ts:237`) und dem Sieger-Pfad heraus; ein reiner Text-Zuschnitt ändert daran nichts. In Doubles nimmt das Lob für einen nie gesehenen zweiten Slot die günstigste verträgliche Vervollständigung (hier kippt dadurch fast das Wagnis-Tor: 0,39 gegen 0,21 bei Schwelle 0,2).
 
   *Erfolg:* 2634199230 Zug 5 und 562428 t11 tragen kein Lob mehr, die elf übrigen gelobten Reads behalten ihres, die Pins 573756 t75 und 562428 t12 stehen, alle Engine-Zahlen der Dumps bleiben gleich. *Plan T59:* 6 Schritte, 3 offene Entscheidungen.
+
+- [ ] **T64 · Zweite Zahl im Bericht: Reue gegen den wirklich geklickten Gegenzug** (Bericht, Mini-Runde, klein, verlustfrei D4)
+
+  GPL Zug 13: Gegen Noiverns wirklich geklickten Air Slash wäre Stone Edge 0,12 mehr wert gewesen als Heavy Slam, das ist ein Fehler-Band. Gegen das Gleichgewicht sind es 0,04, weil Noivern dort zu 38 % auf Clefable ausweicht, sobald Stone Edge droht. Die Engine benotet gegen das Gleichgewicht, der User liest den Zug mit dem Wissen, was kam. Eine zweite, klar beschriftete Zahl neben der Reue zeigt beide Lesarten. Wie ein Schiedsrichter, der neben der Regelauslegung auch die Zeitlupe zeigt.
+
+  Hinweis: Entparkt am User-Gate vom 19.09. 22:46. Die Zahl kommt aus der vorhandenen Matrix (Spalte des gespielten Gegenzugs) und fließt weder in das Tier noch in die Summen ein; sonst wäscht das Ergebnis die Note. Ohne Stone Edge im gebauten Set zeigt sie in Zug 13 nur 0,03: Den Tadel zeigt sie erst, wenn der Zug im Set steht (Team-Editor) und T65 die Zelle richtig preist. In Doubles liest sie das gespielte Paar; ein nie gesehener Slot macht sie zur Untergrenze wie beim Regret. Vor dem ersten Code zwei Formulierungs-Muster am User-Gate.
+
+  *Erfolg:* GPL Zug 13 mit nachgetragenem Stone Edge zeigt beide Zahlen nebeneinander, kein Tier und keine Summe bewegt sich, alle Engine-Zahlen der Dumps bleiben gleich, die drei Prosa-Pins stehen. *Plan T64:* 4 Schritte, 2 offene Entscheidungen.
 
 ## Iteration 8 · Glückskonto: gewürfelt oder umbewertet
 
@@ -161,7 +177,7 @@ Eine gemeinsame Spec für die Klassen-Arithmetik, zwei getrennt gemessene Commit
 
   GPL-Spiel DzBQ5azlO5l Zug 15: Noivern (55/161) steht gegen ein frisches Rotom-Wash, Bene wechselt auf Vileplume, die Engine nennt das einen Fehler. Air Slash lässt das Ziel zu 30 % zurückzucken, aber die Engine preist das Zurückzucken nicht als Anteil: Welcher der festen Seeds zieht, entscheidet, ob Rotom in der Rechnung zurückzuckt. Bei einem sicher treffenden Zuck-Zug ohne KO rechnet die Zelle sogar mit einem einzigen Seed. Die Zuck-Chance bekommt denselben Rang wie der Fehlschlag: eine eigene Klasse mit Gewicht.
 
-  Hinweis: Teilt Klassen-Arithmetik und Dateien mit T23 (`cell-blend.ts`, `outcome-children.ts`, `scripted-prng.ts`); eine gemeinsame Spec spart einen Messzyklus. Aus der Sichtung T10 (Runde 51): Eine `cant`-Zeile auf einer Ereignis-Seite lässt `classifyChild` aussteigen (`cell-blend.ts:215`), und die Zelle fällt auf eine einzige Ziehung zurück, wo eine gelungene Mischung 12 bis 16 zieht. GPL Zug 13 mit von Hand nachgetragenem Stone Edge: −0,2224 aus einer gezuckten Ziehung gegen ein Mittel von −0,4339 über 400 Seeds, Streuung einer Ziehung 0,19. Auf dem ausgelieferten Set mischt Zug 13 sauber (22 von 22 Ereignis-Zellen); als Prüfstein taugt er nur mit nachgetragenem Zug, und ein Fehler-Band erzeugt die Zuck-Klasse dort nicht (Reue höchstens 0,052, weil Noivern im Gleichgewicht ausweicht). Die Spec sagt, ob die Zuck-Chance eine eigene Klasse wird (Zelle −0,43) oder die vorhandenen Gewichte sie tragen (−0,54). In Doubles läuft der Plan erst nach T58.
+  Hinweis: Teilt Klassen-Arithmetik und Dateien mit T23 (`cell-blend.ts`, `outcome-children.ts`, `scripted-prng.ts`); eine gemeinsame Spec spart einen Messzyklus. Aus der Sichtung T10 (Runde 51): Eine `cant`-Zeile auf einer Ereignis-Seite lässt `classifyChild` aussteigen (`cell-blend.ts:215`), und die Zelle fällt auf eine einzige Ziehung zurück, wo eine gelungene Mischung 12 bis 16 zieht. GPL Zug 13 mit von Hand nachgetragenem Stone Edge: −0,2224 aus einer gezuckten Ziehung gegen ein Mittel von −0,4339 über 400 Seeds, Streuung einer Ziehung 0,19. Auf dem ausgelieferten Set mischt Zug 13 sauber (22 von 22 Ereignis-Zellen); als Prüfstein taugt er nur mit nachgetragenem Zug, und ein Fehler-Band erzeugt die Zuck-Klasse dort nicht (Reue höchstens 0,052, weil Noivern im Gleichgewicht ausweicht). Die Spec sagt, ob die Zuck-Chance eine eigene Klasse wird (Zelle −0,43) oder die vorhandenen Gewichte sie tragen (−0,54). In Doubles läuft der Plan erst nach T58. Den Rückfall auf eine Ziehung nimmt T65 vorweg; hier bleibt die Zuck-Klasse.
 
   *Erfolg:* Weniger Zellen fallen wegen einer `cant`-Zeile auf das Seed-Mittel zurück, GPL Zug 15 hängt nicht mehr am Seed, Play-out-Pin hält, Bank in der vorregistrierten Linie. *Plan T24:* 9 Schritte, 5 offene Entscheidungen.
 
@@ -407,12 +423,6 @@ Fällig am nächsten Release-Tag, unabhängig vom Platz in der Liste.
 
   *Plan T55:* 4 Schritte, 2 offene Entscheidungen.
 
-- [ ] **T64 · Zweite Zahl im Bericht: Reue gegen den wirklich geklickten Gegenzug** (Bericht, Geparkt, klein, render-only)
-
-  GPL Zug 13: Gegen Noiverns wirklich geklickten Air Slash wäre Stone Edge 0,12 mehr wert gewesen als Heavy Slam (Fehler-Band). Gegen das Gleichgewicht sind es 0,04, weil Noivern ausweicht, sobald Stone Edge droht; die Engine benotet gegen das Gleichgewicht, und der User liest den Zug mit dem Wissen, was kam. Eine zweite, klar beschriftete Zahl neben der Reue würde beide Lesarten zeigen. Ehrliche Grenze: Ohne Stone Edge im gebauten Set ergibt auch sie nur 0,03 und erzeugt keinen Tadel. Geparkt, bis ein zweiter Fall dieselbe Lücke zeigt; vor dem ersten Code zwei Formulierungs-Muster am User-Gate.
-
-  *Plan T64:* 4 Schritte, 2 offene Entscheidungen.
-
 ## Themen-Übersicht
 
 Wer an einem Thema arbeitet, findet hier die verwandten TODOs.
@@ -424,7 +434,7 @@ Wer an einem Thema arbeitet, findet hier die verwandten TODOs.
 | Re-Fit | T49, T50, T52 |
 | Endspiel | T33, T34, T55, T57 |
 | Sets und Spreads | T25, T26, T27, T28, T29, T30, T31, T32, T60, T62, T63 |
-| Zufall preisen | T14, T15, T16, T23, T24, T35, T58 |
+| Zufall preisen | T14, T15, T16, T23, T24, T35, T58, T65 |
 | Oberfläche | T20 |
 | Richter und Bank | T21, T37, T38, T45, T56 |
 | Q-Runden | T39, T40, T41, T42 |
@@ -463,7 +473,7 @@ Jeder Gap hat sein TODO. Die Pins selbst stehen in `e2e-feedback/corpus.ts`; Re-
 | 649664 t23 | observed steht seit Runde 42 auf chance. Die Bar liest 0,79 statt 0,92, weil der Crit offen bleibt. Der Odds-Satz rendert in keinem Korpus-Zug mehr. | T19, T23, T18 |
 | Draft-Spiel t48, 573756 t70 | Chance-Buchung ohne Würfel: Der Read-Payoff verpufft (t48), die Setup-Auszahlung kommt eine Bewertung zu spät (t70, liest heute quiet mit −0,145). | T22 |
 | VGC Bo3 2634199230 t5 | Nachgestellt in Runde 51, zwei byte-gleiche App-Läufe. Das Lob steht an fünf Stellen; Attribution `p2-read`, `riskPayoff` +0,35 (+18 %), kein Payoff-Fenster, kein Bo3-Lesefehler. Kiran fällt im Zug von 69 auf 48 %. Ursache: Die gelobte Zelle zieht den K. o. an Incineroar nicht, eine Zeile weiter oben fällt er. | T58, T59 |
-| GPL DzBQ5azlO5l t13, t15 | t13: Heavy Slam liest ohne Fehler-Band (Reue 0,034 im Browser, 0,028 mit von Hand nachgetragenem Stone Edge). Drei Dinge müssten zusammenkommen: Stone Edge fehlt im Set (gen9ou 0,35 %), die Zelle Air Slash gegen Stone Edge steht auf einer einzigen gezuckten Ziehung, und der Maßstab ist das Gleichgewicht (deckelt die Reue bei 0,052). t15: Vileplume-Wechsel als Fehler wegen ungepreister Zuck-Chance, nicht angefasst. Fixture `e2e/fixtures/gpl-replay-DzBQ5azlO5l.html`. | T24, T63, T64 |
+| GPL DzBQ5azlO5l t13, t15 | t13: Heavy Slam liest ohne Fehler-Band (Reue 0,034 im Browser, 0,028 mit von Hand nachgetragenem Stone Edge). Drei Dinge müssten zusammenkommen: Stone Edge fehlt im Set (gen9ou 0,35 %), die Zelle Air Slash gegen Stone Edge steht auf einer einzigen gezuckten Ziehung, und der Maßstab ist das Gleichgewicht (deckelt die Reue bei 0,052). t15: Vileplume-Wechsel als Fehler wegen ungepreister Zuck-Chance, nicht angefasst. Fixture `e2e/fixtures/gpl-replay-DzBQ5azlO5l.html`. | T24, T63, T64, T65 |
 | 648453 Set-Stand | App: Landorus-Therian mit Choice Scarf, Volcanion ohne. Bank-Bau: umgekehrt. Beide erklären die Zugreihenfolge; offen ist, welcher stimmt (Handprüfung Zug 12 und 22). | T56, T62 |
 | smogtours-gen9ou-750267 Weavile | Steht mit Jolly 0/0/0/0/0/252 bei 41 Schadens-Beobachtungen und 11 Zugreihenfolgen: Die erfüllte Reihenfolge hält das Tempo, das Budget zahlt es aus dem Angriff. Bank-Bau und App-Bau gleich. | T26 |
 | smogtours-gen9ou-751207 t6, VGC 2629703929 t10 | Tera in der Statik: Ceruledge (Tera Kampf) gilt weiter als immun gegen Body Press; Koraidon (Tera Feuer) liest −0,645 statt −0,396. | T57 |
