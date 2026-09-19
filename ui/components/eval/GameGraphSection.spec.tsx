@@ -87,4 +87,19 @@ describe('GameGraphSection', () => {
     expect(screen.getByText('Team preview')).toBeInTheDocument();
     expect(screen.queryByText('Turn 3')).toBeNull();
   });
+
+  test('the decided strip stands only where the bar backs the sweep (round 50)', () => {
+    // 649664 t15 to t22 named Medicham-Mega for p2 under a bar leaning to p1; t23 stood at 0.89 for p2.
+    const graph = evalGraph();
+    const sweep = { p1: [], p2: [], decided: { side: 'p2' as const, species: 'Medicham-Mega' } };
+    graph.scores[3] = 0.2;
+    graph.results[3] = evalResult('singles', { score: 0.2, unanswered: sweep });
+    graph.scores[7] = -0.89;
+    graph.results[7] = evalResult('singles', { score: -0.89, unanswered: sweep });
+    render(<GameGraphSection {...props({ graph })} />);
+    const strips = [...document.querySelectorAll('line > title')].filter(title => title.textContent === 'practically decided: Medicham-Mega');
+    expect(strips).toHaveLength(1);
+    expect(document.querySelector('rect[data-turn="4"] > title')?.textContent).not.toContain('practically decided');
+    expect(document.querySelector('rect[data-turn="8"] > title')?.textContent).toContain('practically decided: Medicham-Mega');
+  });
 });

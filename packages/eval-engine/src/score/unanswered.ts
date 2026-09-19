@@ -13,7 +13,10 @@ import { healProfile, ppBudget, raceClocks, statusResidual, type HealProfile, ty
 /**
  * The root's unanswered-mon profile: mons no living enemy answers, the
  * switch-in stage, the decided sweep, and the near-decided roll. Narrative
- * input only — the score path never reads it.
+ * input, with one reader on the score path: the side the sweep or the near
+ * stage names starts the forced-win prover (search/forced-win.ts, round 35).
+ * Readers speak the sweep through heldDecided (round 50), which asks the
+ * finished score to back it.
  */
 
 /** The memo state one unansweredMons call shares across its races. */

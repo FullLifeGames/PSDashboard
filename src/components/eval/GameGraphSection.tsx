@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react';
-import type {
-  EvalPreferences, EvalResult, RankedChoice, ReadRecommendation, TurnAnalysis, GameReport, LeadAnalysis,
+import {
+  heldDecided,
+  type EvalPreferences, type EvalResult, type RankedChoice, type ReadRecommendation, type TurnAnalysis, type GameReport, type LeadAnalysis,
 } from '@fulllifegames/eval-engine';
 import type { EvalGraphState } from '../../hooks/useEvaluation';
 import { EvalGameReport } from '../EvalGameReport';
@@ -152,7 +153,7 @@ export function GameGraphSection(props: GameGraphSectionProps) {
           leadScore={graph.lead?.result.score ?? null}
           leadDetail={reportLeads ?? null}
           evalErrors={graph.evalErrors}
-          decided={graph.results.map(result => result?.unanswered?.decided ?? null)}
+          decided={graph.results.map(result => (result ? heldDecided(result) ?? null : null))}
           variation={variation}
           maxTurn={graphMaxTurn}
         />

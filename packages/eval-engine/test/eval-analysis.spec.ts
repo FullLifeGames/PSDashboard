@@ -1458,8 +1458,8 @@ describe('the decided sweep at the analysis layer (round 15)', () => {
   // attaches to its owning side on EVERY decided turn — display layers
   // re-book the resolution prose from it — while the announcement sentence
   // is spoken once per game report, like the round-14 entry sentences.
-  const decidedResult = (): EvalResult => ({
-    score: -0.2, interval: 0, depthCompleted: 1,
+  const decidedResult = (score = -0.8): EvalResult => ({ // round 50: a bar that backs the sweep
+    score, interval: 0, depthCompleted: 1,
     perSide: {
       p1: [choice('move tackle', 'Tackle', -0.2)],
       p2: [choice('move stompingtantrum', 'Stomping Tantrum', 0.2)],
@@ -1489,7 +1489,7 @@ describe('the decided sweep at the analysis layer (round 15)', () => {
 
   test('the near-decided roll carries odds and target, keyed apart from decided', () => {
     const nearResult = (): EvalResult => {
-      const result = decidedResult();
+      const result = decidedResult(-0.2); // no bar floor on the near stage (573756 t73 stands at 0.596)
       result.unanswered = {
         p1: [], p2: [],
         nearDecided: { side: 'p2', species: 'Garchomp', odds: 0.95, removes: 'Corviknight' },

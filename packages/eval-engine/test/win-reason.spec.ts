@@ -29,9 +29,9 @@ describe('win-reason detection', () => {
   test('speaks the decided sweep as the winner\'s conversion', () => {
     const report = buildGameReport([
       mk(1, 0.1, -0.25),
-      mk(2, -0.25, -0.4),
-      mk(3, -0.4, -0.6, { p2: { playedRaw: null, played: null, best: null, safe: null, regret: 0, decided: { species: 'Kyurem-White', announce: true } } }),
-      mk(4, -0.6, -0.9, { p2: { playedRaw: null, played: null, best: null, safe: null, regret: 0, decided: { species: 'Kyurem-White', announce: false } } }),
+      mk(2, -0.25, -0.75),
+      mk(3, -0.75, -0.85, { p2: { playedRaw: null, played: null, best: null, safe: null, regret: 0, decided: { species: 'Kyurem-White', announce: true } } }),
+      mk(4, -0.85, -0.9, { p2: { playedRaw: null, played: null, best: null, safe: null, regret: 0, decided: { species: 'Kyurem-White', announce: false } } }),
     ], names, 'p2');
     expect(report.summary).toContain('From turn 3, Kyurem-White cleared everything Alpha had left.');
     expect(report.conversion).toEqual({ kind: 'decided', turn: 3, species: 'Kyurem-White' });
@@ -40,11 +40,47 @@ describe('win-reason detection', () => {
     expect(report.summary).not.toContain('close game');
   });
 
+  const swept = (species: string, announce = true) =>
+    ({ playedRaw: null, played: null, best: null, safe: null, regret: 0, decided: { species, announce } });
+
+  test('the conversion starts where the bar holds for the winner to the end (round 50)', () => {
+    // 573756: the bar backed the sweep once at t124, fell back to 0.39, and held from t137 on.
+    const report = buildGameReport([
+      mk(1, 0.1, -0.75),
+      mk(2, -0.75, -0.4, { p2: swept('Zapdos-Galar') }),
+      mk(3, -0.4, -0.9),
+      mk(4, -0.9, -0.95, { p2: swept('Zapdos-Galar', false) }),
+      mk(5, -0.95, -1, { p2: swept('Zapdos-Galar', false) }),
+    ], names, 'p2');
+    expect(report.conversion).toEqual({ kind: 'decided', turn: 4, species: 'Zapdos-Galar' });
+    expect(report.summary).toContain('From turn 4, Zapdos-Galar cleared everything Alpha had left.');
+  });
+
+  test('a turn without a sweep does not break the run while the bar holds (round 50)', () => {
+    // 648453: proven at t35, no sweep on the board at t37 and t38, the bar at 1.00 throughout.
+    const report = buildGameReport([
+      mk(1, 0.1, -1),
+      mk(2, -1, -1, { p2: { playedRaw: null, played: null, best: null, safe: null, regret: 0, forcedWin: { turns: 3, mass: 1, caveat: 'none', announce: true } } }),
+      mk(3, -1, -1),
+      mk(4, -1, -1, { p2: swept('Landorus-Therian') }),
+    ], names, 'p2');
+    expect(report.conversion).toEqual({ kind: 'forced', turn: 2, provenTurns: 3 });
+  });
+
+  test('a sweep whose bar never holds to the end is no conversion (round 50)', () => {
+    const report = buildGameReport([
+      mk(1, 0.1, -0.75),
+      mk(2, -0.75, -0.3, { p2: swept('Calyrex-Ice') }),
+      mk(3, -0.3, -0.5),
+    ], names, 'p2');
+    expect(report.conversion).toBeUndefined();
+  });
+
   test('a proven forced win outranks a later decided sweep and carries its caveat', () => {
     const report = buildGameReport([
-      mk(1, 0.05, -0.3),
-      mk(2, -0.3, -0.5, { p2: { playedRaw: null, played: null, best: null, safe: null, regret: 0, forcedWin: { turns: 3, mass: 1, caveat: 'barring-crit', announce: true } } }),
-      mk(3, -0.5, -0.8, { p2: { playedRaw: null, played: null, best: null, safe: null, regret: 0, decided: { species: 'Zapdos-Galar', announce: true } } }),
+      mk(1, 0.05, -0.9),
+      mk(2, -0.9, -0.95, { p2: { playedRaw: null, played: null, best: null, safe: null, regret: 0, forcedWin: { turns: 3, mass: 1, caveat: 'barring-crit', announce: true } } }),
+      mk(3, -0.95, -1, { p2: { playedRaw: null, played: null, best: null, safe: null, regret: 0, decided: { species: 'Zapdos-Galar', announce: true } } }),
     ], names, 'p2');
     expect(report.summary).toContain('From turn 2 the win was forced — every reply lost within 3 turns, barring a crit.');
     expect(report.conversion).toEqual({ kind: 'forced', turn: 2, provenTurns: 3 });
@@ -52,9 +88,9 @@ describe('win-reason detection', () => {
 
   test('an earlier decided sweep speaks over a later forced win', () => {
     const report = buildGameReport([
-      mk(1, 0.05, -0.3),
-      mk(2, -0.3, -0.5, { p2: { playedRaw: null, played: null, best: null, safe: null, regret: 0, decided: { species: 'Zapdos-Galar', announce: true } } }),
-      mk(3, -0.5, -0.8, { p2: { playedRaw: null, played: null, best: null, safe: null, regret: 0, forcedWin: { turns: 2, mass: 1, caveat: 'none', announce: true } } }),
+      mk(1, 0.05, -0.75),
+      mk(2, -0.75, -0.95, { p2: { playedRaw: null, played: null, best: null, safe: null, regret: 0, decided: { species: 'Zapdos-Galar', announce: true } } }),
+      mk(3, -0.95, -1, { p2: { playedRaw: null, played: null, best: null, safe: null, regret: 0, forcedWin: { turns: 2, mass: 1, caveat: 'none', announce: true } } }),
     ], names, 'p2');
     expect(report.summary).toContain('From turn 2, Zapdos-Galar cleared everything Alpha had left.');
     expect(report.conversion).toEqual({ kind: 'decided', turn: 2, species: 'Zapdos-Galar' });
@@ -62,9 +98,9 @@ describe('win-reason detection', () => {
 
   test('a one-turn forced win reads singular', () => {
     const report = buildGameReport([
-      mk(1, 0.05, -0.3),
-      mk(2, -0.3, -0.5, { p2: { playedRaw: null, played: null, best: null, safe: null, regret: 0, forcedWin: { turns: 1, mass: 1, caveat: 'none', announce: true } } }),
-      mk(3, -0.5, -0.8),
+      mk(1, 0.05, -0.9),
+      mk(2, -0.9, -0.95, { p2: { playedRaw: null, played: null, best: null, safe: null, regret: 0, forcedWin: { turns: 1, mass: 1, caveat: 'none', announce: true } } }),
+      mk(3, -0.95, -1),
     ], names, 'p2');
     expect(report.summary).toContain('every reply lost within 1 turn.');
   });
@@ -280,9 +316,9 @@ describe('win-reason detection', () => {
 
   test('without played tracking the conversion still speaks', () => {
     const report = buildGameReport([
-      mk(1, 0.05, -0.3),
-      mk(2, -0.3, -0.5, { p2: { playedRaw: null, played: null, best: null, safe: null, regret: 0, decided: { species: 'Kyurem-White', announce: true } } }),
-      mk(3, -0.5, -0.8),
+      mk(1, 0.05, -0.75),
+      mk(2, -0.75, -0.8, { p2: { playedRaw: null, played: null, best: null, safe: null, regret: 0, decided: { species: 'Kyurem-White', announce: true } } }),
+      mk(3, -0.8, -0.9),
     ], names, 'p2', false);
     expect(report.summary).toContain('From turn 2, Kyurem-White cleared everything Alpha had left.');
     expect(report.summary).not.toContain('clean');

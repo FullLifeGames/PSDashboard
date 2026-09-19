@@ -8,6 +8,7 @@ import {
   CONDITIONAL_MIX_MIN, FORCED_MIX_THRESHOLD, TIER_THRESHOLDS, decidedSeenKey, forcedWinSeenKey, unansweredSeenKey,
   type AnalyzeTurnParams, type Side, type SideAnalysis, type VerdictTier,
 } from './types.ts';
+import { heldDecided } from './decided-held.ts';
 import { matchPlayedChoice } from './played-match.ts';
 import type { SideGrading } from './grading.ts';
 
@@ -265,7 +266,8 @@ function decidedSignals(
   key: Side,
 ): { decided: SideAnalysis['decided']; nearDecided: SideAnalysis['nearDecided']; forcedWin: SideAnalysis['forcedWin'] } {
   let decided: SideAnalysis['decided'];
-  const ownDecided = params.result.unanswered?.decided;
+  // Round 50: the sweep needs the search's key; the near stage below does not.
+  const ownDecided = heldDecided(params.result);
   if (ownDecided && ownDecided.side === key) {
     decided = {
       species: ownDecided.species,

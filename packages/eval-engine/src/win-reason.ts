@@ -1,4 +1,5 @@
 import { BREADTH_MIN_OPTIONS, TIER_THRESHOLDS, playedSetupMove, type SideAnalysis, type TurnAnalysis } from './analysis.ts';
+import { DECIDED_SCORE } from './turn-analysis/types.ts';
 import { KEY_TURN_SWING } from './graph.ts';
 import { koPhrase, phrase } from './prose/phrases.ts';
 import { SPOKEN_MASS } from './types.ts';
@@ -101,14 +102,29 @@ export function luckSentence(
   return `Luck ran ${chanceTotal > 0 ? 'for' : 'against'} ${playerNames[0]} overall (${winDeltaText(chanceTotal)}).`;
 }
 
-/** First forced-win (spoken mass) or decided signal on the WINNER's side, in turn order; forced wins a same-turn tie. */
+/** Every known turn after this one reads the winner at DECIDED_SCORE or beyond. */
+function barHoldsAfter(known: TurnAnalysis[], index: number, winner: Side): boolean {
+  const sign = winner === 'p1' ? 1 : -1;
+  return known.slice(index + 1).every(analysis => analysis.scoreBefore * sign >= DECIDED_SCORE);
+}
+
+/**
+ * First forced-win (spoken mass) or decided signal on the WINNER's side from
+ * which the bar holds for the winner to the last known turn, in turn order;
+ * forced wins a same-turn tie. "From turn N" promises the rest of the game:
+ * a sweep the bar backed once and dropped again is no conversion yet (round
+ * 50; 573756 held at t124, fell to 0.39 at t125 and held from t137 on). The
+ * bar carries the turns where no sweep stands (648453 t37 and t38 under a
+ * win proven at t35).
+ */
 export function conversionFor(
   known: TurnAnalysis[],
   winner: Side,
   playerNames: PlayerNames,
 ): { conversion: WinConversion; sentence: string } | null {
   const loserName = playerNames[sideIndex(other(winner))];
-  for (const analysis of known) {
+  for (const [index, analysis] of known.entries()) {
+    if (!barHoldsAfter(known, index, winner)) continue;
     const side = analysis[winner];
     const forced = side.forcedWin;
     if (forced && forced.mass >= SPOKEN_MASS) {

@@ -132,6 +132,7 @@ value forcedWinInput
 value forcedWinPossible
 value forcedWinSeenKey
 value formatRead
+value heldDecided
 value matchPlayedSide
 value mctsSearch
 value mctsTreeSearch
