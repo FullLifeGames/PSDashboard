@@ -893,6 +893,41 @@ import { summaryLines } from './calibration-summary';
  * static basis for this mass; the next lever, if any, is search/
  * planning-side.
  *
+ * K FIT CONVERGED 2026-09-19 (improvement round 48, T48; f5618ce; NOTHING
+ * ADOPTED at the user gate, K stays 2.28/1.49 and 2.98/0.88, cache stays
+ * v47; probes under docs/perf/probes/2026-09-19-r48/). fitPhaseK runs
+ * Newton to a standstill; the fit report prints the spread from a
+ * bootstrap over games (200 draws) on the 18 Sep capture: singles k0 1.86
+ * +-0.23 [1.46, 2.20], k1 3.73 +-0.65 [2.64, 4.76]; doubles k0 1.99 +-0.29
+ * [1.60, 2.55], k1 3.67 +-0.88 [2.06, 5.06]. Both shipped pins lie outside
+ * those bands. fitLogistic was measured converged (500 steps, 5000 steps
+ * and Newton agree on every implied weight to one decimal), fitConstantK
+ * too (round 47): only the phase fit was short.
+ * FORMS on the fit corpus (5-fold CV over games, 20 seeds, against the
+ * shipped pin): singles linear maximum -2.3 +-1.4 bp Brier, 19 of 20 seeds;
+ * singles CAPPED, K = 1.548 + 6.007*min(ff, 0.35) (rises to a third of the
+ * bodies fainted, then flat at 3.65; breakpoint profiled inside each
+ * training fold, 0.35 on 75 of 100 folds) -4.1 +-1.5 bp, 20 of 20; doubles
+ * linear maximum -7.6 +-3.2 bp, 20 of 20; a cap does not carry in doubles
+ * (breakpoint at the edge, 0 of 20 against the line).
+ * BANK with bands (base of the day byte-identical to r47-t46): singles
+ * capped pooled -6 [-28, +14], hq +5 [-12, +24], late -20 [-39, -1], no
+ * harm, no warning. Doubles maximum pooled -6 [-45, +31], early -91
+ * [-175, -7], warning late +54 [+3, +112].
+ * TIER CENSUS, singles capped (one feedback run, all seven tests green):
+ * 38/2/0 -> 32/2/1 on 558 side-turns, but 36 of 279 turns change
+ * attribution or tier. In the expert golden 655336 the t23 Landorus sack
+ * goes from "low-cost trade" to BLUNDER (regret 0.215 -> 0.430) and t18
+ * gains a mistake (0.032 -> 0.217), three new drift channels, 653785 t19
+ * moves away from quiet; early verdicts vanish (573756 t19 to t22).
+ * FINDING: the verdict tiers (0.1 / 0.2 / 0.4), HEALTHY_SACK_FLOOR and
+ * PROVER_SCORE_FLOOR are measured in wp-units, and wp-units hang on K. A
+ * new K moves every such threshold silently: milder early, stricter from
+ * the middle on. A K adoption needs the thresholds decoupled or re-set
+ * with it (NextSteps T52). The doubles census CANNOT BE READ: all six
+ * feedback replays are singles (NextSteps T53). A 4 bp gain the bank
+ * cannot see does not pay for a new blunder stamp on the expert's game.
+ *
  * VERDICT WITH BANDS 2026-09-19 (improvement round 48, T47; instrument
  * only, no score path). scripts/paired-calibration.mjs prints a verdict
  * table: paired Brier deltas B minus A under the A side's pooled K, per

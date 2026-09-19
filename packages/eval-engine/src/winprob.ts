@@ -21,7 +21,14 @@
  * the bank none of the three separates from the pins (paired Brier with a
  * bootstrap over games: 500-step singles K +2 bp [−4, +9], the maxima −2
  * bp [−19, +14], early better, hq mid and doubles late worse). See the
- * ledger (RE-FIT VERDICT 2026-09-18) and NextSteps T47/T48.
+ * ledger (RE-FIT VERDICT 2026-09-18).
+ * ROUND 48 (2026-09-19): the fitter runs to its maximum now, and the pins
+ * STAY. A capped singles form (1.548 + 6.007·min(ff, 0.35)) wins 4 bp out
+ * of sample on the fit corpus and shows no harm on the bank, but it stamps
+ * a blunder on the expert golden's t23 sack: the verdict tiers and the sack
+ * and prover floors are measured in wp-units, so a new K moves each of
+ * them. No K adoption before those thresholds are decoupled or re-set with
+ * it (ledger K FIT CONVERGED 2026-09-19, NextSteps T52; doubles T53).
  *
  * Since the win-prob-space conversion, the LEAF sigmoid applies once, at
  * the search leaf (`wpUnits`): every downstream value — cell averages, the
