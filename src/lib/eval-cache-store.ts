@@ -162,7 +162,12 @@ export interface StoredEval {
 //      bench HP. Every position moves whose bench holds a body that was hit
 //      and left within one turn, or whose departure the sim rolled apart
 //      from the log (38 of 2306 benched bodies on the bank).
-const EVAL_ENGINE_CACHE_VERSION = 47;
+// v48: round 49, the matchup memo keys a halving move (Super Fang, Nature's
+//      Madness, Ruination) on the defender's current HP. Before, the first
+//      forked position to ask froze its HP into the memo, and a matrix the
+//      worker pool split read a different value run to run. Every position
+//      moves whose sets carry such a move (38 of 833 on the bank).
+const EVAL_ENGINE_CACHE_VERSION = 48;
 
 export function evalStoreKey(
   cacheKey: string,

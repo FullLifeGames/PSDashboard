@@ -86,9 +86,11 @@ export class EvalWorkerClient {
   }
 
   /**
-   * Least-loaded worker (ties keep the lowest index). Placement never
-   * affects results — every job is a pure function of its message — only
-   * queueing: pinning to worker 0 serialized the pair-eval phases and
+   * Least-loaded worker (ties keep the lowest index). Placement must never
+   * affect results: every job is a pure function of its message, which holds
+   * only while every engine memo is a function of its key (round 49: the
+   * matchup memo was not, and doubles cells differed run to run). It affects
+   * only queueing: pinning to worker 0 serialized the pair-eval phases and
    * stacked concurrent turns' trees onto the same few workers.
    */
   private pickWorker(): WorkerHandle {
