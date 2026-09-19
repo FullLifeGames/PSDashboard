@@ -15,7 +15,7 @@ Hinter jedem Titel stehen Thema, Art, Größe (mini, klein, mittel, groß), Gate
 
 ## Iteration 4a · Das Instrument geradeziehen: Die Bank baut wie die App
 
-Drei Sichtungen der Runde 51 sagen dasselbe: erst das Messgerät richten, dann messen. T56 ist ein Instrumentwechsel mit neuer Basis und steht deshalb vor jeder weiteren score-berührenden Runde; T61 ist das kleine Werkzeug daneben. Die Reihenfolge 4a, 4b, 4c vor Iteration 5 ist ein Vorschlag aus Runde 51 und wartet auf das User-Gate.
+Drei Sichtungen der Runde 51 sagen dasselbe: erst das Messgerät richten, dann messen. T56 ist ein Instrumentwechsel mit neuer Basis und steht deshalb vor jeder weiteren score-berührenden Runde; T61 ist das kleine Werkzeug daneben. Die Reihenfolge 4a, 4b, 4c vor Iteration 5 hat der User am 19.09. bestätigt.
 
 - [ ] **T56 · Die Bank baut wie die App** (Richter und Bank, Runde, mittel, score-berührend D3 als Instrumentwechsel)
 
@@ -55,7 +55,7 @@ Zwei Sichtungen haben denselben Befund unabhängig gefunden (T10 an den Zellen, 
 
   Hinweis: Erster Schritt ist eine Zählung: Wie viele Doubles-Wurzelzellen liegen auf einer K.-o.- oder Fehlschlag-Kante, und was kostet ein Plan mit zwei Ereignis-Slots je Seite? Dieselbe Stelle trägt T14 (Klassen auf Ansage), T23 (Crit) und T24 (Zurückzucken); eine gemeinsame Arithmetik für Paar-Züge erspart drei Nachrüstungen. Der Play-out-Pin läuft zuerst einzeln (D7). Bleibt die Wanduhr der Doubles-Matrix nicht im Rahmen, ist die kleine Variante „mehr Ziehungen auf Kanten-Zellen“ der Rückfall.
 
-  *Erfolg:* Die vier Doubles-Dumps tragen `koOdds`, die gespielte Zelle in 2634199230 Zug 5 preist den K. o. an Incineroar anteilig statt gar nicht, Singles-Dumps und Singles-Zeilen der Bank bleiben ziffern-gleich, die Doubles-Zeilen der Bank stehen in der vorregistrierten Linie, Doubles-Matrixzeit höchstens im vorregistrierten Rahmen. *Plan T58:* 8 Schritte, 4 offene Entscheidungen.
+  *Erfolg:* Die vier Doubles-Dumps tragen `koOdds`, die gespielte Zelle in 2634199230 Zug 5 preist den K. o. an Incineroar anteilig statt gar nicht, Singles-Dumps und Singles-Zeilen der Bank bleiben ziffern-gleich, die Doubles-Zeilen der Bank stehen in der vorregistrierten Linie, Doubles-Matrixzeit höchstens im vorregistrierten Rahmen. *Plan T58:* 8 Schritte, 3 offene Entscheidungen.
 
 ## Iteration 5 · Wurzel: Klassen auf Ansage und Speed-Ties
 
@@ -165,17 +165,33 @@ Eine gemeinsame Spec für die Klassen-Arithmetik, zwei getrennt gemessene Commit
 
   *Erfolg:* Weniger Zellen fallen wegen einer `cant`-Zeile auf das Seed-Mittel zurück, GPL Zug 15 hängt nicht mehr am Seed, Play-out-Pin hält, Bank in der vorregistrierten Linie. *Plan T24:* 9 Schritte, 5 offene Entscheidungen.
 
+## Iteration 13 · Doubles-Schaden und Item-Achse
+
+Erst das Doubles-Gate, dann die Item-Achse, getrennt gemessen (D8). Der größte Bau bei den Sets: Er bewegt die Doubles-Hälfte der Bank. Die Iteration steht seit dem User-Gate vom 19.09. (Runde 51) vor Iteration 10 und behält ihre Nummer. T30 stand bis dahin als Vorgänger von T31 in der Liste; der Plan nennt dafür keinen harten Grund, nur die Prüfung in Schritt 6 (hängt die Divergenz in 2663100395 und 913990 an der Tempo-Evidenz?).
+
+- [ ] **T31 · Doubles: Schaden messen und richtig rechnen** (Sets und Spreads, Runde, groß, score-berührend D3, braucht T56)
+
+  In Doubles liest der Parser keine einzige Schadensbeobachtung: `protocol-parser.ts:32` lässt nur Singles durch. Die Doubles-Sets der ganzen VGC- und Champions-Hälfte der Bank sind damit reine Usage-Raten, und der Branch tötet Pokémon, die im Replay sichtbar überlebt haben. Dazu sagt niemand dem Schadensrechner, dass Doubles gespielt wird: Der Fit baut sein Feld ohne Spielart (`spreads/fit.ts:152`), die KO-Odds tragen fest Singles ein (`ko-odds.ts:99`). Ein Erdbeben auf zwei Ziele rechnet so ein Drittel zu stark: heute in den KO-Odds, im Fit ab dem Moment, in dem das Gate offen ist. Gezählt in Runde 51 (T13): Der Parser verwirft in den 681 Doubles-Replays des Fit-Korpus 12 620 Schadenszeilen (0 Beobachtungen gegen 44 064 in Singles), und 43 Doubles-Sets verlieren ihre ganze Offensive, weil eine Zugreihenfolge 252 Speed beansprucht und nichts die ungemessene Offensive schützt (gen9doublesou-2661679765 Incineroar, gen9vgc2024regh-2273212502 Pelipper).
+
+  *Erfolg:* Singles-Sets und Singles-Scores bleiben byte-identisch, die Doubles-Zeilen der Bank verbessern sich oder stehen still, nicht mehr Bank-Stellungen mit vorzeitig endender Rekonstruktion. *Plan T31:* 9 Schritte, 5 offene Entscheidungen.
+
+- [ ] **T32 · Band und Specs aus Schaden lesen** (Sets und Spreads, Runde, mittel, score-berührend D3, braucht T31)
+
+  Die Schadens-Leiter kann kein Choice Band und keine Choice Specs erkennen, weil das Item fest am gebauten Set hängt. Trifft ein Angriff härter, als jeder EV-Körper erklärt, ist das Item die Erklärung. Die Leiter bekommt eine Item-Achse (Band, Specs, Life Orb, kein Item).
+
+  *Erfolg:* Die Leiter erklärt zu harte Treffer mit einem Item statt mit einem verbogenen Körper, die Handprüfung bestätigt die Items, die Bank steht mindestens still. *Plan T32:* 6 Schritte.
+
 ## Iteration 10 · Fitter: Budget auffüllen und Tempo gegen Offensive
 
-Beide Umbauten sitzen in der Leiter des Spread-Fitters; T25 zuerst, weil ein voll aufgefüllter Körper die Sprossen-Wahl verschiebt. Für beide gilt D8: Set-Diffs auf allen drei Pfaden vor der Bank. Am Ende der Sitzung läuft die Kontroll-Aufnahme des Fits über Nacht. Offen am User-Gate (Runde 51): T31 vor T25 und T26 ziehen, weil ohne Doubles-Schaden jede Doubles-Zeile der beiden Runden per Konstruktion 0 ist.
+Beide Umbauten sitzen in der Leiter des Spread-Fitters; T25 zuerst, weil ein voll aufgefüllter Körper die Sprossen-Wahl verschiebt. Für beide gilt D8: Set-Diffs auf allen drei Pfaden vor der Bank. Am Ende der Sitzung läuft die Kontroll-Aufnahme des Fits über Nacht. Iteration 13 (T31, T32) steht seit dem User-Gate vom 19.09. davor: Ohne Doubles-Schaden ist jede Doubles-Zeile der beiden Runden per Konstruktion 0.
 
-- [ ] **T25 · Budget auffüllen, auch unter gemessenen Stats** (Sets und Spreads, Runde, mittel, score-berührend D3, braucht T56)
+- [ ] **T25 · Budget auffüllen, auch unter gemessenen Stats** (Sets und Spreads, Runde, mittel, score-berührend D3, braucht T56, T31)
 
   Wenn das Log die HP misst und eine Verteidiger-Beobachtung den Bulk als uninvestiert liest, gelten HP, Def und SpD als gemessen. Die Auffüll-Regel lässt gemessene Stats stehen, der Rest des Budgets bleibt liegen: Im Fit-Korpus tragen 6151 Körper weniger als 300 von 508 EVs, 222 davon mit 0 Offensive. Im Branch steht dann ein dünnerer Körper als im Replay. Eine gemessene 0 soll heißen: auffüllen, solange der Fit-Fehler nicht steigt. Neu gezählt in Runde 51 (T13, nackter Pfad, heutiger master): Die flache Elle „unter 300 EVs“ mischt drei Budgets (6129 Körper, darin 3902 Champions-Sets, die bei 66 EVs Budget die 300 nie erreichen). Mit dem Budget des eigenen Formats (`spreads/ev-budget.ts`) lassen 5984 von 17 267 Singles-Sets, 13 von 4298 Doubles-Sets und 3890 von 3902 Champions-Sets Budget liegen; die 3890 Champions-Sets stehen alle ohne Offensive da.
 
   *Erfolg:* Weniger Körper unter dem Budget ihres Formats (getrennt nach Singles, Doubles und Champions), der Fit-Fehler steigt bei keinem Set, Bank in keiner Phase schlechter als die vorregistrierte Linie (früher Brier als benannte Nebenfrage). *Plan T25:* 9 Schritte, 3 offene Entscheidungen.
 
-- [ ] **T26 · Gehaltenes Tempo gegen gemessene Offensive, zweiter Anlauf** (Sets und Spreads, Runde, mittel, score-berührend D3, braucht T56)
+- [ ] **T26 · Gehaltenes Tempo gegen gemessene Offensive, zweiter Anlauf** (Sets und Spreads, Runde, mittel, score-berührend D3, braucht T56, T31)
 
   smogtours-gen9ou-750267: p2 Weavile steht mit Jolly 0/0/0/0/0/252 (Prior Jolly 0/252/0/0/4/252), obwohl das Log 41 Schadens-Beobachtungen trägt: Eine erfüllte Zugreihenfolge hält sein Tempo, und die Leiter gibt es nur frei, wenn der Angriffs-Anspruch selbst gekappt wurde. Dazu sperrt `keepNature` jede Sprosse mit eigener Natur, also auch Adamant, die den Schaden 10 % besser träfe. Die weite Lesart aus Runde 41 (Branch `r41-wide`) holte 186 Offensiven zurück, kostete aber 162 Körper ihr Tempo. Gesucht ist ein schärferer Auslöser. Aus der Sichtung T13 (Runde 51): Der Fall lebt auf dem Bau mit Nutzungs-Prioren (Bank-Bau und App-Bau sind für 750267 und den zweiten Weavile in 751382 gleich). Dort sperrt `keepsNature` 25-mal über die 129 Bank-Replays, und der Löser hungert 57 Singles- und 4 Doubles-Sets aus. Auf dem nackten Fit-Korpus kann die Sperre nie feuern, weil dort jeder Prior Hardy ist; er dient nur als Mengen-Kontrolle (Tempo-Familie: 200 Singles, 1 Doubles). Ein reiner Abstands-Auslöser trägt nicht: Nur 18 von 174 Zeilen verlieren ihre Offensive um höchstens 0,5 Prozentpunkte einer HP-Leiste, der Median liegt bei 3,77.
 
@@ -260,22 +276,6 @@ Vier Regeln, je Regel ein eigener Branch-Bench: eine Sitzung für sich. Es gilt 
   939635: Zapdos-Galar verliert sein Scarf durch Knock Off, und die Engine liest aus dem Rennen ein Scarf für Landorus heraus, das es nie gab. Der Parser wirft deshalb jedes Rennen weg, das ein Item-Wechsel berührt (260 Paare im Fit-Korpus). 2663107495: Gholdengo zieht in Zug 1 vor Ogerpon-Wellspring und in Zug 10 dahinter; die erste Beobachtung entscheidet, das Panel zeigt ein Scarf auf Hardy 60 Spe. Das Item wird ein Zustand mit Zeitraum, Brems-Items (Iron Ball, Lagging Tail, Macho Brace, Power-Items) bekommen ihre Spiegel-Regel, Quick Claw wird als Item gelesen, und bei Widerspruch enthält sich die Inferenz.
 
   *Erfolg:* Weniger weggeworfene Rennen als die heutigen 260 (Schwelle in der Spec vorregistrieren), 939635 Landorus verliert das falsche Scarf, 2663107495 Gholdengo bekommt keine Entscheidung, hq spät steht mindestens still; Handprüfung von je fünf Scarf-in- und Scarf-out-Zeilen gegen das Log. *Plan T30:* 9 Schritte, 3 offene Entscheidungen.
-
-## Iteration 13 · Doubles-Schaden und Item-Achse
-
-Erst das Doubles-Gate, dann die Item-Achse, getrennt gemessen (D8). Der größte Bau bei den Sets: Er bewegt die Doubles-Hälfte der Bank.
-
-- [ ] **T31 · Doubles: Schaden messen und richtig rechnen** (Sets und Spreads, Runde, groß, score-berührend D3, braucht T56, T30)
-
-  In Doubles liest der Parser keine einzige Schadensbeobachtung: `protocol-parser.ts:32` lässt nur Singles durch. Die Doubles-Sets der ganzen VGC- und Champions-Hälfte der Bank sind damit reine Usage-Raten, und der Branch tötet Pokémon, die im Replay sichtbar überlebt haben. Dazu sagt niemand dem Schadensrechner, dass Doubles gespielt wird: Der Fit baut sein Feld ohne Spielart (`spreads/fit.ts:152`), die KO-Odds tragen fest Singles ein (`ko-odds.ts:99`). Ein Erdbeben auf zwei Ziele rechnet so ein Drittel zu stark: heute in den KO-Odds, im Fit ab dem Moment, in dem das Gate offen ist. Gezählt in Runde 51 (T13): Der Parser verwirft in den 681 Doubles-Replays des Fit-Korpus 12 620 Schadenszeilen (0 Beobachtungen gegen 44 064 in Singles), und 43 Doubles-Sets verlieren ihre ganze Offensive, weil eine Zugreihenfolge 252 Speed beansprucht und nichts die ungemessene Offensive schützt (gen9doublesou-2661679765 Incineroar, gen9vgc2024regh-2273212502 Pelipper).
-
-  *Erfolg:* Singles-Sets und Singles-Scores bleiben byte-identisch, die Doubles-Zeilen der Bank verbessern sich oder stehen still, nicht mehr Bank-Stellungen mit vorzeitig endender Rekonstruktion. *Plan T31:* 9 Schritte, 5 offene Entscheidungen.
-
-- [ ] **T32 · Band und Specs aus Schaden lesen** (Sets und Spreads, Runde, mittel, score-berührend D3, braucht T31)
-
-  Die Schadens-Leiter kann kein Choice Band und keine Choice Specs erkennen, weil das Item fest am gebauten Set hängt. Trifft ein Angriff härter, als jeder EV-Körper erklärt, ist das Item die Erklärung. Die Leiter bekommt eine Item-Achse (Band, Specs, Life Orb, kein Item).
-
-  *Erfolg:* Die Leiter erklärt zu harte Treffer mit einem Item statt mit einem verbogenen Körper, die Handprüfung bestätigt die Items, die Bank steht mindestens still. *Plan T32:* 6 Schritte.
 
 ## Iteration 14 · Endspiel-Statik
 
