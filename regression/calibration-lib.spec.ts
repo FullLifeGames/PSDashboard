@@ -180,6 +180,23 @@ describe('paired bands (round 48)', () => {
     expect(rowOf(result.rows, 'full', 'doubles', 'all').reading).toBe('unmoved');
   });
 
+  // Round 49: a fix that moved 38 of 833 positions read +1 bp [+0, +2], resolved and irrelevant.
+  test('harm and warnings need size: a resolved shift under 5 bp is a note', () => {
+    const a = bank();
+    const small = pairedBands(a, a.map(sample => against(sample, 0.0001)));
+    const pooled = rowOf(small.rows, 'full', 'all', 'all');
+    expect(pooled.reading).toBe('B worse');
+    expect(pooled.meanBp).toBeLessThan(5);
+    const verdict = bankVerdict(small);
+    expect([verdict.harm.length, verdict.warnings.length]).toEqual([0, 0]);
+    expect(verdict.notes.map((row: BandRow) => `${row.view} ${row.gameType} ${row.phase}`)).toContain('full all all');
+    const line = bandLines(small).at(-1);
+    expect(line).toContain('no harm');
+    expect(line).toContain('resolved under 5 bp: full all (+');
+    // The offset of the earlier test is far above the floor and stays harm.
+    expect(bankVerdict(pairedBands(a, a.map(sample => against(sample, 0.3)))).notes).toHaveLength(0);
+  });
+
   test('the seed fixes the draws', () => {
     let seed = 5;
     const rand = () => { seed = (seed * 1664525 + 1013904223) >>> 0; return seed / 2 ** 32; };

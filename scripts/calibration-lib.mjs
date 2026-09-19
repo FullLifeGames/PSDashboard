@@ -207,13 +207,18 @@ export function pairedBands(a, b, { draws = 2000, seed = 20260919, level = 0.9 }
   return { k, joined: pairs.length, draws, level, rows };
 }
 
-/** What the table says as a verdict: pooled rows decide, phase cells only warn. */
+/** A shift this small is no harm even where its band clears zero: few moved positions resolve a single basis point (round 49, user gate). */
+export const HARM_MIN_BP = 5;
+
+/** What the table says as a verdict: pooled rows decide, phase cells only warn, and harm needs size. */
 export function bankVerdict(result) {
-  const pooled = result.rows.filter(row => row.phase === 'all');
+  const worse = row => row.reading === 'B worse';
+  const sized = row => row.meanBp >= HARM_MIN_BP;
   return {
-    gain: pooled.filter(row => row.reading === 'B better'),
-    harm: pooled.filter(row => row.reading === 'B worse'),
-    warnings: result.rows.filter(row => row.phase !== 'all' && row.reading === 'B worse'),
+    gain: result.rows.filter(row => row.phase === 'all' && row.reading === 'B better'),
+    harm: result.rows.filter(row => row.phase === 'all' && worse(row) && sized(row)),
+    warnings: result.rows.filter(row => row.phase !== 'all' && worse(row) && sized(row)),
+    notes: result.rows.filter(row => worse(row) && !sized(row)),
   };
 }
 
@@ -244,7 +249,8 @@ export function bandLines(result) {
   lines.push(
     `bank verdict: ${verdict.gain.length > 0 ? `gain on ${names(verdict.gain)}` : 'no gain resolved'}; ` +
     `${verdict.harm.length > 0 ? `HARM on ${names(verdict.harm)}` : 'no harm'}; ` +
-    `${verdict.warnings.length > 0 ? `warnings: ${names(verdict.warnings)}` : 'no warnings'}`);
+    `${verdict.warnings.length > 0 ? `warnings: ${names(verdict.warnings)}` : 'no warnings'}` +
+    `${verdict.notes.length > 0 ? `; resolved under ${HARM_MIN_BP} bp: ${names(verdict.notes)}` : ''}`);
   return lines;
 }
 
