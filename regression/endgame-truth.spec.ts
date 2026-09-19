@@ -21,7 +21,12 @@ import { mctsSearch } from '../packages/eval-engine/src/mcts';
  * EVAL_ENDGAME_CAPS widens the solver's caps for a long run, for this bench
  * only ("states=200000,wallMs=1200000,turns=60"; the production default
  * stays 20000 states, 120 s, 30 turns); EVAL_ENDGAME_SOURCE=bank leaves the
- * synthetic fixtures out.
+ * synthetic fixtures out; EVAL_ENDGAME_SOLVED names earlier dumps (comma
+ * separated JSONL paths) whose solver rows are looked up by item name
+ * instead of solved again, so a long run's truth can grade the estimators of
+ * a later engine state in minutes (exact values end in won or lost games and
+ * do not depend on K or the weights; capped rows carry the leaf values of
+ * the run that solved them).
  */
 interface BankPosition {
   id: string; turn: number; serialized: string; gameType: 'singles' | 'doubles';
@@ -87,6 +92,21 @@ function capsFromEnv(): Partial<EndgameCaps> {
   return caps;
 }
 
+/** Solver rows of earlier dumps by item name (EVAL_ENDGAME_SOLVED), with the wall clock they took. */
+async function solvedRows(): Promise<Map<string, EndgameResult & { ms: number }>> {
+  const rows = new Map<string, EndgameResult & { ms: number }>();
+  const paths = (process.env.EVAL_ENDGAME_SOLVED ?? '').split(',').filter(Boolean);
+  if (paths.length === 0) return rows;
+  const fs = await import('node:fs');
+  for (const path of paths) {
+    for (const line of fs.readFileSync(path, 'utf-8').split('\n').filter(text => text.trim())) {
+      const row = JSON.parse(line) as EndgameResult & { name: string; ms: number };
+      rows.set(row.name, { scope: row.scope, value: row.value, exact: row.exact, flags: row.flags, states: row.states, depth: row.depth, pv: row.pv, ms: row.ms });
+    }
+  }
+  return rows;
+}
+
 function sliceOf<T>(items: T[]): T[] {
   const slice = process.env.EVAL_ENDGAME_SLICE?.match(/^(\d+)\/(\d+)$/);
   const sliced = slice ? items.filter((_, index) => index % parseInt(slice[2], 10) === parseInt(slice[1], 10)) : items;
@@ -102,16 +122,19 @@ describe.skipIf(process.env.EVAL_ENDGAME_TRUTH !== '1')('endgame truth bench (ro
     const caps = capsFromEnv();
     if (Object.keys(caps).length > 0) console.log(`solver caps for this run: ${JSON.stringify(caps)}`);
     const fs = process.env.EVAL_ENDGAME_DUMP ? await import('node:fs') : null;
+    const solved = await solvedRows();
+    if (solved.size > 0) console.log(`solver rows looked up from earlier dumps: ${solved.size}`);
     for (const item of items) {
       const started = Date.now();
+      const earlier = solved.get(item.name);
       let exact: EndgameResult;
       try {
-        exact = solveEndgame(item.serialized, caps);
+        exact = earlier ?? solveEndgame(item.serialized, caps);
       } catch (error) {
         console.log(`${item.name}: solver error ${error instanceof Error ? error.message : error}`);
         continue;
       }
-      const ms = Date.now() - started;
+      const ms = earlier ? earlier.ms : Date.now() - started;
       const estimators = exact.scope ? estimate(item.serialized) : null;
       const row = { name: item.name, source: item.source, gameType: item.gameType, decided: item.decided, ...exact, ms, estimators };
       console.log(`${item.name} ${item.gameType} exact=${exact.exact} flags=${exact.flags.join(',') || '-'} value=${exact.value.toFixed(3)} states=${exact.states} depth=${exact.depth} ${ms}ms`);
