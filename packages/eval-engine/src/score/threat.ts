@@ -32,14 +32,18 @@ export interface PairThreat {
 }
 
 /**
- * Memo for the HP-independent part of the matchup term. One cache spans one
- * search: the memoized threat depends only on species/level/set properties,
- * which are constant across every forked position of the same battle, with
- * ONE exception the key carries itself: a halving move (Super Fang, Nature's
- * Madness, Ruination) prices off the defender's current HP (see pairKey).
- * The memo must stay a function of its key: the app splits one matrix over a
- * worker pool with one cache per worker, so a value that depends on what a
- * cache saw first differs run to run (test/threat-memo.spec.ts).
+ * Memo for the boost-independent part of the matchup term. One cache spans
+ * one search. The memo MUST be a function of its key: the app splits one
+ * matrix over a worker pool with one cache per worker, so a value that
+ * depends on what a cache saw first differs run to run (round 49: two runs
+ * of one doubles replay disagreed on single cells). Most of what pairThreat
+ * reads is constant across the forked positions of one battle, but not all
+ * of it, so pairKey carries EVERY read of the memoized function: level, item,
+ * ability, choice lock and usable slots, the current types (Protean, Soak,
+ * Burn Up), the stored stats it divides (Power Trick, Guard Split), the
+ * defender's max HP (forme change, Dynamax) and, where a halving move prices
+ * off it, the defender's current HP. A new read inside pairThreat or
+ * singleMoveFraction needs its key term (test/threat-memo.spec.ts).
  */
 export type MatchupCache = Map<string, PairThreat>;
 
@@ -67,7 +71,7 @@ export function usableSlots(pokemon: Pokemon): Pokemon['moveSlots'] {
   return pokemon.moveSlots.filter(slot => (slot.pp ?? 1) > 0);
 }
 
-/** Moves that deal half the target's CURRENT HP: the one live-state read inside the memoized threat. */
+/** Moves that deal half the target's CURRENT HP. */
 const HALVING_MOVES: ReadonlySet<string> = new Set(['superfang', 'naturesmadness', 'ruination']);
 
 function pairKey(attacker: Pokemon, defender: Pokemon): string {
@@ -80,8 +84,13 @@ function pairKey(attacker: Pokemon, defender: Pokemon): string {
   // memo for the whole search, and in the app, where a worker pool splits
   // one matrix, the value of a cell followed which worker priced it (round 49).
   const liveHp = slots.some(slot => HALVING_MOVES.has(slot.id)) ? `:${defender.hp}` : '';
-  return `${attacker.side.id}:${attacker.name}:${attacker.species.id}:${attacker.level}:${attacker.item}:${attacker.ability}:${lockedMoveId(attacker) ?? ''}:${usable}>` +
-    `${defender.side.id}:${defender.name}:${defender.species.id}:${defender.level}:${defender.item}:${defender.ability}${liveHp}`;
+  // Types and the stored stats are constant for nearly every pair and move
+  // under Protean, Soak, Power Trick and their kin; the key carries them so
+  // the memo never answers for a body that has changed since it was asked.
+  const offense = `${attacker.types.join('/')}:${attacker.storedStats.atk}:${attacker.storedStats.spa}`;
+  const defense = `${defender.types.join('/')}:${defender.storedStats.def}:${defender.storedStats.spd}:${defender.maxhp}`;
+  return `${attacker.side.id}:${attacker.name}:${attacker.species.id}:${attacker.level}:${attacker.item}:${attacker.ability}:${lockedMoveId(attacker) ?? ''}:${usable}:${offense}>` +
+    `${defender.side.id}:${defender.name}:${defender.species.id}:${defender.level}:${defender.item}:${defender.ability}:${defense}${liveHp}`;
 }
 
 /** Defender abilities that blank (or halve) incoming move types in the proxy. */

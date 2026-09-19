@@ -55,6 +55,37 @@ describe('matchup memo (round 49)', () => {
     });
   }
 
+  // The review of the HP fix found the same leak on the types and the stored
+  // stats: both are live reads of the memoized function that a turn can change
+  // without touching species, item, ability or the slots.
+  test('a type change on either side reaches the memo (Protean, Soak)', () => {
+    const battle = makeBattle(makeSet('Meowscarada', ['knockoff', 'flowertrick']), makeSet('Gholdengo', ['shadowball']));
+    const attacker = battle.sides[0].active[0];
+    const defender = battle.sides[1].active[0];
+    const cached = threatGetter(battle, createMatchupCache());
+    const before = cached(attacker, defender);
+    // Protean after Flower Trick: pure Grass, Knock Off loses its STAB.
+    attacker.setType('Grass');
+    expect(cached(attacker, defender)).toEqual(pairThreat(attacker, defender, battle));
+    expect(cached(attacker, defender).physical).toBeLessThan(before.physical * 0.8);
+    // Soak on the defender: the Ghost weakness to Knock Off is gone.
+    const grass = cached(attacker, defender);
+    defender.setType('Water');
+    expect(cached(attacker, defender)).toEqual(pairThreat(attacker, defender, battle));
+    expect(cached(attacker, defender).physical).not.toBe(grass.physical);
+  });
+
+  test('a stored-stat swap reaches the memo (Power Trick)', () => {
+    const battle = makeBattle(makeSet('Shuckle', ['rockslide', 'powertrick']), makeSet('Blissey', ['softboiled']));
+    const attacker = battle.sides[0].active[0];
+    const defender = battle.sides[1].active[0];
+    const cached = threatGetter(battle, createMatchupCache());
+    const before = cached(attacker, defender);
+    [attacker.storedStats.atk, attacker.storedStats.def] = [attacker.storedStats.def, attacker.storedStats.atk];
+    expect(cached(attacker, defender)).toEqual(pairThreat(attacker, defender, battle));
+    expect(cached(attacker, defender).physical).toBeGreaterThan(before.physical * 2);
+  });
+
   test('a pair without a halving move keeps ONE memo entry across the defender\'s HP', () => {
     const battle = makeBattle(makeSet('Garchomp', ['earthquake', 'seismictoss']), makeSet('Blissey', ['softboiled']));
     const attacker = battle.sides[0].active[0];

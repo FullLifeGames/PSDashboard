@@ -165,8 +165,11 @@ export interface StoredEval {
 // v48: round 49, the matchup memo keys a halving move (Super Fang, Nature's
 //      Madness, Ruination) on the defender's current HP. Before, the first
 //      forked position to ask froze its HP into the memo, and a matrix the
-//      worker pool split read a different value run to run. Every position
-//      moves whose sets carry such a move (38 of 833 on the bank).
+//      worker pool split read a different value run to run. The key also
+//      carries the other live reads of the memoized threat (current types,
+//      the stored stats, the defender's max HP). Every position moves whose
+//      sets carry a halving move or whose bodies change type or stats
+//      mid-search (Protean, Soak, Power Trick).
 const EVAL_ENGINE_CACHE_VERSION = 48;
 
 export function evalStoreKey(

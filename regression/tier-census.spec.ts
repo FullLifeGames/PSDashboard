@@ -97,6 +97,9 @@ describe('tier census', () => {
     const { fixtures } = folders({}, { 'game-d': DOUBLES_LOG, 'game-s': SINGLES_LOG });
     expect(resolveGameType('game-d', dumpOf([turn(1, 'quiet', pairSide)]), fixtures)).toBe('doubles');
     expect(() => resolveGameType('game-s', dumpOf([turn(1, 'quiet', pairSide)]), fixtures)).toThrow(/fixture log says singles/);
+    // A doubles dump without analyses has no marks to contradict its fixture: the log stands, and the census counts zero.
+    expect(resolveGameType('game-d', { graph: {}, analyses: null }, fixtures)).toBe('doubles');
+    expect(censusOfDump({ graph: {}, analyses: null }).sides).toBe(0);
     // No fixture: the dump's marks stand alone.
     expect(resolveGameType('unknown', dumpOf([turn(1, 'quiet', pairSide)]), fixtures)).toBe('doubles');
   });

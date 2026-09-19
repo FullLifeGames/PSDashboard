@@ -45,7 +45,9 @@ export function resolveGameType(id, dump, fixtures = FIXTURES) {
   const fixture = join(fixtures, `${id}.json`);
   if (!existsSync(fixture)) return fromDump;
   const fromLog = gameTypeOfLog(JSON.parse(readFileSync(fixture, 'utf8')).log);
-  if (fromLog !== null && fromLog !== fromDump) {
+  // A dump without analyses (a sweep that ended below the report threshold) carries no marks to check against.
+  const marks = (dump.analyses ?? []).some(Boolean);
+  if (fromLog !== null && marks && fromLog !== fromDump) {
     throw new Error(`${id}: the fixture log says ${fromLog}, the dump reads ${fromDump}`);
   }
   return fromLog ?? fromDump;
