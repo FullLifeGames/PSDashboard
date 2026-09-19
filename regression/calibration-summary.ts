@@ -17,6 +17,9 @@ export interface SummarySample {
   p1Won: boolean;
   quality: 'hq' | 'std';
   luckAgainstFavored: boolean;
+  /** The root's decided-sweep side (round 32), and the side the bar holds it for (round 50, heldDecided). */
+  decided?: 'p1' | 'p2' | null;
+  decidedHeld?: 'p1' | 'p2' | null;
 }
 
 const PHASES = ['early', 'mid', 'late'] as const;
@@ -46,6 +49,22 @@ function phaseLines(samples: SummarySample[]): string[] {
     lines.push(`${gameType}: n=${inType.length} sign-accuracy=${pct(inType)}%`);
   }
   return lines;
+}
+
+/**
+ * Round 50: how often the side the decided sweep names wins, over every
+ * sweep and over the sweeps the bar holds. A dump from before round 50
+ * carries no held field and prints the first half only.
+ */
+function decidedLines(samples: SummarySample[]): string[] {
+  const share = (key: 'decided' | 'decidedHeld'): string => {
+    const named = samples.filter(sample => sample[key]);
+    const won = named.filter(sample => (sample[key] === 'p1') === sample.p1Won).length;
+    return `n=${named.length} named-side-wins=${(100 * won / Math.max(1, named.length)).toFixed(1)}%`;
+  };
+  if (!samples.some(sample => sample.decided)) return [];
+  const held = samples.some(sample => sample.decidedHeld !== undefined) ? ` | held by the bar: ${share('decidedHeld')}` : '';
+  return [`decided: ${share('decided')}${held}`];
 }
 
 function bucketLines(samples: SummarySample[]): string[] {
@@ -81,5 +100,6 @@ export function summaryLines(samples: SummarySample[]): string[] {
   const clean = samples.filter(sample => !sample.luckAgainstFavored);
   lines.push(`luck-adjusted: n=${clean.length} excluded=${samples.length - clean.length} brier early/mid/late=${phaseBriers(clean, pooledK)}`);
   lines.push(...bucketLines(samples));
+  lines.push(...decidedLines(samples));
   return lines;
 }

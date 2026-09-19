@@ -14,6 +14,7 @@ import { diskCachedSmogonFetcher } from './smogon-fetch-cache';
 import { createMatchupCache, evalFeatures, EVAL_WEIGHTS, FEATURE_WEIGHTS, type EvalFeatures } from '../packages/eval-engine/src/eval-function';
 import { setLastPairSweep } from '../packages/eval-engine/src/score/last-pair';
 import { livingMons } from '../packages/eval-engine/src/score/threat';
+import { heldDecided } from '../packages/eval-engine/src/turn-analysis/decided-held';
 import { deserializeBattleExact } from '../packages/eval-engine/src/forward-model';
 import { hasLuckAgainst, luckAgainstFavored } from './luck-events';
 import { summaryLines } from './calibration-summary';
@@ -3547,6 +3548,8 @@ interface Sample {
   p1Won: boolean;
   /** The root's decided-sweep side (round 15 profile), null when no sweep stands. Round 32. */
   decided: 'p1' | 'p2' | null;
+  /** Round 50: the sweep's side where the finished score holds it (heldDecided), the side a reader hears named. */
+  decidedHeld: 'p1' | 'p2' | null;
   /** Round 33: one living body per side at the sample — the last-pair static's subset. */
   lastPair: boolean;
   /** Round 34: the replay's ladder rating (null for tournament replays and unrated games). */
@@ -3576,6 +3579,10 @@ const forcedWinFields = (result: ReturnType<typeof searchPosition>): Pick<Sample
 
 const decidedSideOf = (result: ReturnType<typeof searchPosition>): Sample['decided'] =>
   result.unanswered?.decided?.side ?? null;
+
+/** Round 50: the sweep's side where the finished score holds it. */
+const heldSideOf = (result: ReturnType<typeof searchPosition>): Sample['decidedHeld'] =>
+  heldDecided(result)?.side ?? null;
 
 /**
  * Engine levers the bench reads from the environment (round 33):
@@ -3911,6 +3918,7 @@ describe.skipIf(!process.env.EVAL_CALIBRATION)('eval calibration against real re
             // clamp and flip positions of round 15 can be re-derived (their
             // 17 ids are no longer on record anywhere).
             decided: decidedSideOf(result),
+            decidedHeld: heldSideOf(result),
             lastPair: lastPairAt(battle),
             rating,
             quality: qualityOf(id, rating),

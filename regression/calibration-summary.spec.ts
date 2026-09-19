@@ -22,6 +22,18 @@ describe('calibration summary lines (round 34)', () => {
     expect(lines.indexOf(hq!)).toBeGreaterThan(lines.findIndex(line => line.startsWith('late brier=')));
     expect(lines[lines.length - 1]).toMatch(/^\|score\| /);
   });
+  test('the decided line counts the named side, raw and held by the bar (round 50)', () => {
+    const lines = summaryLines([
+      sample({ id: 'a', score: 0.8, decided: 'p1', decidedHeld: 'p1' }),
+      sample({ id: 'b', score: 0.2, p1Won: false, decided: 'p1', decidedHeld: null }),
+      sample({ id: 'c', score: -0.9, p1Won: false, decided: 'p2', decidedHeld: 'p2' }),
+      sample({ id: 'd', score: 0.4, decided: null, decidedHeld: null }),
+    ]);
+    expect(lines[lines.length - 1]).toBe('decided: n=3 named-side-wins=66.7% | held by the bar: n=2 named-side-wins=100.0%');
+  });
+  test('without a decided sample the decided line is omitted', () => {
+    expect(summaryLines([sample({})]).some(line => line.startsWith('decided:'))).toBe(false);
+  });
   test('without hq samples the hq line is omitted and the luck line still prints', () => {
     const lines = summaryLines([sample({}), sample({ id: 'b', gameType: 'doubles' })]);
     expect(lines.some(line => line.startsWith('hq:'))).toBe(false);

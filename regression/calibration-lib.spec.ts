@@ -58,6 +58,16 @@ describe('calibration lib', () => {
     ]);
   });
 
+  test('the decided line reads like the harness line; a dump from before round 50 prints the raw share only', () => {
+    const base = sortSamples(load(FIXTURE) as Sample[]);
+    const winner = (sample: Sample) => (sample.p1Won ? 'p1' : 'p2');
+    const loser = (sample: Sample) => (sample.p1Won ? 'p2' : 'p1');
+    const older = base.map((sample, index) => ({ ...sample, decided: index < 3 ? winner(sample) : index === 3 ? loser(sample) : null }));
+    const named = older.map((sample, index) => ({ ...sample, decidedHeld: index < 2 ? sample.decided : null }));
+    expect(summarize(named).at(-1)).toBe('decided: n=4 named-side-wins=75.0% | held by the bar: n=2 named-side-wins=100.0%');
+    expect(summarize(older).at(-1)).toBe('decided: n=4 named-side-wins=75.0%');
+  });
+
   test('the fit and the Brier are the fit-helpers.ts numbers to the last bit', () => {
     const samples = sortSamples(load(FIXTURE) as Sample[]);
     const outcomes = samples.map(sample => ({ score: sample.score, faintedFraction: sample.faintedFraction, won: sample.p1Won }));

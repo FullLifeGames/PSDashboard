@@ -1,7 +1,8 @@
 // Shared aggregation over calibration dumps (EVAL_CALIBRATION_DUMP JSONL,
 // one sample per line: id, turn, tranche, phase, gameType, score,
-// faintedFraction, p1Won, and since round 32 decided: the root's
-// decided-sweep side or null). Three consumers: the harness itself prints the
+// faintedFraction, p1Won, since round 32 decided: the root's decided-sweep
+// side or null, and since round 50 decidedHeld: that side where the finished
+// score holds the sweep). Three consumers: the harness itself prints the
 // same aggregate lines, scripts/run-calibration.mjs merges slice dumps and
 // summarizes them, scripts/paired-calibration.mjs joins two dumps. The math
 // replicates regression/fit-helpers.ts exactly (pooled constant-K logistic
@@ -118,6 +119,17 @@ export function summarize(samples) {
       `|score| ${lo.toFixed(1)}–${hi > 1 ? '1.0' : hi.toFixed(1)}: n=${inBucket.length} ` +
       `favored-side-wins=${(100 * correct / inBucket.length).toFixed(0)}%`,
     );
+  }
+  // Round 50: the decided sweep's named side, over every sweep and over the
+  // sweeps the bar holds (heldDecided); older dumps carry no held field.
+  const namedShare = key => {
+    const named = samples.filter(sample => sample[key]);
+    const won = named.filter(sample => (sample[key] === 'p1') === sample.p1Won).length;
+    return `n=${named.length} named-side-wins=${(100 * won / Math.max(1, named.length)).toFixed(1)}%`;
+  };
+  if (samples.some(sample => sample.decided)) {
+    const held = samples.some(sample => sample.decidedHeld !== undefined) ? ` | held by the bar: ${namedShare('decidedHeld')}` : '';
+    lines.push(`decided: ${namedShare('decided')}${held}`);
   }
   return lines;
 }
