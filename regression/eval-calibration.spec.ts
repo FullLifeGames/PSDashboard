@@ -894,6 +894,97 @@ import { summaryLines } from './calibration-summary';
  * static basis for this mass; the next lever, if any, is search/
  * planning-side.
  *
+ * FIVE SIGHTINGS 2026-09-19 (improvement round 51, T10 to T13 and T54; no
+ * engine code, no cache bump, cache stays v48; one sighter, two refuters
+ * (recount, counter-hypothesis) and one rework pass per question, reports
+ * with a "Gegenprüfung" section under
+ * docs/perf/probes/2026-09-19-r51/<T>/sighting.md). Every number names its
+ * build path: BARE (observations and move orders), BANK BUILD (raw team
+ * info plus usage fills, one solve; this file's bank loop), APP
+ * BUILD (enriched info, solveReplaySpreads with the speed pre-solve),
+ * HARNESS (the app's code on the e2e-feedback fixtures).
+ * T10, GPL DzBQ5azlO5l t13: Stone Edge is in no built Cobalion set (custom
+ * game falls back to gen9ou, Stone Edge 0.35 %, rank 19 behind the ten-move
+ * usage pool; the app builds Swords Dance, Heavy Slam, Stealth Rock, Taunt).
+ * Adding it by hand does not band Heavy Slam: regret 0.034 without, 0.028
+ * with (browser), 0.034 in node; depth 1, one seed. A band needs three
+ * things at once (the move, a rightly priced Air Slash x Stone Edge cell,
+ * grading against the clicked reply: 0.12; any two stay at or under 0.039),
+ * and against the equilibrium the regret caps at 0.052 because Noivern
+ * pivots out. ENGINE FINDING: a |cant| line on an event side makes
+ * classifyChild bail (cell-blend.ts:215) and the cell falls back to ONE
+ * draw (-0.2224 against a 400-seed mean of -0.4339, single-draw sd 0.19);
+ * on the shipped set t13 blends 22 of 22 event cells. Pivot pairs get no
+ * event plan at all (cell-blend.ts:91, 16 of 99 cells).
+ * T11, VGC 2634199230 t5: one game, not a Bo3 log (one |win|, one |turn|1);
+ * the payoff window is not involved (riskPayoffTurn unset). The praise is
+ * the played cell +0.786 minus the safe floor +0.435 = riskPayoff +0.351,
+ * attribution p2-read, while kirans drops 69 % -> 48 % in the turn. The
+ * praised cell never drew the KO on Incineroar that another row of the same
+ * matrix draws (bit-identical column signature). The praise renders in five
+ * places; 3 of 14 praised reads over eleven dumps sit on a turn the praised
+ * side loses. kirans is scored with seven bodies (a phantom "Floette" from
+ * the Mega switch line).
+ * T10 + T11, DOUBLES HAS NO CELL PLAN: planCellEvents (cell-blend.ts:142)
+ * and koOddsForOptions (:310) bail on any choice with a comma, and every
+ * doubles choice carries one: 0 of 75 565 root cells planned (six turns,
+ * two games), koOdds appears 0 times in all five doubles dumps against 36
+ * to 135 per singles dump. At one seed each doubles root cell is one draw.
+ * T12, SET STATES: bank build and app build differ on 648453 in 4 of 12
+ * sets, two of them items (Landorus-Therian and Volcanion swap the Choice
+ * Scarf; both explain the move order, 281 v 280 without, 330 v 278 with).
+ * Over the 129 bank replays 58 of 997 singles sets differ in 27 of 83
+ * replays (enrichment 15, ten of them Cinderace Blaze -> Libero; second
+ * solve 43, EVs and natures), doubles 0 of 552, and the second solve moves
+ * no item (0 of 1549). Cause of the item split: the gen6 preview's
+ * "(has item)" tick counts as a revealed item and blocks the round-37 Scarf
+ * inference on raw info (inferred-items.ts:20). Round 37 moved 648453 in 3
+ * sets on the app path and in none on the bank path; the round-41 probe
+ * measured the bank path. The "set assumptions 404 in the harness" story is
+ * false (only sets/gen9doublesubers is absent, in the cache too). Fixtures
+ * against .smogon-cache: 4 of 120 sets (gen6ou usage 292 v 297 species).
+ * TOOL TRAP: fetchSmogonUsageStats memoizes by format only
+ * (src/lib/smogon-stats.ts:58); two sources in one process read the first
+ * one twice, which produced a false "0 of 120" in the first pass.
+ * T13, FITTER FAMILIES (bare path, 2122 fit-corpus replays, 25 467 sets,
+ * paired by replay, side and species): 977 sets starved against the
+ * pre-round-40 list (976 singles, 1 doubles; the old 963 and 4885
+ * reproduced). Families: held speed 200/1, sum under 300 273/0, HP up
+ * 190/0, bulk up with speed down 6/0, rest 307/0. Against the same run's
+ * prior: 4380 singles and 43 doubles (no attack line, all 43 already in the
+ * old list, so a list diff hides them). Distance to the best 252 rung:
+ * median 3.77 points of an HP bar, 131 of 869 within 0.5 (the first pass's
+ * 313 of 946 came from a ladder rebuild that matched 595 of 977 rows; the
+ * faithful one matches 960). The 1531 nature changes come from rung
+ * changes: on the bare path every prior is Hardy and ladder.ts:233 cannot
+ * fire. On the bank build over the 129 bank replays it fires 705 times,
+ * keepsNature blocks 25 times, 57 singles and 4 doubles sets starve, among
+ * them T26's Weavile (smogtours-gen9ou-750267, Jolly 0/252/0/0/4/252 ->
+ * 0/0/0/0/0/252; same sets on the app build by T12's count). Bodies under
+ * their own format's budget: singles 5984 of 17 267, doubles 13 of 4298,
+ * Champions 3890 of 3902. Doubles damage: 12 620 lines dropped, 0
+ * observations (T31). Fit corpus and bank share no replay.
+ * T54, TERA IN THE STATICS: 226 of 833 bank positions carry a terastallized
+ * Pokémon on the field (doubles 125 of 248, singles 101 of 585), 334 alive
+ * in the team. Six leaf reads take pokemon.types raw (threat.ts:165 to
+ * :168, hazards.ts:65 and :69, features.ts:26). A variant on live types
+ * moves 263 positions (mean 0.024, largest clean 0.249 at VGC 2629703929
+ * t10, 5 sign flips) and none of the 508 without Tera; the rebuild matches
+ * all 110 exported bank positions. REFEREE, the Tera-aware damage calc:
+ * the variant is closer in 605 of 711 disputed pairs, false immunities 50
+ * against 1, nearly all of it the defender's type (424 v 57; STAB 90 v 28).
+ * Direction-only paired Brier shows no gain: all +6.5 bp +-7.2, doubles
+ * +45 +-35 (depth 1, plain mapping, no verdict). SECOND DEFECT: the rebuild
+ * loses Tera clicks one way only (18 positions, 8 replays): the
+ * defaultMoveChoice branch (protocol-choices.ts:253) appends no gimmick
+ * suffix (8 of 207 clicks), and the sim clears terastallized on a faint
+ * that the HP correction then revives. pairKey carries no Tera term.
+ * BOOKED: T56 (the bank builds like the app, an instrument change with a
+ * new base) and T61 as iteration 4a, T57 (Tera statics plus the lost
+ * clicks) as 4b, T58 (the doubles cell plan) as 4c, T59 to T64 further
+ * down; D8 rewritten, D22 added. The 110-position export is the small
+ * decided endgames, not the bank.
+ *
  * DECIDED V2 2026-09-19 (improvement round 50, T09; 36d830a and 2a79040,
  * render-only, cache stays v48; spec
  * docs/superpowers/specs/2026-09-19-round-50-design.md, probes under
