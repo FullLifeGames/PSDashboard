@@ -122,6 +122,132 @@ export function summarize(samples) {
   return lines;
 }
 
+/** The PRNG of regression/fit-helpers.ts, so a band reproduces from its seed. */
+export function mulberry32(seed) {
+  let a = seed;
+  return () => {
+    a |= 0; a = (a + 0x6d2b79f5) | 0;
+    let t = Math.imul(a ^ (a >>> 15), 1 | a);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+const BAND_VIEWS = [
+  ['full', () => true],
+  ['hq', s => s.quality === 'hq'],
+  ['luck-adjusted', s => !s.luckAgainstFavored],
+];
+// Pooled rows first: a verdict reads them, the phase cells below are warnings only.
+const BAND_CELLS = [
+  ...['all', 'singles', 'doubles'].map(gameType => [gameType, 'all']),
+  ...['all', 'singles', 'doubles'].flatMap(gameType => ['early', 'mid', 'late'].map(phase => [gameType, phase])),
+];
+
+/** One row: the paired mean and its band from resampling REPLAYS (a replay's positions share one outcome). */
+function bandRow(cell, { draws, seed, level }) {
+  const byGame = new Map();
+  for (const pair of cell) {
+    const game = byGame.get(pair.id) ?? { sum: 0, n: 0 };
+    game.sum += pair.delta;
+    game.n += 1;
+    byGame.set(pair.id, game);
+  }
+  const games = [...byGame.values()];
+  const bp = value => value * 10000;
+  const mean = cell.reduce((sum, pair) => sum + pair.delta, 0) / cell.length;
+  const random = mulberry32(seed);
+  const means = [];
+  for (let draw = 0; draw < draws; draw++) {
+    let sum = 0;
+    let n = 0;
+    for (let pick = 0; pick < games.length; pick++) {
+      const game = games[Math.floor(random() * games.length)];
+      sum += game.sum;
+      n += game.n;
+    }
+    means.push(sum / n);
+  }
+  means.sort((x, y) => x - y);
+  const tail = (1 - level) / 2;
+  const lo = means[Math.floor(tail * draws)];
+  const hi = means[Math.ceil((1 - tail) * draws) - 1];
+  const center = means.reduce((sum, value) => sum + value, 0) / draws;
+  const se = Math.sqrt(means.reduce((sum, value) => sum + (value - center) ** 2, 0) / draws);
+  const moved = cell.some(pair => pair.delta !== 0);
+  const reading = !moved ? 'unmoved' : hi < 0 ? 'B better' : lo > 0 ? 'B worse' : 'unresolved';
+  return {
+    n: cell.length, games: games.length, meanBp: bp(mean), loBp: bp(lo), hiBp: bp(hi), seBp: bp(se),
+    pBetter: means.filter(value => value < 0).length / draws, reading,
+  };
+}
+
+/**
+ * The verdict table with error bars (round 48): paired Brier deltas B minus A
+ * under ONE fixed K (the A side's pooled fit), per view, game type and phase,
+ * each with a band from a paired bootstrap over replays. Every row seeds its
+ * own generator, so a row's numbers do not depend on which other rows exist.
+ */
+export function pairedBands(a, b, { draws = 2000, seed = 20260919, level = 0.9 } = {}) {
+  const key = s => `${s.id}#${s.turn}`;
+  const bByKey = new Map(b.map(s => [key(s), s]));
+  const k = fitConstantK(a.map(s => ({ score: s.score, won: s.p1Won })));
+  const squared = (s, score) => (sigmoid(k * score) - (s.p1Won ? 1 : 0)) ** 2;
+  const pairs = a.filter(s => bByKey.has(key(s)))
+    .map(s => ({ id: s.id, sample: s, delta: squared(s, bByKey.get(key(s)).score) - squared(s, s.score) }));
+  const views = BAND_VIEWS.filter(([view]) => view !== 'hq' || pairs.some(pair => pair.sample.quality === 'hq'));
+  const rows = [];
+  for (const [view, keep] of views) {
+    for (const [gameType, phase] of BAND_CELLS) {
+      const cell = pairs.filter(({ sample }) => keep(sample) &&
+        (gameType === 'all' || sample.gameType === gameType) && (phase === 'all' || sample.phase === phase));
+      if (cell.length > 0) rows.push({ view, gameType, phase, ...bandRow(cell, { draws, seed, level }) });
+    }
+  }
+  return { k, joined: pairs.length, draws, level, rows };
+}
+
+/** What the table says as a verdict: pooled rows decide, phase cells only warn. */
+export function bankVerdict(result) {
+  const pooled = result.rows.filter(row => row.phase === 'all');
+  return {
+    gain: pooled.filter(row => row.reading === 'B better'),
+    harm: pooled.filter(row => row.reading === 'B worse'),
+    warnings: result.rows.filter(row => row.phase !== 'all' && row.reading === 'B worse'),
+  };
+}
+
+/** The printed verdict table; the last line is the verdict sentence. */
+export function bandLines(result) {
+  const signed = value => {
+    const rounded = Math.round(value);
+    return `${rounded >= 0 ? '+' : ''}${rounded === 0 ? 0 : rounded}`;
+  };
+  const lines = [
+    `=== verdict table with bands (joined n=${result.joined}, fixed K ${result.k.toFixed(2)} from A; bp, negative = B better; ` +
+    `${Math.round(result.level * 100)} % band over replays, ${result.draws} draws) ===`,
+  ];
+  let view = null;
+  for (const row of result.rows) {
+    if (row.view !== view) {
+      view = row.view;
+      lines.push(` ${view}:`);
+    }
+    lines.push(
+      `   ${row.gameType.padEnd(8)} ${row.phase.padEnd(6)} ${signed(row.meanBp).padStart(5)} ` +
+      `[${signed(row.loBp)}, ${signed(row.hiBp)}]  se ${row.seBp.toFixed(0)}  n=${row.n}/${row.games}g  ` +
+      `P(B better)=${(100 * row.pBetter).toFixed(0)}%  ${row.reading}`);
+  }
+  const verdict = bankVerdict(result);
+  const names = rows => rows
+    .map(row => `${row.view} ${row.gameType}${row.phase === 'all' ? '' : ` ${row.phase}`} (${signed(row.meanBp)})`).join(', ');
+  lines.push(
+    `bank verdict: ${verdict.gain.length > 0 ? `gain on ${names(verdict.gain)}` : 'no gain resolved'}; ` +
+    `${verdict.harm.length > 0 ? `HARM on ${names(verdict.harm)}` : 'no harm'}; ` +
+    `${verdict.warnings.length > 0 ? `warnings: ${names(verdict.warnings)}` : 'no warnings'}`);
+  return lines;
+}
+
 /** Samples of one quality tranche ('hq' or 'std'); dumps from before round 34 carry no quality and pass through untouched. */
 export const filterQuality = (samples, quality) => quality ? samples.filter(s => s.quality === quality) : samples;
 

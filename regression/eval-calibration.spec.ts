@@ -893,6 +893,48 @@ import { summaryLines } from './calibration-summary';
  * static basis for this mass; the next lever, if any, is search/
  * planning-side.
  *
+ * VERDICT WITH BANDS 2026-09-19 (improvement round 48, T47; instrument
+ * only, no score path). scripts/paired-calibration.mjs prints a verdict
+ * table: paired Brier deltas B minus A under the A side's pooled K, per
+ * view (full, hq, luck-adjusted), game type and phase, each with a 90 %
+ * band from a paired bootstrap over REPLAYS (2000 draws, seeded; a replay
+ * yields up to eight positions with one outcome), the share of draws with
+ * B better and the standard error. A row reads "B better" or "B worse"
+ * only when its band clears zero, else "unresolved"; a dump against itself
+ * reads "unmoved" on every row. POOLED ROWS DECIDE, PHASE CELLS WARN.
+ * VERDICT RULE (user gate 19 Sep, replaces the 10 bp lines per phase cell
+ * and the round-45 rule "K follows the clean capture"): a candidate passes
+ * when (1) its gain is shown where the measurement is sharp enough, a
+ * pooled bank row wholly in the good OR the fit corpus out of sample on
+ * every seed, (2) no pooled bank row lies wholly in the bad, and (3) the
+ * tier census of the feedback dumps holds. Phase cells wholly in the bad
+ * go to the gate as warnings with their size.
+ * RESOLUTION of the bank (smallest true effect a row sees four times out
+ * of five, 2.49 x SE; median and range over the moved rows of the seven
+ * round-47 candidates, full view): pooled all 23 bp (10 to 43), pooled
+ * singles 24 (7 to 42), pooled doubles 58 (38 to 137), a singles phase
+ * cell 33 (8 to 66), a doubles phase cell 72 (35 to 242); hq and
+ * luck-adjusted rows read a fifth to a half coarser. A K map moves every
+ * score a little and resolves finer (10 bp pooled) than a weight that
+ * moves few positions a lot.
+ * THE ROUND-47 CANDIDATES AGAIN, pooled rows (full view; all / singles /
+ * doubles, bp with band; docs/perf/probes/2026-09-19-r48/t47/):
+ * - bench HP (adopted, base-20260918-live -> r47-t46): -6 [-15, +2] / +0
+ *   [-5, +4] / -19 [-47, +3]; P(B better) 89 %; warnings luck-adjusted
+ *   late +5 [+1, +10]. No harm, no gain resolved: a correctness fix.
+ * - singles K 500 steps: +2 [-4, +9] / +3 [-5, +12] / unmoved.
+ * - both K 500 steps: +1 [-10, +13] / +3 [-5, +12] / -3 [-35, +29];
+ *   warnings doubles late +51, hq doubles mid +54, hq doubles late +71.
+ * - converged K: -2 [-18, +14] / +0 [-16, +16] / -6 [-45, +31]; warnings
+ *   doubles late +54, hq singles mid +24.
+ * - singles boosts 39 (against both-K): -15 [-30, +1] / -21 [-43, +2];
+ *   P(B better) 94 %: the pooled row stops short of the band, the gain
+ *   sat in one phase cell (singles mid -43 [-74, -12]).
+ * - singles matchup 220: +6 [-14, +26] / +8 [-20, +35]: nothing resolved
+ *   either way; the round-47 rejection stood on noise.
+ * - doubles screens 101: +36 [+10, +66] / unmoved / +123 [+35, +218]:
+ *   HARM, the one candidate of the five the bank itself rejects.
+ *
  * SOLVER NIGHT RUN 2026-09-18/19 (improvement round 47, T08; fa8c613 and
  * 61b8078, bench only, no score path; docs/perf/2026-09-04-endgame-truth.md
  * section "Round 47", dumps under docs/perf/probes/2026-09-18-r47/). 110

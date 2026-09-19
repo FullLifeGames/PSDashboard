@@ -5,7 +5,8 @@ import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { brierScore, fitConstantK } from './fit-helpers';
 import {
-  brier, compareSamples, fitConstantK as fitConstantKJs, load, mergeDumps, sortSamples, summarize,
+  bandLines, bankVerdict, brier, compareSamples, fitConstantK as fitConstantKJs, load, mergeDumps, pairedBands,
+  sortSamples, summarize,
 } from '../scripts/calibration-lib.mjs';
 
 /**
@@ -83,5 +84,112 @@ describe('calibration lib', () => {
     });
     expect(mergeDumps(slices).map(sample => `${sample.id}#${sample.turn}`)).toEqual(SORTED_ORDER);
     expect(mergeDumps(slices)).toEqual(sortSamples(samples));
+  });
+});
+
+/**
+ * Round 48: a paired verdict carries its error bar. One replay yields up to
+ * eight positions with ONE outcome, so the bootstrap resamples replays, not
+ * positions, and a row reads as a verdict only when its band clears zero.
+ */
+describe('paired bands (round 48)', () => {
+  interface BankSample extends Sample { quality: 'hq' | 'std'; luckAgainstFavored: boolean }
+  interface BandRow {
+    view: string; gameType: string; phase: string; n: number; games: number;
+    meanBp: number; loBp: number; hiBp: number; seBp: number; pBetter: number; reading: string;
+  }
+
+  // 30 replays of four positions: every third replay doubles, every second hq, every fifth luck-flagged.
+  const bank = (): BankSample[] => {
+    let seed = 11;
+    const rand = () => { seed = (seed * 1664525 + 1013904223) >>> 0; return seed / 2 ** 32; };
+    const samples: BankSample[] = [];
+    for (let game = 0; game < 30; game++) {
+      const p1Won = rand() < 0.5;
+      (['early', 'mid', 'late', 'late'] as const).forEach((phase, index) => {
+        const lean = (p1Won ? 1 : -1) * (0.1 + 0.2 * index);
+        samples.push({
+          id: `game-${String(game).padStart(2, '0')}`, turn: 3 + 4 * index, phase,
+          gameType: game % 3 === 0 ? 'doubles' : 'singles',
+          score: Math.max(-0.95, Math.min(0.95, lean + (rand() - 0.5) * 0.8)),
+          faintedFraction: index / 4, p1Won,
+          quality: game % 2 === 0 ? 'hq' : 'std', luckAgainstFavored: game % 5 === 0,
+        });
+      });
+    }
+    return samples;
+  };
+  const against = (sample: BankSample, by: number): BankSample =>
+    ({ ...sample, score: Math.max(-0.99, Math.min(0.99, sample.score + (sample.p1Won ? -by : by))) });
+  const rowOf = (rows: BandRow[], view: string, gameType: string, phase: string): BandRow =>
+    rows.find(row => row.view === view && row.gameType === gameType && row.phase === phase)!;
+
+  test('a dump against itself reads unmoved on every row, band [0, 0]', () => {
+    const result = pairedBands(bank(), bank());
+    expect(result.joined).toBe(120);
+    expect(result.rows.map((row: BandRow) => row.view)).toEqual(expect.arrayContaining(['full', 'hq', 'luck-adjusted']));
+    for (const row of result.rows as BandRow[]) {
+      expect(Math.abs(row.meanBp) + Math.abs(row.loBp) + Math.abs(row.hiBp)).toBe(0);
+      expect(row.reading).toBe('unmoved');
+    }
+    const lines = bandLines(result);
+    expect(lines[0]).toContain('joined n=120');
+    expect(lines[1]).toBe(' full:');
+    // Pooled rows come first: all phases, then per game type.
+    expect(lines[2]).toBe('   all      all       +0 [+0, +0]  se 0  n=120/30g  P(B better)=0%  unmoved');
+    expect(lines[3].startsWith('   singles  all ')).toBe(true);
+    expect(lines.at(-1)).toBe('bank verdict: no gain resolved; no harm; no warnings');
+  });
+
+  test('a constructed offset lies inside its band, under the fixed K of the A side', () => {
+    const a = bank();
+    const b = a.map(sample => against(sample, 0.3));
+    const result = pairedBands(a, b);
+    const outcomes = (samples: BankSample[]) => samples.map(sample => ({ score: sample.score, won: sample.p1Won }));
+    expect(result.k).toBe(fitConstantKJs(outcomes(a)));
+    const pooled = rowOf(result.rows, 'full', 'all', 'all');
+    expect(pooled.meanBp).toBeCloseTo((brier(outcomes(b), result.k) - brier(outcomes(a), result.k)) * 10000, 6);
+    expect(pooled.loBp).toBeLessThanOrEqual(pooled.meanBp);
+    expect(pooled.hiBp).toBeGreaterThanOrEqual(pooled.meanBp);
+    expect(pooled.loBp).toBeGreaterThan(0);
+    expect(pooled.reading).toBe('B worse');
+    expect(pooled.pBetter).toBe(0);
+    const verdict = bankVerdict(result);
+    expect(verdict.gain).toHaveLength(0);
+    expect(verdict.harm.map((row: BandRow) => `${row.view} ${row.gameType}`)).toContain('full singles');
+    // The mirror image reads as a gain.
+    const mirrored = pairedBands(b, a);
+    expect(rowOf(mirrored.rows, 'full', 'all', 'all').reading).toBe('B better');
+    expect(bankVerdict(mirrored).gain.length).toBeGreaterThan(0);
+    expect(bandLines(mirrored).at(-1)).toContain('bank verdict: gain on full all');
+  });
+
+  test('one replay moving all of its positions is no verdict: the band resamples replays', () => {
+    const a = bank();
+    const b = a.map(sample => (sample.id === 'game-05' ? against(sample, 0.6) : sample));
+    const result = pairedBands(a, b);
+    const pooled = rowOf(result.rows, 'full', 'all', 'all');
+    expect([pooled.n, pooled.games]).toEqual([120, 30]);
+    expect(pooled.meanBp).toBeGreaterThan(0);
+    // A third of the draws leave the one moved replay out, so the low end stays at zero.
+    expect(pooled.loBp).toBe(0);
+    expect(pooled.reading).toBe('unresolved');
+    expect([rowOf(result.rows, 'full', 'singles', 'all').games, rowOf(result.rows, 'full', 'doubles', 'all').games]).toEqual([20, 10]);
+    expect(rowOf(result.rows, 'hq', 'all', 'all').games).toBe(15);
+    expect(rowOf(result.rows, 'luck-adjusted', 'all', 'all').games).toBe(24);
+    expect(rowOf(result.rows, 'full', 'doubles', 'all').reading).toBe('unmoved');
+  });
+
+  test('the seed fixes the draws', () => {
+    let seed = 5;
+    const rand = () => { seed = (seed * 1664525 + 1013904223) >>> 0; return seed / 2 ** 32; };
+    const a = bank();
+    const b = a.map(sample => ({ ...sample, score: Math.max(-0.99, Math.min(0.99, sample.score + (rand() - 0.5) * 0.4)) }));
+    const first = pairedBands(a, b, { seed: 7 });
+    expect(pairedBands(a, b, { seed: 7 })).toEqual(first);
+    const other = rowOf(pairedBands(a, b, { seed: 8 }).rows, 'full', 'all', 'all');
+    const same = rowOf(first.rows, 'full', 'all', 'all');
+    expect(other.meanBp).toBe(same.meanBp);
+    expect([other.loBp, other.hiBp]).not.toEqual([same.loBp, same.hiBp]);
   });
 });
