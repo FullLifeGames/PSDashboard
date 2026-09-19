@@ -893,6 +893,66 @@ import { summaryLines } from './calibration-summary';
  * static basis for this mass; the next lever, if any, is search/
  * planning-side.
  *
+ * MATCHUP MEMO KEY 2026-09-19 (improvement round 49; 5af4dcd and 49df993,
+ * cache v48; found while wiring doubles replays into the feedback run,
+ * probes under docs/perf/probes/2026-09-19-r49/). FINDING: the memoized
+ * threat (score/threat.ts, one MatchupCache per search) was not a function
+ * of its key. Super Fang, Nature's Madness and Ruination price half the
+ * defender's CURRENT HP, and the key carried no HP: the first forked
+ * position to ask froze its value for the whole search. The bank walks its
+ * cells in a fixed order in one process, so it was reproducible ON STALE
+ * VALUES (since round 33). The app splits one matrix over a worker pool
+ * with one memo per worker and lets workers steal chunks by completion
+ * time, so a cell's value followed which worker priced it: of four doubles
+ * replays run twice each, the two whose assumed Smogon sets carry
+ * Ruination (Ting-Lu, Chien-Pao) differed run to run, in matrix turns
+ * only, same option sets, 4 to 48 cells per turn, up to 0.077. Four
+ * investigators found it independently and no skeptic could refute it; a
+ * review of the fix then found the same leak on two more live reads, the
+ * current types (Protean, Libero, Soak, Burn Up) and the stored stats
+ * (Power Trick, Power and Guard Split). FIX: pairKey carries every read of
+ * pairThreat and singleMoveFraction: types, the divided stored stats, the
+ * defender's max HP, and the defender's HP where the attacker has a usable
+ * halving move (test/threat-memo.spec.ts holds memo against no memo).
+ * BANK against the base of the day (byte-identical to r47-t46): 45 of 833
+ * positions move in 23 replays (39 singles, 6 doubles; HP alone 38 in 17),
+ * largest 0.037, no sign flips; pooled +1 bp [+0, +1], hq singles +2
+ * [+0, +3]: resolved and irrelevant, booked as notes under the new harm
+ * floor. NEW BASE of the code state: .calibration/r49-fullkey (833, Brier
+ * 0.2565/0.2196/0.1223, hq 0.2469/0.1918/0.1228). FEEDBACK: three runs
+ * byte-identical over ten dumps and the drift report, the six singles
+ * dumps byte-identical to the base of the day (no halving move, no type
+ * change in those games), tier census singles 38/2/0 unchanged.
+ * HARM FLOOR (75a784c, user gate): a pooled row is harm, and a phase cell
+ * a warning, only when its band clears zero AND its mean is at least 5 bp;
+ * smaller resolved shifts print after the verdict. A change that moves few
+ * positions resolves a single basis point.
+ *
+ * DOUBLES TIER CENSUS 2026-09-19 (improvement round 49, T53; f58d57e and
+ * d2bd105, instrument only). Four doubles replays of the bank run through
+ * the feedback drift run as census-only replays (no corpus items, nothing
+ * graded): VGC 2629703929 (Tailwind, a visible bring of four on both
+ * sides, long endgame), VGC 2630685175 (Trick Room), Doubles OU 912045
+ * (tournament, hq, both speed controls), Doubles OU 2663093831 (ladder, no
+ * speed control). Smogon inputs pinned from the bank's disk cache
+ * (record-smogon-fixtures.mjs --from-cache: five bodies and one 404
+ * marker, 7.8 MB), so census and bank read the same sets. The always-on
+ * fixture spec checks shape, ten turns, game type, the bring of four and
+ * a pin behind every Smogon URL. scripts/tier-census.mjs counts tiers per
+ * side-turn per game type with unmatched and partial sides beside them
+ * (the replay list is the union over folders) and --moved lists every turn
+ * whose attribution, tier or played-match changed between two folders.
+ * STAND: singles 38/2/0 on 558 side-turns (39 unmatched); doubles 7/5/0 on
+ * 88 side-turns of 44 turns (3 unmatched, 11 partial), attribution chance
+ * 16, quiet 13, shift 5, p2-read 4, p2-decision 3, p1-read 2, unclear 1.
+ * Doubles carries a tier on 13.6 % of its side-turns against 7.2 % in
+ * singles and five mistakes against two: the graded best comes from 16
+ * restricted pair options, a slot that never showed makes the regret a
+ * lower bound, and the four games are gen 9 with Terastallization (VGC at
+ * level 50) where the singles corpus is gen 6 and gen 8, so the split
+ * never compares the game type alone. The run takes 272 to 334 s with ten
+ * replays (262 s with six).
+ *
  * K FIT CONVERGED 2026-09-19 (improvement round 48, T48; f5618ce; NOTHING
  * ADOPTED at the user gate, K stays 2.28/1.49 and 2.98/0.88, cache stays
  * v47; probes under docs/perf/probes/2026-09-19-r48/). fitPhaseK runs

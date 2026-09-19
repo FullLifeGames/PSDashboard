@@ -1,9 +1,9 @@
-# Next Steps (Stand 19.09.2026, nach Runde 48)
+# Next Steps (Stand 19.09.2026 abends, nach Runde 49)
 
 Nur offene Schritte, als priorisierte Checkliste: Die oberste Iteration ist die nächste Sitzung, das oberste offene Kästchen darin das nächste TODO. Jedes TODO nennt das Problem an einer Spielszene und das Erfolgsmaß. Die TODOs der Iteration 3 tragen ihre Umsetzungsschritte hier; für alle anderen stehen sie als Checkliste im Backlog-Plan unter derselben Nummer.
 
-- **Iterationen** bündeln die TODOs einer Sitzung. Eine Iteration wird beim Start zur Runde mit der nächsten freien Rundennummer: Iteration 1 war Runde 46, Iteration 2 war Runde 47, Iteration 2a war Runde 48, Iteration 2b wird Runde 49. Score-berührende TODOs derselben Iteration bekommen je ihre eigene Messung (D3), nie eine gemeinsame.
-- **T-Nummern** (T01 bis T45) sind feste Namen, vergeben am 18.09. in Prioritäts-Reihenfolge. Wandert ein TODO in der Liste, behält es seine Nummer; ein neues TODO bekommt die nächste freie (ab T54; T46 kam am 18.09. in Runde 46 dazu, T47 bis T51 in Runde 47, T52 und T53 in Runde 48). „braucht T01“ heißt: T01 muss vorher gelaufen sein.
+- **Iterationen** bündeln die TODOs einer Sitzung. Eine Iteration wird beim Start zur Runde mit der nächsten freien Rundennummer: Iteration 1 war Runde 46, Iteration 2 war Runde 47, Iteration 2a war Runde 48, Iteration 2b war Runde 49, Iteration 3 wird Runde 50. Score-berührende TODOs derselben Iteration bekommen je ihre eigene Messung (D3), nie eine gemeinsame.
+- **T-Nummern** (T01 bis T45) sind feste Namen, vergeben am 18.09. in Prioritäts-Reihenfolge. Wandert ein TODO in der Liste, behält es seine Nummer; ein neues TODO bekommt die nächste freie (ab T55; T46 kam am 18.09. in Runde 46 dazu, T47 bis T51 in Runde 47, T52 und T53 in Runde 48, T54 in Runde 49). „braucht T01“ heißt: T01 muss vorher gelaufen sein.
 - **Backlog-Plan** (je TODO: Idee, Schritte mit Dateien, volles Gate, Doubles-Abdeckung, offene Entscheidungen, Zahlen, Code-Belege): `docs/superpowers/plans/2026-09-18-backlog-plans.md`.
 - **Erledigtes**: `docs/completed/` nach Gebiet (Index, Eintragsformat und Prozess in `docs/completed/README.md`).
 - **Maschinen-Quellen**: Ledger in `regression/eval-calibration.spec.ts`, Pins in `e2e-feedback/corpus.ts`, Memory-Notizen.
@@ -13,21 +13,11 @@ Die Schritte sind ein erster Entwurf vom 18.09. (Code-Stand dcf9526, jeder Code-
 
 Hinter jedem Titel stehen Thema, Art, Größe (mini, klein, mittel, groß), Gate (score-berührend = D3, verlustfrei = D4, sonst ausgeschrieben) und „braucht“ = muss vorher gelaufen sein.
 
-## Iteration 2b · Tier-Zählung für Doubles
-
-Entstanden am 19.09. in Runde 48. Steht vor Q4, weil Q4 Scores in beiden Spielarten bewegt und D3 seit Runde 48 die Tier-Zählung verlangt; für Doubles gibt es sie nicht.
-
-- [ ] **T53 · Tier-Zählung für Doubles** (Messbasis, Runde, klein, kein Score-Touch)
-
-  Runde 48 wollte das neu gefittete Doubles-K prüfen (Fit-Korpus −7,6 bp in 20 von 20 Seeds, Bank ohne Schaden, Warnung spät +54 bp). Die dritte Bedingung aus D3, die Tier-Zählung der Feedback-Dumps, ließ sich nicht lesen: Alle sechs Feedback-Spiele sind Singles. Jede score-berührende Änderung, die Doubles bewegt, fliegt bei den Zug-Urteilen blind. Wie ein TÜV, der nur die linke Fahrzeugseite prüft. Gebraucht werden Doubles-Replays (VGC und Doubles OU), die durch denselben Feedback-Lauf gehen und deren Dumps in der Zählung stehen; Experten-Pins brauchen sie dafür nicht.
-
-  *Erfolg:* Der Feedback-Lauf schreibt Voll-Dumps für mindestens drei Doubles-Spiele (VGC mit Team-Auswahl und Doubles OU), die Tier-Zählung liest Singles und Doubles getrennt, D21 nennt den Doubles-Stand, und drei Läufe sind byte-identisch. *Plan T53:* 5 Schritte, 2 offene Entscheidungen.
-
 ## Iteration 3 · Q4 Decided v2
 
 Eine große Runde für sich: Brainstorming, Spec, Messung auf dem frischen Bank-Dump, Bau, gepaarter Bench.
 
-- [ ] **T09 · Q4 · Decided v2: erst messen, dann den Score klammern** (Endspiel, Runde, groß, score-berührend D3, braucht T53)
+- [ ] **T09 · Q4 · Decided v2: erst messen, dann den Score klammern** (Endspiel, Runde, groß, score-berührend D3)
 
   573756 ab Zug 135: Der Bericht sagt „practically decided“, der Balken steht bei 26 bis 40 % für SoulWind. Auf der Bank gewinnt die als entschieden gelesene Seite nur 72 bis 80 %. In 749828 Zug 23 nennt die Erkennung p1, Löser und Beweiser beweisen p2. Die Erkennung soll erst „entschieden“ sagen, wenn sie auch gegen einen Volltreffer und einen verlorenen Zug recht behält. Die Score-Klammer (der Score springt auf einen festen Wert, sobald die Erkennung „entschieden“ sagt) kommt erst, wenn die gemessene Quote sie trägt.
 
@@ -48,9 +38,9 @@ Eine große Runde für sich: Brainstorming, Spec, Messung auf dem frischen Bank-
 
   *Erfolg:* Quote der entschiedenen Seite mindestens 90 % gesamt und 85 % in Singles, später Bank-Brier nicht schlechter. Die Score-Klammer ist ein eigener Schritt und startet nur bei bestandener Quote.
 
-## Iteration 4 · Vier Sichtungen
+## Iteration 4 · Fünf Sichtungen
 
-Kein Score-Touch. Jede Sichtung entscheidet, wie eine spätere Runde aussieht: T10 für T24, T11 für T22, T12 für T27, T28, T30 und T31, T13 für T25 und T26.
+Kein Score-Touch. Jede Sichtung entscheidet, wie eine spätere Runde aussieht: T10 für T24, T11 für T22, T12 für T27, T28, T30 und T31, T13 für T25 und T26, T54 für eine mögliche Tera-Runde in der Statik.
 
 - [ ] **T10 · GPL Zug 13: Fehlt Cobalion ein Zug?** (Bericht, Sichtung, mini, kein Score-Touch)
 
@@ -75,6 +65,12 @@ Kein Score-Touch. Jede Sichtung entscheidet, wie eine spätere Runde aussieht: T
   Runde 40 nahm 963 von 25 959 Sets im Fit-Korpus eine 252er-Offensive. Runde 41 gab 20 zurück, die weite Lesart 186. Die anderen 777 kennt niemand im Detail (147 „Bulk hoch bei niedrigem Prior-Tempo“, 222 „Summe unter 300“, 176 korrekt, Rest gemischt), und 1543 Sets wechselten ihre Natur, meist zu Hardy. Erst zählen, dann bauen. Alle gespeicherten Set-Listen sind älter als der Formen-Marker-Fix.
 
   *Erfolg:* Jede Familie hat eine Zahl, zehn Beispiele und eine Empfehlung, getrennt nach Singles und Doubles; die Listen liegen im Sonden-Ordner. *Plan T13:* 7 Schritte, 2 offene Entscheidungen.
+
+- [ ] **T54 · Terastallisierung in der Statik sichten** (Endspiel, Sichtung, klein, kein Score-Touch)
+
+  Gen-9-Spiel, ein Pokémon terastallisiert: Der Sim setzt `terastallized`, das Feld `types` bleibt beim alten Typ. Die statische Bewertung liest überall `pokemon.types` roh (`score/threat.ts` für STAB, Immunität und Typ-Tabelle, `score/hazards.ts` für Stealth Rock und Giftspitzen). Nach dem Tera-Klick rechnet die Statik also weiter mit dem alten defensiven Typ, und ein neuer Tera-STAB zählt nicht. Aufgefallen ist das in Runde 49, als der Review jeden Live-Zugriff der Bedrohungs-Bewertung durchging. Die gesampelten Zellen sehen Tera über den Sim, die Blätter dahinter nicht. Wie ein Wetterbericht, der nach dem Umzug weiter die alte Stadt ansagt.
+
+  *Erfolg:* Eine Zählung, wie viele Bank- und Doubles-Stellungen ein terastallisiertes Pokémon auf dem Feld haben, der Abstand der Statik mit `getTypes()` gegen heute auf diesen Stellungen (Vorzeichen, Größe), und eine Empfehlung, ob daraus eine score-berührende Runde wird. *Plan T54:* 4 Schritte, 1 offene Entscheidung.
 
 ## Iteration 5 · Wurzel: Klassen auf Ansage und Speed-Ties
 
@@ -214,7 +210,7 @@ Drei Kandidaten, die Runde 47 gemessen und nicht übernommen hat, dazu T52 aus R
 
   *Erfolg:* Die Phasen-Variante hat ein Verdikt mit Band (Tabelle aus `scripts/paired-calibration.mjs`); bei Übernahme liegen die bewegten Prozent-Sätze der sechs Feedback-Dumps dem User gesammelt als Re-Pins vor, und alle Engine-Zahlen der Dumps bleiben gleich. *Plan T51:* 6 Schritte, 2 offene Entscheidungen.
 
-- [ ] **T52 · Urteils-Schwellen, die nicht an K hängen** (Re-Fit, Runde, mittel, score-berührend D3, braucht T53 für Doubles)
+- [ ] **T52 · Urteils-Schwellen, die nicht an K hängen** (Re-Fit, Runde, mittel, score-berührend D3)
 
   655336 Zug 23: BKC opfert Landorus mit 8 % HP, der Bericht nennt das einen „low-cost trade“. Mit dem in Runde 48 gefitteten Singles-K (steigt bis ein Drittel gefallener Körper, dann flach bei 3,65; Fit-Korpus −4,1 bp in 20 von 20 Seeds, Bank ohne Schaden) wird derselbe Zug ein Blunder (Regret 0,215 → 0,430), Zug 18 bekommt einen Fehler, und früh verschwinden Urteile (573756 Zug 19 bis 22). 36 von 279 Zügen wechseln Urteil oder Einordnung. Ursache: Die Schwellen 0,1 / 0,2 / 0,4, `HEALTHY_SACK_FLOOR` 0,4 und `PROVER_SCORE_FLOOR` 0,6 sind in Gewinnprozent gemessen, und Gewinnprozent hängt an K. Ein neues K eicht das Thermometer neu und lässt die Fiebergrenze stehen.
 
@@ -398,11 +394,10 @@ Wer an einem Thema arbeitet, findet hier die verwandten TODOs.
 
 | Thema | TODOs |
 | --- | --- |
-| Messbasis | T53 |
 | Werkzeug | T43 |
 | Bericht | T10, T11, T17, T18, T19, T22, T36, T44, T51 |
 | Re-Fit | T49, T50, T52 |
-| Endspiel | T09, T33, T34 |
+| Endspiel | T09, T33, T34, T54 |
 | Sets und Spreads | T12, T13, T25, T26, T27, T28, T29, T30, T31, T32 |
 | Zufall preisen | T14, T15, T16, T23, T24, T35 |
 | Oberfläche | T20 |
@@ -466,6 +461,8 @@ Bericht und Buchung:
 
 Engine und Messung:
 
+- [ ] Der Set-Rückfall für Doubles und VGC ist fest auf Gen 9 verdrahtet (`src/lib/smogon/format-fallback.ts`): Ein Doubles-Replay vor Gen 9 bekäme Gen-9-Sets. Heute ist jedes Doubles-Replay in Bank, Fit-Korpus und Feedback-Lauf Gen 9 → handeln, bevor ein älteres Doubles-Spiel in eine Messung kommt.
+- [ ] Ein neuer Live-Zugriff in `pairThreat` oder `singleMoveFraction` braucht seinen Schlüssel-Term in `pairKey` (Runde 49: HP, Typen und Basiswerte fehlten, Doubles-Zellen wichen von Lauf zu Lauf ab) → bei jeder Änderung an `score/threat.ts` den Test `threat-memo.spec.ts` um den neuen Zugriff erweitern.
 - [ ] `detectSacks` liest die Snapshot-HP der Bank, also die letzte Sichtung, und kennt Regenerator nicht (649664 t9: „sacked Tornadus (3% HP)“, wahr 36 % nach der Heilung) → handeln, wenn ein Sack-Satz eine falsche HP nennt, die ein User reklamiert; Hebel: dieselbe Regel wie `benchHpFromSighting` in `branch/corrections.ts`.
 - [ ] Das Gegnermodell liest eine Doubles-Paar-Zeile nur am ersten Slot (`isSwitchChoice` in `opponent-model.ts`); in Doubles wird es deshalb selten sicher (Favorit ab 0,6 auf 10 von 496 Seiten) → handeln, wenn der Read in Doubles gebraucht wird (T42).
 - [ ] GPL Zug 35 sitzt auf der Kante der Schwelle `HEALTHY_SACK_FLOOR` (Score nach dem Sack 0,383 gegen 0,4; seit Runde 47 ohne Sack-Stempel, liest inaccuracy) → nur wissen: Der Engine-Pin prüft die Regel, nicht mehr den Stempel.
@@ -493,7 +490,7 @@ Geparkte Branches:
 
 - **D1** Kein Push ohne Ansage (Stand 18.09. nach Runde 46: 43 Commits vor origin/master; origin steht auf ba2ce5b, Release 0.7.1).
 - **D2** Vor jedem Push `npm run lint` lokal (der Pages-Workflow hat ein eigenes Lint-Gate) und `npx tsc -b` (`tsc --noEmit` prüft in diesem Solution-Setup nichts).
-- **D3** Score-berührend = Cache-Bump + gepaarter Bank-Bench gegen eine frische Basis vom selben Tag + drei byte-identische Feedback-Läufe. Das Bank-Verdikt liest die Tabelle mit Fehlerbalken aus `scripts/paired-calibration.mjs` (seit Runde 48: 90-%-Band aus einem gepaarten Bootstrap über Replays, Sichten full, hq und glücksbereinigt): **Gepoolte Zeilen entscheiden, Phasen-Zellen warnen.** Ein Kandidat besteht, wenn (1) sein Gewinn dort belegt ist, wo die Messung scharf genug ist (eine gepoolte Bank-Zeile ganz im Guten ODER der Fit-Korpus out-of-sample in allen Seeds), (2) keine gepoolte Bank-Zeile ganz im Schlechten liegt und (3) die Tier-Zählung der Feedback-Dumps hält (D21). Phasen-Zellen ganz im Schlechten gehen mit ihrer Größe als Warnung ans Gate. Eine Korrektur mit Zweck außerhalb der Bank (Korpus-Gap, Korrektheitsfehler) braucht (2) und (3) und ihren eigenen Beleg. Auflösung der Bank (kleinster wahrer Effekt, den eine Zeile in vier von fünf Fällen sieht, Median über die Kandidaten der Runde 47): gepoolt gesamt 23 bp, gepoolt Singles 24, gepoolt Doubles 58, Singles-Phasen-Zelle 33, Doubles-Phasen-Zelle 72; eine K-Abbildung löst feiner auf (gepoolt 10 bp) als ein Gewicht, das wenige Stellungen stark bewegt. Punktwerte ohne Band sind kein Verdikt. Corpus-Re-Pins und Golden-Refreshes nur nach User-Gate.
+- **D3** Score-berührend = Cache-Bump + gepaarter Bank-Bench gegen eine frische Basis vom selben Tag + drei byte-identische Feedback-Läufe (seit Runde 49 zehn Dumps: sechs Singles, vier Doubles). Das Bank-Verdikt liest die Tabelle mit Fehlerbalken aus `scripts/paired-calibration.mjs` (seit Runde 48: 90-%-Band aus einem gepaarten Bootstrap über Replays, Sichten full, hq und glücksbereinigt): **Gepoolte Zeilen entscheiden, Phasen-Zellen warnen.** Ein Kandidat besteht, wenn (1) sein Gewinn dort belegt ist, wo die Messung scharf genug ist (eine gepoolte Bank-Zeile ganz im Guten ODER der Fit-Korpus out-of-sample in allen Seeds), (2) keine gepoolte Bank-Zeile Schaden zeigt und (3) die Tier-Zählung der Feedback-Dumps hält (D21). **Schaden braucht Größe** (User-Gate 19.09., Runde 49): Eine gepoolte Zeile ist Schaden und eine Phasen-Zelle eine Warnung, wenn ihr Band ganz im Schlechten liegt UND ihr Mittel mindestens 5 bp beträgt; kleinere aufgelöste Verschiebungen druckt das Skript als Hinweis hinter dem Verdikt (eine Änderung, die wenige Stellungen bewegt, löst ein einzelnes bp auf). Warnungen und Hinweise gehen mit ihrer Größe ans Gate. Eine Korrektur mit Zweck außerhalb der Bank (Korpus-Gap, Korrektheitsfehler) braucht (2) und (3) und ihren eigenen Beleg. Auflösung der Bank (kleinster wahrer Effekt, den eine Zeile in vier von fünf Fällen sieht, Median über die Kandidaten der Runde 47): gepoolt gesamt 23 bp, gepoolt Singles 24, gepoolt Doubles 58, Singles-Phasen-Zelle 33, Doubles-Phasen-Zelle 72; eine K-Abbildung löst feiner auf (gepoolt 10 bp) als ein Gewicht, das wenige Stellungen stark bewegt. Punktwerte ohne Band sind kein Verdikt. Corpus-Re-Pins und Golden-Refreshes nur nach User-Gate.
 - **D4** Verlustfrei oder render-only = drei byte-identische Feedback-Läufe + Kalibrierung ziffern-gleich + `npm run test:regression`, e2e, lint, `tsc -b`.
 - **D5** Messen vor Bauen: Spike oder Sonde vor dem Design-Gate, Messkette vor Pins, roter Test vor dem Umbau. Jede Runde bekommt vor dem Bau Brainstorming und Spec.
 - **D6** Byte-Vergleiche nur mit `FEEDBACK_DUMP=1` und frischen Dumps (mtime prüfen). Wanduhr-Gates und Perf-Sonden nur verschränkt mit der Basis auf einem Maschinenzustand (Runde 43: +18 % Drift bei unverändertem Code innerhalb eines Vormittags; 573756 unter Fremdlast 101 bis 440 s).
@@ -503,14 +500,14 @@ Geparkte Branches:
 - **D10** Diagnosen am Battle-State über den echten App-Pfad (Browser-Probe mit debug-Feld plus `FEEDBACK_DUMP`); nackte node-Rekonstruktion ist nicht harness-treu; `graph.results[]` hat kein turn-Feld (Index i = Turn i+1).
 - **D11** Während Feedback-, e2e- und Kalibrierungsläufen nichts im Repo anfassen, auch keine Root-Markdown-Dateien (Vite reloadet, HMR zerschießt den Lauf); das gilt, bis Port 5176 leer ist. Browser-Messungen im eigenen Worktree, wenn eine zweite Session aktiv ist. Läufe über zehn Minuten abgekoppelt starten (nohup plus Marker-Datei), das Hintergrund-Tool endet sonst.
 - **D12** Feedback-Läufe: `npm run test:feedback` startet seit Runde 46 über `scripts/run-e2e.mjs --dev-port 5176` (wartet auf Vites Abhängigkeits-Cache, verweigert einen belegten Port, räumt den Server am Ende ab). Weiter von Hand: drift-json vorher löschen (ein roter Lauf schreibt den Bericht zweimal, die zweite Fassung ist unvollständig), Läufe über zehn Minuten detached starten. Meldet der Starter „Port busy“, den Besitzer per `netstat` suchen und seine Kommandozeile prüfen, bevor etwas beendet wird.
-- **D13** Bank: `node scripts/run-calibration.mjs --slices 6 --out .calibration/<name>` (volle Bank 210 bis 340 s; seit Runde 46 misst sie mit den Parametern der App, also mit Abgleich an jeder Zug-Grenze; `--env EVAL_CALIBRATION_RAW=1` ist das Instrument von vor Runde 46, `EVAL_CALIBRATION_LEGACY=1` ein Lauf je Stichprobe mit den heutigen Parametern; Basis `.calibration/base-20260918-live`, 833 Stellungen; seit Runde 47 (Bank-HP, Cache v47) ist `.calibration/r47-t46` die Basis des Code-Stands, 833 Stellungen, Brier 0,2565/0,2196/0,1222, hq 0,2468/0,1916/0,1227. Am 19.09. frisch bestätigt: `.calibration/base-20260919` ist byte-identisch dazu (Runde 48 hat keinen Score bewegt). Alle Bank-Zahlen in dieser Datei und im Backlog-Plan, die älter sind als der 18.09., stammen vom alten Instrument und gelten nur als Vergleich innerhalb ihrer Runde; weitere Flags `--env KEY=VALUE` und `--tranche`). A/B = zwei Ausgabeordner, dazwischen `scripts/paired-calibration.mjs` (dort `--quality hq|std`). Positions-Export über `--env EVAL_CALIBRATION_POSITIONS=<dir>`. Ist ein Slice-Lauf ungleich einem Ein-Prozess-Lauf, zuerst die mtimes von `.smogon-cache` prüfen.
+- **D13** Bank: `node scripts/run-calibration.mjs --slices 6 --out .calibration/<name>` (volle Bank 210 bis 340 s; seit Runde 46 misst sie mit den Parametern der App, also mit Abgleich an jeder Zug-Grenze; `--env EVAL_CALIBRATION_RAW=1` ist das Instrument von vor Runde 46, `EVAL_CALIBRATION_LEGACY=1` ein Lauf je Stichprobe mit den heutigen Parametern; Basis `.calibration/base-20260918-live`, 833 Stellungen; seit Runde 47 (Bank-HP, Cache v47) ist `.calibration/r47-t46` die Basis des Code-Stands, 833 Stellungen, Brier 0,2565/0,2196/0,1222, hq 0,2468/0,1916/0,1227. Seit Runde 49 (vollständiger Merkzettel-Schlüssel, Cache v48) ist `.calibration/r49-fullkey` die Basis des Code-Stands: 833 Stellungen, Brier 0,2565/0,2196/0,1223, hq 0,2469/0,1918/0,1228; 45 Stellungen liegen anders als in `r47-t46`. Alle Bank-Zahlen in dieser Datei und im Backlog-Plan, die älter sind als der 18.09., stammen vom alten Instrument und gelten nur als Vergleich innerhalb ihrer Runde; weitere Flags `--env KEY=VALUE` und `--tranche`). A/B = zwei Ausgabeordner, dazwischen `scripts/paired-calibration.mjs` (dort `--quality hq|std`). Positions-Export über `--env EVAL_CALIBRATION_POSITIONS=<dir>`. Ist ein Slice-Lauf ungleich einem Ein-Prozess-Lauf, zuerst die mtimes von `.smogon-cache` prüfen.
 - **D14** Perf-Umbauten an der Engine tragen ihre Identität dreifach: Fixture `fork-identity.json` (neu aufnehmen nur mit `PERF_IDENTITY_RECORD=1` auf dem Vorher-Code), Engine-Suite, Kalibrierung A/B ziffern-gleich. Die A-Seite einer A/B-Messung läuft auf dem Vorher-Code (Stash oder Worktree), nie auf einer Mischung. Perf-Sonde vor und nach am selben Tag: `PERF_PROBE=1 PERF_PROBE_LABEL=before|after npx playwright test -c docs/perf/probes/2026-09-03/probe.config.ts`.
 - **D15** Worktree-Abbau (Vorfall 12.09. 15:25): Junctions (node_modules, .calibration, .smogon-cache, .fit-corpus) VOR `git worktree remove` einzeln und nicht-rekursiv löschen (PowerShell `[System.IO.Directory]::Delete('<worktree>\<junction>')`), dann per Reparse-Point-Scan prüfen, dass keine mehr existiert. `git worktree remove --force` folgt Junctions und löscht ihre Ziele. Seither: jede Bank-A/B mit frischer Basis am selben Tag; Vergleiche mit Ledger-Zahlen vor dem 12.09. nur mit diesem Vorbehalt. Memory `worktree-junction-removal`.
-- **D16** `ALIGNMENT_SEEDS[0]` bleibt `'1,2,3,4'`; jede Listen-Änderung ist ein Cache-Version-Event. Runde 47 hat v47 genommen (Bank-HP); `r45-threshold` trägt ebenfalls eine v47 und bekäme bei einer Landung die nächste freie Nummer.
+- **D16** `ALIGNMENT_SEEDS[0]` bleibt `'1,2,3,4'`; jede Listen-Änderung ist ein Cache-Version-Event. Runde 49 hat v48 genommen (Merkzettel-Schlüssel); `r45-threshold` trägt eine v47 und bekäme bei einer Landung die nächste freie Nummer.
 - **D17** Gates nie durch eine Pipe leiten (Exit-Code direkt lesen); PP immer live aus `moveSlots.pp`; Commits englisch im Release-Stil, ohne Attribution.
-- **D18** Design-Gates und Erklärungen in einfacher Sprache (User-Vorgabe 25.08.). Doubles und Singles sind First-Class: Neue Features decken beide von Anfang an ab (User-Vorgabe 28.08.). Der Feedback-Korpus ist reine Singles-Evidenz; Doubles-Änderungen brauchen die Bank, das VGC-Replay oder die Doubles-Fixtures als Orakel.
+- **D18** Design-Gates und Erklärungen in einfacher Sprache (User-Vorgabe 25.08.). Doubles und Singles sind First-Class: Neue Features decken beide von Anfang an ab (User-Vorgabe 28.08.). Die Experten-Evidenz des Feedback-Korpus ist rein Singles. Seit Runde 49 laufen vier Doubles-Spiele ohne Pins im Feedback-Lauf mit (`FEEDBACK_CENSUS_REPLAYS`): Sie liefern Dumps für die Tier-Zählung und den Byte-Gleichheits-Test, aber kein Experten-Urteil. Doubles-Änderungen brauchen weiter die Bank, das VGC-Replay oder die Doubles-Fixtures als Orakel.
 - **D19** `docs/` bleibt gitignored; `FeedbackEval.xlsx` und `deploy.ps1` untracked lassen (deploy.ps1 = lokales Server-Deploy via `Host vserver`, nicht pushen). `NextSteps.md` ist getrackt.
-- **D21** Gewichts- und K-Änderungen: neben der gepaarten Bank die Tier-Zählung der sechs Feedback-Dumps lesen (Ungenauigkeiten, Fehler, Blunder je Spiel; Stand nach Runde 47: 38 / 2 / 0 auf 558 Seiten-Zügen). Die Bank benotet den Balken, nicht die Zug-Urteile (Runde 47: Boosts 39 gewann auf der Bank und gab 573756 sieben neue Fehlerzüge). Die Summe allein genügt nicht: neben der Zählung die bewegten Züge lesen, vor allem in der Golden 655336 (Runde 48: Summe 38/2/0 → 32/2/1, aber ein neuer Blunder auf dem Experten-Spiel). Für Doubles ist die Zählung blind, alle sechs Feedback-Spiele sind Singles (T53). Ein neues K verschiebt jede Schwelle in Gewinnprozent mit (T52). Werkzeug: `docs/perf/probes/2026-09-19-r48/feedback/tier-census.cjs`.
+- **D21** Jede score-berührende Änderung liest neben der gepaarten Bank die Tier-Zählung der Feedback-Dumps: `node scripts/tier-census.mjs <ordner>...` zählt Ungenauigkeiten, Fehler und Blunder je Seiten-Zug, getrennt nach Singles und Doubles, mit nicht zugeordneten und nur teilweise gesehenen Seiten daneben; `--moved <basis> <neu>` nennt jeden Zug, dessen Einordnung, Tier oder Zuordnung gewechselt hat. Stand nach Runde 49 (Ordner `docs/perf/probes/2026-09-19-r49/feedback/fullkey-run1`): Singles 38 / 2 / 0 auf 558 Seiten-Zügen (39 nicht zugeordnet), Doubles 7 / 5 / 0 auf 88 Seiten-Zügen (3 nicht zugeordnet, 11 teilweise). Die Bank benotet den Balken, nicht die Zug-Urteile (Runde 47: Boosts 39 gewann auf der Bank und gab 573756 sieben neue Fehlerzüge). Die Summe allein genügt nicht: die bewegten Züge lesen, in Singles vor allem die Golden 655336 (Runde 48: Summe 38/2/0 → 32/2/1, aber ein neuer Blunder auf dem Experten-Spiel), in Doubles das VGC-Spiel 2629703929 mit Team-Auswahl. Doubles liest gröber und nie allein als Spielart: Bewertet werden 16 ausgewählte Zug-Paare, ein nie gesehener Slot macht das Regret zur Untergrenze (teilweise), und die vier Spiele sind Gen 9 mit Tera (VGC Level 50) gegen Gen 6 und 8 im Singles-Korpus; ein bewegtes Doubles-Urteil ist ein Anlass nachzusehen, kein Beweis. Ein neues K verschiebt jede Schwelle in Gewinnprozent mit (T52).
 - **D20** Jede Barrel-Änderung erscheint als Fixture-Diff unter `regression/fixtures/api/` (`UPDATE_API_SNAPSHOT=1` nur bewusst; der Diff ist das API-Review); nach Paket-Änderungen `npm run pack:smoke`.
 
 ## E. Prozess: abhaken und überführen
