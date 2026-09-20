@@ -75,6 +75,31 @@ describe('matchup memo (round 49)', () => {
     expect(cached(attacker, defender).physical).not.toBe(grass.physical);
   });
 
+  // Round 54: a Tera click changes nothing the key carried. The sim keeps
+  // `types` at the old types and holds the new one in `terastallized`, so the
+  // body before and after the click shared one entry, in both directions.
+  // Under `tera: 'auto'` the app searches both bodies in one tree.
+  test('a Tera click reaches the memo, as attacker and as defender', () => {
+    const battle = makeBattle(
+      { ...makeSet('Ceruledge', ['splash', 'bitterblade']), teraType: 'Fighting' },
+      makeSet('Zamazenta', ['splash', 'bodypress']),
+    );
+    const ceruledge = battle.sides[0].active[0];
+    const zamazenta = battle.sides[1].active[0];
+    const cache = createMatchupCache();
+    const cached = threatGetter(battle, cache);
+    cached(ceruledge, zamazenta);
+    cached(zamazenta, ceruledge);
+    expect(cache.size).toBe(2);
+
+    battle.choose('p1', 'move 1 terastallize');
+    battle.choose('p2', 'move 1');
+    expect(ceruledge.terastallized).toBe('Fighting');
+    cached(ceruledge, zamazenta);
+    cached(zamazenta, ceruledge);
+    expect(cache.size).toBe(4);
+  });
+
   test('a stored-stat swap reaches the memo (Power Trick)', () => {
     const battle = makeBattle(makeSet('Shuckle', ['rockslide', 'powertrick']), makeSet('Blissey', ['softboiled']));
     const attacker = battle.sides[0].active[0];

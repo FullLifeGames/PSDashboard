@@ -40,7 +40,7 @@ export interface PairThreat {
  * reads is constant across the forked positions of one battle, but not all
  * of it, so pairKey carries EVERY read of the memoized function: level, item,
  * ability, choice lock and usable slots, the current types (Protean, Soak,
- * Burn Up), the stored stats it divides (Power Trick, Guard Split), the
+ * Burn Up), the Tera type, the stored stats it divides (Power Trick, Guard Split), the
  * defender's max HP (forme change, Dynamax) and, where a halving move prices
  * off it, the defender's current HP. A new read inside pairThreat or
  * singleMoveFraction needs its key term (test/threat-memo.spec.ts).
@@ -87,8 +87,11 @@ function pairKey(attacker: Pokemon, defender: Pokemon): string {
   // Types and the stored stats are constant for nearly every pair and move
   // under Protean, Soak, Power Trick and their kin; the key carries them so
   // the memo never answers for a body that has changed since it was asked.
-  const offense = `${attacker.types.join('/')}:${attacker.storedStats.atk}:${attacker.storedStats.spa}`;
-  const defense = `${defender.types.join('/')}:${defender.storedStats.def}:${defender.storedStats.spd}:${defender.maxhp}`;
+  // A Tera click leaves `types` alone and sets `terastallized`, so the key
+  // carries both: STAB needs the old types next to the Tera type, and a
+  // Stellar body keeps its old types for defense.
+  const offense = `${attacker.types.join('/')}:${attacker.terastallized ?? ''}:${attacker.storedStats.atk}:${attacker.storedStats.spa}`;
+  const defense = `${defender.types.join('/')}:${defender.terastallized ?? ''}:${defender.storedStats.def}:${defender.storedStats.spd}:${defender.maxhp}`;
   return `${attacker.side.id}:${attacker.name}:${attacker.species.id}:${attacker.level}:${attacker.item}:${attacker.ability}:${lockedMoveId(attacker) ?? ''}:${usable}:${offense}>` +
     `${defender.side.id}:${defender.name}:${defender.species.id}:${defender.level}:${defender.item}:${defender.ability}:${defense}${liveHp}`;
 }
