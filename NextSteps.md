@@ -13,9 +13,9 @@ Die Schritte sind ein erster Entwurf vom 18.09. (Code-Stand dcf9526, jeder Code-
 
 Hinter jedem Titel stehen Thema, Art, Größe (mini, klein, mittel, groß), Gate (score-berührend = D3, verlustfrei = D4, sonst ausgeschrieben) und „braucht“ = muss vorher gelaufen sein.
 
-## Iteration 4d · Der App-Bau hält die Zugreihenfolgen
+## Iteration 4d (Runde 53, läuft seit 20.09.) · Der App-Bau hält die Zugreihenfolgen
 
-Gefunden in Runde 52 vom neuen Bank-Instrument: Der alte Bau konnte den Defekt nicht sehen. Die App löst seit dem 08.08. zweistufig; seit wann sie genau diese Sets baut, ist nicht gemessen. Am User-Gate vom 20.09. 14:50 („1a 2a 3a“) vor 4b gezogen: Die App liefert diese Sets heute aus, und die Zählung der gebrochenen Zugreihenfolgen ist ein billiges Orakel.
+Spec `docs/superpowers/specs/2026-09-20-round-53-design.md`, Sichtung `docs/perf/probes/2026-09-20-r53/T66/sighting.md`, Branch `r53`. Gefunden in Runde 52 vom neuen Bank-Instrument: Der alte Bau konnte den Defekt nicht sehen. Die App löst seit dem 08.08. zweistufig; seit wann sie genau diese Sets baut, ist nicht gemessen. Am User-Gate vom 20.09. 14:50 („1a 2a 3a“) vor 4b gezogen: Die App liefert diese Sets heute aus, und die Zählung der gebrochenen Zugreihenfolgen ist ein billiges Orakel.
 
 - [ ] **T66 · Die zweistufige Lösung hält die beobachteten Zugreihenfolgen** (Sets und Spreads, Runde, mittel, score-berührend D3, braucht T56)
 
@@ -24,6 +24,16 @@ Gefunden in Runde 52 vom neuen Bank-Instrument: Der alte Bau konnte den Defekt n
   Hinweis: Der Hebel ist die zweite Lösung in `solveReplaySpreads` (`packages/replay-core/src/team-builder.ts`): Die Tempo-Vorlösung baut ihre Entscheidungen in die Basis-Sets, die Volllösung rechnet auf dieser Basis weiter. Die Sichtung klärt, an welcher Stelle das gehaltene Tempo verloren geht oder überstimmt wird. Das Schluss-Audit der Runde 52 hat die 13 Zeilen, die nur der neue Bau bricht (7 Replays), gegen das Log gelesen: alle sauber, kein Trick Room, kein Tailwind, keine Paralyse, kein Boost, kein Vorrang. Seine Spur, noch ungemessen: `speedMeasured` (`spread-inference.ts`) wertet eine Zugreihenfolge, die der Prior schon erfüllt, als „misst nichts“, und in der Kette ist der Prior die erste Lösung; `speedError` (`spreads/fit.ts`) rechnet gegen den gerade gültigen Spread des Gegenübers, die Lösung je Körper hängt damit an ihrer Reihenfolge. Der gewollte Tausch aus Runde 41 ist es nicht: `releasedRung` gibt gehaltenes Tempo nur nach unten frei, hier gewinnt Volcanion 252 Tempo-EVs, und Pecharunt, Moltres und Gholdengo tauschen eine Tempo-Natur gegen eine Bulk-Natur. Die Tempo-Rechnung der Zählung kennt Choice Scarf und Iron Ball, aber keine Boosts, keine Paralyse, kein Tailwind und kein Trick Room: Die absolute Zahl ist eine Obergrenze, der Unterschied zwischen den Bauten ist der Befund (`docs/perf/probes/2026-09-20-r52/T56/speed-order-violations.vt.ts` und `speed-order-levers.vt.ts`). Die eine Stellung 2658663776 Zug 86 trägt 8 der 11 bp, um die das neue Bank-Instrument schlechter liest als das alte. Verwandt mit T26 (gehaltenes Tempo gegen gemessene Offensive) und T30 (Widerspruchs-Gate): Vor dem Bau klären, ob eine Spec mehrere davon trägt. Es gilt D8; der Feedback-Korpus baut zweistufig, also Set-Diff der zehn Spiele vor dem ersten Lauf.
 
   *Erfolg:* Der App-Bau widerspricht höchstens so vielen Zugreihenfolgen wie der Bau mit einer Lösung (heute 20 gegen 10 von 910), die 13 neu gebrochenen Zeilen sind weg, 2658663776 Zug 86 liest wieder für p2, die gepoolte Singles-Zeile der Bank holt den Abstand zum alten Bau zurück (Linie in der Spec vorregistrieren, Größenordnung −10 bp), Doubles bleibt unbewegt, und die bewegten Urteile der Feedback-Dumps sind gelesen. *Plan T66:* 7 Schritte, 3 offene Entscheidungen.
+
+  Schritte der Runde (die Spec ersetzt die Plan-Schritte):
+
+  - [ ] **1.** Sichtung: An welcher Stufe geht das gehaltene Tempo verloren? Nachbau der Kette mit Identitäts-Test, Zählung je Stufe, Hypothese gegengemessen.
+  - [ ] **2.** Die Zählung ehrlich machen: prüfen, ob der Parser Boosts, Paralyse, Tailwind und Trick Room schon verwirft.
+  - [ ] **3.** Set-Diff auf dem Bank-Weg und im Feedback-Harness vor der Bank (D8).
+  - [ ] **4.** Roter Test in `packages/replay-core/test/two-stage-carry.spec.ts`, Singles und Doubles.
+  - [ ] **5.** Fix in `solveReplaySpreads`: Ein verworfenes Pokémon behält den Spread der Vorlösung. Cache v49.
+  - [ ] **6.** Gate D3: eigener Beleg (Zählung), gepaarte Bank gegen frische Basis, drei Feedback-Läufe, Suite, e2e, lint, `tsc -b`.
+  - [ ] **7.** Signal in C, Ledger, D8 und D13, Eintrag in `docs/completed/`.
 
 ## Iteration 4b · Tera in der Statik
 
