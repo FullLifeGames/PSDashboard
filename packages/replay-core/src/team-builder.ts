@@ -146,22 +146,27 @@ export function solveReplaySpreads(
   const { teams: base, inferred: preSolved } = buildTeams(log, { ...options, p1Info: infos.p1, p2Info: infos.p2 });
   const solved = inferSpreads(observations, { p1: base.p1Team, p2: base.p2Team }, formatHintFor(log).formatHint,
     speedOrders, speedKnowledgeFor(infos, knownTeamsFor(log, userTeamText), usageStats), observedMaxHp(log));
-  carryItemDecisions(solved, preSolved);
+  carryPreSolve(solved, preSolved);
   return resolveInferredItems(solved, infos, usageStats, setAssumptions);
 }
 
 /**
- * The base build's speed-only solve already decided the items and built
- * them into its sets, so the full solve sees them as set items; the
- * decisions ride into the result from that pre-solve.
+ * The base build's speed-only solve already decided the items and the
+ * Speed the move orders asked for, and built both into its sets: the full
+ * solve sees them as its prior. A mon the full solve forfeits (misfit
+ * damage) leaves its map, and the caller's build would reach past that
+ * prior to the usage guess, so the pre-solve's entry comes back for it,
+ * with or without an item decision (round 53, 2658663776: the forfeit
+ * handed Volcanion its 252 Spe back and broke four orders the pre-solve
+ * held). A mon the full solve kept takes only the item decision along.
  */
-function carryItemDecisions(solved: Map<string, SpreadCandidate>, preSolved: Map<string, SpreadCandidate> | undefined) {
+function carryPreSolve(solved: Map<string, SpreadCandidate>, preSolved: Map<string, SpreadCandidate> | undefined) {
   for (const [key, candidate] of preSolved ?? []) {
-    if (candidate.item === undefined) continue;
     const entry = solved.get(key);
-    // A mon the full solve forfeited (misfit damage) keeps the pre-solve's spread and item.
     if (!entry) solved.set(key, candidate);
-    else if (entry.item === undefined) solved.set(key, { ...entry, item: candidate.item, itemReason: candidate.itemReason });
+    else if (candidate.item !== undefined && entry.item === undefined) {
+      solved.set(key, { ...entry, item: candidate.item, itemReason: candidate.itemReason });
+    }
   }
 }
 

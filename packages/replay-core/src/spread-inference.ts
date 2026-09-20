@@ -95,7 +95,9 @@ function bestRung(ctx: SolveContext, key: string, ladder: CandidateRung[], monOb
  * HP bars, attribution confounds), the evidence is unreliable — keep the
  * prior instead of confidently fielding a paper spread (GPL: all-zero
  * Vileplume, 252-HP-only Clefable). A solve that REPAIRS speed-order
- * violations the prior carries always stands.
+ * violations the prior carries always stands. In the two-stage chain the
+ * prior is the speed-only pre-solve's build: solveReplaySpreads hands that
+ * entry back for a forfeited mon (round 53).
  */
 function forfeitsToPrior(ctx: SolveContext, key: string, best: CandidateRung, prior: SpreadCandidate, monObservations: DamageObservation[]): boolean {
   const damageResidual = monObservations.reduce((sum, obs) => sum + observationError(ctx, obs, key, best), 0);

@@ -170,7 +170,12 @@ export interface StoredEval {
 //      the stored stats, the defender's max HP). Every position moves whose
 //      sets carry a halving move or whose bodies change type or stats
 //      mid-search (Protean, Soak, Power Trick).
-const EVAL_ENGINE_CACHE_VERSION = 48;
+// v49: round 53, a mon the full spread solve forfeits keeps the speed-only
+//      pre-solve's spread instead of falling back to the usage guess, so
+//      the built teams hold the move orders the pre-solve repaired. Every
+//      replay moves whose sets carry such a mon (9 of 1549 sets on the
+//      bank, all singles).
+const EVAL_ENGINE_CACHE_VERSION = 49;
 
 export function evalStoreKey(
   cacheKey: string,
