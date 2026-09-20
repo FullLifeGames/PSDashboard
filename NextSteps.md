@@ -13,9 +13,9 @@ Die Schritte sind ein erster Entwurf vom 18.09. (Code-Stand dcf9526, jeder Code-
 
 Hinter jedem Titel stehen Thema, Art, Größe (mini, klein, mittel, groß), Gate (score-berührend = D3, verlustfrei = D4, sonst ausgeschrieben) und „braucht“ = muss vorher gelaufen sein.
 
-## Iteration 4b · Tera in der Statik
+## Iteration 4b (Runde 54, läuft seit 20.09.) · Tera in der Statik
 
-Die Sichtung T54 hat aus dem Verdacht eine Runde gemacht. Sie misst auf der Basis, die T66 in Runde 53 hinterlassen hat (`.calibration/r53-carry`, Cache v49): T66 hat 9 Singles-Sets noch einmal bewegt, und eine Messung zwischen den zwei Basiswechseln wäre unlesbar gewesen.
+Spec `docs/superpowers/specs/2026-09-20-round-54-design.md`, Vorbereitung und Sonden `docs/perf/probes/2026-09-20-r54/T57/`, Branch `r54`. Die Sichtung T54 hat aus dem Verdacht eine Runde gemacht. Sie misst auf der Basis, die T66 in Runde 53 hinterlassen hat (`.calibration/r53-carry`, Cache v49): T66 hat 9 Singles-Sets noch einmal bewegt, und eine Messung zwischen den zwei Basiswechseln wäre unlesbar gewesen.
 
 - [ ] **T57 · Tera in der Statik: Typen lebend lesen** (Endspiel, Runde, mittel, score-berührend D3)
 
@@ -26,6 +26,18 @@ Die Sichtung T54 hat aus dem Verdacht eine Runde gemacht. Sie misst auf der Basi
   Hinweis: Das ergebnisnahe Maß zeigt keinen Gewinn: gepaarter Brier gesamt +6,5 bp ± 7,2, Singles −6,5 ± 16,3, Doubles +45 bp ± 35 (Richtungsmessung auf Tiefe 1 mit einer schlichten Abbildung, kein Verdikt). Gewichte und K sind gegen die blinde Statik gefittet. Die Runde geht als Korrektur mit eigenem Beleg ans Gate (D3, Zusatz für Korrekturen): Beleg ist der Schadensrechner. Vier getrennt gemessene Commits: (1) der Nachbau trägt den Tera-Klick, (2) `pairKey` bekommt den Tera-Term samt Fall in `threat-memo.spec.ts` (der Klick ändert im Sim nur `terastallized`, der Schlüssel ist vorher und nachher zeichengleich; auf dem App-Pfad mit Tera in der Suche ist das heute schon scharf), (3) Verteidiger-Typ lebend, (4) STAB nach den Spielregeln (alter Typ 1,5, Tera-Typ 1,5, beides 2,0; Stellar nach Regel, in der Bank ein Körper von 449). Ein fünfter Commit ist render-only: `null-moves.ts:125` liest die Typen der Dex-Art und kann „immun“ sagen, wo der lebende Körper es nicht ist. Beim Schiedsrichter-Lauf fiel außerdem auf: `ABILITY_IMMUNITIES` kennt Wind Rider nicht (gen9doublesou-2660822493 Zug 2, Hurricane auf Shiftry: Statik 277 % der KP, Rechner 0).
 
   *Erfolg:* Die 18 Stellungen tragen ihren Tera-Körper (Zählung Log gegen Nachbau 0 zu 0), die Statik setzt auf den Bank-Stellungen keine falsche Immunität mehr (heute 50), keine gepoolte Bank-Zeile zeigt Schaden (D3), die Tier-Zählung hält, und die bewegten Doubles-Urteile der vier Spiele ohne Pins sind gelesen. Fällt die Doubles-Zeile, entscheidet das User-Gate zwischen Übernahme mit Re-Fit (T49, T50, T52) und Parken. *Plan T57:* 9 Schritte, 4 offene Entscheidungen.
+
+  Schritte der Runde (die Spec ersetzt die Plan-Schritte):
+
+  - [ ] **1.** Vorbereitung: zwei Leser (Tera-Verlust im Nachbau, Lesestellen der Statik) und ein Sonden-Bauer, je mit einem Gegenprüfer. Das Instrument (Tera-Zählung Log gegen Nachbau, Schiedsrichter gegen den Schadensrechner) misst den Arbeitsbaum; Basis „before“ auf dem unberührten Stand.
+  - [ ] **2.** Rote Tests und Fix: Der Tera-Klick ohne Aktionszeile kommt im Nachbau an (Ursache A), die Markierung überlebt den K. o. im Nachbau (Ursache B). Cache v50.
+  - [ ] **3.** `pairKey` bekommt den Tera-Term, Fall in `threat-memo.spec.ts`.
+  - [ ] **4.** Verteidiger-Typ lebend: Immunität und Typ-Tabelle, Tarnsteine und Giftspitzen, Black Sludge (`liveTypes`).
+  - [ ] **5.** STAB nach den Spielregeln.
+  - [ ] **6.** Wind Rider als eigener kleiner Commit.
+  - [ ] **7.** Render-only: `null-moves.ts` liest den lebenden Körper, wenn einer da ist.
+  - [ ] **8.** Gate-Kette D3 je Zustand: Basis byte-gleich wiederholt, Bank gepaart gegen den Vorzustand und gegen `r53-carry`, Sonden, ein Feedback-Lauf mit Tier-Zählung der bewegten Züge; an der Spitze drei Feedback-Läufe, Suite, e2e, lint, `tsc -b`.
+  - [ ] **9.** Schluss-Audit vor dem User-Gate, Ledger, D13 und D16, Eintrag in `docs/completed/`.
 
 ## Iteration 4c · Doubles bekommt den Zellenplan
 
