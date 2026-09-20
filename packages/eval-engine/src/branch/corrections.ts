@@ -1,4 +1,3 @@
-import { Dex } from '@pkmn/sim';
 import { type PokemonSnapshot, type TurnSnapshot, sideIndex, toId } from '@fulllifegames/replay-core';
 import { protocolChoiceLock, type ChoiceLockContext } from '../choice-lock.ts';
 import { CHOICE_ITEMS } from '../sensitivity.ts';
@@ -6,6 +5,8 @@ import { restoreSideInvariants } from '../forward-model.ts';
 import type { SimBattle, SimPokemon, SimSide } from './types.ts';
 import { normalizeBattleOnlyFormeId } from './team-order.ts';
 import { findFirstAvailableSwitchSlot, findPokemonOnSide, findSlotBySpecies } from './protocol-choices.ts';
+import { terrainIdFromSnapshot, weatherIdFromSnapshot } from './field-ids.ts';
+import { restoreTeraFromSnapshot } from './tera-restore.ts';
 
 function repointActiveSlot(side: SimSide, activeSlot: number, target: SimPokemon): boolean {
   if (side.active[activeSlot] === target) return false;
@@ -212,57 +213,6 @@ function correctHpFromSnapshot(battle: SimBattle, snapshot: TurnSnapshot) {
   restoreSideInvariants(battle);
 }
 
-/** Species whose Tera click also changes forme and ability (Terapagos: max HP as well). */
-const TERA_FORME_SPECIES = new Set(['Ogerpon', 'Terapagos', 'Morpeko']);
-
-/**
- * The sim deletes `terastallized` in its faint block. A body that faints
- * only in the reconstruction (a guessed spread, a damage roll) and is
- * revived by the HP correction came back without the marker, while its side
- * had already spent the Tera: 17 of 833 bank positions stood one Tera body
- * short and none over (round 54). A click the sim swallowed without an error
- * (a locked move, Struggle) leaves the same hole. The snapshot alone decides:
- * it carries the marker per body at every boundary, for the field and the
- * bench, and drops it on a real faint, so a body Revival Blessing brought
- * back stays without it as in the game. The |-terastallize| line is no
- * witness (it stands in the log long after the body fell), and "the side
- * spent its Tera and nobody carries it" is no trigger: that holds in every
- * battle before gen 9 and after every real faint of a Tera body.
- *
- * Left alone: a side that already carries a marker (one Tera per battle), a
- * side with an Illusion holder (the protocol names the disguise), a snapshot
- * entry that matches no body or more than one, and Ogerpon, Terapagos and
- * Morpeko, whose click also changes forme and ability and whose faint
- * regresses the forme. A bare marker would leave half a Tera there; the
- * loss stays on those bodies.
- */
-function restoreTeraFromSnapshot(battle: SimBattle, snapshot: TurnSnapshot) {
-  if (battle.gen !== 9) return;
-  for (let sideIdx = 0; sideIdx < 2; sideIdx++) {
-    const snapshotSide = sideIdx === 0 ? snapshot.p1 : snapshot.p2;
-    const side = battle.sides[sideIdx];
-    const living = side.pokemon.filter((pokemon: SimPokemon) => !pokemon.fainted);
-    if (living.some((pokemon: SimPokemon) => pokemon.terastallized)) continue;
-    if (side.pokemon.some((pokemon: SimPokemon) => pokemon.baseAbility === 'illusion')) continue;
-
-    const entry = snapshotSide.pokemon.find(pokemon => pokemon.terastallized && !pokemon.fainted);
-    if (!entry) continue;
-    const bodies = living.filter((pokemon: SimPokemon) =>
-      toId(pokemon.species?.name || '') === toId(entry.speciesForme) ||
-      toId(pokemon.name || '') === toId(entry.name)
-    );
-    if (bodies.length !== 1 || TERA_FORME_SPECIES.has(bodies[0].species.baseSpecies)) continue;
-
-    // Mirror of BattleActions#terastallize, minus the forme changes.
-    const body = bodies[0];
-    body.terastallized = entry.terastallized;
-    body.addedType = '';
-    body.knownType = true;
-    body.apparentType = entry.terastallized;
-    for (const ally of side.pokemon) ally.canTerastallize = null;
-  }
-}
-
 function snapshotConditionDuration(value: unknown): number | undefined {
   if (!value || typeof value !== 'object') return undefined;
   const maybeDuration = value as { minDuration?: unknown; maxDuration?: unknown; duration?: unknown };
@@ -291,37 +241,6 @@ function syncEffectTableFromSnapshot(
       ...(duration ? { duration } : {}),
     };
   }
-}
-
-function terrainIdFromSnapshot(terrain: string): string {
-  if (!terrain) return '';
-  const terrainCondition = Dex.conditions.get(`${terrain} Terrain`);
-  return terrainCondition.exists ? terrainCondition.id : toId(terrain);
-}
-
-/**
- * @pkmn/client snapshots report weather by display name (its WEATHERS map:
- * "Sand", "Sun", …) — the sim only knows condition ids. Writing an untranslated
- * name into the sim silently disables every weather residual (the gen 3
- * Sandstorm-does-no-damage report).
- */
-const CLIENT_WEATHER_IDS: Record<string, string> = {
-  sand: 'sandstorm',
-  sun: 'sunnyday',
-  rain: 'raindance',
-  hail: 'hail',
-  snow: 'snowscape',
-  harshsunshine: 'desolateland',
-  heavyrain: 'primordialsea',
-  strongwinds: 'deltastream',
-};
-
-function weatherIdFromSnapshot(weather: string): string {
-  if (!weather) return '';
-  const mapped = CLIENT_WEATHER_IDS[toId(weather)];
-  if (mapped) return mapped;
-  const weatherCondition = Dex.conditions.get(weather);
-  return weatherCondition.exists ? weatherCondition.id : toId(weather);
 }
 
 function correctFieldFromSnapshot(battle: SimBattle, snapshot: TurnSnapshot) {
