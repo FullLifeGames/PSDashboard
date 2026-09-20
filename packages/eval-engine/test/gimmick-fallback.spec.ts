@@ -1,6 +1,7 @@
 import { test, expect, describe } from 'vitest';
 import type { PokemonSet } from '@pkmn/sim';
 import { reconstructBranchRuntime } from '../src/branch-engine';
+import { getMainChoice } from '../src/branch/protocol-choices';
 
 /**
  * Round 54 (T57): a Tera turn without an action line for the slot. The
@@ -144,5 +145,59 @@ describe('a gimmick click on a turn without an action line (round 54)', () => {
     });
     const scizor = runtime.battleStream.battle!.sides[0].active[0]!;
     expect(scizor.species.name).toBe('Scizor-Mega');
+  });
+
+  // `pass` takes no modifier: the sim rejects "pass terastallize", and a
+  // rejected side choice is answered with its default for BOTH slots. The
+  // state needs a fainted active whose side still holds its Tera, which only
+  // doubles with an empty bench produces (a singles side with a fainted
+  // active gets a forced switch, or the battle ends).
+  test('a fainted slot passes without a gimmick suffix', async () => {
+    const set = (species: string, moves: string[], level: number): PokemonSet => ({
+      name: species, species, item: '', ability: '', moves,
+      nature: 'Adamant',
+      evs: { hp: 252, atk: 252, def: 0, spa: 0, spd: 4, spe: 0 },
+      ivs: { hp: 31, atk: 31, def: 31, spa: 31, spd: 31, spe: 31 },
+      level,
+      teraType: 'Water',
+    });
+    const log = [
+      '|gametype|doubles',
+      '|player|p1|Alice||',
+      '|player|p2|Bob||',
+      '|gen|9',
+      '|tier|[Gen 9] Doubles OU',
+      '|poke|p1|Blissey, F|',
+      '|poke|p1|Snorlax, L1, M|',
+      '|poke|p2|Hitmontop, M|',
+      '|poke|p2|Chansey, F|',
+      '|start',
+      '|switch|p1a: Blissey|Blissey, F|100/100',
+      '|switch|p1b: Snorlax|Snorlax, L1, M|100/100',
+      '|switch|p2a: Hitmontop|Hitmontop, M|100/100',
+      '|switch|p2b: Chansey|Chansey, F|100/100',
+      '|turn|1',
+      '|move|p2a: Hitmontop|Close Combat|p1b: Snorlax',
+      '|-damage|p1b: Snorlax|0 fnt',
+      '|faint|p1b: Snorlax',
+      '|move|p1a: Blissey|Seismic Toss|p2a: Hitmontop',
+      '|-damage|p2a: Hitmontop|70/100',
+      '|move|p2b: Chansey|Seismic Toss|p1a: Blissey',
+      '|-damage|p1a: Blissey|85/100',
+      '|upkeep',
+      '|turn|2',
+    ].join('\n');
+
+    const runtime = await reconstructBranchRuntime({
+      format: 'gen9doublesou',
+      p1Team: [set('Blissey', ['Seismic Toss'], 100), set('Snorlax', ['Tackle'], 1)],
+      p2Team: [set('Hitmontop', ['Close Combat', 'Fake Out'], 100), set('Chansey', ['Seismic Toss'], 100)],
+      replayLog: log,
+      targetTurn: 2,
+    });
+    const battle = runtime.battleStream.battle!;
+    expect(battle.sides[0].active[1]!.fainted).toBe(true);
+    expect(battle.sides[0].active[1]!.canTerastallize).toBeTruthy();
+    expect(getMainChoice(['|-terastallize|p1b: Snorlax|Water'], 'p1', battle).split(', ')[1]).toBe('pass');
   });
 });

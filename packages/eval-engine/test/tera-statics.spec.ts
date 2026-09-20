@@ -71,6 +71,17 @@ describe('the defender type reads live after a Tera click (round 54)', () => {
     expect(singleMoveFraction(dragonite, gholdengo, 'ironhead', battle)).toBeCloseTo(steelBefore * 4, 6);
   });
 
+  test('a Stellar Tera keeps the old types for defense', () => {
+    const battle = makeBattle(
+      makeSet('Ceruledge', ['splash'], { teraType: 'Stellar' }),
+      makeSet('Zamazenta', ['splash', 'bodypress']),
+    );
+    const [ceruledge, zamazenta] = [battle.sides[0].active[0], battle.sides[1].active[0]];
+    clickTera(battle);
+    expect(ceruledge.terastallized).toBe('Stellar');
+    expect(singleMoveFraction(zamazenta, ceruledge, 'bodypress', battle)).toBe(0);
+  });
+
   test('the memo answers like a fresh reading across the click', () => {
     const battle = makeBattle(
       makeSet('Ceruledge', ['splash'], { teraType: 'Fighting' }),
