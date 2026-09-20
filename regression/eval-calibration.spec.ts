@@ -900,6 +900,114 @@ import { summaryLines } from './calibration-summary';
  * static basis for this mass; the next lever, if any, is search/
  * planning-side.
  *
+ * BANK BUILD 2026-09-20 (improvement round 52, T56 and T61; 8e73953 and
+ * c4bbe02, harness and app plumbing only, no engine touch, no cache bump,
+ * cache stays v48; spec docs/superpowers/specs/2026-09-20-round-52-design.md,
+ * probes under docs/perf/probes/2026-09-20-r52/). FINDING (round 51, T12):
+ * the bank built its teams from raw infos with one solve, the app enriches
+ * the infos and solves in two stages, and since round 37 the two had
+ * drifted apart (648453: Landorus-Therian and Volcanion swap the Choice
+ * Scarf). CHANGE: buildAppTeams (src/lib/app-team-build.ts) is the app's
+ * chain as one pure function, the bank loop calls it through
+ * regression/bank-build.ts, and the option blocks of the worker's solve and
+ * of buildReplayTeams live once in src/lib/team-build-options.ts.
+ * EVAL_CALIBRATION_RAWBUILD=1 restores the two raw builds; without
+ * EVAL_CALIBRATION_SMOGON=1 the naked build is unchanged. The third
+ * buildTeamsFromReplay call (CALIB_POS_PROBE) compares two reconstructions
+ * on the same teams and stays as it was. PINS:
+ * regression/app-build-parity.spec.ts (bank helper, the retired build's
+ * four rows on 648453, handleReplayJob plus buildReplayTeams against
+ * buildAppTeams, singles and doubles) and ui/hooks/appBuildParity.spec.tsx
+ * (the real hook chain with the real worker handler; a solve without speed
+ * orders turns it red on both replays). A change inside the shared option
+ * blocks moves app and bank together and is invisible to the pins.
+ * SET DIFF over the 129 bank replays, pre-registered and met
+ * (T56/build-parity.vt.ts, one data source, paired by replay, side and
+ * species): old against new 58 of 997 singles sets in 27 of 83 replays
+ * (EVs 50, nature 25, ability 10, item 0), doubles 0 of 552; new against an
+ * independent rebuild of the app chain 0 of 1549; species lists equal in
+ * 129 of 129, so the set-assumption keys hold.
+ * IDENTITY: RAWBUILD=1 on the round's final code is byte-identical to the
+ * base of the day (.calibration/r52-rawbuild against base-20260920, itself
+ * byte-identical to r50-held), which also covers T61 and the option-block
+ * refactor; two runs of the new default are byte-identical (r52-appbuild,
+ * r52-appbuild-b). Wall 291 to 299 s against 292 for the raw build: the
+ * second solve costs nothing measurable.
+ * NEW BASE: .calibration/r52-appbuild (c4bbe02, cache v48), n=833, the same
+ * 833 positions: sign 54/65/84 (singles 66, doubles 73); brier
+ * 0.2564/0.2197/0.1255; K pooled 2.24 (singles 2.15, doubles 2.41); hq
+ * n=559 0.2429/0.1941/0.1278; luck-adjusted n=502 0.2333/0.1950/0.1204;
+ * decided 76.7 % of 103, held 93.1 % of 58 (the one new held sweep is the
+ * stall position below).
+ * OLD AGAINST NEW (bank/paired-r52-appbuild-vs-base-20260920-*.txt): 132 of
+ * 833 positions move, all singles, in 25 replays; 6 by more than 0.05, one
+ * by more than 0.2. Pooled +11 bp [+1, +28], singles +15 [+1, +39], doubles
+ * unmoved; hq +4 [+0, +7] and singles +5 [+0, +9], one warning (hq singles
+ * early +6); luck-adjusted +16 [+0, +44] unresolved. ONE POSITION carries
+ * the pooled line: gen9ou-2658663776 t86 (rating 1630, outside hq), a
+ * Poison Heal Gliscor stalling Volcanion's Flamethrower with Substitute and
+ * Protect until p1 forfeits at t94; the raw build reads -0.251, the app
+ * build +0.988 with the decided sweep held for p1 (8 of its 12 sets move,
+ * all eight in EVs, six in nature). Without it the pooled shift is +2.4 bp. By D3's rule the
+ * table reads HARM; the round books it as the instrument's new zero, not as
+ * a verdict on the app's sets. CAUSE: the app build gives Volcanion 252
+ * Speed (239) over Gliscor's 226 although the log shows Gliscor moving
+ * first at t86, t88, t90 and t92; the raw build kept 176, so in the sim
+ * Volcanion now strikes before the Substitute goes up. COUNT
+ * over the bank's observed speed orders (T56/speed-order-violations.vt.ts
+ * and speed-order-levers.vt.ts; plain speed arithmetic with Scarf and Iron
+ * Ball, blind to boosts, paralysis, Tailwind and Trick Room, so the
+ * absolute count is a ceiling and the difference is the finding): of 910
+ * singles orders the raw build contradicts 10 in 8 replays, the app build
+ * 20 in 14 (13 orders in 7 replays only the new build breaks, 3 in one
+ * replay only the old one); doubles 8 of 267 on both. Lever split:
+ * enrichment alone 10, the two-stage solve alone 20. The lever is the second
+ * solve in solveReplaySpreads, and the largest moved positions sit in those
+ * replays (2658669868 t26, 752624 t14, 2663115898 t17). The close audit
+ * read all 13 new rows against their logs: clean (no Trick Room, Tailwind,
+ * paralysis, boost or priority; the parser already drops those). Its lead
+ * for the mechanism, unmeasured: speedMeasured (spread-inference.ts) treats
+ * an order the prior already satisfies as measuring nothing, and in the
+ * chain the prior is the first solve; speedError (spreads/fit.ts) scores
+ * against the counterpart's current spread, so the greedy per-body solve
+ * depends on its order. It is not round 41's designed trade: releasedRung
+ * only releases kept Speed downward, and here Volcanion gains 252 Speed
+ * while Pecharunt, Moltres and Gholdengo swap a speed nature for a bulk one.
+ * The old instrument could not see any of it. The app has solved in two
+ * stages since 8 Aug (76fc029: the inner build already solved on speed
+ * orders alone; round 37's cfc904b added the item carry); from when these
+ * spreads date is unmeasured.
+ * HAND CHECK 648453 (T56/handcheck-648453.md): t12 is the only move-order
+ * datum (t22 is a switch, which resolves first). The raw build gives
+ * Volcanion a Choice Scarf although t6 shows its Leftovers knocked off; the
+ * app build sets Leftovers and scarfs Landorus-Therian, against which no
+ * line speaks (330 v 278).
+ * T61: fetchSmogonUsageStats keys its memo by the fetcher too
+ * (src/lib/smogon/fetcher-key.ts, shared with the set assumptions). One
+ * process with two sources now reproduces 4 of 120 moved sets (before the
+ * fix 0 of 120; T61/two-sources.vt.ts); only gen6ou differs between the
+ * sources (292 v 297 species), so the doubles 0 of 48 says the data are
+ * equal. The app passes no fetcher, the bank builds one per process. The
+ * census test in feedback-fixtures.spec.ts now reads the statistics pins
+ * for its second and fourth game and stays green.
+ * FEEDBACK: three runs byte-identical over ten dumps and unmoved against
+ * round 50's held-run1 (285 to 294 s), tier census singles 38/2/0 and
+ * doubles 7/5/0 with 0 moved turns against r49 fullkey-run1; e2e 75 of 75;
+ * vitest 181 files and 1488 tests; lint and tsc -b clean.
+ * WHAT THIS MEANS: bank numbers before 20 Sep stand on the raw build and
+ * compare only inside their round, or against a RAWBUILD=1 run.
+ * EVAL_CALIBRATION_SOURCE=fit walks the same loop, so fit-side grading
+ * dumps now build like the app while regression/eval-fit.spec.ts still
+ * trains on its own naked build; older fit-side figures (44 of 49 in
+ * DECIDED V2) need RAWBUILD=1 to compare. The dump lines carry no build
+ * tag (it would break the identity check); run.json records the switch.
+ * OPEN (NextSteps): T66, the two-stage solve keeps the observed speed
+ * orders; T67, a type gate for regression/ and ui/ (no tsconfig covers
+ * them; this file carries one standing error at the searchPosition depth
+ * argument); T68, a rejected usage fetch stays in the memo
+ * (smogon-stats.ts caches the promise before it settles; the set
+ * assumptions drop theirs).
+ *
  * FIVE SIGHTINGS 2026-09-19 (improvement round 51, T10 to T13 and T54; no
  * engine code, no cache bump, cache stays v48; one sighter, two refuters
  * (recount, counter-hypothesis) and one rework pass per question, reports
@@ -951,7 +1059,8 @@ import { summaryLines } from './calibration-summary';
  * against .smogon-cache: 4 of 120 sets (gen6ou usage 292 v 297 species).
  * TOOL TRAP: fetchSmogonUsageStats memoizes by format only
  * (src/lib/smogon-stats.ts:58); two sources in one process read the first
- * one twice, which produced a false "0 of 120" in the first pass.
+ * one twice, which produced a false "0 of 120" in the first pass (fixed in
+ * round 52, T61).
  * T13, FITTER FAMILIES (bare path, 2122 fit-corpus replays, 25 467 sets,
  * paired by replay, side and species): 977 sets starved against the
  * pre-round-40 list (976 singles, 1 doubles; the old 963 and 4885
