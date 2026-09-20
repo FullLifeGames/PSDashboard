@@ -29,13 +29,13 @@ Spec `docs/superpowers/specs/2026-09-20-round-54-design.md`, Vorbereitung und So
 
   Schritte der Runde (die Spec ersetzt die Plan-Schritte):
 
-  - [ ] **1.** Vorbereitung: zwei Leser (Tera-Verlust im Nachbau, Lesestellen der Statik) und ein Sonden-Bauer, je mit einem Gegenprüfer. Das Instrument (Tera-Zählung Log gegen Nachbau, Schiedsrichter gegen den Schadensrechner) misst den Arbeitsbaum; Basis „before“ auf dem unberührten Stand.
-  - [ ] **2.** Rote Tests und Fix: Der Tera-Klick ohne Aktionszeile kommt im Nachbau an (Ursache A), die Markierung überlebt den K. o. im Nachbau (Ursache B). Cache v50.
-  - [ ] **3.** `pairKey` bekommt den Tera-Term, Fall in `threat-memo.spec.ts`.
-  - [ ] **4.** Verteidiger-Typ lebend: Immunität und Typ-Tabelle, Tarnsteine und Giftspitzen, Black Sludge (`liveTypes`).
-  - [ ] **5.** STAB nach den Spielregeln.
-  - [ ] **6.** Wind Rider als eigener kleiner Commit.
-  - [ ] **7.** Render-only: `null-moves.ts` liest den lebenden Körper, wenn einer da ist.
+  - [x] **1.** (Workflow, Berichte unter `docs/perf/probes/2026-09-20-r54/T57/wf1/`; Basis „before“: 17 Körper zu wenig, 50 falsche Immunitäten) Vorbereitung: zwei Leser (Tera-Verlust im Nachbau, Lesestellen der Statik) und ein Sonden-Bauer, je mit einem Gegenprüfer. Das Instrument (Tera-Zählung Log gegen Nachbau, Schiedsrichter gegen den Schadensrechner) misst den Arbeitsbaum; Basis „before“ auf dem unberührten Stand.
+  - [x] **2.** (b7313de Klick, 5dffd19 Markierung, 581424a Seite gilt auch in den Ausnahmen als verbraucht) Rote Tests und Fix: Der Tera-Klick ohne Aktionszeile kommt im Nachbau an (Ursache A), die Markierung überlebt den K. o. im Nachbau (Ursache B). Cache v50.
+  - [x] **3.** (be95961) `pairKey` bekommt den Tera-Term, Fall in `threat-memo.spec.ts`.
+  - [x] **4.** (735bb42) Verteidiger-Typ lebend: Immunität und Typ-Tabelle, Tarnsteine und Giftspitzen, Black Sludge (`liveTypes`).
+  - [x] **5.** (d8eb0a3) STAB nach den Spielregeln.
+  - [x] **6.** (5c22919, zusammen mit Soundproof und Bulletproof: dieselbe Regel „Fähigkeit blankt ein Zug-Merkmal“) Wind Rider als eigener kleiner Commit.
+  - [x] **7.** (ffb1269, 6aedcd8; dazu die Schadensvorschau im Rückfall-Pfad, `src/lib/picker-state.ts`) Render-only: `null-moves.ts` liest den lebenden Körper, wenn einer da ist.
   - [ ] **8.** Gate-Kette D3 je Zustand: Basis byte-gleich wiederholt, Bank gepaart gegen den Vorzustand und gegen `r53-carry`, Sonden, ein Feedback-Lauf mit Tier-Zählung der bewegten Züge; an der Spitze drei Feedback-Läufe, Suite, e2e, lint, `tsc -b`.
   - [ ] **9.** Schluss-Audit vor dem User-Gate, Ledger, D13 und D16, Eintrag in `docs/completed/`.
 
