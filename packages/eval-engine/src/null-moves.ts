@@ -114,6 +114,8 @@ export function nullMoveReason(params: {
   gen: number;
   attackerSpecies: string | null;
   defenderSpecies: string;
+  /** The defender's Tera type when it has terastallized: it defends with that type (Stellar keeps the old ones). */
+  defenderTera?: string | null;
 }): string | null {
   const tokens = params.choice.split(' ');
   if (tokens[0] !== 'move' || !tokens[1] || params.choice.includes(',')) return null;
@@ -122,7 +124,8 @@ export function nullMoveReason(params: {
   if (!move.exists) return null;
   const defender = dex.species.get(params.defenderSpecies);
   if (!defender.exists) return null;
-  const types = defender.types;
+  const tera = params.defenderTera;
+  const types = tera && tera !== 'Stellar' ? [tera] : defender.types;
 
   const abilities = attackerAbilities(dex, params.attackerSpecies);
   const mayHave = (ability: string) => abilities.includes(ability);

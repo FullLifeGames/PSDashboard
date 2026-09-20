@@ -125,6 +125,8 @@ function pokemonInfoFromSnapshot(
     boosts: { ...mon.boosts },
     level: mon.level || set?.level || 100,
     types: speciesTypesFor(mon.speciesForme, gen),
+    // The damage calc reads the Tera type from here (as on the live and stored paths).
+    teraType: mon.terastallized || '',
   };
 }
 

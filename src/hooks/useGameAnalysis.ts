@@ -38,11 +38,15 @@ function useAnalysisContext(args: {
     activesForTurn: (turn: number) => {
       const snapshot = snapshots[turn - 1] ?? null;
       if (!snapshot) return null;
-      const activeOf = (side: typeof snapshot.p1): string | null => {
+      const activeOf = (side: typeof snapshot.p1) => {
         const active = side.pokemon.filter(pokemon => pokemon.isActive && !pokemon.fainted);
-        return active.length === 1 ? active[0].speciesForme : null;
+        return active.length === 1 ? active[0] : null;
       };
-      return { p1: activeOf(snapshot.p1), p2: activeOf(snapshot.p2), gen: replayGen };
+      const [p1, p2] = [activeOf(snapshot.p1), activeOf(snapshot.p2)];
+      return {
+        p1: p1?.speciesForme ?? null, p2: p2?.speciesForme ?? null, gen: replayGen,
+        p1Tera: p1?.terastallized || null, p2Tera: p2?.terastallized || null,
+      };
     },
     playedHistory: buildPlayedHistory(graphPlayed, snapshots, turnEventsIndex),
   }), [snapshots, turnEventsIndex, graphPlayed, replayGen]);

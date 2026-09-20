@@ -115,3 +115,15 @@ test('pickerStateFromSnapshot fills move and species types from the dex', () => 
   expect(state.p1Active?.types).toEqual(['Fire', 'Steel']);
   expect(state.p1Active?.moves.map(move => move.type)).toEqual(['Fire', 'Ground', 'Dark', 'Rock']);
 });
+
+// Round 54: the snapshot preview dropped the Tera type, so the branch
+// panel's damage numbers on the fallback path read Body Press into a
+// Ceruledge that had terastallized to Fighting as 0 % (the live and stored
+// paths carry it through branch/pokemon-info.ts).
+test('pickerStateFromSnapshot carries the Tera type of a terastallized body', () => {
+  const snapshot = makeSnapshot();
+  snapshot.p1.pokemon[0] = { ...snapshot.p1.pokemon[0], terastallized: 'Grass' };
+  const state = pickerStateFromSnapshot(snapshot, [set('Heatran', ['Magma Storm'])], [set('Zapdos', ['Roost'])]);
+  expect(state.p1Active?.teraType).toBe('Grass');
+  expect(state.p2Active?.teraType).toBe('');
+});

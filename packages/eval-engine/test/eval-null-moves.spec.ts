@@ -50,6 +50,18 @@ describe('nullMoveReason', () => {
     expect(reason('move shadowball', 'Blissey')).toContain('immune to Ghost-type moves');
   });
 
+  // Round 54: the guard read the dex species. A terastallized defender
+  // defends with its Tera type: the immunity can go, and a new one can come.
+  test('a terastallized defender is read by its Tera type', () => {
+    const live = (choice: string, defenderSpecies: string, defenderTera: string | null) =>
+      nullMoveReason({ choice, gen: 9, attackerSpecies: null, defenderSpecies, defenderTera });
+    expect(live('move closecombat', 'Gholdengo', null)).toContain('immune to Fighting-type moves');
+    expect(live('move closecombat', 'Gholdengo', 'Normal')).toBeNull();
+    expect(live('move closecombat', 'Snorlax', 'Ghost')).toContain('immune to Fighting-type moves');
+    expect(live('move willowisp', 'Garchomp', 'Fire')).toContain('cannot be burned');
+    // A Stellar Tera keeps the old types for defense.
+    expect(live('move closecombat', 'Gholdengo', 'Stellar')).toContain('immune to Fighting-type moves');
+  });
   test('an immunity-breaking attacker ability suppresses the verdict', () => {
     // Pangoro may carry Scrappy — Normal vs Ghost is not a definite null.
     expect(reason('move bodyslam', 'Gengar', 6, 'Pangoro')).toBeNull();

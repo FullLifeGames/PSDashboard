@@ -308,8 +308,9 @@ function bestNullFor(
   const defenderSpecies = actives ? (key === 'p1' ? actives.p2 : actives.p1) : null;
   if (!(best && actives && defenderSpecies)) return undefined;
   const attackerSpecies = key === 'p1' ? actives.p1 : actives.p2;
+  const defenderTera = key === 'p1' ? actives.p2Tera : actives.p1Tera;
   const nullFor = (choice: string) => nullMoveReason({
-    choice, gen: actives.gen, attackerSpecies, defenderSpecies,
+    choice, gen: actives.gen, attackerSpecies, defenderSpecies, defenderTera,
   });
   const reason = nullFor(best.choice);
   if (!reason) return undefined;

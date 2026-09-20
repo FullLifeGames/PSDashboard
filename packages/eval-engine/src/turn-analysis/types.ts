@@ -405,9 +405,13 @@ export interface AnalyzeTurnParams {
   /**
    * Active species at turn start (singles: exactly one per side, else null)
    * plus the replay generation — the null-move guard's board context.
-   * Absent/null species keep the guard off (fail closed).
+   * Absent/null species keep the guard off (fail closed). The Tera types
+   * name what a terastallized active defends with (absent = not terastallized).
    */
-  actives?: { p1: string | null; p2: string | null; gen: number } | null;
+  actives?: {
+    p1: string | null; p2: string | null; gen: number;
+    p1Tera?: string | null; p2Tera?: string | null;
+  } | null;
   /**
    * Per-side played-move history for the whole game (index t−1 = turn t,
    * the current turn included) — the streak detector's input. Render-time
