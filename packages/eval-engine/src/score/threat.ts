@@ -124,6 +124,17 @@ const ABILITY_IMMUNITIES: Record<string, string[]> = {
   eartheater: ['Ground'],
 };
 
+/**
+ * Defender abilities that blank a move FLAG instead of a type (round 54,
+ * gen9doublesou-2660822493 t2: Hurricane into a Wind Rider Shiftry priced
+ * 277 % of its HP where the damage calc reads 0).
+ */
+const ABILITY_FLAG_IMMUNITIES: Record<string, 'wind' | 'sound' | 'bullet'> = {
+  windrider: 'wind',
+  soundproof: 'sound',
+  bulletproof: 'bullet',
+};
+
 type DexMove = ReturnType<Battle['dex']['moves']['get']>;
 
 /** The attacker's big damage modifiers: Life Orb, the matching Choice item, Thick Fat on the defender. */
@@ -193,6 +204,8 @@ export function singleMoveFraction(attacker: Pokemon, defender: Pokemon, moveId:
   if (!move.exists || move.category === 'Status') return 0;
   const blanked = ABILITY_IMMUNITIES[defender.ability] ?? [];
   if (blanked.includes(move.type)) return 0;
+  const blankedFlag = ABILITY_FLAG_IMMUNITIES[defender.ability];
+  if (blankedFlag && move.flags[blankedFlag]) return 0;
   // The defender's LIVE types: smogtours-gen9ou-751207 t6 priced Body Press
   // into a Ceruledge that had terastallized to Fighting at 0, as into a Ghost
   // (50 such false immunities on the bank's Tera positions, round 54).

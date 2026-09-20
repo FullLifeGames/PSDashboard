@@ -146,3 +146,25 @@ describe('STAB by the game\'s rules after a Tera click (round 54)', () => {
     expect(stabRatio(teraType, move)).toBeCloseTo(ratio, 3);
   });
 });
+
+describe('abilities that blank a move flag (round 54)', () => {
+  const fraction = (attacker: PokemonSet, defender: PokemonSet, move: string): number => {
+    const battle = makeBattle(attacker, defender);
+    return singleMoveFraction(battle.sides[0].active[0], battle.sides[1].active[0], move, battle);
+  };
+
+  // gen9doublesou-2660822493 t2: Hurricane into Shiftry priced 277 % of its HP, the calc 0.
+  test('Wind Rider takes no wind move; Wind Power still does', () => {
+    const tornadus = makeSet('Tornadus', ['hurricane']);
+    expect(fraction(tornadus, makeSet('Shiftry', ['splash'], { ability: 'Wind Rider' }), 'hurricane')).toBe(0);
+    expect(fraction(tornadus, makeSet('Shiftry', ['splash'], { ability: 'Wind Power' }), 'hurricane')).toBeGreaterThan(1);
+  });
+
+  test('Soundproof takes no sound move, Bulletproof no ball or bomb', () => {
+    const exploud = makeSet('Exploud', ['boomburst', 'shadowball']);
+    expect(fraction(exploud, makeSet('Kommo-o', ['splash'], { ability: 'Soundproof' }), 'boomburst')).toBe(0);
+    expect(fraction(exploud, makeSet('Kommo-o', ['splash'], { ability: 'Soundproof' }), 'shadowball')).toBeGreaterThan(0);
+    expect(fraction(exploud, makeSet('Kommo-o', ['splash'], { ability: 'Bulletproof' }), 'shadowball')).toBe(0);
+    expect(fraction(exploud, makeSet('Kommo-o', ['splash'], { ability: 'Bulletproof' }), 'boomburst')).toBeGreaterThan(0);
+  });
+});
