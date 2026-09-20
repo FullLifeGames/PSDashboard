@@ -1,6 +1,7 @@
 import { type SmogonUsageStats, toId } from '@fulllifegames/replay-core';
 import { dataPkmnStatsUrl, parseSmogonChaosStats } from './smogon/stats-parse';
 import { ouFallbackFormat } from './smogon/format-fallback';
+import { fetcherKey } from './smogon/fetcher-key';
 import { withSmogonFallback, type SmogonFetch } from './smogon/hosts';
 
 export type { PokemonUsageStats, SmogonUsageStats, SpeciesUsageSet, UsageProbability, UsageSpread } from '@fulllifegames/replay-core';
@@ -55,7 +56,7 @@ export async function fetchSmogonUsageStats(
   options?: { now?: Date; signal?: AbortSignal; fetcher?: typeof fetch },
 ): Promise<SmogonUsageStats | null> {
   const format = getSmogonStatsFormat(formatId);
-  const cacheKey = `${format}:${options?.now?.toISOString() ?? 'latest'}`;
+  const cacheKey = `${format}:${options?.now?.toISOString() ?? 'latest'}:${fetcherKey(options?.fetcher)}`;
   const cached = usageCache.get(cacheKey);
   if (cached) return cached;
 

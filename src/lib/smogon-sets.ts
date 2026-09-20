@@ -6,6 +6,7 @@ import {
   toId, type PokemonSetAssumption, type SetAssumption, type SetSpreadAssumption, type SmogonSetAssumptions,
 } from '@fulllifegames/replay-core';
 import { ouFallbackFormat } from './smogon/format-fallback';
+import { fetcherKey } from './smogon/fetcher-key';
 import { withSmogonFallback, type SmogonFetch } from './smogon/hosts';
 
 export type {
@@ -24,19 +25,6 @@ type AssumptionSet = {
 
 const gens = new Generations(Dex);
 const cache = new Map<string, Promise<SmogonSetAssumptions | null>>();
-/** Cache identity per custom fetcher: two fakes serving different files must not share an entry. */
-const fetcherIds = new WeakMap<object, number>();
-let nextFetcherId = 1;
-
-function fetcherKey(fetcher: SmogonFetcher | undefined): string {
-  if (!fetcher) return 'global';
-  let id = fetcherIds.get(fetcher);
-  if (id === undefined) {
-    id = nextFetcherId++;
-    fetcherIds.set(fetcher, id);
-  }
-  return `custom${id}`;
-}
 
 /**
  * fetch as a free function: @pkmn/smogon calls `this.fetch(url)`, and a
