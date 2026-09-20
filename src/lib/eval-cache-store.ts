@@ -175,7 +175,14 @@ export interface StoredEval {
 //      the built teams hold the move orders the pre-solve repaired. Every
 //      replay moves whose sets carry such a mon (9 of 1549 sets on the
 //      bank, all singles).
-const EVAL_ENGINE_CACHE_VERSION = 49;
+// v50: round 54, Tera reaches the reconstruction and the static eval. A Tera
+//      click on a turn without an action line for its slot (a flinch) is
+//      replayed, a body that fainted only in the reconstruction gets its
+//      marker back from the snapshot, and the static leaves read the Tera
+//      type (immunity, type chart, Stealth Rock, Toxic Spikes, Black Sludge)
+//      with STAB by the game's rules. Every gen 9 position with a living
+//      terastallized body moves (325 of 833 on the bank).
+const EVAL_ENGINE_CACHE_VERSION = 50;
 
 export function evalStoreKey(
   cacheKey: string,

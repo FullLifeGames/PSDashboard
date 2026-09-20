@@ -249,8 +249,15 @@ function getChoiceForSlot(
     }
   }
 
+  // No action line for the slot: the body flinched, slept, was fully
+  // paralyzed, or fell before it moved. A gimmick clicked on that turn still
+  // happened (the sim resolves it before any move runs), so the fallback
+  // carries it like the branches above: 8 of 207 Tera clicks over the bank's
+  // replays took this path and left 13 positions one Tera body short (round
+  // 54). `pass` takes no modifier, the sim rejects it.
   const active = battle.sides[sideIdx].active[activeSlot];
-  return defaultMoveChoice(battle, active);
+  const fallback = defaultMoveChoice(battle, active);
+  return fallback.startsWith('move ') ? `${fallback}${gimmickSuffixForSlot(events, ident, active)}` : fallback;
 }
 
 export function getMainChoice(events: string[], side: 'p1' | 'p2', battle: SimBattle): string {
