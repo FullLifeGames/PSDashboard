@@ -179,9 +179,9 @@ export interface StoredEval {
 //      click on a turn without an action line for its slot (a flinch) is
 //      replayed, a body that fainted only in the reconstruction gets its
 //      marker back from the snapshot, and the static leaves read the Tera
-//      type (immunity, type chart, Stealth Rock, Toxic Spikes, Black Sludge)
-//      with STAB by the game's rules. Every gen 9 position with a living
-//      terastallized body moves (325 of 833 on the bank).
+//      type (immunity, type chart, Stealth Rock, Toxic Spikes, Black Sludge).
+//      Every gen 9 position with a living terastallized body moves (293 of
+//      833 on the bank).
 const EVAL_ENGINE_CACHE_VERSION = 50;
 
 export function evalStoreKey(

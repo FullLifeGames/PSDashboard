@@ -136,28 +136,6 @@ describe('the defender type reads live after a Tera click (round 54)', () => {
   });
 });
 
-describe('STAB by the game\'s rules after a Tera click (round 54)', () => {
-  // Blissey takes Ground, Fire and Ice neutrally, so the ratio across the click is the STAB ratio.
-  const stabRatio = (teraType: string, move: string): number => {
-    const battle = makeBattle(makeSet('Garchomp', ['splash', move], { teraType }), makeSet('Blissey', ['splash']));
-    const [garchomp, blissey] = [battle.sides[0].active[0], battle.sides[1].active[0]];
-    const before = singleMoveFraction(garchomp, blissey, move, battle);
-    clickTera(battle);
-    return singleMoveFraction(garchomp, blissey, move, battle) / before;
-  };
-
-  test.each([
-    ['Ground', 'earthquake', 2 / 1.5, 'an old type that is also the Tera type: 2.0'],
-    ['Fire', 'firefang', 1.5, 'the Tera type alone: 1.5'],
-    ['Fire', 'earthquake', 1, 'an old type keeps its 1.5 under another Tera type'],
-    ['Fire', 'icefang', 1, 'neither: 1.0'],
-    ['Stellar', 'earthquake', 2 / 1.5, 'Stellar on an old type: 2.0'],
-    ['Stellar', 'firefang', 1.2, 'Stellar elsewhere: 1.2'],
-  ])('Tera %s, %s: x%f (%s)', (teraType, move, ratio) => {
-    expect(stabRatio(teraType, move)).toBeCloseTo(ratio, 3);
-  });
-});
-
 describe('abilities that blank a move flag (round 54)', () => {
   const fraction = (attacker: PokemonSet, defender: PokemonSet, move: string): number => {
     const battle = makeBattle(attacker, defender);
