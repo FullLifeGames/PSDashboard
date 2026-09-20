@@ -9,7 +9,11 @@ import { Dex } from '@pkmn/dex';
  * uncommented. CONSERVATIVE by design: only definite type-chart nulls fire.
  * Ability-granted immunities (Levitate, Flash Fire) stay out of scope, and
  * attacker abilities that BREAK an immunity (Scrappy, Corrosion) suppress
- * the verdict. Singles only — doubles choices carry commas and return null.
+ * the verdict. It judges one comma-free move choice against one defender:
+ * singles, and a doubles endgame with one living active per side (the single
+ * target is then the single foe); a side with two acting slots carries a
+ * comma and returns null. A terastallized defender is read by its Tera type
+ * and named with it, so the sentence stays true of the body on the field.
  */
 
 const STATUS_TEXT: Record<string, string> = {
@@ -21,9 +25,18 @@ const STATUS_TEXT: Record<string, string> = {
   frz: 'frozen',
 };
 
+/**
+ * Moves the sim retypes at use time (onModifyType: the user's Tera type or
+ * forme, the held item, weather, terrain). Their dex type is not the type
+ * that lands, so no immunity verdict is definite: the guard stays silent.
+ */
+const RETYPED_ON_USE = new Set([
+  'terablast', 'terastarstorm', 'revelationdance', 'aurawheel', 'ragingbull', 'judgment',
+  'technoblast', 'multiattack', 'naturalgift', 'weatherball', 'terrainpulse',
+]);
+
 type GenDex = ReturnType<typeof Dex.forGen>;
 type DexMove = ReturnType<GenDex['moves']['get']>;
-type DexSpecies = ReturnType<GenDex['species']['get']>;
 
 /**
  * Types immune to a major status, by generation. The @pkmn/dex type chart
@@ -72,7 +85,7 @@ function typeImmunityOf(
 /** Why a status move provably does nothing: the status immunity, the move's own type immunity, powder, or Leech Seed. */
 function statusNullReason(
   move: DexMove,
-  defender: DexSpecies,
+  named: string,
   types: readonly string[],
   gen: number,
   mayHave: (ability: string) => boolean,
@@ -83,20 +96,20 @@ function statusNullReason(
       .find(type => types.includes(type));
     const corroded = (move.status === 'psn' || move.status === 'tox') && mayHave('Corrosion');
     if (blocked && !corroded) {
-      return `${defender.name} cannot be ${STATUS_TEXT[move.status] ?? move.status} (${blocked}-type)`;
+      return `${named} cannot be ${STATUS_TEXT[move.status] ?? move.status} (${blocked}-type)`;
     }
     // Thunder Wave is the canonical status move WITHOUT ignoreImmunity: the
     // move's own type immunity applies (Ground blocks it).
     if (immunity.typeImmune && !immunity.immunityBroken) {
-      return `${defender.name} is immune to ${move.type}-type moves`;
+      return `${named} is immune to ${move.type}-type moves`;
     }
   }
   if (move.flags.powder && gen >= 6 && types.includes('Grass')) {
-    return `powder moves do not affect Grass-types like ${defender.name}`;
+    return `powder moves do not affect Grass-types like ${named}`;
   }
   // The sim implements this one as onTryImmunity — no data field carries it.
   if (move.id === 'leechseed' && types.includes('Grass')) {
-    return `Leech Seed cannot affect Grass-types like ${defender.name}`;
+    return `Leech Seed cannot affect Grass-types like ${named}`;
   }
   return null;
 }
@@ -121,11 +134,13 @@ export function nullMoveReason(params: {
   if (tokens[0] !== 'move' || !tokens[1] || params.choice.includes(',')) return null;
   const dex = Dex.forGen(Math.min(9, Math.max(1, Math.round(params.gen))));
   const move = dex.moves.get(tokens[1]);
-  if (!move.exists) return null;
+  if (!move.exists || RETYPED_ON_USE.has(move.id)) return null;
   const defender = dex.species.get(params.defenderSpecies);
   if (!defender.exists) return null;
   const tera = params.defenderTera;
-  const types = tera && tera !== 'Stellar' ? [tera] : defender.types;
+  const live = !!tera && tera !== 'Stellar';
+  const types = live ? [tera] : defender.types;
+  const named = live ? `${defender.name} (Tera ${tera})` : defender.name;
 
   const abilities = attackerAbilities(dex, params.attackerSpecies);
   const mayHave = (ability: string) => abilities.includes(ability);
@@ -133,8 +148,8 @@ export function nullMoveReason(params: {
 
   if (move.category !== 'Status') {
     return immunity.typeImmune && !immunity.immunityBroken
-      ? `${defender.name} is immune to ${move.type}-type moves`
+      ? `${named} is immune to ${move.type}-type moves`
       : null;
   }
-  return statusNullReason(move, defender, types, params.gen, mayHave, immunity);
+  return statusNullReason(move, named, types, params.gen, mayHave, immunity);
 }

@@ -33,8 +33,9 @@ function useAnalysisContext(args: {
     snapshots,
     turnEventsIndex,
     // Null-move guard board context: the PRE-TURN active species per side,
-    // singles only — anything but exactly one live active passes null and
-    // keeps the guard off (fail closed, doubles out of scope).
+    // anything but exactly one live active per side passes null and keeps
+    // the guard off (fail closed). Singles meet that every turn; a doubles
+    // endgame with one body left per side meets it too.
     activesForTurn: (turn: number) => {
       const snapshot = snapshots[turn - 1] ?? null;
       if (!snapshot) return null;

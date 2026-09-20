@@ -57,11 +57,26 @@ describe('nullMoveReason', () => {
       nullMoveReason({ choice, gen: 9, attackerSpecies: null, defenderSpecies, defenderTera });
     expect(live('move closecombat', 'Gholdengo', null)).toContain('immune to Fighting-type moves');
     expect(live('move closecombat', 'Gholdengo', 'Normal')).toBeNull();
-    expect(live('move closecombat', 'Snorlax', 'Ghost')).toContain('immune to Fighting-type moves');
-    expect(live('move willowisp', 'Garchomp', 'Fire')).toContain('cannot be burned');
+    // The sentence names the Tera: Snorlax the species is no Ghost.
+    expect(live('move closecombat', 'Snorlax', 'Ghost')).toBe('Snorlax (Tera Ghost) is immune to Fighting-type moves');
+    expect(live('move willowisp', 'Garchomp', 'Fire')).toBe('Garchomp (Tera Fire) cannot be burned (Fire-type)');
+    expect(live('move spore', 'Garchomp', 'Grass')).toBe('powder moves do not affect Grass-types like Garchomp (Tera Grass)');
+    expect(live('move leechseed', 'Garchomp', 'Grass')).toBe('Leech Seed cannot affect Grass-types like Garchomp (Tera Grass)');
+    expect(live('move thunderwave', 'Snorlax', 'Ground')).toBe('Snorlax (Tera Ground) is immune to Electric-type moves');
     // A Stellar Tera keeps the old types for defense.
     expect(live('move closecombat', 'Gholdengo', 'Stellar')).toContain('immune to Fighting-type moves');
   });
+  // The sim retypes these at use time (the user's Tera type, weather, a held
+  // plate): the dex type decides nothing, so the guard stays silent.
+  test('a move retyped on use is never called null', () => {
+    expect(reason('move terablast', 'Gengar', 9)).toBeNull();
+    expect(reason('move terablast terastallize', 'Gengar', 9)).toBeNull();
+    expect(reason('move weatherball', 'Gengar', 6)).toBeNull();
+    expect(reason('move judgment', 'Gengar', 6)).toBeNull();
+    // An ordinary Normal move into a Ghost still is.
+    expect(reason('move bodyslam', 'Gengar', 6)).toContain('immune to Normal-type moves');
+  });
+
   test('an immunity-breaking attacker ability suppresses the verdict', () => {
     // Pangoro may carry Scrappy — Normal vs Ghost is not a definite null.
     expect(reason('move bodyslam', 'Gengar', 6, 'Pangoro')).toBeNull();
