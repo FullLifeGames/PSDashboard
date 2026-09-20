@@ -158,7 +158,11 @@ export function solveReplaySpreads(
  * prior to the usage guess, so the pre-solve's entry comes back for it,
  * with or without an item decision (round 53, 2658663776: the forfeit
  * handed Volcanion its 252 Spe back and broke four orders the pre-solve
- * held). A mon the full solve kept takes only the item decision along.
+ * held). A mon the full solve kept takes only the item decision along; so
+ * does a forfeited mon whose max HP the log pinned, which stays in the map
+ * as that same prior with the measured HP. A mon a pasted team or a team
+ * sheet matches is the exception: buildSet returns the sheet set before it
+ * reads `inferred`, so a carried entry reaches only the stats panel there.
  */
 function carryPreSolve(solved: Map<string, SpreadCandidate>, preSolved: Map<string, SpreadCandidate> | undefined) {
   for (const [key, candidate] of preSolved ?? []) {

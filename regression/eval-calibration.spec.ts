@@ -900,42 +900,67 @@ import { summaryLines } from './calibration-summary';
  * static basis for this mass; the next lever, if any, is search/
  * planning-side.
  *
- * PRE-SOLVE CARRY 2026-09-20 (improvement round 53, T66; 5c6dcf6, cache
- * v49, score-touching as a correction with its own evidence; verdict open
- * at the user gate; spec
+ * PRE-SOLVE CARRY 2026-09-20 (improvement round 53, T66; 5c6dcf6 plus the
+ * closing commit, cache v49, score-touching as a correction with its own
+ * evidence; adopted at the user gate of 20 Sep 16:22, "1a 2a 3a": the carry
+ * stands and fast-forwards to master, the t86 remainder stays a C signal
+ * without a TODO, branch v1 follows master and is pushed; spec
  * docs/superpowers/specs/2026-09-20-round-53-design.md, sighting and probes
- * under docs/perf/probes/2026-09-20-r53/). FINDING: round 52's count (the
- * app build breaks 20 of 910 observed singles move orders, a single solve
- * 10) has one cause, and it sits between the two stages, not in the ladder.
- * The speed-only pre-solve repairs the order and builds it into the base
- * sets; the full solve takes those as its prior. A mon whose damage lines
- * misfit forfeits "to the prior" and leaves the solved map, and the
- * caller's build, which no longer knows the pre-solve, reaches past it to
- * the usage guess. carryItemDecisions returned the pre-solve's entry only
- * with an item decision. SIGHTING (T66/stage-trace.vt.ts rebuilds the chain
- * stage by stage and first equals solveReplaySpreads on 129 of 129 bank
- * replays and 10 of 10 feedback games): broken singles orders of 910 by
- * build: no evidence 70, after the pre-solve 7, app build 20, single solve
- * 10; doubles 8 of 267 on every path. All 13 rows the pre-solve holds and
- * the app build loses carry a forfeited mon whose Speed snaps back to the
- * usage guess (2658663776 Volcanion 239, 176, 239 against Gliscor 226);
- * none is lost because the full solve overrules a Speed. Round 52's lead
- * (speedMeasured, speedError against the counterpart's current spread)
- * explains none of them: in stage two speedMeasured holds the pre-solve's
- * Speed as designed. The parser already drops orders under boosts,
- * paralysis, Tailwind and Trick Room (speedContaminatedAt), so the count
- * needs no such arithmetic; the probe still reads a mega at its base
- * forme's Speed. CHANGE: carryPreSolve (team-builder.ts) returns the
- * pre-solve's entry for every forfeited mon, with or without an item; a
- * mon the full solve kept still takes only the item along. Single-stage
- * callers are untouched. Red test first
+ * under docs/perf/probes/2026-09-20-r53/, close audit of four lenses with a
+ * refuter each: 25 findings confirmed and worked in, 3 refuted). FINDING:
+ * round 52's count (the app build breaks 20 of 910 observed singles move
+ * orders, a single solve 10) has one cause, and it sits between the two
+ * stages, not in the ladder. The speed-only pre-solve repairs the order and
+ * builds it into the base sets; the full solve takes those as its prior. A
+ * mon whose damage lines misfit forfeits "to the prior" and leaves the
+ * solved map, and the caller's build, which no longer knows the pre-solve,
+ * reaches past it to the usage guess. carryItemDecisions returned the
+ * pre-solve's entry only with an item decision. SIGHTING
+ * (T66/stage-trace.vt.ts rebuilds the chain stage by stage and first equals
+ * solveReplaySpreads on 129 of 129 bank replays and 10 of 10 feedback
+ * games): broken singles orders of 910 by build: no evidence 70, after the
+ * pre-solve 7, app build 20, single solve 10; doubles: no evidence 31 of
+ * 267, every solved path 8. All 13 rows the pre-solve holds and the app
+ * build loses carry a forfeited mon whose Speed snaps back to the usage
+ * guess (2658663776 Volcanion 239, 176, 239 against Gliscor 226); in the
+ * one row where the full solve also overrules a spread (2658669868
+ * Gholdengo, 252 EVs into SpA) its Speed stays 219 on every stage, so no
+ * row is lost to an overruled Speed. Round 52's lead (speedMeasured,
+ * speedError against the counterpart's current spread) explains none of
+ * them: in stage two speedMeasured holds the pre-solve's Speed as designed.
+ * The parser drops an order only in the direction that could explain it
+ * (speedContaminatedAt): Trick Room and same-turn entries bilaterally, a
+ * speed raiser (Tailwind, +Spe, paradox boosters) on the first mover, a
+ * lowerer (paralysis, -Spe) on the second. What it keeps is a constraint a
+ * fortiori, so the count's plain Speed comparison needs no such arithmetic;
+ * the probe still reads a mega at its base forme's Speed. CHANGE:
+ * carryPreSolve (team-builder.ts) returns the pre-solve's entry for every
+ * forfeited mon the full solve drops from its map, with or without an
+ * item. A forfeited mon whose max HP the log pinned stays in the map as the
+ * stage-two prior (the pre-solve's build) with that HP and takes only the
+ * item along, as does a mon the full solve kept; how many mons take that
+ * middle branch was not counted. A mon a pasted team or a sheet matches
+ * never reads `inferred` in the build, so a carried entry reaches only its
+ * panel. Single-stage callers are untouched. Red test first
  * (packages/replay-core/test/two-stage-carry.spec.ts, singles and doubles:
- * 289 against 303 before the fix). OWN EVIDENCE on the fixed code: the app
- * build breaks 7 of 910 (the same 7 every build breaks: Scarf cases and
- * maxima on both sides, T30's ground), the 13 rows are gone, doubles 8 of
- * 267. SET DIFF before the bank (D8), pre-registered and met: 9 of 1549
- * bank sets in 8 replays, all singles (eight change Speed, Reuniclus gains
- * 4 SpA from the top-up); 0 of 120 sets in the feedback harness.
+ * 289 against 303 before the fix; the doubles log yields no damage
+ * observation, so it pins the same solver path under a doubles header). The
+ * control case was blind at first: the audit showed a carry that overwrites
+ * every kept entry passing it; it now demands the single-solve build and
+ * Garchomp's 0 HP EVs, and that mutation turns it red. OWN EVIDENCE on the
+ * fixed code: the checkout's own chain (probe stage `app`, added between
+ * the before and the after run; `final` stays the old carry at 20 by
+ * construction) breaks 7 of 910, the 13 rows are gone, doubles 8 of 267.
+ * The 15 rows left are broken by every build, the evidence-free one
+ * included: four sit at maximum Speed on both sides (one of them the list's
+ * only Choice Scarf), five carry no Speed EV on either side, six are mixed;
+ * T30's ground, full list in stage-trace.json under stillBroken. SET DIFF
+ * before the bank (D8), pre-registered and met: 9 of 1549 bank sets in 8
+ * replays, all singles (eight change Speed, Reuniclus gains 4 SpA from the
+ * top-up); 0 of 120 sets in the feedback harness. The solved MAP grows
+ * further than the sets: the carry adds 165 entries on the 129 bank replays
+ * (the old carry added none), 154 of them with the EVs the usage guess
+ * already showed.
  * BANK (.calibration/r53-carry against the day's base r52-appbuild, itself
  * run twice byte-identical on c4bbe02 with no code commit since; wall 211
  * s): 39 of 833 positions move, all singles, in exactly those 8 replays; 3
@@ -947,21 +972,34 @@ import { summaryLines } from './calibration-summary';
  * sign 54/65/84 (singles 66, doubles 73); brier 0.2566/0.2197/0.1232; K
  * pooled 2.28 (singles 2.20, doubles 2.41); hq n=559 0.2431/0.1937/0.1275;
  * luck-adjusted n=502 0.2330/0.1948/0.1177; decided 76.7 % of 103, held
- * 94.7 % of 57 (the stall position no longer counts as a held sweep).
+ * 94.7 % of 57 (the held count drops by exactly 2658663776 t86).
  * MISSED: 2658663776 t86 moves from +0.988 to +0.069 and does not read for
  * p2 as NextSteps asked. The order is right now (Gliscor's Substitute
- * stands before Flamethrower); what remains is the engine not seeing a PP
- * stall, not a set. The raw build's -0.251 came with a Volcanion at 0 SpA.
- * AGAINST THE OLD BUILD (base-20260920): pooled +4 [+0, +7], singles +5
- * [+0, +10], hq +3 [+0, +6]; round 52 read +11 and +15. The carry wins back
- * 7 of the 11 bp; a small resolved remainder stays with the instrument
- * change. FEEDBACK: three runs byte-identical over ten dumps and unmoved
- * against round 52's r52-run1 (252 to 253 s), tier census singles 38/2/0
- * and doubles 7/5/0 with 0 moved turns; e2e 75 of 75; vitest 182 files and
- * 1491 tests; lint and tsc -b clean. NOT IN THIS ROUND: the 7 singles and 8
- * doubles rows every build breaks; the pre-solve's top-up that turns freed
- * Speed EVs into HP (it does so for kept mons too); the panel labels a
- * carried speed-only spread "fitted" like every other speed-only solve.
+ * stands before Flamethrower). Why the position still reads almost even was
+ * not measured: from t84 Volcanion clicks Flamethrower ten turns running
+ * into Gliscor's alternating Protect and Substitute under Poison Heal, and
+ * p1 forfeits at t94 with Flamethrower's PP not spent. Whether the search
+ * horizon, the PP bookkeeping or a set carries the rest is open; booked as
+ * a C signal. The raw build read -0.251 there with a Volcanion at 0 SpA
+ * (round 52, T56/stall-2658663776.txt); whether that set produced the
+ * number is untested.
+ * AGAINST THE OLD BUILD (base-20260920): pooled +4 [+0, +7] se 2, singles
+ * +5 [+0, +10], hq +3 [+0, +6]; round 52 read +11 [+1, +28] and +15 [+1,
+ * +39]. The gap's point estimate falls by 7 bp, well inside either band
+ * (the two pairings also run on different fixed K, 2.29 and 2.24). On this
+ * pairing the script still prints "no gain resolved; HARM on full singles
+ * (+5); no warnings; resolved under 5 bp: full all (+4), hq all (+3)": a
+ * D3 harm row against the superseded instrument, round 52's line booked as
+ * the new zero, not this round's gate, which is the day's base.
+ * FEEDBACK: three runs byte-identical over ten dumps and unmoved against
+ * round 52's r52-run1 (252 to 253 s), tier census singles 38/2/0 and
+ * doubles 7/5/0 with 0 moved turns; e2e 75 of 75; vitest 182 files and 1491
+ * tests; lint and tsc -b clean. NOT IN THIS ROUND: the 15 rows every build
+ * breaks; the pre-solve's top-up that turns freed Speed EVs into HP (it
+ * does so for kept mons too); the panel's tag: a carried entry reads
+ * "fitted" ("fits observed damage") like every other speed-only solve,
+ * here on mons whose damage evidence the full solve rejected, and on 154
+ * of 165 the tag moves where no EV does (T69).
  *
  * BANK BUILD 2026-09-20 (improvement round 52, T56 and T61; 8e73953 and
  * c4bbe02, harness and app plumbing only, no engine touch, no cache bump,

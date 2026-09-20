@@ -83,8 +83,15 @@ describe('the two-stage solve keeps the move orders its pre-solve repaired', () 
     const doubled = [...observations, ...observations];
     const solved = solveReplaySpreads(log, doubled, { speedOrders });
     const oneStage = buildTeamsFromReplay(log, { observations: doubled, speedOrders });
+    const preSolved = buildTeamsFromReplay(log, { speedOrders });
     const built = buildTeamsFromReplay(log, { inferredSpreads: solved });
     expect(speedOf(find(built.p2Team, 'Gliscor'))).toBeGreaterThanOrEqual(speedOf(find(built.p1Team, 'Garchomp')));
     expect(speedOf(find(oneStage.p2Team, 'Gliscor'))).toBeGreaterThanOrEqual(speedOf(find(oneStage.p1Team, 'Garchomp')));
+    // Garchomp is the mon an overwriting carry would destroy: the full solve
+    // fits its damage without HP, the pre-solve topped the freed Speed up into HP.
+    expect(built).toEqual(oneStage);
+    expect(built).not.toEqual(preSolved);
+    expect(find(built.p1Team, 'Garchomp').evs.hp).toBe(0);
+    expect(find(preSolved.p1Team, 'Garchomp').evs.hp).toBe(252);
   });
 });
