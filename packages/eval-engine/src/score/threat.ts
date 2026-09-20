@@ -96,6 +96,19 @@ function pairKey(attacker: Pokemon, defender: Pokemon): string {
     `${defender.side.id}:${defender.name}:${defender.species.id}:${defender.level}:${defender.item}:${defender.ability}:${defense}${liveHp}`;
 }
 
+/**
+ * The types a body defends with. After a Tera click the sim keeps `types` at
+ * the old types and carries the new one in `terastallized`; a Stellar Tera
+ * keeps the old types for defense. Not `getTypes()` on purpose: that adds
+ * Roost and the added types (Forest's Curse, Trick-or-Treat), and round 54
+ * measured Tera alone. The shortcut is still exact at a turn boundary: the
+ * click clears an added type, and Roost does not outlast its turn.
+ */
+export function liveTypes(pokemon: Pokemon): string[] {
+  const tera = pokemon.terastallized;
+  return tera && tera !== 'Stellar' ? [tera] : pokemon.types;
+}
+
 /** Defender abilities that blank (or halve) incoming move types in the proxy. */
 const ABILITY_IMMUNITIES: Record<string, string[]> = {
   levitate: ['Ground'],
@@ -165,9 +178,13 @@ export function singleMoveFraction(attacker: Pokemon, defender: Pokemon, moveId:
   if (!move.exists || move.category === 'Status') return 0;
   const blanked = ABILITY_IMMUNITIES[defender.ability] ?? [];
   if (blanked.includes(move.type)) return 0;
-  if (!battle.dex.getImmunity(move.type, defender.types)) return 0;
+  // The defender's LIVE types: smogtours-gen9ou-751207 t6 priced Body Press
+  // into a Ceruledge that had terastallized to Fighting at 0, as into a Ghost
+  // (50 such false immunities on the bank's Tera positions, round 54).
+  const defenderTypes = liveTypes(defender);
+  if (!battle.dex.getImmunity(move.type, defenderTypes)) return 0;
   if (!move.basePower) return fixedDamage(move, attacker, defender) / defender.maxhp;
-  const typeMult = Math.pow(2, battle.dex.getEffectiveness(move.type, defender.types));
+  const typeMult = Math.pow(2, battle.dex.getEffectiveness(move.type, defenderTypes));
   const stab = attacker.types.includes(move.type) ? 1.5 : 1;
   const offense = offenseMultiplier(attacker, defender, move);
   const bulk = bulkMultiplier(defender, move);

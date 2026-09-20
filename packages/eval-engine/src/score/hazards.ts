@@ -1,6 +1,6 @@
 import type { Battle, Pokemon, Side } from '@pkmn/sim';
 import { EVAL_WEIGHTS } from './weights.ts';
-import { usableSlots } from './threat.ts';
+import { liveTypes, usableSlots } from './threat.ts';
 
 /**
  * Hazards priced by their victims: the per-mon entry fraction, the capped
@@ -59,14 +59,17 @@ export function hazardEntryFraction(pokemon: Pokemon, side: Side, battle: Battle
   if (!hasRocks && !spikesLayers && !hasToxicSpikes && !hasWeb) return 0;
   if (pokemon.item === 'heavydutyboots' || pokemon.ability === 'magicguard') return 0;
 
+  // Grounding already follows a Tera click through the sim's isGrounded();
+  // the two typed reads follow it through liveTypes (round 54).
   const grounded = entryGrounded(pokemon, battle);
+  const types = liveTypes(pokemon);
   let fraction = 0;
   if (hasRocks) {
-    fraction += 0.125 * Math.pow(2, battle.dex.getEffectiveness('Rock', pokemon.types));
+    fraction += 0.125 * Math.pow(2, battle.dex.getEffectiveness('Rock', types));
   }
   if (grounded) {
     if (spikesLayers) fraction += [0, 1 / 8, 1 / 6, 1 / 4][spikesLayers];
-    if (hasToxicSpikes && battle.dex.getImmunity('psn', pokemon.types)) {
+    if (hasToxicSpikes && battle.dex.getImmunity('psn', types)) {
       fraction += 0.06; // priced as a slice of the psn/tox status cost
     }
     if (hasWeb) fraction += 0.04;
