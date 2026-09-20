@@ -145,6 +145,21 @@ function bulkMultiplier(defender: Pokemon, move: DexMove): number {
 }
 
 /**
+ * STAB by the game's rules (BattleActions#modifyDamage): an old type or the
+ * Tera type gives 1.5, an old type that is also the Tera type 2.0; a Stellar
+ * Tera gives 2.0 on an old type and 1.2 elsewhere. Left out: Adaptability,
+ * the once-per-type Stellar bookkeeping, the Pledge moves' forced STAB, the
+ * 60 BP floor of Tera-typed moves and Tera Blast's type (round 54).
+ */
+function stabMultiplier(attacker: Pokemon, moveType: string): number {
+  const oldType = attacker.types.includes(moveType);
+  const tera = attacker.terastallized;
+  if (tera === 'Stellar') return oldType ? 2 : 1.2;
+  if (tera === moveType) return oldType ? 2 : 1.5;
+  return oldType ? 1.5 : 1;
+}
+
+/**
  * Fixed damage the proxy can price without a base power (round 33: the
  * last-pair race must see a Seismic Toss Chansey as an attacker). Level
  * moves deal the user's level, the halving moves half the target's
@@ -185,7 +200,7 @@ export function singleMoveFraction(attacker: Pokemon, defender: Pokemon, moveId:
   if (!battle.dex.getImmunity(move.type, defenderTypes)) return 0;
   if (!move.basePower) return fixedDamage(move, attacker, defender) / defender.maxhp;
   const typeMult = Math.pow(2, battle.dex.getEffectiveness(move.type, defenderTypes));
-  const stab = attacker.types.includes(move.type) ? 1.5 : 1;
+  const stab = stabMultiplier(attacker, move.type);
   const offense = offenseMultiplier(attacker, defender, move);
   const bulk = bulkMultiplier(defender, move);
   const [atk, def] = move.category === 'Physical'
