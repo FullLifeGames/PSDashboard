@@ -8,9 +8,8 @@ import { formatEnforcesSleepClause, getBranchSimulatorFormat, replayBringOnly } 
 import { parseReplayLogWithObservations } from '../packages/replay-core/src/protocol-parser';
 import { AUTO_MCTS_FAINTED_FRACTION, battleFaintedFraction, searchPosition } from '../packages/eval-engine/src/search';
 import { mctsSearch } from '../packages/eval-engine/src/mcts';
-import { fetchSmogonUsageStats } from '../src/lib/smogon-stats';
-import { fetchSmogonSetAssumptions } from '../src/lib/smogon-sets';
 import { diskCachedSmogonFetcher } from './smogon-fetch-cache';
+import { bankTeamsFor } from './bank-build';
 import { createMatchupCache, evalFeatures, EVAL_WEIGHTS, FEATURE_WEIGHTS, type EvalFeatures } from '../packages/eval-engine/src/eval-function';
 import { setLastPairSweep } from '../packages/eval-engine/src/score/last-pair';
 import { livingMons } from '../packages/eval-engine/src/score/threat';
@@ -41,7 +40,14 @@ import { summaryLines } from './calibration-summary';
  * grade here; refuses to run without a dump path) ·
  * EVAL_CALIBRATION_SMOGON=1 (build teams WITH the Smogon usage/set fills
  * the app line waits for, disk-pinned in .smogon-cache/ so paired runs
- * see identical data — the information-gap experiment)
+ * see identical data — the information-gap experiment) ·
+ * EVAL_CALIBRATION_RAWBUILD=1 (with the fills, build the teams the way the
+ * bank did until round 52: raw infos and one solve. The default builds the
+ * app's chain instead — enriched infos, the two-stage solve, the
+ * hidden-power evidence — so the bank grades the teams a user sees. Every
+ * number recorded before round 52 was measured on the raw build; this
+ * switch brings it back, the way EVAL_CALIBRATION_RAW=1 keeps the
+ * reconstruction of round 46)
  *
  * Baseline 2026-08-04 (post ev-grading, pre boost-schedule; depth 1, samples 1):
  *   early 55% |0.23| · mid 62% |0.34| · late 81% |0.43|
@@ -3904,24 +3910,21 @@ describe.skipIf(!process.env.EVAL_CALIBRATION)('eval calibration against real re
       const p1Won = winnerName === replay.players[0];
       const gameType: Sample['gameType'] = /\|gametype\|doubles/.test(replay.log) ? 'doubles' : 'singles';
       // Observations drive spread inference — same path the app takes.
-      const { snapshots, observations, speedOrders } = parseReplayLogWithObservations(replay.log);
-      let { p1Team, p2Team } = buildTeamsFromReplay(replay.log, { observations, speedOrders });
-      if (p1Team.length === 0 || p2Team.length === 0) {
-        console.log(`skipping ${id}: could not build teams`);
+      const parsed = parseReplayLogWithObservations(replay.log);
+      const { snapshots, observations } = parsed;
+      // With the fills the build is the app's own chain (round 52): enriched
+      // infos, the two-stage solve, the hidden-power evidence — the teams a
+      // user sees, so the bank grades what the app ships. The switches:
+      //   default                        the app's chain
+      //   EVAL_CALIBRATION_RAWBUILD=1    raw infos and one solve, the build
+      //                                  every record before round 52 stands on
+      //   no EVAL_CALIBRATION_SMOGON=1   the naked build, unchanged
+      const built = await bankTeamsFor({ log: replay.log, formatId: replay.formatid ?? id, parsed, fetcher: smogonFetcher });
+      if (!built.teams) {
+        console.log(`skipping ${id}: ${built.reason}`);
         continue;
       }
-      if (smogonFetcher) {
-        // Rebuild with the fills, mirroring the app hooks: usage stats by
-        // the replay's format id, set assumptions for the known species.
-        const species = [...new Set([...p1Team, ...p2Team].map(set => set.species))];
-        const usageStats = await fetchSmogonUsageStats(replay.formatid ?? id, { fetcher: smogonFetcher });
-        const setAssumptions = await fetchSmogonSetAssumptions({ formatId: replay.formatid ?? id, species, fetcher: smogonFetcher });
-        ({ p1Team, p2Team } = buildTeamsFromReplay(replay.log, { observations, speedOrders, usageStats, setAssumptions }));
-        if (p1Team.length === 0 || p2Team.length === 0) {
-          console.log(`skipping ${id}: could not build teams with fills`);
-          continue;
-        }
-      }
+      const { p1Team, p2Team } = built.teams;
       const maxTurn = snapshots.length;
       const step = Math.max(1, Math.ceil(maxTurn / 8));
       const sampleTurns: number[] = [];

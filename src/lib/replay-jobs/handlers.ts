@@ -3,6 +3,7 @@ import {
 } from '@fulllifegames/eval-engine';
 import { solveReplaySpreads } from '@fulllifegames/replay-core';
 import { snapshotAt } from '../eval-acquire';
+import { replaySolveOptions } from '../team-build-options';
 import type { ReconstructJob, ReconstructOutcome, ReplayJobRequest, ReplayJobResponse } from './types';
 
 export type ReplayPost = (message: ReplayJobResponse) => void;
@@ -19,14 +20,7 @@ export async function handleReplayJob(message: ReplayJobRequest, post: ReplayPos
   try {
     if (message.type === 'solveSpreads') {
       const { job } = message;
-      const solved = solveReplaySpreads(job.log, job.observations, {
-        userTeamText: job.userTeamText,
-        p1Info: job.p1Info,
-        p2Info: job.p2Info,
-        usageStats: job.usageStats,
-        setAssumptions: job.setAssumptions,
-        speedOrders: job.speedOrders,
-      });
+      const solved = solveReplaySpreads(job.log, job.observations, replaySolveOptions(job));
       post({ type: 'solveSpreadsResult', id: message.id, entries: [...solved.entries()] });
       return;
     }

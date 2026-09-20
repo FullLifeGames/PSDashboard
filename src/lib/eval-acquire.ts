@@ -3,6 +3,7 @@ import {
   type DamageObservation, type HiddenPowerEvidence, type OpponentTeamInfo, type ReplayData, type TurnSnapshot,
   type SpreadCandidate, getBranchSimulatorFormat,
 } from '@fulllifegames/replay-core';
+import { replayBuildOptions } from './team-build-options';
 
 type BranchEngineModule = typeof import('./lazy/branch-engine');
 type ReconstructOptions = Parameters<BranchEngineModule['reconstructBranchRuntime']>[0];
@@ -43,15 +44,14 @@ export async function buildReplayTeams(
   opts?: TeamBuildOptions,
 ): Promise<{ p1Team: PokemonSet[]; p2Team: PokemonSet[] }> {
   const { buildTeamsFromReplay } = await import('./lazy/team-builder');
-  return buildTeamsFromReplay(replayData.log, {
+  return buildTeamsFromReplay(replayData.log, replayBuildOptions({
     userTeamText: sources.teamText || undefined,
     p1Info: overrides ? overrides.p1 : sources.effectiveP1Info,
     p2Info: overrides ? overrides.p2 : sources.effectiveP2Info,
     usageStats: sources.usageStats.stats,
     setAssumptions: sources.setAssumptions.assumptions,
-    inferredSpreads: await sources.getInferredSpreads(overrides?.p1, overrides?.p2, opts),
     hpEvidence: sources.hpEvidence,
-  });
+  }, await sources.getInferredSpreads(overrides?.p1, overrides?.p2, opts)));
 }
 
 /** Turn-0 team preview for the lead analysis, bring-trimmed (A.3c). */
