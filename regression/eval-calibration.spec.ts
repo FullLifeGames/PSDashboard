@@ -902,7 +902,10 @@ import { summaryLines } from './calibration-summary';
  *
  * BANK BUILD 2026-09-20 (improvement round 52, T56 and T61; 8e73953 and
  * c4bbe02, harness and app plumbing only, no engine touch, no cache bump,
- * cache stays v48; spec docs/superpowers/specs/2026-09-20-round-52-design.md,
+ * cache stays v48; adopted at the user gate of 20 Sep 14:50, "1a 2a 3a": the
+ * instrument stands with its harm line booked as the new zero, T66 moves
+ * ahead of iteration 4b, fast-forward to master; spec
+ * docs/superpowers/specs/2026-09-20-round-52-design.md,
  * probes under docs/perf/probes/2026-09-20-r52/). FINDING (round 51, T12):
  * the bank built its teams from raw infos with one solve, the app enriches
  * the infos and solves in two stages, and since round 37 the two had
