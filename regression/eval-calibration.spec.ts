@@ -912,11 +912,14 @@ import { summaryLines } from './calibration-summary';
  * docs/perf/probes/2026-09-20-r54/; close audit BEFORE the gate, four lenses
  * with a refuter each: 39 findings confirmed (several raised by two lenses)
  * and worked in, 7 refuted, every bank number re-derived and found right;
- * verdict open at the time of this booking, the user gate decides between the
- * line without the STAB rule, the line with it, and parking). FINDING (round
- * 51, T54): after a Tera click @pkmn/sim keeps pokemon.types at the old types
- * and carries the new one in terastallized; six static leaves read the old
- * types. smogtours-gen9ou-751207 t6: Body Press into a Ceruledge that had
+ * adopted at the user gate of 21 Sep 16:21, "1a 2a 3b 4a": the line without
+ * the STAB rule stands and fast-forwards to master, the rule stays parked for
+ * T71; T74 with T70 moves ahead of iteration 4c as iteration 4e and becomes
+ * round 55, T73 moves right behind 4c as iteration 4f; branch v1 follows
+ * master and is pushed, master itself stays unpushed). FINDING (round 51,
+ * T54): after a Tera click @pkmn/sim keeps pokemon.types at the old types and
+ * carries the new one in terastallized; six static leaves read the old types.
+ * smogtours-gen9ou-751207 t6: Body Press into a Ceruledge that had
  * terastallized to Fighting priced 0, as into a Ghost, where the engine's own
  * damage calc reads a knock-out. NextSteps quoted 237 % of its HP for that
  * hit; the calc double-counts Zamazenta's Dauntless Shield there (it
