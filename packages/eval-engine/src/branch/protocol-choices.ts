@@ -181,14 +181,19 @@ function defaultMoveChoice(battle: SimBattle, active: SimPokemon | null | undefi
   if (!active || active.fainted) return 'pass';
   const firstMove = active.moveSlots[0];
   if (!firstMove) return 'pass';
-  // `move 1` resolves against the request's first entry, not `moveSlots[0]`:
-  // on a locked request the two differ, and the entry has no target.
-  const firstRequestEntry = active.getMoveRequestData().moves[0];
-  const targetType = firstRequestEntry
-    ? (firstRequestEntry.target || '')
+  // `move N` resolves against the request's entries, not `moveSlots`: on a
+  // locked request the two differ, and the entry has no target. The default
+  // is the first ENABLED entry: a choice-locked body that flinched
+  // (gen9vgc2026regi-2630452654 t4, Miraidon locked into Snarl) had `move 1`
+  // disabled, and the rejected side choice cost its partner the Encore.
+  const requestMoves = active.getMoveRequestData().moves;
+  const enabledIndex = Math.max(0, requestMoves.findIndex(move => !move.disabled));
+  const requestEntry = requestMoves[enabledIndex];
+  const targetType = requestEntry
+    ? (requestEntry.target || '')
     : targetTypeForMove(active, firstMove.id || firstMove.move);
   const targetLoc = firstLegalTargetLoc(battle, active, targetType);
-  return `move 1${targetLoc ? ` ${formatTargetLoc(targetLoc)}` : ''}`;
+  return `move ${enabledIndex + 1}${targetLoc ? ` ${formatTargetLoc(targetLoc)}` : ''}`;
 }
 
 function moveChoiceForActive(active: SimPokemon | null | undefined, moveName: string): string {

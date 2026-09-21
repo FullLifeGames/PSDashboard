@@ -108,6 +108,53 @@ describe('a locked slot carries no target loc (round 55)', () => {
     expect(blissey.lastMove?.id).toBe('softboiled');
   });
 
+  test('doubles: a choice-locked slot that flinches defaults to its enabled move', async () => {
+    // gen9vgc2026regi-2630452654 t4: Miraidon sat locked into Snarl and
+    // flinched. No action line, so the rebuild defaulted to `move 1` (Volt
+    // Switch, disabled), the sim rejected the side, and Iron Valiant played
+    // Protect instead of its Encore.
+    const log = [
+      '|gametype|doubles', '|player|p1|Alice||', '|player|p2|Bob||', '|gen|9', '|tier|[Gen 9] Doubles OU',
+      '|poke|p1|Blissey, F|', '|poke|p1|Snorlax, M|', '|poke|p1|Hitmontop, M|',
+      '|poke|p2|Miraidon|', '|poke|p2|Chansey, F|', '|start',
+      '|switch|p1a: Blissey|Blissey, F|100/100',
+      '|switch|p1b: Snorlax|Snorlax, M|100/100',
+      '|switch|p2a: Miraidon|Miraidon|100/100',
+      '|switch|p2b: Chansey|Chansey, F|100/100',
+      '|turn|1',
+      '|switch|p1a: Hitmontop|Hitmontop, M|100/100',
+      '|move|p2a: Miraidon|Snarl|p1a: Hitmontop|[spread] p1a,p1b',
+      '|-damage|p1a: Hitmontop|85/100',
+      '|-damage|p1b: Snorlax|90/100',
+      '|move|p2b: Chansey|Seismic Toss|p1b: Snorlax',
+      '|-damage|p1b: Snorlax|70/100',
+      '|move|p1b: Snorlax|Rest|p1b: Snorlax',
+      '|upkeep', '|turn|2',
+      '|move|p1a: Hitmontop|Fake Out|p2a: Miraidon',
+      '|-damage|p2a: Miraidon|95/100',
+      '|cant|p2a: Miraidon|flinch',
+      '|move|p2b: Chansey|Soft-Boiled|p2b: Chansey',
+      '|upkeep', '|turn|3',
+    ].join('\n');
+    const p1Team = [
+      mon('Blissey', 'Natural Cure', ['Seismic Toss', 'Soft-Boiled'], 'Fairy'),
+      mon('Snorlax', 'Immunity', ['Hyper Beam', 'Rest'], 'Water'),
+      mon('Hitmontop', 'Technician', ['Fake Out', 'Close Combat'], 'Fighting'),
+    ];
+    const p2Team = [
+      { ...mon('Miraidon', 'Hadron Engine', ['Volt Switch', 'Snarl'], 'Electric'), item: 'Choice Specs' },
+      mon('Chansey', 'Natural Cure', ['Seismic Toss', 'Soft-Boiled'], 'Fairy'),
+    ];
+
+    const boundary = await rebuild(log, p1Team, p2Team, 'gen9doublesou', 2);
+    const block = parseTurnBlocks(log).turns.find(turn => turn.turn === 2)!;
+    expect(getMainChoice(block.preUpkeep, 'p2', boundary.battleStream.battle!)).toBe('move 2, move 2');
+    const runtime = await rebuild(log, p1Team, p2Team, 'gen9doublesou', 3);
+    const chansey = runtime.battleStream.battle!.sides[1].pokemon.find(p => p.species.name === 'Chansey')!;
+    expect(runtime.choiceErrors.count).toBe(0);
+    expect(chansey.lastMove?.id).toBe('softboiled');
+  });
+
   test('singles recharge never carried a loc', async () => {
     const log = [
       '|gametype|singles', '|player|p1|Alice||', '|player|p2|Bob||', '|gen|9', '|tier|[Gen 9] OU',
