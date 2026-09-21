@@ -903,7 +903,10 @@ import { summaryLines } from './calibration-summary';
  * REBUILD FIDELITY 2026-09-21 (improvement round 55, iteration 4e, T74 and
  * T70, a fast round without a spec; b583b79, 2f9b0a9 plus the booking, cache
  * v51, score-touching as a correction with its own evidence; probes, the
- * census and the gate chain under docs/perf/probes/2026-09-21-r55/).
+ * census and the gate chain under docs/perf/probes/2026-09-21-r55/; adopted
+ * at the user gate of 21 Sep 17:18: r55 fast-forwards to master, branch v1
+ * follows and is pushed, master itself stays unpushed; round 56 is
+ * iteration 4c, T58).
  * INSTRUMENT: lock-census.vt.ts makes one pass per replay with the working
  * tree's engine (the bank's app build, corrections at every boundary) and
  * compares, at each of 3695 turn boundaries in 149 replays (the bank's 129,
