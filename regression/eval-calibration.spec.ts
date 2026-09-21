@@ -900,6 +900,79 @@ import { summaryLines } from './calibration-summary';
  * static basis for this mass; the next lever, if any, is search/
  * planning-side.
  *
+ * REBUILD FIDELITY 2026-09-21 (improvement round 55, iteration 4e, T74 and
+ * T70, a fast round without a spec; b583b79, 2f9b0a9 plus the booking, cache
+ * v51, score-touching as a correction with its own evidence; probes, the
+ * census and the gate chain under docs/perf/probes/2026-09-21-r55/).
+ * INSTRUMENT: lock-census.vt.ts makes one pass per replay with the working
+ * tree's engine (the bank's app build, corrections at every boundary) and
+ * compares, at each of 3695 turn boundaries in 149 replays (the bank's 129,
+ * the feedback fixtures, the fit corpus's doubles replays with a locked-slot
+ * turn), the move locks the PROTOCOL shows on an active slot (Encore,
+ * Disable, Taunt, Torment: a |-start| without a later |-end|, switch or
+ * faint) against the volatiles the rebuilt body carries; it also sums the
+ * rejected choices (choiceErrors keeps the count and the LAST message per
+ * replay, so message classes are a lower bound). 181 s a label. BEFORE
+ * (7c0112d): Encore on 42 boundaries by the protocol, 7 missing and 1 extra
+ * in 4 replays; Taunt on 65, 1 missing and 2 extra; Disable and Torment never
+ * occur; 42 rejected choices. CAUSE T74 (gen9vgc2026regi-2629703929 t5,
+ * -2630452654 t4, smogtours-gen9doublesou-914408 t7, every time the encored
+ * move is Protect): an Encore that lands BEFORE its target moves bends the
+ * click onto the encored move, and the protocol shows that move, not the
+ * click. The rebuild sent Protect back; at +4 it ran ahead of the Encore, and
+ * the sim counts an Encore on a target that has already moved one turn longer
+ * (conditions.encore.onStart, queue.willMove). In 2629703929 the lock stood
+ * t6 to t8 instead of t6 and t7, and the second Encore of t8 failed against
+ * the first, so t9 to t11 offered Koraidon its attacks while the game had it
+ * on Protect. CHANGE (clickBehindEncore, branch/protocol-choices.ts): when a
+ * |-start|…|Encore for the slot precedes its |move| line in the same turn,
+ * the stand-in click is the request's lowest-priority other enabled move at
+ * priority 0 or below; the Encore bends it as in the game. No such move: the
+ * line stays the choice. The snapshot carries no volatiles, so the loss is
+ * prevented at the source, not restored at the boundary. CAUSE T70: a locked
+ * request (recharge, the release turn of Fly, Dig, Phantom Force or Electro
+ * Shot, a continued rampage) carries one entry WITHOUT a target;
+ * defaultMoveChoice and targetLocSuffixForChoice read the target type from
+ * moveSlots[0] or the Dex, hung a loc on the locked slot, and the sim
+ * rejected the whole side choice, so the PARTNER played its default. CHANGE:
+ * no loc for a request entry without a target; the default resolves against
+ * the request's entries. SECOND DOOR into the same room, found when
+ * 2630452654 still missed its Encore: a slot without an action line (a
+ * flinch) defaulted to `move 1`; on a choice-locked body that entry is
+ * disabled (Miraidon locked into Snarl, `move 1` = Volt Switch), the side
+ * was rejected, and Iron Valiant played Protect instead of its Encore.
+ * CHANGE (2f9b0a9): the default is the first ENABLED entry. In singles the
+ * sim's own `default` already picked that move, so only the error goes.
+ * AFTER: Encore 1 missing, 0 extra (smogtours-gen9doublesou-937928 t4: the
+ * rebuilt Ogerpon outspeeds Ninetales, the game had it the other way round,
+ * so the Encore meets a body without a last move; a broken move order, T30);
+ * Taunt unchanged at 1 and 2 (smogtours-gen9ou-752301: the built Landorus
+ * carries no Taunt; -751543 t20 unread); rejected choices 42 to 21 in 19
+ * replays, no "can't choose a target" left and "is disabled" down from 17
+ * replays to 3 (cause unread); by last message the rest is 11 x "can only switch
+ * in once" (doubles, 10 replays), 4 x "doesn't have a move matching" (3
+ * replays), 3 x "is trapped", 3 x "is disabled" (T75). GATES: bank
+ * r55-rebuild against r54-nostab,
+ * 833 of 833 joined, 5 positions moved, all doubles, all in the three Encore
+ * replays (2629703929 t6 -0.04 to +0.09, t8 -0.78 to +0.61, t10 -0.60 to
+ * -0.95; 2630452654 t6 +0.68 to +0.51; 914408 t8 -0.78 to -0.81); every
+ * singles row unmoved to the digit; full all +8 bp [+0, +25], doubles +28
+ * [+0, +83], doubles mid +74 [+0, +219], luck-adjusted all +1 [+0, +2];
+ * verdict "no gain resolved; no harm; no warnings". The +74 is one position:
+ * 2629703929 t8 now reads p1 ahead with a FREE Koraidon next to a 13 %
+ * Groudon, p1 clicked a third Protect, was encored into it and lost; the
+ * bank counts the outcome against a read the log supports. Brier
+ * 0.2537/0.2230/0.1195, K 2.31; new base .calibration/r55-rebuild. Feedback
+ * three runs byte-identical, exit 0; against the round-54 dumps 9 of 10
+ * unmoved (all six singles), 2629703929 moved on six turns: t11 blunder
+ * (regret 0.51) and t9 inaccuracy gone, t9 to t11 offer Protect alone, t6
+ * mistake 0.23 to 0.02 (the search below it no longer carries the long
+ * lock), t8 new inaccuracy 0.17 (free, Collision Course into the 13 %
+ * Groudon was on offer, p1 clicked Protect). Doubles tiers 12/6/1 to 12/5/0.
+ * Suite 188 files and 1530 tests, tsc -b, lint, e2e 75 of 75 (a first full
+ * run right after the feedback chain lost three tests to timeouts; each
+ * passes alone, the second full run is clean).
+ *
  * TERA IN THE STATIC EVAL 2026-09-20 (improvement round 54, T57; b7313de,
  * 5dffd19, be95961, 735bb42, 5c22919, 55c9a5a, ef0e3f4, ffb1269, 581424a,
  * 63c16d6, 6aedcd8, the booking 34fe304 plus the closing commits, cache v50,

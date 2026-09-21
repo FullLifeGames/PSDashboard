@@ -1,9 +1,9 @@
-# Next Steps (Stand 21.09.2026, nach Runde 54)
+# Next Steps (Stand 21.09.2026, nach Runde 55)
 
 Nur offene Schritte, als priorisierte Checkliste: Die oberste Iteration ist die nächste Sitzung, das oberste offene Kästchen darin das nächste TODO. Jedes TODO nennt das Problem an einer Spielszene und das Erfolgsmaß. Die Umsetzungsschritte jedes TODOs stehen als Checkliste im Backlog-Plan unter derselben Nummer; beim Start einer Iteration wandern sie hierher.
 
-- **Iterationen** bündeln die TODOs einer Sitzung. Eine Iteration wird beim Start zur Runde mit der nächsten freien Rundennummer: Iteration 1 war Runde 46, Iteration 2 war Runde 47, Iteration 2a war Runde 48, Iteration 2b war Runde 49, Iteration 3 war Runde 50, Iteration 4 war Runde 51, Iteration 4a war Runde 52, Iteration 4d war Runde 53, Iteration 4b war Runde 54, Iteration 4e wird Runde 55. Score-berührende TODOs derselben Iteration bekommen je ihre eigene Messung (D3), nie eine gemeinsame.
-- **T-Nummern** (T01 bis T45) sind feste Namen, vergeben am 18.09. in Prioritäts-Reihenfolge. Wandert ein TODO in der Liste, behält es seine Nummer; ein neues TODO bekommt die nächste freie (ab T75; T46 kam am 18.09. in Runde 46 dazu, T47 bis T51 in Runde 47, T52 und T53 in Runde 48, T54 in Runde 49, T55 in Runde 50, T56 bis T64 in Runde 51, T65 am 19.09. nach deren Gate, T66 bis T68 am 20.09. in Runde 52, T69 am 20.09. in Runde 53, T70 bis T74 am 21.09. in Runde 54). „braucht T01“ heißt: T01 muss vorher gelaufen sein.
+- **Iterationen** bündeln die TODOs einer Sitzung. Eine Iteration wird beim Start zur Runde mit der nächsten freien Rundennummer: Iteration 1 war Runde 46, Iteration 2 war Runde 47, Iteration 2a war Runde 48, Iteration 2b war Runde 49, Iteration 3 war Runde 50, Iteration 4 war Runde 51, Iteration 4a war Runde 52, Iteration 4d war Runde 53, Iteration 4b war Runde 54, Iteration 4e war Runde 55. Score-berührende TODOs derselben Iteration bekommen je ihre eigene Messung (D3), nie eine gemeinsame.
+- **T-Nummern** (T01 bis T45) sind feste Namen, vergeben am 18.09. in Prioritäts-Reihenfolge. Wandert ein TODO in der Liste, behält es seine Nummer; ein neues TODO bekommt die nächste freie (ab T76; T46 kam am 18.09. in Runde 46 dazu, T47 bis T51 in Runde 47, T52 und T53 in Runde 48, T54 in Runde 49, T55 in Runde 50, T56 bis T64 in Runde 51, T65 am 19.09. nach deren Gate, T66 bis T68 am 20.09. in Runde 52, T69 am 20.09. in Runde 53, T70 bis T74 am 21.09. in Runde 54, T75 am 21.09. in Runde 55). „braucht T01“ heißt: T01 muss vorher gelaufen sein.
 - **Backlog-Plan** (je TODO: Idee, Schritte mit Dateien, volles Gate, Doubles-Abdeckung, offene Entscheidungen, Zahlen, Code-Belege): `docs/superpowers/plans/2026-09-18-backlog-plans.md`.
 - **Erledigtes**: `docs/completed/` nach Gebiet (Index, Eintragsformat und Prozess in `docs/completed/README.md`).
 - **Maschinen-Quellen**: Ledger in `regression/eval-calibration.spec.ts`, Pins in `e2e-feedback/corpus.ts`, Memory-Notizen.
@@ -12,26 +12,6 @@ Nur offene Schritte, als priorisierte Checkliste: Die oberste Iteration ist die 
 Die Schritte sind ein erster Entwurf vom 18.09. (Code-Stand dcf9526, jeder Code-Beleg per Grep geprüft). Jede Runde bekommt vor dem Bau weiterhin ihr Brainstorming und ihre Spec; die Schritte hier sind deren Startpunkt, und die Spec darf sie ersetzen. Ältere Dokumente nennen Q6 und Q4 gemeinsam „Runde 46“; hier sind es T06 und T09 in den Iterationen 2 und 3.
 
 Hinter jedem Titel stehen Thema, Art, Größe (mini, klein, mittel, groß), Gate (score-berührend = D3, verlustfrei = D4, sonst ausgeschrieben) und „braucht“ = muss vorher gelaufen sein.
-
-## Iteration 4e · Nachbau-Treue: Encore und gesperrte Slots
-
-Zwei Reste aus Runde 54, am User-Gate vom 21.09. („2a“) vor Iteration 4c gezogen: T58 liest dieselben Doubles-Urteile und mäße den Encore-Fehler sonst mit (Vorbild: T66 vor Iteration 4b). Beide sitzen im Nachbau (`branch/protocol-choices.ts` und die Korrekturen), beide sind klein, jeder bekommt seine eigene Zählung als Beleg.
-
-- [ ] **T74 · Encore im Nachbau: Die erste Sperre steht einen Zug zu lang, die zweite fehlt** (Nachbau, Mini-Runde, klein, score-berührend D3 mit eigenem Beleg, erster Schritt Sichtung)
-
-  VGC 2629703929: Jumpluff trifft Koraidon zweimal mit Encore. Im Spiel ist Koraidon in Zug 6 und 7 und wieder in Zug 9 bis 11 auf Protect festgelegt. Die Engine bietet Koraidon in Zug 6 bis 8 nur Protect an (einen Zug zu lang) und in Zug 9 bis 11 sieben Züge (die zweite Sperre fehlt). Seit Runde 54 liest die Statik Koraidons Tera Feuer richtig und sieht, dass Groudons Precipice Blades es doppelt trifft. Sie nennt Protect in Zug 11 deshalb einen Blunder (Reue 0,51) und hielte Collision Course für klar besser: ein Zug, den das Spiel nicht erlaubte. In Zug 9 entsteht aus demselben Grund eine Ungenauigkeit. Wie ein Schiedsrichter, der einem Spieler vorwirft, nicht geschossen zu haben, während der auf der Strafbank saß. Gefunden beim Lesen der bewegten Doubles-Urteile der Runde 54 (`docs/perf/probes/2026-09-20-r54/reading/reading.md`); der Fehler ist älter als die Runde, die richtige Typ-Lesung hat ihn nur sichtbar gemacht.
-
-  Hinweis: Die Ursache ist ungemessen, das Log gibt aber eine Spur: In Zug 5 kommt Jumpluffs Encore VOR Koraidons Zug und biegt dessen Klick auf Protect um; das Protokoll zeigt deshalb „Koraidon setzt Protect ein“. Der Nachbau liest diese Zeile als Wahl und schickt `move protect`, das mit Priorität +4 vor dem Encore läuft. Trifft Encore ein Ziel, das schon gezogen hat, zählt der Simulator einen Zug länger: Sperre bis Zug 8 statt 7, und das zweite Encore in Zug 8 scheitert an der noch laufenden ersten. Das Protokoll zeigt, was passiert ist, nicht, was geklickt wurde. Die Basis-Dumps der Runde 53 bieten in Zug 9 bis 11 schon dieselben Angriffe an (12, 7 und 7 Optionen), der Fehler ist also älter als Runde 54. Weitere Verdachte: Ein K. o., der nur im Nachbau passiert, räumt alle Volatiles ab, auch Encore (C-Signal aus Runde 54), oder die Korrektur aus dem Schnappschuss kennt Encore nicht und der Simulator zählt die Dauer anders als das Spiel. Erster Schritt ist eine Zählung über Bank und Feedback-Spiele: Züge, in denen das Protokoll eine Encore-Sperre zeigt, gegen die Optionen, die die Engine dort anbietet. Dieselbe Zählung für Disable, Taunt und Torment kostet nichts extra.
-
-  *Erfolg:* In Zug 9 bis 11 bietet die Engine Koraidon nur Protect an und in Zug 8 alle Züge, der Blunder in Zug 11 und die Ungenauigkeit in Zug 9 verschwinden, die Zählung steht bei 0 Abweichungen oder nennt den Rest, Singles-Dumps byte-gleich oder gelesen. *Plan T74:* 5 Schritte, 2 offene Entscheidungen.
-
-- [ ] **T70 · Doubles: Ein gesperrter Slot kippt die Wahl der ganzen Seite** (Nachbau, Mini-Runde, klein, score-berührend D3 mit eigenem Beleg)
-
-  Doubles, Snorlax hat Hyper Beam gespielt und lädt nach, sein Partner Blissey spielt laut Protokoll Soft-Boiled. Der Nachbau hängt dem gesperrten Slot einen Zielort an (`move 1 +1`), der Simulator antwortet „You can't choose a target for recharge“ und lehnt die Wahl der ganzen Seite ab. Der Nachbau schickt darauf `default`, und Blissey spielt Seismic Toss statt Soft-Boiled. Dasselbe passiert im Auflösungszug von Fly, Dig und Phantom Force und bei fortgesetztem Outrage. Wie ein Formular, das wegen eines Eintrags in einem gesperrten Feld abgelehnt und dann ganz mit Standardwerten ausgefüllt wird. Gemessen im Review der Runde 54: 15 Züge in 14 von 681 Doubles-Replays des Fit-Korpus, 0 in den 46 Doubles-Spielen der Bank; Singles ist unbetroffen (dort gibt es keinen Zielort). Ursache: `defaultMoveChoice` und `targetLocSuffixForChoice` (`branch/protocol-choices.ts`) lesen den Zieltyp aus `moveSlots[0]` oder dem Dex statt aus dem Eintrag, gegen den der Simulator `move 1` auflöst; der gesperrte Eintrag trägt kein `target`. Der Fehler ist älter als Runde 54.
-
-  Hinweis: Die Sonden samt gemessenem Fix liegen unter `docs/perf/probes/2026-09-20-r54/review/verify-rebuild-0/` (R1 Recharge, R2 Fly, R3 Singles; mit dem Fix spielt Blissey Soft-Boiled, 17 Specs bleiben grün). Den Dex-Rückfall in `targetTypeForMove` nicht global ändern, `branch/state.ts` hängt daran. Die Bank ist blind: Beleg ist die Zählung abgelehnter Seitenwahlen, vorher und nachher.
-
-  *Erfolg:* Auf den 15 Zügen lehnt der Simulator keine Seitenwahl mehr ab, und der Partner spielt seinen Protokollzug; Singles, Bank und Singles-Dumps bleiben byte-gleich; bewegte Doubles-Dumps sind gelesen. *Plan T70:* 4 Schritte, 1 offene Entscheidung.
 
 ## Iteration 4c · Doubles bekommt den Zellenplan
 
@@ -43,7 +23,7 @@ Zwei Sichtungen haben denselben Befund unabhängig gefunden (T10 an den Zellen, 
 
   Hinweis: Erster Schritt ist eine Zählung: Wie viele Doubles-Wurzelzellen liegen auf einer K.-o.- oder Fehlschlag-Kante, und was kostet ein Plan mit zwei Ereignis-Slots je Seite? Dieselbe Stelle trägt T14 (Klassen auf Ansage), T23 (Crit) und T24 (Zurückzucken); eine gemeinsame Arithmetik für Paar-Züge erspart drei Nachrüstungen. Der Play-out-Pin läuft zuerst einzeln (D7). Bleibt die Wanduhr der Doubles-Matrix nicht im Rahmen, ist die kleine Variante „mehr Ziehungen auf Kanten-Zellen“ der Rückfall.
 
-  Seit Runde 54 gilt für das Lesen der Doubles-Urteile: VGC 2629703929 Zug 9 bis 11 misst p1 an Zügen, die eine Encore-Sperre verbot (T74); diese drei Züge sind bis T74 kein Maß.
+  Seit Runde 55 trägt der Nachbau die Encore-Sperren in VGC 2629703929 wie das Spiel (Zug 6 und 7, Zug 9 bis 11); die Züge sind wieder ein Maß. Basis der Bank ist `.calibration/r55-rebuild`, Basis der Dumps `docs/perf/probes/2026-09-21-r55/feedback/r55-run1`.
 
   *Erfolg:* Die vier Doubles-Dumps tragen `koOdds`, die gespielte Zelle in 2634199230 Zug 5 preist den K. o. an Incineroar anteilig statt gar nicht, Singles-Dumps und Singles-Zeilen der Bank bleiben ziffern-gleich, die Doubles-Zeilen der Bank stehen in der vorregistrierten Linie, Doubles-Matrixzeit höchstens im vorregistrierten Rahmen. *Plan T58:* 8 Schritte, 3 offene Entscheidungen.
 
@@ -173,7 +153,7 @@ Zwei Minis, die beim Review der Runde 52 aufgefallen sind. Beide sind verlustfre
 
 ## Iteration 7b · Rechner: Rest aus Runde 54
 
-Eine kleine Korrektur, die der Schiedsrichter der Runde 54 gefunden hat. Sie berührt Scores nur in Spielen mit einer betroffenen Art; der Beleg ist eine Zählung. Die zwei Nachbau-Reste derselben Runde (T74, T70) stehen seit dem User-Gate vom 21.09. als Iteration 4e ganz vorn.
+Eine kleine Korrektur, die der Schiedsrichter der Runde 54 gefunden hat. Sie berührt Scores nur in Spielen mit einer betroffenen Art; der Beleg ist eine Zählung. Die zwei Nachbau-Reste derselben Runde (T74, T70) sind seit Runde 55 erledigt.
 
 - [ ] **T72 · Der Schadensrechner kennt kosmetische Formen nicht** (Zufall preisen, Mini-Runde, klein, score-berührend D3)
 
@@ -182,6 +162,18 @@ Eine kleine Korrektur, die der Schiedsrichter der Runde 54 gefunden hat. Sie ber
   Hinweis: Erster Schritt ist eine Zählung: Welche Arten der Bank und des Fit-Korpus kennt der Rechner nicht? Fix: die Art vor dem Rechner auf die Form abbilden, die er kennt, wo die Form nur das Aussehen ändert (gleiche Basiswerte und Typen).
 
   *Erfolg:* 0 leere Rechner-Ergebnisse auf den Bank-Stellungen (heute 46 Paare), die K.-o.-Quoten stehen für diese Körper, Bank und Dumps bewegen sich nur in Spielen mit einer solchen Art. *Plan T72:* 4 Schritte, 1 offene Entscheidung.
+
+## Iteration 7c · Nachbau: Rest aus Runde 55
+
+Die Zählung der Runde 55 (`docs/perf/probes/2026-09-21-r55/lock-census.vt.ts`, 181 s je Lauf) lässt 21 abgelehnte Wahlen in 19 von 149 Replays übrig.
+
+- [ ] **T75 · Der Simulator lehnt im Nachbau noch 21 Wahlen ab** (Nachbau, Mini-Runde, klein, score-berührend D3 mit eigenem Beleg, erster Schritt Sichtung)
+
+  Lehnt der Simulator die Wahl einer Seite ab, schickt der Nachbau `default`, und in Doubles spielt dann auch der Partner seinen ersten Zug statt seines Protokollzugs. Runde 55 hat zwei Ursachen geschlossen (Zielort am gesperrten Slot, gesperrter erster Zug nach einem Zurückzucken) und die Zahl von 42 auf 21 gedrückt. Der Rest nach der letzten Meldung je Replay: 11-mal „can only switch in once“ (Doubles, 10 Replays: zwei Slots wollen dasselbe Pokémon einwechseln), 4-mal „doesn't have a move matching“ (das gebaute Set trägt den gespielten Zug nicht, etwa Landorus ohne Taunt in smogtours-gen9ou-752301), 3-mal „is trapped“, 3-mal „is disabled“ (Ogerpon Ivy Cudgel, Gouging Fire Morning Sun, Toxapex Toxic Spikes in 573756). Wie ein Formular, das an der Kasse zurückkommt: Der Kunde bekommt dann das Standardmenü.
+
+  Hinweis: `choiceErrors` hält je Replay nur die Zahl und die letzte Meldung. Erster Schritt: jede Ablehnung mit Zug und Meldung mitschreiben, dann die größte Klasse (Doppel-Einwechslung) an einem Replay verfolgen. 573756 ist ein Pin-Spiel; ein Fix dort braucht den Feedback-Lauf vor der Bank. Die Zählung nennt außerdem drei Taunt-Abweichungen (752301 Zug 2 und 3, smogtours-gen9ou-751543 Zug 20, ungelesen) und eine Encore-Abweichung aus gebrochener Zugreihenfolge (smogtours-gen9doublesou-937928 Zug 4, gehört zu T30).
+
+  *Erfolg:* Die Zählung nennt jede Ablehnung mit Zug und Klasse, die Klasse „can only switch in once“ steht bei 0 oder ist erklärt, Singles-Dumps byte-gleich oder gelesen. *Plan T75:* 4 Schritte, 1 offene Entscheidung.
 
 ## Iteration 8 · Glückskonto: gewürfelt oder umbewertet
 
@@ -481,7 +473,7 @@ Wer an einem Thema arbeitet, findet hier die verwandten TODOs.
 | Endspiel | T33, T34, T55, T73 |
 | Sets und Spreads | T25, T26, T27, T28, T29, T30, T31, T32, T60, T62, T63 |
 | Zufall preisen | T14, T15, T16, T23, T24, T35, T58, T65, T72 |
-| Nachbau | T70, T74 |
+| Nachbau | T75 |
 | Oberfläche | T20, T68, T69 |
 | Richter und Bank | T21, T37, T38, T45 |
 | Q-Runden | T39, T40, T41, T42 |
