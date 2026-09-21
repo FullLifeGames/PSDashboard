@@ -900,6 +900,174 @@ import { summaryLines } from './calibration-summary';
  * static basis for this mass; the next lever, if any, is search/
  * planning-side.
  *
+ * TERA IN THE STATIC EVAL 2026-09-20 (improvement round 54, T57; b7313de,
+ * 5dffd19, be95961, 735bb42, 5c22919, 55c9a5a, ffb1269, 581424a, 6aedcd8 plus
+ * the closing commit, cache v50, score-touching as a correction with its own
+ * evidence; the STAB rule d8eb0a3 was built, measured and parked again by
+ * c910b91, the state with it stays on branch r54-stab; spec
+ * docs/superpowers/specs/2026-09-20-round-54-design.md, preparation, probes
+ * and the gate chain under docs/perf/probes/2026-09-20-r54/; verdict open at
+ * the time of this booking, the user gate decides between the line without the
+ * STAB rule, the line with it, and parking). FINDING (round 51, T54): after a
+ * Tera click @pkmn/sim keeps pokemon.types at the old types and carries the
+ * new one in terastallized; six static leaves read the old types.
+ * smogtours-gen9ou-751207 t6: Body Press into a Ceruledge that had
+ * terastallized to Fighting priced 0, as into a Ghost, where the engine's own
+ * damage calc reads a knock-out. NextSteps quoted 237 % of its HP for that
+ * hit; the calc double-counts Zamazenta's Dauntless Shield there (it
+ * re-applies the switch-in boost on top of the sim's stage), by hand it is 164
+ * to 193 %, and the false immunity stands either way. A second defect had to
+ * fall first: the reconstruction lost Tera clicks, always one body too few,
+ * never one too many. PREPARATION (two readers and a probe builder, a checker
+ * each): the instrument docs/perf/probes/2026-09-20-r54/T57/probes/ rebuilds
+ * the bank positions with the working tree's engine (833 of 833 bank scores of
+ * r53-carry reproduced bit for bit, 806 distinct values), counts Tera bodies
+ * against the protocol and measures singleMoveFraction against the Tera-aware
+ * damage calc, 167 s a label. BASE "before" (f88bab2): Tera body on the field
+ * in 226 positions by the log, 215 in the rebuild; 17 positions one body short
+ * (3 singles, 14 doubles), 0 over, 7 replays (round 51 counted 18;
+ * gen9ou-2663115494 t50 keeps its body since round 52 or 53, which of the two
+ * is unmeasured). Referee: 2529 pairs of attacker, move and defender in the
+ * 215 positions, 50 false immunities (static 0 where the calc deals damage),
+ * all from the raw type chart, all with a terastallized defender; mean |static
+ * - calc| 0.2146 over the rows with a real calc result (46 rows are empty
+ * because @smogon/calc does not know Gastrodon-East, T72). CAUSE A (13 bodies,
+ * 3 replays): a Tera turn without an action line for the slot (a flinch; 8 of
+ * 207 clicks over the 129 replays, 5 of them bodies that fell before they
+ * moved) fell through getChoiceForSlot to defaultMoveChoice, the one branch
+ * without the gimmick suffix. CAUSE B (4 bodies, 4 replays): the body faints
+ * only in the rebuild, the sim's faint block deletes terastallized, the HP
+ * correction revives the body without it. CHANGE, one commit a rule, red test
+ * first: (A) the fallback carries the suffix like the other branches (Tera,
+ * Mega, Ultra Burst), never on `pass`. (B) restoreTeraFromSnapshot
+ * (branch/tera-restore.ts) runs after the HP correction at every boundary: a
+ * living snapshot entry that carries the marker spends the side's Tera
+ * (canTerastallize null for every ally, so the search never offers a second
+ * one) and gives the marker back to its body; gen 9 only, never onto a side
+ * that already carries a marker, never onto a side with an Illusion holder
+ * (the protocol names the disguise), never for an entry matching no body or
+ * two, never for Ogerpon, Terapagos and Morpeko (the click also changes forme
+ * and ability, Terapagos 140 max HP; the marker's loss stays there). The first
+ * draft's trigger ("the side spent its Tera and nobody carries it") was
+ * refuted by the checker: that state holds in every battle before gen 9, after
+ * every real faint of a Tera body and after Revival Blessing (964 of 6896
+ * side-turns on the bank); the snapshot alone decides. (C) pairKey carries
+ * terastallized next to the raw types (STAB needs both, a Stellar body keeps
+ * its old types). (D) liveTypes(pokemon) feeds the immunity and the type chart
+ * in threat.ts, Stealth Rock and Toxic Spikes in hazards.ts and Black Sludge
+ * in features.ts; isGrounded() saw Tera before and stays. Not getTypes() on
+ * purpose (Roost, added types): the round measures Tera alone, and the
+ * shortcut is exact at a boundary because the click clears an added type and
+ * Roost does not outlast its turn. (E) STAB by the game's rules (old type 1.5,
+ * Tera type 1.5, both 2.0, Stellar 2.0 and 1.2), checked against the sim on
+ * eight cases: built as d8eb0a3, PARKED, see below. (F)
+ * ABILITY_FLAG_IMMUNITIES: Wind Rider, Soundproof and Bulletproof blank wind,
+ * sound and ball moves (gen9doublesou-2660822493 t2, Hurricane into Shiftry).
+ * (G) render-only: nullMoveReason takes the defender's Tera type, names it in
+ * its sentence ("Garchomp (Tera Fire) cannot be burned") and stays silent on
+ * the eleven moves the sim retypes on use (Tera Blast, Weather Ball, Judgment
+ * and kin); pokemonInfoFromSnapshot carries teraType, so the branch panel's
+ * fallback preview stops reading Body Press into the Fighting Ceruledge as 0
+ * %. The guard is not singles-only as its comment said: a doubles endgame with
+ * one living active a side reaches it (in the corpus one turn, VGC 2629703929
+ * t13, where nothing moves). CODE REVIEW before the chain (four lenses with a
+ * refuter per finding; the fifth lens, spec against code, failed on its output
+ * format): 12 of 19 findings confirmed and worked in, none a blocker: the
+ * restore's carve-outs left the side's Tera armed (581424a), the "side stays
+ * spent" assertion could not go red (the side was spent before the staged
+ * faint; now a fixture with an armed side, and all 13 mutants of the restore
+ * die), pins for the `pass` trap, the Stellar defense and the guard's side
+ * pick. One finding predates the round and becomes T70: in doubles a locked
+ * slot (recharge, a Fly release) gets a target loc, the sim rejects the whole
+ * side's choice and the partner plays the default (14 of 681 doubles replays
+ * of the fit corpus, 0 on the bank). GATE CHAIN
+ * (docs/perf/probes/2026-09-20-r54/gates-chain.sh checks every state out and
+ * measures it alone: bank paired against the previous state and against
+ * r53-carry, the instrument, one feedback run). Base: a bank run on master is
+ * byte-identical to r53-carry (209 s). clickA: 13 of 833 positions move, all
+ * doubles, in exactly the three flinch replays (gen9vgc2026regi-2629760324,
+ * smogtours-gen9doublesou-938644 and -939625), three sign flips of which two
+ * land on the winner (938644 t14 from +0.33 to -0.72 where p1 lost); no gain
+ * resolved, no harm; Tera count 17 short to 4. markB: 5 positions in three of
+ * the four cause-B replays, at most 0.033 (the static is still blind there);
+ * Tera count 0 short and 0 over, 226 against 226 on the field and 334 against
+ * 334 alive: the round's first success measure. key: byte-identical to markB.
+ * def: 293 positions move (147 singles, 146 doubles, 98 replays), every one of
+ * them with a living Tera body and none without (pre-registered, met); against
+ * key: full singles -7 bp [-15, +0], luck-adjusted singles -13 [-25, -2],
+ * doubles -13 [-78, +40] unresolved (round 51's depth-1 direction run had let
+ * expect +45 for doubles; it does not show); table verdict: gain, no harm, no
+ * warnings. Referee: false immunities 52 to 1 (pre-registered: at most 1),
+ * mean error 0.217 to 0.153, of 639 disagreeing pairs 540 closer to the calc
+ * and 99 farther. The one left is no Tera defect: Primarina's Liquid Voice
+ * turns Hyper Voice into a Water move, the static reads it Normal into the
+ * Tera Ghost Sneasler (T73). stab: 128 positions, all with a living Tera body;
+ * the referee sides with the rule (116 of 150 disagreeing pairs closer), the
+ * bank does not: against def, HARM on luck-adjusted doubles +10 bp [+0, +22],
+ * warnings on hq doubles late +8 and luck-adjusted doubles late +23, full
+ * doubles +14 [-3, +37], singles still. Weights and K were fitted against the
+ * blind static; the rule waits for the re-fit rounds (T71). flags: 6 positions
+ * in 3 replays (the two Wind Rider games and gen9ou-2663110678, a singles game
+ * where a built set carries Soundproof), at most 0.034, both disagreeing
+ * referee pairs closer. review (the module split, the review fixes, the render
+ * commits): byte-identical to flags. VARIANT WITHOUT STAB (c910b91, the line
+ * this entry books): against r53-carry gain on luck-adjusted all -22 and
+ * luck-adjusted singles -13 [-26, -2], full singles -6 [-15, +0] and full
+ * doubles -46 [-113, +14] unresolved, no harm on any pooled row; against the
+ * tip with STAB luck-adjusted doubles -10 [-22, +0]. ONE WARNING in both
+ * variants: hq doubles mid +96 bp [+8, +198] on 49 positions; 58 of it come
+ * from clickA and 38 from def, and three positions carry 92 of the 96
+ * (smogtours-gen9doublesou-937928 t6 +0.18 to +0.47, -913993 t6 -0.23 to
+ * +0.05, -939625 t8 -0.11 to +0.09, p1 lost all three). A phase cell warns and
+ * does not decide (D3); it went to the gate with its size. NEW BASE
+ * .calibration/r54-nostab: n=833, the same positions: sign 54/65/85 (singles
+ * 66, doubles 73); brier 0.2540/0.2207/0.1193; K pooled 2.34 (singles 2.22,
+ * doubles 2.55); hq n=559 0.2429/0.1956/0.1226; luck-adjusted n=501
+ * 0.2272/0.1940/0.1131; decided 75.9 % of 108, held 94.6 % of 56. The tip with
+ * STAB (.calibration/r54-review) reads 0.2540/0.2213/0.1196, K 2.33. FEEDBACK:
+ * the six singles dumps (gen 6 and 8, no Tera) are byte-identical to round 53
+ * in every state, tier census singles 38/2/0 throughout. The four doubles
+ * games without pins move from def on: 16 turns change attribution or tier,
+ * doubles census 7/5/0 to 12/6/1 (with STAB 14/4/1, 9 more turns). READING of
+ * the moved doubles judgments (a reader and a skeptic per game against the
+ * replay logs, docs/perf/probes/2026-09-20-r54/reading/reading.md): of the 17
+ * turns the def step moves, 8 read more plausible than before, 4 equally, 3
+ * less, 1 looks like single-draw noise and 1 cannot be told from a dump; every
+ * type relation the readers traced is right by the chart (VGC 2629703929 t7:
+ * Chi-Yu's Heat Wave leaves the Tera Dark Jumpluff at 40 %, the neutral hit
+ * the new static prices, not the 4x the blind one assumed). None of the three
+ * less plausible turns is a type error. In 2629703929 t9 and t11 the new
+ * inaccuracy and the new blunder (regret 0.00 to 0.51) grade p1 against
+ * Koraidon attacks while the log has Koraidon Encore-locked into Protect from
+ * t9 to t11: the rebuild holds the first Encore a turn too long and misses the
+ * second, older than this round, cause unmeasured (T74); the right type
+ * reading only made it visible (Groudon's Precipice Blades now hits the Tera
+ * Fire Koraidon twice as hard). gen9doublesou-2663093831 t9 drops from
+ * "unclear" to "quiet" because the swing of a double-flinch turn falls under
+ * the 0.2 threshold. The 12 turns the STAB step moves read murkier (3 more
+ * plausible, 2 equally, 2 less, 3 noise, 2 cannot tell), and the t11 blunder
+ * that comes with def goes again with stab while another appears at t9:
+ * doubles root cells are single draws (T58), a moved doubles judgment stays a
+ * reason to look and no proof (D21). Three runs byte-identical on the booked
+ * line (two on 20 Sep, the third on 21 Sep after a regular shutdown cut the
+ * chain) and on the tip with STAB; one feedback attempt of the def state
+ * failed on a page-load timeout (649664, the player name never rendered) and
+ * passed on the retry. On the booked line: suite 186 files and 1521 tests, e2e
+ * 75 of 75, lint and tsc -b clean (the tip with STAB: 1527 tests, e2e 75 of
+ * 75). NOT IN THIS ROUND: Tera Blast, Adaptability, the 60 BP floor, the
+ * Pledge moves, the Stellar bookkeeping; abilities and moves that retype
+ * (Liquid Voice, the -ate family; T73); gimmickSuffixForSlot checks the slot,
+ * not the body behind the colon (built sets carry the species as the name, the
+ * protocol the nickname, so a name check does not carry; how often the rebuild
+ * holds another body there is unmeasured); a rebuild-only faint costs more
+ * than the marker (every volatile, isStarted, lastMove); a rejected choice is
+ * answered with the sim's default, which never terastallizes (the restore
+ * catches the marker at the next boundary, the turn itself stays unfaithful);
+ * parsePlayedActions carries no action on a |cant| turn, so no Tera either.
+ * The referee is blind to weather, terrain and screens (67, 40 and 29 of the
+ * 215 positions) and double-counts switch-in boosts: only the difference
+ * between two states carries, never the absolute distance.
+ *
  * PRE-SOLVE CARRY 2026-09-20 (improvement round 53, T66; 5c6dcf6 plus the
  * closing commit, cache v49, score-touching as a correction with its own
  * evidence; adopted at the user gate of 20 Sep 16:22, "1a 2a 3a": the carry

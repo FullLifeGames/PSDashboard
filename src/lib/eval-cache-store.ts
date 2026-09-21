@@ -179,9 +179,11 @@ export interface StoredEval {
 //      click on a turn without an action line for its slot (a flinch) is
 //      replayed, a body that fainted only in the reconstruction gets its
 //      marker back from the snapshot, and the static leaves read the Tera
-//      type (immunity, type chart, Stealth Rock, Toxic Spikes, Black Sludge).
-//      Every gen 9 position with a living terastallized body moves (293 of
-//      833 on the bank).
+//      type (immunity, type chart, Stealth Rock, Toxic Spikes, Black Sludge);
+//      Wind Rider, Soundproof and Bulletproof blank wind, sound and ball
+//      moves. 297 of 833 bank positions move, 293 of them with a living
+//      terastallized body (334 positions carry one). STAB stays tera-blind:
+//      the rule by the book is parked on branch r54-stab.
 const EVAL_ENGINE_CACHE_VERSION = 50;
 
 export function evalStoreKey(
