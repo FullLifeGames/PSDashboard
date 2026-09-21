@@ -184,7 +184,13 @@ export interface StoredEval {
 //      moves. 297 of 833 bank positions move, 293 of them with a living
 //      terastallized body (334 positions carry one). STAB stays tera-blind:
 //      the rule by the book is parked on branch r54-stab.
-const EVAL_ENGINE_CACHE_VERSION = 50;
+// v51: round 55, two rebuild fixes. An Encore that lands before its target
+//      moves no longer stands a turn too long (the rebuild sent the encored
+//      Protect back as the click, and it ran ahead of the Encore), and a
+//      locked doubles slot (recharge, the release turn of Fly) carries no
+//      target loc, so the sim no longer rejects the whole side choice and
+//      the partner plays its protocol move.
+const EVAL_ENGINE_CACHE_VERSION = 51;
 
 export function evalStoreKey(
   cacheKey: string,

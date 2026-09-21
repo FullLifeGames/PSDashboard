@@ -135,12 +135,26 @@ function shouldAppendTargetLoc(
   return battle.actions.targetTypeChoices(targetType) && battle.validTargetLoc(targetLoc, active, targetType);
 }
 
+/**
+ * A locked request (recharge, the release turn of Fly or Dig, a continued
+ * rampage) carries one entry WITHOUT a `target`, and the sim rejects any loc
+ * on it together with the whole side choice. The Dex fallback in
+ * `targetTypeForMove` would still name a target type there.
+ */
+function requestEntryHasNoTarget(active: SimPokemon | null | undefined, moveName: string): boolean {
+  if (!active) return false;
+  const moveId = toId(moveName);
+  const entry = active.getMoveRequestData().moves.find(move => move.id === moveId);
+  return !!entry && !entry.target;
+}
+
 export function targetLocSuffixForChoice(
   battle: SimBattle,
   active: SimPokemon | null | undefined,
   moveName: string,
   protocolTargetLoc: number,
 ): string {
+  if (requestEntryHasNoTarget(active, moveName)) return '';
   if (shouldAppendTargetLoc(battle, active, moveName, protocolTargetLoc)) {
     return ` ${formatTargetLoc(protocolTargetLoc)}`;
   }
@@ -167,7 +181,12 @@ function defaultMoveChoice(battle: SimBattle, active: SimPokemon | null | undefi
   if (!active || active.fainted) return 'pass';
   const firstMove = active.moveSlots[0];
   if (!firstMove) return 'pass';
-  const targetType = targetTypeForMove(active, firstMove.id || firstMove.move);
+  // `move 1` resolves against the request's first entry, not `moveSlots[0]`:
+  // on a locked request the two differ, and the entry has no target.
+  const firstRequestEntry = active.getMoveRequestData().moves[0];
+  const targetType = firstRequestEntry
+    ? (firstRequestEntry.target || '')
+    : targetTypeForMove(active, firstMove.id || firstMove.move);
   const targetLoc = firstLegalTargetLoc(battle, active, targetType);
   return `move 1${targetLoc ? ` ${formatTargetLoc(targetLoc)}` : ''}`;
 }
@@ -185,6 +204,41 @@ function moveChoiceForActive(active: SimPokemon | null | undefined, moveName: st
     toId(move.id || move.move) === moveId || toId(move.move) === moveId
   );
   return `move ${moveIndex >= 0 ? moveIndex + 1 : moveId}`;
+}
+
+/**
+ * An Encore that lands BEFORE its target moves bends the click onto the
+ * encored move, and the protocol shows that move, not the click. Sending it
+ * back runs a Protect at +4 ahead of the Encore, and the sim counts an
+ * Encore on a target that has already moved one turn longer
+ * (gen9vgc2026regi-2629703929: locked t6 to t8 instead of t6 and t7, and the
+ * second Encore failed against the first). The click is unknown; what is
+ * known is that it ran after the Encore. The stand-in is the request's
+ * lowest-priority other move at priority 0 or below, which the Encore then
+ * bends exactly as it did in the game. No such move: the line stays the
+ * choice, as before round 55.
+ */
+function clickBehindEncore(
+  events: string[],
+  moveLineIndex: number,
+  ident: string,
+  active: SimPokemon | null | undefined,
+  shownMove: string,
+): string | null {
+  if (!active) return null;
+  const encoredFirst = events.slice(0, moveLineIndex).some(line =>
+    line.startsWith(`|-start|${ident}`) && line.split('|')[3] === 'Encore');
+  if (!encoredFirst) return null;
+
+  const shownId = toId(shownMove);
+  let standIn: { id: string; priority: number } | null = null;
+  for (const entry of active.getMoveRequestData().moves) {
+    if (entry.id === shownId || entry.disabled) continue;
+    const priority = Dex.moves.get(entry.id).priority;
+    if (priority > 0) continue;
+    if (!standIn || priority < standIn.priority) standIn = { id: entry.id, priority };
+  }
+  return standIn?.id ?? null;
 }
 
 /**
@@ -214,16 +268,17 @@ function getChoiceForSlot(
   const sideIdx = sideIndex(side);
   const ident = `${side}${slotLetter(activeSlot)}:`;
 
-  for (const line of events) {
+  for (const [lineIndex, line] of events.entries()) {
     if (line.startsWith(`|switch|${ident}`) && !line.includes('[from]')) {
       const species = line.split('|')[3].split(',')[0].trim();
       return `switch ${findSlotBySpecies(battle, sideIdx, species)}`;
     }
 
     if (line.startsWith(`|move|${ident}`)) {
-      const moveName = line.split('|')[3];
       const active = battle.sides[sideIdx].active[activeSlot];
-      const targetLoc = protocolTargetLoc(battle, side, activeSlot, line.split('|')[4]);
+      const clicked = clickBehindEncore(events, lineIndex, ident, active, line.split('|')[3]);
+      const moveName = clicked ?? line.split('|')[3];
+      const targetLoc = clicked ? 0 : protocolTargetLoc(battle, side, activeSlot, line.split('|')[4]);
       const suffix = targetLocSuffixForChoice(
         battle,
         active,
