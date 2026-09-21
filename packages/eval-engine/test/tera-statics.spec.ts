@@ -136,6 +136,21 @@ describe('the defender type reads live after a Tera click (round 54)', () => {
   });
 });
 
+// STAB by the game's rules (old type 1.5, Tera type 1.5, both 2.0) was built,
+// measured and parked in round 54: the bank read doubles worse with it (branch
+// r54-stab, T71). Until it lands, a Tera click must not move an attacker's
+// STAB; T71 replaces this pin with the rule's own table.
+describe('STAB stays tera-blind while the rule is parked (round 54)', () => {
+  test.each([['Ground', 'earthquake'], ['Fire', 'firefang'], ['Stellar', 'earthquake']])(
+    'Tera %s leaves %s where it was', (teraType, move) => {
+      const battle = makeBattle(makeSet('Garchomp', ['splash', move], { teraType }), makeSet('Blissey', ['splash']));
+      const [garchomp, blissey] = [battle.sides[0].active[0], battle.sides[1].active[0]];
+      const before = singleMoveFraction(garchomp, blissey, move, battle);
+      clickTera(battle);
+      expect(singleMoveFraction(garchomp, blissey, move, battle)).toBe(before);
+    });
+});
+
 describe('abilities that blank a move flag (round 54)', () => {
   const fraction = (attacker: PokemonSet, defender: PokemonSet, move: string): number => {
     const battle = makeBattle(attacker, defender);

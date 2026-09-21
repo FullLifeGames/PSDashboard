@@ -88,8 +88,10 @@ function pairKey(attacker: Pokemon, defender: Pokemon): string {
   // under Protean, Soak, Power Trick and their kin; the key carries them so
   // the memo never answers for a body that has changed since it was asked.
   // A Tera click leaves `types` alone and sets `terastallized`, so the key
-  // carries both: STAB needs the old types next to the Tera type, and a
-  // Stellar body keeps its old types for defense.
+  // carries both. The defender's term mirrors a read (liveTypes); a Stellar
+  // body keeps its old types for defense, so the raw types stay. The
+  // attacker's term mirrors no read while STAB stays tera-blind: it is kept
+  // for the parked rule (branch r54-stab, T71) and costs one memo entry a click.
   const offense = `${attacker.types.join('/')}:${attacker.terastallized ?? ''}:${attacker.storedStats.atk}:${attacker.storedStats.spa}`;
   const defense = `${defender.types.join('/')}:${defender.terastallized ?? ''}:${defender.storedStats.def}:${defender.storedStats.spd}:${defender.maxhp}`;
   return `${attacker.side.id}:${attacker.name}:${attacker.species.id}:${attacker.level}:${attacker.item}:${attacker.ability}:${lockedMoveId(attacker) ?? ''}:${usable}:${offense}>` +

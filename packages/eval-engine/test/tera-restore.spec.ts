@@ -139,6 +139,7 @@ describe('Tera marker after a reconstruction-only faint (round 54)', () => {
     const { battle } = await rebuilt('gen9ou', withoutTheClick(singlesLog), singlesTeams);
     const snorlax = battle.sides[0].pokemon.find(pokemon => pokemon.species.name === 'Snorlax')!;
     snorlax.addedType = 'Grass';
+    snorlax.knownType = false;
     expect(teraBudget(battle)).toEqual(['Water', 'Water']);
 
     correctBattleFromSnapshot(battle, fullSnapshot(singlesLog));

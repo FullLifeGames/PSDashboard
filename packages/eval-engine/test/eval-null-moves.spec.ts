@@ -69,10 +69,16 @@ describe('nullMoveReason', () => {
   // The sim retypes these at use time (the user's Tera type, weather, a held
   // plate): the dex type decides nothing, so the guard stays silent.
   test('a move retyped on use is never called null', () => {
-    expect(reason('move terablast', 'Gengar', 9)).toBeNull();
+    // Each of them carries a dex type some defender is immune to.
+    const immuneTo: Record<string, string> = {
+      terablast: 'Gengar', terastarstorm: 'Gengar', revelationdance: 'Gengar', judgment: 'Gengar',
+      technoblast: 'Gengar', multiattack: 'Gengar', naturalgift: 'Gengar', weatherball: 'Gengar',
+      terrainpulse: 'Gengar', aurawheel: 'Garchomp', ragingbull: 'Gengar',
+    };
+    for (const [move, defender] of Object.entries(immuneTo)) {
+      expect(reason(`move ${move}`, defender, 9), move).toBeNull();
+    }
     expect(reason('move terablast terastallize', 'Gengar', 9)).toBeNull();
-    expect(reason('move weatherball', 'Gengar', 6)).toBeNull();
-    expect(reason('move judgment', 'Gengar', 6)).toBeNull();
     // An ordinary Normal move into a Ghost still is.
     expect(reason('move bodyslam', 'Gengar', 6)).toContain('immune to Normal-type moves');
   });
