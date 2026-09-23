@@ -1,5 +1,7 @@
 import type { Battle, Pokemon, Side } from '@pkmn/sim';
+import type { MoveAtUse } from '../move-use.ts';
 import { stageMultiplier } from '../stat-stages.ts';
+import { landedMove } from './move-facts.ts';
 
 /**
  * The HP- and boost-independent threat proxy: one attacker→defender
@@ -140,20 +142,20 @@ const ABILITY_FLAG_IMMUNITIES: Record<string, 'wind' | 'sound' | 'bullet'> = {
 type DexMove = ReturnType<Battle['dex']['moves']['get']>;
 
 /** The attacker's big damage modifiers: Life Orb, the matching Choice item, Thick Fat on the defender. */
-function offenseMultiplier(attacker: Pokemon, defender: Pokemon, move: DexMove): number {
+function offenseMultiplier(attacker: Pokemon, defender: Pokemon, use: MoveAtUse): number {
   let offense = 1;
   if (attacker.item === 'lifeorb') offense *= 1.3;
-  if (attacker.item === 'choiceband' && move.category === 'Physical') offense *= 1.5;
-  if (attacker.item === 'choicespecs' && move.category === 'Special') offense *= 1.5;
-  if (defender.ability === 'thickfat' && (move.type === 'Fire' || move.type === 'Ice')) offense *= 0.5;
+  if (attacker.item === 'choiceband' && use.category === 'Physical') offense *= 1.5;
+  if (attacker.item === 'choicespecs' && use.category === 'Special') offense *= 1.5;
+  if (defender.ability === 'thickfat' && (use.type === 'Fire' || use.type === 'Ice')) offense *= 0.5;
   return offense;
 }
 
 /** The defender's bulk items: Eviolite on an NFE, Assault Vest against special moves. */
-function bulkMultiplier(defender: Pokemon, move: DexMove): number {
+function bulkMultiplier(defender: Pokemon, use: MoveAtUse): number {
   let bulk = 1;
   if (defender.item === 'eviolite' && defender.species.nfe) bulk *= 1.5;
-  if (defender.item === 'assaultvest' && move.category === 'Special') bulk *= 1.5;
+  if (defender.item === 'assaultvest' && use.category === 'Special') bulk *= 1.5;
   return bulk;
 }
 
@@ -180,34 +182,42 @@ function fixedDamage(move: DexMove, attacker: Pokemon, defender: Pokemon): numbe
   }
 }
 
+/** Scrappy and Mind's Eye let Normal and Fighting moves hit Ghosts (the sim's ignoreImmunity). */
+function ignoresImmunity(attacker: Pokemon, type: string): boolean {
+  return (attacker.ability === 'scrappy' || attacker.ability === 'mindseye') && (type === 'Normal' || type === 'Fighting');
+}
+
 /**
  * Expected damage of one specific move as a fraction of the defender's max
  * HP under the proxy's rules — standard damage formula with STAB, the type
  * chart, and the big item/ability modifiers; fixed-damage moves at their
- * fixed amount; 0 for status, reactive, and immune moves.
+ * fixed amount; 0 for status, reactive, and immune moves. The type, category
+ * and power are the move's at use (move-use.ts, round 57).
  */
 export function singleMoveFraction(attacker: Pokemon, defender: Pokemon, moveId: string, battle: Battle): number {
   const move = battle.dex.moves.get(moveId);
   if (!move.exists || move.category === 'Status') return 0;
+  // The move as it lands (round 57): its type, category and power at use.
+  const use = landedMove(attacker, defender, move, battle);
   const blanked = ABILITY_IMMUNITIES[defender.ability] ?? [];
-  if (blanked.includes(move.type)) return 0;
+  if (blanked.includes(use.type)) return 0;
   const blankedFlag = ABILITY_FLAG_IMMUNITIES[defender.ability];
   if (blankedFlag && move.flags[blankedFlag]) return 0;
   // The defender's LIVE types: smogtours-gen9ou-751207 t6 priced Body Press
   // into a Ceruledge that had terastallized to Fighting at 0, as into a Ghost
   // (50 such false immunities on the bank's Tera positions, round 54).
   const defenderTypes = liveTypes(defender);
-  if (!battle.dex.getImmunity(move.type, defenderTypes)) return 0;
-  if (!move.basePower) return fixedDamage(move, attacker, defender) / defender.maxhp;
-  const typeMult = Math.pow(2, battle.dex.getEffectiveness(move.type, defenderTypes));
+  if (!ignoresImmunity(attacker, use.type) && !battle.dex.getImmunity(use.type, defenderTypes)) return 0;
+  if (!use.basePower) return fixedDamage(move, attacker, defender) / defender.maxhp;
+  const typeMult = Math.pow(2, battle.dex.getEffectiveness(use.type, defenderTypes));
   // STAB stays tera-blind here: the rule by the book is parked on branch r54-stab (round 54).
-  const stab = attacker.types.includes(move.type) ? 1.5 : 1;
-  const offense = offenseMultiplier(attacker, defender, move);
-  const bulk = bulkMultiplier(defender, move);
-  const [atk, def] = move.category === 'Physical'
+  const stab = attacker.types.includes(use.type) ? 1.5 : 1;
+  const offense = offenseMultiplier(attacker, defender, use);
+  const bulk = bulkMultiplier(defender, use);
+  const [atk, def] = use.category === 'Physical'
     ? [attacker.storedStats.atk, defender.storedStats.def]
     : [attacker.storedStats.spa, defender.storedStats.spd];
-  const damage = (((2 * attacker.level / 5 + 2) * move.basePower * atk / def) / 50 + 2) *
+  const damage = (((2 * attacker.level / 5 + 2) * use.basePower * use.powerMult * atk / def) / 50 + 2) *
     stab * typeMult * offense / bulk;
   return damage / defender.maxhp;
 }
@@ -228,7 +238,7 @@ export function pairThreat(attacker: Pokemon, defender: Pokemon, battle: Battle)
     if (moveFraction > 0) {
       const move = battle.dex.moves.get(slot.id);
       const accuracy = move.accuracy === true ? 1 : move.accuracy / 100;
-      if (move.category === 'Physical') {
+      if (landedMove(attacker, defender, move, battle).category === 'Physical') {
         if (moveFraction > physical) { physical = moveFraction; physicalAcc = accuracy; }
       } else if (moveFraction > special) { special = moveFraction; specialAcc = accuracy; }
       if (move.priority > 0) priority = true;

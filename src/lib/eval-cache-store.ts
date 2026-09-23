@@ -207,7 +207,12 @@ export interface StoredEval {
 //      singles, the MCTS tree, the solver and the prover are untouched.
 //      Doubles options carry kill odds labeled with their slot's move and
 //      target.
-const EVAL_ENGINE_CACHE_VERSION = 52;
+// v53: round 57, the static prices a move as it lands (move-use.ts). Its
+//      type, category and power follow the user's ability (Liquid Voice,
+//      the -ate family, Normalize), forme (Ivy Cudgel), item (Judgment), the
+//      weather, the terrain, the Tera click, Hidden Power's type, weight,
+//      happiness, HP and speed; Scrappy and Mind's Eye hit Ghosts.
+const EVAL_ENGINE_CACHE_VERSION = 53;
 
 export function evalStoreKey(
   cacheKey: string,
