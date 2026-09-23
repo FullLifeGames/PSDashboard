@@ -93,8 +93,19 @@ function missedCrit(dex: Dex, snap: HitSnapshot): number {
   return snap.gen >= 7 ? 1 / 24 : 1 / 16;
 }
 
-/** No roll, not even the top roll as a crit, could reach the HP: scaled up from the drawn damage, with 3 % and 2 HP of margin. */
+/** A crit ignores the attacker's offensive drops, the defender's defensive raises and the screens. */
+function critIgnoresModifiers({ attacker, defender, screens }: HitSnapshot): boolean {
+  return attacker.boosts.atk < 0 || attacker.boosts.spa < 0 || defender.boosts.def > 0 || defender.boosts.spd > 0 || screens.length > 0;
+}
+
+/**
+ * No roll, not even the top roll as a crit, could reach the HP: scaled up
+ * from the drawn damage, with 3 % and 2 HP of margin. A drawn normal roll
+ * under a modifier a crit ignores bounds nothing (final review of round
+ * 56: the crit of an Intimidated attacker does 2.25 times the hit or more).
+ */
 function surelyNonLethal(damage: number, roll: RollRecord): boolean {
+  if (!roll.crit && critIgnoresModifiers(roll.snapshot)) return false;
   const { gen, attacker, defender } = roll.snapshot;
   const critFactor = (gen >= 6 ? 1.5 : 2) * (attacker.abilityId === 'sniper' ? 1.5 : 1);
   const top = damage * 100 / (100 - roll.roll) * (roll.crit ? 1 : critFactor);

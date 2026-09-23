@@ -87,6 +87,25 @@ describe('a draw read as a class of the pair plan (round 56)', () => {
     expect(read(root, 'move doublekick 1, move softboiled', 'move softboiled, move softboiled')).toEqual({ kind: 'fallback', reason: 'multi-roll' });
   });
 
+  test('a crit ignores the attacker\'s drop: the margin rule does not hide its kill (final review, finding 1)', () => {
+    // Garchomp at -2 Atk: Dragon Claw deals 49 to 58, a crit ignores the drop and deals 145 to 172. Snorlax
+    // at 120 HP survives every normal roll, dies to every crit: the hit is an event with a 1-in-24 kill class.
+    const root = doublesRoot(
+      [pairSet('Chomp', 'Garchomp', ['Dragon Claw', 'Protect']), pairSet('Wall', 'Blissey', ['Soft-Boiled', 'Protect'])],
+      [pairSet('Lax', 'Snorlax', ['Rest', 'Protect']), pairSet('Wall2', 'Chansey', ['Soft-Boiled', 'Protect'])],
+      battle => {
+        battle.sides[0].active[0]!.boosts.atk = -2;
+        battle.sides[1].active[0]!.sethp(120);
+      },
+    );
+    const claw = pattern(read(root, 'move dragonclaw 1, move softboiled', 'move rest, move softboiled'))
+      .events.find(event => event.key === 'p1a:dragonclaw>p2a');
+    expect(claw).toMatchObject({ outcome: 'hit-nokill', probability: expect.closeTo(23 / 24, 9) });
+    expect(claw!.alternatives).toEqual([
+      { outcome: 'hit-kill', probability: expect.closeTo(1 / 24, 9), script: { hit: true, crit: true, roll: 7 } },
+    ]);
+  });
+
   test('a random drag-in sends the read to the fallback', () => {
     const root = doublesRoot(
       [pairSet('Blow', 'Pidgeot', ['Whirlwind', 'Protect']), pairSet('Wall', 'Blissey', ['Soft-Boiled', 'Protect'])],
