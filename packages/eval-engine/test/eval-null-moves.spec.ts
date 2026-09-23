@@ -100,3 +100,32 @@ describe('nullMoveReason', () => {
     expect(reason('move willowisp terastallize', 'Charizard-Mega-X')).toContain('cannot be burned');
   });
 });
+
+describe('the null-move sentence asks the move table (round 57)', () => {
+  test('a type the move may take at use is no definite null', () => {
+    // Primarina may carry Liquid Voice (Water), Sylveon Pixilate (Fairy), Delcatty Normalize.
+    expect(nullMoveReason({ choice: 'move hypervoice', gen: 9, attackerSpecies: 'Primarina', defenderSpecies: 'Sneasler', defenderTera: 'Ghost' })).toBeNull();
+    expect(reason('move hypervoice', 'Gengar', 6, 'Sylveon')).toBeNull();
+    expect(reason('move thunderbolt', 'Garchomp', 7, 'Delcatty')).toBeNull();
+  });
+
+  test('a Mega choice reads the Mega forme abilities', () => {
+    // Lopunny-Mega carries Scrappy: Return into a Ghost is no definite null.
+    expect(reason('move return mega', 'Gengar', 6, 'Lopunny')).toBeNull();
+    // Without the Mega click Lopunny has no Scrappy, and Return stays Normal (its power rule never blocks the type).
+    expect(reason('move return', 'Gengar', 6, 'Lopunny')).toContain('immune to Normal-type moves');
+  });
+
+  test('Hidden Power and Struggle are never called null', () => {
+    expect(reason('move hiddenpower', 'Gengar', 7, 'Magnezone')).toBeNull();
+    expect(reason('move struggle', 'Gengar', 9, 'Dragonite')).toBeNull();
+  });
+
+  test('a fixed forme type is judged: Morpeko Aura Wheel into a Ground-type', () => {
+    expect(reason('move aurawheel', 'Garchomp', 9, 'Morpeko')).toContain('immune to Electric-type moves');
+  });
+
+  test('an ordinary Normal move into a Ghost still is', () => {
+    expect(reason('move bodyslam', 'Gengar', 6, 'Snorlax')).toContain('immune to Normal-type moves');
+  });
+});

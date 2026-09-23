@@ -1,6 +1,7 @@
 // Data-only Dex — this module is in the app's MAIN bundle; @pkmn/sim must
 // never be imported here.
 import { Dex } from '@pkmn/dex';
+import { moveAtUse } from './move-use.ts';
 
 /**
  * Mechanical-null detection for recommended moves (653785 t19: Will-O-Wisp
@@ -14,6 +15,9 @@ import { Dex } from '@pkmn/dex';
  * target is then the single foe); a side with two acting slots carries a
  * comma and returns null. A terastallized defender is read by its Tera type
  * and named with it, so the sentence stays true of the body on the field.
+ * Round 57: the type is the move's at use (move-use.ts): a move whose type
+ * depends on a fact the sentence lacks, or on an ability the attacker may or
+ * may not have, is no definite null.
  */
 
 const STATUS_TEXT: Record<string, string> = {
@@ -24,16 +28,6 @@ const STATUS_TEXT: Record<string, string> = {
   slp: 'put to sleep',
   frz: 'frozen',
 };
-
-/**
- * Moves the sim retypes at use time (onModifyType: the user's Tera type or
- * forme, the held item, weather, terrain). Their dex type is not the type
- * that lands, so no immunity verdict is definite: the guard stays silent.
- */
-const RETYPED_ON_USE = new Set([
-  'terablast', 'terastarstorm', 'revelationdance', 'aurawheel', 'ragingbull', 'judgment',
-  'technoblast', 'multiattack', 'naturalgift', 'weatherball', 'terrainpulse',
-]);
 
 type GenDex = ReturnType<typeof Dex.forGen>;
 type DexMove = ReturnType<GenDex['moves']['get']>;
@@ -56,10 +50,50 @@ function statusImmuneTypes(status: string, gen: number): string[] {
   }
 }
 
-/** The attacker's possible abilities (empty when the species is unknown) — they only ever SUPPRESS verdicts. */
-function attackerAbilities(dex: GenDex, attackerSpecies: string | null): string[] {
+const toAbilityId = (name: string) => name.toLowerCase().replace(/[^a-z0-9]/g, '');
+
+/**
+ * The attacker's possible abilities (empty when the species is unknown); a
+ * `mega` choice adds its Mega formes' (Mega evolution comes before moves).
+ * They only ever SUPPRESS verdicts.
+ */
+function candidateAbilities(dex: GenDex, attackerSpecies: string | null, mega: boolean): string[] {
   const attacker = attackerSpecies ? dex.species.get(attackerSpecies) : null;
-  return attacker?.exists ? Object.values(attacker.abilities) : [];
+  if (!attacker?.exists) return [];
+  const names = new Set(Object.values(attacker.abilities));
+  if (mega) {
+    for (const forme of attacker.otherFormes ?? []) {
+      const species = dex.species.get(forme);
+      if (species.exists && species.isMega) for (const name of Object.values(species.abilities)) names.add(name);
+    }
+  }
+  return [...names];
+}
+
+/**
+ * The type the move lands with, from what the sentence knows (round 57):
+ * the species, its possible abilities, the generation and the attacker's
+ * Tera. An unknown item, weather, terrain or hidden type, or abilities that
+ * disagree, leave it undecided (null) and the sentence silent.
+ */
+function typeAtUse(
+  move: DexMove,
+  dex: GenDex,
+  gen: number,
+  abilityNames: readonly string[],
+  attackerSpecies: string | null,
+  attackerTera: string | null | undefined,
+): string | null {
+  const species = attackerSpecies ? dex.species.get(attackerSpecies) : null;
+  const known = species?.exists ? species : null;
+  const use = moveAtUse(move, {
+    gen,
+    species: known ? known.name : undefined,
+    abilities: abilityNames.map(toAbilityId),
+    terastallized: attackerTera,
+    types: known ? known.types : undefined,
+  });
+  return use ? use.type : null;
 }
 
 /**
@@ -70,14 +104,15 @@ function attackerAbilities(dex: GenDex, attackerSpecies: string | null): string[
 function typeImmunityOf(
   dex: GenDex,
   move: DexMove,
+  type: string,
   types: readonly string[],
   mayHave: (ability: string) => boolean,
 ): { typeImmune: boolean; immunityBroken: boolean } {
   const ignoreImmunity = move.ignoreImmunity === true ||
     (typeof move.ignoreImmunity === 'object' && move.ignoreImmunity !== null &&
-      (move.ignoreImmunity as Record<string, boolean>)[move.type] === true);
-  const typeImmune = !ignoreImmunity && !dex.getImmunity(move.type, types as never);
-  const immunityBroken = (move.type === 'Normal' || move.type === 'Fighting') &&
+      (move.ignoreImmunity as Record<string, boolean>)[type] === true);
+  const typeImmune = !ignoreImmunity && !dex.getImmunity(type, types as never);
+  const immunityBroken = (type === 'Normal' || type === 'Fighting') &&
     types.includes('Ghost') && (mayHave('Scrappy') || mayHave("Mind's Eye"));
   return { typeImmune, immunityBroken };
 }
@@ -85,6 +120,7 @@ function typeImmunityOf(
 /** Why a status move provably does nothing: the status immunity, the move's own type immunity, powder, or Leech Seed. */
 function statusNullReason(
   move: DexMove,
+  type: string,
   named: string,
   types: readonly string[],
   gen: number,
@@ -101,7 +137,7 @@ function statusNullReason(
     // Thunder Wave is the canonical status move WITHOUT ignoreImmunity: the
     // move's own type immunity applies (Ground blocks it).
     if (immunity.typeImmune && !immunity.immunityBroken) {
-      return `${named} is immune to ${move.type}-type moves`;
+      return `${named} is immune to ${type}-type moves`;
     }
   }
   if (move.flags.powder && gen >= 6 && types.includes('Grass')) {
@@ -129,27 +165,30 @@ export function nullMoveReason(params: {
   defenderSpecies: string;
   /** The defender's Tera type when it has terastallized: it defends with that type (Stellar keeps the old ones). */
   defenderTera?: string | null;
+  /** The attacker's Tera type when it has terastallized; undefined when unknown. */
+  attackerTera?: string | null;
 }): string | null {
   const tokens = params.choice.split(' ');
   if (tokens[0] !== 'move' || !tokens[1] || params.choice.includes(',')) return null;
-  const dex = Dex.forGen(Math.min(9, Math.max(1, Math.round(params.gen))));
+  const gen = Math.min(9, Math.max(1, Math.round(params.gen)));
+  const dex = Dex.forGen(gen);
   const move = dex.moves.get(tokens[1]);
-  if (!move.exists || RETYPED_ON_USE.has(move.id)) return null;
+  if (!move.exists) return null;
   const defender = dex.species.get(params.defenderSpecies);
   if (!defender.exists) return null;
+  const abilities = candidateAbilities(dex, params.attackerSpecies, tokens.includes('mega'));
+  // A Tera click in this very choice lands before the move with a type the sentence does not know.
+  const attackerTera = tokens.includes('terastallize') ? undefined : params.attackerTera;
+  const type = typeAtUse(move, dex, gen, abilities, params.attackerSpecies, attackerTera);
+  if (type === null) return null;
   const tera = params.defenderTera;
   const live = !!tera && tera !== 'Stellar';
   const types = live ? [tera] : defender.types;
   const named = live ? `${defender.name} (Tera ${tera})` : defender.name;
-
-  const abilities = attackerAbilities(dex, params.attackerSpecies);
   const mayHave = (ability: string) => abilities.includes(ability);
-  const immunity = typeImmunityOf(dex, move, types, mayHave);
-
+  const immunity = typeImmunityOf(dex, move, type, types, mayHave);
   if (move.category !== 'Status') {
-    return immunity.typeImmune && !immunity.immunityBroken
-      ? `${named} is immune to ${move.type}-type moves`
-      : null;
+    return immunity.typeImmune && !immunity.immunityBroken ? `${named} is immune to ${type}-type moves` : null;
   }
-  return statusNullReason(move, named, types, params.gen, mayHave, immunity);
+  return statusNullReason(move, type, named, types, gen, mayHave, immunity);
 }
