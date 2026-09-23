@@ -64,3 +64,24 @@ describe('Tera retypes in the static (round 57)', () => {
     expect(singleMoveFraction(active(battle, 0), active(battle, 1), 'terablast', battle)).toBeCloseTo(plain * 2, 5);
   });
 });
+
+describe('Hidden Power in the static (round 57)', () => {
+  test('gen 6 Hidden Power Ice is four times effective on Landorus-Therian (648453 turn 13)', () => {
+    const battle = singles('gen6customgame', [set('Tornadus-Therian', ['hiddenpowerice', 'icebeam'])], [set('Landorus-Therian', ['splash'])]);
+    const [tornadus, lando] = [active(battle, 0), active(battle, 1)];
+    const hp = singleMoveFraction(tornadus, lando, 'hiddenpower', battle);
+    const beam = singleMoveFraction(tornadus, lando, 'icebeam', battle);
+    expect(hp).toBeGreaterThan(beam * 0.6);
+    expect(hp).toBeLessThan(beam * 0.75);
+  });
+
+  test('gen 3 Hidden Power is priced, not 0', () => {
+    const battle = singles('gen3customgame', [set('Arcanine', ['hiddenpowerelectric'])], [set('Charizard', ['splash'])]);
+    expect(pairThreat(active(battle, 0), active(battle, 1), battle).special).toBeGreaterThan(0.2);
+  });
+
+  test('gen 7 Hidden Power Fire hits a Ghost', () => {
+    const battle = singles('gen7customgame', [set('Magnezone', ['hiddenpowerfire'])], [set('Gengar', ['splash'])]);
+    expect(singleMoveFraction(active(battle, 0), active(battle, 1), 'hiddenpower', battle)).toBeGreaterThan(0.1);
+  });
+});

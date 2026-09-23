@@ -87,6 +87,12 @@ const byStarstorm: Rule = (_move, user) => {
   return { type: 'Stellar', ...(physical ? { category: 'Physical' } : {}) };
 };
 
+/** Hidden Power: the body's hidden type; up to gen 5 its hidden power (mods/gen5 basePowerCallback). */
+const byHiddenPower: Rule = (_move, user) => {
+  if (user.hpType === undefined) return null;
+  return { type: user.hpType, ...(user.gen <= 5 ? { basePower: user.hpPower ?? 70 } : {}) };
+};
+
 /** Struggle is typeless from gen 2 on. */
 const byStruggle: Rule = (_move, user) => (user.gen >= 2 ? { type: '???' } : {});
 
@@ -104,4 +110,5 @@ export const OWN_RULES: Record<string, Rule> = {
   terrainpulse: byTerrain,
   terablast: byTera,
   terastarstorm: byStarstorm,
+  hiddenpower: byHiddenPower,
 };

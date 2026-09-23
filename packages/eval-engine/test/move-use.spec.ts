@@ -146,3 +146,19 @@ describe('Tera rules (round 57)', () => {
     expect(expectSim(battle, active(battle, 0), active(battle, 1), 'terablast')).toMatchObject({ type: 'Stellar', basePower: 100 });
   });
 });
+
+describe('Hidden Power (round 57)', () => {
+  test('gen 3: type, power and a category by type', () => {
+    const battle = singles('gen3customgame', [set('Arcanine', ['hiddenpowerelectric'])], [set('Charizard', ['splash'])]);
+    const answer = expectSim(battle, active(battle, 0), active(battle, 1), 'hiddenpower');
+    expect(answer).toMatchObject({ type: 'Electric', category: 'Special' });
+    expect(answer.basePower).toBe(active(battle, 0).hpPower);
+  });
+
+  test('gen 6 and gen 7: the hidden type at power 60', () => {
+    for (const format of ['gen6customgame', 'gen7customgame']) {
+      const battle = singles(format, [set('Tornadus-Therian', ['hiddenpowerice'])], [set('Landorus-Therian', ['splash'])]);
+      expect(expectSim(battle, active(battle, 0), active(battle, 1), 'hiddenpower')).toMatchObject({ type: 'Ice', basePower: 60 });
+    }
+  });
+});

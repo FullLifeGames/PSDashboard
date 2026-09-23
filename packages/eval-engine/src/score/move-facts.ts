@@ -49,6 +49,8 @@ export function userFacts(pokemon: Pokemon, battle: Battle): MoveUser {
     grounded: grounded(pokemon, battle),
     atk: staged(pokemon, 'atk'),
     spa: staged(pokemon, 'spa'),
+    hpType: pokemon.hpType || 'Dark',
+    hpPower: pokemon.hpPower,
   };
 }
 
