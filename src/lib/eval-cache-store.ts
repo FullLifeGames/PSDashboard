@@ -190,7 +190,11 @@ export interface StoredEval {
 //      locked doubles slot (recharge, the release turn of Fly) carries no
 //      target loc, so the sim no longer rejects the whole side choice and
 //      the partner plays its protocol move.
-const EVAL_ENGINE_CACHE_VERSION = 51;
+// v52: round 56, the doubles cell plan. A doubles root cell with a roll edge
+//      is priced as the weighted mix of its outcome classes (pair/sampler.ts)
+//      instead of one draw; cells without an edge keep their value, singles
+//      is untouched. Doubles options carry kill odds with their slot's label.
+const EVAL_ENGINE_CACHE_VERSION = 52;
 
 export function evalStoreKey(
   cacheKey: string,

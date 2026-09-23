@@ -6,6 +6,7 @@ import {
 } from '../cell-blend.ts';
 import type { CellBlend, CellBlendClass, KoOddsMismatch } from '../types.ts';
 import { countFainted, leafValue, rollSensitivePair, SEARCH_SEEDS } from './leaf.ts';
+import { pairCellSample, type FirstDraw } from '../pair/sampler.ts';
 
 /**
  * One matrix cell's value from seeded sims: the plain seed average, or the
@@ -30,14 +31,15 @@ function plainCellSample(
   p2Choice: string,
   samples: number,
   matchupCache: MatchupCache,
+  first?: FirstDraw,
 ): CellSample {
-  const firstChild = advancePosition(root, p1Choice, p2Choice, SEARCH_SEEDS[0]);
+  const firstChild = first?.child ?? advancePosition(root, p1Choice, p2Choice, SEARCH_SEEDS[0]);
   const firstBattle = positionBattle(firstChild);
   const ended = firstBattle.ended;
   // Averaging wp-units = averaging win probabilities across rolls: the
   // KO-boundary roll groups carry their true value ("30% this crit wins")
   // instead of a flattened score mean.
-  let sum = leafValue(firstBattle, matchupCache);
+  let sum = first?.leaf ?? leafValue(firstBattle, matchupCache);
   const rollMoves = rollSensitivePair(rootBattle, p1Choice, p2Choice);
   const draws = ended
     ? (rollMoves ? Math.max(samples, 3) : 1)
@@ -178,7 +180,8 @@ function blendCellSample(
  * draft T64 priced a 90%-accurate Overheat as a CERTAIN +1.00 off one seed
  * that hit, so terminal roll cells always take at least three seeds, even
  * in single-sample sweeps — a ±1 claim is the strongest output the engine
- * makes.
+ * makes. Round 56: doubles root cells are priced by the pair plan
+ * (pair/sampler.ts); singles cells are untouched.
  */
 export function sampleCell(
   root: SimPosition,
@@ -190,6 +193,13 @@ export function sampleCell(
   blendRoot = false,
 ): CellSample {
   const rootBattle = positionBattle(root);
+  // Round 56: a doubles root cell takes the pair plan (pair/sampler.ts); a
+  // cell without events there continues today's plain path with its draw.
+  if (blendRoot && rootBattle.gameType === 'doubles') {
+    const pair = pairCellSample(root, p1Choice, p2Choice, samples, matchupCache);
+    if (pair.kind === 'sample') return pair.sample;
+    if (pair.kind === 'plain') return plainCellSample(root, rootBattle, rootFainted, p1Choice, p2Choice, samples, matchupCache, pair.first);
+  }
   const plan = blendRoot ? planCellEvents(rootBattle, p1Choice, p2Choice) : null;
   if (!plan || plan.kind !== 'events') {
     return plainCellSample(root, rootBattle, rootFainted, p1Choice, p2Choice, samples, matchupCache);
