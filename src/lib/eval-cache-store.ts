@@ -190,13 +190,23 @@ export interface StoredEval {
 //      locked doubles slot (recharge, the release turn of Fly) carries no
 //      target loc, so the sim no longer rejects the whole side choice and
 //      the partner plays its protocol move.
-// v52: round 56, the doubles cell plan. A doubles root cell whose first draw
-//      shows a dice event is priced as the weighted mix of its outcome
-//      classes (pair/sampler.ts) instead of one draw, a cell with a random
-//      outcome the plan does not price (a speed tie, a flinch, Focus Sash)
-//      as the mean of eight draws; a cell without either keeps its value.
-//      Singles is untouched. Doubles options carry kill odds with their
-//      slot's label.
+// v52: round 56, the doubles cell plan (pair/). A doubles root cell of the
+//      matrix or of an MCTS verify sample whose draws show a dice event
+//      (a hit chance under 100 %, a kill only some damage rolls reach) is
+//      priced as the weighted mix of its outcome classes (pair/sampler.ts)
+//      instead of the plain seed mean. A cell where a fallback rule fires
+//      (a speed tie among move actions, a random drag-in, a |cant| or
+//      confusion line, a flinch chance on a target that moves later, a
+//      status or confusion before the turn, a Protect whose success is
+//      rolled, a shield such as Focus Sash at full HP, a multi-hit move, a
+//      calc that misses the drawn damage, a missed flip, a coverage outside
+//      0.8 to 1.02) takes the mean of eight natural draws. A crit that
+//      decides no kill and a chance secondary such as a burn or a stat drop
+//      stay inside the drawn class. A cell with neither keeps its value to
+//      the digit. On the bank 115 of 129 doubles matrix positions move;
+//      singles, the MCTS tree, the solver and the prover are untouched.
+//      Doubles options carry kill odds labeled with their slot's move and
+//      target.
 const EVAL_ENGINE_CACHE_VERSION = 52;
 
 export function evalStoreKey(

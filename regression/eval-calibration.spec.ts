@@ -903,26 +903,40 @@ import { summaryLines } from './calibration-summary';
  * DOUBLES CELL PLAN 2026-09-23 (improvement round 56, iteration 4c, T58;
  * spec docs/superpowers/specs/2026-09-23-round-56-design.md, plan
  * docs/superpowers/plans/2026-09-23-round-56-plan.md; fcab85c, f4ecfb2,
- * 23ee2d2, 2ff26c0, 9404ccf plus the booking, cache v52, score-touching as
- * a correction with its own evidence; probes, the census, the reading and
- * the gate chain under docs/perf/probes/2026-09-23-r56/; booked before the
- * user gate).
+ * 23ee2d2, 2ff26c0, 9404ccf, the booking bf8b11c, the final review's fixes
+ * 5996e40 and e5ab1e4 plus the close-audit corrections, cache v52,
+ * score-touching as a correction with its own evidence; probes, the
+ * census, the reading, the audit and both gate chains under
+ * docs/perf/probes/2026-09-23-r56/; booked before the user gate).
  * INSTRUMENT: the bank's 833 positions rebuilt with the round-54 instrument
  * (label r56-base); census.vt.ts counts the 248 doubles positions: 34 788
  * root cells (12 x 12 options on average), 22 986 of them (66 %) with a
  * dice event (a hit chance under 100 % or a kill only part of the damage
- * rolls reach). Before this round every doubles root cell was ONE draw
- * (seed 1,2,3,4): planCellEvents and koOddsForOptions bail on a comma
- * choice, and every doubles choice has one. On 712 sample cells from 62
- * positions, each with a 64-seed reference, the one-draw value sat 0.062
- * from the reference on edge cells (median 0.022, p90 0.183, max 1.06),
- * 0.018 on the rest. Anchor gen9championsvgc2026regmbbo3-2634199230 t5
- * (fixture test/fixtures/positions/…-t5.json): seed 1,2,3,4 is the 10 %
- * miss of Mawile's Play Rough on Incineroar, so the played cell read -0.652
+ * rolls reach). Before this round a doubles root cell was the plain seed
+ * mean, because planCellEvents and koOddsForOptions bail on a comma
+ * choice, which every side with two living bodies makes (planCellEvents
+ * also fails once slot a has fallen, and master's koOddsForOptions priced
+ * a comma-free choice against the foe in slot a): one draw (seed 1,2,3,4)
+ * in the one-sample matrix of the bank and of the app's auto mode, three
+ * where that draw ended the game with a move under 100 % accuracy or a
+ * random call (21 of the 712 census cells), and up to the sample count
+ * where a body fell or such a roll was in the pair (three in the MCTS
+ * verify cells and in the app's think-deeper pass). On 712 sample cells
+ * from 62 positions, each with a 64-seed reference, master's value at one
+ * sample sat 0.062 from the reference on edge cells (median 0.022, p90
+ * 0.183, max 1.06), 0.018 on the rest. Anchor
+ * gen9championsvgc2026regmbbo3-2634199230 t5 (fixture
+ * test/fixtures/positions/…-t5.json): seed 1,2,3,4 is the 10 % miss of
+ * Mawile's Play Rough on Incineroar, so the played cell read -0.652
  * against -0.125 over 256 seeds, and the app praised "kirans's read paid
- * off" (+18 %) on a turn that cost kirans 24 points. The calc at the drawn
- * roll (damage-check-v2.vt.ts) matches the sim to the HP on 6535 of 6535
- * anchor rolls and 96.8 % of the bank's once the three call details under
+ * off" (+18 %) on a turn that cost kirans 24 points on the same linear
+ * scale (display 69 % to 48 %). The calc at the drawn roll (first seed;
+ * damage-check-anchor-v2.vt.ts over every legal pair of the anchor,
+ * damage-check-v2.vt.ts over every matrix cell of every third doubles
+ * position of the bank) matches the sim on all 8450 anchor rolls (6535
+ * non-lethal ones to the HP, 1915 lethal ones) and, on those 83 of the
+ * bank's 248 doubles positions, on 16 638 of 17 183 non-lethal rolls
+ * (96.8 %) and 6185 of 6186 lethal ones, once the three call details under
  * (D) are in.
  * CHANGE (packages/eval-engine/src/pair/, doubles only): (A) PairPRNG, a
  * recording PRNG, writes down per hit instance (one move object and one
@@ -931,139 +945,240 @@ import { summaryLines } from './calibration-summary';
  * its denominator, the damage roll with the crit flag, and a speed tie
  * among move actions; scripts answer one instance on demand and still draw
  * their number, so everything before replays exactly. ScriptedPRNG and the
- * singles solver are untouched. (B) Each roll carries a snapshot of the
- * live bodies and field at that moment (the partner's weather, an
- * Intimidate, a Tera click are in it). (C) A draw becomes a class: every
- * instance gets miss, hit, hit-kill or hit-nokill with its probability
- * (threshold/100; kill share (1-c)k/16 + c k'/16 from the calc); uncertain
- * instances are the events, the class key their sequence in roll order,
- * the weight their product; order, truncation, retargeting and redirection
- * are whatever the sim did. (D) Kill tables from @smogon/calc on a doubles
- * field with the partner effects it knows (ruin, auras, Helping Hand,
- * Battery, Power Spot, Steely Spirit, Friend Guard, doubles screens),
- * trusted only where the drawn roll's damage matches to the HP. Three
- * details keep the calc on the sim's number: calculate clones the move, so
- * a spread move against one target goes in through overrides; Download,
- * Intrepid Sword, Dauntless Shield and Embody Aspect stay out (the live
- * boosts carry them); Meteor Beam and Electro Shot lose the charge boost
- * the calc adds itself. (E) The heaviest outcome no draw showed yet
- * (prefix mass times its probability, at least 0.01) is drawn next with the
- * dice answering that one event the other way; stop at a coverage of 0.95,
- * after 8 draws, or without a candidate. (F) What the plan does not price
- * sends the cell to the plain mean of eight natural draws (the five search
- * seeds and three probe seeds): before any draw paralysis, freeze,
- * confusion, attraction, Quick Claw or Quick Draw, a Protect whose success
- * is rolled, multi-hit moves and Parental Bond, random targets, random
- * calls (F1); after a draw a speed tie or a random drag-in (F2), a |cant|
- * from flinch, paralysis, freeze or attraction, a confusion check, a
- * flinch-capable hit on a target that moves later (F3), Substitute, Focus
- * Sash or Sturdy at full HP, Disguise, Ice Face (F4), a second roll on one
- * target (F5), no damage line, no table, a calc that misses the drawn
- * damage (F6), a flip that did not land (F7), a coverage under 0.8 or over
- * 1.02 (F8). (G) The cell's value is the class means weighted by weight
- * over coverage, in the CellBlend shape deepening and the verify merge
- * already read; a cell whose first draw shows no event keeps today's plain
- * path and its value to the digit. Only root cells with blendRoot take the
- * plan: the app's matrix and the verify cells, so MCTS turns meet it in
- * their verify cells only; sub-searches, the MCTS tree, the solver and the
+ * singles solver are untouched. (B) The damage roll, and a hit roll under
+ * 100, carry a snapshot of the live bodies and field at that moment (the
+ * partner's weather, an Intimidate, a Tera click are in it). (C) A draw
+ * becomes a class: every instance gets miss, hit, hit-kill or hit-nokill
+ * with its probability (threshold/100; kill share (1-c)k/16 + c k'/16 from
+ * the calc); uncertain instances are the events, the class key their
+ * sequence in roll order, the weight their product; order, truncation,
+ * retargeting and redirection are whatever the sim did. A non-lethal roll
+ * skips the calc only when even its top roll as a crit falls short of the
+ * HP with 3 % and 2 HP of margin, and never under a modifier a crit
+ * ignores (the attacker's offensive drops, the defender's defensive
+ * raises, a screen; final review, 5996e40). (D) Kill tables from
+ * @smogon/calc on a doubles field with the partner effects it knows (ruin,
+ * auras, Helping Hand, Battery, Power Spot, Steely Spirit, Friend Guard,
+ * doubles screens), trusted where the drawn roll's damage matches to the
+ * HP; a KO roll only has to reach the HP, and a miss orders its hit
+ * alternatives by an unchecked table until the flip that draws one checks
+ * it. Three details keep the calc on the sim's number: calculate clones
+ * the move, so a spread move against one target goes in through
+ * overrides; Download, Intrepid Sword, Dauntless Shield and Embody Aspect
+ * stay out (the live boosts carry them); Meteor Beam and Electro Shot lose
+ * the charge boost the calc adds itself. (E) The heaviest untried flip
+ * (prefix mass times its probability, at least 0.01) is drawn next with
+ * the dice answering that one event the other way; stop at a coverage of
+ * 0.95, after 8 draws, or without a candidate (with one base draw every
+ * flip opens a new class; with three a flip can repeat one). (F) A cell
+ * where one of these rules fires goes to the plain mean of eight natural
+ * draws (the five search seeds and three probe seeds): before any draw
+ * paralysis, freeze, confusion, attraction, Quick Claw or Quick Draw, a
+ * Protect whose success is rolled, multi-hit moves and Parental Bond,
+ * random targets, random calls (F1); after a draw a speed tie among move
+ * actions or a random drag-in (F2), a |cant| from flinch, paralysis or
+ * freeze (the list also names attraction, but the sim writes 'Attract' and
+ * the check compares 'attract', so an attraction that starts during the
+ * turn goes unpriced, T77), a confusion check, a flinch-capable hit on a
+ * target that moves later (F3), Substitute, Focus Sash or Sturdy at full
+ * HP, Disguise, Ice Face (F4), a second roll on one target (F5), no damage
+ * line, no table, a calc that misses the drawn damage (F6), a flip that
+ * did not land (F7), a coverage outside 0.8 to 1.02 (F8). A crit that
+ * decides no kill, a chance secondary such as a burn or a stat drop and
+ * the damage roll of a hit that does not kill stay inside the drawn
+ * class. (G) The cell's value is the class means weighted by weight over
+ * coverage, in the CellBlend shape deepening and the verify merge already
+ * read; a cell where no rule of F fires and whose first draw shows no
+ * event keeps today's plain path and its value to the digit. Only root
+ * cells with blendRoot take the plan: the app's matrix, the verify cells,
+ * and on a depth-1 matrix turn the played pair and the item probes
+ * (evalPair sends them through evalCells), so MCTS turns meet it in their
+ * verify cells only; sub-searches, the MCTS tree, the solver and the
  * prover are unchanged. (H) Doubles options carry kill odds
  * (koOddsForOptions -> pair/odds.ts): per option the uncertain slot event
- * with the best chance, labeled "Play Rough→Incineroar"; a foe another slot
- * of the option kills for sure gives the other slot no headline (focus
- * fire: Karate Chop kills Eevee, Tackle's crit into the same Eevee says
- * nothing about whether it lives; the odds reach the prose and grading's
- * deniedByDice). The prose names the label where it is set (phrases.ts,
- * clauses.ts, win-reason.ts, denied-end.ts); singles sets none. Odds are
- * root odds as in singles: a Howl, a chip or a Tera click in the same turn
- * is not in them. eval-mcts.spec.ts's round-7 pin "doubles results carry no
- * koOdds (fail-closed)" now pins the labeled odds on the same battle.
- * GATE (pre-registered 23 Sep before the first bank run, all met): base
- * bank on master byte-identical to r55-rebuild; the pattern state (it
- * carries the prng and table commits) byte-identical, nothing wired.
- * Census on the 712 cells (census-after.vt.ts, identity exact against
- * master's engine in the same process): edge-cell error 0.0212 mean,
- * 0.0532 p90 (gates 0.030 and 0.07; one draw 0.0618 and 0.1829); 247 cells
- * without an event on their first draw identical to the digit; draws per
- * planned or fallback cell 4.55 on average (gate 5.5; p99 10, max 15 = a
- * spent plan budget plus the fallback's seven fresh seeds); plan 275,
- * fallback 190 (27 %, expected 20 to 35 %), plain 247; fallback reasons tie
- * 68, Focus Sash 44, cant:flinch 25, stall 16, flinch-chance 8,
- * prevented:volatile 7, no-table 4, cant:par 4, multi-hit 4, drag 4,
- * calc-mismatch 3, cant:frz 2, low-cover 1. 57 of the 225 cells without an
- * edge in the census still leave the plain path (tie 17, stall 13, sash 7,
- * flinch 4, par 3, drag 2, volatile 2: random outcomes the census did not
- * count as edges; plus 9 planned); their error fell from 0.041 to 0.015.
- * The Task 4 and tip commits give the same 712 values. Anchor played cell
- * -0.1427 against -0.125 (gate 0.05; 4 draws, classes miss 0.0917, Play
- * Rough kill with both Matcha Gotcha hits 0.7431, with one Matcha Gotcha
- * miss 0.0826 each). Doubles matrix time on the bank's 129 matrix
- * positions, interleaved against master in one process: 3.72x and 3.46x in
- * two runs (base 129.1 and 148.4 s, new 480.2 and 513.0 s; per position
- * p50 3.1x and 2.9x, p90 6.4x and 6.6x; gate 4x), both under load from
- * other projects. Bank r56-sampler against r55-rebuild: singles 585 of 585
- * rows byte-identical, doubles with a fainted fraction from 0.25 119 of 119
- * byte-identical (the bank runs those through MCTS), 112 of the 129 matrix
- * positions moved; verdict "no gain resolved; no harm; warnings: hq doubles
- * late (+15)"; full all +4 bp [-3, +12], doubles +13 [-10, +42], singles +0
- * in every cell; of the warning cell's +15 [+1, +35] on 45 positions, 10.5
- * come from smogtours-gen9doublesou-912883 t10 (+0.180 -> +0.081, p1 won)
- * and 3.4 from -941650 t8; Brier 0.2547/0.2231/0.1198, hq
- * 0.2444/0.1960/0.1234, luck-adjusted 0.2293/0.1947/0.1136, K 2.31 (singles
- * 2.22, doubles 2.46); new base .calibration/r56-sampler (r56-odds
- * byte-identical). Feedback: the six singles dumps byte-identical to round
- * 55, golden 655336 with them; the four doubles dumps move and now carry
- * koOdds (154, 99, 56 and 171 entries, 0 before); three tip runs
- * byte-identical; doubles tiers 12/5/0 -> 9/3/0 on 10 moved turns, the odds
- * step alone moves none; singles 38/2/0. Play-out pin first (D7), suite 193
- * files and 1568 tests, e2e 75 of 75, lint, tsc -b, pack:smoke.
- * READ (reading/reading.md, one reader and one skeptic per game, read-only):
- * the 10 moved turns sit in three games (2630685175 moved values, no
- * label); of 12 rows the skeptics read 8 more plausible, 2 equally, 1 less,
- * 1 cannot tell, and no misquoted number turns a verdict. More plausible:
- * one-draw labels that stood on a single seed now stand on priced classes
- * or eight draws (2663093831 t4: the +1 Throat Chop kill on Sinistcha is a
- * class of 0.1615 instead of seed 0's "no"; t7 and t8: Scale Shot misses in
- * seed 0; 2629703929 t4: p2's read credit came from a Sleep Powder miss one
- * draw priced as certain; t13: the 1-in-24 crit that ended the game is
- * priced; 912045 t1: Make It Rain crits on Rillaboom in the Fake Out
- * cells). Less plausible, 912045 t8: the verify cells now return pair-plan
- * blends, the verify merge deepens only their first draw and keeps static
- * leaves for the rest (the T16 family, and doubles trees carry no class
- * keys, so no tree draw joins a class), a non-lethal Drain Punch crit
- * (p 0.0078) holds a third of the played cell's main class while the 0.95
- * coverage stop drops a lethal crit class (p 0.034); the older one-seed
- * depth check against p2's actual Protect then clears p1. Cannot tell,
- * 2629703929 t4 p1: the class mix raises p1's gap from 0.1494 to 0.3638
- * and the same depth check clears it. 2629703929 t1 loses a correct mistake
- * tier through the item probe's Life Orb on Calyrex-Shadow, which the log
- * rules out (no recoil after Solar Beam).
+ * with the best chance, labeled "Play Rough→Incineroar"; a foe another
+ * slot of the option kills for sure gives the other slot no headline
+ * (focus fire: Karate Chop kills Eevee, Tackle's crit into the same Eevee
+ * says nothing about whether it lives); an allAdjacent move counts the
+ * living partner for the spread modifier, as the sim does (final review,
+ * e5ab1e4). The prose names the label where it is set (phrases.ts,
+ * clauses.ts, win-reason.ts); the sack rule (grading's deniedByDice) and
+ * the denied early end (denied-end.ts) read labeled odds as none, because
+ * the headline may belong to the partner's slot (final review, e5ab1e4);
+ * singles sets no label. Odds are root odds as in singles: a Howl, a chip
+ * or a Tera click in the same turn is not in them. eval-mcts.spec.ts's
+ * round-7 pin "doubles results carry no koOdds (fail-closed)" now pins the
+ * labeled odds on the same battle.
+ * GATE (pre-registered 23 Sep before the first bank run, all met; first
+ * chain on 9404ccf, 11:54 to 12:47): base bank on master byte-identical to
+ * r55-rebuild; the pattern state (it carries the prng and table commits)
+ * byte-identical, nothing wired. Census on the 712 cells
+ * (census-after.vt.ts, identity exact against master's engine in the same
+ * process): edge-cell error 0.0212 mean, 0.0532 p90 (gates 0.030 and
+ * 0.07; master 0.0618 and 0.1829); 247 cells where no rule of F fires and
+ * the first draw shows no event identical to the digit; draws per planned
+ * or fallback cell 4.55 on average (gate 5.5; p99 10, max 15 = a spent
+ * plan budget plus the fallback's seven fresh seeds); plan 275, fallback
+ * 190 (142 of the 487 edge cells, 29 %, expected 20 to 35 %; 48 of the 225
+ * cells without an edge; 41 % of the 465 plan and fallback cells), plain
+ * 247; fallback reasons tie 68, Focus Sash 44, cant:flinch 25, stall 16,
+ * flinch-chance 8, prevented:volatile 7, no-table 4, cant:par 4, multi-hit
+ * 4, drag 4, calc-mismatch 3, cant:frz 2, low-cover 1. 57 of the 225 cells
+ * without an edge in the census still leave the plain path (tie 17, stall
+ * 13, par 3, drag 2, volatile 2: random outcomes the census did not count
+ * as edges; sash 7 and flinch 4, which the Focus Sash guard and Fake
+ * Out's certain flinch send to the fallback with no roll able to kill and
+ * no random outcome at stake; plus 9 planned); their error fell from 0.041
+ * to 0.015. The Task 4 and 9404ccf commits give the same 712 values.
+ * Anchor played cell -0.1427 against -0.125 (gate 0.05; 4 draws, classes
+ * miss 0.0917, Play Rough kill with both Matcha Gotcha hits 0.7431, with
+ * one Matcha Gotcha miss 0.0826 each). Doubles matrix time on the bank's
+ * 129 matrix positions, interleaved against master in one process: 3.72x
+ * and 3.46x in two runs (base 129.1 and 148.4 s, new 480.2 and 513.0 s;
+ * per position p50 3.1x and 2.9x, p90 6.4x and 6.6x; gate 4x), run 1 under
+ * load from other projects (CPU 27 to 77 %), run 2 while the round's own
+ * reading agents ran (13 to 38 % at its start). Bank r56-sampler against
+ * r55-rebuild: singles 585 of 585 rows byte-identical, doubles with a
+ * fainted fraction from 0.25 119 of 119 byte-identical (the bank runs
+ * those through mctsSearch, without verify), 112 of the 129 matrix
+ * positions moved; verdict "no gain resolved; no harm; warnings: hq
+ * doubles late (+15); resolved under 5 bp: hq all late (+4)" (the hint is
+ * the warning's 45 doubles positions spread over all 190 hq late
+ * positions, +4 [+0, +8]; singles are unmoved); full all +4 bp [-3, +12],
+ * doubles +13 [-10, +42], singles +0 in every cell; of the warning cell's
+ * +15 [+1, +35], 10.5 come from smogtours-gen9doublesou-912883 t10 (+0.180
+ * -> +0.081, p1 won) and 3.5 from -941650 t8; Brier 0.2547/0.2231/0.1198,
+ * hq 0.2444/0.1960/0.1234, luck-adjusted 0.2293/0.1947/0.1136, K 2.31
+ * (singles 2.22, doubles 2.46); r56-odds byte-identical. Feedback: the six
+ * singles dumps byte-identical to round 55, golden 655336 with them; the
+ * four doubles dumps move and now carry koOdds (154, 99, 56 and 171
+ * entries, 0 before); three tip runs byte-identical; doubles tiers 12/5/0
+ * -> 9/3/0 on 10 moved turns, the odds step alone moves none; singles
+ * 38/2/0. Play-out pin first (D7): green at 11:23 on the tree committed as
+ * 2ff26c0 (36 s, .superpowers/sdd/2026-09-23-round-56-plan/t4-playout.log),
+ * again inside e2e 75 of 75 at the tip; suite 193 files and 1568 tests,
+ * lint, tsc -b, pack:smoke.
+ * READ (reading/reading.md, one reader and one skeptic per game,
+ * read-only): the 10 moved turns sit in three games (2630685175 moved
+ * values, no label); of 12 rows the skeptics read 8 more plausible (two of
+ * them fragile: 2663093831 t6 turns back to chance with an itemless
+ * Dragonite, which the log allows; 912045 t1 p1 holds by 0.0017 once the
+ * eight-draw fallback's crits carry their true odds, those Fake Out and
+ * Sturdy cells falling back only through F3's Fake Out flaw and the sash
+ * guard, and by 0.0002 with the columns the option cap drops), 2 equally,
+ * 1 less, 1 cannot tell, and no misquoted number turns a verdict. More
+ * plausible: labels that stood on one seed now stand on priced classes or
+ * eight draws (2663093831 t4: the +1 Throat Chop kill on Sinistcha is a
+ * class of 0.1615 instead of seed 0's "no"; t7 and t8: Scale Shot misses
+ * in seed 0; 2629703929 t4: p2's read credit came from a Sleep Powder miss
+ * one draw priced as certain; 912045 t1: Make It Rain crits on Rillaboom
+ * in the Fake Out cells). 2629703929 t13 moved through the verify merge,
+ * not through a priced crit: the verify cell prices no crit class (its
+ * three base draws land in the no-crit class, 23/24 already covers 0.95,
+ * T77), and the merge now pools the two trees that played the cell out for
+ * a blend with one open class, where an unblended cell needed three (-0.7
+ * -> -0.968). Less plausible, 912045 t8: the verify cells now return
+ * pair-plan blends, and a blend with two or more open classes takes no
+ * tree draw (doubles trees carry no class keys) and deepens only its first
+ * draw, keeping static leaves for the rest (the T16 family); inside the
+ * played cell a non-lethal Drain Punch crit (p 0.0078) holds a third of
+ * the main class while the 0.95 coverage stop drops a lethal crit class
+ * (p 0.034); the older one-seed depth check against p2's actual Protect
+ * then clears p1. Cannot tell, 2629703929 t4 p1: the class mix raises p1's
+ * gap from 0.1494 to 0.3638 and the same depth check clears it.
+ * 2629703929 t1 loses a correct mistake tier through the item probe,
+ * whose pairs now take the pair plan as well: with Life Orb on
+ * Calyrex-Shadow, which the log rules out (no recoil after Solar Beam),
+ * the probe's gap falls from 0.4852 to 0.0454 and clears p2.
  * SIDE EFFECT (measured, not gated; the round-51 app-path probe re-run in
- * T11-after/): the anchor turn's card no longer praises kirans. It praises
- * wb_vg, whose 90 % Play Rough connected ("a read that paid off, +17% over
- * the safe Matcha Gotcha + → Incineroar", "Play Rough→Incineroar was a 90%
- * roll to connect"), and grades the same click an inaccuracy (-9 %); the
- * swing splits into +16 % from the choices and +12 % from the rolls
- * instead of -17 % and +41 %. The praise gate itself stays T59.
- * REMAINS: T77 (rule E's 0.95 coverage stop drops a rare expensive class;
- * a Fake Out flinch is certain, yet F3 counts its |cant| line: 13 of the
- * census's 25 cant:flinch fallbacks), T78 (doubles trees flag no boundary
- * cells and carry no class keys: planCellEvents fails on doubles; 2629703929
- * t13 reads a last turn as decided that Flare Blitz wins 58 % of the time),
- * T79 (Ogerpon's fixed Tera type: the build leaves it empty and the sim
- * picks Grass), T80 (the protocol rules out Life Orb without recoil and
- * Leftovers without a heal; the build keeps them). Flinch as its own class
- * (T24), speed ties as a coin (T15), the crit class (T23) and scripted
- * classes at the singles root (T14) build on this plan, whose F2 and F3 are
- * their doubles half; the calc gaps both formats share are T76, caught in
- * doubles by F6 until then. The app's row suffix (KoSuffix) shows a doubles
- * kill chance without its label (C signal).
+ * T11-after/ on 9404ccf): the anchor turn's card no longer praises kirans.
+ * It praises wb_vg, whose 90 % Play Rough connected ("a read that paid
+ * off, +17% over the safe Matcha Gotcha + → Incineroar", "Play
+ * Rough→Incineroar was a 90% roll to connect"), and grades the same click
+ * an inaccuracy (-9 %); the swing splits into +16 % from the choices and
+ * +12 % from the rolls instead of -17 % and +41 %. On the fixed tip e5ab1e4
+ * the card reads the same with small shifts (+16 % praise, -7 % inaccuracy,
+ * the same split). The praise gate itself stays T59.
+ * FINAL REVIEW AND AUDIT: a fresh reviewer read the branch (bf8b11c against
+ * e7f618f): no critical finding, three important ones, all fixed test
+ * first in one pass. (1) The margin rule under (C) skipped the calc for a
+ * normal roll under a modifier a crit ignores: 3362 of 33 485 skipped
+ * rolls over all 34 788 first draws hide a crit kill (median 1/24, max
+ * 1/8), in 3017 cells (8.7 %), always against the Intimidated side or
+ * into a screen; fixed in 5996e40. (2) The odds priced an allAdjacent move
+ * next to a living partner as single-target (Earthquake into a lone
+ * Snorlax: 16 of 16 rolls "kill", the sim's spread rolls kill none; on the
+ * bank smogtours-gen9doublesou-939635 t12 showed Earthquake→Roaring Moon
+ * at 0.34 for a crit-only kill); fixed in e5ab1e4. (3) The sack rule and
+ * the denied early end read the headline as the fainted body's own odds;
+ * fixed in e5ab1e4 by reading labeled odds as none, master's doubles
+ * behavior. Second chain on the fixes (5996e40 and e5ab1e4, 15:31 to 16:16):
+ * census on e5ab1e4: 41 of the 712 cells move, their error falls from 0.0299
+ * to 0.0234; edge-cell error 0.0208 mean, 0.0526 p90; the 215 cells where no
+ * rule of F fires and the first draw shows no event stay identical to
+ * master; calc-mismatch fallbacks rise from 3 to 17 (rolls the margin rule
+ * skipped now meet the calc, and some miss it, T76); 4.53 draws; anchor
+ * unchanged at -0.1427; matrix time 3.61x (base 154.7 s, new 558.2 s; per
+ * position p50 3.3x, p90 6.5x). Bank r56-shortcut against r56-odds: 42
+ * doubles matrix positions move, verdict "gain on luck-adjusted all (-1),
+ * luck-adjusted doubles (-2); no harm; no warnings"; against r55-rebuild the
+ * round's verdict stands ("no gain resolved; no harm; warnings: hq doubles
+ * late (+15); resolved under 5 bp: hq all late (+4)", full all +4 [-4, +12],
+ * doubles +12 [-11, +41]), singles 585 of 585 and doubles from a fainted
+ * fraction of 0.25 119 of 119 byte-identical, 115 of 129 matrix positions
+ * moved; Brier 0.2546/0.2231/0.1197, hq 0.2444/0.1960/0.1234, luck-adjusted
+ * 0.2290/0.1947/0.1136, K 2.31 (singles 2.22, doubles 2.46); new base
+ * .calibration/r56-shortcut (r56-fixodds byte-identical). Feedback: the
+ * margin fix moves three doubles dumps and one verdict, 912045 t1 p2 none ->
+ * inaccuracy (0.067 -> 0.120): Roaring Moon's Breaking Swipe drops Ogerpon's
+ * Attack first, and the column where Ogerpon terastallizes into Ivy Cudgel
+ * now prices the crit that ignores the drop (in the game an Ivy Cudgel crit
+ * took Roaring Moon to 9 %), but that column carries the Tera type the build
+ * gets wrong (Grass for Rock, T79): cannot tell. The odds and grading fixes
+ * move no dump; three tip runs byte-identical; doubles tiers 10/3/0, singles
+ * 38/2/0; suite 193 files and 1572 tests, e2e 75 of 75, lint, tsc -b,
+ * pack:smoke. The second chain's states file carried CRLF line ends, so a
+ * catch-up script ran the two stages it skipped. Seven minor findings are
+ * deferred (T77, T18). The close audit (numbers, process, unsupported
+ * claims, each with a refuter) found 58 points in the booking, 57 held, and
+ * every correction is in this entry, NextSteps and the spec. Found on the
+ * way: origin/master was pushed to e7f618f on 21 Sep 17:18:58, 18 s after v1
+ * (reflog), while D1 and the round-55 entry below said master stays
+ * unpushed; the user gate of round 56 settles it.
+ * REMAINS: T77 (rule E's 0.95 coverage stop drops a rare expensive class,
+ * the game-ending crit of 2629703929 t13 among them; a Fake Out flinch is
+ * certain, yet F3 counts its |cant| line, 13 of the census's 25
+ * cant:flinch fallbacks; the review's minors on Attract, paralysis dealt
+ * in the same turn, Wide Guard and Quick Guard, duplicate flips at three
+ * base draws, the sash guard and deepened fallback cells), T78 (doubles
+ * trees flag no boundary cells and carry no class keys: planCellEvents
+ * fails on doubles; 2629703929 t13 reads a last turn as decided although
+ * Flare Blitz kills Solgaleo in 58 % of its rolls and p1 wins about 56 %
+ * against the played Psychic Fangs), T79 (Ogerpon's fixed Tera type and
+ * mask: the build leaves the type empty and the sim picks Grass), T80 (the
+ * protocol rules out Life Orb without recoil and Leftovers without a heal;
+ * the build keeps them). Flinch as its own class (T24), speed ties as a
+ * coin (T15), the crit class (T23) and scripted classes at the singles
+ * root (T14) build on this plan; its F2 is the doubles half of T15, its F3
+ * that of T24 and T65. The calc gaps both formats share are T76; in
+ * doubles F6 catches them where a non-lethal roll misses its damage or a
+ * KO roll falls short of the HP. C signals from the reading: the app's row
+ * suffix (KoSuffix) shows a doubles kill chance without its label; doubles
+ * odds are root odds; the doubles option cap (RESTRICT_K_DOUBLES, 16
+ * combos) drops p2's natural lines in 912045 t1; in 2663093831 t7 the
+ * played combination is not among p1's 12 options and the partial matcher
+ * fills the hidden slot with a switch the log rules out; the Orthworm move
+ * order there is one of round 53's 15 stillBroken rows (T30). The read
+ * clause prints "X was kills ~4% of the time" for a sure-hit move (singles
+ * too since round 6, T18).
  *
  * REBUILD FIDELITY 2026-09-21 (improvement round 55, iteration 4e, T74 and
  * T70, a fast round without a spec; b583b79, 2f9b0a9 plus the booking, cache
  * v51, score-touching as a correction with its own evidence; probes, the
  * census and the gate chain under docs/perf/probes/2026-09-21-r55/; adopted
  * at the user gate of 21 Sep 17:18: r55 fast-forwards to master, branch v1
- * follows and is pushed, master itself stays unpushed; round 56 is
+ * follows and is pushed (17:18:40), and master went to origin/master as
+ * well (17:18:58, reflog; D1 said otherwise until round 56); round 56 is
  * iteration 4c, T58).
  * INSTRUMENT: lock-census.vt.ts makes one pass per replay with the working
  * tree's engine (the bank's app build, corrections at every boundary) and
