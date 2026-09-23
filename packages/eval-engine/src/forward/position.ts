@@ -104,6 +104,18 @@ export function forkBattle(position: SimPosition, seed: PRNGSeed, scripts?: Roll
   return battle;
 }
 
+/**
+ * Round 56: a fork whose dice are the given PRNG — the doubles pair plan's
+ * recorder attaches itself to the battle it rolls for.
+ */
+export function forkBattleWithPrng(position: SimPosition, prng: PRNG & { attach(battle: Battle): void }): Battle {
+  const battle = deserializeFromParsed(positionParsed(position));
+  prng.attach(battle);
+  battle.prng = prng;
+  repairFaintedActives(battle);
+  return battle;
+}
+
 export function toPosition(battle: Battle): SimPosition {
   return new Position(null, battle);
 }
