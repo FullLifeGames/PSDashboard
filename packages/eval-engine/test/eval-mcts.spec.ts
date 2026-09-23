@@ -256,7 +256,7 @@ describe('MCTS koOdds payload (round 7)', () => {
     expect(tree1.boundaryCells).toEqual([]);
   });
 
-  test('doubles results carry no koOdds (fail-closed)', () => {
+  test('doubles rows carry labeled koOdds on uncertain kills only (round 56; fail-closed before)', () => {
     const battle = new Battle({
       formatid: toID('gen9doublescustomgame'),
       seed: '1,2,3,4',
@@ -280,9 +280,13 @@ describe('MCTS koOdds payload (round 7)', () => {
       battle.choose('p2', 'team 12');
     }
     const result = mctsSearch(serialize(battle), settings);
-    for (const row of [...result.perSide.p1, ...result.perSide.p2]) {
-      expect(row.koOdds).toBeUndefined();
-    }
+    const odds = (choice: string) => result.perSide.p1.find(row => row.choice === choice)!.koOdds;
+    // Round 56, the doubles cell plan: a pair option names the slot its odds belong to.
+    expect(odds('move rockslide, move protect')).toEqual({ accuracy: 0.9, killFraction: 1, label: 'Rock Slide→Pikachu' });
+    expect(odds('move karatechop 1, move tackle 2')).toEqual({ accuracy: 1, killFraction: expect.closeTo(1 / 24, 12), label: 'Tackle→Eevee' });
+    // Karate Chop kills Eevee on every roll: the Tackle's crit kill on the same Eevee is no headline.
+    expect(odds('move karatechop 2, move tackle 2')).toBeUndefined();
+    for (const row of result.perSide.p2) expect(row.koOdds).toBeUndefined();
   });
 
   test('a uniform-outcome mutual-kill cell re-prices to the analytic blend end-to-end', async () => {

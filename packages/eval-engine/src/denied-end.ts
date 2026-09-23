@@ -43,7 +43,7 @@ const toward = (side: Side, delta: number): number => (side === 'p1' ? delta : -
 function carriedMove(analysis: TurnAnalysis, side: Side, odds: number): string | undefined {
   const ko = analysis[side].played?.koOdds;
   if (!ko || ko.killFraction < 1 || ko.accuracy >= 1) return undefined;
-  return Math.abs(ko.accuracy - odds) < 1e-6 ? analysis[side].played!.label : undefined;
+  return Math.abs(ko.accuracy - odds) < 1e-6 ? (ko.label ?? analysis[side].played!.label) : undefined;
 }
 
 /**

@@ -18,7 +18,8 @@ function readClause(name: string, side: SideAnalysis, opponent: SideAnalysis): s
   const horizon = side.riskPayoffTurn
     ? side.riskPayoffTurn === 1 ? ' one turn later' : ` ${side.riskPayoffTurn} turns later`
     : '';
-  const click = side.played.koOdds ? ` The click was ${koPhrase(side.played.koOdds)}.` : '';
+  const odds = side.played.koOdds;
+  const click = odds ? ` ${odds.label ? phrase(odds.label) : 'The click'} was ${koPhrase(odds)}.` : '';
   return `${name} played ${phrase(side.played.label)} — a read that paid off${horizon}, ` +
     `${winDeltaText(side.riskPayoff ?? 0)} over the safe ${phrase(side.safe.label)} (${winPctText(side.safe.worstCase)} guaranteed).${priced}${click}`;
 }

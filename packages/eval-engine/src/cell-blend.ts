@@ -1,5 +1,6 @@
 import type { Battle, Pokemon, PRNGSeed } from '@pkmn/sim';
 import { boundaryEvent, RANDOM_CALL_MOVES, type BoundaryEvent } from './ko-odds.ts';
+import { pairKoOdds } from './pair/odds.ts';
 import type { KoOddsInfo } from './types.ts';
 import { sideIndex } from '@fulllifegames/replay-core';
 
@@ -300,9 +301,11 @@ export function foldClassWeights(events: CellEvent[], first: 'p1' | 'p2'): Map<s
 /**
  * Per-option kill odds vs the opposing PRE-TURN active (the stay-column
  * headline) for the ranked-row payload. Emitted only when the odds carry
- * real information: a kill exists and is not guaranteed.
+ * real information: a kill exists and is not guaranteed. Round 56: doubles
+ * options go through pair/odds.ts (one headline slot, labeled).
  */
 export function koOddsForOptions(battle: Battle, side: 'p1' | 'p2', choices: string[]): (KoOddsInfo | null)[] {
+  if (battle.gameType === 'doubles') return pairKoOdds(battle, side, choices);
   const own = sideIndex(side);
   const attacker = battle.sides[own].active[0];
   const defender = battle.sides[own === 0 ? 1 : 0].active[0];

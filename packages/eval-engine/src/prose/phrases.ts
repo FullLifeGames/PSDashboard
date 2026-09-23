@@ -1,4 +1,5 @@
 import type { SideAnalysis } from '../analysis.ts';
+import type { KoOddsInfo } from '../types.ts';
 import { winPctText } from '../winprob.ts';
 
 /**
@@ -47,6 +48,10 @@ export function koPhrase(odds: { accuracy: number; killFraction: number }): stri
   return `${art(acc)} ${acc}% roll to connect`;
 }
 
+/** One named claim: a doubles label (round 56) names the slot, singles the option. */
+const oddsPart = (name: string, odds: KoOddsInfo, copula: 'was' | 'is') =>
+  `${phrase(odds.label ?? name)} ${odds.killFraction < 1 && odds.accuracy === 1 ? koPhrase(odds) : `${copula} ${koPhrase(odds)}`}`;
+
 /**
  * One parenthetical naming the true odds behind the clause's claims — the
  * played move's and/or the recommendation's. The "kills ~43% of the time"
@@ -56,13 +61,8 @@ export const oddsNote = (side: SideAnalysis): string => {
   const shown = displayBest(side);
   const shownOdds = side.bestNull?.alternative ? side.bestNull.alternative.koOdds : side.best?.koOdds;
   const parts: string[] = [];
-  if (side.played?.koOdds && side.played.choice !== side.best?.choice) {
-    const odds = side.played.koOdds;
-    parts.push(`${phrase(side.played.label)} ${odds.killFraction < 1 && odds.accuracy === 1 ? koPhrase(odds) : `was ${koPhrase(odds)}`}`);
-  }
-  if (shownOdds) {
-    parts.push(`${phrase(shown.label)} ${shownOdds.killFraction < 1 && shownOdds.accuracy === 1 ? koPhrase(shownOdds) : `is ${koPhrase(shownOdds)}`}`);
-  }
+  if (side.played?.koOdds && side.played.choice !== side.best?.choice) parts.push(oddsPart(side.played.label, side.played.koOdds, 'was'));
+  if (shownOdds) parts.push(oddsPart(shown.label, shownOdds, 'is'));
   return parts.length > 0 ? ` (True odds: ${parts.join('; ')}.)` : '';
 };
 

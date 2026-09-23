@@ -371,7 +371,8 @@ export function seedPhrase(analysis: TurnAnalysis, loser: Side): string {
   const side = analysis[loser];
   const setup = playedSetupMove(side) ? '; a setup move the engine may undervalue' : '';
   const better = side.bestNull?.alternative?.label ?? side.best!.label;
-  const oddsBit = side.played!.koOdds ? ` (${koPhrase(side.played!.koOdds)})` : '';
+  const odds = side.played!.koOdds;
+  const oddsBit = odds ? ` (${odds.label ? `${phrase(odds.label)}: ` : ''}${koPhrase(odds)})` : '';
   return `turn ${analysis.turn} (${phrase(side.played!.label)}${oddsBit}, ` +
     `${winDeltaText(-(side.regret ?? 0))} — safer was ${phrase(better)}${setup})`;
 }

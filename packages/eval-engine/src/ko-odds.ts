@@ -61,7 +61,7 @@ function accuracyStageMultiplier(stages: number): number {
   return s >= 0 ? (3 + s) / 3 : 3 / (3 - s);
 }
 
-function critRate(gen: number, critRatio: number): number | null {
+export function critRate(gen: number, critRatio: number): number | null {
   // Stage 0 or 1 only (the move's own ratio); higher effective stages
   // (Super Luck, Scope Lens, focus energy) fail closed at the call site.
   const stage = Math.max(0, Math.min(1, (critRatio || 1) - 1));
@@ -115,7 +115,7 @@ function killShare(damage: unknown, hp: number): number | null {
 }
 
 /** The guards that make the one-turn model refuse a pair: unknown or unpriceable moves, crit and accuracy modifiers it cannot fold. */
-function unpriceable(attacker: Pokemon, defender: Pokemon, move: DexMove): boolean {
+export function unpriceable(attacker: Pokemon, defender: Pokemon, move: DexMove): boolean {
   if (!move.exists) return true;
   if (RANDOM_CALL_MOVES.has(move.id) || UNPRICEABLE_MOVE_IDS.has(move.id)) return true;
   if (move.multihit) return true;
@@ -143,7 +143,7 @@ function weatherAccuracy(move: DexMove, base: number, weather: string): number {
 }
 
 /** Accuracy after weather and stage modifiers; No Guard on either side makes the move sure. */
-function moveAccuracy(battle: Battle, move: DexMove, attacker: Pokemon, defender: Pokemon): number {
+export function moveAccuracy(battle: Battle, move: DexMove, attacker: Pokemon, defender: Pokemon): number {
   let accuracy: number;
   if (move.accuracy === true) {
     accuracy = 1;

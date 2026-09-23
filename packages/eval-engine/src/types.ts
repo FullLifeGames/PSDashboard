@@ -88,6 +88,8 @@ export interface EvalPreferences {
 export interface KoOddsInfo {
   accuracy: number;
   killFraction: number;
+  /** Doubles (round 56): the slot's move and target the odds belong to, "Play Rough→Incineroar". Singles leaves it unset. */
+  label?: string;
 }
 
 /** One outcome class of a blended boundary cell (round 6). */
