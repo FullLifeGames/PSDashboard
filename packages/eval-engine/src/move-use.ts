@@ -77,7 +77,7 @@ export const RULE_ABILITIES: ReadonlySet<string> = new Set(['liquidvoice', 'norm
  * (weather, terrain, grounding, stages, HP, speed, weight, Hidden Power,
  * happiness): pairKey appends their answer (round 57).
  */
-export const CONTEXT_MOVES: ReadonlySet<string> = new Set<string>([]);
+export const CONTEXT_MOVES: ReadonlySet<string> = new Set<string>(['weatherball', 'terrainpulse']);
 
 function withAbility(ability: string, move: MoveLike, own: MoveAtUse, user: MoveUser): MoveAtUse {
   const teraBlastAfterClick = move.id === 'terablast' && !!user.terastallized;

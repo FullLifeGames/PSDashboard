@@ -124,3 +124,29 @@ describe('matchup memo (round 49)', () => {
     expect(cache.size).toBe(1);
   });
 });
+
+describe('the memo keys the move answer (round 57)', () => {
+  const withAbility = (species: string, moves: string[], ability: string): PokemonSet => ({ ...makeSet(species, moves), ability });
+
+  test('Weather Ball: a weather change misses the memo', () => {
+    const battle = makeBattle(withAbility('Pelipper', ['weatherball'], 'Drizzle'), makeSet('Gengar', ['splash']));
+    const [pelipper, gengar] = [battle.sides[0].active[0], battle.sides[1].active[0]];
+    const cache = createMatchupCache();
+    const cached = threatGetter(battle, cache);
+    expect(cached(pelipper, gengar)).toEqual(pairThreat(pelipper, gengar, battle));
+    battle.field.clearWeather();
+    expect(cached(pelipper, gengar)).toEqual(pairThreat(pelipper, gengar, battle));
+    expect(cache.size).toBe(2);
+  });
+
+  test('Terrain Pulse: a terrain change misses the memo', () => {
+    const battle = makeBattle(withAbility('Indeedee', ['terrainpulse'], 'Psychic Surge'), makeSet('Gengar', ['splash']));
+    const [indeedee, gengar] = [battle.sides[0].active[0], battle.sides[1].active[0]];
+    const cache = createMatchupCache();
+    const cached = threatGetter(battle, cache);
+    expect(cached(indeedee, gengar)).toEqual(pairThreat(indeedee, gengar, battle));
+    battle.field.clearTerrain();
+    expect(cached(indeedee, gengar)).toEqual(pairThreat(indeedee, gengar, battle));
+    expect(cache.size).toBe(2);
+  });
+});

@@ -1,7 +1,7 @@
 import type { Battle, Pokemon, Side } from '@pkmn/sim';
 import type { MoveAtUse } from '../move-use.ts';
 import { stageMultiplier } from '../stat-stages.ts';
-import { landedMove } from './move-facts.ts';
+import { landedKey, landedMove } from './move-facts.ts';
 
 /**
  * The HP- and boost-independent threat proxy: one attacker→defender
@@ -45,7 +45,10 @@ export interface PairThreat {
  * Burn Up), the Tera type, the stored stats it divides (Power Trick, Guard Split), the
  * defender's max HP (forme change, Dynamax) and, where a halving move prices
  * off it, the defender's current HP. A new read inside pairThreat or
- * singleMoveFraction needs its key term (test/threat-memo.spec.ts).
+ * singleMoveFraction needs its key term (test/threat-memo.spec.ts). Round 57:
+ * a move whose answer at use reads a fact the key does not name (weather,
+ * terrain, stages, HP, speed, weight, Hidden Power, happiness) keys its
+ * answer instead (landedKey, CONTEXT_MOVES in move-use.ts).
  */
 export type MatchupCache = Map<string, PairThreat>;
 
@@ -76,7 +79,7 @@ export function usableSlots(pokemon: Pokemon): Pokemon['moveSlots'] {
 /** Moves that deal half the target's CURRENT HP. */
 const HALVING_MOVES: ReadonlySet<string> = new Set(['superfang', 'naturesmadness', 'ruination']);
 
-function pairKey(attacker: Pokemon, defender: Pokemon): string {
+function pairKey(attacker: Pokemon, defender: Pokemon, battle: Battle): string {
   // The usable-slot signature keys PP transitions: a move draining to zero
   // mid-search changes the attacker's threat, so it must miss the memo.
   const slots = usableSlots(attacker);
@@ -97,7 +100,8 @@ function pairKey(attacker: Pokemon, defender: Pokemon): string {
   const offense = `${attacker.types.join('/')}:${attacker.terastallized ?? ''}:${attacker.storedStats.atk}:${attacker.storedStats.spa}`;
   const defense = `${defender.types.join('/')}:${defender.terastallized ?? ''}:${defender.storedStats.def}:${defender.storedStats.spd}:${defender.maxhp}`;
   return `${attacker.side.id}:${attacker.name}:${attacker.species.id}:${attacker.level}:${attacker.item}:${attacker.ability}:${lockedMoveId(attacker) ?? ''}:${usable}:${offense}>` +
-    `${defender.side.id}:${defender.name}:${defender.species.id}:${defender.level}:${defender.item}:${defender.ability}:${defense}${liveHp}`;
+    `${defender.side.id}:${defender.name}:${defender.species.id}:${defender.level}:${defender.item}:${defender.ability}:${defense}${liveHp}` +
+    landedKey(attacker, defender, slots.map(slot => slot.id), battle);
 }
 
 /**
@@ -275,7 +279,7 @@ export type ThreatGetter = (attacker: Pokemon, defender: Pokemon) => PairThreat;
 export function threatGetter(battle: Battle, cache?: MatchupCache): ThreatGetter {
   return (attacker: Pokemon, defender: Pokemon): PairThreat => {
     if (!cache) return pairThreat(attacker, defender, battle);
-    const key = pairKey(attacker, defender);
+    const key = pairKey(attacker, defender, battle);
     let value = cache.get(key);
     if (value === undefined) {
       value = pairThreat(attacker, defender, battle);

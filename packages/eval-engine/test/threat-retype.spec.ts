@@ -39,3 +39,10 @@ describe('body retypes in the static (round 57)', () => {
     expect(singleMoveFraction(active(plain, 0), active(plain, 1), 'doubleedge', plain)).toBe(0);
   });
 });
+
+describe('field retypes in the static (round 57)', () => {
+  test('Weather Ball in rain hits a Ghost (gen9ou-2658663604 turn 11)', () => {
+    const battle = singles('gen9customgame', [set('Pelipper', ['weatherball'], { ability: 'Drizzle' })], [set('Gengar', ['splash'])]);
+    expect(singleMoveFraction(active(battle, 0), active(battle, 1), 'weatherball', battle)).toBeGreaterThan(0.2);
+  });
+});

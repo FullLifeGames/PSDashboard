@@ -1,5 +1,5 @@
 import type { Battle, Pokemon } from '@pkmn/sim';
-import { moveAtUse, RULE_ABILITIES, RULE_MOVES, type MoveAtUse, type MoveUser } from '../move-use.ts';
+import { CONTEXT_MOVES, moveAtUse, RULE_ABILITIES, RULE_MOVES, type MoveAtUse, type MoveField, type MoveUser } from '../move-use.ts';
 
 /**
  * The static's side of the move table (round 57): facts from the sim
@@ -10,6 +10,25 @@ import { moveAtUse, RULE_ABILITIES, RULE_MOVES, type MoveAtUse, type MoveUser } 
  */
 type DexMove = ReturnType<Battle['dex']['moves']['get']>;
 
+const UMBRELLA_WEATHER = new Set(['sunnyday', 'raindance', 'desolateland', 'primordialsea']);
+
+/** The types a body is hit and grounded by: the Tera type once clicked (a Stellar Tera keeps the old ones). */
+function typesNow(pokemon: Pokemon): readonly string[] {
+  const tera = pokemon.terastallized;
+  return tera && tera !== 'Stellar' ? [tera] : pokemon.types;
+}
+
+/** pokemon.isGrounded() on raw facts (the sim's reads ability and item through the bench suppression). */
+function grounded(pokemon: Pokemon, battle: Battle): boolean {
+  if ('gravity' in battle.field.pseudoWeather) return true;
+  if (('ingrain' in pokemon.volatiles && battle.gen >= 4) || 'smackdown' in pokemon.volatiles) return true;
+  if (pokemon.item === 'ironball') return true;
+  if (typesNow(pokemon).includes('Flying')) return false;
+  if (pokemon.ability === 'levitate') return false;
+  if ('magnetrise' in pokemon.volatiles || 'telekinesis' in pokemon.volatiles) return false;
+  return pokemon.item !== 'airballoon';
+}
+
 export function userFacts(pokemon: Pokemon, battle: Battle): MoveUser {
   const item = pokemon.item ? battle.dex.items.get(pokemon.item) : null;
   return {
@@ -19,6 +38,16 @@ export function userFacts(pokemon: Pokemon, battle: Battle): MoveUser {
     item: item ? { id: item.id, onPlate: item.onPlate, onMemory: item.onMemory, onDrive: item.onDrive, naturalGift: item.naturalGift } : null,
     terastallized: pokemon.terastallized ?? null,
     types: pokemon.types,
+    grounded: grounded(pokemon, battle),
+  };
+}
+
+/** The weather the user's moves feel (pokemon.effectiveWeather on raw facts) and the terrain. */
+export function fieldFacts(pokemon: Pokemon, battle: Battle): MoveField {
+  const weather = battle.field.effectiveWeather();
+  return {
+    weather: pokemon.item === 'utilityumbrella' && UMBRELLA_WEATHER.has(weather) ? '' : weather,
+    terrain: String(battle.field.terrain ?? ''),
   };
 }
 
@@ -26,5 +55,21 @@ export function userFacts(pokemon: Pokemon, battle: Battle): MoveUser {
 export function landedMove(attacker: Pokemon, _defender: Pokemon, move: DexMove, battle: Battle): MoveAtUse {
   const plain: MoveAtUse = { type: move.type, category: move.category, basePower: move.basePower, powerMult: 1 };
   if (!RULE_MOVES.has(move.id) && !RULE_ABILITIES.has(String(attacker.ability))) return plain;
-  return moveAtUse(move, userFacts(attacker, battle)) ?? plain;
+  return moveAtUse(move, userFacts(attacker, battle), fieldFacts(attacker, battle)) ?? plain;
+}
+
+/**
+ * The memo-key term of the move answers (round 57): every usable slot whose
+ * answer reads a fact outside pairKey (CONTEXT_MOVES) contributes its answer,
+ * so the memo stays a function of its key (round 49) without one key term
+ * per fact.
+ */
+export function landedKey(attacker: Pokemon, defender: Pokemon, slotIds: readonly string[], battle: Battle): string {
+  let key = '';
+  for (const id of slotIds) {
+    if (!CONTEXT_MOVES.has(id)) continue;
+    const use = landedMove(attacker, defender, battle.dex.moves.get(id), battle);
+    key += `|${id}=${use.type}/${use.category}/${use.basePower}/${use.powerMult}`;
+  }
+  return key;
 }

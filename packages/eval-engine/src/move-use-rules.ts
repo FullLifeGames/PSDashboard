@@ -45,6 +45,28 @@ const byUserType: Rule = (_move, user) => {
   return { type: first === '???' && types[1] ? types[1] : first };
 };
 
+const WEATHER_TYPES: Record<string, string> = {
+  sunnyday: 'Fire', desolateland: 'Fire', raindance: 'Water', primordialsea: 'Water',
+  sandstorm: 'Rock', hail: 'Ice', snowscape: 'Ice',
+};
+const TERRAIN_TYPES: Record<string, string> = {
+  electricterrain: 'Electric', grassyterrain: 'Grass', mistyterrain: 'Fairy', psychicterrain: 'Psychic',
+};
+
+/** Weather Ball: the user's effective weather (Umbrella and Cloud Nine already applied by the caller), power doubled. */
+const byWeather: Rule = (move, _user, field) => {
+  if (field.weather === undefined) return null;
+  const type = WEATHER_TYPES[field.weather];
+  return type ? { type, basePower: move.basePower * 2 } : {};
+};
+
+/** Terrain Pulse: the terrain's type and double power, for a grounded user. */
+const byTerrain: Rule = (move, user, field) => {
+  if (field.terrain === undefined || user.grounded === undefined) return null;
+  const type = user.grounded ? TERRAIN_TYPES[field.terrain] : undefined;
+  return type ? { type, basePower: move.basePower * 2 } : {};
+};
+
 /** Struggle is typeless from gen 2 on. */
 const byStruggle: Rule = (_move, user) => (user.gen >= 2 ? { type: '???' } : {});
 
@@ -58,4 +80,6 @@ export const OWN_RULES: Record<string, Rule> = {
   naturalgift: byItem,
   revelationdance: byUserType,
   struggle: byStruggle,
+  weatherball: byWeather,
+  terrainpulse: byTerrain,
 };

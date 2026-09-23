@@ -87,3 +87,31 @@ describe('body rules: form, item, user type, abilities (round 57)', () => {
     expect(battle.log.length).toBe(before);
   });
 });
+
+describe('field rules: Weather Ball, Terrain Pulse (round 57)', () => {
+  test('Weather Ball follows the rain, doubled; an Umbrella and Cloud Nine cancel it', () => {
+    const rain = singles('gen9customgame', [set('Pelipper', ['weatherball'], { ability: 'Drizzle' })], [set('Gengar', ['splash'])]);
+    expect(expectSim(rain, active(rain, 0), active(rain, 1), 'weatherball')).toMatchObject({ type: 'Water', basePower: 100 });
+    const umbrella = singles('gen9customgame', [set('Pelipper', ['weatherball'], { ability: 'Drizzle', item: 'Utility Umbrella' })], [set('Gengar', ['splash'])]);
+    expect(expectSim(umbrella, active(umbrella, 0), active(umbrella, 1), 'weatherball')).toMatchObject({ type: 'Normal', basePower: 50 });
+    const nine = singles('gen9customgame', [set('Pelipper', ['weatherball'], { ability: 'Drizzle' })], [set('Golduck', ['splash'], { ability: 'Cloud Nine' })]);
+    expect(expectSim(nine, active(nine, 0), active(nine, 1), 'weatherball')).toMatchObject({ type: 'Normal', basePower: 50 });
+  });
+
+  test('gen 3 Weather Ball in rain is Water and special', () => {
+    const battle = singles('gen3customgame', [set('Politoed', ['weatherball'], { ability: 'Drizzle' })], [set('Gengar', ['splash'])]);
+    expect(ours(battle, active(battle, 0), active(battle, 1), 'weatherball')).toMatchObject({ type: 'Water', category: 'Special', basePower: 100 });
+  });
+
+  test('Terrain Pulse follows the terrain when grounded, stays Normal in the air', () => {
+    const grounded = singles('gen9customgame', [set('Indeedee', ['terrainpulse'], { ability: 'Psychic Surge' })], [set('Gengar', ['splash'])]);
+    expect(expectSim(grounded, active(grounded, 0), active(grounded, 1), 'terrainpulse')).toMatchObject({ type: 'Psychic', basePower: 100 });
+    const flying = singles('gen9customgame', [set('Talonflame', ['terrainpulse'])], [set('Indeedee', ['splash'], { ability: 'Psychic Surge' })]);
+    expect(expectSim(flying, active(flying, 0), active(flying, 1), 'terrainpulse')).toMatchObject({ type: 'Normal', basePower: 50 });
+  });
+
+  test('a benched Umbrella holder reads no sun', () => {
+    const battle = singles('gen9customgame', [set('Torkoal', ['splash'], { ability: 'Drought' }), set('Venusaur', ['weatherball'], { item: 'Utility Umbrella' })], [set('Gengar', ['splash'])]);
+    expect(ours(battle, bench(battle, 0, 1), active(battle, 1), 'weatherball')).toMatchObject({ type: 'Normal', basePower: 50 });
+  });
+});
