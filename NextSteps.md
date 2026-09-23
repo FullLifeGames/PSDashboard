@@ -3,7 +3,7 @@
 Nur offene Schritte, als priorisierte Checkliste: Die oberste Iteration ist die nächste Sitzung, das oberste offene Kästchen darin das nächste TODO. Jedes TODO nennt das Problem an einer Spielszene und das Erfolgsmaß. Die Umsetzungsschritte jedes TODOs stehen als Checkliste im Backlog-Plan unter derselben Nummer; beim Start einer Iteration wandern sie hierher.
 
 - **Iterationen** bündeln die TODOs einer Sitzung. Eine Iteration wird beim Start zur Runde mit der nächsten freien Rundennummer: Iteration 1 war Runde 46, Iteration 2 war Runde 47, Iteration 2a war Runde 48, Iteration 2b war Runde 49, Iteration 3 war Runde 50, Iteration 4 war Runde 51, Iteration 4a war Runde 52, Iteration 4d war Runde 53, Iteration 4b war Runde 54, Iteration 4e war Runde 55. Score-berührende TODOs derselben Iteration bekommen je ihre eigene Messung (D3), nie eine gemeinsame.
-- **T-Nummern** (T01 bis T45) sind feste Namen, vergeben am 18.09. in Prioritäts-Reihenfolge. Wandert ein TODO in der Liste, behält es seine Nummer; ein neues TODO bekommt die nächste freie (ab T76; T46 kam am 18.09. in Runde 46 dazu, T47 bis T51 in Runde 47, T52 und T53 in Runde 48, T54 in Runde 49, T55 in Runde 50, T56 bis T64 in Runde 51, T65 am 19.09. nach deren Gate, T66 bis T68 am 20.09. in Runde 52, T69 am 20.09. in Runde 53, T70 bis T74 am 21.09. in Runde 54, T75 am 21.09. in Runde 55). „braucht T01“ heißt: T01 muss vorher gelaufen sein.
+- **T-Nummern** (T01 bis T45) sind feste Namen, vergeben am 18.09. in Prioritäts-Reihenfolge. Wandert ein TODO in der Liste, behält es seine Nummer; ein neues TODO bekommt die nächste freie (ab T77; T46 kam am 18.09. in Runde 46 dazu, T47 bis T51 in Runde 47, T52 und T53 in Runde 48, T54 in Runde 49, T55 in Runde 50, T56 bis T64 in Runde 51, T65 am 19.09. nach deren Gate, T66 bis T68 am 20.09. in Runde 52, T69 am 20.09. in Runde 53, T70 bis T74 am 21.09. in Runde 54, T75 am 21.09. in Runde 55, T76 am 23.09. am Gate der Runde 56). „braucht T01“ heißt: T01 muss vorher gelaufen sein.
 - **Backlog-Plan** (je TODO: Idee, Schritte mit Dateien, volles Gate, Doubles-Abdeckung, offene Entscheidungen, Zahlen, Code-Belege): `docs/superpowers/plans/2026-09-18-backlog-plans.md`.
 - **Erledigtes**: `docs/completed/` nach Gebiet (Index, Eintragsformat und Prozess in `docs/completed/README.md`).
 - **Maschinen-Quellen**: Ledger in `regression/eval-calibration.spec.ts`, Pins in `e2e-feedback/corpus.ts`, Memory-Notizen.
@@ -13,9 +13,9 @@ Die Schritte sind ein erster Entwurf vom 18.09. (Code-Stand dcf9526, jeder Code-
 
 Hinter jedem Titel stehen Thema, Art, Größe (mini, klein, mittel, groß), Gate (score-berührend = D3, verlustfrei = D4, sonst ausgeschrieben) und „braucht“ = muss vorher gelaufen sein.
 
-## Iteration 4c · Doubles bekommt den Zellenplan
+## Iteration 4c (Runde 56, läuft seit 23.09.) · Doubles bekommt den Zellenplan
 
-Zwei Sichtungen haben denselben Befund unabhängig gefunden (T10 an den Zellen, T11 an den Dumps). Er steht vor Iteration 5, weil T14, T23 und T24 auf demselben Plan bauen und nach D18 beide Spielarten abdecken müssen.
+Spec `docs/superpowers/specs/2026-09-23-round-56-design.md`, Plan `docs/superpowers/plans/2026-09-23-round-56-plan.md`, Zählung und Sonden `docs/perf/probes/2026-09-23-r56/`, Branch `r56`. Zwei Sichtungen haben denselben Befund unabhängig gefunden (T10 an den Zellen, T11 an den Dumps). Er steht vor Iteration 5, weil T14, T23 und T24 auf demselben Plan bauen und nach D18 beide Spielarten abdecken müssen.
 
 - [ ] **T58 · Doubles bekommt den Zellenplan: Klassen und K.-o.-Quoten für Paar-Züge** (Zufall preisen, Runde, groß, score-berührend D3)
 
@@ -26,6 +26,17 @@ Zwei Sichtungen haben denselben Befund unabhängig gefunden (T10 an den Zellen, 
   Seit Runde 55 trägt der Nachbau die Encore-Sperren in VGC 2629703929 wie das Spiel (Zug 6 und 7, Zug 9 bis 11); die Züge sind wieder ein Maß. Basis der Bank ist `.calibration/r55-rebuild`, Basis der Dumps `docs/perf/probes/2026-09-21-r55/feedback/r55-run1`.
 
   *Erfolg:* Die vier Doubles-Dumps tragen `koOdds`, die gespielte Zelle in 2634199230 Zug 5 preist den K. o. an Incineroar anteilig statt gar nicht, Singles-Dumps und Singles-Zeilen der Bank bleiben ziffern-gleich, die Doubles-Zeilen der Bank stehen in der vorregistrierten Linie, Doubles-Matrixzeit höchstens im vorregistrierten Rahmen. *Plan T58:* 8 Schritte, 3 offene Entscheidungen.
+
+  Schritte der Runde (die Spec ersetzt die Plan-Schritte):
+
+  - [ ] **1.** Zählung vor dem Bau (erledigt 23.09., Spec „Messung vor dem Bau“): 66 % der Doubles-Wurzelzellen auf einer Würfel-Kante, Ein-Wurf-Fehler 0,062, Anker 2634199230 Zug 5 = Seed im 10-%-Fehlschlag, Rechner am gezogenen Wurf 96,8 % genau.
+  - [ ] **2.** Der mitschreibende Würfel (`pair/prng.ts`, `pair/snapshot.ts`, `pair/draw.ts`), nicht verdrahtet.
+  - [ ] **3.** Tötende Würfe aus dem Rechner, am gezogenen Schaden geprüft (`pair/kill-table.ts`, `pair/log.ts`).
+  - [ ] **4.** Ziehung zu Klasse und Regeln vor dem Würfeln (`pair/pattern.ts`, `pair/guards.ts`).
+  - [ ] **5.** Der Plan an der Wurzel (`pair/sampler.ts`, Weiche in `search/cell-sampler.ts`), Cache v52.
+  - [ ] **6.** K.-o.-Angaben für Doppel-Züge (`pair/odds.ts`, Label in der Prosa).
+  - [ ] **7.** Gate D3 (Korrektur mit eigenem Beleg): Sonden (Zellen-Fehler, Anker, Matrixzeit verschränkt), Bank gepaart gegen `r56-base`, drei Feedback-Läufe, Tier-Zählung mit gelesenen Doubles-Urteilen, Suite, e2e, lint, `tsc -b`, `pack:smoke`.
+  - [ ] **8.** Schluss-Audit, Buchung (Ledger, D13, D16, `docs/completed/`), T14, T23, T24 und T65 im Backlog-Plan auf den Doubles-Plan nachziehen.
 
 ## Iteration 4f · Züge und Fähigkeiten, die den Zug-Typ ändern
 
@@ -162,6 +173,14 @@ Eine kleine Korrektur, die der Schiedsrichter der Runde 54 gefunden hat. Sie ber
   Hinweis: Erster Schritt ist eine Zählung: Welche Arten der Bank und des Fit-Korpus kennt der Rechner nicht? Fix: die Art vor dem Rechner auf die Form abbilden, die er kennt, wo die Form nur das Aussehen ändert (gleiche Basiswerte und Typen).
 
   *Erfolg:* 0 leere Rechner-Ergebnisse auf den Bank-Stellungen (heute 46 Paare), die K.-o.-Quoten stehen für diese Körper, Bank und Dumps bewegen sich nur in Spielen mit einer solchen Art. *Plan T72:* 4 Schritte, 1 offene Entscheidung.
+
+- [ ] **T76 · Rechner-Treue: Booster Energy, sichere Volltreffer, Supreme Overlord** (Zufall preisen, Mini-Runde, klein, score-berührend D3)
+
+  Runde 56 hat den Schadensrechner am gezogenen Wurf gemessen: In Doubles trifft er 96,8 % der nicht tödlichen Würfe auf den KP genau, sobald Partner-Effekte und Einwechsel-Boosts richtig ankommen. Die Reste sind Eingaben, die der Rechner nie bekommt: der Booster-Energy- oder Wetter-Boost von Protosynthesis und Quark Drive (`boostedStat`), Supreme Overlord und Last Respects (`alliesFainted`), Rage Fist (`timesAttacked`), Ivy Cudgel. Dazu rechnet `ko-odds.ts` Züge mit sicherem Volltreffer (Flower Trick, Wicked Blow) mit der gewöhnlichen Volltreffer-Chance; der Doubles-Plan liest sie richtig, weil der Simulator dort keinen Volltrefferwurf zieht.
+
+  Hinweis: Erster Schritt ist eine Zählung mit `docs/perf/probes/2026-09-23-r56/damage-check-v2.vt.ts` (Doubles) und einer Singles-Variante: Welche Paare verfehlt der Rechner, und wie viele K.-o.-Quoten der Singles-Zellen kippen? In Doubles fängt die Selbstkontrolle des Plans die Reste bis dahin ab (Rückfall auf 8 Ziehungen).
+
+  *Erfolg:* Die Singles- und Doubles-Zählung nennen die Treffer der Rechner-Reste vorher und nachher, Singles-K.-o.-Quoten mit sicherem Volltreffer stehen auf 1 statt 1/24, Bank in der vorregistrierten Linie. *Plan T76:* 4 Schritte, 1 offene Entscheidung.
 
 ## Iteration 7c · Nachbau: Rest aus Runde 55
 
