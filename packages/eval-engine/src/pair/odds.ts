@@ -35,6 +35,13 @@ function rootTargets(battle: Battle, own: 0 | 1, action: MoveAction): Pokemon[] 
   return foes.length === 1 ? foes : [];
 }
 
+/** The sim's spread flag at the start of the move: two or more targets, the living ally among them for an allAdjacent move. */
+function spreadAtStart(battle: Battle, own: 0 | 1, action: MoveAction, targets: readonly Pokemon[]): boolean {
+  if (battle.dex.moves.get(action.moveId).target !== 'allAdjacent') return targets.length > 1;
+  const allies = battle.sides[own].active.filter(mon => mon && !mon.fainted && mon.position !== action.slot).length;
+  return targets.length + allies > 1;
+}
+
 function slotOdds(battle: Battle, attacker: Pokemon, defender: Pokemon, moveId: string, spread: boolean): Odds | null {
   const move = battle.dex.moves.get(moveId);
   if (move.category === 'Status' || unpriceable(attacker, defender, move)) return null;
@@ -60,7 +67,7 @@ function optionOdds(battle: Battle, own: 0 | 1, choice: string): KoOddsInfo | nu
     if (!attacker || attacker.fainted) continue;
     const targets = rootTargets(battle, own, action);
     for (const defender of targets) {
-      const odds = slotOdds(battle, attacker, defender, action.moveId, targets.length > 1);
+      const odds = slotOdds(battle, attacker, defender, action.moveId, spreadAtStart(battle, own, action, targets));
       if (odds) events.push({ defender, odds });
     }
   }

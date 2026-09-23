@@ -28,6 +28,22 @@ describe('kill odds for doubles options (round 56)', () => {
     expect(split).toEqual({ accuracy: 1, killFraction: expect.closeTo(1 / 24, 12), label: 'Tackle→Eevee' });
   });
 
+  test('Earthquake beside a living partner is a spread hit even against one foe (final review, finding 2)', () => {
+    // The sim counts Zapdos among Earthquake's targets at the start (spreadHit, 0.75): 91 to 108 against
+    // Snorlax's 114 HP, only a crit (136 to 162) kills. Priced single-target, every roll (121 to 144) would.
+    const root = doublesRoot(
+      [pairSet('Chomp', 'Garchomp', ['Earthquake', 'Protect']), pairSet('Bird', 'Zapdos', ['Roost', 'Protect'])],
+      [pairSet('Lax', 'Snorlax', ['Rest', 'Protect']), pairSet('Gone', 'Pikachu', ['Protect'])],
+      battle => {
+        battle.sides[1].active[1]!.faint();
+        battle.faintMessages();
+        battle.sides[1].active[0]!.sethp(114);
+      },
+    );
+    const [quake] = koOddsForOptions(positionBattle(root), 'p1', ['move earthquake, move roost']);
+    expect(quake).toEqual({ accuracy: 1, killFraction: expect.closeTo(1 / 24, 12), label: 'Earthquake→Snorlax' });
+  });
+
   test('a pair without an uncertain kill carries no odds', () => {
     const [odds] = koOddsForOptions(positionBattle(anchorRoot()), 'p1', [QUIET[0]]);
     expect(odds).toBeNull();

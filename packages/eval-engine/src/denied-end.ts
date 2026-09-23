@@ -42,8 +42,9 @@ const toward = (side: Side, delta: number): number => (side === 'p1' ? delta : -
  */
 function carriedMove(analysis: TurnAnalysis, side: Side, odds: number): string | undefined {
   const ko = analysis[side].played?.koOdds;
-  if (!ko || ko.killFraction < 1 || ko.accuracy >= 1) return undefined;
-  return Math.abs(ko.accuracy - odds) < 1e-6 ? (ko.label ?? analysis[side].played!.label) : undefined;
+  // Doubles odds (round 56) may be the partner slot's roll: no name from them.
+  if (!ko || ko.label || ko.killFraction < 1 || ko.accuracy >= 1) return undefined;
+  return Math.abs(ko.accuracy - odds) < 1e-6 ? analysis[side].played!.label : undefined;
 }
 
 /**

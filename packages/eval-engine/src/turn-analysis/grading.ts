@@ -148,10 +148,13 @@ function stayedFeedPayoff(
 /**
  * The body's own action failed by dice while its move carried a knock-out:
  * a hit would have kept it alive, so nobody fed it (573756 t73, round 40).
- * Without knock-out odds on the played line the feed reading stands.
+ * Without knock-out odds on the played line the feed reading stands. A
+ * doubles option's odds (round 56) carry a label and may be the partner
+ * slot's: they count as none until the odds name their attacker.
  */
 function deniedByDice(sack: SackInfo, played: RankedChoice | null): boolean {
-  return sack.rolled !== undefined && (played?.koOdds?.killFraction ?? 0) > 0;
+  const odds = played?.koOdds;
+  return sack.rolled !== undefined && !!odds && !odds.label && odds.killFraction > 0;
 }
 
 /** What the sack gates decided: whether the leniency applies and, for a stayed feed, its windowed payoff. */

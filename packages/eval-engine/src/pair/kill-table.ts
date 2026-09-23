@@ -8,7 +8,9 @@ import type { BodySnapshot, HitSnapshot } from './snapshot.ts';
  * field with the partner effects the calc knows (ruin, Helping Hand,
  * Battery, Power Spot, Steely Spirit, Friend Guard, doubles screens). Three
  * call details keep the calc on the sim's number (docs/perf/probes/
- * 2026-09-23-r56/damage-check-v2.vt.ts, 6535 of 6535 anchor rolls exact):
+ * 2026-09-23-r56/damage-check-anchor-v2.vt.ts: all 8450 anchor rolls, the
+ * 6535 non-lethal ones to the HP; damage-check-v2.vt.ts: 96.8 % of the
+ * non-lethal rolls on 83 bank positions):
  * `calculate` clones the move, so a spread move against one target goes in
  * through `overrides`; abilities whose only effect is an entry boost stay
  * out (the live boosts carry it, the calc would add it again); Meteor Beam

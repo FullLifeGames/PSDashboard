@@ -97,4 +97,33 @@ describe('a death after the mon\'s own dice-failed action', () => {
     const noOdds = run({ name: 'Garchomp', hpFraction: 0.11, rolled: 'miss' }, false);
     expect(noOdds.p1.sacrifice).toBeTruthy();
   });
+
+  test('labeled doubles odds may be the partner slot\'s: a rolled death stays a feed (final review, finding 3)', () => {
+    // Round 56: a doubles option's odds name one slot's move and target, which may be the partner's. Until
+    // the odds name their attacker, the rule reads labeled odds as none: the same turn as the rolled case
+    // above, with a label on the odds, frames the sack like the case without odds.
+    const result: EvalResult = {
+      score: 0.1, interval: 0.05, depthCompleted: 2,
+      perSide: {
+        p1: [
+          choiceEv('move scaleshot', 'Scale Shot', 0.2, 0.2),
+          { ...choiceEv('move firefang', 'Fire Fang', 0.0, 0.0), koOdds: { accuracy: 0.95, killFraction: 1, label: 'Heat Wave→Wall' } },
+        ],
+        p2: [choice('move bodypress', 'Body Press', -0.05)],
+      },
+    };
+    const analysis = analyzeTurn({
+      turn: 73,
+      result,
+      played: {
+        p1: { kind: 'move', name: 'Fire Fang', tera: false },
+        p2: { kind: 'move', name: 'Body Press', tera: false },
+      },
+      playedOutcome: -0.1,
+      scoreBefore: 0.1,
+      scoreAfter: -0.3,
+      sacks: { p1: { name: 'Garchomp', hpFraction: 0.11, rolled: 'miss' } },
+    });
+    expect(analysis.p1.sacrifice).toBeTruthy();
+  });
 });

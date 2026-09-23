@@ -508,6 +508,16 @@ describe('denied early end', () => {
       names, 'p2', true, new Set([3]));
     expect(noPlayed.summary).toContain('but the roll failed');
   });
+
+  test('labeled doubles odds never name the move (final review, finding 3)', () => {
+    // Round 56: the headline odds of a doubles option may be the partner slot's; "X missed" would name
+    // a roll the near-decided body did not take.
+    const labeled = buildGameReport(
+      deniedAnalyses(12, { p2: nearSide({ koOdds: { accuracy: 0.95, killFraction: 1, label: 'Heat Wave→Corviknight' } }) }),
+      names, 'p2', true, new Set([3]));
+    expect(labeled.summary).toContain('but the roll failed — the win waited another 9 turns.');
+    expect(labeled.deniedEnd?.move).toBeUndefined();
+  });
 });
 
 describe('dice event turns (protocol classifier)', () => {
