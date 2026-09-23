@@ -1,4 +1,4 @@
-# Next Steps (Stand 21.09.2026, nach Runde 55)
+# Next Steps (Stand 23.09.2026, nach Runde 56)
 
 Nur offene Schritte, als priorisierte Checkliste: Die oberste Iteration ist die nächste Sitzung, das oberste offene Kästchen darin das nächste TODO. Jedes TODO nennt das Problem an einer Spielszene und das Erfolgsmaß. Die Umsetzungsschritte jedes TODOs stehen als Checkliste im Backlog-Plan unter derselben Nummer; beim Start einer Iteration wandern sie hierher.
 
@@ -12,31 +12,6 @@ Nur offene Schritte, als priorisierte Checkliste: Die oberste Iteration ist die 
 Die Schritte sind ein erster Entwurf vom 18.09. (Code-Stand dcf9526, jeder Code-Beleg per Grep geprüft). Jede Runde bekommt vor dem Bau weiterhin ihr Brainstorming und ihre Spec; die Schritte hier sind deren Startpunkt, und die Spec darf sie ersetzen. Ältere Dokumente nennen Q6 und Q4 gemeinsam „Runde 46“; hier sind es T06 und T09 in den Iterationen 2 und 3.
 
 Hinter jedem Titel stehen Thema, Art, Größe (mini, klein, mittel, groß), Gate (score-berührend = D3, verlustfrei = D4, sonst ausgeschrieben) und „braucht“ = muss vorher gelaufen sein.
-
-## Iteration 4c (Runde 56, gebaut 23.09.) · Doubles bekommt den Zellenplan
-
-Spec `docs/superpowers/specs/2026-09-23-round-56-design.md`, Plan `docs/superpowers/plans/2026-09-23-round-56-plan.md`, Zählung und Sonden `docs/perf/probes/2026-09-23-r56/`, Branch `r56`. Zwei Sichtungen haben denselben Befund unabhängig gefunden (T10 an den Zellen, T11 an den Dumps). Er steht vor Iteration 5, weil T14, T23 und T24 auf demselben Plan bauen und nach D18 beide Spielarten abdecken müssen. Den Doubles-Zellenplan nennen die übrigen TODOs kurz Paar-Plan (Code in `packages/eval-engine/src/pair/`).
-
-- [ ] **T58 · Doubles bekommt den Zellenplan: Klassen und K.-o.-Quoten für Paar-Züge** (Zufall preisen, Runde, groß, score-berührend D3)
-
-  VGC-Spiel 2634199230 Zug 5: Mawile klickt Play Rough auf Incineroar. In derselben Matrix fällt Incineroar in einer Zeile und überlebt in der gespielten. Die Engine lobt Kirans Read mit +18 %, während der Zug Kiran auf derselben Skala 24 Punkte kostet (Anzeige 69 auf 48 %) und Kiran danach aufgibt. Stand vor Runde 56 (master e7f618f): `planCellEvents` steigt bei jeder Wahl mit Komma aus (`cell-blend.ts:142`), `koOddsForOptions` ebenso (`:310`), und in Doubles trägt jede Wahl einer Seite mit zwei lebenden Körpern ein Komma (`forward/choices.ts:205`). Gemessen: 0 von 75 565 Wurzelzellen mit Ereignis-Plan (sechs Züge, zwei echte Spiele), und `koOdds` steht in allen fünf Doubles-Dumps 0-mal, in den sechs Singles-Dumps 36- bis 135-mal. Bei einem Seed ist eine Doubles-Wurzelzelle eine einzige Ziehung, drei, wenn die Ziehung das Spiel beendet und das Paar einen Trefferwurf trägt. Fehlschlag, K.-o.-Wurf und Crit preist die Engine in Doubles also nicht; der Klassenpfad der Singles-Wurzel läuft dort nie. Wie ein Wetterdienst, der für die halbe Stadt nur einmal aus dem Fenster schaut.
-
-  Hinweis: Erster Schritt ist eine Zählung: Wie viele Doubles-Wurzelzellen liegen auf einer K.-o.- oder Fehlschlag-Kante, und was kostet ein Plan mit zwei Ereignis-Slots je Seite? Dieselbe Stelle trägt T14 (Klassen auf Ansage), T23 (Crit) und T24 (Zurückzucken); eine gemeinsame Arithmetik für Paar-Züge erspart drei Nachrüstungen. Der Play-out-Pin läuft zuerst einzeln (D7). Bleibt die Wanduhr der Doubles-Matrix nicht im Rahmen, ist die kleine Variante „mehr Ziehungen auf Kanten-Zellen“ der Rückfall.
-
-  Seit Runde 55 trägt der Nachbau die Encore-Sperren in VGC 2629703929 wie das Spiel (Zug 6 und 7, Zug 9 bis 11); die Züge sind wieder ein Maß. Basis der Bank ist `.calibration/r55-rebuild`, Basis der Dumps `docs/perf/probes/2026-09-21-r55/feedback/r55-run1`.
-
-  *Erfolg:* Die vier Doubles-Dumps tragen `koOdds`, die gespielte Zelle in 2634199230 Zug 5 preist den K. o. an Incineroar anteilig statt gar nicht, Singles-Dumps und Singles-Zeilen der Bank bleiben ziffern-gleich, die Doubles-Zeilen der Bank stehen in der vorregistrierten Linie, Doubles-Matrixzeit höchstens im vorregistrierten Rahmen. *Plan T58:* 8 Schritte, 3 offene Entscheidungen.
-
-  Schritte der Runde (die Spec ersetzt die Plan-Schritte):
-
-  - [x] **1.** Zählung vor dem Bau (erledigt 23.09., Spec „Messung vor dem Bau“, Start-Commit 7b1cd7a): 66 % der Doubles-Wurzelzellen auf einer Würfel-Kante, Ein-Wurf-Fehler 0,062, Anker 2634199230 Zug 5 = Seed im 10-%-Fehlschlag, Rechner am gezogenen Wurf 96,8 % genau.
-  - [x] **2.** Der mitschreibende Würfel (`pair/prng.ts`, `pair/snapshot.ts`, `pair/draw.ts`), nicht verdrahtet (fcab85c).
-  - [x] **3.** Tötende Würfe aus dem Rechner, am gezogenen Schaden geprüft (`pair/kill-table.ts`, `pair/log.ts`; f4ecfb2).
-  - [x] **4.** Ziehung zu Klasse und Regeln vor dem Würfeln (`pair/pattern.ts`, `pair/guards.ts`; 23ee2d2).
-  - [x] **5.** Der Plan an der Wurzel (`pair/sampler.ts`, Weiche in `search/cell-sampler.ts`), Cache v52 (2ff26c0).
-  - [x] **6.** K.-o.-Angaben für Doppel-Züge (`pair/odds.ts`, Label in der Prosa; 9404ccf). Ein Gegner, den ein Slot derselben Option sicher tötet, liefert dem anderen Slot keine Schlagzeile (Fokusfeuer).
-  - [x] **7.** Gate D3 (Korrektur mit eigenem Beleg): Sonden (Zellen-Fehler, Anker, Matrixzeit verschränkt), Bank gepaart gegen `r56-base`, drei Feedback-Läufe, Tier-Zählung mit gelesenen Doubles-Urteilen, Suite, e2e, lint, `tsc -b`, `pack:smoke`. Ergebnis 23.09. (`docs/perf/probes/2026-09-23-r56/`), erste Kette auf 9404ccf: Kanten-Zellen 0,021 neben 64 Seeds (vorher 0,062, Schwelle 0,030), p90 0,053; 247 Zellen ohne Rückfall-Regel und ohne Ereignis in der ersten Ziehung ziffern-gleich; 4,55 Ziehungen je Plan- oder Rückfall-Zelle; Rückfall auf 142 von 487 Kanten-Zellen (29 %, erwartet 20 bis 35 %); Anker −0,143 gegen −0,125 (vorher −0,652); Matrixzeit 3,72× und 3,46× in zwei Läufen (Schwelle 4×); Bank „no gain resolved; no harm“, eine Warnung (hq Doubles spät +15 bp, davon 10,5 aus 912883 Zug 10) und ein Hinweis unter 5 bp (hq gesamt spät +4 bp, dieselben Doubles-Stellungen), Singles 585 von 585 Zeilen byte-gleich; Feedback dreimal byte-gleich, Singles-Dumps unbewegt, alle vier Doubles-Dumps tragen `koOdds` (154, 99, 56 und 171 Einträge, vorher 0); Doubles-Tiers 12/5/0 → 9/3/0 auf 10 bewegten Zügen, gelesen (12 Zeilen: 8 plausibler, 2 gleich, 1 weniger plausibel, 1 offen); Play-out-Pin zuerst grün (`t4-playout.log`); Suite, e2e 75 von 75, lint, `tsc -b`, `pack:smoke`. Der finale Review fand drei wichtige Befunde, behoben in 5996e40 (die Randregel übersprang den Rechner auch unter einer Senkung, einer Erhöhung oder einem Schild, die ein Volltreffer ignoriert) und e5ab1e4 (K.-o.-Angaben zählen bei Streuzügen den lebenden Partner, Sack-Regel und verpasstes frühes Ende lesen keine Doubles-Schlagzeile); zweite Kette: 41 Zählungs-Zellen bewegt (Fehler 0,030 auf 0,023), Kanten-Zellen 0,021, Matrixzeit 3,61×, Bank gegen 9404ccf 42 Stellungen bewegt, kleiner Gewinn glücksbereinigt (−1 bp), ein bewegtes Urteil (912045 Zug 1, p2 wieder Ungenauigkeit 0,12, offen bis T79), Doubles-Tiers 10/3/0.
-  - [x] **8.** Schluss-Audit, Buchung (Ledger, D13, D16, `docs/completed/`), T14, T23, T24 und T65 im Backlog-Plan auf den Doubles-Plan nachziehen. Buchung bf8b11c; finaler Review über den Branch (drei wichtige Befunde behoben, sieben kleine in T77 und T18); Schluss-Audit mit drei Linsen und je einem Gegenprüfer (58 Punkte, 57 bestätigt, eingearbeitet in die Korrektur nach Audit und Review); `docs/completed/` folgt nach dem User-Gate.
 
 ## Iteration 4f · Züge und Fähigkeiten, die den Zug-Typ ändern
 
@@ -52,7 +27,7 @@ Am User-Gate vom 21.09. („3b“) aus Iteration 14 direkt hinter den Doubles-Ze
 
 ## Iteration 4g · Paar-Plan: Deckung, Fake Out und der Doubles-Baum
 
-Zwei Reste aus Runde 56, gefunden beim Lesen der bewegten Doubles-Urteile (`docs/perf/probes/2026-09-23-r56/reading/reading.md`). Beide fassen den Paar-Plan an; die Zählungs-Sonde der Runde (`census-after.vt.ts`, 50 s) und die verschränkte Zeitmessung (`timing-ab.vt.ts`, 10 min) liegen fertig da. Beide Sonden rechnen gegen `base-src`, ein Archiv von e7f618f (master vor Runde 56); für den Abstand zur Spitze der Runde 56 braucht es ein frisches Archiv dieser Spitze. `timing-ab.vt.ts` misst nur die Matrix (`searchPosition`); T78 braucht für den Baum eine eigene Zeitmessung.
+Zwei Reste aus Runde 56 (Platz am User-Gate vom 23.09. bestätigt, „3a“), gefunden beim Lesen der bewegten Doubles-Urteile (`docs/perf/probes/2026-09-23-r56/reading/reading.md`). Beide fassen den Paar-Plan an; die Zählungs-Sonde der Runde (`census-after.vt.ts`, 50 s) und die verschränkte Zeitmessung (`timing-ab.vt.ts`, 10 min) liegen fertig da. Beide Sonden rechnen gegen `base-src`, ein Archiv von e7f618f (master vor Runde 56); für den Abstand zur Spitze der Runde 56 braucht es ein frisches Archiv dieser Spitze. `timing-ab.vt.ts` misst nur die Matrix (`searchPosition`); T78 braucht für den Baum eine eigene Zeitmessung.
 
 - [ ] **T77 · Paar-Plan: seltene teure Ausgänge und das sichere Zurückzucken von Fake Out** (Zufall preisen, Mini-Runde, klein, score-berührend D3)
 
@@ -148,7 +123,7 @@ Sechs kleine Punkte mit einem gemeinsamen Schluss-Gate, fünf davon render-only;
 
   VGC 2634199230 Zug 5 (Stand Runde 51): Die Karte sagte „kirans's read paid off“ und „a read that paid off, +18% over the safe …“, während Kiran im selben Zug von 69 auf 48 % fällt und danach aufgibt. Das Lob steht an fünf Stellen: Abzeichen der Zug-Karte (`eval-badges.ts:24`), Satz (`prose/clauses.ts:14`), Verdikt-Zelle (`eval/SideRow.tsx:131`), Read-Chip und Schlüsselmoment-Abzeichen im Spielbericht (`EvalGameReport.tsx:150` und `:196`). Keine liest den Ausgang des Zugs gegen. Die drei Sätze hängen an `riskPaidOff` und sind render-only, die zwei Abzeichen hängen an der Attribution `p2-read`. Über elf Dumps: 14 gelobte Reads in 329 Zügen, 3 davon auf einem Zug, den die gelobte Seite verliert (einer in Singles: 562428 t11, direkt vor dem gepinnten t12). Kein gepinnter Kanal hängt an einer dieser Zeilen.
 
-  Hinweis: Der Bo3-Verdacht aus dem alten Text ist widerlegt (das Log ist ein Spiel, Showdown schreibt je Bo3-Spiel ein eigenes Replay), das Payoff-Fenster ist unbeteiligt (`riskPayoffTurn` ist nicht gesetzt). Die Ursache der falschen Zelle liegt bei T58; diese Runde hält nur das Lob zurück. `riskPaidOff` hält den Regret heute auch aus den Entscheidungs-Summen (`report.ts:237`) und dem Sieger-Pfad heraus; ein reiner Text-Zuschnitt ändert daran nichts. In Doubles nimmt das Lob für einen nie gesehenen zweiten Slot die günstigste verträgliche Vervollständigung (hier kippt dadurch fast das Wagnis-Tor: 0,39 gegen 0,21 bei Schwelle 0,2).
+  Hinweis: Der Bo3-Verdacht aus dem alten Text ist widerlegt (das Log ist ein Spiel, Showdown schreibt je Bo3-Spiel ein eigenes Replay), das Payoff-Fenster ist unbeteiligt (`riskPayoffTurn` ist nicht gesetzt). Die Ursache der falschen Zelle lag bei T58 (behoben in Runde 56); diese Runde hält nur das Lob zurück. `riskPaidOff` hält den Regret heute auch aus den Entscheidungs-Summen (`report.ts:237`) und dem Sieger-Pfad heraus; ein reiner Text-Zuschnitt ändert daran nichts. In Doubles nimmt das Lob für einen nie gesehenen zweiten Slot die günstigste verträgliche Vervollständigung (hier kippt dadurch fast das Wagnis-Tor: 0,39 gegen 0,21 bei Schwelle 0,2).
 
   *Erfolg:* 562428 t11 und 2629703929 Zug 2 tragen kein Lob mehr, die zehn übrigen gelobten Reads behalten ihres, die Pins 573756 t75 und 562428 t12 stehen, alle Engine-Zahlen der Dumps bleiben gleich. *Plan T59:* 6 Schritte, 3 offene Entscheidungen.
 
@@ -220,7 +195,7 @@ Die Zählung der Runde 55 (`docs/perf/probes/2026-09-21-r55/lock-census.vt.ts`, 
 
 ## Iteration 7d · Sets: was Art und Protokoll festlegen
 
-Zwei kleine Set-Fehler aus dem Lesen der Runde 56. Beide lassen sich ohne Messung am Spiel belegen: Die Art oder das Protokoll schließt aus, was der Bau annimmt.
+Zwei kleine Set-Fehler aus dem Lesen der Runde 56 (Platz am User-Gate vom 23.09. bestätigt, „3a“). Beide lassen sich ohne Messung am Spiel belegen: Die Art oder das Protokoll schließt aus, was der Bau annimmt.
 
 - [ ] **T79 · Ogerpon trägt seinen festen Tera-Typ und seine Maske** (Sets und Spreads, Mini-Runde, klein, score-berührend D3)
 
@@ -252,7 +227,7 @@ Ein Zähl-Skript beantwortet beide Fragen (T21 und Schritt 2 von T22), danach fo
 
   Der Bericht zu 573756 endet mit „The rolls decided it, luck ran LordEnz's way overall (+138%)“. Von diesen 2,76 Punkten tragen die im Protokoll mit einem Marker sichtbaren Würfel 0,03. Der Rest entsteht, weil die Matrix eines Zugs die entstandene Stellung anders bewertet als die Wurzel des Folgezugs (573756 t70 Schwerttanz, Draft t48 U-turn-Read). Der User liest Glück, wo die Engine ihre Meinung geändert hat. Das Glückskonto bekommt zwei Töpfe: gewürfelt und umbewertet.
 
-  Hinweis: Das Gate gilt für Stufe (a), render-only. Stufe (a2) trägt die Klassen-Antwort aus der Suche ins Ergebnis und braucht einen Cache-Bump bei ziffern-gleichen Scores. Stufe (b), der Abgleich des Zellenpreises gegen die Folgewurzel, ist score-berührend und gehört zur Familie T16. Die Zählung aus Schritt 2 ist dieselbe wie in T21: Wer zuerst läuft, legt sie als Sonde ab. VGC 2634199230 Zug 5 ist kein Anker für diese Runde: Die Sichtung T11 (Runde 51) hat dort den Würfel gefunden (die gelobte Zelle zieht den K. o. nicht, T58); der Zug taugt höchstens als Abgrenzung.
+  Hinweis: Das Gate gilt für Stufe (a), render-only. Stufe (a2) trägt die Klassen-Antwort aus der Suche ins Ergebnis und braucht einen Cache-Bump bei ziffern-gleichen Scores. Stufe (b), der Abgleich des Zellenpreises gegen die Folgewurzel, ist score-berührend und gehört zur Familie T16. Die Zählung aus Schritt 2 ist dieselbe wie in T21: Wer zuerst läuft, legt sie als Sonde ab. VGC 2634199230 Zug 5 ist kein Anker für diese Runde: Die Sichtung T11 (Runde 51) hat dort den Würfel gefunden (die gelobte Zelle zog den K. o. nicht, T58, behoben in Runde 56); der Zug taugt höchstens als Abgrenzung.
 
   *Erfolg:* 573756 und 653785 verlieren „The rolls decided it“ (Würfel-Deckung 2 % und 26 %, gemessen mit dem schärferen Anker aus Protokoll-Marker oder koOdds der gespielten Zeile), 562428 und 649664 behalten ihre Glückszeile (69 % und 78 %), höchstens vier Zug-Karten wechseln die Klasse, die gepinnten chance-Kanäle 573756 t73 und 649664 t23 bleiben stehen. *Plan T22:* 9 Schritte, 4 offene Entscheidungen.
 
@@ -492,7 +467,7 @@ Q10 (Werkzeuge für die Messkette) ist bis auf Reste erledigt und steht deshalb 
 
   In Doubles trifft die Engine nur sieben von zehn Vorzeichen, früh liest sie 29 von 67 Stellungen sicher falsch. Der Matchup-Term rechnet jedes Mon einzeln; dass zwei Slots dasselbe Ziel abräumen, sieht die Suche nicht, und Follow Me zählt wie jeder Status-Zug. Geplant sind Hinweise für Doppel-Fokus, Umlenkung und Protect-Tempo, dazu ein Feld-Paar-Feature bei Gewicht 0.
 
-  Hinweis: Der Feedback-Korpus trägt keine Doubles-Pins; die vier Doubles-Spiele ohne Pins liefern Dumps, die sich bewegen würden (Tier-Zählung, D21). Die Evidenz kommt aus der Bank. Vorher landen T57 und T58: In jeder zweiten Doubles-Bank-Stellung steht ein terastallisiertes Pokémon mit falsch gelesenem Typ (125 von 248), und die Doubles-Wurzel preist keinen K. o. (VGC 2634199230 Zug 5). Ein Feld-Paar-Term, der davor gemessen wird, misst beide Fehler mit.
+  Hinweis: Der Feedback-Korpus trägt keine Doubles-Pins; die vier Doubles-Spiele ohne Pins liefern Dumps, die sich bewegen würden (Tier-Zählung, D21). Die Evidenz kommt aus der Bank. Beide Vorbedingungen sind gelandet: T57 (Runde 54) liest den Tera-Typ der 125 von 248 Doubles-Bank-Stellungen mit terastallisiertem Pokémon, T58 (Runde 56) preist den K. o. an der Doubles-Wurzel (VGC 2634199230 Zug 5). Ein Feld-Paar-Term, der davor gemessen wird, misst beide Fehler mit.
 
   *Erfolg:* Doubles-Sign-Zeile (Stand 70 %) und früher Doubles-Brier besser, Singles-Zeilen der Bank ziffern-gleich. *Plan T42:* 7 Schritte, 2 offene Entscheidungen.
 
@@ -537,7 +512,7 @@ Wer an einem Thema arbeitet, findet hier die verwandten TODOs.
 | Re-Fit | T49, T50, T52, T71 |
 | Endspiel | T33, T34, T55, T73 |
 | Sets und Spreads | T25, T26, T27, T28, T29, T30, T31, T32, T60, T62, T63, T79, T80 |
-| Zufall preisen | T14, T15, T16, T23, T24, T35, T58, T65, T72, T76, T77, T78 |
+| Zufall preisen | T14, T15, T16, T23, T24, T35, T65, T72, T76, T77, T78 |
 | Nachbau | T75 |
 | Oberfläche | T20, T68, T69 |
 | Richter und Bank | T21, T37, T38, T45 |
@@ -651,7 +626,7 @@ Geparkte Branches:
 
 ## D. Standing Rules
 
-- **D1** Kein Push ohne Ansage. Stand 23.09. (Buchung der Runde 56): origin/master und origin/v1 stehen auf e7f618f (Runde 55; `git ls-remote origin` bestätigt es). Laut Reflog ging `v1` am 21.09. um 17:18:40 zu origin und master um 17:18:58; master liegt damit 0 Commits vor origin/master. Seit dem 20.09. trägt der Branch `v1` bei origin den master-Stand: nach Runde 52 (User-Freigabe 14:50: „auf einen v1 branch, den du pushen darfst“), nach Runde 53 (User-Gate 16:22, „3a“), nach Runde 54 (User-Gate 21.09. 16:21, „4a“) und nach Runde 55 (User-Gate 21.09. 17:18). Ob der master-Push vom 21.09. freigegeben war, klärt das User-Gate der Runde 56; bis dahin gilt jede Freigabe nur für `v1` und für den genannten Stand.
+- **D1** Kein Push ohne Ansage. Stand 23.09. (Buchung der Runde 56): origin/master und origin/v1 stehen auf e7f618f (Runde 55; `git ls-remote origin` bestätigt es). Laut Reflog ging `v1` am 21.09. um 17:18:40 zu origin und master um 17:18:58; master liegt damit 0 Commits vor origin/master. Seit dem 20.09. trägt der Branch `v1` bei origin den master-Stand: nach Runde 52 (User-Freigabe 14:50: „auf einen v1 branch, den du pushen darfst“), nach Runde 53 (User-Gate 16:22, „3a“), nach Runde 54 (User-Gate 21.09. 16:21, „4a“) und nach Runde 55 (User-Gate 21.09. 17:18). Das User-Gate der Runde 56 (23.09. 17:18, „2a“) bestätigt die Regel: Nur `v1` folgt dem master-Stand (nach Runde 56 auf dessen Spitze gepusht), origin/master bleibt auf e7f618f. Jede Freigabe gilt für `v1` und für den genannten Stand.
 - **D2** Vor jedem Push `npm run lint` lokal (der Pages-Workflow hat ein eigenes Lint-Gate) und `npx tsc -b` (`tsc --noEmit` prüft in diesem Solution-Setup nichts).
 - **D3** Score-berührend = Cache-Bump + gepaarter Bank-Bench gegen eine frische Basis vom selben Tag + drei byte-identische Feedback-Läufe (seit Runde 49 zehn Dumps: sechs Singles, vier Doubles). Das Bank-Verdikt liest die Tabelle mit Fehlerbalken aus `scripts/paired-calibration.mjs` (seit Runde 48: 90-%-Band aus einem gepaarten Bootstrap über Replays, Sichten full, hq und glücksbereinigt): **Gepoolte Zeilen entscheiden, Phasen-Zellen warnen.** Ein Kandidat besteht, wenn (1) sein Gewinn dort belegt ist, wo die Messung scharf genug ist (eine gepoolte Bank-Zeile ganz im Guten ODER der Fit-Korpus out-of-sample in allen Seeds), (2) keine gepoolte Bank-Zeile Schaden zeigt und (3) die Tier-Zählung der Feedback-Dumps hält (D21). **Schaden braucht Größe** (User-Gate 19.09., Runde 49): Eine gepoolte Zeile ist Schaden und eine Phasen-Zelle eine Warnung, wenn ihr Band ganz im Schlechten liegt UND ihr Mittel mindestens 5 bp beträgt; kleinere aufgelöste Verschiebungen druckt das Skript als Hinweis hinter dem Verdikt (eine Änderung, die wenige Stellungen bewegt, löst ein einzelnes bp auf). Warnungen und Hinweise gehen mit ihrer Größe ans Gate. Eine Korrektur mit Zweck außerhalb der Bank (Korpus-Gap, Korrektheitsfehler) braucht (2) und (3) und ihren eigenen Beleg. Auflösung der Bank (kleinster wahrer Effekt, den eine Zeile in vier von fünf Fällen sieht, Median über die Kandidaten der Runde 47): gepoolt gesamt 23 bp, gepoolt Singles 24, gepoolt Doubles 58, Singles-Phasen-Zelle 33, Doubles-Phasen-Zelle 72; eine K-Abbildung löst feiner auf (gepoolt 10 bp) als ein Gewicht, das wenige Stellungen stark bewegt. Punktwerte ohne Band sind kein Verdikt. Corpus-Re-Pins und Golden-Refreshes nur nach User-Gate.
 - **D4** Verlustfrei oder render-only = drei byte-identische Feedback-Läufe + Kalibrierung ziffern-gleich + `npm run test:regression`, e2e, lint, `tsc -b`.

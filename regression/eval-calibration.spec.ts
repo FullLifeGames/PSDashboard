@@ -907,7 +907,10 @@ import { summaryLines } from './calibration-summary';
  * 5996e40 and e5ab1e4 plus the close-audit corrections, cache v52,
  * score-touching as a correction with its own evidence; probes, the
  * census, the reading, the audit and both gate chains under
- * docs/perf/probes/2026-09-23-r56/; booked before the user gate).
+ * docs/perf/probes/2026-09-23-r56/; adopted at the user gate of 23 Sep
+ * 17:18 ("1a 2a 3a"): r56 fast-forwards to master, branch v1 follows and
+ * is pushed, origin/master stays on e7f618f; iterations 4g (T77, T78) and
+ * 7d (T79, T80) stand where the booking placed them).
  * INSTRUMENT: the bank's 833 positions rebuilt with the round-54 instrument
  * (label r56-base); census.vt.ts counts the 248 doubles positions: 34 788
  * root cells (12 x 12 options on average), 22 986 of them (66 %) with a
@@ -1144,7 +1147,8 @@ import { summaryLines } from './calibration-summary';
  * every correction is in this entry, NextSteps and the spec. Found on the
  * way: origin/master was pushed to e7f618f on 21 Sep 17:18:58, 18 s after v1
  * (reflog), while D1 and the round-55 entry below said master stays
- * unpushed; the user gate of round 56 settles it.
+ * unpushed; the user gate of round 56 settled it ("2a"): only v1 follows
+ * the master state, origin/master stays on e7f618f.
  * REMAINS: T77 (rule E's 0.95 coverage stop drops a rare expensive class,
  * the game-ending crit of 2629703929 t13 among them; a Fake Out flinch is
  * certain, yet F3 counts its |cant| line, 13 of the census's 25
