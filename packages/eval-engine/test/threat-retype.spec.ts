@@ -46,3 +46,21 @@ describe('field retypes in the static (round 57)', () => {
     expect(singleMoveFraction(active(battle, 0), active(battle, 1), 'weatherball', battle)).toBeGreaterThan(0.2);
   });
 });
+
+describe('Tera retypes in the static (round 57)', () => {
+  test('Tera-Fairy Tera Blast lands in the physical bucket against a Dragon', () => {
+    const battle = singles('gen9customgame', [set('Dragonite', ['splash', 'terablast'], { teraType: 'Fairy', nature: 'Adamant' })], [set('Garchomp', ['splash'])]);
+    const before = pairThreat(active(battle, 0), active(battle, 1), battle);
+    clickTera(battle, 0);
+    const after = pairThreat(active(battle, 0), active(battle, 1), battle);
+    expect(after.physical).toBeGreaterThan(before.special * 2);
+  });
+
+  test('a Stellar Tera Blast hits a terastallized target twice as hard', () => {
+    const battle = singles('gen9customgame', [set('Garchomp', ['splash', 'terablast'], { teraType: 'Stellar' })], [set('Snorlax', ['splash'], { teraType: 'Normal' })]);
+    clickTera(battle, 0);
+    const plain = singleMoveFraction(active(battle, 0), active(battle, 1), 'terablast', battle);
+    clickTera(battle, 1);
+    expect(singleMoveFraction(active(battle, 0), active(battle, 1), 'terablast', battle)).toBeCloseTo(plain * 2, 5);
+  });
+});

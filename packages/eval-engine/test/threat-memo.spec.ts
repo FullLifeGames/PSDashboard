@@ -149,4 +149,16 @@ describe('the memo keys the move answer (round 57)', () => {
     expect(cached(indeedee, gengar)).toEqual(pairThreat(indeedee, gengar, battle));
     expect(cache.size).toBe(2);
   });
+
+  test('Tera Blast: a stage change that flips the category misses the memo', () => {
+    const battle = makeBattle({ ...makeSet('Gardevoir', ['splash', 'terablast']), teraType: 'Fighting' }, makeSet('Snorlax', ['splash']));
+    battle.choose('p1', 'move 1 terastallize');
+    battle.choose('p2', 'move 1');
+    const [gardevoir, snorlax] = [battle.sides[0].active[0], battle.sides[1].active[0]];
+    const cached = threatGetter(battle, createMatchupCache());
+    expect(cached(gardevoir, snorlax)).toEqual(pairThreat(gardevoir, snorlax, battle));
+    gardevoir.boosts.atk = 6;
+    gardevoir.boosts.spa = -6;
+    expect(cached(gardevoir, snorlax)).toEqual(pairThreat(gardevoir, snorlax, battle));
+  });
 });

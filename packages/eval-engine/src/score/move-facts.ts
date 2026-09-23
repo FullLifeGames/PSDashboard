@@ -11,6 +11,14 @@ import { CONTEXT_MOVES, moveAtUse, RULE_ABILITIES, RULE_MOVES, type MoveAtUse, t
 type DexMove = ReturnType<Battle['dex']['moves']['get']>;
 
 const UMBRELLA_WEATHER = new Set(['sunnyday', 'raindance', 'desolateland', 'primordialsea']);
+const BOOST_TABLE = [1, 1.5, 2, 2.5, 3, 3.5, 4];
+
+/** getStat(stat, false, true): the stored stat with its stage, no modifiers. */
+function staged(pokemon: Pokemon, stat: 'atk' | 'spa' | 'spe'): number {
+  const boost = Math.max(-6, Math.min(6, pokemon.boosts[stat]));
+  const base = pokemon.storedStats[stat];
+  return boost >= 0 ? Math.floor(base * BOOST_TABLE[boost]) : Math.floor(base / BOOST_TABLE[-boost]);
+}
 
 /** The types a body is hit and grounded by: the Tera type once clicked (a Stellar Tera keeps the old ones). */
 function typesNow(pokemon: Pokemon): readonly string[] {
@@ -39,6 +47,8 @@ export function userFacts(pokemon: Pokemon, battle: Battle): MoveUser {
     terastallized: pokemon.terastallized ?? null,
     types: pokemon.types,
     grounded: grounded(pokemon, battle),
+    atk: staged(pokemon, 'atk'),
+    spa: staged(pokemon, 'spa'),
   };
 }
 

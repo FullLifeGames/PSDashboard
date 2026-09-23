@@ -214,6 +214,8 @@ export function singleMoveFraction(attacker: Pokemon, defender: Pokemon, moveId:
   if (!ignoresImmunity(attacker, use.type) && !battle.dex.getImmunity(use.type, defenderTypes)) return 0;
   if (!use.basePower) return fixedDamage(move, attacker, defender) / defender.maxhp;
   const typeMult = Math.pow(2, battle.dex.getEffectiveness(use.type, defenderTypes));
+  // A Stellar move hits a terastallized target twice as hard (pokemon.runEffectiveness).
+  const stellar = use.type === 'Stellar' && defender.terastallized ? 2 : 1;
   // STAB stays tera-blind here: the rule by the book is parked on branch r54-stab (round 54).
   const stab = attacker.types.includes(use.type) ? 1.5 : 1;
   const offense = offenseMultiplier(attacker, defender, use);
@@ -222,7 +224,7 @@ export function singleMoveFraction(attacker: Pokemon, defender: Pokemon, moveId:
     ? [attacker.storedStats.atk, defender.storedStats.def]
     : [attacker.storedStats.spa, defender.storedStats.spd];
   const damage = (((2 * attacker.level / 5 + 2) * use.basePower * use.powerMult * atk / def) / 50 + 2) *
-    stab * typeMult * offense / bulk;
+    stab * typeMult * stellar * offense / bulk;
   return damage / defender.maxhp;
 }
 

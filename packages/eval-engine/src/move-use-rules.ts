@@ -67,6 +67,26 @@ const byTerrain: Rule = (move, user, field) => {
   return type ? { type, basePower: move.basePower * 2 } : {};
 };
 
+/** Tera Blast: the Tera type after the click, physical when Attack with its stage leads; Stellar power 100. */
+const byTera: Rule = (move, user) => {
+  if (user.terastallized === undefined) return null;
+  if (!user.terastallized) return {};
+  if (user.atk === undefined || user.spa === undefined) return null;
+  return {
+    type: user.terastallized,
+    basePower: user.terastallized === 'Stellar' ? 100 : move.basePower,
+    ...(user.atk > user.spa ? { category: 'Physical' } : {}),
+  };
+};
+
+/** Tera Starstorm: Stellar for Terapagos-Stellar, physical like Tera Blast once terastallized. */
+const byStarstorm: Rule = (_move, user) => {
+  if (user.species === undefined) return null;
+  if (user.species !== 'Terapagos-Stellar') return {};
+  const physical = !!user.terastallized && user.atk !== undefined && user.spa !== undefined && user.atk > user.spa;
+  return { type: 'Stellar', ...(physical ? { category: 'Physical' } : {}) };
+};
+
 /** Struggle is typeless from gen 2 on. */
 const byStruggle: Rule = (_move, user) => (user.gen >= 2 ? { type: '???' } : {});
 
@@ -82,4 +102,6 @@ export const OWN_RULES: Record<string, Rule> = {
   struggle: byStruggle,
   weatherball: byWeather,
   terrainpulse: byTerrain,
+  terablast: byTera,
+  terastarstorm: byStarstorm,
 };

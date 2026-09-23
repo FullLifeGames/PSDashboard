@@ -115,3 +115,34 @@ describe('field rules: Weather Ball, Terrain Pulse (round 57)', () => {
     expect(ours(battle, bench(battle, 0, 1), active(battle, 1), 'weatherball')).toMatchObject({ type: 'Normal', basePower: 50 });
   });
 });
+
+describe('Tera rules (round 57)', () => {
+  test('Tera Blast: Normal before the click, the Tera type after, physical when Attack leads', () => {
+    const battle = singles('gen9customgame', [set('Dragonite', ['splash', 'terablast'], { teraType: 'Fairy', nature: 'Adamant', evs: { hp: 0, atk: 252, def: 0, spa: 0, spd: 4, spe: 252 } })], [set('Garchomp', ['splash'])]);
+    expect(expectSim(battle, active(battle, 0), active(battle, 1), 'terablast')).toMatchObject({ type: 'Normal', category: 'Special' });
+    clickTera(battle, 0);
+    expect(expectSim(battle, active(battle, 0), active(battle, 1), 'terablast')).toMatchObject({ type: 'Fairy', category: 'Physical' });
+  });
+
+  test('Tera Blast category reads the stages', () => {
+    const battle = singles('gen9customgame', [set('Gardevoir', ['splash', 'terablast'], { teraType: 'Fighting' })], [set('Snorlax', ['splash'])]);
+    clickTera(battle, 0);
+    expect(expectSim(battle, active(battle, 0), active(battle, 1), 'terablast').category).toBe('Special');
+    active(battle, 0).boosts.atk = 6;
+    active(battle, 0).boosts.spa = -6;
+    expect(expectSim(battle, active(battle, 0), active(battle, 1), 'terablast').category).toBe('Physical');
+  });
+
+  test('a Pixilate Tera Blast is Fairy before the click and the Tera type after', () => {
+    const battle = singles('gen9customgame', [set('Sylveon', ['splash', 'terablast'], { ability: 'Pixilate', teraType: 'Fire' })], [set('Scizor', ['splash'])]);
+    expect(expectSim(battle, active(battle, 0), active(battle, 1), 'terablast').type).toBe('Fairy');
+    clickTera(battle, 0);
+    expect(expectSim(battle, active(battle, 0), active(battle, 1), 'terablast')).toMatchObject({ type: 'Fire', powerMult: 1 });
+  });
+
+  test('Stellar Tera Blast has power 100', () => {
+    const battle = singles('gen9customgame', [set('Garchomp', ['splash', 'terablast'], { teraType: 'Stellar' })], [set('Snorlax', ['splash'])]);
+    clickTera(battle, 0);
+    expect(expectSim(battle, active(battle, 0), active(battle, 1), 'terablast')).toMatchObject({ type: 'Stellar', basePower: 100 });
+  });
+});
