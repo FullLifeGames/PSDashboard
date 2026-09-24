@@ -15,34 +15,34 @@ Hinter jedem Titel stehen Thema, Art, Größe (mini, klein, mittel, groß), Gate
 
 ## Programm · Mehr Simulation (Runden 59 bis 62)
 
-Beschlossen am User-Gate der Runde 58 (24.09. 18:38, „1a 2a 3a 4a 5a“). Das vollständige Programm mit Toren, Entscheidungsregeln und Risiken steht in `docs/superpowers/plans/2026-09-24-program-more-simulation.md`; hier die Kurzfassung.
+Beschlossen am User-Gate der Runde 58 (24.09. 18:38, „1a 2a 3a 4a 5a“) mit der Auflage, den Plan klar festzuhalten und alle übrigen TODOs nach Umbau und Erfolg neu zu bewerten. Das vollständige Programm mit Toren, Entscheidungsregeln und Risiken steht in `docs/superpowers/plans/2026-09-24-program-more-simulation.md`; hier die Kurzfassung.
 
-Runde 58 hat gemessen: Eine Statik mit perfekt gerechnetem Schaden sagt Spielausgänge nur um +16 bp besser voraus, fast ganz in Gen-9-Singles, und eine Bibliothek im Suchpfad wäre 20- bis 40-mal teurer. Die Kosten der Suche liegen im Simulator: Die Kopie des Kampfs frisst 35 bis 53 % eines Singles-Baums, die Suche nach Effekt-Handlern 24 bis 47 %, und ein eigener Laufzeit-Patch macht Suchbäume 1,9- bis 2,5-mal schneller, byte-gleich. Die Richtung: den Simulator billiger machen und ihm mehr Arbeit geben, statt die Schätzung am Ende weiter nachzubauen.
+Runde 58 hat gemessen: Eine Statik mit perfekt gerechnetem Schaden sagt Spielausgänge um +16,4 bp [7,6; 25,3] besser voraus, überwiegend in Gen-9-Singles (rund drei Viertel des Gewinns), und nur mit neu gefitteten Gewichten; eine Bibliothek als Schadenskern machte die kalte Statik 22- bis 40-mal teurer (die Wurzelsuche 1,28- bis 1,50-mal, mit Paar-Schlüssel etwa 1,11- bis 1,25-mal). Die Kosten der Suche liegen im Simulator: Die Kopie des Kampfs frisst 35 bis 53 % eines Singles-Baums, die Suche nach Effekt-Handlern 24 bis 35 % (in Doubles-Bäumen 39 bis 47 %), und ein eigener Laufzeit-Patch macht Suchbäume 1,9- bis 2,5-mal schneller, in 18 Suchen byte-gleich. Die Richtung: den Simulator billiger machen und ihm mehr Arbeit geben, statt die Schätzung am Ende weiter nachzubauen.
 
-Bedingungen des Users: Die Qualität bleibt, die Geschwindigkeit bleibt, und nach Umbau und Erfolg wird jedes übrige TODO neu bewertet (Iteration S3). Bis dahin ruht die übrige Liste; Ausnahmen nur am User-Gate. Die Genauigkeits-Achse der Statik (T71, T81, T82, T88, T90) ist geparkt, bis Iteration S2 gemessen hat.
+Bedingungen des Users: Die Qualität bleibt, die Geschwindigkeit bleibt, und nach Umbau und Erfolg wird jedes übrige TODO neu bewertet (Iteration S3). Erfolg heißt: T91 ist ganz oder nach seiner Teil-Regel übernommen, und S2 hat gemessen (T98 übernommen oder mit dem Beleg aus T97 entfallen). Endet eine Stufe ohne Übernahme oder braucht sie mehr als ihre Runde, geht das Programm ans User-Gate, bevor die nächste Stufe beginnt: weiter, neu zuschneiden oder die Triage auf dem erreichten Stand vorziehen. Bis zur Triage ruht die übrige Liste; Ausnahmen nur am User-Gate, dazu T43 am Release-Tag (Außer der Reihe). Die Genauigkeits-Achse der Statik (T71, T81, T82, T88, T90) ist geparkt, bis Iteration S2 gemessen hat; ihr Urteil fällt in T99. Nach der Triage folgt Iteration 4g (Gate „4a“), danach Iteration E, sofern das Triage-Gate nichts anderes beschließt.
 
 | Schritt | Runde (vorgesehen) | TODOs | Tor in einem Satz |
 | --- | --- | --- | --- |
-| S1 Tempo-Schicht | 59 | T91 | byte-gleich in Zügen, Suchen, Feedback und Kalibrierung, dazu Baum Singles ≥ 2,0×, Doubles ≥ 1,6×, Matrix ≥ 1,8× |
-| S1a Regelfehler, die dem Simulator falsche Zustände geben | 60 | T92 bis T95 | je Fehler rote Probe, Fix, volles D3 |
-| S2 Simulation investieren | 61 | T97, T98 | Bank aufgelöst besser bei höchstens der Wandzeit vor Runde 59 |
-| S3 Triage | 62 | T99 | jedes offene TODO auf dem neuen Stand gelesen und am User-Gate neu eingeordnet |
+| S1 Tempo-Schicht | 59 | T91 | byte-gleich in Zügen, Suchen und Feedback, Kalibrierung ziffern-gleich, dazu Baum Singles ≥ 2,0×, Doubles ≥ 1,6×, Matrix ≥ 1,8×, Pass 3 im Feedback ≥ 1,5× |
+| S1a Regelfehler, die dem Simulator falsche Zustände geben | 60 | T92 bis T95 | je Fehler rote Probe, Fix und eigenes Gate (D3; T94 verlustfrei D4 außer der abgestürzten Stellung) |
+| S2 Simulation investieren | 61 | T97, T98 | Bank aufgelöst besser bei höchstens der Wandzeit vor Runde 59 (Code-Stand 85eb5ad, verschränkt gemessen) |
+| S3 Triage | 62 | T99 | jedes der 68 offenen TODOs außerhalb des Programms auf dem neuen Stand gelesen und am User-Gate neu eingeordnet |
 
 ## Iteration S1 · Tempo-Schicht für den Simulator (Runde 59)
 
-Stufe 1 des Programms. Verlustfrei: Keine Zahl darf sich bewegen, nur die Zeit.
+Stufe 1 des Programms. Verlustfrei: In App, Feedback und Kalibrierung darf sich keine Zahl bewegen, nur die Zeit. Truth-Bench und Nachtlauf des Endspiel-Lösers (Wanduhr-Deckel 120 s) dürfen mehr lösen und sind kein Identitäts-Tor.
 
 - [ ] **T91 · Der Simulator kopiert und sucht Handler zu teuer** (Simulation und Suche, Runde, groß, verlustfrei D4 mit Identitäts-Toren)
 
-  573756 Zug 70: Ein MCTS-Baum kopiert rund 40 % seiner Zeit den Kampf (als JSON schreiben, zurücklesen, ein neues Battle bauen) und sucht weitere 28 % nach Effekt-Handlern; pro Zug fragt der Simulator im Schnitt 8 790-mal, ob jemand auf ein Ereignis reagiert, und findet 15-mal etwas. Bei gen9ou baut er dazu bei jedem Fork die Regeltabelle neu (14 bis 17 % jeder gen9ou-Suche; 563 der 834 Bank-Stellungen sind gen9ou).
+  573756 Zug 70: Ein MCTS-Baum kopiert rund 40 % seiner Zeit den Kampf (als JSON schreiben, zurücklesen, ein neues Battle bauen) und sucht weitere 28 % nach Effekt-Handlern; der Simulator fragt dort je Zug rund 2 700-mal, ob jemand auf ein Ereignis reagiert, und über 70 Bank-Stellungen (Singles und Doubles) findet im Schnitt nur 15 von 8 790 solcher Nachfragen etwas. Bei gen9ou baut er dazu bei jedem Fork die Regeltabelle neu (14 bis 17 % jeder gen9ou-Suche; 563 der 834 Bank-Stellungen sind gen9ou).
 
-  Hinweis: Drei Hebel in `packages/eval-engine/src/forward/sim-fast.ts`, pro Kampf eingehängt, ohne Eingriff in `node_modules`: Regeltabelle einmal setzen (öffentliche API, zuerst), schnelle Kopie (683 → 87 µs pro Fork), Handler-Vorprüfung (5,76 → 1,05 µs pro Nachfrage). Pflege: exakter Pin `@pkmn/sim` 0.10.11, Hash-Tor mit Rückfall auf den Standardweg, Schalter `EVAL_SIM_FAST`, Positivliste der Klassen, die die Kopie teilen darf. Prototypen, Messungen und Review der Runde 58: `docs/perf/probes/2026-09-24-r58/patch/` (`review.md`), `docs/perf/probes/2026-09-24-r58/oracle/patch-review-combo.vt.ts`.
+  Hinweis: Drei Hebel in `packages/eval-engine/src/forward/sim-fast.ts`, pro Kampf eingehängt, ohne Eingriff in `node_modules`: Regeltabelle einmal setzen (öffentliche API, zuerst, eigener Commit), schnelle Kopie (683 → 87 µs pro Fork), Handler-Vorprüfung (5,76 → 1,05 µs pro `runEvent`-Aufruf). Pflege: exakter Pin `@pkmn/sim` 0.10.11, Hash-Tor mit Rückfall auf den Standardweg, Guard-Spec in CI, Schalter `EVAL_SIM_FAST`, Positivliste der Klassen, die die Kopie teilen darf. Prototypen, Messungen und Review der Runde 58: `docs/perf/probes/2026-09-24-r58/patch/` (`review.md`), `docs/perf/probes/2026-09-24-r58/oracle/patch-review-combo.vt.ts`.
 
-  *Erfolg:* 0 Abweichungen in rund 40 700 Zügen (alle Bank-Stellungen, 5×5 Optionen, Tera, 2 Seeds) und in jedem Zustand mit offener Ersatzwahl; 24 MCTS-Bäume und 24 Matrix-Suchen byte-gleich; Engine-Suite mit erzwungenem Patch grün; Feedback 3× byte-identisch an gegen aus; Kalibrierung ziffern-gleich; die drei Gegenproben schlagen an; die Vorprüfung beantwortet ≥ 90 % der Nachfragen; Baum Singles ≥ 2,0×, Doubles ≥ 1,6×, Matrix ≥ 1,8×; Pass 3 im Feedback ≥ 1,5×; Speicher je Worker höchstens +10 %. *Plan T91:* 7 Schritte, 2 offene Entscheidungen.
+  *Erfolg:* 0 Abweichungen in rund 40 700 Zügen (alle Bank-Stellungen, 5×5 Optionen, Tera, 2 Seeds) und in jedem Zustand mit offener Ersatzwahl; 24 MCTS-Bäume und 24 Matrix-Suchen byte-gleich; Engine-Suite mit erzwungenem Patch grün; Feedback 3× byte-identisch an gegen aus; Kalibrierung ziffern-gleich; die drei Gegenproben schlagen an; die Vorprüfung beantwortet ≥ 90 % der `runEvent`-Aufrufe im Feedback-Lauf; Baum Singles ≥ 2,0×, Doubles ≥ 1,6×, Matrix ≥ 1,8× gegen den Code-Stand vor Runde 59; Pass 3 im Feedback ≥ 1,5×; Speicher je Worker höchstens +10 %. Die Regeltabelle landet für sich, sobald ihre Identität hält; für die übrigen Hebel gelten die Entscheidungsregeln des Programms. *Plan T91:* 7 Schritte, 2 offene Entscheidungen.
 
 ## Iteration S1a · Regelfehler, die dem Simulator falsche Zustände geben (Runde 60)
 
-Zwischenschritt des Programms: Je mehr der Simulator entscheidet, desto mehr zählt, dass wir ihm den richtigen Zustand geben. Score-berührend, deshalb nach S1, damit die Tempo-Schicht gegen einen unveränderten Stand geprüft wird. Jeder Fehler bekommt seine eigene Messung (D3).
+Zwischenschritt des Programms, die Liste des Gates „4a“: Spikes-Schichten, As One, der Doubles-Absturz, Verbrennung, Slush Rush. Je mehr der Simulator entscheidet, desto mehr zählt, dass wir ihm den richtigen Zustand geben. T92, T93 und T95 sind score-berührend, deshalb nach S1, damit die Tempo-Schicht gegen einen unveränderten Stand geprüft wird; T94 ist verlustfrei außer der abgestürzten Stellung (D4). Jeder Fehler bekommt seine eigene Messung.
 
 - [ ] **T92 · Korrigierte Seitenbedingungen ohne Schichten und Dauer** (Nachbau, Mini-Runde, klein, score-berührend D3)
 
@@ -56,35 +56,35 @@ Zwischenschritt des Programms: Je mehr der Simulator entscheidet, desto mehr zä
 
   *Erfolg:* Jeder gebaute Calyrex-Ice und Calyrex-Shadow trägt die passende As-One-Form; Bank und Dumps bewegen sich nur in Spielen mit Calyrex. *Plan T93:* 3 Schritte, keine offene Entscheidung.
 
-- [ ] **T94 · Der Doubles-Baum stürzt ab, wenn ein Wechsel neben Outrage steht** (Simulation und Suche, Mini-Runde, klein, verlustfrei D4 außer der abgestürzten Stellung)
+- [ ] **T94 · Der Doubles-Baum stürzt ab: Outrage findet kein Ziel** (Simulation und Suche, Mini-Runde, klein, verlustfrei D4 außer der abgestürzten Stellung)
 
-  smogtours-gen9doublesou-913996 Zug 4: Der MCTS-Baum wirft `p1 "switch 4, move outrage": Can't move: Outrage needs a target` (`forward/switches.ts:52`), in allen Varianten der Messung der Runde 58, mit und ohne Patch. In der App ist der Pfad über den MCTS-Modus erreichbar.
+  smogtours-gen9doublesou-913996 Zug 4: Der MCTS-Baum wirft `p1 "switch 4, move outrage": Can't move: Outrage needs a target` (`forward/switches.ts:52`), in allen sechs Varianten der Sonde der Runde 58 (Tera an und aus, drei Seeds, ohne Patch), auch mit der Wahl `move sandsearstorm, move outrage`. In der App ist der Pfad über den MCTS-Modus erreichbar.
 
   *Erfolg:* Der Baum auf 913996 Zug 4 läuft durch; ein Test hält die Wahl mit Ziel fest; alle übrigen Suchen bleiben byte-gleich. *Plan T94:* 3 Schritte, keine offene Entscheidung.
 
-- [ ] **T95 · Belegte Regelfehler in Statik und Paar-Plan** (Regelfehler, Runde, klein, score-berührend D3, je Fehler eigene Messung)
+- [ ] **T95 · Belegte Regelfehler in Statik und Tempo: Verbrennung und Slush Rush** (Regelfehler, Mini-Runde, klein, score-berührend D3, je Fehler eigene Messung)
 
-  Vier Fehler, die der Gegenprüfer der Runde 58 im Code und zur Laufzeit bestätigt hat: Verbrennung kostet in Gen 2 bis 6 ein Achtel der KP, `score/races.ts:30` rechnet überall ein Sechzehntel; Slush Rush verdoppelt im Schnee nie (`speed.ts:43` prüft `'snow'`, der Simulator schreibt `'snowscape'`; ein Cetitan bleibt bei 182 statt 364); ein exakter Tempo-Gleichstand im letzten Paar geht immer an p2 (`score/last-pair.ts:47`, gespiegelte Garchomp 240 gegen 240 lesen −0,6), während die vier übrigen Kopien der Regel „keiner gewinnt“ sagen; `pair/log.ts:7` sucht `'attract'`, der Simulator schreibt `Attract`, also erkennt der Paar-Plan das Aussetzen durch Anziehung nie.
+  Zwei Fehler, die der Gegenprüfer der Runde 58 im Code und zur Laufzeit bestätigt hat: Verbrennung kostet in Gen 2 bis 6 ein Achtel der KP, `score/races.ts:30` rechnet überall ein Sechzehntel; Slush Rush verdoppelt im Schnee nie (`speed.ts:43` prüft `'snow'`, der Simulator schreibt `'snowscape'`; ein Cetitan bleibt bei 182 statt 364). Die zwei weiteren bestätigten Fehler bleiben, wo sie schon gebucht sind: der exakte Tempo-Gleichstand im letzten Paar, der immer an p2 geht (`score/last-pair.ts:47`), bei T15 (Schritt 4), und `'attract'` gegen die Log-Zeile `Attract` (`pair/log.ts:7`) bei T77.
 
-  *Erfolg:* Je Fehler eine rote Probe, die danach grün ist; Bank und Dumps bewegen sich je Fehler nur, wo er greift; die bewegten Urteile sind gelesen. *Plan T95:* 4 Schritte, 1 offene Entscheidung.
+  *Erfolg:* Je Fehler eine rote Probe, die danach grün ist; Bank und Dumps bewegen sich je Fehler nur, wo er greift; die bewegten Urteile sind gelesen. *Plan T95:* 4 Schritte, keine offene Entscheidung.
 
 ## Iteration S2 · Das Tempo in Simulation investieren (Runde 61)
 
-Stufe 2 des Programms. Erst messen, dann übernehmen; die Schwellen legt die Spec der Runde vor der ersten Messung fest.
+Stufe 2 des Programms. Erst messen, dann übernehmen; die Schwellen legt die Spec der Runde vor der ersten Messung fest, einschließlich der Wandzeit, die das Tor liest.
 
 - [ ] **T97 · Obergrenze der Suche: was bringt mehr Simulation pro Sekunde?** (Simulation und Suche, Runde, mittel, Messung ohne Übernahme)
 
-  573756, die späten Züge: Runde 32 hat mit achtfachem Budget höchstens 0,05 bewegt, und die Runden 42 und 43 haben Baum-Umbauten gemessen, die Tempo kosteten statt es zu nutzen. Eine saubere Obergrenze der Suche fehlt: Was bringt doppeltes oder vierfaches Budget (Iterationen, Tiefe, Ziehungen je Zelle), was ein Weiterspielen bis zum Spielende statt der Schätzung, jeweils gegen die Wandzeit?
+  573756, die späten Züge: Runde 32 hat mit achtfachem Budget höchstens 0,05 bewegt. Runde 42 machte den Baum an 573756 Zug 70 um 54 % billiger und las spät 18 bp schlechter, Runde 43 machte den Doubles-Baum 44 bis 70 % teurer und las spät 12 bis 15 bp schlechter. Eine saubere Obergrenze der Suche fehlt: Was bringt doppeltes oder vierfaches Budget (Iterationen, Tiefe, Ziehungen je Zelle), was ein Weiterspielen bis zum Spielende statt der Schätzung, jeweils gegen die Wandzeit?
 
-  Hinweis: Nach dem Muster der Runde 58 (vorregistrierte Schwellen, gepaart, Bootstrap über Spiele). Dazu die billige Statik-Probe aus Runde 58 auf dem Fit-Korpus: mittlerer Wurf statt Höchstwurf und Status-Effekte (Verbrennung, Guts, Facade). Aufnahme-Sonde `docs/perf/probes/2026-09-24-r58/oracle/capture.vt.ts` und Auswertung `analyze.vt.ts` liegen fertig da.
+  Hinweis: Nach dem Muster der Runde 58 (vorregistrierte Schwellen, gepaart, Bootstrap über Spiele). Dazu die billige Statik-Probe aus Runde 58 auf dem Fit-Korpus: mittlerer Wurf statt Höchstwurf und Status-Effekte (Verbrennung, Guts, Facade). Aufnahme-Sonde `docs/perf/probes/2026-09-24-r58/oracle/capture.vt.ts` und Auswertung `analyze.vt.ts` liegen da; die Aufnahme importiert `score/oracle.ts` und läuft nur auf einem Worktree von `r58-oracle` (33c93c5), und die billige Probe braucht dort einen eigenen Kern-Modus neben `off`, `calc` und `sim`.
 
-  *Erfolg:* Für jede Budget-Form stehen Bank-Gewinn mit Band und Wandzeit nebeneinander, dazu der Gewinn der billigen Statik-Probe; das User-Gate wählt, was T98 übernimmt. *Plan T97:* 5 Schritte, 2 offene Entscheidungen.
+  *Erfolg:* Für jede Budget-Form stehen Bank-Gewinn mit Band und Wandzeit nebeneinander, dazu der Gewinn der billigen Statik-Probe mit Band; das User-Gate wählt, was T98 übernimmt. Die Statik-Probe wird in S2 nicht übernommen, ihr Ergebnis geht in das Urteil über die Genauigkeits-Achse in T99. *Plan T97:* 5 Schritte, 2 offene Entscheidungen.
 
 - [ ] **T98 · Das gewählte Budget übernehmen** (Simulation und Suche, Runde, mittel, score-berührend D3, braucht T97)
 
-  Die Budget-Form, die T97 als beste bei höchstens der Wandzeit vor Runde 59 ausweist, wird Standard in App und Bank.
+  Die Budget-Form, die T97 als beste bei höchstens der Wandzeit vor Runde 59 ausweist, wird Standard in App und Bank. Zeigt T97 keine Form mit aufgelöstem Gewinn in dieser Wandzeit, entfällt T98 mit dem Beleg aus T97; das Budget bleibt, und das Tempo aus S1 bleibt als reiner Zeitgewinn.
 
-  *Erfolg:* Bank gepaart aufgelöst besser, keine gepoolte Zeile mit Schaden, Wandzeit der Analyse nicht über dem Stand vor Runde 59, Feedback 3× byte-identisch zwischen den Läufen, bewegte Urteile gelesen, Pins am User-Gate. *Plan T98:* 4 Schritte, 1 offene Entscheidung.
+  *Erfolg:* Bank gepaart aufgelöst besser, keine gepoolte Zeile mit Schaden, Wandzeit der Analyse nicht über dem Stand vor Runde 59 (verschränkt gemessen, D6), Feedback 3× byte-identisch zwischen den Läufen, bewegte Urteile gelesen, Pins am User-Gate. *Plan T98:* 4 Schritte, 1 offene Entscheidung.
 
 ## Iteration S3 · Triage aller übrigen TODOs (Runde 62)
 
@@ -92,33 +92,11 @@ Stufe 3 des Programms und die Auflage des Users vom 24.09.: Nach Umbau und Erfol
 
 - [ ] **T99 · Jedes offene TODO gegen den neuen Stand lesen** (Werkzeug, Runde, mittel, ohne Code)
 
-  Die Liste stammt aus einer Zeit, in der die Statik alles tragen musste. Nach S1 und S2 erledigt die Simulation manches von selbst, anderes wird wichtiger (die Treue des Nachbaus), und die Genauigkeits-Achse (T71, T81, T82, T88, T90) wartet auf genau dieses Urteil.
+  Die Liste stammt aus einer Zeit, in der die Statik alles tragen musste. Nach S1 und S2 erledigt die Simulation manches von selbst, anderes wird wichtiger (die Treue des Nachbaus), und die Genauigkeits-Achse (T71, T81, T82, T88, T90) wartet auf genau dieses Urteil. Für die Achse liest die Triage den Gewinn je Sekunde aus T97 neben ihrer Decke (+16,4 bp [7,6; 25,3], mit der Modellform T102 zusammen +32,3) und das Ergebnis der billigen Statik-Probe; ein TODO der Achse kommt nur mit einem Plan zurück, der die Gewichte neu fittet (Lehre der Runde 58), sonst bleibt es mit Auslöser geparkt.
 
-  Hinweis: Für jedes TODO mit Spielszene wird die Szene auf dem neuen Stand gelesen (Dump oder Sonde), nicht vermutet. Urteile: obsolet (mit Beleg nach `docs/completed/`), kleiner (Text und Erfolgsmaß neu), wichtiger (höhere Iteration), unverändert. Als Workflow mit Prüfer und Gegenprüfer je TODO.
+  Hinweis: Umfang ist jedes offene TODO außerhalb des Programms (am 24.09. 68, einschließlich der geparkten, Iteration E, T43 und des Abschnitts „Geparkt“). Für jedes TODO mit Spielszene wird die Szene auf dem neuen Stand gelesen (Dump, Sonde oder Bank-Zeile), nicht vermutet; für jedes TODO ohne Szene (Prüfstand, Zählung, Werkzeug) läuft sein Erfolgsmaß oder seine Zählung auf dem neuen Stand, oder das Urteil begründet, warum der Umbau es nicht berührt. Urteile: obsolet (mit Beleg nach `docs/completed/`), kleiner (Text und Erfolgsmaß neu), wichtiger (höhere Iteration), weniger wichtig (tiefere Iteration oder geparkt, mit Auslöser), unverändert. Als Workflow mit Prüfer und Gegenprüfer je TODO.
 
-  *Erfolg:* Jedes offene TODO trägt ein Urteil mit Beleg; die Tabelle ging ans User-Gate; die Liste ist danach neu geordnet, einschließlich Iteration 4g und Iteration E. *Plan T99:* 4 Schritte, 1 offene Entscheidung.
-
-## Iteration E · Eine Regel, ein Ort (Platz entscheidet T99)
-
-Aus der Inventur der Runde 58 (`docs/perf/probes/2026-09-24-r58/inventory/inventory.md`, am Gate „3a“): Wir bauen selten Bibliothekscode nach, schreiben aber dieselbe Regel oft mehrfach, und die Kopien laufen auseinander. Die Triage (T99) entscheidet, ob diese Iteration vor oder hinter Iteration 4g steht.
-
-- [ ] **T96 · Die übrigen Regelfehler der Inventur prüfen** (Regelfehler, Runde, mittel, je Fehler eigenes Gate)
-
-  Die Inventur fand nebenbei 57 Regelfehler (Anhang), gemessen ist keiner auf der Bank; T92 und T95 nehmen die fünf, die ein Gegenprüfer bestätigt hat. Beispiele für den Rest: Drain-Züge zählen im Rennen als 50-%-Heilung, ein Air-Balloon-Träger zahlt auf der Bank Spikes, die Crit-Wächter der K.-o.-Quoten übersehen Scope Lens und Super Luck, Thunder im Regen gegen +1 Ausweichen liest 0,75 statt sicher.
-
-  *Erfolg:* Jeder Fehler hat eine rote Probe gegen Simulator oder Rechner oder ist begründet verworfen; die bestätigten sind eigene TODOs oder in T100 und T101 aufgegangen. *Plan T96:* 3 Schritte, keine offene Entscheidung.
-
-- [ ] **T100 · Doppelte Regeln zusammenlegen** (Werkzeug, Runde, groß, verlustfrei D4 je Zusammenlegung, wo die Kopien gleich rechnen, sonst D3)
-
-  61 Stellen (rund 1 660 Zeilen) kodieren dieselbe Regel mehrfach, und die Kopien laufen auseinander: Bodenhaftung steht dreimal (die Hazards fragen den Simulator, der auf der Bank das Item ausblendet), die Umwandlung von Simulator zu Rechner fünfmal (zwei zählen Intrepid Sword und Download doppelt), die Choice-Items viermal.
-
-  *Erfolg:* Jede Regel aus Abschnitt 3 der Inventur hat einen Ort; wo die Kopien gleich rechneten, bleibt alles byte-gleich, wo nicht, misst D3 den Unterschied. *Plan T100:* 4 Schritte, 1 offene Entscheidung.
-
-- [ ] **T101 · Bibliothek statt Eigenbau, wo sie passt** (Werkzeug, Runde, mittel, je Kandidat eigenes Gate)
-
-  Die Inventur nennt 11 Stellen, die ein Bibliotheks-Aufruf direkt ersetzt, und zehn Kandidaten mit Adapter: Formen über `battleOnly` (Palafin-Hero wird heute zum siebten Körper), Zug- und Item-Klassen aus Dex-Feldern (ein Shell-Smash-Set verliert im Bau Shadow Ball und Giga Drain), `getFinalSpeed` aus dem Rechner, wer einwechseln darf aus dem Request (Revival Blessing wirft heute), `@pkmn/sets` für Team-Text.
-
-  *Erfolg:* Jeder Kandidat ist umgestellt oder begründet verworfen, mit dem Fehler, den er behebt, als roter Probe. *Plan T101:* 3 Schritte, 1 offene Entscheidung.
+  *Erfolg:* Jedes TODO im Umfang trägt genau ein Urteil mit Beleg; die Tabelle ging ans User-Gate; die Liste ist danach neu geordnet (Iteration 4g folgt nach dem Gate „4a“, dann Iteration E, sofern das Gate nichts anderes beschließt). *Plan T99:* 4 Schritte, 1 offene Entscheidung.
 
 ## Iteration 4g · Paar-Plan: Deckung, Fake Out und der Doubles-Baum
 
@@ -128,7 +106,7 @@ Zwei Reste aus Runde 56 (Platz am User-Gate vom 23.09. bestätigt, „3a“), ge
 
   smogtours-gen9doublesou-912045 Zug 8: Der Paar-Plan hört bei 95 % Deckung auf und lässt in der gespielten Zelle eine Klasse weg, in der ein Volltreffer tötet (Wahrscheinlichkeit 3,4 %, Wert −0,86). Die fehlende Masse verteilt er auf die gefundenen Klassen, als gäbe es den tödlichen Volltreffer nicht. Dasselbe passiert einem einzelnen 5-%-Fehlschlag (2663093831 Zug 3, neun Zellen mit Steam Eruption) und dem Volltreffer, der VGC 2629703929 beendete: In der Verify-Zelle Dragon Claw gegen Psychic Fangs (Zug 13) deckt die Klasse ohne Volltreffer mit 23/24 schon 0,958, der tödliche Volltreffer (1/24) wird nie gezogen. Zweitens lässt Fake Out sicher zurückzucken, Regel F3 zählt die `cant`-Zeile aber als Zufall und schickt die Zelle auf das Mittel von acht Ziehungen: 13 der 25 `cant:flinch`-Rückfälle der Zählung sind Fake Out allein. Wie ein Wetterbericht, der den Hagel weglässt, weil der Rest schon 95 % des Tages abdeckt.
 
-  Hinweis: Fake Out: Eine `cant:flinch`-Zeile zählt nur als Zufall, wenn ein Treffer mit Zuck-Chance unter 100 % das Ziel traf (dieselbe Regel liest `flinchChance` in `pair/pattern.ts` schon). Deckung: weiterziehen, solange ein Kandidat mit mindestens 0,02 Masse übrig ist und das Budget reicht, oder die Schwelle auf 0,98 heben; beides gegen Kantenfehler und Zeit messen (heute 0,021 und 3,5 bis 3,7×, Rahmen 4×). Aus dem finalen Review der Runde 56 gehören dazu: Die Attract-Prüfung von F3 vergleicht `attract`, der Simulator schreibt `Attract` (`pair/log.ts`); eine Paralyse aus demselben Zug lässt einen bestandenen 25-%-Wurf ohne Zeile (19 geplante Zellen der 34 788); Wide Guard und Quick Guard würfeln seit Gen 7 nicht mehr, Ally Switch würfelt über einen eigenen Zähler (`pair/guards.ts`); bei drei Basis-Ziehungen zieht der Plan Klassen doppelt (74 von 201 Gegenwürfen); Focus Sash und Sturdy schicken auch dann in den Rückfall, wenn kein Wurf töten kann (Tabelle fragen); eine Rückfall-Zelle könnte als Ein-Klassen-Mischung ihr Mittel durch die Vertiefung tragen.
+  Hinweis: Fake Out: Eine `cant:flinch`-Zeile zählt nur als Zufall, wenn ein Treffer mit Zuck-Chance unter 100 % das Ziel traf (dieselbe Regel liest `flinchChance` in `pair/pattern.ts` schon). Deckung: weiterziehen, solange ein Kandidat mit mindestens 0,02 Masse übrig ist und das Budget reicht, oder die Schwelle auf 0,98 heben; beides gegen Kantenfehler und Zeit messen (heute 0,021 und 3,5 bis 3,7×, Rahmen 4×). Aus dem finalen Review der Runde 56 gehören dazu: Die Attract-Prüfung von F3 vergleicht `attract`, der Simulator schreibt `Attract` (`pair/log.ts`, in Runde 58 zur Laufzeit bestätigt); eine Paralyse aus demselben Zug lässt einen bestandenen 25-%-Wurf ohne Zeile (19 geplante Zellen der 34 788); Wide Guard und Quick Guard würfeln seit Gen 7 nicht mehr, Ally Switch würfelt über einen eigenen Zähler (`pair/guards.ts`); bei drei Basis-Ziehungen zieht der Plan Klassen doppelt (74 von 201 Gegenwürfen); Focus Sash und Sturdy schicken auch dann in den Rückfall, wenn kein Wurf töten kann (Tabelle fragen); eine Rückfall-Zelle könnte als Ein-Klassen-Mischung ihr Mittel durch die Vertiefung tragen.
 
   *Erfolg:* In 912045 Zug 8 trägt die gespielte Verify-Zelle die tödliche Volltreffer-Klasse (p 0,034), in 2663093831 Zug 3 tragen die neun Steam-Eruption-Zellen ihren 5-%-Fehlschlag, die 13 Fake-Out-Zellen fallen nicht mehr wegen `cant:flinch` zurück; der Kantenfehler der Zählung steigt nicht über den Stand nach Runde 56, die Matrixzeit bleibt unter 4× gegen den master vor Runde 56, Singles unberührt. *Plan T77:* 4 Schritte, 1 offene Entscheidung.
 
@@ -139,6 +117,28 @@ Zwei Reste aus Runde 56 (Platz am User-Gate vom 23.09. bestätigt, „3a“), ge
   Hinweis: Randzellen-Meldung (`boundaryCells`) und Klassen-Schlüssel der Bäume (`rootClassKeys`) können aus dem Paar-Plan kommen (`readPattern` auf der Baum-Ziehung). Die Vertiefung nur der ersten Ziehung ist die Familie von T16. Die Bank sieht diesen Hebel nicht: Sie rechnet 119 der 248 Doubles-Stellungen über `mctsSearch`, einen Baum ohne Verify und ohne Merge, der `boundaryCells` und `rootClassKeys` nie liest (in Runde 56 alle 119 byte-gleich), die übrigen 129 über die Matrix. Beleg sind die Feedback-Dumps (912045 Zug 8, 2629703929 Zug 13) und eine Zählung auf dem App-Pfad.
 
   *Erfolg:* 2629703929 Zug 13 liest nicht mehr entschieden, die Flare-Blitz-Zellen stehen bei ihren K.-o.-Angaben, 912045 Zug 8 trägt seine Ungenauigkeit wieder oder das Gate nennt den Grund, die Bank bleibt byte-gleich, Singles unberührt. *Plan T78:* 5 Schritte, 2 offene Entscheidungen.
+
+## Iteration E · Eine Regel, ein Ort (hinter Iteration 4g; T99 kann sie vorziehen)
+
+Aus der Inventur der Runde 58 (`docs/perf/probes/2026-09-24-r58/inventory/inventory.md`, am Gate „3a“): Wir bauen selten Bibliothekscode nach, schreiben aber dieselbe Regel oft mehrfach, und die Kopien laufen auseinander. Das Gate „3a“ beschloss zwei Iterationen, „Regelfehler“ und „Eine Regel, ein Ort“; die Regelfehler, die dem Simulator falsche Zustände geben, zog „4a“ als Iteration S1a vor, die Prüfung der übrigen (T96) steht hier, weil ihre bestätigten Fehler in T100 und T101 aufgehen. Bis zur Triage steht diese Iteration hinter Iteration 4g, die das Gate „4a“ direkt nach der Triage vorsieht; T99 kann sie am User-Gate vorziehen.
+
+- [ ] **T96 · Die übrigen Regelfehler der Inventur prüfen** (Regelfehler, Runde, mittel, je Fehler eigenes Gate)
+
+  Die Inventur fand nebenbei 57 Regelfehler (Anhang), gemessen ist keiner auf der Bank. Ein Gegenprüfer hat vier davon im Code und zur Laufzeit bestätigt (Spikes-Schichten → T92, Verbrennung und Slush Rush → T95, Attract → T77), dazu den Gleichstand im letzten Paar aus Abschnitt 3 (→ T15); T96 prüft die übrigen 53. Beispiele: Drain-Züge zählen im Rennen als 50-%-Heilung, ein Air-Balloon-Träger zahlt auf der Bank Spikes, die Crit-Wächter der K.-o.-Quoten übersehen Scope Lens und Super Luck, Thunder im Regen gegen +1 Ausweichen liest 0,75 statt sicher.
+
+  *Erfolg:* Jeder Fehler hat eine rote Probe gegen Simulator oder Rechner oder ist begründet verworfen; die bestätigten sind eigene TODOs oder in T100 und T101 aufgegangen. *Plan T96:* 3 Schritte, keine offene Entscheidung.
+
+- [ ] **T100 · Doppelte Regeln zusammenlegen** (Werkzeug, Runde, groß, verlustfrei D4 je Zusammenlegung, wo die Kopien gleich rechnen, sonst D3)
+
+  61 Stellen (rund 1 660 Zeilen, Urteil DUPLICATE in Abschnitt 1 der Inventur; die 42 betroffenen Regeln in Abschnitt 3) kodieren dieselbe Regel mehrfach, und die Kopien laufen auseinander: Bodenhaftung steht dreimal (die Hazards fragen den Simulator, der auf der Bank das Item ausblendet), die Umwandlung von Simulator zu Rechner fünfmal (zwei zählen Intrepid Sword und Download doppelt), die Choice-Items viermal.
+
+  *Erfolg:* Jede Regel aus Abschnitt 3 der Inventur hat einen Ort; wo die Kopien gleich rechneten, bleibt alles byte-gleich, wo nicht, misst D3 den Unterschied. *Plan T100:* 4 Schritte, 1 offene Entscheidung.
+
+- [ ] **T101 · Bibliothek statt Eigenbau, wo sie passt** (Werkzeug, Runde, mittel, je Kandidat eigenes Gate)
+
+  Die Inventur nennt 11 Stellen, die ein Bibliotheks-Aufruf direkt ersetzt, 32, die einen Adapter brauchen, und in Abschnitt 4 die zehn aussichtsreichsten Kandidaten. T101 nimmt davon fünf: Formen über `battleOnly` (Palafin-Hero wird heute zum siebten Körper), Zug- und Item-Klassen aus Dex-Feldern (ein Shell-Smash-Set verliert im Bau Shadow Ball und Giga Drain), `getFinalSpeed` aus dem Rechner, wer einwechseln darf aus dem Request (Revival Blessing wirft heute), `@pkmn/sets` für Team-Text. Die übrigen gehören anderswohin: die Singles-Würfel zu T14, der Schaden der Statik über den Rechner entfällt nach dem Kostenurteil der Runde 58, die Seitenbedingungen zu T92, die Zugklassen im Endspiel zu T87, die Wächter der K.-o.-Quoten zu T76.
+
+  *Erfolg:* Jeder Kandidat ist umgestellt oder begründet verworfen, mit dem Fehler, den er behebt, als roter Probe. *Plan T101:* 3 Schritte, 1 offene Entscheidung.
 
 ## Iteration 5 · Wurzel: Klassen auf Ansage und Speed-Ties
 
@@ -164,7 +164,7 @@ Alle drei fassen `search/cell-sampler.ts` an: eine Spec, drei getrennt gemessene
 
   Prüfstand: zwei Machamp auf 1 HP, gleich schnell, jeder tötet den anderen sicher. Der Löser rechnet 0, also Münzwurf. Wurzelmatrix und Baum lesen +1,0 für p1, weil ein fester Seed die Reihenfolge ordnet; die Rennen-Statik liest −0,6. In Doubles sieht der Löser den Tie gar nicht und meldet 1,0 als exakt. Gleich schnell soll überall heißen: zwei Reihenfolgen zu je einer Hälfte.
 
-  Hinweis: Die Baum-Hälfte des Tie-Splits liegt fertig hinter `CHANCE_NODES` und kommt mit T35 zurück; diese Runde fasst Matrix, Doubles-Löser und Statik an. An der Doubles-Wurzel schickt ein Gleichstand unter Zug-Aktionen die Zelle seit Runde 56 auf das Mittel von acht Ziehungen (Regel F2 des Paar-Plans, 68 von 712 Zählungs-Zellen); der Münzwurf ersetzt diesen Rückfall.
+  Hinweis: Die Baum-Hälfte des Tie-Splits liegt fertig hinter `CHANCE_NODES` und kommt mit T35 zurück; diese Runde fasst Matrix, Doubles-Löser und Statik an. An der Doubles-Wurzel schickt ein Gleichstand unter Zug-Aktionen die Zelle seit Runde 56 auf das Mittel von acht Ziehungen (Regel F2 des Paar-Plans, 68 von 712 Zählungs-Zellen); der Münzwurf ersetzt diesen Rückfall. Runde 58 hat die Stelle der Statik zur Laufzeit bestätigt: `score/last-pair.ts:47` gibt einen exakten Tempo-Gleichstand p2 (gespiegelte Garchomp 240 gegen 240 lesen −0,6).
 
   *Erfolg:* `ohko-tie`, `speed-tie-2hko`, `toss-race-even` und `doubles-ohko-tie` lesen 0 statt ±1 oder −0,6, die übrigen exakten Prüfstand-Zeilen bewegen sich nicht, später Bank-Brier in der vorregistrierten Linie. *Plan T15:* 9 Schritte, 7 offene Entscheidungen.
 
@@ -396,7 +396,7 @@ Beide Umbauten sitzen in der Leiter des Spread-Fitters; T25 zuerst, weil ein vol
 
 ## Iteration 10a · Re-Fit-Kandidaten (Runden 47, 48, 54, 57, 58)
 
-Drei Kandidaten, die Runde 47 gemessen und nicht übernommen hat, dazu T52 aus Runde 48, T71 aus Runde 54 (die geparkte STAB-Regel) und T81 aus Runde 57 (die geparkte Stärke beim Einsatz), dazu T102 aus Runde 58 (die Modellform). T71 und T81 warten seit dem Gate der Runde 58 auf die Triage (T99). Das Verdikt mit Bändern (T47) liegt seit Runde 48 vor. Sie stehen hinter den Fitter-Runden, weil deren Kontroll-Aufnahme die Gewichte ohnehin neu liest.
+Drei Kandidaten, die Runde 47 gemessen und nicht übernommen hat, dazu T52 aus Runde 48, T71 aus Runde 54 (die geparkte STAB-Regel) und T81 aus Runde 57 (die geparkte Stärke beim Einsatz), dazu T102 aus Runde 58 (die Modellform). T71 und T81 sind seit dem Gate der Runde 58 geparkt, bis Iteration S2 gemessen hat; ihr Urteil fällt in T99. Das Verdikt mit Bändern (T47) liegt seit Runde 48 vor. Sie stehen hinter den Fitter-Runden, weil deren Kontroll-Aufnahme die Gewichte ohnehin neu liest.
 
 - [ ] **T49 · Boost-Gewicht, das weiß, ob der Boost beißt** (Re-Fit, Runde, mittel, score-berührend D3)
 
@@ -416,7 +416,7 @@ Drei Kandidaten, die Runde 47 gemessen und nicht übernommen hat, dazu T52 aus R
 
   *Erfolg:* Die Phasen-Variante hat ein Verdikt mit Band (Tabelle aus `scripts/paired-calibration.mjs`); bei Übernahme liegen die bewegten Prozent-Sätze der sechs Feedback-Dumps dem User gesammelt als Re-Pins vor, und alle Engine-Zahlen der Dumps bleiben gleich. *Plan T51:* 6 Schritte, 2 offene Entscheidungen.
 
-- [ ] **T71 · STAB nach den Spielregeln übernehmen** (Re-Fit, Mini-Runde, klein, score-berührend D3, braucht T49 oder T50; geparkt bis T99, Gate der Runde 58 „1a“)
+- [ ] **T71 · STAB nach den Spielregeln übernehmen** (Re-Fit, Mini-Runde, klein, score-berührend D3, braucht T49 oder T50; geparkt, bis S2 gemessen hat, Urteil in T99, Gate der Runde 58 „1a“)
 
   Ein Garchomp mit Tera Boden trifft mit Earthquake 2,0-fach statt 1,5-fach, ein Tera-Feuer-Garchomp bekommt auf Fire Fang 1,5 statt 1,0. Die Regel ist gebaut (d8eb0a3, Branch `r54-stab`), gegen den Simulator auf acht Fällen nachgerechnet, und der Schiedsrichter stützt sie: 116 von 150 strittigen Paaren liegen näher am Schadensrechner. Die Bank liest mit ihr Doubles schlechter: glücksbereinigt +10 bp [+0, +22] gegen den Stand ohne sie, dazu Warnungen in Doubles spät (hq +8, glücksbereinigt +23); Singles steht still. Warum die Bank mit der richtigeren Regel schlechter liest, ist ungemessen. Die Arbeitsvermutung: Gewichte und K sind gegen die blinde Statik gefittet, wie ein neues, genaueres Thermometer an einer Heizung, deren Regler auf das alte geeicht ist.
 
@@ -424,7 +424,7 @@ Drei Kandidaten, die Runde 47 gemessen und nicht übernommen hat, dazu T52 aus R
 
   *Erfolg:* Mit neu gefitteten Gewichten zeigt keine gepoolte Bank-Zeile Schaden, der Schiedsrichter-Gewinn bleibt (116 zu 34), die Tier-Zählung hält. *Plan T71:* 3 Schritte, 1 offene Entscheidung.
 
-- [ ] **T81 · Stärke beim Einsatz übernehmen: Low Kick, Heat Crash, Return, Gyro Ball und Co.** (Re-Fit, Mini-Runde, klein, score-berührend D3, braucht T49 oder T50; geparkt bis T99, Gate der Runde 58 „1a“)
+- [ ] **T81 · Stärke beim Einsatz übernehmen: Low Kick, Heat Crash, Return, Gyro Ball und Co.** (Re-Fit, Mini-Runde, klein, score-berührend D3, braucht T49 oder T50; geparkt, bis S2 gemessen hat, Urteil in T99, Gate der Runde 58 „1a“)
 
   smogtours-gen6ou-655336: Lopunny-Megas Return trifft mit Stärke 102, die Statik rechnet 0, weil der Katalog Return die Stärke 0 gibt. Dasselbe gilt in allen vier gepinnten Gen-6-Spielen, für Ferrothorns Gyro Ball, in 649664 sein einziger Angriff, und für Low Kick: In 655336 Zug 6 bietet die Engine ihn dem Bisharp gegen Heatran an (Rechner 75 % der KP), obwohl Bisharp seit dem Trick in Zug 5 per Choice Scarf auf Knock Off gesperrt ist. Runde 57 hat die Regeln gebaut (34f84b9, Branch `r57-power`): Gewicht (Low Kick, Grass Knot, Heavy Slam, Heat Crash), Freundschaft (Return, Frustration), KP (Flail, Reversal, Crush Grip, Wring Out, Hard Press, dazu Endeavor), Tempo (Gyro Ball, Electro Ball). Der Schiedsrichter stützt sie: 137 falsche Immunitäten fallen auf 0, der Fehler der Gewichts-Züge von 0,388 auf 0,048 (141 Paare; die vorregistrierten 0,398 stammen aus der Zählung mit Boost-Stufen). Die Bank liest Doubles glücksbereinigt schlechter, +45 bp [+9, +91] gegen den Stand ohne T81. Die Zeile hängt an vier Spielen mit Gouging Fires Heat Crash, zusammen 98 % ihrer Summe: 941638 und 941650, wo die Gouging-Fire-Seite verliert, 2663095770 und 939635, wo sie gewinnt. Singles Mitte gewinnt −16 [−28, −5]. Arbeitsvermutung wie bei T71, ungemessen: Die Statik wird genauer, die Gewichte sind gegen die blinde Statik gefittet.
 
@@ -440,7 +440,7 @@ Drei Kandidaten, die Runde 47 gemessen und nicht übernommen hat, dazu T52 aus R
 
 - [ ] **T102 · Die Modellform der Statik** (Re-Fit, Runde, mittel, score-berührend D3)
 
-  Die Gewichte der Statik verbinden ihre Merkmale linear. Auf dem Fit-Korpus der Runde 58 sagt ein reicheres Modell auf denselben Merkmalen (Wechselwirkungen mit der Spielphase, Wurzeln) Spielausgänge um +16,8 bp besser voraus, so viel wie ein perfekt gerechneter Schaden; beides zusammen bringt +32,3 bp (Gegenprüfer der Runde 58, `docs/perf/probes/2026-09-24-r58/verify/`). Die Schätzung am Ende des Suchpfads bleibt auch mit mehr Simulation.
+  Die Gewichte der Statik verbinden ihre Merkmale linear. Auf dem Fit-Korpus der Runde 58 sagt ein reicheres Modell auf denselben Merkmalen (Wechselwirkungen mit der Spielphase, Wurzeln) Spielausgänge um +16,8 bp besser voraus (Singles +20,0, Doubles +5,8 nicht aufgelöst), so viel wie ein perfekt gerechneter Schaden; beides zusammen bringt +32,3 bp (Doubles +15,8 nicht aufgelöst; Gegenprüfer der Runde 58, `docs/perf/probes/2026-09-24-r58/verify/`). Die Schätzung am Ende des Suchpfads bleibt auch mit mehr Simulation.
 
   *Erfolg:* Ein Modell ist per Kreuzvalidierung nach Spielen gewählt, die Bank liest es aufgelöst besser ohne gepoolten Schaden, die Tier-Zählung hält. *Plan T102:* 4 Schritte, 2 offene Entscheidungen.
 
@@ -528,7 +528,7 @@ Die exakten Bank-Werte aus dem Nachtlauf der Runde 47 liegen vor (5 exakt, 11 vo
 
   *Erfolg:* Die Zahl der Beweise auf der Bank bleibt gleich (33 von 816 nach Runde 35), die Beweiser-Zeit im Sweep sinkt messbar (verschränkt gemessen). *Plan T34:* 5 Schritte, 2 offene Entscheidungen.
 
-- [ ] **T82 · Züge, deren Katalog-Stärke beim Einsatz steigt oder fällt** (Endspiel, Runde, mittel, score-berührend D3; geparkt bis T99, Gate der Runde 58 „1a“)
+- [ ] **T82 · Züge, deren Katalog-Stärke beim Einsatz steigt oder fällt** (Endspiel, Runde, mittel, score-berührend D3; geparkt, bis S2 gemessen hat, Urteil in T99, Gate der Runde 58 „1a“)
 
   Knock Off trifft ein Ziel mit Item mit 97 statt 65 Stärke; auf der Bank steht er in 292 Feld-Stellungen. Facade trifft mit Status doppelt, Hex gegen einen Statusträger, Acrobatics ohne Item; Eruption, Water Spout und Dragon Energy fallen mit den KP (die Statik rechnet immer 150), Stored Power steigt mit Boosts, Expanding Force im Psycho-Feld, Solar Beam halbiert sich im Regen, und Mehrfachtreffer wie Triple Axel zählen einen Treffer. Die Statik rechnet all das mit der Katalog-Stärke. Schiedsrichter der Runde 57: Water Spout 0,533, Eruption 0,241, Acrobatics 0,156, Hex 0,074 Fehler.
 
@@ -548,13 +548,13 @@ Die exakten Bank-Werte aus dem Nachtlauf der Runde 47 liegen vor (5 exakt, 11 vo
 
   *Erfolg:* Die Prüfungen lesen die Stärke beim Einsatz (Tabelle der Runde 57); Prüfstand und Bank-Endspiele bewegen sich nur in Stellungen mit einem Träger. *Plan T87:* 3 Schritte, keine offene Entscheidung.
 
-- [ ] **T88 · Body Press, Psyshock und Foul Play rechnen mit den falschen Werten** (Endspiel, Mini-Runde, klein, score-berührend D3; geparkt bis T99, Gate der Runde 58 „1a“)
+- [ ] **T88 · Body Press, Psyshock und Foul Play rechnen mit den falschen Werten** (Endspiel, Mini-Runde, klein, score-berührend D3; geparkt, bis S2 gemessen hat, Urteil in T99, Gate der Runde 58 „1a“)
 
   Die Statik nimmt Angriff gegen Verteidigung oder Spezial-Angriff gegen Spezial-Verteidigung, je nach Kategorie. Body Press rechnet aber mit der Verteidigung des Angreifers, Psyshock gegen die Verteidigung des Ziels, Foul Play mit dem Angriff des Ziels; die Stufen in `boostedFraction` folgen derselben falschen Achse. Auf der Bank: Body Press in 110 Feld-Stellungen und 289 mit einem Träger, Psyshock 23 und 93, Foul Play 6 und 32 (Zählung der Runde 57).
 
   *Erfolg:* Der Schiedsrichter der Runde 57 liest diese Züge näher am Rechner, keine gepoolte Bank-Zeile zeigt Schaden. *Plan T88:* 3 Schritte, 1 offene Entscheidung.
 
-- [ ] **T90 · Reste der Zug-Tabelle** (Endspiel, Mini-Runde, klein, score-berührend D3; geparkt bis T99, Gate der Runde 58 „1a“)
+- [ ] **T90 · Reste der Zug-Tabelle** (Endspiel, Mini-Runde, klein, score-berührend D3; geparkt, bis S2 gemessen hat, Urteil in T99, Gate der Runde 58 „1a“)
 
   Aus dem finalen Review der Runde 57: Mega Sol (Meganium-Mega: die eigenen Züge wie in Sonne, Weather Ball also Feuer) und Eelevate (Eelektross-Mega schwebt) fehlen im Adapter, und Champions-Replays liegen im Korpus. Judgment mit einem Z-Kristall bleibt im Simulator Normal (`!item.zMove`), die Tabelle liest nur die Platte. Normalize lässt in Gen 5 und 6 Züge, die sich selbst umtypen (Weather Ball, Hidden Power), bei ihrem Typ. Der Null-Zug-Satz liest für Revelation Dance die Typen der Art (Soak, Reflect Type, Burn Up). `landedOrCatalog` gibt den geteilten Dex-Zug als veränderbares Objekt heraus. `UserFacts.item` baut bei jedem Lesen ein neues Objekt, und `byItem` liest es zweimal.
 

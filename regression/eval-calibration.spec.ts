@@ -916,30 +916,48 @@ import { summaryLines } from './calibration-summary';
  * BOUND on the fit corpus (2103 replays, 12771 positions captured once
  * under three kernels, logistic refit per kernel, 5-fold CV by game, 20
  * seeds, game-cluster bootstrap): sim over own +16.4 bp [7.6, 25.3]
- * resolved, singles +19.0, doubles +7.2 unresolved; calc +11.8; with the
- * hand weights +8.7. A refuter re-derived +16.6 with Newton fits and new
- * folds; the gain sits in gen-9 singles (+26.1), older singles and all
- * doubles do not resolve; a richer model on the own features gains +16.8
- * too, both together +32.3. COST (interleaved, memo per matchup cache):
- * cold static 22x calc and 40x sim, root search 1.28x and 1.50x (96 %
- * memo hits; about 1.11x and 1.25x with a pair-level key) -> by the
- * pre-registered rule the own kernel stays in the hot path, the libraries
- * become referee and test oracle. UNDO: a partial snapshot around
- * getDamage with the sim's State helpers restores everything (90232
- * calls, no residue) at 180 us per call against 133 us for the call.
- * INVENTORY: 184 places (about 5090 LOC) encode game rules; 11 direct
- * reuse, 32 with an adapter, 76 keep, 61 duplicates, 4 dead; 57 rule bugs,
- * five confirmed at runtime. PATCH STUDY: the sim's clone and handler
- * lookup dominate a tree (copy 35-53 % of a singles tree, dispatch 24-47
- * %); a direct clone (683 -> 87 us per fork) and a handler pre-check
- * (5.76 -> 1.05 us per lookup) together make MCTS trees 2.54x (singles)
- * and 1.92x (doubles) and matrix searches 2.17x to 2.62x faster, 18
- * searches and 40726 turns byte-identical; gen9ou and gen4ou rebuild the
- * rule table on every fork (14-17 % of a gen9ou search). VERDICT (user
- * gate 24 Sep 18:38, "1a 2a 3a 4a 5a"): program "more simulation" (T91
- * speed layer, T92-T95 rule bugs that feed the sim wrong states, T97/T98
- * spend the speed on simulation, T99 triage of every other TODO); the
- * static-accuracy axis (T71, T81, T82, T88, T90) is parked until T99.
+ * resolved, singles +19.0, doubles +7.2 unresolved; calc +11.8, held
+ * down by 21546 failed calc calls in 99 games (all 30 gen-2 games among
+ * them) that each priced 0 damage; with the hand weights and a CV-refit
+ * phase K +8.7. A refuter re-derived +16.6 with Newton fits and new folds
+ * (without games with oracle errors sim +15.7, calc +14.5); about three
+ * quarters of the gain sits in gen-9 singles (+26.1), older singles
+ * (+9.1) and doubles (+8.0) do not resolve; a richer model on the own
+ * features gains +16.8 too (singles +20.0, doubles +5.8 unresolved), both
+ * together +32.3. COST (interleaved, memo per matchup cache): cold static
+ * 22x calc and 40x sim, root search 1.28x and 1.50x (96 % memo hits;
+ * about 1.11x and 1.25x with a pair-level key) -> by the pre-registered
+ * rule the own kernel stays in the hot path, the libraries become referee
+ * and test oracle. UNDO: a partial snapshot around getDamage with the
+ * sim's State helpers restores everything (90232 calls, no residue per
+ * call) at 180 us per call against 133 us for the call. INVENTORY: 184
+ * places (about 5090 LOC) encode game rules; 11 direct reuse, 32 with an
+ * adapter, 76 keep, 61 duplicates, 4 dead; 57 rule bugs in the appendix,
+ * four of them plus the last-pair speed tie from section 3 confirmed at
+ * runtime. PATCH STUDY: the sim's clone and handler lookup dominate a
+ * tree (copy 35-53 % of a singles tree, dispatch 24-35 % of a singles
+ * tree and 39-47 % of a doubles tree); a direct clone (683 -> 87 us per
+ * fork) and a handler pre-check (5.76 -> 1.05 us per runEvent call)
+ * together make MCTS trees 2.54x (singles) and 1.92x (doubles) and matrix
+ * searches 2.17x to 2.62x faster in 18 byte-identical searches; the
+ * pre-check with the rule table alone held 40726 turns, the clone alone
+ * 2502 turns, 746 mid-turn states and 24 trees; gen9ou and gen4ou rebuild
+ * the rule table on every fork (14-17 % of a gen9ou search). VERDICT
+ * (user gate 24 Sep 18:38, "1a 2a 3a 4a 5a"): program "more simulation",
+ * rounds 59 to 62: T91 speed layer (5a: own module forward/sim-fast.ts
+ * hooked per battle, exact pin @pkmn/sim 0.10.11, hash gate with fallback,
+ * switch EVAL_SIM_FAST; gates 0 deviations in about 40700 turns and 48
+ * searches, feedback 3x byte-identical, trees singles >= 2.0x, doubles >=
+ * 1.6x, matrix >= 1.8x, pass 3 >= 1.5x), T92-T95 the gate's rule bugs
+ * that feed the sim wrong states (Spikes layers, As One, the doubles
+ * crash, burn, Slush Rush), T97/T98 measure the search budget and spend
+ * the speed on simulation (the cheap static probe folded in, 1a), T99
+ * triage of every other open TODO (68 on 24 Sep), then iteration 4g,
+ * then iteration E "one rule, one place" (T96, T100, T101; 3a); T102
+ * model form in iteration 10a (2a). The static-accuracy axis (T71, T81,
+ * T82, T88, T90) is parked until stage 2 (S2) has measured; T99 rules on
+ * it. Until the triage the rest of the list rests (exceptions only at the
+ * user gate, plus T43 on release day).
  *
  * MOVES AS THEY LAND 2026-09-24 (improvement round 57, iteration 4f, T73
  * and T81; spec docs/superpowers/specs/2026-09-23-round-57-design.md, plan
