@@ -900,6 +900,47 @@ import { summaryLines } from './calibration-summary';
  * static basis for this mass; the next lever, if any, is search/
  * planning-side.
  *
+ * STATIC UPPER BOUND AND SIM COST 2026-09-24 (sighting round 58, out of
+ * turn, no code adopted; throwaway branch r58-oracle 33c93c5, whose commit
+ * message carries the pre-registered thresholds; probes, inventory,
+ * refuters and the patch study under docs/perf/probes/2026-09-24-r58/;
+ * program docs/superpowers/plans/2026-09-24-program-more-simulation.md).
+ * QUESTION (user): are we rebuilding a whole engine, do we need it, and
+ * could @pkmn/sim, @smogon/calc or @pkmn/dex take it over? ORACLE:
+ * score/oracle.ts answers the static's damage with @smogon/calc or an
+ * adapted @pkmn/sim getDamage (no crit, mean roll, both bodies active for
+ * the call, boosts 0, PRNG seed restored, item consumption and log vetoed).
+ * On 834 bank positions and 91681 pairs (bench included) the own kernel
+ * sits 3.8 % of max HP off the sim at the median and 8.3 % on average
+ * (18467 pairs over 10 %); calc against sim 0.1 % at the median. UPPER
+ * BOUND on the fit corpus (2103 replays, 12771 positions captured once
+ * under three kernels, logistic refit per kernel, 5-fold CV by game, 20
+ * seeds, game-cluster bootstrap): sim over own +16.4 bp [7.6, 25.3]
+ * resolved, singles +19.0, doubles +7.2 unresolved; calc +11.8; with the
+ * hand weights +8.7. A refuter re-derived +16.6 with Newton fits and new
+ * folds; the gain sits in gen-9 singles (+26.1), older singles and all
+ * doubles do not resolve; a richer model on the own features gains +16.8
+ * too, both together +32.3. COST (interleaved, memo per matchup cache):
+ * cold static 22x calc and 40x sim, root search 1.28x and 1.50x (96 %
+ * memo hits; about 1.11x and 1.25x with a pair-level key) -> by the
+ * pre-registered rule the own kernel stays in the hot path, the libraries
+ * become referee and test oracle. UNDO: a partial snapshot around
+ * getDamage with the sim's State helpers restores everything (90232
+ * calls, no residue) at 180 us per call against 133 us for the call.
+ * INVENTORY: 184 places (about 5090 LOC) encode game rules; 11 direct
+ * reuse, 32 with an adapter, 76 keep, 61 duplicates, 4 dead; 57 rule bugs,
+ * five confirmed at runtime. PATCH STUDY: the sim's clone and handler
+ * lookup dominate a tree (copy 35-53 % of a singles tree, dispatch 24-47
+ * %); a direct clone (683 -> 87 us per fork) and a handler pre-check
+ * (5.76 -> 1.05 us per lookup) together make MCTS trees 2.54x (singles)
+ * and 1.92x (doubles) and matrix searches 2.17x to 2.62x faster, 18
+ * searches and 40726 turns byte-identical; gen9ou and gen4ou rebuild the
+ * rule table on every fork (14-17 % of a gen9ou search). VERDICT (user
+ * gate 24 Sep 18:38, "1a 2a 3a 4a 5a"): program "more simulation" (T91
+ * speed layer, T92-T95 rule bugs that feed the sim wrong states, T97/T98
+ * spend the speed on simulation, T99 triage of every other TODO); the
+ * static-accuracy axis (T71, T81, T82, T88, T90) is parked until T99.
+ *
  * MOVES AS THEY LAND 2026-09-24 (improvement round 57, iteration 4f, T73
  * and T81; spec docs/superpowers/specs/2026-09-23-round-57-design.md, plan
  * docs/superpowers/plans/2026-09-23-round-57-plan.md; branch r57 =
