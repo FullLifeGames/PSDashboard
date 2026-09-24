@@ -912,8 +912,9 @@ import { summaryLines } from './calibration-summary';
  * the reading under docs/perf/probes/2026-09-23-r57/).
  * INSTRUMENT: retype/arbiter.vt.ts prices every pair of an attacker on the
  * field, a usable non-status move and a foe on the field over all 834
- * rebuilt bank positions (7637 pairs, 4 s; the round-54 arbiter saw only
- * the 226 with a Tera body), tags each row with the family that changes
+ * rebuilt bank positions (7637 pairs, 3 s; the round-54 arbiter saw only
+ * the 226 with a Tera body and skipped every move with catalog power 0),
+ * tags each row with the family that changes
  * the move at use and compares the static with @smogon/calc called
  * directly (weather and terrain passed, both sides' boosts at 0, Hidden
  * Power under its hidden type) or, for the fixed-damage family the calc
@@ -928,7 +929,9 @@ import { summaryLines } from './calibration-summary';
  * Cudgel into Water Absorb); Ivy Cudgel is the biggest family (166 pairs,
  * 101 positions, error 0.419); the T81 families carry 137 false
  * immunities (Low Kick 58, Heat Crash 35, Heavy Slam 29, Grass Knot 6,
- * Endeavor 9). The simulator's own ModifyType answer is exact for active
+ * Endeavor 9), 147 in all; 20 false hits outside every family (Air
+ * Balloon, Psychic Terrain, Armor Tail against priority) stay out of the
+ * round. The simulator's own ModifyType answer is exact for active
  * bodies, but reads Normal for benched Liquid Voice, Pixilate and
  * Judgment users (the sim switches abilities and items off on the bench),
  * writes a debug line per bench call in custom-game formats and throws
@@ -943,7 +946,9 @@ import { summaryLines } from './calibration-summary';
  * Normalize, Struggle, Weather Ball and Terrain Pulse (field, grounding),
  * Tera Blast and Tera Starstorm (the Tera type, physical when Attack with
  * its stage leads, Stellar power 100), Hidden Power (hidden type, gen 2-5
- * hidden power, gen 2-3 category by type). score/move-facts.ts reads the
+ * hidden power, gen 2-3 category by type; a Hidden Power the build never
+ * resolved reads the simulator's IV default, Dark, where the old static
+ * read Normal). score/move-facts.ts reads the
  * facts raw from the sim objects (ability and item ids, suppression
  * ignored on purpose, the bench included) and lazily; landedKey appends
  * the answer of every usable slot in CONTEXT_MOVES to pairKey, so the memo
@@ -956,52 +961,77 @@ import { summaryLines } from './calibration-summary';
  * type, abilities that disagree, a Tera click in the same choice, an
  * unknown attacker).
  * GATES (pre-registered 23 Sep before the first bank run; chain part 1 on
- * 23 Sep, the machine crashed hard at about 21:16 during the field bank,
- * resumed 24 Sep 07:45 with the bank on 4 slices, part 3 after the park):
+ * 23 Sep, the machine crashed hard at about 21:16 during the field bank;
+ * the resumed chain ran 24 Sep 07:45 to 09:23 with the bank on 4 slices,
+ * equal to 6 by construction (sorted merge) but never run on the same
+ * code at both counts, and measured the sentence and the tip with T81
+ * (r57-with-power); part 3 re-measured r57 without T81 after the park):
  * base bank byte-identical to r56-shortcut. body: only the named families
  * moved; Ivy Cudgel false hits 4 -> 0 and error 0.419 -> 0.200 (gate
  * 0.30), Liquid Voice 1 -> 0 and 0.192 -> 0.164, Pixilate 0.636 -> 0.436;
- * bank against r57-base gain on full singles (-9), no harm, warning
- * luck-adjusted doubles early (+59); feedback: only 912045 moved, no
- * verdict. field: Weather Ball 3 -> 0 and 0.242 -> 0.108 (gate 0.15).
- * tera: three Tera Blast pairs after the click, 0.071 -> 0.052. hp:
- * Hidden Power 6 -> 0 and 0.341 -> 0.030 (gate 0.08); bank against the
- * base gain on luck-adjusted singles (-9), no harm; feedback: 648453 and
- * 653785, 11 verdicts, the pinned gap 653785 t19 moves quiet -> shift.
- * power (T81): false immunities 128 -> 0 on the weight moves (pooled
- * error 0.398 -> 0.048), Endeavor 9 -> 0; bank HARM on luck-adjusted
- * doubles (+45 [+9, +91] against hp, +70 against the base; hq +79 and
- * +146), singles mid -16 [-28, -5]; two tournament games with Gouging
- * Fire's Heat Crash carry it (941638 0.304 and 941650 0.064 of a 0.261
- * doubles Brier sum; the static prices Heat Crash like the calc, 0.36
- * against 0.32, and the Gouging Fire side lost both) -> parked under the
- * pre-registered harm rule; eight dumps and 17 verdicts moved, and the
- * golden 655336 drifts less (8 -> 6 details: the t6 key moment and the
- * turning point at 4 come back). TIMING: with T81 the static cost 1.383x
- * and the root search 1.109x against master (gates 1.15x and 1.05x; A/A
- * 1.010x and 1.018x); the timing commit (each slot resolved once, no
- * allocation on the catalog path, lazy facts) brings the tip without T81
- * to 1.121x and 1.043x with byte-identical banks. TIP r57: play-out pin,
- * three feedback runs byte-identical, regression, e2e, lint, tsc, pack
- * smoke; census singles 38/2/0 -> 40/1/0, doubles 10/3/0 unchanged.
- * READING (reader and skeptic per game): hp 3 more plausible, 4 equal, 4
- * less; its 648453 turns are MCTS turns moved through hint order and tree
- * statistics, not through the root price of Hidden Power Ice; the less
- * plausible tiers hang on a Heat Wave the build gives Tornadus-T and the
- * log never shows (T89); the kill odds still price Hidden Power as a bare
- * Normal move, and a new 648453 t23 sentence prints "kills ~6% of the
- * time" (T83). T81: 8 more, 4 equal, 7 less, 3 cannot tell. FINAL REVIEW
- * (fresh reviewer, whole branch plus 34f84b9): ready with fixes; e8955c7
- * closes a false immunity in the sentence (Tera Starstorm with a Tera
- * click in the same choice; an unknown attacker's Tera Blast) and
- * comments that described T81 as shipped; one feedback run byte-identical
- * after it. NEW BASE .calibration/r57-timing (= r57-hp bytes): Brier
- * 0.2543/0.2237/0.1193, hq 0.2441/0.1967/0.1227, luck-adjusted
- * 0.2301/0.1957/0.1136, K pooled 2.30 (singles 2.24, doubles 2.42),
- * decided 78.5 % of 107, held 94.9 % of 59; against r56-shortcut 157
- * singles and 108 doubles positions moved in 60 replays, singles -8 full
- * and -9 luck-adjusted, doubles +18 and +24 unresolved. REMAINS: T81
- * (parked, re-fit candidate beside T71), T82 to T90.
+ * bank against r57-base gain on full singles (-9), no harm, warnings
+ * luck-adjusted doubles early (+59, hq +78); feedback: only 912045 moved,
+ * no verdict; the expected Lopunny-Mega (Scrappy) turns could not move,
+ * since no Ghost faces Lopunny-Mega in the four gen-6 games. field:
+ * Weather Ball 3 -> 0 and 0.242 -> 0.108 (gate 0.15). tera: three Tera
+ * Blast pairs after the click moved (family error over 66 pairs 0.071 ->
+ * 0.052; two refereed pairs fall, 0.400 -> 0.165 and 1.506 -> 0.504, the
+ * third, into Gastrodon-East, has no calc verdict); Tera Starstorm had no
+ * eligible pair (6 of 8 before the click, 2 on the wrongly built base
+ * Terapagos, which the simulator reads Normal too), error 0.058 unchanged.
+ * hp: Hidden Power 6 -> 0 and 0.341 -> 0.030 (gate 0.08); bank against
+ * the base gain on luck-adjusted singles (-9), no harm, same warnings;
+ * feedback: 648453 and 653785, 11 moved turns (8 change a tier), the
+ * pinned gap 653785 t19 moves quiet -> shift. power (T81): false
+ * immunities 128 -> 0 on the weight moves (arbiter error over 141 pairs
+ * 0.388 -> 0.048; the pre-registered 0.398 is the boost-applied census,
+ * 0.044 after), Endeavor 9 -> 0; bank HARM on luck-adjusted doubles (+45
+ * [+9, +91] against hp, +70 against the base; hq +79 and +146), singles
+ * mid -16 [-28, -5], warnings hq all late +15 against hp, luck-adjusted
+ * all early +43 and doubles early +196 against the base. The harm row
+ * (133 positions, Brier sum 0.598) sits on four games with Gouging Fire's
+ * Heat Crash: 941638 0.285 and 941650 0.064, where the Gouging Fire side
+ * lost, and gen9doublesou-2663095770 0.159 and 939635 0.078, where it won;
+ * the static prices Heat Crash like the calc (0.36 against 0.32); the
+ * cause is unmeasured -> parked under the pre-registered harm rule. With
+ * T81 eight dumps and 17 turns moved (12 change a tier), and the golden
+ * 655336 drifts in 6 details instead of 8: the t6 key moment and the
+ * turning point at 4 come back, both through Lopunny's Return, t6 only
+ * against an Iron Head row the Scarf-locked Bisharp cannot click (legal
+ * rows 0.19 and 0.21, out in both runs) and the turning point by 0.0019;
+ * 655336 then lists Lopunny-Mega as unanswered at t11 to t21. TIMING: with
+ * T81 the static cost 1.383x and the root search 1.109x against master
+ * (gates 1.15x and 1.05x; A/A 1.010x and 1.018x); without T81 the static
+ * still cost 1.263x (quick probe, one position); the timing commit (each
+ * slot resolved once, no allocation on the catalog path, lazy facts)
+ * brings it to 1.108x on the quick probe and the tip to 1.121x and 1.043x
+ * with byte-identical banks. TIP r57 (be0d0dd): play-out pin, three
+ * feedback runs byte-identical, regression, e2e, lint, tsc, pack smoke;
+ * census singles 38/2/0 -> 40/1/0, doubles 10/3/0 unchanged (with T81
+ * singles 39/1/0). READING (reader and skeptic per game): hp 3 more
+ * plausible, 4 equal, 4 less; its 648453 turns moved through the root
+ * hints (Hidden Power Ice 0.21 -> 0.85 at t23), which reorder expansion,
+ * redraw each root cell's one chance outcome and change which cells the
+ * verify step reprices (t24, t33; t31 one redrawn 70 % cell); no verdict
+ * hangs on the root price of Hidden Power Ice. Three of the four less
+ * plausible tiers (648453 t23, t24, t31) hang on a Heat Wave the build
+ * gives Tornadus-T and the log never shows (T89), t24 and t31 as much on
+ * the redrawn cells; 653785 t21 surfaced under the verify trigger. The
+ * kill odds still price Hidden Power as a bare Normal move, and a new
+ * 648453 t23 sentence prints "kills ~6% of the time" (T83). T81: 8 more,
+ * 4 equal, 7 less, 3 cannot tell. FINAL REVIEW (fresh reviewer, whole
+ * branch plus 34f84b9): ready with fixes; e8955c7 closes two false
+ * immunity claims in the sentence (a Tera click in the same choice before
+ * Tera Starstorm; an unknown attacker's Tera Blast) and comments that
+ * described T81 as shipped; after it the engine suite, regression, lint,
+ * tsc and one feedback run (byte-identical). NEW BASE
+ * .calibration/r57-timing (= r57-hp bytes): Brier 0.2543/0.2237/0.1193,
+ * hq 0.2441/0.1967/0.1227, luck-adjusted 0.2301/0.1957/0.1136, K pooled
+ * 2.30 (singles 2.24, doubles 2.42), decided 78.5 % of 107, held 94.9 %
+ * of 59; against r56-shortcut 157 singles and 108 doubles positions moved
+ * in 60 replays, singles -8 full (unresolved) and -9 luck-adjusted
+ * (resolved), doubles +18 and +24 unresolved. REMAINS: T81 (parked,
+ * re-fit candidate beside T71), T82 to T90.
  *
  * DOUBLES CELL PLAN 2026-09-23 (improvement round 56, iteration 4c, T58;
  * spec docs/superpowers/specs/2026-09-23-round-56-design.md, plan
