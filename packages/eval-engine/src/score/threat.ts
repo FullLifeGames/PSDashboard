@@ -1,7 +1,6 @@
 import type { Battle, Pokemon, Side } from '@pkmn/sim';
-import type { MoveAtUse } from '../move-use.ts';
 import { stageMultiplier } from '../stat-stages.ts';
-import { landedKey, landedMove } from './move-facts.ts';
+import { landedKey, landedOrCatalog, type Landed } from './move-facts.ts';
 
 /**
  * The HP- and boost-independent threat proxy: one attacker→defender
@@ -101,7 +100,7 @@ function pairKey(attacker: Pokemon, defender: Pokemon, battle: Battle): string {
   const defense = `${defender.types.join('/')}:${defender.terastallized ?? ''}:${defender.storedStats.def}:${defender.storedStats.spd}:${defender.maxhp}`;
   return `${attacker.side.id}:${attacker.name}:${attacker.species.id}:${attacker.level}:${attacker.item}:${attacker.ability}:${lockedMoveId(attacker) ?? ''}:${usable}:${offense}>` +
     `${defender.side.id}:${defender.name}:${defender.species.id}:${defender.level}:${defender.item}:${defender.ability}:${defense}${liveHp}` +
-    landedKey(attacker, defender, slots.map(slot => slot.id), battle);
+    landedKey(attacker, defender, slots, battle);
 }
 
 /**
@@ -146,7 +145,7 @@ const ABILITY_FLAG_IMMUNITIES: Record<string, 'wind' | 'sound' | 'bullet'> = {
 type DexMove = ReturnType<Battle['dex']['moves']['get']>;
 
 /** The attacker's big damage modifiers: Life Orb, the matching Choice item, Thick Fat on the defender. */
-function offenseMultiplier(attacker: Pokemon, defender: Pokemon, use: MoveAtUse): number {
+function offenseMultiplier(attacker: Pokemon, defender: Pokemon, use: Landed): number {
   let offense = 1;
   if (attacker.item === 'lifeorb') offense *= 1.3;
   if (attacker.item === 'choiceband' && use.category === 'Physical') offense *= 1.5;
@@ -156,7 +155,7 @@ function offenseMultiplier(attacker: Pokemon, defender: Pokemon, use: MoveAtUse)
 }
 
 /** The defender's bulk items: Eviolite on an NFE, Assault Vest against special moves. */
-function bulkMultiplier(defender: Pokemon, use: MoveAtUse): number {
+function bulkMultiplier(defender: Pokemon, use: Landed): number {
   let bulk = 1;
   if (defender.item === 'eviolite' && defender.species.nfe) bulk *= 1.5;
   if (defender.item === 'assaultvest' && use.category === 'Special') bulk *= 1.5;
@@ -202,7 +201,11 @@ export function singleMoveFraction(attacker: Pokemon, defender: Pokemon, moveId:
   const move = battle.dex.moves.get(moveId);
   if (!move.exists || move.category === 'Status') return 0;
   // The move as it lands (round 57): its type, category and power at use.
-  const use = landedMove(attacker, defender, move, battle);
+  return landedFraction(attacker, defender, move, landedOrCatalog(attacker, defender, move, battle), battle);
+}
+
+/** singleMoveFraction for a move already resolved at use (pairThreat resolves each slot once). */
+function landedFraction(attacker: Pokemon, defender: Pokemon, move: DexMove, use: Landed, battle: Battle): number {
   const blanked = ABILITY_IMMUNITIES[defender.ability] ?? [];
   if (blanked.includes(use.type)) return 0;
   const blankedFlag = ABILITY_FLAG_IMMUNITIES[defender.ability];
@@ -223,7 +226,7 @@ export function singleMoveFraction(attacker: Pokemon, defender: Pokemon, moveId:
   const [atk, def] = use.category === 'Physical'
     ? [attacker.storedStats.atk, defender.storedStats.def]
     : [attacker.storedStats.spa, defender.storedStats.spd];
-  const damage = (((2 * attacker.level / 5 + 2) * use.basePower * use.powerMult * atk / def) / 50 + 2) *
+  const damage = (((2 * attacker.level / 5 + 2) * use.basePower * (use.powerMult ?? 1) * atk / def) / 50 + 2) *
     stab * typeMult * stellar * offense / bulk;
   return damage / defender.maxhp;
 }
@@ -240,11 +243,13 @@ export function pairThreat(attacker: Pokemon, defender: Pokemon, battle: Battle)
   const usable = usableSlots(attacker);
   const slots = locked ? usable.filter(slot => slot.id === locked) : usable;
   for (const slot of slots) {
-    const moveFraction = singleMoveFraction(attacker, defender, slot.id, battle);
+    const move = battle.dex.moves.get(slot.id);
+    if (!move.exists || move.category === 'Status') continue;
+    const use = landedOrCatalog(attacker, defender, move, battle);
+    const moveFraction = landedFraction(attacker, defender, move, use, battle);
     if (moveFraction > 0) {
-      const move = battle.dex.moves.get(slot.id);
       const accuracy = move.accuracy === true ? 1 : move.accuracy / 100;
-      if (landedMove(attacker, defender, move, battle).category === 'Physical') {
+      if (use.category === 'Physical') {
         if (moveFraction > physical) { physical = moveFraction; physicalAcc = accuracy; }
       } else if (moveFraction > special) { special = moveFraction; specialAcc = accuracy; }
       if (move.priority > 0) priority = true;

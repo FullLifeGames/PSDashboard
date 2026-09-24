@@ -1,5 +1,5 @@
 import type { Battle, Pokemon } from '@pkmn/sim';
-import { CONTEXT_MOVES, moveAtUse, RULE_ABILITIES, RULE_MOVES, type MoveAtUse, type MoveField, type MoveUser } from '../move-use.ts';
+import { CONTEXT_MOVES, moveAtUse, RULE_ABILITIES, RULE_MOVES, type ItemLike, type MoveAtUse, type MoveField, type MoveUser } from '../move-use.ts';
 
 /**
  * The static's side of the move table (round 57): facts from the sim
@@ -37,37 +37,70 @@ function grounded(pokemon: Pokemon, battle: Battle): boolean {
   return pokemon.item !== 'airballoon';
 }
 
-export function userFacts(pokemon: Pokemon, battle: Battle): MoveUser {
-  const item = pokemon.item ? battle.dex.items.get(pokemon.item) : null;
-  return {
-    gen: battle.gen,
-    species: pokemon.species.name,
-    abilities: [String(pokemon.ability)],
-    item: item ? { id: item.id, onPlate: item.onPlate, onMemory: item.onMemory, onDrive: item.onDrive, naturalGift: item.naturalGift } : null,
-    terastallized: pokemon.terastallized ?? null,
-    types: pokemon.types,
-    grounded: grounded(pokemon, battle),
-    atk: staged(pokemon, 'atk'),
-    spa: staged(pokemon, 'spa'),
-    hpType: pokemon.hpType || 'Dark',
-    hpPower: pokemon.hpPower,
-  };
+/**
+ * The user's facts, computed when a rule reads them (round 57, timing): most
+ * rules read one or two facts, and a cold static prices every living pair.
+ */
+class UserFacts implements MoveUser {
+  readonly gen: number;
+  readonly species: string;
+  readonly abilities: readonly string[];
+  readonly terastallized: string | null;
+  readonly types: readonly string[];
+  private readonly pokemon: Pokemon;
+  private readonly battle: Battle;
+
+  constructor(pokemon: Pokemon, battle: Battle) {
+    this.pokemon = pokemon;
+    this.battle = battle;
+    this.gen = battle.gen;
+    this.species = pokemon.species.name;
+    this.abilities = [String(pokemon.ability)];
+    this.terastallized = pokemon.terastallized ?? null;
+    this.types = pokemon.types;
+  }
+
+  get item(): ItemLike | null {
+    if (!this.pokemon.item) return null;
+    const item = this.battle.dex.items.get(this.pokemon.item);
+    return { id: item.id, onPlate: item.onPlate, onMemory: item.onMemory, onDrive: item.onDrive, naturalGift: item.naturalGift };
+  }
+
+  get grounded(): boolean { return grounded(this.pokemon, this.battle); }
+  get atk(): number { return staged(this.pokemon, 'atk'); }
+  get spa(): number { return staged(this.pokemon, 'spa'); }
+  get hpType(): string { return this.pokemon.hpType || 'Dark'; }
+  get hpPower(): number { return this.pokemon.hpPower; }
 }
 
-/** The weather the user's moves feel (pokemon.effectiveWeather on raw facts) and the terrain. */
+export function userFacts(pokemon: Pokemon, battle: Battle): MoveUser {
+  return new UserFacts(pokemon, battle);
+}
+
+/** The weather the user's moves feel (pokemon.effectiveWeather on raw facts), read when a rule asks, and the terrain. */
 export function fieldFacts(pokemon: Pokemon, battle: Battle): MoveField {
-  const weather = battle.field.effectiveWeather();
   return {
-    weather: pokemon.item === 'utilityumbrella' && UMBRELLA_WEATHER.has(weather) ? '' : weather,
+    get weather() {
+      const weather = battle.field.effectiveWeather();
+      return pokemon.item === 'utilityumbrella' && UMBRELLA_WEATHER.has(weather) ? '' : weather;
+    },
     terrain: String(battle.field.terrain ?? ''),
   };
 }
 
+/** A move as the static reads it: the answer at use, or the catalog entry itself when no rule can touch it. */
+export type Landed = Pick<MoveAtUse, 'type' | 'category' | 'basePower'> & { powerMult?: number };
+
+/** The catalog path allocates nothing: the dex move stands in for its own answer. */
+export function landedOrCatalog(attacker: Pokemon, _defender: Pokemon, move: DexMove, battle: Battle): Landed {
+  if (!RULE_MOVES.has(move.id) && !RULE_ABILITIES.has(String(attacker.ability))) return move;
+  return moveAtUse(move, userFacts(attacker, battle), fieldFacts(attacker, battle)) ?? move;
+}
+
 /** The move as it lands for this pair; the catalog when no rule can touch it. */
-export function landedMove(attacker: Pokemon, _defender: Pokemon, move: DexMove, battle: Battle): MoveAtUse {
-  const plain: MoveAtUse = { type: move.type, category: move.category, basePower: move.basePower, powerMult: 1 };
-  if (!RULE_MOVES.has(move.id) && !RULE_ABILITIES.has(String(attacker.ability))) return plain;
-  return moveAtUse(move, userFacts(attacker, battle), fieldFacts(attacker, battle)) ?? plain;
+export function landedMove(attacker: Pokemon, defender: Pokemon, move: DexMove, battle: Battle): MoveAtUse {
+  const use = landedOrCatalog(attacker, defender, move, battle);
+  return { type: use.type, category: use.category, basePower: use.basePower, powerMult: use.powerMult ?? 1 };
 }
 
 /**
@@ -76,12 +109,12 @@ export function landedMove(attacker: Pokemon, _defender: Pokemon, move: DexMove,
  * so the memo stays a function of its key (round 49) without one key term
  * per fact.
  */
-export function landedKey(attacker: Pokemon, defender: Pokemon, slotIds: readonly string[], battle: Battle): string {
+export function landedKey(attacker: Pokemon, defender: Pokemon, slots: readonly { id: string }[], battle: Battle): string {
   let key = '';
-  for (const id of slotIds) {
-    if (!CONTEXT_MOVES.has(id)) continue;
-    const use = landedMove(attacker, defender, battle.dex.moves.get(id), battle);
-    key += `|${id}=${use.type}/${use.category}/${use.basePower}/${use.powerMult}`;
+  for (const slot of slots) {
+    if (!CONTEXT_MOVES.has(slot.id)) continue;
+    const use = landedMove(attacker, defender, battle.dex.moves.get(slot.id), battle);
+    key += `|${slot.id}=${use.type}/${use.category}/${use.basePower}/${use.powerMult}`;
   }
   return key;
 }
