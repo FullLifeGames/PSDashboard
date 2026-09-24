@@ -129,3 +129,14 @@ describe('the null-move sentence asks the move table (round 57)', () => {
     expect(reason('move bodyslam', 'Gengar', 6, 'Snorlax')).toContain('immune to Normal-type moves');
   });
 });
+
+describe('the null-move sentence after the final review (round 57)', () => {
+  test('a Tera click in the same choice leaves the forme and the type undecided', () => {
+    // The click turns Terapagos-Terastal into Terapagos-Stellar before Tera Starstorm, which then lands as Stellar.
+    expect(nullMoveReason({ choice: 'move terastarstorm terastallize', gen: 9, attackerSpecies: 'Terapagos-Terastal', defenderSpecies: 'Gholdengo' })).toBeNull();
+  });
+
+  test('an unknown attacker leaves its Tera unknown, even when the app passes null', () => {
+    expect(nullMoveReason({ choice: 'move terablast', gen: 9, attackerSpecies: null, defenderSpecies: 'Gengar', attackerTera: null })).toBeNull();
+  });
+});

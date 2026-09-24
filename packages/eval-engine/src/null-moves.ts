@@ -151,6 +151,22 @@ function statusNullReason(
 }
 
 /**
+ * The attacker as the move meets it. A Tera click in this very choice lands
+ * before the move, with a type and sometimes a forme (Terapagos-Stellar,
+ * Ogerpon's Tera formes) the sentence does not know; an unknown attacker's
+ * Tera is unknown too, whatever the caller passes (the app sends null for a
+ * side without one active).
+ */
+function attackerAtUse(
+  tokens: readonly string[],
+  species: string | null,
+  tera: string | null | undefined,
+): { species: string | null; tera: string | null | undefined } {
+  const clicking = tokens.includes('terastallize');
+  return { species: clicking ? null : species, tera: clicking || !species ? undefined : tera };
+}
+
+/**
  * Why a single-slot move choice provably does nothing against the given
  * defender — or null when it might do something (which includes every case
  * where the data is incomplete: unknown move, unknown species, non-move or
@@ -177,9 +193,8 @@ export function nullMoveReason(params: {
   const defender = dex.species.get(params.defenderSpecies);
   if (!defender.exists) return null;
   const abilities = candidateAbilities(dex, params.attackerSpecies, tokens.includes('mega'));
-  // A Tera click in this very choice lands before the move with a type the sentence does not know.
-  const attackerTera = tokens.includes('terastallize') ? undefined : params.attackerTera;
-  const type = typeAtUse(move, dex, gen, abilities, params.attackerSpecies, attackerTera);
+  const attacker = attackerAtUse(tokens, params.attackerSpecies, params.attackerTera);
+  const type = typeAtUse(move, dex, gen, abilities, attacker.species, attacker.tera);
   if (type === null) return null;
   const tera = params.defenderTera;
   const live = !!tera && tera !== 'Stellar';

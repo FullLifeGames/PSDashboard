@@ -1,11 +1,12 @@
 import { OWN_RULES, type Own } from './move-use-rules.ts';
 
 /**
- * A move as it lands (round 57, T73 and T81). The dex carries a move's
- * catalog type, category and power; the simulator changes them at use:
- * abilities (Liquid Voice, the -ate family, Normalize), the user's forme
- * (Ivy Cudgel), a held plate, the weather, the terrain, the Tera click,
- * Hidden Power's type, weight, HP, speed and happiness. This table answers
+ * A move as it lands (round 57, T73). The dex carries a move's catalog
+ * type, category and power; the simulator changes them at use: abilities
+ * (Liquid Voice, the -ate family, Normalize), the user's forme (Ivy Cudgel),
+ * a held plate, the weather, the terrain, the Tera click and Hidden Power's
+ * type. The power rules for weight, HP, speed and happiness (T81) are parked
+ * on branch r57-power, with the facts below marked for them. This table answers
  * from raw facts, in the simulator's order (the move's own rule, then the
  * ability; battle-actions.js useMoveInner), without asking the simulator:
  * on the bench the simulator switches abilities and items off, and in a
@@ -46,6 +47,8 @@ export interface MoveUser {
   types?: readonly string[];
   hpType?: string;
   hpPower?: number;
+  // The facts from here to `speed`, and MoveTarget, are read by the parked
+  // T81 rules only (branch r57-power); no rule on this branch reads them.
   happiness?: number;
   hp?: number;
   maxhp?: number;
@@ -74,8 +77,8 @@ export const RULE_MOVES: ReadonlySet<string> = new Set(Object.keys(OWN_RULES));
 export const RULE_ABILITIES: ReadonlySet<string> = new Set(['liquidvoice', 'normalize', ...Object.keys(ATE)]);
 /**
  * Moves whose answer reads a fact the matchup memo's key does not carry
- * (weather, terrain, grounding, stages, HP, speed, weight, Hidden Power,
- * happiness): pairKey appends their answer (round 57).
+ * (weather, terrain, grounding, stages, Hidden Power): pairKey appends
+ * their answer (round 57).
  */
 export const CONTEXT_MOVES: ReadonlySet<string> = new Set<string>(['weatherball', 'terrainpulse', 'terablast', 'terastarstorm', 'hiddenpower']);
 

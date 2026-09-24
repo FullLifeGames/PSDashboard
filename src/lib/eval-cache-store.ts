@@ -210,8 +210,9 @@ export interface StoredEval {
 // v53: round 57, the static prices a move as it lands (move-use.ts). Its
 //      type, category and power follow the user's ability (Liquid Voice,
 //      the -ate family, Normalize), forme (Ivy Cudgel), item (Judgment), the
-//      weather, the terrain, the Tera click, Hidden Power's type, weight,
-//      happiness, HP and speed; Scrappy and Mind's Eye hit Ghosts.
+//      weather, the terrain, the Tera click and Hidden Power's type and
+//      power; Scrappy and Mind's Eye hit Ghosts. Power set at use (weight,
+//      happiness, HP, speed: T81) is parked on branch r57-power.
 const EVAL_ENGINE_CACHE_VERSION = 53;
 
 export function evalStoreKey(

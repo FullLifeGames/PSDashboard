@@ -46,8 +46,8 @@ export interface PairThreat {
  * off it, the defender's current HP. A new read inside pairThreat or
  * singleMoveFraction needs its key term (test/threat-memo.spec.ts). Round 57:
  * a move whose answer at use reads a fact the key does not name (weather,
- * terrain, stages, HP, speed, weight, Hidden Power, happiness) keys its
- * answer instead (landedKey, CONTEXT_MOVES in move-use.ts).
+ * terrain, grounding, stages, Hidden Power) keys its answer instead
+ * (landedKey, CONTEXT_MOVES in move-use.ts).
  */
 export type MatchupCache = Map<string, PairThreat>;
 
