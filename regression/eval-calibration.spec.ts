@@ -904,8 +904,9 @@ import { summaryLines } from './calibration-summary';
  * and T81; spec docs/superpowers/specs/2026-09-23-round-57-design.md, plan
  * docs/superpowers/plans/2026-09-23-round-57-plan.md; branch r57 =
  * 3bf56ce, cb9454d, 9eef4d7, 74f6479, 8d43ba5 (the sentence commit,
- * cherry-picked off 66ba26f), the timing commit be0d0dd and the final
- * review's e8955c7; T81 built as 34f84b9 and parked on branch r57-power,
+ * cherry-picked off 66ba26f), the timing commit be0d0dd, the final
+ * review's e8955c7, the booking 2c32033 and the close-audit corrections
+ * b933ef9; T81 built as 34f84b9 and parked on branch r57-power,
  * the first tip with it kept as branch r57-with-power (66ba26f); cache
  * v53; score-touching as a correction with its own evidence; the eleven
  * understanding reports, the arbiter, the gate chain in three parts and
@@ -1033,14 +1034,19 @@ import { summaryLines } from './calibration-summary';
  * (resolved), doubles +18 and +24 unresolved. REMAINS: T81 (parked,
  * re-fit candidate beside T71), T82 to T90. CLOSE AUDIT (three lenses,
  * each finding checked by a refuter, reports in audit/): about 30 text
- * corrections, none in code, folded into this block. VERDICT (user gate
- * 24 Sep 12:13, "1a 2a 3a 4a"): adopted; r57 goes to master by
- * fast-forward and the master state to origin v1 (origin/master stays
- * e7f618f); T81 stays parked on r57-power as a re-fit candidate beside
- * T71 (iteration 10a); the gap 653785 t19 is re-pinned quiet -> shift
- * (re-checked against the stored tip dumps with verdict/pin.vt.ts: that
- * item alone moves, gap-moved -> gap-open, in all four runs); T82 to T90
- * stay where the booking placed them.
+ * corrections, none in code, folded into this block and NextSteps
+ * (b933ef9) and into the untracked spec, completed entry and backlog
+ * plan. VERDICT (user gate 24 Sep 12:13, "1a 2a 3a 4a"): adopted; r57
+ * goes to master by fast-forward and the master state to origin v1
+ * (origin/master stays e7f618f); T81 stays parked on r57-power as a
+ * re-fit candidate beside T71 (iteration 10a); the gap 653785 t19 is
+ * re-pinned quiet -> shift (re-checked with verdict/pin.vt.ts against the
+ * stored dumps of the three tip runs and the post-review run, byte-equal
+ * for that replay: that item alone moves, gap-moved -> gap-open, in all
+ * four; the shift sits inside the root's score/gameValue gap and leans
+ * on Tornadus-T answering Dragonite, which Weakness Policy refutes at
+ * t24); a verdict check (two lenses, each with a refuter) tightened the
+ * pin note; T82 to T90 stay where the booking placed them.
  *
  * DOUBLES CELL PLAN 2026-09-23 (improvement round 56, iteration 4c, T58;
  * spec docs/superpowers/specs/2026-09-23-round-56-design.md, plan
