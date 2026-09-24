@@ -1031,7 +1031,16 @@ import { summaryLines } from './calibration-summary';
  * of 59; against r56-shortcut 157 singles and 108 doubles positions moved
  * in 60 replays, singles -8 full (unresolved) and -9 luck-adjusted
  * (resolved), doubles +18 and +24 unresolved. REMAINS: T81 (parked,
- * re-fit candidate beside T71), T82 to T90.
+ * re-fit candidate beside T71), T82 to T90. CLOSE AUDIT (three lenses,
+ * each finding checked by a refuter, reports in audit/): about 30 text
+ * corrections, none in code, folded into this block. VERDICT (user gate
+ * 24 Sep 12:13, "1a 2a 3a 4a"): adopted; r57 goes to master by
+ * fast-forward and the master state to origin v1 (origin/master stays
+ * e7f618f); T81 stays parked on r57-power as a re-fit candidate beside
+ * T71 (iteration 10a); the gap 653785 t19 is re-pinned quiet -> shift
+ * (re-checked against the stored tip dumps with verdict/pin.vt.ts: that
+ * item alone moves, gap-moved -> gap-open, in all four runs); T82 to T90
+ * stay where the booking placed them.
  *
  * DOUBLES CELL PLAN 2026-09-23 (improvement round 56, iteration 4c, T58;
  * spec docs/superpowers/specs/2026-09-23-round-56-design.md, plan
