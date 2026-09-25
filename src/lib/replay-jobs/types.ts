@@ -3,7 +3,7 @@ import type {
   DamageObservation, OpponentTeamInfo, SmogonSetAssumptions, SmogonUsageStats, SpeedOrderObservation, SpreadCandidate,
   TurnSnapshot,
 } from '@fulllifegames/replay-core';
-import type { TurnAlignmentRecord } from '@fulllifegames/eval-engine';
+import type { SimFastLever, SimFastReport, TurnAlignmentRecord } from '@fulllifegames/eval-engine';
 
 /**
  * The replay-side jobs the app hands to a worker (round 38): the spread
@@ -62,16 +62,17 @@ export interface ReconstructOutcome {
   choiceErrors: { count: number; last: string | null };
 }
 
-export type ReplayJobRequest =
+export type ReplayJobRequest = (
   | { type: 'solveSpreads'; id: number; job: SolveSpreadsJob }
-  | { type: 'reconstruct'; id: number; job: ReconstructJob };
-
-export type ReplayJobResponse =
+  | { type: 'reconstruct'; id: number; job: ReconstructJob }
+) & { simFast?: readonly SimFastLever[] };
+export type ReplayJobResponse = (
   | { type: 'replayProgress'; id: number; turn: number; target: number }
   | { type: 'replayPosition'; id: number; turn: number; serialized: string }
   | { type: 'reconstructResult'; id: number; outcome: ReconstructOutcome }
   | { type: 'solveSpreadsResult'; id: number; entries: [string, SpreadCandidate][] }
-  | { type: 'replayError'; id: number; message: string };
+  | { type: 'replayError'; id: number; message: string }
+) & { simFast?: SimFastReport };
 
 export const isReplayJob = (message: { type: string }): message is ReplayJobRequest =>
   message.type === 'solveSpreads' || message.type === 'reconstruct';

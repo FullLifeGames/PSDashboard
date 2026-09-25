@@ -1,4 +1,5 @@
 import type { SpreadCandidate } from '@fulllifegames/replay-core';
+import { recordSimFastReport, simFastLevers } from '../eval/sim-fast-setting';
 import type {
   ReconstructJob, ReconstructOutcome, ReplayJobRequest, ReplayJobResponse, SolveSpreadsJob,
 } from './types';
@@ -94,7 +95,7 @@ export class ReplayWorkerClient {
     const next = this.queue.shift();
     if (!next) return;
     this.active = next;
-    this.ensureWorker().postMessage(next.request);
+    this.ensureWorker().postMessage({ ...next.request, simFast: simFastLevers() });
   }
 
   private ensureWorker(): WorkerLike {
@@ -114,6 +115,7 @@ export class ReplayWorkerClient {
   private receive(response: ReplayJobResponse): void {
     const active = this.active;
     if (!active || response.id !== active.request.id) return;
+    if (response.simFast) recordSimFastReport(response.simFast);
     if (response.type === 'replayProgress') {
       active.handlers.onProgress?.(response.turn, response.target);
     } else if (response.type === 'replayPosition') {

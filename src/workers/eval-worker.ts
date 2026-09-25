@@ -1,13 +1,18 @@
 /// <reference lib="webworker" />
 import {
-  mctsSearch, mctsTreeSearch, type SearchExecutor, createLocalExecutor, searchPosition, type EvalWorkerRequest,
-  type EvalWorkerResponse,
+  mctsSearch, mctsTreeSearch, type SearchExecutor, createLocalExecutor, searchPosition, takeSimFastReport,
+  type EvalWorkerRequest, type EvalWorkerResponse,
 } from '@fulllifegames/eval-engine';
+import { adoptSimFastStamp } from '../lib/eval/sim-fast-setting';
 import { isReplayJob, type ReplayJobRequest, type ReplayJobResponse } from '../lib/replay-jobs/types';
 
 const scope = self as unknown as DedicatedWorkerGlobalScope;
 const post = (message: EvalWorkerResponse) => scope.postMessage(message);
-const postReplay = (message: ReplayJobResponse) => scope.postMessage(message);
+/** Round 59: every final answer carries the speed layer's status and its counters since the last one. */
+const settle = (message: EvalWorkerResponse) => post({ ...message, simFast: takeSimFastReport() });
+const postReplay = (message: ReplayJobResponse) => scope.postMessage(
+  message.type === 'replayProgress' || message.type === 'replayPosition' ? message : { ...message, simFast: takeSimFastReport() },
+);
 /** MCTS iterations between two progress messages. */
 const PROGRESS_EVERY = 10;
 
@@ -27,6 +32,8 @@ function executorFor(serializedBattle: string): SearchExecutor {
 
 scope.onmessage = async (event: MessageEvent<EvalWorkerRequest | ReplayJobRequest>) => {
   const message = event.data;
+  // Round 59: the host's speed-layer levers ride on every message (workers see no localStorage).
+  adoptSimFastStamp(message);
   // The replay jobs (spread solve, reconstruction) ride the same script in
   // their own worker instance (ReplayWorkerClient). Their handlers load on
   // demand: they carry replay-core's team builder, the standalone dex, and
@@ -43,7 +50,7 @@ scope.onmessage = async (event: MessageEvent<EvalWorkerRequest | ReplayJobReques
         onProgress: progress => post({ type: 'progress', id: message.id, progress }),
         onPartial: partial => post({ type: 'partial', id: message.id, result: partial }),
       });
-      post({ type: 'result', id: message.id, result });
+      settle({ type: 'result', id: message.id, result });
     } else if (message.type === 'mctstree') {
       const tree = mctsTreeSearch(message.serializedBattle, message.settings, message.seedOffset, {
         // Every iteration reports; one message per ten (plus the last) is
@@ -55,21 +62,21 @@ scope.onmessage = async (event: MessageEvent<EvalWorkerRequest | ReplayJobReques
           }
         },
       });
-      post({ type: 'mctsTreeResult', id: message.id, tree });
+      settle({ type: 'mctsTreeResult', id: message.id, tree });
     } else if (message.type === 'choices') {
       const info = await executorFor(message.serializedBattle).choices(message.tera, message.keepPlayed, message.sleepClause);
-      post({ type: 'choicesResult', id: message.id, info });
+      settle({ type: 'choicesResult', id: message.id, info });
     } else if (message.type === 'cells') {
       const values = await executorFor(message.serializedBattle).evalCells(message.jobs);
-      post({ type: 'cellsResult', id: message.id, values });
+      settle({ type: 'cellsResult', id: message.id, values });
     } else if (message.type === 'subsearch') {
       const result = await executorFor(message.serializedBattle).subSearch(message.job);
-      post({ type: 'result', id: message.id, result });
+      settle({ type: 'result', id: message.id, result });
     } else if (message.type === 'prove') {
       const outcome = await executorFor(message.serializedBattle).prove(message.input);
-      post({ type: 'proveResult', id: message.id, outcome });
+      settle({ type: 'proveResult', id: message.id, outcome });
     }
   } catch (error) {
-    post({ type: 'error', id: message.id, message: error instanceof Error ? error.message : String(error) });
+    settle({ type: 'error', id: message.id, message: error instanceof Error ? error.message : String(error) });
   }
 };

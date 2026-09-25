@@ -1,4 +1,5 @@
 import type { PlayedAction } from './played.ts';
+import type { SimFastLever, SimFastReport } from './forward/sim-fast/state.ts';
 
 /**
  * Which Pokémon may Terastallize in the search: a global switch, or per-side
@@ -476,15 +477,20 @@ export interface MctsTreeStats {
   result: EvalResult;
 }
 
-export type EvalWorkerRequest =
+/** Round 59: the host's speed-layer levers ride on every request (several requests carry no EvalSettings). */
+interface SimFastStamp { simFast?: readonly SimFastLever[] }
+
+export type EvalWorkerRequest = (
   | { type: 'search'; id: number; serializedBattle: string; settings: EvalSettings }
   | { type: 'mctstree'; id: number; serializedBattle: string; settings: EvalSettings; seedOffset: number }
   | { type: 'choices'; id: number; serializedBattle: string; tera: TeraAllowance; keepPlayed?: EvalSettings['keepPlayed']; sleepClause?: boolean }
   | { type: 'cells'; id: number; serializedBattle: string; jobs: EvalCellJob[] }
   | { type: 'subsearch'; id: number; serializedBattle: string; job: EvalSubSearchJob }
-  | { type: 'prove'; id: number; serializedBattle: string; input: ForcedWinInput };
+  | { type: 'prove'; id: number; serializedBattle: string; input: ForcedWinInput }
+) & SimFastStamp;
 
-export type EvalWorkerResponse =
+/** Final answers carry the worker's speed-layer status and its counters since the last one. */
+export type EvalWorkerResponse = (
   | { type: 'progress'; id: number; progress: SearchProgress }
   | { type: 'partial'; id: number; result: EvalResult }
   | { type: 'result'; id: number; result: EvalResult }
@@ -492,4 +498,5 @@ export type EvalWorkerResponse =
   | { type: 'choicesResult'; id: number; info: EvalChoicesInfo }
   | { type: 'cellsResult'; id: number; values: EvalCellValue[] }
   | { type: 'proveResult'; id: number; outcome: ForcedWinOutcome | null }
-  | { type: 'error'; id: number; message: string };
+  | { type: 'error'; id: number; message: string }
+) & { simFast?: SimFastReport };

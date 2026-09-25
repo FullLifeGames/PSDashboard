@@ -1,6 +1,8 @@
-import { test, expect, describe } from 'vitest';
+import { test, expect, describe, vi } from 'vitest';
+import { perfReport, perfReset } from '@fulllifegames/eval-engine';
 import { ReplayWorkerClient, type WorkerLike } from '../src/lib/replay-jobs/client';
 import type { ReconstructJob, ReconstructOutcome, ReplayJobRequest, ReplayJobResponse, SolveSpreadsJob } from '../src/lib/replay-jobs/types';
+import { readSimFastLevers } from '../src/lib/eval/sim-fast-setting';
 
 /** A worker stand-in: records what the client posts, lets the test answer. */
 class FakeWorker implements WorkerLike {
@@ -174,5 +176,26 @@ describe('ReplayWorkerClient', () => {
     await expect(running).rejects.toThrow('cancelled');
     await expect(queued).rejects.toThrow('cancelled');
     expect(workers[0].terminated).toBe(true);
+  });
+
+  test('stamps the speed-layer levers on every job and books the worker report (round 59)', async () => {
+    const { client, workers } = makeClient();
+    const promise = client.reconstruct(reconstructJob(5));
+    const [worker] = workers;
+    expect(worker.posted[0].simFast).toEqual(readSimFastLevers());
+    vi.stubGlobal('localStorage', { getItem: (key: string) => (key === 'ps-replay-interceptor:perf' ? '1' : null), setItem: () => undefined });
+    try {
+      perfReset();
+      worker.emit({
+        type: 'reconstructResult', id: idOf(worker.posted[0]), outcome: outcome(5),
+        simFast: { status: 'active', counters: { ruleTables: 1, clones: 2, dispatchCalls: 3, dispatchAnswered: 3, fallbacks: 0 } },
+      });
+      await promise;
+      perfReport('replay client spec');
+      const perf = (globalThis as { __EVAL_PERF__?: { counters: Record<string, number> } }).__EVAL_PERF__!;
+      expect(perf.counters['simFast:clones']).toBe(2);
+    } finally {
+      vi.unstubAllGlobals();
+    }
   });
 });

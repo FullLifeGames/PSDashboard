@@ -1,4 +1,5 @@
-import { test, expect, describe } from 'vitest';
+import { afterAll, test, expect, describe } from 'vitest';
+import { writeFileSync } from 'node:fs';
 import { State } from '@pkmn/sim';
 import type { Battle } from '@pkmn/sim';
 import { buildTeamsFromReplay } from '../packages/replay-core/src/team-builder';
@@ -17,6 +18,7 @@ import { heldDecided } from '../packages/eval-engine/src/turn-analysis/decided-h
 import { deserializeBattleExact } from '../packages/eval-engine/src/forward-model';
 import { hasLuckAgainst, luckAgainstFavored } from './luck-events';
 import { summaryLines } from './calibration-summary';
+import { takeSimFastReport } from '../packages/eval-engine/src/forward/sim-fast/state';
 
 /**
  * Informational calibration run against real finished replays: does the
@@ -5231,4 +5233,13 @@ describe.skipIf(process.env.CALIB_POS_PROBE !== '1')('single-pass position ident
     expect(fallbackServed).toBeLessThanOrEqual(Math.ceil(comparedSamples / 100));
     expect(unstable).toBeLessThanOrEqual(Math.ceil(comparedSamples / 100));
   });
+});
+
+// Round 59: the speed layer's status and counters of this slice, next to its dump (the gate's proof the layer ran).
+afterAll(() => {
+  const dump = process.env.EVAL_CALIBRATION_DUMP;
+  if (!dump) return;
+  // Never onto the dump itself: a path without .jsonl gets the suffix appended.
+  const proof = dump.endsWith('.jsonl') ? `${dump.slice(0, -'.jsonl'.length)}.sim-fast.json` : `${dump}.sim-fast.json`;
+  writeFileSync(proof, JSON.stringify(takeSimFastReport()));
 });

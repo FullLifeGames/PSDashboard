@@ -35,6 +35,13 @@ jobs:
       - name: Run the Node suites
         run: npm run test:regression
 
+      # Round 59: the engine suite once more with the speed layer switched the other way
+      # (forced on until the gate adopts it, forced off afterwards), so both paths stay green.
+      - name: Run the engine suite with the speed layer forced on
+        run: npx vitest run --project eval-engine
+        env:
+          EVAL_SIM_FAST: '1'
+
   browser:
     name: Browser flows
     runs-on: ubuntu-latest
@@ -65,3 +72,27 @@ jobs:
           name: playwright-results
           path: test-results
           retention-days: 7
+
+  build:
+    name: Production build smoke
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+
+      # The minified bundle with the speed layer off and on: same analysis, every worker reports active.
+      - name: Run the build smoke
+        run: npm run test:build

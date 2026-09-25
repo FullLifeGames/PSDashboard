@@ -17,6 +17,9 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 const REPORT_DIR = join(__dirname, '..', 'docs', 'reports');
 const DUMP = process.env.FEEDBACK_DUMP === '1';
+/** Round 59: '0' | '1' | a lever list for the speed layer; unset keeps the app's default and no perf trace. */
+const SIM_FAST = process.env.FEEDBACK_SIM_FAST;
+const perfByReplay: Record<string, unknown> = {};
 
 /**
  * The expert-feedback drift run: analyzes each pinned replay through the
@@ -121,6 +124,12 @@ test('corpus is well-formed against the real fixtures', () => {
 for (const replayId of [...FEEDBACK_REPLAYS, ...FEEDBACK_CENSUS_REPLAYS]) {
   test(`drift: ${replayId}`, async ({ page }) => {
     const log = await installHermeticRoutes(page, replayId);
+    if (SIM_FAST !== undefined) {
+      await page.addInitScript(value => {
+        localStorage.setItem('ps-replay-interceptor:sim-fast', value);
+        localStorage.setItem('ps-replay-interceptor:perf', '1');
+      }, SIM_FAST);
+    }
     const fixture = JSON.parse(readFileSync(join(__dirname, 'fixtures', `${replayId}.json`), 'utf-8')) as { players: string[] };
     const started = Date.now();
     await page.goto(`/?replay=${replayId}`);
@@ -129,6 +138,9 @@ for (const replayId of [...FEEDBACK_REPLAYS, ...FEEDBACK_CENSUS_REPLAYS]) {
     await panel.locator('button', { hasText: 'Analyze game' }).click();
     const wait = await waitForSweepEnd(page);
     wallTimes[replayId] = Math.round((Date.now() - started) / 1000);
+    if (SIM_FAST !== undefined) {
+      perfByReplay[replayId] = await page.evaluate(() => (window as unknown as { __EVAL_PERF__?: unknown }).__EVAL_PERF__ ?? null);
+    }
     if (!wait.ok) {
       noticeByReplay[replayId] = wait.reason;
       pushErrorResults(replayId, [wait.reason]);
@@ -186,12 +198,13 @@ test.afterAll(() => {
   const meta: DriftMeta = {
     commit: execSync('git rev-parse --short HEAD').toString().trim(),
     date: new Date().toISOString(),
-    settingsLine: `depth 2 · samples 3 · mode auto (fresh-context defaults)${RECORD ? ' · RECORD' : ''}`,
+    settingsLine: `depth 2 · samples 3 · mode auto (fresh-context defaults)${RECORD ? ' · RECORD' : ''}${SIM_FAST !== undefined ? ` · sim-fast ${SIM_FAST}` : ''}`,
     wallTimes,
     noticeByReplay,
     evalErrorsByReplay,
     alignmentByReplay,
     koMismatchByReplay,
+    ...(SIM_FAST !== undefined ? { perfByReplay } : {}),
   };
   mkdirSync(REPORT_DIR, { recursive: true });
   const { markdown, json } = renderReport(results, meta);

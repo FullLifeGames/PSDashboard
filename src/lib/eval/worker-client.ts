@@ -5,6 +5,7 @@ import {
   type EvalWorkerResponse, type MctsTreeStats, type SearchProgress,
 } from '@fulllifegames/eval-engine';
 import { evalPoolSize } from './pool-size';
+import { recordSimFastReport, simFastLevers } from './sim-fast-setting';
 
 export interface EvalRunHandlers {
   onProgress?(progress: SearchProgress): void;
@@ -60,6 +61,7 @@ export class EvalWorkerClient {
       const handle: WorkerHandle = { worker, pending: new Map() };
       worker.onmessage = (event: MessageEvent<EvalWorkerResponse>) => {
         const response = event.data;
+        if (response.simFast) recordSimFastReport(response.simFast);
         const entry = handle.pending.get(response.id);
         if (!entry) return;
         if ((response.type === 'progress' || response.type === 'partial') && entry.onStream) {
@@ -106,7 +108,7 @@ export class EvalWorkerClient {
     const id = this.nextId++;
     return new Promise((resolve, reject) => {
       handle.pending.set(id, { resolve, reject });
-      handle.worker.postMessage({ ...request, id });
+      handle.worker.postMessage({ ...request, id, simFast: simFastLevers() });
     });
   }
 
@@ -247,7 +249,7 @@ export class EvalWorkerClient {
           onProgress(response.progress);
         },
       });
-      handle.worker.postMessage({ type: 'mctstree', id, serializedBattle, settings, seedOffset: offset });
+      handle.worker.postMessage({ type: 'mctstree', id, serializedBattle, settings, seedOffset: offset, simFast: simFastLevers() });
     }).then(tree => {
       perfAdd('tree-wall', Date.now() - postedAt);
       onDone(tree);

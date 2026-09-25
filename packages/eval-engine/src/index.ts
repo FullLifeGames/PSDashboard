@@ -56,6 +56,10 @@ export { searchOrchestrated } from './orchestrator.ts';
 export type { SearchExecutor, OrchestratorCallbacks } from './orchestrator.ts';
 export { perfReset, perfAdd, perfCount, perfSpan, perfSync, perfReport } from './perf-trace.ts';
 export {
+  configureSimFast, parseSimFastSwitch, simFastStatus, takeSimFastReport, SIM_FAST_DEFAULT, SIM_FAST_LEVERS,
+} from './forward/sim-fast/state.ts';
+export type { SimFastLever, SimFastStatus, SimFastCounters, SimFastReport } from './forward/sim-fast/state.ts';
+export {
   parsePlayedActions, parseLeadSpecies, parsePlayedActionsDoubles, allTurnEvents, detectSacks,
 } from './played.ts';
 export type { PlayedAction, PlayedTurn, SackInfo } from './played.ts';

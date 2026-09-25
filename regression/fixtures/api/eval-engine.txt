@@ -73,6 +73,10 @@ type SearchProgress
 type SensitivityProbe
 type SensitivityTarget
 type SideAnalysis
+type SimFastCounters
+type SimFastLever
+type SimFastReport
+type SimFastStatus
 type SimPokemonInfo
 type StreakHistoryEntry
 type StreakOdds
@@ -98,6 +102,8 @@ value MIN_FORCED_MASS
 value PAYOFF_WINDOW
 value PROVER_BUDGET
 value REGRET_THRESHOLD
+value SIM_FAST_DEFAULT
+value SIM_FAST_LEVERS
 value SPOKEN_MASS
 value TIER_THRESHOLDS
 value adoptSerializedRuntime
@@ -115,6 +121,7 @@ value captureSerializedPosition
 value cellKey
 value computeBlunders
 value computeRead
+value configureSimFast
 value correctActivesFromProtocol
 value createBranchState
 value createBranchStateFromBattle
@@ -142,6 +149,7 @@ value notationSlotChoice
 value parseLeadSpecies
 value parsePlayedActions
 value parsePlayedActionsDoubles
+value parseSimFastSwitch
 value parseTendencies
 value patchSerializedItem
 value perfAdd
@@ -165,12 +173,14 @@ value selectKeyTurns
 value selectProbeCombos
 value serializeLiveBattle
 value serializePreviewPosition
+value simFastStatus
 value solveEndgame
 value starvedSupportCells
 value summarizeAlignment
 value summarizeTurn
 value switchChoiceKey
 value switchOptionKey
+value takeSimFastReport
 value teraKey
 value unansweredSeenKey
 value validateBranchRuntime
