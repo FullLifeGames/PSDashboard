@@ -12,6 +12,7 @@
  */
 import type { Battle } from '@pkmn/sim';
 import { cloneBattle } from './clone.ts';
+import { attachDispatch } from './dispatch.ts';
 import { ensureRuleTable } from './rule-table.ts';
 import { breakSimFast, simFastCounters, simFastOn } from './state.ts';
 
@@ -46,4 +47,9 @@ export function adoptTemplate(battle: Battle): Battle {
 /** Test hook: sees every template as it is adopted (the frozen-template spec freezes them). */
 export function setTemplateHook(hook: ((battle: Battle) => void) | null): void {
   templateHook = hook;
+}
+
+/** Lever dispatch: every battle the engine makes carries the pre-check (deserializeFromParsed and the copy paths). */
+export function prepareBattle(battle: Battle): void {
+  if (simFastOn('dispatch')) attachDispatch(battle);
 }

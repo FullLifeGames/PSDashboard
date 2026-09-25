@@ -244,7 +244,7 @@ function deepFreeze(value: unknown, shared: ReadonlySet<object>, seen: Set<objec
   Object.freeze(value);
 }
 
-const SEARCH_LEVERS: readonly (readonly SimFastLever[])[] = [['clone']];
+const SEARCH_LEVERS: readonly (readonly SimFastLever[])[] = [['clone'], ['clone', 'dispatch']];
 
 describe('templates are never written', () => {
   const run = (position: FixturePosition, kind: 'mcts' | 'matrix') => JSON.stringify(kind === 'mcts'

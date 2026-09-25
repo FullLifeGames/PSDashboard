@@ -2,7 +2,7 @@ import { PRNG } from '@pkmn/sim';
 import type { Battle, PRNGSeed } from '@pkmn/sim';
 import { deserializeFromParsed, parseSearchState, type ParsedSearchState } from './parsed-state.ts';
 import { restoreSideInvariants, serializeBattleStable } from './serialize.ts';
-import { adoptTemplate, copyBattle, simFastOn } from './sim-fast/index.ts';
+import { adoptTemplate, copyBattle, prepareBattle, simFastOn } from './sim-fast/index.ts';
 import { repairFaintedActives } from './switches.ts';
 import { ScriptedPRNG, type RollScripts } from './scripted-prng.ts';
 
@@ -113,6 +113,7 @@ function freshBattle(position: SimPosition): Battle {
     const copy = template && copyBattle(template);
     if (copy) {
       restoreSideInvariants(copy);
+      prepareBattle(copy);
       return copy;
     }
   }

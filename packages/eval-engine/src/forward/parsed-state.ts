@@ -1,7 +1,7 @@
 import { State } from '@pkmn/sim';
 import type { Battle } from '@pkmn/sim';
 import { restoreSideInvariants } from './serialize.ts';
-import { prepareFormat } from './sim-fast/index.ts';
+import { prepareBattle, prepareFormat } from './sim-fast/index.ts';
 
 /**
  * The search's parsed position: JSON.parse once per position, the moveSlots
@@ -54,5 +54,6 @@ export function deserializeFromParsed(parsed: ParsedSearchState): Battle {
   // types the field read-only; its own deserializer assigns it the same way.
   (battle as unknown as { log: string[] }).log = [];
   restoreSideInvariants(battle);
+  prepareBattle(battle);
   return battle;
 }

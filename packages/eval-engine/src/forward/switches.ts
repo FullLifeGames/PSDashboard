@@ -5,7 +5,7 @@ import { sideIndex } from '@fulllifegames/replay-core';
 import { switchAssignments } from './assignments.ts';
 import { deserializeFromParsed, parseSearchState, type ParsedSearchState } from './parsed-state.ts';
 import { restoreSideInvariants, serializeBattleStable } from './serialize.ts';
-import { adoptTemplate, copyBattle, simFastOn } from './sim-fast/index.ts';
+import { adoptTemplate, copyBattle, prepareBattle, simFastOn } from './sim-fast/index.ts';
 
 /**
  * Choice submission and forced-switch resolution: applying a choice to a
@@ -155,6 +155,7 @@ function midTurnSource(battle: Battle): () => Battle {
       const trial = copyBattle(snapshot);
       if (!trial) return deserializeFromParsed(parsedFallback ??= parseSearchState(serializeBattleStable(snapshot)));
       restoreSideInvariants(trial);
+      prepareBattle(trial);
       return trial;
     };
   }
