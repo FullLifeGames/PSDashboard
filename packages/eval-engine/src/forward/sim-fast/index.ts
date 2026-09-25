@@ -13,6 +13,7 @@
 import type { Battle } from '@pkmn/sim';
 import { cloneBattle } from './clone.ts';
 import { attachDispatch } from './dispatch.ts';
+import { guardPasses } from './guard.ts';
 import { ensureRuleTable } from './rule-table.ts';
 import { breakSimFast, simFastCounters, simFastOn } from './state.ts';
 
@@ -22,12 +23,12 @@ let templateHook: ((battle: Battle) => void) | null = null;
 
 /** Lever rules: runs before the first `new Battle` of a format (deserializeFromParsed). */
 export function prepareFormat(formatid: string): void {
-  if (simFastOn('rules')) ensureRuleTable(formatid);
+  if (simFastOn('rules') && guardPasses()) ensureRuleTable(formatid);
 }
 
 /** Lever clone: a copy of a template (PRNG unset, history empty), or null when the lever is off or the copy broke. */
 export function copyBattle(template: Battle): Battle | null {
-  if (!simFastOn('clone')) return null;
+  if (!simFastOn('clone') || !guardPasses()) return null;
   try {
     const copy = cloneBattle(template);
     simFastCounters.clones++;
@@ -51,5 +52,5 @@ export function setTemplateHook(hook: ((battle: Battle) => void) | null): void {
 
 /** Lever dispatch: every battle the engine makes carries the pre-check (deserializeFromParsed and the copy paths). */
 export function prepareBattle(battle: Battle): void {
-  if (simFastOn('dispatch')) attachDispatch(battle);
+  if (simFastOn('dispatch') && guardPasses()) attachDispatch(battle);
 }
