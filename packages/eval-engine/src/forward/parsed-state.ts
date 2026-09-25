@@ -1,6 +1,7 @@
 import { State } from '@pkmn/sim';
 import type { Battle } from '@pkmn/sim';
 import { restoreSideInvariants } from './serialize.ts';
+import { prepareFormat } from './sim-fast/index.ts';
 
 /**
  * The search's parsed position: JSON.parse once per position, the moveSlots
@@ -43,6 +44,7 @@ export function parseSearchState(serialized: string): ParsedSearchState {
 
 /** A fresh battle from the parsed state, with the search's side invariants restored. */
 export function deserializeFromParsed(parsed: ParsedSearchState): Battle {
+  prepareFormat(String(parsed.state.formatid));
   const battle = State.deserializeBattle(parsed.state as never);
   for (const trim of parsed.trims) {
     battle.sides[trim.side].pokemon[trim.index].moveSlots.length = trim.length;
