@@ -49,8 +49,7 @@ describe('the switch', () => {
   test('under Node without the variable the default holds and nothing is forced', () => {
     withEnvironment(undefined, () => {
       expect(simFastStatus()).toBe(SIM_FAST_DEFAULT.length > 0 ? 'active' : 'off');
-      configureSimFast(['clone']);
-      breakSimFast('fallback', 'probe');
+      expect(() => breakSimFast('fallback', 'probe')).not.toThrow();
       expect(simFastStatus()).toBe('fallback');
     });
   });
