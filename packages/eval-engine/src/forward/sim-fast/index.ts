@@ -10,10 +10,40 @@
  * @pkmn/sim (MIT License, Copyright (c) 2011-2026 Guangcong Luo and other
  * contributors, http://pokemonshowdown.com/).
  */
+import type { Battle } from '@pkmn/sim';
+import { cloneBattle } from './clone.ts';
 import { ensureRuleTable } from './rule-table.ts';
-import { simFastOn } from './state.ts';
+import { breakSimFast, simFastCounters, simFastOn } from './state.ts';
+
+export { simFastOn } from './state.ts';
+
+let templateHook: ((battle: Battle) => void) | null = null;
 
 /** Lever rules: runs before the first `new Battle` of a format (deserializeFromParsed). */
 export function prepareFormat(formatid: string): void {
   if (simFastOn('rules')) ensureRuleTable(formatid);
+}
+
+/** Lever clone: a copy of a template (PRNG unset, history empty), or null when the lever is off or the copy broke. */
+export function copyBattle(template: Battle): Battle | null {
+  if (!simFastOn('clone')) return null;
+  try {
+    const copy = cloneBattle(template);
+    simFastCounters.clones++;
+    return copy;
+  } catch (error) {
+    breakSimFast('fallback', error instanceof Error ? error.message : String(error));
+    return null;
+  }
+}
+
+/** A battle that becomes a copy source (position template, mid-turn snapshot); never written afterwards. */
+export function adoptTemplate(battle: Battle): Battle {
+  templateHook?.(battle);
+  return battle;
+}
+
+/** Test hook: sees every template as it is adopted (the frozen-template spec freezes them). */
+export function setTemplateHook(hook: ((battle: Battle) => void) | null): void {
+  templateHook = hook;
 }
