@@ -153,15 +153,22 @@ describe('the hash gate', () => {
       esm: { ...PINNED_SIM_HASHES.esm, 'Battle.runEvent': '00000000' },
       cjs: { ...PINNED_SIM_HASHES.cjs, 'Battle.runEvent': '00000000' },
     };
-    setPinnedHashes(falsified);
-    configureSimFast(['rules', 'clone', 'dispatch']);
-    expect(play()).toBe(today);
-    expect(simFastStatus()).toBe('hash-mismatch');
-    expect(takeSimFastReport().counters).toMatchObject({ ruleTables: 0, clones: 0, dispatchCalls: 0 });
-    resetSimFastForTests();
-    setPinnedHashes(falsified);
-    configureSimFast(['clone'], { forced: true });
-    expect(play).toThrow(/sim-fast hash-mismatch/);
-    expect(play).toThrow(/sim-fast hash-mismatch/); // every use, never a silent standard path after the first throw
+    // One lever at a time: with all three, the rules gate breaks first and turns the others off before they reach their gate.
+    const counter = { rules: 'ruleTables', clone: 'clones', dispatch: 'dispatchCalls' } as const;
+    for (const lever of ['rules', 'clone', 'dispatch'] as const) {
+      resetSimFastForTests();
+      setPinnedHashes(falsified);
+      configureSimFast([lever]);
+      expect(play(), lever).toBe(today);
+      expect(simFastStatus(), lever).toBe('hash-mismatch');
+      expect(takeSimFastReport().counters[counter[lever]], lever).toBe(0);
+    }
+    for (const lever of ['clone', 'dispatch'] as const) {
+      resetSimFastForTests();
+      setPinnedHashes(falsified);
+      configureSimFast([lever], { forced: true });
+      expect(play, lever).toThrow(/sim-fast hash-mismatch/);
+      expect(play, lever).toThrow(/sim-fast hash-mismatch/); // every use, never a silent standard path after the first throw
+    }
   });
 });
