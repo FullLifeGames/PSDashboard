@@ -4,7 +4,8 @@ import { evaluatePosition } from '../eval-function.ts';
 import { sideIndex } from '@fulllifegames/replay-core';
 import { switchAssignments } from './assignments.ts';
 import { deserializeFromParsed, parseSearchState, type ParsedSearchState } from './parsed-state.ts';
-import { serializeBattleStable } from './serialize.ts';
+import { restoreSideInvariants, serializeBattleStable } from './serialize.ts';
+import { adoptTemplate, copyBattle, simFastOn } from './sim-fast/index.ts';
 
 /**
  * Choice submission and forced-switch resolution: applying a choice to a
@@ -117,17 +118,16 @@ export function answerFollowUps(
 
 /**
  * The assignment whose entry statically evaluates best for the choosing
- * side (the first one when alone). Every trial deserializes from the one
- * parsed mid-turn state instead of re-parsing the serialized string.
+ * side (the first one when alone). Every trial starts from the one
+ * mid-turn state of this round.
  */
-function bestAssignment(side: Side, midTurn: () => ParsedSearchState, seed: PRNGSeed, assignments: string[]): string {
+function bestAssignment(side: Side, midTurn: () => Battle, seed: PRNGSeed, assignments: string[]): string {
   let best = assignments[0];
   if (assignments.length > 1) {
     const perspective = side.id === 'p1' ? 1 : -1;
-    const mid = midTurn();
     let bestValue = -Infinity;
     for (const candidate of assignments) {
-      const trial = deserializeFromParsed(mid);
+      const trial = midTurn();
       trial.prng = new PRNG(seed);
       if (!trial.choose(side.id as 'p1' | 'p2', candidate)) continue;
       const value = perspective * evaluatePosition(trial);
@@ -138,6 +138,29 @@ function bestAssignment(side: Side, midTurn: () => ParsedSearchState, seed: PRNG
     }
   }
   return best;
+}
+
+/**
+ * The state every trial of one resolution round starts from, taken before
+ * any side answers. Round 59 (lever clone): a snapshot copy, each trial a
+ * copy of it; a break mid-round serializes the snapshot instead.
+ */
+function midTurnSource(battle: Battle): () => Battle {
+  const snapshot = simFastOn('clone') ? copyBattle(battle) : null;
+  if (snapshot) {
+    snapshot.prng = new PRNG(battle.prng.getSeed());
+    adoptTemplate(snapshot);
+    let parsedFallback: ParsedSearchState | null = null;
+    return () => {
+      const trial = copyBattle(snapshot);
+      if (!trial) return deserializeFromParsed(parsedFallback ??= parseSearchState(serializeBattleStable(snapshot)));
+      restoreSideInvariants(trial);
+      return trial;
+    };
+  }
+  const midTurn = serializeBattleStable(battle);
+  let parsedMid: ParsedSearchState | null = null;
+  return () => deserializeFromParsed(parsedMid ??= parseSearchState(midTurn));
 }
 
 /**
@@ -157,9 +180,7 @@ export function resolveForcedSwitches(
 
     // The mid-turn snapshot is taken once, before any side answers, and
     // parsed at most once: every trial of this iteration starts from it.
-    const midTurn = serializeBattleStable(battle);
-    let parsedMid: ParsedSearchState | null = null;
-    const mid = () => (parsedMid ??= parseSearchState(midTurn));
+    const mid = midTurnSource(battle);
     for (const side of pending) {
       const forcedCount = forcedSlotCount(side);
       if (answerFollowUp(battle, side, forcedCount, followUps)) continue;

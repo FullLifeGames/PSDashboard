@@ -1,7 +1,8 @@
 import { PRNG } from '@pkmn/sim';
 import type { Battle, PRNGSeed } from '@pkmn/sim';
 import { deserializeFromParsed, parseSearchState, type ParsedSearchState } from './parsed-state.ts';
-import { serializeBattleStable } from './serialize.ts';
+import { restoreSideInvariants, serializeBattleStable } from './serialize.ts';
+import { adoptTemplate, copyBattle, simFastOn } from './sim-fast/index.ts';
 import { repairFaintedActives } from './switches.ts';
 import { ScriptedPRNG, type RollScripts } from './scripted-prng.ts';
 
@@ -31,10 +32,14 @@ class Position implements SimPosition {
   private serializedCache: string | null;
   private battleCache: Battle | null;
   private parsedCache: ParsedSearchState | null = null;
+  private templateCache: Battle | null = null;
+  /** Built around a live battle (a child), not around a string (a root). */
+  private readonly live: boolean;
 
   constructor(serialized: string | null, battle: Battle | null) {
     this.serializedCache = serialized;
     this.battleCache = battle;
+    this.live = battle !== null;
   }
 
   get serialized(): string {
@@ -53,6 +58,21 @@ class Position implements SimPosition {
       repairFaintedActives(this.battleCache);
     }
     return this.battleCache;
+  }
+
+  /**
+   * Round 59 (lever clone): the battle forks copy, never handed to readers
+   * and never written. A root's template is its own unrepaired
+   * deserialization (the reader's battle is repaired); a child's is a copy of
+   * its battle at the first fork, the moment today's path serializes it.
+   */
+  template(): Battle | null {
+    if (!this.templateCache) {
+      const template = this.live ? copyBattle(this.battleCache!) : deserializeFromParsed(this.getParsed());
+      if (!template) return null;
+      this.templateCache = adoptTemplate(template);
+    }
+    return this.templateCache;
   }
 }
 
@@ -86,13 +106,26 @@ export function positionBattle(position: SimPosition): Battle {
   return battle;
 }
 
+/** A fresh, unseeded, unrepaired battle of the position: a copy of its template, or today's deserialization. */
+function freshBattle(position: SimPosition): Battle {
+  if (position instanceof Position && simFastOn('clone')) {
+    const template = position.template();
+    const copy = template && copyBattle(template);
+    if (copy) {
+      restoreSideInvariants(copy);
+      return copy;
+    }
+  }
+  return deserializeFromParsed(positionParsed(position));
+}
+
 /**
  * A fresh battle from the position's parsed state, seeded so the advance is
  * reproducible. Siblings share the parsed state, never a battle. Round 43:
  * with scripts the dice of the named moves answer on demand.
  */
 export function forkBattle(position: SimPosition, seed: PRNGSeed, scripts?: RollScripts): Battle {
-  const battle = deserializeFromParsed(positionParsed(position));
+  const battle = freshBattle(position);
   if (scripts && scripts.size > 0) {
     const prng = new ScriptedPRNG(seed, scripts);
     prng.attach(battle);
@@ -109,7 +142,7 @@ export function forkBattle(position: SimPosition, seed: PRNGSeed, scripts?: Roll
  * recorder attaches itself to the battle it rolls for.
  */
 export function forkBattleWithPrng(position: SimPosition, prng: PRNG & { attach(battle: Battle): void }): Battle {
-  const battle = deserializeFromParsed(positionParsed(position));
+  const battle = freshBattle(position);
   prng.attach(battle);
   battle.prng = prng;
   repairFaintedActives(battle);

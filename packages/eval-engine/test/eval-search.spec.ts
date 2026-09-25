@@ -1,12 +1,10 @@
 import { test, expect, describe } from 'vitest';
 import { Battle, State, Teams, toID } from '@pkmn/sim';
-type DeserializeFn = typeof State.deserializeBattle;
 import type { PokemonSet } from '@pkmn/sim';
 import { battleFaintedFraction, optionHints, searchOptions, searchPosition, subSearchDepth1 } from '../src/search';
 import { mctsSearch, mctsTreeSearch, wideningWindow, WIDENING_BASE, WIDENING_VISITS_PER_SLOT } from '../src/mcts';
 import { advancePosition, createRootPosition, legalChoices, positionBattle } from '../src/forward-model';
 import { boostedFraction, pairThreat } from '../src/eval-function';
-import { PROVER_BUDGET } from '../src/endgame/prover';
 import type { EvalResult, SearchProgress } from '../src/types';
 
 function makeSet(name: string, species: string, moves: string[], level = 50): PokemonSet {
@@ -118,48 +116,6 @@ describe('depth-1 search', () => {
     }
   });
 
-  test('roll grouping: quiet cells sample once, KO cells get the seed spread', () => {
-    const original = State.deserializeBattle;
-    let forks = 0;
-    State.deserializeBattle = ((serialized: Parameters<DeserializeFn>[0]) => {
-      forks += 1;
-      return original.call(State, serialized);
-    }) as DeserializeFn;
-    // Round 35: a zero prover budget keeps this count about the matrix sampler.
-    const proverStates = PROVER_BUDGET.states; PROVER_BUDGET.states = 0;
-    try {
-      // 2x2 all-quiet matrix (Protect/Substitute): every cell needs one sim.
-      const quiet = serialize(makeBattle(
-        [makeSet('A', 'Snorlax', ['Protect', 'Substitute'])],
-        [makeSet('B', 'Chansey', ['Protect', 'Substitute'])],
-      ));
-      forks = 0;
-      searchPosition(quiet, { depth: 1, samples: 3, tera: false });
-      expect(forks).toBe(1 + 4); // root + 4 cells x 1 draw
-
-      // Toss KOs Pikachu (bench Eevee continues the game): those cells are
-      // roll-sensitive and take the full spread; quiet cells still take one.
-      // The trend tiebreak's probe forks are the same in both runs, so the
-      // s3−s1 delta isolates the sampling behavior.
-      const violent = serialize(makeBattle(
-        [makeSet('Machamp', 'Machamp', ['Seismic Toss', 'Protect'], 100)],
-        [makeSet('Pikachu', 'Pikachu', ['Tackle', 'Growl'], 30), makeSet('Eevee', 'Eevee', ['Tackle', 'Growl'], 30)],
-      ));
-      forks = 0;
-      searchPosition(violent, { depth: 1, samples: 1, tera: false });
-      const forksSingle = forks;
-      forks = 0;
-      searchPosition(violent, { depth: 1, samples: 3, tera: false });
-      const extraDraws = forks - forksSingle;
-      const cells = 2 * 3; // 2 p1 options x 3 p2 options
-      expect(extraDraws).toBeGreaterThan(0);           // some cells multi-sampled
-      expect(extraDraws).toBeLessThan(cells * 2);      // but not all of them
-    } finally {
-      State.deserializeBattle = original;
-      PROVER_BUDGET.states = proverStates;
-    }
-  });
-
   test('the score-focused depth-1 sub-search matches the full search exactly', () => {
     // Boost-free fixtures: with the corpus-fitted boost weight, a Growl row's
     // ev-vs-floor gap grows enough to flip top picks between the ev-sorted
@@ -191,29 +147,6 @@ describe('depth-1 search', () => {
       expect(focused.perSide.p1[0].punishedBy).toBe(full.perSide.p1[0].punishedBy);
       expect(focused.perSide.p2[0].choice).toBe(full.perSide.p2[0].choice);
       expect(focused.perSide.p2[0].worstCase).toBe(full.perSide.p2[0].worstCase);
-    }
-  });
-
-  test('the score-focused sub-search prunes dominated rows', () => {
-    const original = State.deserializeBattle;
-    let forks = 0;
-    State.deserializeBattle = ((serialized: Parameters<DeserializeFn>[0]) => {
-      forks += 1;
-      return original.call(State, serialized);
-    }) as DeserializeFn;
-    try {
-      const root = serialize(makeBattle(
-        [makeSet('Machamp', 'Machamp', ['Seismic Toss', 'Protect', 'Night Shade'], 100)],
-        [makeSet('Chansey', 'Chansey', ['Seismic Toss', 'Protect'], 100), makeSet('Eevee', 'Eevee', ['Protect'], 100)],
-      ));
-      forks = 0;
-      searchPosition(root, { depth: 1, samples: 1, tera: false });
-      const fullForks = forks;
-      forks = 0;
-      subSearchDepth1(root, { depth: 1, samples: 1, tera: false });
-      expect(forks).toBeLessThan(fullForks);
-    } finally {
-      State.deserializeBattle = original;
     }
   });
 
@@ -644,35 +577,6 @@ describe('accuracy and random-call roll sensitivity', () => {
     );
     const sureResult = searchPosition(serialize(sure), { depth: 1, samples: 1, tera: false });
     expect(sureResult.score).toBeCloseTo(1, 5);
-  });
-
-  test('Sleep Talk cells take the seed spread even without a KO (GPL T25)', () => {
-    const original = State.deserializeBattle;
-    let forks = 0;
-    State.deserializeBattle = ((serialized: Parameters<DeserializeFn>[0]) => {
-      forks += 1;
-      return original.call(State, serialized);
-    }) as DeserializeFn;
-    try {
-      // A sleeping Sleep Talker: which move comes out is pure seed — the
-      // cell must not be judged off a single called move.
-      const sleeper = () => {
-        const battle = makeBattle(
-          [makeSet('S', 'Snorlax', ['Sleep Talk', 'Protect'], 100)],
-          [makeSet('C', 'Chansey', ['Protect', 'Substitute'], 100)],
-        );
-        battle.sides[0].active[0]!.setStatus('slp');
-        return serialize(battle);
-      };
-      forks = 0;
-      searchPosition(sleeper(), { depth: 1, samples: 1, tera: false });
-      const single = forks;
-      forks = 0;
-      searchPosition(sleeper(), { depth: 1, samples: 3, tera: false });
-      expect(forks).toBeGreaterThan(single);
-    } finally {
-      State.deserializeBattle = original;
-    }
   });
 });
 

@@ -1,0 +1,236 @@
+import { Battle, State, Teams, toID } from '@pkmn/sim';
+import type { PokemonSet } from '@pkmn/sim';
+import { afterEach, describe, expect, test } from 'vitest';
+import { advancePosition, advancePositionWithLog, createRootPosition, legalChoices, positionBattle } from '../src/forward-model';
+import { deserializeFromParsed, parseSearchState } from '../src/forward/parsed-state';
+import { forkBattle } from '../src/forward/position';
+import { serializeBattleStable } from '../src/forward/serialize';
+import { sharedClasses } from '../src/forward/sim-fast/clone';
+import { copyBattle, setTemplateHook } from '../src/forward/sim-fast/index';
+import {
+  configureSimFast, resetSimFastForTests, simFastStatus, takeSimFastReport, type SimFastLever,
+} from '../src/forward/sim-fast/state';
+import { mctsTreeSearch } from '../src/mcts';
+import { searchPosition } from '../src/search';
+import { loadPositions, SEEDS, stableLog, withSimFast, type FixturePosition } from './sim-fast-helpers';
+
+const positions = loadPositions();
+const byId = (id: string) => positions.find(position => position.id === id)!;
+
+afterEach(() => {
+  setTemplateHook(null);
+  resetSimFastForTests();
+});
+
+function makeSet(name: string, species: string, moves: string[], level = 50): PokemonSet {
+  return {
+    name, species, item: '', ability: 'No Ability', moves, nature: 'Hardy',
+    evs: { hp: 252, atk: 252, def: 0, spa: 0, spd: 4, spe: 0 },
+    ivs: { hp: 31, atk: 31, def: 31, spa: 31, spd: 31, spe: 31 },
+    level, gender: '',
+  };
+}
+
+function makeBattle(formatid: string, p1Sets: PokemonSet[], p2Sets: PokemonSet[]): Battle {
+  const battle = new Battle({
+    formatid: toID(formatid), seed: '1,2,3,4',
+    p1: { name: 'Alpha', team: Teams.pack(p1Sets) }, p2: { name: 'Beta', team: Teams.pack(p2Sets) },
+  });
+  if (battle.sides.some(side => side.requestState === 'teampreview')) {
+    battle.choose('p1', `team ${p1Sets.map((_, index) => index + 1).join('')}`);
+    battle.choose('p2', `team ${p2Sets.map((_, index) => index + 1).join('')}`);
+  }
+  return battle;
+}
+
+const serialize = (battle: Battle) => JSON.stringify(State.serializeBattle(battle));
+
+/** A turn and the next one (first options), as the spec's "weitergespielt" asks for mid-turn states. */
+function played(serialized: string, p1: string, p2: string, seed: string): string {
+  const first = advancePositionWithLog(createRootPosition(serialized), p1, p2, seed);
+  const lines = [first.child.serialized, stableLog(first.log)];
+  if (!positionBattle(first.child).ended) {
+    const c = legalChoices(first.child, 'p1')[0]?.choice ?? 'wait';
+    const d = legalChoices(first.child, 'p2')[0]?.choice ?? 'wait';
+    const second = advancePositionWithLog(first.child, c, d, seed);
+    lines.push(second.child.serialized, stableLog(second.log));
+  }
+  return lines.join('\n');
+}
+
+describe('forks through templates (lever clone)', () => {
+  test('a root: a copy of its template forks as today, every fixture, both seeds', () => {
+    for (const position of positions) {
+      for (const seed of SEEDS) {
+        const today = withSimFast([], () => serializeBattleStable(forkBattle(createRootPosition(position.serialized), seed)));
+        const copied = withSimFast(['clone'], () => {
+          const text = serializeBattleStable(forkBattle(createRootPosition(position.serialized), seed));
+          expect(takeSimFastReport().counters.clones, `${position.id} ${seed}`).toBeGreaterThan(0);
+          return text;
+        });
+        expect(copied, `${position.id} ${seed}`).toBe(today);
+      }
+    }
+  });
+
+  test('a child: two plies play as today, and its forks are copies', () => {
+    const plies = (position: FixturePosition, levers: readonly SimFastLever[]) => withSimFast(levers, () => {
+      const root = createRootPosition(position.serialized);
+      const lines: string[] = [];
+      for (const a of legalChoices(root, 'p1').slice(0, 2)) {
+        for (const b of legalChoices(root, 'p2').slice(0, 2)) {
+          for (const seed of SEEDS) {
+            const first = advancePositionWithLog(root, a.choice, b.choice, seed);
+            if (!positionBattle(first.child).ended) {
+              const c = legalChoices(first.child, 'p1')[0]?.choice ?? 'wait';
+              const d = legalChoices(first.child, 'p2')[0]?.choice ?? 'wait';
+              const second = advancePositionWithLog(first.child, c, d, seed);
+              lines.push(second.child.serialized, stableLog(second.log));
+            }
+            lines.push(first.child.serialized, stableLog(first.log));
+          }
+        }
+      }
+      return { lines, clones: takeSimFastReport().counters.clones };
+    });
+    for (const position of positions) {
+      const copied = plies(position, ['clone']);
+      expect(copied.lines, position.id).toEqual(plies(position, []).lines);
+      expect(copied.clones, position.id).toBeGreaterThan(0);
+    }
+  }, 240_000);
+
+  test('a child\'s template is a copy of its live battle, not a deserialization', () => {
+    withSimFast(['clone'], () => {
+      const root = createRootPosition(positions[0].serialized);
+      const child = advancePosition(root, legalChoices(root, 'p1')[0].choice, legalChoices(root, 'p2')[0].choice, SEEDS[0]);
+      const original = State.deserializeBattle;
+      let deserialized = 0;
+      State.deserializeBattle = ((serialized: Parameters<typeof original>[0]) => {
+        deserialized++;
+        return original.call(State, serialized);
+      }) as typeof original;
+      try {
+        takeSimFastReport();
+        forkBattle(child, SEEDS[1]);
+        expect(deserialized).toBe(0);
+        expect(takeSimFastReport().counters.clones).toBeGreaterThanOrEqual(2);
+      } finally {
+        State.deserializeBattle = original;
+      }
+    });
+  });
+
+  test('a dead active under a stale move request repairs as today (singles and doubles)', () => {
+    const singles = makeBattle('gen9customgame',
+      [makeSet('Snorlax', 'Snorlax', ['Protect'])],
+      [makeSet('Pikachu', 'Pikachu', ['Protect']), makeSet('Eevee', 'Eevee', ['Protect'])]);
+    singles.sides[1].active[0]!.hp = 0;
+    singles.sides[1].active[0]!.fainted = true;
+    const doubles = makeBattle('gen9doublescustomgame',
+      [makeSet('Machamp', 'Machamp', ['Karate Chop']), makeSet('Snorlax', 'Snorlax', ['Tackle']), makeSet('Chansey', 'Chansey', ['Protect'])],
+      [makeSet('Registeel', 'Registeel', ['Protect']), makeSet('Regirock', 'Regirock', ['Protect'])]);
+    doubles.sides[0].active[1]!.hp = 0;
+    doubles.sides[0].active[1]!.fainted = true;
+    const cases: [string, string, string][] = [
+      [serialize(singles), 'move protect', 'move protect'],
+      [serialize(doubles), 'move karatechop 1, move protect', 'move protect, move protect'],
+    ];
+    for (const [serialized, p1, p2] of cases) {
+      for (const seed of SEEDS) {
+        const child = (levers: readonly SimFastLever[]) => withSimFast(levers, () =>
+          advancePosition(createRootPosition(serialized), p1, p2, seed).serialized);
+        expect(child(['clone'])).toBe(child([]));
+      }
+    }
+  });
+
+  test('mid-turn: a double KO in singles and two open slots in doubles resolve through copies and play on as today', () => {
+    const singles = makeBattle('gen9customgame',
+      [makeSet('Electrode', 'Electrode', ['Explosion'], 100), makeSet('Chansey', 'Chansey', ['Protect']), makeSet('Blissey', 'Blissey', ['Protect'])],
+      [makeSet('Pikachu', 'Pikachu', ['Growl'], 5), makeSet('Eevee', 'Eevee', ['Protect']), makeSet('Snorlax', 'Snorlax', ['Protect'])]);
+    const doubles = makeBattle('gen9doublescustomgame',
+      [makeSet('Electrode', 'Electrode', ['Explosion']), makeSet('Voltorb', 'Voltorb', ['Explosion']),
+        makeSet('Chansey', 'Chansey', ['Protect']), makeSet('Blissey', 'Blissey', ['Protect'])],
+      [makeSet('Registeel', 'Registeel', ['Protect']), makeSet('Regirock', 'Regirock', ['Protect'])]);
+    const cases: [string, string, string][] = [
+      [serialize(singles), 'move explosion', 'move growl'],
+      [serialize(doubles), 'move explosion, move explosion', 'move protect, move protect'],
+    ];
+    for (const [serialized, p1, p2] of cases) {
+      for (const seed of SEEDS) {
+        const today = withSimFast([], () => played(serialized, p1, p2, seed));
+        const copied = withSimFast(['clone'], () => {
+          const text = played(serialized, p1, p2, seed);
+          expect(takeSimFastReport().counters.clones).toBeGreaterThanOrEqual(3);
+          return text;
+        });
+        expect(copied).toBe(today);
+      }
+    }
+  });
+
+  test('after a fallback the next fork is today\'s fork', () => {
+    const position = positions[0];
+    const today = withSimFast([], () => serializeBattleStable(forkBattle(createRootPosition(position.serialized), SEEDS[0])));
+    // Unforced on purpose: the break must fall back, not throw (the file's afterEach resets the switch).
+    configureSimFast(['clone']);
+    const broken = deserializeFromParsed(parseSearchState(position.serialized));
+    (broken.sides[0].pokemon[0] as unknown as Record<string, unknown>).foreign = new (class Foreign {})();
+    expect(copyBattle(broken)).toBeNull();
+    expect(simFastStatus()).toBe('fallback');
+    const after = serializeBattleStable(forkBattle(createRootPosition(position.serialized), SEEDS[0]));
+    expect(after).toBe(today);
+  });
+});
+
+/**
+ * Freezes a template down to the shared dex classes. ActiveMoves carry the
+ * DataMove prototype but belong to one battle (Utils.deepClone keeps the
+ * prototype), so they and their nested data are frozen too; sets and teams
+ * are compared as JSON instead.
+ */
+function deepFreeze(value: unknown, shared: ReadonlySet<object>, seen: Set<object>): void {
+  if (typeof value !== 'object' || value === null || seen.has(value)) return;
+  seen.add(value);
+  const proto = Object.getPrototypeOf(value) as object | null;
+  const activeMove = Object.hasOwn(value, 'hit') && (Object.hasOwn(value, 'id') || Object.hasOwn(value, 'move'));
+  if (proto !== null && shared.has(proto) && !activeMove) return;
+  for (const [key, child] of Object.entries(value)) {
+    // Every standard deserialization normalizes the set objects in place (pokemon.mjs:94-150).
+    if (key === 'set' || key === 'team') continue;
+    deepFreeze(child, shared, seen);
+  }
+  Object.freeze(value);
+}
+
+const SEARCH_LEVERS: readonly (readonly SimFastLever[])[] = [['clone']];
+
+describe('templates are never written', () => {
+  const run = (position: FixturePosition, kind: 'mcts' | 'matrix') => JSON.stringify(kind === 'mcts'
+    ? mctsTreeSearch(position.serialized, { depth: 1, samples: 1, tera: false, mode: 'mcts', prove: true }, 0)
+    : searchPosition(position.serialized, { depth: 1, samples: 1, tera: false, mode: 'matrix' }));
+  const jobs: [string, 'mcts' | 'matrix'][] = [
+    ['smogtours-gen9ou-749828#23', 'mcts'], ['gen9vgc2026regi-2629760324#6', 'mcts'], ['smogtours-gen9ou-749351#10', 'matrix'],
+  ];
+
+  for (const levers of SEARCH_LEVERS) {
+    test(`frozen templates through whole searches, results as today (${levers.join('+')})`, () => {
+      for (const [id, kind] of jobs) {
+        const position = byId(id);
+        const today = withSimFast([], () => run(position, kind));
+        const teams: [Battle, string][] = [];
+        const frozen = withSimFast(levers, () => {
+          setTemplateHook(battle => {
+            teams.push([battle, JSON.stringify(battle.sides.map(side => side.team))]);
+            deepFreeze(battle, sharedClasses(battle), new Set());
+          });
+          return run(position, kind);
+        });
+        expect(frozen, `${id} ${kind}`).toBe(today);
+        expect(teams.length, id).toBeGreaterThan(0);
+        for (const [battle, before] of teams) expect(JSON.stringify(battle.sides.map(side => side.team))).toBe(before);
+      }
+    }, 600_000);
+  }
+});
