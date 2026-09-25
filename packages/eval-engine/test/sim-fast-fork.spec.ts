@@ -1,5 +1,5 @@
 import { Battle, State, Teams, toID } from '@pkmn/sim';
-import type { PokemonSet } from '@pkmn/sim';
+import type { PokemonSet, PRNGSeed } from '@pkmn/sim';
 import { afterEach, describe, expect, test } from 'vitest';
 import { advancePosition, advancePositionWithLog, createRootPosition, legalChoices, positionBattle } from '../src/forward-model';
 import { deserializeFromParsed, parseSearchState } from '../src/forward/parsed-state';
@@ -46,8 +46,9 @@ function makeBattle(formatid: string, p1Sets: PokemonSet[], p2Sets: PokemonSet[]
 const serialize = (battle: Battle) => JSON.stringify(State.serializeBattle(battle));
 
 /** A turn and the next one (first options), as the spec's "weitergespielt" asks for mid-turn states. */
-function played(serialized: string, p1: string, p2: string, seed: string): string {
+function played(serialized: string, p1: string, p2: string, seed: PRNGSeed, afterFirst?: () => void): string {
   const first = advancePositionWithLog(createRootPosition(serialized), p1, p2, seed);
+  afterFirst?.();
   const lines = [first.child.serialized, stableLog(first.log)];
   if (!positionBattle(first.child).ended) {
     const c = legalChoices(first.child, 'p1')[0]?.choice ?? 'wait';
@@ -56,6 +57,45 @@ function played(serialized: string, p1: string, p2: string, seed: string): strin
     lines.push(second.child.serialized, stableLog(second.log));
   }
   return lines.join('\n');
+}
+
+interface MidTurnCase {
+  name: string;
+  serialized: string;
+  p1: string;
+  p2: string;
+  /**
+   * Copies in the first advance, exact: the root fork (the root's template is
+   * a deserialization), one snapshot for the one resolution round, and one
+   * trial per assignment of every side that chooses (two replacements each).
+   * The string path makes the root fork only (1).
+   */
+  firstCopies: number;
+  /** A pivot's snapshot still holds the rest of the turn; a double KO's comes after the turn's last action. */
+  queued: boolean;
+}
+
+function midTurnCases(): MidTurnCase[] {
+  const doubleKo = makeBattle('gen9customgame',
+    [makeSet('Electrode', 'Electrode', ['Explosion'], 100), makeSet('Chansey', 'Chansey', ['Protect']), makeSet('Blissey', 'Blissey', ['Protect'])],
+    [makeSet('Pikachu', 'Pikachu', ['Growl'], 5), makeSet('Eevee', 'Eevee', ['Protect']), makeSet('Snorlax', 'Snorlax', ['Protect'])]);
+  const twoSlots = makeBattle('gen9doublescustomgame',
+    [makeSet('Electrode', 'Electrode', ['Explosion']), makeSet('Voltorb', 'Voltorb', ['Explosion']),
+      makeSet('Chansey', 'Chansey', ['Protect']), makeSet('Blissey', 'Blissey', ['Protect'])],
+    [makeSet('Registeel', 'Registeel', ['Protect']), makeSet('Regirock', 'Regirock', ['Protect'])]);
+  const pivot = makeBattle('gen9customgame',
+    [makeSet('Jolteon', 'Jolteon', ['U-turn'], 100), makeSet('Chansey', 'Chansey', ['Protect']), makeSet('Blissey', 'Blissey', ['Protect'])],
+    [makeSet('Snorlax', 'Snorlax', ['Tackle'])]);
+  const doublesPivot = makeBattle('gen9doublescustomgame',
+    [makeSet('Jolteon', 'Jolteon', ['U-turn'], 100), makeSet('Snorlax', 'Snorlax', ['Tackle']),
+      makeSet('Chansey', 'Chansey', ['Protect']), makeSet('Blissey', 'Blissey', ['Protect'])],
+    [makeSet('Registeel', 'Registeel', ['Tackle']), makeSet('Regirock', 'Regirock', ['Tackle'])]);
+  return [
+    { name: 'singles double KO', serialized: serialize(doubleKo), p1: 'move explosion', p2: 'move growl', firstCopies: 6, queued: false },
+    { name: 'doubles two open slots', serialized: serialize(twoSlots), p1: 'move explosion, move explosion', p2: 'move protect, move protect', firstCopies: 4, queued: false },
+    { name: 'singles U-turn', serialized: serialize(pivot), p1: 'move uturn', p2: 'move tackle', firstCopies: 4, queued: true },
+    { name: 'doubles U-turn', serialized: serialize(doublesPivot), p1: 'move uturn 1, move tackle 1', p2: 'move tackle 1, move tackle 1', firstCopies: 4, queued: true },
+  ];
 }
 
 describe('forks through templates (lever clone)', () => {
@@ -145,27 +185,27 @@ describe('forks through templates (lever clone)', () => {
     }
   });
 
-  test('mid-turn: a double KO in singles and two open slots in doubles resolve through copies and play on as today', () => {
-    const singles = makeBattle('gen9customgame',
-      [makeSet('Electrode', 'Electrode', ['Explosion'], 100), makeSet('Chansey', 'Chansey', ['Protect']), makeSet('Blissey', 'Blissey', ['Protect'])],
-      [makeSet('Pikachu', 'Pikachu', ['Growl'], 5), makeSet('Eevee', 'Eevee', ['Protect']), makeSet('Snorlax', 'Snorlax', ['Protect'])]);
-    const doubles = makeBattle('gen9doublescustomgame',
-      [makeSet('Electrode', 'Electrode', ['Explosion']), makeSet('Voltorb', 'Voltorb', ['Explosion']),
-        makeSet('Chansey', 'Chansey', ['Protect']), makeSet('Blissey', 'Blissey', ['Protect'])],
-      [makeSet('Registeel', 'Registeel', ['Protect']), makeSet('Regirock', 'Regirock', ['Protect'])]);
-    const cases: [string, string, string][] = [
-      [serialize(singles), 'move explosion', 'move growl'],
-      [serialize(doubles), 'move explosion, move explosion', 'move protect, move protect'],
-    ];
-    for (const [serialized, p1, p2] of cases) {
+  test('mid-turn: a double KO and a pivot in singles, two open slots and a pivot in doubles, resolve through frozen snapshots and play on as today', () => {
+    for (const c of midTurnCases()) {
       for (const seed of SEEDS) {
-        const today = withSimFast([], () => played(serialized, p1, p2, seed));
+        const today = withSimFast([], () => played(c.serialized, c.p1, c.p2, seed));
+        let firstCopies = -1;
+        let queued = false;
         const copied = withSimFast(['clone'], () => {
-          const text = played(serialized, p1, p2, seed);
-          expect(takeSimFastReport().counters.clones).toBeGreaterThanOrEqual(3);
-          return text;
+          // Every template of the run is frozen: the live battle plays on after its snapshot.
+          setTemplateHook(battle => {
+            queued ||= battle.queue.list.length > 0 || battle.activeMove !== null;
+            deepFreeze(battle, sharedClasses(battle), new Set());
+          });
+          try {
+            return played(c.serialized, c.p1, c.p2, seed, () => { firstCopies = takeSimFastReport().counters.clones; });
+          } finally {
+            setTemplateHook(null);
+          }
         });
-        expect(copied).toBe(today);
+        expect(firstCopies, `${c.name} ${seed}`).toBe(c.firstCopies);
+        expect(queued, `${c.name} ${seed}`).toBe(c.queued);
+        expect(copied, `${c.name} ${seed}`).toBe(today);
       }
     }
   });
