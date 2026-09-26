@@ -39,8 +39,25 @@ export function copyBattle(template: Battle): Battle | null {
   }
 }
 
-/** A battle that becomes a copy source (position template, mid-turn snapshot); never written afterwards. */
+/**
+ * A battle that becomes a copy source (position template, mid-turn snapshot);
+ * never written afterwards. Always a copy or a fresh deserialization, never a
+ * reader's battle.
+ *
+ * Today's fork is a JSON round trip, which drops own keys holding undefined
+ * (state.mjs:385). The sim empties Pokemon.pendingStaleness (pokemon.mjs:1518,
+ * 1583, 1602), a key the constructor does not create, and refills it later
+ * (setItem, :1599): the round trip appends it after the keys added
+ * meanwhile, a copy that kept the empty slot fills it in place, and the key
+ * order of the serialized state (endgame memo keys) differs. So the source
+ * drops the empty slot, as the round trip does.
+ */
 export function adoptTemplate(battle: Battle): Battle {
+  for (const side of battle.sides) {
+    for (const pokemon of side.pokemon) {
+      if (Object.hasOwn(pokemon, 'pendingStaleness') && pokemon.pendingStaleness === undefined) delete pokemon.pendingStaleness;
+    }
+  }
   templateHook?.(battle);
   return battle;
 }

@@ -98,6 +98,25 @@ function midTurnCases(): MidTurnCase[] {
   ];
 }
 
+/**
+ * Alakazam (faster, no item) Tricks Snorlax's Leftovers away: takeItem leaves
+ * Snorlax an own pendingStaleness holding undefined (pokemon.mjs:1583), which
+ * the JSON round trip drops. Snorlax then moves (lastMoveTargetLoc lands after
+ * that slot). The second Trick gives the item back: setItem writes
+ * pendingStaleness (pokemon.mjs:1599), appended after the newer keys today.
+ */
+function trickTwiceCases(): { name: string; serialized: string; p1: string; p2: string }[] {
+  const snorlax = { ...makeSet('Snorlax', 'Snorlax', ['Tackle']), item: 'Leftovers' };
+  const singles = makeBattle('gen9customgame', [makeSet('Alakazam', 'Alakazam', ['Trick'], 100)], [snorlax]);
+  const doubles = makeBattle('gen9doublescustomgame',
+    [makeSet('Alakazam', 'Alakazam', ['Trick'], 100), makeSet('Chansey', 'Chansey', ['Splash'])],
+    [snorlax, makeSet('Blissey', 'Blissey', ['Splash'])]);
+  return [
+    { name: 'singles', serialized: serialize(singles), p1: 'move trick', p2: 'move tackle' },
+    { name: 'doubles', serialized: serialize(doubles), p1: 'move trick 1, move splash', p2: 'move tackle 1, move splash' },
+  ];
+}
+
 describe('forks through templates (lever clone)', () => {
   test('a root: a copy of its template forks as today, every fixture, both seeds', () => {
     for (const position of positions) {
@@ -159,6 +178,27 @@ describe('forks through templates (lever clone)', () => {
         State.deserializeBattle = original;
       }
     });
+  });
+
+  test('an item taken and given back plays as today (Trick twice, singles and doubles, both seeds)', () => {
+    for (const c of trickTwiceCases()) {
+      for (const seed of SEEDS) {
+        const plies = (levers: readonly SimFastLever[]) => withSimFast(levers, () => {
+          const first = advancePositionWithLog(createRootPosition(c.serialized), c.p1, c.p2, seed);
+          return advancePositionWithLog(first.child, c.p1, c.p2, seed).child.serialized;
+        });
+        expect(plies(['clone']), `${c.name} ${seed}`).toBe(plies([]));
+      }
+    }
+  });
+
+  test('a child\'s fork carries the own keys of today\'s fork on every Pokemon, after an item left', () => {
+    const keys = (battle: Battle) => battle.sides.map(side => side.pokemon.map(pokemon => Object.keys(pokemon).join()));
+    for (const c of trickTwiceCases()) {
+      const child = withSimFast(['clone'], () => advancePositionWithLog(createRootPosition(c.serialized), c.p1, c.p2, SEEDS[0]).child);
+      const copied = withSimFast(['clone'], () => keys(forkBattle(child, SEEDS[1])));
+      expect(copied, c.name).toEqual(withSimFast([], () => keys(forkBattle(child, SEEDS[1]))));
+    }
   });
 
   test('a dead active under a stale move request repairs as today (singles and doubles)', () => {

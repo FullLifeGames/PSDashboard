@@ -29,14 +29,21 @@ const protosOf = (sim: typeof esm) => ({
   formats: Object.getPrototypeOf(sim.Dex.formats) as object,
 });
 
+const TEAM = esm.Teams.pack([
+  { name: 'A', species: 'Pikachu', item: '', ability: 'Static', moves: ['thunderbolt'], nature: 'Hardy', evs: {}, ivs: {}, level: 50, gender: '' },
+  { name: 'B', species: 'Eevee', item: '', ability: 'Run Away', moves: ['tackle'], nature: 'Hardy', evs: {}, ivs: {}, level: 50, gender: '' },
+] as unknown as esm.PokemonSet[]);
+
 function twoBattles(formatid: string): [esm.Battle, esm.Battle] {
-  const team = esm.Teams.pack([
-    { name: 'A', species: 'Pikachu', item: '', ability: 'Static', moves: ['thunderbolt'], nature: 'Hardy', evs: {}, ivs: {}, level: 50, gender: '' },
-    { name: 'B', species: 'Eevee', item: '', ability: 'Run Away', moves: ['tackle'], nature: 'Hardy', evs: {}, ivs: {}, level: 50, gender: '' },
-  ] as unknown as esm.PokemonSet[]);
-  const make = () => new esm.Battle({ formatid: esm.toID(formatid), seed: '1,2,3,4', p1: { name: 'x', team }, p2: { name: 'y', team } });
+  const make = () => new esm.Battle({ formatid: esm.toID(formatid), seed: '1,2,3,4', p1: { name: 'x', team: TEAM }, p2: { name: 'y', team: TEAM } });
   return [make(), make()];
 }
+
+/** Undefined writes whose receiver is no Battle, Field, Side or Pokemon ("<file> <receiver>"). */
+const NOT_BATTLE_STATE = new Set([
+  'sim/side.mjs req', // an entry of side.activeRequest, which today's fork rebuilds (state.mjs:112-126)
+  'sim/team-validator.mjs this', // the TeamValidator
+]);
 
 /** Own function-valued keys whose function differs between two battles: per-instance closures. */
 function closures(a: object, b: object): string[] {
@@ -108,6 +115,26 @@ describe('the pins the layer relies on', () => {
     expect(counts).toEqual({
       'data/mods/gen4/moves.mjs': 2, 'data/moves.mjs': 2, 'sim/dex-formats.mjs': 4, 'sim/dex-items.mjs': 3,
     });
+  });
+
+  test('the one key the sim empties that no constructor creates is Pokemon.pendingStaleness', () => {
+    // Today's JSON round trip drops a key holding undefined unless the constructor recreates it; a copy
+    // keeps its slot, so adoptTemplate (sim-fast/index.ts) drops it. A new key here needs the same.
+    const fresh = new esm.Battle({
+      formatid: esm.toID('gen9customgame'), seed: '1,2,3,4', deserialized: true, p1: { name: 'x', team: TEAM }, p2: { name: 'y', team: TEAM },
+    });
+    const created = new Set([fresh, fresh.field, ...fresh.sides.flatMap(side => [side, ...side.pokemon])].flatMap(object => Object.keys(object)));
+    const esmDir = join(SIM_BUILD, 'esm');
+    const sources = [...readdirSync(join(esmDir, 'sim')).filter(name => name.endsWith('.mjs')).map(name => join(esmDir, 'sim', name)),
+      ...walk(join(esmDir, 'data'))];
+    const emptied = new Set<string>();
+    for (const file of sources) {
+      const where = relative(esmDir, file).replaceAll('\\', '/');
+      for (const [, receiver, key] of readFileSync(file, 'utf-8').matchAll(/([\w$]+|\])\.([\w$]+)\s*=\s*(?:undefined|void 0)\b/g)) {
+        if (!NOT_BATTLE_STATE.has(`${where} ${receiver}`)) emptied.add(key);
+      }
+    }
+    expect([...emptied].filter(key => !created.has(key)).sort()).toEqual(['pendingStaleness']);
   });
 });
 
