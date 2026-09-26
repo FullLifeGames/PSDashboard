@@ -31,8 +31,11 @@ export interface SimFastReport {
 
 export const SIM_FAST_LEVERS: readonly SimFastLever[] = ['rules', 'clone', 'dispatch'];
 
-/** Levers a host gets without asking: Node without the variable, the app without an override. */
-export const SIM_FAST_DEFAULT: readonly SimFastLever[] = [];
+/**
+ * Levers a host gets without asking (Node without the variable, the app without an override).
+ * Round 59: adopted at the gate on 2026-09-26; EVAL_SIM_FAST=0 (Node) and '0' in localStorage are the kill switch.
+ */
+export const SIM_FAST_DEFAULT: readonly SimFastLever[] = ['rules', 'clone', 'dispatch'];
 
 /** Effective flags (configured and not broken); the hot paths read them directly. */
 export const simFastFlags: Record<SimFastLever, boolean> = { rules: false, clone: false, dispatch: false };

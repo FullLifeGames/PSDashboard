@@ -37,10 +37,10 @@ jobs:
 
       # Round 59: the engine suite once more with the speed layer switched the other way
       # (forced on until the gate adopts it, forced off afterwards), so both paths stay green.
-      - name: Run the engine suite with the speed layer forced on
+      - name: Run the engine suite with the speed layer forced off
         run: npx vitest run --project eval-engine
         env:
-          EVAL_SIM_FAST: '1'
+          EVAL_SIM_FAST: '0'
 
   browser:
     name: Browser flows
