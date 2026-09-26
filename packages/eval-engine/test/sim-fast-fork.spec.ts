@@ -6,13 +6,13 @@ import { deserializeFromParsed, parseSearchState } from '../src/forward/parsed-s
 import { forkBattle } from '../src/forward/position';
 import { serializeBattleStable } from '../src/forward/serialize';
 import { sharedClasses } from '../src/forward/sim-fast/clone';
-import { copyBattle, setTemplateHook } from '../src/forward/sim-fast/index';
+import { adoptTemplate, copyBattle, setTemplateHook } from '../src/forward/sim-fast/index';
 import {
   configureSimFast, resetSimFastForTests, simFastStatus, takeSimFastReport, type SimFastLever,
 } from '../src/forward/sim-fast/state';
 import { mctsTreeSearch } from '../src/mcts';
 import { searchPosition } from '../src/search';
-import { loadPositions, SEEDS, stableLog, withSimFast, type FixturePosition } from './sim-fast-helpers';
+import { loadPositions, ownKeyLists, SEEDS, stableLog, withSimFast, type FixturePosition } from './sim-fast-helpers';
 
 const positions = loadPositions();
 const byId = (id: string) => positions.find(position => position.id === id)!;
@@ -117,6 +117,20 @@ function trickTwiceCases(): { name: string; serialized: string; p1: string; p2: 
   ];
 }
 
+/**
+ * Gen 2 calls moveUsed without a target on every move (mods/gen2/scripts.mjs:128),
+ * so each mover holds an own lastMoveTargetLoc of undefined (pokemon.mjs:640),
+ * a key the Pokemon constructor never creates; the JSON round trip drops it.
+ * Mew (faster, no item) steals Snorlax's Leftovers with Thief: pendingStaleness
+ * lands after that slot. Mirror Move then copies Snorlax's Rollout, whose
+ * onModifyMove writes a defined lastMoveTargetLoc (moves.mjs:15651): today
+ * appends it after pendingStaleness, a copy that kept the slot fills it in place.
+ */
+function gen2MirrorRollout(): string {
+  return serialize(makeBattle('gen2customgame', [makeSet('Mew', 'Mew', ['Thief', 'Mirror Move'], 100)],
+    [{ ...makeSet('Snorlax', 'Snorlax', ['Rollout']), item: 'Leftovers' }]));
+}
+
 describe('forks through templates (lever clone)', () => {
   test('a root: a copy of its template forks as today, every fixture, both seeds', () => {
     for (const position of positions) {
@@ -201,6 +215,21 @@ describe('forks through templates (lever clone)', () => {
     }
   });
 
+  test('gen 2: an empty lastMoveTargetLoc keeps no slot (Thief, then Mirror Move copies Rollout, both seeds)', () => {
+    // Gen 2 has no doubles format (gen2doublescustomgame does not exist); the guard spec's census covers doubles.
+    const serialized = gen2MirrorRollout();
+    for (const seed of SEEDS) {
+      const plies = (levers: readonly SimFastLever[]) => withSimFast(levers, () => {
+        const first = advancePositionWithLog(createRootPosition(serialized), 'move thief', 'move rollout', seed);
+        return advancePositionWithLog(first.child, 'move mirrormove', 'move rollout', seed).child.serialized;
+      });
+      expect(plies(['clone']), seed).toBe(plies([]));
+      const child = withSimFast(['clone'], () => advancePositionWithLog(createRootPosition(serialized), 'move thief', 'move rollout', seed).child);
+      const copied = withSimFast(['clone'], () => ownKeyLists(forkBattle(child, seed)));
+      expect(copied, seed).toEqual(withSimFast([], () => ownKeyLists(forkBattle(child, seed))));
+    }
+  });
+
   test('a dead active under a stale move request repairs as today (singles and doubles)', () => {
     const singles = makeBattle('gen9customgame',
       [makeSet('Snorlax', 'Snorlax', ['Protect'])],
@@ -261,6 +290,24 @@ describe('forks through templates (lever clone)', () => {
     expect(simFastStatus()).toBe('fallback');
     const after = serializeBattleStable(forkBattle(createRootPosition(position.serialized), SEEDS[0]));
     expect(after).toBe(today);
+  });
+
+  test('a template whose constructor keys cannot be built steps back to today\'s path; forced, it throws', () => {
+    const foreign = () => {
+      const battle = deserializeFromParsed(parseSearchState(positions[0].serialized));
+      // A prototype the key cache has not seen, whose constructor throws.
+      const constructor = function Foreign(): never { throw new Error('no constructor'); };
+      Object.setPrototypeOf(battle, Object.create(Object.getPrototypeOf(battle) as object, { constructor: { value: constructor } }) as object);
+      return battle;
+    };
+    configureSimFast(['clone']);
+    const battle = foreign();
+    expect(adoptTemplate(battle)).toBe(battle);
+    expect(simFastStatus()).toBe('fallback');
+    expect(copyBattle(battle)).toBeNull();
+    resetSimFastForTests();
+    configureSimFast(['clone'], { forced: true });
+    expect(() => adoptTemplate(foreign())).toThrow(/sim-fast fallback: no constructor/);
   });
 });
 

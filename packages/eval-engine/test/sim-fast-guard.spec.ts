@@ -3,14 +3,16 @@ import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { dirname, join, relative } from 'node:path';
 import { afterEach, describe, expect, test } from 'vitest';
-import { advancePositionWithLog, createRootPosition, legalChoices } from '../src/forward-model';
+import { advancePositionWithLog, createRootPosition, legalChoices, positionBattle } from '../src/forward-model';
 import { deserializeFromParsed, parseSearchState } from '../src/forward/parsed-state';
+import { forkBattle } from '../src/forward/position';
+import { restoreSideInvariants, serializeBattleStable } from '../src/forward/serialize';
 import { resetClosuresForTests, sharedClasses } from '../src/forward/sim-fast/clone';
 import { compileClosures } from '../src/forward/sim-fast/clone-plan';
 import { hashSources, PINNED_SIM_HASHES, setPinnedHashes } from '../src/forward/sim-fast/guard';
-import { copyBattle } from '../src/forward/sim-fast/index';
+import { copyBattle, setTemplateHook } from '../src/forward/sim-fast/index';
 import { configureSimFast, resetSimFastForTests, simFastStatus, takeSimFastReport } from '../src/forward/sim-fast/state';
-import { loadPositions, SEEDS, stableLog, withSimFast } from './sim-fast-helpers';
+import { loadPositions, ownKeyLists, SEEDS, stableLog, withSimFast } from './sim-fast-helpers';
 
 const require = createRequire(import.meta.url);
 const cjs = require('@pkmn/sim') as typeof esm;
@@ -57,6 +59,90 @@ function walk(dir: string): string[] {
     const path = join(dir, name);
     return statSync(path).isDirectory() ? walk(path) : path.endsWith('.mjs') ? [path] : [];
   });
+}
+
+const CENSUS_FORMATS = ['gen1customgame', 'gen2customgame', 'gen3customgame', 'gen4customgame', 'gen5customgame', 'gen6customgame',
+  'gen7customgame', 'gen8customgame', 'gen9customgame', 'gen9doublescustomgame'];
+
+type Member = [species: string, item: string, moves: string[]];
+/**
+ * Items to steal and swap (Thief, Trick), a berry and Leftovers, Rollout and
+ * the moves that call it through another move (Mirror Move, Metronome),
+ * Explosion for mid-turn replacements. Each gen keeps the moves and items it
+ * has (gen 1 has no items).
+ */
+const CENSUS_SIDES: [Member[], Member[]] = [
+  [['Mew', '', ['Thief', 'Trick', 'Mirror Move', 'Metronome']], ['Clefable', 'Sitrus Berry', ['Metronome', 'Trick', 'Body Slam', 'Thief']],
+    ['Chansey', 'Leftovers', ['Soft-Boiled', 'Seismic Toss', 'Mirror Move', 'Thief']]],
+  [['Snorlax', 'Leftovers', ['Rollout', 'Body Slam', 'Thief', 'Rest']], ['Golem', 'Sitrus Berry', ['Rollout', 'Explosion', 'Earthquake', 'Trick']],
+    ['Pidgeot', 'Choice Scarf', ['Mirror Move', 'Double-Edge', 'Thief', 'Quick Attack']]],
+];
+
+function censusRoot(formatid: string): string {
+  const dex = esm.Dex.forFormat(esm.Dex.formats.get(formatid));
+  const has = (effect: { exists: boolean; gen: number }) => effect.exists && effect.gen <= dex.gen;
+  const team = (members: Member[]) => esm.Teams.pack(members.map(([species, item, moves]) => ({
+    name: species, species, item: has(dex.items.get(item)) ? item : '', ability: 'No Ability', moves: moves.filter(move => has(dex.moves.get(move))),
+    nature: 'Hardy', gender: '', evs: { hp: 84, atk: 84, def: 84, spa: 84, spd: 84, spe: 84 },
+    ivs: { hp: 30, atk: 30, def: 30, spa: 30, spd: 30, spe: 30 }, level: 100,
+  })) as unknown as esm.PokemonSet[]);
+  const battle = new esm.Battle({
+    formatid: esm.toID(formatid), seed: '1,2,3,4', p1: { name: 'Alpha', team: team(CENSUS_SIDES[0]) }, p2: { name: 'Beta', team: team(CENSUS_SIDES[1]) },
+  });
+  expect(battle.format.exists, formatid).toBe(true);
+  if (battle.sides.some(side => side.requestState === 'teampreview')) {
+    battle.choose('p1', 'team 123');
+    battle.choose('p2', 'team 123');
+  }
+  return JSON.stringify(esm.State.serializeBattle(battle));
+}
+
+interface CensusTally { forks: number; templates: number; snapshots: number; mismatches: string[] }
+
+/** Where two lists first differ, with a little context. */
+function firstDifference(today: readonly string[], copied: readonly string[]): string {
+  let index = 0;
+  while (index < Math.max(today.length, copied.length) && today[index] === copied[index]) index++;
+  const [a, b] = [today[index] ?? '<none>', copied[index] ?? '<none>'];
+  let at = 0;
+  while (at < a.length && a[at] === b[at]) at++;
+  return `#${index}: today ...${a.slice(Math.max(0, at - 60), at + 60)} | copy ...${b.slice(Math.max(0, at - 60), at + 60)}`;
+}
+
+/** Every copy source (position template, mid-turn snapshot): a copy of it against today's round trip of it. */
+function censusTemplate(template: esm.Battle, tally: CensusTally): void {
+  tally.templates++;
+  if (template.sides.some(side => side.requestState === 'switch')) tally.snapshots++;
+  const copy = copyBattle(template)!;
+  // A template has no PRNG (a fork seeds its copy); the round trip serializes a seeded copy, same state otherwise.
+  copy.prng = new esm.PRNG('1,2,3,4');
+  const today = ownKeyLists(deserializeFromParsed(parseSearchState(serializeBattleStable(copy))));
+  restoreSideInvariants(copy);
+  const copied = ownKeyLists(copy);
+  if (copied.join('\n') !== today.join('\n')) tally.mismatches.push(`${template.format.id} template: ${firstDifference(today, copied)}`);
+}
+
+/** A few plies, the same picks with the lever clone and without: every fork's own keys and every child as today. */
+function censusPlayout(label: string, root: string, seed: (typeof SEEDS)[number], pick: number, tally: CensusTally): void {
+  let copied = createRootPosition(root);
+  let today = createRootPosition(root);
+  for (let ply = 0; ply < 5; ply++) {
+    const forked = withSimFast(['clone'], () => ownKeyLists(forkBattle(copied, seed)));
+    const expected = withSimFast([], () => ownKeyLists(forkBattle(today, seed)));
+    tally.forks++;
+    if (forked.join('\n') !== expected.join('\n')) tally.mismatches.push(`${label} ply ${ply} fork: ${firstDifference(expected, forked)}`);
+    if (positionBattle(today).ended) return;
+    const [a, b] = (['p1', 'p2'] as const).map((side, index) => {
+      const options = legalChoices(today, side);
+      return options.length > 0 ? options[(pick * 7 + ply * 3 + index) % options.length].choice : 'wait';
+    });
+    const next = withSimFast(['clone'], () => advancePositionWithLog(copied, a, b, seed));
+    const standard = withSimFast([], () => advancePositionWithLog(today, a, b, seed));
+    if (next.child.serialized !== standard.child.serialized || stableLog(next.log) !== stableLog(standard.log)) {
+      tally.mismatches.push(`${label} ply ${ply} child: ${firstDifference([standard.child.serialized], [next.child.serialized])}`);
+    }
+    [copied, today] = [next.child, standard.child];
+  }
 }
 
 describe('the pins the layer relies on', () => {
@@ -117,13 +203,11 @@ describe('the pins the layer relies on', () => {
     });
   });
 
-  test('the one key the sim empties that no constructor creates is Pokemon.pendingStaleness', () => {
-    // Today's JSON round trip drops a key holding undefined unless the constructor recreates it; a copy
-    // keeps its slot, so adoptTemplate (sim-fast/index.ts) drops it. A new key here needs the same.
-    const fresh = new esm.Battle({
-      formatid: esm.toID('gen9customgame'), seed: '1,2,3,4', deserialized: true, p1: { name: 'x', team: TEAM }, p2: { name: 'y', team: TEAM },
-    });
-    const created = new Set([fresh, fresh.field, ...fresh.sides.flatMap(side => [side, ...side.pokemon])].flatMap(object => Object.keys(object)));
+  test('every constructor key the sim empties by name holds undefined on a fresh object, in every gen', () => {
+    // Today's round trip drops a key holding undefined and leaves the constructor's value; a copy keeps
+    // undefined. adoptTemplate (sim-fast/index.ts) relies on the two agreeing for constructor keys.
+    // A source scan sees only literal writes (gen 2's lastMoveTargetLoc = targetLoc it cannot see):
+    // the census below plays the rest.
     const esmDir = join(SIM_BUILD, 'esm');
     const sources = [...readdirSync(join(esmDir, 'sim')).filter(name => name.endsWith('.mjs')).map(name => join(esmDir, 'sim', name)),
       ...walk(join(esmDir, 'data'))];
@@ -134,8 +218,38 @@ describe('the pins the layer relies on', () => {
         if (!NOT_BATTLE_STATE.has(`${where} ${receiver}`)) emptied.add(key);
       }
     }
-    expect([...emptied].filter(key => !created.has(key)).sort()).toEqual(['pendingStaleness']);
+    const kept: string[] = [];
+    for (const formatid of CENSUS_FORMATS) {
+      const fresh = new esm.Battle({
+        formatid: esm.toID(formatid), seed: '1,2,3,4', deserialized: true, p1: { name: 'x', team: TEAM }, p2: { name: 'y', team: TEAM },
+      });
+      expect(fresh.format.exists, formatid).toBe(true);
+      for (const object of [fresh, fresh.field, ...fresh.sides.flatMap(side => [side, ...side.pokemon])]) {
+        const record = object as unknown as Record<string, unknown>;
+        for (const key of emptied) if (Object.hasOwn(record, key) && record[key] !== undefined) kept.push(`${formatid} ${key}`);
+      }
+    }
+    expect(kept).toEqual([]);
+    expect([...emptied].sort()).toContain('moveThisTurnResult'); // the scan still reads the sources
   });
+
+  test('census: in every gen a copy source forks with today\'s own keys and plays as today (singles and doubles)', () => {
+    const tally: CensusTally = { forks: 0, templates: 0, snapshots: 0, mismatches: [] };
+    setTemplateHook(template => censusTemplate(template, tally));
+    try {
+      for (const formatid of CENSUS_FORMATS) {
+        const root = censusRoot(formatid);
+        for (const seed of SEEDS) {
+          for (let pick = 0; pick < 3; pick++) censusPlayout(`${formatid} ${seed} pick ${pick}`, root, seed, pick, tally);
+        }
+      }
+    } finally {
+      setTemplateHook(null);
+    }
+    expect(tally.mismatches).toEqual([]);
+    expect(tally.forks).toBeGreaterThan(CENSUS_FORMATS.length * 2 * 3);
+    expect(tally.snapshots).toBeGreaterThan(0);
+  }, 120_000);
 });
 
 describe('the rebuilt closures', () => {

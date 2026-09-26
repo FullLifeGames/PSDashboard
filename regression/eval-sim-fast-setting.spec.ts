@@ -1,5 +1,6 @@
 import { afterEach, expect, test, vi } from 'vitest';
 import { perfReport, perfReset, SIM_FAST_DEFAULT, simFastStatus } from '@fulllifegames/eval-engine';
+import { simFastOn } from '../packages/eval-engine/src/forward/sim-fast/state';
 import {
   adoptSimFastStamp, readSimFastLevers, recordSimFastReport, SIM_FAST_STORAGE_KEY,
 } from '../src/lib/eval/sim-fast-setting';
@@ -35,10 +36,13 @@ test('a worker report lands in the perf trace', () => {
 });
 
 test('a message without the stamp leaves the configuration alone', () => {
+  // From the kill switch: a handler that falls back to the default (all levers) would turn the worker on.
+  adoptSimFastStamp({ simFast: [] });
+  adoptSimFastStamp({});
+  expect(simFastStatus()).toBe('off');
+  // From one lever: a fallback to the default would add rules and dispatch, one to [] would turn clone off.
   adoptSimFastStamp({ simFast: ['clone'] });
-  expect(simFastStatus()).toBe('active');
   adoptSimFastStamp({});
   expect(simFastStatus()).toBe('active');
-  adoptSimFastStamp({ simFast: [] });
-  expect(simFastStatus()).toBe('off');
+  expect({ rules: simFastOn('rules'), clone: simFastOn('clone'), dispatch: simFastOn('dispatch') }).toEqual({ rules: false, clone: true, dispatch: false });
 });

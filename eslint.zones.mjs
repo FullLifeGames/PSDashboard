@@ -32,11 +32,13 @@ export const importZones = [
     'The app imports the packages by name (@fulllifegames/replay-core, @fulllifegames/eval-engine), never their files.'),
   // The root suite consumes the packages the way the app does: by name over
   // the curated barrel. The three measurement chains read engine internals
-  // (feature weights, leaf values, sweep setters) and stay white-box.
+  // (feature weights, leaf values, sweep setters) and stay white-box, and the
+  // speed-layer setting spec reads each lever of the worker's switch (simFastOn).
   {
     ...zone(['regression/**/*.ts'], '^(\\.\\./)+packages/',
       'Root specs import the packages by name (@fulllifegames/replay-core, @fulllifegames/eval-engine); only the measurement chains read package internals.'),
-    ignores: ['regression/eval-calibration.spec.ts', 'regression/eval-fit.spec.ts', 'regression/endgame-truth.spec.ts'],
+    ignores: ['regression/eval-calibration.spec.ts', 'regression/eval-fit.spec.ts', 'regression/endgame-truth.spec.ts',
+      'regression/eval-sim-fast-setting.spec.ts'],
   },
   zone(['ui/**/*.{ts,tsx}'], '^(\\.\\./)+packages/',
     'The app suite imports components, hooks, and src/lib directly and the packages by name, never their files.'),

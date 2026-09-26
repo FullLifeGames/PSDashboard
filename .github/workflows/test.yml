@@ -35,12 +35,17 @@ jobs:
       - name: Run the Node suites
         run: npm run test:regression
 
-      # Round 59: the engine suite once more with the speed layer switched the other way
-      # (forced on until the gate adopts it, forced off afterwards), so both paths stay green.
+      # Round 59: the default run above covers the adopted speed layer; one more run forces it
+      # off (the kill switch) and one forces it on (a break throws instead of falling back).
       - name: Run the engine suite with the speed layer forced off
         run: npx vitest run --project eval-engine
         env:
           EVAL_SIM_FAST: '0'
+
+      - name: Run the engine suite with the speed layer forced on
+        run: npx vitest run --project eval-engine
+        env:
+          EVAL_SIM_FAST: '1'
 
   browser:
     name: Browser flows
