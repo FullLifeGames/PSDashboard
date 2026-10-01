@@ -15,7 +15,7 @@ Hinter jedem Titel stehen Thema, Art, Größe (mini, klein, mittel, groß), Gate
 
 ## Programm · Mehr Simulation (Runden 59 bis 62)
 
-Beschlossen am User-Gate der Runde 58 (24.09. 18:38, „1a 2a 3a 4a 5a“) mit der Auflage, den Plan klar festzuhalten und alle übrigen TODOs nach Umbau und Erfolg neu zu bewerten. Das vollständige Programm mit Toren, Entscheidungsregeln und Risiken steht in `docs/superpowers/plans/2026-09-24-program-more-simulation.md`; hier die Kurzfassung.
+Beschlossen am User-Gate der Runde 58 (24.09. 18:38, „1a 2a 3a 4a 5a“) mit der Auflage, den Plan klar festzuhalten und alle übrigen TODOs nach Umbau und Erfolg neu zu bewerten. Das vollständige Programm mit Toren, Entscheidungsregeln und Risiken steht in `docs/superpowers/plans/2026-09-24-program-more-simulation.md`; hier die Kurzfassung. Die ganze Begründung (die Fragen, die wir gestellt haben, was die Runden 58 und 59 gemessen haben, die Entscheidung und was offen ist) steht in `MoreSimulation.md`.
 
 Runde 58 hat gemessen: Eine Statik mit perfekt gerechnetem Schaden sagt Spielausgänge um +16,4 bp [7,6; 25,3] besser voraus, überwiegend in Gen-9-Singles (rund drei Viertel des Gewinns), und nur mit neu gefitteten Gewichten; eine Bibliothek als Schadenskern machte die kalte Statik 22- bis 40-mal teurer (die Wurzelsuche 1,28- bis 1,50-mal, mit Paar-Schlüssel etwa 1,11- bis 1,25-mal). Die Kosten der Suche liegen im Simulator: Die Kopie des Kampfs frisst 35 bis 53 % eines Singles-Baums, die Suche nach Effekt-Handlern 24 bis 35 % (in Doubles-Bäumen 39 bis 47 %), und ein eigener Laufzeit-Patch macht Suchbäume 1,9- bis 2,5-mal schneller, in 18 Suchen byte-gleich. Die Richtung: den Simulator billiger machen und ihm mehr Arbeit geben, statt die Schätzung am Ende weiter nachzubauen.
 
