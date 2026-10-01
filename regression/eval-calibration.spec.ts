@@ -1013,8 +1013,8 @@ import { takeSimFastReport } from '../packages/eval-engine/src/forward/sim-fast/
  * 85eb5ad: the same 50 errors) and with the layer off at level 2 (level 2
  * was not run on the base); at t6 the Task-7 smoke saw the simulator
  * reject "move outrage" without a target; at t4 and t8 the cause is not
- * yet read (T94 sees the same message in the tree at t4) -> T104, beside
- * T94 (the MCTS crash at t4).
+ * yet read (T94 sees the same message in the tree at t4) -> T94, which
+ * now also covers t6 and t8.
  * VERDICT (decision rule 2 of the plan: all gates green): all three
  * levers adopted. SIM_FAST_DEFAULT is ['rules', 'clone', 'dispatch'] since
  * 78a1fdb (adopted at the gate on 26 Sep); EVAL_SIM_FAST=0 (Node) and '0'
@@ -1034,8 +1034,8 @@ import { takeSimFastReport } from '../packages/eval-engine/src/forward/sim-fast/
  * slots and ActiveMove data below the top-level classes, check() not
  * exception-safe, constructor key sets assumed team-independent, the
  * reviews' missing test pins, unknown values of the app kill switch),
- * parked until the first upgrade; T104 (the 913996 choice) in iteration
- * S1a.
+ * parked until the first upgrade; T94 extended by the 913996 choice the
+ * simulator rejects (now t4, t6 and t8) in iteration S1a.
  *
  * STATIC UPPER BOUND AND SIM COST 2026-09-24 (sighting round 58, out of
  * turn, no code adopted; throwaway branch r58-oracle 33c93c5, whose commit
