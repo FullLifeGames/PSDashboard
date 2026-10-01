@@ -902,6 +902,141 @@ import { takeSimFastReport } from '../packages/eval-engine/src/forward/sim-fast/
  * static basis for this mass; the next lever, if any, is search/
  * planning-side.
  *
+ * SPEED LAYER 2026-10-01 (improvement round 59, iteration S1, T91, stage 1
+ * of the program "more simulation"; spec
+ * docs/superpowers/specs/2026-09-24-round-59-design.md, plan
+ * docs/superpowers/plans/2026-09-24-round-59-plan.md; branch r59 from
+ * master 94c88d9 (code state 85eb5ad) = 8fb5795, 790e262, b297690,
+ * 8aa8194, 16d91fb, bddfdd7, e4a5a61, ace8159, eb05424, the first
+ * key-order fix 8b640a9, the default flip 78a1fdb and the final review's
+ * fix 4aaad44; lossless D4, no cache bump, not pushed; gate chain, verdict
+ * and debug probes under docs/perf/probes/2026-09-24-r59/).
+ * CHANGE: packages/eval-engine/src/forward/sim-fast/ hooks three levers
+ * into the battles the search makes (forward/parsed-state.ts, position.ts,
+ * switches.ts), without touching node_modules.
+ * (1) rules: the rule table once per format (the sim never stores it for
+ * gen9ou and gen4ou and rebuilt it on every fork). (2) clone: a Battle
+ * copy instead of the JSON round trip, for forks (a template per position:
+ * a root's unrepaired deserialization, a child's battle at its first fork)
+ * and for the mid-turn forced-switch trials (one snapshot copied per
+ * advance); generated shells and fillers, a positive list of shared dex
+ * classes (anything else throws), Pokemon closures rebuilt from the sim's
+ * source and self-tested on first use. (3) dispatch: a per-battle
+ * pre-check that answers runEvent when no effect listens and steps aside
+ * to the original whenever one might. A hash gate over the sim functions
+ * the layer relies on (ESM and CJS pins; a mismatch turns the layer off
+ * with status hash-mismatch, forced it throws); a guard spec in CI (pins,
+ * shared classes, per-instance closures, mods, runtime handler writes,
+ * since 4aaad44 a dynamic census over gens 1-9); the switch EVAL_SIM_FAST
+ * (Node) and the localStorage override 'ps-replay-interceptor:sim-fast'
+ * (app, no UI switch, stamped on every worker message); status and
+ * counters in the perf trace and in a proof line of every suite run.
+ * GATES (chain run 3 on 4aaad44, 26 Sep 16:40 to 20:31; timing from the
+ * rerun of the timing stage, run 4, 26 Sep 20:38 to 22:08, because run 3
+ * measured on a loaded machine and did not confirm off against the base:
+ * 1.199 / 1.126 / 0.949; base 85eb5ad):
+ *   identity level 1: 834 positions, 40776 turns; off vs on, vs rules
+ *     only and vs the base 0 different;
+ *   identity level 2: 318424 turns; off vs on and vs rules 0 different;
+ *   identity mid-turn: 111316 turns, 0 different, 0 errors;
+ *   identity of searches: 24 MCTS trees and 24 matrix searches (d1, d2,
+ *     singles, doubles; the prover runs in the matrix searches), 0
+ *     different;
+ *   all gens: dynamic census over gens 1-9 and gen-9 doubles in the guard
+ *     spec (own-key lists and child.serialized of a copy against today's
+ *     fork); the review's gen-2 playouts 0 of 200 differing;
+ *   lever 1 alone: identity off vs rules 0 in all four parts; suite with
+ *     EVAL_SIM_FAST=rules 904 passed, 9 skipped, proof active, ruleTables
+ *     3, 0 copies;
+ *   engine suite in default, forced on and rules only: 904 passed, 9
+ *     skipped each; by hand with EVAL_SIM_FAST=0 the same;
+ *   D4: lint 0, tsc -b 0, regression 1659 passed, e2e 75/75; pack smoke
+ *     green on 4aaad44;
+ *   feedback: 3 runs on and 3 off, each RUNS BYTE-IDENTICAL TO BASE, 10 of
+ *     10 dumps unmoved, results identical;
+ *   calibration: on, and off through the kill switch, 833 positions each,
+ *     merged-vs-r59-base=byte-identical;
+ *   production bundle: build smoke 2/2; with the layer every worker is
+ *     active, workers with cells show copies and pre-checks above 0, the
+ *     analysis is byte-equal to off;
+ *   counter-probes: a pre-check blind to abilities breaks the fixture
+ *     identity and the Huge Power turn; a foreign class throws or falls
+ *     back; a forged hash gives hash-mismatch per lever, forced it throws;
+ *   activity: the pre-check answers 92.5 % of the runEvent calls in the
+ *     feedback run (90145505 of 97453762; gate 90 %);
+ *   tempo (4 reps per variant, median; off confirmed against the base at
+ *     1.008 / 1.010 / 1.017; result digests equal across every variant and
+ *     the base): tree singles 2.35x (gate 2.0), tree doubles 1.81x (1.6),
+ *     matrix 2.39x (1.8); copy only singles 1.62x; pre-check only singles
+ *     1.22x, doubles 1.33x; rules only singles 1.15x. Two runs (copy only
+ *     and rules only, rep 0 each) started after 15 minutes of waiting for
+ *     quiet and carry the mark INVALID (not quiet); they sit inside their
+ *     variants' spread, and the adopted layer's gates rest on quiet runs
+ *     only;
+ *   end to end (feedback pass times): pass 3 1.90x (79.4 s -> 41.7 s),
+ *     pass 1 1.14x, pass 2 1.93x, no pass slower, total 1.45x (226.8 s ->
+ *     156.4 s); wall clock on 230 s against base 361 s (reported only,
+ *     one base run);
+ *   memory: maxRSS at most +6.2 % (pre-check only 1039 MB against off
+ *     978 MB; all levers 900 MB; gate 10 %).
+ * TWO DIVERGENCES, BOTH FIXED: chain run 1 (25 Sep, eb05424) found 70 of
+ * 318424 level-2 turns in three bank positions (gen9doublesou-2660809089
+ * t8, gen9doublesou-2660822493 t8, gen9ou-2663108091 t22), copy lever
+ * only, whose child.serialized differed in key order alone (values, logs
+ * and requests equal): eatItem and takeItem leave an own
+ * Pokemon.pendingStaleness slot holding undefined; today's JSON round trip
+ * drops it, the copy keeps it, and setItem refills it one ply later
+ * (Harvest, Trick back). The run then died with the machine restart at
+ * 22:02 (feedback stage); the resumable chain and the flushes kept every
+ * finished stage. A debug workflow (three localizers, an analyst, two
+ * skeptics) found the cause; the spec's request-state remedy, measured on
+ * the three positions and 48 more, left all 70 divergences. Fix 8b640a9:
+ * the copy drops the emptied key, and a guard census pins the sim's
+ * undefined writes to non-constructor keys; run 2 (8b640a9) green. The
+ * final whole-branch review (four lenses, a skeptic per Critical or
+ * Important finding) found
+ * the same class in gen 2: moveUsed without a target leaves
+ * lastMoveTargetLoc undefined, Rollout through Mirror Move or Metronome
+ * refills it, 26 of 200 gen-2 playouts differed (no bank position is gen
+ * 2), and the text census had missed it. Fix 4aaad44: a generic rule
+ * (drop every own key holding undefined that the object's constructor
+ * does not create, key sets cached per prototype and format), the dynamic
+ * census, a gen-2 regression test, and the two test gaps of the default
+ * flip (the Review-Focus-5 test, a forced-on CI step). Run 3 green except
+ * timing, run 4 timing green. KEY ORDER IS NOT COSMETIC: the endgame
+ * solver's and prover's memo key follows own-key order (endgame/key.ts),
+ * so a slot that moves a key reaches results.
+ * PRE-EXISTING, NOT ROUND 59: in smogtours-gen9doublesou-913996 turns 4, 6
+ * and 8 every level-1 and level-2 turn that plays one particular option
+ * throws (50 of 40776 level-1 turns, all at t6; 224 of 318424 level-2
+ * turns, at t4 and t8), identical on the base code at level 1 (base
+ * 85eb5ad: the same 50 errors) and with the layer off at level 2 (level 2
+ * was not run on the base); at t6 the Task-7 smoke saw the simulator
+ * reject "move outrage" without a target; at t4 and t8 the cause is not
+ * yet read (T94 sees the same message in the tree at t4) -> T104, beside
+ * T94 (the MCTS crash at t4).
+ * VERDICT (decision rule 2 of the plan: all gates green): all three
+ * levers adopted. SIM_FAST_DEFAULT is ['rules', 'clone', 'dispatch'] since
+ * 78a1fdb (adopted at the gate on 26 Sep); EVAL_SIM_FAST=0 (Node) and '0'
+ * in localStorage stay the kill switch; CI runs the engine suite by
+ * default, forced off and forced on. Lever 1 would also hold alone (rule
+ * 1); no partial re-run.
+ * UPKEEP: exact pin "@pkmn/sim": "0.10.11" in the root package.json (the
+ * packages keep the peer range ^0.10.11); the hash gate under Node (the
+ * minified app bundle cannot be hashed, there pin and CI carry it); the
+ * guard spec with the dynamic census in CI; an upgrade of @pkmn/sim is a
+ * PR of its own with every identity gate of this round (chain
+ * docs/perf/probes/2026-09-24-r59/gate/), the guard spec with the census
+ * over all gens and the grep for runtime handlers, with T103 done first
+ * (NextSteps D24); a weekly version check of @pkmn/sim (NextSteps C).
+ * REMAINS: T103 (harden the layer before the sim moves: the hash gate does
+ * not cover what the copy mirrors, unhashed pre-check helpers, undefined
+ * slots and ActiveMove data below the top-level classes, check() not
+ * exception-safe, constructor key sets assumed team-independent, the
+ * reviews' missing test pins, unknown values of the app kill switch),
+ * parked until the first upgrade; T104 (the 913996 choice) in iteration
+ * S1a.
+ *
  * STATIC UPPER BOUND AND SIM COST 2026-09-24 (sighting round 58, out of
  * turn, no code adopted; throwaway branch r58-oracle 33c93c5, whose commit
  * message carries the pre-registered thresholds; probes, inventory,

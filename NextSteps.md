@@ -1,9 +1,9 @@
-# Next Steps (Stand 24.09.2026, nach Runde 58)
+# Next Steps (Stand 01.10.2026, nach Runde 59)
 
 Nur offene Schritte, als priorisierte Checkliste: Die oberste Iteration ist die nächste Sitzung, das oberste offene Kästchen darin das nächste TODO. Jedes TODO nennt das Problem an einer Spielszene und das Erfolgsmaß. Die Umsetzungsschritte jedes TODOs stehen als Checkliste im Backlog-Plan unter derselben Nummer; beim Start einer Iteration wandern sie hierher.
 
-- **Iterationen** bündeln die TODOs einer Sitzung. Eine Iteration wird beim Start zur Runde mit der nächsten freien Rundennummer: Iteration 1 war Runde 46, Iteration 2 war Runde 47, Iteration 2a war Runde 48, Iteration 2b war Runde 49, Iteration 3 war Runde 50, Iteration 4 war Runde 51, Iteration 4a war Runde 52, Iteration 4d war Runde 53, Iteration 4b war Runde 54, Iteration 4e war Runde 55, Iteration 4c war Runde 56, Iteration 4f war Runde 57. Runde 58 war die Sichtung „Was bauen wir nach?“ außer der Reihe; seit ihrem Gate stehen die Iterationen S1 bis S3 des Programms „Mehr Simulation“ oben, vorgesehen als Runden 59 bis 62. Score-berührende TODOs derselben Iteration bekommen je ihre eigene Messung (D3), nie eine gemeinsame.
-- **T-Nummern** (T01 bis T45) sind feste Namen, vergeben am 18.09. in Prioritäts-Reihenfolge. Wandert ein TODO in der Liste, behält es seine Nummer; ein neues TODO bekommt die nächste freie (ab T103; T46 kam am 18.09. in Runde 46 dazu, T47 bis T51 in Runde 47, T52 und T53 in Runde 48, T54 in Runde 49, T55 in Runde 50, T56 bis T64 in Runde 51, T65 am 19.09. nach deren Gate, T66 bis T68 am 20.09. in Runde 52, T69 am 20.09. in Runde 53, T70 bis T74 am 21.09. in Runde 54, T75 am 21.09. in Runde 55, T76 am 23.09. am Gate der Runde 56, T77 bis T80 am 23.09. in Runde 56, T81 am 23.09. am Gate der Runde 57, T82 am 23.09. in ihrer Spec, T83 bis T90 am 24.09. in Runde 57, T91 bis T102 am 24.09. am Gate der Runde 58). „braucht T01“ heißt: T01 muss vorher gelaufen sein.
+- **Iterationen** bündeln die TODOs einer Sitzung. Eine Iteration wird beim Start zur Runde mit der nächsten freien Rundennummer: Iteration 1 war Runde 46, Iteration 2 war Runde 47, Iteration 2a war Runde 48, Iteration 2b war Runde 49, Iteration 3 war Runde 50, Iteration 4 war Runde 51, Iteration 4a war Runde 52, Iteration 4d war Runde 53, Iteration 4b war Runde 54, Iteration 4e war Runde 55, Iteration 4c war Runde 56, Iteration 4f war Runde 57. Runde 58 war die Sichtung „Was bauen wir nach?“ außer der Reihe; seit ihrem Gate stehen die Iterationen S1 bis S3 des Programms „Mehr Simulation“ oben, vorgesehen als Runden 59 bis 62; Iteration S1 war Runde 59. Score-berührende TODOs derselben Iteration bekommen je ihre eigene Messung (D3), nie eine gemeinsame.
+- **T-Nummern** (T01 bis T45) sind feste Namen, vergeben am 18.09. in Prioritäts-Reihenfolge. Wandert ein TODO in der Liste, behält es seine Nummer; ein neues TODO bekommt die nächste freie (ab T105; T46 kam am 18.09. in Runde 46 dazu, T47 bis T51 in Runde 47, T52 und T53 in Runde 48, T54 in Runde 49, T55 in Runde 50, T56 bis T64 in Runde 51, T65 am 19.09. nach deren Gate, T66 bis T68 am 20.09. in Runde 52, T69 am 20.09. in Runde 53, T70 bis T74 am 21.09. in Runde 54, T75 am 21.09. in Runde 55, T76 am 23.09. am Gate der Runde 56, T77 bis T80 am 23.09. in Runde 56, T81 am 23.09. am Gate der Runde 57, T82 am 23.09. in ihrer Spec, T83 bis T90 am 24.09. in Runde 57, T91 bis T102 am 24.09. am Gate der Runde 58, T103 und T104 am 01.10. in Runde 59). „braucht T01“ heißt: T01 muss vorher gelaufen sein.
 - **Backlog-Plan** (je TODO: Idee, Schritte mit Dateien, volles Gate, Doubles-Abdeckung, offene Entscheidungen, Zahlen, Code-Belege): `docs/superpowers/plans/2026-09-18-backlog-plans.md`.
 - **Erledigtes**: `docs/completed/` nach Gebiet (Index, Eintragsformat und Prozess in `docs/completed/README.md`).
 - **Maschinen-Quellen**: Ledger in `regression/eval-calibration.spec.ts`, Pins in `e2e-feedback/corpus.ts`, Memory-Notizen.
@@ -23,26 +23,14 @@ Bedingungen des Users: Die Qualität bleibt, die Geschwindigkeit bleibt, und nac
 
 | Schritt | Runde (vorgesehen) | TODOs | Tor in einem Satz |
 | --- | --- | --- | --- |
-| S1 Tempo-Schicht | 59 | T91 | byte-gleich in Zügen, Suchen und Feedback, Kalibrierung ziffern-gleich, dazu Baum Singles ≥ 2,0×, Doubles ≥ 1,6×, Matrix ≥ 1,8×, Pass 3 im Feedback ≥ 1,5× |
-| S1a Regelfehler, die dem Simulator falsche Zustände geben | 60 | T92 bis T95 | je Fehler rote Probe, Fix und eigenes Gate (D3; T94 verlustfrei D4 außer der abgestürzten Stellung) |
+| S1 Tempo-Schicht (gemessen: Runde 59, übernommen) | 59 | T91 | byte-gleich in Zügen, Suchen und Feedback, Kalibrierung ziffern-gleich, dazu Baum Singles ≥ 2,0×, Doubles ≥ 1,6×, Matrix ≥ 1,8×, Pass 3 im Feedback ≥ 1,5×. Ergebnis: alle Tore grün; alle drei Hebel (Regeltabelle einmal je Format, Kopie des Kampfs statt JSON, Vorprüfung vor `runEvent`) seit 78a1fdb Standard, Notaus `EVAL_SIM_FAST=0`; 0 Abweichungen in 40 776 Zügen ab den Bank-Stellungen, 318 424 Zügen eine Ebene tiefer, 111 316 Zügen mitten im Zug und 48 Suchen; Feedback und Kalibrierung byte-gleich; Baum Singles 2,35×, Doubles 1,81×, Matrix 2,39×, Pass 3 1,90×; Ledger-Block `SPEED LAYER 2026-10-01` in `regression/eval-calibration.spec.ts` |
+| S1a Regelfehler, die dem Simulator falsche Zustände geben | 60 | T92 bis T95, T104 | je Fehler rote Probe, Fix und eigenes Gate (D3; T94 verlustfrei D4 außer der abgestürzten Stellung; T104 verlustfrei D4, D3 sobald der Fix ein Bank- oder Dump-Ergebnis bewegt) |
 | S2 Simulation investieren | 61 | T97, T98 | Bank aufgelöst besser bei höchstens der Wandzeit vor Runde 59 (Code-Stand 85eb5ad, verschränkt gemessen) |
-| S3 Triage | 62 | T99 | jedes der 68 offenen TODOs außerhalb des Programms auf dem neuen Stand gelesen und am User-Gate neu eingeordnet |
-
-## Iteration S1 · Tempo-Schicht für den Simulator (Runde 59)
-
-Stufe 1 des Programms. Verlustfrei: In App, Feedback und Kalibrierung darf sich keine Zahl bewegen, nur die Zeit. Truth-Bench und Nachtlauf des Endspiel-Lösers (Wanduhr-Deckel 120 s) dürfen mehr lösen und sind kein Identitäts-Tor.
-
-- [ ] **T91 · Der Simulator kopiert und sucht Handler zu teuer** (Simulation und Suche, Runde, groß, verlustfrei D4 mit Identitäts-Toren)
-
-  573756 Zug 70: Ein MCTS-Baum kopiert rund 40 % seiner Zeit den Kampf (als JSON schreiben, zurücklesen, ein neues Battle bauen) und sucht weitere 28 % nach Effekt-Handlern; der Simulator fragt dort je Zug rund 2 700-mal, ob jemand auf ein Ereignis reagiert, und über 70 Bank-Stellungen (Singles und Doubles) findet im Schnitt nur 15 von 8 790 solcher Nachfragen etwas. Bei gen9ou baut er dazu bei jedem Fork die Regeltabelle neu (14 bis 17 % jeder gen9ou-Suche; 563 der 834 Bank-Stellungen sind gen9ou).
-
-  Hinweis: Drei Hebel in `packages/eval-engine/src/forward/sim-fast.ts`, pro Kampf eingehängt, ohne Eingriff in `node_modules`: Regeltabelle einmal setzen (öffentliche API, zuerst, eigener Commit), schnelle Kopie (683 → 87 µs pro Fork), Handler-Vorprüfung (5,76 → 1,05 µs pro `runEvent`-Aufruf). Pflege: exakter Pin `@pkmn/sim` 0.10.11, Hash-Tor mit Rückfall auf den Standardweg, Guard-Spec in CI, Schalter `EVAL_SIM_FAST`, Positivliste der Klassen, die die Kopie teilen darf. Prototypen, Messungen und Review der Runde 58: `docs/perf/probes/2026-09-24-r58/patch/` (`review.md`), `docs/perf/probes/2026-09-24-r58/oracle/patch-review-combo.vt.ts`.
-
-  *Erfolg:* 0 Abweichungen in rund 40 700 Zügen (alle Bank-Stellungen, 5×5 Optionen, Tera, 2 Seeds) und in jedem Zustand mit offener Ersatzwahl; 24 MCTS-Bäume und 24 Matrix-Suchen byte-gleich; Engine-Suite mit erzwungenem Patch grün; Feedback 3× byte-identisch an gegen aus; Kalibrierung ziffern-gleich; die drei Gegenproben schlagen an; die Vorprüfung beantwortet ≥ 90 % der `runEvent`-Aufrufe im Feedback-Lauf; Baum Singles ≥ 2,0×, Doubles ≥ 1,6×, Matrix ≥ 1,8× gegen den Code-Stand vor Runde 59; Pass 3 im Feedback ≥ 1,5×; Speicher je Worker höchstens +10 %. Die Regeltabelle landet für sich, sobald ihre Identität hält; für die übrigen Hebel gelten die Entscheidungsregeln des Programms. *Plan T91:* 7 Schritte, 2 offene Entscheidungen.
+| S3 Triage | 62 | T99 | jedes der offenen TODOs außerhalb des Programms (am 24.09. 68, seit Runde 59 mit T103 69) auf dem neuen Stand gelesen und am User-Gate neu eingeordnet |
 
 ## Iteration S1a · Regelfehler, die dem Simulator falsche Zustände geben (Runde 60)
 
-Zwischenschritt des Programms, die Liste des Gates „4a“: Spikes-Schichten, As One, der Doubles-Absturz, Verbrennung, Slush Rush. Je mehr der Simulator entscheidet, desto mehr zählt, dass wir ihm den richtigen Zustand geben. T92, T93 und T95 sind score-berührend, deshalb nach S1, damit die Tempo-Schicht gegen einen unveränderten Stand geprüft wird; T94 ist verlustfrei außer der abgestürzten Stellung (D4). Jeder Fehler bekommt seine eigene Messung.
+Zwischenschritt des Programms, die Liste des Gates „4a“: Spikes-Schichten, As One, der Doubles-Absturz, Verbrennung, Slush Rush. Je mehr der Simulator entscheidet, desto mehr zählt, dass wir ihm den richtigen Zustand geben. T92, T93 und T95 sind score-berührend, deshalb nach S1, damit die Tempo-Schicht gegen einen unveränderten Stand geprüft wird; T94 ist verlustfrei außer der abgestürzten Stellung (D4). T104 kam in Runde 59 dazu: Die Identitäts-Sonden fanden in 913996 eine Wahl, die der Simulator ablehnt. In Ebene 1 lehnt der Stand vor Runde 59 sie genauso ab. T104 steht hinter T94, weil beide dasselbe Spiel und wahrscheinlich dieselbe Wahl (`move outrage`) betreffen. Jeder Fehler bekommt seine eigene Messung.
 
 - [ ] **T92 · Korrigierte Seitenbedingungen ohne Schichten und Dauer** (Nachbau, Mini-Runde, klein, score-berührend D3)
 
@@ -61,6 +49,12 @@ Zwischenschritt des Programms, die Liste des Gates „4a“: Spikes-Schichten, A
   smogtours-gen9doublesou-913996 Zug 4: Der MCTS-Baum wirft `p1 "switch 4, move outrage": Can't move: Outrage needs a target` (`forward/switches.ts:52`), in allen sechs Varianten der Sonde der Runde 58 (Tera an und aus, drei Seeds, ohne Patch), auch mit der Wahl `move sandsearstorm, move outrage`. In der App ist der Pfad über den MCTS-Modus erreichbar.
 
   *Erfolg:* Der Baum auf 913996 Zug 4 läuft durch; ein Test hält die Wahl mit Ziel fest; alle übrigen Suchen bleiben byte-gleich. *Plan T94:* 3 Schritte, keine offene Entscheidung.
+
+- [ ] **T104 · Doubles: eine Wahl, die der Simulator ablehnt (913996)** (Simulation und Suche, Mini-Runde, klein, verlustfrei D4, D3 sobald der Fix ein Bank- oder Dump-Ergebnis bewegt)
+
+  smogtours-gen9doublesou-913996 Zug 4, 6 und 8: Die Identitäts-Sonden der Runde 59 spielen an jeder Bank-Stellung die ersten 5×5 Optionen mit zwei Seeds (Ebene 1) und von den Kindern aus einen weiteren Zug (Ebene 2). In diesen drei Stellungen wirft jeder Probe-Zug, der eine bestimmte Option spielt: in Ebene 1 alle 50 Probe-Züge der Stellung Zug 6 (50 von 40 776), in Ebene 2 224 von 318 424, in den Stellungen Zug 4 und 8. Der Code-Stand vor Runde 59 (85eb5ad) wirft in Ebene 1 an denselben 50 Probe-Zügen; Ebene 2 lief auf der Basis nicht, mit ausgeschalteter Schicht wirft sie gleich. Die Tempo-Schicht hat das nicht verursacht. In Zug 6 lehnt der Simulator `move outrage` ohne Ziel ab (ein Probelauf vor den Toren); für Zug 4 und 8 ist der Grund noch nicht gelesen. T94 kennt dieselbe Wahl als Absturz des MCTS-Baums in Zug 4.
+
+  *Erfolg:* Eine rote Probe nennt den Grund, aus dem der Simulator die Wahl ablehnt; danach laufen alle Züge der Ebenen 1 und 2 in 913996 ohne Fehler, ein Test hält die Wahl fest, alle übrigen Züge und Suchen bleiben byte-gleich; bewegt der Fix ein Bank- oder Dump-Ergebnis, gilt D3. *Plan T104:* 3 Schritte, 1 offene Entscheidung.
 
 - [ ] **T95 · Belegte Regelfehler in Statik und Tempo: Verbrennung und Slush Rush** (Regelfehler, Mini-Runde, klein, score-berührend D3, je Fehler eigene Messung)
 
@@ -670,20 +664,26 @@ Fällig am nächsten Release-Tag, unabhängig vom Platz in der Liste.
 
   *Plan T55:* 4 Schritte, 2 offene Entscheidungen.
 
+- [ ] **T103 · Tempo-Schicht härten, bevor der Simulator wechselt** (Werkzeug, Geparkt, klein bis mittel, verlustfrei D4)
+
+  Die Tempo-Schicht der Runde 59 hat auf `@pkmn/sim` 0.10.11 alle Tore der Runde bestanden (Bank in Gen 9 und Gen 3, Zensus über Gen 1 bis 9). Hash-Tor und Guard-Spec decken aber nicht alles ab, worauf die Schicht baut; dort kann ein neuer Simulator etwas ändern, ohne dass ein Test rot wird. Offen aus den Reviews der Runde: Das Hash-Tor prüft nicht den Quelltext der Klassen, den die Kopie nachbildet, und eine Abweichung schaltet immer die ganze Schicht ab, nicht nur den betroffenen Hebel. Die Vorprüfung baut auf Helfer ohne Hash (`alliesAndSelf`, `foes`, `allies`, `activeTeam`, `speedSort`). Schlüssel mit `undefined` unterhalb von Battle, Field, Side und Pokemon (Felder eines ActiveMove, Volatiles, Wahl, Warteschlange) fallen nicht unter die Regel aus 4aaad44, und die verschachtelten Daten der ActiveMoves in der Historie teilt die Kopie ohne Wert-Regeln. `check()` ist nicht ausnahmesicher: Wirft ein künftiger Simulator schon beim Bau des Probe-Kampfs, bricht `prepareFormat` im Standardmodus mit einer Ausnahme ab, statt `hash-mismatch` zu melden. Die Schlüssel der Konstruktoren gelten als unabhängig vom Team (in 0.10.11 wahr, nur `modifiedStats` in Gen 1 hängt davon ab); zur Laufzeit prüft das niemand. Dazu fehlen Test-Pins: der übernommene Standard (ein Rückbau auf `[]` bestünde CI), das Zwischenspeichern der Vorlagen, die Doubles-Matrix in der Suche mit eingefrorenen Vorlagen, der Schnappschuss mitten im Zug durch `adoptTemplate`, die Einordnung der Antworten im Build-Smoke und der Stempel von `runTree`. Und ein unbekannter Wert im Notaus der App (etwa `off` statt `0` in `localStorage`) fällt auf den Standard, die Schicht bleibt also an. Geparkt, bis das erste Upgrade von `@pkmn/sim` ansteht (D24) oder die C-Zeile eine neue Version meldet.
+
+  *Erfolg:* Jede Lücke oben ist geschlossen oder trägt einen Test, der bei einem Simulator-Wechsel rot wird; jeder neue Test ist ohne seinen Fix rot gezeigt; Engine-Suite im Standard, erzwungen an und mit `EVAL_SIM_FAST=0` grün; die Identitäts-Tore der Runde 59 bleiben bei 0 Abweichungen. *Plan T103:* 4 Schritte, 2 offene Entscheidungen.
+
 ## Themen-Übersicht
 
 Wer an einem Thema arbeitet, findet hier die verwandten TODOs.
 
 | Thema | TODOs |
 | --- | --- |
-| Werkzeug | T43, T67, T99, T100, T101 |
+| Werkzeug | T43, T67, T99, T100, T101, T103 |
 | Bericht | T17, T18, T19, T22, T36, T44, T51, T59, T64 |
 | Re-Fit | T49, T50, T52, T71, T81, T102 |
 | Endspiel | T33, T34, T55, T82, T84, T87, T88, T90 |
 | Sets und Spreads | T25, T26, T27, T28, T29, T30, T31, T32, T60, T62, T63, T79, T80, T86, T89 |
 | Zufall preisen | T14, T15, T16, T23, T24, T35, T65, T72, T76, T77, T78, T83 |
 | Nachbau | T75, T92, T93 |
-| Simulation und Suche | T91, T94, T97, T98 |
+| Simulation und Suche | T94, T97, T98, T104 |
 | Regelfehler | T95, T96 |
 | Oberfläche | T20, T68, T69, T85 |
 | Richter und Bank | T21, T37, T38, T45 |
@@ -793,6 +793,7 @@ Umgebung:
 - [ ] e2e „branch replay play controls stay muted without audio errors“ sah in Runde 50 zwei Seitenfehler aus dem Replay-iframe (`$ is not defined`, danach `reading 'length'`): 1 von 2 vollen Läufen rot, einzeln 10 von 12 grün auf dem Branch und 6 von 6 auf der Basis. Ein Showdown-Skript läuft, bevor jQuery geladen ist (dieselbe Familie wie der Config-Routes-Fix e019a73) → handeln, wenn der Test ein zweites Mal ein Gate kippt; Hebel: Ladereihenfolge der dynamischen Skripte im Embed, oder der Test wartet auf `window.$` im iframe, bevor er Fehler zählt.
 - [ ] Browser-Build ist Teil des Feedback-Ankers: Ein Chromium-Wechsel verschiebt die letzte Gleitkomma-Stelle (573756 t81 Verify-Auswahl) → jedes Playwright-Upgrade ist eine Re-Verankerung mit `FEEDBACK_DUMP=1`; Stand `@playwright/test ^1.62.1`.
 - [ ] TypeScript bleibt auf 6.x, bis typescript-eslint den nativen Compiler parst; `@types/node` folgt dem CI-Node-Major (24) → Peer-Range beobachten.
+- [ ] Wöchentlicher Versions-Check von `@pkmn/sim` (ab der Übernahme am 26.09., Pin 0.10.11) → bei neuer Version ein Upgrade-PR nach D24.
 - [ ] Screenshot-Sonde `docs/probes/2026-09-03-css/` (32 Tests, 34 Screens, 0 Pixel Toleranz; Start über `node scripts/run-e2e.mjs -c docs/probes/2026-09-03-css/shots.config.ts`; ihre baseURL steht fest auf Port 5174, `--dev-port` erreicht sie nicht) → als Pixel-Gate für jede UI-Runde wiederverwenden; Baseline mit `--update-snapshots` neu aufnehmen, wenn Copy oder Layout sich bewusst ändern.
 
 Geparkte Branches:
@@ -829,6 +830,7 @@ Geparkte Branches:
 - **D20** Jede Barrel-Änderung erscheint als Fixture-Diff unter `regression/fixtures/api/` (`UPDATE_API_SNAPSHOT=1` nur bewusst; der Diff ist das API-Review); nach Paket-Änderungen `npm run pack:smoke`.
 - **D22** Set-Sonden (Runde 51): Set-Listen nach Replay, Seite und Art paaren, nie nach Index (der Formen-Marker-Fix hat 492 Sets entfernt, die alten Skripte zählen sonst 1582 statt 977). Jeder Nachbau (Leiter, Sweep, Engine-Kopie) besteht vor der ersten Zahl einen Identitäts-Test gegen das heutige Ergebnis (der erste Leiter-Nachbau der Runde traf 595 von 977 Zeilen, der treue 960). Seit Runde 52 (T61) führt der Merkzettel der Nutzungsstatistik seine Datenquelle im Schlüssel: Zwei Quellen in einem Prozess liefern zwei Antworten (Gegenprobe `docs/perf/probes/2026-09-20-r52/T61/two-sources.vt.ts`, 4 von 120). Für Builder-Zählungen in Doubles die vier echten Spiele aus `e2e-feedback/fixtures` nehmen (die synthetischen Doubles-Fixtures stehen in keiner Nutzungsdatei), und den Platzhalter `Tackle` aus `team-builder.ts` nicht als gesehenen Zug zählen. Der Positions-Export der Bank trägt nur die 110 kleinen entschiedenen Endspiele, nicht die 833 Stellungen.
 - **D23** Absturz-Schutz (Vorfall 20.09. 12:48: Bluescreen 30 s nach dem Start eines Bank-Laufs, der zweite harte Absturz in zwei Tagen). Danach standen alle in den letzten Sekunden geschriebenen Dateien in voller Länge aus Null-Bytes da, darunter `.git/HEAD`, `.git/config` und der frische Branch-Ref (`fatal: not a git repository`). Vor jedem schweren Lauf (Bank, Feedback, e2e): erst committen, dann die frisch geschriebenen Dateien auf die Platte zwingen (`powershell -File docs/perf/probes/2026-09-20-r52/flush-recent.ps1`), und unmittelbar vor dem Start kein Git-Schreibvorgang. Ketten flushen nach jeder Stufe (Vorbild `docs/perf/probes/2026-09-20-r52/gates-chain.sh`). Nach einem Absturz: genullte Dateien unter `.git` suchen und aus dem Reflog wiederherstellen, halbe `.calibration`-Ordner löschen, den Lauf neu fahren, mtimes der Caches prüfen. Rezept samt `config`-Inhalt in der Memory-Notiz `machine-crash-zeroed-git-files`. Dritter Absturz 23.09. gegen 21:16, wieder während eines Bank-Laufs mit sechs Slices; diesmal nichts genullt. Seither ist die Kette wiederaufnehmbar (`SKIP_BASE`, `STATES_FILE`, `PREV_BANK`, `PREV_PROBE`, `PREV_DUMPS` in `docs/perf/probes/2026-09-23-r57/gates-chain.sh`), und ihre Bank-Läufe fuhren ab der Wiederaufnahme mit `BANK_ARGS="--slices 4"` (`bank-run.sh` setzt ohne `BANK_ARGS` weiter sechs).
+- **D24** Ein Upgrade von `@pkmn/sim` ist ein eigener PR mit allen Identitäts-Toren der Runde 59 (Kette `docs/perf/probes/2026-09-24-r59/gate/`), der Guard-Spec samt dynamischem Zensus über alle Generationen und dem grep nach Laufzeit-Handlern; T103 ist vorher erledigt.
 
 ## E. Prozess: abhaken und überführen
 
