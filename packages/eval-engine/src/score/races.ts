@@ -22,16 +22,23 @@ export interface HealProfile {
 const HEAL_FRACTION_DEFAULT = 0.5;
 
 /**
- * Per-turn fraction a status burns off its holder (gen7+ residuals; toxic
- * priced at its early ramp). Magic Guard blanks residuals; Poison Heal turns
- * poison into upkeep — priced as merely no residual (the passive regen, like
- * item regen, stays out: second-order next to the race sign).
+ * Per-turn fraction a status burns off its holder, as the sim's conditions
+ * take it: burn 1/8 in gens 2 to 6, else 1/16; poison 1/16 in gen 1, else
+ * 1/8; toxic priced at its early ramp (races-residual.spec.ts checks the
+ * table against the sim, gens 1 to 9). Magic Guard blanks residuals; Poison
+ * Heal turns poison into upkeep, priced as merely no residual (the passive
+ * regen, like item regen, stays out: second-order next to the race sign).
  */
-const STATUS_RESIDUALS: Record<string, number> = { brn: 1 / 16, psn: 1 / 8, tox: 1 / 8 };
+function residualFraction(status: string, gen: number): number {
+  if (status === 'brn') return gen >= 2 && gen <= 6 ? 1 / 8 : 1 / 16;
+  if (status === 'psn') return gen === 1 ? 1 / 16 : 1 / 8;
+  if (status === 'tox') return 1 / 8;
+  return 0;
+}
 
 export function statusResidual(pokemon: Pokemon): number {
   if (pokemon.ability === 'magicguard' || pokemon.ability === 'poisonheal') return 0;
-  return STATUS_RESIDUALS[pokemon.status] ?? 0;
+  return residualFraction(pokemon.status, pokemon.battle.gen);
 }
 
 /**

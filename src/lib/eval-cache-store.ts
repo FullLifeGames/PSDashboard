@@ -227,7 +227,9 @@ export interface StoredEval {
 //      Tera forme switching back in maps to its species through the dex
 //      (749895 built a second Ogerpon). An ability from a protocol line
 //      goes to the Pokémon whose species can have it (Water Absorb heals,
-//      Pickpocket, Trace; T104).
+//      Pickpocket, Trace; T104). The static's burn and poison residual
+//      follows the generation (burn 1/8 in gens 2 to 6, poison 1/16 in
+//      gen 1; T95).
 const EVAL_ENGINE_CACHE_VERSION = 54;
 
 export function evalStoreKey(
