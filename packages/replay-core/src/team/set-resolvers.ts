@@ -283,7 +283,7 @@ function cleanItem(replayItem: string, fallback: string): string {
  * teambuilder default when nothing better is known; protocol rule-outs walk
  * to the next slot (a Bronzong that took an Earthquake is not Levitate).
  */
-function defaultAbility(species: string, ruledOut?: string[]): string {
+export function defaultAbility(species: string, ruledOut?: string[]): string {
   const abilities = (Dex.species.get(species).abilities ?? {}) as unknown as Record<string, string | undefined>;
   for (const slot of ['0', '1', 'H'] as const) {
     const ability = abilities[slot];

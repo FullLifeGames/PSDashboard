@@ -218,7 +218,10 @@ export interface StoredEval {
 //      charge releases, recharge) is one option without a target and goes
 //      to the sim by request index (913996 turn 6 had no playable option).
 //      A snapshot correction writes Spikes and Toxic Spikes layers and the
-//      remaining turns of weather and terrain (T92).
+//      remaining turns of weather and terrain (T92). The build gives every
+//      set an ability the dex knows for its species: the log's "As One"
+//      becomes Calyrex's As One forme, and outside custom games Ogerpon and
+//      Terapagos lose the ability of their battle-only forme (T93).
 const EVAL_ENGINE_CACHE_VERSION = 54;
 
 export function evalStoreKey(
