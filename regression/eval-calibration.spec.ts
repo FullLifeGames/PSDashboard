@@ -902,6 +902,50 @@ import { takeSimFastReport } from '../packages/eval-engine/src/forward/sim-fast/
  * static basis for this mass; the next lever, if any, is search/
  * planning-side.
  *
+ * SEARCH BUDGET 2026-10-02 (improvement round 61, iteration S2 of the
+ * program "more simulation", T97 and T98; spec
+ * docs/superpowers/specs/2026-10-02-round-61-design.md, plan
+ * docs/superpowers/plans/2026-10-02-round-61-plan.md; branch r59; probes
+ * under docs/perf/probes/2026-10-02-r61/). PRE-REGISTERED before the first
+ * measuring run. Instrument first: the bank prices late positions with the
+ * app's tree search (four trees, verify, prover, one engine function),
+ * passes the app's Tera allowance and the played combo; .calibration/
+ * r61-app is the base of every measurement. Forms, each its own bank run
+ * paired against r61-app: late trees 8 and 16, late iterations per tree
+ * 1200 and 2400, early matrix depth 2 and 3, early draws per cell 3 and 5,
+ * early tree instead of matrix (tree from fainted fraction 0). Cost: bank
+ * wall against r61-app; app time = sum of the three analysis passes in a
+ * feedback run, one run per form interleaved with base runs, as a ratio to
+ * the neighbouring base. Time window: three feedback runs of 85eb5ad
+ * interleaved with three of r61-app; a form fits when the r61-app median
+ * times its ratio stays at or under the 85eb5ad median. RECOMMENDATION
+ * RULE for T98 (the user gate decides): a form WINS when a pooled row of
+ * scripts/paired-calibration.mjs has its band wholly on the good side and
+ * no pooled row in full, hq or luck-adjusted shows harm (band wholly bad
+ * and at least 5 bp); among forms that win and fit, the largest gain on
+ * the full all row; within 3 bp the cheaper one; one early and one late
+ * form may combine when both win alone and their extra cost together fits;
+ * one form for singles and doubles, a game type with pooled harm keeps
+ * today's budget; no form: T98 is dropped with the evidence of T97; the
+ * fourfold steps measure the ceiling and are adopted only if they fit.
+ * PLAY-OUT PROBE (no candidate): at every bank position both sides play
+ * to the end eight times, each move drawn from the mix of a sketch search
+ * (matrix, depth 1, one draw), dice per play-out from a fixed seed, the
+ * estimate after 60 turns; a pilot on 50 positions sets the scale (full
+ * run over 3 h on four processes -> four play-outs, still over -> late
+ * positions only); static score, win share and both through a logistic
+ * curve, 5-fold CV by game, 20 seeds, per-game paired Brier, game-cluster
+ * bootstrap, 90 % band; >= 20 bp resolved: play-outs pay (a T99
+ * candidate with a cost estimate); < 10 bp or 0 in the band: they do not;
+ * between: user gate. CHEAP STATIC PROBE (no candidate): the own kernel
+ * with the mean roll, burn halving physical damage (not with Guts, not
+ * Facade from gen 6), Guts x1.5 on Atk under status, Facade doubled under
+ * status other than sleep; fit corpus captured once with own, calc, sim
+ * and mean on the code of 33c93c5; closing at least half of the sim gain
+ * of the same capture with a band that excludes 0: the accuracy axis has
+ * a cheap route; 0 in the band: it has none; between: the number goes to
+ * T99.
+ *
  * RULE FIXES 2026-10-02 (improvement round 60, iteration S1a of the program
  * "more simulation", T92 to T95 plus T79 and T104; spec
  * docs/superpowers/specs/2026-10-02-round-60-design.md, plan
