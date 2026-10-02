@@ -217,6 +217,8 @@ export interface StoredEval {
 //      slot locked in a move (Outrage and the other rampages, Uproar, Bide,
 //      charge releases, recharge) is one option without a target and goes
 //      to the sim by request index (913996 turn 6 had no playable option).
+//      A snapshot correction writes Spikes and Toxic Spikes layers and the
+//      remaining turns of weather and terrain (T92).
 const EVAL_ENGINE_CACHE_VERSION = 54;
 
 export function evalStoreKey(

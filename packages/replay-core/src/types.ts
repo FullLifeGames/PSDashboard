@@ -41,6 +41,12 @@ export interface FieldSnapshot {
   weather: string;
   terrain: string;
   pseudoWeather: Record<string, unknown>;
+  /**
+   * Remaining turns of the weather and the terrain as @pkmn/client counts
+   * them (round 60, T92); absent on snapshots written before round 60.
+   */
+  weatherState?: { minDuration: number; maxDuration: number };
+  terrainState?: { minDuration: number; maxDuration: number };
 }
 
 export interface TurnSnapshot {

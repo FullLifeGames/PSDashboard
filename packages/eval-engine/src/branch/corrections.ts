@@ -5,7 +5,7 @@ import { restoreSideInvariants } from '../forward-model.ts';
 import type { SimBattle, SimPokemon, SimSide } from './types.ts';
 import { normalizeBattleOnlyFormeId } from './team-order.ts';
 import { findFirstAvailableSwitchSlot, findPokemonOnSide, findSlotBySpecies } from './protocol-choices.ts';
-import { terrainIdFromSnapshot, weatherIdFromSnapshot } from './field-ids.ts';
+import { correctFieldFromSnapshot } from './field-correction.ts';
 import { restoreTeraFromSnapshot } from './tera-restore.ts';
 
 function repointActiveSlot(side: SimSide, activeSlot: number, target: SimPokemon): boolean {
@@ -211,61 +211,6 @@ function correctHpFromSnapshot(battle: SimBattle, snapshot: TurnSnapshot) {
     }
   }
   restoreSideInvariants(battle);
-}
-
-function snapshotConditionDuration(value: unknown): number | undefined {
-  if (!value || typeof value !== 'object') return undefined;
-  const maybeDuration = value as { minDuration?: unknown; maxDuration?: unknown; duration?: unknown };
-  for (const duration of [maybeDuration.duration, maybeDuration.minDuration, maybeDuration.maxDuration]) {
-    if (typeof duration === 'number' && Number.isFinite(duration) && duration > 0) return duration;
-  }
-  return undefined;
-}
-
-function syncEffectTableFromSnapshot(
-  table: Record<string, { id?: string; duration?: number; effectOrder?: number }>,
-  snapshotTable: Record<string, unknown>,
-) {
-  const desiredIds = new Set(Object.keys(snapshotTable).map(key => toId(key)));
-  for (const key of Object.keys(table)) {
-    if (!desiredIds.has(toId(key))) delete table[key];
-  }
-
-  for (const [key, value] of Object.entries(snapshotTable)) {
-    const id = toId(key);
-    const duration = snapshotConditionDuration(value);
-    table[id] = {
-      ...(table[id] ?? {}),
-      id,
-      effectOrder: table[id]?.effectOrder ?? 0,
-      ...(duration ? { duration } : {}),
-    };
-  }
-}
-
-function correctFieldFromSnapshot(battle: SimBattle, snapshot: TurnSnapshot) {
-  battle.turn = snapshot.turn;
-  const weather = weatherIdFromSnapshot(snapshot.field.weather);
-  if ((battle.field.weather as string) !== weather) {
-    // Only touch weather the sim disagrees about — matching weather keeps its
-    // reconstructed weatherState (source, remaining duration) untouched.
-    battle.field.weather = weather as SimBattle['field']['weather'];
-    battle.field.weatherState.id = weather as typeof battle.field.weatherState.id;
-    delete battle.field.weatherState.duration;
-  }
-  battle.field.terrain = terrainIdFromSnapshot(snapshot.field.terrain) as SimBattle['field']['terrain'];
-  syncEffectTableFromSnapshot(
-    battle.field.pseudoWeather as Record<string, { id?: string; duration?: number; effectOrder?: number }>,
-    snapshot.field.pseudoWeather,
-  );
-  syncEffectTableFromSnapshot(
-    battle.sides[0].sideConditions as Record<string, { id?: string; duration?: number; effectOrder?: number }>,
-    snapshot.p1.sideConditions,
-  );
-  syncEffectTableFromSnapshot(
-    battle.sides[1].sideConditions as Record<string, { id?: string; duration?: number; effectOrder?: number }>,
-    snapshot.p2.sideConditions,
-  );
 }
 
 /**

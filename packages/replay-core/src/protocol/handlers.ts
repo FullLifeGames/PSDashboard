@@ -50,6 +50,8 @@ function snapshotField(field: Field): FieldSnapshot {
     weather: field.weather || '',
     terrain: field.terrain || '',
     pseudoWeather: JSON.parse(JSON.stringify(field.pseudoWeather)),
+    weatherState: { minDuration: field.weatherState.minDuration, maxDuration: field.weatherState.maxDuration },
+    terrainState: { minDuration: field.terrainState.minDuration, maxDuration: field.terrainState.maxDuration },
   };
 }
 
