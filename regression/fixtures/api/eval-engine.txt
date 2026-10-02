@@ -82,6 +82,7 @@ type StreakHistoryEntry
 type StreakOdds
 type TeraAllowance
 type TeraPreference
+type TreeExecutor
 type TurnAlignmentRecord
 type TurnAnalysis
 type TurnAttribution
@@ -126,6 +127,7 @@ value correctActivesFromProtocol
 value createBranchState
 value createBranchStateFromBattle
 value createLocalExecutor
+value createLocalTreeExecutor
 value decidedSeenKey
 value deserializeBattleExact
 value detectSacks
@@ -169,6 +171,7 @@ value resolveTeraPreference
 value rowCompletedCells
 value searchOrchestrated
 value searchPosition
+value searchTreesOrchestrated
 value selectKeyTurns
 value selectProbeCombos
 value serializeLiveBattle

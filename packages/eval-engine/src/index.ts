@@ -54,6 +54,8 @@ export { parseTendencies, computeRead } from './opponent-model.ts';
 export type { PlayerTendencies } from './opponent-model.ts';
 export { searchOrchestrated } from './orchestrator.ts';
 export type { SearchExecutor, OrchestratorCallbacks } from './orchestrator.ts';
+export { createLocalTreeExecutor, searchTreesOrchestrated } from './tree-orchestrator.ts';
+export type { TreeExecutor } from './tree-orchestrator.ts';
 export { perfReset, perfAdd, perfCount, perfSpan, perfSync, perfReport } from './perf-trace.ts';
 export {
   configureSimFast, parseSimFastSwitch, simFastStatus, takeSimFastReport, SIM_FAST_DEFAULT, SIM_FAST_LEVERS,

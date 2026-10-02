@@ -1,7 +1,6 @@
 import {
-  MCTS_TREES, mergeMctsTrees, rowCompletedCells, starvedSupportCells, perfAdd, perfCount, perfSync, cellKey, searchOrchestrated,
-  applyForcedWin, forcedWinInput, forcedWinPossible,
-  type SearchExecutor, type EvalCellValue, type EvalResult, type EvalSettings, type EvalWorkerRequest,
+  perfCount, searchOrchestrated, searchTreesOrchestrated, forcedWinPossible,
+  type SearchExecutor, type TreeExecutor, type EvalCellValue, type EvalResult, type EvalSettings, type EvalWorkerRequest,
   type EvalWorkerResponse, type MctsTreeStats, type SearchProgress,
 } from '@fulllifegames/eval-engine';
 import { evalPoolSize } from './pool-size';
@@ -175,54 +174,21 @@ export class EvalWorkerClient {
     const generation = this.generation;
     const live = () => generation === this.generation;
 
-    if (settings.mode === 'mcts') return this.evaluateMcts(serializedBattle, settings, handlers, live);
-
-    const executor = this.createPooledExecutor(serializedBattle);
-    return searchOrchestrated(executor, settings, {
-      onProgress: progress => {
+    const callbacks = {
+      onProgress: (progress: SearchProgress) => {
         if (live()) handlers?.onProgress?.(progress);
       },
-      onPartial: partial => {
+      onPartial: (partial: EvalResult) => {
         if (live()) handlers?.onPartial?.(partial);
       },
       shouldStop: () => !live(),
-    });
-  }
-
-  /**
-   * Root parallelization: a FIXED number of independent trees (seed
-   * offsets 0..N−1) spread across the pool and merged by summed root
-   * statistics. The count never follows the pool size — results must
-   * not vary by machine; small pools just run trees in rounds.
-   */
-  private evaluateMcts(
-    serializedBattle: string,
-    settings: EvalSettings,
-    handlers: EvalRunHandlers | undefined,
-    live: () => boolean,
-  ): Promise<EvalResult> {
-    const doneByTree = new Array(MCTS_TREES).fill(0);
-    let totalPerTree = 1;
-    const completed: MctsTreeStats[] = [];
-    const trees = Array.from({ length: MCTS_TREES }, (_, offset) => this.runTree(
-      serializedBattle, settings, offset, live,
-      progress => {
-        doneByTree[offset] = progress.done;
-        totalPerTree = progress.total;
-        handlers?.onProgress?.({
-          done: doneByTree.reduce((sum, done) => sum + done, 0),
-          total: MCTS_TREES * totalPerTree,
-          depth: progress.depth,
-        });
-      },
-      tree => {
-        if (live()) {
-          completed.push(tree);
-          handlers?.onPartial?.(perfSync('main:mcts-merge', () => mergeMctsTrees([...completed])));
-        }
-      },
-    ));
-    return Promise.all(trees).then(allTrees => this.verifiedMerge(serializedBattle, allTrees, settings, handlers, live));
+    };
+    // Round 61: the tree search's orchestration lives in the engine; the
+    // pool is its executor, the bank runs the same function in-process.
+    if (settings.mode === 'mcts') {
+      return searchTreesOrchestrated(this.createPooledTreeExecutor(serializedBattle, live), settings, callbacks);
+    }
+    return searchOrchestrated(this.createPooledExecutor(serializedBattle), settings, callbacks);
   }
 
   /** Posts one MCTS tree to the least-loaded worker; progress streams while the evaluation is live. */
@@ -232,11 +198,9 @@ export class EvalWorkerClient {
     offset: number,
     live: () => boolean,
     onProgress: (progress: SearchProgress) => void,
-    onDone: (tree: MctsTreeStats) => void,
   ): Promise<MctsTreeStats> {
     const handle = this.pickWorker();
     const id = this.nextId++;
-    const postedAt = Date.now();
     return new Promise<MctsTreeStats>((resolve, reject) => {
       handle.pending.set(id, {
         resolve: response => {
@@ -250,81 +214,20 @@ export class EvalWorkerClient {
         },
       });
       handle.worker.postMessage({ type: 'mctstree', id, serializedBattle, settings, seedOffset: offset, simFast: simFastLevers() });
-    }).then(tree => {
-      perfAdd('tree-wall', Date.now() - postedAt);
-      onDone(tree);
-      return tree;
     });
   }
 
   /**
-   * Starved-support verification: cells the merged equilibrium leans on
-   * with too few pooled visits carry ONE chance outcome per tree — re-price
-   * them with the matrix-grade multi-seed sampler before the verdict stands
-   * (draft t56: a lucky Draco Meteor miss promoted a sack). The score is
-   * visit-mean either way; only rankings sharpen.
+   * Round 61: the pool as the engine's tree executor. A FIXED number of
+   * trees (searchTreesOrchestrated) spread across the pool; the count never
+   * follows the pool size, small pools just run trees in rounds.
    */
-  private async verifiedMerge(
-    serializedBattle: string,
-    allTrees: MctsTreeStats[],
-    settings: EvalSettings,
-    handlers: EvalRunHandlers | undefined,
-    live: () => boolean,
-  ): Promise<EvalResult> {
-    const result = await this.verifiedMergeInner(serializedBattle, allTrees, settings, handlers, live);
-    return this.withForcedWin(serializedBattle, result, settings, live);
-  }
-
-  /** Round 35: the forced-win prover on the merged tree result, one worker, after the verify round. */
-  private async withForcedWin(serializedBattle: string, result: EvalResult, settings: EvalSettings, live: () => boolean): Promise<EvalResult> {
-    if (!live() || settings.prove === false) return result;
-    const started = Date.now();
-    const outcome = await this.createPooledExecutor(serializedBattle).prove(forcedWinInput(result, settings));
-    perfAdd('prover', Date.now() - started);
-    if (live()) applyForcedWin(result, outcome);
-    return result;
-  }
-
-  private async verifiedMergeInner(
-    serializedBattle: string,
-    allTrees: MctsTreeStats[],
-    settings: EvalSettings,
-    handlers: EvalRunHandlers | undefined,
-    live: () => boolean,
-  ): Promise<EvalResult> {
-    const merged = perfSync('main:mcts-merge', () => mergeMctsTrees(allTrees));
-    if (!live()) return merged;
-    const jobs = perfSync('main:starved-cells', () => {
-      const starved = starvedSupportCells(allTrees, merged);
-      return rowCompletedCells(allTrees, merged, starved);
-    });
-    if (jobs.length === 0) return merged;
-    handlers?.onPartial?.(merged);
-    try {
-      const executor = this.createPooledExecutor(serializedBattle);
-      const values = await executor.evalCells(jobs);
-      if (!live()) return merged;
-      // Round 33: one more ply for every verified cell that did not end —
-      // a depth-1 sub-search on the first-seed child (the matrix mode's
-      // depth-2 estimator), so a verified row is priced at one depth.
-      const jobByKey = new Map(jobs.map(job => [cellKey(job.i, job.j), job]));
-      const subSettings: EvalSettings = { depth: 1, samples: 1, tera: settings.tera, sleepClause: settings.sleepClause };
-      const deepenStart = Date.now();
-      await Promise.all(values.map(async value => {
-        const job = jobByKey.get(cellKey(value.i, value.j));
-        if (value.ended || !job) return;
-        const sub = await executor.subSearch({ i: value.i, j: value.j, p1Choice: job.p1Choice, p2Choice: job.p2Choice, settings: subSettings });
-        value.deepened = sub.score;
-      }));
-      perfAdd('verify-deepen', Date.now() - deepenStart);
-      if (!live()) return merged;
-      return perfSync('main:mcts-merge', () =>
-        mergeMctsTrees(allTrees, new Map(values.map(value => [cellKey(value.i, value.j), value]))));
-    } catch {
-      // Verification is a refinement — a failed round degrades to the
-      // unverified merge instead of failing the whole search.
-      return merged;
-    }
+  private createPooledTreeExecutor(serializedBattle: string, live: () => boolean): TreeExecutor {
+    return {
+      ...this.createPooledExecutor(serializedBattle),
+      tree: (settings, seedOffset, onProgress) =>
+        this.runTree(serializedBattle, settings, seedOffset, live, onProgress ?? (() => undefined)),
+    };
   }
 
   /**
