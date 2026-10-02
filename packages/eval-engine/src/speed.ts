@@ -1,6 +1,24 @@
 import type { Battle, Pokemon } from '@pkmn/sim';
 
 /**
+ * Speeds asked while one static evaluation runs. The battle holds still
+ * there and the static asks the same body once per pairing (getStat runs
+ * the sim's event chain each time); outside an evaluation nothing is kept,
+ * because a battle that moves on must be asked again.
+ */
+let evaluationSpeeds: WeakMap<Pokemon, number> | null = null;
+
+export function withEvaluationSpeeds<T>(run: () => T): T {
+  if (evaluationSpeeds) return run();
+  evaluationSpeeds = new WeakMap();
+  try {
+    return run();
+  } finally {
+    evaluationSpeeds = null;
+  }
+}
+
+/**
  * Effective speed for move-order decisions, from the simulator (round 60,
  * T95): getStat('spe') applies the stat stage and every ModifySpe handler
  * the sim runs (paralysis per generation, Choice Scarf, Iron Ball, Tailwind,
@@ -9,14 +27,23 @@ import type { Battle, Pokemon } from '@pkmn/sim';
  * replaces checked 'snow' where the sim writes 'snowscape' and doubled every
  * Unburden holder without an item. Trick Room stays with movesFirst
  * (getActionSpeed would invert it).
- *
+ */
+export function effectiveSpeed(pokemon: Pokemon): number {
+  const known = evaluationSpeeds?.get(pokemon);
+  if (known !== undefined) return known;
+  const speed = askSimSpeed(pokemon);
+  evaluationSpeeds?.set(pokemon, speed);
+  return speed;
+}
+
+/**
  * The sim finds no handlers for an inactive Pokémon (battle.js
  * findEventHandlers) and ignores its item and ability from gen 5 on
  * (pokemon.js ignoringItem, ignoringAbility). The static compares benched
  * bodies as if they stood on the field, so a benched body is asked with
  * isActive set for this call only.
  */
-export function effectiveSpeed(pokemon: Pokemon): number {
+function askSimSpeed(pokemon: Pokemon): number {
   if (pokemon.isActive) return pokemon.getStat('spe');
   pokemon.isActive = true;
   try {

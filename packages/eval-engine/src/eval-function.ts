@@ -2,6 +2,7 @@ import type { Battle } from '@pkmn/sim';
 import { EVAL_WEIGHTS, featureWeights, type EvalFeatures } from './score/weights.ts';
 import { evalFeatures } from './score/features.ts';
 import type { MatchupCache } from './score/threat.ts';
+import { withEvaluationSpeeds } from './speed.ts';
 
 /**
  * The static positional evaluation, p1's perspective in [-1, +1]. The
@@ -29,7 +30,8 @@ export function evaluatePosition(battle: Battle, cache?: MatchupCache): number {
     return -1;
   }
 
-  const features = evalFeatures(battle, cache);
+  // One evaluation asks each body's speed once (speed.ts).
+  const features = withEvaluationSpeeds(() => evalFeatures(battle, cache));
   const weights = featureWeights(battle.gameType === 'doubles');
   const teamSize = Math.max(battle.sides[0].pokemon.length, battle.sides[1].pokemon.length, 1);
   const normalizer = teamSize * (EVAL_WEIGHTS.alive + EVAL_WEIGHTS.hp);

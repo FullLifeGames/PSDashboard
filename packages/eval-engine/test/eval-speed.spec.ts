@@ -1,7 +1,7 @@
 import { test, expect, describe } from 'vitest';
 import { Battle, Teams, toID } from '@pkmn/sim';
 import type { PokemonSet } from '@pkmn/sim';
-import { effectiveSpeed, movesFirst } from '../src/speed';
+import { effectiveSpeed, movesFirst, withEvaluationSpeeds } from '../src/speed';
 
 function makeSet(
   name: string,
@@ -82,6 +82,19 @@ describe('effectiveSpeed asks the simulator (round 60, T95)', () => {
     battle.makeChoices('switch 2', 'move protect');
     expect(battle.sides[0].active[0]!.species.id).toBe('talonflame');
     expect(effectiveSpeed(scarfed)).toBe(benched);
+  });
+
+  test('one static evaluation asks each body once; outside one every call asks', () => {
+    const battle = makeBattle([makeSet('A', 'Snorlax', VANILLA)], [makeSet('B', 'Snorlax', VANILLA)]);
+    const mon = battle.sides[0].active[0]!;
+    const getStat = mon.getStat.bind(mon);
+    let asked = 0;
+    mon.getStat = ((...args: Parameters<typeof getStat>) => { asked++; return getStat(...args); }) as typeof mon.getStat;
+    withEvaluationSpeeds(() => [effectiveSpeed(mon), effectiveSpeed(mon)]);
+    expect(asked).toBe(1);
+    effectiveSpeed(mon);
+    effectiveSpeed(mon);
+    expect(asked).toBe(3);
   });
 
   test('paralysis follows the generation (half in gen 9, a quarter in gen 5)', () => {
