@@ -784,29 +784,27 @@ describe('mid-charge candidates', () => {
     expect(candidates.length).toBeGreaterThan(0);
     for (const candidate of candidates) {
       const [slotA] = candidate.choice.split(', ');
-      expect(slotA).toMatch(/^move phantomforce \d/);
+      expect(slotA).toBe('move phantomforce');
     }
     expect(() => advancePosition(position, candidates[0].choice, 'move seismictoss 1, move seismictoss 1', [1, 2, 3, 4])).not.toThrow();
   });
 
-  test('a locked random-target move stays bare (Outrage needs no slot)', () => {
+  test('a locked rampage offers one bare option and plays (round 60, T94)', () => {
     const battle = makeDoublesBattle(
       [
-        makeSet('Dragon', 'Garchomp', ['Outrage', 'Earthquake'], 100),
-        makeSet('Tree', 'Trevenant', ['Wood Hammer', 'Protect'], 100),
+        makeSet('Dragon', 'Garchomp', ['Outrage', 'Earthquake']),
+        makeSet('Tree', 'Trevenant', ['Wood Hammer', 'Protect']),
       ],
       [
         makeSet('Wall', 'Blissey', ['Seismic Toss', 'Protect'], 100),
         makeSet('Wall2', 'Chansey', ['Seismic Toss', 'Protect'], 100),
       ],
     );
-    battle.choose('p1', 'move outrage 1, move woodhammer 1');
+    battle.choose('p1', 'move outrage, move woodhammer 1');
     battle.choose('p2', 'move seismictoss 1, move seismictoss 1');
     const position = createRootPosition(serialize(battle));
     const locked = positionBattle(position).sides[0].active[0]!.volatiles['lockedmove'];
-    // Outrage locks via lockedmove, not twoturnmove — only assert when the
-    // sim actually locked (rampage may end early on some rolls).
-    if (!locked) return;
+    expect(locked).toBeTruthy();
     const candidates = legalChoices(position, 'p1');
     for (const candidate of candidates) {
       const [slotA] = candidate.choice.split(', ');

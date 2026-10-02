@@ -213,7 +213,11 @@ export interface StoredEval {
 //      weather, the terrain, the Tera click and Hidden Power's type and
 //      power; Scrappy and Mind's Eye hit Ghosts. Power set at use (weight,
 //      happiness, HP, speed: T81) is parked on branch r57-power.
-const EVAL_ENGINE_CACHE_VERSION = 53;
+// v54: round 60, the simulator gets the right state and choices. A doubles
+//      slot locked in a move (Outrage and the other rampages, Uproar, Bide,
+//      charge releases, recharge) is one option without a target and goes
+//      to the sim by request index (913996 turn 6 had no playable option).
+const EVAL_ENGINE_CACHE_VERSION = 54;
 
 export function evalStoreKey(
   cacheKey: string,

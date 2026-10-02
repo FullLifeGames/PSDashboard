@@ -3,6 +3,7 @@ import type { Battle, PRNGSeed, Side } from '@pkmn/sim';
 import { evaluatePosition } from '../eval-function.ts';
 import { sideIndex } from '@fulllifegames/replay-core';
 import { switchAssignments } from './assignments.ts';
+import { submittableChoice } from './request-moves.ts';
 import { deserializeFromParsed, parseSearchState, type ParsedSearchState } from './parsed-state.ts';
 import { restoreSideInvariants, serializeBattleStable } from './serialize.ts';
 import { adoptTemplate, copyBattle, prepareBattle, simFastOn } from './sim-fast/index.ts';
@@ -48,8 +49,10 @@ export function applyChoice(battle: Battle, side: 'p1' | 'p2', choice: string): 
   // Pivot pairs carry their follow-up after ' > ' — the move submits now,
   // the follow-up answers the forced-switch request in resolveForcedSwitches.
   [choice] = choice.split(' > ');
-  if (!battle.choose(side, choice)) {
-    const error = battle.sides[sideIndex(side)].choice.error || 'choice rejected';
+  const sideState = battle.sides[sideIndex(side)];
+  // Locked doubles slots submit by request index (round 60, T94).
+  if (!battle.choose(side, submittableChoice(sideState, choice))) {
+    const error = sideState.choice.error || 'choice rejected';
     throw new Error(`${side} "${choice}": ${error}`);
   }
 }

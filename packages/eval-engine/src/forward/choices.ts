@@ -2,7 +2,8 @@ import type { Battle, Pokemon, Side } from '@pkmn/sim';
 import type { TeraAllowance } from '../types.ts';
 import { positionBattle, type ChoiceOption, type SimPosition } from './position.ts';
 import { switchAssignments } from './assignments.ts';
-import { sideIndex, toId } from '@fulllifegames/replay-core';
+import { sideIndex } from '@fulllifegames/replay-core';
+import { isLockedEntry, requestMoveKey, type RequestMove } from './request-moves.ts';
 
 /**
  * The legal choices of one side at a position: team preview leads, the
@@ -23,7 +24,7 @@ interface SlotChoice {
 }
 
 interface ActiveRequestSlot {
-  moves: { move: string; disabled?: unknown; target?: unknown }[];
+  moves: RequestMove[];
   trapped?: unknown;
   canTerastallize?: unknown;
   canMegaEvo?: unknown;
@@ -40,14 +41,6 @@ function benchSwitches(sideState: Side): SlotChoice[] {
   return switches;
 }
 
-/** The move id the sim accepts: the entry's id when present, else the display name's key. */
-function requestMoveKey(move: ActiveRequestSlot['moves'][number]): string {
-  // Happiness moves display with computed BP ("Return 102") — the entry's
-  // id is the token the sim accepts; the display name is only the label.
-  const id = 'id' in move ? (move as { id?: string }).id : undefined;
-  return id || toId(move.move);
-}
-
 /** The once-per-battle gimmicks the request offers this slot. */
 function slotGimmicks(entry: ActiveRequestSlot, allowTera: boolean): { canTera: boolean; canMega: boolean; canUltra: boolean } {
   return {
@@ -58,23 +51,14 @@ function slotGimmicks(entry: ActiveRequestSlot, allowTera: boolean): { canTera: 
 }
 
 /** The target suffixes (and labels) one move enumerates from a doubles slot: foe slots, ally, self, or bare. */
-function moveTargets(
-  sideState: Side,
-  move: ActiveRequestSlot['moves'][number],
-  key: string,
-  slot: number,
-): { suffix: string; label: string }[] {
+function moveTargets(sideState: Side, move: RequestMove, slot: number): { suffix: string; label: string }[] {
+  // A locked entry (rampage, charge release, recharge, Bide, Uproar) names no
+  // target type: the sim keeps the locked target itself (side.js:480-492), so
+  // the slot offers one bare option and applyChoice submits it by index
+  // (round 60, T94; even a never-serialized battle rejects `move outrage`).
+  if (isLockedEntry(move)) return [{ suffix: '', label: move.move }];
   const foeActives = sideState.foe.active;
-    // Locked requests (mid-charge Phantom Force, rampages) carry no target
-    // data. The LIVE sim auto-targets a bare release, but serialization
-    // drops the locked-request shape and the round-tripped sim demands a
-    // target again ("Phantom Force needs a target", gen9doublesou t6/t8) —
-    // and every advance here runs on a round-trip. Fall back to the dex's
-    // target type: foe-targeting releases enumerate slots, random-target
-    // rampages (Outrage) stay bare.
-  const targetType = 'target' in move
-    ? (move.target as string | undefined)
-    : sideState.battle.dex.moves.get(key).target;
+  const targetType = move.target as string | undefined;
   const targets: { suffix: string; label: string }[] = [];
   if (targetType && TARGET_FOE.has(targetType)) {
     const living = foeActives
@@ -150,7 +134,7 @@ function slotChoicesFor(
     if ('disabled' in move && move.disabled) continue;
     const key = requestMoveKey(move);
     if (liveDisabled.has(key)) continue;
-    for (const target of moveTargets(sideState, move, key, slot)) {
+    for (const target of moveTargets(sideState, move, slot)) {
       pushSlotChoices(choices, key, target, gimmicks);
     }
   }
