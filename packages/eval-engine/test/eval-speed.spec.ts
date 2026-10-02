@@ -43,7 +43,7 @@ describe('effectiveSpeed', () => {
     mon.boosts.spe = 2;
     expect(effectiveSpeed(mon, battle)).toBe(mon.storedStats.spe * 2);
     mon.boosts.spe = -1;
-    expect(effectiveSpeed(mon, battle)).toBeCloseTo(mon.storedStats.spe * (2 / 3), 8);
+    expect(effectiveSpeed(mon, battle)).toBe(Math.floor(mon.storedStats.spe / 1.5)); // the sim floors the stage
   });
 
   test('paralysis halves in gen 9, quarters in gen 5, Quick Feet overrides', () => {
@@ -91,7 +91,7 @@ describe('effectiveSpeed', () => {
     );
     const bird = unburden.sides[0].active[0]!;
     expect(effectiveSpeed(bird, unburden)).toBe(bird.storedStats.spe); // Item noch da
-    bird.item = '';
+    bird.useItem(); // the sim's Unburden volatile, not just an empty slot
     expect(effectiveSpeed(bird, unburden)).toBe(bird.storedStats.spe * 2); // verbraucht
   });
 

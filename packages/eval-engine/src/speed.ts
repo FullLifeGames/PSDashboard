@@ -2,54 +2,65 @@ import type { Battle, Pokemon } from '@pkmn/sim';
 import { stageMultiplier } from './stat-stages.ts';
 
 /**
- * Effective speed for move-order decisions: stored speed through the stage
- * multiplier, then the modifiers a replay can actually witness — paralysis
- * (gen-dependent, Quick Feet overrides), Tailwind, Choice Scarf, Iron Ball,
- * Unburden (readable only as "ability present + item slot empty"), and the
- * weather/terrain speed abilities. Deliberately NOT modeled: Cloud Nine/Air
- * Lock suppression, Protosynthesis/Quark Drive, Slow Start, Lagging
- * Tail/Full Incense (move-order, not speed), Quick Powder.
+ * Effective speed for move-order decisions: the sim's getStat('spe') rebuilt
+ * as a list, because asking the sim directly cost the static 15 to 22 %
+ * (round 60, T95 time gate). speed-oracle.spec.ts checks every rule and every
+ * body of the committed bank positions against getStat (at most 1 apart).
+ * The list reads the sim's own state where the sim decides: suppressed
+ * abilities and items (ignoringAbility, ignoringItem: Neutralizing Gas,
+ * Klutz), the weather a holder feels (effectiveWeather: Utility Umbrella,
+ * Air Lock), the Unburden, Protosynthesis and Quark Drive volatiles.
+ * Deliberately not modeled: Slow Start, Lagging Tail/Full Incense
+ * (move-order, not speed), Quick Powder.
+ *
+ * A benched body is read as if on the field: the sim ignores the item and
+ * ability of an inactive Pokémon from gen 5 on, the static compares benched
+ * bodies as if they stood there, so isActive is set for this call only.
  */
-
-/** Paralysis (gen-dependent) and Quick Feet, applied in that order. */
-function applyStatusSpeed(speed: number, pokemon: Pokemon, battle: Battle): number {
-  let value = speed;
-  const ability = pokemon.ability;
-  if (pokemon.status === 'par' && ability !== 'quickfeet') value *= battle.gen >= 7 ? 0.5 : 0.25;
-  if (pokemon.status && ability === 'quickfeet') value *= 1.5;
-  return value;
-}
-
-/** Tailwind, Choice Scarf, Iron Ball, and Unburden, applied in that order. */
-function applyFieldAndItemSpeed(speed: number, pokemon: Pokemon): number {
-  let value = speed;
-  const ability = pokemon.ability;
-  const item = pokemon.item;
-  if (pokemon.side.sideConditions['tailwind']) value *= 2;
-  if (item === 'choicescarf') value *= 1.5;
-  if (item === 'ironball') value *= 0.5;
-  if (ability === 'unburden' && !item) value *= 2;
-  return value;
-}
-
-/** The weather and terrain speed abilities, applied in that order. */
-function applyWeatherSpeed(speed: number, pokemon: Pokemon, battle: Battle): number {
-  let value = speed;
-  const ability = pokemon.ability;
-  const weather = battle.field.weather;
-  if (ability === 'swiftswim' && (weather === 'raindance' || weather === 'primordialsea')) value *= 2;
-  if (ability === 'chlorophyll' && (weather === 'sunnyday' || weather === 'desolateland')) value *= 2;
-  if (ability === 'sandrush' && weather === 'sandstorm') value *= 2;
-  if (ability === 'slushrush' && (weather === 'hail' || weather === 'snow')) value *= 2;
-  if (ability === 'surgesurfer' && battle.field.terrain === 'electricterrain') value *= 2;
-  return value;
-}
-
 export function effectiveSpeed(pokemon: Pokemon, battle: Battle): number {
-  let speed = pokemon.storedStats.spe * stageMultiplier(pokemon.boosts.spe);
-  speed = applyStatusSpeed(speed, pokemon, battle);
-  speed = applyFieldAndItemSpeed(speed, pokemon);
-  return applyWeatherSpeed(speed, pokemon, battle);
+  if (pokemon.isActive) return listSpeed(pokemon, battle);
+  pokemon.isActive = true;
+  try {
+    return listSpeed(pokemon, battle);
+  } finally {
+    pokemon.isActive = false;
+  }
+}
+
+function listSpeed(pokemon: Pokemon, battle: Battle): number {
+  const ability = pokemon.ignoringAbility() ? '' : pokemon.ability;
+  // The sim floors the staged stat before any modifier (pokemon.js getStat).
+  let speed = Math.floor(pokemon.storedStats.spe * stageMultiplier(pokemon.boosts.spe));
+  speed *= abilityFactor(pokemon, ability, battle) * itemFactor(pokemon);
+  if (pokemon.side.sideConditions['tailwind']) speed *= 2;
+  // Paralysis comes after every other modifier (conditions.js par), Quick Feet cancels it.
+  if (pokemon.status === 'par' && ability !== 'quickfeet') speed *= battle.gen >= 7 ? 0.5 : 0.25;
+  return speed;
+}
+
+/** The doubling speed abilities, each under the condition its sim handler checks. */
+const DOUBLING = new Map<string, (pokemon: Pokemon, battle: Battle) => boolean>([
+  ['swiftswim', pokemon => ['raindance', 'primordialsea'].includes(pokemon.effectiveWeather())],
+  ['chlorophyll', pokemon => ['sunnyday', 'desolateland'].includes(pokemon.effectiveWeather())],
+  ['sandrush', (_, battle) => battle.field.isWeather('sandstorm')],
+  ['slushrush', (_, battle) => battle.field.isWeather(['hail', 'snowscape'])],
+  ['surgesurfer', (_, battle) => battle.field.isTerrain('electricterrain')],
+  ['unburden', pokemon => !!pokemon.volatiles['unburden'] && !pokemon.item],
+]);
+
+function abilityFactor(pokemon: Pokemon, ability: string, battle: Battle): number {
+  if (DOUBLING.get(ability)?.(pokemon, battle)) return 2;
+  if (ability === 'quickfeet' && pokemon.status) return 1.5;
+  const paradox = ability === 'protosynthesis' || ability === 'quarkdrive';
+  return paradox && pokemon.volatiles[ability]?.bestStat === 'spe' ? 1.5 : 1;
+}
+
+/** Choice Scarf (not while Dynamaxed) and Iron Ball, unless the sim ignores the item. */
+function itemFactor(pokemon: Pokemon): number {
+  if (pokemon.ignoringItem()) return 1;
+  if (pokemon.item === 'choicescarf') return pokemon.volatiles['dynamax'] ? 1 : 1.5;
+  if (pokemon.item === 'ironball') return 0.5;
+  return 1;
 }
 
 /**
