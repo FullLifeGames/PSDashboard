@@ -28,13 +28,13 @@ export function effectiveSpeed(pokemon: Pokemon, battle: Battle): number {
 }
 
 function listSpeed(pokemon: Pokemon, battle: Battle): number {
-  const ability = pokemon.ignoringAbility() ? '' : pokemon.ability;
   // The sim floors the staged stat before any modifier (pokemon.js getStat).
   let speed = Math.floor(pokemon.storedStats.spe * stageMultiplier(pokemon.boosts.spe));
-  speed *= abilityFactor(pokemon, ability, battle) * itemFactor(pokemon);
+  speed *= abilityFactor(pokemon, battle) * itemFactor(pokemon);
   if (pokemon.side.sideConditions['tailwind']) speed *= 2;
   // Paralysis comes after every other modifier (conditions.js par), Quick Feet cancels it.
-  if (pokemon.status === 'par' && ability !== 'quickfeet') speed *= battle.gen >= 7 ? 0.5 : 0.25;
+  const quickFeet = pokemon.ability === 'quickfeet' && !pokemon.ignoringAbility();
+  if (pokemon.status === 'par' && !quickFeet) speed *= battle.gen >= 7 ? 0.5 : 0.25;
   return speed;
 }
 
@@ -48,19 +48,23 @@ const DOUBLING = new Map<string, (pokemon: Pokemon, battle: Battle) => boolean>(
   ['unburden', pokemon => !!pokemon.volatiles['unburden'] && !pokemon.item],
 ]);
 
-function abilityFactor(pokemon: Pokemon, ability: string, battle: Battle): number {
-  if (DOUBLING.get(ability)?.(pokemon, battle)) return 2;
-  if (ability === 'quickfeet' && pokemon.status) return 1.5;
-  const paradox = ability === 'protosynthesis' || ability === 'quarkdrive';
-  return paradox && pokemon.volatiles[ability]?.bestStat === 'spe' ? 1.5 : 1;
+/** The speed abilities; the sim is asked about suppression only for a holder of one (it is the costly call). */
+function abilityFactor(pokemon: Pokemon, battle: Battle): number {
+  const ability = pokemon.ability;
+  const doubling = DOUBLING.get(ability);
+  let factor = 1;
+  if (doubling) factor = doubling(pokemon, battle) ? 2 : 1;
+  else if (ability === 'quickfeet') factor = pokemon.status ? 1.5 : 1;
+  else if (ability === 'protosynthesis' || ability === 'quarkdrive') factor = pokemon.volatiles[ability]?.bestStat === 'spe' ? 1.5 : 1;
+  return factor !== 1 && pokemon.ignoringAbility() ? 1 : factor;
 }
 
 /** Choice Scarf (not while Dynamaxed) and Iron Ball, unless the sim ignores the item. */
 function itemFactor(pokemon: Pokemon): number {
-  if (pokemon.ignoringItem()) return 1;
-  if (pokemon.item === 'choicescarf') return pokemon.volatiles['dynamax'] ? 1 : 1.5;
-  if (pokemon.item === 'ironball') return 0.5;
-  return 1;
+  let factor = 1;
+  if (pokemon.item === 'choicescarf') factor = pokemon.volatiles['dynamax'] ? 1 : 1.5;
+  else if (pokemon.item === 'ironball') factor = 0.5;
+  return factor !== 1 && pokemon.ignoringItem() ? 1 : factor;
 }
 
 /**
