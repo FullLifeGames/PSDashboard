@@ -60,3 +60,43 @@ describe('dex-legal abilities (round 60, T93)', () => {
     expect(p2Team.find(set => set.species === 'Garchomp')?.ability).toBe('Rough Skin');
   });
 });
+
+describe('fixed Tera type and item (round 60, T79)', () => {
+  const doublesLog = (tier: string, extra: string[] = []) => [
+    '|gametype|doubles', '|gen|9', `|tier|${tier}`,
+    '|poke|p2|Ogerpon-Cornerstone, L50, F|', '|poke|p2|Ogerpon-Wellspring, L50, F|', '|poke|p2|Terapagos, L50, M|',
+    '|start',
+    '|switch|p2a: Ogerpon|Ogerpon-Cornerstone, L50, F|100/100', '|switch|p2b: Terapagos|Terapagos, L50, M|100/100',
+    ...extra,
+    '|turn|1',
+  ].join('\n');
+
+  test('a species with a fixed Tera type and item carries them when the log shows none', () => {
+    const { p2Team } = buildTeamsFromReplay(doublesLog('[Gen 9] Doubles OU'));
+    const cornerstone = p2Team.find(set => set.species === 'Ogerpon-Cornerstone')!;
+    expect(cornerstone.teraType).toBe('Rock');
+    expect(toID(cornerstone.item)).toBe('cornerstonemask');
+    const wellspring = p2Team.find(set => set.species === 'Ogerpon-Wellspring')!;
+    expect(wellspring.teraType).toBe('Water');
+    expect(toID(wellspring.item)).toBe('wellspringmask');
+    expect(p2Team.find(set => set.species === 'Terapagos')!.teraType).toBe('Stellar');
+  });
+
+  test('a custom game keeps what the build had', () => {
+    const { p2Team } = buildTeamsFromReplay(doublesLog('[Gen 9] Doubles Custom Game'));
+    expect(p2Team.find(set => set.species === 'Ogerpon-Cornerstone')!.teraType).toBeUndefined();
+  });
+
+  test('a Tera forme coming back in maps to its species through the dex (749895: no second Ogerpon)', () => {
+    const log = [
+      '|gametype|singles', '|gen|9', '|tier|[Gen 9] OU', '|poke|p2|Ogerpon, F|', '|poke|p2|Garchomp, F|', '|start',
+      '|switch|p2a: Ogerpon|Ogerpon, F|100/100', '|turn|1',
+      '|-terastallize|p2a: Ogerpon|Grass', '|detailschange|p2a: Ogerpon|Ogerpon-Teal-Tera, F, tera:Grass',
+      '|-ability|p2a: Ogerpon|Embody Aspect (Teal)|boost', '|turn|2',
+      '|switch|p2a: Chomp|Garchomp, F|100/100', '|turn|3',
+      '|switch|p2a: Ogerpon|Ogerpon-Teal-Tera, F, tera:Grass|100/100', '|turn|4',
+    ].join('\n');
+    const { p2Team } = buildTeamsFromReplay(log);
+    expect(p2Team.map(set => set.species)).toEqual(['Ogerpon', 'Garchomp']);
+  });
+});

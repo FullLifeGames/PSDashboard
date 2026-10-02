@@ -14,6 +14,7 @@ import { defaultAbility } from './set-resolvers.ts';
  * - T93 rule 2, outside custom games: an ability only a battle-only forme of
  *   the species' base carries becomes the species' default (Ogerpon before
  *   its Tera, Terapagos); in a custom game any ability can be real.
+ * - T79, outside custom games: a fixed Tera type or item from the dex.
  */
 
 export type GenDex = ReturnType<typeof Dex.forGen>;
@@ -60,8 +61,24 @@ export function legalAbility(set: PokemonSet, context: LegalityContext): string 
   return set.ability;
 }
 
+/**
+ * T79, outside custom games: a species with a fixed Tera type or item
+ * (requiredTeraType, requiredItem: Ogerpon's masks, Terapagos) carries it.
+ * Without one the sim takes the species' first type as Tera type
+ * (pokemon.js:209 `set.teraType || types[0]`): Ogerpon-Cornerstone would
+ * terastallize into Grass instead of Rock.
+ */
+export function withRequiredFields(set: PokemonSet, context: LegalityContext): PokemonSet {
+  if (context.custom) return set;
+  const species = Dex.forGen(context.gen).species.get(set.species);
+  if (!species.exists) return set;
+  const teraType = !set.teraType && species.requiredTeraType ? species.requiredTeraType : set.teraType;
+  const item = species.requiredItem && toId(set.item) !== toId(species.requiredItem) ? species.requiredItem : set.item;
+  return teraType === set.teraType && item === set.item ? set : { ...set, teraType, item };
+}
+
 /** A set the simulator can play; the same object when no rule fires. */
 export function dexLegalSet(set: PokemonSet, context: LegalityContext): PokemonSet {
   const ability = legalAbility(set, context);
-  return ability === set.ability ? set : { ...set, ability };
+  return withRequiredFields(ability === set.ability ? set : { ...set, ability }, context);
 }

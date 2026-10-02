@@ -2,7 +2,7 @@ import { describe, expect, test } from 'vitest';
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { TeamValidator } from '@pkmn/sim';
+import { Dex, TeamValidator } from '@pkmn/sim';
 import { parseReplayLogWithObservations } from '@fulllifegames/replay-core';
 import { bankTeamsFor } from './bank-build';
 
@@ -38,6 +38,11 @@ describe('built sets pass the simulator validator (round 60 prover)', () => {
       for (const set of [...built.teams!.p1Team, ...built.teams!.p2Team]) {
         for (const problem of validator.validateSet(JSON.parse(JSON.stringify(set)), {}) ?? []) {
           if (CHECKED.test(problem)) found.push(`${set.species}: ${problem}`);
+        }
+        // The validator fills a missing Tera type itself (team-validator.js:599): check the dex directly.
+        const species = Dex.forGen(gen).species.get(set.species);
+        if (species.requiredTeraType && set.teraType !== species.requiredTeraType) {
+          found.push(`${set.species}: Tera type ${set.teraType ?? '-'} instead of ${species.requiredTeraType}`);
         }
       }
       expect(found).toEqual([]);

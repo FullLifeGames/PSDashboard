@@ -222,6 +222,10 @@ export interface StoredEval {
 //      set an ability the dex knows for its species: the log's "As One"
 //      becomes Calyrex's As One forme, and outside custom games Ogerpon and
 //      Terapagos lose the ability of their battle-only forme (T93).
+//      Outside custom games a species with a fixed Tera type or item
+//      carries it (Ogerpon's masks and Tera types, Terapagos; T79), and a
+//      Tera forme switching back in maps to its species through the dex
+//      (749895 built a second Ogerpon).
 const EVAL_ENGINE_CACHE_VERSION = 54;
 
 export function evalStoreKey(

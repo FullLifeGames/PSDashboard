@@ -12,7 +12,12 @@ const BATTLE_ONLY_FORME_SUFFIXES = [
 
 function normalizeBattleOnlyForme(species: string): string {
   for (const suffix of BATTLE_ONLY_FORME_SUFFIXES) {
-    if (species.endsWith(suffix)) return species.slice(0, -suffix.length);
+    if (!species.endsWith(suffix)) continue;
+    // The dex names the forme it came from (round 60): Ogerpon-Teal-Tera is
+    // Ogerpon, cutting the suffix gave a second card "Ogerpon-Teal" (749895).
+    // Gmax (no battleOnly) and Necrozma-Ultra (two origins) keep the cut.
+    const { battleOnly } = Dex.species.get(species);
+    return typeof battleOnly === 'string' ? battleOnly : species.slice(0, -suffix.length);
   }
   return species;
 }
