@@ -941,7 +941,8 @@ import { takeSimFastReport } from '../packages/eval-engine/src/forward/sim-fast/
  * T104 (be23b7f): an ability from a protocol line goes to the Pokemon
  *   whose species can have it (ability-holder.ts): Water Absorb heals and
  *   Pickpocket credited the attacker, Trace credited the traced ability;
- *   upstream text for @pkmn/client prepared, not sent. Bank 5 rows, +0;
+ *   no upstream bug: @pkmn/protocol already clears [of] for the four
+ *   absorbing abilities, our inference read raw lines. Bank 5 rows, +0;
  *   feedback unmoved.
  * T95 residual (5bb832c): burn 1/8 in gens 2-6, poison 1/16 in gen 1;
  *   prover races-residual.spec.ts (gens 1-9). Bank 2 rows (5th digit);
@@ -963,9 +964,10 @@ import { takeSimFastReport } from '../packages/eval-engine/src/forward/sim-fast/
  *   pack:smoke green, again on 3fb772d (1730 tests); feedback end-1..3
  *   byte-identical, no pin moved in any run of the round; identity speed
  *   layer on vs off OK (834/834/834 rows, 48 searches, 0 errors).
- * VERDICT: adopted at the user gate 02.10. 17:51 (all seven fixes; the
- *   @pkmn/client report goes to the user as a PR proposal first; T105 to
- *   T107 stay as iteration 7e; not pushed, the program stays on r59).
+ * VERDICT: adopted at the user gate 02.10. 17:51 (all seven fixes; T105
+ *   to T107 stay as iteration 7e; not pushed, the program stays on r59).
+ *   The planned @pkmn/client PR proposal was dropped after the check: the
+ *   library is right, the misattribution was ours alone.
  *
  * SPEED LAYER 2026-10-01 (improvement round 59, iteration S1, T91, stage 1
  * of the program "more simulation"; spec

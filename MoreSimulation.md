@@ -168,7 +168,7 @@ Dazu kommt die Statik, die Regeln wirklich nachbaut, weil sie in Mikrosekunden s
 - **Wem eine Fähigkeit gehört:** Statt einer Tabelle je Protokoll-Zeile entscheidet der Dex. Die Fähigkeit geht an das Pokémon, dessen Art sie haben kann; Alomomola kann Water Absorb nicht haben.
 - **Tempo:** Statt Slush Rush in unsere Liste nachzutragen, rechnet der Simulator das Tempo (`getStat('spe')`). Damit fällt eine Handliste weg, die auch Unburden falsch rechnete. Hält das Zeit-Tor nicht, bleibt die Liste, und ein Test prüft sie gegen den Simulator. So kam es: siehe „Was Runde 60 gezeigt hat“.
 
-Außerdem entfernt Runde 60 einen alten Umweg: Für festgelegte Lade-Züge riet die Wahlliste das Ziel aus dem Dex nach, nur weil wir die Wahl falsch abschickten. Der Replay-Parser `@pkmn/client` hat bei Heilungen durch Fähigkeiten denselben Zuschreibungsfehler wie wir; die Meldung bereitet die Runde vor.
+Außerdem entfernt Runde 60 einen alten Umweg: Für festgelegte Lade-Züge riet die Wahlliste das Ziel aus dem Dex nach, nur weil wir die Wahl falsch abschickten. Bei Heilungen durch Fähigkeiten vermuteten wir denselben Zuschreibungsfehler im Replay-Parser `@pkmn/client`. Die Prüfung nach dem Gate zeigte das Gegenteil: `@pkmn/protocol` löscht das `[of]` der vier saugenden Fähigkeiten, bevor der Client die Zeile sieht, und der offizielle Showdown-Client macht es genauso. Unsere eigene Inferenz las die Zeilen roh und umging diesen Schritt. Die Lehre für Grundsatz 3: Vor einer Meldung den ganzen Weg der Bibliothek nachspielen, nicht nur ihren Handler lesen.
 
 ## Was Runde 60 gezeigt hat
 
@@ -187,7 +187,7 @@ Außerdem entfernt Runde 60 einen alten Umweg: Für festgelegte Lade-Züge riet 
 
 Runde 59 hat nur Zeit gespart, die Bewertung ist unverändert. Ob mehr Simulation besser bewertet, ist die eigentliche offene Frage.
 
-- **Runde 60 (S1a):** gebaut, gemessen und am Gate vom 02.10. ganz übernommen (siehe oben). Die Meldung an `@pkmn/client` geht als Vorschlag für einen Pull Request erst an dich. Drei Reste stehen als T105 bis T107 in `NextSteps.md`.
+- **Runde 60 (S1a):** gebaut, gemessen und am Gate vom 02.10. ganz übernommen (siehe oben). Eine Meldung an `@pkmn/client` entfällt; die Bibliothek hatte den Fehler nicht (siehe oben). Drei Reste stehen als T105 bis T107 in `NextSteps.md`.
 - **Runde 61 (S2):** die Obergrenze der Suche messen (T97): doppeltes und vierfaches Budget, getrennt nach Iterationen, Tiefe und Ziehungen je Zelle; eine Sonde, die bis zum Spielende weiterspielt statt zu schätzen; dazu die billige Statik-Probe (mittlerer Wurf statt Höchstwurf, Verbrennung, Guts, Facade). Ergebnis: Gewinn je Sekunde für jede Form von „mehr simulieren“, neben den 16 Basispunkten der Genauigkeits-Achse. Übernommen wird (T98) die beste Form, die die Bank aufgelöst besser macht bei höchstens der Wandzeit vor Runde 59.
 - **Wenn mehr Simulation nicht besser liest:** Dann entfällt T98 mit dem Beleg aus T97. Das Budget bleibt, und das Tempo aus Runde 59 bleibt als reiner Zeitgewinn. Die Runden 42 und 43 zeigen, dass dieser Ausgang möglich ist.
 - **Runde 62 (S3):** Triage. Jedes übrige TODO wird auf dem neuen Stand gelesen, nicht geschätzt, und bekommt ein Urteil: obsolet, kleiner, wichtiger, weniger wichtig oder unverändert. Die Tabelle geht an dein Gate.
