@@ -58,4 +58,11 @@ describe('ability holders from [from] ability lines (round 60, T104)', () => {
       '|turn|2'];
     expect(abilityOf(log, 'p1', 'Alomomola')).toBe('Water Absorb');
   });
+
+  test('a format whose rule table allows any ability keeps an off-species reveal (Balanced Hackmons)', () => {
+    const log = [...head('[Gen 9] Balanced Hackmons'),
+      '|switch|p1a: Chomp|Garchomp, F|100/100', '|switch|p2a: Toad|Seismitoad, M|80/100',
+      '|-ability|p1a: Chomp|Water Absorb', '|turn|1'];
+    expect(abilityOf(log, 'p1', 'Garchomp')).toBe('Water Absorb');
+  });
 });

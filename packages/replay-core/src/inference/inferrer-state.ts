@@ -1,6 +1,7 @@
 import { Dex } from '@pkmn/sim';
 import type { RevealedPokemonInfo } from '../types.ts';
 import { findPokemonByNickname } from './lookup.ts';
+import { abilitiesAreFree } from '../team/dex-legal.ts';
 import { toId } from '../ids.ts';
 
 /** The scan state one team inference carries from line to line. */
@@ -37,7 +38,7 @@ export interface InferrerState {
   gravityActive: boolean;
   /** The replay's generation (|gen| line): the dex that decides who may hold an ability (round 60, T104). */
   gen: number;
-  /** A custom game: any species may hold any ability, the dex decides nothing. */
+  /** A format that lets any species hold any ability (custom games, Hackmons): the dex decides nothing. */
   custom: boolean;
 }
 
@@ -47,7 +48,7 @@ export function createInferrerState(lines: string[], opponentSide: 'p1' | 'p2'):
     lines,
     opponentSide,
     gen: parseInt(genLine?.split('|')[2] ?? '9', 10) || 9,
-    custom: lines.some(line => line.startsWith('|tier|') && /custom game/i.test(line)),
+    custom: abilitiesAreFree(lines.find(line => line.startsWith('|tier|')) ?? ''),
     pokemonMap: new Map<string, RevealedPokemonInfo>(),
     lastMoveTarget: new Map<string, string>(),
     pendingMove: null,

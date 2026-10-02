@@ -12,7 +12,7 @@ import {
   selectCuratedFor, USAGE_MOVE_POOL,
 } from './team/set-resolvers.ts';
 import { resolveInferredItems, speedKnowledgeFor } from './team/inferred-items.ts';
-import { dexLegalSet } from './team/dex-legal.ts';
+import { abilitiesAreFree, dexLegalSet } from './team/dex-legal.ts';
 import type { DamageObservation, HiddenPowerEvidence, OpponentTeamInfo, RevealedPokemonInfo, SpeedOrderObservation } from './types.ts';
 import { toId } from './ids.ts';
 
@@ -68,7 +68,7 @@ function buildTeams(log: string, options: BuildOptions): { teams: BuiltTeams; in
   // Pokémon Champions uses its own EV system (32 per stat, 66 total) —
   // standard-scale guesses/fallbacks must be clamped to the format budget.
   const champions = evBudget(formatHint).perStat !== 252;
-  const legality = { gen: parseInt(gen, 10), custom: /^\|tier\|.*custom game/im.test(log) };
+  const legality = { gen: parseInt(gen, 10), custom: abilitiesAreFree(log) };
   const legalize = (team: PokemonSet[]): PokemonSet[] =>
     (champions ? team.map(set => ({ ...set, evs: legalizeEvs(set.evs, formatHint) })) : team)
       .map(set => dexLegalSet(withHappinessAssumption(set), legality));

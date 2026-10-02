@@ -1,7 +1,6 @@
 import type { PokemonSet } from '@pkmn/sim';
 import { Dex } from '@pkmn/sim';
 import { toId } from '../ids.ts';
-import { defaultAbility } from './set-resolvers.ts';
 
 /**
  * Sets the simulator can play (round 60). The rules read only the dex of the
@@ -50,6 +49,25 @@ function battleOnlyAbilityIds(dex: GenDex, species: string): Set<string> {
   return ids;
 }
 
+/** The species' first ability slot in the replay's generation (Gengar: Levitate in gen 6, Cursed Body from gen 7). */
+function slotZeroAbility(dex: GenDex, species: string): string | undefined {
+  const slots = dex.species.get(species).abilities;
+  return slots[0] || slots[1] || slots.H || undefined;
+}
+
+/**
+ * Whether the replay's format lets any species hold any ability: the sim's
+ * rule table answers for a format it knows (Custom Game, Balanced and Pure
+ * Hackmons, Hackmons Cup carry no 'obtainableabilities'); for one it does
+ * not know (a newer VGC regulation, a draft league) only a custom game counts.
+ */
+export function abilitiesAreFree(log: string): boolean {
+  const tier = log.match(/^\|tier\|(.*)$/m)?.[1] ?? '';
+  const format = Dex.formats.get(tier);
+  if (format.exists) return !Dex.formats.getRuleTable(format).has('obtainableabilities');
+  return /custom game/i.test(tier);
+}
+
 export function legalAbility(set: PokemonSet, context: LegalityContext): string {
   if (context.gen < 3 || !set.ability) return set.ability;
   const dex = Dex.forGen(context.gen);
@@ -57,7 +75,7 @@ export function legalAbility(set: PokemonSet, context: LegalityContext): string 
   const id = toId(set.ability);
   if (ownAbilities(dex, set.species).some(name => toId(name) === id)) return set.ability;
   if (!dex.abilities.get(set.ability).exists) return speciesAbilityFor(dex, set.species, set.ability) ?? set.ability;
-  if (!context.custom && battleOnlyAbilityIds(dex, set.species).has(id)) return defaultAbility(set.species);
+  if (!context.custom && battleOnlyAbilityIds(dex, set.species).has(id)) return slotZeroAbility(dex, set.species) ?? set.ability;
   return set.ability;
 }
 

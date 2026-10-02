@@ -1,6 +1,7 @@
 import { describe, expect, test } from 'vitest';
 import { toID } from '@pkmn/sim';
 import { buildTeamsFromReplay } from '../src/team-builder';
+import { abilitiesAreFree, legalAbility } from '../src/team/dex-legal';
 
 /**
  * Round 60 (T93): the log names an ability by its display name. "As One" is
@@ -98,5 +99,21 @@ describe('fixed Tera type and item (round 60, T79)', () => {
     ].join('\n');
     const { p2Team } = buildTeamsFromReplay(log);
     expect(p2Team.map(set => set.species)).toEqual(['Ogerpon', 'Garchomp']);
+  });
+});
+
+describe('legality follows the replay\'s format and generation (round 60 review)', () => {
+  test('a battle-only forme\'s ability falls back to the species\' ability of that generation', () => {
+    const set = { name: 'Gengar', species: 'Gengar', item: '', ability: 'Shadow Tag', moves: [], nature: '', gender: '', evs: {}, ivs: {}, level: 100 };
+    expect(legalAbility(set as never, { gen: 6, custom: false })).toBe('Levitate');
+    expect(legalAbility(set as never, { gen: 9, custom: false })).toBe('Cursed Body');
+  });
+
+  test('the sim\'s rule table decides which formats allow any ability; an unknown format falls back to the custom-game name', () => {
+    expect(abilitiesAreFree('|tier|[Gen 9] Balanced Hackmons')).toBe(true);
+    expect(abilitiesAreFree('|tier|[Gen 9] Custom Game')).toBe(true);
+    expect(abilitiesAreFree('|tier|[Gen 9] OU')).toBe(false);
+    expect(abilitiesAreFree('|tier|[Gen 9] VGC 2026 Reg I')).toBe(false);
+    expect(abilitiesAreFree('|tier|[Gen 9] Draft Custom Game')).toBe(true);
   });
 });

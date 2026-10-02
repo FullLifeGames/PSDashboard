@@ -105,6 +105,21 @@ describe('effectiveSpeed', () => {
     battle.field.setWeather('raindance', battle.sides[1].active[0]!);
     expect(effectiveSpeed(fish, battle)).toBe(fish.storedStats.spe * 2);
   });
+
+  test('a benched body reads as if on the field, and asking leaves the battle as it was', () => {
+    const battle = makeBattle(
+      [makeSet('A', 'Snorlax', VANILLA), makeSet('S', 'Talonflame', VANILLA, 50, { item: 'choicescarf' })],
+      [makeSet('B', 'Snorlax', VANILLA)],
+    );
+    const scarfed = battle.sides[0].pokemon.find(p => p.species.id === 'talonflame')!;
+    const before = JSON.stringify(battle.toJSON());
+    const benched = effectiveSpeed(scarfed, battle);
+    expect(JSON.stringify(battle.toJSON())).toBe(before);
+    expect(scarfed.isActive).toBe(false);
+    battle.makeChoices('switch 2', 'move protect');
+    expect(battle.sides[0].active[0]!.species.id).toBe('talonflame');
+    expect(effectiveSpeed(scarfed, battle)).toBe(benched);
+  });
 });
 
 describe('movesFirst', () => {
