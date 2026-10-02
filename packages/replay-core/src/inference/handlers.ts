@@ -2,6 +2,7 @@ import { Dex } from '@pkmn/sim';
 import { revealedField, unknownEvs, unknownField } from '../team-info.ts';
 import { canHaveDancer, findPokemon, ruleOut, type InferrerState } from './inferrer-state.ts';
 import { parseDetails, revealMarkerForme, unknownFormeMarkerFor } from './lookup.ts';
+import { abilityHolderIdent, mayHold } from './ability-holder.ts';
 import { toId } from '../ids.ts';
 import type { PokemonFieldInfo } from '../types.ts';
 
@@ -178,6 +179,8 @@ export function recordAbility(state: InferrerState, line: string) {
   const identParts = parts[2].split(': ');
   const nickname = identParts[1];
   const abilityName = parts[3];
+  // A traced, copied or swapped ability is not the species' own (round 60, T104).
+  if (!mayHold(state, parts[2], abilityName)) return;
   const pokemon = findPokemon(state, nickname);
   if (pokemon && !pokemon.ability.value) {
     pokemon.ability = revealedField(abilityName);
@@ -329,25 +332,19 @@ export function recordTera(state: InferrerState, line: string) {
 
 /**
  * Effect attributions reveal abilities: `[from] ability: Poison Heal` on
- * heal/damage/status lines (N1). With `[of] pXa: Nick` the ability belongs
- * to that Pokémon (e.g. Rough Skin recoil), otherwise to the affected one.
+ * heal/damage/status lines (N1). The holder is the line's [of] or its
+ * subject as the dex allows (ability-holder.ts, round 60).
  */
 export function recordAbilityAttribution(state: InferrerState, line: string) {
   const abilityAttribution = line.match(/\[from\] ability:\s*([^|\n[]+)/);
   if (!abilityAttribution) return;
   const abilityName = abilityAttribution[1].trim();
-  const ofIdent = line.match(/\[of\]\s*(p[12])[a-d]?:\s*([^|\n]+)/);
-  let ownerNickname: string | null = null;
-  if (ofIdent) {
-    if (ofIdent[1] === state.opponentSide) ownerNickname = ofIdent[2].trim();
-  } else {
-    const subject = line.match(/^\|-[a-z]+\|(p[12])[a-d]?:\s*([^|]+)\|/);
-    if (subject && subject[1] === state.opponentSide) ownerNickname = subject[2].trim();
-  }
-  if (ownerNickname) {
-    const pokemon = findPokemon(state, ownerNickname);
-    if (pokemon && !pokemon.ability.value) {
-      pokemon.ability = revealedField(abilityName);
-    }
+  const of = line.match(/\[of\]\s*(p[12][a-d]?:\s*[^|\n]+)/)?.[1].trim() ?? null;
+  const subject = line.match(/^\|-[a-z]+\|(p[12][a-d]?:\s*[^|]+)\|/)?.[1].trim() ?? null;
+  const holder = abilityHolderIdent(state, subject, of, abilityName);
+  if (!holder || !holder.startsWith(state.opponentSide)) return;
+  const pokemon = findPokemon(state, holder.split(': ')[1].trim());
+  if (pokemon && !pokemon.ability.value) {
+    pokemon.ability = revealedField(abilityName);
   }
 }

@@ -225,7 +225,9 @@ export interface StoredEval {
 //      Outside custom games a species with a fixed Tera type or item
 //      carries it (Ogerpon's masks and Tera types, Terapagos; T79), and a
 //      Tera forme switching back in maps to its species through the dex
-//      (749895 built a second Ogerpon).
+//      (749895 built a second Ogerpon). An ability from a protocol line
+//      goes to the Pokémon whose species can have it (Water Absorb heals,
+//      Pickpocket, Trace; T104).
 const EVAL_ENGINE_CACHE_VERSION = 54;
 
 export function evalStoreKey(

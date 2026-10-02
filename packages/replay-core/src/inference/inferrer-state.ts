@@ -35,12 +35,19 @@ export interface InferrerState {
   // original; from a later action the ident only gives away acquired items.
   swappedIdents: Map<string, object | null>;
   gravityActive: boolean;
+  /** The replay's generation (|gen| line): the dex that decides who may hold an ability (round 60, T104). */
+  gen: number;
+  /** A custom game: any species may hold any ability, the dex decides nothing. */
+  custom: boolean;
 }
 
 export function createInferrerState(lines: string[], opponentSide: 'p1' | 'p2'): InferrerState {
+  const genLine = lines.find(line => line.startsWith('|gen|'));
   return {
     lines,
     opponentSide,
+    gen: parseInt(genLine?.split('|')[2] ?? '9', 10) || 9,
+    custom: lines.some(line => line.startsWith('|tier|') && /custom game/i.test(line)),
     pokemonMap: new Map<string, RevealedPokemonInfo>(),
     lastMoveTarget: new Map<string, string>(),
     pendingMove: null,
