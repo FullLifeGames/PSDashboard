@@ -1,7 +1,7 @@
 import { expect, test } from 'vitest';
 import { readFileSync } from 'node:fs';
-import { createLocalTreeExecutor, searchPosition, searchTreesOrchestrated } from '@fulllifegames/eval-engine';
-import { bankSampleCount, bankSearch, bankSettings } from './bank-search';
+import { createLocalTreeExecutor, parsePlayedActionsDoubles, searchPosition, searchTreesOrchestrated } from '@fulllifegames/eval-engine';
+import { bankKeepPlayed, bankSampleCount, bankSearch, bankSettings } from './bank-search';
 
 const fixture = (name: string) =>
   (JSON.parse(readFileSync(`packages/eval-engine/test/fixtures/positions/${name}.json`, 'utf-8')) as { serialized: string }).serialized;
@@ -26,6 +26,17 @@ test('Tera like the app: no click -> none, ladder click -> everyone, draft click
   expect(bankSettings({ id: 'gen9ou-1', formatid: 'gen9ou', log: noClick }).tera).toBe(false);
   expect(bankSettings({ id: 'gen9ou-2', formatid: 'gen9ou', log: click }).tera).toBe(true);
   expect(bankSettings({ id: 'gen9draft-3', formatid: 'gen9draft', log: click }).tera).toEqual({ p1: ['Garchomp'], p2: [] });
+});
+
+test('played combo like the app sweep: the log of snapshot[turn], kept only when a slot was played', () => {
+  const doublesTurn = ['|move|p1a: Pelipper|Hurricane|p2a: Wall', '|move|p2a: Wall|Protect|p2a: Wall', '|turn|3'];
+  const kept = bankKeepPlayed([undefined, undefined, doublesTurn], 2, true);
+  expect(kept?.p1Slots?.[0]).toMatchObject({ kind: 'move' });
+  // Like sweep-core: the doubles parser always returns slot lists, so a turn without actions passes [null, null] on.
+  expect(bankKeepPlayed([undefined, undefined, ['|turn|3']], 2, true)).toEqual(parsePlayedActionsDoubles(['|turn|3']));
+  // Singles carry no slots: nothing is kept, played move or not.
+  expect(bankKeepPlayed([undefined, undefined, ['|move|p1a: Chomp|Earthquake|p2a: Rotom', '|turn|3']], 2, false)).toBeUndefined();
+  expect(bankKeepPlayed([], 5, false)).toBeUndefined();
 });
 
 test('draws per cell: only 1, 3 or 5 (five fixed seeds), anything else throws', () => {

@@ -8,7 +8,7 @@ import { buildChoiceLockContext } from '../packages/eval-engine/src/choice-lock'
 import { getBranchSimulatorFormat, replayBringOnly } from '../packages/replay-core/src/replay-format';
 import { parseReplayLogWithObservations } from '../packages/replay-core/src/protocol-parser';
 import { battleFaintedFraction, searchPosition } from '../packages/eval-engine/src/search';
-import { bankSampleCount, bankSearch, bankSettings } from './bank-search';
+import { bankKeepPlayed, bankSampleCount, bankSearch, bankSettings } from './bank-search';
 import { diskCachedSmogonFetcher } from './smogon-fetch-cache';
 import { bankTeamsFor } from './bank-build';
 import { createMatchupCache, evalFeatures, EVAL_WEIGHTS, FEATURE_WEIGHTS, type EvalFeatures } from '../packages/eval-engine/src/eval-function';
@@ -5056,12 +5056,19 @@ function passInstrument(
  * sample the round-34 endgame bench can use (last pair, decided sweep, or
  * at most three living bodies), one JSON file per id#turn.
  */
-async function exportPosition(dir: string | undefined, sample: Sample, serialized: string, living: number): Promise<void> {
-  if (!dir || !(sample.lastPair || sample.decided !== null || living <= 3)) return;
+async function exportPosition(
+  dir: string | undefined, sample: Sample, serialized: string, living: number, settings: { tera: unknown; sleepClause: boolean },
+): Promise<void> {
+  // Round 61: EVAL_CALIBRATION_EXPORT_ALL=1 exports every position (the play-out probe), with the search's Tera and Sleep Clause.
+  const all = process.env.EVAL_CALIBRATION_EXPORT_ALL === '1';
+  if (!dir || !(all || sample.lastPair || sample.decided !== null || living <= 3)) return;
   const fs = await import('node:fs');
   fs.mkdirSync(dir, { recursive: true });
-  const { id, turn, gameType, tranche, quality, p1Won, score, decided, lastPair } = sample;
-  fs.writeFileSync(`${dir}/${id}#${turn}.json`, JSON.stringify({ id, turn, serialized, gameType, tranche, quality, p1Won, score, decided, lastPair }));
+  const { id, turn, gameType, tranche, quality, p1Won, score, decided, lastPair, faintedFraction } = sample;
+  fs.writeFileSync(`${dir}/${id}#${turn}.json`, JSON.stringify({
+    id, turn, serialized, gameType, tranche, quality, p1Won, score, decided, lastPair, faintedFraction,
+    tera: settings.tera, sleepClause: settings.sleepClause,
+  }));
 }
 
 describe.skipIf(!process.env.EVAL_CALIBRATION)('eval calibration against real replays', () => {
@@ -5140,6 +5147,7 @@ describe.skipIf(!process.env.EVAL_CALIBRATION)('eval calibration against real re
       // Observations drive spread inference — same path the app takes.
       const parsed = parseReplayLogWithObservations(replay.log);
       const { snapshots, observations } = parsed;
+      const replaySettings = bankSettings(replay);
       // With the fills the build is the app's own chain (round 52): enriched
       // infos, the two-stage solve, the hidden-power evidence — the teams a
       // user sees, so the bank grades what the app ships. The switches:
@@ -5267,7 +5275,10 @@ describe.skipIf(!process.env.EVAL_CALIBRATION)('eval calibration against real re
           // Round 61: the app's dispatch and the app's tree search (bank-search.ts).
           const result = await bankSearch({
             serialized, faintedFraction, depth, samples: sampleCount, mode: process.env.EVAL_CALIBRATION_MODE,
-            settings: bankSettings(replay),
+            settings: {
+              ...replaySettings,
+              keepPlayed: bankKeepPlayed(snapshots.map(snapshot => snapshot.log), turn, gameType === 'doubles'),
+            },
           });
           const { score } = result;
           if (Number.isNaN(score)) {
@@ -5299,7 +5310,7 @@ describe.skipIf(!process.env.EVAL_CALIBRATION)('eval calibration against real re
             ...(g ? { g } : {}),
           };
           samples.push(sample);
-          await exportPosition(process.env.EVAL_CALIBRATION_POSITIONS, sample, serialized, livingTotal(battle));
+          await exportPosition(process.env.EVAL_CALIBRATION_POSITIONS, sample, serialized, livingTotal(battle), replaySettings);
         } catch (error) {
           console.log(`${id} turn ${turn}: ${error instanceof Error ? error.message : error}`);
         }

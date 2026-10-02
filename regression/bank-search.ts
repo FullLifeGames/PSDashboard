@@ -1,5 +1,6 @@
 import {
-  AUTO_MCTS_FAINTED_FRACTION, createLocalTreeExecutor, resolveTeraPreference, searchPosition, searchTreesOrchestrated,
+  AUTO_MCTS_FAINTED_FRACTION, createLocalTreeExecutor, parsePlayedActions, parsePlayedActionsDoubles, resolveTeraPreference,
+  searchPosition, searchTreesOrchestrated,
   type EvalResult, type EvalSettings, type TeraAllowance,
 } from '@fulllifegames/eval-engine';
 import { formatEnforcesSleepClause, getBranchSimulatorFormat, inferReplayFormatId } from '@fulllifegames/replay-core';
@@ -40,6 +41,13 @@ export function bankSettings(replay: { id?: string; formatid?: string; log: stri
     tera: resolveTeraPreference('auto', inferReplayFormatId(replay), replay.log),
     sleepClause: formatEnforcesSleepClause(getBranchSimulatorFormat(replay)),
   };
+}
+
+/** The app sweep's keepPlayed (sweep-core.ts with useEvalView playedFor): the actions in snapshot[turn]'s log, kept when a slot was played. */
+export function bankKeepPlayed(snapshotLogs: (string[] | undefined)[], turn: number, doubles: boolean): EvalSettings['keepPlayed'] {
+  const lines = snapshotLogs[turn] ?? [];
+  const played = doubles ? parsePlayedActionsDoubles(lines) : parsePlayedActions(lines);
+  return played.p1Slots || played.p2Slots ? played : undefined;
 }
 
 /** EVAL_CALIBRATION_SAMPLES: the engine has five fixed seeds; another count would draw an unseeded PRNG. */
