@@ -1,6 +1,6 @@
 # Warum mehr Simulation
 
-Stand 02.10.2026, nach Runde 59 und dem Spec-Gate der Runde 60. Dieses Dokument hält fest, warum die Engine seit Runde 58 umgebaut wird: Statt Spielregeln immer genauer von Hand nachzubauen, nutzt sie den echten Simulator mehr. Es sammelt die Fragen, die wir dazu gestellt haben, was wir gemessen haben, was wir entschieden haben und was noch offen ist. Die Zahlen stammen aus den Quellen am Ende; die Kurzfassung des Programms steht in `NextSteps.md` unter „Programm · Mehr Simulation“.
+Stand 02.10.2026, nach Runde 60 (ihr Gate steht noch aus). Dieses Dokument hält fest, warum die Engine seit Runde 58 umgebaut wird: Statt Spielregeln immer genauer von Hand nachzubauen, nutzt sie den echten Simulator mehr. Es sammelt die Fragen, die wir dazu gestellt haben, was wir gemessen haben, was wir entschieden haben und was noch offen ist. Die Zahlen stammen aus den Quellen am Ende; die Kurzfassung des Programms steht in `NextSteps.md` unter „Programm · Mehr Simulation“.
 
 ## Kurzfassung
 
@@ -166,15 +166,28 @@ Dazu kommt die Statik, die Regeln wirklich nachbaut, weil sie in Mikrosekunden s
 **Was das in Runde 60 geändert hat.** Die erste Fassung der Spec hätte zwei Regeln von Hand geschrieben; beide fragen jetzt die Bibliothek:
 
 - **Wem eine Fähigkeit gehört:** Statt einer Tabelle je Protokoll-Zeile entscheidet der Dex. Die Fähigkeit geht an das Pokémon, dessen Art sie haben kann; Alomomola kann Water Absorb nicht haben.
-- **Tempo:** Statt Slush Rush in unsere Liste nachzutragen, rechnet der Simulator das Tempo (`getStat('spe')`). Damit fällt eine Handliste weg, die auch Unburden falsch rechnete. Hält das Zeit-Tor nicht, bleibt die Liste, und ein Test prüft sie gegen den Simulator.
+- **Tempo:** Statt Slush Rush in unsere Liste nachzutragen, rechnet der Simulator das Tempo (`getStat('spe')`). Damit fällt eine Handliste weg, die auch Unburden falsch rechnete. Hält das Zeit-Tor nicht, bleibt die Liste, und ein Test prüft sie gegen den Simulator. So kam es: siehe „Was Runde 60 gezeigt hat“.
 
 Außerdem entfernt Runde 60 einen alten Umweg: Für festgelegte Lade-Züge riet die Wahlliste das Ziel aus dem Dex nach, nur weil wir die Wahl falsch abschickten. Der Replay-Parser `@pkmn/client` hat bei Heilungen durch Fähigkeiten denselben Zuschreibungsfehler wie wir; die Meldung bereitet die Runde vor.
+
+## Was Runde 60 gezeigt hat
+
+**Sieben Fehler weniger am Übergang zum Simulator.** Jeder Fix bekam eine Zählung, einen roten Test, einen eigenen Commit und eine eigene Messung gegen den Stand direkt davor.
+
+- **Wahlen:** Ein Doubles-Slot, der in Outrage feststeckt, ist jetzt eine Option ohne Ziel, und wir schicken sie so ab, wie der Simulator sie erwartet. Vorher lehnte er jede Wahl der Stellung 913996 Zug 6 ab, und die Bank ließ die Zeile fallen.
+- **Korrektur:** Eingefügte Spikes tragen ihre Schichten, eingefügtes Wetter und Terrain enden nach der Restdauer, die der Replay-Parser zählt. Ob eine Bedingung Schichten hat, sagt der Dex.
+- **Bau:** Calyrex spielt mit As One, Ogerpon und Terapagos tragen keine Fähigkeit ihrer Kampfform mehr, Ogerpon terastallisiert in seinen festen Typ. Ein Prüfer schickt jedes gebaute Set der Expertenspiele durch den Team-Validator des Simulators. Nebenbei fiel ein erfundener siebter Ogerpon weg, den der Bau aus einem abgeschnittenen Namen gemacht hatte.
+- **Inferenz:** Wem eine Fähigkeit aus einer Protokoll-Zeile gehört, entscheidet der Dex. Welche Formate jede Fähigkeit erlauben (Custom Game, Hackmons), sagt die Regeltabelle des Simulators.
+
+**Die Bank liest danach nicht schlechter.** Vier Stellungen spielen wieder durch (833 → 837 Zeilen). Gepoolt liest die Korrektur 3 Basispunkte besser, As One 6 besser (noch im Fehlerbalken), der feste Tera-Typ samt Ogerpon-Fix 13 schlechter (im Fehlerbalken, ein Spiel). Dort hatte der erfundene Ogerpon dem Sieger Material geschenkt, das er nie hatte. Der Zustand stimmt jetzt, die alte Lesart war geschönt. Die übrigen Fixes bewegen gepoolt nichts. Kein Pin der Expertenspiele bewegte sich.
+
+**Das Tempo zeigt die Grenze des Grundsatzes.** Den Simulator für das Tempo zu fragen kostete die Statik 22 % Zeit, mit einem Merkzettel je Bewertung noch 15,5 %; das Tor erlaubte 5 %. Nach der Regel der Spec bleibt die Liste. Sie deckt jetzt alles, was der Simulator auf den 834 Bank-Stellungen anders rechnete: Protosynthesis und Quark Drive (rund 115 Körper), Unburden nur mit dem Volatile des Simulators, Neutralizing Gas, gerundete Stufen, Slush Rush im Schnee. Wo der Simulator entscheidet, fragt sie ihn nach seinem Zustand und baut seine Bedingungen nicht nach. Ein Prüfer vergleicht sie mit dem Simulator, die Statik kostet 2,5 % mehr. Der Grundsatz gilt also mit einer Ausnahme: Im heißesten Pfad der Statik ist ein Nachbau mit Prüfer billiger als die Frage an den Simulator.
 
 ## Was noch offen ist und wie es entschieden wird
 
 Runde 59 hat nur Zeit gespart, die Bewertung ist unverändert. Ob mehr Simulation besser bewertet, ist die eigentliche offene Frage.
 
-- **Runde 60 (S1a):** die Regelfehler, die dem Simulator falsche Zustände geben. Je mehr der Simulator entscheidet, desto mehr zählt, dass er den richtigen Zustand bekommt. Jeder Fehler bekommt eine Zählung, eine rote Probe, einen Fix und eine eigene Messung. Am Gate vom 02.10. kamen dazu: Ogerpon und Terapagos neben Calyrex (T93), ihr fester Tera-Typ und ihre Maske (T79), Fähigkeiten aus `[of]`-Zeilen (T104) und das Tempo vom Simulator statt aus unserer Liste (T95).
+- **Runde 60 (S1a):** gebaut und gemessen (siehe oben); ihr Gate entscheidet die Übernahme je Fix und die Meldung an `@pkmn/client`. Drei Reste stehen als T105 bis T107 in `NextSteps.md`.
 - **Runde 61 (S2):** die Obergrenze der Suche messen (T97): doppeltes und vierfaches Budget, getrennt nach Iterationen, Tiefe und Ziehungen je Zelle; eine Sonde, die bis zum Spielende weiterspielt statt zu schätzen; dazu die billige Statik-Probe (mittlerer Wurf statt Höchstwurf, Verbrennung, Guts, Facade). Ergebnis: Gewinn je Sekunde für jede Form von „mehr simulieren“, neben den 16 Basispunkten der Genauigkeits-Achse. Übernommen wird (T98) die beste Form, die die Bank aufgelöst besser macht bei höchstens der Wandzeit vor Runde 59.
 - **Wenn mehr Simulation nicht besser liest:** Dann entfällt T98 mit dem Beleg aus T97. Das Budget bleibt, und das Tempo aus Runde 59 bleibt als reiner Zeitgewinn. Die Runden 42 und 43 zeigen, dass dieser Ausgang möglich ist.
 - **Runde 62 (S3):** Triage. Jedes übrige TODO wird auf dem neuen Stand gelesen, nicht geschätzt, und bekommt ein Urteil: obsolet, kleiner, wichtiger, weniger wichtig oder unverändert. Die Tabelle geht an dein Gate.
@@ -186,7 +199,7 @@ Bis zur Triage ruht die übrige Liste; Ausnahmen gibt es nur an deinem Gate. Die
 ## Quellen
 
 - Gespräch der Sitzung vom 24.09.2026 (Fragen und Gate im Wortlaut), 01.10.2026 (Branch-Entscheid) und 02.10.2026 (Grundsätze, Spec-Gate der Runde 60).
-- Runde 60: Spec `docs/superpowers/specs/2026-10-02-round-60-design.md`, Sonden `docs/perf/probes/2026-10-02-r60/` (beide lokal).
+- Runde 60: Spec `docs/superpowers/specs/2026-10-02-round-60-design.md`, Sonden, Zählungen und Lesungen `docs/perf/probes/2026-10-02-r60/` (beide lokal), Ledger-Block `RULE FIXES 2026-10-02` in `regression/eval-calibration.spec.ts`.
 - Ledger-Block `STATIC UPPER BOUND AND SIM COST 2026-09-24` in `regression/eval-calibration.spec.ts` (Runde 58: Obergrenze, Kosten, Undo, Inventur, Patch-Studie, Gate).
 - Ledger-Block `SPEED LAYER 2026-10-01` in derselben Datei (Runde 59: Tore, Fehler, Pflege-Regeln).
 - Programm `docs/superpowers/plans/2026-09-24-program-more-simulation.md` (lokal): Stufen, Tore, Entscheidungsregeln, Risiken.

@@ -902,6 +902,68 @@ import { takeSimFastReport } from '../packages/eval-engine/src/forward/sim-fast/
  * static basis for this mass; the next lever, if any, is search/
  * planning-side.
  *
+ * RULE FIXES 2026-10-02 (improvement round 60, iteration S1a of the program
+ * "more simulation", T92 to T95 plus T79 and T104; spec
+ * docs/superpowers/specs/2026-10-02-round-60-design.md, plan
+ * docs/superpowers/plans/2026-10-02-round-60-plan.md; branch r59 from
+ * e4121d9, executed inline; cache v54; not pushed; probes, censuses and
+ * readings under docs/perf/probes/2026-10-02-r60/). Principle set at the
+ * spec gate: rules come from the simulator and the dex, provers instead of
+ * maintenance, library bugs upstream. Each fix measured on its own against
+ * the state right before it (D3); bank base r60-base = r59-on byte-identical
+ * (833 rows), feedback base unmoved against round 59.
+ * T94 (25d9fac): a doubles slot locked in a move (rampage, Uproar, Bide,
+ *   charge release, recharge) is one option without a target and goes to
+ *   the sim by request index (forward/request-moves.ts); by name the sim
+ *   assumed target type 'normal' and rejected it. Census 17 positions in 8
+ *   doubles games; identity vs round 59: level-1 errors 50 -> 0, level-2
+ *   224 -> 0, no unexpected digest; bank 834 rows (913996#6 back), 3 moved,
+ *   bands +0; feedback 2663093831 t10/t11 by 0.0014.
+ * T92 (4cc3988): snapshot corrections write Spikes/Toxic Spikes layers (dex
+ *   onSideRestart decides stacking) and the remaining turns of weather and
+ *   terrain (FieldSnapshot.weatherState/terrainState from @pkmn/client);
+ *   prover field-correction-oracle.spec.ts. Census 52 to 57 bank games (app
+ *   build and plan build), 5 feedback; bank 13 rows moved, pooled -3 [-8,+0]
+ *   (B better), hq -5 [-15,+0]; feedback 649664 t8 and 562428 t13.
+ * T93 (597d1b0): built sets carry an ability the dex knows (dex-legal.ts):
+ *   an unknown name becomes the species' ability it abbreviates ("As One"),
+ *   a battle-only forme's ability falls back outside free-ability formats;
+ *   prover dex-legal-builds.spec.ts (sim TeamValidator). Bank 837 rows
+ *   (2630685175 t6/t8/t10 no longer end prematurely), 26 moved, pooled -6
+ *   [-19,+1] unresolved, doubles mid -48 [-155,+8]; feedback 2630685175
+ *   follows the winner (t4 -0.736 -> +0.569).
+ * T79 (1e8f778): fixed Tera type and item from the dex (requiredTeraType,
+ *   requiredItem); a Tera forme switching back in maps through dex
+ *   battleOnly (749895 built a second, phantom Ogerpon). Census tera 70 ->
+ *   0; R54 Tera count 0 0 0 0 0; bank 8 rows, all 749895, all away from the
+ *   winner: pooled +13 [+0,+39], hq +23 [+0,+68] (the phantom gave p1
+ *   material it never had); feedback 912045 t1.
+ * T104 (be23b7f): an ability from a protocol line goes to the Pokemon
+ *   whose species can have it (ability-holder.ts): Water Absorb heals and
+ *   Pickpocket credited the attacker, Trace credited the traced ability;
+ *   upstream text for @pkmn/client prepared, not sent. Bank 5 rows, +0;
+ *   feedback unmoved.
+ * T95 residual (5bb832c): burn 1/8 in gens 2-6, poison 1/16 in gen 1;
+ *   prover races-residual.spec.ts (gens 1-9). Bank 2 rows (5th digit);
+ *   feedback the four gen-6 games, at most 0.02.
+ * T95 speed: getStat in the static (18675cb, memo 2be6336) missed the time
+ *   gate (+22 %, +15.5 %; gate 5 %), reverted (46edcb2); fallback per spec
+ *   decision 6: the hand list stays, matches getStat on every bank body
+ *   (Protosynthesis/Quark Drive, Unburden with the sim's volatile,
+ *   ignoringAbility/ignoringItem, effectiveWeather, stages floored, Slush
+ *   Rush in snowscape; a73f58a, lazy queries 2e69351), prover
+ *   speed-oracle.spec.ts; static +2.5 %, feedback walls equal (215-216 s);
+ *   bank 129 rows moved, pooled +0 [-1,+1], doubles early +3 [+0,+6] warns.
+ * REVIEW (fresh reviewer, read-only): no critical; fixed in 3fb772d:
+ *   free-ability formats from the sim's rule table instead of the tier
+ *   name (Balanced Hackmons dropped real reveals), gen-correct fallback
+ *   ability, the benched-speed guard test; bank and feedback
+ *   byte-identical after it.
+ * END GATES: lint, tsc -b, test:regression (1726), test:e2e (75/75),
+ *   pack:smoke green, again on 3fb772d (1730 tests); feedback end-1..3
+ *   byte-identical, no pin moved in any run of the round; identity speed
+ *   layer on vs off OK (834/834/834 rows, 48 searches, 0 errors).
+ *
  * SPEED LAYER 2026-10-01 (improvement round 59, iteration S1, T91, stage 1
  * of the program "more simulation"; spec
  * docs/superpowers/specs/2026-09-24-round-59-design.md, plan

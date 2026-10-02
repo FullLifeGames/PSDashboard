@@ -1,9 +1,9 @@
-# Next Steps (Stand 01.10.2026, nach Runde 59)
+# Next Steps (Stand 02.10.2026, nach Runde 60)
 
 Nur offene Schritte, als priorisierte Checkliste: Die oberste Iteration ist die nächste Sitzung, das oberste offene Kästchen darin das nächste TODO. Jedes TODO nennt das Problem an einer Spielszene und das Erfolgsmaß. Die Umsetzungsschritte jedes TODOs stehen als Checkliste im Backlog-Plan unter derselben Nummer; beim Start einer Iteration wandern sie hierher.
 
-- **Iterationen** bündeln die TODOs einer Sitzung. Eine Iteration wird beim Start zur Runde mit der nächsten freien Rundennummer: Iteration 1 war Runde 46, Iteration 2 war Runde 47, Iteration 2a war Runde 48, Iteration 2b war Runde 49, Iteration 3 war Runde 50, Iteration 4 war Runde 51, Iteration 4a war Runde 52, Iteration 4d war Runde 53, Iteration 4b war Runde 54, Iteration 4e war Runde 55, Iteration 4c war Runde 56, Iteration 4f war Runde 57. Runde 58 war die Sichtung „Was bauen wir nach?“ außer der Reihe; seit ihrem Gate stehen die Iterationen S1 bis S3 des Programms „Mehr Simulation“ oben, vorgesehen als Runden 59 bis 62; Iteration S1 war Runde 59. Score-berührende TODOs derselben Iteration bekommen je ihre eigene Messung (D3), nie eine gemeinsame.
-- **T-Nummern** (T01 bis T45) sind feste Namen, vergeben am 18.09. in Prioritäts-Reihenfolge. Wandert ein TODO in der Liste, behält es seine Nummer; ein neues TODO bekommt die nächste freie (ab T104; T46 kam am 18.09. in Runde 46 dazu, T47 bis T51 in Runde 47, T52 und T53 in Runde 48, T54 in Runde 49, T55 in Runde 50, T56 bis T64 in Runde 51, T65 am 19.09. nach deren Gate, T66 bis T68 am 20.09. in Runde 52, T69 am 20.09. in Runde 53, T70 bis T74 am 21.09. in Runde 54, T75 am 21.09. in Runde 55, T76 am 23.09. am Gate der Runde 56, T77 bis T80 am 23.09. in Runde 56, T81 am 23.09. am Gate der Runde 57, T82 am 23.09. in ihrer Spec, T83 bis T90 am 24.09. in Runde 57, T91 bis T102 am 24.09. am Gate der Runde 58, T103 am 01.10. in Runde 59). „braucht T01“ heißt: T01 muss vorher gelaufen sein.
+- **Iterationen** bündeln die TODOs einer Sitzung. Eine Iteration wird beim Start zur Runde mit der nächsten freien Rundennummer: Iteration 1 war Runde 46, Iteration 2 war Runde 47, Iteration 2a war Runde 48, Iteration 2b war Runde 49, Iteration 3 war Runde 50, Iteration 4 war Runde 51, Iteration 4a war Runde 52, Iteration 4d war Runde 53, Iteration 4b war Runde 54, Iteration 4e war Runde 55, Iteration 4c war Runde 56, Iteration 4f war Runde 57. Runde 58 war die Sichtung „Was bauen wir nach?“ außer der Reihe; seit ihrem Gate stehen die Iterationen S1 bis S3 des Programms „Mehr Simulation“ oben, vorgesehen als Runden 59 bis 62; Iteration S1 war Runde 59, Iteration S1a war Runde 60. Score-berührende TODOs derselben Iteration bekommen je ihre eigene Messung (D3), nie eine gemeinsame.
+- **T-Nummern** (T01 bis T45) sind feste Namen, vergeben am 18.09. in Prioritäts-Reihenfolge. Wandert ein TODO in der Liste, behält es seine Nummer; ein neues TODO bekommt die nächste freie (ab T108; T46 kam am 18.09. in Runde 46 dazu, T47 bis T51 in Runde 47, T52 und T53 in Runde 48, T54 in Runde 49, T55 in Runde 50, T56 bis T64 in Runde 51, T65 am 19.09. nach deren Gate, T66 bis T68 am 20.09. in Runde 52, T69 am 20.09. in Runde 53, T70 bis T74 am 21.09. in Runde 54, T75 am 21.09. in Runde 55, T76 am 23.09. am Gate der Runde 56, T77 bis T80 am 23.09. in Runde 56, T81 am 23.09. am Gate der Runde 57, T82 am 23.09. in ihrer Spec, T83 bis T90 am 24.09. in Runde 57, T91 bis T102 am 24.09. am Gate der Runde 58, T103 am 01.10. in Runde 59, T104 am 02.10. in Runde 60 vergeben und dort erledigt, T105 bis T107 am 02.10. in Runde 60). „braucht T01“ heißt: T01 muss vorher gelaufen sein.
 - **Backlog-Plan** (je TODO: Idee, Schritte mit Dateien, volles Gate, Doubles-Abdeckung, offene Entscheidungen, Zahlen, Code-Belege): `docs/superpowers/plans/2026-09-18-backlog-plans.md`.
 - **Erledigtes**: `docs/completed/` nach Gebiet (Index, Eintragsformat und Prozess in `docs/completed/README.md`).
 - **Maschinen-Quellen**: Ledger in `regression/eval-calibration.spec.ts`, Pins in `e2e-feedback/corpus.ts`, Memory-Notizen.
@@ -24,41 +24,11 @@ Bedingungen des Users: Die Qualität bleibt, die Geschwindigkeit bleibt, und nac
 | Schritt | Runde (vorgesehen) | TODOs | Tor in einem Satz |
 | --- | --- | --- | --- |
 | S1 Tempo-Schicht (gemessen: Runde 59, übernommen) | 59 | T91 | byte-gleich in Zügen, Suchen und Feedback, Kalibrierung ziffern-gleich, dazu Baum Singles ≥ 2,0×, Doubles ≥ 1,6×, Matrix ≥ 1,8×, Pass 3 im Feedback ≥ 1,5×. Ergebnis: alle Tore grün; alle drei Hebel (Regeltabelle einmal je Format, Kopie des Kampfs statt JSON, Vorprüfung vor `runEvent`) seit 78a1fdb Standard, Notaus `EVAL_SIM_FAST=0`; 0 Abweichungen in 40 776 Zügen ab den Bank-Stellungen, 318 424 Zügen eine Ebene tiefer, 111 316 Zügen mitten im Zug und 48 Suchen; Feedback und Kalibrierung byte-gleich; Baum Singles 2,35×, Doubles 1,81×, Matrix 2,39×, Pass 3 1,90×; Ledger-Block `SPEED LAYER 2026-10-01` in `regression/eval-calibration.spec.ts` |
-| S1a Regelfehler, die dem Simulator falsche Zustände geben | 60 | T92 bis T95 | je Fehler rote Probe, Fix und eigenes Gate (D3; T94 verlustfrei D4 außer der abgestürzten Stellung) |
+| S1a Regelfehler, die dem Simulator falsche Zustände geben (gemessen: Runde 60, Gate offen) | 60 | T92 bis T95, dazu T79 und T104 | je Fehler rote Probe, Fix und eigenes Gate (D3; T94 verlustfrei D4 außer der abgestürzten Stellung). Ergebnis: sieben Fixes, je eigene Messung gegen den Stand davor; Bank 833 → 837 Zeilen (vier Stellungen spielen wieder durch), gepoolt T92 −3 bp (besser), T93 −6 (unentschieden), T79 +13 (unentschieden, ein Spiel: ein erfundener siebter Ogerpon fällt weg), übrige ±0; Tempo vom Simulator verfehlte das Zeit-Tor (+22 %), die Liste bleibt mit Prüfer (Statik +2,5 %); End-Tore grün, Feedback dreimal byte-gleich, kein Pin bewegt; Ledger-Block `RULE FIXES 2026-10-02` |
 | S2 Simulation investieren | 61 | T97, T98 | Bank aufgelöst besser bei höchstens der Wandzeit vor Runde 59 (Code-Stand 85eb5ad, verschränkt gemessen) |
-| S3 Triage | 62 | T99 | jedes der offenen TODOs außerhalb des Programms (am 24.09. 68, seit Runde 59 mit T103 69) auf dem neuen Stand gelesen und am User-Gate neu eingeordnet |
+| S3 Triage | 62 | T99 | jedes der offenen TODOs außerhalb des Programms (am 24.09. 68, seit Runde 59 mit T103 69, seit Runde 60 ohne T79 und mit T105 bis T107 71) auf dem neuen Stand gelesen und am User-Gate neu eingeordnet |
 
 Branch: Das Programm bleibt auf Branch `r59`, bis Runde 62 durch ist; die Runden 60 bis 62 bauen darauf auf. Erst nach Abschluss wird es in `v1` gemerged und `v1` gepusht (User-Gate der Runde 59, 01.10.2026). Ob master dabei mitgeht, klärt das Gate der Runde 62.
-
-## Iteration S1a · Regelfehler, die dem Simulator falsche Zustände geben (Runde 60)
-
-Zwischenschritt des Programms, die Liste des Gates „4a“: Spikes-Schichten, As One, der Doubles-Absturz, Verbrennung, Slush Rush. Je mehr der Simulator entscheidet, desto mehr zählt, dass wir ihm den richtigen Zustand geben. T92, T93 und T95 sind score-berührend, deshalb nach S1, damit die Tempo-Schicht gegen einen unveränderten Stand geprüft wird; T94 ist verlustfrei außer der abgestürzten Stellung (D4). Seit Runde 59 deckt T94 auch Zug 6 und 8: Die Identitäts-Sonden fanden dort im selben Spiel Wahlen, die der Simulator ablehnt. Jeder Fehler bekommt seine eigene Messung.
-
-- [ ] **T92 · Korrigierte Seitenbedingungen ohne Schichten und Dauer** (Nachbau, Mini-Runde, klein, score-berührend D3)
-
-  Wo eine Korrektur Spikes einfügt, schreibt `branch/corrections.ts:225-244` keine Schichten: Der Spikes-Schaden wird NaN, der Simulator verbucht ihn als 0; Toxic Spikes mit zwei Schichten vergiften nur normal; korrigiertes Wetter endet nie, Terrain steht ohne Zustand. Die Korrektur läuft an jeder Rekonstruktions-Grenze (App, Bank, Feedback). Gegenprüfer der Runde 58: Ein Garchomp wechselt nach der Korrektur ohne Schaden und nur vergiftet ein; mit den Schichten verliert er ein Viertel und wird schwer vergiftet.
-
-  *Erfolg:* Nach einer Korrektur tragen Spikes, Toxic Spikes, Wetter und Terrain Schichten und Dauer wie im Log; Bank und Dumps bewegen sich nur in Spielen mit korrigierten Seitenbedingungen. *Plan T92:* 3 Schritte, keine offene Entscheidung.
-
-- [ ] **T93 · Calyrex spielt ohne As One** (Nachbau, Mini-Runde, klein, score-berührend D3)
-
-  27 Bank-Stellungen aus 6 VGC-Spielen tragen die Fähigkeits-Id `asone`, die der Gen-9-Dex nicht kennt (dort heißen die Formen `asoneglastrier` und `asonespectrier`); der Simulator spielt Calyrex deshalb ohne As One. Gefunden in der Patch-Prüfung der Runde 58.
-
-  *Erfolg:* Jeder gebaute Calyrex-Ice und Calyrex-Shadow trägt die passende As-One-Form; Bank und Dumps bewegen sich nur in Spielen mit Calyrex. *Plan T93:* 3 Schritte, keine offene Entscheidung.
-
-- [ ] **T94 · Der Doubles-Baum stürzt ab: Outrage findet kein Ziel** (Simulation und Suche, Mini-Runde, klein, verlustfrei D4 außer der abgestürzten Stellung)
-
-  smogtours-gen9doublesou-913996 Zug 4: Der MCTS-Baum wirft `p1 "switch 4, move outrage": Can't move: Outrage needs a target` (`forward/switches.ts:53`), in allen sechs Varianten der Sonde der Runde 58 (Tera an und aus, drei Seeds, ohne Patch), auch mit der Wahl `move sandsearstorm, move outrage`. In der App ist der Pfad über den MCTS-Modus erreichbar.
-
-  Die Identitäts-Sonden der Runde 59 fanden im selben Spiel Wahlen, die der Simulator ablehnt, in Zug 4, 6 und 8. Die Sonden spielen an jeder Bank-Stellung die ersten 5×5 Optionen mit zwei Seeds (Ebene 1) und von den Kindern aus einen weiteren Zug (Ebene 2). In diesen drei Stellungen wirft jeder Probe-Zug, der eine bestimmte Option spielt: in Ebene 1 alle 50 Probe-Züge der Stellung Zug 6 (50 von 40 776), in Ebene 2 224 von 318 424, in den Stellungen Zug 4 und 8. Der Code-Stand vor Runde 59 (85eb5ad) wirft in Ebene 1 an denselben 50 Probe-Zügen; Ebene 2 lief auf der Basis nicht, mit ausgeschalteter Schicht wirft sie gleich. Die Tempo-Schicht hat das nicht verursacht. In Zug 6 lehnt der Simulator `move outrage` ohne Ziel ab (ein Probelauf vor den Toren); für Zug 4 und 8 ist der Grund noch nicht gelesen.
-
-  *Erfolg:* Der Baum auf 913996 Zug 4 läuft durch, und alle Probe-Züge der Ebenen 1 und 2 in 913996 (Zug 4, 6 und 8) laufen ohne Fehler; ein Test hält die Wahl mit Ziel fest; alle übrigen Züge und Suchen bleiben byte-gleich. *Plan T94:* 4 Schritte, keine offene Entscheidung.
-
-- [ ] **T95 · Belegte Regelfehler in Statik und Tempo: Verbrennung und Slush Rush** (Regelfehler, Mini-Runde, klein, score-berührend D3, je Fehler eigene Messung)
-
-  Zwei Fehler, die der Gegenprüfer der Runde 58 im Code und zur Laufzeit bestätigt hat: Verbrennung kostet in Gen 2 bis 6 ein Achtel der KP, `score/races.ts:30` rechnet überall ein Sechzehntel; Slush Rush verdoppelt im Schnee nie (`speed.ts:43` prüft `'snow'`, der Simulator schreibt `'snowscape'`; ein Cetitan bleibt bei 182 statt 364). Die zwei weiteren bestätigten Fehler bleiben, wo sie schon gebucht sind: der exakte Tempo-Gleichstand im letzten Paar, der immer an p2 geht (`score/last-pair.ts:47`), bei T15 (Schritt 4), und `'attract'` gegen die Log-Zeile `Attract` (`pair/log.ts:7`) bei T77.
-
-  *Erfolg:* Je Fehler eine rote Probe, die danach grün ist; Bank und Dumps bewegen sich je Fehler nur, wo er greift; die bewegten Urteile sind gelesen. *Plan T95:* 4 Schritte, keine offene Entscheidung.
 
 ## Iteration S2 · Das Tempo in Simulation investieren (Runde 61)
 
@@ -128,7 +98,7 @@ Aus der Inventur der Runde 58 (`docs/perf/probes/2026-09-24-r58/inventory/invent
 
 - [ ] **T101 · Bibliothek statt Eigenbau, wo sie passt** (Werkzeug, Runde, mittel, je Kandidat eigenes Gate)
 
-  Die Inventur nennt 11 Stellen, die ein Bibliotheks-Aufruf direkt ersetzt, 32, die einen Adapter brauchen, und in Abschnitt 4 die zehn aussichtsreichsten Kandidaten. T101 nimmt davon fünf: Formen über `battleOnly` (Palafin-Hero wird heute zum siebten Körper), Zug- und Item-Klassen aus Dex-Feldern (ein Shell-Smash-Set verliert im Bau Shadow Ball und Giga Drain), `getFinalSpeed` aus dem Rechner, wer einwechseln darf aus dem Request (Revival Blessing wirft heute), `@pkmn/sets` für Team-Text. Die übrigen gehören anderswohin: die Singles-Würfel zu T14, der Schaden der Statik über den Rechner entfällt nach dem Kostenurteil der Runde 58, die Seitenbedingungen zu T92, die Zugklassen im Endspiel zu T87, die Wächter der K.-o.-Quoten zu T76.
+  Die Inventur nennt 11 Stellen, die ein Bibliotheks-Aufruf direkt ersetzt, 32, die einen Adapter brauchen, und in Abschnitt 4 die zehn aussichtsreichsten Kandidaten. T101 nimmt davon fünf: Formen über `battleOnly` (Palafin-Hero wird heute zum siebten Körper; seit Runde 60 liest `inference/lookup.ts` an den Endungen seiner Handliste die Ursprungsform aus dem Dex, die Liste selbst bleibt), Zug- und Item-Klassen aus Dex-Feldern (ein Shell-Smash-Set verliert im Bau Shadow Ball und Giga Drain), `getFinalSpeed` aus dem Rechner (Runde 60 hat `getStat` des Simulators in der Statik gemessen: +15 bis 22 % Zeit; die Tempo-Liste bleibt, hält mit `speed-oracle.spec.ts` jeden Bank-Körper gleich mit dem Simulator, der Kandidat ist damit erledigt), wer einwechseln darf aus dem Request (Revival Blessing wirft heute), `@pkmn/sets` für Team-Text. Die übrigen gehören anderswohin: die Singles-Würfel zu T14, der Schaden der Statik über den Rechner entfällt nach dem Kostenurteil der Runde 58, die Seitenbedingungen zu T92, die Zugklassen im Endspiel zu T87, die Wächter der K.-o.-Quoten zu T76.
 
   *Erfolg:* Jeder Kandidat ist umgestellt oder begründet verworfen, mit dem Fehler, den er behebt, als roter Probe. *Plan T101:* 3 Schritte, 1 offene Entscheidung.
 
@@ -268,7 +238,7 @@ Drei Rechner-Reste: T72 hat der Schiedsrichter der Runde 54 gefunden, T76 die Me
 
 - [ ] **T76 · Rechner-Treue: Booster Energy, sichere Volltreffer, Supreme Overlord** (Zufall preisen, Mini-Runde, klein, score-berührend D3)
 
-  Auf den 83 Doubles-Stellungen der Rechner-Messung von Runde 56 (`out/damage-check-v2.json`) rechnet der Schadensrechner Ivy Cudgel von Ogerpon-Wellspring gegen Incineroar in 47 gezogenen Würfen niedriger als der Simulator, Snarl von Iron Jugulis (Quark Drive) gegen Kyurem in 36. Die Zählung nennt Art-Paare; Replay und Zug holt Schritt 1 nach, und er trennt dabei Rechner-Lücke und Set-Fehler (der gebaute Ogerpon-Wellspring trägt eine Sitrus Berry statt der Wellspring Mask, die seine Form verlangt, T79). Wie ein Rechner, dem man einen Teil der Zutaten verschweigt.
+  Auf den 83 Doubles-Stellungen der Rechner-Messung von Runde 56 (`out/damage-check-v2.json`) rechnet der Schadensrechner Ivy Cudgel von Ogerpon-Wellspring gegen Incineroar in 47 gezogenen Würfen niedriger als der Simulator, Snarl von Iron Jugulis (Quark Drive) gegen Kyurem in 36. Die Zählung nennt Art-Paare; Replay und Zug holt Schritt 1 nach, und er trennt dabei Rechner-Lücke und Set-Fehler (der gebaute Ogerpon-Wellspring trägt eine Sitrus Berry statt der Wellspring Mask, die seine Form verlangt, T79, seit Runde 60 behoben). Wie ein Rechner, dem man einen Teil der Zutaten verschweigt.
 
   Runde 56 hat den Schadensrechner am gezogenen Wurf gemessen: In Doubles trifft er 96,8 % der nicht tödlichen Würfe auf den KP genau, sobald Partner-Effekte und Einwechsel-Boosts richtig ankommen. Die Reste sind Eingaben, die der Rechner nie bekommt: der Booster-Energy- oder Wetter-Boost von Protosynthesis und Quark Drive (`boostedStat`), Supreme Overlord und Last Respects (`alliesFainted`), Rage Fist (`timesAttacked`), Ivy Cudgel. Dazu rechnet `ko-odds.ts` Züge mit sicherem Volltreffer (Flower Trick, Wicked Blow) mit der gewöhnlichen Volltreffer-Chance; der Doubles-Plan liest sie richtig, weil der Simulator dort keinen Volltrefferwurf zieht. Vor dem Bau prüfen: Laut finalem Review der Runde 56 setzt @smogon/calc `isCrit` für solche Züge selbst (`dist/move.js:87`), Normal- und Volltreffer-Tabelle sind dort gleich; dieser Teil könnte schon stimmen.
 
@@ -298,15 +268,7 @@ Die Zählung der Runde 55 (`docs/perf/probes/2026-09-21-r55/lock-census.vt.ts`, 
 
 ## Iteration 7d · Sets: was Art und Protokoll festlegen
 
-Zwei kleine Set-Fehler aus dem Lesen der Runde 56 (Platz am User-Gate vom 23.09. bestätigt, „3a“). Beide lassen sich ohne Messung am Spiel belegen: Die Art oder das Protokoll schließt aus, was der Bau annimmt.
-
-- [ ] **T79 · Ogerpon trägt seinen festen Tera-Typ und seine Maske** (Sets und Spreads, Mini-Runde, klein, score-berührend D3)
-
-  smogtours-gen9doublesou-912045: Ogerpon-Cornerstone kann nur zu Gestein terastallisieren. Das Log zeigt keinen Tera-Typ, der Bau lässt das Feld leer, und der Simulator nimmt dann den ersten Typ der Art: Pflanze (`pokemon.js:209`: `set.teraType || types[0]`). Die Engine rechnet Tera-Klicks dieses Ogerpon also mit dem falschen Typ; eine Zelle, die p2s Urteil in Zug 1 mitträgt, preist einen K.-o.-Anteil auf Tera Pflanze. Der Dex kennt den festen Typ (`requiredTeraType`: Wellspring Wasser, Hearthflame Feuer, Cornerstone Gestein, Terapagos Stellar), nur der Team-Validator liest ihn. Dasselbe gilt für das feste Item: Der gebaute Ogerpon-Wellspring der Rechner-Messung trägt eine Sitrus Berry statt der Wellspring Mask (`requiredItem`). Wie ein Formular mit vorgedrucktem Feld, in das jemand trotzdem etwas anderes schreibt.
-
-  Hinweis: Der Bau setzt `teraType` heute nur aus dem Log (`packages/replay-core/src/team-builder.ts:212`); Rückfall auf `species.requiredTeraType`, ebenso das Item auf `species.requiredItem`. Erster Schritt: zählen, wie viele Bank-Stellungen ein Ogerpon oder Terapagos tragen. Ein Lese-Bericht der Runde 57 (`docs/perf/probes/2026-09-23-r57/understand/carriers-anchors.md`, Befund 3, Ursache ungeprüft) fand eine verwandte Lücke in VGC 2630685175 Zug 4: Der Nachbau baut den Grund-Terapagos mit Teraform Zero und Tera Stellar, das Log zeigt Terapagos-Stellar; Tera Starstorm liest dort selbst im Simulator Normal. Der Tera-Typ stimmt dort schon, falsch sind Form und Fähigkeit, und der Rückfall auf `requiredTeraType` behebt das nicht. Im selben Spiel fällt Terapagos im Nachbau in Zug 4 (drei Fehlstände beim K.o., Zug 5 endet anders als im Log, p1 bleibt unbewertet); die Ursache ist ungeklärt, die Grundform liegt nahe.
-
-  *Erfolg:* Jeder gebaute Ogerpon und Terapagos trägt seinen festen Tera-Typ, jeder Ogerpon seine Maske, die Tera-Zählung aus Runde 54 bleibt bei 0 Abweichungen, Bank und Dumps bewegen sich nur in Spielen mit diesen Arten. *Plan T79:* 3 Schritte, keine offene Entscheidung.
+Zwei kleine Set-Fehler aus dem Lesen der Runde 56 (Platz am User-Gate vom 23.09. bestätigt, „3a“). Beide lassen sich ohne Messung am Spiel belegen: Die Art oder das Protokoll schließt aus, was der Bau annimmt. T79 lief in Runde 60 mit (fester Tera-Typ und festes Item aus dem Dex); T80 bleibt.
 
 - [ ] **T80 · Items, die das Protokoll ausschließt** (Sets und Spreads, Mini-Runde, klein, score-berührend D3)
 
@@ -315,6 +277,28 @@ Zwei kleine Set-Fehler aus dem Lesen der Runde 56 (Platz am User-Gate vom 23.09.
   Hinweis: Ausnahmen beachten: Sheer Force nimmt den Rückstoß bei Zügen mit Zusatzeffekt, Magic Guard jeden Rückstoß; ein Angreifer, der im selben Treffer fällt, bekommt keinen; Leftovers heilt nicht bei vollen KP oder unter Heal Block. Die Schadens-Widersprüche derselben Lesung (Scale Shot, High Horsepower, Blood Moon, Flare Blitz) gehören zu T32.
 
   *Erfolg:* Die drei Spiele tragen die ausgeschlossenen Items nicht mehr, die Item-Probe spricht in 2629703929 Zug 1 nicht mehr über Life Orb frei, Bank und Dumps bewegen sich nur in Spielen mit einem solchen Ausschluss. *Plan T80:* 4 Schritte, 1 offene Entscheidung.
+
+## Iteration 7e · Reste aus Runde 60
+
+Drei Befunde aus den Zählungen und dem Schluss-Review der Runde 60 (Lesungen unter `docs/perf/probes/2026-10-02-r60/census/`). Bis zur Triage ruhen sie wie die übrige Liste; T99 ordnet sie ein.
+
+- [ ] **T105 · Körper auf der Bank tragen Volatile vom Feld** (Nachbau, Mini-Runde, klein, score-berührend D3)
+
+  smogtours-gen9ou-751466 Zug 10: Iron Valiant sitzt auf der Bank und trägt noch das Quark-Drive-Volatile. Der Simulator löscht Volatiles beim Auswechseln; ein Körper auf der Bank dürfte keins tragen. Die Tempo-Zählung der Runde 60 fand 11 solche Körper in 5 Spielen (751466, 937926, 751207, 2658664943, 937928), alle mit Protosynthesis oder Quark Drive. Wechselt der Körper im Nachbau ein, spielt der Simulator den alten Schub weiter (die Tempo-Liste liest ihn ebenso). Vermutete Herkunft: die Schnappschuss-Korrektur der Aktiven, die Körper zwischen Feld und Bank tauscht, ohne die Volatiles zu leeren.
+
+  *Erfolg:* Kein Körper auf der Bank trägt nach einer Korrektur ein Volatile; die Tempo-Zählung (`census/speed-census.vt.ts`) findet die Klasse nicht mehr; Bank und Dumps bewegen sich nur in Spielen mit Paradox-Pokémon.
+
+- [ ] **T106 · Die Korrektur schreibt Bedingungen, die der Simulator nicht kennt** (Nachbau, Mini-Runde, klein, verlustfrei D4 erwartet)
+
+  GPL-Replay Zug 26 bis 38: `@pkmn/client` führt Future Sight als Seitenbedingung (`level 1`, `minDuration 3`, ohne `-end`-Zeile nie beendet); die Schnappschuss-Korrektur schreibt `futuresight` in die Seitenbedingungen des Simulators, dessen Dex die Id nicht kennt (`exists: false`). Der Simulator führt Future Sight als Slot-Bedingung. Der Eintrag ändert heute kein Spiel, liegt aber in jedem serialisierten Zustand. Der Prüfer der Runde 60 vergleicht deshalb nur Bedingungen, die der Dex kennt.
+
+  *Erfolg:* Die Korrektur übersetzt nur Bedingungen, die der Dex kennt (Future Sight als Slot-Bedingung oder gar nicht); Bank und Dumps byte-gleich oder gelesen.
+
+- [ ] **T107 · Restposten aus dem Review der Runde 60** (Regelfehler, Mini-Runde, klein, je Punkt verlustfrei oder mit eigenem Beleg)
+
+  Sieben kleine Befunde, keiner trifft heute ein Bank- oder Feedback-Spiel: (1) Ein ausdrückliches `pass` in einer Doubles-Wahl überspringt in `forward/request-moves.ts` einen besiegten Slot, der Simulator nicht. (2) `recordAbilityAttribution` schneidet den Spitznamen mit `split(': ')`; die alte Erfassung nahm den ganzen Rest. (3) `syncWeather` lässt bei Wechsel oder Entfernen `source` und `sourceSlot` stehen (Primal-Wetter endet in der Vorschau nie). (4) Ein festgelegter Phantom-Force-Release in Doubles verliert die K.-o.-Quote der Option (`pair/odds.ts`, Ziel ohne Ort seit T94). (5) Ein Porygon2, das Download kopiert, bekommt Download als eigene Fähigkeit (`-ability`-Zeilen mit `[from]` sind erworben). (6) Die Tempo-Liste kennt Slow Start, Macho Brace und die Power-Items nicht; der Prüfer sieht eine fehlende Regel nur, wenn ein Fixture-Körper sie trägt. (7) Tests, die die Spec nennt und der Plan ausließ: Calyrex kündigt As One und Unnerve in der Engine an, ein Tera-Typ aus dem Log schlägt `requiredTeraType`, T104 mit zwei möglichen Besitzern, eingefügtes Terrain endet nach seiner Dauer.
+
+  *Erfolg:* Jeder Punkt ist behoben mit rotem Test oder begründet verworfen.
 
 ## Iteration 8 · Glückskonto: gewürfelt oder umbewertet
 
@@ -678,11 +662,11 @@ Wer an einem Thema arbeitet, findet hier die verwandten TODOs.
 | Bericht | T17, T18, T19, T22, T36, T44, T51, T59, T64 |
 | Re-Fit | T49, T50, T52, T71, T81, T102 |
 | Endspiel | T33, T34, T55, T82, T84, T87, T88, T90 |
-| Sets und Spreads | T25, T26, T27, T28, T29, T30, T31, T32, T60, T62, T63, T79, T80, T86, T89 |
+| Sets und Spreads | T25, T26, T27, T28, T29, T30, T31, T32, T60, T62, T63, T80, T86, T89 |
 | Zufall preisen | T14, T15, T16, T23, T24, T35, T65, T72, T76, T77, T78, T83 |
-| Nachbau | T75, T92, T93 |
-| Simulation und Suche | T94, T97, T98 |
-| Regelfehler | T95, T96 |
+| Nachbau | T75, T105, T106 |
+| Simulation und Suche | T97, T98 |
+| Regelfehler | T96, T107 |
 | Oberfläche | T20, T68, T69, T85 |
 | Richter und Bank | T21, T37, T38, T45 |
 | Q-Runden | T39, T40, T41, T42 |
@@ -751,6 +735,8 @@ Bericht und Buchung:
 
 Engine und Messung:
 
+- [ ] VGC 2630685175 Zug 8 liest seit Runde 60 −0,90 und gehalten entschieden für p2, p1 gewann: Glacial Lance besiegt dort Calyrex-Shadow, Calyrex-Ice bekommt Chilling Neigh. Die Zeile fehlte vor T93 (der Nachbau endete vorzeitig) → lesen, wenn eine Runde die Statik in VGC-Endspielen oder die Halte-Regel anfasst.
+- [ ] Doubles früh las nach dem Tempo-Fix der Runde 60 um +3 bp schlechter ([+0, +6], die Zelle warnt nach D3), gepoolt ±0 → beobachten; handeln, wenn eine spätere Runde dieselbe Zelle wieder schlechter liest.
 - [ ] Der Set-Rückfall für Doubles und VGC ist fest auf Gen 9 verdrahtet (`src/lib/smogon/format-fallback.ts`): Ein Doubles-Replay vor Gen 9 bekäme Gen-9-Sets. Heute ist jedes Doubles-Replay in Bank, Fit-Korpus und Feedback-Lauf Gen 9 → handeln, bevor ein älteres Doubles-Spiel in eine Messung kommt.
 - [ ] Ein neuer Live-Zugriff in `pairThreat` oder `singleMoveFraction` braucht seinen Schlüssel-Term in `pairKey` (Runde 49: HP, Typen und Basiswerte fehlten, Doubles-Zellen wichen von Lauf zu Lauf ab) → bei jeder Änderung an `score/threat.ts` den Test `threat-memo.spec.ts` um den neuen Zugriff erweitern. Seit Runde 54 trägt der Schlüssel den Tera-Typ neben den rohen Typen, für Angreifer und Verteidiger (be95961); ein Blatt, das die lebenden Typen liest, ist damit gedeckt, der Fall steht in `threat-memo.spec.ts`.
 - [ ] `detectSacks` liest die Snapshot-HP der Bank, also die letzte Sichtung, und kennt Regenerator nicht (649664 t9: „sacked Tornadus (3% HP)“, wahr 36 % nach der Heilung) → handeln, wenn ein Sack-Satz eine falsche HP nennt, die ein User reklamiert; Hebel: dieselbe Regel wie `benchHpFromSighting` in `branch/corrections.ts`.
