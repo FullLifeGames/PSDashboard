@@ -1,55 +1,29 @@
 import type { Battle, Pokemon } from '@pkmn/sim';
-import { stageMultiplier } from './stat-stages.ts';
 
 /**
- * Effective speed for move-order decisions: stored speed through the stage
- * multiplier, then the modifiers a replay can actually witness — paralysis
- * (gen-dependent, Quick Feet overrides), Tailwind, Choice Scarf, Iron Ball,
- * Unburden (readable only as "ability present + item slot empty"), and the
- * weather/terrain speed abilities. Deliberately NOT modeled: Cloud Nine/Air
- * Lock suppression, Protosynthesis/Quark Drive, Slow Start, Lagging
- * Tail/Full Incense (move-order, not speed), Quick Powder.
+ * Effective speed for move-order decisions, from the simulator (round 60,
+ * T95): getStat('spe') applies the stat stage and every ModifySpe handler
+ * the sim runs (paralysis per generation, Choice Scarf, Iron Ball, Tailwind,
+ * Unburden once the item went, the weather and terrain abilities,
+ * Protosynthesis, Quark Drive, Slow Start, Quick Feet). The hand list it
+ * replaces checked 'snow' where the sim writes 'snowscape' and doubled every
+ * Unburden holder without an item. Trick Room stays with movesFirst
+ * (getActionSpeed would invert it).
+ *
+ * The sim finds no handlers for an inactive Pokémon (battle.js
+ * findEventHandlers) and ignores its item and ability from gen 5 on
+ * (pokemon.js ignoringItem, ignoringAbility). The static compares benched
+ * bodies as if they stood on the field, so a benched body is asked with
+ * isActive set for this call only.
  */
-
-/** Paralysis (gen-dependent) and Quick Feet, applied in that order. */
-function applyStatusSpeed(speed: number, pokemon: Pokemon, battle: Battle): number {
-  let value = speed;
-  const ability = pokemon.ability;
-  if (pokemon.status === 'par' && ability !== 'quickfeet') value *= battle.gen >= 7 ? 0.5 : 0.25;
-  if (pokemon.status && ability === 'quickfeet') value *= 1.5;
-  return value;
-}
-
-/** Tailwind, Choice Scarf, Iron Ball, and Unburden, applied in that order. */
-function applyFieldAndItemSpeed(speed: number, pokemon: Pokemon): number {
-  let value = speed;
-  const ability = pokemon.ability;
-  const item = pokemon.item;
-  if (pokemon.side.sideConditions['tailwind']) value *= 2;
-  if (item === 'choicescarf') value *= 1.5;
-  if (item === 'ironball') value *= 0.5;
-  if (ability === 'unburden' && !item) value *= 2;
-  return value;
-}
-
-/** The weather and terrain speed abilities, applied in that order. */
-function applyWeatherSpeed(speed: number, pokemon: Pokemon, battle: Battle): number {
-  let value = speed;
-  const ability = pokemon.ability;
-  const weather = battle.field.weather;
-  if (ability === 'swiftswim' && (weather === 'raindance' || weather === 'primordialsea')) value *= 2;
-  if (ability === 'chlorophyll' && (weather === 'sunnyday' || weather === 'desolateland')) value *= 2;
-  if (ability === 'sandrush' && weather === 'sandstorm') value *= 2;
-  if (ability === 'slushrush' && (weather === 'hail' || weather === 'snow')) value *= 2;
-  if (ability === 'surgesurfer' && battle.field.terrain === 'electricterrain') value *= 2;
-  return value;
-}
-
-export function effectiveSpeed(pokemon: Pokemon, battle: Battle): number {
-  let speed = pokemon.storedStats.spe * stageMultiplier(pokemon.boosts.spe);
-  speed = applyStatusSpeed(speed, pokemon, battle);
-  speed = applyFieldAndItemSpeed(speed, pokemon);
-  return applyWeatherSpeed(speed, pokemon, battle);
+export function effectiveSpeed(pokemon: Pokemon): number {
+  if (pokemon.isActive) return pokemon.getStat('spe');
+  pokemon.isActive = true;
+  try {
+    return pokemon.getStat('spe');
+  } finally {
+    pokemon.isActive = false;
+  }
 }
 
 /**
@@ -66,7 +40,7 @@ export function movesFirst(
   battle: Battle,
 ): boolean {
   if (threatA.priority !== threatB.priority) return threatA.priority;
-  const speedA = effectiveSpeed(a, battle);
-  const speedB = effectiveSpeed(b, battle);
+  const speedA = effectiveSpeed(a);
+  const speedB = effectiveSpeed(b);
   return battle.field.pseudoWeather['trickroom'] ? speedB > speedA : speedA > speedB;
 }

@@ -29,10 +29,10 @@ function itemMultiplier(pokemon: Pokemon): number {
   return 1;
 }
 
-function averageSpeed(side: Side, battle: Battle): number {
+function averageSpeed(side: Side): number {
   const living = livingOf(side);
   if (living.length === 0) return 0;
-  return living.reduce((sum, pokemon) => sum + effectiveSpeed(pokemon, battle), 0) / living.length;
+  return living.reduce((sum, pokemon) => sum + effectiveSpeed(pokemon), 0) / living.length;
 }
 
 /**
@@ -114,7 +114,7 @@ export function evalFeatures(battle: Battle, cache?: MatchupCache): EvalFeatures
   const p2 = sideFeatureValues(battle.sides[1], battle);
   let trickRoom = 0;
   if (battle.field.pseudoWeather['trickroom']) {
-    trickRoom = averageSpeed(battle.sides[0], battle) <= averageSpeed(battle.sides[1], battle) ? 1 : -1;
+    trickRoom = averageSpeed(battle.sides[0]) <= averageSpeed(battle.sides[1]) ? 1 : -1;
   }
   const terms = matchupTerms(battle, cache);
   const threat = threatGetter(battle, cache);
