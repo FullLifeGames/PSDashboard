@@ -5,10 +5,10 @@ import type { Battle } from '@pkmn/sim';
 import { buildTeamsFromReplay } from '../packages/replay-core/src/team-builder';
 import { applyTargetCorrections, reconstructBranchRuntime } from '../packages/eval-engine/src/branch-engine';
 import { buildChoiceLockContext } from '../packages/eval-engine/src/choice-lock';
-import { formatEnforcesSleepClause, getBranchSimulatorFormat, replayBringOnly } from '../packages/replay-core/src/replay-format';
+import { getBranchSimulatorFormat, replayBringOnly } from '../packages/replay-core/src/replay-format';
 import { parseReplayLogWithObservations } from '../packages/replay-core/src/protocol-parser';
 import { battleFaintedFraction, searchPosition } from '../packages/eval-engine/src/search';
-import { bankSampleCount, bankSearch } from './bank-search';
+import { bankSampleCount, bankSearch, bankSettings } from './bank-search';
 import { diskCachedSmogonFetcher } from './smogon-fetch-cache';
 import { bankTeamsFor } from './bank-build';
 import { createMatchupCache, evalFeatures, EVAL_WEIGHTS, FEATURE_WEIGHTS, type EvalFeatures } from '../packages/eval-engine/src/eval-function';
@@ -5267,7 +5267,7 @@ describe.skipIf(!process.env.EVAL_CALIBRATION)('eval calibration against real re
           // Round 61: the app's dispatch and the app's tree search (bank-search.ts).
           const result = await bankSearch({
             serialized, faintedFraction, depth, samples: sampleCount, mode: process.env.EVAL_CALIBRATION_MODE,
-            settings: { tera: false, sleepClause: formatEnforcesSleepClause(getBranchSimulatorFormat(replay)) },
+            settings: bankSettings(replay),
           });
           const { score } = result;
           if (Number.isNaN(score)) {

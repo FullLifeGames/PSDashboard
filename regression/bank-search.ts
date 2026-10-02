@@ -1,7 +1,8 @@
 import {
-  AUTO_MCTS_FAINTED_FRACTION, createLocalTreeExecutor, searchPosition, searchTreesOrchestrated,
-  type EvalResult, type EvalSettings,
+  AUTO_MCTS_FAINTED_FRACTION, createLocalTreeExecutor, resolveTeraPreference, searchPosition, searchTreesOrchestrated,
+  type EvalResult, type EvalSettings, type TeraAllowance,
 } from '@fulllifegames/eval-engine';
+import { formatEnforcesSleepClause, getBranchSimulatorFormat, inferReplayFormatId } from '@fulllifegames/replay-core';
 
 /**
  * Round 61: the bank's search, the app's dispatch. Below the auto threshold
@@ -26,6 +27,19 @@ export function bankSearch(input: BankSearchInput): Promise<EvalResult> {
   const tree = mode === 'mcts' || (mode === 'auto' && faintedFraction >= AUTO_MCTS_FAINTED_FRACTION);
   if (tree) return searchTreesOrchestrated(createLocalTreeExecutor(serialized), { ...settings, depth: 1, samples: 1, mode: 'mcts' });
   return Promise.resolve(searchPosition(serialized, { ...settings, depth, samples }));
+}
+
+/**
+ * The app's format switches for one replay (useEvalView useEvalFormat): Tera
+ * with the default preference 'auto' (none without a click, everyone on the
+ * ladder, only the species that clicked in draft and custom formats), Sleep
+ * Clause from the branch format.
+ */
+export function bankSettings(replay: { id?: string; formatid?: string; log: string }): { tera: TeraAllowance; sleepClause: boolean } {
+  return {
+    tera: resolveTeraPreference('auto', inferReplayFormatId(replay), replay.log),
+    sleepClause: formatEnforcesSleepClause(getBranchSimulatorFormat(replay)),
+  };
 }
 
 /** EVAL_CALIBRATION_SAMPLES: the engine has five fixed seeds; another count would draw an unseeded PRNG. */
