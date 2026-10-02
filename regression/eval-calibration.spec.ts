@@ -7,8 +7,8 @@ import { applyTargetCorrections, reconstructBranchRuntime } from '../packages/ev
 import { buildChoiceLockContext } from '../packages/eval-engine/src/choice-lock';
 import { formatEnforcesSleepClause, getBranchSimulatorFormat, replayBringOnly } from '../packages/replay-core/src/replay-format';
 import { parseReplayLogWithObservations } from '../packages/replay-core/src/protocol-parser';
-import { AUTO_MCTS_FAINTED_FRACTION, battleFaintedFraction, searchPosition } from '../packages/eval-engine/src/search';
-import { mctsSearch } from '../packages/eval-engine/src/mcts';
+import { battleFaintedFraction, searchPosition } from '../packages/eval-engine/src/search';
+import { bankSampleCount, bankSearch } from './bank-search';
 import { diskCachedSmogonFetcher } from './smogon-fetch-cache';
 import { bankTeamsFor } from './bank-build';
 import { createMatchupCache, evalFeatures, EVAL_WEIGHTS, FEATURE_WEIGHTS, type EvalFeatures } from '../packages/eval-engine/src/eval-function';
@@ -5071,7 +5071,7 @@ describe.skipIf(!process.env.EVAL_CALIBRATION)('eval calibration against real re
     // crossed the old 40-min budget by minutes (2026-08-11).
     applyCalibrationLevers();
     const samples: Sample[] = [];
-    const sampleCount = Math.max(1, parseInt(process.env.EVAL_CALIBRATION_SAMPLES ?? '1', 10) || 1);
+    const sampleCount = bankSampleCount(process.env.EVAL_CALIBRATION_SAMPLES);
     // EVAL_CALIBRATION_SOURCE=fit swaps the replay universe to the
     // manifest-pinned weight-fitting corpus, read from the build script's
     // disk cache (no network). FIT-SIDE DUMPS ONLY: those games trained the
@@ -5259,18 +5259,15 @@ describe.skipIf(!process.env.EVAL_CALIBRATION)('eval calibration against real re
           // search fix a phase, or is the static eval itself miscalibrated?
           // EVAL_CALIBRATION_MODE=mcts runs the DUCT tree instead — the
           // matrix path is gated every round; MCTS earns numbers here too.
-          // (Dispatch mirrors eval-worker: searchPosition IGNORES mode.)
+          // (Round 61: tree turns run the app's searchTreesOrchestrated, bank-search.ts.)
           const depth = process.env.EVAL_CALIBRATION_DEPTH === '2' ? 2 : 1;
           const faintedFraction = battleFaintedFraction(battle);
           // EVAL_CALIBRATION_MODE=auto mirrors the app's sweep dispatch
           // exactly: matrix below the threshold, the DUCT tree at or above.
-          const mode = process.env.EVAL_CALIBRATION_MODE;
-          const useMcts = mode === 'mcts' ||
-            (mode === 'auto' && faintedFraction >= AUTO_MCTS_FAINTED_FRACTION);
-          const runSearch = useMcts ? mctsSearch : searchPosition;
-          const result = runSearch(serialized, {
-            depth, samples: sampleCount, tera: false,
-            sleepClause: formatEnforcesSleepClause(getBranchSimulatorFormat(replay)),
+          // Round 61: the app's dispatch and the app's tree search (bank-search.ts).
+          const result = await bankSearch({
+            serialized, faintedFraction, depth, samples: sampleCount, mode: process.env.EVAL_CALIBRATION_MODE,
+            settings: { tera: false, sleepClause: formatEnforcesSleepClause(getBranchSimulatorFormat(replay)) },
           });
           const { score } = result;
           if (Number.isNaN(score)) {
