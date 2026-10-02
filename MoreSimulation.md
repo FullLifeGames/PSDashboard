@@ -1,6 +1,6 @@
 # Warum mehr Simulation
 
-Stand 02.10.2026, nach Runde 60 (ihr Gate steht noch aus). Dieses Dokument hält fest, warum die Engine seit Runde 58 umgebaut wird: Statt Spielregeln immer genauer von Hand nachzubauen, nutzt sie den echten Simulator mehr. Es sammelt die Fragen, die wir dazu gestellt haben, was wir gemessen haben, was wir entschieden haben und was noch offen ist. Die Zahlen stammen aus den Quellen am Ende; die Kurzfassung des Programms steht in `NextSteps.md` unter „Programm · Mehr Simulation“.
+Stand 02.10.2026, nach Runde 60 und ihrem Gate. Dieses Dokument hält fest, warum die Engine seit Runde 58 umgebaut wird: Statt Spielregeln immer genauer von Hand nachzubauen, nutzt sie den echten Simulator mehr. Es sammelt die Fragen, die wir dazu gestellt haben, was wir gemessen haben, was wir entschieden haben und was noch offen ist. Die Zahlen stammen aus den Quellen am Ende; die Kurzfassung des Programms steht in `NextSteps.md` unter „Programm · Mehr Simulation“.
 
 ## Kurzfassung
 
@@ -187,7 +187,7 @@ Außerdem entfernt Runde 60 einen alten Umweg: Für festgelegte Lade-Züge riet 
 
 Runde 59 hat nur Zeit gespart, die Bewertung ist unverändert. Ob mehr Simulation besser bewertet, ist die eigentliche offene Frage.
 
-- **Runde 60 (S1a):** gebaut und gemessen (siehe oben); ihr Gate entscheidet die Übernahme je Fix und die Meldung an `@pkmn/client`. Drei Reste stehen als T105 bis T107 in `NextSteps.md`.
+- **Runde 60 (S1a):** gebaut, gemessen und am Gate vom 02.10. ganz übernommen (siehe oben). Die Meldung an `@pkmn/client` geht als Vorschlag für einen Pull Request erst an dich. Drei Reste stehen als T105 bis T107 in `NextSteps.md`.
 - **Runde 61 (S2):** die Obergrenze der Suche messen (T97): doppeltes und vierfaches Budget, getrennt nach Iterationen, Tiefe und Ziehungen je Zelle; eine Sonde, die bis zum Spielende weiterspielt statt zu schätzen; dazu die billige Statik-Probe (mittlerer Wurf statt Höchstwurf, Verbrennung, Guts, Facade). Ergebnis: Gewinn je Sekunde für jede Form von „mehr simulieren“, neben den 16 Basispunkten der Genauigkeits-Achse. Übernommen wird (T98) die beste Form, die die Bank aufgelöst besser macht bei höchstens der Wandzeit vor Runde 59.
 - **Wenn mehr Simulation nicht besser liest:** Dann entfällt T98 mit dem Beleg aus T97. Das Budget bleibt, und das Tempo aus Runde 59 bleibt als reiner Zeitgewinn. Die Runden 42 und 43 zeigen, dass dieser Ausgang möglich ist.
 - **Runde 62 (S3):** Triage. Jedes übrige TODO wird auf dem neuen Stand gelesen, nicht geschätzt, und bekommt ein Urteil: obsolet, kleiner, wichtiger, weniger wichtig oder unverändert. Die Tabelle geht an dein Gate.

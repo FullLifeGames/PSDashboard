@@ -963,6 +963,9 @@ import { takeSimFastReport } from '../packages/eval-engine/src/forward/sim-fast/
  *   pack:smoke green, again on 3fb772d (1730 tests); feedback end-1..3
  *   byte-identical, no pin moved in any run of the round; identity speed
  *   layer on vs off OK (834/834/834 rows, 48 searches, 0 errors).
+ * VERDICT: adopted at the user gate 02.10. 17:51 (all seven fixes; the
+ *   @pkmn/client report goes to the user as a PR proposal first; T105 to
+ *   T107 stay as iteration 7e; not pushed, the program stays on r59).
  *
  * SPEED LAYER 2026-10-01 (improvement round 59, iteration S1, T91, stage 1
  * of the program "more simulation"; spec
