@@ -103,7 +103,7 @@ export function speedTie(battle: Battle, p1Choice: string, p2Choice: string): bo
   const actives = [battle.sides[0].active[0], battle.sides[1].active[0]];
   if (!ids[0] || !ids[1] || !actives[0] || !actives[1]) return false;
   const priorities = ids.map(id => battle.dex.moves.get(id!).priority);
-  return priorities[0] === priorities[1] && effectiveSpeed(actives[0]) === effectiveSpeed(actives[1]);
+  return priorities[0] === priorities[1] && effectiveSpeed(actives[0], battle) === effectiveSpeed(actives[1], battle);
 }
 
 /** The side whose move line comes first in a draw's log, or null when nobody moved. */

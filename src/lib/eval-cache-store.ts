@@ -229,10 +229,7 @@ export interface StoredEval {
 //      goes to the Pokémon whose species can have it (Water Absorb heals,
 //      Pickpocket, Trace; T104). The static's burn and poison residual
 //      follows the generation (burn 1/8 in gens 2 to 6, poison 1/16 in
-//      gen 1; T95). The static asks the simulator for speed (getStat,
-//      benched bodies as if on the field) instead of a hand list that
-//      missed Slush Rush in snow, Protosynthesis and Quark Drive and
-//      doubled every item-less Unburden holder (T95).
+//      gen 1; T95).
 const EVAL_ENGINE_CACHE_VERSION = 54;
 
 export function evalStoreKey(
