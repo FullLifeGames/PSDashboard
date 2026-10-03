@@ -1,4 +1,4 @@
-import { test, expect, describe } from 'vitest';
+import { test, expect, describe, onTestFinished } from 'vitest';
 import { Battle, State, Teams, toID } from '@pkmn/sim';
 import type { PokemonSet } from '@pkmn/sim';
 import { createHash } from 'node:crypto';
@@ -9,6 +9,7 @@ import {
 } from '../src/forward-model';
 import { searchPosition } from '../src/search';
 import { mctsTreeSearch } from '../src/mcts';
+import { configureSearchBudget, SEARCH_BUDGET_DEFAULT } from '../src/search/budget';
 import { deserializeFromParsed, parseSearchState } from '../src/forward/parsed-state';
 import doublesTeams from './fixtures/doubles-identity-fixture';
 
@@ -152,6 +153,10 @@ function capture(root: SimPosition): unknown {
 
 describe('fork and search identity', () => {
   test('children, the depth-1 matrix, and one MCTS tree match the recorded reference', { timeout: 120000 }, () => {
+    // The reference holds a tree of the search before round 61 (600 iterations): the identity under test is the
+    // speed layer's, not the budget's, so the tree runs with that budget.
+    configureSearchBudget({ ...SEARCH_BUDGET_DEFAULT, iterations: 600 });
+    onTestFinished(() => configureSearchBudget(null));
     const singles = withHistory(createRootPosition(serialize(makeSixVsSix())), 3);
     const doubles = withHistory(createRootPosition(serialize(makeBattle('gen9doublescustomgame', doublesTeams.p1Team, doublesTeams.p2Team))), 2);
     // JSON round trip: the fixture cannot tell -0 from 0, and neither should the comparison.

@@ -1,8 +1,8 @@
-import { AUTO_MCTS_FAINTED_FRACTION } from '../types.ts';
-
 /**
  * Round 61 (T97, T98): every search budget the round measures, one object
- * for the app and the bank. The default is the search before round 61. A
+ * for the app and the bank. The default is the form chosen at the round-61
+ * gate (03.10.): trees from the first turn (tree-from 0), 1200 iterations
+ * per tree; the search before round 61 is iterations=600,tree-from=0.25. A
  * measurement switch without a UI knob picks a form: EVAL_SEARCH_BUDGET
  * under Node, the localStorage key ps-replay-interceptor:search-budget in
  * the browser (stamped on every worker message). Syntax: a comma list of
@@ -23,7 +23,7 @@ export interface SearchBudget {
 }
 
 export const SEARCH_BUDGET_DEFAULT: SearchBudget = {
-  trees: 4, iterations: 600, earlyDepth: 1, earlySamples: 1, treeFrom: AUTO_MCTS_FAINTED_FRACTION,
+  trees: 4, iterations: 1200, earlyDepth: 1, earlySamples: 1, treeFrom: 0,
 };
 
 /** Each switch key: the field it sets and the values it accepts (draws stay within the five fixed seeds). */

@@ -1,6 +1,9 @@
-import { test, expect, describe } from 'vitest';
+import { test, expect, describe, onTestFinished } from 'vitest';
 import { coverageNotice, needsSettingsUpgrade, recordEvalError, resolveAutoTurnSettings, serializedFaintedFraction, supersedesStored, verificationDeepSettings, withEvalGapNotice } from '../src/hooks/useEvaluation';
-import { AUTO_MCTS_FAINTED_FRACTION, computeBlunders, selectKeyTurns, BLUNDER_SWING, KEY_TURN_SWING, KEY_MOMENT_SWING } from '@fulllifegames/eval-engine';
+import {
+  AUTO_MCTS_FAINTED_FRACTION, computeBlunders, configureSearchBudget, selectKeyTurns, BLUNDER_SWING, KEY_TURN_SWING, KEY_MOMENT_SWING,
+  SEARCH_BUDGET_DEFAULT,
+} from '@fulllifegames/eval-engine';
 
 describe('coverage notice (acquisition pass)', () => {
   // The notice describes the RECONSTRUCTION pass — one fast replay of the
@@ -129,11 +132,16 @@ describe('graph merge monotonicity', () => {
 });
 
 describe('auto mode resolution', () => {
-  test('auto is the pinned d1s1 line: matrix below the threshold, MCTS at or above', () => {
-    expect(resolveAutoTurnSettings(0)).toEqual({ depth: 1, samples: 1, mode: 'matrix' });
-    expect(resolveAutoTurnSettings(AUTO_MCTS_FAINTED_FRACTION - 0.001)).toEqual({ depth: 1, samples: 1, mode: 'matrix' });
-    expect(resolveAutoTurnSettings(AUTO_MCTS_FAINTED_FRACTION)).toEqual({ depth: 1, samples: 1, mode: 'mcts' });
+  test('auto runs the tree from the first turn (round 61); the threshold before it stays reachable through the budget', () => {
+    expect(resolveAutoTurnSettings(0)).toEqual({ depth: 1, samples: 1, mode: 'mcts' });
     expect(resolveAutoTurnSettings(1)).toEqual({ depth: 1, samples: 1, mode: 'mcts' });
+    configureSearchBudget({ ...SEARCH_BUDGET_DEFAULT, treeFrom: AUTO_MCTS_FAINTED_FRACTION });
+    try {
+      expect(resolveAutoTurnSettings(AUTO_MCTS_FAINTED_FRACTION - 0.001)).toEqual({ depth: 1, samples: 1, mode: 'matrix' });
+      expect(resolveAutoTurnSettings(AUTO_MCTS_FAINTED_FRACTION)).toEqual({ depth: 1, samples: 1, mode: 'mcts' });
+    } finally {
+      configureSearchBudget(null);
+    }
   });
 
   test('serializedFaintedFraction mirrors the engine definition', () => {
@@ -150,6 +158,11 @@ describe('auto mode resolution', () => {
   test('supersedes resolves auto per turn: the fast sketch never downgrades a resolved-MCTS turn', () => {
     const mctsStored = { depth: 1, samples: 1, mode: 'mcts' } as const;
     const fastIncoming = { depth: 1, samples: 1, mode: 'matrix' } as const;
+    // Round 61 default (tree from the first turn): an early turn's target is MCTS too.
+    expect(supersedesStored(mctsStored, fastIncoming, 'auto', 0.1)).toBe(false);
+    // The resolution logic below, under the threshold before round 61.
+    configureSearchBudget({ ...SEARCH_BUDGET_DEFAULT, treeFrom: AUTO_MCTS_FAINTED_FRACTION });
+    onTestFinished(() => configureSearchBudget(null));
     // Late turn (fraction at/above the threshold): auto's target is MCTS — keep it.
     expect(supersedesStored(mctsStored, fastIncoming, 'auto', 0.5)).toBe(false);
     // Early turn: auto's target is matrix — the sketch may replace the stale engine.
@@ -163,6 +176,11 @@ describe('auto mode resolution', () => {
 
   test('needsSettingsUpgrade under auto prefs follows the turn resolution', () => {
     const prefs = { depth: 2, samples: 3, mode: 'auto', auto: false, tera: 'auto' } as const;
+    // Round 61 default (tree from the first turn): an early turn holding the d1s1 matrix upgrades to the tree.
+    expect(needsSettingsUpgrade({ depth: 1, samples: 1, mode: 'matrix' }, prefs, 0.1)).toBe(true);
+    // The resolution logic below, under the threshold before round 61.
+    configureSearchBudget({ ...SEARCH_BUDGET_DEFAULT, treeFrom: AUTO_MCTS_FAINTED_FRACTION });
+    onTestFinished(() => configureSearchBudget(null));
     // Early turn already holding the pinned d1s1 matrix: settled (depth
     // prefs apply to the explicit matrix modes, not to auto).
     expect(needsSettingsUpgrade({ depth: 1, samples: 1, mode: 'matrix' }, prefs, 0.1)).toBe(false);

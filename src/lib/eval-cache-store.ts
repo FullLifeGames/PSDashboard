@@ -233,7 +233,13 @@ export interface StoredEval {
 //      on every bank body: Slush Rush in snow, Protosynthesis and Quark
 //      Drive, Unburden only with the simulator's volatile, suppressed
 //      abilities and items, stages floored (T95).
-const EVAL_ENGINE_CACHE_VERSION = 54;
+// v55 (round 61, T98): the search budget chosen at the round-61 gate
+//      (03.10. 23:30): auto turns run the tree from the first turn
+//      (tree-from 0) with 1200 iterations per tree, measured in T97 against
+//      the app's own search on the bank (early tree -23 bp, doubled
+//      iterations -10 bp pooled) and inside the time window from before
+//      round 59.
+const EVAL_ENGINE_CACHE_VERSION = 55;
 
 /** Round 61: a search-budget form stores under its own tag; the default keeps today's keys. */
 const versionTag = (): string => {

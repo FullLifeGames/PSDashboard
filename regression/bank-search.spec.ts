@@ -10,8 +10,13 @@ const fixture = (name: string) =>
 
 test('auto: below the threshold the bank runs the sync matrix search', async () => {
   const serialized = fixture('gen9ou-2658658993-t2');
-  const result = await bankSearch({ serialized, faintedFraction: 0, depth: 1, samples: 1, mode: 'auto', settings: { tera: false } });
-  expect(result).toEqual(searchPosition(serialized, { depth: 1, samples: 1, tera: false }));
+  configureSearchBudget({ ...SEARCH_BUDGET_DEFAULT, treeFrom: 0.25 });
+  try {
+    const result = await bankSearch({ serialized, faintedFraction: 0, depth: 1, samples: 1, mode: 'auto', settings: { tera: false } });
+    expect(result).toEqual(searchPosition(serialized, { depth: 1, samples: 1, tera: false }));
+  } finally {
+    configureSearchBudget(null);
+  }
 });
 
 test('auto: at the threshold the bank runs the app tree search', { timeout: 600_000 }, async () => {
@@ -43,7 +48,7 @@ test('played combo like the app sweep: the log of snapshot[turn], kept only when
 
 test('auto reads the budget: early depth and the tree threshold', async () => {
   const serialized = fixture('gen9ou-2658658993-t2');
-  configureSearchBudget({ ...SEARCH_BUDGET_DEFAULT, earlyDepth: 2 });
+  configureSearchBudget({ ...SEARCH_BUDGET_DEFAULT, treeFrom: 0.25, earlyDepth: 2 });
   try {
     const result = await bankSearch({ serialized, faintedFraction: 0, depth: 1, samples: 1, mode: 'auto', settings: { tera: false } });
     expect(result).toEqual(searchPosition(serialized, { depth: 2, samples: 1, tera: false }));

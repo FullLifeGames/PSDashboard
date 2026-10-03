@@ -1,6 +1,6 @@
-import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, onTestFinished, test, vi } from 'vitest';
 import { act, renderHook, waitFor } from '@testing-library/react';
-import type { EvalResult, EvalSettings, SearchProgress } from '@fulllifegames/eval-engine';
+import { AUTO_MCTS_FAINTED_FRACTION, configureSearchBudget, SEARCH_BUDGET_DEFAULT, type EvalResult, type EvalSettings, type SearchProgress } from '@fulllifegames/eval-engine';
 import { evalResult } from '../fixtures/eval-result';
 
 // The evaluation surface over a scripted worker pool client: the hook's
@@ -106,6 +106,9 @@ describe('useEvaluation single position', () => {
   });
 
   test('auto mode reads the fainted fraction off the acquired position and routes to the tree once bodies fell', async () => {
+    // The threshold before round 61; the default now runs the tree from the first turn (next test).
+    configureSearchBudget({ ...SEARCH_BUDGET_DEFAULT, treeFrom: AUTO_MCTS_FAINTED_FRACTION });
+    onTestFinished(() => configureSearchBudget(null));
     const { result } = renderHook(() => useEvaluation());
     act(() => result.current.setPrefs({ ...matrixPrefs, mode: 'auto' }));
     act(() => result.current.evaluate({ cacheKey: null, tera: false, acquire: async () => position(0), tag: 'a' }));
@@ -115,6 +118,14 @@ describe('useEvaluation single position', () => {
     act(() => result.current.evaluate({ cacheKey: null, tera: false, acquire: async () => position(4), tag: 'b' }));
     await waitFor(() => expect(script.calls).toHaveLength(2));
     expect(script.calls[1].settings.mode).toBe('mcts');
+  });
+
+  test('auto runs the tree from the first turn at the round-61 default', async () => {
+    const { result } = renderHook(() => useEvaluation());
+    act(() => result.current.setPrefs({ ...matrixPrefs, mode: 'auto' }));
+    act(() => result.current.evaluate({ cacheKey: null, tera: false, acquire: async () => position(0), tag: 'a' }));
+    await waitFor(() => expect(result.current.status).toBe('done'));
+    expect(script.calls[0].settings.mode).toBe('mcts');
   });
 
   test('an engine override pins the single evaluation until it is released; the stored prefs stay what they were', async () => {
