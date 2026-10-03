@@ -19,6 +19,8 @@ const REPORT_DIR = join(__dirname, '..', 'docs', 'reports');
 const DUMP = process.env.FEEDBACK_DUMP === '1';
 /** Round 59: '0' | '1' | a lever list for the speed layer; unset keeps the app's default and no perf trace. */
 const SIM_FAST = process.env.FEEDBACK_SIM_FAST;
+/** Round 61: a search-budget form (search/budget.ts syntax); unset keeps the app's default. */
+const SEARCH_BUDGET = process.env.FEEDBACK_SEARCH_BUDGET;
 const perfByReplay: Record<string, unknown> = {};
 
 /**
@@ -130,6 +132,11 @@ for (const replayId of [...FEEDBACK_REPLAYS, ...FEEDBACK_CENSUS_REPLAYS]) {
         localStorage.setItem('ps-replay-interceptor:perf', '1');
       }, SIM_FAST);
     }
+    if (SEARCH_BUDGET !== undefined) {
+      await page.addInitScript(value => {
+        localStorage.setItem('ps-replay-interceptor:search-budget', value);
+      }, SEARCH_BUDGET);
+    }
     const fixture = JSON.parse(readFileSync(join(__dirname, 'fixtures', `${replayId}.json`), 'utf-8')) as { players: string[] };
     const started = Date.now();
     await page.goto(`/?replay=${replayId}`);
@@ -198,7 +205,7 @@ test.afterAll(() => {
   const meta: DriftMeta = {
     commit: execSync('git rev-parse --short HEAD').toString().trim(),
     date: new Date().toISOString(),
-    settingsLine: `depth 2 · samples 3 · mode auto (fresh-context defaults)${RECORD ? ' · RECORD' : ''}${SIM_FAST !== undefined ? ` · sim-fast ${SIM_FAST}` : ''}`,
+    settingsLine: `depth 2 · samples 3 · mode auto (fresh-context defaults)${RECORD ? ' · RECORD' : ''}${SIM_FAST !== undefined ? ` · sim-fast ${SIM_FAST}` : ''}${SEARCH_BUDGET !== undefined ? ` · budget ${SEARCH_BUDGET}` : ''}`,
     wallTimes,
     noticeByReplay,
     evalErrorsByReplay,
