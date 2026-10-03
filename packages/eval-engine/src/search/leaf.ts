@@ -16,6 +16,19 @@ export const SEARCH_SEEDS: readonly PRNGSeed[] = [
   '1,2,3,4', '5,6,7,8', '9,10,11,12', '13,14,15,16', '17,18,19,20',
 ];
 
+/**
+ * Round 61: the seed a tree cell draws at creation. Tree k uses family
+ * floor(k / 5); family 0 is SEARCH_SEEDS, so trees 0 to 4 keep the
+ * sequences they had (a sixth tree used to copy the first).
+ */
+export function treeSeed(iteration: number, seedOffset: number): PRNGSeed {
+  const family = Math.floor(seedOffset / SEARCH_SEEDS.length);
+  const slot = (iteration + seedOffset) % SEARCH_SEEDS.length;
+  if (family === 0) return SEARCH_SEEDS[slot];
+  const base = 20 * family + 4 * slot;
+  return `${base + 1},${base + 2},${base + 3},${base + 4}` as PRNGSeed;
+}
+
 export function countFainted(battle: ReturnType<typeof positionBattle>): number {
   return battle.sides[0].pokemon.filter(p => p.fainted).length +
     battle.sides[1].pokemon.filter(p => p.fainted).length;

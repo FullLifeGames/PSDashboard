@@ -1,5 +1,5 @@
 import {
-  type EvalResult, type TeraAllowance, type TurnSensitivity, type TurnVerification, teraKey,
+  type EvalResult, type TeraAllowance, type TurnSensitivity, type TurnVerification, searchBudgetTag, teraKey,
 } from '@fulllifegames/eval-engine';
 
 /**
@@ -235,6 +235,12 @@ export interface StoredEval {
 //      abilities and items, stages floored (T95).
 const EVAL_ENGINE_CACHE_VERSION = 54;
 
+/** Round 61: a search-budget form stores under its own tag; the default keeps today's keys. */
+const versionTag = (): string => {
+  const tag = searchBudgetTag();
+  return tag ? `v${EVAL_ENGINE_CACHE_VERSION}~${tag}` : `v${EVAL_ENGINE_CACHE_VERSION}`;
+};
+
 export function evalStoreKey(
   cacheKey: string,
   depth: number,
@@ -242,12 +248,12 @@ export function evalStoreKey(
   mode: string,
   tera: TeraAllowance,
 ): string {
-  return `v${EVAL_ENGINE_CACHE_VERSION}|${cacheKey}|d${depth}s${samples}m${mode}t${teraKey(tera)}`;
+  return `${versionTag()}|${cacheKey}|d${depth}s${samples}m${mode}t${teraKey(tera)}`;
 }
 
 /** The key prefix shared by every turn, engine, and set fingerprint of one replay. */
 export function evalStorePrefix(replayId: string): string {
-  return `v${EVAL_ENGINE_CACHE_VERSION}|${replayId}:`;
+  return `${versionTag()}|${replayId}:`;
 }
 
 const DB_NAME = 'ps-replay-interceptor-eval';

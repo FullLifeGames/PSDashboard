@@ -4,6 +4,7 @@ import {
   type EvalWorkerResponse, type MctsTreeStats, type SearchProgress,
 } from '@fulllifegames/eval-engine';
 import { evalPoolSize } from './pool-size';
+import { searchBudgetStamp } from './search-budget-setting';
 import { recordSimFastReport, simFastLevers } from './sim-fast-setting';
 
 export interface EvalRunHandlers {
@@ -107,7 +108,7 @@ export class EvalWorkerClient {
     const id = this.nextId++;
     return new Promise((resolve, reject) => {
       handle.pending.set(id, { resolve, reject });
-      handle.worker.postMessage({ ...request, id, simFast: simFastLevers() });
+      handle.worker.postMessage({ ...request, id, simFast: simFastLevers(), searchBudget: searchBudgetStamp() });
     });
   }
 
@@ -213,7 +214,9 @@ export class EvalWorkerClient {
           onProgress(response.progress);
         },
       });
-      handle.worker.postMessage({ type: 'mctstree', id, serializedBattle, settings, seedOffset: offset, simFast: simFastLevers() });
+      handle.worker.postMessage({
+        type: 'mctstree', id, serializedBattle, settings, seedOffset: offset, simFast: simFastLevers(), searchBudget: searchBudgetStamp(),
+      });
     });
   }
 

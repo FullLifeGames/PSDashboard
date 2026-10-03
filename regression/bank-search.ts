@@ -1,5 +1,5 @@
 import {
-  AUTO_MCTS_FAINTED_FRACTION, createLocalTreeExecutor, parsePlayedActions, parsePlayedActionsDoubles, resolveTeraPreference,
+  autoTurnSettings, createLocalTreeExecutor, parsePlayedActions, parsePlayedActionsDoubles, resolveTeraPreference,
   searchPosition, searchTreesOrchestrated,
   type EvalResult, type EvalSettings, type TeraAllowance,
 } from '@fulllifegames/eval-engine';
@@ -24,10 +24,15 @@ export interface BankSearchInput {
 }
 
 export function bankSearch(input: BankSearchInput): Promise<EvalResult> {
-  const { serialized, faintedFraction, depth, samples, mode, settings } = input;
-  const tree = mode === 'mcts' || (mode === 'auto' && faintedFraction >= AUTO_MCTS_FAINTED_FRACTION);
-  if (tree) return searchTreesOrchestrated(createLocalTreeExecutor(serialized), { ...settings, depth: 1, samples: 1, mode: 'mcts' });
-  return Promise.resolve(searchPosition(serialized, { ...settings, depth, samples }));
+  const { serialized, faintedFraction, mode, settings } = input;
+  // Round 61: auto reads the search budget (early depth and draws, tree threshold); the depth and draw levers apply outside auto.
+  const resolved = mode === 'auto'
+    ? autoTurnSettings(faintedFraction)
+    : { depth: input.depth, samples: input.samples, mode: mode === 'mcts' ? 'mcts' as const : 'matrix' as const };
+  if (resolved.mode === 'mcts') {
+    return searchTreesOrchestrated(createLocalTreeExecutor(serialized), { ...settings, depth: 1, samples: 1, mode: 'mcts' });
+  }
+  return Promise.resolve(searchPosition(serialized, { ...settings, depth: resolved.depth, samples: resolved.samples }));
 }
 
 /**

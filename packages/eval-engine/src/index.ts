@@ -55,6 +55,10 @@ export type { PlayerTendencies } from './opponent-model.ts';
 export { searchOrchestrated } from './orchestrator.ts';
 export type { SearchExecutor, OrchestratorCallbacks } from './orchestrator.ts';
 export { createLocalTreeExecutor, searchTreesOrchestrated } from './tree-orchestrator.ts';
+export {
+  autoTurnSettings, configureSearchBudget, parseSearchBudget, searchBudget, searchBudgetTag, SEARCH_BUDGET_DEFAULT,
+} from './search/budget.ts';
+export type { SearchBudget } from './search/budget.ts';
 export type { TreeExecutor } from './tree-orchestrator.ts';
 export { perfReset, perfAdd, perfCount, perfSpan, perfSync, perfReport } from './perf-trace.ts';
 export {

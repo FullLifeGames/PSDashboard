@@ -1,6 +1,8 @@
 import { expect, test } from 'vitest';
 import { readFileSync } from 'node:fs';
-import { createLocalTreeExecutor, parsePlayedActionsDoubles, searchPosition, searchTreesOrchestrated } from '@fulllifegames/eval-engine';
+import {
+  configureSearchBudget, createLocalTreeExecutor, parsePlayedActionsDoubles, SEARCH_BUDGET_DEFAULT, searchPosition, searchTreesOrchestrated,
+} from '@fulllifegames/eval-engine';
 import { bankKeepPlayed, bankSampleCount, bankSearch, bankSettings } from './bank-search';
 
 const fixture = (name: string) =>
@@ -37,6 +39,17 @@ test('played combo like the app sweep: the log of snapshot[turn], kept only when
   // Singles carry no slots: nothing is kept, played move or not.
   expect(bankKeepPlayed([undefined, undefined, ['|move|p1a: Chomp|Earthquake|p2a: Rotom', '|turn|3']], 2, false)).toBeUndefined();
   expect(bankKeepPlayed([], 5, false)).toBeUndefined();
+});
+
+test('auto reads the budget: early depth and the tree threshold', async () => {
+  const serialized = fixture('gen9ou-2658658993-t2');
+  configureSearchBudget({ ...SEARCH_BUDGET_DEFAULT, earlyDepth: 2 });
+  try {
+    const result = await bankSearch({ serialized, faintedFraction: 0, depth: 1, samples: 1, mode: 'auto', settings: { tera: false } });
+    expect(result).toEqual(searchPosition(serialized, { depth: 2, samples: 1, tera: false }));
+  } finally {
+    configureSearchBudget(null);
+  }
 });
 
 test('draws per cell: only 1, 3 or 5 (five fixed seeds), anything else throws', () => {

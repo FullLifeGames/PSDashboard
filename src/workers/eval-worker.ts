@@ -3,6 +3,7 @@ import {
   mctsSearch, mctsTreeSearch, type SearchExecutor, createLocalExecutor, searchPosition, takeSimFastReport,
   type EvalWorkerRequest, type EvalWorkerResponse,
 } from '@fulllifegames/eval-engine';
+import { adoptSearchBudgetStamp } from '../lib/eval/search-budget-setting';
 import { adoptSimFastStamp } from '../lib/eval/sim-fast-setting';
 import { isReplayJob, type ReplayJobRequest, type ReplayJobResponse } from '../lib/replay-jobs/types';
 
@@ -43,6 +44,8 @@ scope.onmessage = async (event: MessageEvent<EvalWorkerRequest | ReplayJobReques
     await handleReplayJob(message, postReplay);
     return;
   }
+  // Round 61: search messages carry the search budget (iterations per tree).
+  adoptSearchBudgetStamp(message);
   try {
     if (message.type === 'search') {
       const run = message.settings.mode === 'mcts' ? mctsSearch : searchPosition;

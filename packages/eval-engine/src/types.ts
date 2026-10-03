@@ -1,5 +1,6 @@
 import type { PlayedAction } from './played.ts';
 import type { SimFastLever, SimFastReport } from './forward/sim-fast/state.ts';
+import type { SearchBudget } from './search/budget.ts';
 
 /**
  * Which Pokémon may Terastallize in the search: a global switch, or per-side
@@ -477,8 +478,8 @@ export interface MctsTreeStats {
   result: EvalResult;
 }
 
-/** Round 59: the host's speed-layer levers ride on every request (several requests carry no EvalSettings). */
-interface SimFastStamp { simFast?: readonly SimFastLever[] }
+/** Round 59: the speed-layer levers; round 61: the search budget. Both ride on every request (several carry no EvalSettings). */
+interface SimFastStamp { simFast?: readonly SimFastLever[]; searchBudget?: SearchBudget }
 
 export type EvalWorkerRequest = (
   | { type: 'search'; id: number; serializedBattle: string; settings: EvalSettings }

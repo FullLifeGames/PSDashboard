@@ -1,5 +1,5 @@
 import { useCallback, useRef, useState } from 'react';
-import { AUTO_MCTS_FAINTED_FRACTION, type EvalPreferences, type EvalSettings } from '@fulllifegames/eval-engine';
+import { autoTurnSettings, type EvalPreferences, type EvalSettings } from '@fulllifegames/eval-engine';
 
 const PREFS_KEY = 'ps-replay-interceptor:eval-prefs';
 // Default line engine: 'auto' — the grid-tuned measured best (matrix d1s1
@@ -70,9 +70,8 @@ export interface TurnEvalSettings {
  * prefs, which apply to the explicit matrix modes only).
  */
 export function resolveAutoTurnSettings(faintedFraction: number): TurnEvalSettings {
-  return faintedFraction >= AUTO_MCTS_FAINTED_FRACTION
-    ? { depth: 1, samples: 1, mode: 'mcts' }
-    : { depth: 1, samples: 1, mode: 'matrix' };
+  // Round 61: the budget's early matrix and tree threshold (search/budget.ts); the default is the line above.
+  return autoTurnSettings(faintedFraction);
 }
 
 /** Mirror of the engine's battleFaintedFraction on a serialized battle (sim-free for the UI chunk). */

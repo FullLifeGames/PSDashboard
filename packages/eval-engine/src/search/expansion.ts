@@ -7,7 +7,7 @@ import type { TeraAllowance } from '../types.ts';
 import { makeNode, type Node } from './mcts-node.ts';
 import { classKeyOf, makeChanceNode, type TreeChild } from './chance-node.ts';
 import { classChildren, groupedChildren, type OutcomeChildren } from './outcome-children.ts';
-import { SEARCH_SEEDS } from './leaf.ts';
+import { SEARCH_SEEDS, treeSeed } from './leaf.ts';
 
 /**
  * Round 43: how a tree cell expands. In the first two plies every tree
@@ -103,7 +103,7 @@ export function expandCell(
   const p2Choice = node.p2Options[j].choice;
   const key = cellKey(i, j);
   if (!CHANCE_NODES || depth > CHANCE_MAX_DEPTH) {
-    return singleChild(node, p1Choice, p2Choice, SEARCH_SEEDS[(iteration + seedOffset) % SEARCH_SEEDS.length], ctx, book, key);
+    return singleChild(node, p1Choice, p2Choice, treeSeed(iteration, seedOffset), ctx, book, key);
   }
   if (!node.boundary) return singleChild(node, p1Choice, p2Choice, SEARCH_SEEDS[0], ctx, book, key);
   const grouped = groupedDraw(node.position, p1Choice, p2Choice, depth, ctx);

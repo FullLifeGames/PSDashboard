@@ -10,6 +10,7 @@ import { expandCell, type ExpansionContext, type RootClassBook } from './search/
 import { forcedWinFor } from './search/forced-win.ts';
 import { applyForcedWin, forcedWinInput } from './search/forced-win-apply.ts';
 import { perfSync } from './perf-trace.ts';
+import { searchBudget, SEARCH_BUDGET_DEFAULT } from './search/budget.ts';
 import type { EvalResult, EvalSettings, KoOddsInfo, MctsTreeStats, SearchProgress, UnansweredProfile } from './types.ts';
 
 /**
@@ -25,7 +26,8 @@ import type { EvalResult, EvalSettings, KoOddsInfo, MctsTreeStats, SearchProgres
  * in search/mcts-node.ts.
  */
 
-export const MCTS_ITERATIONS = 600;
+/** Iterations per tree at the default budget; the budget in force sets them (round 61, search/budget.ts). */
+export const MCTS_ITERATIONS = SEARCH_BUDGET_DEFAULT.iterations;
 const PARTIAL_EVERY = 150;
 /**
  * Round 42: forced switches are decision nodes. The fallback the roadmap
@@ -151,13 +153,14 @@ function backpropagate(path: PathStep[], leaf: number): void {
 function reportIteration(
   callbacks: MctsCallbacks | undefined,
   root: Node,
-  done: number,
+  progress: { done: number; total: number },
   maxDepth: number,
   koOdds: RootKoOdds,
   unanswered: UnansweredProfile,
 ): void {
-  callbacks?.onProgress?.({ done, total: MCTS_ITERATIONS, depth: maxDepth });
-  if (done % PARTIAL_EVERY === 0 && done < MCTS_ITERATIONS) {
+  const { done, total } = progress;
+  callbacks?.onProgress?.({ done, total, depth: maxDepth });
+  if (done % PARTIAL_EVERY === 0 && done < total) {
     callbacks?.onPartial?.(toResult(root, maxDepth, koOdds, unanswered));
   }
 }
@@ -194,12 +197,13 @@ function runMcts(
   const book: RootClassBook = { battle: rootBattle, events: new Map(), keys: new Map() };
 
   let maxDepth = 1;
-  for (let iteration = 0; iteration < MCTS_ITERATIONS; iteration++) {
+  const iterations = searchBudget().iterations;
+  for (let iteration = 0; iteration < iterations; iteration++) {
     if (callbacks?.shouldStop?.()) break;
     const { path, leaf, depth } = selectAndExpand(root, iteration, seedOffset, ctx, book);
     maxDepth = Math.max(maxDepth, depth);
     backpropagate(path, leaf);
-    reportIteration(callbacks, root, iteration + 1, maxDepth, koOdds, unanswered);
+    reportIteration(callbacks, root, { done: iteration + 1, total: iterations }, maxDepth, koOdds, unanswered);
   }
 
   const result = toResult(root, maxDepth, koOdds, unanswered);

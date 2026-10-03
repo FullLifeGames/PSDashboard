@@ -67,6 +67,7 @@ type ReadRecommendation
 type ReconstructParams
 type ResolvedSideCommand
 type SackInfo
+type SearchBudget
 type SearchCallbacks
 type SearchExecutor
 type SearchProgress
@@ -103,6 +104,7 @@ value MIN_FORCED_MASS
 value PAYOFF_WINDOW
 value PROVER_BUDGET
 value REGRET_THRESHOLD
+value SEARCH_BUDGET_DEFAULT
 value SIM_FAST_DEFAULT
 value SIM_FAST_LEVERS
 value SPOKEN_MASS
@@ -114,6 +116,7 @@ value analyzeTurn
 value annotateNicknames
 value applyForcedWin
 value applyTargetCorrections
+value autoTurnSettings
 value branchSideChoicesReady
 value buildChoiceLockContext
 value buildGameReport
@@ -122,6 +125,7 @@ value captureSerializedPosition
 value cellKey
 value computeBlunders
 value computeRead
+value configureSearchBudget
 value configureSimFast
 value correctActivesFromProtocol
 value createBranchState
@@ -151,6 +155,7 @@ value notationSlotChoice
 value parseLeadSpecies
 value parsePlayedActions
 value parsePlayedActionsDoubles
+value parseSearchBudget
 value parseSimFastSwitch
 value parseTendencies
 value patchSerializedItem
@@ -169,6 +174,8 @@ value requiredChoicesForActiveSlots
 value resolveSideChoices
 value resolveTeraPreference
 value rowCompletedCells
+value searchBudget
+value searchBudgetTag
 value searchOrchestrated
 value searchPosition
 value searchTreesOrchestrated

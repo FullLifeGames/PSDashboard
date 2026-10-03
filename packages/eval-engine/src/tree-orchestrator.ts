@@ -1,8 +1,9 @@
 import { mctsTreeSearch } from './mcts.ts';
-import { MCTS_TREES, mergeMctsTrees, rowCompletedCells, starvedSupportCells } from './mcts-merge.ts';
+import { mergeMctsTrees, rowCompletedCells, starvedSupportCells } from './mcts-merge.ts';
 import type { OrchestratorCallbacks, SearchExecutor } from './orchestrator.ts';
 import { perfAdd, perfSync } from './perf-trace.ts';
 import { cellKey } from './rank.ts';
+import { searchBudget } from './search/budget.ts';
 import { applyForcedWin, forcedWinInput } from './search/forced-win-apply.ts';
 import { createLocalExecutor } from './search/position.ts';
 import type { EvalCellJob, EvalCellValue, EvalResult, EvalSettings, MctsTreeStats, SearchProgress } from './types.ts';
@@ -10,7 +11,7 @@ import type { EvalCellJob, EvalCellValue, EvalResult, EvalSettings, MctsTreeStat
 /**
  * Round 61: the tree search's orchestration, one place for the app and the
  * bank. Root parallelization over a FIXED number of trees (seed offsets
- * 0..N-1, never the pool size), merged by summed root statistics; cells the
+ * 0..N-1 from the search budget, never the pool size), merged by summed root statistics; cells the
  * merged equilibrium leans on with too few visits are re-priced with the
  * multi-seed sampler and deepened one ply (draft t56, round 33); the
  * forced-win prover runs on the result (round 35). The app passes its
@@ -32,17 +33,18 @@ export function createLocalTreeExecutor(serializedBattle: string): TreeExecutor 
 const stopped = (callbacks?: OrchestratorCallbacks) => callbacks?.shouldStop?.() === true;
 
 function runTrees(executor: TreeExecutor, settings: EvalSettings, callbacks?: OrchestratorCallbacks): Promise<MctsTreeStats[]> {
-  const doneByTree = new Array<number>(MCTS_TREES).fill(0);
+  const treeCount = searchBudget().trees;
+  const doneByTree = new Array<number>(treeCount).fill(0);
   let totalPerTree = 1;
   const completed: MctsTreeStats[] = [];
-  return Promise.all(Array.from({ length: MCTS_TREES }, async (_, offset) => {
+  return Promise.all(Array.from({ length: treeCount }, async (_, offset) => {
     const started = Date.now();
     const tree = await executor.tree(settings, offset, progress => {
       doneByTree[offset] = progress.done;
       totalPerTree = progress.total;
       callbacks?.onProgress?.({
         done: doneByTree.reduce((sum, done) => sum + done, 0),
-        total: MCTS_TREES * totalPerTree,
+        total: treeCount * totalPerTree,
         depth: progress.depth,
       });
     });
