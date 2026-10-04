@@ -8,8 +8,8 @@ import { AUTO_MCTS_FAINTED_FRACTION } from '../src/types';
 afterEach(() => configureSearchBudget(null));
 
 describe('search budget (round 61)', () => {
-  test('the default is the form chosen at the round-61 gate: trees from the first turn, 1200 iterations per tree', () => {
-    expect(SEARCH_BUDGET_DEFAULT).toEqual({ trees: 4, iterations: 1200, earlyDepth: 1, earlySamples: 1, treeFrom: 0 });
+  test('the default is the form chosen at the round-61 gate: trees from the first turn', () => {
+    expect(SEARCH_BUDGET_DEFAULT).toEqual({ trees: 4, iterations: 600, earlyDepth: 1, earlySamples: 1, treeFrom: 0 });
     expect(searchBudget()).toEqual(SEARCH_BUDGET_DEFAULT);
     expect(searchBudgetTag()).toBe('');
     expect(autoTurnSettings(0)).toEqual({ depth: 1, samples: 1, mode: 'mcts' });
@@ -29,7 +29,7 @@ describe('search budget (round 61)', () => {
     expect(parseSearchBudget('trees=8,iterations=1200')).toEqual({ ...SEARCH_BUDGET_DEFAULT, trees: 8, iterations: 1200 });
     expect(parseSearchBudget('early-depth=3,early-samples=5,tree-from=0')).toEqual({ ...SEARCH_BUDGET_DEFAULT, earlyDepth: 3, earlySamples: 5, treeFrom: 0 });
     configureSearchBudget(parseSearchBudget('trees=16,tree-from=0'));
-    expect(searchBudgetTag()).toBe('t16-i1200-d1-s1-f0');
+    expect(searchBudgetTag()).toBe('t16-i600-d1-s1-f0');
     expect(autoTurnSettings(0)).toEqual({ depth: 1, samples: 1, mode: 'mcts' });
   });
 

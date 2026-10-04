@@ -239,7 +239,11 @@ export interface StoredEval {
 //      the app's own search on the bank (early tree -23 bp, doubled
 //      iterations -10 bp pooled) and inside the time window from before
 //      round 59.
-const EVAL_ENGINE_CACHE_VERSION = 55;
+// v56 (round 61, T98): the pair missed the time gate (04.10.: 222 s
+//      against 198 s before round 59), so the gate's fallback holds: the
+//      tree from the first turn with 600 iterations per tree (-23 bp
+//      pooled on the bank).
+const EVAL_ENGINE_CACHE_VERSION = 56;
 
 /** Round 61: a search-budget form stores under its own tag; the default keeps today's keys. */
 const versionTag = (): string => {

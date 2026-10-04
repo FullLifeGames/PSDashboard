@@ -29,11 +29,11 @@ test('a stamped message configures the worker, an unstamped one leaves it alone'
 test('cache keys: unchanged at the default, tagged under a form', () => {
   const plain = evalStoreKey('r:1:x', 1, 1, 'matrix', true);
   const prefix = evalStorePrefix('r');
-  expect(plain.startsWith('v55|')).toBe(true);
-  expect(prefix).toBe('v55|r:');
+  expect(plain.startsWith('v56|')).toBe(true);
+  expect(prefix).toBe('v56|r:');
   configureSearchBudget({ ...SEARCH_BUDGET_DEFAULT, trees: 8 });
-  expect(evalStoreKey('r:1:x', 1, 1, 'matrix', true)).toBe(plain.replace(/^v55\|/, 'v55~t8-i1200-d1-s1-f0|'));
-  expect(evalStorePrefix('r')).toBe('v55~t8-i1200-d1-s1-f0|r:');
+  expect(evalStoreKey('r:1:x', 1, 1, 'matrix', true)).toBe(plain.replace(/^v56\|/, 'v56~t8-i600-d1-s1-f0|'));
+  expect(evalStorePrefix('r')).toBe('v56~t8-i600-d1-s1-f0|r:');
 });
 
 test('the app resolves auto through the budget', () => {
