@@ -5,7 +5,7 @@ import {
 } from '@fulllifegames/eval-engine';
 import { EvalWorkerClient } from '../../lib/eval/worker-client';
 import { evalStoreKey, loadStoredEval, loadStoredEvalsByPrefix, saveStoredEval } from '../../lib/eval-cache-store';
-import { resolveAutoTurnSettings, type TurnEvalSettings } from './prefs';
+import { resolveAutoLeadSettings, type TurnEvalSettings } from './prefs';
 import type { CachedEval } from './single-eval';
 import type { GraphSweepParams, SweepData, SweepEnv, SweepSettings } from './sweep-types';
 import { sweepTurns } from './sweep-core';
@@ -234,10 +234,10 @@ async function evaluateLead(
   paintFinal: (running: boolean) => void,
 ): Promise<boolean> {
   if (!(env.params.acquirePreview && env.data.lead === null && env.runRef.current === env.runId)) return true;
-  // Team preview has zero fainted bodies — under auto the lead always
-  // resolves to the pinned matrix side.
+  // Round 61: under auto the lead keeps the budget's early matrix even though
+  // the turns run the tree from the first one (resolveAutoLeadSettings).
   const { depth, samples, mode } = sweep;
-  const lead0 = mode === 'auto' ? resolveAutoTurnSettings(0) : { depth, samples, mode };
+  const lead0 = mode === 'auto' ? resolveAutoLeadSettings() : { depth, samples, mode };
   const leadSettings: EvalSettings = { ...lead0, tera: env.params.tera, sleepClause: env.params.sleepClause };
   const key = env.params.cacheKeyFor(0);
   const storeKey = evalStoreKey(key, lead0.depth, lead0.samples, lead0.mode, env.params.tera);

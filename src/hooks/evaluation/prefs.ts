@@ -1,5 +1,5 @@
 import { useCallback, useRef, useState } from 'react';
-import { autoTurnSettings, type EvalPreferences, type EvalSettings } from '@fulllifegames/eval-engine';
+import { autoTurnSettings, searchBudget, type EvalPreferences, type EvalSettings } from '@fulllifegames/eval-engine';
 
 const PREFS_KEY = 'ps-replay-interceptor:eval-prefs';
 // Default line engine: 'auto' — the grid-tuned measured best (matrix d1s1
@@ -63,15 +63,26 @@ export interface TurnEvalSettings {
 }
 
 /**
- * Resolve the auto mode at one position: the VERIFIED line configuration —
- * d1s1 matrix while boards are full, the DUCT tree once the fainted
- * fraction crosses the threshold. Auto is a complete engine spec (its
- * matrix side is pinned to the measured d1s1, independent of the depth
- * prefs, which apply to the explicit matrix modes only).
+ * Resolve the auto mode at one position: the VERIFIED line configuration
+ * from the search budget (search/budget.ts). Since round 61 the default
+ * runs the DUCT tree from the first turn; below the budget's tree
+ * threshold auto runs the budget's early matrix. Auto is a complete engine
+ * spec, independent of the depth prefs, which apply to the explicit matrix
+ * modes only.
  */
 export function resolveAutoTurnSettings(faintedFraction: number): TurnEvalSettings {
-  // Round 61: the budget's early matrix and tree threshold (search/budget.ts); the default is the line above.
   return autoTurnSettings(faintedFraction);
+}
+
+/**
+ * The team-preview lead under auto: the budget's early matrix, whatever the
+ * tree threshold. The bank never samples turn 0, so no gate measured the
+ * tree on a lead root (one row per lead pair, 225 cells in doubles); round
+ * 61's review saw a tree make a clean lead an inaccuracy on thin visits.
+ */
+export function resolveAutoLeadSettings(): TurnEvalSettings {
+  const { earlyDepth, earlySamples } = searchBudget();
+  return { depth: earlyDepth, samples: earlySamples, mode: 'matrix' };
 }
 
 /** Mirror of the engine's battleFaintedFraction on a serialized battle (sim-free for the UI chunk). */

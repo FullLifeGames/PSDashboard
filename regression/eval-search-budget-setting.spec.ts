@@ -2,7 +2,7 @@ import { afterEach, expect, test, vi } from 'vitest';
 import { configureSearchBudget, SEARCH_BUDGET_DEFAULT, searchBudget } from '@fulllifegames/eval-engine';
 import { adoptSearchBudgetStamp, readSearchBudget, SEARCH_BUDGET_STORAGE_KEY } from '../src/lib/eval/search-budget-setting';
 import { evalStoreKey, evalStorePrefix } from '../src/lib/eval-cache-store';
-import { resolveAutoTurnSettings } from '../src/hooks/evaluation/prefs';
+import { resolveAutoLeadSettings, resolveAutoTurnSettings } from '../src/hooks/evaluation/prefs';
 
 function stubStorage(values: Record<string, string>): void {
   vi.stubGlobal('localStorage', { getItem: (key: string) => values[key] ?? null, setItem: () => undefined });
@@ -34,6 +34,13 @@ test('cache keys: unchanged at the default, tagged under a form', () => {
   configureSearchBudget({ ...SEARCH_BUDGET_DEFAULT, trees: 8 });
   expect(evalStoreKey('r:1:x', 1, 1, 'matrix', true)).toBe(plain.replace(/^v56\|/, 'v56~t8-i600-d1-s1-f0|'));
   expect(evalStorePrefix('r')).toBe('v56~t8-i600-d1-s1-f0|r:');
+});
+
+test('the team-preview lead stays on the early matrix under auto, whatever the tree threshold', () => {
+  // Round 61 review: the bank never samples turn 0, so the lead keeps the early matrix until a measurement moves it.
+  expect(resolveAutoLeadSettings()).toEqual({ depth: 1, samples: 1, mode: 'matrix' });
+  configureSearchBudget({ ...SEARCH_BUDGET_DEFAULT, earlyDepth: 2, earlySamples: 3 });
+  expect(resolveAutoLeadSettings()).toEqual({ depth: 2, samples: 3, mode: 'matrix' });
 });
 
 test('the app resolves auto through the budget', () => {
