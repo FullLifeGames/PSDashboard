@@ -41,7 +41,8 @@ describe('GameGraphSection', () => {
     expect(screen.getByText('analyzing… turn 4/10')).toBeInTheDocument();
     await userEvent.click(screen.getByRole('button', { name: 'Cancel' }));
     expect(wired.onCancel).toHaveBeenCalledTimes(1);
-    expect(screen.getByText(/^line:/)).toHaveTextContent('then auto (matrix early, MCTS late) everywhere');
+    // Round 61 default: auto runs the tree on every turn, so the hint offers no deeper step.
+    expect(screen.getByText(/^line:/)).toHaveTextContent(/then auto \(MCTS every turn\) everywhere$/);
 
     rerender(<GameGraphSection {...wired} hasGraph smogonPending prefs={{ ...prefs, mode: 'mcts' }} />);
     const analyze = screen.getByRole('button', { name: 'Re-analyze' });

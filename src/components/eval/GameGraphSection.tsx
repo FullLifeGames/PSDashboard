@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react';
 import {
-  heldDecided,
+  autoTurnSettings, heldDecided,
   type EvalPreferences, type EvalResult, type RankedChoice, type ReadRecommendation, type TurnAnalysis, type GameReport, type LeadAnalysis,
 } from '@fulllifegames/eval-engine';
 import type { EvalGraphState } from '../../hooks/useEvaluation';
@@ -51,14 +51,17 @@ function GraphHeader({ onAnalyzeGame, graph, onCancel, running, smogonPending, h
 }
 
 function LineHint({ prefs }: { prefs: EvalPreferences }) {
+  // Round 61: auto reads the search budget; by default it runs the tree on every turn, and tree turns offer no deeper rung.
+  const autoTreeEverywhere = autoTurnSettings(0).mode === 'mcts';
+  const deeper = prefs.mode === 'matrix' || (prefs.mode === 'auto' && !autoTreeEverywhere);
   return (
     <div
       style={{ fontSize: 10, color: '#778', marginTop: 2 }}
-      title="Analyze game paints the whole line with a fast depth-1 scan first, then converges every turn to the settings above, report-worthy swings first. Any turn can go deeper still from its view (Think deeper); Tera applies everywhere."
+      title="Analyze game paints the whole line with a fast depth-1 scan first, then converges every turn to the settings above, report-worthy swings first. Matrix turns can go deeper still from their view (Think deeper); Tera applies everywhere."
     >
       line: fast scan, then {prefs.mode === 'mcts' ? 'MCTS'
-        : prefs.mode === 'auto' ? 'auto (matrix early, MCTS late)'
-        : `depth ${prefs.depth}`} everywhere · deeper: per turn
+        : prefs.mode === 'auto' ? (autoTreeEverywhere ? 'auto (MCTS every turn)' : 'auto (matrix early, MCTS late)')
+        : `depth ${prefs.depth}`} everywhere{deeper ? ' · deeper: per turn' : ''}
     </div>
   );
 }
