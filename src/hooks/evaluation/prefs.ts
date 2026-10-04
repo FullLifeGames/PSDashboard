@@ -76,9 +76,9 @@ export function resolveAutoTurnSettings(faintedFraction: number): TurnEvalSettin
 
 /**
  * The team-preview lead under auto: the budget's early matrix, whatever the
- * tree threshold. The bank never samples turn 0, so no gate measured the
- * tree on a lead root (one row per lead pair, 225 cells in doubles); round
- * 61's review saw a tree make a clean lead an inaccuracy on thin visits.
+ * tree threshold. Measured in round 61 on the 128 bank games with a team
+ * preview (gen 5 on): the tree read doubles previews worse (hq +267 bp
+ * [+20, +534]) and singles no differently (-9 bp, unresolved).
  */
 export function resolveAutoLeadSettings(): TurnEvalSettings {
   const { earlyDepth, earlySamples } = searchBudget();
