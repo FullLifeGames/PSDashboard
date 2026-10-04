@@ -183,13 +183,25 @@ Außerdem entfernt Runde 60 einen alten Umweg: Für festgelegte Lade-Züge riet 
 
 **Das Tempo zeigt die Grenze des Grundsatzes.** Den Simulator für das Tempo zu fragen kostete die Statik 22 % Zeit, mit einem Merkzettel je Bewertung noch 15,5 %; das Tor erlaubte 5 %. Nach der Regel der Spec bleibt die Liste. Sie deckt jetzt alles, was der Simulator auf den 834 Bank-Stellungen anders rechnete: Protosynthesis und Quark Drive (rund 115 Körper), Unburden nur mit dem Volatile des Simulators, Neutralizing Gas, gerundete Stufen, Slush Rush im Schnee. Wo der Simulator entscheidet, fragt sie ihn nach seinem Zustand und baut seine Bedingungen nicht nach. Ein Prüfer vergleicht sie mit dem Simulator, die Statik kostet 2,5 % mehr. Der Grundsatz gilt also mit einer Ausnahme: Im heißesten Pfad der Statik ist ein Nachbau mit Prüfer billiger als die Frage an den Simulator.
 
+## Was Runde 61 gezeigt hat
+
+**Mehr Simulation liest besser, vor allem in Doubles.** Runde 59 hatte die Rechnung fast doppelt so schnell gemacht. Runde 61 hat gemessen, wo diese Zeit am meisten bringt, wie ein Schachspieler, der seine gesparte Bedenkzeit dort ausgibt, wo die Stellung am schwersten ist.
+
+- **Zuerst gleiche Regeln:** Die Bank rechnete späte Stellungen mit einem Baum ohne Nachprüfung, ohne Tera und ohne den gespielten Zug; die App mit vier Bäumen, Nachprüfung, Tera und dem gespielten Zug. Jetzt rufen beide dieselbe Funktion der Engine. Das allein verschiebt die Bank kaum.
+- **Neun Formen von mehr Zeit:** mehr Bäume, mehr Durchläufe je Baum, tiefere oder öfter gewürfelte Matrix am Anfang, Bäume schon ab dem ersten Zug. Am meisten bringen die Bäume ab dem ersten Zug: −23 Basispunkte gepoolt, in Doubles −70, früh in Doubles −200. Singles bewegen sich kaum. Kein einzelnes Spiel trägt den Gewinn.
+- **Das Zeitfenster:** Die App darf höchstens so lange brauchen wie vor Runde 59. Bäume ab dem ersten Zug kosten das 1,33-Fache von heute und bleiben damit 14 % unter dem alten Stand. Zusammen mit doppelten Durchläufen gewann die Bank −33 Basispunkte, aber die App wurde 12 % langsamer als vor Runde 59: Doppelte Durchläufe verlängern auch die neuen frühen Bäume. Darum gilt jetzt die einfache Form.
+- **Was du in der App siehst:** Auto rechnet jeden Zug mit dem Baum, auch bei vollen Teams. „Think deeper“ erscheint in Auto nicht mehr, weil eine tiefere Matrix weniger weit sieht als der Baum. Die Team-Vorschau (einen Lead wählt man erst ab Gen 5) bleibt bei der Matrix: Über 128 Spiele mit Vorschau gemessen, liest der Baum Doubles-Vorschauen schlechter. Ein Expertenspiel liest sich jetzt ehrlicher (der KO durch Fire Blast in 649664 war Glück), eines verliert eine Lesart des Experten (562428 Zug 10, T110).
+
+**Weiterspielen bis zum Ende lohnt sich nicht überall.** Von jeder Bank-Stellung spielten beide Seiten viermal mit einer schnellen Suche zu Ende. Zusammen mit der Statik hilft das in Singles deutlich (−120 Basispunkte), in Doubles schadet es, weil die schnelle Suche Doubles schlecht spielt. Eine Stellung kostet so etwa 30 Sekunden; die App rechnet ein ganzes Spiel in 13.
+
+**Die billige Statik bringt wenig.** Mittlerer Schadenswurf und Status-Regeln (Verbrennung, Guts, Facade) im eigenen Kern schließen nur 3 der 16 Basispunkte, die der Simulator-Kern bringt. Einen billigen Weg zu genauerem Schaden gibt es nicht; die Triage liest diese Zahl.
+
 ## Was noch offen ist und wie es entschieden wird
 
 Runde 59 hat nur Zeit gespart, die Bewertung ist unverändert. Ob mehr Simulation besser bewertet, ist die eigentliche offene Frage.
 
 - **Runde 60 (S1a):** gebaut, gemessen und am Gate vom 02.10. ganz übernommen (siehe oben). Eine Meldung an `@pkmn/client` entfällt; die Bibliothek hatte den Fehler nicht (siehe oben). Drei Reste stehen als T105 bis T107 in `NextSteps.md`.
-- **Runde 61 (S2):** die Obergrenze der Suche messen (T97): doppeltes und vierfaches Budget, getrennt nach Iterationen, Tiefe und Ziehungen je Zelle; eine Sonde, die bis zum Spielende weiterspielt statt zu schätzen; dazu die billige Statik-Probe (mittlerer Wurf statt Höchstwurf, Verbrennung, Guts, Facade). Ergebnis: Gewinn je Sekunde für jede Form von „mehr simulieren“, neben den 16 Basispunkten der Genauigkeits-Achse. Übernommen wird (T98) die beste Form, die die Bank aufgelöst besser macht bei höchstens der Wandzeit vor Runde 59.
-- **Wenn mehr Simulation nicht besser liest:** Dann entfällt T98 mit dem Beleg aus T97. Das Budget bleibt, und das Tempo aus Runde 59 bleibt als reiner Zeitgewinn. Die Runden 42 und 43 zeigen, dass dieser Ausgang möglich ist.
+- **Runde 61 (S2):** gemessen und an den Gates vom 03. und 04.10. übernommen: Bäume ab dem ersten Zug (siehe oben). Drei Reste stehen als T109 bis T111 in `NextSteps.md`.
 - **Runde 62 (S3):** Triage. Jedes übrige TODO wird auf dem neuen Stand gelesen, nicht geschätzt, und bekommt ein Urteil: obsolet, kleiner, wichtiger, weniger wichtig oder unverändert. Die Tabelle geht an dein Gate.
 
 ## Was mit der übrigen Liste passiert

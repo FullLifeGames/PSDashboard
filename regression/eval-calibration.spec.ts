@@ -946,6 +946,56 @@ import { takeSimFastReport } from '../packages/eval-engine/src/forward/sim-fast/
  * a cheap route; 0 in the band: it has none; between: the number goes to
  * T99.
  *
+ * MEASURED (03.10. and 04.10., readings in docs/perf/probes/2026-10-02-r61/
+ * ledger.md). Instrument: trees via searchTreesOrchestrated (r61-trees,
+ * 358 tree rows moved, no gain or harm resolved, bank 197 s -> 382 s), the
+ * app's Tera allowance (r61-tera, 117 of 129 games carry a click, 493 rows
+ * moved; luck-adjusted doubles +103 [+4, +242], one VGC game
+ * 2629760324 carries most of it), the played doubles combo (r61-app, 185
+ * doubles rows); the sum against r60-review resolves nothing (full all -5
+ * [-40, +30]). Time window: pass sums 218.3 s (85eb5ad, median of three)
+ * against 132.0 s (r61-app), headroom 1.65x. Forms against r61-app, full
+ * all with band, app cost against the neighbouring base: late trees 8 +2
+ * (singles HARM +6 [+2, +11], 1.16x); trees 16 +1 (doubles -12 [-25, -1],
+ * 1.35x); iterations 1200 -10 [-20, -2] (doubles -28, 1.21x); iterations
+ * 2400 -15 [-28, -2] (1.97x, does not fit); early depth 2 -12 [-26, +1]
+ * (luck-adjusted all -14 resolved, 1.13x); depth 3 -7 [-28, +12] (2.06x,
+ * does not fit); draws 3 -3 (doubles -5, 1.03x); draws 5 -2 (doubles -6,
+ * 1.04x); tree from the first turn -23 [-45, -2] (doubles -70 [-131, -12],
+ * early doubles -200, 1.33x). Every form moved only its own rows; the gain
+ * sits in doubles and spreads over many games (largest single game about
+ * 4 bp). Play-out probe (837 positions, four play-outs each): play-out
+ * alone +111 [-52, +267]; static plus play-out -52 [-117, +8] pooled,
+ * singles -120 [-231, -11] resolved, doubles +24 [+1, +48]; about 30 s per
+ * position on one core. Cheap static probe (2103 games, 12771 samples, the
+ * capture of round 58 reproduced at sim +16.4 [+7.6, +25.3]): mean mode
+ * +3.0 [-1.3, +7.3] (18 % of the sim gain), singles +5.1 [+1.3, +8.7].
+ *
+ * VERDICT. Gate 1 (03.10. 23:30, "1a, 2a, 3a"): T98 takes trees from the
+ * first turn plus 1200 iterations, fallback trees from the first turn
+ * alone; no game-type exception; both probes noted (play-outs do not pay
+ * pooled; the singles number goes to T99; the accuracy axis has no cheap
+ * route). The pair (r61-t98, cache v55) won -33 [-58, -10] but missed the
+ * time gate: pass sums 222.4 s against 197.7 s for 85eb5ad (doubled
+ * iterations also lengthen the new early trees). The fallback became the
+ * default (3d94f71, cache v56): bank r61-t98b byte-identical to the T97 run
+ * of the form, time gate green at 158.8 s against 184.4 s; feedback three
+ * times byte-identical; singles tiers 41/1/0 -> 22/3/0, doubles 9/4/0
+ * unchanged. Gate 2 (04.10. 12:46, "1a 2a 3a 4a"): T98 adopted; the
+ * think-deeper ladder leaves auto (a tree turn offers no rung), a deeper
+ * tree rung only if markedly deeper (T109); 649664 t8 accepts chance
+ * (Fire Blast's 12 % kill under the published set, 53 % under the older
+ * one); 562428 t10 stays pinned as a known drift (the tree reads that
+ * early turn narrower than the matrix, T110). Final review: the
+ * team-preview lead stays on the early matrix under auto (d97e119), and
+ * at the user's request (04.10. 17:35, rule fixed before measuring: the
+ * tree unless a pooled row shows harm) turn 0 was measured on the 128
+ * bank games with a team preview: full all +25 [-26, +81], singles -9,
+ * hq doubles +267 [+20, +534] HARM, so the matrix stays by evidence
+ * (f806a41); matrix and tree name different top leads on 119 of 164
+ * singles and 76 of 92 doubles sides. Base of every later bank
+ * comparison: .calibration/r61-t98b.
+ *
  * RULE FIXES 2026-10-02 (improvement round 60, iteration S1a of the program
  * "more simulation", T92 to T95 plus T79 and T104; spec
  * docs/superpowers/specs/2026-10-02-round-60-design.md, plan
