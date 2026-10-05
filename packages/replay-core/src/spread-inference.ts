@@ -8,6 +8,7 @@ import {
 } from './spreads/fit.ts';
 import { decideScarfs, type SpeedKnowledgeMap } from './spreads/scarf.ts';
 import { hpEvsForMaxHp, type ObservedMaxHp } from './spreads/max-hp.ts';
+import { readableOrders } from './spreads/order-limit.ts';
 
 export { evBudget, legalizeEvs } from './spreads/ev-budget.ts';
 export type { SpreadCandidate } from './spreads/ladder.ts';
@@ -219,7 +220,7 @@ export function inferSpreads(
   knowledge: SpeedKnowledgeMap = new Map(),
   maxHp: Map<string, ObservedMaxHp> = new Map(),
 ): Map<string, SpreadCandidate> {
-  const ctx = buildSolveContext(observations, sets, formatid, speedOrders, maxHp);
+  const ctx = buildSolveContext(observations, sets, formatid, readableOrders(speedOrders, sets), maxHp);
   ctx.scarf = decideScarfs(ctx, knowledge);
 
   // Greedy by observation count, then a refinement pass: the first pass can
