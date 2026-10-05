@@ -151,7 +151,8 @@ describe('sacrifice detection', () => {
       '|-damage|p1a: Dauni|0 fnt|[from] Stealth Rock',
       '|faint|p1a: Dauni',
     ];
-    expect(detectSacks(events, sackSnapshot(9))).toEqual({ p1: { name: 'Dauni', hpFraction: 0.09 } });
+    // Round 63: the switch-in fell to the rocks before acting, so the low-HP feed also carries the hazard mark.
+    expect(detectSacks(events, sackSnapshot(9))).toEqual({ p1: { name: 'Dauni', hpFraction: 0.09, hazard: true } });
     expect(detectSacks(events, sackSnapshot(45))).toEqual({});
     expect(detectSacks(events, null)).toEqual({});
   });
