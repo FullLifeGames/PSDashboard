@@ -57,6 +57,12 @@ test('auto reads the budget: early depth and the tree threshold', async () => {
   }
 });
 
+test('auto at the default: an early singles position runs the matrix with three draws', async () => {
+  const serialized = fixture('gen9ou-2658658993-t2');
+  const result = await bankSearch({ serialized, faintedFraction: 0, depth: 1, samples: 1, mode: 'auto', settings: { tera: false } });
+  expect(result).toEqual(searchPosition(serialized, { depth: 1, samples: 3, tera: false }));
+});
+
 test('auto reads the game type off the position: each game type follows its own split', { timeout: 120_000 }, async () => {
   // Round 63 (T110): a cheap tree form, singles below their own threshold, doubles at theirs.
   configureSearchBudget(parseSearchBudget('singles-tree-from=0.25,singles-early-samples=1,doubles-tree-from=0,trees=1,iterations=50'));

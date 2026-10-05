@@ -11,15 +11,9 @@ const TREE = { depth: 1, samples: 1, mode: 'mcts' } as const;
 const MATRIX = { depth: 1, samples: 1, mode: 'matrix' } as const;
 
 describe('search budget (round 61)', () => {
-  test('the default is the form chosen at the round-61 gate: trees from the first turn', () => {
-    expect(SEARCH_BUDGET_DEFAULT).toEqual({
-      trees: 4, iterations: 600,
-      singles: { earlyDepth: 1, earlySamples: 1, treeFrom: 0 },
-      doubles: { earlyDepth: 1, earlySamples: 1, treeFrom: 0 },
-      lead: { depth: 1, samples: 1 },
-    });
-    expect(searchBudget()).toEqual(SEARCH_BUDGET_DEFAULT);
-    expect(searchBudgetTag()).toBe('');
+  test('the form chosen at the round-61 gate stays reachable through the switch: trees from the first turn', () => {
+    configureSearchBudget(parseSearchBudget('singles-tree-from=0,singles-early-samples=1'));
+    expect(searchBudgetTag()).not.toBe('');
     for (const doubles of [false, true]) {
       expect(autoTurnSettings(0, doubles)).toEqual(TREE);
       expect(autoTurnSettings(0.5, doubles)).toEqual(TREE);
@@ -41,7 +35,7 @@ describe('search budget (round 61)', () => {
     const early = { earlyDepth: 3, earlySamples: 5, treeFrom: 0 };
     expect(parseSearchBudget('early-depth=3,early-samples=5,tree-from=0')).toEqual({ ...SEARCH_BUDGET_DEFAULT, singles: early, doubles: early });
     configureSearchBudget(parseSearchBudget('trees=16,tree-from=0'));
-    expect(searchBudgetTag()).toBe('t16-i600-s1.1.0-d1.1.0-l1.1');
+    expect(searchBudgetTag()).toBe('t16-i600-s1.3.0-d1.1.0-l1.1');
     expect(autoTurnSettings(0, false)).toEqual(TREE);
   });
 
@@ -68,6 +62,23 @@ describe('search budget (round 61)', () => {
 });
 
 describe('search budget per game type (round 63, T110)', () => {
+  test('the default splits auto by game type: early singles turns run the matrix with three draws, doubles the tree from the first turn', () => {
+    expect(SEARCH_BUDGET_DEFAULT).toEqual({
+      trees: 4, iterations: 600,
+      singles: { earlyDepth: 1, earlySamples: 3, treeFrom: AUTO_MCTS_FAINTED_FRACTION },
+      doubles: { earlyDepth: 1, earlySamples: 1, treeFrom: 0 },
+      lead: { depth: 1, samples: 1 },
+    });
+    expect(searchBudget()).toEqual(SEARCH_BUDGET_DEFAULT);
+    expect(searchBudgetTag()).toBe('');
+    const early = { depth: 1, samples: 3, mode: 'matrix' } as const;
+    expect(autoTurnSettings(0, false)).toEqual(early);
+    expect(autoTurnSettings(AUTO_MCTS_FAINTED_FRACTION - 0.001, false)).toEqual(early);
+    expect(autoTurnSettings(AUTO_MCTS_FAINTED_FRACTION, false)).toEqual(TREE);
+    expect(autoTurnSettings(0, true)).toEqual(TREE);
+    expect(autoTurnSettings(1, true)).toEqual(TREE);
+  });
+
   test('the switch sets one game type or both, and the team-preview lead apart', () => {
     const singlesOne = parseSearchBudget('singles-early-samples=3,singles-early-depth=2')!;
     expect(singlesOne.singles).toEqual({ earlyDepth: 2, earlySamples: 3, treeFrom: SEARCH_BUDGET_DEFAULT.singles.treeFrom });
@@ -98,11 +109,12 @@ describe('search budget per game type (round 63, T110)', () => {
     configureSearchBudget(parseSearchBudget('doubles-tree-from=0.25,doubles-early-depth=2'));
     expect(autoTurnSettings(0, true)).toEqual({ depth: 2, samples: 1, mode: 'matrix' });
     expect(autoTurnSettings(0.25, true)).toEqual(TREE);
-    expect(autoTurnSettings(0, false)).toEqual(TREE);
+    // The singles split keeps its default.
+    expect(autoTurnSettings(0, false)).toEqual({ depth: 1, samples: 3, mode: 'matrix' });
   });
 
   test('tags tell apart forms that differ in one game type, and a form equal to the default keeps the plain key', () => {
-    configureSearchBudget(parseSearchBudget('singles-tree-from=0.25'));
+    configureSearchBudget(parseSearchBudget('singles-tree-from=0.5'));
     const singlesTag = searchBudgetTag();
     configureSearchBudget(parseSearchBudget('doubles-tree-from=0.25'));
     const doublesTag = searchBudgetTag();
@@ -110,11 +122,11 @@ describe('search budget per game type (round 63, T110)', () => {
     const leadTag = searchBudgetTag();
     expect(new Set([singlesTag, doublesTag, leadTag, '']).size).toBe(4);
     // Field by field, not by key order: a form that spells out the default is the default.
-    configureSearchBudget(parseSearchBudget('early-samples=5,early-samples=1'));
+    configureSearchBudget(parseSearchBudget('early-samples=5,singles-early-samples=3,doubles-early-samples=1'));
     expect(searchBudgetTag()).toBe('');
     configureSearchBudget({
       lead: { samples: 1, depth: 1 }, doubles: { treeFrom: 0, earlySamples: 1, earlyDepth: 1 },
-      singles: { treeFrom: 0, earlySamples: 1, earlyDepth: 1 }, iterations: 600, trees: 4,
+      singles: { treeFrom: AUTO_MCTS_FAINTED_FRACTION, earlySamples: 3, earlyDepth: 1 }, iterations: 600, trees: 4,
     });
     expect(searchBudgetTag()).toBe('');
   });

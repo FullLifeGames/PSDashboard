@@ -134,7 +134,7 @@ describe('useEvalView', () => {
   });
 
   test("auto resolves by the replay's game type: both sweeps carry it and the deepening target follows it", () => {
-    configureSearchBudget(parseSearchBudget('singles-tree-from=0.25'));
+    configureSearchBudget(parseSearchBudget('singles-tree-from=0.25,singles-early-samples=1'));
     onTestFinished(() => configureSearchBudget(null));
     const tree = { depth: 1, samples: 1, mode: 'mcts' } as const;
     const graph = evalGraph('singles', {

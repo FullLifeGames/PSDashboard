@@ -1,9 +1,12 @@
+import { AUTO_MCTS_FAINTED_FRACTION } from '../types.ts';
+
 /**
  * Round 61 (T97, T98): every search budget the round measures, one object
- * for the app and the bank. The default is the form chosen at the round-61
- * gate (03.10.): trees from the first turn (tree-from 0). The pair with
- * 1200 iterations per tree failed the time gate (04.10.), so the iterations
- * stay at 600; the search before round 61 is tree-from=0.25,early-samples=1.
+ * for the app and the bank. The round-61 gate (03.10.) chose trees from the
+ * first turn (tree-from 0). The pair with 1200 iterations per tree failed
+ * the time gate (04.10.), so the iterations stay at 600; the search before
+ * round 61 is tree-from=0.25,early-samples=1, the round-61 default
+ * singles-tree-from=0,singles-early-samples=1.
  * A measurement switch without a UI knob picks a form: EVAL_SEARCH_BUDGET
  * under Node, the localStorage key ps-replay-interceptor:search-budget in
  * the browser (stamped on every worker message). Syntax: a comma list of
@@ -12,7 +15,11 @@
  * with a singles- or doubles- prefix for one, lead-depth and lead-samples).
  *
  * Round 63 (T110): auto splits per game type, and the team-preview lead has
- * its own matrix that no early split moves.
+ * its own matrix that no early split moves. Doubles keep the tree from the
+ * first turn; singles run the matrix with three draws until a quarter of
+ * all bodies fell, because the tree read early singles turns narrower
+ * (562428 t10 lost the Heatran read; read sentences on the corpus 11 -> 5),
+ * and three draws keep the one-draw fallback of T65 closed.
  */
 export interface AutoSplit {
   /** Matrix depth of auto turns below treeFrom. */
@@ -36,7 +43,7 @@ export interface SearchBudget {
 
 export const SEARCH_BUDGET_DEFAULT: SearchBudget = {
   trees: 4, iterations: 600,
-  singles: { earlyDepth: 1, earlySamples: 1, treeFrom: 0 },
+  singles: { earlyDepth: 1, earlySamples: 3, treeFrom: AUTO_MCTS_FAINTED_FRACTION },
   doubles: { earlyDepth: 1, earlySamples: 1, treeFrom: 0 },
   lead: { depth: 1, samples: 1 },
 };

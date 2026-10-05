@@ -135,12 +135,15 @@ describe('useEvaluation single position', () => {
     expect(script.calls[1].settings.mode).toBe('mcts');
   });
 
-  test('auto runs the tree from the first turn at the round-61 default', async () => {
+  test('at the default auto runs an early singles position on the matrix with three draws, an early doubles position on the tree', async () => {
     const { result } = renderHook(() => useEvaluation());
     act(() => result.current.setPrefs({ ...matrixPrefs, mode: 'auto' }));
     act(() => result.current.evaluate({ cacheKey: null, tera: false, acquire: async () => position(0), tag: 'a' }));
     await waitFor(() => expect(result.current.status).toBe('done'));
-    expect(script.calls[0].settings.mode).toBe('mcts');
+    expect(script.calls[0].settings).toMatchObject({ depth: 1, samples: 3, mode: 'matrix' });
+    act(() => result.current.evaluate({ cacheKey: null, tera: false, acquire: async () => doublesPosition(0), tag: 'b' }));
+    await waitFor(() => expect(script.calls).toHaveLength(2));
+    expect(script.calls[1].settings.mode).toBe('mcts');
   });
 
   test('an engine override pins the single evaluation until it is released; the stored prefs stay what they were', async () => {
@@ -263,7 +266,7 @@ describe('useEvaluation whole-game sweep', () => {
   });
 
   test("an auto sweep resolves every turn by the replay's game type", async () => {
-    configureSearchBudget(parseSearchBudget('singles-tree-from=0.25'));
+    configureSearchBudget(parseSearchBudget('singles-tree-from=0.25,singles-early-samples=1'));
     onTestFinished(() => configureSearchBudget(null));
     const tree = { depth: 1, samples: 1, mode: 'mcts' };
     const matrix = { depth: 1, samples: 1, mode: 'matrix' };
@@ -281,5 +284,28 @@ describe('useEvaluation whole-game sweep', () => {
     expect(singles.faintedFractions).toEqual([0, 1 / 6, 2 / 6]);
     // Doubles keep the tree from the first turn under the same form.
     expect((await sweepOf(true)).settings).toEqual([tree, tree, tree]);
+  });
+
+  test('at the default an auto sweep runs early singles turns on the matrix with three draws, doubles on the tree, both leads on the d1s1 matrix', async () => {
+    const tree = { depth: 1, samples: 1, mode: 'mcts' };
+    const early = { depth: 1, samples: 3, mode: 'matrix' };
+    const sweepOf = async (doubles: boolean) => {
+      // The team-preview position, told apart from turn 1's by a marker field.
+      const preview = JSON.stringify({ preview: true, ...JSON.parse(doubles ? doublesPosition(0) : position(0)) });
+      const { result } = renderHook(() => useEvaluation());
+      act(() => result.current.setPrefs({ ...matrixPrefs, mode: 'auto' }));
+      act(() => result.current.runGraphSweep({ ...sweepParams(turn => async () => position(turn - 1)), doubles, acquirePreview: async () => preview }));
+      await waitFor(() => expect(result.current.graph.running).toBe(true));
+      await waitFor(() => expect(result.current.graph.running).toBe(false), { timeout: 10_000 });
+      return { graph: result.current.graph, lead: script.calls.filter(call => call.serialized === preview).map(call => call.settings) };
+    };
+    const singles = await sweepOf(false);
+    expect(singles.graph.settings).toEqual([early, early, tree]);
+    expect(singles.graph.lead).not.toBeNull();
+    expect(singles.lead).toEqual([expect.objectContaining({ depth: 1, samples: 1, mode: 'matrix' })]);
+    const doubles = await sweepOf(true);
+    expect(doubles.graph.settings).toEqual([tree, tree, tree]);
+    expect(doubles.graph.lead).not.toBeNull();
+    expect(doubles.lead).toEqual([expect.objectContaining({ depth: 1, samples: 1, mode: 'matrix' })]);
   });
 });

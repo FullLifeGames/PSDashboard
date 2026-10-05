@@ -164,7 +164,7 @@ test.describe('PS Dashboard', () => {
     await expect(panel.getByTitle('What produced the numbers shown for this turn.')).toHaveText('MCTS');
   });
 
-  test('auto mode runs the tree on every turn, full boards included (GPL)', async ({ page }) => {
+  test('auto mode runs early singles turns on the matrix and the tree once bodies fell (GPL)', async ({ page }) => {
     test.setTimeout(360_000);
     await page.evaluate(() => {
       localStorage.setItem('ps-replay-interceptor:eval-pool', '2');
@@ -181,14 +181,15 @@ test.describe('PS Dashboard', () => {
     const panel = page.locator('.ps-main-right .ps-eval-panel');
     // The auto pref round-trips into the dropdown and the caption names the routing.
     await expect(panel.locator('select').first()).toHaveValue('auto');
-    await expect(panel.getByText('auto (MCTS every turn)')).toBeVisible();
+    await expect(panel.getByText('auto (matrix early, MCTS late)')).toBeVisible();
     await panel.locator('button', { hasText: 'Analyze game' }).click();
     await expect(panel.locator('button', { hasText: 'Re-analyze' })).toBeVisible({ timeout: 300_000 });
 
-    // Turn 2: full boards — since round 61 the DUCT tree prices them too (tree from the first turn).
+    // Turn 2: full boards — round 63 (T110): a singles game (GPL has no gametype line) prices them with the
+    // matrix and three draws until a quarter of all bodies fell; doubles would run the tree from the first turn.
     await panel.locator('.ps-eval-graph rect[data-turn="2"]').click();
     await expect(panel.locator('.ps-eval-analysis')).toContainText('Turn 2', { timeout: 15_000 });
-    await expect(panel.getByTitle('What produced the numbers shown for this turn.')).toHaveText('MCTS');
+    await expect(panel.getByTitle('What produced the numbers shown for this turn.')).toHaveText('depth 1 · 3 samples');
 
     // Turn 38: nine bodies down — the tree as before.
     await panel.locator('.ps-eval-graph rect[data-turn="38"]').click();

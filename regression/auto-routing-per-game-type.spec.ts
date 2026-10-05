@@ -16,6 +16,15 @@ const SKETCH = { depth: 1, samples: 1, mode: 'matrix' } as const;
 const AUTO_PREFS = { depth: 2, samples: 3, mode: 'auto', auto: false, autoAnalyze: false, tera: 'auto' } as const;
 
 describe('auto routing per game type', () => {
+  test('at the default early singles turns run the matrix with three draws, doubles the tree from the first turn, the lead stays d1s1', () => {
+    expect(resolveAutoTurnSettings(0, false)).toEqual({ depth: 1, samples: 3, mode: 'matrix' });
+    expect(resolveAutoTurnSettings(0.249, false)).toEqual({ depth: 1, samples: 3, mode: 'matrix' });
+    expect(resolveAutoTurnSettings(0.25, false)).toEqual(TREE);
+    expect(resolveAutoTurnSettings(0, true)).toEqual(TREE);
+    expect(resolveAutoTurnSettings(0.249, true)).toEqual(TREE);
+    expect(resolveAutoLeadSettings()).toEqual(SKETCH);
+  });
+
   test('a form per game type resolves each game type by its own split', () => {
     configureSearchBudget(parseSearchBudget('singles-tree-from=0.25,singles-early-samples=3'));
     expect(resolveAutoTurnSettings(0.1, false)).toEqual({ depth: 1, samples: 3, mode: 'matrix' });
@@ -47,7 +56,7 @@ describe('auto routing per game type', () => {
   });
 
   test('the upgrade check resolves the configured engine per game type', () => {
-    configureSearchBudget(parseSearchBudget('singles-tree-from=0.25'));
+    configureSearchBudget(parseSearchBudget('singles-tree-from=0.25,singles-early-samples=1'));
     // An early singles turn holding the sketch is settled; the same doubles turn rises to the tree.
     expect(needsSettingsUpgrade(SKETCH, AUTO_PREFS, 0.1, false)).toBe(false);
     expect(needsSettingsUpgrade(SKETCH, AUTO_PREFS, 0.1, true)).toBe(true);

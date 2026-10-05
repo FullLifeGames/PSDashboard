@@ -82,13 +82,14 @@ describe('WorkspaceEvalColumn', () => {
     expect(screen.getByText('Game report', { selector: 'span' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Re-analyze' })).toBeInTheDocument();
 
-    // The slider moves the analysis turn: that turn's view opens with its provenance. Round 61: auto runs the tree
-    // on every turn, and a tree turn offers no deeper rung (ThinkDeeperButton.spec covers the ladder itself).
+    // The slider moves the analysis turn: that turn's view opens with its provenance. Round 63 (T110): auto runs an
+    // early singles turn on the matrix with three draws, and a matrix turn offers the next depth (ThinkDeeperButton.spec
+    // covers the ladder itself).
     act(() => app().board.timeline.navigateTo({ turn: 3, line: 'main' }));
     await waitFor(() => expect(app().analysis.turnAnalysis?.turn).toBe(3));
     expect(screen.getByText('Turn 3')).toBeInTheDocument();
-    expect(screen.getByTitle('What produced the numbers shown for this turn.')).toHaveTextContent(/^MCTS$/);
-    expect(screen.queryByRole('button', { name: /Think deeper about this position/ })).toBeNull();
+    expect(screen.getByTitle('What produced the numbers shown for this turn.')).toHaveTextContent(/^depth 1 · 3 samples$/);
+    expect(screen.getByRole('button', { name: 'Think deeper about this position (depth 2)' })).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /Evaluate/ })).toBeNull();
 
     // The graph's T0 point opens the team-preview analysis: the replay has a preview, so the sweep graded the leads.
