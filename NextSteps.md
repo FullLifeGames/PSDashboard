@@ -3,7 +3,7 @@
 Nur offene Schritte, als priorisierte Checkliste: Die oberste Welle ist die nächste Runde; ihre Spuren laufen parallel, je Spur zuerst das oberste offene Kästchen (Abschnitt „Parallel arbeiten“). Jedes TODO nennt das Problem an einer Spielszene und das Erfolgsmaß. Die Umsetzungsschritte jedes TODOs stehen als Checkliste im Backlog-Plan unter derselben Nummer; beim Start einer Welle schreibt ihre Spec die Schritte neu; unter „Runde 62 (neu gefasst)“ sind die alten Kästchen dort nur Hintergrund.
 
 - **Iterationen** bündeln die TODOs einer Sitzung. Eine Iteration wird beim Start zur Runde mit der nächsten freien Rundennummer: Iteration 1 war Runde 46, Iteration 2 war Runde 47, Iteration 2a war Runde 48, Iteration 2b war Runde 49, Iteration 3 war Runde 50, Iteration 4 war Runde 51, Iteration 4a war Runde 52, Iteration 4d war Runde 53, Iteration 4b war Runde 54, Iteration 4e war Runde 55, Iteration 4c war Runde 56, Iteration 4f war Runde 57. Runde 58 war die Sichtung „Was bauen wir nach?“ außer der Reihe; seit ihrem Gate stehen die Iterationen S1 bis S3 des Programms „Mehr Simulation“ oben, vorgesehen als Runden 59 bis 62; Iteration S1 war Runde 59, Iteration S1a war Runde 60, Iteration S2 war Runde 61, Iteration S3 war Runde 62 (Triage). Seit Runde 62 heißen die Bündel Wellen: Eine Welle ist eine Runde, ihre Spuren laufen parallel mit je einem Sub-Agent; Welle 1 wird Runde 63. Score-berührende TODOs bekommen je ihre eigene Messung (D3), nie eine gemeinsame.
-- **T-Nummern** (T01 bis T45) sind feste Namen, vergeben am 18.09. in Prioritäts-Reihenfolge. Wandert ein TODO in der Liste, behält es seine Nummer; ein neues TODO bekommt die nächste freie (ab T117; T46 kam am 18.09. in Runde 46 dazu, T47 bis T51 in Runde 47, T52 und T53 in Runde 48, T54 in Runde 49, T55 in Runde 50, T56 bis T64 in Runde 51, T65 am 19.09. nach deren Gate, T66 bis T68 am 20.09. in Runde 52, T69 am 20.09. in Runde 53, T70 bis T74 am 21.09. in Runde 54, T75 am 21.09. in Runde 55, T76 am 23.09. am Gate der Runde 56, T77 bis T80 am 23.09. in Runde 56, T81 am 23.09. am Gate der Runde 57, T82 am 23.09. in ihrer Spec, T83 bis T90 am 24.09. in Runde 57, T91 bis T102 am 24.09. am Gate der Runde 58, T103 am 01.10. in Runde 59, T104 am 02.10. in Runde 60 vergeben und dort erledigt, T105 bis T107 am 02.10. in Runde 60, T108 am 02.10. nach ihrem Gate, T109 bis T111 am 04.10. in Runde 61, T112 bis T116 am 05.10. in Runde 62). Seit Runde 62 sind 36 Nummern stillgelegt; sie stehen mit Beleg und altem Text in `docs/completed/triage.md`. „braucht T01“ heißt: T01 muss vorher gelaufen sein.
+- **T-Nummern** (T01 bis T45) sind feste Namen, vergeben am 18.09. in Prioritäts-Reihenfolge. Wandert ein TODO in der Liste, behält es seine Nummer; ein neues TODO bekommt die nächste freie (ab T118; T46 kam am 18.09. in Runde 46 dazu, T47 bis T51 in Runde 47, T52 und T53 in Runde 48, T54 in Runde 49, T55 in Runde 50, T56 bis T64 in Runde 51, T65 am 19.09. nach deren Gate, T66 bis T68 am 20.09. in Runde 52, T69 am 20.09. in Runde 53, T70 bis T74 am 21.09. in Runde 54, T75 am 21.09. in Runde 55, T76 am 23.09. am Gate der Runde 56, T77 bis T80 am 23.09. in Runde 56, T81 am 23.09. am Gate der Runde 57, T82 am 23.09. in ihrer Spec, T83 bis T90 am 24.09. in Runde 57, T91 bis T102 am 24.09. am Gate der Runde 58, T103 am 01.10. in Runde 59, T104 am 02.10. in Runde 60 vergeben und dort erledigt, T105 bis T107 am 02.10. in Runde 60, T108 am 02.10. nach ihrem Gate, T109 bis T111 am 04.10. in Runde 61, T112 bis T116 am 05.10. in Runde 62, T117 am 05.10. aus den Experten-Urteilen zu T45). Seit Runde 62 sind 36 Nummern stillgelegt; sie stehen mit Beleg und altem Text in `docs/completed/triage.md`. „braucht T01“ heißt: T01 muss vorher gelaufen sein.
 - **Backlog-Plan** (je TODO: Idee, Schritte mit Dateien, volles Gate, Doubles-Abdeckung, offene Entscheidungen, Zahlen, Code-Belege): `docs/superpowers/plans/2026-09-18-backlog-plans.md`.
 - **Erledigtes**: `docs/completed/` nach Gebiet (Index, Eintragsformat und Prozess in `docs/completed/README.md`).
 - **Maschinen-Quellen**: Ledger in `regression/eval-calibration.spec.ts`, Pins in `e2e-feedback/corpus.ts`, Memory-Notizen.
@@ -30,7 +30,8 @@ Gate der Runde 62 (05.10.2026): Die nächsten Schritte laufen mit mehreren Sub-A
 | 1 | E · Bericht, erster Teil | T19, T18, T17, T116 | Engine-Zahlen unberührt (Score, Tiers, Bank ohne Lauf byte-gleich), Feedback-Dumps und Prosa-Pins, UI-Tests. |
 | 1 | F · Vorschau | T20, T96, T68 | UI-Tests und e2e; Bank und Feedback unberührt. |
 | 1 | G · Choice-Sperre nach Trick | T115 | Zählung auf 0, Golden 655336 zuerst, Bank gepaart, Feedback 3×. |
-| 1 | U · User-Aufgabe: Experten-Urteile | T45 | Urteile im Ledger, mindestens ein Doubles-Pin nach dem Wellen-Lauf. |
+| 1 | H · Zugreihenfolge im Set-Bau | T117 | Zählung der gebrochenen Reihenfolgen auf 0, Set-Diff auf Bank und Feedback, Bank gepaart, Feedback 3×. |
+| 1 | U · Integrator: erster Doubles-Pin | T45 | Truth-Pin an 2630685175 Zug 8 nach dem Wellen-Lauf, die vier Urteile im Ledger-Block der Welle. |
 | 2 | A · Rechner-Eingaben | T83, T72, T76, T100, T84 | Zählung je TODO auf 0, Dumps (Quoten, Zeilen), jede bewegte Bank-Zeile gelesen. |
 | 2 | B · Wahlen, Wurzelwert, Tiefer denken | T113, T114, T109, T111 | Prüfstände, Bank-Lauf mit dem Spielwert der Wurzel neben dem Score (das Bank-Feld baut der Integrator), Feedback 3×, UI-Tests und e2e für T109, Score-Frage von T114 am User-Gate. |
 | 2 | C · Gegner-Inferenz | T108 | Zählung Client gegen Inferenz gelesen, Bank gepaart, Feedback 3×. |
@@ -250,21 +251,37 @@ Der Nachbau gibt dem Baum im Golden-Spiel 655336 ab Zug 6 Züge, die der Spieler
 
   *Erfolg:* Die Zählung über Bank und Dumps (aktiver Choice-Träger nach Trick oder Switcheroo ohne choicelock) fällt auf 0; 655336 Zug 6 bietet Bisharp nur den gesperrten Zug an; jede bewegte Bank-Zeile und der Golden-Kanal gelesen. *Plan T115:* 3 Schritte im Backlog-Plan.
 
-## Welle 1 · Spur U · User-Aufgabe: Experten-Urteile
+## Welle 1 · Spur H · Zugreihenfolge im Set-Bau
 
-Läuft neben der ganzen Welle: Der User urteilt über vier offene Stellungen. Pins landen erst nach dem Wellen-Lauf, damit alle Spuren gegen dieselbe Feedback-Basis messen.
+Das Spiel zeigt, wer zuerst zieht, und der Set-Bau darf das nie widerlegen (Urteil des Users zu T45, 05.10.). Eigene Spur, weil der Tempo-Löser in Dateien liegt, die keine andere Spur der Welle 1 anfasst.
+
+*Dateien:* packages/replay-core/src/protocol/speed-evidence.ts, packages/replay-core/src/spreads/ (scarf.ts, ladder.ts).
+
+*Tor:* Zählung der gebrochenen Reihenfolgen auf 0, Set-Diff auf Bank und Feedback, Bank gepaart, Feedback 3×.
+
+- [ ] **T117 · Der Set-Bau widerspricht keiner beobachteten Zugreihenfolge** (Sets und Spreads, Runde, mittel, score-berührend D3)
+
+  gen9ou-2663108091 Zug 26: Kingambit greift vor Great Tusk an, die App baut aber Kingambit Adamant mit 199 Tempo und Great Tusk Jolly mit 300. Daraus beweist die Engine einen Sieg für p1 (Score +1,0), den die Reihenfolge im selben Zug widerlegt; p1 verlor. Urteil des Users am 05.10.: Was das Spiel zeigt, gilt; ein defensiver Great Tusk (Stealth Rock) oder Tempo auf Kingambit erklärt die Reihenfolge, und die Engine darf nie etwas anderes annehmen. In Runde 53 gezählt: 7 von 910 Singles- und 8 von 267 Doubles-Reihenfolgen der Bank bricht jeder heutige Bau (Liste stillBroken in docs/perf/probes/2026-09-20-r53/T66/stage-trace-after.json), darunter dieses Spiel, 2663093831 Zug 7 (Orthworm 166 gegen Incineroar 156) und 937928 Zug 4. Weg: Eine gesehene Reihenfolge ist eine harte Grenze für beide Seiten; passt kein Set, gibt zuerst das Tempo der Seite ohne eigenen Tempo-Beleg nach (etwa ein defensiver Great Tusk), dann ein Tempo-Item. Die Zähl-Sonde rechnet eine Mega-Entwicklung mit dem Tempo der Grundform.
+
+  *Nutzen:* Engine und App: kein Beweis und kein Urteil mehr auf einer Tempo-Annahme, die das Spiel widerlegt (15 Reihenfolgen auf der Bank, ein falscher Zwangssieg in 2663108091); App: Tempo-Werte im Panel, die zum Spiel passen.
+
+  *Erfolg:* Die Zählung (docs/perf/probes/2026-09-20-r53/T66/stage-trace.vt.ts mit T66_CODE=after, Stufe app) meldet 0 gebrochene Reihenfolgen in Singles und Doubles; 2663108091 Zug 26 liest keinen Sieg für p1 mehr; Set-Diff auf Bank und Feedback gelesen; Bank gepaart, Feedback 3×. *Plan T117:* 4 Schritte im Backlog-Plan.
+
+## Welle 1 · Spur U · Integrator: erster Doubles-Pin
+
+Die Urteile des Users liegen vor (05.10.). Der Integrator trägt den Pin an 2630685175 Zug 8 erst nach dem Wellen-Lauf ein, damit alle Spuren gegen dieselbe Feedback-Basis messen.
 
 *Dateien:* keine eigene; corpus.ts, Fixtures und Feedback-Harness ändert der Integrator.
 
-*Tor:* Urteile im Ledger, mindestens ein Doubles-Pin nach dem Wellen-Lauf.
+*Tor:* Truth-Pin an 2630685175 Zug 8 nach dem Wellen-Lauf, die vier Urteile im Ledger-Block der Welle.
 
-- [ ] **T45 · Experten-Urteile zu den gehaltenen Decided-Verlusten** (Richter und Bank, User-Aufgabe, klein, kein Score-Touch)
+- [ ] **T45 · Erster Doubles-Pin aus den Experten-Urteilen** (Richter und Bank, Mini-Runde, klein, kein Score-Touch)
 
-  VGC 2630685175 Zug 8 bucht p2 einen Fehler von rund 95 % auf 4 % (Taunt statt Astral Barrage, Reue 1,738), und kein Doubles-Spiel im Korpus trägt einen Pin. Die Liste: sechs gehaltene Decided-Verluste auf r61-t98b (drei Singles, drei Doubles); 2663102863 Zug 10 und 2629731825 Zug 4 sind schon erklärt. Der User sagt je Stellung 'Engine hat recht' oder 'Spieler hat recht'; jedes Urteil wird nach Zustimmung ein truth- oder gap-Pin.
+  Urteile des Users am 05.10.2026 zu den vier offenen gehaltenen Decided-Verlusten auf r61-t98b (docs/perf/probes/2026-10-04-r62/t45-verdicts.md): (1) VGC 2630685175 Zug 8: Engine hat recht, Taunt statt Astral Barrage ist der Fehler. (2) gen9ou-2663108091 Zug 26: Spieler hat recht; das Spiel zeigt, dass Kingambit schneller ist, und die Engine darf nie etwas anderes annehmen (wird T117). (3) gen9ou-2663114316 Zug 18: Engine hat recht, aber schwierig, weil Tera Ghost Close Combat zu einem 50/50 macht. (4) smogtours-gen9ou-752058 Zug 32: offen; Rapid Spin ohne Verbrennung plus Headlong Rush hätte vielleicht gegen Quiver Dance gewonnen. Nur (1) wird Pin (Gate „a“). 2630685175 läuft im Feedback-Lauf als Zählungs-Spiel ohne Korpus-Einträge; der Integrator baut den Pin in Harness und corpus.ts nach dem Lauf der Welle 1.
 
-  *Nutzen:* Engine: der erste Doubles-Pin im Feedback-Korpus, damit Doubles-Urteile des Baums gegen einen Menschen geprüft werden; Kosten ein Abend User-Zeit.
+  *Nutzen:* Engine: der erste Doubles-Pin im Feedback-Korpus, damit Doubles-Urteile des Baums gegen einen Menschen geprüft werden.
 
-  *Erfolg:* vier offene Urteile im Ledger, mindestens ein Doubles-Pin im Feedback-Korpus. *Plan T45:* Backlog-Plan, Abschnitt T45 (Runde 62 neu gefasst).
+  *Erfolg:* Truth-Pin an 2630685175 Zug 8 (p2: Fehler mit Taunt) im Feedback-Korpus, eingetragen nach dem Lauf der Welle 1; die vier Urteile im Ledger-Block der Welle. *Plan T45:* Backlog-Plan, Abschnitt T45 (Runde 62 neu gefasst).
 
 ## Welle 2 · Spur A · Rechner-Eingaben
 
@@ -572,7 +589,7 @@ Wer an einem Thema arbeitet, findet hier die verwandten TODOs.
 | Statik | T81 |
 | Tempo | T112 |
 | Zufall preisen | T16, T78 |
-| Sets und Spreads | T26, T28, T31, T80, T86, T89 |
+| Sets und Spreads | T26, T28, T31, T80, T86, T89, T117 |
 | Werkzeug | T43, T101, T103, T108, T111 |
 | Bericht | T17, T18, T19, T22, T51, T59, T64, T116 |
 | Oberfläche | T20, T68, T69, T85 |
@@ -655,7 +672,6 @@ Engine und Messung:
 - [ ] `gimmickSuffixForSlot` (`branch/protocol-choices.ts`) prüft den Slot, nicht den Körper hinter dem Doppelpunkt: Steht im Nachbau ein anderer Körper im Slot, terastallisiert der falsche (gemessen am Simulator in der Vorbereitung der Runde 54, `docs/perf/probes/2026-09-20-r54/T57/wf1/check-teraloss.md`). Ein Namensvergleich trägt nicht, weil die gebauten Sets die Art als Namen führen und das Protokoll den Spitznamen. Wie oft der Nachbau dort abweicht, ist ungemessen → zählen, wenn eine Runde den Nachbau ohnehin durchläuft.
 - [ ] Ein K. o., der nur im Nachbau passiert, kostet mehr als die Tera-Markierung (Runde 54): Der Simulator räumt alle Volatiles ab (Substitute, Leech Seed, Encore), setzt `isStarted` und `lastMove` zurück; die Korrektur stellt nur KP, Status, Boosts und seit Runde 54 die Markierung her. Eine vom Simulator abgelehnte Wahl beantwortet der Nachbau mit `default`, und der terastallisiert nie (die Markierung kommt an der nächsten Grenze zurück, der Zug selbst bleibt untreu) → handeln, wenn eine Stellung mit verlorenem Substitute in einem Dump oder einer Bank-Spitze auffällt.
 - [ ] `parsePlayedActions` (`played.ts`) führt auf einem Zug mit `|cant|` keine Aktion, also auch kein Tera: Der Abgleich „gespielt gegen Optionen“ sieht den Tera-Klick eines zurückgezuckten Körpers nicht → mitnehmen, wenn T59 oder T64 an `played.ts` bauen.
-- [ ] Der App-Bau widerspricht 7 von 910 beobachteten Singles-Zugreihenfolgen der Bank und 8 von 267 in Doubles (Runde 53; vor T66 waren es 20, der Bau mit einer Lösung bricht 10). Diese 15 Zeilen bricht jeder Bau, auch der ohne Evidenz: vier mit dem Tempo-Maximum auf beiden Seiten (darunter der einzige Choice Scarf), fünf ohne ein einziges Tempo-EV auf beiden Seiten, sechs gemischt, Stoff für die Set- und Löser-Spuren (T30 ist in Runde 62 geschlossen; Liste in `stage-trace.json` unter `stillBroken`) → nach jeder Set- oder Löser-Runde neu zählen (`docs/perf/probes/2026-09-20-r53/T66/stage-trace.vt.ts` mit `T66_CODE=after`, Stufe `app`, 17 s; ohne den Schalter scheitert der Identitäts-Test der Sonde am neuen Übertrag); steigt die Zahl, vor der Bank nachsehen. Die Sonde rechnet eine Mega-Entwicklung mit dem Tempo der Grundform. (Darunter 2663093831 Zug 7: Orthworm 166 gegen Incineroar 156, im Log trifft Flare Blitz Orthworm, bevor es zieht; die Lesung der Runde 56 hat die Zeile wiedergefunden. Dazu 937928 Zug 4, eine Encore-Notiz aus T75.)
 - [ ] `carryPreSolve` (`team-builder.ts`, bis Runde 53 `carryItemDecisions`) gibt einem Pokémon, das die Volllösung verwirft und aus ihrem Ergebnis streicht, den Eintrag der Tempo-Vorlösung zurück. Ohne Item sind das 165 Einträge auf den 129 Bank-Replays, 9 davon bewegen ein Set (8 Replays); wie oft der mittlere Zweig greift (verworfen, aber vom Log mit festen KP im Ergebnis gehalten), ist ungezählt. Die Aussage zum Item-Zweig (kein Treffer in den 139 gemessenen Replays) stammt unverändert aus Runde 52 → wer die App auf eine Lösung zurückbauen will, braucht zuerst einen Fall für den Item-Zweig.
 
 - [ ] Ein Play-out verheizt eine Win-Condition in falscher Reihenfolge (Draft t56 bis t62 hält seit Runde 42 per e2e-Pin) → bei einem weiteren Fall Q5 (T39) vorziehen.
