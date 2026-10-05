@@ -186,3 +186,47 @@ describe('how a move lands in doubles (T20, Rock Slide from T96)', () => {
     expectInside(range, lost[0], current.sides[1].active[0].maxhp);
   });
 });
+
+/** The numbers of a range, without the KO text (that one reads the defender's current HP). */
+const span = (result: DamageResult | undefined) => result && [result.minPercent, result.maxPercent];
+
+describe('the Tera toggle in the preview equals the calc after the click (T20, decision 18)', () => {
+  test('singles: the attacker\'s and the defender\'s Tera both move the number, and both together match the executed turn', () => {
+    const current = battle('gen9customgame',
+      [set('Garchomp', ['Earthquake'], { teraType: 'Ground' })],
+      [set('Snorlax', ['Splash'], { evs: { ...STATS, hp: 252, def: 252 }, teraType: 'Steel' })]);
+    const off = preview(current).p1.default[0][0];
+    const attacker = preview(current, { p1: ['Ground'], p2: [null] }).p1.default[0][0];
+    const defender = preview(current, { p1: [null], p2: ['Steel'] }).p1.default[0][0];
+    const both = preview(current, { p1: ['Ground'], p2: ['Steel'] });
+    expect(span(attacker)).not.toEqual(span(off));
+    expect(span(defender)).not.toEqual(span(off));
+
+    const { lost, log } = play(current, 'move earthquake terastallize', 'move splash terastallize');
+    expect(log).toContain('|-terastallize|p1a: Garchomp|Ground');
+    expect(log).toContain('|-terastallize|p2a: Snorlax|Steel');
+    expectPlainHits(log);
+    expectInside(both.p1.default[0][0], lost[0], current.sides[1].active[0].maxhp);
+    expect(span(preview(current).p1.default[0][0])).toEqual(span(both.p1.default[0][0]));
+  });
+
+  test('doubles, two targets: the toggle moves the spread rows and the targeted rows into both foes', () => {
+    const current = battle('gen9doublescustomgame',
+      [set('Garchomp', ['Earthquake', 'High Horsepower'], { teraType: 'Ground' }), set('Corviknight', ['Splash'])],
+      [wall('Snorlax'), wall('Blissey')]);
+    const off = preview(current).p1;
+    const on = preview(current, { p1: ['Ground', null], p2: [null, null] }).p1;
+    const rows = (side: typeof on) => [
+      ...side.spread[0][1].map(row => span(row.result)),
+      span(side.targets[0]['2:1']), span(side.targets[0]['2:2']),
+    ];
+    rows(on).forEach((row, index) => expect(row).not.toEqual(rows(off)[index]));
+
+    const { lost, log } = play(current, 'move earthquake terastallize, move splash', 'move splash, move splash');
+    expect(log).toContain('|-terastallize|p1a: Garchomp|Ground');
+    expectPlainHits(log);
+    expectInside(on.spread[0][1].find(row => row.label === 'P2A')?.result, lost[0], current.sides[1].active[0].maxhp);
+    expectInside(on.spread[0][1].find(row => row.label === 'P2B')?.result, lost[1], current.sides[1].active[1].maxhp);
+    expect(rows(preview(current).p1)).toEqual(rows(on));
+  });
+});

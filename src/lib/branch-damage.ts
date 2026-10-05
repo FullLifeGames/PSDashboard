@@ -25,6 +25,12 @@ export interface DamagePreviewInputs {
   p2MovesBySlot: BranchMoveOption[][];
   fieldState: BranchSimState['field'] | null;
   gen: number;
+  /**
+   * The Tera type each slot's armed toggle would take, null when off. The
+   * preview reads it as the calc reads a Pokémon after the click: attacking
+   * and defending in its Tera type (T20). Mega, Ultra Burst and Z stay out.
+   */
+  teraBySlot?: { p1: (string | null)[]; p2: (string | null)[] };
 }
 
 type LivingEnemy = { active: SimPokemonInfo; index: number };
@@ -89,9 +95,20 @@ function slotDamage(args: {
   return { defaults, spread, targets: Object.fromEntries(targetEntries) };
 }
 
+/** The active slots as the calc sees them once the armed Tera toggles take effect. */
+function withTera(slots: (SimPokemonInfo | null)[], tera: (string | null)[] | undefined): (SimPokemonInfo | null)[] {
+  if (!tera?.some(Boolean)) return slots;
+  return slots.map((info, slot) => {
+    const teraType = tera[slot];
+    return info && teraType ? { ...info, teraType } : info;
+  });
+}
+
 /** The damage preview for both sides — the pure core of the picker's preview effect. */
 export function computePreviewDamage(inputs: DamagePreviewInputs, calc: CalcSingleDamageRange): { p1: SideDamage; p2: SideDamage } {
-  const { p1ActiveSlots, p2ActiveSlots, p1MovesBySlot, p2MovesBySlot, fieldState, gen } = inputs;
+  const { p1MovesBySlot, p2MovesBySlot, fieldState, gen } = inputs;
+  const p1ActiveSlots = withTera(inputs.p1ActiveSlots, inputs.teraBySlot?.p1);
+  const p2ActiveSlots = withTera(inputs.p2ActiveSlots, inputs.teraBySlot?.p2);
   const gameType = p1ActiveSlots.length > 1 || p2ActiveSlots.length > 1 ? 'Doubles' as const : 'Singles' as const;
   const contextFor = (attacker: 'p1' | 'p2') => ({
     gameType,
