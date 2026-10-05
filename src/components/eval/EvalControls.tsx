@@ -21,7 +21,7 @@ function DepthSelect({ prefs, onPrefsChange, running }: PrefsProps) {
           else onPrefsChange({ ...prefs, mode: 'matrix', depth: parseInt(value, 10) as EvalPreferences['depth'] });
         }}
         disabled={running}
-        title="Auto runs the MCTS tree on every turn: four trees of 600 iterations each, the measured-best line configuration."
+        title="Auto picks the engine per turn. Singles: the depth-1 matrix with three samples until a quarter of all Pokémon have fainted, then the MCTS tree. Doubles: the MCTS tree on every turn. The MCTS search runs four trees of 600 iterations each."
       >
         <option value="1">1</option>
         <option value="2">2</option>

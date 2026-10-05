@@ -36,6 +36,8 @@ describe('EvalControls', () => {
 
     rerender(<EvalControls {...wired} prefs={{ ...prefs, mode: 'auto' }} />);
     expect(select('Depth')).toHaveValue('auto');
+    // Round 63 (T110): the help text names the routing per game type.
+    expect(select('Depth')).toHaveAttribute('title', expect.stringMatching(/^Auto picks the engine per turn\. Singles: .+\. Doubles: the MCTS tree on every turn\./));
     expect(screen.queryByText('Samples')).toBeNull();
     rerender(<EvalControls {...wired} prefs={{ ...prefs, depth: 2 }} />);
     expect(select('Depth')).toHaveValue('2');
