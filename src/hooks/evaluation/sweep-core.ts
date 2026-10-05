@@ -31,7 +31,8 @@ const TURN_LANES = lanesForPool(evalPoolSize());
  * Resolve 'auto' to this turn's concrete engine BEFORE any cache or
  * store-key work — stored results only ever carry concrete modes.
  * The fainted fraction comes from the same serialized position the
- * engine will evaluate (the app-side mirror of the harness rule).
+ * engine will evaluate (the app-side mirror of the harness rule), the
+ * game type from the sweep (a cached fraction skips the position).
  */
 async function resolveTurnEngine(
   env: SweepEnv, turn: number, settings: SweepSettings,
@@ -52,7 +53,7 @@ async function resolveTurnEngine(
       if (aborted(env)) return 'abort';
       env.data.faintedFractions[turn - 1] = fraction;
     }
-    ({ depth, samples, mode } = resolveAutoTurnSettings(fraction));
+    ({ depth, samples, mode } = resolveAutoTurnSettings(fraction, env.params.doubles));
   }
   return { depth, samples, mode, ...(settings.prove === false ? { prove: false } : {}) };
 }
@@ -227,7 +228,7 @@ async function evalTurn(
   // Monotone merge: the graph already holds a deeper result for this
   // turn (an explicit deepen, a deeper prior sweep) — every stored
   // field stands and this pass skips the turn entirely.
-  if (!supersedesStored(env.data.turnSettings[turn - 1], { depth, samples, mode }, env.configuredMode, env.data.faintedFractions[turn - 1])) {
+  if (!supersedesStored(env.data.turnSettings[turn - 1], { depth, samples, mode }, env.configuredMode, env.data.faintedFractions[turn - 1], env.params.doubles)) {
     finishTurn();
     return true;
   }

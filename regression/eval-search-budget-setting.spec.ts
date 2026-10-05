@@ -32,21 +32,26 @@ test('cache keys: unchanged at the default, tagged under a form', () => {
   expect(plain.startsWith('v56|')).toBe(true);
   expect(prefix).toBe('v56|r:');
   configureSearchBudget({ ...SEARCH_BUDGET_DEFAULT, trees: 8 });
-  expect(evalStoreKey('r:1:x', 1, 1, 'matrix', true)).toBe(plain.replace(/^v56\|/, 'v56~t8-i600-d1-s1-f0|'));
-  expect(evalStorePrefix('r')).toBe('v56~t8-i600-d1-s1-f0|r:');
+  expect(evalStoreKey('r:1:x', 1, 1, 'matrix', true)).toBe(plain.replace(/^v56\|/, 'v56~t8-i600-s1.1.0-d1.1.0-l1.1|'));
+  expect(evalStorePrefix('r')).toBe('v56~t8-i600-s1.1.0-d1.1.0-l1.1|r:');
 });
 
-test('the team-preview lead stays on the early matrix under auto, whatever the tree threshold', () => {
-  // Round 61 review: the bank never samples turn 0, so the lead keeps the early matrix until a measurement moves it.
+test('the team-preview lead keeps its own matrix under auto, whatever the tree thresholds and early splits', () => {
+  // Round 61 review: the bank never samples turn 0, so the lead keeps the matrix until a measurement moves it;
+  // round 63 (T110): its own budget field, apart from the early splits of both game types.
   expect(resolveAutoLeadSettings()).toEqual({ depth: 1, samples: 1, mode: 'matrix' });
-  configureSearchBudget({ ...SEARCH_BUDGET_DEFAULT, earlyDepth: 2, earlySamples: 3 });
+  const early = { earlyDepth: 2, earlySamples: 3, treeFrom: 0.25 } as const;
+  configureSearchBudget({ ...SEARCH_BUDGET_DEFAULT, singles: early, doubles: early });
+  expect(resolveAutoLeadSettings()).toEqual({ depth: 1, samples: 1, mode: 'matrix' });
+  configureSearchBudget({ ...SEARCH_BUDGET_DEFAULT, lead: { depth: 2, samples: 3 } });
   expect(resolveAutoLeadSettings()).toEqual({ depth: 2, samples: 3, mode: 'matrix' });
 });
 
-test('the app resolves auto through the budget', () => {
-  // Round 61 default: the tree from the first turn.
-  expect(resolveAutoTurnSettings(0)).toEqual({ depth: 1, samples: 1, mode: 'mcts' });
-  configureSearchBudget({ ...SEARCH_BUDGET_DEFAULT, treeFrom: 0.25, earlyDepth: 2 });
-  expect(resolveAutoTurnSettings(0.1)).toEqual({ depth: 2, samples: 1, mode: 'matrix' });
-  expect(resolveAutoTurnSettings(0.5)).toEqual({ depth: 1, samples: 1, mode: 'mcts' });
+test('the app resolves auto through the budget, per game type', () => {
+  // Doubles default: the tree from the first turn.
+  expect(resolveAutoTurnSettings(0, true)).toEqual({ depth: 1, samples: 1, mode: 'mcts' });
+  configureSearchBudget({ ...SEARCH_BUDGET_DEFAULT, singles: { earlyDepth: 2, earlySamples: 1, treeFrom: 0.25 } });
+  expect(resolveAutoTurnSettings(0.1, false)).toEqual({ depth: 2, samples: 1, mode: 'matrix' });
+  expect(resolveAutoTurnSettings(0.5, false)).toEqual({ depth: 1, samples: 1, mode: 'mcts' });
+  expect(resolveAutoTurnSettings(0.1, true)).toEqual({ depth: 1, samples: 1, mode: 'mcts' });
 });

@@ -1,6 +1,6 @@
-import { describe, expect, test, vi } from 'vitest';
+import { describe, expect, onTestFinished, test, vi } from 'vitest';
 import { act, renderHook } from '@testing-library/react';
-import type { EvalResult } from '@fulllifegames/eval-engine';
+import { configureSearchBudget, parseSearchBudget, type EvalResult } from '@fulllifegames/eval-engine';
 import { useEvalView, type EvalViewInputs } from '../../src/hooks/useEvalView';
 import type { useEvaluation } from '../../src/hooks/useEvaluation';
 import type { TeamBuildSources } from '../../src/lib/eval-acquire';
@@ -131,6 +131,28 @@ describe('useEvalView', () => {
     const auto = evaluationOf({ graph, prefs: { mode: 'auto' } }).evaluation;
     const autoTarget = renderHook(() => useEvalView(inputs(auto, { analysisTurn: 6 }))).result.current.thinkDeeperTarget;
     expect(autoTarget).toEqual({ mode: 'auto' });
+  });
+
+  test("auto resolves by the replay's game type: both sweeps carry it and the deepening target follows it", () => {
+    configureSearchBudget(parseSearchBudget('singles-tree-from=0.25'));
+    onTestFinished(() => configureSearchBudget(null));
+    const tree = { depth: 1, samples: 1, mode: 'mcts' } as const;
+    const graph = evalGraph('singles', {
+      settings: [tree, null, null, null, null, null, null, null, null, null],
+      faintedFractions: [0.1, null, null, null, null, null, null, null, null, null],
+    });
+    const { evaluation, spies } = evaluationOf({ graph, prefs: { mode: 'auto' } });
+    const singles = renderHook(() => useEvalView(inputs(evaluation, { analysisTurn: 1 })));
+    act(() => singles.result.current.handleAnalyzeGame());
+    act(() => singles.result.current.analyzeTurnNow(1));
+    const doubles = renderHook(() => useEvalView(inputs(evaluation, { analysisTurn: 1, replayGameType: 'doubles', evalIsDoubles: true })));
+    act(() => doubles.result.current.handleAnalyzeGame());
+    act(() => doubles.result.current.analyzeTurnNow(1));
+    expect(spies.runGraphSweep.mock.calls.map(call => (call[0] as { doubles: boolean }).doubles)).toEqual([false, false, true, true]);
+    // A stored tree result on an early turn: singles configure the matrix there, so the deepening target is the
+    // matrix; doubles configure the tree, which is settled and offers no rung.
+    expect(singles.result.current.thinkDeeperTarget).toEqual({ depth: 1, samples: 1, mode: 'matrix' });
+    expect(doubles.result.current.thinkDeeperTarget).toBeNull();
   });
 
   test('the analyzed result follows the selected turn in replay view and the live result on the sim', () => {

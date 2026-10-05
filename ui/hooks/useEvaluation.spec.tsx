@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, onTestFinished, test, vi } from 'vitest';
 import { act, renderHook, waitFor } from '@testing-library/react';
-import { AUTO_MCTS_FAINTED_FRACTION, configureSearchBudget, SEARCH_BUDGET_DEFAULT, type EvalResult, type EvalSettings, type SearchProgress } from '@fulllifegames/eval-engine';
+import { AUTO_MCTS_FAINTED_FRACTION, configureSearchBudget, parseSearchBudget, type EvalResult, type EvalSettings, type SearchProgress } from '@fulllifegames/eval-engine';
 import { evalResult } from '../fixtures/eval-result';
 
 // The evaluation surface over a scripted worker pool client: the hook's
@@ -34,6 +34,7 @@ const PREFS_KEY = 'ps-replay-interceptor:eval-prefs';
 const position = (fainted: number, total = 6) => JSON.stringify({
   sides: [{ pokemon: Array.from({ length: total }, (_, i) => ({ hp: i < fainted ? 0 : 100, fainted: i < fainted })) }],
 });
+const doublesPosition = (fainted: number, total = 6) => JSON.stringify({ gameType: 'doubles', ...JSON.parse(position(fainted, total)) });
 const scoreOf = (serialized: string) => (JSON.parse(serialized) as { sides: { pokemon: { hp: number }[] }[] }).sides[0].pokemon.filter(p => p.hp === 0).length / 10;
 
 beforeEach(() => {
@@ -107,7 +108,7 @@ describe('useEvaluation single position', () => {
 
   test('auto mode reads the fainted fraction off the acquired position and routes to the tree once bodies fell', async () => {
     // The threshold before round 61; the default now runs the tree from the first turn (next test).
-    configureSearchBudget({ ...SEARCH_BUDGET_DEFAULT, treeFrom: AUTO_MCTS_FAINTED_FRACTION });
+    configureSearchBudget(parseSearchBudget(`tree-from=${AUTO_MCTS_FAINTED_FRACTION},early-samples=1`));
     onTestFinished(() => configureSearchBudget(null));
     const { result } = renderHook(() => useEvaluation());
     act(() => result.current.setPrefs({ ...matrixPrefs, mode: 'auto' }));
@@ -116,6 +117,20 @@ describe('useEvaluation single position', () => {
     expect(script.calls[0].settings.mode).toBe('matrix');
 
     act(() => result.current.evaluate({ cacheKey: null, tera: false, acquire: async () => position(4), tag: 'b' }));
+    await waitFor(() => expect(script.calls).toHaveLength(2));
+    expect(script.calls[1].settings.mode).toBe('mcts');
+  });
+
+  test('auto reads the game type off the acquired position: each game type follows its own split', async () => {
+    configureSearchBudget(parseSearchBudget('singles-tree-from=0.25,singles-early-samples=3'));
+    onTestFinished(() => configureSearchBudget(null));
+    const { result } = renderHook(() => useEvaluation());
+    act(() => result.current.setPrefs({ ...matrixPrefs, mode: 'auto' }));
+    act(() => result.current.evaluate({ cacheKey: null, tera: false, acquire: async () => position(0), tag: 'singles' }));
+    await waitFor(() => expect(result.current.status).toBe('done'));
+    expect(script.calls[0].settings).toMatchObject({ depth: 1, samples: 3, mode: 'matrix' });
+
+    act(() => result.current.evaluate({ cacheKey: null, tera: false, acquire: async () => doublesPosition(0), tag: 'doubles' }));
     await waitFor(() => expect(script.calls).toHaveLength(2));
     expect(script.calls[1].settings.mode).toBe('mcts');
   });
@@ -245,5 +260,26 @@ describe('useEvaluation whole-game sweep', () => {
     expect(acquireAll).toHaveBeenCalledTimes(1);
     expect(result.current.graph.scores).toEqual([0, 0.1, null]);
     expect(result.current.graph.notice).toMatch(/reached the game's end one turn early/);
+  });
+
+  test("an auto sweep resolves every turn by the replay's game type", async () => {
+    configureSearchBudget(parseSearchBudget('singles-tree-from=0.25'));
+    onTestFinished(() => configureSearchBudget(null));
+    const tree = { depth: 1, samples: 1, mode: 'mcts' };
+    const matrix = { depth: 1, samples: 1, mode: 'matrix' };
+    const sweepOf = async (doubles: boolean) => {
+      const { result } = renderHook(() => useEvaluation());
+      act(() => result.current.setPrefs({ ...matrixPrefs, mode: 'auto' }));
+      act(() => result.current.runGraphSweep({ ...sweepParams(turn => async () => position(turn - 1)), doubles }));
+      await waitFor(() => expect(result.current.graph.running).toBe(true));
+      await waitFor(() => expect(result.current.graph.running).toBe(false), { timeout: 10_000 });
+      return result.current.graph;
+    };
+    // Singles: zero and one of six bodies down sit below the singles threshold, two of six above it.
+    const singles = await sweepOf(false);
+    expect(singles.settings).toEqual([matrix, matrix, tree]);
+    expect(singles.faintedFractions).toEqual([0, 1 / 6, 2 / 6]);
+    // Doubles keep the tree from the first turn under the same form.
+    expect((await sweepOf(true)).settings).toEqual([tree, tree, tree]);
   });
 });

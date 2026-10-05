@@ -1,7 +1,7 @@
-import { describe, expect, test, vi } from 'vitest';
+import { describe, expect, onTestFinished, test, vi } from 'vitest';
 import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import type { EvalPreferences } from '@fulllifegames/eval-engine';
+import { configureSearchBudget, parseSearchBudget, type EvalPreferences } from '@fulllifegames/eval-engine';
 import { GameGraphSection, type GameGraphSectionProps } from '../../../src/components/eval/GameGraphSection';
 import { evalGraph, evalResult, gameReport } from '../../fixtures/eval-result';
 import { leadAnalysis, turnAnalysis } from '../../fixtures/analysis';
@@ -49,6 +49,16 @@ describe('GameGraphSection', () => {
     expect(analyze).toBeDisabled();
     expect(analyze).toHaveAttribute('title', expect.stringMatching(/^Waiting for Smogon data/));
     expect(screen.getByText(/^line:/)).toHaveTextContent('then MCTS everywhere');
+  });
+
+  test('the auto line hint follows the game type (round 63, T110)', () => {
+    configureSearchBudget(parseSearchBudget('singles-tree-from=0.25'));
+    onTestFinished(() => configureSearchBudget(null));
+    const auto = { ...prefs, mode: 'auto' as const };
+    const { rerender } = render(<GameGraphSection {...props({ prefs: auto })} />);
+    expect(screen.getByText(/^line:/)).toHaveTextContent('line: fast scan, then auto (matrix early, MCTS late) everywhere · deeper: per turn');
+    rerender(<GameGraphSection {...props({ prefs: auto, doubles: true })} />);
+    expect(screen.getByText(/^line:/)).toHaveTextContent('line: fast scan, then auto (MCTS every turn) everywhere');
   });
 
   test('the notice, the gap-turn reason with its escalation control, and the variation-only hint explain partial lines', () => {

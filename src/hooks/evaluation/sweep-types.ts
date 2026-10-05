@@ -41,6 +41,8 @@ export interface GraphSweepParams {
   tera: TeraAllowance;
   /** Sleep Clause enforced for this replay (resolved from the branch format). */
   sleepClause?: boolean;
+  /** The replay's game type: auto resolves each turn per game type (round 63, T110). */
+  doubles: boolean;
   cacheKeyFor(turn: number): string;
   acquireFor(turn: number): (report: (turn: number, target: number) => void) => Promise<string>;
   /**

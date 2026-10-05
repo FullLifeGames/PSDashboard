@@ -135,6 +135,7 @@ function useSweepRuns(inputs: EvalViewInputs, format: EvalFormat) {
       turns: analyzableTurns,
       tera: effectiveTera,
       sleepClause: effectiveSleepClause,
+      doubles: evalIsDoubles,
       cacheKeyFor: turn => `${replayData.id}:${turn}:${setsFingerprint}`,
       storePrefix: evalStorePrefix(replayData.id),
       acquireFor: acquire.makeReplayAcquire,
@@ -147,7 +148,7 @@ function useSweepRuns(inputs: EvalViewInputs, format: EvalFormat) {
       playedLeads: parseLeadSpecies(replayData.log),
       sensitivityTargetsFor,
     });
-  }, [replayData, evaluation, analyzableTurns, effectiveTera, effectiveSleepClause, setsFingerprint, acquire, playedFor, sources, bringOnlyLists, sensitivityTargetsFor]);
+  }, [replayData, evaluation, analyzableTurns, effectiveTera, effectiveSleepClause, evalIsDoubles, setsFingerprint, acquire, playedFor, sources, bringOnlyLists, sensitivityTargetsFor]);
 
   // Explains ONE turn: a two-turn mini sweep (turn + its follow-up) so the
   // report can price the played outcome. Runs ONLY from the explicit deepen
@@ -160,6 +161,7 @@ function useSweepRuns(inputs: EvalViewInputs, format: EvalFormat) {
       to: Math.min(turn + 1, analyzableTurns),
       tera: effectiveTera,
       sleepClause: effectiveSleepClause,
+      doubles: evalIsDoubles,
       cacheKeyFor: sweepTurn => `${replayData.id}:${sweepTurn}:${setsFingerprint}`,
       storePrefix: evalStorePrefix(replayData.id),
       acquireFor: acquire.makeReplayAcquire,
@@ -167,7 +169,7 @@ function useSweepRuns(inputs: EvalViewInputs, format: EvalFormat) {
       sensitivityTargetsFor,
       settings,
     });
-  }, [replayData, evaluation, analyzableTurns, effectiveTera, effectiveSleepClause, setsFingerprint, acquire, playedFor, sensitivityTargetsFor]);
+  }, [replayData, evaluation, analyzableTurns, effectiveTera, effectiveSleepClause, evalIsDoubles, setsFingerprint, acquire, playedFor, sensitivityTargetsFor]);
 
   /**
    * "Always on": with the autoAnalyze pref set, Analyze game starts by
@@ -238,7 +240,7 @@ function useEvalHousekeeping(inputs: EvalViewInputs, format: EvalFormat, handleE
 
 /** The analyzed-turn result surface and the explicit deepening ladder. */
 function useThinkDeeper(inputs: EvalViewInputs, analyzeTurnNow: (turn: number, settings?: TurnEvalSettings) => void) {
-  const { evaluation, liveEvalView, analysisTurn } = inputs;
+  const { evaluation, liveEvalView, analysisTurn, evalIsDoubles } = inputs;
   // ONE place for everything: in replay view the advantage bar, ranked
   // lists, and matrix render from the ANALYZED turn's cached sweep result
   // (turn 0 = the lead decision) — the branch view keeps its live result.
@@ -256,8 +258,8 @@ function useThinkDeeper(inputs: EvalViewInputs, analyzeTurnNow: (turn: number, s
   // The explicit deepening ladder: a sketch (or gap) first rises to the
   // configured settings, then one depth further (cap 3).
   const thinkDeeperTarget = useMemo(
-    () => resolveThinkDeeperTarget(liveEvalView, analysisTurn, evaluation.graph, evaluation.prefs),
-    [liveEvalView, analysisTurn, evaluation.graph, evaluation.prefs],
+    () => resolveThinkDeeperTarget(liveEvalView, analysisTurn, evaluation.graph, evaluation.prefs, evalIsDoubles),
+    [liveEvalView, analysisTurn, evaluation.graph, evaluation.prefs, evalIsDoubles],
   );
   const handleThinkDeeper = useCallback(() => {
     if (analysisTurn === null || analysisTurn < 1 || !thinkDeeperTarget) return;
@@ -273,15 +275,16 @@ function resolveThinkDeeperTarget(
   analysisTurn: number | null,
   graph: Evaluation['graph'],
   prefs: Evaluation['prefs'],
+  doubles: boolean,
 ): TurnEvalSettings | { mode: 'auto' } | null {
   if (liveEvalView || analysisTurn === null || analysisTurn < 1) return null;
   const stored = graph.settings[analysisTurn - 1] ?? null;
   const fraction = graph.faintedFractions[analysisTurn - 1] ?? null;
-  if (!stored || needsSettingsUpgrade(stored, prefs, fraction)) {
+  if (!stored || needsSettingsUpgrade(stored, prefs, fraction, doubles)) {
     if (prefs.mode === 'auto') {
       // Rise to the turn's auto-resolved engine; a gap turn's routing
       // signal is unknown until swept — the sweep resolves it itself.
-      return fraction !== null ? resolveAutoTurnSettings(fraction) : { mode: 'auto' };
+      return fraction !== null ? resolveAutoTurnSettings(fraction, doubles) : { mode: 'auto' };
     }
     return { depth: prefs.depth, samples: prefs.samples, mode: prefs.mode };
   }

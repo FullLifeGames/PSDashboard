@@ -132,13 +132,20 @@ describe('graph merge monotonicity', () => {
 });
 
 describe('auto mode resolution', () => {
-  test('auto runs the tree from the first turn (round 61); the threshold before it stays reachable through the budget', () => {
-    expect(resolveAutoTurnSettings(0)).toEqual({ depth: 1, samples: 1, mode: 'mcts' });
-    expect(resolveAutoTurnSettings(1)).toEqual({ depth: 1, samples: 1, mode: 'mcts' });
-    configureSearchBudget({ ...SEARCH_BUDGET_DEFAULT, treeFrom: AUTO_MCTS_FAINTED_FRACTION });
+  // The search before round 61 for both game types (round 63: auto splits per game type).
+  const before61 = { earlyDepth: 1, earlySamples: 1, treeFrom: AUTO_MCTS_FAINTED_FRACTION } as const;
+  const budgetBefore61 = { ...SEARCH_BUDGET_DEFAULT, singles: before61, doubles: before61 };
+
+  test('auto runs the tree from the first turn in doubles (round 61); the threshold before it stays reachable through the budget', () => {
+    expect(resolveAutoTurnSettings(0, true)).toEqual({ depth: 1, samples: 1, mode: 'mcts' });
+    expect(resolveAutoTurnSettings(1, true)).toEqual({ depth: 1, samples: 1, mode: 'mcts' });
+    expect(resolveAutoTurnSettings(1, false)).toEqual({ depth: 1, samples: 1, mode: 'mcts' });
+    configureSearchBudget(budgetBefore61);
     try {
-      expect(resolveAutoTurnSettings(AUTO_MCTS_FAINTED_FRACTION - 0.001)).toEqual({ depth: 1, samples: 1, mode: 'matrix' });
-      expect(resolveAutoTurnSettings(AUTO_MCTS_FAINTED_FRACTION)).toEqual({ depth: 1, samples: 1, mode: 'mcts' });
+      for (const doubles of [false, true]) {
+        expect(resolveAutoTurnSettings(AUTO_MCTS_FAINTED_FRACTION - 0.001, doubles)).toEqual({ depth: 1, samples: 1, mode: 'matrix' });
+        expect(resolveAutoTurnSettings(AUTO_MCTS_FAINTED_FRACTION, doubles)).toEqual({ depth: 1, samples: 1, mode: 'mcts' });
+      }
     } finally {
       configureSearchBudget(null);
     }
@@ -158,10 +165,10 @@ describe('auto mode resolution', () => {
   test('supersedes resolves auto per turn: the fast sketch never downgrades a resolved-MCTS turn', () => {
     const mctsStored = { depth: 1, samples: 1, mode: 'mcts' } as const;
     const fastIncoming = { depth: 1, samples: 1, mode: 'matrix' } as const;
-    // Round 61 default (tree from the first turn): an early turn's target is MCTS too.
-    expect(supersedesStored(mctsStored, fastIncoming, 'auto', 0.1)).toBe(false);
+    // Doubles default (tree from the first turn): an early turn's target is MCTS too.
+    expect(supersedesStored(mctsStored, fastIncoming, 'auto', 0.1, true)).toBe(false);
     // The resolution logic below, under the threshold before round 61.
-    configureSearchBudget({ ...SEARCH_BUDGET_DEFAULT, treeFrom: AUTO_MCTS_FAINTED_FRACTION });
+    configureSearchBudget(budgetBefore61);
     onTestFinished(() => configureSearchBudget(null));
     // Late turn (fraction at/above the threshold): auto's target is MCTS — keep it.
     expect(supersedesStored(mctsStored, fastIncoming, 'auto', 0.5)).toBe(false);
@@ -176,10 +183,10 @@ describe('auto mode resolution', () => {
 
   test('needsSettingsUpgrade under auto prefs follows the turn resolution', () => {
     const prefs = { depth: 2, samples: 3, mode: 'auto', auto: false, tera: 'auto' } as const;
-    // Round 61 default (tree from the first turn): an early turn holding the d1s1 matrix upgrades to the tree.
-    expect(needsSettingsUpgrade({ depth: 1, samples: 1, mode: 'matrix' }, prefs, 0.1)).toBe(true);
+    // Doubles default (tree from the first turn): an early turn holding the d1s1 matrix upgrades to the tree.
+    expect(needsSettingsUpgrade({ depth: 1, samples: 1, mode: 'matrix' }, prefs, 0.1, true)).toBe(true);
     // The resolution logic below, under the threshold before round 61.
-    configureSearchBudget({ ...SEARCH_BUDGET_DEFAULT, treeFrom: AUTO_MCTS_FAINTED_FRACTION });
+    configureSearchBudget(budgetBefore61);
     onTestFinished(() => configureSearchBudget(null));
     // Early turn already holding the pinned d1s1 matrix: settled (depth
     // prefs apply to the explicit matrix modes, not to auto).

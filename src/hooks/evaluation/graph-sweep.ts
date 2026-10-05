@@ -234,8 +234,9 @@ async function evaluateLead(
   paintFinal: (running: boolean) => void,
 ): Promise<boolean> {
   if (!(env.params.acquirePreview && env.data.lead === null && env.runRef.current === env.runId)) return true;
-  // Round 61: under auto the lead keeps the budget's early matrix even though
-  // the turns run the tree from the first one (resolveAutoLeadSettings).
+  // Round 61: under auto the lead keeps the matrix whatever the turns run;
+  // round 63: the budget's own lead matrix, apart from the early splits
+  // (resolveAutoLeadSettings).
   const { depth, samples, mode } = sweep;
   const lead0 = mode === 'auto' ? resolveAutoLeadSettings() : { depth, samples, mode };
   const leadSettings: EvalSettings = { ...lead0, tera: env.params.tera, sleepClause: env.params.sleepClause };

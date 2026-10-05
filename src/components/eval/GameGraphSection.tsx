@@ -50,9 +50,10 @@ function GraphHeader({ onAnalyzeGame, graph, onCancel, running, smogonPending, h
   );
 }
 
-function LineHint({ prefs }: { prefs: EvalPreferences }) {
-  // Round 61: auto reads the search budget; by default it runs the tree on every turn, and tree turns offer no deeper rung.
-  const autoTreeEverywhere = autoTurnSettings(0).mode === 'mcts';
+function LineHint({ prefs, doubles }: { prefs: EvalPreferences; doubles?: boolean }) {
+  // Round 61: auto reads the search budget, and tree turns offer no deeper rung. Round 63 (T110): per game type;
+  // by default doubles run the tree on every turn, singles the matrix until a quarter of all bodies fell.
+  const autoTreeEverywhere = autoTurnSettings(0, !!doubles).mode === 'mcts';
   const deeper = prefs.mode === 'matrix' || (prefs.mode === 'auto' && !autoTreeEverywhere);
   return (
     <div
@@ -127,18 +128,20 @@ export interface GameGraphSectionProps extends TurnViewProps {
   variation?: { startTurn: number; scores: (number | null)[] } | null;
   graphMaxTurn?: number;
   showReportView: boolean;
+  /** Doubles replay — auto routes per game type (EvalPanel passes its own prop through). */
+  doubles?: boolean;
 }
 
 /** The game graph with its controls, the report overview, or the selected turn's view. */
 export function GameGraphSection(props: GameGraphSectionProps) {
   const {
     onAnalyzeGame, onCancel, running, smogonPending, hasGraph, prefs, graph, playerNames, currentTurn, currentLine,
-    selectTurn, reportLeads, variation, graphMaxTurn, showReportView, report, analysis,
+    selectTurn, reportLeads, variation, graphMaxTurn, showReportView, report, analysis, doubles,
   } = props;
   return (
     <div style={{ margin: '6px 0' }}>
       <GraphHeader onAnalyzeGame={onAnalyzeGame} graph={graph} onCancel={onCancel} running={running} smogonPending={smogonPending} hasGraph={hasGraph} />
-      <LineHint prefs={prefs} />
+      <LineHint prefs={prefs} doubles={doubles} />
       {/* A short or missing line says why — an unexplained blank graph
           reads as a broken app rather than a diverged reconstruction. */}
       {graph.notice && (

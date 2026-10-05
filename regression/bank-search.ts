@@ -23,11 +23,15 @@ export interface BankSearchInput {
   settings: Omit<EvalSettings, 'depth' | 'samples' | 'mode'>;
 }
 
+/** The position's game type, as the app sweep reads it off the replay (the simulator serializes gameType). */
+const isDoubles = (serialized: string) => (JSON.parse(serialized) as { gameType?: string }).gameType === 'doubles';
+
 export function bankSearch(input: BankSearchInput): Promise<EvalResult> {
   const { serialized, faintedFraction, mode, settings } = input;
   // Round 61: auto reads the search budget (early depth and draws, tree threshold); the depth and draw levers apply outside auto.
+  // Round 63 (T110): per game type.
   const resolved = mode === 'auto'
-    ? autoTurnSettings(faintedFraction)
+    ? autoTurnSettings(faintedFraction, isDoubles(serialized))
     : { depth: input.depth, samples: input.samples, mode: mode === 'mcts' ? 'mcts' as const : 'matrix' as const };
   if (resolved.mode === 'mcts') {
     return searchTreesOrchestrated(createLocalTreeExecutor(serialized), { ...settings, depth: 1, samples: 1, mode: 'mcts' });

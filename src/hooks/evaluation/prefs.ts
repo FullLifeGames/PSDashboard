@@ -2,10 +2,10 @@ import { useCallback, useRef, useState } from 'react';
 import { autoTurnSettings, searchBudget, type EvalPreferences, type EvalSettings } from '@fulllifegames/eval-engine';
 
 const PREFS_KEY = 'ps-replay-interceptor:eval-prefs';
-// Default line engine: 'auto' — the grid-tuned measured best (matrix d1s1
-// through the opening, the DUCT tree once AUTO_MCTS_FAINTED_FRACTION of all
-// bodies fell). depth/samples apply when the user picks an explicit matrix
-// mode; stored user prefs always win over this default.
+// Default line engine: 'auto' — the measured-best line per game type from
+// the search budget (search/budget.ts). depth/samples apply when the user
+// picks an explicit matrix mode; stored user prefs always win over this
+// default.
 const DEFAULT_PREFS: EvalPreferences = { depth: 2, samples: 3, mode: 'auto', auto: false, autoAnalyze: false, tera: 'auto' };
 
 function loadPrefs(): EvalPreferences {
@@ -64,30 +64,35 @@ export interface TurnEvalSettings {
 
 /**
  * Resolve the auto mode at one position: the VERIFIED line configuration
- * from the search budget (search/budget.ts). Since round 61 the default
- * runs the DUCT tree from the first turn; below the budget's tree
- * threshold auto runs the budget's early matrix. Auto is a complete engine
- * spec, independent of the depth prefs, which apply to the explicit matrix
- * modes only.
+ * from the search budget (search/budget.ts). Since round 63 (T110) each game
+ * type has its own split: below its tree threshold auto runs its early
+ * matrix, at or above it the DUCT tree. Auto is a complete engine spec,
+ * independent of the depth prefs, which apply to the explicit matrix modes
+ * only.
  */
-export function resolveAutoTurnSettings(faintedFraction: number): TurnEvalSettings {
-  return autoTurnSettings(faintedFraction);
+export function resolveAutoTurnSettings(faintedFraction: number, doubles: boolean): TurnEvalSettings {
+  return autoTurnSettings(faintedFraction, doubles);
 }
 
 /**
- * The team-preview lead under auto: the budget's early matrix, whatever the
- * tree threshold. Measured in round 61 on the 128 bank games with a team
- * preview (gen 5 on): the tree read doubles previews worse (hq +267 bp
- * [+20, +534]) and singles no differently (-9 bp, unresolved).
+ * The team-preview lead under auto: the budget's lead matrix in both game
+ * types, whatever the early splits. Measured in round 61 on the 128 bank
+ * games with a team preview (gen 5 on): the tree read doubles previews
+ * worse (hq +267 bp [+20, +534]) and singles no differently (-9 bp,
+ * unresolved).
  */
 export function resolveAutoLeadSettings(): TurnEvalSettings {
-  const { earlyDepth, earlySamples } = searchBudget();
-  return { depth: earlyDepth, samples: earlySamples, mode: 'matrix' };
+  const { depth, samples } = searchBudget().lead;
+  return { depth, samples, mode: 'matrix' };
 }
 
-/** Mirror of the engine's battleFaintedFraction on a serialized battle (sim-free for the UI chunk). */
-export function serializedFaintedFraction(serialized: string): number {
-  const battle = JSON.parse(serialized) as { sides?: { pokemon?: { hp?: number; fainted?: boolean }[] }[] };
+/**
+ * Auto's two routing signals on a serialized battle (sim-free for the UI
+ * chunk): the engine's battleFaintedFraction and the game type (a battle
+ * without one is singles, the simulator's default).
+ */
+export function serializedAutoRouting(serialized: string): { faintedFraction: number; doubles: boolean } {
+  const battle = JSON.parse(serialized) as { gameType?: string; sides?: { pokemon?: { hp?: number; fainted?: boolean }[] }[] };
   let fainted = 0;
   let total = 0;
   for (const side of battle.sides ?? []) {
@@ -96,20 +101,26 @@ export function serializedFaintedFraction(serialized: string): number {
       if (pokemon.fainted || (pokemon.hp ?? 0) <= 0) fainted += 1;
     }
   }
-  return total > 0 ? fainted / total : 0;
+  return { faintedFraction: total > 0 ? fainted / total : 0, doubles: battle.gameType === 'doubles' };
+}
+
+/** Mirror of the engine's battleFaintedFraction on a serialized battle. */
+export function serializedFaintedFraction(serialized: string): number {
+  return serializedAutoRouting(serialized).faintedFraction;
 }
 
 /**
  * The turn's configured target engine: 'auto' resolves through the
- * position's fainted fraction when known; null = unresolvable (auto prefs
- * but the fraction was never recorded for this turn — callers stay
- * conservative until a sweep resolves it).
+ * position's fainted fraction and the game type when the fraction is known;
+ * null = unresolvable (auto prefs but the fraction was never recorded for
+ * this turn — callers stay conservative until a sweep resolves it).
  */
 const configuredTarget = (
   mode: EvalPreferences['mode'],
   faintedFraction: number | null | undefined,
+  doubles: boolean,
 ): EngineMode | null =>
-  mode !== 'auto' ? mode : faintedFraction == null ? null : resolveAutoTurnSettings(faintedFraction).mode;
+  mode !== 'auto' ? mode : faintedFraction == null ? null : resolveAutoTurnSettings(faintedFraction, doubles).mode;
 
 /**
  * The stored result is SHALLOWER than the panel preferences — the turn can
@@ -119,21 +130,23 @@ const configuredTarget = (
  * depth ≥ 2 sitting on an MCTS-target turn (a think-deeper product stored
  * before round 32, when the ladder still crossed engines): settled, not
  * stale. Auto prefs resolve through the turn's
- * fainted fraction; with the fraction unknown the answer is conservative
- * (no upgrade claimed — the next sweep resolves it).
+ * fainted fraction and the game type (`doubles`, read by auto only); with
+ * the fraction unknown the answer is conservative (no upgrade claimed — the
+ * next sweep resolves it).
  */
 export function needsSettingsUpgrade(
   stored: TurnEvalSettings | null,
   prefs: EvalPreferences,
   faintedFraction?: number | null,
+  doubles = false,
 ): boolean {
   if (!stored) return true;
   const escalatedPastMcts = (target: EngineMode) =>
     target === 'mcts' && stored.mode === 'matrix' && stored.depth >= 2;
   if (prefs.mode === 'auto') {
-    const target = configuredTarget('auto', faintedFraction);
+    const target = configuredTarget('auto', faintedFraction, doubles);
     if (target === null) return false;
-    const resolved = resolveAutoTurnSettings(faintedFraction!);
+    const resolved = resolveAutoTurnSettings(faintedFraction!, doubles);
     if (stored.mode !== resolved.mode) return !escalatedPastMcts(resolved.mode);
     if (resolved.mode === 'mcts') return false;
     return stored.depth < resolved.depth || stored.samples < resolved.samples;
@@ -153,19 +166,21 @@ export function needsSettingsUpgrade(
  * outranks the d1s1-grade MCTS tier in BOTH directions: the think-deeper
  * click's d2s3 pass LANDS on a stored MCTS turn even though matrix is not
  * that turn's configured engine, and once stored it survives the next
- * MCTS-target sweep. Auto resolves per turn via the fainted fraction;
- * unresolvable cross-mode conflicts keep the stored result (fail closed).
+ * MCTS-target sweep. Auto resolves per turn via the fainted fraction and
+ * the game type (`doubles`, read by auto only); unresolvable cross-mode
+ * conflicts keep the stored result (fail closed).
  */
 export function supersedesStored(
   stored: TurnEvalSettings | null,
   incoming: TurnEvalSettings,
   configuredMode: EvalPreferences['mode'],
   faintedFraction?: number | null,
+  doubles = false,
 ): boolean {
   if (!stored) return true;
   if (stored.mode !== incoming.mode) {
     if (incoming.mode === 'matrix' && incoming.depth >= 2 && stored.mode === 'mcts') return true;
-    if (incoming.mode !== configuredTarget(configuredMode, faintedFraction)) return false;
+    if (incoming.mode !== configuredTarget(configuredMode, faintedFraction, doubles)) return false;
     return !(incoming.mode === 'mcts' && stored.mode === 'matrix' && stored.depth >= 2);
   }
   if (incoming.mode === 'mcts') return true;

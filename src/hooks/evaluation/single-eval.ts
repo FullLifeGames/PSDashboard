@@ -6,7 +6,7 @@ import {
 import { EvalWorkerClient } from '../../lib/eval/worker-client';
 import { throttleLatest } from '../../lib/eval/throttle-latest';
 import { evalStoreKey, loadStoredEval, saveStoredEval } from '../../lib/eval-cache-store';
-import { resolveAutoTurnSettings, serializedFaintedFraction, type EngineMode, type TurnEvalSettings } from './prefs';
+import { resolveAutoTurnSettings, serializedAutoRouting, type EngineMode, type TurnEvalSettings } from './prefs';
 
 export type EvalStatus = 'idle' | 'reconstructing' | 'searching' | 'done' | 'stale' | 'error';
 
@@ -77,13 +77,17 @@ async function resolveEngineAndStored(
 ): Promise<'aborted' | 'done' | { serialized: string | null; resolved: TurnEvalSettings }> {
   const { depth, samples, mode } = prefs;
   let serialized: string | null = null;
-  let resolved: TurnEvalSettings = mode === 'auto' ? resolveAutoTurnSettings(0) : { depth, samples, mode };
+  let resolved: TurnEvalSettings;
   if (mode === 'auto') {
     serialized = await params.acquire((turn, target) => {
       if (io.runRef.current === runId) io.setReconstructProgress({ turn, target });
     });
     if (io.runRef.current !== runId) return 'aborted';
-    resolved = resolveAutoTurnSettings(serializedFaintedFraction(serialized));
+    // Round 63 (T110): the position carries both routing signals, its fainted fraction and its game type.
+    const { faintedFraction, doubles } = serializedAutoRouting(serialized);
+    resolved = resolveAutoTurnSettings(faintedFraction, doubles);
+  } else {
+    resolved = { depth, samples, mode };
   }
   // Persistent cache: a result from a previous session for the same
   // position + settings skips reconstruction and search entirely.
