@@ -14,8 +14,24 @@ const EMPTY_STATE: SmogonUsageStatsState = {
   error: null,
 };
 
-export function useSmogonUsageStats(formatid: string | undefined): SmogonUsageStatsState {
+/**
+ * A new replay of the same format keeps `formatid`, so the load would never
+ * run again. After a failed load the next replay key (any value that changes
+ * per loaded replay) asks once more (T68); after a load that worked, or one
+ * still running, it changes nothing.
+ */
+function useRetryAttempt(formatid: string | undefined, replayKey: unknown, state: SmogonUsageStatsState): number {
+  const [attempt, setAttempt] = useState({ replayKey, count: 0 });
+  if (attempt.replayKey !== replayKey) {
+    const failed = state.formatid === formatid && !!state.error;
+    setAttempt({ replayKey, count: failed ? attempt.count + 1 : attempt.count });
+  }
+  return attempt.count;
+}
+
+export function useSmogonUsageStats(formatid: string | undefined, replayKey?: unknown): SmogonUsageStatsState {
   const [state, setState] = useState<SmogonUsageStatsState>(EMPTY_STATE);
+  const attempt = useRetryAttempt(formatid, replayKey, state);
 
   useEffect(() => {
     if (!formatid) return;
@@ -50,7 +66,7 @@ export function useSmogonUsageStats(formatid: string | undefined): SmogonUsageSt
       active = false;
       controller.abort();
     };
-  }, [formatid]);
+  }, [formatid, attempt]);
 
   if (!formatid) return EMPTY_STATE;
   if (state.formatid !== formatid) return { formatid, stats: null, loading: true, error: null };

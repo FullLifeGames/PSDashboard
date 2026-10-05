@@ -89,6 +89,111 @@ describe('useSmogonUsageStats', () => {
     expect(result.current.error).toBe('No Smogon usage stats found for this format');
   });
 
+  test('a load cut short by a format change is not remembered: back on the format, the stats load', async () => {
+    // T68 scene: replay in format X, a replay in Y before X's stats arrive, then X again (VGC: doubles sets hang on it).
+    let firstAsk = true;
+    const fetchMock = vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      if (init?.signal?.aborted) return Promise.reject(new DOMException('signal is aborted without reason', 'AbortError'));
+      if (url.endsWith('/stats/gen9vgc2025.json')) {
+        if (!firstAsk) return Promise.resolve(json(statsFile({ Kyogre: { moves: { 'Water Spout': 0.9 } } })));
+        firstAsk = false;
+        return new Promise<Response>((_, reject) => init?.signal?.addEventListener('abort', () =>
+          reject(new DOMException('signal is aborted without reason', 'AbortError'))));
+      }
+      if (url.endsWith('/stats/gen2ou.json')) return Promise.resolve(json(statsFile({ Snorlax: { moves: { 'Body Slam': 0.9 } } })));
+      return Promise.resolve(missing());
+    });
+    vi.stubGlobal('fetch', fetchMock);
+    const { result, rerender } = renderHook((formatid: string) => useSmogonUsageStats(formatid), { initialProps: 'gen9vgc2025regh' });
+    await waitFor(() => expect(fetchMock).toHaveBeenCalled());
+    rerender('gen2ou');
+    await waitFor(() => expect(result.current.stats?.pokemon.snorlax).toBeDefined());
+    rerender('gen9vgc2025regh');
+    await waitFor(() => expect(result.current.loading).toBe(false));
+    expect(result.current.error).toBeNull();
+    expect(result.current.stats?.pokemon.kyogre.moves[0].value).toBe('Water Spout');
+  });
+
+  test('a network failure is not remembered: the next fetch of the format delivers', async () => {
+    let online = false;
+    vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL) => {
+      if (!online) throw new TypeError('Failed to fetch');
+      const url = String(input);
+      if (url.endsWith('/stats/gen1ou.json')) return json(statsFile({ Tauros: { moves: { 'Body Slam': 1 } } }));
+      if (url.endsWith('/stats/gen2ubers.json')) return json(statsFile({ Mewtwo: { moves: { Psychic: 1 } } }));
+      return missing();
+    }));
+    const { result, rerender } = renderHook((formatid: string) => useSmogonUsageStats(formatid), { initialProps: 'gen1ou' });
+    await waitFor(() => expect(result.current.loading).toBe(false));
+    expect(result.current.error).toBe('No Smogon usage stats found for this format');
+    online = true;
+    rerender('gen2ubers');
+    await waitFor(() => expect(result.current.stats?.pokemon.mewtwo).toBeDefined());
+    rerender('gen1ou');
+    await waitFor(() => expect(result.current.loading).toBe(false));
+    expect(result.current.error).toBeNull();
+    expect(result.current.stats?.pokemon.tauros).toBeDefined();
+  });
+
+  test('after a failure the next replay of the same format asks again', async () => {
+    // A second replay keeps the format, so only the replay key tells the hook a new load happened.
+    let online = false;
+    const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
+      if (!online) throw new TypeError('Failed to fetch');
+      return String(input).endsWith('/stats/gen3uu.json') ? json(statsFile({ Raichu: { moves: { Thunderbolt: 1 } } })) : missing();
+    });
+    vi.stubGlobal('fetch', fetchMock);
+    const { result, rerender } = renderHook(
+      ({ formatid, replay }: { formatid: string; replay: string }) => useSmogonUsageStats(formatid, replay),
+      { initialProps: { formatid: 'gen3uu', replay: 'gen3uu-1' } },
+    );
+    await waitFor(() => expect(result.current.loading).toBe(false));
+    expect(result.current.error).toBe('No Smogon usage stats found for this format');
+    online = true;
+    rerender({ formatid: 'gen3uu', replay: 'gen3uu-2' });
+    await waitFor(() => expect(result.current.stats?.pokemon.raichu).toBeDefined());
+    expect(result.current.error).toBeNull();
+  });
+
+  test('a next replay of a format that loaded, or is still loading, asks nothing new', async () => {
+    let release: () => void = () => {};
+    const gate = new Promise<void>(resolve => { release = resolve; });
+    const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
+      await gate;
+      return String(input).endsWith('/stats/gen3nu.json') ? json(statsFile({ Golem: { moves: { Earthquake: 1 } } })) : missing();
+    });
+    vi.stubGlobal('fetch', fetchMock);
+    const { result, rerender } = renderHook(
+      ({ formatid, replay }: { formatid: string; replay: string }) => useSmogonUsageStats(formatid, replay),
+      { initialProps: { formatid: 'gen3nu', replay: 'gen3nu-1' } },
+    );
+    await waitFor(() => expect(fetchMock).toHaveBeenCalled());
+    // Still loading: the second replay must not cut the running load short.
+    rerender({ formatid: 'gen3nu', replay: 'gen3nu-2' });
+    release();
+    await waitFor(() => expect(result.current.stats?.pokemon.golem).toBeDefined());
+    const calls = fetchMock.mock.calls.length;
+    rerender({ formatid: 'gen3nu', replay: 'gen3nu-3' });
+    expect(result.current.stats?.pokemon.golem).toBeDefined();
+    expect(fetchMock.mock.calls.length).toBe(calls);
+  });
+
+  test('a 404 from every source stays remembered', async () => {
+    const fetchMock = stubStats({ '/stats/gen2uu.json': statsFile({ Kingdra: { moves: { Surf: 1 } } }) });
+    const { result, rerender } = renderHook((formatid: string) => useSmogonUsageStats(formatid), { initialProps: 'gen7ubers' });
+    await waitFor(() => expect(result.current.loading).toBe(false));
+    expect(result.current.error).toBe('No Smogon usage stats found for this format');
+    const askedUbers = () => fetchMock.mock.calls.filter(call => String(call[0]).includes('/stats/gen7')).length;
+    const asked = askedUbers();
+    rerender('gen2uu');
+    await waitFor(() => expect(result.current.stats?.pokemon.kingdra).toBeDefined());
+    rerender('gen7ubers');
+    await waitFor(() => expect(result.current.loading).toBe(false));
+    expect(result.current.error).toBe('No Smogon usage stats found for this format');
+    expect(askedUbers()).toBe(asked);
+  });
+
   test('a format change reads as loading at once and lands on the new file', async () => {
     stubStats({
       '/stats/gen4ou.json': statsFile({ Heatran: { moves: { 'Magma Storm': 0.7 } } }),

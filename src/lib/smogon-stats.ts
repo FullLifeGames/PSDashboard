@@ -51,6 +51,49 @@ export function buildSmogonStatsUrls(
   }));
 }
 
+/**
+ * Fetches every candidate and merges per species: the format's own file
+ * wins, the generation's OU fills species it lacks. A niche format's stats
+ * file existing must not blank out guessing for a Pokémon that simply is not
+ * played there (e.g. Annihilape missing from doublesou). `answered` is false
+ * when a source failed for any reason but a 404 (network, server error): the
+ * stats are then what the reachable sources said, not the whole answer.
+ */
+async function fetchCandidates(
+  formatId: string | undefined,
+  fetcher: SmogonFetch,
+  signal: AbortSignal | undefined,
+): Promise<{ stats: SmogonUsageStats | null; answered: boolean }> {
+  const results: SmogonUsageStats[] = [];
+  let answered = true;
+  for (const candidate of buildSmogonStatsUrls(formatId)) {
+    try {
+      const response = await fetcher(candidate.url, { signal });
+      if (!response.ok) {
+        // A 404 is an answer (the file is absent); anything else may pass.
+        if (response.status !== 404) answered = false;
+        continue;
+      }
+      const payload = await response.json();
+      results.push(parseSmogonChaosStats(payload, {
+        format: candidate.format,
+        month: candidate.month,
+      }));
+    } catch (error) {
+      if (error instanceof DOMException && error.name === 'AbortError') throw error;
+      answered = false;
+    }
+  }
+  const [primary, ...fallbacks] = results;
+  if (!primary) return { stats: null, answered };
+  for (const fallback of fallbacks) {
+    for (const [id, entry] of Object.entries(fallback.pokemon)) {
+      primary.pokemon[id] ??= entry;
+    }
+  }
+  return { stats: primary, answered };
+}
+
 export async function fetchSmogonUsageStats(
   formatId: string | undefined,
   options?: { now?: Date; signal?: AbortSignal; fetcher?: typeof fetch },
@@ -61,35 +104,17 @@ export async function fetchSmogonUsageStats(
   if (cached) return cached;
 
   const fetcher = withSmogonFallback((options?.fetcher ?? fetch) as SmogonFetch);
-  const request = (async () => {
-    // Fetch every candidate and merge per species: the format's own file
-    // wins, the generation's OU fills species it lacks. A niche format's
-    // stats file existing must not blank out guessing for a Pokémon that
-    // simply is not played there (e.g. Annihilape missing from doublesou).
-    const results: SmogonUsageStats[] = [];
-    for (const candidate of buildSmogonStatsUrls(formatId)) {
-      try {
-        const response = await fetcher(candidate.url, { signal: options?.signal });
-        if (!response.ok) continue;
-        const payload = await response.json();
-        results.push(parseSmogonChaosStats(payload, {
-          format: candidate.format,
-          month: candidate.month,
-        }));
-      } catch (error) {
-        if (error instanceof DOMException && error.name === 'AbortError') throw error;
-      }
-    }
-    const [primary, ...fallbacks] = results;
-    if (!primary) return null;
-    for (const fallback of fallbacks) {
-      for (const [id, entry] of Object.entries(fallback.pokemon)) {
-        primary.pokemon[id] ??= entry;
-      }
-    }
-    return primary;
-  })();
-
+  const outcome = fetchCandidates(formatId, fetcher, options?.signal);
+  const request = outcome.then(result => result.stats);
   usageCache.set(cacheKey, request);
+  // Only an answer is remembered (T68): an abort, a network failure or a
+  // server error leaves the memo empty, so the next load asks again; a 404
+  // from every source stays (the format has no file).
+  const forget = () => {
+    if (usageCache.get(cacheKey) === request) usageCache.delete(cacheKey);
+  };
+  outcome.then(result => {
+    if (!result.answered) forget();
+  }, forget);
   return request;
 }
