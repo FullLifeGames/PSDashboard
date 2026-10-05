@@ -432,4 +432,12 @@ export interface AnalyzeTurnParams {
    * `announce` flips off.
    */
   decidedSeen?: ReadonlySet<string> | null;
+  /**
+   * Round 63 (T18): the fainted share of all bodies at turn start, the
+   * auto mode's phase measure. The near-decided sentence waits for
+   * AUTO_MCTS_FAINTED_FRACTION — on full teams a one-roll sweep is a
+   * threat, not a near-won game (649664 t3). Absent or null keeps the
+   * gate off.
+   */
+  faintedFraction?: number | null;
 }

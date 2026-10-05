@@ -13,6 +13,15 @@ export interface AnalysisGraphData {
   playedOutcome: (number | null)[];
   verified: Parameters<typeof analyzeTurn>[0]['verified'][];
   sensitivity: Parameters<typeof analyzeTurn>[0]['sensitivity'][];
+  /** The auto mode's per-turn phase (null where the sweep never resolved one). */
+  faintedFractions?: (number | null)[];
+}
+
+/** The fallen share of the bodies a pre-turn snapshot lists, null without a snapshot. */
+function snapshotFaintedFraction(snapshot: TurnSnapshot | undefined): number | null {
+  if (!snapshot) return null;
+  const bodies = [...snapshot.p1.pokemon, ...snapshot.p2.pokemon];
+  return bodies.length > 0 ? bodies.filter(pokemon => pokemon.fainted).length / bodies.length : null;
 }
 
 export interface TurnAnalysisContext {
@@ -62,6 +71,10 @@ export function analyzeTurnAt(args: {
     ...(args.tendencies ? { tendencies: args.tendencies } : {}),
     actives: context.activesForTurn(turn),
     playedHistory: context.playedHistory,
+    // Round 63 (T18): the turn's phase for the near sentence — the sweep's
+    // own measure first (it counts the bodies a VGC side brought), else the
+    // pre-turn snapshot (manual modes record no phase).
+    faintedFraction: graph.faintedFractions?.[turn - 1] ?? snapshotFaintedFraction(context.snapshots[turn - 1]),
     ...(args.unansweredSeen ? { unansweredSeen: args.unansweredSeen } : {}),
     ...(args.decidedSeen ? { decidedSeen: args.decidedSeen } : {}),
   });

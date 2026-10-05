@@ -1,3 +1,4 @@
+import { AUTO_MCTS_FAINTED_FRACTION } from '../types.ts';
 import {
   decidedSeenKey, forcedWinSeenKey, type AnalyzeTurnParams, type Side, type SideAnalysis,
 } from './types.ts';
@@ -24,6 +25,16 @@ function forcedWinSignal(params: AnalyzeTurnParams, key: Side): SideAnalysis['fo
   };
 }
 
+/**
+ * Round 63 (T18): the near stage speaks once a quarter of the bodies has
+ * fallen (the auto mode's phase line). Gated on announce, so the report
+ * walk speaks it at the first turn in phase; the state stays for the
+ * denied-early-end reading. An unknown share keeps the gate off.
+ */
+const nearInPhase = (params: AnalyzeTurnParams): boolean =>
+  params.faintedFraction === undefined || params.faintedFraction === null ||
+  params.faintedFraction >= AUTO_MCTS_FAINTED_FRACTION;
+
 export function decidedSignals(
   params: AnalyzeTurnParams,
   key: Side,
@@ -42,7 +53,7 @@ export function decidedSignals(
   if (ownNear && ownNear.side === key) {
     nearDecided = {
       species: ownNear.species, odds: ownNear.odds, removes: ownNear.removes,
-      announce: !params.decidedSeen?.has(
+      announce: nearInPhase(params) && !params.decidedSeen?.has(
         decidedSeenKey(key, { species: ownNear.species, removes: ownNear.removes })),
     };
   }

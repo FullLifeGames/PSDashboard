@@ -81,7 +81,9 @@ function decidedSentences(analysis: TurnAnalysis, playerNames: PlayerNames, deci
   }
   const nearDecided = analysis.p1.nearDecided ?? analysis.p2.nearDecided;
   if (nearDecided?.announce) {
-    sentences.push(`${nearDecided.species} is one ${Math.round(nearDecided.odds * 100)}% roll ` +
+    // Round 63 (T18): a click that cannot fail is no roll.
+    const odds = Math.round(nearDecided.odds * 100);
+    sentences.push(`${nearDecided.species} is one ${odds >= 100 ? 'sure KO' : `${odds}% roll`} ` +
       `from clearing the rest — removing ${nearDecided.removes} leaves no answer behind.`);
   }
   return sentences;
