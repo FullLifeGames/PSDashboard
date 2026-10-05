@@ -1,4 +1,4 @@
-import type { ActiveMove, Battle, ID, Pokemon } from '@pkmn/sim';
+import type { ActiveMove, Battle, BoostsTable, ID, Pokemon } from '@pkmn/sim';
 import { CONTEXT_MOVES, moveAtUse, RULE_ABILITIES, RULE_MOVES, type ItemLike, type MoveAtUse, type MoveField, type MoveUser } from '../move-use.ts';
 
 /**
@@ -102,9 +102,13 @@ export function fieldFacts(pokemon: Pokemon, battle: Battle): MoveField {
  * class against the simulator:
  *  - memo: the answer reads only what pairKey keys (item, forme, happiness);
  *  - live: it reads HP, status, the field, speed or weight, so landedKey keys
- *    the answer itself.
+ *    the answer itself;
+ *  - stages: it reads the boost stages, which stay outside the memo key, so
+ *    the memo prices it at the power of no boosts and boostedFraction asks
+ *    the power on the stages of the moment (stagedPower; decision 3 of the
+ *    round-63 wave spec).
  */
-export const POWER_MOVES: ReadonlyMap<string, 'memo' | 'live'> = new Map([
+export const POWER_MOVES: ReadonlyMap<string, 'memo' | 'live' | 'stages'> = new Map([
   ...['knockoff', 'acrobatics', 'return', 'frustration', 'pikapapow', 'veeveevolley', 'watershuriken']
     .map(id => [id, 'memo'] as const),
   ...['lowkick', 'grassknot', 'heavyslam', 'heatcrash', 'flail', 'reversal', 'eruption', 'waterspout', 'dragonenergy',
@@ -112,6 +116,7 @@ export const POWER_MOVES: ReadonlyMap<string, 'memo' | 'live'> = new Map([
     'barbbarrage', 'infernalparade', 'wakeupslap', 'smellingsalts', 'solarbeam', 'solarblade', 'expandingforce',
     'psyblade', 'mistyexplosion', 'gravapple', 'collisioncourse', 'electrodrift', 'endeavor']
     .map(id => [id, 'live'] as const),
+  ...['storedpower', 'powertrip', 'punishment'].map(id => [id, 'stages'] as const),
 ]);
 
 /** A move's power as the simulator sets it at use; `simDamage` for a fixed-damage move. */
@@ -260,6 +265,25 @@ export function landedOrCatalog(attacker: Pokemon, defender: Pokemon, move: DexM
     ...(power.simDamage === undefined ? {} : { simDamage: power.simDamage }),
     ...(landing === 1 ? {} : { landing }),
   };
+}
+
+const NO_BOOSTS: BoostsTable = { atk: 0, def: 0, spa: 0, spd: 0, spe: 0, accuracy: 0, evasion: 0 };
+
+/** A view of one body on other stages; every other read goes to the body itself. */
+const onStages = (pokemon: Pokemon, boosts: BoostsTable): Pokemon =>
+  Object.create(pokemon, { boosts: { value: boosts } }) as Pokemon;
+
+/** A stages-class move as the memo prices it: both bodies on no boosts. */
+export function stagedLanded(attacker: Pokemon, defender: Pokemon, move: DexMove, battle: Battle): Landed {
+  return landedOrCatalog(onStages(attacker, NO_BOOSTS), onStages(defender, NO_BOOSTS), move, battle);
+}
+
+/** The power the simulator gives a stages-class move on the live stages, the attacker's overridden where asked. */
+export function stagedPower(attacker: Pokemon, defender: Pokemon, moveId: string, boosts?: Partial<BoostsTable>): number {
+  const battle = attacker.battle;
+  const user = boosts ? onStages(attacker, { ...attacker.boosts, ...boosts }) : attacker;
+  const move = battle.dex.moves.get(moveId) as unknown as ActiveMove;
+  return onField(battle, attacker, defender, () => askPower(user, defender, move, battle)).basePower;
 }
 
 /** A move as it lands for one pair, every field set; `simDamage` and `landing` as in Landed. */

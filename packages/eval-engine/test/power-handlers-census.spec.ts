@@ -32,8 +32,6 @@ const EXCLUDED: Record<string, string> = {
   superfang: 'own', naturesmadness: 'own', ruination: 'own', terablast: 'own', hiddenpower: 'own',
   counter: 'own', mirrorcoat: 'own', metalburst: 'own', comeuppance: 'own', finalgambit: 'own', psywave: 'own',
   guardianofalola: 'own',
-  // Boost stages: priced through the stage path, not the memo (T81.3).
-  storedpower: 'stages', powertrip: 'stages', punishment: 'stages',
 };
 
 const GENS = [3, 4, 5, 6, 7, 8, 9];
@@ -107,7 +105,8 @@ describe('power handlers of the Dex (round 63, T81)', () => {
         const plain = answer();
         for (const [fact, change] of [...live, ...stages]) {
           const moved = answer(change) !== plain;
-          const covered = kind === 'live' && live.some(([name]) => name === fact);
+          const covered = (kind === 'live' && live.some(([name]) => name === fact)) ||
+            (kind === 'stages' && (stages.some(([name]) => name === fact) || fact.endsWith('speed stage')));
           if (moved && !covered) misses.push(`${id} (${kind}) moves with ${fact} into ${targetSpecies}`);
         }
       }

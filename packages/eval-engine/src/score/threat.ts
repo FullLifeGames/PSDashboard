@@ -1,6 +1,6 @@
-import type { Battle, Pokemon, Side } from '@pkmn/sim';
+import type { Battle, BoostsTable, Pokemon, Side, StatIDExceptHP } from '@pkmn/sim';
 import { stageMultiplier } from '../stat-stages.ts';
-import { landedKey, landedOrCatalog, type Landed } from './move-facts.ts';
+import { landedKey, landedOrCatalog, POWER_MOVES, stagedLanded, stagedPower, type Landed } from './move-facts.ts';
 
 /**
  * The HP- and boost-independent threat proxy: one attacker→defender
@@ -30,6 +30,27 @@ export interface PairThreat {
    */
   physicalAcc?: number;
   specialAcc?: number;
+  /**
+   * Moves whose stages are not their category's (round 63, T81), each with
+   * its own best fraction at stage 0: Body Press (the user's Defense),
+   * Psyshock (the target's Defense), Foul Play (the target's Attack), and
+   * the moves whose power the boosts set (Stored Power, Power Trip), priced
+   * at the power of no boosts. Absent on an ordinary pair.
+   */
+  axes?: AxisThreat[];
+}
+
+/** One move whose damage reads other stages than its category's (PairThreat.axes). */
+export interface AxisThreat {
+  fraction: number;
+  acc: number;
+  /** Whose offensive stage the damage reads, and which. */
+  holder: 'attacker' | 'defender';
+  offense: StatIDExceptHP;
+  /** The target's defensive stage the damage reads. */
+  defense: StatIDExceptHP;
+  /** A move whose power the boosts set: its id and the power its fraction was priced at. */
+  staged?: { id: string; basePower: number };
 }
 
 /**
@@ -156,13 +177,22 @@ function offenseMultiplier(attacker: Pokemon, defender: Pokemon, use: Landed): n
   return offense;
 }
 
-/** The defender's bulk items: Eviolite on an NFE, Assault Vest against special moves. */
-function bulkMultiplier(defender: Pokemon, use: Landed): number {
+/**
+ * The defender's bulk items: Eviolite on an NFE, Assault Vest on Special
+ * Defense. The sim modifies the defensive stat the move reads (getDamage:
+ * Modify<Def|SpD> of defenseStat), so Psyshock passes an Assault Vest; the
+ * offensive modifiers above follow the category, as getDamage's do.
+ */
+function bulkMultiplier(defender: Pokemon, defense: StatIDExceptHP): number {
   let bulk = 1;
   if (defender.item === 'eviolite' && defender.species.nfe) bulk *= 1.5;
-  if (defender.item === 'assaultvest' && use.category === 'Special') bulk *= 1.5;
+  if (defender.item === 'assaultvest' && defense === 'spd') bulk *= 1.5;
   return bulk;
 }
+
+/** A move whose Dex entry names the stats its damage reads (Body Press, Psyshock, Foul Play). */
+const offAxis = (move: DexMove) =>
+  !!(move.overrideOffensiveStat || move.overrideDefensiveStat || move.overrideOffensivePokemon || move.overrideDefensivePokemon);
 
 /**
  * Fixed damage the proxy can price without a base power (round 33: the
@@ -208,17 +238,25 @@ export function singleMoveFraction(attacker: Pokemon, defender: Pokemon, moveId:
   return landedFraction(attacker, defender, move, landedOrCatalog(attacker, defender, move, battle), battle);
 }
 
+/** The defender's ability or types blank the move (the proxy's immunities). */
+function blanked(attacker: Pokemon, defender: Pokemon, move: DexMove, type: string, defenderTypes: string[], battle: Battle): boolean {
+  if ((ABILITY_IMMUNITIES[defender.ability] ?? []).includes(type)) return true;
+  const blankedFlag = ABILITY_FLAG_IMMUNITIES[defender.ability];
+  if (blankedFlag && move.flags[blankedFlag]) return true;
+  return !ignoresImmunity(attacker, type) && !battle.dex.getImmunity(type, defenderTypes);
+}
+
+/** The stats getDamage reads: the Dex entry's override, else the category's own (round 63, T81). */
+const offenseStat = (move: DexMove, physical: boolean): StatIDExceptHP => move.overrideOffensiveStat ?? (physical ? 'atk' : 'spa');
+const defenseStat = (move: DexMove, physical: boolean): StatIDExceptHP => move.overrideDefensiveStat ?? (physical ? 'def' : 'spd');
+
 /** singleMoveFraction for a move already resolved at use (pairThreat resolves each slot once). */
 function landedFraction(attacker: Pokemon, defender: Pokemon, move: DexMove, use: Landed, battle: Battle): number {
-  const blanked = ABILITY_IMMUNITIES[defender.ability] ?? [];
-  if (blanked.includes(use.type)) return 0;
-  const blankedFlag = ABILITY_FLAG_IMMUNITIES[defender.ability];
-  if (blankedFlag && move.flags[blankedFlag]) return 0;
   // The defender's LIVE types: smogtours-gen9ou-751207 t6 priced Body Press
   // into a Ceruledge that had terastallized to Fighting at 0, as into a Ghost
   // (50 such false immunities on the bank's Tera positions, round 54).
   const defenderTypes = liveTypes(defender);
-  if (!ignoresImmunity(attacker, use.type) && !battle.dex.getImmunity(use.type, defenderTypes)) return 0;
+  if (blanked(attacker, defender, move, use.type, defenderTypes, battle)) return 0;
   if (!use.basePower) return (use.simDamage ?? fixedDamage(move, attacker, defender)) / defender.maxhp;
   const typeMult = Math.pow(2, battle.dex.getEffectiveness(use.type, defenderTypes));
   // A Stellar move hits a terastallized target twice as hard (pokemon.runEffectiveness).
@@ -226,10 +264,12 @@ function landedFraction(attacker: Pokemon, defender: Pokemon, move: DexMove, use
   // STAB stays tera-blind here: the rule by the book is parked on branch r54-stab (round 54).
   const stab = attacker.types.includes(use.type) ? 1.5 : 1;
   const offense = offenseMultiplier(attacker, defender, use);
-  const bulk = bulkMultiplier(defender, use);
-  const [atk, def] = use.category === 'Physical'
-    ? [attacker.storedStats.atk, defender.storedStats.def]
-    : [attacker.storedStats.spa, defender.storedStats.spd];
+  // Body Press off the user's Defense, Psyshock against the target's, Foul Play off the target's Attack.
+  const physical = use.category === 'Physical';
+  const defense = defenseStat(move, physical);
+  const atk = (move.overrideOffensivePokemon === 'target' ? defender : attacker).storedStats[offenseStat(move, physical)];
+  const def = (move.overrideDefensivePokemon === 'source' ? attacker : defender).storedStats[defense];
+  const bulk = bulkMultiplier(defender, defense);
   const damage = (((2 * attacker.level / 5 + 2) * use.basePower * (use.powerMult ?? 1) * atk / def) / 50 + 2) *
     stab * typeMult * stellar * offense / bulk * (use.landing ?? 1);
   return damage / defender.maxhp;
@@ -246,21 +286,46 @@ export function pairThreat(attacker: Pokemon, defender: Pokemon, battle: Battle)
   const locked = lockedMoveId(attacker);
   const usable = usableSlots(attacker);
   const slots = locked ? usable.filter(slot => slot.id === locked) : usable;
+  let axes: AxisThreat[] | undefined;
   for (const slot of slots) {
     const move = battle.dex.moves.get(slot.id);
     if (!move.exists || move.category === 'Status') continue;
-    const use = landedOrCatalog(attacker, defender, move, battle);
+    const staged = POWER_MOVES.get(move.id) === 'stages';
+    const use = threatUse(attacker, defender, move, battle, staged);
     const moveFraction = landedFraction(attacker, defender, move, use, battle);
     if (moveFraction > 0) {
-      const accuracy = move.accuracy === true ? 1 : move.accuracy / 100;
-      if (use.category === 'Physical') {
+      const accuracy = accuracyOf(move);
+      if (staged || offAxis(move)) {
+        (axes ??= []).push(axisThreat(move, use, moveFraction, accuracy, staged));
+      } else if (use.category === 'Physical') {
         if (moveFraction > physical) { physical = moveFraction; physicalAcc = accuracy; }
       } else if (moveFraction > special) { special = moveFraction; specialAcc = accuracy; }
       if (move.priority > 0) priority = true;
     }
   }
-  return { physical, special, priority, physicalAcc, specialAcc };
+  return { physical, special, priority, physicalAcc, specialAcc, ...(axes ? { axes } : {}) };
 }
+
+/** A slot as the memo prices it: at use, a stages-class move on no boosts (boostedFraction adds them). */
+const threatUse = (attacker: Pokemon, defender: Pokemon, move: DexMove, battle: Battle, staged: boolean): Landed =>
+  (staged ? stagedLanded(attacker, defender, move, battle) : landedOrCatalog(attacker, defender, move, battle));
+
+const accuracyOf = (move: DexMove): number => (move.accuracy === true ? 1 : move.accuracy / 100);
+
+/** The PairThreat.axes entry of one move: its stats from the Dex, its power if the boosts set it. */
+function axisThreat(move: DexMove, use: Landed, fraction: number, acc: number, staged: boolean): AxisThreat {
+  const physical = use.category === 'Physical';
+  return {
+    fraction, acc,
+    holder: move.overrideOffensivePokemon === 'target' ? 'defender' : 'attacker',
+    offense: offenseStat(move, physical),
+    defense: defenseStat(move, physical),
+    ...(staged ? { staged: { id: move.id, basePower: use.basePower } } : {}),
+  };
+}
+
+/** Stages that override the attacker's live ones (a setup move's would-be boosts). */
+export type StageOverride = Partial<BoostsTable>;
 
 /**
  * The memoized threat with the CURRENT boost stages applied. Stages stay
@@ -268,20 +333,42 @@ export function pairThreat(attacker: Pokemon, defender: Pokemon, battle: Battle)
  * one search while the cached part does not. This is what makes setup moves
  * visible to the matchup term: +2 Atk doubles the pressure on every pair,
  * not just the flat boost weight. The optional override substitutes the
- * attacker's offensive stages (candidate hints price a setup move by the
- * stages it WOULD grant); defender stages always read live.
+ * attacker's stages (candidate hints price a setup move by the stages it
+ * WOULD grant); defender stages always read live. Since round 63 (T81) each
+ * move reads the stages of its own stats (PairThreat.axes), and a move whose
+ * power the boosts set asks the simulator for that power on these stages.
  */
-export function boostedFraction(
+export function boostedFraction(threat: PairThreat, attacker: Pokemon, defender: Pokemon, attackerBoosts?: StageOverride): number {
+  return stagedFraction(threat, attacker, defender, attackerBoosts, false);
+}
+
+/** boostedFraction, each fraction weighed by its move's accuracy when asked (expectedRate, round 14). */
+export function stagedFraction(
   threat: PairThreat,
   attacker: Pokemon,
   defender: Pokemon,
-  attackerBoosts?: { atk?: number; spa?: number },
+  attackerBoosts: StageOverride | undefined,
+  withAccuracy: boolean,
 ): number {
   const atkStage = attackerBoosts?.atk ?? attacker.boosts.atk;
   const spaStage = attackerBoosts?.spa ?? attacker.boosts.spa;
-  const physical = threat.physical * stageMultiplier(atkStage) / stageMultiplier(defender.boosts.def);
-  const special = threat.special * stageMultiplier(spaStage) / stageMultiplier(defender.boosts.spd);
-  return Math.max(physical, special);
+  const physical = threat.physical * (withAccuracy ? threat.physicalAcc ?? 1 : 1) *
+    stageMultiplier(atkStage) / stageMultiplier(defender.boosts.def);
+  const special = threat.special * (withAccuracy ? threat.specialAcc ?? 1 : 1) *
+    stageMultiplier(spaStage) / stageMultiplier(defender.boosts.spd);
+  let best = Math.max(physical, special);
+  for (const axis of threat.axes ?? []) best = Math.max(best, axisFraction(axis, attacker, defender, attackerBoosts, withAccuracy));
+  return best;
+}
+
+function axisFraction(axis: AxisThreat, attacker: Pokemon, defender: Pokemon, attackerBoosts: StageOverride | undefined, withAccuracy: boolean): number {
+  const offenseStage = axis.holder === 'attacker'
+    ? attackerBoosts?.[axis.offense] ?? attacker.boosts[axis.offense]
+    : defender.boosts[axis.offense];
+  const value = axis.fraction * (withAccuracy ? axis.acc : 1) *
+    stageMultiplier(offenseStage) / stageMultiplier(defender.boosts[axis.defense]);
+  if (!axis.staged) return value;
+  return value * stagedPower(attacker, defender, axis.staged.id, attackerBoosts) / axis.staged.basePower;
 }
 
 export type ThreatGetter = (attacker: Pokemon, defender: Pokemon) => PairThreat;

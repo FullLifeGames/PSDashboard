@@ -5,7 +5,7 @@ import { stageMultiplier } from '../stat-stages.ts';
 import type { DecidedSweep, EntryUnanswered, NearDecidedSweep, UnansweredProfile } from '../types.ts';
 import { hazardEntryFraction } from './hazards.ts';
 import {
-  livingMons, singleMoveFraction, threatGetter, usableSlots,
+  livingMons, singleMoveFraction, stagedFraction, threatGetter, usableSlots,
   type MatchupCache, type PairThreat, type ThreatGetter,
 } from './threat.ts';
 import { healProfile, ppBudget, raceClocks, statusResidual, type HealProfile, type RaceSide } from './races.ts';
@@ -32,13 +32,12 @@ interface ProfileContext {
  * category-max move's accuracy (round 14) — the profile's races run on
  * what a turn is worth, not on the best case.
  */
-/** Per-turn expected damage fraction: the category-max move at its accuracy, stage-adjusted (round 14). */
+/**
+ * Per-turn expected damage fraction: the category-max move at its accuracy, stage-adjusted (round 14);
+ * since round 63 each move on the stages of its own stats (PairThreat.axes, T81).
+ */
 export function expectedRate(threatOut: PairThreat, attacker: Pokemon, defender: Pokemon): number {
-  const physical = threatOut.physical * (threatOut.physicalAcc ?? 1) *
-    stageMultiplier(attacker.boosts.atk) / stageMultiplier(defender.boosts.def);
-  const special = threatOut.special * (threatOut.specialAcc ?? 1) *
-    stageMultiplier(attacker.boosts.spa) / stageMultiplier(defender.boosts.spd);
-  return Math.max(physical, special);
+  return stagedFraction(threatOut, attacker, defender, undefined, true);
 }
 
 /** One mon's race side for the profile: entry-tolled HP off the bench, expected rates, memoized PP inputs. */

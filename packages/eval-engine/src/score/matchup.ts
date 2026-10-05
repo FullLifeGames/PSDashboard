@@ -2,7 +2,7 @@ import type { Battle, Pokemon } from '@pkmn/sim';
 import { movesFirst } from '../speed.ts';
 import { EVAL_WEIGHTS } from './weights.ts';
 import { hazardEntryFraction } from './hazards.ts';
-import { boostedFraction, livingMons, threatGetter, type MatchupCache, type PairThreat } from './threat.ts';
+import { boostedFraction, livingMons, threatGetter, type MatchupCache, type PairThreat, type StageOverride } from './threat.ts';
 import { healProfile, ppBudget, raceClocks, raceSide, statusResidual, type RaceClocks, type RaceSide } from './races.ts';
 
 /**
@@ -23,7 +23,7 @@ function beatsPair(
   threatA: PairThreat,
   threatB: PairThreat,
   battle: Battle,
-  aBoosts?: { atk: number; spa: number },
+  aBoosts?: StageOverride,
 ): boolean {
   const { turnsA, turnsB } = raceClocks(
     raceSide(a, a.hp / a.maxhp, boostedFraction(threatA, a, b, aBoosts), battle),

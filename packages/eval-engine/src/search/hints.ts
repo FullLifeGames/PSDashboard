@@ -1,4 +1,4 @@
-import type { Pokemon } from '@pkmn/sim';
+import type { BoostsTable, Pokemon } from '@pkmn/sim';
 import { boostedFraction, pairThreat, singleMoveFraction } from '../eval-function.ts';
 import { positionBattle, type ChoiceOption, type SimPosition } from '../forward-model.ts';
 import { sideIndex } from '@fulllifegames/replay-core';
@@ -39,20 +39,27 @@ function hintBoard(position: SimPosition, side: 'p1' | 'p2'): HintBoard {
   return { battle, sideState, foeActives, foes, actors };
 }
 
-/** Damage-fraction gain a self-boosting move would buy over SETUP_HORIZON turns. */
+/** The stats whose stages a damage fraction can read (Body Press reads Defense, Stored Power every boost). */
+const DAMAGE_STAGES = ['atk', 'def', 'spa', 'spd'] as const;
+
+/**
+ * Damage-fraction gain a self-boosting move would buy over SETUP_HORIZON
+ * turns. Since round 63 (T81) every stage a damage fraction reads counts:
+ * Iron Defense buys a Body Press carrier its Defense, Calm Mind buys a
+ * Stored Power carrier its power (boostedFraction reads PairThreat.axes).
+ */
 function setupEquity(board: HintBoard, attacker: Pokemon, moveId: string): number {
   const { battle, foes } = board;
   const move = battle.dex.moves.get(moveId);
-  const boosts = (move.boosts || move.self?.boosts || undefined) as { atk?: number; spa?: number } | undefined;
-  if (!boosts || (!boosts.atk && !boosts.spa)) return 0;
+  const boosts = (move.boosts || move.self?.boosts || undefined) as Partial<BoostsTable> | undefined;
+  if (!boosts || DAMAGE_STAGES.every(stat => !boosts[stat])) return 0;
+  const stages: Partial<BoostsTable> = {};
+  for (const stat of DAMAGE_STAGES) stages[stat] = clampStage(attacker.boosts[stat] + (boosts[stat] ?? 0));
   let equity = 0;
   for (const foe of foes) {
     const threat = pairThreat(attacker, foe, battle);
     const now = boostedFraction(threat, attacker, foe);
-    const then = boostedFraction(threat, attacker, foe, {
-      atk: clampStage(attacker.boosts.atk + (boosts.atk ?? 0)),
-      spa: clampStage(attacker.boosts.spa + (boosts.spa ?? 0)),
-    });
+    const then = boostedFraction(threat, attacker, foe, stages);
     equity = Math.max(equity, (then - now) * SETUP_HORIZON);
   }
   return equity;
