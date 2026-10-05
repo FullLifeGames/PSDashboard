@@ -2,13 +2,13 @@ import type { EntryUnanswered, EvalMatrix, RankedChoice } from '../types.ts';
 import { nullMoveReason } from '../null-moves.ts';
 import { detectStreakOdds } from '../streaks.ts';
 import { TIE_EPSILON } from '../rank.ts';
-import { SPOKEN_MASS } from '../types.ts';
 import { LIKELIEST_CLICK_MIN, PREDICTIVE_READ_CONFIDENCE, modelOpponent, type OpponentModel } from '../opponent-model.ts';
 import {
   CONDITIONAL_MIX_MIN, FORCED_MIX_THRESHOLD, TIER_THRESHOLDS, decidedSeenKey, forcedWinSeenKey, unansweredSeenKey,
   type AnalyzeTurnParams, type Side, type SideAnalysis, type VerdictTier,
 } from './types.ts';
 import { heldDecided } from './decided-held.ts';
+import { forcedWinSpeaks } from './forced-speech.ts';
 import { matchPlayedChoice } from './played-match.ts';
 import type { SideGrading } from './grading.ts';
 
@@ -284,7 +284,7 @@ function decidedSignals(
     };
   }
   const forcedWin = forcedWinSignal(params, key);
-  if (forcedWin?.announce && forcedWin.mass >= SPOKEN_MASS) {
+  if (forcedWinSpeaks(forcedWin, key === 'p1' ? params.scoreBefore : -params.scoreBefore)) {
     // The proof speaks for the board; the decided stages keep their state, quietly.
     if (decided) decided = { ...decided, announce: false };
     if (nearDecided) nearDecided = { ...nearDecided, announce: false };

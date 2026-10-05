@@ -52,7 +52,7 @@ describe('the forced win in prose (round 35)', () => {
       open: { side: 'p1', moveId: 'firefang', label: 'Fire Fang', odds: 0.9, kind: 'kill' },
     })).toContain('Alpha wins in 2 against every reply if the 90% Fire Fang knocks out.');
     expect(summaryAt({ side: 'p1', turns: 5, mass: 0.92, caveat: 'sampled-rolls', engineScore: 0.5, states: 80 }))
-      .toContain('Alpha wins in 5 against every reply in 92% of the rolls on the sampled rolls.');
+      .toContain('Alpha wins in 5 against every reply in 92% of the sampled rolls.');
   });
 
   test('below the spoken mass the sentence stays quiet and the near stage speaks', () => {
