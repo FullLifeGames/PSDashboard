@@ -1,6 +1,6 @@
 import { test, expect, describe } from 'vitest';
 import { Battle, Teams, toID } from '@pkmn/sim';
-import type { PokemonSet } from '@pkmn/sim';
+import type { Pokemon, PokemonSet } from '@pkmn/sim';
 import { createMatchupCache, pairThreat, threatGetter } from '../src/score/threat';
 
 /**
@@ -160,5 +160,58 @@ describe('the memo keys the move answer (round 57)', () => {
     gardevoir.boosts.atk = 6;
     gardevoir.boosts.spa = -6;
     expect(cached(gardevoir, snorlax)).toEqual(pairThreat(gardevoir, snorlax, battle));
+  });
+});
+
+describe('the memo keys the power at use (round 63, T81)', () => {
+  /** The change must move the answer, and the memo must answer like a fresh reading after it. */
+  function missesTheMemo(attacker: PokemonSet, defender: PokemonSet, change: (user: Pokemon, target: Pokemon, battle: Battle) => void) {
+    const battle = makeBattle(attacker, defender);
+    const [user, target] = [battle.sides[0].active[0], battle.sides[1].active[0]];
+    const cached = threatGetter(battle, createMatchupCache());
+    const before = cached(user, target);
+    expect(before).toEqual(pairThreat(user, target, battle));
+    change(user, target, battle);
+    const after = cached(user, target);
+    expect(after).toEqual(pairThreat(user, target, battle));
+    expect(after).not.toEqual(before);
+  }
+
+  test("Flail and Endeavor: the user's HP misses the memo", () => {
+    for (const move of ['flail', 'endeavor']) {
+      missesTheMemo(makeSet('Kingambit', [move]), makeSet('Snorlax', ['splash']), user => { user.hp = Math.floor(user.maxhp / 10); });
+    }
+  });
+
+  test("Brine and Crush Grip: the target's HP misses the memo", () => {
+    for (const move of ['brine', 'crushgrip']) {
+      missesTheMemo(makeSet('Kingambit', [move]), makeSet('Snorlax', ['splash']), (_, target) => { target.hp = Math.floor(target.maxhp / 3); });
+    }
+  });
+
+  test('Facade and Hex: a status misses the memo', () => {
+    missesTheMemo(makeSet('Ursaluna', ['facade']), makeSet('Snorlax', ['splash']), user => { user.setStatus('brn'); });
+    missesTheMemo(makeSet('Gengar', ['hex']), makeSet('Garchomp', ['splash']), (_, target) => { target.setStatus('par'); });
+  });
+
+  test('Solar Beam: the weather misses the memo', () => {
+    missesTheMemo(makeSet('Venusaur', ['solarbeam']), makeSet('Garchomp', ['splash']), (_, __, battle) => {
+      battle.field.setWeather('raindance', 'debug');
+    });
+  });
+
+  test('Gyro Ball: a speed stage and Tailwind miss the memo', () => {
+    missesTheMemo(makeSet('Ferrothorn', ['gyroball']), makeSet('Weavile', ['splash']), (_, target) => { target.boosts.spe = 2; });
+    missesTheMemo(makeSet('Ferrothorn', ['gyroball']), makeSet('Weavile', ['splash']), (_, target) => {
+      target.side.addSideCondition('tailwind', 'debug');
+    });
+  });
+
+  test('Low Kick: a weight change misses the memo', () => {
+    missesTheMemo(makeSet('Machamp', ['lowkick']), makeSet('Snorlax', ['splash']), (_, target) => { target.weighthg = 1; });
+  });
+
+  test('Knock Off: the target losing its item misses the memo', () => {
+    missesTheMemo(makeSet('Weavile', ['knockoff']), { ...makeSet('Garchomp', ['splash']), item: 'Leftovers' }, (_, target) => { target.item = ''; });
   });
 });

@@ -1,4 +1,4 @@
-import type { MoveField, MoveLike, MoveTarget, MoveUser } from './move-use.ts';
+import type { MoveField, MoveLike, MoveUser } from './move-use.ts';
 
 /**
  * The move's own rule at use (round 57): what the simulator's onModifyType,
@@ -6,7 +6,7 @@ import type { MoveField, MoveLike, MoveTarget, MoveUser } from './move-use.ts';
  * overrides the catalog; null means a needed fact is unknown.
  */
 export type Own = { type?: string; category?: string; basePower?: number } | null;
-type Rule = (move: MoveLike, user: MoveUser, field: MoveField, target: MoveTarget) => Own;
+type Rule = (move: MoveLike, user: MoveUser, field: MoveField) => Own;
 
 const FORM_TYPES: Record<string, Record<string, string>> = {
   ivycudgel: {

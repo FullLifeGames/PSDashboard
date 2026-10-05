@@ -47,7 +47,9 @@ export interface PairThreat {
  * singleMoveFraction needs its key term (test/threat-memo.spec.ts). Round 57:
  * a move whose answer at use reads a fact the key does not name (weather,
  * terrain, grounding, stages, Hidden Power) keys its answer instead
- * (landedKey, CONTEXT_MOVES in move-use.ts).
+ * (landedKey, CONTEXT_MOVES in move-use.ts); round 63 (T81) adds the moves
+ * whose power the simulator sets from HP, status, the field, speed or weight
+ * (the live class of POWER_MOVES in move-facts.ts).
  */
 export type MatchupCache = Map<string, PairThreat>;
 
@@ -167,7 +169,8 @@ function bulkMultiplier(defender: Pokemon, use: Landed): number {
  * last-pair race must see a Seismic Toss Chansey as an attacker). Level
  * moves deal the user's level, the halving moves half the target's
  * current HP; the reactive family (Counter, Mirror Coat, Metal Burst) and
- * self-sacrifice stay at 0.
+ * self-sacrifice stay at 0. Endeavor's HP difference comes from the
+ * simulator (landedOrCatalog, round 63).
  */
 function fixedDamage(move: DexMove, attacker: Pokemon, defender: Pokemon): number {
   if (HALVING_MOVES.has(move.id)) return Math.floor(defender.hp / 2);
@@ -195,7 +198,8 @@ function ignoresImmunity(attacker: Pokemon, type: string): boolean {
  * HP under the proxy's rules — standard damage formula with STAB, the type
  * chart, and the big item/ability modifiers; fixed-damage moves at their
  * fixed amount; 0 for status, reactive, and immune moves. The type, category
- * and power are the move's at use (move-use.ts, round 57).
+ * and power are the move's at use (move-use.ts, round 57; the power the
+ * simulator sets at use, move-facts.ts, round 63).
  */
 export function singleMoveFraction(attacker: Pokemon, defender: Pokemon, moveId: string, battle: Battle): number {
   const move = battle.dex.moves.get(moveId);
@@ -215,7 +219,7 @@ function landedFraction(attacker: Pokemon, defender: Pokemon, move: DexMove, use
   // (50 such false immunities on the bank's Tera positions, round 54).
   const defenderTypes = liveTypes(defender);
   if (!ignoresImmunity(attacker, use.type) && !battle.dex.getImmunity(use.type, defenderTypes)) return 0;
-  if (!use.basePower) return fixedDamage(move, attacker, defender) / defender.maxhp;
+  if (!use.basePower) return (use.simDamage ?? fixedDamage(move, attacker, defender)) / defender.maxhp;
   const typeMult = Math.pow(2, battle.dex.getEffectiveness(use.type, defenderTypes));
   // A Stellar move hits a terastallized target twice as hard (pokemon.runEffectiveness).
   const stellar = use.type === 'Stellar' && defender.terastallized ? 2 : 1;

@@ -5,16 +5,16 @@ import { OWN_RULES, type Own } from './move-use-rules.ts';
  * type, category and power; the simulator changes them at use: abilities
  * (Liquid Voice, the -ate family, Normalize), the user's forme (Ivy Cudgel),
  * a held plate, the weather, the terrain, the Tera click and Hidden Power's
- * type. The power rules for weight, HP, speed and happiness (T81) are parked
- * on branch r57-power, with the facts below marked for them. This table answers
- * from raw facts, in the simulator's order (the move's own rule, then the
- * ability; battle-actions.js useMoveInner), without asking the simulator:
- * on the bench the simulator switches abilities and items off, and in a
- * debug-mode format every suppressed handler writes a log line.
+ * type. This table answers from raw facts, in the simulator's order (the
+ * move's own rule, then the ability; battle-actions.js useMoveInner), without
+ * asking the simulator, because the null-move sentence has no battle to ask.
+ * The power a move sets when it lands (weight, HP, speed, status, item) is
+ * not here: the static asks the simulator's own handler for it
+ * (score/move-facts.ts POWER_MOVES, round 63, T81).
  *
  * NO IMPORTS beyond the rules: the null-move sentence runs in the app's main
  * bundle. A fact left undefined is unknown: a TYPE rule that needs it answers
- * null (the type is undecided), a POWER rule keeps the catalog power (the
+ * null (the type is undecided), a power rule keeps the catalog power (the
  * static always passes its facts; the sentence reads only the type).
  */
 export interface MoveLike {
@@ -47,22 +47,12 @@ export interface MoveUser {
   types?: readonly string[];
   hpType?: string;
   hpPower?: number;
-  // The facts from here to `speed`, and MoveTarget, are read by the parked
-  // T81 rules only (branch r57-power); no rule on this branch reads them.
-  happiness?: number;
-  hp?: number;
-  maxhp?: number;
-  /** Weight in hectograms after Autotomize, Heavy Metal, Light Metal and Float Stone. */
-  weighthg?: number;
-  /** Speed with its stage, Choice Scarf, Iron Ball, paralysis and Tailwind. */
-  speed?: number;
   /** Attack and Special Attack with their stages, unmodified (Tera Blast's category). */
   atk?: number;
   spa?: number;
   grounded?: boolean;
 }
 
-export interface MoveTarget { weighthg?: number; hp?: number; maxhp?: number; speed?: number }
 export interface MoveField { weather?: string; terrain?: string }
 export interface MoveAtUse { type: string; category: string; basePower: number; powerMult: number }
 
@@ -99,9 +89,9 @@ function withAbility(ability: string, move: MoveLike, own: MoveAtUse, user: Move
 const same = (a: MoveAtUse, b: MoveAtUse) =>
   a.type === b.type && a.category === b.category && a.basePower === b.basePower && a.powerMult === b.powerMult;
 
-export function moveAtUse(move: MoveLike, user: MoveUser, field: MoveField = {}, target: MoveTarget = {}): MoveAtUse | null {
+export function moveAtUse(move: MoveLike, user: MoveUser, field: MoveField = {}): MoveAtUse | null {
   const rule = OWN_RULES[move.id];
-  const own: Own = rule ? rule(move, user, field, target) : {};
+  const own: Own = rule ? rule(move, user, field) : {};
   if (own === null) return null;
   const base: MoveAtUse = {
     type: own.type ?? move.type,
