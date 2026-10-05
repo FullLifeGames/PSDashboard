@@ -49,7 +49,7 @@ export function koPhrase(odds: { accuracy: number; killFraction: number }): stri
 }
 
 /** One named claim: a doubles label (round 56) names the slot, singles the option. */
-const oddsPart = (name: string, odds: KoOddsInfo, copula: 'was' | 'is') =>
+export const oddsPart =(name: string, odds: KoOddsInfo, copula: 'was' | 'is') =>
   `${phrase(odds.label ?? name)} ${odds.killFraction < 1 && odds.accuracy === 1 ? koPhrase(odds) : `${copula} ${koPhrase(odds)}`}`;
 
 /**

@@ -1,7 +1,7 @@
 import { diffChoices, playedSetupMove, type SideAnalysis } from '../analysis.ts';
 import type { RankedChoice } from '../types.ts';
 import { winDeltaText, winPctText } from '../winprob.ts';
-import { conditionalNote, displayBest, koPhrase, nullNote, oddsNote, phrase } from './phrases.ts';
+import { conditionalNote, displayBest, nullNote, oddsNote, oddsPart, phrase } from './phrases.ts';
 
 /**
  * The per-side clauses of the turn summary: paid-off reads, misplays,
@@ -19,7 +19,8 @@ function readClause(name: string, side: SideAnalysis, opponent: SideAnalysis): s
     ? side.riskPayoffTurn === 1 ? ' one turn later' : ` ${side.riskPayoffTurn} turns later`
     : '';
   const odds = side.played.koOdds;
-  const click = odds ? ` ${odds.label ? phrase(odds.label) : 'The click'} was ${koPhrase(odds)}.` : '';
+  // Round 63 (T18): the kill-range shape is a verb phrase of its own ("kills ~43% of the time").
+  const click = odds ? ` ${oddsPart('The click', odds, 'was')}.` : '';
   return `${name} played ${phrase(side.played.label)} — a read that paid off${horizon}, ` +
     `${winDeltaText(side.riskPayoff ?? 0)} over the safe ${phrase(side.safe.label)} (${winPctText(side.safe.worstCase)} guaranteed).${priced}${click}`;
 }
