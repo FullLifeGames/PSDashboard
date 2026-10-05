@@ -138,6 +138,13 @@ export function forcedClause(name: string, side: SideAnalysis): string | null {
 export function sackClause(name: string, side: SideAnalysis): string | null {
   if (!side.sacrifice) return null;
   const pct = Math.round(side.sacrifice.hpFraction * 100);
+  if (side.sacrifice.hazard) {
+    // Round 63 (T17): the switch-in the hazards took (653785 t19).
+    return `${name} sacked ${side.sacrifice.name} (${pct}% HP) into the entry hazards — it fell before it could act, ` +
+      'and the next Pokémon came in on a free switch' +
+      (side.sacrifice.verified ? '; the payoff over the next turns repaid it, so it reads as a sacrifice, not a misplay.'
+        : '; graded as a sacrifice, not a misplay.');
+  }
   if (side.sacrifice.stayed) {
     if (side.sacrifice.verified) {
       return `${name} fed ${side.sacrifice.name} (${pct}% HP) — the line's priced floor is what happened, ` +

@@ -95,6 +95,19 @@ function RegretCell({ name, side, setupMove }: Pick<RowProps, 'name' | 'side'> &
   return <span style={{ color: '#f3a6a6' }} title={`${name} gave up this much win probability vs the engine's best.`}>mistake · {winDeltaText(-side.regret)}</span>;
 }
 
+/** What kind of sack the note marks (round 63 adds the hazard and stayed shapes). */
+function sackTitle(sacrifice: NonNullable<SideAnalysis['sacrifice']>): string {
+  if (sacrifice.hazard) {
+    return 'Switched into the entry hazards and fell before acting, so the next Pokémon came in on a free switch: a sacrifice, not graded as a misplay.';
+  }
+  if (sacrifice.stayed) {
+    return 'The body was left in to take the hit the line priced in, and the next turns paid it back: a sacrifice, not graded as a misplay.';
+  }
+  return sacrifice.healthy
+    ? 'A healthy body was fed while the engine stayed decisively ahead on both sides of the sack: simplification, not graded as a misplay.'
+    : 'A nearly-dead Pokémon was fed on purpose: a low-cost sack, not graded as a misplay.';
+}
+
 /** The read that beat the safe line's guarantee. */
 function ReadPaidOffCell({ side }: Pick<RowProps, 'side'>) {
   return (
@@ -121,9 +134,7 @@ function VerdictCell({ name, side, regretful, setupMove }: Pick<RowProps, 'name'
       {side.sacrifice && (
         <span
           style={{ color: '#9aa5b1' }}
-          title={side.sacrifice.healthy
-            ? 'A healthy body was fed while the engine stayed decisively ahead on both sides of the sack: simplification, not graded as a misplay.'
-            : 'A nearly-dead Pokémon was fed on purpose: a low-cost sack, not graded as a misplay.'}
+          title={sackTitle(side.sacrifice)}
         >
           · sacked {side.sacrifice.name} ({Math.round(side.sacrifice.hpFraction * 100)}% HP)
         </span>

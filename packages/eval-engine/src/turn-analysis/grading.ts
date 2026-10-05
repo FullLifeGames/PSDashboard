@@ -227,6 +227,56 @@ function sackVerdict(tier: VerdictTier | undefined, regret: number | null, gate:
 }
 
 /**
+ * Round 63 (T17): a hazard sack's windowed payoff over the safe guarantee —
+ * only when the rolls after the pair added nothing (own after-score at most
+ * FEED_FLOOR_EPSILON over the pair's value). The switch-in's death already
+ * sits in the pair's cell (the attack aimed at it hits nothing), so the
+ * floor gate of a stayed feed cannot apply; what must not count is luck
+ * after the pair (653785 t19: −0.05). Null when the gate fails.
+ */
+function hazardSackPayoff(params: AnalyzeTurnParams, key: Side, safe: RankedChoice | null): number | null {
+  if (params.playedOutcome === null || params.scoreAfter === null || !safe) return null;
+  const luckAfter = key === 'p1' ? params.scoreAfter - params.playedOutcome : params.playedOutcome - params.scoreAfter;
+  if (luckAfter > FEED_FLOOR_EPSILON) return null;
+  const chain = [params.playedOutcome, ...(params.futureOutcomes ?? [])].slice(0, PAYOFF_WINDOW + 1);
+  return bestWindowPayoff(chain, key, safe.worstCase).payoff;
+}
+
+/**
+ * Round 63 (T17): praise without a band. An UNTIERED side earns the
+ * sacrifice stamp only in the two verified forms — a stayed feed through
+ * the priced-floor gate (573756 t68) or a hazard sack through the
+ * luck-after-the-pair gate (653785 t19) — and only when the window repaid
+ * the regret with the read margin on top. Low-HP and healthy faints stay
+ * leniencies for tiered turns; a phantom stay-in has no choice to praise,
+ * and an already-lost position earns no praise (the gamble credit's bound).
+ */
+function praisedSack(
+  params: AnalyzeTurnParams,
+  key: Side,
+  g: { sack: SackInfo | undefined; played: RankedChoice | null; safe: RankedChoice | null; regret: number | null; neverActed: boolean },
+): boolean {
+  const { sack, played, safe, regret } = g;
+  if (!sack || regret === null || g.neverActed || deniedByDice(sack, played)) return false;
+  if ((key === 'p1' ? params.scoreBefore : -params.scoreBefore) <= -DECIDED_SCORE) return false;
+  const payoff = sack.stayed ? stayedFeedPayoff(params, key, played, safe)
+    : sack.hazard ? hazardSackPayoff(params, key, safe) : null;
+  return payoff !== null && payoff >= regret + RISK_PAYOFF_MARGIN;
+}
+
+/** The verdict before sensitivity: a tiered side through the sack leniency, an untiered one through the praise forms. */
+function sideVerdict(
+  params: AnalyzeTurnParams,
+  key: Side,
+  g: { sack: SackInfo | undefined; played: RankedChoice | null; safe: RankedChoice | null; regret: number | null; neverActed: boolean },
+): SackVerdict {
+  const tier = baseTier(g.regret, key, params.scoreBefore);
+  if (tier) return sackVerdict(tier, g.regret, sackGate(params, key, g.sack, g.played, g.safe));
+  const praised = praisedSack(params, key, g);
+  return { sacrificed: praised, feedVerified: praised, tier: undefined };
+}
+
+/**
  * Item-sensitivity: if the verdict changes band under a usage-plausible
  * alternative item for an opposing mon whose item is only a guess, the
  * verdict HINGES on hidden information — soften to the most charitable
@@ -292,7 +342,7 @@ export function gradeSide(params: AnalyzeTurnParams, key: Side): SideGrading {
     : null;
   const { regret, verifiedAtDepth } = verifiedRegret(params, key, played, best);
   const sack = params.sacks?.[key];
-  const verdict = sackVerdict(baseTier(regret, key, params.scoreBefore), regret, sackGate(params, key, sack, played, safe));
+  const verdict = sideVerdict(params, key, { sack, played, safe, regret, neverActed });
   const acquittal = sensitivityAcquittal(verdict.tier, params.sensitivity?.[key]);
   return {
     playedRaw, playedSlots, played, playedPartial, neverActed, options, best, safe, regret, verifiedAtDepth,

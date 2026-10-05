@@ -48,6 +48,13 @@ describe('SideRow', () => {
     expect(screen.queryByText(/\(waiting\)/)).toBeNull();
   });
 
+  test('the sack note says which sack it was: a switch-in the hazards took, or a body left in to take the priced hit', () => {
+    const { rerender } = render(<SideRow name="Alice" side={sideAnalysis({ sacrifice: { name: 'Weavile', hpFraction: 0.22, healthy: true, hazard: true, verified: true } })} />);
+    expect(screen.getByText('· sacked Weavile (22% HP)')).toHaveAttribute('title', expect.stringContaining('entry hazards'));
+    rerender(<SideRow name="Alice" side={sideAnalysis({ sacrifice: { name: 'Weavile', hpFraction: 0.6, stayed: true, verified: true } })} />);
+    expect(screen.getByText('· sacked Weavile (60% HP)')).toHaveAttribute('title', expect.stringContaining('left in'));
+  });
+
   test('a blunder reads as a blunder; a setup move softens the chip into a caveat', () => {
     const { rerender } = render(<SideRow name="Alice" side={misplayedSide('blunder')} />);
     expect(screen.getByText(`blunder · ${winDeltaText(-0.5)}`)).toBeInTheDocument();
