@@ -196,21 +196,26 @@ Außerdem entfernt Runde 60 einen alten Umweg: Für festgelegte Lade-Züge riet 
 
 **Die billige Statik bringt wenig.** Mittlerer Schadenswurf und Status-Regeln (Verbrennung, Guts, Facade) im eigenen Kern schließen nur 3 der 16 Basispunkte, die der Simulator-Kern bringt. Einen billigen Weg zu genauerem Schaden gibt es nicht; die Triage liest diese Zahl.
 
+## Was Runde 62 entschieden hat
+
+Runde 62 hat jedes übrige TODO auf dem neuen Stand gelesen, mit einem Prüfer und einem Gegenprüfer je TODO. 36 von 75 TODOs sind geschlossen: Ihre Szene liest jetzt richtig, ihr Hebel ist mit dem Baum ab Zug 1 weg (die Wurzel-Matrix rechnet nur noch die Nachprüfung, die den Score nicht anfasst), oder sie gehen in einem anderen TODO auf. Wichtiger geworden ist, was der Simulator jetzt an jedem Knoten spielt: Die Statik ist Blattwert jedes Baums und sortiert die Doubles-Kombinationen (T81), und die Sets, die der Baum spielt, tragen zu wenige oder widerlegte Züge (T28, T89). Die nächsten Schritte laufen als Wellen mit parallelen Spuren, jede Spur mit eigenen Dateien; vorn stehen frühe Singles-Züge als Matrix (T110), der Zugkern der Statik (T81) und die Nachprüfung im Baum (T16, T78).
+
 ## Was noch offen ist und wie es entschieden wird
 
 Runde 59 hat nur Zeit gespart, die Bewertung ist unverändert. Ob mehr Simulation besser bewertet, ist die eigentliche offene Frage.
 
 - **Runde 60 (S1a):** gebaut, gemessen und am Gate vom 02.10. ganz übernommen (siehe oben). Eine Meldung an `@pkmn/client` entfällt; die Bibliothek hatte den Fehler nicht (siehe oben). Drei Reste stehen als T105 bis T107 in `NextSteps.md`.
 - **Runde 61 (S2):** gemessen und an den Gates vom 03. und 04.10. übernommen: Bäume ab dem ersten Zug (siehe oben). Drei Reste stehen als T109 bis T111 in `NextSteps.md`.
-- **Runde 62 (S3):** Triage. Jedes übrige TODO wird auf dem neuen Stand gelesen, nicht geschätzt, und bekommt ein Urteil: obsolet, kleiner, wichtiger, weniger wichtig oder unverändert. Die Tabelle geht an dein Gate.
+- **Runde 62 (S3):** Triage, am Gate vom 05.10. übernommen (siehe unten).
 
 ## Was mit der übrigen Liste passiert
 
-Bis zur Triage ruht die übrige Liste; Ausnahmen gibt es nur an deinem Gate. Die Genauigkeits-Achse der Statik bleibt geparkt, ihr Urteil fällt in der Triage, mit dem Gewinn je Sekunde aus Runde 61 neben ihrer Decke. Ein TODO der Achse kommt nur mit einem Plan zurück, der die Gewichte neu fittet. „Eine Regel, ein Ort“ (die Doppelungen zusammenlegen, Bibliothek statt Eigenbau, wo sie passt) folgt nach der Triage. Der ganze Umbau bleibt bis zum Ende von Runde 62 auf Branch `r59` und geht danach nach `v1`.
+Die Triage ist durch: Die Liste in `NextSteps.md` trägt nur noch TODOs mit Nutzen-Satz, geordnet als Wellen mit parallelen Spuren. Die Genauigkeits-Achse lebt in T81 (Zugkern ohne Re-Fit, am Gate entschieden) und T102 (Re-Fit mit Modellform). Aus „Eine Regel, ein Ort“ bleiben die Teile mit Szene (T100 Simulator → Rechner, T101 Einwechsel-Rechte und Kampfformen, T96 Fehler in der Oberfläche). Der Umbau geht nach dem Gate der Runde 62 von `r59` nach `v1`.
 
 ## Quellen
 
 - Gespräch der Sitzung vom 24.09.2026 (Fragen und Gate im Wortlaut), 01.10.2026 (Branch-Entscheid) und 02.10.2026 (Grundsätze, Spec-Gate der Runde 60).
+- Runde 62: Spec `docs/superpowers/specs/2026-10-04-round-62-design.md`, Tabelle, Berichte und Sonden `docs/perf/probes/2026-10-04-r62/` (beide lokal), geschlossene TODOs `docs/completed/triage.md`, Ledger-Block `TRIAGE 2026-10-04` in `regression/eval-calibration.spec.ts`.
 - Runde 60: Spec `docs/superpowers/specs/2026-10-02-round-60-design.md`, Sonden, Zählungen und Lesungen `docs/perf/probes/2026-10-02-r60/` (beide lokal), Ledger-Block `RULE FIXES 2026-10-02` in `regression/eval-calibration.spec.ts`.
 - Ledger-Block `STATIC UPPER BOUND AND SIM COST 2026-09-24` in `regression/eval-calibration.spec.ts` (Runde 58: Obergrenze, Kosten, Undo, Inventur, Patch-Studie, Gate).
 - Ledger-Block `SPEED LAYER 2026-10-01` in derselben Datei (Runde 59: Tore, Fehler, Pflege-Regeln).

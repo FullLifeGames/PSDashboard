@@ -902,6 +902,23 @@ import { takeSimFastReport } from '../packages/eval-engine/src/forward/sim-fast/
  * static basis for this mass; the next lever, if any, is search/
  * planning-side.
  *
+ * TRIAGE 2026-10-04 (improvement round 62, iteration S3 of the program
+ * "more simulation", T99; no engine code, cache stays v56, bank base
+ * stays .calibration/r61-t98b): every open TODO (75), the three round-61
+ * signals and every watch line of section C judged against the state after
+ * the rebuild by twelve examiners and twelve counter-examiners (one per
+ * group) and one critic, disagreements ruled by hand (38 rulings).
+ * Verdicts: obsolete 3, discarded 28, merged into another TODO 5
+ * (36 closed); smaller 21, more important 4, less important 2,
+ * unchanged 12 (39 kept, each with a benefit line);
+ * new TODOs T112 to T116. No bank run: no run request would have flipped a
+ * keep or a close. Closed TODOs with evidence and old text in
+ * docs/completed/triage.md; table, reports and probes under
+ * docs/perf/probes/2026-10-04-r62/. Gate 2026-10-05 09:41 "1a", on the
+ * order "run the next steps with several sub-agents in parallel" (the list
+ * now runs as three waves of lanes that share no file, NextSteps D25),
+ * "3a" (fast-forward r59 into v1 and push v1; master stays).
+ *
  * SEARCH BUDGET 2026-10-02 (improvement round 61, iteration S2 of the
  * program "more simulation", T97 and T98; spec
  * docs/superpowers/specs/2026-10-02-round-61-design.md, plan
