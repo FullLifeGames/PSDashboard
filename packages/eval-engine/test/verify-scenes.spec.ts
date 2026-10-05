@@ -74,3 +74,12 @@ describe('verify scenes: every class one ply deeper (round 63, T16)', () => {
     expect(Math.abs(value - -0.454)).toBeLessThan(2.5 * 0.111);
   });
 });
+
+describe('verify scenes: doubles boundary cells and the played column (round 63, T78)', () => {
+  test("2629703929 t13 (VGC): p2's winning Psychic Fangs carries no tier once Flare Blitz's kill odds are priced (0.2618 before)", { timeout: 300_000 }, async () => {
+    const position = scene('gen9vgc2026regi-2629703929-t13');
+    const analysis = flat(position, await search(position));
+    expect(analysis.p2.played?.label).toContain('Psychic Fangs');
+    expect(analysis.p2.regret!).toBeLessThan(0.1);
+  });
+});

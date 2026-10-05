@@ -1,5 +1,5 @@
 import { mctsTreeSearch } from './mcts.ts';
-import { mergeMctsTrees, rowCompletedCells, starvedSupportCells } from './mcts-merge.ts';
+import { mergeMctsTrees } from './mcts-merge.ts';
 import type { OrchestratorCallbacks, SearchExecutor } from './orchestrator.ts';
 import { perfAdd, perfSync } from './perf-trace.ts';
 import { cellKey } from './rank.ts';
@@ -7,6 +7,7 @@ import { searchBudget } from './search/budget.ts';
 import { applyForcedWin, forcedWinInput } from './search/forced-win-apply.ts';
 import { createLocalExecutor } from './search/position.ts';
 import type { EvalCellJob, EvalCellValue, EvalResult, EvalSettings, MctsTreeStats, SearchProgress } from './types.ts';
+import { boundaryCheckCells, playedIndices, rowCompletedCells, starvedSupportCells, type VerifyFocus } from './verify-select.ts';
 
 /**
  * Round 61: the tree search's orchestration, one place for the app and the
@@ -72,20 +73,40 @@ async function verifyCells(executor: TreeExecutor, jobs: EvalCellJob[], settings
 }
 
 /**
+ * Round 63 (T78): a doubles tree ships no boundary list, so the pair plan
+ * prices the support and played cells the visit stats leave out, in one
+ * cells round without deepening; a cell it prices with classes is a
+ * boundary cell. Singles has nothing to check.
+ */
+async function pairPlanBoundary(
+  executor: TreeExecutor, trees: MctsTreeStats[], merged: EvalResult, played: VerifyFocus['played'],
+): Promise<Set<number>> {
+  const checks = boundaryCheckCells(trees, merged, { played });
+  if (checks.length === 0) return new Set();
+  const values = await executor.evalCells(checks);
+  return new Set(values.filter(value => value.blend).map(value => cellKey(value.i, value.j)));
+}
+
+/**
  * Starved-support verification: cells the merged equilibrium leans on with
  * too few pooled visits carry ONE chance outcome per tree; re-price them with
- * the matrix-grade multi-seed sampler before the verdict stands. The score is
- * the visit mean either way; only rankings sharpen.
+ * the matrix-grade multi-seed sampler before the verdict stands. Round 63
+ * (T78): the played row and column count as support, and the pair plan
+ * names the doubles boundary cells. The score is the visit mean either way;
+ * only rankings sharpen.
  */
 async function verifiedMerge(
   executor: TreeExecutor, trees: MctsTreeStats[], settings: EvalSettings, callbacks?: OrchestratorCallbacks,
 ): Promise<EvalResult> {
   const merged = perfSync('main:mcts-merge', () => mergeMctsTrees(trees));
   if (stopped(callbacks)) return merged;
-  const jobs = perfSync('main:starved-cells', () => rowCompletedCells(trees, merged, starvedSupportCells(trees, merged)));
-  if (jobs.length === 0) return merged;
-  callbacks?.onPartial?.(merged);
   try {
+    const played = playedIndices(trees, merged, settings.keepPlayed);
+    const focus: VerifyFocus = { played, boundary: await pairPlanBoundary(executor, trees, merged, played) };
+    if (stopped(callbacks)) return merged;
+    const jobs = perfSync('main:starved-cells', () => rowCompletedCells(trees, merged, starvedSupportCells(trees, merged, focus), focus));
+    if (jobs.length === 0) return merged;
+    callbacks?.onPartial?.(merged);
     const values = await verifyCells(executor, jobs, settings);
     if (stopped(callbacks)) return merged;
     return perfSync('main:mcts-merge', () =>

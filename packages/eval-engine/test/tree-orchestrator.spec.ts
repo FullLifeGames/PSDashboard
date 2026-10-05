@@ -2,6 +2,7 @@ import { describe, expect, test } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { mctsTreeSearch } from '../src/mcts';
 import { MCTS_TREES, mergeMctsTrees, rowCompletedCells, starvedSupportCells } from '../src/mcts-merge';
+import { boundaryCheckCells, playedIndices } from '../src/verify-select';
 import { createLocalExecutor } from '../src/search';
 import { applyForcedWin, forcedWinInput } from '../src/search/forced-win-apply';
 import { cellKey } from '../src/rank';
@@ -13,17 +14,22 @@ const position = (name: string) =>
 const CASES = ['smogtours-gen9ou-749828-t23', 'gen9ou-2658658993-t2', 'gen9doublesou-2663093831-t12'];
 
 /**
- * The tree path by hand, sequential: four trees, merge, the verify cells as one cells round that goes one
- * ply deeper per outcome (round 63, T16; before, a sub-search per cell on its first-seed child), merge, prover.
+ * The tree path by hand, sequential: four trees, merge, the doubles boundary check by the pair plan and the
+ * played row and column (round 63, T78), the verify cells as one cells round that goes one ply deeper per
+ * outcome (round 63, T16; before, a sub-search per cell on its first-seed child), merge, prover.
  */
 async function handPipeline(serialized: string, settings: EvalSettings): Promise<{ result: EvalResult; jobs: number }> {
   const trees = Array.from({ length: MCTS_TREES }, (_, offset) => mctsTreeSearch(serialized, settings, offset));
   const merged = mergeMctsTrees(trees);
-  const jobs = rowCompletedCells(trees, merged, starvedSupportCells(trees, merged));
+  const executor = createLocalExecutor(serialized);
+  const played = playedIndices(trees, merged, settings.keepPlayed);
+  const checked = await executor.evalCells(boundaryCheckCells(trees, merged, { played }));
+  const focus = { played, boundary: new Set(checked.filter(value => value.blend).map(value => cellKey(value.i, value.j))) };
+  const jobs = rowCompletedCells(trees, merged, starvedSupportCells(trees, merged, focus), focus);
   let result = merged;
   if (jobs.length > 0) {
     const deepen: EvalSettings = { depth: 1, samples: 1, tera: settings.tera, sleepClause: settings.sleepClause };
-    const values = await createLocalExecutor(serialized).evalCells(jobs.map(job => ({ ...job, deepen })));
+    const values = await executor.evalCells(jobs.map(job => ({ ...job, deepen })));
     result = mergeMctsTrees(trees, new Map(values.map(value => [cellKey(value.i, value.j), value])));
   }
   if (settings.prove !== false) applyForcedWin(result, await createLocalExecutor(serialized).prove(forcedWinInput(result, settings)));

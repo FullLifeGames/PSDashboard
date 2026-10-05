@@ -234,10 +234,13 @@ export function mctsTreeSearch(
   // Boundary flags for the merge's verify selection. Analytic only (one
   // calc per damaging pair, no sim advances) and identical across trees,
   // and the merge reads trees[0] alone — so only the offset-0 tree pays
-  // the i×j calc scan (doubles: 256 cells); sibling trees ship an empty
-  // list that nothing reads.
+  // the i×j calc scan; sibling trees ship an empty list that nothing reads.
+  // Round 63 (T78): a doubles tree ships no list. The analytic plan gives
+  // up on every combined choice, and the pair plan that prices doubles
+  // cells decides their boundary in the verify step (verify-select.ts).
+  const doubles = positionBattle(root.position).gameType === 'doubles';
   const boundaryCells: number[] = [];
-  if (seedOffset === 0 && !root.ended && root.p1Options.length > 0 && root.p2Options.length > 0) {
+  if (seedOffset === 0 && !doubles && !root.ended && root.p1Options.length > 0 && root.p2Options.length > 0) {
     const battle = positionBattle(root.position);
     for (let i = 0; i < root.p1Options.length; i++) {
       for (let j = 0; j < root.p2Options.length; j++) {
@@ -257,7 +260,7 @@ export function mctsTreeSearch(
     depth: maxDepth,
     rootValue: root.value,
     koOdds,
-    boundaryCells,
+    ...(doubles ? {} : { boundaryCells }),
     // Root-cell stats for the merged equilibrium (Map order is insertion
     // order — deterministic under the fixed seed schedule).
     cells: [...root.children.entries()].map(([key, child]) => cellStats(key, child, rootClassKeys.get(key))),
