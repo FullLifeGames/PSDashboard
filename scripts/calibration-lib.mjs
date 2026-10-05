@@ -180,18 +180,149 @@ function bandRow(cell, { draws, seed, level }) {
     }
     means.push(sum / n);
   }
+  const moved = cell.some(pair => pair.delta !== 0);
+  return bandOf(mean, means, { n: cell.length, games: games.length, moved, level, zero: 0 });
+}
+
+/** Mean, band, spread and reading of one row from its bootstrap means; a band within `zero` of nought reads unresolved. */
+function bandOf(mean, means, { n, games, moved, level, zero }) {
+  const bp = value => value * 10000;
+  const draws = means.length;
   means.sort((x, y) => x - y);
   const tail = (1 - level) / 2;
   const lo = means[Math.floor(tail * draws)];
   const hi = means[Math.ceil((1 - tail) * draws) - 1];
   const center = means.reduce((sum, value) => sum + value, 0) / draws;
   const se = Math.sqrt(means.reduce((sum, value) => sum + (value - center) ** 2, 0) / draws);
-  const moved = cell.some(pair => pair.delta !== 0);
-  const reading = !moved ? 'unmoved' : hi < 0 ? 'B better' : lo > 0 ? 'B worse' : 'unresolved';
+  const reading = !moved ? 'unmoved' : hi < -zero ? 'B better' : lo > zero ? 'B worse' : 'unresolved';
   return {
-    n: cell.length, games: games.length, meanBp: bp(mean), loBp: bp(lo), hiBp: bp(hi), seBp: bp(se),
+    n, games, meanBp: bp(mean), loBp: bp(lo), hiBp: bp(hi), seBp: bp(se),
     pBetter: means.filter(value => value < 0).length / draws, reading,
   };
+}
+
+/**
+ * One K by Newton on the weighted log-likelihood, run to a standstill:
+ * fitPhaseK of regression/fit-helpers.ts with k1 = 0. The 500 gradient steps
+ * of fitConstantK stop short on a small cell; here each side gets the K that
+ * fits it best, so neither keeps an unfinished fit. A step that raises the
+ * loss is halved. K stays in [0, 50]: a cell where every sign is right has
+ * no finite maximum, and a score that runs against the outcomes earns no
+ * credit by flipping its sign.
+ * `weights[i]` counts how often sample i was drawn (1 for a plain fit).
+ */
+const K_MAX = 50;
+
+function fitWeightedK(scores, wins, weights, start) {
+  let k = start;
+  let base = start;
+  let step = 0;
+  let best = Infinity;
+  for (let iter = 0; iter < 200; iter++) {
+    let loss = 0;
+    let gradient = 0;
+    let curvature = 0;
+    for (let i = 0; i < scores.length; i++) {
+      const weight = weights[i];
+      if (weight === 0) continue;
+      const score = scores[i];
+      const p = sigmoid(k * score);
+      const clamped = Math.min(1 - 1e-6, Math.max(1e-6, p));
+      loss -= weight * (wins[i] ? Math.log(clamped) : Math.log(1 - clamped));
+      gradient += weight * (p - wins[i]) * score;
+      curvature += weight * p * (1 - p) * score * score;
+    }
+    if (loss > best + 1e-12 * Math.abs(best)) {
+      step /= 2;
+      k = base - step;
+      if (Math.abs(step) < 1e-10) break;
+      continue;
+    }
+    best = loss;
+    base = k;
+    k = Math.max(0, Math.min(K_MAX, base - Math.max(-10, Math.min(10, gradient / (curvature * (1 + 1e-9) + 1e-12)))));
+    step = base - k;
+    if (Math.abs(step) < 1e-10) break;
+  }
+  return k;
+}
+
+/** The plain fit of `{ score, won }` samples: every weight 1, started where fitConstantK starts. */
+export function fitKToStandstill(samples) {
+  return fitWeightedK(samples.map(s => s.score), samples.map(s => (s.won ? 1 : 0)), samples.map(() => 1), 1.5);
+}
+
+const GAME_TYPES = ['singles', 'doubles'];
+const PHASES = ['early', 'mid', 'late'];
+
+/** A row's pairs split by game type and phase, as flat arrays the bootstrap weights by replay. */
+function ownKCells(cell, gameIndex) {
+  const cells = [];
+  for (const gameType of GAME_TYPES) {
+    for (const phase of PHASES) {
+      const inCell = cell.filter(pair => pair.sample.gameType === gameType && pair.sample.phase === phase);
+      if (inCell.length === 0) continue;
+      const wins = inCell.map(pair => (pair.sample.p1Won ? 1 : 0));
+      const a = inCell.map(pair => pair.a);
+      const b = inCell.map(pair => pair.b);
+      const ones = inCell.map(() => 1);
+      cells.push({
+        gameType, phase, a, b, wins, game: inCell.map(pair => gameIndex.get(pair.id)),
+        kA: fitWeightedK(a, wins, ones, 1.5), kB: fitWeightedK(b, wins, ones, 1.5),
+      });
+    }
+  }
+  return cells;
+}
+
+/** Sum of the paired squared-error deltas and the drawn count over the cells, each side under its own K per cell. */
+function ownKSum(cells, counts) {
+  let sum = 0;
+  let n = 0;
+  for (const cell of cells) {
+    const weights = cell.game.map(game => counts[game]);
+    if (!weights.some(weight => weight > 0)) continue;
+    const kA = counts === null ? cell.kA : fitWeightedK(cell.a, cell.wins, weights, cell.kA);
+    const kB = counts === null ? cell.kB : fitWeightedK(cell.b, cell.wins, weights, cell.kB);
+    for (let i = 0; i < cell.a.length; i++) {
+      const weight = weights[i];
+      if (weight === 0) continue;
+      sum += weight * ((sigmoid(kB * cell.b[i]) - cell.wins[i]) ** 2 - (sigmoid(kA * cell.a[i]) - cell.wins[i]) ** 2);
+      n += weight;
+    }
+  }
+  return { sum, n };
+}
+
+/** Below this many bp a band counts as nought: the two fits stop 1e-10 apart, not at the same bit. */
+const OWN_K_ZERO_BP = 0.001;
+
+/** One row under own K: every draw resamples the row's replays and refits each cell's K, so the band carries the fit's noise too. */
+function ownKRow(cell, { draws, seed, level }) {
+  const gameIndex = new Map();
+  for (const pair of cell) if (!gameIndex.has(pair.id)) gameIndex.set(pair.id, gameIndex.size);
+  const games = gameIndex.size;
+  const cells = ownKCells(cell, gameIndex);
+  const point = ownKSum(cells, new Array(games).fill(1));
+  const random = mulberry32(seed);
+  const means = [];
+  const counts = new Array(games);
+  for (let draw = 0; draw < draws; draw++) {
+    counts.fill(0);
+    for (let pick = 0; pick < games; pick++) counts[Math.floor(random() * games)] += 1;
+    const drawn = ownKSum(cells, counts);
+    means.push(drawn.sum / drawn.n);
+  }
+  const moved = cell.some(pair => pair.a !== pair.b);
+  return bandOf(point.sum / point.n, means, { n: cell.length, games, moved, level, zero: OWN_K_ZERO_BP / 10000 });
+}
+
+/** Per side, the K of every game type and phase in the pairs (null where a cell is empty). */
+function ownKs(pairs) {
+  const cells = ownKCells(pairs, new Map(pairs.map(pair => [pair.id, 0])));
+  const side = key => Object.fromEntries(GAME_TYPES.map(gameType => [gameType, Object.fromEntries(PHASES.map(phase =>
+    [phase, cells.find(cell => cell.gameType === gameType && cell.phase === phase)?.[key] ?? null]))]));
+  return { a: side('kA'), b: side('kB') };
 }
 
 /**
@@ -207,16 +338,39 @@ export function pairedBands(a, b, { draws = 2000, seed = 20260919, level = 0.9 }
   const squared = (s, score) => (sigmoid(k * score) - (s.p1Won ? 1 : 0)) ** 2;
   const pairs = a.filter(s => bByKey.has(key(s)))
     .map(s => ({ id: s.id, sample: s, delta: squared(s, bByKey.get(key(s)).score) - squared(s, s.score) }));
+  const rows = bandRows(pairs, cell => bandRow(cell, { draws, seed, level }));
+  return { k, joined: pairs.length, draws, level, rows };
+}
+
+/** Every view, game type and phase that holds a pair, each row computed by `rowOf` on its cell. */
+function bandRows(pairs, rowOf) {
   const views = BAND_VIEWS.filter(([view]) => view !== 'hq' || pairs.some(pair => pair.sample.quality === 'hq'));
   const rows = [];
   for (const [view, keep] of views) {
     for (const [gameType, phase] of BAND_CELLS) {
       const cell = pairs.filter(({ sample }) => keep(sample) &&
         (gameType === 'all' || sample.gameType === gameType) && (phase === 'all' || sample.phase === phase));
-      if (cell.length > 0) rows.push({ view, gameType, phase, ...bandRow(cell, { draws, seed, level }) });
+      if (cell.length > 0) rows.push({ view, gameType, phase, ...rowOf(cell) });
     }
   }
-  return { k, joined: pairs.length, draws, level, rows };
+  return rows;
+}
+
+/**
+ * The second verdict table (round 63, T52 step 1, rule D25): the same rows,
+ * but each side scores under its own K per game type and phase, fitted on
+ * the row's own positions and refit in every bootstrap draw. Under one fixed
+ * K the bank pays for scale (round 62: rescaling doubles per phase alone
+ * reads −35 bp); here a pure rescale reads nought, and only a better order
+ * of the positions within a cell reads as a gain.
+ */
+export function ownKBands(a, b, { draws = 2000, seed = 20260919, level = 0.9 } = {}) {
+  const key = s => `${s.id}#${s.turn}`;
+  const bByKey = new Map(b.map(s => [key(s), s]));
+  const pairs = a.filter(s => bByKey.has(key(s)))
+    .map(s => ({ id: s.id, sample: s, a: s.score, b: bByKey.get(key(s)).score }));
+  const rows = bandRows(pairs, cell => ownKRow(cell, { draws, seed, level }));
+  return { ownK: true, k: ownKs(pairs), joined: pairs.length, draws, level, rows };
 }
 
 /** A shift this small is no harm even where its band clears zero: few moved positions resolve a single basis point (round 49, user gate). */
@@ -240,10 +394,13 @@ export function bandLines(result) {
     const rounded = Math.round(value);
     return `${rounded >= 0 ? '+' : ''}${rounded === 0 ? 0 : rounded}`;
   };
-  const lines = [
-    `=== verdict table with bands (joined n=${result.joined}, fixed K ${result.k.toFixed(2)} from A; bp, negative = B better; ` +
-    `${Math.round(result.level * 100)} % band over replays, ${result.draws} draws) ===`,
-  ];
+  const tail = `bp, negative = B better; ${Math.round(result.level * 100)} % band over replays, ${result.draws} draws) ===`;
+  const ks = side => GAME_TYPES
+    .map(gameType => `${gameType} ${PHASES.map(phase => result.k[side][gameType][phase]?.toFixed(2) ?? '-').join('/')}`).join(' ');
+  const lines = result.ownK
+    ? [`=== verdict table with own K per game type and phase, refit in every draw (joined n=${result.joined}; ${tail}`,
+      ` K A ${ks('a')} | K B ${ks('b')}`]
+    : [`=== verdict table with bands (joined n=${result.joined}, fixed K ${result.k.toFixed(2)} from A; ${tail}`];
   let view = null;
   for (const row of result.rows) {
     if (row.view !== view) {
@@ -259,7 +416,7 @@ export function bandLines(result) {
   const names = rows => rows
     .map(row => `${row.view} ${row.gameType}${row.phase === 'all' ? '' : ` ${row.phase}`} (${signed(row.meanBp)})`).join(', ');
   lines.push(
-    `bank verdict: ${verdict.gain.length > 0 ? `gain on ${names(verdict.gain)}` : 'no gain resolved'}; ` +
+    `bank verdict${result.ownK ? ', own K per phase' : ''}: ${verdict.gain.length > 0 ? `gain on ${names(verdict.gain)}` : 'no gain resolved'}; ` +
     `${verdict.harm.length > 0 ? `HARM on ${names(verdict.harm)}` : 'no harm'}; ` +
     `${verdict.warnings.length > 0 ? `warnings: ${names(verdict.warnings)}` : 'no warnings'}` +
     `${verdict.notes.length > 0 ? `; resolved under ${HARM_MIN_BP} bp: ${names(verdict.notes)}` : ''}`);

@@ -3,14 +3,16 @@
 // Joins the two dumps on id#turn (identical positions only), reproduces the
 // harness aggregates for each side, prints the verdict table with error bars
 // (paired Brier deltas under the A side's K, 90 % band from a bootstrap over
-// replays; pooled rows decide, phase cells warn), shows the disagreement structure, and
+// replays; pooled rows decide, phase cells warn), then the same table with each
+// side under its own K per game type and phase (round 63, rule D25: a pure
+// rescale reads nought there), shows the disagreement structure, and
 // computes counterfactual hybrid lines (file A early, file B once
 // faintedFraction crosses a threshold) plus score blends. The math lives in
 // scripts/calibration-lib.mjs, which replicates the fit-helpers.ts
 // methodology exactly (pooled constant-K logistic fit via 500-iteration GD,
 // Brier under that K), so numbers here are comparable to the printed sweep
 // output.
-import { bandLines, filterQuality, load, pairedBands, record, right, takeQualityArg } from './calibration-lib.mjs';
+import { bandLines, filterQuality, load, ownKBands, pairedBands, record, right, takeQualityArg } from './calibration-lib.mjs';
 
 const key = s => `${s.id}#${s.turn}`;
 
@@ -49,10 +51,11 @@ if (tranches.length > 1 || tranches[0] !== 'untagged') {
 }
 
 // Under --quality both sides are one tranche already, so the hq view would repeat the full one.
-const bands = pairedBands(a, b);
-if (quality) bands.rows = bands.rows.filter(row => row.view !== 'hq');
-console.log('');
-for (const line of bandLines(bands)) console.log(line);
+for (const bands of [pairedBands(a, b), ownKBands(a, b)]) {
+  if (quality) bands.rows = bands.rows.filter(row => row.view !== 'hq');
+  console.log('');
+  for (const line of bandLines(bands)) console.log(line);
+}
 
 console.log('\n=== disagreement structure (joined) ===');
 for (const phase of ['early', 'mid', 'late']) {

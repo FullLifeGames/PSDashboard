@@ -5,7 +5,7 @@ import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { brierScore, fitConstantK } from './fit-helpers';
 import {
-  bandLines, bankVerdict, brier, compareSamples, fitConstantK as fitConstantKJs, load, mergeDumps, pairedBands,
+  bandLines, bankVerdict, brier, compareSamples, fitConstantK as fitConstantKJs, load, mergeDumps, ownKBands, pairedBands,
   sortSamples, summarize,
 } from '../scripts/calibration-lib.mjs';
 
@@ -205,6 +205,93 @@ describe('paired bands (round 48)', () => {
     expect(line).toContain('resolved under 5 bp: full all (+');
     // The offset of the earlier test is far above the floor and stays harm.
     expect(bankVerdict(pairedBands(a, a.map(sample => against(sample, 0.3)))).notes).toHaveLength(0);
+  });
+
+  /**
+   * Round 62 (D25): under one fixed K the bank pays for scale. A root that
+   * reads doubles early flatter and late steeper wins on the bank without a
+   * single better decision (doubles −35 bp from rescaling alone). The second
+   * table gives each side its own K per game type and phase, so only a
+   * better ordering of the positions reads as a gain.
+   */
+  describe('own K per phase (round 63, T52 step 1)', () => {
+    const scaled = (samples: BankSample[], gameType: string, phase: string, by: number) =>
+      samples.map(sample => (sample.gameType === gameType && sample.phase === phase ? { ...sample, score: sample.score * by } : sample));
+
+    test('a dump against itself reads unmoved on every row', () => {
+      const result = ownKBands(bank(), bank());
+      expect(result.joined).toBe(120);
+      expect(result.rows.length).toBe(pairedBands(bank(), bank()).rows.length);
+      for (const row of result.rows as BandRow[]) {
+        expect(Math.abs(row.meanBp) + Math.abs(row.loBp) + Math.abs(row.hiBp)).toBe(0);
+        expect(row.reading).toBe('unmoved');
+      }
+    });
+
+    test('a pure rescale of one cell is no gain and no harm, while the fixed K reads it', () => {
+      const a = bank();
+      const b = scaled(a, 'singles', 'early', 0.5);
+      const fixed = rowOf(pairedBands(a, b).rows, 'full', 'singles', 'early');
+      expect(Math.abs(fixed.meanBp)).toBeGreaterThan(1);
+      const result = ownKBands(a, b);
+      for (const row of result.rows as BandRow[]) {
+        expect(Math.abs(row.meanBp)).toBeLessThan(0.001);
+        expect(row.reading).not.toBe('B better');
+        expect(row.reading).not.toBe('B worse');
+      }
+      expect(result.k.b.singles.early).toBeCloseTo(2 * result.k.a.singles.early, 6);
+      expect(bandLines(result).at(-1)).toBe('bank verdict, own K per phase: no gain resolved; no harm; no warnings');
+    });
+
+    test('a better ordering survives its own K: scores toward the winner read as a gain, the mirror as harm', () => {
+      const a = bank();
+      const b = a.map(sample => against(sample, -0.3));
+      const result = ownKBands(a, b);
+      expect(rowOf(result.rows, 'full', 'all', 'all').reading).toBe('B better');
+      expect(bankVerdict(result).gain.length).toBeGreaterThan(0);
+      const mirrored = ownKBands(b, a);
+      expect(rowOf(mirrored.rows, 'full', 'all', 'all').reading).toBe('B worse');
+      expect(bandLines(mirrored).at(-1)).toContain('bank verdict, own K per phase: no gain resolved; HARM on full all');
+    });
+
+    test('each K is the maximum-likelihood fit of its game type and phase; a cell with every sign right stops at 50', () => {
+      const a = bank();
+      const result = ownKBands(a, a.map(sample => against(sample, 0.1)));
+      const capped: string[] = [];
+      for (const gameType of ['singles', 'doubles'] as const) {
+        for (const phase of ['early', 'mid', 'late'] as const) {
+          const k = result.k.a[gameType][phase];
+          const cell = a.filter(sample => sample.gameType === gameType && sample.phase === phase);
+          if (cell.every(sample => (sample.score > 0) === sample.p1Won)) {
+            capped.push(`${gameType} ${phase}`);
+            expect(k).toBe(50);
+            continue;
+          }
+          const gradient = cell.reduce((sum, sample) =>
+            sum + (1 / (1 + Math.exp(-k * sample.score)) - (sample.p1Won ? 1 : 0)) * sample.score, 0);
+          expect(Math.abs(gradient)).toBeLessThan(1e-8);
+        }
+      }
+      // The fixture leans its late positions hard: both late cells carry no wrong sign.
+      expect(capped).toEqual(['singles late', 'doubles late']);
+    });
+
+    test('a score that runs against the outcomes earns no credit by flipping its sign: K stops at 0', () => {
+      const a = bank();
+      const flipped = a.map(sample => ({ ...sample, score: -sample.score }));
+      const result = ownKBands(a, flipped, { draws: 50 });
+      expect(result.k.b.singles.early).toBe(0);
+      expect(rowOf(result.rows, 'full', 'all', 'all').reading).toBe('B worse');
+    });
+
+    test('the table names its K per side and cell, and its verdict line says which table it is', () => {
+      const a = bank();
+      const lines = bandLines(ownKBands(a, a.map(sample => against(sample, 0.1))));
+      expect(lines[0]).toContain('own K per game type and phase, refit in every draw');
+      expect(lines[1]).toMatch(/^ K A singles (\d+\.\d\d\/){2}\d+\.\d\d doubles (\d+\.\d\d\/){2}\d+\.\d\d \| K B singles /);
+      expect(lines[2]).toBe(' full:');
+      expect(lines.at(-1)!.startsWith('bank verdict, own K per phase: ')).toBe(true);
+    });
   });
 
   test('the seed fixes the draws', () => {
