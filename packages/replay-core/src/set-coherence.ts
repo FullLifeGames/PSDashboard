@@ -3,7 +3,7 @@
 // simulator across the dynamic-import boundary (team-builder stays lazy).
 import { Dex } from '@pkmn/dex';
 import type { PokemonSetAssumption } from './smogon/sets-lookup.ts';
-import { slotMoveKey, slotOptionKeys, slotOrderedMoves } from './team/move-slots.ts';
+import { filledSlots, slotMoveKey, slotOrderedMoves } from './team/move-slots.ts';
 
 /**
  * Pairwise coherence vetoes for guessed set assembly. Marginal fills (top
@@ -18,6 +18,12 @@ export interface MoveCandidate {
   name: string;
   /** false = revealed/manual (immune to vetoes), true = usage/set fill. */
   guessed: boolean;
+  /**
+   * A move of the chosen Smogon set: coherent by construction, so rows 1
+   * and 2 spare it; the item rows still apply, because the item may come
+   * from elsewhere (an inferred Scarf). Round 63, T28.
+   */
+  fromSet?: boolean;
 }
 
 export interface CoherenceContext {
@@ -58,6 +64,8 @@ interface MoveFacts {
   category: 'Physical' | 'Special' | 'Status';
   basePower: number;
   type: string;
+  /** Moves before the turn order (Ice Shard): their own role, never a redundant second attack. */
+  priority: number;
   /** The stat the move's damage actually scales with (Body Press: def). */
   scaling: 'atk' | 'spa' | 'def' | null;
 }
@@ -68,7 +76,7 @@ function factsOf(name: string): MoveFacts | null {
   const scaling = move.category === 'Status' ? null
     : move.overrideOffensiveStat === 'def' ? 'def'
     : move.category === 'Physical' ? 'atk' : 'spa';
-  return { id: move.id, category: move.category, basePower: move.basePower, type: move.type, scaling };
+  return { id: move.id, category: move.category, basePower: move.basePower, type: move.type, priority: move.priority, scaling };
 }
 
 export interface CuratedEvidence {
@@ -97,8 +105,6 @@ const UNSEEN_MOVE_PROBABILITY = 0.01;
  */
 interface CandidateIds {
   moveIds: string[];
-  /** Every option of every move slot, as slot keys (T89). */
-  slotKeys: string[];
   itemId: string;
   abilityId: string;
 }
@@ -106,18 +112,17 @@ interface CandidateIds {
 function candidateIds(candidate: PokemonSetAssumption): CandidateIds {
   return {
     moveIds: candidate.moves.map(move => Dex.moves.get(move.value).id as string),
-    slotKeys: slotOptionKeys(candidate.moves),
     itemId: candidate.item ? (Dex.items.get(candidate.item.value).id as string) : '',
     abilityId: candidate.ability ? (Dex.abilities.get(candidate.ability.value).id as string) : '',
   };
 }
 
-/** Two points per revealed move (any option of a slot), item, and ability the candidate carries. */
-function fitScore(ids: CandidateIds, evidence: CuratedEvidence): number {
-  let fit = 0;
-  for (const revealed of evidence.revealedMoves) {
-    if (ids.slotKeys.includes(slotMoveKey(revealed))) fit += 2;
-  }
+/**
+ * Two points per move slot a revealed move fills (any option, one move per
+ * slot: T89), per revealed item, and per revealed ability the candidate carries.
+ */
+function fitScore(candidate: PokemonSetAssumption, ids: CandidateIds, evidence: CuratedEvidence): number {
+  let fit = 2 * filledSlots(candidate.moves, evidence.revealedMoves.map(slotMoveKey)).size;
   if (evidence.revealedItem && ids.itemId === evidence.revealedItem) fit += 2;
   if (evidence.revealedAbility && ids.abilityId === evidence.revealedAbility) fit += 2;
   return fit;
@@ -135,7 +140,7 @@ export function selectCuratedSet(
     if (ids.itemId && evidence.ruledOutItems.includes(ids.itemId)) continue;
     if (ids.abilityId && evidence.ruledOutAbilities.includes(ids.abilityId)) continue;
 
-    const fit = fitScore(ids, evidence);
+    const fit = fitScore(candidate, ids, evidence);
     if (fit < evidence.revealedMoves.length) continue;
 
     const tiebreak = ids.moveIds.reduce((sum, id) =>
@@ -174,10 +179,10 @@ function keepDamagingMoves(candidates: MoveCandidate[], served: Set<string>): Da
     if (!facts || facts.category === 'Status') continue;
     const keep = () => {
       damagingKept.add(candidate);
-      keptDamageTypes.add(facts.type);
+      if (facts.priority <= 0) keptDamageTypes.add(facts.type);
       if (facts.scaling) keptScalings.add(facts.scaling);
     };
-    if (!candidate.guessed) {
+    if (!candidate.guessed || candidate.fromSet) {
       keep();
       continue;
     }
@@ -187,8 +192,9 @@ function keepDamagingMoves(candidates: MoveCandidate[], served: Set<string>): Da
       continue;
     }
     // Row 2: redundant same-type damage from the same slot budget
-    // (Air Slash + Hurricane) — first accepted (higher usage) wins.
-    if (keptDamageTypes.has(facts.type)) continue;
+    // (Air Slash + Hurricane) — first accepted (higher usage) wins. A
+    // priority move is no second main attack (Ice Shard beside Icicle Crash).
+    if (facts.priority <= 0 && keptDamageTypes.has(facts.type)) continue;
     keep();
   }
   return { keptScalings, damagingKept };
@@ -223,15 +229,19 @@ export function applyCoherenceVetoes(
   candidates: MoveCandidate[],
   context: CoherenceContext,
 ): MoveCandidate[] {
-  // Boost context comes from the WHOLE pool (usage order can list the attack
-  // before the boost) — boost moves themselves are never vetoed by these rows.
-  const served = new Set<string>();
-  for (const candidate of candidates) {
-    const serves = BOOST_SERVES[Dex.moves.get(candidate.name).id];
-    if (serves) served.add(serves);
-  }
   const restrictiveItem = CHOICE_ITEMS.has(context.itemId) ? 'choice'
     : context.itemId === 'assaultvest' ? 'av' : null;
+  // Boost context comes from the WHOLE pool (usage order can list the attack
+  // before the boost) — boost moves themselves are never vetoed by these rows.
+  // A guessed boost the item rows strike serves nothing (round 63, T28: a
+  // usage Dragon Dance under Choice Specs left Kyurem with Icicle Spear only).
+  const served = new Set<string>();
+  for (const candidate of candidates) {
+    const move = Dex.moves.get(candidate.name);
+    const serves = BOOST_SERVES[move.id];
+    const struck = candidate.guessed && restrictiveItem !== null && move.category === 'Status';
+    if (serves && !struck) served.add(serves);
+  }
 
   const keeps = keepDamagingMoves(candidates, served);
   return assembleKeptMoves(candidates, restrictiveItem, keeps);

@@ -1,19 +1,29 @@
 import type { PokemonSet } from '@pkmn/sim';
 import { Dex } from '@pkmn/sim';
-import type { SmogonUsageStats, SpeciesUsageSet } from '../smogon/stats-types.ts';
+import type { SmogonUsageStats, SpeciesUsageSet, UsageProbability } from '../smogon/stats-types.ts';
 import { getSpeciesSetAssumption, type SmogonSetAssumptions } from '../smogon/sets-lookup.ts';
-import { getSpeciesUsageSet } from '../smogon/usage-lookup.ts';
+import { getSpeciesUsageSet, getSpeciesUsageStats } from '../smogon/usage-lookup.ts';
 import { applyCoherenceVetoes, selectCuratedSet, type MoveCandidate } from '../set-coherence.ts';
 import { itemSetValue } from '../team-info.ts';
 import type { SpreadCandidate } from '../spread-inference.ts';
 import type { KnowledgeSource, PokemonEvs, RevealedPokemonInfo } from '../types.ts';
 import { toId } from '../ids.ts';
+import { slotMoveKey } from './move-slots.ts';
 
 type SmogonSet = ReturnType<typeof getSpeciesSetAssumption>;
 type CuratedSet = ReturnType<typeof selectCuratedSet>;
 
 /** Usage-move candidates fetched per species — vetoes refill from the tail. */
 export const USAGE_MOVE_POOL = 10;
+
+/**
+ * The usage moves past USAGE_MOVE_POOL: the last refill of a pool the vetoes
+ * left short (round 63, T28, decision 12: a set under four moves only when
+ * the whole pool holds fewer than four allowed moves).
+ */
+export function usageMoveTail(usageStats: SmogonUsageStats | null | undefined, species: string): UsageProbability[] {
+  return getSpeciesUsageStats(species, usageStats)?.moves.slice(USAGE_MOVE_POOL) ?? [];
+}
 
 /** User-edited or in-game-revealed spread fields: they outrank every guess and every sheet. */
 export interface EditedFields {
@@ -121,7 +131,8 @@ export function selectCuratedFor(info: RevealedPokemonInfo, smogonSet: SmogonSet
     revealedMoves: info.moves
       .filter(move => move.source === 'revealed' || move.source === 'manual')
       .map(move => toId(move.name)),
-    revealedItem: toId(known(info.item)),
+    // A consumed or knocked-off item is still the set's item (round 63: 751407 Dragonite's Choice Band).
+    revealedItem: toId(itemSetValue(known(info.item))),
     revealedAbility: toId(known(info.ability)),
     ruledOutItems: info.ruledOut?.items ?? [],
     ruledOutAbilities: info.ruledOut?.abilities ?? [],
@@ -159,26 +170,34 @@ export function resolveItemWithout(
 
 /**
  * Move assembly: revealed/manual knowledge first (immune to vetoes), then
- * the winning curated set's moves, then usage fills. Coherence vetoes drop
- * jointly implausible fills, and the deeper usage pool refills the slots.
+ * the winning curated set's moves (its slots already read against the
+ * evidence), then the enrichment's guesses, then usage fills, the usage
+ * tail last. Round 63 (T89 with T28, decision 11): the chosen set stands
+ * before every guess. Coherence vetoes drop jointly implausible fills, and
+ * the rest of the pool refills the slots. The panel's enrichment offers the
+ * same order (team-info.ts).
  */
 export function assembleMoves(
   info: RevealedPokemonInfo, curated: CuratedSet | null, usageSet: SpeciesUsageSet | null, smogonSet: SmogonSet, item: string,
+  usageTail: UsageProbability[] = [],
 ): string[] {
-  const pool: MoveCandidate[] = info.moves.map(move => ({
-    name: move.name,
-    guessed: move.source !== 'revealed' && move.source !== 'manual',
-  }));
-  const pooled = new Set(pool.map(candidate => toId(candidate.name)));
+  const pool: MoveCandidate[] = [];
+  const pooled = new Set<string>();
+  const offer = (name: string, candidate: Omit<MoveCandidate, 'name'>) => {
+    if (pooled.has(slotMoveKey(name))) return;
+    pooled.add(slotMoveKey(name));
+    pool.push({ name, ...candidate });
+  };
+  for (const move of info.moves) {
+    if (move.source === 'revealed' || move.source === 'manual') offer(move.name, { guessed: false });
+  }
+  for (const fill of curated?.moves ?? []) offer(fill.value, { guessed: true, fromSet: true });
+  for (const move of info.moves) offer(move.name, { guessed: true });
   for (const fill of [
-    ...(curated?.moves ?? []),
     ...(usageSet?.moves ?? []),
     ...(curated ? [] : (smogonSet?.moves ?? [])),
-  ]) {
-    if (pooled.has(toId(fill.value))) continue;
-    pooled.add(toId(fill.value));
-    pool.push({ name: fill.value, guessed: true });
-  }
+    ...usageTail,
+  ]) offer(fill.value, { guessed: true });
   return applyCoherenceVetoes(pool, { itemId: toId(item) })
     .slice(0, 4)
     .map(candidate => candidate.name);

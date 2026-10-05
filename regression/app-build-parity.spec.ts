@@ -109,13 +109,15 @@ describe('the bank builds the teams the app ships', () => {
     const { parsed, seed, usageStats, setAssumptions } = await knowledgeFor(replay);
     const app = buildAppTeams(replay.log, seed, { usageStats, setAssumptions });
     const old = await withRawBuild(() => bankTeams(replay, parsed));
+    // Round 63 (T89): both builds read the published move slots, so the old
+    // build now picks Volcanion's Leftovers set too, and Ferrothorn's solved
+    // spread is where the two diverge instead.
     expect(moved(rows(old), rows(app)))
-      .toEqual(['p1:Tornadus-Therian', 'p1:Volcanion', 'p2:Landorus-Therian', 'p2:Tornadus-Therian']);
+      .toEqual(['p1:Tornadus-Therian', 'p2:Ferrothorn', 'p2:Landorus-Therian', 'p2:Tornadus-Therian']);
     // The scene the round is named after: the old build explains the move
-    // order with speed EVs and leaves Volcanion its scarf.
+    // order with speed EVs.
     expect(itemOf(old, 'p2', 'Landorus-Therian')).toBe('Rocky Helmet');
     expect(itemOf(app, 'p2', 'Landorus-Therian')).toBe('Choice Scarf');
-    expect(itemOf(old, 'p1', 'Volcanion')).toBe('Choice Scarf');
     expect(itemOf(app, 'p1', 'Volcanion')).not.toBe('Choice Scarf');
     expect(unpinned).toEqual([]);
   }, 120_000);

@@ -9,7 +9,7 @@ import { observedMaxHp } from './spreads/max-hp.ts';
 import { withHiddenPowerType } from './hidden-power.ts';
 import {
   assembleMoves, buildSheetSet, editedFields, findUserMatch, resolveAbility, resolveItem, resolveItemWithout, resolveSpread,
-  selectCuratedFor, USAGE_MOVE_POOL,
+  selectCuratedFor, USAGE_MOVE_POOL, usageMoveTail,
 } from './team/set-resolvers.ts';
 import { resolveInferredItems, speedKnowledgeFor } from './team/inferred-items.ts';
 import { abilitiesAreFree, dexLegalSet } from './team/dex-legal.ts';
@@ -196,7 +196,7 @@ function buildSet(
   const item = inferred?.item === ''
     ? resolveItemWithout(info, usageStats, setAssumptions, 'choicescarf')
     : resolveItem(info, curated, usageSet, smogonSet, inferred?.item ?? '');
-  const moves = assembleMoves(info, curated, usageSet, smogonSet, item);
+  const moves = assembleMoves(info, curated, usageSet, smogonSet, item, usageMoveTail(usageStats, info.species));
   const revealedMoves = info.moves.filter(move => move.source === 'revealed').map(move => move.name);
   const spread = resolveSpread(info.species, edited, inferred, curated, usageSet, smogonSet, revealedMoves);
 

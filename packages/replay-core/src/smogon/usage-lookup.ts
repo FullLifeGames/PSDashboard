@@ -5,19 +5,46 @@
  */
 import type { PokemonFieldInfo, PokemonMoveInfo } from '../types.ts';
 import type { PokemonUsageStats, SmogonUsageStats, SpeciesUsageSet, UsageProbability } from './stats-types.ts';
+import { Dex } from '@pkmn/dex';
 import { toId } from '../ids.ts';
 
 export function sourceDetail(format: string, month: string): string {
   return `Smogon ${format} ${month}`;
 }
 
+function ownUsageStats(species: string, usageStats: SmogonUsageStats): PokemonUsageStats | undefined {
+  return usageStats.pokemon[toId(species)] ??
+    Object.values(usageStats.pokemon).find(entry => toId(entry.species) === toId(species));
+}
+
+/**
+ * The base species of a forme that battles exactly like it: same types,
+ * base stats and abilities in the Dex (Gastrodon-East, Maushold-Four,
+ * Zarude-Dada); null for a forme that battles differently (Rotom-Wash).
+ */
+function battleAlikeBase(species: string): string | null {
+  const forme = Dex.species.get(species);
+  if (!forme.exists || forme.baseSpecies === forme.name) return null;
+  const base = Dex.species.get(forme.baseSpecies);
+  const same = (a: unknown, b: unknown) => JSON.stringify(a) === JSON.stringify(b);
+  return base.exists && same(forme.types, base.types) && same(forme.baseStats, base.baseStats) &&
+    same(forme.abilities, base.abilities) ? base.name : null;
+}
+
+/**
+ * The species' usage entry; a forme the usage files do not list reads its
+ * battle-alike base species (round 63, T28: Gastrodon-East and Maushold-Four
+ * had no pool and played with their revealed moves or Tackle).
+ */
 export function getSpeciesUsageStats(
   species: string,
   usageStats?: SmogonUsageStats | null,
 ): PokemonUsageStats | undefined {
   if (!usageStats) return undefined;
-  return usageStats.pokemon[toId(species)] ??
-    Object.values(usageStats.pokemon).find(entry => toId(entry.species) === toId(species));
+  const own = ownUsageStats(species, usageStats);
+  if (own) return own;
+  const base = battleAlikeBase(species);
+  return base ? ownUsageStats(base, usageStats) : undefined;
 }
 
 export function getSpeciesUsageSet(

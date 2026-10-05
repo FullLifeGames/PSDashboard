@@ -1,4 +1,4 @@
-import { getSpeciesUsageSet } from './smogon/usage-lookup.ts';
+import { getSpeciesUsageSet, getSpeciesUsageStats } from './smogon/usage-lookup.ts';
 import type { SmogonUsageStats, UsageProbability, UsageSpread } from './smogon/stats-types.ts';
 import { getSpeciesSetAssumption, type SetAssumption, type SetSpreadAssumption, type SmogonSetAssumptions } from './smogon/sets-lookup.ts';
 import { applyCoherenceVetoes, selectCuratedSet, type MoveCandidate } from './set-coherence.ts';
@@ -209,7 +209,8 @@ function curatedSetFor(pokemon: RevealedPokemonInfo, usageSet: SpeciesUsage, smo
     revealedMoves: pokemon.moves
       .filter(move => move.source === 'revealed' || move.source === 'manual')
       .map(move => toId(move.name)),
-    revealedItem: proven(pokemon.item),
+    // A consumed or knocked-off item is still the set's item (round 63).
+    revealedItem: proven({ ...pokemon.item, value: itemSetValue(pokemon.item.value) }),
     revealedAbility: proven(pokemon.ability),
     ruledOutItems: pokemon.ruledOut?.items ?? [],
     ruledOutAbilities: pokemon.ruledOut?.abilities ?? [],
@@ -227,24 +228,33 @@ function setFallbacks(curated: CuratedSet | null, smogonSet: SmogonSet) {
   };
 }
 
-/** The move pool in offer order: known, curated, usage, then marginal set moves when nothing curated won. */
+/**
+ * The move pool in the build's offer order (assembleMoves): known, the
+ * curated set (spared by veto rows 1 and 2), earlier guesses, usage, marginal
+ * set moves when nothing curated won, then the usage tail (round 63, T89
+ * with T28).
+ */
 function assembleMovePool(
   pokemon: RevealedPokemonInfo, curated: CuratedSet | null, usageSet: SpeciesUsage, smogonSet: SmogonSet,
+  usageTail: UsageProbability[],
 ): { pool: MoveCandidate[]; infoFor: Map<string, PokemonMoveInfo> } {
   const infoFor = new Map<string, PokemonMoveInfo>();
   const pool: MoveCandidate[] = [];
   const pooled = new Set<string>();
-  const offer = (move: PokemonMoveInfo) => {
+  const known = (move: PokemonMoveInfo) => move.source === 'revealed' || move.source === 'manual';
+  const offer = (move: PokemonMoveInfo, fromSet = false) => {
     const key = moveDedupKey(move.name);
     if (pooled.has(key)) return;
     pooled.add(key);
     infoFor.set(move.name, move);
-    pool.push({ name: move.name, guessed: move.source !== 'revealed' && move.source !== 'manual' });
+    pool.push({ name: move.name, guessed: !known(move), ...(fromSet ? { fromSet } : {}) });
   };
+  for (const move of pokemon.moves) if (known(move)) offer(move);
+  for (const move of curated?.moves ?? []) offer(guessedMoveFromSet(move), true);
   for (const move of pokemon.moves) offer(move);
-  for (const move of curated?.moves ?? []) offer(guessedMoveFromSet(move));
   for (const move of usageSet?.moves ?? []) offer(guessedMove(move));
   if (!curated) for (const move of smogonSet?.moves ?? []) offer(guessedMoveFromSet(move));
+  for (const move of usageTail) offer(guessedMove(move));
   return { pool, infoFor };
 }
 
@@ -293,7 +303,8 @@ export function enrichPokemonInfo(
 
   // The item resolves BEFORE the moves — the Choice/AV veto rows read it.
   const item = normalizeItemField(pokemon.item, usageSet?.item, fallback.item, pokemon.ruledOut?.items, !!curated);
-  const { pool, infoFor } = assembleMovePool(pokemon, curated, usageSet, smogonSet);
+  const usageTail = getSpeciesUsageStats(pokemon.species, usageStats)?.moves.slice(GUESS_MOVE_POOL) ?? [];
+  const { pool, infoFor } = assembleMovePool(pokemon, curated, usageSet, smogonSet, usageTail);
   const moves = vetoedMoves(pool, infoFor, item.value);
 
   return {

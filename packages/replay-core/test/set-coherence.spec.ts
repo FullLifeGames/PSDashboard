@@ -118,6 +118,55 @@ describe('set-coherence vetoes', () => {
     ]);
   });
 
+  // T28 (round 63): rows 1 and 2 threw whole movesets away. Seven Kyurem
+  // with Choice Specs kept only Icicle Spear: a usage Dragon Dance that the
+  // Specs strike anyway still "served" Attack and vetoed every special move.
+  const fromSet = (name: string): MoveCandidate => ({ name, guessed: true, fromSet: true });
+
+  test('a guessed boost the Choice item strikes serves nothing (Kyurem with Specs, T28)', () => {
+    const kept = applyCoherenceVetoes([
+      guessed('Earth Power'), guessed('Draco Meteor'), guessed('Dragon Dance'), guessed('Icicle Spear'),
+    ], { itemId: 'choicespecs' });
+    expect(names(kept)).toEqual(['Earth Power', 'Draco Meteor', 'Icicle Spear']);
+  });
+
+  test('a guessed boost the Vest strikes serves nothing (T28)', () => {
+    const kept = applyCoherenceVetoes([
+      guessed('Calm Mind'), guessed('Close Combat'), guessed('Moonblast'),
+    ], { itemId: 'assaultvest' });
+    expect(names(kept)).toEqual(['Close Combat', 'Moonblast']);
+  });
+
+  test('a revealed boost still serves under a guessed Choice item (T28)', () => {
+    const kept = applyCoherenceVetoes([
+      revealed('Dragon Dance'), guessed('Earth Power'), guessed('Icicle Spear'),
+    ], { itemId: 'choicespecs' });
+    expect(names(kept)).toEqual(['Dragon Dance', 'Icicle Spear']);
+  });
+
+  test('row 2 spares a priority move, and a priority move blocks no main attack (Weavile, T28)', () => {
+    expect(names(applyCoherenceVetoes([
+      revealed('Triple Axel'), guessed('Ice Shard'), guessed('Icicle Crash'),
+    ], { itemId: 'choiceband' }))).toEqual(['Triple Axel', 'Ice Shard']);
+    expect(names(applyCoherenceVetoes([
+      guessed('Ice Shard'), guessed('Icicle Crash'), guessed('Knock Off'),
+    ], { itemId: 'choiceband' }))).toEqual(['Ice Shard', 'Icicle Crash', 'Knock Off']);
+  });
+
+  test('rows 1 and 2 spare the chosen set\'s own moves (Samurott-Hisui with the Vest, T28)', () => {
+    const kept = applyCoherenceVetoes([
+      revealed('Ceaseless Edge'), fromSet('Razor Shell'), fromSet('Sucker Punch'), fromSet('Knock Off'), guessed('Night Slash'),
+    ], { itemId: 'assaultvest' });
+    expect(names(kept)).toEqual(['Ceaseless Edge', 'Razor Shell', 'Sucker Punch', 'Knock Off']);
+    expect(names(applyCoherenceVetoes([guessed('Swords Dance'), fromSet('Body Press')], { itemId: '' })))
+      .toEqual(['Swords Dance', 'Body Press']);
+  });
+
+  test('the item rows still strike a chosen-set status move (an inferred Scarf, T28)', () => {
+    expect(names(applyCoherenceVetoes([fromSet('Volt Switch'), fromSet('Toxic')], { itemId: 'choicescarf' })))
+      .toEqual(['Volt Switch']);
+  });
+
   test('a boost later in the pool still vetoes an earlier off-stat guess', () => {
     // Usage order can list the attack first; the veto scans the whole pool
     // for boost context before deciding.
@@ -201,6 +250,18 @@ describe('coherent-set selection', () => {
   test('fixed moves come before the open slots, first options before the others (T89)', () => {
     const picked = selectCuratedSet([pivot()], evidence({ revealedMoves: ['hurricane'] }));
     expect(values(picked)).toEqual(['Hurricane', 'Knock Off', 'U-turn', 'Heat Wave', 'Hidden Power Ice']);
+  });
+
+  test('two revealed options of one slot fill it once (573756 Toxapex: "The Pex" cannot hold both Toxic and Haze, T89)', () => {
+    const toxapex = (moves: (string | string[])[], item: string) => ({ ...slotted(moves, item), species: 'Toxapex' });
+    const pex = toxapex([['Light Screen', 'Knock Off', 'Scald'], ['Knock Off', 'Scald', 'Poison Jab'], ['Toxic', 'Haze'], 'Recover'], 'Shed Shell');
+    const spdef = toxapex([['Knock Off', 'Scald', 'Poison Jab'], ['Toxic', 'Knock Off'], ['Haze', 'Light Screen'], 'Recover'], 'Black Sludge');
+    const picked = selectCuratedSet([pex, spdef], evidence({ revealedMoves: ['toxic', 'knockoff', 'haze', 'recover'] }));
+    expect(picked?.item?.value).toBe('Black Sludge');
+    expect(values(picked)).toEqual(['Recover']);
+    // One Knock Off fills one slot: the other slot stays open and offers its other options.
+    expect(values(selectCuratedSet([pex], evidence({ revealedMoves: ['knockoff'] }))))
+      .toEqual(['Recover', 'Scald', 'Toxic', 'Poison Jab', 'Haze']);
   });
 
   test('a set without slot options comes back as published (T89)', () => {
