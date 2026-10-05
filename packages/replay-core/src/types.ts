@@ -111,6 +111,13 @@ export interface SpeedOrderObservation {
   secondSide: 'p1' | 'p2';
   secondSpecies: string;
   turn: number;
+  /**
+   * The Choice Scarf each mover held that turn, for a mon whose Scarf came or
+   * went during the game (round 63): the race is read with it instead of the
+   * set's item.
+   */
+  firstScarf?: boolean;
+  secondScarf?: boolean;
 }
 
 export type KnowledgeSource = 'revealed' | 'guessed' | 'manual' | 'sheet' | 'unknown';

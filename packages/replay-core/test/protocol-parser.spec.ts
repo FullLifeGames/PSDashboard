@@ -510,33 +510,33 @@ describe('speed-order cleanliness', () => {
     expect(orders(singlesLog(['Hawlucha, M', 'Dragapult, F'], firstThenDraco('Acrobatics'), ['|-enditem|p1a: A|Grassy Seed']))).toEqual([]);
   });
 
-  test('a Choice Scarf that changed hands voids the races that ran with an item the set does not carry', () => {
+  test('a Choice Scarf that changed hands is read at every race with the Scarf the mon held (round 63)', () => {
     const mons: [string, string] = ['Snorlax, M', 'Dragapult, F'];
     const race = ['|move|p1a: A|Body Slam|p2a: B', '|move|p2a: B|Draco Meteor|p1a: A'];
-    const turns = (log: string) => parseReplayLogWithObservations(log).speedOrders.map(o => o.turn);
-    // Knocked off at turn 2: the race of turn 1 ran with the Scarf the set carries, the race of turn 3 without it.
-    expect(turns(singlesLog(mons, [
+    const read = (log: string) => parseReplayLogWithObservations(log).speedOrders.map(o => [o.turn, o.firstScarf, o.secondScarf]);
+    // Knocked off at turn 2: the race of turn 1 ran with the Scarf, the race of turn 3 without it; the set keeps
+    // the Scarf, so the order says which one ran.
+    expect(read(singlesLog(mons, [
       ...race, '|turn|2', '|-enditem|p2a: B|Choice Scarf|[from] move: Knock Off|[of] p1a: A', '|turn|3', ...race,
-    ]))).toEqual([1]);
-    // A race the knocked-off mon still WON stands: without the Scarf it only understates the win.
-    expect(turns(singlesLog(mons, [
-      ...race, '|turn|2', '|-enditem|p2a: B|Choice Scarf|[from] move: Knock Off|[of] p1a: A', '|turn|3',
-      '|move|p2a: B|Draco Meteor|p1a: A', '|move|p1a: A|Body Slam|p2a: B',
-    ]))).toEqual([1, 3]);
-    // Knocked off before any race: nothing stands.
-    expect(orders(singlesLog(mons, race, ['|-enditem|p2a: B|Choice Scarf|[from] move: Knock Off|[of] p1a: A']))).toEqual([]);
-    // Tricked onto A at turn 2: the race A lost at turn 1 ran without the Scarf the set now carries (dropped),
-    // the race A won at turn 3 stands.
-    expect(turns(singlesLog(mons, [
+    ]))).toEqual([[1, undefined, true], [3, undefined, false]]);
+    // The race of the turn the Scarf moved is dropped: which item ran it is open.
+    expect(read(singlesLog(mons, [
+      ...race, '|turn|2', '|-enditem|p2a: B|Choice Scarf|[from] move: Knock Off|[of] p1a: A', ...race,
+    ]))).toEqual([[1, undefined, true]]);
+    // Knocked off before any race: the race runs without it.
+    expect(read(singlesLog(mons, race, ['|-enditem|p2a: B|Choice Scarf|[from] move: Knock Off|[of] p1a: A']))).toEqual([[1, undefined, false]]);
+    // Tricked onto A at turn 2: the race A lost at turn 1 ran without a Scarf, the race A won at turn 3 with it
+    // (the build keeps A's own item, a swapped-in one is never the set's).
+    expect(read(singlesLog(mons, [
       '|move|p2a: B|Draco Meteor|p1a: A', '|move|p1a: A|Body Slam|p2a: B',
       '|turn|2', '|-item|p1a: A|Choice Scarf|[from] move: Trick', '|turn|3', ...race,
-    ]))).toEqual([3]);
-    // Given away: which item the set carries is open, so no race of the giver counts.
-    expect(orders(singlesLog(mons, race, [
+    ]))).toEqual([[1, undefined, false], [3, true, undefined]]);
+    // Given away before any race: the giver races without it.
+    expect(read(singlesLog(mons, race, [
       '|-item|p2a: B|Choice Scarf|[from] ability: Frisk|[of] p1a: A', '|-item|p2a: B|Leftovers|[from] move: Trick',
-    ]))).toEqual([]);
-    // Frisk only reveals the Scarf: the race stands.
-    expect(orders(singlesLog(mons, race, ['|-item|p2a: B|Choice Scarf|[from] ability: Frisk|[of] p1a: A']))).toEqual(['Snorlax>Dragapult']);
+    ]))).toEqual([[1, undefined, false]]);
+    // Frisk only reveals the Scarf: the set carries it, the race stands as it is.
+    expect(read(singlesLog(mons, race, ['|-item|p2a: B|Choice Scarf|[from] ability: Frisk|[of] p1a: A']))).toEqual([[1, undefined, undefined]]);
   });
 });
 

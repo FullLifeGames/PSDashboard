@@ -4,7 +4,7 @@ import {
   appendFinalSnapshot, feedLine, handleActionBoundary, handleCrit, handleDamage, handleGametype, handleGen, handleMove,
   handleResisted, handleSuperEffective, isActionBoundary,
 } from './protocol/handlers.ts';
-import { dropScarfMovers, noteActivation } from './protocol/speed-evidence.ts';
+import { noteActivation, settleScarfMovers } from './protocol/speed-evidence.ts';
 
 export function parseReplayLog(log: string): TurnSnapshot[] {
   return parseReplayLogWithObservations(log).snapshots;
@@ -54,7 +54,7 @@ export function parseReplayLogWithObservations(log: string): {
     feedLine(state, line);
   }
   flushSpeedOrder(state);
-  dropScarfMovers(state);
+  settleScarfMovers(state);
   appendFinalSnapshot(state);
 
   const { snapshots, observations, speedOrders, hpEvidence } = state;

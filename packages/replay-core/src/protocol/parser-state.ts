@@ -15,12 +15,10 @@ interface TurnMover {
   cleanSecond: boolean;
 }
 
-/** A turn span in which a mon's Choice Scarf differed from its set's (round 37). */
-export interface ScarfSpan {
-  from: number;
-  to: number;
-  /** The first-mover role is poisoned too (a Scarf given away: which item the set carries is open). */
-  both: boolean;
+/** A Choice Scarf that came (`held`) or went at this turn (round 63). */
+export interface ScarfChange {
+  turn: number;
+  held: boolean;
 }
 
 /** The pending move context: crits and multi-hits disqualify its damage. */
@@ -61,13 +59,11 @@ export interface ParserState {
   /** Idents that acted early on a Quick Claw, Quick Draw, or Custap Berry this turn (round 37). */
   quickActed: Set<string>;
   /**
-   * Per `side:species`, the turn span whose races measure a Choice Scarf the
-   * set does not carry (round 37): from a loss on, up to a gain, the whole
-   * game and both roles when the Scarf was given away. Only the race lost
-   * (the second-mover role) is false evidence; moving first without the
-   * set's Scarf only understates the win.
+   * Per `side:species`, the turns a Choice Scarf came or went (round 63):
+   * the races around them are read with the Scarf the mon held, the races
+   * of a change turn are dropped.
    */
-  scarfMoved: Map<string, ScarfSpan>;
+  scarfChanges: Map<string, ScarfChange[]>;
   lastMove: PendingMove | null;
   // Take initial snapshot at turn 0 (before any turns)
   capturedInitial: boolean;
@@ -89,7 +85,7 @@ export function createParserState(): ParserState {
     actedThisTurn: new Set<string>(),
     reordered: new Set<string>(),
     quickActed: new Set<string>(),
-    scarfMoved: new Map<string, ScarfSpan>(),
+    scarfChanges: new Map<string, ScarfChange[]>(),
     lastMove: null,
     capturedInitial: false,
   };

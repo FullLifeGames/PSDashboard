@@ -1,5 +1,5 @@
 import type { PokemonSet } from '@pkmn/sim';
-import type { PokemonEvs } from '../types.ts';
+import type { PokemonEvs, SpeedOrderObservation } from '../types.ts';
 import { keyOf, speedStat, type SolveContext } from './fit.ts';
 import { ZERO_EVS } from './ev-budget.ts';
 import type { SpreadCandidate } from './ladder.ts';
@@ -114,13 +114,17 @@ function decideAgainstGuessedScarf(ctx: SolveContext, first: Mover, second: Move
   return scarfIn(first, max, scarfRef);
 }
 
-/** One order's decision: [key, decision], or null when the order is reachable or unexplained. */
-function decide(ctx: SolveContext, first: Mover, second: Mover): [string, ItemDecision] | null {
+/**
+ * One order's decision: [key, decision], or null when the order is
+ * reachable or unexplained. A race the order reads with the Scarf a mover
+ * held that turn (round 63) decides nothing about that mover's set item.
+ */
+function decide(ctx: SolveContext, order: SpeedOrderObservation, first: Mover, second: Mover): [string, ItemDecision] | null {
   const max = maxSpeed(ctx, first);
   // A first mover already carrying a Scarf is the ladder's business.
-  if (max === 0 || toId(first.set.item ?? '') === 'choicescarf') return null;
-  const secondScarf = toId(second.set.item ?? '') === 'choicescarf';
-  if (secondScarf && !second.know.itemKnown) return decideAgainstGuessedScarf(ctx, first, second, max);
+  if (max === 0 || order.firstScarf !== undefined || toId(first.set.item ?? '') === 'choicescarf') return null;
+  const secondScarf = order.secondScarf ?? toId(second.set.item ?? '') === 'choicescarf';
+  if (secondScarf && order.secondScarf === undefined && !second.know.itemKnown) return decideAgainstGuessedScarf(ctx, first, second, max);
   const ref = floor(ctx, second) * (secondScarf ? SCARF_FACTOR : 1);
   return max >= ref ? null : scarfIn(first, max, ref);
 }
@@ -132,7 +136,7 @@ export function decideScarfs(ctx: SolveContext, knowledge: SpeedKnowledgeMap): M
     const first = mover(ctx, order.firstSide, order.firstSpecies, knowledge);
     const second = mover(ctx, order.secondSide, order.secondSpecies, knowledge);
     if (!first || !second) continue;
-    const decision = decide(ctx, first, second);
+    const decision = decide(ctx, order, first, second);
     if (decision && !decisions.has(decision[0])) decisions.set(decision[0], decision[1]);
   }
   return decisions;

@@ -213,8 +213,11 @@ function holdsScarf(ctx: SolveContext, side: 'p1' | 'p2', species: string): bool
   return toId(setOf(ctx, side, species)?.item ?? '') === 'choicescarf';
 }
 
-function effectiveSpeed(ctx: SolveContext, side: 'p1' | 'p2', species: string, spread: SpreadCandidate): number {
-  return speedStat(ctx, side, species, spread) * (holdsScarf(ctx, side, species) ? 1.5 : 1);
+/** A race's Speed: the Scarf the order says the mover held (round 63), else the set's or the decision's. */
+export function effectiveSpeed(
+  ctx: SolveContext, side: 'p1' | 'p2', species: string, spread: SpreadCandidate, held?: boolean,
+): number {
+  return speedStat(ctx, side, species, spread) * ((held ?? holdsScarf(ctx, side, species)) ? 1.5 : 1);
 }
 
 export function speedError(ctx: SolveContext, key: string, candidate: SpreadCandidate): number {
@@ -224,8 +227,8 @@ export function speedError(ctx: SolveContext, key: string, candidate: SpreadCand
     const firstSpread = firstKey === key ? candidate : spreadFor(ctx, order.firstSide, order.firstSpecies);
     const secondKey = keyOf(order.secondSide, order.secondSpecies);
     const secondSpread = secondKey === key ? candidate : spreadFor(ctx, order.secondSide, order.secondSpecies);
-    if (effectiveSpeed(ctx, order.firstSide, order.firstSpecies, firstSpread) <
-      effectiveSpeed(ctx, order.secondSide, order.secondSpecies, secondSpread)) {
+    if (effectiveSpeed(ctx, order.firstSide, order.firstSpecies, firstSpread, order.firstScarf) <
+      effectiveSpeed(ctx, order.secondSide, order.secondSpecies, secondSpread, order.secondScarf)) {
       violations += 1;
     }
   }

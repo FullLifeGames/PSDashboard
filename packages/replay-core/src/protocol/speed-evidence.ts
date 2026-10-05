@@ -1,4 +1,5 @@
-import { gens, type ClientIdent, type ParserState, type ScarfSpan } from './parser-state.ts';
+import { gens, type ClientIdent, type ParserState } from './parser-state.ts';
+import type { SpeedOrderObservation } from '../types.ts';
 import { toId } from '../ids.ts';
 
 /**
@@ -13,6 +14,7 @@ import { toId } from '../ids.ts';
 
 const NOT_A_RACE = /\[from\]\s?(?:ability: |move: )?(?:Dancer|Instruct|Magic Bounce|Magic Coat|Snatch)/;
 const AT_THE_SWITCH = /\[from\]\s?Pursuit/;
+const SWAP_MOVE = /\[from\] move: (?:Trick|Switcheroo)/;
 
 const WEATHER_ABILITY: Record<string, RegExp> = {
   swiftswim: /^(?:Rain|Heavy Rain)$/,
@@ -39,8 +41,8 @@ export function switchTriggered(line: string): boolean {
  * After You and Quash mark their target as rearranged for the turn; a
  * Quick Claw, Quick Draw, or Custap Berry activation marks the holder as
  * having acted early; a Choice Scarf that comes or goes (Knock Off, Trick,
- * a theft) marks the holder for the whole game, because the solver reads
- * every race against the set's item.
+ * a theft) is noted for its holder and its giver, because the solver reads
+ * a race against the set's item unless the order names the Scarf held.
  */
 export function noteActivation(state: ParserState, line: string): void {
   const parts = line.split('|');
@@ -50,47 +52,66 @@ export function noteActivation(state: ParserState, line: string): void {
   if (line.startsWith('|-activate|') && /^move: (?:After You|Quash)$/.test(effect)) state.reordered.add(ident);
   if (line.startsWith('|-activate|') && /^(?:item: Quick Claw|ability: Quick Draw)$/.test(effect)) state.quickActed.add(ident);
   if (line.startsWith('|-enditem|') && effect === 'Custap Berry') state.quickActed.add(ident);
-  const change = scarfChange(state, line, ident, effect);
-  const mon = change ? state.battle.getPokemon(ident as ClientIdent) : null;
-  if (change && mon) {
-    const key = `${ident.slice(0, 2)}:${mon.speciesForme}`;
-    const known = state.scarfMoved.get(key);
-    state.scarfMoved.set(key, known
-      ? { from: Math.min(known.from, change.from), to: Math.max(known.to, change.to), both: known.both || change.both }
-      : change);
+  for (const [holder, held] of scarfChanges(state, line, ident, effect)) {
+    const mon = state.battle.getPokemon(holder as ClientIdent);
+    if (!mon) continue;
+    const key = `${holder.slice(0, 2)}:${mon.speciesForme}`;
+    state.scarfChanges.set(key, [...(state.scarfChanges.get(key) ?? []), { turn: state.speedTurn, held }]);
   }
 }
 
 /**
- * The turn span a Scarf change poisons: a removed Scarf (Knock Off, a
- * theft) from this turn on, a Scarf arriving by a move or a stealing
- * ability up to this turn (the set carries what the protocol revealed), a
- * Scarf given away the whole game and in both roles (which item the set
- * carries is open). Frisk only reveals.
+ * The holders whose Scarf this line moves (round 63): a removed Scarf
+ * (Knock Off, a theft, the giver's side of a swap into nothing), an
+ * arriving one with its giver (`[of]`, else the other party of the pending
+ * Trick or Switcheroo), and a known Scarf swapped for another item. Frisk
+ * only reveals.
  */
-function scarfChange(state: ParserState, line: string, ident: string, item: string): ScarfSpan | null {
-  const turn = state.speedTurn;
-  if (line.startsWith('|-enditem|')) return item === 'Choice Scarf' ? { from: turn, to: Infinity, both: false } : null;
-  if (!line.startsWith('|-item|') || !line.includes('[from]') || line.includes('ability: Frisk')) return null;
-  if (item === 'Choice Scarf') return { from: 0, to: turn, both: false };
-  const before = state.battle.getPokemon(ident as ClientIdent)?.item ?? '';
-  return before === 'choicescarf' ? { from: 0, to: Infinity, both: true } : null;
+function scarfChanges(state: ParserState, line: string, ident: string, item: string): [string, boolean][] {
+  if (line.startsWith('|-enditem|')) return item === 'Choice Scarf' ? [[ident, false]] : [];
+  if (!line.startsWith('|-item|') || !line.includes('[from]') || line.includes('ability: Frisk')) return [];
+  if (item !== 'Choice Scarf') {
+    return state.battle.getPokemon(ident as ClientIdent)?.item === 'choicescarf' ? [[ident, false]] : [];
+  }
+  const giver = line.match(/\[of\] (p[12][a-d]?: [^|]+)/)?.[1] ?? swapPartner(state, line, ident);
+  return giver ? [[ident, true], [giver, false]] : [[ident, true]];
+}
+
+/** The other party of the pending Trick or Switcheroo. */
+function swapPartner(state: ParserState, line: string, ident: string): string | undefined {
+  const move = state.lastMove;
+  if (!move || !SWAP_MOVE.test(line)) return undefined;
+  if (move.attacker === ident) return move.target;
+  return move.target === ident ? move.attacker : undefined;
 }
 
 /**
- * A race lost while the mon's Scarf differed from its set's is no evidence
- * about that item (the solver would read a Scarfed loser); a race won
- * without the set's Scarf only understates the win and stays.
+ * The races of a mon whose Scarf came or went: dropped in the turn it
+ * moved (which item ran that race is open), read with the Scarf the mon
+ * held at every other race. Before its first change a mon held the
+ * opposite of what that change gave it.
  */
-export function dropScarfMovers(state: ParserState): void {
-  if (state.scarfMoved.size === 0) return;
-  const poisoned = (side: string, species: string, turn: number, role: 'first' | 'second') => {
-    const span = state.scarfMoved.get(`${side}:${species}`);
-    return span !== undefined && turn >= span.from && turn <= span.to && (span.both || role === 'second');
+export function settleScarfMovers(state: ParserState): void {
+  if (state.scarfChanges.size === 0) return;
+  const held = (side: string, species: string, turn: number): boolean | null | undefined => {
+    const changes = state.scarfChanges.get(`${side}:${species}`);
+    if (!changes) return undefined;
+    if (changes.some(change => change.turn === turn)) return null;
+    const before = changes.filter(change => change.turn < turn);
+    return before.length > 0 ? before[before.length - 1].held : !changes[0].held;
   };
-  state.speedOrders = state.speedOrders.filter(order =>
-    !poisoned(order.firstSide, order.firstSpecies, order.turn, 'first') &&
-    !poisoned(order.secondSide, order.secondSpecies, order.turn, 'second'));
+  const settled: SpeedOrderObservation[] = [];
+  for (const order of state.speedOrders) {
+    const first = held(order.firstSide, order.firstSpecies, order.turn);
+    const second = held(order.secondSide, order.secondSpecies, order.turn);
+    if (first === null || second === null) continue;
+    settled.push({
+      ...order,
+      ...(first === undefined ? {} : { firstScarf: first }),
+      ...(second === undefined ? {} : { secondScarf: second }),
+    });
+  }
+  state.speedOrders = settled;
 }
 
 /**
