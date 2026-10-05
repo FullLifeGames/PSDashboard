@@ -267,6 +267,18 @@ export function landedOrCatalog(attacker: Pokemon, defender: Pokemon, move: DexM
   };
 }
 
+/**
+ * The attacker's own ModifySTAB handler (Adaptability), found by its Dex
+ * field and asked in the sim's event frame on the STAB the rules give.
+ */
+export function abilityStab(attacker: Pokemon, defender: Pokemon, move: DexMove, stab: number, battle: Battle): number {
+  const ability = battle.dex.abilities.getByID(attacker.ability);
+  if (!(ability as unknown as { onModifySTAB?: unknown }).onModifySTAB) return stab;
+  const answer: unknown = onField(battle, attacker, defender, () =>
+    battle.singleEvent('ModifySTAB', ability, attacker.abilityState, attacker, defender, move as unknown as ActiveMove, stab));
+  return typeof answer === 'number' ? answer : stab;
+}
+
 const NO_BOOSTS: BoostsTable = { atk: 0, def: 0, spa: 0, spd: 0, spe: 0, accuracy: 0, evasion: 0 };
 
 /** A view of one body on other stages; every other read goes to the body itself. */
