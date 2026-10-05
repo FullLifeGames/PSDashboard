@@ -231,7 +231,7 @@ function landedFraction(attacker: Pokemon, defender: Pokemon, move: DexMove, use
     ? [attacker.storedStats.atk, defender.storedStats.def]
     : [attacker.storedStats.spa, defender.storedStats.spd];
   const damage = (((2 * attacker.level / 5 + 2) * use.basePower * (use.powerMult ?? 1) * atk / def) / 50 + 2) *
-    stab * typeMult * stellar * offense / bulk;
+    stab * typeMult * stellar * offense / bulk * (use.landing ?? 1);
   return damage / defender.maxhp;
 }
 
