@@ -4,7 +4,7 @@ import userEvent from '@testing-library/user-event';
 import { winDeltaText } from '@fulllifegames/eval-engine';
 import { EvalGameReport } from '../../src/components/EvalGameReport';
 import type { TurnEvalSettings } from '../../src/hooks/useEvaluation';
-import { gameReport } from '../fixtures/eval-result';
+import { gameReport, rankedChoice } from '../fixtures/eval-result';
 import { leadAnalysis, turnAnalysis } from '../fixtures/analysis';
 
 const names: [string, string] = ['Alice', 'Bob'];
@@ -70,6 +70,16 @@ describe('EvalGameReport', () => {
     await userEvent.click(chip(0));
     expect(onSelectTurn).toHaveBeenCalledWith(0);
     expect(screen.getAllByRole('button')).toHaveLength(1);
+  });
+
+  test('doubles: a lead pair graded a mistake gets no chip, because the lead reading there is close to a coin flip', () => {
+    // Round 63 (T116): 912045, "led Ogerpon-Cornerstone + Rillaboom, better: Chi-Yu + Okidogi" at a 0.25 regret.
+    const played = rankedChoice('team 34', 'Lead Ogerpon-Cornerstone + Rillaboom', -0.35);
+    const best = rankedChoice('team 12', 'Lead Chi-Yu + Okidogi', -0.1);
+    const leads = leadAnalysis({ p2: { played, best, regret: 0.25, tier: 'mistake' } });
+    render(<EvalGameReport report={gameReport()} playerNames={names} leads={leads} onSelectTurn={vi.fn()} />);
+    expect(screen.queryByRole('button', { name: /^T0/ })).toBeNull();
+    expect(screen.queryByText(/better: Chi-Yu \+ Okidogi/)).toBeNull();
   });
 
   test('an untracked report makes no "clean" claims; a missing accuracy shows a dash', () => {

@@ -1,4 +1,16 @@
-import type { TurnAnalysis } from '@fulllifegames/eval-engine';
+import type { LeadSideAnalysis, TurnAnalysis } from '@fulllifegames/eval-engine';
+
+/**
+ * Round 63 (T116): the team-preview verdict a side's lead may carry. In
+ * doubles (a led pair) the reading sits close to a coin flip — the matrix
+ * and the tree name a different best lead on 76 of 92 sides, and only 2 of
+ * the 14 matrix lead mistakes on the 46 bank previews hold under the tree —
+ * so a doubles lead gets no mistake or inaccuracy, only the engine's pick.
+ */
+export function leadTier(side: LeadSideAnalysis): LeadSideAnalysis['tier'] {
+  const label = side.played?.label ?? side.best?.label ?? '';
+  return label.includes(' + ') ? undefined : side.tier;
+}
 
 interface Badge {
   text: string;

@@ -1,13 +1,13 @@
 import { type GameReport, type LeadAnalysis, winDeltaText } from '@fulllifegames/eval-engine';
 import type { TurnEvalSettings } from '../hooks/useEvaluation';
-import { attributionBadge } from './eval-badges';
+import { attributionBadge, leadTier } from './eval-badges';
 import { sideIndex } from '@fulllifegames/replay-core';
 
 interface EvalGameReportProps {
   report: GameReport;
   playerNames: [string, string];
   onSelectTurn?: (turn: number) => void;
-  /** Turn-0 verdicts — a T0 chip appears for mistake-level lead choices. */
+  /** Turn-0 verdicts — a T0 chip appears for mistake-level lead choices (singles; a doubles lead carries none, eval-badges leadTier). */
   leads?: LeadAnalysis | null;
   /** What produced each turn's numbers — chips carry a d1/d2/MCTS badge so
    * mixed-depth curves read honestly. */
@@ -50,7 +50,7 @@ function AccuracyLine({ report, playerNames }: Pick<EvalGameReportProps, 'report
 
 function LeadChips({ leads, playerNames, onSelectTurn }: { leads: LeadAnalysis; playerNames: [string, string]; onSelectTurn: SelectTurn }) {
   const leadMisplays = (['p1', 'p2'] as const).filter(side =>
-    leads[side].tier === 'mistake' || leads[side].tier === 'blunder');
+    leadTier(leads[side]) === 'mistake' || leadTier(leads[side]) === 'blunder');
   if (leadMisplays.length === 0) return null;
   return (
     <div className="ps-eval-report-moments">

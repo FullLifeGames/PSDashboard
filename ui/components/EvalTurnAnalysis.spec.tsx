@@ -55,6 +55,18 @@ describe('EvalLeadAnalysis', () => {
     expect(screen.getByText(/^mistake ·/)).toHaveTextContent(`mistake · ${winDeltaText(-0.3)} · better: Rotom-Wash (${winPctText(-0.1)})`);
   });
 
+  test('doubles: a lead pair keeps the engine\'s pick as a neutral line, without a verdict', () => {
+    // Round 63 (T116): the doubles lead reading sits close to a coin flip, so no mistake or inaccuracy is named.
+    const played = rankedChoice('team 34', 'Lead Ogerpon-Cornerstone + Rillaboom', -0.35);
+    const best = rankedChoice('team 12', 'Lead Chi-Yu + Okidogi', -0.1);
+    const { rerender } = render(<EvalLeadAnalysis leads={leadAnalysis({ p2: { played, best, regret: 0.25, tier: 'mistake' } })} playerNames={names} />);
+    expect(screen.queryByText(/mistake/)).toBeNull();
+    expect(screen.getByText(/^engine:/)).toHaveTextContent(`engine: Chi-Yu + Okidogi (${winPctText(-0.1)})`);
+    rerender(<EvalLeadAnalysis leads={leadAnalysis({ p2: { played, best, regret: 0.12, tier: 'inaccuracy' } })} playerNames={names} />);
+    expect(screen.queryByText(/inaccuracy/)).toBeNull();
+    expect(screen.getByText(/^engine:/)).toHaveTextContent('engine: Chi-Yu + Okidogi');
+  });
+
   test('an unmatched lead, an inaccuracy, and a differing untiered pick each get their line', () => {
     const p2 = { played: rankedChoice('team 1', 'Lead Ferrothorn', -0.15), best: rankedChoice('team 2', 'Lead Rotom-Wash', -0.1), regret: 0.05 };
     const leads = leadAnalysis({ p1: { played: null, best: rankedChoice('team 1', 'Lead Garchomp', 0.2), regret: null }, p2: { ...p2, tier: 'inaccuracy' } });

@@ -2,7 +2,7 @@ import {
   type TurnAnalysis, type LeadAnalysis, type LeadSideAnalysis, type RankedChoice, type ReadRecommendation,
   formatRead, summarizeTurn, winDeltaText, winPctText,
 } from '@fulllifegames/eval-engine';
-import { attributionBadge } from './eval-badges';
+import { attributionBadge, leadTier } from './eval-badges';
 import { EngineRow } from './eval/analysis-bits';
 import { SideRow } from './eval/SideRow';
 import { evTitle } from './eval/turn-copy';
@@ -85,17 +85,18 @@ export function EvalTurnAnalysis({ analysis, playerNames, reads, onExplore }: Ev
 
 const stripLead = (label: string) => label.replace(/^Lead /, '');
 
-/** The graded lead miss or inaccuracy. */
+/** The graded lead miss or inaccuracy (singles; a doubles lead carries no verdict, leadTier). */
 function LeadGrade({ side }: { side: LeadSideAnalysis }) {
-  const bad = side.tier === 'mistake' || side.tier === 'blunder';
+  const tier = leadTier(side);
+  const bad = tier === 'mistake' || tier === 'blunder';
   return (
     <>
       {bad && side.best && (
-        <span style={{ color: side.tier === 'blunder' ? '#ff7a7a' : '#f3a6a6' }}>
-          {side.tier} · {winDeltaText(-(side.regret ?? 0))} · better: {stripLead(side.best.label)} ({winPctText(side.best.ev)})
+        <span style={{ color: tier === 'blunder' ? '#ff7a7a' : '#f3a6a6' }}>
+          {tier} · {winDeltaText(-(side.regret ?? 0))} · better: {stripLead(side.best.label)} ({winPctText(side.best.ev)})
         </span>
       )}
-      {side.tier === 'inaccuracy' && side.best && (
+      {tier === 'inaccuracy' && side.best && (
         <span style={{ color: '#b6a46a' }}>
           · inaccuracy ({winDeltaText(-(side.regret ?? 0))}): {stripLead(side.best.label)} was a touch better
         </span>
@@ -112,7 +113,7 @@ function LeadVerdict({ name, side }: { name: string; side: LeadSideAnalysis }) {
         <span style={{ color: '#8c8' }}>✓ the engine's leads</span>
       )}
       <LeadGrade side={side} />
-      {!side.tier && side.played && side.best && side.played.choice !== side.best.choice && (
+      {!leadTier(side) && side.played && side.best && side.played.choice !== side.best.choice && (
         <span style={{ color: '#778' }} title={evTitle(name)}>
           engine: {stripLead(side.best.label)} ({winPctText(side.best.ev)})
         </span>
