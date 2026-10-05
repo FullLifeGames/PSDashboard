@@ -564,7 +564,7 @@ describe('KO-before-acting speed evidence', () => {
     expect(speedOrders).toEqual([{
       firstSide: 'p1', firstSpecies: 'Noivern',
       secondSide: 'p2', secondSpecies: 'Iron Valiant',
-      turn: 1,
+      turn: 1, knockOut: true,
     }]);
   });
 
@@ -620,7 +620,7 @@ describe('KO-before-acting speed evidence', () => {
     expect(boostedVictim.speedOrders).toEqual([{
       firstSide: 'p1', firstSpecies: 'Noivern',
       secondSide: 'p2', secondSpecies: 'Iron Valiant',
-      turn: 1,
+      turn: 1, knockOut: true,
     }]);
     // Booster on the ATTACKER: the boosted speed explains the race. Drop.
     const boostedAttacker = parseReplayLogWithObservations(koLog([

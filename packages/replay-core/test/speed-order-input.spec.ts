@@ -108,3 +108,30 @@ describe('the solver reads a race with the Scarf the order names', () => {
     });
   }
 });
+
+describe('a knock-out order says the victim fell before acting', () => {
+  // Its chosen move, and with it the move's priority, never shows: a Trick Room or a Roar the victim
+  // clicked would have moved last at any Speed (T117 reads such an order as weak evidence).
+  test('singles', () => {
+    const log = [
+      ...header('singles'), '|switch|p1a: A|Sylveon, F|100/100', '|switch|p2a: B|Cresselia, F|100/100', '|turn|1',
+      '|move|p1a: A|Hyper Voice|p2a: B', '|-damage|p2a: B|0 fnt', '|faint|p2a: B', '|turn|2',
+    ].join('\n');
+    expect(parseReplayLogWithObservations(log).speedOrders.map(o => [o.firstSpecies, o.secondSpecies, o.knockOut]))
+      .toEqual([['Sylveon', 'Cresselia', true]]);
+  });
+
+  test('doubles', () => {
+    const log = [
+      ...header('doubles'),
+      '|switch|p1a: A|Dragonite, M|100/100', '|switch|p1b: C|Cresselia, F|100/100',
+      '|switch|p2a: B|Scizor, M|100/100', '|switch|p2b: D|Sylveon, F|100/100',
+      '|turn|1',
+      '|move|p1a: A|Iron Head|p2b: D', '|-damage|p2b: D|60/100',
+      '|move|p2b: D|Hyper Voice|p1b: C|[spread] p1a,p1b', '|-damage|p1a: A|70/100', '|-damage|p1b: C|0 fnt', '|faint|p1b: C',
+      '|turn|2',
+    ].join('\n');
+    expect(parseReplayLogWithObservations(log).speedOrders.map(o => [o.firstSpecies, o.secondSpecies, o.knockOut]))
+      .toEqual([['Sylveon', 'Cresselia', true], ['Dragonite', 'Sylveon', undefined]]);
+  });
+});

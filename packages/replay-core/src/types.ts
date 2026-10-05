@@ -118,6 +118,8 @@ export interface SpeedOrderObservation {
    */
   firstScarf?: boolean;
   secondScarf?: boolean;
+  /** The second mover fell before acting: its chosen move, and so its priority, never showed (round 63). */
+  knockOut?: true;
 }
 
 export type KnowledgeSource = 'revealed' | 'guessed' | 'manual' | 'sheet' | 'unknown';

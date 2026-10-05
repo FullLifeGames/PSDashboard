@@ -159,6 +159,7 @@ function recordFaintSpeedEvidence(state: ParserState, line: string) {
         secondSide: victim.startsWith('p1') ? 'p1' : 'p2',
         secondSpecies: victimMon.speciesForme,
         turn: state.speedTurn,
+        knockOut: true,
       });
     }
   }
