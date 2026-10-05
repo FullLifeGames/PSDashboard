@@ -12,6 +12,8 @@ export {
 
 const usageCache = new Map<string, Promise<SmogonUsageStats | null>>();
 
+const isAbort = (error: unknown) => error instanceof DOMException && error.name === 'AbortError';
+
 export function getSmogonStatsFormat(formatId: string | undefined): string {
   const id = toId(formatId || 'gen9ou').replace(/^smogtours/, '');
   if (id.includes('nationaldexdoubles')) return 'gen9nationaldexdoubles';
@@ -80,7 +82,7 @@ async function fetchCandidates(
         month: candidate.month,
       }));
     } catch (error) {
-      if (error instanceof DOMException && error.name === 'AbortError') throw error;
+      if (isAbort(error)) throw error;
       answered = false;
     }
   }
@@ -101,7 +103,14 @@ export async function fetchSmogonUsageStats(
   const format = getSmogonStatsFormat(formatId);
   const cacheKey = `${format}:${options?.now?.toISOString() ?? 'latest'}:${fetcherKey(options?.fetcher)}`;
   const cached = usageCache.get(cacheKey);
-  if (cached) return cached;
+  if (cached) {
+    // Joining a load that another caller aborts is not this caller's answer:
+    // the memo has dropped that load by then, so ask again.
+    return cached.catch(error => {
+      if (isAbort(error) && !options?.signal?.aborted) return fetchSmogonUsageStats(formatId, options);
+      throw error;
+    });
+  }
 
   const fetcher = withSmogonFallback((options?.fetcher ?? fetch) as SmogonFetch);
   const outcome = fetchCandidates(formatId, fetcher, options?.signal);

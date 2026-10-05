@@ -179,6 +179,18 @@ describe('useSmogonUsageStats', () => {
     expect(fetchMock.mock.calls.length).toBe(calls);
   });
 
+  test('under StrictMode a hook mounted on a format still loads: the first effect aborts only its own load', async () => {
+    const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      if (init?.signal?.aborted) throw new DOMException('signal is aborted without reason', 'AbortError');
+      return String(input).endsWith('/stats/gen4ubers.json') ? json(statsFile({ Groudon: { moves: { Earthquake: 1 } } })) : missing();
+    });
+    vi.stubGlobal('fetch', fetchMock);
+    const { result } = renderHook(() => useSmogonUsageStats('gen4ubers'), { reactStrictMode: true });
+    await waitFor(() => expect(result.current.loading).toBe(false));
+    expect(result.current.error).toBeNull();
+    expect(result.current.stats?.pokemon.groudon).toBeDefined();
+  });
+
   test('a 404 from every source stays remembered', async () => {
     const fetchMock = stubStats({ '/stats/gen2uu.json': statsFile({ Kingdra: { moves: { Surf: 1 } } }) });
     const { result, rerender } = renderHook((formatid: string) => useSmogonUsageStats(formatid), { initialProps: 'gen7ubers' });

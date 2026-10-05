@@ -37,6 +37,26 @@ describe('the usage-stats memo keeps answers only', () => {
     expect(Object.keys(stats?.pokemon ?? {})).toEqual(['dragapult']);
   });
 
+  test('a caller that joins a load another caller then aborts asks again', async () => {
+    let release: () => void = () => {};
+    const gate = new Promise<void>(resolve => { release = resolve; });
+    const source = fetcher(async (path, _ask, init) => {
+      await new Promise<void>((resolve, reject) => {
+        if (init?.signal?.aborted) return reject(abortError());
+        init?.signal?.addEventListener('abort', () => reject(abortError()));
+        void gate.then(resolve);
+      });
+      return path === '/stats/gen8ou.json' ? ok('Tyranitar') : status(404);
+    });
+    const first = new AbortController();
+    const leaving = fetchSmogonUsageStats('gen8ou', { fetcher: source.fn, signal: first.signal });
+    const joining = fetchSmogonUsageStats('gen8ou', { fetcher: source.fn });
+    first.abort();
+    release();
+    await expect(leaving).rejects.toThrow();
+    expect((await joining)?.pokemon.tyranitar).toBeDefined();
+  });
+
   test('a network failure is forgotten: the next call fetches again', async () => {
     let online = false;
     const source = fetcher(path => {
