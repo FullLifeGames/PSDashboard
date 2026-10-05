@@ -39,6 +39,15 @@ describe('SideRow', () => {
     expect(screen.getByText('difference:').nextElementSibling).toHaveTextContent(/^only the/);
   });
 
+  test('the better line through a forced switch shows the switch alone, never the waiting placeholder', () => {
+    const best = rankedChoice('switch 2', '→ Tyranitar', 0.35, {
+      punishedBy: 'Ice Punch', line: [{ p1: '→ Keldeo', p2: '(waiting)' }, { p1: 'Hydro Pump', p2: 'High Jump Kick' }],
+    });
+    render(<SideRow name="Alice" side={misplayedSide('mistake', { best, safe: best })} />);
+    expect(screen.getByText('then → Keldeo → Hydro Pump · High Jump Kick')).toBeInTheDocument();
+    expect(screen.queryByText(/\(waiting\)/)).toBeNull();
+  });
+
   test('a blunder reads as a blunder; a setup move softens the chip into a caveat', () => {
     const { rerender } = render(<SideRow name="Alice" side={misplayedSide('blunder')} />);
     expect(screen.getByText(`blunder · ${winDeltaText(-0.5)}`)).toBeInTheDocument();

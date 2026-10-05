@@ -1,6 +1,7 @@
 import { diffChoices, playedSetupMove, type SideAnalysis } from '../analysis.ts';
 import type { RankedChoice } from '../types.ts';
 import { winDeltaText, winPctText } from '../winprob.ts';
+import { formatLine } from './line.ts';
 import { conditionalNote, displayBest, nullNote, oddsNote, oddsPart, phrase } from './phrases.ts';
 
 /**
@@ -37,9 +38,7 @@ export function sideClause(name: string, side: SideAnalysis, opponent: SideAnaly
 
 /** The principal variation after a choice, as a ", then A · B → C · D" tail. */
 const lineOf = (choice: { line?: { p1: string; p2: string }[] }) =>
-  choice.line && choice.line.length > 0
-    ? `, then ${choice.line.map(step => `${step.p1} · ${step.p2}`).join(' → ')}`
-    : '';
+  choice.line && choice.line.length > 0 ? `, then ${formatLine(choice.line)}` : '';
 
 /**
  * An unpunished read gets neutral framing: the engine's line is "safe",

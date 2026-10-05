@@ -1,5 +1,5 @@
 import {
-  diffChoices, playedSetupMove, type SideAnalysis, type RankedChoice, winDeltaText, winPctText,
+  diffChoices, formatLine, playedSetupMove, type SideAnalysis, type RankedChoice, winDeltaText, winPctText,
 } from '@fulllifegames/eval-engine';
 import { ExplorableLabel, KoSuffix, MiniBar } from './analysis-bits';
 import { comparisonTarget, ENGINE_EQUIVALENT_EPSILON, evTitle, playedTextFor, RISK_DISPLAY_GAP } from './turn-copy';
@@ -183,7 +183,7 @@ function ComparisonRows({ name, side, played, best, difference, onExplore }: Pic
         )}
         {!swapped && target.punishedBy && <span style={{ color: '#778' }}>· worst vs {target.punishedBy}</span>}
         {!swapped && target.line && target.line.length > 0 && (
-          <span className="ps-eval-line">then {target.line.map(step => `${step.p1} · ${step.p2}`).join(' → ')}</span>
+          <span className="ps-eval-line">then {formatLine(target.line)}</span>
         )}
         <KoSuffix odds={swapped ? swapped.koOdds : target.koOdds} />
       </div>

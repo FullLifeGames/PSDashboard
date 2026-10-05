@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react';
-import { type EvalResult, type RankedChoice, winDeltaText, winPercent } from '@fulllifegames/eval-engine';
+import { type EvalResult, type RankedChoice, formatLine, winDeltaText, winPercent } from '@fulllifegames/eval-engine';
 import type { EvalStatus, TurnEvalSettings } from '../../hooks/useEvaluation';
 import { EvalMatrixView } from '../EvalMatrixView';
 import { MiniBar } from '../EvalTurnAnalysis';
@@ -24,7 +24,7 @@ function ChoiceDetail({ choice, index, best }: { choice: RankedChoice; index: nu
       </span>
       {choice.line && choice.line.length > 0 && (
         <span className="ps-eval-line">
-          then {choice.line.map(step => `${step.p1} · ${step.p2}`).join(' → ')}
+          then {formatLine(choice.line)}
         </span>
       )}
     </>

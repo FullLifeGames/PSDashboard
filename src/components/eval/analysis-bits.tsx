@@ -1,4 +1,4 @@
-import { type SideAnalysis, type RankedChoice, winPctText } from '@fulllifegames/eval-engine';
+import { type SideAnalysis, type RankedChoice, formatLine, winPctText } from '@fulllifegames/eval-engine';
 import { evTitle } from './turn-copy';
 
 /** The engine's line as a click-to-explore button, or a plain span. */
@@ -53,7 +53,7 @@ export function EngineRow({ name, side, onExplore }: { name: string; side: SideA
           engine: <ExplorableLabel label={best.label} onClick={onExplore && (() => onExplore(best))} /> ({winPctText(best.ev)})
         </span>
         {best.line && best.line.length > 0 && (
-          <span className="ps-eval-line">then {best.line.map(step => `${step.p1} · ${step.p2}`).join(' → ')}</span>
+          <span className="ps-eval-line">then {formatLine(best.line)}</span>
         )}
       </div>
     </div>

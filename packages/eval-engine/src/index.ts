@@ -83,6 +83,7 @@ export type { SensitivityTarget } from './sensitivity.ts';
 export { serializeLiveBattle } from './serialize.ts';
 export type { StreakHistoryEntry, StreakOdds } from './streaks.ts';
 export { summarizeTurn, formatRead } from './summary.ts';
+export { formatLine } from './prose/line.ts';
 export { heldDecided } from './turn-analysis/decided-held.ts';
 export { resolveTeraPreference, teraKey } from './tera.ts';
 export type { TeraPreference } from './tera.ts';

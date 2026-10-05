@@ -61,4 +61,13 @@ describe('EvalResultBlock', () => {
     expect(screen.getByText('then Stone Edge · Protect')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Matrix' })).toBeNull();
   });
+
+  test('a follow-up line through a forced switch shows the switch alone, never the waiting placeholder', () => {
+    const line = [{ p1: '→ Keldeo', p2: '(waiting)' }, { p1: 'Hydro Pump', p2: 'High Jump Kick' }];
+    const perSide = { p1: [rankedChoice('move rapidspin', 'Rapid Spin', 0.3, { line })], p2: [rankedChoice('move fakeout', 'Fake Out', -0.3)] };
+    const result = evalResult('singles', { perSide, matrix: undefined });
+    render(<EvalResultBlock result={result} status="done" playerNames={names} resultSettings={{ depth: 1, samples: 1, mode: 'mcts' }} thinkDeeper={null} />);
+    expect(screen.getByText('then → Keldeo → Hydro Pump · High Jump Kick')).toBeInTheDocument();
+    expect(screen.queryByText(/\(waiting\)/)).toBeNull();
+  });
 });

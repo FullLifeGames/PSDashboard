@@ -43,6 +43,15 @@ describe('EngineRow', () => {
     expect(onExplore).toHaveBeenCalledWith(best);
   });
 
+  test('a follow-up through a forced-switch node shows the replacement alone, never the waiting placeholder', () => {
+    const best = rankedChoice('move fakeout 1, move spore 2', 'Fake Out → Rillaboom + Spore → Tornadus', 0.3, {
+      line: [{ p1: '(waiting)', p2: '→ Rillaboom + Protect' }, { p1: 'Flare Blitz', p2: 'Protect' }],
+    });
+    render(<EngineRow name="Alice" side={sideAnalysis({ best, played: null })} />);
+    expect(screen.getByText('then → Rillaboom + Protect → Flare Blitz · Protect')).toBeInTheDocument();
+    expect(screen.queryByText(/\(waiting\)/)).toBeNull();
+  });
+
   test('renders nothing without an engine line', () => {
     const { container } = render(<EngineRow name="Alice" side={sideAnalysis({ best: null })} />);
     expect(container).toBeEmptyDOMElement();
