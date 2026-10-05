@@ -125,14 +125,45 @@ function partHint(board: HintBoard, part: string, partIndex: number): number {
 }
 
 /** Summed per-slot static threat hints for combined doubles options. */
+/**
+ * The hint of every part a position has priced, per side and slot (round 63,
+ * T112). A doubles node ranks some hundred combos built from a few dozen
+ * parts and hints its kept combos a second time for the expansion order; each
+ * part is now priced once per position (the round-63 count: 9 to 11 % of the
+ * parts are distinct). A position's battle never changes once built (a hint
+ * that reads a body on other terms restores it: asClicked, effectiveSpeed),
+ * so a part's hint is a function of the position, the side, the slot and the
+ * part. Singles hint each position and side once and keep their path.
+ */
+const partHints = new WeakMap<SimPosition, Map<string, number>>();
+
+function partMemo(position: SimPosition): Map<string, number> {
+  let memo = partHints.get(position);
+  if (!memo) {
+    memo = new Map();
+    partHints.set(position, memo);
+  }
+  return memo;
+}
+
 export function combinedOptionHints(
   position: SimPosition,
   side: 'p1' | 'p2',
   options: ChoiceOption[],
 ): number[] {
-  const board = hintBoard(position, side);
+  const memo = partMemo(position);
+  let board: HintBoard | null = null;
   return options.map(option =>
-    option.choice.split(',').reduce((sum, part, partIndex) => sum + partHint(board, part, partIndex), 0));
+    option.choice.split(',').reduce((sum, part, partIndex) => {
+      const key = `${side}:${partIndex}:${part}`;
+      let hint = memo.get(key);
+      if (hint === undefined) {
+        board ??= hintBoard(position, side);
+        hint = partHint(board, part, partIndex);
+        memo.set(key, hint);
+      }
+      return sum + hint;
+    }, 0));
 }
 
 /** Static hints for singles options: damage fraction for moves, threat differential for switches. */

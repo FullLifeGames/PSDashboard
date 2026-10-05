@@ -214,4 +214,38 @@ describe('the memo keys the power at use (round 63, T81)', () => {
   test('Knock Off: the target losing its item misses the memo', () => {
     missesTheMemo(makeSet('Weavile', ['knockoff']), { ...makeSet('Garchomp', ['splash']), item: 'Leftovers' }, (_, target) => { target.item = ''; });
   });
+
+  test('a Stellar body spending its boost on a type misses the memo', () => {
+    const battle = makeBattle({ ...makeSet('Garchomp', ['splash', 'earthquake']), teraType: 'Stellar' }, makeSet('Snorlax', ['splash']));
+    battle.choose('p1', 'move 1 terastallize');
+    battle.choose('p2', 'move 1');
+    const [chomp, lax] = [battle.sides[0].active[0], battle.sides[1].active[0]];
+    const cached = threatGetter(battle, createMatchupCache());
+    const fresh = cached(chomp, lax);
+    expect(fresh).toEqual(pairThreat(chomp, lax, battle));
+    chomp.stellarBoostedTypes.push('Ground');
+    expect(cached(chomp, lax)).toEqual(pairThreat(chomp, lax, battle));
+    expect(cached(chomp, lax)).not.toEqual(fresh);
+  });
+
+  test("Dragon Darts in doubles: the foe's partner fainting misses the memo", () => {
+    const battle = new Battle({
+      formatid: toID('gen9doublescustomgame'),
+      seed: '1,2,3,4',
+      p1: { name: 'Alpha', team: Teams.pack([makeSet('Dragapult', ['dragondarts']), makeSet('Pikachu', ['splash'])]) },
+      p2: { name: 'Beta', team: Teams.pack([makeSet('Snorlax', ['splash']), makeSet('Garchomp', ['splash'])]) },
+    });
+    if (battle.sides.some(side => side.requestState === 'teampreview')) {
+      battle.choose('p1', 'team 12');
+      battle.choose('p2', 'team 12');
+    }
+    const [pult, lax] = [battle.sides[0].active[0], battle.sides[1].active[0]];
+    const cached = threatGetter(battle, createMatchupCache());
+    const split = cached(pult, lax);
+    expect(split).toEqual(pairThreat(pult, lax, battle));
+    battle.sides[1].active[1].faint();
+    battle.faintMessages();
+    expect(cached(pult, lax)).toEqual(pairThreat(pult, lax, battle));
+    expect(cached(pult, lax)).not.toEqual(split);
+  });
 });
