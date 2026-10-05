@@ -1,6 +1,7 @@
 import { test, expect, describe } from 'vitest';
 import { analyzeTurn, type AnalyzeTurnParams } from '../src/analysis';
 import { summarizeTurn } from '../src/summary';
+import { buildGameReport } from '../src/report';
 import type { SackInfo } from '../src/played';
 import type { EvalResult, RankedChoice } from '../src/types';
 
@@ -123,5 +124,95 @@ describe('doubles: the same forms ride on the pair choice', () => {
     });
     expect(analysis.p1.tier).toBeUndefined();
     expect(analysis.p1.sacrifice).toEqual({ name: 'Chi-Yu', hpFraction: 0.5, stayed: true, verified: true });
+  });
+});
+
+describe('the read credit without a band (648453 t13)', () => {
+  /** p2 switches Lopunny-Mega in against the Hidden Power Ice; the engine's equilibrium gave the switch no weight. */
+  const t13 = (overrides: Partial<AnalyzeTurnParams> = {}, lopunnyWeight = 0) => {
+    const result: EvalResult = {
+      score: 0.0596, interval: 0, depthCompleted: 1,
+      perSide: {
+        p1: [ranked('move hiddenpowerice', 'Hidden Power Ice', 0.1, 0.1, 0.1, 'switch Bisharp')],
+        p2: [
+          ranked('switch 5', '→ Bisharp', -0.1861, 0.0073, -0.1061, 'Heat Wave'),
+          ranked('switch 2', '→ Keldeo', -0.3, 0.0, -0.11, 'Hurricane'),
+          ranked('switch 6', '→ Lopunny-Mega', -0.2126, -0.0095, -0.1679, 'Hurricane'),
+        ],
+      },
+      matrix: {
+        p1Labels: ['Hidden Power Ice', 'Heat Wave'], p2Labels: ['→ Bisharp', '→ Keldeo', '→ Lopunny-Mega'],
+        p1Choices: ['move hiddenpowerice', 'move heatwave'], p2Choices: ['switch 5', 'switch 2', 'switch 6'],
+        values: [[-0.042, 0.071, 0.069], [0.1, -0.05, 0.2]],
+        mixes: { p1: [0.5, 0.5], p2: [0.57 - lopunnyWeight, 0.43, lopunnyWeight] },
+      },
+    };
+    return analyzeTurn({
+      turn: 13, result,
+      played: { p1: { kind: 'move', name: 'Hidden Power' }, p2: { kind: 'switch', name: 'Mandy', species: 'Lopunny-Mega' } },
+      playedOutcome: 0.00097, futureOutcomes: [-0.279, -0.569, -0.422],
+      scoreBefore: 0.0596, scoreAfter: 0.0475,
+      ...overrides,
+    });
+  };
+
+  test('singles: the zero-weight switch that paid at once and grew over the window earns the card sentence', () => {
+    const analysis = t13();
+    expect(analysis.p2.tier).toBeUndefined();
+    expect(analysis.p2.readCredit?.payoff).toBeCloseTo(0.755, 3);
+    expect(analysis.p2.readCredit?.payoffTurn).toBe(2);
+    expect(summarizeTurn(analysis, names)).toContain('Beta played switching to Lopunny-Mega — a read the engine gave no weight');
+    // Not a risk credit: the attribution, the report's read list and the totals stay as they were.
+    expect(analysis.p2.riskPaidOff).toBeUndefined();
+    expect(analysis.attribution).toBe('quiet');
+    expect(buildGameReport([analysis, analysis, analysis].map((entry, index) => ({ ...entry, turn: 13 + index })), names, 'p2').reads)
+      .toEqual([]);
+  });
+
+  test('guards: a choice the equilibrium plays, a small immediate payoff, or a lost position earn nothing', () => {
+    expect(t13({}, 0.3).p2.readCredit).toBeUndefined();
+    expect(t13({ playedOutcome: 0.1 }).p2.readCredit).toBeUndefined();
+    expect(t13({ scoreBefore: 0.75 }).p2.readCredit).toBeUndefined();
+  });
+
+  test('a stamped sacrifice takes no read credit on the same turn', () => {
+    // Had the switch-in fallen to the hazards, the sacrifice stamp would carry the turn instead.
+    const stamped = t13({ sacks: { p2: { name: 'Mandy', hpFraction: 0.8, healthy: true, hazard: true } } });
+    expect(stamped.p2.sacrifice?.hazard).toBe(true);
+    expect(stamped.p2.readCredit).toBeUndefined();
+  });
+});
+
+describe('the read credit on a doubles pair', () => {
+  test('a zero-weight combo that paid at once and grew over the window earns the sentence too', () => {
+    const result: EvalResult = {
+      score: 0.1, interval: 0, depthCompleted: 1,
+      perSide: {
+        p1: [
+          ranked('move tailwind, move protect', 'Tailwind + Protect', -0.1, 0.1, 0.15, 'Heat Wave + Protect'),
+          ranked('move tailwind, move solarbeam 1', 'Tailwind + Solar Beam→Groudon', -0.2, 0.1, 0.1, 'Heat Wave + Protect'),
+        ],
+        p2: [ranked('move heatwave, move protect', 'Heat Wave + Protect', -0.1, -0.1, -0.1, null)],
+      },
+      matrix: {
+        p1Labels: ['Tailwind + Protect', 'Tailwind + Solar Beam→Groudon'], p2Labels: ['Heat Wave + Protect'],
+        p1Choices: ['move tailwind, move protect', 'move tailwind, move solarbeam 1'], p2Choices: ['move heatwave, move protect'],
+        values: [[0.15], [0.1]],
+        mixes: { p1: [1, 0], p2: [1] },
+      },
+    };
+    const analysis = analyzeTurn({
+      turn: 1, result,
+      played: {
+        p1: null, p2: null,
+        p1Slots: [{ kind: 'move', name: 'Tailwind', targetLoc: null }, { kind: 'move', name: 'Solar Beam', targetLoc: 1 }],
+        p2Slots: [{ kind: 'move', name: 'Heat Wave', targetLoc: null }, { kind: 'move', name: 'Protect', targetLoc: null }],
+      },
+      playedOutcome: 0.1, futureOutcomes: [0.3, 0.5],
+      scoreBefore: 0.1, scoreAfter: 0.12,
+    });
+    expect(analysis.p1.tier).toBeUndefined();
+    expect(analysis.p1.readCredit).toEqual({ payoff: expect.closeTo(0.6, 6), payoffTurn: 2 });
+    expect(analysis.p1.riskPaidOff).toBeUndefined();
   });
 });

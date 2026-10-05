@@ -3,7 +3,7 @@ import { winDeltaText, winPercent } from './winprob.ts';
 import { forcedWinSpeaks } from './turn-analysis/forced-speech.ts';
 import { phrase, playedBest } from './prose/phrases.ts';
 import {
-  forcedClause, inaccuracyClause, sackClause, sensitivityClause, sideClause, streakClause, unansweredClause,
+  forcedClause, inaccuracyClause, readCreditClause, sackClause, sensitivityClause, sideClause, streakClause, unansweredClause,
 } from './prose/clauses.ts';
 
 /**
@@ -216,7 +216,7 @@ function attributionSentences(analysis: TurnAnalysis, playerNames: PlayerNames, 
 function rideAlongSentences(analysis: TurnAnalysis, playerNames: PlayerNames): string[] {
   const sentences: string[] = [];
   const kinds: ((name: string, side: SideAnalysis) => string | null)[] = [
-    (name, side) => sackClause(name, side) ?? inaccuracyClause(name, side),
+    (name, side) => sackClause(name, side) ?? readCreditClause(name, side) ?? inaccuracyClause(name, side),
     forcedClause,
     (_name, side) => unansweredClause(side),
     streakClause,

@@ -52,6 +52,48 @@ function bookRiskPayoff(params: AnalyzeTurnParams, key: Side, side: SideAnalysis
   return false;
 }
 
+/** A choice the side's equilibrium mix weighs under this share counts as one the engine gave no weight. */
+const QUIET_READ_MAX_WEIGHT = 0.01;
+
+/** The equilibrium weight on the played choice, and whether it is the mix's favourite; null without a solved mix. */
+function playedWeight(params: AnalyzeTurnParams, key: Side, played: RankedChoice): { weight: number; favourite: boolean } | null {
+  const matrix = params.result.matrix;
+  const choices = key === 'p1' ? matrix?.p1Choices : matrix?.p2Choices;
+  const mix = key === 'p1' ? matrix?.mixes.p1 : matrix?.mixes.p2;
+  const index = choices?.indexOf(played.choice) ?? -1;
+  if (!mix || index < 0 || index >= mix.length) return null;
+  return { weight: mix[index], favourite: mix[index] >= Math.max(...mix) };
+}
+
+/** The read's shape: a live position, some floor given up against the safe line, a choice the equilibrium gave no weight. */
+function quietReadShape(params: AnalyzeTurnParams, key: Side, played: RankedChoice, safe: RankedChoice): boolean {
+  const ownBefore = key === 'p1' ? params.scoreBefore : -params.scoreBefore;
+  if (ownBefore <= -DECIDED_SCORE || played.worstCase >= safe.worstCase) return false;
+  const weight = playedWeight(params, key, played);
+  return weight !== null && !weight.favourite && weight.weight < QUIET_READ_MAX_WEIGHT;
+}
+
+/**
+ * Round 63 (T17): the read credit of an UNTIERED turn (648453 t13), the
+ * narrowest rule that carries the scene on the ten feedback dumps (eight
+ * sides there, four singles and four doubles): not from a lost position
+ * (the gamble bound), a choice the equilibrium gave no weight, some floor
+ * given up against the safe line, an immediate payoff over the safe
+ * guarantee of at least the regret plus the read margin, and within the
+ * window a mistake-sized edge on top of the regret. Card sentence only.
+ */
+function markQuietRead(params: AnalyzeTurnParams, key: Side, side: SideAnalysis): void {
+  const { played, safe } = side;
+  if (side.tier || !played || !safe || params.playedOutcome === null || side.regret === null) return;
+  if (!quietReadShape(params, key, played, safe)) return;
+  const immediate = bestWindowPayoff([params.playedOutcome], key, safe.worstCase).payoff;
+  if (immediate === null || immediate < side.regret + RISK_PAYOFF_MARGIN) return;
+  const chain = [params.playedOutcome, ...(params.futureOutcomes ?? [])].slice(0, PAYOFF_WINDOW + 1);
+  const { payoff, payoffTurn } = bestWindowPayoff(chain, key, safe.worstCase);
+  if (payoff === null || payoff < side.regret + TIER_THRESHOLDS.mistake) return;
+  side.readCredit = { payoff, ...(payoffTurn > 0 ? { payoffTurn } : {}) };
+}
+
 /**
  * The opponent model's best response matches the played choice: the
  * machine id is authoritative; the label match only serves cached reads
@@ -69,7 +111,11 @@ export function markRisk(params: AnalyzeTurnParams, key: Side, side: SideAnalysi
   if (side.sacrifice || side.neverActed) return;
   const tiered = side.tier === 'mistake' || side.tier === 'blunder';
   const gamble = isGamble(params, key, side, tiered);
-  if (!tiered && !gamble) return;
+  if (!tiered && !gamble) {
+    // Round 63 (T17): no band and no gamble — a quiet read can still earn its sentence.
+    markQuietRead(params, key, side);
+    return;
+  }
   if (!side.played?.punishedBy || !opponent.played) return;
   if (opponent.played.label === side.played.punishedBy) return;
   if (bookRiskPayoff(params, key, side, tiered)) return;

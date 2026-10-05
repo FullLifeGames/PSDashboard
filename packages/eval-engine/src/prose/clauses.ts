@@ -105,6 +105,17 @@ function mistakeClause(name: string, side: SideAnalysis, opponent: SideAnalysis)
   return punishedMisplayClause(name, side, side.played, side.best, why, caveat);
 }
 
+/** Round 63 (T17): the read credit of an untiered turn — praise on the card, never a verdict (648453 t13). */
+export function readCreditClause(name: string, side: SideAnalysis): string | null {
+  const credit = side.readCredit;
+  if (!credit || !side.played || !side.safe) return null;
+  const horizon = credit.payoffTurn
+    ? credit.payoffTurn === 1 ? ' one turn later' : ` ${credit.payoffTurn} turns later`
+    : '';
+  return `${name} played ${phrase(side.played.label)} — a read the engine gave no weight, and it paid off${horizon}: ` +
+    `${winDeltaText(credit.payoff)} over the safe ${phrase(side.safe.label)} (${winPctText(side.safe.worstCase)} guaranteed).`;
+}
+
 /** Sub-verdict note: a light imprecision worth naming, not blaming. */
 export function inaccuracyClause(name: string, side: SideAnalysis): string | null {
   if (side.tier !== 'inaccuracy' || !side.played || !side.best) return null;

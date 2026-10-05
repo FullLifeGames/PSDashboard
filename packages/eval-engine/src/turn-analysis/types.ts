@@ -184,6 +184,15 @@ export interface SideAnalysis {
    */
   riskWasRead?: boolean;
   /**
+   * Round 63 (T17): a read on an UNTIERED turn — the played choice carried
+   * no equilibrium weight, gave up some floor against the safe line, paid
+   * at once and grew a mistake-sized edge within the window (648453 t13,
+   * the Lopunny-Mega switch). Card sentence only: it is no riskPaidOff, so
+   * the attribution, the report's read list and the totals stay unmoved.
+   * `payoff` is the window's best own outcome over the safe guarantee.
+   */
+  readCredit?: { payoff: number; payoffTurn?: number };
+  /**
    * A slot's choice was never observed (flinch/sleep — the protocol shows
    * `|cant|`): `played` is the BEST combo consistent with the visible slots,
    * so the regret is a charitable lower bound, never blame for hidden picks.
