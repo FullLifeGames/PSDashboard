@@ -31,15 +31,16 @@ export function getMovePool(species: string, gen: number): Promise<string[]> {
   const request = (async () => {
     const names = new Set<string>();
     const genPrefix = String(generation.num);
-    let current = generation.species.get(species);
-    while (current) {
-      const learnset = await generation.learnsets.get(current.id);
-      for (const [moveId, sources] of Object.entries(learnset?.learnset ?? {})) {
+    const entry = generation.species.get(species);
+    // The library walks prevos and the forme a Pokémon changes from (a forme's
+    // own learnset holds only its signature moves: Rotom-Wash, Hydro Pump).
+    const learnsets = entry ? generation.learnsets.all(entry) : [];
+    for await (const learnset of learnsets) {
+      for (const [moveId, sources] of Object.entries(learnset.learnset ?? {})) {
         if (!sources.some(code => code.startsWith(genPrefix))) continue;
         const move = generation.moves.get(moveId);
         if (move) names.add(move.name);
       }
-      current = current.prevo ? generation.species.get(current.prevo) : undefined;
     }
     // Unknown species or missing learnset: offer everything rather than block.
     if (names.size === 0) return allGenMoves(generation.num);
