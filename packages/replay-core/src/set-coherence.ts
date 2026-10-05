@@ -3,6 +3,7 @@
 // simulator across the dynamic-import boundary (team-builder stays lazy).
 import { Dex } from '@pkmn/dex';
 import type { PokemonSetAssumption } from './smogon/sets-lookup.ts';
+import { slotMoveKey, slotOptionKeys, slotOrderedMoves } from './team/move-slots.ts';
 
 /**
  * Pairwise coherence vetoes for guessed set assembly. Marginal fills (top
@@ -96,6 +97,8 @@ const UNSEEN_MOVE_PROBABILITY = 0.01;
  */
 interface CandidateIds {
   moveIds: string[];
+  /** Every option of every move slot, as slot keys (T89). */
+  slotKeys: string[];
   itemId: string;
   abilityId: string;
 }
@@ -103,16 +106,17 @@ interface CandidateIds {
 function candidateIds(candidate: PokemonSetAssumption): CandidateIds {
   return {
     moveIds: candidate.moves.map(move => Dex.moves.get(move.value).id as string),
+    slotKeys: slotOptionKeys(candidate.moves),
     itemId: candidate.item ? (Dex.items.get(candidate.item.value).id as string) : '',
     abilityId: candidate.ability ? (Dex.abilities.get(candidate.ability.value).id as string) : '',
   };
 }
 
-/** Two points per revealed move, item, and ability the candidate carries. */
+/** Two points per revealed move (any option of a slot), item, and ability the candidate carries. */
 function fitScore(ids: CandidateIds, evidence: CuratedEvidence): number {
   let fit = 0;
   for (const revealed of evidence.revealedMoves) {
-    if (ids.moveIds.includes(revealed)) fit += 2;
+    if (ids.slotKeys.includes(slotMoveKey(revealed))) fit += 2;
   }
   if (evidence.revealedItem && ids.itemId === evidence.revealedItem) fit += 2;
   if (evidence.revealedAbility && ids.abilityId === evidence.revealedAbility) fit += 2;
@@ -142,7 +146,13 @@ export function selectCuratedSet(
       bestTiebreak = tiebreak;
     }
   }
-  return best;
+  return best ? withSlotsResolved(best, evidence) : null;
+}
+
+/** The winner's moves with its slots read against the evidence (T89, decision 11). */
+function withSlotsResolved(set: PokemonSetAssumption, evidence: CuratedEvidence): PokemonSetAssumption {
+  const moves = slotOrderedMoves(set.moves, new Set(evidence.revealedMoves.map(slotMoveKey)));
+  return moves === set.moves ? set : { ...set, moves };
 }
 
 interface DamagingKeeps {

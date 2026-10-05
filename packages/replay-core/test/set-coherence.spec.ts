@@ -168,6 +168,46 @@ describe('coherent-set selection', () => {
     expect(picked).toBe(second);
   });
 
+  // T89 (round 63): Smogon publishes slots with alternatives; the build must
+  // read a slot as filled once one option is seen, and never trade a fixed
+  // move for a second option of a filled slot (648453 Tornadus-T).
+  const slotted = (moves: (string | string[])[], item?: string): PokemonSetAssumption => ({
+    species: 'Tornadus-Therian', sourceDetail: 't',
+    moves: moves.map(slot => Array.isArray(slot)
+      ? { value: slot[0], sourceDetail: 't', options: slot }
+      : { value: slot, sourceDetail: 't' }),
+    ...(item ? { item: { value: item, sourceDetail: 't' } } : {}),
+  });
+  const pivot = () => slotted(['Hurricane', ['Heat Wave', 'Hidden Power Ice'], 'Knock Off', 'U-turn'], 'Assault Vest');
+  const values = (picked: PokemonSetAssumption | null) => picked?.moves.map(move => move.value);
+
+  test('a revealed option fills its slot: the fixed Knock Off stays, Heat Wave goes (T89)', () => {
+    const picked = selectCuratedSet([pivot()], evidence({ revealedMoves: ['uturn', 'hiddenpowerice', 'hurricane'] }));
+    expect(values(picked)).toEqual(['Hurricane', 'Knock Off', 'U-turn']);
+  });
+
+  test('a revealed second option counts toward the fit like a first option (T89)', () => {
+    const scarf = slotted(['Hurricane', 'U-turn', 'Taunt', 'Superpower'], 'Choice Scarf');
+    const picked = selectCuratedSet([scarf, pivot()], evidence({ revealedMoves: ['uturn', 'hiddenpowerice', 'hurricane'] }));
+    expect(picked?.item?.value).toBe('Assault Vest');
+  });
+
+  test('a revealed typeless Hidden Power fills a typed Hidden Power option (T89)', () => {
+    // Logs before gen 8 show "Hidden Power" without its type.
+    const picked = selectCuratedSet([pivot()], evidence({ revealedMoves: ['hiddenpower'] }));
+    expect(values(picked)).toEqual(['Hurricane', 'Knock Off', 'U-turn']);
+  });
+
+  test('fixed moves come before the open slots, first options before the others (T89)', () => {
+    const picked = selectCuratedSet([pivot()], evidence({ revealedMoves: ['hurricane'] }));
+    expect(values(picked)).toEqual(['Hurricane', 'Knock Off', 'U-turn', 'Heat Wave', 'Hidden Power Ice']);
+  });
+
+  test('a set without slot options comes back as published (T89)', () => {
+    const boots = utility();
+    expect(selectCuratedSet([boots], evidence({ revealedMoves: ['roost'] }))).toBe(boots);
+  });
+
   test('a revealed item counts toward the fit', () => {
     const boots = utility();
     // Hurricane matches both sets; the revealed Boots break the tie by fit.
