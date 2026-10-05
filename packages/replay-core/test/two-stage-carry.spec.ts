@@ -3,6 +3,7 @@ import { Generations, Pokemon } from '@smogon/calc';
 import type { PokemonSet } from '@pkmn/sim';
 import { buildTeamsFromReplay, solveReplaySpreads } from '../src/team-builder';
 import { parseReplayLogWithObservations } from '../src/protocol-parser';
+import type { SmogonUsageStats } from '../src/smogon/stats-types';
 import type { DamageObservation } from '../src/types';
 
 /**
@@ -70,21 +71,41 @@ describe('the two-stage solve keeps the move orders its pre-solve repaired', () 
     expect(built).toEqual(preSolved);
   });
 
+  /** The scene of the carry tests: Gliscor moves before Garchomp, each hits the other once. */
+  const scene = [
+    '|player|p1|Alice|', '|player|p2|Bob|', '|gen|9', '|tier|[Gen 9] OU',
+    '|poke|p1|Garchomp, M|', '|poke|p2|Gliscor, M|',
+    '|start', '|switch|p1a: Garchomp|Garchomp, M|100/100', '|switch|p2a: Gliscor|Gliscor, M|100/100', '|turn|1',
+    '|move|p2a: Gliscor|Knock Off|p1a: Garchomp', '|-damage|p1a: Garchomp|80/100',
+    '|move|p1a: Garchomp|Dragon Claw|p2a: Gliscor', '|-damage|p2a: Gliscor|60/100', '|turn|2',
+  ].join('\n');
+  /** A usage spread that runs Garchomp at 0 Speed with half the EV budget open (252 Atk only). */
+  const slowGarchomp: SmogonUsageStats = {
+    format: 'gen9ou', month: 'test', source: 'test',
+    pokemon: {
+      Garchomp: {
+        species: 'Garchomp', rawCount: 1, abilities: [], items: [], moves: [],
+        spreads: [{
+          value: 'Adamant:0/252/0/0/0/0', probability: 1, sourceDetail: 'test', nature: 'Adamant',
+          evs: { hp: 0, atk: 252, def: 0, spa: 0, spd: 0, spe: 0 },
+        }],
+      },
+    },
+  };
+
   test('a mon the full solve keeps is still solved by the full solve', () => {
     // Clean damage lines do not forfeit: the carry must not overwrite the full solve's answer.
-    const log = [
-      '|player|p1|Alice|', '|player|p2|Bob|', '|gen|9', '|tier|[Gen 9] OU',
-      '|poke|p1|Garchomp, M|', '|poke|p2|Gliscor, M|',
-      '|start', '|switch|p1a: Garchomp|Garchomp, M|100/100', '|switch|p2a: Gliscor|Gliscor, M|100/100', '|turn|1',
-      '|move|p2a: Gliscor|Knock Off|p1a: Garchomp', '|-damage|p1a: Garchomp|80/100',
-      '|move|p1a: Garchomp|Dragon Claw|p2a: Gliscor', '|-damage|p2a: Gliscor|60/100', '|turn|2',
-    ].join('\n');
+    // The usage guess already runs Garchomp (240) under Gliscor (289), so no order needs repair
+    // (round 63); the pre-solve tops the open half of the budget up into HP, the full solve's
+    // damage lines take it back.
+    const log = scene;
     const { observations, speedOrders } = parseReplayLogWithObservations(log);
     const doubled = [...observations, ...observations];
-    const solved = solveReplaySpreads(log, doubled, { speedOrders });
-    const oneStage = buildTeamsFromReplay(log, { observations: doubled, speedOrders });
-    const preSolved = buildTeamsFromReplay(log, { speedOrders });
-    const built = buildTeamsFromReplay(log, { inferredSpreads: solved });
+    const usageStats = slowGarchomp;
+    const solved = solveReplaySpreads(log, doubled, { speedOrders, usageStats });
+    const oneStage = buildTeamsFromReplay(log, { observations: doubled, speedOrders, usageStats });
+    const preSolved = buildTeamsFromReplay(log, { speedOrders, usageStats });
+    const built = buildTeamsFromReplay(log, { inferredSpreads: solved, usageStats });
     expect(speedOf(find(built.p2Team, 'Gliscor'))).toBeGreaterThanOrEqual(speedOf(find(built.p1Team, 'Garchomp')));
     expect(speedOf(find(oneStage.p2Team, 'Gliscor'))).toBeGreaterThanOrEqual(speedOf(find(oneStage.p1Team, 'Garchomp')));
     // Garchomp is the mon an overwriting carry would destroy: the full solve
@@ -93,5 +114,19 @@ describe('the two-stage solve keeps the move orders its pre-solve repaired', () 
     expect(built).not.toEqual(preSolved);
     expect(find(built.p1Team, 'Garchomp').evs.hp).toBe(0);
     expect(find(preSolved.p1Team, 'Garchomp').evs.hp).toBe(252);
+  });
+
+  test('known path dependence of the settled orders (round 63): two-stage HP 60 against one-stage HP 0', () => {
+    // The species-shaped guesses run Garchomp (303) over Gliscor (289), which moved first. The
+    // settling (T117) frees only 60 Speed EVs (Garchomp 288); the pre-solve tops them up into HP, and
+    // the full solve keeps that HP because the damage lines fit it as well as none. The one-stage
+    // build never had the HP: the two chains part on a spread the evidence cannot tell apart.
+    const { observations, speedOrders } = parseReplayLogWithObservations(scene);
+    const doubled = [...observations, ...observations];
+    const built = buildTeamsFromReplay(scene, { inferredSpreads: solveReplaySpreads(scene, doubled, { speedOrders }) });
+    const oneStage = buildTeamsFromReplay(scene, { observations: doubled, speedOrders });
+    expect([find(built.p1Team, 'Garchomp').evs.hp, find(built.p1Team, 'Garchomp').evs.spe]).toEqual([60, 192]);
+    expect([find(oneStage.p1Team, 'Garchomp').evs.hp, find(oneStage.p1Team, 'Garchomp').evs.spe]).toEqual([0, 192]);
+    expect(speedOf(find(built.p2Team, 'Gliscor'))).toBeGreaterThan(speedOf(find(built.p1Team, 'Garchomp')));
   });
 });
