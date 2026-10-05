@@ -186,14 +186,41 @@ function keepingOrder(racers: Racer[], bounds: Bound[]): Racer[] {
     yielding(a) - yielding(b) || a.key.localeCompare(b.key));
 }
 
-/** One tier's settling: strict on the broken races, else (a cycle) tied. */
+/** The races inside a cycle of orders (both directions seen): only a tie explains them. */
+function cyclic(races: Race[]): Set<Race> {
+  const next = new Map<Racer, Racer[]>();
+  for (const race of races) next.set(race.first, [...(next.get(race.first) ?? []), race.second]);
+  const reaches = (from: Racer, to: Racer) => {
+    const seen = new Set([from]);
+    for (const queue = [from]; queue.length > 0;) {
+      const at = queue.pop()!;
+      if (at === to) return true;
+      for (const step of next.get(at) ?? []) {
+        if (seen.has(step)) continue;
+        seen.add(step);
+        queue.push(step);
+      }
+    }
+    return false;
+  };
+  return new Set(races.filter(race => reaches(race.second, race.first)));
+}
+
+/**
+ * One tier's settling. Every race ends strict (the first mover faster, no
+ * coin flip on an order the log showed) unless its priors tie it or it sits
+ * in a cycle of orders; when that fails, every race may tie.
+ */
 function solve(ctx: SolveContext, knowledge: SpeedKnowledgeMap, racers: Racer[], races: Race[], tier: Tier): Map<string, Option> | null {
+  const loops = cyclic(races);
   for (const strict of [true, false]) {
-    const bounds = races.map(({ order, first, second, broken }) => ({
-      first, second, broken, strict: strict && broken,
-      firstFactor: scarfFactor(ctx, order.firstSide, order.firstSpecies, order.firstScarf),
-      secondFactor: scarfFactor(ctx, order.secondSide, order.secondSpecies, order.secondScarf),
-    }));
+    const bounds = races.map(race => {
+      const { order, first, second, broken } = race;
+      const firstFactor = scarfFactor(ctx, order.firstSide, order.firstSpecies, order.firstScarf);
+      const secondFactor = scarfFactor(ctx, order.secondSide, order.secondSpecies, order.secondScarf);
+      const tied = first.stat * firstFactor === second.stat * secondFactor;
+      return { first, second, broken, firstFactor, secondFactor, strict: strict && !tied && !loops.has(race) };
+    });
     const domains = new Map(racers.map(racer => [racer.key, domainOf(ctx, knowledge, racer, tier)]));
     const settled = propagate(domains, bounds) ? fix(domains, bounds, keepingOrder(racers, bounds)) : null;
     if (settled) return settled;

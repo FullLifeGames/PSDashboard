@@ -153,7 +153,8 @@ describe('every observed order holds before the ladder (T117)', () => {
       'p2:incineroar': { itemKnown: true, spreads: usage(['Careful', evs(252, 0, 96, 0, 160, 0), 0.11], ['Adamant', evs(252, 4, 96, 0, 156, 0), 0.1]) },
     }));
     const [held, orthwormRepaired, sinistchaHeld, tingLuRepaired] = margins(solved, sets, orders);
-    expect(held).toBeGreaterThanOrEqual(0);
+    // Incineroar outran Ting-Lu strictly before the settling and still does (no coin flip on a seen order).
+    expect(held).toBeGreaterThan(0);
     expect(orthwormRepaired).toBeGreaterThan(0);
     expect(sinistchaHeld).toBeGreaterThanOrEqual(0);
     expect(tingLuRepaired).toBeGreaterThan(0);
@@ -183,16 +184,23 @@ describe('every observed order holds before the ladder (T117)', () => {
       expect(statOf(open, sets, 'p1', 'Gholdengo')).toBe(219);
     });
 
-    test(`a cycle ends tied (${formatid}, 749828 t15 and t16)`, () => {
+    test(`a cycle ends tied, every other order strict (${formatid}, 749828 t15 and t16)`, () => {
+      // Raging Bolt also outran a Timid 252 Clefable (240 under its 249): once the cycle ties Raging
+      // Bolt to Gholdengo (219), Clefable must come under it, strictly.
       const sets = {
-        p1: [mon('Gholdengo', 'Bold', evs(252, 0, 196, 0, 0, 60), 'Air Balloon')],
+        p1: [mon('Gholdengo', 'Bold', evs(252, 0, 196, 0, 0, 60), 'Air Balloon'), mon('Clefable', 'Timid', evs(252, 0, 4, 0, 0, 252), 'Leftovers')],
         p2: [mon('Raging Bolt', 'Modest', evs(0, 0, 4, 252, 0, 252), 'Leftovers')],
       };
-      const orders = [race('p2', 'Raging Bolt', 'p1', 'Gholdengo', 15), race('p1', 'Gholdengo', 'p2', 'Raging Bolt', 16)];
+      const orders = [
+        race('p2', 'Raging Bolt', 'p1', 'Gholdengo', 15), race('p1', 'Gholdengo', 'p2', 'Raging Bolt', 16),
+        race('p2', 'Raging Bolt', 'p1', 'Clefable', 20),
+      ];
       const solved = inferSpreads([], sets, formatid, orders, knowledge({
-        'p1:gholdengo': { itemKnown: true }, 'p2:ragingbolt': { itemKnown: true },
+        'p1:gholdengo': { itemKnown: true }, 'p2:ragingbolt': { itemKnown: true }, 'p1:clefable': { itemKnown: true },
       }));
-      expect(margins(solved, sets, orders)).toEqual([0, 0]);
+      const [back, forth, clefable] = margins(solved, sets, orders);
+      expect([back, forth]).toEqual([0, 0]);
+      expect(clefable).toBeGreaterThan(0);
     });
 
     test(`a weak knock-out binds while a set fits it (${formatid}, Sylveon over a Trick Room Cresselia)`, () => {
