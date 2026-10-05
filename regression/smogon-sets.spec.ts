@@ -145,6 +145,33 @@ describe('Smogon set assumptions', () => {
     expect(assumptions?.pokemon.kyurem?.sourceDetail).toBe('Smogon sets gen9doublesubers');
   });
 
+  test('keeps every option of a published move slot (T89)', async () => {
+    // @pkmn/smogon flattens a slot to its first option; the build must know
+    // Heat Wave and Hidden Power Ice share one slot while Knock Off is fixed.
+    const pivot = { item: 'Assault Vest', nature: 'Calm', evs: { hp: 248, spd: 252 }, moves: ['Hurricane', ['Heat Wave', 'Hidden Power Ice'], 'Knock Off', 'U-turn'] };
+    const assumptions = await fetchSmogonSetAssumptions({
+      formatId: 'gen6ou', species: ['Tornadus-Therian'],
+      fetcher: byUrl({ gen6ou: { 'Tornadus-Therian': { 'Choice Scarf': { item: 'Choice Scarf', moves: ['Hurricane', 'U-turn', 'Knock Off', ['Superpower', 'Heat Wave']] }, 'Assault Vest Pivot': pivot } } }) as never,
+    });
+    const entry = assumptions?.pokemon.tornadustherian;
+    expect(entry?.moves.map(move => move.value)).toEqual(['Hurricane', 'U-turn', 'Knock Off', 'Superpower']);
+    expect(entry?.moves[3].options).toEqual(['Superpower', 'Heat Wave']);
+    expect(entry?.moves[0].options).toBeUndefined();
+    const vest = entry?.alternatives?.[0];
+    expect(vest?.moves.map(move => move.value)).toEqual(['Hurricane', 'Heat Wave', 'Knock Off', 'U-turn']);
+    expect(vest?.moves[1].options).toEqual(['Heat Wave', 'Hidden Power Ice']);
+    expect(vest?.moves.filter(move => move.options)).toHaveLength(1);
+  });
+
+  test('keeps the move slots of a doubles sets file (T89)', async () => {
+    const assumptions = await fetchSmogonSetAssumptions({
+      formatId: 'gen9doublesou', species: ['Tornadus'],
+      fetcher: byUrl({ gen9doublesou: { Tornadus: { 'Bulky Tailwind': { item: 'Covert Cloak', moves: ['Bleakwind Storm', 'Tailwind', ['Taunt', 'Rain Dance', 'Sunny Day'], 'Protect'] } } } }) as never,
+    });
+    expect(assumptions?.pokemon.tornadus?.moves[2]).toMatchObject({ value: 'Taunt', options: ['Taunt', 'Rain Dance', 'Sunny Day'] });
+    expect(assumptions?.pokemon.tornadus?.moves[3].options).toBeUndefined();
+  });
+
   test('a missing fallback file is absence, not failure', async () => {
     const assumptions = await fetchSmogonSetAssumptions({
       formatId: 'gen8ou', species: ['Toxapex', 'Kyurem'], fetcher: byUrl({ gen8ou: toxapexSet }) as never,

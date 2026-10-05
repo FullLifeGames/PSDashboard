@@ -7,6 +7,11 @@ import { toId } from '../ids.ts';
 export interface SetAssumption {
   value: string;
   sourceDetail: string;
+  /**
+   * Every option of a published move slot ("Heat Wave / Hidden Power Ice"),
+   * `value` first; absent on a fixed slot (round 63, T89).
+   */
+  options?: string[];
 }
 
 export interface SetSpreadAssumption extends SetAssumption {

@@ -16,12 +16,16 @@ export { getSpeciesSetAssumption } from '@fulllifegames/replay-core';
 
 type SmogonFetcher = ConstructorParameters<typeof Smogon>[0];
 type AssumptionSet = {
+  name?: string;
   ability?: string;
   item?: string;
   moves?: string[];
   nature?: string;
   evs?: Partial<Record<'hp' | 'atk' | 'def' | 'spa' | 'spd' | 'spe', number>>;
 };
+
+/** A published sets file: species, then set name; a move slot is one name or its options. */
+type RawSetsFile = Record<string, Record<string, { moves?: (string | string[])[] } | undefined> | undefined>;
 
 const gens = new Generations(Dex);
 const cache = new Map<string, Promise<SmogonSetAssumptions | null>>();
@@ -71,6 +75,48 @@ async function setsFrom(smogon: Smogon, gen: ReturnType<typeof gens.get>, name: 
   }
 }
 
+/**
+ * Keeps the sets files this request parsed: @pkmn/smogon flattens every
+ * move slot to its first option (toSet), the published file still holds
+ * them all (round 63, T89: "Heat Wave / Hidden Power Ice" is one slot,
+ * Knock Off a fixed one). @pkmn/smogon reads nothing but `json()`.
+ */
+function keepingSetsFiles(fetcher: SmogonFetch, files: RawSetsFile[]): SmogonFetch {
+  return async (input, init) => {
+    const response = await fetcher(input, init);
+    if (!/\/sets\/[^/]+\.json$/.test(input)) return response;
+    return {
+      ok: response.ok,
+      status: response.status,
+      json: async () => {
+        const file = await response.json() as RawSetsFile;
+        files.push(file);
+        return file;
+      },
+    } as Response;
+  };
+}
+
+/** The published slots behind one flattened set: same set name, same first options. */
+function publishedSlots(files: RawSetsFile[], set: AssumptionSet): (string | string[])[] | null {
+  const moves = set.moves ?? [];
+  if (!set.name) return null;
+  for (const file of files) {
+    for (const sets of Object.values(file)) {
+      const slots = sets?.[set.name]?.moves;
+      if (slots?.length === moves.length &&
+        slots.every((slot, index) => (Array.isArray(slot) ? slot[0] : slot) === moves[index])) return slots;
+    }
+  }
+  return null;
+}
+
+function moveAssumption(move: string, slot: string | string[] | undefined, detail: string): SetAssumption {
+  return Array.isArray(slot) && slot.length > 1
+    ? { value: move, sourceDetail: detail, options: [...slot] }
+    : { value: move, sourceDetail: detail };
+}
+
 function assumption(value: string | undefined, detail: string): SetAssumption | undefined {
   return value ? { value, sourceDetail: detail } : undefined;
 }
@@ -102,13 +148,15 @@ function normalizeSet(
   species: string,
   set: AssumptionSet,
   detail: string,
+  files: RawSetsFile[],
 ): PokemonSetAssumption {
+  const slots = publishedSlots(files, set);
   return {
     species,
     sourceDetail: detail,
     ability: assumption(set.ability, detail),
     item: assumption(set.item, detail),
-    moves: (set.moves ?? []).slice(0, 4).map(move => ({ value: move, sourceDetail: detail })),
+    moves: (set.moves ?? []).slice(0, 4).map((move, index) => moveAssumption(move, slots?.[index], detail)),
     spread: spreadAssumption(set, detail),
   };
 }
@@ -128,7 +176,8 @@ export async function fetchSmogonSetAssumptions(params: {
 
   const request = (async () => {
     const gen = gens.get(genFromFormat(format));
-    const fetcher = withSmogonFallback((params.fetcher ?? boundFetch) as SmogonFetch);
+    const files: RawSetsFile[] = [];
+    const fetcher = keepingSetsFiles(withSmogonFallback((params.fetcher ?? boundFetch) as SmogonFetch), files);
     const smogon = new Smogon(fetcher as unknown as SmogonFetcher, true);
     const fallback = fallbackFormat(format);
     const pokemon: Record<string, PokemonSetAssumption> = {};
@@ -147,8 +196,8 @@ export async function fetchSmogonSetAssumptions(params: {
         if (!first) return; // No published set for this species: absence, not failure.
         formats.add(sourceFormat);
         const detail = sourceDetail(sourceFormat);
-        const entry = normalizeSet(name, first, detail);
-        const alternatives = sets.slice(1, 8).map(set => normalizeSet(name, set, detail));
+        const entry = normalizeSet(name, first, detail, files);
+        const alternatives = sets.slice(1, 8).map(set => normalizeSet(name, set, detail, files));
         if (alternatives.length > 0) entry.alternatives = alternatives;
         pokemon[toId(name)] = entry;
       } catch (error) {
