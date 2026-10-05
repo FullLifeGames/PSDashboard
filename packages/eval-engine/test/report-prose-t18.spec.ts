@@ -130,3 +130,40 @@ describe('T18 point 2: a side is called practically decided once, and never afte
     expect(at(decidedResult('p1', 'Keldeo', 0.9), proven).p1.decided?.announce).toBe(true);
   });
 });
+
+describe('T18 point 3: "practically decided" stays quiet when the turn itself undid it', () => {
+  const decidedTurn = (side: 'p1' | 'p2', species: string, scoreBefore: number, scoreAfter: number | null, doubles = false) =>
+    analyzeTurn({
+      turn: 23,
+      result: {
+        score: scoreBefore, interval: 0, depthCompleted: 1,
+        perSide: doubles
+          ? {
+            p1: [choice('move astralbarrage, move bodypress 1', 'Astral Barrage + Body Press→Terapagos-Stellar', scoreBefore)],
+            p2: [choice('move behemothbash 1, move protect', 'Behemoth Bash→Calyrex-Shadow + Protect', -scoreBefore)],
+          }
+          : { p1: [choice('move hydropump', 'Hydro Pump', scoreBefore)], p2: [choice('move highjumpkick', 'High Jump Kick', -scoreBefore)] },
+        unanswered: { p1: [], p2: [], decided: { side, species } },
+      },
+      played: null, playedOutcome: null, scoreBefore, scoreAfter,
+    });
+
+  test('singles, 649664 t23: 16% to 81% for BKC, so Medicham-Mega clearing everything is not said', () => {
+    const analysis = decidedTurn('p2', 'Medicham-Mega', -0.89, 0.79);
+    expect(analysis.p2.decided).toEqual({ species: 'Medicham-Mega', announce: false });
+    expect(summarizeTurn(analysis, names)).not.toContain('practically decided');
+  });
+
+  test('doubles, 2630685175 t8: the decided side flips on the card, so the sentence stays quiet', () => {
+    expect(decidedTurn('p2', 'Zamazenta-Crowned', -0.9, 0.86, true).p2.decided?.announce).toBe(false);
+  });
+
+  test('573756 t124: an after-score under the decided line (0.39 toward p2) is no practically decided game', () => {
+    expect(decidedTurn('p2', 'Zapdos-Galar', -0.76, -0.39).p2.decided?.announce).toBe(false);
+  });
+
+  test('a turn that holds the line, or the last turn without an after-score, still speaks', () => {
+    expect(summarizeTurn(decidedTurn('p2', 'Zapdos-Galar', -0.89, -0.97), names)).toContain('practically decided');
+    expect(decidedTurn('p1', 'Keldeo', 0.79, null).p1.decided?.announce).toBe(true);
+  });
+});

@@ -1,6 +1,6 @@
 import { AUTO_MCTS_FAINTED_FRACTION } from '../types.ts';
 import {
-  decidedSeenKey, forcedWinSeenKey, type AnalyzeTurnParams, type Side, type SideAnalysis,
+  DECIDED_SCORE, decidedSeenKey, forcedWinSeenKey, type AnalyzeTurnParams, type Side, type SideAnalysis,
 } from './types.ts';
 import { heldDecided } from './decided-held.ts';
 import { forcedWinSpeaks } from './forced-speech.ts';
@@ -35,13 +35,24 @@ const nearInPhase = (params: AnalyzeTurnParams): boolean =>
   params.faintedFraction === undefined || params.faintedFraction === null ||
   params.faintedFraction >= AUTO_MCTS_FAINTED_FRACTION;
 
+/**
+ * Round 63 (T18): the card's own outcome still backs the sweep — the
+ * after-score holds the decided line (DECIDED_SCORE) for the side, or the
+ * game ended. A turn that undid it says so in its estimate; "from here X
+ * clears everything" would contradict it (649664 t23: 16% to 81% the other
+ * way; 573756 t124: down to 0.39). The near stage has no such gate: its
+ * sentence is about a roll that may fail (573756 t73).
+ */
+const outcomeHolds = (params: AnalyzeTurnParams, key: Side): boolean =>
+  params.scoreAfter === null || (key === 'p1' ? params.scoreAfter : -params.scoreAfter) >= DECIDED_SCORE;
+
 /** Round 50: the sweep needs the search's key (heldDecided); the near stage below does not. */
 function decidedStage(params: AnalyzeTurnParams, key: Side): SideAnalysis['decided'] {
   const ownDecided = heldDecided(params.result);
   if (!ownDecided || ownDecided.side !== key) return undefined;
   return {
     species: ownDecided.species,
-    announce: !params.decidedSeen?.has(decidedSeenKey(key, { species: ownDecided.species })),
+    announce: outcomeHolds(params, key) && !params.decidedSeen?.has(decidedSeenKey(key, { species: ownDecided.species })),
   };
 }
 

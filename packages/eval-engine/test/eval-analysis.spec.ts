@@ -1476,7 +1476,7 @@ describe('the decided sweep at the analysis layer (round 15)', () => {
     },
     playedOutcome: -0.2,
     scoreBefore: -0.2,
-    scoreAfter: -0.25,
+    scoreAfter: -0.85, // round 63: the turn keeps the decided line (an after-score under it quiets the sentence)
     ...extra,
   });
 
