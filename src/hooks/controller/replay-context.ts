@@ -40,7 +40,7 @@ function useReplaySurface() {
 }
 
 function useSmogonBundle(replayData: ReplayData | null, p1Info: OpponentTeamInfo | null, opponentInfo: OpponentTeamInfo | null) {
-  const usageStats = useSmogonUsageStats(replayData?.formatid);
+  const usageStats = useSmogonUsageStats(replayData?.formatid, replayData);
   const revealedSpecies = useMemo(() => {
     const p1 = p1Info?.pokemon.map(pokemon => pokemon.species) ?? [];
     const p2 = opponentInfo?.pokemon.map(pokemon => pokemon.species) ?? [];
