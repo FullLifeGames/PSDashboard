@@ -8,6 +8,10 @@ type CalcStatus = NonNullable<CalcPokemonOptions>['status'];
 type CalcStats = NonNullable<CalcPokemonOptions>['evs'];
 type CalcGender = NonNullable<CalcPokemonOptions>['gender'];
 type CalcTeraType = NonNullable<CalcPokemonOptions>['teraType'];
+type CalcMoveOptions = NonNullable<ConstructorParameters<typeof Move>[2]>;
+type CalcAbility = CalcMoveOptions['ability'];
+type CalcItem = CalcMoveOptions['item'];
+type CalcSpecies = CalcMoveOptions['species'];
 
 export interface DamageResult {
   moveName: string;
@@ -79,9 +83,9 @@ function percentOfMaxHp(damage: number, maxhp: number): number {
   return maxhp > 0 ? Math.round(damage / maxhp * 1000) / 10 : 0;
 }
 
-function koChanceFor(minPct: number, maxPct: number, dmg: number | number[] | number[][], hp: number): string {
+function koChanceFor(minPct: number, maxPct: number, hits: number[][], hp: number): string {
   if (maxPct >= 100) {
-    return minPct >= 100 ? 'guaranteed OHKO' : `${estimateKoProb(dmg, hp)}% OHKO`;
+    return minPct >= 100 ? 'guaranteed OHKO' : `${estimateKoProb(hits, hp)}% OHKO`;
   }
   if (maxPct >= 50) return 'possible 2HKO';
   if (maxPct >= 33) return 'possible 3HKO';
@@ -103,20 +107,25 @@ export function calcSingleDamageRange(
       gen,
       atkPoke,
       defPoke,
-      new Move(gen, moveOption.name),
+      // The attacker's ability and item reach the move too: Skill Link sets five hits.
+      new Move(gen, moveOption.name, {
+        ability: (attacker.ability || undefined) as CalcAbility,
+        item: (attacker.item || undefined) as CalcItem,
+        species: attacker.species as CalcSpecies,
+      }),
       calcField(context),
     );
-    const dmg = result.damage;
-    const flat = Array.isArray(dmg) ? dmg.flat().map(Number) : [Number(dmg)];
-    const minPct = percentOfMaxHp(Math.min(...flat), defender.maxhp);
-    const maxPct = percentOfMaxHp(Math.max(...flat), defender.maxhp);
+    // A multi-hit move deals the sum of its hits; the calc sums them itself (T96).
+    const [minDamage, maxDamage] = result.range();
+    const minPct = percentOfMaxHp(minDamage, defender.maxhp);
+    const maxPct = percentOfMaxHp(maxDamage, defender.maxhp);
 
     return {
       moveName: moveOption.name,
       minPercent: minPct,
       maxPercent: maxPct,
       range: `${minPct}% - ${maxPct}%`,
-      koChance: koChanceFor(minPct, maxPct, dmg, defender.hp),
+      koChance: koChanceFor(minPct, maxPct, hitRolls(result.damage), defender.hp),
     };
   } catch {
     return emptyDamageResult(moveOption.name);
@@ -133,9 +142,33 @@ function emptyDamageResult(moveName: string): DamageResult {
   };
 }
 
-function estimateKoProb(dmg: number | number[] | number[][], targetHp: number): number {
-  if (!Array.isArray(dmg)) return Number(dmg) >= targetHp ? 100 : 0;
-  const flat = dmg.flat().map(Number);
-  const koCount = flat.filter(d => d >= targetHp).length;
-  return Math.round(koCount / flat.length * 100);
+/**
+ * The calc's damage as one row of equally likely rolls per hit: a number,
+ * one hit's rolls, one number per hit (fewer than 16, as the calc's own
+ * damageRange reads them: fixed-damage Parental Bond) or one row per hit.
+ */
+function hitRolls(damage: number | number[] | number[][]): number[][] {
+  if (!Array.isArray(damage)) return [[Number(damage)]];
+  if (damage.length > 0 && Array.isArray(damage[0])) return (damage as number[][]).map(row => row.map(Number));
+  const rolls = (damage as number[]).map(Number);
+  return rolls.length < 16 ? rolls.map(hit => [hit]) : [rolls];
+}
+
+/** The chance that the hits together reach `targetHp`: every hit rolls on its own. */
+function estimateKoProb(hits: number[][], targetHp: number): number {
+  let totals = new Map<number, number>([[0, 1]]);
+  for (const rolls of hits) {
+    const next = new Map<number, number>();
+    for (const [sum, ways] of totals) {
+      for (const roll of rolls) next.set(sum + roll, (next.get(sum + roll) ?? 0) + ways);
+    }
+    totals = next;
+  }
+  let all = 0;
+  let knockouts = 0;
+  for (const [sum, ways] of totals) {
+    all += ways;
+    if (sum >= targetHp) knockouts += ways;
+  }
+  return all > 0 ? Math.round(knockouts / all * 100) : 0;
 }
