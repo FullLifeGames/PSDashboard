@@ -1,4 +1,5 @@
 import { Generations, Pokemon, Move, Field, calculate } from '@smogon/calc';
+import { Dex } from '@pkmn/sim';
 import type { SimPokemonInfo, BranchMoveOption } from './branch-engine.ts';
 import { toId, TERRAIN_BY_ID, WEATHER_BY_ID } from '@fulllifegames/replay-core';
 
@@ -12,6 +13,7 @@ type CalcMoveOptions = NonNullable<ConstructorParameters<typeof Move>[2]>;
 type CalcAbility = CalcMoveOptions['ability'];
 type CalcItem = CalcMoveOptions['item'];
 type CalcSpecies = CalcMoveOptions['species'];
+type CalcMoveOverrides = NonNullable<CalcMoveOptions['overrides']>;
 
 export interface DamageResult {
   moveName: string;
@@ -30,6 +32,14 @@ export interface DamageCalcContext {
   terrain?: string;
   attackerSideConditions?: string[];
   defenderSideConditions?: string[];
+  /**
+   * Doubles, when the preview sees the field: the defender's living partner
+   * (never the attacker; null when it stands alone) and whether the
+   * attacker's partner lives. They decide how the move lands (moveLanding);
+   * left out, the calc's own reading stands.
+   */
+  defenderPartner?: SimPokemonInfo | null;
+  attackerPartnerAlive?: boolean;
 }
 
 function toConditionId(value: string | undefined): string {
@@ -79,6 +89,43 @@ function calcPokemonFrom(gen: CalcGen, info: SimPokemonInfo): Pokemon {
   } satisfies CalcPokemonOptions);
 }
 
+/** Whether the move does damage to this Pokémon at all (the calc reads immunities). */
+function landsOn(gen: CalcGen, attacker: SimPokemonInfo, target: SimPokemonInfo, moveName: string, context: DamageCalcContext): boolean {
+  const result = calculate(gen, calcPokemonFrom(gen, attacker), calcPokemonFrom(gen, target), new Move(gen, moveName), calcField(context));
+  return result.range()[1] > 0;
+}
+
+/**
+ * How the move lands in doubles, as the simulator decides it per use: a
+ * spread move loses its spread factor when it hits only one Pokémon
+ * (trySpreadMoveHit sets spreadHit for more than one target;
+ * Battle.getMoveTargets counts the living foes, and for allAdjacent the
+ * attacker's living partner too, immune or not), and a smart-target
+ * multi-hit (Dragon Darts) lands one hit on the defender and one on its
+ * partner, unless the partner is immune (Pokemon.getSmartTargets, then the
+ * immunity step turns the second hit back onto the defender).
+ */
+function moveLanding(
+  gen: CalcGen,
+  attacker: SimPokemonInfo,
+  moveOption: BranchMoveOption,
+  context: DamageCalcContext,
+): CalcMoveOverrides | undefined {
+  if (context.gameType !== 'Doubles' || context.defenderPartner === undefined) return undefined;
+  const partner = context.defenderPartner;
+  const foes = partner ? 2 : 1;
+  const hit = moveOption.targetType === 'allAdjacentFoes' ? foes
+    : moveOption.targetType === 'allAdjacent' ? foes + (context.attackerPartnerAlive ? 1 : 0)
+    : 0;
+  const overrides: CalcMoveOverrides = {};
+  if (hit === 1) overrides.target = 'normal';
+  if (partner && Dex.forGen(gen.num).moves.get(moveOption.name).smartTarget &&
+    landsOn(gen, attacker, partner, moveOption.name, context)) {
+    overrides.multihit = 1;
+  }
+  return Object.keys(overrides).length > 0 ? overrides : undefined;
+}
+
 function percentOfMaxHp(damage: number, maxhp: number): number {
   return maxhp > 0 ? Math.round(damage / maxhp * 1000) / 10 : 0;
 }
@@ -112,6 +159,7 @@ export function calcSingleDamageRange(
         ability: (attacker.ability || undefined) as CalcAbility,
         item: (attacker.item || undefined) as CalcItem,
         species: attacker.species as CalcSpecies,
+        overrides: moveLanding(gen, attacker, moveOption, context),
       }),
       calcField(context),
     );

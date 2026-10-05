@@ -28,6 +28,24 @@ export interface DamagePreviewInputs {
 }
 
 type LivingEnemy = { active: SimPokemonInfo; index: number };
+type SlotsBySide = { p1: (SimPokemonInfo | null)[]; p2: (SimPokemonInfo | null)[] };
+
+const isLiving = (info: SimPokemonInfo | null | undefined): info is SimPokemonInfo =>
+  !!info && !info.fainted && info.hp > 0;
+
+/**
+ * Doubles: who else stands next to the defender and the attacker, so the
+ * calc lands the move as the simulator does (one target, no spread factor;
+ * Dragon Darts split over two foes). The partner is never the attacker.
+ */
+function fieldFacts(slots: SlotsBySide, attacker: SimPokemonInfo, defenderSide: 'p1' | 'p2', defenderSlot: number) {
+  const attackerSide = slots.p1.includes(attacker) ? 'p1' : 'p2';
+  return {
+    defenderPartner: slots[defenderSide].find((info, slot) =>
+      slot !== defenderSlot && info !== attacker && isLiving(info)) ?? null,
+    attackerPartnerAlive: slots[attackerSide].some(info => info !== attacker && isLiving(info)),
+  };
+}
 
 /** Per-move damage of one active slot: targeted entries, the best untargeted range, and spread breakdowns. */
 function slotDamage(args: {
@@ -35,19 +53,21 @@ function slotDamage(args: {
   moves: BranchMoveOption[];
   enemySide: 'p1' | 'p2';
   enemyActives: LivingEnemy[];
-  targetBySideSlot: { p1: Map<string, SimPokemonInfo | null>; p2: Map<string, SimPokemonInfo | null> };
+  slots: SlotsBySide;
   context: DamageContext;
   calc: CalcSingleDamageRange;
 }) {
-  const { active, moves, enemySide, enemyActives, targetBySideSlot, context, calc } = args;
+  const { active, moves, enemySide, enemyActives, slots, context, calc } = args;
   const defaults: DamageResult[] = [];
   const spread: Record<number, SpreadTargetDamage[]> = {};
   const targetEntries: [string, DamageResult][] = [];
+  const contextInto = (side: 'p1' | 'p2', slot: number): DamageContext =>
+    (context?.gameType === 'Doubles' ? { ...context, ...fieldFacts(slots, active, side, slot) } : context);
   moves.forEach((move, moveIndex) => {
     for (const target of move.targetOptions) {
-      const defender = targetBySideSlot[target.side].get(`${target.side}:${target.activeSlot}`);
+      const defender = slots[target.side][target.activeSlot];
       if (defender) {
-        targetEntries.push([`${move.slot}:${target.targetLoc}`, calc(active, defender, move, context)]);
+        targetEntries.push([`${move.slot}:${target.targetLoc}`, calc(active, defender, move, contextInto(target.side, target.activeSlot))]);
       }
     }
 
@@ -55,7 +75,7 @@ function slotDamage(args: {
     // Untargeted moves (spread/self/singles): one range per living enemy (G6).
     const perTarget = enemyActives.map(enemy => ({
       label: `${enemySide.toUpperCase()}${String.fromCharCode(65 + enemy.index)}`,
-      result: calc(active, enemy.active, move, context),
+      result: calc(active, enemy.active, move, contextInto(enemySide, enemy.index)),
     }));
     const best = perTarget.reduce((currentBest, candidate) =>
       candidate.result.maxPercent > currentBest.result.maxPercent ? candidate : currentBest,
@@ -81,10 +101,7 @@ export function computePreviewDamage(inputs: DamagePreviewInputs, calc: CalcSing
     attackerSideConditions: attacker === 'p1' ? fieldState?.p1SideConditions : fieldState?.p2SideConditions,
     defenderSideConditions: attacker === 'p1' ? fieldState?.p2SideConditions : fieldState?.p1SideConditions,
   });
-  const targetBySideSlot = {
-    p1: new Map(p1ActiveSlots.map((active, index) => [`p1:${index}`, active])),
-    p2: new Map(p2ActiveSlots.map((active, index) => [`p2:${index}`, active])),
-  };
+  const slots: SlotsBySide = { p1: p1ActiveSlots, p2: p2ActiveSlots };
 
   const makeSideDamage = (side: 'p1' | 'p2'): SideDamage => {
     const activeSlots = side === 'p1' ? p1ActiveSlots : p2ActiveSlots;
@@ -92,8 +109,7 @@ export function computePreviewDamage(inputs: DamagePreviewInputs, calc: CalcSing
     const enemySide = side === 'p1' ? 'p2' : 'p1';
     const enemyActives = (side === 'p1' ? p2ActiveSlots : p1ActiveSlots)
       .map((active, index) => ({ active, index }))
-      .filter((entry): entry is LivingEnemy =>
-        !!entry.active && !entry.active.fainted && entry.active.hp > 0);
+      .filter((entry): entry is LivingEnemy => isLiving(entry.active));
     const context = contextFor(side);
 
     const defaults: DamageResult[][] = [];
@@ -106,7 +122,7 @@ export function computePreviewDamage(inputs: DamagePreviewInputs, calc: CalcSing
       spread[activeSlot] = {};
       targets[activeSlot] = {};
       if (!active || moves.length === 0) return;
-      const slot = slotDamage({ active, moves, enemySide, enemyActives, targetBySideSlot, context, calc });
+      const slot = slotDamage({ active, moves, enemySide, enemyActives, slots, context, calc });
       defaults[activeSlot] = slot.defaults;
       spread[activeSlot] = slot.spread;
       targets[activeSlot] = slot.targets;

@@ -79,3 +79,110 @@ describe('multi-hit moves land all their hits in the preview (T96 point 1)', () 
     expect(lost[1]).toBe(0);
   });
 });
+
+/** A bulky target that takes every hit standing: physical bulk, Splash. */
+function wall(species: string): PokemonSet {
+  return set(species, ['Splash'], { evs: { ...STATS, hp: 252, def: 252 } });
+}
+
+/** Faints one active so its side fights on with a single Pokémon (no bench left to send in). */
+function faint(current: Battle, side: 0 | 1, slot: number) {
+  current.sides[side].active[slot].faint();
+  current.faintMessages();
+}
+
+/** The roll is the only luck the range covers: a crit or a miss voids the check. */
+function expectPlainHits(log: string) {
+  expect(log).not.toContain('|-crit|');
+  expect(log).not.toContain('|-miss|');
+}
+
+describe('how a move lands in doubles (T20, Rock Slide from T96)', () => {
+  test('Rock Slide into a lone foe hits it alone: no spread reduction', () => {
+    const current = battle('gen9doublescustomgame',
+      [set('Garchomp', ['Rock Slide']), set('Corviknight', ['Splash'])],
+      [wall('Snorlax'), wall('Clefable')]);
+    faint(current, 1, 1);
+    const range = preview(current).p1.default[0][0];
+    const { lost, log } = play(current, 'move rockslide, move splash', 'move splash, pass');
+    expectPlainHits(log);
+    expectInside(range, lost[0], current.sides[1].active[0].maxhp);
+  });
+
+  test('Earthquake into a lone foe with no living ally hits one Pokémon: no spread reduction', () => {
+    const current = battle('gen9doublescustomgame',
+      [set('Garchomp', ['Earthquake']), set('Corviknight', ['Splash'])],
+      [wall('Snorlax'), wall('Clefable')]);
+    faint(current, 0, 1);
+    faint(current, 1, 1);
+    const range = preview(current).p1.default[0][0];
+    const { lost, log } = play(current, 'move earthquake, pass', 'move splash, pass');
+    expectPlainHits(log);
+    expectInside(range, lost[0], current.sides[1].active[0].maxhp);
+  });
+
+  test('Earthquake into a lone foe next to a living ally still spreads, even when the ally is immune', () => {
+    const current = battle('gen9doublescustomgame',
+      [set('Garchomp', ['Earthquake']), set('Corviknight', ['Splash'])],
+      [wall('Snorlax'), wall('Clefable')]);
+    faint(current, 1, 1);
+    const range = preview(current).p1.default[0][0];
+    const { lost, log } = play(current, 'move earthquake, move splash', 'move splash, pass');
+    expectPlainHits(log);
+    expectInside(range, lost[0], current.sides[1].active[0].maxhp);
+  });
+
+  test('Rock Slide into two foes spreads over both', () => {
+    const current = battle('gen9doublescustomgame',
+      [set('Garchomp', ['Rock Slide']), set('Corviknight', ['Splash'])],
+      [wall('Snorlax'), wall('Clefable')]);
+    const rows = preview(current).p1.spread[0][1];
+    const { lost, log } = play(current, 'move rockslide, move splash', 'move splash, move splash');
+    expectPlainHits(log);
+    expectInside(rows.find(row => row.label === 'P2A')?.result, lost[0], current.sides[1].active[0].maxhp);
+    expectInside(rows.find(row => row.label === 'P2B')?.result, lost[1], current.sides[1].active[1].maxhp);
+  });
+
+  test('Dragon Darts at one of two foes lands one dart on each', () => {
+    const current = battle('gen9doublescustomgame',
+      [set('Dragapult', ['Dragon Darts']), set('Corviknight', ['Splash'])],
+      [wall('Snorlax'), wall('Blissey')]);
+    const targets = preview(current).p1.targets[0];
+    const { lost, log } = play(current, 'move dragondarts 1, move splash', 'move splash, move splash');
+    expectPlainHits(log);
+    expectInside(targets['1:1'], lost[0], current.sides[1].active[0].maxhp);
+    expectInside(targets['1:2'], lost[1], current.sides[1].active[1].maxhp);
+  });
+
+  test('Dragon Darts with an immune partner of the target lands both darts on the target', () => {
+    const current = battle('gen9doublescustomgame',
+      [set('Dragapult', ['Dragon Darts']), set('Corviknight', ['Splash'])],
+      [wall('Snorlax'), wall('Clefable')]);
+    const targets = preview(current).p1.targets[0];
+    const { lost, log } = play(current, 'move dragondarts 1, move splash', 'move splash, move splash');
+    expectPlainHits(log);
+    // The second dart turns to the target again (a smart-target move prints no hit count).
+    expect(log).toContain('|-anim|p1a: Dragapult|Dragon Darts|p2a: Snorlax');
+    expect(lost[1]).toBe(0);
+    expectInside(targets['1:1'], lost[0], current.sides[1].active[0].maxhp);
+  });
+
+  test('Dragon Darts at a lone foe lands both darts on it', () => {
+    const current = battle('gen9doublescustomgame',
+      [set('Dragapult', ['Dragon Darts']), set('Corviknight', ['Splash'])],
+      [wall('Snorlax'), wall('Blissey')]);
+    faint(current, 1, 1);
+    const targets = preview(current).p1.targets[0];
+    const { lost, log } = play(current, 'move dragondarts 1, move splash', 'move splash, pass');
+    expectPlainHits(log);
+    expectInside(targets['1:1'], lost[0], current.sides[1].active[0].maxhp);
+  });
+
+  test('singles never spreads: Rock Slide reads as before', () => {
+    const current = battle('gen9customgame', [set('Garchomp', ['Rock Slide'])], [wall('Snorlax')]);
+    const range = preview(current).p1.default[0][0];
+    const { lost, log } = play(current, 'move rockslide', 'move splash');
+    expectPlainHits(log);
+    expectInside(range, lost[0], current.sides[1].active[0].maxhp);
+  });
+});
