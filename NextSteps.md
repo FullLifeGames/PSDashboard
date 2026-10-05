@@ -1,6 +1,6 @@
 # Next Steps (Stand 05.10.2026, nach Runde 62)
 
-Nur offene Schritte, als priorisierte Checkliste: Die oberste Welle ist die nächste Runde; ihre Spuren laufen parallel, je Spur zuerst das oberste offene Kästchen (Abschnitt „Parallel arbeiten“). Jedes TODO nennt das Problem an einer Spielszene und das Erfolgsmaß. Die Umsetzungsschritte jedes TODOs stehen als Checkliste im Backlog-Plan unter derselben Nummer; beim Start einer Welle wandern sie hierher.
+Nur offene Schritte, als priorisierte Checkliste: Die oberste Welle ist die nächste Runde; ihre Spuren laufen parallel, je Spur zuerst das oberste offene Kästchen (Abschnitt „Parallel arbeiten“). Jedes TODO nennt das Problem an einer Spielszene und das Erfolgsmaß. Die Umsetzungsschritte jedes TODOs stehen als Checkliste im Backlog-Plan unter derselben Nummer; beim Start einer Welle schreibt ihre Spec die Schritte neu; unter „Runde 62 (neu gefasst)“ sind die alten Kästchen dort nur Hintergrund.
 
 - **Iterationen** bündeln die TODOs einer Sitzung. Eine Iteration wird beim Start zur Runde mit der nächsten freien Rundennummer: Iteration 1 war Runde 46, Iteration 2 war Runde 47, Iteration 2a war Runde 48, Iteration 2b war Runde 49, Iteration 3 war Runde 50, Iteration 4 war Runde 51, Iteration 4a war Runde 52, Iteration 4d war Runde 53, Iteration 4b war Runde 54, Iteration 4e war Runde 55, Iteration 4c war Runde 56, Iteration 4f war Runde 57. Runde 58 war die Sichtung „Was bauen wir nach?“ außer der Reihe; seit ihrem Gate stehen die Iterationen S1 bis S3 des Programms „Mehr Simulation“ oben, vorgesehen als Runden 59 bis 62; Iteration S1 war Runde 59, Iteration S1a war Runde 60, Iteration S2 war Runde 61, Iteration S3 war Runde 62 (Triage). Seit Runde 62 heißen die Bündel Wellen: Eine Welle ist eine Runde, ihre Spuren laufen parallel mit je einem Sub-Agent; Welle 1 wird Runde 63. Score-berührende TODOs bekommen je ihre eigene Messung (D3), nie eine gemeinsame.
 - **T-Nummern** (T01 bis T45) sind feste Namen, vergeben am 18.09. in Prioritäts-Reihenfolge. Wandert ein TODO in der Liste, behält es seine Nummer; ein neues TODO bekommt die nächste freie (ab T117; T46 kam am 18.09. in Runde 46 dazu, T47 bis T51 in Runde 47, T52 und T53 in Runde 48, T54 in Runde 49, T55 in Runde 50, T56 bis T64 in Runde 51, T65 am 19.09. nach deren Gate, T66 bis T68 am 20.09. in Runde 52, T69 am 20.09. in Runde 53, T70 bis T74 am 21.09. in Runde 54, T75 am 21.09. in Runde 55, T76 am 23.09. am Gate der Runde 56, T77 bis T80 am 23.09. in Runde 56, T81 am 23.09. am Gate der Runde 57, T82 am 23.09. in ihrer Spec, T83 bis T90 am 24.09. in Runde 57, T91 bis T102 am 24.09. am Gate der Runde 58, T103 am 01.10. in Runde 59, T104 am 02.10. in Runde 60 vergeben und dort erledigt, T105 bis T107 am 02.10. in Runde 60, T108 am 02.10. nach ihrem Gate, T109 bis T111 am 04.10. in Runde 61, T112 bis T116 am 05.10. in Runde 62). Seit Runde 62 sind 36 Nummern stillgelegt; sie stehen mit Beleg und altem Text in `docs/completed/triage.md`. „braucht T01“ heißt: T01 muss vorher gelaufen sein.
@@ -23,73 +23,62 @@ Gate der Runde 62 (05.10.2026): Die nächsten Schritte laufen mit mehreren Sub-A
 
 | Welle | Spur | TODOs | Tor |
 | --- | --- | --- | --- |
-| 1 | A · Auto-Budget: Singles früh, Tiefer denken, Texte | T110, T109, T111 | Bank gepaart (T110), Feedback 3× mit 562428 t10 auf ok, UI-Tests und e2e für T109. |
-| 1 | B · Zugkern der Statik | T81, T112 | Bank gepaart, Singles und Doubles getrennt, mit K der Bank und eigenem K je Phase; Feedback 3× mit Tier-Zählung; T112 byte-gleich. |
+| 1 | A · Auto-Budget: frühe Singles-Züge | T110 | Bank gepaart, Feedback 3× mit 562428 t10 auf ok, roter Test für die Schwelle je Spielart und für den unveränderten Doubles-Lead. |
+| 1 | B · Zugkern der Statik | T81, T112 | Bank gepaart, Singles und Doubles getrennt, mit K der Bank und eigenem K je Phase; Feedback 3× mit Tier-Zählung; T112 byte-gleich; Zeit-Tore im gemeinsamen Zeitfenster. |
 | 1 | C · Nachprüfung im Baum: Klassen und Tiefe | T16, T78 | Monte-Carlo-Sonde und Dumps (Noten), Pins mit Golden 655336 am User-Gate; jede bewegte Bank-Zeile gelesen (die Bank sieht die Nachprüfung kaum). |
-| 1 | D · Set-Treue | T89, T28, T80, T101 | Set-Diff auf Bank und Feedback, Bank gepaart mit frischer Basis, Feedback 3×, Pin-Bewegungen (648453 t13, t20, 649664 t8) am User-Gate. |
-| 1 | E · Bericht, erster Teil | T19, T18, T17, T64, T116 | Engine-Zahlen unberührt (Score, Tiers, Bank ohne Lauf byte-gleich), Feedback-Dumps und Prosa-Pins, UI-Tests. |
+| 1 | D · Set-Treue | T89, T28, T80, T101 | Set-Diff auf Bank und Feedback, Bank gepaart, Feedback 3×, Pin-Bewegungen (648453 t13, t20, 649664 t8) am User-Gate. |
+| 1 | E · Bericht, erster Teil | T19, T18, T17, T116 | Engine-Zahlen unberührt (Score, Tiers, Bank ohne Lauf byte-gleich), Feedback-Dumps und Prosa-Pins, UI-Tests. |
 | 1 | F · Vorschau | T20, T96, T68 | UI-Tests und e2e; Bank und Feedback unberührt. |
-| 1 | U · User-Aufgabe: Experten-Urteile | T45 | Urteile im Ledger, mindestens ein Doubles-Pin. |
+| 1 | G · Choice-Sperre nach Trick | T115 | Zählung auf 0, Golden 655336 zuerst, Bank gepaart, Feedback 3×. |
+| 1 | U · User-Aufgabe: Experten-Urteile | T45 | Urteile im Ledger, mindestens ein Doubles-Pin nach dem Wellen-Lauf. |
 | 2 | A · Rechner-Eingaben | T83, T72, T76, T100, T84 | Zählung je TODO auf 0, Dumps (Quoten, Zeilen), jede bewegte Bank-Zeile gelesen. |
-| 2 | B · Wahlen und Wurzelwert | T113, T114 | Prüfstände, Bank-Lauf mit gameValue neben dem Score, Feedback 3×, Score-Frage am User-Gate. |
-| 2 | C · Nachbau-Treue | T115, T108 | Zählungen auf 0, Golden 655336 zuerst, Bank gepaart, Feedback 3×. |
-| 2 | D · Bericht, zweiter Teil | T22, T59 | Engine-Zahlen unberührt, Dumps und Prosa-Pins, chance-Pins 573756 t73 und 649664 t23 stehen. |
+| 2 | B · Wahlen, Wurzelwert, Tiefer denken | T113, T114, T109, T111 | Prüfstände, Bank-Lauf mit dem Spielwert der Wurzel neben dem Score (das Bank-Feld baut der Integrator), Feedback 3×, UI-Tests und e2e für T109, Score-Frage von T114 am User-Gate. |
+| 2 | C · Gegner-Inferenz | T108 | Zählung Client gegen Inferenz gelesen, Bank gepaart, Feedback 3×. |
+| 2 | D · Bericht, zweiter Teil | T22, T59, T64 | Engine-Zahlen unberührt, Dumps und Prosa-Pins, chance-Pins 573756 t73 und 649664 t23 stehen. |
 | 2 | E · Panel und Knöpfe | T85, T69 | UI-Tests und e2e, Set-Diff 0. |
-| 2 | F · Skala | T52, T51 | Bank mit K der Bank und eigenem K je Phase, Doubles-Tier-Zählung, Anzeige-Kalibrierung. |
+| 2 | F · Doubles-K am Blatt | T52 | Bank mit K der Bank und eigenem K je Phase, Doubles-Tier-Zählung. |
 | 3 | A · Fitter und Doubles-Schaden | T31, T26, T86 | Set-Diff, Fit-Fehler je Familie, Bank mit frischer Basis, Feedback 3×. |
 | 3 | B · Statik-Gewichte | T42, T49, T102, T39 | Bank mit beiden K-Lesungen, Fit-Korpus mit Kreuzprüfung, Feedback 3× mit Tier-Zählung. |
+| 3 | C · Prozent-Anzeige | T51 | Anzeige-Kalibrierung, Re-Pins der Prosa am User-Gate, kein Urteil bewegt sich. |
 
 **Regeln für parallele Spuren.**
 
-- Eine Welle ist eine Runde. Jede Spur ist ein Sub-Agent auf einem eigenen Branch und Worktree vom Stand bei Wellen-Start; die Hauptsitzung ist Integrator. Die Spuren einer Welle teilen keine Datei; Abhängigkeiten liegen zwischen den Wellen.
+- Eine Welle ist eine Runde. Jede Spur ist ein Sub-Agent auf einem eigenen Branch und Worktree vom Stand bei Wellen-Start; die Hauptsitzung ist Integrator. Die Spuren einer Welle teilen keine Datei (Runde 62 am Code geprüft); Abhängigkeiten liegen zwischen den Wellen.
 - Datei-Hoheit: Eine Spur ändert nur die Dateien ihrer Liste. Braucht sie eine fremde Datei, meldet sie das dem Integrator und ändert sie nicht selbst.
-- Nur der Integrator ändert: NextSteps.md, docs/completed/, den Ledger-Block in regression/eval-calibration.spec.ts, e2e-feedback/corpus.ts (Pins, Re-Pins nur am User-Gate), EVAL_ENGINE_CACHE_VERSION in src/lib/eval-cache-store.ts (ein Bump je Welle), eslint.ratchet.mjs und den Snapshot in regression/package-api.spec.ts.
-- Eine schwere Messung zur Zeit auf der Maschine (Bank, Feedback, e2e, volle Regression), über eine Warteschlange beim Integrator; ein Bank-Lauf dauert rund 13 Minuten (r61-t98b 794 s), ein Feedback-Lauf rund 5. Sonden auf einzelnen Stellungen dürfen parallel laufen, je höchstens 5 Minuten.
-- Messungen laufen in einem eigenen Messungs-Worktree des Integrators, der die Spur-Commits nacheinander auscheckt; jede Spur misst gegen dieselbe Basis vom Wellen-Start und liest gepaart mit dem K der Bank und mit eigenem K je Phase.
+- Nur der Integrator ändert: NextSteps.md, docs/completed/, den Ledger-Block und das Sample-Format in regression/eval-calibration.spec.ts, die Mess-Skripte (scripts/run-calibration.mjs, scripts/paired-calibration.mjs), e2e-feedback/corpus.ts, Fixtures und den Feedback-Harness (Pins, Re-Pins nur am User-Gate), EVAL_ENGINE_CACHE_VERSION in src/lib/eval-cache-store.ts (ein Bump je Welle) und eslint.ratchet.mjs.
+- Barrels und API-Snapshot: Die Barrels packages/*/src/index.ts und der Snapshot in regression/fixtures/api/*.txt sind gemeinsame Dateien. Eine Spur, die einen Export ändert, schreibt den Snapshot in ihrem Branch mit UPDATE_API_SNAPSHOT=1 neu und nennt den Diff im Bericht; der Integrator führt Barrels und Snapshot beim Merge zusammen.
+- Messungen: eine schwere Messung zur Zeit auf der Maschine (Bank, Feedback, e2e, volle Regression), über die Warteschlange des Integrators; ein Bank-Lauf dauert rund 13 Minuten (r61-t98b 794 s), ein Feedback-Lauf rund 5. Während einer Wanduhr-Messung (Zeit-Tore von T110, T81, T112, T16, T78, T113) ruhen alle Spuren: keine Sonde, kein Test, kein Build; Zeit-Tore laufen gebündelt in einem Fenster. Sonst dürfen Sonden auf einzelnen Stellungen parallel laufen, je höchstens 5 Minuten.
+- Git-Stopp und Absturz-Schutz: Alle Worktrees teilen ein .git. Vor jedem schweren Lauf meldet der Integrator einen Git-Stopp; alle Spuren committen und flushen vorher (D23), bis zum Ende des Laufs schreibt niemand in .git. Der Smogon-Cache ist vor Wellen-Start warm und gilt während der Welle als nur lesbar.
+- Messungs-Worktree: Messungen laufen in einem eigenen Worktree des Integrators, der die Spur-Commits nacheinander auscheckt. Jede Spur misst gegen dieselbe Basis vom Wellen-Start (eine neue Basis, sobald ein neuer Tag beginnt) und liest gepaart mit dem K der Bank und mit eigenem K je Phase.
+- Sonden in Worktrees: docs/ ist gitignored und fehlt in jedem Worktree. Plan, Spec und Sonden liest eine Spur im Haupt-Checkout, nur lesend; docs/ kommt nie als Junction in einen Worktree. Sonden-Configs nehmen ihre Wurzel aus PROBE_ROOT und importieren Repo-Code nur über Aliase (@engine, @replaycore, @regression, die Paketnamen), damit eine Sonde mit PROBE_ROOT=<eigener Worktree> den Code der Spur rechnet. Vor Welle 1 prüft der Integrator das in einem Worktree an einer Sonde mit bekanntem Ergebnis.
 - Worktrees: nie git worktree remove auf einem Worktree mit Junctions; Junctions (.calibration, .smogon-cache, .fit-corpus, node_modules) vorher mit [System.IO.Directory]::Delete lösen. Keine automatische Worktree-Isolation des Agent-Werkzeugs, weil sie Worktrees ohne getrackte Änderung selbst entfernt und dabei Junctions folgen würde.
-- Merge: Der Integrator merged die Spuren in der Reihenfolge der Liste, jede Spur vorher auf den Wellen-Stand rebased; Konflikte nur mit Marker-Zählung auflösen. Danach rechnet er den Wellen-Lauf (Bank gegen die Basis, Feedback 3×); zeigt der Lauf einen Schaden, den keine Spur allein zeigte, rechnet er Spur für Spur zurück.
+- Merge: Der Integrator merged die Spuren in der Reihenfolge der Liste, jede Spur vorher auf den Wellen-Stand rebased; Konflikte löst er nur, nachdem er die Konflikt-Marker gezählt hat. Danach rechnet er den Wellen-Lauf (Bank gegen die Basis, Feedback 3×); zeigt der Lauf einen Schaden, den keine Spur allein zeigte, rechnet er Spur für Spur zurück.
 - Ein User-Gate je Welle mit einer Tabelle über alle Spuren. Commits englisch und ohne Attribution, kein Push ohne Okay, Singles und Doubles gleichrangig, keine Spiellogik hart kodieren.
-- Vor Welle 1 baut der Integrator Schritt 1 von T52 (eigenes K je Phase in scripts/paired-calibration.mjs), weil jede Spur damit liest.
+- Vor Welle 1 baut der Integrator Schritt 1 von T52 (eigenes K je Phase in scripts/paired-calibration.mjs), weil jede Spur damit liest, und stellt die Sonden-Config auf PROBE_ROOT um. Die Kästchen unter „Runde 62 (neu gefasst)“ im Backlog-Plan sind Hintergrund; die Spec der Welle schreibt die Schritte jeder Spur neu.
 
-## Welle 1 · Spur A · Auto-Budget: Singles früh, Tiefer denken, Texte
+## Welle 1 · Spur A · Auto-Budget: frühe Singles-Züge
 
-Klein und schon gemessen: Der Hybrid aus T110 ist aus vorhandenen Bank-Zeilen gerechnet neutral, holt den Pin 562428 t10 zurück und macht frühe Singles-Klicks schneller. T109 und T111 ändern dieselben Dateien und die Texte zu Auto.
+Klein und zum Teil schon gemessen: Der Hybrid aus T110 ist aus vorhandenen Bank-Zeilen gerechnet neutral und holt in den Dumps der Runde 61 den Pin 562428 t10 zurück; beides gilt für einen Wurf, die drei Würfe misst die Spur zuerst.
 
-*Dateien:* packages/eval-engine/src/search/budget.ts, src/hooks/evaluation/ (prefs.ts, single-eval.ts, sweep-core.ts), src/hooks/useEvaluation.ts, src/hooks/useEvalView.ts, src/components/eval/GameGraphSection.tsx, EvalControls.tsx, PlayOutBar.tsx, ThinkDeeperButton, regression/bank-search.ts, EVALUATION.md, packages/eval-engine/README.md.
+*Dateien:* packages/eval-engine/src/search/budget.ts, src/hooks/evaluation/ (prefs.ts, single-eval.ts, sweep-core.ts, graph-sweep.ts), src/hooks/useEvaluation.ts, src/hooks/useEvalView.ts, src/components/GameGraphSection.tsx, regression/bank-search.ts.
 
-*Tor:* Bank gepaart (T110), Feedback 3× mit 562428 t10 auf ok, UI-Tests und e2e für T109.
+*Tor:* Bank gepaart, Feedback 3× mit 562428 t10 auf ok, roter Test für die Schwelle je Spielart und für den unveränderten Doubles-Lead.
 
 - [ ] **T110 · Frühe Singles-Züge als Matrix, Doubles bleibt beim Baum** (Simulation und Suche, Mini-Runde, klein, score-berührend D3)
 
-  Seit Runde 61 rechnet Auto in Singles auch frühe Züge mit dem Baum. Der Baum liest sie enger: 562428 Zug 10 verliert den Heatran-Read (Pin drift), auf dem Korpus sinken die Read-Sätze von 11 auf 5 und die frühen Singles-Shifts von 6 auf 1. Weg: die Baum-Schwelle je Spielart im Suchbudget, Singles unter 25 % gefallener Pokémon als Matrix mit drei Würfen, Doubles wie heute. Aus vorhandenen Bank-Zeilen gerechnet ist das neutral (+2 [−9, +13]).
+  Seit Runde 61 rechnet Auto in Singles auch frühe Züge mit dem Baum. Der Baum liest sie enger: 562428 Zug 10 verliert den Heatran-Read (Pin drift), auf dem Korpus sinken die Read-Sätze von 11 auf 5 und die frühen Singles-Shifts von 6 auf 1. Weg: die Baum-Schwelle je Spielart im Suchbudget, Singles unter 25 % gefallener Pokémon als Matrix mit drei Würfen, Doubles wie heute. Aus vorhandenen Bank-Zeilen gerechnet ist das neutral (+2 [−9, +13]), und in den Dumps der Runde 61 steht 562428 Zug 10 so auf ok; beides gilt für einen Wurf. Für drei Würfe gibt es nur die Bank-Zeile der Runde 61 (early-samples-3: Singles −2 [−7, +3], Zeit 1,02×); Pin und Klickzeit misst die Spur zuerst. Schwelle und Würfe gelten je Spielart: Die Team-Vorschau in Doubles liest dasselbe Budget-Feld (prefs.ts:83) und bleibt unverändert.
 
-  *Nutzen:* Feedback: Pin 562428 t10 von drift zurück auf ok; App: die verlorenen Read-Sätze kommen zurück und frühe Singles-Klicks werden schneller (0,76 statt 3,25 s); Bank neutral.
+  *Nutzen:* Feedback: Pin 562428 t10 von drift zurück auf ok (mit einem Wurf gemessen); App: die verlorenen Read-Sätze kommen zurück und frühe Singles-Klicks werden schneller (mit einem Wurf 0,76 statt 3,25 s, mit drei Würfen noch zu messen); Bank neutral.
 
-  *Erfolg:* 562428 Zug 10 wieder ok, kein anderer Pin bewegt; Bank gepaart voll und hq ohne Schaden; Singles-Wanduhr nicht höher; roter Test auf die Schwelle je Spielart. T65 bleibt geschlossen, solange die frühe Singles-Matrix drei Würfe rechnet (Gate 05.10.). *Plan T110:* Backlog-Plan, Abschnitt T110 (Runde 62 neu gefasst).
-
-- [ ] **T109 · Tiefer denken auf Baum-Zügen** (Simulation und Suche, Mini-Runde, klein, render-nah)
-
-  Seit Runde 61 verschwindet 'Think deeper' in Auto ab Zug 1. Die Stufe ist gemessen: vierfache Durchläufe je Baum (Bank −15 bp gepoolt, Doubles −38), Wartezeit eines Klicks rund 3- bis 4-mal ein Baum-Zug (Node: Singles 2 → 7 s, Doubles 6 → 17 s). Rest: am Gate entscheiden, ob ein Baum-Zug diese Stufe anbietet; dann TurnEvalSettings mit Budget-Stufe, Cache-Schlüssel, Knopf-Text, UI-Test und e2e.
-
-  *Nutzen:* App: ein Klick rechnet einen Zug in der besten gemessenen Tiefe (Bank −15 bp gepoolt, Doubles −38), sichtbar als Knopf in Auto, für etwa 3- bis 4-mal die Zeit eines Baum-Zugs.
-
-  *Erfolg:* Ein Baum-Zug bietet die Stufe mit 2400 Durchläufen an und nennt die Wartezeit, oder der Knopf entfällt bewusst mit Text. *Plan T109:* Backlog-Plan, Abschnitt T109 (Runde 62 neu gefasst).
-
-- [ ] **T111 · Restposten aus Runde 61** (Werkzeug, Mini-Runde, klein, je Punkt verlustfrei oder mit eigenem Beleg)
-
-  Restposten aus Runde 61, gekürzt. (11) Wartezeit eines Einzelklicks an Zug 2 im Worker-Pool messen (Singles, Doubles, VGC; Einzelprozess heute 3,25, 7,3 und 5,5 s), Ergebnis ins Ledger. (7)+(8) Texte zu Auto angleichen (PlayOutBar.tsx, EvalControls.tsx, EVALUATION.md, README des Engine-Pakets, Kommentare in play-out.ts und prefs.ts). (1) FEEDBACK_SEARCH_BUDGET schon in Node parsen. (3) MCTS_TREES neben dem Budget klären (Tests lesen ihn). Verworfen: (2), (4), (5), (6), (10); (9) geht in T114.
-
-  *Nutzen:* App: Wartezeit eines Klicks an frühen Zügen gemessen (Einzelprozess bis 7,3 s in Doubles) und Texte, die sagen, was Auto tut; Engine: zwei Pins prüfen den Weg, den die App rechnet.
-
-  *Erfolg:* je Punkt roter Test oder Textänderung mit e2e-Abgleich, (11) im Ledger. *Plan T111:* Backlog-Plan, Abschnitt T111 (Runde 62 neu gefasst).
+  *Erfolg:* 562428 Zug 10 wieder ok, kein anderer Pin bewegt; Bank gepaart voll und hq ohne Schaden; Singles-Wanduhr nicht höher; roter Test auf die Schwelle je Spielart und auf den unveränderten Doubles-Lead. T65 bleibt geschlossen, solange die frühe Singles-Matrix drei Würfe rechnet (Gate 05.10.). *Plan T110:* Backlog-Plan, Abschnitt T110 (Runde 62 neu gefasst).
 
 ## Welle 1 · Spur B · Zugkern der Statik
 
 Der einzige aufgelöste Bank-Gewinn der Triage ohne Zeitkosten (Singles rund −10 bp), und in Doubles kommen Heat Crash, Body Press und Surging Strikes zurück in die Suche. Der Merkzettel für die Hinweise folgt in derselben Spur, weil T81 die Hinweise ändert.
 
-*Dateien:* packages/eval-engine/src/score/ (threat.ts, move-facts.ts, matchup.ts, unanswered.ts), move-use.ts, move-use-rules.ts, search/hints.ts.
+*Dateien:* packages/eval-engine/src/score/ (threat.ts, move-facts.ts, matchup.ts, unanswered.ts), move-use.ts, move-use-rules.ts, search/hints.ts, packages/eval-engine/test/threat-memo.spec.ts.
 
-*Tor:* Bank gepaart, Singles und Doubles getrennt, mit K der Bank und eigenem K je Phase; Feedback 3× mit Tier-Zählung; T112 byte-gleich.
+*Tor:* Bank gepaart, Singles und Doubles getrennt, mit K der Bank und eigenem K je Phase; Feedback 3× mit Tier-Zählung; T112 byte-gleich; Zeit-Tore im gemeinsamen Zeitfenster.
 
 - [ ] **T81 · Statik und Such-Hinweise lesen Züge, wie sie landen** (Statik, Runde, mittel, score-berührend D3)
 
@@ -97,7 +86,7 @@ Der einzige aufgelöste Bank-Gewinn der Triage ohne Zeitkosten (Singles rund −
 
   *Nutzen:* Engine: der einzige aufgelöste Bank-Gewinn der Triage ohne Zeitkosten (Singles rund −10 bp); App: Doubles-Empfehlungen zeigen Heat Crash, Body Press und Surging Strikes wieder, die heute fast nie in die Suche kommen.
 
-  *Erfolg:* Singles-Zeile aufgelöst besser, keine gepoolte Zeile mit Schaden, Singles und Doubles getrennt und mit eigenem K je Phase gelesen; 0 Paare mit Stärke 0, wo der Simulator mehr gibt; die drei Doubles-Szenen listen ihren Zug; Statik unter 1,15× Zeit; Feedback 3× mit Tier-Zählung, Gen 6 gelesen. *Plan T81:* Backlog-Plan, Abschnitt T81 (Runde 62 neu gefasst).
+  *Erfolg:* Singles-Zeile aufgelöst besser, keine gepoolte Zeile mit Schaden, Singles und Doubles getrennt und mit eigenem K je Phase gelesen; 0 Paare mit Stärke 0, wo der Simulator mehr gibt; die drei Doubles-Szenen listen ihren Zug; Statik unter 1,15× Zeit; Feedback 3× mit Tier-Zählung, Gen 6 gelesen. threat-memo.spec.ts ist um jeden neuen Live-Zugriff erweitert (KP, Status, Item im Merkzettel-Schlüssel). *Plan T81:* Backlog-Plan, Abschnitt T81 (Runde 62 neu gefasst).
 
 - [ ] **T112 · Merkzettel für die Such-Hinweise** (Tempo, Mini-Runde, klein, verlustfrei D4)
 
@@ -111,7 +100,7 @@ Der einzige aufgelöste Bank-Gewinn der Triage ohne Zeitkosten (Singles rund −
 
 Seit Runde 61 trifft die Nachprüfung jeden Zug ab 1. T16 repariert die Vertiefung aus der ersten Ziehung (rund fünf falsche Singles-Noten, Doubles-Rückfall-Zellen), T78 die Doubles-Randzellen (2629703929 Zug 13).
 
-*Dateien:* packages/eval-engine/src/tree-orchestrator.ts, mcts-merge.ts, mcts.ts, search/cell-sampler.ts, search/position.ts, cell-blend.ts, pair/sampler.ts, src/lib/eval/worker-client.ts.
+*Dateien:* packages/eval-engine/src/tree-orchestrator.ts, mcts-merge.ts, mcts.ts, search/cell-sampler.ts, search/position.ts, cell-blend.ts, pair/sampler.ts, src/lib/eval/worker-client.ts, src/hooks/evaluation/sweep-verify.ts.
 
 *Tor:* Monte-Carlo-Sonde und Dumps (Noten), Pins mit Golden 655336 am User-Gate; jede bewegte Bank-Zeile gelesen (die Bank sieht die Nachprüfung kaum).
 
@@ -135,9 +124,9 @@ Seit Runde 61 trifft die Nachprüfung jeden Zug ab 1. T16 repariert die Vertiefu
 
 Die App baut Sets, die das Log widerlegt oder die zu wenige Züge tragen (Kyurem mit Specs und nur Icicle Spear in sieben Spielen, Slot-Alternativen statt fester Züge, Items ohne Rückstoß, Phantom-Formen); seit Runde 61 spielt der Baum sie an jedem Knoten. T89 und T28 teilen assembleMoves.
 
-*Dateien:* packages/replay-core/src/team/ (set-resolvers.ts, set-coherence.ts), team-builder.ts, inference/lookup.ts, src/lib/replay-jobs/handlers.ts, packages/eval-engine/src/forward/switches.ts.
+*Dateien:* packages/replay-core/src/team/set-resolvers.ts, packages/replay-core/src/set-coherence.ts, packages/replay-core/src/team-builder.ts, packages/replay-core/src/inference/ (handlers.ts, lookup.ts), src/lib/smogon-sets.ts, packages/eval-engine/src/forward/switches.ts.
 
-*Tor:* Set-Diff auf Bank und Feedback, Bank gepaart mit frischer Basis, Feedback 3×, Pin-Bewegungen (648453 t13, t20, 649664 t8) am User-Gate.
+*Tor:* Set-Diff auf Bank und Feedback, Bank gepaart, Feedback 3×, Pin-Bewegungen (648453 t13, t20, 649664 t8) am User-Gate.
 
 - [ ] **T89 · Der Bau hält zwei Optionen eines Smogon-Slots statt des festen Zugs** (Sets und Spreads, Mini-Runde, klein, score-berührend D3)
 
@@ -173,9 +162,9 @@ Die App baut Sets, die das Log widerlegt oder die zu wenige Züge tragen (Kyurem
 
 ## Welle 1 · Spur E · Bericht, erster Teil
 
-Sätze, die der User liest: offene Ereignisse, kleine Sätze, Lob ohne Band, Reue gegen den echten Klick, Lead-Chips in Doubles. Alles hinter dem Score, darum ohne Bank-Lauf.
+Sätze, die der User liest: offene Ereignisse, kleine Sätze, Lob ohne Band, Lead-Chips in Doubles. Alles hinter dem Score, darum ohne Bank-Lauf.
 
-*Dateien:* packages/eval-engine/src/turn-analysis/, summary.ts, report.ts, win-reason.ts, prose/, src/lib/eval-badges.ts, src/components/eval/ (EvalTurnAnalysis.tsx, EvalGameReport.tsx, SideRow.tsx, analysis-bits.tsx, EvalResultBlock.tsx).
+*Dateien:* packages/eval-engine/src/turn-analysis/, summary.ts, report.ts, win-reason.ts, played.ts, prose/, src/components/ (eval-badges.ts, EvalTurnAnalysis.tsx, EvalGameReport.tsx, SideRow.tsx, analysis-bits.tsx, EvalResultBlock.tsx).
 
 *Tor:* Engine-Zahlen unberührt (Score, Tiers, Bank ohne Lauf byte-gleich), Feedback-Dumps und Prosa-Pins, UI-Tests.
 
@@ -203,14 +192,6 @@ Sätze, die der User liest: offene Ereignisse, kleine Sätze, Lob ohne Band, Reu
 
   *Erfolg:* die drei Szenen tragen ihren Satz; die Kollateral-Zählung nennt jeden neuen Eintrag, und die Regeln sind enger als die naive Fassung, die heute 125 von 542 ungetierten Seiten loben würde. *Plan T17:* Backlog-Plan, Abschnitt T17 (Runde 62 neu gefasst).
 
-- [ ] **T64 · Reue gegen den wirklich geklickten Gegenzug zeigen** (Bericht, Mini-Runde, klein, verlustfrei D4)
-
-  Die Zahl rechnet hindsightReadFor schon (signals.ts:140), sie spricht aber nur im shift-Satz und erscheint nie an der Seiten-Zeile; in Doubles fehlt sie ganz, weil opponentColumn den Doubles-Klick nicht findet (signals.ts:112). Zeigen nur, wenn sie ein Band weiter liegt als die Reue und die Zelle der besten Zeile mindestens 8 Besuche hat oder nachgeprüft ist.
-
-  *Nutzen:* App: der User sieht neben der Note, was der Zug gegen den echten Gegenklick kostete; heute auf 46 Singles-Seiten berechnet und unsichtbar, in Doubles gar nicht.
-
-  *Erfolg:* auf den zehn Dumps zeigt die Seiten-Zeile die Zahl genau dort, in Singles und Doubles; 912045 Zug 8 zeigt keine Zahl aus Zellen mit 1 bis 2 Besuchen; kein Tier und keine Summe bewegt sich; die Prosa-Pins stehen. *Plan T64:* Backlog-Plan, Abschnitt T64 (Runde 62 neu gefasst).
-
 - [ ] **T116 · Lead-Urteile in Doubles nur bei stabiler Lesart** (Bericht, Mini-Runde, klein, verlustfrei D4)
 
   Der Spielbericht von 912045 zeigt „T0 led Ogerpon-Cornerstone + Rillaboom, better: Chi-Yu + Okidogi“ als Fehler (Bedauern 0,253). Matrix und Baum nennen an 76 von 92 Doubles-Seiten einen anderen besten Lead; die Lead-Wahl in Doubles liegt nahe am Zufall. Der Baum taugt nicht als zweiter Leser, weil Runde 61 ihn an Doubles-Vorschauen als schlechter gemessen hat.
@@ -223,7 +204,7 @@ Sätze, die der User liest: offene Ereignisse, kleine Sätze, Lob ohne Band, Reu
 
 Was der User in der Schadensvorschau, im Editor und nach einem gescheiterten Statistik-Abruf sieht. Klein und verlustfrei für die Engine.
 
-*Dateien:* src/lib/branch-damage.ts, packages/eval-engine/src/damage-calc.ts (nur der Vorschau-Teil), src/lib/pokemon-options.ts, Sprite-Namen, src/lib/smogon-stats.ts, smogon-sets.ts, src/components (BranchPanel.tsx, SideControls.tsx, FightSection.tsx).
+*Dateien:* src/lib/branch-damage.ts, packages/eval-engine/src/damage-calc.ts (nur der Vorschau-Teil), packages/eval-engine/src/branch/types.ts, src/hooks/useSideControlsState.ts, src/lib/pokemon-options.ts, src/lib/sprite-url.ts, src/lib/smogon-stats.ts, src/components/BranchPanel.tsx, src/components/branch/ (SideControls.tsx, FightSection.tsx).
 
 *Tor:* UI-Tests und e2e; Bank und Feedback unberührt.
 
@@ -253,13 +234,29 @@ Was der User in der Schadensvorschau, im Editor und nach einem gescheiterten Sta
 
   *Erfolg:* Ein Test in ui/hooks/useSmogonUsageStats.spec.tsx stellt beide Fälle nach (erst rot), der nächste Abruf liefert Daten; ein 404 aller Quellen darf gemerkt bleiben; alle Engine-Zahlen der Dumps bleiben gleich. *Plan T68:* Backlog-Plan, Abschnitt T68 (Runde 62 neu gefasst).
 
+## Welle 1 · Spur G · Choice-Sperre nach Trick
+
+Der Nachbau gibt dem Baum im Golden-Spiel 655336 ab Zug 6 Züge, die der Spieler nicht klicken kann. Die Sperre geht vermutlich in choice-lock.ts verloren (jede Item-Zeile gilt als Störung, auch Trick), darum hält diese Spur die Datei in Welle 1.
+
+*Dateien:* packages/eval-engine/src/choice-lock.ts, packages/eval-engine/src/branch/corrections.ts.
+
+*Tor:* Zählung auf 0, Golden 655336 zuerst, Bank gepaart, Feedback 3×.
+
+- [ ] **T115 · Choice-Sperre nach Trick** (Nachbau, Mini-Runde, klein, score-berührend D3)
+
+  Der Nachbau verliert die Choice-Sperre nach Trick. Golden 655336: In Zug 5 tauscht Trick den Choice Scarf zu Bisharp, das danach gesperrt ist; der Dump bietet in Zug 6 trotzdem Low Kick (0,431), Swords Dance und Iron Head an (graph.results[5].perSide.p1). Der Baum spielt an jedem Knoten Züge, die der Spieler nicht klicken kann. Sonst hält der Nachbau die Sperre (93 von 837 Bank-Stellungen tragen choicelock).
+
+  *Nutzen:* App und Feedback: das Golden-Spiel 655336 bietet ab Zug 6 nur klickbare Züge an; jede Stellung nach Trick oder Switcheroo mit Choice-Item wird richtig gesucht.
+
+  *Erfolg:* Die Zählung über Bank und Dumps (aktiver Choice-Träger nach Trick oder Switcheroo ohne choicelock) fällt auf 0; 655336 Zug 6 bietet Bisharp nur den gesperrten Zug an; jede bewegte Bank-Zeile und der Golden-Kanal gelesen. *Plan T115:* 3 Schritte im Backlog-Plan.
+
 ## Welle 1 · Spur U · User-Aufgabe: Experten-Urteile
 
-Läuft neben der ganzen Welle: Der User urteilt über vier offene Stellungen, der Integrator trägt die Pins ein.
+Läuft neben der ganzen Welle: Der User urteilt über vier offene Stellungen. Pins landen erst nach dem Wellen-Lauf, damit alle Spuren gegen dieselbe Feedback-Basis messen.
 
-*Dateien:* nur e2e-feedback/corpus.ts, und das schreibt der Integrator.
+*Dateien:* keine eigene; corpus.ts, Fixtures und Feedback-Harness ändert der Integrator.
 
-*Tor:* Urteile im Ledger, mindestens ein Doubles-Pin.
+*Tor:* Urteile im Ledger, mindestens ein Doubles-Pin nach dem Wellen-Lauf.
 
 - [ ] **T45 · Experten-Urteile zu den gehaltenen Decided-Verlusten** (Richter und Bank, User-Aufgabe, klein, kein Score-Touch)
 
@@ -271,9 +268,9 @@ Läuft neben der ganzen Welle: Der User urteilt über vier offene Stellungen, de
 
 ## Welle 2 · Spur A · Rechner-Eingaben
 
-Fünf kleine Fehler an derselben Stelle: Der Rechner bekommt Namen, Formen, Boosts, Gefallene und Tera-Körper nicht so, wie der Simulator sie kennt. Sichtbar an Quoten und Vorschau.
+Fünf kleine Fehler an derselben Stelle: Der Rechner bekommt Namen, Formen, Boosts, Gefallene und Tera-Körper nicht so, wie der Simulator sie kennt. Sichtbar an Quoten und Vorschau. Die Aufrufstelle in spreads/fit.ts (T72) folgt in Spur 3A.
 
-*Dateien:* packages/eval-engine/src/ko-odds.ts, damage-calc.ts, pair/kill-table.ts, pair/snapshot.ts, pair/odds.ts, choice-lock.ts, Hidden-Power-Brücke, cell-blend.ts (Tera-Körper der Quoten).
+*Dateien:* packages/eval-engine/src/ko-odds.ts, damage-calc.ts, pair/kill-table.ts, pair/snapshot.ts, pair/odds.ts, choice-lock.ts (nur der Rechner-Aufruf), Hidden-Power-Brücke, cell-blend.ts (Tera-Körper der Quoten).
 
 *Tor:* Zählung je TODO auf 0, Dumps (Quoten, Zeilen), jede bewegte Bank-Zeile gelesen.
 
@@ -321,13 +318,13 @@ Fünf kleine Fehler an derselben Stelle: Der Rechner bekommt Namen, Formen, Boos
 
   *Erfolg:* die Zählung (groups/endspiel/census.vt.ts) meldet 0 geänderte Zeilen; Bank und Dumps bewegen sich nur in Stellungen mit Tera-Option, jede bewegte Zeile gelesen. *Plan T84:* Backlog-Plan, Abschnitt T84 (Runde 62 neu gefasst).
 
-## Welle 2 · Spur B · Wahlen und Wurzelwert
+## Welle 2 · Spur B · Wahlen, Wurzelwert, Tiefer denken
 
-Doubles-Züge ohne Urteil (Pollen Puff auf den Partner) und ein Wurzel-Score weit vom Spielwert in kleinen Endspielen (doubles-spread-2v1 liest 0,355 statt 1,0). Nach Spur 1C, weil T114 dieselbe Merge-Stelle liest.
+Doubles-Züge ohne Urteil (Pollen Puff auf den Partner), ein Wurzel-Score weit vom Spielwert in kleinen Endspielen (doubles-spread-2v1 liest 0,355 statt 1,0), dann die tiefere Stufe auf Baum-Zügen und die Restposten der Runde 61. Nach Spur 1C, weil T114, T109 und T111 dieselben Dateien des Baums ändern. T111 Punkt 1 (den Budget-Schalter schon in Node parsen) liegt im Feedback-Harness: die Spur liefert ihn als Patch, der Integrator übernimmt ihn.
 
-*Dateien:* packages/eval-engine/src/forward/choices.ts, search/options.ts (nur Wurzel, keepPlayed), mcts-merge.ts (Score), endgame/prover.ts, regression/endgame-truth.spec.ts, decided-held-positions.spec.ts.
+*Dateien:* packages/eval-engine/src/forward/choices.ts, search/options.ts (nur Wurzel), mcts-merge.ts, mcts.ts, endgame/prover.ts, src/lib/eval/worker-client.ts, src/hooks/useEvalView.ts, src/components/ (ThinkDeeperButton.tsx, EvalControls.tsx, PlayOutBar.tsx), src/lib/play-out.ts, regression/endgame-truth.spec.ts, regression/decided-held-positions.spec.ts, EVALUATION.md, packages/eval-engine/README.md.
 
-*Tor:* Prüfstände, Bank-Lauf mit gameValue neben dem Score, Feedback 3×, Score-Frage am User-Gate.
+*Tor:* Prüfstände, Bank-Lauf mit dem Spielwert der Wurzel neben dem Score (das Bank-Feld baut der Integrator), Feedback 3×, UI-Tests und e2e für T109, Score-Frage von T114 am User-Gate.
 
 - [ ] **T113 · Züge auf den Partner als Option** (Simulation und Suche, Mini-Runde, klein, score-berührend D3)
 
@@ -341,25 +338,33 @@ Doubles-Züge ohne Urteil (Pollen Puff auf den Partner) und ein Wurzel-Score wei
 
   Auf Baum-Zügen ist der Score das Mittel über die Besuche, nicht der Spielwert (mcts-merge.ts:272, :292). In kleinen Endspielen liegen beide weit auseinander: Der Prüfstand doubles-spread-2v1 liest in der App 0,355 bei Spielwert 0,849, ein Einzelbaum 0,999, Wahrheit 1,0 (docs/perf/probes/2026-10-04-r62/groups/endspiel/spread2v1-doubles-spread-2v1.json). Auf den Dumps weichen 13 von 329 Zügen um mehr als 0,15 ab, in beiden Spielarten (2629703929 Zug 13 −0,83 gegen −0,64, 649664 Zug 22, 648453 Zug 35, 573756 Zug 135). doubles-ohko-tie liest 1,0 über einen falschen Beweis mit Masse 1. Der Prüfstand misst in seiner Baum-Spalte nur mctsSearch, nicht den App-Pfad (regression/endgame-truth.spec.ts:69).
 
-  *Nutzen:* Engine und App: die Bar trifft kleine Endspiele (heute 13 von 329 Korpus-Zügen um mehr als 0,15 daneben), und die Bank zeigt, ob Score oder Spielwert besser kalibriert.
+  *Nutzen:* Engine und App: die Bar trifft kleine Endspiele (heute 13 von 329 Korpus-Zügen um mehr als 0,15 daneben), die Bank zeigt, ob Score oder Spielwert besser kalibriert, und zwei Prüfstände prüfen den Weg, den die App rechnet (aus T111 Punkt 9).
 
   *Erfolg:* Prüfstand über searchTreesOrchestrated; doubles-spread-2v1 näher an 1,0, doubles-ohko-tie ohne falschen Beweis; ein Bank-Lauf mit gameValue neben dem Score entscheidet, welcher den Brier besser trifft; auf den Dumps sinkt die Zahl der Züge mit Abstand über 0,15. *Plan T114:* 4 Schritte im Backlog-Plan.
 
-## Welle 2 · Spur C · Nachbau-Treue
+- [ ] **T109 · Tiefer denken auf Baum-Zügen** (Simulation und Suche, Mini-Runde, klein, render-nah)
 
-Der Nachbau gibt dem Baum Züge, die der Spieler nicht klicken kann (Choice-Sperre nach Trick im Golden-Spiel 655336), und die Inferenz verliert gegessene Items (649664 Zug 8 empfiehlt Mega).
+  Seit Runde 61 verschwindet 'Think deeper' in Auto ab Zug 1. Die Stufe ist gemessen: vierfache Durchläufe je Baum (Bank −15 bp gepoolt, Doubles −38), Wartezeit eines Klicks rund 3- bis 4-mal ein Baum-Zug (Node: Singles 2 → 7 s, Doubles 6 → 17 s). Rest: am Gate entscheiden, ob ein Baum-Zug diese Stufe anbietet; dann TurnEvalSettings mit Budget-Stufe, Cache-Schlüssel, Knopf-Text, UI-Test und e2e.
 
-*Dateien:* packages/eval-engine/src/branch/corrections.ts, packages/replay-core/src/inference/ (handlers.ts, opponent-inferrer.ts).
+  *Nutzen:* App: ein Klick rechnet einen Zug in der besten gemessenen Tiefe (Bank −15 bp gepoolt, Doubles −38), sichtbar als Knopf in Auto, für etwa 3- bis 4-mal die Zeit eines Baum-Zugs.
 
-*Tor:* Zählungen auf 0, Golden 655336 zuerst, Bank gepaart, Feedback 3×.
+  *Erfolg:* Ein Baum-Zug bietet die Stufe mit 2400 Durchläufen an und nennt die Wartezeit, oder der Knopf entfällt bewusst mit Text. *Plan T109:* Backlog-Plan, Abschnitt T109 (Runde 62 neu gefasst).
 
-- [ ] **T115 · Choice-Sperre nach Trick** (Nachbau, Mini-Runde, klein, score-berührend D3)
+- [ ] **T111 · Restposten aus Runde 61** (Werkzeug, Mini-Runde, klein, je Punkt verlustfrei oder mit eigenem Beleg)
 
-  Der Nachbau verliert die Choice-Sperre nach Trick. Golden 655336: In Zug 5 tauscht Trick den Choice Scarf zu Bisharp, das danach gesperrt ist; der Dump bietet in Zug 6 trotzdem Low Kick (0,431), Swords Dance und Iron Head an (graph.results[5].perSide.p1). Der Baum spielt an jedem Knoten Züge, die der Spieler nicht klicken kann. Sonst hält der Nachbau die Sperre (93 von 837 Bank-Stellungen tragen choicelock).
+  Restposten aus Runde 61, gekürzt. (11) Wartezeit eines Einzelklicks an Zug 2 im Worker-Pool messen (Singles, Doubles, VGC; Einzelprozess heute 3,25, 7,3 und 5,5 s), Ergebnis ins Ledger. (7)+(8) Texte zu Auto angleichen (PlayOutBar.tsx, EvalControls.tsx, EVALUATION.md, README des Engine-Pakets, Kommentare in play-out.ts und prefs.ts). (1) FEEDBACK_SEARCH_BUDGET schon in Node parsen. (3) MCTS_TREES neben dem Budget klären (Tests lesen ihn). Verworfen: (2), (4), (5), (6), (10); (9) geht in T114.
 
-  *Nutzen:* App und Feedback: das Golden-Spiel 655336 bietet ab Zug 6 nur klickbare Züge an; jede Stellung nach Trick oder Switcheroo mit Choice-Item wird richtig gesucht.
+  *Nutzen:* App: Wartezeit eines Klicks an frühen Zügen gemessen (Einzelprozess bis 7,3 s in Doubles) und Texte, die sagen, was Auto tut.
 
-  *Erfolg:* Die Zählung über Bank und Dumps (aktiver Choice-Träger nach Trick oder Switcheroo ohne choicelock) fällt auf 0; 655336 Zug 6 bietet Bisharp nur den gesperrten Zug an; jede bewegte Bank-Zeile und der Golden-Kanal gelesen. *Plan T115:* 3 Schritte im Backlog-Plan.
+  *Erfolg:* je Punkt roter Test oder Textänderung mit e2e-Abgleich, (11) im Ledger. *Plan T111:* Backlog-Plan, Abschnitt T111 (Runde 62 neu gefasst).
+
+## Welle 2 · Spur C · Gegner-Inferenz
+
+Die Inferenz verliert gegessene Items (649664 Zug 8 empfiehlt Mega) und liest das Log mit eigenen Regex, wo @pkmn/client den Zustand schon führt.
+
+*Dateien:* packages/replay-core/src/inference/handlers.ts, packages/replay-core/src/opponent-inferrer.ts.
+
+*Tor:* Zählung Client gegen Inferenz gelesen, Bank gepaart, Feedback 3×.
 
 - [ ] **T108 · Die Gegner-Inferenz liest, was die Bibliothek schon weiß** (Werkzeug, Runde, mittel, score-berührend D3)
 
@@ -371,9 +376,9 @@ Der Nachbau gibt dem Baum Züge, die der Spieler nicht klicken kann (Choice-Sper
 
 ## Welle 2 · Spur D · Bericht, zweiter Teil
 
-Glück ohne Würfel und Lob auf einem verlorenen Zug. Erst nach dem Hybrid aus Spur 1A, weil er die Glückskonten in Singles zurückschneidet, und nach Spur 1E, weil dieselben Dateien.
+Glück ohne Würfel, Lob auf einem verlorenen Zug, Reue gegen den echten Klick. Nach dem Hybrid aus Spur 1A (Glückskonten in Singles), nach Spur 1C (T64 liest 912045 Zug 8, den T16 ändert) und nach Spur 1E (dieselben Dateien).
 
-*Dateien:* wie Spur 1E, dazu packages/eval-engine/src/dice-events.ts.
+*Dateien:* wie Spur 1E, dazu packages/eval-engine/src/dice-events.ts und turn-analysis/signals.ts.
 
 *Tor:* Engine-Zahlen unberührt, Dumps und Prosa-Pins, chance-Pins 573756 t73 und 649664 t23 stehen.
 
@@ -393,11 +398,19 @@ Glück ohne Würfel und Lob auf einem verlorenen Zug. Erst nach dem Hybrid aus S
 
   *Erfolg:* 653785 Zug 10 ohne Lob, 2663093831 Zug 1 behält sein Fenster-Lob, kein anderer Prosa-Pin bewegt sich. *Plan T59:* Backlog-Plan, Abschnitt T59 (Runde 62 neu gefasst).
 
+- [ ] **T64 · Reue gegen den wirklich geklickten Gegenzug zeigen** (Bericht, Mini-Runde, klein, verlustfrei D4)
+
+  Die Zahl rechnet hindsightReadFor schon (signals.ts:140), sie spricht aber nur im shift-Satz und erscheint nie an der Seiten-Zeile; in Doubles fehlt sie ganz, weil opponentColumn den Doubles-Klick nicht findet (signals.ts:112). Zeigen nur, wenn sie ein Band weiter liegt als die Reue und die Zelle der besten Zeile mindestens 8 Besuche hat oder nachgeprüft ist.
+
+  *Nutzen:* App: der User sieht neben der Note, was der Zug gegen den echten Gegenklick kostete; heute auf 46 Singles-Seiten berechnet und unsichtbar, in Doubles gar nicht.
+
+  *Erfolg:* auf den zehn Dumps zeigt die Seiten-Zeile die Zahl genau dort, in Singles und Doubles; 912045 Zug 8 zeigt keine Zahl aus Zellen mit 1 bis 2 Besuchen; kein Tier und keine Summe bewegt sich; die Prosa-Pins stehen. *Plan T64:* Backlog-Plan, Abschnitt T64 (Runde 62 neu gefasst).
+
 ## Welle 2 · Spur E · Panel und Knöpfe
 
 Zug-Knöpfe mit dem Typ beim Einsatz und ein Panel, das die Herkunft eines Spreads nennt. Nach Welle 1, weil Spur 1B den Zugkern und Spur 1D den Team-Bau ändert.
 
-*Dateien:* src/lib/picker-state.ts, branch-Zustand der Vorschau, packages/replay-core/src/team-info.ts, Herkunfts-Etiketten.
+*Dateien:* src/lib/picker-state.ts, packages/eval-engine/src/branch/state.ts, packages/replay-core/src/team-info.ts, src/lib/provenance-labels.ts.
 
 *Tor:* UI-Tests und e2e, Set-Diff 0.
 
@@ -417,13 +430,13 @@ Zug-Knöpfe mit dem Typ beim Einsatz und ein Panel, das die Herkunft eines Sprea
 
   *Erfolg:* Ein Eintrag mit EVs und Natur des Schätzwerts behält dessen Etikett, ein Eintrag aus Zugreihenfolge oder Übertrag sagt das, fitted steht nur an Spreads mit tragender Schadenszeile; Set-Diff 0 auf Bank und Feedback-Harness; Zählung über Bank und Feedback getrennt nach Singles und Doubles. Kommt T26 vorher, braucht es ein Etikett für aufgefüllte Spreads. *Plan T69:* Backlog-Plan, Abschnitt T69 (Runde 62 neu gefasst).
 
-## Welle 2 · Spur F · Skala
+## Welle 2 · Spur F · Doubles-K am Blatt
 
-Das Doubles-K am Blatt und die Prozent-Anzeige. Billig, aber zur Hälfte Skala, darum gelesen mit dem Bank-Instrument, das Skala von Gewinn trennt (Schritt 1 von T52 läuft vor Welle 1).
+Das Doubles-K am Blatt, gelesen mit dem Bank-Instrument, das Skala von Gewinn trennt (Schritt 1 von T52 läuft vor Welle 1).
 
-*Dateien:* packages/eval-engine/src/winprob.ts, search/leaf.ts (K am Blatt), Anzeige der Prozente.
+*Dateien:* packages/eval-engine/src/winprob.ts (nur das K am Blatt), packages/eval-engine/src/search/leaf.ts.
 
-*Tor:* Bank mit K der Bank und eigenem K je Phase, Doubles-Tier-Zählung, Anzeige-Kalibrierung.
+*Tor:* Bank mit K der Bank und eigenem K je Phase, Doubles-Tier-Zählung.
 
 - [ ] **T52 · Doubles-K am Blatt, gelesen gegen die Skala** (Re-Fit, Mini-Runde, klein, score-berührend D3)
 
@@ -433,17 +446,9 @@ Das Doubles-K am Blatt und die Prozent-Anzeige. Billig, aber zur Hälfte Skala, 
 
   *Erfolg:* Doubles-Zeile mit eigenem K je Phase aufgelöst besser, kein gepoolter Schaden; Doubles-Noten bewegen sich nur mit Lesung. Der Singles-Teil (gedeckeltes K) entfällt. *Plan T52:* Backlog-Plan, Abschnitt T52 (Runde 62 neu gefasst).
 
-- [ ] **T51 · Prozent-Anzeige, die mit dem Spielverlauf sicherer wird** (Bericht, Runde, klein, verlustfrei D4 mit Re-Pins)
-
-  Die Prozent-Anzeige (DISPLAY_K 1,85, winprob.ts:72 und :85) zeigt späte Stellungen zu zaghaft: spät angezeigt 76 %, gewonnen 88 bis 91 % (Singles), Doubles noch mehr. Weg: Phasen-Form der Anzeige, VGC-K getrennt prüfen.
-
-  *Nutzen:* App: die Prozentzahl, die der User sieht, trifft späte und Doubles-Stellungen besser (rund −60 bp Anzeige-Kalibrierung); kein Urteil bewegt sich.
-
-  *Erfolg:* Anzeige-Kalibrierung spät und Doubles besser (rund −60 bp auf allen Basen), Mitte nicht schlechter; bewiesene Wurzeln mit Masse unter 1 werden nicht übertrieben (649664 Zug 24 zeigt nicht 98 %, solange ein 20-%-Fehlschuss offen ist); kein Urteil bewegt sich. *Plan T51:* Backlog-Plan, Abschnitt T51 (Runde 62 neu gefasst).
-
 ## Welle 3 · Spur A · Fitter und Doubles-Schaden
 
-Der Spread-Löser: Doubles-Schaden messen (T31), Angreifer ohne Angriff (T26), ein Fit-Feld wie der Simulator (T86). Sichtbar im Panel, groß im Aufwand. Nach Spur 2A, weil T31 und T86 dieselben Rechner-Eingaben lesen.
+Der Spread-Löser: Doubles-Schaden messen (T31), Angreifer ohne Angriff (T26), ein Fit-Feld wie der Simulator (T86). Sichtbar im Panel, groß im Aufwand. Nach Spur 2A, weil T31 und T86 dieselben Rechner-Eingaben lesen; die Aufrufstelle aus T72 kommt hier dazu.
 
 *Dateien:* packages/replay-core/src/spreads/ (fit.ts, ladder.ts), spread-inference.ts, protocol-parser.ts.
 
@@ -513,6 +518,22 @@ Hinweis-Terme und Feld-Paar für Doubles früh, dann der Re-Fit der Statik (Mode
 
   *Erfolg:* Erst Held-out-Gewinn in der CV (mindestens 16 von 20 Seeds), dann früher Brier (Stand 0,2562) und frühe Sign-Accuracy (54 %) besser bei unveränderter später Zeile. *Plan T39:* 9 Schritte, 3 offene Entscheidungen.
 
+## Welle 3 · Spur C · Prozent-Anzeige
+
+Eine Prozent-Anzeige, die mit dem Spielverlauf sicherer wird. Sie braucht den Anteil gefallener Pokémon an jeder Aufrufstelle der Anzeige (Bericht, Zusammenfassung, Ergebnis-Block), darum nach den Bericht-Spuren 1E und 2D und nach Spur 2F (winprob.ts).
+
+*Dateien:* packages/eval-engine/src/winprob.ts (Anzeige), report.ts, summary.ts, win-reason.ts, src/components/EvalResultBlock.tsx.
+
+*Tor:* Anzeige-Kalibrierung, Re-Pins der Prosa am User-Gate, kein Urteil bewegt sich.
+
+- [ ] **T51 · Prozent-Anzeige, die mit dem Spielverlauf sicherer wird** (Bericht, Runde, klein, verlustfrei D4 mit Re-Pins)
+
+  Die Prozent-Anzeige (DISPLAY_K 1,85, winprob.ts:72 und :85) zeigt späte Stellungen zu zaghaft: spät angezeigt 76 %, gewonnen 88 bis 91 % (Singles), Doubles noch mehr. Weg: Phasen-Form der Anzeige, VGC-K getrennt prüfen.
+
+  *Nutzen:* App: die Prozentzahl, die der User sieht, trifft späte und Doubles-Stellungen besser (rund −60 bp Anzeige-Kalibrierung); kein Urteil bewegt sich.
+
+  *Erfolg:* Anzeige-Kalibrierung spät und Doubles besser (rund −60 bp auf allen Basen), Mitte nicht schlechter; bewiesene Wurzeln mit Masse unter 1 werden nicht übertrieben (649664 Zug 24 zeigt nicht 98 %, solange ein 20-%-Fehlschuss offen ist); kein Urteil bewegt sich. *Plan T51:* Backlog-Plan, Abschnitt T51 (Runde 62 neu gefasst).
+
 ## Außer der Reihe (am nächsten Release-Tag)
 
 Fällig am nächsten Release-Tag, unabhängig von den Wellen.
@@ -548,17 +569,17 @@ Wer an einem Thema arbeitet, findet hier die verwandten TODOs.
 | Thema | TODOs |
 | --- | --- |
 | Simulation und Suche | T109, T110, T113, T114 |
-| Werkzeug | T43, T101, T103, T108, T111 |
 | Statik | T81 |
 | Tempo | T112 |
 | Zufall preisen | T16, T78 |
 | Sets und Spreads | T26, T28, T31, T80, T86, T89 |
+| Werkzeug | T43, T101, T103, T108, T111 |
 | Bericht | T17, T18, T19, T22, T51, T59, T64, T116 |
 | Oberfläche | T20, T68, T69, T85 |
 | Regelfehler | T96 |
+| Nachbau | T115 |
 | Richter und Bank | T45 |
 | Rechner-Treue | T72, T76, T83, T84, T100 |
-| Nachbau | T115 |
 | Re-Fit | T49, T52, T102 |
 | Q-Runden | T39, T42 |
 
@@ -614,22 +635,22 @@ Bericht und Buchung:
 - [ ] Doubles-Zeilen der App zeigen die K.-o.-Quote seit Runde 56 („· 90% KO“), aber ohne Slot und Ziel: `KoSuffix` (`src/components/eval/analysis-bits.tsx`) liest `koOdds.label` nicht, der Tooltip sagt „vs the standing active“ → handeln, wenn jemand die Quote einer Doubles-Zeile dem falschen Pokémon zuordnet; Hebel: Label in Suffix oder Tooltip.
 - [ ] Doubles-K.-o.-Angaben sind Wurzel-Quoten (Runde 56, wie in Singles): Howl, ein Pollen-Puff-Kratzer oder ein Tera-Klick im selben Zug fehlen darin (2663093831 Zug 4, 2629703929 Zug 1); die Zellen preisen es → handeln, wenn eine Prosa-Zahl oder die Sack-Regel daran falsch wird.
 - [ ] In 2663093831 Zug 7 steht p1s gespielte Kombination (Orthworm greift an, Dragonite schützt sich) nicht unter den 12 Optionen; der Teil-Abgleich füllt den verdeckten Slot mit „→ Ting-Lu“, einem Wechsel, den das Log ausschließt (ein Wechsel ginge vor Flare Blitz) → zusammen mit dem Options-Deckel lesen.
-- [ ] Favor-Grenze prüft nur das Vorzeichen (655336 bucht +2,05 ab t5 als Resolution) → Größen-Bedingung nachrüsten, sobald ein echtes Glücksereignis eines Start-Ziel-Siegers als Resolution gebucht wird (`report.ts`: `favorBoundary`, `resolutionTurns`).
+- [ ] Favor-Grenze prüft nur das Vorzeichen (655336 bucht heute +0,274 als Resolution, Stand 05.10.) → Größen-Bedingung nachrüsten, sobald ein echtes Glücksereignis eines Start-Ziel-Siegers als Resolution gebucht wird (`report.ts`: `favorBoundary`, `resolutionTurns`).
 - [ ] Setup-Züge ohne Feed bleiben bewusst unentlastet (573756 t70, zweiter Schwerttanz: heute Regret 0,075, kein Tier) → handeln, falls der Experte solche Spots reklamiert; Gutschrift nur mit Floor-Anker, sonst Ergebnis-Wäsche.
-- [ ] 648453 t13 HP Ice: Regret 0,1288 (inaccuracy) → erreicht er wieder 0,2, ist die erste Hälfte des Gaps erneut offen.
-- [ ] 573756 t68: chanceDelta +0,0749 für die opfernde Seite → fällt der Wert unter 0,02, reicht für T17 die strenge Opfer-Schwelle ohne Aufweichung.
+- [ ] 648453 t13 HP Ice: Regret 0,102 (inaccuracy, Stand 05.10.; die Note hängt an T89 und T16) → erreicht er wieder 0,2, ist die erste Hälfte des Gaps erneut offen.
+- [ ] 573756 t68: chanceDelta +0,166 für die opfernde Seite (Stand 05.10.; der Boden hält inzwischen) → fällt der Wert unter 0,02, reicht für T17 die strenge Opfer-Schwelle ohne Aufweichung.
 
 Engine und Messung:
 
 - [ ] Der Set-Rückfall für Doubles und VGC ist fest auf Gen 9 verdrahtet (`src/lib/smogon/format-fallback.ts`): Ein Doubles-Replay vor Gen 9 bekäme Gen-9-Sets. Heute ist jedes Doubles-Replay in Bank, Fit-Korpus und Feedback-Lauf Gen 9 → handeln, bevor ein älteres Doubles-Spiel in eine Messung kommt.
-- [ ] Ein neuer Live-Zugriff in `pairThreat` oder `singleMoveFraction` braucht seinen Schlüssel-Term in `pairKey` (Runde 49: HP, Typen und Basiswerte fehlten, Doubles-Zellen wichen von Lauf zu Lauf ab) → bei jeder Änderung an `score/threat.ts` den Test `threat-memo.spec.ts` um den neuen Zugriff erweitern. Seit Runde 54 trägt der Schlüssel den Tera-Typ neben den rohen Typen, für Angreifer und Verteidiger (be95961); ein Blatt, das die lebenden Typen liest, ist damit gedeckt, der Fall steht in `threat-memo.spec.ts`.
+- [ ] Ein neuer Live-Zugriff in `pairThreat` oder `singleMoveFraction` braucht seinen Schlüssel-Term in `pairKey` (Runde 49: HP, Typen und Basiswerte fehlten, Doubles-Zellen wichen von Lauf zu Lauf ab) → bei jeder Änderung an `score/threat.ts` (zuerst T81, dort im Tor) den Test `threat-memo.spec.ts` um den neuen Zugriff erweitern. Seit Runde 54 trägt der Schlüssel den Tera-Typ neben den rohen Typen, für Angreifer und Verteidiger (be95961); ein Blatt, das die lebenden Typen liest, ist damit gedeckt, der Fall steht in `threat-memo.spec.ts`.
 - [ ] Das Gegnermodell liest eine Doubles-Paar-Zeile nur am ersten Slot (`isSwitchChoice` in `opponent-model.ts`); in Doubles wird es deshalb selten sicher (Favorit ab 0,6 auf 10 von 496 Seiten) → handeln, wenn der Read in Doubles gebraucht wird (T42).
 - [ ] 573756 Zug 134 bis 136: Die Decided-Erkennung nennt seit Zug 92 die richtige Seite, der Balken steht bei 0,33 bis 0,60, weil die Suche den Struggle-Plan über zwölf Plies nicht ausrechnet. Seit Runde 50 schweigt der Satz dort bis Zug 137 → mit T109 messen (2400 Durchläufe; T33 ist in Runde 62 geschlossen): Steht der Balken ab Zug 134 bei 0,7, spricht der Satz von selbst früher.
 
 - [ ] Der Spread-Löser gibt GPL-Cobalion Timid bei 252 Angriffs-EVs: Natur und EVs stammen aus unvereinbaren Vorlagen. Der beobachtete Treffer (106) beweist den Fehler nicht, er bindet Cobalions Angriff und Noiverns Verteidigung gemeinsam → handeln, wenn eine Fitter-Runde denselben Widerspruch an weiteren Sets zeigt.
 - [ ] Die Bring-Beschränkung fällt in kurzen VGC-Spielen still weg: `replayBringOnly` liefert null, sobald eine Seite weniger Arten zeigt als die Bring-Zahl (2634199230: 3 von 4 nach sechs Zügen). `|teamsize|` nennt nur die Zahl 4, nicht die vier Arten → handeln, wenn ein gemessenes Urteil daran hängt.
 - [ ] Die Harness-Fixtures tragen einen älteren Datenstand als `.smogon-cache` (gen6ou: 292 gegen 297 Arten, Datei vom 14.08.) und bewegen 4 von 72 Singles-Sets in 649664 und 655336 → beim nächsten Neu-Aufzeichnen der Fixtures mit bewegten Pins in genau diesen beiden Spielen rechnen.
-- [ ] Doubles-Urteile springen zwischen zwei Zuständen einer Runde (Runde 54, VGC 2629703929): Mit dem lebenden Verteidiger-Typ entsteht in Zug 11 ein Blunder (Reue 0,00 auf 0,51), mit der STAB-Regel verschwindet er wieder (0,01), und in Zug 9 entsteht ein anderer (0,12 auf 0,48). Seit Runde 56 (T58) ist eine Doubles-Wurzelzelle der Matrix mit Würfel-Ereignis die Mischung ihrer Klassen oder das Mittel von acht Ziehungen. Die Frage beantwortet das nicht: Zug 9 bis 11 laufen über MCTS (Fainted-Anteil 0,50 bis 0,63), der Paar-Plan erreicht sie nur über Verify-Zellen, und ihre Reuen stehen in Runde 55 und 56 gleich (p2 0,1043, 0,1022, 0,0437) → beim nächsten Wechsel der Doubles-Statik dieselben Züge vergleichen; springen sie dann, liegt es nicht an der Matrix-Zelle (mit T78 lesen).
+- [ ] Doubles-Urteile springen zwischen zwei Zuständen einer Runde (Runde 54, VGC 2629703929): Mit dem lebenden Verteidiger-Typ entsteht in Zug 11 ein Blunder (Reue 0,00 auf 0,51), mit der STAB-Regel verschwindet er wieder (0,01), und in Zug 9 entsteht ein anderer (0,12 auf 0,48). Seit Runde 56 (T58) ist eine Doubles-Wurzelzelle der Matrix mit Würfel-Ereignis die Mischung ihrer Klassen oder das Mittel von acht Ziehungen. Die Frage beantwortet das nicht: Zug 9 bis 11 laufen über MCTS (Fainted-Anteil 0,50 bis 0,63), der Paar-Plan erreicht sie nur über Verify-Zellen, und ihre Reuen stehen in Runde 55 und 56 gleich (p2 0,1043, 0,1022, 0,0437) → beim nächsten Wechsel der Doubles-Statik dieselben Züge vergleichen; springen sie dann, liegt es nicht an der Matrix-Zelle (beim Doubles-Teil von T81 lesen; Stand 05.10.: p2 0,104, 0,102, 0,044 wie in Runde 55).
 - [ ] Warnung der Runde 54 auf der Bank: Doubles Mitte hq +96 bp [+8, +198] auf 49 Stellungen (mit der STAB-Regel +98 [+11, +196]); drei Stellungen tragen 92 davon (smogtours-gen9doublesou-937928 Zug 6, -913993 Zug 6, -939625 Zug 8, alle lesen nach der Korrektur freundlicher für den späteren Verlierer) → Runde 56 hat sie kaum bewegt (937928 Zug 6: 0,4718 auf 0,4719, 913993 Zug 6: 0,05266 auf 0,05272; 939625 Zug 8 läuft über MCTS und ist byte-gleich), gelesen hat sie noch niemand → bei T31 zuerst lesen.
 - [ ] `gimmickSuffixForSlot` (`branch/protocol-choices.ts`) prüft den Slot, nicht den Körper hinter dem Doppelpunkt: Steht im Nachbau ein anderer Körper im Slot, terastallisiert der falsche (gemessen am Simulator in der Vorbereitung der Runde 54, `docs/perf/probes/2026-09-20-r54/T57/wf1/check-teraloss.md`). Ein Namensvergleich trägt nicht, weil die gebauten Sets die Art als Namen führen und das Protokoll den Spitznamen. Wie oft der Nachbau dort abweicht, ist ungemessen → zählen, wenn eine Runde den Nachbau ohnehin durchläuft.
 - [ ] Ein K. o., der nur im Nachbau passiert, kostet mehr als die Tera-Markierung (Runde 54): Der Simulator räumt alle Volatiles ab (Substitute, Leech Seed, Encore), setzt `isStarted` und `lastMove` zurück; die Korrektur stellt nur KP, Status, Boosts und seit Runde 54 die Markierung her. Eine vom Simulator abgelehnte Wahl beantwortet der Nachbau mit `default`, und der terastallisiert nie (die Markierung kommt an der nächsten Grenze zurück, der Zug selbst bleibt untreu) → handeln, wenn eine Stellung mit verlorenem Substitute in einem Dump oder einer Bank-Spitze auffällt.
@@ -639,13 +660,13 @@ Engine und Messung:
 
 - [ ] Ein Play-out verheizt eine Win-Condition in falscher Reihenfolge (Draft t56 bis t62 hält seit Runde 42 per e2e-Pin) → bei einem weiteren Fall Q5 (T39) vorziehen.
 - [ ] Früher Brier: Runde 40 kostete früh 28 bp hq (0,2569 → 0,2597), spät gewann sie 84 bp; Verdacht: exakte HP-Körper geben früh zu extreme Balken → bei jeder Fitter-Runde die frühe hq-Spalte vorregistrieren; handeln, wenn zwei Runden hintereinander früh verlieren.
-- [ ] hq-Tranche: n=548 (410 smogtours plus Ladder ab Rating 1700; der Ledger nennt je nach Runde 547 oder 548) → Tranche neu schneiden, wenn n unter 500 fällt oder eine neue Tranche das Verhältnis kippt.
-- [ ] 648453-Divergenz (einziger Premature-End-Rest, 1 Block von 270) → Backstop nur, falls die Rate mit dem Korpus wächst.
+- [ ] hq-Tranche: n=560 (r61-t98b; smogtours plus Ladder ab Rating 1700) → Tranche neu schneiden, wenn n unter 500 fällt oder eine neue Tranche das Verhältnis kippt.
+- [ ] Premature-End-Rest: heute nur 2663093831 Zug 14 (1 von 320 Blöcken der Dumps; 648453 hat keinen Rest mehr) → Backstop nur, falls die Rate mit dem Korpus wächst.
 
 - [ ] Bewegte MCTS-Züge, deren Urteil nicht am umgepreisten Zug hängt (Runde 57, 648453): Neue Hinweise an der Wurzel (Hidden Power Ice in Zug 23: 0,21 → 0,85) ordnen die Baum-Expansion um, ziehen den einen Zufallsausgang jeder Wurzelzelle neu (Chance-Knoten aus) und ändern, welche Zellen die Nachprüfung neu preist (Zug 24 und 33; Zug 31 eine neu gezogene 70-%-Zelle). Fast jede Zelle eines MCTS-Zugs bewegt sich (Zug 23: 26 von 28 Zellen), obwohl kein Urteil am Wurzelpreis von Hidden Power Ice hängt → handeln, wenn ein Pin nur an so einer Verschiebung hängt; Hebel: Baum-Varianz messen (mehr Bäume oder Iterationen), bevor ein Urteil gelesen wird.
-- [ ] Golden 655336 driftet seit vor Runde 57 in acht Punkten (fehlende Schlüsselmomente Zug 6, 13 und 26, zusätzlicher Schlüsselmoment Zug 27, fehlender Fehlzug 26:p2, fehlender Read 13:p1, zusätzlicher Read 27:p1, Wendepunkt 3 statt 4); T81 nimmt zwei davon weg, beide über Lopunnys Return, Zug 6 nur gegen eine Zeile, die der gesperrte Bisharp nicht klicken kann → beim nächsten Golden-Refresh am User-Gate gesammelt lesen.
+- [ ] Golden 655336 driftet seit vor Runde 57 in acht Punkten (fehlende Schlüsselmomente Zug 6, 13 und 26, zusätzlicher Schlüsselmoment Zug 27, fehlender Fehlzug 26:p2, fehlender Read 13:p1, zusätzlicher Read 27:p1, Wendepunkt 3 statt 4); Stand 05.10. meldet der Drift-Bericht statt des fehlenden Reads 13:p1 einen zusätzlichen Fehlzug 13:p2; Zug 6 trägt T115 (der gesperrte Bisharp), die Note 26:p2 verschwindet laut Monte-Carlo mit T16, Lopunnys Return bewegt T81 → beim nächsten Golden-Refresh am User-Gate gesammelt lesen.
 - [ ] 20 falsche Treffer außerhalb aller Familien (Schiedsrichter der Runde 57, Zeile „ohne Familie“: Air Balloon, Psychic Terrain, Armor Tail gegen Priorität) → handeln, wenn einer davon ein Urteil trägt; Hebel: Familien im Schiedsrichter anlegen und zählen.
-- [ ] Der Pin 653785 Zug 19 steht seit Runde 57 auf shift, und das hängt an wackeligen Zahlen (Runde 57, Verdikt-Check): → Weavile führt nur mit 0,0032 vor Pain Split, der Wechsel quiet → shift liegt in der Lücke zwischen Score und gameValue der Wurzel (auf gameValue las der Zug schon in Runde 56 shift), und der Gewinn lehnt sich an Tornadus-T als Antwort auf Dragonite. Das Spiel widerlegt das in Zug 24: Die vierfach effektive Hidden Power löst Dragonites Weakness Policy aus, die die Engine nicht kennt → handeln, wenn der Pin wieder kippt oder ein Weakness-Policy-Term gebaut wird; Hebel: Pins auf gameValue statt Score lesen, Weakness Policy in der Statik.
+- [ ] Der Pin 653785 Zug 19 steht seit Runde 57 auf shift, und das hängt an wackeligen Zahlen (Runde 57, Verdikt-Check): → Weavile liegt heute 0,0019 hinter der besten Zeile (Stand 05.10., der Zug liest weiter shift), der Wechsel quiet → shift liegt in der Lücke zwischen Score und gameValue der Wurzel (auf gameValue las der Zug schon in Runde 56 shift), und der Gewinn lehnt sich an Tornadus-T als Antwort auf Dragonite. Das Spiel widerlegt das in Zug 24: Die vierfach effektive Hidden Power löst Dragonites Weakness Policy aus, die die Engine nicht kennt → handeln, wenn der Pin wieder kippt oder ein Weakness-Policy-Term gebaut wird; Hebel: Pins auf gameValue statt Score lesen, Weakness Policy in der Statik.
 
 Umgebung:
 
