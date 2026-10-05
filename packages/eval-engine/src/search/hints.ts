@@ -75,11 +75,31 @@ function switchHint(board: HintBoard, tokens: string[]): number {
     boostedFraction(pairThreat(foe, candidate, battle), foe, candidate)));
 }
 
+/**
+ * A Tera option is hinted on the terastallized body (round 63, T81, the hint
+ * part of T84): its STAB, Tera Blast and the 60-power floor follow the Tera
+ * type. The body is set terastallized for the call and restored, the idiom
+ * of speed.ts effectiveSpeed.
+ */
+function asClicked<T>(attacker: Pokemon, clicked: boolean, ask: () => T): T {
+  if (!clicked || attacker.terastallized || !attacker.teraType) return ask();
+  attacker.terastallized = attacker.teraType;
+  try {
+    return ask();
+  } finally {
+    attacker.terastallized = undefined;
+  }
+}
+
 /** A move part: support floor or setup equity for status, spread damage, targeted or best-foe damage, the Fake Out bonus. */
 function moveHint(board: HintBoard, tokens: string[], partIndex: number): number {
-  const { battle, foeActives, foes, actors } = board;
-  const attacker = actors[partIndex];
-  if (!attacker || foes.length === 0) return 0;
+  const attacker = board.actors[partIndex];
+  if (!attacker || board.foes.length === 0) return 0;
+  return asClicked(attacker, tokens.includes('terastallize'), () => moveHintOf(board, tokens, attacker));
+}
+
+function moveHintOf(board: HintBoard, tokens: string[], attacker: Pokemon): number {
+  const { battle, foeActives, foes } = board;
   const move = battle.dex.moves.get(tokens[1]);
   if (move.category === 'Status') return Math.max(SUPPORT_HINT, setupEquity(board, attacker, tokens[1]));
   if (move.target === 'allAdjacentFoes' || move.target === 'allAdjacent') {
@@ -127,7 +147,8 @@ export function singlesOptionHints(position: SimPosition, side: 'p1' | 'p2', opt
     if (!opponent || opponent.fainted) return 0;
     if (option.choice.startsWith('move ')) {
       if (!active || active.fainted) return 0;
-      return singleMoveFraction(active, opponent, option.choice.split(' ')[1], battle);
+      return asClicked(active, option.choice.endsWith(' terastallize'),
+        () => singleMoveFraction(active, opponent, option.choice.split(' ')[1], battle));
     }
     const slot = parseInt(option.choice.split(' ')[1], 10);
     const candidate = sideState.pokemon[slot - 1];
