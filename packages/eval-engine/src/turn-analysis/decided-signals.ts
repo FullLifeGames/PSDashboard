@@ -35,30 +35,37 @@ const nearInPhase = (params: AnalyzeTurnParams): boolean =>
   params.faintedFraction === undefined || params.faintedFraction === null ||
   params.faintedFraction >= AUTO_MCTS_FAINTED_FRACTION;
 
+/** Round 50: the sweep needs the search's key (heldDecided); the near stage below does not. */
+function decidedStage(params: AnalyzeTurnParams, key: Side): SideAnalysis['decided'] {
+  const ownDecided = heldDecided(params.result);
+  if (!ownDecided || ownDecided.side !== key) return undefined;
+  return {
+    species: ownDecided.species,
+    announce: !params.decidedSeen?.has(decidedSeenKey(key, { species: ownDecided.species })),
+  };
+}
+
+function nearStage(params: AnalyzeTurnParams, key: Side): SideAnalysis['nearDecided'] {
+  const ownNear = params.result.unanswered?.nearDecided;
+  if (!ownNear || ownNear.side !== key) return undefined;
+  return {
+    species: ownNear.species, odds: ownNear.odds, removes: ownNear.removes,
+    announce: nearInPhase(params) && !params.decidedSeen?.has(
+      decidedSeenKey(key, { species: ownNear.species, removes: ownNear.removes })),
+  };
+}
+
 export function decidedSignals(
   params: AnalyzeTurnParams,
   key: Side,
 ): { decided: SideAnalysis['decided']; nearDecided: SideAnalysis['nearDecided']; forcedWin: SideAnalysis['forcedWin'] } {
-  let decided: SideAnalysis['decided'];
-  // Round 50: the sweep needs the search's key; the near stage below does not.
-  const ownDecided = heldDecided(params.result);
-  if (ownDecided && ownDecided.side === key) {
-    decided = {
-      species: ownDecided.species,
-      announce: !params.decidedSeen?.has(decidedSeenKey(key, { species: ownDecided.species })),
-    };
-  }
-  let nearDecided: SideAnalysis['nearDecided'];
-  const ownNear = params.result.unanswered?.nearDecided;
-  if (ownNear && ownNear.side === key) {
-    nearDecided = {
-      species: ownNear.species, odds: ownNear.odds, removes: ownNear.removes,
-      announce: nearInPhase(params) && !params.decidedSeen?.has(
-        decidedSeenKey(key, { species: ownNear.species, removes: ownNear.removes })),
-    };
-  }
+  let decided = decidedStage(params, key);
+  let nearDecided = nearStage(params, key);
   const forcedWin = forcedWinSignal(params, key);
-  if (forcedWinSpeaks(forcedWin, key === 'p1' ? params.scoreBefore : -params.scoreBefore)) {
+  // Round 63 (T18): once the report has spoken the side's proof, its decided
+  // stages add nothing (648453: t36 and t39 after the proof at t35).
+  const proofSpoken = params.decidedSeen?.has(forcedWinSeenKey(key)) ?? false;
+  if (proofSpoken || forcedWinSpeaks(forcedWin, key === 'p1' ? params.scoreBefore : -params.scoreBefore)) {
     // The proof speaks for the board; the decided stages keep their state, quietly.
     if (decided) decided = { ...decided, announce: false };
     if (nearDecided) nearDecided = { ...nearDecided, announce: false };

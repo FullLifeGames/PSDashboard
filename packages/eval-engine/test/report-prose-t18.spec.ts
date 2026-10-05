@@ -1,5 +1,5 @@
 import { test, expect, describe } from 'vitest';
-import { analyzeTurn } from '../src/analysis';
+import { analyzeTurn, decidedSeenKey, forcedWinSeenKey } from '../src/analysis';
 import { summarizeTurn } from '../src/summary';
 import type { EvalResult, KoOddsInfo, RankedChoice } from '../src/types';
 
@@ -89,5 +89,44 @@ describe('T18 point 1: the near sentence waits for a quarter of the bodies to fa
   test('573756 t73 keeps its pinned 95% roll at 0.42 fallen', () => {
     const result = nearResult('p2', 'Garchomp', 0.95, 'Corviknight', -0.6);
     expect(summarizeTurn(at(result, 0.4167), names)).toContain('is one 95% roll from clearing the rest');
+  });
+});
+
+describe('T18 point 2: a side is called practically decided once, and never after its proof', () => {
+  const decidedResult = (side: 'p1' | 'p2', species: string, score: number, near?: { species: string; removes: string }): EvalResult => ({
+    score, interval: 0, depthCompleted: 1,
+    perSide: { p1: [choice('move a', 'A', score)], p2: [choice('move b', 'B', -score)] },
+    unanswered: {
+      p1: [], p2: [], decided: { side, species },
+      ...(near ? { nearDecided: { side, species: near.species, odds: 1, removes: near.removes } } : {}),
+    },
+  });
+  const at = (result: EvalResult, decidedSeen: Set<string>) => analyzeTurn({
+    turn: 13, result, played: null, playedOutcome: null, scoreBefore: result.score, scoreAfter: result.score, decidedSeen,
+  });
+
+  test('the decided key is the side alone; the near key keeps species and target', () => {
+    expect(decidedSeenKey('p2', { species: 'Volcanion' })).toBe(decidedSeenKey('p2', { species: 'Ting-Lu' }));
+    expect(decidedSeenKey('p2', { species: 'Volcanion' })).not.toBe(decidedSeenKey('p1', { species: 'Volcanion' }));
+    expect(decidedSeenKey('p2', { species: 'Keldeo', removes: 'Weavile' }))
+      .not.toBe(decidedSeenKey('p2', { species: 'Keldeo', removes: 'Volcanion' }));
+  });
+
+  test('doubles, 2663093831: after Volcanion was called the sweeper, Ting-Lu the next turn stays quiet', () => {
+    const spoken = new Set([decidedSeenKey('p2', { species: 'Volcanion' })]);
+    const analysis = at(decidedResult('p2', 'Ting-Lu', -0.9), spoken);
+    expect(analysis.p2.decided).toEqual({ species: 'Ting-Lu', announce: false });
+    expect(summarizeTurn(analysis, names)).not.toContain('practically decided');
+  });
+
+  test('singles, 648453 t36 and t37: once the proof has spoken for a side, its decided and near stages stay quiet', () => {
+    const proven = new Set([forcedWinSeenKey('p2')]);
+    const t36 = at(decidedResult('p2', 'Lopunny-Mega', -1), proven);
+    expect(t36.p2.decided?.announce).toBe(false);
+    const t37 = at(decidedResult('p2', 'Lopunny-Mega', -0.85, { species: 'Ferrothorn', removes: 'Tornadus-Therian' }), proven);
+    expect(t37.p2.nearDecided?.announce).toBe(false);
+    expect(summarizeTurn(t37, names)).not.toContain('from clearing the rest');
+    // The other side's stages are its own.
+    expect(at(decidedResult('p1', 'Keldeo', 0.9), proven).p1.decided?.announce).toBe(true);
   });
 });

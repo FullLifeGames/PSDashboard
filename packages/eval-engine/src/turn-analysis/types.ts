@@ -325,11 +325,14 @@ export const unansweredSeenKey = (side: 'p1' | 'p2', signal: { species: string; 
 /**
  * Spoken-once key for the decided/near-decided announcements (round 15),
  * same regime as unansweredSeenKey: a `removes` target marks the near
- * stage. Each stage (and each new removal target) is its own statement —
- * a spoken near sentence never mutes the later full decided one.
+ * stage. Each near stage (each new removal target) is its own statement —
+ * a spoken near sentence never mutes the later full decided one. Round 63
+ * (T18): the decided stage keys on the side alone — "practically decided"
+ * is said once per side, not again for each new sweeper (2663093831 t12
+ * Volcanion, t13 Ting-Lu).
  */
 export const decidedSeenKey = (side: 'p1' | 'p2', signal: { species: string; removes?: string }): string =>
-  signal.removes ? `${side}:${signal.species}:near:${signal.removes}` : `${side}:${signal.species}:decided`;
+  signal.removes ? `${side}:${signal.species}:near:${signal.removes}` : `${side}:decided`;
 
 /** Spoken-once key for the forced-win sentence (round 35), same walk regime as decidedSeenKey. */
 export const forcedWinSeenKey = (side: 'p1' | 'p2'): string => `${side}:forced`;
