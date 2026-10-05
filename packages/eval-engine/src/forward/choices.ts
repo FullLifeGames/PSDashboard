@@ -2,6 +2,7 @@ import type { Battle, Pokemon, Side } from '@pkmn/sim';
 import type { TeraAllowance } from '../types.ts';
 import { positionBattle, type ChoiceOption, type SimPosition } from './position.ts';
 import { switchAssignments } from './assignments.ts';
+import { switchInSlots } from './switches.ts';
 import { sideIndex } from '@fulllifegames/replay-core';
 import { isLockedEntry, requestMoveKey, type RequestMove } from './request-moves.ts';
 
@@ -31,14 +32,12 @@ interface ActiveRequestSlot {
   canUltraBurst?: unknown;
 }
 
+/** The bench a switch may send in: the living bench, or the fainted after Revival Blessing (switchInSlots, T101). */
 function benchSwitches(sideState: Side): SlotChoice[] {
-  const switches: SlotChoice[] = [];
-  sideState.pokemon.forEach((pokemon, index) => {
-    if (pokemon.isActive || pokemon.fainted) return;
-    // Species, not nickname — labels feed the analysis text and PVs.
-    switches.push({ choice: `switch ${index + 1}`, label: `→ ${pokemon.species.name}`, once: false, bench: index + 1 });
-  });
-  return switches;
+  // Species, not nickname — labels feed the analysis text and PVs.
+  return switchInSlots(sideState).map(slot => ({
+    choice: `switch ${slot}`, label: `→ ${sideState.pokemon[slot - 1].species.name}`, once: false, bench: slot,
+  }));
 }
 
 /** The once-per-battle gimmicks the request offers this slot. */
@@ -294,10 +293,7 @@ function singlesChoices(
   if (active && !forced) singlesMoveChoices(sideState, active, side, tera, options);
 
   if (forced || !trapped) {
-    sideState.pokemon.forEach((pokemon, index) => {
-      if (pokemon.isActive || pokemon.fainted) return;
-      options.push({ choice: `switch ${index + 1}`, label: `→ ${pokemon.species.name}` });
-    });
+    for (const { choice, label } of benchSwitches(sideState)) options.push({ choice, label });
   }
 
   return options;

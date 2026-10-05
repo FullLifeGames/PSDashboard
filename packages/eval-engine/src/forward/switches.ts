@@ -43,6 +43,19 @@ export function repairFaintedActives(battle: Battle): void {
   resolveForcedSwitches(battle, REPAIR_SEED);
 }
 
+/**
+ * The party slots a forced switch may send in. A request that marks an
+ * active `reviving` (Revival Blessing) takes only a fainted party member,
+ * the simulator rejects a living one ("You have to pass to a fainted
+ * Pokémon"); every other forced switch takes the living bench (round 63,
+ * T101: 677869 lost 4 of 11 turns to the rejected pick).
+ */
+export function switchInSlots(side: Side): number[] {
+  const party = (side.activeRequest as { side?: { pokemon?: { active?: boolean; reviving?: boolean }[] } } | null)?.side?.pokemon;
+  const reviving = !!party?.some(entry => entry.active && entry.reviving);
+  return side.pokemon.flatMap((pokemon, index) => (!pokemon.isActive && pokemon.fainted === reviving ? [index + 1] : []));
+}
+
 export function applyChoice(battle: Battle, side: 'p1' | 'p2', choice: string): void {
   // The waiting-side sentinel (see legalChoices): nothing to submit.
   if (choice === 'wait') return;
@@ -188,10 +201,7 @@ export function resolveForcedSwitches(
     for (const side of pending) {
       const forcedCount = forcedSlotCount(side);
       if (answerFollowUp(battle, side, forcedCount, followUps)) continue;
-      const benchSlots = side.pokemon
-        .map((pokemon, index) => ({ pokemon, slot: index + 1 }))
-        .filter(({ pokemon }) => !pokemon.isActive && !pokemon.fainted)
-        .map(({ slot }) => slot);
+      const benchSlots = switchInSlots(side);
       if (benchSlots.length === 0) continue;
 
       const best = bestAssignment(side, mid, seed, switchAssignments(forcedCount, benchSlots));
