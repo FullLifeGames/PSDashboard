@@ -7,18 +7,44 @@
  */
 
 import { calculate, Field, Generations, Move, Pokemon } from '@smogon/calc';
-import type { PokemonSet } from '@pkmn/sim';
+import { Dex, type PokemonSet } from '@pkmn/sim';
 import { type DamageObservation, typedHiddenPowerId, inferOpponentTeam, toId } from '@fulllifegames/replay-core';
 import { CHOICE_ITEMS } from './sensitivity.ts';
 
-export interface ProtocolLock { species: string; moveId: string }
-interface TrailState { species: string; moves: string[]; itemDisturbed: boolean }
+/** `handedOver`: the Choice item came by a move, so the protocol itself shows it (no set guess to vet). */
+export interface ProtocolLock { species: string; moveId: string; handedOver?: boolean }
+interface TrailState { species: string; moves: string[]; itemDisturbed: boolean; handedItem?: string }
 export type ChoiceLockTrails = Record<'p1' | 'p2', Map<number, TrailState | null>>;
+
+/**
+ * An item line a move wrote (`[from] move: Trick`, Switcheroo, Thief,
+ * Knock Off, ...; Fling writes `[from]move:`): the protocol's word on what
+ * the body holds from that line on.
+ */
+const MOVE_ITEM_SOURCE = /\[from\] ?move: /;
+
+const isChoiceItem = (itemId: string) => !!itemId && Dex.items.get(itemId).isChoice === true;
+
+/**
+ * A move hands the trailing active an item (round 63, T115): its trail
+ * starts over with that item, because the sim's Choice item drops the old
+ * lock on arrival and locks the next move. Any other item line disturbs.
+ */
+function noteTrailItemLine(state: TrailState, line: string) {
+  if (line.startsWith('|-item|') && MOVE_ITEM_SOURCE.test(line)) {
+    state.moves = [];
+    state.itemDisturbed = false;
+    state.handedItem = toId(line.split('|')[3] ?? '');
+    return;
+  }
+  state.itemDisturbed = true;
+}
 
 /**
  * One forward walk over the log; the state AT each `|turn|N` marker is the
  * trail for turn N's position (moves the CURRENT active committed since its
- * last real entry, and whether its item was touched in that span).
+ * last real entry or a handed-over item, and whether its item was otherwise
+ * touched in that span).
  */
 export function buildChoiceLockTrails(replayLog: string): ChoiceLockTrails {
   const trails: ChoiceLockTrails = { p1: new Map(), p2: new Map() };
@@ -39,7 +65,7 @@ export function buildChoiceLockTrails(replayLog: string): ChoiceLockTrails {
     const item = line.match(/^\|-(?:item|enditem)\|(p[12])[a-d]?:/);
     if (item) {
       const state = current[item[1] as 'p1' | 'p2'];
-      if (state) state.itemDisturbed = true;
+      if (state) noteTrailItemLine(state, line);
       continue;
     }
     const turn = line.match(/^\|turn\|(\d+)/);
@@ -52,13 +78,80 @@ export function buildChoiceLockTrails(replayLog: string): ChoiceLockTrails {
   return trails;
 }
 
-/** The one-distinct-move rule: exactly one committed move, item untouched. */
+/**
+ * The one-distinct-move rule: exactly one committed move, item untouched —
+ * or, after a hand-over, a Choice item and one move since it arrived.
+ */
 export function protocolChoiceLock(
   trails: ChoiceLockTrails, side: 'p1' | 'p2', turn: number,
 ): ProtocolLock | null {
   const state = trails[side].get(turn);
   if (!state || state.itemDisturbed || state.moves.length !== 1) return null;
-  return { species: state.species, moveId: state.moves[0] };
+  if (state.handedItem === undefined) return { species: state.species, moveId: state.moves[0] };
+  if (!isChoiceItem(state.handedItem)) return null;
+  return { species: state.species, moveId: state.moves[0], handedOver: true };
+}
+
+/**
+ * What one body holds by the protocol (round 63, T115): `item` is an item
+ * id ('' = nothing), `lock` the move a Choice item holds it to (its first
+ * move since the item arrived), null without one.
+ */
+export interface ProtocolHeldItem { side: 'p1' | 'p2'; species: string; item: string; lock: string | null }
+interface HeldState { side: 'p1' | 'p2'; species: string; item: string | null; moves: string[] }
+type HeldWalk = { bodies: Map<string, HeldState>; touched: Set<HeldState> };
+
+/** The body a `pXa: Nickname` ident names; nicknames key the bodies, so slots never matter (doubles). */
+const heldBody = (walk: HeldWalk, ident: string | undefined) => walk.bodies.get((ident ?? '').replace(/^(p[12])[a-d]?: /, '$1: '));
+
+function noteHeldEntry(walk: HeldWalk, parts: string[]) {
+  const ident = parts[2]?.match(/^(p[12])[a-d]?: (.+)$/);
+  if (!ident) return;
+  const key = `${ident[1]}: ${ident[2]}`;
+  const species = (parts[3] ?? '').split(',')[0].trim();
+  const body = walk.bodies.get(key) ?? { side: ident[1] as 'p1' | 'p2', species, item: null, moves: [] };
+  body.species = species;
+  body.moves = [];
+  walk.bodies.set(key, body);
+}
+
+/** A move-written item line makes the body's item known; once known, every item line on it counts. */
+function noteHeldItemLine(walk: HeldWalk, parts: string[], line: string) {
+  const body = heldBody(walk, parts[2]);
+  if (!body || (body.item === null && !MOVE_ITEM_SOURCE.test(line))) return;
+  const item = parts[1] === '-item' ? toId(parts[3] ?? '') : '';
+  if (body.item === item) return;
+  body.item = item;
+  body.moves = [];
+  walk.touched.add(body);
+}
+
+/**
+ * Per boundary turn N, every body whose protocol item changed in the block
+ * before it (between `|turn|N-1` and `|turn|N`), in order of first touch,
+ * with its item and lock at the boundary. The board takes these over: the
+ * sim plays a swap or a Knock Off with the build's guesses (655336: the
+ * Trick handed Bisharp the guessed Colbur Berry) or on another body.
+ */
+export function buildProtocolHeldItems(replayLog: string): Map<number, ProtocolHeldItem[]> {
+  const out = new Map<number, ProtocolHeldItem[]>();
+  const walk: HeldWalk = { bodies: new Map(), touched: new Set() };
+  for (const line of replayLog.split('\n')) {
+    const parts = line.split('|');
+    if (parts[1] === 'switch' || parts[1] === 'drag') noteHeldEntry(walk, parts);
+    else if (parts[1] === '-item' || parts[1] === '-enditem') noteHeldItemLine(walk, parts, line);
+    else if (parts[1] === 'move') {
+      const body = heldBody(walk, parts[2]);
+      const moveId = toId(parts[3] ?? '');
+      if (body && moveId && !body.moves.includes(moveId)) body.moves.push(moveId);
+    } else if (parts[1] === 'turn' && walk.touched.size > 0) {
+      out.set(parseInt(parts[2], 10), [...walk.touched].map(({ side, species, item, moves }) => ({
+        side, species, item: item ?? '', lock: isChoiceItem(item ?? '') && moves.length > 0 ? moves[0] : null,
+      })));
+      walk.touched = new Set();
+    }
+  }
+  return out;
 }
 
 export type ItemCorroboration = 'corroborated' | 'contradicted' | 'ambiguous';
@@ -184,6 +277,8 @@ export interface ChoiceLockContext {
   trails: ChoiceLockTrails;
   /** speciesId -> may this mon's (choice) item justify a lock stamp? */
   eligibility: Record<'p1' | 'p2', Record<string, boolean>>;
+  /** Boundary turn -> the protocol's held items for the bodies the block before it touched (round 63, T115). */
+  heldItems: Map<number, ProtocolHeldItem[]>;
 }
 
 /**
@@ -210,5 +305,5 @@ export function buildChoiceLockContext(
         corroborateChoiceItem(side, built.species, built.item, teams, observations, genNum) !== 'contradicted';
     }
   }
-  return { trails: buildChoiceLockTrails(replayLog), eligibility };
+  return { trails: buildChoiceLockTrails(replayLog), eligibility, heldItems: buildProtocolHeldItems(replayLog) };
 }

@@ -53,15 +53,22 @@ describe('protocol choice-lock trails', () => {
     expect(protocolChoiceLock(trails, 'p1', 4)).toBeNull();
   });
 
-  test('an item event on the active since entry disturbs the trail (Trick family)', () => {
+  test('a Trick-handed Choice item locks the next move; any other item event disturbs the trail', () => {
+    // Round 63 (T115): the sim's Choice Scarf drops the old lock on arrival
+    // and locks the next move (items.ts onStart / onModifyMove), and the GPL
+    // replay shows it: Vileplume clicks Sludge Bomb at t19 after the Trick
+    // and again at t20. The T38 re-entry at t37 starts a fresh trail.
     const trails = buildChoiceLockTrails(log([
       '|switch|p1a: Plume|Vileplume|100/100',
       '|turn|1',
       '|-item|p1a: Plume|Choice Scarf|[from] move: Trick',
       '|move|p1a: Plume|Sludge Bomb|p2a: Chansey',
       '|turn|2',
+      '|-enditem|p1a: Plume|Choice Scarf|[from] move: Knock Off|[of] p2a: Chansey',
+      '|turn|3',
     ]));
-    expect(protocolChoiceLock(trails, 'p1', 2)).toBeNull();
+    expect(protocolChoiceLock(trails, 'p1', 2)).toEqual({ species: 'Vileplume', moveId: 'sludgebomb', handedOver: true });
+    expect(protocolChoiceLock(trails, 'p1', 3)).toBeNull();
   });
 
   test('|cant| does not break the trail; |drag| counts as entry', () => {
