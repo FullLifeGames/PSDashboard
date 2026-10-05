@@ -336,7 +336,8 @@ export function winPathFor(args: WinPathArgs): WinPathResult | null {
     return { winPath: { factor: 'decisions', size: top.size }, sentence, foldLuck: false };
   }
   if (top.factor === 'reads') {
-    const examples = reads.slice(0, 2)
+    // The two biggest payoffs, told in the order they were played (round 63, T18).
+    const examples = reads.slice(0, 2).sort((a, b) => a.turn - b.turn)
       .map(read => `${phrase(read.label)} on turn ${read.turn} (${winDeltaText(read.payoff)})`);
     return { winPath: { factor: 'reads', size: top.size }, sentence: `${winnerName} won it on reads: ${examples.join(' and ')}.`, foldLuck: false };
   }
