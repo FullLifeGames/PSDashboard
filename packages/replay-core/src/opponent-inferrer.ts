@@ -6,6 +6,7 @@ import {
   addFromPreview, addFromSwitch, noteEntry, noteGravity, noteMoveOrBoundary, recordAbility, recordAbilityAttribution,
   recordConsumedItem, recordHealItem, recordItem, recordItemDamage, recordMega, recordMove, recordTera, ruleOutFromDamage,
 } from './inference/handlers.ts';
+import { watchItemEvidence } from './inference/item-evidence.ts';
 import { toId } from './ids.ts';
 
 /** "SitrusBerry" / "HighHorsepower" (packed names) → "Sitrus Berry" / "High Horsepower". */
@@ -129,6 +130,7 @@ export function inferOpponentTeam(log: string, opponentSide: 'p1' | 'p2' = 'p2')
   const state = createInferrerState(lines, opponentSide);
 
   for (const line of lines) {
+    watchItemEvidence(state, line);
     noteMoveOrBoundary(state, line);
     noteGravity(state, line);
     noteEntry(state, line);

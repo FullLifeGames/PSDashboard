@@ -3,6 +3,7 @@ import type { RevealedPokemonInfo } from '../types.ts';
 import { findPokemonByNickname } from './lookup.ts';
 import { abilitiesAreFree } from '../team/dex-legal.ts';
 import { toId } from '../ids.ts';
+import type { ItemWatch } from './item-evidence.ts';
 
 /** The scan state one team inference carries from line to line. */
 export interface InferrerState {
@@ -40,6 +41,8 @@ export interface InferrerState {
   gen: number;
   /** A format that lets any species hold any ability (custom games, Hackmons): the dex decides nothing. */
   custom: boolean;
+  /** Item evidence by absence (round 63, T80): the resolving move and the residual phase; item-evidence.ts creates it. */
+  itemWatch?: ItemWatch;
 }
 
 export function createInferrerState(lines: string[], opponentSide: 'p1' | 'p2'): InferrerState {
