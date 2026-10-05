@@ -19,9 +19,10 @@ export interface MoveCandidate {
   /** false = revealed/manual (immune to vetoes), true = usage/set fill. */
   guessed: boolean;
   /**
-   * A move of the chosen Smogon set: coherent by construction, so rows 1
-   * and 2 spare it; the item rows still apply, because the item may come
-   * from elsewhere (an inferred Scarf). Round 63, T28.
+   * A move of the chosen Smogon set: row 1 spares it (the set's own boost
+   * decides what its attacks scale with); row 2 and the item rows still
+   * apply. Round 63, T28; E1: a same-type pair the log did not show has no
+   * claim on the build (the d2 bank read doubles worse with such pairs).
    */
   fromSet?: boolean;
 }
@@ -182,12 +183,12 @@ function keepDamagingMoves(candidates: MoveCandidate[], served: Set<string>): Da
       if (facts.priority <= 0) keptDamageTypes.add(facts.type);
       if (facts.scaling) keptScalings.add(facts.scaling);
     };
-    if (!candidate.guessed || candidate.fromSet) {
+    if (!candidate.guessed) {
       keep();
       continue;
     }
     // Row 1: a big attack the set's boost does not serve (SD + Body Press).
-    if (served.size > 0 && facts.scaling && !served.has(facts.scaling) &&
+    if (!candidate.fromSet && served.size > 0 && facts.scaling && !served.has(facts.scaling) &&
       facts.basePower >= BOOST_VETO_MIN_BP && !PIVOT_MOVES.has(facts.id)) {
       continue;
     }
