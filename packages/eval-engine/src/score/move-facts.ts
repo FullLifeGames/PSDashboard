@@ -119,6 +119,54 @@ export const POWER_MOVES: ReadonlyMap<string, 'memo' | 'live' | 'stages'> = new 
   ...['storedpower', 'powertrip', 'punishment'].map(id => [id, 'stages'] as const),
 ]);
 
+/**
+ * Per Dex, read once (round 63, T81 timing): which moves the static resolves
+ * at use at all (`touched`: a type rule, a power asked from the simulator,
+ * more than one hit or a sure crit), whose answer the memo key carries
+ * (`keyed`: the context moves, the live power moves, the sure crits, the
+ * moves that split over two foes), which read other stats than their
+ * category's (`offAxis`) or set their power from the boosts (`staged`), and
+ * the abilities with their own ModifySTAB handler. A set lookup per slot
+ * instead of Dex reads per slot.
+ */
+export interface DexTraits {
+  touched: ReadonlySet<string>;
+  keyed: ReadonlySet<string>;
+  offAxis: ReadonlySet<string>;
+  staged: ReadonlySet<string>;
+  stabAbilities: ReadonlySet<string>;
+}
+const dexTraits = new WeakMap<object, DexTraits>();
+let lastDex: object | null = null;
+let lastTraits: DexTraits | null = null;
+
+function buildTraits(battle: Battle): DexTraits {
+  const moves = battle.dex.moves.all();
+  const ids = (test: (move: (typeof moves)[number]) => unknown) => new Set(moves.filter(test).map(move => move.id as string));
+  const kinds = (kind: string) => [...POWER_MOVES].filter(([, value]) => value === kind).map(([id]) => id);
+  return {
+    touched: new Set([...POWER_MOVES.keys(), ...RULE_MOVES, ...ids(move => move.multihit || move.willCrit)]),
+    keyed: new Set([...CONTEXT_MOVES, ...kinds('live'), ...ids(move => move.willCrit || move.smartTarget)]),
+    offAxis: ids(move => move.overrideOffensiveStat || move.overrideDefensiveStat ||
+      move.overrideOffensivePokemon || move.overrideDefensivePokemon),
+    staged: new Set(kinds('stages')),
+    stabAbilities: new Set(battle.dex.abilities.all()
+      .filter(ability => (ability as unknown as { onModifySTAB?: unknown }).onModifySTAB).map(ability => ability.id as string)),
+  };
+}
+
+export function traitsOf(battle: Battle): DexTraits {
+  if (battle.dex === lastDex && lastTraits) return lastTraits;
+  let traits = dexTraits.get(battle.dex);
+  if (!traits) {
+    traits = buildTraits(battle);
+    dexTraits.set(battle.dex, traits);
+  }
+  lastDex = battle.dex;
+  lastTraits = traits;
+  return traits;
+}
+
 /** A move's power as the simulator sets it at use; `simDamage` for a fixed-damage move. */
 interface PowerAtUse { basePower: number; powerMult: number; simDamage?: number }
 
@@ -148,21 +196,45 @@ function onField<T>(battle: Battle, attacker: Pokemon, defender: Pokemon, ask: (
   }
 }
 
+/** askPower on the field (onField) without a closure: the static's hot path asks it for every asked slot. */
+function askPowerOnField(attacker: Pokemon, defender: Pokemon, move: ActiveMove, battle: Battle): PowerAtUse {
+  const log = battle as unknown as { debugMode: boolean };
+  const debug = log.debugMode;
+  const userBenched = !attacker.isActive;
+  const targetBenched = !defender.isActive;
+  log.debugMode = false;
+  attacker.isActive = true;
+  defender.isActive = true;
+  try {
+    return askPower(attacker, defender, move, battle);
+  } finally {
+    if (userBenched) attacker.isActive = false;
+    if (targetBenched) defender.isActive = false;
+    log.debugMode = debug;
+  }
+}
+
 /**
- * The move's own onBasePower in the sim's event frame (singleEvent): its
- * chainModify writes the frame's modifier, which the static keeps as powerMult.
+ * The move's own onBasePower in an event frame of the sim's shape (what
+ * runEvent hands its handlers: the user, the target, the move and a
+ * modifier of 1): its chainModify writes the frame's modifier, which the
+ * static keeps as powerMult. The frame is set for the call and restored
+ * (singleEvent would do the same with more bookkeeping, measured too slow
+ * for the static, round 63).
  */
 function ownBasePower(battle: Battle, attacker: Pokemon, defender: Pokemon, move: ActiveMove, basePower: number): PowerAtUse {
   const own = move.onBasePower as unknown as Handler;
-  let modifier = 1;
-  const relay: unknown = battle.singleEvent('BasePower', move, null, attacker, defender, move, basePower,
-    function (this: Battle, ...args: unknown[]) {
-      this.event.modifier = 1;
-      const answer = own.apply(this, args);
-      modifier = this.event.modifier;
-      return answer;
-    });
-  return { basePower: typeof relay === 'number' ? relay : basePower, powerMult: modifier };
+  const frame = battle as unknown as { event: unknown };
+  const parent = frame.event;
+  const event = { id: 'BasePower', target: attacker, source: defender, effect: move, modifier: 1 };
+  frame.event = event;
+  let relay: unknown;
+  try {
+    relay = own.call(battle, basePower, attacker, defender, move);
+  } finally {
+    frame.event = parent;
+  }
+  return { basePower: typeof relay === 'number' ? relay : basePower, powerMult: event.modifier };
 }
 
 /** getDamage's order: fixed damage first, then the power callback, then the move's own BasePower handler. */
@@ -235,7 +307,7 @@ function chainedPower(hits: number, accuracy: number, powerOf: (hit: number) => 
  */
 function critFactor(attacker: Pokemon, defender: Pokemon, move: DexMove, battle: Battle): number {
   if (!move.willCrit) return 1;
-  const lands = onField(battle, attacker, defender, () => battle.runEvent('CriticalHit', defender, null, move as unknown as ActiveMove));
+  const lands: unknown = onField(battle, attacker, defender, () => battle.runEvent('CriticalHit', defender, null, move as unknown as ActiveMove));
   return lands ? move.critModifier || (battle.gen >= 6 ? 1.5 : 2) : 1;
 }
 
@@ -250,21 +322,29 @@ export type Landed = Pick<MoveAtUse, 'type' | 'category' | 'basePower'> & {
 
 /** The catalog path allocates nothing: the dex move stands in for its own answer. */
 export function landedOrCatalog(attacker: Pokemon, defender: Pokemon, move: DexMove, battle: Battle): Landed {
-  const asked = POWER_MOVES.has(move.id);
-  const retyped = RULE_MOVES.has(move.id) || RULE_ABILITIES.has(String(attacker.ability));
-  if (!asked && !retyped && !move.multihit && !move.willCrit) return move;
-  const typed: Landed = retyped ? moveAtUse(move, userFacts(attacker, battle), fieldFacts(attacker, battle)) ?? move : move;
+  const retypedByAbility = RULE_ABILITIES.has(String(attacker.ability));
+  if (!retypedByAbility && !traitsOf(battle).touched.has(move.id)) return move;
+  const typed: Landed = retypedByAbility || RULE_MOVES.has(move.id)
+    ? moveAtUse(move, userFacts(attacker, battle), fieldFacts(attacker, battle)) ?? move
+    : move;
+  return landedPower(attacker, defender, move, battle, typed);
+}
+
+/** The power at use on top of the typed answer: asked from the simulator, every hit, a sure crit. */
+function landedPower(attacker: Pokemon, defender: Pokemon, move: DexMove, battle: Battle, typed: Landed): Landed {
   // The Dex move stands in for the active move: the asked handlers only read it (the census spec checks).
-  const power: PowerAtUse = asked
-    ? onField(battle, attacker, defender, () => askPower(attacker, defender, move as unknown as ActiveMove, battle))
-    : { basePower: typed.basePower, powerMult: 1 };
-  const landing = hitsFactor(attacker, defender, move, power.basePower, battle) * critFactor(attacker, defender, move, battle);
-  return {
-    type: typed.type, category: typed.category, basePower: power.basePower,
-    powerMult: (typed.powerMult ?? 1) * power.powerMult,
-    ...(power.simDamage === undefined ? {} : { simDamage: power.simDamage }),
-    ...(landing === 1 ? {} : { landing }),
+  const power = POWER_MOVES.has(move.id) ? askPowerOnField(attacker, defender, move as unknown as ActiveMove, battle) : null;
+  const basePower = power ? power.basePower : typed.basePower;
+  const landing = move.multihit || move.willCrit
+    ? hitsFactor(attacker, defender, move, basePower, battle) * critFactor(attacker, defender, move, battle)
+    : 1;
+  if (!power && landing === 1) return typed;
+  const answer: Landed = {
+    type: typed.type, category: typed.category, basePower, powerMult: (typed.powerMult ?? 1) * (power ? power.powerMult : 1),
   };
+  if (power?.simDamage !== undefined) answer.simDamage = power.simDamage;
+  if (landing !== 1) answer.landing = landing;
+  return answer;
 }
 
 /**
@@ -272,8 +352,8 @@ export function landedOrCatalog(attacker: Pokemon, defender: Pokemon, move: DexM
  * field and asked in the sim's event frame on the STAB the rules give.
  */
 export function abilityStab(attacker: Pokemon, defender: Pokemon, move: DexMove, stab: number, battle: Battle): number {
+  if (!traitsOf(battle).stabAbilities.has(attacker.ability)) return stab;
   const ability = battle.dex.abilities.getByID(attacker.ability);
-  if (!(ability as unknown as { onModifySTAB?: unknown }).onModifySTAB) return stab;
   const answer: unknown = onField(battle, attacker, defender, () =>
     battle.singleEvent('ModifySTAB', ability, attacker.abilityState, attacker, defender, move as unknown as ActiveMove, stab));
   return typeof answer === 'number' ? answer : stab;
@@ -295,7 +375,7 @@ export function stagedPower(attacker: Pokemon, defender: Pokemon, moveId: string
   const battle = attacker.battle;
   const user = boosts ? onStages(attacker, { ...attacker.boosts, ...boosts }) : attacker;
   const move = battle.dex.moves.get(moveId) as unknown as ActiveMove;
-  return onField(battle, attacker, defender, () => askPower(user, defender, move, battle)).basePower;
+  return askPowerOnField(user, defender, move, battle).basePower;
 }
 
 /** A move as it lands for one pair, every field set; `simDamage` and `landing` as in Landed. */
@@ -312,19 +392,28 @@ export function landedMove(attacker: Pokemon, defender: Pokemon, move: DexMove, 
 }
 
 /**
- * The memo-key term of the move answers (round 57): every usable slot whose
+ * The answers the memo key carries (round 57): every usable slot whose
  * answer reads a fact outside pairKey (CONTEXT_MOVES, the live power moves,
- * a sure crit against Lucky Chant, Dragon Darts against the foe's partner)
- * contributes its answer, so the memo stays a function of its key (round 49)
- * without one key term per fact.
+ * a sure crit against Lucky Chant, Dragon Darts against the foe's partner),
+ * by slot id; null when no slot needs one, as for most pairs. On a miss the
+ * memo prices the pair with these same answers (round 63: asked once).
  */
-export function landedKey(attacker: Pokemon, defender: Pokemon, slots: readonly { id: string }[], battle: Battle): string {
-  let key = '';
+export function keyedAnswers(attacker: Pokemon, defender: Pokemon, slots: readonly { id: string }[], battle: Battle): Map<string, Landed> | null {
+  const { keyed } = traitsOf(battle);
+  let answers: Map<string, Landed> | null = null;
   for (const slot of slots) {
-    const move = battle.dex.moves.getByID(slot.id as ID);
-    if (!CONTEXT_MOVES.has(slot.id) && POWER_MOVES.get(slot.id) !== 'live' && !move.willCrit && !move.smartTarget) continue;
-    const use = landedMove(attacker, defender, move, battle);
-    key += `|${slot.id}=${use.type}/${use.category}/${use.basePower}/${use.powerMult}/${use.simDamage ?? ''}/${use.landing ?? ''}`;
+    if (!keyed.has(slot.id)) continue;
+    (answers ??= new Map()).set(slot.id, landedOrCatalog(attacker, defender, battle.dex.moves.getByID(slot.id as ID), battle));
+  }
+  return answers;
+}
+
+/** The memo-key term of the keyed answers, so the memo stays a function of its key (round 49) without one key term per fact. */
+export function landedKey(answers: ReadonlyMap<string, Landed> | null): string {
+  if (!answers) return '';
+  let key = '';
+  for (const [id, use] of answers) {
+    key += `|${id}=${use.type}/${use.category}/${use.basePower}/${use.powerMult ?? 1}/${use.simDamage ?? ''}/${use.landing ?? ''}`;
   }
   return key;
 }

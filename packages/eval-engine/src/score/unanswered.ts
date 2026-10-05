@@ -5,7 +5,7 @@ import { stageMultiplier } from '../stat-stages.ts';
 import type { DecidedSweep, EntryUnanswered, NearDecidedSweep, UnansweredProfile } from '../types.ts';
 import { hazardEntryFraction } from './hazards.ts';
 import {
-  livingMons, singleMoveFraction, stagedFraction, threatGetter, usableSlots,
+  expectedFraction, livingMons, singleMoveFraction, threatGetter, usableSlots,
   type MatchupCache, type PairThreat, type ThreatGetter,
 } from './threat.ts';
 import { healProfile, ppBudget, raceClocks, statusResidual, type HealProfile, type RaceSide } from './races.ts';
@@ -37,7 +37,7 @@ interface ProfileContext {
  * since round 63 each move on the stages of its own stats (PairThreat.axes, T81).
  */
 export function expectedRate(threatOut: PairThreat, attacker: Pokemon, defender: Pokemon): number {
-  return stagedFraction(threatOut, attacker, defender, undefined, true);
+  return expectedFraction(threatOut, attacker, defender);
 }
 
 /** One mon's race side for the profile: entry-tolled HP off the bench, expected rates, memoized PP inputs. */

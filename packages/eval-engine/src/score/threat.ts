@@ -1,6 +1,8 @@
-import type { Battle, BoostsTable, Pokemon, Side, StatIDExceptHP } from '@pkmn/sim';
+import type { Battle, BoostsTable, ID, Pokemon, Side, StatIDExceptHP } from '@pkmn/sim';
 import { stageMultiplier } from '../stat-stages.ts';
-import { abilityStab, landedKey, landedOrCatalog, POWER_MOVES, stagedLanded, stagedPower, type Landed } from './move-facts.ts';
+import {
+  abilityStab, keyedAnswers, landedKey, landedOrCatalog, stagedLanded, stagedPower, traitsOf, type Landed,
+} from './move-facts.ts';
 
 /**
  * The HP- and boost-independent threat proxy: one attacker→defender
@@ -101,10 +103,14 @@ export function usableSlots(pokemon: Pokemon): Pokemon['moveSlots'] {
 /** Moves that deal half the target's CURRENT HP. */
 const HALVING_MOVES: ReadonlySet<string> = new Set(['superfang', 'naturesmadness', 'ruination']);
 
-function pairKey(attacker: Pokemon, defender: Pokemon, battle: Battle): string {
+function pairKey(
+  attacker: Pokemon,
+  defender: Pokemon,
+  slots: Pokemon['moveSlots'],
+  answers: ReadonlyMap<string, Landed> | null,
+): string {
   // The usable-slot signature keys PP transitions: a move draining to zero
   // mid-search changes the attacker's threat, so it must miss the memo.
-  const slots = usableSlots(attacker);
   const usable = slots.map(slot => slot.id).join(',');
   // A halving move prices off the defender's current HP, so such a pair keys
   // on it. Without it the first forked position to ask froze its HP into the
@@ -124,7 +130,7 @@ function pairKey(attacker: Pokemon, defender: Pokemon, battle: Battle): string {
   const defense = `${defender.types.join('/')}:${defender.terastallized ?? ''}:${defender.storedStats.def}:${defender.storedStats.spd}:${defender.maxhp}`;
   return `${attacker.side.id}:${attacker.name}:${attacker.species.id}:${attacker.level}:${attacker.item}:${attacker.ability}:${lockedMoveId(attacker) ?? ''}:${usable}:${offense}>` +
     `${defender.side.id}:${defender.name}:${defender.species.id}:${defender.level}:${defender.item}:${defender.ability}:${defense}${liveHp}` +
-    landedKey(attacker, defender, slots, battle);
+    landedKey(answers);
 }
 
 /**
@@ -191,9 +197,6 @@ function bulkMultiplier(defender: Pokemon, defense: StatIDExceptHP): number {
   return bulk;
 }
 
-/** A move whose Dex entry names the stats its damage reads (Body Press, Psyshock, Foul Play). */
-const offAxis = (move: DexMove) =>
-  !!(move.overrideOffensiveStat || move.overrideDefensiveStat || move.overrideOffensivePokemon || move.overrideDefensivePokemon);
 
 /**
  * Fixed damage the proxy can price without a base power (round 33: the
@@ -272,7 +275,7 @@ function stabMultiplier(attacker: Pokemon, defender: Pokemon, move: DexMove, typ
     return oldType ? 2 : 4915 / 4096;
   }
   const rule = tera === type && oldType ? 2 : stab;
-  return rule > 1 ? abilityStab(attacker, defender, move, rule, battle) : rule;
+  return rule > 1 && traitsOf(battle).stabAbilities.has(attacker.ability) ? abilityStab(attacker, defender, move, rule, battle) : rule;
 }
 
 /**
@@ -315,35 +318,44 @@ function landedFraction(attacker: Pokemon, defender: Pokemon, move: DexMove, use
   return damage / defender.maxhp;
 }
 
-export function pairThreat(attacker: Pokemon, defender: Pokemon, battle: Battle): PairThreat {
-  let physical = 0;
-  let special = 0;
-  let physicalAcc = 1;
-  let specialAcc = 1;
-  let priority = false;
+/**
+ * The threat of one direction. threatGetter hands over what the memo key
+ * already read: the keyed answers (`known`) and the usable slots.
+ */
+export function pairThreat(
+  attacker: Pokemon,
+  defender: Pokemon,
+  battle: Battle,
+  known?: ReadonlyMap<string, Landed> | null,
+  usable: Pokemon['moveSlots'] = usableSlots(attacker),
+): PairThreat {
   // A choice-locked attacker only ever clicks its locked move again — a lock
   // into a resisted attack (or a status move) ends its threat outright.
   const locked = lockedMoveId(attacker);
-  const usable = usableSlots(attacker);
   const slots = locked ? usable.filter(slot => slot.id === locked) : usable;
-  let axes: AxisThreat[] | undefined;
+  const threat: PairThreat = { physical: 0, special: 0, priority: false, physicalAcc: 1, specialAcc: 1 };
+  const traits = traitsOf(battle);
   for (const slot of slots) {
-    const move = battle.dex.moves.get(slot.id);
+    // Slots carry ids, so the Dex is asked by id (moves.get would normalize the name first).
+    const move = battle.dex.moves.getByID(slot.id as ID);
     if (!move.exists || move.category === 'Status') continue;
-    const staged = POWER_MOVES.get(move.id) === 'stages';
-    const use = threatUse(attacker, defender, move, battle, staged);
-    const moveFraction = landedFraction(attacker, defender, move, use, battle);
-    if (moveFraction > 0) {
-      const accuracy = accuracyOf(move);
-      if (staged || offAxis(move)) {
-        (axes ??= []).push(axisThreat(move, use, moveFraction, accuracy, staged));
-      } else if (use.category === 'Physical') {
-        if (moveFraction > physical) { physical = moveFraction; physicalAcc = accuracy; }
-      } else if (moveFraction > special) { special = moveFraction; specialAcc = accuracy; }
-      if (move.priority > 0) priority = true;
-    }
+    const staged = traits.staged.has(move.id);
+    const use = known?.get(move.id) ?? threatUse(attacker, defender, move, battle, staged);
+    const fraction = landedFraction(attacker, defender, move, use, battle);
+    if (fraction > 0) addMove(threat, move, use, fraction, staged || traits.offAxis.has(move.id) ? staged : null);
   }
-  return { physical, special, priority, physicalAcc, specialAcc, ...(axes ? { axes } : {}) };
+  return threat;
+}
+
+/** One move into the threat: the best of its category, or its own entry (`ownAxis` set: staged or off-axis). */
+function addMove(threat: PairThreat, move: DexMove, use: Landed, fraction: number, ownAxis: boolean | null): void {
+  const accuracy = accuracyOf(move);
+  if (ownAxis !== null) {
+    (threat.axes ??= []).push(axisThreat(move, use, fraction, accuracy, ownAxis));
+  } else if (use.category === 'Physical') {
+    if (fraction > threat.physical) { threat.physical = fraction; threat.physicalAcc = accuracy; }
+  } else if (fraction > threat.special) { threat.special = fraction; threat.specialAcc = accuracy; }
+  if (move.priority > 0) threat.priority = true;
 }
 
 /** A slot as the memo prices it: at use, a stages-class move on no boosts (boostedFraction adds them). */
@@ -379,25 +391,28 @@ export type StageOverride = Partial<BoostsTable>;
  * power the boosts set asks the simulator for that power on these stages.
  */
 export function boostedFraction(threat: PairThreat, attacker: Pokemon, defender: Pokemon, attackerBoosts?: StageOverride): number {
-  return stagedFraction(threat, attacker, defender, attackerBoosts, false);
-}
-
-/** boostedFraction, each fraction weighed by its move's accuracy when asked (expectedRate, round 14). */
-export function stagedFraction(
-  threat: PairThreat,
-  attacker: Pokemon,
-  defender: Pokemon,
-  attackerBoosts: StageOverride | undefined,
-  withAccuracy: boolean,
-): number {
   const atkStage = attackerBoosts?.atk ?? attacker.boosts.atk;
   const spaStage = attackerBoosts?.spa ?? attacker.boosts.spa;
-  const physical = threat.physical * (withAccuracy ? threat.physicalAcc ?? 1 : 1) *
-    stageMultiplier(atkStage) / stageMultiplier(defender.boosts.def);
-  const special = threat.special * (withAccuracy ? threat.specialAcc ?? 1 : 1) *
-    stageMultiplier(spaStage) / stageMultiplier(defender.boosts.spd);
-  let best = Math.max(physical, special);
-  for (const axis of threat.axes ?? []) best = Math.max(best, axisFraction(axis, attacker, defender, attackerBoosts, withAccuracy));
+  const physical = threat.physical * stageMultiplier(atkStage) / stageMultiplier(defender.boosts.def);
+  const special = threat.special * stageMultiplier(spaStage) / stageMultiplier(defender.boosts.spd);
+  const best = Math.max(physical, special);
+  return threat.axes ? Math.max(best, axesFraction(threat.axes, attacker, defender, attackerBoosts, false)) : best;
+}
+
+/** boostedFraction with each fraction weighed by its move's accuracy (expectedRate, round 14). */
+export function expectedFraction(threat: PairThreat, attacker: Pokemon, defender: Pokemon): number {
+  const physical = threat.physical * (threat.physicalAcc ?? 1) *
+    stageMultiplier(attacker.boosts.atk) / stageMultiplier(defender.boosts.def);
+  const special = threat.special * (threat.specialAcc ?? 1) *
+    stageMultiplier(attacker.boosts.spa) / stageMultiplier(defender.boosts.spd);
+  const best = Math.max(physical, special);
+  return threat.axes ? Math.max(best, axesFraction(threat.axes, attacker, defender, undefined, true)) : best;
+}
+
+/** The best of the PairThreat.axes entries, each on the stages of its own stats. */
+function axesFraction(axes: AxisThreat[], attacker: Pokemon, defender: Pokemon, attackerBoosts: StageOverride | undefined, withAccuracy: boolean): number {
+  let best = 0;
+  for (const axis of axes) best = Math.max(best, axisFraction(axis, attacker, defender, attackerBoosts, withAccuracy));
   return best;
 }
 
@@ -417,10 +432,12 @@ export type ThreatGetter = (attacker: Pokemon, defender: Pokemon) => PairThreat;
 export function threatGetter(battle: Battle, cache?: MatchupCache): ThreatGetter {
   return (attacker: Pokemon, defender: Pokemon): PairThreat => {
     if (!cache) return pairThreat(attacker, defender, battle);
-    const key = pairKey(attacker, defender, battle);
+    const slots = usableSlots(attacker);
+    const answers = keyedAnswers(attacker, defender, slots, battle);
+    const key = pairKey(attacker, defender, slots, answers);
     let value = cache.get(key);
     if (value === undefined) {
-      value = pairThreat(attacker, defender, battle);
+      value = pairThreat(attacker, defender, battle, answers, slots);
       cache.set(key, value);
     }
     return value;
