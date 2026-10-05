@@ -5,7 +5,7 @@ import {
   type BranchSlotChoice,
 } from '@fulllifegames/eval-engine';
 import type { SpreadTargetDamage } from '../../lib/branch-damage';
-import { useGimmick, useMovePool } from '../../hooks/useSideControlsState';
+import { useMovePool, type Gimmick } from '../../hooks/useSideControlsState';
 import { SwitchBtn } from './ChoiceButtons';
 import { FightSection, type WhatIfState } from './FightSection';
 import { toId } from '@fulllifegames/replay-core';
@@ -30,6 +30,8 @@ export interface SideControlsProps {
   pending: BranchSlotChoice | null;
   blockedSwitchKeys: Set<string>;
   modifiers: BranchSlotModifiers;
+  /** The slot's gimmick toggle, held by the panel so the damage preview sees it (T20). */
+  gimmick: Gimmick;
   dmgResults: DamageResult[];
   spreadDamageResults: Record<number, SpreadTargetDamage[]>;
   targetDamageResults: Record<string, DamageResult | undefined>;
@@ -119,9 +121,8 @@ function SwitchGrid({ switches, advanced, forceSwitch, pending, blockedSwitchKey
 
 /* ── Controls for one side (moves/switches) ── */
 export function SideControls(props: SideControlsProps) {
-  const { label, activeName, activeSpecies, activeFainted, moves, switches, forceSwitch, pending, blockedSwitchKeys, modifiers, gen, advanced, played, onChoice } = props;
+  const { label, activeName, activeSpecies, activeFainted, moves, switches, forceSwitch, pending, blockedSwitchKeys, gen, advanced, played, onChoice } = props;
   const [tab, setTab] = useState<'fight' | 'switch'>(forceSwitch ? 'switch' : 'fight');
-  const gimmick = useGimmick(modifiers);
   const [whatIfMove, setWhatIfMove] = useState('');
   const [whatIfReplace, setWhatIfReplace] = useState<string | null>(null);
   const movePool = useMovePool(activeSpecies, gen);
@@ -144,7 +145,7 @@ export function SideControls(props: SideControlsProps) {
       {!forceSwitch && advanced && <TabRow tab={tab} setTab={setTab} />}
 
       {!forceSwitch && (!advanced || tab === 'fight') && moves.length > 0 && (
-        <FightSection {...props} gimmick={gimmick} movePool={movePool} whatIf={whatIf} />
+        <FightSection {...props} movePool={movePool} whatIf={whatIf} />
       )}
 
       {(forceSwitch || !advanced || tab === 'switch') && switches.length > 0 && (

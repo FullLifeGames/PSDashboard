@@ -7,6 +7,7 @@ import {
 import type { PickerSource } from '../lib/picker-state';
 import { computePreviewDamage, EMPTY_SIDE_DAMAGE, type DamagePreviewInputs, type SideDamage } from '../lib/branch-damage';
 import { SideControls, type PlayedPick } from './branch/SideControls';
+import { useGimmickToggles, type Gimmick } from '../hooks/useSideControlsState';
 import { ExecuteRow, PickerSourceLine, RawLogToggle } from './branch/PanelStatus';
 
 export type { PlayedPick } from './branch/SideControls';
@@ -45,6 +46,7 @@ const EMPTY_MODIFIERS: BranchSlotModifiers = {
   canUltraBurst: false,
   zMoves: [],
 };
+const EMPTY_SLOT_MODIFIERS: BranchSlotModifiers[] = [];
 
 const ADVANCED_KEY = 'ps-replay-interceptor:picker-advanced';
 
@@ -98,9 +100,9 @@ function useSlots(simState: BranchSimState | null) {
   return { p1ActiveSlots, p2ActiveSlots, p1MovesBySlot, p2MovesBySlot, p1SwitchesBySlot, p2SwitchesBySlot };
 }
 
-/** The damage preview per side, recomputed whenever the actives, moves, field, or gen change. */
+/** The damage preview per side, recomputed whenever the actives, moves, field, gen, or armed Tera toggles change. */
 function usePreviewDamage(inputs: DamagePreviewInputs) {
-  const { p1ActiveSlots, p2ActiveSlots, p1MovesBySlot, p2MovesBySlot, fieldState, gen } = inputs;
+  const { p1ActiveSlots, p2ActiveSlots, p1MovesBySlot, p2MovesBySlot, fieldState, gen, teraBySlot } = inputs;
   const [damageBySide, setDamageBySide] = useState<{ p1: SideDamage; p2: SideDamage }>({
     p1: EMPTY_SIDE_DAMAGE,
     p2: EMPTY_SIDE_DAMAGE,
@@ -113,7 +115,7 @@ function usePreviewDamage(inputs: DamagePreviewInputs) {
       if (cancelled) return;
       if (!cancelled) {
         setDamageBySide(computePreviewDamage(
-          { p1ActiveSlots, p2ActiveSlots, p1MovesBySlot, p2MovesBySlot, fieldState, gen },
+          { p1ActiveSlots, p2ActiveSlots, p1MovesBySlot, p2MovesBySlot, fieldState, gen, teraBySlot },
           calcSingleDamageRange,
         ));
       }
@@ -123,7 +125,7 @@ function usePreviewDamage(inputs: DamagePreviewInputs) {
     return () => {
       cancelled = true;
     };
-  }, [p1ActiveSlots, p2ActiveSlots, p1MovesBySlot, p2MovesBySlot, fieldState, gen]);
+  }, [p1ActiveSlots, p2ActiveSlots, p1MovesBySlot, p2MovesBySlot, fieldState, gen, teraBySlot]);
   return damageBySide;
 }
 
@@ -160,6 +162,7 @@ interface SideColumnProps {
   gen: number;
   advanced: boolean;
   played: PlayedPick | null | undefined;
+  gimmickFor: (side: 'p1' | 'p2', slot: number) => Gimmick;
   onSetChoice: Props['onSetChoice'];
   onHypotheticalMove: Props['onHypotheticalMove'];
 }
@@ -177,7 +180,7 @@ function slotIdentity(side: 'p1' | 'p2', slot: number, activeSlots: (SimPokemonI
 
 /** The choice part of one slot's controls: options, pending state, gimmicks, damage. */
 function slotChoiceProps(props: SideColumnProps, slot: number) {
-  const { side, simState, movesBySlot, switchesBySlot, requiredChoices, damage } = props;
+  const { side, simState, movesBySlot, switchesBySlot, requiredChoices, damage, gimmickFor } = props;
   const forceSwitches = side === 'p1' ? simState.p1ForceSwitches : simState.p2ForceSwitches;
   const choices = side === 'p1' ? simState.p1Choices : simState.p2Choices;
   const modifiersBySlot = side === 'p1' ? simState.p1ModifiersBySlot : simState.p2ModifiersBySlot;
@@ -188,6 +191,7 @@ function slotChoiceProps(props: SideColumnProps, slot: number) {
     pending: choices[slot] ?? null,
     blockedSwitchKeys: blockedSwitchKeys(choices, requiredChoices, slot),
     modifiers: modifiersBySlot[slot] ?? EMPTY_MODIFIERS,
+    gimmick: gimmickFor(side, slot),
     dmgResults: damage.default[slot] ?? [],
     spreadDamageResults: damage.spread[slot] ?? {},
     targetDamageResults: damage.targets[slot] ?? {},
@@ -214,13 +218,27 @@ function SideColumn(props: SideColumnProps) {
   );
 }
 
+/**
+ * The slot views, the gimmick toggles and the damage preview of a position.
+ * The toggles live here, not per slot: the preview reads both sides' Tera (T20).
+ */
+function usePanelPreview(simState: BranchSimState | null, gen: number) {
+  const slots = useSlots(simState);
+  const { gimmickFor, teraBySlot } = useGimmickToggles(
+    simState?.p1ModifiersBySlot ?? EMPTY_SLOT_MODIFIERS,
+    simState?.p2ModifiersBySlot ?? EMPTY_SLOT_MODIFIERS,
+  );
+  const { p1ActiveSlots, p2ActiveSlots, p1MovesBySlot, p2MovesBySlot } = slots;
+  const fieldState = simState?.field ?? null;
+  const damageBySide = usePreviewDamage({ p1ActiveSlots, p2ActiveSlots, p1MovesBySlot, p2MovesBySlot, fieldState, gen, teraBySlot });
+  return { slots, gimmickFor, damageBySide };
+}
+
 /* ── Main BranchPanel (controls only, no iframe) ── */
 export function BranchPanel({ simState, source, acquiringExact, executeError, executing, gen, onSetChoice, onHypotheticalMove, onExecuteTurn, played }: Props) {
   const { advanced, toggleAdvanced } = useAdvancedToggle();
-  const slots = useSlots(simState);
+  const { slots, gimmickFor, damageBySide } = usePanelPreview(simState, gen);
   const { p1ActiveSlots, p2ActiveSlots, p1MovesBySlot, p2MovesBySlot, p1SwitchesBySlot, p2SwitchesBySlot } = slots;
-  const fieldState = simState?.field ?? null;
-  const damageBySide = usePreviewDamage({ p1ActiveSlots, p2ActiveSlots, p1MovesBySlot, p2MovesBySlot, fieldState, gen });
 
   if (!simState) return null;
 
@@ -231,7 +249,7 @@ export function BranchPanel({ simState, source, acquiringExact, executeError, ex
   const bothChosen = branchSideChoicesReady(simState.p1Choices, p1RequiredChoices) &&
     branchSideChoicesReady(simState.p2Choices, p2RequiredChoices);
   const pendingLabel = pendingLabelFor(simState, bothChosen, isMultiActive);
-  const columnProps = { simState, gen, advanced, onSetChoice, onHypotheticalMove };
+  const columnProps = { simState, gen, advanced, gimmickFor, onSetChoice, onHypotheticalMove };
 
   return (
     <div>

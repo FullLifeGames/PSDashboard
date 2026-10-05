@@ -1,8 +1,9 @@
 import { describe, expect, test, vi } from 'vitest';
 import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { calcSingleDamageRange, type SimPokemonInfo } from '@fulllifegames/eval-engine';
 import { BranchPanel } from '../../src/components/BranchPanel';
-import { simState } from '../fixtures/sim-state';
+import { NO_MODIFIERS, simState } from '../fixtures/sim-state';
 
 // The legal move pool is heavy dex data; a fixed pool keeps the what-if row deterministic here.
 vi.mock('../../src/lib/pokemon-options', () => ({ getMovePool: async () => ['Dragon Claw', 'Fire Fang'] }));
@@ -126,6 +127,64 @@ describe('BranchPanel', () => {
     expect(slot('P2').getByRole('button', { name: /Rotom-Wash/ })).toHaveTextContent('played');
     expect(slot('P2').getByText('played:')).toHaveTextContent('played: → Rotom-Wash');
     expect(sideLabels()).toEqual(['P1', 'P2']);
+  });
+
+  describe('the Tera toggle reaches the damage preview (T20, decision 18)', () => {
+    const singles = simState('singles');
+    const [garchomp] = singles.p1ActiveSlots as SimPokemonInfo[];
+    const [ferrothorn] = singles.p2ActiveSlots as SimPokemonInfo[];
+    const earthquake = singles.p1MovesBySlot[0][0];
+    const range = (attacker: SimPokemonInfo, defender: SimPokemonInfo, gameType: 'Singles' | 'Doubles' = 'Singles', move = earthquake) =>
+      calcSingleDamageRange(attacker, defender, move, { gameType, gen: 9 }).range;
+
+    test('singles: pressing the attacker Tera toggle moves the number to the calc after the click, and back', async () => {
+      localStorage.setItem(ADVANCED_KEY, '1');
+      render(<BranchPanel {...props({ simState: simState('singles', { p1ModifiersBySlot: [{ ...NO_MODIFIERS, teraType: 'Ground' }] }) })} />);
+      const button = slot('P1').getByRole('button', { name: /Earthquake/ });
+      const plain = range(garchomp, ferrothorn);
+      const tera = range({ ...garchomp, teraType: 'Ground' }, ferrothorn);
+      expect(tera).not.toBe(plain);
+      await waitFor(() => expect(button).toHaveTextContent(plain));
+      await userEvent.click(slot('P1').getByRole('button', { name: 'Tera (Ground)' }));
+      await waitFor(() => expect(button).toHaveTextContent(tera));
+      await userEvent.click(slot('P1').getByRole('button', { name: 'Tera (Ground)' }));
+      await waitFor(() => expect(button).toHaveTextContent(plain));
+    });
+
+    test('singles: the defender Tera toggle moves the attacker number too', async () => {
+      localStorage.setItem(ADVANCED_KEY, '1');
+      render(<BranchPanel {...props({ simState: simState('singles', { p2ModifiersBySlot: [{ ...NO_MODIFIERS, teraType: 'Fire' }] }) })} />);
+      const button = slot('P1').getByRole('button', { name: /Earthquake/ });
+      const tera = range(garchomp, { ...ferrothorn, teraType: 'Fire' });
+      expect(tera).not.toBe(range(garchomp, ferrothorn));
+      await userEvent.click(slot('P2').getByRole('button', { name: 'Tera (Fire)' }));
+      await waitFor(() => expect(button).toHaveTextContent(tera));
+    });
+
+    test('doubles: the toggle moves the rows of the move into both targets', async () => {
+      localStorage.setItem(ADVANCED_KEY, '1');
+      const doubles = simState('doubles', { p1ModifiersBySlot: [{ ...NO_MODIFIERS, teraType: 'Fire' }, { ...NO_MODIFIERS }] });
+      const [incineroar] = doubles.p1ActiveSlots as SimPokemonInfo[];
+      const flareBlitz = doubles.p1MovesBySlot[0][1];
+      render(<BranchPanel {...props({ simState: doubles })} />);
+      await userEvent.click(slot('P1A').getByRole('button', { name: 'Tera (Fire)' }));
+      for (const target of doubles.p2ActiveSlots as SimPokemonInfo[]) {
+        const tera = range({ ...incineroar, teraType: 'Fire' }, target, 'Doubles', flareBlitz);
+        expect(tera).not.toBe(range(incineroar, target, 'Doubles', flareBlitz));
+        await waitFor(() => expect(slot('P1A').getByTitle(`Flare Blitz into ${target.species} (100%)`)).toHaveTextContent(tera));
+      }
+    });
+
+    test('Mega Evolve stays out of the preview', async () => {
+      localStorage.setItem(ADVANCED_KEY, '1');
+      render(<BranchPanel {...props({ simState: simState('singles', { p1ModifiersBySlot: [{ ...NO_MODIFIERS, canMegaEvo: true }] }) })} />);
+      const button = slot('P1').getByRole('button', { name: /Earthquake/ });
+      const plain = range(garchomp, ferrothorn);
+      await waitFor(() => expect(button).toHaveTextContent(plain));
+      await userEvent.click(slot('P1').getByRole('button', { name: 'Mega Evolve' }));
+      expect(slot('P1').getByRole('button', { name: 'Mega Evolve' })).toHaveAttribute('aria-pressed', 'true');
+      await waitFor(() => expect(button).toHaveTextContent(plain));
+    });
   });
 
   test('the what-if loader hands the hypothetical move to the handler with its side and slot', async () => {

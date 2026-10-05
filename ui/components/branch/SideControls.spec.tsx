@@ -3,6 +3,7 @@ import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { switchOptionKey } from '@fulllifegames/eval-engine';
 import { SideControls, type SideControlsProps } from '../../../src/components/branch/SideControls';
+import { gimmickView } from '../../../src/hooks/useSideControlsState';
 import { NO_MODIFIERS, simState } from '../../fixtures/sim-state';
 
 // The legal move pool is heavy dex data; a fixed pool keeps the what-if row deterministic here.
@@ -14,7 +15,8 @@ function props(overrides: Partial<SideControlsProps> = {}): SideControlsProps {
   return {
     label: 'P1', activeName: 'Garchomp', activeSpecies: 'Garchomp', activeFainted: false,
     moves: singles.p1MovesBySlot[0], switches: singles.p1SwitchesBySlot[0], forceSwitch: false, pending: null,
-    blockedSwitchKeys: new Set(), modifiers: NO_MODIFIERS, dmgResults: [], spreadDamageResults: {}, targetDamageResults: {},
+    blockedSwitchKeys: new Set(), modifiers: NO_MODIFIERS, gimmick: gimmickView(NO_MODIFIERS, null, vi.fn()),
+    dmgResults: [], spreadDamageResults: {}, targetDamageResults: {},
     gen: 9, advanced: false, onChoice: vi.fn(), onHypotheticalMove: vi.fn(), ...overrides,
   };
 }
@@ -71,6 +73,16 @@ describe('SideControls', () => {
     rerender(<SideControls {...props({ forceSwitch: true, activeFainted: false })} />);
     expect(screen.getByText('Garchomp is switching out. Choose who to send in:')).toBeInTheDocument();
     expect(screen.getByText(/Choose a replacement/)).not.toHaveTextContent('for Garchomp');
+  });
+
+  test('the gimmick toggle comes from the panel: it shows armed and reports the click', async () => {
+    const modifiers = { ...NO_MODIFIERS, teraType: 'Steel' };
+    const toggle = vi.fn();
+    render(<SideControls {...props({ modifiers, gimmick: gimmickView(modifiers, 'terastallize', toggle) })} />);
+    const tera = screen.getByRole('button', { name: 'Tera (Steel)' });
+    expect(tera).toHaveAttribute('aria-pressed', 'true');
+    await userEvent.click(tera);
+    expect(toggle).toHaveBeenCalledWith('terastallize');
   });
 
   test('a reserved switch-in is disabled with the reason; the selected one stays clickable', () => {

@@ -4,7 +4,7 @@ import userEvent from '@testing-library/user-event';
 import { useState } from 'react';
 import { switchOptionKey } from '@fulllifegames/eval-engine';
 import { FightSection, type FightSectionProps } from '../../../src/components/branch/FightSection';
-import { useGimmick } from '../../../src/hooks/useSideControlsState';
+import { useGimmickToggles } from '../../../src/hooks/useSideControlsState';
 import { NO_MODIFIERS, simState } from '../../fixtures/sim-state';
 
 const singles = simState('singles');
@@ -12,10 +12,10 @@ const doubles = simState('doubles');
 
 type HostProps = Partial<Omit<FightSectionProps, 'gimmick' | 'whatIf'>>;
 
-/** The Fight face over the real gimmick toggle and what-if state, as SideControls hosts it. */
+/** The Fight face over the panel's real gimmick toggle and what-if state, as SideControls hosts it. */
 function Host(props: HostProps) {
   const modifiers = props.modifiers ?? NO_MODIFIERS;
-  const gimmick = useGimmick(modifiers);
+  const gimmick = useGimmickToggles([modifiers], []).gimmickFor('p1', 0);
   const [whatIfMove, setWhatIfMove] = useState('');
   const [whatIfReplace, setWhatIfReplace] = useState<string | null>(null);
   return (
