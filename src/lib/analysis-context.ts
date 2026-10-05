@@ -17,8 +17,15 @@ export interface AnalysisGraphData {
   faintedFractions?: (number | null)[];
 }
 
-/** The fallen share of the bodies a pre-turn snapshot lists, null without a snapshot. */
-function snapshotFaintedFraction(snapshot: TurnSnapshot | undefined): number | null {
+/**
+ * Round 63 (T18): the turn's phase for the near sentence — the sweep's own
+ * measure first (it counts the bodies a VGC side brought), else the fallen
+ * share of the bodies the pre-turn snapshot lists (manual modes record no
+ * phase); null without either.
+ */
+function turnFaintedFraction(graph: AnalysisGraphData, snapshot: TurnSnapshot | undefined, turn: number): number | null {
+  const recorded = graph.faintedFractions?.[turn - 1];
+  if (recorded !== undefined && recorded !== null) return recorded;
   if (!snapshot) return null;
   const bodies = [...snapshot.p1.pokemon, ...snapshot.p2.pokemon];
   return bodies.length > 0 ? bodies.filter(pokemon => pokemon.fainted).length / bodies.length : null;
@@ -71,10 +78,7 @@ export function analyzeTurnAt(args: {
     ...(args.tendencies ? { tendencies: args.tendencies } : {}),
     actives: context.activesForTurn(turn),
     playedHistory: context.playedHistory,
-    // Round 63 (T18): the turn's phase for the near sentence — the sweep's
-    // own measure first (it counts the bodies a VGC side brought), else the
-    // pre-turn snapshot (manual modes record no phase).
-    faintedFraction: graph.faintedFractions?.[turn - 1] ?? snapshotFaintedFraction(context.snapshots[turn - 1]),
+    faintedFraction: turnFaintedFraction(graph, context.snapshots[turn - 1], turn),
     ...(args.unansweredSeen ? { unansweredSeen: args.unansweredSeen } : {}),
     ...(args.decidedSeen ? { decidedSeen: args.decidedSeen } : {}),
   });
