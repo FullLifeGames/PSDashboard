@@ -12,22 +12,18 @@ const position = (name: string) =>
   (JSON.parse(readFileSync(new URL(`./fixtures/positions/${name}.json`, import.meta.url), 'utf-8')) as { serialized: string }).serialized;
 const CASES = ['smogtours-gen9ou-749828-t23', 'gen9ou-2658658993-t2', 'gen9doublesou-2663093831-t12'];
 
-/** The app's tree path before round 61 (worker-client evaluateMcts → verifiedMerge), sequential. */
-async function previousPipeline(serialized: string, settings: EvalSettings): Promise<{ result: EvalResult; jobs: number }> {
+/**
+ * The tree path by hand, sequential: four trees, merge, the verify cells as one cells round that goes one
+ * ply deeper per outcome (round 63, T16; before, a sub-search per cell on its first-seed child), merge, prover.
+ */
+async function handPipeline(serialized: string, settings: EvalSettings): Promise<{ result: EvalResult; jobs: number }> {
   const trees = Array.from({ length: MCTS_TREES }, (_, offset) => mctsTreeSearch(serialized, settings, offset));
   const merged = mergeMctsTrees(trees);
   const jobs = rowCompletedCells(trees, merged, starvedSupportCells(trees, merged));
   let result = merged;
   if (jobs.length > 0) {
-    const executor = createLocalExecutor(serialized);
-    const values = await executor.evalCells(jobs);
-    const jobByKey = new Map(jobs.map(job => [cellKey(job.i, job.j), job]));
-    const sub: EvalSettings = { depth: 1, samples: 1, tera: settings.tera, sleepClause: settings.sleepClause };
-    for (const value of values) {
-      const job = jobByKey.get(cellKey(value.i, value.j));
-      if (value.ended || !job) continue;
-      value.deepened = (await executor.subSearch({ i: value.i, j: value.j, p1Choice: job.p1Choice, p2Choice: job.p2Choice, settings: sub })).score;
-    }
+    const deepen: EvalSettings = { depth: 1, samples: 1, tera: settings.tera, sleepClause: settings.sleepClause };
+    const values = await createLocalExecutor(serialized).evalCells(jobs.map(job => ({ ...job, deepen })));
     result = mergeMctsTrees(trees, new Map(values.map(value => [cellKey(value.i, value.j), value])));
   }
   if (settings.prove !== false) applyForcedWin(result, await createLocalExecutor(serialized).prove(forcedWinInput(result, settings)));
@@ -35,12 +31,12 @@ async function previousPipeline(serialized: string, settings: EvalSettings): Pro
 }
 
 describe('tree orchestration (round 61)', () => {
-  test('equals the app path before round 61 on singles and doubles positions', { timeout: 900_000 }, async () => {
+  test('equals the tree path by hand on singles and doubles positions', { timeout: 900_000 }, async () => {
     let verified = 0;
     for (const name of CASES) {
       const serialized = position(name);
       const settings: EvalSettings = { depth: 1, samples: 1, mode: 'mcts', tera: true };
-      const before = await previousPipeline(serialized, settings);
+      const before = await handPipeline(serialized, settings);
       const now = await searchTreesOrchestrated(createLocalTreeExecutor(serialized), settings);
       expect(now, name).toEqual(before.result);
       if (before.jobs > 0) verified++;

@@ -152,7 +152,10 @@ function deepPool(pool: ReturnType<typeof poolContinuation>, minTrees: number): 
  * while the one miss tree sat at +0.2 — the hit class keeps its depth,
  * the miss class keeps the sampler). Trees without a recorded class join
  * a pool only in the one-open-class shape, where every open draw must
- * belong to that class (round 32's rule as the special case).
+ * belong to that class (round 32's rule as the special case). Round 63
+ * (T16): the verify step takes every open class one ply deeper
+ * (cls.deepened) and a plain cell's outcome groups mixed by share
+ * (cell.deepened), so no verified cell mixes depths.
  */
 function verifiedValue(trees: MctsTreeStats[], key: number, cell: EvalCellValue, pooledValue: number): number {
   if (!cell.blend) {
@@ -161,10 +164,14 @@ function verifiedValue(trees: MctsTreeStats[], key: number, cell: EvalCellValue,
     return deepPool(pool, Math.min(VERIFY_MIN_TREES, trees.length)) ? pooledValue : cell.deepened ?? cell.value;
   }
   const { blend } = cell;
-  // A deepened first-seed child re-blends inside its class only (reblendValue's rule).
-  const classMean = (cls: CellBlendClass) => cell.deepened !== undefined && cls.hasFirst
-    ? (cls.leafSum - blend.firstLeaf + cell.deepened) / cls.count
-    : cls.leafSum / cls.count;
+  // A class one ply deeper (round 63); otherwise a deepened first-seed child
+  // re-blends inside its class only (reblendValue's rule, values from before).
+  const classMean = (cls: CellBlendClass) => {
+    if (cls.deepened !== undefined) return cls.deepened;
+    return cell.deepened !== undefined && cls.hasFirst
+      ? (cls.leafSum - blend.firstLeaf + cell.deepened) / cls.count
+      : cls.leafSum / cls.count;
+  };
   const open = blend.classes.filter(cls => !cls.ended);
   let value = 0;
   for (const cls of blend.classes) {

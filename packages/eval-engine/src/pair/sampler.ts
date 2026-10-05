@@ -5,6 +5,7 @@ import { PROBE_SEEDS } from '../cell-blend.ts';
 import type { CellBlendClass } from '../types.ts';
 import { leafValue, SEARCH_SEEDS } from '../search/leaf.ts';
 import type { CellSample } from '../search/cell-sampler.ts';
+import { drawPlain, outcomeGroups, VERIFY_PLAIN_SEEDS } from '../search/verify-cell.ts';
 import { drawPair, type PairDraw } from './draw.ts';
 import { parsePairChoice, planTimeFallback } from './guards.ts';
 import { memoKillTable, type KillTable } from './kill-table.ts';
@@ -32,7 +33,7 @@ const COVER_MAX = 1.02;
 const MIN_MASS = 0.01;
 const NO_SCRIPTS: ReadonlyMap<string, PairScript> = new Map();
 
-export interface FirstDraw { child: SimPosition; leaf: number; ended: boolean }
+export interface FirstDraw { child: SimPosition; leaf: number; ended: boolean; log?: readonly string[] }
 
 export type PairCell =
   | { kind: 'skip' }
@@ -40,9 +41,9 @@ export type PairCell =
   | { kind: 'sample'; sample: CellSample; via: 'plan' | 'fallback'; reason: string | null; draws: number };
 
 interface Branch { seed: PRNGSeed; scripts: ReadonlyMap<string, PairScript>; from: number }
-interface Found { key: string; weight: number; leafSum: number; count: number; ended: boolean; hasFirst: boolean; events: PairEvent[]; branch: Branch }
+interface Found { key: string; weight: number; leafSum: number; count: number; ended: boolean; hasFirst: boolean; events: PairEvent[]; branch: Branch; child: SimPosition }
 interface Candidate { id: string; prior: number; branch: Branch; prefix: PairEvent[]; flipKey: string; outcome: PairOutcome }
-interface Cell { root: SimPosition; p1Choice: string; p2Choice: string; samples: number; matchupCache: MatchupCache; tableFor: TableFor }
+interface Cell { root: SimPosition; p1Choice: string; p2Choice: string; samples: number; matchupCache: MatchupCache; tableFor: TableFor; plainDraws?: number }
 
 const memos = new WeakMap<SimPosition, Map<string, KillTable | null>>();
 
@@ -63,8 +64,20 @@ const drawn = (cell: Cell, seed: PRNGSeed, scripts: ReadonlyMap<string, PairScri
 const read = (cell: Cell, draw: PairDraw): PatternRead =>
   readPattern(draw.records, draw.log, positionBattle(cell.root).dex, cell.tableFor);
 
-/** Rule F: the plain mean over the eight fallback seeds; the first natural draw is reused where there is one. */
+/**
+ * Rule F: the plain mean over the eight fallback seeds; the first natural
+ * draw is reused where there is one. Round 63 (T16): a verify cell draws
+ * `plainDraws` seeds (the fallback's eight first) and hands their outcome
+ * groups on.
+ */
 function fallbackCell(cell: Cell, first: PairDraw | null, reason: string, spent: number): PairCell {
+  if (cell.plainDraws) {
+    const draws = VERIFY_PLAIN_SEEDS.slice(0, cell.plainDraws).map((seed, index) =>
+      (index === 0 && first ? first : drawPlain(cell.root, cell.p1Choice, cell.p2Choice, seed, cell.matchupCache)));
+    const value = draws.reduce((sum, draw) => sum + draw.leaf, 0) / draws.length;
+    const sample: CellSample = { value, ended: draws[0].ended, firstChild: draws[0].child, outcomes: outcomeGroups(draws) };
+    return { kind: 'sample', sample, via: 'fallback', reason, draws: spent + draws.length - (first ? 1 : 0) };
+  }
   const leaves: number[] = [];
   let firstChild = first?.child;
   let ended = first?.ended ?? false;
@@ -127,7 +140,7 @@ function landed(events: PairEvent[], candidate: Candidate): boolean {
 function record(found: Map<string, Found>, candidates: Map<string, Candidate>, pattern: Pattern, draw: PairDraw, branch: Branch, isFirst: boolean): void {
   let entry = found.get(pattern.key);
   if (!entry) {
-    entry = { key: pattern.key, weight: pattern.weight, leafSum: 0, count: 0, ended: true, hasFirst: false, events: pattern.events, branch };
+    entry = { key: pattern.key, weight: pattern.weight, leafSum: 0, count: 0, ended: true, hasFirst: false, events: pattern.events, branch, child: draw.child };
     found.set(pattern.key, entry);
     for (const candidate of candidatesOf(entry)) if (!candidates.has(candidate.id)) candidates.set(candidate.id, candidate);
   }
@@ -145,7 +158,8 @@ function blended(found: Map<string, Found>, first: PairDraw, cover: number): Cel
     key: entry.key, weight: entry.weight / cover, leafSum: entry.leafSum, count: entry.count, hasFirst: entry.hasFirst, ended: entry.ended,
   }));
   const value = classes.reduce((sum, cls) => sum + cls.weight * (cls.leafSum / cls.count), 0);
-  return { value, ended: classes.every(cls => cls.ended), firstChild: first.child, blend: { classes, firstLeaf: first.leaf } };
+  const classChildren = new Map([...found.values()].map(entry => [entry.key, entry.child]));
+  return { value, ended: classes.every(cls => cls.ended), firstChild: first.child, blend: { classes, firstLeaf: first.leaf }, classChildren };
 }
 
 /** Rules A.4 and E: the remaining base seeds, then the flips, then the coverage check. */
@@ -179,17 +193,19 @@ function plan(cell: Cell, first: PairDraw, firstPattern: Pattern): PairCell {
   return { kind: 'sample', sample: blended(found, first, cover), via: 'plan', reason: null, draws };
 }
 
-export function pairCellSample(root: SimPosition, p1Choice: string, p2Choice: string, samples: number, matchupCache: MatchupCache): PairCell {
+export function pairCellSample(
+  root: SimPosition, p1Choice: string, p2Choice: string, samples: number, matchupCache: MatchupCache, plainDraws?: number,
+): PairCell {
   const battle = positionBattle(root);
   const p1 = parsePairChoice(battle, 0, p1Choice);
   const p2 = parsePairChoice(battle, 1, p2Choice);
   if (!p1 || !p2) return { kind: 'skip' };
-  const cell: Cell = { root, p1Choice, p2Choice, samples, matchupCache, tableFor: tablesFor(root) };
+  const cell: Cell = { root, p1Choice, p2Choice, samples, matchupCache, tableFor: tablesFor(root), ...(plainDraws ? { plainDraws } : {}) };
   const early = planTimeFallback(battle, [p1, p2]);
   if (early) return fallbackCell(cell, null, early, 0);
   const first = drawn(cell, SEARCH_SEEDS[0], NO_SCRIPTS);
   const pattern = read(cell, first);
   if (pattern.kind === 'fallback') return fallbackCell(cell, first, pattern.reason, 1);
-  if (pattern.events.length === 0) return { kind: 'plain', first: { child: first.child, leaf: first.leaf, ended: first.ended } };
+  if (pattern.events.length === 0) return { kind: 'plain', first: { child: first.child, leaf: first.leaf, ended: first.ended, log: first.log } };
   return plan(cell, first, pattern);
 }

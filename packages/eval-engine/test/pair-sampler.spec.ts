@@ -14,8 +14,14 @@ const meanOver = (root: ReturnType<typeof anchorRoot>, p1: string, p2: string, s
 
 const seeds = (count: number) => Array.from({ length: count }, (_, k) => `${101 + 4 * k},${102 + 4 * k},${103 + 4 * k},${104 + 4 * k}`);
 
-/** A sample as data: the first child by its serialized identity (the live battle behind it carries per-run state such as |t:| lines). */
-const asData = (sample: CellSample) => ({ ...sample, firstChild: sample.firstChild.serialized });
+/**
+ * A sample as data: the children by their serialized identity (the live battle behind each carries per-run
+ * state such as |t:| lines) — the first child, and since round 63 the class children the verify step deepens.
+ */
+const asData = (sample: CellSample) => ({
+  ...sample, firstChild: sample.firstChild.serialized,
+  classChildren: sample.classChildren && [...sample.classChildren].map(([key, child]) => [key, child.serialized]),
+});
 const cellData = (cell: PairCell) => (cell.kind === 'sample' ? { ...cell, sample: asData(cell.sample) } : cell);
 
 describe('the pair plan at the root (round 56)', () => {

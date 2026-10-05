@@ -57,18 +57,18 @@ function runTrees(executor: TreeExecutor, settings: EvalSettings, callbacks?: Or
   }));
 }
 
-/** Round 33: one more ply for every verified cell that did not end, so a verified row is priced at one depth. */
-async function deepenVerified(executor: TreeExecutor, jobs: EvalCellJob[], values: EvalCellValue[], settings: EvalSettings): Promise<void> {
-  const jobByKey = new Map(jobs.map(job => [cellKey(job.i, job.j), job]));
-  const subSettings: EvalSettings = { depth: 1, samples: 1, tera: settings.tera, sleepClause: settings.sleepClause };
+/**
+ * Round 33: one more ply for every verified cell, so a verified row is
+ * priced at one depth. Round 63 (T16): the cells job itself goes one ply
+ * deeper per outcome (every open class, a plain cell's outcome groups), so
+ * the span now holds the sampling as well.
+ */
+async function verifyCells(executor: TreeExecutor, jobs: EvalCellJob[], settings: EvalSettings): Promise<EvalCellValue[]> {
+  const deepen: EvalSettings = { depth: 1, samples: 1, tera: settings.tera, sleepClause: settings.sleepClause };
   const started = Date.now();
-  await Promise.all(values.map(async value => {
-    const job = jobByKey.get(cellKey(value.i, value.j));
-    if (value.ended || !job) return;
-    const sub = await executor.subSearch({ i: value.i, j: value.j, p1Choice: job.p1Choice, p2Choice: job.p2Choice, settings: subSettings });
-    value.deepened = sub.score;
-  }));
+  const values = await executor.evalCells(jobs.map(job => ({ ...job, deepen })));
   perfAdd('verify-deepen', Date.now() - started);
+  return values;
 }
 
 /**
@@ -86,9 +86,7 @@ async function verifiedMerge(
   if (jobs.length === 0) return merged;
   callbacks?.onPartial?.(merged);
   try {
-    const values = await executor.evalCells(jobs);
-    if (stopped(callbacks)) return merged;
-    await deepenVerified(executor, jobs, values, settings);
+    const values = await verifyCells(executor, jobs, settings);
     if (stopped(callbacks)) return merged;
     return perfSync('main:mcts-merge', () =>
       mergeMctsTrees(trees, new Map(values.map(value => [cellKey(value.i, value.j), value]))));

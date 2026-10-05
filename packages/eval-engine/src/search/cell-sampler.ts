@@ -7,19 +7,37 @@ import {
 import type { CellBlend, CellBlendClass, KoOddsMismatch } from '../types.ts';
 import { countFainted, leafValue, rollSensitivePair, SEARCH_SEEDS } from './leaf.ts';
 import { pairCellSample, type FirstDraw } from '../pair/sampler.ts';
+import { drawPlain, outcomeGroups, VERIFY_PLAIN_SEEDS, type PlainDraw, type VerifyDraws } from './verify-cell.ts';
 
 /**
  * One matrix cell's value from seeded sims: the plain seed average, or the
  * analytic class blend on root boundary cells.
  */
 
-/** One sampled root cell: its value, whether it ended, the first-seed child, and the blend when one applied. */
-export interface CellSample {
+/**
+ * One sampled root cell: its value, whether it ended, the first-seed child,
+ * and the blend when one applied. Round 63 (T16): the class children and a
+ * verify cell's outcome groups ride along for the verify step's deepening.
+ */
+export interface CellSample extends VerifyDraws {
   value: number;
   ended: boolean;
   firstChild: SimPosition;
   blend?: CellBlend;
   diagnostic?: KoOddsMismatch;
+}
+
+/**
+ * Round 63 (T16): a verify cell without a plan prices `plainDraws` natural
+ * draws (the first one reused when given) and hands their outcome groups on.
+ */
+export function plainVerifySample(
+  root: SimPosition, p1Choice: string, p2Choice: string, plainDraws: number, matchupCache: MatchupCache, first?: PlainDraw,
+): CellSample {
+  const draws = VERIFY_PLAIN_SEEDS.slice(0, plainDraws).map((seed, index) =>
+    (index === 0 && first ? first : drawPlain(root, p1Choice, p2Choice, seed, matchupCache)));
+  const value = draws.reduce((sum, draw) => sum + draw.leaf, 0) / draws.length;
+  return { value, ended: draws[0].ended, firstChild: draws[0].child, outcomes: outcomeGroups(draws) };
 }
 
 /** The plain seed average (no analytic blend): one sim unless a KO or a roll makes seeds diverge. */
@@ -32,6 +50,7 @@ function plainCellSample(
   samples: number,
   matchupCache: MatchupCache,
   first?: FirstDraw,
+  plainDraws?: number,
 ): CellSample {
   const firstChild = first?.child ?? advancePosition(root, p1Choice, p2Choice, SEARCH_SEEDS[0]);
   const firstBattle = positionBattle(firstChild);
@@ -44,6 +63,10 @@ function plainCellSample(
   const draws = ended
     ? (rollMoves ? Math.max(samples, 3) : 1)
     : (countFainted(firstBattle) > rootFainted || rollMoves ? samples : 1);
+  if (plainDraws && draws > 1) {
+    const log = first?.log ?? advancePositionWithLog(root, p1Choice, p2Choice, SEARCH_SEEDS[0]).log;
+    return plainVerifySample(root, p1Choice, p2Choice, plainDraws, matchupCache, { child: firstChild, log, leaf: sum, ended });
+  }
   for (let s = 1; s < draws; s++) {
     const child = advancePosition(root, p1Choice, p2Choice, SEARCH_SEEDS[s]);
     sum += leafValue(positionBattle(child), matchupCache);
@@ -63,6 +86,8 @@ interface ClassEntry {
   count: number;
   hasFirst: boolean;
   ended: boolean;
+  /** The class's first draw: the child the verify step deepens. */
+  child: SimPosition;
 }
 
 /** One seeded draw with its protocol log and leaf value. */
@@ -82,7 +107,7 @@ function classifyDraw(
 ): boolean {
   const key = classifyChild(draw.log, events);
   if (key === null || !expected.has(key)) return false;
-  const entry = classes.get(key) ?? { leafSum: 0, count: 0, hasFirst: false, ended: true };
+  const entry = classes.get(key) ?? { leafSum: 0, count: 0, hasFirst: false, ended: true, child: draw.child };
   entry.leafSum += draw.leaf;
   entry.count += 1;
   entry.hasFirst = entry.hasFirst || isFirst;
@@ -111,6 +136,7 @@ function blendFromClasses(
     blendClasses.push({ key, weight: normalized, leafSum: cls.leafSum, count: cls.count, hasFirst: cls.hasFirst, ended: cls.ended });
   }
   const blend: CellBlend = { classes: blendClasses, firstLeaf: draws[0].leaf };
+  const classChildren = new Map([...classes].map(([key, cls]) => [key, cls.child]));
   const ended = draws.every(draw => draw.ended);
   const diagnostic: KoOddsMismatch | undefined = missing.length > 0
     ? {
@@ -119,7 +145,7 @@ function blendFromClasses(
       sampled: Object.fromEntries([...classes].map(([key, cls]) => [key, cls.count])),
     }
     : undefined;
-  return { value, ended, firstChild: draws[0].child, blend, ...(diagnostic ? { diagnostic } : {}) };
+  return { value, ended, firstChild: draws[0].child, blend, classChildren, ...(diagnostic ? { diagnostic } : {}) };
 }
 
 /**
@@ -135,17 +161,20 @@ function blendCellSample(
   p2Choice: string,
   samples: number,
   matchupCache: MatchupCache,
+  plainDraws?: number,
 ): CellSample {
   const draws: Draw[] = [];
   const drawSeed = (seed: PRNGSeed) => { draws.push(drawCell(root, p1Choice, p2Choice, seed, matchupCache)); };
   const baseDraws = Math.max(1, Math.min(samples, SEARCH_SEEDS.length));
   for (let s = 0; s < baseDraws; s++) drawSeed(SEARCH_SEEDS[s]);
 
-  const fallback = () => ({
-    value: draws.slice(0, baseDraws).reduce((sum, draw) => sum + draw.leaf, 0) / baseDraws,
-    ended: draws[0].ended,
-    firstChild: draws[0].child,
-  });
+  const fallback = (): CellSample => (plainDraws
+    ? plainVerifySample(root, p1Choice, p2Choice, plainDraws, matchupCache, draws[0])
+    : {
+      value: draws.slice(0, baseDraws).reduce((sum, draw) => sum + draw.leaf, 0) / baseDraws,
+      ended: draws[0].ended,
+      firstChild: draws[0].child,
+    });
 
   const first = observeOrder(draws.map(draw => draw.log), events);
   if (first === null) return fallback();
@@ -191,18 +220,22 @@ export function sampleCell(
   samples: number,
   matchupCache: MatchupCache,
   blendRoot = false,
+  plainDraws?: number,
 ): CellSample {
   const rootBattle = positionBattle(root);
   // Round 56: a doubles root cell takes the pair plan (pair/sampler.ts); a
   // cell without events there continues today's plain path with its draw.
   if (blendRoot && rootBattle.gameType === 'doubles') {
-    const pair = pairCellSample(root, p1Choice, p2Choice, samples, matchupCache);
+    const pair = pairCellSample(root, p1Choice, p2Choice, samples, matchupCache, plainDraws);
     if (pair.kind === 'sample') return pair.sample;
-    if (pair.kind === 'plain') return plainCellSample(root, rootBattle, rootFainted, p1Choice, p2Choice, samples, matchupCache, pair.first);
+    if (pair.kind === 'plain') return plainCellSample(root, rootBattle, rootFainted, p1Choice, p2Choice, samples, matchupCache, pair.first, plainDraws);
   }
   const plan = blendRoot ? planCellEvents(rootBattle, p1Choice, p2Choice) : null;
+  // Round 63 (T16): a guard the plan cannot fold (a paralyzed attacker, a
+  // Substitute, a pivot) is chance of its own: a verify cell draws them all.
+  if (plainDraws && plan?.kind === 'fail') return plainVerifySample(root, p1Choice, p2Choice, plainDraws, matchupCache);
   if (!plan || plan.kind !== 'events') {
-    return plainCellSample(root, rootBattle, rootFainted, p1Choice, p2Choice, samples, matchupCache);
+    return plainCellSample(root, rootBattle, rootFainted, p1Choice, p2Choice, samples, matchupCache, undefined, plainDraws);
   }
-  return blendCellSample(root, plan.events, p1Choice, p2Choice, samples, matchupCache);
+  return blendCellSample(root, plan.events, p1Choice, p2Choice, samples, matchupCache, plainDraws);
 }

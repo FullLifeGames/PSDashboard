@@ -28,9 +28,16 @@ export interface EvalSettings {
   /**
    * Sweep hint (root only): the actions actually played this turn. The
    * doubles candidate restriction keeps the matching combined option ranked
-   * so played-vs-best regret stays computable.
+   * so played-vs-best regret stays computable. Round 63 (T78): the verify
+   * step checks the played row and column in both game types; singles
+   * carries the played actions in p1 / p2 (option lists ignore them).
    */
-  keepPlayed?: { p1Slots?: (PlayedAction | null)[]; p2Slots?: (PlayedAction | null)[] } | null;
+  keepPlayed?: {
+    p1?: PlayedAction | null;
+    p2?: PlayedAction | null;
+    p1Slots?: (PlayedAction | null)[];
+    p2Slots?: (PlayedAction | null)[];
+  } | null;
   /**
    * Round 35: false skips the forced-win prover after the root search. The
    * graph sweep's sketch pass sets it (every sketch is replaced by the full
@@ -111,6 +118,11 @@ export interface CellBlendClass {
   hasFirst: boolean;
   /** Every sampled child of this class ended the game (its leaves are exact +-1). */
   ended: boolean;
+  /**
+   * Round 63 (T16): the class's representative child (its first draw) one
+   * ply deeper — set by the verify step on every open class.
+   */
+  deepened?: number;
 }
 
 /**
@@ -402,6 +414,13 @@ export interface EvalCellJob {
   p2Choice: string;
   /** Number of fixed seeds to average. */
   samples: number;
+  /**
+   * Round 63 (T16): the verify step's sub-search settings. With them the
+   * cell goes one ply deeper per outcome in the same job: every open class
+   * of a blend (CellBlendClass.deepened), or the outcome groups of a plain
+   * cell over more natural draws (EvalCellValue.deepened).
+   */
+  deepen?: EvalSettings;
 }
 
 export interface EvalCellValue {
@@ -419,6 +438,8 @@ export interface EvalCellValue {
    * on that child), set by the verify step in the MCTS mode. Below the
    * depth floor it replaces the one-ply sampler value; blended cells
    * re-blend it through the first-seed class (as reblendValue does).
+   * Round 63 (T16): a plain verify cell carries its outcome groups one ply
+   * deeper, mixed by draw share; blended cells carry the depth per class.
    */
   deepened?: number;
 }

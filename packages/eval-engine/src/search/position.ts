@@ -11,6 +11,7 @@ import type { CellValue, SearchExecutor } from '../orchestrator.ts';
 import type { EvalResult, EvalSettings, RankedChoice } from '../types.ts';
 import { countFainted, leafValue, SEARCH_SEEDS } from './leaf.ts';
 import { sampleCell } from './cell-sampler.ts';
+import { deepenVerifiedCell, VERIFY_PLAIN_DRAWS } from './verify-cell.ts';
 import { isCombined } from './hints.ts';
 import { expandPivotPairs, restrictOptions, searchOptions } from './options.ts';
 import { attachRootPayload, koOddsMapsFor, type RootPayload } from './root-payload.ts';
@@ -286,13 +287,17 @@ export function createLocalExecutor(serializedBattle: string): SearchExecutor {
       let completed = 0;
       for (const job of jobs) {
         // evalCells only ever serves the orchestrated ROOT — blend like the
-        // sync path's root matrix.
-        const cell = sampleCell(root, rootFainted, job.p1Choice, job.p2Choice, job.samples, matchupCache, true);
-        out.push({
+        // sync path's root matrix. Round 63 (T16): a verify job (`deepen`)
+        // draws more where there is no plan and goes one ply deeper per outcome.
+        const { deepen } = job;
+        const cell = sampleCell(root, rootFainted, job.p1Choice, job.p2Choice, job.samples, matchupCache, true, deepen ? VERIFY_PLAIN_DRAWS : undefined);
+        const value: CellValue = {
           i: job.i, j: job.j, value: cell.value, ended: cell.ended,
           ...(cell.blend ? { blend: cell.blend } : {}),
           ...(cell.diagnostic ? { diagnostic: { ...cell.diagnostic, i: job.i, j: job.j } } : {}),
-        });
+        };
+        if (deepen) deepenVerifiedCell(value, cell, child => subSearch(child.serialized, deepen, matchupCache).score);
+        out.push(value);
         completed += 1;
         onDone?.(completed);
       }
