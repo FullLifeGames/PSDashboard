@@ -42,15 +42,6 @@ function flat(position: Scene, result: EvalResult) {
   });
 }
 
-const cellValue = (result: EvalResult, p1Label: string, p2Label: string): number => {
-  const matrix = result.matrix!;
-  const i = matrix.p1Labels.indexOf(p1Label);
-  const j = matrix.p2Labels.indexOf(p2Label);
-  expect(i, p1Label).toBeGreaterThanOrEqual(0);
-  expect(j, p2Label).toBeGreaterThanOrEqual(0);
-  return matrix.values[i][j];
-};
-
 describe('verify scenes: every class one ply deeper (round 63, T16)', () => {
   test('648453 t13: p1 loses the note only the first draw carried (0.1018 before; MC 0.0832)', { timeout: 300_000 }, async () => {
     const position = scene('smogtours-gen6ou-648453-t13');
@@ -66,12 +57,14 @@ describe('verify scenes: every class one ply deeper (round 63, T16)', () => {
     expect(analysis.p1.tier).toBe('inaccuracy');
   });
 
-  test('912045 t8 (doubles): the fallback cell is priced from all its draws, not the first one (−0.9 before; MC −0.454)', { timeout: 300_000 }, async () => {
+  test("912045 t8 (doubles): p1's flat verdict falls from the first draw's blunder to the Monte-Carlo reference's inaccuracy", { timeout: 300_000 }, async () => {
+    // Before, the fallback cell Earth Power + Matcha Gotcha × Earth Power + Tera + Drain Punch read −0.9
+    // through its first draw and p1's played Blood Moon line graded a blunder (0.4778). Doubles verify
+    // cells now go deeper through their heaviest outcome (the doubles time bound); the reference reads
+    // an inaccuracy (0.174 and 0.183 on two seed blocks).
     const position = scene('smogtours-gen9doublesou-912045-t8');
-    const result = await search(position);
-    const value = cellValue(result, 'Earth Power→Okidogi + Matcha Gotcha', 'Earth Power→Ursaluna-Bloodmoon + Tera + Drain Punch→Ursaluna-Bloodmoon');
-    // The cell's outcomes spread from −1 to +1: 40 MC draws leave a standard error of 0.111. Inside 2.5 of them.
-    expect(Math.abs(value - -0.454)).toBeLessThan(2.5 * 0.111);
+    const analysis = flat(position, await search(position));
+    expect(analysis.p1.tier).toBe('inaccuracy');
   });
 });
 

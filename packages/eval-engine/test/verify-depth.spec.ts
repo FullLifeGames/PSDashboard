@@ -9,7 +9,7 @@ import { advancePosition, advancePositionWithLog, createRootPosition, positionBa
 import { createLocalExecutor, subSearchDepth1 } from '../src/search';
 import { countFainted, leafValue, SEARCH_SEEDS } from '../src/search/leaf';
 import { sampleCell } from '../src/search/cell-sampler';
-import { deeperValues, VERIFY_PLAIN_DRAWS } from '../src/search/verify-cell';
+import { deeperValues, VERIFY_DEEPEN_COVER, VERIFY_PLAIN_DRAWS } from '../src/search/verify-cell';
 import type { EvalCellValue, EvalSettings, MctsTreeStats } from '../src/types';
 import { anchorRoot, doublesRoot, pairSet, PLAYED } from './pair-battles';
 
@@ -116,10 +116,11 @@ describe('the deepening rule (round 63, T16)', () => {
       { weight: 0.2, child: child('e'), leaf: 1, ended: true },
     ];
     const asked: string[] = [];
-    const values = deeperValues(outcomes, position => {
+    const deeper = (position: SimPosition) => {
       asked.push(position.serialized);
       return outcomes.find(outcome => outcome.child === position)!.leaf + step[position.serialized];
-    });
+    };
+    const values = deeperValues(outcomes, deeper, VERIFY_DEEPEN_COVER.singles);
     // a (0.5), b (0.8 < 0.9), c (0.95): three deepened, d (0.05) shifted, e ended.
     expect(asked).toEqual(['a', 'b', 'c']);
     const meanStep = (0.5 * 0.2 + 0.3 * -0.1 + 0.15 * 0.4) / 0.95;
@@ -128,6 +129,21 @@ describe('the deepening rule (round 63, T16)', () => {
     expect(values[2]).toBeCloseTo(0.2, 12);
     expect(values[3]).toBeCloseTo(0.2, 12);
     expect(values[4]).toBe(1);
+  });
+
+  test('doubles goes deeper through the heaviest outcome only; the rest shifts by its step', () => {
+    const outcomes = [
+      { weight: 0.3, child: child('b'), leaf: 0.3, ended: false },
+      { weight: 0.5, child: child('a'), leaf: 0.1, ended: false },
+      { weight: 0.2, child: child('e'), leaf: -1, ended: true },
+    ];
+    const asked: string[] = [];
+    const values = deeperValues(outcomes, position => {
+      asked.push(position.serialized);
+      return outcomes.find(outcome => outcome.child === position)!.leaf + step[position.serialized];
+    }, VERIFY_DEEPEN_COVER.doubles);
+    expect(asked).toEqual(['a']);
+    expect(values).toEqual([0.3 + 0.2, 0.1 + 0.2, -1].map(v => expect.closeTo(v, 12)));
   });
 });
 
@@ -152,7 +168,7 @@ describe('the verify executor deepens per class (round 63, T16)', () => {
     expect(value.deepened).toBeUndefined();
   });
 
-  test('a doubles pair-plan cell: the open classes go one ply deeper through their own draws under the cover rule', { timeout: 120_000 }, async () => {
+  test('a doubles pair-plan cell: the heaviest open class goes one ply deeper through its own draw, the rest shift by its step', { timeout: 120_000 }, async () => {
     const root = anchorRoot();
     const [value] = await createLocalExecutor(root.serialized).evalCells([{ i: 0, j: 0, p1Choice: PLAYED[0], p2Choice: PLAYED[1], samples: 3, deepen: SUB }]);
     const open = value.blend!.classes.filter(cls => !cls.ended);
@@ -160,7 +176,7 @@ describe('the verify executor deepens per class (round 63, T16)', () => {
     const sample = sampleCell(root, countFainted(positionBattle(root)), ...PLAYED, 3, createMatchupCache(), true, VERIFY_PLAIN_DRAWS);
     const expected = deeperValues(open.map(cls => ({
       weight: cls.weight, child: sample.classChildren!.get(cls.key)!, leaf: cls.leafSum / cls.count, ended: false,
-    })), position => deepened(root, position));
+    })), position => deepened(root, position), VERIFY_DEEPEN_COVER.doubles);
     open.forEach((cls, index) => expect(cls.deepened, cls.key).toBeCloseTo(expected[index], 12));
     // The first natural draw's class deepens the same child the old verify step deepened.
     const first = open.find(cls => cls.hasFirst)!;
@@ -169,7 +185,7 @@ describe('the verify executor deepens per class (round 63, T16)', () => {
 });
 
 describe('a cell without a plan draws more and deepens each outcome (round 63, T16)', () => {
-  const checkPlain = async (root: ReturnType<typeof createRootPosition>, p1: string, p2: string) => {
+  const checkPlain = async (root: ReturnType<typeof createRootPosition>, p1: string, p2: string, cover: number) => {
     const sample = sampleCell(root, countFainted(positionBattle(root)), p1, p2, 3, createMatchupCache(), true, VERIFY_PLAIN_DRAWS);
     const groups = sample.outcomes!;
     expect(groups.length).toBeGreaterThan(1);
@@ -177,7 +193,7 @@ describe('a cell without a plan draws more and deepens each outcome (round 63, T
     for (const group of groups) expect(Number.isInteger(Math.round(group.share * VERIFY_PLAIN_DRAWS * 1e9) / 1e9)).toBe(true);
     const [value] = await createLocalExecutor(root.serialized).evalCells([{ i: 0, j: 0, p1Choice: p1, p2Choice: p2, samples: 3, deepen: SUB }]);
     expect(value.blend).toBeUndefined();
-    const values = deeperValues(groups.map(group => ({ ...group, weight: group.share })), position => deepened(root, position));
+    const values = deeperValues(groups.map(group => ({ ...group, weight: group.share })), position => deepened(root, position), cover);
     const expected = groups.reduce((sum, group, index) => sum + group.share * values[index], 0);
     expect(value.deepened).toBeCloseTo(expected, 12);
     expect(value.value).toBeCloseTo(sample.value, 12);
@@ -186,7 +202,7 @@ describe('a cell without a plan draws more and deepens each outcome (round 63, T
   test('singles: a paralyzed Focus Blast (the plan refuses it) mixes full paralysis, miss and hit by their draw shares', { timeout: 60_000 }, async () => {
     const root = focusBlastRoot(true);
     expect(planCellEvents(positionBattle(root), ...FOCUS).kind).toBe('fail');
-    await checkPlain(root, ...FOCUS);
+    await checkPlain(root, ...FOCUS, VERIFY_DEEPEN_COVER.singles);
   });
 
   test('doubles: a rule-F fallback cell (paralyzed attacker) mixes its outcome groups', { timeout: 60_000 }, async () => {
@@ -195,7 +211,7 @@ describe('a cell without a plan draws more and deepens each outcome (round 63, T
       [pairSet('A', 'Snorlax', ['Rest', 'Protect']), pairSet('B', 'Snorlax', ['Rest', 'Protect'])],
       battle => { battle.sides[0].active[0]!.setStatus('par'); },
     );
-    await checkPlain(root, 'move dragonclaw 1, move softboiled', 'move rest, move rest');
+    await checkPlain(root, 'move dragonclaw 1, move softboiled', 'move rest, move rest', VERIFY_DEEPEN_COVER.doubles);
   });
 
   test('cells without deepen carry no depth (the matrix mode and the played-pair check stay as they were)', async () => {

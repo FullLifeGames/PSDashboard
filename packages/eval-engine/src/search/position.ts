@@ -11,7 +11,7 @@ import type { CellValue, SearchExecutor } from '../orchestrator.ts';
 import type { EvalResult, EvalSettings, RankedChoice } from '../types.ts';
 import { countFainted, leafValue, SEARCH_SEEDS } from './leaf.ts';
 import { sampleCell } from './cell-sampler.ts';
-import { deepenVerifiedCell, VERIFY_PLAIN_DRAWS } from './verify-cell.ts';
+import { deepenVerifiedCell, VERIFY_DEEPEN_COVER, VERIFY_PLAIN_DRAWS } from './verify-cell.ts';
 import { isCombined } from './hints.ts';
 import { expandPivotPairs, restrictOptions, searchOptions } from './options.ts';
 import { attachRootPayload, koOddsMapsFor, type RootPayload } from './root-payload.ts';
@@ -284,6 +284,7 @@ export function createLocalExecutor(serializedBattle: string): SearchExecutor {
     async evalCells(jobs, onDone) {
       const out: CellValue[] = [];
       const rootFainted = countFainted(positionBattle(root));
+      const cover = VERIFY_DEEPEN_COVER[positionBattle(root).gameType === 'doubles' ? 'doubles' : 'singles'];
       let completed = 0;
       for (const job of jobs) {
         // evalCells only ever serves the orchestrated ROOT — blend like the
@@ -296,7 +297,7 @@ export function createLocalExecutor(serializedBattle: string): SearchExecutor {
           ...(cell.blend ? { blend: cell.blend } : {}),
           ...(cell.diagnostic ? { diagnostic: { ...cell.diagnostic, i: job.i, j: job.j } } : {}),
         };
-        if (deepen) deepenVerifiedCell(value, cell, child => subSearch(child.serialized, deepen, matchupCache).score);
+        if (deepen) deepenVerifiedCell(value, cell, child => subSearch(child.serialized, deepen, matchupCache).score, cover);
         out.push(value);
         completed += 1;
         onDone?.(completed);
