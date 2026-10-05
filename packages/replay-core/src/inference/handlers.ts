@@ -16,6 +16,15 @@ const SWAP_PAIR_MOVES = new Set(['trick', 'switcheroo', 'thief', 'covet']);
 /** A landed Ground move from a possible immunity-breaker proves nothing about Levitate. */
 const MOLD_BREAKER_ABILITIES = new Set(['moldbreaker', 'teravolt', 'turboblaze']);
 
+/**
+ * The item is still open: nothing shown, or only the team preview's flag
+ * that the Pokémon holds something. An item the log shows replaces the flag
+ * (round 63: 655336's Trick giver kept "(has item)").
+ */
+function itemOpen(pokemon: { item: PokemonFieldInfo }): boolean {
+  return !pokemon.item.value || pokemon.item.value === '(has item)';
+}
+
 /** Two plain moves disprove a Choice lock; a plain Status move disproves Assault Vest. */
 function recordPlainMove(state: InferrerState, ident: string, moveName: string) {
   const nickname = ident.split(': ')[1]?.trim();
@@ -210,7 +219,7 @@ function creditSwapGiver(state: InferrerState, line: string, ident: string, item
   if (giver && giver.startsWith(state.opponentSide) && !priorSwap) {
     const giverNickname = giver.split(': ')[1];
     const pokemon = giverNickname ? findPokemon(state, giverNickname) : null;
-    if (pokemon && !pokemon.item.value) {
+    if (pokemon && itemOpen(pokemon)) {
       pokemon.item = revealedField(itemName);
     }
   }
@@ -255,7 +264,7 @@ export function recordConsumedItem(state: InferrerState, line: string) {
   const nickname = identParts[1];
   const itemName = parts[3];
   const pokemon = findPokemon(state, nickname);
-  if (pokemon && !pokemon.item.value && !state.swappedIdents.has(ident)) {
+  if (pokemon && itemOpen(pokemon) && !state.swappedIdents.has(ident)) {
     pokemon.item = revealedField(`${itemName} (consumed)`);
   }
 }
@@ -267,7 +276,7 @@ export function recordHealItem(state: InferrerState, line: string) {
   const nickname = parts[2].split(': ')[1];
   const itemName = line.match(/\[from\] item:\s*([^|\n]+)/)?.[1]?.trim();
   const pokemon = findPokemon(state, nickname);
-  if (pokemon && itemName && (!pokemon.item.value || pokemon.item.value === '(has item)')) {
+  if (pokemon && itemName && itemOpen(pokemon)) {
     pokemon.item = revealedField(itemName);
   }
 }
@@ -299,7 +308,7 @@ export function recordItemDamage(state: InferrerState, line: string) {
   const ownerMatch = owner?.match(/^(p[12])[a-d]?:\s*(.+)$/);
   if (itemName && ownerMatch && ownerMatch[1] === state.opponentSide) {
     const pokemon = findPokemon(state, ownerMatch[2].trim());
-    if (pokemon && (!pokemon.item.value || pokemon.item.value === '(has item)')) {
+    if (pokemon && itemOpen(pokemon)) {
       pokemon.item = revealedField(itemName);
     }
   }
@@ -312,7 +321,7 @@ export function recordMega(state: InferrerState, line: string) {
   const nickname = parts[2].split(': ')[1];
   const stone = parts[4]?.trim();
   const pokemon = findPokemon(state, nickname);
-  if (pokemon && stone && (!pokemon.item.value || pokemon.item.value === '(has item)')) {
+  if (pokemon && stone && itemOpen(pokemon)) {
     pokemon.item = revealedField(stone);
   }
 }
