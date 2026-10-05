@@ -117,12 +117,12 @@ function moveLanding(
   const hit = moveOption.targetType === 'allAdjacentFoes' ? foes
     : moveOption.targetType === 'allAdjacent' ? foes + (context.attackerPartnerAlive ? 1 : 0)
     : 0;
-  const overrides: CalcMoveOverrides = {};
-  if (hit === 1) overrides.target = 'normal';
-  if (partner && Dex.forGen(gen.num).moves.get(moveOption.name).smartTarget &&
-    landsOn(gen, attacker, partner, moveOption.name, context)) {
-    overrides.multihit = 1;
-  }
+  const split = !!partner && !!Dex.forGen(gen.num).moves.get(moveOption.name).smartTarget &&
+    landsOn(gen, attacker, partner, moveOption.name, context);
+  const overrides: CalcMoveOverrides = {
+    ...(hit === 1 ? { target: 'normal' as const } : {}),
+    ...(split ? { multihit: 1 } : {}),
+  };
   return Object.keys(overrides).length > 0 ? overrides : undefined;
 }
 
