@@ -437,38 +437,42 @@ describe('evidence that cannot measure keeps the prior', () => {
     });
   }
 
-  test('a move order no rung can repair keeps the prior Speed', () => {
-    // Garchomp moved after a Toxapex (base 35: even 252+ Speed stays below
-    // an uninvested Garchomp) — the real Toxapex must have carried a Scarf
-    // the build does not know. Every rung violates the order alike, so the
-    // order measures nothing about Garchomp; the old solve let the budget
-    // shave the prior's 252 Spe to 0 for the bulk rung the damage lines
-    // asked for. Garchomp carries the most lines, so the greedy solve
-    // takes it first and its bulk, not the attackers' offense, explains them.
-    const garchomp = mon('Garchomp', 'p2', 'Jolly', offensive);
-    const toxapex = mon('Toxapex', 'p1', 'Bold', { hp: 252, atk: 0, def: 252, spa: 0, spd: 4, spe: 0 });
-    const clefable = mon('Clefable', 'p1', 'Bold', { hp: 252, atk: 0, def: 252, spa: 0, spd: 4, spe: 0 });
-    const magnezone = mon('Magnezone', 'p1', 'Modest', { hp: 0, atk: 0, def: 4, spa: 252, spd: 0, spe: 252 }, 'Choice Specs');
-    const sets = {
-      p1: [asSet(toxapex, ['Scald']), asSet(clefable, ['Moonblast']), asSet(magnezone, ['Flash Cannon'])],
-      p2: [asSet(garchomp, ['Earthquake'])],
-    };
-    const order = { firstSide: 'p1' as const, firstSpecies: 'Toxapex', secondSide: 'p2' as const, secondSpecies: 'Garchomp', turn: 4 };
-    const observations = [
-      hit(clefable, { ...garchomp, evs: bulky }, 'Moonblast'),
-      hit(clefable, { ...garchomp, evs: bulky }, 'Moonblast'),
-      hit(magnezone, { ...garchomp, evs: bulky }, 'Flash Cannon'),
-      hit(magnezone, { ...garchomp, evs: bulky }, 'Flash Cannon'),
-    ];
-    const solved = inferSpreads(observations, sets, 'gen9ou', [order]).get('p2:garchomp');
-    const evs = solved?.evs ?? sets.p2[0].evs;
-    expect(evs.spe).toBe(252);
-    expect(solved?.nature ?? sets.p2[0].nature).toBe('Jolly');
-    // Control: without the order the same lines buy full bulk and Speed gives way.
-    const free = inferSpreads(observations, sets, 'gen9ou', []).get('p2:garchomp');
-    expect(free?.evs.spd).toBe(252);
-    expect(free?.evs.spe ?? 0).toBeLessThan(252);
-  });
+  for (const formatid of ['gen9ou', 'gen9doublesou']) {
+    test(`a move order no Speed can repair gets a Scarf after every legal Speed (T117, ${formatid})`, () => {
+      // Garchomp moved after a Toxapex (base 35): Toxapex's fastest Speed (185)
+      // stays under Garchomp's slowest legal one (216), so no spread explains
+      // the order. Round 63 (an observed order is a hard limit): the Choice
+      // Scarf the real Toxapex must have carried comes in last, and Garchomp
+      // sits under the Scarfed Toxapex. Before, every rung broke the order
+      // alike and the build kept a Garchomp the log proves too fast.
+      const garchomp = mon('Garchomp', 'p2', 'Jolly', offensive);
+      const toxapex = mon('Toxapex', 'p1', 'Bold', { hp: 252, atk: 0, def: 252, spa: 0, spd: 4, spe: 0 });
+      const clefable = mon('Clefable', 'p1', 'Bold', { hp: 252, atk: 0, def: 252, spa: 0, spd: 4, spe: 0 });
+      const magnezone = mon('Magnezone', 'p1', 'Modest', { hp: 0, atk: 0, def: 4, spa: 252, spd: 0, spe: 252 }, 'Choice Specs');
+      const sets = {
+        p1: [asSet(toxapex, ['Scald']), asSet(clefable, ['Moonblast']), asSet(magnezone, ['Flash Cannon'])],
+        p2: [asSet(garchomp, ['Earthquake'])],
+      };
+      const order = { firstSide: 'p1' as const, firstSpecies: 'Toxapex', secondSide: 'p2' as const, secondSpecies: 'Garchomp', turn: 4 };
+      const observations = [
+        hit(clefable, { ...garchomp, evs: bulky }, 'Moonblast'),
+        hit(clefable, { ...garchomp, evs: bulky }, 'Moonblast'),
+        hit(magnezone, { ...garchomp, evs: bulky }, 'Flash Cannon'),
+        hit(magnezone, { ...garchomp, evs: bulky }, 'Flash Cannon'),
+      ];
+      const solved = inferSpreads(observations, sets, formatid, [order]);
+      const speedOf = (side: 'p1' | 'p2', set: PokemonSet) => {
+        const spread = solved.get(`${side}:${toId(set.species)}`) ?? set;
+        return new Pokemon(gen, set.species, { level: 100, nature: spread.nature, evs: spread.evs }).stats.spe;
+      };
+      expect(solved.get('p1:toxapex')?.item).toBe('Choice Scarf');
+      expect(speedOf('p1', sets.p1[0]) * 1.5).toBeGreaterThan(speedOf('p2', sets.p2[0]));
+      // Control: without the order the same lines buy full bulk and Speed gives way.
+      const free = inferSpreads(observations, sets, formatid, []).get('p2:garchomp');
+      expect(free?.evs.spd).toBe(252);
+      expect(free?.evs.spe ?? 0).toBeLessThan(252);
+    });
+  }
 
   test('a move order the prior already satisfies keeps the prior Speed and nature (round 40)', () => {
     // 573756 after round 37: Garchomp (Jolly 252 Spe) moved before a

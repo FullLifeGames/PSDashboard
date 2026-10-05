@@ -1,3 +1,4 @@
+import { Dex } from '@pkmn/dex';
 import type { PokemonEvs } from '../types.ts';
 import { capToBudget, ZERO_EVS, type EvBudget } from './ev-budget.ts';
 import { toId } from '../ids.ts';
@@ -100,6 +101,23 @@ function rungNature(options: RungOption[], keepNature: boolean, priorNature: str
   return natures[0] ?? priorNature;
 }
 
+/** The nature raising `plus` and lowering `minus`, from the Dex; neutral when both name one stat. */
+export function natureOf(plus: keyof PokemonEvs, minus: keyof PokemonEvs): string {
+  if (plus === minus) return 'Hardy';
+  return Dex.natures.all().find(nature => nature.plus === plus && nature.minus === minus)?.name ?? 'Hardy';
+}
+
+/**
+ * A kept Speed keeps a nature that lowers it (round 63: the settled orders
+ * may need it): a rung's plus nature takes Speed as its minus, a rung
+ * without one keeps the prior's nature.
+ */
+function slowNature(nature: string | null, ctx: LadderContext): string | null {
+  if (!ctx.slowKept || nature === null) return nature;
+  const plus = Dex.natures.get(nature).plus as keyof PokemonEvs | undefined;
+  return plus && nature !== ctx.priorNature ? natureOf(plus, 'spe') : ctx.prior.nature;
+}
+
 /** The stats a measurement fixed (round 40: HP from the log's maximum HP). */
 const fixedStats = (fixed: Partial<PokemonEvs>): Set<keyof PokemonEvs> =>
   new Set((Object.keys(fixed) as (keyof PokemonEvs)[]).filter(stat => fixed[stat] !== undefined));
@@ -137,6 +155,8 @@ interface LadderContext {
   offenseStat: 'atk' | 'spa';
   priorPlus: keyof PokemonEvs | undefined;
   priorNature: string;
+  /** Speed is kept and the prior's nature lowers it. */
+  slowKept: boolean;
 }
 
 /**
@@ -181,7 +201,7 @@ function offeredRung(ctx: LadderContext, options: RungOption[]): CandidateRung |
   const claimed: Partial<PokemonEvs> = Object.assign({}, ...options.map(option => option.evs ?? {}));
   const evs = composeRung(ctx.prior, claimed, ctx.keep, ctx.budget, ctx.fixed);
   if (expressed(evs, claimed, ctx.fixed)) {
-    const nature = rungNature(options, keepsNature(ctx.keep, ctx.priorPlus), ctx.priorNature);
+    const nature = slowNature(rungNature(options, keepsNature(ctx.keep, ctx.priorPlus), ctx.priorNature), ctx);
     return nature === null ? null : { evs, nature };
   }
   return releasedRung(ctx, options, claimed, evs);
@@ -231,6 +251,7 @@ export function candidateLadder(
   const ctx: LadderContext = {
     prior, budget, fixed, keep, offenseStat, priorPlus,
     priorNature: priorPlus && measured.has(priorPlus) ? 'Hardy' : prior.nature,
+    slowKept: keep.has('spe') && Dex.natures.get(prior.nature).minus === 'spe',
   };
   const rungs = priorRungs(ctx);
   for (const o of offense) {

@@ -1,4 +1,5 @@
 import { Generations, Pokemon, Move, Field, calculate } from '@smogon/calc';
+import { Dex } from '@pkmn/dex';
 import type { PokemonSet } from '@pkmn/sim';
 import type { DamageObservation, PokemonEvs, SpeedOrderObservation } from '../types.ts';
 import { WEATHER_BY_ID } from '../calc-field.ts';
@@ -213,11 +214,25 @@ function holdsScarf(ctx: SolveContext, side: 'p1' | 'p2', species: string): bool
   return toId(setOf(ctx, side, species)?.item ?? '') === 'choicescarf';
 }
 
-/** A race's Speed: the Scarf the order says the mover held (round 63), else the set's or the decision's. */
-export function effectiveSpeed(
-  ctx: SolveContext, side: 'p1' | 'p2', species: string, spread: SpreadCandidate, held?: boolean,
-): number {
-  return speedStat(ctx, side, species, spread) * ((held ?? holdsScarf(ctx, side, species)) ? 1.5 : 1);
+/** A race's Scarf factor: the Scarf the order says the mover held (round 63), else the set's or the decision's. */
+export function scarfFactor(ctx: SolveContext, side: 'p1' | 'p2', species: string, held?: boolean): number {
+  return (held ?? holdsScarf(ctx, side, species)) ? 1.5 : 1;
+}
+
+function effectiveSpeed(ctx: SolveContext, side: 'p1' | 'p2', species: string, spread: SpreadCandidate, held?: boolean): number {
+  return speedStat(ctx, side, species, spread) * scarfFactor(ctx, side, species, held);
+}
+
+/**
+ * A knock-out on a victim whose set runs a move below priority 0 (Trick
+ * Room, Roar, Teleport): the victim may have clicked it and moved last at
+ * any Speed, so the order is weak evidence (round 63). Priorities from the
+ * Dex of the replay's generation.
+ */
+export function weakRace(ctx: SolveContext, order: SpeedOrderObservation): boolean {
+  if (!order.knockOut) return false;
+  const dex = Dex.forGen(ctx.gen.num);
+  return (setOf(ctx, order.secondSide, order.secondSpecies)?.moves ?? []).some(move => dex.moves.get(move).priority < 0);
 }
 
 export function speedError(ctx: SolveContext, key: string, candidate: SpreadCandidate): number {

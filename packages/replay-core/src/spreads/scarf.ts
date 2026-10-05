@@ -1,6 +1,6 @@
 import type { PokemonSet } from '@pkmn/sim';
 import type { PokemonEvs, SpeedOrderObservation } from '../types.ts';
-import { keyOf, speedStat, type SolveContext } from './fit.ts';
+import { keyOf, speedStat, weakRace, type SolveContext } from './fit.ts';
 import { ZERO_EVS } from './ev-budget.ts';
 import type { SpreadCandidate } from './ladder.ts';
 import { toId } from '../ids.ts';
@@ -129,10 +129,15 @@ function decide(ctx: SolveContext, order: SpeedOrderObservation, first: Mover, s
   return max >= ref ? null : scarfIn(first, max, ref);
 }
 
-/** One pass over the orders before the ladder; the first decision per mon stands. */
+/**
+ * One pass over the orders before the ladder; the first decision per mon
+ * stands. A weak race (round 63) never earns an item: the settling drops it
+ * before it adds a Scarf.
+ */
 export function decideScarfs(ctx: SolveContext, knowledge: SpeedKnowledgeMap): Map<string, ItemDecision> {
   const decisions = new Map<string, ItemDecision>();
   for (const order of ctx.speedOrders) {
+    if (weakRace(ctx, order)) continue;
     const first = mover(ctx, order.firstSide, order.firstSpecies, knowledge);
     const second = mover(ctx, order.secondSide, order.secondSpecies, knowledge);
     if (!first || !second) continue;
@@ -140,4 +145,15 @@ export function decideScarfs(ctx: SolveContext, knowledge: SpeedKnowledgeMap): M
     if (decision && !decisions.has(decision[0])) decisions.set(decision[0], decision[1]);
   }
   return decisions;
+}
+
+/** The spreads round 37 calls plausible for one mon: the known spread, else its usage camp (round 63 settles on them first). */
+export function plausibleFor(ctx: SolveContext, side: 'p1' | 'p2', species: string, knowledge: SpeedKnowledgeMap): SpreadCandidate[] {
+  return mover(ctx, side, species, knowledge)?.plausible ?? [];
+}
+
+/** Round 37's rule for a Scarf the solver may give a first mover (round 63 asks it after any legal Speed). */
+export function scarfAllowed(ctx: SolveContext, side: 'p1' | 'p2', species: string, knowledge: SpeedKnowledgeMap): boolean {
+  const m = mover(ctx, side, species, knowledge);
+  return !!m && scarfInAllowed(m);
 }

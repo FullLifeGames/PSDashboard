@@ -8,7 +8,7 @@ import {
 } from './spreads/fit.ts';
 import { decideScarfs, type SpeedKnowledgeMap } from './spreads/scarf.ts';
 import { hpEvsForMaxHp, type ObservedMaxHp } from './spreads/max-hp.ts';
-import { readableOrders } from './spreads/order-limit.ts';
+import { readableOrders, settledSets } from './spreads/order-limit.ts';
 
 export { evBudget, legalizeEvs } from './spreads/ev-budget.ts';
 export type { SpreadCandidate } from './spreads/ladder.ts';
@@ -222,6 +222,8 @@ export function inferSpreads(
 ): Map<string, SpreadCandidate> {
   const ctx = buildSolveContext(observations, sets, formatid, readableOrders(speedOrders, sets), maxHp);
   ctx.scarf = decideScarfs(ctx, knowledge);
+  // T117 (round 63): every observed order holds in the sets the ladder starts from.
+  ctx.sets = settledSets(ctx, knowledge);
 
   // Greedy by observation count, then a refinement pass: the first pass can
   // solve a mon against a still-wrong partner guess; the second re-solves
