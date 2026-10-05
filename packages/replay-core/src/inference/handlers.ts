@@ -1,7 +1,7 @@
 import { Dex } from '@pkmn/sim';
 import { revealedField, unknownEvs, unknownField } from '../team-info.ts';
 import { canHaveDancer, findPokemon, ruleOut, type InferrerState } from './inferrer-state.ts';
-import { parseDetails, revealMarkerForme, unknownFormeMarkerFor } from './lookup.ts';
+import { parseDetails, revealMarkerForme, teamSpecies, unknownFormeMarkerFor } from './lookup.ts';
 import { abilityHolderIdent, mayHold } from './ability-holder.ts';
 import { toId } from '../ids.ts';
 import type { PokemonFieldInfo } from '../types.ts';
@@ -76,10 +76,11 @@ export function noteEntry(state: InferrerState, line: string) {
   const parsed = parseDetails(parts[3]);
   if (parts[2]) {
     if (parsed) {
-      state.identSpecies.set(parts[2], parsed.species);
+      const species = teamSpecies(state.pokemonMap, parsed.species);
+      state.identSpecies.set(parts[2], species);
       if (parts[2].startsWith(state.opponentSide)) {
         const nickname = parts[2].split(': ')[1]?.trim();
-        if (nickname) state.nicknameSpecies.set(nickname, parsed.species);
+        if (nickname) state.nicknameSpecies.set(nickname, species);
       }
     }
     state.plainMovesSince.delete(parts[2]);
@@ -159,8 +160,10 @@ export function addFromSwitch(state: InferrerState, line: string) {
   const side = state.opponentSide;
   if (!(line.startsWith(`|switch|${side}`) || line.startsWith(`|drag|${side}`))) return;
   const parts = line.split('|');
-  const parsed = parseDetails(parts[3]);
-  if (!parsed || state.pokemonMap.has(parsed.species)) return;
+  const details = parseDetails(parts[3]);
+  if (!details) return;
+  const parsed = { ...details, species: teamSpecies(state.pokemonMap, details.species) };
+  if (state.pokemonMap.has(parsed.species)) return;
   const marker = unknownFormeMarkerFor(state.pokemonMap, parsed.species);
   if (marker) revealMarkerForme(state.pokemonMap, marker, parsed);
   else state.pokemonMap.set(parsed.species, revealedPokemon(parsed, unknownField()));
