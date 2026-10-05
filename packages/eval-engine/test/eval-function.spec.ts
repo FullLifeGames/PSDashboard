@@ -136,9 +136,12 @@ describe('stranded bench pricing', () => {
 
 describe('win-condition sweep cells', () => {
   test('a fast non-OHKO flip lands in fastChip alone', () => {
-    // +2 Dragapult vs Talonflame + Weavile. Measured pair fractions (empirical
-    // pin 2026-08-24): Darts→Talon 0.3534 (+2: 0.7067), Darts→Weavile 0.3942
-    // (+2: 0.7884), Flare Blitz→Pult 0.292, Night Slash→Pult 0.8887; speeds
+    // +2 Dragapult vs Talonflame + Weavile. Dragon Darts hits a lone foe twice
+    // (the simulator's multihit 2, priced since round 63, T81), so both foes
+    // stand at +2 Defense, which halves the pair again: the fractions of the
+    // empirical pin 2026-08-24 hold digit for digit. Darts→Talon 0.3534 (+2:
+    // 0.7067), Darts→Weavile 0.3942 (+2: 0.7884), Flare Blitz→Pult 0.292,
+    // Night Slash→Pult 0.8887; speeds
     // 162/146/145. Only the WEAVILE pair flips: unboosted Pult loses the 3v2
     // race, at +2 the race ties 2-2 and speed decides. (The Talonflame pair
     // never flips — unboosted Pult already wins 3v4.) Boosted Darts (0.7884)
@@ -149,6 +152,7 @@ describe('win-condition sweep cells', () => {
       [makeSet('A', 'Talonflame', ['Flare Blitz']), makeSet('B', 'Weavile', ['Night Slash'])],
     );
     sweepy.sides[0].active[0]!.boosts.atk = 2;
+    for (const foe of sweepy.sides[1].pokemon) foe.boosts.def = 2;
     const features = evalFeatures(sweepy);
     expect(features.sweepFastChip).toBeCloseTo(0.5, 5);
     expect(features.sweepFastKo).toBeCloseTo(0, 5);
@@ -159,7 +163,8 @@ describe('win-condition sweep cells', () => {
   test('an Iron Ball moves the flips into the slow cells', () => {
     // An Iron Ball (speed 162→81, now slowest) breaks the tie-WIN the fast
     // flip rode on, so the full-HP board prices at zero — slow flips need
-    // strict turn wins. Two boards produce them (fractions as pinned above):
+    // strict turn wins. Two boards produce them (fractions as pinned above,
+    // the foes again at +2 Defense against the two Darts hits):
     // slowChip: Pult chipped to 136/195 (0.6974) — Flare Blitz now 3HKOs it,
     //   boosted Darts win 2v3 strictly, unboosted 3v3 ties and the slower
     //   side loses → the Talonflame pair flips, no KO range (0.7067 < 1.0).
@@ -172,6 +177,7 @@ describe('win-condition sweep cells', () => {
     const pult = chipped.sides[0].active[0]!;
     pult.boosts.atk = 2;
     pult.hp = Math.floor(pult.maxhp * 0.7);
+    for (const foe of chipped.sides[1].pokemon) foe.boosts.def = 2;
     const chippedCells = evalFeatures(chipped);
     expect(chippedCells.sweepSlowChip).toBeGreaterThan(0);
     expect(chippedCells.sweepSlowChip).toBeCloseTo(0.5 * (pult.hp / pult.maxhp), 5);
@@ -186,9 +192,7 @@ describe('win-condition sweep cells', () => {
       [makeSet('A', 'Talonflame', ['Flare Blitz']), makeSet('B', 'Weavile', ['Night Slash'])],
     );
     koBoard.sides[0].active[0]!.boosts.atk = 2;
-    for (const target of koBoard.sides[1].pokemon) {
-      target.hp = Math.max(1, Math.floor(target.maxhp * 0.6));
-    }
+    for (const target of koBoard.sides[1].pokemon) { target.hp = Math.max(1, Math.floor(target.maxhp * 0.6)); target.boosts.def = 2; }
     const koCells = evalFeatures(koBoard);
     expect(koCells.sweepSlowKo).toBeCloseTo(0.5, 5);
     expect(koCells.sweepFastKo).toBeCloseTo(0, 5);
@@ -204,7 +208,8 @@ describe('win-condition sweep cells', () => {
     // (0.5989, inside boosted Darts' 0.7884 but above unboosted 0.3942) —
     // boosted races 1-1 and speed decides, unboosted needs 2 turns and
     // loses. fastKo = 1 flip / 2 targets × hp 0.8 = 0.4. (Talonflame's pair:
-    // unboosted Pult wins 2v3 outright — no flip.)
+    // unboosted Pult wins 2v3 outright — no flip.) The foes stand at +2
+    // Defense against the two Darts hits, as above.
     const sweepy = makeBattle(
       [makeSet('Pult', 'Dragapult', ['Dragon Darts', 'Dragon Dance'])],
       [makeSet('A', 'Talonflame', ['Flare Blitz']), makeSet('B', 'Weavile', ['Night Slash'])],
@@ -212,9 +217,7 @@ describe('win-condition sweep cells', () => {
     const pult = sweepy.sides[0].active[0]!;
     pult.boosts.atk = 2;
     pult.hp = Math.floor(pult.maxhp * 0.8);
-    for (const target of sweepy.sides[1].pokemon) {
-      target.hp = Math.max(1, Math.floor(target.maxhp * 0.6));
-    }
+    for (const target of sweepy.sides[1].pokemon) { target.hp = Math.max(1, Math.floor(target.maxhp * 0.6)); target.boosts.def = 2; }
     const features = evalFeatures(sweepy);
     expect(features.sweepFastKo).toBeGreaterThan(0);
     expect(features.sweepFastKo + features.sweepFastChip).toBeCloseTo(0.4, 5);

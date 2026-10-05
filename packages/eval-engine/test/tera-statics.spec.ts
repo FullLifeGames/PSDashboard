@@ -92,7 +92,9 @@ describe('the defender type reads live after a Tera click (round 54)', () => {
     expect(cached(zamazenta, ceruledge)).toEqual(pairThreat(zamazenta, ceruledge, battle));
     clickTera(battle);
     expect(cached(zamazenta, ceruledge)).toEqual(pairThreat(zamazenta, ceruledge, battle));
-    expect(cached(zamazenta, ceruledge).physical).toBeGreaterThan(0.3);
+    // Body Press deals damage off the user's Defense (the Dex's overrideOffensiveStat), so since round 63
+    // (T81) it keeps its own entry in PairThreat.axes instead of the physical bucket.
+    expect(cached(zamazenta, ceruledge).axes?.find(axis => axis.offense === 'def')?.fraction).toBeGreaterThan(0.3);
   });
 
   describe('hazards', () => {
