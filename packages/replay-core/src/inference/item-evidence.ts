@@ -78,9 +78,25 @@ function possibleAbilities(state: InferrerState, ident: string): Set<string> | n
   return new Set(Object.values(entry.abilities ?? {}).map(name => toId(String(name))).filter(id => id && !ruled.includes(id)));
 }
 
+/**
+ * Illusion shows another party member's name (round 63 review): any
+ * absence line on the side could belong to the disguised Pokémon, so a
+ * team that may hold an Illusion user is not judged. The abilities come
+ * from the Dex of the replay's generation; a revealed ability decides.
+ */
+function illusionPossible(state: InferrerState): boolean {
+  const dex = Dex.forGen(state.gen);
+  return [...state.pokemonMap.values()].some(mon => {
+    const known = mon.ability.source === 'revealed' || mon.ability.source === 'manual' ? toId(mon.ability.value) : '';
+    if (known) return known === 'illusion';
+    const entry = dex.species.get(mon.species.replace(/-\*$/, ''));
+    return entry.exists && Object.values(entry.abilities ?? {}).some(name => toId(String(name)) === 'illusion');
+  });
+}
+
 /** Rules an item out for an opponent Pokémon whose item the log has not shown and no swap replaced. */
 function ruleOutUnknown(state: InferrerState, key: string, itemId: string) {
-  if (!key.startsWith(state.opponentSide)) return;
+  if (!key.startsWith(state.opponentSide) || illusionPossible(state)) return;
   const nickname = key.slice(4);
   const pokemon = findPokemon(state, nickname);
   if (!pokemon || (pokemon.item.value && pokemon.item.value !== '(has item)')) return;

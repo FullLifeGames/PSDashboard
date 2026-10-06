@@ -104,6 +104,20 @@ describe('Leftovers and Black Sludge show their heal below full HP (T80)', () =>
   });
 });
 
+describe('Illusion hides who stands on the field (round 63 review, issue 2)', () => {
+  test('a side that may hold an Illusion user rules nothing out by absence (Zoroark-Hisui as Dondozo)', () => {
+    // Zoroark-Hisui (Choice Specs) takes the shape of the last party member:
+    // the log names Dondozo while the sand chips it and its Shadow Balls land.
+    const sand = set('Tyranitar', '', 'Sand Stream', ['Calm Mind']);
+    const zoroark = set('Zoroark-Hisui', 'Choice Specs', 'Illusion', ['Shadow Ball'], 50);
+    const dondozo = set('Dondozo', 'Leftovers', 'Unaware', ['Rest']);
+    const log = play([sand], [zoroark, dondozo], [['move calmmind', 'move shadowball'], ['move calmmind', 'move shadowball']]);
+    expect(log).toMatch(/\|switch\|p2a: Dondozo\|Dondozo/);
+    expect(log).toMatch(/\|-damage\|p2a: Dondozo\|\d+\/\d+\|\[from\] Sandstorm/);
+    for (const item of ['leftovers', 'blacksludge', 'lifeorb']) expect(ruledOut(log, 'Dondozo')).not.toContain(item);
+  });
+});
+
 describe('Rocky Helmet shows its damage on every contact hit (T80, decision 13)', () => {
   const holder = (item: string) => set('Skarmory', item, 'Sturdy', ['Roost']);
   const tackle: [string, string][] = [['move tackle', 'move roost']];
