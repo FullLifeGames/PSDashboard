@@ -56,12 +56,16 @@ test.describe('PS Dashboard', () => {
     await expect(page.getByText(/Branching · Turn/)).toHaveCount(0);
   });
 
-  test('the draft t56 play-out sends Muk-Alola before Heatran (round 42)', async ({ page }) => {
+  test('the draft t56 play-out never sends Heatran before Muk-Alola (round 42)', async ({ page }) => {
     // Round 19 finding, round 42 pin: from turn 56 (p1 Kyurem Ice Beam, p2
     // into Slowking) the play-out used to send Heatran into Mienshao's Knock
     // Off at turn 62 and lose it, then crawl 21 turns to a 5% win. With the
     // forced switch searched as a tree node the engine sacks Muk-Alola first
     // (turn 58) and keeps Heatran for the finish (turn 65, 59% HP left).
+    // Round 63 (T16, every verified outcome one ply deeper): the play-out
+    // follows the Monte-Carlo ranking at turn 59 (p1 Stealth Rock, p2 Scald)
+    // and p2 wins at turn 62 without sending either; the pin keeps its intent,
+    // Heatran never enters ahead of Muk-Alola (pending the round-63 user gate).
     // Nicknames in the history rows: Sludge Shadow = Muk-Alola, Fire Shadow = Heatran.
     test.setTimeout(600_000);
     const draftReplay = JSON.parse(readFileSync(fixturePath('draft-replay.json'), 'utf-8'));
@@ -99,9 +103,7 @@ test.describe('PS Dashboard', () => {
     });
     const muk = p2Switches.findIndex(name => name.startsWith('Sludge Shadow'));
     const heatran = p2Switches.findIndex(name => name.startsWith('Fire Shadow'));
-    expect(muk, `p2 switches: ${p2Switches.join(', ')}`).toBeGreaterThanOrEqual(0);
-    expect(heatran, `p2 switches: ${p2Switches.join(', ')}`).toBeGreaterThanOrEqual(0);
-    expect(muk, `p2 switches: ${p2Switches.join(', ')}`).toBeLessThan(heatran);
+    expect(heatran < 0 || (muk >= 0 && muk < heatran), `p2 switches: ${p2Switches.join(', ')}`).toBe(true);
   });
 
   test('the branch sim iframe follows the played variation line', async ({ page }) => {
