@@ -35,14 +35,17 @@ test('Tera like the app: no click -> none, ladder click -> everyone, draft click
   expect(bankSettings({ id: 'gen9draft-3', formatid: 'gen9draft', log: click }).tera).toEqual({ p1: ['Garchomp'], p2: [] });
 });
 
-test('played combo like the app sweep: the log of snapshot[turn], kept only when a slot was played', () => {
+test('played combo like the app sweep: the log of snapshot[turn], kept when a slot or a singles action was played', () => {
   const doublesTurn = ['|move|p1a: Pelipper|Hurricane|p2a: Wall', '|move|p2a: Wall|Protect|p2a: Wall', '|turn|3'];
   const kept = bankKeepPlayed([undefined, undefined, doublesTurn], 2, true);
   expect(kept?.p1Slots?.[0]).toMatchObject({ kind: 'move' });
   // Like sweep-core: the doubles parser always returns slot lists, so a turn without actions passes [null, null] on.
   expect(bankKeepPlayed([undefined, undefined, ['|turn|3']], 2, true)).toEqual(parsePlayedActionsDoubles(['|turn|3']));
-  // Singles carry no slots: nothing is kept, played move or not.
-  expect(bankKeepPlayed([undefined, undefined, ['|move|p1a: Chomp|Earthquake|p2a: Rotom', '|turn|3']], 2, false)).toBeUndefined();
+  // Round 63 (T78, lane C's merge patch): a singles action is kept, so the verify step joins the played row and column.
+  const singles = bankKeepPlayed([undefined, undefined, ['|move|p1a: Chomp|Earthquake|p2a: Rotom', '|turn|3']], 2, false);
+  expect(singles?.p1).toMatchObject({ kind: 'move' });
+  expect(singles?.p1Slots).toBeUndefined();
+  expect(bankKeepPlayed([undefined, undefined, ['|turn|3']], 2, false)).toBeUndefined();
   expect(bankKeepPlayed([], 5, false)).toBeUndefined();
 });
 

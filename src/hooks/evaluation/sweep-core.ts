@@ -136,7 +136,7 @@ async function runFreshEvaluation(
   if (aborted(env)) return false;
   env.clientRef.current ??= new EvalWorkerClient();
   const client = env.clientRef.current;
-  const keepPlayed = turnPlayed?.p1Slots || turnPlayed?.p2Slots ? turnPlayed : undefined;
+  const keepPlayed = turnPlayed?.p1Slots || turnPlayed?.p2Slots || turnPlayed?.p1 || turnPlayed?.p2 ? turnPlayed : undefined;
   const result = await perfSpan(`evaluate[${mode}-d${depth}s${samples}]`, () =>
     // exclusive: false — pipelined turns share the pool and
     // must not cancel each other; the run's own cancel path

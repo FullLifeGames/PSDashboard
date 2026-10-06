@@ -57,8 +57,11 @@ export interface EvalSettings {
  * take the tree's stronger reading. Lives here (not search.ts) so the UI
  * layer can import it without pulling @pkmn/sim into the main chunk.
  * Round 61 (T98): the auto mode reads its threshold from the search budget
- * (search/budget.ts), whose default runs the tree from the first turn; this
- * constant names the threshold before round 61 (bank measurement chains).
+ * (search/budget.ts), whose default ran the tree from the first turn; this
+ * constant named the threshold before round 61 (bank measurement chains).
+ * Round 63 (T110): it is again the singles default of the budget, where
+ * turns below a quarter fainted run the matrix with three draws; doubles
+ * keep the tree from the first turn.
  */
 export const AUTO_MCTS_FAINTED_FRACTION = 0.25;
 

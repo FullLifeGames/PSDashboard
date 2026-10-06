@@ -52,11 +52,11 @@ export function bankSettings(replay: { id?: string; formatid?: string; log: stri
   };
 }
 
-/** The app sweep's keepPlayed (sweep-core.ts with useEvalView playedFor): the actions in snapshot[turn]'s log, kept when a slot was played. */
+/** The app sweep's keepPlayed (sweep-core.ts with useEvalView playedFor): the actions in snapshot[turn]'s log, kept when a slot or a singles action was played. */
 export function bankKeepPlayed(snapshotLogs: (string[] | undefined)[], turn: number, doubles: boolean): EvalSettings['keepPlayed'] {
   const lines = snapshotLogs[turn] ?? [];
   const played = doubles ? parsePlayedActionsDoubles(lines) : parsePlayedActions(lines);
-  return played.p1Slots || played.p2Slots ? played : undefined;
+  return played.p1Slots || played.p2Slots || played.p1 || played.p2 ? played : undefined;
 }
 
 /** EVAL_CALIBRATION_SAMPLES: the engine has five fixed seeds; another count would draw an unseeded PRNG. */

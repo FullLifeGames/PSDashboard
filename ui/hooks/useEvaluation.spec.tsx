@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, onTestFinished, test, vi } from 'vitest';
 import { act, renderHook, waitFor } from '@testing-library/react';
-import { AUTO_MCTS_FAINTED_FRACTION, configureSearchBudget, parseSearchBudget, type EvalResult, type EvalSettings, type SearchProgress } from '@fulllifegames/eval-engine';
+import { AUTO_MCTS_FAINTED_FRACTION, configureSearchBudget, parsePlayedActions, parseSearchBudget, type EvalResult, type EvalSettings, type SearchProgress } from '@fulllifegames/eval-engine';
 import { evalResult } from '../fixtures/eval-result';
 
 // The evaluation surface over a scripted worker pool client: the hook's
@@ -227,6 +227,21 @@ describe('useEvaluation whole-game sweep', () => {
     expect(graph.notice).toBeNull();
     expect(graph.progress).toBeNull();
     expect(script.calls).toHaveLength(3);
+  });
+
+  // Round 63 (T78, lane C's merge patch): the verify step joins the played row and column, so a singles turn hands its played action on too.
+  test('a singles sweep hands the played action to the search as keepPlayed; a turn without one passes nothing', async () => {
+    const played = parsePlayedActions(['|move|p1a: Chomp|Earthquake|p2a: Rotom', '|turn|2']);
+    const { result } = renderHook(() => useEvaluation());
+    act(() => result.current.setPrefs(matrixPrefs));
+    act(() => result.current.runGraphSweep({
+      ...sweepParams(turn => async () => position(turn - 1)), playedFor: (turn: number) => (turn === 1 ? played : null),
+    }));
+    await waitFor(() => expect(result.current.graph.running).toBe(true));
+    await waitFor(() => expect(result.current.graph.running).toBe(false), { timeout: 10_000 });
+    const settingsOf = (score: number) => script.calls.find(call => scoreOf(call.serialized) === score)?.settings;
+    expect(settingsOf(0)?.keepPlayed?.p1).toMatchObject({ kind: 'move' });
+    expect(settingsOf(0.1)?.keepPlayed).toBeUndefined();
   });
 
   test('a failed search records its error and the notice names it; a turn without a position is a silent gap; clearGraph empties everything', async () => {
