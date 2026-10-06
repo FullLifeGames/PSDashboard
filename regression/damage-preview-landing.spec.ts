@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'vitest';
-import { Battle, Teams, toID, type PokemonSet } from '@pkmn/sim';
-import { calcSingleDamageRange, createBranchStateFromBattle, type DamageResult } from '@fulllifegames/eval-engine';
+import { Battle, Dex, Teams, toID, type PokemonSet } from '@pkmn/sim';
+import { calcSingleDamageRange, createBranchStateFromBattle, type BranchSlotChoice, type DamageResult } from '@fulllifegames/eval-engine';
 import { computePreviewDamage } from '../src/lib/branch-damage';
 
 /**
@@ -20,7 +20,7 @@ function set(species: string, moves: string[], extra: Partial<PokemonSet> = {}):
   };
 }
 
-function battle(format: 'gen9customgame' | 'gen9doublescustomgame', p1: PokemonSet[], p2: PokemonSet[], seed = 1): Battle {
+function battle(format: 'gen9customgame' | 'gen9doublescustomgame' | 'gen8doublescustomgame', p1: PokemonSet[], p2: PokemonSet[], seed = 1): Battle {
   const created = new Battle({
     formatid: toID(format), seed: [seed, 2, 3, 4],
     p1: { name: 'Alpha', team: Teams.pack(p1) }, p2: { name: 'Beta', team: Teams.pack(p2) },
@@ -32,14 +32,16 @@ function battle(format: 'gen9customgame' | 'gen9doublescustomgame', p1: PokemonS
   return created;
 }
 
-/** The picker's preview at this position, both sides. */
-function preview(current: Battle, teraBySlot?: { p1: (string | null)[]; p2: (string | null)[] }) {
+type Picks = { p1: (BranchSlotChoice | null)[]; p2: (BranchSlotChoice | null)[] };
+
+/** The picker's preview at this position, both sides, with the armed Tera toggles and the picks made so far. */
+function preview(current: Battle, teraBySlot?: { p1: (string | null)[]; p2: (string | null)[] }, choices?: Picks) {
   const state = createBranchStateFromBattle(current as never, [], {});
   return computePreviewDamage({
     p1ActiveSlots: state.p1ActiveSlots, p2ActiveSlots: state.p2ActiveSlots,
     p1MovesBySlot: state.p1MovesBySlot, p2MovesBySlot: state.p2MovesBySlot,
-    fieldState: state.field, gen: current.gen, ...(teraBySlot ? { teraBySlot } : {}),
-  }, calcSingleDamageRange);
+    fieldState: state.field, gen: current.gen, ...(teraBySlot ? { teraBySlot } : {}), ...(choices ? { choices } : {}),
+  } as Parameters<typeof computePreviewDamage>[0], calcSingleDamageRange);
 }
 
 /** Plays one turn and returns the HP each p2 slot lost, with the turn's log. */
@@ -323,5 +325,49 @@ describe('a drawn hit count lands inside the preview (T124 point 3)', () => {
     const turns = Array.from({ length: 400 }, (_, index) => index + 1);
     const knockouts = turns.filter(seed => play(scene(seed), 'move bulletseed', 'move splash').log.includes('|faint|p2a: Snorlax')).length;
     expect(Math.abs(knockouts / turns.length - chance)).toBeLessThan(3 * Math.sqrt(chance * (1 - chance) / turns.length));
+  });
+});
+
+/** Dragapult throws Dragon Darts at P2A while P2A's partner Blissey uses `pick`; the preview reads both sides' picks. */
+function dartsScene(format: 'gen8doublescustomgame' | 'gen9doublescustomgame', pick: string) {
+  const current = battle(format, [set('Dragapult', ['Dragon Darts']), set('Corviknight', ['Splash'])],
+    [armored('Snorlax'), set('Blissey', [pick, 'Splash'], { evs: { ...STATS, hp: 252, def: 252 }, ability: 'Battle Armor' })]);
+  const choices: Picks = { p1: [null, null], p2: [null, { kind: 'move', moveId: toID(pick), moveName: pick }] };
+  const row = preview(current, undefined, choices).p1.targets[0]['1:1'];
+  const { lost, log } = play(current, 'move dragondarts 1, move splash', 'move splash, move 1');
+  expectPlainHits(log);
+  return { row, lost, log, maxhp: current.sides[1].active[0].maxhp };
+}
+
+describe('Protect on the Dragon Darts partner (T124 point 4)', () => {
+  test('the partner protects: both darts hit the target, as the simulator lands them', () => {
+    const { row, lost, log, maxhp } = dartsScene('gen9doublescustomgame', 'Protect');
+    expect(log).toContain('|-singleturn|p2b: Blissey|Protect');
+    expect(lost[1]).toBe(0);
+    expectInside(row, lost[0], maxhp);
+  });
+
+  test('the partner endures or splashes: one dart each, as before', () => {
+    for (const pick of ['Endure', 'Splash']) {
+      const { row, lost, maxhp } = dartsScene('gen9doublescustomgame', pick);
+      expect(lost[1], pick).toBeGreaterThan(0);
+      expectInside(row, lost[0], maxhp);
+    }
+  });
+
+  test('every shielding move in gens 8 and 9 lands the darts in the preview where the simulator lands them', () => {
+    // Every move that stalls or sets a condition that stops moves (onTryHit), as the partner's pick:
+    // Protect and its kin, Endure, the side guards, Magic Coat. The target's row must hold what it took.
+    for (const format of ['gen8doublescustomgame', 'gen9doublescustomgame'] as const) {
+      const dex = Dex.forFormat(format);
+      const stops = (id?: string) => !!id && !!dex.conditions.get(id).onTryHit;
+      const picks = dex.moves.all().filter(move => !move.isMax && !move.isZ &&
+        (move.stallingMove || stops(move.volatileStatus) || stops(move.sideCondition)));
+      expect(picks.length, format).toBeGreaterThan(10);
+      for (const move of picks) {
+        const { row, lost, maxhp } = dartsScene(format, move.name);
+        expectInside(row, lost[0], maxhp);
+      }
+    }
   });
 });

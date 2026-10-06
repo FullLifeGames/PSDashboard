@@ -40,6 +40,8 @@ export interface DamageCalcContext {
    */
   defenderPartner?: SimPokemonInfo | null;
   attackerPartnerAlive?: boolean;
+  /** The move id the defender's partner picked this turn, when the preview knows it (T124). */
+  defenderPartnerMove?: string;
 }
 
 function toConditionId(value: string | undefined): string {
@@ -60,13 +62,14 @@ function sideOptions(conditions: string[] | undefined) {
   };
 }
 
-function calcField(context: DamageCalcContext): Field {
+/** The calc's field; `defenderProtected` raises the calc's own Protect on the defender's side. */
+function calcField(context: DamageCalcContext, defenderProtected = false): Field {
   return new Field({
     gameType: context.gameType ?? 'Singles',
     weather: WEATHER_BY_ID[toConditionId(context.weather)],
     terrain: TERRAIN_BY_ID[toConditionId(context.terrain)],
     attackerSide: sideOptions(context.attackerSideConditions),
-    defenderSide: sideOptions(context.defenderSideConditions),
+    defenderSide: { ...sideOptions(context.defenderSideConditions), isProtected: defenderProtected },
   });
 }
 
@@ -89,10 +92,25 @@ function calcPokemonFrom(gen: CalcGen, info: SimPokemonInfo): Pokemon {
   } satisfies CalcPokemonOptions);
 }
 
-/** Whether the move does damage to this Pokémon at all (the calc reads immunities). */
-function landsOn(gen: CalcGen, attacker: SimPokemonInfo, target: SimPokemonInfo, moveName: string, context: DamageCalcContext): boolean {
-  const result = calculate(gen, calcPokemonFrom(gen, attacker), calcPokemonFrom(gen, target), new Move(gen, moveName), calcField(context));
+/** Whether the move does damage to this Pokémon at all (the calc reads immunities, and Protect when it stands). */
+function landsOn(gen: CalcGen, attacker: SimPokemonInfo, target: SimPokemonInfo, moveName: string, context: DamageCalcContext, isProtected: boolean): boolean {
+  const result = calculate(gen, calcPokemonFrom(gen, attacker), calcPokemonFrom(gen, target), new Move(gen, moveName), calcField(context, isProtected));
   return result.range()[1] > 0;
+}
+
+/**
+ * Whether the partner's pick shields it before the move lands: a stalling
+ * move whose volatile stops moves (Protect, Detect, Spiky Shield and their
+ * kin carry an onTryHit; Endure does not), going first by priority. All from
+ * the Dex; whether the move breaks through is the calc's call (isProtected).
+ */
+function shieldedBy(gen: CalcGen, pick: string | undefined, moveName: string): boolean {
+  if (!pick) return false;
+  const dex = Dex.forGen(gen.num);
+  const shield = dex.moves.get(pick);
+  if (!shield.stallingMove || !shield.volatileStatus) return false;
+  const stopsMoves = 'onTryHit' in dex.conditions.get(shield.volatileStatus);
+  return stopsMoves && shield.priority > dex.moves.get(moveName).priority;
 }
 
 /**
@@ -102,8 +120,8 @@ function landsOn(gen: CalcGen, attacker: SimPokemonInfo, target: SimPokemonInfo,
  * Battle.getMoveTargets counts the living foes, and for allAdjacent the
  * attacker's living partner too, immune or not), and a smart-target
  * multi-hit (Dragon Darts) lands one hit on the defender and one on its
- * partner, unless the partner is immune (Pokemon.getSmartTargets, then the
- * immunity step turns the second hit back onto the defender).
+ * partner, unless the partner is immune or protected (Pokemon.getSmartTargets,
+ * then a failed hit step turns the second hit back onto the defender).
  */
 function moveLanding(
   gen: CalcGen,
@@ -118,7 +136,7 @@ function moveLanding(
     : moveOption.targetType === 'allAdjacent' ? foes + (context.attackerPartnerAlive ? 1 : 0)
     : 0;
   const split = !!partner && !!Dex.forGen(gen.num).moves.get(moveOption.name).smartTarget &&
-    landsOn(gen, attacker, partner, moveOption.name, context);
+    landsOn(gen, attacker, partner, moveOption.name, context, shieldedBy(gen, context.defenderPartnerMove, moveOption.name));
   const overrides: CalcMoveOverrides = {
     ...(hit === 1 ? { target: 'normal' as const } : {}),
     ...(split ? { multihit: 1 } : {}),

@@ -1,4 +1,4 @@
-import type { BranchMoveOption, BranchSimState, SimPokemonInfo, DamageResult } from '@fulllifegames/eval-engine';
+import type { BranchMoveOption, BranchSimState, BranchSlotChoice, SimPokemonInfo, DamageResult } from '@fulllifegames/eval-engine';
 
 export interface SpreadTargetDamage {
   label: string;
@@ -31,10 +31,19 @@ export interface DamagePreviewInputs {
    * and defending in its Tera type (T20). Mega, Ultra Burst and Z stay out.
    */
   teraBySlot?: { p1: (string | null)[]; p2: (string | null)[] };
+  /**
+   * Both sides' picks so far (live tip or draft). The preview reads what the
+   * defender's partner chose: a Protect there turns the second Dragon Dart
+   * back onto the defender (T124).
+   */
+  choices?: { p1: (BranchSlotChoice | null)[]; p2: (BranchSlotChoice | null)[] };
 }
 
 type LivingEnemy = { active: SimPokemonInfo; index: number };
 type SlotsBySide = { p1: (SimPokemonInfo | null)[]; p2: (SimPokemonInfo | null)[] };
+type ChoicesBySide = NonNullable<DamagePreviewInputs['choices']>;
+
+const NO_CHOICES: ChoicesBySide = { p1: [], p2: [] };
 
 const isLiving = (info: SimPokemonInfo | null | undefined): info is SimPokemonInfo =>
   !!info && !info.fainted && info.hp > 0;
@@ -42,13 +51,16 @@ const isLiving = (info: SimPokemonInfo | null | undefined): info is SimPokemonIn
 /**
  * Doubles: who else stands next to the defender and the attacker, so the
  * calc lands the move as the simulator does (one target, no spread factor;
- * Dragon Darts split over two foes). The partner is never the attacker.
+ * Dragon Darts split over two foes, unless the partner's pick shields it).
+ * The partner is never the attacker.
  */
-function fieldFacts(slots: SlotsBySide, attacker: SimPokemonInfo, defenderSide: 'p1' | 'p2', defenderSlot: number) {
+function fieldFacts(slots: SlotsBySide, choices: ChoicesBySide, attacker: SimPokemonInfo, defenderSide: 'p1' | 'p2', defenderSlot: number) {
   const attackerSide = slots.p1.includes(attacker) ? 'p1' : 'p2';
+  const partnerSlot = slots[defenderSide].findIndex((info, slot) => slot !== defenderSlot && info !== attacker && isLiving(info));
+  const partnerPick = choices[defenderSide][partnerSlot];
   return {
-    defenderPartner: slots[defenderSide].find((info, slot) =>
-      slot !== defenderSlot && info !== attacker && isLiving(info)) ?? null,
+    defenderPartner: slots[defenderSide][partnerSlot] ?? null,
+    ...(partnerPick?.kind === 'move' ? { defenderPartnerMove: partnerPick.moveId } : {}),
     attackerPartnerAlive: slots[attackerSide].some(info => info !== attacker && isLiving(info)),
   };
 }
@@ -60,15 +72,16 @@ function slotDamage(args: {
   enemySide: 'p1' | 'p2';
   enemyActives: LivingEnemy[];
   slots: SlotsBySide;
+  choices: ChoicesBySide;
   context: DamageContext;
   calc: CalcSingleDamageRange;
 }) {
-  const { active, moves, enemySide, enemyActives, slots, context, calc } = args;
+  const { active, moves, enemySide, enemyActives, slots, choices, context, calc } = args;
   const defaults: DamageResult[] = [];
   const spread: Record<number, SpreadTargetDamage[]> = {};
   const targetEntries: [string, DamageResult][] = [];
   const contextInto = (side: 'p1' | 'p2', slot: number): DamageContext =>
-    (context?.gameType === 'Doubles' ? { ...context, ...fieldFacts(slots, active, side, slot) } : context);
+    (context?.gameType === 'Doubles' ? { ...context, ...fieldFacts(slots, choices, active, side, slot) } : context);
   moves.forEach((move, moveIndex) => {
     for (const target of move.targetOptions) {
       const defender = slots[target.side][target.activeSlot];
@@ -119,6 +132,7 @@ export function computePreviewDamage(inputs: DamagePreviewInputs, calc: CalcSing
     defenderSideConditions: attacker === 'p1' ? fieldState?.p2SideConditions : fieldState?.p1SideConditions,
   });
   const slots: SlotsBySide = { p1: p1ActiveSlots, p2: p2ActiveSlots };
+  const choices = inputs.choices ?? NO_CHOICES;
 
   const makeSideDamage = (side: 'p1' | 'p2'): SideDamage => {
     const activeSlots = side === 'p1' ? p1ActiveSlots : p2ActiveSlots;
@@ -139,7 +153,7 @@ export function computePreviewDamage(inputs: DamagePreviewInputs, calc: CalcSing
       spread[activeSlot] = {};
       targets[activeSlot] = {};
       if (!active || moves.length === 0) return;
-      const slot = slotDamage({ active, moves, enemySide, enemyActives, slots, context, calc });
+      const slot = slotDamage({ active, moves, enemySide, enemyActives, slots, choices, context, calc });
       defaults[activeSlot] = slot.defaults;
       spread[activeSlot] = slot.spread;
       targets[activeSlot] = slot.targets;

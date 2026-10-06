@@ -1,9 +1,11 @@
 import { describe, expect, test, vi } from 'vitest';
 import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { calcSingleDamageRange, type BranchMoveOption, type BranchSimState, type SimPokemonInfo } from '@fulllifegames/eval-engine';
+import {
+  calcSingleDamageRange, type BranchMoveOption, type BranchSimState, type BranchSlotChoice, type SimPokemonInfo,
+} from '@fulllifegames/eval-engine';
 import { BranchPanel } from '../../src/components/BranchPanel';
-import { NO_MODIFIERS, simState } from '../fixtures/sim-state';
+import { NO_MODIFIERS, moveOption, pokemon, simState, targetOption } from '../fixtures/sim-state';
 
 // The legal move pool is heavy dex data; a fixed pool keeps the what-if row deterministic here.
 vi.mock('../../src/lib/pokemon-options', () => ({ getMovePool: async () => ['Dragon Claw', 'Fire Fang'] }));
@@ -276,6 +278,25 @@ describe('one Tera per side in doubles (T124 point 1)', () => {
     render(<BranchPanel {...props({ simState: doubles({ p1Choices: [flareBlitzTera, null] }) })} />);
     expect(slot('P1B').getByRole('button', { name: 'Tera (Bug)' })).toBeDisabled();
     expect(slot('P1A').getByRole('button', { name: 'Tera (Fire)' })).toBeEnabled();
+  });
+
+  test('the preview reads the picks: Protect on Rillaboom\'s partner lands both Dragon Darts on Rillaboom (T124 point 4)', async () => {
+    localStorage.setItem(ADVANCED_KEY, '1');
+    const dragapult = pokemon('Dragapult', { isActive: true, activeSlot: 0, ability: 'Clear Body', item: '', moves: [{ name: 'Dragon Darts', type: 'Dragon' }] });
+    const darts = moveOption('Dragon Darts', { type: 'Dragon', requiresTarget: true, targetOptions: [targetOption('p2', 0, 'Rillaboom', 1), targetOption('p2', 1, 'Tornadus', 2)] });
+    const protect = { kind: 'move' as const, moveId: 'protect', moveName: 'Protect' };
+    const scene = (p2Choices: (BranchSlotChoice | null)[]) => doubles({
+      p1ActiveSlots: [dragapult, amoonguss], p1MovesBySlot: [[darts], fixture.p1MovesBySlot[1]], p2Choices,
+    });
+    const row = () => slot('P1A').getByTitle('Dragon Darts into Rillaboom (100%)');
+    const dartsInto = (context: object) => calcSingleDamageRange(dragapult, rillaboom, darts, { gameType: 'Doubles', gen: 9, ...context }).range;
+    const split = dartsInto({ defenderPartner: fixture.p2ActiveSlots[1] });
+    const both = dartsInto({ defenderPartner: null });
+    expect(split).not.toBe(both);
+    const { rerender } = render(<BranchPanel {...props({ simState: scene([null, null]) })} />);
+    await waitFor(() => expect(row()).toHaveTextContent(split));
+    rerender(<BranchPanel {...props({ simState: scene([null, protect]) })} />);
+    await waitFor(() => expect(row()).toHaveTextContent(both));
   });
 
   test('each side holds its own Tera', async () => {

@@ -103,9 +103,9 @@ function useSlots(simState: BranchSimState | null) {
   return { p1ActiveSlots, p2ActiveSlots, p1MovesBySlot, p2MovesBySlot, p1SwitchesBySlot, p2SwitchesBySlot };
 }
 
-/** The damage preview per side, recomputed whenever the actives, moves, field, gen, or armed Tera toggles change. */
+/** The damage preview per side, recomputed whenever the actives, moves, field, gen, armed Tera toggles, or picks change. */
 function usePreviewDamage(inputs: DamagePreviewInputs) {
-  const { p1ActiveSlots, p2ActiveSlots, p1MovesBySlot, p2MovesBySlot, fieldState, gen, teraBySlot } = inputs;
+  const { p1ActiveSlots, p2ActiveSlots, p1MovesBySlot, p2MovesBySlot, fieldState, gen, teraBySlot, choices } = inputs;
   const [damageBySide, setDamageBySide] = useState<{ p1: SideDamage; p2: SideDamage }>({
     p1: EMPTY_SIDE_DAMAGE,
     p2: EMPTY_SIDE_DAMAGE,
@@ -118,7 +118,7 @@ function usePreviewDamage(inputs: DamagePreviewInputs) {
       if (cancelled) return;
       if (!cancelled) {
         setDamageBySide(computePreviewDamage(
-          { p1ActiveSlots, p2ActiveSlots, p1MovesBySlot, p2MovesBySlot, fieldState, gen, teraBySlot },
+          { p1ActiveSlots, p2ActiveSlots, p1MovesBySlot, p2MovesBySlot, fieldState, gen, teraBySlot, choices },
           calcSingleDamageRange,
         ));
       }
@@ -128,7 +128,7 @@ function usePreviewDamage(inputs: DamagePreviewInputs) {
     return () => {
       cancelled = true;
     };
-  }, [p1ActiveSlots, p2ActiveSlots, p1MovesBySlot, p2MovesBySlot, fieldState, gen, teraBySlot]);
+  }, [p1ActiveSlots, p2ActiveSlots, p1MovesBySlot, p2MovesBySlot, fieldState, gen, teraBySlot, choices]);
   return damageBySide;
 }
 
@@ -237,7 +237,7 @@ function usePanelPreview(simState: BranchSimState | null, gen: number, positionK
   );
   const { p1ActiveSlots, p2ActiveSlots, p1MovesBySlot, p2MovesBySlot } = slots;
   const fieldState = simState?.field ?? null;
-  const damageBySide = usePreviewDamage({ p1ActiveSlots, p2ActiveSlots, p1MovesBySlot, p2MovesBySlot, fieldState, gen, teraBySlot });
+  const damageBySide = usePreviewDamage({ p1ActiveSlots, p2ActiveSlots, p1MovesBySlot, p2MovesBySlot, fieldState, gen, teraBySlot, choices });
   return { slots, gimmickFor, damageBySide };
 }
 
