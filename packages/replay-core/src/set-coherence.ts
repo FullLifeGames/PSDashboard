@@ -59,7 +59,6 @@ const PIVOT_MOVES = new Set(['uturn', 'voltswitch', 'flipturn', 'partingshot', '
  */
 const DEF_BOOSTS = new Set(['irondefense', 'acidarmor', 'cottonguard', 'barrier', 'shelter']);
 
-const CHOICE_ITEMS = new Set(['choiceband', 'choicespecs', 'choicescarf']);
 const TRICK_FAMILY = new Set(['trick', 'switcheroo']);
 
 /** A boost-contradiction only matters on moves whose DAMAGE is the point. */
@@ -267,7 +266,8 @@ export function applyCoherenceVetoes(
   candidates: MoveCandidate[],
   context: CoherenceContext,
 ): MoveCandidate[] {
-  const restrictiveItem = CHOICE_ITEMS.has(context.itemId) ? 'choice'
+  // A Choice item from the Dex (`isChoice`, round 64 decision 17).
+  const restrictiveItem = Dex.items.get(context.itemId).isChoice ? 'choice'
     : context.itemId === 'assaultvest' ? 'av' : null;
   // Boost context comes from the WHOLE pool (usage order can list the attack
   // before the boost) — boost moves themselves are never vetoed by these rows.

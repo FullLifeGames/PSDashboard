@@ -119,3 +119,13 @@ describe('the panel and the build drop the same contradicting guess', () => {
     expect(panel).toEqual(built);
   });
 });
+
+describe('the veto rows read their lists from the Dex (decision 17)', () => {
+  test('a Choice item is what the Dex marks isChoice', () => {
+    for (const itemId of ['choiceband', 'choicespecs', 'choicescarf']) {
+      expect(names(applyCoherenceVetoes([guessed('Volt Switch'), guessed('Toxic')], { itemId }))).toEqual(['Volt Switch']);
+    }
+    expect(names(applyCoherenceVetoes([guessed('Volt Switch'), guessed('Toxic')], { itemId: 'lifeorb' })))
+      .toEqual(['Volt Switch', 'Toxic']);
+  });
+});
