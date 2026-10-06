@@ -172,6 +172,24 @@ describe('Smogon set assumptions', () => {
     expect(assumptions?.pokemon.tornadus?.moves[3].options).toBeUndefined();
   });
 
+  test('keeps every option of a published item slot (round 64, T120)', async () => {
+    // The set as published: "Leftovers / Metal Coat" is one item slot, read like a move slot.
+    const doubles = await fetchSmogonSetAssumptions({
+      formatId: 'gen9doublesou', species: ['Gholdengo'],
+      fetcher: byUrl({ gen9doublesou: { Gholdengo: {
+        'Nasty Plot': { item: ['Leftovers', 'Metal Coat'], moves: ['Protect', 'Nasty Plot', 'Make It Rain', ['Shadow Ball', 'Dazzling Gleam']] },
+        'Choice Specs': { item: 'Choice Specs', moves: ['Make It Rain', 'Shadow Ball', ['Power Gem', 'Focus Blast'], 'Trick'] },
+      } } }) as never,
+    });
+    expect(doubles?.pokemon.gholdengo?.item).toMatchObject({ value: 'Leftovers', options: ['Leftovers', 'Metal Coat'] });
+    expect(doubles?.pokemon.gholdengo?.alternatives?.[0].item?.options).toBeUndefined();
+    const singles = await fetchSmogonSetAssumptions({
+      formatId: 'gen9ou', species: ['Clefable'],
+      fetcher: byUrl({ gen9ou: { Clefable: { 'Calm Mind': { item: ['Leftovers', 'Sticky Barb'], moves: ['Calm Mind', 'Moonblast', 'Moonlight', 'Flamethrower'] } } } }) as never,
+    });
+    expect(singles?.pokemon.clefable?.item).toMatchObject({ value: 'Leftovers', options: ['Leftovers', 'Sticky Barb'] });
+  });
+
   test('a missing fallback file is absence, not failure', async () => {
     const assumptions = await fetchSmogonSetAssumptions({
       formatId: 'gen8ou', species: ['Toxapex', 'Kyurem'], fetcher: byUrl({ gen8ou: toxapexSet }) as never,

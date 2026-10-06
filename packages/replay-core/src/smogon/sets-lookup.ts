@@ -8,8 +8,9 @@ export interface SetAssumption {
   value: string;
   sourceDetail: string;
   /**
-   * Every option of a published move slot ("Heat Wave / Hidden Power Ice"),
-   * `value` first; absent on a fixed slot (round 63, T89).
+   * Every option of a published slot, `value` first; absent on a fixed slot:
+   * a move slot ("Heat Wave / Hidden Power Ice", round 63, T89) or the item
+   * ("Leftovers / Metal Coat", round 64, T120).
    */
   options?: string[];
 }

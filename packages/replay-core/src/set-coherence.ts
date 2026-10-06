@@ -136,21 +136,25 @@ const UNSEEN_MOVE_PROBABILITY = 0.01;
  * Coherent-set selection: score each CURATED set against the revealed
  * evidence and build from the best match instead of assembling marginals.
  * fit = +2 per revealed move in the set, +2 item match, +2 ability match,
- * disqualified on rule-out violations; ties break toward the set whose moves
+ * disqualified on rule-out violations (an item slot only when the log rules
+ * out every item it lists); ties break toward the set whose moves
  * the usage marginals like best (Σ log p). A set below the floor —
  * fit < revealed-move count, i.e. it contradicts what we saw — yields null
  * and the caller falls back to marginal assembly plus the pairwise vetoes.
  */
 interface CandidateIds {
   moveIds: string[];
-  itemId: string;
+  /** Every item the published slot lists, first listed first (round 64, R1). */
+  itemIds: string[];
   abilityId: string;
 }
+
+const itemId = (name: string) => Dex.items.get(name).id as string;
 
 function candidateIds(candidate: PokemonSetAssumption): CandidateIds {
   return {
     moveIds: candidate.moves.map(move => Dex.moves.get(move.value).id as string),
-    itemId: candidate.item ? (Dex.items.get(candidate.item.value).id as string) : '',
+    itemIds: candidate.item ? (candidate.item.options ?? [candidate.item.value]).map(itemId) : [],
     abilityId: candidate.ability ? (Dex.abilities.get(candidate.ability.value).id as string) : '',
   };
 }
@@ -161,7 +165,7 @@ function candidateIds(candidate: PokemonSetAssumption): CandidateIds {
  */
 function fitScore(candidate: PokemonSetAssumption, ids: CandidateIds, evidence: CuratedEvidence): number {
   let fit = 2 * filledSlots(candidate.moves, evidence.revealedMoves.map(slotMoveKey)).size;
-  if (evidence.revealedItem && ids.itemId === evidence.revealedItem) fit += 2;
+  if (evidence.revealedItem && ids.itemIds.includes(evidence.revealedItem)) fit += 2;
   if (evidence.revealedAbility && ids.abilityId === evidence.revealedAbility) fit += 2;
   return fit;
 }
@@ -175,7 +179,7 @@ function bestCandidate(
   let bestTiebreak = -Infinity;
   for (const candidate of candidates) {
     const ids = candidateIds(candidate);
-    if (itemRuleOuts && ids.itemId && evidence.ruledOutItems.includes(ids.itemId)) continue;
+    if (itemRuleOuts && ids.itemIds.length > 0 && ids.itemIds.every(id => evidence.ruledOutItems.includes(id))) continue;
     if (ids.abilityId && evidence.ruledOutAbilities.includes(ids.abilityId)) continue;
 
     const fit = fitScore(candidate, ids, evidence);
@@ -198,7 +202,7 @@ export function selectCuratedSet(
 ): PokemonSetAssumption | null {
   const best = bestCandidate(candidates, evidence, true);
   if (!best) return null;
-  const resolved = withSlotsResolved(best, evidence);
+  const resolved = withItemSlotResolved(withSlotsResolved(best, evidence), evidence);
   const unruled = bestCandidate(candidates, evidence, false);
   return unruled && unruled !== best ? withItemAfterRuleOut(resolved, unruled, evidence) : resolved;
 }
@@ -218,7 +222,21 @@ function withItemAfterRuleOut(
   const replacement = [evidence.guessedItem, evidence.usageItem].find(allowed);
   if (!replacement) return set;
   const why = replacement === evidence.guessedItem ? `${replacement} guessed from the log` : 'most used other item';
-  return { ...set, item: { value: replacement, sourceDetail: `${unruled.item?.value} ruled out, ${why}` } };
+  const listed = (unruled.item?.options ?? [unruled.item?.value]).join(' and ');
+  return { ...set, item: { value: replacement, sourceDetail: `${listed} ruled out, ${why}` } };
+}
+
+/**
+ * The item a published item slot plays (round 64, T120, R1: the set as
+ * published): the revealed one when the slot lists it, else the first the
+ * log does not rule out. A slot whose first item stands keeps its object.
+ */
+function withItemSlotResolved(set: PokemonSetAssumption, evidence: CuratedEvidence): PokemonSetAssumption {
+  const options = set.item?.options;
+  if (!set.item || !options) return set;
+  const played = options.find(option => itemId(option) === evidence.revealedItem)
+    ?? options.find(option => !evidence.ruledOutItems.includes(itemId(option)));
+  return !played || played === set.item.value ? set : { ...set, item: { ...set.item, value: played } };
 }
 
 /** The winner's moves with its slots read against the evidence (T89, decision 11). */

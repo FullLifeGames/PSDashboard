@@ -137,3 +137,62 @@ describe('the panel and the build play the same item after a rule-out', () => {
     expect(panel).toMatchObject({ value: 'Grassy Seed', source: 'guessed', sourceDetail: 'Leftovers ruled out, most used other item' });
   });
 });
+
+/** The Nasty Plot set as published: its item slot lists Leftovers, then Metal Coat (round 64, R1). */
+const plotSlot = (): PokemonSetAssumption => ({
+  ...plot(), item: { value: 'Leftovers', sourceDetail: 's', options: ['Leftovers', 'Metal Coat'] },
+});
+
+describe('an item slot is read like a move slot (sets as published, round 64 R1)', () => {
+  test('a set whose first listed item is ruled out stays a candidate and plays its next listed item', () => {
+    const picked = selectCuratedSet([plotSlot(), specs()], evidence({ ruledOutItems: ['leftovers'], usageItem: 'Choice Specs' }));
+    expect(picked?.moves.map(move => move.value)).toEqual(['Protect', 'Nasty Plot', 'Make It Rain', 'Shadow Ball']);
+    expect(picked?.item?.value).toBe('Metal Coat');
+  });
+
+  test('a revealed item on a later option counts toward the fit', () => {
+    const picked = selectCuratedSet([specs(), plotSlot()], evidence({
+      revealedItem: 'metalcoat', usageProbability: moveId => (moveId === 'trick' || moveId === 'powergem' ? 0.9 : 0.3),
+    }));
+    expect(picked?.item?.value).toBe('Metal Coat');
+    expect(picked?.moves.map(move => move.value)).toContain('Nasty Plot');
+  });
+
+  test('only when every listed item is ruled out does the most used allowed item replace it', () => {
+    const picked = selectCuratedSet([plotSlot(), specs()], evidence({ ruledOutItems: ['leftovers', 'metalcoat'], usageItem: 'Grassy Seed' }));
+    expect(picked?.item).toMatchObject({ value: 'Grassy Seed', sourceDetail: 'Leftovers and Metal Coat ruled out, most used other item' });
+  });
+
+  test('a set whose first listed item is allowed is returned as published (the same object)', () => {
+    const first = plotSlot();
+    expect(selectCuratedSet([first, specs()], evidence({ ruledOutItems: ['metalcoat'] }))).toBe(first);
+  });
+});
+
+function buildSlot(log: string) {
+  const usageStats = stats(usage('Gholdengo', Object.entries({
+    'Make It Rain': 0.99, 'Shadow Ball': 0.95, Protect: 0.6, 'Nasty Plot': 0.57, Trick: 0.27, 'Power Gem': 0.1,
+  }), [['Choice Specs', 0.25], ['Leftovers', 0.19], ['Grassy Seed', 0.19], ['Metal Coat', 0.03]]));
+  const setAssumptions = sets(plotSlot(), specs());
+  const raw = inferOpponentTeam(log, 'p2');
+  raw.pokemon.find(mon => mon.species === 'Gholdengo')!.ruledOut = { items: ['leftovers'], abilities: [] };
+  const p2Info = enrichTeamInfo(raw, usageStats, setAssumptions);
+  const team = buildTeamsFromReplay(log, { p2Info, usageStats, setAssumptions }).p2Team;
+  const built = team.find(set => set.species === 'Gholdengo')!;
+  return { built, panel: p2Info.pokemon.find(mon => mon.species === 'Gholdengo')! };
+}
+
+describe('2663102863: Leftovers ruled out, the Nasty Plot set plays its published Metal Coat', () => {
+  test('doubles: the build and the panel keep the Nasty Plot set with Metal Coat', () => {
+    const { built, panel } = buildSlot(doubles('Gholdengo', ['Make It Rain']));
+    expect(built.item).toBe('Metal Coat');
+    expect(built.moves).toContain('Nasty Plot');
+    expect(panel.item.value).toBe('Metal Coat');
+  });
+
+  test('singles: the build and the panel keep the Nasty Plot set with Metal Coat', () => {
+    const { built, panel } = buildSlot(singles('Gholdengo', ['Make It Rain']));
+    expect(built.item).toBe('Metal Coat');
+    expect(panel.item.value).toBe('Metal Coat');
+  });
+});

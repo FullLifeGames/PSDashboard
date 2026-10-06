@@ -24,8 +24,9 @@ type AssumptionSet = {
   evs?: Partial<Record<'hp' | 'atk' | 'def' | 'spa' | 'spd' | 'spe', number>>;
 };
 
-/** A published sets file: species, then set name; a move slot is one name or its options. */
-type RawSetsFile = Record<string, Record<string, { moves?: (string | string[])[] } | undefined> | undefined>;
+/** A published sets file: species, then set name; a move slot or the item is one name or its options. */
+type RawSet = { moves?: (string | string[])[]; item?: string | string[] };
+type RawSetsFile = Record<string, Record<string, RawSet | undefined> | undefined>;
 
 const gens = new Generations(Dex);
 const cache = new Map<string, Promise<SmogonSetAssumptions | null>>();
@@ -97,24 +98,26 @@ function keepingSetsFiles(fetcher: SmogonFetch, files: RawSetsFile[]): SmogonFet
   };
 }
 
-/** The published slots behind one flattened set: same set name, same first options. */
-function publishedSlots(files: RawSetsFile[], set: AssumptionSet): (string | string[])[] | null {
+/** The published set behind one flattened set: same set name, same first options. */
+function publishedSet(files: RawSetsFile[], set: AssumptionSet): RawSet | null {
   const moves = set.moves ?? [];
   if (!set.name) return null;
   for (const file of files) {
     for (const sets of Object.values(file)) {
-      const slots = sets?.[set.name]?.moves;
+      const published = sets?.[set.name];
+      const slots = published?.moves;
       if (slots?.length === moves.length &&
-        slots.every((slot, index) => (Array.isArray(slot) ? slot[0] : slot) === moves[index])) return slots;
+        slots.every((slot, index) => (Array.isArray(slot) ? slot[0] : slot) === moves[index])) return published ?? null;
     }
   }
   return null;
 }
 
-function moveAssumption(move: string, slot: string | string[] | undefined, detail: string): SetAssumption {
+/** A move or the item with its published slot: `options` when the slot lists more than one. */
+function slotAssumption(value: string, slot: string | string[] | undefined, detail: string): SetAssumption {
   return Array.isArray(slot) && slot.length > 1
-    ? { value: move, sourceDetail: detail, options: [...slot] }
-    : { value: move, sourceDetail: detail };
+    ? { value, sourceDetail: detail, options: [...slot] }
+    : { value, sourceDetail: detail };
 }
 
 function assumption(value: string | undefined, detail: string): SetAssumption | undefined {
@@ -150,13 +153,14 @@ function normalizeSet(
   detail: string,
   files: RawSetsFile[],
 ): PokemonSetAssumption {
-  const slots = publishedSlots(files, set);
+  const published = publishedSet(files, set);
   return {
     species,
     sourceDetail: detail,
     ability: assumption(set.ability, detail),
-    item: assumption(set.item, detail),
-    moves: (set.moves ?? []).slice(0, 4).map((move, index) => moveAssumption(move, slots?.[index], detail)),
+    // Round 64 (T120, R1): the item slot as published ("Leftovers / Metal Coat").
+    item: set.item ? slotAssumption(set.item, published?.item, detail) : undefined,
+    moves: (set.moves ?? []).slice(0, 4).map((move, index) => slotAssumption(move, published?.moves?.[index], detail)),
     spread: spreadAssumption(set, detail),
   };
 }
