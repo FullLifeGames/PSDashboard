@@ -130,13 +130,19 @@ function percentOfMaxHp(damage: number, maxhp: number): number {
   return maxhp > 0 ? Math.round(damage / maxhp * 1000) / 10 : 0;
 }
 
-function koChanceFor(minPct: number, maxPct: number, hits: number[][], hp: number): string {
-  if (maxPct >= 100) {
-    return minPct >= 100 ? 'guaranteed OHKO' : `${estimateKoProb(hits, hp)}% OHKO`;
-  }
-  if (maxPct >= 50) return 'possible 2HKO';
-  if (maxPct >= 33) return 'possible 3HKO';
-  return '';
+/** The calc gives exact KO odds up to four hits; past that it only estimates, and the picker stays quiet. */
+const MAX_KO_HITS = 4;
+
+/**
+ * The calc's own KO verdict against the defender's current HP
+ * (Result.kochance: the hits' combined rolls, end-of-turn chip and
+ * recovery included), so a damaged target a third-of-max hit finishes
+ * reads as a KO.
+ */
+function koChanceOf(result: ReturnType<typeof calculate>, maxDamage: number): string {
+  if (maxDamage <= 0) return '';
+  const { n, text } = result.kochance(false);
+  return n >= 1 && n <= MAX_KO_HITS ? text : '';
 }
 
 export function calcSingleDamageRange(
@@ -173,7 +179,7 @@ export function calcSingleDamageRange(
       minPercent: minPct,
       maxPercent: maxPct,
       range: `${minPct}% - ${maxPct}%`,
-      koChance: koChanceFor(minPct, maxPct, hitRolls(result.damage), defender.hp),
+      koChance: koChanceOf(result, maxDamage),
     };
   } catch {
     return emptyDamageResult(moveOption.name);
@@ -188,35 +194,4 @@ function emptyDamageResult(moveName: string): DamageResult {
     range: '-',
     koChance: '',
   };
-}
-
-/**
- * The calc's damage as one row of equally likely rolls per hit: a number,
- * one hit's rolls, one number per hit (fewer than 16, as the calc's own
- * damageRange reads them: fixed-damage Parental Bond) or one row per hit.
- */
-function hitRolls(damage: number | number[] | number[][]): number[][] {
-  if (!Array.isArray(damage)) return [[Number(damage)]];
-  if (damage.length > 0 && Array.isArray(damage[0])) return (damage as number[][]).map(row => row.map(Number));
-  const rolls = (damage as number[]).map(Number);
-  return rolls.length < 16 ? rolls.map(hit => [hit]) : [rolls];
-}
-
-/** The chance that the hits together reach `targetHp`: every hit rolls on its own. */
-function estimateKoProb(hits: number[][], targetHp: number): number {
-  let totals = new Map<number, number>([[0, 1]]);
-  for (const rolls of hits) {
-    const next = new Map<number, number>();
-    for (const [sum, ways] of totals) {
-      for (const roll of rolls) next.set(sum + roll, (next.get(sum + roll) ?? 0) + ways);
-    }
-    totals = next;
-  }
-  let all = 0;
-  let knockouts = 0;
-  for (const [sum, ways] of totals) {
-    all += ways;
-    if (sum >= targetHp) knockouts += ways;
-  }
-  return all > 0 ? Math.round(knockouts / all * 100) : 0;
 }

@@ -230,3 +230,31 @@ describe('the Tera toggle in the preview equals the calc after the click (T20, d
     expect(rows(preview(current).p1)).toEqual(rows(on));
   });
 });
+
+describe('the KO text reads the defender\'s current HP (review of wave 1)', () => {
+  test('singles: Earthquake into a Snorlax at 60/267 HP is a guaranteed KO, and the simulator knocks it out', () => {
+    const current = battle('gen9customgame', [set('Garchomp', ['Earthquake'])], [wall('Snorlax')]);
+    current.sides[1].active[0].sethp(60);
+    const range = preview(current).p1.default[0][0];
+    // A third of its max HP or so: the share of max HP alone read "possible 3HKO".
+    expect(range.maxPercent).toBeLessThan(50);
+    expect(range.minPercent / 100 * 267).toBeGreaterThan(60);
+    expect(range.koChance).toBe('guaranteed OHKO');
+    const { log } = play(current, 'move earthquake', 'move splash');
+    expect(log).toContain('|faint|p2a: Snorlax');
+  });
+
+  test('doubles: the spread Earthquake into a damaged Snorlax next to Blissey is a guaranteed KO for that row', () => {
+    const current = battle('gen9doublescustomgame',
+      [set('Garchomp', ['Earthquake']), set('Corviknight', ['Splash'])],
+      [wall('Snorlax'), wall('Blissey')]);
+    current.sides[1].active[0].sethp(60);
+    const rows = preview(current).p1.spread[0][1];
+    const snorlax = rows.find(row => row.label === 'P2A')!.result;
+    const blissey = rows.find(row => row.label === 'P2B')!.result;
+    expect(snorlax.koChance).toBe('guaranteed OHKO');
+    expect(blissey.koChance).not.toContain('OHKO');
+    const { log } = play(current, 'move earthquake, move splash', 'move splash, move splash');
+    expect(log).toContain('|faint|p2a: Snorlax');
+  });
+});

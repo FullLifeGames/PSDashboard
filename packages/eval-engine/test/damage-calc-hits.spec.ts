@@ -5,8 +5,8 @@ import type { BranchMoveOption, SimPokemonInfo } from '../src/branch-engine';
 
 /**
  * T96 point 1: the preview's damage of a multi-hit move is the sum of its
- * hits, as the calc itself sums them (Result.range), and its KO chance counts
- * every combination of the hits' own rolls.
+ * hits, as the calc itself sums them (Result.range), and its KO text is the
+ * calc's verdict over all the hits (Result.kochance).
  */
 const gen9 = Generations.get(9);
 const STATS = { hp: 0, atk: 0, def: 0, spa: 0, spd: 0, spe: 0 };
@@ -60,18 +60,17 @@ describe('multi-hit moves in the damage preview', () => {
     expect(calcDirect(cinccino, target, 'Bullet Seed').move.hits).toBe(5);
   });
 
-  test('the KO chance of a multi-hit counts every combination of the hits\' rolls', () => {
+  test('the KO text of a multi-hit is the calc\'s verdict over all its hits at the target\'s current HP', () => {
     const urshifu = mon('Urshifu-Rapid-Strike', { ability: 'Unseen Fist' });
     const full = mon('Great Tusk', { evs: { ...STATS, hp: 252, def: 4 } });
-    const rows = calcDirect(urshifu, full, 'Surging Strikes').damage as number[][];
-    const sums = rows.reduce<number[]>((acc, hit) => acc.flatMap(sum => hit.map(roll => sum + roll)), [0]);
-    const [min, max] = [Math.min(...sums), Math.max(...sums)];
-    const hp = Math.round((min + max) / 2);
-    const damaged = { ...full, hp, maxhp: hp };
-    const expected = Math.round(sums.filter(sum => sum >= hp).length / sums.length * 100);
-    expect(expected).toBeGreaterThan(0);
-    expect(expected).toBeLessThan(100);
-    expect(calcSingleDamageRange(urshifu, damaged, move('Surging Strikes')).koChance).toBe(`${expected}% OHKO`);
+    const [min, max] = calcDirect(urshifu, full, 'Surging Strikes').range();
+    // Between the weakest and the strongest three hits: a KO only some roll combinations reach.
+    const damaged = { ...full, hp: Math.round((min + max) / 2) };
+    const verdict = calcDirect(urshifu, damaged, 'Surging Strikes').kochance(false);
+    expect(verdict.n).toBe(1);
+    expect(verdict.chance).toBeGreaterThan(0);
+    expect(verdict.chance).toBeLessThan(1);
+    expect(calcSingleDamageRange(urshifu, damaged, move('Surging Strikes')).koChance).toBe(verdict.text);
   });
 
   test('a fixed-damage Parental Bond hit counts twice', () => {
