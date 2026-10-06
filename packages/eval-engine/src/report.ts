@@ -1,6 +1,7 @@
 import type { SideAnalysis, TurnAnalysis, VerdictTier } from './analysis.ts';
 import { type DeniedEnd, deniedEndFor, deniedEndSentence } from './denied-end.ts';
 import { KEY_TURN_SWING } from './graph.ts';
+import { regretSpanFor } from './prose/phrases.ts';
 import {
   LUCK_TOTAL_THRESHOLD, badTier, closeGameFallback, conversionFor, luckSentence, matchupClause, momentScore,
   seedPhrase, seedsOfTheLoss, tipClause, winPathFor, type WinConversion, type WinPath, type WinPathResult,
@@ -51,6 +52,8 @@ interface GameMisplay {
   riskUnpunished?: boolean;
   /** A nearly-dead Pokémon was deliberately fed — rendered neutrally as a sack. */
   sacrifice?: boolean;
+  /** Round 64 (T123): a regret over 1 spans these two values (shown best, played), rendered as two win chances. */
+  span?: { from: number; to: number };
 }
 
 export interface GameReport {
@@ -216,6 +219,7 @@ function misplaysFor(known: TurnAnalysis[], side: Side): GameMisplay[] {
       ...(analysis[side].tier ? { tier: analysis[side].tier } : {}),
       ...(analysis[side].riskUnpunished ? { riskUnpunished: true } : {}),
       ...(analysis[side].sacrifice ? { sacrifice: true } : {}),
+      ...regretSpanFor(analysis[side]),
     }))
     .sort((a, b) => b.regret - a.regret)
     .slice(0, REPORT_MISPLAYS_PER_SIDE);

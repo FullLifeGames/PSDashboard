@@ -82,6 +82,17 @@ describe('EvalGameReport', () => {
     expect(screen.queryByText(/better: Chi-Yu \+ Okidogi/)).toBeNull();
   });
 
+  test('a misplay whose regret is over 1 shows the two win chances it spans (T123 point 8, 2630685175 t8)', () => {
+    const misplays = [
+      { turn: 8, side: 'p2' as const, regret: 1.687, played: 'Taunt→Calyrex-Ice + Body Press→Terapagos-Stellar', better: 'Astral Barrage + Body Press→Calyrex-Ice', tier: 'mistake' as const, span: { from: 0.92, to: -0.767 } },
+      { turn: 3, side: 'p1' as const, regret: 0.3, played: 'Stone Edge', better: 'Earthquake', tier: 'mistake' as const },
+    ];
+    render(<EvalGameReport report={gameReport({ misplays })} playerNames={names} />);
+    expect(within(chip(8)).getByText('85% to 19%')).toBeInTheDocument();
+    expect(within(chip(8)).queryByText(/−84%/)).toBeNull();
+    expect(within(chip(3)).getByText(winDeltaText(-0.3))).toBeInTheDocument();
+  });
+
   test('a denied end at odds 1 reads as a sure KO, never as a 100% roll (T123 point 3)', () => {
     const deniedEnd = { turn: 9, side: 'p2' as const, species: 'Kingambit', odds: 1, removes: 'Garchomp', turnsRemaining: 12 };
     render(<EvalGameReport report={gameReport({ deniedEnd })} playerNames={names} />);

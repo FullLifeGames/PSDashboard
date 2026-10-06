@@ -1,7 +1,7 @@
 import type { SideAnalysis } from '../analysis.ts';
 import type { KoOddsInfo } from '../types.ts';
 import { splitCombinedLabel } from '../turn-analysis/played-match.ts';
-import { winPctText } from '../winprob.ts';
+import { winDeltaText, winPctText } from '../winprob.ts';
 
 /**
  * The phrase helpers the turn summary and the game report share: choice
@@ -58,6 +58,25 @@ export const displayBest = (side: SideAnalysis): { label: string; ev: number; sw
   side.bestNull?.alternative
     ? { ...side.bestNull.alternative, swapped: true }
     : { label: side.best!.label, ev: side.best!.ev, swapped: false };
+
+/**
+ * Round 64 (T123, decision 22): regret is best ev minus played ev on the
+ * score scale [−1, 1], so it reaches 2. Above 1 the played choice turned a
+ * board the engine's line held into one it loses, and the linear points
+ * ("−84%") claim more than the two win chances the card shows. Such a
+ * regret reads as those two chances, from the engine's line to the played
+ * choice ("85% to 19%", 2630685175 t8); at or under 1 the points stay.
+ */
+export const REGRET_SPAN_MIN = 1;
+
+export const regretText = (regret: number, from: number, to: number): string =>
+  regret > REGRET_SPAN_MIN ? `${winPctText(from)} to ${winPctText(to)}` : winDeltaText(-regret);
+
+/** The two values a regret over 1 spans (the displayed best, the played choice), for the report's misplay. */
+export const regretSpanFor = (side: SideAnalysis): { span?: { from: number; to: number } } =>
+  side.played && side.best && (side.regret ?? 0) > REGRET_SPAN_MIN
+    ? { span: { from: displayBest(side).ev, to: side.played.ev } }
+    : {};
 
 /** The null recommendation kept its place (no alternative): name the caveat. */
 export const nullNote = (side: SideAnalysis): string =>

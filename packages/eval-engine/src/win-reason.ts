@@ -1,7 +1,7 @@
 import { BREADTH_MIN_OPTIONS, TIER_THRESHOLDS, playedSetupMove, type SideAnalysis, type TurnAnalysis } from './analysis.ts';
 import { DECIDED_SCORE } from './turn-analysis/types.ts';
 import { KEY_TURN_SWING } from './graph.ts';
-import { koPhrase, phrase } from './prose/phrases.ts';
+import { displayBest, koPhrase, phrase, regretText } from './prose/phrases.ts';
 import { SPOKEN_MASS } from './types.ts';
 import { winDeltaText, winPercent } from './winprob.ts';
 import { sideIndex } from '@fulllifegames/replay-core';
@@ -367,13 +367,16 @@ export function seedsOfTheLoss(known: TurnAnalysis[], loser: Side, turningPoint:
     .sort((a, b) => a.turn - b.turn);
 }
 
-/** One seed, as "turn N (played, regret — safer was better)"; the played move's analytic odds ground the claim (round 6). */
+/**
+ * One seed, as "turn N (played, regret; safer was better)"; the played move's analytic odds ground the claim (round 6).
+ * Round 64 (T123): a regret over 1 reads as the two win chances it spans (regretText), the frame without the dash.
+ */
 export function seedPhrase(analysis: TurnAnalysis, loser: Side): string {
   const side = analysis[loser];
   const setup = playedSetupMove(side) ? '; a setup move the engine may undervalue' : '';
-  const better = side.bestNull?.alternative?.label ?? side.best!.label;
+  const better = displayBest(side);
   const odds = side.played!.koOdds;
   const oddsBit = odds ? ` (${odds.label ? `${phrase(odds.label)}: ` : ''}${koPhrase(odds)})` : '';
   return `turn ${analysis.turn} (${phrase(side.played!.label)}${oddsBit}, ` +
-    `${winDeltaText(-(side.regret ?? 0))} — safer was ${phrase(better)}${setup})`;
+    `${regretText(side.regret ?? 0, better.ev, side.played!.ev)}; safer was ${phrase(better.label)}${setup})`;
 }

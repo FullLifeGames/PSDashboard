@@ -65,6 +65,18 @@ describe('SideRow', () => {
     expect(screen.getByText('· sacked Weavile (77% HP)')).toHaveAttribute('title', expect.stringContaining('paid it back'));
   });
 
+  test('a regret over 1 shows the two win chances it spans, the real regret in the title (T123 point 8, 2630685175 t8 shape)', () => {
+    const played = rankedChoice('move taunt 1, move bodypress 2', 'Taunt→Calyrex-Ice + Body Press→Terapagos-Stellar', -0.767);
+    const best = rankedChoice('move astralbarrage, move bodypress 1', 'Astral Barrage + Body Press→Calyrex-Ice', 0.92);
+    const { rerender } = render(<SideRow name="Alice" side={misplayedSide('mistake', { played, best, safe: best, regret: 1.687 })} />);
+    const chipText = `mistake · ${winPctText(0.92)} to ${winPctText(-0.767)}`;
+    expect(chipText).toBe('mistake · 85% to 19%');
+    expect(screen.getByText(chipText)).toHaveAttribute('title', expect.stringContaining('regret 1.69 on the score scale from −1 to 1'));
+    expect(screen.queryByText(/−84%/)).toBeNull();
+    rerender(<SideRow name="Alice" side={misplayedSide()} />);
+    expect(screen.getByText(`mistake · ${winDeltaText(-0.25)}`)).toBeInTheDocument();
+  });
+
   test('a sack note names the other bodies the side lost on the turn (T123 point 10, 912045 t1 shape)', () => {
     const { rerender } = render(<SideRow name="Alice" side={sideAnalysis({ sacrifice: { name: 'Ogerpon', hpFraction: 0.09, alsoFell: ['Rillaboom'] } })} />);
     expect(screen.getByText('· sacked Ogerpon (9% HP), also lost Rillaboom')).toBeInTheDocument();

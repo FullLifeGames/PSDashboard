@@ -172,6 +172,7 @@ value playedSetupMove
 value proveForcedWin
 value reconstructBranchRuntime
 value reconstructionReached
+value regretText
 value releaseBrokenClaims
 value requiredChoicesForActiveSlots
 value resolveSideChoices

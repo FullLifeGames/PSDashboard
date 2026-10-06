@@ -1,4 +1,4 @@
-import { type GameReport, type LeadAnalysis, rollText, winDeltaText } from '@fulllifegames/eval-engine';
+import { type GameReport, type LeadAnalysis, regretText, rollText, winDeltaText } from '@fulllifegames/eval-engine';
 import type { TurnEvalSettings } from '../hooks/useEvaluation';
 import { attributionBadge, leadTier } from './eval-badges';
 import { sideIndex } from '@fulllifegames/replay-core';
@@ -108,7 +108,9 @@ function MisplayChip({ misplay, playerNames, onSelectTurn, settingsFor }: {
               {misplay.tier === 'blunder' ? 'blunder · better: ' : 'better: '}{misplay.better}
             </span>
           )}
-      <span style={{ color: tone }}>{winDeltaText(-misplay.regret)}</span>
+      <span style={{ color: tone }}>
+        {misplay.span ? regretText(misplay.regret, misplay.span.from, misplay.span.to) : winDeltaText(-misplay.regret)}
+      </span>
     </button>
   );
 }
