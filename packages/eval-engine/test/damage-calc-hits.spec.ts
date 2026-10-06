@@ -138,6 +138,15 @@ describe('multi-hit moves with a drawn hit count (T124 point 3)', () => {
     expect(calcSingleDamageRange(breloom, { ...blissey, hp: 1 }, move('Bullet Seed')).koChance).toBe('guaranteed OHKO');
   });
 
+  test("an ability that fixes the count wins over the draw: Battle Bond's Water Shuriken shows its three hits (review of wave 1.5)", () => {
+    const gen7 = Generations.get(7);
+    const ash = mon('Greninja-Ash', { ability: 'Battle Bond' }, gen7);
+    const snorlax = mon('Snorlax', { evs: { ...STATS, hp: 252, def: 252 } }, gen7);
+    const result = calcSingleDamageRange(ash, snorlax, move('Water Shuriken'), { gen: 7 });
+    const three = calcDirect(ash, snorlax, 'Water Shuriken', gen7, 3).range();
+    expect([result.minPercent, result.maxPercent]).toEqual([pct(three[0], snorlax.maxhp), pct(three[1], snorlax.maxhp)]);
+  });
+
   test("without an OHKO: the fewest hits' guaranteed verdict holds for every count, else a possible KO in the fewest uses", () => {
     // At 486 HP two hits guarantee a 3HKO, and every larger count a 2HKO.
     const at486 = { ...blissey, hp: 486 };

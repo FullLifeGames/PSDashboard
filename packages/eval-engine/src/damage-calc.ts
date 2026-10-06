@@ -163,24 +163,63 @@ function sharesOf(drawn: readonly number[]): HitCount[] {
 
 const range = (low: number, high: number) => Array.from({ length: high - low + 1 }, (_, index) => low + index);
 
+type GearHolder = Pick<SimPokemonInfo, 'ability' | 'item' | 'species'>;
+type ModifyMoveHandler = (this: unknown, move: unknown, pokemon: unknown, target: unknown) => void;
+
+/** One answer per gen, species, ability, item and move: the handlers read nothing else. */
+const multihitMemo = new Map<string, number | number[] | undefined>();
+
+/**
+ * The move's hit count once the attacker's own ability and item have
+ * reshaped it, as the simulator's ModifyMove event does before the hit loop:
+ * their onModifyMove handlers from the Dex run on the simulator's own copy
+ * of the move (Skill Link takes the top count, Battle Bond gives
+ * Ash-Greninja's Water Shuriken three hits). A handler that asks the battle
+ * for more than the preview holds leaves the copy as it is.
+ */
+function multihitAtUse(gen: number, attacker: GearHolder, moveName: string) {
+  const key = `${gen}|${attacker.species}|${attacker.ability}|${attacker.item}|${moveName}`;
+  if (!multihitMemo.has(key)) multihitMemo.set(key, askModifyMove(gen, attacker, moveName));
+  return multihitMemo.get(key);
+}
+
+function askModifyMove(gen: number, attacker: GearHolder, moveName: string) {
+  const dex = Dex.forGen(gen);
+  const move = dex.getActiveMove(moveName);
+  const pokemon = { species: dex.species.get(attacker.species), transformed: false };
+  for (const effect of [dex.abilities.get(attacker.ability), dex.items.get(attacker.item)]) {
+    const handler = (effect as { onModifyMove?: unknown }).onModifyMove;
+    if (typeof handler !== 'function') continue;
+    try {
+      (handler as ModifyMoveHandler).call(undefined, move, pokemon, null);
+    } catch {
+      // The handler needs the battle itself; the move keeps its count.
+    }
+  }
+  return move.multihit;
+}
+
 /**
  * The hit counts the simulator's hit loop draws for one use of the move
- * (battle-actions hitStepMoveHitLoop), or null when the move lands one
- * fixed count and the calc's own reading stands (Skill Link: the ability's
- * onModifyMove takes the top count, which the calc reads itself). The loop's
- * rules live inline in the simulator, with no handler to ask, so they are
- * mirrored here as in score/move-facts.ts, and
- * test/damage-calc-hit-counts.spec.ts holds them against the simulator's
- * own draws: 2 to 5 hits sample 2/2/2/2/2/2/2/3/3/3/3/3/3/3/4/4/4/5/5/5
- * from gen 5 on and 2/2/2/3/3/3/4/5 before; Loaded Dice turns a count under
- * 4 into 4 or 5 and ten hits into 4 to 10.
+ * (battle-actions hitStepMoveHitLoop), or null when the Dex fixes one count
+ * and the calc's own reading stands. A count the attacker's ability sets
+ * (multihitAtUse) goes to the calc as such. The loop's draws live inline in
+ * the simulator, with no handler to ask, so they are mirrored here as in
+ * score/move-facts.ts, and test/damage-calc-hit-counts.spec.ts holds them
+ * against the simulator's own draws: 2 to 5 hits sample
+ * 2/2/2/2/2/2/2/3/3/3/3/3/3/3/4/4/4/5/5/5 from gen 5 on and 2/2/2/3/3/3/4/5
+ * before; Loaded Dice turns a count under 4 into 4 or 5 and ten hits into
+ * 4 to 10.
  */
-export function hitCounts(gen: number, attacker: Pick<SimPokemonInfo, 'ability' | 'item'>, moveName: string): HitCount[] | null {
-  const multihit = Dex.forGen(gen).moves.get(moveName).multihit;
+export function hitCounts(gen: number, attacker: GearHolder, moveName: string): HitCount[] | null {
+  const listed = Dex.forGen(gen).moves.get(moveName).multihit;
+  const multihit = multihitAtUse(gen, attacker, moveName);
   const loadedDice = gen >= 5 && toId(attacker.item) === 'loadeddice';
   if (!multihit) return null;
-  if (typeof multihit === 'number') return multihit === 10 && loadedDice ? sharesOf(range(4, 10)) : null;
-  if (toId(attacker.ability) === 'skilllink') return null;
+  if (typeof multihit === 'number') {
+    if (multihit === 10 && loadedDice) return sharesOf(range(4, 10));
+    return multihit === listed ? null : [{ hits: multihit, chance: 1 }];
+  }
   const [low, high] = multihit;
   if (low !== 2 || high !== 5) return sharesOf(range(low, high));
   const drawn = gen >= 5 ? [2, 2, 2, 2, 2, 2, 2, 3, 3, 3, 3, 3, 3, 3, 4, 4, 4, 5, 5, 5] : [2, 2, 2, 3, 3, 3, 4, 5];

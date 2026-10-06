@@ -14,7 +14,7 @@ import { battleOf, powerInTurn } from './power-oracle';
  */
 
 const splash = (species: string, extra: Partial<PokemonSet> = {}) => set(species, ['splash'], extra);
-const NO_GEAR = { ability: '', item: '' };
+const gear = (species: string, ability = '', item = '') => ({ species, ability, item });
 
 /** The distribution of a sampled array: each value with its share, fewest hits first. */
 function shares(values: readonly number[]): HitCount[] {
@@ -43,7 +43,7 @@ describe('the hit counts the preview prices are the simulator\'s', () => {
       battle.choose('p1', 'move 1');
       battle.choose('p2', 'move 1');
       expect(sampled.length, format).toBe(1);
-      expect(hitCounts(gen, NO_GEAR, 'Pin Missile'), format).toEqual(shares(sampled[0]));
+      expect(hitCounts(gen, gear('Jolteon'), 'Pin Missile'), format).toEqual(shares(sampled[0]));
     }
   });
 
@@ -53,7 +53,7 @@ describe('the hit counts the preview prices are the simulator\'s', () => {
       const dice = set('Maushold', [id], { item: 'Loaded Dice' });
       // Shuckle outlasts ten hits; a turn whose first hit misses lands none and is left out.
       const counted = seeds.map(seed => hitsInTurn('gen9customgame', dice, splash('Shuckle'), id, seed)).filter(hits => hits > 0);
-      const mirrored = hitCounts(9, { ability: '', item: 'Loaded Dice' }, id)!;
+      const mirrored = hitCounts(9, gear('Maushold', '', 'Loaded Dice'), id)!;
       const seen = shares(counted);
       expect(seen.map(entry => entry.hits), id).toEqual(mirrored.map(entry => entry.hits));
       for (const [index, entry] of seen.entries()) {
@@ -62,15 +62,25 @@ describe('the hit counts the preview prices are the simulator\'s', () => {
         expect(Math.abs(entry.chance - mirrored[index].chance), `${id} ${entry.hits} hits`).toBeLessThan(tolerance);
       }
     }
-    expect(hitCounts(9, { ability: '', item: 'Loaded Dice' }, 'Bullet Seed')).toEqual([{ hits: 4, chance: 0.5 }, { hits: 5, chance: 0.5 }]);
+    expect(hitCounts(9, gear('Maushold', '', 'Loaded Dice'), 'Bullet Seed')).toEqual([{ hits: 4, chance: 0.5 }, { hits: 5, chance: 0.5 }]);
   });
 
-  test('Skill Link and fixed counts leave the calc its own single count', () => {
+  test("an ability that sets the count gives the simulator's count: Skill Link the top, Battle Bond three", () => {
     const link = battleOf('gen9customgame', [set('Cinccino', ['bulletseed'], { ability: 'Skill Link' })], [splash('Snorlax')]);
-    expect(powerInTurn(link, { p1: 'move 1', p2: 'move 1' }, 'bulletseed').length).toBe(5);
-    expect(hitCounts(9, { ability: 'Skill Link', item: '' }, 'Bullet Seed')).toBeNull();
+    const linkHits = powerInTurn(link, { p1: 'move 1', p2: 'move 1' }, 'bulletseed').length;
+    expect(linkHits).toBe(5);
+    expect(hitCounts(9, gear('Cinccino', 'Skill Link'), 'Bullet Seed')).toEqual([{ hits: linkHits, chance: 1 }]);
+    // Battle Bond's own onModifyMove gives Ash-Greninja's Water Shuriken three hits; plain Greninja draws 2 to 5.
+    const ash = set('Greninja-Ash', ['watershuriken'], { ability: 'Battle Bond' });
+    const drawn = Array.from({ length: 12 }, (_, index) => hitsInTurn('gen7customgame', ash, splash('Snorlax'), 'watershuriken', `${index + 1},2,3,4`));
+    expect(new Set(drawn)).toEqual(new Set([3]));
+    expect(hitCounts(7, gear('Greninja-Ash', 'Battle Bond'), 'Water Shuriken')).toEqual([{ hits: 3, chance: 1 }]);
+    expect(hitCounts(7, gear('Greninja', 'Torrent'), 'Water Shuriken')?.map(entry => entry.hits)).toEqual([2, 3, 4, 5]);
+  });
+
+  test('fixed counts from the Dex leave the calc its own single count', () => {
     for (const name of ['Double Hit', 'Surging Strikes', 'Triple Dive', 'Dragon Darts', 'Population Bomb', 'Earthquake']) {
-      expect(hitCounts(9, NO_GEAR, name), name).toBeNull();
+      expect(hitCounts(9, gear('Garchomp'), name), name).toBeNull();
     }
   });
 });
