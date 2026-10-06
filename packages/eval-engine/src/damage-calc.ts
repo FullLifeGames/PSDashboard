@@ -130,8 +130,72 @@ function percentOfMaxHp(damage: number, maxhp: number): number {
   return maxhp > 0 ? Math.round(damage / maxhp * 1000) / 10 : 0;
 }
 
+/** One hit count the simulator can draw for a use of the move, with its chance. */
+export interface HitCount {
+  hits: number;
+  chance: number;
+}
+
+/** Each value of the simulator's sampled array with its share, fewest hits first. */
+function sharesOf(drawn: readonly number[]): HitCount[] {
+  const counts = new Map<number, number>();
+  for (const hits of drawn) counts.set(hits, (counts.get(hits) ?? 0) + 1);
+  return [...counts].sort(([a], [b]) => a - b).map(([hits, count]) => ({ hits, chance: count / drawn.length }));
+}
+
+const range = (low: number, high: number) => Array.from({ length: high - low + 1 }, (_, index) => low + index);
+
+/**
+ * The hit counts the simulator's hit loop draws for one use of the move
+ * (battle-actions hitStepMoveHitLoop), or null when the move lands one
+ * fixed count and the calc's own reading stands (Skill Link: the ability's
+ * onModifyMove takes the top count, which the calc reads itself). The loop's
+ * rules live inline in the simulator, with no handler to ask, so they are
+ * mirrored here as in score/move-facts.ts, and
+ * test/damage-calc-hit-counts.spec.ts holds them against the simulator's
+ * own draws: 2 to 5 hits sample 2/2/2/2/2/2/2/3/3/3/3/3/3/3/4/4/4/5/5/5
+ * from gen 5 on and 2/2/2/3/3/3/4/5 before; Loaded Dice turns a count under
+ * 4 into 4 or 5 and ten hits into 4 to 10.
+ */
+export function hitCounts(gen: number, attacker: Pick<SimPokemonInfo, 'ability' | 'item'>, moveName: string): HitCount[] | null {
+  const multihit = Dex.forGen(gen).moves.get(moveName).multihit;
+  const loadedDice = gen >= 5 && toId(attacker.item) === 'loadeddice';
+  if (!multihit) return null;
+  if (typeof multihit === 'number') return multihit === 10 && loadedDice ? sharesOf(range(4, 10)) : null;
+  if (toId(attacker.ability) === 'skilllink') return null;
+  const [low, high] = multihit;
+  if (low !== 2 || high !== 5) return sharesOf(range(low, high));
+  const drawn = gen >= 5 ? [2, 2, 2, 2, 2, 2, 2, 3, 3, 3, 3, 3, 3, 3, 4, 4, 4, 5, 5, 5] : [2, 2, 2, 3, 3, 3, 4, 5];
+  return sharesOf(loadedDice ? drawn.flatMap(hits => (hits < 4 ? [4, 5] : [hits, hits])) : drawn);
+}
+
 /** The calc gives exact KO odds up to four hits; past that it only estimates, and the picker stays quiet. */
 const MAX_KO_HITS = 4;
+
+type CalcResult = ReturnType<typeof calculate>;
+type PricedCount = { chance: number; result: CalcResult };
+
+/** The calc's rounding of a KO chance in its texts (0.1 % to 99.9 %). */
+const chancePercent = (chance: number) => Math.max(Math.min(Math.round(chance * 1000), 999), 1) / 10;
+
+/**
+ * The KO verdict over the hit counts the move can draw. Counts that agree
+ * keep the calc's text. A count that can OHKO gives the exact OHKO chance:
+ * each count's own chance, weighed by how often it is drawn. Past one use the
+ * count is drawn again each time, which the calc does not price, so a
+ * verdict holds only when the fewest hits guarantee it (every larger count
+ * does at least as much); otherwise a KO in the fewest uses any count
+ * reaches is possible.
+ */
+function koOverCounts(priced: PricedCount[]): { n: number; text: string } {
+  const verdicts = priced.map(({ chance, result }) => ({ share: chance, ...result.kochance(false) }));
+  if (verdicts.every(verdict => verdict.text === verdicts[0].text)) return verdicts[0];
+  const ohko = verdicts.reduce((sum, verdict) => sum + (verdict.n === 1 ? verdict.share * (verdict.chance ?? 0) : 0), 0);
+  if (ohko > 0) return { n: 1, text: ohko >= 1 ? 'guaranteed OHKO' : `${chancePercent(ohko)}% chance to OHKO` };
+  if (verdicts[0].chance === 1) return verdicts[0];
+  const n = Math.min(...verdicts.map(verdict => verdict.n).filter(hits => hits >= 1));
+  return { n, text: `possible ${n}HKO` };
+}
 
 /**
  * The calc's own KO verdict against the defender's current HP
@@ -139,9 +203,9 @@ const MAX_KO_HITS = 4;
  * recovery included), so a damaged target a third-of-max hit finishes
  * reads as a KO.
  */
-function koChanceOf(result: ReturnType<typeof calculate>, maxDamage: number): string {
+function koChanceOf(priced: PricedCount[], maxDamage: number): string {
   if (maxDamage <= 0) return '';
-  const { n, text } = result.kochance(false);
+  const { n, text } = priced.length === 1 ? priced[0].result.kochance(false) : koOverCounts(priced);
   return n >= 1 && n <= MAX_KO_HITS ? text : '';
 }
 
@@ -153,24 +217,27 @@ export function calcSingleDamageRange(
 ): DamageResult {
   try {
     const gen = calcGeneration(context);
-    const atkPoke = calcPokemonFrom(gen, attacker);
-    const defPoke = calcPokemonFrom(gen, defender);
-
-    const result = calculate(
+    const overrides = moveLanding(gen, attacker, moveOption, context);
+    const priceAt = (hits?: number): CalcResult => calculate(
       gen,
-      atkPoke,
-      defPoke,
+      calcPokemonFrom(gen, attacker),
+      calcPokemonFrom(gen, defender),
       // The attacker's ability and item reach the move too: Skill Link sets five hits.
       new Move(gen, moveOption.name, {
         ability: (attacker.ability || undefined) as CalcAbility,
         item: (attacker.item || undefined) as CalcItem,
         species: attacker.species as CalcSpecies,
-        overrides: moveLanding(gen, attacker, moveOption, context),
+        overrides,
+        ...(hits ? { hits } : {}),
       }),
       calcField(context),
     );
-    // A multi-hit move deals the sum of its hits; the calc sums them itself (T96).
-    const [minDamage, maxDamage] = result.range();
+    // A multi-hit move deals the sum of its hits; the calc sums them itself (T96). A drawn hit
+    // count spans the fewest hits' minimum to the most hits' maximum, every count priced (T124).
+    const counts = overrides?.multihit ? null : hitCounts(gen.num, attacker, moveOption.name);
+    const priced = counts ? counts.map(({ hits, chance }) => ({ chance, result: priceAt(hits) })) : [{ chance: 1, result: priceAt() }];
+    const minDamage = Math.min(...priced.map(({ result }) => result.range()[0]));
+    const maxDamage = Math.max(...priced.map(({ result }) => result.range()[1]));
     const minPct = percentOfMaxHp(minDamage, defender.maxhp);
     const maxPct = percentOfMaxHp(maxDamage, defender.maxhp);
 
@@ -179,7 +246,7 @@ export function calcSingleDamageRange(
       minPercent: minPct,
       maxPercent: maxPct,
       range: `${minPct}% - ${maxPct}%`,
-      koChance: koChanceOf(result, maxDamage),
+      koChance: koChanceOf(priced, maxDamage),
     };
   } catch {
     return emptyDamageResult(moveOption.name);

@@ -20,9 +20,9 @@ function set(species: string, moves: string[], extra: Partial<PokemonSet> = {}):
   };
 }
 
-function battle(format: 'gen9customgame' | 'gen9doublescustomgame', p1: PokemonSet[], p2: PokemonSet[]): Battle {
+function battle(format: 'gen9customgame' | 'gen9doublescustomgame', p1: PokemonSet[], p2: PokemonSet[], seed = 1): Battle {
   const created = new Battle({
-    formatid: toID(format), seed: [1, 2, 3, 4],
+    formatid: toID(format), seed: [seed, 2, 3, 4],
     p1: { name: 'Alpha', team: Teams.pack(p1) }, p2: { name: 'Beta', team: Teams.pack(p2) },
   });
   if (created.sides.some(side => side.requestState === 'teampreview')) {
@@ -256,5 +256,72 @@ describe('the KO text reads the defender\'s current HP (review of wave 1)', () =
     expect(blissey.koChance).not.toContain('OHKO');
     const { log } = play(current, 'move earthquake, move splash', 'move splash, move splash');
     expect(log).toContain('|faint|p2a: Snorlax');
+  });
+});
+
+/** Seeds for the hit-count checks: enough turns that every count the simulator draws turns up. */
+const SEEDS = Array.from({ length: 60 }, (_, index) => index + 1);
+/** A wall that never takes a crit: the roll and the hit count stay the only luck the range covers. */
+const armored = (species: string) => set(species, ['Splash'], { evs: { ...STATS, hp: 252, def: 252 }, ability: 'Battle Armor' });
+const hitCountOf = (log: string) => log.match(/\|-hitcount\|[^|]+\|(\d+)/)?.[1] ?? '0';
+
+describe('a drawn hit count lands inside the preview (T124 point 3)', () => {
+  test('singles: every Bullet Seed lies in the range, 2 to 5 hits and with Loaded Dice 4 or 5', () => {
+    for (const item of ['', 'Loaded Dice']) {
+      const counts = new Set<string>();
+      for (const seed of SEEDS) {
+        const current = battle('gen9customgame', [set('Breloom', ['Bullet Seed'], { item })], [armored('Snorlax')], seed);
+        const range = preview(current).p1.default[0][0];
+        const { lost, log } = play(current, 'move bulletseed', 'move splash');
+        expectPlainHits(log);
+        counts.add(hitCountOf(log));
+        expectInside(range, lost[0], current.sides[1].active[0].maxhp);
+      }
+      expect([...counts].sort(), item || 'no item').toEqual(item ? ['4', '5'] : ['2', '3', '4', '5']);
+    }
+  });
+
+  test('doubles: the Bullet Seed row into one foe holds every drawn count', () => {
+    const counts = new Set<string>();
+    for (const seed of SEEDS) {
+      const current = battle('gen9doublescustomgame',
+        [set('Breloom', ['Bullet Seed']), set('Corviknight', ['Splash'])], [armored('Snorlax'), armored('Blissey')], seed);
+      const range = preview(current).p1.targets[0]['1:1'];
+      const { lost, log } = play(current, 'move bulletseed 1, move splash', 'move splash, move splash');
+      expectPlainHits(log);
+      counts.add(hitCountOf(log));
+      expectInside(range, lost[0], current.sides[1].active[0].maxhp);
+      expect(lost[1]).toBe(0);
+    }
+    expect([...counts].sort()).toEqual(['2', '3', '4', '5']);
+  });
+
+  test('Loaded Dice Population Bomb lands 4 to 10 hits, all inside the range', () => {
+    const counts = new Set<string>();
+    for (const seed of SEEDS) {
+      const current = battle('gen9customgame', [set('Maushold', ['Population Bomb'], { item: 'Loaded Dice' })], [armored('Snorlax')], seed);
+      const range = preview(current).p1.default[0][0];
+      const { lost, log } = play(current, 'move populationbomb', 'move splash');
+      // The move's own accuracy still rolls once; Loaded Dice drops only the roll per hit.
+      if (log.includes('|-miss|')) continue;
+      counts.add(hitCountOf(log));
+      expectInside(range, lost[0], current.sides[1].active[0].maxhp);
+    }
+    expect([...counts].map(Number).sort((a, b) => a - b)).toEqual([4, 5, 6, 7, 8, 9, 10]);
+  });
+
+  test('the previewed OHKO chance matches the share of knockouts over 400 seeded turns', () => {
+    // At 100 HP two or three hits never knock Snorlax out, four hits sometimes, five always.
+    const scene = (seed: number) => {
+      const current = battle('gen9customgame', [set('Breloom', ['Bullet Seed'])], [armored('Snorlax')], seed);
+      current.sides[1].active[0].sethp(100);
+      return current;
+    };
+    const text = preview(scene(1)).p1.default[0][0].koChance;
+    const chance = Number(text.match(/^([\d.]+)% chance to OHKO$/)?.[1]) / 100;
+    expect(chance, text).toBeGreaterThan(0.15);
+    const turns = Array.from({ length: 400 }, (_, index) => index + 1);
+    const knockouts = turns.filter(seed => play(scene(seed), 'move bulletseed', 'move splash').log.includes('|faint|p2a: Snorlax')).length;
+    expect(Math.abs(knockouts / turns.length - chance)).toBeLessThan(3 * Math.sqrt(chance * (1 - chance) / turns.length));
   });
 });

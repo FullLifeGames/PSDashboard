@@ -26,13 +26,14 @@ function move(name: string, targetType = 'normal'): BranchMoveOption {
   return { name, activeSlot: 0, slot: 1, pp: 16, maxpp: 16, disabled: false, type: '', targetType, requiresTarget: false, targetOptions: [] };
 }
 
-/** The calc's own result for the same two Pokémon, built straight from @smogon/calc. */
-function calcDirect(attacker: SimPokemonInfo, defender: SimPokemonInfo, name: string, gen = gen9) {
+/** The calc's own result for the same two Pokémon, built straight from @smogon/calc; `hits` asks for one hit count. */
+function calcDirect(attacker: SimPokemonInfo, defender: SimPokemonInfo, name: string, gen = gen9, hits?: number) {
   const poke = (info: SimPokemonInfo) => new Pokemon(gen, info.species, {
     level: info.level, ability: info.ability || undefined, item: info.item || undefined, nature: info.nature,
     evs: info.evs, ivs: info.ivs, curHP: info.hp,
   });
-  return calculate(gen, poke(attacker), poke(defender), new Move(gen, name, { ability: attacker.ability as never }), new Field({ gameType: 'Singles' }));
+  const options = { ability: attacker.ability as never, item: (attacker.item || undefined) as never, ...(hits ? { hits } : {}) };
+  return calculate(gen, poke(attacker), poke(defender), new Move(gen, name, options), new Field({ gameType: 'Singles' }));
 }
 
 const pct = (damage: number, maxhp: number) => Math.round(damage / maxhp * 1000) / 10;
@@ -88,5 +89,61 @@ describe('multi-hit moves in the damage preview', () => {
     const [min, max] = calcDirect(garchomp, kingambit, 'Earthquake').range();
     const result = calcSingleDamageRange(garchomp, kingambit, move('Earthquake', 'allAdjacent'));
     expect([result.minPercent, result.maxPercent]).toEqual([pct(min, kingambit.maxhp), pct(max, kingambit.maxhp)]);
+  });
+});
+
+/**
+ * T124 point 3: a move whose hit count the simulator draws (2 to 5 hits, or
+ * Population Bomb under Loaded Dice) shows every count it can land, each
+ * priced by the calc; the counts and their chances are the simulator's
+ * (35/35/15/15 from gen 5 on, Loaded Dice 4 or 5 and 4 to 10; held against
+ * the simulator in damage-calc-hit-counts.spec.ts).
+ */
+describe('multi-hit moves with a drawn hit count (T124 point 3)', () => {
+  const breloom = mon('Breloom');
+  const blissey = mon('Blissey', { evs: { ...STATS, hp: 252, def: 252 } });
+  const spanOf = (attacker: SimPokemonInfo, defender: SimPokemonInfo, name: string, fewest: number, most: number) =>
+    [pct(calcDirect(attacker, defender, name, gen9, fewest).range()[0], defender.maxhp), pct(calcDirect(attacker, defender, name, gen9, most).range()[1], defender.maxhp)];
+
+  test("2 to 5 hits span the fewest hits' minimum to the most hits' maximum, singles and doubles", () => {
+    for (const gameType of ['Singles', 'Doubles'] as const) {
+      const result = calcSingleDamageRange(breloom, blissey, move('Bullet Seed'), { gameType });
+      expect([result.minPercent, result.maxPercent], gameType).toEqual(spanOf(breloom, blissey, 'Bullet Seed', 2, 5));
+    }
+  });
+
+  test('Loaded Dice lands 4 or 5 hits of a 2 to 5 hit move, and 4 to 10 of Population Bomb', () => {
+    const dice = mon('Breloom', { item: 'Loaded Dice' });
+    const seed = calcSingleDamageRange(dice, blissey, move('Bullet Seed'));
+    expect([seed.minPercent, seed.maxPercent]).toEqual(spanOf(dice, blissey, 'Bullet Seed', 4, 5));
+    const maushold = mon('Maushold', { item: 'Loaded Dice' });
+    const bomb = calcSingleDamageRange(maushold, blissey, move('Population Bomb'));
+    expect([bomb.minPercent, bomb.maxPercent]).toEqual(spanOf(maushold, blissey, 'Population Bomb', 4, 10));
+    // Without Loaded Dice the ten hits stay the calc's own count: the preview reads a move that connects.
+    const plain = calcSingleDamageRange(mon('Maushold'), blissey, move('Population Bomb'));
+    expect([plain.minPercent, plain.maxPercent]).toEqual(spanOf(mon('Maushold'), blissey, 'Population Bomb', 10, 10));
+  });
+
+  test("the OHKO chance weighs every count by its chance; agreeing counts keep the calc's text", () => {
+    // At 329 HP only 4 and 5 hits knock Blissey out: 0.15 x 99.6 % + 0.15 x 100 %.
+    const damaged = { ...blissey, hp: 329 };
+    const ohko = (hits: number) => {
+      const verdict = calcDirect(breloom, damaged, 'Bullet Seed', gen9, hits).kochance(false);
+      return verdict.n === 1 ? verdict.chance ?? 0 : 0;
+    };
+    const chance = 0.35 * ohko(2) + 0.35 * ohko(3) + 0.15 * ohko(4) + 0.15 * ohko(5);
+    expect(chance).toBeGreaterThan(0.15);
+    expect(chance).toBeLessThan(0.3);
+    expect(calcSingleDamageRange(breloom, damaged, move('Bullet Seed')).koChance).toBe(`${Math.round(chance * 1000) / 10}% chance to OHKO`);
+    expect(calcSingleDamageRange(breloom, { ...blissey, hp: 1 }, move('Bullet Seed')).koChance).toBe('guaranteed OHKO');
+  });
+
+  test("without an OHKO: the fewest hits' guaranteed verdict holds for every count, else a possible KO in the fewest uses", () => {
+    // At 486 HP two hits guarantee a 3HKO, and every larger count a 2HKO.
+    const at486 = { ...blissey, hp: 486 };
+    expect(calcDirect(breloom, at486, 'Bullet Seed', gen9, 2).kochance(false).text).toBe('guaranteed 3HKO');
+    expect(calcSingleDamageRange(breloom, at486, move('Bullet Seed')).koChance).toBe('guaranteed 3HKO');
+    // At full HP two hits may need four uses, five hits always take two: two uses can do it, not always.
+    expect(calcSingleDamageRange(breloom, blissey, move('Bullet Seed')).koChance).toBe('possible 2HKO');
   });
 });
