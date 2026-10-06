@@ -38,7 +38,7 @@ describe('the hazard sack', () => {
       [mon('Charizard', 'Charizard', 80, true)],
     );
     expect(detectSacks(events, before)).toEqual({
-      p1: { name: 'Weavile', hpFraction: 63 / 281, healthy: true, hazard: true },
+      p1: { name: 'Weavile', species: 'Weavile', hpFraction: 63 / 281, healthy: true, hazard: true },
     });
   });
 
@@ -53,7 +53,7 @@ describe('the hazard sack', () => {
       [mon('Chi-Yu', 'Chi-Yu', 100, true)],
       [mon('Rillaboom', 'Rillaboom', 100, true), mon('Amoonguss', 'Amoonguss', 40, false)],
     );
-    expect(detectSacks(events, before).p2).toEqual({ name: 'Amoonguss', hpFraction: 0.4, healthy: true, hazard: true });
+    expect(detectSacks(events, before).p2).toEqual({ name: 'Amoonguss', species: 'Amoonguss', hpFraction: 0.4, healthy: true, hazard: true });
   });
 
   test('a replacement after a move (a pivot or an end-of-turn switch) killed by hazards is no hazard sack', () => {

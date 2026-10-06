@@ -216,3 +216,69 @@ describe('the read credit on a doubles pair', () => {
     expect(analysis.p1.riskPaidOff).toBeUndefined();
   });
 });
+
+/**
+ * Round 63 fix: a body the opponent's near-decided click removes is the
+ * opponent's way into its sweep, so letting it fall is no win-condition
+ * sacrifice (649664 t20: "Medicham-Mega is one sure KO from clearing the
+ * rest — removing Lopunny-Mega …", then "BKC fed Lopunny … verified").
+ */
+describe('no praise for feeding the body the opponent\'s near sweep removes', () => {
+  const stayedFeed = (args: {
+    near?: { side: 'p1' | 'p2'; species: string; removes: string };
+    sack: SackInfo;
+    doubles?: boolean;
+  }) => {
+    const result: EvalResult = {
+      score: 0.35, interval: 0, depthCompleted: 1,
+      perSide: args.doubles
+        ? {
+          p1: [
+            ranked('switch 3, move protect', '→ Incineroar + Protect', 0.1, 0.3, 0.4, 'Heat Wave + Protect'),
+            ranked('move bloodmoon 1, move protect', 'Blood Moon→Chi-Yu + Protect', -0.1, 0.3, 0.38, 'Heat Wave + Protect'),
+          ],
+          p2: [ranked('move heatwave, move protect', 'Heat Wave + Protect', -0.2, -0.2, -0.2, null)],
+        }
+        : {
+          p1: [
+            ranked('switch 4', '→ Excadrill', 0.1, 0.3, 0.4, 'Fake Out'),
+            ranked('move return', 'Return 102', -0.1, 0.3, 0.38, 'Fake Out'),
+          ],
+          p2: [ranked('move fakeout', 'Fake Out', -0.2, -0.2, -0.2, null)],
+        },
+      ...(args.near ? { unanswered: { p1: [], p2: [], nearDecided: { ...args.near, odds: 1 } } } : {}),
+    };
+    return analyzeTurn({
+      turn: 20, result,
+      played: args.doubles
+        ? {
+          p1: null, p2: null,
+          p1Slots: [{ kind: 'move', name: 'Blood Moon', targetLoc: 1 }, { kind: 'move', name: 'Protect', targetLoc: null }],
+          p2Slots: [{ kind: 'move', name: 'Heat Wave', targetLoc: null }, { kind: 'move', name: 'Protect', targetLoc: null }],
+        }
+        : { p1: { kind: 'move', name: 'Return' }, p2: { kind: 'move', name: 'Fake Out' } },
+      playedOutcome: -0.1, futureOutcomes: [0.2, 0.4],
+      scoreBefore: 0.35, scoreAfter: -0.12,
+      sacks: { p1: args.sack },
+    });
+  };
+  const lopunny: SackInfo = { name: 'Lopunny', species: 'Lopunny-Mega', hpFraction: 0.63, stayed: true };
+
+  test('singles, 649664 t20: Medicham-Mega\'s near click removes Lopunny-Mega, so BKC feeding it earns no stamp', () => {
+    const analysis = stayedFeed({ near: { side: 'p2', species: 'Medicham-Mega', removes: 'Lopunny-Mega' }, sack: lopunny });
+    expect(analysis.p1.sacrifice).toBeUndefined();
+    expect(summarizeTurn(analysis, names)).not.toContain('fed Lopunny');
+  });
+
+  test('doubles, 912045 t7: the near click removes the fed Chi-Yu, so no stamp either', () => {
+    const chiYu: SackInfo = { name: 'Chi-Yu', species: 'Chi-Yu', hpFraction: 0.25, stayed: true };
+    const analysis = stayedFeed({ near: { side: 'p2', species: 'Ursaluna-Bloodmoon', removes: 'Chi-Yu' }, sack: chiYu, doubles: true });
+    expect(analysis.p1.sacrifice).toBeUndefined();
+  });
+
+  test('guards: a near click on another body, or the own side\'s near stage, leaves the stamp', () => {
+    expect(stayedFeed({ near: { side: 'p2', species: 'Medicham-Mega', removes: 'Excadrill' }, sack: lopunny }).p1.sacrifice?.verified).toBe(true);
+    expect(stayedFeed({ near: { side: 'p1', species: 'Lopunny-Mega', removes: 'Medicham-Mega' }, sack: lopunny }).p1.sacrifice?.verified).toBe(true);
+    expect(stayedFeed({ sack: lopunny }).p1.sacrifice?.verified).toBe(true);
+  });
+});

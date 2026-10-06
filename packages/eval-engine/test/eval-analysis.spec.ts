@@ -152,7 +152,7 @@ describe('sacrifice detection', () => {
       '|faint|p1a: Dauni',
     ];
     // Round 63: the switch-in fell to the rocks before acting, so the low-HP feed also carries the hazard mark.
-    expect(detectSacks(events, sackSnapshot(9))).toEqual({ p1: { name: 'Dauni', hpFraction: 0.09, hazard: true } });
+    expect(detectSacks(events, sackSnapshot(9))).toEqual({ p1: { name: 'Dauni', species: 'Uxie', hpFraction: 0.09, hazard: true } });
     expect(detectSacks(events, sackSnapshot(45))).toEqual({});
     expect(detectSacks(events, null)).toEqual({});
   });
@@ -169,7 +169,7 @@ describe('sacrifice detection', () => {
       '|faint|p1a: Relous',
     ];
     expect(detectSacks(events, sackSnapshot(46))).toEqual({
-      p1: { name: 'Relous', hpFraction: 116 / 253, healthy: true },
+      p1: { name: 'Relous', species: 'Salazzle', hpFraction: 116 / 253, healthy: true },
     });
   });
 
@@ -180,7 +180,7 @@ describe('sacrifice detection', () => {
     expect(detectSacks(['|drag|p1a: Dauni|Uxie, L50|120/182', '|faint|p1a: Dauni'], sackSnapshot(66))).toEqual({});
     expect(detectSacks(['|switch|p1a: Relous|Salazzle, F|116/253'], sackSnapshot(46))).toEqual({});
     expect(detectSacks(['|faint|p1a: Dauni'], sackSnapshot(46))).toEqual({
-      p1: { name: 'Dauni', hpFraction: 0.46, stayed: true },
+      p1: { name: 'Dauni', species: 'Uxie', hpFraction: 0.46, stayed: true },
     });
   });
 
@@ -193,12 +193,12 @@ describe('sacrifice detection', () => {
       '|faint|p1a: Dauni',
     ];
     expect(detectSacks(events, sackSnapshot(46))).toEqual({
-      p1: { name: 'Dauni', hpFraction: 0.46, stayed: true },
+      p1: { name: 'Dauni', species: 'Uxie', hpFraction: 0.46, stayed: true },
     });
     // Dragged in this turn = not a deliberate stay; below the low-HP
     // threshold = shape 1 as before; absent from the snapshot = no claim.
     expect(detectSacks(['|drag|p1a: Dauni|Uxie, L50|120/182', '|faint|p1a: Dauni'], sackSnapshot(66))).toEqual({});
-    expect(detectSacks(['|faint|p1a: Dauni'], sackSnapshot(9))).toEqual({ p1: { name: 'Dauni', hpFraction: 0.09 } });
+    expect(detectSacks(['|faint|p1a: Dauni'], sackSnapshot(9))).toEqual({ p1: { name: 'Dauni', species: 'Uxie', hpFraction: 0.09 } });
     expect(detectSacks(['|faint|p1a: Ghost'], sackSnapshot(46))).toEqual({});
   });
 

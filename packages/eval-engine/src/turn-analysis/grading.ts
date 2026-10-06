@@ -1,3 +1,4 @@
+import { Dex } from '@pkmn/dex';
 import type { RankedChoice } from '../types.ts';
 import type { PlayedAction, SackInfo } from '../played.ts';
 import {
@@ -243,6 +244,20 @@ function hazardSackPayoff(params: AnalyzeTurnParams, key: Side, safe: RankedChoi
 }
 
 /**
+ * Round 63 fix: the fed body is the one the opponent's near-decided click
+ * removes — the opponent's way into its sweep, so letting it fall is no
+ * win-condition sacrifice (649664 t20: Medicham-Mega one sure KO from
+ * clearing the rest by removing Lopunny-Mega, the body BKC fed). Formes of
+ * one species are one body (Lopunny and Lopunny-Mega), read from the Dex.
+ */
+function feedsOpposingSweep(params: AnalyzeTurnParams, key: Side, sack: SackInfo): boolean {
+  const near = params.result.unanswered?.nearDecided;
+  if (!near || near.side === key || !sack.species) return false;
+  const base = (species: string) => Dex.species.get(species).baseSpecies || species;
+  return base(near.removes) === base(sack.species);
+}
+
+/**
  * Round 63 (T17): praise without a band. An UNTIERED side earns the
  * sacrifice stamp only in the two verified forms — a stayed feed through
  * the priced-floor gate (573756 t68) or a hazard sack through the
@@ -259,6 +274,7 @@ function praisedSack(
   const { sack, played, safe, regret } = g;
   if (!sack || regret === null || g.neverActed || deniedByDice(sack, played)) return false;
   if ((key === 'p1' ? params.scoreBefore : -params.scoreBefore) <= -DECIDED_SCORE) return false;
+  if (feedsOpposingSweep(params, key, sack)) return false;
   const payoff = sack.stayed ? stayedFeedPayoff(params, key, played, safe)
     : sack.hazard ? hazardSackPayoff(params, key, safe) : null;
   return payoff !== null && payoff >= regret + RISK_PAYOFF_MARGIN;

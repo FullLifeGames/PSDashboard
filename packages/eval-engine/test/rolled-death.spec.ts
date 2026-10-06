@@ -41,20 +41,20 @@ describe('a death after the mon\'s own dice-failed action', () => {
       '|-damage|p1a: Dauni|0 fnt',
       '|faint|p1a: Dauni',
     ];
-    expect(detectSacks(missed, sackSnapshot(11))).toEqual({ p1: { name: 'Dauni', hpFraction: 0.11, rolled: 'miss' } });
+    expect(detectSacks(missed, sackSnapshot(11))).toEqual({ p1: { name: 'Dauni', species: 'Uxie', hpFraction: 0.11, rolled: 'miss' } });
     // Older logs carry only the |-miss| line.
     expect(detectSacks(missed.filter(line => !line.includes('[miss]')), sackSnapshot(11)))
-      .toEqual({ p1: { name: 'Dauni', hpFraction: 0.11, rolled: 'miss' } });
+      .toEqual({ p1: { name: 'Dauni', species: 'Uxie', hpFraction: 0.11, rolled: 'miss' } });
     // A dice |cant| (full paralysis, flinch, freeze, sleep) is the same shape; Taunt is not dice.
     const paralyzed = ['|cant|p1a: Dauni|par', '|move|p2a: Wall|Body Press|p1a: Dauni', '|-damage|p1a: Dauni|0 fnt', '|faint|p1a: Dauni'];
-    expect(detectSacks(paralyzed, sackSnapshot(11))).toEqual({ p1: { name: 'Dauni', hpFraction: 0.11, rolled: 'cant' } });
+    expect(detectSacks(paralyzed, sackSnapshot(11))).toEqual({ p1: { name: 'Dauni', species: 'Uxie', hpFraction: 0.11, rolled: 'cant' } });
     const taunted = ['|cant|p1a: Dauni|move: Taunt|Toxic', '|move|p2a: Wall|Body Press|p1a: Dauni', '|-damage|p1a: Dauni|0 fnt', '|faint|p1a: Dauni'];
-    expect(detectSacks(taunted, sackSnapshot(11))).toEqual({ p1: { name: 'Dauni', hpFraction: 0.11 } });
+    expect(detectSacks(taunted, sackSnapshot(11))).toEqual({ p1: { name: 'Dauni', species: 'Uxie', hpFraction: 0.11 } });
     // The opponent's miss says nothing about the fainted mon's own action.
     const theirMiss = ['|move|p2a: Wall|Stone Edge|p1a: Dauni|[miss]', '|-miss|p2a: Wall|p1a: Dauni', '|-damage|p1a: Dauni|0 fnt|[from] Stealth Rock', '|faint|p1a: Dauni'];
-    expect(detectSacks(theirMiss, sackSnapshot(11))).toEqual({ p1: { name: 'Dauni', hpFraction: 0.11 } });
+    expect(detectSacks(theirMiss, sackSnapshot(11))).toEqual({ p1: { name: 'Dauni', species: 'Uxie', hpFraction: 0.11 } });
     // The stayed shape carries the flag too.
-    expect(detectSacks(missed, sackSnapshot(46))).toEqual({ p1: { name: 'Dauni', hpFraction: 0.46, stayed: true, rolled: 'miss' } });
+    expect(detectSacks(missed, sackSnapshot(46))).toEqual({ p1: { name: 'Dauni', species: 'Uxie', hpFraction: 0.46, stayed: true, rolled: 'miss' } });
   });
 
   test('a rolled death with a knock-out chance is no sack; without odds the feed reading stands', () => {

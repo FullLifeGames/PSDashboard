@@ -13,6 +13,12 @@ import { CHANCE_CANT } from '../dice-events.ts';
 /** A Pokémon fed to the opponent while nearly dead — its loss cost almost nothing. */
 export interface SackInfo {
   name: string;
+  /**
+   * Round 63: the fed body's species (the pre-turn snapshot's forme, or the
+   * switch line's details) — the verdict layer matches it against the
+   * opposing near-decided target. Absent when neither names it.
+   */
+  species?: string;
   hpFraction: number;
   /**
    * The fed body was HEALTHY (switched in and fainted the same turn above
@@ -59,7 +65,7 @@ export interface SackInfo {
 const SACK_HP_THRESHOLD = 0.15;
 
 /** Latest deliberate switch-in per slot ident this turn (drags excluded). */
-type Entered = Map<string, { name: string; hpFraction: number }>;
+type Entered = Map<string, { name: string; species: string; hpFraction: number }>;
 
 /**
  * The sack a faint line reads as, in shape order: the low-HP feed (pre-turn
@@ -82,20 +88,20 @@ function sackForFaint(
     toId(entry.name) === nameId || toId(entry.speciesForme) === nameId);
   if (pokemon?.fainted) return undefined;
   if (pokemon && pokemon.hpPercent / 100 <= SACK_HP_THRESHOLD) {
-    return { name, hpFraction: pokemon.hpPercent / 100 };
+    return { name, species: pokemon.speciesForme, hpFraction: pokemon.hpPercent / 100 };
   }
   // The healthy candidate stands on the switch line alone — a body first
   // REVEALED by the sack switch-in is absent from the pre-turn snapshot.
   const fed = entered.get(`${side}${slot}`);
   if (fed && fed.hpFraction > SACK_HP_THRESHOLD) {
-    return { name, hpFraction: fed.hpFraction, healthy: true };
+    return { name, species: fed.species, hpFraction: fed.hpFraction, healthy: true };
   }
   // STAY-AND-DIE CANDIDATE: active since the turn began (neither switched
   // nor dragged in this turn) and above the low-HP threshold. The verdict
   // layer decides whether certainty + payoff justify the feed framing.
   if (!fed && !dragged.has(`${side}${slot}`) && pokemon &&
     pokemon.hpPercent / 100 > SACK_HP_THRESHOLD) {
-    return { name, hpFraction: pokemon.hpPercent / 100, stayed: true };
+    return { name, species: pokemon.speciesForme, hpFraction: pokemon.hpPercent / 100, stayed: true };
   }
   return undefined;
 }
@@ -123,9 +129,13 @@ interface SackScan {
 
 /** Records one non-faint line; true when the line was consumed. */
 function noteSackLine(scan: SackScan, line: string): boolean {
-  const switchMatch = line.match(/^\|switch\|(p[12][a-d]): ([^|]+)\|[^|]*\|(\d+)\/(\d+)/);
+  const switchMatch = line.match(/^\|switch\|(p[12][a-d]): ([^|]+)\|([^|]*)\|(\d+)\/(\d+)/);
   if (switchMatch) {
-    scan.entered.set(switchMatch[1], { name: switchMatch[2].trim(), hpFraction: Number(switchMatch[3]) / Number(switchMatch[4]) });
+    scan.entered.set(switchMatch[1], {
+      name: switchMatch[2].trim(),
+      species: switchMatch[3].split(',')[0].trim(),
+      hpFraction: Number(switchMatch[4]) / Number(switchMatch[5]),
+    });
     if (!scan.moved) scan.switchPhase.add(switchMatch[1]);
     return true;
   }
