@@ -22,6 +22,8 @@ type AssumptionSet = {
   moves?: string[];
   nature?: string;
   evs?: Partial<Record<'hp' | 'atk' | 'def' | 'spa' | 'spd' | 'spe', number>>;
+  /** @pkmn/smogon's first IV option, completed for a typed Hidden Power (fixIVs). */
+  ivs?: Partial<Record<'hp' | 'atk' | 'def' | 'spa' | 'spd' | 'spe', number>>;
 };
 
 /** A published sets file: species, then set name; a move slot or the item is one name or its options. */
@@ -162,6 +164,8 @@ function normalizeSet(
     item: set.item ? slotAssumption(set.item, published?.item, detail) : undefined,
     moves: (set.moves ?? []).slice(0, 4).map((move, index) => slotAssumption(move, published?.moves?.[index], detail)),
     spread: spreadAssumption(set, detail),
+    // Round 64 (T122): the IVs as published (Speed 0, Attack 0).
+    ...(set.ivs && Object.keys(set.ivs).length > 0 ? { ivs: { ...set.ivs } } : {}),
   };
 }
 

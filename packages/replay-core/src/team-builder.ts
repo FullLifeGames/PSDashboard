@@ -74,15 +74,17 @@ function buildTeams(log: string, options: BuildOptions): { teams: BuiltTeams; in
       .map(set => dexLegalSet(withHappinessAssumption(set), legality));
   const hpFor = (side: 'p1' | 'p2') =>
     (options?.hpEvidence ?? []).filter(entry => entry.attackerSide === side);
+  const hpTyped = (side: 'p1' | 'p2'): HiddenPowerTyping =>
+    set => withHiddenPowerType(set, hpFor(side), options?.usageStats, parseInt(gen, 10));
   const build = (inferred?: Map<string, SpreadCandidate>) => ({
     p1Team: legalize(infos.p1.pokemon.map(pokemon => buildSet(
       pokemon, knownTeams.p1, options?.usageStats, options?.setAssumptions,
-      inferred?.get(`p1:${toId(pokemon.species)}`))))
-      .map(built => withHiddenPowerType(built, hpFor('p1'), options?.usageStats, parseInt(gen, 10))),
+      inferred?.get(`p1:${toId(pokemon.species)}`), hpTyped('p1'))))
+      .map(hpTyped('p1')),
     p2Team: legalize(infos.p2.pokemon.map(pokemon => buildSet(
       pokemon, knownTeams.p2, options?.usageStats, options?.setAssumptions,
-      inferred?.get(`p2:${toId(pokemon.species)}`))))
-      .map(built => withHiddenPowerType(built, hpFor('p2'), options?.usageStats, parseInt(gen, 10))),
+      inferred?.get(`p2:${toId(pokemon.species)}`), hpTyped('p2'))))
+      .map(hpTyped('p2')),
   });
 
   const inferred = inferredSpreadsFor(log, options, build, formatHint, infos, knownTeams);
@@ -176,12 +178,16 @@ function carryPreSolve(solved: Map<string, SpreadCandidate>, preSolved: Map<stri
   }
 }
 
+/** The build's Hidden Power step: a typeless "Hidden Power" takes its type from evidence or usage. */
+type HiddenPowerTyping = (set: PokemonSet) => PokemonSet;
+
 function buildSet(
   info: RevealedPokemonInfo,
   userTeam: PokemonSet[] | null,
   usageStats?: SmogonUsageStats | null,
   setAssumptions?: SmogonSetAssumptions | null,
   inferred?: SpreadCandidate,
+  hpTyped: HiddenPowerTyping = set => set,
 ): PokemonSet {
   const edited = editedFields(info);
   const userMatch = findUserMatch(userTeam, info.species);
@@ -200,7 +206,7 @@ function buildSet(
   const revealedMoves = info.moves.filter(move => move.source === 'revealed').map(move => move.name);
   const spread = resolveSpread(info.species, edited, inferred, curated, usageSet, smogonSet, revealedMoves);
 
-  return {
+  const set: PokemonSet = {
     name: info.species,
     species: info.species,
     item,
@@ -213,6 +219,12 @@ function buildSet(
     gender: (info.gender || '') as '' | 'M' | 'F',
     teraType: info.teraType.value || undefined,
   };
+  // A typeless Hidden Power reads its type before guessed IVs arrive: the step
+  // keeps the type of deliberate (edited) IVs only, and the published or
+  // solved ones are no such choice (round 64, T122: gen 6 Attack 0 would play
+  // a Dragon-type Hidden Power).
+  const default31 = { hp: 31, atk: 31, def: 31, spa: 31, spd: 31, spe: 31 };
+  return edited.editedIvs ? set : { ...hpTyped({ ...set, ivs: default31 }), ivs: spread.ivs };
 }
 
 /**

@@ -12,6 +12,10 @@ import { slotMoveKey } from './move-slots.ts';
 
 type SmogonSet = ReturnType<typeof getSpeciesSetAssumption>;
 type CuratedSet = ReturnType<typeof selectCuratedSet>;
+/** A solved spread; lane H's speed solver may add the IVs a seen move order demands (round 64, decision 28). */
+type SolvedSpread = SpreadCandidate & { ivs?: Partial<PokemonEvs> };
+
+const ALL_31: PokemonSet['ivs'] = { hp: 31, atk: 31, def: 31, spa: 31, spd: 31, spe: 31 };
 
 /** Usage-move candidates fetched per species — vetoes refill from the tail. */
 export const USAGE_MOVE_POOL = 10;
@@ -231,8 +235,23 @@ function spreadEvs(
     defaultEvsFor(species, revealedMoves);
 }
 
+/**
+ * The IVs, stat by stat (round 64, T122 point 4, decision 21): edited ones
+ * win whole, then an IV the speed solver decided, then the IVs the chosen
+ * Smogon set publishes (the first set's when its spread is the one played),
+ * then 31.
+ */
+function spreadIvs(
+  edited: EditedFields, inferred: SolvedSpread | undefined, curated: CuratedSet | null,
+  usageSet: SpeciesUsageSet | null, smogonSet: SmogonSet,
+): PokemonSet['ivs'] {
+  if (edited.editedIvs) return edited.editedIvs;
+  const published = curated ? curated.ivs : !usageSet?.spread ? smogonSet?.ivs : undefined;
+  return { ...ALL_31, ...published, ...inferred?.ivs };
+}
+
 export function resolveSpread(
-  species: string, edited: EditedFields, inferred: SpreadCandidate | undefined, curated: CuratedSet | null,
+  species: string, edited: EditedFields, inferred: SolvedSpread | undefined, curated: CuratedSet | null,
   usageSet: SpeciesUsageSet | null, smogonSet: SmogonSet, revealedMoves: string[] = [],
 ): { nature: PokemonSet['nature']; evs: PokemonSet['evs']; ivs: PokemonSet['ivs'] } {
   const spread = usageSet?.spread;
@@ -240,7 +259,7 @@ export function resolveSpread(
   return {
     nature: spreadNature(edited, inferred, curated, spread, setSpread),
     evs: spreadEvs(species, edited, inferred, curated, spread, setSpread, revealedMoves),
-    ivs: edited.editedIvs || { hp: 31, atk: 31, def: 31, spa: 31, spd: 31, spe: 31 },
+    ivs: spreadIvs(edited, inferred, curated, usageSet, smogonSet),
   };
 }
 

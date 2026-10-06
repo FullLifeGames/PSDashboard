@@ -190,6 +190,25 @@ describe('Smogon set assumptions', () => {
     expect(singles?.pokemon.clefable?.item).toMatchObject({ value: 'Leftovers', options: ['Leftovers', 'Sticky Barb'] });
   });
 
+  test('keeps the published IVs of a set, the first of a list (round 64, T122)', async () => {
+    const singles = await fetchSmogonSetAssumptions({
+      formatId: 'gen9ou', species: ['Alomomola'],
+      fetcher: byUrl({ gen9ou: { Alomomola: {
+        WishFish: { item: 'Heavy-Duty Boots', nature: 'Relaxed', ivs: { spe: 0 }, moves: ['Flip Turn', 'Wish', 'Protect', 'Scald'] },
+        Plain: { item: 'Leftovers', moves: ['Flip Turn', 'Wish', 'Protect', 'Scald'] },
+      } } }) as never,
+    });
+    expect(singles?.pokemon.alomomola?.ivs).toEqual({ spe: 0 });
+    expect(singles?.pokemon.alomomola?.alternatives?.[0].ivs).toBeUndefined();
+    const doubles = await fetchSmogonSetAssumptions({
+      formatId: 'gen9doublesou', species: ['Sinistcha'],
+      fetcher: byUrl({ gen9doublesou: { Sinistcha: {
+        'Trick Room': { item: 'Sitrus Berry', ivs: [{ atk: 0 }, { atk: 0, spe: 0 }], moves: ['Matcha Gotcha', 'Rage Powder', 'Trick Room', 'Protect'] },
+      } } }) as never,
+    });
+    expect(doubles?.pokemon.sinistcha?.ivs).toEqual({ atk: 0 });
+  });
+
   test('a missing fallback file is absence, not failure', async () => {
     const assumptions = await fetchSmogonSetAssumptions({
       formatId: 'gen8ou', species: ['Toxapex', 'Kyurem'], fetcher: byUrl({ gen8ou: toxapexSet }) as never,

@@ -28,6 +28,12 @@ export interface PokemonSetAssumption {
   moves: SetAssumption[];
   spread?: SetSpreadAssumption;
   /**
+   * The IVs the set lists (Trick Room Speed 0, Attack 0 on a special
+   * attacker); absent when it lists none, and the build then plays 31
+   * (round 64, T122). A list of IV options gives its first.
+   */
+  ivs?: Partial<Record<'hp' | 'atk' | 'def' | 'spa' | 'spd' | 'spe', number>>;
+  /**
    * The species' OTHER published sets (this entry is the first). Coherent-set
    * selection scores all of them against revealed evidence — curated sets are
    * internally coherent by construction, unlike marginal assembly.
