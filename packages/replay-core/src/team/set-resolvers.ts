@@ -138,6 +138,10 @@ export function selectCuratedFor(info: RevealedPokemonInfo, smogonSet: SmogonSet
     ruledOutAbilities: info.ruledOut?.abilities ?? [],
     usageProbability: moveId =>
       usageSet?.moves.find(move => toId(move.value) === moveId)?.probability ?? 0,
+    // The item after a rule-out (round 64, decision 19): the info's guess
+    // (the Boots tell, or the enrichment's own pick), then the usage majority.
+    guessedItem: info.item.source === 'guessed' ? itemSetValue(info.item.value) : '',
+    usageItem: usageSet?.item?.value ?? '',
   }) : null;
 }
 

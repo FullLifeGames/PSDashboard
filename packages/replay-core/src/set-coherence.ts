@@ -119,6 +119,14 @@ export interface CuratedEvidence {
   ruledOutAbilities: string[];
   /** Usage marginal probability of a move id (tiebreak; 0..1). */
   usageProbability: (moveId: string) => number;
+  /**
+   * An item the log already points to (the inference's Heavy-Duty Boots
+   * tell, or the panel's own guess): the first replacement when the log
+   * rules out the item of the set the evidence picks (round 64, decision 19).
+   */
+  guessedItem?: string;
+  /** The most used item the log still allows: the replacement after that ('' without usage data). */
+  usageItem?: string;
 }
 
 /** Marginal floor for moves the usage list does not know. */
@@ -158,16 +166,16 @@ function fitScore(candidate: PokemonSetAssumption, ids: CandidateIds, evidence: 
   return fit;
 }
 
-export function selectCuratedSet(
-  candidates: PokemonSetAssumption[],
-  evidence: CuratedEvidence,
+/** The best-fitting candidate; `itemRuleOuts` false reads the item rule-outs as if the log had shown none. */
+function bestCandidate(
+  candidates: PokemonSetAssumption[], evidence: CuratedEvidence, itemRuleOuts: boolean,
 ): PokemonSetAssumption | null {
   let best: PokemonSetAssumption | null = null;
   let bestFit = -Infinity;
   let bestTiebreak = -Infinity;
   for (const candidate of candidates) {
     const ids = candidateIds(candidate);
-    if (ids.itemId && evidence.ruledOutItems.includes(ids.itemId)) continue;
+    if (itemRuleOuts && ids.itemId && evidence.ruledOutItems.includes(ids.itemId)) continue;
     if (ids.abilityId && evidence.ruledOutAbilities.includes(ids.abilityId)) continue;
 
     const fit = fitScore(candidate, ids, evidence);
@@ -181,7 +189,36 @@ export function selectCuratedSet(
       bestTiebreak = tiebreak;
     }
   }
-  return best ? withSlotsResolved(best, evidence) : null;
+  return best;
+}
+
+export function selectCuratedSet(
+  candidates: PokemonSetAssumption[],
+  evidence: CuratedEvidence,
+): PokemonSetAssumption | null {
+  const best = bestCandidate(candidates, evidence, true);
+  if (!best) return null;
+  const resolved = withSlotsResolved(best, evidence);
+  const unruled = bestCandidate(candidates, evidence, false);
+  return unruled && unruled !== best ? withItemAfterRuleOut(resolved, unruled, evidence) : resolved;
+}
+
+/**
+ * The log ruled out the item of the set the evidence picks (`unruled`), so
+ * the next set won, and its item is no evidence (round 64, T120, decision
+ * 19: 2663102863's Gholdengo lost Leftovers and drew the next set's Choice
+ * Specs). It plays a guess the log supports, else the most used item the
+ * log allows, marked as such; without either it keeps its own.
+ */
+function withItemAfterRuleOut(
+  set: PokemonSetAssumption, unruled: PokemonSetAssumption, evidence: CuratedEvidence,
+): PokemonSetAssumption {
+  const allowed = (item: string | undefined): item is string =>
+    !!item && !evidence.ruledOutItems.includes(Dex.items.get(item).id as string);
+  const replacement = [evidence.guessedItem, evidence.usageItem].find(allowed);
+  if (!replacement) return set;
+  const why = replacement === evidence.guessedItem ? `${replacement} guessed from the log` : 'most used other item';
+  return { ...set, item: { value: replacement, sourceDetail: `${unruled.item?.value} ruled out, ${why}` } };
 }
 
 /** The winner's moves with its slots read against the evidence (T89, decision 11). */

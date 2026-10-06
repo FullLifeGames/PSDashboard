@@ -216,6 +216,9 @@ function curatedSetFor(pokemon: RevealedPokemonInfo, usageSet: SpeciesUsage, smo
     ruledOutAbilities: pokemon.ruledOut?.abilities ?? [],
     usageProbability: moveId =>
       usageSet?.moves.find(move => toId(move.value) === moveId)?.probability ?? 0,
+    // The item after a rule-out, as the build reads it (round 64, decision 19).
+    guessedItem: pokemon.item.source === 'guessed' ? itemSetValue(pokemon.item.value) : '',
+    usageItem: usageSet?.item?.value ?? '',
   }) : null;
 }
 
