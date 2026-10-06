@@ -39,22 +39,47 @@ function hintBoard(position: SimPosition, side: 'p1' | 'p2'): HintBoard {
   return { battle, sideState, foeActives, foes, actors };
 }
 
-/** The stats whose stages a damage fraction can read (Body Press reads Defense, Stored Power every boost). */
-const DAMAGE_STAGES = ['atk', 'def', 'spa', 'spd'] as const;
+type DexMove = ReturnType<HintBoard['battle']['dex']['moves']['get']>;
+
+/** Every stat a stage can sit on. */
+const STAGES = ['atk', 'def', 'spa', 'spd', 'spe', 'accuracy', 'evasion'] as const;
+
+/**
+ * The stages a status move gives its user, as the simulator applies them
+ * (round 64, T125): `self.boosts` always land on the user, the move's own
+ * `boosts` on its targets, and the user is among them only for the target
+ * classes 'self' and 'allies' (the simulator's alliesAndSelf). Swagger and
+ * Decorate raise the target, Coaching the ally: none of them is the user's
+ * setup. test/setup-equity.spec.ts plays every Dex move with stages in the
+ * simulator against this reading.
+ */
+export function ownStages(move: DexMove): Partial<BoostsTable> | null {
+  const onUser = move.target === 'self' || move.target === 'allies' ? move.boosts : null;
+  const self = move.self?.boosts;
+  if (!onUser && !self) return null;
+  const stages: Partial<BoostsTable> = {};
+  for (const stat of STAGES) {
+    const stage = (onUser?.[stat] ?? 0) + (self?.[stat] ?? 0);
+    if (stage) stages[stat] = stage;
+  }
+  return Object.keys(stages).length > 0 ? stages : null;
+}
 
 /**
  * Damage-fraction gain a self-boosting move would buy over SETUP_HORIZON
  * turns. Since round 63 (T81) every stage a damage fraction reads counts:
  * Iron Defense buys a Body Press carrier its Defense, Calm Mind buys a
  * Stored Power carrier its power (boostedFraction reads PairThreat.axes).
+ * Since round 64 (T125) only the user's own stages count, all seven of them:
+ * a stage no move of the carrier reads changes no fraction, and Agility buys
+ * Stored Power its power.
  */
 function setupEquity(board: HintBoard, attacker: Pokemon, moveId: string): number {
   const { battle, foes } = board;
-  const move = battle.dex.moves.get(moveId);
-  const boosts = (move.boosts || move.self?.boosts || undefined) as Partial<BoostsTable> | undefined;
-  if (!boosts || DAMAGE_STAGES.every(stat => !boosts[stat])) return 0;
+  const boosts = ownStages(battle.dex.moves.get(moveId));
+  if (!boosts) return 0;
   const stages: Partial<BoostsTable> = {};
-  for (const stat of DAMAGE_STAGES) stages[stat] = clampStage(attacker.boosts[stat] + (boosts[stat] ?? 0));
+  for (const stat of STAGES) stages[stat] = clampStage(attacker.boosts[stat] + (boosts[stat] ?? 0));
   let equity = 0;
   for (const foe of foes) {
     const threat = pairThreat(attacker, foe, battle);

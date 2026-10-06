@@ -2,6 +2,7 @@ import { test, expect, describe } from 'vitest';
 import { Battle, Teams, toID } from '@pkmn/sim';
 import type { Pokemon, PokemonSet } from '@pkmn/sim';
 import { createMatchupCache, pairThreat, threatGetter } from '../src/score/threat';
+import { battleOf } from './power-oracle';
 
 /**
  * Round 49: the matchup memo must be a function of its key. Super Fang,
@@ -259,21 +260,6 @@ describe('the memo keys the power at use (round 63, T81)', () => {
  * whole search. The splits run in the simulator here.
  */
 describe('the memo keys the stats a move reads off its axis (round 64, T125)', () => {
-  function battleOf(format: string, p1: PokemonSet[], p2: PokemonSet[]): Battle {
-    const battle = new Battle({
-      formatid: toID(format),
-      seed: '1,2,3,4',
-      p1: { name: 'Alpha', team: Teams.pack(p1) },
-      p2: { name: 'Beta', team: Teams.pack(p2) },
-    });
-    if (battle.sides.some(side => side.requestState === 'teampreview')) {
-      const order = p1.map((_, index) => index + 1).join('');
-      battle.choose('p1', `team ${order}`);
-      battle.choose('p2', `team ${p2.map((_, index) => index + 1).join('')}`);
-    }
-    return battle;
-  }
-
   /** The pair is asked before the turn; after it the memo must answer like a fresh reading, and the answer must have moved. */
   function missesAfter(battle: Battle, attacker: Pokemon, defender: Pokemon, turn: { p1: string; p2: string }, moved: () => boolean) {
     const cached = threatGetter(battle, createMatchupCache());
