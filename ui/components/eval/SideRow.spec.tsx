@@ -57,7 +57,7 @@ describe('SideRow', () => {
 
   test('a stayed sack the window did not verify claims no payback (T123 point 4, the 573756 t68 shape without verified)', () => {
     // A tiered stayed feed clears the payoff margin but not regret plus margin: demoted, not verified (grading.ts sackVerdict).
-    const { rerender } = render(<SideRow name="Alice" side={misplayedSide('inaccuracy', { sacrifice: { name: 'Weavile', hpFraction: 0.77, stayed: true } })} />);
+    const { rerender } = render(<SideRow name="Alice" side={misplayedSide('mistake', { tier: 'inaccuracy', sacrifice: { name: 'Weavile', hpFraction: 0.77, stayed: true } })} />);
     const note = screen.getByText('· sacked Weavile (77% HP)');
     expect(note).toHaveAttribute('title', expect.stringContaining('payoff window'));
     expect(note.getAttribute('title')).not.toContain('paid it back');
