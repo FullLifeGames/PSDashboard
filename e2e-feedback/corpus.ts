@@ -47,7 +47,7 @@ export interface FeedbackItem {
   turn?: number;
   kind: 'truth' | 'gap';
   /** expert-…: distilled expert claims. round…-gate-…: engine deliverables pinned at a round's user gate. user-…: the user's own expert observations. */
-  source: 'expert-2026-08' | 'round6-gate-2026-08' | 'user-2026-08';
+  source: 'expert-2026-08' | 'round6-gate-2026-08' | 'user-2026-08' | 'user-2026-10';
   essence: string;
   /** truth only — pinned from the user-approved baseline. */
   expect?: TurnClaim | ReportClaim;
@@ -73,24 +73,26 @@ export const FEEDBACK_REPLAYS = [
   'smogtours-gen6ou-649664',
   'smogtours-gen6ou-653785',
   'smogtours-gen6ou-655336',
+  // Round 63 (T45): the first doubles game with a user verdict, moved here from the census list.
+  'gen9vgc2026regi-2630685175',
 ] as const;
 
 /**
  * Census-only replays (round 49): doubles games that run through the same
  * drift run so their dumps exist for the tier census (scripts/tier-census.mjs,
  * standing rule D21). They carry NO corpus items: nothing about them is an
- * expert claim, and the drift report grades nothing on them. All four come
- * from the calibration bank, with the Smogon inputs the bank measures them
- * with. The drift run appends them after FEEDBACK_REPLAYS, so the six pinned
- * replays keep their place in every report.
+ * expert claim, and the drift report grades nothing on them. All come from
+ * the calibration bank, with the Smogon inputs the bank measures them with.
+ * The drift run appends them after FEEDBACK_REPLAYS, so the pinned replays
+ * keep their place in every report.
  * - 2629703929: VGC, both sides bring a visible four, Tailwind, long endgame.
- * - 2630685175: VGC, Trick Room.
  * - 912045: Doubles OU, tournament, Tailwind and Trick Room, long endgame.
  * - 2663093831: Doubles OU, ladder, no speed control.
+ * Round 63 (T45): 2630685175 (VGC, Trick Room) left this list for
+ * FEEDBACK_REPLAYS when the user judged its turn 8; its dump still feeds the census.
  */
 export const FEEDBACK_CENSUS_REPLAYS = [
   'gen9vgc2026regi-2629703929',
-  'gen9vgc2026regi-2630685175',
   'smogtours-gen9doublesou-912045',
   'gen9doublesou-2663093831',
 ] as const;
@@ -167,5 +169,11 @@ export const FEEDBACK_CORPUS: FeedbackItem[] = [
     essence: 'Will-O-Wisp is proposed over the Weavile switch against Charizard-X — Fire types cannot be burned, the suggestion is mechanically useless (the expert: the first gross error). (Re-pinned 2026-08-15: the blunder verdict evaporated once turns 20-23 evaluate and Lopunny lines price — toward the expert, who contested the blunder; the conditional-recommendation narrative stays open. The attached Return branching bug is FIXED — a370c61. Re-pinned again 2026-08-15 round 2, user-approved: tier none → inaccuracy after Tornadus-T\'s typeless Hidden Power resolves to its evidence-proven HP Ice — the t15/t24 super markers refute the old IV-default Dark, so turns 20-23 price with corrected rolls; the endgame also loses 2 reconstructed turns to a seeded sim CRIT the real game did not have (hax alignment — seed search / scripted PRNG — is future-iteration agenda). Re-pinned 2026-08-15 round 3, user-approved: inaccuracy → none — stranded-bench pricing (④ B1) reprices the position and the regret falls below the inaccuracy band; the engine\'s recommendation is now Hex, not the null Will-O-Wisp, so the mechanically-null complaint softens too. Round 5 2026-08-16, user-approved note: the GENERAL null-move guard landed — a mechanically null recommendation now swaps to a co-optimal alternative or carries its enabling-condition caveat, engine-wide (fires on 573756 Toxic→Toxapex and 562428 Toxic/Earthquake→Corviknight); the Will-O-Wisp half of the desired is delivered.) (Round 46 2026-09-18, expert follow-up at the truth gate: the entry stays a gap with a new open half. Both old halves stand: Will-O-Wisp ranks seventh of eight rows, the recommendation is a switch, and the turn reads quiet with no tier (regret 0.0021). The expert\'s point is the played line itself. 3d switches the doomed Weavile (63/281) into Stealth Rock, it faints on entry, Charizard-Mega-X\'s Flare Blitz fails without a target, and Lopunny-Mega comes in for free; BKC answers in kind on turn 20 with Landorus-Therian (24/319), and Return fails. The engine recommends → Tornadus-Therian, the switch that takes the Flare Blitz, and says nothing about the sack. Crediting it belongs with the praise-without-an-error-band work, NextSteps T17.) (Round 57 2026-09-24, user-gated: with Hidden Power priced under its hidden type, most plausibly the bench pair Tornadus-Therian against Dragonite re-prices in the leaves (not measured; the root\'s unanswered list stays p2 [Klefki]); every p1 row that keeps Tornadus healthy gains +0.021 to +0.033 against +0.0067 for → Tornadus-Therian. The played → Weavile, the hazard sack, is now the best row (regret 0, ahead of Pain Split by 0.0032), and the roots of t19 and t20 move +0.018 and +0.049, so the swing crosses the shift threshold (0.193 → 0.224). Both halves point toward the desired and both are fragile: the lead is 0.0032, the root interval 0.18, and on the root\'s gameValue the swing already read 0.284 at round 56 (0.304 now), so quiet → shift lives in the gap between the root\'s score and its gameValue. The gain also leans on Tornadus-Therian answering Dragonite, which the game refutes at t24: the ×4 Hidden Power feeds Dragonite\'s Weakness Policy, which the engine does not model. The credit for the sack itself is still unsaid: the summary names BKC\'s missed Mega + Roost instead. Observed re-pinned quiet → shift.)',
     observed: { side: 'p1', tier: 'none', attribution: ['shift'] },
     desired: 'The hazard sack is recognized and credited: a doomed mon switched into hazards so the opponent\'s attack fails and the next mon enters for free (turn 19 Weavile, turn 20 Landorus-Therian), instead of a turn that says nothing about the sack (through round 56 it read quiet and recommended → Tornadus-Therian into the Flare Blitz; since round 57 it reads shift and ranks → Weavile best by 0.0032 without crediting it). Delivered earlier: mechanically null moves no longer surface as recommendations, and the Return/Frustration id family branches correctly.',
+  },
+  // ---- truth (round 63, T45: the first doubles pin, from the user's verdict of 2026-10-05) ----
+  {
+    replay: 'gen9vgc2026regi-2630685175', turn: 8, kind: 'truth', source: 'user-2026-10',
+    essence: "User verdict 2026-10-05 (T45, held decided losses on the bank): the engine is right — p2's Taunt into Calyrex-Ice instead of Astral Barrage is the mistake. Pinned on the round-63 wave state (p2 mistake, regret 1.697 on the [−1, 1] score scale, best Astral Barrage + Body Press→Terapagos-Stellar). Watch: turn 7 before it reads a forced win for p1 that only holds against the prover's cut of p2's replies (NextSteps T118).",
+    expect: { side: 'p2', tier: 'mistake', attribution: ['p2-decision'], playedLabelIncludes: 'Taunt' },
   },
 ];
