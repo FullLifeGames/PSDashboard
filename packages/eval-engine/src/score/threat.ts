@@ -64,7 +64,8 @@ export interface AxisThreat {
  * reads is constant across the forked positions of one battle, but not all
  * of it, so pairKey carries EVERY read of the memoized function: level, item,
  * ability, choice lock and usable slots, the current types (Protean, Soak,
- * Burn Up), the Tera type, the stored stats it divides (Power Trick, Guard Split), the
+ * Burn Up), the Tera type, the stored stats it divides (Power Trick, Guard Split;
+ * since round 64 also those an off-axis move reads, axisKey), the
  * defender's max HP (forme change, Dynamax) and, where a halving move prices
  * off it, the defender's current HP. A new read inside pairThreat or
  * singleMoveFraction needs its key term (test/threat-memo.spec.ts). Round 57:
@@ -130,7 +131,30 @@ function pairKey(
   const defense = `${defender.types.join('/')}:${defender.terastallized ?? ''}:${defender.storedStats.def}:${defender.storedStats.spd}:${defender.maxhp}`;
   return `${attacker.side.id}:${attacker.name}:${attacker.species.id}:${attacker.level}:${attacker.item}:${attacker.ability}:${lockedMoveId(attacker) ?? ''}:${usable}:${offense}>` +
     `${defender.side.id}:${defender.name}:${defender.species.id}:${defender.level}:${defender.item}:${defender.ability}:${defense}${liveHp}` +
-    landedKey(answers);
+    axisKey(attacker, defender, slots) + landedKey(answers);
+}
+
+/**
+ * The stored stats an off-axis slot reads besides the attacker's atk/spa and
+ * the defender's def/spd (round 64, T125): Body Press the user's Defense,
+ * Foul Play the target's Attack, as the Dex names them. Guard Split and
+ * Power Split write exactly these and leave the four above alone. Both
+ * category variants are keyed, so a move whose category flips at use stays
+ * exact. '' for a pair without such a slot.
+ */
+function axisKey(attacker: Pokemon, defender: Pokemon, slots: Pokemon['moveSlots']): string {
+  const battle = attacker.battle;
+  const { offAxis } = traitsOf(battle);
+  let key = '';
+  for (const slot of slots) {
+    if (!offAxis.has(slot.id)) continue;
+    const move = battle.dex.moves.getByID(slot.id as ID);
+    const offense = (move.overrideOffensivePokemon === 'target' ? defender : attacker).storedStats;
+    const defense = (move.overrideDefensivePokemon === 'source' ? attacker : defender).storedStats;
+    key += `|${slot.id}=${offense[offenseStat(move, true)]}/${offense[offenseStat(move, false)]}` +
+      `/${defense[defenseStat(move, true)]}/${defense[defenseStat(move, false)]}`;
+  }
+  return key;
 }
 
 /**

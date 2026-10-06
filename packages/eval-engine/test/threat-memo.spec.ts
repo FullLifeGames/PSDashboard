@@ -249,3 +249,76 @@ describe('the memo keys the power at use (round 63, T81)', () => {
     expect(cached(pult, lax)).not.toEqual(split);
   });
 });
+
+/**
+ * Round 64 (T125, point 1): Body Press reads the user's Defense and Foul Play
+ * the target's Attack (the Dex's overrideOffensiveStat and
+ * overrideOffensivePokemon), and the key carried neither. Guard Split and
+ * Power Split write those stored stats without touching the four the key
+ * did carry, so a pair asked before the split kept its old answer for the
+ * whole search. The splits run in the simulator here.
+ */
+describe('the memo keys the stats a move reads off its axis (round 64, T125)', () => {
+  function battleOf(format: string, p1: PokemonSet[], p2: PokemonSet[]): Battle {
+    const battle = new Battle({
+      formatid: toID(format),
+      seed: '1,2,3,4',
+      p1: { name: 'Alpha', team: Teams.pack(p1) },
+      p2: { name: 'Beta', team: Teams.pack(p2) },
+    });
+    if (battle.sides.some(side => side.requestState === 'teampreview')) {
+      const order = p1.map((_, index) => index + 1).join('');
+      battle.choose('p1', `team ${order}`);
+      battle.choose('p2', `team ${p2.map((_, index) => index + 1).join('')}`);
+    }
+    return battle;
+  }
+
+  /** The pair is asked before the turn; after it the memo must answer like a fresh reading, and the answer must have moved. */
+  function missesAfter(battle: Battle, attacker: Pokemon, defender: Pokemon, turn: { p1: string; p2: string }, moved: () => boolean) {
+    const cached = threatGetter(battle, createMatchupCache());
+    const before = cached(attacker, defender);
+    expect(before).toEqual(pairThreat(attacker, defender, battle));
+    battle.choose('p1', turn.p1);
+    battle.choose('p2', turn.p2);
+    expect(moved()).toBe(true);
+    expect(cached(attacker, defender)).toEqual(pairThreat(attacker, defender, battle));
+    expect(cached(attacker, defender)).not.toEqual(before);
+  }
+
+  test("singles: Guard Split, then Body Press against a benched foe reads the user's new Defense", () => {
+    const battle = battleOf('gen9customgame',
+      [makeSet('Corviknight', ['bodypress', 'guardsplit'])], [makeSet('Shuckle', ['splash']), makeSet('Blissey', ['splash'])]);
+    const corviknight = battle.sides[0].active[0];
+    const def = corviknight.storedStats.def;
+    missesAfter(battle, corviknight, battle.sides[1].pokemon[1], { p1: 'move 2', p2: 'move 1' }, () => corviknight.storedStats.def > def);
+  });
+
+  test("singles: Power Split, then Foul Play from the bench reads the target's new Attack", () => {
+    const battle = battleOf('gen9customgame',
+      [makeSet('Tauros', ['splash']), makeSet('Sableye', ['foulplay'])], [makeSet('Machamp', ['powersplit'])]);
+    const machamp = battle.sides[1].active[0];
+    const atk = machamp.storedStats.atk;
+    missesAfter(battle, battle.sides[0].pokemon[1], machamp, { p1: 'move 1', p2: 'move 1' }, () => machamp.storedStats.atk < atk);
+  });
+
+  test("doubles: Guard Split into the ally, then Body Press against a foe the split never touched", () => {
+    const battle = battleOf('gen9doublescustomgame',
+      [makeSet('Corviknight', ['bodypress', 'guardsplit']), makeSet('Shuckle', ['splash'])],
+      [makeSet('Blissey', ['splash']), makeSet('Chansey', ['splash'])]);
+    const corviknight = battle.sides[0].active[0];
+    const def = corviknight.storedStats.def;
+    missesAfter(battle, corviknight, battle.sides[1].active[0], { p1: 'move 2 -2, move 1', p2: 'move 1, move 1' },
+      () => corviknight.storedStats.def > def);
+  });
+
+  test("doubles: Power Split into the foe's ally, then Foul Play against the splitter", () => {
+    const battle = battleOf('gen9doublescustomgame',
+      [makeSet('Sableye', ['foulplay']), makeSet('Tauros', ['splash'])],
+      [makeSet('Machamp', ['powersplit']), makeSet('Snorlax', ['splash'])]);
+    const machamp = battle.sides[1].active[0];
+    const atk = machamp.storedStats.atk;
+    missesAfter(battle, battle.sides[0].active[0], machamp, { p1: 'move 1 1, move 1', p2: 'move 1 -2, move 1' },
+      () => machamp.storedStats.atk !== atk);
+  });
+});
