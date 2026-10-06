@@ -286,7 +286,7 @@ describe('natural-language turn summaries', () => {
       scoreAfter: -0.1,
     }), names);
     expect(summary).toContain('Beta played Rock Slide and Rage Fist');
-    expect(summary).toContain("Partner's action hidden — graded on the visible slot.");
+    expect(summary).toContain("Partner's action hidden; graded on the visible slot.");
   });
 
   test('a one-detail difference is condensed into a why clause', () => {

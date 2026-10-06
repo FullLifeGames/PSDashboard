@@ -26,14 +26,17 @@ function readClause(name: string, side: SideAnalysis, opponent: SideAnalysis): s
     `${winDeltaText(side.riskPayoff ?? 0)} over the safe ${choiceNoun(side.safe.label)} (${winPctText(side.safe.worstCase)} guaranteed).${priced}${click}`;
 }
 
+/**
+ * A charitable partial grade must say so — one slot's choice was never
+ * visible (flinch/sleep), so the combo shown is the best consistent one.
+ * Round 64 (T123): the read credit and the inaccuracy say it too.
+ */
+const partialNote = (side: SideAnalysis, verb: 'graded' | 'credited'): string =>
+  side.playedPartial ? ` (Partner's action hidden; ${verb} on the visible slot.)` : '';
+
 export function sideClause(name: string, side: SideAnalysis, opponent: SideAnalysis): string | null {
   const clause = readClause(name, side, opponent) ?? mistakeClause(name, side, opponent);
-  if (!clause) return null;
-  // A charitable partial grade must say so — one slot's choice was never
-  // visible (flinch/sleep), so the combo shown is the best consistent one.
-  return side.playedPartial
-    ? `${clause} (Partner's action hidden — graded on the visible slot.)`
-    : clause;
+  return clause ? `${clause}${partialNote(side, 'graded')}` : null;
 }
 
 /** The principal variation after a choice, as a ", then A · B → C · D" tail. */
@@ -118,7 +121,8 @@ export function readCreditClause(name: string, side: SideAnalysis, ownLuck: numb
     ? ` On top of that, luck contributed ${winDeltaText(ownLuck)} for ${name}.`
     : '';
   return `${name} ${playedVerb(side.played.label)} — a read the engine gave no weight: ${when} it stood ` +
-    `${winDeltaText(credit.payoff)} over the safe ${choiceNoun(side.safe.label)} (${winPctText(side.safe.worstCase)} guaranteed).${luck}`;
+    `${winDeltaText(credit.payoff)} over the safe ${choiceNoun(side.safe.label)} (${winPctText(side.safe.worstCase)} guaranteed).` +
+    `${partialNote(side, 'credited')}${luck}`;
 }
 
 /** Sub-verdict note: a light imprecision worth naming, not blaming. */
@@ -127,7 +131,7 @@ export function inaccuracyClause(name: string, side: SideAnalysis): string | nul
   const shown = displayBest(side);
   return `${name}'s ${phrase(side.played.label)} was an inaccuracy — ` +
     `${phrase(shown.label)} was slightly better (${winPctText(shown.ev)} vs ${winPctText(side.played.ev)}).` +
-    `${oddsNote(side)}${nullNote(side)}${conditionalNote(side)}`;
+    `${oddsNote(side)}${nullNote(side)}${conditionalNote(side)}${partialNote(side, 'graded')}`;
 }
 
 /**
