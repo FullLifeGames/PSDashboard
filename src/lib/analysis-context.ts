@@ -18,17 +18,35 @@ export interface AnalysisGraphData {
 }
 
 /**
+ * Round 64 (T123): how many bodies each side brought, as the protocol's
+ * `|teamsize|` line before turn 1 states it (VGC: 4 of the 6 team preview
+ * lists); null for a side the log does not size.
+ */
+function broughtCounts(snapshots: TurnSnapshot[]): { p1: number | null; p2: number | null } {
+  const counts: { p1: number | null; p2: number | null } = { p1: null, p2: null };
+  for (const line of snapshots[0]?.log ?? []) {
+    const match = line.match(/^\|teamsize\|(p[12])\|(\d+)/);
+    if (match) counts[match[1] as 'p1' | 'p2'] = Number(match[2]);
+  }
+  return counts;
+}
+
+/**
  * Round 63 (T18): the turn's phase for the near sentence — the sweep's own
  * measure first (it counts the bodies a VGC side brought), else the fallen
- * share of the bodies the pre-turn snapshot lists (manual modes record no
- * phase); null without either.
+ * share of the pre-turn snapshot (manual modes record no phase); null
+ * without either. Round 64 (T123): the snapshot share counts the bodies a
+ * side brought, not the six its team preview lists.
  */
-function turnFaintedFraction(graph: AnalysisGraphData, snapshot: TurnSnapshot | undefined, turn: number): number | null {
+export function turnFaintedFraction(graph: AnalysisGraphData, snapshots: TurnSnapshot[], turn: number): number | null {
   const recorded = graph.faintedFractions?.[turn - 1];
   if (recorded !== undefined && recorded !== null) return recorded;
+  const snapshot = snapshots[turn - 1];
   if (!snapshot) return null;
-  const bodies = [...snapshot.p1.pokemon, ...snapshot.p2.pokemon];
-  return bodies.length > 0 ? bodies.filter(pokemon => pokemon.fainted).length / bodies.length : null;
+  const brought = broughtCounts(snapshots);
+  const total = (brought.p1 ?? snapshot.p1.pokemon.length) + (brought.p2 ?? snapshot.p2.pokemon.length);
+  const fallen = [...snapshot.p1.pokemon, ...snapshot.p2.pokemon].filter(pokemon => pokemon.fainted).length;
+  return total > 0 ? fallen / total : null;
 }
 
 export interface TurnAnalysisContext {
@@ -78,7 +96,7 @@ export function analyzeTurnAt(args: {
     ...(args.tendencies ? { tendencies: args.tendencies } : {}),
     actives: context.activesForTurn(turn),
     playedHistory: context.playedHistory,
-    faintedFraction: turnFaintedFraction(graph, context.snapshots[turn - 1], turn),
+    faintedFraction: turnFaintedFraction(graph, context.snapshots, turn),
     ...(args.unansweredSeen ? { unansweredSeen: args.unansweredSeen } : {}),
     ...(args.decidedSeen ? { decidedSeen: args.decidedSeen } : {}),
   });

@@ -1,9 +1,12 @@
 import { describe, expect, test } from 'vitest';
 import { allTurnEvents, type EvalResult } from '@fulllifegames/eval-engine';
 import type { TurnSnapshot } from '@fulllifegames/replay-core';
-import { analyzeTurnAt, computeGameReportData, type AnalysisGraphData, type TurnAnalysisContext } from '../../src/lib/analysis-context';
+import {
+  analyzeTurnAt, computeGameReportData, turnFaintedFraction, type AnalysisGraphData, type TurnAnalysisContext,
+} from '../../src/lib/analysis-context';
 import { evalGraph, evalResult } from '../fixtures/eval-result';
-import { replayFixture } from '../fixtures/replay';
+import { parseReplayLog } from '@fulllifegames/replay-core';
+import { replayData as replayOf, replayFixture } from '../fixtures/replay';
 
 const { replayData, snapshots } = replayFixture('singles');
 
@@ -52,6 +55,40 @@ describe('analyzeTurnAt passes the phase of the turn', () => {
       expect(nearAt(1, graph, context)?.announce).toBe(false);
       expect(nearAt(2, graph, context)?.announce).toBe(true);
     }
+  });
+});
+
+/**
+ * Round 64 (T123 point 7): without a recorded share the fallback counted the
+ * six bodies team preview lists per side, where a VGC side brings four
+ * (2629703929 t9: the sweep's 0.5 against the snapshot's 0.333). The
+ * protocol's own |teamsize| line names how many each side brought.
+ */
+describe('the fallback share counts the bodies each side brought', () => {
+  const vgc = replayOf('vgc');
+  vgc.log = vgc.log.replace('|teampreview\n', '|teampreview|4\n|teamsize|p1|4\n|teamsize|p2|4\n');
+  const vgcSnapshots = parseReplayLog(vgc.log);
+  const vgcGraph: AnalysisGraphData = {
+    scores: vgcSnapshots.map(() => 0.3),
+    results: vgcSnapshots.map(() => evalResult('doubles', {
+      score: 0.3,
+      unanswered: { p1: [], p2: [], nearDecided: { side: 'p1', species: 'Raichu', odds: 0.9, removes: 'Bulbasaur' } },
+    })),
+    played: vgcSnapshots.map(() => null), playedOutcome: vgcSnapshots.map(() => null),
+    verified: vgcSnapshots.map(() => null), sensitivity: vgcSnapshots.map(() => null),
+  };
+
+  test('VGC: two of the eight brought bodies fallen is a quarter, so the near sentence speaks', () => {
+    const fallen = structuredClone(vgcSnapshots);
+    for (const pokemon of fallen[1].p2.pokemon.slice(0, 2)) pokemon.fainted = true;
+    expect(turnFaintedFraction(vgcGraph, fallen, 2)).toBe(0.25);
+    expect(nearAt(2, vgcGraph, contextWith(fallen))?.announce).toBe(true);
+  });
+
+  test('singles: the protocol says six per side, the listed six, so the share is unchanged', () => {
+    const fallen = structuredClone(snapshots);
+    for (const pokemon of fallen[1].p2.pokemon.slice(0, 3)) pokemon.fainted = true;
+    expect(turnFaintedFraction(graphWith(undefined), fallen, 2)).toBe(3 / 12);
   });
 });
 
