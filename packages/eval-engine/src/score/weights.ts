@@ -133,7 +133,8 @@ export interface EvalFeatures {
   /**
    * Win-condition value of standing boosts, split by HOW the sweep would
    * actually play out. Per side, over living mons with a positive offensive
-   * stage, each pair the boost FLIPS (beats 1v1 boosted, loses unboosted)
+   * stage, each pair the boost FLIPS (beats 1v1 boosted, loses unboosted;
+   * since round 64 "unboosted" reads the mon on no stages at all)
    * contributes 1/enemies × hpFraction into exactly ONE cell:
    * fast = the sweeper acts first (movesFirst: priority rule, effective
    * speed, Trick Room), ko = the boosted best-move fraction covers the

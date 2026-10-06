@@ -1,8 +1,8 @@
-import type { Battle, Pokemon } from '@pkmn/sim';
+import type { Battle, BoostsTable, Pokemon } from '@pkmn/sim';
 import { movesFirst } from '../speed.ts';
 import { EVAL_WEIGHTS } from './weights.ts';
 import { hazardEntryFraction } from './hazards.ts';
-import { boostedFraction, livingMons, threatGetter, type MatchupCache, type PairThreat, type StageOverride } from './threat.ts';
+import { boostedFraction, livingMons, threatGetter, type MatchupCache, type PairThreat } from './threat.ts';
 import { healProfile, ppBudget, raceClocks, raceSide, statusResidual, type RaceClocks, type RaceSide } from './races.ts';
 
 /**
@@ -13,9 +13,7 @@ import { healProfile, ppBudget, raceClocks, raceSide, statusResidual, type RaceC
 /**
  * KO-first 1v1 verdict for one pair, same semantics as the matchup term:
  * fewer race-clock turns to KO wins (raceClocks: heal-PP absorption, action
- * economy, PP budgets), priority then speed break ties. The optional
- * override substitutes the attacker's offensive stages (the sweep feature
- * asks "who would this mon beat WITHOUT its boosts?").
+ * economy, PP budgets), priority then speed break ties.
  */
 function beatsPair(
   a: Pokemon,
@@ -23,10 +21,9 @@ function beatsPair(
   threatA: PairThreat,
   threatB: PairThreat,
   battle: Battle,
-  aBoosts?: StageOverride,
 ): boolean {
   const { turnsA, turnsB } = raceClocks(
-    raceSide(a, a.hp / a.maxhp, boostedFraction(threatA, a, b, aBoosts), battle),
+    raceSide(a, a.hp / a.maxhp, boostedFraction(threatA, a, b), battle),
     raceSide(b, b.hp / b.maxhp, boostedFraction(threatB, b, a), battle),
   );
   if (turnsA < turnsB) return true;
@@ -35,6 +32,17 @@ function beatsPair(
 }
 
 interface SweepCells { fastKo: number; fastChip: number; slowKo: number; slowChip: number }
+
+const NO_STAGES: Readonly<BoostsTable> = Object.freeze({ atk: 0, def: 0, spa: 0, spd: 0, spe: 0, accuracy: 0, evasion: 0 });
+
+/**
+ * The mon without its boosts (round 64, T125): a view of the body on no
+ * stages at all, every other read and write going to the view (the idiom of
+ * onStages in move-facts.ts). Resetting only Attack and Special Attack kept a
+ * Calm Mind's Special Defense in the foe's race, a Dragon Dance's Speed in
+ * the move order and an Iron Defense under Body Press.
+ */
+const unboosted = (pokemon: Pokemon): Pokemon => Object.create(pokemon, { boosts: { value: NO_STAGES } }) as Pokemon;
 
 /** One side's sweep cells (see EvalFeatures.sweepFastKo). */
 export function sweepCells(
@@ -52,7 +60,7 @@ export function sweepCells(
       const threatA = threat(a, b);
       const threatB = threat(b, a);
       if (!beatsPair(a, b, threatA, threatB, battle) ||
-        beatsPair(a, b, threatA, threatB, battle, { atk: 0, spa: 0 })) {
+        beatsPair(unboosted(a), b, threatA, threatB, battle)) {
         continue;
       }
       const weight = (1 / theirs.length) * (a.hp / a.maxhp);
