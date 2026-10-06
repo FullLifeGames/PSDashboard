@@ -20,10 +20,11 @@ function set(species: string, item: string, ability: string, moves: string[], le
 
 /**
  * The spectators' log: each `|split|` keeps its public line, as a replay does.
- * `format` names a format whose rules fix the abilities (OU); the default
- * custom game lets any species hold any ability.
+ * `format` defaults to OU, whose rules fix each species' abilities; a custom
+ * game lets any species hold any ability, and the inference then judges
+ * nothing that hangs on an ability (round 64, T125).
  */
-function play(p1: PokemonSet[], p2: PokemonSet[], turns: [string, string][], doubles = false, gen = 9, format = 'customgame'): string {
+function play(p1: PokemonSet[], p2: PokemonSet[], turns: [string, string][], doubles = false, gen = 9, format = 'ou'): string {
   const battle = new Battle({
     formatid: toID(doubles ? `gen${gen}doubles${format}` : `gen${gen}${format}`), seed: '1,2,3,4',
     p1: { name: 'Alpha', team: Teams.pack(p1) }, p2: { name: 'Beta', team: Teams.pack(p2) },
@@ -232,5 +233,54 @@ describe('Shell Bell heals its holder after a hit below full HP (round 64, T120,
     const blocked = (item: string) => ou([chip()], [slow(item)], [['move psychicnoise', 'move bodyslam']]);
     expect(shown(blocked('Shell Bell'), 'Shell Bell')).toBe(false);
     expect(ruledOut(blocked('Expert Belt'), 'Snorlax')).not.toContain('shellbell');
+  });
+});
+
+describe('T125 point 4: the slot map, gen 4 Life Orb and free abilities (round 64, decision 20)', () => {
+  test('doubles: after Ally Switch the slot map follows the swap, so a benched Leftovers holder is not judged', () => {
+    // Singles is not affected: Ally Switch fails without a partner. Snorlax holds Leftovers,
+    // Psychic Noise keeps them silent for two turns, Ally Switch moves Snorlax to slot a,
+    // and slot a switches out: the benched Snorlax shows no heal and must not be judged.
+    const p1 = [set('Mew', '', 'Synchronize', ['Tackle']), set('Blissey', '', 'Natural Cure', ['Seismic Toss', 'Psychic Noise'])];
+    const p2 = [
+      set('Kadabra', '', 'Synchronize', ['Ally Switch', 'Calm Mind']), set('Snorlax', 'Leftovers', 'Thick Fat', ['Curse']),
+      set('Chansey', '', 'Natural Cure', ['Soft-Boiled']),
+    ];
+    const log = play(p1, p2, [
+      ['move tackle 1, move psychicnoise 2', 'move calmmind, move curse'],
+      ['move tackle 1, move seismictoss 1', 'move allyswitch, move curse'],
+      ['move tackle 2, move seismictoss 2', 'switch 3, move calmmind'],
+    ], true, 9, 'ou');
+    expect(log).toMatch(/\|swap\|p2a: Kadabra\|1\|\[from\] move: Ally Switch/);
+    expect(log).toMatch(/\|switch\|p2a: Chansey/);
+    expect(shown(log, 'Leftovers')).toBe(false);
+    expect(ruledOut(log, 'Snorlax')).not.toContain('leftovers');
+    expect(ruledOut(log, 'Kadabra')).toContain('leftovers');
+  });
+
+  test('gen 4: a fixed-damage hit skips the base-power step that arms Life Orb, so its missing recoil rules nothing out', () => {
+    const tosser = (item: string) => set('Blissey', item, 'Natural Cure', ['Seismic Toss']);
+    const singles = (item: string, gen: number) => play([wall()], [tosser(item)], [['move recover', 'move seismictoss']], false, gen, 'ou');
+    expect(shown(singles('Life Orb', 4), 'Life Orb')).toBe(false);
+    expect(ruledOut(singles('Life Orb', 4), 'Blissey')).not.toContain('lifeorb');
+    // Checker: from gen 5 on the recoil follows every damaging move, Seismic Toss included.
+    expect(shown(singles('Life Orb', 5), 'Life Orb')).toBe(true);
+    expect(ruledOut(singles('Expert Belt', 5), 'Blissey')).toContain('lifeorb');
+    const p1 = [wall(), set('Chansey', '', 'Natural Cure', ['Soft-Boiled'])];
+    const p2 = [tosser('Life Orb'), set('Skarmory', '', 'Sturdy', ['Roost'])];
+    const doubles = play(p1, p2, [['move recover, move softboiled', 'move seismictoss 1, move roost']], true, 4, 'ou');
+    expect(shown(doubles, 'Life Orb')).toBe(false);
+    expect(ruledOut(doubles, 'Blissey')).not.toContain('lifeorb');
+  });
+
+  test('a format with free abilities: a species without Magic Guard in its list may still hold it, so nothing is ruled out', () => {
+    const guarded = set('Rattata', 'Life Orb', 'Magic Guard', ['Tackle']);
+    const singles = play([wall()], [guarded], [['move recover', 'move tackle']], false, 9, 'customgame');
+    expect(shown(singles, 'Life Orb')).toBe(false);
+    expect(ruledOut(singles, 'Rattata')).not.toContain('lifeorb');
+    const p1 = [wall(), set('Blissey', '', 'Natural Cure', ['Soft-Boiled'])];
+    const doubles = play(p1, [guarded, set('Talonflame', '', 'Gale Wings', ['Roost'])],
+      [['move recover, move softboiled', 'move tackle 1, move roost']], true, 9, 'customgame');
+    expect(ruledOut(doubles, 'Rattata')).not.toContain('lifeorb');
   });
 });

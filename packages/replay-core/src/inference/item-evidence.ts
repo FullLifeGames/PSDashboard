@@ -1,5 +1,6 @@
 import { Battle, Dex } from '@pkmn/sim';
 import { findPokemon, ruleOut, type InferrerState } from './inferrer-state.ts';
+import type { RevealedPokemonInfo } from '../types.ts';
 import { toId } from '../ids.ts';
 
 /**
@@ -66,13 +67,23 @@ function newWatch(): ItemWatch {
   };
 }
 
-/** Abilities the Pokémon may have: the known one, else its species' minus the rule-outs; null when unknown. */
+/** The ability the log or the user proved ('' when only guessed or unknown). */
+function provenAbility(info: RevealedPokemonInfo | undefined): string {
+  return info && (info.ability.source === 'revealed' || info.ability.source === 'manual') ? toId(info.ability.value) : '';
+}
+
+/**
+ * Abilities the Pokémon may have: the known one, else its species' minus the
+ * rule-outs; null when unknown, and in a format whose rules let any species
+ * hold any ability (the simulator's rule table, round 64, T125).
+ */
 function possibleAbilities(state: InferrerState, ident: string): Set<string> | null {
   const key = keyOf(ident);
   const opponent = key.startsWith(state.opponentSide);
   const info = opponent ? findPokemon(state, key.slice(4)) : undefined;
-  const known = info && (info.ability.source === 'revealed' || info.ability.source === 'manual') ? toId(info.ability.value) : '';
+  const known = provenAbility(info);
   if (known) return new Set([known]);
+  if (state.custom) return null;
   const species = info?.species ?? state.identSpecies.get(ident);
   const entry = species ? Dex.forGen(state.gen).species.get(species) : null;
   if (!entry?.exists) return null;
@@ -84,13 +95,15 @@ function possibleAbilities(state: InferrerState, ident: string): Set<string> | n
  * Illusion shows another party member's name (round 63 review): any
  * absence line on the side could belong to the disguised Pokémon, so a
  * team that may hold an Illusion user is not judged. The abilities come
- * from the Dex of the replay's generation; a revealed ability decides.
+ * from the Dex of the replay's generation; a revealed ability decides; in a
+ * format with free abilities any unknown one may be Illusion.
  */
 function illusionPossible(state: InferrerState): boolean {
   const dex = Dex.forGen(state.gen);
   return [...state.pokemonMap.values()].some(mon => {
-    const known = mon.ability.source === 'revealed' || mon.ability.source === 'manual' ? toId(mon.ability.value) : '';
+    const known = provenAbility(mon);
     if (known) return known === 'illusion';
+    if (state.custom) return true;
     const entry = dex.species.get(mon.species.replace(/-\*$/, ''));
     return entry.exists && Object.values(entry.abilities ?? {}).some(name => toId(String(name)) === 'illusion');
   });
@@ -106,10 +119,18 @@ function ruleOutUnknown(state: InferrerState, key: string, itemId: string) {
   ruleOut(state, nickname, 'items', itemId);
 }
 
-/** Whether a Life Orb on the attacker would have shown its recoil after this hit. */
+/**
+ * Whether a Life Orb on the attacker would have shown its recoil after this
+ * hit. Gen 4's Life Orb arms its recoil in the base-power step (the
+ * simulator's onBasePower), which a fixed-damage move (Seismic Toss, Super
+ * Fang: `damage` or `damageCallback`) never runs (round 64, T125).
+ */
 function lifeOrbWouldShow(state: InferrerState, watch: ItemWatch, action: ActionWatch): boolean {
-  const move = Dex.forGen(state.gen).moves.get(action.move);
+  const dex = Dex.forGen(state.gen);
+  const move = dex.moves.get(action.move);
   if (!move.exists || move.category === 'Status' || move.flags.futuremove) return false;
+  const armsAtBasePower = !!(dex.items.get('lifeorb') as { onBasePower?: unknown }).onBasePower;
+  if (armsAtBasePower && (move.damage || move.damageCallback)) return false;
   const abilities = possibleAbilities(state, action.ident);
   if (!abilities || abilities.has('magicguard') || abilities.has('klutz')) return false;
   if (abilities.has('sheerforce') && move.secondaries) return false;
@@ -257,6 +278,23 @@ function onHp({ watch, parts, key, opponent }: LineContext) {
   if (watch.residual?.has(key) && current >= max) watch.residualSilenced.add(key);
 }
 
+/**
+ * Ally Switch (`|swap|p2a: Kadabra|1|`): the Pokémon leaves its position for
+ * the numbered one and the Pokémon there takes its place (round 64, T125: a
+ * stale map judged a benched Leftovers holder after the next switch).
+ */
+function onSwap({ watch, parts, opponent }: LineContext) {
+  if (!opponent) return;
+  const from = (parts[2] ?? '').slice(0, 3);
+  const to = `${from.slice(0, 2)}${'abcd'[Number(parts[3])] ?? ''}`;
+  const moved = watch.slots.get(from);
+  const other = watch.slots.get(to);
+  if (!moved || to === from) return;
+  watch.slots.set(to, moved);
+  if (other) watch.slots.set(from, other);
+  else watch.slots.delete(from);
+}
+
 function onFaint({ watch, key }: LineContext) {
   for (const [slot, holder] of watch.slots) if (holder === key) watch.slots.delete(slot);
   watch.residual?.delete(key);
@@ -291,7 +329,7 @@ function noteHeldItem(watch: ItemWatch, { parts, line, key }: LineContext) {
 }
 
 const BOARD: Record<string, (context: LineContext) => void> = {
-  switch: onEntry, drag: onEntry, replace: onEntry,
+  switch: onEntry, drag: onEntry, replace: onEntry, swap: onSwap,
   '-damage': onHp, '-heal': onHp, '-sethp': onHp,
   faint: onFaint, '-start': onCondition, '-end': onCondition, '-fieldstart': onField, '-fieldend': onField,
 };
