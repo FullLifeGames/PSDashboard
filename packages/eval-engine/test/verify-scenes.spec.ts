@@ -43,11 +43,13 @@ function flat(position: Scene, result: EvalResult) {
 }
 
 describe('verify scenes: every class one ply deeper (round 63, T16)', () => {
-  test('648453 t13: p1 loses the note only the first draw carried (0.1018 before; MC 0.0832)', { timeout: 300_000 }, async () => {
+  test('648453 t13: p1 agrees with the Monte-Carlo reference (inaccuracy 0.118 and 0.119 on two seed blocks; 0.1018 from the first draw before)', { timeout: 300_000 }, async () => {
+    // Under the wave's static (T81 without STAB) the note is real: the reference re-prices the same verify
+    // cells with 40 fresh draws each, one ply deeper, and keeps the inaccuracy the first draw used to carry alone.
     const position = scene('smogtours-gen6ou-648453-t13');
     const analysis = flat(position, await search(position));
-    expect(analysis.p1.regret!).toBeLessThan(0.1);
-    expect(analysis.p1.tier ?? null).toBeNull();
+    expect(analysis.p1.tier).toBe('inaccuracy');
+    expect(Math.abs(analysis.p1.regret! - 0.118)).toBeLessThan(0.02);
   });
 
   test('573756 t73: Body Press keeps its inaccuracy (MC 0.1312; three averaged draws lost it in round 62)', { timeout: 300_000 }, async () => {
@@ -57,14 +59,15 @@ describe('verify scenes: every class one ply deeper (round 63, T16)', () => {
     expect(analysis.p1.tier).toBe('inaccuracy');
   });
 
-  test("912045 t8 (doubles): p1's flat verdict falls from the first draw's blunder to the Monte-Carlo reference's inaccuracy", { timeout: 300_000 }, async () => {
+  test("912045 t8 (doubles): p1's flat verdict agrees with the Monte-Carlo reference (none, 0.015 and 0.016 on two seed blocks; the first draw's blunder 0.478 before)", { timeout: 300_000 }, async () => {
     // Before, the fallback cell Earth Power + Matcha Gotcha × Earth Power + Tera + Drain Punch read −0.9
     // through its first draw and p1's played Blood Moon line graded a blunder (0.4778). Doubles verify
-    // cells now go deeper through their heaviest outcome (the doubles time bound); the reference reads
-    // an inaccuracy (0.174 and 0.183 on two seed blocks).
+    // cells now go deeper through their heaviest outcome (the doubles time bound); under the wave's
+    // static the reference reads no tier (0.015 and 0.016 on two seed blocks, 24 draws per cell).
     const position = scene('smogtours-gen9doublesou-912045-t8');
     const analysis = flat(position, await search(position));
-    expect(analysis.p1.tier).toBe('inaccuracy');
+    expect(analysis.p1.tier ?? null).toBeNull();
+    expect(analysis.p1.regret!).toBeLessThan(0.05);
   });
 });
 

@@ -104,16 +104,18 @@ describe('the bank builds the teams the app ships', () => {
     expect(unpinned).toEqual([]);
   }, 120_000);
 
-  test('the retired build differs in the four known rows of 648453', async () => {
+  test('the retired build differs in the three known rows of 648453', async () => {
     const replay = fixture(SINGLES);
     const { parsed, seed, usageStats, setAssumptions } = await knowledgeFor(replay);
     const app = buildAppTeams(replay.log, seed, { usageStats, setAssumptions });
     const old = await withRawBuild(() => bankTeams(replay, parsed));
-    // Round 63 (T89): both builds read the published move slots, so the old
-    // build now picks Volcanion's Leftovers set too, and Ferrothorn's solved
-    // spread is where the two diverge instead.
+    // Round 63: both builds read the published move slots (T89), so the old
+    // build picks Volcanion's Leftovers set too; and the settled move orders
+    // (T117) keep p1 Tornadus-Therian's Speed (Timid 252 Spe, not Hardy
+    // 252 Atk), so p2 Ferrothorn solves to the old build's Relaxed
+    // 88 Def / 168 SpD again.
     expect(moved(rows(old), rows(app)))
-      .toEqual(['p1:Tornadus-Therian', 'p2:Ferrothorn', 'p2:Landorus-Therian', 'p2:Tornadus-Therian']);
+      .toEqual(['p1:Tornadus-Therian', 'p2:Landorus-Therian', 'p2:Tornadus-Therian']);
     // The scene the round is named after: the old build explains the move
     // order with speed EVs.
     expect(itemOf(old, 'p2', 'Landorus-Therian')).toBe('Rocky Helmet');
