@@ -253,7 +253,7 @@ describe('natural-language turn summaries', () => {
       scoreBefore: 0.1,
       scoreAfter: -0.25,
     }), names);
-    expect(summary).toContain('a read that paid off one turn later, +18% over the safe switching to Dragapult');
+    expect(summary).toContain('a read that paid off one turn later, +18% over the safe switch to Dragapult');
   });
 
   test('a hidden partner slot is disclosed in the summary', () => {
@@ -285,7 +285,7 @@ describe('natural-language turn summaries', () => {
       scoreBefore: 0.1,
       scoreAfter: -0.1,
     }), names);
-    expect(summary).toContain('Beta played Rock Slide + Rage Fist');
+    expect(summary).toContain('Beta played Rock Slide and Rage Fist');
     expect(summary).toContain("Partner's action hidden — graded on the visible slot.");
   });
 
@@ -331,7 +331,7 @@ describe('natural-language turn summaries', () => {
       scoreBefore: 0.1,
       scoreAfter: -0.25,
     }), names);
-    expect(summary).toContain('Beta played Recover — a read that paid off, +13% over the safe switching to Dragapult');
+    expect(summary).toContain('Beta played Recover — a read that paid off, +13% over the safe switch to Dragapult');
     expect(summary).toContain('The floor priced in Reply; Draco Meteor came instead.');
     expect(summary).not.toContain('safer was');
   });

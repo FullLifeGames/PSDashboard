@@ -1,5 +1,6 @@
 import type { SideAnalysis } from '../analysis.ts';
 import type { KoOddsInfo } from '../types.ts';
+import { splitCombinedLabel } from '../turn-analysis/played-match.ts';
 import { winPctText } from '../winprob.ts';
 
 /**
@@ -11,6 +12,27 @@ import { winPctText } from '../winprob.ts';
 
 /** Choice labels read as prose: "→ Dragapult" becomes "switching to Dragapult". */
 export const phrase = (label: string) => (label.startsWith('→ ') ? `switching to ${label.slice(2)}` : label);
+
+/**
+ * Round 64 (T123): the gerund fits a subject ("switching to Heatran was
+ * worth"), not an object. What a side did reads as a verb per slot
+ * ("switched to Keldeo", "switched to Calyrex-Shadow and played Protect"),
+ * a line after "the safe" as a noun per slot ("switch to Volcanion",
+ * "switch to Chi-Yu and Collision Course→Chien-Pao"). A doubles pair splits
+ * into its slots, a Tera or Mega marker staying with its move.
+ */
+export const playedVerb = (label: string): string =>
+  splitCombinedLabel(label)
+    .map(part => (part.startsWith('→ ') ? { verb: 'switched to', object: part.slice(2) } : { verb: 'played', object: part }))
+    // Two slots of one kind share the verb: "played Tailwind and Solar Beam→Groudon".
+    .map((slot, index, slots) => (index > 0 && slots[index - 1].verb === slot.verb ? slot.object : `${slot.verb} ${slot.object}`))
+    .join(' and ');
+
+/** The noun form of a line, for "the safe …" (see playedVerb). */
+export const choiceNoun = (label: string): string =>
+  splitCombinedLabel(label)
+    .map(part => (part.startsWith('→ ') ? `switch to ${part.slice(2)}` : part))
+    .join(' and ');
 
 export const playedBest = (side: SideAnalysis) =>
   side.played !== null && side.best !== null && side.played.choice === side.best.choice;

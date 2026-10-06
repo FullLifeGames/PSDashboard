@@ -2,7 +2,7 @@ import { TIER_THRESHOLDS, diffChoices, playedSetupMove, type SideAnalysis } from
 import type { RankedChoice } from '../types.ts';
 import { winDeltaText, winPctText } from '../winprob.ts';
 import { formatLine } from './line.ts';
-import { conditionalNote, displayBest, nullNote, oddsNote, oddsPart, phrase } from './phrases.ts';
+import { choiceNoun, conditionalNote, displayBest, nullNote, oddsNote, oddsPart, phrase, playedVerb } from './phrases.ts';
 
 /**
  * The per-side clauses of the turn summary: paid-off reads, misplays,
@@ -22,8 +22,8 @@ function readClause(name: string, side: SideAnalysis, opponent: SideAnalysis): s
   const odds = side.played.koOdds;
   // Round 63 (T18): the kill-range shape is a verb phrase of its own ("kills ~43% of the time").
   const click = odds ? ` ${oddsPart('The click', odds, 'was')}.` : '';
-  return `${name} played ${phrase(side.played.label)} — a read that paid off${horizon}, ` +
-    `${winDeltaText(side.riskPayoff ?? 0)} over the safe ${phrase(side.safe.label)} (${winPctText(side.safe.worstCase)} guaranteed).${priced}${click}`;
+  return `${name} ${playedVerb(side.played.label)} — a read that paid off${horizon}, ` +
+    `${winDeltaText(side.riskPayoff ?? 0)} over the safe ${choiceNoun(side.safe.label)} (${winPctText(side.safe.worstCase)} guaranteed).${priced}${click}`;
 }
 
 export function sideClause(name: string, side: SideAnalysis, opponent: SideAnalysis): string | null {
@@ -61,7 +61,7 @@ function unpunishedReadClause(
   const framing = side.riskWasRead
     ? `a read against the opponent's tendencies: ${came}`
     : `a read: ${came}`;
-  return `${name} played ${phrase(played.label)} — ${framing}. ` +
+  return `${name} ${playedVerb(played.label)} — ${framing}. ` +
     `The engine's safe line was ${phrase(safe.label)} (${winPctText(safe.worstCase)} guaranteed)${lineOf(safe)}.${why}${caveat}${oddsNote(side)}`;
 }
 
@@ -83,10 +83,10 @@ function punishedMisplayClause(
   const line = shown.swapped ? '' : lineOf(best);
   const reasons = `${shown.swapped ? '' : why}${caveat}${nullNote(side)}${conditionalNote(side)}${oddsNote(side)}`;
   if (side.tier === 'blunder') {
-    return `${name} played ${phrase(played.label)} (${winPctText(played.ev)}) — ` +
+    return `${name} ${playedVerb(played.label)} (${winPctText(played.ev)}) — ` +
       `a blunder; clearly better was ${phrase(shown.label)} (${winPctText(shown.ev)})${line}.${reasons}`;
   }
-  return `${name} played ${phrase(played.label)} (${winPctText(played.ev)}); ` +
+  return `${name} ${playedVerb(played.label)} (${winPctText(played.ev)}); ` +
     `safer was ${phrase(shown.label)} (${winPctText(shown.ev)})${line}.${reasons}`;
 }
 
@@ -117,8 +117,8 @@ export function readCreditClause(name: string, side: SideAnalysis, ownLuck: numb
   const luck = ownLuck !== null && Math.abs(ownLuck) >= TIER_THRESHOLDS.inaccuracy
     ? ` On top of that, luck contributed ${winDeltaText(ownLuck)} for ${name}.`
     : '';
-  return `${name} played ${phrase(side.played.label)} — a read the engine gave no weight: ${when} it stood ` +
-    `${winDeltaText(credit.payoff)} over the safe ${phrase(side.safe.label)} (${winPctText(side.safe.worstCase)} guaranteed).${luck}`;
+  return `${name} ${playedVerb(side.played.label)} — a read the engine gave no weight: ${when} it stood ` +
+    `${winDeltaText(credit.payoff)} over the safe ${choiceNoun(side.safe.label)} (${winPctText(side.safe.worstCase)} guaranteed).${luck}`;
 }
 
 /** Sub-verdict note: a light imprecision worth naming, not blaming. */

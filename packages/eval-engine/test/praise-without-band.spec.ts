@@ -161,7 +161,7 @@ describe('the read credit without a band (648453 t13)', () => {
     expect(analysis.p2.tier).toBeUndefined();
     expect(analysis.p2.readCredit?.payoff).toBeCloseTo(0.755, 3);
     expect(analysis.p2.readCredit?.payoffTurn).toBe(2);
-    expect(summarizeTurn(analysis, names)).toContain('Beta played switching to Lopunny-Mega — a read the engine gave no weight: 2 turns later, before the rolls');
+    expect(summarizeTurn(analysis, names)).toContain('Beta switched to Lopunny-Mega — a read the engine gave no weight: 2 turns later, before the rolls');
     // Not a risk credit: the attribution, the report's read list and the totals stay as they were.
     expect(analysis.p2.riskPaidOff).toBeUndefined();
     expect(analysis.attribution).toBe('quiet');
@@ -217,7 +217,7 @@ describe('the read credit on a doubles pair', () => {
     // Round 63 fix: measured before the rolls; a roll that moved the side gets its luck tail (2629703929 t1: −7%).
     const rolled = { ...analysis, scoreAfter: -0.03, chanceDelta: -0.13 };
     const summary = summarizeTurn(rolled, names);
-    expect(summary).toContain('Alpha played Tailwind + Solar Beam→Groudon — a read the engine gave no weight: 2 turns later, before the rolls,');
+    expect(summary).toContain('Alpha played Tailwind and Solar Beam→Groudon — a read the engine gave no weight: 2 turns later, before the rolls,');
     expect(summary).toContain('On top of that, luck contributed −7% for Alpha.');
   });
 });
@@ -321,8 +321,8 @@ describe('the read credit says it is measured before the rolls', () => {
 
   test('singles: the gain is the pair\'s value before the rolls, with no claim that it paid off', () => {
     const summary = t13Shape(0.0475);
-    expect(summary).toContain('Beta played switching to Lopunny-Mega — a read the engine gave no weight: ' +
-      '2 turns later, before the rolls, it stood +38% over the safe switching to Bisharp (41% guaranteed).');
+    expect(summary).toContain('Beta switched to Lopunny-Mega — a read the engine gave no weight: ' +
+      '2 turns later, before the rolls, it stood +38% over the safe switch to Bisharp (41% guaranteed).');
     expect(summary).not.toContain('paid off');
     // A roll under an inaccuracy stays unnamed.
     expect(summary).not.toContain('luck contributed');
