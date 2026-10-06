@@ -47,9 +47,6 @@ const BOOST_SERVES: Record<string, 'atk' | 'spa'> = {
   geomancy: 'spa', torchsong: 'spa',
 };
 
-/** Pivots are utility whatever their category — never boost-vetoed. */
-const PIVOT_MOVES = new Set(['uturn', 'voltswitch', 'flipturn', 'partingshot', 'batonpass', 'teleport', 'chillyreception', 'shedtail']);
-
 /**
  * Defense-boost setup whose offensive payoff is a Defense-scaling attack
  * (Body Press). Usage ranks these high BECAUSE of the pairing — when the
@@ -73,6 +70,8 @@ interface MoveFacts {
   priority: number;
   /** The stat the move's damage actually scales with (Body Press: def). */
   scaling: 'atk' | 'spa' | 'def' | null;
+  /** A pivot (the Dex's `selfSwitch`: U-turn, Volt Switch) is utility whatever its category, never boost-vetoed. */
+  pivot: boolean;
   /** The user's own stat the damage reads outside its category (Body Press: def); null for the rest. */
   readsOwn: string | null;
   /** The user's stats the move lowers on use (Close Combat: def and spd). */
@@ -94,7 +93,7 @@ function factsOf(name: string): MoveFacts | null {
   const readsOwn = move.overrideOffensiveStat && move.overrideOffensivePokemon !== 'target' ? move.overrideOffensiveStat : null;
   return {
     id: move.id, category: move.category, basePower: move.basePower, type: move.type, priority: move.priority, scaling,
-    readsOwn, lowersOwn: ownStatsLowered(move),
+    pivot: !!move.selfSwitch, readsOwn, lowersOwn: ownStatsLowered(move),
   };
 }
 
@@ -221,7 +220,7 @@ function keepDamagingMoves(candidates: MoveCandidate[], served: Set<string>): Da
     }
     // Row 1: a big attack the set's boost does not serve (SD + Body Press).
     if (served.size > 0 && facts.scaling && !served.has(facts.scaling) &&
-      facts.basePower >= BOOST_VETO_MIN_BP && !PIVOT_MOVES.has(facts.id)) {
+      facts.basePower >= BOOST_VETO_MIN_BP && !facts.pivot) {
       continue;
     }
     // Row 4: a move the Dex says contradicts a kept one (Body Press reads

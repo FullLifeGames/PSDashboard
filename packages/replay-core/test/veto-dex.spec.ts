@@ -128,4 +128,10 @@ describe('the veto rows read their lists from the Dex (decision 17)', () => {
     expect(names(applyCoherenceVetoes([guessed('Volt Switch'), guessed('Toxic')], { itemId: 'lifeorb' })))
       .toEqual(['Volt Switch', 'Toxic']);
   });
+
+  test('a pivot is what the Dex marks selfSwitch: Nasty Plot spares U-turn and Volt Switch, not Close Combat', () => {
+    expect(names(applyCoherenceVetoes([
+      revealed('Nasty Plot'), guessed('U-turn'), guessed('Volt Switch'), guessed('Close Combat'),
+    ], { itemId: '' }))).toEqual(['Nasty Plot', 'U-turn', 'Volt Switch']);
+  });
 });
