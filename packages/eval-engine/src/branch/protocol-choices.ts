@@ -235,15 +235,33 @@ function clickBehindEncore(
     line.startsWith(`|-start|${ident}`) && line.split('|')[3] === 'Encore');
   if (!encoredFirst) return null;
 
-  const shownId = toId(shownMove);
+  return slowestRequestMove(active, toId(shownMove));
+}
+
+/** The request's lowest-priority enabled move at priority 0 or below (other than `exceptId`), or null. */
+function slowestRequestMove(active: SimPokemon, exceptId = ''): string | null {
   let standIn: { id: string; priority: number } | null = null;
   for (const entry of active.getMoveRequestData().moves) {
-    if (entry.id === shownId || entry.disabled) continue;
+    if (entry.id === exceptId || entry.disabled) continue;
     const priority = Dex.moves.get(entry.id).priority;
     if (priority > 0) continue;
     if (!standIn || priority < standIn.priority) standIn = { id: entry.id, priority };
   }
   return standIn?.id ?? null;
+}
+
+/**
+ * Round 64 (T121): the switch answers a request the slot's own item made
+ * (Eject Pack, Eject Button). The simulator writes `[from]` on a switch only
+ * for a move's selfSwitch; an item's switch follows its `|-enditem|` on the
+ * slot, so that item line is the slot's last own line before it (751407 t1:
+ * Deoxys's Eject Pack, then Dragonite).
+ */
+function answersOwnItem(events: string[], index: number, ident: string): boolean {
+  for (let i = index - 1; i >= 0; i--) {
+    if (events[i].split('|')[2]?.startsWith(ident)) return events[i].startsWith('|-enditem|');
+  }
+  return false;
 }
 
 /**
@@ -275,6 +293,17 @@ function getChoiceForSlot(
 
   for (const [lineIndex, line] of events.entries()) {
     if (line.startsWith(`|switch|${ident}`) && !line.includes('[from]')) {
+      // The holder's item ejected it before it acted (2658662321 t2: Salt
+      // Cure hit Hatterene, its Eject Button brought Walking Wake). The click
+      // is unknown and the sim cancels it as the holder leaves; the slowest
+      // move lets the hit land first, as in the game.
+      if (answersOwnItem(events, lineIndex, ident)) {
+        const active = battle.sides[sideIdx].active[activeSlot];
+        const standIn = active ? slowestRequestMove(active) : null;
+        if (!standIn) break;
+        const suffix = targetLocSuffixForChoice(battle, active, standIn, 0);
+        return `${moveChoiceForActive(active, standIn)}${suffix}${gimmickSuffixForSlot(events, ident, active)}`;
+      }
       const species = line.split('|')[3].split(',')[0].trim();
       return `switch ${findSlotBySpecies(battle, sideIdx, species)}`;
     }
@@ -333,10 +362,11 @@ export function collectForcedSwitchSpecies(
   side: 'p1' | 'p2',
 ): string[] {
   const species: string[] = [];
-  const matcher = new RegExp(`^\\|switch\\|${side}[a-d]:`);
+  const matcher = new RegExp(`^\\|switch\\|(${side}[a-d]:)`);
 
-  for (const line of preUpkeep) {
-    if (matcher.test(line) && line.includes('[from]')) {
+  for (const [index, line] of preUpkeep.entries()) {
+    const slot = line.match(matcher)?.[1];
+    if (slot && (line.includes('[from]') || answersOwnItem(preUpkeep, index, slot))) {
       species.push(line.split('|')[3].split(',')[0].trim());
     }
   }
