@@ -2,7 +2,7 @@ import {
   type TurnAnalysis, type LeadAnalysis, type LeadSideAnalysis, type RankedChoice, type ReadRecommendation,
   formatRead, summarizeTurn, winDeltaText, winPctText,
 } from '@fulllifegames/eval-engine';
-import { attributionBadge, leadTier } from './eval-badges';
+import { attributionBadge, isPairLead, leadTier } from './eval-badges';
 import { EngineRow } from './eval/analysis-bits';
 import { SideRow } from './eval/SideRow';
 import { evTitle } from './eval/turn-copy';
@@ -105,15 +105,20 @@ function LeadGrade({ side }: { side: LeadSideAnalysis }) {
   );
 }
 
-/** The lead verdict chips: agreement, the graded miss, the inaccuracy, or the engine's differing pick. */
+/**
+ * The lead verdict chips: agreement, the graded miss, the inaccuracy, or the engine's differing pick.
+ * Round 64 (T123): a doubles pair gets no tick either, only the engine's pick as a neutral line (T116).
+ */
 function LeadVerdict({ name, side }: { name: string; side: LeadSideAnalysis }) {
+  const agrees = !!side.played && !!side.best && side.played.choice === side.best.choice;
+  const pair = isPairLead(side);
   return (
     <>
-      {side.played && side.best && side.played.choice === side.best.choice && (
+      {agrees && !pair && (
         <span style={{ color: '#8c8' }}>✓ the engine's leads</span>
       )}
       <LeadGrade side={side} />
-      {!leadTier(side) && side.played && side.best && side.played.choice !== side.best.choice && (
+      {!leadTier(side) && side.played && side.best && (!agrees || pair) && (
         <span style={{ color: '#778' }} title={evTitle(name)}>
           engine: {stripLead(side.best.label)} ({winPctText(side.best.ev)})
         </span>

@@ -67,6 +67,14 @@ describe('EvalLeadAnalysis', () => {
     expect(screen.getByText(/^engine:/)).toHaveTextContent('engine: Chi-Yu + Okidogi');
   });
 
+  test('doubles: a led pair that matches the engine\'s pick gets no tick either, only the neutral engine line (T123 point 5)', () => {
+    // Round 63 lead census, gen9doublesou-2660802611 p1: led Landorus + Incineroar, the engine's pick too.
+    const pair = rankedChoice('team 12', 'Lead Landorus + Incineroar', 0.1);
+    render(<EvalLeadAnalysis leads={leadAnalysis({ p1: { played: pair, best: pair, regret: 0 } })} playerNames={names} />);
+    expect(screen.queryByText('✓ the engine\'s leads')).toBeNull();
+    expect(screen.getByText(/^engine:/)).toHaveTextContent(`engine: Landorus + Incineroar (${winPctText(0.1)})`);
+  });
+
   test('an unmatched lead, an inaccuracy, and a differing untiered pick each get their line', () => {
     const p2 = { played: rankedChoice('team 1', 'Lead Ferrothorn', -0.15), best: rankedChoice('team 2', 'Lead Rotom-Wash', -0.1), regret: 0.05 };
     const leads = leadAnalysis({ p1: { played: null, best: rankedChoice('team 1', 'Lead Garchomp', 0.2), regret: null }, p2: { ...p2, tier: 'inaccuracy' } });

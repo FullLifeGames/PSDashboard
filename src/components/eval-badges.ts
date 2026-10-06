@@ -8,8 +8,13 @@ import type { LeadSideAnalysis, TurnAnalysis } from '@fulllifegames/eval-engine'
  * so a doubles lead gets no mistake or inaccuracy, only the engine's pick.
  */
 export function leadTier(side: LeadSideAnalysis): LeadSideAnalysis['tier'] {
+  return isPairLead(side) ? undefined : side.tier;
+}
+
+/** A doubles lead: the led (or the engine's) choice names a pair. Round 64 (T123): the turn-0 card reads it too. */
+export function isPairLead(side: LeadSideAnalysis): boolean {
   const label = side.played?.label ?? side.best?.label ?? '';
-  return label.includes(' + ') ? undefined : side.tier;
+  return label.includes(' + ');
 }
 
 interface Badge {
