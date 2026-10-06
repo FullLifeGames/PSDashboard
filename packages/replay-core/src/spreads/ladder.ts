@@ -9,6 +9,8 @@ export interface SpreadCandidate {
   /** An item the move-order evidence decided (round 37): 'Choice Scarf', or '' for "not the guessed Scarf". */
   item?: string;
   itemReason?: 'moved-first' | 'moved-second';
+  /** IVs a seen move order needed (round 64: a Speed IV below 31 only when no other Speed keeps the order). */
+  ivs?: PokemonEvs;
 }
 
 export interface CandidateRung {

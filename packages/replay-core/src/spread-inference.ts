@@ -3,7 +3,7 @@ import type { DamageObservation, PokemonEvs, SpeedOrderObservation } from './typ
 import { capToBudget, evTotal, ZERO_EVS, type EvBudget } from './spreads/ev-budget.ts';
 import { candidateLadder, type CandidateRung, type SpreadCandidate } from './spreads/ladder.ts';
 import {
-  buildSolveContext, hpBasisOf, keyOf, observationError, physicalAttackerFor, priorDistance, setOf, speedError, spreadFor,
+  buildSolveContext, genNumOf, hpBasisOf, keyOf, observationError, physicalAttackerFor, priorDistance, setOf, speedError, spreadFor,
   type SolveContext,
 } from './spreads/fit.ts';
 import { decideScarfs, type SpeedKnowledgeMap } from './spreads/scarf.ts';
@@ -220,7 +220,7 @@ export function inferSpreads(
   knowledge: SpeedKnowledgeMap = new Map(),
   maxHp: Map<string, ObservedMaxHp> = new Map(),
 ): Map<string, SpreadCandidate> {
-  const ctx = buildSolveContext(observations, sets, formatid, readableOrders(speedOrders, sets), maxHp);
+  const ctx = buildSolveContext(observations, sets, formatid, readableOrders(speedOrders, sets, genNumOf(formatid)), maxHp);
   ctx.scarf = decideScarfs(ctx, knowledge);
   // T117 (round 63): every observed order holds in the sets the ladder starts from.
   ctx.sets = settledSets(ctx, knowledge);
@@ -241,6 +241,15 @@ export function inferSpreads(
   }
   for (const key of order) solveOne(ctx, key);
   for (const key of order) solveOne(ctx, key);
+
+  // A Speed IV the settling took (round 64) rides on the solved entry, as an item does.
+  for (const side of ['p1', 'p2'] as const) {
+    ctx.sets[side].forEach((set, index) => {
+      if (set.ivs?.spe === sets[side][index]?.ivs?.spe) return;
+      const key = keyOf(side, set.species);
+      ctx.solved.set(key, { ...(ctx.solved.get(key) ?? spreadFor(ctx, side, set.species)), ivs: { ...set.ivs } });
+    });
+  }
 
   // A decided mon carries its item even when no spread was solved for it.
   for (const [key, decision] of ctx.scarf) {

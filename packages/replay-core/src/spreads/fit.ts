@@ -8,6 +8,7 @@ import { evBudget, ZERO_EVS, type EvBudget } from './ev-budget.ts';
 import type { CandidateRung, SpreadCandidate } from './ladder.ts';
 import type { ItemDecision } from './scarf.ts';
 import type { ObservedMaxHp } from './max-hp.ts';
+import { raceSpeed } from './race-speed.ts';
 import { toId } from '../ids.ts';
 
 /**
@@ -28,6 +29,35 @@ const WEATHER_ALIASES: Record<string, string> = {
 
 const weatherFor = (raw: string) => WEATHER_BY_ID[WEATHER_ALIASES[toId(raw)] ?? toId(raw)];
 
+/**
+ * An order as the solver reads it (round 64): each mover named by its set,
+ * with the battle forme that raced when that forme runs on its own base
+ * Speed (a Mega after its evolution, Terapagos-Terastal).
+ */
+export interface ReadOrder extends SpeedOrderObservation {
+  firstForme?: string;
+  secondForme?: string;
+  /** A transformed mover's own set: it ran the race on the copied Pokémon's Speed with its own item (round 64). */
+  firstHolder?: { side: 'p1' | 'p2'; species: string };
+  secondHolder?: { side: 'p1' | 'p2'; species: string };
+}
+
+/** One mover of a read order: whose spread raced, in which forme, and whose item (the Scarf the order names first). */
+export interface RaceSide {
+  side: 'p1' | 'p2';
+  species: string;
+  forme?: string;
+  held?: boolean;
+  holder?: { side: 'p1' | 'p2'; species: string };
+}
+
+export const firstOf = (order: ReadOrder): RaceSide => ({
+  side: order.firstSide, species: order.firstSpecies, forme: order.firstForme, held: order.firstScarf, holder: order.firstHolder,
+});
+export const secondOf = (order: ReadOrder): RaceSide => ({
+  side: order.secondSide, species: order.secondSpecies, forme: order.secondForme, held: order.secondScarf, holder: order.secondHolder,
+});
+
 /** Everything one spread solve shares between its scoring functions. */
 export interface SolveContext {
   gen: ReturnType<typeof Generations.get>;
@@ -37,9 +67,9 @@ export interface SolveContext {
   /** Observations per mon (as attacker AND as defender). */
   byMon: Map<string, DamageObservation[]>;
   /** Observed same-turn move order, indexed per participant. */
-  speedByMon: Map<string, SpeedOrderObservation[]>;
+  speedByMon: Map<string, ReadOrder[]>;
   /** The orders with sets on both sides, in observation order (round 37: the Scarf decisions walk them). */
-  speedOrders: SpeedOrderObservation[];
+  speedOrders: ReadOrder[];
   /** Choice Scarf decisions from the move orders, keyed like `solved` (round 37). */
   scarf: Map<string, ItemDecision>;
   /** Maximum HP per mon as the log printed it (round 40: pins the HP EVs). */
@@ -47,9 +77,14 @@ export interface SolveContext {
   priors: Map<string, SpreadCandidate>;
 }
 
-function genOf(formatid: string) {
+/** The generation a format plays. */
+export function genNumOf(formatid: string): number {
   const genNumber = parseInt(formatid.match(/^gen(\d)/)?.[1] ?? '9', 10);
-  return Generations.get(Math.min(Math.max(genNumber, 1), 9) as 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9);
+  return Math.min(Math.max(genNumber, 1), 9);
+}
+
+function genOf(formatid: string) {
+  return Generations.get(genNumOf(formatid) as 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9);
 }
 
 export const keyOf = (side: 'p1' | 'p2', species: string) => `${side}:${toId(species)}`;
@@ -76,7 +111,7 @@ export function buildSolveContext(
   observations: DamageObservation[],
   sets: { p1: PokemonSet[]; p2: PokemonSet[] },
   formatid: string,
-  speedOrders: SpeedOrderObservation[],
+  speedOrders: ReadOrder[],
   maxHp: Map<string, ObservedMaxHp> = new Map(),
 ): SolveContext {
   const ctx: SolveContext = {
@@ -85,7 +120,7 @@ export function buildSolveContext(
     sets,
     solved: new Map<string, SpreadCandidate>(),
     byMon: new Map<string, DamageObservation[]>(),
-    speedByMon: new Map<string, SpeedOrderObservation[]>(),
+    speedByMon: new Map<string, ReadOrder[]>(),
     speedOrders: [],
     scarf: new Map<string, ItemDecision>(),
     maxHp,
@@ -105,6 +140,8 @@ export function buildSolveContext(
 
   for (const order of speedOrders) {
     if (!setOf(ctx, order.firstSide, order.firstSpecies) || !setOf(ctx, order.secondSide, order.secondSpecies)) continue;
+    // A transformed mover's race needs its own set too: its item ran the race.
+    if ([order.firstHolder, order.secondHolder].some(holder => holder && !setOf(ctx, holder.side, holder.species))) continue;
     const firstKey = keyOf(order.firstSide, order.firstSpecies);
     const secondKey = keyOf(order.secondSide, order.secondSpecies);
     if (firstKey === secondKey) continue;
@@ -192,13 +229,13 @@ export function observationError(ctx: SolveContext, obs: DamageObservation, cand
   }
 }
 
-/** The Speed stat of a spread on the set's level and IVs, 0 when the calc cannot build the species. */
-export function speedStat(ctx: SolveContext, side: 'p1' | 'p2', species: string, spread: SpreadCandidate): number {
+/** The Speed stat of a spread on the set's level and IVs (the spread's own IVs first; a battle forme's base Speed when one raced), 0 when the calc cannot build the species. */
+export function speedStat(ctx: SolveContext, side: 'p1' | 'p2', species: string, spread: SpreadCandidate, forme?: string): number {
   const set = setOf(ctx, side, species);
-  const name = set?.species ?? species;
+  const name = forme ?? set?.species ?? species;
   for (const candidate of [name, name.split('-')[0]]) {
     try {
-      return new Pokemon(ctx.gen, candidate, { level: set?.level || 100, nature: spread.nature, evs: spread.evs, ivs: set?.ivs }).stats.spe;
+      return new Pokemon(ctx.gen, candidate, { level: set?.level || 100, nature: spread.nature, evs: spread.evs, ivs: spread.ivs ?? set?.ivs }).stats.spe;
     } catch {
       // Unknown forme: try the base species.
     }
@@ -214,13 +251,15 @@ function holdsScarf(ctx: SolveContext, side: 'p1' | 'p2', species: string): bool
   return toId(setOf(ctx, side, species)?.item ?? '') === 'choicescarf';
 }
 
-/** A race's Scarf factor: the Scarf the order says the mover held (round 63), else the set's or the decision's. */
-export function scarfFactor(ctx: SolveContext, side: 'p1' | 'p2', species: string, held?: boolean): number {
-  return (held ?? holdsScarf(ctx, side, species)) ? 1.5 : 1;
+/** Whether a race ran with a Scarf: the one the order says the mover held (round 63), else its holder's set's or decision's. */
+export function racedWithScarf(ctx: SolveContext, mover: RaceSide): boolean {
+  const holder = mover.holder ?? mover;
+  return mover.held ?? holdsScarf(ctx, holder.side, holder.species);
 }
 
-function effectiveSpeed(ctx: SolveContext, side: 'p1' | 'p2', species: string, spread: SpreadCandidate, held?: boolean): number {
-  return speedStat(ctx, side, species, spread) * scarfFactor(ctx, side, species, held);
+/** The Speed a race ran at: the stat in the forme that raced, with the Scarf as the simulator rounds it (round 64). */
+function effectiveSpeed(ctx: SolveContext, mover: RaceSide, spread: SpreadCandidate): number {
+  return raceSpeed(ctx.gen.num, speedStat(ctx, mover.side, mover.species, spread, mover.forme), racedWithScarf(ctx, mover));
 }
 
 /**
@@ -229,7 +268,7 @@ function effectiveSpeed(ctx: SolveContext, side: 'p1' | 'p2', species: string, s
  * any Speed, so the order is weak evidence (round 63). Priorities from the
  * Dex of the replay's generation.
  */
-export function weakRace(ctx: SolveContext, order: SpeedOrderObservation): boolean {
+export function weakRace(ctx: SolveContext, order: ReadOrder): boolean {
   if (!order.knockOut) return false;
   const dex = Dex.forGen(ctx.gen.num);
   return (setOf(ctx, order.secondSide, order.secondSpecies)?.moves ?? []).some(move => dex.moves.get(move).priority < 0);
@@ -242,8 +281,7 @@ export function speedError(ctx: SolveContext, key: string, candidate: SpreadCand
     const firstSpread = firstKey === key ? candidate : spreadFor(ctx, order.firstSide, order.firstSpecies);
     const secondKey = keyOf(order.secondSide, order.secondSpecies);
     const secondSpread = secondKey === key ? candidate : spreadFor(ctx, order.secondSide, order.secondSpecies);
-    if (effectiveSpeed(ctx, order.firstSide, order.firstSpecies, firstSpread, order.firstScarf) <
-      effectiveSpeed(ctx, order.secondSide, order.secondSpecies, secondSpread, order.secondScarf)) {
+    if (effectiveSpeed(ctx, firstOf(order), firstSpread) < effectiveSpeed(ctx, secondOf(order), secondSpread)) {
       violations += 1;
     }
   }

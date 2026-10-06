@@ -120,6 +120,12 @@ export interface SpeedOrderObservation {
   secondScarf?: boolean;
   /** The second mover fell before acting: its chosen move, and so its priority, never showed (round 63). */
   knockOut?: true;
+  /**
+   * The mover was transformed: it raced on this Pokémon's Speed with its own
+   * item (round 64; the simulator's Transform copies the target's stats).
+   */
+  firstCopied?: { side: 'p1' | 'p2'; species: string };
+  secondCopied?: { side: 'p1' | 'p2'; species: string };
 }
 
 export type KnowledgeSource = 'revealed' | 'guessed' | 'manual' | 'sheet' | 'unknown';
