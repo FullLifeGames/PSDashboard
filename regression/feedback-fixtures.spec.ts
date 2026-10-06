@@ -36,6 +36,10 @@ test('feedback fixtures parse and cover every corpus turn', () => {
  * 0. The mirror image on the attacker side: Melmetal's knock-outs read as
  * small hits had solved it to 0 Atk. (Without Smogon fills the special
  * side stays at the base guess: no special hit measured it.)
+ * Round 64 (T122): every clean physical hit fits Def 0 and Def 232 alike
+ * (lane H's 53-line reading), so the old Def 0 was the tie-break toward the
+ * prior; the solve now refills the open budget as far as the lines allow.
+ * What the knock-out must not do is pull the fit off the clean hits.
  */
 test('573756: the lethal-aware fit drops the knock-out bias on both sides', () => {
   const replay = JSON.parse(readFileSync(join('e2e-feedback', 'fixtures', 'smogtours-gen8ou-573756.json'), 'utf-8')) as { log: string };
@@ -43,7 +47,9 @@ test('573756: the lethal-aware fit drops the knock-out bias on both sides', () =
   const { p1Team, p2Team } = buildTeamsFromReplay(replay.log, { observations, speedOrders });
   const toxapex = p1Team.find(set => set.species === 'Toxapex');
   expect(toxapex).toBeTruthy();
-  expect(toxapex!.evs.def).toBe(0);
+  // The knock-out read as a reading had solved Bold 252 Def; the clean hits
+  // do not ask for it (the rule itself: spread-inference.spec.ts).
+  expect(toxapex!.nature === 'Bold' && toxapex!.evs.def === 252).toBe(false);
   const melmetal = p2Team.find(set => set.species === 'Melmetal');
   expect(melmetal).toBeTruthy();
   expect(melmetal!.evs.atk).toBe(252);
@@ -62,7 +68,9 @@ const fixtureFetcher = async (url: string) => {
  * 573756 under gen8ou sets: p1's Toxapex takes the specially defensive
  * curated set (SpD 252, Def 0 fitted from the physical knock-outs), and
  * Corviknight the curated 248/136/124 spread. Round 40: the log's 303/303
- * pins Toxapex at 248 HP EVs; the SpD claim stands beside it.
+ * pins Toxapex at 248 HP EVs; the SpD claim stands beside it. Round 64
+ * (T122): the open budget refills toward the prior, so the exact split moved
+ * (248/20/240); the claim is the specially defensive set at 248 HP.
  */
 test('573756: the set fixtures feed the curated Toxapex and Corviknight sets', async () => {
   for (const name of ['_sets_gen6ou.json.json', '_sets_gen8ou.json.json']) {
@@ -73,7 +81,9 @@ test('573756: the set fixtures feed the curated Toxapex and Corviknight sets', a
   const setAssumptions = await fetchSmogonSetAssumptions({ formatId: 'gen8ou', species: ['Toxapex', 'Corviknight'], fetcher: fixtureFetcher as never });
   const { p1Team } = buildTeamsFromReplay(replay.log, { observations, speedOrders, setAssumptions });
   const toxapex = p1Team.find(set => set.species === 'Toxapex')!;
-  expect([toxapex.evs.hp, toxapex.evs.def, toxapex.evs.spd]).toEqual([248, 0, 252]);
+  expect(toxapex.evs.hp).toBe(248);
+  expect(toxapex.evs.spd).toBeGreaterThanOrEqual(240);
+  expect(toxapex.evs.spd).toBeGreaterThan(toxapex.evs.def);
   const corviknight = p1Team.find(set => set.species === 'Corviknight')!;
   expect([corviknight.evs.hp, corviknight.evs.def, corviknight.evs.spd]).toEqual([248, 136, 124]);
 });

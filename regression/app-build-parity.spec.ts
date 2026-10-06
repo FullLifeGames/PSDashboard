@@ -113,9 +113,11 @@ describe('the bank builds the teams the app ships', () => {
     // build picks Volcanion's Leftovers set too; and the settled move orders
     // (T117) keep p1 Tornadus-Therian's Speed (Timid 252 Spe, not Hardy
     // 252 Atk), so p2 Ferrothorn solves to the old build's Relaxed
-    // 88 Def / 168 SpD again.
+    // 88 Def / 168 SpD again. Round 64 (T122): the solve refills open EV
+    // budgets toward the prior, so p2 Keldeo's spread now differs between
+    // the builds and p2 Tornadus-Therian's no longer does.
     expect(moved(rows(old), rows(app)))
-      .toEqual(['p1:Tornadus-Therian', 'p2:Landorus-Therian', 'p2:Tornadus-Therian']);
+      .toEqual(['p1:Tornadus-Therian', 'p2:Keldeo', 'p2:Landorus-Therian']);
     // The scene the round is named after: the old build explains the move
     // order with speed EVs.
     expect(itemOf(old, 'p2', 'Landorus-Therian')).toBe('Rocky Helmet');
