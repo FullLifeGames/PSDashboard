@@ -1,6 +1,6 @@
 import { describe, expect, onTestFinished, test, vi } from 'vitest';
 import { act, renderHook } from '@testing-library/react';
-import { configureSearchBudget, parseSearchBudget, type EvalResult } from '@fulllifegames/eval-engine';
+import { configureSearchBudget, parsePlayedActions, parseSearchBudget, type EvalResult } from '@fulllifegames/eval-engine';
 import { useEvalView, type EvalViewInputs } from '../../src/hooks/useEvalView';
 import type { useEvaluation } from '../../src/hooks/useEvaluation';
 import type { TeamBuildSources } from '../../src/lib/eval-acquire';
@@ -75,6 +75,20 @@ describe('useEvalView', () => {
     rerender(main);
     act(() => result.current.handleEvaluate());
     expect(spies.evaluate).toHaveBeenLastCalledWith(expect.objectContaining({ cacheKey: `${replayData.id}:3:fp1`, tag: 'main:3', acquire: main.acquire.acquireReplayPosition }));
+  });
+
+  // Round 63 (final review): Evaluate and Analyze game store a replay turn under one cache key, so both hand the
+  // search the same played action (the verify step joins its row and column, T78); live and variation positions have none.
+  test('Evaluate on a replay turn hands the search the played action the sweep would; live and variation evaluations none', () => {
+    const { evaluation, spies } = evaluationOf();
+    const expected = parsePlayedActions(snapshots[3]?.log ?? []);
+    expect(expected.p1 ?? expected.p2).toBeTruthy();
+    const { result, rerender } = renderHook((props: EvalViewInputs) => useEvalView(props), { initialProps: inputs(evaluation) });
+    act(() => result.current.handleEvaluate());
+    expect((spies.evaluate.mock.calls.at(-1)![0] as { keepPlayed?: unknown }).keepPlayed).toEqual(expected);
+    rerender(inputs(evaluation, { liveTip: true, liveEvalView: true, evalViewKey: 'variation:3' }));
+    act(() => result.current.handleEvaluate());
+    expect((spies.evaluate.mock.calls.at(-1)![0] as { keepPlayed?: unknown }).keepPlayed).toBeUndefined();
   });
 
   test('a finished evaluation on the variation feeds the graph overlay at its own turn only', () => {

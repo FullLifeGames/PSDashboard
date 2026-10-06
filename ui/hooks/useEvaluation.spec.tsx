@@ -106,6 +106,16 @@ describe('useEvaluation single position', () => {
     expect(script.calls).toHaveLength(1);
   });
 
+  // Round 63 (final review): the single evaluation of a replay turn searches with the played action, like the sweep it shares the cache key with.
+  test('a single evaluation hands its played action to the search as keepPlayed', async () => {
+    const played = parsePlayedActions(['|move|p1a: Chomp|Earthquake|p2a: Rotom', '|turn|2']);
+    const { result } = renderHook(() => useEvaluation());
+    act(() => result.current.setPrefs(matrixPrefs));
+    act(() => result.current.evaluate({ cacheKey: 'replay:1:fp', tera: false, sleepClause: true, acquire: async () => position(1), tag: 'main:1', keepPlayed: played }));
+    await waitFor(() => expect(result.current.status).toBe('done'));
+    expect(script.calls[0].settings.keepPlayed).toEqual(played);
+  });
+
   test('auto mode reads the fainted fraction off the acquired position and routes to the tree once bodies fell', async () => {
     // The threshold before round 61; the default now runs the tree from the first turn (next test).
     configureSearchBudget(parseSearchBudget(`tree-from=${AUTO_MCTS_FAINTED_FRACTION},early-samples=1`));

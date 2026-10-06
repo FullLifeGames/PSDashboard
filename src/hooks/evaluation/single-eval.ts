@@ -34,6 +34,12 @@ interface EvaluateParams {
    * navigated away must not display (or be recorded) as the new position's.
    */
   tag?: string;
+  /**
+   * The actions played on this replay turn, as the sweep passes them (round
+   * 63): both store under one cache key, so both search with the played row
+   * and column in the verify step. Absent for live and variation positions.
+   */
+  keepPlayed?: EvalSettings['keepPlayed'];
 }
 
 export interface CachedEval {
@@ -135,7 +141,11 @@ async function searchAndInstall(
   }, PARTIAL_INTERVAL_MS);
   let final: EvalResult;
   try {
-    final = await io.clientRef.current.evaluate(serialized, { depth: resolved.depth, samples: resolved.samples, mode: resolved.mode, tera: params.tera, sleepClause: params.sleepClause }, {
+    const settings: EvalSettings = {
+      depth: resolved.depth, samples: resolved.samples, mode: resolved.mode, tera: params.tera, sleepClause: params.sleepClause,
+      ...(params.keepPlayed ? { keepPlayed: params.keepPlayed } : {}),
+    };
+    final = await io.clientRef.current.evaluate(serialized, settings, {
       onProgress: update => progress.push(update),
       onPartial: partial => partials.push(partial),
     });

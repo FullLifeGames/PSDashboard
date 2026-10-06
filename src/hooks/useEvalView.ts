@@ -7,6 +7,7 @@ import { needsSettingsUpgrade, resolveAutoTurnSettings, type TurnEvalSettings, u
 import type { useEvalAcquire } from './useEvalAcquire';
 import { makePreviewAcquire, type TeamBuildSources } from '../lib/eval-acquire';
 import { evalStorePrefix } from '../lib/eval-cache-store';
+import { keptPlayed } from './evaluation/sweep-core';
 import {
   resolveTeraPreference, parseLeadSpecies, parsePlayedActions, parsePlayedActionsDoubles,
   type SensitivityTarget,
@@ -14,6 +15,11 @@ import {
 
 type Evaluation = ReturnType<typeof useEvaluation>;
 type Acquire = ReturnType<typeof useEvalAcquire>;
+
+/** The actions played on a replay turn: snapshots[turn] carries the block ending at |turn|turn+1. */
+const playedOn = (snapshots: TurnSnapshot[], turn: number, doubles: boolean) => (doubles
+  ? parsePlayedActionsDoubles(snapshots[turn]?.log ?? [])
+  : parsePlayedActions(snapshots[turn]?.log ?? []));
 
 export interface EvalViewInputs {
   replayData: ReplayData | null;
@@ -79,7 +85,7 @@ type EvalFormat = ReturnType<typeof useEvalFormat>;
 /** The Evaluate action for whatever position the pointer holds, and the
  *  variation-score recording of finished live evals. */
 function useEvaluateAction(inputs: EvalViewInputs, format: EvalFormat) {
-  const { replayData, evaluation, liveTip, viewingVariation, serializedAtView, viewTurn, setsFingerprint, evalViewKey, acquire, setVariationScores } = inputs;
+  const { replayData, snapshots, evalIsDoubles, evaluation, liveTip, viewingVariation, serializedAtView, viewTurn, setsFingerprint, evalViewKey, acquire, setVariationScores } = inputs;
   const { effectiveTera, effectiveSleepClause } = format;
   const handleEvaluate = useCallback(() => {
     if (!replayData) return;
@@ -97,9 +103,11 @@ function useEvaluateAction(inputs: EvalViewInputs, format: EvalFormat) {
         sleepClause: effectiveSleepClause,
         acquire: acquire.acquireReplayPosition,
         tag: evalViewKey,
+        // The sweep stores this turn under the same key: search it with the same played action.
+        keepPlayed: keptPlayed(playedOn(snapshots, viewTurn, evalIsDoubles)),
       });
     }
-  }, [replayData, liveTip, viewingVariation, serializedAtView, evaluation, effectiveTera, effectiveSleepClause, acquire.acquireBranchPosition, acquire.acquireReplayPosition, viewTurn, setsFingerprint, evalViewKey]);
+  }, [replayData, snapshots, evalIsDoubles, liveTip, viewingVariation, serializedAtView, evaluation, effectiveTera, effectiveSleepClause, acquire.acquireBranchPosition, acquire.acquireReplayPosition, viewTurn, setsFingerprint, evalViewKey]);
 
   // Every eval finishing while the pointer sits on the variation feeds the
   // graph overlay — auto-evals after executed turns included. The tag guard
@@ -125,9 +133,7 @@ function useSweepRuns(inputs: EvalViewInputs, format: EvalFormat) {
   const { replayData, snapshots, evaluation, analyzableTurns, evalIsDoubles, acquire, sources, bringOnlyLists, setsFingerprint, sensitivityTargetsFor, smogonPending } = inputs;
   const { effectiveTera, effectiveSleepClause, evalAvailable } = format;
 
-  const playedFor = useCallback((turn: number) => (evalIsDoubles
-    ? parsePlayedActionsDoubles(snapshots[turn]?.log ?? [])
-    : parsePlayedActions(snapshots[turn]?.log ?? [])), [evalIsDoubles, snapshots]);
+  const playedFor = useCallback((turn: number) => playedOn(snapshots, turn, evalIsDoubles), [evalIsDoubles, snapshots]);
 
   const handleAnalyzeGame = useCallback(() => {
     if (!replayData) return;

@@ -127,7 +127,7 @@ async function verifyAndProbeFresh(
 }
 
 /** The played turn the search keeps: any doubles slot or singles action (the verify step joins its row and column). */
-const keptPlayed = (turnPlayed: PlayedTurn | null) =>
+export const keptPlayed = (turnPlayed: PlayedTurn | null) =>
   (turnPlayed?.p1Slots || turnPlayed?.p2Slots || turnPlayed?.p1 || turnPlayed?.p2 ? turnPlayed : undefined);
 
 /** Search a turn that no cache layer covered, then install and persist everything it produced. */
