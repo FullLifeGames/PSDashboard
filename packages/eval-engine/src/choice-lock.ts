@@ -135,20 +135,52 @@ export interface ProtocolHeldItem {
   touched: boolean;
 }
 interface HeldState { side: 'p1' | 'p2'; species: string; item: string | null; moves: string[] }
-type HeldWalk = { bodies: Map<string, HeldState>; touched: Set<HeldState> };
+/** Per slot: the body its last entry named and what that body held just before (an Illusion may undo it). */
+interface SlotEntry { key: string; item: string | null; moves: string[]; touched: boolean }
+type HeldWalk = { bodies: Map<string, HeldState>; touched: Set<HeldState>; slots: Map<string, SlotEntry> };
 
 /** The body a `pXa: Nickname` ident names. */
 const heldBody = (walk: HeldWalk, ident: string | undefined) => walk.bodies.get(bodyKey(ident));
 
-function noteHeldEntry(walk: HeldWalk, parts: string[]) {
-  const ident = parts[2]?.match(/^(p[12])[a-d]?: (.+)$/);
-  if (!ident) return;
-  const key = `${ident[1]}: ${ident[2]}`;
+/** The body an entry or replace line names, created on first sight, and its slot (`p2a`). */
+function namedBody(walk: HeldWalk, parts: string[]) {
+  const ident = parts[2]?.match(/^(p[12])([a-d])?: (.+)$/);
+  if (!ident) return null;
+  const key = `${ident[1]}: ${ident[3]}`;
   const species = (parts[3] ?? '').split(',')[0].trim();
   const body = walk.bodies.get(key) ?? { side: ident[1] as 'p1' | 'p2', species, item: null, moves: [] };
   body.species = species;
-  body.moves = [];
   walk.bodies.set(key, body);
+  return { key, body, slot: `${ident[1]}${ident[2] ?? 'a'}` };
+}
+
+function noteHeldEntry(walk: HeldWalk, parts: string[]) {
+  const named = namedBody(walk, parts);
+  if (!named) return;
+  const { key, body, slot } = named;
+  walk.slots.set(slot, { key, item: body.item, moves: body.moves, touched: walk.touched.has(body) });
+  body.moves = [];
+}
+
+/**
+ * An Illusion breaks (round 64 review): the lines since the slot's last
+ * entry were the Zoroark's, written under the name of the body it imitated
+ * (681568: "Volcarona"'s Focus Sash broke on Zoroark-Hisui). The imitated
+ * body gets back what it held at that entry; the Zoroark takes the item the
+ * lines left and the moves since.
+ */
+function noteHeldReplace(walk: HeldWalk, parts: string[]) {
+  const named = namedBody(walk, parts);
+  if (!named) return;
+  const entry = walk.slots.get(named.slot);
+  const disguise = entry && walk.bodies.get(entry.key);
+  walk.slots.set(named.slot, { key: named.key, item: named.body.item, moves: named.body.moves, touched: walk.touched.has(named.body) });
+  if (!entry || !disguise || disguise === named.body) return;
+  if (disguise.item !== entry.item && disguise.item !== null) setHeld(walk, named.body, disguise.item);
+  named.body.moves = disguise.moves;
+  disguise.item = entry.item;
+  disguise.moves = entry.moves;
+  if (!entry.touched) walk.touched.delete(disguise);
 }
 
 function setHeld(walk: HeldWalk, body: HeldState, item: string) {
@@ -185,12 +217,13 @@ function noteHeldItemLine(walk: HeldWalk, parts: string[], handed: boolean) {
  */
 export function buildProtocolHeldItems(replayLog: string): Map<number, ProtocolHeldItem[]> {
   const out = new Map<number, ProtocolHeldItem[]>();
-  const walk: HeldWalk = { bodies: new Map(), touched: new Set() };
+  const walk: HeldWalk = { bodies: new Map(), touched: new Set(), slots: new Map() };
   const lines = replayLog.split('\n');
   const handed = handOverLines(lines);
   for (const [index, line] of lines.entries()) {
     const parts = line.split('|');
     if (parts[1] === 'switch' || parts[1] === 'drag') noteHeldEntry(walk, parts);
+    else if (parts[1] === 'replace') noteHeldReplace(walk, parts);
     else if (parts[1] === '-item' || parts[1] === '-enditem') noteHeldItemLine(walk, parts, handed.has(index));
     else if (parts[1] === 'move') {
       const body = heldBody(walk, parts[2]);

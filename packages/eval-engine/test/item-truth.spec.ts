@@ -427,3 +427,90 @@ describe('ability hand-overs and sim-only changes on synthetic boards (round 64,
     expect({ snorlax: snorlax.item, toxapex: toxapex.item }).toEqual({ snorlax: 'leftovers', toxapex: '' });
   });
 });
+
+describe('item lines a disguised Zoroark writes belong to the Zoroark (round 64 review)', () => {
+  // The 681568 shape: Zoroark-Hisui enters as Volcarona (the last party
+  // member), Sucker Punch breaks its Focus Sash and its Illusion in one hit.
+  const singlesLines = [
+    '|player|p1|Alice|', '|player|p2|Bob|', '|gen|9', '|tier|[Gen 9] OU', '|start',
+    '|switch|p1a: Gamb|Kingambit, M|100/100',
+    '|switch|p2a: Glim|Glimmora, M|100/100',
+    '|turn|1',
+    '|',
+    '|switch|p2a: Volcarona|Volcarona, F|100/100',
+    '|move|p1a: Gamb|Iron Head|p2a: Volcarona',
+    '|-damage|p2a: Volcarona|60/100',
+    '|upkeep',
+    '|turn|2',
+    '|',
+    '|move|p2a: Volcarona|Shadow Ball|p1a: Gamb',
+    '|-damage|p1a: Gamb|80/100',
+    '|upkeep',
+    '|turn|3',
+    '|',
+    '|move|p1a: Gamb|Sucker Punch|p2a: Volcarona',
+    '|-supereffective|p2a: Volcarona',
+    '|-enditem|p2a: Volcarona|Focus Sash',
+    '|-damage|p2a: Volcarona|1/100',
+    '|replace|p2a: Imposter|Zoroark-Hisui, M',
+    '|-end|p2a: Imposter|Illusion',
+    '|move|p2a: Imposter|Shadow Ball|p1a: Gamb',
+    '|-damage|p1a: Gamb|60/100',
+    '|upkeep',
+    '|turn|4',
+  ];
+
+  test('singles: the Focus Sash breaks on the Zoroark, the real Volcarona keeps its item', () => {
+    const held = buildChoiceLockContext(log(singlesLines), { p1Team: [], p2Team: [] }, []).heldItems.get(4)!;
+    expect(held.map(entry => [entry.species, entry.item, entry.firstMove, entry.touched])).toEqual([
+      ['Kingambit', null, 'ironhead', false],
+      ['Glimmora', null, null, false],
+      ['Volcarona', null, null, false],
+      ['Zoroark-Hisui', '', 'shadowball', true],
+    ]);
+    const mon = (species: string, item: string, ability: string, moves: string[]): PokemonSet => ({
+      name: species, species, item, ability, moves, nature: 'Hardy', level: 100,
+      evs: { hp: 84, atk: 84, def: 84, spa: 84, spd: 84, spe: 84 }, ivs: { hp: 31, atk: 31, def: 31, spa: 31, spd: 31, spe: 31 },
+    });
+    const board = new LiveBattle({
+      formatid: 'gen9customgame' as never,
+      p1: { name: 'Alice', team: Teams.pack([mon('Kingambit', 'Leftovers', 'Supreme Overlord', ['Iron Head'])]) },
+      p2: { name: 'Bob', team: Teams.pack([
+        mon('Glimmora', 'Focus Sash', 'Toxic Debris', ['Power Gem']), mon('Volcarona', 'Heavy-Duty Boots', 'Flame Body', ['Fiery Dance']),
+        mon('Zoroark-Hisui', 'Focus Sash', 'Illusion', ['Shadow Ball']),
+      ]) },
+    });
+    const context = buildChoiceLockContext(log(singlesLines), { p1Team: [], p2Team: [] }, []);
+    correctActivesFromProtocol(board as never, [], { context, turn: 4 });
+    expect(board.sides[1].pokemon.map(body => body.item)).toEqual(['focussash', 'heavydutyboots', '']);
+  });
+
+  test('doubles: a Throat Spray used under a disguise on p1b goes to the Zoroark, not to the imitated Kingdra', () => {
+    const lines = [
+      '|gametype|doubles', '|player|p1|Alice||', '|player|p2|Bob||', '|gen|9', '|tier|[Gen 9] Doubles OU', '|start',
+      '|switch|p1a: Masq|Masquerain, F|100/100',
+      '|switch|p1b: Kingdra|Kingdra, M|100/100',
+      '|switch|p2a: Ursa|Ursaluna, M|100/100',
+      '|switch|p2b: Cress|Cresselia, F|100/100',
+      '|turn|1',
+      '|',
+      '|move|p1b: Kingdra|Snarl|p2a: Ursa|[spread] p2a,p2b',
+      '|-damage|p2a: Ursa|90/100',
+      '|-damage|p2b: Cress|95/100',
+      '|-enditem|p1b: Kingdra|Throat Spray',
+      '|-boost|p1b: Kingdra|spa|1|[from] item: Throat Spray',
+      '|move|p2a: Ursa|Facade|p1b: Kingdra',
+      '|-damage|p1b: Kingdra|40/100',
+      '|replace|p1b: Zorua|Zoroark-Hisui, F',
+      '|-end|p1b: Zorua|Illusion',
+      '|upkeep',
+      '|turn|2',
+    ];
+    const held = buildChoiceLockContext(log(lines), { p1Team: [], p2Team: [] }, []).heldItems.get(2)!;
+    expect(held.filter(entry => entry.side === 'p1').map(entry => [entry.species, entry.item, entry.firstMove])).toEqual([
+      ['Masquerain', null, null],
+      ['Kingdra', null, null],
+      ['Zoroark-Hisui', '', 'snarl'],
+    ]);
+  });
+});
