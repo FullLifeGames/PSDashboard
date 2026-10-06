@@ -1,4 +1,4 @@
-import { Dex } from '@pkmn/sim';
+import { Battle, Dex } from '@pkmn/sim';
 import { findPokemon, ruleOut, type InferrerState } from './inferrer-state.ts';
 import { toId } from '../ids.ts';
 
@@ -31,6 +31,8 @@ export interface ItemWatch {
   hp: Map<string, string>;
   /** The opponent Pokémon on each field position. */
   slots: Map<string, string>;
+  /** Each Pokémon's held item as the log shows it ('' after it lost it), by side and nickname. */
+  items: Map<string, string>;
   /** The HP of the opponent's actives when the turn's residual phase began. */
   residual: Map<string, string> | null;
   /** Pokémon that showed a residual item line since then. */
@@ -59,7 +61,7 @@ const hpOf = (text: string | undefined) => (text ?? '').split(' ')[0];
 
 function newWatch(): ItemWatch {
   return {
-    action: null, hp: new Map(), slots: new Map(), residual: null, residualShown: new Set(), residualSilenced: new Set(),
+    action: null, hp: new Map(), slots: new Map(), items: new Map(), residual: null, residualShown: new Set(), residualSilenced: new Set(),
     healBlocked: new Set(), embargoed: new Set(), magicRoom: false,
   };
 }
@@ -115,17 +117,40 @@ function lifeOrbWouldShow(state: InferrerState, watch: ItemWatch, action: Action
 }
 
 /**
+ * Whether a move from an attacker holding `heldItem` ('' for none) makes
+ * contact, read from the simulator: the item's own move change (Punching
+ * Glove takes contact from a punch), then `Battle#checkMoveMakesContact`
+ * (Protective Pads). Any doubt reads as no contact (round 64, T120).
+ */
+export function contactLands(gen: number, moveName: string, heldItem: string): boolean {
+  const dex = Dex.forGen(gen);
+  const holder = { hasItem: (item: string | string[]) => [item].flat().map(toId).includes(heldItem), addVolatile: () => false };
+  try {
+    const move = dex.getActiveMove(moveName);
+    const item = dex.items.get(heldItem) as { onModifyMove?: (this: never, ...args: never[]) => void };
+    item.onModifyMove?.call({} as never, move as never, holder as never, null as never);
+    return Battle.prototype.checkMoveMakesContact.call({} as never, move, holder as never, holder as never);
+  } catch {
+    return false;
+  }
+}
+
+/**
  * Whether a Rocky Helmet on the target would have hurt this attacker. From
- * the generation of Protective Pads on, any attacker whose item this scan
- * does not know may hold them: the fit corpus showed helmets that stayed
- * silent against Kleavor and Zapdos-Galar and spoke later.
+ * the generation of Protective Pads on, only an attacker whose item the log
+ * showed is judged (round 64, decision 19; the fit corpus of round 63
+ * showed helmets that stayed silent against Kleavor and Zapdos-Galar and
+ * spoke later), and the simulator says whether that item lets it make contact.
  */
 function helmetWouldShow(state: InferrerState, watch: ItemWatch, action: ActionWatch): boolean {
   const dex = Dex.forGen(state.gen);
   const pads = dex.items.get('protectivepads');
-  if (pads.exists && pads.gen <= state.gen) return false;
+  const padsExist = pads.exists && pads.gen <= state.gen;
+  const held = watch.items.get(action.attacker);
+  if (padsExist && held === undefined) return false;
   const move = dex.moves.get(action.move);
   if (!move.exists || move.category === 'Status' || !move.flags.contact) return false;
+  if (padsExist && !contactLands(state.gen, move.name, held ?? '')) return false;
   const abilities = possibleAbilities(state, action.ident);
   return !!abilities && !abilities.has('magicguard') && !abilities.has('longreach') && !watch.magicRoom;
 }
@@ -142,8 +167,10 @@ function judgeAction(state: InferrerState, watch: ItemWatch, action: ActionWatch
   }
   if (!helmetWouldShow(state, watch, action)) return;
   for (const holder of hitOthers) {
+    // A holder that may have Klutz ignores its item (the sim's ignoringItem).
     const judged = holder.startsWith(state.opponentSide) && !action.fainted.has(holder) &&
-      !action.shown.has(`${holder}|rockyhelmet`) && !watch.embargoed.has(holder);
+      !action.shown.has(`${holder}|rockyhelmet`) && !watch.embargoed.has(holder) &&
+      possibleAbilities(state, holder)?.has('klutz') === false;
     if (judged) ruleOutUnknown(state, holder, 'rockyhelmet');
   }
 }
@@ -220,6 +247,22 @@ function onField({ watch, parts, line }: LineContext) {
   if (/Magic Room/.test(line)) watch.magicRoom = parts[1] === '-fieldstart';
 }
 
+/**
+ * The item a line shows: `-item` gives the subject its item, `-enditem`
+ * leaves it with none, a `[from] item:` effect names the item of its
+ * `[of]` Pokémon or else of the subject (Life Orb, Rocky Helmet), an
+ * `-activate` of an item names the subject's.
+ */
+function noteHeldItem(watch: ItemWatch, { parts, line, key }: LineContext) {
+  const of = ofIdent(line);
+  const fromItem = line.match(FROM_ITEM)?.[1]?.trim();
+  const activated = parts[1] === '-activate' ? line.match(/\|item: ([^|]+)/)?.[1]?.trim() : undefined;
+  if (parts[1] === '-item') watch.items.set(key, toId(parts[3] ?? ''));
+  else if (parts[1] === '-enditem') watch.items.set(key, '');
+  else if (fromItem) watch.items.set(of ? keyOf(of) : key, toId(fromItem));
+  else if (activated) watch.items.set(key, toId(activated));
+}
+
 const BOARD: Record<string, (context: LineContext) => void> = {
   switch: onEntry, drag: onEntry, replace: onEntry,
   '-damage': onHp, '-heal': onHp, '-sethp': onHp,
@@ -283,6 +326,7 @@ export function watchItemEvidence(state: InferrerState, line: string) {
   const key = keyOf(parts[2] ?? '');
   const context: LineContext = { state, watch, parts, line, key, opponent: key.startsWith(state.opponentSide) };
   BOARD[parts[1] ?? '']?.(context);
+  if (parts[2]) noteHeldItem(watch, context);
   noteSilenced(watch);
   trackAction(watch, context);
   const fromItem = line.match(FROM_ITEM)?.[1]?.trim();

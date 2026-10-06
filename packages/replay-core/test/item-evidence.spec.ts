@@ -1,6 +1,7 @@
 import { test, expect, describe } from 'vitest';
-import { Battle, Teams, toID, type PokemonSet } from '@pkmn/sim';
+import { Battle, Dex, Teams, toID, type PokemonSet } from '@pkmn/sim';
 import { inferOpponentTeam } from '../src/opponent-inferrer';
+import { contactLands } from '../src/inference/item-evidence';
 
 /**
  * Items the protocol rules out by a line it does NOT show (round 63, T80).
@@ -17,14 +18,20 @@ function set(species: string, item: string, ability: string, moves: string[], le
   };
 }
 
-/** The spectators' log: each `|split|` keeps its public line, as a replay does. */
-function play(p1: PokemonSet[], p2: PokemonSet[], turns: [string, string][], doubles = false, gen = 9): string {
+/**
+ * The spectators' log: each `|split|` keeps its public line, as a replay does.
+ * `format` names a format whose rules fix the abilities (OU); the default
+ * custom game lets any species hold any ability.
+ */
+function play(p1: PokemonSet[], p2: PokemonSet[], turns: [string, string][], doubles = false, gen = 9, format = 'customgame'): string {
   const battle = new Battle({
-    formatid: toID(doubles ? `gen${gen}doublescustomgame` : `gen${gen}customgame`), seed: '1,2,3,4',
+    formatid: toID(doubles ? `gen${gen}doubles${format}` : `gen${gen}${format}`), seed: '1,2,3,4',
     p1: { name: 'Alpha', team: Teams.pack(p1) }, p2: { name: 'Beta', team: Teams.pack(p2) },
   });
-  battle.choose('p1', 'team 1');
-  battle.choose('p2', 'team 1');
+  if (battle.requestState === 'teampreview') {
+    battle.choose('p1', 'team 1');
+    battle.choose('p2', 'team 1');
+  }
   for (const [p1Choice, p2Choice] of turns) {
     battle.choose('p1', p1Choice);
     battle.choose('p2', p2Choice);
@@ -136,5 +143,63 @@ describe('Rocky Helmet shows its damage on every contact hit (T80, decision 13)'
     expect(shown(padded, 'Rocky Helmet')).toBe(false);
     expect(ruledOut(padded, 'Skarmory')).not.toContain('rockyhelmet');
     expect(ruledOut(play([set('Rattata', '', 'Guts', ['Tackle'])], [holder('Shed Shell')], tackle), 'Skarmory')).not.toContain('rockyhelmet');
+  });
+});
+
+describe('Rocky Helmet from the generation of Protective Pads on (round 64, T120, decision 19)', () => {
+  const holder = (item: string, ability = 'Sturdy') => set('Skarmory', item, ability, ['Knock Off', 'Roost']);
+  const ou = (p1: PokemonSet[], p2: PokemonSet[], turns: [string, string][], doubles = false, gen = 9) =>
+    play(p1, p2, turns, doubles, gen, 'ou');
+
+  test('singles gen 9: an attacker whose Leftovers were knocked off hits without helmet damage: Rocky Helmet ruled out', () => {
+    // Turn 1 the attacker's item is unknown when it hits; turn 2 it holds nothing, as the log showed (573756 Melmetal).
+    const attacker = set('Rattata', 'Leftovers', 'Guts', ['Tackle']);
+    const knocked: [string, string][] = [['move tackle', 'move knockoff'], ['move tackle', 'move roost']];
+    expect(shown(ou([attacker], [holder('Rocky Helmet')], knocked), 'Rocky Helmet')).toBe(true);
+    const log = ou([attacker], [holder('Shed Shell')], knocked);
+    expect(log).toMatch(/\|-enditem\|p1a: Rattata\|Leftovers\|\[from\] move: Knock Off/);
+    expect(ruledOut(log, 'Skarmory')).toContain('rockyhelmet');
+    expect(ruledOut(ou([attacker], [holder('Shed Shell')], knocked.slice(0, 1)), 'Skarmory')).not.toContain('rockyhelmet');
+  });
+
+  test('singles gen 9: an attacker that shows its Life Orb hits without helmet damage: Rocky Helmet ruled out', () => {
+    const log = ou([set('Rattata', 'Life Orb', 'Guts', ['Tackle'])], [holder('Shed Shell')], [['move tackle', 'move roost']]);
+    expect(shown(log, 'Life Orb')).toBe(true);
+    expect(ruledOut(log, 'Skarmory')).toContain('rockyhelmet');
+  });
+
+  test('doubles gen 9: an attacker that shows its Life Orb hits without helmet damage: Rocky Helmet ruled out', () => {
+    const p1 = [set('Rattata', 'Life Orb', 'Guts', ['Tackle']), set('Blissey', '', 'Natural Cure', ['Soft-Boiled'])];
+    const p2 = [holder('Shed Shell'), set('Talonflame', '', 'Gale Wings', ['Roost'])];
+    const log = ou(p1, p2, [['move tackle 1, move softboiled', 'move roost, move roost']], true);
+    expect(shown(log, 'Life Orb')).toBe(true);
+    expect(ruledOut(log, 'Skarmory')).toContain('rockyhelmet');
+  });
+
+  test('a punch from a Punching Glove holder makes no contact: nothing is ruled out', () => {
+    const glove = set('Hitmonchan', 'Punching Glove', 'Iron Fist', ['Mach Punch', 'Tackle']);
+    // Frisk on the holder's side shows the attacker's Punching Glove.
+    const frisker = holder('Shed Shell', 'Frisk');
+    const punch = ou([glove], [frisker], [['move machpunch', 'move roost']]);
+    expect(punch).toMatch(/\|-item\|p1a: Hitmonchan\|Punching Glove\|\[from\] ability: Frisk/);
+    expect(ruledOut(punch, 'Skarmory')).not.toContain('rockyhelmet');
+    expect(ruledOut(ou([glove], [frisker], [['move tackle', 'move roost']]), 'Skarmory')).toContain('rockyhelmet');
+  });
+
+  test('a holder that may have Klutz is not judged (gen 6 Lopunny)', () => {
+    const lopunny = set('Lopunny', 'Rocky Helmet', 'Klutz', ['Roost']);
+    const log = ou([set('Rattata', '', 'Guts', ['Tackle'])], [lopunny], [['move tackle', 'move roost']], false, 6);
+    expect(shown(log, 'Rocky Helmet')).toBe(false);
+    expect(ruledOut(log, 'Lopunny')).not.toContain('rockyhelmet');
+  });
+
+  test('checker: the contact rule read from the simulator agrees with its battles for every item that modifies a move', () => {
+    const items = [...Dex.forGen(9).items.all().filter(item => item.onModifyMove).map(item => item.name), 'Protective Pads', 'Life Orb'];
+    for (const item of items) {
+      for (const move of ['Mach Punch', 'Tackle']) {
+        const log = ou([set('Hitmonchan', item, 'Iron Fist', [move])], [holder('Rocky Helmet')], [[`move ${toID(move)}`, 'move roost']]);
+        expect(shown(log, 'Rocky Helmet'), `${item} ${move}`).toBe(contactLands(9, move, toID(item)));
+      }
+    }
   });
 });
