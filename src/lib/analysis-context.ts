@@ -2,7 +2,7 @@ import { toID } from '@pkmn/dex';
 import type { ReplayData, TurnSnapshot } from '@fulllifegames/replay-core';
 import {
   analyzeTurn, decidedSeenKey, diceEventTurns, forcedWinSeenKey, forcedWinSpeaks, PAYOFF_WINDOW, unansweredSeenKey, type TurnAnalysis, detectSacks,
-  type PlayedTurn, type StreakHistoryEntry, buildGameReport, type GameReport, computeRead, type EvalResult,
+  type PlayedTurn, type StreakHistoryEntry, buildGameReport, type GameReport, computeRead, type EvalResult, releaseBrokenClaims,
 } from '@fulllifegames/eval-engine';
 
 /** The graph slices the analyses read — matches useEvaluation's graph. */
@@ -182,6 +182,9 @@ export function computeGameReportData(args: {
   // on every decided turn, the sentence speaks once.
   const decidedSeen = new Set<string>();
   const analyses = args.graph.results.map((_, index) => {
+    // Round 64 (T123): a bar that left the decided zone frees the side's decided and forced sentences again.
+    const bar = args.graph.scores[index];
+    if (bar !== null && bar !== undefined) releaseBrokenClaims(decidedSeen, bar);
     const analysis = analyzeTurnAt({
       turn: index + 1, graph: args.graph, context: args.context,
       includeSacks: true, unansweredSeen, decidedSeen,

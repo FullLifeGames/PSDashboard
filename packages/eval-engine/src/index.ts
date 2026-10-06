@@ -87,6 +87,7 @@ export { formatLine } from './prose/line.ts';
 export { rollText } from './prose/phrases.ts';
 export { heldDecided } from './turn-analysis/decided-held.ts';
 export { forcedWinSpeaks } from './turn-analysis/forced-speech.ts';
+export { releaseBrokenClaims } from './turn-analysis/decided-signals.ts';
 export { resolveTeraPreference, teraKey } from './tera.ts';
 export type { TeraPreference } from './tera.ts';
 export { AUTO_MCTS_FAINTED_FRACTION } from './types.ts';

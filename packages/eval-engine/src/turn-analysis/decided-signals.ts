@@ -66,6 +66,23 @@ function nearStage(params: AnalyzeTurnParams, key: Side): SideAnalysis['nearDeci
   };
 }
 
+/**
+ * Round 64 (T123): the report walk speaks a side's decided and forced
+ * sentences once, until the board leaves the decided zone: once a later
+ * turn's bar reads the side under DECIDED_SCORE, the walk forgets both keys,
+ * and a new sweep or proof speaks again (2630685175: decided at t6, the bar
+ * fell to 16% at t7, decided again at t10). Near keys stay; a near stage
+ * lives under the line by nature (573756 t73 at 0.41).
+ */
+export function releaseBrokenClaims(seen: Set<string>, scoreBefore: number): void {
+  for (const key of ['p1', 'p2'] as const) {
+    if ((key === 'p1' ? scoreBefore : -scoreBefore) >= DECIDED_SCORE) continue;
+    // The decided stage keys on the side alone (round 63), whatever the species.
+    seen.delete(decidedSeenKey(key, { species: '' }));
+    seen.delete(forcedWinSeenKey(key));
+  }
+}
+
 export function decidedSignals(
   params: AnalyzeTurnParams,
   key: Side,
