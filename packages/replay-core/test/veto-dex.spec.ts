@@ -153,3 +153,42 @@ describe('the veto rows read their lists from the Dex (decision 17)', () => {
     ], { itemId: '' }))).toEqual(['Body Press', 'Cosmic Power', 'Iron Defense']);
   });
 });
+
+describe('row 3 spares the chosen set as published (review of round 64)', () => {
+  const storedPower = ['Cosmic Power', 'Stored Power', 'Recover', 'Taunt'];
+
+  test('the chosen set keeps its Cosmic Power without a Defense-scaling attack (gen 9 Ubers Arceus-Psychic "Stored Power")', () => {
+    expect(names(applyCoherenceVetoes(storedPower.map(fromSet), { itemId: 'mindplate' }))).toEqual(storedPower);
+    // A guessed Cosmic Power outside the chosen set still needs its payoff.
+    expect(names(applyCoherenceVetoes([guessed('Cosmic Power'), guessed('Stored Power')], { itemId: '' }))).toEqual(['Stored Power']);
+  });
+
+  const arceus = stats(usage('Arceus-Psychic', [['Judgment', 0.9], ['Recover', 0.8], ['Cosmic Power', 0.5], ['Stored Power', 0.5], ['Taunt', 0.4]]));
+  const published = {
+    format: 'test', source: 's',
+    pokemon: { arceuspsychic: {
+      species: 'Arceus-Psychic', sourceDetail: 's', item: { value: 'Mind Plate', sourceDetail: 's' },
+      moves: storedPower.map(value => ({ value, sourceDetail: 's' })),
+    } },
+  };
+  const buildWithSet = (log: string) => {
+    const p2Info = enrichTeamInfo(inferOpponentTeam(log, 'p2'), arceus, published);
+    const team = buildTeamsFromReplay(log, { p2Info, usageStats: arceus, setAssumptions: published }).p2Team;
+    return {
+      built: team.find(set => set.species === 'Arceus-Psychic')!.moves.map(slotMoveKey).sort(),
+      panel: p2Info.pokemon.find(mon => mon.species === 'Arceus-Psychic')!.moves.map(move => slotMoveKey(move.name)).sort(),
+    };
+  };
+
+  test('singles: the build and the panel play the published set, Cosmic Power included', () => {
+    const { built, panel } = buildWithSet(singles('Arceus-Psychic', ['Stored Power']));
+    expect(built).toEqual(keysOf(...storedPower));
+    expect(panel).toEqual(built);
+  });
+
+  test('doubles: the build and the panel play the published set, Cosmic Power included', () => {
+    const { built, panel } = buildWithSet(doubles('Arceus-Psychic', ['Stored Power']));
+    expect(built).toEqual(keysOf(...storedPower));
+    expect(panel).toEqual(built);
+  });
+});

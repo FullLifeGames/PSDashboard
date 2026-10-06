@@ -20,8 +20,9 @@ export interface MoveCandidate {
   guessed: boolean;
   /**
    * A move of the chosen Smogon set: coherent by construction, so rows 1
-   * and 2 spare it; the item rows still apply, because the item may come
-   * from elsewhere (an inferred Scarf). Round 63, T28.
+   * to 4 spare it (row 3 since the review of round 64: the set is read as
+   * published); the item rows still apply, because the item may come from
+   * elsewhere (an inferred Scarf). Round 63, T28.
    */
   fromSet?: boolean;
   /**
@@ -319,7 +320,7 @@ function assembleKeptMoves(
       if (restrictiveItem === 'choice' && !TRICK_FAMILY.has(facts.id)) continue;
       // Row 3: a defense-boost enabler without its payoff attack (Iron
       // Defense whose Body Press was vetoed or never offered).
-      if (defenseBoost(Dex.moves.get(facts.id)) && !keeps.keptScalings.has('def')) continue;
+      if (!candidate.fromSet && defenseBoost(Dex.moves.get(facts.id)) && !keeps.keptScalings.has('def')) continue;
       kept.push(candidate);
       continue;
     }
