@@ -55,6 +55,16 @@ describe('SideRow', () => {
     expect(screen.getByText('· sacked Weavile (60% HP)')).toHaveAttribute('title', expect.stringContaining('left in'));
   });
 
+  test('a stayed sack the window did not verify claims no payback (T123 point 4, the 573756 t68 shape without verified)', () => {
+    // A tiered stayed feed clears the payoff margin but not regret plus margin: demoted, not verified (grading.ts sackVerdict).
+    const { rerender } = render(<SideRow name="Alice" side={misplayedSide('inaccuracy', { sacrifice: { name: 'Weavile', hpFraction: 0.77, stayed: true } })} />);
+    const note = screen.getByText('· sacked Weavile (77% HP)');
+    expect(note).toHaveAttribute('title', expect.stringContaining('payoff window'));
+    expect(note.getAttribute('title')).not.toContain('paid it back');
+    rerender(<SideRow name="Alice" side={sideAnalysis({ sacrifice: { name: 'Weavile', hpFraction: 0.77, stayed: true, verified: true } })} />);
+    expect(screen.getByText('· sacked Weavile (77% HP)')).toHaveAttribute('title', expect.stringContaining('paid it back'));
+  });
+
   test('a blunder reads as a blunder; a setup move softens the chip into a caveat', () => {
     const { rerender } = render(<SideRow name="Alice" side={misplayedSide('blunder')} />);
     expect(screen.getByText(`blunder · ${winDeltaText(-0.5)}`)).toBeInTheDocument();
