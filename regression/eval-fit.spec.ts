@@ -1,17 +1,19 @@
 import { test, describe } from 'vitest';
-import { existsSync, readFileSync, writeFileSync } from 'fs';
+import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 'fs';
 import { join } from 'path';
 import { buildTeamsFromReplay } from '../packages/replay-core/src/team-builder';
 import { reconstructBranchRuntime } from '../packages/eval-engine/src/branch-engine';
 import { getBranchSimulatorFormat, replayBringOnly } from '../packages/replay-core/src/replay-format';
 import { parseReplayLogWithObservations } from '../packages/replay-core/src/protocol-parser';
 import {
-  createMatchupCache, evalFeatures, evaluatePosition, EVAL_WEIGHTS, FEATURE_WEIGHTS,
+  createMatchupCache, DOUBLES_FEATURE_WEIGHTS, evalFeatures, evaluatePosition, EVAL_WEIGHTS, FEATURE_WEIGHTS,
   type EvalFeatures,
 } from '../packages/eval-engine/src/eval-function';
 import { battleFaintedFraction } from '../packages/eval-engine/src/search';
+import { WINPROB_K } from '../packages/eval-engine/src/winprob';
 import {
-  bootstrapPhaseK, brierScore, crossValidate, fitConstantK, fitLogistic, fitPhaseK, logLossScore, mulberry32, phaseBucket,
+  atKScore, bootstrapPhaseK, brierScore, crossValidate, fitConstantK, fitLogistic, fitPhaseK, layoutOf, logLossScore,
+  mulberry32, phaseBucket, refitAtKReport, type AtKSample,
 } from './fit-helpers';
 
 /**
@@ -68,6 +70,18 @@ const CACHE_DIR = '.fit-corpus';
  */
 const SAMPLES_CACHE = join(CACHE_DIR, 'samples-cache.json');
 
+/**
+ * Round 64 (T127): a capture into its own folder, never into the shared
+ * cache above (`EVAL_FIT_SAMPLES=<dir>`), sliced over the manifest so
+ * parallel processes split it (`EVAL_FIT_SLICE=k/n` captures every n-th
+ * replay from the k-th and stops; without it the fit reads every
+ * `samples-<k>of<n>.json` of the folder and writes `EVAL_FIT_OUT`, default
+ * `<dir>/fit-report.json`). `EVAL_FIT_LEGACY=0` skips the older reports.
+ */
+const SAMPLES_DIR = process.env.EVAL_FIT_SAMPLES;
+const SLICE = (process.env.EVAL_FIT_SLICE ?? '').match(/^(\d+)\/(\d+)$/);
+const slicePart = SLICE ? { k: Number(SLICE[1]), n: Number(SLICE[2]) } : null;
+
 /** The brought species per side, or undefined where the format brings the whole team. */
 const bringOnlyFor = (...args: Parameters<typeof replayBringOnly>) => replayBringOnly(...args) ?? undefined;
 const FEATURE_KEYS = Object.keys(FEATURE_WEIGHTS) as (keyof EvalFeatures)[];
@@ -77,6 +91,63 @@ const cacheStamp = (manifest: { replays: { id: string }[] }) => JSON.stringify({
   weights: { EVAL_WEIGHTS, FEATURE_WEIGHTS },
   manifestIds: manifest.replays.map(entry => entry.id),
 });
+
+type Manifest = { replays: { id: string; format: string; source: 'tournament' | 'ladder' }[] };
+
+/**
+ * The cached samples under the current stamp: every slice of the folder, or
+ * the shared cache. An empty folder means capture; a folder with missing or
+ * stale slices stops the run instead of recapturing the whole corpus.
+ */
+function cachedSamples(manifest: Manifest): FitSample[] {
+  const stamp = cacheStamp(manifest);
+  const read = (path: string) => JSON.parse(readFileSync(path, 'utf-8')) as { stamp?: string; samples: FitSample[] };
+  if (!SAMPLES_DIR) {
+    const cached = existsSync(SAMPLES_CACHE) ? read(SAMPLES_CACHE) : null;
+    return cached?.stamp === stamp ? cached.samples : [];
+  }
+  if (slicePart || !existsSync(SAMPLES_DIR)) return [];
+  const slices = readdirSync(SAMPLES_DIR).map(name => name.match(/^samples-(\d+)of(\d+)\.json$/)).filter(match => match !== null);
+  const total = Number(slices[0]?.[2] ?? 0);
+  if (slices.length === 0) return [];
+  if (slices.length !== total || slices.some(match => Number(match[2]) !== total)) throw new Error(`incomplete capture in ${SAMPLES_DIR}: ${slices.length} of ${total} slices`);
+  const parts = slices.map(match => read(join(SAMPLES_DIR, match[0])));
+  if (parts.some(part => part.stamp !== stamp)) throw new Error(`stale capture in ${SAMPLES_DIR}: the stamp differs`);
+  return parts.flatMap(part => part.samples);
+}
+
+/** Writes a fresh capture to the slice file (or the shared cache without a folder). */
+function writeSamples(manifest: Manifest, samples: FitSample[]): string {
+  if (!SAMPLES_DIR) {
+    writeFileSync(SAMPLES_CACHE, JSON.stringify({ stamp: cacheStamp(manifest), samples }));
+    return SAMPLES_CACHE;
+  }
+  mkdirSync(SAMPLES_DIR, { recursive: true });
+  const path = join(SAMPLES_DIR, `samples-${slicePart?.k ?? 1}of${slicePart?.n ?? 1}.json`);
+  writeFileSync(path, JSON.stringify({ stamp: cacheStamp(manifest), samples }));
+  return path;
+}
+
+/**
+ * The T127 refit (round 64): the static's weights at the fixed K of winprob.ts
+ * in today's layout. First the identity: the hand weights must give back every
+ * captured score, or the fit refuses.
+ */
+function writeRefitReport(samples: FitSample[]) {
+  const singles = FEATURE_KEYS.map(key => FEATURE_WEIGHTS[key]);
+  const doubles = FEATURE_KEYS.map(key => DOUBLES_FEATURE_WEIGHTS[key]);
+  const { layout, start } = layoutOf(singles, doubles);
+  const atK: AtKSample[] = samples.map(sample => ({
+    g: sample.g, won: sample.p1Won, doubles: sample.gameType === 'doubles', faintedFraction: sample.faintedFraction, game: sample.game,
+  }));
+  const off = atK.filter((sample, i) => Math.abs(atKScore(sample, start, layout) - samples[i].score) > 1e-9).length;
+  if (off > 0) throw new Error(`identity: ${off} of ${samples.length} captured scores differ from the hand weights' tanh`);
+  const draws = Number(process.env.EVAL_FIT_DRAWS ?? 200);
+  const report = refitAtKReport(atK, FEATURE_KEYS, singles, doubles, WINPROB_K, { seeds: 20, folds: 5, draws, minGames: 20 });
+  const out = process.env.EVAL_FIT_OUT ?? join(SAMPLES_DIR ?? CACHE_DIR, 'fit-report.json');
+  writeFileSync(out, JSON.stringify({ identity: { samples: samples.length, off }, ...report }, null, 1));
+  console.log(`refit at fixed K: adopt=${report.verdict.adopt} wins=${report.summary.pooled.logLossWins}/20 -> ${out}`);
+}
 
 interface FitSample {
   game: string;
@@ -89,6 +160,70 @@ interface FitSample {
   /** Fainted bodies / total bodies at capture time — the phase covariate. */
   faintedFraction: number;
   p1Won: boolean;
+}
+
+/** One manifest replay's sampled positions, captured in a single reconstruction pass. */
+async function captureEntry(entry: Manifest['replays'][number], samples: FitSample[]): Promise<void> {
+  const cachePath = join(CACHE_DIR, `${entry.id}.json`);
+  if (!existsSync(cachePath)) return;
+  try {
+    const replay = JSON.parse(readFileSync(cachePath, 'utf-8')) as {
+      id?: string; log: string; players?: string[]; format?: string; formatid?: string;
+    };
+    const winnerName = replay.log.match(/\|win\|(.+)/)?.[1]?.trim();
+    const players = replay.players ?? [];
+    if (!winnerName || players.length < 2) return;
+    const p1Won = winnerName === players[0];
+    if (!p1Won && winnerName !== players[1]) return;
+    const gameType: FitSample['gameType'] = /\|gametype\|doubles/.test(replay.log) ? 'doubles' : 'singles';
+    const genClass: FitSample['genClass'] = /^gen9/.test(replay.formatid ?? entry.format) ? 'gen9' : 'old';
+
+    const { snapshots, observations, speedOrders } = parseReplayLogWithObservations(replay.log);
+    const { p1Team, p2Team } = buildTeamsFromReplay(replay.log, { observations, speedOrders });
+    if (p1Team.length === 0 || p2Team.length === 0 || snapshots.length < 4) return;
+
+    const maxTurn = snapshots.length;
+    const step = Math.max(1, Math.ceil(maxTurn / 8));
+    const wanted = new Set<number>();
+    for (let turn = 2; turn < maxTurn; turn += step) wanted.add(turn);
+
+    // Bring-limited replays (VGC: four of six) reconstruct with the
+    // brought species only, the trim the app and the bank apply; without
+    // it every sample carried two bodies per side that never played
+    // (round 46). Per-side fail-open, null for bring-all formats.
+    const replayMeta = { id: entry.id, format: replay.format ?? entry.format, formatid: replay.formatid, log: replay.log };
+    const bringOnly = bringOnlyFor(replayMeta as Parameters<typeof replayBringOnly>[0], snapshots);
+
+    // Single-pass capture: one reconstruction yields every sampled turn.
+    await reconstructBranchRuntime({
+      format: getBranchSimulatorFormat(replayMeta as Parameters<typeof getBranchSimulatorFormat>[0]),
+      p1Team, p2Team,
+      bringOnly,
+      replayLog: replay.log,
+      targetTurn: maxTurn - 1,
+      snapshot: snapshots[Math.min(maxTurn - 2, snapshots.length - 1)],
+      capturePositions: {
+        snapshotFor: turn => snapshots[Math.min(turn - 1, snapshots.length - 1)] ?? null,
+        onPosition: (turn, battle) => {
+          if (!wanted.has(turn) || battle.ended) return;
+          const cache = createMatchupCache();
+          const features = evalFeatures(battle, cache);
+          const teamSize = Math.max(battle.sides[0].pokemon.length, battle.sides[1].pokemon.length, 1);
+          const scaleOverNorm = EVAL_WEIGHTS.scale / (teamSize * (EVAL_WEIGHTS.alive + EVAL_WEIGHTS.hp));
+          const g = FEATURE_KEYS.map(key => features[key] * scaleOverNorm);
+          const score = evaluatePosition(battle, cache);
+          if (Number.isNaN(score) || g.some(Number.isNaN)) return;
+          samples.push({
+            game: entry.id, source: entry.source, gameType, genClass, g, score,
+            faintedFraction: battleFaintedFraction(battle), p1Won,
+          });
+        },
+      },
+    });
+    console.log(`${entry.id}: ok`);
+  } catch (error) {
+    console.log(`${entry.id}: ${error instanceof Error ? error.message : error}`);
+  }
 }
 
 /** Implied point-scale weights, normalized so `bodies` matches its hand weight. */
@@ -105,95 +240,24 @@ describe('eval weight fitting (EVAL_FIT=1)', () => {
     skip(!process.env.EVAL_FIT, 'weight fitting is opt-in: EVAL_FIT=1');
     skip(!existsSync(MANIFEST_PATH), 'run node scripts/build-fit-corpus.mjs first');
 
-    const manifest = JSON.parse(readFileSync(MANIFEST_PATH, 'utf-8')) as {
-      replays: { id: string; format: string; source: 'tournament' | 'ladder' }[];
-    };
-    let samples: FitSample[] = [];
-
-    if (existsSync(SAMPLES_CACHE)) {
-      const cached = JSON.parse(readFileSync(SAMPLES_CACHE, 'utf-8')) as {
-        stamp?: string; samples: FitSample[];
-      };
-      if (cached.stamp === cacheStamp(manifest)) {
-        samples = cached.samples;
-        console.log(`loaded ${samples.length} samples from ${SAMPLES_CACHE}`);
-      }
-    }
+    const manifest = JSON.parse(readFileSync(MANIFEST_PATH, 'utf-8')) as Manifest;
+    const samples: FitSample[] = cachedSamples(manifest);
+    console.log(`loaded ${samples.length} cached samples`);
 
     const cacheHit = samples.length > 0;
-    for (const entry of cacheHit ? [] : manifest.replays) {
-      const cachePath = join(CACHE_DIR, `${entry.id}.json`);
-      if (!existsSync(cachePath)) continue;
-      try {
-        const replay = JSON.parse(readFileSync(cachePath, 'utf-8')) as {
-          id?: string; log: string; players?: string[]; format?: string; formatid?: string;
-        };
-        const winnerName = replay.log.match(/\|win\|(.+)/)?.[1]?.trim();
-        const players = replay.players ?? [];
-        if (!winnerName || players.length < 2) continue;
-        const p1Won = winnerName === players[0];
-        if (!p1Won && winnerName !== players[1]) continue;
-        const gameType: FitSample['gameType'] = /\|gametype\|doubles/.test(replay.log) ? 'doubles' : 'singles';
-        const genClass: FitSample['genClass'] = /^gen9/.test(replay.formatid ?? entry.format) ? 'gen9' : 'old';
-
-        const { snapshots, observations, speedOrders } = parseReplayLogWithObservations(replay.log);
-        const { p1Team, p2Team } = buildTeamsFromReplay(replay.log, { observations, speedOrders });
-        if (p1Team.length === 0 || p2Team.length === 0 || snapshots.length < 4) continue;
-
-        const maxTurn = snapshots.length;
-        const step = Math.max(1, Math.ceil(maxTurn / 8));
-        const wanted = new Set<number>();
-        for (let turn = 2; turn < maxTurn; turn += step) wanted.add(turn);
-
-        // Bring-limited replays (VGC: four of six) reconstruct with the
-        // brought species only, the trim the app and the bank apply; without
-        // it every sample carried two bodies per side that never played
-        // (round 46). Per-side fail-open, null for bring-all formats.
-        const replayMeta = { id: entry.id, format: replay.format ?? entry.format, formatid: replay.formatid, log: replay.log };
-        const bringOnly = bringOnlyFor(replayMeta as Parameters<typeof replayBringOnly>[0], snapshots);
-
-        // Single-pass capture: one reconstruction yields every sampled turn.
-        await reconstructBranchRuntime({
-          format: getBranchSimulatorFormat(replayMeta as Parameters<typeof getBranchSimulatorFormat>[0]),
-          p1Team, p2Team,
-          bringOnly,
-          replayLog: replay.log,
-          targetTurn: maxTurn - 1,
-          snapshot: snapshots[Math.min(maxTurn - 2, snapshots.length - 1)],
-          capturePositions: {
-            snapshotFor: turn => snapshots[Math.min(turn - 1, snapshots.length - 1)] ?? null,
-            onPosition: (turn, battle) => {
-              if (!wanted.has(turn) || battle.ended) return;
-              const cache = createMatchupCache();
-              const features = evalFeatures(battle, cache);
-              const teamSize = Math.max(battle.sides[0].pokemon.length, battle.sides[1].pokemon.length, 1);
-              const scaleOverNorm = EVAL_WEIGHTS.scale / (teamSize * (EVAL_WEIGHTS.alive + EVAL_WEIGHTS.hp));
-              const g = FEATURE_KEYS.map(key => features[key] * scaleOverNorm);
-              const score = evaluatePosition(battle, cache);
-              if (Number.isNaN(score) || g.some(Number.isNaN)) return;
-              samples.push({
-                game: entry.id, source: entry.source, gameType, genClass, g, score,
-                faintedFraction: battleFaintedFraction(battle), p1Won,
-              });
-            },
-          },
-        });
-        console.log(`${entry.id}: ok`);
-      } catch (error) {
-        console.log(`${entry.id}: ${error instanceof Error ? error.message : error}`);
-      }
-    }
+    const replays = slicePart ? manifest.replays.filter((_, index) => index % slicePart.n === slicePart.k - 1) : manifest.replays;
+    for (const entry of cacheHit ? [] : replays) await captureEntry(entry, samples);
 
     const games = new Set(samples.map(sample => sample.game));
     console.log(`\nsamples=${samples.length} games=${games.size}`);
+    if (!cacheHit && samples.length > 0) console.log(`cached samples to ${writeSamples(manifest, samples)}`);
+    if (slicePart) return;
     if (samples.length < 100) {
       console.log('too few samples to fit — check the corpus cache');
       return;
     }
-    if (!cacheHit) {
-      writeFileSync(SAMPLES_CACHE, JSON.stringify({ stamp: cacheStamp(manifest), samples }));
-      console.log(`cached samples to ${SAMPLES_CACHE}`);
-    }
+    if (SAMPLES_DIR || process.env.EVAL_FIT_OUT) writeRefitReport(samples);
+    if (process.env.EVAL_FIT_LEGACY === '0') return;
 
     const report = (label: string, subset: FitSample[]) => {
       if (subset.length < 50) {
