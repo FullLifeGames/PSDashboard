@@ -144,6 +144,7 @@ value forcedWinFor
 value forcedWinInput
 value forcedWinPossible
 value forcedWinSeenKey
+value forcedWinSpeaks
 value formatLine
 value formatRead
 value heldDecided

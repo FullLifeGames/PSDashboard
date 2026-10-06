@@ -1,7 +1,7 @@
 import { describe, expect, test } from 'vitest';
 import { allTurnEvents, type EvalResult } from '@fulllifegames/eval-engine';
 import type { TurnSnapshot } from '@fulllifegames/replay-core';
-import { analyzeTurnAt, type AnalysisGraphData, type TurnAnalysisContext } from '../../src/lib/analysis-context';
+import { analyzeTurnAt, computeGameReportData, type AnalysisGraphData, type TurnAnalysisContext } from '../../src/lib/analysis-context';
 import { evalGraph, evalResult } from '../fixtures/eval-result';
 import { replayFixture } from '../fixtures/replay';
 
@@ -52,5 +52,29 @@ describe('analyzeTurnAt passes the phase of the turn', () => {
       expect(nearAt(1, graph, context)?.announce).toBe(false);
       expect(nearAt(2, graph, context)?.announce).toBe(true);
     }
+  });
+});
+
+/**
+ * Round 63 fix: the report walk marks the forced-win sentence spoken
+ * whenever it speaks — since T19 that includes a proof under 0.9 whose open
+ * event holds the bar down (649664 t24) — so the walk says it once.
+ */
+describe('the report walk speaks the forced-win sentence once', () => {
+  test('a proof under 0.9 that speaks on the first turn stays quiet on the next', () => {
+    const forcedWin = {
+      side: 'p1' as const, turns: 5, mass: 0.8, caveat: 'barring-crit' as const, engineScore: -0.95, states: 40,
+      open: { side: 'p1' as const, moveId: 'hydropump', label: 'Hydro Pump', odds: 0.8, kind: 'hit' as const },
+    };
+    const turns = snapshots.length;
+    const graph: AnalysisGraphData = {
+      scores: Array.from({ length: turns }, () => 0.7875),
+      results: Array.from({ length: turns }, () => evalResult('singles', { score: 0.7875, forcedWin })),
+      played: Array.from({ length: turns }, () => null), playedOutcome: Array.from({ length: turns }, () => null),
+      verified: Array.from({ length: turns }, () => null), sensitivity: Array.from({ length: turns }, () => null),
+    };
+    const walk = computeGameReportData({ replayData, graph, context: contextWith(snapshots), winner: 'p1', tendencies: null });
+    expect(walk?.analyses[0]?.p1.forcedWin?.announce).toBe(true);
+    expect(walk?.analyses[1]?.p1.forcedWin?.announce).toBe(false);
   });
 });

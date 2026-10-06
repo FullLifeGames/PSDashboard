@@ -85,6 +85,7 @@ export type { StreakHistoryEntry, StreakOdds } from './streaks.ts';
 export { summarizeTurn, formatRead } from './summary.ts';
 export { formatLine } from './prose/line.ts';
 export { heldDecided } from './turn-analysis/decided-held.ts';
+export { forcedWinSpeaks } from './turn-analysis/forced-speech.ts';
 export { resolveTeraPreference, teraKey } from './tera.ts';
 export type { TeraPreference } from './tera.ts';
 export { AUTO_MCTS_FAINTED_FRACTION } from './types.ts';

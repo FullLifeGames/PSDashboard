@@ -1,7 +1,7 @@
 import { toID } from '@pkmn/dex';
 import type { ReplayData, TurnSnapshot } from '@fulllifegames/replay-core';
 import {
-  analyzeTurn, decidedSeenKey, diceEventTurns, forcedWinSeenKey, PAYOFF_WINDOW, SPOKEN_MASS, unansweredSeenKey, type TurnAnalysis, detectSacks,
+  analyzeTurn, decidedSeenKey, diceEventTurns, forcedWinSeenKey, forcedWinSpeaks, PAYOFF_WINDOW, unansweredSeenKey, type TurnAnalysis, detectSacks,
   type PlayedTurn, type StreakHistoryEntry, buildGameReport, type GameReport, computeRead, type EvalResult,
 } from '@fulllifegames/eval-engine';
 
@@ -180,7 +180,8 @@ export function computeGameReportData(args: {
         decidedSeen.add(decidedSeenKey(key, { species: near.species, removes: near.removes }));
       }
       const forced = analysis[key].forcedWin;
-      if (forced?.announce && forced.mass >= SPOKEN_MASS) decidedSeen.add(forcedWinSeenKey(key));
+      // Round 63: whenever the sentence speaks, the 0.9 proof and the open event under it (T19) alike.
+      if (forcedWinSpeaks(forced, key === 'p1' ? analysis.scoreBefore : -analysis.scoreBefore)) decidedSeen.add(forcedWinSeenKey(key));
     }
     return analysis;
   });
