@@ -239,7 +239,7 @@ export const ratchetOverrides = [
     "rules": {
       "complexity": [
         "error",
-        50
+        45
       ]
     }
   },

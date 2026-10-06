@@ -126,6 +126,10 @@ async function verifyAndProbeFresh(
   return { turnVerified, turnSensitivity };
 }
 
+/** The played turn the search keeps: any doubles slot or singles action (the verify step joins its row and column). */
+const keptPlayed = (turnPlayed: PlayedTurn | null) =>
+  (turnPlayed?.p1Slots || turnPlayed?.p2Slots || turnPlayed?.p1 || turnPlayed?.p2 ? turnPlayed : undefined);
+
 /** Search a turn that no cache layer covered, then install and persist everything it produced. */
 async function runFreshEvaluation(
   env: SweepEnv, serialized: string, args: Omit<TurnStageArgs, 'hit'>, verify: boolean,
@@ -136,7 +140,7 @@ async function runFreshEvaluation(
   if (aborted(env)) return false;
   env.clientRef.current ??= new EvalWorkerClient();
   const client = env.clientRef.current;
-  const keepPlayed = turnPlayed?.p1Slots || turnPlayed?.p2Slots || turnPlayed?.p1 || turnPlayed?.p2 ? turnPlayed : undefined;
+  const keepPlayed = keptPlayed(turnPlayed);
   const result = await perfSpan(`evaluate[${mode}-d${depth}s${samples}]`, () =>
     // exclusive: false — pipelined turns share the pool and
     // must not cancel each other; the run's own cancel path

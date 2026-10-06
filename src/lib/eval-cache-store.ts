@@ -243,7 +243,13 @@ export interface StoredEval {
 //      against 198 s before round 59), so the gate's fallback holds: the
 //      tree from the first turn with 600 iterations per tree (-23 bp
 //      pooled on the bank).
-const EVAL_ENGINE_CACHE_VERSION = 56;
+// v57 (round 63, wave 1): eight lanes land together: early singles turns
+//      on the matrix again (T110), the static's move core asks the
+//      simulator (T81 without STAB) and memoizes its hints (T112), the
+//      verify step deepens per class and checks doubles boundary cells
+//      (T16, T78), set fidelity (T89, T28, T80, T101), the choice lock
+//      after Trick (T115) and observed move orders (T117).
+const EVAL_ENGINE_CACHE_VERSION = 57;
 
 /** Round 61: a search-budget form stores under its own tag; the default keeps today's keys. */
 const versionTag = (): string => {
