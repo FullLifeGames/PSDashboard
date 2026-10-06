@@ -28,6 +28,15 @@ export const playedVerb = (label: string): string =>
     .map((slot, index, slots) => (index > 0 && slots[index - 1].verb === slot.verb ? slot.object : `${slot.verb} ${slot.object}`))
     .join(' and ');
 
+/**
+ * Round 64 (T123): a probability under 1 as a whole percent that never
+ * reads as certain (99.5% is 99, not 100); exactly 1 stays 100.
+ */
+export const percentBelowSure = (odds: number): number => (odds >= 1 ? 100 : Math.min(99, Math.round(odds * 100)));
+
+/** The near-decided click: a "sure KO" only at odds 1, else an "N% roll" (T123: 99.5% is no sure KO). */
+export const rollText = (odds: number): string => (odds >= 1 ? 'sure KO' : `${percentBelowSure(odds)}% roll`);
+
 /** The noun form of a line, for "the safe …" (see playedVerb). */
 export const choiceNoun = (label: string): string =>
   splitCombinedLabel(label)

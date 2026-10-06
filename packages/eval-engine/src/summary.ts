@@ -1,7 +1,7 @@
 import { BREADTH_MIN_OPTIONS, CHANCE_THRESHOLD, type SideAnalysis, type TurnAnalysis } from './analysis.ts';
 import { winDeltaText, winPercent } from './winprob.ts';
 import { forcedWinSpeaks } from './turn-analysis/forced-speech.ts';
-import { phrase, playedBest } from './prose/phrases.ts';
+import { percentBelowSure, phrase, playedBest, rollText } from './prose/phrases.ts';
 import {
   forcedClause, inaccuracyClause, readCreditClause, sackClause, sensitivityClause, sideClause, streakClause, unansweredClause,
 } from './prose/clauses.ts';
@@ -55,9 +55,9 @@ function forcedWinSentence(side: SideAnalysis, player: string, ownBar: number): 
   if (forced.mass >= 1) return `${head}${tail}.`;
   if (forced.open) {
     const verb = forced.open.kind === 'hit' ? 'lands' : 'knocks out';
-    return `${head} if the ${Math.round(forced.open.odds * 100)}% ${forced.open.label} ${verb}${tail}.`;
+    return `${head} if the ${percentBelowSure(forced.open.odds)}% ${forced.open.label} ${verb}${tail}.`;
   }
-  const share = Math.round(forced.mass * 100);
+  const share = percentBelowSure(forced.mass);
   return forced.caveat === 'sampled-rolls'
     ? `${head} in ${share}% of the sampled rolls.`
     : `${head} in ${share}% of the rolls${tail}.`;
@@ -82,9 +82,8 @@ function decidedSentences(analysis: TurnAnalysis, playerNames: PlayerNames, deci
   }
   const nearDecided = analysis.p1.nearDecided ?? analysis.p2.nearDecided;
   if (nearDecided?.announce) {
-    // Round 63 (T18): a click that cannot fail is no roll.
-    const odds = Math.round(nearDecided.odds * 100);
-    sentences.push(`${nearDecided.species} is one ${odds >= 100 ? 'sure KO' : `${odds}% roll`} ` +
+    // Round 63 (T18): a click that cannot fail is no roll; round 64 (T123): 99.5% can fail.
+    sentences.push(`${nearDecided.species} is one ${rollText(nearDecided.odds)} ` +
       `from clearing the rest — removing ${nearDecided.removes} leaves no answer behind.`);
   }
   return sentences;

@@ -1,4 +1,5 @@
 import type { TurnAnalysis } from './analysis.ts';
+import { rollText } from './prose/phrases.ts';
 import { TIER_THRESHOLDS } from './turn-analysis/types.ts';
 
 /**
@@ -78,7 +79,8 @@ export function deniedEndFor(
 
 /** The denied end spoken: for the eventual winner the delayed win, for the loser the turnaround. */
 export function deniedEndSentence(denied: DeniedEnd, winner: Side, loserName: string): string {
-  const roll = `${denied.species} stood one ${Math.round(denied.odds * 100)}% roll from clearing the rest`;
+  // Round 64 (T123): the same words as the near sentence, a sure KO only at odds 1.
+  const roll = `${denied.species} stood one ${rollText(denied.odds)} from clearing the rest`;
   const fail = denied.move !== undefined ? `${denied.move} missed` : 'the roll failed';
   return denied.side === winner
     ? `Turn ${denied.turn} nearly ended it far earlier: ${roll}, but ${fail} — ` +

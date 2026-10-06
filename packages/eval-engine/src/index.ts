@@ -84,6 +84,7 @@ export { serializeLiveBattle } from './serialize.ts';
 export type { StreakHistoryEntry, StreakOdds } from './streaks.ts';
 export { summarizeTurn, formatRead } from './summary.ts';
 export { formatLine } from './prose/line.ts';
+export { rollText } from './prose/phrases.ts';
 export { heldDecided } from './turn-analysis/decided-held.ts';
 export { forcedWinSpeaks } from './turn-analysis/forced-speech.ts';
 export { resolveTeraPreference, teraKey } from './tera.ts';

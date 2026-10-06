@@ -51,7 +51,7 @@ describe('EvalGameReport', () => {
     expect(within(chip(6)).getByText('sack')).toBeInTheDocument();
     expect(screen.getByText('Bob: no clear misplays')).toBeInTheDocument();
     expect(within(chip(8)).getByText(`read paid off ${winDeltaText(0.14)}`)).toBeInTheDocument();
-    expect(within(chip(9)).getByText('one 90% roll from ending it — missed')).toBeInTheDocument();
+    expect(within(chip(9)).getByText('one 90% roll from ending it, missed')).toBeInTheDocument();
     expect(within(chip(9)).getByText('Knock Off')).toBeInTheDocument();
     expect(within(chip(7)).getByText('chance swing (rolls, crits, reveals)')).toBeInTheDocument();
     expect(within(chip(7)).getByText(winDeltaText(-0.35))).toBeInTheDocument();
@@ -80,6 +80,14 @@ describe('EvalGameReport', () => {
     render(<EvalGameReport report={gameReport()} playerNames={names} leads={leads} onSelectTurn={vi.fn()} />);
     expect(screen.queryByRole('button', { name: /^T0/ })).toBeNull();
     expect(screen.queryByText(/better: Chi-Yu \+ Okidogi/)).toBeNull();
+  });
+
+  test('a denied end at odds 1 reads as a sure KO, never as a 100% roll (T123 point 3)', () => {
+    const deniedEnd = { turn: 9, side: 'p2' as const, species: 'Kingambit', odds: 1, removes: 'Garchomp', turnsRemaining: 12 };
+    render(<EvalGameReport report={gameReport({ deniedEnd })} playerNames={names} />);
+    expect(within(chip(9)).getByText('one sure KO from ending it, failed')).toBeInTheDocument();
+    expect(screen.queryByText(/100% roll/)).toBeNull();
+    expect(chip(9).getAttribute('title')).not.toMatch(/[—–]/);
   });
 
   test('an untracked report makes no "clean" claims; a missing accuracy shows a dash', () => {

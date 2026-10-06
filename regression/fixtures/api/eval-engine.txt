@@ -175,6 +175,7 @@ value reconstructionReached
 value requiredChoicesForActiveSlots
 value resolveSideChoices
 value resolveTeraPreference
+value rollText
 value rowCompletedCells
 value searchBudget
 value searchBudgetTag

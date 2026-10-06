@@ -1,4 +1,4 @@
-import { type GameReport, type LeadAnalysis, winDeltaText } from '@fulllifegames/eval-engine';
+import { type GameReport, type LeadAnalysis, rollText, winDeltaText } from '@fulllifegames/eval-engine';
 import type { TurnEvalSettings } from '../hooks/useEvaluation';
 import { attributionBadge, leadTier } from './eval-badges';
 import { sideIndex } from '@fulllifegames/replay-core';
@@ -163,14 +163,14 @@ function DeniedEndChip({ report, playerNames, onSelectTurn, settingsFor }: EvalG
         type="button"
         className="ps-btn ps-eval-report-moment"
         onClick={() => onSelectTurn?.(denied.turn)}
-        title={`One roll from ending the game: removing ${denied.removes} leaves no answer behind — the roll failed. Jump to this turn's analysis`}
+        title={`One click from ending the game: removing ${denied.removes} leaves no answer behind, and it failed. Jump to this turn's analysis`}
       >
         <span style={{ color: '#cde' }}>T{denied.turn}</span>
         <SettingsBadge turn={denied.turn} settingsFor={settingsFor} />
         <span style={{ color: '#b6a46a' }}>{playerNames[sideIndex(denied.side)]}</span>
         {denied.move && <span style={{ color: '#aab' }}>{denied.move}</span>}
         <span style={{ color: '#b6a46a' }}>
-          one {Math.round(denied.odds * 100)}% roll from ending it — {denied.move ? 'missed' : 'failed'}
+          one {rollText(denied.odds)} from ending it, {denied.move ? 'missed' : 'failed'}
         </span>
       </button>
     </div>
