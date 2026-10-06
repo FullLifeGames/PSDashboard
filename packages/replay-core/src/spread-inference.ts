@@ -41,6 +41,9 @@ const FIT_FORFEIT_PER_OBSERVATION = 0.01;
 /** Minimum observations before a spread claim beats the existing guess. */
 const MIN_OBSERVATIONS = 2;
 
+/** The ladder's EV step: the stat moves every 4 EVs. */
+const EV_STEP = 4;
+
 /**
  * A move order measures Speed only when it REFUTES the prior and some rung
  * repairs it. An order the prior already satisfies measures nothing
@@ -107,20 +110,52 @@ function forfeitsToPrior(ctx: SolveContext, key: string, best: CandidateRung, pr
     speedError(ctx, key, best) >= speedError(ctx, key, prior);
 }
 
+/** The mon's damage misfit under a spread (the bestRung sum without the Speed term). */
+const damageError = (ctx: SolveContext, key: string, rung: CandidateRung, observations: DamageObservation[]) =>
+  observations.reduce((sum, obs) => sum + observationError(ctx, obs, key, rung), 0);
+
 /**
- * Top up the leftover budget in UNMEASURED, non-Speed stats: a winner
- * like "252 HP only" would otherwise field a systematically
- * under-statted sim mon. Filled stats carry no observation evidence
- * either way (they are exactly the unmeasured ones), so the fill can
- * never contradict the solve.
+ * The most EVs a measured stat takes, in the ladder's 4-EV steps up to
+ * `room`, while the mon's damage lines fit as well as they do at `rung`.
  */
-function topUpUnmeasured(best: CandidateRung, offenseStat: keyof PokemonEvs, measured: Set<keyof PokemonEvs>, budget: EvBudget): PokemonEvs {
+function neutralRoom(
+  ctx: SolveContext, key: string, rung: CandidateRung, stat: keyof PokemonEvs, room: number, observations: DamageObservation[],
+): number {
+  const fitted = damageError(ctx, key, rung, observations);
+  const adds = [...new Set([...Array.from({ length: Math.floor(room / EV_STEP) }, (_, i) => (i + 1) * EV_STEP), room])];
+  const fits = (add: number) =>
+    damageError(ctx, key, { ...rung, evs: { ...rung.evs, [stat]: (rung.evs[stat] ?? 0) + add } }, observations) <= fitted + 1e-12;
+  // Bisection: a stat's fit mostly leaves the rolls once and stays out; where it does not, the add it
+  // returns still fits (round 64 census: 3 of 1548 bank sets differ from a step-by-step scan, at a
+  // fraction of its calc calls).
+  let low = 0;
+  let high = adds.length;
+  while (low < high) {
+    const mid = (low + high) >> 1;
+    if (fits(adds[mid])) low = mid + 1;
+    else high = mid;
+  }
+  return low === 0 ? 0 : adds[low - 1];
+}
+
+/**
+ * Top up the leftover budget in the non-Speed stats, offense first: a
+ * winner like "252 HP only" would otherwise field a systematically
+ * under-statted sim mon. An unmeasured stat takes what fits (it carries
+ * no observation evidence either way). A measured stat takes the most EVs
+ * at which the mon's damage lines fit exactly as well as at the winning
+ * rung (round 64, T122): the ladder knows a stat only at 0 and 252, so a
+ * winning 0 left half the budget open where the evidence allowed more
+ * (66 of 1548 bank sets at 260 EVs or fewer). The log's HP stays.
+ */
+function topUp(ctx: SolveContext, key: string, best: CandidateRung, offenseStat: keyof PokemonEvs, measured: Set<keyof PokemonEvs>, evidence: MonEvidence): PokemonEvs {
   const evs: PokemonEvs = { ...best.evs };
-  let remaining = budget.total - evTotal(evs);
+  let remaining = ctx.budget.total - evTotal(evs);
   for (const stat of ([offenseStat, 'hp', 'def', 'spd'] as (keyof PokemonEvs)[])) {
     if (remaining <= 0) break;
-    if (measured.has(stat)) continue;
-    const add = Math.min(budget.perStat - (evs[stat] ?? 0), remaining);
+    if (stat === 'hp' && evidence.fixedHp !== undefined) continue;
+    const room = Math.min(ctx.budget.perStat - (evs[stat] ?? 0), remaining);
+    const add = measured.has(stat) ? neutralRoom(ctx, key, { evs, nature: best.nature }, stat, room, evidence.observations) : room;
     if (add > 0) {
       evs[stat] = (evs[stat] ?? 0) + add;
       remaining -= add;
@@ -203,7 +238,7 @@ function solveOne(ctx: SolveContext, key: string) {
     ...(evidence.hasDefenderObs ? (['hp', 'def', 'spd'] as (keyof PokemonEvs)[]) : []),
     ...(evidence.fixedHp === undefined ? [] : (['hp'] as (keyof PokemonEvs)[])),
   ]);
-  ctx.solved.set(key, { evs: topUpUnmeasured(best, offenseStat, measured, ctx.budget), nature: best.nature });
+  ctx.solved.set(key, { evs: topUp(ctx, key, best, offenseStat, measured, evidence), nature: best.nature });
 }
 
 /**

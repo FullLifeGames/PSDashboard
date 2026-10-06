@@ -109,24 +109,26 @@ describe('the two-stage solve keeps the move orders its pre-solve repaired', () 
     expect(speedOf(find(built.p2Team, 'Gliscor'))).toBeGreaterThanOrEqual(speedOf(find(built.p1Team, 'Garchomp')));
     expect(speedOf(find(oneStage.p2Team, 'Gliscor'))).toBeGreaterThanOrEqual(speedOf(find(oneStage.p1Team, 'Garchomp')));
     // Garchomp is the mon an overwriting carry would destroy: the full solve
-    // fits its damage without HP, the pre-solve topped the freed Speed up into HP.
+    // fits its damage with less HP than the pre-solve topped the freed Speed
+    // up into (round 64: only the HP the damage lines allow, not 0).
     expect(built).toEqual(oneStage);
     expect(built).not.toEqual(preSolved);
-    expect(find(built.p1Team, 'Garchomp').evs.hp).toBe(0);
+    expect(find(built.p1Team, 'Garchomp').evs.hp).toBeLessThan(find(preSolved.p1Team, 'Garchomp').evs.hp);
     expect(find(preSolved.p1Team, 'Garchomp').evs.hp).toBe(252);
   });
 
-  test('known path dependence of the settled orders (round 63): two-stage HP 60 against one-stage HP 0', () => {
+  test('the two chains agree on the settled Garchomp (round 63 path pin, T122): HP 60 both ways', () => {
     // The species-shaped guesses run Garchomp (303) over Gliscor (289), which moved first. The
     // settling (T117) frees only 60 Speed EVs (Garchomp 288); the pre-solve tops them up into HP, and
-    // the full solve keeps that HP because the damage lines fit it as well as none. The one-stage
-    // build never had the HP: the two chains part on a spread the evidence cannot tell apart.
+    // the full solve keeps that HP because the damage lines fit it as well as none. Round 63 pinned
+    // the one-stage build at HP 0 (it left the 60 EVs open); since round 64 the full solve tops its
+    // open budget up wherever the damage lines still fit, so both chains land on HP 60.
     const { observations, speedOrders } = parseReplayLogWithObservations(scene);
     const doubled = [...observations, ...observations];
     const built = buildTeamsFromReplay(scene, { inferredSpreads: solveReplaySpreads(scene, doubled, { speedOrders }) });
     const oneStage = buildTeamsFromReplay(scene, { observations: doubled, speedOrders });
     expect([find(built.p1Team, 'Garchomp').evs.hp, find(built.p1Team, 'Garchomp').evs.spe]).toEqual([60, 192]);
-    expect([find(oneStage.p1Team, 'Garchomp').evs.hp, find(oneStage.p1Team, 'Garchomp').evs.spe]).toEqual([0, 192]);
+    expect([find(oneStage.p1Team, 'Garchomp').evs.hp, find(oneStage.p1Team, 'Garchomp').evs.spe]).toEqual([60, 192]);
     expect(speedOf(find(built.p2Team, 'Gliscor'))).toBeGreaterThan(speedOf(find(built.p1Team, 'Garchomp')));
   });
 });
