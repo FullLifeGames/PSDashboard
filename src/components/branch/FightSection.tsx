@@ -1,6 +1,6 @@
 import type { BranchMoveOption, BranchSwitchOption } from '../../hooks/useBranch';
 import {
-  type BranchSlotModifiers, type DamageResult, switchOptionKey, type BranchSlotChoice,
+  type BranchMoveModifier, type BranchSlotModifiers, type DamageResult, switchOptionKey, type BranchSlotChoice,
 } from '@fulllifegames/eval-engine';
 import type { SpreadTargetDamage } from '../../lib/branch-damage';
 import type { Gimmick } from '../../hooks/useSideControlsState';
@@ -37,17 +37,26 @@ export interface FightSectionProps {
   onHypotheticalMove: (params: { species: string; move: string; replace: string | null }) => void;
 }
 
-function ModifierToggle({ label, active, onToggle }: {
-  label: string;
-  active: boolean;
-  onToggle: () => void;
-}) {
+/** What the partner holding a gimmick does this turn, for the blocked toggle's title. */
+const HELD_ACTION: Record<BranchMoveModifier, string> = {
+  terastallize: 'terastallizes',
+  mega: 'mega evolves',
+  ultra: 'ultra bursts',
+  zmove: 'uses a Z-Move',
+};
+
+function ModifierToggle({ label, kind, gimmick }: { label: string; kind: BranchMoveModifier; gimmick: Gimmick }) {
+  const active = gimmick.modifier === kind;
+  // A side takes each gimmick once per turn: a partner that holds it blocks this toggle (T124).
+  const holder = active ? undefined : gimmick.heldBy[kind];
   return (
     <button
       type="button"
       className={`ps-modifier-toggle ${active ? 'ps-modifier-toggle-active' : ''}`}
       aria-pressed={active}
-      onClick={onToggle}
+      disabled={!!holder}
+      title={holder ? `${holder} already ${HELD_ACTION[kind]} this turn.` : undefined}
+      onClick={() => gimmick.toggle(kind)}
     >
       {label}
     </button>
@@ -55,37 +64,12 @@ function ModifierToggle({ label, active, onToggle }: {
 }
 
 function ModifierRow({ label, modifiers, gimmick }: { label: string; modifiers: BranchSlotModifiers; gimmick: Gimmick }) {
-  const { modifier, hasZMoves, toggle } = gimmick;
   return (
     <div className="ps-modifier-row" role="group" aria-label={`Battle gimmicks for ${label}`}>
-      {modifiers.teraType && (
-        <ModifierToggle
-          label={`Tera (${modifiers.teraType})`}
-          active={modifier === 'terastallize'}
-          onToggle={() => toggle('terastallize')}
-        />
-      )}
-      {modifiers.canMegaEvo && (
-        <ModifierToggle
-          label="Mega Evolve"
-          active={modifier === 'mega'}
-          onToggle={() => toggle('mega')}
-        />
-      )}
-      {modifiers.canUltraBurst && (
-        <ModifierToggle
-          label="Ultra Burst"
-          active={modifier === 'ultra'}
-          onToggle={() => toggle('ultra')}
-        />
-      )}
-      {hasZMoves && (
-        <ModifierToggle
-          label="Z-Move"
-          active={modifier === 'zmove'}
-          onToggle={() => toggle('zmove')}
-        />
-      )}
+      {modifiers.teraType && <ModifierToggle label={`Tera (${modifiers.teraType})`} kind="terastallize" gimmick={gimmick} />}
+      {modifiers.canMegaEvo && <ModifierToggle label="Mega Evolve" kind="mega" gimmick={gimmick} />}
+      {modifiers.canUltraBurst && <ModifierToggle label="Ultra Burst" kind="ultra" gimmick={gimmick} />}
+      {gimmick.hasZMoves && <ModifierToggle label="Z-Move" kind="zmove" gimmick={gimmick} />}
     </div>
   );
 }

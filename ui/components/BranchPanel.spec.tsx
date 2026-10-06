@@ -1,7 +1,7 @@
 import { describe, expect, test, vi } from 'vitest';
 import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { calcSingleDamageRange, type BranchMoveOption, type SimPokemonInfo } from '@fulllifegames/eval-engine';
+import { calcSingleDamageRange, type BranchMoveOption, type BranchSimState, type SimPokemonInfo } from '@fulllifegames/eval-engine';
 import { BranchPanel } from '../../src/components/BranchPanel';
 import { NO_MODIFIERS, simState } from '../fixtures/sim-state';
 
@@ -238,5 +238,50 @@ describe('armed toggles belong to one position (T124 point 2)', () => {
     rerender(<BranchPanel {...at('r1:variation:6')} />);
     expect(slot('P1A').getByRole('button', { name: 'Tera (Fire)' })).toHaveAttribute('aria-pressed', 'false');
     expect(slot('P2B').getByRole('button', { name: 'Tera (Steel)' })).toHaveAttribute('aria-pressed', 'false');
+  });
+});
+
+describe('one Tera per side in doubles (T124 point 1)', () => {
+  const doubles = (overrides: Partial<BranchSimState> = {}) => simState('doubles', {
+    p1ModifiersBySlot: [{ ...NO_MODIFIERS, teraType: 'Fire' }, { ...NO_MODIFIERS, teraType: 'Bug' }], ...overrides,
+  });
+  const fixture = doubles();
+  const [incineroar, amoonguss] = fixture.p1ActiveSlots as SimPokemonInfo[];
+  const [rillaboom] = fixture.p2ActiveSlots as SimPokemonInfo[];
+  const pollenPuff = fixture.p1MovesBySlot[1][1];
+  const pollenPuffRow = () => slot('P1B').getByTitle('Pollen Puff into Rillaboom (100%)');
+
+  test('the partner of an armed Tera cannot arm its own, and its rows stay untoggled', async () => {
+    localStorage.setItem(ADVANCED_KEY, '1');
+    render(<BranchPanel {...props({ simState: fixture })} />);
+    await userEvent.click(slot('P1A').getByRole('button', { name: 'Tera (Fire)' }));
+    const bug = slot('P1B').getByRole('button', { name: 'Tera (Bug)' });
+    expect(bug).toBeDisabled();
+    expect(bug).toHaveAttribute('title', 'P1A already terastallizes this turn.');
+    await userEvent.click(bug);
+    expect(bug).toHaveAttribute('aria-pressed', 'false');
+    // P1A's Tera reaches the preview; P1B's rows stay as the calc reads the untoggled Amoonguss.
+    const plain = calcRange(amoonguss, rillaboom, pollenPuff, 'Doubles');
+    expect(plain).not.toBe(calcRange({ ...amoonguss, teraType: 'Bug' }, rillaboom, pollenPuff, 'Doubles'));
+    await waitFor(() => expect(slot('P1A').getByTitle('Flare Blitz into Rillaboom (100%)'))
+      .toHaveTextContent(calcRange({ ...incineroar, teraType: 'Fire' }, rillaboom, fixture.p1MovesBySlot[0][1], 'Doubles')));
+    expect(pollenPuffRow()).toHaveTextContent(plain);
+    // Released on P1A, the Tera is free for P1B again.
+    await userEvent.click(slot('P1A').getByRole('button', { name: 'Tera (Fire)' }));
+    expect(bug).toBeEnabled();
+  });
+
+  test('a pending choice that terastallizes holds the Tera for its side too', () => {
+    const flareBlitzTera = { kind: 'move' as const, moveId: 'flareblitz', moveName: 'Flare Blitz', targetLoc: 1, modifier: 'terastallize' as const };
+    render(<BranchPanel {...props({ simState: doubles({ p1Choices: [flareBlitzTera, null] }) })} />);
+    expect(slot('P1B').getByRole('button', { name: 'Tera (Bug)' })).toBeDisabled();
+    expect(slot('P1A').getByRole('button', { name: 'Tera (Fire)' })).toBeEnabled();
+  });
+
+  test('each side holds its own Tera', async () => {
+    render(<BranchPanel {...props({ simState: doubles({ p2ModifiersBySlot: [{ ...NO_MODIFIERS, teraType: 'Grass' }, { ...NO_MODIFIERS }] }) })} />);
+    await userEvent.click(slot('P1A').getByRole('button', { name: 'Tera (Fire)' }));
+    await userEvent.click(slot('P2A').getByRole('button', { name: 'Tera (Grass)' }));
+    expect(slot('P2A').getByRole('button', { name: 'Tera (Grass)' })).toHaveAttribute('aria-pressed', 'true');
   });
 });

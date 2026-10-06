@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import type { BranchSlotModifiers, BranchMoveModifier } from '@fulllifegames/eval-engine';
+import type { BranchSlotChoice, BranchSlotModifiers, BranchMoveModifier } from '@fulllifegames/eval-engine';
 
 /** Legal move pool for "What if it had …" — loaded lazily per active species. */
 export function useMovePool(activeSpecies: string, gen: number): string[] {
@@ -37,15 +37,50 @@ function gimmickApplies(kind: BranchMoveModifier, modifiers: BranchSlotModifiers
   return modifiers.zMoves.some(Boolean);
 }
 
-/** One slot's gimmick toggle as the Fight face reads it. */
-export function gimmickView(modifiers: BranchSlotModifiers, modifier: BranchMoveModifier | null, toggle: (kind: BranchMoveModifier) => void) {
+/** The gimmicks other slots of the side hold this turn, each with the holder's slot label ("P1A"). */
+type HeldGimmicks = Partial<Record<BranchMoveModifier, string>>;
+
+/** One slot's gimmick toggle as the Fight face reads it; `heldBy` names the partner that holds a gimmick this turn. */
+export function gimmickView(
+  modifiers: BranchSlotModifiers,
+  modifier: BranchMoveModifier | null,
+  toggle: (kind: BranchMoveModifier) => void,
+  heldBy: HeldGimmicks = {},
+) {
   const hasZMoves = modifiers.zMoves.some(Boolean);
   const hasAnyModifier = !!modifiers.teraType || modifiers.canMegaEvo || modifiers.canUltraBurst || hasZMoves;
   const modifierAvailable = !!modifier && gimmickApplies(modifier, modifiers);
-  return { modifier, modifierAvailable, hasZMoves, hasAnyModifier, toggle };
+  return { modifier, modifierAvailable, hasZMoves, hasAnyModifier, toggle, heldBy };
 }
 
 export type Gimmick = ReturnType<typeof gimmickView>;
+
+/** Each side's pending choices, as the picker state holds them (live tip or draft). */
+type PendingChoices = Record<Side, (BranchSlotChoice | null)[]>;
+
+const NO_PENDING: PendingChoices = { p1: [], p2: [] };
+
+/**
+ * The gimmicks the other slots of a side hold this turn: armed, or in their
+ * pending choice. The simulator takes each gimmick once per side choice
+ * (Side.chooseMove: "You can only Terastallize once per battle", the same
+ * for Mega Evolution, Ultra Burst and Z-Moves) while the request offers it to
+ * every slot, so the panel holds the kind for the other slots, as Showdown's
+ * own client does (T124; ui/hooks/gimmickOncePerSide.spec.tsx checks it
+ * against the simulator).
+ */
+function heldByPartners(side: Side, slot: number, armed: ArmedGimmicks, pending: PendingChoices): HeldGimmicks {
+  const held: HeldGimmicks = {};
+  const slots = Math.max(armed[side].length, pending[side].length);
+  for (let other = 0; other < slots; other++) {
+    if (other === slot) continue;
+    const pick = pending[side][other];
+    for (const kind of [armed[side][other], pick?.kind === 'move' ? pick.modifier : null]) {
+      if (kind) held[kind] = `${side.toUpperCase()}${String.fromCharCode(65 + other)}`;
+    }
+  }
+  return held;
+}
 
 const keepApplying = (armed: (BranchMoveModifier | null)[], modifiers: BranchSlotModifiers[]) =>
   armed.map((kind, slot) => (kind && gimmickApplies(kind, modifiers[slot]) ? kind : null));
@@ -72,8 +107,15 @@ function useArmedAt(positionKey: string | undefined) {
  * both sides, held by the panel so the damage preview reads them: an armed
  * Tera toggle gives `teraBySlot` the type the Pokémon would take (T20).
  * `positionKey` names the viewed position; the toggles belong to it.
+ * `pending` holds each side's chosen actions: a gimmick one slot holds,
+ * armed or chosen, stays out of reach for the side's other slots (T124).
  */
-export function useGimmickToggles(p1Modifiers: BranchSlotModifiers[], p2Modifiers: BranchSlotModifiers[], positionKey?: string) {
+export function useGimmickToggles(
+  p1Modifiers: BranchSlotModifiers[],
+  p2Modifiers: BranchSlotModifiers[],
+  positionKey?: string,
+  pending: PendingChoices = NO_PENDING,
+) {
   const { armed, setArmed } = useArmedAt(positionKey);
   // Once a gimmick is spent (or the active Pokémon changed and can't use
   // it), it must not silently stick to future move choices ("Thundurus
@@ -83,9 +125,10 @@ export function useGimmickToggles(p1Modifiers: BranchSlotModifiers[], p2Modifier
   if (spent('p1') || spent('p2')) setArmed(() => kept);
   const toggle = useCallback((side: Side, slot: number, kind: BranchMoveModifier) => setArmed(current => {
     const next = [...current[side]];
+    if (next[slot] !== kind && heldByPartners(side, slot, current, pending)[kind]) return current;
     next[slot] = next[slot] === kind ? null : kind;
     return { ...current, [side]: next };
-  }), [setArmed]);
+  }), [setArmed, pending]);
   const teraBySlot = useMemo(
     () => ({ p1: teraOf(armed.p1, p1Modifiers), p2: teraOf(armed.p2, p2Modifiers) }),
     [armed, p1Modifiers, p2Modifiers],
@@ -94,6 +137,7 @@ export function useGimmickToggles(p1Modifiers: BranchSlotModifiers[], p2Modifier
     (side === 'p1' ? p1Modifiers : p2Modifiers)[slot] ?? NO_SLOT_MODIFIERS,
     armed[side][slot] ?? null,
     kind => toggle(side, slot, kind),
+    heldByPartners(side, slot, armed, pending),
   );
   return { gimmickFor, teraBySlot };
 }

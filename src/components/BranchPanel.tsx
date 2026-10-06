@@ -49,6 +49,7 @@ const EMPTY_MODIFIERS: BranchSlotModifiers = {
   zMoves: [],
 };
 const EMPTY_SLOT_MODIFIERS: BranchSlotModifiers[] = [];
+const EMPTY_CHOICES: (BranchSlotChoice | null)[] = [];
 
 const ADVANCED_KEY = 'ps-replay-interceptor:picker-advanced';
 
@@ -226,10 +227,13 @@ function SideColumn(props: SideColumnProps) {
  */
 function usePanelPreview(simState: BranchSimState | null, gen: number, positionKey: string | undefined) {
   const slots = useSlots(simState);
+  // Both sides' chosen actions: a gimmick in one slot's pick is the side's for this turn (T124).
+  const choices = useMemo(() => ({ p1: simState?.p1Choices ?? EMPTY_CHOICES, p2: simState?.p2Choices ?? EMPTY_CHOICES }), [simState]);
   const { gimmickFor, teraBySlot } = useGimmickToggles(
     simState?.p1ModifiersBySlot ?? EMPTY_SLOT_MODIFIERS,
     simState?.p2ModifiersBySlot ?? EMPTY_SLOT_MODIFIERS,
     positionKey,
+    choices,
   );
   const { p1ActiveSlots, p2ActiveSlots, p1MovesBySlot, p2MovesBySlot } = slots;
   const fieldState = simState?.field ?? null;

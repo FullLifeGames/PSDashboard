@@ -92,6 +92,23 @@ describe('useGimmickToggles', () => {
     expect(hook.result.current.gimmickFor('p1', 0).modifier).toBeNull();
   });
 
+  test('a gimmick one slot holds, armed or in its pending choice, is out of reach for the side\'s other slots (T124 point 1)', () => {
+    const { result } = renderToggles({ p1: [withTera, withTera], p2: [withTera] });
+    act(() => result.current.gimmickFor('p1', 0).toggle('terastallize'));
+    expect(result.current.gimmickFor('p1', 1).heldBy).toEqual({ terastallize: 'P1A' });
+    act(() => result.current.gimmickFor('p1', 1).toggle('terastallize'));
+    expect(result.current.gimmickFor('p1', 1).modifier).toBeNull();
+    expect(result.current.gimmickFor('p1', 0).heldBy).toEqual({});
+    expect(result.current.gimmickFor('p2', 0).heldBy).toEqual({});
+    expect(result.current.teraBySlot).toEqual({ p1: ['Fire', null], p2: [null] });
+
+    const pick = { kind: 'move' as const, moveId: 'flareblitz', moveName: 'Flare Blitz', modifier: 'terastallize' as const };
+    const pending = renderHook(() => useGimmickToggles([withTera, withTera], [], 'k', { p1: [null, pick], p2: [] }));
+    expect(pending.result.current.gimmickFor('p1', 0).heldBy).toEqual({ terastallize: 'P1B' });
+    act(() => pending.result.current.gimmickFor('p1', 0).toggle('terastallize'));
+    expect(pending.result.current.gimmickFor('p1', 0).modifier).toBeNull();
+  });
+
   test('teraBySlot keeps its identity across renders until a toggle changes', () => {
     const sides = { p1: [withTera], p2: [NO_MODIFIERS] };
     const { result, rerender } = renderToggles(sides);
