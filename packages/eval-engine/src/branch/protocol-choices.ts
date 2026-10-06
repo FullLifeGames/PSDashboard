@@ -250,18 +250,22 @@ function slowestRequestMove(active: SimPokemon, exceptId = ''): string | null {
   return standIn?.id ?? null;
 }
 
+/** A line the slot's choice made: a move, a switch, or a `|cant|` that names a move. */
+const isOwnAction = (line: string) => /^\|(move|switch)\|/.test(line) || (line.startsWith('|cant|') && !!line.split('|')[4]);
+
 /**
- * Round 64 (T121): the switch answers a request the slot's own item made
- * (Eject Pack, Eject Button). The simulator writes `[from]` on a switch only
- * for a move's selfSwitch; an item's switch follows its `|-enditem|` on the
- * slot, so that item line is the slot's last own line before it (751407 t1:
- * Deoxys's Eject Pack, then Dragonite).
+ * Whether the slot's switch at `index` answers a forced request instead of
+ * being the side's choice (round 64, T121). Current logs write `[from]` for
+ * a move's selfSwitch; an item's switch follows its own `|-enditem|` on the
+ * slot (751407 t1: Deoxys's Eject Pack, then Dragonite); gens 1 to 4 replace
+ * a fainted body before upkeep; and older logs (gen 6 and 8, 2022) write a
+ * pivot's switch without `[from]`, after the slot's own move (653785 t5:
+ * Tornadus's U-turn, then Excadrill).
  */
-function answersOwnItem(events: string[], index: number, ident: string): boolean {
-  for (let i = index - 1; i >= 0; i--) {
-    if (events[i].split('|')[2]?.startsWith(ident)) return events[i].startsWith('|-enditem|');
-  }
-  return false;
+function answersForcedRequest(events: string[], index: number, ident: string): boolean {
+  if (events[index].includes('[from]')) return true;
+  const own = events.slice(0, index).filter(line => line.split('|')[2]?.startsWith(ident));
+  return /^\|(-enditem|faint)\|/.test(own[own.length - 1] ?? '') || own.some(isOwnAction);
 }
 
 /**
@@ -293,11 +297,12 @@ function getChoiceForSlot(
 
   for (const [lineIndex, line] of events.entries()) {
     if (line.startsWith(`|switch|${ident}`) && !line.includes('[from]')) {
-      // The holder's item ejected it before it acted (2658662321 t2: Salt
-      // Cure hit Hatterene, its Eject Button brought Walking Wake). The click
-      // is unknown and the sim cancels it as the holder leaves; the slowest
-      // move lets the hit land first, as in the game.
-      if (answersOwnItem(events, lineIndex, ident)) {
+      // The body left before it acted: its item ejected it (2658662321 t2:
+      // Salt Cure hit Hatterene, its Eject Button brought Walking Wake) or it
+      // fainted (gen 3 replaces before upkeep). The click is unknown and the
+      // sim cancels it as the body leaves; the slowest move lets the hit
+      // land first, as in the game.
+      if (answersForcedRequest(events, lineIndex, ident)) {
         const active = battle.sides[sideIdx].active[activeSlot];
         const standIn = active ? slowestRequestMove(active) : null;
         if (!standIn) break;
@@ -366,7 +371,7 @@ export function collectForcedSwitchSpecies(
 
   for (const [index, line] of preUpkeep.entries()) {
     const slot = line.match(matcher)?.[1];
-    if (slot && (line.includes('[from]') || answersOwnItem(preUpkeep, index, slot))) {
+    if (slot && answersForcedRequest(preUpkeep, index, slot)) {
       species.push(line.split('|')[3].split(',')[0].trim());
     }
   }
