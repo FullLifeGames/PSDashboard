@@ -188,16 +188,15 @@ export function assembleMoves(
     pooled.add(slotMoveKey(name));
     pool.push({ name, ...candidate });
   };
-  for (const move of info.moves) {
-    if (move.source === 'revealed' || move.source === 'manual') offer(move.name, { guessed: false });
-  }
+  const known = info.moves.filter(move => move.source === 'revealed' || move.source === 'manual');
+  for (const move of known) offer(move.name, { guessed: false });
+  // A guess the enrichment took from the usage tail stays a tail move (its boost serves nothing).
+  const tailKeys = new Set(usageTail.map(fill => slotMoveKey(fill.value)));
   for (const fill of curated?.moves ?? []) offer(fill.value, { guessed: true, fromSet: true });
-  for (const move of info.moves) offer(move.name, { guessed: true });
-  for (const fill of [
-    ...(usageSet?.moves ?? []),
-    ...(curated ? [] : (smogonSet?.moves ?? [])),
-    ...usageTail,
-  ]) offer(fill.value, { guessed: true });
+  for (const move of info.moves) offer(move.name, { guessed: true, tail: tailKeys.has(slotMoveKey(move.name)) || undefined });
+  const fills = [...(usageSet?.moves ?? []), ...(curated ? [] : (smogonSet?.moves ?? []))];
+  for (const fill of fills) offer(fill.value, { guessed: true });
+  for (const fill of usageTail) offer(fill.value, { guessed: true, tail: true });
   return applyCoherenceVetoes(pool, { itemId: toId(item) })
     .slice(0, 4)
     .map(candidate => candidate.name);

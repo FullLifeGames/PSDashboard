@@ -151,6 +151,33 @@ describe('the chosen set before every guess (T89, T28)', () => {
     expect(rotom.built).toEqual(keysOf('Hydro Pump'));
   });
 
+  // Review of round 63: the usage tail joined row 1's boost context, so a
+  // boost at a fraction of a percent struck the guessed special attacks of
+  // every set no chosen Smogon set covered.
+  const tail = (top: [string, number][]): [string, number][] => [...top, ['Dragon Dance', 0.002], ['Swords Dance', 0.001]];
+
+  test('singles: a boost in the usage tail leaves Kingdra its special attacks', () => {
+    const log = singles(9, 'Kingdra', ['Hydro Pump']);
+    const usageStats = stats(usage('Kingdra', tail([
+      ['Hydro Pump', 0.9], ['Draco Meteor', 0.8], ['Weather Ball', 0.6], ['Hurricane', 0.5], ['Rain Dance', 0.3],
+      ['Protect', 0.2], ['Surf', 0.15], ['Ice Beam', 0.1], ['Flip Turn', 0.08], ['Focus Energy', 0.05],
+    ]), [['Life Orb', 0.6]]));
+    const { built, panel } = build(log, 'Kingdra', usageStats, null);
+    expect(built).toEqual(keysOf('Hydro Pump', 'Draco Meteor', 'Weather Ball', 'Hurricane'));
+    expect(panel).toEqual(built);
+  });
+
+  test('doubles: a boost in the usage tail leaves Kyurem with Life Orb its special attacks', () => {
+    const log = doubles('Kyurem', ['Freeze-Dry']);
+    const usageStats = stats(usage('Kyurem', tail([
+      ['Freeze-Dry', 0.9], ['Earth Power', 0.8], ['Draco Meteor', 0.7], ['Flash Cannon', 0.5], ['Protect', 0.4],
+      ['Icy Wind', 0.3], ['Blizzard', 0.2], ['Glaciate', 0.1], ['Ice Beam', 0.08], ['Substitute', 0.05],
+    ]), [['Life Orb', 0.6]]));
+    const { built, panel } = build(log, 'Kyurem', usageStats, null);
+    expect(built).toEqual(keysOf('Freeze-Dry', 'Earth Power', 'Draco Meteor', 'Flash Cannon'));
+    expect(panel).toEqual(built);
+  });
+
   test('fewer than four moves only when the pool holds fewer than four allowed ones (no usage, no set)', () => {
     const log = singles(9, 'Decidueye', ['Shadow Sneak', 'Swords Dance']);
     const { built } = build(log, 'Decidueye', stats(), null);

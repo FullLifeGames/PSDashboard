@@ -25,6 +25,12 @@ export interface MoveCandidate {
    * claim on the build (the d2 bank read doubles worse with such pairs).
    */
   fromSet?: boolean;
+  /**
+   * A usage move past the top ten: it may refill a slot, but its boost
+   * serves nothing in row 1 (round 63 review: a Dragon Dance at 0.2 %
+   * struck Kingdra's guessed special attacks).
+   */
+  tail?: boolean;
 }
 
 export interface CoherenceContext {
@@ -235,13 +241,14 @@ export function applyCoherenceVetoes(
   // Boost context comes from the WHOLE pool (usage order can list the attack
   // before the boost) — boost moves themselves are never vetoed by these rows.
   // A guessed boost the item rows strike serves nothing (round 63, T28: a
-  // usage Dragon Dance under Choice Specs left Kyurem with Icicle Spear only).
+  // usage Dragon Dance under Choice Specs left Kyurem with Icicle Spear only),
+  // and neither does a boost from the usage tail.
   const served = new Set<string>();
   for (const candidate of candidates) {
     const move = Dex.moves.get(candidate.name);
     const serves = BOOST_SERVES[move.id];
     const struck = candidate.guessed && restrictiveItem !== null && move.category === 'Status';
-    if (serves && !struck) served.add(serves);
+    if (serves && !struck && !candidate.tail) served.add(serves);
   }
 
   const keeps = keepDamagingMoves(candidates, served);

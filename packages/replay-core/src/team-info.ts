@@ -242,19 +242,19 @@ function assembleMovePool(
   const pool: MoveCandidate[] = [];
   const pooled = new Set<string>();
   const known = (move: PokemonMoveInfo) => move.source === 'revealed' || move.source === 'manual';
-  const offer = (move: PokemonMoveInfo, fromSet = false) => {
+  const offer = (move: PokemonMoveInfo, mark: { fromSet?: true; tail?: true } = {}) => {
     const key = moveDedupKey(move.name);
     if (pooled.has(key)) return;
     pooled.add(key);
     infoFor.set(move.name, move);
-    pool.push({ name: move.name, guessed: !known(move), ...(fromSet ? { fromSet } : {}) });
+    pool.push({ name: move.name, guessed: !known(move), ...mark });
   };
   for (const move of pokemon.moves) if (known(move)) offer(move);
-  for (const move of curated?.moves ?? []) offer(guessedMoveFromSet(move), true);
+  for (const move of curated?.moves ?? []) offer(guessedMoveFromSet(move), { fromSet: true });
   for (const move of pokemon.moves) offer(move);
   for (const move of usageSet?.moves ?? []) offer(guessedMove(move));
   if (!curated) for (const move of smogonSet?.moves ?? []) offer(guessedMoveFromSet(move));
-  for (const move of usageTail) offer(guessedMove(move));
+  for (const move of usageTail) offer(guessedMove(move), { tail: true });
   return { pool, infoFor };
 }
 

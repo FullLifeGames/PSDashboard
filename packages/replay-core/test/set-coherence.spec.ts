@@ -171,6 +171,16 @@ describe('set-coherence vetoes', () => {
     ], { itemId: '' }))).toEqual(['Headlong Rush', 'Earthquake']);
   });
 
+  test('a boost from the usage tail serves nothing (Kingdra with Life Orb, review of round 63)', () => {
+    // The tail past the top ten usage moves only refills slots; a Dragon
+    // Dance at 0.1 % must not decide what the set's attacks scale with.
+    const kept = applyCoherenceVetoes([
+      revealed('Hydro Pump'), guessed('Draco Meteor'), guessed('Weather Ball'), guessed('Hurricane'),
+      { name: 'Dragon Dance', guessed: true, tail: true },
+    ], { itemId: 'lifeorb' });
+    expect(names(kept)).toEqual(['Hydro Pump', 'Draco Meteor', 'Weather Ball', 'Hurricane', 'Dragon Dance']);
+  });
+
   test('the item rows still strike a chosen-set status move (an inferred Scarf, T28)', () => {
     expect(names(applyCoherenceVetoes([fromSet('Volt Switch'), fromSet('Toxic')], { itemId: 'choicescarf' })))
       .toEqual(['Volt Switch']);
