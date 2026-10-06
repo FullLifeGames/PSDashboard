@@ -270,10 +270,13 @@ function koChanceOf(priced: PricedCount[], maxDamage: number): string {
  * The Stellar one-time boost (T124): a Stellar attacker's first use of each
  * type hits harder (the calc's isStellarFirstUse). The simulator lists the
  * types already spent (stellarBoostedTypes, empty before the Tera turn) by
- * the type at use, which the calc gives after its own type changes.
+ * the type at use, which the calc gives after its own type changes. Without
+ * the list (a picker state approximated from the replay) the spent types are
+ * unknown, and the preview claims no boost.
  */
 function stellarFirstUse(attacker: SimPokemonInfo, typeAtUse: () => string): boolean {
-  return attacker.teraType === 'Stellar' && !(attacker.stellarBoostedTypes ?? []).includes(typeAtUse());
+  const spent = attacker.stellarBoostedTypes;
+  return attacker.teraType === 'Stellar' && !!spent && !spent.includes(typeAtUse());
 }
 
 export function calcSingleDamageRange(

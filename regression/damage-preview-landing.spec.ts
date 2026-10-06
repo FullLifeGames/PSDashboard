@@ -1,6 +1,9 @@
 import { describe, expect, test } from 'vitest';
 import { Battle, Dex, Teams, toID, type PokemonSet } from '@pkmn/sim';
-import { calcSingleDamageRange, createBranchStateFromBattle, type BranchSlotChoice, type DamageResult } from '@fulllifegames/eval-engine';
+import {
+  calcSingleDamageRange, createBranchStateFromBattle,
+  type BranchMoveOption, type BranchSlotChoice, type DamageResult, type SimPokemonInfo,
+} from '@fulllifegames/eval-engine';
 import { computePreviewDamage } from '../src/lib/branch-damage';
 
 /**
@@ -389,6 +392,23 @@ describe('the Stellar first-use boost (T124 point 5)', () => {
     expect(log).toContain('|-terastallize|p1a: Garchomp|Stellar');
     turnInside(current, [preview(current).p1.default[0][0]], 'move earthquake', 'move splash');
     turnInside(current, [preview(current).p1.default[0][1]], 'move smackdown', 'move splash');
+  });
+
+  test('a picker state without the spent list (the snapshot path) claims no first-use boost (review of wave 1.5)', () => {
+    const current = battle('gen9customgame', [stellar()], [armored('Snorlax')]);
+    turnInside(current, [preview(current, { p1: ['Stellar'], p2: [null] }).p1.default[0][0]], 'move earthquake terastallize', 'move splash');
+    const state = createBranchStateFromBattle(current as never, [], {});
+    const [garchomp] = state.p1ActiveSlots;
+    const [snorlax] = state.p2ActiveSlots;
+    const [earthquake, smackDown] = state.p1MovesBySlot[0];
+    const { stellarBoostedTypes, ...snapshotLike } = garchomp!;
+    expect(stellarBoostedTypes).toEqual(['Ground']);
+    const read = (info: SimPokemonInfo, move: BranchMoveOption) => calcSingleDamageRange(info, snorlax!, move, { gameType: 'Singles', gen: 9 }).range;
+    const allSpent = { ...garchomp!, stellarBoostedTypes: ['Ground', 'Rock'] };
+    // Unknown spent types read as spent: the spent Earthquake as the exact path reads it, Smack Down unboosted too.
+    expect(read(snapshotLike, earthquake)).toBe(read(garchomp!, earthquake));
+    expect(read(snapshotLike, smackDown)).toBe(read(allSpent, smackDown));
+    expect(read(snapshotLike, smackDown)).not.toBe(read(garchomp!, smackDown));
   });
 
   test('doubles: the first Stellar Earthquake boosts both foes\' rows, as the simulator keeps the boost for every target of the use', () => {
