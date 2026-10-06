@@ -8,7 +8,7 @@
 
 import { calculate, Field, Generations, Move, Pokemon } from '@smogon/calc';
 import { Dex, type PokemonSet } from '@pkmn/sim';
-import { type DamageObservation, typedHiddenPowerId, inferOpponentTeam, toId } from '@fulllifegames/replay-core';
+import { type DamageObservation, typedHiddenPowerId, inferOpponentTeam, itemSetValue, toId } from '@fulllifegames/replay-core';
 import { CHOICE_ITEMS } from './sensitivity.ts';
 
 /** `handedOver`: the Choice item came by a move, so the protocol itself shows it (no set guess to vet). */
@@ -17,27 +17,37 @@ interface TrailState { species: string; moves: string[]; itemDisturbed: boolean;
 export type ChoiceLockTrails = Record<'p1' | 'p2', Map<number, TrailState | null>>;
 
 /**
- * An item line a move wrote (`[from] move: Trick`, Switcheroo, Thief,
- * Knock Off, ...; Fling writes `[from]move:`): the protocol's word on what
- * the body holds from that line on.
+ * An `-item` line that hands the body an item rather than showing one it
+ * held (round 64, T121): a move always moves items (Trick, Thief, Covet,
+ * Bestow, Recycle; Fling writes `[from]move:`); an ability does when it is
+ * the receiver's own per the Dex (Pickpocket, Magician, Harvest), not when
+ * it belongs to the `[of]` body (Frisk shows the holder's item).
  */
-const MOVE_ITEM_SOURCE = /\[from\] ?move: /;
+function handsItemOver(parts: string[], species: string): boolean {
+  const from = parts.find(part => part.startsWith('[from]'))?.match(/^\[from\] ?(move|ability): ?(.+)$/);
+  if (!from) return false;
+  if (from[1] === 'move') return true;
+  return Object.values(Dex.species.get(species).abilities).some(ability => toId(ability) === toId(from[2]));
+}
 
 const isChoiceItem = (itemId: string) => !!itemId && Dex.items.get(itemId).isChoice === true;
 
 /**
- * A move hands the trailing active an item (round 63, T115): its trail
- * starts over with that item, because the sim's Choice item drops the old
- * lock on arrival and locks the next move. Any other item line disturbs.
+ * A hand-over to the trailing active (round 63, T115; abilities since round
+ * 64): its trail starts over with that item, because the sim's Choice item
+ * drops the old lock on arrival and locks the next move. A reveal (Frisk, an
+ * Air Balloon announcement) leaves the trail as it was; any other item line
+ * disturbs.
  */
 function noteTrailItemLine(state: TrailState, line: string) {
-  if (line.startsWith('|-item|') && MOVE_ITEM_SOURCE.test(line)) {
+  const parts = line.split('|');
+  if (parts[1] === '-item' && handsItemOver(parts, state.species)) {
     state.moves = [];
     state.itemDisturbed = false;
-    state.handedItem = toId(line.split('|')[3] ?? '');
+    state.handedItem = toId(parts[3] ?? '');
     return;
   }
-  state.itemDisturbed = true;
+  if (parts[1] !== '-item') state.itemDisturbed = true;
 }
 
 /**
@@ -93,11 +103,19 @@ export function protocolChoiceLock(
 }
 
 /**
- * What one body holds by the protocol (round 63, T115): `item` is an item
- * id ('' = nothing), `lock` the move a Choice item holds it to (its first
- * move since the item arrived), null without one.
+ * What one body holds by the protocol (round 63, T115; every item line since
+ * round 64, T121).
  */
-export interface ProtocolHeldItem { side: 'p1' | 'p2'; species: string; item: string; lock: string | null }
+export interface ProtocolHeldItem {
+  side: 'p1' | 'p2';
+  species: string;
+  /** The item id the protocol shows ('' = nothing); null before any item line on the body. */
+  item: string | null;
+  /** The body's first move since it entered or was handed its item: a Choice item's lock. */
+  firstMove: string | null;
+  /** The protocol's item for the body changed in the block before this boundary. */
+  touched: boolean;
+}
 interface HeldState { side: 'p1' | 'p2'; species: string; item: string | null; moves: string[] }
 type HeldWalk = { bodies: Map<string, HeldState>; touched: Set<HeldState> };
 
@@ -115,23 +133,37 @@ function noteHeldEntry(walk: HeldWalk, parts: string[]) {
   walk.bodies.set(key, body);
 }
 
-/** A move-written item line makes the body's item known; once known, every item line on it counts. */
-function noteHeldItemLine(walk: HeldWalk, parts: string[], line: string) {
-  const body = heldBody(walk, parts[2]);
-  if (!body || (body.item === null && !MOVE_ITEM_SOURCE.test(line))) return;
-  const item = parts[1] === '-item' ? toId(parts[3] ?? '') : '';
+function setHeld(walk: HeldWalk, body: HeldState, item: string) {
   if (body.item === item) return;
   body.item = item;
-  body.moves = [];
   walk.touched.add(body);
 }
 
 /**
- * Per boundary turn N, every body whose protocol item changed in the block
- * before it (between `|turn|N-1` and `|turn|N`), in order of first touch,
- * with its item and lock at the boundary. The board takes these over: the
- * sim plays a swap or a Knock Off with the build's guesses (655336: the
- * Trick handed Bisharp the guessed Colbur Berry) or on another body.
+ * Every item line makes the body's item known (round 64, T121): `-enditem`
+ * leaves none, `-item` names it. A hand-over restarts the body's moves, and
+ * the `[of]` body gives the item up (Covet, Bestow and Magician write no
+ * line for the giver).
+ */
+function noteHeldItemLine(walk: HeldWalk, parts: string[]) {
+  const body = heldBody(walk, parts[2]);
+  if (!body) return;
+  if (parts[1] === '-enditem') return setHeld(walk, body, '');
+  setHeld(walk, body, toId(parts[3] ?? ''));
+  if (!handsItemOver(parts, body.species)) return;
+  body.moves = [];
+  const giver = heldBody(walk, parts.find(part => part.startsWith('[of] '))?.slice(5));
+  if (giver && giver !== body) setHeld(walk, giver, '');
+}
+
+/**
+ * Per boundary turn N, every body the protocol has shown so far, in order
+ * of first entry, with the item the protocol shows at the boundary and
+ * whether the block before it (between `|turn|N-1` and `|turn|N`) changed
+ * it. The board takes these over: the sim plays a swap or a Knock Off with
+ * the build's guesses (655336: the Trick handed Bisharp the guessed Colbur
+ * Berry), on another body, or misses a trigger the game had (751505: the
+ * sim popped an Air Balloon the protocol never popped).
  */
 export function buildProtocolHeldItems(replayLog: string): Map<number, ProtocolHeldItem[]> {
   const out = new Map<number, ProtocolHeldItem[]>();
@@ -139,14 +171,14 @@ export function buildProtocolHeldItems(replayLog: string): Map<number, ProtocolH
   for (const line of replayLog.split('\n')) {
     const parts = line.split('|');
     if (parts[1] === 'switch' || parts[1] === 'drag') noteHeldEntry(walk, parts);
-    else if (parts[1] === '-item' || parts[1] === '-enditem') noteHeldItemLine(walk, parts, line);
+    else if (parts[1] === '-item' || parts[1] === '-enditem') noteHeldItemLine(walk, parts);
     else if (parts[1] === 'move') {
       const body = heldBody(walk, parts[2]);
       const moveId = toId(parts[3] ?? '');
       if (body && moveId && !body.moves.includes(moveId)) body.moves.push(moveId);
-    } else if (parts[1] === 'turn' && walk.touched.size > 0) {
-      out.set(parseInt(parts[2], 10), [...walk.touched].map(({ side, species, item, moves }) => ({
-        side, species, item: item ?? '', lock: isChoiceItem(item ?? '') && moves.length > 0 ? moves[0] : null,
+    } else if (parts[1] === 'turn') {
+      out.set(parseInt(parts[2], 10), [...walk.bodies.values()].map(body => ({
+        side: body.side, species: body.species, item: body.item, firstMove: body.moves[0] ?? null, touched: walk.touched.has(body),
       })));
       walk.touched = new Set();
     }
@@ -277,7 +309,7 @@ export interface ChoiceLockContext {
   trails: ChoiceLockTrails;
   /** speciesId -> may this mon's (choice) item justify a lock stamp? */
   eligibility: Record<'p1' | 'p2', Record<string, boolean>>;
-  /** Boundary turn -> the protocol's held items for the bodies the block before it touched (round 63, T115). */
+  /** Boundary turn -> what every body the protocol has shown holds there (round 63, T115; round 64, T121). */
   heldItems: Map<number, ProtocolHeldItem[]>;
 }
 
@@ -300,7 +332,10 @@ export function buildChoiceLockContext(
       const speciesId = toId(built.species);
       if (!CHOICE_ITEMS.has(toId(built.item ?? ''))) continue;
       const revealed = info.pokemon.find(mon => toId(mon.species) === speciesId);
-      const proven = revealed?.item.source === 'revealed' || revealed?.item.source === 'manual';
+      // The team preview's "(has item)" is revealed-source but names no item
+      // (round 64, T121: 649664's guessed Keldeo Specs skipped the check).
+      const proven = (revealed?.item.source === 'revealed' || revealed?.item.source === 'manual') &&
+        toId(itemSetValue(revealed.item.value)) === toId(built.item);
       eligibility[side][speciesId] = proven ||
         corroborateChoiceItem(side, built.species, built.item, teams, observations, genNum) !== 'contradicted';
     }

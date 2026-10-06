@@ -1,11 +1,12 @@
 import { type PokemonSnapshot, type TurnSnapshot, sideIndex, toId } from '@fulllifegames/replay-core';
-import { protocolChoiceLock, type ChoiceLockContext, type ProtocolHeldItem } from '../choice-lock.ts';
+import { protocolChoiceLock, type ChoiceLockContext } from '../choice-lock.ts';
 import { CHOICE_ITEMS } from '../sensitivity.ts';
 import { restoreSideInvariants } from '../forward-model.ts';
 import type { SimBattle, SimPokemon, SimSide } from './types.ts';
 import { normalizeBattleOnlyFormeId } from './team-order.ts';
 import { findFirstAvailableSwitchSlot, findPokemonOnSide, findSlotBySpecies } from './protocol-choices.ts';
 import { correctFieldFromSnapshot } from './field-correction.ts';
+import { applyProtocolHeldItems } from './held-items.ts';
 import { restoreTeraFromSnapshot } from './tera-restore.ts';
 
 function repointActiveSlot(side: SimSide, activeSlot: number, target: SimPokemon): boolean {
@@ -67,7 +68,7 @@ export function correctActivesFromProtocol(
     if (repointActiveSlot(side, activeSlot, target)) repointed = true;
   }
   // After the repoints, so a lock lands on the body the protocol has active.
-  const handedOver = locks ? applyProtocolHeldItems(battle, locks.context.heldItems.get(locks.turn)) : false;
+  const handedOver = locks ? applyProtocolHeldItems(battle, locks.context, locks.turn) : false;
   // The cached requests were built from the PRE-correction actives — refresh
   // the disable flags and the request view from the corrected board.
   if (repointed || handedOver) {
@@ -77,55 +78,6 @@ export function correctActivesFromProtocol(
     if (locks) restampProtocolLocks(battle, locks.context, locks.turn);
     refreshRequestsFromLiveState(battle);
   }
-}
-
-/**
- * Round 63 (T115): the items the protocol shows after a block whose item
- * lines a move wrote (Trick, Switcheroo, Knock Off; choice-lock.ts
- * buildProtocolHeldItems). The sim played those moves with the build's
- * guesses or on another body: 655336's Trick handed Bisharp the guessed
- * Colbur Berry, so turn 6 offered four moves to a body the real Choice
- * Scarf held to Knock Off; 751407's Knock Off hit the sim's Eject Pack
- * switch-in and left Dragonite its Choice Band. True when the board changed.
- */
-function applyProtocolHeldItems(battle: SimBattle, held: ProtocolHeldItem[] | undefined): boolean {
-  let changed = false;
-  for (const entry of held ?? []) {
-    const body = findPokemonOnSide(battle.sides[sideIndex(entry.side)], entry.species);
-    if (!body) continue;
-    if (setHeldItem(battle, body, entry.item)) changed = true;
-    if (body.isActive && !body.fainted && setHeldItemLock(body, entry.lock)) changed = true;
-  }
-  return changed;
-}
-
-/** Pokemon#setItem and #takeItem without their events: the protocol already played the hand-over out. */
-function setHeldItem(battle: SimBattle, body: SimPokemon, itemId: string): boolean {
-  if (body.item === itemId) return false;
-  if (!itemId) {
-    body.item = '';
-    battle.clearEffectState(body.itemState);
-    return true;
-  }
-  const item = battle.dex.items.get(itemId);
-  if (!item.exists) return false;
-  body.item = item.id;
-  body.itemState = battle.initEffectState({ id: item.id, target: body });
-  return true;
-}
-
-/**
- * The protocol's lock after a hand-over: a held Choice item and the first
- * move since it arrived, else none (the sim's Choice item drops its old lock
- * on arrival). The same direct stamp as restampProtocolLocks.
- */
-function setHeldItemLock(body: SimPokemon, lock: string | null): boolean {
-  const want = lock && body.getItem().isChoice && body.moveSlots.some(slot => slot.id === lock) ? lock : null;
-  const current = (body.volatiles['choicelock'] as { move?: string } | undefined)?.move ?? null;
-  if (current === want) return false;
-  if (want) body.volatiles['choicelock'] = { id: 'choicelock', move: want } as never;
-  else delete body.volatiles['choicelock'];
-  return true;
 }
 
 /** Spec 1b's stamp: protocol trail + eligibility + set sanity, never sim history. */

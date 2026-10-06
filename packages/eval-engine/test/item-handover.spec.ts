@@ -64,14 +64,18 @@ describe('hand-over trails', () => {
 describe('held items from the protocol', () => {
   const teams = { p1Team: [] as PokemonSet[], p2Team: [] as PokemonSet[] };
 
-  test('each body a move-written item line touched, with its final item and lock, by species', () => {
+  test('each body the protocol shows, with its final item, its first move since the hand-over and the block\'s touch, by species', () => {
     const context = buildChoiceLockContext(trickTurn(false), teams, []);
     expect(context.heldItems.get(2)).toEqual([
-      { side: 'p1', species: 'Bisharp', item: 'choicescarf', lock: 'knockoff' },
+      { side: 'p1', species: 'Bisharp', item: 'choicescarf', firstMove: 'knockoff', touched: true },
       // Latias received Life Orb by Trick and lost it to Knock Off in the same turn.
-      { side: 'p2', species: 'Latias', item: '', lock: null },
+      { side: 'p2', species: 'Latias', item: '', firstMove: null, touched: true },
     ]);
-    expect(context.heldItems.get(1)).toBeUndefined();
+    // Since round 64 (T121) every boundary lists the bodies shown so far; no item line yet means null.
+    expect(context.heldItems.get(1)).toEqual([
+      { side: 'p1', species: 'Bisharp', item: null, firstMove: null, touched: false },
+      { side: 'p2', species: 'Latias', item: null, firstMove: null, touched: false },
+    ]);
   });
 
   test('a silent give-away empties the giver; a Knock Off empties its target', () => {
@@ -92,10 +96,13 @@ describe('held items from the protocol', () => {
       '|turn|3',
     ]), teams, []);
     expect(context.heldItems.get(2)).toEqual([
-      { side: 'p1', species: 'Alomomola', item: 'choicescarf', lock: null },
-      { side: 'p2', species: 'Gholdengo', item: '', lock: null },
+      { side: 'p1', species: 'Alomomola', item: 'choicescarf', firstMove: null, touched: true },
+      { side: 'p2', species: 'Gholdengo', item: '', firstMove: 'trick', touched: true },
     ]);
-    expect(context.heldItems.get(3)).toEqual([{ side: 'p1', species: 'Alomomola', item: '', lock: null }]);
+    expect(context.heldItems.get(3)).toEqual([
+      { side: 'p1', species: 'Alomomola', item: '', firstMove: null, touched: true },
+      { side: 'p2', species: 'Gholdengo', item: '', firstMove: 'trick', touched: false },
+    ]);
   });
 });
 
@@ -166,9 +173,9 @@ describe('the board follows the protocol after a hand-over (round 63, T115)', ()
 
   test('751407: Dragonite holds nothing after the turn-1 Knock Off, at turn 2 and on its return at turn 14', { timeout: 240000 }, async () => {
     // Protocol facts: Deoxys's Eject Pack brings Dragonite in and Ogerpon's
-    // Knock Off removes its Choice Band. The sim's Eject Pack switch brings
-    // Gholdengo, the sim's Knock Off hits Gholdengo, and the active
-    // correction puts Dragonite back with the Band it lost in the real game.
+    // Knock Off removes its Choice Band. Until round 64 the sim's Eject Pack
+    // switch brought Gholdengo and the Knock Off hit Gholdengo; the board
+    // follows the protocol either way (eject-switch.spec.ts reads the switch).
     const replay = fixture('smogtours-gen9ou-751407.json');
     const { observations, speedOrders } = parseReplayLogWithObservations(replay.log);
     const { p1Team, p2Team } = buildTeamsFromReplay(replay.log, { observations, speedOrders });
