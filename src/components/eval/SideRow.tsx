@@ -140,6 +140,7 @@ function VerdictCell({ name, side, regretful, setupMove }: Pick<RowProps, 'name'
           title={sackTitle(side.sacrifice)}
         >
           · sacked {side.sacrifice.name} ({Math.round(side.sacrifice.hpFraction * 100)}% HP)
+          {side.sacrifice.alsoFell && side.sacrifice.alsoFell.length > 0 ? `, also lost ${side.sacrifice.alsoFell.join(' and ')}` : ''}
         </span>
       )}
       {side.riskPaidOff && !side.sacrifice && <ReadPaidOffCell side={side} />}

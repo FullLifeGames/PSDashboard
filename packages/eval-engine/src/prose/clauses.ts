@@ -154,8 +154,15 @@ export function forcedClause(name: string, side: SideAnalysis): string | null {
 /**
  * A deliberate low-cost sack: neutral framing, no blame vocabulary — the
  * engine cannot see the intent (Trick absorption, momentum), only the cost.
+ * Round 64 (T123): the other bodies the side lost on the turn follow by name.
  */
 export function sackClause(name: string, side: SideAnalysis): string | null {
+  const sentence = sackSentence(name, side);
+  const others = side.sacrifice?.alsoFell;
+  return sentence && others && others.length > 0 ? `${sentence} ${name} also lost ${others.join(' and ')} on this turn.` : sentence;
+}
+
+function sackSentence(name: string, side: SideAnalysis): string | null {
   if (!side.sacrifice) return null;
   const pct = Math.round(side.sacrifice.hpFraction * 100);
   if (side.sacrifice.hazard) {

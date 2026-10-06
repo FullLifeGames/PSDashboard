@@ -65,6 +65,13 @@ describe('SideRow', () => {
     expect(screen.getByText('· sacked Weavile (77% HP)')).toHaveAttribute('title', expect.stringContaining('paid it back'));
   });
 
+  test('a sack note names the other bodies the side lost on the turn (T123 point 10, 912045 t1 shape)', () => {
+    const { rerender } = render(<SideRow name="Alice" side={sideAnalysis({ sacrifice: { name: 'Ogerpon', hpFraction: 0.09, alsoFell: ['Rillaboom'] } })} />);
+    expect(screen.getByText('· sacked Ogerpon (9% HP), also lost Rillaboom')).toBeInTheDocument();
+    rerender(<SideRow name="Alice" side={sideAnalysis({ sacrifice: { name: 'Ogerpon', hpFraction: 0.09 } })} />);
+    expect(screen.getByText('· sacked Ogerpon (9% HP)')).toBeInTheDocument();
+  });
+
   test('a blunder reads as a blunder; a setup move softens the chip into a caveat', () => {
     const { rerender } = render(<SideRow name="Alice" side={misplayedSide('blunder')} />);
     expect(screen.getByText(`blunder · ${winDeltaText(-0.5)}`)).toBeInTheDocument();

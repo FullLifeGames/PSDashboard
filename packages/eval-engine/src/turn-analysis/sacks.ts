@@ -59,6 +59,13 @@ export interface SackInfo {
    * healthy shape; the verdict layer gates it on its own.
    */
   hazard?: true;
+  /**
+   * Round 64 (T123): the side's other bodies that fainted on the same turn,
+   * as the protocol names them. The verdict reads the first sack-shaped
+   * faint alone; the sentence names the rest, so a turn that cost two bodies
+   * does not read as one (912045 t1: Ogerpon and Rillaboom to Make It Rain).
+   */
+  alsoFell?: string[];
 }
 
 /** Below this pre-turn HP fraction a faint reads as a sacrifice, not a loss. */
@@ -180,7 +187,8 @@ function noteSackLine(scan: SackScan, line: string): boolean {
  *   outcome landed on the played line's priced floor and the windowed
  *   payoff clears the read margin (573756 t68).
  * A switch-phase entry the hazards took before it acted adds `hazard` to
- * its low-HP or healthy shape (round 63).
+ * its low-HP or healthy shape (round 63). The side's other faints of the
+ * turn ride along as `alsoFell` (round 64).
  */
 export function detectSacks(
   events: string[],
@@ -188,6 +196,7 @@ export function detectSacks(
 ): { p1?: SackInfo; p2?: SackInfo } {
   if (!snapshotBefore) return {};
   const sacks: { p1?: SackInfo; p2?: SackInfo } = {};
+  const fallen: Record<SideId, string[]> = { p1: [], p2: [] };
   const scan: SackScan = {
     entered: new Map(), dragged: new Set(), rolled: new Map(), moved: false, switchPhase: new Set(), hazardFell: new Set(),
   };
@@ -196,6 +205,7 @@ export function detectSacks(
     const match = line.match(/^\|faint\|(p[12])([a-d]):\s*(.+)$/);
     if (!match) continue;
     const side = match[1] as SideId;
+    fallen[side].push(match[3].trim());
     if (sacks[side]) continue;
     const sack = sackForFaint(side, match[2], match[3].trim(), snapshotBefore, scan.entered, scan.dragged);
     if (!sack) continue;
@@ -206,6 +216,17 @@ export function detectSacks(
       ...(roll ? { rolled: roll } : {}),
       ...(scan.hazardFell.has(ref) ? { hazard: true as const } : {}),
     };
+  }
+  return withAlsoFell(sacks, fallen);
+}
+
+/** Round 64 (T123): every other own faint of the turn, in protocol order, onto the side's sack. */
+function withAlsoFell(sacks: { p1?: SackInfo; p2?: SackInfo }, fallen: Record<SideId, string[]>): { p1?: SackInfo; p2?: SackInfo } {
+  for (const side of ['p1', 'p2'] as const) {
+    const sack = sacks[side];
+    if (!sack) continue;
+    const others = fallen[side].filter((name, index) => index !== fallen[side].indexOf(sack.name));
+    if (others.length > 0) sacks[side] = { ...sack, alsoFell: others };
   }
   return sacks;
 }
