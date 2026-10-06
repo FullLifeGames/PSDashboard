@@ -80,6 +80,7 @@ export function makePokemonInfo(
     ivs,
     gender,
     teraType,
+    stellarBoostedTypes: [...pokemon.stellarBoostedTypes],
     boosts: { ...pokemon.boosts },
     level,
     types,

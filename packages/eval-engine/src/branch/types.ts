@@ -67,6 +67,8 @@ export interface SimPokemonInfo {
   ivs?: PokemonStatTable;
   gender?: string;
   teraType?: string;
+  /** Types a Stellar Pokémon has already spent its one-time boost on (the sim's stellarBoostedTypes). */
+  stellarBoostedTypes?: string[];
   boosts: Record<string, number>;
   level: number;
   types: string[];
