@@ -2,8 +2,9 @@ import type { Battle } from '@pkmn/sim';
 import { sideIndex } from '@fulllifegames/replay-core';
 import { planCellEvents, type CellEvent } from '../cell-blend.ts';
 import { createMatchupCache, type MatchupCache } from '../eval-function.ts';
-import { createRootPosition, positionBattle, type ChoiceOption, type SimPosition } from '../forward-model.ts';
+import { createRootPosition, legalChoices, positionBattle, type ChoiceOption, type SimPosition } from '../forward-model.ts';
 import { boundaryEvent } from '../ko-odds.ts';
+import { isCombined } from '../search/hints.ts';
 import { leafValue } from '../search/leaf.ts';
 import { searchOptions } from '../search/options.ts';
 import { MIN_FORCED_MASS, type ForcedWinCaveat, type ForcedWinOpen, type ForcedWinProof, type TeraAllowance } from '../types.ts';
@@ -13,7 +14,8 @@ import { endgameKey } from './key.ts';
 /**
  * The forced-win prover (round 35): an AND/OR proof search from the root.
  * An own move (OR) proves when EVERY reply (AND) still proves, down to a
- * battle the side has won. Chance is priced per cell as the endgame
+ * battle the side has won; every reply is every legal choice, never the
+ * doubles cut of the tree (round 64). Chance is priced per cell as the endgame
  * solver's outcome classes; a proof holds per class, and the result is
  * the proven MASS (the analytic share of the classes proven along every
  * reply), a lower bound on the win probability under the class model.
@@ -232,7 +234,9 @@ class ForcedWinProver {
    * stalls a line; the static under-reads healing), the heaviest child of
    * that cell. Returns the candidates whose line ends in a win within
    * probeDepth turns, best first; an empty list means no full proof is
-   * attempted.
+   * attempted. The probe reads the engine's reply list (the doubles cut
+   * included): it only picks the candidates the full proof tries, so it
+   * can miss a proof and never make one.
    */
   probe(root: SimPosition, rootOrder: string[]): string[] {
     const battle = positionBattle(root);
@@ -274,11 +278,21 @@ class ForcedWinProver {
     return 0;
   }
 
-  /** The OR node: candidates in order until one proves with mass 1 or the list ends. */
+  /**
+   * The OR node: candidates in order until one proves with mass 1 or the
+   * list ends. The own side picks from the engine's list; the replies are
+   * every legal choice of the simulator (round 64, T118): the doubles combo
+   * list the tree keeps (16 by static hints) is a search budget, not a
+   * refutation. VGC 2630685175 turn 7 proved a win against the 12 combos
+   * p2's tree kept, and Zamazenta's Protect, cut from them, escapes it. A
+   * single-slot list stays the engine's (field moves that fail into a
+   * standing condition dropped), so singles proofs read as before.
+   */
   expand(position: SimPosition, ply: number, rootOrder: string[] | null): ReplyProof {
     const battle = positionBattle(position);
     const own = searchOptions(position, this.side, this.opts);
-    const replies = searchOptions(position, other(this.side), this.opts);
+    const legal = legalChoices(position, other(this.side), { tera: this.opts.tera });
+    const replies = isCombined(legal) ? legal : searchOptions(position, other(this.side), this.opts);
     if (own.length === 0 || replies.length === 0) return { proven: NONE, cells: [] };
     const ordered = rootOrder && rootOrder.length > 0 ? orderByRanking(own, rootOrder) : orderByOdds(battle, this.side, own);
     const candidates = ordered.slice(0, rootOrder ? ROOT_CANDIDATES : INNER_CANDIDATES);
