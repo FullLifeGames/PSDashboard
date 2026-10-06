@@ -249,7 +249,15 @@ export interface StoredEval {
 //      verify step deepens per class and checks doubles boundary cells
 //      (T16, T78), set fidelity (T89, T28, T80, T101), the choice lock
 //      after Trick (T115) and observed move orders (T117).
-const EVAL_ENGINE_CACHE_VERSION = 57;
+// v58 (round 64, wave 1.5): the doubles prover answers every legal reply
+//      (T118), the static's memo and setup hint read the stats a move
+//      really uses (T125), the verify step deepens per state a class
+//      leaves (T119), sets read published item slots, IVs and the Boots
+//      tell (T120, T122 point 4), the rebuild follows every protocol item
+//      line and switch-in (T121), and the speed solver reads formes,
+//      Transform and Scarf rounding and fills open EV budgets toward the
+//      prior (T122).
+const EVAL_ENGINE_CACHE_VERSION = 58;
 
 /** Round 61: a search-budget form stores under its own tag; the default keeps today's keys. */
 const versionTag = (): string => {

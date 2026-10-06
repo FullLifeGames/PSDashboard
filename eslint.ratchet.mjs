@@ -242,16 +242,5 @@ export const ratchetOverrides = [
         45
       ]
     }
-  },
-  {
-    "files": [
-      "regression/eval-fit.spec.ts"
-    ],
-    "rules": {
-      "complexity": [
-        "error",
-        32
-      ]
-    }
   }
 ];
