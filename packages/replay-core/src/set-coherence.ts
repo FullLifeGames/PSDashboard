@@ -74,6 +74,16 @@ interface MoveFacts {
   priority: number;
   /** The stat the move's damage actually scales with (Body Press: def). */
   scaling: 'atk' | 'spa' | 'def' | null;
+  /** The user's own stat the damage reads outside its category (Body Press: def); null for the rest. */
+  readsOwn: string | null;
+  /** The user's stats the move lowers on use (Close Combat: def and spd). */
+  lowersOwn: string[];
+}
+
+/** The user's stats a move lowers on itself, from the Dex (`self.boosts`, `selfBoost`). */
+function ownStatsLowered(move: ReturnType<typeof Dex.moves.get>): string[] {
+  const boosts: Record<string, number | undefined> = { ...move.self?.boosts, ...move.selfBoost?.boosts };
+  return Object.keys(boosts).filter(stat => (boosts[stat] ?? 0) < 0);
 }
 
 function factsOf(name: string): MoveFacts | null {
@@ -82,7 +92,11 @@ function factsOf(name: string): MoveFacts | null {
   const scaling = move.category === 'Status' ? null
     : move.overrideOffensiveStat === 'def' ? 'def'
     : move.category === 'Physical' ? 'atk' : 'spa';
-  return { id: move.id, category: move.category, basePower: move.basePower, type: move.type, priority: move.priority, scaling };
+  const readsOwn = move.overrideOffensiveStat && move.overrideOffensivePokemon !== 'target' ? move.overrideOffensiveStat : null;
+  return {
+    id: move.id, category: move.category, basePower: move.basePower, type: move.type, priority: move.priority, scaling,
+    readsOwn, lowersOwn: ownStatsLowered(move),
+  };
 }
 
 export interface CuratedEvidence {
@@ -171,6 +185,18 @@ interface DamagingKeeps {
   damagingKept: Set<MoveCandidate>;
 }
 
+/** Two moves the Dex calls contradicting: one reads a user stat the other lowers (Body Press beside Close Combat). */
+function contradicts(a: MoveFacts, b: MoveFacts): boolean {
+  return (!!a.readsOwn && b.lowersOwn.includes(a.readsOwn)) || (!!b.readsOwn && a.lowersOwn.includes(b.readsOwn));
+}
+
+/** The damaging moves no row may veto: seen ones and the chosen set's, wherever the pool lists them. */
+function protectedDamaging(candidates: MoveCandidate[]): MoveFacts[] {
+  return candidates.filter(candidate => !candidate.guessed || candidate.fromSet)
+    .map(candidate => factsOf(candidate.name))
+    .filter((facts): facts is MoveFacts => !!facts && facts.category !== 'Status');
+}
+
 /**
  * Pass 1 decides the DAMAGING keeps (rows 1 and 2), so a status rule can
  * ask what the kept attacks scale with — Iron Defense is only coherent
@@ -180,6 +206,7 @@ function keepDamagingMoves(candidates: MoveCandidate[], served: Set<string>): Da
   const keptDamageTypes = new Set<string>();
   const keptScalings = new Set<string>();
   const damagingKept = new Set<MoveCandidate>();
+  const keptFacts = protectedDamaging(candidates);
   for (const candidate of candidates) {
     const facts = factsOf(candidate.name);
     if (!facts || facts.category === 'Status') continue;
@@ -187,6 +214,7 @@ function keepDamagingMoves(candidates: MoveCandidate[], served: Set<string>): Da
       damagingKept.add(candidate);
       if (facts.priority <= 0) keptDamageTypes.add(facts.type);
       if (facts.scaling) keptScalings.add(facts.scaling);
+      if (candidate.guessed && !candidate.fromSet) keptFacts.push(facts);
     };
     if (!candidate.guessed || candidate.fromSet) {
       keep();
@@ -197,6 +225,10 @@ function keepDamagingMoves(candidates: MoveCandidate[], served: Set<string>): Da
       facts.basePower >= BOOST_VETO_MIN_BP && !PIVOT_MOVES.has(facts.id)) {
       continue;
     }
+    // Row 4: a move the Dex says contradicts a kept one (Body Press reads
+    // the Defense that Close Combat or Clanging Scales lowers): the guessed
+    // move falls, the first kept stays (round 64, T120, decision 15).
+    if (keptFacts.some(kept => contradicts(facts, kept))) continue;
     // Row 2: redundant same-type damage from the same slot budget
     // (Air Slash + Hurricane) — first accepted (higher usage) wins. A
     // priority move is no second main attack (Ice Shard beside Icicle Crash).
