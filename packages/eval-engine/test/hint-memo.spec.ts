@@ -49,10 +49,20 @@ describe('the hint memo (round 63, T112)', () => {
     expect(firstCalls).toBeLessThanOrEqual(parts.size * 4);
   });
 
-  test('a fresh position of the same state hints the same, singles and doubles', () => {
-    const doubles = doublesRoot();
-    const options = legalChoices(doubles, 'p1', { tera: true });
-    expect(combinedOptionHints(createRootPosition(doubles.serialized), 'p1', options)).toEqual(combinedOptionHints(doubles, 'p1', options));
+  // Round 64 (T126): both sides of the old comparison ran through the memo, so
+  // a key that mixed parts (without the side, without the slot) passed. The
+  // reference hints each option alone on its own fresh position, where the
+  // memo holds only that option's parts. Both p1 actives know Knock Off, both
+  // slot-0 mons know it, and both sides can send in their slot 3.
+  test('one memo hints every option of both sides as the option alone on a fresh position, singles and doubles', () => {
+    const doubles = rootOf(battleOf('gen9doublescustomgame',
+      [set('Garchomp', ['earthquake', 'knockoff', 'protect']), set('Rillaboom', ['knockoff', 'woodhammer', 'fakeout']), splash('Pikachu')],
+      [set('Incineroar', ['knockoff', 'flareblitz', 'fakeout']), set('Amoonguss', ['spore', 'pollenpuff', 'protect']), splash('Corviknight')]));
+    for (const side of ['p1', 'p2'] as const) {
+      const options = legalChoices(doubles, side, { tera: true });
+      const alone = options.map(option => combinedOptionHints(createRootPosition(doubles.serialized), side, [option])[0]);
+      expect(combinedOptionHints(doubles, side, options)).toEqual(alone);
+    }
     const singles = rootOf(battleOf('gen9customgame',
       [set('Garchomp', ['earthquake', 'dragonclaw', 'swordsdance'], { teraType: 'Fire' }), splash('Pikachu')], [splash('Blissey'), splash('Corviknight')]));
     const singlesOptions: ChoiceOption[] = legalChoices(singles, 'p1', { tera: true });

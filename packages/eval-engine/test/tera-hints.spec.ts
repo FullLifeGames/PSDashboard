@@ -35,12 +35,29 @@ describe('Tera options hinted on the terastallized body (round 63, T81)', () => 
     expect(teraBlast).toBeGreaterThan(2 * blast);
   });
 
+  // Round 64 (T126): the doubles test held a STAB constant (2/1.5), so with STAB
+  // parked in round 63 it read 1 and passed whether or not the part was hinted
+  // on the clicked body. Each Tera part is now held against the static of a body
+  // the simulator terastallized; the Tera Blast row moves type and category
+  // under any STAB rule.
   test('doubles: the Tera part of a combined option is hinted on the terastallized body', () => {
-    const root = rootOf(battleOf('gen9doublescustomgame',
-      [set('Garchomp', ['highhorsepower'], { teraType: 'Ground' }), splash('Pikachu')], [splash('Blissey'), splash('Chansey')]));
-    const [plain, tera] = combinedOptionHints(root, 'p1', [option('move highhorsepower 1, move splash'), option('move highhorsepower 1 terastallize, move splash')]);
-    // The Splash part adds the support floor to both.
-    expect((tera - 0.25) / (plain - 0.25)).toBeCloseTo(2 / 1.5, 10);
+    // Tera Blast turns Fairy and physical under any STAB rule; High Horsepower moves with the STAB rule only.
+    const rows = [['Ground', 'highhorsepower', 'Blissey', false], ['Fairy', 'terablast', 'Dragonite', true]] as const;
+    for (const [teraType, move, foe, movesUnderAnyRule] of rows) {
+      const board = () => battleOf('gen9doublescustomgame',
+        [set('Garchomp', ['splash', move], { teraType }), splash('Pikachu')], [splash(foe), splash('Chansey')]);
+      const unclicked = board();
+      const [plain, tera] = combinedOptionHints(rootOf(unclicked), 'p1', [option(`move ${move} 1, move splash`), option(`move ${move} 1 terastallize, move splash`)]);
+      const clicked = board();
+      clicked.choose('p1', 'move 1 terastallize, move 1');
+      clicked.choose('p2', 'move 1, move 1');
+      const garchomp = clicked.sides[0].active[0];
+      expect(garchomp.terastallized).toBe(teraType);
+      // The Splash part adds the support floor to both.
+      expect(plain - 0.25).toBeCloseTo(singleMoveFraction(unclicked.sides[0].active[0], unclicked.sides[1].active[0], move, unclicked), 10);
+      expect(tera - 0.25).toBeCloseTo(singleMoveFraction(garchomp, clicked.sides[1].active[0], move, clicked), 10);
+      if (movesUnderAnyRule) expect(tera - plain).toBeGreaterThan(0.05);
+    }
   });
 
   test('hinting leaves the body as it was', () => {
