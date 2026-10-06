@@ -225,7 +225,8 @@ function withAlsoFell(sacks: { p1?: SackInfo; p2?: SackInfo }, fallen: Record<Si
   for (const side of ['p1', 'p2'] as const) {
     const sack = sacks[side];
     if (!sack) continue;
-    const others = fallen[side].filter((name, index) => index !== fallen[side].indexOf(sack.name));
+    const own = fallen[side].indexOf(sack.name);
+    const others = fallen[side].filter((_, index) => index !== own);
     if (others.length > 0) sacks[side] = { ...sack, alsoFell: others };
   }
   return sacks;
