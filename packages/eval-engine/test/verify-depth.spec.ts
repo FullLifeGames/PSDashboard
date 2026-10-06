@@ -9,7 +9,7 @@ import { advancePosition, advancePositionWithLog, createRootPosition, positionBa
 import { createLocalExecutor, subSearchDepth1 } from '../src/search';
 import { countFainted, leafValue, SEARCH_SEEDS } from '../src/search/leaf';
 import { sampleCell } from '../src/search/cell-sampler';
-import { deeperValues, VERIFY_DEEPEN_COVER, VERIFY_PLAIN_DRAWS } from '../src/search/verify-cell';
+import { deeperValues, VERIFY_DEEPEN_COVER, VERIFY_PLAIN_DRAWS, VERIFY_STATE_RULE } from '../src/search/verify-cell';
 import type { EvalCellValue, EvalSettings, MctsTreeStats } from '../src/types';
 import { anchorRoot, doublesRoot, pairSet, PLAYED } from './pair-battles';
 
@@ -148,7 +148,7 @@ describe('the deepening rule (round 63, T16)', () => {
 });
 
 describe('the verify executor deepens per class (round 63, T16)', () => {
-  test('a singles boundary cell: every open class carries its first draw one ply deeper', { timeout: 60_000 }, async () => {
+  test('a singles boundary cell: every open class carries its states one ply deeper, its first draw for its own state', { timeout: 60_000 }, async () => {
     const root = focusBlastRoot();
     const plan = planCellEvents(positionBattle(root), ...FOCUS);
     expect(plan.kind).toBe('events');
@@ -157,26 +157,41 @@ describe('the verify executor deepens per class (round 63, T16)', () => {
     const classes = value.blend!.classes;
     expect(classes.map(cls => cls.key).sort()).toEqual(['hit-nokill', 'miss']);
     // The class's representative is its first draw in the sampler's seed order; 0.7 and 0.3 both go deeper.
+    // Round 64 (T119): a class whose draws leave several states (Focus Blast's 10 % Special Defense drop)
+    // mixes them by share, the first draw standing for its own state.
     const order = [...SEARCH_SEEDS.slice(0, 3), ...PROBE_SEEDS];
+    const sample = sampleCell(root, countFainted(positionBattle(root)), ...FOCUS, 3, createMatchupCache(), true, VERIFY_PLAIN_DRAWS);
     for (const cls of classes) {
       const seed = order.find(s => classifyChild(advancePositionWithLog(root, ...FOCUS, s).log, plan.events) === cls.key)!;
-      expect(cls.deepened, cls.key).toBe(deepened(root, advancePosition(root, ...FOCUS, seed)));
+      const first = deepened(root, advancePosition(root, ...FOCUS, seed));
+      const states = sample.classGroups?.get(cls.key);
+      if (!states) {
+        expect(cls.deepened, cls.key).toBe(first);
+        continue;
+      }
+      expect(states.map(state => deepened(root, state.child)), cls.key).toContain(first);
+      const values = deeperValues(states.map(state => ({ weight: state.share, child: state.child, leaf: state.leaf, ended: state.ended })),
+        position => deepened(root, position), VERIFY_STATE_RULE.singles.cover, VERIFY_STATE_RULE.singles.cap);
+      expect(cls.deepened, cls.key).toBeCloseTo(states.reduce((sum, state, index) => sum + state.share * values[index], 0), 12);
     }
+    expect(sample.classGroups?.size, 'a class with more than one state').toBeGreaterThan(0);
     // The one-ply blend itself is today's.
     const plain = sampleCell(root, countFainted(positionBattle(root)), ...FOCUS, 3, createMatchupCache(), true);
     expect(value.value).toBe(plain.value);
     expect(value.deepened).toBeUndefined();
   });
 
-  test('a doubles pair-plan cell: the heaviest open class goes one ply deeper through its own draw, the rest shift by its step', { timeout: 120_000 }, async () => {
+  test('a doubles pair-plan cell: the heaviest open class goes one ply deeper through its states, the rest shift by its step', { timeout: 120_000 }, async () => {
     const root = anchorRoot();
     const [value] = await createLocalExecutor(root.serialized).evalCells([{ i: 0, j: 0, p1Choice: PLAYED[0], p2Choice: PLAYED[1], samples: 3, deepen: SUB }]);
     const open = value.blend!.classes.filter(cls => !cls.ended);
     expect(open.length).toBeGreaterThan(1);
     const sample = sampleCell(root, countFainted(positionBattle(root)), ...PLAYED, 3, createMatchupCache(), true, VERIFY_PLAIN_DRAWS);
+    // Round 64 (T119): a class whose draws leave several states goes deeper through each of them.
     const expected = deeperValues(open.map(cls => ({
       weight: cls.weight, child: sample.classChildren!.get(cls.key)!, leaf: cls.leafSum / cls.count, ended: false,
-    })), position => deepened(root, position), VERIFY_DEEPEN_COVER.doubles);
+      ...(sample.classGroups?.get(cls.key) ? { groups: sample.classGroups.get(cls.key) } : {}),
+    })), position => deepened(root, position), VERIFY_DEEPEN_COVER.doubles, Number.POSITIVE_INFINITY, VERIFY_STATE_RULE.doubles);
     open.forEach((cls, index) => expect(cls.deepened, cls.key).toBeCloseTo(expected[index], 12));
     // The first natural draw's class deepens the same child the old verify step deepened.
     const first = open.find(cls => cls.hasFirst)!;
@@ -193,7 +208,8 @@ describe('a cell without a plan draws more and deepens each outcome (round 63, T
     for (const group of groups) expect(Number.isInteger(Math.round(group.share * VERIFY_PLAIN_DRAWS * 1e9) / 1e9)).toBe(true);
     const [value] = await createLocalExecutor(root.serialized).evalCells([{ i: 0, j: 0, p1Choice: p1, p2Choice: p2, samples: 3, deepen: SUB }]);
     expect(value.blend).toBeUndefined();
-    const values = deeperValues(groups.map(group => ({ ...group, weight: group.share })), position => deepened(root, position), cover);
+    const rule = VERIFY_STATE_RULE[positionBattle(root).gameType === 'doubles' ? 'doubles' : 'singles'];
+    const values = deeperValues(groups.map(group => ({ ...group, weight: group.share })), position => deepened(root, position), cover, Number.POSITIVE_INFINITY, rule);
     const expected = groups.reduce((sum, group, index) => sum + group.share * values[index], 0);
     expect(value.deepened).toBeCloseTo(expected, 12);
     expect(value.value).toBeCloseTo(sample.value, 12);

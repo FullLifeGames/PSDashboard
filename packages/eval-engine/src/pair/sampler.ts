@@ -5,7 +5,7 @@ import { PROBE_SEEDS } from '../cell-blend.ts';
 import type { CellBlendClass } from '../types.ts';
 import { leafValue, SEARCH_SEEDS } from '../search/leaf.ts';
 import type { CellSample } from '../search/cell-sampler.ts';
-import { drawPlain, outcomeGroups, VERIFY_PLAIN_SEEDS } from '../search/verify-cell.ts';
+import { drawPlain, firstDraw, outcomeGroups, stateGroups, VERIFY_PLAIN_SEEDS, VERIFY_STATE_RULE, type StateGroup } from '../search/verify-cell.ts';
 import { drawPair, type PairDraw } from './draw.ts';
 import { parsePairChoice, planTimeFallback } from './guards.ts';
 import { memoKillTable, type KillTable } from './kill-table.ts';
@@ -41,7 +41,11 @@ export type PairCell =
   | { kind: 'sample'; sample: CellSample; via: 'plan' | 'fallback'; reason: string | null; draws: number };
 
 interface Branch { seed: PRNGSeed; scripts: ReadonlyMap<string, PairScript>; from: number }
-interface Found { key: string; weight: number; leafSum: number; count: number; ended: boolean; hasFirst: boolean; events: PairEvent[]; branch: Branch; child: SimPosition }
+interface Found {
+  key: string; weight: number; leafSum: number; count: number; ended: boolean; hasFirst: boolean; events: PairEvent[]; branch: Branch; child: SimPosition;
+  /** Round 64: every draw of the class, the plan's in order, then the verify pool's. */
+  draws: PairDraw[];
+}
 interface Candidate { id: string; prior: number; branch: Branch; prefix: PairEvent[]; flipKey: string; outcome: PairOutcome }
 interface Cell { root: SimPosition; p1Choice: string; p2Choice: string; samples: number; matchupCache: MatchupCache; tableFor: TableFor; plainDraws?: number }
 
@@ -140,10 +144,11 @@ function landed(events: PairEvent[], candidate: Candidate): boolean {
 function record(found: Map<string, Found>, candidates: Map<string, Candidate>, pattern: Pattern, draw: PairDraw, branch: Branch, isFirst: boolean): void {
   let entry = found.get(pattern.key);
   if (!entry) {
-    entry = { key: pattern.key, weight: pattern.weight, leafSum: 0, count: 0, ended: true, hasFirst: false, events: pattern.events, branch, child: draw.child };
+    entry = { key: pattern.key, weight: pattern.weight, leafSum: 0, count: 0, ended: true, hasFirst: false, events: pattern.events, branch, child: draw.child, draws: [] };
     found.set(pattern.key, entry);
     for (const candidate of candidatesOf(entry)) if (!candidates.has(candidate.id)) candidates.set(candidate.id, candidate);
   }
+  entry.draws.push(draw);
   entry.leafSum += draw.leaf;
   entry.count += 1;
   entry.ended = entry.ended && draw.ended;
@@ -152,14 +157,38 @@ function record(found: Map<string, Found>, candidates: Map<string, Candidate>, p
 
 const coverage = (found: Map<string, Found>) => [...found.values()].reduce((sum, entry) => sum + entry.weight, 0);
 
+/**
+ * Round 64 (T119): a verify cell's classes take the rest of the doubles
+ * pool's natural seeds (the plan's own natural draws are the first ones);
+ * a draw that reads into a found class joins it, any other read is left
+ * out. Class keys, weights and one-ply means stay the plan's. Returns the
+ * states of the classes whose draws differ.
+ */
+function poolStates(cell: Cell, found: Map<string, Found>, natural: number): Map<string, StateGroup[]> {
+  for (const seed of VERIFY_PLAIN_SEEDS.slice(natural, VERIFY_STATE_RULE.doubles.pool)) {
+    const draw = drawn(cell, seed, NO_SCRIPTS);
+    const pattern = read(cell, draw);
+    if (pattern.kind === 'pattern') found.get(pattern.key)?.draws.push(draw);
+  }
+  const states = new Map<string, StateGroup[]>();
+  for (const [key, entry] of found) {
+    const groups = stateGroups(entry.draws, firstDraw);
+    if (groups) states.set(key, groups);
+  }
+  return states;
+}
+
 /** Rule G: the class means weighted by the class weights over the coverage, in the CellBlend shape deepening and the verify merge read. */
-function blended(found: Map<string, Found>, first: PairDraw, cover: number): CellSample {
+function blended(found: Map<string, Found>, first: PairDraw, cover: number, classGroups?: Map<string, StateGroup[]>): CellSample {
   const classes: CellBlendClass[] = [...found.values()].map(entry => ({
     key: entry.key, weight: entry.weight / cover, leafSum: entry.leafSum, count: entry.count, hasFirst: entry.hasFirst, ended: entry.ended,
   }));
   const value = classes.reduce((sum, cls) => sum + cls.weight * (cls.leafSum / cls.count), 0);
   const classChildren = new Map([...found.values()].map(entry => [entry.key, entry.child]));
-  return { value, ended: classes.every(cls => cls.ended), firstChild: first.child, blend: { classes, firstLeaf: first.leaf }, classChildren };
+  return {
+    value, ended: classes.every(cls => cls.ended), firstChild: first.child, blend: { classes, firstLeaf: first.leaf }, classChildren,
+    ...(classGroups && classGroups.size > 0 ? { classGroups } : {}),
+  };
 }
 
 /** Rules A.4 and E: the remaining base seeds, then the flips, then the coverage check. */
@@ -190,7 +219,9 @@ function plan(cell: Cell, first: PairDraw, firstPattern: Pattern): PairCell {
   }
   const cover = coverage(found);
   if (cover < COVER_MIN || cover > COVER_MAX) return fallbackCell(cell, first, cover < COVER_MIN ? 'low-cover' : 'over-cover', draws);
-  return { kind: 'sample', sample: blended(found, first, cover), via: 'plan', reason: null, draws };
+  // Natural draws so far: the base seeds, the first of VERIFY_PLAIN_SEEDS.
+  const states = cell.plainDraws ? poolStates(cell, found, base) : undefined;
+  return { kind: 'sample', sample: blended(found, first, cover, states), via: 'plan', reason: null, draws };
 }
 
 export function pairCellSample(

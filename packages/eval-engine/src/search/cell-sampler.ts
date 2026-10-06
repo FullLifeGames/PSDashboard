@@ -7,7 +7,9 @@ import {
 import type { CellBlend, CellBlendClass, KoOddsMismatch } from '../types.ts';
 import { countFainted, leafValue, rollSensitivePair, SEARCH_SEEDS } from './leaf.ts';
 import { pairCellSample, type FirstDraw } from '../pair/sampler.ts';
-import { drawPlain, outcomeGroups, VERIFY_PLAIN_SEEDS, type PlainDraw, type VerifyDraws } from './verify-cell.ts';
+import {
+  drawPlain, firstDraw, outcomeGroups, stateGroups, stateRuleFor, VERIFY_PLAIN_SEEDS, type PlainDraw, type StateGroup, type VerifyDraws,
+} from './verify-cell.ts';
 
 /**
  * One matrix cell's value from seeded sims: the plain seed average, or the
@@ -29,7 +31,8 @@ export interface CellSample extends VerifyDraws {
 
 /**
  * Round 63 (T16): a verify cell without a plan prices `plainDraws` natural
- * draws (the first one reused when given) and hands their outcome groups on.
+ * draws (the first one reused when given) and hands their outcome groups on
+ * (round 64: with the states their draws leave).
  */
 export function plainVerifySample(
   root: SimPosition, p1Choice: string, p2Choice: string, plainDraws: number, matchupCache: MatchupCache, first?: PlainDraw,
@@ -38,6 +41,20 @@ export function plainVerifySample(
     (index === 0 && first ? first : drawPlain(root, p1Choice, p2Choice, seed, matchupCache)));
   const value = draws.reduce((sum, draw) => sum + draw.leaf, 0) / draws.length;
   return { value, ended: draws[0].ended, firstChild: draws[0].child, outcomes: outcomeGroups(draws) };
+}
+
+/**
+ * Round 64 (T119): the verify pool of a plain cell. A cell the sampler
+ * draws once (no accuracy roll, no faint) draws the game type's pool too,
+ * and keeps its one draw unless the pool shows a second outcome or a
+ * second state (a sure-hit Spore's sleep counter, Scald's burn); null then.
+ */
+function verifyPool(
+  root: SimPosition, p1Choice: string, p2Choice: string, plainDraws: number, matchupCache: MatchupCache, first: PlainDraw, drawsMore: boolean,
+): CellSample | null {
+  const size = drawsMore ? plainDraws : Math.min(plainDraws, stateRuleFor(root).pool);
+  const pool = plainVerifySample(root, p1Choice, p2Choice, size, matchupCache, first);
+  return drawsMore || pool.outcomes!.length > 1 || pool.outcomes![0].groups ? pool : null;
 }
 
 /** The plain seed average (no analytic blend): one sim unless a KO or a roll makes seeds diverge. */
@@ -63,9 +80,10 @@ function plainCellSample(
   const draws = ended
     ? (rollMoves ? Math.max(samples, 3) : 1)
     : (countFainted(firstBattle) > rootFainted || rollMoves ? samples : 1);
-  if (plainDraws && draws > 1) {
+  if (plainDraws) {
     const log = first?.log ?? advancePositionWithLog(root, p1Choice, p2Choice, SEARCH_SEEDS[0]).log;
-    return plainVerifySample(root, p1Choice, p2Choice, plainDraws, matchupCache, { child: firstChild, log, leaf: sum, ended });
+    const pool = verifyPool(root, p1Choice, p2Choice, plainDraws, matchupCache, { child: firstChild, log, leaf: sum, ended }, draws > 1);
+    if (pool) return pool;
   }
   for (let s = 1; s < draws; s++) {
     const child = advancePosition(root, p1Choice, p2Choice, SEARCH_SEEDS[s]);
@@ -88,6 +106,8 @@ interface ClassEntry {
   ended: boolean;
   /** The class's first draw: the child the verify step deepens. */
   child: SimPosition;
+  /** Round 64: every draw of the class, the plan's in order, then the verify pool's. */
+  draws: Draw[];
 }
 
 /** One seeded draw with its protocol log and leaf value. */
@@ -107,7 +127,8 @@ function classifyDraw(
 ): boolean {
   const key = classifyChild(draw.log, events);
   if (key === null || !expected.has(key)) return false;
-  const entry = classes.get(key) ?? { leafSum: 0, count: 0, hasFirst: false, ended: true, child: draw.child };
+  const entry = classes.get(key) ?? { leafSum: 0, count: 0, hasFirst: false, ended: true, child: draw.child, draws: [] };
+  entry.draws.push(draw);
   entry.leafSum += draw.leaf;
   entry.count += 1;
   entry.hasFirst = entry.hasFirst || isFirst;
@@ -125,6 +146,7 @@ function blendFromClasses(
   draws: Draw[],
   p1Choice: string,
   p2Choice: string,
+  pools?: ReadonlyMap<string, Draw[]>,
 ): CellSample {
   let value = 0;
   const blendClasses: CellBlendClass[] = [];
@@ -137,6 +159,11 @@ function blendFromClasses(
   }
   const blend: CellBlend = { classes: blendClasses, firstLeaf: draws[0].leaf };
   const classChildren = new Map([...classes].map(([key, cls]) => [key, cls.child]));
+  const classGroups = new Map<string, StateGroup[]>();
+  for (const [key, cls] of pools ?? []) {
+    const groups = stateGroups(cls, firstDraw);
+    if (groups) classGroups.set(key, groups);
+  }
   const ended = draws.every(draw => draw.ended);
   const diagnostic: KoOddsMismatch | undefined = missing.length > 0
     ? {
@@ -145,7 +172,30 @@ function blendFromClasses(
       sampled: Object.fromEntries([...classes].map(([key, cls]) => [key, cls.count])),
     }
     : undefined;
-  return { value, ended, firstChild: draws[0].child, blend, classChildren, ...(diagnostic ? { diagnostic } : {}) };
+  return {
+    value, ended, firstChild: draws[0].child, blend, classChildren,
+    ...(classGroups.size > 0 ? { classGroups } : {}), ...(diagnostic ? { diagnostic } : {}),
+  };
+}
+
+/**
+ * Round 64 (T119): every class's draws for the verify step, the plan's own
+ * first and then the rest of the `plainDraws` natural seeds read with the
+ * plan's reader. A pool draw that reads into no planned class is left out;
+ * the pool never changes the plan's classes, weights or one-ply means.
+ */
+function classPools(
+  root: SimPosition, events: CellEvent[], p1Choice: string, p2Choice: string, plainDraws: number,
+  matchupCache: MatchupCache, classes: Map<string, ClassEntry>, drawnBySeed: Map<string, Draw>,
+): Map<string, Draw[]> {
+  const pools = new Map([...classes].map(([key, cls]) => [key, [...cls.draws]]));
+  for (const seed of VERIFY_PLAIN_SEEDS.slice(0, plainDraws)) {
+    if (drawnBySeed.has(String(seed))) continue;
+    const draw = drawCell(root, p1Choice, p2Choice, seed, matchupCache);
+    const key = classifyChild(draw.log, events);
+    if (key !== null) pools.get(key)?.push(draw);
+  }
+  return pools;
 }
 
 /**
@@ -164,7 +214,11 @@ function blendCellSample(
   plainDraws?: number,
 ): CellSample {
   const draws: Draw[] = [];
-  const drawSeed = (seed: PRNGSeed) => { draws.push(drawCell(root, p1Choice, p2Choice, seed, matchupCache)); };
+  const drawnBySeed = new Map<string, Draw>();
+  const drawSeed = (seed: PRNGSeed) => {
+    draws.push(drawCell(root, p1Choice, p2Choice, seed, matchupCache));
+    drawnBySeed.set(String(seed), draws[draws.length - 1]);
+  };
   const baseDraws = Math.max(1, Math.min(samples, SEARCH_SEEDS.length));
   for (let s = 0; s < baseDraws; s++) drawSeed(SEARCH_SEEDS[s]);
 
@@ -197,7 +251,8 @@ function blendCellSample(
   let weightTotal = 0;
   for (const [key, weight] of expected) if (classes.has(key)) weightTotal += weight;
   if (weightTotal <= 0) return fallback();
-  return blendFromClasses(expected, classes, weightTotal, missing, draws, p1Choice, p2Choice);
+  const pools = plainDraws ? classPools(root, events, p1Choice, p2Choice, plainDraws, matchupCache, classes, drawnBySeed) : undefined;
+  return blendFromClasses(expected, classes, weightTotal, missing, draws, p1Choice, p2Choice, pools);
 }
 
 /**
