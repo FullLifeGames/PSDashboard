@@ -2,7 +2,7 @@ import { toID } from '@pkmn/dex';
 import type { ReplayData, TurnSnapshot } from '@fulllifegames/replay-core';
 import {
   analyzeTurn, decidedSeenKey, diceEventTurns, forcedWinSeenKey, forcedWinSpeaks, PAYOFF_WINDOW, unansweredSeenKey, type TurnAnalysis, detectSacks,
-  type PlayedTurn, type StreakHistoryEntry, buildGameReport, type GameReport, computeRead, type EvalResult, releaseBrokenClaims,
+  type PlayedTurn, type StreakHistoryEntry, buildGameReport, type GameReport, computeRead, type EvalResult, noteSpokenClaim, releaseBrokenClaims,
 } from '@fulllifegames/eval-engine';
 
 /** The graph slices the analyses read — matches useEvaluation's graph. */
@@ -195,14 +195,17 @@ export function computeGameReportData(args: {
       const signal = analysis[key].unanswered;
       if (signal) unansweredSeen.add(unansweredSeenKey(key, signal));
       const decided = analysis[key].decided;
-      if (decided?.announce) decidedSeen.add(decidedSeenKey(key, { species: decided.species }));
+      // Round 64 (review): a claim remembers whether it was spoken inside the decided zone (releaseBrokenClaims).
+      if (decided?.announce) noteSpokenClaim(decidedSeen, decidedSeenKey(key, { species: decided.species }), key, analysis.scoreBefore);
       const near = analysis[key].nearDecided;
       if (near?.announce) {
         decidedSeen.add(decidedSeenKey(key, { species: near.species, removes: near.removes }));
       }
       const forced = analysis[key].forcedWin;
       // Round 63: whenever the sentence speaks, the 0.9 proof and the open event under it (T19) alike.
-      if (forcedWinSpeaks(forced, key === 'p1' ? analysis.scoreBefore : -analysis.scoreBefore)) decidedSeen.add(forcedWinSeenKey(key));
+      if (forcedWinSpeaks(forced, key === 'p1' ? analysis.scoreBefore : -analysis.scoreBefore)) {
+        noteSpokenClaim(decidedSeen, forcedWinSeenKey(key), key, analysis.scoreBefore);
+      }
     }
     return analysis;
   });

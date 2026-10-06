@@ -154,6 +154,7 @@ value mctsTreeSearch
 value mergeMctsTrees
 value notationSideLabel
 value notationSlotChoice
+value noteSpokenClaim
 value parseLeadSpecies
 value parsePlayedActions
 value parsePlayedActionsDoubles

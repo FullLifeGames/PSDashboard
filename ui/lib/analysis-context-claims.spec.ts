@@ -13,13 +13,13 @@ import { replayFixture, type ReplayKind } from '../fixtures/replay';
  * turn's bar reads that side under DECIDED_SCORE.
  */
 
-const walkOver = (kind: ReplayKind, scores: number[], decidedAt: Set<number>, forcedAt: Set<number> = new Set()) => {
+const walkOver = (kind: ReplayKind, scores: number[], decidedAt: Set<number>, forcedAt: Set<number> = new Set(), mass = 1) => {
   const { replayData, snapshots } = replayFixture(kind);
   const format = kind === 'singles' ? 'singles' : 'doubles';
   const results: EvalResult[] = scores.map((score, index) => evalResult(format, {
     score,
     unanswered: { p1: [], p2: [], ...(decidedAt.has(index + 1) ? { decided: { side: 'p1' as const, species: 'Calyrex-Ice' } } : {}) },
-    ...(forcedAt.has(index + 1) ? { forcedWin: { side: 'p1' as const, turns: 1, mass: 1, caveat: 'sampled-rolls' as const, engineScore: 1, states: 6 } } : {}),
+    ...(forcedAt.has(index + 1) ? { forcedWin: { side: 'p1' as const, turns: 1, mass, caveat: 'sampled-rolls' as const, engineScore: 1, states: 6 } } : {}),
   }));
   const graph: AnalysisGraphData = {
     scores, results,
@@ -53,4 +53,13 @@ describe('the walk speaks a side\'s decided sentence again after the board left 
     expect(walk[4]?.p1.decided?.announce).toBe(true);
     expect(walk[5]?.p1.forcedWin?.announce).toBe(true);
   });
+
+  // Review fix: a proof spoken under the line (mass 0.75, open branch at -0.4, bar 0.65 by applyForcedWin)
+  // left no decided zone behind; releasing it on the next turn made it speak on every turn.
+  for (const kind of ['singles', 'vgc'] as const) {
+    test(`${kind}: a proof spoken while the bar sits under 0.7 speaks once, not on every turn`, () => {
+      const walk = walkOver(kind, [0.65, 0.65, 0.65, 0.65], new Set(), new Set([1, 2, 3, 4]), 0.75);
+      expect(walk.map(analysis => analysis?.p1.forcedWin?.announce)).toEqual([true, false, false, false]);
+    });
+  }
 });

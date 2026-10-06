@@ -66,20 +66,38 @@ function nearStage(params: AnalyzeTurnParams, key: Side): SideAnalysis['nearDeci
   };
 }
 
+/** A spoken claim's marker: it was spoken while the side's bar sat inside the decided zone. */
+const zoneMarker = (claim: string): string => `${claim}:zone`;
+
+/**
+ * Round 64 (T123): the walk notes a spoken decided or forced key, and when
+ * the turn's bar read the side at DECIDED_SCORE or beyond, also that it was
+ * spoken inside the decided zone (releaseBrokenClaims needs it).
+ */
+export function noteSpokenClaim(seen: Set<string>, claim: string, key: Side, scoreBefore: number): void {
+  seen.add(claim);
+  if ((key === 'p1' ? scoreBefore : -scoreBefore) >= DECIDED_SCORE) seen.add(zoneMarker(claim));
+}
+
 /**
  * Round 64 (T123): the report walk speaks a side's decided and forced
- * sentences once, until the board leaves the decided zone: once a later
- * turn's bar reads the side under DECIDED_SCORE, the walk forgets both keys,
- * and a new sweep or proof speaks again (2630685175: decided at t6, the bar
- * fell to 16% at t7, decided again at t10). Near keys stay; a near stage
- * lives under the line by nature (573756 t73 at 0.41).
+ * sentences once, until the board leaves the decided zone: a claim spoken
+ * inside the zone is forgotten once a later turn's bar reads the side under
+ * DECIDED_SCORE, and a new sweep or proof speaks again (2630685175: decided
+ * at t6, the bar fell to 16% at t7, decided again at t10). The release is a
+ * transition: a proof spoken under the line (an open event holding the bar
+ * at 0.65) left no zone and stays spoken, or it would repeat every turn.
+ * Near keys stay; a near stage lives under the line by nature (573756 t73).
  */
 export function releaseBrokenClaims(seen: Set<string>, scoreBefore: number): void {
   for (const key of ['p1', 'p2'] as const) {
     if ((key === 'p1' ? scoreBefore : -scoreBefore) >= DECIDED_SCORE) continue;
     // The decided stage keys on the side alone (round 63), whatever the species.
-    seen.delete(decidedSeenKey(key, { species: '' }));
-    seen.delete(forcedWinSeenKey(key));
+    for (const claim of [decidedSeenKey(key, { species: '' }), forcedWinSeenKey(key)]) {
+      if (!seen.has(zoneMarker(claim))) continue;
+      seen.delete(claim);
+      seen.delete(zoneMarker(claim));
+    }
   }
 }
 
