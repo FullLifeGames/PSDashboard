@@ -16,18 +16,34 @@ export interface ProtocolLock { species: string; moveId: string; handedOver?: bo
 interface TrailState { species: string; moves: string[]; itemDisturbed: boolean; handedItem?: string }
 export type ChoiceLockTrails = Record<'p1' | 'p2', Map<number, TrailState | null>>;
 
+/** `pXy: Nickname` -> `pX: Nickname`: nicknames key the bodies, so slots never matter (doubles). */
+const bodyKey = (ident: string | undefined) => (ident ?? '').replace(/^(p[12])[a-d]?: /, '$1: ');
+/** Lines after which no move is in progress: an entry, the request break (`|`), the turn's end. */
+const MOVE_ENDS = new Set(['switch', 'drag', 'replace', '', 'upkeep', 'turn']);
+
 /**
- * An `-item` line that hands the body an item rather than showing one it
- * held (round 64, T121): a move always moves items (Trick, Thief, Covet,
- * Bestow, Recycle; Fling writes `[from]move:`); an ability does when it is
- * the receiver's own per the Dex (Pickpocket, Magician, Harvest), not when
- * it belongs to the `[of]` body (Frisk shows the holder's item).
+ * The `-item` lines that hand their body an item rather than show one it
+ * held (round 64, T121), told apart by where the simulator writes them, not
+ * by species. A move always moves items (Trick, Thief, Covet, Bestow,
+ * Recycle; Fling writes `[from]move:`). An ability moves one when its line
+ * comes inside the receiver's own move (Magician: the thief's move is in
+ * progress) or right after the giver's silent `-enditem` from the same
+ * effect (Pickpocket). Frisk writes its line at the frisker's entry about
+ * the holder it shows, so it never sits inside that holder's move.
  */
-function handsItemOver(parts: string[], species: string): boolean {
-  const from = parts.find(part => part.startsWith('[from]'))?.match(/^\[from\] ?(move|ability): ?(.+)$/);
-  if (!from) return false;
-  if (from[1] === 'move') return true;
-  return Object.values(Dex.species.get(species).abilities).some(ability => toId(ability) === toId(from[2]));
+function handOverLines(lines: string[]): Set<number> {
+  const handed = new Set<number>();
+  let mover: string | null = null;
+  let silentGive: string | null = null;
+  lines.forEach((line, index) => {
+    const parts = line.split('|');
+    const from = parts.find(part => part.startsWith('[from]'))?.match(/^\[from\] ?(move|ability): ?(.+)$/);
+    if (parts[1] === 'move') mover = bodyKey(parts[2]);
+    else if (MOVE_ENDS.has(parts[1] ?? '')) mover = null;
+    if (parts[1] === '-item' && from && (from[1] === 'move' || from[2] === silentGive || mover === bodyKey(parts[2]))) handed.add(index);
+    silentGive = parts[1] === '-enditem' && parts.includes('[silent]') && from ? from[2] : null;
+  });
+  return handed;
 }
 
 const isChoiceItem = (itemId: string) => !!itemId && Dex.items.get(itemId).isChoice === true;
@@ -39,9 +55,9 @@ const isChoiceItem = (itemId: string) => !!itemId && Dex.items.get(itemId).isCho
  * Air Balloon announcement) leaves the trail as it was; any other item line
  * disturbs.
  */
-function noteTrailItemLine(state: TrailState, line: string) {
+function noteTrailItemLine(state: TrailState, line: string, handed: boolean) {
   const parts = line.split('|');
-  if (parts[1] === '-item' && handsItemOver(parts, state.species)) {
+  if (handed) {
     state.moves = [];
     state.itemDisturbed = false;
     state.handedItem = toId(parts[3] ?? '');
@@ -59,7 +75,9 @@ function noteTrailItemLine(state: TrailState, line: string) {
 export function buildChoiceLockTrails(replayLog: string): ChoiceLockTrails {
   const trails: ChoiceLockTrails = { p1: new Map(), p2: new Map() };
   const current: Record<'p1' | 'p2', TrailState | null> = { p1: null, p2: null };
-  for (const line of replayLog.split('\n')) {
+  const lines = replayLog.split('\n');
+  const handed = handOverLines(lines);
+  for (const [index, line] of lines.entries()) {
     const entry = line.match(/^\|(?:switch|drag)\|(p[12])[a-d]?:[^|]*\|([^,|]+)/);
     if (entry) {
       current[entry[1] as 'p1' | 'p2'] = { species: entry[2].trim(), moves: [], itemDisturbed: false };
@@ -75,7 +93,7 @@ export function buildChoiceLockTrails(replayLog: string): ChoiceLockTrails {
     const item = line.match(/^\|-(?:item|enditem)\|(p[12])[a-d]?:/);
     if (item) {
       const state = current[item[1] as 'p1' | 'p2'];
-      if (state) noteTrailItemLine(state, line);
+      if (state) noteTrailItemLine(state, line, handed.has(index));
       continue;
     }
     const turn = line.match(/^\|turn\|(\d+)/);
@@ -119,8 +137,8 @@ export interface ProtocolHeldItem {
 interface HeldState { side: 'p1' | 'p2'; species: string; item: string | null; moves: string[] }
 type HeldWalk = { bodies: Map<string, HeldState>; touched: Set<HeldState> };
 
-/** The body a `pXa: Nickname` ident names; nicknames key the bodies, so slots never matter (doubles). */
-const heldBody = (walk: HeldWalk, ident: string | undefined) => walk.bodies.get((ident ?? '').replace(/^(p[12])[a-d]?: /, '$1: '));
+/** The body a `pXa: Nickname` ident names. */
+const heldBody = (walk: HeldWalk, ident: string | undefined) => walk.bodies.get(bodyKey(ident));
 
 function noteHeldEntry(walk: HeldWalk, parts: string[]) {
   const ident = parts[2]?.match(/^(p[12])[a-d]?: (.+)$/);
@@ -145,12 +163,12 @@ function setHeld(walk: HeldWalk, body: HeldState, item: string) {
  * the `[of]` body gives the item up (Covet, Bestow and Magician write no
  * line for the giver).
  */
-function noteHeldItemLine(walk: HeldWalk, parts: string[]) {
+function noteHeldItemLine(walk: HeldWalk, parts: string[], handed: boolean) {
   const body = heldBody(walk, parts[2]);
   if (!body) return;
   if (parts[1] === '-enditem') return setHeld(walk, body, '');
   setHeld(walk, body, toId(parts[3] ?? ''));
-  if (!handsItemOver(parts, body.species)) return;
+  if (!handed) return;
   body.moves = [];
   const giver = heldBody(walk, parts.find(part => part.startsWith('[of] '))?.slice(5));
   if (giver && giver !== body) setHeld(walk, giver, '');
@@ -168,10 +186,12 @@ function noteHeldItemLine(walk: HeldWalk, parts: string[]) {
 export function buildProtocolHeldItems(replayLog: string): Map<number, ProtocolHeldItem[]> {
   const out = new Map<number, ProtocolHeldItem[]>();
   const walk: HeldWalk = { bodies: new Map(), touched: new Set() };
-  for (const line of replayLog.split('\n')) {
+  const lines = replayLog.split('\n');
+  const handed = handOverLines(lines);
+  for (const [index, line] of lines.entries()) {
     const parts = line.split('|');
     if (parts[1] === 'switch' || parts[1] === 'drag') noteHeldEntry(walk, parts);
-    else if (parts[1] === '-item' || parts[1] === '-enditem') noteHeldItemLine(walk, parts);
+    else if (parts[1] === '-item' || parts[1] === '-enditem') noteHeldItemLine(walk, parts, handed.has(index));
     else if (parts[1] === 'move') {
       const body = heldBody(walk, parts[2]);
       const moveId = toId(parts[3] ?? '');

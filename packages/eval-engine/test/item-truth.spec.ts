@@ -1,6 +1,6 @@
 import { readFileSync } from 'fs';
 import { test, expect, describe } from 'vitest';
-import type { Battle, PokemonSet } from '@pkmn/sim';
+import { Battle as LiveBattle, Teams, type Battle, type PokemonSet } from '@pkmn/sim';
 import {
   buildTeamsFromReplay, getBranchSimulatorFormat, parseReplayLog, parseReplayLogWithObservations, replayBringOnly,
   type SmogonUsageStats,
@@ -168,25 +168,97 @@ describe('the walk knows every item line (points 3 and 4)', () => {
   });
 
   test('a Frisk reveal keeps the holder\'s trail and leaves the frisker\'s item alone', () => {
+    // Gourgeist can have Frisk too: the line still names Spy's Frisk, not a hand-over to Gourgeist.
     const lines = [
       ...start,
-      '|switch|p1a: Chomp|Garchomp, M|100/100',
+      '|switch|p1a: Pump|Gourgeist, M|100/100',
       '|switch|p2a: Doll|Banette, F|100/100',
       '|turn|1',
-      '|move|p1a: Chomp|Earthquake|p2a: Doll',
+      '|move|p1a: Pump|Poltergeist|p2a: Doll',
       '|-damage|p2a: Doll|10/100',
-      '|move|p2a: Doll|Shadow Sneak|p1a: Chomp',
-      '|-damage|p1a: Chomp|90/100',
+      '|move|p2a: Doll|Shadow Sneak|p1a: Pump',
+      '|-damage|p1a: Pump|90/100',
       '|upkeep',
       '|turn|2',
+      '|',
       '|switch|p2a: Spy|Banette, M|100/100',
-      '|-item|p1a: Chomp|Choice Scarf|[from] ability: Frisk|[of] p2a: Spy',
+      '|-item|p1a: Pump|Choice Scarf|[from] ability: Frisk|[of] p2a: Spy',
       '|upkeep',
       '|turn|3',
     ];
-    expect(heldAt(lines, 3)?.find(entry => entry.side === 'p1')).toEqual(
-      { side: 'p1', species: 'Garchomp', item: 'choicescarf', firstMove: 'earthquake', touched: true });
-    expect(protocolChoiceLock(buildChoiceLockTrails(log(lines)), 'p1', 3)).toEqual({ species: 'Garchomp', moveId: 'earthquake' });
+    expect(heldAt(lines, 3)).toEqual([
+      { side: 'p1', species: 'Gourgeist', item: 'choicescarf', firstMove: 'poltergeist', touched: true },
+      { side: 'p2', species: 'Banette', item: null, firstMove: 'shadowsneak', touched: false },
+      { side: 'p2', species: 'Banette', item: null, firstMove: null, touched: false },
+    ]);
+    expect(protocolChoiceLock(buildChoiceLockTrails(log(lines)), 'p1', 3)).toEqual({ species: 'Gourgeist', moveId: 'poltergeist' });
+  });
+});
+
+/** The simulator's own spectator log (the public line of every |split| pair) after the given turns. */
+function simLog(format: string, p1: PokemonSet[], p2: PokemonSet[], turns: [string, string][] = []): string {
+  const battle = new LiveBattle({
+    formatid: format as never, seed: [1, 2, 3, 4],
+    p1: { name: 'Alice', team: Teams.pack(p1) }, p2: { name: 'Bob', team: Teams.pack(p2) },
+  });
+  if (battle.sides.some(side => side.requestState === 'teampreview')) {
+    battle.choose('p1', `team ${p1.map((_, index) => index + 1).join('')}`);
+    battle.choose('p2', `team ${p2.map((_, index) => index + 1).join('')}`);
+  }
+  for (const [p1Choice, p2Choice] of turns) {
+    battle.choose('p1', p1Choice);
+    battle.choose('p2', p2Choice);
+  }
+  return battle.log.filter((line, index, all) => !line.startsWith('|split|') && !all[index - 1]?.startsWith('|split|')).join('\n');
+}
+
+const simSet = (species: string, item: string, ability: string, moves: string[]): PokemonSet => ({
+  name: species, species, item, ability, moves, nature: 'Hardy', gender: '', level: 100,
+  evs: { hp: 84, atk: 84, def: 84, spa: 84, spd: 84, spe: 84 }, ivs: { hp: 31, atk: 31, def: 31, spa: 31, spd: 31, spe: 31 },
+});
+
+describe('a Frisk the simulator writes leaves the frisker\'s item alone (round 64 review)', () => {
+  const eligibility = { p1: {}, p2: {} };
+
+  test('singles: Dusknoir frisks a Gourgeist that could have Frisk itself and keeps its Leftovers', () => {
+    const p1 = [simSet('Dusknoir', 'Leftovers', 'Frisk', ['Shadow Sneak'])];
+    const p2 = [simSet('Gourgeist', 'Sitrus Berry', 'Insomnia', ['Shadow Sneak'])];
+    const replayLog = simLog('gen9customgame', p1, p2);
+    expect(replayLog).toContain('|-item|p2a: Gourgeist|Sitrus Berry|[from] ability: Frisk|[of] p1a: Dusknoir');
+    const context = { ...buildChoiceLockContext(replayLog, { p1Team: [], p2Team: [] }, []), eligibility };
+    expect(context.heldItems.get(1)).toEqual([
+      { side: 'p1', species: 'Dusknoir', item: null, firstMove: null, touched: false },
+      { side: 'p2', species: 'Gourgeist', item: 'sitrusberry', firstMove: null, touched: true },
+    ]);
+    const board = new LiveBattle({ formatid: 'gen9customgame' as never, p1: { name: 'Alice', team: Teams.pack(p1) }, p2: { name: 'Bob', team: Teams.pack(p2) } });
+    correctActivesFromProtocol(board as never, [], { context, turn: 1 });
+    expect([board.sides[0].pokemon[0].item, board.sides[1].pokemon[0].item]).toEqual(['leftovers', 'sitrusberry']);
+  });
+
+  test('Magician and Pickpocket lines the simulator writes still hand the item over', () => {
+    const magician = simLog('gen9customgame',
+      [simSet('Klefki', '', 'Magician', ['Flash Cannon'])], [simSet('Chansey', 'Leftovers', 'Natural Cure', ['Soft-Boiled'])],
+      [['move flashcannon', 'move softboiled']]);
+    expect(magician).toContain('|-item|p1a: Klefki|Leftovers|[from] ability: Magician|[of] p2a: Chansey');
+    expect(buildChoiceLockContext(magician, { p1Team: [], p2Team: [] }, []).heldItems.get(2)!.map(entry => [entry.species, entry.item, entry.firstMove]))
+      .toEqual([['Klefki', 'leftovers', null], ['Chansey', '', 'softboiled']]);
+    const pickpocket = simLog('gen9customgame',
+      [simSet('Weavile', '', 'Pickpocket', ['Swords Dance'])], [simSet('Chansey', 'Leftovers', 'Natural Cure', ['Pound'])],
+      [['move swordsdance', 'move pound']]);
+    expect(pickpocket).toContain('|-item|p1a: Weavile|Leftovers|[from] ability: Pickpocket|[of] p2a: Chansey');
+    expect(buildChoiceLockContext(pickpocket, { p1Team: [], p2Team: [] }, []).heldItems.get(2)!.map(entry => [entry.species, entry.item, entry.firstMove]))
+      .toEqual([['Weavile', 'leftovers', null], ['Chansey', '', 'pound']]);
+  });
+
+  test('doubles: one Frisk shows both foes\' items and empties neither the frisker nor its partner', () => {
+    const p1 = [simSet('Dusknoir', 'Leftovers', 'Frisk', ['Shadow Sneak']), simSet('Blissey', 'Heavy-Duty Boots', 'Natural Cure', ['Soft-Boiled'])];
+    const p2 = [simSet('Gourgeist', 'Sitrus Berry', 'Insomnia', ['Shadow Sneak']), simSet('Noivern', 'Heavy-Duty Boots', 'Infiltrator', ['Hurricane'])];
+    const replayLog = simLog('gen9doublescustomgame', p1, p2);
+    expect(replayLog.split('\n').filter(line => line.includes('ability: Frisk'))).toHaveLength(2);
+    const held = buildChoiceLockContext(replayLog, { p1Team: [], p2Team: [] }, []).heldItems.get(1)!;
+    expect(held.map(entry => [entry.species, entry.item])).toEqual([
+      ['Dusknoir', null], ['Blissey', null], ['Gourgeist', 'sitrusberry'], ['Noivern', 'heavydutyboots'],
+    ]);
   });
 });
 
