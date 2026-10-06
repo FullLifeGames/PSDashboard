@@ -134,4 +134,13 @@ describe('the veto rows read their lists from the Dex (decision 17)', () => {
       revealed('Nasty Plot'), guessed('U-turn'), guessed('Volt Switch'), guessed('Close Combat'),
     ], { itemId: '' }))).toEqual(['Nasty Plot', 'U-turn', 'Volt Switch']);
   });
+
+  test('a boost serves the offense stats the Dex raises for the user: Shell Smash serves both, Torch Song spa', () => {
+    expect(names(applyCoherenceVetoes([
+      revealed('Shell Smash'), guessed('Icicle Spear'), guessed('Hydro Pump'), guessed('Body Press'),
+    ], { itemId: '' }))).toEqual(['Shell Smash', 'Icicle Spear', 'Hydro Pump']);
+    expect(names(applyCoherenceVetoes([
+      revealed('Torch Song'), guessed('Earthquake'), guessed('Shadow Ball'),
+    ], { itemId: '' }))).toEqual(['Torch Song', 'Shadow Ball']);
+  });
 });

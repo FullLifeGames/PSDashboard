@@ -39,13 +39,22 @@ export interface CoherenceContext {
   itemId: string;
 }
 
-/** Offense stat each setup move serves — the coherence axis of veto row 1. */
-const BOOST_SERVES: Record<string, 'atk' | 'spa'> = {
-  swordsdance: 'atk', dragondance: 'atk', bulkup: 'atk', coil: 'atk',
-  honeclaws: 'atk', victorydance: 'atk', shiftgear: 'atk', shellsmash: 'atk',
-  nastyplot: 'spa', calmmind: 'spa', quiverdance: 'spa', tailglow: 'spa',
-  geomancy: 'spa', torchsong: 'spa',
-};
+type DexMove = ReturnType<typeof Dex.moves.get>;
+
+/**
+ * The offense stats a move raises for its user, from the Dex (round 64,
+ * decision 17): a self-targeted status move's boosts, `self.boosts`,
+ * `selfBoost`, and a sure secondary's self boosts (Torch Song). The
+ * coherence axis of veto row 1.
+ */
+function boostsServed(move: DexMove): ('atk' | 'spa')[] {
+  const raised: Record<string, number | undefined> = {
+    ...(move.category === 'Status' && move.target === 'self' ? move.boosts : undefined),
+    ...move.self?.boosts, ...move.selfBoost?.boosts,
+    ...(move.secondary?.chance === 100 ? move.secondary.self?.boosts : undefined),
+  };
+  return (['atk', 'spa'] as const).filter(stat => (raised[stat] ?? 0) > 0);
+}
 
 /**
  * Defense-boost setup whose offensive payoff is a Defense-scaling attack
@@ -79,7 +88,7 @@ interface MoveFacts {
 }
 
 /** The user's stats a move lowers on itself, from the Dex (`self.boosts`, `selfBoost`). */
-function ownStatsLowered(move: ReturnType<typeof Dex.moves.get>): string[] {
+function ownStatsLowered(move: DexMove): string[] {
   const boosts: Record<string, number | undefined> = { ...move.self?.boosts, ...move.selfBoost?.boosts };
   return Object.keys(boosts).filter(stat => (boosts[stat] ?? 0) < 0);
 }
@@ -276,9 +285,8 @@ export function applyCoherenceVetoes(
   const served = new Set<string>();
   for (const candidate of candidates) {
     const move = Dex.moves.get(candidate.name);
-    const serves = BOOST_SERVES[move.id];
     const struck = candidate.guessed && restrictiveItem !== null && move.category === 'Status';
-    if (serves && !struck && !candidate.tail) served.add(serves);
+    if (!struck && !candidate.tail) for (const stat of boostsServed(move)) served.add(stat);
   }
 
   const keeps = keepDamagingMoves(candidates, served);
