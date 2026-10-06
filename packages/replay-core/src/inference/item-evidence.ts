@@ -117,6 +117,25 @@ function lifeOrbWouldShow(state: InferrerState, watch: ItemWatch, action: Action
 }
 
 /**
+ * Whether a Shell Bell on the attacker would have shown its heal after this
+ * hit: the simulator heals an eighth of the damage dealt after the move
+ * (onAfterMoveSecondarySelf, gens 3 to 9), so a holder still below full HP
+ * when the move ends shows the line. Sheer Force on a move with a secondary
+ * effect skips that step; Klutz, Embargo, Magic Room and Heal Block silence it.
+ */
+function shellBellWouldShow(state: InferrerState, watch: ItemWatch, action: ActionWatch): boolean {
+  const dex = Dex.forGen(state.gen);
+  const bell = dex.items.get('shellbell');
+  const move = dex.moves.get(action.move);
+  if (!bell.exists || bell.gen > state.gen || !move.exists || move.category === 'Status') return false;
+  const [current, max] = hpOf(watch.hp.get(action.attacker)).split('/').map(Number);
+  if (!(current > 0 && current < max)) return false;
+  const abilities = possibleAbilities(state, action.ident);
+  if (!abilities || abilities.has('klutz') || (abilities.has('sheerforce') && move.secondaries)) return false;
+  return !watch.magicRoom && !watch.embargoed.has(action.attacker) && !watch.healBlocked.has(action.attacker);
+}
+
+/**
  * Whether a move from an attacker holding `heldItem` ('' for none) makes
  * contact, read from the simulator: the item's own move change (Punching
  * Glove takes contact from a punch), then `Battle#checkMoveMakesContact`
@@ -155,14 +174,22 @@ function helmetWouldShow(state: InferrerState, watch: ItemWatch, action: ActionW
   return !!abilities && !abilities.has('magicguard') && !abilities.has('longreach') && !watch.magicRoom;
 }
 
+/** The opponent attacker's own items: Life Orb shows its recoil, Shell Bell its heal. */
+function judgeAttacker(state: InferrerState, watch: ItemWatch, action: ActionWatch) {
+  if (!action.shown.has(`${action.attacker}|lifeorb`) && lifeOrbWouldShow(state, watch, action)) {
+    ruleOutUnknown(state, action.attacker, 'lifeorb');
+  }
+  if (!action.shown.has(`${action.attacker}|shellbell`) && shellBellWouldShow(state, watch, action)) {
+    ruleOutUnknown(state, action.attacker, 'shellbell');
+  }
+}
+
 function judgeAction(state: InferrerState, watch: ItemWatch, action: ActionWatch) {
   if (action.doubt || action.fainted.has(action.attacker)) return;
   const hitOthers = [...action.hits].filter(key => key !== action.attacker);
   if (hitOthers.length === 0) return;
   if (action.attacker.startsWith(state.opponentSide)) {
-    if (!action.shown.has(`${action.attacker}|lifeorb`) && lifeOrbWouldShow(state, watch, action)) {
-      ruleOutUnknown(state, action.attacker, 'lifeorb');
-    }
+    judgeAttacker(state, watch, action);
     return;
   }
   if (!helmetWouldShow(state, watch, action)) return;

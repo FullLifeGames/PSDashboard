@@ -203,3 +203,34 @@ describe('Rocky Helmet from the generation of Protective Pads on (round 64, T120
     }
   });
 });
+
+describe('Shell Bell heals its holder after a hit below full HP (round 64, T120, decision 19)', () => {
+  // Mew moves first and chips the slow attacker, whose hit then shows the heal (or not).
+  const chip = () => set('Mew', '', 'Synchronize', ['Tackle', 'Recover', 'Psychic Noise']);
+  const slow = (item: string, ability = 'Thick Fat', moves = ['Body Slam']) => set('Snorlax', item, ability, moves);
+  const ou = (p1: PokemonSet[], p2: PokemonSet[], turns: [string, string][], doubles = false) => play(p1, p2, turns, doubles, 9, 'ou');
+
+  test('singles: a hit below full HP without the heal rules Shell Bell out', () => {
+    expect(shown(ou([chip()], [slow('Shell Bell')], [['move tackle', 'move bodyslam']]), 'Shell Bell')).toBe(true);
+    expect(ruledOut(ou([chip()], [slow('Expert Belt')], [['move tackle', 'move bodyslam']]), 'Snorlax')).toContain('shellbell');
+  });
+
+  test('doubles: a hit below full HP without the heal rules Shell Bell out', () => {
+    const p1 = [chip(), set('Blissey', '', 'Natural Cure', ['Soft-Boiled'])];
+    const p2 = (item: string) => [slow(item), set('Talonflame', '', 'Gale Wings', ['Roost'])];
+    const turn: [string, string] = ['move tackle 1, move softboiled', 'move bodyslam 1, move roost'];
+    expect(shown(ou(p1, p2('Shell Bell'), [turn], true), 'Shell Bell')).toBe(true);
+    expect(ruledOut(ou(p1, p2('Expert Belt'), [turn], true), 'Snorlax')).toContain('shellbell');
+  });
+
+  test('full HP, Sheer Force on a move with a secondary, or Heal Block rule nothing out', () => {
+    const full = ou([chip()], [slow('Expert Belt')], [['move recover', 'move bodyslam']]);
+    expect(ruledOut(full, 'Snorlax')).not.toContain('shellbell');
+    const force = (item: string) => ou([chip()], [set('Nidoking', item, 'Sheer Force', ['Earth Power'])], [['move tackle', 'move earthpower']]);
+    expect(shown(force('Shell Bell'), 'Shell Bell')).toBe(false);
+    expect(ruledOut(force('Expert Belt'), 'Nidoking')).not.toContain('shellbell');
+    const blocked = (item: string) => ou([chip()], [slow(item)], [['move psychicnoise', 'move bodyslam']]);
+    expect(shown(blocked('Shell Bell'), 'Shell Bell')).toBe(false);
+    expect(ruledOut(blocked('Expert Belt'), 'Snorlax')).not.toContain('shellbell');
+  });
+});
