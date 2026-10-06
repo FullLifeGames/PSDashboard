@@ -230,7 +230,7 @@ function setFallbacks(curated: CuratedSet | null, smogonSet: SmogonSet) {
 
 /**
  * The move pool in the build's offer order (assembleMoves): known, the
- * curated set (spared by veto row 1), earlier guesses, usage, marginal
+ * curated set (spared by veto rows 1 and 2), earlier guesses, usage, marginal
  * set moves when nothing curated won, then the usage tail (round 63, T89
  * with T28).
  */

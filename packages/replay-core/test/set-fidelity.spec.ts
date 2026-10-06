@@ -78,21 +78,12 @@ describe('the chosen set before every guess (T89, T28)', () => {
     expect(panel).toEqual(built);
   });
 
-  test('singles: the chosen set\'s priority move survives row 2, its second Dark attack does not (Samurott-Hisui, E1)', () => {
+  test('singles: the chosen set\'s second Dark attack survives row 2 in the panel and the build (Samurott-Hisui)', () => {
     const log = singles(9, 'Samurott-Hisui', ['Ceaseless Edge']);
     const usageStats = stats(usage('Samurott-Hisui', [['Ceaseless Edge', 0.9], ['Razor Shell', 0.7], ['Sacred Sword', 0.5], ['Sucker Punch', 0.45], ['Knock Off', 0.4]]));
     const setAssumptions = sets(smogonSet('Samurott-Hisui', ['Ceaseless Edge', 'Razor Shell', 'Sucker Punch', 'Knock Off'], 'Assault Vest'));
     const { built, panel } = build(log, 'Samurott-Hisui', usageStats, setAssumptions);
-    expect(built).toEqual(keysOf('Ceaseless Edge', 'Razor Shell', 'Sucker Punch', 'Sacred Sword'));
-    expect(panel).toEqual(built);
-  });
-
-  test('doubles: with Headlong Rush seen, the chosen set\'s Earthquake still meets row 2 (938640 Ursaluna, E1)', () => {
-    const log = doubles('Ursaluna', ['Facade', 'Protect', 'Headlong Rush']);
-    const usageStats = stats(usage('Ursaluna', [['Facade', 0.9], ['Headlong Rush', 0.8], ['Protect', 0.7], ['Earthquake', 0.6], ['Swords Dance', 0.4]]));
-    const setAssumptions = sets(smogonSet('Ursaluna', ['Facade', 'Headlong Rush', 'Earthquake', 'Protect'], 'Flame Orb'));
-    const { built, panel } = build(log, 'Ursaluna', usageStats, setAssumptions);
-    expect(built).toEqual(keysOf('Facade', 'Protect', 'Headlong Rush', 'Swords Dance'));
+    expect(built).toEqual(keysOf('Ceaseless Edge', 'Razor Shell', 'Sucker Punch', 'Knock Off'));
     expect(panel).toEqual(built);
   });
 
@@ -103,8 +94,7 @@ describe('the chosen set before every guess (T89, T28)', () => {
     const info = inferOpponentTeam(log, 'p2');
     info.pokemon[0].moves.push({ name: 'Icicle Spear', source: 'guessed' });
     const { built } = build(log, 'Kyurem', usageStats, setAssumptions, info);
-    // E1: Freeze-Dry meets row 2 beside Ice Beam; the guessed Icicle Spear still never gets in.
-    expect(built).toEqual(keysOf('Ice Beam', 'Earth Power', 'Draco Meteor'));
+    expect(built).toEqual(keysOf('Ice Beam', 'Freeze-Dry', 'Earth Power', 'Draco Meteor'));
   });
 
   test('doubles: a short pool reaches past the first ten usage moves (Latios with Choice Scarf)', () => {

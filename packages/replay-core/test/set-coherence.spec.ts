@@ -153,21 +153,22 @@ describe('set-coherence vetoes', () => {
     ], { itemId: 'choiceband' }))).toEqual(['Ice Shard', 'Icicle Crash', 'Knock Off']);
   });
 
-  // Round 63, E1 (the d2 doubles reading): a same-type pair the log did not
-  // show has no claim on the build, so row 2 holds against the chosen set
-  // too; only row 1 spares it.
-  test('row 1 spares the chosen set\'s moves, row 2 does not (Samurott-Hisui with the Vest, E1)', () => {
+  test('rows 1 and 2 spare the chosen set\'s own moves (Samurott-Hisui with the Vest, T28)', () => {
     const kept = applyCoherenceVetoes([
       revealed('Ceaseless Edge'), fromSet('Razor Shell'), fromSet('Sucker Punch'), fromSet('Knock Off'), guessed('Night Slash'),
     ], { itemId: 'assaultvest' });
-    expect(names(kept)).toEqual(['Ceaseless Edge', 'Razor Shell', 'Sucker Punch']);
+    expect(names(kept)).toEqual(['Ceaseless Edge', 'Razor Shell', 'Sucker Punch', 'Knock Off']);
     expect(names(applyCoherenceVetoes([guessed('Swords Dance'), fromSet('Body Press')], { itemId: '' })))
       .toEqual(['Swords Dance', 'Body Press']);
   });
 
-  test('a revealed same-type pair is never vetoed (E1)', () => {
+  test('a revealed same-type pair is never vetoed, and the chosen set keeps its own pair (round 63)', () => {
+    // The user gate of round 63 reads the published set as published (d2): row 2 spares the chosen set's moves.
     expect(names(applyCoherenceVetoes([
       revealed('Headlong Rush'), revealed('Earthquake'), fromSet('Stomping Tantrum'),
+    ], { itemId: '' }))).toEqual(['Headlong Rush', 'Earthquake', 'Stomping Tantrum']);
+    expect(names(applyCoherenceVetoes([
+      revealed('Headlong Rush'), revealed('Earthquake'), guessed('Stomping Tantrum'),
     ], { itemId: '' }))).toEqual(['Headlong Rush', 'Earthquake']);
   });
 
