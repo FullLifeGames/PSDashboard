@@ -902,6 +902,82 @@ import { takeSimFastReport } from '../packages/eval-engine/src/forward/sim-fast/
  * static basis for this mass; the next lever, if any, is search/
  * planning-side.
  *
+ * WAVE 1 2026-10-06 (improvement round 63, the first wave of lanes after
+ * the round-62 triage; spec docs/superpowers/specs/2026-10-05-round-63-
+ * wave-1-design.md, plan docs/superpowers/plans/2026-10-05-round-63-wave-1-
+ * plan.md; branch r63 from 888cd12, cache v57; probes, queue and lane
+ * ledgers under docs/perf/probes/2026-10-05-r63/). Eight sub-agents in
+ * their own worktrees, one lane each, sharing no file: A T110 (early
+ * singles turns on the matrix again, three draws), B T81 and T112 (the
+ * static asks the simulator for power, hits and the stats a move reads;
+ * STAB by the game's rules after a Tera click; a memo for the search
+ * hints), C T16 and T78 (the verify step prices every chance class one ply
+ * deeper, played row and doubles boundary cells included), D T89, T28,
+ * T80, T101 (Smogon slots with two options, every set from its chosen set
+ * first, items the protocol rules out, Revival Blessing, battle formes by
+ * the Dex), E T19, T18, T17, T116 (report sentences, sacrifice and hazard
+ * sack credit, read credit, no doubles lead verdicts), F T20, T96, T68
+ * (damage preview: Tera, every hit, sprites, editor, stats retry), G T115
+ * (the board follows the items the protocol shows after a move), H T117
+ * (every observed move order settled before the ladder). Each lane measured
+ * alone through one queue in a measurement worktree (bank paired with both
+ * tables, feedback 3x, e2e) against the same base; a new day took a new
+ * base (r63-base-1006, byte-identical to the 05.10. base). Before the
+ * wave: the second bank table with own K per game type and phase, refit
+ * in every draw (888cd12), and PROBE_ROOT probe configs.
+ * Merge: cherry-picks in lane order without conflict; integrator patch
+ * bfc60cf (singles hands the played action to the verify step), cache v57,
+ * fork identity re-recorded (moves only through lane B's static), two
+ * lane tests pinned to the merged read (verify scenes 648453 t13 and
+ * 912045 t8; app-build parity three rows); final review by three fresh
+ * reviewers: Evaluate on a replay turn now searches with the played action
+ * (b2960fe, it shared the sweep's cache key), six fixes (D usage tail out
+ * of veto row 1, no absence rule-outs with a possible Illusion user; F KO
+ * text from the calc against current HP; E no sacrifice praise for a body
+ * the opposing near sweep removes, read credit "before the rolls" plus
+ * luck, forced-win key in the walk). Round-42 play-out pin kept on its
+ * intent (508ffc6: Heatran never before Muk-Alola; with T16 the play-out
+ * follows the Monte-Carlo ranking and wins at turn 62 sending neither).
+ * T45: VGC 2630685175 turn 8 is the first doubles truth pin (p2's Taunt
+ * into Calyrex-Ice instead of Astral Barrage, regret 1.697); the four user
+ * verdicts of 05.10.: 2630685175 t8 engine right (pinned), 2663108091 t26
+ * player right (became T117, fixed: no false p1 win), 2663114316 t18
+ * engine right but a Tera-Ghost 50/50, 752058 t32 open (reads -0.495
+ * after the wave instead of -0.932, toward the winner p1).
+ * USER GATE 2026-10-06 11:29/11:33: (1) the chosen Smogon sets are read as
+ * published (d2; E1 reverted in ac39c56), the veto rule was meant for
+ * contradicting pairs such as Close Combat beside Body Press and T120
+ * narrows it; (2) STAB by the rules stays in (park reverted in af9b037,
+ * identity 7db8a8c): the weights are wrong, not the rule, so T127 refits
+ * them in wave 1.5 and T102 may refit the model form again in wave 3;
+ * (3) play-out pin on its intent; (4) 573756 t75 re-pinned to "the Kyurem
+ * switch is the best move"; (5) the Trick at golden 655336 t5 is not
+ * necessarily a mistake (a possible Sucker Punch or Pursuit Bisharp), so
+ * misplay 5:p2 leaves the golden and the other channels are known drift;
+ * (6) the gap pins 573756 t68, 648453 t13 and 653785 t19 become truth with
+ * their new sentences; (7) the new TODOs T118 to T127 run as wave 1.5
+ * before wave 2; (8) push v1 after the booking.
+ * WAVE RUN on the gate state 7db8a8c against r63-base-1006 (bank 945 s,
+ * 805 of 837 positions moved): no harm and no warning in both tables;
+ * fixed K all +1 [-41, +40], singles -20 [-66, +23], doubles +51
+ * [-25, +124]; own K all -5 [-39, +28], singles -25 [-64, +15], doubles
+ * +41 [-14, +102]; singles late resolved better (-73 fixed, -87 own K).
+ * Against the state before the two gate decisions (508ffc6, E1 without
+ * STAB) d2 and STAB together cost own K all +17 [+1, +33] (doubles late
+ * +117) and fixed K hq singles +13 [+1, +24], the price T120 and T127 are
+ * to win back. Feedback three runs byte-identical (265/255/255 s);
+ * tiers against the day base singles 22/3/0 -> 39/2/0 (the early matrix
+ * is back) and doubles 9/4/0 -> 12/3/0, 87 turns moved; against wave run
+ * 2, 23 turns moved, nearly all doubles (2663093831 t7 blunder ->
+ * mistake). Pins after the gate re-pins (c2e088d, one browser run
+ * byte-identical to the wave run): every turn truth pin ok, golden 655336
+ * ten channels of known drift, gaps 573756 t73 and 649664 t23 open. e2e
+ * 74 of 75 in the full run: the timeline slider test waited 30 s for the
+ * replay iframe and passed 4 of 4 alone (watch line in NextSteps C).
+ * Regression 2049 green on 7db8a8c, lint and tsc -b clean. Base of the
+ * code state: .calibration/r63-wave3. New TODOs T118 to T127 as wave 1.5
+ * (NextSteps, round 64).
+ *
  * TRIAGE 2026-10-04 (improvement round 62, iteration S3 of the program
  * "more simulation", T99; no engine code, cache stays v56, bank base
  * stays .calibration/r61-t98b): every open TODO (75), the three round-61
