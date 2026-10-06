@@ -177,13 +177,21 @@ describe('BranchPanel', () => {
 
     test('Mega Evolve stays out of the preview', async () => {
       localStorage.setItem(ADVANCED_KEY, '1');
-      render(<BranchPanel {...props({ simState: simState('singles', { p1ModifiersBySlot: [{ ...NO_MODIFIERS, canMegaEvo: true }] }) })} />);
+      render(<BranchPanel {...props({ simState: simState('singles', {
+        p1ModifiersBySlot: [{ ...NO_MODIFIERS, canMegaEvo: true, teraType: 'Ground' }],
+        p2ModifiersBySlot: [{ ...NO_MODIFIERS, teraType: 'Fire' }],
+      }) })} />);
       const button = slot('P1').getByRole('button', { name: /Earthquake/ });
-      const plain = range(garchomp, ferrothorn);
-      await waitFor(() => expect(button).toHaveTextContent(plain));
+      await waitFor(() => expect(button).toHaveTextContent(range(garchomp, ferrothorn)));
       await userEvent.click(slot('P1').getByRole('button', { name: 'Mega Evolve' }));
       expect(slot('P1').getByRole('button', { name: 'Mega Evolve' })).toHaveAttribute('aria-pressed', 'true');
-      await waitFor(() => expect(button).toHaveTextContent(plain));
+      expect(slot('P1').getByRole('button', { name: 'Tera (Ground)' })).toHaveAttribute('aria-pressed', 'false');
+      // The number before the click cannot show a leak: no recomputation may have landed yet (T126).
+      // The defender's Tera recomputes the preview for sure, and that recomputation reads P1's armed Mega too.
+      const megaLeftOut = range(garchomp, { ...ferrothorn, teraType: 'Fire' });
+      expect(megaLeftOut).not.toBe(range({ ...garchomp, teraType: 'Ground' }, { ...ferrothorn, teraType: 'Fire' }));
+      await userEvent.click(slot('P2').getByRole('button', { name: 'Tera (Fire)' }));
+      await waitFor(() => expect(button).toHaveTextContent(megaLeftOut));
     });
   });
 
