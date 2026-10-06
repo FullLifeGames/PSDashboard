@@ -22,8 +22,7 @@ describe('Tera options hinted on the terastallized body (round 63, T81)', () => 
   test('singles: a Tera option is hinted on the terastallized body', () => {
     const root = rootOf(battleOf('gen9customgame', [set('Garchomp', ['earthquake', 'terablast'], { teraType: 'Ground' })], [splash('Blissey')]));
     const [quake, teraQuake] = singlesOptionHints(root, 'p1', [option('move earthquake'), option('move earthquake terastallize')]);
-    // Measurement option without T81 step 4: STAB stays tera-blind, the Ground click moves Earthquake not at all.
-    expect(teraQuake / quake).toBeCloseTo(1, 10);
+    expect(teraQuake / quake).toBeCloseTo(2 / 1.5, 10);
     // Tera Blast after the click: Fairy, physical on Garchomp's Attack, with Tera STAB, as the clicked body prices it.
     const fairyBattle = () => battleOf('gen9customgame', [set('Garchomp', ['terablast'], { teraType: 'Fairy' })], [splash('Dragonite')]);
     const [blast, teraBlast] = singlesOptionHints(rootOf(fairyBattle()), 'p1', [option('move terablast'), option('move terablast terastallize')]);
@@ -41,7 +40,7 @@ describe('Tera options hinted on the terastallized body (round 63, T81)', () => 
       [set('Garchomp', ['highhorsepower'], { teraType: 'Ground' }), splash('Pikachu')], [splash('Blissey'), splash('Chansey')]));
     const [plain, tera] = combinedOptionHints(root, 'p1', [option('move highhorsepower 1, move splash'), option('move highhorsepower 1 terastallize, move splash')]);
     // The Splash part adds the support floor to both.
-    expect((tera - 0.25) / (plain - 0.25)).toBeCloseTo(1, 10);
+    expect((tera - 0.25) / (plain - 0.25)).toBeCloseTo(2 / 1.5, 10);
   });
 
   test('hinting leaves the body as it was', () => {

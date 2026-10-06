@@ -138,19 +138,40 @@ describe('the defender type reads live after a Tera click (round 54)', () => {
   });
 });
 
-// STAB by the game's rules (old type 1.5, Tera type 1.5, both 2.0) was built,
-// measured and parked in round 54 (T71); round 63 landed it with T81 step 4
-// and this measurement option takes it out again. Without it a Tera click
-// must not move an attacker's STAB.
-describe('STAB stays tera-blind while the rule is parked (round 54)', () => {
-  test.each([['Ground', 'earthquake'], ['Fire', 'firefang'], ['Stellar', 'earthquake']])(
-    'Tera %s leaves %s where it was', (teraType, move) => {
+// STAB by the game's rules (old type 1.5, Tera type 1.5, both 2.0, Stellar
+// 2.0 and 1.2 on the first use of a type) was built and parked in round 54
+// (T71) and lands with T81 in round 63; test/stab-rules.spec.ts holds it
+// against the damage the simulator deals. Blissey takes Ground and Fire
+// neutrally, so the ratio across the click is the STAB ratio.
+describe('STAB follows the Tera click (round 63, T81)', () => {
+  test.each([['Ground', 'earthquake', 2 / 1.5], ['Fire', 'firefang', 1.5], ['Stellar', 'earthquake', 2 / 1.5]])(
+    'Tera %s moves %s by x%f', (teraType, move, ratio) => {
       const battle = makeBattle(makeSet('Garchomp', ['splash', move], { teraType }), makeSet('Blissey', ['splash']));
       const [garchomp, blissey] = [battle.sides[0].active[0], battle.sides[1].active[0]];
       const before = singleMoveFraction(garchomp, blissey, move, battle);
       clickTera(battle);
-      expect(singleMoveFraction(garchomp, blissey, move, battle)).toBe(before);
+      expect(singleMoveFraction(garchomp, blissey, move, battle) / before).toBeCloseTo(ratio, 10);
     });
+
+  test('the same in doubles: Tera Ground Earthquake into either foe', () => {
+    const battle = new Battle({
+      formatid: toID('gen9doublescustomgame'),
+      seed: '1,2,3,4',
+      p1: { name: 'Alpha', team: Teams.pack([makeSet('Garchomp', ['splash', 'earthquake'], { teraType: 'Ground' }), makeSet('Pikachu', ['splash'])]) },
+      p2: { name: 'Beta', team: Teams.pack([makeSet('Blissey', ['splash']), makeSet('Chansey', ['splash'])]) },
+    });
+    if (battle.sides.some(side => side.requestState === 'teampreview')) {
+      battle.choose('p1', 'team 12');
+      battle.choose('p2', 'team 12');
+    }
+    const garchomp = battle.sides[0].active[0];
+    const before = battle.sides[1].active.map(foe => singleMoveFraction(garchomp, foe, 'earthquake', battle));
+    battle.choose('p1', 'move 1 terastallize, move 1');
+    battle.choose('p2', 'move 1, move 1');
+    expect(garchomp.terastallized).toBe('Ground');
+    battle.sides[1].active.forEach((foe, index) =>
+      expect(singleMoveFraction(garchomp, foe, 'earthquake', battle) / before[index]).toBeCloseTo(2 / 1.5, 10));
+  });
 });
 
 describe('abilities that blank a move flag (round 54)', () => {

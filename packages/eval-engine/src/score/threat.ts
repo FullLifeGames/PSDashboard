@@ -1,7 +1,7 @@
 import type { Battle, BoostsTable, ID, Pokemon, Side, StatIDExceptHP } from '@pkmn/sim';
 import { stageMultiplier } from '../stat-stages.ts';
 import {
-  keyedAnswers, landedKey, landedOrCatalog, stagedLanded, stagedPower, traitsOf, type Landed,
+  abilityStab, keyedAnswers, landedKey, landedOrCatalog, stagedLanded, stagedPower, traitsOf, type Landed,
 } from './move-facts.ts';
 
 /**
@@ -123,9 +123,10 @@ function pairKey(
   // A Tera click leaves `types` alone and sets `terastallized`, so the key
   // carries both. The defender's term mirrors a read (liveTypes); a Stellar
   // body keeps its old types for defense, so the raw types stay. The
-  // attacker's term mirrors no read while STAB stays tera-blind: it is kept
-  // for the parked rule (T71; round 63 measurement option without T81 step 4).
-  const offense = `${attacker.types.join('/')}:${attacker.terastallized ?? ''}:${attacker.storedStats.atk}:${attacker.storedStats.spa}`;
+  // attacker's term mirrors STAB by the rules (round 63, T81), a Stellar
+  // body's term the types it has spent its boost on.
+  const stellar = attacker.terastallized === 'Stellar' ? `:${attacker.stellarBoostedTypes.join('/')}` : '';
+  const offense = `${attacker.types.join('/')}:${attacker.terastallized ?? ''}${stellar}:${attacker.storedStats.atk}:${attacker.storedStats.spa}`;
   const defense = `${defender.types.join('/')}:${defender.terastallized ?? ''}:${defender.storedStats.def}:${defender.storedStats.spd}:${defender.maxhp}`;
   return `${attacker.side.id}:${attacker.name}:${attacker.species.id}:${attacker.level}:${attacker.item}:${attacker.ability}:${lockedMoveId(attacker) ?? ''}:${usable}:${offense}>` +
     `${defender.side.id}:${defender.name}:${defender.species.id}:${defender.level}:${defender.item}:${defender.ability}:${defense}${liveHp}` +
@@ -253,6 +254,43 @@ function blanked(attacker: Pokemon, defender: Pokemon, move: DexMove, type: stri
 const offenseStat = (move: DexMove, physical: boolean): StatIDExceptHP => move.overrideOffensiveStat ?? (physical ? 'atk' : 'spa');
 const defenseStat = (move: DexMove, physical: boolean): StatIDExceptHP => move.overrideDefensiveStat ?? (physical ? 'def' : 'spd');
 
+/**
+ * STAB by the game's rules (BattleActions#modifyDamage; T71, built in round
+ * 54 and landed with T81 in round 63): an old type or the Tera type 1.5, an
+ * old type that is also the Tera type 2.0; a Stellar Tera 2.0 on an old
+ * type and 1.2 elsewhere, on the first use of a type only (the sim's
+ * stellarBoostedTypes, which Terapagos-Stellar never fills); then the
+ * attacker's own ModifySTAB handler (Adaptability), asked from the
+ * simulator. modifyDamage writes the battle (it fills stellarBoostedTypes),
+ * so the rest is mirrored here and test/stab-rules.spec.ts holds it against
+ * the damage the simulator deals.
+ */
+function stabMultiplier(attacker: Pokemon, defender: Pokemon, move: DexMove, type: string, battle: Battle): number {
+  if (type === '???') return 1;
+  const tera = attacker.terastallized;
+  const oldType = attacker.types.includes(type);
+  const stab = oldType || (tera !== 'Stellar' && tera === type) ? 1.5 : 1;
+  if (tera === 'Stellar') {
+    if (attacker.stellarBoostedTypes.includes(type)) return stab;
+    return oldType ? 2 : 4915 / 4096;
+  }
+  const rule = tera === type && oldType ? 2 : stab;
+  return rule > 1 && traitsOf(battle).stabAbilities.has(attacker.ability) ? abilityStab(attacker, defender, move, rule, battle) : rule;
+}
+
+/**
+ * getDamage's floor: once the user terastallized, a move of its Tera type
+ * (a Stellar body: of a type not yet boosted) under 60 power hits as 60,
+ * unless it has priority, hits more than once or sets a power of 0 or 150
+ * at use; mirrored for the same reason, held by test/stab-rules.spec.ts.
+ */
+function teraFloor(attacker: Pokemon, move: DexMove, type: string, power: number): boolean {
+  const tera = attacker.terastallized;
+  if (!tera || power >= 60 || move.priority > 0 || move.multihit) return false;
+  if (move.basePowerCallback && (move.basePower === 0 || move.basePower === 150)) return false;
+  return tera === 'Stellar' ? !attacker.stellarBoostedTypes.includes(type) : tera === type;
+}
+
 /** singleMoveFraction for a move already resolved at use (pairThreat resolves each slot once). */
 function landedFraction(attacker: Pokemon, defender: Pokemon, move: DexMove, use: Landed, battle: Battle): number {
   // The defender's LIVE types: smogtours-gen9ou-751207 t6 priced Body Press
@@ -264,8 +302,7 @@ function landedFraction(attacker: Pokemon, defender: Pokemon, move: DexMove, use
   const typeMult = Math.pow(2, battle.dex.getEffectiveness(use.type, defenderTypes));
   // A Stellar move hits a terastallized target twice as hard (pokemon.runEffectiveness).
   const stellar = use.type === 'Stellar' && defender.terastallized ? 2 : 1;
-  // STAB stays tera-blind here: round 63 measurement option without T81 step 4 (STAB by the rules, T71).
-  const stab = attacker.types.includes(use.type) ? 1.5 : 1;
+  const stab = stabMultiplier(attacker, defender, move, use.type, battle);
   const offense = offenseMultiplier(attacker, defender, use);
   // Body Press off the user's Defense, Psyshock against the target's, Foul Play off the target's Attack.
   const physical = use.category === 'Physical';
@@ -273,8 +310,11 @@ function landedFraction(attacker: Pokemon, defender: Pokemon, move: DexMove, use
   const atk = (move.overrideOffensivePokemon === 'target' ? defender : attacker).storedStats[offenseStat(move, physical)];
   const def = (move.overrideDefensivePokemon === 'source' ? attacker : defender).storedStats[defense];
   const bulk = bulkMultiplier(defender, defense);
-  const damage = (((2 * attacker.level / 5 + 2) * use.basePower * (use.powerMult ?? 1) * atk / def) / 50 + 2) *
-    stab * typeMult * stellar * offense / bulk * (use.landing ?? 1);
+  const level = 2 * attacker.level / 5 + 2;
+  const powered = teraFloor(attacker, move, use.type, use.basePower * (use.powerMult ?? 1))
+    ? level * 60
+    : level * use.basePower * (use.powerMult ?? 1);
+  const damage = ((powered * atk / def) / 50 + 2) * stab * typeMult * stellar * offense / bulk * (use.landing ?? 1);
   return damage / defender.maxhp;
 }
 
