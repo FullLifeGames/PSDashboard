@@ -273,6 +273,21 @@ describe('one Tera per side in doubles (T124 point 1)', () => {
     expect(bug).toBeEnabled();
   });
 
+  test('a switch picked after arming frees the Tera: the partner takes it, and the first slot gives way (review of wave 1.5)', async () => {
+    const switchPick = { kind: 'switch' as const, speciesId: 'flutter mane', pokemonName: 'Flutter Mane' };
+    const { rerender } = render(<BranchPanel {...props({ simState: fixture })} />);
+    await userEvent.click(slot('P1A').getByRole('button', { name: 'Tera (Fire)' }));
+    expect(slot('P1B').getByRole('button', { name: 'Tera (Bug)' })).toBeDisabled();
+    rerender(<BranchPanel {...props({ simState: doubles({ p1Choices: [switchPick, null] }) })} />);
+    const bug = slot('P1B').getByRole('button', { name: 'Tera (Bug)' });
+    expect(bug).toBeEnabled();
+    await userEvent.click(bug);
+    expect(bug).toHaveAttribute('aria-pressed', 'true');
+    const fire = slot('P1A').getByRole('button', { name: 'Tera (Fire)' });
+    expect(fire).toHaveAttribute('aria-pressed', 'false');
+    expect(fire).toHaveAttribute('title', 'P1B already terastallizes this turn.');
+  });
+
   test('a pending choice that terastallizes holds the Tera for its side too', () => {
     const flareBlitzTera = { kind: 'move' as const, moveId: 'flareblitz', moveName: 'Flare Blitz', targetLoc: 1, modifier: 'terastallize' as const };
     render(<BranchPanel {...props({ simState: doubles({ p1Choices: [flareBlitzTera, null] }) })} />);

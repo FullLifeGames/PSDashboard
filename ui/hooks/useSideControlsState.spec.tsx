@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'vitest';
 import { act, renderHook, waitFor } from '@testing-library/react';
-import type { BranchSlotModifiers } from '@fulllifegames/eval-engine';
+import type { BranchSlotChoice, BranchSlotModifiers } from '@fulllifegames/eval-engine';
 import { useGimmickToggles, useMovePool } from '../../src/hooks/useSideControlsState';
 import { NO_MODIFIERS } from '../fixtures/sim-state';
 
@@ -107,6 +107,26 @@ describe('useGimmickToggles', () => {
     expect(pending.result.current.gimmickFor('p1', 0).heldBy).toEqual({ terastallize: 'P1B' });
     act(() => pending.result.current.gimmickFor('p1', 0).toggle('terastallize'));
     expect(pending.result.current.gimmickFor('p1', 0).modifier).toBeNull();
+  });
+
+  test('a slot with a pick holds only what the pick carries: a switch or a plain move frees its armed Tera for the partner (review of wave 1.5)', () => {
+    const switchPick = { kind: 'switch' as const, speciesId: 'rillaboom', pokemonName: 'Rillaboom' };
+    const plainMove = { kind: 'move' as const, moveId: 'flareblitz', moveName: 'Flare Blitz', targetLoc: 1 };
+    for (const pick of [switchPick, plainMove]) {
+      type Pending = { p1: (BranchSlotChoice | null)[]; p2: (BranchSlotChoice | null)[] };
+      const hook = renderHook(({ pending }: { pending: Pending }) => useGimmickToggles([withTera, withTera], [], 'k', pending),
+        { initialProps: { pending: { p1: [null, null], p2: [] } as Pending } });
+      const slotOf = (slot: number) => hook.result.current.gimmickFor('p1', slot);
+      act(() => slotOf(0).toggle('terastallize'));
+      expect(slotOf(1).heldBy, pick.kind).toEqual({ terastallize: 'P1A' });
+      hook.rerender({ pending: { p1: [pick, null], p2: [] } });
+      expect(slotOf(1).heldBy, pick.kind).toEqual({});
+      act(() => slotOf(1).toggle('terastallize'));
+      expect(slotOf(1).modifier, pick.kind).toBe('terastallize');
+      // P1A's armed Tera gives way, so a new pick there cannot carry a second Tera.
+      expect(slotOf(0), pick.kind).toMatchObject({ modifier: null, modifierAvailable: false, heldBy: { terastallize: 'P1B' } });
+      expect(hook.result.current.teraBySlot.p1, pick.kind).toEqual([null, 'Fire']);
+    }
   });
 
   test('teraBySlot keeps its identity across renders until a toggle changes', () => {

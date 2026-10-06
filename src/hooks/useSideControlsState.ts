@@ -49,7 +49,8 @@ export function gimmickView(
 ) {
   const hasZMoves = modifiers.zMoves.some(Boolean);
   const hasAnyModifier = !!modifiers.teraType || modifiers.canMegaEvo || modifiers.canUltraBurst || hasZMoves;
-  const modifierAvailable = !!modifier && gimmickApplies(modifier, modifiers);
+  // A gimmick a partner holds this turn never rides on this slot's next pick.
+  const modifierAvailable = !!modifier && gimmickApplies(modifier, modifiers) && !heldBy[modifier];
   return { modifier, modifierAvailable, hasZMoves, hasAnyModifier, toggle, heldBy };
 }
 
@@ -61,13 +62,14 @@ type PendingChoices = Record<Side, (BranchSlotChoice | null)[]>;
 const NO_PENDING: PendingChoices = { p1: [], p2: [] };
 
 /**
- * The gimmicks the other slots of a side hold this turn: armed, or in their
- * pending choice. The simulator takes each gimmick once per side choice
- * (Side.chooseMove: "You can only Terastallize once per battle", the same
- * for Mega Evolution, Ultra Burst and Z-Moves) while the request offers it to
- * every slot, so the panel holds the kind for the other slots, as Showdown's
- * own client does (T124; ui/hooks/gimmickOncePerSide.spec.tsx checks it
- * against the simulator).
+ * The gimmicks the other slots of a side hold this turn: what a slot's
+ * pending choice carries once it has one, else its armed toggle (a switch or
+ * a plain move picked after arming frees the gimmick). The simulator takes
+ * each gimmick once per side choice (Side.chooseMove: "You can only
+ * Terastallize once per battle", the same for Mega Evolution, Ultra Burst and
+ * Z-Moves) while the request offers it to every slot, so the panel holds the
+ * kind for the other slots, as Showdown's own client does (T124;
+ * ui/hooks/gimmickOncePerSide.spec.tsx checks it against the simulator).
  */
 function heldByPartners(side: Side, slot: number, armed: ArmedGimmicks, pending: PendingChoices): HeldGimmicks {
   const held: HeldGimmicks = {};
@@ -75,9 +77,8 @@ function heldByPartners(side: Side, slot: number, armed: ArmedGimmicks, pending:
   for (let other = 0; other < slots; other++) {
     if (other === slot) continue;
     const pick = pending[side][other];
-    for (const kind of [armed[side][other], pick?.kind === 'move' ? pick.modifier : null]) {
-      if (kind) held[kind] = `${side.toUpperCase()}${String.fromCharCode(65 + other)}`;
-    }
+    const kind = pick ? (pick.kind === 'move' ? pick.modifier : null) : armed[side][other];
+    if (kind) held[kind] = `${side.toUpperCase()}${String.fromCharCode(65 + other)}`;
   }
   return held;
 }
@@ -124,9 +125,11 @@ export function useGimmickToggles(
   const spent = (side: Side) => kept[side].some((kind, slot) => kind !== (armed[side][slot] ?? null));
   if (spent('p1') || spent('p2')) setArmed(() => kept);
   const toggle = useCallback((side: Side, slot: number, kind: BranchMoveModifier) => setArmed(current => {
-    const next = [...current[side]];
-    if (next[slot] !== kind && heldByPartners(side, slot, current, pending)[kind]) return current;
-    next[slot] = next[slot] === kind ? null : kind;
+    const arming = current[side][slot] !== kind;
+    if (arming && heldByPartners(side, slot, current, pending)[kind]) return current;
+    // Arming takes the kind from a partner whose pick no longer carries it, so it cannot ride on that slot's next pick.
+    const next = current[side].map(held => (arming && held === kind ? null : held));
+    next[slot] = arming ? kind : null;
     return { ...current, [side]: next };
   }), [setArmed, pending]);
   const teraBySlot = useMemo(
