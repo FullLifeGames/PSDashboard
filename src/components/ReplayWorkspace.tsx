@@ -106,7 +106,7 @@ function LeadRegion({ app, replayData }: WorkspaceProps) {
    On T0 the lead picker takes their place. */
 function PickerRegion({ app, replayData }: WorkspaceProps) {
   const { playOut } = app.transients;
-  const { viewT0, viewTurn, liveTip } = app.board.timeline;
+  const { viewT0, viewTurn, liveTip, evalViewKey } = app.board.timeline;
   const { simState, executing, executeError } = app.ctx.branch;
   const { branchPreparing, handleSetChoice, handleExecuteDraft } = app.board.deviation;
   const { replayGen } = app.ctx.meta;
@@ -137,6 +137,7 @@ function PickerRegion({ app, replayData }: WorkspaceProps) {
       onHypotheticalMove={app.handleHypotheticalMove}
       onExecuteTurn={liveTip ? app.handleExecuteTurn : handleExecuteDraft}
       played={playedAtView}
+      positionKey={`${replayData.id}:${evalViewKey}`}
     />
   );
 }

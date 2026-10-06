@@ -74,6 +74,24 @@ describe('useGimmickToggles', () => {
     expect(result.current.teraBySlot).toEqual({ p1: ['Fire', null], p2: ['Steel'] });
   });
 
+  test('armed toggles belong to one position: a new position key starts every slot unarmed (T124 point 2)', () => {
+    const sides = { p1: [withTera, withMega], p2: [withTera] };
+    const hook = renderHook(({ key }: { key: string }) => useGimmickToggles(sides.p1, sides.p2, key), { initialProps: { key: 'r1:main:2' } });
+    act(() => hook.result.current.gimmickFor('p1', 0).toggle('terastallize'));
+    act(() => hook.result.current.gimmickFor('p1', 1).toggle('mega'));
+    act(() => hook.result.current.gimmickFor('p2', 0).toggle('terastallize'));
+    expect(hook.result.current.teraBySlot).toEqual({ p1: ['Fire', null], p2: ['Fire'] });
+    hook.rerender({ key: 'r1:main:2' });
+    expect(hook.result.current.gimmickFor('p1', 1).modifier).toBe('mega');
+    hook.rerender({ key: 'r1:main:3' });
+    expect([hook.result.current.gimmickFor('p1', 0).modifier, hook.result.current.gimmickFor('p1', 1).modifier,
+      hook.result.current.gimmickFor('p2', 0).modifier]).toEqual([null, null, null]);
+    expect(hook.result.current.teraBySlot).toEqual({ p1: [null, null], p2: [null] });
+    // Back on the old position the toggles stay released: an arming belongs to the visit, not to the turn.
+    hook.rerender({ key: 'r1:main:2' });
+    expect(hook.result.current.gimmickFor('p1', 0).modifier).toBeNull();
+  });
+
   test('teraBySlot keeps its identity across renders until a toggle changes', () => {
     const sides = { p1: [withTera], p2: [NO_MODIFIERS] };
     const { result, rerender } = renderToggles(sides);

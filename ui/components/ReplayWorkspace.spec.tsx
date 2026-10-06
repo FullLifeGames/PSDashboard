@@ -105,6 +105,29 @@ describe('ReplayWorkspace', () => {
     expect(proceed).not.toHaveBeenCalled();
   }, 90_000);
 
+  test('an armed Tera toggle falls back when the timeline moves to another position (T124 point 2)', async () => {
+    const { app } = await mountLoaded('singles');
+    // The Tera toggles come with the exact position (the snapshot approximation names no Tera type).
+    const exactAt = async (turn: number) => {
+      act(() => app().board.timeline.navigateTo({ turn, line: 'main' }));
+      await waitFor(() => expect(app().engine.positionPicker?.source).toBe('stored'), { timeout: 60_000 });
+      await waitFor(() => expect(app().engine.pickerSimState?.turnNumber).toBe(turn), { timeout: 30_000 });
+    };
+    const tera = () => screen.getAllByRole('button', { name: /^Tera \(/ })[0];
+    // Both positions rebuilt once: the way back reads them from the store, with no snapshot step in between.
+    await exactAt(3);
+    await exactAt(2);
+    await screen.findAllByRole('button', { name: /^Tera \(/ }, { timeout: 10_000 });
+    await userEvent.click(tera());
+    expect(tera()).toHaveAttribute('aria-pressed', 'true');
+    // Turn 3 keeps the same two actives, both still able to terastallize, and comes from the store at once:
+    // only the move to a new position can release the toggle.
+    await exactAt(3);
+    await screen.findAllByRole('button', { name: /^Tera \(/ }, { timeout: 10_000 });
+    expect(sideLabels()).toEqual(['P1', 'P2']);
+    expect(tera()).toHaveAttribute('aria-pressed', 'false');
+  }, 90_000);
+
   test('a doubles replay renders two slot columns per side', async () => {
     const { app } = await mountLoaded('doubles');
     act(() => app().board.timeline.navigateTo({ turn: 2, line: 'main' }));

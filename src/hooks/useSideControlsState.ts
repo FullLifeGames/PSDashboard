@@ -54,23 +54,38 @@ const teraOf = (armed: (BranchMoveModifier | null)[], modifiers: BranchSlotModif
   modifiers.map((slotModifiers, slot) => (armed[slot] === 'terastallize' ? slotModifiers.teraType : null));
 
 /**
+ * The armed gimmicks of one position. A new position key starts every slot
+ * unarmed, the way the draft choices clear on navigation: an armed Tera must
+ * not ride along to another turn and silently change its numbers (T124).
+ */
+function useArmedAt(positionKey: string | undefined) {
+  const [state, setState] = useState<{ key: string | undefined; armed: ArmedGimmicks }>({ key: positionKey, armed: NONE_ARMED });
+  const moved = state.key !== positionKey;
+  if (moved) setState({ key: positionKey, armed: NONE_ARMED });
+  const setArmed = useCallback((update: (current: ArmedGimmicks) => ArmedGimmicks) =>
+    setState(current => ({ key: current.key, armed: update(current.armed) })), []);
+  return { armed: moved ? NONE_ARMED : state.armed, setArmed };
+}
+
+/**
  * The battle gimmick toggles (Tera/Mega/Ultra/Z) of every active slot of
  * both sides, held by the panel so the damage preview reads them: an armed
  * Tera toggle gives `teraBySlot` the type the Pokémon would take (T20).
+ * `positionKey` names the viewed position; the toggles belong to it.
  */
-export function useGimmickToggles(p1Modifiers: BranchSlotModifiers[], p2Modifiers: BranchSlotModifiers[]) {
-  const [armed, setArmed] = useState<ArmedGimmicks>(NONE_ARMED);
+export function useGimmickToggles(p1Modifiers: BranchSlotModifiers[], p2Modifiers: BranchSlotModifiers[], positionKey?: string) {
+  const { armed, setArmed } = useArmedAt(positionKey);
   // Once a gimmick is spent (or the active Pokémon changed and can't use
   // it), it must not silently stick to future move choices ("Thundurus
   // can't Terastallize" after an earlier Tera).
   const kept = { p1: keepApplying(armed.p1, p1Modifiers), p2: keepApplying(armed.p2, p2Modifiers) };
   const spent = (side: Side) => kept[side].some((kind, slot) => kind !== (armed[side][slot] ?? null));
-  if (spent('p1') || spent('p2')) setArmed(kept);
+  if (spent('p1') || spent('p2')) setArmed(() => kept);
   const toggle = useCallback((side: Side, slot: number, kind: BranchMoveModifier) => setArmed(current => {
     const next = [...current[side]];
     next[slot] = next[slot] === kind ? null : kind;
     return { ...current, [side]: next };
-  }), []);
+  }), [setArmed]);
   const teraBySlot = useMemo(
     () => ({ p1: teraOf(armed.p1, p1Modifiers), p2: teraOf(armed.p2, p2Modifiers) }),
     [armed, p1Modifiers, p2Modifiers],

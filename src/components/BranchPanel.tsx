@@ -36,6 +36,8 @@ interface Props {
   onExecuteTurn: () => void;
   /** The action each side actually took at this position on the viewed line. */
   played?: { p1: PlayedPick | null; p2: PlayedPick | null } | null;
+  /** Names the viewed position: armed gimmick toggles belong to it and fall back on a new one (T124). */
+  positionKey?: string;
 }
 
 const EMPTY_MOVES: BranchMoveOption[] = [];
@@ -222,11 +224,12 @@ function SideColumn(props: SideColumnProps) {
  * The slot views, the gimmick toggles and the damage preview of a position.
  * The toggles live here, not per slot: the preview reads both sides' Tera (T20).
  */
-function usePanelPreview(simState: BranchSimState | null, gen: number) {
+function usePanelPreview(simState: BranchSimState | null, gen: number, positionKey: string | undefined) {
   const slots = useSlots(simState);
   const { gimmickFor, teraBySlot } = useGimmickToggles(
     simState?.p1ModifiersBySlot ?? EMPTY_SLOT_MODIFIERS,
     simState?.p2ModifiersBySlot ?? EMPTY_SLOT_MODIFIERS,
+    positionKey,
   );
   const { p1ActiveSlots, p2ActiveSlots, p1MovesBySlot, p2MovesBySlot } = slots;
   const fieldState = simState?.field ?? null;
@@ -235,9 +238,9 @@ function usePanelPreview(simState: BranchSimState | null, gen: number) {
 }
 
 /* ── Main BranchPanel (controls only, no iframe) ── */
-export function BranchPanel({ simState, source, acquiringExact, executeError, executing, gen, onSetChoice, onHypotheticalMove, onExecuteTurn, played }: Props) {
+export function BranchPanel({ simState, source, acquiringExact, executeError, executing, gen, onSetChoice, onHypotheticalMove, onExecuteTurn, played, positionKey }: Props) {
   const { advanced, toggleAdvanced } = useAdvancedToggle();
-  const { slots, gimmickFor, damageBySide } = usePanelPreview(simState, gen);
+  const { slots, gimmickFor, damageBySide } = usePanelPreview(simState, gen, positionKey);
   const { p1ActiveSlots, p2ActiveSlots, p1MovesBySlot, p2MovesBySlot, p1SwitchesBySlot, p2SwitchesBySlot } = slots;
 
   if (!simState) return null;

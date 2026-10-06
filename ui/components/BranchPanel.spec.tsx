@@ -1,7 +1,7 @@
 import { describe, expect, test, vi } from 'vitest';
 import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { calcSingleDamageRange, type SimPokemonInfo } from '@fulllifegames/eval-engine';
+import { calcSingleDamageRange, type BranchMoveOption, type SimPokemonInfo } from '@fulllifegames/eval-engine';
 import { BranchPanel } from '../../src/components/BranchPanel';
 import { NO_MODIFIERS, simState } from '../fixtures/sim-state';
 
@@ -203,5 +203,40 @@ describe('BranchPanel', () => {
     await userEvent.type(box, 'Dragon Claw');
     await userEvent.click(slot('P1').getByRole('button', { name: 'Load move' }));
     expect(wired.onHypotheticalMove).toHaveBeenCalledWith('p1', 0, { species: 'Garchomp', move: 'Dragon Claw', replace: 'Scale Shot' });
+  });
+});
+
+/** The calc's range for a move as the preview reads it, with the game type of the fixture. */
+const calcRange = (attacker: SimPokemonInfo, defender: SimPokemonInfo, move: BranchMoveOption, gameType: 'Singles' | 'Doubles') =>
+  calcSingleDamageRange(attacker, defender, move, { gameType, gen: 9 }).range;
+
+describe('armed toggles belong to one position (T124 point 2)', () => {
+  test('singles: a new position releases the armed Tera, and the number falls back to the plain attacker', async () => {
+    localStorage.setItem(ADVANCED_KEY, '1');
+    const at = (positionKey: string) => props({ positionKey, simState: simState('singles', { p1ModifiersBySlot: [{ ...NO_MODIFIERS, teraType: 'Ground' }] }) });
+    const { rerender } = render(<BranchPanel {...at('r1:main:2')} />);
+    const [garchomp] = simState('singles').p1ActiveSlots as SimPokemonInfo[];
+    const [ferrothorn] = simState('singles').p2ActiveSlots as SimPokemonInfo[];
+    const earthquake = simState('singles').p1MovesBySlot[0][0];
+    const button = () => slot('P1').getByRole('button', { name: /Earthquake/ });
+    await userEvent.click(slot('P1').getByRole('button', { name: 'Tera (Ground)' }));
+    await waitFor(() => expect(button()).toHaveTextContent(calcRange({ ...garchomp, teraType: 'Ground' }, ferrothorn, earthquake, 'Singles')));
+    rerender(<BranchPanel {...at('r1:main:3')} />);
+    expect(slot('P1').getByRole('button', { name: 'Tera (Ground)' })).toHaveAttribute('aria-pressed', 'false');
+    await waitFor(() => expect(button()).toHaveTextContent(calcRange(garchomp, ferrothorn, earthquake, 'Singles')));
+  });
+
+  test('doubles: every armed slot of both sides falls back on a new position', async () => {
+    const at = (positionKey: string) => props({ positionKey, simState: simState('doubles', {
+      p1ModifiersBySlot: [{ ...NO_MODIFIERS, teraType: 'Fire' }, { ...NO_MODIFIERS }],
+      p2ModifiersBySlot: [{ ...NO_MODIFIERS }, { ...NO_MODIFIERS, teraType: 'Steel' }],
+    }) });
+    const { rerender } = render(<BranchPanel {...at('r1:variation:5')} />);
+    await userEvent.click(slot('P1A').getByRole('button', { name: 'Tera (Fire)' }));
+    await userEvent.click(slot('P2B').getByRole('button', { name: 'Tera (Steel)' }));
+    expect(slot('P2B').getByRole('button', { name: 'Tera (Steel)' })).toHaveAttribute('aria-pressed', 'true');
+    rerender(<BranchPanel {...at('r1:variation:6')} />);
+    expect(slot('P1A').getByRole('button', { name: 'Tera (Fire)' })).toHaveAttribute('aria-pressed', 'false');
+    expect(slot('P2B').getByRole('button', { name: 'Tera (Steel)' })).toHaveAttribute('aria-pressed', 'false');
   });
 });
