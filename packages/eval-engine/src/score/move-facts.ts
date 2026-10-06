@@ -125,16 +125,14 @@ export const POWER_MOVES: ReadonlyMap<string, 'memo' | 'live' | 'stages'> = new 
  * more than one hit or a sure crit), whose answer the memo key carries
  * (`keyed`: the context moves, the live power moves, the sure crits, the
  * moves that split over two foes), which read other stats than their
- * category's (`offAxis`) or set their power from the boosts (`staged`), and
- * the abilities with their own ModifySTAB handler. A set lookup per slot
- * instead of Dex reads per slot.
+ * category's (`offAxis`) or set their power from the boosts (`staged`). A
+ * set lookup per slot instead of Dex reads per slot.
  */
 export interface DexTraits {
   touched: ReadonlySet<string>;
   keyed: ReadonlySet<string>;
   offAxis: ReadonlySet<string>;
   staged: ReadonlySet<string>;
-  stabAbilities: ReadonlySet<string>;
 }
 const dexTraits = new WeakMap<object, DexTraits>();
 let lastDex: object | null = null;
@@ -150,8 +148,6 @@ function buildTraits(battle: Battle): DexTraits {
     offAxis: ids(move => move.overrideOffensiveStat || move.overrideDefensiveStat ||
       move.overrideOffensivePokemon || move.overrideDefensivePokemon),
     staged: new Set(kinds('stages')),
-    stabAbilities: new Set(battle.dex.abilities.all()
-      .filter(ability => (ability as unknown as { onModifySTAB?: unknown }).onModifySTAB).map(ability => ability.id as string)),
   };
 }
 
@@ -345,18 +341,6 @@ function landedPower(attacker: Pokemon, defender: Pokemon, move: DexMove, battle
   if (power?.simDamage !== undefined) answer.simDamage = power.simDamage;
   if (landing !== 1) answer.landing = landing;
   return answer;
-}
-
-/**
- * The attacker's own ModifySTAB handler (Adaptability), found by its Dex
- * field and asked in the sim's event frame on the STAB the rules give.
- */
-export function abilityStab(attacker: Pokemon, defender: Pokemon, move: DexMove, stab: number, battle: Battle): number {
-  if (!traitsOf(battle).stabAbilities.has(attacker.ability)) return stab;
-  const ability = battle.dex.abilities.getByID(attacker.ability);
-  const answer: unknown = onField(battle, attacker, defender, () =>
-    battle.singleEvent('ModifySTAB', ability, attacker.abilityState, attacker, defender, move as unknown as ActiveMove, stab));
-  return typeof answer === 'number' ? answer : stab;
 }
 
 const NO_BOOSTS: BoostsTable = { atk: 0, def: 0, spa: 0, spd: 0, spe: 0, accuracy: 0, evasion: 0 };

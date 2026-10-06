@@ -215,19 +215,6 @@ describe('the memo keys the power at use (round 63, T81)', () => {
     missesTheMemo(makeSet('Weavile', ['knockoff']), { ...makeSet('Garchomp', ['splash']), item: 'Leftovers' }, (_, target) => { target.item = ''; });
   });
 
-  test('a Stellar body spending its boost on a type misses the memo', () => {
-    const battle = makeBattle({ ...makeSet('Garchomp', ['splash', 'earthquake']), teraType: 'Stellar' }, makeSet('Snorlax', ['splash']));
-    battle.choose('p1', 'move 1 terastallize');
-    battle.choose('p2', 'move 1');
-    const [chomp, lax] = [battle.sides[0].active[0], battle.sides[1].active[0]];
-    const cached = threatGetter(battle, createMatchupCache());
-    const fresh = cached(chomp, lax);
-    expect(fresh).toEqual(pairThreat(chomp, lax, battle));
-    chomp.stellarBoostedTypes.push('Ground');
-    expect(cached(chomp, lax)).toEqual(pairThreat(chomp, lax, battle));
-    expect(cached(chomp, lax)).not.toEqual(fresh);
-  });
-
   test("Dragon Darts in doubles: the foe's partner fainting misses the memo", () => {
     const battle = new Battle({
       formatid: toID('gen9doublescustomgame'),
