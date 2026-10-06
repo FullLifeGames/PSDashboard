@@ -139,28 +139,35 @@ function neutralRoom(
 }
 
 /**
- * Top up the leftover budget in the non-Speed stats, offense first: a
- * winner like "252 HP only" would otherwise field a systematically
- * under-statted sim mon. An unmeasured stat takes what fits (it carries
- * no observation evidence either way). A measured stat takes the most EVs
- * at which the mon's damage lines fit exactly as well as at the winning
- * rung (round 64, T122): the ladder knows a stat only at 0 and 252, so a
- * winning 0 left half the budget open where the evidence allowed more
- * (66 of 1548 bank sets at 260 EVs or fewer). The log's HP stays.
+ * Top up the leftover budget in the non-Speed stats: a winner like "252
+ * HP only" would otherwise field a systematically under-statted sim mon.
+ * An unmeasured stat takes what fits (it carries no observation evidence
+ * either way). A measured stat takes the most EVs at which the mon's
+ * damage lines fit exactly as well as at the winning rung (round 64,
+ * T122): the ladder knows a stat only at 0 and 252, so a winning 0 left
+ * half the budget open where the evidence allowed more (66 of 1548 bank
+ * sets at 260 EVs or fewer). Where the lines cannot tell spreads apart,
+ * the prior is the better guess: each stat first refills toward the
+ * prior's EVs, then the top-up order (offense, HP, Def, SpD) spends the
+ * rest (573756: a Bold Toxapex's open 4 EVs went to Attack, the prior
+ * runs them in SpD). The log's HP stays.
  */
-function topUp(ctx: SolveContext, key: string, best: CandidateRung, offenseStat: keyof PokemonEvs, measured: Set<keyof PokemonEvs>, evidence: MonEvidence): PokemonEvs {
+function topUp(
+  ctx: SolveContext, key: string, best: CandidateRung, prior: SpreadCandidate, offenseStat: keyof PokemonEvs,
+  measured: Set<keyof PokemonEvs>, evidence: MonEvidence,
+): PokemonEvs {
   const evs: PokemonEvs = { ...best.evs };
   let remaining = ctx.budget.total - evTotal(evs);
-  for (const stat of ([offenseStat, 'hp', 'def', 'spd'] as (keyof PokemonEvs)[])) {
-    if (remaining <= 0) break;
-    if (stat === 'hp' && evidence.fixedHp !== undefined) continue;
-    const room = Math.min(ctx.budget.perStat - (evs[stat] ?? 0), remaining);
+  const give = (stat: keyof PokemonEvs, room: number) => {
+    if (room <= 0) return;
     const add = measured.has(stat) ? neutralRoom(ctx, key, { evs, nature: best.nature }, stat, room, evidence.observations) : room;
-    if (add > 0) {
-      evs[stat] = (evs[stat] ?? 0) + add;
-      remaining -= add;
-    }
-  }
+    evs[stat] = (evs[stat] ?? 0) + add;
+    remaining -= add;
+  };
+  const order = ([offenseStat, 'hp', 'def', 'spd', offenseStat === 'atk' ? 'spa' : 'atk'] as (keyof PokemonEvs)[])
+    .filter(stat => stat !== 'hp' || evidence.fixedHp === undefined);
+  for (const stat of order) give(stat, Math.min((prior.evs[stat] ?? 0) - (evs[stat] ?? 0), ctx.budget.perStat - (evs[stat] ?? 0), remaining));
+  for (const stat of order.slice(0, -1)) give(stat, Math.min(ctx.budget.perStat - (evs[stat] ?? 0), remaining));
   return evs;
 }
 
@@ -238,7 +245,7 @@ function solveOne(ctx: SolveContext, key: string) {
     ...(evidence.hasDefenderObs ? (['hp', 'def', 'spd'] as (keyof PokemonEvs)[]) : []),
     ...(evidence.fixedHp === undefined ? [] : (['hp'] as (keyof PokemonEvs)[])),
   ]);
-  ctx.solved.set(key, { evs: topUp(ctx, key, best, offenseStat, measured, evidence), nature: best.nature });
+  ctx.solved.set(key, { evs: topUp(ctx, key, best, prior, offenseStat, measured, evidence), nature: best.nature });
 }
 
 /**

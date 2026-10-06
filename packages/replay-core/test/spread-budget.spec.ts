@@ -55,3 +55,25 @@ describe('a solve spends the budget the damage lines leave open (T122 point 7)',
     });
   }
 });
+
+describe('the open budget refills toward the prior first (T122 point 7, round 64 h2)', () => {
+  // 573756 shape: the fit takes the physically defensive rung (252 HP / 252 Def) over the specially
+  // defensive prior (Calm 252 HP / 252 SpD), which zeroes SpD and leaves 4 EVs open. The lines cannot tell where those
+  // 4 go; the prior put its EVs in SpD, so they go there, not into an Attack no line asks for.
+  const truth: Mon = { species: 'Toxapex', side: 'p1', nature: 'Bold', evs: evs(252, 0, 252, 0, 4, 0) };
+  const prior: Mon = { ...truth, nature: 'Calm', evs: evs(252, 0, 4, 0, 252, 0) };
+  const garchomp: Mon = { species: 'Garchomp', side: 'p2', nature: 'Jolly', evs: evs(0, 252, 4, 0, 0, 252) };
+  const bolt: Mon = { species: 'Raging Bolt', side: 'p2', nature: 'Modest', evs: evs(0, 0, 4, 252, 0, 252) };
+  const observations = [hit(garchomp, truth, 'Earthquake'), hit(bolt, truth, 'Thunderbolt'), hit(truth, garchomp, 'Knock Off')];
+  const sets = {
+    p1: [asSet(prior, ['Knock Off', 'Recover'])],
+    p2: [asSet(garchomp, ['Earthquake']), asSet(bolt, ['Thunderbolt'])],
+  };
+
+  for (const formatid of ['gen9ou', 'gen9doublesou']) {
+    test(`the 4 EVs the bulk rung leaves open land in SpD as in the prior, not in Attack (${formatid})`, () => {
+      const solved = inferSpreads(observations, sets, formatid)!.get('p1:toxapex')!;
+      expect(solved.evs).toEqual(evs(252, 0, 252, 0, 4, 0));
+    });
+  }
+});
