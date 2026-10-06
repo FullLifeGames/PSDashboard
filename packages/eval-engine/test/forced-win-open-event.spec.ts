@@ -34,7 +34,7 @@ describe('the open event of a forced win under 0.9', () => {
       open: { side: 'p1', moveId: 'hydropump', label: 'Hydro Pump', odds: 0.8, kind: 'hit' },
     });
     expect(summarizeTurn(analyzeAt(result, 0.7875), names))
-      .toContain('Alpha wins in 5 against every reply if the 80% Hydro Pump lands, barring a crit.');
+      .toContain('Alpha wins within 5 turns against every reply if the 80% Hydro Pump lands, barring a crit.');
   });
 
   test('when the open event speaks, the decided stage of the same side stays quiet on that turn', () => {
@@ -65,7 +65,7 @@ describe('the open event of a forced win under 0.9', () => {
       },
     });
     const summary = summarizeTurn(analyzeAt(result, 0.7), names);
-    expect(summary).toContain('Alpha wins in 2 against every reply in 80% of the sampled rolls.');
+    expect(summary).toContain('Alpha wins within 2 turns against every reply in 80% of the sampled rolls.');
     expect(summary).not.toContain('crit');
   });
 

@@ -29,13 +29,13 @@ describe('the forced win in prose (round 35)', () => {
 
   test('a full proof speaks the plain sentence and mutes the near stage', () => {
     const summary = summaryAt({ side: 'p1', turns: 3, mass: 1, caveat: 'none', engineScore: 0.5, states: 12 });
-    expect(summary).toContain('Alpha wins in 3 against every reply.');
+    expect(summary).toContain('Alpha wins within 3 turns against every reply.');
     expect(summary).not.toContain('from clearing the rest');
   });
 
   test('a crit caveat rides on the sentence', () => {
     const summary = summaryAt({ side: 'p1', turns: 4, mass: 1, caveat: 'barring-crit', engineScore: 0.5, states: 30 });
-    expect(summary).toContain('Alpha wins in 4 against every reply, barring a crit.');
+    expect(summary).toContain('Alpha wins within 4 turns against every reply, barring a crit.');
   });
 
   test('an open hit class names the roll', () => {
@@ -43,16 +43,16 @@ describe('the forced win in prose (round 35)', () => {
       side: 'p1', turns: 3, mass: 0.95, caveat: 'barring-crit', engineScore: 0.5, states: 40,
       open: { side: 'p1', moveId: 'firefang', label: 'Fire Fang', odds: 0.95, kind: 'hit' },
     });
-    expect(summary).toContain('Alpha wins in 3 against every reply if the 95% Fire Fang lands, barring a crit.');
+    expect(summary).toContain('Alpha wins within 3 turns against every reply if the 95% Fire Fang lands, barring a crit.');
   });
 
   test('an open kill class says knocks out; a mass without an open class says the share of rolls', () => {
     expect(summaryAt({
       side: 'p1', turns: 2, mass: 0.9, caveat: 'none', engineScore: 0.5, states: 9,
       open: { side: 'p1', moveId: 'firefang', label: 'Fire Fang', odds: 0.9, kind: 'kill' },
-    })).toContain('Alpha wins in 2 against every reply if the 90% Fire Fang knocks out.');
+    })).toContain('Alpha wins within 2 turns against every reply if the 90% Fire Fang knocks out.');
     expect(summaryAt({ side: 'p1', turns: 5, mass: 0.92, caveat: 'sampled-rolls', engineScore: 0.5, states: 80 }))
-      .toContain('Alpha wins in 5 against every reply in 92% of the sampled rolls.');
+      .toContain('Alpha wins within 5 turns against every reply in 92% of the sampled rolls.');
   });
 
   test('below the spoken mass the sentence stays quiet and the near stage speaks', () => {
@@ -78,6 +78,6 @@ describe('the forced win in prose (round 35)', () => {
       result: { ...forcedResult({ side: 'p2', turns: 2, mass: 1, caveat: 'sampled-rolls', engineScore: -0.4, states: 6 }), score: -1 },
       played: null, playedOutcome: null, scoreBefore: -1, scoreAfter: null, playedTracking: false,
     }), names);
-    expect(summary).toContain('Beta wins in 2 against every reply on the sampled rolls.');
+    expect(summary).toContain('Beta wins within 2 turns against every reply on the sampled rolls.');
   });
 });

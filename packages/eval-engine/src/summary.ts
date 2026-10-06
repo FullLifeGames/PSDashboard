@@ -50,7 +50,8 @@ function forcedWinSentence(side: SideAnalysis, player: string, ownBar: number): 
   const forced = side.forcedWin;
   if (!forced || !forcedWinSpeaks(forced, ownBar)) return null;
   const tail = forced.caveat === 'barring-crit' ? ', barring a crit' : forced.caveat === 'sampled-rolls' ? ' on the sampled rolls' : '';
-  const head = `${player} wins in ${forced.turns} against every reply`;
+  // Round 64 (T123): `turns` is the deepest proven line in own moves, so the win comes within it.
+  const head = `${player} wins within ${forced.turns} turn${forced.turns === 1 ? '' : 's'} against every reply`;
   if (forced.mass >= 1) return `${head}${tail}.`;
   if (forced.open) {
     const verb = forced.open.kind === 'hit' ? 'lands' : 'knocks out';
