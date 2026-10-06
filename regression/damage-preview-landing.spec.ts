@@ -371,3 +371,33 @@ describe('Protect on the Dragon Darts partner (T124 point 4)', () => {
     }
   });
 });
+
+describe('the Stellar first-use boost (T124 point 5)', () => {
+  const stellar = () => set('Garchomp', ['Earthquake', 'Smack Down'], { teraType: 'Stellar' });
+  /** Plays one turn from full HP (damage never reads the target's HP) and checks every previewed row against it. */
+  function turnInside(current: Battle, rows: (DamageResult | undefined)[], p1: string, p2: string) {
+    current.sides[1].active.forEach(mon => mon.sethp(mon.maxhp));
+    const { lost, log } = play(current, p1, p2);
+    expectPlainHits(log);
+    rows.forEach((row, slot) => expectInside(row, lost[slot], current.sides[1].active[slot].maxhp));
+    return log;
+  }
+
+  test('singles: the armed Stellar toggle boosts the first Earthquake, the second is plain, the first Smack Down boosted again', () => {
+    const current = battle('gen9customgame', [stellar()], [armored('Snorlax')]);
+    const log = turnInside(current, [preview(current, { p1: ['Stellar'], p2: [null] }).p1.default[0][0]], 'move earthquake terastallize', 'move splash');
+    expect(log).toContain('|-terastallize|p1a: Garchomp|Stellar');
+    turnInside(current, [preview(current).p1.default[0][0]], 'move earthquake', 'move splash');
+    turnInside(current, [preview(current).p1.default[0][1]], 'move smackdown', 'move splash');
+  });
+
+  test('doubles: the first Stellar Earthquake boosts both foes\' rows, as the simulator keeps the boost for every target of the use', () => {
+    const current = battle('gen9doublescustomgame', [stellar(), set('Corviknight', ['Splash'])], [armored('Snorlax'), armored('Blissey')]);
+    const rows = preview(current, { p1: ['Stellar', null], p2: [null, null] }).p1.spread[0][1];
+    const byLabel = (label: string) => rows.find(row => row.label === label)?.result;
+    turnInside(current, [byLabel('P2A'), byLabel('P2B')], 'move earthquake terastallize, move splash', 'move splash, move splash');
+    const again = preview(current).p1.spread[0][1];
+    turnInside(current, [again.find(row => row.label === 'P2A')?.result, again.find(row => row.label === 'P2B')?.result],
+      'move earthquake, move splash', 'move splash, move splash');
+  });
+});

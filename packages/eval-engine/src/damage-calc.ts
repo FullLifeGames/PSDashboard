@@ -227,6 +227,16 @@ function koChanceOf(priced: PricedCount[], maxDamage: number): string {
   return n >= 1 && n <= MAX_KO_HITS ? text : '';
 }
 
+/**
+ * The Stellar one-time boost (T124): a Stellar attacker's first use of each
+ * type hits harder (the calc's isStellarFirstUse). The simulator lists the
+ * types already spent (stellarBoostedTypes, empty before the Tera turn) by
+ * the type at use, which the calc gives after its own type changes.
+ */
+function stellarFirstUse(attacker: SimPokemonInfo, typeAtUse: () => string): boolean {
+  return attacker.teraType === 'Stellar' && !(attacker.stellarBoostedTypes ?? []).includes(typeAtUse());
+}
+
 export function calcSingleDamageRange(
   attacker: SimPokemonInfo,
   defender: SimPokemonInfo,
@@ -236,7 +246,7 @@ export function calcSingleDamageRange(
   try {
     const gen = calcGeneration(context);
     const overrides = moveLanding(gen, attacker, moveOption, context);
-    const priceAt = (hits?: number): CalcResult => calculate(
+    const priceAt = (hits?: number, isStellarFirstUse = false): CalcResult => calculate(
       gen,
       calcPokemonFrom(gen, attacker),
       calcPokemonFrom(gen, defender),
@@ -246,14 +256,18 @@ export function calcSingleDamageRange(
         item: (attacker.item || undefined) as CalcItem,
         species: attacker.species as CalcSpecies,
         overrides,
+        isStellarFirstUse,
         ...(hits ? { hits } : {}),
       }),
       calcField(context),
     );
+    const firstUse = stellarFirstUse(attacker, () => priceAt().move.type);
     // A multi-hit move deals the sum of its hits; the calc sums them itself (T96). A drawn hit
     // count spans the fewest hits' minimum to the most hits' maximum, every count priced (T124).
     const counts = overrides?.multihit ? null : hitCounts(gen.num, attacker, moveOption.name);
-    const priced = counts ? counts.map(({ hits, chance }) => ({ chance, result: priceAt(hits) })) : [{ chance: 1, result: priceAt() }];
+    const priced = counts
+      ? counts.map(({ hits, chance }) => ({ chance, result: priceAt(hits, firstUse) }))
+      : [{ chance: 1, result: priceAt(undefined, firstUse) }];
     const minDamage = Math.min(...priced.map(({ result }) => result.range()[0]));
     const maxDamage = Math.max(...priced.map(({ result }) => result.range()[1]));
     const minPct = percentOfMaxHp(minDamage, defender.maxhp);
