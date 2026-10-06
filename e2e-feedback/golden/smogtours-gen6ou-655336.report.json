@@ -6,7 +6,6 @@
     { "turn": 26, "attribution": "p2-decision" }
   ],
   "misplays": [
-    { "turn": 5, "side": "p2" },
     { "turn": 26, "side": "p2" }
   ],
   "reads": [
