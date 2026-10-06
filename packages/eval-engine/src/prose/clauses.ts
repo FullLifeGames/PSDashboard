@@ -1,4 +1,4 @@
-import { diffChoices, playedSetupMove, type SideAnalysis } from '../analysis.ts';
+import { TIER_THRESHOLDS, diffChoices, playedSetupMove, type SideAnalysis } from '../analysis.ts';
 import type { RankedChoice } from '../types.ts';
 import { winDeltaText, winPctText } from '../winprob.ts';
 import { formatLine } from './line.ts';
@@ -106,14 +106,19 @@ function mistakeClause(name: string, side: SideAnalysis, opponent: SideAnalysis)
 }
 
 /** Round 63 (T17): the read credit of an untiered turn — praise on the card, never a verdict (648453 t13). */
-export function readCreditClause(name: string, side: SideAnalysis): string | null {
+export function readCreditClause(name: string, side: SideAnalysis, ownLuck: number | null): string | null {
   const credit = side.readCredit;
   if (!credit || !side.played || !side.safe) return null;
-  const horizon = credit.payoffTurn
-    ? credit.payoffTurn === 1 ? ' one turn later' : ` ${credit.payoffTurn} turns later`
+  // The gates read the pair's value before the rolls (round 63 fix): say so, and name the
+  // turn's own luck once it moved the side by an inaccuracy (649664 t15 ended on the floor).
+  const when = credit.payoffTurn
+    ? `${credit.payoffTurn === 1 ? 'one turn later' : `${credit.payoffTurn} turns later`}, before the rolls,`
+    : 'before the rolls,';
+  const luck = ownLuck !== null && Math.abs(ownLuck) >= TIER_THRESHOLDS.inaccuracy
+    ? ` On top of that, luck contributed ${winDeltaText(ownLuck)} for ${name}.`
     : '';
-  return `${name} played ${phrase(side.played.label)} — a read the engine gave no weight, and it paid off${horizon}: ` +
-    `${winDeltaText(credit.payoff)} over the safe ${phrase(side.safe.label)} (${winPctText(side.safe.worstCase)} guaranteed).`;
+  return `${name} played ${phrase(side.played.label)} — a read the engine gave no weight: ${when} it stood ` +
+    `${winDeltaText(credit.payoff)} over the safe ${phrase(side.safe.label)} (${winPctText(side.safe.worstCase)} guaranteed).${luck}`;
 }
 
 /** Sub-verdict note: a light imprecision worth naming, not blaming. */

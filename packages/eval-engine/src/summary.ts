@@ -215,16 +215,17 @@ function attributionSentences(analysis: TurnAnalysis, playerNames: PlayerNames, 
  */
 function rideAlongSentences(analysis: TurnAnalysis, playerNames: PlayerNames): string[] {
   const sentences: string[] = [];
-  const kinds: ((name: string, side: SideAnalysis) => string | null)[] = [
-    (name, side) => sackClause(name, side) ?? readCreditClause(name, side) ?? inaccuracyClause(name, side),
+  const kinds: ((name: string, side: SideAnalysis, ownLuck: number | null) => string | null)[] = [
+    (name, side, ownLuck) => sackClause(name, side) ?? readCreditClause(name, side, ownLuck) ?? inaccuracyClause(name, side),
     forcedClause,
     (_name, side) => unansweredClause(side),
     streakClause,
     sensitivityClause,
   ];
+  const luck = analysis.chanceDelta;
   for (const clause of kinds) {
-    const p1Note = clause(playerNames[0], analysis.p1);
-    const p2Note = clause(playerNames[1], analysis.p2);
+    const p1Note = clause(playerNames[0], analysis.p1, luck);
+    const p2Note = clause(playerNames[1], analysis.p2, luck === null ? null : -luck);
     if (p1Note) sentences.push(p1Note);
     if (p2Note) sentences.push(p2Note);
   }

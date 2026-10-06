@@ -161,7 +161,7 @@ describe('the read credit without a band (648453 t13)', () => {
     expect(analysis.p2.tier).toBeUndefined();
     expect(analysis.p2.readCredit?.payoff).toBeCloseTo(0.755, 3);
     expect(analysis.p2.readCredit?.payoffTurn).toBe(2);
-    expect(summarizeTurn(analysis, names)).toContain('Beta played switching to Lopunny-Mega — a read the engine gave no weight');
+    expect(summarizeTurn(analysis, names)).toContain('Beta played switching to Lopunny-Mega — a read the engine gave no weight: 2 turns later, before the rolls');
     // Not a risk credit: the attribution, the report's read list and the totals stay as they were.
     expect(analysis.p2.riskPaidOff).toBeUndefined();
     expect(analysis.attribution).toBe('quiet');
@@ -214,6 +214,11 @@ describe('the read credit on a doubles pair', () => {
     expect(analysis.p1.tier).toBeUndefined();
     expect(analysis.p1.readCredit).toEqual({ payoff: expect.closeTo(0.6, 6), payoffTurn: 2 });
     expect(analysis.p1.riskPaidOff).toBeUndefined();
+    // Round 63 fix: measured before the rolls; a roll that moved the side gets its luck tail (2629703929 t1: −7%).
+    const rolled = { ...analysis, scoreAfter: -0.03, chanceDelta: -0.13 };
+    const summary = summarizeTurn(rolled, names);
+    expect(summary).toContain('Alpha played Tailwind + Solar Beam→Groudon — a read the engine gave no weight: 2 turns later, before the rolls,');
+    expect(summary).toContain('On top of that, luck contributed −7% for Alpha.');
   });
 });
 
@@ -280,5 +285,50 @@ describe('no praise for feeding the body the opponent\'s near sweep removes', ()
     expect(stayedFeed({ near: { side: 'p2', species: 'Medicham-Mega', removes: 'Excadrill' }, sack: lopunny }).p1.sacrifice?.verified).toBe(true);
     expect(stayedFeed({ near: { side: 'p1', species: 'Lopunny-Mega', removes: 'Medicham-Mega' }, sack: lopunny }).p1.sacrifice?.verified).toBe(true);
     expect(stayedFeed({ sack: lopunny }).p1.sacrifice?.verified).toBe(true);
+  });
+});
+
+/**
+ * Round 63 fix: the read credit's gates read the pair's value before the
+ * rolls, so its sentence says so, and it names the turn's own luck when the
+ * rolls moved the side by an inaccuracy or more (649664 t15: "+16% over the
+ * safe Hydro Pump (47% guaranteed)" while devin's bar ended on the floor).
+ */
+describe('the read credit says it is measured before the rolls', () => {
+  const t13Shape = (scoreAfter: number) => {
+    const result: EvalResult = {
+      score: 0.0596, interval: 0, depthCompleted: 1,
+      perSide: {
+        p1: [ranked('move hiddenpowerice', 'Hidden Power Ice', 0.1, 0.1, 0.1, 'switch Bisharp')],
+        p2: [
+          ranked('switch 5', '→ Bisharp', -0.1861, 0.0073, -0.1061, 'Heat Wave'),
+          ranked('switch 6', '→ Lopunny-Mega', -0.2126, -0.0095, -0.1679, 'Hurricane'),
+        ],
+      },
+      matrix: {
+        p1Labels: ['Hidden Power Ice'], p2Labels: ['→ Bisharp', '→ Lopunny-Mega'],
+        p1Choices: ['move hiddenpowerice'], p2Choices: ['switch 5', 'switch 6'],
+        values: [[-0.042, 0.069]], mixes: { p1: [1], p2: [1, 0] },
+      },
+    };
+    return summarizeTurn(analyzeTurn({
+      turn: 13, result,
+      played: { p1: { kind: 'move', name: 'Hidden Power' }, p2: { kind: 'switch', name: 'Mandy', species: 'Lopunny-Mega' } },
+      playedOutcome: 0.00097, futureOutcomes: [-0.279, -0.569, -0.422],
+      scoreBefore: 0.0596, scoreAfter,
+    }), names);
+  };
+
+  test('singles: the gain is the pair\'s value before the rolls, with no claim that it paid off', () => {
+    const summary = t13Shape(0.0475);
+    expect(summary).toContain('Beta played switching to Lopunny-Mega — a read the engine gave no weight: ' +
+      '2 turns later, before the rolls, it stood +38% over the safe switching to Bisharp (41% guaranteed).');
+    expect(summary).not.toContain('paid off');
+    // A roll under an inaccuracy stays unnamed.
+    expect(summary).not.toContain('luck contributed');
+  });
+
+  test('singles, 649664 t15 shape: when the rolls took the gain back, the luck tail says so for the side', () => {
+    expect(t13Shape(0.3)).toContain('On top of that, luck contributed −15% for Beta.');
   });
 });
