@@ -143,4 +143,13 @@ describe('the veto rows read their lists from the Dex (decision 17)', () => {
       revealed('Torch Song'), guessed('Earthquake'), guessed('Shadow Ball'),
     ], { itemId: '' }))).toEqual(['Torch Song', 'Shadow Ball']);
   });
+
+  test('a defense boost is a self status move the Dex says raises Defense and no offense: Cosmic Power falls without Body Press', () => {
+    expect(names(applyCoherenceVetoes([
+      revealed('Moonblast'), guessed('Cosmic Power'), guessed('Bulk Up'), guessed('Protect'),
+    ], { itemId: '' }))).toEqual(['Moonblast', 'Bulk Up', 'Protect']);
+    expect(names(applyCoherenceVetoes([
+      revealed('Body Press'), guessed('Cosmic Power'), guessed('Iron Defense'),
+    ], { itemId: '' }))).toEqual(['Body Press', 'Cosmic Power', 'Iron Defense']);
+  });
 });

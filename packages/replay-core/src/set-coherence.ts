@@ -61,9 +61,12 @@ function boostsServed(move: DexMove): ('atk' | 'spa')[] {
  * (Body Press). Usage ranks these high BECAUSE of the pairing — when the
  * payoff attack is vetoed or absent, the guessed enabler must fall with it
  * (GPL Cobalion: Body Press vetoed next to revealed Swords Dance, Iron
- * Defense stayed behind).
+ * Defense stayed behind). From the Dex (round 64, decision 17): a
+ * self-targeted status move that raises Defense and no offense stat.
  */
-const DEF_BOOSTS = new Set(['irondefense', 'acidarmor', 'cottonguard', 'barrier', 'shelter']);
+function defenseBoost(move: DexMove): boolean {
+  return move.category === 'Status' && move.target === 'self' && (move.boosts?.def ?? 0) > 0 && boostsServed(move).length === 0;
+}
 
 const TRICK_FAMILY = new Set(['trick', 'switcheroo']);
 
@@ -261,7 +264,7 @@ function assembleKeptMoves(
       if (restrictiveItem === 'choice' && !TRICK_FAMILY.has(facts.id)) continue;
       // Row 3: a defense-boost enabler without its payoff attack (Iron
       // Defense whose Body Press was vetoed or never offered).
-      if (DEF_BOOSTS.has(facts.id) && !keeps.keptScalings.has('def')) continue;
+      if (defenseBoost(Dex.moves.get(facts.id)) && !keeps.keptScalings.has('def')) continue;
       kept.push(candidate);
       continue;
     }
