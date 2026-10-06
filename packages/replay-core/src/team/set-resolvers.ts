@@ -150,15 +150,24 @@ export function selectCuratedFor(info: RevealedPokemonInfo, smogonSet: SmogonSet
 }
 
 /**
- * Known beats everything; an item the move-order evidence inferred (round
- * 37) beats the curated set and the usage marginal.
+ * Known (revealed, consumed) beats everything; then an item the move-order
+ * evidence inferred (round 37); then an item the protocol inference tells
+ * (`tellItem`: Heavy-Duty Boots after a Stealth Rock switch-in without
+ * damage, round 64, decision 19: evidence, as the panel shows it); then the
+ * curated set and the usage marginal.
  */
 export function resolveItem(
   info: RevealedPokemonInfo, curated: CuratedSet | null, usageSet: SpeciesUsageSet | null, smogonSet: SmogonSet, inferredItem = '',
+  tellItem = '',
 ): string {
+  const evidence = itemSetValue(known(info.item)) || itemSetValue(inferredItem) || allowed(tellItem, info.ruledOut?.items);
+  return evidence || guessedItem(info, curated, usageSet, smogonSet);
+}
+
+/** The guess when no evidence names the item: the curated set's, else the info's guess or the usage marginal. */
+function guessedItem(info: RevealedPokemonInfo, curated: CuratedSet | null, usageSet: SpeciesUsageSet | null, smogonSet: SmogonSet): string {
   const curatedItem = curated ? allowed(curated.item?.value, info.ruledOut?.items) : '';
-  return itemSetValue(known(info.item)) || itemSetValue(inferredItem) || curatedItem ||
-    cleanItem(info.item.value, usageSet?.item?.value || allowed(smogonSet?.item?.value, info.ruledOut?.items));
+  return curatedItem || cleanItem(info.item.value, usageSet?.item?.value || allowed(smogonSet?.item?.value, info.ruledOut?.items));
 }
 
 /** The item the build would pick if `excludedItemId` were ruled out (round 37: the replacement for a dropped Scarf). */

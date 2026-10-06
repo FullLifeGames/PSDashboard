@@ -49,6 +49,20 @@ type BuildOptions = Parameters<typeof buildTeamsFromReplay>[1];
 type BuiltTeams = { p1Team: PokemonSet[]; p2Team: PokemonSet[] };
 type SideInfos = { p1: OpponentTeamInfo; p2: OpponentTeamInfo };
 
+/**
+ * The items the protocol inference itself guesses, by side and species (the
+ * Heavy-Duty Boots tell). Enriched infos mix them with the enrichment's own
+ * guesses, so they are read from the log's inference (round 64, T120).
+ */
+function itemTells(log: string, options: BuildOptions, infos: SideInfos): Record<'p1' | 'p2', Map<string, string>> {
+  const tells = (side: 'p1' | 'p2') => {
+    const raw = options?.[`${side}Info`] ? inferOpponentTeam(log, side) : infos[side];
+    return new Map(raw.pokemon.filter(mon => mon.item.source === 'guessed' && mon.item.value)
+      .map(mon => [toId(mon.species), mon.item.value]));
+  };
+  return { p1: tells('p1'), p2: tells('p2') };
+}
+
 function infosFor(log: string, options: BuildOptions): SideInfos {
   return { p1: options?.p1Info || inferOpponentTeam(log, 'p1'), p2: options?.p2Info || inferOpponentTeam(log, 'p2') };
 }
@@ -76,16 +90,13 @@ function buildTeams(log: string, options: BuildOptions): { teams: BuiltTeams; in
     (options?.hpEvidence ?? []).filter(entry => entry.attackerSide === side);
   const hpTyped = (side: 'p1' | 'p2'): HiddenPowerTyping =>
     set => withHiddenPowerType(set, hpFor(side), options?.usageStats, parseInt(gen, 10));
-  const build = (inferred?: Map<string, SpreadCandidate>) => ({
-    p1Team: legalize(infos.p1.pokemon.map(pokemon => buildSet(
-      pokemon, knownTeams.p1, options?.usageStats, options?.setAssumptions,
-      inferred?.get(`p1:${toId(pokemon.species)}`), hpTyped('p1'))))
-      .map(hpTyped('p1')),
-    p2Team: legalize(infos.p2.pokemon.map(pokemon => buildSet(
-      pokemon, knownTeams.p2, options?.usageStats, options?.setAssumptions,
-      inferred?.get(`p2:${toId(pokemon.species)}`), hpTyped('p2'))))
-      .map(hpTyped('p2')),
-  });
+  const tells = itemTells(log, options, infos);
+  const sideTeam = (side: 'p1' | 'p2', inferred?: Map<string, SpreadCandidate>) =>
+    legalize(infos[side].pokemon.map(pokemon => buildSet(
+      pokemon, knownTeams[side], options?.usageStats, options?.setAssumptions, inferred?.get(`${side}:${toId(pokemon.species)}`),
+      { hpTyped: hpTyped(side), tellItem: tells[side].get(toId(pokemon.species)) ?? '' })))
+      .map(hpTyped(side));
+  const build = (inferred?: Map<string, SpreadCandidate>) => ({ p1Team: sideTeam('p1', inferred), p2Team: sideTeam('p2', inferred) });
 
   const inferred = inferredSpreadsFor(log, options, build, formatHint, infos, knownTeams);
   return { teams: build(inferred), inferred };
@@ -181,13 +192,19 @@ function carryPreSolve(solved: Map<string, SpreadCandidate>, preSolved: Map<stri
 /** The build's Hidden Power step: a typeless "Hidden Power" takes its type from evidence or usage. */
 type HiddenPowerTyping = (set: PokemonSet) => PokemonSet;
 
+/** Per-Pokémon build context: the Hidden Power step and the item the inference tells. */
+interface SetContext {
+  hpTyped: HiddenPowerTyping;
+  tellItem: string;
+}
+
 function buildSet(
   info: RevealedPokemonInfo,
   userTeam: PokemonSet[] | null,
   usageStats?: SmogonUsageStats | null,
   setAssumptions?: SmogonSetAssumptions | null,
   inferred?: SpreadCandidate,
-  hpTyped: HiddenPowerTyping = set => set,
+  { hpTyped, tellItem }: SetContext = { hpTyped: set => set, tellItem: '' },
 ): PokemonSet {
   const edited = editedFields(info);
   const userMatch = findUserMatch(userTeam, info.species);
@@ -201,7 +218,7 @@ function buildSet(
   // Scarf must not return through the usage marginal (round 37).
   const item = inferred?.item === ''
     ? resolveItemWithout(info, usageStats, setAssumptions, 'choicescarf')
-    : resolveItem(info, curated, usageSet, smogonSet, inferred?.item ?? '');
+    : resolveItem(info, curated, usageSet, smogonSet, inferred?.item ?? '', tellItem);
   const moves = assembleMoves(info, curated, usageSet, smogonSet, item, usageMoveTail(usageStats, info.species));
   const revealedMoves = info.moves.filter(move => move.source === 'revealed').map(move => move.name);
   const spread = resolveSpread(info.species, edited, inferred, curated, usageSet, smogonSet, revealedMoves);
