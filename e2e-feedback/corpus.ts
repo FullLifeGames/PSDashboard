@@ -101,8 +101,13 @@ export const FEEDBACK_CORPUS: FeedbackItem[] = [
   // ---- truth (pins approved by the user at Gate 1, 2026-08-14) ----
   {
     replay: 'smogtours-gen8ou-573756', turn: 75, kind: 'truth', source: 'expert-2026-08',
-    essence: "SoulWind's double switch into Kyurem — the game-breaking play that briefly brought him back — is recognized as a paid-off read. (The expert referenced it as t76; the analysis banks the read on t75, confirmed by the user.) (Round 63 2026-10-06, user-gated: with the verify step pricing every chance class one ply deeper (T16) and singles handing the played action to it, the double switch into Kyurem is the engine's own best move (regret 0.0116 → 0), so no risk is left to pay off; the turn reads quiet with both sides on the engine's preferred line, and the card adds that Kyurem has no switch-in left on the other side. Re-pinned from a read that paid off to the Kyurem switch as the best move.)",
-    expect: { side: 'p1', tier: 'none', playedLabelIncludes: 'Kyurem', summaryIncludes: ["both sides played the engine's preferred line"] },
+    essence: "SoulWind's double switch into Kyurem — the game-breaking play that briefly brought him back — is recognized as a paid-off read. (The expert referenced it as t76; the analysis banks the read on t75, confirmed by the user.) (Round 63 2026-10-06, user-gated: with the verify step pricing every chance class one ply deeper (T16) and singles handing the played action to it, the double switch into Kyurem is the engine's own best move (regret 0.0116 → 0), so no risk is left to pay off; the turn reads quiet with both sides on the engine's preferred line, and the card adds that Kyurem has no switch-in left on the other side. Re-pinned from a read that paid off to the Kyurem switch as the best move.) (Round 64 2026-10-08, user-gated \"3a\": the rebuild now brings Clefable on the turn-30 U-turn as the game did (T121), so p2's Toxapex keeps one more Toxic Spikes PP and the Kyurem switch and Knock Off sit 0.001 apart; the summary reads the switch as a read that paid off. The pin keeps the firm core: p1 plays the Kyurem switch and neither side earns a tier; the sentence is no longer pinned.)",
+    expect: { side: 'p1', tier: 'none', playedLabelIncludes: 'Kyurem' },
+  },
+  {
+    replay: 'smogtours-gen8ou-573756', turn: 75, kind: 'truth', source: 'user-2026-10',
+    essence: "Round 64 user gate (2026-10-08, \"3a\"): the other half of the t75 core: p2 earns no tier on the turn SoulWind switches into Kyurem.",
+    expect: { side: 'p2', tier: 'none' },
   },
   {
     replay: 'smogtours-gen8ou-573756', turn: 8, kind: 'truth', source: 'round6-gate-2026-08',

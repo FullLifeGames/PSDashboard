@@ -56,7 +56,7 @@ test.describe('PS Dashboard', () => {
     await expect(page.getByText(/Branching · Turn/)).toHaveCount(0);
   });
 
-  test('the draft t56 play-out never sends Heatran before Muk-Alola (round 42)', async ({ page }) => {
+  test('the draft t56 play-out wins for p2 without crawling (round 42)', async ({ page }) => {
     // Round 19 finding, round 42 pin: from turn 56 (p1 Kyurem Ice Beam, p2
     // into Slowking) the play-out used to send Heatran into Mienshao's Knock
     // Off at turn 62 and lose it, then crawl 21 turns to a 5% win. With the
@@ -64,8 +64,13 @@ test.describe('PS Dashboard', () => {
     // (turn 58) and keeps Heatran for the finish (turn 65, 59% HP left).
     // Round 63 (T16, every verified outcome one ply deeper): the play-out
     // follows the Monte-Carlo ranking at turn 59 (p1 Stealth Rock, p2 Scald)
-    // and p2 wins at turn 62 without sending either; the pin keeps its intent,
-    // Heatran never enters ahead of Muk-Alola (pending the round-63 user gate).
+    // and p2 wins at turn 62 without sending either.
+    // Round 64 (user gate 08.10., "2a"): the pin keeps the intent, not the
+    // switch order. Muk-Alola is p2's top switch in no line, and the order
+    // held only through near ties (0.001 to 0.005) that the Monte-Carlo
+    // reference decides the other way; with the state-split verify step (T119)
+    // p2 sends Heatran at turn 61 and wins at turn 66. What the pin forbids is
+    // the crawl: p2 (Bene) wins the play-out by turn 70.
     // Nicknames in the history rows: Sludge Shadow = Muk-Alola, Fire Shadow = Heatran.
     test.setTimeout(600_000);
     const draftReplay = JSON.parse(readFileSync(fixturePath('draft-replay.json'), 'utf-8'));
@@ -101,9 +106,10 @@ test.describe('PS Dashboard', () => {
         if (p2Part.startsWith('→ ')) p2Switches.push(p2Part.slice(2).trim());
       }
     });
-    const muk = p2Switches.findIndex(name => name.startsWith('Sludge Shadow'));
-    const heatran = p2Switches.findIndex(name => name.startsWith('Fire Shadow'));
-    expect(heatran < 0 || (muk >= 0 && muk < heatran), `p2 switches: ${p2Switches.join(', ')}`).toBe(true);
+    const lastTurn = Number(/Branching · Turn (\d+)/.exec(await page.getByText(/Branching · Turn \d+/).innerText())?.[1]);
+    const line = `ended at turn ${lastTurn}, p2 switches: ${p2Switches.join(', ')}`;
+    await expect(page.locator('.ps-ended-tag'), line).toHaveText('Bene wins!');
+    expect(lastTurn, line).toBeLessThanOrEqual(70);
   });
 
   test('the branch sim iframe follows the played variation line', async ({ page }) => {
