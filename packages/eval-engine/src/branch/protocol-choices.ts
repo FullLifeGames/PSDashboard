@@ -256,16 +256,21 @@ const isOwnAction = (line: string) => /^\|(move|switch)\|/.test(line) || (line.s
 /**
  * Whether the slot's switch at `index` answers a forced request instead of
  * being the side's choice (round 64, T121). Current logs write `[from]` for
- * a move's selfSwitch; an item's switch follows its own `|-enditem|` on the
- * slot (751407 t1: Deoxys's Eject Pack, then Dragonite); gens 1 to 4 replace
- * a fainted body before upkeep; and older logs (gen 6 and 8, 2022) write a
- * pivot's switch without `[from]`, after the slot's own move (653785 t5:
- * Tornadus's U-turn, then Excadrill).
+ * a move's selfSwitch; older logs (gen 6 and 8, 2022) write a pivot's switch
+ * without `[from]`, after the slot's own move (653785 t5: Tornadus's U-turn,
+ * then Excadrill). A body that left before it acted, ejected by its item
+ * (751407 t1: Deoxys's Eject Pack, then Dragonite) or fainted (gens 1 to 4
+ * replace before upkeep), had its replacement asked for, so the simulator
+ * writes the request break (`|`) between that last own line and the switch.
+ * A Pursuit that pops the Air Balloon of a body on its way out writes the
+ * chosen switch right after the item line (round 64 review).
  */
 function answersForcedRequest(events: string[], index: number, ident: string): boolean {
   if (events[index].includes('[from]')) return true;
-  const own = events.slice(0, index).filter(line => line.split('|')[2]?.startsWith(ident));
-  return /^\|(-enditem|faint)\|/.test(own[own.length - 1] ?? '') || own.some(isOwnAction);
+  const own = [...events.keys()].filter(at => at < index && events[at].split('|')[2]?.startsWith(ident));
+  if (own.some(at => isOwnAction(events[at]))) return true;
+  const last = own[own.length - 1];
+  return last !== undefined && /^\|(-enditem|faint)\|/.test(events[last]) && events.slice(last + 1, index).includes('|');
 }
 
 /**

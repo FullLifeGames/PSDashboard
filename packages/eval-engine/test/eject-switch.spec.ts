@@ -1,12 +1,12 @@
 import { readFileSync } from 'fs';
 import { test, expect, describe } from 'vitest';
-import type { Battle, PokemonSet } from '@pkmn/sim';
+import { Battle as LiveBattle, Teams, type Battle, type PokemonSet } from '@pkmn/sim';
 import {
   buildTeamsFromReplay, getBranchSimulatorFormat, parseReplayLog, parseReplayLogWithObservations, replayBringOnly,
 } from '@fulllifegames/replay-core';
 import { buildChoiceLockContext } from '../src/choice-lock';
 import { reconstructBranchRuntime } from '../src/branch-engine';
-import { collectForcedSwitchSpecies, parseTurnBlocks } from '../src/branch/protocol-choices';
+import { collectForcedSwitchSpecies, getMainChoice, parseTurnBlocks } from '../src/branch/protocol-choices';
 
 /**
  * Round 64 (T121): an Eject Pack or Eject Button switch is the protocol's
@@ -50,6 +50,75 @@ describe('the forced list reads the switch an item made', () => {
       '|switch|p1a: Ferrothorn|Ferrothorn|100/100',
     ];
     expect(collectForcedSwitchSpecies(berry, [], 'p1')).toEqual([]);
+  });
+});
+
+/**
+ * Round 64 review: what the simulator writes around a switch that follows an
+ * item line, per generation. An ejection asks for the replacement, so the
+ * sim writes the request break (`|`) between the item line and the switch;
+ * a Pursuit that pops the Air Balloon of a body on its way out writes the
+ * switch right after the item line.
+ */
+describe('the simulator\'s own logs: ejection against a Pursuit-time balloon pop', () => {
+  const mon = (species: string, item: string, ability: string, moves: string[], spe = 0): PokemonSet => ({
+    name: species, species, item, ability, moves, nature: 'Serious', gender: '', level: 100,
+    evs: { hp: 252, atk: 0, def: 4, spa: 0, spd: 0, spe }, ivs: { hp: 31, atk: 31, def: 31, spa: 31, spd: 31, spe: 31 },
+  });
+  const make = (format: string, p1: PokemonSet[], p2: PokemonSet[]) => {
+    const battle = new LiveBattle({ formatid: format as never, seed: [1, 2, 3, 4], p1: { name: 'A', team: Teams.pack(p1) }, p2: { name: 'B', team: Teams.pack(p2) } });
+    if (battle.sides.some(side => side.requestState === 'teampreview')) {
+      battle.choose('p1', `team ${p1.map((_, index) => index + 1).join('')}`);
+      battle.choose('p2', `team ${p2.map((_, index) => index + 1).join('')}`);
+    }
+    return battle;
+  };
+  /** Plays turn 1 (and p1's forced answer), then reads it back as the reconstruction does. */
+  const readTurn = (format: string, p1: PokemonSet[], p2: PokemonSet[], choices: [string, string], forcedAnswer?: string) => {
+    const played = make(format, p1, p2);
+    played.choose('p1', choices[0]);
+    played.choose('p2', choices[1]);
+    if (forcedAnswer && played.sides[0].requestState === 'switch') played.choose('p1', forcedAnswer);
+    const lines = played.log.filter((line, index, all) => !line.startsWith('|split|') && !all[index - 1]?.startsWith('|split|'));
+    const turn = parseTurnBlocks(lines.join('\n')).turns.find(entry => entry.turn === 1)!;
+    return {
+      forced: collectForcedSwitchSpecies(turn.preUpkeep, turn.postUpkeep, 'p1'),
+      main: getMainChoice(turn.preUpkeep, 'p1', make(format, p1, p2) as never),
+    };
+  };
+  const heatran = mon('Heatran', 'Air Balloon', 'Flash Fire', ['Lava Plume']);
+  const pursuer = mon('Tyranitar', 'Leftovers', 'Sand Stream', ['Pursuit'], 252);
+
+  test.each([5, 6, 7])('gen %i: a Pursuit that pops a switching Air Balloon holder leaves the switch the side\'s choice', gen => {
+    const singles = readTurn(`gen${gen}customgame`, [heatran, mon('Snorlax', 'Leftovers', 'Thick Fat', ['Body Slam'])], [pursuer], ['switch 2', 'move pursuit']);
+    expect(singles).toEqual({ forced: [], main: 'switch 2' });
+    const doubles = readTurn(`gen${gen}doublescustomgame`,
+      [heatran, mon('Blissey', 'Leftovers', 'Natural Cure', ['Soft-Boiled']), mon('Snorlax', 'Leftovers', 'Thick Fat', ['Body Slam'])],
+      [pursuer, mon('Chansey', 'Eviolite', 'Natural Cure', ['Soft-Boiled'])],
+      ['switch 3, move softboiled', 'move pursuit 1, move softboiled']);
+    expect(doubles).toEqual({ forced: [], main: 'switch 3, move 1' });
+  });
+
+  test.each([5, 6, 7, 8, 9])('gen %i: an Eject Button switch is the answer to the item\'s request', gen => {
+    const ejected = readTurn(`gen${gen}customgame`,
+      [mon('Snorlax', 'Eject Button', 'Thick Fat', ['Body Slam']), mon('Blissey', 'Leftovers', 'Natural Cure', ['Soft-Boiled'])],
+      [mon('Tyranitar', 'Leftovers', 'Sand Stream', ['Crunch'], 252)], ['move bodyslam', 'move crunch'], 'switch 2');
+    expect(ejected).toEqual({ forced: ['Blissey'], main: 'move 1' });
+  });
+
+  test.each([8, 9])('gen %i: an Eject Pack switch after a self-drop or an Intimidate is the answer to the item\'s request; doubles Eject Button too', gen => {
+    const team = [mon('Snorlax', 'Eject Pack', 'Thick Fat', ['Superpower', 'Body Slam'], 252), mon('Blissey', 'Leftovers', 'Natural Cure', ['Soft-Boiled'])];
+    const tyranitar = mon('Tyranitar', 'Leftovers', 'Sand Stream', ['Crunch']);
+    expect(readTurn(`gen${gen}customgame`, team, [tyranitar], ['move superpower', 'move crunch'], 'switch 2'))
+      .toEqual({ forced: ['Blissey'], main: 'move 1' });
+    const slowTeam = [mon('Snorlax', 'Eject Pack', 'Thick Fat', ['Body Slam']), team[1]];
+    expect(readTurn(`gen${gen}customgame`, slowTeam, [tyranitar, mon('Incineroar', 'Leftovers', 'Intimidate', ['Flare Blitz'])], ['move bodyslam', 'switch 2'], 'switch 2'))
+      .toEqual({ forced: ['Blissey'], main: 'move 1' });
+    const doubles = readTurn(`gen${gen}doublescustomgame`,
+      [mon('Snorlax', 'Eject Button', 'Thick Fat', ['Body Slam']), mon('Blissey', 'Leftovers', 'Natural Cure', ['Soft-Boiled']), mon('Chansey', 'Eviolite', 'Natural Cure', ['Soft-Boiled'])],
+      [mon('Tyranitar', 'Leftovers', 'Sand Stream', ['Crunch'], 252), mon('Happiny', 'Eviolite', 'Natural Cure', ['Soft-Boiled'])],
+      ['move bodyslam 1, move softboiled', 'move crunch 1, move softboiled'], 'switch 3, pass');
+    expect(doubles).toEqual({ forced: ['Chansey'], main: 'move 1 +1, move 1' });
   });
 });
 
