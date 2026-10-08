@@ -119,18 +119,35 @@ function ruleOutUnknown(state: InferrerState, key: string, itemId: string) {
   ruleOut(state, nickname, 'items', itemId);
 }
 
+type ItemHandler = (this: never, ...args: never[]) => unknown;
+
 /**
- * Whether a Life Orb on the attacker would have shown its recoil after this
- * hit. Gen 4's Life Orb arms its recoil in the base-power step (the
- * simulator's onBasePower), which a fixed-damage move (Seismic Toss, Super
- * Fang: `damage` or `damageCallback`) never runs (round 64, T125).
+ * Whether the generation's Life Orb deals its recoil after this move, read
+ * from the simulator's item. Gen 4's arms the recoil in the base-power step
+ * (onBasePower), which a fixed-damage move (Seismic Toss, Super Fang:
+ * `damage`, `damageCallback`) and a one-hit KO move (`ohko`) never run
+ * (round 64, T125 and its review). From gen 5 the item's own
+ * onAfterMoveSecondarySelf decides, called on stubs: gens 5 and 6 skip a
+ * one-hit KO move there. A handler that fails on the stubs proves nothing.
  */
+function lifeOrbRecoils(dex: ReturnType<typeof Dex.forGen>, move: ReturnType<ReturnType<typeof Dex.forGen>['moves']['get']>): boolean {
+  const lifeOrb = dex.items.get('lifeorb') as { onBasePower?: unknown; onAfterMoveSecondarySelf?: ItemHandler };
+  if (lifeOrb.onBasePower) return !move.damage && !move.damageCallback && !move.ohko;
+  let recoil = false;
+  try {
+    const context = { damage: () => { recoil = true; }, dex };
+    lifeOrb.onAfterMoveSecondarySelf?.call(context as never, { baseMaxhp: 100, forceSwitchFlag: false } as never, {} as never, move as never);
+  } catch {
+    return false;
+  }
+  return recoil;
+}
+
+/** Whether a Life Orb on the attacker would have shown its recoil after this hit. */
 function lifeOrbWouldShow(state: InferrerState, watch: ItemWatch, action: ActionWatch): boolean {
   const dex = Dex.forGen(state.gen);
   const move = dex.moves.get(action.move);
-  if (!move.exists || move.category === 'Status' || move.flags.futuremove) return false;
-  const armsAtBasePower = !!(dex.items.get('lifeorb') as { onBasePower?: unknown }).onBasePower;
-  if (armsAtBasePower && (move.damage || move.damageCallback)) return false;
+  if (!move.exists || move.category === 'Status' || move.flags.futuremove || !lifeOrbRecoils(dex, move)) return false;
   const abilities = possibleAbilities(state, action.ident);
   if (!abilities || abilities.has('magicguard') || abilities.has('klutz')) return false;
   if (abilities.has('sheerforce') && move.secondaries) return false;

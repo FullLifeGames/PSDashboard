@@ -284,3 +284,28 @@ describe('T125 point 4: the slot map, gen 4 Life Orb and free abilities (round 6
     expect(ruledOut(doubles, 'Rattata')).not.toContain('lifeorb');
   });
 });
+
+describe('a one-hit KO and Life Orb, per generation (review of round 64)', () => {
+  // A level-30 target: Sheer Cold's accuracy grows with the level gap, so the KO lands.
+  const target = () => [set('Snorlax', '', 'Thick Fat', ['Rest'], 30)];
+  const lapras = (item: string) => [set('Lapras', item, 'Shell Armor', ['Sheer Cold'])];
+  const ohko = (item: string, gen: number) => play(target(), lapras(item), [['move rest', 'move sheercold']], false, gen, 'ou');
+
+  for (const gen of [4, 5, 6]) {
+    test(`gen ${gen}: Sheer Cold's one-hit KO shows no Life Orb recoil, so nothing is ruled out`, () => {
+      const log = ohko('Life Orb', gen);
+      expect(log).toMatch(/^\|-ohko$/m);
+      expect(shown(log, 'Life Orb')).toBe(false);
+      expect(ruledOut(log, 'Lapras')).not.toContain('lifeorb');
+    });
+  }
+
+  for (const gen of [7, 9]) {
+    test(`gen ${gen}: the one-hit KO shows the recoil, and its absence rules Life Orb out`, () => {
+      expect(shown(ohko('Life Orb', gen), 'Life Orb')).toBe(true);
+      const log = ohko('Expert Belt', gen);
+      expect(log).toMatch(/^\|-ohko$/m);
+      expect(ruledOut(log, 'Lapras')).toContain('lifeorb');
+    });
+  }
+});
