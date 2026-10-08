@@ -184,11 +184,25 @@ function transform(slots: Map<string, Slot>, turn: TurnRead, slot: string, targe
   if (copy) turn.copies.push(copy);
 }
 
-/** One slot line's part in its turn: an entry or a faint resets the slot, a change or a transform records itself, `-mega` marks the change. */
+/**
+ * Ally Switch (`|swap|p1b: Meowstic|0|`): the Pokémon leaves its slot for
+ * the numbered position and the Pokémon there takes its place.
+ */
+function swap(slots: Map<string, Slot>, slot: string, position: string): void {
+  const target = `${sideOf(slot)}${'abcd'[Number(position)] ?? ''}`;
+  const moved = slots.get(slot);
+  const other = slots.get(target);
+  if (other) slots.set(slot, other);
+  else slots.delete(slot);
+  if (moved) slots.set(target, moved);
+}
+
+/** One slot line's part in its turn: an entry or a faint resets the slot, a swap trades two, a change or a transform records itself, `-mega` marks the change. */
 function readSlotLine(slots: Map<string, Slot>, turn: TurnRead, tag: string, ident: string, details: string): void {
   const slot = ident.slice(0, 3);
   if (tag === 'switch' || tag === 'drag' || tag === 'replace') slots.set(slot, { species: speciesOf(details) });
   else if (tag === 'faint') slots.delete(slot);
+  else if (tag === 'swap') swap(slots, slot, details);
   else if (tag === 'detailschange' || tag === '-formechange') changeForme(slots, turn, slot, details);
   else if (tag === '-transform') transform(slots, turn, slot, details);
   const evolved = tag === '-mega' ? turn.changes.findLast(change => change.side === sideOf(slot)) : undefined;

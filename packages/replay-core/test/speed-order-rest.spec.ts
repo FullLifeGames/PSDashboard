@@ -237,3 +237,25 @@ describe('a Speed IV below 31 only when no other Speed keeps a seen order (T122 
     });
   }
 });
+
+describe('the forme that raced, after Ally Switch, mid-turn changes and Ultra Burst (T122 review)', () => {
+  const sorted = (orders: string[]) => [...orders].sort();
+
+  test('doubles: Ally Switch moves the slots, so a later Mega Evolution names the right Pokemon (Gen 6)', () => {
+    // Meowstic (Timid 252, 307) Ally Switches into p1a at t1; at t2 Kangaskhan, now p1b, mega evolves and
+    // races on its base Speed in Gen 6 (216). Meowstic Psyshocks first (a status move could ride Prankster),
+    // Garchomp (333) before Kangaskhan, Shuckle last. Read with the slots before the swap, Kangaskhan's
+    // evolution looked like Meowstic's and its races were named Meowstic.
+    const battle = simulate('gen6doublescustomgame', [
+      mon('Kangaskhan', 'Hardy', evs(0, 0, 0, 0, 0, 0), 'Kangaskhanite', ['Splash']),
+      mon('Meowstic', 'Timid', evs(0, 0, 0, 0, 0, 252), 'Light Clay', ['Ally Switch', 'Psyshock']),
+    ], [
+      mon('Garchomp', 'Jolly', evs(0, 0, 0, 0, 0, 252), 'Leftovers', ['Splash']),
+      mon('Shuckle', 'Relaxed', evs(0, 0, 0, 0, 0, 0), 'Leftovers', ['Splash']),
+    ], [['move 1, move 1', 'move 1, move 1'], ['move 2 1, move 1 mega', 'move 1, move 1']]);
+    expect(movers(battle, 2)).toEqual(['p1a: Meowstic', 'p2a: Garchomp', 'p1b: Kangaskhan', 'p2b: Shuckle']);
+    expect(sorted(ordersOf(battle, 2))).toEqual(sorted([
+      'p1 Meowstic > p2 Garchomp', 'p1 Meowstic > p2 Shuckle', 'p2 Garchomp > p1 Kangaskhan', 'p1 Kangaskhan > p2 Shuckle',
+    ]));
+  });
+});
