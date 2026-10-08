@@ -902,6 +902,106 @@ import { takeSimFastReport } from '../packages/eval-engine/src/forward/sim-fast/
  * static basis for this mass; the next lever, if any, is search/
  * planning-side.
  *
+ * WAVE 1.5 2026-10-08 (improvement round 64, the rest of wave 1 run as a
+ * wave of its own before wave 2; spec docs/superpowers/specs/2026-10-06-
+ * round-64-wave-1-5-design.md, plan docs/superpowers/plans/2026-10-06-
+ * round-64-wave-1-5-plan.md; branch r64 from 5360833 (= v1), cache v58;
+ * probes, queue and lane ledgers under docs/perf/probes/2026-10-06-r64/).
+ * Eight sub-agents in their own worktrees, one lane each, sharing no file
+ * (design gate 06.10. 12:46 "1a 2a 3a 4a 5a 6a"): A T118 (the doubles
+ * prover's AND node takes every legal reply from the simulator; 2630685175
+ * t7 checks 36 of 36 and 2660809089 #8 42 of 42, both false forced wins
+ * gone; doubles proofs bank 3 -> 2, dumps 2 -> 1; singles unchanged),
+ * B T125 points 1 to 3 and T126 (the threat memo key carries the stats a
+ * move reads off its axis, Body Press and Foul Play; setup equity counts
+ * own boosts and every stage a move of the holder reads; bank b1
+ * byte-identical) and T127 (refit of the static weights with STAB by the
+ * rules on the fit corpus: capture tool 0cbbdb3, 12 826 positions from
+ * 2 111 games, fixed K per phase, 20 seeds), C T119 and T126 (the verify
+ * step splits a chance class by the states its draws leave: singles by
+ * every state, doubles by the simulator's counters from a pool of 8
+ * draws; MC census singles cells outside 2.5 SE 9 -> 2 of 177, doubles
+ * 51 -> 35 of 218, singles verdicts 72 -> 73 of 75; bank byte-identical),
+ * D T120, T125 point 4 and T122 point 4 (a Dex veto row for a move that
+ * reads a stat its partner lowers, Body Press beside Close Combat; the
+ * type-doubling veto only for usage fillers; Dex-derived hand lists; item
+ * slots read like move slots; an item after a proven rule-out from
+ * evidence or the usage majority; Rocky Helmet and Shell Bell from the
+ * simulator; the Boots hint as evidence; published IVs read, 344 of 1548
+ * bank sets), E T123 (the ten report points of round 63, each with a scene
+ * and a red test; a regret above 1 keeps its number without breaking the
+ * scale; engine numbers of the dumps byte-identical), F T124 and T126
+ * (damage preview: Tera once per side from the simulator, armed toggles
+ * reset on navigation, multi-hit and Loaded Dice spreads from the calc,
+ * Protect on the partner, the Stellar first boost; feedback byte-identical
+ * to the base, e2e 75/75), G T121 (the board follows every item line of
+ * the protocol, abilities and Eject Pack included: board item against
+ * protocol 128 -> 0 on the bank and 5 -> 0 in the feedback, Eject 3 -> 15
+ * of 15, old pivots without [from] 4 -> 19 of 19, gen 3 replacements
+ * 3 -> 9 of 9), H T122 (speed solver: rounding, forme Speed and Transform
+ * from simulator and Dex, a Speed IV below 31 only when an observed order
+ * needs it, empty budgets filled toward the prior EVs (h2); empty budgets
+ * 66 -> 1 of 1548, unseen forme orders 11 -> 0, broken orders stay 0).
+ * Each lane measured alone through one queue against the same base
+ * (r63-wave3 / base-1006-1; the new day took r64-base-1008, byte-identical
+ * to it); timing window against 5360833: prover +2 %, doubles tree +5 %
+ * (gate at most +10 %), build +17 % (no gate; the budget fill, about 12 ms
+ * per replay).
+ * T127 NOT ADOPTED: variant E (bodies 199, hazards 0.78, screens 88,
+ * matchup 220, coverage 88, doubles tailwind 38, doubles trickRoom 29; the
+ * two sign-unsure weights and the boost weights held) beat the hand
+ * weights out of fold in 20 of 20 seeds, doubles included, yet the bank
+ * read doubles +116 bp [+43, +190] worse with fixed K (own K +88; mid
+ * +176, late +69) and 72 feedback tiers moved (golden 655336 t23 and t24
+ * blunders): the corpus scores the static on teams from the protocol, the
+ * bank scores the search on the app's sets, and in doubles they disagree.
+ * The fit stays on branch w15-b (043baf1); the merge took lane B up to
+ * 0cbbdb3.
+ * Merge: cherry-picks A to H without conflict (44 commits), cache v58 with
+ * the lint ratchet (9c72364), a SideRow.spec typing fix (836ed9a), three
+ * build pins re-pinned with their intent kept (29e2072: app-build parity
+ * list; Toxapex not Bold 252 Def; curated Toxapex HP 248, SpD above Def).
+ * Final review by three fresh reviewers, 13 fixes, each with a red test
+ * first: E 1 (a forced-win sentence below 0.7 no longer repeats every
+ * turn), F 3 (Battle Bond Water Shuriken, the Stellar first boost on the
+ * snapshot path, an armed toggle no longer blocks a partner that
+ * switches), G 3 (Frisk read as a hand-over, a disguised Zoroark's item
+ * lines, Pursuit into an Air Balloon holder), D 3 (the Boots hint only
+ * without a possible Magic Guard, veto row 3 spares the chosen set, Life
+ * Orb after a one-hit KO in gens 4 to 6), H 3 (Ally Switch in the forme
+ * reader, the gen 8 forme timing of a race, Ultra Burst like a Mega).
+ * WAVE RUN on 7a64967 against r64-base-1008 (567 of 837 positions moved,
+ * 464 singles and 103 doubles): no harm in a pooled row in both tables;
+ * fixed K all -9 [-39, +21], singles -14 [-42, +16], doubles +4 [-66,
+ * +80]; all early -38 [-72, -6] and singles early -39 [-69, -11] resolved
+ * better (hq singles early -50); warning doubles late +94 [+4, +264] (own
+ * K +130), about 90 % of it from 938644 #12 and #14, where p2's Gholdengo
+ * plays Metal Coat from the published item slot although the log rules it
+ * out (Tera-Fairy Dazzling Gleam took 66 % of Moltres-Galar, Metal Coat
+ * reaches 47 to 56 %), the rest protocol-right boards of lane G (938276,
+ * 941638) -> T130. Feedback three runs byte-identical; tiers singles
+ * 39/2/0 -> 40/1/0, doubles 12/3/0 -> 11/4/0, 41 turns moved. The lane
+ * counts hold on the merged state (broken orders 0, board item against
+ * protocol 0, doubles proofs 3; D's IVs break no order). Regression 2282
+ * green, lint and tsc -b clean.
+ * USER GATE 2026-10-08 20:38 ("1b will den Stab behalten / 2a 3a 4a 5a
+ * 6a"): (1) STAB by the rules stays and T127 runs at once as round 65,
+ * with the bank as its fit target, before wave 2; (2) the round-42
+ * play-out pin keeps its intent: p2 (Bene) wins the turn-56 play-out by
+ * turn 70 (the old switch order held only through near ties of 0.001 to
+ * 0.005 that the Monte-Carlo reference decides the other way; the wave
+ * wins at turn 66); (3) 573756 t75 pinned on its firm core: p1 plays the
+ * Kyurem switch and neither side earns a tier (the rebuild brings Clefable
+ * on the turn-30 U-turn as the game did, and the switch leads Knock Off by
+ * 0.001); (4) the prior-ward fill h2 stays (h1 read singles 3 to 5 bp
+ * better); (5) the new TODOs T128 to T136 go to the wave-2 lanes, T129 and
+ * T130 first in theirs; (6) push v1 after the booking. Re-pins 4bbd119:
+ * one feedback run byte-identical to the wave run, every turn truth pin
+ * ok, golden 655336 nine channels of known drift, gaps 573756 t73 and
+ * 649664 t23 open; e2e 75/75. Base of the code state:
+ * .calibration/r64-wave1 (Brier 0.2508/0.2258/0.1134, K 2.45). New TODOs
+ * T128 to T136 (NextSteps, wave 2).
+ *
  * WAVE 1 2026-10-06 (improvement round 63, the first wave of lanes after
  * the round-62 triage; spec docs/superpowers/specs/2026-10-05-round-63-
  * wave-1-design.md, plan docs/superpowers/plans/2026-10-05-round-63-wave-1-
