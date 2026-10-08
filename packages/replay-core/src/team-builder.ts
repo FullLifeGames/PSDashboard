@@ -1,5 +1,5 @@
 import type { PokemonSet } from '@pkmn/sim';
-import { Teams } from '@pkmn/sim';
+import { Dex, Teams } from '@pkmn/sim';
 import { inferOpponentTeam } from './opponent-inferrer.ts';
 import { getSpeciesUsageSet } from './smogon/usage-lookup.ts';
 import type { SmogonUsageStats } from './smogon/stats-types.ts';
@@ -49,15 +49,56 @@ type BuildOptions = Parameters<typeof buildTeamsFromReplay>[1];
 type BuiltTeams = { p1Team: PokemonSet[]; p2Team: PokemonSet[] };
 type SideInfos = { p1: OpponentTeamInfo; p2: OpponentTeamInfo };
 
+type GenDex = ReturnType<typeof Dex.forGen>;
+type DamageHandler = (this: never, ...args: never[]) => unknown;
+
 /**
- * The items the protocol inference itself guesses, by side and species (the
- * Heavy-Duty Boots tell). Enriched infos mix them with the enrichment's own
- * guesses, so they are read from the log's inference (round 64, T120).
+ * Whether the ability's own damage handler in the simulator refuses Stealth
+ * Rock damage (Magic Guard refuses every damage that is not a move). A
+ * handler that fails on the stub counts as refusing: then the tell proves nothing.
  */
-function itemTells(log: string, options: BuildOptions, infos: SideInfos): Record<'p1' | 'p2', Map<string, string>> {
+function keepsRocksOff(dex: GenDex, name: string): boolean {
+  const { onDamage } = dex.abilities.get(name) as { onDamage?: DamageHandler };
+  if (!onDamage) return false;
+  const rocks = dex.conditions.get('stealthrock');
+  try {
+    const context = { add: () => undefined, effect: rocks, effectState: {} };
+    return onDamage.call(context as never, 1 as never, { abilityState: {} } as never, null as never, rocks as never) === false;
+  } catch {
+    return true;
+  }
+}
+
+/**
+ * Whether an ability the Pokémon may have keeps the rock damage off it: the
+ * known one, else its species' abilities minus the rule-outs, and in a format
+ * with free abilities any ability (round 64 review: a Magic Guard Clefable
+ * shows the Boots tell without Boots).
+ */
+function rocksMayMiss(info: RevealedPokemonInfo, dex: GenDex, freeAbilities: boolean): boolean {
+  const known = info.ability.source === 'revealed' || info.ability.source === 'manual' ? info.ability.value : '';
+  if (known) return keepsRocksOff(dex, known);
+  if (freeAbilities) return dex.abilities.all().some(ability => keepsRocksOff(dex, ability.name));
+  const ruled = info.ruledOut?.abilities ?? [];
+  return Object.values(dex.species.get(info.species).abilities ?? {})
+    .some(name => !!name && !ruled.includes(toId(name)) && keepsRocksOff(dex, name));
+}
+
+/**
+ * The items the protocol inference itself guesses, by side and species: its
+ * one tell, Heavy-Duty Boots after a Stealth Rock switch-in without damage.
+ * Enriched infos mix them with the enrichment's own guesses, so they are read
+ * from the log's inference (round 64, T120). A tell is evidence only while no
+ * ability the Pokémon may have explains the missing damage as well.
+ */
+function itemTells(
+  log: string, options: BuildOptions, infos: SideInfos, legality: { gen: number; custom: boolean },
+): Record<'p1' | 'p2', Map<string, string>> {
+  const dex = Dex.forGen(legality.gen);
   const tells = (side: 'p1' | 'p2') => {
     const raw = options?.[`${side}Info`] ? inferOpponentTeam(log, side) : infos[side];
-    return new Map(raw.pokemon.filter(mon => mon.item.source === 'guessed' && mon.item.value)
+    return new Map(raw.pokemon
+      .filter(mon => mon.item.source === 'guessed' && mon.item.value && !rocksMayMiss(mon, dex, legality.custom))
       .map(mon => [toId(mon.species), mon.item.value]));
   };
   return { p1: tells('p1'), p2: tells('p2') };
@@ -90,7 +131,7 @@ function buildTeams(log: string, options: BuildOptions): { teams: BuiltTeams; in
     (options?.hpEvidence ?? []).filter(entry => entry.attackerSide === side);
   const hpTyped = (side: 'p1' | 'p2'): HiddenPowerTyping =>
     set => withHiddenPowerType(set, hpFor(side), options?.usageStats, parseInt(gen, 10));
-  const tells = itemTells(log, options, infos);
+  const tells = itemTells(log, options, infos, legality);
   const sideTeam = (side: 'p1' | 'p2', inferred?: Map<string, SpreadCandidate>) =>
     legalize(infos[side].pokemon.map(pokemon => buildSet(
       pokemon, knownTeams[side], options?.usageStats, options?.setAssumptions, inferred?.get(`${side}:${toId(pokemon.species)}`),
