@@ -288,4 +288,22 @@ describe('the forme that raced, after Ally Switch, mid-turn changes and Ultra Bu
       'p1 Garchomp > p2 Eiscue', 'p1 Garchomp > p2 Shuckle', 'p2 Eiscue-Noice > p1 Rotom-Wash', 'p1 Rotom-Wash > p2 Shuckle',
     ]));
   });
+  for (const format of ['gen7customgame', 'gen7doublescustomgame']) {
+    test(`Ultra Burst re-sorts like a Mega Evolution in Gen 7, so the order names Necrozma-Ultra (${format})`, () => {
+      // Necrozma-Dusk-Mane (0 Speed, 190) bursts into Necrozma-Ultra (294) and, re-sorted, moves before
+      // Garchomp (240). Read on its turn-start forme, the order forced Dusk-Mane past 240.
+      const necrozma = mon('Necrozma-Dusk-Mane', 'Hardy', evs(0, 252, 0, 0, 4, 0), 'Ultranecrozium Z', ['Splash']);
+      const garchomp = mon('Garchomp', 'Adamant', evs(0, 252, 0, 0, 4, 0), 'Leftovers', ['Splash']);
+      const doubles = format.includes('doubles');
+      const battle = simulate(format,
+        doubles ? [necrozma, mon('Shuckle', 'Relaxed', evs(0, 0, 0, 0, 0, 0), 'Leftovers', ['Splash'])] : [necrozma],
+        doubles ? [garchomp, mon('Shuckle', 'Relaxed', evs(0, 0, 0, 0, 0, 0), 'Rocky Helmet', ['Splash'])] : [garchomp],
+        [[doubles ? 'move 1 ultra, move 1' : 'move 1 ultra', doubles ? 'move 1, move 1' : 'move 1']]);
+      expect(movers(battle, 1).slice(0, 2)).toEqual(['p1a: Necrozma', 'p2a: Garchomp']);
+      expect(ordersOf(battle, 1)).toContain('p1 Necrozma-Ultra > p2 Garchomp');
+      const { speedOrders } = parseReplayLogWithObservations(replayLog(battle));
+      const sets = { p1: [necrozma], p2: [garchomp] };
+      expect(spreadOf(inferSpreads([], sets, 'gen7ou', speedOrders), sets, 'p1', 'Necrozma-Dusk-Mane').evs.spe).toBe(0);
+    });
+  }
 });

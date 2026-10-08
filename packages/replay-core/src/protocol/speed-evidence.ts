@@ -120,7 +120,7 @@ type Side = 'p1' | 'p2';
  * One Pokémon on the field during a turn (round 64): each forme it held
  * from a line of the turn on (the first from the turn's start or its
  * entry), and the line of its own first move. `resorted` marks a change
- * the simulator re-sorts the turn on in Gen 7 (a Mega Evolution).
+ * the simulator's megaEvo action makes, which Gen 7 re-sorts the turn on.
  */
 interface TurnMon {
   side: Side;
@@ -162,6 +162,7 @@ interface SlotLine {
   slot: string;
   details: string;
   at: number;
+  gen: number;
 }
 
 /** The protocol the parse has read: the snapshots keep each turn's lines, the last turn is still open. */
@@ -185,12 +186,23 @@ function enter({ slots, turn, slot, details, at }: SlotLine): void {
   slots.set(slot, { species, mon });
 }
 
+/**
+ * A forme the simulator's megaEvo action changes into (battle-actions.js
+ * runMegaEvo: canMegaEvo gives a Mega, canUltraBurst the forme a Z-Crystal
+ * holder bursts into), read from the Dex.
+ */
+function megaEvolution(gen: number, species: string): boolean {
+  const data = gens.get(gen as Parameters<typeof gens.get>[0]);
+  const forme = data.species.get(species);
+  return !!forme?.isMega || !!(forme?.requiredItem && data.items.get(forme.requiredItem)?.zMove);
+}
+
 /** A forme change of the slot (`detailschange`, `-formechange`), from this line on. */
-function changeForme({ slots, slot, details, at }: SlotLine): void {
+function changeForme({ slots, slot, details, at, gen }: SlotLine): void {
   const entry = slots.get(slot);
   const to = speciesOf(details);
   if (!entry || entry.copied || entry.species === to) return;
-  entry.mon.formes.push({ at, species: to, resorted: false });
+  entry.mon.formes.push({ at, species: to, resorted: megaEvolution(gen, to) });
   entry.species = to;
 }
 
@@ -223,15 +235,9 @@ function move({ slots, line, slot, at }: SlotLine): void {
   if (mon && mon.acted === undefined && !foreignAction(line)) mon.acted = at;
 }
 
-/** The last forme change of the slot came from a Mega Evolution. */
-function megaEvolve({ slots, slot }: SlotLine): void {
-  const formes = slots.get(slot)?.mon.formes;
-  if (formes && formes.length > 1) formes[formes.length - 1].resorted = true;
-}
-
 const SLOT_LINES: Record<string, (line: SlotLine) => void> = {
   switch: enter, drag: enter, replace: enter, faint: ({ slots, slot }) => slots.delete(slot), swap,
-  detailschange: changeForme, '-formechange': changeForme, '-transform': transform, '-mega': megaEvolve, move,
+  detailschange: changeForme, '-formechange': changeForme, '-transform': transform, move,
 };
 
 /** A turn starts: every active Pokémon gets a new record from the turn line on. */
@@ -246,7 +252,7 @@ function startTurn(slots: Map<string, Slot>, at: number): TurnRead {
 }
 
 /** Per turn, the Pokémon on the field, the formes each held from which line on, and the transformed slots. */
-function readTurns(lines: string[]): Map<number, TurnRead> {
+function readTurns(lines: string[], gen: number): Map<number, TurnRead> {
   const slots = new Map<string, Slot>();
   let turn: TurnRead = { mons: [], copies: [] };
   const turns = new Map<number, TurnRead>([[0, turn]]);
@@ -256,7 +262,7 @@ function readTurns(lines: string[]): Map<number, TurnRead> {
       turn = startTurn(slots, at);
       turns.set(parseInt(ident, 10), turn);
     } else {
-      SLOT_LINES[tag]?.({ slots, turn, line, slot: ident.slice(0, 3), details, at });
+      SLOT_LINES[tag]?.({ slots, turn, line, slot: ident.slice(0, 3), details, at, gen });
     }
   });
   return turns;
@@ -270,7 +276,8 @@ const recordOf = (turn: TurnRead, side: Side, species: string) =>
 /**
  * The forme a mover held when the simulator last sorted it against the
  * other one (round 64, T122). Gen 6 and below sort a turn once, on the
- * Speeds at its start; Gen 7 also re-sorts a Pokémon that mega evolves;
+ * Speeds at its start; Gen 7 also re-sorts a Pokémon its megaEvo action
+ * changed (a Mega Evolution, an Ultra Burst);
  * Gen 8 and later re-sort the movers still waiting after every action
  * (@pkmn/sim battle.js runAction), so two movers were ordered just before
  * the first of them acted.
@@ -300,7 +307,7 @@ function racedMover(
 
 /** Every order names the mover that raced: its forme at the sort, or what it copied (round 64). */
 export function settleRacedFormes(state: ParserState): void {
-  const turns = readTurns(readLines(state));
+  const turns = readTurns(readLines(state), state.genNum);
   state.speedOrders = state.speedOrders.flatMap(order => {
     const turn = turns.get(order.turn);
     if (!turn) return [order];
