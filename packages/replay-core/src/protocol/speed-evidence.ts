@@ -114,15 +114,19 @@ export function settleScarfMovers(state: ParserState): void {
   state.speedOrders = settled;
 }
 
-/** A slot's forme change inside a turn (round 64): the forme before, the forme after, and whether a Mega Evolution made it. */
-interface FormeChange {
-  side: 'p1' | 'p2';
-  from: string;
-  to: string;
-  mega: boolean;
-}
-
 type Side = 'p1' | 'p2';
+
+/**
+ * One Pokémon on the field during a turn (round 64): each forme it held
+ * from a line of the turn on (the first from the turn's start or its
+ * entry), and the line of its own first move. `resorted` marks a change
+ * the simulator re-sorts the turn on in Gen 7 (a Mega Evolution).
+ */
+interface TurnMon {
+  side: Side;
+  formes: { at: number; species: string; resorted: boolean }[];
+  acted?: number;
+}
 
 /**
  * A transformed slot (round 64): its own species and the Pokémon it copied.
@@ -134,18 +138,30 @@ interface Copy {
   own: string;
   copied: { side: Side; species: string };
   shared: boolean;
+  mon: TurnMon;
 }
 
-/** What one turn of the protocol says about its movers' formes. */
+/** What one turn of the protocol says about its movers. */
 interface TurnRead {
-  changes: FormeChange[];
+  mons: TurnMon[];
   copies: Copy[];
 }
 
-/** An active slot: the species it entered as, and the Pokémon it copied. */
+/** An active slot: the species it holds, the Pokémon it copied, and its record of this turn. */
 interface Slot {
   species: string;
   copied?: { side: Side; species: string };
+  mon: TurnMon;
+}
+
+/** One protocol line as the reader walks it. */
+interface SlotLine {
+  slots: Map<string, Slot>;
+  turn: TurnRead;
+  line: string;
+  slot: string;
+  details: string;
+  at: number;
 }
 
 /** The protocol the parse has read: the snapshots keep each turn's lines, the last turn is still open. */
@@ -158,28 +174,32 @@ function copyOf(slots: Map<string, Slot>, slot: string, entry: Slot): Copy | nul
   if (!entry.copied) return null;
   const shared = [...slots].some(([other, held]) =>
     other !== slot && sideOf(other) === sideOf(slot) && !held.copied && held.species === entry.copied!.species);
-  return { side: sideOf(slot), own: entry.species, copied: entry.copied, shared };
+  return { side: sideOf(slot), own: entry.species, copied: entry.copied, shared, mon: entry.mon };
 }
 
-/** The copies standing at a turn's start. */
-const standingCopies = (slots: Map<string, Slot>) =>
-  [...slots].map(([slot, entry]) => copyOf(slots, slot, entry)).filter((copy): copy is Copy => copy !== null);
+/** A Pokémon enters the slot: a new record for the turn. */
+function enter({ slots, turn, slot, details, at }: SlotLine): void {
+  const species = speciesOf(details);
+  const mon: TurnMon = { side: sideOf(slot), formes: [{ at, species, resorted: false }] };
+  turn.mons.push(mon);
+  slots.set(slot, { species, mon });
+}
 
-/** A forme change of the slot (`detailschange`, `-formechange`), from the forme it held. */
-function changeForme(slots: Map<string, Slot>, turn: TurnRead, slot: string, details: string): void {
+/** A forme change of the slot (`detailschange`, `-formechange`), from this line on. */
+function changeForme({ slots, slot, details, at }: SlotLine): void {
   const entry = slots.get(slot);
   const to = speciesOf(details);
   if (!entry || entry.copied || entry.species === to) return;
-  turn.changes.push({ side: sideOf(slot), from: entry.species, to, mega: false });
+  entry.mon.formes.push({ at, species: to, resorted: false });
   entry.species = to;
 }
 
 /** A `-transform`: the slot copies its target from here on. */
-function transform(slots: Map<string, Slot>, turn: TurnRead, slot: string, target: string): void {
+function transform({ slots, turn, slot, details }: SlotLine): void {
   const entry = slots.get(slot);
-  const copied = slots.get(target.slice(0, 3));
+  const copied = slots.get(details.slice(0, 3));
   if (!entry || !copied) return;
-  entry.copied = { side: sideOf(target), species: copied.copied?.species ?? copied.species };
+  entry.copied = { side: sideOf(details), species: copied.copied?.species ?? copied.species };
   const copy = copyOf(slots, slot, entry);
   if (copy) turn.copies.push(copy);
 }
@@ -188,8 +208,8 @@ function transform(slots: Map<string, Slot>, turn: TurnRead, slot: string, targe
  * Ally Switch (`|swap|p1b: Meowstic|0|`): the Pokémon leaves its slot for
  * the numbered position and the Pokémon there takes its place.
  */
-function swap(slots: Map<string, Slot>, slot: string, position: string): void {
-  const target = `${sideOf(slot)}${'abcd'[Number(position)] ?? ''}`;
+function swap({ slots, slot, details }: SlotLine): void {
+  const target = `${sideOf(slot)}${'abcd'[Number(details)] ?? ''}`;
   const moved = slots.get(slot);
   const other = slots.get(target);
   if (other) slots.set(slot, other);
@@ -197,72 +217,98 @@ function swap(slots: Map<string, Slot>, slot: string, position: string): void {
   if (moved) slots.set(target, moved);
 }
 
-/** One slot line's part in its turn: an entry or a faint resets the slot, a swap trades two, a change or a transform records itself, `-mega` marks the change. */
-function readSlotLine(slots: Map<string, Slot>, turn: TurnRead, tag: string, ident: string, details: string): void {
-  const slot = ident.slice(0, 3);
-  if (tag === 'switch' || tag === 'drag' || tag === 'replace') slots.set(slot, { species: speciesOf(details) });
-  else if (tag === 'faint') slots.delete(slot);
-  else if (tag === 'swap') swap(slots, slot, details);
-  else if (tag === 'detailschange' || tag === '-formechange') changeForme(slots, turn, slot, details);
-  else if (tag === '-transform') transform(slots, turn, slot, details);
-  const evolved = tag === '-mega' ? turn.changes.findLast(change => change.side === sideOf(slot)) : undefined;
-  if (evolved) evolved.mega = true;
+/** The slot's own first move of the turn (a copied action is not its place in the order). */
+function move({ slots, line, slot, at }: SlotLine): void {
+  const mon = slots.get(slot)?.mon;
+  if (mon && mon.acted === undefined && !foreignAction(line)) mon.acted = at;
 }
 
-/** Per turn, the forme changes and the transformed slots the protocol shows. */
+/** The last forme change of the slot came from a Mega Evolution. */
+function megaEvolve({ slots, slot }: SlotLine): void {
+  const formes = slots.get(slot)?.mon.formes;
+  if (formes && formes.length > 1) formes[formes.length - 1].resorted = true;
+}
+
+const SLOT_LINES: Record<string, (line: SlotLine) => void> = {
+  switch: enter, drag: enter, replace: enter, faint: ({ slots, slot }) => slots.delete(slot), swap,
+  detailschange: changeForme, '-formechange': changeForme, '-transform': transform, '-mega': megaEvolve, move,
+};
+
+/** A turn starts: every active Pokémon gets a new record from the turn line on. */
+function startTurn(slots: Map<string, Slot>, at: number): TurnRead {
+  const turn: TurnRead = { mons: [], copies: [] };
+  for (const entry of slots.values()) {
+    entry.mon = { side: entry.mon.side, formes: [{ at, species: entry.species, resorted: false }] };
+    turn.mons.push(entry.mon);
+  }
+  turn.copies = [...slots].map(([slot, entry]) => copyOf(slots, slot, entry)).filter((copy): copy is Copy => copy !== null);
+  return turn;
+}
+
+/** Per turn, the Pokémon on the field, the formes each held from which line on, and the transformed slots. */
 function readTurns(lines: string[]): Map<number, TurnRead> {
   const slots = new Map<string, Slot>();
-  let turn: TurnRead = { changes: [], copies: [] };
+  let turn: TurnRead = { mons: [], copies: [] };
   const turns = new Map<number, TurnRead>([[0, turn]]);
-  for (const line of lines) {
+  lines.forEach((line, at) => {
     const [, tag, ident = '', details = ''] = line.split('|');
     if (tag === 'turn') {
-      turn = { changes: [], copies: standingCopies(slots) };
+      turn = startTurn(slots, at);
       turns.set(parseInt(ident, 10), turn);
     } else {
-      readSlotLine(slots, turn, tag, ident, details);
+      SLOT_LINES[tag]?.({ slots, turn, line, slot: ident.slice(0, 3), details, at });
     }
-  }
+  });
   return turns;
 }
 
+/** The record of the Pokémon the order names: the one of that side that held this forme during the turn. */
+const recordOf = (turn: TurnRead, side: Side, species: string) =>
+  turn.copies.find(copy => copy.side === side && copy.copied.species === species)?.mon ??
+  turn.mons.find(mon => mon.side === side && mon.formes.some(forme => forme.species === species));
+
 /**
- * The forme whose Speed raced (round 64, T122). The simulator sorts a turn
- * on the Speeds its movers had at the start of the turn in Gen 6 and below;
- * Gen 7 re-sorts a Pokémon that mega evolves, and Gen 8 and later re-sort
- * after every action (@pkmn/sim battle.js runAction). A mover whose forme
- * changed earlier in the turn under a rule that kept its old Speed raced
- * as the old forme, when the two run on different base Speeds.
+ * The forme a mover held when the simulator last sorted it against the
+ * other one (round 64, T122). Gen 6 and below sort a turn once, on the
+ * Speeds at its start; Gen 7 also re-sorts a Pokémon that mega evolves;
+ * Gen 8 and later re-sort the movers still waiting after every action
+ * (@pkmn/sim battle.js runAction), so two movers were ordered just before
+ * the first of them acted.
  */
-function racedForme(state: ParserState, changes: FormeChange[], side: Side, species: string): string {
-  if (state.genNum >= 8) return species;
-  const change = changes.find(entry => entry.side === side && entry.to === species && !(state.genNum === 7 && entry.mega));
-  if (!change) return species;
-  const dex = gens.get(state.genNum).species;
-  return dex.get(change.from)?.baseStats.spe === dex.get(species)?.baseStats.spe ? species : change.from;
+function formeAtSort(state: ParserState, mon: TurnMon, firstActed: number | undefined): string | undefined {
+  if (state.genNum >= 8) return firstActed === undefined ? undefined : mon.formes.filter(forme => forme.at < firstActed).at(-1)?.species;
+  return mon.formes.filter((forme, index) => index === 0 || (state.genNum === 7 && forme.resorted)).at(-1)?.species;
 }
 
 /**
  * The mover that raced: a transformed mover by its own species with the
  * Pokémon it copied (the simulator's Transform copies the target's stats,
- * the item stays its own), else the forme that raced; null when a copy and
- * its side's own Pokémon of that species stand together.
+ * the item stays its own), else the forme it held at the sort when that
+ * runs on another base Speed; null when a copy and its side's own Pokémon
+ * of that species stand together.
  */
-function racedMover(state: ParserState, turn: TurnRead, side: Side, species: string): { species: string; copied?: Copy['copied'] } | null {
+function racedMover(
+  state: ParserState, turn: TurnRead, side: Side, species: string, firstActed: number | undefined,
+): { species: string; copied?: Copy['copied'] } | null {
   const copy = turn.copies.find(entry => entry.side === side && entry.copied.species === species);
   if (copy) return copy.shared ? null : { species: copy.own, copied: copy.copied };
-  return { species: racedForme(state, turn.changes, side, species) };
+  const mon = recordOf(turn, side, species);
+  const raced = mon && formeAtSort(state, mon, firstActed);
+  const dex = gens.get(state.genNum).species;
+  return { species: raced && dex.get(raced)?.baseStats.spe !== dex.get(species)?.baseStats.spe ? raced : species };
 }
 
-/** Every order names the mover that raced: its forme, or what it copied (round 64). */
+/** Every order names the mover that raced: its forme at the sort, or what it copied (round 64). */
 export function settleRacedFormes(state: ParserState): void {
   const turns = readTurns(readLines(state));
   state.speedOrders = state.speedOrders.flatMap(order => {
     const turn = turns.get(order.turn);
-    if (!turn || (turn.changes.length === 0 && turn.copies.length === 0)) return [order];
-    const first = racedMover(state, turn, order.firstSide, order.firstSpecies);
-    const second = racedMover(state, turn, order.secondSide, order.secondSpecies);
+    if (!turn) return [order];
+    const firstActed = recordOf(turn, order.firstSide, order.firstSpecies)?.acted;
+    const first = racedMover(state, turn, order.firstSide, order.firstSpecies, firstActed);
+    const second = racedMover(state, turn, order.secondSide, order.secondSpecies, firstActed);
     if (!first || !second) return [];
+    if (first.species === order.firstSpecies && second.species === order.secondSpecies && !first.copied && !second.copied) return [order];
     return [{
       ...order, firstSpecies: first.species, secondSpecies: second.species,
       ...(first.copied ? { firstCopied: first.copied } : {}), ...(second.copied ? { secondCopied: second.copied } : {}),

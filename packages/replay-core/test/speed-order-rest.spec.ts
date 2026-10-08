@@ -258,4 +258,34 @@ describe('the forme that raced, after Ally Switch, mid-turn changes and Ultra Bu
       'p1 Meowstic > p2 Garchomp', 'p1 Meowstic > p2 Shuckle', 'p2 Garchomp > p1 Kangaskhan', 'p1 Kangaskhan > p2 Shuckle',
     ]));
   });
+  test('singles: a second mover that changes forme after the first mover acted raced in its old forme (Gen 9, Eiscue)', () => {
+    // Garchomp (Adamant 0 Speed, 240) Tackles Eiscue (136), whose Ice Face breaks into Eiscue-Noice (296)
+    // before it moves; the simulator had already put Garchomp first. Read as Eiscue-Noice, the order
+    // asked Garchomp for 228 Speed EVs.
+    const garchomp = mon('Garchomp', 'Adamant', evs(0, 252, 0, 0, 4, 0), 'Leftovers', ['Tackle']);
+    const eiscue = { ...mon('Eiscue', 'Hardy', evs(0, 0, 0, 0, 0, 0), 'Leftovers', ['Splash']), ability: 'Ice Face' };
+    const battle = simulate('gen9customgame', [garchomp], [eiscue], [['move 1', 'move 1']]);
+    expect(movers(battle, 1)).toEqual(['p1a: Garchomp', 'p2a: Eiscue']);
+    expect(ordersOf(battle, 1)).toEqual(['p1 Garchomp > p2 Eiscue']);
+    const { speedOrders } = parseReplayLogWithObservations(replayLog(battle));
+    const sets = { p1: [garchomp], p2: [eiscue] };
+    expect(spreadOf(inferSpreads([], sets, 'gen9ou', speedOrders), sets, 'p1', 'Garchomp').evs.spe).toBe(0);
+  });
+
+  test('doubles: each race reads the formes from the last sort before its first mover acted (Gen 9)', () => {
+    // Before Garchomp (240) acts, Rotom-Wash (208) sits ahead of Eiscue (136); Garchomp's Tackle breaks
+    // Eiscue into Eiscue-Noice (296) and the simulator re-sorts the movers still waiting, so Eiscue now
+    // moves before Rotom-Wash: Garchomp raced Eiscue, Eiscue-Noice raced Rotom-Wash.
+    const battle = simulate('gen9doublescustomgame', [
+      mon('Garchomp', 'Adamant', evs(0, 252, 0, 0, 4, 0), 'Leftovers', ['Tackle']),
+      mon('Rotom-Wash', 'Bold', evs(252, 0, 252, 0, 4, 0), 'Leftovers', ['Splash']),
+    ], [
+      { ...mon('Eiscue', 'Hardy', evs(0, 0, 0, 0, 0, 0), 'Leftovers', ['Splash']), ability: 'Ice Face' },
+      mon('Shuckle', 'Relaxed', evs(0, 0, 0, 0, 0, 0), 'Leftovers', ['Splash']),
+    ], [['move 1 1, move 1', 'move 1, move 1']]);
+    expect(movers(battle, 1)).toEqual(['p1a: Garchomp', 'p2a: Eiscue', 'p1b: Rotom', 'p2b: Shuckle']);
+    expect(sorted(ordersOf(battle, 1))).toEqual(sorted([
+      'p1 Garchomp > p2 Eiscue', 'p1 Garchomp > p2 Shuckle', 'p2 Eiscue-Noice > p1 Rotom-Wash', 'p1 Rotom-Wash > p2 Shuckle',
+    ]));
+  });
 });
