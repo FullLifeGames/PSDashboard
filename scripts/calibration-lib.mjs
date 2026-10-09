@@ -29,8 +29,13 @@ export function fitConstantK(samples) {
 export const brier = (samples, k) =>
   samples.reduce((sum, s) => sum + (probOf(s, k) - (s.won ? 1 : 0)) ** 2, 0) / samples.length;
 
-/** Reads one JSONL dump; blank lines are skipped. */
-export const load = path => readFileSync(path, 'utf8').split('\n').filter(line => line.trim()).map(line => JSON.parse(line));
+/**
+ * Reads one JSONL dump, or several joined by commas in order (round 65, D26:
+ * the doubles verdict reads the bank's dump together with the holdout's);
+ * blank lines are skipped.
+ */
+export const load = path => path.split(',').flatMap(one =>
+  readFileSync(one, 'utf8').split('\n').filter(line => line.trim()).map(line => JSON.parse(line)));
 
 export const right = s => (s.score > 0) === s.p1Won;
 

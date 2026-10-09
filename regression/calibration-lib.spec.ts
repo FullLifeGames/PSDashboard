@@ -95,6 +95,18 @@ describe('calibration lib', () => {
     expect(mergeDumps(slices).map(sample => `${sample.id}#${sample.turn}`)).toEqual(SORTED_ORDER);
     expect(mergeDumps(slices)).toEqual(sortSamples(samples));
   });
+
+  // Round 65 (D26): the doubles verdict reads the bank's dump together with the holdout's, one comma list per side.
+  test('a comma list loads every dump in order, a single path loads one', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'calibration-lib-'));
+    const bank = join(dir, 'bank.jsonl');
+    const holdout = join(dir, 'holdout.jsonl');
+    writeFileSync(bank, `${JSON.stringify({ id: 'gen9ou-1', turn: 2 })}\n`);
+    writeFileSync(holdout, `${JSON.stringify({ id: 'gen9doublesou-2', turn: 3 })}\n\n${JSON.stringify({ id: 'gen9vgc2026regi-3', turn: 4 })}\n`);
+    const keys = (samples: { id: string; turn: number }[]) => samples.map(sample => `${sample.id}#${sample.turn}`);
+    expect(keys(load(`${bank},${holdout}`))).toEqual(['gen9ou-1#2', 'gen9doublesou-2#3', 'gen9vgc2026regi-3#4']);
+    expect(keys(load(holdout))).toEqual(['gen9doublesou-2#3', 'gen9vgc2026regi-3#4']);
+  });
 });
 
 /**

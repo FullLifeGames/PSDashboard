@@ -908,6 +908,72 @@ import { takeSimFastReport } from '../packages/eval-engine/src/forward/sim-fast/
  * static basis for this mass; the next lever, if any, is search/
  * planning-side.
  *
+ * DOUBLES FIT 2026-10-09 (improvement round 65, T127 run as a round of its
+ * own before wave 2; branch r65 from 5408d84 (= v1), cache v59 and v60;
+ * ledger, chains and probes under docs/perf/probes/2026-10-09-r65/). The
+ * booked plan, a refit with the bank as its target, gave way after the
+ * diagnosis: no calculation is broken (search, team build and
+ * reconstruction each excluded), but (1) round 64's corpus fit learned on
+ * teams built naked from the protocol (a Doubles OU mon carried 1.9 moves),
+ * and on the app's build variant E's gains mostly vanish; (2) the bank's 46
+ * doubles games are a skewed sample on screens: in its 17 games with
+ * screens up the screens side lost 12, in the holdout it won 49 of 84
+ * (binomial P 0.015), so every table that prices screens higher reads worse
+ * on the bank. A fit against the bank would learn those games by heart.
+ * BUILT: a static-only bank (ced14e3, 92b8646; EVAL_CALIBRATION_STATIC=1,
+ * with EVAL_CALIBRATION_FEATURES=1 the feature vector in the dump); a
+ * weight table per rule set and game type (9419f80; the host names the rule
+ * set from the replay's format, EvalSettings.ruleset carries it into every
+ * search, executors are bound to one rule set; 4dfbe9d carries it through
+ * every forked battle and the greedy replacement after a knock-out); the
+ * corpus grown to 3,977 replays (e19d6c2: 450 Champions OU; afc530a: 800
+ * Doubles OU rated 1400 to 1765, 600 Champions VGC Bo3) with a holdout of
+ * one set in three per doubles and Champions family (f636b7b; FNV-1a of
+ * family and players, a Bo3 never splits; 869 games: Doubles OU 369,
+ * Champions VGC 329, Champions OU 149, SV VGC 22; EVAL_CALIBRATION_SOURCE=
+ * holdout, three positions per game); the refit per family on bank dumps
+ * of the corpus, the app's build (7fd63cf; EVAL_FIT_DUMP, folds and
+ * bootstrap clustered by set, pre-registered holds, a second pass for
+ * flagged weights).
+ * PRE-REGISTERED (08:31): R1 the refit wins the pooled out-of-fold log-loss
+ * in all 20 seeds with mean Brier not worse; R2 a flagged weight (sign
+ * flipped against the hand weight, band wider than twice its value) is held
+ * and the family refits once; R3 no pooled harm with search on the
+ * family's test bank in both tables (standard doubles: bank doubles plus
+ * holdout Doubles OU and SV VGC; Champions: its holdout); R4 feedback three
+ * times byte-identical with the tier census, re-pins only at the gate.
+ * RESULTS (r65-corpus-app3, 23,776 positions, identity 18,903 of 18,903):
+ * Champions OU 20 of 20 seeds (log-loss -102 bp, Brier -50), holdout
+ * static -85 [-164, -5], search -23 [-97, +49] (early -83 resolved better,
+ * late +87 a warning; own K -8, no warning): adopted, 8fb437b. Standard
+ * doubles 17 of 20 (-14.5 / -7 bp): holdout Doubles OU search -36 [-62,
+ * -10] (own K -28 [-51, -6]), bank Doubles OU +144 [+24, +279], SV VGC
+ * (bank and holdout, 31 games) +85 [-10, +181]; one weight at a time the
+ * screens weight alone carries the holdout gain and the bank harm.
+ * Standard singles 17 of 20 and Champions VGC 7 of 20 keep their hand
+ * weights.
+ * USER GATE 2026-10-09 11:38 ("1a / 2b (wir sollten auf jeden Fall mehr
+ * VGC Spiele haben, das wird eine große Audience des Tools) / 3a / 4a"):
+ * (1) Champions OU keeps its fit; (2) Doubles OU takes its fit and VGC
+ * outside Champions becomes a rule set of its own with the hand doubles
+ * table (359769a, cache v60; replayRuleset in replay-core), more VGC games
+ * first (T137 as round 66); (3) doubles verdicts read the bank's doubles
+ * rows together with the holdout's (paired-calibration takes a comma list
+ * per side), the bank alone warns (NextSteps D26); (4) v1 pushed after the
+ * booking.
+ * GATE STATE 359769a: holdout Doubles OU row for row the candidate's, SV
+ * VGC row for row the base's; bank against r65-base-1009 (92b8646, in its
+ * values r64-wave1) 198 positions moved, every one Doubles OU; the bank
+ * alone reads doubles +96 (own K +74), a warning under D26; bank plus
+ * holdout -10 [-34, +15] (own K -4 [-25, +18]), no harm, no warning.
+ * Feedback three times byte-identical; against the base only the two
+ * Doubles OU census games differ, 8 turns moved, doubles tiers 11/4/0 ->
+ * 10/3/1 (2663093831 t7 mistake -> blunder at the same best move), the
+ * golden and the VGC pin unmoved. e2e 75/75, regression 2309 green, lint
+ * and tsc -b clean. Base of the code state: .calibration/r65-gate (Brier
+ * 0.2519/0.2311/0.1154, hq 0.2394/0.2031/0.1180, K 2.38). New TODOs T137
+ * to T140 (NextSteps).
+ *
  * WAVE 1.5 2026-10-08 (improvement round 64, the rest of wave 1 run as a
  * wave of its own before wave 2; spec docs/superpowers/specs/2026-10-06-
  * round-64-wave-1-5-design.md, plan docs/superpowers/plans/2026-10-06-

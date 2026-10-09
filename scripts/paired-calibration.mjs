@@ -1,5 +1,7 @@
 // Paired engine-vs-engine analysis over EVAL_CALIBRATION_DUMP files.
 // Usage: node scripts/paired-calibration.mjs <a.jsonl> <b.jsonl>
+// Each side may name several dumps joined by commas (round 65, D26: the
+// doubles verdict reads the bank's dump together with the holdout's).
 // Joins the two dumps on id#turn (identical positions only), reproduces the
 // harness aggregates for each side, prints the verdict table with error bars
 // (paired Brier deltas under the A side's K, 90 % band from a bootstrap over
