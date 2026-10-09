@@ -189,13 +189,43 @@ export const DOUBLES_FEATURE_WEIGHTS: Record<keyof EvalFeatures, number> = {
  * replay's format and hands it to the search (EvalSettings.ruleset); the
  * static weighs the features with the table of its rule set and game type.
  * Champions OU (singles) and Champions VGC (doubles) are their own games
- * with their own fits (round 65: a doubles table fitted without the
- * Champions VGC games read those games 43 bp worse than the hand weights).
+ * with their own fits: on the round-65 corpus their fitted weights part
+ * from the Scarlet/Violet games' (Champions OU bodies 121 and matchup 210
+ * against the singles table's 200 and 120).
  */
 export type StaticRuleset = 'standard' | 'champions';
 
-/** Champions OU (singles); until a fit of its own, the singles table. */
-export const CHAMPIONS_FEATURE_WEIGHTS: Record<keyof EvalFeatures, number> = { ...FEATURE_WEIGHTS };
+/**
+ * Champions OU (singles), fitted 2026-10-09 (round 65, T127) at the fixed
+ * singles K on its own games: 1,971 positions of 285 sets (450 ladder games
+ * rated 1366 to 1665, two thirds of their sets; the third is the holdout),
+ * the corpus measured like the app (the app's team build, the bank's
+ * reconstruction), folds and bootstrap clustered by set. Out of fold it
+ * beats the singles table in 20 of 20 seeds (log-loss −102 bp, Brier
+ * −50 bp); on the holdout's 149 games the static reads −85 bp [−164, −5]
+ * and the search −23 bp [−97, +49] (own K per phase −8, early −83
+ * [−172, 0], late +87 under the fixed K and +24 under its own). Fitted with
+ * their 90 % band: bodies 121 [87, 157], hazards 1.13 [0.6, 1.7], matchup
+ * 210 [82, 363]. Held: coverage (the first pass flipped its sign), the
+ * boost, Trick Room and choice-mismatch weights (variant E's holds);
+ * screens and tailwind lack support in Champions OU. Written out in full,
+ * so an edit of the singles table never moves a held Champions weight.
+ */
+export const CHAMPIONS_FEATURE_WEIGHTS: Record<keyof EvalFeatures, number> = {
+  bodies: 121,
+  boosts: 12,
+  hazards: 1.13,
+  screens: 5,
+  tailwind: 8,
+  trickRoom: 10,
+  matchup: 210,
+  coverage: 40,
+  choiceMismatch: 40,
+  sweepFastKo: 0,
+  sweepFastChip: 0,
+  sweepSlowKo: 0,
+  sweepSlowChip: 0,
+};
 
 /** Champions VGC (doubles); until a fit of its own, the doubles table. */
 export const CHAMPIONS_DOUBLES_FEATURE_WEIGHTS: Record<keyof EvalFeatures, number> = { ...DOUBLES_FEATURE_WEIGHTS };

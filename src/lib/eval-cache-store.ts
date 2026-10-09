@@ -257,7 +257,12 @@ export interface StoredEval {
 //      line and switch-in (T121), and the speed solver reads formes,
 //      Transform and Scarf rounding and fills open EV budgets toward the
 //      prior (T122).
-const EVAL_ENGINE_CACHE_VERSION = 58;
+// v59 (round 65): the static weighs by the replay's rule set. Champions OU
+//      gets its own fitted weights (bodies 121, hazards 1.13, matchup 210),
+//      and the greedy replacement after a knock-out reads the table of the
+//      rule set its position carries. Champions OU positions read new
+//      values; every other position keeps its value.
+const EVAL_ENGINE_CACHE_VERSION = 59;
 
 /** Round 61: a search-budget form stores under its own tag; the default keeps today's keys. */
 const versionTag = (): string => {
