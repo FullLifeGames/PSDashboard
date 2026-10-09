@@ -145,6 +145,16 @@ describe('Smogon set assumptions', () => {
     expect(assumptions?.pokemon.kyurem?.sourceDetail).toBe('Smogon sets gen9doublesubers');
   });
 
+  // Round 66 review: WebKit fails json() on a 404 page with "The string did not match the expected pattern.", a message
+  // the error filter does not know, so a format whose set file is missing for every species (Scarlet/Violet VGC 2026)
+  // threw "Smogon sets unavailable" in Safari. A 404 sets file now reads as an empty file before json() runs.
+  test('round 66: a 404 sets file reads as no sets in every browser', async () => {
+    const webkit404 = async () => ({
+      ok: false, status: 404, json: async () => { throw new SyntaxError('The string did not match the expected pattern.'); },
+    }) as unknown as Response;
+    await expect(fetchSmogonSetAssumptions({ formatId: 'gen9vgc2026regi', species: ['Kyurem', 'Toxapex'], fetcher: webkit404 as never })).resolves.toBeNull();
+  });
+
   // Round 66 (T142): on 150 Bo3 games of 2025 Reg H with open team sheets the VGC 2025 sets guessed 66 % of the items
   // and 82 % of the moves, the Doubles OU sets 48 % and 73 %; a year without a VGC set file guesses better from its
   // usage file alone than from the Doubles OU sets (2026 Reg I items 77 % against 68 %, Champions VGC 56 % against 51 %).

@@ -89,11 +89,16 @@ async function setsFrom(smogon: Smogon, gen: ReturnType<typeof gens.get>, name: 
  * move slot to its first option (toSet), the published file still holds
  * them all (round 63, T89: "Heat Wave / Hidden Power Ice" is one slot,
  * Knock Off a fixed one). @pkmn/smogon reads nothing but `json()`.
+ * A missing sets file (404) reads as an empty one before json() runs: the
+ * browsers word the parse error of a 404 page differently, and WebKit's
+ * "The string did not match the expected pattern." passed no error filter
+ * (round 66 review).
  */
 function keepingSetsFiles(fetcher: SmogonFetch, files: RawSetsFile[]): SmogonFetch {
   return async (input, init) => {
     const response = await fetcher(input, init);
     if (!/\/sets\/[^/]+\.json$/.test(input)) return response;
+    if (response.status === 404) return { ok: false, status: 404, json: async () => ({}) } as Response;
     return {
       ok: response.ok,
       status: response.status,
