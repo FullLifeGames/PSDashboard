@@ -1,0 +1,2049 @@
+{
+ "note": "Round 65: one third of the fit corpus's sets in every doubles and Champions family, held out of every fit and read as a test bank (scripts/build-fit-holdout.mjs).",
+ "sets": [
+  {
+   "key": "championsou|221savage|baigu",
+   "family": "championsou",
+   "ids": [
+    "gen9championsou-2693233309"
+   ]
+  },
+  {
+   "key": "championsou|221savage|lovebaka",
+   "family": "championsou",
+   "ids": [
+    "gen9championsou-2691896664"
+   ]
+  },
+  {
+   "key": "championsou|221savage|pok3monjake",
+   "family": "championsou",
+   "ids": [
+    "gen9championsou-2691891166"
+   ]
+  },
+  {
+   "key": "championsou|221savage|thu6yri",
+   "family": "championsou",
+   "ids": [
+    "gen9championsou-2692101621"
+   ]
+  },
+  {
+   "key": "championsou|221savage|tintedlensuser",
+   "family": "championsou",
+   "ids": [
+    "gen9championsou-2693244154"
+   ]
+  },
+  {
+   "key": "championsou|221savage|whitewingedfox",
+   "family": "championsou",
+   "ids": [
+    "gen9championsou-2693228880"
+   ]
+  },
+  {
+   "key": "championsou|acidosis|charjabugzealot",
+   "family": "championsou",
+   "ids": [
+    "gen9championsou-2694549543"
+   ]
+  },
+  {
+   "key": "championsou|acidosis|onesmallpenguin",
+   "family": "championsou",
+   "ids": [
+    "gen9championsou-2692930833"
+   ]
+  },
+  {
+   "key": "championsou|aldidadoa|gigabowser20",
+   "family": "championsou",
+   "ids": [
+    "gen9championsou-2691456367"
+   ]
+  },
+  {
+   "key": "championsou|aldidadoa|omatictron",
+   "family": "championsou",
+   "ids": [
+    "gen9championsou-2693046173"
+   ]
+  },
+  {
+   "key": "championsou|aldidadoa|tintedlensuser",
+   "family": "championsou",
+   "ids": [
+    "gen9championsou-2692963582"
+   ]
+  },
+  {
+   "key": "championsou|amieao|baigu",
+   "family": "championsou",
+   "ids": [
+    "gen9championsou-2693166839"
+   ]
+  },
+  {
+   "key": "championsou|amieao|hunter171717",
+   "family": "championsou",
+   "ids": [
+    "gen9championsou-2693713781"
+   ]
+  },
+  {
+   "key": "championsou|amieao|ziglings",
+   "family": "championsou",
+   "ids": [
+    "gen9championsou-2692697449"
+   ]
+  },
+  {
+   "key": "championsou|andresmao|antonny01",
+   "family": "championsou",
+   "ids": [
+    "gen9championsou-2691945913"
+   ]
+  },
+  {
+   "key": "championsou|andrewm0n|hatzegopteryx285",
+   "family": "championsou",
+   "ids": [
+    "gen9championsou-2694943171"
+   ]
+  },
+  {
+   "key": "championsou|andymiloknockis|elopipebomb",
+   "family": "championsou",
+   "ids": [
+    "gen9championsou-2692345548"
+   ]
+  },
+  {
+   "key": "championsou|argon657|qulbutokeee",
+   "family": "championsou",
+   "ids": [
+    "gen9championsou-2693892277"
+   ]
+  },
+  {
+   "key": "championsou|asdccc|ineedaonetype",
+   "family": "championsou",
+   "ids": [
+    "gen9championsou-2692053674"
+   ]
+  },
+  {
+   "key": "championsou|asdccc|jason2015",
+   "family": "championsou",
+   "ids": [
+    "gen9championsou-2695398577"
+   ]
+  },
+  {
+   "key": "championsou|axolloveslokix|ineedaonetype",
+   "family": "championsou",
+   "ids": [
+    "gen9championsou-2691899166"
+   ]
+  },
+  {
+   "key": "championsou|axtell|b7ue",
+   "family": "championsou",
+   "ids": [
+    "gen9championsou-2692599072"
+   ]
+  },
+  {
+   "key": "championsou|axtell|raimeui",
+   "family": "championsou",
+   "ids": [
+    "gen9championsou-2692660534"
+   ]
+  },
+  {
+   "key": "championsou|axtell|tintedlensuser",
+   "family": "championsou",
+   "ids": [
+    "gen9championsou-2692824525"
+   ]
+  },
+  {
+   "key": "championsou|b7ue|badtoworse",
+   "family": "championsou",
+   "ids": [
+    "gen9championsou-2693266624"
+   ]
+  },
+  {
+   "key": "championsou|baigupig|calemtwo",
+   "family": "championsou",
+   "ids": [
+    "gen9championsou-2694981435"
+   ]
+  },
+  {
+   "key": "championsou|baigupig|crazeysman",
+   "family": "championsou",
+   "ids": [
+    "gen9championsou-2694975381"
+   ]
+  },
+  {
+   "key": "championsou|baigupig|kingowenjr",
+   "family": "championsou",
+   "ids": [
+    "gen9championsou-2694992788",
+    "gen9championsou-2694382448"
+   ]
+  },
+  {
+   "key": "championsou|baigupig|meorge96",
+   "family": "championsou",
+   "ids": [
+    "gen9championsou-2694391656"
+   ]
+  },
+  {
+   "key": "championsou|baigu|crazeysman",
+   "family": "championsou",
+   "ids": [
+    "gen9championsou-2693815715"
+   ]
+  },
+  {
+   "key": "championsou|baigu|hummusgrubbus",
+   "family": "championsou",
+   "ids": [
+    "gen9championsou-2692006615"
+   ]
+  },
+  {
+   "key": "championsou|baigu|hunter171717",
+   "family": "championsou",
+   "ids": [
+    "gen9championsou-2693207413"
+   ]
+  },
+  {
+   "key": "championsou|baigu|larpmen3",
+   "family": "championsou",
+   "ids": [
+    "gen9championsou-2693773283"
+   ]
+  },
+  {
+   "key": "championsou|baigu|megaptrainer",
+   "family": "championsou",
+   "ids": [
+    "gen9championsou-2694175141"
+   ]
+  },
+  {
+   "key": "championsou|baigu|tintedlensuser",
+   "family": "championsou",
+   "ids": [
+    "gen9championsou-2692699732",
+    "gen9championsou-2692683341"
+   ]
+  },
+  {
+   "key": "championsou|baigu|whitewingedfox",
+   "family": "championsou",
+   "ids": [
+    "gen9championsou-2693844577",
+    "gen9championsou-2693204767"
+   ]
+  },
+  {
+   "key": "championsou|bigmanswag24|demonlorddracoz",
+   "family": "championsou",
+   "ids": [
+    "gen9championsou-2693005741"
+   ]
+  },
+  {
+   "key": "championsou|bingus105|iamnatty",
+   "family": "championsou",
+   "ids": [
+    "gen9championsou-2691741156"
+   ]
+  },
+  {
+   "key": "championsou|biujj|dsppp",
+   "family": "championsou",
+   "ids": [
+    "gen9championsou-2694371329"
+   ]
+  },
+  {
+   "key": "championsou|bombasticychu|redvioletblue",
+   "family": "championsou",
+   "ids": [
+    "gen9championsou-2692263144"
+   ]
+  },
+  {
+   "key": "championsou|bombasticychu|tintedlensuser",
+   "family": "championsou",
+   "ids": [
+    "gen9championsou-2692235078"
+   ]
+  },
+  {
+   "key": "championsou|bombasticychu|ultrakasajizo",
+   "family": "championsou",
+   "ids": [
+    "gen9championsou-2692011057"
+   ]
+  },
+  {
+   "key": "championsou|bouncingcakes|kazuelasnt",
+   "family": "championsou",
+   "ids": [
+    "gen9championsou-2691844564"
+   ]
+  },
+  {
+   "key": "championsou|bouncingcakes|masterpokejohn",
+   "family": "championsou",
+   "ids": [
+    "gen9championsou-2691755813"
+   ]
+  },
+  {
+   "key": "championsou|bouncingcakes|redvioletblue",
+   "family": "championsou",
+   "ids": [
+    "gen9championsou-2692330588"
+   ]
+  },
+  {
+   "key": "championsou|bouncingcakes|saurheadandpain",
+   "family": "championsou",
+   "ids": [
+    "gen9championsou-2691828965"
+   ]
+  },
+  {
+   "key": "championsou|bouncingcakes|spacetemmie",
+   "family": "championsou",
+   "ids": [
+    "gen9championsou-2692373474"
+   ]
+  },
+  {
+   "key": "championsou|bouncingcakes|whichjuanz",
+   "family": "championsou",
+   "ids": [
+    "gen9championsou-2691760310"
+   ]
+  },
+  {
+   "key": "championsou|burgerthing|fazbeared",
+   "family": "championsou",
+   "ids": [
+    "gen9championsou-2693895085"
+   ]
+  },
+  {
+   "key": "championsou|burrasca|originalname1679",
+   "family": "championsou",
+   "ids": [
+    "gen9championsou-2691479438"
+   ]
+  },
+  {
+   "key": "championsou|cackleford967|profix991",
+   "family": "championsou",
+   "ids": [
+    "gen9championsou-2692358324"
+   ]
+  },
+  {
+   "key": "championsou|cackleford967|spacetemmie",
+   "family": "championsou",
+   "ids": [
+    "gen9championsou-2692361321"
+   ]
+  },
+  {
+   "key": "championsou|calemtwo|ineedaonetype",
+   "family": "championsou",
+   "ids": [
+    "gen9championsou-2694454559"
+   ]
+  },
+  {
+   "key": "championsou|carkol32|jason2015",
+   "family": "championsou",
+   "ids": [
+    "gen9championsou-2693425313"
+   ]
+  },
+  {
+   "key": "championsou|charmalane|draco09876",
+   "family": "championsou",
+   "ids": [
+    "gen9championsou-2692053545"
+   ]
+  },
+  {
+   "key": "championsou|chigusa24zono|kingowenjr",
+   "family": "championsou",
+   "ids": [
+    "gen9championsou-2693671626"
+   ]
+  },
+  {
+   "key": "championsou|choucroutevolante|flippersjosh",
+   "family": "championsou",
+   "ids": [
+    "gen9championsou-2693089721"
+   ]
+  },
+  {
+   "key": "championsou|choucroutevolante|redvioletblue",
+   "family": "championsou",
+   "ids": [
+    "gen9championsou-2693116324"
+   ]
+  },
+  {
+   "key": "championsou|cocamatt|relaxarus",
+   "family": "championsou",
+   "ids": [
+    "gen9championsou-2692800649"
+   ]
+  },
+  {
+   "key": "championsou|colo010|relaxarus",
+   "family": "championsou",
+   "ids": [
+    "gen9championsou-2692950157"
+   ]
+  },
+  {
+   "key": "championsou|coutraininginc2|heimao1",
+   "family": "championsou",
+   "ids": [
+    "gen9championsou-2694880127"
+   ]
+  },
+  {
+   "key": "championsou|crazeysman|demonlorddracoz",
+   "family": "championsou",
+   "ids": [
+    "gen9championsou-2692992914"
+   ]
+  },
+  {
+   "key": "championsou|crazeysman|whitewingedfox",
+   "family": "championsou",
+   "ids": [
+    "gen9championsou-2693207713"
+   ]
+  },
+  {
+   "key": "championsou|dailygravy|pokeag",
+   "family": "championsou",
+   "ids": [
+    "gen9championsou-2691645472"
+   ]
+  },
+  {
+   "key": "championsou|deecolon|otozinclus",
+   "family": "championsou",
+   "ids": [
+    "gen9championsou-2692294904"
+   ]
+  },
+  {
+   "key": "championsou|demonlorddracoz|ineedaonetype",
+   "family": "championsou",
+   "ids": [
+    "gen9championsou-2694514531"
+   ]
+  },
+  {
+   "key": "championsou|demonlorddracoz|jason2015",
+   "family": "championsou",
+   "ids": [
+    "gen9championsou-2694147064"
+   ]
+  },
+  {
+   "key": "championsou|demonlorddracoz|marlingl",
+   "family": "championsou",
+   "ids": [
+    "gen9championsou-2694481780",
+    "gen9championsou-2693317995"
+   ]
+  },
+  {
+   "key": "championsou|demonlorddracoz|onesmallpenguin",
+   "family": "championsou",
+   "ids": [
+    "gen9championsou-2693407476"
+   ]
+  },
+  {
+   "key": "championsou|demonlorddracoz|ratette",
+   "family": "championsou",
+   "ids": [
+    "gen9championsou-2693373437"
+   ]
+  },
+  {
+   "key": "championsou|dioporseo|switchemdownjj",
+   "family": "championsou",
+   "ids": [
+    "gen9championsou-2691861755",
+    "gen9championsou-2692808254"
+   ]
+  },
+  {
+   "key": "championsou|donotperceiveme|hiiamreddead2",
+   "family": "championsou",
+   "ids": [
+    "gen9championsou-2693743955"
+   ]
+  },
+  {
+   "key": "championsou|draco09876|ineedaonetype",
+   "family": "championsou",
+   "ids": [
+    "gen9championsou-2691882899"
+   ]
+  },
+  {
+   "key": "championsou|draco09876|juloan",
+   "family": "championsou",
+   "ids": [
+    "gen9championsou-2691912587"
+   ]
+  },
+  {
+   "key": "championsou|draco09876|ratette",
+   "family": "championsou",
+   "ids": [
+    "gen9championsou-2691892061"
+   ]
+  },
+  {
+   "key": "championsou|dragonfandan|kingowenjr",
+   "family": "championsou",
+   "ids": [
+    "gen9championsou-2694378219"
+   ]
+  },
+  {
+   "key": "championsou|ds2311er|paradoxengine",
+   "family": "championsou",
+   "ids": [
+    "gen9championsou-2693113315"
+   ]
+  },
+  {
+   "key": "championsou|emperadorsrn|flippersjosh",
+   "family": "championsou",
+   "ids": [
+    "gen9championsou-2692750689"
+   ]
+  },
+  {
+   "key": "championsou|emperadorsrn|jusmine",
+   "family": "championsou",
+   "ids": [
+    "gen9championsou-2692753366"
+   ]
+  },
+  {
+   "key": "championsou|emsioab|switchemdownjj",
+   "family": "championsou",
+   "ids": [
+    "gen9championsou-2693645983",
+    "gen9championsou-2693002503"
+   ]
+  },
+  {
+   "key": "championsou|fazbeared|ziglings",
+   "family": "championsou",
+   "ids": [
+    "gen9championsou-2693236643"
+   ]
+  },
+  {
+   "key": "championsou|flippersjosh|ineedaonetype",
+   "family": "championsou",
+   "ids": [
+    "gen9championsou-2692372505"
+   ]
+  },
+  {
+   "key": "championsou|flippersjosh|juloan",
+   "family": "championsou",
+   "ids": [
+    "gen9championsou-2694108875"
+   ]
+  },
+  {
+   "key": "championsou|flippersjosh|l0uness",
+   "family": "championsou",
+   "ids": [
+    "gen9championsou-2691755166"
+   ]
+  },
+  {
+   "key": "championsou|flippersjosh|switchemdownjj",
+   "family": "championsou",
+   "ids": [
+    "gen9championsou-2692986633",
+    "gen9championsou-2694103115",
+    "gen9championsou-2692994386"
+   ]
+  },
+  {
+   "key": "championsou|g1forever|ineedaonetype",
+   "family": "championsou",
+   "ids": [
+    "gen9championsou-2694071168"
+   ]
+  },
+  {
+   "key": "championsou|g1forever|norman2",
+   "family": "championsou",
+   "ids": [
+    "gen9championsou-2692897806",
+    "gen9championsou-2692901939"
+   ]
+  },
+  {
+   "key": "championsou|gigabowser20|jason2015",
+   "family": "championsou",
+   "ids": [
+    "gen9championsou-2692957545",
+    "gen9championsou-2691454048"
+   ]
+  },
+  {
+   "key": "championsou|guwopthegoat|noivern1379",
+   "family": "championsou",
+   "ids": [
+    "gen9championsou-2694047454"
+   ]
+  },
+  {
+   "key": "championsou|guwopthegoat|pxoh",
+   "family": "championsou",
+   "ids": [
+    "gen9championsou-2694174396",
+    "gen9championsou-2694653831"
+   ]
+  },
+  {
+   "key": "championsou|happyskadi|hummusgrubbus",
+   "family": "championsou",
+   "ids": [
+    "gen9championsou-2693663988"
+   ]
+  },
+  {
+   "key": "championsou|happyskadi|peakrow",
+   "family": "championsou",
+   "ids": [
+    "gen9championsou-2693313151"
+   ]
+  },
+  {
+   "key": "championsou|healboy009|relaxarus",
+   "family": "championsou",
+   "ids": [
+    "gen9championsou-2693317484"
+   ]
+  },
+  {
+   "key": "championsou|heckingman|nvidiato7trillion",
+   "family": "championsou",
+   "ids": [
+    "gen9championsou-2693868844"
+   ]
+  },
+  {
+   "key": "championsou|heimao1|lianxiaonian",
+   "family": "championsou",
+   "ids": [
+    "gen9championsou-2693670693"
+   ]
+  },
+  {
+   "key": "championsou|heitorzin6677|hgtuy",
+   "family": "championsou",
+   "ids": [
+    "gen9championsou-2695044311"
+   ]
+  },
+  {
+   "key": "championsou|heratina|ratette",
+   "family": "championsou",
+   "ids": [
+    "gen9championsou-2691886974"
+   ]
+  },
+  {
+   "key": "championsou|hernameislady|xxmoooxx",
+   "family": "championsou",
+   "ids": [
+    "gen9championsou-2692830023"
+   ]
+  },
+  {
+   "key": "championsou|hgtuy|pokechamp13",
+   "family": "championsou",
+   "ids": [
+    "gen9championsou-2691703002"
+   ]
+  },
+  {
+   "key": "championsou|homerosompson|mrluvaluva",
+   "family": "championsou",
+   "ids": [
+    "gen9championsou-2692931710"
+   ]
+  },
+  {
+   "key": "championsou|homerosompson|onesmallpenguin",
+   "family": "championsou",
+   "ids": [
+    "gen9championsou-2692928706"
+   ]
+  },
+  {
+   "key": "championsou|hummusgrubbus|littleveggie",
+   "family": "championsou",
+   "ids": [
+    "gen9championsou-2694170254"
+   ]
+  },
+  {
+   "key": "championsou|hunter171717|lastfr",
+   "family": "championsou",
+   "ids": [
+    "gen9championsou-2694553317"
+   ]
+  },
+  {
+   "key": "championsou|hunter171717|peakrow",
+   "family": "championsou",
+   "ids": [
+    "gen9championsou-2694438176"
+   ]
+  },
+  {
+   "key": "championsou|iklpoijlpjolje|switchemdownjj",
+   "family": "championsou",
+   "ids": [
+    "gen9championsou-2692819628"
+   ]
+  },
+  {
+   "key": "championsou|ineedaonetype|larpmen3",
+   "family": "championsou",
+   "ids": [
+    "gen9championsou-2695096643"
+   ]
+  },
+  {
+   "key": "championsou|ineedaonetype|marteaumastoc",
+   "family": "championsou",
+   "ids": [
+    "gen9championsou-2692992005"
+   ]
+  },
+  {
+   "key": "championsou|ineedaonetype|pxoh",
+   "family": "championsou",
+   "ids": [
+    "gen9championsou-2695231434"
+   ]
+  },
+  {
+   "key": "championsou|ineedaonetype|swaggerw2f",
+   "family": "championsou",
+   "ids": [
+    "gen9championsou-2694777396"
+   ]
+  },
+  {
+   "key": "championsou|ineedaonetype|whichjuanz",
+   "family": "championsou",
+   "ids": [
+    "gen9championsou-2691758621"
+   ]
+  },
+  {
+   "key": "championsou|jason2015|seatown",
+   "family": "championsou",
+   "ids": [
+    "gen9championsou-2693383788"
+   ]
+  },
+  {
+   "key": "championsou|jason2015|wqdong",
+   "family": "championsou",
+   "ids": [
+    "gen9championsou-2692954314"
+   ]
+  },
+  {
+   "key": "championsou|joshizback|sabrinasandstorm",
+   "family": "championsou",
+   "ids": [
+    "gen9championsou-2693561421"
+   ]
+  },
+  {
+   "key": "championsou|juloan|paradoxengine",
+   "family": "championsou",
+   "ids": [
+    "gen9championsou-2692121053",
+    "gen9championsou-2692851667"
+   ]
+  },
+  {
+   "key": "championsou|juloan|switchemdownjj",
+   "family": "championsou",
+   "ids": [
+    "gen9championsou-2692864570",
+    "gen9championsou-2692869205"
+   ]
+  },
+  {
+   "key": "championsou|kianchimchar|paradoxengine",
+   "family": "championsou",
+   "ids": [
+    "gen9championsou-2694672446"
+   ]
+  },
+  {
+   "key": "championsou|kurusii|otozinclus",
+   "family": "championsou",
+   "ids": [
+    "gen9championsou-2692416030"
+   ]
+  },
+  {
+   "key": "championsou|larpmen3|switchemdownjj",
+   "family": "championsou",
+   "ids": [
+    "gen9championsou-2693912982"
+   ]
+  },
+  {
+   "key": "championsou|liquidswxrdz|steven45rosas",
+   "family": "championsou",
+   "ids": [
+    "gen9championsou-2693634570"
+   ]
+  },
+  {
+   "key": "championsou|livyatan294|onesmallpenguin",
+   "family": "championsou",
+   "ids": [
+    "gen9championsou-2692924660"
+   ]
+  },
+  {
+   "key": "championsou|marlingl|ultrakasajizo",
+   "family": "championsou",
+   "ids": [
+    "gen9championsou-2691945449"
+   ]
+  },
+  {
+   "key": "championsou|marlingl|whitewingedfox",
+   "family": "championsou",
+   "ids": [
+    "gen9championsou-2693833608"
+   ]
+  },
+  {
+   "key": "championsou|marteaumastoc|redvioletblue",
+   "family": "championsou",
+   "ids": [
+    "gen9championsou-2692335120"
+   ]
+  },
+  {
+   "key": "championsou|masterlulu|nat7382",
+   "family": "championsou",
+   "ids": [
+    "gen9championsou-2693195428"
+   ]
+  },
+  {
+   "key": "championsou|mgg65|whichjuanz",
+   "family": "championsou",
+   "ids": [
+    "gen9championsou-2695281281"
+   ]
+  },
+  {
+   "key": "championsou|monandoboyz4|tintedlensuser",
+   "family": "championsou",
+   "ids": [
+    "gen9championsou-2694187205"
+   ]
+  },
+  {
+   "key": "championsou|mrluvaluva|switchemdownjj",
+   "family": "championsou",
+   "ids": [
+    "gen9championsou-2692976810"
+   ]
+  },
+  {
+   "key": "championsou|oatmiltank|pokechamp26",
+   "family": "championsou",
+   "ids": [
+    "gen9championsou-2694660174"
+   ]
+  },
+  {
+   "key": "championsou|onesmallpenguin|tintedlensuser",
+   "family": "championsou",
+   "ids": [
+    "gen9championsou-2693377894",
+    "gen9championsou-2693400002"
+   ]
+  },
+  {
+   "key": "championsou|pok3monjake|switchemdownjj",
+   "family": "championsou",
+   "ids": [
+    "gen9championsou-2693906103"
+   ]
+  },
+  {
+   "key": "championsou|pokechamp13|switchemdownjj",
+   "family": "championsou",
+   "ids": [
+    "gen9championsou-2691856821"
+   ]
+  },
+  {
+   "key": "championsou|pxoh|switchemdownjj",
+   "family": "championsou",
+   "ids": [
+    "gen9championsou-2692962764"
+   ]
+  },
+  {
+   "key": "championsou|ratette|switchemdownjj",
+   "family": "championsou",
+   "ids": [
+    "gen9championsou-2691843318"
+   ]
+  },
+  {
+   "key": "championsou|relaxarus|switchemdownjj",
+   "family": "championsou",
+   "ids": [
+    "gen9championsou-2692804916"
+   ]
+  },
+  {
+   "key": "championsou|seatown|xygjky",
+   "family": "championsou",
+   "ids": [
+    "gen9championsou-2694828817"
+   ]
+  },
+  {
+   "key": "championsvgc|agati|niccovgc",
+   "family": "championsvgc",
+   "ids": [
+    "gen9championsvgc2026regmbbo3-2639084854-5n7pu2pkkn118qmlh7jbj4714nb714qpw",
+    "gen9championsvgc2026regmbbo3-2639087424-xxljiuedpghc0q31e0yiasgd54117uspw"
+   ]
+  },
+  {
+   "key": "championsvgc|ahrivgc|zee",
+   "family": "championsvgc",
+   "ids": [
+    "gen9championsvgc2026regmabo3-2611780497-k36cutb2ebmrr215cfcbvsdcckb2obgpw",
+    "gen9championsvgc2026regmabo3-2611785852-0goow92kgdk31xwapmoyd6hlpl62euopw"
+   ]
+  },
+  {
+   "key": "championsvgc|animus|pwnyperson",
+   "family": "championsvgc",
+   "ids": [
+    "gen9championsvgc2026regmabo3-2606723198",
+    "gen9championsvgc2026regmabo3-2606726147",
+    "gen9championsvgc2026regmabo3-2606728106"
+   ]
+  },
+  {
+   "key": "championsvgc|animus|slushiw",
+   "family": "championsvgc",
+   "ids": [
+    "gen9championsvgc2026regmbbo3-2637328722-3q5402xyrmcw823lr3ww2lgaq9peu2ipw",
+    "gen9championsvgc2026regmbbo3-2637332981-wpykj4d1dl95uev47hh6v9jlmhec85apw"
+   ]
+  },
+  {
+   "key": "championsvgc|arekusabi|saamuvgc",
+   "family": "championsvgc",
+   "ids": [
+    "gen9championsvgc2026regmabo3-2606579300-loq8hm8d7arhke1rf3nxlomq07rpiuwpw",
+    "gen9championsvgc2026regmabo3-2606583629-5ot27psk43e8e0iigf9camac6ue0b4rpw"
+   ]
+  },
+  {
+   "key": "championsvgc|arkanevgc|momajun",
+   "family": "championsvgc",
+   "ids": [
+    "gen9championsvgc2026regmbbo3-2640919534-ybpkeruvjbpucxp2111p08g8wl9vh2epw",
+    "gen9championsvgc2026regmbbo3-2640922707-3cgr1ad694emd17gb9a72n9lhr9iti8pw"
+   ]
+  },
+  {
+   "key": "championsvgc|aurarayquaza|nashvgc7",
+   "family": "championsvgc",
+   "ids": [
+    "gen9championsvgc2026regmabo3-2605549109-iuxh7rgoirmq3a1cgbys1f4fls9mybbpw",
+    "gen9championsvgc2026regmabo3-2605552708-5ks36i5m03xgcfpd8vnxc5i2at0supupw"
+   ]
+  },
+  {
+   "key": "championsvgc|avatarfede|triir",
+   "family": "championsvgc",
+   "ids": [
+    "gen9championsvgc2026regmabo3-2606506605-y8wegg4x1fcdmr8bfrqsfihaxyoonjbpw",
+    "gen9championsvgc2026regmabo3-2606510452-kgqinrou0ffia1ft20ghabljw6kd0h2pw",
+    "gen9championsvgc2026regmabo3-2606512163-yw9eg0osn3vyc4db6gvimbs3xt6lsewpw"
+   ]
+  },
+  {
+   "key": "championsvgc|azulitepoke|banfoxblizzards",
+   "family": "championsvgc",
+   "ids": [
+    "gen9championsvgc2026regmabo3-2606353620",
+    "gen9championsvgc2026regmabo3-2606358514"
+   ]
+  },
+  {
+   "key": "championsvgc|bytev24|magicrana",
+   "family": "championsvgc",
+   "ids": [
+    "gen9championsvgc2026regmabo3-2604827394",
+    "gen9championsvgc2026regmabo3-2604833316"
+   ]
+  },
+  {
+   "key": "championsvgc|bytev24|zekromzeke",
+   "family": "championsvgc",
+   "ids": [
+    "gen9championsvgc2026regmbbo3-2641315466",
+    "gen9championsvgc2026regmbbo3-2641321000",
+    "gen9championsvgc2026regmbbo3-2641324213"
+   ]
+  },
+  {
+   "key": "championsvgc|changchu|pmc21",
+   "family": "championsvgc",
+   "ids": [
+    "gen9championsvgc2026regmabo3-2611680893-nvx9qkc0n6v1l94wuaby2ryieqa4cx0pw",
+    "gen9championsvgc2026regmabo3-2611684445-sssot9kd5352vut2rg4g9fpd2ox2b7ppw",
+    "gen9championsvgc2026regmabo3-2611687386-ys6m4t76qc3icdmrnxhstgb3qtqvnp5pw"
+   ]
+  },
+  {
+   "key": "championsvgc|chillinwithdylan|supahsanti",
+   "family": "championsvgc",
+   "ids": [
+    "gen9championsvgc2026regmabo3-2611151768-lgi54q1dl3cjnukrsarx2dy37lwu714pw",
+    "gen9championsvgc2026regmabo3-2611155858-braqkdf30y9b06r6u5lnls8wj7to3gfpw"
+   ]
+  },
+  {
+   "key": "championsvgc|code|patcon5",
+   "family": "championsvgc",
+   "ids": [
+    "gen9championsvgc2026regmabo3-2612084199-564cqm44xyw2olw6s8a9nw0vfhvddqlpw",
+    "gen9championsvgc2026regmabo3-2612087060-vaxat1o76mcihuo2e9d5fgcwbwd0c74pw"
+   ]
+  },
+  {
+   "key": "championsvgc|dawoblefet|thacrow",
+   "family": "championsvgc",
+   "ids": [
+    "gen9championsvgc2026regmbbo3-2640275402-78u1t7j4ichpej1stsph3j3ed38yapvpw",
+    "gen9championsvgc2026regmbbo3-2640278557-92coeqb0ne1pf3cgdpbdbjmmou38s9apw",
+    "gen9championsvgc2026regmbbo3-2640282250-3olrrlt8j81rpsaqw5giia7kw35srvbpw"
+   ]
+  },
+  {
+   "key": "championsvgc|dominicex|keanuvgc",
+   "family": "championsvgc",
+   "ids": [
+    "gen9championsvgc2026regmbbo3-2636761942-57w15ijywfer8mxglxgs5im6ofs1lmjpw",
+    "gen9championsvgc2026regmbbo3-2636766788-fx7ylqmw3lxhdubj2ta8hpufb0fu463pw"
+   ]
+  },
+  {
+   "key": "championsvgc|dubiousvgc|jmodri",
+   "family": "championsvgc",
+   "ids": [
+    "gen9championsvgc2026regmbbo3-2643774036",
+    "gen9championsvgc2026regmbbo3-2643775532",
+    "gen9championsvgc2026regmbbo3-2643777213"
+   ]
+  },
+  {
+   "key": "championsvgc|elninovgc21|feyette",
+   "family": "championsvgc",
+   "ids": [
+    "gen9championsvgc2026regmbbo3-2641072552-30bgqaymavyvc5nhw8da7wrqdurxquwpw",
+    "gen9championsvgc2026regmbbo3-2641075218-raeheb02ypsxsatpbx1kc3jcl8gmp0opw",
+    "gen9championsvgc2026regmbbo3-2641077120-wmwbuvmi64t5f2siiv38hu6xj41htc8pw"
+   ]
+  },
+  {
+   "key": "championsvgc|elninovgc21|jonotv",
+   "family": "championsvgc",
+   "ids": [
+    "gen9championsvgc2026regmabo3-2611984319",
+    "gen9championsvgc2026regmabo3-2611988490"
+   ]
+  },
+  {
+   "key": "championsvgc|elninovgc21|liviovgc",
+   "family": "championsvgc",
+   "ids": [
+    "gen9championsvgc2026regmbbo3-2636395999",
+    "gen9championsvgc2026regmbbo3-2636399419",
+    "gen9championsvgc2026regmbbo3-2636401962"
+   ]
+  },
+  {
+   "key": "championsvgc|emforbes|magicrana",
+   "family": "championsvgc",
+   "ids": [
+    "gen9championsvgc2026regmbbo3-2640176702-as8sxl4nl6sc35i7qk4c0rnd02hwfehpw",
+    "gen9championsvgc2026regmbbo3-2640179238-kb8qh5d2sf4e9k4vkqnulb8ou2kkteqpw",
+    "gen9championsvgc2026regmbbo3-2640181593-1lv7pjhtudjqshwxosms8l23syyu7x3pw"
+   ]
+  },
+  {
+   "key": "championsvgc|feis|mrx009psychogundam",
+   "family": "championsvgc",
+   "ids": [
+    "gen9championsvgc2026regmb-2640686759-x9e19dx9xeivtj0plqev4v67b9yebiqpw",
+    "gen9championsvgc2026regmb-2640690557-rvhdr0j3xnb64mp3td5ma991h3ge2kxpw"
+   ]
+  },
+  {
+   "key": "championsvgc|frostvg|majorstar",
+   "family": "championsvgc",
+   "ids": [
+    "gen9championsvgc2026regmbbo3-2643415752-qiai1ex32pjt11jnefmqbghrf7m4ehmpw",
+    "gen9championsvgc2026regmbbo3-2643421059-shl7krgs0oc389hj159ybktplrdv3ukpw"
+   ]
+  },
+  {
+   "key": "championsvgc|frostvg|pizzagreedent",
+   "family": "championsvgc",
+   "ids": [
+    "gen9championsvgc2026regmbbo3-2639714006-m1fseersdjk0e886qqe6o7mf9f7f1yopw",
+    "gen9championsvgc2026regmbbo3-2639718000-j9r7nndssul4nn4dgfexen0qgxolplwpw"
+   ]
+  },
+  {
+   "key": "championsvgc|frostvg|tamupoke",
+   "family": "championsvgc",
+   "ids": [
+    "gen9championsvgc2026regmabo3-2607362806",
+    "gen9championsvgc2026regmabo3-2607370025",
+    "gen9championsvgc2026regmabo3-2607375073"
+   ]
+  },
+  {
+   "key": "championsvgc|gahaku|pqlarbear",
+   "family": "championsvgc",
+   "ids": [
+    "gen9championsvgc2026regmbbo3-2641440393-msxhaachem6r0tc9lu7f4kyflic0labpw",
+    "gen9championsvgc2026regmbbo3-2641444339-c4dejdoew4l12q8lo4jm6wkwh9egfjrpw",
+    "gen9championsvgc2026regmbbo3-2641446511-uvpo8383bqco9pet9tvhwdm20ru3gjmpw"
+   ]
+  },
+  {
+   "key": "championsvgc|getnikkdon|thebrosofpokes",
+   "family": "championsvgc",
+   "ids": [
+    "gen9championsvgc2026regmabo3-2611951079-1m72slmw1ytvffl9mphj5w4ortgxij9pw",
+    "gen9championsvgc2026regmabo3-2611956834-41wri26sg0ubvnv3qqp3iarmuf6e4v1pw",
+    "gen9championsvgc2026regmabo3-2611960670-crccww0s2n1qvxpi4cudwsbny1pshi3pw"
+   ]
+  },
+  {
+   "key": "championsvgc|glacialfrance|zekromzeke",
+   "family": "championsvgc",
+   "ids": [
+    "gen9championsvgc2026regmabo3-2607398508",
+    "gen9championsvgc2026regmabo3-2607403610",
+    "gen9championsvgc2026regmabo3-2607408244"
+   ]
+  },
+  {
+   "key": "championsvgc|icebergvgc|kirans",
+   "family": "championsvgc",
+   "ids": [
+    "gen9championsvgc2026regmbbo3-2644270669-o7vkv9ti9scaxxf642qu8sb4fttvtyspw",
+    "gen9championsvgc2026regmbbo3-2644272893-dr8exd0gg7l75b8icbcxne5a8pgb9r2pw",
+    "gen9championsvgc2026regmbbo3-2644274255-ai0amu43cjmci6to30xw6vi1wrhglpepw"
+   ]
+  },
+  {
+   "key": "championsvgc|icebergvgc|nashvgc7",
+   "family": "championsvgc",
+   "ids": [
+    "gen9championsvgc2026regmbbo3-2635566162-8tn12wopum55odeajxydjuy0cc4nqbcpw",
+    "gen9championsvgc2026regmbbo3-2635568741-thgji9d4pq47cejvfkpfpapweclrsb0pw",
+    "gen9championsvgc2026regmbbo3-2635570979-exukun2m962te3be9p1u205mk3iox1ppw"
+   ]
+  },
+  {
+   "key": "championsvgc|jhufself|pwnyperson",
+   "family": "championsvgc",
+   "ids": [
+    "gen9championsvgc2026regmabo3-2611470375",
+    "gen9championsvgc2026regmabo3-2611473020",
+    "gen9championsvgc2026regmabo3-2611475032"
+   ]
+  },
+  {
+   "key": "championsvgc|joeux9|niziulove",
+   "family": "championsvgc",
+   "ids": [
+    "gen9championsvgc2026regmabo3-2605957766-gt2nrlvappuqs5wtssmtd46stogm0nppw",
+    "gen9championsvgc2026regmabo3-2605962733-cmeenyjkqenkjhi6dilqg6n8h8qhswopw",
+    "gen9championsvgc2026regmabo3-2605965414-bd9mrxl0f6g85rrpqtjn9rx8ehygrtbpw"
+   ]
+  },
+  {
+   "key": "championsvgc|joeux9|prrot",
+   "family": "championsvgc",
+   "ids": [
+    "gen9championsvgc2026regmabo3-2611955134-1x09w6ko2mqhwdruy3iyh0uk974qpqrpw",
+    "gen9championsvgc2026regmabo3-2611957180-uv9j8ns002fitcec35codoik1q680xvpw",
+    "gen9championsvgc2026regmabo3-2611958660-0rowhc3tur70kwxi4ejohmkbv51jw2opw"
+   ]
+  },
+  {
+   "key": "championsvgc|kakunaka|pizzagreedent",
+   "family": "championsvgc",
+   "ids": [
+    "gen9championsvgc2026regmabo3-2610779472-wsnp2eo5oo846d86vhala1s5lr4qo9fpw",
+    "gen9championsvgc2026regmabo3-2610784960-05rv1h1c8fg4l370smqcfstcj0xjp29pw"
+   ]
+  },
+  {
+   "key": "championsvgc|kangourou1234|pasder",
+   "family": "championsvgc",
+   "ids": [
+    "gen9championsvgc2026regmabo3-2611743086-epgjdsx4481r7kdwk8f9anu92sptkhopw",
+    "gen9championsvgc2026regmabo3-2611746007-bx7fh0ullg0kedon46rdvshy979hpx4pw",
+    "gen9championsvgc2026regmabo3-2611749637-onjfvmv9kn5tulvrlqp17veibindqwtpw"
+   ]
+  },
+  {
+   "key": "championsvgc|katz|miiversevgc",
+   "family": "championsvgc",
+   "ids": [
+    "gen9championsvgc2026regmbbo3-2639982833",
+    "gen9championsvgc2026regmbbo3-2639984763"
+   ]
+  },
+  {
+   "key": "championsvgc|keanuvgc|unclelou",
+   "family": "championsvgc",
+   "ids": [
+    "gen9championsvgc2026regmabo3-2612204702-smjc3f71nh66notf8ppkmkbrv7pmowrpw",
+    "gen9championsvgc2026regmabo3-2612208623-ymrlovunhm0itrxwf9ttnpdbtuvt44mpw"
+   ]
+  },
+  {
+   "key": "championsvgc|kirans|miraai1",
+   "family": "championsvgc",
+   "ids": [
+    "gen9championsvgc2026regmbbo3-2640974091-20edm8ttsf2r4mjtqh1oevdco9u5mvapw",
+    "gen9championsvgc2026regmbbo3-2640976174-x3qouwxvvaqcx02aj63k2mg5o6ds7y1pw",
+    "gen9championsvgc2026regmbbo3-2640978625-tq3cq6ukm31gcm83qbjx0fdrnq5edb1pw"
+   ]
+  },
+  {
+   "key": "championsvgc|kirans|wbvg",
+   "family": "championsvgc",
+   "ids": [
+    "gen9championsvgc2026regmbbo3-2634199230-u27uqhdieyvatf2eo404q2xpsuoce14pw",
+    "gen9championsvgc2026regmbbo3-2634201292-jy25372b477nfr959khj1lf8jgpi699pw",
+    "gen9championsvgc2026regmbbo3-2634204248-verb493us8sclkro1owkof528sh6n4mpw"
+   ]
+  },
+  {
+   "key": "championsvgc|mattmaster2010|nails",
+   "family": "championsvgc",
+   "ids": [
+    "gen9championsvgc2026regmbbo3-2640825616-yb9q6w0p5gnqopbdtmrkpfmy81weqcypw",
+    "gen9championsvgc2026regmbbo3-2640828540-gxxy92ebmg43i1bfmfcnxrwywoa2lp8pw",
+    "gen9championsvgc2026regmbbo3-2640831907-x3vbvwdkn2ut2xn75x0asypu70fjnyqpw"
+   ]
+  },
+  {
+   "key": "championsvgc|maxljcr|sohaib",
+   "family": "championsvgc",
+   "ids": [
+    "gen9championsvgc2026regma-2612051672",
+    "gen9championsvgc2026regma-2612054921"
+   ]
+  },
+  {
+   "key": "championsvgc|miiversevgc|zgrzgr",
+   "family": "championsvgc",
+   "ids": [
+    "gen9championsvgc2026regmabo3-2611759614",
+    "gen9championsvgc2026regmabo3-2611763228"
+   ]
+  },
+  {
+   "key": "championsvgc|momajun|zgrzgr",
+   "family": "championsvgc",
+   "ids": [
+    "gen9championsvgc2026regmb-2636810508-x54ai7rlloqkwbvxfn95jnrjufj12oxpw",
+    "gen9championsvgc2026regmb-2636815439-b7jh5lppvw15nv6n33f0o5nch1ogdbvpw",
+    "gen9championsvgc2026regmb-2636817609-ccvy81sbgl4v5l7nu0j08iwlvoc6cpbpw"
+   ]
+  },
+  {
+   "key": "championsvgc|nails|prrot",
+   "family": "championsvgc",
+   "ids": [
+    "gen9championsvgc2026regma-2604410427",
+    "gen9championsvgc2026regma-2604413910",
+    "gen9championsvgc2026regma-2604417854"
+   ]
+  },
+  {
+   "key": "championsvgc|pasder|slycedbreadvgc",
+   "family": "championsvgc",
+   "ids": [
+    "gen9championsvgc2026regmbbo3-2640704262-2mabca3pymgvi3cfl1xieh6puppkgtnpw",
+    "gen9championsvgc2026regmbbo3-2640706331-wymj5nvn9g4c1v64ito1ddex1ex8830pw",
+    "gen9championsvgc2026regmbbo3-2640709378-bv8cw7j4hihfojoijpttnnfb6ynm801pw"
+   ]
+  },
+  {
+   "key": "championsvgc|portina|superpawmi",
+   "family": "championsvgc",
+   "ids": [
+    "gen9championsvgc2026regmbbo3-2640542669-oq9ufiodsrb5l9enfgdax7tnbidrbyjpw",
+    "gen9championsvgc2026regmbbo3-2640545258-ow4lkfqwrr6u4dxe2fmvywip46p639cpw",
+    "gen9championsvgc2026regmbbo3-2640548600-jisc5jwrj8a814vuoagr8ygj9h929efpw"
+   ]
+  },
+  {
+   "key": "championsvgc|portina|triir",
+   "family": "championsvgc",
+   "ids": [
+    "gen9championsvgc2026regmabo3-2611728375",
+    "gen9championsvgc2026regmabo3-2611733414",
+    "gen9championsvgc2026regmabo3-2611739345"
+   ]
+  },
+  {
+   "key": "championsvgc|rubenbranzini|willofurshifu",
+   "family": "championsvgc",
+   "ids": [
+    "gen9championsvgc2026regmbbo3-2635918069-62otqpr0whd584ejvdhn4ik2cba4bxepw",
+    "gen9championsvgc2026regmbbo3-2635921768-cmxhck79pb14eut1uidyawhv9lewb86pw",
+    "gen9championsvgc2026regmbbo3-2635925905-nk260bl7coe49b50g287ewtpmfyj609pw"
+   ]
+  },
+  {
+   "key": "championsvgc|sempra|whimvgc",
+   "family": "championsvgc",
+   "ids": [
+    "gen9championsvgc2026regmabo3-2610018597-8bjc9rhkgpmyrn005uky6r4xucxed1apw",
+    "gen9championsvgc2026regmabo3-2610021295-wlob98h5y7rjpq2kupa3djfhm5prwdlpw",
+    "gen9championsvgc2026regmabo3-2610023222-5ofu7guk7ms654wu73bd55bca917v3cpw"
+   ]
+  },
+  {
+   "key": "doublesou|aayanahmadchishti7|leoboygamer",
+   "family": "doublesou",
+   "ids": [
+    "gen9doublesou-2661737525"
+   ]
+  },
+  {
+   "key": "doublesou|actuarily|luigilooming",
+   "family": "doublesou",
+   "ids": [
+    "gen9doublesou-2543324419",
+    "gen9doublesou-2543321105",
+    "gen9doublesou-2543328455-31ejhd7iav4b9whyukr8mw44snsqnrupw"
+   ]
+  },
+  {
+   "key": "doublesou|afairy|drakedblitz",
+   "family": "doublesou",
+   "ids": [
+    "gen9doublesou-2553927955-1d39d95nsfjhn933t02upsgan3nlwhcpw",
+    "gen9doublesou-2553930384"
+   ]
+  },
+  {
+   "key": "doublesou|akarukokuyo|zapdos",
+   "family": "doublesou",
+   "ids": [
+    "gen9doublesou-2553498001-unli98296xkqgwfdu8vatxnrins5waupw",
+    "gen9doublesou-2553500928-abj18keeg7p90m89cgq7j8lk86j2kl3pw",
+    "gen9doublesou-2553505145-f3jedu3wwcfym1xwpcky52xcoiuwh90pw"
+   ]
+  },
+  {
+   "key": "doublesou|akhant|mudkip",
+   "family": "doublesou",
+   "ids": [
+    "gen9doublesou-2549535754-31xj8ju0gqxvqlf1d5ptpixmt60eqoqpw",
+    "gen9doublesou-2549540661-jusrhru826uk5pfhnjx9a9rk648giv4pw"
+   ]
+  },
+  {
+   "key": "doublesou|amoodybidoof210|pennyfarthingman",
+   "family": "doublesou",
+   "ids": [
+    "gen9doublesou-2662161639"
+   ]
+  },
+  {
+   "key": "doublesou|aseqtpie|auroraflowers",
+   "family": "doublesou",
+   "ids": [
+    "gen9doublesou-2545779730-dmk7cg2a0inlr2lg5xdk6fqtelwt28opw",
+    "gen9doublesou-2545788484-qabhh2egvn1th4mk1ljl3tscvi2f7qupw"
+   ]
+  },
+  {
+   "key": "doublesou|atlt928prettydoll|mik3ymon",
+   "family": "doublesou",
+   "ids": [
+    "gen9doublesou-2540881163-kjrg80o41xdbjc2icm49ms5de61au5mpw",
+    "gen9doublesou-2540883710-511133m0betp6bb71vcyyxwrj2yq64ypw"
+   ]
+  },
+  {
+   "key": "doublesou|bjerkoen|sheiniki",
+   "family": "doublesou",
+   "ids": [
+    "gen9doublesou-2661737737"
+   ]
+  },
+  {
+   "key": "doublesou|bond02468|fayamangblessi32",
+   "family": "doublesou",
+   "ids": [
+    "gen9doublesou-2661680847"
+   ]
+  },
+  {
+   "key": "doublesou|breakfastenjoyer|voltiix",
+   "family": "doublesou",
+   "ids": [
+    "gen9doublesou-2549699154",
+    "gen9doublesou-2549706980"
+   ]
+  },
+  {
+   "key": "doublesou|bugjimmy|kaskill",
+   "family": "doublesou",
+   "ids": [
+    "gen9doublesou-2542431194",
+    "gen9doublesou-2542433793"
+   ]
+  },
+  {
+   "key": "doublesou|cheo1234|oreiii",
+   "family": "doublesou",
+   "ids": [
+    "gen9doublesou-2661739982"
+   ]
+  },
+  {
+   "key": "doublesou|cwilsonc|daxolotl1107",
+   "family": "doublesou",
+   "ids": [
+    "gen9doublesou-2662159584"
+   ]
+  },
+  {
+   "key": "doublesou|cwilsonc|heliostopo",
+   "family": "doublesou",
+   "ids": [
+    "gen9doublesou-2662172165"
+   ]
+  },
+  {
+   "key": "doublesou|dangerdeniz|leaoghost",
+   "family": "doublesou",
+   "ids": [
+    "gen9doublesou-2543741084-y6kflinr2v5vid8ng4voxcui1892hh2pw",
+    "gen9doublesou-2543745071-h2etvmjgecsq42dh26c4e9bt4owsh7jpw",
+    "gen9doublesou-2543749845-962bqcq0d6losj83hg6fwej4b9od5xxpw"
+   ]
+  },
+  {
+   "key": "doublesou|darealobama|muke100",
+   "family": "doublesou",
+   "ids": [
+    "gen9doublesou-2661743326"
+   ]
+  },
+  {
+   "key": "doublesou|darksolpokemonvgc|segarxxx",
+   "family": "doublesou",
+   "ids": [
+    "gen9doublesou-2661683621"
+   ]
+  },
+  {
+   "key": "doublesou|darksolpokemonvgc|theonlyarrow",
+   "family": "doublesou",
+   "ids": [
+    "gen9doublesou-2661679765"
+   ]
+  },
+  {
+   "key": "doublesou|daxolotl1107|dhinio1234321",
+   "family": "doublesou",
+   "ids": [
+    "gen9doublesou-2662157017"
+   ]
+  },
+  {
+   "key": "doublesou|ddungddi|sennatoomey",
+   "family": "doublesou",
+   "ids": [
+    "gen9doublesou-2661736716"
+   ]
+  },
+  {
+   "key": "doublesou|deshawnbanks|dhemzo",
+   "family": "doublesou",
+   "ids": [
+    "gen9doublesou-2661751487"
+   ]
+  },
+  {
+   "key": "doublesou|dhemzo|duckyboba",
+   "family": "doublesou",
+   "ids": [
+    "gen9doublesou-2661743494"
+   ]
+  },
+  {
+   "key": "doublesou|divinem4dness|penter",
+   "family": "doublesou",
+   "ids": [
+    "gen9doublesou-2543921336-97iqrhc0c8x2j2itddspro7c6a3enm7pw",
+    "gen9doublesou-2543926901-90w0i11beyk3ww1ldoua1klitfqm81cpw",
+    "gen9doublesou-2543938562-pdvifngqyj79kooal5kmwf66xhipqsrpw"
+   ]
+  },
+  {
+   "key": "doublesou|dru4u|takessomeguts",
+   "family": "doublesou",
+   "ids": [
+    "gen9doublesou-2661680113"
+   ]
+  },
+  {
+   "key": "doublesou|efrites|lowkeymofo",
+   "family": "doublesou",
+   "ids": [
+    "gen9doublesou-2662153935"
+   ]
+  },
+  {
+   "key": "doublesou|evolveintocrab|megu114514",
+   "family": "doublesou",
+   "ids": [
+    "gen9doublesou-2661678728"
+   ]
+  },
+  {
+   "key": "doublesou|factoryslvt|firerr",
+   "family": "doublesou",
+   "ids": [
+    "gen9doublesou-2662156150"
+   ]
+  },
+  {
+   "key": "doublesou|fern262|refridgenator",
+   "family": "doublesou",
+   "ids": [
+    "gen9doublesou-2662158783"
+   ]
+  },
+  {
+   "key": "doublesou|gggggman|tapubulutapubulu",
+   "family": "doublesou",
+   "ids": [
+    "gen9doublesou-2662171981"
+   ]
+  },
+  {
+   "key": "doublesou|gggggman|yunbxy",
+   "family": "doublesou",
+   "ids": [
+    "gen9doublesou-2662177694"
+   ]
+  },
+  {
+   "key": "doublesou|greensa|neffex005",
+   "family": "doublesou",
+   "ids": [
+    "gen9doublesou-2661743479"
+   ]
+  },
+  {
+   "key": "doublesou|guink6|inster",
+   "family": "doublesou",
+   "ids": [
+    "gen9doublesou-2661744009"
+   ]
+  },
+  {
+   "key": "doublesou|heliostopo|sloko",
+   "family": "doublesou",
+   "ids": [
+    "gen9doublesou-2661755510"
+   ]
+  },
+  {
+   "key": "doublesou|hybone|peum",
+   "family": "doublesou",
+   "ids": [
+    "gen9doublesou-2553213413-mokiwuo73xvsc1j903qrp1sokgax6hfpw",
+    "gen9doublesou-2553205349-xvqyrs5t7x12uc2cce0apg8aeuv0n4gpw",
+    "gen9doublesou-2553208065-rhcj3jan1ctx1ji164shh8ayvbw4fsjpw"
+   ]
+  },
+  {
+   "key": "doublesou|ilovedee|wuminshi",
+   "family": "doublesou",
+   "ids": [
+    "gen9doublesou-2661750102",
+    "gen9doublesou-2661753773"
+   ]
+  },
+  {
+   "key": "doublesou|inafable|regiboob",
+   "family": "doublesou",
+   "ids": [
+    "gen9doublesou-2545681892-rpvrfji211gba4vnnubluswkec9a1ncpw",
+    "gen9doublesou-2545687051-ox2loh0e7vw7y3al20j8uj2bu7m8uxipw"
+   ]
+  },
+  {
+   "key": "doublesou|inster|tomtyrano",
+   "family": "doublesou",
+   "ids": [
+    "gen9doublesou-2661746817"
+   ]
+  },
+  {
+   "key": "doublesou|j0hnst0ne|srvoltmike",
+   "family": "doublesou",
+   "ids": [
+    "gen9doublesou-2540933323-oyd64ua9y2vdpq5olnuxeqsd6mavqxvpw",
+    "gen9doublesou-2540937546-6l5s3e68l3484ak18aaqkj3cc3jk6kipw"
+   ]
+  },
+  {
+   "key": "doublesou|jazz721|papiloco",
+   "family": "doublesou",
+   "ids": [
+    "gen9doublesou-2544386633",
+    "gen9doublesou-2544391180"
+   ]
+  },
+  {
+   "key": "doublesou|jdnwnjs|sebbygreen",
+   "family": "doublesou",
+   "ids": [
+    "gen9doublesou-2661683148"
+   ]
+  },
+  {
+   "key": "doublesou|jondiiii|shiritu",
+   "family": "doublesou",
+   "ids": [
+    "gen9doublesou-2543197510-83vlau8ph3m29piufs4qhdvmx5s8ogypw",
+    "gen9doublesou-2543203909-euqqjb3y09m4xb8fjvanwx01h3kkjjxpw",
+    "gen9doublesou-2543208737-6gycrgwyt9jyfdo90i1evxsj443slxxpw"
+   ]
+  },
+  {
+   "key": "doublesou|kdkdksksjd|neffex005",
+   "family": "doublesou",
+   "ids": [
+    "gen9doublesou-2661740718"
+   ]
+  },
+  {
+   "key": "doublesou|lickilickymaven|teckel1000",
+   "family": "doublesou",
+   "ids": [
+    "gen9doublesou-2661742211"
+   ]
+  },
+  {
+   "key": "doublesou|lilyphiliaaa|megu114514",
+   "family": "doublesou",
+   "ids": [
+    "gen9doublesou-2661676964"
+   ]
+  },
+  {
+   "key": "doublesou|lilyphiliaaa|vajinbuu",
+   "family": "doublesou",
+   "ids": [
+    "gen9doublesou-2661676087"
+   ]
+  },
+  {
+   "key": "doublesou|lugiajp|val16",
+   "family": "doublesou",
+   "ids": [
+    "gen9doublesou-2544428652-h133fw7wmtp51rie1xfc8j9imablenxpw",
+    "gen9doublesou-2544432629-4xgmds4b43j57ujfg53yhau4nb3dfpypw"
+   ]
+  },
+  {
+   "key": "doublesou|mcanales|zekta",
+   "family": "doublesou",
+   "ids": [
+    "gen9doublesou-2662168898"
+   ]
+  },
+  {
+   "key": "doublesou|megaman229|pennyfarthingman",
+   "family": "doublesou",
+   "ids": [
+    "gen9doublesou-2661737064"
+   ]
+  },
+  {
+   "key": "doublesou|misterpoke|umadbruh",
+   "family": "doublesou",
+   "ids": [
+    "gen9doublesou-2661679056"
+   ]
+  },
+  {
+   "key": "doublesou|nanandes|rampopst",
+   "family": "doublesou",
+   "ids": [
+    "gen9doublesou-2541609490-8dwlw9n6n1p32w3h6nh5qx53w86ukqypw",
+    "gen9doublesou-2541615870-7tj4vgdshppp2ruapeibhfxvkea8pnapw",
+    "gen9doublesou-2541621327-pee57hpyogvdbid733eiky4bsr5dj0opw"
+   ]
+  },
+  {
+   "key": "doublesou|nghia11|vajinbuu",
+   "family": "doublesou",
+   "ids": [
+    "gen9doublesou-2661678491"
+   ]
+  },
+  {
+   "key": "doublesou|ohtheguilt|steambuns",
+   "family": "doublesou",
+   "ids": [
+    "gen9doublesou-2544016875-j0rmddtkrhorcwodqb8ynsne9m97ol6pw",
+    "gen9doublesou-2544022755-hdv12laus8ki1h2s4d48pvrqorgjjjvpw",
+    "gen9doublesou-2544028966-3395cko4oaxytl3aqcc5i2eur6vwgiipw"
+   ]
+  },
+  {
+   "key": "doublesou|piesmellsgood|yellowpaint",
+   "family": "doublesou",
+   "ids": [
+    "smogtours-gen9doublesou-910295",
+    "smogtours-gen9doublesou-910297"
+   ]
+  },
+  {
+   "key": "doublesou|pigwarrior19|soulwind",
+   "family": "doublesou",
+   "ids": [
+    "smogtours-gen9doublesou-911051",
+    "smogtours-gen9doublesou-911063"
+   ]
+  },
+  {
+   "key": "doublesou|praytothispoppy|thewell1886",
+   "family": "doublesou",
+   "ids": [
+    "gen9doublesou-2661753717"
+   ]
+  },
+  {
+   "key": "doublesou|qazoo|slugpupstew",
+   "family": "doublesou",
+   "ids": [
+    "gen9doublesou-2541935080",
+    "gen9doublesou-2541941905"
+   ]
+  },
+  {
+   "key": "doublesou|refridgenator|zorotroz",
+   "family": "doublesou",
+   "ids": [
+    "gen9doublesou-2662151902"
+   ]
+  },
+  {
+   "key": "doublesou|segarxxx|vajinbuu",
+   "family": "doublesou",
+   "ids": [
+    "gen9doublesou-2661683138"
+   ]
+  },
+  {
+   "key": "doublesou|sevaunn|wenho",
+   "family": "doublesou",
+   "ids": [
+    "gen9doublesou-2545128477-hyx65dg4esrv5ngdgx5q0vq6g7ii4t3pw",
+    "gen9doublesou-2545131564-jufpha14xyokv5ido2fum7xsvdmnmpvpw"
+   ]
+  },
+  {
+   "key": "doublesou|silicon2|ultimathrash",
+   "family": "doublesou",
+   "ids": [
+    "gen9doublesou-2544548510",
+    "gen9doublesou-2544551323"
+   ]
+  },
+  {
+   "key": "doublesou|smaiden|tahatsquared",
+   "family": "doublesou",
+   "ids": [
+    "smogtours-gen9doublesou-910266",
+    "smogtours-gen9doublesou-910271",
+    "smogtours-gen9doublesou-910275"
+   ]
+  },
+  {
+   "key": "doublesou|smb|terekusai",
+   "family": "doublesou",
+   "ids": [
+    "gen9doublesou-2553015206-etu3yu8guhce3y7dd3xboxg3x5vr60hpw",
+    "gen9doublesou-2553019133-av19o7xvr0iapbisp4mihvknhdda4eppw",
+    "gen9doublesou-2553022720-0wca20tcmeqgll5pxdexxj2ygsn9q67pw"
+   ]
+  },
+  {
+   "key": "doublesou|sparkelzlol|zee",
+   "family": "doublesou",
+   "ids": [
+    "gen9doublesou-2544329652",
+    "gen9doublesou-2544332554",
+    "gen9doublesou-2544335097"
+   ]
+  },
+  {
+   "key": "doublesou|susejvgc|thetired",
+   "family": "doublesou",
+   "ids": [
+    "gen9doublesou-2544978046-xbohpwvraro94ftx4aiulp6rqwtx2p9pw",
+    "gen9doublesou-2544981874-ko5h6vmbsuo49lax8sj0ytudkg8iyqrpw",
+    "gen9doublesou-2544986124-h5r8nj3fopc0lmd03t33iwir4hg6vjipw"
+   ]
+  },
+  {
+   "key": "doublesou|sylviphus|typekarnaz",
+   "family": "doublesou",
+   "ids": [
+    "gen9doublesou-2661740603"
+   ]
+  },
+  {
+   "key": "doublesou|uncledrive|yoda2798",
+   "family": "doublesou",
+   "ids": [
+    "gen9doublesou-2544382823-g62xfv5ejxc4s5tj13ua9pr5jsno3ewpw",
+    "gen9doublesou-2544390746-lwhio30bwl7ahdiemgdv1to5llvfvxipw"
+   ]
+  },
+  {
+   "key": "vgc|aditya1|shadowknight16",
+   "family": "vgc",
+   "ids": [
+    "gen9vgc2024regh-2273213586"
+   ]
+  },
+  {
+   "key": "vgc|badteamonpaper|ryunick",
+   "family": "vgc",
+   "ids": [
+    "gen9vgc2024regh-2273230773"
+   ]
+  },
+  {
+   "key": "vgc|bell24|oricoriowarrior",
+   "family": "vgc",
+   "ids": [
+    "gen9vgc2024regh-2273215377"
+   ]
+  },
+  {
+   "key": "vgc|bishopdell|duoxdg",
+   "family": "vgc",
+   "ids": [
+    "gen9vgc2024regh-2273224017"
+   ]
+  },
+  {
+   "key": "vgc|bobbio|freya3292",
+   "family": "vgc",
+   "ids": [
+    "gen9vgc2024regh-2273200203"
+   ]
+  },
+  {
+   "key": "vgc|bogdyoda|kingofgreed64",
+   "family": "vgc",
+   "ids": [
+    "gen9vgc2024regh-2273212448"
+   ]
+  },
+  {
+   "key": "vgc|cokee37|pepposki",
+   "family": "vgc",
+   "ids": [
+    "gen9vgc2024regh-2273220961"
+   ]
+  },
+  {
+   "key": "vgc|danigoma12|pocketzpaz",
+   "family": "vgc",
+   "ids": [
+    "gen9vgc2024regh-2273232103"
+   ]
+  },
+  {
+   "key": "vgc|dcjz|lolchair",
+   "family": "vgc",
+   "ids": [
+    "gen9vgc2024regh-2273220755"
+   ]
+  },
+  {
+   "key": "vgc|doggods|fdsdfgsdfgfdgfd",
+   "family": "vgc",
+   "ids": [
+    "gen9vgc2024regh-2273228495"
+   ]
+  },
+  {
+   "key": "vgc|greenknightsixvgc|semiau",
+   "family": "vgc",
+   "ids": [
+    "gen9vgc2024regh-2273212624"
+   ]
+  },
+  {
+   "key": "vgc|greenknightsixvgc|shadowknight16",
+   "family": "vgc",
+   "ids": [
+    "gen9vgc2024regh-2273200033"
+   ]
+  },
+  {
+   "key": "vgc|ishmish|pocketzpaz",
+   "family": "vgc",
+   "ids": [
+    "gen9vgc2024regh-2273218468"
+   ]
+  },
+  {
+   "key": "vgc|jogofuego|jrzcvgc",
+   "family": "vgc",
+   "ids": [
+    "gen9vgc2024regh-2273226013"
+   ]
+  },
+  {
+   "key": "vgc|joonii|lolchair",
+   "family": "vgc",
+   "ids": [
+    "gen9vgc2024regh-2273215549"
+   ]
+  },
+  {
+   "key": "vgc|kaithebunny1729|valeriarichardsss",
+   "family": "vgc",
+   "ids": [
+    "gen9vgc2024regh-2273213554"
+   ]
+  },
+  {
+   "key": "vgc|liam2025|shihevixe3",
+   "family": "vgc",
+   "ids": [
+    "gen9vgc2024regh-2273231017"
+   ]
+  },
+  {
+   "key": "vgc|luca8|shihevixe3",
+   "family": "vgc",
+   "ids": [
+    "gen9vgc2024regh-2273230292"
+   ]
+  },
+  {
+   "key": "vgc|redbrood|shiftyboy",
+   "family": "vgc",
+   "ids": [
+    "gen9vgc2024regh-2273217172"
+   ]
+  },
+  {
+   "key": "vgc|shihevixe3|sldpk1",
+   "family": "vgc",
+   "ids": [
+    "gen9vgc2024regh-2273224139"
+   ]
+  },
+  {
+   "key": "vgc|theforceofevil|wlgxeb41",
+   "family": "vgc",
+   "ids": [
+    "gen9vgc2024regh-2273228617"
+   ]
+  },
+  {
+   "key": "vgc|theheroofmeow|vectoramv",
+   "family": "vgc",
+   "ids": [
+    "gen9vgc2024regh-2273231934"
+   ]
+  }
+ ]
+}

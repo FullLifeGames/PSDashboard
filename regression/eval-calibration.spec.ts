@@ -1,5 +1,5 @@
 import { afterAll, test, expect, describe } from 'vitest';
-import { writeFileSync } from 'node:fs';
+import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { State } from '@pkmn/sim';
 import type { Battle } from '@pkmn/sim';
 import { buildTeamsFromReplay } from '../packages/replay-core/src/team-builder';
@@ -12,6 +12,7 @@ import { leafValue } from '../packages/eval-engine/src/search/leaf';
 import { bankKeepPlayed, bankSampleCount, bankSearch, bankSettings } from './bank-search';
 import { diskCachedSmogonFetcher } from './smogon-fetch-cache';
 import { bankTeamsFor } from './bank-build';
+import { bankUniverse } from './bank-universe';
 import { createMatchupCache, evalFeatures, EVAL_WEIGHTS, FEATURE_WEIGHTS, type EvalFeatures } from '../packages/eval-engine/src/eval-function';
 import { setLastPairSweep } from '../packages/eval-engine/src/score/last-pair';
 import { livingMons } from '../packages/eval-engine/src/score/threat';
@@ -5221,7 +5222,8 @@ type RootReading = Pick<Sample, 'score' | 'decided' | 'decidedHeld' | 'forcedWin
  */
 async function rootReading(battle: Battle, args: Parameters<typeof bankSearch>[0]): Promise<RootReading> {
   if (process.env.EVAL_CALIBRATION_STATIC === '1') {
-    return { score: leafValue(battle, createMatchupCache()), decided: null, decidedHeld: null, forcedWinMass: null, forcedWinTurns: null };
+    const score = leafValue(battle, createMatchupCache(args.settings.ruleset));
+    return { score, decided: null, decidedHeld: null, forcedWinMass: null, forcedWinTurns: null };
   }
   const result = await bankSearch(args);
   return { score: result.score, decided: decidedSideOf(result), decidedHeld: heldSideOf(result), ...forcedWinFields(result) };
@@ -5344,27 +5346,9 @@ describe.skipIf(!process.env.EVAL_CALIBRATION)('eval calibration against real re
     applyCalibrationLevers();
     const samples: Sample[] = [];
     const sampleCount = bankSampleCount(process.env.EVAL_CALIBRATION_SAMPLES);
-    // EVAL_CALIBRATION_SOURCE=fit swaps the replay universe to the
-    // manifest-pinned weight-fitting corpus, read from the build script's
-    // disk cache (no network). FIT-SIDE DUMPS ONLY: those games trained the
-    // winprob K and the feature weights, so their numbers must never be
-    // quoted as calibration records — hence the dump-path guard, and the
-    // tranche labels (fit-tournament / fit-ladder) keep provenance loud.
-    // The two universes never mix ids.
-    const fitSource = process.env.EVAL_CALIBRATION_SOURCE === 'fit';
-    if (fitSource && !process.env.EVAL_CALIBRATION_DUMP) {
-      throw new Error('EVAL_CALIBRATION_SOURCE=fit produces fit-side dumps only — set EVAL_CALIBRATION_DUMP');
-    }
-    const fs = fitSource ? await import('node:fs') : null;
-    const fitEntries = fs
-      ? (JSON.parse(fs.readFileSync('regression/fixtures/fit-corpus-manifest.json', 'utf-8')) as {
-          replays: { id: string; source: 'tournament' | 'ladder' }[];
-        }).replays
-      : [];
-    const universeIds = fitSource ? fitEntries.map(entry => entry.id) : REPLAY_IDS;
-    const trancheOf = fitSource
-      ? new Map(fitEntries.map(entry => [entry.id, `fit-${entry.source}`]))
-      : TRANCHE_OF;
+    // The replay universe (bankUniverse above): the bank, the fit corpus, or (round 65) its holdout.
+    const universe = bankUniverse({ ids: REPLAY_IDS, trancheOf: TRANCHE_OF });
+    const { ids: universeIds, trancheOf } = universe;
     // Tranche filter first, then the slice indexes over the filtered list —
     // a new stratum runs alone and its dump concatenates with the standing
     // full-corpus dumps (determinism keeps the old positions valid).
@@ -5386,14 +5370,14 @@ describe.skipIf(!process.env.EVAL_CALIBRATION)('eval calibration against real re
     type ReplayJson = { id: string; log: string; players: string[]; formatid?: string; rating?: number };
     for (const id of replayIds) {
       let replay: ReplayJson;
-      if (fs) {
+      if (universe.cached) {
         // Disk-cached fit replay (node scripts/build-fit-corpus.mjs).
         const cachePath = `.fit-corpus/${id}.json`;
-        if (!fs.existsSync(cachePath)) {
+        if (!existsSync(cachePath)) {
           console.log(`skipping ${id}: no fit cache`);
           continue;
         }
-        replay = JSON.parse(fs.readFileSync(cachePath, 'utf-8')) as ReplayJson;
+        replay = JSON.parse(readFileSync(cachePath, 'utf-8')) as ReplayJson;
       } else {
         const response = await fetch(`https://replay.pokemonshowdown.com/${id}.json`);
         if (!response.ok) {
@@ -5427,9 +5411,7 @@ describe.skipIf(!process.env.EVAL_CALIBRATION)('eval calibration against real re
       }
       const { p1Team, p2Team } = built.teams;
       const maxTurn = snapshots.length;
-      const step = Math.max(1, Math.ceil(maxTurn / 8));
-      const sampleTurns: number[] = [];
-      for (let turn = 2; turn < maxTurn; turn += step) sampleTurns.push(turn);
+      const sampleTurns = universe.sampleTurns(maxTurn);
 
       // A.3c: bring-limited replays (the VGC tranche) reconstruct with only
       // the brought species per side — the same trim the app's sweep and
