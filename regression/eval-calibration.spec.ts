@@ -908,6 +908,59 @@ import { takeSimFastReport } from '../packages/eval-engine/src/forward/sim-fast/
  * static basis for this mass; the next lever, if any, is search/
  * planning-side.
  *
+ * VGC DATA AND WEIGHTS 2026-10-09 (improvement round 66, T137 run as a
+ * round of its own before wave 2, with T141 and T142 from its sighting;
+ * branch r66 from 0fb3110 (= v1), cache v61 to v63; ledger, chains and
+ * probes under docs/perf/probes/2026-10-09-r66/).
+ * DATA: the corpus held 50 Scarlet/Violet VGC games, all uploaded the day
+ * after their format left the ladder (rating median 1298), and 600 of its
+ * 923 Champions VGC games were unrated challenges played after the M-B
+ * ladder ended. scripts/expand-fit-corpus.mjs --sort rating (fb80a81) pages
+ * the replay search by rating and keeps bank and feedback replays out;
+ * 8d1c0af adds 1,150 rated Scarlet/Violet VGC games of seven regulations
+ * (2024 G and H, 2025 G, H and I, 2026 F and I; rating 1563 to 1876) and
+ * 500 rated Champions VGC games (M-A, M-B, M-C; 1601 to 1959): corpus 5,627
+ * replays, holdout by the same hash 1,424 games (all 869 old ones stay;
+ * Scarlet/Violet VGC 415 of 1,200, Champions VGC 491 of 1,423).
+ * holdoutTurns takes each turn inside its own third, and a short game drops
+ * the thirds it cannot reach. PRE-REGISTERED (479ceb8, before any fit):
+ * unrated ladder games stay out of the fit; round 65's rules R1 to R4 per
+ * VGC family.
+ * TEAM BUILD (the sighting): Champions VGC read the Scarlet/Violet usage
+ * file, and every VGC format took the Doubles OU analyses as its set
+ * assumptions. T141 (8f5d2d3, v61) reads gen9championsvgc2026; T142
+ * (603788f, v62) reads the set file of the format's year (gen9vgc2025,
+ * gen9vgc2024, Champions championsvgc2026), never Doubles OU; b685866 reads
+ * a 404 sets file as an empty one (Safari threw "Smogon sets unavailable").
+ * Against open team sheets taken out of the log, items and moves guessed
+ * right: Champions VGC (849 games) 42.5/63.8 -> 61.2/75.1 %, 2025 H
+ * 48.2/72.9 -> 66.4/82.0, 2026 I 67.7/78.1 -> 76.9/79.4, 2026 F 59.8/77.1
+ * -> 62.5/72.8 (moves worse; no set file for 2026). Bank: T142 moves 46
+ * positions in the 10 VGC games, doubles -14 bp resolved better, no harm.
+ * Holdout with search: Scarlet/Violet VGC -6 [-59, +47]; Champions VGC T141
+ * +18 with an early warning (+73, own K +23), T142 -4, both together +14
+ * [-37, +69] without a warning. Feedback: only the two VGC dumps move,
+ * every pin holds (2630685175 t7 mistake -> inaccuracy, the forced win of
+ * T118).
+ * FIT (.calibration/r66-corpus-app-t142, 32,070 positions, identity 22,294
+ * of 22,294): Champions VGC 20 of 20 seeds (log-loss -25.3 bp, Brier -10.8
+ * bp; screens 83, bodies 196, matchup 96; coverage, hazards, tailwind and
+ * Trick Room held), 18 of 20 with the unrated games. Scarlet/Violet VGC 14
+ * of 20 after R2 held hazards, coverage (fitted -27) and tailwind (fitted
+ * 3); the first pass won 18 of 20, but neither pass reads better on the
+ * holdout. The candidate 05ae0fa on the holdout's 491 Champions VGC games
+ * with search: -16 [-35, +3] (early -45 [-86, -7], M-C -50 [-92, -13]; own
+ * K -6), no harm, no warning; bank and feedback byte-identical, e2e 75/75.
+ * USER GATE 2026-10-09 19:40 ("1a 2a 3a 4b 5a"): T141 and T142 stay;
+ * Champions doubles take the fit (8e629a4, v63); Scarlet/Violet VGC keeps
+ * the hand doubles table, and T144 (tailwind and coverage in VGC first)
+ * goes to wave 3 lane B; T145 (the reconstruction feeds Champions stat
+ * points to the simulator as EVs, so a fully invested Adamant Garchomp
+ * attacks with 169 instead of 200) and T143 (Champions OU reads its own set
+ * file) go to wave 2 lane F; v1 pushed. Base of the code state:
+ * .calibration/r66-t142 (Brier 0.2520/0.2305/0.1147, hq
+ * 0.2395/0.2031/0.1177, K 2.40).
+ *
  * DOUBLES FIT 2026-10-09 (improvement round 65, T127 run as a round of its
  * own before wave 2; branch r65 from 5408d84 (= v1), cache v59 and v60;
  * ledger, chains and probes under docs/perf/probes/2026-10-09-r65/). The
