@@ -467,7 +467,18 @@ export function bootstrapWeightsAtK(
   });
 }
 
-export interface AtKReportOptions { seeds: number; folds: number; draws: number; minGames: number }
+export interface AtKReportOptions {
+  seeds: number;
+  folds: number;
+  draws: number;
+  minGames: number;
+  /**
+   * Round 65: weights that keep their start, by feature name, in the shared
+   * table or among the doubles overrides (the pre-registered holds of a
+   * refit, such as variant E's sign-unsure and boost weights).
+   */
+  hold?: { shared?: string[]; doubles?: string[] };
+}
 
 const meanOf = (values: number[]) => values.reduce((sum, value) => sum + value, 0) / values.length;
 
@@ -495,6 +506,16 @@ export function refitAtKReport(
 ) {
   const { layout, start } = layoutOf(singles, doubles);
   const free = supportOf(samples, layout, options.minGames);
+  const column = (name: string) => {
+    const index = names.indexOf(name);
+    if (index < 0) throw new Error(`hold: no weight named ${name}`);
+    return index;
+  };
+  for (const name of options.hold?.shared ?? []) free[column(name)] = false;
+  for (const name of options.hold?.doubles ?? []) {
+    const override = layout.overrides.indexOf(column(name));
+    if (override >= 0) free[layout.columns + override] = false;
+  }
   const fit = fitWeightsAtK(samples, start, layout, k, free);
   const bands = bootstrapWeightsAtK(samples, options.draws, 64, start, layout, k, free);
   const weights = start.map((hand, m) => {

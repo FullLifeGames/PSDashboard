@@ -6,15 +6,17 @@ import { reconstructBranchRuntime } from '../packages/eval-engine/src/branch-eng
 import { getBranchSimulatorFormat, replayBringOnly } from '../packages/replay-core/src/replay-format';
 import { parseReplayLogWithObservations } from '../packages/replay-core/src/protocol-parser';
 import {
-  createMatchupCache, DOUBLES_FEATURE_WEIGHTS, evalFeatures, evaluatePosition, EVAL_WEIGHTS, FEATURE_WEIGHTS,
-  type EvalFeatures,
+  CHAMPIONS_DOUBLES_FEATURE_WEIGHTS, CHAMPIONS_FEATURE_WEIGHTS, createMatchupCache, DOUBLES_FEATURE_WEIGHTS, evalFeatures,
+  evaluatePosition, EVAL_WEIGHTS, FEATURE_WEIGHTS, type EvalFeatures,
 } from '../packages/eval-engine/src/eval-function';
 import { battleFaintedFraction } from '../packages/eval-engine/src/search';
-import { WINPROB_K } from '../packages/eval-engine/src/winprob';
+import { WINPROB_K, wpUnits } from '../packages/eval-engine/src/winprob';
 import {
-  atKScore, bootstrapPhaseK, brierScore, crossValidate, fitConstantK, fitLogistic, fitPhaseK, layoutOf, logLossScore,
-  mulberry32, phaseBucket, refitAtKReport, type AtKSample,
+  bootstrapPhaseK, brierScore, crossValidate, fitConstantK, fitLogistic, fitPhaseK, logLossScore,
+  mulberry32, phaseBucket,
 } from './fit-helpers';
+import { dumpSamples, familyReports, rulesetOfId, withoutHoldout, type FamilySample } from './fit-families';
+import { holdoutSets } from './bank-universe';
 
 /**
  * Weight-fitting harness (WP 7): fits the static eval's linear feature
@@ -128,25 +130,73 @@ function writeSamples(manifest: Manifest, samples: FitSample[]): string {
   return path;
 }
 
+/** A family's start tables, feature order. */
+const tables = (singles: Record<keyof EvalFeatures, number>, doubles: Record<keyof EvalFeatures, number>) =>
+  ({ singles: FEATURE_KEYS.map(key => singles[key]), doubles: FEATURE_KEYS.map(key => doubles[key]) });
+
 /**
- * The T127 refit (round 64): the static's weights at the fixed K of winprob.ts
- * in today's layout. First the identity: the hand weights must give back every
- * captured score, or the fit refuses.
+ * Round 65: the families the static weighs apart (rule set × game type,
+ * score/weights.ts), each refit on its own games.
+ */
+const FAMILIES = [
+  { name: 'standard-singles', ...tables(FEATURE_WEIGHTS, DOUBLES_FEATURE_WEIGHTS) },
+  { name: 'standard-doubles', ...tables(FEATURE_WEIGHTS, DOUBLES_FEATURE_WEIGHTS) },
+  { name: 'champions-singles', ...tables(CHAMPIONS_FEATURE_WEIGHTS, CHAMPIONS_DOUBLES_FEATURE_WEIGHTS) },
+  { name: 'champions-doubles', ...tables(CHAMPIONS_FEATURE_WEIGHTS, CHAMPIONS_DOUBLES_FEATURE_WEIGHTS) },
+];
+
+/**
+ * The pre-registered holds of round 64's variant E: the two weights whose
+ * free fit flips its sign inside a band over nought (shared Trick Room,
+ * choice mismatch) and both boost weights (T49).
+ */
+const HOLD = { shared: ['trickRoom', 'choiceMismatch', 'boosts'], doubles: ['boosts'] };
+
+/**
+ * The T127 refit (round 64; per family since round 65): the static's weights
+ * at the fixed K of winprob.ts, every family on its own games, clustered by
+ * set. First the identity: the start tables must give back every captured
+ * score, or the fit refuses.
  */
 function writeRefitReport(samples: FitSample[]) {
-  const singles = FEATURE_KEYS.map(key => FEATURE_WEIGHTS[key]);
-  const doubles = FEATURE_KEYS.map(key => DOUBLES_FEATURE_WEIGHTS[key]);
-  const { layout, start } = layoutOf(singles, doubles);
-  const atK: AtKSample[] = samples.map(sample => ({
-    g: sample.g, won: sample.p1Won, doubles: sample.gameType === 'doubles', faintedFraction: sample.faintedFraction, game: sample.game,
+  const family: FamilySample[] = samples.map(sample => ({
+    game: sample.game, set: sample.set ?? sample.game, gameType: sample.gameType, ruleset: sample.ruleset ?? rulesetOfId(sample.game),
+    g: sample.g, p1Won: sample.p1Won, faintedFraction: sample.faintedFraction, score: sample.score, wp: sample.wp, lastPair: sample.lastPair,
   }));
-  const off = atK.filter((sample, i) => Math.abs(atKScore(sample, start, layout) - samples[i].score) > 1e-9).length;
-  if (off > 0) throw new Error(`identity: ${off} of ${samples.length} captured scores differ from the hand weights' tanh`);
   const draws = Number(process.env.EVAL_FIT_DRAWS ?? 200);
-  const report = refitAtKReport(atK, FEATURE_KEYS, singles, doubles, WINPROB_K, { seeds: 20, folds: 5, draws, minGames: 20 });
+  const report = familyReports(family, FEATURE_KEYS, FAMILIES, WINPROB_K, { seeds: 20, folds: 5, draws, minGames: 20, hold: HOLD }, wpUnits);
   const out = process.env.EVAL_FIT_OUT ?? join(SAMPLES_DIR ?? CACHE_DIR, 'fit-report.json');
-  writeFileSync(out, JSON.stringify({ identity: { samples: samples.length, off }, ...report }, null, 1));
-  console.log(`refit at fixed K: adopt=${report.verdict.adopt} wins=${report.summary.pooled.logLossWins}/20 -> ${out}`);
+  writeFileSync(out, JSON.stringify(report, null, 1));
+  for (const [name, entry] of Object.entries(report.families)) {
+    console.log('verdict' in entry
+      ? `refit ${name}: adopt=${entry.verdict.adopt} wins=${entry.summary.pooled.logLossWins}/20 sets=${entry.games}`
+      : `refit ${name}: ${entry.skipped}`);
+  }
+  console.log(`-> ${out}`);
+}
+
+/**
+ * Round 65: the corpus measured like the app (EVAL_FIT_DUMP=<bank dumps>,
+ * from EVAL_CALIBRATION_SOURCE=fit with EVAL_CALIBRATION_STATIC=1 and
+ * EVAL_CALIBRATION_FEATURES=1: the app's team build and the bank's
+ * reconstruction) instead of this spec's own capture, whose naked teams
+ * leave a Doubles OU mon 1.9 moves. Sets are keyed by the corpus cache's
+ * players.
+ */
+function samplesOf(manifest: Manifest): FitSample[] {
+  if (!process.env.EVAL_FIT_DUMP) return cachedSamples(manifest);
+  const playersOf = (id: string) => (JSON.parse(readFileSync(join(CACHE_DIR, `${id}.json`), 'utf-8')) as { players?: string[] }).players ?? [];
+  const genClass = (id: string): FitSample['genClass'] => (/^(smogtours-)?gen9/.test(id) ? 'gen9' : 'old');
+  return dumpSamples(process.env.EVAL_FIT_DUMP.split(','), playersOf)
+    .map(sample => ({ ...sample, source: sample.source ?? 'ladder', genClass: genClass(sample.game) }));
+}
+
+/** Round 65: no fit ever trains on the holdout (scripts/build-fit-holdout.mjs). */
+function fitSamples(samples: FitSample[]): FitSample[] {
+  const holdout = new Set(holdoutSets().flatMap(set => set.ids));
+  const { kept, dropped } = withoutHoldout(samples, holdout);
+  console.log(`holdout: ${dropped} samples of ${new Set(samples.filter(sample => holdout.has(sample.game)).map(sample => sample.game)).size} games left out`);
+  return kept;
 }
 
 interface FitSample {
@@ -160,6 +210,11 @@ interface FitSample {
   /** Fainted bodies / total bodies at capture time — the phase covariate. */
   faintedFraction: number;
   p1Won: boolean;
+  /** Round 65 (bank dumps): the cluster key, the rule set, a score in wp-units, the last pair (no identity check). */
+  set?: string;
+  ruleset?: 'standard' | 'champions';
+  wp?: boolean;
+  lastPair?: boolean;
 }
 
 /** One manifest replay's sampled positions, captured in a single reconstruction pass. */
@@ -241,17 +296,18 @@ describe('eval weight fitting (EVAL_FIT=1)', () => {
     skip(!existsSync(MANIFEST_PATH), 'run node scripts/build-fit-corpus.mjs first');
 
     const manifest = JSON.parse(readFileSync(MANIFEST_PATH, 'utf-8')) as Manifest;
-    const samples: FitSample[] = cachedSamples(manifest);
-    console.log(`loaded ${samples.length} cached samples`);
+    const loaded: FitSample[] = samplesOf(manifest);
+    console.log(`loaded ${loaded.length} cached samples`);
 
-    const cacheHit = samples.length > 0;
+    const cacheHit = loaded.length > 0;
     const replays = slicePart ? manifest.replays.filter((_, index) => index % slicePart.n === slicePart.k - 1) : manifest.replays;
-    for (const entry of cacheHit ? [] : replays) await captureEntry(entry, samples);
+    for (const entry of cacheHit ? [] : replays) await captureEntry(entry, loaded);
 
-    const games = new Set(samples.map(sample => sample.game));
-    console.log(`\nsamples=${samples.length} games=${games.size}`);
-    if (!cacheHit && samples.length > 0) console.log(`cached samples to ${writeSamples(manifest, samples)}`);
+    const games = new Set(loaded.map(sample => sample.game));
+    console.log(`\nsamples=${loaded.length} games=${games.size}`);
+    if (!cacheHit && loaded.length > 0) console.log(`cached samples to ${writeSamples(manifest, loaded)}`);
     if (slicePart) return;
+    const samples = fitSamples(loaded);
     if (samples.length < 100) {
       console.log('too few samples to fit — check the corpus cache');
       return;

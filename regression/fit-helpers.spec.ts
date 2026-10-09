@@ -263,5 +263,20 @@ describe('weights at a fixed K (round 64, T127)', () => {
     const kept = refitAtKReport(samples, names, [1.6, 0.6, 1, 0], [1.6, 1.2, 2.5, 0], K, { seeds: 3, folds: 5, draws: 10, minGames: 20 });
     expect(kept.verdict.adopt).toBe(false);
   });
+
+  // Round 65: the pre-registered holds (the two sign-unsure weights and the boost weights of variant E) are a report option.
+  test('a held weight keeps its start in the fit, the bands and the proposal', () => {
+    const samples = corpus([1.6, 0.6, 1, 0], [1.6, 1.2, 2.5, 0], 600, 5);
+    const names = ['bodies', 'boosts', 'tailwind', 'sweep'];
+    const report = refitAtKReport(samples, names, [1, 1, 1, 0], [1, 0.5, 2, 0], K,
+      { seeds: 2, folds: 5, draws: 5, minGames: 20, hold: { shared: ['boosts'], doubles: ['tailwind'] } });
+    const weight = (table: string, name: string) => report.weights.find(entry => entry.table === table && entry.name === name)!;
+    expect(weight('shared', 'boosts')).toMatchObject({ free: false, fit: 1, se: 0 });
+    expect(weight('doubles', 'tailwind')).toMatchObject({ free: false, fit: 2, se: 0 });
+    expect(weight('doubles', 'boosts').free).toBe(true);
+    expect(weight('shared', 'bodies').free).toBe(true);
+    expect(report.proposed.singles.boosts).toBe(1);
+    expect(report.proposed.doubles.tailwind).toBe(2);
+  });
 });
 
