@@ -218,6 +218,16 @@ export function replayBringOnly(
   return p1.length === bringCount && p2.length === bringCount ? { p1, p2 } : null;
 }
 
+/**
+ * Round 65: a Pokémon Champions replay (Champions OU, Champions VGC), read
+ * from the replay's own format id. The simulator knows no Champions format
+ * (its reconstructions run as Doubles OU or a custom game), so the hosts
+ * name the rule set from here and the engine weighs its statics by it.
+ */
+export function isChampionsReplay(source: ReplayFormatSource): boolean {
+  return /champions/.test(inferReplayFormatId(source));
+}
+
 /** The branch format carries the clause as a custom-rule suffix — is it there? */
 export function formatEnforcesSleepClause(format: string): boolean {
   if (/@@@.*sleep ?clause/i.test(format)) return true;

@@ -239,7 +239,7 @@ async function evaluateLead(
   // (resolveAutoLeadSettings).
   const { depth, samples, mode } = sweep;
   const lead0 = mode === 'auto' ? resolveAutoLeadSettings() : { depth, samples, mode };
-  const leadSettings: EvalSettings = { ...lead0, tera: env.params.tera, sleepClause: env.params.sleepClause };
+  const leadSettings: EvalSettings = { ...lead0, tera: env.params.tera, sleepClause: env.params.sleepClause, ruleset: env.params.ruleset };
   const key = env.params.cacheKeyFor(0);
   const storeKey = evalStoreKey(key, lead0.depth, lead0.samples, lead0.mode, env.params.tera);
   const cached = await loadLeadResult(env, lead0, key, storeKey);
@@ -287,9 +287,9 @@ async function runSweep(env: SweepEnv, opts: {
   if (!(await prefetchStore(env))) return;
   const rangeTurns: number[] = [];
   for (let turn = from; turn <= to; turn++) rangeTurns.push(turn);
-  const fullSettings: SweepSettings = { depth, samples, mode, tera: env.params.tera, sleepClause: env.params.sleepClause };
+  const fullSettings: SweepSettings = { depth, samples, mode, tera: env.params.tera, sleepClause: env.params.sleepClause, ruleset: env.params.ruleset };
   // The sketch skips the forced-win prover (round 35): every sketch is replaced by the full pass.
-  const fastSettings: SweepSettings = { depth: 1, samples: 1, mode: 'matrix', tera: env.params.tera, sleepClause: env.params.sleepClause, prove: false };
+  const fastSettings: SweepSettings = { depth: 1, samples: 1, mode: 'matrix', tera: env.params.tera, sleepClause: env.params.sleepClause, ruleset: env.params.ruleset, prove: false };
   const isFast = depth === 1 && samples === 1 && mode === 'matrix';
 
   if (rangeTurns.length > 2 && !isFast) {

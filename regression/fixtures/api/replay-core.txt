@@ -61,6 +61,7 @@ value getSpeciesUsageStats
 value guessedFieldFromUsage
 value inferOpponentTeam
 value inferReplayFormatId
+value isChampionsReplay
 value itemSetValue
 value manualEvs
 value manualField

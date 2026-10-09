@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, type Dispatch, type SetStateAction } from 'react';
 import {
   type OpponentTeamInfo, type ReplayData, type TurnSnapshot, formatEnforcesSleepClause,
-  getBranchSimulatorFormat, inferReplayFormatId,
+  getBranchSimulatorFormat, inferReplayFormatId, isChampionsReplay,
 } from '@fulllifegames/replay-core';
 import { needsSettingsUpgrade, resolveAutoTurnSettings, type TurnEvalSettings, useEvaluation } from './useEvaluation';
 import type { useEvalAcquire } from './useEvalAcquire';
@@ -10,7 +10,7 @@ import { evalStorePrefix } from '../lib/eval-cache-store';
 import { keptPlayed } from './evaluation/sweep-core';
 import {
   resolveTeraPreference, parseLeadSpecies, parsePlayedActions, parsePlayedActionsDoubles,
-  type SensitivityTarget,
+  type SensitivityTarget, type StaticRuleset,
 } from '@fulllifegames/eval-engine';
 
 type Evaluation = ReturnType<typeof useEvaluation>;
@@ -73,11 +73,18 @@ function useEvalFormat(inputs: EvalViewInputs) {
     () => (replayData ? formatEnforcesSleepClause(getBranchSimulatorFormat(replayData)) : false),
     [replayData],
   );
+  // Round 65: the rule set (Pokémon Champions or standard) from the replay's
+  // own format: the reconstruction runs Champions as Doubles OU or a custom
+  // game, and the static weighs its features by the replay's game.
+  const effectiveRuleset = useMemo(
+    (): StaticRuleset => (replayData && isChampionsReplay(replayData) ? 'champions' : 'standard'),
+    [replayData],
+  );
   const evalAvailable = useMemo(
     () => !!replayData && (replayGameType === null || replayGameType === 'singles' || replayGameType === 'doubles'),
     [replayData, replayGameType],
   );
-  return { effectiveTera, effectiveSleepClause, evalAvailable };
+  return { effectiveTera, effectiveSleepClause, effectiveRuleset, evalAvailable };
 }
 
 type EvalFormat = ReturnType<typeof useEvalFormat>;
@@ -86,28 +93,29 @@ type EvalFormat = ReturnType<typeof useEvalFormat>;
  *  variation-score recording of finished live evals. */
 function useEvaluateAction(inputs: EvalViewInputs, format: EvalFormat) {
   const { replayData, snapshots, evalIsDoubles, evaluation, liveTip, viewingVariation, serializedAtView, viewTurn, setsFingerprint, evalViewKey, acquire, setVariationScores } = inputs;
-  const { effectiveTera, effectiveSleepClause } = format;
+  const { effectiveTera, effectiveSleepClause, effectiveRuleset } = format;
   const handleEvaluate = useCallback(() => {
     if (!replayData) return;
     if (liveTip) {
-      evaluation.evaluate({ cacheKey: null, tera: effectiveTera, sleepClause: effectiveSleepClause, acquire: acquire.acquireBranchPosition, tag: evalViewKey });
+      evaluation.evaluate({ cacheKey: null, tera: effectiveTera, sleepClause: effectiveSleepClause, ruleset: effectiveRuleset, acquire: acquire.acquireBranchPosition, tag: evalViewKey });
     } else if (viewingVariation && serializedAtView) {
       // A recorded variation position: acquisition is instant — the search
       // itself still runs at the configured settings.
       const stored = serializedAtView;
-      evaluation.evaluate({ cacheKey: null, tera: effectiveTera, sleepClause: effectiveSleepClause, acquire: async () => stored, tag: evalViewKey });
+      evaluation.evaluate({ cacheKey: null, tera: effectiveTera, sleepClause: effectiveSleepClause, ruleset: effectiveRuleset, acquire: async () => stored, tag: evalViewKey });
     } else {
       evaluation.evaluate({
         cacheKey: `${replayData.id}:${viewTurn}:${setsFingerprint}`,
         tera: effectiveTera,
         sleepClause: effectiveSleepClause,
+        ruleset: effectiveRuleset,
         acquire: acquire.acquireReplayPosition,
         tag: evalViewKey,
         // The sweep stores this turn under the same key: search it with the same played action.
         keepPlayed: keptPlayed(playedOn(snapshots, viewTurn, evalIsDoubles)),
       });
     }
-  }, [replayData, snapshots, evalIsDoubles, liveTip, viewingVariation, serializedAtView, evaluation, effectiveTera, effectiveSleepClause, acquire.acquireBranchPosition, acquire.acquireReplayPosition, viewTurn, setsFingerprint, evalViewKey]);
+  }, [replayData, snapshots, evalIsDoubles, liveTip, viewingVariation, serializedAtView, evaluation, effectiveTera, effectiveSleepClause, effectiveRuleset, acquire.acquireBranchPosition, acquire.acquireReplayPosition, viewTurn, setsFingerprint, evalViewKey]);
 
   // Every eval finishing while the pointer sits on the variation feeds the
   // graph overlay — auto-evals after executed turns included. The tag guard
@@ -131,7 +139,7 @@ function useEvaluateAction(inputs: EvalViewInputs, format: EvalFormat) {
  *  sweep, and the "always on" auto-analyze. */
 function useSweepRuns(inputs: EvalViewInputs, format: EvalFormat) {
   const { replayData, snapshots, evaluation, analyzableTurns, evalIsDoubles, acquire, sources, bringOnlyLists, setsFingerprint, sensitivityTargetsFor, smogonPending } = inputs;
-  const { effectiveTera, effectiveSleepClause, evalAvailable } = format;
+  const { effectiveTera, effectiveSleepClause, effectiveRuleset, evalAvailable } = format;
 
   const playedFor = useCallback((turn: number) => playedOn(snapshots, turn, evalIsDoubles), [evalIsDoubles, snapshots]);
 
@@ -141,6 +149,7 @@ function useSweepRuns(inputs: EvalViewInputs, format: EvalFormat) {
       turns: analyzableTurns,
       tera: effectiveTera,
       sleepClause: effectiveSleepClause,
+      ruleset: effectiveRuleset,
       doubles: evalIsDoubles,
       cacheKeyFor: turn => `${replayData.id}:${turn}:${setsFingerprint}`,
       storePrefix: evalStorePrefix(replayData.id),
@@ -154,7 +163,7 @@ function useSweepRuns(inputs: EvalViewInputs, format: EvalFormat) {
       playedLeads: parseLeadSpecies(replayData.log),
       sensitivityTargetsFor,
     });
-  }, [replayData, evaluation, analyzableTurns, effectiveTera, effectiveSleepClause, evalIsDoubles, setsFingerprint, acquire, playedFor, sources, bringOnlyLists, sensitivityTargetsFor]);
+  }, [replayData, evaluation, analyzableTurns, effectiveTera, effectiveSleepClause, effectiveRuleset, evalIsDoubles, setsFingerprint, acquire, playedFor, sources, bringOnlyLists, sensitivityTargetsFor]);
 
   // Explains ONE turn: a two-turn mini sweep (turn + its follow-up) so the
   // report can price the played outcome. Runs ONLY from the explicit deepen
@@ -167,6 +176,7 @@ function useSweepRuns(inputs: EvalViewInputs, format: EvalFormat) {
       to: Math.min(turn + 1, analyzableTurns),
       tera: effectiveTera,
       sleepClause: effectiveSleepClause,
+      ruleset: effectiveRuleset,
       doubles: evalIsDoubles,
       cacheKeyFor: sweepTurn => `${replayData.id}:${sweepTurn}:${setsFingerprint}`,
       storePrefix: evalStorePrefix(replayData.id),
@@ -175,7 +185,7 @@ function useSweepRuns(inputs: EvalViewInputs, format: EvalFormat) {
       sensitivityTargetsFor,
       settings,
     });
-  }, [replayData, evaluation, analyzableTurns, effectiveTera, effectiveSleepClause, evalIsDoubles, setsFingerprint, acquire, playedFor, sensitivityTargetsFor]);
+  }, [replayData, evaluation, analyzableTurns, effectiveTera, effectiveSleepClause, effectiveRuleset, evalIsDoubles, setsFingerprint, acquire, playedFor, sensitivityTargetsFor]);
 
   /**
    * "Always on": with the autoAnalyze pref set, Analyze game starts by

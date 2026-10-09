@@ -1,6 +1,7 @@
 import type { PlayedAction } from './played.ts';
 import type { SimFastLever, SimFastReport } from './forward/sim-fast/state.ts';
 import type { SearchBudget } from './search/budget.ts';
+import type { StaticRuleset } from './score/weights.ts';
 
 /**
  * Which Pokémon may Terastallize in the search: a global switch, or per-side
@@ -44,6 +45,14 @@ export interface EvalSettings {
    * pass, so its proof would only cost); everything else proves.
    */
   prove?: boolean;
+  /**
+   * Round 65: the rule set the replay runs under (Pokémon Champions or the
+   * standard games), named by the host from the replay's format: the
+   * simulator reconstructs every doubles game as Doubles OU and knows no
+   * Champions format. The static applies its rule set's weight table at
+   * every leaf; absent means standard.
+   */
+  ruleset?: StaticRuleset;
 }
 
 /**
@@ -332,6 +341,8 @@ export interface ForcedWinInput {
   rootOrder: { p1: string[]; p2: string[] };
   tera?: TeraAllowance;
   sleepClause?: boolean;
+  /** Round 65: the search's rule set (EvalSettings.ruleset), for the prover's statics. */
+  ruleset?: StaticRuleset;
 }
 
 export interface ForcedWinProof {
@@ -507,6 +518,12 @@ export interface MctsTreeStats {
 
 /** Round 59: the speed-layer levers; round 61: the search budget. Both ride on every request (several carry no EvalSettings). */
 interface SimFastStamp { simFast?: readonly SimFastLever[]; searchBudget?: SearchBudget }
+/**
+ * Round 65: the rule set of the position a message is about. The worker
+ * keys its executors by position and rule set, so cells, sub-searches and
+ * proofs read the statics of the replay's game.
+ */
+interface RulesetStamp { ruleset?: StaticRuleset }
 
 export type EvalWorkerRequest = (
   | { type: 'search'; id: number; serializedBattle: string; settings: EvalSettings }
@@ -515,7 +532,7 @@ export type EvalWorkerRequest = (
   | { type: 'cells'; id: number; serializedBattle: string; jobs: EvalCellJob[] }
   | { type: 'subsearch'; id: number; serializedBattle: string; job: EvalSubSearchJob }
   | { type: 'prove'; id: number; serializedBattle: string; input: ForcedWinInput }
-) & SimFastStamp;
+) & SimFastStamp & RulesetStamp;
 
 /** Final answers carry the worker's speed-layer status and its counters since the last one. */
 export type EvalWorkerResponse = (

@@ -1,9 +1,9 @@
 import {
   autoTurnSettings, createLocalTreeExecutor, parsePlayedActions, parsePlayedActionsDoubles, resolveTeraPreference,
   searchPosition, searchTreesOrchestrated,
-  type EvalResult, type EvalSettings, type TeraAllowance,
+  type EvalResult, type EvalSettings, type StaticRuleset, type TeraAllowance,
 } from '@fulllifegames/eval-engine';
-import { formatEnforcesSleepClause, getBranchSimulatorFormat, inferReplayFormatId } from '@fulllifegames/replay-core';
+import { formatEnforcesSleepClause, getBranchSimulatorFormat, inferReplayFormatId, isChampionsReplay } from '@fulllifegames/replay-core';
 
 /**
  * Round 61: the bank's search, the app's dispatch. Below the auto threshold
@@ -34,7 +34,7 @@ export function bankSearch(input: BankSearchInput): Promise<EvalResult> {
     ? autoTurnSettings(faintedFraction, isDoubles(serialized))
     : { depth: input.depth, samples: input.samples, mode: mode === 'mcts' ? 'mcts' as const : 'matrix' as const };
   if (resolved.mode === 'mcts') {
-    return searchTreesOrchestrated(createLocalTreeExecutor(serialized), { ...settings, depth: 1, samples: 1, mode: 'mcts' });
+    return searchTreesOrchestrated(createLocalTreeExecutor(serialized, settings.ruleset), { ...settings, depth: 1, samples: 1, mode: 'mcts' });
   }
   return Promise.resolve(searchPosition(serialized, { ...settings, depth: resolved.depth, samples: resolved.samples }));
 }
@@ -45,10 +45,12 @@ export function bankSearch(input: BankSearchInput): Promise<EvalResult> {
  * ladder, only the species that clicked in draft and custom formats), Sleep
  * Clause from the branch format.
  */
-export function bankSettings(replay: { id?: string; formatid?: string; log: string }): { tera: TeraAllowance; sleepClause: boolean } {
+export function bankSettings(replay: { id?: string; formatid?: string; log: string }): { tera: TeraAllowance; sleepClause: boolean; ruleset: StaticRuleset } {
   return {
     tera: resolveTeraPreference('auto', inferReplayFormatId(replay), replay.log),
     sleepClause: formatEnforcesSleepClause(getBranchSimulatorFormat(replay)),
+    // Round 65: the rule set from the replay's own format, as the app resolves it (useEvalView).
+    ruleset: isChampionsReplay(replay) ? 'champions' : 'standard',
   };
 }
 

@@ -1,7 +1,7 @@
 import { useCallback, useMemo, useRef, useState } from 'react';
 import {
   type TurnSensitivity, type TurnVerification, type EvalPreferences, type EvalResult, type EvalSettings,
-  type SearchProgress, type TeraAllowance, teraKey,
+  type SearchProgress, type StaticRuleset, type TeraAllowance, teraKey,
 } from '@fulllifegames/eval-engine';
 import { EvalWorkerClient } from '../../lib/eval/worker-client';
 import { throttleLatest } from '../../lib/eval/throttle-latest';
@@ -21,6 +21,8 @@ interface EvaluateParams {
   tera: TeraAllowance;
   /** Sleep Clause enforced for this replay (resolved from the branch format). */
   sleepClause?: boolean;
+  /** Round 65: the rule set the replay runs under (Pokémon Champions or standard), resolved from its format. */
+  ruleset?: StaticRuleset;
   /**
    * Produces the serialized position. A reconstruction-based acquire calls
    * reportReconstruct(turn, target) as it replays turns; the hook surfaces
@@ -142,7 +144,7 @@ async function searchAndInstall(
   let final: EvalResult;
   try {
     const settings: EvalSettings = {
-      depth: resolved.depth, samples: resolved.samples, mode: resolved.mode, tera: params.tera, sleepClause: params.sleepClause,
+      depth: resolved.depth, samples: resolved.samples, mode: resolved.mode, tera: params.tera, sleepClause: params.sleepClause, ruleset: params.ruleset,
       ...(params.keepPlayed ? { keepPlayed: params.keepPlayed } : {}),
     };
     final = await io.clientRef.current.evaluate(serialized, settings, {

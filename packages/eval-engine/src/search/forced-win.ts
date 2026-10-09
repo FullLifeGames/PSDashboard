@@ -40,7 +40,7 @@ export function forcedWinFor(root: SimPosition, input: ForcedWinInput): ForcedWi
   let spent = { states: 0, cells: 0 };
   for (const side of forcedWinSides(battle, input)) {
     const proof = proveForcedWin(root, {
-      side, rootOrder: input.rootOrder[side], tera: input.tera, sleepClause: input.sleepClause, spent,
+      side, rootOrder: input.rootOrder[side], tera: input.tera, sleepClause: input.sleepClause, ruleset: input.ruleset, spent,
     });
     if (proof.mass >= MIN_FORCED_MASS) return { side, proof };
     spent = { states: proof.states, cells: proof.cells };

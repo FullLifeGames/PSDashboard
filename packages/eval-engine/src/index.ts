@@ -98,4 +98,5 @@ export type {
   ReadRecommendation, SearchProgress, EvalChoiceOption, EvalChoicesInfo, EvalCellJob, EvalCellValue,
   EvalSubSearchJob, MctsTreeStats, EvalWorkerRequest, EvalWorkerResponse,
 } from './types.ts';
+export type { StaticRuleset } from './score/weights.ts';
 export { winProbability, winPercent, winPctText, winDeltaText } from './winprob.ts';

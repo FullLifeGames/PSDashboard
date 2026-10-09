@@ -1,7 +1,7 @@
 import {
   matchPlayedSide, phantomStayIn, type TurnSensitivity, type TurnVerification, type SensitivityTarget,
   type LeadEvalData, type PlayedTurn, type EvalPreferences, type EvalResult, type EvalSettings,
-  type RankedChoice, type TeraAllowance,
+  type RankedChoice, type StaticRuleset, type TeraAllowance,
 } from '@fulllifegames/eval-engine';
 import type { EvalWorkerClient } from '../../lib/eval/worker-client';
 import type { StoredEval } from '../../lib/eval-cache-store';
@@ -41,6 +41,8 @@ export interface GraphSweepParams {
   tera: TeraAllowance;
   /** Sleep Clause enforced for this replay (resolved from the branch format). */
   sleepClause?: boolean;
+  /** Round 65: the rule set the replay runs under (Pokémon Champions or standard), resolved from its format. */
+  ruleset?: StaticRuleset;
   /** The replay's game type: auto resolves each turn per game type (round 63, T110). */
   doubles: boolean;
   cacheKeyFor(turn: number): string;

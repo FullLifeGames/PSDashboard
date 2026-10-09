@@ -57,6 +57,20 @@ describe('useEvalView', () => {
     expect(empty.result.current.evalAvailable).toBe(false);
   });
 
+  // Round 65: a Pokémon Champions replay (OU or VGC) is its own rule set, named from the replay's format.
+  test('resolves the rule set from the replay format and hands it to Evaluate and the sweep', () => {
+    const { evaluation, spies } = evaluationOf();
+    const standard = renderHook(() => useEvalView(inputs(evaluation)));
+    expect(standard.result.current.effectiveRuleset).toBe('standard');
+    const champions = { ...replayData, id: 'gen9championsou-2695399689', formatid: 'gen9championsou' };
+    const view = renderHook(() => useEvalView(inputs(evaluation, { replayData: champions })));
+    expect(view.result.current.effectiveRuleset).toBe('champions');
+    act(() => view.result.current.handleEvaluate());
+    expect(spies.evaluate.mock.calls[0][0]).toMatchObject({ ruleset: 'champions' });
+    act(() => view.result.current.handleAnalyzeGame());
+    expect(spies.runGraphSweep.mock.calls[0][0]).toMatchObject({ ruleset: 'champions' });
+  });
+
   test('Evaluate targets the position under the pointer: live sim, recorded variation, or cached main line', async () => {
     const { evaluation, spies } = evaluationOf();
     const wired = inputs(evaluation, { liveTip: true, liveEvalView: true, evalViewKey: 'variation:3' });

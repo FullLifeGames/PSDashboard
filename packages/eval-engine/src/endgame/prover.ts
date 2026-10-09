@@ -1,7 +1,7 @@
 import type { Battle } from '@pkmn/sim';
 import { sideIndex } from '@fulllifegames/replay-core';
 import { planCellEvents, type CellEvent } from '../cell-blend.ts';
-import { createMatchupCache, type MatchupCache } from '../eval-function.ts';
+import { createMatchupCache, type MatchupCache, type StaticRuleset } from '../eval-function.ts';
 import { createRootPosition, legalChoices, positionBattle, type ChoiceOption, type SimPosition } from '../forward-model.ts';
 import { boundaryEvent } from '../ko-odds.ts';
 import { isCombined } from '../search/hints.ts';
@@ -61,6 +61,8 @@ export interface ProveRequest {
   rootOrder: string[];
   tera?: TeraAllowance;
   sleepClause?: boolean;
+  /** Round 65: the rule set whose weight table the prover's statics read. */
+  ruleset?: StaticRuleset;
   budget?: Partial<ProverBudget>;
   /** States and cells already spent by an earlier attempt on this position. */
   spent?: { states: number; cells: number };
@@ -72,7 +74,7 @@ interface Memo extends Proven { remaining: number }
 interface Cell extends EndgameChildren { reply: ChoiceOption; p1Choice: string; p2Choice: string }
 interface CellProof { cell: Cell; proofs: Proven[]; proven: Proven }
 interface ReplyProof { proven: Proven; cells: CellProof[] }
-interface ProverOptions { tera?: TeraAllowance; sleepClause?: boolean }
+interface ProverOptions { tera?: TeraAllowance; sleepClause?: boolean; ruleset?: StaticRuleset }
 
 const NONE: Proven = { mass: 0, turns: 0, caveat: 'none' };
 const CAVEAT_RANK: Record<ForcedWinCaveat, number> = { none: 0, 'barring-crit': 1, 'sampled-rolls': 2 };
@@ -181,7 +183,7 @@ class ForcedWinProver {
   /** Cells drawn once per (position, pair): the probe's cells serve the proof. */
   private readonly cellCache = new Map<string, EndgameChildren>();
   private readonly inProgress = new Set<string>();
-  private readonly cache: MatchupCache = createMatchupCache();
+  private readonly cache: MatchupCache;
   private readonly side: Side;
   private readonly opts: ProverOptions;
   private readonly budget: ProverBudget;
@@ -191,6 +193,7 @@ class ForcedWinProver {
   constructor(side: Side, opts: ProverOptions, budget: ProverBudget, spent: { states: number; cells: number }) {
     this.side = side;
     this.opts = opts;
+    this.cache = createMatchupCache(opts.ruleset);
     this.budget = budget;
     this.states = spent.states;
     this.cells = spent.cells;
@@ -402,12 +405,12 @@ export function proveForcedWin(rootOrSerialized: string | SimPosition, request: 
   const battle = positionBattle(root);
   const budget = { ...PROVER_BUDGET, ...request.budget };
   const spent = request.spent ?? { states: 0, cells: 0 };
-  const prover = new ForcedWinProver(request.side, { tera: request.tera, sleepClause: request.sleepClause }, budget, spent);
+  const prover = new ForcedWinProver(request.side, { tera: request.tera, sleepClause: request.sleepClause, ruleset: request.ruleset }, budget, spent);
   if (battle.ended || prover.states >= budget.states) return { ...NONE, openValue: null, states: prover.states, cells: prover.cells };
   const winners = prover.probe(root, request.rootOrder);
   if (winners.length === 0) return { ...NONE, openValue: null, states: prover.states, cells: prover.cells };
   prover.states += 1;
   const { proven, cells } = prover.expand(root, 0, winners);
-  const fields = openFields(battle, request.side, cells, createMatchupCache());
+  const fields = openFields(battle, request.side, cells, createMatchupCache(request.ruleset));
   return { ...proven, ...fields, states: prover.states, cells: prover.cells };
 }

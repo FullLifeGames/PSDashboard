@@ -116,6 +116,15 @@ describe('useEvaluation single position', () => {
     expect(script.calls[0].settings.keepPlayed).toEqual(played);
   });
 
+  // Round 65: the rule set (Pokémon Champions or standard) rides with the search settings to the pool.
+  test('a single evaluation hands the rule set to the search', async () => {
+    const { result } = renderHook(() => useEvaluation());
+    act(() => result.current.setPrefs(matrixPrefs));
+    act(() => result.current.evaluate({ cacheKey: null, tera: false, ruleset: 'champions', acquire: async () => position(1), tag: 'main:1' }));
+    await waitFor(() => expect(result.current.status).toBe('done'));
+    expect(script.calls[0].settings.ruleset).toBe('champions');
+  });
+
   test('auto mode reads the fainted fraction off the acquired position and routes to the tree once bodies fell', async () => {
     // The threshold before round 61; the default now runs the tree from the first turn (next test).
     configureSearchBudget(parseSearchBudget(`tree-from=${AUTO_MCTS_FAINTED_FRACTION},early-samples=1`));
@@ -252,6 +261,15 @@ describe('useEvaluation whole-game sweep', () => {
     const settingsOf = (score: number) => script.calls.find(call => scoreOf(call.serialized) === score)?.settings;
     expect(settingsOf(0)?.keepPlayed?.p1).toMatchObject({ kind: 'move' });
     expect(settingsOf(0.1)?.keepPlayed).toBeUndefined();
+  });
+
+  test('a sweep hands the rule set to every turn it searches', async () => {
+    const { result } = renderHook(() => useEvaluation());
+    act(() => result.current.setPrefs(matrixPrefs));
+    act(() => result.current.runGraphSweep({ ...sweepParams(turn => async () => position(turn - 1)), ruleset: 'champions' }));
+    await waitFor(() => expect(result.current.graph.running).toBe(true));
+    await waitFor(() => expect(result.current.graph.running).toBe(false), { timeout: 10_000 });
+    expect(script.calls.map(call => call.settings.ruleset)).toEqual(['champions', 'champions', 'champions']);
   });
 
   test('a failed search records its error and the notice names it; a turn without a position is a silent gap; clearGraph empties everything', async () => {

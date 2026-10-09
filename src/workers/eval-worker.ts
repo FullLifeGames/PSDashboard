@@ -1,7 +1,7 @@
 /// <reference lib="webworker" />
 import {
   mctsSearch, mctsTreeSearch, type SearchExecutor, createLocalExecutor, searchPosition, takeSimFastReport,
-  type EvalWorkerRequest, type EvalWorkerResponse,
+  type EvalWorkerRequest, type EvalWorkerResponse, type StaticRuleset,
 } from '@fulllifegames/eval-engine';
 import { adoptSearchBudgetStamp } from '../lib/eval/search-budget-setting';
 import { adoptSimFastStamp } from '../lib/eval/sim-fast-setting';
@@ -18,15 +18,17 @@ const postReplay = (message: ReplayJobResponse) => scope.postMessage(
 const PROGRESS_EVERY = 10;
 
 // One executor (with its matchup cache and lazily deserialized root) is
-// reused across every message about the same position.
+// reused across every message about the same position under the same rule
+// set (round 65: the rule set picks the static's weight table).
 const executors = new Map<string, SearchExecutor>();
 
-function executorFor(serializedBattle: string): SearchExecutor {
-  let executor = executors.get(serializedBattle);
+function executorFor(serializedBattle: string, ruleset: StaticRuleset = 'standard'): SearchExecutor {
+  const key = `${ruleset}|${serializedBattle}`;
+  let executor = executors.get(key);
   if (!executor) {
     if (executors.size >= 4) executors.clear();
-    executor = createLocalExecutor(serializedBattle);
-    executors.set(serializedBattle, executor);
+    executor = createLocalExecutor(serializedBattle, ruleset);
+    executors.set(key, executor);
   }
   return executor;
 }
@@ -67,16 +69,16 @@ scope.onmessage = async (event: MessageEvent<EvalWorkerRequest | ReplayJobReques
       });
       settle({ type: 'mctsTreeResult', id: message.id, tree });
     } else if (message.type === 'choices') {
-      const info = await executorFor(message.serializedBattle).choices(message.tera, message.keepPlayed, message.sleepClause);
+      const info = await executorFor(message.serializedBattle, message.ruleset).choices(message.tera, message.keepPlayed, message.sleepClause);
       settle({ type: 'choicesResult', id: message.id, info });
     } else if (message.type === 'cells') {
-      const values = await executorFor(message.serializedBattle).evalCells(message.jobs);
+      const values = await executorFor(message.serializedBattle, message.ruleset).evalCells(message.jobs);
       settle({ type: 'cellsResult', id: message.id, values });
     } else if (message.type === 'subsearch') {
-      const result = await executorFor(message.serializedBattle).subSearch(message.job);
+      const result = await executorFor(message.serializedBattle, message.ruleset).subSearch(message.job);
       settle({ type: 'result', id: message.id, result });
     } else if (message.type === 'prove') {
-      const outcome = await executorFor(message.serializedBattle).prove(message.input);
+      const outcome = await executorFor(message.serializedBattle, message.ruleset).prove(message.input);
       settle({ type: 'proveResult', id: message.id, outcome });
     }
   } catch (error) {

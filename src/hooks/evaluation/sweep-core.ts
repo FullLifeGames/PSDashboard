@@ -103,7 +103,7 @@ async function computeFreshPlayedOutcome(
   const p2Choice = matchOrPhantom(result, 'p2', turnPlayed);
   if (p1Choice && p2Choice) {
     const paired = await guardedStage(env, () => perfSpan('played-pair', () =>
-      client.evalPair(serialized, p1Choice.choice, p2Choice.choice, { depth, samples, mode, tera: env.params.tera, sleepClause: env.params.sleepClause })));
+      client.evalPair(serialized, p1Choice.choice, p2Choice.choice, { depth, samples, mode, tera: env.params.tera, sleepClause: env.params.sleepClause, ruleset: env.params.ruleset })));
     if (paired === 'abort') return 'abort';
     outcome = paired;
   }
@@ -146,7 +146,7 @@ async function runFreshEvaluation(
     // must not cancel each other; the run's own cancel path
     // still kills them all at once.
     client.evaluate(serialized, {
-      depth, samples, mode, tera: env.params.tera, keepPlayed, sleepClause: env.params.sleepClause, ...sketchFields(engine),
+      depth, samples, mode, tera: env.params.tera, keepPlayed, sleepClause: env.params.sleepClause, ruleset: env.params.ruleset, ...sketchFields(engine),
     }, undefined, { exclusive: false }));
   if (aborted(env)) return false;
   data.scores[turn - 1] = result.score;
@@ -226,7 +226,7 @@ async function evalTurn(
   env.data.played[turn - 1] = turnPlayed;
   const engine: TurnEngine = { depth, samples, mode, ...sketchFields({ prove }) };
   const resolvedSettings: EvalSettings = {
-    depth, samples, mode, tera: env.params.tera, sleepClause: env.params.sleepClause, ...sketchFields(engine),
+    depth, samples, mode, tera: env.params.tera, sleepClause: env.params.sleepClause, ruleset: env.params.ruleset, ...sketchFields(engine),
   };
 
   // Monotone merge: the graph already holds a deeper result for this

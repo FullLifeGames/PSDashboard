@@ -7,6 +7,7 @@ import { searchBudget } from './search/budget.ts';
 import { applyForcedWin, forcedWinInput } from './search/forced-win-apply.ts';
 import { createLocalExecutor } from './search/position.ts';
 import type { EvalCellJob, EvalCellValue, EvalResult, EvalSettings, MctsTreeStats, SearchProgress } from './types.ts';
+import type { StaticRuleset } from './score/weights.ts';
 import { boundaryCheckCells, playedIndices, rowCompletedCells, starvedSupportCells, type VerifyFocus } from './verify-select.ts';
 
 /**
@@ -23,9 +24,9 @@ export interface TreeExecutor extends SearchExecutor {
   tree(settings: EvalSettings, seedOffset: number, onProgress?: (progress: SearchProgress) => void): Promise<MctsTreeStats>;
 }
 
-export function createLocalTreeExecutor(serializedBattle: string): TreeExecutor {
+export function createLocalTreeExecutor(serializedBattle: string, ruleset: StaticRuleset = 'standard'): TreeExecutor {
   return {
-    ...createLocalExecutor(serializedBattle),
+    ...createLocalExecutor(serializedBattle, ruleset),
     tree: async (settings, seedOffset, onProgress) =>
       mctsTreeSearch(serializedBattle, settings, seedOffset, onProgress ? { onProgress } : undefined),
   };
@@ -65,7 +66,7 @@ function runTrees(executor: TreeExecutor, settings: EvalSettings, callbacks?: Or
  * the span now holds the sampling as well.
  */
 async function verifyCells(executor: TreeExecutor, jobs: EvalCellJob[], settings: EvalSettings): Promise<EvalCellValue[]> {
-  const deepen: EvalSettings = { depth: 1, samples: 1, tera: settings.tera, sleepClause: settings.sleepClause };
+  const deepen: EvalSettings = { depth: 1, samples: 1, tera: settings.tera, sleepClause: settings.sleepClause, ruleset: settings.ruleset };
   const started = Date.now();
   const values = await executor.evalCells(jobs.map(job => ({ ...job, deepen })));
   perfAdd('verify-deepen', Date.now() - started);

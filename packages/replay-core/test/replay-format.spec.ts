@@ -1,6 +1,7 @@
 import { test, expect, describe } from 'vitest';
 import {
   formatEnforcesSleepClause,
+  isChampionsReplay,
   getBranchSimulatorFormat,
   getReplayGameType,
   inferReplayFormatId,
@@ -134,6 +135,18 @@ describe('replay format inference', () => {
     expect(formatEnforcesSleepClause('gen9ou')).toBe(false);
     expect(formatEnforcesSleepClause('gen9customgame')).toBe(false);
     expect(formatEnforcesSleepClause('gen9customgame@@@Sleep Clause Mod')).toBe(true);
+  });
+
+  // Round 65: the static weighs a Pokémon Champions replay by its own tables
+  // (singles and doubles), named from the replay's format; the simulator
+  // reconstructs Champions VGC as Doubles OU and Champions OU as a custom game.
+  test('a Champions replay is named from its own format, singles and doubles', () => {
+    expect(isChampionsReplay(vgcReplay)).toBe(true);
+    expect(isChampionsReplay({ id: 'gen9championsvgc2026regmabo3-2603652560', log: '|gametype|doubles\n|gen|9' })).toBe(true);
+    expect(isChampionsReplay({ id: 'gen9championsou-2695399689', log: '|gametype|singles\n|gen|9\n|tier|[Gen 9 Champions] OU' })).toBe(true);
+    expect(isChampionsReplay({ id: 'gen9ou-123', log: '|gametype|singles\n|gen|9\n|tier|[Gen 9] OU' })).toBe(false);
+    expect(isChampionsReplay({ id: 'gen9doublesou-2663093831', log: '|gametype|doubles\n|gen|9\n|tier|[Gen 9] Doubles OU' })).toBe(false);
+    expect(isChampionsReplay({ id: 'gen9vgc2026regi-2630181744', log: '|gametype|doubles\n|gen|9\n|tier|[Gen 9] VGC 2026 Reg I' })).toBe(false);
   });
 
   // A private replay link carries a 31-character password as a `-{password}pw`

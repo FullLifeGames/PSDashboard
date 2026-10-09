@@ -26,7 +26,7 @@ async function backfillPlayedOutcome(
         env.clientRef.current ??= new EvalWorkerClient();
         const client = env.clientRef.current;
         outcome = await perfSpan('played-pair', () =>
-          client.evalPair(serialized, p1Choice.choice, p2Choice.choice, { depth, samples, mode, tera: env.params.tera, sleepClause: env.params.sleepClause }));
+          client.evalPair(serialized, p1Choice.choice, p2Choice.choice, { depth, samples, mode, tera: env.params.tera, sleepClause: env.params.sleepClause, ruleset: env.params.ruleset }));
       } catch (err) {
         if (aborted(env)) return 'abort';
         if (isCancelled(err)) return 'abort';

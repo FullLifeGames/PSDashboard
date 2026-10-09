@@ -1,4 +1,4 @@
-import { createMatchupCache, unansweredMons, type MatchupCache } from '../eval-function.ts';
+import { createMatchupCache, unansweredMons, type MatchupCache, type StaticRuleset } from '../eval-function.ts';
 import {
   advancePosition, createRootPosition, positionBattle, type ChoiceOption, type SimPosition,
 } from '../forward-model.ts';
@@ -39,7 +39,7 @@ import { buildMatrix, cellValueMemo, maximinRows, minimaxColumns, type Matrix, t
 export function subSearchDepth1(
   serializedBattle: string,
   settings: EvalSettings,
-  matchupCache: MatchupCache = createMatchupCache(),
+  matchupCache: MatchupCache = createMatchupCache(settings.ruleset),
 ): EvalResult {
   const root = createRootPosition(serializedBattle);
   const battle = positionBattle(root);
@@ -203,7 +203,7 @@ export function searchPosition(
   serializedBattle: string,
   settings: EvalSettings,
   callbacks?: SearchCallbacks,
-  matchupCache: MatchupCache = createMatchupCache(),
+  matchupCache: MatchupCache = createMatchupCache(settings.ruleset),
   restrictCandidates = false,
 ): EvalResult {
   const root = createRootPosition(serializedBattle);
@@ -257,10 +257,11 @@ export function searchPosition(
 /**
  * Single-threaded SearchExecutor over this module's sim primitives — the
  * reference implementation the orchestrator parity test pins against, and
- * the fallback when no worker pool is available.
+ * the fallback when no worker pool is available. Round 65: an executor
+ * serves one position under one rule set, whose weight table its statics read.
  */
-export function createLocalExecutor(serializedBattle: string): SearchExecutor {
-  const matchupCache = createMatchupCache();
+export function createLocalExecutor(serializedBattle: string, ruleset: StaticRuleset = 'standard'): SearchExecutor {
+  const matchupCache = createMatchupCache(ruleset);
   const root = createRootPosition(serializedBattle);
   return {
     async choices(tera, keepPlayed, sleepClause) {

@@ -171,7 +171,7 @@ function runMcts(
   callbacks?: MctsCallbacks,
   seedOffset = 0,
 ): { root: Node; maxDepth: number; result: EvalResult; koOdds?: RootKoOdds; rootClassKeys: Map<number, string> } {
-  const matchupCache = createMatchupCache();
+  const matchupCache = createMatchupCache(settings.ruleset);
   const tera = settings.tera ?? true;
   // keepPlayed applies to the root only — children have their own spaces.
   const root = makeNode(createRootPosition(serializedBattle), tera, matchupCache, settings.keepPlayed, settings.sleepClause);

@@ -182,5 +182,26 @@ export const DOUBLES_FEATURE_WEIGHTS: Record<keyof EvalFeatures, number> = {
   trickRoom: 87,
 };
 
-export const featureWeights = (doubles: boolean): Record<keyof EvalFeatures, number> =>
-  (doubles ? DOUBLES_FEATURE_WEIGHTS : FEATURE_WEIGHTS);
+/**
+ * The rule set a battle runs under (round 65). The simulator knows no
+ * Pokémon Champions format (its doubles reconstructions run as Doubles OU,
+ * its singles as a custom game), so the host names the rule set from the
+ * replay's format and hands it to the search (EvalSettings.ruleset); the
+ * static weighs the features with the table of its rule set and game type.
+ * Champions OU (singles) and Champions VGC (doubles) are their own games
+ * with their own fits (round 65: a doubles table fitted without the
+ * Champions VGC games read those games 43 bp worse than the hand weights).
+ */
+export type StaticRuleset = 'standard' | 'champions';
+
+/** Champions OU (singles); until a fit of its own, the singles table. */
+export const CHAMPIONS_FEATURE_WEIGHTS: Record<keyof EvalFeatures, number> = { ...FEATURE_WEIGHTS };
+
+/** Champions VGC (doubles); until a fit of its own, the doubles table. */
+export const CHAMPIONS_DOUBLES_FEATURE_WEIGHTS: Record<keyof EvalFeatures, number> = { ...DOUBLES_FEATURE_WEIGHTS };
+
+/** The weight table of a game type under a rule set. */
+export function featureWeights(doubles: boolean, ruleset: StaticRuleset = 'standard'): Record<keyof EvalFeatures, number> {
+  if (ruleset === 'champions') return doubles ? CHAMPIONS_DOUBLES_FEATURE_WEIGHTS : CHAMPIONS_FEATURE_WEIGHTS;
+  return doubles ? DOUBLES_FEATURE_WEIGHTS : FEATURE_WEIGHTS;
+}

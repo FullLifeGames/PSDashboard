@@ -1,7 +1,7 @@
 import {
   perfCount, searchOrchestrated, searchTreesOrchestrated, forcedWinPossible,
   type SearchExecutor, type TreeExecutor, type EvalCellValue, type EvalResult, type EvalSettings, type EvalWorkerRequest,
-  type EvalWorkerResponse, type MctsTreeStats, type SearchProgress,
+  type EvalWorkerResponse, type MctsTreeStats, type SearchProgress, type StaticRuleset,
 } from '@fulllifegames/eval-engine';
 import { evalPoolSize } from './pool-size';
 import { searchBudgetStamp } from './search-budget-setting';
@@ -38,7 +38,7 @@ export function playedOutcomeSettings(settings: EvalSettings): EvalSettings | nu
   const mode = settings.mode ?? 'matrix';
   if (mode !== 'mcts' && settings.depth <= 1) return null;
   const depth = (mode === 'mcts' ? 1 : Math.min(settings.depth - 1, 2)) as 1 | 2;
-  return { depth, samples: 1, tera: settings.tera, mode: 'matrix' };
+  return { depth, samples: 1, tera: settings.tera, mode: 'matrix', ruleset: settings.ruleset };
 }
 
 /**
@@ -112,11 +112,12 @@ export class EvalWorkerClient {
     });
   }
 
-  private createPooledExecutor(serializedBattle: string): SearchExecutor {
+  /** Round 65: an executor serves one position under one rule set; every message names it, so the worker's executor reads the replay's weights. */
+  private createPooledExecutor(serializedBattle: string, ruleset?: StaticRuleset): SearchExecutor {
     let roundRobin = 0;
     return {
       choices: async (tera, keepPlayed, sleepClause) => {
-        const response = await this.rpc(this.pickWorker(), { type: 'choices', serializedBattle, tera, keepPlayed, sleepClause });
+        const response = await this.rpc(this.pickWorker(), { type: 'choices', serializedBattle, tera, keepPlayed, sleepClause, ruleset });
         if (response.type !== 'choicesResult') throw new Error('unexpected worker response');
         return response.info;
       },
@@ -133,7 +134,7 @@ export class EvalWorkerClient {
         await Promise.all(workers.map(async handle => {
           while (next < chunks.length) {
             const chunk = chunks[next++];
-            const response = await this.rpc(handle, { type: 'cells', serializedBattle, jobs: chunk });
+            const response = await this.rpc(handle, { type: 'cells', serializedBattle, jobs: chunk, ruleset });
             if (response.type !== 'cellsResult') throw new Error('unexpected worker response');
             values.push(...response.values);
             completed += chunk.length;
@@ -145,7 +146,7 @@ export class EvalWorkerClient {
       subSearch: async job => {
         const workers = this.ensureWorkers();
         const handle = workers[roundRobin++ % workers.length];
-        const response = await this.rpc(handle, { type: 'subsearch', serializedBattle, job });
+        const response = await this.rpc(handle, { type: 'subsearch', serializedBattle, job, ruleset });
         if (response.type !== 'result') throw new Error('unexpected worker response');
         return response.result;
       },
@@ -153,7 +154,7 @@ export class EvalWorkerClient {
         // Round 35: no round trip where the trigger cannot fire (full boards
         // without a decided profile); a queued worker would only delay the turn.
         if (!forcedWinPossible(serializedBattle, input)) return null;
-        const response = await this.rpc(this.pickWorker(), { type: 'prove', serializedBattle, input });
+        const response = await this.rpc(this.pickWorker(), { type: 'prove', serializedBattle, input, ruleset });
         if (response.type !== 'proveResult') throw new Error('unexpected worker response');
         return response.outcome;
       },
@@ -187,9 +188,9 @@ export class EvalWorkerClient {
     // Round 61: the tree search's orchestration lives in the engine; the
     // pool is its executor, the bank runs the same function in-process.
     if (settings.mode === 'mcts') {
-      return searchTreesOrchestrated(this.createPooledTreeExecutor(serializedBattle, live), settings, callbacks);
+      return searchTreesOrchestrated(this.createPooledTreeExecutor(serializedBattle, live, settings.ruleset), settings, callbacks);
     }
-    return searchOrchestrated(this.createPooledExecutor(serializedBattle), settings, callbacks);
+    return searchOrchestrated(this.createPooledExecutor(serializedBattle, settings.ruleset), settings, callbacks);
   }
 
   /** Posts one MCTS tree to the least-loaded worker; progress streams while the evaluation is live. */
@@ -225,9 +226,9 @@ export class EvalWorkerClient {
    * trees (searchTreesOrchestrated) spread across the pool; the count never
    * follows the pool size, small pools just run trees in rounds.
    */
-  private createPooledTreeExecutor(serializedBattle: string, live: () => boolean): TreeExecutor {
+  private createPooledTreeExecutor(serializedBattle: string, live: () => boolean, ruleset?: StaticRuleset): TreeExecutor {
     return {
-      ...this.createPooledExecutor(serializedBattle),
+      ...this.createPooledExecutor(serializedBattle, ruleset),
       tree: (settings, seedOffset, onProgress) =>
         this.runTree(serializedBattle, settings, seedOffset, live, onProgress ?? (() => undefined)),
     };
@@ -247,6 +248,7 @@ export class EvalWorkerClient {
         type: 'subsearch',
         serializedBattle,
         job: { i: 0, j: 0, p1Choice, p2Choice, settings: subSettings },
+        ruleset: settings.ruleset,
       });
       if (response.type !== 'result') throw new Error('unexpected worker response');
       return response.result.score;
@@ -255,6 +257,7 @@ export class EvalWorkerClient {
       type: 'cells',
       serializedBattle,
       jobs: [{ i: 0, j: 0, p1Choice, p2Choice, samples: 1 }],
+      ruleset: settings.ruleset,
     });
     if (response.type !== 'cellsResult' || response.values.length === 0) {
       throw new Error('unexpected worker response');

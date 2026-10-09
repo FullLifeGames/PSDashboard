@@ -13,6 +13,7 @@ export function forcedWinInput(result: EvalResult, settings: EvalSettings): Forc
     rootOrder: { p1: result.perSide.p1.map(row => row.choice), p2: result.perSide.p2.map(row => row.choice) },
     ...(settings.tera !== undefined ? { tera: settings.tera } : {}),
     ...(settings.sleepClause !== undefined ? { sleepClause: settings.sleepClause } : {}),
+    ...(settings.ruleset !== undefined ? { ruleset: settings.ruleset } : {}),
   };
 }
 

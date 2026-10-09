@@ -1,6 +1,6 @@
 import type { Battle } from '@pkmn/sim';
 import { ENDGAME_MAX_BODIES } from '../types.ts';
-import { createMatchupCache, type MatchupCache } from '../eval-function.ts';
+import { createMatchupCache, type MatchupCache, type StaticRuleset } from '../eval-function.ts';
 import { createRootPosition, positionBattle, type SimPosition } from '../forward-model.ts';
 import { solveMatrixGame } from '../ranking/solve.ts';
 import { livingMons } from '../score/threat.ts';
@@ -53,15 +53,16 @@ const argmax = (mix: number[]): number => mix.reduce((best, weight, index) => (w
 class EndgameSolver {
   private readonly memo = new Map<string, Memo>();
   private readonly inProgress = new Set<string>();
-  private readonly cache: MatchupCache = createMatchupCache();
+  private readonly cache: MatchupCache;
   private readonly start = Date.now();
   private readonly caps: EndgameCaps;
   readonly flags = new Set<EndgameFlag>();
   states = 0;
   depth = 0;
 
-  constructor(caps: EndgameCaps) {
+  constructor(caps: EndgameCaps, ruleset: StaticRuleset) {
     this.caps = caps;
+    this.cache = createMatchupCache(ruleset);
   }
 
   solve(position: SimPosition, ply: number): Solved {
@@ -119,12 +120,13 @@ class EndgameSolver {
   }
 }
 
-export function solveEndgame(serializedBattle: string, caps: Partial<EndgameCaps> = {}): EndgameResult {
+/** Round 65: `ruleset` names the weight table of the solver's statics (EvalSettings.ruleset). */
+export function solveEndgame(serializedBattle: string, caps: Partial<EndgameCaps> = {}, ruleset: StaticRuleset = 'standard'): EndgameResult {
   const root = createRootPosition(serializedBattle);
   if (!endgameScope(positionBattle(root))) {
     return { scope: false, value: 0, exact: false, flags: [], states: 0, depth: 0, pv: [] };
   }
-  const solver = new EndgameSolver({ ...ENDGAME_CAPS, ...caps });
+  const solver = new EndgameSolver({ ...ENDGAME_CAPS, ...caps }, ruleset);
   const solved = solver.solve(root, 0);
   return {
     scope: true, value: solved.value, exact: solver.flags.size === 0, flags: [...solver.flags],

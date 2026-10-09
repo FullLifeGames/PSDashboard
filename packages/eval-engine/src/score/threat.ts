@@ -3,6 +3,7 @@ import { stageMultiplier } from '../stat-stages.ts';
 import {
   abilityStab, keyedAnswers, landedKey, landedOrCatalog, stagedLanded, stagedPower, traitsOf, type Landed,
 } from './move-facts.ts';
+import type { StaticRuleset } from './weights.ts';
 
 /**
  * The HP- and boost-independent threat proxy: one attacker→defender
@@ -75,10 +76,17 @@ export interface AxisThreat {
  * whose power the simulator sets from HP, status, the field, speed or weight
  * (the live class of POWER_MOVES in move-facts.ts).
  */
-export type MatchupCache = Map<string, PairThreat>;
+export type MatchupCache = Map<string, PairThreat> & {
+  /**
+   * Round 65: the rule set whose weight table the static applies (score/weights.ts).
+   * The memo itself is weight-free; a search creates its cache with the
+   * rule set of its settings, and a plain Map reads as 'standard'.
+   */
+  readonly ruleset?: StaticRuleset;
+};
 
-export function createMatchupCache(): MatchupCache {
-  return new Map();
+export function createMatchupCache(ruleset: StaticRuleset = 'standard'): MatchupCache {
+  return Object.assign(new Map<string, PairThreat>(), { ruleset });
 }
 
 /** The move a Choice item has locked this Pokémon into, if any. */

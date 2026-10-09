@@ -79,6 +79,7 @@ type SimFastLever
 type SimFastReport
 type SimFastStatus
 type SimPokemonInfo
+type StaticRuleset
 type StreakHistoryEntry
 type StreakOdds
 type TeraAllowance
