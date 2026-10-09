@@ -275,7 +275,10 @@ export interface StoredEval {
 //      (gen9vgc2025, gen9vgc2024, Champions championsvgc2026) and never the
 //      Doubles OU analyses; a year without a file (Scarlet/Violet 2026)
 //      guesses from its usage file. VGC positions read new values.
-const EVAL_ENGINE_CACHE_VERSION = 62;
+// v63 (round 66, T137, gate "2a"): Champions doubles weigh by the Champions
+//      VGC fit (screens 83, bodies 196, matchup 96). Champions doubles
+//      positions read new values.
+const EVAL_ENGINE_CACHE_VERSION = 63;
 
 /** Round 61: a search-budget form stores under its own tag; the default keeps today's keys. */
 const versionTag = (): string => {

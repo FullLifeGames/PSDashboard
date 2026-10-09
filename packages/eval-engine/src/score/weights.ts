@@ -275,17 +275,32 @@ export const CHAMPIONS_FEATURE_WEIGHTS: Record<keyof EvalFeatures, number> = {
 };
 
 /**
- * Champions VGC (doubles): the hand doubles table (as VGC); its own fit in
- * round 65 beat it in 7 of 20 seeds. Written out in full.
+ * Champions doubles: every Champions doubles format reads this table, fitted
+ * 2026-10-09 (round 66, T137) on Champions VGC at the fixed doubles K: 2,601
+ * positions of 386 sets (rated Bo1 ladder games of regulations M-A, M-B and
+ * M-C and the Bo3 tournament games, two thirds of their sets; the third is
+ * the holdout; unrated challenges played after a ladder ended stay out of
+ * the fit), the corpus measured like the app with Champions usage and set
+ * files (T141, T142), folds and bootstrap clustered by set. Out of fold it
+ * beats the hand doubles table in 20 of 20 seeds (log-loss −25.3 bp, Brier
+ * −10.8 bp). Fitted with their 90 % band: screens 83 [45, 122], bodies 196
+ * [171, 223], matchup 96 [44, 151]. Held at the hand table: coverage,
+ * hazards, tailwind and Trick Room (the first pass flagged them), the boost
+ * and choice-mismatch weights. On the holdout's 491 games the search reads
+ * −16 bp [−35, +3] (early −45 [−86, −7], regulation M-C −50 [−92, −13]; own
+ * K per phase −6), no harm. Round 65's fit on 283 sets, most of them unrated
+ * challenges, won 7 of 20 seeds. The reconstruction still feeds Champions
+ * stat points to the simulator as EVs (T145); refit after it. Adopted at the
+ * round-66 gate ("2a"). Written out in full.
  */
 export const CHAMPIONS_DOUBLES_FEATURE_WEIGHTS: Record<keyof EvalFeatures, number> = {
-  bodies: 200,
+  bodies: 196,
   boosts: 27,
   hazards: 0.75,
-  screens: 5,
+  screens: 83,
   tailwind: 68,
   trickRoom: 87,
-  matchup: 120,
+  matchup: 96,
   coverage: 40,
   choiceMismatch: 40,
   sweepFastKo: 0,
