@@ -73,8 +73,8 @@ export function holdoutSets(): { key: string; family: string; ids: string[] }[] 
  * dump-path guard; the tranche labels fit-tournament / fit-ladder keep
  * provenance loud). EVAL_CALIBRATION_SOURCE=holdout reads the corpus's
  * holdout instead, one third of its doubles and Champions sets that every
- * fit drops (regression/eval-fit.spec.ts), tranche holdout-<family>, three
- * positions per game. The universes never mix ids.
+ * fit drops (regression/eval-fit.spec.ts), tranche holdout-<family>, up to
+ * three positions per game (holdoutTurns). The universes never mix ids.
  */
 export function bankUniverse(bank: { ids: string[]; trancheOf: Map<string, string> }): BankUniverse {
   const source = process.env.EVAL_CALIBRATION_SOURCE;

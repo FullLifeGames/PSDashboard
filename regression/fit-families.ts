@@ -93,10 +93,14 @@ export function withoutHoldout<T extends { game: string }>(samples: T[], holdout
 }
 
 /**
- * Round 66: a ladder game without a rating was played after its format left
- * the ladder, as a challenge of unknown level (the 600 Champions VGC Bo3
- * games of round 65, uploaded after the M-B ladder ended). Such games stay
- * in the corpus and in the holdout but leave the fit.
+ * Round 66: a Bo1 ladder game without a rating was played after its format
+ * left the ladder, as a challenge of unknown level (the 600 Champions VGC
+ * Bo3 games of round 65, uploaded after the M-B ladder ended). Such games
+ * stay in the corpus and in the holdout but leave the fit. On a Bo3 ladder
+ * only the deciding game of a set carries the rating, so this rule would
+ * also drop games 1 and 2 of a rated Bo3 set; the corpus holds no rated Bo3
+ * ladder game today (the review of round 66), and a Bo3 ladder expansion
+ * must first give the whole set its rating.
  */
 export function withoutUnratedLadder<T extends { source?: 'tournament' | 'ladder'; rating?: number | null }>(samples: T[]): { kept: T[]; dropped: number } {
   const kept = samples.filter(sample => sample.source === 'tournament' || (sample.rating ?? 0) > 0);

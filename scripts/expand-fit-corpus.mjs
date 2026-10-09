@@ -8,7 +8,9 @@
 // Round 66: --sort rating pages the search by rating instead (`sort=rating&page=N`), so a format that
 // left the ladder still yields its rated ladder games; newest first only finds the unrated challenges
 // played after. Replays of the calibration bank and the feedback corpus never enter (the corpus and the
-// bank share no replay), and every new entry carries its rating.
+// bank share no replay), and every new entry carries its rating. On a Bo3 ladder only the deciding game of a set
+// carries the rating (games 1 and 2 read 0), so --sort rating there finds the deciding games only, and the fit's
+// rule against unrated ladder games (regression/fit-families.ts) would drop the rest of the set.
 //
 // Run: node scripts/expand-fit-corpus.mjs --format gen9championsou --pages 80 --games 450 --min-rating 1300
 //      node scripts/expand-fit-corpus.mjs --format gen9vgc2026regi --sort rating --pages 10 --games 150 --min-turns 6
@@ -57,8 +59,11 @@ for (let page = 0; page < pages; page++) {
   if (list.length < 51) break;
   await sleep(DELAY_MS);
 }
-const candidates = rows
-  .filter(row => row.id && !known.has(row.id) && !excluded.has(row.id) && (row.rating ?? 0) >= minRating)
+// The search's pages can shift on an active ladder, so one replay may come back twice: keep its first row.
+const seenIds = new Set();
+const unique = rows.filter(row => row.id && !seenIds.has(row.id) && seenIds.add(row.id));
+const candidates = unique
+  .filter(row => !known.has(row.id) && !excluded.has(row.id) && (row.rating ?? 0) >= minRating)
   .sort((a, b) => (b.rating ?? 0) - (a.rating ?? 0) || (a.id < b.id ? -1 : 1));
 const barred = rows.filter(row => excluded.has(row.id)).length;
 console.log(`${format}: ${rows.length} replays searched (${sort}), ${candidates.length} new at rating >= ${minRating}, ${barred} bank or feedback replays left out`);

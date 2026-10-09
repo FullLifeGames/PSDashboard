@@ -1,5 +1,6 @@
+import { readFileSync } from 'node:fs';
 import { afterEach, describe, expect, test } from 'vitest';
-import { bankTurns, bankUniverse, holdoutSets, holdoutTurns, phaseOf } from './bank-universe';
+import { FIT_MANIFEST, bankTurns, bankUniverse, holdoutSets, holdoutTurns, phaseOf } from './bank-universe';
 
 /** Round 65: the universe of a bank run (bank, fit corpus, holdout) and its sampled turns. */
 
@@ -50,6 +51,16 @@ describe('bank universe', () => {
     expect(universe.ids).toHaveLength(sets.reduce((sum, set) => sum + set.ids.length, 0));
     expect(universe.trancheOf.get(sets[0].ids[0])).toBe(`holdout-${sets[0].family}`);
     expect(universe.sampleTurns(30)).toEqual([5, 15, 25]);
+  });
+
+  // Round 66 review: scripts/expand-fit-corpus.mjs keeps bank and feedback replays out, scripts/build-fit-corpus.mjs does not.
+  test('the fit corpus and its holdout share no replay with the bank or the feedback corpus', () => {
+    const quoted = (path: string) => [...readFileSync(path, 'utf-8').matchAll(/'((?:[a-z0-9]+-)+\d+)'/g)].map(match => match[1]);
+    const barred = new Set([...quoted('regression/eval-calibration.spec.ts'), ...quoted('e2e-feedback/corpus.ts')]);
+    const corpus = new Set((JSON.parse(readFileSync(FIT_MANIFEST, 'utf-8')) as { replays: { id: string }[] }).replays.map(entry => entry.id));
+    expect(barred.size).toBeGreaterThanOrEqual(134);
+    expect([...corpus].filter(id => barred.has(id))).toEqual([]);
+    expect(holdoutSets().flatMap(set => set.ids).filter(id => !corpus.has(id))).toEqual([]);
   });
 
   test('the fit corpus needs a dump path, and an unknown source stops the run', () => {
