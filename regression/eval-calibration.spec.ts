@@ -5210,6 +5210,23 @@ const decidedSideOf = (result: ReturnType<typeof searchPosition>): Sample['decid
 const heldSideOf = (result: ReturnType<typeof searchPosition>): Sample['decidedHeld'] =>
   heldDecided(result)?.side ?? null;
 
+type RootReading = Pick<Sample, 'score' | 'decided' | 'decidedHeld' | 'forcedWinMass' | 'forcedWinTurns'>;
+
+/**
+ * The root's reading of a sampled position: the bank's search, or with
+ * EVAL_CALIBRATION_STATIC=1 (round 65) the static alone, the search's leaf
+ * value at the root (leafValue: wp-units, the last-pair race included) with
+ * no search. The switch reads what the fit corpus fits on the bank's own
+ * positions and builds; a measurement switch, never a record.
+ */
+async function rootReading(battle: Battle, args: Parameters<typeof bankSearch>[0]): Promise<RootReading> {
+  if (process.env.EVAL_CALIBRATION_STATIC === '1') {
+    return { score: leafValue(battle, createMatchupCache()), decided: null, decidedHeld: null, forcedWinMass: null, forcedWinTurns: null };
+  }
+  const result = await bankSearch(args);
+  return { score: result.score, decided: decidedSideOf(result), decidedHeld: heldSideOf(result), ...forcedWinFields(result) };
+}
+
 /**
  * Engine levers the bench reads from the environment (round 33):
  * EVAL_LAST_PAIR_SWEEP=1 turns on the last-pair static's sweep variant
@@ -5521,20 +5538,15 @@ describe.skipIf(!process.env.EVAL_CALIBRATION)('eval calibration against real re
           // EVAL_CALIBRATION_MODE=auto mirrors the app's sweep dispatch
           // exactly: matrix below the threshold, the DUCT tree at or above.
           // Round 61: the app's dispatch and the app's tree search (bank-search.ts).
-          // Round 65: EVAL_CALIBRATION_STATIC=1 scores the sampled position
-          // with the static alone, the search's leaf value at the root
-          // (leafValue: wp-units, the last-pair race included), and runs no
-          // search. It reads what the fit corpus fits on the bank's own
-          // positions and builds; a measurement switch, never a record.
-          const staticOnly = process.env.EVAL_CALIBRATION_STATIC === '1';
-          const result = staticOnly ? null : await bankSearch({
+          // Round 65: rootReading runs the search, or the static alone under EVAL_CALIBRATION_STATIC=1.
+          const root = await rootReading(battle, {
             serialized, faintedFraction, depth, samples: sampleCount, mode: process.env.EVAL_CALIBRATION_MODE,
             settings: {
               ...replaySettings,
               keepPlayed: bankKeepPlayed(snapshots.map(snapshot => snapshot.log), turn, gameType === 'doubles'),
             },
           });
-          const score = result ? result.score : leafValue(battle, createMatchupCache());
+          const { score } = root;
           if (Number.isNaN(score)) {
             // A NaN would silently poison every aggregate — surface it loudly.
             console.log(`NaN score: ${id} turn ${turn}`);
@@ -5554,13 +5566,14 @@ describe.skipIf(!process.env.EVAL_CALIBRATION)('eval calibration against real re
             // Round 32 enabler for Q4: the root's decided-sweep side, so the
             // clamp and flip positions of round 15 can be re-derived (their
             // 17 ids are no longer on record anywhere).
-            decided: result ? decidedSideOf(result) : null,
-            decidedHeld: result ? heldSideOf(result) : null,
+            decided: root.decided,
+            decidedHeld: root.decidedHeld,
             lastPair: lastPairAt(battle),
             rating,
             quality: qualityOf(id, rating),
             luckAgainstFavored: luckFlag(replay.log, turn, score),
-            ...(result ? forcedWinFields(result) : { forcedWinMass: null, forcedWinTurns: null }),
+            forcedWinMass: root.forcedWinMass,
+            forcedWinTurns: root.forcedWinTurns,
             ...(g ? { g } : {}),
           };
           samples.push(sample);
