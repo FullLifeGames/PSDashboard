@@ -1,6 +1,6 @@
 import { type SmogonUsageStats, toId } from '@fulllifegames/replay-core';
 import { dataPkmnStatsUrl, parseSmogonChaosStats } from './smogon/stats-parse';
-import { ouFallbackFormat } from './smogon/format-fallback';
+import { ouFallbackFormat, vgcYearFormat } from './smogon/format-fallback';
 import { fetcherKey } from './smogon/fetcher-key';
 import { withSmogonFallback, type SmogonFetch } from './smogon/hosts';
 
@@ -21,9 +21,7 @@ export function getSmogonStatsFormat(formatId: string | undefined): string {
   // species the Smogon doubles ladder never sees (e.g. Annihilape).
   // Pokémon Champions VGC keeps a year file of its own (round 66, T141):
   // megas, its own item pool and EV scale, another metagame.
-  const vgcYear = id.match(/(champions)?vgc(\d{4})/);
-  if (vgcYear) return `${id.match(/^gen\d+/)?.[0] ?? 'gen9'}${vgcYear[1] ?? ''}vgc${vgcYear[2]}`;
-  return ouFallbackFormat(id);
+  return vgcYearFormat(id) ?? ouFallbackFormat(id);
 }
 
 /**

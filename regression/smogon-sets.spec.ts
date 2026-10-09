@@ -140,9 +140,30 @@ describe('Smogon set assumptions', () => {
 
   test('doubles formats fall back to Doubles Ubers', async () => {
     const assumptions = await fetchSmogonSetAssumptions({
-      formatId: 'gen9vgc2026regi', species: ['Kyurem'], fetcher: byUrl({ gen9doublesou: {}, gen9doublesubers: kyuremSet }) as never,
+      formatId: 'gen9doublesou', species: ['Kyurem'], fetcher: byUrl({ gen9doublesou: {}, gen9doublesubers: kyuremSet }) as never,
     });
     expect(assumptions?.pokemon.kyurem?.sourceDetail).toBe('Smogon sets gen9doublesubers');
+  });
+
+  // Round 66 (T142): on 150 Bo3 games of 2025 Reg H with open team sheets the VGC 2025 sets guessed 66 % of the items
+  // and 82 % of the moves, the Doubles OU sets 48 % and 73 %; a year without a VGC set file guesses better from its
+  // usage file alone than from the Doubles OU sets (2026 Reg I items 77 % against 68 %, Champions VGC 56 % against 51 %).
+  test('round 66 (T142): a VGC format reads the VGC set file of its year and never the Doubles OU analyses', async () => {
+    const doublesOnly = { gen9doublesou: kyuremSet, gen9doublesubers: kyuremSet };
+    const regH = await fetchSmogonSetAssumptions({
+      formatId: 'gen9vgc2025regh', species: ['Kyurem', 'Toxapex'], fetcher: byUrl({ ...doublesOnly, gen9vgc2025: toxapexSet }) as never,
+    });
+    expect(regH?.pokemon.toxapex?.sourceDetail).toBe('Smogon sets gen9vgc2025');
+    expect(regH?.pokemon.kyurem).toBeUndefined();
+    expect(regH?.formats).toEqual(['gen9vgc2025']);
+    const regI = await fetchSmogonSetAssumptions({ formatId: 'gen9vgc2026regi', species: ['Kyurem'], fetcher: byUrl(doublesOnly) as never });
+    expect(regI).toBeNull();
+    // @pkmn/smogon names Champions files without the generation (sets/championsvgc2026.json).
+    const champions = await fetchSmogonSetAssumptions({
+      formatId: 'gen9championsvgc2026regmc', species: ['Kyurem', 'Toxapex'], fetcher: byUrl({ ...doublesOnly, gen9vgc2026: toxapexSet, championsvgc2026: kyuremSet }) as never,
+    });
+    expect(champions?.pokemon.kyurem?.sourceDetail).toBe('Smogon sets gen9championsvgc2026');
+    expect(champions?.pokemon.toxapex).toBeUndefined();
   });
 
   test('keeps every option of a published move slot (T89)', async () => {

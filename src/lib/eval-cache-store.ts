@@ -271,7 +271,11 @@ export interface StoredEval {
 //      VGC usage file (gen9championsvgc2026: megas, Champions items and EV
 //      scale) instead of the Scarlet/Violet one (gen9vgc2026). Champions VGC
 //      positions read new values; every other position keeps its value.
-const EVAL_ENGINE_CACHE_VERSION = 61;
+// v62 (round 66, T142): VGC reads the VGC set file of its year
+//      (gen9vgc2025, gen9vgc2024, Champions championsvgc2026) and never the
+//      Doubles OU analyses; a year without a file (Scarlet/Violet 2026)
+//      guesses from its usage file. VGC positions read new values.
+const EVAL_ENGINE_CACHE_VERSION = 62;
 
 /** Round 61: a search-budget form stores under its own tag; the default keeps today's keys. */
 const versionTag = (): string => {

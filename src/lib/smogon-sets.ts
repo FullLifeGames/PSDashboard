@@ -5,7 +5,7 @@ import type { ID } from '@pkmn/data';
 import {
   toId, type PokemonSetAssumption, type SetAssumption, type SetSpreadAssumption, type SmogonSetAssumptions,
 } from '@fulllifegames/replay-core';
-import { ouFallbackFormat } from './smogon/format-fallback';
+import { ouFallbackFormat, vgcYearFormat } from './smogon/format-fallback';
 import { fetcherKey } from './smogon/fetcher-key';
 import { withSmogonFallback, type SmogonFetch } from './smogon/hosts';
 
@@ -45,21 +45,27 @@ function genFromFormat(formatId: string | undefined): number {
   return match ? Number.parseInt(match[1], 10) : 9;
 }
 
+/**
+ * The sets file a format reads. Round 66 (T142): VGC reads the VGC file of
+ * its year (gen9vgc2025, gen9championsvgc2026) and never the Doubles OU
+ * analyses, another format's sets; a year without a file leaves the guess
+ * to the usage file.
+ */
 function normalizeFormat(formatId: string | undefined): string {
   const id = toId(formatId || 'gen9ou');
   if (id.includes('nationaldexdoubles')) return 'gen9nationaldexdoubles';
-  return ouFallbackFormat(id);
+  return vgcYearFormat(id) ?? ouFallbackFormat(id);
 }
 
 function sourceDetail(format: string): string {
   return `Smogon sets ${format}`;
 }
 
-/** The generation's Ubers file (Doubles Ubers for doubles and VGC): where a banned species' set lives. */
+/** The generation's Ubers file (Doubles Ubers for doubles): where a banned species' set lives. VGC takes none (T142). */
 function fallbackFormat(format: string): string | null {
   const gen = format.match(/^gen\d+/)?.[0];
-  if (!gen) return null;
-  const fallback = format.includes('doubles') || format.includes('vgc') ? `${gen}doublesubers` : `${gen}ubers`;
+  if (!gen || format.includes('vgc')) return null;
+  const fallback = format.includes('doubles') ? `${gen}doublesubers` : `${gen}ubers`;
   return fallback === format ? null : fallback;
 }
 

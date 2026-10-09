@@ -1,4 +1,14 @@
 /**
+ * A VGC format's year-level data name, which its stats and sets files carry
+ * (round 66): Scarlet/Violet VGC `gen9vgc2026`, Pokémon Champions VGC
+ * `gen9championsvgc2026`; null for every other format.
+ */
+export function vgcYearFormat(id: string): string | null {
+  const match = id.match(/(champions)?vgc(\d{4})/);
+  return match ? `${id.match(/^gen\d+/)?.[0] ?? 'gen9'}${match[1] ?? ''}vgc${match[2]}` : null;
+}
+
+/**
  * Where a format's published data lives when the format itself has none:
  * doubles and VGC ladders read Doubles OU, draft formats and Custom Game
  * read their generation's OU, everything else is itself.
