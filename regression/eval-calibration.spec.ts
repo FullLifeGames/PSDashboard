@@ -8,6 +8,7 @@ import { buildChoiceLockContext } from '../packages/eval-engine/src/choice-lock'
 import { getBranchSimulatorFormat, replayBringOnly } from '../packages/replay-core/src/replay-format';
 import { parseReplayLogWithObservations } from '../packages/replay-core/src/protocol-parser';
 import { battleFaintedFraction, searchPosition } from '../packages/eval-engine/src/search';
+import { leafValue } from '../packages/eval-engine/src/search/leaf';
 import { bankKeepPlayed, bankSampleCount, bankSearch, bankSettings } from './bank-search';
 import { diskCachedSmogonFetcher } from './smogon-fetch-cache';
 import { bankTeamsFor } from './bank-build';
@@ -49,7 +50,11 @@ import { takeSimFastReport } from '../packages/eval-engine/src/forward/sim-fast/
  * hidden-power evidence — so the bank grades the teams a user sees. Every
  * number recorded before round 52 was measured on the raw build; this
  * switch brings it back, the way EVAL_CALIBRATION_RAW=1 keeps the
- * reconstruction of round 46)
+ * reconstruction of round 46) ·
+ * EVAL_CALIBRATION_STATIC=1 (round 65: score each sampled position with
+ * the static's leaf value and run no search; with
+ * EVAL_CALIBRATION_FEATURES=1 it reads on the bank's positions and builds
+ * what the fit corpus fits, a measurement switch, never a record)
  *
  * Baseline 2026-08-04 (post ev-grading, pre boost-schedule; depth 1, samples 1):
  *   early 55% |0.23| · mid 62% |0.34| · late 81% |0.43|
@@ -5516,14 +5521,20 @@ describe.skipIf(!process.env.EVAL_CALIBRATION)('eval calibration against real re
           // EVAL_CALIBRATION_MODE=auto mirrors the app's sweep dispatch
           // exactly: matrix below the threshold, the DUCT tree at or above.
           // Round 61: the app's dispatch and the app's tree search (bank-search.ts).
-          const result = await bankSearch({
+          // Round 65: EVAL_CALIBRATION_STATIC=1 scores the sampled position
+          // with the static alone, the search's leaf value at the root
+          // (leafValue: wp-units, the last-pair race included), and runs no
+          // search. It reads what the fit corpus fits on the bank's own
+          // positions and builds; a measurement switch, never a record.
+          const staticOnly = process.env.EVAL_CALIBRATION_STATIC === '1';
+          const result = staticOnly ? null : await bankSearch({
             serialized, faintedFraction, depth, samples: sampleCount, mode: process.env.EVAL_CALIBRATION_MODE,
             settings: {
               ...replaySettings,
               keepPlayed: bankKeepPlayed(snapshots.map(snapshot => snapshot.log), turn, gameType === 'doubles'),
             },
           });
-          const { score } = result;
+          const score = result ? result.score : leafValue(battle, createMatchupCache());
           if (Number.isNaN(score)) {
             // A NaN would silently poison every aggregate — surface it loudly.
             console.log(`NaN score: ${id} turn ${turn}`);
@@ -5543,13 +5554,13 @@ describe.skipIf(!process.env.EVAL_CALIBRATION)('eval calibration against real re
             // Round 32 enabler for Q4: the root's decided-sweep side, so the
             // clamp and flip positions of round 15 can be re-derived (their
             // 17 ids are no longer on record anywhere).
-            decided: decidedSideOf(result),
-            decidedHeld: heldSideOf(result),
+            decided: result ? decidedSideOf(result) : null,
+            decidedHeld: result ? heldSideOf(result) : null,
             lastPair: lastPairAt(battle),
             rating,
             quality: qualityOf(id, rating),
             luckAgainstFavored: luckFlag(replay.log, turn, score),
-            ...forcedWinFields(result),
+            ...(result ? forcedWinFields(result) : { forcedWinMass: null, forcedWinTurns: null }),
             ...(g ? { g } : {}),
           };
           samples.push(sample);
