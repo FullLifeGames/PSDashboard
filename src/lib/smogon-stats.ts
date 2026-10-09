@@ -19,8 +19,10 @@ export function getSmogonStatsFormat(formatId: string | undefined): string {
   if (id.includes('nationaldexdoubles')) return 'gen9nationaldexdoubles';
   // VGC: the year-level stats file aggregates all regulations and holds
   // species the Smogon doubles ladder never sees (e.g. Annihilape).
-  const vgcYear = id.match(/vgc(\d{4})/);
-  if (vgcYear) return `${id.match(/^gen\d+/)?.[0] ?? 'gen9'}vgc${vgcYear[1]}`;
+  // Pokémon Champions VGC keeps a year file of its own (round 66, T141):
+  // megas, its own item pool and EV scale, another metagame.
+  const vgcYear = id.match(/(champions)?vgc(\d{4})/);
+  if (vgcYear) return `${id.match(/^gen\d+/)?.[0] ?? 'gen9'}${vgcYear[1] ?? ''}vgc${vgcYear[2]}`;
   return ouFallbackFormat(id);
 }
 

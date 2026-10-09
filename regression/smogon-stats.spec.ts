@@ -79,10 +79,19 @@ describe('Smogon usage stat enrichment', () => {
   });
 
   test('maps VGC formats to the year-level stats file with doubles fallbacks', () => {
-    const urls = buildSmogonStatsUrls('gen9championsvgc2026regmb');
+    const urls = buildSmogonStatsUrls('gen9vgc2026regi');
     expect(urls.map(candidate => candidate.format)).toEqual([
       'gen9vgc2026', 'gen9doublesou', 'gen9ou', 'gen9ubers',
     ]);
+  });
+
+  test('round 66 (T141): Champions VGC reads its own year-level stats file, not the Scarlet/Violet one', () => {
+    // data.pkmn.cc keeps gen9championsvgc2026 (megas, Champions items and EV scale) beside gen9vgc2026.
+    for (const format of ['gen9championsvgc2026regmb', 'gen9championsvgc2026regmcbo3']) {
+      expect(buildSmogonStatsUrls(format).map(candidate => candidate.format)).toEqual([
+        'gen9championsvgc2026', 'gen9doublesou', 'gen9ou', 'gen9ubers',
+      ]);
+    }
   });
 
   test('fetchSmogonUsageStats assumes OU when the format has no stats file', async () => {
@@ -129,7 +138,7 @@ describe('Smogon usage stat enrichment', () => {
       return new Response('not found', { status: 404 });
     }) as typeof fetch;
 
-    const stats = await fetchSmogonUsageStats('gen9championsvgc2026regmb', {
+    const stats = await fetchSmogonUsageStats('gen9vgc2026regi', {
       now: new Date('2026-08-04T00:00:00Z'),
       fetcher,
     });

@@ -267,7 +267,11 @@ export interface StoredEval {
 //      screens 88, Trick Room 58, matchup 118, coverage 91); VGC outside
 //      Champions is a rule set of its own and keeps the hand doubles table,
 //      as Champions VGC does. Doubles OU positions read new values.
-const EVAL_ENGINE_CACHE_VERSION = 60;
+// v61 (round 66, T141): Champions VGC builds its teams from the Champions
+//      VGC usage file (gen9championsvgc2026: megas, Champions items and EV
+//      scale) instead of the Scarlet/Violet one (gen9vgc2026). Champions VGC
+//      positions read new values; every other position keeps its value.
+const EVAL_ENGINE_CACHE_VERSION = 61;
 
 /** Round 61: a search-budget form stores under its own tag; the default keeps today's keys. */
 const versionTag = (): string => {
