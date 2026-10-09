@@ -12,7 +12,7 @@ import { leafValue } from '../packages/eval-engine/src/search/leaf';
 import { bankKeepPlayed, bankSampleCount, bankSearch, bankSettings } from './bank-search';
 import { diskCachedSmogonFetcher } from './smogon-fetch-cache';
 import { bankTeamsFor } from './bank-build';
-import { bankUniverse } from './bank-universe';
+import { bankUniverse, phaseOf } from './bank-universe';
 import { createMatchupCache, evalFeatures, EVAL_WEIGHTS, FEATURE_WEIGHTS, type EvalFeatures } from '../packages/eval-engine/src/eval-function';
 import { setLastPairSweep } from '../packages/eval-engine/src/score/last-pair';
 import { livingMons } from '../packages/eval-engine/src/score/threat';
@@ -5600,13 +5600,12 @@ describe.skipIf(!process.env.EVAL_CALIBRATION)('eval calibration against real re
             console.log(`NaN score: ${id} turn ${turn}`);
             continue;
           }
-          const fraction = turn / maxTurn;
           const rating = replay.rating ?? null;
           const sample: Sample = {
             id,
             turn,
             tranche: trancheOf.get(id) ?? 'unknown',
-            phase: fraction < 1 / 3 ? 'early' : fraction < 2 / 3 ? 'mid' : 'late',
+            phase: phaseOf(turn, maxTurn),
             gameType,
             score,
             faintedFraction,

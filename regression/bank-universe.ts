@@ -24,6 +24,12 @@ export interface BankUniverse {
   sampleTurns(maxTurn: number): number[];
 }
 
+/** The phase of a sampled turn: the third of the game it falls in (turn / maxTurn). */
+export function phaseOf(turn: number, maxTurn: number): 'early' | 'mid' | 'late' {
+  const fraction = turn / maxTurn;
+  return fraction < 1 / 3 ? 'early' : fraction < 2 / 3 ? 'mid' : 'late';
+}
+
 /** The bank's standing rule: every ceil(maxTurn / 8)-th turn from turn 2. */
 export function bankTurns(maxTurn: number): number[] {
   const step = Math.max(1, Math.ceil(maxTurn / 8));
@@ -36,10 +42,21 @@ export function bankTurns(maxTurn: number): number[] {
  * Round 65: three turns per holdout game, one in each third of the game
  * (the bank's phases), so the holdout buys its power with games: positions
  * of one game share their outcome, a fourth position adds little.
+ * Round 66: each turn is the one nearest the middle of its third among the
+ * sampleable turns (from turn 2) inside that third; a short game drops the
+ * thirds it has no such turn in. Before, a game of five or six snapshots
+ * clamped its early point to turn 2, which reads as mid.
  */
 export function holdoutTurns(maxTurn: number): number[] {
-  const turns = [1 / 6, 1 / 2, 5 / 6].map(at => Math.min(maxTurn - 1, Math.max(2, Math.round(at * maxTurn))));
-  return [...new Set(turns)].filter(turn => turn < maxTurn);
+  const turns: number[] = [];
+  (['early', 'mid', 'late'] as const).forEach((phase, third) => {
+    const inThird: number[] = [];
+    for (let turn = 2; turn < maxTurn; turn++) if (phaseOf(turn, maxTurn) === phase) inThird.push(turn);
+    if (inThird.length === 0) return;
+    const target = Math.round(((2 * third + 1) / 6) * maxTurn);
+    turns.push(Math.min(inThird[inThird.length - 1], Math.max(inThird[0], target)));
+  });
+  return turns;
 }
 
 /** The holdout's sets as written by scripts/build-fit-holdout.mjs. */

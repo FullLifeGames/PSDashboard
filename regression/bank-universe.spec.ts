@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, test } from 'vitest';
-import { bankTurns, bankUniverse, holdoutSets, holdoutTurns } from './bank-universe';
+import { bankTurns, bankUniverse, holdoutSets, holdoutTurns, phaseOf } from './bank-universe';
 
 /** Round 65: the universe of a bank run (bank, fit corpus, holdout) and its sampled turns. */
 
@@ -19,6 +19,22 @@ describe('bank universe', () => {
     expect(holdoutTurns(30)).toEqual([5, 15, 25]);
     expect(holdoutTurns(12)).toEqual([2, 6, 10]);
     expect(holdoutTurns(4)).toEqual([2, 3]);
+  });
+
+  test('round 66: each holdout turn lies in the third it stands for, a short game drops the thirds it cannot reach', () => {
+    // Round 65's rule clamped the early point to turn 2, which a game of five or six snapshots reads as mid.
+    const round65 = (maxTurn: number) => [...new Set([1 / 6, 1 / 2, 5 / 6]
+      .map(at => Math.min(maxTurn - 1, Math.max(2, Math.round(at * maxTurn)))))].filter(turn => turn < maxTurn);
+    for (let maxTurn = 3; maxTurn <= 400; maxTurn++) {
+      const turns = holdoutTurns(maxTurn);
+      expect(new Set(turns.map(turn => phaseOf(turn, maxTurn))).size).toBe(turns.length);
+      if (maxTurn >= 7) expect(turns).toEqual(round65(maxTurn));
+    }
+    expect(holdoutTurns(6)).toEqual([3, 5]);
+    expect(holdoutTurns(5)).toEqual([3, 4]);
+    expect(holdoutTurns(3)).toEqual([2]);
+    expect([2, 3, 4, 5].map(turn => phaseOf(turn, 6))).toEqual(['mid', 'mid', 'late', 'late']);
+    expect(phaseOf(2, 7)).toBe('early');
   });
 
   test('without a source the bank runs its own tranches from the network', () => {
