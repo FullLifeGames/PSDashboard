@@ -90,7 +90,7 @@ const FEATURE_KEYS = Object.keys(FEATURE_WEIGHTS) as (keyof EvalFeatures)[];
 const cacheStamp = (manifest: { replays: { id: string }[] }) => JSON.stringify({
   schema: 2, // FitSample gained faintedFraction/genClass — bump forces one recapture
   featureKeys: FEATURE_KEYS,
-  weights: { EVAL_WEIGHTS, FEATURE_WEIGHTS },
+  weights: { EVAL_WEIGHTS, FEATURE_WEIGHTS, DOUBLES_FEATURE_WEIGHTS, CHAMPIONS_FEATURE_WEIGHTS, CHAMPIONS_DOUBLES_FEATURE_WEIGHTS },
   manifestIds: manifest.replays.map(entry => entry.id),
 });
 
@@ -185,9 +185,16 @@ function writeRefitReport(samples: FitSample[]) {
  */
 function samplesOf(manifest: Manifest): FitSample[] {
   if (!process.env.EVAL_FIT_DUMP) return cachedSamples(manifest);
+  const fromDumps = dumpSamplesOf(process.env.EVAL_FIT_DUMP);
+  // An empty read would fall back to this spec's naked capture: a dump made without g must stop the run instead.
+  if (fromDumps.length === 0) throw new Error(`EVAL_FIT_DUMP: no sample with a feature vector in ${process.env.EVAL_FIT_DUMP}`);
+  return fromDumps;
+}
+
+function dumpSamplesOf(paths: string): FitSample[] {
   const playersOf = (id: string) => (JSON.parse(readFileSync(join(CACHE_DIR, `${id}.json`), 'utf-8')) as { players?: string[] }).players ?? [];
   const genClass = (id: string): FitSample['genClass'] => (/^(smogtours-)?gen9/.test(id) ? 'gen9' : 'old');
-  return dumpSamples(process.env.EVAL_FIT_DUMP.split(','), playersOf)
+  return dumpSamples(paths.split(','), playersOf)
     .map(sample => ({ ...sample, source: sample.source ?? 'ladder', genClass: genClass(sample.game) }));
 }
 
@@ -231,6 +238,8 @@ async function captureEntry(entry: Manifest['replays'][number], samples: FitSamp
     const p1Won = winnerName === players[0];
     if (!p1Won && winnerName !== players[1]) return;
     const gameType: FitSample['gameType'] = /\|gametype\|doubles/.test(replay.log) ? 'doubles' : 'singles';
+    const ruleset = rulesetOfId(entry.id);
+    const set = `${ruleset}-${gameType}|${players.map(name => name.toLowerCase().replace(/[^a-z0-9]/g, '')).sort().join('|')}`;
     const genClass: FitSample['genClass'] = /^gen9/.test(replay.formatid ?? entry.format) ? 'gen9' : 'old';
 
     const { snapshots, observations, speedOrders } = parseReplayLogWithObservations(replay.log);
@@ -261,7 +270,8 @@ async function captureEntry(entry: Manifest['replays'][number], samples: FitSamp
         snapshotFor: turn => snapshots[Math.min(turn - 1, snapshots.length - 1)] ?? null,
         onPosition: (turn, battle) => {
           if (!wanted.has(turn) || battle.ended) return;
-          const cache = createMatchupCache();
+          // Round 65: the score under the replay's rule set, as the families check it.
+          const cache = createMatchupCache(ruleset);
           const features = evalFeatures(battle, cache);
           const teamSize = Math.max(battle.sides[0].pokemon.length, battle.sides[1].pokemon.length, 1);
           const scaleOverNorm = EVAL_WEIGHTS.scale / (teamSize * (EVAL_WEIGHTS.alive + EVAL_WEIGHTS.hp));
@@ -269,7 +279,7 @@ async function captureEntry(entry: Manifest['replays'][number], samples: FitSamp
           const score = evaluatePosition(battle, cache);
           if (Number.isNaN(score) || g.some(Number.isNaN)) return;
           samples.push({
-            game: entry.id, source: entry.source, gameType, genClass, g, score,
+            game: entry.id, source: entry.source, gameType, genClass, g, score, ruleset, set,
             faintedFraction: battleFaintedFraction(battle), p1Won,
           });
         },
@@ -313,7 +323,8 @@ describe('eval weight fitting (EVAL_FIT=1)', () => {
       return;
     }
     if (SAMPLES_DIR || process.env.EVAL_FIT_OUT) writeRefitReport(samples);
-    if (process.env.EVAL_FIT_LEGACY === '0') return;
+    // The legacy reports read `score` as the static's tanh; dump samples carry the leaf value in wp-units.
+    if (process.env.EVAL_FIT_LEGACY === '0' || process.env.EVAL_FIT_DUMP) return;
 
     const report = (label: string, subset: FitSample[]) => {
       if (subset.length < 50) {

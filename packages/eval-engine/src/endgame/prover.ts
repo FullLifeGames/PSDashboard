@@ -401,7 +401,7 @@ function openFields(root: Battle, side: Side, cells: CellProof[], cache: Matchup
 
 /** Proves from a serialized battle or a root position the caller already holds (no second deserialization). */
 export function proveForcedWin(rootOrSerialized: string | SimPosition, request: ProveRequest): ForcedWinProof {
-  const root = typeof rootOrSerialized === 'string' ? createRootPosition(rootOrSerialized) : rootOrSerialized;
+  const root = typeof rootOrSerialized === 'string' ? createRootPosition(rootOrSerialized, request.ruleset) : rootOrSerialized;
   const battle = positionBattle(root);
   const budget = { ...PROVER_BUDGET, ...request.budget };
   const spent = request.spent ?? { states: 0, cells: 0 };

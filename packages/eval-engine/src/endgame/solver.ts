@@ -122,7 +122,7 @@ class EndgameSolver {
 
 /** Round 65: `ruleset` names the weight table of the solver's statics (EvalSettings.ruleset). */
 export function solveEndgame(serializedBattle: string, caps: Partial<EndgameCaps> = {}, ruleset: StaticRuleset = 'standard'): EndgameResult {
-  const root = createRootPosition(serializedBattle);
+  const root = createRootPosition(serializedBattle, ruleset);
   if (!endgameScope(positionBattle(root))) {
     return { scope: false, value: 0, exact: false, flags: [], states: 0, depth: 0, pv: [] };
   }

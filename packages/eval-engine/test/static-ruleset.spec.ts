@@ -5,6 +5,8 @@ import {
   createMatchupCache, evaluatePosition, featureWeights,
 } from '../src/eval-function';
 import { createRootPosition, positionBattle } from '../src/forward-model';
+import { forkBattle } from '../src/forward/position';
+import { repairFaintedActives } from '../src/forward/switches';
 import { createLocalExecutor, searchPosition } from '../src/search';
 import { mctsSearch } from '../src/mcts';
 import { createLocalTreeExecutor, searchTreesOrchestrated } from '../src/tree-orchestrator';
@@ -33,6 +35,19 @@ function withChampionsMatchup<T>(value: number, run: () => T): T {
     return run();
   } finally {
     [CHAMPIONS_FEATURE_WEIGHTS.matchup, CHAMPIONS_DOUBLES_FEATURE_WEIGHTS.matchup] = saved;
+  }
+}
+
+/** The Champions tables with some weights of their own for one call (both game types). */
+function withChampionsTables<T>(weights: Partial<typeof FEATURE_WEIGHTS>, run: () => T): T {
+  const saved = [{ ...CHAMPIONS_FEATURE_WEIGHTS }, { ...CHAMPIONS_DOUBLES_FEATURE_WEIGHTS }];
+  Object.assign(CHAMPIONS_FEATURE_WEIGHTS, weights);
+  Object.assign(CHAMPIONS_DOUBLES_FEATURE_WEIGHTS, weights);
+  try {
+    return run();
+  } finally {
+    Object.assign(CHAMPIONS_FEATURE_WEIGHTS, saved[0]);
+    Object.assign(CHAMPIONS_DOUBLES_FEATURE_WEIGHTS, saved[1]);
   }
 }
 
@@ -100,6 +115,23 @@ describe('static rule set', () => {
     const standard = (await run('standard')).score;
     const champions = await withChampionsMatchupAsync(FEATURE_WEIGHTS.matchup + 400, async () => (await run('champions')).score);
     expect(champions).not.toBe(standard);
+  });
+
+  // Review fix: the greedy replacement after a knock-out (matrix cells, a pivot without a follow-up, prover cells, the repair on deserialization) weighs by the rule set the position carries from its root.
+  test('the greedy replacement after a knock-out reads the rule set of its position', () => {
+    const serialized = position('gen9ou-2658663776-t2');
+    const replacement = (ruleset: StaticRuleset) => {
+      const battle = forkBattle(createRootPosition(serialized, ruleset), '1,2,3,4');
+      const active = battle.sides[0].active[0];
+      active.hp = 0;
+      active.fainted = true;
+      repairFaintedActives(battle);
+      return battle.sides[0].active[0].species.name;
+    };
+    const standard = replacement('standard');
+    const skewed = { matchup: 2000, bodies: 20 };
+    expect(withChampionsTables(skewed, () => replacement('champions'))).not.toBe(standard);
+    expect(withChampionsTables(skewed, () => replacement('standard'))).toBe(standard);
   });
 
   test('the prover input carries the rule set', () => {

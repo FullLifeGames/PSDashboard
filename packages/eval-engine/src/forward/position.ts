@@ -5,6 +5,8 @@ import { restoreSideInvariants, serializeBattleStable } from './serialize.ts';
 import { adoptTemplate, copyBattle, prepareBattle, simFastOn } from './sim-fast/index.ts';
 import { repairFaintedActives } from './switches.ts';
 import { ScriptedPRNG, type RollScripts } from './scripted-prng.ts';
+import { battleRuleset, tagRuleset } from './ruleset.ts';
+import type { StaticRuleset } from '../score/weights.ts';
 
 /**
  * The immutable search position: a lazily serialized/deserialized battle
@@ -26,6 +28,8 @@ export interface ChoiceOption {
  */
 export interface SimPosition {
   readonly serialized: string;
+  /** Round 65: the rule set the position is searched under (a root takes its search's, children inherit). */
+  readonly ruleset?: StaticRuleset;
 }
 
 class Position implements SimPosition {
@@ -35,11 +39,13 @@ class Position implements SimPosition {
   private templateCache: Battle | null = null;
   /** Built around a live battle (a child), not around a string (a root). */
   private readonly live: boolean;
+  readonly ruleset: StaticRuleset;
 
-  constructor(serialized: string | null, battle: Battle | null) {
+  constructor(serialized: string | null, battle: Battle | null, ruleset: StaticRuleset) {
     this.serializedCache = serialized;
     this.battleCache = battle;
     this.live = battle !== null;
+    this.ruleset = ruleset;
   }
 
   get serialized(): string {
@@ -54,7 +60,7 @@ class Position implements SimPosition {
 
   getBattle(): Battle {
     if (!this.battleCache) {
-      this.battleCache = deserializeFromParsed(this.getParsed());
+      this.battleCache = tagRuleset(deserializeFromParsed(this.getParsed()), this.ruleset);
       repairFaintedActives(this.battleCache);
     }
     return this.battleCache;
@@ -80,8 +86,8 @@ class Position implements SimPosition {
 const foreignParsedCache = new WeakMap<SimPosition, ParsedSearchState>();
 const foreignBattleCache = new WeakMap<SimPosition, Battle>();
 
-export function createRootPosition(serializedBattle: string): SimPosition {
-  return new Position(serializedBattle, null);
+export function createRootPosition(serializedBattle: string, ruleset: StaticRuleset = 'standard'): SimPosition {
+  return new Position(serializedBattle, null, ruleset);
 }
 
 /** The parsed state every fork of the position starts from (one parse per position). */
@@ -126,7 +132,7 @@ function freshBattle(position: SimPosition): Battle {
  * with scripts the dice of the named moves answer on demand.
  */
 export function forkBattle(position: SimPosition, seed: PRNGSeed, scripts?: RollScripts): Battle {
-  const battle = freshBattle(position);
+  const battle = tagRuleset(freshBattle(position), position.ruleset ?? 'standard');
   if (scripts && scripts.size > 0) {
     const prng = new ScriptedPRNG(seed, scripts);
     prng.attach(battle);
@@ -143,7 +149,7 @@ export function forkBattle(position: SimPosition, seed: PRNGSeed, scripts?: Roll
  * recorder attaches itself to the battle it rolls for.
  */
 export function forkBattleWithPrng(position: SimPosition, prng: PRNG & { attach(battle: Battle): void }): Battle {
-  const battle = freshBattle(position);
+  const battle = tagRuleset(freshBattle(position), position.ruleset ?? 'standard');
   prng.attach(battle);
   battle.prng = prng;
   repairFaintedActives(battle);
@@ -151,5 +157,5 @@ export function forkBattleWithPrng(position: SimPosition, prng: PRNG & { attach(
 }
 
 export function toPosition(battle: Battle): SimPosition {
-  return new Position(null, battle);
+  return new Position(null, battle, battleRuleset(battle));
 }

@@ -41,7 +41,7 @@ export function subSearchDepth1(
   settings: EvalSettings,
   matchupCache: MatchupCache = createMatchupCache(settings.ruleset),
 ): EvalResult {
-  const root = createRootPosition(serializedBattle);
+  const root = createRootPosition(serializedBattle, settings.ruleset);
   const battle = positionBattle(root);
   if (battle.ended) {
     return { score: leafValue(battle, matchupCache), interval: 0, depthCompleted: settings.depth, perSide: { p1: [], p2: [] } };
@@ -206,7 +206,7 @@ export function searchPosition(
   matchupCache: MatchupCache = createMatchupCache(settings.ruleset),
   restrictCandidates = false,
 ): EvalResult {
-  const root = createRootPosition(serializedBattle);
+  const root = createRootPosition(serializedBattle, settings.ruleset);
   const battle = positionBattle(root);
   if (battle.ended) {
     const score = leafValue(battle, matchupCache);
@@ -262,7 +262,7 @@ export function searchPosition(
  */
 export function createLocalExecutor(serializedBattle: string, ruleset: StaticRuleset = 'standard'): SearchExecutor {
   const matchupCache = createMatchupCache(ruleset);
-  const root = createRootPosition(serializedBattle);
+  const root = createRootPosition(serializedBattle, ruleset);
   return {
     async choices(tera, keepPlayed, sleepClause) {
       const battle = positionBattle(root);

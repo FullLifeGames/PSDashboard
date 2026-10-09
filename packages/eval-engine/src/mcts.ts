@@ -174,7 +174,7 @@ function runMcts(
   const matchupCache = createMatchupCache(settings.ruleset);
   const tera = settings.tera ?? true;
   // keepPlayed applies to the root only — children have their own spaces.
-  const root = makeNode(createRootPosition(serializedBattle), tera, matchupCache, settings.keepPlayed, settings.sleepClause);
+  const root = makeNode(createRootPosition(serializedBattle, settings.ruleset), tera, matchupCache, settings.keepPlayed, settings.sleepClause);
   if (root.ended || root.p1Options.length === 0 || root.p2Options.length === 0) {
     return {
       root,
@@ -218,7 +218,7 @@ export function mctsSearch(
 ): EvalResult {
   const { result } = runMcts(serializedBattle, settings, callbacks);
   if (settings.prove !== false) {
-    applyForcedWin(result, perfSync('prover', () => forcedWinFor(createRootPosition(serializedBattle), forcedWinInput(result, settings))));
+    applyForcedWin(result, perfSync('prover', () => forcedWinFor(createRootPosition(serializedBattle, settings.ruleset), forcedWinInput(result, settings))));
   }
   return result;
 }

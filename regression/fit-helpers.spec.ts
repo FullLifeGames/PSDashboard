@@ -278,5 +278,12 @@ describe('weights at a fixed K (round 64, T127)', () => {
     expect(report.proposed.singles.boosts).toBe(1);
     expect(report.proposed.doubles.tailwind).toBe(2);
   });
+
+  test('a doubles hold on a weight the doubles table shares with singles is an error', () => {
+    const samples = corpus([1.6, 0.6, 1, 0], [1.6, 1.2, 2.5, 0], 100, 5);
+    const names = ['bodies', 'boosts', 'tailwind', 'sweep'];
+    expect(() => refitAtKReport(samples, names, [1, 1, 1, 0], [1, 0.5, 2, 0], K,
+      { seeds: 1, folds: 5, draws: 1, minGames: 20, hold: { doubles: ['bodies'] } })).toThrow(/no doubles override/);
+  });
 });
 

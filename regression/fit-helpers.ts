@@ -514,7 +514,8 @@ export function refitAtKReport(
   for (const name of options.hold?.shared ?? []) free[column(name)] = false;
   for (const name of options.hold?.doubles ?? []) {
     const override = layout.overrides.indexOf(column(name));
-    if (override >= 0) free[layout.columns + override] = false;
+    if (override < 0) throw new Error(`hold: ${name} has no doubles override (the doubles table shares the singles weight)`);
+    free[layout.columns + override] = false;
   }
   const fit = fitWeightsAtK(samples, start, layout, k, free);
   const bands = bootstrapWeightsAtK(samples, options.draws, 64, start, layout, k, free);

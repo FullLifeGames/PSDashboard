@@ -21,7 +21,7 @@ const CACHE_DIR = '.fit-corpus';
 const HOLDOUT_FORMAT = /doubles|vgc|champions/;
 
 /** The family of a held-out format: Champions VGC, Champions OU, Scarlet/Violet VGC or Doubles OU. */
-export function familyOf(format) {
+function familyOf(format) {
   if (/champions/.test(format)) return /vgc/.test(format) ? 'championsvgc' : 'championsou';
   return /vgc/.test(format) ? 'vgc' : 'doublesou';
 }

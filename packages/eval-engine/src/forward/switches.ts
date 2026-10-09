@@ -1,6 +1,8 @@
 import { PRNG } from '@pkmn/sim';
 import type { Battle, PRNGSeed, Side } from '@pkmn/sim';
-import { evaluatePosition } from '../eval-function.ts';
+import { createMatchupCache, evaluatePosition } from '../eval-function.ts';
+import type { StaticRuleset } from '../score/weights.ts';
+import { battleRuleset } from './ruleset.ts';
 import { sideIndex } from '@fulllifegames/replay-core';
 import { switchAssignments } from './assignments.ts';
 import { submittableChoice } from './request-moves.ts';
@@ -135,9 +137,10 @@ export function answerFollowUps(
 /**
  * The assignment whose entry statically evaluates best for the choosing
  * side (the first one when alone). Every trial starts from the one
- * mid-turn state of this round.
+ * mid-turn state of this round. Round 65: the static weighs by the rule
+ * set the battle was forked under, as the leaves do.
  */
-function bestAssignment(side: Side, midTurn: () => Battle, seed: PRNGSeed, assignments: string[]): string {
+function bestAssignment(side: Side, midTurn: () => Battle, seed: PRNGSeed, assignments: string[], ruleset: StaticRuleset): string {
   let best = assignments[0];
   if (assignments.length > 1) {
     const perspective = side.id === 'p1' ? 1 : -1;
@@ -146,7 +149,7 @@ function bestAssignment(side: Side, midTurn: () => Battle, seed: PRNGSeed, assig
       const trial = midTurn();
       trial.prng = new PRNG(seed);
       if (!trial.choose(side.id as 'p1' | 'p2', candidate)) continue;
-      const value = perspective * evaluatePosition(trial);
+      const value = perspective * evaluatePosition(trial, createMatchupCache(ruleset));
       if (value > bestValue) {
         bestValue = value;
         best = candidate;
@@ -204,7 +207,7 @@ export function resolveForcedSwitches(
       const benchSlots = switchInSlots(side);
       if (benchSlots.length === 0) continue;
 
-      const best = bestAssignment(side, mid, seed, switchAssignments(forcedCount, benchSlots));
+      const best = bestAssignment(side, mid, seed, switchAssignments(forcedCount, benchSlots), battleRuleset(battle));
       applyChoice(battle, side.id as 'p1' | 'p2', best);
     }
   }

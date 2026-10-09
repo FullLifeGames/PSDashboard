@@ -5,7 +5,13 @@ import { readFileSync } from 'node:fs';
  * bank's own tranches, the weight-fitting corpus, or the corpus's holdout.
  */
 
-/** Round 65: the holdout of the fit corpus (scripts/build-fit-holdout.mjs), a test bank no fit trains on. */
+/**
+ * Round 65: the holdout of the fit corpus (scripts/build-fit-holdout.mjs), a
+ * test bank no round-65 or later fit trains on. Older fits did: the hand
+ * doubles table (fitted 2026-08-08) and the doubles K (2026-08-09) saw the
+ * holdout's games from the corpus of that time (239 of 869), so readings of
+ * the hand doubles table there lean its way.
+ */
 export const HOLDOUT_MANIFEST = 'regression/fixtures/fit-holdout-manifest.json';
 export const FIT_MANIFEST = 'regression/fixtures/fit-corpus-manifest.json';
 
@@ -64,7 +70,8 @@ export function bankUniverse(bank: { ids: string[]; trancheOf: Map<string, strin
       sampleTurns: holdoutTurns,
     };
   }
-  if (source !== 'fit') return { ...bank, cached: false, sampleTurns: bankTurns };
+  if (source === undefined || source === '') return { ...bank, cached: false, sampleTurns: bankTurns };
+  if (source !== 'fit') throw new Error(`unknown EVAL_CALIBRATION_SOURCE ${source} (fit or holdout)`);
   if (!process.env.EVAL_CALIBRATION_DUMP) {
     throw new Error('EVAL_CALIBRATION_SOURCE=fit produces fit-side dumps only — set EVAL_CALIBRATION_DUMP');
   }
