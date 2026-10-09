@@ -262,7 +262,12 @@ export interface StoredEval {
 //      and the greedy replacement after a knock-out reads the table of the
 //      rule set its position carries. Champions OU positions read new
 //      values; every other position keeps its value.
-const EVAL_ENGINE_CACHE_VERSION = 59;
+// v60 (round 65, gate "2b"): Doubles OU and every doubles format outside
+//      VGC and Champions take the round-65 fit (bodies 180, hazards 0.51,
+//      screens 88, Trick Room 58, matchup 118, coverage 91); VGC outside
+//      Champions is a rule set of its own and keeps the hand doubles table,
+//      as Champions VGC does. Doubles OU positions read new values.
+const EVAL_ENGINE_CACHE_VERSION = 60;
 
 /** Round 61: a search-budget form stores under its own tag; the default keeps today's keys. */
 const versionTag = (): string => {

@@ -35,6 +35,13 @@ test('Tera like the app: no click -> none, ladder click -> everyone, draft click
   expect(bankSettings({ id: 'gen9draft-3', formatid: 'gen9draft', log: click }).tera).toEqual({ p1: ['Garchomp'], p2: [] });
 });
 
+// Round 65: the rule set from the replay's own format, as the app resolves it (useEvalView).
+test('rule set like the app: Champions, VGC outside Champions, every other format standard', () => {
+  expect(bankSettings({ id: 'gen9championsvgc2026regmabo3-1', formatid: 'gen9championsvgc2026regmabo3', log: '|gametype|doubles\n|gen|9' }).ruleset).toBe('champions');
+  expect(bankSettings({ id: 'gen9vgc2026regi-2', formatid: 'gen9vgc2026regi', log: '|gametype|doubles\n|gen|9' }).ruleset).toBe('vgc');
+  expect(bankSettings({ id: 'gen9doublesou-3', formatid: 'gen9doublesou', log: '|gametype|doubles\n|gen|9' }).ruleset).toBe('standard');
+});
+
 test('played combo like the app sweep: the log of snapshot[turn], kept when a slot or a singles action was played', () => {
   const doublesTurn = ['|move|p1a: Pelipper|Hurricane|p2a: Wall', '|move|p2a: Wall|Protect|p2a: Wall', '|turn|3'];
   const kept = bankKeepPlayed([undefined, undefined, doublesTurn], 2, true);

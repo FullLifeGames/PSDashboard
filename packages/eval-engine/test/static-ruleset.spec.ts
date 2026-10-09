@@ -2,7 +2,7 @@ import { describe, expect, test } from 'vitest';
 import { readFileSync } from 'node:fs';
 import {
   CHAMPIONS_DOUBLES_FEATURE_WEIGHTS, CHAMPIONS_FEATURE_WEIGHTS, DOUBLES_FEATURE_WEIGHTS, FEATURE_WEIGHTS,
-  createMatchupCache, evaluatePosition, featureWeights,
+  VGC_DOUBLES_FEATURE_WEIGHTS, createMatchupCache, evaluatePosition, featureWeights,
 } from '../src/eval-function';
 import { createRootPosition, positionBattle } from '../src/forward-model';
 import { forkBattle } from '../src/forward/position';
@@ -71,6 +71,16 @@ describe('static rule set', () => {
     expect(featureWeights(true)).toBe(DOUBLES_FEATURE_WEIGHTS);
     expect(featureWeights(false, 'champions')).toBe(CHAMPIONS_FEATURE_WEIGHTS);
     expect(featureWeights(true, 'champions')).toBe(CHAMPIONS_DOUBLES_FEATURE_WEIGHTS);
+    expect(featureWeights(true, 'vgc')).toBe(VGC_DOUBLES_FEATURE_WEIGHTS);
+    expect(featureWeights(false, 'vgc')).toBe(FEATURE_WEIGHTS);
+  });
+
+  // Round 65 gate (2b): VGC keeps the hand doubles table while Doubles OU takes its fit; a VGC singles game reads the singles table.
+  test('a VGC cache weighs doubles by the VGC table and singles by the singles table', () => {
+    const doubles = positionBattle(createRootPosition(position(DOUBLES)));
+    expect(evaluatePosition(doubles, createMatchupCache('vgc'))).not.toBe(evaluatePosition(doubles, createMatchupCache('standard')));
+    const singles = positionBattle(createRootPosition(position(SINGLES)));
+    expect(evaluatePosition(singles, createMatchupCache('vgc'))).toBe(evaluatePosition(singles, createMatchupCache('standard')));
   });
 
   test('the static weighs by the rule set its cache names, a plain Map reads as standard', () => {

@@ -1,5 +1,6 @@
 import { describe, expect, test } from 'vitest';
 import { readFileSync } from 'node:fs';
+import { replayRuleset } from '@fulllifegames/replay-core';
 import { mctsTreeSearch } from '../src/mcts';
 import { MCTS_TREES, mergeMctsTrees, rowCompletedCells, starvedSupportCells } from '../src/mcts-merge';
 import { playedIndices } from '../src/verify-select';
@@ -8,12 +9,15 @@ import { applyForcedWin, forcedWinInput } from '../src/search/forced-win-apply';
 import { cellKey } from '../src/rank';
 import { createLocalTreeExecutor, searchTreesOrchestrated, type TreeExecutor } from '../src/tree-orchestrator';
 import type { EvalCellJob, EvalCellValue, EvalSettings, ForcedWinInput, ForcedWinOutcome, MctsTreeStats } from '../src/types';
+import type { StaticRuleset } from '../src/eval-function';
 
 interface Fixture { serialized: string; tera?: EvalSettings['tera']; sleepClause?: boolean; keepPlayed?: EvalSettings['keepPlayed'] | null; played?: EvalSettings['keepPlayed'] }
 
 const fixture = (name: string) =>
   JSON.parse(readFileSync(new URL(`./fixtures/positions/${name}.json`, import.meta.url), 'utf-8')) as Fixture;
 const position = (name: string) => fixture(name).serialized;
+/** Round 65: a fixture's rule set, named from its replay id as the hosts name it (useEvalView, bankSettings). */
+const rulesetOf = (name: string): StaticRuleset => replayRuleset({ id: name.replace(/-t\d+$/, ''), log: '' });
 const CASES = ['smogtours-gen9ou-749828-t23', 'gen9ou-2658658993-t2', 'gen9doublesou-2663093831-t12'];
 /** Positions whose search runs a verify round (the doubles one after the pair plan's check round). */
 const VERIFYING = ['smogtours-gen6ou-648453-t13', 'gen9doublesou-2663093831-t12'];
@@ -30,8 +34,8 @@ interface Recording {
  * The local executor with a record of every call. `lastFirst` holds tree 0 back until the other trees
  * are done, so the trees finish in an order other than their seed offsets.
  */
-function recordingExecutor(serialized: string, lastFirst = false): { executor: TreeExecutor; record: Recording } {
-  const local = createLocalTreeExecutor(serialized);
+function recordingExecutor(serialized: string, lastFirst = false, ruleset: StaticRuleset = 'standard'): { executor: TreeExecutor; record: Recording } {
+  const local = createLocalTreeExecutor(serialized, ruleset);
   const record: Recording = { offsets: [], trees: [], rounds: [], proofs: [] };
   let release = () => {};
   const othersDone = new Promise<void>(resolve => { release = resolve; });
@@ -62,7 +66,10 @@ function recordingExecutor(serialized: string, lastFirst = false): { executor: T
 
 const settingsOf = (name: string, keepPlayed?: EvalSettings['keepPlayed']): EvalSettings => {
   const { tera, sleepClause } = fixture(name);
-  return { depth: 1, samples: 1, mode: 'mcts', tera: tera ?? true, sleepClause: sleepClause ?? true, ...(keepPlayed ? { keepPlayed } : {}) };
+  return {
+    depth: 1, samples: 1, mode: 'mcts', tera: tera ?? true, sleepClause: sleepClause ?? true, ruleset: rulesetOf(name),
+    ...(keepPlayed ? { keepPlayed } : {}),
+  };
 };
 
 /**
@@ -95,7 +102,7 @@ describe('tree orchestration (round 61; read through the executor since round 64
       const verify = record.rounds.at(-1)!;
       expect(verify.jobs.length, name).toBeGreaterThan(0);
       for (const job of verify.jobs) {
-        expect(job.deepen, name).toEqual({ depth: 1, samples: 1, tera: settings.tera, sleepClause: settings.sleepClause });
+        expect(job.deepen, name).toEqual({ depth: 1, samples: 1, tera: settings.tera, sleepClause: settings.sleepClause, ruleset: settings.ruleset });
       }
       if (doubles) expect(record.rounds[0].jobs.every(job => job.deepen === undefined), name).toBe(true);
     }
@@ -128,7 +135,9 @@ describe('tree orchestration (round 61; read through the executor since round 64
   test('the played row joins the verify set (doubles: VGC 2629703929 t8, p1 Heat Wave + Protect)', { timeout: 600_000 }, async () => {
     const name = 'gen9vgc2026regi-2629703929-t8';
     const keepPlayed = fixture(name).keepPlayed!;
-    const { executor, record } = recordingExecutor(position(name));
+    // Round 65 gate (2b): a VGC position, searched under the VGC rule set (the hand doubles table) as the app searches it.
+    expect(rulesetOf(name)).toBe('vgc');
+    const { executor, record } = recordingExecutor(position(name), false, rulesetOf(name));
     await searchTreesOrchestrated(executor, settingsOf(name, keepPlayed));
     const merged = mergeMctsTrees(record.trees);
     const played = playedIndices(record.trees, merged, keepPlayed);

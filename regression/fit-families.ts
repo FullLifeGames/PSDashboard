@@ -14,8 +14,8 @@ import { atKScore, layoutOf, refitAtKReport, type AtKReportOptions, type AtKSamp
  * bootstrap.
  */
 
-export type Ruleset = 'standard' | 'champions';
-export type FamilyName = 'standard-singles' | 'standard-doubles' | 'champions-singles' | 'champions-doubles';
+export type Ruleset = 'standard' | 'vgc' | 'champions';
+export type FamilyName = `${Ruleset}-${'singles' | 'doubles'}`;
 
 export interface FamilySample {
   game: string;
@@ -34,8 +34,11 @@ export interface FamilySample {
   source?: 'tournament' | 'ladder';
 }
 
-/** The rule set of a corpus game, from its id (the hosts resolve it from the same format id, isChampionsReplay). */
-export const rulesetOfId = (id: string): Ruleset => (/champions/.test(id) ? 'champions' : 'standard');
+/** The rule set of a corpus game, from its id (the hosts resolve it from the same format id, replayRuleset). */
+export const rulesetOfId = (id: string): Ruleset => {
+  if (/champions/.test(id)) return 'champions';
+  return /vgc/.test(id) ? 'vgc' : 'standard';
+};
 
 export const familyOf = (sample: Pick<FamilySample, 'ruleset' | 'gameType'>): FamilyName => `${sample.ruleset}-${sample.gameType}`;
 

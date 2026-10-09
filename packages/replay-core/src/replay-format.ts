@@ -218,14 +218,21 @@ export function replayBringOnly(
   return p1.length === bringCount && p2.length === bringCount ? { p1, p2 } : null;
 }
 
+/** Round 65: the rule set a replay's static weighs by (the engine's StaticRuleset). */
+export type ReplayRuleset = 'standard' | 'vgc' | 'champions';
+
 /**
- * Round 65: a Pokémon Champions replay (Champions OU, Champions VGC), read
- * from the replay's own format id. The simulator knows no Champions format
- * (its reconstructions run as Doubles OU or a custom game), so the hosts
- * name the rule set from here and the engine weighs its statics by it.
+ * Round 65: the rule set of a replay, read from its own format id. Pokémon
+ * Champions (Champions OU, Champions VGC) is its own game, and the simulator
+ * knows no Champions format (its reconstructions run as Doubles OU or a
+ * custom game); VGC outside Champions (bring six, pick four, level 50) parts
+ * from Doubles OU. The hosts name the rule set from here and the engine
+ * weighs its statics by it.
  */
-export function isChampionsReplay(source: ReplayFormatSource): boolean {
-  return /champions/.test(inferReplayFormatId(source));
+export function replayRuleset(source: ReplayFormatSource): ReplayRuleset {
+  const format = inferReplayFormatId(source);
+  if (/champions/.test(format)) return 'champions';
+  return /vgc/.test(format) ? 'vgc' : 'standard';
 }
 
 /** The branch format carries the clause as a custom-rule suffix — is it there? */

@@ -165,35 +165,82 @@ export const FEATURE_WEIGHTS: Record<keyof EvalFeatures, number> = {
 };
 
 /**
- * Doubles overrides, corpus-fitted 2026-08-08 (590 doubles/VGC games,
- * cluster-bootstrap significant): speed control and screens carry far more
- * win probability in doubles than the singles hand weights say — tailwind
- * 68±25 vs 8, Trick Room 87±27 vs 10, screens 103±40 vs 5, boosts 27±7 vs
- * 12. The direction matches doubles domain knowledge (speed control decides
- * VGC games); confounding (winning teams get their setup up) likely inflates
- * the magnitudes, so adoption is gated on the calibration buckets like every
- * other weight change. Features consistent with the hand weights (hazards,
- * matchup, coverage) keep them.
+ * Doubles OU and every doubles format outside VGC and Champions, fitted
+ * 2026-10-09 (round 65, T127) at the fixed doubles K on the corpus measured
+ * like the app (the app's team build, the bank's reconstruction): 3,951
+ * positions of 679 sets of the Scarlet/Violet doubles without the holdout
+ * (739 Doubles OU games, 28 VGC games), folds and bootstrap clustered by
+ * set. Fitted with their 90 % band: bodies 180 [159, 201], hazards 0.51
+ * [0.13, 0.92], screens 88 [44, 144], matchup 118 [42, 205], coverage 91
+ * [34, 171], Trick Room 58 [29, 90]. Held: the boost weights, tailwind (the
+ * first pass flagged it) and choice mismatch. Out of fold it beats the hand
+ * table in 17 of 20 seeds (log-loss −14.5 bp, Brier −7 bp), short of the
+ * pre-registered 20. On the holdout's 369 Doubles OU games the search reads
+ * −36 bp [−62, −10] (own K per phase −28 [−51, −6]), on the bank's 36
+ * Doubles OU games +144 [+24, +279], nearly all of it the screens weight:
+ * in the bank's games with screens up the screens side lost 9 of 14, in the
+ * holdout's it won 48 of 83. Bank and holdout together read −11 [−40, +18].
+ * Adopted at the round-65 gate ("2b": Doubles OU takes the fit, VGC keeps
+ * the hand table).
  */
 export const DOUBLES_FEATURE_WEIGHTS: Record<keyof EvalFeatures, number> = {
-  ...FEATURE_WEIGHTS,
+  bodies: 180,
   boosts: 27,
+  hazards: 0.51,
+  screens: 88,
+  tailwind: 68,
+  trickRoom: 58,
+  matchup: 118,
+  coverage: 91,
+  choiceMismatch: 40,
+  sweepFastKo: 0,
+  sweepFastChip: 0,
+  sweepSlowKo: 0,
+  sweepSlowChip: 0,
+};
+
+/**
+ * VGC outside Champions (doubles; bring six, pick four, level 50): the hand
+ * doubles table, corpus-fitted 2026-08-08 (590 doubles and VGC games,
+ * cluster-bootstrap significant): speed control carries far more win
+ * probability in doubles than the singles hand weights say (tailwind 68±25
+ * against 8, Trick Room 87±27 against 10, boosts 27±7 against 12); the
+ * other weights are the singles hand weights. Round 65 keeps it for VGC:
+ * the corpus holds 50 VGC games against 1,108 Doubles OU, and on the 31 VGC
+ * games of bank and holdout the Doubles OU fit read +85 bp [−10, +181].
+ * Written out in full, so a refit of Doubles OU never moves it.
+ */
+export const VGC_DOUBLES_FEATURE_WEIGHTS: Record<keyof EvalFeatures, number> = {
+  bodies: 200,
+  boosts: 27,
+  hazards: 0.75,
+  screens: 5,
   tailwind: 68,
   trickRoom: 87,
+  matchup: 120,
+  coverage: 40,
+  choiceMismatch: 40,
+  sweepFastKo: 0,
+  sweepFastChip: 0,
+  sweepSlowKo: 0,
+  sweepSlowChip: 0,
 };
 
 /**
  * The rule set a battle runs under (round 65). The simulator knows no
  * Pokémon Champions format (its doubles reconstructions run as Doubles OU,
  * its singles as a custom game), so the host names the rule set from the
- * replay's format and hands it to the search (EvalSettings.ruleset); the
- * static weighs the features with the table of its rule set and game type.
- * Champions OU (singles) and Champions VGC (doubles) are their own games
- * with their own fits: on the round-65 corpus their fitted weights part
- * from the Scarlet/Violet games' (Champions OU bodies 121 and matchup 210
- * against the singles table's 200 and 120).
+ * replay's format (replayRuleset in replay-core) and hands it to the search
+ * (EvalSettings.ruleset); the static weighs the features with the table of
+ * its rule set and game type. Champions OU (singles) and Champions VGC
+ * (doubles) are their own games with their own fits: on the round-65
+ * corpus their fitted weights part from the Scarlet/Violet games'
+ * (Champions OU bodies 121 and matchup 210 against the singles table's 200
+ * and 120). VGC outside Champions parts from Doubles OU (bring six, pick
+ * four, level 50) and keeps the hand doubles table until it has data of
+ * its own; a VGC singles game reads the singles table.
  */
-export type StaticRuleset = 'standard' | 'champions';
+export type StaticRuleset = 'standard' | 'vgc' | 'champions';
 
 /**
  * Champions OU (singles), fitted 2026-10-09 (round 65, T127) at the fixed
@@ -227,11 +274,29 @@ export const CHAMPIONS_FEATURE_WEIGHTS: Record<keyof EvalFeatures, number> = {
   sweepSlowChip: 0,
 };
 
-/** Champions VGC (doubles); until a fit of its own, the doubles table. */
-export const CHAMPIONS_DOUBLES_FEATURE_WEIGHTS: Record<keyof EvalFeatures, number> = { ...DOUBLES_FEATURE_WEIGHTS };
+/**
+ * Champions VGC (doubles): the hand doubles table (as VGC); its own fit in
+ * round 65 beat it in 7 of 20 seeds. Written out in full.
+ */
+export const CHAMPIONS_DOUBLES_FEATURE_WEIGHTS: Record<keyof EvalFeatures, number> = {
+  bodies: 200,
+  boosts: 27,
+  hazards: 0.75,
+  screens: 5,
+  tailwind: 68,
+  trickRoom: 87,
+  matchup: 120,
+  coverage: 40,
+  choiceMismatch: 40,
+  sweepFastKo: 0,
+  sweepFastChip: 0,
+  sweepSlowKo: 0,
+  sweepSlowChip: 0,
+};
 
 /** The weight table of a game type under a rule set. */
 export function featureWeights(doubles: boolean, ruleset: StaticRuleset = 'standard'): Record<keyof EvalFeatures, number> {
   if (ruleset === 'champions') return doubles ? CHAMPIONS_DOUBLES_FEATURE_WEIGHTS : CHAMPIONS_FEATURE_WEIGHTS;
-  return doubles ? DOUBLES_FEATURE_WEIGHTS : FEATURE_WEIGHTS;
+  if (!doubles) return FEATURE_WEIGHTS;
+  return ruleset === 'vgc' ? VGC_DOUBLES_FEATURE_WEIGHTS : DOUBLES_FEATURE_WEIGHTS;
 }

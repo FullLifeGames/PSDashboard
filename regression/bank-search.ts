@@ -3,7 +3,7 @@ import {
   searchPosition, searchTreesOrchestrated,
   type EvalResult, type EvalSettings, type StaticRuleset, type TeraAllowance,
 } from '@fulllifegames/eval-engine';
-import { formatEnforcesSleepClause, getBranchSimulatorFormat, inferReplayFormatId, isChampionsReplay } from '@fulllifegames/replay-core';
+import { formatEnforcesSleepClause, getBranchSimulatorFormat, inferReplayFormatId, replayRuleset } from '@fulllifegames/replay-core';
 
 /**
  * Round 61: the bank's search, the app's dispatch. Below the auto threshold
@@ -50,7 +50,7 @@ export function bankSettings(replay: { id?: string; formatid?: string; log: stri
     tera: resolveTeraPreference('auto', inferReplayFormatId(replay), replay.log),
     sleepClause: formatEnforcesSleepClause(getBranchSimulatorFormat(replay)),
     // Round 65: the rule set from the replay's own format, as the app resolves it (useEvalView).
-    ruleset: isChampionsReplay(replay) ? 'champions' : 'standard',
+    ruleset: replayRuleset(replay),
   };
 }
 

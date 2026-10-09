@@ -1,7 +1,7 @@
 import { test, expect, describe } from 'vitest';
 import {
   formatEnforcesSleepClause,
-  isChampionsReplay,
+  replayRuleset,
   getBranchSimulatorFormat,
   getReplayGameType,
   inferReplayFormatId,
@@ -137,16 +137,18 @@ describe('replay format inference', () => {
     expect(formatEnforcesSleepClause('gen9customgame@@@Sleep Clause Mod')).toBe(true);
   });
 
-  // Round 65: the static weighs a Pokémon Champions replay by its own tables
-  // (singles and doubles), named from the replay's format; the simulator
-  // reconstructs Champions VGC as Doubles OU and Champions OU as a custom game.
-  test('a Champions replay is named from its own format, singles and doubles', () => {
-    expect(isChampionsReplay(vgcReplay)).toBe(true);
-    expect(isChampionsReplay({ id: 'gen9championsvgc2026regmabo3-2603652560', log: '|gametype|doubles\n|gen|9' })).toBe(true);
-    expect(isChampionsReplay({ id: 'gen9championsou-2695399689', log: '|gametype|singles\n|gen|9\n|tier|[Gen 9 Champions] OU' })).toBe(true);
-    expect(isChampionsReplay({ id: 'gen9ou-123', log: '|gametype|singles\n|gen|9\n|tier|[Gen 9] OU' })).toBe(false);
-    expect(isChampionsReplay({ id: 'gen9doublesou-2663093831', log: '|gametype|doubles\n|gen|9\n|tier|[Gen 9] Doubles OU' })).toBe(false);
-    expect(isChampionsReplay({ id: 'gen9vgc2026regi-2630181744', log: '|gametype|doubles\n|gen|9\n|tier|[Gen 9] VGC 2026 Reg I' })).toBe(false);
+  // Round 65: the static weighs a replay by the tables of its rule set, named
+  // from the replay's own format: Pokémon Champions (singles and doubles; the
+  // simulator reconstructs Champions VGC as Doubles OU and Champions OU as a
+  // custom game), VGC outside Champions, and every other format.
+  test('a replay names its rule set from its own format', () => {
+    expect(replayRuleset(vgcReplay)).toBe('champions');
+    expect(replayRuleset({ id: 'gen9championsvgc2026regmabo3-2603652560', log: '|gametype|doubles\n|gen|9' })).toBe('champions');
+    expect(replayRuleset({ id: 'gen9championsou-2695399689', log: '|gametype|singles\n|gen|9\n|tier|[Gen 9 Champions] OU' })).toBe('champions');
+    expect(replayRuleset({ id: 'gen9vgc2026regi-2630181744', log: '|gametype|doubles\n|gen|9\n|tier|[Gen 9] VGC 2026 Reg I' })).toBe('vgc');
+    expect(replayRuleset({ id: 'gen9vgc2024regh-2160552710', log: '|gametype|doubles\n|gen|9' })).toBe('vgc');
+    expect(replayRuleset({ id: 'gen9ou-123', log: '|gametype|singles\n|gen|9\n|tier|[Gen 9] OU' })).toBe('standard');
+    expect(replayRuleset({ id: 'gen9doublesou-2663093831', log: '|gametype|doubles\n|gen|9\n|tier|[Gen 9] Doubles OU' })).toBe('standard');
   });
 
   // A private replay link carries a 31-character password as a `-{password}pw`

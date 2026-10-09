@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, type Dispatch, type SetStateAction } from 'react';
 import {
   type OpponentTeamInfo, type ReplayData, type TurnSnapshot, formatEnforcesSleepClause,
-  getBranchSimulatorFormat, inferReplayFormatId, isChampionsReplay,
+  getBranchSimulatorFormat, inferReplayFormatId, replayRuleset,
 } from '@fulllifegames/replay-core';
 import { needsSettingsUpgrade, resolveAutoTurnSettings, type TurnEvalSettings, useEvaluation } from './useEvaluation';
 import type { useEvalAcquire } from './useEvalAcquire';
@@ -73,11 +73,11 @@ function useEvalFormat(inputs: EvalViewInputs) {
     () => (replayData ? formatEnforcesSleepClause(getBranchSimulatorFormat(replayData)) : false),
     [replayData],
   );
-  // Round 65: the rule set (Pokémon Champions or standard) from the replay's
-  // own format: the reconstruction runs Champions as Doubles OU or a custom
-  // game, and the static weighs its features by the replay's game.
+  // Round 65: the rule set (Pokémon Champions, VGC or standard) from the
+  // replay's own format: the reconstruction runs Champions as Doubles OU or a
+  // custom game, and the static weighs its features by the replay's game.
   const effectiveRuleset = useMemo(
-    (): StaticRuleset => (replayData && isChampionsReplay(replayData) ? 'champions' : 'standard'),
+    (): StaticRuleset => (replayData ? replayRuleset(replayData) : 'standard'),
     [replayData],
   );
   const evalAvailable = useMemo(

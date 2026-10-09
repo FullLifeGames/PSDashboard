@@ -7,7 +7,7 @@ import { getBranchSimulatorFormat, replayBringOnly } from '../packages/replay-co
 import { parseReplayLogWithObservations } from '../packages/replay-core/src/protocol-parser';
 import {
   CHAMPIONS_DOUBLES_FEATURE_WEIGHTS, CHAMPIONS_FEATURE_WEIGHTS, createMatchupCache, DOUBLES_FEATURE_WEIGHTS, evalFeatures,
-  evaluatePosition, EVAL_WEIGHTS, FEATURE_WEIGHTS, type EvalFeatures,
+  evaluatePosition, EVAL_WEIGHTS, FEATURE_WEIGHTS, VGC_DOUBLES_FEATURE_WEIGHTS, type EvalFeatures,
 } from '../packages/eval-engine/src/eval-function';
 import { battleFaintedFraction } from '../packages/eval-engine/src/search';
 import { WINPROB_K, wpUnits } from '../packages/eval-engine/src/winprob';
@@ -15,7 +15,7 @@ import {
   bootstrapPhaseK, brierScore, crossValidate, fitConstantK, fitLogistic, fitPhaseK, logLossScore,
   mulberry32, phaseBucket,
 } from './fit-helpers';
-import { dumpSamples, familyReports, rulesetOfId, withoutHoldout, type FamilySample } from './fit-families';
+import { dumpSamples, familyReports, rulesetOfId, withoutHoldout, type FamilySample, type Ruleset } from './fit-families';
 import { holdoutSets } from './bank-universe';
 
 /**
@@ -90,7 +90,7 @@ const FEATURE_KEYS = Object.keys(FEATURE_WEIGHTS) as (keyof EvalFeatures)[];
 const cacheStamp = (manifest: { replays: { id: string }[] }) => JSON.stringify({
   schema: 2, // FitSample gained faintedFraction/genClass — bump forces one recapture
   featureKeys: FEATURE_KEYS,
-  weights: { EVAL_WEIGHTS, FEATURE_WEIGHTS, DOUBLES_FEATURE_WEIGHTS, CHAMPIONS_FEATURE_WEIGHTS, CHAMPIONS_DOUBLES_FEATURE_WEIGHTS },
+  weights: { EVAL_WEIGHTS, FEATURE_WEIGHTS, DOUBLES_FEATURE_WEIGHTS, VGC_DOUBLES_FEATURE_WEIGHTS, CHAMPIONS_FEATURE_WEIGHTS, CHAMPIONS_DOUBLES_FEATURE_WEIGHTS },
   manifestIds: manifest.replays.map(entry => entry.id),
 });
 
@@ -141,6 +141,7 @@ const tables = (singles: Record<keyof EvalFeatures, number>, doubles: Record<key
 const FAMILIES = [
   { name: 'standard-singles', ...tables(FEATURE_WEIGHTS, DOUBLES_FEATURE_WEIGHTS) },
   { name: 'standard-doubles', ...tables(FEATURE_WEIGHTS, DOUBLES_FEATURE_WEIGHTS) },
+  { name: 'vgc-doubles', ...tables(FEATURE_WEIGHTS, VGC_DOUBLES_FEATURE_WEIGHTS) },
   { name: 'champions-singles', ...tables(CHAMPIONS_FEATURE_WEIGHTS, CHAMPIONS_DOUBLES_FEATURE_WEIGHTS) },
   { name: 'champions-doubles', ...tables(CHAMPIONS_FEATURE_WEIGHTS, CHAMPIONS_DOUBLES_FEATURE_WEIGHTS) },
 ];
@@ -219,7 +220,7 @@ interface FitSample {
   p1Won: boolean;
   /** Round 65 (bank dumps): the cluster key, the rule set, a score in wp-units, the last pair (no identity check). */
   set?: string;
-  ruleset?: 'standard' | 'champions';
+  ruleset?: Ruleset;
   wp?: boolean;
   lastPair?: boolean;
 }

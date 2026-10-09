@@ -40,6 +40,8 @@ describe('fit families', () => {
     expect(rulesetOfId('gen9championsvgc2026regmabo3-1')).toBe('champions');
     expect(rulesetOfId('gen9championsou-2')).toBe('champions');
     expect(rulesetOfId('smogtours-gen9doublesou-3')).toBe('standard');
+    expect(rulesetOfId('gen9vgc2024regh-4')).toBe('vgc');
+    expect(familyOf({ ruleset: 'vgc', gameType: 'doubles' })).toBe('vgc-doubles');
     expect(familyOf({ ruleset: 'champions', gameType: 'singles' })).toBe('champions-singles');
     expect(familyOf({ ruleset: 'standard', gameType: 'doubles' })).toBe('standard-doubles');
   });

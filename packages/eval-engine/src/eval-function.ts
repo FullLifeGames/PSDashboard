@@ -12,6 +12,7 @@ import type { MatchupCache } from './score/threat.ts';
 
 export {
   CHAMPIONS_DOUBLES_FEATURE_WEIGHTS, CHAMPIONS_FEATURE_WEIGHTS, DOUBLES_FEATURE_WEIGHTS, EVAL_WEIGHTS, FEATURE_WEIGHTS, featureWeights,
+  VGC_DOUBLES_FEATURE_WEIGHTS,
 } from './score/weights.ts';
 export type { EvalFeatures, StaticRuleset } from './score/weights.ts';
 export { hazardCost, hazardRemovalEquity, strandedMons } from './score/hazards.ts';

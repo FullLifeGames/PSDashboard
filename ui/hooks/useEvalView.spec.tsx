@@ -69,6 +69,9 @@ describe('useEvalView', () => {
     expect(spies.evaluate.mock.calls[0][0]).toMatchObject({ ruleset: 'champions' });
     act(() => view.result.current.handleAnalyzeGame());
     expect(spies.runGraphSweep.mock.calls[0][0]).toMatchObject({ ruleset: 'champions' });
+    // Round 65 gate (2b): VGC outside Champions is its own rule set too.
+    const vgc = { ...replayData, id: 'gen9vgc2026regi-2630181744', formatid: 'gen9vgc2026regi' };
+    expect(renderHook(() => useEvalView(inputs(evaluation, { replayData: vgc }))).result.current.effectiveRuleset).toBe('vgc');
   });
 
   test('Evaluate targets the position under the pointer: live sim, recorded variation, or cached main line', async () => {

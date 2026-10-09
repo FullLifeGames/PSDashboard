@@ -14,6 +14,7 @@ type PokemonSetAssumption
 type PokemonSnapshot
 type PokemonUsageStats
 type ReplayData
+type ReplayRuleset
 type RevealedPokemonInfo
 type SetAssumption
 type SetSpreadAssumption
@@ -61,7 +62,6 @@ value getSpeciesUsageStats
 value guessedFieldFromUsage
 value inferOpponentTeam
 value inferReplayFormatId
-value isChampionsReplay
 value itemSetValue
 value manualEvs
 value manualField
@@ -71,6 +71,7 @@ value parseReplayLog
 value parseReplayLogWithObservations
 value parseTeamText
 value replayBringOnly
+value replayRuleset
 value resolveHiddenPowerType
 value sideIndex
 value solveReplaySpreads

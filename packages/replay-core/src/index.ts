@@ -14,9 +14,10 @@ export { inferOpponentTeam } from './opponent-inferrer.ts';
 export { parseReplayLog, parseReplayLogWithObservations } from './protocol-parser.ts';
 export {
   splitReplayPassword, getReplayGameType, inferReplayFormatId, getReplayDisplayFormat, getReplayGeneration,
-  getReplayBringCount, speciesBaseId, broughtSpeciesFor, replayBringOnly, formatEnforcesSleepClause, isChampionsReplay,
+  getReplayBringCount, speciesBaseId, broughtSpeciesFor, replayBringOnly, formatEnforcesSleepClause, replayRuleset,
   getBranchSimulatorFormat,
 } from './replay-format.ts';
+export type { ReplayRuleset } from './replay-format.ts';
 export { finalPlayedTurn } from './replay-turns.ts';
 export { getSpeciesSetAssumption } from './smogon/sets-lookup.ts';
 export type {
