@@ -32,6 +32,8 @@ export interface FamilySample {
   /** The bank prices the last pair by its race, not by the static: no identity check there. */
   lastPair?: boolean;
   source?: 'tournament' | 'ladder';
+  /** The replay's ladder rating (null or 0 for tournament games and unrated games). */
+  rating?: number | null;
 }
 
 /** The rule set of a corpus game, from its id (the hosts resolve it from the same format id, replayRuleset). */
@@ -53,6 +55,7 @@ interface BankRow {
   p1Won: boolean;
   lastPair?: boolean;
   g?: number[];
+  rating?: number | null;
 }
 
 /**
@@ -78,7 +81,7 @@ export function dumpSamples(paths: string[], playersOf: (id: string) => string[]
       return {
         game: row.id, set: setOf(row, familyOf({ ruleset, gameType: row.gameType })), gameType: row.gameType, ruleset,
         g: row.g!, p1Won: row.p1Won, faintedFraction: row.faintedFraction, score: row.score, wp: true,
-        lastPair: row.lastPair ?? false, source: row.tranche === 'fit-tournament' ? 'tournament' : 'ladder',
+        lastPair: row.lastPair ?? false, source: row.tranche === 'fit-tournament' ? 'tournament' : 'ladder', rating: row.rating ?? null,
       };
     });
 }
@@ -86,6 +89,17 @@ export function dumpSamples(paths: string[], playersOf: (id: string) => string[]
 /** The samples outside the holdout (scripts/build-fit-holdout.mjs), and how many it took. */
 export function withoutHoldout<T extends { game: string }>(samples: T[], holdout: ReadonlySet<string>): { kept: T[]; dropped: number } {
   const kept = samples.filter(sample => !holdout.has(sample.game));
+  return { kept, dropped: samples.length - kept.length };
+}
+
+/**
+ * Round 66: a ladder game without a rating was played after its format left
+ * the ladder, as a challenge of unknown level (the 600 Champions VGC Bo3
+ * games of round 65, uploaded after the M-B ladder ended). Such games stay
+ * in the corpus and in the holdout but leave the fit.
+ */
+export function withoutUnratedLadder<T extends { source?: 'tournament' | 'ladder'; rating?: number | null }>(samples: T[]): { kept: T[]; dropped: number } {
+  const kept = samples.filter(sample => sample.source === 'tournament' || (sample.rating ?? 0) > 0);
   return { kept, dropped: samples.length - kept.length };
 }
 

@@ -15,7 +15,7 @@ import {
   bootstrapPhaseK, brierScore, crossValidate, fitConstantK, fitLogistic, fitPhaseK, logLossScore,
   mulberry32, phaseBucket,
 } from './fit-helpers';
-import { dumpSamples, familyReports, rulesetOfId, withoutHoldout, type FamilySample, type Ruleset } from './fit-families';
+import { dumpSamples, familyReports, rulesetOfId, withoutHoldout, withoutUnratedLadder, type FamilySample, type Ruleset } from './fit-families';
 import { holdoutSets } from './bank-universe';
 
 /**
@@ -192,11 +192,18 @@ function samplesOf(manifest: Manifest): FitSample[] {
   return fromDumps;
 }
 
+/**
+ * Round 66: dump samples leave out ladder games without a rating (played after
+ * their format left the ladder; fit-families.ts), unless EVAL_FIT_UNRATED=1
+ * keeps them for a diagnosis.
+ */
 function dumpSamplesOf(paths: string): FitSample[] {
   const playersOf = (id: string) => (JSON.parse(readFileSync(join(CACHE_DIR, `${id}.json`), 'utf-8')) as { players?: string[] }).players ?? [];
   const genClass = (id: string): FitSample['genClass'] => (/^(smogtours-)?gen9/.test(id) ? 'gen9' : 'old');
-  return dumpSamples(paths.split(','), playersOf)
-    .map(sample => ({ ...sample, source: sample.source ?? 'ladder', genClass: genClass(sample.game) }));
+  const samples = dumpSamples(paths.split(','), playersOf);
+  const { kept, dropped } = process.env.EVAL_FIT_UNRATED === '1' ? { kept: samples, dropped: 0 } : withoutUnratedLadder(samples);
+  console.log(`unrated ladder: ${dropped} samples left out${process.env.EVAL_FIT_UNRATED === '1' ? ' (EVAL_FIT_UNRATED=1 keeps them)' : ''}`);
+  return kept.map(sample => ({ ...sample, source: sample.source ?? 'ladder', genClass: genClass(sample.game) }));
 }
 
 /** Round 65: no fit ever trains on the holdout (scripts/build-fit-holdout.mjs). */

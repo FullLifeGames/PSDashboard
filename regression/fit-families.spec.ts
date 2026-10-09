@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'vitest';
-import { dumpSamples, familyOf, familyReports, rulesetOfId, withoutHoldout, type FamilySample } from './fit-families';
+import { dumpSamples, familyOf, familyReports, rulesetOfId, withoutHoldout, withoutUnratedLadder, type FamilySample } from './fit-families';
 import { mulberry32 } from './fit-helpers';
 import { mkdtempSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -64,6 +64,23 @@ describe('fit families', () => {
     expect(samples).toHaveLength(2);
     expect(samples[0]).toMatchObject({ game: 'gen9championsou-1', ruleset: 'champions', gameType: 'singles', set: 'champions-singles|alice|bob', wp: true, source: 'ladder' });
     expect(samples[1]).toMatchObject({ ruleset: 'standard', gameType: 'doubles', set: 'standard-doubles|carol|dave' });
+  });
+
+  test('round 66: ladder games without a rating leave the fit, tournament games and rated ladder games stay', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'fit-families-'));
+    const dump = join(dir, 'merged.jsonl');
+    const row = (id: string, tranche: string, rating: number | null) => JSON.stringify({
+      id, turn: 2, tranche, phase: 'early', gameType: 'doubles', score: 0.1, faintedFraction: 0, p1Won: true, lastPair: false, rating, g: [1, 2],
+    });
+    writeFileSync(dump, [
+      row('gen9championsvgc2026regmbbo3-1', 'fit-ladder', null), row('gen9championsvgc2026regmbbo3-2', 'fit-ladder', 0),
+      row('gen9championsvgc2026regmc-3', 'fit-ladder', 1650), row('gen9championsvgc2026regmabo3-4', 'fit-tournament', null),
+    ].join('\n') + '\n');
+    const samples = dumpSamples([dump], () => ['a', 'b']);
+    expect(samples.map(sample => sample.rating)).toEqual([null, 0, 1650, null]);
+    const { kept, dropped } = withoutUnratedLadder(samples);
+    expect(kept.map(sample => sample.game)).toEqual(['gen9championsvgc2026regmc-3', 'gen9championsvgc2026regmabo3-4']);
+    expect(dropped).toBe(2);
   });
 
   test('each family refits on its own games with the pre-registered holds, and the identity check guards the capture', () => {
