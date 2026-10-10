@@ -159,20 +159,22 @@ function ReadChips({ report, playerNames, onSelectTurn, settingsFor }: EvalGameR
 function DeniedEndChip({ report, playerNames, onSelectTurn, settingsFor }: EvalGameReportProps) {
   const denied = report.deniedEnd;
   if (!denied) return null;
+  // Round 67 (T135): a sure KO has no roll that could fail; it never came.
+  const sure = denied.odds >= 1;
   return (
     <div className="ps-eval-report-moments">
       <button
         type="button"
         className="ps-btn ps-eval-report-moment"
         onClick={() => onSelectTurn?.(denied.turn)}
-        title={`One click from ending the game: removing ${denied.removes} leaves no answer behind, and it failed. Jump to this turn's analysis`}
+        title={`One click from ending the game: removing ${denied.removes} leaves no answer behind, and ${sure ? 'the knock-out never came' : 'it failed'}. Jump to this turn's analysis`}
       >
         <span style={{ color: '#cde' }}>T{denied.turn}</span>
         <SettingsBadge turn={denied.turn} settingsFor={settingsFor} />
         <span style={{ color: '#b6a46a' }}>{playerNames[sideIndex(denied.side)]}</span>
         {denied.move && <span style={{ color: '#aab' }}>{denied.move}</span>}
         <span style={{ color: '#b6a46a' }}>
-          one {rollText(denied.odds)} from ending it, {denied.move ? 'missed' : 'failed'}
+          one {rollText(denied.odds)} from ending it, {denied.move ? 'missed' : sure ? 'never came' : 'failed'}
         </span>
       </button>
     </div>

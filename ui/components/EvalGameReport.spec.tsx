@@ -101,11 +101,12 @@ describe('EvalGameReport', () => {
     expect(within(chip(9)).getByText('chance swing (rolls, crits, reveals)')).toBeInTheDocument();
   });
 
-  test('a denied end at odds 1 reads as a sure KO, never as a 100% roll (T123 point 3)', () => {
+  test('a denied end at odds 1 reads as a sure KO that never came, never as a 100% roll or a failed one (T123 point 3, T135 point 4)', () => {
     const deniedEnd = { turn: 9, side: 'p2' as const, species: 'Kingambit', odds: 1, removes: 'Garchomp', turnsRemaining: 12 };
     render(<EvalGameReport report={gameReport({ deniedEnd })} playerNames={names} />);
-    expect(within(chip(9)).getByText('one sure KO from ending it, failed')).toBeInTheDocument();
+    expect(within(chip(9)).getByText('one sure KO from ending it, never came')).toBeInTheDocument();
     expect(screen.queryByText(/100% roll/)).toBeNull();
+    expect(chip(9).getAttribute('title')).toContain('the knock-out never came');
     expect(chip(9).getAttribute('title')).not.toMatch(/[—–]/);
   });
 
