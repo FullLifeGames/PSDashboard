@@ -1,7 +1,11 @@
 import { Dex } from '@pkmn/sim';
 
-/** A line the slot's choice made: a move, a switch, or a `|cant|` that names a move. */
-const isOwnAction = (line: string) => /^\|(move|switch)\|/.test(line) || (line.startsWith('|cant|') && !!line.split('|')[4]);
+/**
+ * A line the slot's choice made: a move, a switch, or a `|cant|` that names
+ * its move (a `|cant|` with `[of]` is a blocker's line about the foe's move).
+ */
+const isOwnAction = (line: string) =>
+  /^\|(move|switch)\|/.test(line) || (line.startsWith('|cant|') && !!line.split('|')[4] && !line.includes('[of]'));
 
 /**
  * An own `|-activate|` of an ability that makes its holder leave mid-turn: the
@@ -34,4 +38,29 @@ export function answersForcedRequest(events: string[], index: number, ident: str
   const last = own[own.length - 1];
   if (last === undefined || !events.slice(last + 1, index).includes('|')) return false;
   return /^\|(-enditem|faint)\|/.test(events[last]) || abilityAskedToLeave(events[last]);
+}
+
+/** The species the block's switches bring in on forced requests, in order: before upkeep the answers above, after upkeep every switch. */
+export function collectForcedSwitchSpecies(
+  preUpkeep: string[],
+  postUpkeep: string[],
+  side: 'p1' | 'p2',
+): string[] {
+  const species: string[] = [];
+  const matcher = new RegExp(`^\\|switch\\|(${side}[a-d]:)`);
+
+  for (const [index, line] of preUpkeep.entries()) {
+    const slot = line.match(matcher)?.[1];
+    if (slot && answersForcedRequest(preUpkeep, index, slot)) {
+      species.push(line.split('|')[3].split(',')[0].trim());
+    }
+  }
+
+  for (const line of postUpkeep) {
+    if (matcher.test(line)) {
+      species.push(line.split('|')[3].split(',')[0].trim());
+    }
+  }
+
+  return species;
 }

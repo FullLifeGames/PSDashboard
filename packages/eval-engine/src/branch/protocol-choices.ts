@@ -239,6 +239,30 @@ function clickBehindEncore(
   return slowestRequestMove(active, toId(shownMove));
 }
 
+/** Whether the body's request or move slots carry the move. */
+function knowsMove(active: SimPokemon, moveName: string): boolean {
+  const moveId = toId(moveName);
+  return active.getMoveRequestData().moves.some(move => move.id === moveId || toId(move.move) === moveId) ||
+    active.moveSlots.some(slot => toId(slot.id || slot.move) === moveId);
+}
+
+/**
+ * The click behind a `|cant|` move the body's set lacks (round 67, T108). The
+ * move never ran: its blocker stopped it. The stand-in is one of the body's
+ * own moves the same blocker stops, the first enabled request move with the
+ * shown move's Dex category and priority (752301 t1: Landorus, built without
+ * Taunt, clicks Stealth Rock, and the same-turn Taunt stops it as it stopped
+ * the Taunt in the game); else the slowest move. Null: no enabled move.
+ */
+function clickBehindBlockedMove(active: SimPokemon, shownMove: string): string | null {
+  const shown = Dex.moves.get(shownMove);
+  const alike = active.getMoveRequestData().moves.find(entry => {
+    const move = Dex.moves.get(entry.id);
+    return !entry.disabled && move.category === shown.category && move.priority === shown.priority;
+  });
+  return alike?.id ?? slowestRequestMove(active);
+}
+
 /** The request's lowest-priority enabled move at priority 0 or below (other than `exceptId`), or null. */
 function slowestRequestMove(active: SimPokemon, exceptId = ''): string | null {
   let standIn: { id: string; priority: number } | null = null;
@@ -310,31 +334,47 @@ function getChoiceForSlot(
       return `${moveChoiceForActive(active, moveName)}${suffix}${gimmickSuffixForSlot(events, ident, active)}`;
     }
 
-    // A |cant| that names a move is the choice the player committed before it
-    // was blocked (same-turn Taunt, Imprison, flinch). Falling through to
-    // `move 1` instead played Uxie's U-turn on a taunted Stealth Rock turn and
-    // pulled the pivot switch a turn early — the first domino of a replay-wide
-    // desync. A reason-only |cant| (slp, par) keeps scanning: a Sleep Talk
-    // turn carries both that line and the |move| line the scan should find.
     if (line.startsWith(`|cant|${ident}`)) {
-      const moveName = line.split('|')[4]?.trim();
-      if (moveName) {
-        const active = battle.sides[sideIdx].active[activeSlot];
-        const suffix = targetLocSuffixForChoice(battle, active, moveName, 0);
-        return `${moveChoiceForActive(active, moveName)}${suffix}${gimmickSuffixForSlot(events, ident, active)}`;
-      }
+      const choice = choiceFromCant(events, line, ident, battle, battle.sides[sideIdx].active[activeSlot]);
+      if (choice) return choice;
     }
   }
 
-  // No action line for the slot: the body flinched, slept, was fully
-  // paralyzed, or fell before it moved. A gimmick clicked on that turn still
-  // happened (the sim resolves it before any move runs), so the fallback
-  // carries it like the branches above: 8 of 207 Tera clicks over the bank's
-  // replays took this path and left 13 positions one Tera body short (round
-  // 54). `pass` takes no modifier, the sim rejects it.
-  const active = battle.sides[sideIdx].active[activeSlot];
+  return defaultChoiceForSlot(events, ident, battle, battle.sides[sideIdx].active[activeSlot]);
+}
+
+/**
+ * No action line for the slot: the body flinched, slept, was fully
+ * paralyzed, or fell before it moved. A gimmick clicked on that turn still
+ * happened (the sim resolves it before any move runs), so the fallback
+ * carries it like the branches above: 8 of 207 Tera clicks over the bank's
+ * replays took this path and left 13 positions one Tera body short (round
+ * 54). `pass` takes no modifier, the sim rejects it.
+ */
+function defaultChoiceForSlot(events: string[], ident: string, battle: SimBattle, active: SimPokemon | null | undefined): string {
   const fallback = defaultMoveChoice(battle, active);
   return fallback.startsWith('move ') ? `${fallback}${gimmickSuffixForSlot(events, ident, active)}` : fallback;
+}
+
+/**
+ * A |cant| that names a move is the choice the player committed before it
+ * was blocked (same-turn Taunt, Imprison, flinch). Falling through to
+ * `move 1` instead played Uxie's U-turn on a taunted Stealth Rock turn and
+ * pulled the pivot switch a turn early — the first domino of a replay-wide
+ * desync. A reason-only |cant| (slp, par) keeps scanning: a Sleep Talk
+ * turn carries both that line and the |move| line the scan should find, and
+ * so does a |cant| with [of], the blocker's line (Dazzling, Queenly Majesty,
+ * Armor Tail) about the foe's move (round 67, T108). Undefined: scan on.
+ */
+function choiceFromCant(
+  events: string[], line: string, ident: string, battle: SimBattle, active: SimPokemon | null | undefined,
+): string | undefined {
+  const shownMove = line.includes('[of]') ? undefined : line.split('|')[4]?.trim();
+  if (!shownMove) return undefined;
+  const moveName = active && !knowsMove(active, shownMove) ? clickBehindBlockedMove(active, shownMove) : shownMove;
+  if (!moveName) return defaultChoiceForSlot(events, ident, battle, active);
+  const suffix = targetLocSuffixForChoice(battle, active, moveName, 0);
+  return `${moveChoiceForActive(active, moveName)}${suffix}${gimmickSuffixForSlot(events, ident, active)}`;
 }
 
 export function getMainChoice(events: string[], side: 'p1' | 'p2', battle: SimBattle): string {
@@ -344,26 +384,4 @@ export function getMainChoice(events: string[], side: 'p1' | 'p2', battle: SimBa
   return choices.length > 0 ? choices.join(', ') : 'move 1';
 }
 
-export function collectForcedSwitchSpecies(
-  preUpkeep: string[],
-  postUpkeep: string[],
-  side: 'p1' | 'p2',
-): string[] {
-  const species: string[] = [];
-  const matcher = new RegExp(`^\\|switch\\|(${side}[a-d]:)`);
-
-  for (const [index, line] of preUpkeep.entries()) {
-    const slot = line.match(matcher)?.[1];
-    if (slot && answersForcedRequest(preUpkeep, index, slot)) {
-      species.push(line.split('|')[3].split(',')[0].trim());
-    }
-  }
-
-  for (const line of postUpkeep) {
-    if (matcher.test(line)) {
-      species.push(line.split('|')[3].split(',')[0].trim());
-    }
-  }
-
-  return species;
-}
+export { collectForcedSwitchSpecies } from './forced-request.ts';
