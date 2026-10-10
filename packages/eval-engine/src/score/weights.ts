@@ -255,8 +255,13 @@ export type StaticRuleset = 'standard' | 'vgc' | 'champions';
  * their 90 % band: bodies 121 [87, 157], hazards 1.13 [0.6, 1.7], matchup
  * 210 [82, 363]. Held: coverage (the first pass flipped its sign), the
  * boost, Trick Room and choice-mismatch weights (variant E's holds);
- * screens and tailwind lack support in Champions OU. Written out in full,
- * so an edit of the singles table never moves a held Champions weight.
+ * screens and tailwind lack support in Champions OU. Round 67 (wave 2,
+ * decision 31): refit on the faithful reconstruction (T145, the Champions
+ * mod; T143, the Champions OU set file), 1,972 positions of 285 sets, the
+ * free weights land on bodies 122 [87, 159], hazards 1.07 [0.54, 1.65] and
+ * matchup 252 [102, 427] and lose out of fold in 20 of 20 seeds (log-loss
+ * +62 bp): the table stays. Written out in full, so an edit of the singles
+ * table never moves a held Champions weight.
  */
 export const CHAMPIONS_FEATURE_WEIGHTS: Record<keyof EvalFeatures, number> = {
   bodies: 121,
@@ -289,9 +294,12 @@ export const CHAMPIONS_FEATURE_WEIGHTS: Record<keyof EvalFeatures, number> = {
  * and choice-mismatch weights. On the holdout's 491 games the search reads
  * −16 bp [−35, +3] (early −45 [−86, −7], regulation M-C −50 [−92, −13]; own
  * K per phase −6), no harm. Round 65's fit on 283 sets, most of them unrated
- * challenges, won 7 of 20 seeds. The reconstruction still feeds Champions
- * stat points to the simulator as EVs (T145); refit after it. Adopted at the
- * round-66 gate ("2a"). Written out in full.
+ * challenges, won 7 of 20 seeds. Adopted at the round-66 gate ("2a").
+ * Round 67 (wave 2, decision 31): refit on the faithful reconstruction
+ * (T145, the Champions mod), 2,605 positions of 386 sets, bodies 197
+ * [173, 225], screens 84 [46, 123] and matchup 107 [58, 161] lose out of
+ * fold in 20 of 20 seeds (log-loss +28 bp): the table stays. Written out
+ * in full.
  */
 export const CHAMPIONS_DOUBLES_FEATURE_WEIGHTS: Record<keyof EvalFeatures, number> = {
   bodies: 196,
