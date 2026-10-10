@@ -22,7 +22,18 @@ const PROGRESS_EVERY = 10;
 // set (round 65: the rule set picks the static's weight table).
 const executors = new Map<string, SearchExecutor>();
 
-function executorFor(serializedBattle: string, ruleset: StaticRuleset = 'standard'): SearchExecutor {
+/**
+ * Round 67 (T139): every search message names its rule set. A missing one
+ * is a caller's bug, answered with an error instead of the standard weights
+ * (which would price a VGC or Champions position with the wrong table).
+ */
+function requireRuleset(ruleset: StaticRuleset | undefined): StaticRuleset {
+  if (!ruleset) throw new Error('evaluation worker: a search message without a rule set');
+  return ruleset;
+}
+
+function executorFor(serializedBattle: string, named: StaticRuleset | undefined): SearchExecutor {
+  const ruleset = requireRuleset(named);
   const key = `${ruleset}|${serializedBattle}`;
   let executor = executors.get(key);
   if (!executor) {
@@ -50,6 +61,7 @@ scope.onmessage = async (event: MessageEvent<EvalWorkerRequest | ReplayJobReques
   adoptSearchBudgetStamp(message);
   try {
     if (message.type === 'search') {
+      requireRuleset(message.settings.ruleset);
       const run = message.settings.mode === 'mcts' ? mctsSearch : searchPosition;
       const result = run(message.serializedBattle, message.settings, {
         onProgress: progress => post({ type: 'progress', id: message.id, progress }),
@@ -57,6 +69,7 @@ scope.onmessage = async (event: MessageEvent<EvalWorkerRequest | ReplayJobReques
       });
       settle({ type: 'result', id: message.id, result });
     } else if (message.type === 'mctstree') {
+      requireRuleset(message.settings.ruleset);
       const tree = mctsTreeSearch(message.serializedBattle, message.settings, message.seedOffset, {
         // Every iteration reports; one message per ten (plus the last) is
         // all a progress bar can show, and each message is a main-thread

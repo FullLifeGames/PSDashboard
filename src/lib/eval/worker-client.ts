@@ -28,6 +28,14 @@ interface WorkerHandle {
 type DistributiveOmit<T, K extends PropertyKey> = T extends unknown ? Omit<T, K> : never;
 
 /**
+ * Round 67 (T139): every evaluation names the rule set of its position, and
+ * the pool sends it on every message, standard included. A caller without
+ * one is refused before any message instead of priced with the standard
+ * table (the worker refuses such a message too).
+ */
+const MISSING_RULESET = 'evaluation without a rule set';
+
+/**
  * Sub-search settings that value a played pair with the same machinery the
  * sweep's own cells get: depth-1 matrix cells are static evals already
  * (null = use the plain cell path); deeper searches deepen their cells with
@@ -115,7 +123,7 @@ export class EvalWorkerClient {
   }
 
   /** Round 65: an executor serves one position under one rule set; every message names it, so the worker's executor reads the replay's weights. */
-  private createPooledExecutor(serializedBattle: string, ruleset?: StaticRuleset): SearchExecutor {
+  private createPooledExecutor(serializedBattle: string, ruleset: StaticRuleset): SearchExecutor {
     let roundRobin = 0;
     return {
       choices: async (tera, keepPlayed, sleepClause) => {
@@ -169,6 +177,8 @@ export class EvalWorkerClient {
     handlers?: EvalRunHandlers,
     opts?: { exclusive?: boolean },
   ): Promise<EvalResult> {
+    const ruleset = settings.ruleset;
+    if (!ruleset) return Promise.reject(new Error(MISSING_RULESET));
     // Exclusive (the default): a fresh evaluation supersedes whatever is
     // running — the single-result panel's semantics. The graph sweep
     // passes exclusive: false and pipelines several independent turns
@@ -190,9 +200,9 @@ export class EvalWorkerClient {
     // Round 61: the tree search's orchestration lives in the engine; the
     // pool is its executor, the bank runs the same function in-process.
     if (settings.mode === 'mcts') {
-      return searchTreesOrchestrated(this.createPooledTreeExecutor(serializedBattle, live, settings.ruleset), settings, callbacks);
+      return searchTreesOrchestrated(this.createPooledTreeExecutor(serializedBattle, live, ruleset), settings, callbacks);
     }
-    return searchOrchestrated(this.createPooledExecutor(serializedBattle, settings.ruleset), settings, callbacks);
+    return searchOrchestrated(this.createPooledExecutor(serializedBattle, ruleset), settings, callbacks);
   }
 
   /** Posts one MCTS tree to the least-loaded worker; progress streams while the evaluation is live. */
@@ -228,7 +238,7 @@ export class EvalWorkerClient {
    * trees (searchTreesOrchestrated) spread across the pool; the count never
    * follows the pool size, small pools just run trees in rounds.
    */
-  private createPooledTreeExecutor(serializedBattle: string, live: () => boolean, ruleset?: StaticRuleset): TreeExecutor {
+  private createPooledTreeExecutor(serializedBattle: string, live: () => boolean, ruleset: StaticRuleset): TreeExecutor {
     return {
       ...this.createPooledExecutor(serializedBattle, ruleset),
       tree: (settings, seedOffset, onProgress) =>
@@ -243,6 +253,8 @@ export class EvalWorkerClient {
    * estimator disagreement into the decision/chance decomposition.
    */
   async evalPair(serializedBattle: string, p1Choice: string, p2Choice: string, settings: EvalSettings): Promise<number> {
+    const ruleset = settings.ruleset;
+    if (!ruleset) throw new Error(MISSING_RULESET);
     const handle = this.pickWorker();
     const subSettings = playedOutcomeSettings(settings);
     if (subSettings) {
@@ -250,7 +262,7 @@ export class EvalWorkerClient {
         type: 'subsearch',
         serializedBattle,
         job: { i: 0, j: 0, p1Choice, p2Choice, settings: subSettings },
-        ruleset: settings.ruleset,
+        ruleset,
       });
       if (response.type !== 'result') throw new Error('unexpected worker response');
       return response.result.score;
@@ -259,7 +271,7 @@ export class EvalWorkerClient {
       type: 'cells',
       serializedBattle,
       jobs: [{ i: 0, j: 0, p1Choice, p2Choice, samples: 1 }],
-      ruleset: settings.ruleset,
+      ruleset,
     });
     if (response.type !== 'cellsResult' || response.values.length === 0) {
       throw new Error('unexpected worker response');
