@@ -71,6 +71,7 @@ type RankedChoice
 type ReadRecommendation
 type ReconstructParams
 type ResolvedSideCommand
+type RolledHit
 type SackInfo
 type SearchBudget
 type SearchCallbacks
@@ -93,6 +94,7 @@ type TreeExecutor
 type TurnAlignmentRecord
 type TurnAnalysis
 type TurnAttribution
+type TurnRolls
 type TurnSensitivity
 type TurnVerification
 type UnansweredProfile
@@ -139,6 +141,7 @@ value createLocalExecutor
 value createLocalTreeExecutor
 value decidedSeenKey
 value deserializeBattleExact
+value detectRolls
 value detectSacks
 value diceEventTurns
 value diffChoices
