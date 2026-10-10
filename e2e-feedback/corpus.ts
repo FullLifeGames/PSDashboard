@@ -90,11 +90,17 @@ export const FEEDBACK_REPLAYS = [
  * - 2663093831: Doubles OU, ladder, no speed control.
  * Round 63 (T45): 2630685175 (VGC, Trick Room) left this list for
  * FEEDBACK_REPLAYS when the user judged its turn 8; its dump still feeds the census.
+ * Round 67 (gate "4a"): the tier census counts Pokémon Champions too, one
+ * game of each Champions ladder, neither in the fit corpus, its holdout or the bank:
+ * - 2695803506: Champions VGC Reg M-C, rated 1710, 13 turns, no team sheet.
+ * - 2628340185: Champions OU (singles), rated 1688, 25 turns.
  */
 export const FEEDBACK_CENSUS_REPLAYS = [
   'gen9vgc2026regi-2629703929',
   'smogtours-gen9doublesou-912045',
   'gen9doublesou-2663093831',
+  'gen9championsvgc2026regmc-2695803506',
+  'gen9championsou-2628340185',
 ] as const;
 
 export const FEEDBACK_CORPUS: FeedbackItem[] = [

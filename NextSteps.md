@@ -21,6 +21,8 @@ Das Programm ist mit Runde 62 abgeschlossen: Tempo-Schicht (Runde 59), Regelfehl
 
 Gate der Runde 62 (05.10.2026): Die nächsten Schritte laufen mit mehreren Sub-Agents parallel. Die Liste ist deshalb in 3 Wellen geteilt; eine Welle ist eine Runde, jede Spur einer Welle ist die Arbeit eines Sub-Agents. Die Spuren einer Welle teilen keine Datei, Abhängigkeiten liegen zwischen den Wellen. Jede Spur nennt ihre Dateien und ihr Tor. Welle 1 war Runde 63 (06.10.); ihr Gate („7a“) stellte die neuen TODOs aus den Spuren und Reviews als Welle 1.5 vor Welle 2. Welle 1.5 war Runde 64 (06. bis 08.10.); ihr Gate stellt T127 als eigene Runde 65 vor Welle 2 („1b“: STAB bleibt, der Re-Fit misst sich an der Bank) und sortiert die neuen TODOs T128 bis T136 in die Spuren von Welle 2 („5a“, T129 und T130 jeweils zuerst; T129 und T133 bekommen die neue Spur G). Runde 65 (09.10.) lief T127 als eigene Runde; ihr Gate („1a / 2b / 3a / 4a“) übernimmt eigene Gewichte für Champions OU und Doubles OU, gibt VGC ein eigenes Regelwerk mit den Handgewichten, liest Doubles-Urteile auf Bank plus Prüfbank (D26) und stellt T137 als Runde 66 vor Welle 2; T138 geht in Spur F, T139 und T140 in Spur B. Runde 66 (09.10.) lief T137 als eigene Runde; ihr Gate („1a 2a 3a 4b 5a“) übernimmt T141 und T142 (jedes VGC-Format baut aus den Daten seines Spiels und Jahres) und die Champions-VGC-Gewichte, Scarlet/Violet-VGC behält die Handtabelle; T145 (Champions-Stat-Points im Nachbau) und T143 (Champions-OU-Sets) gehen in Spur F vor T52 und T138, T144 (Tailwind und Coverage in SV VGC) in Welle 3, Spur B.
 
+**Welle 2 läuft als Runde 67 (seit 10.10.2026).** Spec `docs/superpowers/specs/2026-10-10-round-67-wave-2-design.md`, Gate 10.10. 09:53 („1a 2 3a 4a 5b 6a 7a“). Die Spec sortiert um, damit die Spuren keine Datei teilen: T145 (jetzt über den Champions-Mod aus `@pkmn/mods`) kommt mit Team-Bau und Spread-Löser in Spur F; T132, T69 und T136 Punkt 3 gehen in Welle 3, Spur A; T64 in Welle 3, Spur C; T129 von G nach B; T109 (der Knopf „Think deeper“ entfällt), T111 (Punkte 1, 7, 8, 11), T140 und der App-Teil von T139 von B nach E; T136 Punkt 1 von E nach A; die Taunt-Fälle aus T108 nach G. Die Abschnitte unten stehen bis zur Buchung an ihrem alten Platz; maßgeblich ist die Spec.
+
 | Welle | Spur | TODOs | Tor |
 | --- | --- | --- | --- |
 | 2 | A · Rechner-Eingaben | T83, T72, T76, T100, T84 | Zählung je TODO auf 0, Dumps (Quoten, Zeilen), jede bewegte Bank-Zeile gelesen. |
@@ -49,7 +51,7 @@ Gate der Runde 62 (05.10.2026): Die nächsten Schritte laufen mit mehreren Sub-A
 - Ein User-Gate je Welle mit einer Tabelle über alle Spuren. Commits englisch und ohne Attribution, kein Push ohne Okay, Singles und Doubles gleichrangig, keine Spiellogik hart kodieren.
 - Schritt 1 von T52 (eigenes K je Phase in scripts/paired-calibration.mjs) und die Sonden-Config mit PROBE_ROOT stehen seit Runde 63 (888cd12; PROBE_ROOT in einem Worktree an einer Sonde mit bekanntem Ergebnis geprüft). Die Kästchen unter „Runde 62 (neu gefasst)“ im Backlog-Plan sind Hintergrund; die Spec der Welle schreibt die Schritte jeder Spur neu.
 
-## Welle 2 · Spur A · Rechner-Eingaben
+## Welle 2 · Spur A · Rechner-Eingaben (Runde 67)
 
 Fünf kleine Fehler an derselben Stelle: Der Rechner bekommt Namen, Formen, Boosts, Gefallene und Tera-Körper nicht so, wie der Simulator sie kennt. Sichtbar an Quoten und Vorschau. Die Aufrufstelle in spreads/fit.ts (T72) folgt in Spur 3A.
 
@@ -101,7 +103,7 @@ Fünf kleine Fehler an derselben Stelle: Der Rechner bekommt Namen, Formen, Boos
 
   *Erfolg:* die Zählung (groups/endspiel/census.vt.ts) meldet 0 geänderte Zeilen; Bank und Dumps bewegen sich nur in Stellungen mit Tera-Option, jede bewegte Zeile gelesen. *Plan T84:* Backlog-Plan, Abschnitt T84 (Runde 62 neu gefasst).
 
-## Welle 2 · Spur B · Wahlen, Wurzelwert, Tiefer denken
+## Welle 2 · Spur B · Wahlen, Wurzelwert, Tiefer denken (Runde 67)
 
 Doubles-Züge ohne Urteil (Pollen Puff auf den Partner), eine Doubles-Matrix, die nur die gekürzte Antwortliste der Gegenseite prüft (T128), ein Wurzel-Score weit vom Spielwert in kleinen Endspielen (doubles-spread-2v1 liest 0,355 statt 1,0), dann die tiefere Stufe auf Baum-Zügen, die Restposten der Runde 61 und die Doubles-Nachprüfung (T134). Nach Spur 1C, weil T114, T109 und T111 dieselben Dateien des Baums ändern. T111 Punkt 1 (den Budget-Schalter schon in Node parsen) liegt im Feedback-Harness: die Spur liefert ihn als Patch, der Integrator übernimmt ihn.
 
@@ -173,7 +175,7 @@ Doubles-Züge ohne Urteil (Pollen Puff auf den Partner), eine Doubles-Matrix, di
 
   *Erfolg:* roter Test zuerst (die Unter-Einstellungen tragen die Sleep Clause); Feedback 3× mit Tier-Zählung, jeder bewegte Zug gelesen; Bank gepaart. *Plan T140:* Backlog-Plan.
 
-## Welle 2 · Spur C · Gegner-Inferenz, Sets und Spreads
+## Welle 2 · Spur C · Gegner-Inferenz, Sets und Spreads (Runde 67)
 
 Zuerst die Items, die das Log widerlegt (T130, trägt die größte Warnung des Wellen-Laufs der Runde 64), dann die Inferenz, die gegessene Items verliert (649664 Zug 8 empfiehlt Mega) und das Log mit eigenen Regex liest, wo @pkmn/client den Zustand schon führt, dann veröffentlichte Choice-Sets (T131) und die Reste des Tempo-Lösers (T132). Eine Spur, weil alle vier dieselben Dateien des Set-Baus lesen.
 
@@ -213,7 +215,7 @@ Zuerst die Items, die das Log widerlegt (T130, trägt die größte Warnung des W
 
   *Erfolg:* gebrochene Reihenfolgen bleiben 0; die 25 Sets behalten ihr Prior-Tempo oder tragen eine Messung; Sinistcha spielt IV 31 ohne Tempo-EVs; Set-Diff; Bank gepaart, Feedback 3×. *Plan T132:* Backlog-Plan.
 
-## Welle 2 · Spur D · Bericht, zweiter Teil
+## Welle 2 · Spur D · Bericht, zweiter Teil (Runde 67)
 
 Glück ohne Würfel, Lob auf einem verlorenen Zug, Reue gegen den echten Klick. Nach dem Hybrid aus Spur 1A (Glückskonten in Singles), nach Spur 1C (T64 liest 912045 Zug 8, den T16 ändert) und nach Spur 1E (dieselben Dateien).
 
@@ -253,7 +255,7 @@ Glück ohne Würfel, Lob auf einem verlorenen Zug, Reue gegen den echten Klick. 
 
   *Erfolg:* je Punkt Szene und roter Test; Engine-Zahlen der Dumps byte-gleich; Prosa-Pins stehen. *Plan T135:* Backlog-Plan.
 
-## Welle 2 · Spur E · Panel und Knöpfe
+## Welle 2 · Spur E · Panel und Knöpfe (Runde 67)
 
 Zug-Knöpfe mit dem Typ beim Einsatz und ein Panel, das die Herkunft eines Spreads nennt. Nach Welle 1, weil Spur 1B den Zugkern und Spur 1D den Team-Bau ändert.
 
@@ -285,7 +287,7 @@ Zug-Knöpfe mit dem Typ beim Einsatz und ein Panel, das die Herkunft eines Sprea
 
   *Erfolg:* je Punkt ein roter UI-Test; Bank und Feedback unberührt. *Plan T136:* Backlog-Plan.
 
-## Welle 2 · Spur F · Doubles-K am Blatt und Champions-Treue
+## Welle 2 · Spur F · Doubles-K am Blatt und Champions-Treue (Runde 67)
 
 Zuerst die Champions-Treue (Gate der Runde 66, „4b“): Der Nachbau rechnet Champions-Werte wie Showdown (T145), und Champions OU liest seine eigene Set-Datei (T143). Danach das Doubles-K am Blatt, gelesen mit dem Bank-Instrument, das Skala von Gewinn trennt (Schritt 1 von T52 steht seit Runde 63), und zuletzt die Prozent-Skala für Champions (T138) auf den treuen Nachbauten.
 
@@ -325,7 +327,7 @@ Zuerst die Champions-Treue (Gate der Runde 66, „4b“): Der Nachbau rechnet Ch
 
   *Erfolg:* Champions-OU-Prüfbank mit Suche ohne Warnung in beiden Tabellen und besser als heute (−23 bp mit festem K); Tier-Urteile bewegen sich nur mit Lesung; Champions VGC mit derselben Methode geprüft. *Plan T138:* Backlog-Plan.
 
-## Welle 2 · Spur G · Reihenfolge und Nachbau
+## Welle 2 · Spur G · Reihenfolge und Nachbau (Runde 67)
 
 Ein Urteil darf nicht davon abhängen, in welcher Reihenfolge der Nachbau die Bank führt (T129, zuerst), und ein korrigiert eingewechseltes Pokémon soll die Effekte spielen, die das Protokoll zeigt (T133). Neue Spur seit dem Gate der Runde 64 („5a“).
 

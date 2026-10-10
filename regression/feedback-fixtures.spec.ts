@@ -112,8 +112,12 @@ test('573756: Magnezone holds the Choice Scarf the move order proves', async () 
  * turns, the game type, a readable bring of four on both sides of a VGC
  * game (without it the app evaluates six bodies a side), and a pin (body or
  * 404 marker) behind every Smogon URL the replay's format asks for.
+ * Round 67: Champions OU joins as the one singles census game; every other
+ * census game is doubles.
  */
-test('census fixtures are doubles games with every Smogon input pinned', async () => {
+const SINGLES_CENSUS: readonly string[] = ['gen9championsou-2628340185'];
+
+test('census fixtures are doubles games (Champions OU singles) with every Smogon input pinned', async () => {
   expect(FEEDBACK_CENSUS_REPLAYS.filter(id => (FEEDBACK_REPLAYS as readonly string[]).includes(id))).toEqual([]);
   expect(FEEDBACK_CORPUS.filter(item => (FEEDBACK_CENSUS_REPLAYS as readonly string[]).includes(item.replay))).toEqual([]);
   for (const id of FEEDBACK_CENSUS_REPLAYS) {
@@ -122,7 +126,7 @@ test('census fixtures are doubles games with every Smogon input pinned', async (
     };
     expect(replay.id).toBe(id);
     expect(replay.players.length).toBeGreaterThanOrEqual(2);
-    expect(getReplayGameType(replay.log)).toBe('doubles');
+    expect(getReplayGameType(replay.log)).toBe(SINGLES_CENSUS.includes(id) ? 'singles' : 'doubles');
     const { snapshots, observations, speedOrders } = parseReplayLogWithObservations(replay.log);
     expect(finalPlayedTurn(snapshots)).toBeGreaterThanOrEqual(10);
     if (replay.formatid.includes('vgc')) {
