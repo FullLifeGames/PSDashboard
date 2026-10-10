@@ -149,16 +149,20 @@ function closeDrops(state: InferrerState, watch: TriggerWatch) {
   }
 }
 
+const fieldOf = (watch: TriggerWatch) => `${watch.weather}|${watch.terrain}|${watch.gravity}|${watch.magicRoom}`;
+
 /** Gravity, Magic Room, the terrain and the weather the triggers read. */
 function onField(watch: TriggerWatch, parts: string[]) {
   const id = toId((parts[2] ?? '').replace(/^move: /, ''));
   const on = parts[1] !== '-fieldend';
+  const before = fieldOf(watch);
   if (parts[1] === '-weather') watch.weather = id === 'none' ? '' : id;
   else if (id === 'gravity') watch.gravity = on;
   else if (id === 'magicroom') watch.magicRoom = on;
   else if (TERRAINS.has(id)) watch.terrain = on ? id : (watch.terrain === id ? '' : watch.terrain);
   // A field change inside an entry's window: the Booster Energy reading is no longer clean.
-  for (const entry of watch.entries.values()) entry.booster = false;
+  // A lasting weather's upkeep line changes nothing (752839 t13).
+  if (fieldOf(watch) !== before) for (const entry of watch.entries.values()) entry.booster = false;
 }
 
 /** The item lines that answer a waiting entry or drop. */

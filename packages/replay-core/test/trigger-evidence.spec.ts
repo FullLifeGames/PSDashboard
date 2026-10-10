@@ -118,6 +118,39 @@ describe('Booster Energy is spent on entry outside its weather or terrain (T130)
     expect(play([sun], [wall(), tusk('Booster Energy')], turns)).not.toMatch(/\|-enditem\|p2a: Great Tusk\|Booster Energy/);
     expect(ruledOut(play([sun], [wall(), tusk('Leftovers')], turns), 'Great Tusk')).not.toContain('boosterenergy');
   });
+
+  // 752839 t13: Iron Valiant comes in after an Eject Button as the turn's last action; the sun's upkeep line follows before the turn ends.
+  const ninetales = () => set('Ninetales', 'Heat Rock', 'Drought', ['Nasty Plot', 'Protect']);
+  const pivot = () => set('Blissey', 'Leftovers', 'Natural Cure', ['U-turn', 'Protect']);
+  const lastEntry = {
+    singles: { p1: () => [ninetales()], p2: (item: string) => [pivot(), hands(item)], turns: [['move nastyplot', 'move uturn'], ['', 'switch 2']] },
+    doubles: {
+      p1: () => [ninetales(), set('Chansey', 'Eviolite', 'Natural Cure', ['Protect'])],
+      p2: (item: string) => [pivot(), set('Chansey', 'Eviolite', 'Natural Cure', ['Protect']), hands(item)],
+      turns: [['move nastyplot, move protect', 'move uturn 1, move protect'], ['', 'switch 3']],
+    },
+  } as const;
+
+  test.each(['singles', 'doubles'] as const)('%s: a lasting weather\'s upkeep line changes nothing, so a last entry without the line rules Booster Energy out', format => {
+    const { p1, p2, turns } = lastEntry[format];
+    const options = { doubles: format === 'doubles' };
+    const withBooster = play(p1(), p2('Booster Energy'), turns as unknown as [string, string][], options);
+    expect(withBooster).toMatch(/\|-enditem\|p2a: Iron Hands\|Booster Energy/);
+    const log = play(p1(), p2('Leftovers'), turns as unknown as [string, string][], options);
+    // The shape: no move between the entry and the turn's end, only the sun's upkeep line.
+    expect(log).toMatch(/\|switch\|p2a: Iron Hands\|(?:(?!\|move\|)[\s\S])*\|-weather\|SunnyDay\|\[upkeep\](?:(?!\|move\|)[\s\S])*\|turn\|2/);
+    expect(ruledOut(log, 'Iron Hands')).toContain('boosterenergy');
+  });
+
+  test('doubles: a teammate\'s Drought that comes up with the entry voids the reading: nothing is ruled out', () => {
+    const p1 = [wall(), set('Chansey', 'Eviolite', 'Natural Cure', ['Soft-Boiled'])];
+    const p2 = (item: string) => [ninetales(), tusk(item), wall()];
+    const turns: [string, string][] = [['move softboiled, move softboiled', 'move protect, move protect']];
+    const withBooster = play(p1, p2('Booster Energy'), turns, { doubles: true });
+    expect(withBooster).toMatch(/\|switch\|p2b: Great Tusk[\s\S]*\|-weather\|SunnyDay\|\[from\] ability: Drought/);
+    expect(withBooster).not.toMatch(/\|-enditem\|p2b: Great Tusk\|Booster Energy/);
+    expect(ruledOut(play(p1, p2('Leftovers'), turns, { doubles: true }), 'Great Tusk')).not.toContain('boosterenergy');
+  });
 });
 
 describe('Eject Pack switches its holder out after a stat drop (T130)', () => {
