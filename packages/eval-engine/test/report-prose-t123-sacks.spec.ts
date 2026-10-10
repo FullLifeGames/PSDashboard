@@ -42,7 +42,11 @@ describe('point 10: a sack names the other bodies the side lost on the turn', ()
       [mon('Gholdengo', 'Gholdengo', 100, true)],
       [mon('Ogerpon', 'Ogerpon-Cornerstone', 9, true), mon('Rillaboom', 'Rillaboom', 78, true)],
     );
-    expect(detectSacks(events, before).p2).toEqual({ name: 'Ogerpon', species: 'Ogerpon-Cornerstone', hpFraction: 0.09, alsoFell: ['Rillaboom'] });
+    // Round 67 (T135 point 1): the other faint's shape rides along for the verdict.
+    expect(detectSacks(events, before).p2).toEqual({
+      name: 'Ogerpon', species: 'Ogerpon-Cornerstone', hpFraction: 0.09, alsoFell: ['Rillaboom'],
+      others: [{ name: 'Rillaboom', species: 'Rillaboom', hpFraction: 0.78, stayed: true }],
+    });
   });
 
   test('singles (653785 t26 shape): the replacement the hazards took after the fed body is named', () => {
@@ -58,7 +62,10 @@ describe('point 10: a sack names the other bodies the side lost on the turn', ()
       [mon('Tornadus', 'Tornadus-Therian', 10, true), mon('Volcanion', 'Volcanion', 30, false)],
       [mon('Dragonite', 'Dragonite', 100, true)],
     );
-    expect(detectSacks(events, before).p1).toEqual({ name: 'Tornadus', species: 'Tornadus-Therian', hpFraction: 0.1, alsoFell: ['Volcanion'] });
+    expect(detectSacks(events, before).p1).toEqual({
+      name: 'Tornadus', species: 'Tornadus-Therian', hpFraction: 0.1, alsoFell: ['Volcanion'],
+      others: [{ name: 'Volcanion', species: 'Volcanion', hpFraction: 109 / 363, healthy: true }],
+    });
   });
 
   test('the sack sentence names them; a one-body sack (573756 t68) says nothing more', () => {

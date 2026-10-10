@@ -174,7 +174,10 @@ interface SackGate {
  * windowed payoff over the safe guarantee clears the read margin (573756
  * t68). Fails closed. Before any shape: a body whose own action the dice
  * failed while its move carried a knock-out was not fed — a hit would have
- * kept it alive (573756 t73, round 40) — so no shape applies.
+ * kept it alive (573756 t73, round 40) — so no shape applies. Round 67
+ * (T135, rule A): every own faint of the turn passes its own gate, so a
+ * plain loss (no shape) or a body behind a stricter gate that fails blocks
+ * the leniency (a low-HP feed is cheap, a partner lost next to it is not).
  */
 function sackGate(
   params: AnalyzeTurnParams,
@@ -183,23 +186,34 @@ function sackGate(
   played: RankedChoice | null,
   safe: RankedChoice | null,
 ): SackGate {
-  let sackApplies = false;
-  let feedPayoff: number | null = null;
-  if (sack && !deniedByDice(sack, played)) {
-    if (sack.stayed) {
-      const payoff = stayedFeedPayoff(params, key, played, safe);
-      sackApplies = payoff !== null && payoff >= RISK_PAYOFF_MARGIN;
-      if (sackApplies) feedPayoff = payoff;
-    } else if (sack.healthy) {
-      const ownBefore = key === 'p1' ? params.scoreBefore : -params.scoreBefore;
-      const ownAfter = params.scoreAfter === null ? null : (key === 'p1' ? params.scoreAfter : -params.scoreAfter);
-      sackApplies = ownBefore >= HEALTHY_SACK_FLOOR &&
-        ownAfter !== null && ownAfter >= HEALTHY_SACK_FLOOR;
-    } else {
-      sackApplies = true;
-    }
+  if (!sack) return { sackApplies: false, feedPayoff: null };
+  const gates = turnFaints(sack).map(shape => (shape && !deniedByDice(shape, played) ? shapeGate(params, key, shape, played, safe) : null));
+  if (gates.some(gate => gate === null || !gate.sackApplies)) return { sackApplies: false, feedPayoff: null };
+  return { sackApplies: true, feedPayoff: gates.find(gate => gate!.feedPayoff !== null)?.feedPayoff ?? null };
+}
+
+/** Round 67 (T135, rule A): every own faint of the turn, the side's sack first; null = a plain loss with no sack shape. */
+const turnFaints = (sack: SackInfo): (SackInfo | null)[] => [sack, ...(sack.others ?? [])];
+
+/** One fallen body's shape gate (sackGate above), with a stayed feed's windowed payoff. */
+function shapeGate(
+  params: AnalyzeTurnParams,
+  key: Side,
+  shape: SackInfo,
+  played: RankedChoice | null,
+  safe: RankedChoice | null,
+): SackGate {
+  if (shape.stayed) {
+    const payoff = stayedFeedPayoff(params, key, played, safe);
+    const sackApplies = payoff !== null && payoff >= RISK_PAYOFF_MARGIN;
+    return { sackApplies, feedPayoff: sackApplies ? payoff : null };
   }
-  return { sackApplies, feedPayoff };
+  if (shape.healthy) {
+    const ownBefore = key === 'p1' ? params.scoreBefore : -params.scoreBefore;
+    const ownAfter = params.scoreAfter === null ? null : (key === 'p1' ? params.scoreAfter : -params.scoreAfter);
+    return { sackApplies: ownBefore >= HEALTHY_SACK_FLOOR && ownAfter !== null && ownAfter >= HEALTHY_SACK_FLOOR, feedPayoff: null };
+  }
+  return { sackApplies: true, feedPayoff: null };
 }
 
 /** The sack verdict on the tier: demoted one band, cleared for a verified feed, never excusing a blunder. */
@@ -265,18 +279,30 @@ function feedsOpposingSweep(params: AnalyzeTurnParams, key: Side, sack: SackInfo
  * the regret with the read margin on top. Low-HP and healthy faints stay
  * leniencies for tiered turns; a phantom stay-in has no choice to praise,
  * and an already-lost position earns no praise (the gamble credit's bound).
+ * Round 67 (T135, rule A): every own faint of the turn must earn it.
  */
 function praisedSack(
   params: AnalyzeTurnParams,
   key: Side,
   g: { sack: SackInfo | undefined; played: RankedChoice | null; safe: RankedChoice | null; regret: number | null; neverActed: boolean },
 ): boolean {
-  const { sack, played, safe, regret } = g;
-  if (!sack || regret === null || g.neverActed || deniedByDice(sack, played)) return false;
+  if (!g.sack || g.regret === null || g.neverActed) return false;
   if ((key === 'p1' ? params.scoreBefore : -params.scoreBefore) <= -DECIDED_SCORE) return false;
-  if (feedsOpposingSweep(params, key, sack)) return false;
-  const payoff = sack.stayed ? stayedFeedPayoff(params, key, played, safe)
-    : sack.hazard ? hazardSackPayoff(params, key, safe) : null;
+  return turnFaints(g.sack).every(shape => praisedFaint(params, key, shape, g.played, g.safe, g.regret!));
+}
+
+/** One fallen body's praise form: a stayed feed through the floor gate or a hazard sack, repaying the regret with the margin. */
+function praisedFaint(
+  params: AnalyzeTurnParams,
+  key: Side,
+  shape: SackInfo | null,
+  played: RankedChoice | null,
+  safe: RankedChoice | null,
+  regret: number,
+): boolean {
+  if (!shape || deniedByDice(shape, played) || feedsOpposingSweep(params, key, shape)) return false;
+  const payoff = shape.stayed ? stayedFeedPayoff(params, key, played, safe)
+    : shape.hazard ? hazardSackPayoff(params, key, safe) : null;
   return payoff !== null && payoff >= regret + RISK_PAYOFF_MARGIN;
 }
 

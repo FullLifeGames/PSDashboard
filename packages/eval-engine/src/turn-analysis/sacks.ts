@@ -61,11 +61,17 @@ export interface SackInfo {
   hazard?: true;
   /**
    * Round 64 (T123): the side's other bodies that fainted on the same turn,
-   * as the protocol names them. The verdict reads the first sack-shaped
-   * faint alone; the sentence names the rest, so a turn that cost two bodies
-   * does not read as one (912045 t1: Ogerpon and Rillaboom to Make It Rain).
+   * as the protocol names them. The sentence names the rest, so a turn that
+   * cost two bodies does not read as one (912045 t1: Ogerpon and Rillaboom
+   * to Make It Rain).
    */
   alsoFell?: string[];
+  /**
+   * Round 67 (T135, rule A): the sack shape of each body in `alsoFell`, in
+   * protocol order (null = a plain loss with no sack shape). The verdict
+   * reads them all: the framing holds only when every fallen body earns it.
+   */
+  others?: (SackInfo | null)[];
 }
 
 /** Below this pre-turn HP fraction a faint reads as a sacrifice, not a loss. */
@@ -188,15 +194,15 @@ function noteSackLine(scan: SackScan, line: string): boolean {
  *   payoff clears the read margin (573756 t68).
  * A switch-phase entry the hazards took before it acted adds `hazard` to
  * its low-HP or healthy shape (round 63). The side's other faints of the
- * turn ride along as `alsoFell` (round 64).
+ * turn ride along as `alsoFell` (round 64) with their shapes as `others`
+ * (round 67, rule A: the verdict judges every fallen body).
  */
 export function detectSacks(
   events: string[],
   snapshotBefore: TurnSnapshot | null,
 ): { p1?: SackInfo; p2?: SackInfo } {
   if (!snapshotBefore) return {};
-  const sacks: { p1?: SackInfo; p2?: SackInfo } = {};
-  const fallen: Record<SideId, string[]> = { p1: [], p2: [] };
+  const fallen: Record<SideId, { name: string; sack: SackInfo | null }[]> = { p1: [], p2: [] };
   const scan: SackScan = {
     entered: new Map(), dragged: new Set(), rolled: new Map(), moved: false, switchPhase: new Set(), hazardFell: new Set(),
   };
@@ -205,29 +211,35 @@ export function detectSacks(
     const match = line.match(/^\|faint\|(p[12])([a-d]):\s*(.+)$/);
     if (!match) continue;
     const side = match[1] as SideId;
-    fallen[side].push(match[3].trim());
-    if (sacks[side]) continue;
-    const sack = sackForFaint(side, match[2], match[3].trim(), snapshotBefore, scan.entered, scan.dragged);
-    if (!sack) continue;
-    const ref = `${side}${match[2]}`;
-    const roll = scan.rolled.get(ref);
-    sacks[side] = {
-      ...sack,
-      ...(roll ? { rolled: roll } : {}),
-      ...(scan.hazardFell.has(ref) ? { hazard: true as const } : {}),
-    };
+    fallen[side].push({ name: match[3].trim(), sack: faintShape(side, match[2], match[3].trim(), snapshotBefore, scan) });
   }
-  return withAlsoFell(sacks, fallen);
+  return { ...sideSack('p1', fallen.p1), ...sideSack('p2', fallen.p2) };
 }
 
-/** Round 64 (T123): every other own faint of the turn, in protocol order, onto the side's sack. */
-function withAlsoFell(sacks: { p1?: SackInfo; p2?: SackInfo }, fallen: Record<SideId, string[]>): { p1?: SackInfo; p2?: SackInfo } {
-  for (const side of ['p1', 'p2'] as const) {
-    const sack = sacks[side];
-    if (!sack) continue;
-    const own = fallen[side].indexOf(sack.name);
-    const others = fallen[side].filter((_, index) => index !== own);
-    if (others.length > 0) sacks[side] = { ...sack, alsoFell: others };
-  }
-  return sacks;
+/** One faint's sack shape with its roll and hazard marks, or null for a plain loss. */
+function faintShape(side: SideId, slot: string, name: string, snapshotBefore: TurnSnapshot, scan: SackScan): SackInfo | null {
+  const sack = sackForFaint(side, slot, name, snapshotBefore, scan.entered, scan.dragged);
+  if (!sack) return null;
+  const ref = `${side}${slot}`;
+  const roll = scan.rolled.get(ref);
+  return {
+    ...sack,
+    ...(roll ? { rolled: roll } : {}),
+    ...(scan.hazardFell.has(ref) ? { hazard: true as const } : {}),
+  };
+}
+
+/**
+ * The side's sack: its first sack-shaped faint, with every other own faint
+ * of the turn in protocol order as `alsoFell` (round 64, names) and
+ * `others` (round 67, shapes; null = a plain loss).
+ */
+function sideSack(side: SideId, fallen: { name: string; sack: SackInfo | null }[]): { p1?: SackInfo; p2?: SackInfo } {
+  const first = fallen.findIndex(entry => entry.sack !== null);
+  if (first < 0) return {};
+  const rest = fallen.filter((_, index) => index !== first);
+  const sack = rest.length > 0
+    ? { ...fallen[first].sack!, alsoFell: rest.map(entry => entry.name), others: rest.map(entry => entry.sack) }
+    : fallen[first].sack!;
+  return { [side]: sack };
 }
