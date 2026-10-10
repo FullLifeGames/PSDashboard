@@ -47,6 +47,12 @@ export const rulesetOfId = (id: string): Ruleset => {
 
 export const familyOf = (sample: Pick<FamilySample, 'ruleset' | 'gameType'>): FamilyName => `${sample.ruleset}-${sample.gameType}`;
 
+/** The rule set of a family name ('champions-doubles' is Champions). */
+const rulesetOfFamily = (name: string): Ruleset => name.split('-')[0] as Ruleset;
+
+/** The leaf's phase K per rule set (round 67, T138: Pokémon Champions prices its own scale). */
+export type KOf = (ruleset: Ruleset) => GameTypeK;
+
 const playerId = (name: string) => name.toLowerCase().replace(/[^a-z0-9]/g, '');
 
 interface BankRow {
@@ -141,12 +147,13 @@ function refitWithSecondPass(
  * The refit of every family on its own samples, with the shared options
  * (the pre-registered holds among them). First the identity: the start
  * tables must give back every captured score (`leaf` turns the static's tanh
- * into the leaf value for wp samples), or the capture and the tables
- * disagree and the report stops.
+ * into the leaf value for wp samples, under the K of the sample's rule set),
+ * or the capture and the tables disagree and the report stops. Each family
+ * refits at the K of its rule set (`kOf`, round 67: Champions has its own).
  */
 export function familyReports(
-  samples: FamilySample[], names: string[], families: FamilyTables[], k: GameTypeK, options: AtKReportOptions,
-  leaf: (tanh: number, doubles: boolean, faintedFraction: number) => number,
+  samples: FamilySample[], names: string[], families: FamilyTables[], kOf: KOf, options: AtKReportOptions,
+  leaf: (tanh: number, doubles: boolean, faintedFraction: number, ruleset: Ruleset) => number,
 ): { identity: { samples: number; off: number }; families: Record<string, FamilyReport> } {
   let off = 0;
   let checked = 0;
@@ -161,13 +168,13 @@ export function familyReports(
       if (sample.lastPair) return;
       checked++;
       const tanh = atKScore(atK[i], start, layout);
-      const expected = sample.wp ? leaf(tanh, atK[i].doubles, sample.faintedFraction) : tanh;
+      const expected = sample.wp ? leaf(tanh, atK[i].doubles, sample.faintedFraction, sample.ruleset) : tanh;
       if (Math.abs(expected - sample.score) > 1e-9) off++;
     });
     const games = new Set(atK.map(sample => sample.game)).size;
     reports[family.name] = games < options.minGames
       ? { skipped: games === 0 ? 'no games' : `${games} sets, below ${options.minGames}`, games }
-      : refitWithSecondPass(atK, names, family, k, options);
+      : refitWithSecondPass(atK, names, family, kOf(rulesetOfFamily(family.name)), options);
   }
   if (off > 0) throw new Error(`identity: ${off} of ${checked} captured scores differ from the start tables`);
   return { identity: { samples: checked, off }, families: reports };
@@ -189,7 +196,7 @@ export interface PhaseKReport { n: number; sets: number; today: PhaseK; fitted: 
  * fitted one. Reports only.
  */
 export function phaseKReports(
-  samples: FamilySample[], families: FamilyTables[], k: GameTypeK, draws: number,
+  samples: FamilySample[], families: FamilyTables[], kOf: KOf, draws: number,
 ): Record<string, PhaseKReport | { skipped: string }> {
   const reports: Record<string, PhaseKReport | { skipped: string }> = {};
   for (const family of families) {
@@ -204,6 +211,7 @@ export function phaseKReports(
       score: atKScore({ g: sample.g, won: sample.p1Won, doubles, faintedFraction: sample.faintedFraction, game: sample.set }, start, layout),
       faintedFraction: sample.faintedFraction, won: sample.p1Won, game: sample.set,
     }));
+    const k = kOf(rulesetOfFamily(family.name));
     const today = doubles ? k.doubles : k.singles;
     const fitted = fitPhaseK(outcome);
     const bucket = (name: Bucket): PhaseBucketScores => {

@@ -96,7 +96,7 @@ describe('fit families', () => {
       { name: 'standard-doubles', singles: [2, 2], doubles: [2, 2] },
       { name: 'champions-singles', singles: [2, 2], doubles: [2, 2] },
     ];
-    const reports = familyReports(samples, names, families, K, { seeds: 2, folds: 5, draws: 4, minGames: 20, hold: { shared: ['bodies'] } }, leaf);
+    const reports = familyReports(samples, names, families, () => K, { seeds: 2, folds: 5, draws: 4, minGames: 20, hold: { shared: ['bodies'] } }, leaf);
     expect(reports.identity.off).toBe(0);
     expect(reports.families['champions-singles']).toMatchObject({ skipped: 'no games' });
     const singles = reports.families['standard-singles'];
@@ -107,7 +107,7 @@ describe('fit families', () => {
     expect(singles.proposed.singles.matchup).toBeLessThan(doubles.proposed.doubles.matchup);
     expect(singles.games).toBe(220);
     // A score that the start weights do not give back stops the report.
-    expect(() => familyReports([{ ...samples[0], score: 0.9 }, ...samples.slice(1)], names, families, K,
+    expect(() => familyReports([{ ...samples[0], score: 0.9 }, ...samples.slice(1)], names, families, () => K,
       { seeds: 2, folds: 5, draws: 4, minGames: 20 }, leaf)).toThrow(/identity/);
   });
 
@@ -117,12 +117,31 @@ describe('fit families', () => {
     const samples = synthetic('gen9ou', 'singles', [3, -1.5], 260, 7);
     const names = ['bodies', 'matchup'];
     const families = [{ name: 'standard-singles', singles: [2, 2], doubles: [2, 2] }];
-    const reports = familyReports(samples, names, families, K, { seeds: 2, folds: 5, draws: 6, minGames: 20 }, leaf);
+    const reports = familyReports(samples, names, families, () => K, { seeds: 2, folds: 5, draws: 6, minGames: 20 }, leaf);
     const entry = reports.families['standard-singles'];
     if (!('first' in entry)) throw new Error('no second pass');
     expect(entry.first.verdict.flagged).toContain('shared:matchup');
     expect(entry.weights.find(weight => weight.name === 'matchup')).toMatchObject({ free: false, fit: 2 });
     expect(entry.secondPassHeld).toEqual(['shared:matchup']);
+  });
+
+  // Round 67 (T138): once Champions prices its own scale, a Champions capture holds leaf values under the Champions K:
+  // the identity check and the refit read the K of each family's rule set.
+  test('round 67 (T138): the identity and the refit read the K of each family\'s rule set', () => {
+    const championsK = { singles: { k0: 1.6, k1: 4.4 }, doubles: { k0: 1.9, k1: 4.2 } };
+    const kOf = (ruleset: string) => (ruleset === 'champions' ? championsK : K);
+    const leafOf = (tanh: number, doubles: boolean, ff: number, ruleset: string) => {
+      const k = doubles ? kOf(ruleset).doubles : kOf(ruleset).singles;
+      return 2 / (1 + Math.exp(-(k.k0 + k.k1 * ff) * tanh)) - 1;
+    };
+    const captured = (sample: FamilySample) => ({ ...sample, score: leafOf(Math.tanh(2 * sample.g[0] + 2 * sample.g[1]), false, 0, sample.ruleset) });
+    const samples = [...synthetic('gen9ou', 'singles', [3, 1], 220, 3), ...synthetic('gen9championsou', 'singles', [3, 1], 220, 4)].map(captured);
+    const names = ['bodies', 'matchup'];
+    const families = [{ name: 'standard-singles', singles: [2, 2], doubles: [2, 2] }, { name: 'champions-singles', singles: [2, 2], doubles: [2, 2] }];
+    const options = { seeds: 2, folds: 5, draws: 4, minGames: 20 };
+    expect(familyReports(samples, names, families, kOf, options, leafOf).identity).toEqual({ samples: samples.length, off: 0 });
+    // One K for every family cannot give the Champions capture back.
+    expect(() => familyReports(samples, names, families, () => K, options, leaf)).toThrow(/identity/);
   });
 
   // Round 67 (T138): Pokémon Champions prices its own scale. The phase K of a family comes back from its own games:
@@ -144,7 +163,7 @@ describe('fit families', () => {
     // The bank prices the last pair by its race: those positions never meet the leaf K.
     const lastPairs = samples.slice(0, 50).map(sample => ({ ...sample, game: `${sample.game}-last`, p1Won: !sample.p1Won, lastPair: true }));
     const families = [{ name: 'champions-singles', singles: [2, 2], doubles: [2, 2] }, { name: 'champions-doubles', singles: [2, 2], doubles: [2, 2] }];
-    const reports = phaseKReports([...samples, ...lastPairs], families, K, 20);
+    const reports = phaseKReports([...samples, ...lastPairs], families, () => K, 20);
     expect(reports['champions-doubles']).toMatchObject({ skipped: expect.stringMatching(/^0 samples/) });
     const report = reports['champions-singles'];
     if (!('fitted' in report)) throw new Error('no report');

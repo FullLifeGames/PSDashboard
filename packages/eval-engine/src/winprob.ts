@@ -47,20 +47,43 @@
  * see DISPLAY_K below. DIFFERENCES (regret, swings, verdict bands) stay in
  * wp-units.
  */
+import type { StaticRuleset } from './score/weights.ts';
+
 export const WINPROB_K = {
   singles: { k0: 2.28, k1: 1.49 },
   doubles: { k0: 1.987, k1: 3.666 },
 } as const;
 
+/**
+ * Round 67 (T138): Pokémon Champions prices its own scale. Fitted on its own
+ * corpus games in the app's build on the Champions mod with the round-67
+ * tables, the holdout and unrated ladder games left out (regression/
+ * fit-families.ts phaseKReports): singles 1.64 + 4.41·ff (1,956 positions of
+ * 285 sets; K at a third fainted 3.11 [2.50, 3.93]), doubles 1.86 + 4.17·ff
+ * (2,510 positions of 386 sets; 3.25 [2.83, 3.65]). The Scarlet/Violet K read
+ * the early Champions game too confidently and the late one too timidly. The
+ * thresholds in wp-units stay where they are (wave 2, decision 33).
+ */
+export const CHAMPIONS_WINPROB_K = {
+  singles: { k0: 1.64, k1: 4.41 },
+  doubles: { k0: 1.86, k1: 4.17 },
+} as const;
+
+/** The leaf's phase K of a game type under a rule set: Champions its own, every other rule set its game type's. */
+export function winprobK(doubles: boolean, ruleset: StaticRuleset = 'standard'): { readonly k0: number; readonly k1: number } {
+  const table = ruleset === 'champions' ? CHAMPIONS_WINPROB_K : WINPROB_K;
+  return doubles ? table.doubles : table.singles;
+}
+
 /** P(the RAW score's side wins) — the leaf mapping's core. */
-export function winProbability(score: number, doubles = false, faintedFraction = 0): number {
-  const { k0, k1 } = doubles ? WINPROB_K.doubles : WINPROB_K.singles;
+export function winProbability(score: number, doubles = false, faintedFraction = 0, ruleset: StaticRuleset = 'standard'): number {
+  const { k0, k1 } = winprobK(doubles, ruleset);
   return 1 / (1 + Math.exp(-(k0 + k1 * faintedFraction) * score));
 }
 
-/** Raw leaf score → win-prob units (2p−1, still in [−1, +1]). */
-export const wpUnits = (score: number, doubles = false, faintedFraction = 0): number =>
-  2 * winProbability(score, doubles, faintedFraction) - 1;
+/** Raw leaf score → win-prob units (2p−1, still in [−1, +1]), under the K of the rule set. */
+export const wpUnits = (score: number, doubles = false, faintedFraction = 0, ruleset: StaticRuleset = 'standard'): number =>
+  2 * winProbability(score, doubles, faintedFraction, ruleset) - 1;
 
 /**
  * Display calibration for aggregated root scores. Fitted 2026-08-11 on a

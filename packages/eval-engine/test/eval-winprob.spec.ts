@@ -1,5 +1,5 @@
 import { test, expect, describe } from 'vitest';
-import { DISPLAY_K, winPercent, winProbability, WINPROB_K, wpUnits } from '../src/winprob';
+import { CHAMPIONS_WINPROB_K, DISPLAY_K, winPercent, winProbability, WINPROB_K, wpUnits } from '../src/winprob';
 
 describe('win probability mapping', () => {
   test('an even score is a coin flip in both game types', () => {
@@ -34,6 +34,22 @@ describe('win probability mapping', () => {
     expect(WINPROB_K.singles).toEqual({ k0: 2.28, k1: 1.49 });
     expect(winProbability(0.4, true, 0.5)).toBeCloseTo(1 / (1 + Math.exp(-(1.987 + 3.666 * 0.5) * 0.4)), 12);
     expect(winProbability(0.4, false, 0.5)).toBeCloseTo(1 / (1 + Math.exp(-(2.28 + 1.49 * 0.5) * 0.4)), 12);
+  });
+
+  // Round 67 (T138): Pokémon Champions prices its own scale, fitted on its corpus games in the app's build on the
+  // Champions mod (1.64 + 4.41 × the fainted share in singles, 1.86 + 4.17 in doubles); every other rule set keeps
+  // the K of its game type.
+  test('round 67 (T138): Champions prices its own phase K; standard and VGC keep their game type\'s', () => {
+    expect(CHAMPIONS_WINPROB_K).toEqual({ singles: { k0: 1.64, k1: 4.41 }, doubles: { k0: 1.86, k1: 4.17 } });
+    for (const doubles of [false, true]) {
+      const champions = doubles ? CHAMPIONS_WINPROB_K.doubles : CHAMPIONS_WINPROB_K.singles;
+      const gameType = doubles ? WINPROB_K.doubles : WINPROB_K.singles;
+      const p = (k: { k0: number; k1: number }) => 1 / (1 + Math.exp(-(k.k0 + k.k1 * 0.5) * 0.4));
+      expect(winProbability(0.4, doubles, 0.5, 'champions')).toBeCloseTo(p(champions), 12);
+      expect(wpUnits(0.4, doubles, 0.5, 'champions')).toBeCloseTo(2 * p(champions) - 1, 12);
+      for (const ruleset of ['standard', 'vgc'] as const) expect(winProbability(0.4, doubles, 0.5, ruleset)).toBeCloseTo(p(gameType), 12);
+      expect(winProbability(0.4, doubles, 0.5)).toBeCloseTo(p(gameType), 12);
+    }
   });
 
   test('wpUnits carries the Jensen effect: variance helps when behind, hurts ahead', () => {

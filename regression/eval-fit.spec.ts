@@ -10,7 +10,7 @@ import {
   evaluatePosition, EVAL_WEIGHTS, FEATURE_WEIGHTS, VGC_DOUBLES_FEATURE_WEIGHTS, type EvalFeatures,
 } from '../packages/eval-engine/src/eval-function';
 import { battleFaintedFraction } from '../packages/eval-engine/src/search';
-import { WINPROB_K, wpUnits } from '../packages/eval-engine/src/winprob';
+import { CHAMPIONS_WINPROB_K, WINPROB_K, wpUnits } from '../packages/eval-engine/src/winprob';
 import {
   bootstrapPhaseK, brierScore, crossValidate, fitConstantK, fitLogistic, fitPhaseK, logLossScore,
   mulberry32, phaseBucket,
@@ -170,6 +170,9 @@ const HOLD = { shared: ['trickRoom', 'choiceMismatch', 'boosts'], doubles: ['boo
  * set. First the identity: the start tables must give back every captured
  * score, or the fit refuses.
  */
+/** The leaf's phase K of a family's rule set (round 67, T138: Pokémon Champions prices its own scale). */
+const kOf = (ruleset: Ruleset) => (ruleset === 'champions' ? CHAMPIONS_WINPROB_K : WINPROB_K);
+
 const familySamplesOf = (samples: FitSample[]): FamilySample[] => samples.map(sample => ({
   game: sample.game, set: sample.set ?? sample.game, gameType: sample.gameType, ruleset: sample.ruleset ?? rulesetOfId(sample.game),
   g: sample.g, p1Won: sample.p1Won, faintedFraction: sample.faintedFraction, score: sample.score, wp: sample.wp, lastPair: sample.lastPair,
@@ -182,7 +185,7 @@ const familySamplesOf = (samples: FitSample[]): FamilySample[] => samples.map(sa
  */
 function writePhaseKReport(samples: FitSample[]) {
   const draws = Number(process.env.EVAL_FIT_DRAWS ?? 200);
-  const report = phaseKReports(familySamplesOf(samples), familiesToFit(), WINPROB_K, draws);
+  const report = phaseKReports(familySamplesOf(samples), familiesToFit(), kOf, draws);
   const out = process.env.EVAL_FIT_K_OUT ?? join(SAMPLES_DIR ?? CACHE_DIR, 'phase-k-report.json');
   writeFileSync(out, JSON.stringify(report, null, 1));
   for (const [name, entry] of Object.entries(report)) {
@@ -193,7 +196,7 @@ function writePhaseKReport(samples: FitSample[]) {
 
 function writeRefitReport(samples: FitSample[]) {
   const draws = Number(process.env.EVAL_FIT_DRAWS ?? 200);
-  const report = familyReports(familySamplesOf(samples), FEATURE_KEYS, familiesToFit(), WINPROB_K, { seeds: 20, folds: 5, draws, minGames: 20, hold: HOLD }, wpUnits);
+  const report = familyReports(familySamplesOf(samples), FEATURE_KEYS, familiesToFit(), kOf, { seeds: 20, folds: 5, draws, minGames: 20, hold: HOLD }, wpUnits);
   const out = process.env.EVAL_FIT_OUT ?? join(SAMPLES_DIR ?? CACHE_DIR, 'fit-report.json');
   writeFileSync(out, JSON.stringify(report, null, 1));
   for (const [name, entry] of Object.entries(report.families)) {

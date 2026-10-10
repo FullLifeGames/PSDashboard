@@ -55,14 +55,16 @@ export function battleFaintedFraction(battle: ReturnType<typeof positionBattle>)
  * exact ±1 (the sigmoid saturates near but not at ±1). Shared by the sync
  * search, the executor (worker path), and MCTS — all engine modes must live
  * in the same value space. Round 33: the last pair is priced by its race
- * (last-pair.ts), after the sigmoid, in the same units.
+ * (last-pair.ts), after the sigmoid, in the same units. Round 67 (T138):
+ * the sigmoid reads the phase K of the search's rule set, which the matchup
+ * cache carries (Pokémon Champions has its own).
  */
 export function leafValue(battle: ReturnType<typeof positionBattle>, matchupCache: MatchupCache): number {
   const raw = evaluatePosition(battle, matchupCache);
   if (battle.ended) return raw > 0 ? 1 : raw < 0 ? -1 : 0;
   const race = lastPairRace(battle, matchupCache);
   if (race) return lastPairValue(race);
-  return wpUnits(raw, battle.gameType === 'doubles', battleFaintedFraction(battle));
+  return wpUnits(raw, battle.gameType === 'doubles', battleFaintedFraction(battle), matchupCache.ruleset);
 }
 
 /** Move ids named in a (possibly combined) choice string. */
