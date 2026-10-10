@@ -5,7 +5,8 @@ import { buildTeamsFromReplay, formatEnforcesSleepClause, getBranchSimulatorForm
 import { reconstructBranchRuntime } from '../src/branch-engine';
 import { createLocalExecutor } from '../src/search';
 import { mctsTreeSearch } from '../src/mcts';
-import { mergeMctsTrees, MCTS_TREES, starvedSupportCells } from '../src/mcts-merge';
+import { mergeMctsTrees, starvedSupportCells } from '../src/mcts-merge';
+import { searchBudget } from '../src/search/budget';
 import { cellKey } from '../src/rank';
 
 /**
@@ -54,7 +55,7 @@ describe('mcts starved-support verification (draft t56)', () => {
 
     const sleepClause = formatEnforcesSleepClause(getBranchSimulatorFormat(replay));
     const settings = { depth: 1 as const, samples: 1 as const, tera: false, sleepClause, mode: 'mcts' as const };
-    const trees = Array.from({ length: MCTS_TREES }, (_, offset) => mctsTreeSearch(serialized!, settings, offset));
+    const trees = Array.from({ length: searchBudget().trees }, (_, offset) => mctsTreeSearch(serialized!, settings, offset));
     const merged = mergeMctsTrees(trees);
 
     // The selection must fire here: the support cells carry at most four

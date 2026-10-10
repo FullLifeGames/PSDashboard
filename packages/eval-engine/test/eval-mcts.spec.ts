@@ -3,7 +3,8 @@ import { Battle, State, Teams, toID } from '@pkmn/sim';
 import type { PokemonSet } from '@pkmn/sim';
 import { analyzeTurn, matchPlayedChoice } from '../src/analysis';
 import { mctsSearch, mctsTreeSearch, MCTS_ITERATIONS } from '../src/mcts';
-import { mergeMctsTrees, MCTS_TREES, starvedSupportCells } from '../src/mcts-merge';
+import { mergeMctsTrees, starvedSupportCells } from '../src/mcts-merge';
+import { searchBudget } from '../src/search/budget';
 import { createLocalExecutor, searchPosition } from '../src/search';
 import { cellKey } from '../src/rank';
 import type { EvalResult, SearchProgress } from '../src/types';
@@ -155,7 +156,7 @@ describe('DUCT-MCTS search', () => {
   test('root-parallel trees merge deterministically and agree on the win', () => {
     const root = threeTurnWin();
     const settings = { depth: 1, samples: 1, tera: false, mode: 'mcts' } as const;
-    const trees = Array.from({ length: MCTS_TREES }, (_, offset) => mctsTreeSearch(root, settings, offset));
+    const trees = Array.from({ length: searchBudget().trees }, (_, offset) => mctsTreeSearch(root, settings, offset));
 
     // All trees rank the same option lists (a hard merge precondition).
     for (const tree of trees) {
@@ -168,7 +169,7 @@ describe('DUCT-MCTS search', () => {
     expect(merged.score).toBeGreaterThan(0.3);
     // Merged visits cover every tree's iterations.
     const totalTopVisits = trees.reduce((sum, tree) => sum + tree.visits, 0);
-    expect(totalTopVisits).toBe(MCTS_TREES * MCTS_ITERATIONS);
+    expect(totalTopVisits).toBe(searchBudget().trees * MCTS_ITERATIONS);
     // Deterministic: same trees, same merge.
     expect(mergeMctsTrees(trees.map(tree => ({ ...tree })))).toEqual(merged);
     // A single tree merges to exactly its own result.
@@ -185,7 +186,7 @@ describe('DUCT-MCTS search', () => {
     expect(sum(result.matrix!.mixes.p1)).toBeCloseTo(1, 6);
     expect(sum(result.matrix!.mixes.p2)).toBeCloseTo(1, 6);
 
-    const trees = Array.from({ length: MCTS_TREES }, (_, offset) =>
+    const trees = Array.from({ length: searchBudget().trees }, (_, offset) =>
       mctsTreeSearch(threeTurnWin(), { depth: 1, samples: 1, tera: false, mode: 'mcts' }, offset));
     expect(mergeMctsTrees(trees).matrix).toBeTruthy();
   });

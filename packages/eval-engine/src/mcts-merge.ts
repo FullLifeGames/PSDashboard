@@ -22,13 +22,6 @@ export {
  */
 
 /**
- * Fixed tree count. Machine-independent on purpose: results must not vary
- * with a machine's worker-pool size. Pools smaller than this simply run
- * trees in successive rounds.
- */
-export const MCTS_TREES = 4;
-
-/**
  * A pool whose continuation has reached this magnitude has played the cell
  * out to a (near-)terminal verdict; only there does the tree's depth
  * outrank the sampler's one-ply static (573756 t138: −0.94 to −0.99 over

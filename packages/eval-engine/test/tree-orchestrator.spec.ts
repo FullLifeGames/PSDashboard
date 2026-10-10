@@ -1,8 +1,8 @@
-import { describe, expect, test } from 'vitest';
+import { describe, expect, onTestFinished, test } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { replayRuleset } from '@fulllifegames/replay-core';
 import { mctsTreeSearch } from '../src/mcts';
-import { MCTS_TREES, mergeMctsTrees, rowCompletedCells, starvedSupportCells } from '../src/mcts-merge';
+import { mergeMctsTrees, rowCompletedCells, starvedSupportCells } from '../src/mcts-merge';
 import { playedIndices } from '../src/verify-select';
 import { createLocalExecutor } from '../src/search';
 import { applyForcedWin, forcedWinInput } from '../src/search/forced-win-apply';
@@ -10,6 +10,7 @@ import { cellKey } from '../src/rank';
 import { createLocalTreeExecutor, searchTreesOrchestrated, type TreeExecutor } from '../src/tree-orchestrator';
 import type { EvalCellJob, EvalCellValue, EvalSettings, ForcedWinInput, ForcedWinOutcome, MctsTreeStats } from '../src/types';
 import type { StaticRuleset } from '../src/eval-function';
+import { configureSearchBudget, parseSearchBudget, searchBudget } from '../src/search/budget';
 
 interface Fixture { serialized: string; tera?: EvalSettings['tera']; sleepClause?: boolean; keepPlayed?: EvalSettings['keepPlayed'] | null; played?: EvalSettings['keepPlayed'] }
 
@@ -47,7 +48,7 @@ function recordingExecutor(serialized: string, lastFirst = false, ruleset: Stati
       const tree = await local.tree(settings, offset, onProgress);
       if (lastFirst && offset === 0) await othersDone;
       record.trees[offset] = tree;
-      if (offset !== 0 && ++finished === MCTS_TREES - 1) release();
+      if (offset !== 0 && ++finished === searchBudget().trees - 1) release();
       return tree;
     },
     evalCells: async (jobs, onDone) => {
@@ -80,6 +81,17 @@ const settingsOf = (name: string, keepPlayed?: EvalSettings['keepPlayed']): Eval
  * ledger of round 64).
  */
 describe('tree orchestration (round 61; read through the executor since round 64)', () => {
+  // Round 67 (T111 point 3): the tests count the trees the budget in force runs; with a constant beside the budget
+  // the late-finishing run below waited for trees a smaller budget never starts.
+  test('a budget of three trees runs three offsets, whatever order they finish in', { timeout: 120_000 }, async () => {
+    configureSearchBudget(parseSearchBudget('trees=3'));
+    onTestFinished(() => configureSearchBudget(null));
+    const name = VERIFYING[0];
+    const late = recordingExecutor(position(name), true);
+    await searchTreesOrchestrated(late.executor, settingsOf(name));
+    expect([...late.record.offsets].sort()).toEqual([0, 1, 2]);
+  });
+
   test('runs every tree offset once and merges them in offset order, whatever order they finish in', { timeout: 600_000 }, async () => {
     for (const name of VERIFYING) {
       const settings = settingsOf(name);
@@ -87,7 +99,7 @@ describe('tree orchestration (round 61; read through the executor since round 64
       const late = recordingExecutor(position(name), true);
       const expected = await searchTreesOrchestrated(inOrder.executor, settings);
       const result = await searchTreesOrchestrated(late.executor, settings);
-      expect([...late.record.offsets].sort(), name).toEqual(Array.from({ length: MCTS_TREES }, (_, offset) => offset));
+      expect([...late.record.offsets].sort(), name).toEqual(Array.from({ length: searchBudget().trees }, (_, offset) => offset));
       expect(result, name).toEqual(expected);
     }
   });
@@ -175,7 +187,7 @@ describe('tree orchestration (round 61; read through the executor since round 64
       ...local,
       tree: async (settings, offset, onProgress) => {
         const tree = await local.tree(settings, offset, onProgress);
-        if (++trees === MCTS_TREES) stop = true;
+        if (++trees === searchBudget().trees) stop = true;
         return tree;
       },
       evalCells: async jobs => { calls.evalCells++; return local.evalCells(jobs); },
@@ -192,7 +204,7 @@ describe('tree orchestration (round 61; read through the executor since round 64
     for (const name of CASES) {
       const serialized = position(name);
       const settings: EvalSettings = { depth: 1, samples: 1, mode: 'mcts', tera: true };
-      const trees = Array.from({ length: MCTS_TREES }, (_, offset) => mctsTreeSearch(serialized, settings, offset));
+      const trees = Array.from({ length: searchBudget().trees }, (_, offset) => mctsTreeSearch(serialized, settings, offset));
       const merged = mergeMctsTrees(trees);
       if (rowCompletedCells(trees, merged, starvedSupportCells(trees, merged)).length === 0) continue;
       applyForcedWin(merged, await createLocalExecutor(serialized).prove(forcedWinInput(merged, settings)));
