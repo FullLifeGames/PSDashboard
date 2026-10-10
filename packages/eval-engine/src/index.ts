@@ -51,6 +51,8 @@ export type { LeadSideAnalysis, LeadAnalysis, LeadEvalData } from './leads.ts';
 export { mergeMctsTrees, rowCompletedCells, starvedSupportCells } from './mcts-merge.ts';
 export { mctsSearch, mctsTreeSearch } from './mcts.ts';
 export type { MctsCallbacks } from './mcts.ts';
+export { moveAtUse } from './move-use.ts';
+export type { ItemLike, MoveAtUse, MoveField, MoveLike, MoveUser } from './move-use.ts';
 export { parseTendencies, computeRead } from './opponent-model.ts';
 export type { PlayerTendencies } from './opponent-model.ts';
 export { searchOrchestrated } from './orchestrator.ts';

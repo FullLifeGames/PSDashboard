@@ -116,6 +116,39 @@ test('pickerStateFromSnapshot fills move and species types from the dex', () => 
   expect(state.p1Active?.moves.map(move => move.type)).toEqual(['Fire', 'Ground', 'Dark', 'Rock']);
 });
 
+/** A snapshot whose p1 active is `species` (the rest of makeSnapshot stays). */
+function withActive(species: string, extra: Partial<TurnSnapshot['p1']['pokemon'][number]> = {}): TurnSnapshot {
+  const snapshot = makeSnapshot();
+  snapshot.p1.pokemon[0] = snapshotMon({ name: species, speciesForme: species, isActive: true, ...extra });
+  return snapshot;
+}
+
+// Round 67 (T85): the snapshot path labels a move by its type at use: moveAtUse on the facts the snapshot
+// knows (the species, the revealed ability or every ability the species may have, a revealed item, the
+// Tera click), the catalog type where those facts leave it undecided.
+test('pickerStateFromSnapshot labels a move by its type at use', () => {
+  const typesFor = (snapshot: TurnSnapshot, team: PokemonSet) =>
+    pickerStateFromSnapshot(snapshot, [team], [set('Zapdos', ['Roost'])]).p1MovesBySlot[0].map(move => move.type);
+  expect(typesFor(withActive('Ogerpon-Wellspring'), set('Ogerpon-Wellspring', ['Ivy Cudgel', 'Horn Leech']))).toEqual(['Water', 'Grass']);
+  expect(typesFor(withActive('Sylveon', { ability: 'Pixilate' }), set('Sylveon', ['Hyper Voice', 'Shadow Ball']))).toEqual(['Fairy', 'Ghost']);
+  // Unrevealed, Sylveon may have Cute Charm: the possible abilities disagree and the button keeps the catalog
+  // type, whatever ability the guessed set names.
+  expect(typesFor(withActive('Sylveon'), { ...set('Sylveon', ['Hyper Voice']), ability: 'Pixilate' })).toEqual(['Normal']);
+  expect(typesFor(withActive('Garchomp', { terastallized: 'Fairy' }), set('Garchomp', ['Tera Blast', 'Earthquake']))).toEqual(['Fairy', 'Ground']);
+  expect(typesFor(withActive('Garchomp'), set('Garchomp', ['Tera Blast']))).toEqual(['Normal']);
+});
+
+test('pickerStateFromSnapshot labels both doubles slots at use', () => {
+  const snapshot = makeSnapshot();
+  snapshot.p1.pokemon = [
+    snapshotMon({ name: 'Ogerpon-Hearthflame', speciesForme: 'Ogerpon-Hearthflame', isActive: true }),
+    snapshotMon({ name: 'Primarina', speciesForme: 'Primarina', isActive: true, ability: 'Liquid Voice' }),
+  ];
+  const team = [set('Ogerpon-Hearthflame', ['Ivy Cudgel']), set('Primarina', ['Hyper Voice', 'Moonblast'])];
+  const state = pickerStateFromSnapshot(snapshot, team, [set('Zapdos', ['Roost'])]);
+  expect(state.p1MovesBySlot.map(moves => moves.map(move => move.type))).toEqual([['Fire'], ['Water', 'Fairy']]);
+});
+
 // Round 54: the snapshot preview dropped the Tera type, so the branch
 // panel's damage numbers on the fallback path read Body Press into a
 // Ceruledge that had terastallized to Fighting as 0 % (the live and stored

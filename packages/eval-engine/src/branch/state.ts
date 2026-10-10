@@ -1,4 +1,4 @@
-import { Battle, BattleStreams, Dex, Teams } from '@pkmn/sim';
+import { Battle, BattleStreams, Teams } from '@pkmn/sim';
 import type { ID, PokemonSet } from '@pkmn/sim';
 import type { BranchSlotChoice } from '../branch-choices.ts';
 import { serializeBattleStable } from '../forward-model.ts';
@@ -12,6 +12,33 @@ import { forceSwitches } from './corrections.ts';
 import { extractPokemonInfo, makePokemonInfo } from './pokemon-info.ts';
 
 
+/**
+ * The type a move lands with (round 67, T85): the simulator's own reading on
+ * the active body, in the order of battle-actions.js useMoveInner (the
+ * move's ModifyType, then everyone's), so Ivy Cudgel follows the mask, Tera
+ * Blast the Tera type after the click, the -ate family and Liquid Voice
+ * their abilities. Asked with debug lines off: a custom-game format runs in
+ * debug mode, and a handler's debug line would land in the log (the idiom
+ * of score/move-facts.ts onField). The battle's catalog type when the
+ * simulator refuses.
+ */
+function typeAtUse(battle: SimBattle, active: SimPokemon, id: string): string {
+  const log = battle as unknown as { debugMode: boolean };
+  const debug = log.debugMode;
+  log.debugMode = false;
+  try {
+    const move = battle.dex.getActiveMove(id);
+    const target = active.foes()[0] ?? null;
+    battle.singleEvent('ModifyType', move, null, active, target, move, move);
+    battle.runEvent('ModifyType', active, target, move, move);
+    return move.type;
+  } catch {
+    return battle.dex.moves.get(id).type || '';
+  } finally {
+    log.debugMode = debug;
+  }
+}
+
 function makeMoves(
   active: SimPokemon | null | undefined,
   activeSlot: number,
@@ -20,7 +47,6 @@ function makeMoves(
 ): BranchMoveOption[] {
   if (!active || active.fainted || forceSwitch) return [];
   return active.moveSlots.map((move, index): BranchMoveOption => {
-    const moveData = Dex.moves.get(move.id || move.move);
     const targetType = targetTypeForMove(active, move.id || move.move);
     const targetOptions = buildTargetOptions(battle, active, targetType);
     return {
@@ -30,7 +56,7 @@ function makeMoves(
       pp: move.pp,
       maxpp: move.maxpp,
       disabled: !!move.disabled,
-      type: moveData?.type || '',
+      type: typeAtUse(battle, active, move.id || move.move),
       targetType,
       requiresTarget: targetOptions.length > 0,
       targetOptions,

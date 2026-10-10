@@ -1,9 +1,10 @@
 import { Generations, Pokemon as CalcPokemon } from '@smogon/calc';
 import { Dex } from '@pkmn/dex';
 import type { PokemonSet } from '@pkmn/sim';
-import { speciesBaseId, type PokemonSnapshot, type TurnSnapshot } from '@fulllifegames/replay-core';
-import type {
-  BranchMoveOption, BranchSimState, BranchSlotModifiers, BranchSwitchOption, SimPokemonInfo,
+import { speciesBaseId, toId, type PokemonSnapshot, type TurnSnapshot } from '@fulllifegames/replay-core';
+import {
+  moveAtUse,
+  type BranchMoveOption, type BranchSimState, type BranchSlotModifiers, type BranchSwitchOption, type MoveUser, type SimPokemonInfo,
 } from '@fulllifegames/eval-engine';
 
 /**
@@ -49,12 +50,60 @@ function moveNamesFor(mon: PokemonSnapshot, set: PokemonSet | undefined): string
   return set?.moves && set.moves.length > 0 ? set.moves : mon.moves;
 }
 
+/** Attack and Special Attack of the guessed set (Tera Blast's category in the move table; the label reads only the type). */
+function guessedAttacks(mon: PokemonSnapshot, set: PokemonSet | undefined, gen: number): { atk?: number; spa?: number } {
+  if (!set) return {};
+  try {
+    const calcGen = Generations.get(Math.min(9, Math.max(1, gen)) as 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9);
+    const poke = new CalcPokemon(calcGen, mon.speciesForme, { level: mon.level || set.level || 100, nature: set.nature || undefined, evs: set.evs, ivs: set.ivs });
+    return { atk: poke.rawStats.atk, spa: poke.rawStats.spa };
+  } catch {
+    return {};
+  }
+}
+
+/**
+ * The facts a snapshot holds about a body for the move table (round 67,
+ * T85): the species, the revealed ability or every ability the species may
+ * have, a revealed item (an empty item is unknown), the Tera click. The
+ * hidden type stays unknown.
+ */
+function snapshotMoveUser(mon: PokemonSnapshot, set: PokemonSet | undefined, gen: number): MoveUser {
+  const dex = dexForGen(gen);
+  const species = dex.species.get(mon.speciesForme);
+  const known = species.exists ? species : null;
+  const item = mon.item ? dex.items.get(mon.item) : null;
+  return {
+    gen,
+    species: known?.name,
+    abilities: mon.ability ? [toId(mon.ability)] : Object.values(known?.abilities ?? {}).map(toId),
+    item: item?.exists ? { id: item.id, onPlate: item.onPlate, onMemory: item.onMemory, onDrive: item.onDrive, naturalGift: item.naturalGift } : undefined,
+    terastallized: mon.terastallized || null,
+    types: known?.types,
+    ...guessedAttacks(mon, set, gen),
+  };
+}
+
+/**
+ * The type a move lands with on the snapshot path (round 67, T85): the move
+ * table on the snapshot's facts. The weather and the terrain stay unknown,
+ * so Weather Ball, Terrain Pulse and Hidden Power keep the catalog type, as
+ * does a move whose possible abilities disagree; the live and stored paths
+ * ask the simulator instead (branch/state.ts).
+ */
+function snapshotTypeAtUse(name: string, user: MoveUser, gen: number): string {
+  const move = dexForGen(gen).moves.get(name);
+  if (!move.exists) return '';
+  return moveAtUse(move, user)?.type ?? move.type;
+}
+
 function moveOptionsFor(
   mon: PokemonSnapshot,
   set: PokemonSet | undefined,
   activeSlot: number,
   gen: number,
 ): BranchMoveOption[] {
+  const user = snapshotMoveUser(mon, set, gen);
   return moveNamesFor(mon, set).map((name, slot) => ({
     name,
     activeSlot,
@@ -63,7 +112,7 @@ function moveOptionsFor(
     pp: 0,
     maxpp: 0,
     disabled: false,
-    type: moveTypeFor(name, gen),
+    type: snapshotTypeAtUse(name, user, gen),
     targetType: 'normal',
     requiresTarget: false,
     targetOptions: [],
