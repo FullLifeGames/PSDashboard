@@ -147,6 +147,8 @@ export const treeToGiven = (order: BenchOrder, tree: MctsTreeStats): MctsTreeSta
   ...tree,
   p1Options: optionsToGiven(order, 'p1', tree.p1Options),
   p2Options: optionsToGiven(order, 'p2', tree.p2Options),
+  ...(tree.p1Legal ? { p1Legal: optionsToGiven(order, 'p1', tree.p1Legal) } : {}),
+  ...(tree.p2Legal ? { p2Legal: optionsToGiven(order, 'p2', tree.p2Legal) } : {}),
   result: resultToGiven(order, tree.result),
 });
 

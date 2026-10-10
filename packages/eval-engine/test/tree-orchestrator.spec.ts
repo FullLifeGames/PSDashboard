@@ -65,6 +65,21 @@ function recordingExecutor(serialized: string, lastFirst = false, ruleset: Stati
   return { executor, record };
 }
 
+/** Round 67 (T128): the verify round is the last cells round without plain jobs (the answer round's jobs are plain and come after it). */
+const verifyRound = (record: Recording) => record.rounds.filter(round => !round.jobs.some(job => job.plain)).at(-1);
+
+/** Runs `run` with the answer round in the given form (EVAL_DOUBLES_ANSWERS), restoring the variable after. */
+async function withAnswers<T>(mode: 'off' | 'protect' | 'full', run: () => Promise<T>): Promise<T> {
+  const saved = process.env.EVAL_DOUBLES_ANSWERS;
+  process.env.EVAL_DOUBLES_ANSWERS = mode;
+  try {
+    return await run();
+  } finally {
+    if (saved === undefined) delete process.env.EVAL_DOUBLES_ANSWERS;
+    else process.env.EVAL_DOUBLES_ANSWERS = saved;
+  }
+}
+
 const settingsOf = (name: string, keepPlayed?: EvalSettings['keepPlayed']): EvalSettings => {
   const { tera, sleepClause } = fixture(name);
   return {
@@ -81,6 +96,20 @@ const settingsOf = (name: string, keepPlayed?: EvalSettings['keepPlayed']): Eval
  * ledger of round 64).
  */
 describe('tree orchestration (round 61; read through the executor since round 64)', () => {
+  // Round 67 (T128): a doubles root asks for plain cells after the verify round, and the prover proves the answered ranking.
+  test('the answer round follows the verify round with plain cells, and the prover proves its ranking', { timeout: 600_000 }, async () => {
+    const name = 'gen9vgc2026regi-2630685175-t7-played';
+    const played = fixture(name);
+    const settings: EvalSettings = { depth: 1, samples: 1, mode: 'mcts', tera: played.tera ?? true, sleepClause: played.sleepClause ?? false, ruleset: 'vgc', keepPlayed: played.keepPlayed ?? undefined };
+    const { executor, record } = recordingExecutor(position(name), false, 'vgc');
+    const result = await withAnswers('protect', () => searchTreesOrchestrated(executor, settings));
+    const verifyAt = record.rounds.indexOf(verifyRound(record)!);
+    const answers = record.rounds.slice(verifyAt + 1);
+    expect(answers.length).toBeGreaterThan(0);
+    expect(answers.every(round => round.jobs.every(job => job.plain && job.deepen === undefined))).toBe(true);
+    expect(record.proofs[0].input.rootOrder).toEqual({ p1: result.perSide.p1.map(row => row.choice), p2: result.perSide.p2.map(row => row.choice) });
+  });
+
   // Round 67 (T111 point 3): the tests count the trees the budget in force runs; with a constant beside the budget
   // the late-finishing run below waited for trees a smaller budget never starts.
   test('a budget of three trees runs three offsets, whatever order they finish in', { timeout: 120_000 }, async () => {
@@ -110,8 +139,8 @@ describe('tree orchestration (round 61; read through the executor since round 64
       const { executor, record } = recordingExecutor(position(name));
       await searchTreesOrchestrated(executor, settings);
       const doubles = name.includes('doubles');
-      expect(record.rounds.length, name).toBe(doubles ? 2 : 1);
-      const verify = record.rounds.at(-1)!;
+      expect(record.rounds.filter(round => !round.jobs.some(job => job.plain)).length, name).toBe(doubles ? 2 : 1);
+      const verify = verifyRound(record)!;
       expect(verify.jobs.length, name).toBeGreaterThan(0);
       for (const job of verify.jobs) {
         expect(job.deepen, name).toEqual({ depth: 1, samples: 1, tera: settings.tera, sleepClause: settings.sleepClause, ruleset: settings.ruleset });
@@ -137,7 +166,7 @@ describe('tree orchestration (round 61; read through the executor since round 64
     expect(withPlayed.record.trees).toEqual(without.record.trees);
     const merged = mergeMctsTrees(withPlayed.record.trees);
     const played = playedIndices(withPlayed.record.trees, merged, keepPlayed);
-    const keys = (record: Recording) => new Set((record.rounds.at(-1)?.jobs ?? []).map(job => cellKey(job.i, job.j)));
+    const keys = (record: Recording) => new Set((verifyRound(record)?.jobs ?? []).map(job => cellKey(job.i, job.j)));
     const onlyWithPlayed = [...keys(withPlayed.record)].filter(key => !keys(without.record).has(key));
     expect(played.p1).toBe(rare.i);
     expect(onlyWithPlayed.length).toBeGreaterThan(0);
@@ -157,15 +186,16 @@ describe('tree orchestration (round 61; read through the executor since round 64
     // The trees' own support leaves the played row out; the played option brings it into the check and verify rounds.
     const support = rowCompletedCells(record.trees, merged, starvedSupportCells(record.trees, merged));
     expect(support.some(job => job.i === played.p1)).toBe(false);
-    expect(record.rounds.at(-1)!.jobs.some(job => job.i === played.p1)).toBe(true);
+    expect(verifyRound(record)!.jobs.some(job => job.i === played.p1)).toBe(true);
   });
 
   test('the matrix reads the verified values and the prover proves the verified result', { timeout: 600_000 }, async () => {
+    // The verify-to-prover contract, with the doubles answer round off (it re-ranks after verify; its own test follows).
     for (const name of VERIFYING) {
       const settings = settingsOf(name);
       const { executor, record } = recordingExecutor(position(name));
-      const result = await searchTreesOrchestrated(executor, settings);
-      const values = record.rounds.at(-1)!.values;
+      const result = await withAnswers('off', () => searchTreesOrchestrated(executor, settings));
+      const values = verifyRound(record)!.values;
       const verified = mergeMctsTrees(record.trees, new Map(values.map(value => [cellKey(value.i, value.j), value])));
       const unverified = mergeMctsTrees(record.trees);
       expect(verified.matrix!.values, name).not.toEqual(unverified.matrix!.values);

@@ -314,6 +314,14 @@ function localExecutorOn(serializedBattle: string, ruleset: StaticRuleset): Sear
       const cover = VERIFY_DEEPEN_COVER[positionBattle(root).gameType === 'doubles' ? 'doubles' : 'singles'];
       let completed = 0;
       for (const job of jobs) {
+        if (job.plain) {
+          // Round 67 (T128): the answer round's cheap price of a cell, one natural draw and its leaf.
+          const battle = positionBattle(advancePosition(root, job.p1Choice, job.p2Choice, SEARCH_SEEDS[0]));
+          out.push({ i: job.i, j: job.j, value: leafValue(battle, matchupCache), ended: battle.ended });
+          completed += 1;
+          onDone?.(completed);
+          continue;
+        }
         // evalCells only ever serves the orchestrated ROOT — blend like the
         // sync path's root matrix. Round 63 (T16): a verify job (`deepen`)
         // draws more where there is no plan and goes one ply deeper per outcome.

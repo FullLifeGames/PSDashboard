@@ -54,9 +54,21 @@ describe('verify scenes: hidden lengths (round 64, T119)', () => {
     const result = await search(position);
     const value = cell(result, 'Heat Wave + Flare Blitz→Groudon', 'Rock Slide + Sleep Powder→Chi-Yu');
     expect(Math.abs(value - 0.3892)).toBeLessThan(2.5 * 0.1156);
-    // The side verdicts agreed with the reference before and still do.
+    // Round 67 (T128): over every legal answer p2's Protect + → Solgaleo refutes the old best row (Heat Wave +
+    // Flare Blitz→Groudon), and the played Heat Wave + Protect stands within 0.03 of the best: no tier. Over the
+    // listed answers alone (the reference's list) the verdicts are still the reference's: p1 a mistake.
     const analysis = flat(position, result);
-    expect(analysis.p1.tier).toBe('mistake');
+    expect(analysis.p1.tier ?? null).toBeNull();
     expect(analysis.p2.tier ?? null).toBeNull();
+    const saved = process.env.EVAL_DOUBLES_ANSWERS;
+    process.env.EVAL_DOUBLES_ANSWERS = 'off';
+    try {
+      const listed = flat(position, await search(position));
+      expect(listed.p1.tier).toBe('mistake');
+      expect(listed.p2.tier ?? null).toBeNull();
+    } finally {
+      if (saved === undefined) delete process.env.EVAL_DOUBLES_ANSWERS;
+      else process.env.EVAL_DOUBLES_ANSWERS = saved;
+    }
   });
 });

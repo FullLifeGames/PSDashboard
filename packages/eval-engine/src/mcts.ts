@@ -1,5 +1,5 @@
 import { createMatchupCache, unansweredMons } from './eval-function.ts';
-import { createRootPosition, positionBattle } from './forward-model.ts';
+import { createRootPosition, legalChoices, positionBattle } from './forward-model.ts';
 import { koOddsForOptions, planCellEvents } from './cell-blend.ts';
 import { cellKey, rankFromMatrix, toResult as rankedToResult } from './rank.ts';
 import { attachKoOdds, hasUnansweredContent, koOddsMapsFor } from './search/root-payload.ts';
@@ -12,7 +12,7 @@ import { applyForcedWin, forcedWinInput } from './search/forced-win-apply.ts';
 import { perfSync } from './perf-trace.ts';
 import { searchBudget, SEARCH_BUDGET_DEFAULT } from './search/budget.ts';
 import { benchOrder, callbacksToGiven, resultToGiven, treeToGiven } from './search/bench-order.ts';
-import type { EvalResult, EvalSettings, KoOddsInfo, MctsTreeStats, SearchProgress, UnansweredProfile } from './types.ts';
+import type { EvalResult, EvalSettings, KoOddsInfo, MctsTreeStats, SearchProgress, TeraAllowance, UnansweredProfile } from './types.ts';
 
 /**
  * DUCT (decoupled UCT) Monte-Carlo tree search — the "think deeper" mode.
@@ -268,6 +268,7 @@ function treeSearchOn(
       }
     }
   }
+  const legal = seedOffset === 0 && doubles ? rootLegal(root, settings.tera ?? true) : {};
   return {
     p1Options: root.p1Options.map(option => ({ choice: option.choice, label: option.label })),
     p2Options: root.p2Options.map(option => ({ choice: option.choice, label: option.label })),
@@ -280,11 +281,19 @@ function treeSearchOn(
     rootValue: root.value,
     koOdds,
     ...(doubles ? {} : { boundaryCells }),
+    ...legal,
     // Root-cell stats for the merged equilibrium (Map order is insertion
     // order — deterministic under the fixed seed schedule).
     cells: [...root.children.entries()].map(([key, child]) => cellStats(key, child, rootClassKeys.get(key))),
     result,
   };
+}
+
+/** Round 67 (T128): both sides' legal choices at a live doubles root, for the answer round (shipped by the offset-0 tree). */
+function rootLegal(root: Node, tera: TeraAllowance): Pick<MctsTreeStats, 'p1Legal' | 'p2Legal'> {
+  if (root.ended || root.p1Options.length === 0 || root.p2Options.length === 0) return {};
+  const options = (side: 'p1' | 'p2') => legalChoices(root.position, side, { tera }).map(option => ({ choice: option.choice, label: option.label }));
+  return { p1Legal: options('p1'), p2Legal: options('p2') };
 }
 
 /** The searched root node itself — for tests that inspect the tree's structure. */

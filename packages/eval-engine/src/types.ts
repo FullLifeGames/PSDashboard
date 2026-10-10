@@ -435,6 +435,12 @@ export interface EvalCellJob {
    * cell over more natural draws (EvalCellValue.deepened).
    */
   deepen?: EvalSettings;
+  /**
+   * Round 67 (T128): one natural draw (the first search seed) and its leaf,
+   * no pair plan and no class blend: the answer round's cheap price of a
+   * row against an answer the tree did not list.
+   */
+  plain?: boolean;
 }
 
 export interface EvalCellValue {
@@ -491,6 +497,14 @@ export interface MctsTreeStats {
    * represent an accuracy×killFraction split. Drives the verify sampler.
    */
   boundaryCells?: number[];
+  /**
+   * Round 67 (T128): every legal choice of each side at a doubles root
+   * (legalChoices, the simulator's list), shipped by the offset-0 tree only:
+   * the answer round grades each side against the other side's answers the
+   * tree did not list. Absent for singles and on sibling trees.
+   */
+  p1Legal?: EvalChoiceOption[];
+  p2Legal?: EvalChoiceOption[];
   /**
    * Root-cell tree stats for the merged equilibrium ranking: `total` is the
    * sum of every leaf value backed through the cell (expansion included),

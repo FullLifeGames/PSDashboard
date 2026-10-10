@@ -9,6 +9,7 @@ import { createLocalExecutor } from './search/position.ts';
 import type { EvalCellJob, EvalCellValue, EvalResult, EvalSettings, MctsTreeStats, SearchProgress } from './types.ts';
 import type { StaticRuleset } from './score/weights.ts';
 import { boundaryCheckCells, playedIndices, rowCompletedCells, starvedSupportCells, type VerifyFocus } from './verify-select.ts';
+import { addedAnswers, answerSides, answersMode, detectionJobs, extensionJobs, gradedRanking } from './search/answers.ts';
 
 /**
  * Round 61: the tree search's orchestration, one place for the app and the
@@ -118,11 +119,44 @@ async function verifiedMerge(
   }
 }
 
+/**
+ * Round 67 (T128): the doubles root's answer round (search/answers.ts).
+ * After the verify round each side is graded against the other side's legal
+ * answers the tree did not list, each priced by one natural draw: 'protect'
+ * adds the answers that beat the listed ones against the side's best row,
+ * 'full' every unlisted one. Like verification a refinement: a failed round
+ * keeps the verified merge, and the score stays the visit mean.
+ */
+async function answerRound(
+  executor: TreeExecutor, trees: MctsTreeStats[], merged: EvalResult, callbacks?: OrchestratorCallbacks,
+): Promise<EvalResult> {
+  const mode = answersMode();
+  const sides = mode === 'off' ? null : answerSides(trees[0], merged);
+  if (!sides || stopped(callbacks)) return merged;
+  const started = Date.now();
+  try {
+    const added = await Promise.all(sides.map(async view => {
+      if (mode === 'full') return addedAnswers(view, mode, []);
+      const jobs = detectionJobs(view, merged);
+      return jobs.length === 0 ? [] : addedAnswers(view, mode, await executor.evalCells(jobs));
+    }));
+    if (stopped(callbacks) || added.every(list => list.length === 0)) return merged;
+    const perSide = await Promise.all(sides.map(async (view, index) => (added[index].length === 0
+      ? merged.perSide[view.side]
+      : gradedRanking(view, merged, trees[0], added[index], await executor.evalCells(extensionJobs(view, added[index]))))));
+    return stopped(callbacks) ? merged : { ...merged, perSide: { p1: perSide[0], p2: perSide[1] } };
+  } catch {
+    return merged;
+  } finally {
+    perfAdd('answer-round', Date.now() - started);
+  }
+}
+
 export async function searchTreesOrchestrated(
   executor: TreeExecutor, settings: EvalSettings, callbacks?: OrchestratorCallbacks,
 ): Promise<EvalResult> {
   const trees = await runTrees(executor, settings, callbacks);
-  const result = await verifiedMerge(executor, trees, settings, callbacks);
+  const result = await answerRound(executor, trees, await verifiedMerge(executor, trees, settings, callbacks), callbacks);
   if (stopped(callbacks) || settings.prove === false) return result;
   const started = Date.now();
   const outcome = await executor.prove(forcedWinInput(result, settings));
