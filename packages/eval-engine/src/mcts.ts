@@ -3,7 +3,7 @@ import { createRootPosition, legalChoices, positionBattle } from './forward-mode
 import { koOddsForOptions, planCellEvents } from './cell-blend.ts';
 import { cellKey, rankFromMatrix, toResult as rankedToResult } from './rank.ts';
 import { attachKoOdds, hasUnansweredContent, koOddsMapsFor } from './search/root-payload.ts';
-import { topVisitedIndex } from './mcts-merge.ts';
+import { topVisitedIndex, treeScore } from './mcts-merge.ts';
 import { makeNode, pick, principalVariation, treeMatrix, type Node } from './search/mcts-node.ts';
 import { cellStats, isChanceNode, pickClass } from './search/chance-node.ts';
 import { expandCell, type ExpansionContext, type RootClassBook } from './search/expansion.ts';
@@ -79,7 +79,8 @@ function toResult(
   const j = topVisitedIndex(root.p2N);
   const v1 = i >= 0 ? root.p1W[i] / root.p1N[i] : root.value;
   const v2 = j >= 0 ? root.p2W[j] / root.p2N[j] : root.value;
-  result.score = (v1 + v2) / 2;
+  // rankedToResult wrote the matrix mode's score; the visit mean replaces it unless EVAL_TREE_SCORE says otherwise (T114).
+  result.score = treeScore((v1 + v2) / 2, result.score);
   result.interval = Math.abs(v2 - v1);
   if (result.perSide.p1.length > 0) {
     const line = principalVariation(root);
