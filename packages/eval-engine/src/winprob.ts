@@ -57,21 +57,25 @@ export const WINPROB_K = {
 } as const;
 
 /**
- * Round 67 (T138): Pokémon Champions prices its own scale. Fitted on its own
- * corpus games in the app's build on the Champions mod with the round-67
- * tables, the holdout and unrated ladder games left out (regression/
- * fit-families.ts phaseKReports): singles 1.64 + 4.41·ff (1,956 positions of
- * 285 sets; K at a third fainted 3.11 [2.50, 3.93]), doubles 1.86 + 4.17·ff
- * (2,510 positions of 386 sets; 3.25 [2.83, 3.65]). The Scarlet/Violet K read
- * the early Champions game too confidently and the late one too timidly. The
- * thresholds in wp-units stay where they are (wave 2, decision 33).
+ * Round 67 (T138): Pokémon Champions doubles prices its own scale. Fitted on
+ * its own corpus games in the app's build on the Champions mod with the
+ * round-67 tables, the holdout and unrated ladder games left out (regression/
+ * fit-families.ts phaseKReports): 1.86 + 4.17·ff (2,510 positions of 386
+ * sets; K at a third fainted 3.25 [2.83, 3.65]). On the Champions VGC holdout
+ * with search it reads −16 bp [−27, −5] with the base's K (early −40) and
+ * level with own K per phase: the Scarlet/Violet doubles K read the early
+ * Champions game too confidently. Champions singles keeps the singles K: its
+ * fit, 1.64 + 4.41·ff (1,956 positions of 285 sets), read the Champions OU
+ * holdout −28 [−56, +1] with the base's K but its mid game worse in both
+ * tables (+35 [+7, +65], own K +26 [+3, +47]). The thresholds in wp-units
+ * stay where they are (wave 2, decision 33).
  */
 export const CHAMPIONS_WINPROB_K = {
-  singles: { k0: 1.64, k1: 4.41 },
+  singles: WINPROB_K.singles,
   doubles: { k0: 1.86, k1: 4.17 },
 } as const;
 
-/** The leaf's phase K of a game type under a rule set: Champions its own, every other rule set its game type's. */
+/** The leaf's phase K of a game type under a rule set: Champions doubles its own, every other case its game type's. */
 export function winprobK(doubles: boolean, ruleset: StaticRuleset = 'standard'): { readonly k0: number; readonly k1: number } {
   const table = ruleset === 'champions' ? CHAMPIONS_WINPROB_K : WINPROB_K;
   return doubles ? table.doubles : table.singles;
