@@ -2,6 +2,7 @@ import { Generations, Pokemon, Move, Field, calculate } from '@smogon/calc';
 import { Dex } from '@pkmn/sim';
 import type { SimPokemonInfo, BranchMoveOption } from './branch-engine.ts';
 import { toId, TERRAIN_BY_ID, WEATHER_BY_ID } from '@fulllifegames/replay-core';
+import { hitDraws } from './calc/hit-draws.ts';
 
 type CalcPokemonOptions = ConstructorParameters<typeof Pokemon>[2];
 type CalcBoosts = NonNullable<CalcPokemonOptions>['boosts'];
@@ -161,8 +162,6 @@ function sharesOf(drawn: readonly number[]): HitCount[] {
   return [...counts].sort(([a], [b]) => a - b).map(([hits, count]) => ({ hits, chance: count / drawn.length }));
 }
 
-const range = (low: number, high: number) => Array.from({ length: high - low + 1 }, (_, index) => low + index);
-
 type GearHolder = Pick<SimPokemonInfo, 'ability' | 'item' | 'species'>;
 type ModifyMoveHandler = (this: unknown, move: unknown, pokemon: unknown, target: unknown) => void;
 
@@ -201,29 +200,17 @@ function askModifyMove(gen: number, attacker: GearHolder, moveName: string) {
 
 /**
  * The hit counts the simulator's hit loop draws for one use of the move
- * (battle-actions hitStepMoveHitLoop), or null when the Dex fixes one count
+ * (calc/hit-draws.ts, held against the simulator's own draws by
+ * test/damage-calc-hit-counts.spec.ts), or null when the Dex fixes one count
  * and the calc's own reading stands. A count the attacker's ability sets
- * (multihitAtUse) goes to the calc as such. The loop's draws live inline in
- * the simulator, with no handler to ask, so they are mirrored here as in
- * score/move-facts.ts, and test/damage-calc-hit-counts.spec.ts holds them
- * against the simulator's own draws: 2 to 5 hits sample
- * 2/2/2/2/2/2/2/3/3/3/3/3/3/3/4/4/4/5/5/5 from gen 5 on and 2/2/2/3/3/3/4/5
- * before; Loaded Dice turns a count under 4 into 4 or 5 and ten hits into
- * 4 to 10.
+ * (multihitAtUse) goes to the calc as such.
  */
 export function hitCounts(gen: number, attacker: GearHolder, moveName: string): HitCount[] | null {
-  const listed = Dex.forGen(gen).moves.get(moveName).multihit;
   const multihit = multihitAtUse(gen, attacker, moveName);
-  const loadedDice = gen >= 5 && toId(attacker.item) === 'loadeddice';
   if (!multihit) return null;
-  if (typeof multihit === 'number') {
-    if (multihit === 10 && loadedDice) return sharesOf(range(4, 10));
-    return multihit === listed ? null : [{ hits: multihit, chance: 1 }];
-  }
-  const [low, high] = multihit;
-  if (low !== 2 || high !== 5) return sharesOf(range(low, high));
-  const drawn = gen >= 5 ? [2, 2, 2, 2, 2, 2, 2, 3, 3, 3, 3, 3, 3, 3, 4, 4, 4, 5, 5, 5] : [2, 2, 2, 3, 3, 3, 4, 5];
-  return sharesOf(loadedDice ? drawn.flatMap(hits => (hits < 4 ? [4, 5] : [hits, hits])) : drawn);
+  const drawn = hitDraws(gen, multihit, toId(attacker.item) === 'loadeddice');
+  if (drawn.length === 1 && multihit === Dex.forGen(gen).moves.get(moveName).multihit) return null;
+  return sharesOf(drawn);
 }
 
 /** The calc gives exact KO odds up to four hits; past that it only estimates, and the picker stays quiet. */

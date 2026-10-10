@@ -1,4 +1,5 @@
 import type { ActiveMove, Battle, BoostsTable, ID, Pokemon } from '@pkmn/sim';
+import { hitDraws } from '../calc/hit-draws.ts';
 import { CONTEXT_MOVES, moveAtUse, RULE_ABILITIES, RULE_MOVES, type ItemLike, type MoveAtUse, type MoveField, type MoveUser } from '../move-use.ts';
 
 /**
@@ -254,20 +255,14 @@ const skillLink = (attacker: Pokemon) => String(attacker.ability) === 'skilllink
 const loadedDice = (attacker: Pokemon) => attacker.item === 'loadeddice';
 
 /**
- * The expected hit count of the simulator's hit loop (battle-actions.js
- * hitStepMoveHitLoop). Its rules live inline there, with no handler to ask,
- * so they are mirrored here and test/multi-hit.spec.ts holds them against
- * the simulator (the array it samples, its counts per turn): 2 to 5 hits are
- * 2/2/2/2/2/2/2/3/3/3/3/3/3/3/4/4/4/5/5/5 from gen 5 on (mean 3.1) and
- * 2/2/2/3/3/3/4/5 before (3.0); Skill Link takes the top count; Loaded Dice
- * turns a count under 4 into 4 or 5 (mean 4.5) and ten hits into 4 to 10 (7).
+ * The expected hit count of the simulator's hit loop: the mean of the array
+ * it samples (calc/hit-draws.ts; test/multi-hit.spec.ts holds it against the
+ * simulator's counts per turn), 3.1 for 2 to 5 hits from gen 5 on, 3 before,
+ * 4.5 and 7 under Loaded Dice. Skill Link takes the top count.
  */
 function expectedHits(attacker: Pokemon, multihit: number | number[], gen: number): number {
-  if (typeof multihit === 'number') return multihit === 10 && loadedDice(attacker) ? 7 : multihit;
-  const [low, high] = multihit;
-  if (skillLink(attacker)) return high;
-  if (low === 2 && high === 5) return gen >= 5 ? (loadedDice(attacker) ? 4.5 : 3.1) : 3;
-  return (low + high) / 2;
+  const drawn = hitDraws(gen, Array.isArray(multihit) && skillLink(attacker) ? multihit[1] : multihit, loadedDice(attacker));
+  return drawn.reduce((sum, hits) => sum + hits, 0) / drawn.length;
 }
 
 /**
