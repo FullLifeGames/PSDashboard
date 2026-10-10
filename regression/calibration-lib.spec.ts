@@ -5,8 +5,8 @@ import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { brierScore, fitConstantK } from './fit-helpers';
 import {
-  bandLines, bankVerdict, brier, compareSamples, fitConstantK as fitConstantKJs, load, mergeDumps, ownKBands, pairedBands,
-  sortSamples, summarize,
+  asScore, bandLines, bankVerdict, brier, compareSamples, fitConstantK as fitConstantKJs, load, mergeDumps, ownKBands, pairedBands,
+  sortSamples, summarize, takeFieldArgs,
 } from '../scripts/calibration-lib.mjs';
 
 /**
@@ -106,6 +106,18 @@ describe('calibration lib', () => {
     const keys = (samples: { id: string; turn: number }[]) => samples.map(sample => `${sample.id}#${sample.turn}`);
     expect(keys(load(`${bank},${holdout}`))).toEqual(['gen9ou-1#2', 'gen9doublesou-2#3', 'gen9vgc2026regi-3#4']);
     expect(keys(load(holdout))).toEqual(['gen9doublesou-2#3', 'gen9vgc2026regi-3#4']);
+  });
+
+  // Round 67 (T114): one bank run pairs the root's solved game value against its score.
+  test('a field flag reads another number as the score; a sample without it keeps its score', () => {
+    const { argv, aField, bField } = takeFieldArgs(['a.jsonl', '--b-field', 'gameValue', 'b.jsonl', '--quality', 'hq']);
+    expect(argv).toEqual(['a.jsonl', 'b.jsonl', '--quality', 'hq']);
+    expect([aField, bField]).toEqual([null, 'gameValue']);
+    expect(takeFieldArgs(['--a-field', 'gameValue', 'a.jsonl', 'b.jsonl'])).toEqual({ argv: ['a.jsonl', 'b.jsonl'], aField: 'gameValue', bField: null });
+    const samples = [{ id: 'gen9ou-1', turn: 2, score: 0.4, gameValue: 0.9 }, { id: 'gen9ou-1', turn: 5, score: -0.2, gameValue: null }];
+    expect(asScore(samples, 'gameValue').map(sample => sample.score)).toEqual([0.9, -0.2]);
+    expect(asScore(samples, null)).toBe(samples);
+    expect(() => takeFieldArgs(['a.jsonl', 'b.jsonl', '--b-field'])).toThrow('--b-field expects a field name');
   });
 });
 

@@ -37,6 +37,30 @@ export const brier = (samples, k) =>
 export const load = path => path.split(',').flatMap(one =>
   readFileSync(one, 'utf8').split('\n').filter(line => line.trim()).map(line => JSON.parse(line)));
 
+/**
+ * Round 67 (T114): `--a-field <name>` and `--b-field <name>` read another number of a
+ * side's dump as its score (the root's solved `gameValue`), so one bank run pairs its
+ * game value against its score; the flags leave the rest of argv in order.
+ */
+export function takeFieldArgs(argv) {
+  let rest = argv;
+  const fields = { aField: null, bField: null };
+  for (const [flag, name] of [['--a-field', 'aField'], ['--b-field', 'bField']]) {
+    const index = rest.indexOf(flag);
+    if (index < 0) continue;
+    const field = rest[index + 1];
+    if (!field || field.startsWith('--')) throw new Error(`${flag} expects a field name`);
+    fields[name] = field;
+    rest = [...rest.slice(0, index), ...rest.slice(index + 2)];
+  }
+  return { argv: rest, ...fields };
+}
+
+/** The samples with `field` as their score; a sample without a number there keeps its score. */
+export const asScore = (samples, field) => (field
+  ? samples.map(s => (typeof s[field] === 'number' ? { ...s, score: s[field] } : s))
+  : samples);
+
 export const right = s => (s.score > 0) === s.p1Won;
 
 /** Code-unit order by replay id, then turn: the order the harness and the slice merge both sum in. */

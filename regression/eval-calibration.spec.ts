@@ -5289,6 +5289,12 @@ interface Sample {
   phase: 'early' | 'mid' | 'late';
   gameType: 'singles' | 'doubles';
   score: number;
+  /**
+   * Round 67 (T114): the root's solved matrix value next to the score (tree
+   * turns score the visit mean), null without a full matrix or under
+   * EVAL_CALIBRATION_STATIC=1. Observational: paired-calibration reads it with --b-field gameValue.
+   */
+  gameValue: number | null;
   /** Fainted bodies / total bodies at the sampled position. */
   faintedFraction: number;
   p1Won: boolean;
@@ -5330,7 +5336,7 @@ const decidedSideOf = (result: ReturnType<typeof searchPosition>): Sample['decid
 const heldSideOf = (result: ReturnType<typeof searchPosition>): Sample['decidedHeld'] =>
   heldDecided(result)?.side ?? null;
 
-type RootReading = Pick<Sample, 'score' | 'decided' | 'decidedHeld' | 'forcedWinMass' | 'forcedWinTurns'>;
+type RootReading = Pick<Sample, 'score' | 'gameValue' | 'decided' | 'decidedHeld' | 'forcedWinMass' | 'forcedWinTurns'>;
 
 /**
  * The root's reading of a sampled position: the bank's search, or with
@@ -5342,10 +5348,13 @@ type RootReading = Pick<Sample, 'score' | 'decided' | 'decidedHeld' | 'forcedWin
 async function rootReading(battle: Battle, args: Parameters<typeof bankSearch>[0]): Promise<RootReading> {
   if (process.env.EVAL_CALIBRATION_STATIC === '1') {
     const score = leafValue(battle, createMatchupCache(args.settings.ruleset));
-    return { score, decided: null, decidedHeld: null, forcedWinMass: null, forcedWinTurns: null };
+    return { score, gameValue: null, decided: null, decidedHeld: null, forcedWinMass: null, forcedWinTurns: null };
   }
   const result = await bankSearch(args);
-  return { score: result.score, decided: decidedSideOf(result), decidedHeld: heldSideOf(result), ...forcedWinFields(result) };
+  return {
+    score: result.score, gameValue: result.gameValue ?? null,
+    decided: decidedSideOf(result), decidedHeld: heldSideOf(result), ...forcedWinFields(result),
+  };
 }
 
 /**
@@ -5443,9 +5452,11 @@ function passInstrument(
  * at most three living bodies), one JSON file per id#turn.
  */
 async function exportPosition(
-  dir: string | undefined, sample: Sample, serialized: string, living: number, settings: { tera: unknown; sleepClause: boolean },
+  dir: string | undefined, sample: Sample, serialized: string, living: number,
+  settings: { tera: unknown; sleepClause: boolean; ruleset: unknown },
 ): Promise<void> {
   // Round 61: EVAL_CALIBRATION_EXPORT_ALL=1 exports every position (the play-out probe), with the search's Tera and Sleep Clause.
+  // Round 67 (T139): and the replay's rule set, so a consumer (the endgame truth bench) computes with the position's own tables.
   const all = process.env.EVAL_CALIBRATION_EXPORT_ALL === '1';
   if (!dir || !(all || sample.lastPair || sample.decided !== null || living <= 3)) return;
   const fs = await import('node:fs');
@@ -5453,7 +5464,7 @@ async function exportPosition(
   const { id, turn, gameType, tranche, quality, p1Won, score, decided, lastPair, faintedFraction } = sample;
   fs.writeFileSync(`${dir}/${id}#${turn}.json`, JSON.stringify({
     id, turn, serialized, gameType, tranche, quality, p1Won, score, decided, lastPair, faintedFraction,
-    tera: settings.tera, sleepClause: settings.sleepClause,
+    tera: settings.tera, sleepClause: settings.sleepClause, ruleset: settings.ruleset,
   }));
 }
 
@@ -5661,6 +5672,7 @@ describe.skipIf(!process.env.EVAL_CALIBRATION)('eval calibration against real re
             phase: phaseOf(turn, maxTurn),
             gameType,
             score,
+            gameValue: root.gameValue,
             faintedFraction,
             p1Won,
             // Round 32 enabler for Q4: the root's decided-sweep side, so the

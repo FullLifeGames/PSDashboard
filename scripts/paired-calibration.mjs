@@ -2,6 +2,8 @@
 // Usage: node scripts/paired-calibration.mjs <a.jsonl> <b.jsonl>
 // Each side may name several dumps joined by commas (round 65, D26: the
 // doubles verdict reads the bank's dump together with the holdout's).
+// `--b-field gameValue` reads side B's root game value as its score (round 67,
+// T114: one run pairs its game value against its score).
 // Joins the two dumps on id#turn (identical positions only), reproduces the
 // harness aggregates for each side, prints the verdict table with error bars
 // (paired Brier deltas under the A side's K, 90 % band from a bootstrap over
@@ -14,18 +16,21 @@
 // methodology exactly (pooled constant-K logistic fit via 500-iteration GD,
 // Brier under that K), so numbers here are comparable to the printed sweep
 // output.
-import { bandLines, filterQuality, load, ownKBands, pairedBands, record, right, takeQualityArg } from './calibration-lib.mjs';
+import {
+  asScore, bandLines, filterQuality, load, ownKBands, pairedBands, record, right, takeFieldArgs, takeQualityArg,
+} from './calibration-lib.mjs';
 
 const key = s => `${s.id}#${s.turn}`;
 
-const { argv, quality } = takeQualityArg(process.argv.slice(2));
+const { argv: rest, aField, bField } = takeFieldArgs(process.argv.slice(2));
+const { argv, quality } = takeQualityArg(rest);
 const [aPath, bPath] = argv;
 if (!aPath || !bPath) {
-  console.error('usage: node scripts/paired-calibration.mjs <a.jsonl> <b.jsonl> [--quality hq|std]');
+  console.error('usage: node scripts/paired-calibration.mjs <a.jsonl> <b.jsonl> [--quality hq|std] [--a-field <name>] [--b-field <name>]');
   process.exit(1);
 }
-const a = filterQuality(load(aPath), quality);
-const b = filterQuality(load(bPath), quality);
+const a = asScore(filterQuality(load(aPath), quality), aField);
+const b = asScore(filterQuality(load(bPath), quality), bField);
 const bByKey = new Map(b.map(s => [key(s), s]));
 const joined = a
   .filter(s => bByKey.has(key(s)))
