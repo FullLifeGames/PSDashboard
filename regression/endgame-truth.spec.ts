@@ -7,8 +7,9 @@ import { createRootPosition, positionBattle } from '../packages/eval-engine/src/
 import { CHAMPIONS_DOUBLES_FEATURE_WEIGHTS, CHAMPIONS_FEATURE_WEIGHTS, createMatchupCache, type StaticRuleset } from '../packages/eval-engine/src/eval-function';
 import { leafValue } from '../packages/eval-engine/src/search/leaf';
 import { setLastPairSweep } from '../packages/eval-engine/src/score/last-pair';
-import { AUTO_MCTS_FAINTED_FRACTION, battleFaintedFraction, searchPosition } from '../packages/eval-engine/src/search';
-import { mctsSearch } from '../packages/eval-engine/src/mcts';
+import { battleFaintedFraction, searchPosition } from '../packages/eval-engine/src/search';
+import { autoTurnSettings } from '../packages/eval-engine/src/search/budget';
+import { createLocalTreeExecutor, searchTreesOrchestrated } from '../packages/eval-engine/src/tree-orchestrator';
 
 /**
  * The endgame truth bench (round 34): every estimator against the solver
@@ -41,8 +42,10 @@ interface Item {
   ruleset: StaticRuleset;
 }
 interface Estimates {
-  static: number; staticB: number; d1: number; d2: number; d3: number; mcts: number;
-  /** Round 35: the sweep's auto mode with the forced-win bar, and the proven mass behind it. */
+  static: number; staticB: number; d1: number; d2: number; d3: number;
+  /** Round 67 (T114, T111 point 9): the app's tree (searchTreesOrchestrated: four trees, verify, answers, prover), its score and its game value. */
+  mcts: number; mctsGameValue: number | null;
+  /** Round 35: the sweep's auto mode with the forced-win bar, and the proven mass behind it (round 67: the app's dispatch per game type). */
   prover: number; proverMass: number | null;
 }
 
@@ -69,23 +72,25 @@ const syntheticItems = (): Item[] => ENDGAME_FIXTURES.map(fixture => ({
   serialized: JSON.stringify(State.serializeBattle(fixture.build())), ruleset: 'standard',
 }));
 
-function estimate(serialized: string, ruleset: StaticRuleset): Estimates {
+async function estimate(serialized: string, ruleset: StaticRuleset): Promise<Estimates> {
   const battle = positionBattle(createRootPosition(serialized, ruleset));
   const staticValue = leafValue(battle, createMatchupCache(ruleset));
   setLastPairSweep(true);
   const staticB = leafValue(battle, createMatchupCache(ruleset));
   setLastPairSweep(false);
-  const proverSettings = { depth: 1 as const, samples: 1 as const, tera: false as const, ruleset };
-  const proverScore = battleFaintedFraction(battle) >= AUTO_MCTS_FAINTED_FRACTION
-    ? mctsSearch(serialized, proverSettings)
-    : searchPosition(serialized, proverSettings);
+  // Round 67 (T114, T111 point 9): the tree the app computes, not one bare tree (mctsSearch read 0.999 at
+  // doubles-spread-2v1 where the app read 0.355); the auto column takes the app's dispatch per game type.
+  const tree = await searchTreesOrchestrated(createLocalTreeExecutor(serialized, ruleset), { depth: 1, samples: 1, mode: 'mcts', tera: false, ruleset });
+  const auto = autoTurnSettings(battleFaintedFraction(battle), battle.gameType === 'doubles');
+  const proverScore = auto.mode === 'mcts' ? tree : searchPosition(serialized, { depth: auto.depth, samples: auto.samples, tera: false, ruleset });
   return {
     static: staticValue,
     staticB,
     d1: searchPosition(serialized, { depth: 1, samples: 1, tera: false, ruleset }).score,
     d2: searchPosition(serialized, { depth: 2, samples: 3, tera: false, ruleset }).score,
     d3: searchPosition(serialized, { depth: 3, samples: 3, tera: false, ruleset }).score,
-    mcts: mctsSearch(serialized, { depth: 1, samples: 1, tera: false, ruleset }).score,
+    mcts: tree.score,
+    mctsGameValue: tree.gameValue ?? null,
     prover: proverScore.score,
     proverMass: proverScore.forcedWin?.mass ?? null,
   };
@@ -148,7 +153,7 @@ describe.skipIf(process.env.EVAL_ENDGAME_TRUTH !== '1')('endgame truth bench (ro
         continue;
       }
       const ms = earlier ? earlier.ms : Date.now() - started;
-      const estimators = exact.scope ? estimate(item.serialized, item.ruleset) : null;
+      const estimators = exact.scope ? await estimate(item.serialized, item.ruleset) : null;
       const row = { name: item.name, source: item.source, gameType: item.gameType, decided: item.decided, ...exact, ms, estimators };
       console.log(`${item.name} ${item.gameType} exact=${exact.exact} flags=${exact.flags.join(',') || '-'} value=${exact.value.toFixed(3)} states=${exact.states} depth=${exact.depth} ${ms}ms`);
       if (fs) fs.appendFileSync(process.env.EVAL_ENDGAME_DUMP!, JSON.stringify(row) + '\n');
@@ -156,13 +161,13 @@ describe.skipIf(process.env.EVAL_ENDGAME_TRUTH !== '1')('endgame truth bench (ro
   });
 });
 
-/** The Champions tables with some weights of their own for one call (both game types), as static-ruleset.spec.ts does. */
-function withChampionsTables<T>(weights: Partial<typeof CHAMPIONS_FEATURE_WEIGHTS>, run: () => T): T {
+/** The Champions tables with some weights of their own for one run (both game types), as static-ruleset.spec.ts does. */
+async function withChampionsTables<T>(weights: Partial<typeof CHAMPIONS_FEATURE_WEIGHTS>, run: () => Promise<T>): Promise<T> {
   const saved = [{ ...CHAMPIONS_FEATURE_WEIGHTS }, { ...CHAMPIONS_DOUBLES_FEATURE_WEIGHTS }];
   Object.assign(CHAMPIONS_FEATURE_WEIGHTS, weights);
   Object.assign(CHAMPIONS_DOUBLES_FEATURE_WEIGHTS, weights);
   try {
-    return run();
+    return await run();
   } finally {
     Object.assign(CHAMPIONS_FEATURE_WEIGHTS, saved[0]);
     Object.assign(CHAMPIONS_DOUBLES_FEATURE_WEIGHTS, saved[1]);
@@ -187,12 +192,12 @@ describe('the endgame bench reads the rule set of each position (round 67, T139)
     expect(syntheticItems().every(item => item.ruleset === 'standard')).toBe(true);
   });
 
-  test('the solver and the estimators weigh a Champions position by the Champions table', { timeout: 120_000 }, () => {
+  test('the solver and the estimators weigh a Champions position by the Champions table', { timeout: 120_000 }, async () => {
     const item = { ...syntheticItems().find(fixture => fixture.name === 'doubles-1v2-spread')!, ruleset: 'champions' as StaticRuleset };
     const skew = { matchup: 2000, bodies: 20 };
     // A turn cap of 0 makes the root itself the solver's stand-in leaf, the value its rule set weighs.
-    const standard = { estimates: estimate(item.serialized, 'standard'), solved: solveItem({ ...item, ruleset: 'standard' }, { turns: 0 }) };
-    const champions = withChampionsTables(skew, () => ({ estimates: estimate(item.serialized, 'champions'), solved: solveItem(item, { turns: 0 }) }));
+    const standard = { estimates: await estimate(item.serialized, 'standard'), solved: solveItem({ ...item, ruleset: 'standard' }, { turns: 0 }) };
+    const champions = await withChampionsTables(skew, async () => ({ estimates: await estimate(item.serialized, 'champions'), solved: solveItem(item, { turns: 0 }) }));
     expect(champions.estimates.static).not.toBe(standard.estimates.static);
     expect(champions.estimates.d1).not.toBe(standard.estimates.d1);
     expect(champions.solved.value).not.toBe(standard.solved.value);

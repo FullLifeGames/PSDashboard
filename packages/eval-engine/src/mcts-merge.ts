@@ -210,6 +210,31 @@ function visitMeanScore(trees: MctsTreeStats[], base: MctsTreeStats): { score: n
   return { score: (v1 + v2) / 2, interval: Math.abs(v2 - v1) };
 }
 
+export type TreeScoreForm = 'visits' | 'game' | 'mix';
+
+const treeScoreEnv = (): string | undefined =>
+  (globalThis as { process?: { env?: Record<string, string | undefined> } }).process?.env?.EVAL_TREE_SCORE;
+
+/**
+ * Round 67 (T114): the score's form on tree turns, a measurement switch
+ * until the user's gate decides: EVAL_TREE_SCORE under Node, 'visits'
+ * otherwise; a typo throws. 'visits' is the visit mean (hybrid semantics),
+ * 'game' the matrix mode's score (the solved game value clamped into the
+ * maximin interval), 'mix' their midpoint. The rankings never move with it.
+ */
+export function treeScoreForm(): TreeScoreForm {
+  const raw = treeScoreEnv();
+  if (raw === undefined || raw === '') return 'visits';
+  if (raw === 'visits' || raw === 'game' || raw === 'mix') return raw;
+  throw new Error(`EVAL_TREE_SCORE must be visits, game or mix, got ${raw}`);
+}
+
+/** The tree's score in the form in force, from the visit mean and the matrix mode's score of the same ranking. */
+export function treeScore(visitMean: number, matrixScore: number): number {
+  const form = treeScoreForm();
+  return form === 'game' ? matrixScore : form === 'mix' ? (visitMean + matrixScore) / 2 : visitMean;
+}
+
 /** Most-visited index (ties keep the lower index — the old rank order). */
 export function topVisitedIndex(n: number[]): number {
   let best = -1;
@@ -257,7 +282,8 @@ export function mergeMctsTrees(trees: MctsTreeStats[], verified?: Map<number, Ev
   if (base.result.unanswered) result.unanswered = base.result.unanswered;
 
   const { score, interval } = visitMeanScore(trees, base);
-  result.score = score;
+  // rankedToResult wrote the matrix mode's score; the visit mean replaces it unless EVAL_TREE_SCORE says otherwise (T114).
+  result.score = treeScore(score, result.score);
   result.interval = interval;
   attachDonorLine(trees, result);
 
