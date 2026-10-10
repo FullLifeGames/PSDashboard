@@ -66,8 +66,11 @@ export function makePreviewAcquire(
     if (p1Team.length === 0 || p2Team.length === 0) return null;
     // Bring-limited replays: the lead analysis enumerates pairs over the
     // brought species, not the whole six. Per-side fail-open keeps an
-    // unpinned side's full pool.
-    return branchEngine.serializePreviewPosition(getBranchSimulatorFormat(replayData), p1Team, p2Team, bringOnlyLists);
+    // unpinned side's full pool. A Champions preview plays on the Champions
+    // mod, loaded first (round 67, T145).
+    const format = getBranchSimulatorFormat(replayData);
+    await branchEngine.loadSimMods(format);
+    return branchEngine.serializePreviewPosition(format, p1Team, p2Team, bringOnlyLists);
   };
 }
 

@@ -6,6 +6,7 @@ export {
   applyTargetCorrections, reconstructionReached, validateBranchRuntime, correctActivesFromProtocol,
   captureSerializedPosition, createBranchState, createBranchStateFromBattle, serializePreviewPosition,
   annotateNicknames, executeBranchChoices, resolveSideChoices, reconstructBranchRuntime, adoptSerializedRuntime,
+  loadSimMods, loadSimModsFor,
 } from '@fulllifegames/eval-engine';
 export type {
   BranchChoiceErrorLog, BranchExecuteResult, BranchFieldState, BranchMoveOption, BranchRuntime, BranchSimState,
