@@ -20,6 +20,7 @@ import { forcedWinFor } from './forced-win.ts';
 import { applyForcedWin, forcedWinInput } from './forced-win-apply.ts';
 import { perfSync } from '../perf-trace.ts';
 import { buildMatrix, cellValueMemo, maximinRows, minimaxColumns, type Matrix, type SearchCallbacks } from './matrix.ts';
+import { benchOrder, callbacksToGiven, executorToGiven, resultToGiven } from './bench-order.ts';
 
 /**
  * The sync search: the pruned depth-1 sub-search, the full root search with
@@ -50,7 +51,7 @@ export function subSearchDepth1(
   const p1Options = searchOptions(root, 'p1', { tera, keep: settings.keepPlayed?.p1Slots, sleepClause: settings.sleepClause });
   const p2Options = searchOptions(root, 'p2', { tera, keep: settings.keepPlayed?.p2Slots, sleepClause: settings.sleepClause });
   if (p1Options.length === 0 || p2Options.length === 0) {
-    return searchPosition(serializedBattle, settings, undefined, matchupCache);
+    return searchOn(serializedBattle, settings, undefined, matchupCache);
   }
 
   const cellValue = cellValueMemo(root, countFainted(battle), p1Options, p2Options, settings.samples, matchupCache);
@@ -81,7 +82,7 @@ export function subSearchDepth1(
 function subSearch(serializedBattle: string, settings: EvalSettings, matchupCache: MatchupCache): EvalResult {
   return settings.depth === 1
     ? subSearchDepth1(serializedBattle, settings, matchupCache)
-    : searchPosition(serializedBattle, settings, undefined, matchupCache, true);
+    : searchOn(serializedBattle, settings, undefined, matchupCache, true);
 }
 
 /** The root's option lists: restricted for deep sub-searches, pivot-expanded for the root matrix. */
@@ -199,7 +200,25 @@ function applyTrendLayers(
   applyTrendTiebreak(state.matrix, result, state.trendMap);
 }
 
+/**
+ * Round 67 (T129): a root search runs on the board with its bench in
+ * canonical order (search/bench-order.ts) and names its choices, partial
+ * results included, in the given board's slots. Sub-searches run on the
+ * children of that board as they stand.
+ */
 export function searchPosition(
+  serializedBattle: string,
+  settings: EvalSettings,
+  callbacks?: SearchCallbacks,
+  matchupCache: MatchupCache = createMatchupCache(settings.ruleset),
+  restrictCandidates = false,
+): EvalResult {
+  const order = restrictCandidates ? null : benchOrder(serializedBattle);
+  if (!order) return searchOn(serializedBattle, settings, callbacks, matchupCache, restrictCandidates);
+  return resultToGiven(order, searchOn(order.serialized, settings, callbacksToGiven(order, callbacks), matchupCache, restrictCandidates));
+}
+
+function searchOn(
   serializedBattle: string,
   settings: EvalSettings,
   callbacks?: SearchCallbacks,
@@ -261,6 +280,13 @@ export function searchPosition(
  * serves one position under one rule set, whose weight table its statics read.
  */
 export function createLocalExecutor(serializedBattle: string, ruleset: StaticRuleset = 'standard'): SearchExecutor {
+  // Round 67 (T129): the executor serves the canonical bench and speaks the given board's slots.
+  const order = benchOrder(serializedBattle);
+  if (!order) return localExecutorOn(serializedBattle, ruleset);
+  return executorToGiven(order, localExecutorOn(order.serialized, ruleset));
+}
+
+function localExecutorOn(serializedBattle: string, ruleset: StaticRuleset): SearchExecutor {
   const matchupCache = createMatchupCache(ruleset);
   const root = createRootPosition(serializedBattle, ruleset);
   return {

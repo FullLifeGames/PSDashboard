@@ -11,6 +11,7 @@ import { forcedWinFor } from './search/forced-win.ts';
 import { applyForcedWin, forcedWinInput } from './search/forced-win-apply.ts';
 import { perfSync } from './perf-trace.ts';
 import { searchBudget, SEARCH_BUDGET_DEFAULT } from './search/budget.ts';
+import { benchOrder, callbacksToGiven, resultToGiven, treeToGiven } from './search/bench-order.ts';
 import type { EvalResult, EvalSettings, KoOddsInfo, MctsTreeStats, SearchProgress, UnansweredProfile } from './types.ts';
 
 /**
@@ -211,11 +212,18 @@ function runMcts(
   return { root, maxDepth, result, koOdds, rootClassKeys: book.keys };
 }
 
+/** Round 67 (T129): the tree runs on the board with its bench in canonical order and names its choices in the given board's slots. */
 export function mctsSearch(
   serializedBattle: string,
   settings: EvalSettings,
   callbacks?: MctsCallbacks,
 ): EvalResult {
+  const order = benchOrder(serializedBattle);
+  if (!order) return mctsSearchOn(serializedBattle, settings, callbacks);
+  return resultToGiven(order, mctsSearchOn(order.serialized, settings, callbacksToGiven(order, callbacks)));
+}
+
+function mctsSearchOn(serializedBattle: string, settings: EvalSettings, callbacks?: MctsCallbacks): EvalResult {
   const { result } = runMcts(serializedBattle, settings, callbacks);
   if (settings.prove !== false) {
     applyForcedWin(result, perfSync('prover', () => forcedWinFor(createRootPosition(serializedBattle, settings.ruleset), forcedWinInput(result, settings))));
@@ -223,8 +231,19 @@ export function mctsSearch(
   return result;
 }
 
-/** One parallel tree's run: root statistics plus its own ranked result. */
+/** One parallel tree's run: root statistics plus its own ranked result (round 67: on the canonical bench, named in the given slots). */
 export function mctsTreeSearch(
+  serializedBattle: string,
+  settings: EvalSettings,
+  seedOffset: number,
+  callbacks?: MctsCallbacks,
+): MctsTreeStats {
+  const order = benchOrder(serializedBattle);
+  if (!order) return treeSearchOn(serializedBattle, settings, seedOffset, callbacks);
+  return treeToGiven(order, treeSearchOn(order.serialized, settings, seedOffset, callbacksToGiven(order, callbacks)));
+}
+
+function treeSearchOn(
   serializedBattle: string,
   settings: EvalSettings,
   seedOffset: number,
