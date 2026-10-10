@@ -105,7 +105,7 @@ describe('the predictive read before the click', () => {
       p2Labels: ['Rock Slide + Knock Off', 'Protect + Trick Room'], p2Choices: ['move rockslide, move knockoff 1', 'move protect, move trickroom'],
     }), { played: null, playedOutcome: null });
     expect(summarizeTurn(analysis, names)).toContain(
-      'If Alpha expects Rock Slide + Knock Off (67% on the opponent model), switching to Noivern + Tailwind is the move — +50% over Fake Out + Moonblast against it.');
+      'If Alpha expects Rock Slide + Knock Off (67% on the opponent model), switching to Noivern and playing Tailwind is the move — +50% over Fake Out + Moonblast against it.');
   });
 
   test('a doubles matrix of move pairs alone leaves the model unsure, and the sentence silent', () => {

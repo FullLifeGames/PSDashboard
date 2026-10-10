@@ -10,8 +10,24 @@ import { winDeltaText, winPctText } from '../winprob.ts';
  * template composition; sim-free, main-bundle safe.
  */
 
-/** Choice labels read as prose: "→ Dragapult" becomes "switching to Dragapult". */
-export const phrase = (label: string) => (label.startsWith('→ ') ? `switching to ${label.slice(2)}` : label);
+/**
+ * Choice labels read as prose: "→ Dragapult" becomes "switching to Dragapult". Round 67 (T135): a doubles
+ * pair with a switch read as one switch ("switching to Ting-Lu + Scale Shot→Incineroar", 2663093831 t7) or
+ * kept a raw arrow ("Parting Shot→Orthworm + → Volcanion"); it now reads per slot in the gerund, the shape of
+ * playedVerb below. A pair of moves keeps its label like a single move, and a single label keeps its form (the
+ * singles pins "switching to Heatran", "switching to Lopunny-Mega came instead").
+ */
+export const phrase = (label: string): string => {
+  const slots = splitCombinedLabel(label);
+  if (slots.length < 2 || !slots.some(part => part.startsWith('→ '))) {
+    return label.startsWith('→ ') ? `switching to ${label.slice(2)}` : label;
+  }
+  return slots
+    .map(part => (part.startsWith('→ ') ? { verb: 'switching to', object: part.slice(2) } : { verb: 'playing', object: part }))
+    // Two slots of one kind share the verb: "playing Tailwind and Solar Beam→Groudon".
+    .map((slot, index, all) => (index > 0 && all[index - 1].verb === slot.verb ? slot.object : `${slot.verb} ${slot.object}`))
+    .join(' and ');
+};
 
 /**
  * Round 64 (T123): the gerund fits a subject ("switching to Heatran was
