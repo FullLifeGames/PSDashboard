@@ -1,11 +1,14 @@
 import { Move as CalcMove, type Generations } from '@smogon/calc';
-import { Dex } from '@pkmn/sim';
+import { Dex, toID } from '@pkmn/sim';
 import type { CalcBody } from './body.ts';
 
 /**
  * Round 67: the move as the calc must read it for this attacker, the other
  * half of the engine's one builder (calc/body.ts), used by ko-odds.ts,
- * damage-calc.ts and pair/kill-table.ts. A move whose power rule calc 0.11
+ * damage-calc.ts and pair/kill-table.ts. The slot "Hidden Power" goes as the
+ * type the simulator gives the attacker (hpType), and before gen 6 at the
+ * power it gives (hpPower), where the calc reads the bare name as a Normal
+ * move of power 60, 0 before gen 6 (T83). A move whose power rule calc 0.11
  * lacks gets the power its own basePowerCallback in the Dex returns on the
  * attacker's facts: Last Respects by the side's fallen (T76;
  * test/calc-sim-inputs.spec.ts holds that the calc prices it at its listed
@@ -30,7 +33,14 @@ function powerAtUse(gen: CalcGen, name: string, attacker: CalcBody): number | nu
   }
 }
 
+/** The slot "Hidden Power" with the attacker's type, and its power before gen 6; any other move as named. */
+function typedHiddenPower(gen: CalcGen, name: string, attacker: CalcBody): { name: string; basePower: number | null } {
+  if (toID(name) !== 'hiddenpower' || !attacker.hpType) return { name, basePower: null };
+  return { name: `Hidden Power ${attacker.hpType}`, basePower: gen.num < 6 && attacker.hpPower ? attacker.hpPower : null };
+}
+
 export function calcMove(gen: CalcGen, name: string, attacker: CalcBody, options: CalcMoveOptions = {}): CalcMove {
-  const basePower = powerAtUse(gen, name, attacker);
-  return new CalcMove(gen, name, basePower === null ? options : { ...options, overrides: { ...options.overrides, basePower } });
+  const typed = typedHiddenPower(gen, name, attacker);
+  const basePower = typed.basePower ?? powerAtUse(gen, name, attacker);
+  return new CalcMove(gen, typed.name, basePower === null ? options : { ...options, overrides: { ...options.overrides, basePower } });
 }

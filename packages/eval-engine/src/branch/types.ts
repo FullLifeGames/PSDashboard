@@ -75,6 +75,9 @@ export interface SimPokemonInfo {
   alliesFainted?: number;
   /** The side's fallen so far (side.totalFainted), the count Last Respects powers up by (T76). */
   totalFainted?: number;
+  /** Hidden Power's type and power as the simulator gives them (hpType, hpPower; round 67, T83). */
+  hpType?: string;
+  hpPower?: number;
   boosts: Record<string, number>;
   level: number;
   types: string[];

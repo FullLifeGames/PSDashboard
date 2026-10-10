@@ -39,6 +39,9 @@ export interface CalcBody {
   alliesFainted?: number;
   /** The side's fallen, for Last Respects (T76). */
   totalFainted?: number;
+  /** Hidden Power's type and power as the simulator gives them (T83). */
+  hpType?: string;
+  hpPower?: number;
 }
 
 /** A body read off the simulator: everything the calc and the pair plan's guards read, as plain data. */
@@ -51,7 +54,7 @@ export interface SimBody extends CalcBody {
   status: string;
 }
 
-type SimFacts = Pick<CalcBody, 'boostedStat' | 'alliesFainted' | 'totalFainted'>;
+type SimFacts = Pick<CalcBody, 'boostedStat' | 'alliesFainted' | 'totalFainted' | 'hpType' | 'hpPower'>;
 
 /**
  * What the simulator holds and calc 0.11 cannot see on its own (round 67,
@@ -59,7 +62,8 @@ type SimFacts = Pick<CalcBody, 'boostedStat' | 'alliesFainted' | 'totalFainted'>
  * the stat the volatile of its ability names (Protosynthesis and Quark Drive
  * keep their bestStat there), the fallen its ability state counts (Supreme
  * Overlord), the side's fallen (Last Respects). A suppressed ability gives
- * neither of the first two, as in the simulator's own handlers.
+ * neither of the first two, as in the simulator's own handlers. With them
+ * Hidden Power's type and power (T83).
  */
 export function simBodyFacts(mon: Pokemon): SimFacts {
   const active = !mon.ignoringAbility();
@@ -70,6 +74,8 @@ export function simBodyFacts(mon: Pokemon): SimFacts {
     ...(boostedStat ? { boostedStat } : {}),
     ...(alliesFainted ? { alliesFainted } : {}),
     ...(totalFainted ? { totalFainted } : {}),
+    hpType: mon.hpType,
+    hpPower: mon.hpPower,
   };
 }
 
@@ -119,6 +125,8 @@ export function bodyFromInfo(info: SimPokemonInfo): SimBody {
     boostedStat: info.boostedStat,
     alliesFainted: info.alliesFainted,
     totalFainted: info.totalFainted,
+    hpType: info.hpType,
+    hpPower: info.hpPower,
   };
 }
 

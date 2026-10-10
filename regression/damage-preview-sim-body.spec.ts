@@ -25,7 +25,7 @@ function set(species: string, moves: string[], extra: Partial<PokemonSet> = {}):
 /** A bulky target that takes the hit standing and never takes a crit. */
 const armored = (species: string) => set(species, ['Splash'], { evs: { ...STATS, hp: 252, def: 252, spd: 252 }, ability: 'Battle Armor' });
 
-function battle(format: 'gen9customgame' | 'gen9doublescustomgame', p1: PokemonSet[], p2: PokemonSet[], seed: number): Battle {
+function battle(format: 'gen9customgame' | 'gen9doublescustomgame' | 'gen7customgame' | 'gen7doublescustomgame', p1: PokemonSet[], p2: PokemonSet[], seed: number): Battle {
   const created = new Battle({
     formatid: toID(format), seed: [seed, 2, 3, 4],
     p1: { name: 'Alpha', team: Teams.pack(p1) }, p2: { name: 'Beta', team: Teams.pack(p2) },
@@ -194,6 +194,24 @@ describe('what the simulator holds reaches the preview (T76)', () => {
         return {
           current, rows: [{ row: doubles ? view.targets[0]['1:1'] : view.default[0][0], side: 1, slot: 0 }],
           p1: doubles ? 'move icebeam 1, move splash' : 'move icebeam', p2: doubles ? 'move splash, move splash' : 'move splash',
+        };
+      });
+    }
+  });
+});
+
+describe('Hidden Power reaches the preview typed (T83)', () => {
+  test('singles and doubles gen 7: the Hidden Power Ice row holds the damage the simulator deals', () => {
+    for (const format of ['gen7customgame', 'gen7doublescustomgame'] as const) {
+      const doubles = format === 'gen7doublescustomgame';
+      expectRowsHold(seed => {
+        const current = battle(format, [set('Starmie', ['Hidden Power Ice']), ...(doubles ? [set('Corviknight', ['Splash'])] : [])],
+          [armored('Landorus-Therian'), ...(doubles ? [armored('Blissey')] : [])], seed);
+        expect(current.sides[0].active[0].hpType).toBe('Ice');
+        const view = preview(current).p1;
+        return {
+          current, rows: [{ row: doubles ? view.targets[0]['1:1'] : view.default[0][0], side: 1, slot: 0 }],
+          p1: doubles ? 'move hiddenpower 1, move splash' : 'move hiddenpower', p2: doubles ? 'move splash, move splash' : 'move splash',
         };
       });
     }
