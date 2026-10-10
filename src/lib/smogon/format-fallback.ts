@@ -11,6 +11,18 @@ export function vgcYearFormat(id: string): string | null {
 }
 
 /**
+ * The sets file of a Pokémon Champions format without a VGC year (round 67,
+ * T143): @pkmn/smogon names Champions sets files without the generation
+ * (sets/championsou.json), and `gen9championsou` asked for a file that does
+ * not exist and fell back to the Scarlet/Violet Ubers analyses. Null for
+ * every other format; a Champions VGC format reads its year first
+ * (vgcYearFormat).
+ */
+export function championsSetsFormat(id: string): string | null {
+  return id.match(/^gen\d+(champions[a-z0-9]+)$/)?.[1] ?? null;
+}
+
+/**
  * Where a format's published data lives when the format itself has none:
  * doubles ladders read Doubles OU, draft formats and Custom Game read their
  * generation's OU, everything else is itself. A VGC format with a year reads

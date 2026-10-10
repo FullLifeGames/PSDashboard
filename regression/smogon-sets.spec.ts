@@ -176,6 +176,27 @@ describe('Smogon set assumptions', () => {
     expect(champions?.pokemon.toxapex).toBeUndefined();
   });
 
+  // Round 67 (T143): Champions OU asked for sets/gen9championsou.json, a file that does not exist (@pkmn/smogon names
+  // Champions files without the generation), and fell back to the Scarlet/Violet Ubers analyses: Corviknight (39 %
+  // usage) got Impish 252/160/96 with Tera instead of its Champions set with 32/32/2 Stat Points.
+  test('round 67 (T143): Champions OU reads the Champions OU set file and no Scarlet/Violet file', async () => {
+    const corviknightChampions = { Corviknight: { 'Iron Press': { nature: 'Impish', evs: { hp: 32, def: 32, spd: 2 }, moves: ['Iron Defense', 'Body Press', 'Roost', 'Brave Bird'] } } };
+    const corviknightUbers = { Corviknight: { Defog: { nature: 'Impish', evs: { hp: 252, def: 160, spd: 96 }, moves: ['Defog', 'Brave Bird', 'Roost', 'U-turn'] } } };
+    const files = byUrl({ championsou: corviknightChampions, gen9ubers: { ...corviknightUbers, ...kyuremSet }, gen9ou: corviknightUbers });
+    const requested: string[] = [];
+    const assumptions = await fetchSmogonSetAssumptions({
+      formatId: 'gen9championsou', species: ['Corviknight', 'Kyurem'],
+      fetcher: (async (url: string) => { requested.push(url); return files(url); }) as never,
+    });
+    expect(assumptions?.pokemon.corviknight?.sourceDetail).toBe('Smogon sets championsou');
+    expect(assumptions?.pokemon.corviknight?.spread?.evs).toEqual({ hp: 32, atk: 0, def: 32, spa: 0, spd: 2, spe: 0 });
+    // Kyurem has no Champions OU set: the guess goes to the usage file, never to a Scarlet/Violet analysis.
+    expect(assumptions?.pokemon.kyurem).toBeUndefined();
+    expect(assumptions?.formats).toEqual(['championsou']);
+    expect(requested.length).toBeGreaterThan(0);
+    expect(requested.filter(url => !/\/sets\/championsou\.json$/.test(url))).toEqual([]);
+  });
+
   test('keeps every option of a published move slot (T89)', async () => {
     // @pkmn/smogon flattens a slot to its first option; the build must know
     // Heat Wave and Hidden Power Ice share one slot while Knock Off is fixed.

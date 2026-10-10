@@ -5,7 +5,7 @@ import type { ID } from '@pkmn/data';
 import {
   toId, type PokemonSetAssumption, type SetAssumption, type SetSpreadAssumption, type SmogonSetAssumptions,
 } from '@fulllifegames/replay-core';
-import { ouFallbackFormat, vgcYearFormat } from './smogon/format-fallback';
+import { championsSetsFormat, ouFallbackFormat, vgcYearFormat } from './smogon/format-fallback';
 import { fetcherKey } from './smogon/fetcher-key';
 import { withSmogonFallback, type SmogonFetch } from './smogon/hosts';
 
@@ -49,19 +49,22 @@ function genFromFormat(formatId: string | undefined): number {
  * The sets file a format reads. Round 66 (T142): VGC reads the VGC file of
  * its year (gen9vgc2025, gen9championsvgc2026) and never the Doubles OU
  * analyses, another format's sets; a year without a file leaves the guess
- * to the usage file.
+ * to the usage file. Round 67 (T143): every other Champions format reads its
+ * own file, named without the generation (championsou), and no
+ * Scarlet/Violet file: the name carries no generation, so fallbackFormat
+ * adds no Ubers file.
  */
 function normalizeFormat(formatId: string | undefined): string {
   const id = toId(formatId || 'gen9ou');
   if (id.includes('nationaldexdoubles')) return 'gen9nationaldexdoubles';
-  return vgcYearFormat(id) ?? ouFallbackFormat(id);
+  return vgcYearFormat(id) ?? championsSetsFormat(id) ?? ouFallbackFormat(id);
 }
 
 function sourceDetail(format: string): string {
   return `Smogon sets ${format}`;
 }
 
-/** The generation's Ubers file (Doubles Ubers for doubles): where a banned species' set lives. VGC takes none (T142). */
+/** The generation's Ubers file (Doubles Ubers for doubles): where a banned species' set lives. VGC (T142) and Champions (T143) take none. */
 function fallbackFormat(format: string): string | null {
   const gen = format.match(/^gen\d+/)?.[0];
   if (!gen || format.includes('vgc')) return null;
