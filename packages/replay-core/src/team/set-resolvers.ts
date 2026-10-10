@@ -3,7 +3,7 @@ import { Dex } from '@pkmn/sim';
 import type { SmogonUsageStats, SpeciesUsageSet, UsageProbability } from '../smogon/stats-types.ts';
 import { getSpeciesSetAssumption, type SmogonSetAssumptions } from '../smogon/sets-lookup.ts';
 import { getSpeciesUsageSet, getSpeciesUsageStats } from '../smogon/usage-lookup.ts';
-import { applyCoherenceVetoes, selectCuratedSet, type MoveCandidate } from '../set-coherence.ts';
+import { applyCoherenceVetoes, itemFromChosenSet, selectCuratedSet, type MoveCandidate } from '../set-coherence.ts';
 import { itemSetValue } from '../team-info.ts';
 import type { SpreadCandidate } from '../spread-inference.ts';
 import type { KnowledgeSource, PokemonEvs, RevealedPokemonInfo } from '../types.ts';
@@ -214,7 +214,7 @@ export function assembleMoves(
   const fills = [...(usageSet?.moves ?? []), ...(curated ? [] : (smogonSet?.moves ?? []))];
   for (const fill of fills) offer(fill.value, { guessed: true });
   for (const fill of usageTail) offer(fill.value, { guessed: true, tail: true });
-  return applyCoherenceVetoes(pool, { itemId: toId(item) })
+  return applyCoherenceVetoes(pool, { itemId: toId(item), itemFromSet: itemFromChosenSet(curated, item) })
     .slice(0, 4)
     .map(candidate => candidate.name);
 }

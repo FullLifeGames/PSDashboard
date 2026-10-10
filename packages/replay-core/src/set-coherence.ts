@@ -21,8 +21,9 @@ export interface MoveCandidate {
   /**
    * A move of the chosen Smogon set: coherent by construction, so rows 1
    * to 4 spare it (row 3 since the review of round 64: the set is read as
-   * published); the item rows still apply, because the item may come from
-   * elsewhere (an inferred Scarf). Round 63, T28.
+   * published); the item rows spare it only when the item is the set's own
+   * (round 67, T131), because an item from elsewhere (an inferred Scarf)
+   * may contradict it. Round 63, T28.
    */
   fromSet?: boolean;
   /**
@@ -34,11 +35,18 @@ export interface MoveCandidate {
 }
 
 export interface CoherenceContext {
-  /** The set's item id ('' when unknown) — provenance does not matter: only
-   * guessed MOVES are vetoed, and a status fill contradicts a Choice/AV item
-   * whether the item is proof or the stronger guess. */
+  /** The set's item id ('' when unknown): a status fill contradicts a Choice/AV item whether it is proof or a guess. */
   itemId: string;
+  /**
+   * The item is the chosen set's own published item (round 67, T131,
+   * decision 20): the set's moves came with it, so the item rows spare
+   * them, and only them. Absent or false: the item came from elsewhere.
+   */
+  itemFromSet?: boolean;
 }
+
+/** A selected set; `itemReplaced` when its item gave way after a rule-out (then it is no longer the set's own). */
+export type CuratedSetAssumption = PokemonSetAssumption & { itemReplaced?: true };
 
 type DexMove = ReturnType<typeof Dex.moves.get>;
 
@@ -200,7 +208,7 @@ function bestCandidate(
 export function selectCuratedSet(
   candidates: PokemonSetAssumption[],
   evidence: CuratedEvidence,
-): PokemonSetAssumption | null {
+): CuratedSetAssumption | null {
   const best = bestCandidate(candidates, evidence, true);
   if (!best) return null;
   const resolved = withItemSlotResolved(withSlotsResolved(best, evidence), evidence);
@@ -217,14 +225,20 @@ export function selectCuratedSet(
  */
 function withItemAfterRuleOut(
   set: PokemonSetAssumption, unruled: PokemonSetAssumption, evidence: CuratedEvidence,
-): PokemonSetAssumption {
+): CuratedSetAssumption {
   const allowed = (item: string | undefined): item is string =>
     !!item && !evidence.ruledOutItems.includes(Dex.items.get(item).id as string);
   const replacement = [evidence.guessedItem, evidence.usageItem].find(allowed);
   if (!replacement) return set;
   const why = replacement === evidence.guessedItem ? `${replacement} guessed from the log` : 'most used other item';
   const listed = (unruled.item?.options ?? [unruled.item?.value]).join(' and ');
-  return { ...set, item: { value: replacement, sourceDetail: `${listed} ruled out, ${why}` } };
+  return { ...set, item: { value: replacement, sourceDetail: `${listed} ruled out, ${why}` }, itemReplaced: true };
+}
+
+/** Whether `item` is the chosen set's own: an option of its published item slot that no rule-out replaced (T131). */
+export function itemFromChosenSet(curated: CuratedSetAssumption | null, item: string): boolean {
+  if (!curated?.item || curated.itemReplaced || !item) return false;
+  return (curated.item.options ?? [curated.item.value]).some(option => itemId(option) === itemId(item));
 }
 
 /**
@@ -306,7 +320,7 @@ function keepDamagingMoves(candidates: MoveCandidate[], served: Set<string>): Da
 
 /** Pass 2 assembles in pool order; status rows run against the kept attacks. */
 function assembleKeptMoves(
-  candidates: MoveCandidate[], restrictiveItem: 'choice' | 'av' | null, keeps: DamagingKeeps,
+  candidates: MoveCandidate[], restrictiveItem: 'choice' | 'av' | null, keeps: DamagingKeeps, itemFromSet: boolean,
 ): MoveCandidate[] {
   const kept: MoveCandidate[] = [];
   for (const candidate of candidates) {
@@ -316,8 +330,10 @@ function assembleKeptMoves(
       continue;
     }
     if (facts.category === 'Status') {
-      if (restrictiveItem === 'av') continue;
-      if (restrictiveItem === 'choice' && !TRICK_FAMILY.has(facts.id)) continue;
+      // The set's own item came with the set's moves (T131).
+      const spared = !!candidate.fromSet && itemFromSet;
+      if (restrictiveItem === 'av' && !spared) continue;
+      if (restrictiveItem === 'choice' && !TRICK_FAMILY.has(facts.id) && !spared) continue;
       // Row 3: a defense-boost enabler without its payoff attack (Iron
       // Defense whose Body Press was vetoed or never offered).
       if (!candidate.fromSet && defenseBoost(Dex.moves.get(facts.id)) && !keeps.keptScalings.has('def')) continue;
@@ -342,12 +358,13 @@ export function applyCoherenceVetoes(
   // usage Dragon Dance under Choice Specs left Kyurem with Icicle Spear only),
   // and neither does a boost from the usage tail.
   const served = new Set<string>();
+  const itemFromSet = !!context.itemFromSet;
   for (const candidate of candidates) {
     const move = Dex.moves.get(candidate.name);
-    const struck = candidate.guessed && restrictiveItem !== null && move.category === 'Status';
+    const struck = candidate.guessed && restrictiveItem !== null && move.category === 'Status' && !(candidate.fromSet && itemFromSet);
     if (!struck && !candidate.tail) for (const stat of boostsServed(move)) served.add(stat);
   }
 
   const keeps = keepDamagingMoves(candidates, served);
-  return assembleKeptMoves(candidates, restrictiveItem, keeps);
+  return assembleKeptMoves(candidates, restrictiveItem, keeps, itemFromSet);
 }

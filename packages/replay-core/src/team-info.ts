@@ -1,7 +1,7 @@
 import { getSpeciesUsageSet, getSpeciesUsageStats } from './smogon/usage-lookup.ts';
 import type { SmogonUsageStats, UsageProbability, UsageSpread } from './smogon/stats-types.ts';
 import { getSpeciesSetAssumption, type SetAssumption, type SetSpreadAssumption, type SmogonSetAssumptions } from './smogon/sets-lookup.ts';
-import { applyCoherenceVetoes, selectCuratedSet, type MoveCandidate } from './set-coherence.ts';
+import { applyCoherenceVetoes, itemFromChosenSet, selectCuratedSet, type MoveCandidate } from './set-coherence.ts';
 import type { SpreadCandidate } from './spreads/ladder.ts';
 import type { OpponentTeamInfo, PokemonEvs, PokemonEvsInfo, PokemonFieldInfo, PokemonMoveInfo, RevealedPokemonInfo } from './types.ts';
 import { toId } from './ids.ts';
@@ -263,11 +263,15 @@ function assembleMovePool(
 
 /**
  * Known moves always stay; vetoed guesses drop and the pool's tail refills
- * the display up to four slots.
+ * the display up to four slots. The item rows spare the chosen set's moves
+ * when the item is that set's own (T131), as the build does.
  */
-function vetoedMoves(pool: MoveCandidate[], infoFor: Map<string, PokemonMoveInfo>, itemValue: string): PokemonMoveInfo[] {
+function vetoedMoves(
+  pool: MoveCandidate[], infoFor: Map<string, PokemonMoveInfo>, itemValue: string, curated: CuratedSet | null,
+): PokemonMoveInfo[] {
   const moves: PokemonMoveInfo[] = [];
-  for (const candidate of applyCoherenceVetoes(pool, { itemId: toId(itemSetValue(itemValue)) })) {
+  const item = itemSetValue(itemValue);
+  for (const candidate of applyCoherenceVetoes(pool, { itemId: toId(item), itemFromSet: itemFromChosenSet(curated, item) })) {
     const move = infoFor.get(candidate.name);
     if (!move) continue;
     if (!candidate.guessed || moves.length < 4) moves.push(move);
@@ -308,7 +312,7 @@ export function enrichPokemonInfo(
   const item = normalizeItemField(pokemon.item, usageSet?.item, fallback.item, pokemon.ruledOut?.items, !!curated);
   const usageTail = getSpeciesUsageStats(pokemon.species, usageStats)?.moves.slice(GUESS_MOVE_POOL) ?? [];
   const { pool, infoFor } = assembleMovePool(pokemon, curated, usageSet, smogonSet, usageTail);
-  const moves = vetoedMoves(pool, infoFor, item.value);
+  const moves = vetoedMoves(pool, infoFor, item.value, curated);
 
   return {
     ...pokemon,
