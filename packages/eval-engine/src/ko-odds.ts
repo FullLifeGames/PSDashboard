@@ -1,6 +1,7 @@
-import { Generations, Move as CalcMove, Pokemon as CalcPokemon, Field, calculate } from '@smogon/calc';
+import { Generations, Move as CalcMove, Field, calculate } from '@smogon/calc';
 import type { Battle, Pokemon } from '@pkmn/sim';
 import { TERRAIN_BY_ID, WEATHER_BY_ID } from '@fulllifegames/replay-core';
+import { bodyOf, calcPokemon } from './calc/body.ts';
 
 /**
  * Analytic one-turn boundary-event odds (round 6 expectation grounding).
@@ -67,25 +68,6 @@ export function critRate(gen: number, critRatio: number): number | null {
   const stage = Math.max(0, Math.min(1, (critRatio || 1) - 1));
   if (stage === 1) return 1 / 8;
   return gen >= 7 ? 1 / 24 : 1 / 16;
-}
-
-function toCalcPokemon(gen: ReturnType<typeof Generations.get>, pokemon: Pokemon, dex: Battle['dex']) {
-  const set = pokemon.set;
-  return new CalcPokemon(gen, pokemon.species.name, {
-    level: pokemon.level,
-    ability: pokemon.ability ? dex.abilities.get(pokemon.ability).name : undefined,
-    item: pokemon.item ? dex.items.get(pokemon.item).name : undefined,
-    nature: set.nature || undefined,
-    evs: set.evs as never,
-    ivs: set.ivs as never,
-    boosts: {
-      atk: pokemon.boosts.atk, def: pokemon.boosts.def, spa: pokemon.boosts.spa,
-      spd: pokemon.boosts.spd, spe: pokemon.boosts.spe,
-    } as never,
-    curHP: pokemon.hp,
-    status: (pokemon.status || undefined) as never,
-    teraType: (pokemon.terastallized || undefined) as never,
-  });
 }
 
 function calcField(battle: Battle, defender: Pokemon): Field {
@@ -168,8 +150,8 @@ function damageKillFraction(
 ): KillRolls | null {
   try {
     const gen = Generations.get(genNum as 3 | 4 | 5 | 6 | 7 | 8 | 9);
-    const atkPoke = toCalcPokemon(gen, attacker, battle.dex);
-    const defPoke = toCalcPokemon(gen, defender, battle.dex);
+    const atkPoke = calcPokemon(gen, bodyOf(battle, attacker));
+    const defPoke = calcPokemon(gen, bodyOf(battle, defender));
     const field = calcField(battle, defender);
     const normal = killShare(calculate(gen, atkPoke, defPoke, new CalcMove(gen, move.name), field).damage, defender.hp);
     const crit = killShare(calculate(gen, atkPoke, defPoke, new CalcMove(gen, move.name, { isCrit: true }), field).damage, defender.hp);

@@ -1,15 +1,10 @@
-import { Generations, Pokemon, Move, Field, calculate } from '@smogon/calc';
+import { Generations, Move, Field, calculate, type Pokemon } from '@smogon/calc';
 import { Dex } from '@pkmn/sim';
 import type { SimPokemonInfo, BranchMoveOption } from './branch-engine.ts';
 import { toId, TERRAIN_BY_ID, WEATHER_BY_ID } from '@fulllifegames/replay-core';
+import { bodyFromInfo, calcPokemon } from './calc/body.ts';
 import { hitDraws } from './calc/hit-draws.ts';
 
-type CalcPokemonOptions = ConstructorParameters<typeof Pokemon>[2];
-type CalcBoosts = NonNullable<CalcPokemonOptions>['boosts'];
-type CalcStatus = NonNullable<CalcPokemonOptions>['status'];
-type CalcStats = NonNullable<CalcPokemonOptions>['evs'];
-type CalcGender = NonNullable<CalcPokemonOptions>['gender'];
-type CalcTeraType = NonNullable<CalcPokemonOptions>['teraType'];
 type CalcMoveOptions = NonNullable<ConstructorParameters<typeof Move>[2]>;
 type CalcAbility = CalcMoveOptions['ability'];
 type CalcItem = CalcMoveOptions['item'];
@@ -76,21 +71,9 @@ function calcField(context: DamageCalcContext, defenderProtected = false): Field
 
 type CalcGen = ReturnType<typeof calcGeneration>;
 
-/** A calc Pokémon from the branch's live info: the same fields for attacker and defender. */
+/** A calc Pokémon from the branch's live info, through the engine's one builder (calc/body.ts). */
 function calcPokemonFrom(gen: CalcGen, info: SimPokemonInfo): Pokemon {
-  return new Pokemon(gen, info.species, {
-    level: info.level,
-    ability: info.ability || undefined,
-    item: info.item || undefined,
-    nature: info.nature || undefined,
-    evs: info.evs as CalcStats,
-    ivs: info.ivs as CalcStats,
-    gender: (info.gender || undefined) as CalcGender,
-    teraType: (info.teraType || undefined) as CalcTeraType,
-    boosts: info.boosts as CalcBoosts,
-    curHP: info.hp,
-    status: (info.status || undefined) as CalcStatus,
-  } satisfies CalcPokemonOptions);
+  return calcPokemon(gen, bodyFromInfo(info));
 }
 
 /** Whether the move does damage to this Pokémon at all (the calc reads immunities, and Protect when it stands). */

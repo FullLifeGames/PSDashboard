@@ -1,30 +1,16 @@
 import type { Battle, Pokemon } from '@pkmn/sim';
+import { bodyOf, type SimBody } from '../calc/body.ts';
 
 /**
  * Round 56: the state of one hit, frozen as plain data at the moment the
  * sim rolls it — the doubles pair plan's calc input (kill-table.ts) and the
  * flags its guards read. Taken from the live bodies and the live field, so
  * everything the turn changed before the hit (Intimidate, a weather set by
- * the partner, chip damage, a Tera click) is already in it.
+ * the partner, chip damage, a Tera click) is already in it. Since round 67
+ * the bodies are read by the engine's one builder (calc/body.ts).
  */
 
-export interface BodySnapshot {
-  species: string;
-  level: number;
-  /** Calc name ('' without); `abilityId` is the sim's id. */
-  ability: string;
-  abilityId: string;
-  item: string;
-  itemId: string;
-  nature: string;
-  evs: Record<string, number>;
-  ivs: Record<string, number>;
-  boosts: { atk: number; def: number; spa: number; spd: number; spe: number };
-  hp: number;
-  maxhp: number;
-  status: string;
-  tera: string | null;
-}
+export type BodySnapshot = SimBody;
 
 export interface HitSnapshot {
   gen: number;
@@ -54,25 +40,6 @@ export interface HitSnapshot {
 const ROOMS = ['gravity', 'magicroom', 'wonderroom'];
 const SCREENS = ['reflect', 'lightscreen', 'auroraveil'];
 
-function body(battle: Battle, mon: Pokemon): BodySnapshot {
-  return {
-    species: mon.species.name,
-    level: mon.level,
-    ability: mon.ability ? battle.dex.abilities.get(mon.ability).name : '',
-    abilityId: mon.ability,
-    item: mon.item ? battle.dex.items.get(mon.item).name : '',
-    itemId: mon.item,
-    nature: mon.set.nature ?? '',
-    evs: { ...mon.set.evs },
-    ivs: { ...mon.set.ivs },
-    boosts: { atk: mon.boosts.atk, def: mon.boosts.def, spa: mon.boosts.spa, spd: mon.boosts.spd, spe: mon.boosts.spe },
-    hp: mon.hp,
-    maxhp: mon.maxhp,
-    status: mon.status,
-    tera: mon.terastallized ?? null,
-  };
-}
-
 /** The ability id of the living body next to `mon`, or null. */
 function partnerAbility(mon: Pokemon): string | null {
   const partner = mon.side.active.find(other => other && other !== mon && !other.fainted);
@@ -96,8 +63,8 @@ export function snapshotPair(battle: Battle, attacker: Pokemon, defender: Pokemo
     moveId,
     moveName: battle.dex.moves.get(moveId).name,
     spreadHit,
-    attacker: body(battle, attacker),
-    defender: body(battle, defender),
+    attacker: bodyOf(battle, attacker),
+    defender: bodyOf(battle, defender),
     weather: battle.field.effectiveWeather(),
     terrain: battle.field.effectiveTerrain(),
     rooms: ROOMS.filter(id => battle.field.pseudoWeather[id]),

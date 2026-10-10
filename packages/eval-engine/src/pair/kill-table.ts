@@ -1,5 +1,6 @@
 import { Generations, Move as CalcMove, Pokemon as CalcPokemon, Field, calculate } from '@smogon/calc';
 import { TERRAIN_BY_ID, WEATHER_BY_ID } from '@fulllifegames/replay-core';
+import { calcPokemon } from '../calc/body.ts';
 import type { BodySnapshot, HitSnapshot } from './snapshot.ts';
 
 /**
@@ -12,9 +13,9 @@ import type { BodySnapshot, HitSnapshot } from './snapshot.ts';
  * 6535 non-lethal ones to the HP; damage-check-v2.vt.ts: 96.8 % of the
  * non-lethal rolls on 83 bank positions):
  * `calculate` clones the move, so a spread move against one target goes in
- * through `overrides`; abilities whose only effect is an entry boost stay
- * out (the live boosts carry it, the calc would add it again); Meteor Beam
- * and Electro Shot lose the charge boost the calc adds itself.
+ * through `overrides`; the bodies come from the engine's one builder, which
+ * counts an entry boost once (calc/body.ts, round 67); Meteor Beam and
+ * Electro Shot lose the charge boost the calc adds itself.
  */
 
 export interface KillTable {
@@ -26,25 +27,10 @@ export interface KillTable {
 type CalcGen = ReturnType<typeof Generations.get>;
 
 const SPREAD_TARGETS = new Set(['allAdjacent', 'allAdjacentFoes']);
-const ENTRY_BOOST_ABILITIES = new Set([
-  'download', 'intrepidsword', 'dauntlessshield',
-  'embodyaspectcornerstone', 'embodyaspecthearthflame', 'embodyaspectteal', 'embodyaspectwellspring',
-]);
 const CHARGE_BOOST_MOVES = new Set(['meteorbeam', 'electroshot']);
 
 function calcBody(gen: CalcGen, body: BodySnapshot, spaOffset: number): CalcPokemon {
-  return new CalcPokemon(gen, body.species, {
-    level: body.level,
-    ability: ENTRY_BOOST_ABILITIES.has(body.abilityId) ? undefined : body.ability || undefined,
-    item: body.item || undefined,
-    nature: body.nature || undefined,
-    evs: body.evs as never,
-    ivs: body.ivs as never,
-    boosts: { ...body.boosts, spa: body.boosts.spa - spaOffset } as never,
-    curHP: body.hp,
-    status: (body.status || undefined) as never,
-    teraType: (body.tera ?? undefined) as never,
-  });
+  return calcPokemon(gen, spaOffset ? { ...body, boosts: { ...body.boosts, spa: body.boosts.spa - spaOffset } } : body);
 }
 
 function calcField(snap: HitSnapshot): Field {

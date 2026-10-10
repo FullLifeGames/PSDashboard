@@ -6,9 +6,10 @@
  * because nothing here reads sim history.
  */
 
-import { calculate, Field, Generations, Move, Pokemon } from '@smogon/calc';
+import { calculate, Field, Generations, Move, type Pokemon } from '@smogon/calc';
 import { Dex, type PokemonSet } from '@pkmn/sim';
 import { type DamageObservation, typedHiddenPowerId, inferOpponentTeam, itemSetValue, toId } from '@fulllifegames/replay-core';
+import { calcPokemon, type CalcBody } from './calc/body.ts';
 import { CHOICE_ITEMS } from './sensitivity.ts';
 
 /** `handedOver`: the Choice item came by a move, so the protocol itself shows it (no set guess to vet). */
@@ -264,19 +265,23 @@ const TYPE_BOOST_ITEMS: Record<string, string> = {
  */
 type CalcGen = ReturnType<typeof Generations.get>;
 
+const stagesOf = (boosts: Record<string, number>): CalcBody['boosts'] =>
+  ({ atk: boosts.atk ?? 0, def: boosts.def ?? 0, spa: boosts.spa ?? 0, spd: boosts.spd ?? 0, spe: boosts.spe ?? 0 });
+
+/** Both bodies of an observation stood on the field: their stages hold every entry boost (calc/body.ts). */
 function calcAttacker(gen: CalcGen, attackerSet: PokemonSet, obs: DamageObservation, withItem: string): Pokemon {
-  return new Pokemon(gen, attackerSet.species, {
-    level: attackerSet.level || 100, ability: attackerSet.ability || undefined,
-    item: withItem || undefined, nature: attackerSet.nature, evs: attackerSet.evs,
-    ivs: attackerSet.ivs, boosts: obs.attackerBoosts,
-    status: (obs.attackerStatus || undefined) as never,
+  return calcPokemon(gen, {
+    species: attackerSet.species, level: attackerSet.level || 100, ability: attackerSet.ability || '', item: withItem,
+    nature: attackerSet.nature, evs: attackerSet.evs, ivs: attackerSet.ivs, gender: attackerSet.gender,
+    boosts: stagesOf(obs.attackerBoosts), status: obs.attackerStatus, tera: null, onField: true,
   });
 }
 
 function calcDefender(gen: CalcGen, defenderSet: PokemonSet | undefined, obs: DamageObservation): Pokemon {
-  return new Pokemon(gen, defenderSet?.species ?? obs.defenderSpecies, {
-    level: defenderSet?.level || 100, nature: defenderSet?.nature,
-    evs: defenderSet?.evs, ivs: defenderSet?.ivs, boosts: obs.defenderBoosts,
+  return calcPokemon(gen, {
+    species: defenderSet?.species ?? obs.defenderSpecies, level: defenderSet?.level || 100, ability: '', item: '',
+    nature: defenderSet?.nature ?? '', evs: defenderSet?.evs ?? {}, ivs: defenderSet?.ivs ?? {}, gender: defenderSet?.gender,
+    boosts: stagesOf(obs.defenderBoosts), tera: null, onField: true,
   });
 }
 
