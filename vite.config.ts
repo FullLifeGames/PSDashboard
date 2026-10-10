@@ -48,7 +48,9 @@ export default defineConfig({
    * running at that moment ("Failed to fetch dynamically imported module").
    */
   optimizeDeps: {
-    include: ['@pkmn/client', '@pkmn/data', '@pkmn/dex', '@pkmn/sim', '@pkmn/smogon', '@smogon/calc'],
+    // Round 67: the Champions mod loads on the first Champions replay; pre-bundled here so
+    // the dev server does not re-optimize and reload the page in the middle of a run.
+    include: ['@pkmn/client', '@pkmn/data', '@pkmn/dex', '@pkmn/mods/champions', '@pkmn/protocol', '@pkmn/sim', '@pkmn/smogon', '@smogon/calc'],
   },
   /**
    * ES-module workers so the worker build can code-split: the replay jobs

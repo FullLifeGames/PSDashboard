@@ -45,7 +45,8 @@
     "access": "public"
   },
   "dependencies": {
-    "@fulllifegames/replay-core": "*"
+    "@fulllifegames/replay-core": "*",
+    "@pkmn/mods": "0.10.11"
   },
   "peerDependencies": {
     "@pkmn/dex": "^0.10.11",
