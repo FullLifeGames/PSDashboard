@@ -42,11 +42,12 @@ function spreadAtStart(battle: Battle, own: 0 | 1, action: MoveAction, targets: 
   return targets.length + allies > 1;
 }
 
-function slotOdds(battle: Battle, attacker: Pokemon, defender: Pokemon, moveId: string, spread: boolean): Odds | null {
-  const move = battle.dex.moves.get(moveId);
+/** One slot's event; a slot that clicks Tera is priced on the body the click makes (round 67, T84). */
+function slotOdds(battle: Battle, attacker: Pokemon, defender: Pokemon, action: MoveAction, spread: boolean): Odds | null {
+  const move = battle.dex.moves.get(action.moveId);
   if (move.category === 'Status' || unpriceable(attacker, defender, move)) return null;
   const crit = critRate(battle.gen, move.critRatio ?? 1);
-  const table = killTable(snapshotPair(battle, attacker, defender, moveId, spread));
+  const table = killTable(snapshotPair(battle, attacker, defender, action.moveId, spread, action.tera === true));
   if (!table || crit === null) return null;
   const killFraction = (1 - crit) * killCount(table.normal, defender.hp) / 16 + crit * killCount(table.crit, defender.hp) / 16;
   const accuracy = moveAccuracy(battle, move, attacker, defender);
@@ -67,7 +68,7 @@ function optionOdds(battle: Battle, own: 0 | 1, choice: string): KoOddsInfo | nu
     if (!attacker || attacker.fainted) continue;
     const targets = rootTargets(battle, own, action);
     for (const defender of targets) {
-      const odds = slotOdds(battle, attacker, defender, action.moveId, spreadAtStart(battle, own, action, targets));
+      const odds = slotOdds(battle, attacker, defender, action, spreadAtStart(battle, own, action, targets));
       if (odds) events.push({ defender, odds });
     }
   }

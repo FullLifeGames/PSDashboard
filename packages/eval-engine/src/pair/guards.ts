@@ -8,8 +8,9 @@ import type { Battle, Pokemon } from '@pkmn/sim';
  * random move.
  */
 
+/** `tera`: the move part clicks Tera (its terastallize token), set only then (round 67, T84). */
 export type PairAction =
-  | { kind: 'move'; slot: number; moveId: string; loc: number | null }
+  | { kind: 'move'; slot: number; moveId: string; loc: number | null; tera?: true }
   | { kind: 'switch'; slot: number; to: number }
   | { kind: 'pass'; slot: number };
 
@@ -24,7 +25,7 @@ function parseAction(part: string, slot: number): PairAction {
   if (tokens[0] === 'switch') return { kind: 'switch', slot, to: Number(tokens[1]) };
   if (tokens[0] !== 'move') return { kind: 'pass', slot };
   const loc = tokens.slice(2).find(token => /^-?\d+$/.test(token));
-  return { kind: 'move', slot, moveId: tokens[1], loc: loc === undefined ? null : Number(loc) };
+  return { kind: 'move', slot, moveId: tokens[1], loc: loc === undefined ? null : Number(loc), ...(tokens.includes('terastallize') ? { tera: true as const } : {}) };
 }
 
 /** The slot actions of a choice (its parts map onto the living actives in slot order), or null for team preview, wait or a part count that does not fit. */

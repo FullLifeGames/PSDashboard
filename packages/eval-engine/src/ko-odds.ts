@@ -1,8 +1,9 @@
 import { Generations, Field, calculate } from '@smogon/calc';
 import type { Battle, Pokemon } from '@pkmn/sim';
 import { TERRAIN_BY_ID, WEATHER_BY_ID } from '@fulllifegames/replay-core';
-import { attackerAtUse, bodyOf, calcPokemon } from './calc/body.ts';
+import { attackerAtUse, calcPokemon, type SimBody } from './calc/body.ts';
 import { calcMove } from './calc/move.ts';
+import { bodyAsClicked } from './calc/tera-click.ts';
 
 /**
  * Analytic one-turn boundary-event odds (round 6 expectation grounding).
@@ -146,17 +147,17 @@ function damageKillFraction(
   genNum: number,
   battle: Battle,
   move: DexMove,
-  attacker: Pokemon,
+  bodies: { attacker: SimBody; defender: SimBody },
   defender: Pokemon,
 ): KillRolls | null {
   try {
     const gen = Generations.get(genNum as 3 | 4 | 5 | 6 | 7 | 8 | 9);
-    const atkBody = attackerAtUse(genNum, bodyOf(battle, attacker), move.name);
-    const atkPoke = calcPokemon(gen, atkBody);
-    const defPoke = calcPokemon(gen, bodyOf(battle, defender));
+    const atkPoke = calcPokemon(gen, bodies.attacker);
+    const defPoke = calcPokemon(gen, bodies.defender);
     const field = calcField(battle, defender);
-    const normal = killShare(calculate(gen, atkPoke, defPoke, calcMove(gen, move.name, atkBody), field).damage, defender.hp);
-    const crit = killShare(calculate(gen, atkPoke, defPoke, calcMove(gen, move.name, atkBody, { isCrit: true }), field).damage, defender.hp);
+    const hp = bodies.defender.hp;
+    const normal = killShare(calculate(gen, atkPoke, defPoke, calcMove(gen, move.name, bodies.attacker), field).damage, hp);
+    const crit = killShare(calculate(gen, atkPoke, defPoke, calcMove(gen, move.name, bodies.attacker, { isCrit: true }), field).damage, hp);
     if (normal === null || crit === null) return null;
     const c = critRate(genNum, move.critRatio ?? 1);
     if (c === null) return null;
@@ -170,12 +171,17 @@ function damageKillFraction(
   }
 }
 
+/** Which of the two bodies an option clicks Tera for: its own attacker, or (a cell's other side) the defender. */
+export interface TeraClicks { attacker?: boolean; defender?: boolean }
+
 /**
  * The analytic odds of one attacking move against one defender, or null
- * when the model cannot price it (the caller keeps the seed average).
+ * when the model cannot price it (the caller keeps the seed average). `tera`:
+ * a body whose side clicks Tera this turn is read as the click makes it,
+ * before any move lands (round 67, T84); left out, the bodies as they stand.
  */
 export function boundaryEvent(
-  battle: Battle, attacker: Pokemon, defender: Pokemon, moveId: string,
+  battle: Battle, attacker: Pokemon, defender: Pokemon, moveId: string, tera: TeraClicks = {},
 ): BoundaryEvent | null {
   const genNum = battle.gen;
   if (genNum <= 2 || genNum > 9) return null;
@@ -192,7 +198,11 @@ export function boundaryEvent(
     return { accuracy, killFraction: 0, pKill: 0, normalKillRolls: 0, critKillRolls: 0 };
   }
 
-  const rolls = damageKillFraction(genNum, battle, move, attacker, defender);
+  const bodies = {
+    attacker: attackerAtUse(genNum, bodyAsClicked(battle, attacker, !!tera.attacker), move.name),
+    defender: bodyAsClicked(battle, defender, !!tera.defender),
+  };
+  const rolls = damageKillFraction(genNum, battle, move, bodies, defender);
   if (rolls === null) return null;
   return { accuracy, ...rolls, pKill: accuracy * rolls.killFraction };
 }

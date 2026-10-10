@@ -1,5 +1,6 @@
 import type { Battle, Pokemon } from '@pkmn/sim';
 import { bodyOf, type SimBody } from '../calc/body.ts';
+import { bodyAsClicked } from '../calc/tera-click.ts';
 
 /**
  * Round 56: the state of one hit, frozen as plain data at the moment the
@@ -56,14 +57,15 @@ function shieldOf(defender: Pokemon): string | null {
   return null;
 }
 
-export function snapshotPair(battle: Battle, attacker: Pokemon, defender: Pokemon, moveId: string, spreadHit: boolean): HitSnapshot {
+/** The hit as it stands now; `tera`: the attacker clicks Tera with the move and is read as the click makes it (round 67, T84). */
+export function snapshotPair(battle: Battle, attacker: Pokemon, defender: Pokemon, moveId: string, spreadHit: boolean, tera = false): HitSnapshot {
   const onField = battle.sides.flatMap(side => side.active).filter(mon => mon && !mon.fainted);
   return {
     gen: battle.gen,
     moveId,
     moveName: battle.dex.moves.get(moveId).name,
     spreadHit,
-    attacker: bodyOf(battle, attacker),
+    attacker: bodyAsClicked(battle, attacker, tera),
     defender: bodyOf(battle, defender),
     weather: battle.field.effectiveWeather(),
     terrain: battle.field.effectiveTerrain(),

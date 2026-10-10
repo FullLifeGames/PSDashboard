@@ -60,6 +60,9 @@ function moveIdOf(choice: string): string | null {
   return tokens[0] === 'move' && tokens[1] ? tokens[1] : null;
 }
 
+/** The choice clicks Tera with its move: its odds read the body the click makes (round 67, T84). */
+const clicksTera = (choice: string) => choice.split(' > ')[0].trim().split(/\s+/).includes('terastallize');
+
 /** Action-prevention layers the occurrence model cannot fold. */
 function attackerPrevented(attacker: Pokemon): boolean {
   if (attacker.status === 'par' || attacker.status === 'frz' || attacker.status === 'slp') return true;
@@ -112,7 +115,8 @@ function unpricedMovePlan(move: DexMove): SideEventPlan {
 }
 
 /** One side's boundary event for the cell: fail when a guard trips, skip when the side has no priceable roll. */
-function planSideEvent(battle: Battle, side: 'p1' | 'p2', moveId: string, oppChoice: string): SideEventPlan {
+function planSideEvent(battle: Battle, side: 'p1' | 'p2', choice: string, oppChoice: string): SideEventPlan {
+  const moveId = moveIdOf(choice)!;
   const own = sideIndex(side);
   const oppIndex = own === 0 ? 1 : 0;
   const attacker = battle.sides[own].active[0];
@@ -124,7 +128,7 @@ function planSideEvent(battle: Battle, side: 'p1' | 'p2', moveId: string, oppCho
   if (!defender) return { kind: 'fail' };
   if (defenderShielded(defender)) return { kind: 'fail' };
 
-  const event = boundaryEvent(battle, attacker, defender, moveId);
+  const event = boundaryEvent(battle, attacker, defender, moveId, { attacker: clicksTera(choice), defender: clicksTera(oppChoice) });
   const move = battle.dex.moves.get(moveId);
   if (event === null) return unpricedMovePlan(move);
   if (event.accuracy < 1 || (event.killFraction > 0 && event.killFraction < 1)) {
@@ -149,9 +153,9 @@ export function planCellEvents(battle: Battle, p1Choice: string, p2Choice: strin
 
   const events: CellEvent[] = [];
   for (const side of ['p1', 'p2'] as const) {
-    const moveId = moveIds[side];
-    if (!moveId) continue; // a switching side has no event
-    const plan = planSideEvent(battle, side, moveId, side === 'p1' ? p2Choice : p1Choice);
+    if (!moveIds[side]) continue; // a switching side has no event
+    const [choice, oppChoice] = side === 'p1' ? [p1Choice, p2Choice] : [p2Choice, p1Choice];
+    const plan = planSideEvent(battle, side, choice, oppChoice);
     if (plan.kind === 'fail') return { kind: 'fail' };
     if (plan.kind === 'event') events.push(plan.event);
   }
@@ -315,7 +319,7 @@ export function koOddsForOptions(battle: Battle, side: 'p1' | 'p2', choices: str
     if (!moveId) return null;
     if (!attacker || attacker.fainted || !defender || defender.fainted) return null;
     if (attackerPrevented(attacker) || defenderShielded(defender)) return null;
-    const event = boundaryEvent(battle, attacker, defender, moveId);
+    const event = boundaryEvent(battle, attacker, defender, moveId, { attacker: clicksTera(choice) });
     if (!event || event.killFraction <= 0 || event.pKill >= 1) return null;
     return { accuracy: event.accuracy, killFraction: event.killFraction };
   });

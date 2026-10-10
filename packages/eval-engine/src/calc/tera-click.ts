@@ -1,5 +1,5 @@
-import { Battle, Teams, toID, type PokemonSet } from '@pkmn/sim';
-import type { SimBody } from './body.ts';
+import { Battle, Teams, toID, type Pokemon, type PokemonSet } from '@pkmn/sim';
+import { bodyOf, type SimBody } from './body.ts';
 
 /**
  * Round 67 (T100, T84): the body a Tera click makes, asked from the
@@ -53,6 +53,16 @@ function clickOnTwin(gen: number, body: SimBody): Clicked | null {
   } catch {
     return null;
   }
+}
+
+/**
+ * A battle's Pokémon as an option that clicks its Tera finds it (T84): the
+ * body the click makes, from the simulator; as it stands when the option
+ * does not click, or the body clicked before or has no Tera type.
+ */
+export function bodyAsClicked(battle: Battle, mon: Pokemon, clicks: boolean): SimBody {
+  const body = bodyOf(battle, mon);
+  return clicks && !mon.terastallized && mon.teraType ? teraClicked(battle.gen, { ...body, tera: mon.teraType }) : body;
 }
 
 /** The body after the Tera click on its `tera` type: as the simulator makes it when the forme changes, else the same body. */
