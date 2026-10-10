@@ -39,6 +39,9 @@ export {
   manualField, manualEvs, manualMove, applyInferredSpreads, itemSetValue, enrichTeamInfo, enrichPokemonInfo,
   unknownEvs, EMPTY_EVS, INFERRED_SPREAD_DETAIL, INFERRED_ITEM_DETAIL, RULED_OUT_ITEM_DETAIL,
 } from './team-info.ts';
+export { enrichTeamInfos } from './team/damage-ruleouts.ts';
+export type { ItemDamageJudge } from './team/damage-ruleouts.ts';
+export { judgeItemsByDamage } from './team/item-damage.ts';
 export { parseTeamText } from './team-parser.ts';
 export { parsePastedTeam, applyPastedTeam, countMatchingSpecies } from './team-paste.ts';
 export type { PastedSet } from './team-paste.ts';
@@ -46,5 +49,5 @@ export { applyTeamSheetToInfo } from './team-sheets.ts';
 export type {
   ReplayData, PokemonSnapshot, SideSnapshot, FieldSnapshot, TurnSnapshot, DamageObservation,
   HiddenPowerEvidence, SpeedOrderObservation, KnowledgeSource, StatId, PokemonEvs, PokemonMoveInfo,
-  PokemonFieldInfo, PokemonEvsInfo, RevealedPokemonInfo, OpponentTeamInfo,
+  PokemonFieldInfo, PokemonEvsInfo, RevealedPokemonInfo, OpponentTeamInfo, LoggedHit, HitParty,
 } from './types.ts';

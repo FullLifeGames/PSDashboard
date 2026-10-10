@@ -156,6 +156,67 @@ export interface PokemonEvsInfo {
   detail?: string;
 }
 
+/** One side of a logged hit, as it stood when the move landed. */
+export interface HitParty {
+  /** The forme that took part (a Mega, Terapagos-Terastal). */
+  species: string;
+  level: number;
+  /** The Tera type when terastallized. */
+  tera?: string;
+  boosts: Record<string, number>;
+  status: string;
+  /** HP as a fraction of max HP before the hit. */
+  hp: number;
+  /** Known ability at the hit ('' when unknown). */
+  ability: string;
+  /** The item the log shows it holding at the hit ('' when none is shown). */
+  held: string;
+  /** It lost an item or took one from another Pokémon before the hit: its own set item is not what it held. */
+  itemChanged: boolean;
+  /** 'M', 'F' or '' (genderless or unknown): Rivalry reads it. */
+  gender: string;
+  /** Its side's fainted Pokémon at the hit (Supreme Overlord). */
+  alliesFainted: number;
+  /** Ability states the calculator cannot see by itself: an active Flash Fire, Slow Start, Protosynthesis or Quark Drive stat, a Charge. */
+  flashFire: boolean;
+  slowStart: boolean;
+  boostedStat: string;
+  charged: boolean;
+}
+
+/**
+ * One clean hit a Pokémon dealt, as the log shows it (round 67, T130): what
+ * the damage judge needs to recompute it with the calculator, in singles and
+ * doubles. The inference collects it with its own @pkmn/client walk; crits,
+ * multi-hit moves and [from]-attributed damage stay out.
+ */
+export interface LoggedHit {
+  move: string;
+  attacker: HitParty;
+  defender: HitParty & { side: 'p1' | 'p2' };
+  /** Damage as a fraction of the defender's max HP. */
+  observed: number;
+  /** The hit knocked the defender out or left it at the lowest HP the log shows: only a floor on the damage. */
+  lowerBound: boolean;
+  weather: string;
+  terrain: string;
+  /** Reflect, Light Screen and Aurora Veil on the defender's side. */
+  screens: string[];
+  helpingHand: boolean;
+  /** The defender came in this turn (Stakeout). */
+  defenderNew: boolean;
+  doubles: boolean;
+  /** The move line names its spread targets ([spread]): the calculator's spread factor applies. */
+  spread: boolean;
+  /** The other Pokémon on the field, with the ability the log showed ('' when unknown). */
+  others: { species: string; ability: string }[];
+  /** Anything the calculator cannot know: a transformed or stat-swapped party, Magic Room, Wonder Room, Dynamax. */
+  doubt: string;
+  gen: number;
+  /** The format as the log's |tier| line names it. */
+  format: string;
+}
+
 export interface RevealedPokemonInfo {
   species: string;
   moves: PokemonMoveInfo[];
@@ -174,6 +235,8 @@ export interface RevealedPokemonInfo {
    * rules out Levitate. Rule-outs beat guesses, never revealed/manual/sheet.
    */
   ruledOut?: { abilities: string[]; items: string[] };
+  /** The clean hits this Pokémon dealt (round 67, T130): the damage judge reads them against its item candidates. */
+  hits?: LoggedHit[];
 }
 
 export interface OpponentTeamInfo {

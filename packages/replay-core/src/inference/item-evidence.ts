@@ -56,7 +56,7 @@ const RESIDUAL_ITEMS = ['leftovers', 'blacksludge'];
 const FROM_ITEM = /\[from\] item:\s*([^|\n[]+)/;
 
 /** "p2a: Nick" → "p2: Nick": one Pokémon whatever slot it stands in. */
-const keyOf = (ident: string) => ident.replace(/^(p[1-4])[a-d]?:\s*/, '$1: ').trim();
+export const keyOf = (ident: string) => ident.replace(/^(p[1-4])[a-d]?:\s*/, '$1: ').trim();
 const ofIdent = (line: string) => line.match(/\[of\]\s*(p[1-4][a-d]?:\s*[^|]+)/)?.[1] ?? null;
 const hpOf = (text: string | undefined) => (text ?? '').split(' ')[0];
 
@@ -77,7 +77,7 @@ function provenAbility(info: RevealedPokemonInfo | undefined): string {
  * rule-outs; null when unknown, and in a format whose rules let any species
  * hold any ability (the simulator's rule table, round 64, T125).
  */
-function possibleAbilities(state: InferrerState, ident: string): Set<string> | null {
+export function possibleAbilities(state: InferrerState, ident: string): Set<string> | null {
   const key = keyOf(ident);
   const opponent = key.startsWith(state.opponentSide);
   const info = opponent ? findPokemon(state, key.slice(4)) : undefined;
@@ -98,7 +98,7 @@ function possibleAbilities(state: InferrerState, ident: string): Set<string> | n
  * from the Dex of the replay's generation; a revealed ability decides; in a
  * format with free abilities any unknown one may be Illusion.
  */
-function illusionPossible(state: InferrerState): boolean {
+export function illusionPossible(state: InferrerState): boolean {
   const dex = Dex.forGen(state.gen);
   return [...state.pokemonMap.values()].some(mon => {
     const known = provenAbility(mon);
@@ -110,7 +110,7 @@ function illusionPossible(state: InferrerState): boolean {
 }
 
 /** Rules an item out for an opponent Pokémon whose item the log has not shown and no swap replaced. */
-function ruleOutUnknown(state: InferrerState, key: string, itemId: string) {
+export function ruleOutUnknown(state: InferrerState, key: string, itemId: string) {
   if (!key.startsWith(state.opponentSide) || illusionPossible(state)) return;
   const nickname = key.slice(4);
   const pokemon = findPokemon(state, nickname);

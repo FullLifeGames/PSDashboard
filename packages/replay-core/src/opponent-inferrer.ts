@@ -7,6 +7,9 @@ import {
   recordConsumedItem, recordHealItem, recordItem, recordItemDamage, recordMega, recordMove, recordTera, ruleOutFromDamage,
 } from './inference/handlers.ts';
 import { watchItemEvidence } from './inference/item-evidence.ts';
+import { watchTriggerEvidence } from './inference/trigger-evidence.ts';
+import { attachHits, collectHits } from './inference/hits.ts';
+import { rocksMayMiss } from './inference/rocks-tell.ts';
 import { toId } from './ids.ts';
 
 /** "SitrusBerry" / "HighHorsepower" (packed names) → "Sitrus Berry" / "High Horsepower". */
@@ -146,9 +149,12 @@ export function inferOpponentTeam(log: string, opponentSide: 'p1' | 'p2' = 'p2')
     recordMega(state, line);
     recordTera(state, line);
     recordAbilityAttribution(state, line);
+    watchTriggerEvidence(state, line);
+    collectHits(state, line);
   }
+  attachHits(state);
 
-  inferBootsFromHazards(lines, opponentSide, state.pokemonMap);
+  inferBootsFromHazards(lines, opponentSide, state.pokemonMap, { gen: state.gen, custom: state.custom });
 
   const sheet = parseShowteamSheet(log, opponentSide);
   if (sheet) applyTeamSheet(state.pokemonMap, sheet);
@@ -159,15 +165,15 @@ export function inferOpponentTeam(log: string, opponentSide: 'p1' | 'p2' = 'p2')
 /**
  * Switching into Stealth Rock without taking chip damage is a strong
  * Heavy-Duty Boots tell (N2). Only applies from gen 8 on (the item's debut)
- * and skips known Magic Guard holders.
+ * and skips holders an ability they may have explains as well (T130).
  */
 function inferBootsFromHazards(
   lines: string[],
   side: 'p1' | 'p2',
   pokemonMap: Map<string, RevealedPokemonInfo>,
+  legality: { gen: number; custom: boolean },
 ) {
-  const gen = parseInt(lines.find(line => line.startsWith('|gen|'))?.split('|')[2] ?? '9', 10) || 9;
-  if (gen < 8) return;
+  if (legality.gen < 8) return;
 
   let rocksUp = false;
   for (let index = 0; index < lines.length; index++) {
@@ -183,18 +189,22 @@ function inferBootsFromHazards(
     if (tookRockDamageOnEntry(lines, index, nickname)) continue;
 
     const pokemon = findPokemonByNickname(pokemonMap, nickname, lines, side);
-    if (!pokemon || !canGuessBoots(pokemon)) continue;
+    if (!pokemon || !canGuessBoots(pokemon, legality)) continue;
     pokemon.item = guessedField('Heavy-Duty Boots', undefined, 'No Stealth Rock damage on switch-in');
   }
 }
 
-/** Boots stay a guess only while nothing known about the holder rules them out. */
-function canGuessBoots(pokemon: RevealedPokemonInfo): boolean {
+/**
+ * Boots stay a guess only while nothing known about the holder rules them
+ * out, and while no ability it may have keeps the rock damage off, asked of
+ * the simulator as the build asks it (T130: a Magic Guard Clefable showed the
+ * guess in the panel while the build refused it).
+ */
+function canGuessBoots(pokemon: RevealedPokemonInfo, legality: { gen: number; custom: boolean }): boolean {
   if (pokemon.item.value && pokemon.item.value !== '(has item)') return false;
-  if (toId(pokemon.ability.value) === 'magicguard') return false;
   // A rocks chip elsewhere in the game disproves Boots outright.
   if (pokemon.ruledOut?.items.includes('heavydutyboots')) return false;
-  return true;
+  return !rocksMayMiss(pokemon, legality.gen, legality.custom);
 }
 
 /** Entry-hazard damage resolves before the next action — scan until then. */

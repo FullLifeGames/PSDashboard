@@ -4,6 +4,8 @@ import { findPokemonByNickname } from './lookup.ts';
 import { abilitiesAreFree } from '../team/dex-legal.ts';
 import { toId } from '../ids.ts';
 import type { ItemWatch } from './item-evidence.ts';
+import type { TriggerWatch } from './trigger-evidence.ts';
+import type { HitWalk } from './hits.ts';
 
 /** The scan state one team inference carries from line to line. */
 export interface InferrerState {
@@ -43,6 +45,10 @@ export interface InferrerState {
   custom: boolean;
   /** Item evidence by absence (round 63, T80): the resolving move and the residual phase; item-evidence.ts creates it. */
   itemWatch?: ItemWatch;
+  /** Item evidence by a trigger without its line (round 67, T130); trigger-evidence.ts creates it. */
+  triggerWatch?: TriggerWatch;
+  /** The client walk that collects each opponent attacker's clean hits (round 67, T130); hits.ts creates it. */
+  hitWalk?: HitWalk;
 }
 
 export function createInferrerState(lines: string[], opponentSide: 'p1' | 'p2'): InferrerState {

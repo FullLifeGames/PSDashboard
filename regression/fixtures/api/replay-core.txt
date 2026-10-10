@@ -3,7 +3,10 @@ type DamageObservation
 type EvBudget
 type FieldSnapshot
 type HiddenPowerEvidence
+type HitParty
+type ItemDamageJudge
 type KnowledgeSource
+type LoggedHit
 type OpponentTeamInfo
 type PastedSet
 type PkmnStatsPayload
@@ -50,6 +53,7 @@ value calcIvs
 value countMatchingSpecies
 value enrichPokemonInfo
 value enrichTeamInfo
+value enrichTeamInfos
 value evBudget
 value extractTeamSheets
 value fillUsageMoves
@@ -67,6 +71,7 @@ value guessedFieldFromUsage
 value inferOpponentTeam
 value inferReplayFormatId
 value itemSetValue
+value judgeItemsByDamage
 value manualEvs
 value manualField
 value manualMove

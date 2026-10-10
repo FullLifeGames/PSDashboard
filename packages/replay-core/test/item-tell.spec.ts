@@ -136,7 +136,8 @@ describe('the tell is no evidence while an ability the Pokémon may have keeps t
     expect(log).not.toMatch(/\|-damage\|p2a: Clefable\|[^\n]*\[from\] Stealth Rock/);
     expect(log).not.toMatch(/\[from\] item: Life Orb/);
     const { tell, built } = buildClefable(log);
-    expect(tell).toMatchObject({ value: 'Heavy-Duty Boots', source: 'guessed' });
+    // The inference asks the simulator as the build does (round 67, T130): no guess at all.
+    expect(tell.value).not.toBe('Heavy-Duty Boots');
     expect(built).toBe('Life Orb');
   });
 
@@ -152,7 +153,7 @@ describe('the tell is no evidence while an ability the Pokémon may have keeps t
       true,
     );
     expect(log).toMatch(/\|switch\|p2a: Clefable/);
-    expect(buildClefable(log).tell).toMatchObject({ value: 'Heavy-Duty Boots', source: 'guessed' });
+    expect(buildClefable(log).tell.value).not.toBe('Heavy-Duty Boots');
     expect(buildClefable(log).built).toBe('Life Orb');
   });
 });
