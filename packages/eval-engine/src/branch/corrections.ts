@@ -7,6 +7,7 @@ import { normalizeBattleOnlyFormeId } from './team-order.ts';
 import { findFirstAvailableSwitchSlot, findPokemonOnSide, findSlotBySpecies } from './protocol-choices.ts';
 import { correctFieldFromSnapshot } from './field-correction.ts';
 import { applyProtocolHeldItems } from './held-items.ts';
+import { playProtocolEntries } from './entry-effects.ts';
 import { restoreTeraFromSnapshot } from './tera-restore.ts';
 
 function repointActiveSlot(side: SimSide, activeSlot: number, target: SimPokemon): boolean {
@@ -54,6 +55,7 @@ export function correctActivesFromProtocol(
   events: string[],
   locks?: { context: ChoiceLockContext; turn: number },
 ) {
+  const before = battle.sides.map(side => [...side.active]);
   let repointed = false;
   for (const line of events) {
     const match = line.match(/^\|(switch|drag)\|(p[12])([a-d]):[^|]*\|([^,|]+)/);
@@ -67,6 +69,9 @@ export function correctActivesFromProtocol(
     if (!target) continue;
     if (repointActiveSlot(side, activeSlot, target)) repointed = true;
   }
+  // A body the repoints put on the field plays its switch-in with the item it
+  // held, before the held items take the protocol's state (round 67, T133).
+  if (repointed) playProtocolEntries(battle, before, events);
   // After the repoints, so a lock lands on the body the protocol has active.
   const handedOver = locks ? applyProtocolHeldItems(battle, locks.context, locks.turn) : false;
   // The cached requests were built from the PRE-correction actives — refresh
@@ -183,12 +188,19 @@ type SnapshotPokemon = TurnSnapshot['p1']['pokemon'][number];
  * never meets a boundary correction (round 47, 913994 t5: Rillaboom left at
  * 22 % and read 100 %). Status and boosts of the bench stay with the sim (a
  * silent Natural Cure lives only there); only a faint-state disagreement is
- * resolved from the snapshot.
+ * resolved from the snapshot. A faint written or taken back moves the side's
+ * fainted count, as the sim's own faint does (round 67, T133: Supreme
+ * Overlord and Last Respects read it; 752324's Kingambit counted no fallen
+ * ally after the correction fainted Amoonguss).
  */
 function correctBodyFromSnapshot(battlePokemon: SimPokemon, snapshotPokemon: SnapshotPokemon) {
   if (!snapshotPokemon.isActive && battlePokemon.fainted === snapshotPokemon.fainted) {
     if (!snapshotPokemon.fainted) battlePokemon.hp = benchHpFromSighting(battlePokemon, snapshotPokemon.hpPercent);
     return;
+  }
+  if (battlePokemon.fainted !== snapshotPokemon.fainted) {
+    const side = battlePokemon.side;
+    side.totalFainted = Math.max(0, side.totalFainted + (snapshotPokemon.fainted ? 1 : -1));
   }
   battlePokemon.hp = Math.max(0, Math.round((snapshotPokemon.hpPercent / 100) * battlePokemon.maxhp));
   battlePokemon.fainted = snapshotPokemon.fainted;
