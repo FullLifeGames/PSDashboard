@@ -22,7 +22,7 @@ function readClause(name: string, side: SideAnalysis, opponent: SideAnalysis): s
   const odds = side.played.koOdds;
   // Round 63 (T18): the kill-range shape is a verb phrase of its own ("kills ~43% of the time").
   const click = odds ? ` ${oddsPart('The click', odds, 'was')}.` : '';
-  return `${name} ${playedVerb(side.played.label)} — a read that paid off${horizon}, ` +
+  return `${name} ${playedVerb(side.played.label)}: a read that paid off${horizon}, ` +
     `${winDeltaText(side.riskPayoff ?? 0)} over the safe ${choiceNoun(side.safe.label)} (${winPctText(side.safe.worstCase)} guaranteed).${priced}${click}`;
 }
 
@@ -66,7 +66,7 @@ function unpunishedReadClause(
   const framing = side.riskWasRead
     ? `a read against the opponent's tendencies: ${came}`
     : `a read: ${came}`;
-  return `${name} ${playedVerb(played.label)} — ${framing}. ` +
+  return `${name} ${playedVerb(played.label)} as ${framing}. ` +
     `The engine's safe line was ${phrase(safe.label)} (${winPctText(safe.worstCase)} guaranteed)${lineOf(safe)}.${why}${caveat}${oddsNote(side)}`;
 }
 
@@ -88,7 +88,7 @@ function punishedMisplayClause(
   const line = shown.swapped ? '' : lineOf(best);
   const reasons = `${shown.swapped ? '' : why}${caveat}${nullNote(side)}${conditionalNote(side)}${oddsNote(side)}`;
   if (side.tier === 'blunder') {
-    return `${name} ${playedVerb(played.label)} (${winPctText(played.ev)}) — ` +
+    return `${name} ${playedVerb(played.label)} (${winPctText(played.ev)}), ` +
       `a blunder; clearly better was ${phrase(shown.label)} (${winPctText(shown.ev)})${line}.${reasons}`;
   }
   return `${name} ${playedVerb(played.label)} (${winPctText(played.ev)}); ` +
@@ -102,7 +102,7 @@ function mistakeClause(name: string, side: SideAnalysis, opponent: SideAnalysis)
   const why = difference ? ` The difference: ${difference}.` : '';
   const setup = playedSetupMove(side);
   const caveat = setup
-    ? ` (${setup} is a setup move — its payoff lies past the search horizon, so the regret may be overstated.)`
+    ? ` (${setup} is a setup move: its payoff lies past the search horizon, so the regret may be overstated.)`
     : '';
   if (side.riskUnpunished && side.safe) {
     return unpunishedReadClause(name, side, opponent, side.played, side.safe, why, caveat);
@@ -127,7 +127,7 @@ export function readCreditClause(name: string, side: SideAnalysis, ownLuck: numb
       ? ` On top of that, luck contributed ${winDeltaText(ownLuck)} for ${name}.`
       : ` On top of that, the engine re-read the position after the turn (${winDeltaText(ownLuck)} for ${name}).`
     : '';
-  return `${name} ${playedVerb(side.played.label)} — a read the engine gave no weight: ${when} it stood ` +
+  return `${name} ${playedVerb(side.played.label)}, a read the engine gave no weight: ${when} it stood ` +
     `${winDeltaText(credit.payoff)} over the safe ${choiceNoun(side.safe.label)} (${winPctText(side.safe.worstCase)} guaranteed).` +
     `${partialNote(side, 'credited')}${luck}`;
 }
@@ -136,7 +136,7 @@ export function readCreditClause(name: string, side: SideAnalysis, ownLuck: numb
 export function inaccuracyClause(name: string, side: SideAnalysis): string | null {
   if (side.tier !== 'inaccuracy' || !side.played || !side.best) return null;
   const shown = displayBest(side);
-  return `${name}'s ${phrase(side.played.label)} was an inaccuracy — ` +
+  return `${name}'s ${phrase(side.played.label)} was an inaccuracy; ` +
     `${phrase(shown.label)} was slightly better (${winPctText(shown.ev)} vs ${winPctText(side.played.ev)}).` +
     `${oddsNote(side)}${nullNote(side)}${conditionalNote(side)}${partialNote(side, 'graded')}`;
 }
@@ -154,8 +154,8 @@ export function forcedClause(name: string, side: SideAnalysis): string | null {
     `here (${Math.round(side.forcedMix.weight * 100)}%)`;
   if (!side.played) return `${base}.`;
   return side.played.label === side.forcedMix.label
-    ? `${base} — which is what happened.`
-    : `${base} — ${phrase(side.played.label)} came instead.`;
+    ? `${base}, which is what happened.`
+    : `${base}, but ${phrase(side.played.label)} came instead.`;
 }
 
 /**
@@ -174,23 +174,23 @@ function sackSentence(name: string, side: SideAnalysis): string | null {
   const pct = Math.round(side.sacrifice.hpFraction * 100);
   if (side.sacrifice.hazard) {
     // Round 63 (T17): the switch-in the hazards took (653785 t19).
-    return `${name} sacked ${side.sacrifice.name} (${pct}% HP) into the entry hazards — it fell before it could act, ` +
+    return `${name} sacked ${side.sacrifice.name} (${pct}% HP) into the entry hazards; it fell before it could act, ` +
       'and the next Pokémon came in on a free switch' +
       (side.sacrifice.verified ? '; the payoff over the next turns repaid it, so it reads as a sacrifice, not a misplay.'
         : '; graded as a sacrifice, not a misplay.');
   }
   if (side.sacrifice.stayed) {
     if (side.sacrifice.verified) {
-      return `${name} fed ${side.sacrifice.name} (${pct}% HP) — the line's priced floor is what happened, ` +
+      return `${name} fed ${side.sacrifice.name} (${pct}% HP): the line's priced floor is what happened, ` +
         `and the windowed payoff repaid the sack's full regret with a real edge on top; ` +
         `verified as a win-condition sacrifice, not graded as a misplay.`;
     }
-    return `${name} fed ${side.sacrifice.name} (${pct}% HP) — the line's priced floor is what happened, ` +
+    return `${name} fed ${side.sacrifice.name} (${pct}% HP): the line's priced floor is what happened, ` +
       `and the line's payoff lands within the payoff window; graded as a sacrifice, not a misplay.`;
   }
   return side.sacrifice.healthy
-    ? `${name} sacked a healthy ${side.sacrifice.name} (${pct}% HP) while decisively ahead — simplification, not graded as a misplay.`
-    : `${name} sacked ${side.sacrifice.name} (${pct}% HP) — a low-cost trade, not graded as a misplay.`;
+    ? `${name} sacked a healthy ${side.sacrifice.name} (${pct}% HP) while decisively ahead: simplification, not graded as a misplay.`
+    : `${name} sacked ${side.sacrifice.name} (${pct}% HP): a low-cost trade, not graded as a misplay.`;
 }
 
 /** Multi-turn expectation: the narrative half of round 6 — never a grade. */
@@ -201,10 +201,10 @@ export function streakClause(name: string, side: SideAnalysis): string | null {
   const nth = `${n}${n % 10 === 1 && n % 100 !== 11 ? 'st' : n % 10 === 2 && n % 100 !== 12 ? 'nd' : n % 10 === 3 && n % 100 !== 13 ? 'rd' : 'th'}`;
   const pct = Math.round(streak.cumulative * 100);
   if (streak.event === 'crit') {
-    return `${name}'s ${nth} straight attack into the boosted ${streak.defenderSpecies} — cumulative crit odds ` +
+    return `${name}'s ${nth} straight attack into the boosted ${streak.defenderSpecies}: cumulative crit odds ` +
       `reach ~${pct}% across the streak, and a crit ignores those boosts.`;
   }
-  return `${name}'s ${nth} ${streak.moveLabel} into ${streak.defenderSpecies} — ${streak.event} fishing compounds to ~${pct}% across the streak.`;
+  return `${name}'s ${nth} ${streak.moveLabel} into ${streak.defenderSpecies}: ${streak.event} fishing compounds to ~${pct}% across the streak.`;
 }
 
 /**
@@ -229,9 +229,9 @@ export function sensitivityClause(name: string, side: SideAnalysis): string | nu
 export function unansweredClause(side: SideAnalysis): string | null {
   if (!side.unanswered) return null;
   if (side.unanswered.heldBy) {
-    return `${side.unanswered.species} has no switch-in left on the other side — only the standing ` +
+    return `${side.unanswered.species} has no switch-in left on the other side; only the standing ` +
       `${side.unanswered.heldBy} holds it, and from the bench the opponent can only sacrifice into it.`;
   }
-  return `${side.unanswered.species} has no live answer on the other side — any turn that ` +
+  return `${side.unanswered.species} has no live answer on the other side, so any turn that ` +
     'brings it in cleanly turns profit, and the opponent can only sacrifice into it.';
 }

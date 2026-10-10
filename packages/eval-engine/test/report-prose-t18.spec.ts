@@ -73,7 +73,7 @@ describe('T18 point 1: the near sentence waits for a quarter of the bodies to fa
     expect(early.p2.nearDecided).toEqual({ species: 'Medicham-Mega', odds: 0.9, removes: 'Keldeo', announce: false });
     expect(summarizeTurn(early, names)).not.toContain('from clearing the rest');
     expect(summarizeTurn(at(result, 0.25), names))
-      .toContain('Medicham-Mega is one 90% roll from clearing the rest — removing Keldeo leaves no answer behind.');
+      .toContain('Medicham-Mega is one 90% roll from clearing the rest; removing Keldeo leaves no answer behind.');
     // Without a known share the gate stays off (the card of a caller that passes none reads as before).
     expect(at(result).p2.nearDecided?.announce).toBe(true);
   });
@@ -82,7 +82,7 @@ describe('T18 point 1: the near sentence waits for a quarter of the bodies to fa
     const result = nearResult('p1', 'Chi-Yu', 1, 'Groudon', 0.67, true);
     expect(summarizeTurn(at(result, 0), names)).not.toContain('from clearing the rest');
     const later = summarizeTurn(at(result, 0.5), names);
-    expect(later).toContain('Chi-Yu is one sure KO from clearing the rest — removing Groudon leaves no answer behind.');
+    expect(later).toContain('Chi-Yu is one sure KO from clearing the rest; removing Groudon leaves no answer behind.');
     expect(later).not.toContain('100% roll');
   });
 

@@ -79,14 +79,14 @@ function decidedSentences(analysis: TurnAnalysis, playerNames: PlayerNames, deci
   sentences.push(...forced);
   if (decided?.announce) {
     const opponent = decided.key === 'p1' ? playerNames[1] : playerNames[0];
-    sentences.push(`From here ${decided.species} clears everything ${opponent} has left — ` +
+    sentences.push(`From here ${decided.species} clears everything ${opponent} has left: ` +
       'the game is practically decided.');
   }
   const nearDecided = analysis.p1.nearDecided ?? analysis.p2.nearDecided;
   if (nearDecided?.announce) {
     // Round 63 (T18): a click that cannot fail is no roll; round 64 (T123): 99.5% can fail.
     sentences.push(`${nearDecided.species} is one ${rollText(nearDecided.odds)} ` +
-      `from clearing the rest — removing ${nearDecided.removes} leaves no answer behind.`);
+      `from clearing the rest; removing ${nearDecided.removes} leaves no answer behind.`);
   }
   return sentences;
 }
@@ -119,12 +119,12 @@ function chanceSentence(analysis: TurnAnalysis, playerNames: PlayerNames, decide
   const delta = analysis.chanceDelta ?? analysis.swing ?? 0;
   const toward = decided !== null && (decided.key === 'p1' ? delta > 0 : delta < 0);
   if (toward) {
-    return 'Both sides picked reasonable options — the swing is the decided game resolving ' +
+    return 'Both sides picked reasonable options; the swing is the decided game resolving ' +
       `toward ${decided.key === 'p1' ? playerNames[0] : playerNames[1]} (${winDeltaText(delta)}).`;
   }
   return chanceRolled(analysis) === false
     ? `Both sides picked reasonable options; the engine re-read the position after the turn (${winDeltaText(delta)}).`
-    : 'Both sides picked reasonable options — the swing came from how the turn rolled ' +
+    : 'Both sides picked reasonable options; the swing came from how the turn rolled ' +
       `(${winDeltaText(delta)}).`;
 }
 
@@ -142,7 +142,7 @@ function hindsightSentence(analysis: TurnAnalysis, playerNames: PlayerNames): st
     ? `${missed.read.against} was the likeliest click on the opponent model ` +
       `(${Math.round(missed.read.likeliest * 100)}%), and against it`
     : `against the ${missed.read.against} actually clicked,`;
-  return `The read was there for ${missed.name} — ${lead} ${phrase(missed.read.response)} ` +
+  return `The read was there for ${missed.name}: ${lead} ${phrase(missed.read.response)} ` +
     `was worth ${winDeltaText(missed.read.gain)} more.`;
 }
 
@@ -160,7 +160,7 @@ function predictiveSentence(analysis: TurnAnalysis, playerNames: PlayerNames): s
   const top = reads.sort((a, b) => b.read.gain - a.read.gain)[0];
   if (!top) return null;
   return `If ${top.name} expects ${top.read.expect} (${Math.round(top.read.confidence * 100)}% on the opponent model), ` +
-    `${phrase(top.read.response)} is the move — ${winDeltaText(top.read.gain)} over ${phrase(top.read.over)} against it.`;
+    `${phrase(top.read.response)} is the move: ${winDeltaText(top.read.gain)} over ${phrase(top.read.over)} against it.`;
 }
 
 /**
@@ -181,13 +181,13 @@ function shiftSentences(analysis: TurnAnalysis, playerNames: PlayerNames): strin
   const open = (analysis.p1.viableCount ?? 0) >= BREADTH_MIN_OPTIONS &&
     (analysis.p2.viableCount ?? 0) >= BREADTH_MIN_OPTIONS;
   sentences.push(open
-    ? `A genuinely open turn rather than a drift — ${analysis.p1.viableCount} of ` +
+    ? `A genuinely open turn rather than a drift: ${analysis.p1.viableCount} of ` +
       `${analysis.p1.choiceCount} options for ${playerNames[0]} and ${analysis.p2.viableCount} of ` +
       `${analysis.p2.choiceCount} for ${playerNames[1]} sat within an inaccuracy of best, so the ` +
       `turn hinged on out-predicting the opponent${decomposition}.`
     : decomposition
-      ? `No single mistake stands out — the choices and ${reRead ? "the engine's re-read" : 'the rolls'} pushed the same way${decomposition}.`
-      : 'No single mistake stands out — the swing built up without a clear culprit.');
+      ? `No single mistake stands out; the choices and ${reRead ? "the engine's re-read" : 'the rolls'} pushed the same way${decomposition}.`
+      : 'No single mistake stands out; the swing built up without a clear culprit.');
   const hindsight = hindsightSentence(analysis, playerNames);
   if (hindsight) sentences.push(hindsight);
   return sentences;
@@ -211,10 +211,10 @@ function attributionSentences(analysis: TurnAnalysis, playerNames: PlayerNames, 
     case 'shift':
       return shiftSentences(analysis, playerNames);
     case 'unclear':
-      return ['The score swung, but a choice never surfaced (a Pokémon slept, flinched, or was fully paralyzed) — no blame assigned.'];
+      return ['The score swung, but a choice never surfaced (a Pokémon slept, flinched, or was fully paralyzed), so no blame is assigned.'];
     default:
       return [playedBest(analysis.p1) && playedBest(analysis.p2)
-        ? "A quiet turn — both sides played the engine's preferred line."
+        ? "A quiet turn: both sides played the engine's preferred line."
         : 'A quiet turn.'];
   }
 }
@@ -267,7 +267,7 @@ export function summarizeTurn(
     // Played actions were never parsed (doubles) — describe the movement
     // and point at the engine lines; blame is off the table.
     sentences.push(analysis.attribution === 'shift'
-      ? "The advantage moved — compare the engine's preferred lines for both sides below."
+      ? "The advantage moved; compare the engine's preferred lines for both sides below."
       : 'A quiet turn.');
     return sentences.join(' ');
   }

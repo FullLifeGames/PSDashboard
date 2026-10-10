@@ -334,7 +334,7 @@ function winnerSentences(
     // clean line keeps the praise and drops its matchup-and-variance tail.
     sentences.push(story.path
       ? `${loserName}'s play was clean.`
-      : `${loserName}'s play was clean — the loss came from matchup and variance, not blunders.`);
+      : `${loserName}'s play was clean: the loss came from matchup and variance, not blunders.`);
   }
   if (story.path) sentences.push(story.path.sentence);
   return sentences;
@@ -357,7 +357,7 @@ function reportSummary(
   if (winner && story) {
     sentences.push(...winnerSentences(playerNames, winner, turningPoint, playedTracking, decisionTotals, story, series));
   } else if (known.length > 0) {
-    sentences.push('No winner recorded — the game may be unfinished.');
+    sentences.push('No winner recorded; the game may be unfinished.');
   }
 
   if (!story?.path?.foldLuck && Math.abs(chanceTotal) >= LUCK_TOTAL_THRESHOLD) {

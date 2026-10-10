@@ -82,7 +82,7 @@ describe('win-reason detection', () => {
       mk(2, -0.9, -0.95, { p2: { playedRaw: null, played: null, best: null, safe: null, regret: 0, forcedWin: { turns: 3, mass: 1, caveat: 'barring-crit', announce: true } } }),
       mk(3, -0.95, -1, { p2: { playedRaw: null, played: null, best: null, safe: null, regret: 0, decided: { species: 'Zapdos-Galar', announce: true } } }),
     ], names, 'p2');
-    expect(report.summary).toContain('From turn 2 the win was forced — every reply lost within 3 turns, barring a crit.');
+    expect(report.summary).toContain('From turn 2 the win was forced: every reply lost within 3 turns, barring a crit.');
     expect(report.conversion).toEqual({ kind: 'forced', turn: 2, provenTurns: 3 });
   });
 
@@ -173,7 +173,7 @@ describe('win-reason detection', () => {
       mk(4, -0.6, -0.85),
     ], names, 'p2');
     // t2's roll is past the favor boundary (resolution) — only t1 is luck.
-    expect(report.summary).toContain('The rolls decided it — luck ran Beta\'s way overall (+15%).');
+    expect(report.summary).toContain('The rolls decided it: luck ran Beta\'s way overall (+15%).');
     expect(report.summary).not.toContain('Luck ran');
     expect(report.winPath).toEqual({ factor: 'variance', size: 0.3 });
   });
@@ -310,7 +310,7 @@ describe('win-reason detection', () => {
       mk(3, -0.2, -0.5),
       mk(4, -0.5, -0.7),
     ], names, 'p2');
-    expect(report.summary).toContain('No single edge decided it — Beta converted a close game turn by turn.');
+    expect(report.summary).toContain('No single edge decided it; Beta converted a close game turn by turn.');
     expect(report.winPath).toEqual({ factor: 'close', size: 0 });
   });
 
@@ -331,7 +331,7 @@ describe('win-reason detection', () => {
       mk(3, -0.75, -0.9),
     ], names, 'p2');
     expect(report.summary).toContain('start to finish');
-    expect(report.summary).toContain('72% matchup from the start');
+    expect(report.summary).toContain('from a 72% opening matchup');
   });
 });
 
@@ -364,7 +364,7 @@ describe('dice-anchored luck claims', () => {
       mk(2, -0.2, -0.45, { chanceDelta: -0.17 }),
       mk(3, -0.45, -0.7),
     ], names, 'p2', true, new Set([1]));
-    expect(report.summary).toContain('The rolls decided it — luck ran Beta\'s way overall (+24%).');
+    expect(report.summary).toContain('The rolls decided it: luck ran Beta\'s way overall (+24%).');
   });
 
   test('a weak dice anchor leaves the luck claim alone', () => {
@@ -443,7 +443,7 @@ describe('denied early end', () => {
   test('speaks the winner\'s failed one-roll sweep and how long the win waited', () => {
     const report = buildGameReport(deniedAnalyses(12), names, 'p2', true, new Set([3]));
     expect(report.summary).toContain('Turn 3 nearly ended it far earlier: Garchomp stood one 95% roll ' +
-      'from clearing the rest, but Fire Fang missed — the win waited another 9 turns.');
+      'from clearing the rest, but Fire Fang missed, and the win waited another 9 turns.');
     expect(report.deniedEnd).toEqual({
       turn: 3, side: 'p2', species: 'Garchomp', removes: 'Corviknight',
       odds: 0.95, move: 'Fire Fang', turnsRemaining: 9,
@@ -466,7 +466,7 @@ describe('denied early end', () => {
       ...Array.from({ length: 7 }, (_, i) => mk(6 + i, -0.1 - i * 0.1, -0.1 - (i + 1) * 0.1)),
     ], names, 'p2', true, new Set([3]));
     expect(report.summary).toContain('Turn 3 nearly ended it the other way: Machamp stood one 90% roll ' +
-      'from clearing the rest, but the roll failed — Alpha went on to lose.');
+      'from clearing the rest, but the roll failed, and Alpha went on to lose.');
     expect(report.deniedEnd).toEqual({
       turn: 3, side: 'p1', species: 'Machamp', removes: 'Chansey',
       odds: 0.9, turnsRemaining: 9,
@@ -501,7 +501,7 @@ describe('denied early end', () => {
     const otherOdds = buildGameReport(
       deniedAnalyses(12, { p2: nearSide({ koOdds: { accuracy: 0.7, killFraction: 1 } }) }),
       names, 'p2', true, new Set([3]));
-    expect(otherOdds.summary).toContain('but the roll failed — the win waited another 9 turns.');
+    expect(otherOdds.summary).toContain('but the roll failed, and the win waited another 9 turns.');
     expect(otherOdds.deniedEnd?.move).toBeUndefined();
     const noPlayed = buildGameReport(
       deniedAnalyses(12, { p2: nearSide(null) }),
@@ -515,7 +515,7 @@ describe('denied early end', () => {
     const labeled = buildGameReport(
       deniedAnalyses(12, { p2: nearSide({ koOdds: { accuracy: 0.95, killFraction: 1, label: 'Heat Wave→Corviknight' } }) }),
       names, 'p2', true, new Set([3]));
-    expect(labeled.summary).toContain('but the roll failed — the win waited another 9 turns.');
+    expect(labeled.summary).toContain('but the roll failed, and the win waited another 9 turns.');
     expect(labeled.deniedEnd?.move).toBeUndefined();
   });
 });

@@ -97,7 +97,7 @@ export const regretSpanFor = (side: SideAnalysis): { span?: { from: number; to: 
 /** The null recommendation kept its place (no alternative): name the caveat. */
 export const nullNote = (side: SideAnalysis): string =>
   side.bestNull && !side.bestNull.alternative && side.best
-    ? ` (A caveat: ${side.best.label} does nothing here — ${side.bestNull.reason}; it only pays against the rest of the team.)`
+    ? ` (A caveat: ${side.best.label} does nothing here because ${side.bestNull.reason}; it only pays against the rest of the team.)`
     : '';
 
 /**
@@ -147,7 +147,7 @@ export function conditionalNote(side: SideAnalysis): string {
     conditional.mixWhen ? `${phrase(conditional.mixLabel)} covers ${conditional.mixWhen}` : null,
   ].filter((segment): segment is string => segment !== null);
   return ` The engine's own equilibrium leans ${phrase(conditional.mixLabel)} ` +
-    `(${Math.round(conditional.mixWeight * 100)}%)${segments.length > 0 ? ` — ${segments.join('; ')}` : ''}.`;
+    `(${Math.round(conditional.mixWeight * 100)}%)${segments.length > 0 ? `: ${segments.join('; ')}` : ''}.`;
 }
 
 /**
@@ -165,5 +165,5 @@ export function formatRead(read: {
   const parts = read.breakdown
     .map(entry => `${winPctText(entry.value)} if ${entry.label} (${Math.round(entry.prob * 100)}% likely)`)
     .join(', ');
-  return `Read: ${target}${parts ? ` — ${parts}` : ''} — net ${winPctText(read.net)}.`;
+  return `Read: ${target}${parts ? `; ${parts}` : ''}; net ${winPctText(read.net)}.`;
 }

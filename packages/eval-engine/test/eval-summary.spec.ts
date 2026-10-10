@@ -240,7 +240,7 @@ describe('natural-language turn summaries', () => {
       scoreAfter: 0.1,
     }), names);
     expect(summary).toContain('quiet turn');
-    expect(summary).toContain("Alpha's U-turn was an inaccuracy — Draco Meteor was slightly better");
+    expect(summary).toContain("Alpha's U-turn was an inaccuracy; Draco Meteor was slightly better");
   });
 
   test('a delayed payoff names its horizon', () => {
@@ -331,7 +331,7 @@ describe('natural-language turn summaries', () => {
       scoreBefore: 0.1,
       scoreAfter: -0.25,
     }), names);
-    expect(summary).toContain('Beta played Recover — a read that paid off, +13% over the safe switch to Dragapult');
+    expect(summary).toContain('Beta played Recover: a read that paid off, +13% over the safe switch to Dragapult');
     expect(summary).toContain('The floor priced in Reply; Draco Meteor came instead.');
     expect(summary).not.toContain('safer was');
   });
@@ -818,7 +818,7 @@ describe('streak clauses (round 6)', () => {
       },
     };
     const summary = summarizeTurn(analysis, names);
-    expect(summary).toContain("Alpha's 5th Ice Beam into Blissey — freeze fishing compounds to ~41% across the streak.");
+    expect(summary).toContain("Alpha's 5th Ice Beam into Blissey: freeze fishing compounds to ~41% across the streak.");
   });
 
   test('crit accumulation names the boost-ignoring roll', () => {

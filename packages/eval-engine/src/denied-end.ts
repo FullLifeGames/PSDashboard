@@ -87,8 +87,8 @@ export function deniedEndSentence(denied: DeniedEnd, winner: Side, loserName: st
   // Round 67 (T135): a sure KO has no roll that could fail; it never came (2695803506 t2).
   const fail = denied.move !== undefined ? `${denied.move} missed` : denied.odds >= 1 ? 'the KO never came' : 'the roll failed';
   return denied.side === winner
-    ? `Turn ${denied.turn} nearly ended it far earlier: ${roll}, but ${fail} — ` +
+    ? `Turn ${denied.turn} nearly ended it far earlier: ${roll}, but ${fail}, and ` +
       `the win waited another ${denied.turnsRemaining} turns.`
-    : `Turn ${denied.turn} nearly ended it the other way: ${roll}, but ${fail} — ` +
+    : `Turn ${denied.turn} nearly ended it the other way: ${roll}, but ${fail}, and ` +
       `${loserName} went on to lose.`;
 }

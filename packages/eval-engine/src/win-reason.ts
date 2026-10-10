@@ -158,7 +158,7 @@ export function conversionFor(
         : forced.caveat === 'sampled-rolls' ? ' on the sampled rolls' : '';
       return {
         conversion: { kind: 'forced', turn: analysis.turn, provenTurns: forced.turns },
-        sentence: `From turn ${analysis.turn} the win was forced — ` +
+        sentence: `From turn ${analysis.turn} the win was forced: ` +
           `every reply lost within ${forced.turns} turn${forced.turns === 1 ? '' : 's'}${tail}.`,
       };
     }
@@ -205,7 +205,7 @@ export function tipClause(
 export function matchupClause(series: (number | undefined)[], winner: Side): string {
   const first = series.find((value): value is number => value !== undefined);
   if (first === undefined || toward(winner, first) < MATCHUP_EDGE) return '';
-  return ` — a ${winPercent(winner === 'p1' ? first : -first)}% matchup from the start`;
+  return ` from a ${winPercent(winner === 'p1' ? first : -first)}% opening matchup`;
 }
 
 /** Regret that actually cost something: paid-off reads, unpunished risks, and sacks carry no blame. */
@@ -282,7 +282,7 @@ function grindFor(
 }
 
 const grindSentence = (grind: Grind, winnerName: string): string => {
-  const main = `${winnerName} built it step by step from turn ${grind.spanStart} — ` +
+  const main = `${winnerName} built it step by step from turn ${grind.spanStart}: ` +
     `${winDeltaText(grind.drift)} across ${grind.spanCount} turns with no single big swing.`;
   const parts: string[] = [];
   if (grind.narrow > 0) parts.push(`${grind.narrow} turn${grind.narrow === 1 ? '' : 's'} where only one line held`);
@@ -360,7 +360,7 @@ export function winPathFor(args: WinPathArgs): WinPathResult | null {
   }
   if (top.factor === 'decisions') {
     const winnerBit = punished[winner] < NEGLIGIBLE_REGRET ? 'next to nothing' : winDeltaText(-punished[winner]);
-    const sentence = `${loserName} gave it away in small steps — ${winDeltaText(-punished[loser])} ` +
+    const sentence = `${loserName} gave it away in small steps: ${winDeltaText(-punished[loser])} ` +
       `to decisions across the game, against ${winnerBit} for ${winnerName}.`;
     return { winPath: { factor: 'decisions', size: top.size }, sentence, foldLuck: false };
   }
@@ -370,14 +370,14 @@ export function winPathFor(args: WinPathArgs): WinPathResult | null {
       .map(read => `${phrase(read.label)} on turn ${read.turn} (${winDeltaText(read.payoff)})`);
     return { winPath: { factor: 'reads', size: top.size }, sentence: `${winnerName} won it on reads: ${examples.join(' and ')}.`, foldLuck: false };
   }
-  const sentence = `The rolls decided it — luck ran ${winnerName}'s way overall (${winDeltaText(top.size)}).`;
+  const sentence = `The rolls decided it: luck ran ${winnerName}'s way overall (${winDeltaText(top.size)}).`;
   return { winPath: { factor: 'variance', size: top.size }, sentence, foldLuck: true };
 }
 
 /** Nothing crossed a floor and nothing else explained the tip — say so instead of saying nothing. */
 export const closeGameFallback = (winnerName: string): WinPathResult => ({
   winPath: { factor: 'close', size: 0 },
-  sentence: `No single edge decided it — ${winnerName} converted a close game turn by turn.`,
+  sentence: `No single edge decided it; ${winnerName} converted a close game turn by turn.`,
   foldLuck: false,
 });
 

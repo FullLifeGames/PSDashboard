@@ -57,7 +57,7 @@ describe('the predictive read before the click', () => {
     expect(analysis.p1.predictiveRead!.gain).toBeCloseTo(1.0, 8);
     expect(analysis.p2.predictiveRead).toBeUndefined();
     expect(summarizeTurn(analysis, names)).toContain(
-      'If Alpha expects Earthquake (67% on the opponent model), switching to Noivern is the move — +50% over Scald against it.');
+      'If Alpha expects Earthquake (67% on the opponent model), switching to Noivern is the move: +50% over Scald against it.');
   });
 
   test('the sentence stands without played actions', () => {
@@ -105,7 +105,7 @@ describe('the predictive read before the click', () => {
       p2Labels: ['Rock Slide + Knock Off', 'Protect + Trick Room'], p2Choices: ['move rockslide, move knockoff 1', 'move protect, move trickroom'],
     }), { played: null, playedOutcome: null });
     expect(summarizeTurn(analysis, names)).toContain(
-      'If Alpha expects Rock Slide + Knock Off (67% on the opponent model), switching to Noivern and playing Tailwind is the move — +50% over Fake Out + Moonblast against it.');
+      'If Alpha expects Rock Slide + Knock Off (67% on the opponent model), switching to Noivern and playing Tailwind is the move: +50% over Fake Out + Moonblast against it.');
   });
 
   test('a doubles matrix of move pairs alone leaves the model unsure, and the sentence silent', () => {
@@ -165,7 +165,7 @@ describe('the hindsight read and the likeliest click', () => {
     const analysis = clicked('Earth Power', true);
     expect(analysis.p2.hindsightRead?.likeliest).toBeCloseTo(0.33, 1);
     expect(summarizeTurn(analysis, names)).toContain(
-      'The read was there for Beta — Earth Power was the likeliest click on the opponent model (33%), ' +
+      'The read was there for Beta: Earth Power was the likeliest click on the opponent model (33%), ' +
       'and against it switching to Mandibuzz was worth +12% more.');
   });
 
