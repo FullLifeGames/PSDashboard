@@ -15,9 +15,13 @@ import { toId } from '../ids.ts';
  * reads from no EVs, IV 0 and a lowering nature up to the format's cap, IV 31
  * and a raising nature (ruling R1: pair consistency, the way
  * corroborateChoiceItem judges a Choice item against the built defender).
- * A hit counts only when some candidate, or no item, explains it; any doubt
- * drops the hit (ruling R3). The app reaches this module only through the
- * inference's dynamic import, so the entry chunk stays free of the calculator.
+ * The defender's item and ability count as built only where the log showed
+ * them; a guessed one is ranged with no item and with the species' other
+ * abilities (ruling R18: a guessed Assault Vest ruled out 649664's Keldeo's
+ * Choice Scarf). A hit counts only when some candidate, or no item, explains
+ * it; any doubt drops the hit (ruling R3). The app reaches this module only
+ * through the inference's dynamic import, so the entry chunk stays free of the
+ * calculator.
  */
 
 /** HP-bar reading noise: the slack of the spread fit and the Choice-lock check. */
@@ -163,8 +167,14 @@ interface HitContext {
   gen: CalcGen;
   abilities: AbilityVariant[];
   spreads: { strong: Spread; weak: Spread };
-  defender: CalcOptions;
+  defenders: CalcOptions[];
 }
+
+/** The holder in one configuration: a spread, an ability with its state, an item ('' for none). */
+const holderOptions = (spread: Spread, { ability, abilityOn }: AbilityVariant, item: string): CalcOptions => ({
+  ability: ability || undefined, abilityOn, item: item || undefined, nature: spread.nature as CalcOptions['nature'],
+  evs: spread.evs, ivs: { hp: 31, atk: 31, def: 31, spa: 31, spd: 31, spe: 31, ...spread.ivs },
+});
 
 /**
  * By what factor the hit lies outside the hull the holder's allowed
@@ -174,17 +184,14 @@ interface HitContext {
  * calculator cannot judge.
  */
 function missOf(ctx: HitContext, item: string): number | null {
-  const { hit, gen, abilities, spreads, defender } = ctx;
-  const holder = (spread: Spread, { ability, abilityOn }: AbilityVariant): CalcOptions => ({
-    ability: ability || undefined, abilityOn, item: item || undefined, nature: spread.nature as CalcOptions['nature'],
-    evs: spread.evs, ivs: { hp: 31, atk: 31, def: 31, spa: 31, spd: 31, spe: 31, ...spread.ivs },
-  });
-  const strong = abilities.map(ability => rolls(gen, hit, holder(spreads.strong, ability), defender));
+  const { hit, gen, abilities, spreads, defenders } = ctx;
+  const pairs = defenders.flatMap(defender => abilities.map(ability => ({ defender, ability })));
+  const strong = pairs.map(({ defender, ability }) => rolls(gen, hit, holderOptions(spreads.strong, ability, item), defender));
   if (strong.some(range => range === null)) return null;
   const max = Math.max(...strong.map(range => range!.max));
   if (hit.observed - OBSERVATION_SLACK > max) return (hit.observed - OBSERVATION_SLACK) / max;
   if (hit.lowerBound) return 1;
-  const weak = abilities.map(ability => rolls(gen, hit, holder(spreads.weak, ability), defender));
+  const weak = pairs.map(({ defender, ability }) => rolls(gen, hit, holderOptions(spreads.weak, ability, item), defender));
   if (weak.some(range => range === null)) return null;
   const min = Math.min(...weak.map(range => range!.min));
   return hit.observed + OBSERVATION_SLACK < min ? min / (hit.observed + OBSERVATION_SLACK) : 1;
@@ -203,6 +210,39 @@ function variantsOf(abilities: string[], party: HitParty): AbilityVariant[] {
   });
 }
 
+const shown = (field: { source: string }) => field.source === 'revealed' || field.source === 'manual';
+
+/** The rolls of the holder's strong spreads without an item against one defender variant, as a key. */
+function variantKey(ctx: Omit<HitContext, 'defenders'>, defender: CalcOptions): string {
+  return ctx.abilities.map(ability => {
+    const range = rolls(ctx.gen, ctx.hit, holderOptions(ctx.spreads.strong, ability, ''), defender);
+    return range ? `${range.min}:${range.max}` : '-';
+  }).join('|');
+}
+
+/**
+ * The defender as built, with what the log has not shown ranged (ruling
+ * R18): no item beside a guessed one, each ability the species may have
+ * beside a guessed one. Variants that give the holder's strong spreads the
+ * same rolls collapse into one, so the common case costs one configuration.
+ */
+function defenderVariants(dex: GenDex, info: RevealedPokemonInfo, ctx: Omit<HitContext, 'defenders'>): CalcOptions[] {
+  const party = ctx.hit.defender;
+  const built = defenderOptions(dex, info, party);
+  const itemShown = party.itemChanged || !!party.held || shown(info.item);
+  const items = itemShown || !built.item ? [built.item] : [built.item, undefined];
+  const ruled = info.ruledOut?.abilities ?? [];
+  const possible = party.ability || shown(info.ability) ? []
+    : mayHave(dex, party.species, '').filter(ability => !ruled.includes(toId(ability)));
+  const abilities = possible.length > 0 ? possible : [built.ability];
+  const distinct = new Map<string, CalcOptions>();
+  for (const option of items.flatMap(item => abilities.map(ability => ({ ...built, item, ability })))) {
+    const key = variantKey(ctx, option);
+    if (!distinct.has(key)) distinct.set(key, option);
+  }
+  return [...distinct.values()];
+}
+
 function contextOf(attacker: RevealedPokemonInfo, hit: LoggedHit, teams: { p1: OpponentTeamInfo; p2: OpponentTeamInfo }): HitContext | null {
   const info = defenderOf(teams[hit.defender.side], hit.defender.species);
   if (!info || info.evs.source === 'unknown') return null;
@@ -211,11 +251,11 @@ function contextOf(attacker: RevealedPokemonInfo, hit: LoggedHit, teams: { p1: O
     ? attacker.ability.value : abilityName(dex, hit.attacker.ability);
   const ruled = attacker.ruledOut?.abilities ?? [];
   const abilities = mayHave(dex, hit.attacker.species, known).filter(ability => known || !ruled.includes(toId(ability)));
-  return {
+  const base = {
     hit, gen: Generations.get(Math.min(9, Math.max(1, hit.gen)) as 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9),
     abilities: variantsOf(abilities.length > 0 ? abilities : [''], hit.attacker), spreads: extremes(offenseStat(dex, hit.move)),
-    defender: defenderOptions(dex, info, hit.defender),
   };
+  return { ...base, defenders: defenderVariants(dex, info, base) };
 }
 
 /**

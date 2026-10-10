@@ -224,3 +224,51 @@ describe('any doubt drops the hit (T130, ruling R3)', () => {
     expect(judgeItemsByDamage(lost, CANDIDATES, built())).toEqual([]);
   });
 });
+
+/**
+ * The defender's item and ability count as the panel builds them only where
+ * the log has shown them (round 67, ruling R18): a guessed Assault Vest or a
+ * guessed Multiscale cuts the damage the calculator expects, so a hit the
+ * game dealt without them would refute every item without a boost. 649664
+ * t23: one Hydro Pump into a Tornadus-Therian whose Assault Vest was a guess
+ * ruled Keldeo's Choice Scarf out.
+ */
+describe('the defender\'s unproven item and ability widen the hull (T130, ruling R18)', () => {
+  const plainLog = () => play([moltres()], [gholdengo('Metal Coat')], [['move protect', 'move dazzlinggleam terastallize'], ['move nastyplot', 'move dazzlinggleam']]);
+  const guessedVest = () => ({ ...builtAs('Moltres-Galar', 'Leftovers', 'Berserk', BULKY), item: guessedField('Assault Vest') });
+
+  test('singles: a guessed Assault Vest the defender did not hold refutes nothing', () => {
+    expect(judgeItemsByDamage(attackerIn(plainLog(), 'Gholdengo'), CANDIDATES, teams([guessedVest()]))).toEqual([]);
+  });
+
+  test('doubles: the same for a spread hit', () => {
+    const log = play([moltres(), set('Blissey', 'Leftovers', 'Natural Cure', ['Soft-Boiled'], BULKY)],
+      [gholdengo('Metal Coat'), set('Chansey', 'Eviolite', 'Natural Cure', ['Soft-Boiled'], BULKY)],
+      [['move protect, move softboiled', 'move dazzlinggleam terastallize, move softboiled'], ['move nastyplot, move softboiled', 'move dazzlinggleam, move softboiled']], true);
+    const built = teams([guessedVest(), builtAs('Blissey', 'Leftovers', 'Natural Cure', BULKY)]);
+    expect(judgeItemsByDamage(attackerIn(log, 'Gholdengo'), CANDIDATES, built)).toEqual([]);
+  });
+
+  test('an Assault Vest the log showed still decides: Choice Specs stays, the items without a boost fall', () => {
+    // An Assault Vest holder cannot use status moves: Moltres-Galar attacks instead of protecting.
+    const vest = set('Moltres-Galar', 'Assault Vest', 'Berserk', ['Fiery Wrath'], BULKY);
+    const log = play([vest], [gholdengo('Choice Specs')], [['move fierywrath', 'move dazzlinggleam terastallize']]);
+    const refuted = judgeItemsByDamage(attackerIn(log, 'Gholdengo'), CANDIDATES, teams([builtAs('Moltres-Galar', 'Assault Vest', 'Berserk', BULKY)]));
+    expect(refuted.sort()).toEqual(['choicescarf', 'leftovers', 'metalcoat']);
+  });
+
+  // Solid Rock takes a quarter off a super-effective hit, a cut Choice Specs makes up for and no plain item does.
+  const SPECIAL = { nature: 'Modest', evs: { spa: 252, hp: 252 } };
+  const blissey = (item: string) => set('Blissey', item, 'Natural Cure', ['Flash Cannon', 'Soft-Boiled'], SPECIAL);
+  const rhyperior = (ability: string) => set('Rhyperior', 'Leftovers', ability, ['Iron Defense', 'Protect'], BULKY);
+  const PLAIN = ['Leftovers', 'Choice Specs', 'Choice Scarf'];
+
+  test('singles: a guessed Solid Rock the defender did not have refutes nothing; a shown one decides', () => {
+    const plain = play([rhyperior('Lightning Rod')], [blissey('Leftovers')], [['move irondefense', 'move flashcannon']]);
+    const guessed = { ...builtAs('Rhyperior', 'Leftovers', 'Lightning Rod', BULKY), ability: guessedField('Solid Rock') };
+    expect(judgeItemsByDamage(attackerIn(plain, 'Blissey'), PLAIN, teams([guessed]))).toEqual([]);
+    const boosted = play([rhyperior('Solid Rock')], [blissey('Choice Specs')], [['move irondefense', 'move flashcannon']]);
+    const refuted = judgeItemsByDamage(attackerIn(boosted, 'Blissey'), PLAIN, teams([builtAs('Rhyperior', 'Leftovers', 'Solid Rock', BULKY)]));
+    expect(refuted.sort()).toEqual(['choicescarf', 'leftovers']);
+  });
+});
