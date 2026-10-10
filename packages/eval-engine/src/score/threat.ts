@@ -80,13 +80,16 @@ export type MatchupCache = Map<string, PairThreat> & {
   /**
    * Round 65: the rule set whose weight table the static applies (score/weights.ts).
    * The memo itself is weight-free; a search creates its cache with the
-   * rule set of its settings, and a plain Map reads as 'standard'.
+   * rule set of its settings, and a plain Map reads as 'standard'. Round 67
+   * (T139): every cache names one, so a path that forgets to pass its rule
+   * set fails to compile instead of weighing with the standard table.
    */
-  readonly ruleset?: StaticRuleset;
+  readonly ruleset: StaticRuleset;
 };
 
-export function createMatchupCache(ruleset: StaticRuleset = 'standard'): MatchupCache {
-  return Object.assign(new Map<string, PairThreat>(), { ruleset });
+/** A search's memo under its rule set: the argument is required, an unset optional rule set (EvalSettings.ruleset) reads as 'standard'. */
+export function createMatchupCache(ruleset: StaticRuleset | undefined): MatchupCache {
+  return Object.assign(new Map<string, PairThreat>(), { ruleset: ruleset ?? 'standard' });
 }
 
 /** The move a Choice item has locked this Pokémon into, if any. */

@@ -1,9 +1,10 @@
-import { test, describe } from 'vitest';
+import { test, describe, expect } from 'vitest';
 import { State } from '@pkmn/sim';
+import { replayRuleset } from '@fulllifegames/replay-core';
 import { ENDGAME_FIXTURES } from './endgame-fixtures';
 import { solveEndgame, type EndgameCaps, type EndgameResult } from '../packages/eval-engine/src/endgame/solver';
 import { createRootPosition, positionBattle } from '../packages/eval-engine/src/forward-model';
-import { createMatchupCache } from '../packages/eval-engine/src/eval-function';
+import { CHAMPIONS_DOUBLES_FEATURE_WEIGHTS, CHAMPIONS_FEATURE_WEIGHTS, createMatchupCache, type StaticRuleset } from '../packages/eval-engine/src/eval-function';
 import { leafValue } from '../packages/eval-engine/src/search/leaf';
 import { setLastPairSweep } from '../packages/eval-engine/src/score/last-pair';
 import { AUTO_MCTS_FAINTED_FRACTION, battleFaintedFraction, searchPosition } from '../packages/eval-engine/src/search';
@@ -31,8 +32,14 @@ import { mctsSearch } from '../packages/eval-engine/src/mcts';
 interface BankPosition {
   id: string; turn: number; serialized: string; gameType: 'singles' | 'doubles';
   tranche: string; quality: string; p1Won: boolean; score: number; decided: 'p1' | 'p2' | null; lastPair: boolean;
+  /** Round 67: the export names the position's rule set (d5855a0); older exports read it off the replay id. */
+  ruleset?: StaticRuleset;
 }
-interface Item { name: string; source: 'bank' | 'synthetic'; gameType: 'singles' | 'doubles'; decided: 'p1' | 'p2' | null; serialized: string }
+interface Item {
+  name: string; source: 'bank' | 'synthetic'; gameType: 'singles' | 'doubles'; decided: 'p1' | 'p2' | null; serialized: string;
+  /** Round 67 (T139): the tables the solver and every estimator weigh this position with. */
+  ruleset: StaticRuleset;
+}
 interface Estimates {
   static: number; staticB: number; d1: number; d2: number; d3: number; mcts: number;
   /** Round 35: the sweep's auto mode with the forced-win bar, and the proven mass behind it. */
@@ -50,36 +57,42 @@ async function bankItems(dir: string): Promise<Item[]> {
   }
   return fs.readdirSync(dir).filter(file => file.endsWith('.json')).sort().map(file => {
     const bank = JSON.parse(fs.readFileSync(path.join(dir, file), 'utf-8')) as BankPosition;
-    return { name: `${bank.id}#${bank.turn}`, source: 'bank' as const, gameType: bank.gameType, decided: bank.decided, serialized: bank.serialized };
+    return {
+      name: `${bank.id}#${bank.turn}`, source: 'bank' as const, gameType: bank.gameType, decided: bank.decided, serialized: bank.serialized,
+      ruleset: bank.ruleset ?? replayRuleset({ id: bank.id, log: '' }),
+    };
   });
 }
 
 const syntheticItems = (): Item[] => ENDGAME_FIXTURES.map(fixture => ({
   name: fixture.name, source: 'synthetic', gameType: fixture.gameType, decided: null,
-  serialized: JSON.stringify(State.serializeBattle(fixture.build())),
+  serialized: JSON.stringify(State.serializeBattle(fixture.build())), ruleset: 'standard',
 }));
 
-function estimate(serialized: string): Estimates {
-  const battle = positionBattle(createRootPosition(serialized));
-  const staticValue = leafValue(battle, createMatchupCache());
+function estimate(serialized: string, ruleset: StaticRuleset): Estimates {
+  const battle = positionBattle(createRootPosition(serialized, ruleset));
+  const staticValue = leafValue(battle, createMatchupCache(ruleset));
   setLastPairSweep(true);
-  const staticB = leafValue(battle, createMatchupCache());
+  const staticB = leafValue(battle, createMatchupCache(ruleset));
   setLastPairSweep(false);
-  const proverSettings = { depth: 1 as const, samples: 1 as const, tera: false as const };
+  const proverSettings = { depth: 1 as const, samples: 1 as const, tera: false as const, ruleset };
   const proverScore = battleFaintedFraction(battle) >= AUTO_MCTS_FAINTED_FRACTION
     ? mctsSearch(serialized, proverSettings)
     : searchPosition(serialized, proverSettings);
   return {
     static: staticValue,
     staticB,
-    d1: searchPosition(serialized, { depth: 1, samples: 1, tera: false }).score,
-    d2: searchPosition(serialized, { depth: 2, samples: 3, tera: false }).score,
-    d3: searchPosition(serialized, { depth: 3, samples: 3, tera: false }).score,
-    mcts: mctsSearch(serialized, { depth: 1, samples: 1, tera: false }).score,
+    d1: searchPosition(serialized, { depth: 1, samples: 1, tera: false, ruleset }).score,
+    d2: searchPosition(serialized, { depth: 2, samples: 3, tera: false, ruleset }).score,
+    d3: searchPosition(serialized, { depth: 3, samples: 3, tera: false, ruleset }).score,
+    mcts: mctsSearch(serialized, { depth: 1, samples: 1, tera: false, ruleset }).score,
     prover: proverScore.score,
     proverMass: proverScore.forcedWin?.mass ?? null,
   };
 }
+
+/** The solver on one item with this run's caps. */
+const solveItem = (item: Item, caps: Partial<EndgameCaps>): EndgameResult => solveEndgame(item.serialized, caps, item.ruleset);
 
 /** EVAL_ENDGAME_CAPS as partial solver caps; unknown keys and non-numbers are dropped. */
 function capsFromEnv(): Partial<EndgameCaps> {
@@ -129,16 +142,59 @@ describe.skipIf(process.env.EVAL_ENDGAME_TRUTH !== '1')('endgame truth bench (ro
       const earlier = solved.get(item.name);
       let exact: EndgameResult;
       try {
-        exact = earlier ?? solveEndgame(item.serialized, caps);
+        exact = earlier ?? solveItem(item, caps);
       } catch (error) {
         console.log(`${item.name}: solver error ${error instanceof Error ? error.message : error}`);
         continue;
       }
       const ms = earlier ? earlier.ms : Date.now() - started;
-      const estimators = exact.scope ? estimate(item.serialized) : null;
+      const estimators = exact.scope ? estimate(item.serialized, item.ruleset) : null;
       const row = { name: item.name, source: item.source, gameType: item.gameType, decided: item.decided, ...exact, ms, estimators };
       console.log(`${item.name} ${item.gameType} exact=${exact.exact} flags=${exact.flags.join(',') || '-'} value=${exact.value.toFixed(3)} states=${exact.states} depth=${exact.depth} ${ms}ms`);
       if (fs) fs.appendFileSync(process.env.EVAL_ENDGAME_DUMP!, JSON.stringify(row) + '\n');
     }
+  });
+});
+
+/** The Champions tables with some weights of their own for one call (both game types), as static-ruleset.spec.ts does. */
+function withChampionsTables<T>(weights: Partial<typeof CHAMPIONS_FEATURE_WEIGHTS>, run: () => T): T {
+  const saved = [{ ...CHAMPIONS_FEATURE_WEIGHTS }, { ...CHAMPIONS_DOUBLES_FEATURE_WEIGHTS }];
+  Object.assign(CHAMPIONS_FEATURE_WEIGHTS, weights);
+  Object.assign(CHAMPIONS_DOUBLES_FEATURE_WEIGHTS, weights);
+  try {
+    return run();
+  } finally {
+    Object.assign(CHAMPIONS_FEATURE_WEIGHTS, saved[0]);
+    Object.assign(CHAMPIONS_DOUBLES_FEATURE_WEIGHTS, saved[1]);
+  }
+}
+
+// Round 67 (T139): the bench computes every position with the tables of its own rule set; before, Champions and
+// VGC positions ran on the standard tables (a Champions table skewed for the call moved nothing).
+describe('the endgame bench reads the rule set of each position (round 67, T139)', () => {
+  test('an exported position brings its rule set; an export without one reads it off the replay id', async () => {
+    const fs = await import('node:fs');
+    const os = await import('node:os');
+    const path = await import('node:path');
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'endgame-ruleset-'));
+    const { serialized } = syntheticItems()[0];
+    const base = { serialized, tranche: 'test', quality: 'std', p1Won: true, score: 0, decided: null, lastPair: false };
+    fs.writeFileSync(path.join(dir, 'a.json'), JSON.stringify({ ...base, id: 'gen9championsou-1', turn: 3, gameType: 'singles', ruleset: 'champions' }));
+    fs.writeFileSync(path.join(dir, 'b.json'), JSON.stringify({ ...base, id: 'gen9vgc2026regi-2', turn: 5, gameType: 'doubles' }));
+    fs.writeFileSync(path.join(dir, 'c.json'), JSON.stringify({ ...base, id: 'gen9ou-3', turn: 7, gameType: 'singles' }));
+    const items = await bankItems(dir);
+    expect(items.map(item => item.ruleset)).toEqual(['champions', 'vgc', 'standard']);
+    expect(syntheticItems().every(item => item.ruleset === 'standard')).toBe(true);
+  });
+
+  test('the solver and the estimators weigh a Champions position by the Champions table', { timeout: 120_000 }, () => {
+    const item = { ...syntheticItems().find(fixture => fixture.name === 'doubles-1v2-spread')!, ruleset: 'champions' as StaticRuleset };
+    const skew = { matchup: 2000, bodies: 20 };
+    // A turn cap of 0 makes the root itself the solver's stand-in leaf, the value its rule set weighs.
+    const standard = { estimates: estimate(item.serialized, 'standard'), solved: solveItem({ ...item, ruleset: 'standard' }, { turns: 0 }) };
+    const champions = withChampionsTables(skew, () => ({ estimates: estimate(item.serialized, 'champions'), solved: solveItem(item, { turns: 0 }) }));
+    expect(champions.estimates.static).not.toBe(standard.estimates.static);
+    expect(champions.estimates.d1).not.toBe(standard.estimates.d1);
+    expect(champions.solved.value).not.toBe(standard.solved.value);
   });
 });

@@ -26,7 +26,8 @@ function namedSide(input: ForcedWinInput, smallBoard: boolean): Side | undefined
 export function forcedWinSides(battle: Battle, input: ForcedWinInput): Side[] {
   if (battle.ended) return [];
   const endgame = endgameScope(battle);
-  const pair = !endgame && lastPairRace(battle, createMatchupCache()) !== null;
+  // Round 67 (T139): the race reads threats only, its cache still names the search's rule set.
+  const pair = !endgame && lastPairRace(battle, createMatchupCache(input.ruleset)) !== null;
   const named = namedSide(input, endgame || pair);
   if (!endgame && !pair && !named) return [];
   const favored: Side = named ?? (input.score >= 0 ? 'p1' : 'p2');

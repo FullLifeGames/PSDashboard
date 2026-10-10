@@ -120,13 +120,17 @@ class EndgameSolver {
   }
 }
 
-/** Round 65: `ruleset` names the weight table of the solver's statics (EvalSettings.ruleset). */
-export function solveEndgame(serializedBattle: string, caps: Partial<EndgameCaps> = {}, ruleset: StaticRuleset = 'standard'): EndgameResult {
-  const root = createRootPosition(serializedBattle, ruleset);
+/**
+ * Round 65: `ruleset` names the weight table of the solver's statics
+ * (EvalSettings.ruleset). Round 67 (T139): every caller names it (the
+ * endgame bench passes each position's own); unset reads as 'standard'.
+ */
+export function solveEndgame(serializedBattle: string, caps: Partial<EndgameCaps> | undefined, ruleset: StaticRuleset | undefined): EndgameResult {
+  const root = createRootPosition(serializedBattle, ruleset ?? 'standard');
   if (!endgameScope(positionBattle(root))) {
     return { scope: false, value: 0, exact: false, flags: [], states: 0, depth: 0, pv: [] };
   }
-  const solver = new EndgameSolver({ ...ENDGAME_CAPS, ...caps }, ruleset);
+  const solver = new EndgameSolver({ ...ENDGAME_CAPS, ...caps }, ruleset ?? 'standard');
   const solved = solver.solve(root, 0);
   return {
     scope: true, value: solved.value, exact: solver.flags.size === 0, flags: [...solver.flags],

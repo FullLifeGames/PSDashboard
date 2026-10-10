@@ -4,6 +4,8 @@ import { createRootPosition, positionBattle } from '../src/forward-model';
 import { mctsSearch } from '../src/mcts';
 import { AUTO_MCTS_FAINTED_FRACTION, battleFaintedFraction, searchPosition } from '../src/search';
 import { heldDecided } from '../src/turn-analysis/decided-held';
+import type { EvalSettings } from '../src/types';
+import { replayRuleset } from '@fulllifegames/replay-core';
 
 /**
  * The decided sweep against the bar on real bank positions (round 50): the
@@ -17,19 +19,29 @@ interface BankPosition { id: string; turn: number; serialized: string; p1Won: bo
 const load = (file: string): BankPosition =>
   JSON.parse(readFileSync(new URL(`./fixtures/positions/${file}`, import.meta.url), 'utf-8')) as BankPosition;
 
-function search(serialized: string) {
-  const battle = positionBattle(createRootPosition(serialized));
-  const settings = { depth: 1 as const, samples: 1 as const, tera: false as const };
+/** Round 67 (T139): the bench's settings for one position, under its replay's rule set as the bank names it (bankSettings). */
+const settingsFor = (position: BankPosition): EvalSettings => ({ depth: 1, samples: 1, tera: false, ruleset: replayRuleset({ id: position.id, log: '' }) });
+
+function search(position: BankPosition) {
+  const settings = settingsFor(position);
+  const battle = positionBattle(createRootPosition(position.serialized, settings.ruleset));
   return battleFaintedFraction(battle) >= AUTO_MCTS_FAINTED_FRACTION
-    ? mctsSearch(serialized, settings)
-    : searchPosition(serialized, settings);
+    ? mctsSearch(position.serialized, settings)
+    : searchPosition(position.serialized, settings);
 }
 
 describe('the decided sweep needs the bar on real positions (round 50)', () => {
+  // Round 67 (T139): the bench searches every position with the tables of its replay's rule set, as the bank does.
+  test('the bench searches each fixture under the rule set of its replay', () => {
+    expect(settingsFor(load('gen9vgc2026regi-2629703929-t6.json')).ruleset).toBe('vgc');
+    expect(settingsFor(load('gen9doublesou-2663093831-t12.json')).ruleset).toBe('standard');
+    expect(settingsFor(load('smogtours-gen9ou-749828-t23.json')).ruleset).toBe('standard');
+  });
+
   test('749828 t23 (singles): the sweep names Primarina for p1, the bar reads p2, nothing is held', { timeout: 120000 }, () => {
     // Aqua Jet lends its first strike to Primarina's best move while Rillaboom's
     // Grassy Glide goes first under the terrain (T33); the prover proves p2, and p2 won.
-    const result = search(load('smogtours-gen9ou-749828-t23.json').serialized);
+    const result = search(load('smogtours-gen9ou-749828-t23.json'));
     expect(result.unanswered?.decided?.side).toBe('p1');
     expect(result.score).toBeLessThan(0);
     expect(heldDecided(result)).toBeUndefined();
@@ -37,7 +49,7 @@ describe('the decided sweep needs the bar on real positions (round 50)', () => {
 
   test('2629703929 t6 (doubles): the sweep names Chi-Yu for p1 under a level bar, nothing is held', { timeout: 120000 }, () => {
     const position = load('gen9vgc2026regi-2629703929-t6.json');
-    const result = search(position.serialized);
+    const result = search(position);
     expect(result.unanswered?.decided).toEqual({ side: 'p1', species: 'Chi-Yu' });
     expect(Math.abs(result.score)).toBeLessThan(0.7);
     expect(heldDecided(result)).toBeUndefined();
@@ -46,7 +58,7 @@ describe('the decided sweep needs the bar on real positions (round 50)', () => {
 
   test('2663093831 t12 (doubles): sweep and bar name p2, the sweep is held', { timeout: 120000 }, () => {
     const position = load('gen9doublesou-2663093831-t12.json');
-    const result = search(position.serialized);
+    const result = search(position);
     expect(result.unanswered?.decided?.side).toBe('p2');
     expect(heldDecided(result)).toEqual(result.unanswered?.decided);
     expect(position.p1Won).toBe(false);
