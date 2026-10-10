@@ -1,6 +1,7 @@
 import { BREADTH_MIN_OPTIONS, CHANCE_THRESHOLD, type SideAnalysis, type TurnAnalysis } from './analysis.ts';
 import { winDeltaText, winPercent } from './winprob.ts';
 import { forcedWinSpeaks } from './turn-analysis/forced-speech.ts';
+import { chanceRolled } from './turn-analysis/luck.ts';
 import { percentBelowSure, phrase, playedBest, rollText } from './prose/phrases.ts';
 import {
   forcedClause, inaccuracyClause, readCreditClause, sackClause, sensitivityClause, sideClause, streakClause, unansweredClause,
@@ -97,7 +98,10 @@ function decisionSentences(analysis: TurnAnalysis, playerNames: PlayerNames): st
   if (p1Clause) sentences.push(p1Clause);
   if (p2Clause) sentences.push(p2Clause);
   if (analysis.chanceDelta !== null && Math.abs(analysis.chanceDelta) >= CHANCE_THRESHOLD) {
-    sentences.push(`On top of that, luck contributed ${winDeltaText(analysis.chanceDelta)}.`);
+    // Round 67 (T22): luck only with a roll in the residual's direction; the rest is the engine re-reading the position.
+    sentences.push(chanceRolled(analysis) === false
+      ? `On top of that, the engine re-read the position after the turn (${winDeltaText(analysis.chanceDelta)}).`
+      : `On top of that, luck contributed ${winDeltaText(analysis.chanceDelta)}.`);
   }
   return sentences;
 }
@@ -106,14 +110,19 @@ function decisionSentences(analysis: TurnAnalysis, playerNames: PlayerNames): st
  * Round 15: on a decided board a chance swing TOWARD the decided side is
  * the game resolving, not luck — the same booking the game report has made
  * since round 12, now visible on the turn itself. Chance against the
- * decided side stays genuine luck.
+ * decided side stays genuine luck. Round 67 (T22): a swing without a roll
+ * in its direction is the engine re-reading the position (649664 t12: the
+ * only roll went the other way), so the card says so.
  */
 function chanceSentence(analysis: TurnAnalysis, playerNames: PlayerNames, decided: Decided): string {
   const delta = analysis.chanceDelta ?? analysis.swing ?? 0;
   const toward = decided !== null && (decided.key === 'p1' ? delta > 0 : delta < 0);
-  return toward
-    ? 'Both sides picked reasonable options — the swing is the decided game resolving ' +
-      `toward ${decided.key === 'p1' ? playerNames[0] : playerNames[1]} (${winDeltaText(delta)}).`
+  if (toward) {
+    return 'Both sides picked reasonable options — the swing is the decided game resolving ' +
+      `toward ${decided.key === 'p1' ? playerNames[0] : playerNames[1]} (${winDeltaText(delta)}).`;
+  }
+  return chanceRolled(analysis) === false
+    ? `Both sides picked reasonable options; the engine re-read the position after the turn (${winDeltaText(delta)}).`
     : 'Both sides picked reasonable options — the swing came from how the turn rolled ' +
       `(${winDeltaText(delta)}).`;
 }
@@ -162,8 +171,11 @@ function predictiveSentence(analysis: TurnAnalysis, playerNames: PlayerNames): s
  */
 function shiftSentences(analysis: TurnAnalysis, playerNames: PlayerNames): string[] {
   const sentences: string[] = [];
+  // Round 67 (T22): the chance part names the re-read when no roll went its way.
+  const reRead = chanceRolled(analysis) === false;
   const decomposition = analysis.decisionDelta !== null && analysis.chanceDelta !== null
-    ? ` (${winDeltaText(analysis.decisionDelta)} expected, ${winDeltaText(analysis.chanceDelta)} from the rolls)`
+    ? ` (${winDeltaText(analysis.decisionDelta)} expected, ${winDeltaText(analysis.chanceDelta)} ` +
+      `${reRead ? 'as the engine re-read the position' : 'from the rolls'})`
     : '';
   const open = (analysis.p1.viableCount ?? 0) >= BREADTH_MIN_OPTIONS &&
     (analysis.p2.viableCount ?? 0) >= BREADTH_MIN_OPTIONS;
@@ -173,7 +185,7 @@ function shiftSentences(analysis: TurnAnalysis, playerNames: PlayerNames): strin
       `${analysis.p2.choiceCount} for ${playerNames[1]} sat within an inaccuracy of best, so the ` +
       `turn hinged on out-predicting the opponent${decomposition}.`
     : decomposition
-      ? `No single mistake stands out — the choices and the rolls pushed the same way${decomposition}.`
+      ? `No single mistake stands out — the choices and ${reRead ? "the engine's re-read" : 'the rolls'} pushed the same way${decomposition}.`
       : 'No single mistake stands out — the swing built up without a clear culprit.');
   const hindsight = hindsightSentence(analysis, playerNames);
   if (hindsight) sentences.push(hindsight);
@@ -215,8 +227,10 @@ function attributionSentences(analysis: TurnAnalysis, playerNames: PlayerNames, 
  */
 function rideAlongSentences(analysis: TurnAnalysis, playerNames: PlayerNames): string[] {
   const sentences: string[] = [];
+  // Round 67 (T22): the credit's luck rider names the re-read when no roll went the residual's way.
+  const rolled = chanceRolled(analysis) !== false;
   const kinds: ((name: string, side: SideAnalysis, ownLuck: number | null) => string | null)[] = [
-    (name, side, ownLuck) => sackClause(name, side) ?? readCreditClause(name, side, ownLuck) ?? inaccuracyClause(name, side),
+    (name, side, ownLuck) => sackClause(name, side) ?? readCreditClause(name, side, ownLuck, rolled) ?? inaccuracyClause(name, side),
     forcedClause,
     (_name, side) => unansweredClause(side),
     streakClause,

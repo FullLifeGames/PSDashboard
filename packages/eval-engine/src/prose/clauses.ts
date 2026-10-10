@@ -108,8 +108,11 @@ function mistakeClause(name: string, side: SideAnalysis, opponent: SideAnalysis)
   return punishedMisplayClause(name, side, side.played, side.best, why, caveat);
 }
 
-/** Round 63 (T17): the read credit of an untiered turn — praise on the card, never a verdict (648453 t13). */
-export function readCreditClause(name: string, side: SideAnalysis, ownLuck: number | null): string | null {
+/**
+ * Round 63 (T17): the read credit of an untiered turn — praise on the card, never a verdict (648453 t13).
+ * Round 67 (T22): `rolled` false (no roll went the residual's way) names the rider's swing as the re-read.
+ */
+export function readCreditClause(name: string, side: SideAnalysis, ownLuck: number | null, rolled = true): string | null {
   const credit = side.readCredit;
   if (!credit || !side.played || !side.safe) return null;
   // The gates read the pair's value before the rolls (round 63 fix): say so, and name the
@@ -118,7 +121,9 @@ export function readCreditClause(name: string, side: SideAnalysis, ownLuck: numb
     ? `${credit.payoffTurn === 1 ? 'one turn later' : `${credit.payoffTurn} turns later`}, before the rolls,`
     : 'before the rolls,';
   const luck = ownLuck !== null && Math.abs(ownLuck) >= TIER_THRESHOLDS.inaccuracy
-    ? ` On top of that, luck contributed ${winDeltaText(ownLuck)} for ${name}.`
+    ? rolled
+      ? ` On top of that, luck contributed ${winDeltaText(ownLuck)} for ${name}.`
+      : ` On top of that, the engine re-read the position after the turn (${winDeltaText(ownLuck)} for ${name}).`
     : '';
   return `${name} ${playedVerb(side.played.label)} — a read the engine gave no weight: ${when} it stood ` +
     `${winDeltaText(credit.payoff)} over the safe ${choiceNoun(side.safe.label)} (${winPctText(side.safe.worstCase)} guaranteed).` +

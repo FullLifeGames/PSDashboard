@@ -130,6 +130,7 @@ value buildGameReport
 value calcSingleDamageRange
 value captureSerializedPosition
 value cellKey
+value chanceRolled
 value computeBlunders
 value computeRead
 value configureSearchBudget

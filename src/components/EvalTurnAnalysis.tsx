@@ -1,6 +1,6 @@
 import {
   type TurnAnalysis, type LeadAnalysis, type LeadSideAnalysis, type RankedChoice, type ReadRecommendation,
-  formatRead, summarizeTurn, winDeltaText, winPctText,
+  chanceRolled, formatRead, summarizeTurn, winDeltaText, winPctText,
 } from '@fulllifegames/eval-engine';
 import { attributionBadge, isPairLead, leadTier } from './eval-badges';
 import { EngineRow } from './eval/analysis-bits';
@@ -42,6 +42,25 @@ function ReadRows({ reads, playerNames }: Pick<EvalTurnAnalysisProps, 'reads' | 
   );
 }
 
+/**
+ * The estimate change split in two: what the chosen pair was expected to move and the rest. Round 67 (T22):
+ * the rest is "how it rolled" only with a roll in its direction, else the engine's re-read of the position.
+ */
+function SplitRow({ analysis, name }: { analysis: TurnAnalysis; name: string }) {
+  const reRead = chanceRolled(analysis) === false;
+  return (
+    <div
+      className="ps-eval-analysis-row"
+      style={{ color: '#778' }}
+      title={reRead
+        ? `${name}'s estimate change split in two: what the chosen pair was expected to move, and how the engine re-read the position after the turn. No roll on this turn went that way.`
+        : `${name}'s estimate change split in two: what the chosen pair was expected to move, and what the actual rolls added on top.`}
+    >
+      {winDeltaText(analysis.decisionDelta ?? 0)} expected from the choices · {winDeltaText(analysis.chanceDelta ?? 0)} {reRead ? "from the engine's re-read" : 'from how it rolled'}
+    </div>
+  );
+}
+
 /** Chess-style explanation of one analyzed turn: played vs best, and why the score moved. */
 export function EvalTurnAnalysis({ analysis, playerNames, reads, onExplore }: EvalTurnAnalysisProps) {
   const badge = attributionBadge(analysis, playerNames);
@@ -58,15 +77,7 @@ export function EvalTurnAnalysis({ analysis, playerNames, reads, onExplore }: Ev
         <span style={{ color: badge.color }}>{badge.text}</span>
       </div>
       <div className="ps-eval-analysis-summary">{summarizeTurn(analysis, playerNames)}</div>
-      {analysis.decisionDelta !== null && analysis.chanceDelta !== null && (
-        <div
-          className="ps-eval-analysis-row"
-          style={{ color: '#778' }}
-          title={`${playerNames[0]}'s estimate change split in two: what the chosen pair was expected to move, and what the actual rolls added on top.`}
-        >
-          {winDeltaText(analysis.decisionDelta)} expected from the choices · {winDeltaText(analysis.chanceDelta)} from how it rolled
-        </div>
-      )}
+      {analysis.decisionDelta !== null && analysis.chanceDelta !== null && <SplitRow analysis={analysis} name={playerNames[0]} />}
       {analysis.playedTracking === false ? (
         <>
           <EngineRow name={playerNames[0]} side={analysis.p1} onExplore={exploreFor('p1')} />

@@ -33,4 +33,13 @@ describe('attributionBadge', () => {
     expect(attributionBadge(analysis('unclear'), names)).toEqual({ text: 'unclear (a choice never surfaced)', color: '#778' });
     expect(attributionBadge(analysis('none' as TurnAnalysis['attribution']), names).text).toBe('quiet turn');
   });
+
+  test('round 67 (T22): a chance swing without a roll in its direction reads as the engine re-reading the position', () => {
+    const swing = (chanceDelta: number, rolledFor?: { p1: boolean; p2: boolean }) =>
+      analysis('chance', {}, {}, { chanceDelta, ...(rolledFor ? { rolledFor } : {}) });
+    expect(attributionBadge(swing(0.3, { p1: false, p2: true }), names)).toEqual({ text: 'engine re-read (no roll behind it)', color: '#b6a46a' });
+    expect(attributionBadge(swing(-0.3, { p1: true, p2: false }), names).text).toBe('engine re-read (no roll behind it)');
+    expect(attributionBadge(swing(-0.3, { p1: false, p2: true }), names).text).toBe('chance swing (rolls, crits, reveals)');
+    expect(attributionBadge(swing(0.3), names).text).toBe('chance swing (rolls, crits, reveals)');
+  });
 });

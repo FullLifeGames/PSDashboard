@@ -1,4 +1,4 @@
-import type { LeadSideAnalysis, TurnAnalysis } from '@fulllifegames/eval-engine';
+import { chanceRolled, type LeadSideAnalysis, type TurnAnalysis } from '@fulllifegames/eval-engine';
 
 /**
  * Round 63 (T116): the team-preview verdict a side's lead may carry. In
@@ -40,7 +40,10 @@ export function attributionBadge(analysis: TurnAnalysis, playerNames: [string, s
     case 'p1-read': return { text: `${playerNames[0]}'s read paid off`, color: '#8c8' };
     case 'p2-read': return { text: `${playerNames[1]}'s read paid off`, color: '#8c8' };
     case 'both-read': return { text: 'both sides\' reads paid off', color: '#8c8' };
-    case 'chance': return { text: 'chance swing (rolls, crits, reveals)', color: '#b6a46a' };
+    // Round 67 (T22): without a roll in the swing's direction the engine re-read the position.
+    case 'chance': return chanceRolled(analysis) === false
+      ? { text: 'engine re-read (no roll behind it)', color: '#b6a46a' }
+      : { text: 'chance swing (rolls, crits, reveals)', color: '#b6a46a' };
     case 'shift':
       return analysis.playedTracking === false
         ? { text: 'advantage shifted', color: '#b6a46a' }
