@@ -46,10 +46,14 @@ describe('dex-legal abilities (round 60, T93)', () => {
     }).toEqual({ calyrexIce: 'asoneglastrier', calyrexShadow: 'asonespectrier', terapagos: 'terashift', ogerpon: 'waterabsorb' });
   });
 
+  // Since round 67 (T108 step 2) the inference also reads an ability a line names as its effect, as the client does:
+  // Terapagos shows Tera Shift on entry (`|-activate|p1b: Terapagos|ability: Tera Shift`) before its Stellar forme shows
+  // Teraform Zero, so the set keeps the ability it entered with; Ogerpon's Embody Aspect still shows only on its Tera.
   test('a custom game keeps a battle-only ability, but an unknown name still becomes the dex ability', () => {
     const { p1Team, p2Team } = buildTeamsFromReplay(vgcLog('[Gen 9] Custom Game'));
     expect(abilityOf(p2Team, 'Calyrex-Shadow')).toBe('asonespectrier');
-    expect(abilityOf(p1Team, 'Terapagos')).toBe('teraformzero');
+    expect(abilityOf(p1Team, 'Ogerpon-Wellspring')).toBe('embodyaspectwellspring');
+    expect(abilityOf(p1Team, 'Terapagos')).toBe('terashift');
   });
 
   test('an ability the species already has keeps its exact string', () => {
