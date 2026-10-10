@@ -85,7 +85,7 @@ A chess-style evaluation panel sits beside the battle in the right column by def
 
 - depth 1 to 2: the full joint matrix, with deeper cells valued by a shallower sub-search,
 - MCTS: a DUCT Monte-Carlo tree search; a forced switch after a knock-out is a decision node of its own inside the tree (the replaced side picks from its bench with lookahead, the other side waits), while the root matrix, the verify sampler, play-outs and the prover keep resolving replacements greedily by the static pick,
-- Auto, the default: each position routes by its own fainted fraction, matrix search while boards are full, the tree once a quarter of all bodies have fallen. This is the grid-tuned best line on the stratified calibration bed, re-baselined on about 800 positions with Smogon-informed sets.
+- Auto, the default: each position routes by its game type and its fainted fraction, as the search budget sets them. Doubles run the tree on every turn; singles run a depth-1 matrix with three samples while boards are full and the tree once a quarter of all bodies have fallen. The calibration bank measured this split in rounds 61 and 63.
 
 Sampling is deterministic with fixed seeds and KO-boundary roll grouping, and the work fans out across a worker pool sized by the machine's cores. Pool size and lane count only move wall-clock; the numbers are the same on every machine.
 
@@ -187,7 +187,7 @@ Selecting a turn never re-searches; it shows the stored result with its settings
 
 The MCTS mode carries its own corpus calibration: hint-ordered expansion under progressive widening (the restriction's own static hints decide which options may open, so the doubles 16x16 root no longer starves its iteration budget), and equilibrium rankings over tree-informed root cells. Chance-suspect support cells (a root cell fixes one chance outcome per tree, so a lucky miss can masquerade as a good line) are re-verified by the matrix-grade multi-seed sampler before the verdict stands; tree disagreement is visit-weighted, so one thin outlier tree beside three deep ones does not tip a cell. Each root cell records the outcome class its tree drew, and the merge pools depth per class: a played-out hit class keeps the trees' depth while a thin miss class keeps the sampler's mean. Verified cells are then searched one ply deeper on their first-seed child, and the other support cells of a row or column that mixes a rich tree cell with a starved one join the verify jobs under the same cap, so a whole line is priced at one depth. On the honest-fills rig the depth-1 matrix ties or beats the pure tree overall, which is why Auto, not pure MCTS, is the default line.
 
-The default Auto line routes to the tree once a quarter of all bodies have fallen, and the honesty features follow the line everywhere. Misplay verification and item-sensitivity probes work regardless of which engine drew the turn: a flagged MCTS turn re-adjudicates as matrix pairs at the same deep tier the matrix line gets. Only root pivot pairs remain matrix-side.
+The default Auto line runs the tree on every doubles turn and on singles turns once a quarter of all bodies have fallen, and the honesty features follow the line everywhere. Misplay verification and item-sensitivity probes work regardless of which engine drew the turn: a flagged MCTS turn re-adjudicates as matrix pairs at the same deep tier the matrix line gets. Only root pivot pairs remain matrix-side.
 
 ### The game report
 
