@@ -1,9 +1,9 @@
 import { describe, expect, test, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import type { DamageResult } from '@fulllifegames/eval-engine';
+import { calcSingleDamageRange, type DamageResult } from '@fulllifegames/eval-engine';
 import { MoveBtn, SwitchBtn } from '../../../src/components/branch/ChoiceButtons';
-import { moveOption, switchOption, targetOption } from '../../fixtures/sim-state';
+import { moveOption, pokemon, switchOption, targetOption } from '../../fixtures/sim-state';
 
 const damage = (moveName: string, min: number, max: number, koChance = ''): DamageResult =>
   ({ moveName, minPercent: min, maxPercent: max, range: `${min}% - ${max}%`, koChance });
@@ -103,5 +103,24 @@ describe('SwitchBtn', () => {
     expect(button).toHaveAttribute('title', reason);
     rerender(<SwitchBtn sw={switchOption('Heatran', { fainted: true, hp: '0 fnt', hpPercent: 0 })} selected={false} disabled={false} onClick={vi.fn()} />);
     expect(screen.getByRole('button')).toBeDisabled();
+  });
+});
+
+describe('the hit distribution on the move button (T136 point 1, round 67)', () => {
+  const breloom = pokemon('Breloom', { ability: '', item: '', nature: 'Hardy', evs: { hp: 0, atk: 252, def: 0, spa: 0, spd: 0, spe: 0 }, isActive: true, activeSlot: 0 });
+  const blissey = pokemon('Blissey', { ability: '', item: '', nature: 'Hardy', evs: { hp: 252, atk: 0, def: 252, spa: 0, spd: 0, spe: 0 }, isActive: true, activeSlot: 0 });
+  const bulletSeed = moveOption('Bullet Seed', { type: 'Grass', pp: 30, maxpp: 30 });
+
+  test('Bullet Seed into Blissey names each hit count with its chance and range in the tooltip, compact and full', () => {
+    const result = calcSingleDamageRange(breloom, blissey, bulletSeed, { gameType: 'Singles', gen: 9 });
+    const counts = result.hitShares ?? [];
+    expect(counts.map(({ hits, chance }) => [hits, chance])).toEqual([[2, 0.35], [3, 0.35], [4, 0.15], [5, 0.15]]);
+    const expected = counts.map(({ hits, chance, minPercent, maxPercent }) => `${hits} hits (${Math.round(chance * 1000) / 10}%): ${minPercent}% - ${maxPercent}%`).join(' · ');
+    const { rerender } = render(<MoveBtn move={bulletSeed} dmg={result} targetDamage={{}} pendingChoice={null} compact onClick={vi.fn()} />);
+    expect(screen.getByRole('button', { name: /Bullet Seed/ })).toHaveAttribute('title', `Grass · 30/30 PP · ${result.range}${result.koChance ? ` (${result.koChance})` : ''} · ${expected}`);
+    rerender(<MoveBtn move={bulletSeed} dmg={result} targetDamage={{}} pendingChoice={null} onClick={vi.fn()} />);
+    expect(screen.getByRole('button', { name: /Bullet Seed/ })).toHaveAttribute('title', expected);
+    expect(expected).toContain('2 hits (35%)');
+    expect(expected).toContain('5 hits (15%)');
   });
 });

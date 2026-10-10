@@ -19,6 +19,12 @@ export interface DamageResult {
   maxPercent: number;
   range: string;
   koChance: string;
+  /**
+   * A move whose hit count the simulator draws: each count with its chance
+   * and its own range (round 67, T136 point 1), fewest hits first. Absent
+   * for one hit or a fixed count.
+   */
+  hitShares?: { hits: number; chance: number; minPercent: number; maxPercent: number }[];
 }
 
 export interface DamageCalcContext {
@@ -302,10 +308,19 @@ export function calcSingleDamageRange(
       maxPercent: maxPct,
       range: `${minPct}% - ${maxPct}%`,
       koChance: koChanceOf(priced, maxDamage),
+      ...(counts && counts.length > 1 ? { hitShares: hitSharesOf(counts, priced, maxhp) } : {}),
     };
   } catch {
     return emptyDamageResult(moveOption.name);
   }
+}
+
+/** Each drawn hit count with its chance and its own range (round 67, T136 point 1). */
+function hitSharesOf(counts: HitCount[], priced: PricedCount[], maxhp: number): NonNullable<DamageResult['hitShares']> {
+  return counts.map(({ hits, chance }, index) => {
+    const [min, max] = priced[index].result.range();
+    return { hits, chance, minPercent: percentOfMaxHp(min, maxhp), maxPercent: percentOfMaxHp(max, maxhp) };
+  });
 }
 
 function emptyDamageResult(moveName: string): DamageResult {

@@ -13,9 +13,17 @@ function hpBarClass(pct: number) {
 
 const ppTextFor = (move: BranchMoveOption) => (move.maxpp > 0 ? `${move.pp}/${move.maxpp}` : '—');
 
+/** A drawn hit count, count by count: its chance and its range (round 67, T136 point 1); '' for one hit. */
+function hitSharesText(dmg: DamageResult | undefined): string {
+  return (dmg?.hitShares ?? []).map(({ hits, chance, minPercent, maxPercent }) =>
+    `${hits} hits (${Math.round(chance * 1000) / 10}%): ${minPercent}% - ${maxPercent}%`).join(' · ');
+}
+
 function compactMoveTitle(move: BranchMoveOption, dmg: DamageResult | undefined) {
+  const shares = hitSharesText(dmg);
   return `${move.type || '???'} · ${ppTextFor(move)} PP` +
-    (dmg && dmg.maxPercent > 0 ? ` · ${dmg.range}${dmg.koChance ? ` (${dmg.koChance})` : ''}` : '');
+    (dmg && dmg.maxPercent > 0 ? ` · ${dmg.range}${dmg.koChance ? ` (${dmg.koChance})` : ''}` : '') +
+    (shares ? ` · ${shares}` : '');
 }
 
 type PendingMove = Extract<BranchSlotChoice, { kind: 'move' }> | null;
@@ -145,7 +153,7 @@ export function MoveBtn({ move, dmg, spreadDamage, zMoveName, targetDamage, pend
         disabled={move.disabled || (move.requiresTarget && move.targetOptions.length === 0)}
         className={`ps-movebtn ${compact ? 'ps-movebtn-compact ' : ''}${selected ? 'ps-movebtn-selected' : ''}`}
         style={{ background: bg }}
-        title={compact ? compactMoveTitle(move, dmg) : undefined}
+        title={compact ? compactMoveTitle(move, dmg) : hitSharesText(dmg) || undefined}
       >
         <MoveBtnBody
           move={move}

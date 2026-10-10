@@ -156,3 +156,39 @@ describe('multi-hit moves with a drawn hit count (T124 point 3)', () => {
     expect(calcSingleDamageRange(breloom, blissey, move('Bullet Seed')).koChance).toBe('possible 2HKO');
   });
 });
+
+/**
+ * T136 point 1 (round 67, lane A): the result carries the distribution per
+ * hit count, each count with the simulator's chance and its own calc range,
+ * so the move button can show it.
+ */
+describe('the per-count distribution of a drawn hit count (T136 point 1)', () => {
+  const breloom = mon('Breloom');
+  const blissey = mon('Blissey', { evs: { ...STATS, hp: 252, def: 252 } });
+  const countRange = (attacker: SimPokemonInfo, hits: number) => {
+    const [min, max] = calcDirect(attacker, blissey, 'Bullet Seed', gen9, hits).range();
+    return { minPercent: pct(min, blissey.maxhp), maxPercent: pct(max, blissey.maxhp) };
+  };
+
+  test('Bullet Seed into Blissey: 2, 3, 4 and 5 hits at 35, 35, 15 and 15 %, each with its range, singles and doubles', () => {
+    for (const gameType of ['Singles', 'Doubles'] as const) {
+      const result = calcSingleDamageRange(breloom, blissey, move('Bullet Seed'), { gameType });
+      expect(result.hitShares, gameType).toEqual([
+        { hits: 2, chance: 0.35, ...countRange(breloom, 2) },
+        { hits: 3, chance: 0.35, ...countRange(breloom, 3) },
+        { hits: 4, chance: 0.15, ...countRange(breloom, 4) },
+        { hits: 5, chance: 0.15, ...countRange(breloom, 5) },
+      ]);
+    }
+  });
+
+  test('Loaded Dice: 4 or 5 hits at half each; one hit or a fixed count carries no distribution', () => {
+    const dice = mon('Breloom', { item: 'Loaded Dice' });
+    expect(calcSingleDamageRange(dice, blissey, move('Bullet Seed')).hitShares).toEqual([
+      { hits: 4, chance: 0.5, ...countRange(dice, 4) },
+      { hits: 5, chance: 0.5, ...countRange(dice, 5) },
+    ]);
+    expect(calcSingleDamageRange(breloom, blissey, move('Seed Bomb')).hitShares).toBeUndefined();
+    expect(calcSingleDamageRange(mon('Cinccino', { ability: 'Skill Link' }), blissey, move('Bullet Seed')).hitShares).toBeUndefined();
+  });
+});
