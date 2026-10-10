@@ -26,16 +26,6 @@ describe('win probability mapping', () => {
     expect(WINPROB_K.doubles.k0).toBeGreaterThan(1);
   });
 
-  // Round 67 (T52): the doubles K at the leaf moves to the likelihood maximum of round 48, 1.987 + 3.666 × the
-  // fainted share (the pins 2.98 + 0.88 were an intermediate state of a stopped gradient); singles keep theirs, and
-  // the thresholds in wp-units stay where they are.
-  test('round 67 (T52): doubles K at the leaf is 1.987 + 3.666 × the fainted share, singles keep 2.28 + 1.49', () => {
-    expect(WINPROB_K.doubles).toEqual({ k0: 1.987, k1: 3.666 });
-    expect(WINPROB_K.singles).toEqual({ k0: 2.28, k1: 1.49 });
-    expect(winProbability(0.4, true, 0.5)).toBeCloseTo(1 / (1 + Math.exp(-(1.987 + 3.666 * 0.5) * 0.4)), 12);
-    expect(winProbability(0.4, false, 0.5)).toBeCloseTo(1 / (1 + Math.exp(-(2.28 + 1.49 * 0.5) * 0.4)), 12);
-  });
-
   // Round 67 (T138): Pokémon Champions prices its own scale, fitted on its corpus games in the app's build on the
   // Champions mod (1.64 + 4.41 × the fainted share in singles, 1.86 + 4.17 in doubles); every other rule set keeps
   // the K of its game type.

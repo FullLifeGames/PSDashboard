@@ -29,9 +29,11 @@
  * and prover floors are measured in wp-units, so a new K moves each of
  * them. No K adoption before those thresholds are decoupled or re-set with
  * it (ledger K FIT CONVERGED 2026-09-19, NextSteps T52; doubles T53).
- * ROUND 67 (T52): doubles move to that converged maximum, 1.987 + 3.666·ff,
- * read on the bank plus the doubles holdout with both tables; the thresholds
- * in wp-units stay where they are (wave 2, decision 33).
+ * ROUND 67 (T52): that converged doubles maximum, 1.987 + 3.666·ff, did not
+ * pass on the bank plus the doubles holdout: the bank gain (fixed K −36 bp)
+ * did not carry to the holdout, and with own K per phase the doubles row read
+ * +5 [−2, +12] with harm in the luck-adjusted rows (+8 [+1, +16]); the pins
+ * stay.
  *
  * Since the win-prob-space conversion, the LEAF sigmoid applies once, at
  * the search leaf (`wpUnits`): every downstream value — cell averages, the
@@ -51,7 +53,7 @@ import type { StaticRuleset } from './score/weights.ts';
 
 export const WINPROB_K = {
   singles: { k0: 2.28, k1: 1.49 },
-  doubles: { k0: 1.987, k1: 3.666 },
+  doubles: { k0: 2.98, k1: 0.88 },
 } as const;
 
 /**
