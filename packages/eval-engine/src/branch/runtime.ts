@@ -5,6 +5,7 @@ import {
 } from '../hax-alignment.ts';
 import type { BranchRuntime, SimBattle, TurnBlock } from './types.ts';
 import { collectForcedSwitchSpecies, getMainChoice, parseTurnBlocks } from './protocol-choices.ts';
+import { protocolNicknames, simNamedLines } from './protocol-names.ts';
 import {
   buildForcedSwitchChoice, correctActivesFromProtocol, correctBattleFromSnapshot, hasForceSwitch,
   refreshRequestsFromLiveState, repairStaleForcedSwitchRequest,
@@ -47,11 +48,14 @@ function captureBoundary(session: ReconstructionSession, battle: SimBattle, turn
  * 2026-08-15-hax-alignment-design.md), then reseed the live battle
  * before committing. Reseeding happens EVERY turn (also for candidate
  * 0) so one turn's RNG consumption never shifts the next turn's rolls.
+ * The block is read with the sim's names: the events are keyed by name,
+ * and a nicknamed body's never met the sim's (round 67, G4).
  */
 function chooseBlockSeed(
   session: ReconstructionSession, battle: SimBattle, turnBlock: TurnBlock, p1Choice: string, p2Choice: string,
+  nicknames: Map<string, string>,
 ): AlignedBlock {
-  const blockLines = [...turnBlock.preUpkeep, ...turnBlock.postUpkeep];
+  const blockLines = simNamedLines([...turnBlock.preUpkeep, ...turnBlock.postUpkeep], nicknames, battle);
   const expectedEvents = extractProtocolEvents(blockLines);
   const alignForced = {
     p1: collectForcedSwitchSpecies(turnBlock.preUpkeep, turnBlock.postUpkeep, 'p1'),
@@ -178,7 +182,9 @@ function scoreBlock(session: ReconstructionSession, turnBlock: TurnBlock, aligne
  * out the boundary, choose the aligned seed, commit the protocol's choices,
  * resolve forced switches, and score the block. 'break' ends the replay.
  */
-async function replayBlock(session: ReconstructionSession, turnBlock: TurnBlock): Promise<'continue' | 'break'> {
+async function replayBlock(
+  session: ReconstructionSession, turnBlock: TurnBlock, nicknames: Map<string, string>,
+): Promise<'continue' | 'break'> {
   const { params, battleStream } = session;
   if (params.onRawBoundary && battleStream.battle) {
     params.onRawBoundary(turnBlock.turn, battleStream.battle);
@@ -210,7 +216,7 @@ async function replayBlock(session: ReconstructionSession, turnBlock: TurnBlock)
   const p1Choice = getMainChoice(turnBlock.preUpkeep, 'p1', battle);
   const p2Choice = getMainChoice(turnBlock.preUpkeep, 'p2', battle);
 
-  const aligned = chooseBlockSeed(session, battle, turnBlock, p1Choice, p2Choice);
+  const aligned = chooseBlockSeed(session, battle, turnBlock, p1Choice, p2Choice, nicknames);
   battle.resetRNG(aligned.seedChoice.seed);
   const simLogStart = battle.log.length;
 
@@ -269,8 +275,9 @@ export async function reconstructBranchRuntime(params: ReconstructParams): Promi
   await startBattle(session, orderedP1, orderedP2);
 
   const { turns } = parseTurnBlocks(params.replayLog);
+  const nicknames = protocolNicknames(params.replayLog);
   for (const turnBlock of turns) {
-    if ((await replayBlock(session, turnBlock)) === 'break') break;
+    if ((await replayBlock(session, turnBlock, nicknames)) === 'break') break;
   }
 
   return finishReconstruction(session);
