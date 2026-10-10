@@ -2,7 +2,7 @@ import { Dex } from '@pkmn/sim';
 import { revealedField, unknownEvs, unknownField } from '../team-info.ts';
 import { canHaveDancer, findPokemon, ruleOut, type InferrerState } from './inferrer-state.ts';
 import { revealMarkerForme, teamSpecies, unknownFormeMarkerFor } from './lookup.ts';
-import { abilityHolderIdent, mayHold } from './ability-holder.ts';
+import { abilityHolderIdent } from './ability-holder.ts';
 import { ATTACKER_PUNISH_ITEMS, ownMove } from './client-facts.ts';
 import { arg, detailsOf, fromEffect, hasKw, identOf, ofIdent, type LogLine } from './log-line.ts';
 import { toId } from '../ids.ts';
@@ -186,19 +186,6 @@ export function recordMove(state: InferrerState, line: LogLine) {
   }
 }
 
-/** Ability: |-ability|p2a: Nickname|Ability Name */
-export function recordAbility(state: InferrerState, line: LogLine) {
-  const nickname = line.cmd === '-ability' ? sideSubject(line, state.opponentSide) : null;
-  if (nickname === null) return;
-  const abilityName = arg(line, 2);
-  // A traced, copied or swapped ability is not the species' own (round 60, T104).
-  if (!mayHold(state, arg(line, 1), abilityName)) return;
-  const pokemon = findPokemon(state, nickname);
-  if (pokemon && !pokemon.ability.value) {
-    pokemon.ability = revealedField(abilityName);
-  }
-}
-
 /** Giver: the [of] ident when present, else the OTHER party of the
  *  resolving swap move (Trick swaps emit no [of]). */
 function swapGiverIdent(state: InferrerState, line: LogLine, ident: string): string | null {
@@ -258,71 +245,23 @@ export function recordItem(state: InferrerState, line: LogLine) {
   }
 }
 
-/** End item (consumed): |-enditem|p2a: Nickname|Item Name. After a swap
- *  the mon consumes/loses the ACQUIRED item — never its set item. */
-export function recordConsumedItem(state: InferrerState, line: LogLine) {
-  const nickname = line.cmd === '-enditem' ? sideSubject(line, state.opponentSide) : null;
-  if (nickname === null) return;
-  const ident = arg(line, 1);
-  const itemName = arg(line, 2);
-  const pokemon = findPokemon(state, nickname);
-  if (pokemon && itemOpen(pokemon) && !state.swappedIdents.has(ident)) {
-    pokemon.item = revealedField(`${itemName} (consumed)`);
-  }
-}
-
-/** Heal messages reveal held items: |-heal|p2a: Nick|50/100|[from] item: Leftovers (G19) */
-export function recordHealItem(state: InferrerState, line: LogLine) {
-  const from = fromEffect(line);
-  const nickname = line.cmd === '-heal' && from.type === 'item' ? sideSubject(line, state.opponentSide) : null;
-  if (nickname === null) return;
-  const itemName = from.name;
-  const pokemon = findPokemon(state, nickname);
-  if (pokemon && itemName && itemOpen(pokemon)) {
-    pokemon.item = revealedField(itemName);
-  }
-}
-
-/** The holder of an item-damage line: the [of] Pokémon, else (attacker-punishing
- *  items in logs that drop [of]) the target of the damaged Pokémon's own move. */
-function itemDamageOwner(state: InferrerState, line: LogLine, damagedIdent: string, itemName: string | undefined): string | null {
-  const of = ofIdent(line);
-  let owner: string | null = damagedIdent;
-  if (of && /^p[12]/.test(of)) {
-    owner = of.trim();
-  } else if (itemName && ATTACKER_PUNISH_ITEMS.has(toId(itemName))) {
-    owner = state.lastMoveTarget.get(damagedIdent) ?? null;
-  }
-  return owner;
-}
-
 /**
- * Item damage reveals the holder: Life Orb/Black Sludge recoil hurts the
- * holder itself, but Rocky Helmet hurts the ATTACKER — its holder is the
- * [of] Pokémon, or in video-reconstructed logs that drop [of], the target
- * of the damaged Pokémon's own move.
+ * Item damage that hurts the attacker reveals its holder (Rocky Helmet, Jaboca
+ * and Rowap Berry): the [of] Pokémon, or in video-reconstructed logs that drop
+ * [of], the target of the damaged Pokémon's own move. The holder's own recoil
+ * items (Life Orb, Black Sludge) come from the client (client-facts.ts, T108
+ * step 2), which gives these three to the damaged Pokémon when [of] is missing.
  */
 export function recordItemDamage(state: InferrerState, line: LogLine) {
   const from = fromEffect(line);
-  if (line.cmd !== '-damage' || from.type !== 'item') return;
-  const itemName = from.name || undefined;
-  const owner = identOf(itemDamageOwner(state, line, arg(line, 1), itemName) ?? undefined);
-  if (itemName && owner && owner.side === state.opponentSide) {
+  if (line.cmd !== '-damage' || from.type !== 'item' || !ATTACKER_PUNISH_ITEMS.has(toId(from.name))) return;
+  const of = ofIdent(line);
+  const owner = identOf((of && /^p[12]/.test(of) ? of.trim() : state.lastMoveTarget.get(arg(line, 1))) ?? undefined);
+  if (owner && owner.side === state.opponentSide) {
     const pokemon = findPokemon(state, owner.name.trim());
     if (pokemon && itemOpen(pokemon)) {
-      pokemon.item = revealedField(itemName);
+      pokemon.item = revealedField(from.name);
     }
-  }
-}
-
-/** Mega evolution reveals the stone: |-mega|p2a: Nick|Lopunny|Lopunnite (G19) */
-export function recordMega(state: InferrerState, line: LogLine) {
-  const nickname = line.cmd === '-mega' ? sideSubject(line, state.opponentSide) : null;
-  if (nickname === null) return;
-  const stone = arg(line, 3).trim();
-  const pokemon = findPokemon(state, nickname);
-  if (pokemon && stone && itemOpen(pokemon)) {
-    pokemon.item = revealedField(stone);
   }
 }
 

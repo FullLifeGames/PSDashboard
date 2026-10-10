@@ -3,8 +3,8 @@ import { guessedField, revealedField, unknownEvs, unknownField } from './team-in
 import { createInferrerState } from './inference/inferrer-state.ts';
 import { findPokemonByNickname } from './inference/lookup.ts';
 import {
-  addFromPreview, addFromSwitch, noteEntry, noteGravity, noteMoveOrBoundary, recordAbility, recordAbilityAttribution,
-  recordConsumedItem, recordHealItem, recordItem, recordItemDamage, recordMega, recordMove, recordTera, ruleOutFromDamage,
+  addFromPreview, addFromSwitch, noteEntry, noteGravity, noteMoveOrBoundary, recordAbilityAttribution, recordItem,
+  recordItemDamage, recordMove, recordTera, ruleOutFromDamage,
 } from './inference/handlers.ts';
 import { watchItemEvidence } from './inference/item-evidence.ts';
 import { watchTriggerEvidence } from './inference/trigger-evidence.ts';
@@ -126,10 +126,11 @@ function applyTeamSheet(pokemonMap: Map<string, RevealedPokemonInfo>, sheet: She
 
 /**
  * Extracts revealed information about the opponent's team from the replay log.
- * Parses |poke|, |switch|, |move|, |-ability|, |-item|, |-terastallize| lines for p2.
  * Every line is read once through @pkmn/protocol (round 67, T108 step 1) and
  * runs through the handlers in this fixed order; unlike the protocol parser
- * several of them may fire for one line.
+ * several of them may fire for one line. The walk's own @pkmn/client battle
+ * reads the line last, and its state gives abilities and items the handlers
+ * leave to it (T108 step 2, inference/client-facts.ts).
  */
 export function inferOpponentTeam(log: string, opponentSide: 'p1' | 'p2' = 'p2'): OpponentTeamInfo {
   const lines = log.split('\n').map(readLine);
@@ -144,12 +145,8 @@ export function inferOpponentTeam(log: string, opponentSide: 'p1' | 'p2' = 'p2')
     addFromPreview(state, line);
     addFromSwitch(state, line);
     recordMove(state, line);
-    recordAbility(state, line);
     recordItem(state, line);
-    recordConsumedItem(state, line);
-    recordHealItem(state, line);
     recordItemDamage(state, line);
-    recordMega(state, line);
     recordTera(state, line);
     recordAbilityAttribution(state, line);
     watchTriggerEvidence(state, line);
