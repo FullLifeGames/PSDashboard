@@ -1,6 +1,7 @@
 import { Dex } from '@pkmn/sim';
 import type { RevealedPokemonInfo } from '../types.ts';
 import { toId } from '../ids.ts';
+import { arg, detailsOf, identOf, type LogLine } from './log-line.ts';
 
 /**
  * The formes a battle-only forme comes from, as the Dex names them: one for
@@ -32,23 +33,6 @@ export function teamSpecies(pokemonMap: Map<string, RevealedPokemonInfo>, specie
   return origins.find(origin => pokemonMap.has(origin)) ??
     [...pokemonMap.keys()].find(key => !key.endsWith('-*') && Dex.species.get(key).num === num) ??
     origins[0];
-}
-
-/** Species as the details line names it, level and gender; teamSpecies maps a battle forme to its card. */
-export function parseDetails(details: string): { species: string; level: number; gender: string } | null {
-  if (!details) return null;
-  const parts = details.split(', ');
-  const species = parts[0].trim();
-  let level = 100;
-  let gender = '';
-  for (const part of parts.slice(1)) {
-    if (part.startsWith('L')) {
-      level = parseInt(part.slice(1), 10);
-    } else if (part === 'M' || part === 'F') {
-      gender = part;
-    }
-  }
-  return { species, level, gender };
 }
 
 /**
@@ -88,23 +72,19 @@ export function revealMarkerForme(
   }
 }
 
+/** The opponent Pokémon behind a nickname: the first switch or drag line of the side that names it. */
 export function findPokemonByNickname(
   pokemonMap: Map<string, RevealedPokemonInfo>,
   nickname: string,
-  lines: string[],
+  lines: readonly LogLine[],
   side: string,
 ): RevealedPokemonInfo | undefined {
-  // Look for a switch line that maps this nickname to a species
   for (const line of lines) {
-    if ((line.startsWith(`|switch|${side}`) || line.startsWith(`|drag|${side}`)) &&
-        line.includes(`: ${nickname}|`)) {
-      const parts = line.split('|');
-      const details = parts[3];
-      const parsed = parseDetails(details);
-      if (parsed) {
-        return pokemonMap.get(teamSpecies(pokemonMap, parsed.species));
-      }
-    }
+    if (line.cmd !== 'switch' && line.cmd !== 'drag') continue;
+    const ident = identOf(arg(line, 1));
+    if (ident?.side !== side || ident.name !== nickname) continue;
+    const parsed = detailsOf(arg(line, 2));
+    if (parsed) return pokemonMap.get(teamSpecies(pokemonMap, parsed.species));
   }
   return undefined;
 }

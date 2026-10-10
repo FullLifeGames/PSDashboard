@@ -1,6 +1,8 @@
 import { Dex } from '@pkmn/sim';
+import { Protocol } from '@pkmn/protocol';
 import type { InferrerState } from './inferrer-state.ts';
-import { keyOf, possibleAbilities, ruleOutUnknown } from './item-evidence.ts';
+import { possibleAbilities, ruleOutUnknown } from './item-evidence.ts';
+import { arg, identOf, keyOf, namesEffect, ofIdent, type LogLine } from './log-line.ts';
 import { toId } from '../ids.ts';
 
 /**
@@ -54,19 +56,19 @@ const TERRAINS = new Set(['electricterrain', 'grassyterrain', 'mistyterrain', 'p
 /** The team an Eject Pack could switch to: the brought count the log prints last (VGC brings 4 of 6), else the preview, else the entries. */
 function teamSizeOf(state: InferrerState): number {
   const side = state.opponentSide;
-  const sizes = state.lines.filter(line => line.startsWith(`|teamsize|${side}|`)).map(line => Number(line.split('|')[3]));
+  const sizes = state.lines.filter(line => line.cmd === 'teamsize' && arg(line, 1) === side).map(line => Number(arg(line, 2)));
   if (sizes.length > 0 && sizes[sizes.length - 1] > 0) return sizes[sizes.length - 1];
-  const preview = state.lines.filter(line => line.startsWith(`|poke|${side}|`)).length;
+  const preview = state.lines.filter(line => line.cmd === 'poke' && arg(line, 1) === side).length;
   if (preview > 0) return preview;
   return new Set(state.lines
-    .filter(line => line.startsWith(`|switch|${side}`) || line.startsWith(`|drag|${side}`))
-    .map(line => keyOf(line.split('|')[2] ?? ''))).size;
+    .filter(line => (line.cmd === 'switch' || line.cmd === 'drag') && identOf(arg(line, 1))?.side === side)
+    .map(line => keyOf(arg(line, 1)))).size;
 }
 
 function newWatch(state: InferrerState): TriggerWatch {
   return {
     gravity: false, magicRoom: false, weather: '', terrain: '', slots: new Map(), fainted: new Set(), teamSize: teamSizeOf(state),
-    embargoed: new Set(), commanding: new Set(), neutralized: state.lines.some(line => line.includes('Neutralizing Gas')),
+    embargoed: new Set(), commanding: new Set(), neutralized: state.lines.some(line => namesEffect(line, 'Neutralizing Gas')),
     entries: new Map(), drops: new Map(),
   };
 }
@@ -106,16 +108,17 @@ function boosterSpends(state: InferrerState, ident: string, watch: TriggerWatch)
 }
 
 /** A Pokémon entered a position: whoever stood there left (its drop judges nothing), and the newcomer's entry opens. */
-function onEntry(state: InferrerState, watch: TriggerWatch, parts: string[], key: string) {
-  const position = (parts[2] ?? '').slice(0, 3);
+function onEntry(state: InferrerState, watch: TriggerWatch, line: LogLine, key: string) {
+  const ident = arg(line, 1);
+  const position = ident.slice(0, 3);
   const before = watch.slots.get(position);
   if (before) watch.drops.delete(before);
   watch.slots.set(position, key);
-  if (parts[1] === 'replace') return;
+  if (line.cmd === 'replace') return;
   watch.entries.set(key, {
-    ident: parts[2] ?? '',
+    ident,
     balloon: inGen(state, 'airballoon') && !watch.gravity && !watch.magicRoom,
-    booster: boosterSpends(state, parts[2] ?? '', watch),
+    booster: boosterSpends(state, ident, watch),
   });
 }
 
@@ -130,11 +133,11 @@ function closeEntries(state: InferrerState, watch: TriggerWatch) {
 }
 
 /** A drop on an opponent Pokémon that an Eject Pack would answer. */
-function onDrop(state: InferrerState, watch: TriggerWatch, parts: string[], key: string) {
-  if (!(Number(parts[4]) > 0) || !inGen(state, 'ejectpack') || watch.drops.has(key)) return;
+function onDrop(state: InferrerState, watch: TriggerWatch, line: LogLine, key: string) {
+  if (!(Number(arg(line, 3)) > 0) || !inGen(state, 'ejectpack') || watch.drops.has(key)) return;
   if (toId(state.pendingMove?.moveName ?? '') === 'partingshot') return;
   if (watch.magicRoom || watch.embargoed.has(key) || watch.commanding.has(key)) return;
-  if (possibleAbilities(state, parts[2] ?? '')?.has('klutz') !== false) return;
+  if (possibleAbilities(state, arg(line, 1))?.has('klutz') !== false) return;
   watch.drops.set(key, { moved: false });
 }
 
@@ -152,11 +155,11 @@ function closeDrops(state: InferrerState, watch: TriggerWatch) {
 const fieldOf = (watch: TriggerWatch) => `${watch.weather}|${watch.terrain}|${watch.gravity}|${watch.magicRoom}`;
 
 /** Gravity, Magic Room, the terrain and the weather the triggers read. */
-function onField(watch: TriggerWatch, parts: string[]) {
-  const id = toId((parts[2] ?? '').replace(/^move: /, ''));
-  const on = parts[1] !== '-fieldend';
+function onField(watch: TriggerWatch, line: LogLine) {
+  const id = toId(Protocol.parseEffect(arg(line, 1)).name);
+  const on = line.cmd !== '-fieldend';
   const before = fieldOf(watch);
-  if (parts[1] === '-weather') watch.weather = id === 'none' ? '' : id;
+  if (line.cmd === '-weather') watch.weather = id === 'none' ? '' : id;
   else if (id === 'gravity') watch.gravity = on;
   else if (id === 'magicroom') watch.magicRoom = on;
   else if (TERRAINS.has(id)) watch.terrain = on ? id : (watch.terrain === id ? '' : watch.terrain);
@@ -166,18 +169,18 @@ function onField(watch: TriggerWatch, parts: string[]) {
 }
 
 /** The item lines that answer a waiting entry or drop. */
-function onItemLine(watch: TriggerWatch, parts: string[], key: string) {
-  const item = toId(parts[3] ?? '');
+function onItemLine(watch: TriggerWatch, line: LogLine, key: string) {
+  const item = toId(arg(line, 2));
   const entry = watch.entries.get(key);
-  if (entry && parts[1] === '-item' && item === 'airballoon') entry.balloon = false;
-  if (entry && parts[1] === '-enditem' && item === 'boosterenergy') entry.booster = false;
-  if (parts[1] === '-enditem' && item === 'ejectpack') watch.drops.delete(key);
+  if (entry && line.cmd === '-item' && item === 'airballoon') entry.balloon = false;
+  if (entry && line.cmd === '-enditem' && item === 'boosterenergy') entry.booster = false;
+  if (line.cmd === '-enditem' && item === 'ejectpack') watch.drops.delete(key);
 }
 
 /** Ally Switch: the Pokémon leaves its position for the numbered one and the one there takes its place. */
-function onSwap(watch: TriggerWatch, parts: string[]) {
-  const from = (parts[2] ?? '').slice(0, 3);
-  const to = `${from.slice(0, 2)}${'abcd'[Number(parts[3])] ?? ''}`;
+function onSwap(watch: TriggerWatch, line: LogLine) {
+  const from = arg(line, 1).slice(0, 3);
+  const to = `${from.slice(0, 2)}${'abcd'[Number(arg(line, 2))] ?? ''}`;
   const moved = watch.slots.get(from);
   if (!moved || to === from) return;
   const other = watch.slots.get(to);
@@ -186,8 +189,8 @@ function onSwap(watch: TriggerWatch, parts: string[]) {
   else watch.slots.delete(from);
 }
 
-function onCondition(watch: TriggerWatch, parts: string[], line: string, key: string) {
-  if (/Embargo/.test(line)) watch.embargoed[parts[1] === '-start' ? 'add' : 'delete'](key);
+function onCondition(watch: TriggerWatch, line: LogLine, key: string) {
+  if (Protocol.parseEffect(arg(line, 2)).name === 'Embargo') watch.embargoed[line.cmd === '-start' ? 'add' : 'delete'](key);
 }
 
 function onFaint(watch: TriggerWatch, key: string) {
@@ -198,14 +201,14 @@ function onFaint(watch: TriggerWatch, key: string) {
 }
 
 /** Lines about an opponent Pokémon. */
-function onOpponentLine(state: InferrerState, watch: TriggerWatch, parts: string[], line: string, key: string) {
-  const tag = parts[1];
-  if (tag === 'switch' || tag === 'drag' || tag === 'replace') onEntry(state, watch, parts, key);
-  else if (tag === '-unboost') onDrop(state, watch, parts, key);
-  else if (tag === '-item' || tag === '-enditem') onItemLine(watch, parts, key);
+function onOpponentLine(state: InferrerState, watch: TriggerWatch, line: LogLine, key: string) {
+  const tag = line.cmd;
+  if (tag === 'switch' || tag === 'drag' || tag === 'replace') onEntry(state, watch, line, key);
+  else if (tag === '-unboost') onDrop(state, watch, line, key);
+  else if (tag === '-item' || tag === '-enditem') onItemLine(watch, line, key);
   else if (tag === 'faint') onFaint(watch, key);
-  else if (tag === 'swap') onSwap(watch, parts);
-  else if (tag === '-start' || tag === '-end') onCondition(watch, parts, line, key);
+  else if (tag === 'swap') onSwap(watch, line);
+  else if (tag === '-start' || tag === '-end') onCondition(watch, line, key);
 }
 
 /** The windows' clock: a move or a turn closes the entries, a residual phase after a move closes the drops. */
@@ -216,22 +219,21 @@ function notePhase(state: InferrerState, watch: TriggerWatch, tag: string) {
 }
 
 /** Commander puts both Pokémon out of reach of a switch: no Eject Pack is judged for them. */
-function noteCommander(watch: TriggerWatch, parts: string[], line: string) {
-  if (!line.includes('ability: Commander')) return;
-  for (const ident of [parts[2], line.match(/\[of\]\s*(p[1-4][a-d]?:\s*[^|]+)/)?.[1]]) if (ident) watch.commanding.add(keyOf(ident));
+function noteCommander(watch: TriggerWatch, line: LogLine) {
+  if (!namesEffect(line, 'Commander')) return;
+  for (const ident of [arg(line, 1), ofIdent(line)]) if (ident) watch.commanding.add(keyOf(ident));
 }
 
 /**
  * The line handler: the field the triggers read, the windows they open, and
  * at their close the items whose line never came.
  */
-export function watchTriggerEvidence(state: InferrerState, line: string) {
+export function watchTriggerEvidence(state: InferrerState, line: LogLine) {
   const watch = (state.triggerWatch ??= newWatch(state));
-  const parts = line.split('|');
-  const tag = parts[1] ?? '';
+  const tag = line.cmd;
   notePhase(state, watch, tag);
-  if (tag === '-weather' || tag === '-fieldstart' || tag === '-fieldend') onField(watch, parts);
-  noteCommander(watch, parts, line);
-  const key = keyOf(parts[2] ?? '');
-  if (key.startsWith(state.opponentSide)) onOpponentLine(state, watch, parts, line, key);
+  if (tag === '-weather' || tag === '-fieldstart' || tag === '-fieldend') onField(watch, line);
+  noteCommander(watch, line);
+  const key = keyOf(arg(line, 1));
+  if (key.startsWith(state.opponentSide)) onOpponentLine(state, watch, line, key);
 }

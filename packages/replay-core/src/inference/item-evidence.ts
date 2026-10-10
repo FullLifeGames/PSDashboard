@@ -1,7 +1,11 @@
 import { Battle, Dex } from '@pkmn/sim';
+import { Protocol } from '@pkmn/protocol';
 import { findPokemon, ruleOut, type InferrerState } from './inferrer-state.ts';
+import { arg, fromEffect, hasKw, keyOf, ofIdent, type LogLine } from './log-line.ts';
 import type { RevealedPokemonInfo } from '../types.ts';
 import { toId } from '../ids.ts';
+
+export { keyOf } from './log-line.ts';
 
 /**
  * Items the protocol rules out by a line it does NOT show (round 63, T80):
@@ -49,16 +53,26 @@ export interface ItemWatch {
   magicRoom: boolean;
 }
 
-// Not |replace|: an Illusion breaks inside the hit, before the attacker's recoil.
-const ACTION_BOUNDARIES = new Set(['', 'move', 'switch', 'drag', 'cant', 'turn', 'upkeep']);
+// Not |replace|: an Illusion breaks inside the hit, before the attacker's recoil. "done" is the "|" line.
+const ACTION_BOUNDARIES = new Set(['done', 'move', 'switch', 'drag', 'cant', 'turn', 'upkeep']);
 const ITEM_LINES = new Set(['-item', '-enditem']);
 const RESIDUAL_ITEMS = ['leftovers', 'blacksludge'];
-const FROM_ITEM = /\[from\] item:\s*([^|\n[]+)/;
 
-/** "p2a: Nick" → "p2: Nick": one Pokémon whatever slot it stands in. */
-export const keyOf = (ident: string) => ident.replace(/^(p[1-4])[a-d]?:\s*/, '$1: ').trim();
-const ofIdent = (line: string) => line.match(/\[of\]\s*(p[1-4][a-d]?:\s*[^|]+)/)?.[1] ?? null;
-const hpOf = (text: string | undefined) => (text ?? '').split(' ')[0];
+/** HP as the protocol reads an HP argument ("50/100 par"); null when it names none. */
+const healthOf = (text: string | undefined) => Protocol.parseHealth((text ?? '') as Protocol.PokemonHPStatus);
+/** Alive and below full HP. */
+function belowFull(text: string | undefined): boolean {
+  const health = healthOf(text);
+  return !!health && health.hp > 0 && health.hp < health.maxhp;
+}
+/** The item a line's [from] effect names ('' for none). */
+const fromItem = (line: LogLine) => (fromEffect(line).type === 'item' ? fromEffect(line).name : '');
+/** The item an -activate (or its upgraded -block) names as its effect: Quick Claw, Safety Goggles, Protective Pads. */
+function activatedItem(line: LogLine): string {
+  if (line.cmd !== '-activate' && line.cmd !== '-block') return '';
+  const effect = Protocol.parseEffect(arg(line, 2));
+  return effect.type === 'item' ? effect.name : '';
+}
 
 function newWatch(): ItemWatch {
   return {
@@ -166,8 +180,7 @@ function shellBellWouldShow(state: InferrerState, watch: ItemWatch, action: Acti
   const bell = dex.items.get('shellbell');
   const move = dex.moves.get(action.move);
   if (!bell.exists || bell.gen > state.gen || !move.exists || move.category === 'Status') return false;
-  const [current, max] = hpOf(watch.hp.get(action.attacker)).split('/').map(Number);
-  if (!(current > 0 && current < max)) return false;
+  if (!belowFull(watch.hp.get(action.attacker))) return false;
   const abilities = possibleAbilities(state, action.ident);
   if (!abilities || abilities.has('klutz') || (abilities.has('sheerforce') && move.secondaries)) return false;
   return !watch.magicRoom && !watch.embargoed.has(action.attacker) && !watch.healBlocked.has(action.attacker);
@@ -249,8 +262,7 @@ function judgeAction(state: InferrerState, watch: ItemWatch, action: ActionWatch
 function judgeResidual(state: InferrerState, watch: ItemWatch) {
   if (state.gen < 3) return;
   for (const [key, hp] of watch.residual ?? []) {
-    const [current, max] = hp.split('/').map(Number);
-    if (!(current > 0 && current < max) || watch.residualShown.has(key) || watch.residualSilenced.has(key)) continue;
+    if (!belowFull(hp) || watch.residualShown.has(key) || watch.residualSilenced.has(key)) continue;
     const abilities = possibleAbilities(state, key);
     if (!abilities || abilities.has('klutz')) continue;
     for (const item of RESIDUAL_ITEMS) ruleOutUnknown(state, key, item);
@@ -274,25 +286,24 @@ function noteSilenced(watch: ItemWatch) {
 interface LineContext {
   state: InferrerState;
   watch: ItemWatch;
-  parts: string[];
-  line: string;
+  line: LogLine;
   key: string;
   opponent: boolean;
 }
 
 /** A Pokémon entered: the opponent's positions and HP. */
-function onEntry({ watch, parts, key, opponent }: LineContext) {
+function onEntry({ watch, line, key, opponent }: LineContext) {
   if (!opponent) return;
-  watch.slots.set((parts[2] ?? '').slice(0, 3), key);
-  watch.hp.set(key, hpOf(parts[4]));
+  watch.slots.set(arg(line, 1).slice(0, 3), key);
+  watch.hp.set(key, arg(line, 3));
 }
 
 /** An HP line. Full HP inside the residual phase (Grassy Terrain before the Leftovers turn) leaves nothing to heal. */
-function onHp({ watch, parts, key, opponent }: LineContext) {
+function onHp({ watch, line, key, opponent }: LineContext) {
   if (!opponent) return;
-  watch.hp.set(key, hpOf(parts[3]));
-  const [current, max] = hpOf(parts[3]).split('/').map(Number);
-  if (watch.residual?.has(key) && current >= max) watch.residualSilenced.add(key);
+  watch.hp.set(key, arg(line, 2));
+  const health = healthOf(arg(line, 2));
+  if (watch.residual?.has(key) && health && health.hp >= health.maxhp) watch.residualSilenced.add(key);
 }
 
 /**
@@ -300,10 +311,10 @@ function onHp({ watch, parts, key, opponent }: LineContext) {
  * the numbered one and the Pokémon there takes its place (round 64, T125: a
  * stale map judged a benched Leftovers holder after the next switch).
  */
-function onSwap({ watch, parts, opponent }: LineContext) {
+function onSwap({ watch, line, opponent }: LineContext) {
   if (!opponent) return;
-  const from = (parts[2] ?? '').slice(0, 3);
-  const to = `${from.slice(0, 2)}${'abcd'[Number(parts[3])] ?? ''}`;
+  const from = arg(line, 1).slice(0, 3);
+  const to = `${from.slice(0, 2)}${'abcd'[Number(arg(line, 2))] ?? ''}`;
   const moved = watch.slots.get(from);
   const other = watch.slots.get(to);
   if (!moved || to === from) return;
@@ -318,15 +329,16 @@ function onFaint({ watch, key }: LineContext) {
 }
 
 /** Heal Block and Embargo silence a holder's item line. */
-function onCondition({ watch, parts, line, key }: LineContext) {
-  const add = parts[1] === '-start';
-  if (/Heal Block/.test(line)) watch.healBlocked[add ? 'add' : 'delete'](key);
-  if (/Embargo/.test(line)) watch.embargoed[add ? 'add' : 'delete'](key);
+function onCondition({ watch, line, key }: LineContext) {
+  const add = line.cmd === '-start';
+  const effect = Protocol.parseEffect(arg(line, 2)).name;
+  if (effect === 'Heal Block') watch.healBlocked[add ? 'add' : 'delete'](key);
+  if (effect === 'Embargo') watch.embargoed[add ? 'add' : 'delete'](key);
 }
 
 /** Magic Room silences every item. */
-function onField({ watch, parts, line }: LineContext) {
-  if (/Magic Room/.test(line)) watch.magicRoom = parts[1] === '-fieldstart';
+function onField({ watch, line }: LineContext) {
+  if (Protocol.parseEffect(arg(line, 1)).name === 'Magic Room') watch.magicRoom = line.cmd === '-fieldstart';
 }
 
 /**
@@ -335,13 +347,13 @@ function onField({ watch, parts, line }: LineContext) {
  * `[of]` Pokémon or else of the subject (Life Orb, Rocky Helmet), an
  * `-activate` of an item names the subject's.
  */
-function noteHeldItem(watch: ItemWatch, { parts, line, key }: LineContext) {
+function noteHeldItem(watch: ItemWatch, { line, key }: LineContext) {
   const of = ofIdent(line);
-  const fromItem = line.match(FROM_ITEM)?.[1]?.trim();
-  const activated = parts[1] === '-activate' ? line.match(/\|item: ([^|]+)/)?.[1]?.trim() : undefined;
-  if (parts[1] === '-item') watch.items.set(key, toId(parts[3] ?? ''));
-  else if (parts[1] === '-enditem') watch.items.set(key, '');
-  else if (fromItem) watch.items.set(of ? keyOf(of) : key, toId(fromItem));
+  const shown = fromItem(line);
+  const activated = activatedItem(line);
+  if (line.cmd === '-item') watch.items.set(key, toId(arg(line, 2)));
+  else if (line.cmd === '-enditem') watch.items.set(key, '');
+  else if (shown) watch.items.set(of ? keyOf(of) : key, toId(shown));
   else if (activated) watch.items.set(key, toId(activated));
 }
 
@@ -357,13 +369,12 @@ const BOARD: Record<string, (context: LineContext) => void> = {
  * another Pokémon's item acted on it without a move of its own (Red Card,
  * Pickpocket): the hit proves nothing about the attacker's item.
  */
-function noteItemLine(action: ActionWatch, { parts, line, key }: LineContext) {
+function noteItemLine(action: ActionWatch, { line, key }: LineContext) {
   const of = ofIdent(line);
-  const fromItem = line.match(FROM_ITEM)?.[1]?.trim();
-  if (fromItem) action.shown.add(`${of && toId(fromItem) === 'rockyhelmet' ? keyOf(of) : key}|${toId(fromItem)}`);
-  const tag = parts[1];
-  const itemLine = ITEM_LINES.has(tag) || (tag === '-activate' && /item:/.test(line));
-  if (itemLine && (key === action.attacker || (of && keyOf(of) === action.attacker && !/\[from\] move:/.test(line)))) {
+  const shown = fromItem(line);
+  if (shown) action.shown.add(`${of && toId(shown) === 'rockyhelmet' ? keyOf(of) : key}|${toId(shown)}`);
+  const itemLine = ITEM_LINES.has(line.cmd) || !!activatedItem(line);
+  if (itemLine && (key === action.attacker || (of && keyOf(of) === action.attacker && fromEffect(line).type !== 'move'))) {
     action.doubt = true;
   }
 }
@@ -372,24 +383,24 @@ function noteItemLine(action: ActionWatch, { parts, line, key }: LineContext) {
 function trackAction(watch: ItemWatch, context: LineContext) {
   const action = watch.action;
   if (!action) return;
-  const { parts, line, key } = context;
-  if (parts[1] === '-damage' && !line.includes('[from]')) action.hits.add(key);
-  if (parts[1] === 'faint' || (parts[1] === '-damage' && /\|0 fnt/.test(line))) action.fainted.add(key);
+  const { line, key } = context;
+  if (line.cmd === '-damage' && !hasKw(line, 'from')) action.hits.add(key);
+  if (line.cmd === 'faint' || (line.cmd === '-damage' && healthOf(arg(line, 2))?.fainted)) action.fainted.add(key);
   noteItemLine(action, context);
 }
 
 /** The phases: a "|" line opens the residual window, |upkeep| judges it, a plain |move| opens an action. */
-function notePhase(state: InferrerState, watch: ItemWatch, parts: string[], line: string) {
-  if (line === '|') {
+function notePhase(state: InferrerState, watch: ItemWatch, line: LogLine) {
+  if (line.cmd === 'done') {
     watch.residual = new Map([...watch.slots.values()].map(key => [key, watch.hp.get(key) ?? '']));
     watch.residualShown.clear();
     watch.residualSilenced.clear();
-  } else if (parts[1] === 'upkeep') {
+  } else if (line.cmd === 'upkeep') {
     judgeResidual(state, watch);
     watch.residual = null;
-  } else if (parts[1] === 'move' && parts[2] && !line.includes('[from]')) {
+  } else if (line.cmd === 'move' && arg(line, 1) && !hasKw(line, 'from')) {
     watch.action = {
-      ident: parts[2], attacker: keyOf(parts[2]), move: parts[3] ?? '',
+      ident: arg(line, 1), attacker: keyOf(arg(line, 1)), move: arg(line, 2),
       hits: new Set(), shown: new Set(), fainted: new Set(), doubt: false,
     };
   }
@@ -400,17 +411,16 @@ function notePhase(state: InferrerState, watch: ItemWatch, parts: string[], line
  * judges it, opens the next plain move, and judges the residual phase at
  * |upkeep| against the HP its opening "|" line found.
  */
-export function watchItemEvidence(state: InferrerState, line: string) {
+export function watchItemEvidence(state: InferrerState, line: LogLine) {
   const watch = (state.itemWatch ??= newWatch());
-  const parts = line.split('|');
-  if (parts.length >= 2 && ACTION_BOUNDARIES.has(parts[1])) closeAction(state, watch);
-  notePhase(state, watch, parts, line);
-  const key = keyOf(parts[2] ?? '');
-  const context: LineContext = { state, watch, parts, line, key, opponent: key.startsWith(state.opponentSide) };
-  BOARD[parts[1] ?? '']?.(context);
-  if (parts[2]) noteHeldItem(watch, context);
+  if (ACTION_BOUNDARIES.has(line.cmd)) closeAction(state, watch);
+  notePhase(state, watch, line);
+  const key = keyOf(arg(line, 1));
+  const context: LineContext = { state, watch, line, key, opponent: key.startsWith(state.opponentSide) };
+  BOARD[line.cmd]?.(context);
+  if (arg(line, 1)) noteHeldItem(watch, context);
   noteSilenced(watch);
   trackAction(watch, context);
-  const fromItem = line.match(FROM_ITEM)?.[1]?.trim();
-  if (watch.residual && fromItem && RESIDUAL_ITEMS.includes(toId(fromItem))) watch.residualShown.add(key);
+  const shown = fromItem(line);
+  if (watch.residual && shown && RESIDUAL_ITEMS.includes(toId(shown))) watch.residualShown.add(key);
 }

@@ -6,10 +6,12 @@ import { toId } from '../ids.ts';
 import type { ItemWatch } from './item-evidence.ts';
 import type { TriggerWatch } from './trigger-evidence.ts';
 import type { HitWalk } from './hits.ts';
+import { arg, type LogLine } from './log-line.ts';
 
 /** The scan state one team inference carries from line to line. */
 export interface InferrerState {
-  lines: string[];
+  /** Every line of the log, read once through @pkmn/protocol (round 67, T108 step 1). */
+  lines: readonly LogLine[];
   opponentSide: 'p1' | 'p2';
   pokemonMap: Map<string, RevealedPokemonInfo>;
   // Each ident's latest move target — resolves Rocky Helmet reveals in
@@ -51,13 +53,13 @@ export interface InferrerState {
   hitWalk?: HitWalk;
 }
 
-export function createInferrerState(lines: string[], opponentSide: 'p1' | 'p2'): InferrerState {
-  const genLine = lines.find(line => line.startsWith('|gen|'));
+export function createInferrerState(lines: readonly LogLine[], opponentSide: 'p1' | 'p2'): InferrerState {
+  const genLine = lines.find(line => line.cmd === 'gen');
   return {
     lines,
     opponentSide,
-    gen: parseInt(genLine?.split('|')[2] ?? '9', 10) || 9,
-    custom: abilitiesAreFree(lines.find(line => line.startsWith('|tier|')) ?? ''),
+    gen: (genLine ? Number(arg(genLine, 1)) : 9) || 9,
+    custom: abilitiesAreFree(lines.find(line => line.cmd === 'tier')?.raw ?? ''),
     pokemonMap: new Map<string, RevealedPokemonInfo>(),
     lastMoveTarget: new Map<string, string>(),
     pendingMove: null,

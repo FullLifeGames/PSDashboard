@@ -9,7 +9,9 @@ import {
 import { watchItemEvidence } from './inference/item-evidence.ts';
 import { watchTriggerEvidence } from './inference/trigger-evidence.ts';
 import { attachHits, collectHits } from './inference/hits.ts';
+import { syncClientFacts } from './inference/client-facts.ts';
 import { rocksMayMiss } from './inference/rocks-tell.ts';
+import { arg, fromEffect, identOf, readLine, type LogLine } from './inference/log-line.ts';
 import { toId } from './ids.ts';
 
 /** "SitrusBerry" / "HighHorsepower" (packed names) → "Sitrus Berry" / "High Horsepower". */
@@ -125,11 +127,12 @@ function applyTeamSheet(pokemonMap: Map<string, RevealedPokemonInfo>, sheet: She
 /**
  * Extracts revealed information about the opponent's team from the replay log.
  * Parses |poke|, |switch|, |move|, |-ability|, |-item|, |-terastallize| lines for p2.
- * Every line runs through the handlers in this fixed order; unlike the
- * protocol parser several of them may fire for one line.
+ * Every line is read once through @pkmn/protocol (round 67, T108 step 1) and
+ * runs through the handlers in this fixed order; unlike the protocol parser
+ * several of them may fire for one line.
  */
 export function inferOpponentTeam(log: string, opponentSide: 'p1' | 'p2' = 'p2'): OpponentTeamInfo {
-  const lines = log.split('\n');
+  const lines = log.split('\n').map(readLine);
   const state = createInferrerState(lines, opponentSide);
 
   for (const line of lines) {
@@ -151,6 +154,7 @@ export function inferOpponentTeam(log: string, opponentSide: 'p1' | 'p2' = 'p2')
     recordAbilityAttribution(state, line);
     watchTriggerEvidence(state, line);
     collectHits(state, line);
+    syncClientFacts(state, line);
   }
   attachHits(state);
 
@@ -168,7 +172,7 @@ export function inferOpponentTeam(log: string, opponentSide: 'p1' | 'p2' = 'p2')
  * and skips holders an ability they may have explains as well (T130).
  */
 function inferBootsFromHazards(
-  lines: string[],
+  lines: readonly LogLine[],
   side: 'p1' | 'p2',
   pokemonMap: Map<string, RevealedPokemonInfo>,
   legality: { gen: number; custom: boolean },
@@ -177,21 +181,28 @@ function inferBootsFromHazards(
 
   let rocksUp = false;
   for (let index = 0; index < lines.length; index++) {
-    const line = lines[index];
-    if (line.startsWith(`|-sidestart|${side}:`) && line.includes('Stealth Rock')) rocksUp = true;
-    if (line.startsWith(`|-sideend|${side}:`) && line.includes('Stealth Rock')) rocksUp = false;
-    if (!rocksUp) continue;
-
-    const switchMatch = line.match(new RegExp(`^\\|(?:switch|drag)\\|${side}[a-d]:\\s*([^|]+)\\|`));
-    if (!switchMatch) continue;
-    const nickname = switchMatch[1].trim();
-
-    if (tookRockDamageOnEntry(lines, index, nickname)) continue;
+    rocksUp = rocksAfter(lines[index], side, rocksUp);
+    const nickname = rocksUp ? entrantOf(lines[index], side) : null;
+    if (!nickname || tookRockDamageOnEntry(lines, index, nickname)) continue;
 
     const pokemon = findPokemonByNickname(pokemonMap, nickname, lines, side);
     if (!pokemon || !canGuessBoots(pokemon, legality)) continue;
     pokemon.item = guessedField('Heavy-Duty Boots', undefined, 'No Stealth Rock damage on switch-in');
   }
+}
+
+/** Stealth Rock on the side: set by its -sidestart, lifted by its -sideend; every other line leaves it. */
+function rocksAfter(line: LogLine, side: string, up: boolean): boolean {
+  if (identOf(arg(line, 1))?.side !== side || !arg(line, 2).includes('Stealth Rock')) return up;
+  if (line.cmd === '-sidestart') return true;
+  return line.cmd === '-sideend' ? false : up;
+}
+
+/** The nickname of a Pokémon of the side entering a position ("|switch|p2a: Nick|..."), else null. */
+function entrantOf(line: LogLine, side: string): string | null {
+  if (line.cmd !== 'switch' && line.cmd !== 'drag') return null;
+  const ident = identOf(arg(line, 1));
+  return ident && ident.side === side && ident.slot ? ident.name.trim() : null;
 }
 
 /**
@@ -208,11 +219,12 @@ function canGuessBoots(pokemon: RevealedPokemonInfo, legality: { gen: number; cu
 }
 
 /** Entry-hazard damage resolves before the next action — scan until then. */
-function tookRockDamageOnEntry(lines: string[], index: number, nickname: string): boolean {
+function tookRockDamageOnEntry(lines: readonly LogLine[], index: number, nickname: string): boolean {
   for (let lookahead = index + 1; lookahead < lines.length; lookahead++) {
     const next = lines[lookahead];
-    if (next.startsWith('|move|') || next.startsWith('|turn|') || next.startsWith('|upkeep')) break;
-    if (next.includes('[from] Stealth Rock') && next.includes(`: ${nickname}|`)) {
+    if (next.cmd === 'move' || next.cmd === 'turn' || next.cmd === 'upkeep') break;
+    const from = fromEffect(next);
+    if (!from.type && from.name === 'Stealth Rock' && identOf(arg(next, 1))?.name === nickname) {
       return true;
     }
   }

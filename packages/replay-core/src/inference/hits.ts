@@ -1,8 +1,10 @@
 import { Battle } from '@pkmn/client';
 import type { HitParty, LoggedHit } from '../types.ts';
 import { gens, type ClientIdent } from '../protocol/parser-state.ts';
+import { Protocol } from '@pkmn/protocol';
 import { findPokemon, type InferrerState } from './inferrer-state.ts';
-import { illusionPossible, keyOf } from './item-evidence.ts';
+import { illusionPossible } from './item-evidence.ts';
+import { arg, hasKw, identOf, keyOf, namesEffect, ofIdent, type LogLine } from './log-line.ts';
 import { toId } from '../ids.ts';
 
 /**
@@ -25,8 +27,10 @@ type ClientPokemon = NonNullable<ReturnType<Battle['getPokemon']>>;
 const SCREEN_IDS = ['reflect', 'lightscreen', 'auroraveil'];
 /** The client's marks for an item a Pokémon took from another one. */
 const ACQUIRED = new Set(['tricked', 'stolen', 'bestowed', 'harvested']);
-/** Lines after which no move is resolving. */
-const ACTION_ENDS = new Set(['', 'move', 'switch', 'drag', 'cant', 'turn', 'upkeep']);
+/** Lines after which no move is resolving ('' a blank line, "done" the "|" line). */
+const ACTION_ENDS = new Set(['', 'done', 'move', 'switch', 'drag', 'cant', 'turn', 'upkeep']);
+/** Moves that swap stats the calculator cannot see. */
+const STAT_SWAPS = new Set(['Power Split', 'Guard Split']);
 
 /** A hit on one target of the resolving move; `lines` counts its damage lines. */
 interface TargetHit {
@@ -56,7 +60,8 @@ export interface HitWalk {
 }
 
 function newWalk(state: InferrerState): HitWalk {
-  const tier = state.lines.find(line => line.startsWith('|tier|'))?.split('|')[2] ?? '';
+  const tierLine = state.lines.find(line => line.cmd === 'tier');
+  const tier = tierLine ? arg(tierLine, 1) : '';
   return { battle: new Battle(gens), pending: null, hits: new Map(), swapped: new Set(), neutralized: false, format: tier };
 }
 
@@ -113,9 +118,9 @@ function recordHit(walk: HitWalk, pending: PendingMove, attacker: ClientPokemon,
 }
 
 /** A damage line of the resolving move, read before it applies: the first opens the target's hit, a second spoils it. */
-function noteDamage(walk: HitWalk, parts: string[], gen: number) {
+function noteDamage(walk: HitWalk, line: LogLine, gen: number) {
   const pending = walk.pending;
-  const target = parts[2] ?? '';
+  const target = arg(line, 1);
   if (!pending || target === pending.attacker) return;
   const known = pending.targets.get(target);
   if (known) {
@@ -129,9 +134,9 @@ function noteDamage(walk: HitWalk, parts: string[], gen: number) {
 }
 
 /** The same damage line after it applied: the HP it left and whether that reading is only a floor. */
-function settleDamage(walk: HitWalk, parts: string[]) {
-  const entry = walk.pending?.targets.get(parts[2] ?? '');
-  const defender = walk.battle.getPokemon((parts[2] ?? '') as ClientIdent);
+function settleDamage(walk: HitWalk, line: LogLine) {
+  const entry = walk.pending?.targets.get(arg(line, 1));
+  const defender = walk.battle.getPokemon(arg(line, 1) as ClientIdent);
   if (!entry || entry.lines !== 1 || !defender || defender.maxhp <= 0) return;
   const after = defender.hp / defender.maxhp;
   entry.hit.observed = entry.hit.defender.hp - after;
@@ -152,10 +157,12 @@ function closeMove(walk: HitWalk) {
 }
 
 /** Stat swaps the calculator cannot see stay with both Pokémon until they leave the field. */
-function noteSwaps(walk: HitWalk, parts: string[], line: string) {
-  if (parts[1] === 'switch' || parts[1] === 'drag') walk.swapped.delete(keyOf(parts[2] ?? ''));
-  if (!/move: (Power Split|Guard Split)|\|Power Trick/.test(line)) return;
-  for (const ident of [parts[2], line.match(/\[of\]\s*(p[1-4][a-d]?:\s*[^|]+)/)?.[1]]) if (ident) walk.swapped.add(keyOf(ident));
+function noteSwaps(walk: HitWalk, line: LogLine) {
+  if (line.cmd === 'switch' || line.cmd === 'drag') walk.swapped.delete(keyOf(arg(line, 1)));
+  const effect = Protocol.parseEffect(arg(line, 2));
+  const swap = (effect.type === 'move' && STAT_SWAPS.has(effect.name)) || line.args.slice(1).some(value => value === 'Power Trick');
+  if (!swap) return;
+  for (const ident of [arg(line, 1), ofIdent(line)]) if (ident) walk.swapped.add(keyOf(ident));
 }
 
 /**
@@ -164,31 +171,29 @@ function noteSwaps(walk: HitWalk, parts: string[], line: string) {
  * and feeds the line to the client.
  */
 /** A line of the resolving move: an opponent's move opens it, a crit marks its target, a plain damage line opens a hit. */
-function noteMoveLine(walk: HitWalk, state: InferrerState, parts: string[], line: string) {
-  const tag = parts[1] ?? '';
-  if (tag === 'move' && (parts[2] ?? '').startsWith(state.opponentSide)) {
-    walk.pending = { attacker: parts[2], move: toId(parts[3] ?? ''), spread: line.includes('[spread]'), crits: new Set(), targets: new Map() };
-  } else if (tag === '-crit' && walk.pending) {
-    walk.pending.crits.add(parts[2] ?? '');
-  } else if (tag === '-damage' && !line.includes('[from]')) {
-    noteDamage(walk, parts, state.gen);
+function noteMoveLine(walk: HitWalk, state: InferrerState, line: LogLine) {
+  if (line.cmd === 'move' && identOf(arg(line, 1))?.side === state.opponentSide) {
+    walk.pending = { attacker: arg(line, 1), move: toId(arg(line, 2)), spread: hasKw(line, 'spread'), crits: new Set(), targets: new Map() };
+  } else if (line.cmd === '-crit' && walk.pending) {
+    walk.pending.crits.add(arg(line, 1));
+  } else if (line.cmd === '-damage' && !hasKw(line, 'from')) {
+    noteDamage(walk, line, state.gen);
   }
 }
 
-export function collectHits(state: InferrerState, line: string) {
+export function collectHits(state: InferrerState, line: LogLine) {
   const walk = (state.hitWalk ??= newWalk(state));
-  const parts = line.split('|');
-  const tag = parts[1] ?? '';
-  if (ACTION_ENDS.has(tag)) closeMove(walk);
-  noteMoveLine(walk, state, parts, line);
-  noteSwaps(walk, parts, line);
-  if (line.includes('Neutralizing Gas')) walk.neutralized = true;
+  if (ACTION_ENDS.has(line.cmd)) closeMove(walk);
+  noteMoveLine(walk, state, line);
+  noteSwaps(walk, line);
+  if (namesEffect(line, 'Neutralizing Gas')) walk.neutralized = true;
   try {
-    walk.battle.add(line);
+    // The client reads the same parse; copies, so its handlers cannot change what the next handler reads.
+    walk.battle.add([...line.args] as Protocol.ArgType, { ...line.kwArgs } as Protocol.BattleArgsKWArgType);
   } catch {
     // A line the client cannot apply (a synthetic log's impossible order) is skipped, as the parser does.
   }
-  if (tag === '-damage' && !line.includes('[from]')) settleDamage(walk, parts);
+  if (line.cmd === '-damage' && !hasKw(line, 'from')) settleDamage(walk, line);
 }
 
 /**
