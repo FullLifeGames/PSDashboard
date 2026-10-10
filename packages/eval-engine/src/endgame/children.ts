@@ -3,6 +3,9 @@ import { positionBattle, type SimPosition } from '../forward-model.ts';
 import { BOUNDARY_DRAW_BUDGET, type CellEvent } from '../cell-blend.ts';
 import { SEARCH_SEEDS } from '../search/leaf.ts';
 import { classChildren, drawChild, median, totalHp, type Draw } from '../search/outcome-children.ts';
+import { createMatchupCache } from '../eval-function.ts';
+import { battleRuleset } from '../forward/ruleset.ts';
+import { drawPair } from '../pair/draw.ts';
 
 /**
  * One matrix cell's children for the endgame solver (round 34): chance
@@ -50,13 +53,41 @@ function damagingPair(battle: Battle, p1Choice: string, p2Choice: string): boole
   }));
 }
 
-/** The plain path: the median of three draws for damaging pairs, one draw otherwise. */
+/** One group of plain draws: its median child, whether the draws disagree on faints or the end (unpriced) or on damage (spread). */
+function plainGroup(draws: Draw[]): { pick: Draw; unpriced: boolean; spread: boolean } {
+  const unpriced = draws.some(draw => draw.fainted !== draws[0].fainted || draw.ended !== draws[0].ended);
+  return { pick: median(draws), unpriced, spread: unpriced || draws.some(draw => draw.measure !== draws[0].measure) };
+}
+
+/**
+ * Round 67 (T114): whether a doubles pair's first draw shuffled a speed tie
+ * among its move actions, read off the pair plan's recording dice. Singles
+ * pairs price their ties on the class path (outcome-children.ts speedTie).
+ */
+function doublesTie(root: SimPosition, battle: Battle, p1Choice: string, p2Choice: string): boolean {
+  if (battle.gameType === 'singles') return false;
+  return drawPair(root, p1Choice, p2Choice, SEARCH_SEEDS[0], new Map(), createMatchupCache(battleRuleset(battle))).records
+    .some(record => record.kind === 'tie');
+}
+
+/**
+ * The plain path: the median of three draws for damaging pairs, one draw
+ * otherwise. Round 67 (T114): a doubles pair whose order a speed tie decides
+ * prices each order as a child of half the weight (the scripted dice put one
+ * side's move actions first): the fixed draws resolved doubles-ohko-tie
+ * alike, and the prover proved a coin flip with mass 1.
+ */
 function plainChildren(root: SimPosition, battle: Battle, rootHp: number, p1Choice: string, p2Choice: string): EndgameChildren {
   const count = damagingPair(battle, p1Choice, p2Choice) ? PLAIN_DRAWS : 1;
-  const draws: Draw[] = SEARCH_SEEDS.slice(0, count).map(seed => drawChild(root, rootHp, p1Choice, p2Choice, seed));
-  const pick = median(draws);
-  const unpriced = draws.some(draw => draw.fainted !== draws[0].fainted || draw.ended !== draws[0].ended);
-  const spread = unpriced || draws.some(draw => draw.measure !== draws[0].measure);
+  if (doublesTie(root, battle, p1Choice, p2Choice)) {
+    const orders = (['p1', 'p2'] as const).map(first => plainGroup(SEARCH_SEEDS.slice(0, count).map(seed =>
+      drawChild(root, rootHp, p1Choice, p2Choice, seed, { scripts: new Map([[`${first}:tie`, { first }]]) }))));
+    return {
+      children: orders.map(order => ({ position: order.pick.position, weight: 0.5, share: 0.5, ended: order.pick.ended })),
+      unpriced: orders.some(order => order.unpriced), plain: true, spread: orders.some(order => order.spread), missing: [], events: [],
+    };
+  }
+  const { pick, unpriced, spread } = plainGroup(SEARCH_SEEDS.slice(0, count).map(seed => drawChild(root, rootHp, p1Choice, p2Choice, seed)));
   return { children: [{ position: pick.position, weight: 1, share: 1, ended: pick.ended }], unpriced, plain: true, spread, missing: [], events: [] };
 }
 

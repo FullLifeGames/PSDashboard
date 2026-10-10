@@ -107,8 +107,9 @@ describe('endgame children (round 34)', () => {
     expect(new Set(winners)).toEqual(new Set(['Alpha', 'Beta']));
   });
   test('doubles cells take the plain path and flag unpriced only when the draws disagree on a KO', () => {
+    // Round 67: a level above Blissey's, so no speed tie splits the cell (the tie has its own test below).
     const battle = makeBattle(
-      [makeSet('Champ', 'Machamp', ['Seismic Toss']), makeSet('Pika', 'Pikachu', ['Tackle'], 5)],
+      [makeSet('Champ', 'Machamp', ['Seismic Toss'], 110), makeSet('Pika', 'Pikachu', ['Tackle'], 5)],
       [makeSet('Blob', 'Blissey', ['Soft-Boiled']), makeSet('Chu', 'Pikachu', ['Tackle'], 5)],
       'gen9doublescustomgame',
     );
@@ -137,7 +138,7 @@ describe('endgame children (round 34)', () => {
   });
   test('the doubles plain path reports plain with share 1 and no key (round 35)', () => {
     const battle = makeBattle(
-      [makeSet('Champ', 'Machamp', ['Seismic Toss']), makeSet('Pika', 'Pikachu', ['Tackle'], 5)],
+      [makeSet('Champ', 'Machamp', ['Seismic Toss'], 110), makeSet('Pika', 'Pikachu', ['Tackle'], 5)],
       [makeSet('Blob', 'Blissey', ['Soft-Boiled']), makeSet('Chu', 'Pikachu', ['Tackle'], 5)],
       'gen9doublescustomgame',
     );
@@ -151,6 +152,25 @@ describe('endgame children (round 34)', () => {
     expect(children).toHaveLength(1);
     expect(children[0].share).toBe(1);
     expect(children[0].key).toBeUndefined();
+  });
+  // Round 67 (T114): Machamp and Blissey share their speed; the order of Seismic Toss and Soft-Boiled is a coin.
+  test('a doubles speed tie prices each order as a plain child of one half', () => {
+    const battle = makeBattle(
+      [makeSet('Champ', 'Machamp', ['Seismic Toss']), makeSet('Pika', 'Pikachu', ['Tackle'], 5)],
+      [makeSet('Blob', 'Blissey', ['Soft-Boiled']), makeSet('Chu', 'Pikachu', ['Tackle'], 5)],
+      'gen9doublescustomgame',
+    );
+    for (const side of battle.sides) side.active[1]!.faint();
+    battle.faintMessages();
+    const root = createRootPosition(serialize(battle));
+    const p1Choice = searchOptions(root, 'p1', { tera: false })[0].choice;
+    const p2Choice = searchOptions(root, 'p2', { tera: false })[0].choice;
+    const { children, plain, unpriced } = endgameChildren(root, p1Choice, p2Choice);
+    expect(plain).toBe(true);
+    expect(unpriced).toBe(false);
+    expect(children.map(child => child.share)).toEqual([0.5, 0.5]);
+    const blisseyHp = children.map(child => positionBattle(child.position).sides[1].active[0]!.hp);
+    expect(blisseyHp[0]).not.toBe(blisseyHp[1]);
   });
 });
 

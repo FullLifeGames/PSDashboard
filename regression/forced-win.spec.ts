@@ -19,7 +19,8 @@ import { proveForcedWin, MIN_FORCED_MASS, type ForcedWinCaveat } from '@fulllife
  * prove 0.9999, while the six-turn heal war healer-vs-band lies beyond the
  * probe's five turns; fixed-vs-ghost and the sack fail at the depth cap or
  * at unpriced cells, honestly; doubles proofs carry the sampled-rolls
- * label, the doubles tie reads the sampled order (doubles-ohko-tie), and
+ * label, a doubles speed tie prices each order as one half since round 67
+ * (doubles-ohko-tie, a coin flip like the singles ohko-tie), and
  * the doubles spread cells stay unpriced.
  */
 interface Expected { side: 'p1' | 'p2'; mass: number | null; turns?: number; caveat?: ForcedWinCaveat; digits?: number }
@@ -31,7 +32,7 @@ const EXPECTED: Record<string, Expected> = {
   'doubles-toss-race': { side: 'p1', mass: 1, turns: 2, caveat: 'sampled-rolls' },
   'doubles-level-gap': { side: 'p1', mass: 1, turns: 1, caveat: 'sampled-rolls' },
   'doubles-priority': { side: 'p1', mass: 1, turns: 1, caveat: 'sampled-rolls' },
-  'doubles-ohko-tie': { side: 'p1', mass: 1, turns: 1, caveat: 'sampled-rolls' },
+  'doubles-ohko-tie': { side: 'p1', mass: 0.5, turns: 1, caveat: 'sampled-rolls' },
   'ohko-tie': { side: 'p1', mass: 0.5, turns: 1 },
   // The last tie decides: the first turn's order does not, so both read one half.
   'speed-tie-2hko': { side: 'p1', mass: 0.5, turns: 1 },
