@@ -2,6 +2,7 @@ import type { SideAnalysis, TurnAnalysis, VerdictTier } from './analysis.ts';
 import { type DeniedEnd, deniedEndFor, deniedEndSentence } from './denied-end.ts';
 import { KEY_TURN_SWING } from './graph.ts';
 import { regretSpanFor } from './prose/phrases.ts';
+import { diceAnchorFor, luckSplit, type LuckSplit } from './turn-analysis/luck.ts';
 import {
   LUCK_TOTAL_THRESHOLD, badTier, closeGameFallback, conversionFor, luckSentence, matchupClause, momentScore,
   seedPhrase, seedsOfTheLoss, tipClause, winPathFor, type WinConversion, type WinPath, type WinPathResult,
@@ -86,6 +87,11 @@ export interface GameReport {
   resolutionTotal: number;
   /** Chance summed over the protocol's dice-event turns (p1 perspective, resolution excluded) — the luck claims' anchor. Absent without dice info. */
   diceAnchorTotal?: number;
+  /**
+   * Round 67 (T22): chanceTotal in two parts (p1 perspective): the turns with a roll in their residual's
+   * direction and the rest, the engine re-reading the position. Absent without the turns' rolls.
+   */
+  chanceSplit?: LuckSplit;
   /** How the winner sealed it: the first proven forced win or decided sweep. Absent without a signal. */
   conversion?: WinConversion;
   /** A one-roll sweep that visibly failed while the game ran on — the denied early end (denied-end.ts). */
@@ -277,6 +283,7 @@ function winStoryFor(args: {
   playedTracking: boolean;
   chanceTotal: number;
   diceAnchor: number | null;
+  chanceSplit: LuckSplit | null;
   diceTurns: ReadonlySet<number> | null;
 }): WinStory {
   const { known, winner, turningPoint, playedTracking } = args;
@@ -286,8 +293,8 @@ function winStoryFor(args: {
   const denied = deniedEndFor(known, args.diceTurns);
   const tip = tipClause(known, winner, args.playerNames[sideIndex(winner)], turningPoint, args.diceTurns);
   const path = winPathFor({
-    known, series: args.series, boundary: args.boundary, winner, playerNames: args.playerNames,
-    chanceTotal: args.chanceTotal, diceAnchor: args.diceAnchor, playedTracking, seedsSpoken: seeds.length > 0,
+    known, series: args.series, boundary: args.boundary, winner, playerNames: args.playerNames, chanceTotal: args.chanceTotal,
+    diceAnchor: args.diceAnchor, chanceSplit: args.chanceSplit, playedTracking, seedsSpoken: seeds.length > 0,
   });
   // Nothing else explained a tipped game: say so instead of saying nothing.
   if (!path && !conversion && seeds.length === 0 && turningPoint !== null) {
@@ -339,11 +346,11 @@ function reportSummary(
   turningPoint: number | null,
   playedTracking: boolean,
   decisionTotals: { p1: number; p2: number },
-  chanceTotal: number,
-  diceAnchor: number | null,
+  luck: { chanceTotal: number; diceAnchor: number | null; split: LuckSplit | null },
   story: WinStory | null,
   series: (number | undefined)[],
 ): string {
+  const { chanceTotal, diceAnchor, split } = luck;
   const sentences: string[] = [];
   if (winner && story) {
     sentences.push(...winnerSentences(playerNames, winner, turningPoint, playedTracking, decisionTotals, story, series));
@@ -352,26 +359,16 @@ function reportSummary(
   }
 
   if (!story?.path?.foldLuck && Math.abs(chanceTotal) >= LUCK_TOTAL_THRESHOLD) {
-    sentences.push(luckSentence(chanceTotal, diceAnchor, playerNames));
+    sentences.push(luckSentence(chanceTotal, diceAnchor, playerNames, split));
   }
   return sentences.join(' ');
 }
 
-/** The luck claims' anchor: the chance ledger summed over the dice-event turns only (resolution excluded). */
-function diceAnchorFor(
-  known: TurnAnalysis[],
-  diceTurns: ReadonlySet<number> | null,
-  resolution: Set<number>,
-): number | null {
-  if (diceTurns === null) return null;
-  return known.reduce((sum, analysis) =>
-    sum + (diceTurns.has(analysis.turn) && !resolution.has(analysis.turn) ? analysis.chanceDelta ?? 0 : 0), 0);
-}
-
 /** The report's optional story-and-anchor fields, absent when unset. */
-function optionalFields(story: WinStory | null, diceAnchor: number | null): Partial<GameReport> {
+function optionalFields(story: WinStory | null, diceAnchor: number | null, split: LuckSplit | null): Partial<GameReport> {
   return {
     ...(diceAnchor !== null ? { diceAnchorTotal: diceAnchor } : {}),
+    ...(split ? { chanceSplit: split } : {}),
     ...(story?.conversion ? { conversion: story.conversion.conversion } : {}),
     ...(story?.denied ? { deniedEnd: story.denied } : {}),
     ...(story?.path ? { winPath: story.path.winPath } : {}),
@@ -404,17 +401,20 @@ export function buildGameReport(
     : { p1: null, p2: null };
 
   const diceAnchor = diceAnchorFor(known, diceTurns, resolution);
+  // Round 67 (T22): the ledger in rolled and re-read parts, when every turn carries its rolls.
+  const chanceSplit = luckSplit(known, resolution);
 
   // The play that produced the boundary score happened on the turn before.
   const turningPoint = boundary !== null && boundary > 1 ? boundary - 1 : null;
   const story = winner === null ? null : winStoryFor({
-    known, series, boundary, playerNames, winner, turningPoint, playedTracking, chanceTotal, diceAnchor, diceTurns,
+    known, series, boundary, playerNames, winner, turningPoint, playedTracking, chanceTotal, diceAnchor, chanceSplit, diceTurns,
   });
-  const summary = reportSummary(known, playerNames, winner, turningPoint, playedTracking, decisionTotals, chanceTotal, diceAnchor, story, series);
+  const summary = reportSummary(known, playerNames, winner, turningPoint, playedTracking, decisionTotals,
+    { chanceTotal, diceAnchor, split: chanceSplit }, story, series);
 
   return {
     winner, turningPoint, keyMoments, misplays, reads, tracked: playedTracking,
     accuracy, decisionTotals, chanceTotal, resolutionTotal, summary,
-    ...optionalFields(story, diceAnchor),
+    ...optionalFields(story, diceAnchor, chanceSplit),
   };
 }

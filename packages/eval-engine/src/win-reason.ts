@@ -2,6 +2,7 @@ import { BREADTH_MIN_OPTIONS, TIER_THRESHOLDS, playedSetupMove, type SideAnalysi
 import { DECIDED_SCORE } from './turn-analysis/types.ts';
 import { KEY_TURN_SWING } from './graph.ts';
 import { displayBest, koPhrase, phrase, regretText } from './prose/phrases.ts';
+import { chanceRolled, rollsCarry, type LuckSplit } from './turn-analysis/luck.ts';
 import { SPOKEN_MASS } from './types.ts';
 import { winDeltaText, winPercent } from './winprob.ts';
 import { sideIndex } from '@fulllifegames/replay-core';
@@ -82,18 +83,42 @@ const diceContradict = (chanceTotal: number, diceAnchor: number | null): boolean
   diceAnchor !== null && Math.abs(diceAnchor) >= TIER_THRESHOLDS.inaccuracy &&
   chanceTotal !== 0 && Math.sign(diceAnchor) !== Math.sign(chanceTotal);
 
+/** Round 67 (T22): the rolls stand behind the ledger: with the split they carry it, without it the markers do not dispute it. */
+const rollsBehind = (chanceTotal: number, diceAnchor: number | null, split: LuckSplit | null): boolean =>
+  split ? rollsCarry(chanceTotal, split) : !diceContradict(chanceTotal, diceAnchor);
+
+/**
+ * Round 67 (T22): a ledger the rolls do not carry, in its two parts from the
+ * beneficiary's side: what the rolls gave or cost, and what the engine
+ * re-read (649664 on the base: +58% overall, +22% of it rolled).
+ */
+function reReadLuckSentence(chanceTotal: number, split: LuckSplit, playerNames: PlayerNames): string {
+  const sign = chanceTotal > 0 ? 1 : -1;
+  const beneficiary = playerNames[chanceTotal > 0 ? 0 : 1];
+  const rolled = sign * split.rolled;
+  const amount = winDeltaText(Math.abs(rolled)).slice(1);
+  const rolls = amount === '0%' ? `the rolls gave ${beneficiary} nothing`
+    : rolled > 0 ? `the rolls gave ${beneficiary} ${winDeltaText(rolled)}` : `the rolls cost ${beneficiary} ${amount}`;
+  return `Chance swings favored ${beneficiary} overall (${winDeltaText(Math.abs(chanceTotal))}): ${rolls}, ` +
+    `and the engine re-read the position for ${winDeltaText(sign * split.reRead)}.`;
+}
+
 /**
  * The luck line: named "luck" only while the visible dice don't dispute it.
  * Contradicted, it keeps the number but says what it is — the ledger's
  * residual — and names where the dice actually went (the draft game: two
  * crits and two Flame Body burns into the winner under a net toward them).
+ * Round 67 (T22): with the ledger split, "luck" only when the rolls carry
+ * it; otherwise the line names the rolls and the re-read apart.
  */
 export function luckSentence(
   chanceTotal: number,
   diceAnchor: number | null,
   playerNames: PlayerNames,
+  split: LuckSplit | null = null,
 ): string {
-  if (diceContradict(chanceTotal, diceAnchor)) {
+  if (split && !rollsCarry(chanceTotal, split)) return reReadLuckSentence(chanceTotal, split, playerNames);
+  if (!split && diceContradict(chanceTotal, diceAnchor)) {
     const beneficiary = playerNames[chanceTotal > 0 ? 0 : 1];
     const diceName = playerNames[(diceAnchor ?? 0) > 0 ? 0 : 1];
     return `Chance swings favored ${beneficiary} overall (${winDeltaText(Math.abs(chanceTotal))}), ` +
@@ -167,7 +192,8 @@ export function tipClause(
   if (analysis.attribution === `${winner}-read` && played) {
     return `, when ${winnerName}'s read (${phrase(played.label)}) paid off`;
   }
-  const diceShown = diceTurns === null || diceTurns.has(analysis.turn);
+  // Round 67 (T22): with the turn's rolls known, a roll toward the residual decides; else the marker turns.
+  const diceShown = chanceRolled(analysis) ?? (diceTurns === null || diceTurns.has(analysis.turn));
   if (analysis.attribution === 'chance' && diceShown && toward(winner, analysis.chanceDelta ?? 0) > 0) {
     return `, on a roll that went ${winnerName}'s way`;
   }
@@ -279,6 +305,8 @@ export interface WinPathArgs {
   chanceTotal: number;
   /** Chance summed over the protocol's dice-event turns (p1 perspective), null without dice info. */
   diceAnchor: number | null;
+  /** Round 67 (T22): the ledger split into rolled and re-read (turn-analysis/luck.ts), null without the turns' rolls. */
+  chanceSplit: LuckSplit | null;
   playedTracking: boolean;
   /** The seeds sentence already tells the decisions story — don't tell it twice. */
   seedsSpoken: boolean;
@@ -300,8 +328,8 @@ function factorCandidates(
     candidates.push({ factor: 'decisions', size: punished[loser] - punished[winner] });
   }
   if (playedTracking && readsSize >= WIN_PATH_FLOOR) candidates.push({ factor: 'reads', size: readsSize });
-  // "The rolls decided it" needs the visible dice on board with the claim.
-  if (luck >= LUCK_TOTAL_THRESHOLD && !diceContradict(args.chanceTotal, args.diceAnchor)) {
+  // "The rolls decided it" needs the visible dice on board with the claim (round 67: carrying half the ledger).
+  if (luck >= LUCK_TOTAL_THRESHOLD && rollsBehind(args.chanceTotal, args.diceAnchor, args.chanceSplit)) {
     candidates.push({ factor: 'variance', size: luck });
   }
   return candidates;

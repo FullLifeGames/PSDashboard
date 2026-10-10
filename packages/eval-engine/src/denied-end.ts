@@ -1,5 +1,6 @@
 import type { TurnAnalysis } from './analysis.ts';
 import { rollText } from './prose/phrases.ts';
+import { chanceRolled } from './turn-analysis/luck.ts';
 import { TIER_THRESHOLDS } from './turn-analysis/types.ts';
 
 /**
@@ -52,7 +53,9 @@ function carriedMove(analysis: TurnAnalysis, side: Side, odds: number): string |
  * The first turn where a one-roll sweep visibly failed and the game ran on:
  * nearDecided on the side, a protocol dice event on the turn, the turn's
  * chance against the side, and at least DENIED_MIN_REMAINDER analyzed
- * turns still to come. Fails closed without dice info.
+ * turns still to come. Fails closed without dice info. Round 67 (T22): with
+ * the turn's rolls known, the roll must have gone against the side (a
+ * marker that favored it no longer counts).
  */
 export function deniedEndFor(
   known: TurnAnalysis[],
@@ -63,7 +66,7 @@ export function deniedEndFor(
   for (const analysis of known) {
     for (const side of ['p1', 'p2'] as const) {
       const near = analysis[side].nearDecided;
-      if (!near || !diceTurns.has(analysis.turn)) continue;
+      if (!near || !(chanceRolled(analysis) ?? diceTurns.has(analysis.turn))) continue;
       if (toward(side, analysis.chanceDelta ?? 0) > -DENIED_MIN_CHANCE) continue;
       const turnsRemaining = lastTurn - analysis.turn;
       if (turnsRemaining < DENIED_MIN_REMAINDER) continue;

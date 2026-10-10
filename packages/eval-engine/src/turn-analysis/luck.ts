@@ -84,3 +84,44 @@ export function chanceRolled(analysis: Pick<TurnAnalysis, 'chanceDelta' | 'rolle
   if (!analysis.rolledFor || analysis.chanceDelta === null) return null;
   return analysis.chanceDelta !== 0 && analysis.rolledFor[analysis.chanceDelta > 0 ? 'p1' : 'p2'];
 }
+
+/** The game's luck ledger in two parts (p1 perspective): the chance of turns with a roll in its direction, and the rest. */
+export interface LuckSplit {
+  rolled: number;
+  reRead: number;
+}
+
+/**
+ * The ledger split over the same turns as the report's chanceTotal
+ * (resolution turns stay out). Null unless every turn carries its rolls:
+ * without the protocol the report keeps the marker anchor's gates.
+ */
+export function luckSplit(known: TurnAnalysis[], resolution: ReadonlySet<number>): LuckSplit | null {
+  if (known.length === 0 || known.some(analysis => analysis.rolledFor === undefined)) return null;
+  const split = { rolled: 0, reRead: 0 };
+  for (const analysis of known) {
+    if (resolution.has(analysis.turn) || analysis.chanceDelta === null) continue;
+    if (chanceRolled(analysis)) split.rolled += analysis.chanceDelta;
+    else split.reRead += analysis.chanceDelta;
+  }
+  return split;
+}
+
+/** The share of the ledger the rolls must hold, the ledger's way, before the report says the rolls decided it. */
+export const ROLLS_CARRY_SHARE = 0.5;
+
+/** The rolls carry the ledger: the rolled part points the ledger's way and holds at least ROLLS_CARRY_SHARE of it. */
+export const rollsCarry = (chanceTotal: number, split: LuckSplit): boolean =>
+  chanceTotal !== 0 && Math.sign(split.rolled) === Math.sign(chanceTotal) &&
+  Math.abs(split.rolled) >= ROLLS_CARRY_SHARE * Math.abs(chanceTotal);
+
+/** The luck claims' marker anchor: the chance ledger summed over the dice-event turns only (resolution excluded). */
+export function diceAnchorFor(
+  known: TurnAnalysis[],
+  diceTurns: ReadonlySet<number> | null,
+  resolution: ReadonlySet<number>,
+): number | null {
+  if (diceTurns === null) return null;
+  return known.reduce((sum, analysis) =>
+    sum + (diceTurns.has(analysis.turn) && !resolution.has(analysis.turn) ? analysis.chanceDelta ?? 0 : 0), 0);
+}
