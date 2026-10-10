@@ -26,7 +26,9 @@ interface PendingBranchRefresh {
 }
 
 function useReplaySurface() {
-  const { loading, error, replayData, snapshots, observations, speedOrders, hpEvidence, opponentInfo, p1Info, loadReplay, loadReplayFile } = useReplay();
+  const {
+    loading, error, replayData, snapshots, observations, speedOrders, hpEvidence, opponentInfo, p1Info, itemJudge, loadReplay, loadReplayFile,
+  } = useReplay();
   const { embed, requestedReplay } = useEmbedHost({ loadReplay, loadReplayFile });
   // Canonical link of whatever is loaded — mirrored into the loader input,
   // whichever path (typed URL, file, share link, embed message) loaded it.
@@ -35,7 +37,7 @@ function useReplaySurface() {
     : null;
   return {
     loading, error, replayData, snapshots, observations, speedOrders, hpEvidence,
-    opponentInfo, p1Info, loadReplay, loadReplayFile, embed, requestedReplay, loadedReplayUrl,
+    opponentInfo, p1Info, itemJudge, loadReplay, loadReplayFile, embed, requestedReplay, loadedReplayUrl,
   };
 }
 
@@ -129,7 +131,7 @@ export function useReplayContext() {
   const { sharedBranch, sharedBranchError, clearSharedBranch } = useSharedBranch();
   const refreshQueue = useTeamRefreshQueue(branch.history, branch.simState, branchWindowOpenRef);
   const knowledge = useTeamKnowledge({
-    replayData: replay.replayData, p1Info: replay.p1Info, opponentInfo: replay.opponentInfo,
+    replayData: replay.replayData, p1Info: replay.p1Info, opponentInfo: replay.opponentInfo, itemJudge: replay.itemJudge,
     observations: replay.observations, speedOrders: replay.speedOrders, hpEvidence: replay.hpEvidence,
     usageStats: smogon.usageStats, setAssumptions: smogon.setAssumptions,
     onTeamsEdited: refreshQueue.handleTeamsEdited, replayWorker,

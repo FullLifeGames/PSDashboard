@@ -4,7 +4,7 @@ import { join } from 'node:path';
 import { act, renderHook, waitFor } from '@testing-library/react';
 import type { PokemonSet } from '@pkmn/sim';
 import {
-  inferOpponentTeam, parseReplayLogWithObservations, type ReplayData, type SpreadCandidate,
+  inferOpponentTeam, judgeItemsByDamage, parseReplayLogWithObservations, type ReplayData, type SpreadCandidate,
 } from '@fulllifegames/replay-core';
 import { useTeamKnowledge, type TeamKnowledgeInputs } from '../../src/hooks/useTeamKnowledge';
 import { appTeamSeed, buildAppTeams } from '../../src/lib/app-team-build';
@@ -67,6 +67,8 @@ describe('the app chain and buildAppTeams', () => {
       replayData,
       p1Info: inferOpponentTeam(replayData.log, 'p1'),
       opponentInfo: inferOpponentTeam(replayData.log, 'p2'),
+      // useReplay hands the damage judge over with the infos it loaded them with (round 67, T130).
+      itemJudge: judgeItemsByDamage,
       observations: parsed.observations,
       speedOrders: parsed.speedOrders,
       hpEvidence: parsed.hpEvidence,

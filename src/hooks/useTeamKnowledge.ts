@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
-  type DamageObservation, type HiddenPowerEvidence, type OpponentTeamInfo, type ReplayData,
-  type SpeedOrderObservation, applyPastedTeam, countMatchingSpecies, applyInferredSpreads, enrichTeamInfo,
+  type DamageObservation, type HiddenPowerEvidence, type ItemDamageJudge, type OpponentTeamInfo, type ReplayData,
+  type SpeedOrderObservation, applyPastedTeam, countMatchingSpecies, applyInferredSpreads, enrichTeamInfos,
   applyTeamSheetToInfo,
 } from '@fulllifegames/replay-core';
 import { parseSetsImport } from '../lib/sets-io';
@@ -16,6 +16,8 @@ export interface TeamKnowledgeInputs {
   replayData: ReplayData | null;
   p1Info: OpponentTeamInfo | null;
   opponentInfo: OpponentTeamInfo | null;
+  /** The damage judge loaded with the inference (round 67, T130); absent, the enrichment judges no item. */
+  itemJudge?: ItemDamageJudge | null;
   observations: DamageObservation[];
   speedOrders: SpeedOrderObservation[];
   hpEvidence: HiddenPowerEvidence[];
@@ -105,7 +107,7 @@ function useSetsIO(args: {
 
 export function useTeamKnowledge(inputs: TeamKnowledgeInputs) {
   const {
-    replayData, p1Info, opponentInfo, observations, speedOrders, hpEvidence, usageStats, setAssumptions, onTeamsEdited,
+    replayData, p1Info, opponentInfo, itemJudge, observations, speedOrders, hpEvidence, usageStats, setAssumptions, onTeamsEdited,
     replayWorker,
   } = inputs;
   const paste = useTeamPaste();
@@ -113,20 +115,26 @@ export function useTeamKnowledge(inputs: TeamKnowledgeInputs) {
   const { hpResolverFor, replayGenNumber } = useHpResolver(replayData, hpEvidence, usageStats);
   const sheetTeams = useSheetTeams(replayData);
 
+  // Both sides enrich together: each open item is judged against the hits it dealt into the other side as the
+  // panel builds it (round 67, T130), and the build reads these same infos.
+  const enriched = useMemo(() => {
+    const empty = { pokemon: [] };
+    const both = enrichTeamInfos({ p1: p1Info ?? empty, p2: opponentInfo ?? empty }, usageStats.stats, setAssumptions.assumptions,
+      { p1: hpResolverFor('p1'), p2: hpResolverFor('p2') }, itemJudge ?? undefined);
+    return { p1: p1Info ? both.p1 : null, p2: opponentInfo ? both.p2 : null };
+  }, [p1Info, opponentInfo, usageStats.stats, setAssumptions.assumptions, hpResolverFor, itemJudge]);
+
   const effectiveP1Info = useMemo(() => {
     if (edits.editedP1Info) return edits.editedP1Info;
-    const base = p1Info ? enrichTeamInfo(p1Info, usageStats.stats, setAssumptions.assumptions, hpResolverFor('p1')) : null;
+    const base = enriched.p1;
     // A pasted team overlays the player's side as green "manual" data (G15).
     if (base && paste.pastedSets && paste.pastedSets.length > 0) {
       return applyPastedTeam(base, paste.pastedSets).info;
     }
     return base;
-  }, [edits.editedP1Info, p1Info, usageStats.stats, setAssumptions.assumptions, paste.pastedSets, hpResolverFor]);
+  }, [edits.editedP1Info, enriched, paste.pastedSets]);
 
-  const effectiveP2Info = useMemo(() => {
-    if (edits.editedP2Info) return edits.editedP2Info;
-    return opponentInfo ? enrichTeamInfo(opponentInfo, usageStats.stats, setAssumptions.assumptions, hpResolverFor('p2')) : null;
-  }, [edits.editedP2Info, opponentInfo, usageStats.stats, setAssumptions.assumptions, hpResolverFor]);
+  const effectiveP2Info = useMemo(() => edits.editedP2Info ?? enriched.p2, [edits.editedP2Info, enriched]);
 
   const { solvedSpreads, getInferredSpreads } = useSpreadSolve({
     replayData, observations, speedOrders, teamText: paste.teamText,

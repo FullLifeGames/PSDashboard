@@ -1,7 +1,9 @@
 import { useState, useCallback } from 'react';
 import { fetchReplay } from '../lib/replay-fetcher';
 import { parseExportedReplay } from '../lib/replay-file';
-import type { DamageObservation, HiddenPowerEvidence, ReplayData, SpeedOrderObservation, TurnSnapshot, OpponentTeamInfo } from '@fulllifegames/replay-core';
+import type {
+  DamageObservation, HiddenPowerEvidence, ItemDamageJudge, ReplayData, SpeedOrderObservation, TurnSnapshot, OpponentTeamInfo,
+} from '@fulllifegames/replay-core';
 
 export interface ReplayState {
   loading: boolean;
@@ -16,6 +18,11 @@ export interface ReplayState {
   hpEvidence: HiddenPowerEvidence[];
   p1Info: OpponentTeamInfo | null;
   opponentInfo: OpponentTeamInfo | null;
+  /**
+   * The damage judge (round 67, T130), loaded with the inference: the enrichment
+   * reads the infos' logged hits with it, so both arrive in one render.
+   */
+  itemJudge: ItemDamageJudge | null;
 }
 
 /** Load outcome for callers that need to react (embed host responses). */
@@ -35,13 +42,14 @@ export function useReplay() {
     hpEvidence: [],
     p1Info: null,
     opponentInfo: null,
+    itemJudge: null,
   });
 
   const runLoad = useCallback(async (task: () => Promise<ReplayData>): Promise<LoadReplayResult> => {
     setState(prev => ({ ...prev, loading: true, error: null }));
     try {
       const data = await task();
-      const [{ parseReplayLogWithObservations }, { inferOpponentTeam }] = await Promise.all([
+      const [{ parseReplayLogWithObservations }, { inferOpponentTeam, judgeItemsByDamage }] = await Promise.all([
         import('../lib/lazy/protocol-parser'),
         import('../lib/lazy/opponent-inferrer'),
       ]);
@@ -59,6 +67,7 @@ export function useReplay() {
         hpEvidence,
         p1Info,
         opponentInfo,
+        itemJudge: judgeItemsByDamage,
       });
       return { data, error: null };
     } catch (err) {

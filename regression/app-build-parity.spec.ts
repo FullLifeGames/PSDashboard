@@ -3,8 +3,8 @@ import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import type { PokemonSet } from '@pkmn/sim';
 import {
-  enrichTeamInfo, parseReplayLogWithObservations, resolveHiddenPowerType,
-  type OpponentTeamInfo, type ReplayData, type SpreadCandidate,
+  enrichTeamInfos, judgeItemsByDamage, parseReplayLogWithObservations, resolveHiddenPowerType,
+  type ReplayData, type SpreadCandidate,
 } from '@fulllifegames/replay-core';
 import { appTeamSeed, buildAppTeams } from '../src/lib/app-team-build';
 import { buildReplayTeams, type TeamBuildSources } from '../src/lib/eval-acquire';
@@ -129,13 +129,13 @@ describe('the bank builds the teams the app ships', () => {
   test.each([SINGLES, DOUBLES])('buildAppTeams matches the app entry points on %s', async id => {
     const replay = fixture(id);
     const { seed, usageStats, setAssumptions } = await knowledgeFor(replay);
-    // The enrich memos of useTeamKnowledge, settled: the lazy hidden-power
-    // resolver has landed and the Smogon data is in.
-    const enriched = (side: 'p1' | 'p2'): OpponentTeamInfo =>
-      enrichTeamInfo(seed.rawInfos[side], usageStats, setAssumptions, species => resolveHiddenPowerType(
-        seed.hpEvidence.filter(entry => entry.attackerSide === side), usageStats, species, seed.gen));
-    const effectiveP1Info = enriched('p1');
-    const effectiveP2Info = enriched('p2');
+    // The enrich memo of useTeamKnowledge, settled: the lazy hidden-power
+    // resolver has landed, the Smogon data is in, and the damage judge came
+    // with the inference (round 67, T130).
+    const hp = (side: 'p1' | 'p2') => (species: string) => resolveHiddenPowerType(
+      seed.hpEvidence.filter(entry => entry.attackerSide === side), usageStats, species, seed.gen);
+    const { p1: effectiveP1Info, p2: effectiveP2Info } = enrichTeamInfos(seed.rawInfos, usageStats, setAssumptions,
+      { p1: hp('p1'), p2: hp('p2') }, judgeItemsByDamage);
     const solved = await solveInWorker({
       log: replay.log, observations: seed.observations, speedOrders: seed.speedOrders,
       p1Info: effectiveP1Info, p2Info: effectiveP2Info, usageStats, setAssumptions,
