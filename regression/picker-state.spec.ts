@@ -1,9 +1,9 @@
 import { test, expect } from 'vitest';
 import { readFileSync } from 'fs';
 import type { PokemonSet } from '@pkmn/sim';
-import { buildTeamsFromReplay, parseReplayLog, type TurnSnapshot } from '@fulllifegames/replay-core';
+import { buildTeamsFromReplay, getBranchSimulatorFormat, parseReplayLog, type TurnSnapshot } from '@fulllifegames/replay-core';
 import { reconstructBranchRuntime } from '@fulllifegames/eval-engine';
-import { pickerStateFromSerialized, pickerStateFromSnapshot } from '../src/lib/picker-state';
+import { pickerStateFromSerialized, pickerStateFromSnapshot, teraUsedSides } from '../src/lib/picker-state';
 
 function loadFixtureReplay() {
   return JSON.parse(readFileSync('e2e/fixtures/replay.json', 'utf-8')) as {
@@ -148,6 +148,98 @@ test('pickerStateFromSnapshot labels both doubles slots at use', () => {
   const state = pickerStateFromSnapshot(snapshot, team, [set('Zapdos', ['Roost'])]);
   expect(state.p1MovesBySlot.map(moves => moves.map(move => move.type))).toEqual([['Fire'], ['Water', 'Fairy']]);
 });
+
+// Round 67 (T136 point 2): the fast picker offers the Tera toggle the exact position will, the simulator's
+// canTerastallize on the snapshot's facts: gen 9, a side that has not terastallized, no Z crystal or usable Mega
+// Stone, no Terastal Clause in the branch format; the Tera type of the guessed set, else the species' first type.
+test('pickerStateFromSnapshot offers the Tera type the battle will have', () => {
+  const teraOf = (snapshot: TurnSnapshot, team: PokemonSet, gen = 9, format?: string) =>
+    pickerStateFromSnapshot(snapshot, [team], [set('Zapdos', ['Roost'])], gen, null, { format }).p1ModifiersBySlot.map(slot => slot.teraType);
+  const heatran = { ...set('Heatran', ['Magma Storm']), teraType: 'Fairy' };
+  expect(teraOf(makeSnapshot(), heatran)).toEqual(['Fairy']);
+  expect(teraOf(makeSnapshot(), set('Heatran', ['Magma Storm']))).toEqual(['Fire']);
+  // One Tera per side and battle: a terastallized teammate spent it.
+  const spent = makeSnapshot();
+  spent.p1.pokemon[1] = { ...spent.p1.pokemon[1], terastallized: 'Water' };
+  expect(teraOf(spent, heatran)).toEqual([null]);
+  expect(teraOf(makeSnapshot(), heatran, 8)).toEqual([null]);
+  expect(teraOf(makeSnapshot(), heatran, 9, 'gen9monotype')).toEqual([null]);
+  expect(teraOf(makeSnapshot(), heatran, 9, 'gen9ou')).toEqual(['Fairy']);
+  // A Mega Stone its holder can use takes the gimmick slot; a stone for another species does not.
+  expect(teraOf(withActive('Charizard'), { ...set('Charizard', ['Flamethrower']), item: 'Charizardite X' }, 9, 'gen9customgame')).toEqual([null]);
+  expect(teraOf(withActive('Garchomp'), { ...set('Garchomp', ['Earthquake']), item: 'Charizardite X' }, 9, 'gen9customgame')).toEqual(['Dragon']);
+});
+
+// The snapshot clears the Tera type of a body that fainted; the simulator never gives the side its Tera back.
+test('a side whose terastallized Pokémon fainted has spent its Tera', () => {
+  const earlier = makeSnapshot();
+  earlier.log = ['|move|p1a: Heatran|Magma Storm|p2a: Zapdos', '|-terastallize|p1a: Rotom-Wash|Water'];
+  const now = makeSnapshot();
+  now.p1.pokemon[1] = { ...now.p1.pokemon[1], fainted: true, hp: 0, hpPercent: 0 };
+  const teraUsed = teraUsedSides([earlier, now]);
+  expect(teraUsed).toEqual({ p1: true, p2: false });
+  const state = pickerStateFromSnapshot(now, [{ ...set('Heatran', ['Magma Storm']), teraType: 'Fairy' }], [set('Zapdos', ['Roost'])], 9, null, { teraUsed });
+  expect(state.p1ModifiersBySlot[0].teraType).toBeNull();
+  expect(state.p2ModifiersBySlot[0].teraType).toBe('Electric');
+});
+
+// The simulator bars a body transformed into Ogerpon or Terapagos from Tera (pokemon.js transformInto); the checker
+// holds the snapshot rule against a live battle where Imposter turns Ditto into Ogerpon-Wellspring.
+test('a body transformed into Ogerpon offers no Tera, like the simulator', async () => {
+  const { Battle, Teams } = await import('@pkmn/sim');
+  const ogerpon = { ...set('Ogerpon-Wellspring', ['Ivy Cudgel']), item: 'Wellspring Mask', teraType: 'Water' };
+  const ditto = { ...set('Ditto', ['Transform']), ability: 'Imposter', teraType: 'Normal' };
+  const battle = new Battle({ formatid: 'gen9customgame' as never, seed: '1,2,3,4', p1: { name: 'A', team: Teams.pack([ogerpon]) }, p2: { name: 'B', team: Teams.pack([ditto]) } });
+  if (battle.sides[0].requestState === 'teampreview') {
+    battle.choose('p1', 'team 1');
+    battle.choose('p2', 'team 1');
+  }
+  const { serializeLiveBattle } = await import('@fulllifegames/eval-engine');
+  const stored = await pickerStateFromSerialized(serializeLiveBattle(battle));
+  expect(stored.p2ActiveSlots[0].species).toBe('Ogerpon-Wellspring');
+  expect(stored.p2ModifiersBySlot[0].teraType).toBeNull();
+  expect(stored.p1ModifiersBySlot[0].teraType).toBe('Water');
+
+  const snapshot = makeSnapshot();
+  snapshot.p1.pokemon = [snapshotMon({ name: 'Ogerpon-Wellspring', speciesForme: 'Ogerpon-Wellspring', isActive: true })];
+  snapshot.p2.pokemon = [snapshotMon({ name: 'Ditto', speciesForme: 'Ogerpon-Wellspring', isActive: true })];
+  const fast = pickerStateFromSnapshot(snapshot, [ogerpon], [ditto], 9, null, { format: 'gen9customgame' });
+  expect(fast.p2ModifiersBySlot[0].teraType).toBe(stored.p2ModifiersBySlot[0].teraType);
+  expect(fast.p1ModifiersBySlot[0].teraType).toBe(stored.p1ModifiersBySlot[0].teraType);
+});
+
+test('pickerStateFromSnapshot offers each doubles slot its own Tera type', () => {
+  const snapshot = makeSnapshot();
+  snapshot.p1.pokemon = [
+    snapshotMon({ name: 'Heatran', speciesForme: 'Heatran', isActive: true }),
+    snapshotMon({ name: 'Rotom-Wash', speciesForme: 'Rotom-Wash', isActive: true }),
+  ];
+  const team = [{ ...set('Heatran', ['Magma Storm']), teraType: 'Grass' }, set('Rotom-Wash', ['Hydro Pump'])];
+  expect(pickerStateFromSnapshot(snapshot, team, [set('Zapdos', ['Roost'])]).p1ModifiersBySlot.map(slot => slot.teraType)).toEqual(['Grass', 'Electric']);
+});
+
+// The checker against the source: the stored picker reads the simulator's canTerastallize; the fast picker over the
+// same teams must offer the same Tera types at the same position, in singles and in doubles.
+test('the snapshot picker offers the Tera types of the stored picker', async () => {
+  const doubles = JSON.parse(readFileSync('e2e-feedback/fixtures/gen9doublesou-2663093831.json', 'utf-8')) as { formatid: string; log: string };
+  for (const fixture of [loadFixtureReplay(), doubles]) {
+    const snapshots = parseReplayLog(fixture.log);
+    const { p1Team, p2Team } = buildTeamsFromReplay(fixture.log);
+    const runtime = await reconstructBranchRuntime({
+      format: getBranchSimulatorFormat(fixture), p1Team, p2Team, replayLog: fixture.log, targetTurn: 3,
+      snapshot: snapshots.find(entry => entry.turn === 3) ?? null,
+    });
+    const { serializeLiveBattle } = await import('@fulllifegames/eval-engine');
+    const stored = await pickerStateFromSerialized(serializeLiveBattle(runtime.battleStream.battle!));
+    const at = snapshots.findIndex(entry => entry.turn === 3);
+    const fast = pickerStateFromSnapshot(snapshots[at], p1Team, p2Team, 9, null, { format: getBranchSimulatorFormat(fixture), teraUsed: teraUsedSides(snapshots.slice(0, at + 1)) });
+    for (const side of ['p1', 'p2'] as const) {
+      const bySpecies = (state: typeof stored) => Object.fromEntries(state[`${side}ActiveSlots`].map((info, slot) =>
+        [info.species, state[`${side}ModifiersBySlot`][slot]?.teraType ?? null]));
+      expect(bySpecies(fast), `${fixture.formatid} ${side}`).toEqual(bySpecies(stored));
+    }
+  }
+}, 120_000);
 
 // Round 54: the snapshot preview dropped the Tera type, so the branch
 // panel's damage numbers on the fallback path read Body Press into a

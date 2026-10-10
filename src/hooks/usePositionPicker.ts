@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import type { ReplayData, TurnSnapshot } from '@fulllifegames/replay-core';
+import { getBranchSimulatorFormat, type ReplayData, type TurnSnapshot } from '@fulllifegames/replay-core';
 import type { BranchSlotChoice } from '@fulllifegames/eval-engine';
 import type { PickerSource } from '../lib/picker-state';
 import { buildReplayTeams, type TeamBuildSources } from '../lib/eval-acquire';
@@ -100,17 +100,21 @@ async function resolvePickerState(args: {
     // either — the pickers stay empty until a rebuild passes through.
     return null;
   }
-  const snapshot = snapshots[Math.min(viewTurn - 1, snapshots.length - 1)] ?? null;
+  const index = Math.min(viewTurn - 1, snapshots.length - 1);
+  const snapshot = snapshots[index] ?? null;
   if (!snapshot || !replayData) return null;
   // The approximation needs the guessed moves and items, not a spread
   // solve: it takes the solved spreads when a solve already exists and
   // never starts one (the solve used to run three times during a load,
   // once per arriving Smogon payload, before the dwell even fired).
-  const [{ pickerStateFromSnapshot }, teams] = await Promise.all([
+  const [{ pickerStateFromSnapshot, teraUsedSides }, teams] = await Promise.all([
     import('../lib/picker-state'),
     buildReplayTeams(replayData, sources, undefined, { cachedOnly: true }),
   ]);
-  return { simState: pickerStateFromSnapshot(snapshot, teams.p1Team, teams.p2Team, replayGenNumber, bringOnlyLists), source: 'snapshot' };
+  // Round 67 (T136): the fast picker offers Tera where the simulator will: the branch format allows it,
+  // and the side has not terastallized in any turn so far.
+  const rules = { format: getBranchSimulatorFormat(replayData), teraUsed: teraUsedSides(snapshots.slice(0, index + 1)) };
+  return { simState: pickerStateFromSnapshot(snapshot, teams.p1Team, teams.p2Team, replayGenNumber, bringOnlyLists, rules), source: 'snapshot' };
 }
 
 /**

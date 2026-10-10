@@ -1,6 +1,6 @@
 import { Generations, Pokemon as CalcPokemon } from '@smogon/calc';
 import { Dex } from '@pkmn/dex';
-import type { PokemonSet } from '@pkmn/sim';
+import { Dex as SimDex, type PokemonSet } from '@pkmn/sim';
 import { speciesBaseId, toId, type PokemonSnapshot, type TurnSnapshot } from '@fulllifegames/replay-core';
 import {
   moveAtUse,
@@ -180,6 +180,83 @@ function pokemonInfoFromSnapshot(
 }
 
 /**
+ * Terastal Clause in the branch format's rule table: the simulator nulls
+ * every canTerastallize at battle start. Read the way replay-core reads
+ * Sleep Clause (formatEnforcesSleepClause); no format, no clause. This
+ * module loads through import() only, so the simulator's dex stays out of
+ * the entry chunk.
+ */
+function teraBanned(format: string | undefined): boolean {
+  if (!format) return false;
+  if (/@@@.*terastal ?clause/i.test(format)) return true;
+  try {
+    const base = SimDex.formats.get(format.split('@@@')[0]);
+    return base.exists && SimDex.formats.getRuleTable(base).has('terastalclause');
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * The sides that terastallized up to a snapshot (round 67, T136), read from
+ * the protocol lines each snapshot keeps: a snapshot clears the Tera type of
+ * a body that fainted, and the simulator never gives the side its Tera back.
+ */
+export function teraUsedSides(snapshots: readonly TurnSnapshot[]): { p1: boolean; p2: boolean } {
+  const used = { p1: false, p2: false };
+  for (const snapshot of snapshots) {
+    for (const line of snapshot.log) {
+      if (!line.startsWith('|-terastallize|')) continue;
+      const side = line.split('|')[2]?.slice(0, 2);
+      if (side === 'p1' || side === 'p2') used[side] = true;
+    }
+  }
+  return used;
+}
+
+/**
+ * A body transformed into one of these keeps no Tera (sim pokemon.js
+ * transformInto names them; the Dex carries no flag). The snapshot has no
+ * battle to ask, so regression/picker-state.spec.ts holds this mirror
+ * against a live battle.
+ */
+const NO_TERA_TRANSFORMED_INTO: ReadonlySet<string> = new Set(['Ogerpon', 'Terapagos']);
+
+/**
+ * The Tera type the fast picker offers (round 67, T136): the simulator's
+ * canTerastallize on the snapshot's facts. The body's Tera type is its
+ * set's, else its species' first type (sim pokemon.js); none outside gen 9,
+ * once a Pokémon of the side has terastallized, under Terastal Clause, for
+ * a held Z crystal or a Mega Stone the body can use (battle-actions
+ * canTerastallize and canMegaEvo), or after a transformation into Ogerpon
+ * or Terapagos.
+ */
+function snapshotTeraType(mon: PokemonSnapshot, set: PokemonSet | undefined, gen: number, sideMayTera: boolean): string | null {
+  if (!sideMayTera || gen !== 9) return null;
+  const dex = dexForGen(gen);
+  const species = dex.species.get(set?.species || mon.speciesForme);
+  if (transformedWithoutTera(dex, mon, species) || holdsOtherGimmick(dex, set?.item || mon.item, species)) return null;
+  return set?.teraType || species.types[0] || null;
+}
+
+type GenDex = ReturnType<typeof dexForGen>;
+type GenSpecies = ReturnType<GenDex['species']['get']>;
+
+/** The snapshot shows a body transformed into Ogerpon or Terapagos (its set names another species). */
+function transformedWithoutTera(dex: GenDex, mon: PokemonSnapshot, species: GenSpecies): boolean {
+  const shown = dex.species.get(mon.speciesForme);
+  return shown.baseSpecies !== species.baseSpecies && NO_TERA_TRANSFORMED_INTO.has(shown.baseSpecies);
+}
+
+/** A held Z crystal, or a Mega Stone the body can use, takes the place of Tera (battle-actions canMegaEvo). */
+function holdsOtherGimmick(dex: GenDex, itemName: string, species: GenSpecies): boolean {
+  const item = dex.items.get(itemName);
+  if (!item.exists) return false;
+  const stone = item.megaStone;
+  return !!item.zMove || !!(stone && (stone[species.name] || stone[species.baseSpecies]));
+}
+
+/**
  * Approximate pickers for main-line turns without a recorded position:
  * moves from the guessed teams (falling back to the snapshot's revealed
  * moves), switches from the snapshot's living bench. Legality is settled by
@@ -196,7 +273,7 @@ interface SnapshotSideOptions {
 /** One side's approximate pickers: moves per active slot, the living bench, and the infos. */
 function snapshotSideOptions(
   snapshot: TurnSnapshot, side: 'p1' | 'p2', team: PokemonSet[], gen: number,
-  bringOnly: { p1: string[]; p2: string[] } | null | undefined,
+  bringOnly: { p1: string[]; p2: string[] } | null | undefined, teraAllowed: boolean,
 ): SnapshotSideOptions {
   const pokemon = snapshot[side].pokemon;
   const actives = pokemon.filter(mon => mon.isActive && !mon.fainted);
@@ -225,8 +302,10 @@ function snapshotSideOptions(
   const activeSlots = actives.map((mon, index) => pokemonInfoFromSnapshot(mon, setFor(mon), index, gen));
   const infos = pokemon.map(mon =>
     pokemonInfoFromSnapshot(mon, setFor(mon), mon.isActive ? actives.indexOf(mon) : null, gen));
-  const modifiersBySlot = actives.map((_, index) => ({
-    teraType: null,
+  // One Tera per side and battle: a terastallized teammate spent it.
+  const sideMayTera = teraAllowed && !pokemon.some(mon => mon.terastallized);
+  const modifiersBySlot = actives.map((mon, index) => ({
+    teraType: snapshotTeraType(mon, setFor(mon), gen, sideMayTera),
     canMegaEvo: false,
     canUltraBurst: false,
     zMoves: (movesBySlot[index] ?? []).map(() => null),
@@ -284,8 +363,15 @@ export function pickerStateFromSnapshot(
    *  (base-species match — actives reveal formes the preview does not).
    *  Null (or an empty side) leaves the bench unfiltered. */
   bringOnly?: { p1: string[]; p2: string[] } | null,
+  /**
+   * Round 67 (T136): the branch simulator format (getBranchSimulatorFormat),
+   * whose rule table says whether Tera exists at all, and the sides that
+   * terastallized before this snapshot (teraUsedSides).
+   */
+  rules: { format?: string; teraUsed?: { p1: boolean; p2: boolean } } = {},
 ): BranchSimState {
-  const p1 = snapshotSideOptions(snapshot, 'p1', p1Team, gen, bringOnly);
-  const p2 = snapshotSideOptions(snapshot, 'p2', p2Team, gen, bringOnly);
+  const teraAllowed = !teraBanned(rules.format);
+  const p1 = snapshotSideOptions(snapshot, 'p1', p1Team, gen, bringOnly, teraAllowed && !rules.teraUsed?.p1);
+  const p2 = snapshotSideOptions(snapshot, 'p2', p2Team, gen, bringOnly, teraAllowed && !rules.teraUsed?.p2);
   return snapshotPickerState(snapshot, p1, p2);
 }
