@@ -33,12 +33,14 @@ type DistributiveOmit<T, K extends PropertyKey> = T extends unknown ? Omit<T, K>
  * (null = use the plain cell path); deeper searches deepen their cells with
  * a depth-(d−1) sub-search, so the played pair gets exactly that. MCTS has
  * no fixed-depth equivalent — a depth-1 sub-search is the approximation.
+ * Round 67 (T140): the Sleep Clause rides along, because serialization strips
+ * a custom game's clause from the rule table the sub-search would fall back on.
  */
 export function playedOutcomeSettings(settings: EvalSettings): EvalSettings | null {
   const mode = settings.mode ?? 'matrix';
   if (mode !== 'mcts' && settings.depth <= 1) return null;
   const depth = (mode === 'mcts' ? 1 : Math.min(settings.depth - 1, 2)) as 1 | 2;
-  return { depth, samples: 1, tera: settings.tera, mode: 'matrix', ruleset: settings.ruleset };
+  return { depth, samples: 1, tera: settings.tera, mode: 'matrix', sleepClause: settings.sleepClause, ruleset: settings.ruleset };
 }
 
 /**

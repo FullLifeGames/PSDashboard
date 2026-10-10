@@ -47,6 +47,16 @@ describe('worker client rule set', () => {
     client.dispose();
   });
 
+  // Round 67 (T140): the played pair's sub-search filters a second sleep like the sweep does.
+  test('a pair valued by a sub-search carries the Sleep Clause in its settings', async () => {
+    vi.stubGlobal('Worker', FakeWorker);
+    const client = new EvalWorkerClient();
+    await client.evalPair('{}', 'move 1', 'move 1', { depth: 2, samples: 1, sleepClause: true, ruleset: 'standard' });
+    const sub = posted.find(request => request.type === 'subsearch');
+    expect(sub?.type === 'subsearch' ? sub.job.settings.sleepClause : null).toBe(true);
+    client.dispose();
+  });
+
   test('a standard replay sends no rule set, the worker reads it as standard', async () => {
     vi.stubGlobal('Worker', FakeWorker);
     const client = new EvalWorkerClient();
