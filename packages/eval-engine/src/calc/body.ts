@@ -33,6 +33,12 @@ export interface CalcBody {
   onField: boolean;
   /** The battle's mod (Dex.currentMod), for a branch by format at the one place below. */
   mod?: string;
+  /** The stat a Paradox ability's volatile raises (T76). */
+  boostedStat?: string;
+  /** Supreme Overlord's fallen (T76). */
+  alliesFainted?: number;
+  /** The side's fallen, for Last Respects (T76). */
+  totalFainted?: number;
 }
 
 /** A body read off the simulator: everything the calc and the pair plan's guards read, as plain data. */
@@ -45,8 +51,31 @@ export interface SimBody extends CalcBody {
   status: string;
 }
 
+type SimFacts = Pick<CalcBody, 'boostedStat' | 'alliesFainted' | 'totalFainted'>;
+
+/**
+ * What the simulator holds and calc 0.11 cannot see on its own (round 67,
+ * T76), read off the body and nothing derived from weather, terrain or item:
+ * the stat the volatile of its ability names (Protosynthesis and Quark Drive
+ * keep their bestStat there), the fallen its ability state counts (Supreme
+ * Overlord), the side's fallen (Last Respects). A suppressed ability gives
+ * neither of the first two, as in the simulator's own handlers.
+ */
+export function simBodyFacts(mon: Pokemon): SimFacts {
+  const active = !mon.ignoringAbility();
+  const boostedStat = active ? (mon.volatiles[mon.ability] as { bestStat?: string } | undefined)?.bestStat : undefined;
+  const alliesFainted = active ? (mon.abilityState as { fallen?: number }).fallen : undefined;
+  const totalFainted = mon.side.totalFainted;
+  return {
+    ...(boostedStat ? { boostedStat } : {}),
+    ...(alliesFainted ? { alliesFainted } : {}),
+    ...(totalFainted ? { totalFainted } : {}),
+  };
+}
+
 export function bodyOf(battle: Battle, mon: Pokemon): SimBody {
   return {
+    ...simBodyFacts(mon),
     species: mon.species.name,
     level: mon.level,
     ability: mon.ability ? battle.dex.abilities.get(mon.ability).name : '',
@@ -87,6 +116,9 @@ export function bodyFromInfo(info: SimPokemonInfo): SimBody {
     status: info.status,
     tera: info.teraType || null,
     onField: info.isActive,
+    boostedStat: info.boostedStat,
+    alliesFainted: info.alliesFainted,
+    totalFainted: info.totalFainted,
   };
 }
 
@@ -221,5 +253,7 @@ export function calcPokemon(gen: CalcGen, body: CalcBody): CalcPokemon {
     curHP: body.hp,
     status: (body.status || undefined) as never,
     teraType: (body.tera ?? undefined) as never,
+    boostedStat: body.boostedStat as never,
+    alliesFainted: body.alliesFainted,
   });
 }

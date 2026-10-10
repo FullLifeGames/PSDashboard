@@ -69,6 +69,12 @@ export interface SimPokemonInfo {
   teraType?: string;
   /** Types a Stellar Pokémon has already spent its one-time boost on (the sim's stellarBoostedTypes). */
   stellarBoostedTypes?: string[];
+  /** The stat Protosynthesis or Quark Drive raises, as the simulator's volatile names it (round 67, T76). */
+  boostedStat?: string;
+  /** Supreme Overlord's count of fallen allies, as its ability state keeps it (T76). */
+  alliesFainted?: number;
+  /** The side's fallen so far (side.totalFainted), the count Last Respects powers up by (T76). */
+  totalFainted?: number;
   boosts: Record<string, number>;
   level: number;
   types: string[];

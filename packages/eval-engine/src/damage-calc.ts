@@ -4,6 +4,7 @@ import type { SimPokemonInfo, BranchMoveOption } from './branch-engine.ts';
 import { toId, TERRAIN_BY_ID, WEATHER_BY_ID } from '@fulllifegames/replay-core';
 import { attackerAtUse, bodyFromInfo, calcPokemon } from './calc/body.ts';
 import { hitDraws } from './calc/hit-draws.ts';
+import { calcMove } from './calc/move.ts';
 import { teraClicked } from './calc/tera-click.ts';
 
 type CalcMoveOptions = NonNullable<ConstructorParameters<typeof Move>[2]>;
@@ -86,7 +87,7 @@ function calcPokemonFrom(gen: CalcGen, info: SimPokemonInfo): Pokemon {
 
 /** Whether the move does damage to this Pokémon at all (the calc reads immunities, and Protect when it stands). */
 function landsOn(gen: CalcGen, attacker: SimPokemonInfo, target: SimPokemonInfo, moveName: string, context: DamageCalcContext, isProtected: boolean): boolean {
-  const result = calculate(gen, calcPokemonFrom(gen, attacker), calcPokemonFrom(gen, target), new Move(gen, moveName), calcField(context, isProtected));
+  const result = calculate(gen, calcPokemonFrom(gen, attacker), calcPokemonFrom(gen, target), calcMove(gen, moveName, bodyFor(gen, attacker)), calcField(context, isProtected));
   return result.range()[1] > 0;
 }
 
@@ -266,12 +267,13 @@ export function calcSingleDamageRange(
   try {
     const gen = calcGeneration(context);
     const overrides = moveLanding(gen, attacker, moveOption, context);
+    const atkBody = attackerAtUse(gen.num, bodyFor(gen, attacker), moveOption.name);
     const priceAt = (hits?: number, isStellarFirstUse = false): CalcResult => calculate(
       gen,
-      calcPokemon(gen, attackerAtUse(gen.num, bodyFor(gen, attacker), moveOption.name)),
+      calcPokemon(gen, atkBody),
       calcPokemonFrom(gen, defender),
       // The attacker's ability and item reach the move too: Skill Link sets five hits.
-      new Move(gen, moveOption.name, {
+      calcMove(gen, moveOption.name, atkBody, {
         ability: (attacker.ability || undefined) as CalcAbility,
         item: (attacker.item || undefined) as CalcItem,
         species: attacker.species as CalcSpecies,

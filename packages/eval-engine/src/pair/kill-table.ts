@@ -1,6 +1,7 @@
 import { Generations, Move as CalcMove, Pokemon as CalcPokemon, Field, calculate } from '@smogon/calc';
 import { TERRAIN_BY_ID, WEATHER_BY_ID } from '@fulllifegames/replay-core';
 import { attackerAtUse, calcPokemon } from '../calc/body.ts';
+import { calcMove } from '../calc/move.ts';
 import type { BodySnapshot, HitSnapshot } from './snapshot.ts';
 
 /**
@@ -71,10 +72,10 @@ function chargeOffset(snap: HitSnapshot): number {
   return snap.attacker.abilityId === 'contrary' ? -1 : 1;
 }
 
-function calcMove(gen: CalcGen, snap: HitSnapshot, isCrit: boolean): CalcMove {
-  const plain = new CalcMove(gen, snap.moveName, { isCrit });
+function hitMove(gen: CalcGen, snap: HitSnapshot, isCrit: boolean): CalcMove {
+  const plain = calcMove(gen, snap.moveName, snap.attacker, { isCrit });
   if (snap.spreadHit || !SPREAD_TARGETS.has(plain.target)) return plain;
-  return new CalcMove(gen, snap.moveName, { isCrit, overrides: { target: 'normal' } });
+  return calcMove(gen, snap.moveName, snap.attacker, { isCrit, overrides: { target: 'normal' } });
 }
 
 function rollsOf(damage: unknown): number[] | null {
@@ -89,8 +90,8 @@ export function killTable(snap: HitSnapshot): KillTable | null {
     const attacker = calcBody(gen, attackerAtUse(gen.num, snap.attacker, snap.moveName), chargeOffset(snap));
     const defender = calcBody(gen, snap.defender, 0);
     const field = calcField(snap);
-    const normal = rollsOf(calculate(gen, attacker, defender, calcMove(gen, snap, false), field).damage);
-    const crit = rollsOf(calculate(gen, attacker, defender, calcMove(gen, snap, true), field).damage);
+    const normal = rollsOf(calculate(gen, attacker, defender, hitMove(gen, snap, false), field).damage);
+    const crit = rollsOf(calculate(gen, attacker, defender, hitMove(gen, snap, true), field).damage);
     return normal && crit ? { normal, crit } : null;
   } catch {
     return null;

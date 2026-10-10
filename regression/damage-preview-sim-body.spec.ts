@@ -161,3 +161,41 @@ describe('forms the calc does not know reach the preview (T72)', () => {
     });
   });
 });
+
+describe('what the simulator holds reaches the preview (T76)', () => {
+  test('singles and doubles: Kingambit\'s Iron Head after three faints holds its row', () => {
+    for (const format of ['gen9customgame', 'gen9doublescustomgame'] as const) {
+      const doubles = format === 'gen9doublescustomgame';
+      expectRowsHold(seed => {
+        const current = battle(format,
+          [set('Pawmot', ['Splash']), ...(doubles ? [set('Corviknight', ['Splash'])] : []), set('Kingambit', ['Iron Head'], { ability: 'Supreme Overlord' })],
+          [armored('Snorlax'), ...(doubles ? [armored('Blissey')] : [])], seed);
+        current.sides[0].totalFainted = 3;
+        current.choose('p1', doubles ? 'switch 3, move splash' : 'switch 2');
+        current.choose('p2', doubles ? 'move splash, move splash' : 'move splash');
+        expect((current.sides[0].active[0].abilityState as { fallen?: number }).fallen).toBe(3);
+        const view = preview(current).p1;
+        return {
+          current, rows: [{ row: doubles ? view.targets[0]['1:1'] : view.default[0][0], side: 1, slot: 0 }],
+          p1: doubles ? 'move ironhead 1, move splash' : 'move ironhead', p2: doubles ? 'move splash, move splash' : 'move splash',
+        };
+      });
+    }
+  });
+
+  test('singles and doubles: a Booster Energy Quark Drive hit holds its row', () => {
+    for (const format of ['gen9customgame', 'gen9doublescustomgame'] as const) {
+      const doubles = format === 'gen9doublescustomgame';
+      expectRowsHold(seed => {
+        const current = battle(format,
+          [set('Iron Bundle', ['Ice Beam'], { ability: 'Quark Drive', item: 'Booster Energy' }), ...(doubles ? [set('Corviknight', ['Splash'])] : [])],
+          [armored('Snorlax'), ...(doubles ? [armored('Blissey')] : [])], seed);
+        const view = preview(current).p1;
+        return {
+          current, rows: [{ row: doubles ? view.targets[0]['1:1'] : view.default[0][0], side: 1, slot: 0 }],
+          p1: doubles ? 'move icebeam 1, move splash' : 'move icebeam', p2: doubles ? 'move splash, move splash' : 'move splash',
+        };
+      });
+    }
+  });
+});

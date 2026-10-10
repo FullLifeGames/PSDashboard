@@ -1,4 +1,5 @@
 import { Dex } from '@pkmn/sim';
+import { simBodyFacts } from '../calc/body.ts';
 import type { PokemonStatTable, SimPokemon, SimPokemonInfo, SimSide } from './types.ts';
 
 function statTableWithDefaults(
@@ -81,6 +82,8 @@ export function makePokemonInfo(
     gender,
     teraType,
     stellarBoostedTypes: [...pokemon.stellarBoostedTypes],
+    // What the calc cannot see on its own, read as the engine's one builder reads it (round 67, T76).
+    ...simBodyFacts(pokemon),
     boosts: { ...pokemon.boosts },
     level,
     types,
