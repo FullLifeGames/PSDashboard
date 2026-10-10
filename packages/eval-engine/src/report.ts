@@ -3,6 +3,7 @@ import { type DeniedEnd, deniedEndFor, deniedEndSentence } from './denied-end.ts
 import { KEY_TURN_SWING } from './graph.ts';
 import { regretSpanFor } from './prose/phrases.ts';
 import { diceAnchorFor, luckSplit, type LuckSplit } from './turn-analysis/luck.ts';
+import { lostGround } from './turn-analysis/risk.ts';
 import {
   LUCK_TOTAL_THRESHOLD, badTier, closeGameFallback, conversionFor, luckSentence, matchupClause, momentScore,
   seedPhrase, seedsOfTheLoss, tipClause, winPathFor, type WinConversion, type WinPath, type WinPathResult,
@@ -231,9 +232,10 @@ function misplaysFor(known: TurnAnalysis[], side: Side): GameMisplay[] {
     .slice(0, REPORT_MISPLAYS_PER_SIDE);
 }
 
+/** Round 67 (T59): a read whose side lost ground on the turn stays off the list (its regret stays out of the totals). */
 function readsFor(known: TurnAnalysis[], side: Side): GameRead[] {
   return known
-    .filter(analysis => analysis[side].riskPaidOff && analysis[side].played)
+    .filter(analysis => analysis[side].riskPaidOff && analysis[side].played && !lostGround(analysis, side))
     .map(analysis => ({
       turn: analysis.turn,
       side,

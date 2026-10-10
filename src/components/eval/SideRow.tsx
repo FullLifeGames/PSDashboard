@@ -10,6 +10,8 @@ interface RowProps {
   name: string;
   side: SideAnalysis;
   onExplore?: (choice: RankedChoice) => void;
+  /** Round 67 (T59): the side lost ground on the turn (lostGround): its paid-off read shows no praise chip. */
+  lostGround?: boolean;
 }
 
 function PlayedCell({ name, side }: Pick<RowProps, 'name' | 'side'>) {
@@ -142,7 +144,7 @@ function ReadPaidOffCell({ side }: Pick<RowProps, 'side'>) {
   );
 }
 
-function VerdictCell({ name, side, regretful, setupMove }: Pick<RowProps, 'name' | 'side'> & { regretful: boolean; setupMove: string | null }) {
+function VerdictCell({ name, side, regretful, setupMove, lostGround }: Pick<RowProps, 'name' | 'side' | 'lostGround'> & { regretful: boolean; setupMove: string | null }) {
   return (
     <>
       {side.verifiedAtDepth && (
@@ -162,7 +164,7 @@ function VerdictCell({ name, side, regretful, setupMove }: Pick<RowProps, 'name'
           {side.sacrifice.alsoFell && side.sacrifice.alsoFell.length > 0 ? `, also lost ${side.sacrifice.alsoFell.join(' and ')}` : ''}
         </span>
       )}
-      {side.riskPaidOff && !side.sacrifice && <ReadPaidOffCell side={side} />}
+      {side.riskPaidOff && !side.sacrifice && !lostGround && <ReadPaidOffCell side={side} />}
       {regretful && !side.sacrifice && !side.riskPaidOff && <RegretCell name={name} side={side} setupMove={setupMove} />}
       {side.tier === 'inaccuracy' && side.best && (
         <span
@@ -232,7 +234,7 @@ function ComparisonRows({ name, side, played, best, difference, onExplore }: Pic
 }
 
 /** One tracked side of an analyzed turn: what it played, the engine's line, the verdict, and the comparison. */
-export function SideRow({ name, side, onExplore }: RowProps) {
+export function SideRow({ name, side, onExplore, lostGround }: RowProps) {
   const regretful = side.tier === 'mistake' || side.tier === 'blunder';
   const setupMove = playedSetupMove(side);
   const difference = regretful && side.played && side.best ? diffChoices(side.played, side.best) : null;
@@ -243,7 +245,7 @@ export function SideRow({ name, side, onExplore }: RowProps) {
         <span style={{ color: '#cde', fontWeight: 'bold' }}>{name}</span>
         <PlayedCell name={name} side={side} />
         <EngineCell name={name} side={side} regretful={regretful} onExplore={onExplore} />
-        <VerdictCell name={name} side={side} regretful={regretful} setupMove={setupMove} />
+        <VerdictCell name={name} side={side} regretful={regretful} setupMove={setupMove} lostGround={lostGround} />
       </div>
       {regretful && side.played && side.best && (
         <ComparisonRows name={name} side={side} played={side.played} best={side.best} difference={difference} onExplore={onExplore} />

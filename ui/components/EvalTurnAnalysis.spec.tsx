@@ -31,6 +31,15 @@ describe('EvalTurnAnalysis', () => {
     expect(screen.getByText(/expected from the choices/)).toHaveTextContent('from how it rolled');
   });
 
+  test('a read whose side lost ground loses its badge, its chip and its sentence; the turn shows its movement (T59)', () => {
+    const read = sideAnalysis({ riskPaidOff: true, riskPayoff: 0.2, safe: rankedChoice('move protect', 'Protect', 0.05) });
+    render(<EvalTurnAnalysis analysis={turnAnalysis(9, { attribution: 'p1-read', p1: read, swing: -0.3, chanceDelta: -0.25 })} playerNames={names} />);
+    expect(screen.queryByText("Alice's read paid off")).toBeNull();
+    expect(screen.queryByText(/read paid off/)).toBeNull();
+    expect(screen.getByText('chance swing (rolls, crits, reveals)')).toBeInTheDocument();
+    expect(screen.queryByText(/a read that paid off/)).toBeNull();
+  });
+
   test('exploring an engine line passes the side, the line, and the other side\'s reply', async () => {
     const onExplore = vi.fn();
     const analysis = turnAnalysis(4);

@@ -1,6 +1,6 @@
 import {
   type TurnAnalysis, type LeadAnalysis, type LeadSideAnalysis, type RankedChoice, type ReadRecommendation,
-  chanceRolled, formatRead, summarizeTurn, winDeltaText, winPctText,
+  chanceRolled, formatRead, lostGround, summarizeTurn, winDeltaText, winPctText,
 } from '@fulllifegames/eval-engine';
 import { attributionBadge, isPairLead, leadTier } from './eval-badges';
 import { EngineRow } from './eval/analysis-bits';
@@ -85,8 +85,8 @@ export function EvalTurnAnalysis({ analysis, playerNames, reads, onExplore }: Ev
         </>
       ) : (
         <>
-          <SideRow name={playerNames[0]} side={analysis.p1} onExplore={exploreFor('p1')} />
-          <SideRow name={playerNames[1]} side={analysis.p2} onExplore={exploreFor('p2')} />
+          <SideRow name={playerNames[0]} side={analysis.p1} onExplore={exploreFor('p1')} lostGround={lostGround(analysis, 'p1')} />
+          <SideRow name={playerNames[1]} side={analysis.p2} onExplore={exploreFor('p2')} lostGround={lostGround(analysis, 'p2')} />
         </>
       )}
       <ReadRows reads={reads} playerNames={playerNames} />

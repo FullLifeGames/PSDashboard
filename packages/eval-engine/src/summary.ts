@@ -2,6 +2,7 @@ import { BREADTH_MIN_OPTIONS, CHANCE_THRESHOLD, type SideAnalysis, type TurnAnal
 import { winDeltaText, winPercent } from './winprob.ts';
 import { forcedWinSpeaks } from './turn-analysis/forced-speech.ts';
 import { chanceRolled } from './turn-analysis/luck.ts';
+import { lostGround, shownAttribution } from './turn-analysis/risk.ts';
 import { percentBelowSure, phrase, playedBest, rollText } from './prose/phrases.ts';
 import {
   forcedClause, inaccuracyClause, readCreditClause, sackClause, sensitivityClause, sideClause, streakClause, unansweredClause,
@@ -90,11 +91,11 @@ function decidedSentences(analysis: TurnAnalysis, playerNames: PlayerNames, deci
   return sentences;
 }
 
-/** A decision or read turn: each side's clause, then the luck rider. */
+/** A decision or read turn: each side's clause (round 67, T59: no praise for a side that lost ground), then the luck rider. */
 function decisionSentences(analysis: TurnAnalysis, playerNames: PlayerNames): string[] {
   const sentences: string[] = [];
-  const p1Clause = sideClause(playerNames[0], analysis.p1, analysis.p2);
-  const p2Clause = sideClause(playerNames[1], analysis.p2, analysis.p1);
+  const p1Clause = sideClause(playerNames[0], analysis.p1, analysis.p2, !lostGround(analysis, 'p1'));
+  const p2Clause = sideClause(playerNames[1], analysis.p2, analysis.p1, !lostGround(analysis, 'p2'));
   if (p1Clause) sentences.push(p1Clause);
   if (p2Clause) sentences.push(p2Clause);
   if (analysis.chanceDelta !== null && Math.abs(analysis.chanceDelta) >= CHANCE_THRESHOLD) {
@@ -192,9 +193,12 @@ function shiftSentences(analysis: TurnAnalysis, playerNames: PlayerNames): strin
   return sentences;
 }
 
-/** The attribution's own sentences: decisions and reads, chance, shift, unclear, or quiet. */
+/**
+ * The attribution's own sentences: decisions and reads, chance, shift, unclear, or quiet. Round 67 (T59): as
+ * shown, so a read whose side lost ground tells the turn's movement instead (the attribution field stays).
+ */
 function attributionSentences(analysis: TurnAnalysis, playerNames: PlayerNames, decided: Decided): string[] {
-  switch (analysis.attribution) {
+  switch (shownAttribution(analysis)) {
     case 'p1-decision':
     case 'p2-decision':
     case 'both-decision':
@@ -227,10 +231,12 @@ function attributionSentences(analysis: TurnAnalysis, playerNames: PlayerNames, 
  */
 function rideAlongSentences(analysis: TurnAnalysis, playerNames: PlayerNames): string[] {
   const sentences: string[] = [];
-  // Round 67 (T22): the credit's luck rider names the re-read when no roll went the residual's way.
+  // Round 67 (T22): the credit's luck rider names the re-read when no roll went the residual's way;
+  // (T59) a side that lost ground gets no credit sentence.
   const rolled = chanceRolled(analysis) !== false;
-  const kinds: ((name: string, side: SideAnalysis, ownLuck: number | null) => string | null)[] = [
-    (name, side, ownLuck) => sackClause(name, side) ?? readCreditClause(name, side, ownLuck, rolled) ?? inaccuracyClause(name, side),
+  const kinds: ((name: string, side: SideAnalysis, ownLuck: number | null, praised: boolean) => string | null)[] = [
+    (name, side, ownLuck, praised) => sackClause(name, side) ??
+      (praised ? readCreditClause(name, side, ownLuck, rolled) : null) ?? inaccuracyClause(name, side),
     forcedClause,
     (_name, side) => unansweredClause(side),
     streakClause,
@@ -238,8 +244,8 @@ function rideAlongSentences(analysis: TurnAnalysis, playerNames: PlayerNames): s
   ];
   const luck = analysis.chanceDelta;
   for (const clause of kinds) {
-    const p1Note = clause(playerNames[0], analysis.p1, luck);
-    const p2Note = clause(playerNames[1], analysis.p2, luck === null ? null : -luck);
+    const p1Note = clause(playerNames[0], analysis.p1, luck, !lostGround(analysis, 'p1'));
+    const p2Note = clause(playerNames[1], analysis.p2, luck === null ? null : -luck, !lostGround(analysis, 'p2'));
     if (p1Note) sentences.push(p1Note);
     if (p2Note) sentences.push(p2Note);
   }

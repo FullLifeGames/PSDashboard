@@ -1,7 +1,7 @@
 import type { RankedChoice, ReadRecommendation } from '../types.ts';
 import {
   CHANCE_THRESHOLD, DECIDED_SCORE, PAYOFF_WINDOW, RISK_PAYOFF_EPSILON, RISK_PAYOFF_MARGIN, TIER_THRESHOLDS,
-  type AnalyzeTurnParams, type Side, type SideAnalysis, type TurnAttribution,
+  type AnalyzeTurnParams, type Side, type SideAnalysis, type TurnAnalysis, type TurnAttribution,
 } from './types.ts';
 import { bestWindowPayoff } from './grading.ts';
 
@@ -177,4 +177,34 @@ export function attributionFor(
     return swing !== null && Math.abs(swing) >= CHANCE_THRESHOLD ? 'shift' : 'quiet';
   }
   return culpritAttribution(p1, p2) ?? movementAttribution(p1, p2, swing, chanceDelta);
+}
+
+/**
+ * Round 67 (T59): the side's own estimate fell across the turn by at least
+ * the edge a read must win (RISK_PAYOFF_MARGIN). The read was priced from the
+ * played cell; on such a turn every place that praises it stays silent
+ * (653785 t10 of round 62: Hydro Pump hit nothing and 3d fell 0.298). A
+ * window read at a small loss keeps its praise (2663093831 t1: −0.041).
+ */
+export function lostGround(analysis: Pick<TurnAnalysis, 'swing'>, side: Side): boolean {
+  const swing = analysis.swing ?? null;
+  if (swing === null) return false;
+  return (side === 'p1' ? swing : -swing) <= -RISK_PAYOFF_MARGIN;
+}
+
+/**
+ * Round 67 (T59): the attribution as the card and the badges show it. A read
+ * whose side lost ground no longer claims the turn (both-read keeps the other
+ * side's); with no read left the turn shows its movement. The attribution
+ * field stays, so pins, key moments and totals read the same.
+ */
+export function shownAttribution(analysis: TurnAnalysis): TurnAttribution {
+  const { attribution, p1, p2 } = analysis;
+  if (attribution !== 'p1-read' && attribution !== 'p2-read' && attribution !== 'both-read') return attribution;
+  const p1Read = attribution !== 'p2-read' && !lostGround(analysis, 'p1');
+  const p2Read = attribution !== 'p1-read' && !lostGround(analysis, 'p2');
+  if (p1Read && p2Read) return 'both-read';
+  if (p1Read) return 'p1-read';
+  if (p2Read) return 'p2-read';
+  return movementAttribution(p1, p2, analysis.swing, analysis.chanceDelta);
 }

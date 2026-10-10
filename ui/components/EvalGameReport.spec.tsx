@@ -93,6 +93,14 @@ describe('EvalGameReport', () => {
     expect(within(chip(3)).getByText(winDeltaText(-0.3))).toBeInTheDocument();
   });
 
+  test('a key moment whose read lost ground shows the turn\'s movement, not the praise badge (T59)', () => {
+    const read = { playedRaw: null, played: rankedChoice('move hypervoice', 'Hyper Voice', 0.3), best: null, safe: null, regret: 0, riskPaidOff: true };
+    const moment = turnAnalysis(9, { attribution: 'p1-read', p1: read, swing: -0.544, chanceDelta: -0.687 });
+    render(<EvalGameReport report={gameReport({ keyMoments: [moment] })} playerNames={names} />);
+    expect(within(chip(9)).queryByText("Alice's read paid off")).toBeNull();
+    expect(within(chip(9)).getByText('chance swing (rolls, crits, reveals)')).toBeInTheDocument();
+  });
+
   test('a denied end at odds 1 reads as a sure KO, never as a 100% roll (T123 point 3)', () => {
     const deniedEnd = { turn: 9, side: 'p2' as const, species: 'Kingambit', odds: 1, removes: 'Garchomp', turnsRemaining: 12 };
     render(<EvalGameReport report={gameReport({ deniedEnd })} playerNames={names} />);

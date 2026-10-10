@@ -108,6 +108,15 @@ describe('SideRow', () => {
     expect(screen.getByText(`· inaccuracy (${winDeltaText(-0.12)})`)).toBeInTheDocument();
   });
 
+  test('a paid-off read on a turn its side lost shows no praise chip (T59, 912045 t9 shape)', () => {
+    const read = sideAnalysis({ riskPaidOff: true, riskPayoff: 0.12, safe: rankedChoice('move protect', 'Protect', 0.05) });
+    const { rerender } = render(<SideRow name="Alice" side={read} lostGround />);
+    expect(screen.queryByText(/read paid off/)).toBeNull();
+    expect(screen.queryByText(/regret/)).toBeNull();
+    rerender(<SideRow name="Alice" side={read} />);
+    expect(screen.getByText(`read paid off · ${winDeltaText(0.12)}`)).toBeInTheDocument();
+  });
+
   test('a prevented action and an unseen partner are spelled out; the sensitivity note names the guessed item', () => {
     const { rerender } = render(<SideRow name="Alice" side={sideAnalysis({ played: null, playedRaw: null, prevented: 'flinch' })} />);
     expect(screen.getByText('flinched: the chosen action never surfaced')).toBeInTheDocument();

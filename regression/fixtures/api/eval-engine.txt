@@ -159,6 +159,7 @@ value formatRead
 value heldDecided
 value loadSimMods
 value loadSimModsFor
+value lostGround
 value matchPlayedSide
 value mctsSearch
 value mctsTreeSearch
@@ -201,6 +202,7 @@ value selectKeyTurns
 value selectProbeCombos
 value serializeLiveBattle
 value serializePreviewPosition
+value shownAttribution
 value simFastStatus
 value solveEndgame
 value starvedSupportCells

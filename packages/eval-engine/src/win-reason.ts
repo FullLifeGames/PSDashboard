@@ -3,6 +3,7 @@ import { DECIDED_SCORE } from './turn-analysis/types.ts';
 import { KEY_TURN_SWING } from './graph.ts';
 import { displayBest, koPhrase, phrase, regretText } from './prose/phrases.ts';
 import { chanceRolled, rollsCarry, type LuckSplit } from './turn-analysis/luck.ts';
+import { lostGround } from './turn-analysis/risk.ts';
 import { SPOKEN_MASS } from './types.ts';
 import { winDeltaText, winPercent } from './winprob.ts';
 import { sideIndex } from '@fulllifegames/replay-core';
@@ -213,10 +214,10 @@ const punishedRegret = (side: SideAnalysis): number =>
 
 interface ReadExample { turn: number; label: string; payoff: number }
 
-/** A side's paid-off reads, biggest payoff first. */
+/** A side's paid-off reads, biggest payoff first; round 67 (T59): not on a turn the side lost ground. */
 function paidReads(analyses: TurnAnalysis[], side: Side): ReadExample[] {
   return analyses
-    .filter(analysis => analysis[side].riskPaidOff && analysis[side].played)
+    .filter(analysis => analysis[side].riskPaidOff && analysis[side].played && !lostGround(analysis, side))
     .map(analysis => ({
       turn: analysis.turn,
       label: analysis[side].played!.label,

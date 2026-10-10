@@ -189,9 +189,10 @@ describe('game report (multi-turn root cause)', () => {
       riskPayoff: payoff,
       riskPaidOff: true,
     });
+    // Round 67 (T59): the read's side holds its ground on the turn (a read on a lost turn leaves the list).
     const report = buildGameReport([
-      mk(1, 0.1, 0.3, { p2: read('Flip Turn', 0.3, 0.25) }),
-      mk(2, 0.3, 0.2),
+      mk(1, 0.3, 0.1, { p2: read('Flip Turn', 0.3, 0.25) }),
+      mk(2, 0.1, 0.2),
     ], names, 'p2');
     expect(report.reads).toEqual([{ turn: 1, side: 'p2', played: 'Flip Turn', payoff: 0.25 }]);
     expect(report.misplays).toEqual([]);

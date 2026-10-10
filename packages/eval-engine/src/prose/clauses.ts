@@ -34,7 +34,9 @@ function readClause(name: string, side: SideAnalysis, opponent: SideAnalysis): s
 const partialNote = (side: SideAnalysis, verb: 'graded' | 'credited'): string =>
   side.playedPartial ? ` (Partner's action hidden; ${verb} on the visible slot.)` : '';
 
-export function sideClause(name: string, side: SideAnalysis, opponent: SideAnalysis): string | null {
+/** Round 67 (T59): `praised` false (the side lost ground) silences a paid-off read; no misplay clause takes its place. */
+export function sideClause(name: string, side: SideAnalysis, opponent: SideAnalysis, praised = true): string | null {
+  if (side.riskPaidOff && !praised) return null;
   const clause = readClause(name, side, opponent) ?? mistakeClause(name, side, opponent);
   return clause ? `${clause}${partialNote(side, 'graded')}` : null;
 }

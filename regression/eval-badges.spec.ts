@@ -34,6 +34,13 @@ describe('attributionBadge', () => {
     expect(attributionBadge(analysis('none' as TurnAnalysis['attribution']), names).text).toBe('quiet turn');
   });
 
+  test('round 67 (T59): a read whose side lost ground loses its praise badge and shows the turn\'s movement', () => {
+    const lost = { swing: -0.3, chanceDelta: -0.25 };
+    expect(attributionBadge(analysis('p1-read', { riskPaidOff: true }, {}, lost), names).text).toBe('chance swing (rolls, crits, reveals)');
+    expect(attributionBadge(analysis('both-read', { riskPaidOff: true }, { riskPaidOff: true }, lost), names).text).toBe("Bob's read paid off");
+    expect(attributionBadge(analysis('p1-read', { riskPaidOff: true }, {}, { swing: -0.05, chanceDelta: 0 }), names).text).toBe("Alice's read paid off");
+  });
+
   test('round 67 (T22): a chance swing without a roll in its direction reads as the engine re-reading the position', () => {
     const swing = (chanceDelta: number, rolledFor?: { p1: boolean; p2: boolean }) =>
       analysis('chance', {}, {}, { chanceDelta, ...(rolledFor ? { rolledFor } : {}) });

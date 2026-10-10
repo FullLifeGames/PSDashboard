@@ -329,6 +329,9 @@ describe('the read credit says it is measured before the rolls', () => {
   });
 
   test('singles, 649664 t15 shape: when the rolls took the gain back, the luck tail says so for the side', () => {
-    expect(t13Shape(0.3)).toContain('On top of that, luck contributed −15% for Beta.');
+    // Round 67 (T59): the side holds its ground here (−0.09); 649664 t15 itself moved +0.016 for devin on the base.
+    expect(t13Shape(0.15)).toContain('On top of that, luck contributed −7% for Beta.');
+    // A turn that cost the side at least 0.1 gets no credit at all.
+    expect(t13Shape(0.3)).not.toContain('a read the engine gave no weight');
   });
 });

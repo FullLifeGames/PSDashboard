@@ -1,4 +1,4 @@
-import { chanceRolled, type LeadSideAnalysis, type TurnAnalysis } from '@fulllifegames/eval-engine';
+import { chanceRolled, shownAttribution, type LeadSideAnalysis, type TurnAnalysis } from '@fulllifegames/eval-engine';
 
 /**
  * Round 63 (T116): the team-preview verdict a side's lead may carry. In
@@ -29,9 +29,12 @@ function decisionBadge(side: TurnAnalysis['p1'], name: string): Badge {
   return { text: `${name} ${decisionWord}`, color: side.tier === 'blunder' ? '#ff7a7a' : '#f3a6a6' };
 }
 
-/** Shared attribution label + color for analysis and report views. */
+/**
+ * Shared attribution label + color for analysis and report views. Round 67 (T59): the attribution as shown,
+ * so a read whose side lost ground shows the turn's movement, never "read paid off".
+ */
 export function attributionBadge(analysis: TurnAnalysis, playerNames: [string, string]): Badge {
-  switch (analysis.attribution) {
+  switch (shownAttribution(analysis)) {
     case 'p1-decision': return decisionBadge(analysis.p1, playerNames[0]);
     case 'p2-decision': return decisionBadge(analysis.p2, playerNames[1]);
     case 'both-decision': return analysis.p1.riskUnpunished && analysis.p2.riskUnpunished

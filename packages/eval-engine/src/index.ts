@@ -93,6 +93,7 @@ export { heldDecided } from './turn-analysis/decided-held.ts';
 export { forcedWinSpeaks } from './turn-analysis/forced-speech.ts';
 export { noteSpokenClaim, releaseBrokenClaims } from './turn-analysis/decided-signals.ts';
 export { chanceRolled } from './turn-analysis/luck.ts';
+export { lostGround, shownAttribution } from './turn-analysis/risk.ts';
 export { resolveTeraPreference, teraKey } from './tera.ts';
 export type { TeraPreference } from './tera.ts';
 export { AUTO_MCTS_FAINTED_FRACTION } from './types.ts';
