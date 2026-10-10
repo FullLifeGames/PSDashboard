@@ -131,6 +131,8 @@ function moveHintOf(board: HintBoard, tokens: string[], attacker: Pokemon): numb
     return foes.reduce((sum, foe) => sum + singleMoveFraction(attacker, foe, tokens[1], battle), 0) * SPREAD_FACTOR;
   }
   const targetLoc = tokens.length > 2 ? parseInt(tokens[2], 10) : NaN;
+  // Round 67 (T113): a move aimed at the own partner (Pollen Puff's heal, a U-turn into it) is support, not foe damage.
+  if (targetLoc < 0) return SUPPORT_HINT;
   let damage: number;
   if (Number.isFinite(targetLoc) && targetLoc > 0) {
     const foe = foeActives[targetLoc - 1];

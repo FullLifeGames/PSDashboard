@@ -34,10 +34,11 @@ function restrictCombined(
   keep?: (PlayedAction | null)[],
 ): ChoiceOption[] {
   if (options.length <= RESTRICT_K_DOUBLES) return options;
-  // Distinct cores compete on hints first — a gimmick variant scores the same
-  // hint as its base, so without the core budget three variants of each top
-  // damage pair crowded out every status/setup combo. Gimmick variants of the
-  // strongest cores then fill the remaining slots.
+  // Distinct cores compete on hints first: without the core budget three
+  // gimmick variants of each top damage pair crowded out every status/setup
+  // combo (a Tera variant is hinted on its Tera body since round 63, so it
+  // can outrank its base). Gimmick variants of the strongest cores then fill
+  // the remaining slots.
   const hints = combinedOptionHints(position, side, options);
   const scored = options.map((option, index) => ({ option, index, value: hints[index] }));
   const groups = new Map<string, typeof scored>();
@@ -167,7 +168,8 @@ export function searchOptions(
   side: 'p1' | 'p2',
   opts?: { tera?: TeraAllowance; keep?: (PlayedAction | null)[]; sleepClause?: boolean },
 ): ChoiceOption[] {
-  const options = legalChoices(position, side, opts);
+  // Round 67 (T113): the played slots (keepPlayed, root only) add the partner target a played move named.
+  const options = legalChoices(position, side, { tera: opts?.tera, partner: opts?.keep });
   if (isCombined(options)) return restrictCombined(position, side, options, opts?.keep);
   return dropNoopMoves(positionBattle(position), side, options, opts?.sleepClause);
 }

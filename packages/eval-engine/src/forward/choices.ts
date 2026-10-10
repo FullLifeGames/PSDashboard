@@ -3,7 +3,7 @@ import type { TeraAllowance } from '../types.ts';
 import { positionBattle, type ChoiceOption, type SimPosition } from './position.ts';
 import { switchAssignments } from './assignments.ts';
 import { switchInSlots } from './switches.ts';
-import { sideIndex } from '@fulllifegames/replay-core';
+import { sideIndex, toId } from '@fulllifegames/replay-core';
 import { isLockedEntry, requestMoveKey, type RequestMove } from './request-moves.ts';
 
 /**
@@ -14,6 +14,14 @@ import { isLockedEntry, requestMoveKey, type RequestMove } from './request-moves
 
 /** Move target types that require picking a foe slot in doubles. */
 const TARGET_FOE = new Set(['normal', 'any', 'adjacentFoe']);
+
+/**
+ * Round 67 (T113): the played actions of a side's slots (keepPlayed at the
+ * root). A move the player aimed at the own partner names its location
+ * (negative), and the slot lists that target too when the simulator accepts
+ * it for the move.
+ */
+export type PlayedSlots = readonly ({ kind: string; name: string; targetLoc?: number | null } | null)[];
 
 interface SlotChoice {
   choice: string;
@@ -49,8 +57,21 @@ function slotGimmicks(entry: ActiveRequestSlot, allowTera: boolean): { canTera: 
   };
 }
 
+/**
+ * The played partner target of this move, when the player aimed it at the own
+ * side and the simulator accepts that location for the move's target type
+ * (battle.validTargetLoc, the check Side#chooseMove runs).
+ */
+function partnerTarget(sideState: Side, move: RequestMove, slot: number, played: PlayedSlots[number] | undefined): { suffix: string; label: string } | null {
+  const loc = played?.kind === 'move' && toId(played.name) === requestMoveKey(move) ? played.targetLoc : null;
+  const user = sideState.active[slot];
+  const partner = loc !== null && loc !== undefined && loc < 0 ? sideState.active[-loc - 1] : null;
+  if (!user || !partner || partner === user || !sideState.battle.validTargetLoc(loc!, user, move.target as string)) return null;
+  return { suffix: ` ${loc}`, label: `${move.move}→${partner.species.name}` };
+}
+
 /** The target suffixes (and labels) one move enumerates from a doubles slot: foe slots, ally, self, or bare. */
-function moveTargets(sideState: Side, move: RequestMove, slot: number): { suffix: string; label: string }[] {
+function moveTargets(sideState: Side, move: RequestMove, slot: number, played?: PlayedSlots[number]): { suffix: string; label: string }[] {
   // A locked entry (rampage, charge release, recharge, Bide, Uproar) names no
   // target type: the sim keeps the locked target itself (side.js:480-492), so
   // the slot offers one bare option and applyChoice submits it by index
@@ -79,6 +100,8 @@ function moveTargets(sideState: Side, move: RequestMove, slot: number): { suffix
   } else {
     targets.push({ suffix: '', label: move.move });
   }
+  const partner = partnerTarget(sideState, move, slot, played);
+  if (partner && !targets.some(target => target.suffix === partner.suffix)) targets.push(partner);
   return targets;
 }
 
@@ -113,6 +136,7 @@ function slotChoicesFor(
   forced: boolean,
   slot: number,
   allowTera: boolean,
+  played?: PlayedSlots[number],
 ): SlotChoice[] {
   if (forced) return benchSwitches(sideState);
   const pokemon = sideState.active[slot];
@@ -133,7 +157,7 @@ function slotChoicesFor(
     if ('disabled' in move && move.disabled) continue;
     const key = requestMoveKey(move);
     if (liveDisabled.has(key)) continue;
-    for (const target of moveTargets(sideState, move, slot)) {
+    for (const target of moveTargets(sideState, move, slot, played)) {
       pushSlotChoices(choices, key, target, gimmicks);
     }
   }
@@ -212,6 +236,7 @@ function doublesChoices(
   slotCount: number,
   side: 'p1' | 'p2',
   tera: TeraAllowance | undefined,
+  partner?: PlayedSlots,
 ): ChoiceOption[] {
   // Round 42: more forced slots than living replacements — the product
   // over per-slot switches drops every pair with a shared target and left
@@ -224,7 +249,7 @@ function doublesChoices(
   const perSlot: SlotChoice[][] = [];
   for (let slot = 0; slot < slotCount; slot++) {
     const slotTera = teraAllowed(tera, side, sideState.active[slot] ?? null);
-    const slotChoices = slotChoicesFor(sideState, actives[slot], !!forceSwitch[slot], slot, slotTera);
+    const slotChoices = slotChoicesFor(sideState, actives[slot], !!forceSwitch[slot], slot, slotTera, partner?.[slot]);
     if (slotChoices.length > 0) perSlot.push(slotChoices);
   }
   if (perSlot.length === 0) return [];
@@ -302,7 +327,7 @@ function singlesChoices(
 export function legalChoices(
   position: SimPosition,
   side: 'p1' | 'p2',
-  opts?: { tera?: TeraAllowance },
+  opts?: { tera?: TeraAllowance; partner?: PlayedSlots },
 ): ChoiceOption[] {
   const battle = positionBattle(position);
   const sideState = battle.sides[sideIndex(side)];
@@ -320,6 +345,6 @@ export function legalChoices(
   const actives = 'active' in request ? request.active ?? [] : [];
   const forceSwitch = 'forceSwitch' in request ? request.forceSwitch ?? [] : [];
   const slotCount = Math.max(actives.length, forceSwitch.length);
-  if (slotCount > 1) return doublesChoices(sideState, actives, forceSwitch, slotCount, side, opts?.tera);
+  if (slotCount > 1) return doublesChoices(sideState, actives, forceSwitch, slotCount, side, opts?.tera, opts?.partner);
   return singlesChoices(request, sideState, side, opts?.tera);
 }
