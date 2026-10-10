@@ -1,5 +1,8 @@
 import { readFileSync } from 'node:fs';
-import { atKScore, layoutOf, refitAtKReport, type AtKReportOptions, type AtKSample, type GameTypeK } from './fit-helpers';
+import {
+  atKScore, bootstrapPhaseK, brierScore, fitPhaseK, layoutOf, logLossScore, phaseBucket, refitAtKReport,
+  type AtKReportOptions, type AtKSample, type GameTypeK, type PhaseK, type PhaseKSpread,
+} from './fit-helpers';
 
 /**
  * Round 65: the static's refit per family. Pokémon Champions OU and
@@ -168,4 +171,53 @@ export function familyReports(
   }
   if (off > 0) throw new Error(`identity: ${off} of ${checked} captured scores differ from the start tables`);
   return { identity: { samples: checked, off }, families: reports };
+}
+
+type Bucket = 'early' | 'mid' | 'late';
+/** One phase bucket: today's K of the game type against the fitted K. */
+interface PhaseBucketScores { n: number; brierToday: number; brierFitted: number; logLossToday: number; logLossFitted: number }
+/** One family's phase K on its own games. */
+export interface PhaseKReport { n: number; sets: number; today: PhaseK; fitted: PhaseK; spread: PhaseKSpread; buckets: Record<Bucket, PhaseBucketScores> }
+
+/**
+ * Round 67 (T138): the phase K of each family on its own games, in the form
+ * of WINPROB_K (k0 + k1 × the fainted share). The static's tanh comes back
+ * from each sample's features under the family's tables; the bank prices the
+ * last pair by its race, so those samples stay out (the leaf K never reaches
+ * them). fitPhaseK finds the likelihood maximum, the bootstrap over sets its
+ * band, and every phase bucket scores today's K of the game type against the
+ * fitted one. Reports only.
+ */
+export function phaseKReports(
+  samples: FamilySample[], families: FamilyTables[], k: GameTypeK, draws: number,
+): Record<string, PhaseKReport | { skipped: string }> {
+  const reports: Record<string, PhaseKReport | { skipped: string }> = {};
+  for (const family of families) {
+    const subset = samples.filter(sample => familyOf(sample) === family.name && !sample.lastPair);
+    if (subset.length < 100) {
+      reports[family.name] = { skipped: `${subset.length} samples, below 100` };
+      continue;
+    }
+    const { layout, start } = layoutOf(family.singles, family.doubles);
+    const doubles = family.name.endsWith('-doubles');
+    const outcome = subset.map(sample => ({
+      score: atKScore({ g: sample.g, won: sample.p1Won, doubles, faintedFraction: sample.faintedFraction, game: sample.set }, start, layout),
+      faintedFraction: sample.faintedFraction, won: sample.p1Won, game: sample.set,
+    }));
+    const today = doubles ? k.doubles : k.singles;
+    const fitted = fitPhaseK(outcome);
+    const bucket = (name: Bucket): PhaseBucketScores => {
+      const inBucket = outcome.filter(sample => phaseBucket(sample.faintedFraction) === name);
+      return {
+        n: inBucket.length,
+        brierToday: brierScore(inBucket, today.k0, today.k1), brierFitted: brierScore(inBucket, fitted.k0, fitted.k1),
+        logLossToday: logLossScore(inBucket, today.k0, today.k1), logLossFitted: logLossScore(inBucket, fitted.k0, fitted.k1),
+      };
+    };
+    reports[family.name] = {
+      n: outcome.length, sets: new Set(outcome.map(sample => sample.game)).size, today, fitted,
+      spread: bootstrapPhaseK(outcome, draws, 48), buckets: { early: bucket('early'), mid: bucket('mid'), late: bucket('late') },
+    };
+  }
+  return reports;
 }

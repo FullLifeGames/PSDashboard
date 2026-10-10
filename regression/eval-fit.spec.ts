@@ -15,7 +15,9 @@ import {
   bootstrapPhaseK, brierScore, crossValidate, fitConstantK, fitLogistic, fitPhaseK, logLossScore,
   mulberry32, phaseBucket,
 } from './fit-helpers';
-import { dumpSamples, familyReports, rulesetOfId, withoutHoldout, withoutUnratedLadder, type FamilySample, type Ruleset } from './fit-families';
+import {
+  dumpSamples, familyReports, phaseKReports, rulesetOfId, withoutHoldout, withoutUnratedLadder, type FamilySample, type Ruleset,
+} from './fit-families';
 import { holdoutSets } from './bank-universe';
 
 /**
@@ -147,6 +149,15 @@ const FAMILIES = [
 ];
 
 /**
+ * Round 67: `EVAL_FIT_FAMILIES=<name>,<name>` refits only these families
+ * (the Champions refit after T145 and T143); without it every family.
+ */
+const familiesToFit = () => {
+  const names = (process.env.EVAL_FIT_FAMILIES ?? '').split(',').map(name => name.trim()).filter(Boolean);
+  return names.length === 0 ? FAMILIES : FAMILIES.filter(family => names.includes(family.name));
+};
+
+/**
  * The pre-registered holds of round 64's variant E: the two weights whose
  * free fit flips its sign inside a band over nought (shared Trick Room,
  * choice mismatch) and both boost weights (T49).
@@ -159,13 +170,30 @@ const HOLD = { shared: ['trickRoom', 'choiceMismatch', 'boosts'], doubles: ['boo
  * set. First the identity: the start tables must give back every captured
  * score, or the fit refuses.
  */
-function writeRefitReport(samples: FitSample[]) {
-  const family: FamilySample[] = samples.map(sample => ({
-    game: sample.game, set: sample.set ?? sample.game, gameType: sample.gameType, ruleset: sample.ruleset ?? rulesetOfId(sample.game),
-    g: sample.g, p1Won: sample.p1Won, faintedFraction: sample.faintedFraction, score: sample.score, wp: sample.wp, lastPair: sample.lastPair,
-  }));
+const familySamplesOf = (samples: FitSample[]): FamilySample[] => samples.map(sample => ({
+  game: sample.game, set: sample.set ?? sample.game, gameType: sample.gameType, ruleset: sample.ruleset ?? rulesetOfId(sample.game),
+  g: sample.g, p1Won: sample.p1Won, faintedFraction: sample.faintedFraction, score: sample.score, wp: sample.wp, lastPair: sample.lastPair,
+}));
+
+/**
+ * Round 67 (T138): `EVAL_FIT_PHASE_K=1` writes the phase K of every family
+ * to fit on its own games (fit-families.ts phaseKReports) to
+ * `EVAL_FIT_K_OUT`, default `<dir>/phase-k-report.json`.
+ */
+function writePhaseKReport(samples: FitSample[]) {
   const draws = Number(process.env.EVAL_FIT_DRAWS ?? 200);
-  const report = familyReports(family, FEATURE_KEYS, FAMILIES, WINPROB_K, { seeds: 20, folds: 5, draws, minGames: 20, hold: HOLD }, wpUnits);
+  const report = phaseKReports(familySamplesOf(samples), familiesToFit(), WINPROB_K, draws);
+  const out = process.env.EVAL_FIT_K_OUT ?? join(SAMPLES_DIR ?? CACHE_DIR, 'phase-k-report.json');
+  writeFileSync(out, JSON.stringify(report, null, 1));
+  for (const [name, entry] of Object.entries(report)) {
+    console.log('fitted' in entry ? `phase K ${name}: k0=${entry.fitted.k0.toFixed(2)} k1=${entry.fitted.k1.toFixed(2)} sets=${entry.sets}` : `phase K ${name}: ${entry.skipped}`);
+  }
+  console.log(`-> ${out}`);
+}
+
+function writeRefitReport(samples: FitSample[]) {
+  const draws = Number(process.env.EVAL_FIT_DRAWS ?? 200);
+  const report = familyReports(familySamplesOf(samples), FEATURE_KEYS, familiesToFit(), WINPROB_K, { seeds: 20, folds: 5, draws, minGames: 20, hold: HOLD }, wpUnits);
   const out = process.env.EVAL_FIT_OUT ?? join(SAMPLES_DIR ?? CACHE_DIR, 'fit-report.json');
   writeFileSync(out, JSON.stringify(report, null, 1));
   for (const [name, entry] of Object.entries(report.families)) {
@@ -330,7 +358,8 @@ describe('eval weight fitting (EVAL_FIT=1)', () => {
       console.log('too few samples to fit — check the corpus cache');
       return;
     }
-    if (SAMPLES_DIR || process.env.EVAL_FIT_OUT) writeRefitReport(samples);
+    if (process.env.EVAL_FIT_PHASE_K === '1') writePhaseKReport(samples);
+    else if (SAMPLES_DIR || process.env.EVAL_FIT_OUT) writeRefitReport(samples);
     // The legacy reports read `score` as the static's tanh; dump samples carry the leaf value in wp-units.
     if (process.env.EVAL_FIT_LEGACY === '0' || process.env.EVAL_FIT_DUMP) return;
 

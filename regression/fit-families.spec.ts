@@ -1,5 +1,7 @@
 import { describe, expect, test } from 'vitest';
-import { dumpSamples, familyOf, familyReports, rulesetOfId, withoutHoldout, withoutUnratedLadder, type FamilySample } from './fit-families';
+import {
+  dumpSamples, familyOf, familyReports, phaseKReports, rulesetOfId, withoutHoldout, withoutUnratedLadder, type FamilySample,
+} from './fit-families';
 import { mulberry32 } from './fit-helpers';
 import { mkdtempSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -121,5 +123,36 @@ describe('fit families', () => {
     expect(entry.first.verdict.flagged).toContain('shared:matchup');
     expect(entry.weights.find(weight => weight.name === 'matchup')).toMatchObject({ free: false, fit: 2 });
     expect(entry.secondPassHeld).toEqual(['shared:matchup']);
+  });
+
+  // Round 67 (T138): Pokémon Champions prices its own scale. The phase K of a family comes back from its own games:
+  // the static's tanh under the family's tables, outcomes against k0 + k1 × the fainted share.
+  test('round 67 (T138): the phase K of a family comes back from its own games', () => {
+    const random = mulberry32(67);
+    const truth = (ff: number) => 1 + 4 * ff;
+    const samples: FamilySample[] = [];
+    for (let game = 0; game < 700; game++) {
+      for (const ff of [0, 1 / 3, 2 / 3]) {
+        const g = [random() - 0.5, random() - 0.5];
+        const z = Math.tanh(2 * g[0] + 2 * g[1]);
+        samples.push({
+          game: `gen9championsou-${game}`, set: `champions-singles|${game}`, gameType: 'singles', ruleset: 'champions', g,
+          p1Won: random() < 1 / (1 + Math.exp(-truth(ff) * z)), faintedFraction: ff, score: 0, wp: true, lastPair: false,
+        });
+      }
+    }
+    // The bank prices the last pair by its race: those positions never meet the leaf K.
+    const lastPairs = samples.slice(0, 50).map(sample => ({ ...sample, game: `${sample.game}-last`, p1Won: !sample.p1Won, lastPair: true }));
+    const families = [{ name: 'champions-singles', singles: [2, 2], doubles: [2, 2] }, { name: 'champions-doubles', singles: [2, 2], doubles: [2, 2] }];
+    const reports = phaseKReports([...samples, ...lastPairs], families, K, 20);
+    expect(reports['champions-doubles']).toMatchObject({ skipped: expect.stringMatching(/^0 samples/) });
+    const report = reports['champions-singles'];
+    if (!('fitted' in report)) throw new Error('no report');
+    expect(report.n).toBe(samples.length);
+    expect(report.today).toEqual(K.singles);
+    expect(Math.abs(report.fitted.k0 - 1)).toBeLessThan(0.6);
+    expect(Math.abs(report.fitted.k1 - 4)).toBeLessThan(1.5);
+    expect(report.buckets.late.brierFitted).toBeLessThan(report.buckets.late.brierToday);
+    expect(report.spread.k1.lo).toBeLessThan(report.fitted.k1);
   });
 });
