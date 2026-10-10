@@ -2,7 +2,7 @@ import { Generations, Move, Field, calculate, type Pokemon } from '@smogon/calc'
 import { Dex } from '@pkmn/sim';
 import type { SimPokemonInfo, BranchMoveOption } from './branch-engine.ts';
 import { toId, TERRAIN_BY_ID, WEATHER_BY_ID } from '@fulllifegames/replay-core';
-import { bodyFromInfo, calcPokemon } from './calc/body.ts';
+import { attackerAtUse, bodyFromInfo, calcPokemon } from './calc/body.ts';
 import { hitDraws } from './calc/hit-draws.ts';
 import { teraClicked } from './calc/tera-click.ts';
 
@@ -268,7 +268,7 @@ export function calcSingleDamageRange(
     const overrides = moveLanding(gen, attacker, moveOption, context);
     const priceAt = (hits?: number, isStellarFirstUse = false): CalcResult => calculate(
       gen,
-      calcPokemonFrom(gen, attacker),
+      calcPokemon(gen, attackerAtUse(gen.num, bodyFor(gen, attacker), moveOption.name)),
       calcPokemonFrom(gen, defender),
       // The attacker's ability and item reach the move too: Skill Link sets five hits.
       new Move(gen, moveOption.name, {

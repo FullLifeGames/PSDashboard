@@ -133,3 +133,31 @@ describe('an armed Tera reads the body the simulator makes of the click (T100, T
     });
   });
 });
+
+describe('forms the calc does not know reach the preview (T72)', () => {
+  test('singles: Aegislash attacks in the forme its Stance Change gives it and takes hits in its Shield forme', () => {
+    expectRowsHold(seed => {
+      const current = battle('gen9customgame', [set('Aegislash', ['Iron Head'], { ability: 'Stance Change' })], [armored('Snorlax')], seed);
+      expect(current.sides[0].active[0].species.name).toBe('Aegislash');
+      return { current, rows: [{ row: preview(current).p1.default[0][0], side: 1, slot: 0 }], p1: 'move ironhead', p2: 'move splash' };
+    });
+    expectRowsHold(seed => {
+      const current = battle('gen9customgame', [set('Garchomp', ['Earthquake'])],
+        [set('Aegislash', ['Splash'], { ability: 'Stance Change', evs: { ...STATS, hp: 252, def: 252 } })], seed);
+      return { current, rows: [{ row: preview(current).p1.default[0][0], side: 1, slot: 0 }], p1: 'move earthquake', p2: 'move splash' };
+    });
+  });
+
+  test('doubles: Gastrodon-East\'s Earth Power and a Dragon Claw into it hold their rows', () => {
+    expectRowsHold(seed => {
+      const current = battle('gen9doublescustomgame',
+        [set('Gastrodon-East', ['Earth Power'], { ability: 'Sticky Hold' }), set('Garchomp', ['Dragon Claw'])],
+        [armored('Snorlax'), set('Gastrodon-East', ['Splash'], { ability: 'Sticky Hold', evs: { ...STATS, hp: 252, def: 252 } })], seed);
+      const targets = preview(current).p1.targets;
+      return {
+        current, rows: [{ row: targets[0]['1:1'], side: 1, slot: 0 }, { row: targets[1]['1:2'], side: 1, slot: 1 }],
+        p1: 'move earthpower 1, move dragonclaw 2', p2: 'move splash, move splash',
+      };
+    });
+  });
+});

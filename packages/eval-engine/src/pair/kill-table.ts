@@ -1,6 +1,6 @@
 import { Generations, Move as CalcMove, Pokemon as CalcPokemon, Field, calculate } from '@smogon/calc';
 import { TERRAIN_BY_ID, WEATHER_BY_ID } from '@fulllifegames/replay-core';
-import { calcPokemon } from '../calc/body.ts';
+import { attackerAtUse, calcPokemon } from '../calc/body.ts';
 import type { BodySnapshot, HitSnapshot } from './snapshot.ts';
 
 /**
@@ -86,7 +86,7 @@ function rollsOf(damage: unknown): number[] | null {
 export function killTable(snap: HitSnapshot): KillTable | null {
   try {
     const gen = Generations.get(snap.gen as 3 | 4 | 5 | 6 | 7 | 8 | 9);
-    const attacker = calcBody(gen, snap.attacker, chargeOffset(snap));
+    const attacker = calcBody(gen, attackerAtUse(gen.num, snap.attacker, snap.moveName), chargeOffset(snap));
     const defender = calcBody(gen, snap.defender, 0);
     const field = calcField(snap);
     const normal = rollsOf(calculate(gen, attacker, defender, calcMove(gen, snap, false), field).damage);

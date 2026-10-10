@@ -1,7 +1,7 @@
 import { Generations, Move as CalcMove, Field, calculate } from '@smogon/calc';
 import type { Battle, Pokemon } from '@pkmn/sim';
 import { TERRAIN_BY_ID, WEATHER_BY_ID } from '@fulllifegames/replay-core';
-import { bodyOf, calcPokemon } from './calc/body.ts';
+import { attackerAtUse, bodyOf, calcPokemon } from './calc/body.ts';
 
 /**
  * Analytic one-turn boundary-event odds (round 6 expectation grounding).
@@ -150,7 +150,7 @@ function damageKillFraction(
 ): KillRolls | null {
   try {
     const gen = Generations.get(genNum as 3 | 4 | 5 | 6 | 7 | 8 | 9);
-    const atkPoke = calcPokemon(gen, bodyOf(battle, attacker));
+    const atkPoke = calcPokemon(gen, attackerAtUse(genNum, bodyOf(battle, attacker), move.name));
     const defPoke = calcPokemon(gen, bodyOf(battle, defender));
     const field = calcField(battle, defender);
     const normal = killShare(calculate(gen, atkPoke, defPoke, new CalcMove(gen, move.name), field).damage, defender.hp);

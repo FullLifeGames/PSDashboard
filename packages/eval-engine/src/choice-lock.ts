@@ -9,7 +9,7 @@
 import { calculate, Field, Generations, Move, type Pokemon } from '@smogon/calc';
 import { Dex, type PokemonSet } from '@pkmn/sim';
 import { type DamageObservation, typedHiddenPowerId, inferOpponentTeam, itemSetValue, toId } from '@fulllifegames/replay-core';
-import { calcPokemon, type CalcBody } from './calc/body.ts';
+import { attackerAtUse, calcPokemon, type CalcBody } from './calc/body.ts';
 import { CHOICE_ITEMS } from './sensitivity.ts';
 
 /** `handedOver`: the Choice item came by a move, so the protocol itself shows it (no set guess to vet). */
@@ -268,13 +268,17 @@ type CalcGen = ReturnType<typeof Generations.get>;
 const stagesOf = (boosts: Record<string, number>): CalcBody['boosts'] =>
   ({ atk: boosts.atk ?? 0, def: boosts.def ?? 0, spa: boosts.spa ?? 0, spd: boosts.spd ?? 0, spe: boosts.spe ?? 0 });
 
-/** Both bodies of an observation stood on the field: their stages hold every entry boost (calc/body.ts). */
-function calcAttacker(gen: CalcGen, attackerSet: PokemonSet, obs: DamageObservation, withItem: string): Pokemon {
-  return calcPokemon(gen, {
+/**
+ * Both bodies of an observation stood on the field: their stages hold every
+ * entry boost; the attacker hits in the forme its ability takes for the move
+ * (calc/body.ts).
+ */
+function calcAttacker(gen: CalcGen, attackerSet: PokemonSet, obs: DamageObservation, withItem: string, moveId: string): Pokemon {
+  return calcPokemon(gen, attackerAtUse(gen.num, {
     species: attackerSet.species, level: attackerSet.level || 100, ability: attackerSet.ability || '', item: withItem,
     nature: attackerSet.nature, evs: attackerSet.evs, ivs: attackerSet.ivs, gender: attackerSet.gender,
     boosts: stagesOf(obs.attackerBoosts), status: obs.attackerStatus, tera: null, onField: true,
-  });
+  }, moveId));
 }
 
 function calcDefender(gen: CalcGen, defenderSet: PokemonSet | undefined, obs: DamageObservation): Pokemon {
@@ -291,7 +295,7 @@ function explainsObservation(
   calcMoveId: string, withItem: string,
 ): boolean | null {
   try {
-    const attacker = calcAttacker(gen, attackerSet, obs, withItem);
+    const attacker = calcAttacker(gen, attackerSet, obs, withItem, calcMoveId);
     const defender = calcDefender(gen, defenderSet, obs);
     const result = calculate(gen, attacker, defender, new Move(gen, calcMoveId), new Field({}));
     const rolls = (Array.isArray(result.damage) ? (result.damage as number[]).flat() : [Number(result.damage)]).map(Number);

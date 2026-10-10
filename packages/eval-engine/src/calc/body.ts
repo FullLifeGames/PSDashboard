@@ -122,6 +122,76 @@ export function calcAddsStages(gen: number, ability: string): boolean {
 /** The simulator's own name for no ability: no check of the calc names it, and it keeps the calc off the species' first ability. */
 const NO_ABILITY = Dex.abilities.get('noability').name;
 
+/** One answer per gen and name. */
+const speciesMemo = new Map<string, string>();
+
+/**
+ * The species as the calc knows it (round 67, T72). The calc refuses a name
+ * it does not list (Gastrodon-East, the simulator's "Aegislash" for the
+ * Shield forme, color forms), so such a species goes to it as the form it
+ * lists with the same base species in the Dex and the same base stats and
+ * types: the base species' own name first, then the calc's order. Without
+ * such a form the name stays, and the calc refuses as before.
+ */
+export function calcSpecies(gen: number, name: string): string {
+  const key = `${gen}|${name}`;
+  let known = speciesMemo.get(key);
+  if (known === undefined) {
+    known = knownForm(gen, name);
+    speciesMemo.set(key, known);
+  }
+  return known;
+}
+
+function knownForm(gen: number, name: string): string {
+  const calcGen = Generations.get(gen as 9);
+  if (calcGen.species.get(toID(name))) return name;
+  const dex = Dex.forGen(gen);
+  const species = dex.species.get(name);
+  if (!species.exists) return name;
+  const stats = Object.values(species.baseStats).join('/');
+  const types = species.types.join('/');
+  const forms = [...calcGen.species].filter(form => dex.species.get(form.name).baseSpecies === species.baseSpecies &&
+    Object.values(form.baseStats).join('/') === stats && form.types.join('/') === types);
+  return (forms.find(form => form.name === species.baseSpecies) ?? forms[0])?.name ?? name;
+}
+
+/** One answer per gen, species, ability and move. */
+const atUseMemo = new Map<string, string>();
+type ModifyMoveHandler = (this: unknown, move: unknown, pokemon: unknown, target: unknown) => void;
+
+/**
+ * The attacker as its move finds it (round 67, T72): the forme its own
+ * ability takes in the move's ModifyMove, asked from the Dex handler on a
+ * stand-in that records the change, the way damage-calc asks its multi-hit
+ * handlers. Stance Change turns Aegislash into Aegislash-Blade for every
+ * attack, a rule the calc does not know. A handler that needs the battle
+ * itself leaves the body as it is.
+ */
+export function attackerAtUse<T extends CalcBody>(gen: number, body: T, moveName: string): T {
+  const key = `${gen}|${body.species}|${body.ability}|${moveName}`;
+  let species = atUseMemo.get(key);
+  if (species === undefined) {
+    species = formeAtUse(gen, body, moveName);
+    atUseMemo.set(key, species);
+  }
+  return species === body.species ? body : { ...body, species };
+}
+
+function formeAtUse(gen: number, body: CalcBody, moveName: string): string {
+  const dex = Dex.forGen(gen);
+  const handler = (dex.abilities.get(body.ability) as { onModifyMove?: unknown }).onModifyMove;
+  if (typeof handler !== 'function' || !dex.moves.get(moveName).exists) return body.species;
+  let forme = body.species;
+  const user = { species: dex.species.get(body.species), transformed: false, formeChange: (id: string) => { forme = dex.species.get(id).name; } };
+  try {
+    (handler as ModifyMoveHandler).call(undefined, dex.getActiveMove(moveName), user, null);
+  } catch {
+    // The handler needs the battle itself: the body keeps its forme.
+  }
+  return forme;
+}
+
 /**
  * Entry boosts count once (T100). A body on the field holds its entry stage
  * already (the simulator applied it when the body came in, or it was spent
@@ -129,18 +199,19 @@ const NO_ABILITY = Dex.abilities.get('noability').name;
  * default for the species, goes to the calc as "No Ability". A body still to
  * come in keeps it: the simulator boosts it on entry.
  */
-function abilityForCalc(gen: CalcGen, body: CalcBody): string | undefined {
+function abilityForCalc(gen: CalcGen, body: CalcBody, species: string): string | undefined {
   const given = body.ability || undefined;
   if (!body.onField) return given;
-  const effective = given ?? gen.species.get(toID(body.species))?.abilities?.[0];
+  const effective = given ?? gen.species.get(toID(species))?.abilities?.[0];
   return effective && calcAddsStages(gen.num, effective) ? NO_ABILITY : given;
 }
 
 /** The one place the engine builds a calc Pokémon. */
 export function calcPokemon(gen: CalcGen, body: CalcBody): CalcPokemon {
-  return new CalcPokemon(gen, body.species, {
+  const species = calcSpecies(gen.num, body.species);
+  return new CalcPokemon(gen, species, {
     level: body.level,
-    ability: abilityForCalc(gen, body) as never,
+    ability: abilityForCalc(gen, body, species) as never,
     item: (body.item || undefined) as never,
     nature: (body.nature || undefined) as never,
     evs: body.evs,
