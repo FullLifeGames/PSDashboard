@@ -121,7 +121,7 @@ describe('useEvalView', () => {
     expect(stale).not.toHaveBeenCalled();
   });
 
-  test('Analyze game sweeps every played turn; the deepen sweep covers the turn and its follow-up', () => {
+  test("Analyze game sweeps every played turn; a single turn's analysis covers the turn and its follow-up", () => {
     const { evaluation, spies } = evaluationOf();
     const { result } = renderHook(() => useEvalView(inputs(evaluation, { analyzableTurns: 6 })));
     act(() => result.current.handleAnalyzeGame());
@@ -130,60 +130,76 @@ describe('useEvalView', () => {
     expect(sweep.from).toBeUndefined();
     expect(sweep.cacheKeyFor(3)).toBe(`${replayData.id}:3:fp1`);
 
-    act(() => result.current.analyzeTurnNow(6, { depth: 2, samples: 3, mode: 'matrix' }));
-    expect(spies.runGraphSweep.mock.calls[1][0]).toMatchObject({ from: 6, to: 6, settings: { depth: 2, samples: 3, mode: 'matrix' } });
+    act(() => result.current.analyzeTurnNow(5));
+    expect(spies.runGraphSweep.mock.calls[1][0]).toMatchObject({ from: 5, to: 6 });
+    act(() => result.current.analyzeTurnNow(6));
+    expect(spies.runGraphSweep.mock.calls[2][0]).toMatchObject({ from: 6, to: 6 });
   });
 
-  test('the deepening ladder: sketch to configured, then one depth further, never past a tree or depth 3', () => {
+  // Round 67 (T109, gate answer 5b): the deeper stage left with "Think deeper"; a gap turn keeps its analysis.
+  test('a gap turn offers its analysis at the current settings, an analyzed turn offers nothing', () => {
     const graph = evalGraph('singles', {
       settings: [
         { depth: 1, samples: 1, mode: 'matrix' }, { depth: 2, samples: 3, mode: 'matrix' }, { depth: 3, samples: 1, mode: 'matrix' },
         { depth: 1, samples: 1, mode: 'mcts' }, null, null, null, null, null, null,
       ],
-      faintedFractions: [0, 0.1, 0.2, 0.3, 0.5, null, null, null, null, null],
+      faintedFractions: [0, 0.1, 0.2, 0.3, 0.1, 0.5, null, null, null, null],
     });
-    const { evaluation } = evaluationOf({ graph, prefs: { depth: 1, samples: 1, mode: 'matrix' } });
+    const { evaluation } = evaluationOf({ graph, prefs: { depth: 2, samples: 3, mode: 'matrix' } });
     const targetAt = (analysisTurn: number | null, extra: Partial<EvalViewInputs> = {}) =>
-      renderHook(() => useEvalView(inputs(evaluation, { analysisTurn, ...extra }))).result.current.thinkDeeperTarget;
-
-    expect(targetAt(1)).toEqual({ depth: 2, samples: 1, mode: 'matrix' });
-    expect(targetAt(2)).toEqual({ depth: 3, samples: 3, mode: 'matrix' });
+      renderHook(() => useEvalView(inputs(evaluation, { analysisTurn, ...extra }))).result.current.analyzeTarget;
+    // A sketch, a configured, a deeper and a tree result alike: nothing to click.
+    expect(targetAt(1)).toBeNull();
+    expect(targetAt(2)).toBeNull();
     expect(targetAt(3)).toBeNull();
-    // A tree result under matrix preferences is a mode change: the rung is the configured engine.
-    expect(targetAt(4)).toEqual({ depth: 1, samples: 1, mode: 'matrix' });
-    expect(targetAt(5)).toEqual({ depth: 1, samples: 1, mode: 'matrix' });
+    expect(targetAt(4)).toBeNull();
+    // A gap turn: the configured settings.
+    expect(targetAt(5)).toEqual({ depth: 2, samples: 3, mode: 'matrix' });
     expect(targetAt(null)).toBeNull();
-    expect(targetAt(1, { liveEvalView: true })).toBeNull();
+    expect(targetAt(5, { liveEvalView: true })).toBeNull();
 
-    // A tree turn under tree preferences is the deepest engine the panel has: no rung.
-    const tree = evaluationOf({ graph, prefs: { mode: 'mcts' } }).evaluation;
-    expect(renderHook(() => useEvalView(inputs(tree, { analysisTurn: 4 }))).result.current.thinkDeeperTarget).toBeNull();
-
+    // Auto names the engine the sweep will resolve: per game type where the fraction is known, else the auto sentinel.
     const auto = evaluationOf({ graph, prefs: { mode: 'auto' } }).evaluation;
-    const autoTarget = renderHook(() => useEvalView(inputs(auto, { analysisTurn: 6 }))).result.current.thinkDeeperTarget;
-    expect(autoTarget).toEqual({ mode: 'auto' });
+    const autoAt = (analysisTurn: number, extra: Partial<EvalViewInputs> = {}) =>
+      renderHook(() => useEvalView(inputs(auto, { analysisTurn, ...extra }))).result.current.analyzeTarget;
+    expect(autoAt(5)).toEqual({ depth: 1, samples: 3, mode: 'matrix' });
+    expect(autoAt(5, { replayGameType: 'doubles', evalIsDoubles: true })).toEqual({ depth: 1, samples: 1, mode: 'mcts' });
+    expect(autoAt(6)).toEqual({ depth: 1, samples: 1, mode: 'mcts' });
+    expect(autoAt(7)).toEqual({ mode: 'auto' });
   });
 
-  test("auto resolves by the replay's game type: both sweeps carry it and the deepening target follows it", () => {
+  test('the analyze click sweeps the gap turn and its follow-up at the current settings', () => {
+    const graph = evalGraph('singles', { settings: Array(10).fill(null), faintedFractions: Array(10).fill(null) });
+    const { evaluation, spies } = evaluationOf({ graph, prefs: { depth: 2, samples: 3, mode: 'matrix' } });
+    const { result } = renderHook(() => useEvalView(inputs(evaluation, { analysisTurn: 4 })));
+    act(() => result.current.handleAnalyzeTurn());
+    const sweep = spies.runGraphSweep.mock.calls[0][0] as Record<string, unknown>;
+    expect(sweep).toMatchObject({ from: 4, to: 5 });
+    // No override: the sweep reads the panel settings it runs everything else with.
+    expect('settings' in sweep).toBe(false);
+  });
+
+  test("auto resolves by the replay's game type: both sweeps carry it and a gap turn's target follows it", () => {
     configureSearchBudget(parseSearchBudget('singles-tree-from=0.25,singles-early-samples=1'));
     onTestFinished(() => configureSearchBudget(null));
     const tree = { depth: 1, samples: 1, mode: 'mcts' } as const;
     const graph = evalGraph('singles', {
       settings: [tree, null, null, null, null, null, null, null, null, null],
-      faintedFractions: [0.1, null, null, null, null, null, null, null, null, null],
+      faintedFractions: [0.1, 0.1, null, null, null, null, null, null, null, null],
     });
     const { evaluation, spies } = evaluationOf({ graph, prefs: { mode: 'auto' } });
-    const singles = renderHook(() => useEvalView(inputs(evaluation, { analysisTurn: 1 })));
+    const singles = renderHook(() => useEvalView(inputs(evaluation, { analysisTurn: 2 })));
     act(() => singles.result.current.handleAnalyzeGame());
-    act(() => singles.result.current.analyzeTurnNow(1));
-    const doubles = renderHook(() => useEvalView(inputs(evaluation, { analysisTurn: 1, replayGameType: 'doubles', evalIsDoubles: true })));
+    act(() => singles.result.current.analyzeTurnNow(2));
+    const doubles = renderHook(() => useEvalView(inputs(evaluation, { analysisTurn: 2, replayGameType: 'doubles', evalIsDoubles: true })));
     act(() => doubles.result.current.handleAnalyzeGame());
-    act(() => doubles.result.current.analyzeTurnNow(1));
+    act(() => doubles.result.current.analyzeTurnNow(2));
     expect(spies.runGraphSweep.mock.calls.map(call => (call[0] as { doubles: boolean }).doubles)).toEqual([false, false, true, true]);
-    // A stored tree result on an early turn: singles configure the matrix there, so the deepening target is the
-    // matrix; doubles configure the tree, which is settled and offers no rung.
-    expect(singles.result.current.thinkDeeperTarget).toEqual({ depth: 1, samples: 1, mode: 'matrix' });
-    expect(doubles.result.current.thinkDeeperTarget).toBeNull();
+    // The gap turn at a tenth fainted: singles configure the early matrix there, doubles the tree.
+    expect(singles.result.current.analyzeTarget).toEqual({ depth: 1, samples: 1, mode: 'matrix' });
+    expect(doubles.result.current.analyzeTarget).toEqual(tree);
+    // The stored tree turn offers nothing in either game type.
+    expect(renderHook(() => useEvalView(inputs(evaluation, { analysisTurn: 1 }))).result.current.analyzeTarget).toBeNull();
   });
 
   test('the analyzed result follows the selected turn in replay view and the live result on the sim', () => {

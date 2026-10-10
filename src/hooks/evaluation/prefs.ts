@@ -123,52 +123,17 @@ const configuredTarget = (
   mode !== 'auto' ? mode : faintedFraction == null ? null : resolveAutoTurnSettings(faintedFraction, doubles).mode;
 
 /**
- * The stored result is SHALLOWER than the panel preferences — the turn can
- * be re-run at full settings (the explicit deepen button offers exactly
- * that). Deeper/heavier stored results never downgrade (a depth-2 result
- * stays shown under depth-1 prefs); that includes a matrix escalation of
- * depth ≥ 2 sitting on an MCTS-target turn (a think-deeper product stored
- * before round 32, when the ladder still crossed engines): settled, not
- * stale. Auto prefs resolve through the turn's
- * fainted fraction and the game type (`doubles`, read by auto only); with
- * the fraction unknown the answer is conservative (no upgrade claimed — the
- * next sweep resolves it).
- */
-export function needsSettingsUpgrade(
-  stored: TurnEvalSettings | null,
-  prefs: EvalPreferences,
-  faintedFraction?: number | null,
-  doubles = false,
-): boolean {
-  if (!stored) return true;
-  const escalatedPastMcts = (target: EngineMode) =>
-    target === 'mcts' && stored.mode === 'matrix' && stored.depth >= 2;
-  if (prefs.mode === 'auto') {
-    const target = configuredTarget('auto', faintedFraction, doubles);
-    if (target === null) return false;
-    const resolved = resolveAutoTurnSettings(faintedFraction!, doubles);
-    if (stored.mode !== resolved.mode) return !escalatedPastMcts(resolved.mode);
-    if (resolved.mode === 'mcts') return false;
-    return stored.depth < resolved.depth || stored.samples < resolved.samples;
-  }
-  if (stored.mode !== prefs.mode) return !escalatedPastMcts(prefs.mode);
-  if (prefs.mode === 'mcts') return false;
-  return stored.depth < prefs.depth || stored.samples < prefs.samples;
-}
-
-/**
  * May a sweep pass replace the graph's stored per-turn data? Monotone merge:
  * a shallower result never overwrites a deeper one — the fast re-scan of a
- * later "Analyze game" must not downgrade an explicitly deepened turn.
- * Cross-mode results replace only when the incoming pass carries the
- * CONFIGURED engine mode (the user's stated intent beats a stale result
- * from the other engine) — except that a matrix escalation of depth ≥ 2
- * outranks the d1s1-grade MCTS tier in BOTH directions: the think-deeper
- * click's d2s3 pass LANDS on a stored MCTS turn even though matrix is not
- * that turn's configured engine, and once stored it survives the next
- * MCTS-target sweep. Auto resolves per turn via the fainted fraction and
- * the game type (`doubles`, read by auto only); unresolvable cross-mode
- * conflicts keep the stored result (fail closed).
+ * later "Analyze game" must not downgrade a turn stored at deeper settings
+ * (depth 2, then a re-analyze at depth 1). Cross-mode results replace only
+ * when the incoming pass carries the CONFIGURED engine mode (the user's
+ * stated intent beats a stale result from the other engine) — except that a
+ * matrix result of depth ≥ 2 outranks the d1s1-grade MCTS tier in BOTH
+ * directions: it lands on a stored MCTS turn, and once stored it survives
+ * the next MCTS-target sweep. Auto resolves per turn via the fainted
+ * fraction and the game type (`doubles`, read by auto only); unresolvable
+ * cross-mode conflicts keep the stored result (fail closed).
  */
 export function supersedesStored(
   stored: TurnEvalSettings | null,

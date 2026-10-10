@@ -75,12 +75,6 @@ export interface GraphSweepParams {
    */
   sensitivityTargetsFor?(side: 'p1' | 'p2'): SensitivityTarget[];
   /**
-   * Engine-settings override for this sweep (the explicit think-deeper
-   * escalation). The whole sweep runs at these settings instead of the
-   * panel preferences — meant for short ranges.
-   */
-  settings?: TurnEvalSettings;
-  /**
    * This replay's store-key prefix (evalStorePrefix): the run reads every
    * persisted eval under it once, before the first pass, instead of one
    * store read per turn. Absent = single reads.

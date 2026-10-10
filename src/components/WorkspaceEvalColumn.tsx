@@ -30,7 +30,7 @@ function EvalSection({ app, replayData }: WorkspaceColumnProps) {
   } = app.board.timeline;
   const {
     handleEvaluate, handleAnalyzeGame, analyzedResult, analyzedSettings,
-    thinkDeeperTarget, handleThinkDeeper,
+    analyzeTarget, handleAnalyzeTurn,
   } = app.engine.evalView;
   const { handleExploreChoice, handlePickPair } = app.engine.walk;
   const { playOut, fastPlayOut } = app.transients;
@@ -40,8 +40,8 @@ function EvalSection({ app, replayData }: WorkspaceColumnProps) {
       status={liveEvalView ? liveEvalStatus : 'idle'}
       result={analyzedResult}
       resultSettings={analyzedSettings}
-      onThinkDeeper={!liveEvalView ? handleThinkDeeper : undefined}
-      thinkDeeperTarget={!liveEvalView ? thinkDeeperTarget : null}
+      onAnalyzeTurn={!liveEvalView ? handleAnalyzeTurn : undefined}
+      analyzeTarget={!liveEvalView ? analyzeTarget : null}
       smogonPending={app.engine.smogonPending}
       progress={evaluation.progress}
       reconstructProgress={evaluation.reconstructProgress}

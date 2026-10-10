@@ -8,7 +8,7 @@ import { EvalControls } from './eval/EvalControls';
 import { EvalStatus as EvalStatusBlock, type PlayOutProgress } from './eval/EvalStatus';
 import { GameGraphSection } from './eval/GameGraphSection';
 import { EvalResultBlock } from './eval/EvalResultBlock';
-import { ThinkDeeperButton } from './eval/ThinkDeeperButton';
+import { AnalyzePositionButton } from './eval/AnalyzePositionButton';
 
 interface EvalPanelProps {
   playerNames: [string, string];
@@ -28,10 +28,10 @@ interface EvalPanelProps {
   onPickPair?: (p1: { choice: string; label: string }, p2: { choice: string; label: string }) => void;
   /** Replay view: the settings that produced the shown result (fast scan vs configured). */
   resultSettings?: TurnEvalSettings | null;
-  /** Explicit per-position deepening — selecting a turn never re-searches. */
-  onThinkDeeper?: () => void;
-  /** The settings the deepen button would run (null = at the cap / not applicable). */
-  thinkDeeperTarget?: TurnEvalSettings | { mode: 'auto' } | null;
+  /** A gap turn's analysis at the panel's settings — selecting a turn never re-searches. */
+  onAnalyzeTurn?: () => void;
+  /** The settings that analysis would run (null = the turn holds a result, or not applicable). */
+  analyzeTarget?: TurnEvalSettings | { mode: 'auto' } | null;
   /** Smogon usage/sets still loading — a sweep started now would silently
    * build teams without the guessed fills (the T35 one-move Iron Valiant). */
   smogonPending?: boolean;
@@ -128,7 +128,7 @@ function PanelHeader({ running, ...props }: EvalPanelProps & { running: boolean 
 export function EvalPanel(props: EvalPanelProps) {
   const {
     playerNames, status, result, onPickChoice, onPickPair,
-    graph, variation, onAnalyzeGame, onSelectTurn, resultSettings, onThinkDeeper, thinkDeeperTarget, smogonPending,
+    graph, variation, onAnalyzeGame, onSelectTurn, resultSettings, onAnalyzeTurn, analyzeTarget, smogonPending,
     positionLabel, analysisTurn, playOutProgress, report, doubles,
   } = props;
   const running = status === 'searching' || status === 'reconstructing';
@@ -142,13 +142,12 @@ export function EvalPanel(props: EvalPanelProps) {
     }
     : undefined;
   const showReportView = view === 'report' && !!report;
-  const thinkDeeper = (
-    <ThinkDeeperButton
-      onThinkDeeper={onThinkDeeper}
-      thinkDeeperTarget={thinkDeeperTarget}
+  const analyzeTurn = (
+    <AnalyzePositionButton
+      onAnalyze={onAnalyzeTurn}
+      target={analyzeTarget}
       disabled={graph.running || smogonPending}
       smogonPending={smogonPending}
-      result={result}
     />
   );
 
@@ -163,8 +162,8 @@ export function EvalPanel(props: EvalPanelProps) {
           selectTurn={selectTurn}
           showReportView={showReportView}
           onBackToReport={() => setView('report')}
-          thinkDeeper={thinkDeeper}
-          hasThinkDeeper={!!(onThinkDeeper && thinkDeeperTarget)}
+          analyzeTurn={analyzeTurn}
+          hasAnalyzeTurn={!!(onAnalyzeTurn && analyzeTarget)}
         />
       )}
 
@@ -175,7 +174,7 @@ export function EvalPanel(props: EvalPanelProps) {
           playerNames={playerNames}
           positionLabel={positionLabel}
           resultSettings={resultSettings}
-          thinkDeeper={thinkDeeper}
+          thinkDeeper={null}
           onPickChoice={onPickChoice}
           onPickPair={onPickPair}
           doubles={doubles}

@@ -15,8 +15,8 @@ const emptyGraph = () => evalGraph('singles', {
 function props(overrides: Partial<GameGraphSectionProps> = {}): GameGraphSectionProps {
   return {
     onAnalyzeGame: vi.fn(), onCancel: vi.fn(), running: false, hasGraph: true, prefs, graph: evalGraph(), playerNames: names,
-    currentTurn: 3, selectTurn: vi.fn(), showReportView: false, onBackToReport: vi.fn(), result: evalResult(), thinkDeeper: null,
-    hasThinkDeeper: false, analysis: null, ...overrides,
+    currentTurn: 3, selectTurn: vi.fn(), showReportView: false, onBackToReport: vi.fn(), result: evalResult(), analyzeTurn: null,
+    hasAnalyzeTurn: false, analysis: null, ...overrides,
   };
 }
 
@@ -27,7 +27,9 @@ describe('GameGraphSection', () => {
     expect(screen.getByText('Game graph')).toBeInTheDocument();
     await userEvent.click(screen.getByRole('button', { name: 'Analyze game' }));
     expect(wired.onAnalyzeGame).toHaveBeenCalledTimes(1);
-    expect(screen.getByText(/^line:/)).toHaveTextContent('line: fast scan, then depth 2 everywhere · deeper: per turn');
+    // Round 67 (T109): the deeper stage left with Think deeper, so the hint names none.
+    expect(screen.getByText(/^line:/)).toHaveTextContent(/^line: fast scan, then depth 2 everywhere$/);
+    expect(screen.getByText(/^line:/).getAttribute('title')).not.toMatch(/deeper/i);
     expect(screen.queryByRole('img')).toBeNull();
 
     rerender(<GameGraphSection {...wired} hasGraph graph={evalGraph()} />);
@@ -41,8 +43,8 @@ describe('GameGraphSection', () => {
     expect(screen.getByText('analyzing… turn 4/10')).toBeInTheDocument();
     await userEvent.click(screen.getByRole('button', { name: 'Cancel' }));
     expect(wired.onCancel).toHaveBeenCalledTimes(1);
-    // Round 63 default (T110): auto runs early singles turns on the matrix, which can go deeper.
-    expect(screen.getByText(/^line:/)).toHaveTextContent('then auto (matrix early, MCTS late) everywhere · deeper: per turn');
+    // Round 63 default (T110): auto runs early singles turns on the matrix.
+    expect(screen.getByText(/^line:/)).toHaveTextContent(/then auto \(matrix early, MCTS late\) everywhere$/);
 
     rerender(<GameGraphSection {...wired} hasGraph smogonPending prefs={{ ...prefs, mode: 'mcts' }} />);
     const analyze = screen.getByRole('button', { name: 'Re-analyze' });
@@ -56,20 +58,20 @@ describe('GameGraphSection', () => {
     onTestFinished(() => configureSearchBudget(null));
     const auto = { ...prefs, mode: 'auto' as const };
     const { rerender } = render(<GameGraphSection {...props({ prefs: auto })} />);
-    expect(screen.getByText(/^line:/)).toHaveTextContent('line: fast scan, then auto (matrix early, MCTS late) everywhere · deeper: per turn');
+    expect(screen.getByText(/^line:/)).toHaveTextContent(/^line: fast scan, then auto \(matrix early, MCTS late\) everywhere$/);
     rerender(<GameGraphSection {...props({ prefs: auto, doubles: true })} />);
     expect(screen.getByText(/^line:/)).toHaveTextContent('line: fast scan, then auto (MCTS every turn) everywhere');
   });
 
-  test('the notice, the gap-turn reason with its escalation control, and the variation-only hint explain partial lines', () => {
+  test('the notice, the gap-turn reason with its analysis control, and the variation-only hint explain partial lines', () => {
     const evalErrors = evalGraph().evalErrors;
     evalErrors[2] = 'no legal choices';
     const graph = evalGraph('singles', { notice: 'Reconstruction diverged at turn 6; the line stops there.', evalErrors });
-    const { rerender } = render(<GameGraphSection {...props({ graph, currentTurn: 3, result: null, hasThinkDeeper: true, thinkDeeper: <button type="button">deeper</button> })} />);
+    const { rerender } = render(<GameGraphSection {...props({ graph, currentTurn: 3, result: null, hasAnalyzeTurn: true, analyzeTurn: <button type="button">analyze</button> })} />);
     const notices = screen.getAllByRole('status');
     expect(notices[0]).toHaveTextContent('⚠ Reconstruction diverged at turn 6; the line stops there.');
     expect(notices[1]).toHaveTextContent('⚠ This turn could not be evaluated: no legal choices');
-    expect(screen.getByRole('button', { name: 'deeper' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'analyze' })).toBeInTheDocument();
 
     rerender(<GameGraphSection {...props({ hasGraph: false, graph: emptyGraph(), variation: { startTurn: 2, scores: [null, null, 0.3] }, graphMaxTurn: 8 })} />);
     expect(screen.getByText('Gold = your variation. The main line has no curve yet; Analyze game fills it for comparison.')).toBeInTheDocument();

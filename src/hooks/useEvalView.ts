@@ -3,7 +3,7 @@ import {
   type OpponentTeamInfo, type ReplayData, type TurnSnapshot, formatEnforcesSleepClause,
   getBranchSimulatorFormat, inferReplayFormatId, replayRuleset,
 } from '@fulllifegames/replay-core';
-import { needsSettingsUpgrade, resolveAutoTurnSettings, type TurnEvalSettings, useEvaluation } from './useEvaluation';
+import { resolveAutoTurnSettings, type TurnEvalSettings, useEvaluation } from './useEvaluation';
 import type { useEvalAcquire } from './useEvalAcquire';
 import { makePreviewAcquire, type TeamBuildSources } from '../lib/eval-acquire';
 import { evalStorePrefix } from '../lib/eval-cache-store';
@@ -135,8 +135,8 @@ function useEvaluateAction(inputs: EvalViewInputs, format: EvalFormat) {
   return handleEvaluate;
 }
 
-/** Analyze game (full sweep incl. turn 0), the explicit per-turn deepen
- *  sweep, and the "always on" auto-analyze. */
+/** Analyze game (full sweep incl. turn 0), a gap turn's single analysis,
+ *  and the "always on" auto-analyze. */
 function useSweepRuns(inputs: EvalViewInputs, format: EvalFormat) {
   const { replayData, snapshots, evaluation, analyzableTurns, evalIsDoubles, acquire, sources, bringOnlyLists, setsFingerprint, sensitivityTargetsFor, smogonPending } = inputs;
   const { effectiveTera, effectiveSleepClause, effectiveRuleset, evalAvailable } = format;
@@ -166,9 +166,10 @@ function useSweepRuns(inputs: EvalViewInputs, format: EvalFormat) {
   }, [replayData, evaluation, analyzableTurns, effectiveTera, effectiveSleepClause, effectiveRuleset, evalIsDoubles, setsFingerprint, acquire, playedFor, sources, bringOnlyLists, sensitivityTargetsFor]);
 
   // Explains ONE turn: a two-turn mini sweep (turn + its follow-up) so the
-  // report can price the played outcome. Runs ONLY from the explicit deepen
-  // button — selecting a turn shows the stored result and never re-searches.
-  const analyzeTurnNow = useCallback((turn: number, settings?: TurnEvalSettings) => {
+  // report can price the played outcome, at the panel's settings. Runs ONLY
+  // from a gap turn's Analyze button: selecting a turn shows the stored
+  // result and never re-searches.
+  const analyzeTurnNow = useCallback((turn: number) => {
     if (!replayData) return;
     evaluation.runGraphSweep({
       turns: analyzableTurns,
@@ -183,7 +184,6 @@ function useSweepRuns(inputs: EvalViewInputs, format: EvalFormat) {
       acquireFor: acquire.makeReplayAcquire,
       playedFor,
       sensitivityTargetsFor,
-      settings,
     });
   }, [replayData, evaluation, analyzableTurns, effectiveTera, effectiveSleepClause, effectiveRuleset, evalIsDoubles, setsFingerprint, acquire, playedFor, sensitivityTargetsFor]);
 
@@ -254,8 +254,8 @@ function useEvalHousekeeping(inputs: EvalViewInputs, format: EvalFormat, handleE
   ]);
 }
 
-/** The analyzed-turn result surface and the explicit deepening ladder. */
-function useThinkDeeper(inputs: EvalViewInputs, analyzeTurnNow: (turn: number, settings?: TurnEvalSettings) => void) {
+/** The analyzed-turn result surface and a gap turn's first analysis. */
+function useAnalyzedTurn(inputs: EvalViewInputs, analyzeTurnNow: (turn: number) => void) {
   const { evaluation, liveEvalView, analysisTurn, evalIsDoubles } = inputs;
   // ONE place for everything: in replay view the advantage bar, ranked
   // lists, and matrix render from the ANALYZED turn's cached sweep result
@@ -271,22 +271,24 @@ function useThinkDeeper(inputs: EvalViewInputs, analyzeTurnNow: (turn: number, s
   const analyzedSettings = !liveEvalView && analysisTurn !== null && analysisTurn >= 1
     ? evaluation.graph.settings[analysisTurn - 1] ?? null
     : null;
-  // The explicit deepening ladder: a sketch (or gap) first rises to the
-  // configured settings, then one depth further (cap 3).
-  const thinkDeeperTarget = useMemo(
-    () => resolveThinkDeeperTarget(liveEvalView, analysisTurn, evaluation.graph, evaluation.prefs, evalIsDoubles),
+  // A gap turn (no result yet) offers its analysis at the panel's settings.
+  // An analyzed turn offers nothing: the deeper stage left with "Think
+  // deeper" (round 67, T109, gate answer 5b).
+  const analyzeTarget = useMemo(
+    () => resolveAnalyzeTarget(liveEvalView, analysisTurn, evaluation.graph, evaluation.prefs, evalIsDoubles),
     [liveEvalView, analysisTurn, evaluation.graph, evaluation.prefs, evalIsDoubles],
   );
-  const handleThinkDeeper = useCallback(() => {
-    if (analysisTurn === null || analysisTurn < 1 || !thinkDeeperTarget) return;
-    // The 'auto' sentinel means "no override" — the sweep resolves the
-    // turn's engine from its position, exactly like Analyze game.
-    analyzeTurnNow(analysisTurn, 'depth' in thinkDeeperTarget ? thinkDeeperTarget : undefined);
-  }, [analysisTurn, thinkDeeperTarget, analyzeTurnNow]);
-  return { analyzedResult, analyzedSettings, thinkDeeperTarget, handleThinkDeeper };
+  const handleAnalyzeTurn = useCallback(() => {
+    if (analysisTurn === null || analysisTurn < 1 || !analyzeTarget) return;
+    // No override: the sweep runs the panel's settings and resolves auto per
+    // turn from its position, exactly like Analyze game.
+    analyzeTurnNow(analysisTurn);
+  }, [analysisTurn, analyzeTarget, analyzeTurnNow]);
+  return { analyzedResult, analyzedSettings, analyzeTarget, handleAnalyzeTurn };
 }
 
-function resolveThinkDeeperTarget(
+/** The settings a gap turn's analysis runs, as its button names them; null for a stored turn. */
+function resolveAnalyzeTarget(
   liveEvalView: boolean,
   analysisTurn: number | null,
   graph: Evaluation['graph'],
@@ -294,28 +296,14 @@ function resolveThinkDeeperTarget(
   doubles: boolean,
 ): TurnEvalSettings | { mode: 'auto' } | null {
   if (liveEvalView || analysisTurn === null || analysisTurn < 1) return null;
-  const stored = graph.settings[analysisTurn - 1] ?? null;
-  const fraction = graph.faintedFractions[analysisTurn - 1] ?? null;
-  if (!stored || needsSettingsUpgrade(stored, prefs, fraction, doubles)) {
-    if (prefs.mode === 'auto') {
-      // Rise to the turn's auto-resolved engine; a gap turn's routing
-      // signal is unknown until swept — the sweep resolves it itself.
-      return fraction !== null ? resolveAutoTurnSettings(fraction, doubles) : { mode: 'auto' };
-    }
-    return { depth: prefs.depth, samples: prefs.samples, mode: prefs.mode };
+  if (graph.settings[analysisTurn - 1]) return null;
+  if (prefs.mode === 'auto') {
+    // The engine the sweep will resolve; a gap turn's routing signal is
+    // unknown until swept, and the sweep resolves it itself.
+    const fraction = graph.faintedFractions[analysisTurn - 1] ?? null;
+    return fraction !== null ? resolveAutoTurnSettings(fraction, doubles) : { mode: 'auto' };
   }
-  // A tree turn is the deepest engine the panel has: a matrix rung would
-  // see three plies where the tree saw seven (573756 t138), so no rung is
-  // offered. Escalations stored before round 32 keep their precedence.
-  if (stored.mode === 'mcts') return null;
-  // The matrix ladder caps at the engine's depth 3.
-  if (stored.depth >= 3) return null;
-  return {
-    depth: (stored.depth + 1) as 2 | 3,
-    // Never shed samples on the way up — a d3s3 run must supersede d2s5.
-    samples: Math.max(stored.samples, prefs.samples) as TurnEvalSettings['samples'],
-    mode: 'matrix',
-  };
+  return { depth: prefs.depth, samples: prefs.samples, mode: prefs.mode };
 }
 
 export function useEvalView(inputs: EvalViewInputs) {
@@ -323,6 +311,6 @@ export function useEvalView(inputs: EvalViewInputs) {
   const handleEvaluate = useEvaluateAction(inputs, format);
   const sweeps = useSweepRuns(inputs, format);
   useEvalHousekeeping(inputs, format, handleEvaluate);
-  const deeper = useThinkDeeper(inputs, sweeps.analyzeTurnNow);
-  return { ...format, handleEvaluate, ...sweeps, ...deeper };
+  const analyzed = useAnalyzedTurn(inputs, sweeps.analyzeTurnNow);
+  return { ...format, handleEvaluate, ...sweeps, ...analyzed };
 }

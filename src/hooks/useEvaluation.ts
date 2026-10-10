@@ -5,9 +5,7 @@ import { usePrefsState, type TurnEvalSettings } from './evaluation/prefs';
 import { useSingleEval, type CachedEval } from './evaluation/single-eval';
 import { useGraphState, useGraphSweepRunner } from './evaluation/graph-sweep';
 
-export {
-  needsSettingsUpgrade, resolveAutoTurnSettings, serializedFaintedFraction, supersedesStored,
-} from './evaluation/prefs';
+export { resolveAutoTurnSettings, serializedFaintedFraction, supersedesStored } from './evaluation/prefs';
 export type { TurnEvalSettings } from './evaluation/prefs';
 export type { EvalStatus } from './evaluation/single-eval';
 export { verificationDeepSettings } from './evaluation/sweep-verify';

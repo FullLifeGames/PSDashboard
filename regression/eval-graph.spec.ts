@@ -1,5 +1,5 @@
 import { test, expect, describe, onTestFinished } from 'vitest';
-import { coverageNotice, needsSettingsUpgrade, recordEvalError, resolveAutoTurnSettings, serializedFaintedFraction, supersedesStored, verificationDeepSettings, withEvalGapNotice } from '../src/hooks/useEvaluation';
+import { coverageNotice, recordEvalError, resolveAutoTurnSettings, serializedFaintedFraction, supersedesStored, verificationDeepSettings, withEvalGapNotice } from '../src/hooks/useEvaluation';
 import {
   AUTO_MCTS_FAINTED_FRACTION, computeBlunders, configureSearchBudget, selectKeyTurns, BLUNDER_SWING, KEY_TURN_SWING, KEY_MOMENT_SWING,
   SEARCH_BUDGET_DEFAULT,
@@ -70,23 +70,6 @@ describe('eval-gap visibility helpers', () => {
   });
 });
 
-describe('settings upgrade decision (merged flow)', () => {
-  const prefs = { depth: 2, samples: 3, mode: 'matrix', auto: false, tera: 'auto' } as const;
-  test('shallower stored settings upgrade; deeper never downgrade', () => {
-    expect(needsSettingsUpgrade(null, prefs)).toBe(true);
-    expect(needsSettingsUpgrade({ depth: 1, samples: 1, mode: 'matrix' }, prefs)).toBe(true);
-    expect(needsSettingsUpgrade({ depth: 2, samples: 1, mode: 'matrix' }, prefs)).toBe(true);
-    expect(needsSettingsUpgrade({ depth: 2, samples: 3, mode: 'matrix' }, prefs)).toBe(false);
-    // Deeper/heavier stored results stay shown under lighter prefs.
-    expect(needsSettingsUpgrade({ depth: 2, samples: 5, mode: 'matrix' }, prefs)).toBe(false);
-    expect(needsSettingsUpgrade({ depth: 2, samples: 3, mode: 'matrix' }, { ...prefs, depth: 1, samples: 1 })).toBe(false);
-    // Engine-mode mismatch always re-runs — the fast pass is matrix even
-    // for MCTS users, so their selected turns must still get MCTS.
-    expect(needsSettingsUpgrade({ depth: 1, samples: 1, mode: 'matrix' }, { ...prefs, mode: 'mcts' })).toBe(true);
-    expect(needsSettingsUpgrade({ depth: 2, samples: 1, mode: 'mcts' }, { ...prefs, mode: 'mcts' })).toBe(false);
-  });
-});
-
 describe('graph merge monotonicity', () => {
   test('a shallower pass never overwrites deeper stored data', () => {
     // The re-analyze fast pass (d1s1) used to clobber a deepened turn's
@@ -110,19 +93,18 @@ describe('graph merge monotonicity', () => {
     // Same-mode MCTS has no depth ordering — it refreshes.
     expect(supersedesStored({ depth: 1, samples: 1, mode: 'mcts' }, { depth: 1, samples: 1, mode: 'mcts' }, 'mcts')).toBe(true);
   });
-  test('an explicit matrix escalation survives an MCTS-target sweep', () => {
-    // Think-deeper's cross-engine product (matrix depth ≥ 2) outranks the
-    // d1s1-grade MCTS tier — the next sweep must not trample it, whether
-    // MCTS is the target via explicit prefs or the auto routing.
+  test('a matrix result of depth ≥ 2 survives an MCTS-target sweep', () => {
+    // A matrix result of depth ≥ 2 outranks the d1s1-grade MCTS tier — the
+    // next sweep must not trample it, whether MCTS is the target via
+    // explicit prefs or the auto routing.
     expect(supersedesStored({ depth: 2, samples: 3, mode: 'matrix' }, { depth: 1, samples: 1, mode: 'mcts' }, 'mcts')).toBe(false);
     expect(supersedesStored({ depth: 3, samples: 3, mode: 'matrix' }, { depth: 1, samples: 1, mode: 'mcts' }, 'mcts')).toBe(false);
     expect(supersedesStored({ depth: 2, samples: 3, mode: 'matrix' }, { depth: 1, samples: 1, mode: 'mcts' }, 'auto', 0.5)).toBe(false);
   });
-  test('an explicit matrix escalation LANDS on an MCTS-target turn', () => {
-    // The other direction of the same rule — the think-deeper click itself.
-    // Its d2s3 matrix pass must supersede the stored d1s1-grade MCTS result
-    // even though matrix is not the turn's configured engine; without this
-    // the sweep skips the turn and the button silently does nothing.
+  test('a matrix result of depth ≥ 2 LANDS on an MCTS-target turn', () => {
+    // The other direction of the same rule: a d2s3 matrix pass supersedes
+    // the stored d1s1-grade MCTS result even where matrix is not the turn's
+    // configured engine.
     expect(supersedesStored({ depth: 1, samples: 1, mode: 'mcts' }, { depth: 2, samples: 3, mode: 'matrix' }, 'auto', 0.5)).toBe(true);
     expect(supersedesStored({ depth: 1, samples: 1, mode: 'mcts' }, { depth: 2, samples: 3, mode: 'matrix' }, 'mcts')).toBe(true);
     expect(supersedesStored({ depth: 1, samples: 1, mode: 'mcts' }, { depth: 3, samples: 3, mode: 'matrix' }, 'auto', 1)).toBe(true);
@@ -179,31 +161,6 @@ describe('auto mode resolution', () => {
     // Same-mode comparisons never need the fraction.
     expect(supersedesStored({ depth: 2, samples: 3, mode: 'matrix' }, fastIncoming, 'auto', null)).toBe(false);
     expect(supersedesStored(fastIncoming, { depth: 2, samples: 3, mode: 'matrix' }, 'auto', null)).toBe(true);
-  });
-
-  test('needsSettingsUpgrade under auto prefs follows the turn resolution', () => {
-    const prefs = { depth: 2, samples: 3, mode: 'auto', auto: false, tera: 'auto' } as const;
-    // Doubles default (tree from the first turn): an early turn holding the d1s1 matrix upgrades to the tree.
-    expect(needsSettingsUpgrade({ depth: 1, samples: 1, mode: 'matrix' }, prefs, 0.1, true)).toBe(true);
-    // The resolution logic below, under the threshold before round 61.
-    configureSearchBudget(budgetBefore61);
-    onTestFinished(() => configureSearchBudget(null));
-    // Early turn already holding the pinned d1s1 matrix: settled (depth
-    // prefs apply to the explicit matrix modes, not to auto).
-    expect(needsSettingsUpgrade({ depth: 1, samples: 1, mode: 'matrix' }, prefs, 0.1)).toBe(false);
-    // Late turn still holding matrix: the auto target is MCTS — upgrade.
-    expect(needsSettingsUpgrade({ depth: 1, samples: 1, mode: 'matrix' }, prefs, 0.5)).toBe(true);
-    // Late turn holding MCTS: settled.
-    expect(needsSettingsUpgrade({ depth: 1, samples: 1, mode: 'mcts' }, prefs, 0.5)).toBe(false);
-    // Unknown fraction: conservative for stored turns; gaps always analyze.
-    expect(needsSettingsUpgrade({ depth: 1, samples: 1, mode: 'matrix' }, prefs, null)).toBe(false);
-    expect(needsSettingsUpgrade(null, prefs, null)).toBe(true);
-    // A think-deeper'd early turn (deeper matrix) never downgrades under auto.
-    expect(needsSettingsUpgrade({ depth: 2, samples: 3, mode: 'matrix' }, prefs, 0.1)).toBe(false);
-    // A think-deeper'd LATE turn (matrix depth ≥ 2 above the MCTS tier)
-    // is settled too — no badge claims it needs the line engine back.
-    expect(needsSettingsUpgrade({ depth: 2, samples: 3, mode: 'matrix' }, prefs, 0.5)).toBe(false);
-    expect(needsSettingsUpgrade({ depth: 2, samples: 3, mode: 'matrix' }, { ...prefs, mode: 'mcts' })).toBe(false);
   });
 });
 

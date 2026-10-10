@@ -51,18 +51,17 @@ function GraphHeader({ onAnalyzeGame, graph, onCancel, running, smogonPending, h
 }
 
 function LineHint({ prefs, doubles }: { prefs: EvalPreferences; doubles?: boolean }) {
-  // Round 61: auto reads the search budget, and tree turns offer no deeper rung. Round 63 (T110): per game type;
-  // by default doubles run the tree on every turn, singles the matrix until a quarter of all bodies fell.
+  // Round 61: auto reads the search budget. Round 63 (T110): per game type; by default doubles run the tree on every
+  // turn, singles the matrix until a quarter of all bodies fell. Round 67 (T109): no deeper stage per turn.
   const autoTreeEverywhere = autoTurnSettings(0, !!doubles).mode === 'mcts';
-  const deeper = prefs.mode === 'matrix' || (prefs.mode === 'auto' && !autoTreeEverywhere);
   return (
     <div
       style={{ fontSize: 10, color: '#778', marginTop: 2 }}
-      title="Analyze game paints the whole line with a fast depth-1 scan first, then converges every turn to the settings above, report-worthy swings first. Matrix turns can go deeper still from their view (Think deeper); Tera applies everywhere."
+      title="Analyze game paints the whole line with a fast depth-1 scan first, then converges every turn to the settings above, report-worthy swings first. Tera applies everywhere."
     >
       line: fast scan, then {prefs.mode === 'mcts' ? 'MCTS'
         : prefs.mode === 'auto' ? (autoTreeEverywhere ? 'auto (MCTS every turn)' : 'auto (matrix early, MCTS late)')
-        : `depth ${prefs.depth}`} everywhere{deeper ? ' · deeper: per turn' : ''}
+        : `depth ${prefs.depth}`} everywhere
     </div>
   );
 }
@@ -73,9 +72,9 @@ interface TurnViewProps {
   result: EvalResult | null;
   currentTurn: number;
   graph: EvalGraphState;
-  /** The escalation control (null when not applicable). */
-  thinkDeeper: ReactNode;
-  hasThinkDeeper: boolean;
+  /** A gap turn's analysis control (null when not applicable). */
+  analyzeTurn: ReactNode;
+  hasAnalyzeTurn: boolean;
   leadAnalysis?: LeadAnalysis | null;
   analysis: TurnAnalysis | null;
   playerNames: [string, string];
@@ -83,7 +82,7 @@ interface TurnViewProps {
   onPickChoice?: (side: 'p1' | 'p2', choice: RankedChoice, reply?: RankedChoice | null) => void;
 }
 
-function TurnView({ report, onBackToReport, result, currentTurn, graph, thinkDeeper, hasThinkDeeper, leadAnalysis, analysis, playerNames, reads, onPickChoice }: TurnViewProps) {
+function TurnView({ report, onBackToReport, result, currentTurn, graph, analyzeTurn, hasAnalyzeTurn, leadAnalysis, analysis, playerNames, reads, onPickChoice }: TurnViewProps) {
   return (
     <>
       {report && (
@@ -104,10 +103,10 @@ function TurnView({ report, onBackToReport, result, currentTurn, graph, thinkDee
           ⚠ This turn could not be evaluated: {graph.evalErrors[currentTurn - 1]}
         </div>
       )}
-      {/* A gap turn has no result block below — the escalation
-          control still has to be reachable to analyze it at all. */}
-      {!result && hasThinkDeeper && (
-        <div style={{ marginTop: 4 }}>{thinkDeeper}</div>
+      {/* A gap turn has no result block below — its analysis
+          control is the one way to search it on its own. */}
+      {!result && hasAnalyzeTurn && (
+        <div style={{ marginTop: 4 }}>{analyzeTurn}</div>
       )}
       {leadAnalysis && <EvalLeadAnalysis leads={leadAnalysis} playerNames={playerNames} />}
       {!leadAnalysis && analysis && <EvalTurnAnalysis analysis={analysis} playerNames={playerNames} reads={reads} onExplore={onPickChoice} />}

@@ -104,12 +104,12 @@ test.describe('PS Dashboard', () => {
     await expect(panel.locator('.ps-eval-analysis')).toContainText('Turn 1', { timeout: 15_000 });
   });
 
-  test('deepening is explicit and monotone — clicking an entry never re-searches', async ({ page }) => {
+  test('clicking an entry never re-searches, and a shallower re-analyze never downgrades a deeper turn', async ({ page }) => {
     test.setTimeout(240_000);
     await page.evaluate(() => {
       localStorage.setItem('ps-replay-interceptor:eval-pool', '2');
       localStorage.setItem('ps-replay-interceptor:eval-prefs',
-        JSON.stringify({ depth: 1, samples: 1, auto: false, tera: 'auto' }));
+        JSON.stringify({ depth: 2, samples: 1, auto: false, tera: 'auto' }));
     });
     await page.reload();
     await page.locator('button', { hasText: 'Load' }).click();
@@ -119,18 +119,16 @@ test.describe('PS Dashboard', () => {
     await panel.locator('button', { hasText: 'Analyze game' }).click();
     await expect(panel.locator('button', { hasText: 'Re-analyze' })).toBeVisible({ timeout: 180_000 });
 
-    // Selecting a turn shows the stored depth-1 result — no silent
-    // re-search swaps the numbers. The escalation is the explicit button
-    // (restored 2026-08-13: the single-turn acquire heals like the sweep).
+    // Selecting a turn shows the stored depth-2 result — no silent
+    // re-search swaps the numbers. Round 67 (T109, gate answer 5b): an
+    // analyzed turn offers no deeper stage.
     await panel.locator('.ps-eval-graph rect[data-turn="1"]').click();
-    await expect(panel.getByText(/^depth 1/)).toBeVisible({ timeout: 15_000 });
-    const deeper = panel.locator('button', { hasText: 'Think deeper about this position' });
-    await expect(deeper).toContainText('depth 2');
-    await deeper.click();
-    await expect(panel.getByText(/^depth 2/)).toBeVisible({ timeout: 120_000 });
+    await expect(panel.getByText(/^depth 2/)).toBeVisible({ timeout: 15_000 });
+    await expect(panel.locator('button', { hasText: 'Think deeper' })).toHaveCount(0);
 
-    // Monotone merge: a later re-analyze (fast scan) must NOT downgrade the
-    // explicitly deepened turn back to depth 1.
+    // Monotone merge: a later re-analyze at depth 1 must NOT downgrade the
+    // turn stored at depth 2.
+    await panel.locator('label', { hasText: 'Depth' }).locator('select').selectOption('1');
     await panel.locator('button', { hasText: 'Re-analyze' }).click();
     await expect(panel.locator('button', { hasText: 'Re-analyze' })).toBeVisible({ timeout: 180_000 });
     await panel.locator('.ps-eval-graph rect[data-turn="1"]').click();
@@ -195,10 +193,7 @@ test.describe('PS Dashboard', () => {
     await panel.locator('.ps-eval-graph rect[data-turn="38"]').click();
     await expect(panel.locator('.ps-eval-analysis')).toContainText('Turn 38', { timeout: 15_000 });
     await expect(panel.getByTitle('What produced the numbers shown for this turn.')).toHaveText('MCTS');
-    // Round 32: a tree turn offers no matrix rung (it would see three plies
-    // where the tree saw seven); the badge stays MCTS and no ladder button
-    // renders for this turn.
-    await expect(panel.locator('button', { hasText: 'Think deeper about this position' })).toHaveCount(0);
-    await expect(panel.getByTitle('What produced the numbers shown for this turn.')).toHaveText('MCTS');
+    // Round 67 (T109, gate answer 5b): no analyzed turn offers a deeper stage.
+    await expect(panel.locator('button', { hasText: 'Think deeper' })).toHaveCount(0);
   });
 });

@@ -52,12 +52,12 @@ describe('EvalPanel', () => {
 
   test('replay view: the report is the overview; a card or a navigation opens the turn view, with a way back', async () => {
     const onSelectTurn = vi.fn();
-    const onThinkDeeper = vi.fn();
+    const onAnalyzeTurn = vi.fn();
     const onAnalyzeGame = vi.fn();
     const graph = evalGraph();
     const report = gameReport({ keyMoments: [turnAnalysis(6, { attribution: 'chance', swing: -0.4 })] });
     const wired = props({
-      graph, report, analysis: turnAnalysis(3), onSelectTurn, onAnalyzeGame, onThinkDeeper, thinkDeeperTarget: { depth: 2, samples: 1, mode: 'matrix' },
+      graph, report, analysis: turnAnalysis(3), onSelectTurn, onAnalyzeGame, onAnalyzeTurn, analyzeTarget: { depth: 2, samples: 1, mode: 'matrix' },
       result: graph.results[2], resultSettings: graph.settings[2], currentTurn: 3, analysisTurn: 3, graphMaxTurn: 12,
     });
     const { rerender } = render(<EvalPanel {...wired} />);
@@ -70,8 +70,9 @@ describe('EvalPanel', () => {
     expect(onSelectTurn).toHaveBeenCalledWith(6, undefined);
     expect(screen.getByText('Turn 3')).toBeInTheDocument();
     expect(screen.getByText('depth 1 · 1 sample')).toBeInTheDocument();
-    await userEvent.click(screen.getByRole('button', { name: 'Think deeper about this position (depth 2)' }));
-    expect(onThinkDeeper).toHaveBeenCalledTimes(1);
+    // Round 67 (T109, gate answer 5b): an analyzed turn offers no deeper stage.
+    expect(screen.queryByRole('button', { name: /Think deeper/ })).toBeNull();
+    expect(onAnalyzeTurn).not.toHaveBeenCalled();
     await userEvent.click(screen.getByRole('button', { name: '← Game report' }));
     expect(screen.getByText('Game report', { selector: 'span' })).toBeInTheDocument();
 
@@ -82,6 +83,17 @@ describe('EvalPanel', () => {
     expect(onSelectTurn).toHaveBeenLastCalledWith(5, 'main');
     await userEvent.click(screen.getByRole('button', { name: 'Re-analyze' }));
     expect(onAnalyzeGame).toHaveBeenCalledTimes(1);
+  });
+
+  test('a gap turn of the replay view offers its analysis at the named settings', async () => {
+    const onAnalyzeTurn = vi.fn();
+    const graph = evalGraph('singles', { scores: [0.1, null, 0.2], results: [evalResult(), null, evalResult()], settings: [null, null, null], faintedFractions: [0, null, 0.1] });
+    render(<EvalPanel {...props({
+      graph, analysis: null, onSelectTurn: vi.fn(), onAnalyzeGame: vi.fn(), onAnalyzeTurn, analyzeTarget: { depth: 1, samples: 3, mode: 'matrix' },
+      result: null, currentTurn: 2, analysisTurn: 2, graphMaxTurn: 3,
+    })} />);
+    await userEvent.click(screen.getByRole('button', { name: 'Analyze this position (depth 1)' }));
+    expect(onAnalyzeTurn).toHaveBeenCalledTimes(1);
   });
 
   test('a running play-out replaces the result block; Smogon pending disables the sweep; a variation alone still shows the graph', () => {

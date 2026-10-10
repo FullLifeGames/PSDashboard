@@ -348,7 +348,7 @@ export function useGraphSweepRunner(env: {
     cancel();
     perfReset();
     const runId = ++runRef.current;
-    const { depth, samples, mode } = params.settings ?? prefsRef.current;
+    const { depth, samples, mode } = prefsRef.current;
     const configuredMode = prefsRef.current.mode;
     const from = Math.max(1, params.from ?? 1);
     const to = Math.min(params.turns, params.to ?? params.turns);
