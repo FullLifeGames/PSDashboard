@@ -2569,11 +2569,11 @@
       ],
       "forcedWin": {
         "side": "p1",
-        "turns": 4,
+        "turns": 5,
         "mass": 1,
         "caveat": "sampled-rolls",
         "engineScore": 0.9,
-        "states": 8
+        "states": 14
       }
     },
     "mcts": {

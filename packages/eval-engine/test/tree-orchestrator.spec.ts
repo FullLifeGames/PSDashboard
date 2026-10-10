@@ -107,7 +107,8 @@ describe('tree orchestration (round 61; read through the executor since round 64
     const answers = record.rounds.slice(verifyAt + 1);
     expect(answers.length).toBeGreaterThan(0);
     expect(answers.every(round => round.jobs.every(job => job.plain && job.deepen === undefined))).toBe(true);
-    expect(record.proofs[0].input.rootOrder).toEqual({ p1: result.perSide.p1.map(row => row.choice), p2: result.perSide.p2.map(row => row.choice) });
+    // The prover reads the answered ranking (its near ties by label since round 67, T134).
+    expect(record.proofs[0].input.rootOrder).toEqual(forcedWinInput(result, settings).rootOrder);
   });
 
   // Round 67 (T111 point 3): the tests count the trees the budget in force runs; with a constant beside the budget

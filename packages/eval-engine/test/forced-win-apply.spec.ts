@@ -47,9 +47,11 @@ const resultWith = (score: number, p1: string[], p2: string[], extra: Partial<Ev
 
 describe('forced-win trigger and bar (round 35)', () => {
   test('forcedWinInput carries score, profile, ranking order and the search allowance', () => {
+    // Rows a band apart keep the ranking's order; a near tie goes by label since round 67 (prover-near-tie.spec.ts).
     const result = resultWith(0.3, ['move seismictoss', 'move protect'], ['move softboiled'], {
       unanswered: { p1: [], p2: [], decided: { side: 'p1', species: 'Machamp' } },
     });
+    result.perSide.p1[1] = row('move protect', 0.2);
     expect(forcedWinInput(result, { depth: 1, samples: 1, tera: false, sleepClause: true })).toEqual({
       score: 0.3,
       unanswered: result.unanswered,
