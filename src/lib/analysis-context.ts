@@ -3,6 +3,7 @@ import type { ReplayData, TurnSnapshot } from '@fulllifegames/replay-core';
 import {
   analyzeTurn, decidedSeenKey, diceEventTurns, forcedWinSeenKey, forcedWinSpeaks, PAYOFF_WINDOW, unansweredSeenKey, type TurnAnalysis, detectSacks,
   type PlayedTurn, type StreakHistoryEntry, buildGameReport, type GameReport, computeRead, type EvalResult, noteSpokenClaim, releaseBrokenClaims,
+  detectRolls,
 } from '@fulllifegames/eval-engine';
 
 /** The graph slices the analyses read — matches useEvaluation's graph. */
@@ -60,6 +61,20 @@ type TurnReads = NonNullable<Parameters<typeof analyzeTurn>[0]['reads']>;
 /** Each player's own tendencies from the replay log (parseTendencies). */
 export type ReplayTendencies = NonNullable<Parameters<typeof analyzeTurn>[0]['tendencies']>;
 
+/**
+ * What analyzeTurn reads from the turn's own protocol against the pre-turn
+ * snapshot: the sacks (when asked) and, round 67 (T22), the dice markers and
+ * move hits, so the luck sentences can tell a roll from a re-read.
+ */
+function protocolInputs(turn: number, context: TurnAnalysisContext, includeSacks: boolean) {
+  const events = context.turnEventsIndex[turn];
+  const before = context.snapshots[turn - 1] ?? null;
+  return {
+    ...(includeSacks ? { sacks: detectSacks(events ?? [], before) } : {}),
+    ...(events ? { rolls: detectRolls(events, before) } : {}),
+  };
+}
+
 /** One argument assembly for analyzeTurn — the per-turn view and the report
  *  walk used to paste the same block at two sites. */
 export function analyzeTurnAt(args: {
@@ -89,9 +104,7 @@ export function analyzeTurnAt(args: {
     scoreBefore,
     scoreAfter: graph.scores[turn] ?? null,
     playedTracking: true,
-    ...(args.includeSacks
-      ? { sacks: detectSacks(context.turnEventsIndex[turn] ?? [], context.snapshots[turn - 1] ?? null) }
-      : {}),
+    ...protocolInputs(turn, context, args.includeSacks),
     ...(args.reads ? { reads: args.reads } : {}),
     ...(args.tendencies ? { tendencies: args.tendencies } : {}),
     actives: context.activesForTurn(turn),

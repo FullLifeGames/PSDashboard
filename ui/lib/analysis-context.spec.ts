@@ -115,3 +115,36 @@ describe('the report walk speaks the forced-win sentence once', () => {
     expect(walk?.analyses[1]?.p1.forcedWin?.announce).toBe(false);
   });
 });
+
+/**
+ * Round 67 (T22): the walk and the card hand the turn's rolls to analyzeTurn
+ * (dice markers and move hits read from the turn's protocol against the
+ * pre-turn snapshot), so the luck sentences can tell a roll from a re-read.
+ */
+describe('analyzeTurnAt passes the rolls of the turn', () => {
+  test('singles: a crit on turn 1 is a roll for p1, a turn without dice rolled for nobody', () => {
+    const critLog = replayData.log.replace('|-damage|p2a: Kingambit|55/100', () => '|-crit|p2a: Kingambit\n|-damage|p2a: Kingambit|55/100');
+    const context = { ...contextWith(snapshots), turnEventsIndex: allTurnEvents(critLog) };
+    const graph = graphWith(undefined);
+    expect(analyzeTurnAt({ turn: 1, graph, context, includeSacks: true })?.rolledFor).toEqual({ p1: true, p2: false });
+    expect(analyzeTurnAt({ turn: 2, graph, context, includeSacks: true })?.rolledFor).toEqual({ p1: false, p2: false });
+  });
+
+  test('VGC: a crit on p2a favors p1, and the report walk carries the same rolls as the card', () => {
+    const vgc = replayOf('vgc');
+    vgc.log = vgc.log.replace('|switch|p2b: Ivysaur|Ivysaur, L50|100/100', () =>
+      '|switch|p2b: Ivysaur|Ivysaur, L50|100/100\n|move|p1a: Raichu|Thunderbolt|p2a: Squirtle\n|-crit|p2a: Squirtle\n|-damage|p2a: Squirtle|20/100');
+    const vgcSnapshots = parseReplayLog(vgc.log);
+    const graph: AnalysisGraphData = {
+      scores: vgcSnapshots.map(() => 0.1), results: vgcSnapshots.map(() => evalResult('doubles', { score: 0.1 })),
+      played: vgcSnapshots.map(() => null), playedOutcome: vgcSnapshots.map(() => null),
+      verified: vgcSnapshots.map(() => null), sensitivity: vgcSnapshots.map(() => null),
+    };
+    const context: TurnAnalysisContext = {
+      snapshots: vgcSnapshots, turnEventsIndex: allTurnEvents(vgc.log), activesForTurn: () => null, playedHistory: { p1: [], p2: [] },
+    };
+    expect(analyzeTurnAt({ turn: 2, graph, context, includeSacks: true })?.rolledFor).toEqual({ p1: true, p2: false });
+    const walk = computeGameReportData({ replayData: vgc, graph, context, winner: 'p1', tendencies: null });
+    expect(walk?.analyses[1]?.rolledFor).toEqual({ p1: true, p2: false });
+  });
+});

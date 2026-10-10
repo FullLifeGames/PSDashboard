@@ -1,6 +1,7 @@
 import type { EvalResult, ForcedWinCaveat, ForcedWinOpen, KoOddsInfo, RankedChoice, ReadRecommendation } from '../types.ts';
 import type { StreakHistoryEntry, StreakOdds } from '../streaks.ts';
 import type { PlayedAction, PlayedTurn, SackInfo } from '../played.ts';
+import type { TurnRolls } from '../dice-events.ts';
 import type { SideId } from '@fulllifegames/replay-core';
 import type { PlayerTendencies } from '../opponent-model.ts';
 
@@ -376,6 +377,15 @@ export interface TurnAnalysis {
    * act". Absent means true.
    */
   playedTracking?: boolean;
+  /**
+   * Round 67 (T22): the sides the turn's rolls favored (turn-analysis/luck.ts):
+   * a protocol dice marker, or a played line's KO odds as they came out on
+   * the body they priced. The luck sentences say "rolled" only for a roll in
+   * the residual's direction and name the rest as the engine re-reading the
+   * position. Absent without the turn's protocol: the sentences keep their
+   * ungated form.
+   */
+  rolledFor?: { p1: boolean; p2: boolean };
 }
 
 /** analyzeTurn's input: the sweep's cached per-turn data plus the render-time context. */
@@ -401,6 +411,8 @@ export interface AnalyzeTurnParams {
   playedTracking?: boolean;
   /** Per-side low-HP sacrifices detected in the turn's protocol (played.ts). */
   sacks?: { p1?: SackInfo; p2?: SackInfo };
+  /** Round 67 (T22): the turn's dice markers and move hits (dice-events.ts detectRolls); absent keeps rolledFor off. */
+  rolls?: TurnRolls | null;
   /** Per-side opponent-model best responses (opponent-model.ts computeRead). */
   reads?: { p1?: ReadRecommendation | null; p2?: ReadRecommendation | null };
   /**

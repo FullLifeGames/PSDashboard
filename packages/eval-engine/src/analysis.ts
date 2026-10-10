@@ -1,6 +1,7 @@
 import { gradeSide, gradingFields } from './turn-analysis/grading.ts';
 import { signalFields, signalSide } from './turn-analysis/signals.ts';
 import { attributionFor, markRisk } from './turn-analysis/risk.ts';
+import { rolledSides } from './turn-analysis/luck.ts';
 import type { AnalyzeTurnParams, Side, SideAnalysis, TurnAnalysis } from './turn-analysis/types.ts';
 
 /**
@@ -57,5 +58,7 @@ export function analyzeTurn(params: AnalyzeTurnParams): TurnAnalysis {
     p1,
     p2,
     playedTracking,
+    // Round 67 (T22): the turn's rolls, display only (the sentences split rolled from re-read).
+    ...(params.rolls ? { rolledFor: rolledSides(params.rolls, p1, p2, params.actives) } : {}),
   };
 }
