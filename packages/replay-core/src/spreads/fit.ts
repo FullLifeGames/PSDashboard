@@ -4,7 +4,7 @@ import type { PokemonSet } from '@pkmn/sim';
 import type { DamageObservation, PokemonEvs, SpeedOrderObservation } from '../types.ts';
 import { WEATHER_BY_ID } from '../calc-field.ts';
 import { typedHiddenPowerId } from '../hidden-power.ts';
-import { evBudget, ZERO_EVS, type EvBudget } from './ev-budget.ts';
+import { calcEvs, calcIvs, evBudget, onBudgetScale, statPointsOfEv, ZERO_EVS, type EvBudget } from './ev-budget.ts';
 import type { CandidateRung, SpreadCandidate } from './ladder.ts';
 import type { ItemDecision } from './scarf.ts';
 import type { ObservedMaxHp } from './max-hp.ts';
@@ -93,12 +93,19 @@ export function setOf(ctx: SolveContext, side: 'p1' | 'p2', species: string): Po
   return ctx.sets[side].find(entry => toId(entry.species) === toId(species) || toId(entry.name || '') === toId(species));
 }
 
-/** The species' base HP (the set's species, else the key's) and its HP IV, for the max-HP inversion. */
+/** The species' base HP (the set's species, else the key's) and its HP IV (31 on Stat Points), for the max-HP inversion. */
 export function hpBasisOf(ctx: SolveContext, side: 'p1' | 'p2', species: string): { baseHp: number; iv: number } | undefined {
   const set = setOf(ctx, side, species);
   const data = ctx.gen.species.get(toId(set?.species ?? species) as Parameters<typeof ctx.gen.species.get>[0]);
   if (!data) return undefined;
-  return { baseHp: data.baseStats.hp, iv: set?.ivs?.hp ?? 31 };
+  return { baseHp: data.baseStats.hp, iv: calcIvs(set?.ivs, ctx.budget)?.hp ?? 31 };
+}
+
+/** The sets with every spread on the budget's scale: a Stat Point solve never reads EVs as points (round 67). */
+function onScale(sets: { p1: PokemonSet[]; p2: PokemonSet[] }, budget: EvBudget): { p1: PokemonSet[]; p2: PokemonSet[] } {
+  if (!budget.statPoints) return sets;
+  const scaled = (team: PokemonSet[]) => team.map(set => ({ ...set, evs: onBudgetScale({ ...ZERO_EVS, ...set.evs }, budget) }));
+  return { p1: scaled(sets.p1), p2: scaled(sets.p2) };
 }
 
 /**
@@ -114,10 +121,11 @@ export function buildSolveContext(
   speedOrders: ReadOrder[],
   maxHp: Map<string, ObservedMaxHp> = new Map(),
 ): SolveContext {
+  const budget = evBudget(formatid);
   const ctx: SolveContext = {
     gen: genOf(formatid),
-    budget: evBudget(formatid),
-    sets,
+    budget,
+    sets: onScale(sets, budget),
     solved: new Map<string, SpreadCandidate>(),
     byMon: new Map<string, DamageObservation[]>(),
     speedByMon: new Map<string, ReadOrder[]>(),
@@ -160,6 +168,7 @@ export function spreadFor(ctx: SolveContext, side: 'p1' | 'p2', species: string)
   return { evs: { ...ZERO_EVS, ...(set?.evs ?? {}) }, nature: set?.nature || 'Hardy' };
 }
 
+/** A body as the calculator reads it: Stat Points as their EVs and every IV at 31 (calcEvs), else the spread itself. */
 function calcPokemon(ctx: SolveContext, side: 'p1' | 'p2', species: string, spread: SpreadCandidate, obsBoosts: Record<string, number>, status: string) {
   const set = setOf(ctx, side, species);
   return new Pokemon(ctx.gen, set?.species ?? species, {
@@ -167,8 +176,8 @@ function calcPokemon(ctx: SolveContext, side: 'p1' | 'p2', species: string, spre
     ability: set?.ability || undefined,
     item: set?.item || undefined,
     nature: spread.nature,
-    evs: spread.evs,
-    ivs: set?.ivs,
+    evs: calcEvs(spread.evs, ctx.budget),
+    ivs: calcIvs(set?.ivs, ctx.budget),
     boosts: obsBoosts,
     status: (status || undefined) as ConstructorParameters<typeof Pokemon>[2] extends { status?: infer S } ? S : never,
   });
@@ -229,13 +238,18 @@ export function observationError(ctx: SolveContext, obs: DamageObservation, cand
   }
 }
 
-/** The Speed stat of a spread on the set's level and IVs (the spread's own IVs first; a battle forme's base Speed when one raced), 0 when the calc cannot build the species. */
+/**
+ * The Speed stat of a spread on the set's level and IVs (the spread's own IVs first; a battle forme's base
+ * Speed when one raced; Stat Points as their EVs with every IV at 31), 0 when the calc cannot build the species.
+ */
 export function speedStat(ctx: SolveContext, side: 'p1' | 'p2', species: string, spread: SpreadCandidate, forme?: string): number {
   const set = setOf(ctx, side, species);
   const name = forme ?? set?.species ?? species;
+  const evs = calcEvs(spread.evs, ctx.budget);
+  const ivs = calcIvs(spread.ivs ?? set?.ivs, ctx.budget);
   for (const candidate of [name, name.split('-')[0]]) {
     try {
-      return new Pokemon(ctx.gen, candidate, { level: set?.level || 100, nature: spread.nature, evs: spread.evs, ivs: spread.ivs ?? set?.ivs }).stats.spe;
+      return new Pokemon(ctx.gen, candidate, { level: set?.level || 100, nature: spread.nature, evs, ivs }).stats.spe;
     } catch {
       // Unknown forme: try the base species.
     }
@@ -312,6 +326,9 @@ export function physicalAttackerFor(ctx: SolveContext, key: string): boolean {
   return physical * 2 >= attacking.length;
 }
 
+/** A changed nature weighs as much as 64 moved EVs; on Stat Points as the points with the same stats (8). */
+const NATURE_DISTANCE_EVS = 64;
+
 /**
  * Roll ranges are wide: opposite rungs (0 EV and 252 EV) can BOTH fit an
  * observation with zero error. Ties break toward the mon's prior guess —
@@ -322,5 +339,6 @@ export function priorDistance(ctx: SolveContext, key: string, rung: CandidateRun
   if (!prior) return 0;
   const stats: (keyof PokemonEvs)[] = ['hp', 'atk', 'def', 'spa', 'spd', 'spe'];
   const evDistance = stats.reduce((sum, stat) => sum + Math.abs((rung.evs[stat] ?? 0) - (prior.evs[stat] ?? 0)), 0);
-  return evDistance + (rung.nature === prior.nature ? 0 : 64);
+  const natureDistance = ctx.budget.statPoints ? statPointsOfEv(NATURE_DISTANCE_EVS) : NATURE_DISTANCE_EVS;
+  return evDistance + (rung.nature === prior.nature ? 0 : natureDistance);
 }

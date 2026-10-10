@@ -1,4 +1,5 @@
 import { keyOf } from './fit.ts';
+import { calcEvs, evBudget, evStep, ZERO_EVS, type EvBudget } from './ev-budget.ts';
 
 /** One Pokémon's maximum HP as the log printed it, with the level of that line. */
 export interface ObservedMaxHp {
@@ -36,14 +37,19 @@ export function observedMaxHp(log: string): Map<string, ObservedMaxHp> {
  * over the legal EV counts (multiples of four, 0..252). Level 100 inverts
  * exactly; lower levels leave a few candidates, of which the one nearest
  * the prior's HP EVs wins. `undefined` when no count reaches the HP
- * (foreign IVs, Shedinja): then the log measured nothing usable.
+ * (foreign IVs, Shedinja): then the log measured nothing usable. On Stat
+ * Points (round 67) the candidates are the points 0..32, each through its
+ * EVs (calcEvs), and the answer is in points.
  */
-export function hpEvsForMaxHp(baseHp: number, level: number, maxhp: number, priorHp: number, iv = 31): number | undefined {
+export function hpEvsForMaxHp(
+  baseHp: number, level: number, maxhp: number, priorHp: number, iv = 31, budget: EvBudget = evBudget(''),
+): number | undefined {
   let best: number | undefined;
-  for (let ev = 0; ev <= 252; ev += 4) {
+  for (let value = 0; value <= budget.perStat; value += evStep(budget)) {
+    const ev = calcEvs({ ...ZERO_EVS, hp: value }, budget).hp;
     const hp = Math.floor((2 * baseHp + iv + Math.floor(ev / 4)) * level / 100) + level + 10;
     if (hp !== maxhp) continue;
-    if (best === undefined || Math.abs(ev - priorHp) < Math.abs(best - priorHp)) best = ev;
+    if (best === undefined || Math.abs(value - priorHp) < Math.abs(best - priorHp)) best = value;
   }
   return best;
 }

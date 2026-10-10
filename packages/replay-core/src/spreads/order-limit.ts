@@ -1,7 +1,7 @@
 import { Dex } from '@pkmn/dex';
 import type { PokemonSet } from '@pkmn/sim';
 import type { PokemonEvs, SpeedOrderObservation } from '../types.ts';
-import { capToBudget, ZERO_EVS } from './ev-budget.ts';
+import { capToBudget, evStep, onBudgetScale, ZERO_EVS } from './ev-budget.ts';
 import {
   firstOf, keyOf, physicalAttackerFor, racedWithScarf, secondOf, setOf, speedStat, weakRace, type RaceSide, type ReadOrder, type SolveContext,
 } from './fit.ts';
@@ -55,7 +55,6 @@ type Reading = (option: Option) => number;
 /** A race as one solve reads it: each mover's race Speed, whether the priors break it and whether it must end strict. */
 interface Bound { first: Racer; second: Racer; firstSpeed: Reading; secondSpeed: Reading; broken: boolean; strict: boolean }
 
-const EV_STEP = 4;
 const MAX_IVS: PokemonEvs = { hp: 31, atk: 31, def: 31, spa: 31, spd: 31, spe: 31 };
 
 const named = (sets: PokemonSet[], species: string) =>
@@ -130,20 +129,21 @@ function option(ctx: SolveContext, racer: Racer, spread: SpreadCandidate, plausi
   return { stat: speedStat(ctx, racer.side, racer.species, spread), spread, plausible, cost: cost(ctx, spread, racer.prior) };
 }
 
-/** The prior and round 37's plausible spreads; a known spread is the only one. */
+/** The prior and round 37's plausible spreads (on the budget's scale); a known spread is the only one. */
 function plausibleOptions(ctx: SolveContext, knowledge: SpeedKnowledgeMap, racer: Racer): Option[] {
   const prior = option(ctx, racer, racer.prior, true);
   if (racer.known) return [prior];
   const usage = plausibleFor(ctx, racer.side, racer.species, knowledge).map(spread =>
-    option(ctx, racer, { evs: capToBudget({ ...ZERO_EVS, ...spread.evs }, new Set(), ctx.budget), nature: spread.nature }, true));
+    option(ctx, racer, { evs: capToBudget(onBudgetScale({ ...ZERO_EVS, ...spread.evs }, ctx.budget), new Set(), ctx.budget), nature: spread.nature }, true));
   return [prior, ...usage];
 }
 
-/** Every Speed the prior reaches by its Speed EVs and its nature's Speed effect, the cheapest spread per Speed. */
+/** Every Speed the prior reaches by its Speed EVs (Stat Points one by one) and its nature's Speed effect, the cheapest spread per Speed. */
 function legalOptions(ctx: SolveContext, racer: Racer): Option[] {
   const cheapest = new Map<number, Option>();
   const physical = physicalAttackerFor(ctx, racer.key);
-  const steps = [...new Set([...Array.from({ length: Math.floor(ctx.budget.perStat / EV_STEP) + 1 }, (_, i) => i * EV_STEP), ctx.budget.perStat])];
+  const step = evStep(ctx.budget);
+  const steps = [...new Set([...Array.from({ length: Math.floor(ctx.budget.perStat / step) + 1 }, (_, i) => i * step), ctx.budget.perStat])];
   for (const nature of speedNatures(racer.prior.nature, physical)) {
     for (const spe of steps) {
       const evs = capToBudget({ ...ZERO_EVS, ...racer.prior.evs, spe }, new Set<StatId>(['spe']), ctx.budget);
@@ -159,9 +159,11 @@ function legalOptions(ctx: SolveContext, racer: Racer): Option[] {
  * The Speeds below the set's own Speed IV (round 64, decision 28): no Speed
  * EVs, the prior's nature with its Speed effect lowered, each IV down to 0.
  * A changed IV costs more than a changed nature. Asked only after every
- * legal Speed at the set's IV failed.
+ * legal Speed at the set's IV failed. Pokémon Champions has no IVs to lower
+ * (every IV is 31 and statModify reads none, round 67): no option there.
  */
 function slowOptions(ctx: SolveContext, racer: Racer): Option[] {
+  if (ctx.budget.statPoints) return [];
   const [lowered] = speedNatures(racer.prior.nature, physicalAttackerFor(ctx, racer.key));
   const evs = capToBudget({ ...ZERO_EVS, ...racer.prior.evs, spe: 0 }, new Set<StatId>(['spe']), ctx.budget);
   const ivs = { ...MAX_IVS, ...racer.set.ivs };

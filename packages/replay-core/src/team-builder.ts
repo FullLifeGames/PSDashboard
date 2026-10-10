@@ -5,6 +5,7 @@ import { getSpeciesUsageSet } from './smogon/usage-lookup.ts';
 import type { SmogonUsageStats } from './smogon/stats-types.ts';
 import { getSpeciesSetAssumption, type SmogonSetAssumptions } from './smogon/sets-lookup.ts';
 import { evBudget, inferSpreads, legalizeEvs, type SpreadCandidate } from './spread-inference.ts';
+import { ALL_31_IVS } from './spreads/ev-budget.ts';
 import { observedMaxHp } from './spreads/max-hp.ts';
 import { withHiddenPowerType } from './hidden-power.ts';
 import {
@@ -120,12 +121,14 @@ function buildTeams(log: string, options: BuildOptions): { teams: BuiltTeams; in
   const infos = infosFor(log, options);
   const knownTeams = knownTeamsFor(log, options?.userTeamText);
   const { gen, formatHint } = formatHintFor(log);
-  // Pokémon Champions uses its own EV system (32 per stat, 66 total) —
-  // standard-scale guesses/fallbacks must be clamped to the format budget.
-  const champions = evBudget(formatHint).perStat !== 252;
+  // Pokémon Champions counts Stat Points (32 per stat, 66 total) and every
+  // IV is 31 (round 67, T145): a guess or fallback from an EV-scale source
+  // reaches the Stat Point scale by the level-50 inverse (legalizeEvs), and
+  // the sets keep every IV at 31, as the server plays them.
+  const champions = evBudget(formatHint).statPoints;
   const legality = { gen: parseInt(gen, 10), custom: abilitiesAreFree(log) };
   const legalize = (team: PokemonSet[]): PokemonSet[] =>
-    (champions ? team.map(set => ({ ...set, evs: legalizeEvs(set.evs, formatHint) })) : team)
+    (champions ? team.map(set => ({ ...set, evs: legalizeEvs(set.evs, formatHint), ivs: { ...ALL_31_IVS } })) : team)
       .map(set => dexLegalSet(withHappinessAssumption(set), legality));
   const hpFor = (side: 'p1' | 'p2') =>
     (options?.hpEvidence ?? []).filter(entry => entry.attackerSide === side);

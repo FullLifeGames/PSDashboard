@@ -1,6 +1,6 @@
 import type { PokemonSet } from '@pkmn/sim';
 import type { DamageObservation, PokemonEvs, SpeedOrderObservation } from './types.ts';
-import { capToBudget, evTotal, ZERO_EVS, type EvBudget } from './spreads/ev-budget.ts';
+import { capToBudget, evStep, evTotal, ZERO_EVS, type EvBudget } from './spreads/ev-budget.ts';
 import { candidateLadder, type CandidateRung, type SpreadCandidate } from './spreads/ladder.ts';
 import {
   buildSolveContext, genNumOf, hpBasisOf, keyOf, observationError, physicalAttackerFor, priorDistance, setOf, speedError, spreadFor,
@@ -41,9 +41,6 @@ const FIT_FORFEIT_PER_OBSERVATION = 0.01;
 /** Minimum observations before a spread claim beats the existing guess. */
 const MIN_OBSERVATIONS = 2;
 
-/** The ladder's EV step: the stat moves every 4 EVs. */
-const EV_STEP = 4;
-
 /**
  * A move order measures Speed only when it REFUTES the prior and some rung
  * repairs it. An order the prior already satisfies measures nothing
@@ -70,7 +67,7 @@ function measuredHpEvs(ctx: SolveContext, key: string): number | undefined {
   const [side, species] = key.split(':') as ['p1' | 'p2', string];
   const basis = hpBasisOf(ctx, side, species);
   if (!basis) return undefined;
-  return hpEvsForMaxHp(basis.baseHp, seen.level, seen.maxhp, ctx.priors.get(key)?.evs.hp ?? 0, basis.iv);
+  return hpEvsForMaxHp(basis.baseHp, seen.level, seen.maxhp, ctx.priors.get(key)?.evs.hp ?? 0, basis.iv, ctx.budget);
 }
 
 /** The prior with the measured HP in place, legalized around it. */
@@ -115,14 +112,15 @@ const damageError = (ctx: SolveContext, key: string, rung: CandidateRung, observ
   observations.reduce((sum, obs) => sum + observationError(ctx, obs, key, rung), 0);
 
 /**
- * The most EVs a measured stat takes, in the ladder's 4-EV steps up to
- * `room`, while the mon's damage lines fit as well as they do at `rung`.
+ * The most EVs a measured stat takes, in the ladder's steps (4 EVs, one Stat
+ * Point) up to `room`, while the mon's damage lines fit as well as they do at `rung`.
  */
 function neutralRoom(
   ctx: SolveContext, key: string, rung: CandidateRung, stat: keyof PokemonEvs, room: number, observations: DamageObservation[],
 ): number {
   const fitted = damageError(ctx, key, rung, observations);
-  const adds = [...new Set([...Array.from({ length: Math.floor(room / EV_STEP) }, (_, i) => (i + 1) * EV_STEP), room])];
+  const step = evStep(ctx.budget);
+  const adds = [...new Set([...Array.from({ length: Math.floor(room / step) }, (_, i) => (i + 1) * step), room])];
   const fits = (add: number) =>
     damageError(ctx, key, { ...rung, evs: { ...rung.evs, [stat]: (rung.evs[stat] ?? 0) + add } }, observations) <= fitted + 1e-12;
   // Bisection: a stat's fit mostly leaves the rolls once and stays out; where it does not, the add it

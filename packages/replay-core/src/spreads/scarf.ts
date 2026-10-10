@@ -1,7 +1,7 @@
 import type { PokemonSet } from '@pkmn/sim';
 import type { PokemonEvs } from '../types.ts';
 import { keyOf, speedStat, weakRace, type ReadOrder, type SolveContext } from './fit.ts';
-import { ZERO_EVS } from './ev-budget.ts';
+import { onBudgetScale, statPointsOfEv, ZERO_EVS, type EvBudget } from './ev-budget.ts';
 import { raceSpeed, scarfedSpeed } from './race-speed.ts';
 import type { SpreadCandidate } from './ladder.ts';
 import { toId } from '../ids.ts';
@@ -33,13 +33,13 @@ export type ItemDecision = 'holds' | 'lacks';
 
 /** A usage spread below this share is an oddity, not a configuration to measure against. */
 const PLAUSIBLE_SHARE = 0.05;
-/** Speed EVs from which a spread counts as tempo-invested. */
+/** Speed EVs from which a spread counts as tempo-invested; on Stat Points the points with the same Speed (25). */
 const INVESTED_SPE = 200;
 /** A tempo camp holding this much of the plausible mass drops the other camp. */
 const CONFIDENT_CAMP_SHARE = 0.8;
 
 const NONE: SpeedKnowledge = { itemKnown: false, scarfRuledOut: false, spreadKnown: false, spreads: [] };
-const invested = (spread: SpreadCandidate) => (spread.evs.spe ?? 0) >= INVESTED_SPE;
+const investedFrom = (budget: EvBudget) => (budget.statPoints ? statPointsOfEv(INVESTED_SPE) : INVESTED_SPE);
 
 interface Mover {
   key: string;
@@ -49,14 +49,21 @@ interface Mover {
   know: SpeedKnowledge;
   prior: SpreadCandidate;
   plausible: SpreadCandidate[];
+  /** Whether a spread counts as tempo-invested, on the format's scale. */
+  invested: (spread: SpreadCandidate) => boolean;
   /** The battle forme the order says raced, on its own base Speed (round 64). */
   forme?: string;
 }
 
-/** The known spread, else the usage spreads worth 5%, thinned to a camp holding 80% of the mass. */
-function plausibleSpreads(know: SpeedKnowledge, prior: SpreadCandidate): SpreadCandidate[] {
+/**
+ * The known spread, else the usage spreads worth 5% (on the format's scale:
+ * a Scarlet/Violet usage spread in a Champions build reads as its Stat
+ * Points), thinned to a camp holding 80% of the mass.
+ */
+function plausibleSpreads(know: SpeedKnowledge, prior: SpreadCandidate, budget: EvBudget, invested: Mover['invested']): SpreadCandidate[] {
   if (know.spreadKnown) return [prior];
-  const spreads = know.spreads.filter(spread => spread.probability >= PLAUSIBLE_SHARE);
+  const spreads = know.spreads.filter(spread => spread.probability >= PLAUSIBLE_SHARE)
+    .map(spread => ({ ...spread, evs: onBudgetScale({ ...ZERO_EVS, ...spread.evs }, budget) }));
   if (spreads.length === 0) return [prior];
   const mass = spreads.reduce((sum, spread) => sum + spread.probability, 0);
   const fastMass = spreads.filter(invested).reduce((sum, spread) => sum + spread.probability, 0);
@@ -71,7 +78,9 @@ function mover(ctx: SolveContext, side: 'p1' | 'p2', species: string, knowledge:
   if (!set) return null;
   const know = knowledge.get(key) ?? NONE;
   const prior: SpreadCandidate = { evs: { ...ZERO_EVS, ...set.evs }, nature: set.nature || 'Hardy' };
-  return { key, side, species, set, know, prior, plausible: plausibleSpreads(know, prior), forme };
+  const threshold = investedFrom(ctx.budget);
+  const invested = (spread: SpreadCandidate) => (spread.evs.spe ?? 0) >= threshold;
+  return { key, side, species, set, know, prior, plausible: plausibleSpreads(know, prior, ctx.budget, invested), invested, forme };
 }
 
 const speeds = (ctx: SolveContext, m: Mover, spreads: SpreadCandidate[]) =>
@@ -88,12 +97,12 @@ const floor = (ctx: SolveContext, m: Mover) => Math.min(...speeds(ctx, m, m.plau
 
 /** The slowest Speed-invested plausible configuration, else the prior: the spreads a Scarf rides on. */
 function investedFloor(ctx: SolveContext, m: Mover): number {
-  const fast = speeds(ctx, m, m.plausible.filter(invested));
+  const fast = speeds(ctx, m, m.plausible.filter(m.invested));
   return fast.length > 0 ? Math.min(...fast) : speedStat(ctx, m.side, m.species, m.prior, m.forme);
 }
 
 /** A Scarf rides on a tempo species: some plausible spread invests in Speed (a known spread decides for itself). */
-const tempoSpecies = (m: Mover) => (m.know.spreads.length === 0 && !m.know.spreadKnown) || m.plausible.some(invested);
+const tempoSpecies = (m: Mover) => (m.know.spreads.length === 0 && !m.know.spreadKnown) || m.plausible.some(m.invested);
 
 function scarfInAllowed(m: Mover): boolean {
   return !m.know.itemKnown && !m.know.scarfRuledOut && toId(m.set.item ?? '') !== 'choicescarf' && tempoSpecies(m);
