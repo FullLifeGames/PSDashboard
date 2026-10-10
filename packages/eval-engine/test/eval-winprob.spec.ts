@@ -26,6 +26,16 @@ describe('win probability mapping', () => {
     expect(WINPROB_K.doubles.k0).toBeGreaterThan(1);
   });
 
+  // Round 67 (T52): the doubles K at the leaf moves to the likelihood maximum of round 48, 1.987 + 3.666 × the
+  // fainted share (the pins 2.98 + 0.88 were an intermediate state of a stopped gradient); singles keep theirs, and
+  // the thresholds in wp-units stay where they are.
+  test('round 67 (T52): doubles K at the leaf is 1.987 + 3.666 × the fainted share, singles keep 2.28 + 1.49', () => {
+    expect(WINPROB_K.doubles).toEqual({ k0: 1.987, k1: 3.666 });
+    expect(WINPROB_K.singles).toEqual({ k0: 2.28, k1: 1.49 });
+    expect(winProbability(0.4, true, 0.5)).toBeCloseTo(1 / (1 + Math.exp(-(1.987 + 3.666 * 0.5) * 0.4)), 12);
+    expect(winProbability(0.4, false, 0.5)).toBeCloseTo(1 / (1 + Math.exp(-(2.28 + 1.49 * 0.5) * 0.4)), 12);
+  });
+
   test('wpUnits carries the Jensen effect: variance helps when behind, hurts ahead', () => {
     // Below 50% the sigmoid is convex: a spread of outcomes beats its mean.
     expect(wpUnits(-0.9) + wpUnits(-0.1)).toBeGreaterThan(2 * wpUnits(-0.5));
