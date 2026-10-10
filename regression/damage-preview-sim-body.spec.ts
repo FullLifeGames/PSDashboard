@@ -109,3 +109,27 @@ describe('entry boosts count once in the preview (T100)', () => {
     });
   });
 });
+
+describe('an armed Tera reads the body the simulator makes of the click (T100, Terapagos-Stellar)', () => {
+  test('singles: Terapagos\'s Tera Starstorm with the toggle armed is the Terapagos-Stellar hit', () => {
+    expectRowsHold(seed => {
+      const current = battle('gen9customgame', [set('Terapagos', ['Tera Starstorm'], { ability: 'Tera Shift', teraType: 'Stellar' })], [armored('Snorlax')], seed);
+      expect(current.sides[0].active[0].species.name).toBe('Terapagos-Terastal');
+      const row = preview(current, { p1: ['Stellar'], p2: [null] }).p1.default[0][0];
+      return { current, rows: [{ row, side: 1, slot: 0 }], p1: 'move terastarstorm terastallize', p2: 'move splash' };
+    });
+  });
+
+  test('doubles: the clicked Tera Starstorm hits both foes, each row holds its damage', () => {
+    expectRowsHold(seed => {
+      const current = battle('gen9doublescustomgame',
+        [set('Terapagos', ['Tera Starstorm'], { ability: 'Tera Shift', teraType: 'Stellar' }), set('Corviknight', ['Splash'])],
+        [armored('Snorlax'), armored('Blissey')], seed);
+      const targets = preview(current, { p1: ['Stellar', null], p2: [null, null] }).p1.targets[0];
+      return {
+        current, rows: [{ row: targets['1:1'], side: 1, slot: 0 }, { row: targets['1:2'], side: 1, slot: 1 }],
+        p1: 'move terastarstorm 1 terastallize, move splash', p2: 'move splash, move splash',
+      };
+    });
+  });
+});

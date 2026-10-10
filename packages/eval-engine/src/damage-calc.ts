@@ -4,6 +4,7 @@ import type { SimPokemonInfo, BranchMoveOption } from './branch-engine.ts';
 import { toId, TERRAIN_BY_ID, WEATHER_BY_ID } from '@fulllifegames/replay-core';
 import { bodyFromInfo, calcPokemon } from './calc/body.ts';
 import { hitDraws } from './calc/hit-draws.ts';
+import { teraClicked } from './calc/tera-click.ts';
 
 type CalcMoveOptions = NonNullable<ConstructorParameters<typeof Move>[2]>;
 type CalcAbility = CalcMoveOptions['ability'];
@@ -71,9 +72,16 @@ function calcField(context: DamageCalcContext, defenderProtected = false): Field
 
 type CalcGen = ReturnType<typeof calcGeneration>;
 
+/**
+ * The info's body for the calc: an armed Tera toggle reads as the
+ * simulator's click makes it (round 67: Terapagos-Terastal clicks into
+ * Terapagos-Stellar, an Ogerpon into its -Tera forme; calc/tera-click.ts).
+ */
+const bodyFor = (gen: CalcGen, info: SimPokemonInfo) => teraClicked(gen.num, bodyFromInfo(info));
+
 /** A calc Pokémon from the branch's live info, through the engine's one builder (calc/body.ts). */
 function calcPokemonFrom(gen: CalcGen, info: SimPokemonInfo): Pokemon {
-  return calcPokemon(gen, bodyFromInfo(info));
+  return calcPokemon(gen, bodyFor(gen, info));
 }
 
 /** Whether the move does damage to this Pokémon at all (the calc reads immunities, and Protect when it stands). */
@@ -282,8 +290,9 @@ export function calcSingleDamageRange(
       : [{ chance: 1, result: priceAt(undefined, firstUse) }];
     const minDamage = Math.min(...priced.map(({ result }) => result.range()[0]));
     const maxDamage = Math.max(...priced.map(({ result }) => result.range()[1]));
-    const minPct = percentOfMaxHp(minDamage, defender.maxhp);
-    const maxPct = percentOfMaxHp(maxDamage, defender.maxhp);
+    const maxhp = bodyFor(gen, defender).maxhp;
+    const minPct = percentOfMaxHp(minDamage, maxhp);
+    const maxPct = percentOfMaxHp(maxDamage, maxhp);
 
     return {
       moveName: moveOption.name,
