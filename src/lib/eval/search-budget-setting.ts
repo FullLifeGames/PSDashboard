@@ -26,6 +26,14 @@ export function searchBudgetStamp(): SearchBudget {
   return budget;
 }
 
+/**
+ * Round 67 (T111): the help texts' words for one game type's tree threshold,
+ * read from the budget instead of written by hand; null = the tree on every turn.
+ */
+export function treeThresholdText(split: SearchBudget['singles']): string | null {
+  return split.treeFrom <= 0 ? null : `${Math.round(split.treeFrom * 100)}% of all Pokémon have fainted`;
+}
+
 /** Worker side: a stamped message reconfigures the worker; an unstamped one leaves it alone. */
 export function adoptSearchBudgetStamp(message: { searchBudget?: SearchBudget }): void {
   if (message.searchBudget) configureSearchBudget(message.searchBudget);

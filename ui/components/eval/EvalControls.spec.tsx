@@ -1,4 +1,4 @@
-import { describe, expect, test, vi } from 'vitest';
+import { describe, expect, onTestFinished, test, vi } from 'vitest';
 import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import type { EvalPreferences } from '@fulllifegames/eval-engine';
@@ -41,6 +41,16 @@ describe('EvalControls', () => {
     expect(screen.queryByText('Samples')).toBeNull();
     rerender(<EvalControls {...wired} prefs={{ ...prefs, depth: 2 }} />);
     expect(select('Depth')).toHaveValue('2');
+  });
+
+  // Round 67 (T111 point 8): the help text reads the search budget instead of naming its numbers by hand.
+  test('the auto help text names the search budget in force', () => {
+    const { rerender } = render(<EvalControls {...props({ prefs: { ...prefs, mode: 'auto' } })} />);
+    expect(select('Depth')).toHaveAttribute('title', 'Auto picks the engine per turn. Singles: the depth-1 matrix with 3 samples until 25% of all Pokémon have fainted, then the MCTS tree. Doubles: the MCTS tree on every turn. The MCTS search runs 4 trees of 600 iterations each.');
+    localStorage.setItem('ps-replay-interceptor:search-budget', 'trees=8,iterations=1200,singles-tree-from=0.5,doubles-tree-from=0.25,doubles-early-samples=5');
+    onTestFinished(() => localStorage.removeItem('ps-replay-interceptor:search-budget'));
+    rerender(<EvalControls {...props({ prefs: { ...prefs, mode: 'auto' } })} />);
+    expect(select('Depth')).toHaveAttribute('title', 'Auto picks the engine per turn. Singles: the depth-1 matrix with 3 samples until 50% of all Pokémon have fainted, then the MCTS tree. Doubles: the depth-1 matrix with 5 samples until 25% of all Pokémon have fainted, then the MCTS tree. The MCTS search runs 8 trees of 1200 iterations each.');
   });
 
   test('tera and auto follow their visibility flags; the checkboxes report their new state', async () => {

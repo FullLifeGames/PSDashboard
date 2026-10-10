@@ -1,3 +1,6 @@
+import type { SearchBudget } from '@fulllifegames/eval-engine';
+import { readSearchBudget, treeThresholdText } from '../lib/eval/search-budget-setting';
+
 interface PlayOutBarProps {
   playOut: { active: boolean } | null;
   playOutNotice: { text: string; watchTurn: number } | null;
@@ -12,8 +15,16 @@ interface PlayOutBarProps {
   onFastPlayOutChange: (fast: boolean) => void;
 }
 
-const FAST_TITLE = 'Every turn of the run is evaluated by the depth-1 matrix search instead of the Auto line. ' +
-  'Much faster once Pokémon have fainted, and weaker there: the tree search looks several turns ahead, this one looks one turn ahead.';
+/** Round 67 (T111): where the fast run saves time, per game type, read from the search budget. */
+function fastTitle(budget: SearchBudget): string {
+  const where = (split: SearchBudget['singles']) => {
+    const threshold = treeThresholdText(split);
+    return threshold === null ? 'every turn' : `once ${threshold}`;
+  };
+  return 'The depth-1 matrix search evaluates every turn of the run instead of the Auto line. ' +
+    `It runs much faster where Auto would run the tree search (doubles: ${where(budget.doubles)}; singles: ${where(budget.singles)}) ` +
+    'and reads weaker there: the tree looks several turns ahead, the matrix one turn.';
+}
 
 /** The running state: spinner, the fast marker, and Stop. */
 function RunningRow({ fastPlayOut, onStopPlayOut }: Pick<PlayOutBarProps, 'fastPlayOut' | 'onStopPlayOut'>) {
@@ -50,7 +61,7 @@ function StartRow({ viewTurn, startDisabled, fastPlayOut, onStartPlayOut, onFast
       <span style={{ fontSize: 10, color: '#8fa3bd' }}>
         engine finishes the game from turn {viewTurn}; watch the result from here afterwards
       </span>
-      <label title={FAST_TITLE} style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 10, color: '#aabbcc' }}>
+      <label title={fastTitle(readSearchBudget())} style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 10, color: '#aabbcc' }}>
         <input
           type="checkbox"
           checked={fastPlayOut}

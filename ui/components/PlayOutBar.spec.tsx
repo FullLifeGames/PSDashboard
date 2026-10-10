@@ -1,4 +1,4 @@
-import { describe, expect, test, vi } from 'vitest';
+import { describe, expect, onTestFinished, test, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { PlayOutBar } from '../../src/components/PlayOutBar';
@@ -60,6 +60,17 @@ describe('PlayOutBar', () => {
 
     rerender(<PlayOutBar {...wired} playOut={{ active: true }} />);
     expect(screen.getByText(/Engine play-out running/)).not.toHaveTextContent('fast');
+  });
+
+  // Round 67 (T111 point 7): the fast option says where Auto runs the tree, per game type, from the search budget.
+  test('the fast option names where it saves time, per game type', () => {
+    const { rerender } = render(<PlayOutBar {...props()} />);
+    const title = () => screen.getByRole('checkbox', { name: /Fast play-out/ }).closest('label')?.getAttribute('title');
+    expect(title()).toBe('The depth-1 matrix search evaluates every turn of the run instead of the Auto line. It runs much faster where Auto would run the tree search (doubles: every turn; singles: once 25% of all Pokémon have fainted) and reads weaker there: the tree looks several turns ahead, the matrix one turn.');
+    localStorage.setItem('ps-replay-interceptor:search-budget', 'doubles-tree-from=0.25');
+    onTestFinished(() => localStorage.removeItem('ps-replay-interceptor:search-budget'));
+    rerender(<PlayOutBar {...props()} />);
+    expect(title()).toContain('(doubles: once 25% of all Pokémon have fainted; singles: once 25% of all Pokémon have fainted)');
   });
 
   test('the notice hides while a new run is active', () => {

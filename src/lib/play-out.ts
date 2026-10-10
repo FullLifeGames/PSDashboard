@@ -5,9 +5,11 @@ export const PLAY_OUT_CAP = 100;
 
 /**
  * The "fast play-out" engine: the depth-1 matrix on every turn instead of
- * the Auto line, which routes to the tree once a quarter of all bodies
- * fell. A session option the user asks for: several times faster in the
- * endgame, and weaker there (the tree looks several turns ahead).
+ * the Auto line, which runs the tree on every doubles turn and on singles
+ * turns once a quarter of all bodies fell (the search budget's defaults,
+ * search/budget.ts). A session option the user asks for: several times
+ * faster wherever Auto runs the tree, and weaker there (the tree looks
+ * several turns ahead).
  */
 export const FAST_PLAY_OUT_SETTINGS = { depth: 1, samples: 1, mode: 'matrix' } as const;
 

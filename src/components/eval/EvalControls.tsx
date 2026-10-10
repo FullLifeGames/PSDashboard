@@ -1,5 +1,6 @@
-import type { EvalPreferences, EvalResult } from '@fulllifegames/eval-engine';
+import type { EvalPreferences, EvalResult, SearchBudget } from '@fulllifegames/eval-engine';
 import type { EvalStatus } from '../../hooks/useEvaluation';
+import { readSearchBudget, treeThresholdText } from '../../lib/eval/search-budget-setting';
 
 interface PrefsProps {
   prefs: EvalPreferences;
@@ -8,6 +9,20 @@ interface PrefsProps {
 }
 
 const LABEL_STYLE = { display: 'flex', alignItems: 'center', gap: 4, fontSize: 10, color: '#aabbcc' } as const;
+
+/** One game type's auto line in words, from its split of the search budget. */
+function autoLineText(split: SearchBudget['singles']): string {
+  const threshold = treeThresholdText(split);
+  if (threshold === null) return 'the MCTS tree on every turn';
+  const draws = split.earlySamples === 1 ? 'one sample' : `${split.earlySamples} samples`;
+  return `the depth-${split.earlyDepth} matrix with ${draws} until ${threshold}, then the MCTS tree`;
+}
+
+/** Round 67 (T111): the auto help text reads the budget in force, so a measurement form never shows stale numbers. */
+function autoTitle(budget: SearchBudget): string {
+  return `Auto picks the engine per turn. Singles: ${autoLineText(budget.singles)}. Doubles: ${autoLineText(budget.doubles)}. ` +
+    `The MCTS search runs ${budget.trees} trees of ${budget.iterations} iterations each.`;
+}
 
 function DepthSelect({ prefs, onPrefsChange, running }: PrefsProps) {
   return (
@@ -21,7 +36,7 @@ function DepthSelect({ prefs, onPrefsChange, running }: PrefsProps) {
           else onPrefsChange({ ...prefs, mode: 'matrix', depth: parseInt(value, 10) as EvalPreferences['depth'] });
         }}
         disabled={running}
-        title="Auto picks the engine per turn. Singles: the depth-1 matrix with three samples until a quarter of all Pokémon have fainted, then the MCTS tree. Doubles: the MCTS tree on every turn. The MCTS search runs four trees of 600 iterations each."
+        title={autoTitle(readSearchBudget())}
       >
         <option value="1">1</option>
         <option value="2">2</option>
