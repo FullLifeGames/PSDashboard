@@ -32,6 +32,8 @@ export {
   fillUsageMoves,
 } from './smogon/usage-lookup.ts';
 export type { SpeedKnowledge, SpeedKnowledgeMap, SpreadCandidate } from './spread-inference.ts';
+export { calcEvs, calcIvs, evBudget } from './spreads/ev-budget.ts';
+export type { EvBudget } from './spreads/ev-budget.ts';
 export { buildTeamsFromReplay, solveReplaySpreads, extractTeamSheets } from './team-builder.ts';
 export {
   manualField, manualEvs, manualMove, applyInferredSpreads, itemSetValue, enrichTeamInfo, enrichPokemonInfo,

@@ -1,6 +1,7 @@
 import { State } from '@pkmn/sim';
 import type { Battle } from '@pkmn/sim';
 import { restoreSideInvariants } from './serialize.ts';
+import { assertSimMods } from './sim-mods.ts';
 import { prepareBattle, prepareFormat } from './sim-fast/index.ts';
 
 /**
@@ -44,6 +45,7 @@ export function parseSearchState(serialized: string): ParsedSearchState {
 
 /** A fresh battle from the parsed state, with the search's side invariants restored. */
 export function deserializeFromParsed(parsed: ParsedSearchState): Battle {
+  assertSimMods(String(parsed.state.formatid));
   prepareFormat(String(parsed.state.formatid));
   const battle = State.deserializeBattle(parsed.state as never);
   for (const trim of parsed.trims) {

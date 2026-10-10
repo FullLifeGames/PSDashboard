@@ -149,6 +149,8 @@ value forcedWinSpeaks
 value formatLine
 value formatRead
 value heldDecided
+value loadSimMods
+value loadSimModsFor
 value matchPlayedSide
 value mctsSearch
 value mctsTreeSearch

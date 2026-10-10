@@ -223,11 +223,10 @@ export type ReplayRuleset = 'standard' | 'vgc' | 'champions';
 
 /**
  * Round 65: the rule set of a replay, read from its own format id. Pokémon
- * Champions (Champions OU, Champions VGC) is its own game, and the simulator
- * knows no Champions format (its reconstructions run as Doubles OU or a
- * custom game); VGC outside Champions (bring six, pick four, level 50) parts
- * from Doubles OU. The hosts name the rule set from here and the engine
- * weighs its statics by it.
+ * Champions (Champions OU, Champions VGC) is its own game, reconstructed on
+ * the Champions mod since round 67 (getBranchSimulatorFormat); VGC outside
+ * Champions (bring six, pick four, level 50) parts from Doubles OU. The
+ * hosts name the rule set from here and the engine weighs its statics by it.
  */
 export function replayRuleset(source: ReplayFormatSource): ReplayRuleset {
   const format = inferReplayFormatId(source);
@@ -246,14 +245,25 @@ export function formatEnforcesSleepClause(format: string): boolean {
   }
 }
 
+/**
+ * Round 67 (T145): the Champions mod's formats (@pkmn/mods champions) a
+ * Champions replay branches on. Singles play the mod's OU; doubles play its
+ * Doubles Custom Game, which brings the whole team as Doubles OU does (the
+ * reconstruction trims to the brought Pokémon itself, where a VGC format's
+ * team preview would keep the first four). The regulation changes only
+ * legality, and the base Dex resolves no custom-rule suffix on a mod format.
+ */
+const CHAMPIONS_SINGLES_FORMAT = 'gen9championsou';
+const CHAMPIONS_DOUBLES_FORMAT = 'gen9championsdoublescustomgame';
+
 export function getBranchSimulatorFormat(source: ReplayFormatSource): string {
   const formatid = inferReplayFormatId(source);
   const gameType = getReplayGameType(source.log);
   const gen = extractGen({ ...source, formatid });
+  const doubles = gameType === 'doubles' || formatid.includes('doubles') || formatid.includes('vgc');
 
-  if (gameType === 'doubles' || formatid.includes('doubles') || formatid.includes('vgc')) {
-    return `gen${gen}doublesou`;
-  }
+  if (replayRuleset(source) === 'champions') return doubles ? CHAMPIONS_DOUBLES_FORMAT : CHAMPIONS_SINGLES_FORMAT;
+  if (doubles) return `gen${gen}doublesou`;
 
   // A formatid the sim doesn't know (draft leagues, video pipelines) runs as
   // a rule-less custom game anyway — name that explicitly so clause suffixes

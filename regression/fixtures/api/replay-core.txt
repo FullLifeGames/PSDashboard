@@ -1,5 +1,6 @@
 type ChaosStatsPayload
 type DamageObservation
+type EvBudget
 type FieldSnapshot
 type HiddenPowerEvidence
 type KnowledgeSource
@@ -44,9 +45,12 @@ value applyPastedTeam
 value applyTeamSheetToInfo
 value broughtSpeciesFor
 value buildTeamsFromReplay
+value calcEvs
+value calcIvs
 value countMatchingSpecies
 value enrichPokemonInfo
 value enrichTeamInfo
+value evBudget
 value extractTeamSheets
 value fillUsageMoves
 value finalPlayedTurn

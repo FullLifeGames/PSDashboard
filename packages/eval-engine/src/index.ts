@@ -35,6 +35,7 @@ export type { ChoiceLockTrails, ChoiceLockContext } from './choice-lock.ts';
 export { calcSingleDamageRange } from './damage-calc.ts';
 export type { DamageResult, DamageCalcContext } from './damage-calc.ts';
 export { deserializeBattleExact } from './forward-model.ts';
+export { loadSimMods, loadSimModsFor } from './forward/sim-mods.ts';
 export { ENDGAME_CAPS, endgameScope, solveEndgame } from './endgame/solver.ts';
 export type { EndgameCaps, EndgameFlag, EndgameResult } from './endgame/solver.ts';
 export { PROVER_BUDGET, proveForcedWin } from './endgame/prover.ts';

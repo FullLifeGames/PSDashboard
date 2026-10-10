@@ -8,6 +8,7 @@ import { reorderForLeads, trimTeamToBring } from './team-order.ts';
 import { extractLeads } from './protocol-choices.ts';
 import { hasForceSwitch } from './corrections.ts';
 import { safeStreamWrite, sleep } from './execute.ts';
+import { loadSimMods, simModsReady } from '../forward/sim-mods.ts';
 
 export interface ReconstructParams {
   format: string;
@@ -277,10 +278,13 @@ export async function advanceSimToTurn(session: ReconstructionSession, wantedTur
  * yielded DIFFERENT positions run to run (diverged fallback paths, shuffled
  * bench slots, wrong choice locks) — the sweep's cached eval and the branch
  * a click executes in could disagree about what "switch 3" even is (draft
- * T48). Team preview is answered with defaults.
+ * T48). Team preview is answered with defaults. A Champions format loads
+ * the Champions mod first (round 67, T145); every other format starts
+ * without waiting.
  */
 export async function startBattle(session: ReconstructionSession, orderedP1: PokemonSet[], orderedP2: PokemonSet[]) {
   const { params, battleStream } = session;
+  if (!simModsReady(params.format)) await loadSimMods(params.format);
   const p1Packed = Teams.pack(orderedP1);
   const p2Packed = Teams.pack(orderedP2);
   const p1Name = JSON.stringify(params.playerNames?.[0]?.trim() || 'Player 1');

@@ -1,5 +1,6 @@
 import { State } from '@pkmn/sim';
 import type { Battle } from '@pkmn/sim';
+import { assertSimMods } from './sim-mods.ts';
 
 /**
  * Battle serialization for positions: the stable string identity, the
@@ -34,8 +35,10 @@ export function serializeBattleStable(battle: Battle): string {
  */
 export function deserializeBattleExact(serialized: string): Battle {
   const state = JSON.parse(serialized) as {
+    formatid?: string;
     sides?: { pokemon?: { moveSlots?: unknown[]; baseMoveSlots?: unknown[] }[] }[];
   };
+  assertSimMods(state.formatid ?? '');
   const trims: { side: number; index: number; length: number }[] = [];
   state.sides?.forEach((side, sideIndex) => side.pokemon?.forEach((pokemon, index) => {
     const base = pokemon.baseMoveSlots;

@@ -65,8 +65,27 @@ describe('replay format inference', () => {
     })).toBe('gen3ou');
   });
 
-  test('maps custom VGC replay formats to a supported doubles simulator format', () => {
-    expect(getBranchSimulatorFormat(vgcReplay)).toBe('gen9doublesou');
+  test('maps VGC replay formats to a supported doubles simulator format', () => {
+    expect(getBranchSimulatorFormat({ id: 'gen9vgc2026regi-2630181744', log: '|gametype|doubles\n|gen|9\n|tier|[Gen 9] VGC 2026 Reg I' })).toBe('gen9doublesou');
+    expect(getBranchSimulatorFormat({ id: 'gen9vgc2024regh-2160552710', log: '|gametype|doubles\n|gen|9' })).toBe('gen9doublesou');
+  });
+
+  // Round 67 (T145): Pokémon Champions branches on the Champions mod of @pkmn/mods. Singles play the mod's OU, doubles
+  // its Doubles Custom Game, which brings the whole team as Doubles OU does (the reconstruction trims to the brought
+  // Pokémon itself; a VGC format's team preview would keep the first four). The regulation (M-A, M-B, M-C) changes only
+  // legality, and a mod format takes no custom-rule suffix.
+  test('round 67 (T145): Champions replays branch on the Champions mod\'s formats', () => {
+    expect(getBranchSimulatorFormat(vgcReplay)).toBe('gen9championsdoublescustomgame');
+    for (const id of ['gen9championsvgc2026regma-2604410427', 'gen9championsvgc2026regmabo3-2603652560', 'gen9championsvgc2026regmc-2695803506',
+      'gen9championsvgc2026regmbbo3-2634199230']) {
+      expect(getBranchSimulatorFormat({ id, log: '|gametype|doubles\n|gen|9' }), id).toBe('gen9championsdoublescustomgame');
+    }
+    expect(getBranchSimulatorFormat({ id: 'gen9championsou-2628340185', log: '|gametype|singles\n|gen|9\n|tier|[Gen 9 Champions] OU' }))
+      .toBe('gen9championsou');
+    // A Champions OU log declares Sleep Moves Clause, never Sleep Clause Mod; a rule-less one still gets no suffix.
+    expect(getBranchSimulatorFormat({ id: 'gen9championsou-1', log: '|gametype|singles\n|gen|9\n|tier|[Gen 9 Champions] OU\n|rule|Sleep Clause Mod: Limit one foe put to sleep' }))
+      .toBe('gen9championsou');
+    expect(getBranchSimulatorFormat({ id: 'gen9championsou-2', log: '|gametype|singles\n|gen|9' })).toBe('gen9championsou');
   });
 
   test('preserves standard singles simulator formats', () => {
@@ -138,9 +157,9 @@ describe('replay format inference', () => {
   });
 
   // Round 65: the static weighs a replay by the tables of its rule set, named
-  // from the replay's own format: Pokémon Champions (singles and doubles; the
-  // simulator reconstructs Champions VGC as Doubles OU and Champions OU as a
-  // custom game), VGC outside Champions, and every other format.
+  // from the replay's own format: Pokémon Champions (singles and doubles, on
+  // the Champions mod since round 67), VGC outside Champions, and every other
+  // format.
   test('a replay names its rule set from its own format', () => {
     expect(replayRuleset(vgcReplay)).toBe('champions');
     expect(replayRuleset({ id: 'gen9championsvgc2026regmabo3-2603652560', log: '|gametype|doubles\n|gen|9' })).toBe('champions');
