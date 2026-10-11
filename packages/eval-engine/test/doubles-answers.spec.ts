@@ -2,8 +2,11 @@ import { afterEach, describe, expect, test } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { createLocalTreeExecutor, searchTreesOrchestrated } from '../src/tree-orchestrator';
 import { matchPlayedSide } from '../src/turn-analysis/played-match';
+import { analyzeTurn } from '../src/analysis';
+import type { PlayedTurn } from '../src/played';
 import {
-  addedAnswers, ANSWER_CAP, ANSWER_MARGIN, answerSides, answersMode, detectionJobs, extensionJobs, gradedRanking, type AnswerSide,
+  addedAnswers, ANSWER_CAP, ANSWER_MARGIN, answerSides, answersMode, confirmedAnswers, confirmJobs, detectionJobs, extensionJobs, gradedRanking,
+  type AnswerSide,
 } from '../src/search/answers';
 import type { StaticRuleset } from '../src/eval-function';
 import type { EvalCellValue, EvalResult, EvalSettings, MctsTreeStats } from '../src/types';
@@ -20,6 +23,7 @@ import type { EvalCellValue, EvalResult, EvalSettings, MctsTreeStats } from '../
 
 interface Position {
   serialized: string; tera: EvalSettings['tera']; sleepClause: boolean; ruleset: StaticRuleset; keepPlayed: NonNullable<EvalSettings['keepPlayed']>;
+  turn?: number; played?: PlayedTurn; sacks?: Parameters<typeof analyzeTurn>[0]['sacks'];
 }
 
 const fixture = (name: string): Position =>
@@ -46,6 +50,22 @@ describe('the doubles matrix reads every answer (round 67, T128)', () => {
     expect(result.matrix!.p2Labels).not.toContain(best.punishedBy);
     const played = matchPlayedSide(result, 'p1', { p1: null, p2: null, p1Slots: position.keepPlayed.p1Slots, p2Slots: position.keepPlayed.p2Slots });
     expect(played).not.toBeNull();
+  });
+
+  test('2630685175 t8: a double Protect that only stalls answers nothing, and the played Taunt stays the mistake (user truth pin)', { timeout: 180_000 }, async () => {
+    // At one ply p1’s Protect + Protect read -0.16 for p2, the board’s static after a stalled turn, where the trees
+    // read +0.84; one ply deeper it reads +0.87, like the listed answers (probe lanes/B/t128-pin). An answer counts
+    // only when it still refutes the best row one ply deeper.
+    const position = fixture('gen9vgc2026regi-2630685175-t8');
+    const result = await search(position);
+    const best = result.perSide.p2[0];
+    expect(best.label).toMatch(/^Astral Barrage/);
+    expect(best.ev).toBeGreaterThan(0.8);
+    const analysis = analyzeTurn({
+      turn: position.turn!, result, played: position.played!, playedOutcome: null, scoreBefore: result.score, scoreAfter: null, sacks: position.sacks!,
+    });
+    expect(analysis.p2.played?.label).toMatch(/^Taunt/);
+    expect(analysis.p2.tier).toBe('mistake');
   });
 
   test('a singles root has no answer round', { timeout: 120_000 }, async () => {
@@ -98,6 +118,19 @@ describe('the answer round, step by step (round 67, T128)', () => {
     expect(addedAnswers(view, 'protect', detected)).toEqual([2]);
     expect(addedAnswers(view, 'full', detected)).toEqual([2, 3]);
     expect(ANSWER_CAP).toBeGreaterThan(0);
+  });
+
+  test('protect keeps a candidate only when it still refutes the best row one ply deeper', () => {
+    const { view, result } = scene();
+    const deepen: EvalSettings = { depth: 1, samples: 1, tera: false };
+    const jobs = confirmJobs(view, result, [2, 3], deepen);
+    expect(jobs.map(job => [job.p1Choice, job.p2Choice, job.settings])).toEqual([
+      ['move a 1, move b 1', 'move protect, move protect', deepen], ['move a 1, move b 1', 'move z 1, move y 1', deepen],
+    ]);
+    // The best row reads 1.00 against the listed answers: one ply deeper Protect + Protect holds it to 0.3 (kept),
+    // Z + Y only to 1 - ANSWER_MARGIN / 2 (dropped: the one-ply refutation does not survive the deeper search).
+    const deep = (score: number) => ({ score, interval: 0, depthCompleted: 1, perSide: { p1: [], p2: [] } }) as EvalResult;
+    expect(confirmedAnswers(view, result, [2, 3], [deep(0.3), deep(1 - ANSWER_MARGIN / 2)])).toEqual([2]);
   });
 
   test('the graded side ranks against the added answer, priced for every listed row', () => {

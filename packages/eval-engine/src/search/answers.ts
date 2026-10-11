@@ -1,6 +1,8 @@
 import { rankFromMatrix } from '../rank.ts';
 import { attachKoOdds, koOddsMapsFor } from './root-payload.ts';
-import type { EvalCellJob, EvalCellValue, EvalChoiceOption, EvalResult, MctsTreeStats, RankedChoice } from '../types.ts';
+import type {
+  EvalCellJob, EvalCellValue, EvalChoiceOption, EvalResult, EvalSettings, EvalSubSearchJob, MctsTreeStats, RankedChoice,
+} from '../types.ts';
 
 /**
  * Round 67 (T128): the doubles root's answer round. The tree lists 16
@@ -15,6 +17,15 @@ import type { EvalCellJob, EvalCellValue, EvalChoiceOption, EvalResult, MctsTree
  * every unlisted legal answer. An added answer is priced for every listed
  * row of the graded side by one natural draw, and the side's ranking is
  * solved over its listed rows against the listed and the added answers.
+ * Since b4 (2630685175 t8) a 'protect' candidate counts only when it still
+ * refutes the best row one ply deeper (one natural draw, a depth-1 search of
+ * its child: the depth the verify round prices a cell at). At one ply a
+ * stall answer reads the board's static, which can lie far from the trees'
+ * value (p1's double Protect read -0.16 for p2 at one ply and +0.87 one ply
+ * deeper, where every listed answer read +0.84). The added column itself
+ * stays priced by one natural draw: the best row's step from one ply to one
+ * ply deeper does not carry to the other rows (2629703929 t8: shifted by it,
+ * every p1 row fell to about -0.54 and the played row read a blunder).
  * The answers come from the simulator's legal list (legalChoices), never a
  * hand list. The score stays the visit mean; the rankings read the answers.
  * Pure and sim-free, like the merge.
@@ -100,6 +111,30 @@ export function addedAnswers(view: AnswerSide, mode: AnswersMode, detected: Eval
   return unlisted.filter(answer => (own.get(answer) ?? Infinity) < listedMin - ANSWER_MARGIN)
     .sort((a, b) => own.get(a)! - own.get(b)! || a - b)
     .slice(0, ANSWER_CAP);
+}
+
+/** The graded side's best row against each candidate answer, searched one ply deeper (the executor's sub-search). */
+export function confirmJobs(view: AnswerSide, result: EvalResult, candidates: number[], deepen: EvalSettings): EvalSubSearchJob[] {
+  const best = result.perSide[view.side][0];
+  const row = best ? view.rows.findIndex(option => option.choice === best.choice) : -1;
+  if (row < 0) return [];
+  return candidates.map(answer => ({ ...job(view, row, answer), settings: deepen }));
+}
+
+/**
+ * The candidates that still refute the best row one ply deeper (more than
+ * ANSWER_MARGIN below the best row's listed minimum in the merged matrix,
+ * from the graded side); deep[k] belongs to candidates[k].
+ */
+export function confirmedAnswers(view: AnswerSide, result: EvalResult, candidates: number[], deep: EvalResult[]): number[] {
+  const matrix = result.matrix!;
+  const best = result.perSide[view.side][0];
+  const row = view.rows.findIndex(option => option.choice === best.choice);
+  const sign = view.side === 'p1' ? 1 : -1;
+  const listed = view.answers.slice(0, view.listed)
+    .map((_, column) => sign * (view.side === 'p1' ? matrix.values[row][column] : matrix.values[column][row]));
+  const listedMin = Math.min(...listed);
+  return candidates.filter((_, k) => deep[k] !== undefined && sign * deep[k].score < listedMin - ANSWER_MARGIN);
 }
 
 /** Every listed row of the graded side against each added answer. */

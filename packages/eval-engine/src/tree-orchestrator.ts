@@ -9,7 +9,10 @@ import { createLocalExecutor } from './search/position.ts';
 import type { EvalCellJob, EvalCellValue, EvalResult, EvalSettings, MctsTreeStats, SearchProgress } from './types.ts';
 import type { StaticRuleset } from './score/weights.ts';
 import { boundaryCheckCells, playedIndices, rowCompletedCells, starvedSupportCells, type VerifyFocus } from './verify-select.ts';
-import { addedAnswers, answerSides, answersMode, detectionJobs, extensionJobs, gradedRanking } from './search/answers.ts';
+import {
+  addedAnswers, answerSides, answersMode, confirmedAnswers, confirmJobs, detectionJobs, extensionJobs, gradedRanking,
+  type AnswerSide, type AnswersMode,
+} from './search/answers.ts';
 
 /**
  * Round 61: the tree search's orchestration, one place for the app and the
@@ -119,27 +122,38 @@ async function verifiedMerge(
   }
 }
 
+/** One side's answers to add: every unlisted one ('full'), or the candidates the deeper search confirms ('protect'). */
+async function sideAnswers(
+  executor: TreeExecutor, view: AnswerSide, merged: EvalResult, mode: AnswersMode, deepen: EvalSettings,
+): Promise<number[]> {
+  if (mode === 'full') return addedAnswers(view, mode, []);
+  const jobs = detectionJobs(view, merged);
+  if (jobs.length === 0) return [];
+  const candidates = addedAnswers(view, mode, await executor.evalCells(jobs));
+  if (candidates.length === 0) return [];
+  const deep = await Promise.all(confirmJobs(view, merged, candidates, deepen).map(job => executor.subSearch(job)));
+  return confirmedAnswers(view, merged, candidates, deep);
+}
+
 /**
  * Round 67 (T128): the doubles root's answer round (search/answers.ts).
  * After the verify round each side is graded against the other side's legal
  * answers the tree did not list, each priced by one natural draw: 'protect'
- * adds the answers that beat the listed ones against the side's best row,
- * 'full' every unlisted one. Like verification a refinement: a failed round
- * keeps the verified merge, and the score stays the visit mean.
+ * adds the answers that beat the listed ones against the side's best row and
+ * still do one ply deeper (since b4), 'full' every unlisted one. Like
+ * verification a refinement: a failed round keeps the verified merge, and
+ * the score stays the visit mean.
  */
 async function answerRound(
-  executor: TreeExecutor, trees: MctsTreeStats[], merged: EvalResult, callbacks?: OrchestratorCallbacks,
+  executor: TreeExecutor, trees: MctsTreeStats[], merged: EvalResult, settings: EvalSettings, callbacks?: OrchestratorCallbacks,
 ): Promise<EvalResult> {
   const mode = answersMode();
   const sides = mode === 'off' ? null : answerSides(trees[0], merged);
   if (!sides || stopped(callbacks)) return merged;
   const started = Date.now();
   try {
-    const added = await Promise.all(sides.map(async view => {
-      if (mode === 'full') return addedAnswers(view, mode, []);
-      const jobs = detectionJobs(view, merged);
-      return jobs.length === 0 ? [] : addedAnswers(view, mode, await executor.evalCells(jobs));
-    }));
+    const deepen: EvalSettings = { depth: 1, samples: 1, tera: settings.tera, sleepClause: settings.sleepClause, ruleset: settings.ruleset };
+    const added = await Promise.all(sides.map(view => sideAnswers(executor, view, merged, mode, deepen)));
     if (stopped(callbacks) || added.every(list => list.length === 0)) return merged;
     const perSide = await Promise.all(sides.map(async (view, index) => (added[index].length === 0
       ? merged.perSide[view.side]
@@ -156,7 +170,7 @@ export async function searchTreesOrchestrated(
   executor: TreeExecutor, settings: EvalSettings, callbacks?: OrchestratorCallbacks,
 ): Promise<EvalResult> {
   const trees = await runTrees(executor, settings, callbacks);
-  const result = await answerRound(executor, trees, await verifiedMerge(executor, trees, settings, callbacks), callbacks);
+  const result = await answerRound(executor, trees, await verifiedMerge(executor, trees, settings, callbacks), settings, callbacks);
   if (stopped(callbacks) || settings.prove === false) return result;
   const started = Date.now();
   const outcome = await executor.prove(forcedWinInput(result, settings));
