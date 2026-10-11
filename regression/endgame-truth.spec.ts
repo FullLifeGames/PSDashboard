@@ -10,6 +10,7 @@ import { setLastPairSweep } from '../packages/eval-engine/src/score/last-pair';
 import { battleFaintedFraction, searchPosition } from '../packages/eval-engine/src/search';
 import { autoTurnSettings } from '../packages/eval-engine/src/search/budget';
 import { createLocalTreeExecutor, searchTreesOrchestrated } from '../packages/eval-engine/src/tree-orchestrator';
+import { loadSimModsFor } from '../packages/eval-engine/src/forward/sim-mods';
 
 /**
  * The endgame truth bench (round 34): every estimator against the solver
@@ -143,6 +144,8 @@ describe.skipIf(process.env.EVAL_ENDGAME_TRUTH !== '1')('endgame truth bench (ro
     const solved = await solvedRows();
     if (solved.size > 0) console.log(`solver rows looked up from earlier dumps: ${solved.size}`);
     for (const item of items) {
+      // Round 67 merge (T145): an export of a Champions game revives only on the Champions mod.
+      await loadSimModsFor(item.serialized);
       const started = Date.now();
       const earlier = solved.get(item.name);
       let exact: EndgameResult;
