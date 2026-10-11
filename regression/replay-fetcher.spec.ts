@@ -126,7 +126,8 @@ describe('replay fetcher', () => {
     try {
       const replay = await fetchReplay('https://replay.pokemonshowdown.com/gen9championsvgc2026regmb-2639020147');
       expect(replay.formatid).toBe('gen9championsvgc2026regmb');
-      expect(getBranchSimulatorFormat(replay)).toBe('gen9doublesou');
+      // Round 67 (T145): a Champions doubles replay branches on the Champions mod's Doubles Custom Game.
+      expect(getBranchSimulatorFormat(replay)).toBe('gen9championsdoublescustomgame');
     } finally {
       globalThis.fetch = originalFetch;
     }
