@@ -1,5 +1,5 @@
 import type { PokemonSet } from '@pkmn/sim';
-import { Dex, Teams } from '@pkmn/sim';
+import { Teams } from '@pkmn/sim';
 import { inferOpponentTeam } from './opponent-inferrer.ts';
 import { getSpeciesUsageSet } from './smogon/usage-lookup.ts';
 import type { SmogonUsageStats } from './smogon/stats-types.ts';
@@ -14,6 +14,7 @@ import {
 } from './team/set-resolvers.ts';
 import { resolveInferredItems, speedKnowledgeFor } from './team/inferred-items.ts';
 import { abilitiesAreFree, dexLegalSet } from './team/dex-legal.ts';
+import { rocksMayMiss } from './inference/rocks-tell.ts';
 import type { DamageObservation, HiddenPowerEvidence, OpponentTeamInfo, RevealedPokemonInfo, SpeedOrderObservation } from './types.ts';
 import { toId } from './ids.ts';
 
@@ -50,56 +51,22 @@ type BuildOptions = Parameters<typeof buildTeamsFromReplay>[1];
 type BuiltTeams = { p1Team: PokemonSet[]; p2Team: PokemonSet[] };
 type SideInfos = { p1: OpponentTeamInfo; p2: OpponentTeamInfo };
 
-type GenDex = ReturnType<typeof Dex.forGen>;
-type DamageHandler = (this: never, ...args: never[]) => unknown;
-
-/**
- * Whether the ability's own damage handler in the simulator refuses Stealth
- * Rock damage (Magic Guard refuses every damage that is not a move). A
- * handler that fails on the stub counts as refusing: then the tell proves nothing.
- */
-function keepsRocksOff(dex: GenDex, name: string): boolean {
-  const { onDamage } = dex.abilities.get(name) as { onDamage?: DamageHandler };
-  if (!onDamage) return false;
-  const rocks = dex.conditions.get('stealthrock');
-  try {
-    const context = { add: () => undefined, effect: rocks, effectState: {} };
-    return onDamage.call(context as never, 1 as never, { abilityState: {} } as never, null as never, rocks as never) === false;
-  } catch {
-    return true;
-  }
-}
-
-/**
- * Whether an ability the Pokémon may have keeps the rock damage off it: the
- * known one, else its species' abilities minus the rule-outs, and in a format
- * with free abilities any ability (round 64 review: a Magic Guard Clefable
- * shows the Boots tell without Boots).
- */
-function rocksMayMiss(info: RevealedPokemonInfo, dex: GenDex, freeAbilities: boolean): boolean {
-  const known = info.ability.source === 'revealed' || info.ability.source === 'manual' ? info.ability.value : '';
-  if (known) return keepsRocksOff(dex, known);
-  if (freeAbilities) return dex.abilities.all().some(ability => keepsRocksOff(dex, ability.name));
-  const ruled = info.ruledOut?.abilities ?? [];
-  return Object.values(dex.species.get(info.species).abilities ?? {})
-    .some(name => !!name && !ruled.includes(toId(name)) && keepsRocksOff(dex, name));
-}
-
 /**
  * The items the protocol inference itself guesses, by side and species: its
  * one tell, Heavy-Duty Boots after a Stealth Rock switch-in without damage.
  * Enriched infos mix them with the enrichment's own guesses, so they are read
  * from the log's inference (round 64, T120). A tell is evidence only while no
- * ability the Pokémon may have explains the missing damage as well.
+ * ability the Pokémon may have explains the missing damage as well: the
+ * inference's own rock check (inference/rocks-tell.ts; round 64 review, a
+ * Magic Guard Clefable shows the Boots tell without Boots).
  */
 function itemTells(
   log: string, options: BuildOptions, infos: SideInfos, legality: { gen: number; custom: boolean },
 ): Record<'p1' | 'p2', Map<string, string>> {
-  const dex = Dex.forGen(legality.gen);
   const tells = (side: 'p1' | 'p2') => {
     const raw = options?.[`${side}Info`] ? inferOpponentTeam(log, side) : infos[side];
     return new Map(raw.pokemon
-      .filter(mon => mon.item.source === 'guessed' && mon.item.value && !rocksMayMiss(mon, dex, legality.custom))
+      .filter(mon => mon.item.source === 'guessed' && mon.item.value && !rocksMayMiss(mon, legality.gen, legality.custom))
       .map(mon => [toId(mon.species), mon.item.value]));
   };
   return { p1: tells('p1'), p2: tells('p2') };
