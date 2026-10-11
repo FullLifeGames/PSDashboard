@@ -61,7 +61,7 @@ export interface EvalSettings {
  * third faint). Grid-tuned 2026-08-11 on the grand 826-position bed with
  * per-stratum robustness: the 0.00–0.25 plateau wins overall (+0.7 sign,
  * −0.002 brier vs the original 0.40) and 0.25 keeps the matrix side — and
- * with it verification, sensitivity probes, and the think-deeper ladder —
+ * with it verification and sensitivity probes —
  * through the opening while mid (+3.3 ladder) and doubles (+2.5 ladder)
  * take the tree's stronger reading. Lives here (not search.ts) so the UI
  * layer can import it without pulling @pkmn/sim into the main chunk.
@@ -76,7 +76,7 @@ export const AUTO_MCTS_FAINTED_FRACTION = 0.25;
 
 /** Panel preferences persisted in localStorage (worker only sees EvalSettings). */
 export interface EvalPreferences {
-  /** UI offers 1/2 only — depth 3 costs 3-4× for capped gains (MCTS is the "deeper" mode). */
+  /** UI offers 1/2 only — depth 3 costs 3-4× for capped gains (the tree mode searches deeper). */
   depth: 1 | 2;
   samples: 1 | 3 | 5;
   /**

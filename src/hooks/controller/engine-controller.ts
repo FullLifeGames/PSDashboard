@@ -75,7 +75,7 @@ function useEvalViewLayer(
   const { acquire, smogonPending } = acquireLayer;
 
   // Evaluation view glue: format switches, Evaluate, sweeps, invalidations,
-  // and the think-deeper ladder.
+  // and the single-turn analysis of a gap turn.
   return useEvalView({
     replayData, snapshots, evaluation, replayGameType, evalIsDoubles,
     viewTurn, viewLine, viewingVariation, liveTip, liveEvalView, evalViewKey, serializedAtView,

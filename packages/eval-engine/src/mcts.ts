@@ -15,7 +15,7 @@ import { benchOrder, callbacksToGiven, resultToGiven, treeToGiven } from './sear
 import type { EvalResult, EvalSettings, KoOddsInfo, MctsTreeStats, SearchProgress, TeraAllowance, UnansweredProfile } from './types.ts';
 
 /**
- * DUCT (decoupled UCT) Monte-Carlo tree search — the "think deeper" mode.
+ * DUCT (decoupled UCT) Monte-Carlo tree search, the engine's tree mode.
  * Both sides select their choice independently via UCB over their own
  * statistics (the correct formulation for simultaneous moves), new leaves
  * are valued by the static eval (no rollouts, foul-play style), and values
