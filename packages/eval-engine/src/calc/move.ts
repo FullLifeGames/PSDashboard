@@ -44,7 +44,7 @@ function typedHiddenPower(gen: CalcGen, name: string, attacker: CalcBody): { nam
 }
 
 /** The power and type a body's mod gives the move where the calc reads another, from the mod's Dex (loaded with its battle). */
-function modOverrides(gen: CalcGen, name: string, attacker: CalcBody, calc: CalcMove): CalcMoveOptions['overrides'] | null {
+function modOverrides(name: string, attacker: CalcBody, calc: CalcMove): CalcMoveOptions['overrides'] | null {
   const dex = attacker.mod === 'champions' ? Dex.dexes[attacker.mod] : undefined;
   const move = dex?.moves.get(name);
   if (!move?.exists) return null;
@@ -57,6 +57,6 @@ export function calcMove(gen: CalcGen, name: string, attacker: CalcBody, options
   const typed = typedHiddenPower(gen, name, attacker);
   const basePower = typed.basePower ?? powerAtUse(gen, name, attacker);
   const move = new CalcMove(gen, typed.name, basePower === null ? options : { ...options, overrides: { ...options.overrides, basePower } });
-  const changed = basePower === null ? modOverrides(gen, typed.name, attacker, move) : null;
+  const changed = basePower === null ? modOverrides(typed.name, attacker, move) : null;
   return changed ? new CalcMove(gen, typed.name, { ...options, overrides: { ...options.overrides, ...changed } }) : move;
 }
