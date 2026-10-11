@@ -8,7 +8,7 @@
 
 import { calculate, Field, Generations, Move, type Pokemon } from '@smogon/calc';
 import { Dex, type PokemonSet } from '@pkmn/sim';
-import { type DamageObservation, typedHiddenPowerId, inferOpponentTeam, itemSetValue, toId } from '@fulllifegames/replay-core';
+import { type DamageObservation, typedHiddenPowerId, inferOpponentTeam, itemSetValue, replayRuleset, toId } from '@fulllifegames/replay-core';
 import { attackerAtUse, calcPokemon, type CalcBody } from './calc/body.ts';
 import { CHOICE_ITEMS } from './sensitivity.ts';
 
@@ -271,32 +271,33 @@ const stagesOf = (boosts: Record<string, number>): CalcBody['boosts'] =>
 /**
  * Both bodies of an observation stood on the field: their stages hold every
  * entry boost; the attacker hits in the forme its ability takes for the move
- * (calc/body.ts).
+ * (calc/body.ts). A Champions game's sets hold Stat Points, which the one
+ * builder reads as EVs through the mod (round 67, decision 30).
  */
-function calcAttacker(gen: CalcGen, attackerSet: PokemonSet, obs: DamageObservation, withItem: string, moveId: string): Pokemon {
+function calcAttacker(gen: CalcGen, attackerSet: PokemonSet, obs: DamageObservation, withItem: string, moveId: string, mod?: string): Pokemon {
   return calcPokemon(gen, attackerAtUse(gen.num, {
     species: attackerSet.species, level: attackerSet.level || 100, ability: attackerSet.ability || '', item: withItem,
     nature: attackerSet.nature, evs: attackerSet.evs, ivs: attackerSet.ivs, gender: attackerSet.gender,
-    boosts: stagesOf(obs.attackerBoosts), status: obs.attackerStatus, tera: null, onField: true,
+    boosts: stagesOf(obs.attackerBoosts), status: obs.attackerStatus, tera: null, onField: true, mod,
   }, moveId));
 }
 
-function calcDefender(gen: CalcGen, defenderSet: PokemonSet | undefined, obs: DamageObservation): Pokemon {
+function calcDefender(gen: CalcGen, defenderSet: PokemonSet | undefined, obs: DamageObservation, mod?: string): Pokemon {
   return calcPokemon(gen, {
     species: defenderSet?.species ?? obs.defenderSpecies, level: defenderSet?.level || 100, ability: '', item: '',
     nature: defenderSet?.nature ?? '', evs: defenderSet?.evs ?? {}, ivs: defenderSet?.ivs ?? {}, gender: defenderSet?.gender,
-    boosts: stagesOf(obs.defenderBoosts), tera: null, onField: true,
+    boosts: stagesOf(obs.defenderBoosts), tera: null, onField: true, mod,
   });
 }
 
 /** Whether the roll range (± slack) under `withItem` contains the observed fraction; null when the calc cannot judge. */
 function explainsObservation(
   gen: CalcGen, attackerSet: PokemonSet, defenderSet: PokemonSet | undefined, obs: DamageObservation,
-  calcMoveId: string, withItem: string,
+  calcMoveId: string, withItem: string, mod?: string,
 ): boolean | null {
   try {
-    const attacker = calcAttacker(gen, attackerSet, obs, withItem, calcMoveId);
-    const defender = calcDefender(gen, defenderSet, obs);
+    const attacker = calcAttacker(gen, attackerSet, obs, withItem, calcMoveId, mod);
+    const defender = calcDefender(gen, defenderSet, obs, mod);
     const result = calculate(gen, attacker, defender, new Move(gen, calcMoveId), new Field({}));
     const rolls = (Array.isArray(result.damage) ? (result.damage as number[]).flat() : [Number(result.damage)]).map(Number);
     const maxHp = defender.maxHP();
@@ -323,14 +324,14 @@ function rivalItemsFor(gen: CalcGen, calcMoveId: string): string[] {
 
 /** One observation's verdict on the Choice item hypothesis. */
 function judgeObservation(
-  gen: CalcGen, attackerSet: PokemonSet, defenderSet: PokemonSet | undefined, obs: DamageObservation, item: string,
+  gen: CalcGen, attackerSet: PokemonSet, defenderSet: PokemonSet | undefined, obs: DamageObservation, item: string, mod?: string,
 ): 'contradicted' | 'choice-only' | 'skip' {
   // Typeless "hiddenpower" calcs as the set's resolved variant (same seam
   // as spread-inference — the IV-default type would judge with wrong rolls).
   const calcMoveId = obs.moveId === 'hiddenpower'
     ? typedHiddenPowerId(attackerSet.moves) ?? obs.moveId
     : obs.moveId;
-  const explains = (withItem: string) => explainsObservation(gen, attackerSet, defenderSet, obs, calcMoveId, withItem);
+  const explains = (withItem: string) => explainsObservation(gen, attackerSet, defenderSet, obs, calcMoveId, withItem, mod);
   const rivals = rivalItemsFor(gen, calcMoveId);
   const choiceFits = explains(item);
   if (choiceFits === null) return 'skip';
@@ -349,6 +350,8 @@ export function corroborateChoiceItem(
   teams: { p1Team: PokemonSet[]; p2Team: PokemonSet[] },
   observations: DamageObservation[],
   genNum: number,
+  /** 'champions' when the sets hold Stat Points (round 67, decision 30). */
+  mod?: string,
 ): ItemCorroboration {
   const gen = Generations.get(Math.min(9, Math.max(1, genNum)) as 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9);
   const speciesId = toId(species);
@@ -360,7 +363,7 @@ export function corroborateChoiceItem(
     if (obs.attackerSide !== side || toId(obs.attackerSpecies) !== speciesId) continue;
     const defenderTeam = side === 'p1' ? teams.p2Team : teams.p1Team;
     const defenderSet = defenderTeam.find(candidate => toId(candidate.species) === toId(obs.defenderSpecies));
-    const verdict = judgeObservation(gen, attackerSet, defenderSet, obs, item);
+    const verdict = judgeObservation(gen, attackerSet, defenderSet, obs, item, mod);
     if (verdict === 'contradicted') return 'contradicted';
     if (verdict === 'choice-only') sawChoiceOnly = true;
   }
@@ -386,6 +389,8 @@ export function buildChoiceLockContext(
   observations: DamageObservation[],
 ): ChoiceLockContext {
   const genNum = parseInt(replayLog.match(/^\|gen\|(\d)/m)?.[1] ?? '9', 10);
+  // Round 67 (decision 30): a Champions game's built sets hold Stat Points.
+  const mod = replayRuleset({ log: replayLog }) === 'champions' ? 'champions' : undefined;
   const eligibility: ChoiceLockContext['eligibility'] = { p1: {}, p2: {} };
   for (const side of ['p1', 'p2'] as const) {
     const info = inferOpponentTeam(replayLog, side);
@@ -399,7 +404,7 @@ export function buildChoiceLockContext(
       const proven = (revealed?.item.source === 'revealed' || revealed?.item.source === 'manual') &&
         toId(itemSetValue(revealed.item.value)) === toId(built.item);
       eligibility[side][speciesId] = proven ||
-        corroborateChoiceItem(side, built.species, built.item, teams, observations, genNum) !== 'contradicted';
+        corroborateChoiceItem(side, built.species, built.item, teams, observations, genNum, mod) !== 'contradicted';
     }
   }
   return { trails: buildChoiceLockTrails(replayLog), eligibility, heldItems: buildProtocolHeldItems(replayLog) };

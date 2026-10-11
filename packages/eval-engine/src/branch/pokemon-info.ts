@@ -84,6 +84,7 @@ export function makePokemonInfo(
     stellarBoostedTypes: [...pokemon.stellarBoostedTypes],
     // What the calc cannot see on its own, read as the engine's one builder reads it (round 67, T76).
     ...simBodyFacts(pokemon),
+    ...(pokemon.battle.dex.currentMod === 'champions' ? { mod: 'champions' } : {}),
     boosts: { ...pokemon.boosts },
     level,
     types,

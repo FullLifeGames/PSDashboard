@@ -1,7 +1,7 @@
 import { Generations, Pokemon as CalcPokemon } from '@smogon/calc';
 import { Dex } from '@pkmn/dex';
 import { Dex as SimDex, type PokemonSet } from '@pkmn/sim';
-import { speciesBaseId, toId, type PokemonSnapshot, type TurnSnapshot } from '@fulllifegames/replay-core';
+import { calcEvs, calcIvs, evBudget, speciesBaseId, toId, type PokemonEvs, type PokemonSnapshot, type TurnSnapshot } from '@fulllifegames/replay-core';
 import {
   moveAtUse,
   type BranchMoveOption, type BranchSimState, type BranchSlotModifiers, type BranchSwitchOption, type MoveUser, type SimPokemonInfo,
@@ -52,12 +52,26 @@ function moveNamesFor(mon: PokemonSnapshot, set: PokemonSet | undefined): string
   return set?.moves && set.moves.length > 0 ? set.moves : mon.moves;
 }
 
+/**
+ * Round 67 (decision 30): the spreads the calc reads for a guessed set. A set of a Champions game holds Stat Points,
+ * which @smogon/calc 0.11 reads as EV = 8·SP − 4 with every IV 31 (the server's statModify on every level).
+ */
+const CHAMPIONS_BUDGET = evBudget('gen9championsou');
+function calcSpreadsOf(set: PokemonSet | undefined, champions: boolean): { evs?: Partial<PokemonEvs>; ivs?: Partial<PokemonEvs> } {
+  if (!set) return {};
+  if (!champions) return { evs: set.evs, ivs: set.ivs };
+  return { evs: calcEvs(set.evs as PokemonEvs, CHAMPIONS_BUDGET), ivs: calcIvs(set.ivs as Partial<PokemonEvs>, CHAMPIONS_BUDGET) };
+}
+
+/** The evs of a Champions game's info hold Stat Points; the calc converts them through the mod (decision 30). */
+const championsMark = (champions: boolean): { mod?: string } => (champions ? { mod: 'champions' } : {});
+
 /** Attack and Special Attack of the guessed set (Tera Blast's category in the move table; the label reads only the type). */
-function guessedAttacks(mon: PokemonSnapshot, set: PokemonSet | undefined, gen: number): { atk?: number; spa?: number } {
+function guessedAttacks(mon: PokemonSnapshot, set: PokemonSet | undefined, gen: number, champions = false): { atk?: number; spa?: number } {
   if (!set) return {};
   try {
     const calcGen = Generations.get(Math.min(9, Math.max(1, gen)) as 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9);
-    const poke = new CalcPokemon(calcGen, mon.speciesForme, { level: mon.level || set.level || 100, nature: set.nature || undefined, evs: set.evs, ivs: set.ivs });
+    const poke = new CalcPokemon(calcGen, mon.speciesForme, { level: mon.level || set.level || 100, nature: set.nature || undefined, ...calcSpreadsOf(set, champions) });
     return { atk: poke.rawStats.atk, spa: poke.rawStats.spa };
   } catch {
     return {};
@@ -70,7 +84,7 @@ function guessedAttacks(mon: PokemonSnapshot, set: PokemonSet | undefined, gen: 
  * have, a revealed item (an empty item is unknown), the Tera click. The
  * hidden type stays unknown.
  */
-function snapshotMoveUser(mon: PokemonSnapshot, set: PokemonSet | undefined, gen: number): MoveUser {
+function snapshotMoveUser(mon: PokemonSnapshot, set: PokemonSet | undefined, gen: number, champions = false): MoveUser {
   const dex = dexForGen(gen);
   const species = dex.species.get(mon.speciesForme);
   const known = species.exists ? species : null;
@@ -82,7 +96,7 @@ function snapshotMoveUser(mon: PokemonSnapshot, set: PokemonSet | undefined, gen
     item: item?.exists ? { id: item.id, onPlate: item.onPlate, onMemory: item.onMemory, onDrive: item.onDrive, naturalGift: item.naturalGift } : undefined,
     terastallized: mon.terastallized || null,
     types: known?.types,
-    ...guessedAttacks(mon, set, gen),
+    ...guessedAttacks(mon, set, gen, champions),
   };
 }
 
@@ -104,8 +118,9 @@ function moveOptionsFor(
   set: PokemonSet | undefined,
   activeSlot: number,
   gen: number,
+  champions = false,
 ): BranchMoveOption[] {
-  const user = snapshotMoveUser(mon, set, gen);
+  const user = snapshotMoveUser(mon, set, gen, champions);
   return moveNamesFor(mon, set).map((name, slot) => ({
     name,
     activeSlot,
@@ -128,6 +143,7 @@ function absoluteHp(
   mon: PokemonSnapshot,
   set: PokemonSet | undefined,
   gen: number,
+  champions = false,
 ): { hp: number; maxhp: number; hpPercent: number } {
   const hpPercent = mon.maxhp === 0 && !mon.fainted ? 100 : mon.hpPercent;
   try {
@@ -135,8 +151,7 @@ function absoluteHp(
     const poke = new CalcPokemon(calcGen, mon.speciesForme, {
       level: mon.level || set?.level || 100,
       nature: set?.nature || undefined,
-      evs: set?.evs,
-      ivs: set?.ivs,
+      ...calcSpreadsOf(set, champions),
     });
     const maxhp = poke.maxHP();
     const hp = mon.fainted ? 0 : Math.max(1, Math.round(maxhp * hpPercent / 100));
@@ -151,8 +166,9 @@ function pokemonInfoFromSnapshot(
   set: PokemonSet | undefined,
   activeSlot: number | null,
   gen: number,
+  champions: boolean,
 ): SimPokemonInfo {
-  const { hp, maxhp, hpPercent } = absoluteHp(mon, set, gen);
+  const { hp, maxhp, hpPercent } = absoluteHp(mon, set, gen, champions);
   return {
     name: mon.name,
     species: mon.speciesForme,
@@ -178,6 +194,7 @@ function pokemonInfoFromSnapshot(
     types: speciesTypesFor(mon.speciesForme, gen),
     // The damage calc reads the Tera type from here (as on the live and stored paths).
     teraType: mon.terastallized || '',
+    ...championsMark(champions),
   };
 }
 
@@ -275,7 +292,7 @@ interface SnapshotSideOptions {
 /** One side's approximate pickers: moves per active slot, the living bench, and the infos. */
 function snapshotSideOptions(
   snapshot: TurnSnapshot, side: 'p1' | 'p2', team: PokemonSet[], gen: number,
-  bringOnly: { p1: string[]; p2: string[] } | null | undefined, teraAllowed: boolean,
+  bringOnly: { p1: string[]; p2: string[] } | null | undefined, teraAllowed: boolean, champions = false,
 ): SnapshotSideOptions {
   const pokemon = snapshot[side].pokemon;
   const actives = pokemon.filter(mon => mon.isActive && !mon.fainted);
@@ -288,7 +305,7 @@ function snapshotSideOptions(
   const broughtBases = (bringOnly?.[side] ?? []).map(name => speciesBaseId(name));
   const inBring = (mon: PokemonSnapshot) =>
     broughtBases.length === 0 || broughtBases.includes(speciesBaseId(mon.speciesForme));
-  const movesBySlot = actives.map((mon, index) => moveOptionsFor(mon, setFor(mon), index, gen));
+  const movesBySlot = actives.map((mon, index) => moveOptionsFor(mon, setFor(mon), index, gen, champions));
   const switchesBySlot = actives.map((_, activeSlot): BranchSwitchOption[] =>
     pokemon
       .filter(mon => !mon.isActive && !mon.fainted && benchPercent(mon) > 0 && inBring(mon))
@@ -301,9 +318,9 @@ function snapshotSideOptions(
         hpPercent: benchPercent(mon),
         fainted: false,
       })));
-  const activeSlots = actives.map((mon, index) => pokemonInfoFromSnapshot(mon, setFor(mon), index, gen));
+  const activeSlots = actives.map((mon, index) => pokemonInfoFromSnapshot(mon, setFor(mon), index, gen, champions));
   const infos = pokemon.map(mon =>
-    pokemonInfoFromSnapshot(mon, setFor(mon), mon.isActive ? actives.indexOf(mon) : null, gen));
+    pokemonInfoFromSnapshot(mon, setFor(mon), mon.isActive ? actives.indexOf(mon) : null, gen, champions));
   // One Tera per side and battle: a terastallized teammate spent it.
   const sideMayTera = teraAllowed && !pokemon.some(mon => mon.terastallized);
   const modifiersBySlot = actives.map((mon, index) => ({
@@ -373,7 +390,9 @@ export function pickerStateFromSnapshot(
   rules: { format?: string; teraUsed?: { p1: boolean; p2: boolean } } = {},
 ): BranchSimState {
   const teraAllowed = !teraBanned(rules.format);
-  const p1 = snapshotSideOptions(snapshot, 'p1', p1Team, gen, bringOnly, teraAllowed && !rules.teraUsed?.p1);
-  const p2 = snapshotSideOptions(snapshot, 'p2', p2Team, gen, bringOnly, teraAllowed && !rules.teraUsed?.p2);
+  // Round 67 (decision 30): a Champions format's sets hold Stat Points.
+  const champions = evBudget(rules.format ?? '').statPoints;
+  const p1 = snapshotSideOptions(snapshot, 'p1', p1Team, gen, bringOnly, teraAllowed && !rules.teraUsed?.p1, champions);
+  const p2 = snapshotSideOptions(snapshot, 'p2', p2Team, gen, bringOnly, teraAllowed && !rules.teraUsed?.p2, champions);
   return snapshotPickerState(snapshot, p1, p2);
 }

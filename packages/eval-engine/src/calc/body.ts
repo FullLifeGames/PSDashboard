@@ -1,5 +1,6 @@
 import { Generations, Move as CalcMove, Pokemon as CalcPokemon, Field, calculate } from '@smogon/calc';
 import { Dex, toID, type Battle, type Pokemon } from '@pkmn/sim';
+import { calcEvs, calcIvs, evBudget, type PokemonEvs } from '@fulllifegames/replay-core';
 import type { SimPokemonInfo } from '../branch/types.ts';
 
 /**
@@ -127,6 +128,7 @@ export function bodyFromInfo(info: SimPokemonInfo): SimBody {
     totalFainted: info.totalFainted,
     hpType: info.hpType,
     hpPower: info.hpPower,
+    mod: info.mod,
   };
 }
 
@@ -246,16 +248,27 @@ function abilityForCalc(gen: CalcGen, body: CalcBody, species: string): string |
   return effective && calcAddsStages(gen.num, effective) ? NO_ABILITY : given;
 }
 
+/**
+ * Round 67 (decision 30): @smogon/calc 0.11 does not know Pokémon Champions. A body of a Champions battle carries
+ * Stat Points in its evs; the calc reads them as EV = 8·SP − 4 with every IV 31, which gives the server's statModify
+ * on every level (calc-champions.spec.ts holds it against the simulator).
+ */
+const CHAMPIONS_BUDGET = evBudget('gen9championsou');
+const calcSpreads = (body: CalcBody): { evs: StatSpread; ivs: StatSpread } => (body.mod === 'champions'
+  ? { evs: calcEvs(body.evs as PokemonEvs, CHAMPIONS_BUDGET), ivs: calcIvs(body.ivs as Partial<PokemonEvs>, CHAMPIONS_BUDGET) ?? {} }
+  : { evs: body.evs, ivs: body.ivs });
+
 /** The one place the engine builds a calc Pokémon. */
 export function calcPokemon(gen: CalcGen, body: CalcBody): CalcPokemon {
   const species = calcSpecies(gen.num, body.species);
+  const { evs, ivs } = calcSpreads(body);
   return new CalcPokemon(gen, species, {
     level: body.level,
     ability: abilityForCalc(gen, body, species) as never,
     item: (body.item || undefined) as never,
     nature: (body.nature || undefined) as never,
-    evs: body.evs,
-    ivs: body.ivs,
+    evs,
+    ivs,
     gender: (body.gender || undefined) as never,
     boosts: body.boosts,
     curHP: body.hp,

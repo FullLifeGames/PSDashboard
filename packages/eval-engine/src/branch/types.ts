@@ -78,6 +78,8 @@ export interface SimPokemonInfo {
   /** Hidden Power's type and power as the simulator gives them (hpType, hpPower; round 67, T83). */
   hpType?: string;
   hpPower?: number;
+  /** 'champions' on a body of a Champions battle: its evs hold Stat Points, which the calc reads as EVs (round 67, decision 30). */
+  mod?: string;
   boosts: Record<string, number>;
   level: number;
   types: string[];
