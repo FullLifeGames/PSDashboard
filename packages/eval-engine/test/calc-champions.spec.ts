@@ -1,7 +1,8 @@
 import { describe, expect, test } from 'vitest';
 import { Battle, Dex, type PokemonSet } from '@pkmn/sim';
 import { Generations } from '@smogon/calc';
-import { bodyFromInfo, bodyOf, calcPokemon } from '../src/calc/body';
+import { bodyFromInfo, bodyOf, calcPokemon, type CalcBody } from '../src/calc/body';
+import { calcMove } from '../src/calc/move';
 import { makePokemonInfo } from '../src/branch/pokemon-info';
 import { loadSimMods } from '../src/forward/sim-mods';
 
@@ -68,6 +69,20 @@ describe('the engine prices a Champions body as the simulator plays it (decision
       const calc = calcPokemon(gen, bodyFromInfo(info));
       expect({ ...calc.rawStats, hp: calc.maxHP() }, mon.species.name).toEqual({ ...mon.storedStats, hp: mon.maxhp });
     }
+  });
+
+  test('calcMove gives the move of a Champions body the power and type of the Champions mod', () => {
+    const gen = Generations.get(9);
+    const attacker = { mod: 'champions' } as CalcBody;
+    const wrong: string[] = [];
+    for (const move of Dex.dexes.champions.moves.all()) {
+      // The Let's Go moves and Struggle sit outside what the calc prices; a power callback sets power at use.
+      if (!move.exists || move.isNonstandard === 'LGPE' || move.id === 'struggle') continue;
+      const calc = calcMove(gen, move.name, attacker);
+      if (calc.type !== move.type) wrong.push(`${move.name} type ${calc.type} vs ${move.type}`);
+      if (move.category !== 'Status' && !move.basePowerCallback && calc.bp !== move.basePower) wrong.push(`${move.name} power ${calc.bp} vs ${move.basePower}`);
+    }
+    expect(wrong).toEqual([]);
   });
 
   test('a body outside Champions keeps its EVs and IVs', () => {

@@ -13,6 +13,10 @@ import type { CalcBody } from './body.ts';
  * attacker's facts: Last Respects by the side's fallen (T76;
  * test/calc-sim-inputs.spec.ts holds that the calc prices it at its listed
  * power whatever alliesFainted says, so the set empties once it learns it).
+ * A body of a Champions battle uses its moves as the Champions mod defines
+ * them: calc 0.11 prices them at Gen 9 values, so a power or type the mod
+ * changes goes in as an override, read from the mod's own Dex (round 67
+ * merge, decision 30; calc-champions.spec.ts checks every Champions move).
  */
 
 type CalcGen = ReturnType<typeof Generations.get>;
@@ -39,8 +43,20 @@ function typedHiddenPower(gen: CalcGen, name: string, attacker: CalcBody): { nam
   return { name: `Hidden Power ${attacker.hpType}`, basePower: gen.num < 6 && attacker.hpPower ? attacker.hpPower : null };
 }
 
+/** The power and type a body's mod gives the move where the calc reads another, from the mod's Dex (loaded with its battle). */
+function modOverrides(gen: CalcGen, name: string, attacker: CalcBody, calc: CalcMove): CalcMoveOptions['overrides'] | null {
+  const dex = attacker.mod === 'champions' ? Dex.dexes[attacker.mod] : undefined;
+  const move = dex?.moves.get(name);
+  if (!move?.exists) return null;
+  const power = move.category !== 'Status' && !move.basePowerCallback && move.basePower !== calc.bp ? { basePower: move.basePower } : {};
+  const type = move.type !== calc.type ? { type: move.type as never } : {};
+  return Object.keys(power).length + Object.keys(type).length > 0 ? { ...power, ...type } : null;
+}
+
 export function calcMove(gen: CalcGen, name: string, attacker: CalcBody, options: CalcMoveOptions = {}): CalcMove {
   const typed = typedHiddenPower(gen, name, attacker);
   const basePower = typed.basePower ?? powerAtUse(gen, name, attacker);
-  return new CalcMove(gen, typed.name, basePower === null ? options : { ...options, overrides: { ...options.overrides, basePower } });
+  const move = new CalcMove(gen, typed.name, basePower === null ? options : { ...options, overrides: { ...options.overrides, basePower } });
+  const changed = basePower === null ? modOverrides(gen, typed.name, attacker, move) : null;
+  return changed ? new CalcMove(gen, typed.name, { ...options, overrides: { ...options.overrides, ...changed } }) : move;
 }

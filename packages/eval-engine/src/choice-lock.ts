@@ -10,6 +10,7 @@ import { calculate, Field, Generations, Move, type Pokemon } from '@smogon/calc'
 import { Dex, type PokemonSet } from '@pkmn/sim';
 import { type DamageObservation, typedHiddenPowerId, inferOpponentTeam, itemSetValue, replayRuleset, toId } from '@fulllifegames/replay-core';
 import { attackerAtUse, calcPokemon, type CalcBody } from './calc/body.ts';
+import { calcMove } from './calc/move.ts';
 import { CHOICE_ITEMS } from './sensitivity.ts';
 
 /** `handedOver`: the Choice item came by a move, so the protocol itself shows it (no set guess to vet). */
@@ -298,7 +299,8 @@ function explainsObservation(
   try {
     const attacker = calcAttacker(gen, attackerSet, obs, withItem, calcMoveId, mod);
     const defender = calcDefender(gen, defenderSet, obs, mod);
-    const result = calculate(gen, attacker, defender, new Move(gen, calcMoveId), new Field({}));
+    // The move as the calc must read it: a Champions game's moves at the mod's power and type (calc/move.ts).
+    const result = calculate(gen, attacker, defender, calcMove(gen, calcMoveId, { mod } as CalcBody), new Field({}));
     const rolls = (Array.isArray(result.damage) ? (result.damage as number[]).flat() : [Number(result.damage)]).map(Number);
     const maxHp = defender.maxHP();
     if (rolls.length === 0 || maxHp <= 0) return null;
