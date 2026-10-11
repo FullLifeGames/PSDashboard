@@ -5633,7 +5633,7 @@ describe.skipIf(!process.env.EVAL_CALIBRATION)('eval calibration against real re
           // offline suspect diagnosis can compare feature profiles.
           let g: number[] | undefined;
           if (process.env.EVAL_CALIBRATION_FEATURES === '1') {
-            const featureCache = createMatchupCache();
+            const featureCache = createMatchupCache(replaySettings.ruleset);
             const features = evalFeatures(battle, featureCache);
             const teamSize = Math.max(battle.sides[0].pokemon.length, battle.sides[1].pokemon.length, 1);
             const scaleOverNorm = EVAL_WEIGHTS.scale / (teamSize * (EVAL_WEIGHTS.alive + EVAL_WEIGHTS.hp));
