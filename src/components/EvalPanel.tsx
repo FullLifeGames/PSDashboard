@@ -174,7 +174,6 @@ export function EvalPanel(props: EvalPanelProps) {
           playerNames={playerNames}
           positionLabel={positionLabel}
           resultSettings={resultSettings}
-          thinkDeeper={null}
           onPickChoice={onPickChoice}
           onPickPair={onPickPair}
           doubles={doubles}

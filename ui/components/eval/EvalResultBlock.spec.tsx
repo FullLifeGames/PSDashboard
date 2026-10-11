@@ -11,13 +11,12 @@ describe('EvalResultBlock', () => {
   test('the advantage bar, the provenance line, and the top three lines per side with their gaps', () => {
     const result = evalResult();
     const settings = { depth: 2 as const, samples: 3 as const, mode: 'matrix' as const };
-    render(<EvalResultBlock result={result} status="done" playerNames={names} positionLabel="Turn 5 · main line" resultSettings={settings} thinkDeeper={<button type="button">deeper</button>} />);
+    render(<EvalResultBlock result={result} status="done" playerNames={names} positionLabel="Turn 5 · main line" resultSettings={settings} />);
     const pct = winPercent(result.score);
     expect(screen.getByText('Turn 5 · main line')).toBeInTheDocument();
     expect(screen.getByRole('img', { name: `Advantage estimate: Alice ${pct}%, Bob ${100 - pct}%` })).toBeInTheDocument();
     expect(document.querySelector('.ps-eval-bar-fill')).toHaveStyle({ width: `${pct}%` });
     expect(screen.getByText('depth 2 · 3 samples')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'deeper' })).toBeInTheDocument();
     expect(screen.queryByText('toss-up: prediction battle')).toBeNull();
 
     const choices = document.querySelectorAll('.ps-eval-choice');
@@ -35,7 +34,7 @@ describe('EvalResultBlock', () => {
     const onPickChoice = vi.fn();
     const onPickPair = vi.fn();
     const result = evalResult();
-    const shared = { result, playerNames: names, thinkDeeper: null, onPickChoice, onPickPair };
+    const shared = { result, playerNames: names, onPickChoice, onPickPair };
     const { rerender } = render(<EvalResultBlock {...shared} status="done" />);
     await userEvent.click(screen.getByRole('button', { name: /Swords Dance/ }));
     expect(onPickChoice).toHaveBeenCalledWith('p1', result.perSide.p1[1], result.perSide.p2[0]);
@@ -55,7 +54,7 @@ describe('EvalResultBlock', () => {
     const line = [{ p1: 'Stone Edge', p2: 'Protect' }];
     const perSide = { p1: [rankedChoice('move earthquake', 'Earthquake', 0.3, { line })], p2: [rankedChoice('move protect', 'Protect', -0.3)] };
     const result = evalResult('singles', { interval: 0.3, perSide, matrix: undefined });
-    render(<EvalResultBlock result={result} status="done" playerNames={names} resultSettings={{ depth: 1, samples: 1, mode: 'mcts' }} thinkDeeper={null} />);
+    render(<EvalResultBlock result={result} status="done" playerNames={names} resultSettings={{ depth: 1, samples: 1, mode: 'mcts' }} />);
     expect(screen.getByText('toss-up: prediction battle')).toBeInTheDocument();
     expect(screen.getByText('MCTS')).toBeInTheDocument();
     expect(screen.getByText('then Stone Edge · Protect')).toBeInTheDocument();
@@ -66,7 +65,7 @@ describe('EvalResultBlock', () => {
     const line = [{ p1: '→ Keldeo', p2: '(waiting)' }, { p1: 'Hydro Pump', p2: 'High Jump Kick' }];
     const perSide = { p1: [rankedChoice('move rapidspin', 'Rapid Spin', 0.3, { line })], p2: [rankedChoice('move fakeout', 'Fake Out', -0.3)] };
     const result = evalResult('singles', { perSide, matrix: undefined });
-    render(<EvalResultBlock result={result} status="done" playerNames={names} resultSettings={{ depth: 1, samples: 1, mode: 'mcts' }} thinkDeeper={null} />);
+    render(<EvalResultBlock result={result} status="done" playerNames={names} resultSettings={{ depth: 1, samples: 1, mode: 'mcts' }} />);
     expect(screen.getByText('then → Keldeo → Hydro Pump · High Jump Kick')).toBeInTheDocument();
     expect(screen.queryByText(/\(waiting\)/)).toBeNull();
   });

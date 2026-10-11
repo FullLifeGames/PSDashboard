@@ -1,4 +1,3 @@
-import type { ReactNode } from 'react';
 import { type EvalResult, type RankedChoice, formatLine, winDeltaText, winPercent } from '@fulllifegames/eval-engine';
 import type { EvalStatus, TurnEvalSettings } from '../../hooks/useEvaluation';
 import { EvalMatrixView } from '../EvalMatrixView';
@@ -78,10 +77,9 @@ function ChoiceList({
   );
 }
 
-function SettingsLine({ result, resultSettings, children }: {
+function SettingsLine({ result, resultSettings }: {
   result: EvalResult;
   resultSettings?: TurnEvalSettings | null;
-  children: ReactNode;
 }) {
   return (
     <div style={{ display: 'flex', gap: 8, alignItems: 'baseline', fontSize: 10, color: '#778', marginTop: 2 }}>
@@ -97,19 +95,17 @@ function SettingsLine({ result, resultSettings, children }: {
           toss-up: prediction battle
         </span>
       )}
-      {children}
     </div>
   );
 }
 
 /** The single-position result: the advantage bar, its provenance, the ranked lines, and the matrix. */
-export function EvalResultBlock({ result, status, playerNames, positionLabel, resultSettings, thinkDeeper, onPickChoice, onPickPair, doubles }: {
+export function EvalResultBlock({ result, status, playerNames, positionLabel, resultSettings, onPickChoice, onPickPair, doubles }: {
   result: EvalResult;
   status: EvalStatus;
   playerNames: [string, string];
   positionLabel?: string | null;
   resultSettings?: TurnEvalSettings | null;
-  thinkDeeper: ReactNode;
   onPickChoice?: PickChoice;
   onPickPair?: (p1: { choice: string; label: string }, p2: { choice: string; label: string }) => void;
   doubles?: boolean;
@@ -128,9 +124,7 @@ export function EvalResultBlock({ result, status, playerNames, positionLabel, re
         <div className="ps-eval-bar-fill" style={{ width: `${p1Pct}%` }} />
         <div className="ps-eval-bar-tick" />
       </div>
-      <SettingsLine result={result} resultSettings={resultSettings}>
-        {thinkDeeper}
-      </SettingsLine>
+      <SettingsLine result={result} resultSettings={resultSettings} />
       <div className="ps-eval-columns">
         {/* Stale results describe the PREVIOUS position — clicking them
             would map old choices onto the new state (wrong switches). */}
