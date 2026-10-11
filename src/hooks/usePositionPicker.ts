@@ -114,6 +114,10 @@ async function resolvePickerState(args: {
   // Round 67 (T136): the fast picker offers Tera where the simulator will: the branch format allows it,
   // and the side has not terastallized in any turn so far.
   const rules = { format: getBranchSimulatorFormat(replayData), teraUsed: teraUsedSides(snapshots.slice(0, index + 1)) };
+  // Round 67 merge (T145): the fast picker asks the simulator whether the format offers Tera, and a Champions
+  // format exists only once its mod is loaded.
+  const { loadSimMods } = await import('../lib/lazy/branch-engine');
+  await loadSimMods(rules.format);
   return { simState: pickerStateFromSnapshot(snapshot, teams.p1Team, teams.p2Team, replayGenNumber, bringOnlyLists, rules), source: 'snapshot' };
 }
 

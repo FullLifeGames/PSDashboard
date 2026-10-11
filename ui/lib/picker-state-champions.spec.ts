@@ -60,4 +60,17 @@ describe('snapshot picker on a Champions replay (decision 30)', () => {
     }
     expect(compared).toBeGreaterThan(3);
   }, 60_000);
+
+  test('the fast picker offers no Tera where the Champions mod has none (T136, T145)', async () => {
+    const replay = fixture<{ formatid: string; log: string }>('gen9championsou-2693832490.json');
+    await loadSimMods('gen9championsou');
+    const { p1Team, p2Team } = buildTeamsFromReplay(replay.log);
+    const format = getBranchSimulatorFormat(replay);
+    for (const snapshot of parseReplayLog(replay.log).slice(1, 6)) {
+      const state = pickerStateFromSnapshot(snapshot, p1Team, p2Team, 9, null, { format });
+      const slots = [...state.p1ModifiersBySlot, ...state.p2ModifiersBySlot];
+      expect(slots.length, `turn ${snapshot.turn}`).toBeGreaterThan(0);
+      expect(slots.map(slot => slot.teraType).filter(type => type !== null), `turn ${snapshot.turn}`).toEqual([]);
+    }
+  }, 60_000);
 });

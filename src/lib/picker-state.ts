@@ -1,11 +1,12 @@
 import { Generations, Pokemon as CalcPokemon } from '@smogon/calc';
 import { Dex } from '@pkmn/dex';
-import { Dex as SimDex, type PokemonSet } from '@pkmn/sim';
+import type { PokemonSet } from '@pkmn/sim';
 import { calcEvs, calcIvs, evBudget, speciesBaseId, toId, type PokemonEvs, type PokemonSnapshot, type TurnSnapshot } from '@fulllifegames/replay-core';
 import {
   moveAtUse,
   type BranchMoveOption, type BranchSimState, type BranchSlotModifiers, type BranchSwitchOption, type MoveUser, type SimPokemonInfo,
 } from '@fulllifegames/eval-engine';
+import { teraBanned } from './picker-tera';
 
 /**
  * Data sources for the always-visible pickers (spec: input variant B).
@@ -196,24 +197,6 @@ function pokemonInfoFromSnapshot(
     teraType: mon.terastallized || '',
     ...championsMark(champions),
   };
-}
-
-/**
- * Terastal Clause in the branch format's rule table: the simulator nulls
- * every canTerastallize at battle start. Read the way replay-core reads
- * Sleep Clause (formatEnforcesSleepClause); no format, no clause. This
- * module loads through import() only, so the simulator's dex stays out of
- * the entry chunk.
- */
-function teraBanned(format: string | undefined): boolean {
-  if (!format) return false;
-  if (/@@@.*terastal ?clause/i.test(format)) return true;
-  try {
-    const base = SimDex.formats.get(format.split('@@@')[0]);
-    return base.exists && SimDex.formats.getRuleTable(base).has('terastalclause');
-  } catch {
-    return false;
-  }
 }
 
 /**
