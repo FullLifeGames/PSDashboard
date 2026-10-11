@@ -5,6 +5,7 @@ import { itemSetValue } from '../team-info.ts';
 import { abilitiesAreFree } from './dex-legal.ts';
 import type { ItemDamageJudge } from './damage-ruleouts.ts';
 import { natureOf } from '../spreads/ladder.ts';
+import { ALL_31_IVS, calcEvs, evBudget, onBudgetScale, ZERO_EVS } from '../spreads/ev-budget.ts';
 import { toId } from '../ids.ts';
 
 /**
@@ -19,7 +20,10 @@ import { toId } from '../ids.ts';
  * them; a guessed one is ranged with no item and with the species' other
  * abilities (ruling R18: a guessed Assault Vest ruled out 649664's Keldeo's
  * Choice Scarf). A hit counts only when some candidate, or no item, explains
- * it; any doubt drops the hit (ruling R3). The app reaches this module only
+ * it; any doubt drops the hit (ruling R3). A Champions game goes to the
+ * calculator on its Stat Points, as EV = 8·SP − 4 with every IV 31 (decision
+ * 30, ruling R10): its strongest spread is the same 252 EVs, its weakest has
+ * no IV 0. The app reaches this module only
  * through the inference's dynamic import, so the entry chunk stays free of the
  * calculator.
  */
@@ -64,14 +68,14 @@ function readableMove(dex: GenDex, moveId: string): boolean {
 }
 
 /**
- * The hit is fit to judge: no doubt at the hit, abilities the Dex fixes, not
- * a Champions game (ruling R10), a readable move, no Stellar first use, the
+ * The hit is fit to judge: no doubt at the hit, abilities the Dex fixes, a
+ * readable move, no Stellar first use, the
  * holder's own item in play, and nobody else on the field whose possible
  * ability changes the damage or hides the weather.
  */
 function judgeable(hit: LoggedHit): boolean {
   if (hit.doubt || hit.attacker.itemChanged || hit.attacker.tera === 'Stellar') return false;
-  if (/champions/i.test(hit.format) || abilitiesAreFree(`|tier|${hit.format}`)) return false;
+  if (abilitiesAreFree(`|tier|${hit.format}`)) return false;
   const dex = Dex.forGen(hit.gen);
   if (!readableMove(dex, hit.move)) return false;
   // A Charge doubles the next Electric move, which the calculator does not model.
@@ -98,13 +102,13 @@ function offenseStat(dex: GenDex, moveId: string): Stat | null {
   return move.category === 'Physical' ? 'atk' : 'spa';
 }
 
-/** The holder's strongest and weakest legal spreads for that stat. */
-function extremes(stat: Stat | null): { strong: Spread; weak: Spread } {
+/** The holder's strongest and weakest legal spreads for that stat (32 Stat Points are 252 EVs; a Champions body has no IV 0). */
+function extremes(stat: Stat | null, champions: boolean): { strong: Spread; weak: Spread } {
   if (!stat) return { strong: { evs: {}, ivs: {}, nature: 'Hardy' }, weak: { evs: {}, ivs: {}, nature: 'Hardy' } };
   const other: Stat = stat === 'atk' ? 'spa' : 'atk';
   return {
     strong: { evs: { [stat]: MAX_EVS }, ivs: {}, nature: natureOf(stat, other) },
-    weak: { evs: {}, ivs: { [stat]: 0 }, nature: natureOf(other, stat) },
+    weak: { evs: {}, ivs: champions ? {} : { [stat]: 0 }, nature: natureOf(other, stat) },
   };
 }
 
@@ -123,12 +127,17 @@ function calcPokemon(gen: CalcGen, party: HitParty, options: CalcOptions): Pokem
 const abilityName = (dex: GenDex, id: string) => (id ? dex.abilities.get(id).name : '');
 const itemName = (dex: GenDex, id: string) => (id ? dex.items.get(id).name : '');
 
+/** A Champions game's spreads: Stat Points (an EV-scale build converted first) as the EVs the calculator reads. */
+const CHAMPIONS_BUDGET = evBudget('gen9championsou');
+const championsEvs = (evs: Partial<PokemonEvs>): PokemonEvs => calcEvs(onBudgetScale({ ...ZERO_EVS, ...evs }, CHAMPIONS_BUDGET), CHAMPIONS_BUDGET);
+
 /** The defender as the panel builds it, with what the log shows it holding at the hit. */
-function defenderOptions(dex: GenDex, info: RevealedPokemonInfo, party: HitParty): CalcOptions {
+function defenderOptions(dex: GenDex, info: RevealedPokemonInfo, party: HitParty, champions: boolean): CalcOptions {
   const item = party.itemChanged ? itemName(dex, party.held) : itemName(dex, party.held) || itemSetValue(info.item.value);
   return {
     ability: abilityName(dex, party.ability) || info.ability.value || undefined, item: item || undefined,
-    nature: (info.nature?.value || 'Hardy') as CalcOptions['nature'], evs: info.evs.value, ivs: info.ivs?.value,
+    nature: (info.nature?.value || 'Hardy') as CalcOptions['nature'],
+    evs: champions ? championsEvs(info.evs.value) : info.evs.value, ivs: champions ? { ...ALL_31_IVS } : info.ivs?.value,
   };
 }
 
@@ -165,6 +174,8 @@ interface AbilityVariant {
 interface HitContext {
   hit: LoggedHit;
   gen: CalcGen;
+  /** A Champions game: spreads on the Stat Point scale. */
+  champions: boolean;
   abilities: AbilityVariant[];
   spreads: { strong: Spread; weak: Spread };
   defenders: CalcOptions[];
@@ -228,7 +239,7 @@ function variantKey(ctx: Omit<HitContext, 'defenders'>, defender: CalcOptions): 
  */
 function defenderVariants(dex: GenDex, info: RevealedPokemonInfo, ctx: Omit<HitContext, 'defenders'>): CalcOptions[] {
   const party = ctx.hit.defender;
-  const built = defenderOptions(dex, info, party);
+  const built = defenderOptions(dex, info, party, ctx.champions);
   const itemShown = party.itemChanged || !!party.held || shown(info.item);
   const items = itemShown || !built.item ? [built.item] : [built.item, undefined];
   const ruled = info.ruledOut?.abilities ?? [];
@@ -251,9 +262,10 @@ function contextOf(attacker: RevealedPokemonInfo, hit: LoggedHit, teams: { p1: O
     ? attacker.ability.value : abilityName(dex, hit.attacker.ability);
   const ruled = attacker.ruledOut?.abilities ?? [];
   const abilities = mayHave(dex, hit.attacker.species, known).filter(ability => known || !ruled.includes(toId(ability)));
+  const champions = /champions/i.test(hit.format);
   const base = {
-    hit, gen: Generations.get(Math.min(9, Math.max(1, hit.gen)) as 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9),
-    abilities: variantsOf(abilities.length > 0 ? abilities : [''], hit.attacker), spreads: extremes(offenseStat(dex, hit.move)),
+    hit, gen: Generations.get(Math.min(9, Math.max(1, hit.gen)) as 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9), champions,
+    abilities: variantsOf(abilities.length > 0 ? abilities : [''], hit.attacker), spreads: extremes(offenseStat(dex, hit.move), champions),
   };
   return { ...base, defenders: defenderVariants(dex, info, base) };
 }

@@ -200,11 +200,11 @@ describe('any doubt drops the hit (T130, ruling R3)', () => {
     expect(judgeItemsByDamage(tripled, CANDIDATES, built())).toEqual([]);
   });
 
-  test('a hit under a doubt, in a Champions game or in a free-ability format judges nothing', () => {
+  // Round 67 merge (ruling R10): a Champions game is judged on its Stat Points (item-damage-champions.spec.ts).
+  test('a hit under a doubt or in a free-ability format judges nothing', () => {
     const attacker = attackerIn(specsLog(), 'Gholdengo');
     const changed = (patch: Partial<LoggedHit>) => ({ ...attacker, hits: (attacker.hits ?? []).map(hit => ({ ...hit, ...patch })) });
     expect(judgeItemsByDamage(changed({ doubt: 'magic room' }), CANDIDATES, built())).toEqual([]);
-    expect(judgeItemsByDamage(changed({ format: '[Gen 9] Champions OU' }), CANDIDATES, built())).toEqual([]);
     expect(judgeItemsByDamage(changed({ format: '[Gen 9] Custom Game' }), CANDIDATES, built())).toEqual([]);
   });
 
