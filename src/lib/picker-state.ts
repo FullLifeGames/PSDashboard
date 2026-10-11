@@ -41,7 +41,9 @@ function speciesTypesFor(species: string, gen: number): string[] {
 /** Exact pickers from a recorded position — no live stream needed. */
 export async function pickerStateFromSerialized(serialized: string): Promise<BranchSimState> {
   const { deserializeBattleExact } = await import('./lazy/forward-model');
-  const { createBranchStateFromBattle } = await import('./lazy/branch-engine');
+  const { createBranchStateFromBattle, loadSimModsFor } = await import('./lazy/branch-engine');
+  // Round 67 (T145): a Champions position revives on the Champions mod, which nothing before this lazy module loads.
+  await loadSimModsFor(serialized);
   const battle = deserializeBattleExact(serialized);
   return createBranchStateFromBattle(battle, battle.log ?? [], { p1Choices: [], p2Choices: [] });
 }

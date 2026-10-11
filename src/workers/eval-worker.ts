@@ -1,7 +1,7 @@
 /// <reference lib="webworker" />
 import {
   mctsSearch, mctsTreeSearch, type SearchExecutor, createLocalExecutor, searchPosition, takeSimFastReport,
-  type EvalWorkerRequest, type EvalWorkerResponse, type StaticRuleset,
+  type EvalWorkerRequest, type EvalWorkerResponse, type StaticRuleset, loadSimModsFor,
 } from '@fulllifegames/eval-engine';
 import { adoptSearchBudgetStamp } from '../lib/eval/search-budget-setting';
 import { adoptSimFastStamp } from '../lib/eval/sim-fast-setting';
@@ -60,6 +60,8 @@ scope.onmessage = async (event: MessageEvent<EvalWorkerRequest | ReplayJobReques
   // Round 61: search messages carry the search budget (iterations per tree).
   adoptSearchBudgetStamp(message);
   try {
+    // Round 67 (T145): a Champions position revives on the Champions mod, which nothing in this worker loaded before.
+    await loadSimModsFor(message.serializedBattle);
     if (message.type === 'search') {
       requireRuleset(message.settings.ruleset);
       const run = message.settings.mode === 'mcts' ? mctsSearch : searchPosition;
