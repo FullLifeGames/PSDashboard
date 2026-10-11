@@ -8,6 +8,7 @@ import type { GameReport } from '../packages/eval-engine/src/report';
 import type { AlignmentSummary } from '../packages/eval-engine/src/hax-alignment';
 import { parseReplayLogWithObservations } from '../packages/replay-core/src/protocol-parser';
 import { finalPlayedTurn } from '../packages/replay-core/src/replay-turns';
+import { parseSearchBudget } from '../packages/eval-engine/src/search/budget';
 import { FEEDBACK_CENSUS_REPLAYS, FEEDBACK_CORPUS, FEEDBACK_REPLAYS } from './corpus';
 import { evaluateItem, validateCorpus, type ClaimResult } from './claims';
 import { installHermeticRoutes, RECORD } from './hermetic';
@@ -19,8 +20,13 @@ const REPORT_DIR = join(__dirname, '..', 'docs', 'reports');
 const DUMP = process.env.FEEDBACK_DUMP === '1';
 /** Round 59: '0' | '1' | a lever list for the speed layer; unset keeps the app's default and no perf trace. */
 const SIM_FAST = process.env.FEEDBACK_SIM_FAST;
-/** Round 61: a search-budget form (search/budget.ts syntax); unset keeps the app's default. */
+/**
+ * Round 61: a search-budget form (search/budget.ts syntax); unset keeps the app's default. Round 67 (T111):
+ * parsed here before any page opens, so a typo stops the run instead of measuring the default (the browser
+ * reads a bad form as the default).
+ */
 const SEARCH_BUDGET = process.env.FEEDBACK_SEARCH_BUDGET;
+parseSearchBudget(SEARCH_BUDGET);
 const perfByReplay: Record<string, unknown> = {};
 
 /**
