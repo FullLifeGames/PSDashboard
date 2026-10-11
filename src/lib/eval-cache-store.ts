@@ -278,7 +278,17 @@ export interface StoredEval {
 // v63 (round 66, T137, gate "2a"): Champions doubles weigh by the Champions
 //      VGC fit (screens 83, bodies 196, matchup 96). Champions doubles
 //      positions read new values.
-const EVAL_ENGINE_CACHE_VERSION = 63;
+// v64 (round 67, wave 2): the rebuild plays the entry effects of a body its
+//      correction puts on the field and reads the protocol with the
+//      simulator's names; the inference rules out guessed items the log's
+//      damage refutes and takes facts from its own client walk; every calc
+//      Pokémon comes from one builder (entry boosts once, Tera bodies, forms,
+//      Paradox, Supreme Overlord, Hidden Power); the search reads one bench
+//      order, lists partner targets and grades doubles roots against the
+//      unlisted answers; Pokémon Champions runs on the Champions mod with
+//      Stat Points, reads its own set file and prices doubles with its own K.
+//      Positions of every format read new values.
+const EVAL_ENGINE_CACHE_VERSION = 64;
 
 /** Round 61: a search-budget form stores under its own tag; the default keeps today's keys. */
 const versionTag = (): string => {
