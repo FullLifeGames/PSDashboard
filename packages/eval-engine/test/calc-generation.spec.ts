@@ -2,7 +2,6 @@ import { describe, expect, test } from 'vitest';
 import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { calcGenerationFor, calcModOf, simGenNum } from '@fulllifegames/replay-core';
-import { CALC_HAS_GEN0 } from './calc-version';
 
 /**
  * Round 68 (T186, decisions 1 and 6): one function decides the calculator's generation from the game generation and
@@ -38,10 +37,10 @@ describe('the calculator generation of a battle (decision 1)', () => {
     const gen = calcGenerationFor(9, 'champions');
     expect(simGenNum(gen)).toBe(9);
     expect(gen.species.get('garchomp' as never), 'a generation with data').toBeDefined();
-    if (CALC_HAS_GEN0) expect(gen.num).toBe(0);
+    expect(gen.num).toBe(0);
   });
 
-  test.skipIf(!CALC_HAS_GEN0)('generation 0 is the Champions generation whatever the mod argument says', () => {
+  test('generation 0 is the Champions generation whatever the mod argument says', () => {
     expect(calcGenerationFor(0).num).toBe(0);
     expect(calcGenerationFor(9, 'champions').num).toBe(0);
     expect(calcGenerationFor(9).num).toBe(9);

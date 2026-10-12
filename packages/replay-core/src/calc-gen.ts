@@ -19,15 +19,9 @@ export const CHAMPIONS_MOD = 'champions';
 const CLASSIC_GEN = 9;
 let championsGen: CalcGeneration | undefined;
 
-/**
- * The calculator's generation for the Champions mod: its generation 0 where the installed calculator carries data
- * for it (0.12), else generation 9 (0.11, whose generation 0 is empty), the generation the bridge of decision 30 prices on.
- */
+/** The calculator's generation for the Champions mod: its own generation 0 (0.12 and later, which the peer ranges require). */
 function championsCalcGeneration(): CalcGeneration {
-  if (!championsGen) {
-    const zero = Generations.get(0 as CalcGenerationNum);
-    championsGen = zero.species.get('garchomp' as never) ? zero : Generations.get(CLASSIC_GEN);
-  }
+  championsGen ??= Generations.get(0 as CalcGenerationNum);
   return championsGen;
 }
 

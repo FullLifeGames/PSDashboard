@@ -2,7 +2,6 @@ import { describe, expect, test } from 'vitest';
 import { Generations } from '@smogon/calc';
 import * as bodyModule from '../src/calc/body';
 import { calcAddsStages, calcPokemon, type CalcBody } from '../src/calc/body';
-import { CALC_HAS_GEN0 } from './calc-version';
 
 /**
  * Round 68 (T186, decision 5): entry stages as in 0.11. @smogon/calc 0.12 gives Intrepid Sword and Dauntless Shield
@@ -11,8 +10,7 @@ import { CALC_HAS_GEN0 } from './calc-version';
  * ability a probe finds in the second group), a body on the field never does (its stage comes from the simulator).
  * Two probes tell the groups apart per gen and ability, both read from the calc, no list: `calcAddsStages` (the calc
  * adds a stage of its own) and `calcOwnEntryStage(gen, ability)` (it adds a stage to the holder when abilityOn is true).
- * These checkers need the 0.12 calculator (skipped under 0.11, enabled by step C3; the ones asking calcOwnEntryStage
- * stay red until step C6 writes it).
+ * These checkers need the 0.12 calculator, which the peer ranges require.
  */
 const ownEntryStage = (bodyModule as unknown as { calcOwnEntryStage?: (gen: number, ability: string) => boolean }).calcOwnEntryStage;
 const BODY: CalcBody = {
@@ -20,7 +18,7 @@ const BODY: CalcBody = {
   boosts: { atk: 0, def: 0, spa: 0, spd: 0, spe: 0 }, tera: null, onField: false,
 };
 
-describe.skipIf(!CALC_HAS_GEN0)('the entry stages of 0.12 (decision 5)', () => {
+describe('the entry stages of 0.12 (decision 5)', () => {
   test('the calc adds a stage of its own for Download, the Embody Aspects and, in Gen 8, Sword and Shield', () => {
     const found = (gen: number) => [...Generations.get(gen as 9).abilities].map(ability => ability.name).filter(name => calcAddsStages(gen, name)).sort();
     expect(found(3)).toEqual([]);
