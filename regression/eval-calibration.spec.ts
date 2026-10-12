@@ -908,6 +908,126 @@ import { takeSimFastReport } from '../packages/eval-engine/src/forward/sim-fast/
  * static basis for this mass; the next lever, if any, is search/
  * planning-side.
  *
+ * WAVE 2 2026-10-10..11 (improvement round 67, the second wave of lanes:
+ * seven lanes A to G in their own worktrees from d5855a0, measured one at a
+ * time against r67-base-1010 (reproduced byte for byte as r67-base-1011 on
+ * the morning of 11.10.), merged on r67-merge by cherry-pick in the order
+ * F, C, A, B, G, E, D and fast-forwarded onto r67 at 8e7dc0b; cache v63 to
+ * v64; ledger, lane reports, chains and probes under
+ * docs/perf/probes/2026-10-10-r67/). Gate of 10.10. 09:53 ("1a 2 3a 4a 5b
+ * 6a 7a"): the lanes share no file; Champions runs on the Champions mod of
+ * @pkmn/mods (Stat Points in the sets' evs, the server's statModify, no
+ * Tera); Champions refits in lane F; one Champions VGC and one Champions OU
+ * census game in the feedback run; Think deeper goes; T128 lists every legal
+ * answer if the doubles tree time allows it; the report changes stay
+ * display-only. Intermediate feedback ran twice from 11.10. (user decision),
+ * the wave run three times.
+ * A CALC INPUTS (T100, T72, T76, T83, T84, T136.1): one builder, calc/body.ts,
+ * for every calc Pokemon (entry boosts once: 14 / 40+83 / 105 double counts
+ * -> 0); Aegislash attacks as Blade; Paradox stat, Supreme Overlord and Last
+ * Respects from the simulator's body (simulator-check misses 579 -> 322);
+ * typed Hidden Power; a Tera option's kill odds on the clicked body (Brier
+ * per hit against 48 simulator seeds 0.434 -> 0.165). Bank: a5 moves 124
+ * singles rows, +3 [+0, +7] unresolved, no harm.
+ * B SEARCH (T129, T113, T128, T139, T134, T114, T111.3): one canonical bench
+ * order (538 bank rows and 17 feedback verdicts depended on it; 14 of 26
+ * fixture rankings -> 0); partner targets at the root; the answer round
+ * grades a doubles root against legal answers the tree did not list, and
+ * adds an answer only when it still refutes the best row one ply deeper
+ * (d56cd37, after the one-ply price moved the user's truth pin 2630685175
+ * t8); the rule set on every path; the prover's near-tie order by label;
+ * the tree score's form behind EVAL_TREE_SCORE (default visits). Holdout
+ * through T128: bank plus holdouts luck-adjusted all -7 [-14, -1], doubles
+ * -9 [-17, -2], no harm.
+ * C INFERENCE (T130, T131, T108): a damage judge rules out guessed items a
+ * logged hit refutes (played items refuted 21/9/1 -> 0; R18 ranges the
+ * defender's unproven item and ability); published status moves stay under
+ * the set's own Choice item or Assault Vest (161 -> 0); every log line read
+ * once through @pkmn/protocol, facts the inference missed taken from its own
+ * @pkmn/client walk (4 of 11 handlers replaced). c1 doubles mid warning (the
+ * log moves two Gholdengo builds to Choice Specs) stays: the rule is right
+ * (the score moves toward the side with the stronger Gholdengo, which lost
+ * both games).
+ * D REPORT (T22 stage a, T59, T135): rolls per turn and side, "the engine
+ * re-read the position" as the second luck class, praise silent on lost
+ * ground, sack rule A, doubles slot phrasing, frames without em dashes;
+ * display-only (461 whitelisted changes, 0 forbidden).
+ * E APP (T140, T139, T109, T111, T85, T136.2): Think deeper retired, the gap
+ * turn keeps "Analyze this position"; every worker message names its rule
+ * set; move buttons show the type at use (145 wrong buttons -> 0 of 8571);
+ * the fast picker offers Tera where the stored one does.
+ * F CHAMPIONS (T145, T143, T52, T138): Champions battles on the mod
+ * (statModify checked over 1388 species x 25 natures); Champions OU reads
+ * championsou; the Champions refits lose out of fold in 20 of 20 seeds (no
+ * weight changes); T52's doubles K wins the bank (-36) but harms bank plus
+ * holdout (own K luck-adjusted +8 [+1, +16]), reverted; T138 keeps a
+ * Champions doubles K (1.86 + 4.17 x fainted share; Champions VGC holdout
+ * -16 [-27, -5]) and leaves Champions OU on the singles K (its fit warned
+ * mid +35 [+7, +65]).
+ * G REBUILD (T133, T108.3, G4): a corrected body's switch-in plays through
+ * runSwitch; Emergency Exit and Wimp Out read as forced; a move from a |cant|
+ * line plays as the protocol shows it; the hax alignment reads the
+ * simulator's names (perfect alignments bank singles 1750 -> 2623 of 2798,
+ * doubles 220 -> 347 of 516).
+ * MERGE (integrator, each with a red test): the Champions mod loads in the
+ * evaluation worker and the stored picker (4bb1b02); decision 30: a
+ * Champions body goes to calc 0.11 as EV = 8 x SP - 4 with every IV 31 in
+ * every engine path (cf12e07) and at the mod's move power and type
+ * (2068a24: the mod changes 20 powers and two types); lane C's R10 (the
+ * damage judge on for Champions) reverted in c81ef04 because replay-core
+ * cannot read the mod's moves reliably; the fast picker asks a throwaway
+ * battle whether a format offers Tera (1c02c53). Three fresh reviewers: no
+ * critical finding; the Champions move gap was the important one.
+ * TIMING (quiet window 11.10. 15:10-16:19, three interleaved runs against
+ * d5855a0, medians): doubles tree time (20 bank positions) lane B with the
+ * answer round off +3.4 %, protect +20.2 % (+17.8 % over off), full +107 %;
+ * the whole wave +26.3 %; build path 64.0 -> 94.3 ms per replay; click wait
+ * at turn 2 doubles cold 7.6 -> 8.9 s, warm 2.0 -> 2.5 s, singles flat.
+ * WAVE RUN on 8e7dc0b against r67-base-1010 (bank 870 s): 648 of 837
+ * positions moved (462 singles, 186 doubles); pooled all -8 [-33, +14],
+ * own K -14; doubles -15, own K -35; late -27, own K -40; no gain resolved,
+ * no harm; warning luck-adjusted doubles mid +67 [+15, +126] (own K +78),
+ * carried by lane C's Gholdengo Choice Specs builds (+45 of +66.5 in the
+ * cell, G +4.5, B -0.7, interplay +17.7 mostly 938644 t6). Holdouts:
+ * Doubles OU no finding; VGC no harm, warning mid +35 (luck-adjusted +43),
+ * carried by C +17.0 and G +17.6 (B +4.9, A 0.0) in lane-alone holdouts
+ * (one board now hits the log, Quark Drive; one is a legal sample instead of
+ * an impossible sleep counter, T187); bank plus holdouts (D26) no harm,
+ * doubles late resolved better -34 [-60, -11] (hq -77), warning doubles mid
+ * +22 [+6, +41] (luck-adjusted +26). Champions VGC no finding; Champions OU
+ * no harm, warning luck-adjusted early +94 [+1, +191], two thirds of it
+ * already in lane F's T145/T143 measurement. Feedback three times
+ * byte-identical, every pin holds; tier census singles 45/1/0 -> 45/1/0,
+ * doubles 11/2/2 -> 17/5/0 (the answer round finds more regret; both
+ * blunders gone). e2e 74/75 (the play-out pin); full regression 2637
+ * green, 1 red (eval-gpl t35: a custom game counted as a format with free
+ * abilities, so Noivern could hold Magic Guard and the boots guess fell);
+ * lint, tsc -b, build, pack:smoke green after 54dc49b.
+ * USER GATE 2026-10-11 20:43 ("Recs", that is 1a 2a 3a 4a 5b 6a 7a 8a 9a
+ * 12a; to 5: "Noivern kann niemals Magic Guard haben"; 10 explained, the
+ * library reports wait for an okay; no wave 4): the answer round keeps
+ * Protect, the tree score stays the visit mean, sack rule A, Champions OU
+ * keeps the singles K (T164 refits with search), T108 step 2 stays at 4 of
+ * 11 handlers (the rest parked as T170), doubles verify cover stays (T148),
+ * T184 removes the think-deeper rest, T186 (@smogon/calc 0.12) runs as round
+ * 68. Gate fixes: 0b38b62 keeps each species to its own abilities in a
+ * custom game (abilitiesAreFree answers yes only where the rule table drops
+ * obtainable abilities; the flag custom becomes freeAbilities; eval-gpl t35
+ * holds again; bank 0 of 837 moved and feedback twice byte-identical against
+ * the wave run, so the base of 10.10. reproduces on 12.10.); 71f7ee8 pins the
+ * play-out's core (p2 wins by turn 75 with at most six switches). On
+ * 71f7ee8: e2e 75/75, full regression 2641 green, lint, tsc -b, build,
+ * pack:smoke green. Four fresh reviewers checked T146 to T187 against the
+ * code on 12.10.: T171 and T174 were already fixed, T176 rested on a wrong
+ * premise (no order breaks under Trick Room), T151's Overheat is Chi-Yu's
+ * (a slot swap in the rebuild), the parked "missing Megas" item was wrong,
+ * the Champions parser warning is a real bug (T188), and the gate text read
+ * the doubles mid warning backwards (the static does not punish the better
+ * build); the new TODOs go into wave 3 (new lanes D to G) and the sections
+ * outside the waves, next free T190. v1 pushed. Base of the code state:
+ * .calibration/r67-wave (Brier 0.2535/0.2300/0.1117, hq
+ * 0.2453/0.2023/0.1063, K 2.42).
+ *
  * VGC DATA AND WEIGHTS 2026-10-09 (improvement round 66, T137 run as a
  * round of its own before wave 2, with T141 and T142 from its sighting;
  * branch r66 from 0fb3110 (= v1), cache v61 to v63; ledger, chains and
