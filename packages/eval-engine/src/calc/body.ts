@@ -47,6 +47,8 @@ export interface CalcBody {
    * field never carries it, because the simulator cleared the field when it clicked.
    */
   abilityOn?: boolean;
+  /** The types a Stellar body has spent its one-time boost on (the simulator's stellarBoostedTypes, T152); absent when unknown. */
+  stellarBoostedTypes?: string[];
   /** The stat a Paradox ability's volatile raises (T76). */
   boostedStat?: string;
   /** Supreme Overlord's fallen (T76). */
@@ -68,7 +70,7 @@ export interface SimBody extends CalcBody {
   status: string;
 }
 
-type SimFacts = Pick<CalcBody, 'boostedStat' | 'alliesFainted' | 'totalFainted' | 'hpType' | 'hpPower'>;
+type SimFacts = Pick<CalcBody, 'boostedStat' | 'alliesFainted' | 'totalFainted' | 'hpType' | 'hpPower' | 'stellarBoostedTypes'>;
 
 /**
  * What the simulator holds and calc 0.11 cannot see on its own (round 67,
@@ -77,7 +79,8 @@ type SimFacts = Pick<CalcBody, 'boostedStat' | 'alliesFainted' | 'totalFainted' 
  * keep their bestStat there), the fallen its ability state counts (Supreme
  * Overlord), the side's fallen (Last Respects). A suppressed ability gives
  * neither of the first two, as in the simulator's own handlers. With them
- * Hidden Power's type and power (T83).
+ * Hidden Power's type and power (T83), and for a body of the Stellar Tera type
+ * the types it has spent its one-time boost on (T152).
  */
 export function simBodyFacts(mon: Pokemon): SimFacts {
   const active = !mon.ignoringAbility();
@@ -88,6 +91,7 @@ export function simBodyFacts(mon: Pokemon): SimFacts {
     ...(boostedStat ? { boostedStat } : {}),
     ...(alliesFainted ? { alliesFainted } : {}),
     ...(totalFainted ? { totalFainted } : {}),
+    ...(mon.teraType === 'Stellar' || mon.terastallized === 'Stellar' ? { stellarBoostedTypes: [...mon.stellarBoostedTypes] } : {}),
     hpType: mon.hpType,
     hpPower: mon.hpPower,
   };
@@ -183,6 +187,7 @@ export function bodyFromInfo(info: SimPokemonInfo): SimBody {
     boostedStat: info.boostedStat,
     alliesFainted: info.alliesFainted,
     totalFainted: info.totalFainted,
+    stellarBoostedTypes: info.stellarBoostedTypes,
     hpType: info.hpType,
     hpPower: info.hpPower,
     mod: info.mod,

@@ -3,6 +3,7 @@ import type { Battle, Pokemon } from '@pkmn/sim';
 import { TERRAIN_BY_ID, WEATHER_BY_ID, calcGenerationFor } from '@fulllifegames/replay-core';
 import { attackerAtUse, calcPokemon, type SimBody } from './calc/body.ts';
 import { calcMove } from './calc/move.ts';
+import { stellarFirstUse } from './calc/stellar.ts';
 import { bodyAsClicked } from './calc/tera-click.ts';
 
 /**
@@ -159,8 +160,11 @@ function damageKillFraction(
     const defPoke = calcPokemon(gen, bodies.defender);
     const field = calcField(battle, defender);
     const hp = bodies.defender.hp;
-    const normal = killShare(calculate(gen, atkPoke, defPoke, calcMove(gen, move.name, bodies.attacker), field).damage, hp);
-    const crit = killShare(calculate(gen, atkPoke, defPoke, calcMove(gen, move.name, bodies.attacker, { isCrit: true }), field).damage, hp);
+    // A Stellar body's first use of a type hits harder (T152); the type at use is the calc's own.
+    const first = stellarFirstUse(bodies.attacker, () => calculate(gen, atkPoke, defPoke, calcMove(gen, move.name, bodies.attacker), field).move.type);
+    const stellar = first ? { isStellarFirstUse: true } : {};
+    const normal = killShare(calculate(gen, atkPoke, defPoke, calcMove(gen, move.name, bodies.attacker, stellar), field).damage, hp);
+    const crit = killShare(calculate(gen, atkPoke, defPoke, calcMove(gen, move.name, bodies.attacker, { isCrit: true, ...stellar }), field).damage, hp);
     if (normal === null || crit === null) return null;
     const c = critRate(genNum, move.critRatio ?? 1);
     if (c === null) return null;

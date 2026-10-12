@@ -2,6 +2,7 @@ import { Move as CalcMove, Pokemon as CalcPokemon, Field, calculate } from '@smo
 import { TERRAIN_BY_ID, WEATHER_BY_ID, calcGenerationFor, simGenNum, type CalcGeneration } from '@fulllifegames/replay-core';
 import { attackerAtUse, calcPokemon } from '../calc/body.ts';
 import { calcMove } from '../calc/move.ts';
+import { stellarFirstUse } from '../calc/stellar.ts';
 import type { BodySnapshot, HitSnapshot } from './snapshot.ts';
 
 /**
@@ -80,17 +81,17 @@ function chargeOffset(snap: HitSnapshot): number {
   return snap.attacker.abilityId === 'contrary' ? -1 : 1;
 }
 
-function hitMove(gen: CalcGen, snap: HitSnapshot, isCrit: boolean): CalcMove {
-  const plain = calcMove(gen, snap.moveName, snap.attacker, { isCrit });
+function hitMove(gen: CalcGen, snap: HitSnapshot, isCrit: boolean, isStellarFirstUse = false): CalcMove {
+  const plain = calcMove(gen, snap.moveName, snap.attacker, { isCrit, isStellarFirstUse });
   if (snap.spreadHit || !SPREAD_TARGETS.has(plain.target)) return plain;
-  return calcMove(gen, snap.moveName, snap.attacker, { isCrit, overrides: { target: 'normal' } });
+  return calcMove(gen, snap.moveName, snap.attacker, { isCrit, isStellarFirstUse, overrides: { target: 'normal' } });
 }
 
 /** The hit's 16 values: the calc's Doubles field, or the Singles one where the calc forces a spread the simulator did not play. */
-function hitRolls(gen: CalcGen, snap: HitSnapshot, attacker: CalcPokemon, defender: CalcPokemon, isCrit: boolean): number[] | null {
-  const result = calculate(gen, attacker, defender, hitMove(gen, snap, isCrit), calcField(snap));
+function hitRolls(gen: CalcGen, snap: HitSnapshot, attacker: CalcPokemon, defender: CalcPokemon, isCrit: boolean, firstUse: boolean): number[] | null {
+  const result = calculate(gen, attacker, defender, hitMove(gen, snap, isCrit, firstUse), calcField(snap));
   const forced = !snap.spreadHit && SPREAD_TARGETS.has(result.move.target) && snap.screens.length === 0;
-  return rollsOf(forced ? calculate(gen, attacker, defender, hitMove(gen, snap, isCrit), calcField(snap, 'Singles')).damage : result.damage);
+  return rollsOf(forced ? calculate(gen, attacker, defender, hitMove(gen, snap, isCrit, firstUse), calcField(snap, 'Singles')).damage : result.damage);
 }
 
 function rollsOf(damage: unknown): number[] | null {
@@ -104,8 +105,10 @@ export function killTable(snap: HitSnapshot): KillTable | null {
     const gen = calcGenerationFor(snap.gen, snap.attacker.mod);
     const attacker = calcBody(gen, attackerAtUse(simGenNum(gen), snap.attacker, snap.moveName), chargeOffset(snap));
     const defender = calcBody(gen, snap.defender, 0);
-    const normal = hitRolls(gen, snap, attacker, defender, false);
-    const crit = hitRolls(gen, snap, attacker, defender, true);
+    // A Stellar body's first use of a type hits harder (T152); the type at use is the calc's own.
+    const first = stellarFirstUse(snap.attacker, () => calculate(gen, attacker, defender, hitMove(gen, snap, false), calcField(snap)).move.type);
+    const normal = hitRolls(gen, snap, attacker, defender, false, first);
+    const crit = hitRolls(gen, snap, attacker, defender, true, first);
     return normal && crit ? { normal, crit } : null;
   } catch {
     return null;

@@ -5,6 +5,7 @@ import { toId, TERRAIN_BY_ID, WEATHER_BY_ID, calcGenerationFor, simGenNum } from
 import { attackerAtUse, bodyFromInfo, calcPokemon, simDexOf, type CalcBody } from './calc/body.ts';
 import { hitDraws } from './calc/hit-draws.ts';
 import { calcMove, protectBlocks } from './calc/move.ts';
+import { stellarFirstUse } from './calc/stellar.ts';
 import { teraClicked } from './calc/tera-click.ts';
 
 type CalcMoveOptions = NonNullable<ConstructorParameters<typeof Move>[2]>;
@@ -256,19 +257,6 @@ function koChanceOf(priced: PricedCount[], maxDamage: number): string {
   return n >= 1 && n <= MAX_KO_HITS ? text : '';
 }
 
-/**
- * The Stellar one-time boost (T124): a Stellar attacker's first use of each
- * type hits harder (the calc's isStellarFirstUse). The simulator lists the
- * types already spent (stellarBoostedTypes, empty before the Tera turn) by
- * the type at use, which the calc gives after its own type changes. Without
- * the list (a picker state approximated from the replay) the spent types are
- * unknown, and the preview claims no boost.
- */
-function stellarFirstUse(attacker: SimPokemonInfo, typeAtUse: () => string): boolean {
-  const spent = attacker.stellarBoostedTypes;
-  return attacker.teraType === 'Stellar' && !!spent && !spent.includes(typeAtUse());
-}
-
 /** A Doubles hit on a foe that stands alone, with the foes-only spread target left on the move (moveLanding sets one foe for the moves whose Dex target spreads) and no screen to price at the doubles factor. */
 function aloneSpread(context: DamageCalcContext, result: CalcResult): boolean {
   const screens = [...(context.defenderSideConditions ?? [])].map(toConditionId).some(id => ['reflect', 'lightscreen', 'auroraveil'].includes(id));
@@ -300,7 +288,7 @@ export function calcSingleDamageRange(
       // The calc forces a spread on a few moves (Tera Starstorm of Terapagos-Stellar, Expanding Force on Psychic Terrain): against a lone foe the simulator plays one target, which the Singles game type prices (T152).
       return aloneSpread(context, result) ? calculate(gen, atkPoke, defPoke, calcMoveFor(), calcField({ ...context, gameType: 'Singles' })) : result;
     };
-    const firstUse = stellarFirstUse(attacker, () => priceAt().move.type);
+    const firstUse = stellarFirstUse(atkBody, () => priceAt().move.type);
     // A multi-hit move deals the sum of its hits; the calc sums them itself (T96). A drawn hit
     // count spans the fewest hits' minimum to the most hits' maximum, every count priced (T124).
     const counts = overrides?.multihit ? null : hitCounts(simGenNum(gen), attacker, moveOption.name);
