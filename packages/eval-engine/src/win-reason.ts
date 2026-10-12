@@ -125,6 +125,8 @@ export function luckSentence(
     return `Chance swings favored ${beneficiary} overall (${winDeltaText(Math.abs(chanceTotal))}), ` +
       `while the visible dice favored ${diceName}.`;
   }
+  // Round 69 (T177): with the split the rolls carry the ledger, so the line quotes what they gave, not the re-read part with it.
+  if (split) return `Luck ran ${chanceTotal > 0 ? 'for' : 'against'} ${playerNames[0]} (${winDeltaText(split.rolled)} from the rolls).`;
   return `Luck ran ${chanceTotal > 0 ? 'for' : 'against'} ${playerNames[0]} overall (${winDeltaText(chanceTotal)}).`;
 }
 
@@ -370,7 +372,9 @@ export function winPathFor(args: WinPathArgs): WinPathResult | null {
       .map(read => `${phrase(read.label)} on turn ${read.turn} (${winDeltaText(read.payoff)})`);
     return { winPath: { factor: 'reads', size: top.size }, sentence: `${winnerName} won it on reads: ${examples.join(' and ')}.`, foldLuck: false };
   }
-  const sentence = `The rolls decided it: luck ran ${winnerName}'s way overall (${winDeltaText(top.size)}).`;
+  const sentence = args.chanceSplit
+    ? `The rolls decided it: luck ran ${winnerName}'s way (${winDeltaText(toward(winner, args.chanceSplit.rolled))} from the rolls).`
+    : `The rolls decided it: luck ran ${winnerName}'s way overall (${winDeltaText(top.size)}).`;
   return { winPath: { factor: 'variance', size: top.size }, sentence, foldLuck: true };
 }
 

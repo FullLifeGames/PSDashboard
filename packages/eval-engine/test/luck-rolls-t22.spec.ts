@@ -66,7 +66,7 @@ describe('T22 detection: the hits a move put on an opposing body', () => {
       '|-damage|p2a: Medicham|0 fnt',
       '|faint|p2a: Medicham',
     ], singles);
-    expect(rolls.hits).toEqual([{ side: 'p1', move: 'hydropump', target: 'Medicham-Mega', ko: true }]);
+    expect(rolls.hits).toMatchObject([{ side: 'p1', move: 'hydropump', target: 'Medicham-Mega', ko: true }]);
   });
 
   test('singles (649664 t12 shape): a switch-in the move hit is named by its switch line', () => {
@@ -78,7 +78,7 @@ describe('T22 detection: the hits a move put on an opposing body', () => {
       '|-damage|p1a: Tyranitar|0 fnt',
       '|faint|p1a: Tyranitar',
     ], singles);
-    expect(rolls.hits).toEqual([{ side: 'p2', move: 'highjumpkick', target: 'Tyranitar', ko: true }]);
+    expect(rolls.hits).toMatchObject([{ side: 'p2', move: 'highjumpkick', target: 'Tyranitar', ko: true }]);
     expect(rolls.favored).toEqual({ p1: false, p2: false });
   });
 
@@ -91,7 +91,7 @@ describe('T22 detection: the hits a move put on an opposing body', () => {
       '|faint|p2a: Medicham',
       '|upkeep',
     ], singles);
-    expect(rolls.hits).toEqual([{ side: 'p1', move: 'scald', target: 'Medicham-Mega', ko: false }]);
+    expect(rolls.hits).toMatchObject([{ side: 'p1', move: 'scald', target: 'Medicham-Mega', ko: false }]);
   });
 
   test('doubles: a spread move gives one hit per opposing body, allies stay out', () => {
@@ -109,7 +109,7 @@ describe('T22 detection: the hits a move put on an opposing body', () => {
       '|-damage|p1a: Chi-Yu|40/100',
       '|-damage|p2a: Incineroar|30/100',
     ], before);
-    expect(rolls.hits).toEqual([
+    expect(rolls.hits).toMatchObject([
       { side: 'p1', move: 'heatwave', target: 'Incineroar', ko: false },
       { side: 'p1', move: 'heatwave', target: 'Chien-Pao', ko: true },
       { side: 'p1', move: 'earthquake', target: 'Incineroar', ko: false },
@@ -123,7 +123,7 @@ describe('T22 detection: the hits a move put on an opposing body', () => {
       '|move|p1a: Keldeo|Hydro Pump|p2a: Medicham|[miss]',
       '|-miss|p1a: Keldeo|p2a: Medicham',
     ], singles);
-    expect(rolls.hits).toEqual([]);
+    expect(rolls.hits).toMatchObject([]);
   });
 });
 

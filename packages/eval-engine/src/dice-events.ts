@@ -1,3 +1,4 @@
+import { Dex } from '@pkmn/dex';
 import { toId, type SideId, type TurnSnapshot } from '@fulllifegames/replay-core';
 
 /**
@@ -21,25 +22,72 @@ import { toId, type SideId, type TurnSnapshot } from '@fulllifegames/replay-core
  * (Rest sleep is fixed-length — a documented over-inclusion.) */
 export const CHANCE_CANT: ReadonlySet<string> = new Set(['slp', 'par', 'frz', 'flinch']);
 
-function diceLine(line: string): boolean {
-  if (line.startsWith('|-crit|') || line.startsWith('|-miss|')) return true;
+type GenDex = ReturnType<typeof Dex.forGen>;
+
+/** The Dex of a replay generation (a Champions battle reads Gen 9's, whose moves it shares); absent without a generation. */
+const dexOfGeneration = (generation: number | undefined): GenDex | undefined =>
+  generation === undefined ? undefined : Dex.forGen(Math.min(9, Math.max(1, generation)));
+
+/** The Dex and the move whose action is running at a line; null keeps the markers as the protocol alone shows them. */
+type DiceContext = { dex: GenDex; running: string | null } | null;
+
+/**
+ * Round 69 (T177): whether a move's own dice can decide a status it lands: an accuracy under 100 (Hypnosis, Toxic,
+ * Thunder Wave from Gen 7 on) or a status chance under 100 (Scald's burn). Thunder Wave in Gen 6 (accuracy 100), Toxic
+ * Spikes and Rest (accuracy true) roll nothing.
+ */
+function moveRollsStatus(dex: GenDex, id: string): boolean {
+  const move = dex.moves.get(id);
+  if (typeof move.accuracy === 'number' && move.accuracy < 100) return true;
+  const effects = move.secondaries ?? (move.secondary ? [move.secondary] : []);
+  return effects.some(effect => effect.status !== undefined && (effect.chance ?? 100) < 100);
+}
+
+/** A bare or `[from] move:` status is a roll when its source's dice can decide it; with no running move (a hazard on a switch-in, a residual) it is none. */
+function statusRolls(from: string | undefined, context: NonNullable<DiceContext>): boolean {
+  if (from === undefined) return context.running !== null && moveRollsStatus(context.dex, context.running);
+  if (from.startsWith('[from] ability:')) return true;
+  return from.startsWith('[from] move:') && moveRollsStatus(context.dex, toId(from.slice('[from] move:'.length)));
+}
+
+function diceLine(line: string, context: DiceContext): boolean {
+  if (line.startsWith('|-crit|')) return !context || context.running === null || !context.dex.moves.get(context.running).willCrit;
+  if (line.startsWith('|-miss|')) return true;
   if (line.startsWith('|move|') && line.includes('|[miss]')) return true;
   if (line.startsWith('|cant|')) return CHANCE_CANT.has(line.split('|')[3] ?? '');
   if (line.startsWith('|-status|')) {
-    // A named non-ability source (move: Rest, item: Flame Orb, hazards) is
-    // deterministic; a bare status (move secondary, direct status move) and
-    // an ability source (Flame Body, Static) are rolled.
+    // Without a generation: a named non-ability source (move: Rest, item: Flame Orb, hazards) is
+    // deterministic; a bare status (move secondary, direct status move) and an ability source (Flame
+    // Body, Static) are rolled. With one (round 69, T177): the source's own Dex entry decides.
     const from = line.split('|').find(part => part.startsWith('[from]'));
-    return from === undefined || from.startsWith('[from] ability:');
+    return context ? statusRolls(from, context) : from === undefined || from.startsWith('[from] ability:');
   }
   return false;
 }
 
-/** Turns whose protocol carries at least one visible dice event; the index is by turn (entry 0 stays empty). */
-export function diceEventTurns(turnEventsIndex: readonly (readonly string[])[]): Set<number> {
+/** The tags that close a move's action: the next action, the residual phase (the empty line), the turn's end. */
+const ACTION_END: ReadonlySet<string> = new Set(['move', 'switch', 'drag', 'cant', 'upkeep', 'turn', '']);
+
+/** Per line of a turn: whether it is a dice marker, with the running move read for the generation's Dex. */
+function diceMarks(lines: readonly string[], generation: number | undefined): boolean[] {
+  const dex = dexOfGeneration(generation);
+  let running: string | null = null;
+  return lines.map(line => {
+    const tag = line.split('|')[1] ?? '';
+    if (tag === 'move') running = toId(line.split('|')[3] ?? '');
+    else if (ACTION_END.has(tag)) running = null;
+    return diceLine(line, dex ? { dex, running } : null);
+  });
+}
+
+/**
+ * Turns whose protocol carries at least one visible dice event; the index is by turn (entry 0 stays empty).
+ * Round 69 (T177): with the replay generation a sure crit and a status no dice decided are no event.
+ */
+export function diceEventTurns(turnEventsIndex: readonly (readonly string[])[], generation?: number): Set<number> {
   const turns = new Set<number>();
   turnEventsIndex.forEach((lines, turn) => {
-    if (turn >= 1 && lines.some(diceLine)) turns.add(turn);
+    if (turn >= 1 && diceMarks(lines, generation).some(Boolean)) turns.add(turn);
   });
   return turns;
 }
@@ -51,6 +99,10 @@ export interface RolledHit {
   move: string;
   /** The body's species: its switch line this turn, else the pre-turn snapshot. */
   target: string;
+  /** Round 69 (T177): the attacker's slot ("p1a", "p2b"), so a doubles hit names who used the move. */
+  slot: string;
+  /** Round 69 (T177): the attacker's species, read like the target's; absent when no line names it. */
+  attacker?: string;
   /** The hit took the body's last HP (a |-damage| to 0 without [from]). */
   ko: boolean;
 }
@@ -73,9 +125,6 @@ export interface TurnRolls {
 const sideOfIdent = (ident: string | undefined): SideId | null =>
   ident?.startsWith('p1') ? 'p1' : ident?.startsWith('p2') ? 'p2' : null;
 
-/** The tags that close a move's action: the next action, the residual phase (the empty line), the turn's end. */
-const ACTION_END: ReadonlySet<string> = new Set(['move', 'switch', 'drag', 'cant', 'upkeep', 'turn', '']);
-
 /** Who entered each slot this turn (slot ident → name and species). */
 type Entered = Map<string, { name: string; species: string }>;
 
@@ -94,6 +143,8 @@ function speciesOf(ident: string, entered: Entered, snapshotBefore: TurnSnapshot
 /** The move whose action is running: its side, its id, and the bodies it has hit so far. */
 interface RunningAction {
   side: SideId;
+  /** The attacker's ident ("p1a: Name"). */
+  ident: string;
   move: string;
   hits: Map<string, RolledHit>;
 }
@@ -112,7 +163,11 @@ function noteHit(action: RunningAction, parts: string[], scan: { entered: Entere
   }
   const target = speciesOf(ident, scan.entered, scan.snapshotBefore);
   if (target === null) return;
-  const hit = { side: action.side, move: action.move, target, ko };
+  const attacker = speciesOf(action.ident, scan.entered, scan.snapshotBefore);
+  const hit: RolledHit = {
+    side: action.side, move: action.move, target, slot: action.ident.slice(0, 3), ko,
+    ...(attacker !== null ? { attacker } : {}),
+  };
   action.hits.set(ident, hit);
   scan.hits.push(hit);
 }
@@ -121,7 +176,7 @@ function noteHit(action: RunningAction, parts: string[], scan: { entered: Entere
 function nextAction(action: RunningAction | null, tag: string, parts: string[]): RunningAction | null {
   if (tag === 'move') {
     const side = sideOfIdent(parts[2]);
-    return side ? { side, move: toId(parts[3] ?? ''), hits: new Map() } : null;
+    return side ? { side, ident: parts[2] ?? '', move: toId(parts[3] ?? ''), hits: new Map() } : null;
   }
   return ACTION_END.has(tag) ? null : action;
 }
@@ -132,15 +187,19 @@ function noteEntry(entered: Entered, parts: string[]): void {
   entered.set(ident.slice(0, 3), { name: ident.slice(5), species: (parts[3] ?? '').split(',')[0].trim() });
 }
 
-/** Round 67 (T22): the sides a turn's dice markers favored and the hits its moves put on opposing bodies. */
-export function detectRolls(lines: readonly string[], snapshotBefore: TurnSnapshot | null): TurnRolls {
+/**
+ * Round 67 (T22): the sides a turn's dice markers favored and the hits its moves put on opposing bodies.
+ * Round 69 (T177): with the replay generation, the markers of a sure crit and of a status no dice decided are no roll.
+ */
+export function detectRolls(lines: readonly string[], snapshotBefore: TurnSnapshot | null, generation?: number): TurnRolls {
   const favored = { p1: false, p2: false };
   const scan = { entered: new Map() as Entered, snapshotBefore, hits: [] as RolledHit[] };
+  const marks = diceMarks(lines, generation);
   let action: RunningAction | null = null;
-  for (const line of lines) {
+  for (const [index, line] of lines.entries()) {
     const parts = line.split('|');
     const tag = parts[1] ?? '';
-    const victim = diceLine(line) ? sideOfIdent(parts[2]) : null;
+    const victim = marks[index] ? sideOfIdent(parts[2]) : null;
     if (victim) favored[victim === 'p1' ? 'p2' : 'p1'] = true;
     action = nextAction(action, tag, parts);
     if (tag === 'switch' || tag === 'drag') noteEntry(scan.entered, parts);

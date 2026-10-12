@@ -71,8 +71,17 @@ function protocolInputs(turn: number, context: TurnAnalysisContext, includeSacks
   const before = context.snapshots[turn - 1] ?? null;
   return {
     ...(includeSacks ? { sacks: detectSacks(events ?? [], before) } : {}),
-    ...(events ? { rolls: detectRolls(events, before) } : {}),
+    ...(events ? { rolls: detectRolls(events, before, context.activesForTurn(turn)?.gen) } : {}),
   };
+}
+
+/** Round 69 (T177): the replay's generation, read from the first turn that has a board; undefined keeps the dice markers as the protocol shows them. */
+function replayGenerationOf(context: TurnAnalysisContext): number | undefined {
+  for (let turn = 1; turn < context.snapshots.length; turn++) {
+    const gen = context.activesForTurn(turn)?.gen;
+    if (gen !== undefined) return gen;
+  }
+  return undefined;
 }
 
 /** One argument assembly for analyzeTurn — the per-turn view and the report
@@ -226,7 +235,7 @@ export function computeGameReportData(args: {
   const report = buildGameReport(
     analyses, [args.replayData.players[0], args.replayData.players[1]], args.winner, true,
     // Protocol dice anchor for the luck claims (crits, misses, rolled statuses).
-    diceEventTurns(args.context.turnEventsIndex),
+    diceEventTurns(args.context.turnEventsIndex, replayGenerationOf(args.context)),
   );
   return { report, analyses };
 }
