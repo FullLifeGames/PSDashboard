@@ -908,6 +908,61 @@ import { takeSimFastReport } from '../packages/eval-engine/src/forward/sim-fast/
  * static basis for this mass; the next lever, if any, is search/
  * planning-side.
  *
+ * CALC 0.12 2026-10-12 (improvement round 68, T186 with T156, T157 and
+ * T159 as a round of its own after wave 2; branch r68 from f018c57 (= v1),
+ * cache v64 to v65; spec, ledger, measurements and probes under
+ * docs/perf/probes/2026-10-12-r68/; the first round on the agent setup of
+ * 12.10.: builders and reviewers on Sonnet 5.5, one fresh builder a step).
+ * @smogon/calc 0.12 models Pokemon Champions as its generation 0 (level 50,
+ * Stat Points in evs, no IVs, its own move table): over every Champions
+ * species, nature, stat and Stat Point it gives the stats of the round-67
+ * bridge (EV = 8 x SP - 4, IV 31), and its legal damaging moves agree with
+ * the Champions mod on power, type, category and flags (Pound missing). One
+ * function picks the calc generation from gen and mod (replay-core
+ * calc-gen.ts); 14 gen.num reads take the simulator's generation. One
+ * shared builder (replay-core calc-build.ts) serves the engine, the spread
+ * solver, the item judge and the picker: a species the calc lacks (35 in
+ * Champions, Aegislash among them) builds through its equal-valued form or
+ * Dex overrides, a move it lacks reads as unreadable. Where 0.12 disagrees
+ * with the simulator the simulator wins: Protect is asked from the
+ * simulator's own hooks (0.12 prices Unseen Fist through Protect at a
+ * quarter, the base mods' simulator at full; calc/protect.ts), Struggle in
+ * gens 3 and 4 takes no item boost, and the entry stages of Intrepid Sword
+ * and Dauntless Shield go through abilityOn where 0.12 no longer adds them.
+ * T156: a suppressed ability goes to the calc as No Ability, the entry
+ * stage only when the simulator would give it now; T157: choice-lock ranges
+ * the defender's abilities; T159: replay-core prices Champions on
+ * generation 0, the damage judge is on for Champions again (R10), Champions
+ * is read from the tier name too.
+ * DIAGNOSES: the bank moved 85 singles rows in 15 gen9ou replays, all with
+ * Zamazenta: calc 0.11 added Dauntless Shield's stage on top of the logged
+ * one in the spread solver and the judge, 0.12 counts it once as the
+ * simulator does (old code with only that rule rebuilds all 129 bank teams
+ * byte for byte as the new state). Champions OU holdout: 34 of 149 replays
+ * build differently, from four rules: the solver reads Aegislash (it used
+ * to throw; 21 replays, +13.6 bp), Shadow Claw slices (+2.6), Double Shock
+ * punches (-0.9; the server applies Iron Fist, @pkmn/mods 0.10.11 is
+ * stale), Infernal Parade has power 65 (-0.1); old code plus the four rules
+ * makes the same 84 072 calc calls.
+ * MEASUREMENTS against r68-base-1012 (f018c57; byte-identical to round 67's
+ * r67-noiv, holdouts equal to r67-wave and r67-wavec): M1 (T186, 9cf608d)
+ * bank 85 of 837 moved, no harm, hq warning luck-adjusted singles mid +16
+ * (own K +14); Champions VGC 2 of 1442, no finding; Champions OU 80 of 445,
+ * harm +14 [+0, +30]. M2 (827b971) bank byte-identical to M1, feedback
+ * three times byte-identical and equal to M1; holdouts against the base:
+ * Doubles OU 0 of 1089, VGC 4 of 1118, Champions VGC 21 of 1442, no
+ * finding; Champions OU 103 of 445, harm +17 [+3, +34] (own K +13 [+0,
+ * +28]), M1 to M2 +3 under 5 bp; bank plus doubles holdouts (D26) no
+ * finding. One feedback turn moved: gen9championsou-2628340185 t21, p1 now
+ * an inaccuracy (regret 0.060 -> 0.124), right by the rules (Draining Kiss
+ * is a sure KO, Trailblaze 34 %), caused by the Aegislash read; no pin
+ * there. Full regression 2734 green, e2e 75/75, lint, tsc -b, build,
+ * pack:smoke green after cbd0e45. New TODOs T190 to T193 (forme
+ * observations in the spread solver, the item at the hit, gen 1 and 2
+ * spreads, the defender's item in choice-lock), next free T194. Base of the
+ * code state: .calibration/r68-m2 (Brier 0.2536/0.2307/0.1120, hq
+ * 0.2454/0.2038/0.1069, K 2.41).
+ *
  * WAVE 2 2026-10-10..11 (improvement round 67, the second wave of lanes:
  * seven lanes A to G in their own worktrees from d5855a0, measured one at a
  * time against r67-base-1010 (reproduced byte for byte as r67-base-1011 on
