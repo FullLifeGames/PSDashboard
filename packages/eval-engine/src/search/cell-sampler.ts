@@ -57,6 +57,15 @@ function verifyPool(
   return drawsMore || pool.outcomes!.length > 1 || pool.outcomes![0].groups ? pool : null;
 }
 
+/**
+ * Round 69 (T146 c2): the analytic weight of unreached classes from which on a blend cell prices as the mean of
+ * its draws. The unreached weight of the bank's singles cells sits at or below 0.197 for a class a few draws miss by
+ * chance (a crit class of 0.06 to 0.19 stays out of 16 draws up to 18 % of the time at 0.1, 3 % at 0.2) and from
+ * 0.207 up for model gaps (missing-census, singles r61 positions); 0.2 is the gap, and a real class of that weight
+ * is out of 16 draws only 3 % of the time.
+ */
+export const MISSING_WEIGHT_CUT = 0.2;
+
 /** The plain seed average (no analytic blend): one sim unless a KO or a roll makes seeds diverge. */
 function plainCellSample(
   root: SimPosition,
@@ -110,6 +119,12 @@ interface ClassEntry {
   draws: Draw[];
 }
 
+/** The mean over every draw of the cell (the plan's base draws and the chase to the budget). */
+function allDrawsSample(draws: Draw[]): CellSample {
+  const value = draws.reduce((sum, draw) => sum + draw.leaf, 0) / draws.length;
+  return { value, ended: draws[0].ended, firstChild: draws[0].child };
+}
+
 /** One seeded draw with its protocol log and leaf value. */
 function drawCell(root: SimPosition, p1Choice: string, p2Choice: string, seed: PRNGSeed, matchupCache: MatchupCache): Draw {
   const { child, log } = advancePositionWithLog(root, p1Choice, p2Choice, seed);
@@ -135,6 +150,18 @@ function classifyDraw(
   entry.ended = entry.ended && draw.ended;
   classes.set(key, entry);
   return true;
+}
+
+/** The diagnostic for analytically expected classes no draw reached, or undefined when none is missing. */
+function unreachedDiagnostic(
+  expected: Map<string, number>, classes: Map<string, ClassEntry>, missing: string[], p1Choice: string, p2Choice: string,
+): KoOddsMismatch | undefined {
+  if (missing.length === 0) return undefined;
+  return {
+    i: -1, j: -1, p1Choice, p2Choice, missing, // i/j stamped by the caller
+    analytic: Object.fromEntries(expected),
+    sampled: Object.fromEntries([...classes].map(([key, cls]) => [key, cls.count])),
+  };
 }
 
 /** The analytically weighted class means, the blend payload, and the diagnostic for unsampled classes. */
@@ -165,13 +192,7 @@ function blendFromClasses(
     if (groups) classGroups.set(key, groups);
   }
   const ended = draws.every(draw => draw.ended);
-  const diagnostic: KoOddsMismatch | undefined = missing.length > 0
-    ? {
-      i: -1, j: -1, p1Choice, p2Choice, missing, // i/j stamped by the caller
-      analytic: Object.fromEntries(expected),
-      sampled: Object.fromEntries([...classes].map(([key, cls]) => [key, cls.count])),
-    }
-    : undefined;
+  const diagnostic = unreachedDiagnostic(expected, classes, missing, p1Choice, p2Choice);
   return {
     value, ended, firstChild: draws[0].child, blend, classChildren,
     ...(classGroups.size > 0 ? { classGroups } : {}), ...(diagnostic ? { diagnostic } : {}),
@@ -251,6 +272,13 @@ function blendCellSample(
   let weightTotal = 0;
   for (const [key, weight] of expected) if (classes.has(key)) weightTotal += weight;
   if (weightTotal <= 0) return fallback();
+  // Round 69 (T146 c2): a large unreached weight is a state effect the board before the turn cannot see (a Weakness
+  // Policy that turns the survive-survive class into a kill): the renormalised classes would price the cell as if
+  // the effect did not exist, so the draws price it, and the diagnostic keeps the model's miss on record.
+  if (missing.reduce((sum, key) => sum + expected.get(key)!, 0) >= MISSING_WEIGHT_CUT) {
+    const diagnostic = unreachedDiagnostic(expected, classes, missing, p1Choice, p2Choice);
+    return plainDraws ? { ...fallback(), diagnostic } : { ...allDrawsSample(draws), diagnostic };
+  }
   const pools = plainDraws ? classPools(root, events, p1Choice, p2Choice, plainDraws, matchupCache, classes, drawnBySeed) : undefined;
   return blendFromClasses(expected, classes, weightTotal, missing, draws, p1Choice, p2Choice, pools);
 }
