@@ -128,12 +128,11 @@ const configuredTarget = (
  * later "Analyze game" must not downgrade a turn stored at deeper settings
  * (depth 2, then a re-analyze at depth 1). Cross-mode results replace only
  * when the incoming pass carries the CONFIGURED engine mode (the user's
- * stated intent beats a stale result from the other engine) — except that a
- * matrix result of depth ≥ 2 outranks the d1s1-grade MCTS tier in BOTH
- * directions: it lands on a stored MCTS turn, and once stored it survives
- * the next MCTS-target sweep. Auto resolves per turn via the fainted
- * fraction and the game type (`doubles`, read by auto only); unresolvable
- * cross-mode conflicts keep the stored result (fail closed).
+ * stated intent beats a stale result from the other engine, whatever its
+ * depth: round 69 removed the rule that let a matrix result of depth ≥ 2
+ * outrank the tree in both directions). Auto resolves per turn via the
+ * fainted fraction and the game type (`doubles`, read by auto only);
+ * unresolvable cross-mode conflicts keep the stored result (fail closed).
  */
 export function supersedesStored(
   stored: TurnEvalSettings | null,
@@ -144,9 +143,7 @@ export function supersedesStored(
 ): boolean {
   if (!stored) return true;
   if (stored.mode !== incoming.mode) {
-    if (incoming.mode === 'matrix' && incoming.depth >= 2 && stored.mode === 'mcts') return true;
-    if (incoming.mode !== configuredTarget(configuredMode, faintedFraction, doubles)) return false;
-    return !(incoming.mode === 'mcts' && stored.mode === 'matrix' && stored.depth >= 2);
+    return incoming.mode === configuredTarget(configuredMode, faintedFraction, doubles);
   }
   if (incoming.mode === 'mcts') return true;
   return incoming.depth >= stored.depth && incoming.samples >= stored.samples;

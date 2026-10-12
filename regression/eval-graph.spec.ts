@@ -93,23 +93,22 @@ describe('graph merge monotonicity', () => {
     // Same-mode MCTS has no depth ordering — it refreshes.
     expect(supersedesStored({ depth: 1, samples: 1, mode: 'mcts' }, { depth: 1, samples: 1, mode: 'mcts' }, 'mcts')).toBe(true);
   });
-  test('a matrix result of depth ≥ 2 survives an MCTS-target sweep', () => {
-    // A matrix result of depth ≥ 2 outranks the d1s1-grade MCTS tier — the
-    // next sweep must not trample it, whether MCTS is the target via
-    // explicit prefs or the auto routing.
-    expect(supersedesStored({ depth: 2, samples: 3, mode: 'matrix' }, { depth: 1, samples: 1, mode: 'mcts' }, 'mcts')).toBe(false);
-    expect(supersedesStored({ depth: 3, samples: 3, mode: 'matrix' }, { depth: 1, samples: 1, mode: 'mcts' }, 'mcts')).toBe(false);
-    expect(supersedesStored({ depth: 2, samples: 3, mode: 'matrix' }, { depth: 1, samples: 1, mode: 'mcts' }, 'auto', 0.5)).toBe(false);
+  test('a matrix result of depth ≥ 2 is replaced by an MCTS-target sweep', () => {
+    // Round 69 (T184): the configured engine decides. The deep matrix result no
+    // longer outranks the tree, whether MCTS is the target via explicit prefs or
+    // the auto routing (the full table: supersedes-stored-t184.spec.ts).
+    expect(supersedesStored({ depth: 2, samples: 3, mode: 'matrix' }, { depth: 1, samples: 1, mode: 'mcts' }, 'mcts')).toBe(true);
+    expect(supersedesStored({ depth: 3, samples: 3, mode: 'matrix' }, { depth: 1, samples: 1, mode: 'mcts' }, 'mcts')).toBe(true);
+    expect(supersedesStored({ depth: 2, samples: 3, mode: 'matrix' }, { depth: 1, samples: 1, mode: 'mcts' }, 'auto', 0.5)).toBe(true);
   });
-  test('a matrix result of depth ≥ 2 LANDS on an MCTS-target turn', () => {
-    // The other direction of the same rule: a d2s3 matrix pass supersedes
-    // the stored d1s1-grade MCTS result even where matrix is not the turn's
-    // configured engine.
-    expect(supersedesStored({ depth: 1, samples: 1, mode: 'mcts' }, { depth: 2, samples: 3, mode: 'matrix' }, 'auto', 0.5)).toBe(true);
-    expect(supersedesStored({ depth: 1, samples: 1, mode: 'mcts' }, { depth: 2, samples: 3, mode: 'matrix' }, 'mcts')).toBe(true);
-    expect(supersedesStored({ depth: 1, samples: 1, mode: 'mcts' }, { depth: 3, samples: 3, mode: 'matrix' }, 'auto', 1)).toBe(true);
-    // The fast matrix sketch (d1) is NOT an escalation — routing still wins.
-    expect(supersedesStored({ depth: 1, samples: 1, mode: 'mcts' }, { depth: 1, samples: 1, mode: 'matrix' }, 'auto', 0.5)).toBe(false);
+  test('a matrix result of depth ≥ 2 does not land on an MCTS-target turn', () => {
+    // The other direction of the removed rule: where the tree is the turn's
+    // target, only a tree pass replaces a stored tree result.
+    expect(supersedesStored({ depth: 1, samples: 1, mode: 'mcts' }, { depth: 2, samples: 3, mode: 'matrix' }, 'auto', 0.5)).toBe(false);
+    expect(supersedesStored({ depth: 1, samples: 1, mode: 'mcts' }, { depth: 2, samples: 3, mode: 'matrix' }, 'mcts')).toBe(false);
+    expect(supersedesStored({ depth: 1, samples: 1, mode: 'mcts' }, { depth: 3, samples: 3, mode: 'matrix' }, 'auto', 1)).toBe(false);
+    // Where the matrix is the target, it lands.
+    expect(supersedesStored({ depth: 1, samples: 1, mode: 'mcts' }, { depth: 2, samples: 3, mode: 'matrix' }, 'matrix')).toBe(true);
   });
 });
 
