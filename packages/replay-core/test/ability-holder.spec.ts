@@ -51,8 +51,8 @@ describe('ability holders from [from] ability lines (round 60, T104)', () => {
     expect(abilityOf(log, 'p2', 'Gyarados')).toBe('');
   });
 
-  test('a custom game keeps the rule that [of] gets it: Rough Skin goes to its holder', () => {
-    const log = [...head('[Gen 9] Custom Game'),
+  test('a format with free abilities keeps the rule that [of] gets it: Rough Skin goes to its holder', () => {
+    const log = [...head('[Gen 9] Balanced Hackmons'),
       '|switch|p1a: Chomp|Garchomp, F|100/100', '|switch|p2a: Lando|Landorus-Therian, M|100/100', '|turn|1',
       '|move|p2a: Lando|U-turn|p1a: Chomp', '|-damage|p1a: Chomp|80/100',
       '|-damage|p2a: Lando|90/100|[from] ability: Rough Skin|[of] p1a: Chomp',
@@ -63,8 +63,8 @@ describe('ability holders from [from] ability lines (round 60, T104)', () => {
 
   // Round 67 (T108 step 1): @pkmn/protocol reads an absorbing heal (Dry Skin, Earth Eater, Volt Absorb, Water
   // Absorb) without the attacker's [of], so the healed Pokémon holds the ability even where the dex decides nothing.
-  test('a custom game: an absorbing heal goes to the healed Pokémon, as the protocol reads the line', () => {
-    const log = [...head('[Gen 9] Custom Game'),
+  test('a format with free abilities: an absorbing heal goes to the healed Pokémon, as the protocol reads the line', () => {
+    const log = [...head('[Gen 9] Balanced Hackmons'),
       '|switch|p1a: Alomomola|Alomomola, F|100/100', '|switch|p2a: Toad|Seismitoad, M|80/100', '|turn|1',
       '|move|p1a: Alomomola|Scald|p2a: Toad', '|-heal|p2a: Toad|100/100|[from] ability: Water Absorb|[of] p1a: Alomomola',
       '|turn|2'];

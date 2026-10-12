@@ -61,12 +61,12 @@ type SideInfos = { p1: OpponentTeamInfo; p2: OpponentTeamInfo };
  * Magic Guard Clefable shows the Boots tell without Boots).
  */
 function itemTells(
-  log: string, options: BuildOptions, infos: SideInfos, legality: { gen: number; custom: boolean },
+  log: string, options: BuildOptions, infos: SideInfos, legality: { gen: number; freeAbilities: boolean },
 ): Record<'p1' | 'p2', Map<string, string>> {
   const tells = (side: 'p1' | 'p2') => {
     const raw = options?.[`${side}Info`] ? inferOpponentTeam(log, side) : infos[side];
     return new Map(raw.pokemon
-      .filter(mon => mon.item.source === 'guessed' && mon.item.value && !rocksMayMiss(mon, legality.gen, legality.custom))
+      .filter(mon => mon.item.source === 'guessed' && mon.item.value && !rocksMayMiss(mon, legality.gen, legality.freeAbilities))
       .map(mon => [toId(mon.species), mon.item.value]));
   };
   return { p1: tells('p1'), p2: tells('p2') };
@@ -93,7 +93,7 @@ function buildTeams(log: string, options: BuildOptions): { teams: BuiltTeams; in
   // reaches the Stat Point scale by the level-50 inverse (legalizeEvs), and
   // the sets keep every IV at 31, as the server plays them.
   const champions = evBudget(formatHint).statPoints;
-  const legality = { gen: parseInt(gen, 10), custom: abilitiesAreFree(log) };
+  const legality = { gen: parseInt(gen, 10), freeAbilities: abilitiesAreFree(log) };
   const legalize = (team: PokemonSet[]): PokemonSet[] =>
     (champions ? team.map(set => ({ ...set, evs: legalizeEvs(set.evs, formatHint), ivs: { ...ALL_31_IVS } })) : team)
       .map(set => dexLegalSet(withHappinessAssumption(set), legality));

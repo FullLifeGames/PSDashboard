@@ -97,7 +97,7 @@ export function possibleAbilities(state: InferrerState, ident: string): Set<stri
   const info = opponent ? findPokemon(state, key.slice(4)) : undefined;
   const known = provenAbility(info);
   if (known) return new Set([known]);
-  if (state.custom) return null;
+  if (state.freeAbilities) return null;
   const species = info?.species ?? state.identSpecies.get(ident);
   const entry = species ? Dex.forGen(state.gen).species.get(species) : null;
   if (!entry?.exists) return null;
@@ -117,7 +117,7 @@ export function illusionPossible(state: InferrerState): boolean {
   return [...state.pokemonMap.values()].some(mon => {
     const known = provenAbility(mon);
     if (known) return known === 'illusion';
-    if (state.custom) return true;
+    if (state.freeAbilities) return true;
     const entry = dex.species.get(mon.species.replace(/-\*$/, ''));
     return entry.exists && Object.values(entry.abilities ?? {}).some(name => toId(String(name)) === 'illusion');
   });

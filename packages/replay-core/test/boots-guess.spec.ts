@@ -151,3 +151,20 @@ describe('the guess stands where no possible ability keeps the rocks off (guards
     expect(rawItem(withUnaware)).toMatchObject({ value: 'Heavy-Duty Boots', source: 'guessed' });
   });
 });
+
+/**
+ * Round 67 gate (11.10.): draft leagues play their games as custom games under the usual abilities, so a custom game
+ * keeps each species to its own abilities. Noivern (Frisk, Infiltrator, Telepathy) can never have Magic Guard, and an
+ * entry on Stealth Rock without damage reads as Heavy-Duty Boots there too (the GPL report's Noivern, eval-gpl t35).
+ */
+describe('a custom game keeps each species to its own abilities (round 67 gate)', () => {
+  test('a Noivern on Stealth Rock without damage reads as Heavy-Duty Boots in a custom game', () => {
+    const noivern = mon('Noivern', 'Heavy-Duty Boots', 'Infiltrator', ['Draco Meteor', 'Hurricane']);
+    const log = play([rocks()], [mon('Chansey', '', 'Natural Cure', ['Soft-Boiled']), noivern],
+      [['move stealthrock', 'move softboiled'], ['move roost', 'switch 2'], ['move roost', 'move dracometeor']])
+      .replace('|tier|[Gen 9] OU', '|tier|[Gen 9] Custom Game');
+    expect(log).toMatch(/\|tier\|\[Gen 9\] Custom Game/);
+    expect(log).not.toMatch(/\|-damage\|p2a: Noivern\|[^\n]*\[from\] Stealth Rock/);
+    expect(rawItem(log, 'Noivern').value).toBe('Heavy-Duty Boots');
+  });
+});

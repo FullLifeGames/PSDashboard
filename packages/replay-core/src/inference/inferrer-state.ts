@@ -43,8 +43,8 @@ export interface InferrerState {
   gravityActive: boolean;
   /** The replay's generation (|gen| line): the dex that decides who may hold an ability (round 60, T104). */
   gen: number;
-  /** A format that lets any species hold any ability (custom games, Hackmons): the dex decides nothing. */
-  custom: boolean;
+  /** A format that lets any species hold any ability (Balanced Hackmons; a custom game keeps the usual ones, round 67 gate): the dex decides nothing. */
+  freeAbilities: boolean;
   /** Item evidence by absence (round 63, T80): the resolving move and the residual phase; item-evidence.ts creates it. */
   itemWatch?: ItemWatch;
   /** Item evidence by a trigger without its line (round 67, T130); trigger-evidence.ts creates it. */
@@ -59,7 +59,7 @@ export function createInferrerState(lines: readonly LogLine[], opponentSide: 'p1
     lines,
     opponentSide,
     gen: (genLine ? Number(arg(genLine, 1)) : 9) || 9,
-    custom: abilitiesAreFree(lines.find(line => line.cmd === 'tier')?.raw ?? ''),
+    freeAbilities: abilitiesAreFree(lines.find(line => line.cmd === 'tier')?.raw ?? ''),
     pokemonMap: new Map<string, RevealedPokemonInfo>(),
     lastMoveTarget: new Map<string, string>(),
     pendingMove: null,

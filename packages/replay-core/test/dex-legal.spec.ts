@@ -49,11 +49,18 @@ describe('dex-legal abilities (round 60, T93)', () => {
   // Since round 67 (T108 step 2) the inference also reads an ability a line names as its effect, as the client does:
   // Terapagos shows Tera Shift on entry (`|-activate|p1b: Terapagos|ability: Tera Shift`) before its Stellar forme shows
   // Teraform Zero, so the set keeps the ability it entered with; Ogerpon's Embody Aspect still shows only on its Tera.
-  test('a custom game keeps a battle-only ability, but an unknown name still becomes the dex ability', () => {
-    const { p1Team, p2Team } = buildTeamsFromReplay(vgcLog('[Gen 9] Custom Game'));
+  test('a format with free abilities keeps a battle-only ability, but an unknown name still becomes the dex ability', () => {
+    const { p1Team, p2Team } = buildTeamsFromReplay(vgcLog('[Gen 9] Balanced Hackmons'));
     expect(abilityOf(p2Team, 'Calyrex-Shadow')).toBe('asonespectrier');
     expect(abilityOf(p1Team, 'Ogerpon-Wellspring')).toBe('embodyaspectwellspring');
     expect(abilityOf(p1Team, 'Terapagos')).toBe('terashift');
+  });
+
+  // Round 67 gate (11.10.): draft leagues play as custom games under the usual abilities.
+  test('a custom game reads abilities like a standard format', () => {
+    const { p1Team, p2Team } = buildTeamsFromReplay(vgcLog('[Gen 9] Custom Game'));
+    expect(abilityOf(p1Team, 'Ogerpon-Wellspring')).toBe('waterabsorb');
+    expect(abilityOf(p2Team, 'Calyrex-Shadow')).toBe('asonespectrier');
   });
 
   test('an ability the species already has keeps its exact string', () => {
@@ -87,9 +94,16 @@ describe('fixed Tera type and item (round 60, T79)', () => {
     expect(p2Team.find(set => set.species === 'Terapagos')!.teraType).toBe('Stellar');
   });
 
-  test('a custom game keeps what the build had', () => {
-    const { p2Team } = buildTeamsFromReplay(doublesLog('[Gen 9] Doubles Custom Game'));
+  test('a format with free abilities keeps what the build had', () => {
+    const { p2Team } = buildTeamsFromReplay(doublesLog('[Gen 9] Balanced Hackmons'));
     expect(p2Team.find(set => set.species === 'Ogerpon-Cornerstone')!.teraType).toBeUndefined();
+  });
+
+  test('a custom game carries the fixed Tera type and item like a standard format (round 67 gate)', () => {
+    const { p2Team } = buildTeamsFromReplay(doublesLog('[Gen 9] Doubles Custom Game'));
+    const cornerstone = p2Team.find(set => set.species === 'Ogerpon-Cornerstone')!;
+    expect(cornerstone.teraType).toBe('Rock');
+    expect(toID(cornerstone.item)).toBe('cornerstonemask');
   });
 
   test('a Tera forme coming back in maps to its species through the dex (749895: no second Ogerpon)', () => {
@@ -109,15 +123,17 @@ describe('fixed Tera type and item (round 60, T79)', () => {
 describe('legality follows the replay\'s format and generation (round 60 review)', () => {
   test('a battle-only forme\'s ability falls back to the species\' ability of that generation', () => {
     const set = { name: 'Gengar', species: 'Gengar', item: '', ability: 'Shadow Tag', moves: [], nature: '', gender: '', evs: {}, ivs: {}, level: 100 };
-    expect(legalAbility(set as never, { gen: 6, custom: false })).toBe('Levitate');
-    expect(legalAbility(set as never, { gen: 9, custom: false })).toBe('Cursed Body');
+    expect(legalAbility(set as never, { gen: 6, freeAbilities: false })).toBe('Levitate');
+    expect(legalAbility(set as never, { gen: 9, freeAbilities: false })).toBe('Cursed Body');
   });
 
-  test('the sim\'s rule table decides which formats allow any ability; an unknown format falls back to the custom-game name', () => {
+  test('the sim\'s rule table decides which formats allow any ability; a custom game and an unknown format keep the usual abilities', () => {
     expect(abilitiesAreFree('|tier|[Gen 9] Balanced Hackmons')).toBe(true);
-    expect(abilitiesAreFree('|tier|[Gen 9] Custom Game')).toBe(true);
+    expect(abilitiesAreFree('|tier|[Gen 9] Hackmons Cup')).toBe(true);
+    expect(abilitiesAreFree('|tier|[Gen 9] Custom Game')).toBe(false);
+    expect(abilitiesAreFree('|tier|[Gen 9] Doubles Custom Game')).toBe(false);
     expect(abilitiesAreFree('|tier|[Gen 9] OU')).toBe(false);
     expect(abilitiesAreFree('|tier|[Gen 9] VGC 2026 Reg I')).toBe(false);
-    expect(abilitiesAreFree('|tier|[Gen 9] Draft Custom Game')).toBe(true);
+    expect(abilitiesAreFree('|tier|[Gen 9] Draft Custom Game')).toBe(false);
   });
 });

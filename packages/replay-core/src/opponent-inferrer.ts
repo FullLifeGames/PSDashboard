@@ -155,7 +155,7 @@ export function inferOpponentTeam(log: string, opponentSide: 'p1' | 'p2' = 'p2')
   }
   attachHits(state);
 
-  inferBootsFromHazards(lines, opponentSide, state.pokemonMap, { gen: state.gen, custom: state.custom });
+  inferBootsFromHazards(lines, opponentSide, state.pokemonMap, { gen: state.gen, freeAbilities: state.freeAbilities });
 
   const sheet = parseShowteamSheet(log, opponentSide);
   if (sheet) applyTeamSheet(state.pokemonMap, sheet);
@@ -172,7 +172,7 @@ function inferBootsFromHazards(
   lines: readonly LogLine[],
   side: 'p1' | 'p2',
   pokemonMap: Map<string, RevealedPokemonInfo>,
-  legality: { gen: number; custom: boolean },
+  legality: { gen: number; freeAbilities: boolean },
 ) {
   if (legality.gen < 8) return;
 
@@ -208,11 +208,11 @@ function entrantOf(line: LogLine, side: string): string | null {
  * the simulator as the build asks it (T130: a Magic Guard Clefable showed the
  * guess in the panel while the build refused it).
  */
-function canGuessBoots(pokemon: RevealedPokemonInfo, legality: { gen: number; custom: boolean }): boolean {
+function canGuessBoots(pokemon: RevealedPokemonInfo, legality: { gen: number; freeAbilities: boolean }): boolean {
   if (pokemon.item.value && pokemon.item.value !== '(has item)') return false;
   // A rocks chip elsewhere in the game disproves Boots outright.
   if (pokemon.ruledOut?.items.includes('heavydutyboots')) return false;
-  return !rocksMayMiss(pokemon, legality.gen, legality.custom);
+  return !rocksMayMiss(pokemon, legality.gen, legality.freeAbilities);
 }
 
 /** Entry-hazard damage resolves before the next action — scan until then. */

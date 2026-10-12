@@ -205,7 +205,7 @@ describe('any doubt drops the hit (T130, ruling R3)', () => {
     const changed = (patch: Partial<LoggedHit>) => ({ ...attacker, hits: (attacker.hits ?? []).map(hit => ({ ...hit, ...patch })) });
     expect(judgeItemsByDamage(changed({ doubt: 'magic room' }), CANDIDATES, built())).toEqual([]);
     expect(judgeItemsByDamage(changed({ format: '[Gen 9] Champions OU' }), CANDIDATES, built())).toEqual([]);
-    expect(judgeItemsByDamage(changed({ format: '[Gen 9] Custom Game' }), CANDIDATES, built())).toEqual([]);
+    expect(judgeItemsByDamage(changed({ format: '[Gen 9] Balanced Hackmons' }), CANDIDATES, built())).toEqual([]);
   });
 
   test('doubles: a partner that may hold Friend Guard keeps the hit out', () => {

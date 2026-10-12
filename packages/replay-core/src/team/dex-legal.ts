@@ -10,18 +10,20 @@ import { toId } from '../ids.ts';
  * - T93 rule 1: an ability name the dex does not know becomes the species'
  *   own ability whose id starts with it (the log writes "As One", the dex
  *   knows "As One (Spectrier)").
- * - T93 rule 2, outside custom games: an ability only a battle-only forme of
- *   the species' base carries becomes the species' default (Ogerpon before
- *   its Tera, Terapagos); in a custom game any ability can be real.
- * - T79, outside custom games: a fixed Tera type or item from the dex.
+ * - T93 rule 2, outside formats with free abilities: an ability only a
+ *   battle-only forme of the species' base carries becomes the species'
+ *   default (Ogerpon before its Tera, Terapagos); in Balanced Hackmons any
+ *   ability can be real.
+ * - T79, outside formats with free abilities: a fixed Tera type or item from
+ *   the dex.
  */
 
 export type GenDex = ReturnType<typeof Dex.forGen>;
 
 export interface LegalityContext {
   gen: number;
-  /** A custom game: players may give any species any ability or item. */
-  custom: boolean;
+  /** A format with free abilities (abilitiesAreFree): players may give any species any ability or item. */
+  freeAbilities: boolean;
 }
 
 function ownAbilities(dex: GenDex, species: string): string[] {
@@ -57,15 +59,18 @@ function slotZeroAbility(dex: GenDex, species: string): string | undefined {
 
 /**
  * Whether the replay's format lets any species hold any ability: the sim's
- * rule table answers for a format it knows (Custom Game, Balanced and Pure
- * Hackmons, Hackmons Cup carry no 'obtainableabilities'); for one it does
- * not know (a newer VGC regulation, a draft league) only a custom game counts.
+ * rule table answers for a format it knows (Balanced and Pure Hackmons,
+ * Hackmons Cup carry no 'obtainableabilities'). A custom game keeps each
+ * species to its own abilities, although the sim's Custom Game checks none:
+ * draft leagues play their games as custom games under the usual abilities
+ * (round 67 gate: Noivern can never have Magic Guard). A format the sim does
+ * not know (a newer VGC regulation, a league's own name) counts the same way.
  */
 export function abilitiesAreFree(log: string): boolean {
   const tier = log.match(/^\|tier\|(.*)$/m)?.[1] ?? '';
   const format = Dex.formats.get(tier);
-  if (format.exists) return !Dex.formats.getRuleTable(format).has('obtainableabilities');
-  return /custom game/i.test(tier);
+  if (!format.exists || format.id.endsWith('customgame')) return false;
+  return !Dex.formats.getRuleTable(format).has('obtainableabilities');
 }
 
 export function legalAbility(set: PokemonSet, context: LegalityContext): string {
@@ -75,19 +80,19 @@ export function legalAbility(set: PokemonSet, context: LegalityContext): string 
   const id = toId(set.ability);
   if (ownAbilities(dex, set.species).some(name => toId(name) === id)) return set.ability;
   if (!dex.abilities.get(set.ability).exists) return speciesAbilityFor(dex, set.species, set.ability) ?? set.ability;
-  if (!context.custom && battleOnlyAbilityIds(dex, set.species).has(id)) return slotZeroAbility(dex, set.species) ?? set.ability;
+  if (!context.freeAbilities && battleOnlyAbilityIds(dex, set.species).has(id)) return slotZeroAbility(dex, set.species) ?? set.ability;
   return set.ability;
 }
 
 /**
- * T79, outside custom games: a species with a fixed Tera type or item
+ * T79, outside formats with free abilities: a species with a fixed Tera type or item
  * (requiredTeraType, requiredItem: Ogerpon's masks, Terapagos) carries it.
  * Without one the sim takes the species' first type as Tera type
  * (pokemon.js:209 `set.teraType || types[0]`): Ogerpon-Cornerstone would
  * terastallize into Grass instead of Rock.
  */
 export function withRequiredFields(set: PokemonSet, context: LegalityContext): PokemonSet {
-  if (context.custom) return set;
+  if (context.freeAbilities) return set;
   const species = Dex.forGen(context.gen).species.get(set.species);
   if (!species.exists) return set;
   const teraType = !set.teraType && species.requiredTeraType ? species.requiredTeraType : set.teraType;

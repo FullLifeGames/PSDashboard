@@ -20,8 +20,8 @@ function set(species: string, item: string, ability: string, moves: string[], le
 
 /**
  * The spectators' log: each `|split|` keeps its public line, as a replay does.
- * `format` defaults to OU, whose rules fix each species' abilities; a custom
- * game lets any species hold any ability, and the inference then judges
+ * `format` defaults to OU, whose rules fix each species' abilities; Balanced
+ * Hackmons lets any species hold any ability, and the inference then judges
  * nothing that hangs on an ability (round 64, T125).
  */
 function play(p1: PokemonSet[], p2: PokemonSet[], turns: [string, string][], doubles = false, gen = 9, format = 'ou'): string {
@@ -275,12 +275,15 @@ describe('T125 point 4: the slot map, gen 4 Life Orb and free abilities (round 6
 
   test('a format with free abilities: a species without Magic Guard in its list may still hold it, so nothing is ruled out', () => {
     const guarded = set('Rattata', 'Life Orb', 'Magic Guard', ['Tackle']);
-    const singles = play([wall()], [guarded], [['move recover', 'move tackle']], false, 9, 'customgame');
+    const singles = play([wall()], [guarded], [['move recover', 'move tackle']], false, 9, 'balancedhackmons');
     expect(shown(singles, 'Life Orb')).toBe(false);
     expect(ruledOut(singles, 'Rattata')).not.toContain('lifeorb');
     const p1 = [wall(), set('Blissey', '', 'Natural Cure', ['Soft-Boiled'])];
     const doubles = play(p1, [guarded, set('Talonflame', '', 'Gale Wings', ['Roost'])],
-      [['move recover, move softboiled', 'move tackle 1, move roost']], true, 9, 'customgame');
+      [['move recover, move softboiled', 'move tackle 1, move roost']], true, 9, 'customgame')
+      // The sim knows no doubles format with free abilities; the log names Balanced Hackmons (round 67 gate: a custom
+      // game keeps each species to its own abilities).
+      .replace(/\|tier\|[^\n]*/, '|tier|[Gen 9] Balanced Hackmons');
     expect(ruledOut(doubles, 'Rattata')).not.toContain('lifeorb');
   });
 });

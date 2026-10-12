@@ -88,7 +88,7 @@ function adoptAbility(state: InferrerState, info: RevealedPokemonInfo, client: C
   const dex = Dex.forGen(state.gen);
   const name = dex.abilities.get(client.baseAbility).name;
   // The species' own spelling: the client keeps only the id, and "As One" is the id of no gen 9 ability ("As One (Spectrier)").
-  const own = speciesAbilityFor(dex, info.species.replace(/-\*$/, ''), name) ?? (state.custom ? name : '');
+  const own = speciesAbilityFor(dex, info.species.replace(/-\*$/, ''), name) ?? (state.freeAbilities ? name : '');
   if (own) info.ability = revealedField(own);
 }
 
