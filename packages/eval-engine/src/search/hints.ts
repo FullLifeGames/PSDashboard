@@ -17,6 +17,12 @@ export const isCombined = (options: ChoiceOption[]) => options.some(option => op
 const SUPPORT_HINT = 0.25;
 /** Fake Out on the turn it works: damage plus one neutralized foe action. */
 const FLINCH_BONUS = 0.3;
+/**
+ * Round 69 (T42, decision 15): a KO that only the two attacks together make
+ * (or that a Protect denies the foes) takes one action off the board, as a
+ * flinch does, so it counts as much.
+ */
+const PAIR_KO_BONUS = FLINCH_BONUS;
 /** Boost payoff counted for ~2 future attacks. */
 const SETUP_HORIZON = 2;
 /** Spread moves hit both foes, at the doubles spread penalty. */
@@ -43,7 +49,27 @@ function hintBoard(position: SimPosition, side: 'p1' | 'p2', battle = positionBa
   return { position, side, battle, sideState, foeActives, foes, actors };
 }
 
-type DexMove = ReturnType<HintBoard['battle']['dex']['moves']['get']>;
+type HintDex = HintBoard['battle']['dex'];
+type DexMove = ReturnType<HintDex['moves']['get']>;
+
+/**
+ * Round 69 (T42): a move that pulls the foes' single-target moves onto its
+ * user (Follow Me, Rage Powder): a self-targeted move whose volatile carries
+ * the redirect handler, read from the Dex (test/doubles-pair-hints.spec.ts
+ * plays every self-targeted move against this reading).
+ */
+export function redirectsFoes(dex: HintDex, move: DexMove): boolean {
+  return move.target === 'self' && !!move.volatileStatus && 'onFoeRedirectTarget' in dex.conditions.get(move.volatileStatus);
+}
+
+/**
+ * Round 69 (T42): a move that stops the hits on its user (Protect, Detect and
+ * their kin): a stalling self-targeted move whose volatile stops moves
+ * (onTryHit; Endure has none), the reading damage-calc.ts shieldedBy uses.
+ */
+export function shieldsFromHits(dex: HintDex, move: DexMove): boolean {
+  return move.target === 'self' && !!move.stallingMove && !!move.volatileStatus && 'onTryHit' in dex.conditions.get(move.volatileStatus);
+}
 
 /** Every stat a stage can sit on. */
 const STAGES = ['atk', 'def', 'spa', 'spd', 'spe', 'accuracy', 'evasion'] as const;
@@ -183,43 +209,110 @@ function targetAtUse(board: HintBoard, attacker: Pokemon, move: DexMove): string
   return active.target;
 }
 
+/**
+ * What one part of a combined option reads, kept per part so the pair terms
+ * can combine two parts: the part's hint, the single foe slot it aims at with
+ * that foe's HP and the damage fraction (pair focus), the damage its hint
+ * prices when it attacks (what a partner's redirection covers), whether it
+ * redirects, and its Protect tempo.
+ */
+interface PartRead {
+  hint: number;
+  foeSlot: number;
+  foeHp: number;
+  damage: number;
+  attack: number;
+  redirect: boolean;
+  tempo: number;
+}
+
+const plainRead = (hint: number): PartRead => ({ hint, foeSlot: 0, foeHp: 0, damage: 0, attack: 0, redirect: false, tempo: 0 });
+
+/** The foes can KO the mover only together: each hit leaves it standing, the two hits do not (a Protect denies that). */
+function pairOnlyKo(board: HintBoard, mon: Pokemon): boolean {
+  const hits = board.foes.map(foe => boostedFraction(pairThreat(foe, mon, board.battle), foe, mon));
+  const hp = mon.hp / mon.maxhp;
+  return hits.length > 1 && hits.every(hit => hit < hp) && hits.reduce((sum, hit) => sum + hit, 0) >= hp;
+}
+
 /** A move part: support floor or setup equity for status, spread damage, targeted or best-foe damage, the Fake Out bonus. */
-function moveHint(board: HintBoard, tokens: string[], partIndex: number): number {
+function moveHint(board: HintBoard, tokens: string[], partIndex: number): PartRead {
   const attacker = board.actors[partIndex];
-  if (!attacker || board.foes.length === 0) return 0;
+  if (!attacker || board.foes.length === 0) return plainRead(0);
   const clicks = tokens.includes('terastallize');
   const twin = clicks ? clickedTwin(board.position, board.side, attacker) : null;
   if (twin) return moveHintOf(twinBoard(twin, board.position, board.side), tokens, twin.mon);
   return asClicked(attacker, clicks, () => moveHintOf(board, tokens, attacker));
 }
 
-function moveHintOf(board: HintBoard, tokens: string[], attacker: Pokemon): number {
-  const { battle, foeActives, foes } = board;
+function moveHintOf(board: HintBoard, tokens: string[], attacker: Pokemon): PartRead {
+  const { battle, foes } = board;
   const move = battle.dex.moves.get(tokens[1]);
-  if (move.category === 'Status') return Math.max(SUPPORT_HINT, setupEquity(board, attacker, tokens[1]));
+  if (move.category === 'Status') {
+    const read = plainRead(Math.max(SUPPORT_HINT, setupEquity(board, attacker, tokens[1])));
+    read.redirect = redirectsFoes(battle.dex, move);
+    if (shieldsFromHits(battle.dex, move) && pairOnlyKo(board, attacker)) read.tempo = PAIR_KO_BONUS;
+    return read;
+  }
   const target = targetAtUse(board, attacker, move);
   if (target === 'allAdjacentFoes' || target === 'allAdjacent') {
-    return foes.reduce((sum, foe) => sum + singleMoveFraction(attacker, foe, tokens[1], battle), 0) * SPREAD_FACTOR;
+    const spread = foes.reduce((sum, foe) => sum + singleMoveFraction(attacker, foe, tokens[1], battle), 0) * SPREAD_FACTOR;
+    return { ...plainRead(spread), attack: spread };
   }
   const targetLoc = tokens.length > 2 ? parseInt(tokens[2], 10) : NaN;
   // Round 67 (T113): a move aimed at the own partner (Pollen Puff's heal, a U-turn into it) is support, not foe damage.
-  if (targetLoc < 0) return SUPPORT_HINT;
-  let damage: number;
-  if (Number.isFinite(targetLoc) && targetLoc > 0) {
-    const foe = foeActives[targetLoc - 1];
-    damage = foe && !foe.fainted ? singleMoveFraction(attacker, foe, tokens[1], battle) : 0;
-  } else {
-    damage = Math.max(...foes.map(foe => singleMoveFraction(attacker, foe, tokens[1], battle)));
-  }
-  if (move.id === 'fakeout' && attacker.activeMoveActions === 0) damage += FLINCH_BONUS;
-  return damage;
+  if (targetLoc < 0) return plainRead(SUPPORT_HINT);
+  return aimedRead(board, tokens, attacker, targetLoc);
 }
 
-function partHint(board: HintBoard, part: string, partIndex: number): number {
+/** A damaging move at one foe: the aimed slot's, else the best foe's (the only foe left is the aim). */
+function aimedRead(board: HintBoard, tokens: string[], attacker: Pokemon, targetLoc: number): PartRead {
+  const { battle, foeActives, foes } = board;
+  let damage: number;
+  let foe: Pokemon | undefined;
+  if (Number.isFinite(targetLoc) && targetLoc > 0) {
+    const aimed = foeActives[targetLoc - 1];
+    foe = aimed && !aimed.fainted ? aimed : undefined;
+    damage = foe ? singleMoveFraction(attacker, foe, tokens[1], battle) : 0;
+  } else {
+    damage = Math.max(...foes.map(each => singleMoveFraction(attacker, each, tokens[1], battle)));
+    if (foes.length === 1) foe = foes[0];
+  }
+  const hint = tokens[1] === 'fakeout' && attacker.activeMoveActions === 0 ? damage + FLINCH_BONUS : damage;
+  const read: PartRead = { ...plainRead(hint), attack: hint };
+  if (foe) {
+    read.foeSlot = foeActives.indexOf(foe) + 1;
+    read.foeHp = foe.hp / foe.maxhp;
+    read.damage = damage;
+  }
+  return read;
+}
+
+function partRead(board: HintBoard, part: string, partIndex: number): PartRead {
   const tokens = part.trim().split(' ');
-  if (tokens[0] === 'switch') return switchHint(board, tokens);
-  if (tokens[0] !== 'move') return 0;
+  if (tokens[0] === 'switch') return plainRead(switchHint(board, tokens));
+  if (tokens[0] !== 'move') return plainRead(0);
   return moveHint(board, tokens, partIndex);
+}
+
+/**
+ * Round 69 (T42, decision 15): what the two parts of a combined option do
+ * together. Two attacks on one foe that only the pair KOs count the KO bonus;
+ * a redirection move is priced as the damage of the partner it covers (never
+ * below its own hint); a Protect that denies a pair-only KO carries its tempo.
+ * Singles options have one part: this never applies there.
+ */
+function pairTerms(reads: PartRead[]): number {
+  if (reads.length !== 2) return 0;
+  const [a, b] = reads;
+  let extra = a.tempo + b.tempo;
+  if (a.redirect) extra += Math.max(0, b.attack - a.hint);
+  if (b.redirect) extra += Math.max(0, a.attack - b.hint);
+  if (a.foeSlot > 0 && a.foeSlot === b.foeSlot && a.damage > 0 && b.damage > 0) {
+    const hp = a.foeHp;
+    if (a.damage < hp && b.damage < hp && a.damage + b.damage >= hp) extra += PAIR_KO_BONUS;
+  }
+  return extra;
 }
 
 /** Summed per-slot static threat hints for combined doubles options. */
@@ -233,9 +326,9 @@ function partHint(board: HintBoard, part: string, partIndex: number): number {
  * so a part's hint is a function of the position, the side, the slot and the
  * part. Singles hint each position and side once and keep their path.
  */
-const partHints = new WeakMap<SimPosition, Map<string, number>>();
+const partHints = new WeakMap<SimPosition, Map<string, PartRead>>();
 
-function partMemo(position: SimPosition): Map<string, number> {
+function partMemo(position: SimPosition): Map<string, PartRead> {
   let memo = partHints.get(position);
   if (!memo) {
     memo = new Map();
@@ -251,17 +344,19 @@ export function combinedOptionHints(
 ): number[] {
   const memo = partMemo(position);
   let board: HintBoard | null = null;
-  return options.map(option =>
-    option.choice.split(',').reduce((sum, part, partIndex) => {
+  return options.map(option => {
+    const reads = option.choice.split(',').map((part, partIndex) => {
       const key = `${side}:${partIndex}:${part}`;
-      let hint = memo.get(key);
-      if (hint === undefined) {
+      let read = memo.get(key);
+      if (read === undefined) {
         board ??= hintBoard(position, side);
-        hint = partHint(board, part, partIndex);
-        memo.set(key, hint);
+        read = partRead(board, part, partIndex);
+        memo.set(key, read);
       }
-      return sum + hint;
-    }, 0));
+      return read;
+    });
+    return reads.reduce((sum, read) => sum + read.hint, 0) + pairTerms(reads);
+  });
 }
 
 /** Static hints for singles options: damage fraction for moves, threat differential for switches. */
