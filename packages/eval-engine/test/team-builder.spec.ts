@@ -205,8 +205,10 @@ describe('team builder edited assumptions', () => {
     const lando = teams.p2Team.find(set => set.species === 'Landorus-Therian')!;
     const landoAtk = lando.evs.atk ?? 0;
     const uxieBulk = (uxie!.evs.hp ?? 0) + (uxie!.evs.def ?? 0);
-    // At least one side of the U-turn pair moved to explain the observed 31%.
-    expect(landoAtk === 0 || uxieBulk > 252).toBe(true);
+    // At least one side of the U-turn pair moved to explain the observed 31%. Round 69 (T132): the species-shaped
+    // guesses carry 252 Spe on both and no order measures Uxie's, so the budget holds it beside the 252 HP and the
+    // pair explains the line with Landorus's Attack at 80 instead of 0 (it was 0 when the Speed gave way).
+    expect(landoAtk < 252 || uxieBulk > 252).toBe(true);
   });
 
   test('coherence vetoes drop a boost-contradicting usage fill and refill from the pool', () => {

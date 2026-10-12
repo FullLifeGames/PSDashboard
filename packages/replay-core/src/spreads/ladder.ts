@@ -247,6 +247,18 @@ function releasedRung(ctx: LadderContext, options: RungOption[], claimed: Partia
   return expressed(evs, claimed, ctx.fixed) ? { evs, nature } : null;
 }
 
+/**
+ * Round 69 (T132 point 1, spec decision 12): a Speed no move order measures keeps the prior. Damage carries no Speed
+ * information, yet the budget gave the prior's Speed EVs to an offense or bulk claim for a fit-error difference of
+ * 0.00004 to 0.00024 (562428 Victini, 2663108091 Samurott-Hisui, 750540 Iron Boulder: 25 bank sets). The EVs are fixed
+ * like the log's HP, a claim the budget cannot express beside them is not offered, and the Speed is kept for the
+ * nature policy (bulk natures never take it, the offense nature opens beside it: T26). A Speed a satisfied or
+ * unrepairable order kept already (`keep`) stays round 41's, which lets a measured offense release it.
+ */
+function unmeasuredTempo(prior: SpreadCandidate, hasSpeedObs: boolean, keep: ReadonlySet<keyof PokemonEvs>): boolean {
+  return !hasSpeedObs && !keep.has('spe') && (prior.evs.spe ?? 0) > 0;
+}
+
 export function candidateLadder(
   prior: SpreadCandidate,
   physicalAttacker: boolean,
@@ -257,6 +269,9 @@ export function candidateLadder(
   keep: ReadonlySet<keyof PokemonEvs> = new Set(),
   fixed: Partial<PokemonEvs> = {},
 ): CandidateRung[] {
+  const held = unmeasuredTempo(prior, hasSpeedObs, keep);
+  const keptAll = held ? new Set([...keep, 'spe' as const]) : keep;
+  const fixedAll = held ? { ...fixed, spe: prior.evs.spe } : fixed;
   const max = budget.perStat;
   const offenseStat = physicalAttacker ? 'atk' : 'spa';
   const offense = offenseRungs(offenseStat, physicalAttacker ? 'Adamant' : 'Modest', max, hasAttackerObs);
@@ -266,9 +281,9 @@ export function candidateLadder(
   const measured = measuredStats(offenseStat, hasAttackerObs, hasDefenderObs, hasSpeedObs);
   const priorPlus = NATURE_PLUS[toId(prior.nature)];
   const ctx: LadderContext = {
-    prior, budget, fixed, keep, offenseStat, priorPlus,
+    prior, budget, fixed: fixedAll, keep: keptAll, offenseStat, priorPlus,
     priorNature: priorPlus && measured.has(priorPlus) ? 'Hardy' : prior.nature,
-    slowKept: keep.has('spe') && Dex.natures.get(prior.nature).minus === 'spe',
+    slowKept: keptAll.has('spe') && Dex.natures.get(prior.nature).minus === 'spe',
   };
   const rungs = priorRungs(ctx);
   for (const o of offense) {

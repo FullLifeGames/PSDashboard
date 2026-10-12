@@ -437,7 +437,9 @@ describe('evidence that cannot measure keeps the prior', () => {
         hit(magnezone, { ...garchomp, evs: bulky }, 'Flash Cannon'),
       ];
       const weak = inferSpreads(measured, sets, formatid).get('p2:garchomp');
-      expect(weak?.evs.atk).toBe(0);
+      // Round 69 (T132): the unmeasured Speed keeps its 252 EVs, so the offense goes down to what the budget leaves.
+      expect(weak?.evs.atk).toBeLessThanOrEqual(4);
+      expect(weak?.evs.spe).toBe(252);
     });
   }
 
@@ -471,10 +473,11 @@ describe('evidence that cannot measure keeps the prior', () => {
       };
       expect(solved.get('p1:toxapex')?.item).toBe('Choice Scarf');
       expect(speedOf('p1', sets.p1[0]) * 1.5).toBeGreaterThan(speedOf('p2', sets.p2[0]));
-      // Control: without the order the same lines buy full bulk and Speed gives way.
+      // Control: without the order nothing measures Speed, so the same lines leave the prior's 252 Spe alone
+      // (round 69, T132: they used to buy full bulk with it); the order is what lowers it above.
       const free = inferSpreads(observations, sets, formatid, []).get('p2:garchomp');
-      expect(free?.evs.spd).toBe(252);
-      expect(free?.evs.spe ?? 0).toBeLessThan(252);
+      expect(free?.evs.spe ?? 252).toBe(252);
+      expect(solved.get('p2:garchomp')?.evs.spe ?? 252).toBeLessThan(free?.evs.spe ?? 252);
     });
   }
 
@@ -503,10 +506,11 @@ describe('evidence that cannot measure keeps the prior', () => {
     const solved = inferSpreads(observations, sets, 'gen9ou', [order]).get('p2:garchomp');
     expect(solved?.evs.spe).toBe(252);
     expect(solved?.nature).toBe('Jolly');
-    // Control: without any order, damage-fitted bulk may still take the Speed (unchanged rule).
+    // Control: without any order the Speed stays too, since nothing measures it (round 69, T132; round 40 let
+    // damage-fitted bulk take it here, 252 HP and 4 Spe). The satisfied order above is no longer what protects it.
     const free = inferSpreads(observations, sets, 'gen9ou', []).get('p2:garchomp');
-    expect(free?.evs.hp).toBe(252);
-    expect(free?.evs.spe ?? 0).toBeLessThan(252);
+    expect(free?.evs.spe ?? 252).toBe(252);
+    expect(free?.nature ?? 'Jolly').toBe('Jolly');
   });
 
   test("the log's max HP fixes the HP EVs, and Speed outlasts a knock-out-only offense (573756 Garchomp)", () => {
@@ -572,9 +576,10 @@ describe('evidence that cannot measure keeps the prior', () => {
   });
 
   test('a fixed HP is never shaved for a bulk rung the damage lines ask for', () => {
-    // Truth: 208 HP / 252 SpD; the lines want SpD, the log fixes HP at 208.
+    // Truth: 208 HP / 252 SpD; the lines want SpD, the log fixes HP at 208. Round 69 (T132): the prior carries the
+    // truth's 48 Spe, because a Speed no order measures keeps its EVs and the bulk claim then needs room beside it.
     const truth = { hp: 208, atk: 0, def: 0, spa: 0, spd: 252, spe: 48 };
-    const garchomp = mon('Garchomp', 'p2', 'Jolly', offensive);
+    const garchomp = mon('Garchomp', 'p2', 'Jolly', { ...offensive, spe: 48 });
     const clefable = mon('Clefable', 'p1', 'Bold', { hp: 252, atk: 0, def: 252, spa: 0, spd: 4, spe: 0 });
     const magnezone = mon('Magnezone', 'p1', 'Modest', { hp: 0, atk: 0, def: 4, spa: 252, spd: 0, spe: 252 }, 'Choice Specs');
     const sets = {
@@ -592,5 +597,12 @@ describe('evidence that cannot measure keeps the prior', () => {
     expect(solved?.evs.hp).toBe(208);
     expect(solved?.evs.spd).toBe(252);
     expect(Object.values(solved?.evs ?? {}).reduce((sum, value) => sum + value, 0)).toBeLessThanOrEqual(508);
+    // With the offensive prior's 252 Spe the 252-SpD claim has no room beside the fixed HP: the Speed stays (T132),
+    // and the log's HP is still not shaved.
+    const fast = { p1: sets.p1, p2: [asSet(mon('Garchomp', 'p2', 'Jolly', offensive), ['Earthquake'])] };
+    const kept = inferSpreads(observations, fast, 'gen9ou', [], new Map(), maxHp).get('p2:garchomp');
+    expect(kept?.evs.hp).toBe(208);
+    expect(kept?.evs.spe).toBe(252);
+    expect(Object.values(kept?.evs ?? {}).reduce((sum, value) => sum + value, 0)).toBeLessThanOrEqual(508);
   });
 });

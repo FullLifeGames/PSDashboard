@@ -73,8 +73,16 @@ describe('a kept Speed gives way to a measured offense (round 41)', () => {
     // Round 69 (T26): the kept Speed no longer blocks the offense nature. Round 40 held Jolly here and paid 10 % of
     // the lines (the top roll on Toxapex lies above what a Jolly body deals); the order still holds at Adamant.
     expect(noHp?.nature).toBe('Adamant');
+    // Round 69 (T132): without the order nothing measures the prior's 252 Spe, so the log's HP and the offense
+    // claim no longer take its room; round 41 had the fit "already right" with the Speed at 4. A prior whose Speed
+    // is the truth's 4 still solves the bulky attacker.
     const noOrder = inferSpreads(observations, sets, 'gen9ou', [], new Map(), maxHp420).get('p2:garchomp');
-    expect(noOrder?.evs).toEqual(bulkyAttacker);
+    expect(noOrder?.evs.spe).toBe(252);
+    expect(noOrder?.evs.hp).toBe(252);
+    expect(evTotal(noOrder?.evs)).toBeLessThanOrEqual(508);
+    const slowPrior = { p1: sets.p1, p2: [asSet({ ...garchomp, evs: { ...offensive, spe: 4 } }, ['Earthquake', 'Swords Dance'])] };
+    const slow = inferSpreads(observations, slowPrior, 'gen9ou', [], new Map(), maxHp420).get('p2:garchomp');
+    expect(slow?.evs).toEqual(bulkyAttacker);
   });
 
   test('a bulk claim beside an expressed offense claim does not release the kept Speed', () => {
