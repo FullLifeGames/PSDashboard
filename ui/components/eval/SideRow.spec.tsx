@@ -127,4 +127,16 @@ describe('SideRow', () => {
     expect(screen.getByText('· partner unseen')).toBeInTheDocument();
     expect(screen.getByText('± hinges on Kingambit')).toHaveAttribute('title', 'The verdict depends on a guessed item: Leftovers: fine · Air Balloon: mistake');
   });
+  test('the hindsight line shows only for a read that cleared the gate (T64), on a clean row and a mistaken one', () => {
+    const line = 'Against Iron Head, switching to Heatran was worth +28% more.';
+    const read = { response: '→ Heatran', against: 'Iron Head', gain: 0.56 };
+    const { rerender } = render(<SideRow name="Alice" side={sideAnalysis({ hindsightRead: { ...read, shown: true, line } })} />);
+    expect(screen.getByText(line)).toBeInTheDocument();
+    // A read the gate held back (few visits, or too close to the regret) says nothing on the row.
+    rerender(<SideRow name="Alice" side={sideAnalysis({ hindsightRead: read })} />);
+    expect(screen.queryByText(line)).toBeNull();
+    expect(screen.queryByText(/was worth/)).toBeNull();
+    rerender(<SideRow name="Alice" side={misplayedSide('mistake', { hindsightRead: { ...read, shown: true, line } })} />);
+    expect(screen.getByText(line)).toBeInTheDocument();
+  });
 });

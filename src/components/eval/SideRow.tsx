@@ -233,6 +233,20 @@ function ComparisonRows({ name, side, played, best, difference, onExplore }: Pic
   );
 }
 
+/** Round 69 (T64): the number against the reply the opponent really clicked, once the engine's gate let it through. */
+function HindsightRow({ line }: { line: string }) {
+  return (
+    <div className="ps-eval-analysis-row">
+      <span
+        style={{ color: '#cde' }}
+        title="Worked out on the matrix cell of the opponent's actual reply, shown when it lies clear of the regret and rests on enough search."
+      >
+        {line}
+      </span>
+    </div>
+  );
+}
+
 /** One tracked side of an analyzed turn: what it played, the engine's line, the verdict, and the comparison. */
 export function SideRow({ name, side, onExplore, lostGround }: RowProps) {
   const regretful = side.tier === 'mistake' || side.tier === 'blunder';
@@ -250,6 +264,7 @@ export function SideRow({ name, side, onExplore, lostGround }: RowProps) {
       {regretful && side.played && side.best && (
         <ComparisonRows name={name} side={side} played={side.played} best={side.best} difference={difference} onExplore={onExplore} />
       )}
+      {side.hindsightRead?.shown && side.hindsightRead.line && <HindsightRow line={side.hindsightRead.line} />}
     </div>
   );
 }
