@@ -1,4 +1,5 @@
 import { Pokemon, Move, Field, calculate } from '@smogon/calc';
+import { buildCalcPokemon, calcBaseStats, calcKnowsMove } from '../calc-build.ts';
 import { calcGenerationFor, calcModOf, simGenNum, type CalcGeneration } from '../calc-gen.ts';
 import { Dex } from '@pkmn/dex';
 import type { PokemonSet } from '@pkmn/sim';
@@ -97,9 +98,9 @@ export function setOf(ctx: SolveContext, side: 'p1' | 'p2', species: string): Po
 /** The species' base HP (the set's species, else the key's) and its HP IV (31 on Stat Points), for the max-HP inversion. */
 export function hpBasisOf(ctx: SolveContext, side: 'p1' | 'p2', species: string): { baseHp: number; iv: number } | undefined {
   const set = setOf(ctx, side, species);
-  const data = ctx.gen.species.get(toId(set?.species ?? species) as Parameters<typeof ctx.gen.species.get>[0]);
-  if (!data) return undefined;
-  return { baseHp: data.baseStats.hp, iv: calcIvs(set?.ivs, ctx.budget)?.hp ?? 31 };
+  const baseStats = calcBaseStats(ctx.gen, set?.species ?? species);
+  if (!baseStats) return undefined;
+  return { baseHp: baseStats.hp, iv: calcIvs(set?.ivs, ctx.budget)?.hp ?? 31 };
 }
 
 /** The sets with every spread on the budget's scale: a Stat Point solve never reads EVs as points (round 67). */
@@ -172,7 +173,7 @@ export function spreadFor(ctx: SolveContext, side: 'p1' | 'p2', species: string)
 /** A body as the calculator reads it: the spread itself, Stat Points in evs for Champions' generation 0, which ignores IVs (round 68, T186). */
 function calcPokemon(ctx: SolveContext, side: 'p1' | 'p2', species: string, spread: SpreadCandidate, obsBoosts: Record<string, number>, status: string) {
   const set = setOf(ctx, side, species);
-  return new Pokemon(ctx.gen, set?.species ?? species, {
+  return buildCalcPokemon(ctx.gen, set?.species ?? species, {
     level: set?.level || 100,
     ability: set?.ability || undefined,
     item: set?.item || undefined,
@@ -197,6 +198,8 @@ function rollRange(ctx: SolveContext, obs: DamageObservation, attackerSpread: Sp
   const calcMoveId = obs.moveId === 'hiddenpower'
     ? typedHiddenPowerId(setOf(ctx, obs.attackerSide, obs.attackerSpecies)?.moves ?? []) ?? obs.moveId
     : obs.moveId;
+  // A move the calculator's generation lacks (Pound in Champions' generation 0) builds as a 0-damage Status move: no judgment, no miss.
+  if (!calcKnowsMove(gen, calcMoveId)) return null;
   const result = calculate(gen, attacker, defender, new Move(gen, calcMoveId), new Field({
     weather: weatherFor(obs.weather),
     defenderSide: {
@@ -250,7 +253,7 @@ export function speedStat(ctx: SolveContext, side: 'p1' | 'p2', species: string,
   const ivs = spread.ivs ?? set?.ivs;
   for (const candidate of [name, name.split('-')[0]]) {
     try {
-      return new Pokemon(ctx.gen, candidate, { level: set?.level || 100, nature: spread.nature, evs, ivs }).stats.spe;
+      return buildCalcPokemon(ctx.gen, candidate, { level: set?.level || 100, nature: spread.nature, evs, ivs }).stats.spe;
     } catch {
       // Unknown forme: try the base species.
     }

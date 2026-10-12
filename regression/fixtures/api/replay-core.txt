@@ -1,4 +1,5 @@
 type CalcGeneration
+type CalcPokemonOptions
 type ChaosStatsPayload
 type DamageObservation
 type EvBudget
@@ -27,6 +28,7 @@ type SideId
 type SideSnapshot
 type SmogonSetAssumptions
 type SmogonUsageStats
+type SpeciesDex
 type SpeciesUsageSet
 type SpeedKnowledge
 type SpeedKnowledgeMap
@@ -49,11 +51,15 @@ value applyInferredSpreads
 value applyPastedTeam
 value applyTeamSheetToInfo
 value broughtSpeciesFor
+value buildCalcPokemon
 value buildTeamsFromReplay
+value calcBaseStats
 value calcEvs
 value calcGenerationFor
 value calcIvs
+value calcKnowsMove
 value calcModOf
+value calcSpecies
 value countMatchingSpecies
 value enrichPokemonInfo
 value enrichTeamInfo
@@ -91,6 +97,7 @@ value simGenNum
 value solveReplaySpreads
 value sourceDetail
 value speciesBaseId
+value speciesOverrides
 value splitReplayPassword
 value toId
 value typedHiddenPowerId

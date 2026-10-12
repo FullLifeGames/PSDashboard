@@ -1,4 +1,5 @@
 import { calculate, Field, Move, Pokemon } from '@smogon/calc';
+import { buildCalcPokemon, calcKnowsMove } from '../calc-build.ts';
 import { calcGenerationFor, calcModOf, type CalcGeneration } from '../calc-gen.ts';
 import { Dex } from '@pkmn/sim';
 import type { HitParty, LoggedHit, OpponentTeamInfo, PokemonEvs, RevealedPokemonInfo } from '../types.ts';
@@ -111,7 +112,7 @@ function extremes(stat: Stat | null): { strong: Spread; weak: Spread } {
 
 /** A calculator Pokémon at the hit's HP. */
 function calcPokemon(gen: CalcGen, party: HitParty, options: CalcOptions): Pokemon {
-  const mon = new Pokemon(gen, party.species, {
+  const mon = buildCalcPokemon(gen, party.species, {
     ...options, level: party.level, boosts: party.boosts, status: (party.status || undefined) as CalcOptions['status'],
     teraType: party.tera as CalcOptions['teraType'], gender: (party.gender || undefined) as CalcOptions['gender'],
     alliesFainted: party.alliesFainted, boostedStat: (party.boostedStat || undefined) as CalcOptions['boostedStat'],
@@ -143,6 +144,8 @@ function rolls(gen: CalcGen, hit: LoggedHit, attacker: CalcOptions, defender: Ca
     });
     // A spread move the log shows without [spread] hit one target: no spread factor. The calculator
     // rebuilds the move from its name and overrides, so the target goes in as an override.
+    // A move the generation lacks (Pound in Champions' generation 0) builds as a 0-damage Status move: the hit cannot judge.
+    if (!calcKnowsMove(gen, hit.move)) return null;
     const named = new Move(gen, hit.move);
     const move = hit.doubles && !hit.spread && SPREAD_TARGETS.has(named.target)
       ? new Move(gen, hit.move, { overrides: { target: 'normal' } })
