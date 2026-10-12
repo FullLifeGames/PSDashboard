@@ -41,6 +41,12 @@ export interface CalcBody {
    * picker or a built set carries no simulator flags and leaves it undefined, which keeps the stage (T156).
    */
   entryStage?: boolean;
+  /**
+   * The calc's abilityOn for this body, set only on the body a Tera click makes when the click clears a weather or a
+   * terrain that stands (Teraform Zero, T152; calc/tera-click.ts): the calc then clears its field too. A body on the
+   * field never carries it, because the simulator cleared the field when it clicked.
+   */
+  abilityOn?: boolean;
   /** The stat a Paradox ability's volatile raises (T76). */
   boostedStat?: string;
   /** Supreme Overlord's fallen (T76). */
@@ -330,7 +336,7 @@ export function calcPokemon(gen: CalcGen, body: CalcBody): CalcPokemon {
   return buildCalcPokemon(gen, body.species, {
     level: body.level,
     ability: ability as never,
-    ...(entersWithStage(gen, body, ability, species) ? { abilityOn: true } : {}),
+    ...(body.abilityOn || entersWithStage(gen, body, ability, species) ? { abilityOn: true } : {}),
     item: (body.item || undefined) as never,
     nature: (body.nature || undefined) as never,
     evs: body.evs,

@@ -81,18 +81,20 @@ type CalcGen = ReturnType<typeof calcGeneration>;
 /**
  * The info's body for the calc: an armed Tera toggle reads as the
  * simulator's click makes it (round 67: Terapagos-Terastal clicks into
- * Terapagos-Stellar, an Ogerpon into its -Tera forme; calc/tera-click.ts).
+ * Terapagos-Stellar, an Ogerpon into its -Tera forme; calc/tera-click.ts). The click goes into the context's weather and
+ * terrain, which Terapagos-Stellar's Teraform Zero clears (round 69, T152).
  */
-const bodyFor = (gen: CalcGen, info: SimPokemonInfo) => teraClicked(simGenNum(gen), bodyFromInfo(info));
+const bodyFor = (gen: CalcGen, info: SimPokemonInfo, context: DamageCalcContext = {}) =>
+  teraClicked(simGenNum(gen), bodyFromInfo(info), { weather: toConditionId(context.weather), terrain: toConditionId(context.terrain) });
 
 /** A calc Pokémon from the branch's live info, through the engine's one builder (calc/body.ts). */
-function calcPokemonFrom(gen: CalcGen, info: SimPokemonInfo): Pokemon {
-  return calcPokemon(gen, bodyFor(gen, info));
+function calcPokemonFrom(gen: CalcGen, info: SimPokemonInfo, context: DamageCalcContext = {}): Pokemon {
+  return calcPokemon(gen, bodyFor(gen, info, context));
 }
 
 /** Whether the move does damage to this Pokémon at all (the calc reads immunities, and Protect when it stands). */
 function landsOn(gen: CalcGen, attacker: SimPokemonInfo, target: SimPokemonInfo, moveName: string, context: DamageCalcContext, isProtected: boolean): boolean {
-  const result = calculate(gen, calcPokemonFrom(gen, attacker), calcPokemonFrom(gen, target), calcMove(gen, moveName, bodyFor(gen, attacker)), calcField(context, isProtected));
+  const result = calculate(gen, calcPokemonFrom(gen, attacker, context), calcPokemonFrom(gen, target, context), calcMove(gen, moveName, bodyFor(gen, attacker)), calcField(context, isProtected));
   return result.range()[1] > 0;
 }
 
@@ -276,11 +278,11 @@ export function calcSingleDamageRange(
   try {
     const gen = calcGeneration(context, attacker.mod);
     const overrides = moveLanding(gen, attacker, moveOption, context);
-    const atkBody = attackerAtUse(simGenNum(gen), bodyFor(gen, attacker), moveOption.name);
+    const atkBody = attackerAtUse(simGenNum(gen), bodyFor(gen, attacker, context), moveOption.name);
     const priceAt = (hits?: number, isStellarFirstUse = false): CalcResult => calculate(
       gen,
       calcPokemon(gen, atkBody),
-      calcPokemonFrom(gen, defender),
+      calcPokemonFrom(gen, defender, context),
       // The attacker's ability and item reach the move too: Skill Link sets five hits.
       calcMove(gen, moveOption.name, atkBody, {
         ability: (attacker.ability || undefined) as CalcAbility,

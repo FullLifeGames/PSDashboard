@@ -12,11 +12,22 @@ import { bodyOf, type SimBody } from './body.ts';
  * already clicked Ogerpon-*-Tera would get its Embody stage a second time).
  * Two memos: per species and Tera type whether the click changes the forme
  * at all, then per whole body for the formes that change.
+ *
+ * Round 69 (T152): Terapagos-Stellar's Teraform Zero clears the weather and
+ * the terrain on the click (the simulator's onAfterTerastallization), which
+ * the calc does only for a holder with abilityOn. A click into a field that
+ * stands is asked of a second twin with that field set, and the body it makes
+ * carries abilityOn when the field is gone after the click; nothing else
+ * reads the ability's name.
  */
 
 type Clicked = Pick<SimBody, 'species' | 'ability' | 'abilityId' | 'boosts' | 'hp' | 'maxhp'>;
 
+/** The weather and terrain a click goes into (sim ids; empty or absent for none). */
+export interface ClickField { weather?: string; terrain?: string }
+
 const changesForme = new Map<string, boolean>();
+const clearsFieldMemo = new Map<string, boolean>();
 const clickedBodies = new Map<string, Clicked>();
 
 const FOE: PokemonSet = {
@@ -24,8 +35,8 @@ const FOE: PokemonSet = {
   evs: { hp: 0, atk: 0, def: 0, spa: 0, spd: 0, spe: 0 }, ivs: { hp: 31, atk: 31, def: 31, spa: 31, spd: 31, spe: 31 }, level: 50, gender: '',
 };
 
-/** The simulator's click on a twin of the body, or null when the twin cannot be built (a species this gen lacks). */
-function clickOnTwin(gen: number, body: SimBody): Clicked | null {
+/** A one-Pokémon battle of the body (its stages and HP as they stand), or null when it cannot be built (a species this gen lacks). */
+function twinOf(gen: number, body: SimBody): { twin: Battle; mon: Pokemon } | null {
   const set: PokemonSet = {
     name: body.species, species: body.species, item: body.item, ability: body.ability, moves: ['splash'],
     nature: body.nature || 'Hardy', evs: { ...FOE.evs, ...body.evs }, ivs: { ...FOE.ivs, ...body.ivs }, level: body.level,
@@ -44,6 +55,18 @@ function clickOnTwin(gen: number, body: SimBody): Clicked | null {
     // The body as it stands before the click: its stages and HP.
     Object.assign(mon.boosts, body.boosts);
     mon.hp = body.hp;
+    return { twin, mon };
+  } catch {
+    return null;
+  }
+}
+
+/** The simulator's click on a twin of the body, or null when the twin cannot be built. */
+function clickOnTwin(gen: number, body: SimBody): Clicked | null {
+  const made = twinOf(gen, body);
+  if (!made) return null;
+  const { twin, mon } = made;
+  try {
     twin.actions.terastallize(mon);
     const { atk, def, spa, spd, spe } = mon.boosts;
     return {
@@ -55,6 +78,22 @@ function clickOnTwin(gen: number, body: SimBody): Clicked | null {
   }
 }
 
+/** Does the simulator's click on a twin of the body, standing in this field, leave the weather or the terrain gone? */
+function clearsOnTwin(gen: number, body: SimBody, field: ClickField): boolean {
+  const made = twinOf(gen, body);
+  if (!made) return false;
+  const { twin, mon } = made;
+  try {
+    if (field.weather) twin.field.setWeather(field.weather, 'debug');
+    if (field.terrain) twin.field.setTerrain(field.terrain, 'debug');
+    const stood = !!(twin.field.weather || twin.field.terrain);
+    twin.actions.terastallize(mon);
+    return stood && !twin.field.weather && !twin.field.terrain;
+  } catch {
+    return false;
+  }
+}
+
 /**
  * A battle's Pokémon as an option that clicks its Tera finds it (T84): the
  * body the click makes, from the simulator; as it stands when the option
@@ -62,11 +101,16 @@ function clickOnTwin(gen: number, body: SimBody): Clicked | null {
  */
 export function bodyAsClicked(battle: Battle, mon: Pokemon, clicks: boolean): SimBody {
   const body = bodyOf(battle, mon);
-  return clicks && !mon.terastallized && mon.teraType ? teraClicked(battle.gen, { ...body, tera: mon.teraType }) : body;
+  return clicks && !mon.terastallized && mon.teraType
+    ? teraClicked(battle.gen, { ...body, tera: mon.teraType }, { weather: battle.field.weather, terrain: battle.field.terrain })
+    : body;
 }
 
-/** The body after the Tera click on its `tera` type: as the simulator makes it when the forme changes, else the same body. */
-export function teraClicked<T extends SimBody>(gen: number, body: T): T {
+/**
+ * The body after the Tera click on its `tera` type: as the simulator makes it when the forme changes, else the same
+ * body. `field` is the weather and terrain the click goes into: a click that clears them marks the body abilityOn.
+ */
+export function teraClicked<T extends SimBody>(gen: number, body: T, field: ClickField = {}): T {
   if (!body.tera || gen < 9) return body;
   const formeKey = `${gen}|${body.species}|${body.tera}`;
   let changes = changesForme.get(formeKey);
@@ -84,5 +128,17 @@ export function teraClicked<T extends SimBody>(gen: number, body: T): T {
     after = clicked;
     clickedBodies.set(key, after);
   }
-  return { ...body, ...after };
+  return { ...body, ...after, ...(clearsField(gen, body, field) ? { abilityOn: true } : {}) };
+}
+
+/** One answer per gen, species, Tera type and field: does the click clear the field that stands? */
+function clearsField(gen: number, body: SimBody, field: ClickField): boolean {
+  if (!field.weather && !field.terrain) return false;
+  const key = `${gen}|${body.species}|${body.tera}|${field.weather ?? ''}|${field.terrain ?? ''}`;
+  let clears = clearsFieldMemo.get(key);
+  if (clears === undefined) {
+    clears = clearsOnTwin(gen, body, field);
+    clearsFieldMemo.set(key, clears);
+  }
+  return clears;
 }

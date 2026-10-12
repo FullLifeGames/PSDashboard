@@ -1,5 +1,6 @@
 import type { Battle, Pokemon } from '@pkmn/sim';
 import { sideIndex } from '@fulllifegames/replay-core';
+import { bodyAsClicked } from '../calc/tera-click.ts';
 import { critRate, moveAccuracy, unpriceable } from '../ko-odds.ts';
 import type { KoOddsInfo } from '../types.ts';
 import { parsePairChoice, type PairAction } from './guards.ts';
@@ -42,19 +43,32 @@ function spreadAtStart(battle: Battle, own: 0 | 1, action: MoveAction, targets: 
   return targets.length + allies > 1;
 }
 
-/** One slot's event; a slot that clicks Tera is priced on the body the click makes (round 67, T84). */
-function slotOdds(battle: Battle, attacker: Pokemon, defender: Pokemon, action: MoveAction, spread: boolean): Odds | null {
+/**
+ * One slot's event; a slot that clicks Tera is priced on the body the click makes (round 67, T84). `cleared`: a click of
+ * the option clears the weather and the terrain (Teraform Zero, T152) before any of its slots moves, so every slot meets
+ * the cleared field, the clicking one and its partner alike.
+ */
+function slotOdds(battle: Battle, attacker: Pokemon, defender: Pokemon, action: MoveAction, spread: boolean, cleared: boolean): Odds | null {
   const move = battle.dex.moves.get(action.moveId);
   if (move.category === 'Status' || unpriceable(attacker, defender, move)) return null;
   const crit = critRate(battle.gen, move.critRatio ?? 1);
-  const table = killTable(snapshotPair(battle, attacker, defender, action.moveId, spread, action.tera === true));
+  const snapshot = snapshotPair(battle, attacker, defender, action.moveId, spread, action.tera === true);
+  const table = killTable(cleared ? { ...snapshot, weather: '', terrain: '' } : snapshot);
   if (!table || crit === null) return null;
   const killFraction = (1 - crit) * killCount(table.normal, defender.hp) / 16 + crit * killCount(table.crit, defender.hp) / 16;
-  const accuracy = moveAccuracy(battle, move, attacker, defender);
+  const accuracy = moveAccuracy(battle, move, attacker, defender, cleared ? '' : undefined);
   return {
     accuracy, killFraction, pKill: accuracy * killFraction, label: `${move.name}→${defender.species.name}`,
     attacker: { slot: action.slot, species: attacker.species.name },
   };
+}
+
+/** Does a slot of the option click a Tera that clears the field (the body the click makes carries abilityOn)? */
+function clearsField(battle: Battle, own: 0 | 1, actions: readonly PairAction[]): boolean {
+  return actions.some(action => {
+    const mon = action.kind === 'move' && action.tera ? battle.sides[own].active[action.slot] : null;
+    return !!mon && !mon.fainted && !!bodyAsClicked(battle, mon, true).abilityOn;
+  });
 }
 
 /**
@@ -65,13 +79,15 @@ function slotOdds(battle: Battle, attacker: Pokemon, defender: Pokemon, action: 
  */
 function optionOdds(battle: Battle, own: 0 | 1, choice: string): KoOddsInfo | null {
   const events: { defender: Pokemon; odds: Odds }[] = [];
-  for (const action of parsePairChoice(battle, own, choice) ?? []) {
+  const actions = parsePairChoice(battle, own, choice) ?? [];
+  const cleared = clearsField(battle, own, actions);
+  for (const action of actions) {
     if (action.kind !== 'move') continue;
     const attacker = battle.sides[own].active[action.slot];
     if (!attacker || attacker.fainted) continue;
     const targets = rootTargets(battle, own, action);
     for (const defender of targets) {
-      const odds = slotOdds(battle, attacker, defender, action, spreadAtStart(battle, own, action, targets));
+      const odds = slotOdds(battle, attacker, defender, action, spreadAtStart(battle, own, action, targets), cleared);
       if (odds) events.push({ defender, odds });
     }
   }

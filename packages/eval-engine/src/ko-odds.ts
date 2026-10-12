@@ -126,13 +126,16 @@ function weatherAccuracy(move: DexMove, base: number, weather: string): number {
   return value;
 }
 
-/** Accuracy after weather and stage modifiers; No Guard on either side makes the move sure. */
-export function moveAccuracy(battle: Battle, move: DexMove, attacker: Pokemon, defender: Pokemon): number {
+/**
+ * Accuracy after weather and stage modifiers; No Guard on either side makes the move sure. `weather` is the weather the
+ * move meets when it is not the battle's own: '' after a Tera click that clears it (T152).
+ */
+export function moveAccuracy(battle: Battle, move: DexMove, attacker: Pokemon, defender: Pokemon, weather = battle.field.weather ?? ''): number {
   let accuracy: number;
   if (move.accuracy === true) {
     accuracy = 1;
   } else {
-    const base = weatherAccuracy(move, move.accuracy / 100, battle.field.weather ?? '');
+    const base = weatherAccuracy(move, move.accuracy / 100, weather);
     const stages = (attacker.boosts.accuracy ?? 0) - (defender.boosts.evasion ?? 0);
     accuracy = Math.min(1, base * accuracyStageMultiplier(stages));
   }
@@ -188,12 +191,10 @@ export function boundaryEvent(
   const move = battle.dex.moves.get(moveId);
   if (unpriceable(attacker, defender, move)) return null;
 
-  // Accuracy first — shared by damaging and status branches.
-  const accuracy = moveAccuracy(battle, move, attacker, defender);
-
   if (move.category === 'Status') {
     // Accuracy-only event: the hit/miss split is pure table arithmetic;
     // the status effect's consequences live inside the outcome classes.
+    const accuracy = moveAccuracy(battle, move, attacker, defender);
     if (accuracy >= 1) return null;
     return { accuracy, killFraction: 0, pKill: 0, normalKillRolls: 0, critKillRolls: 0 };
   }
@@ -202,6 +203,8 @@ export function boundaryEvent(
     attacker: attackerAtUse(genNum, bodyAsClicked(battle, attacker, !!tera.attacker), move.name),
     defender: bodyAsClicked(battle, defender, !!tera.defender),
   };
+  // A click that clears the weather (Teraform Zero) comes before every move of the turn, the accuracy roll included.
+  const accuracy = moveAccuracy(battle, move, attacker, defender, bodies.attacker.abilityOn || bodies.defender.abilityOn ? '' : undefined);
   const rolls = damageKillFraction(genNum, battle, move, bodies, defender);
   if (rolls === null) return null;
   return { accuracy, ...rolls, pKill: accuracy * rolls.killFraction };
