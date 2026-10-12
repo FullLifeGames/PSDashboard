@@ -210,9 +210,14 @@ export function selectCuratedSet(
   evidence: CuratedEvidence,
 ): CuratedSetAssumption | null {
   const best = bestCandidate(candidates, evidence, true);
-  if (!best) return null;
-  const resolved = withItemSlotResolved(withSlotsResolved(best, evidence), evidence);
   const unruled = bestCandidate(candidates, evidence, false);
+  if (!best) {
+    // Every published set that fits the moves lists only items the log rules out (round 69, T166): the set that fits stays
+    // the pick and plays the replacement item of the rule below, or none of it when no replacement is allowed.
+    const replaced = unruled ? withItemAfterRuleOut(withSlotsResolved(unruled, evidence), unruled, evidence) : null;
+    return replaced?.itemReplaced ? replaced : null;
+  }
+  const resolved = withItemSlotResolved(withSlotsResolved(best, evidence), evidence);
   return unruled && unruled !== best ? withItemAfterRuleOut(resolved, unruled, evidence) : resolved;
 }
 
