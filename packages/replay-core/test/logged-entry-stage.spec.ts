@@ -18,10 +18,10 @@ import type { DamageObservation, PokemonEvs, RevealedPokemonInfo } from '../src/
  * logged stage plus one more (Def +2); 0.12 adds it only for `abilityOn`, as the simulator gives it once per Pokémon.
  * The oracle is the simulator: a real Gen 9 battle where Zamazenta enters with Dauntless Shield and takes a Garchomp hit.
  *
- * Singles and doubles: the spread solver reads singles only (the parser records a damage observation under `|gametype|singles`
- * and none in doubles, which is why the doubles bank did not move in m1), so the solver test runs on singles and a doubles
- * test pins that premise. The item judge reads the hits of both game types with the same boosts (the `LoggedHit` party boosts),
- * so the calculator-level reading and the judge scene run on both. The doubles hit is Stomping Tantrum, a single-target move
+ * Singles and doubles: the spread solver reads both since round 69 (T31: the parser records a damage observation under
+ * `|gametype|doubles` as well; in m1 it read singles only, which is why the doubles bank did not move), so the solver test runs
+ * on both. The item judge reads the hits of both game types with the same boosts (the `LoggedHit` party boosts), so the
+ * calculator-level reading and the judge scene run on both. The doubles hit is Stomping Tantrum, a single-target move
  * without a secondary effect: Earthquake is a spread move there, and Fire Fang's burn would add end-of-turn damage to the
  * HP the scene reads. On calculator 0.11 (steps/vitest.r68-calc011.config.ts) the rolls tests and the solver test are red;
  * the judge scene stays green there (its margin absorbs the old double stage on this hit) and guards the boosts it hands on.
@@ -119,7 +119,7 @@ describe('a Dauntless Shield stage the log shows is priced once (T186 guard)', (
         // The boosts the solver (singles observation) and the judge (the logged hit, both game types) hand the calculator.
         const hit = inferOpponentTeam(scene.log, 'p1').pokemon.find(mon => mon.species === 'Garchomp')?.hits?.[0];
         expect(hit?.defender.boosts).toEqual({ def: 1 });
-        if (kind === 'singles') expect(hitObservation(scene.log).defenderBoosts).toEqual(hit?.defender.boosts);
+        expect(hitObservation(scene.log).defenderBoosts).toEqual(hit?.defender.boosts);
         const once = rollsOf(hit!.defender.boosts, kind);
         expect(once).toContain(scene.damage);
         // The double count of calculator 0.11: Def +1 from the log plus the calculator's own +1.
@@ -141,21 +141,19 @@ describe('a Dauntless Shield stage the log shows is priced once (T186 guard)', (
     });
   }
 
-  test('singles: the solver reads the played spread of the hit with no error, one with the stage counted twice with some', () => {
-    for (const scene of scenesOf('singles', 4)) {
-      const obs = hitObservation(scene.log);
-      expect(Math.abs(obs.observedFraction - scene.damage / scene.maxHp)).toBeLessThan(0.01);
-      const sets = { p1: [garchomp(MOVE.singles)], p2: [zamazenta()] };
-      const ctx = buildSolveContext([obs], sets, FORMAT.singles, []);
-      expect(observationError(ctx, obs, 'p2:zamazenta', { evs: sp({}), nature: 'Jolly' })).toBe(0);
-      // The same hit read as a defender with Def +2: what a double count makes of the played spread.
-      const doubled: DamageObservation = { ...obs, defenderBoosts: { def: 2 } };
-      expect(observationError(ctx, doubled, 'p2:zamazenta', { evs: sp({}), nature: 'Jolly' })).toBeGreaterThan(0);
-    }
-  });
-
-  test('doubles: the parser gives the solver no damage observation (the premise of the singles-only solver test)', () => {
-    const scene = scenesOf('doubles', 1)[0];
-    expect(parseReplayLogWithObservations(scene.log).observations).toEqual([]);
-  });
+  for (const kind of ['singles', 'doubles'] as const) {
+    test(`${kind}: the solver reads the played spread of the hit with no error, one with the stage counted twice with some`, () => {
+      for (const scene of scenesOf(kind, 4)) {
+        const obs = hitObservation(scene.log);
+        expect(obs.doubles).toBe(kind === 'doubles');
+        expect(Math.abs(obs.observedFraction - scene.damage / scene.maxHp)).toBeLessThan(0.01);
+        const sets = { p1: [garchomp(MOVE[kind])], p2: [zamazenta()] };
+        const ctx = buildSolveContext([obs], sets, FORMAT[kind], []);
+        expect(observationError(ctx, obs, 'p2:zamazenta', { evs: sp({}), nature: 'Jolly' })).toBe(0);
+        // The same hit read as a defender with Def +2: what a double count makes of the played spread.
+        const doubled: DamageObservation = { ...obs, defenderBoosts: { def: 2 } };
+        expect(observationError(ctx, doubled, 'p2:zamazenta', { evs: sp({}), nature: 'Jolly' })).toBeGreaterThan(0);
+      }
+    });
+  }
 });

@@ -1,16 +1,16 @@
-import { Pokemon, Move, Field, calculate } from '@smogon/calc';
+import { Pokemon, calculate } from '@smogon/calc';
 import { buildCalcPokemon, calcBaseStats, calcKnowsMove } from '../calc-build.ts';
 import { calcGenerationFor, calcModOf, simGenNum, type CalcGeneration } from '../calc-gen.ts';
 import { Dex } from '@pkmn/dex';
 import type { PokemonSet } from '@pkmn/sim';
 import type { DamageObservation, PokemonEvs, SpeedOrderObservation } from '../types.ts';
-import { WEATHER_BY_ID } from '../calc-field.ts';
 import { typedHiddenPowerId } from '../hidden-power.ts';
 import { calcIvs, evBudget, onBudgetScale, statPointsOfEv, ZERO_EVS, type EvBudget } from './ev-budget.ts';
 import type { CandidateRung, SpreadCandidate } from './ladder.ts';
 import type { ItemDecision } from './scarf.ts';
 import type { ObservedMaxHp } from './max-hp.ts';
 import { raceSpeed } from './race-speed.ts';
+import { defenderSideOf, fieldOf, moveOf } from './observation-read.ts';
 import { toId } from '../ids.ts';
 
 /**
@@ -23,13 +23,6 @@ const SPEED_VIOLATION_PENALTY = 1000;
 
 /** HP-bar reading noise (the GPL pipeline is ±1–2%): error inside this slack is free. */
 const OBSERVATION_SLACK = 0.02;
-
-/** Client condition ids the shared calc map doesn't spell out. */
-const WEATHER_ALIASES: Record<string, string> = {
-  sand: 'sandstorm', rain: 'raindance', sun: 'sunnyday',
-};
-
-const weatherFor = (raw: string) => WEATHER_BY_ID[WEATHER_ALIASES[toId(raw)] ?? toId(raw)];
 
 /**
  * An order as the solver reads it (round 64): each mover named by its set,
@@ -139,7 +132,7 @@ export function buildSolveContext(
   const { byMon, speedByMon } = ctx;
 
   for (const obs of observations) {
-    const defenderSide = obs.attackerSide === 'p1' ? 'p2' : 'p1';
+    const defenderSide = defenderSideOf(obs);
     if (setOf(ctx, obs.attackerSide, obs.attackerSpecies) && setOf(ctx, defenderSide, obs.defenderSpecies)) {
       const attackerKey = keyOf(obs.attackerSide, obs.attackerSpecies);
       const defenderKey = keyOf(defenderSide, obs.defenderSpecies);
@@ -186,12 +179,11 @@ function calcPokemon(ctx: SolveContext, side: 'p1' | 'p2', species: string, spre
 }
 
 /** The calc's roll range for one observation under the candidate spread, as HP fractions. */
-function rollRange(ctx: SolveContext, obs: DamageObservation, attackerSpread: SpreadCandidate, defenderSpread: SpreadCandidate): { min: number; max: number } | null {
+export function rollRange(ctx: SolveContext, obs: DamageObservation, attackerSpread: SpreadCandidate, defenderSpread: SpreadCandidate): { min: number; max: number } | null {
   const { gen } = ctx;
-  const defenderSide = obs.attackerSide === 'p1' ? 'p2' : 'p1';
+  const defenderSide = defenderSideOf(obs);
   const attacker = calcPokemon(ctx, obs.attackerSide, obs.attackerSpecies, attackerSpread, obs.attackerBoosts, obs.attackerStatus);
   const defender = calcPokemon(ctx, defenderSide, obs.defenderSpecies, defenderSpread, obs.defenderBoosts, '');
-  const screens = new Set(obs.screens);
   // The protocol records typeless "hiddenpower"; calc it as the SET's
   // resolved variant, or the fit runs the IV-default type against a hit
   // the sim plays typed (653785: Dark-fitted spreads, Ice-rolled sim).
@@ -200,14 +192,7 @@ function rollRange(ctx: SolveContext, obs: DamageObservation, attackerSpread: Sp
     : obs.moveId;
   // A move the calculator's generation lacks (Pound in Champions' generation 0) builds as a 0-damage Status move: no judgment, no miss.
   if (!calcKnowsMove(gen, calcMoveId)) return null;
-  const result = calculate(gen, attacker, defender, new Move(gen, calcMoveId), new Field({
-    weather: weatherFor(obs.weather),
-    defenderSide: {
-      isReflect: screens.has('reflect'),
-      isLightScreen: screens.has('lightscreen'),
-      isAuroraVeil: screens.has('auroraveil'),
-    },
-  }));
+  const result = calculate(gen, attacker, defender, moveOf(gen, calcMoveId, obs), fieldOf(obs));
   const rolls = (Array.isArray(result.damage) ? (result.damage as number[]).flat() : [Number(result.damage)]).map(Number);
   if (rolls.length === 0) return null;
   const maxHp = defender.maxHP();
@@ -216,7 +201,7 @@ function rollRange(ctx: SolveContext, obs: DamageObservation, attackerSpread: Sp
 }
 
 export function observationError(ctx: SolveContext, obs: DamageObservation, candidateKey: string, candidate: SpreadCandidate): number {
-  const defenderSide = obs.attackerSide === 'p1' ? 'p2' : 'p1';
+  const defenderSide = defenderSideOf(obs);
   const attackerKey = keyOf(obs.attackerSide, obs.attackerSpecies);
   const attackerSpread = attackerKey === candidateKey ? candidate : spreadFor(ctx, obs.attackerSide, obs.attackerSpecies);
   const defenderKey = keyOf(defenderSide, obs.defenderSpecies);

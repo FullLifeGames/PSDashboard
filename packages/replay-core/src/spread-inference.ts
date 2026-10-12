@@ -7,6 +7,7 @@ import {
   type SolveContext,
 } from './spreads/fit.ts';
 import { decideScarfs, type SpeedKnowledgeMap } from './spreads/scarf.ts';
+import { defenderSideOf } from './spreads/observation-read.ts';
 import { hpEvsForMaxHp, type ObservedMaxHp } from './spreads/max-hp.ts';
 import { readableOrders, settledSets } from './spreads/order-limit.ts';
 
@@ -192,7 +193,7 @@ function evidenceFor(ctx: SolveContext, key: string): MonEvidence {
     // offense — the prior's investment stands instead of yielding to bulk.
     hasOffenseEvidence: attackerObs.some(obs => !obs.lethal),
     attacked: attackerObs.length > 0,
-    hasDefenderObs: observations.some(obs => keyOf(obs.attackerSide === 'p1' ? 'p2' : 'p1', obs.defenderSpecies) === key),
+    hasDefenderObs: observations.some(obs => keyOf(defenderSideOf(obs), obs.defenderSpecies) === key),
     hasSpeedObs: (ctx.speedByMon.get(key) ?? []).length > 0,
     fixedHp: measuredHpEvs(ctx, key),
   };
