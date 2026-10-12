@@ -7,7 +7,7 @@ import type { TeraAllowance } from '../types.ts';
 import { makeNode, type Node } from './mcts-node.ts';
 import { classKeyOf, makeChanceNode, type TreeChild } from './chance-node.ts';
 import { classChildren, groupedChildren, type OutcomeChildren } from './outcome-children.ts';
-import { SEARCH_SEEDS, treeSeed } from './leaf.ts';
+import { SEARCH_SEEDS, speedTie, treeSeed } from './leaf.ts';
 
 /**
  * Round 43: how a tree cell expands. In the first two plies every tree
@@ -66,7 +66,17 @@ function rootEvents(book: RootClassBook, key: number, p1Choice: string, p2Choice
   return events;
 }
 
-/** One child from a plain advance; a root boundary cell records the drawn class from the log. */
+/** The side whose move line the log shows first (the sampler's order prefix of a tied cell), null when neither moved. */
+function movedFirst(log: string[]): 'p1' | 'p2' | null {
+  const line = log.find(entry => entry.startsWith('|move|p1a:') || entry.startsWith('|move|p2a:'));
+  return line ? (line.startsWith('|move|p1a:') ? 'p1' : 'p2') : null;
+}
+
+/**
+ * One child from a plain advance; a root boundary cell records the drawn class from the log. Round 69 (T146 c5): a
+ * tied singles cell's sampler classes carry the order (`p1:hit-kill|none`), so the drawn class names the order the
+ * coin flip gave this tree, and the merge finds the class its pool belongs to.
+ */
 function singleChild(
   node: Node, p1Choice: string, p2Choice: string, seed: PRNGSeed, ctx: ExpansionContext, book: RootClassBook | undefined, key: number,
 ): Expanded {
@@ -75,7 +85,8 @@ function singleChild(
   if (book) {
     const events = rootEvents(book, key, p1Choice, p2Choice);
     const classKey = events ? classifyChild(log, events) : null;
-    if (classKey !== null) book.keys.set(key, classKey);
+    const order = classKey !== null && speedTie(book.battle, p1Choice, p2Choice) ? movedFirst(log) : null;
+    if (classKey !== null) book.keys.set(key, order ? `${order}:${classKey}` : classKey);
   }
   return { child: made, leaf: made.value, boundary: made.boundary };
 }
