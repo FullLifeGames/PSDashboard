@@ -71,6 +71,12 @@ test.describe('PS Dashboard', () => {
     // reference decides the other way; with the state-split verify step (T119)
     // p2 sends Heatran at turn 61 and wins at turn 66. What the pin forbids is
     // the crawl: p2 (Bene) wins the play-out by turn 70.
+    // Round 67 (user gate 11.10., "5b"): at turn 57 Iron Head, Earth Power and
+    // Freeze-Dry lie within 0.01 and the Monte-Carlo reference decides none of
+    // them; the line it plays wins at turn 72 after six p2 switches, the
+    // turn-56 switch into Slowking included (every other turn-57 choice wins by
+    // turn 66). The pin keeps the core: p2 wins by turn 75 with at most six
+    // switches.
     // Nicknames in the history rows: Sludge Shadow = Muk-Alola, Fire Shadow = Heatran.
     test.setTimeout(600_000);
     const draftReplay = JSON.parse(readFileSync(fixturePath('draft-replay.json'), 'utf-8'));
@@ -109,7 +115,8 @@ test.describe('PS Dashboard', () => {
     const lastTurn = Number(/Branching · Turn (\d+)/.exec(await page.getByText(/Branching · Turn \d+/).innerText())?.[1]);
     const line = `ended at turn ${lastTurn}, p2 switches: ${p2Switches.join(', ')}`;
     await expect(page.locator('.ps-ended-tag'), line).toHaveText('Bene wins!');
-    expect(lastTurn, line).toBeLessThanOrEqual(70);
+    expect(lastTurn, line).toBeLessThanOrEqual(75);
+    expect(p2Switches.length, line).toBeLessThanOrEqual(6);
   });
 
   test('the branch sim iframe follows the played variation line', async ({ page }) => {
