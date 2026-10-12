@@ -2,7 +2,8 @@ import { test, expect, describe } from 'vitest';
 import type { Battle, Pokemon, PokemonSet } from '@pkmn/sim';
 import { createMatchupCache, evalFeatures, evaluatePosition, featureWeights, EVAL_WEIGHTS, type EvalFeatures, type StaticRuleset } from '../src/eval-function';
 import { pairThreat } from '../src/score/threat';
-import { removesStages, stageValue } from '../src/score/boost-bite';
+import { removalFormat, removesStages, stageValue } from '../src/score/boost-bite';
+import { loadSimMods } from '../src/forward/sim-mods';
 import { set } from './move-oracle';
 import { battleOf, fingerprint } from './power-oracle';
 
@@ -16,8 +17,12 @@ import { battleOf, fingerprint } from './power-oracle';
  * who moves first, what a move does to a stage) is played in the simulator.
  */
 
+await loadSimMods('gen9championscustomgame');
+
 const SINGLES = 'gen9customgame';
 const DOUBLES = 'gen9doublescustomgame';
+const CHAMPIONS = 'gen9championscustomgame';
+const CHAMPIONS_DOUBLES = 'gen9championsdoublescustomgame';
 const splash = (species: string, extra: Partial<PokemonSet> = {}) => set(species, ['splash'], extra);
 const GARCHOMP = () => set('Garchomp', ['crunch', 'splash']);
 const clefable = (ability: string, moves = ['splash']) => set('Clefable', moves, { ability });
@@ -180,11 +185,12 @@ describe('boostsBiting, doubles', () => {
  * stages are gone (the mon is dragged out, or none is left on it).
  */
 function removedInSim(format: string, moveId: string, benched: boolean): boolean {
-  const doubles = format === DOUBLES;
+  const doubles = format === DOUBLES || format === CHAMPIONS_DOUBLES;
   const target = () => set('Blissey', ['splash']);
   const field = doubles ? 2 : 1;
+  const mover = (moves: string[]) => set('Snorlax', moves, { evs: { hp: 252, atk: 0, def: 0, spa: 0, spd: 0, spe: 0 } });
   const mine = Array.from({ length: benched ? field + 1 + (doubles ? 1 : 0) : field }, target);
-  const theirs = Array.from({ length: mine.length }, (_, index) => (index === 0 ? set('Snorlax', [moveId, 'splash']) : splash('Snorlax')));
+  const theirs = Array.from({ length: mine.length }, (_, index) => (index === 0 ? mover([moveId, 'splash']) : mover(['splash'])));
   const battle = battleOf(format, mine, theirs);
   const boosted = battle.sides[0].active[0]!;
   boosted.boosts.atk = 2;
@@ -210,7 +216,7 @@ describe('removesStages (the move predicate), checked against the simulator', ()
     const moves = dexOf(format).moves.all().filter(playable);
     expect(moves.length).toBeGreaterThan(800);
     const mismatches = moves
-      .filter(move => removesStages(9, move.id, true) !== removedInSim(format, move.id, true))
+      .filter(move => removesStages(SINGLES, move.id, true) !== removedInSim(format, move.id, true))
       .map(move => move.id);
     expect(mismatches).toEqual([]);
   });
@@ -218,7 +224,7 @@ describe('removesStages (the move predicate), checked against the simulator', ()
   test('every gen 9 move, played at a boosted mon with no bench (singles)', () => {
     const moves = dexOf(SINGLES).moves.all().filter(playable);
     const mismatches = moves
-      .filter(move => removesStages(9, move.id, false) !== removedInSim(SINGLES, move.id, false))
+      .filter(move => removesStages(SINGLES, move.id, false) !== removedInSim(SINGLES, move.id, false))
       .map(move => move.id);
     expect(mismatches).toEqual([]);
   });
@@ -227,14 +233,14 @@ describe('removesStages (the move predicate), checked against the simulator', ()
     const forcing = dexOf(SINGLES).moves.all().filter(move => playable(move) && !!move.forceSwitch);
     expect(forcing.length).toBeGreaterThan(2);
     for (const move of forcing) {
-      expect(`${move.id} ${removesStages(9, move.id, true)}`).toBe(`${move.id} true`);
-      expect(`${move.id} ${removesStages(9, move.id, false)}`).toBe(`${move.id} false`);
+      expect(`${move.id} ${removesStages(SINGLES, move.id, true)}`).toBe(`${move.id} true`);
+      expect(`${move.id} ${removesStages(SINGLES, move.id, false)}`).toBe(`${move.id} false`);
     }
   });
 
   test('the rest of the removers are moves with a handler (the Dex has no flag for them)', () => {
     const others = dexOf(SINGLES).moves.all()
-      .filter(move => playable(move) && !move.forceSwitch && removesStages(9, move.id, false));
+      .filter(move => playable(move) && !move.forceSwitch && removesStages(SINGLES, move.id, false));
     expect(others.length).toBeGreaterThan(0);
     for (const move of others) {
       expect(`${move.id} ${typeof move.onHit === 'function' || typeof move.onHitField === 'function'}`).toBe(`${move.id} true`);
@@ -242,9 +248,63 @@ describe('removesStages (the move predicate), checked against the simulator', ()
   });
 
   test('moves that leave the stages alone answer false, and the memo answers the same twice', () => {
-    for (const id of ['splash', 'tackle', 'swordsdance']) expect(removesStages(9, id, true)).toBe(false);
-    expect(removesStages(9, 'haze', true)).toBe(true);
-    expect(removesStages(9, 'haze', true)).toBe(true);
+    for (const id of ['splash', 'tackle', 'swordsdance']) expect(removesStages(SINGLES, id, true)).toBe(false);
+    expect(removesStages(SINGLES, 'haze', true)).toBe(true);
+    expect(removesStages(SINGLES, 'haze', true)).toBe(true);
+  });
+});
+
+describe('the twin battle runs in the mode of the battle it answers for (user 12.10.: the mode decides)', () => {
+  const SP = { hp: 32, atk: 32, def: 0, spa: 0, spd: 0, spe: 0 };
+  const champion = (species: string, moves: string[], ability = 'No Ability') => set(species, moves, { ability, evs: SP, level: 50 });
+  const playable = (move: { exists: boolean; gen: number; isMax?: unknown; isZ?: unknown; id: string }) =>
+    move.exists && move.gen <= 9 && !move.isMax && !move.isZ && move.id !== 'struggle';
+
+  test('removalFormat: a base battle plays its twin on the base custom game, a Champions battle on the Champions custom game, singles or doubles', () => {
+    const base = [SINGLES, DOUBLES].map(format => removalFormat(battleOf(format, [splash('Garchomp'), splash('Snorlax')], [splash('Clefable'), splash('Snorlax')])));
+    expect(base).toEqual([SINGLES, SINGLES]);
+    const champions = [CHAMPIONS, CHAMPIONS_DOUBLES, 'gen9championsou', 'gen9championsvgc2026regmbbo3']
+      .map(format => removalFormat(battleOf(format, [splash('Garchomp'), splash('Snorlax')], [splash('Clefable'), splash('Snorlax')])));
+    expect(champions).toEqual([CHAMPIONS, CHAMPIONS, CHAMPIONS, CHAMPIONS]);
+  });
+
+  test.each([CHAMPIONS, CHAMPIONS_DOUBLES])('every move played at a boosted mon in the Champions mod, with a bench and without (%s)', format => {
+    const dex = battleOf(format, [splash('Pikachu'), splash('Pikachu')], [splash('Pikachu'), splash('Pikachu')]).dex;
+    const moves = dex.moves.all().filter(playable);
+    expect(moves.length).toBeGreaterThan(800);
+    const twin = removalFormat(battleOf(format, [splash('Pikachu'), splash('Pikachu')], [splash('Pikachu'), splash('Pikachu')]));
+    const mismatches = moves
+      .flatMap(move => [true, false].map(benched => ({ move, benched })))
+      .filter(({ move, benched }) => removesStages(twin, move.id, benched) !== removedInSim(format === CHAMPIONS_DOUBLES && !benched ? CHAMPIONS : format, move.id, benched))
+      .map(({ move, benched }) => `${move.id} ${benched}`);
+    expect(mismatches).toEqual([]);
+  });
+
+  test('a Champions singles board: the foe that clicks Haze takes the stage away, the same foe without it does not', () => {
+    const board = (moves: string[]) => {
+      const battle = battleOf(CHAMPIONS, [champion('Garchomp', ['crunch', 'splash'])], [champion('Clefable', moves)]);
+      const attacker = battle.sides[0].active[0]!;
+      attacker.boosts.atk = 2;
+      const foe = battle.sides[1].active[0]!;
+      foe.sethp(biteHp(battle, attacker, foe));
+      return evalFeatures(battle);
+    };
+    const haze = board(['haze', 'splash']);
+    const control = board(['splash']);
+    expect(haze.boosts).toBeGreaterThan(0);
+    expect(haze.boostsBiting).toBe(0);
+    expect(control.boostsBiting).toBeCloseTo(control.boosts, 12);
+  });
+
+  test('a Champions doubles board: one foe with Haze, one without: the stage counts for the half it bites', () => {
+    const battle = battleOf(CHAMPIONS_DOUBLES, [champion('Garchomp', ['crunch', 'splash']), champion('Garchomp', ['crunch', 'splash'])],
+      [champion('Clefable', ['haze', 'splash']), champion('Clefable', ['splash'])]);
+    const attackers = battle.sides[0].active as Pokemon[];
+    for (const attacker of attackers) attacker.boosts.atk = 2;
+    for (const foe of battle.sides[1].active as Pokemon[]) foe.sethp(biteHp(battle, attackers[0], foe));
+    const features = evalFeatures(battle);
+    expect(features.boosts).toBeGreaterThan(0);
+    expect(features.boostsBiting).toBeCloseTo(0.5 * features.boosts, 12);
   });
 });
 
@@ -280,7 +340,7 @@ describe('inert at weight 0', () => {
     ['singles', SINGLES, 'standard' as const],
     ['champions singles', SINGLES, 'champions' as const],
   ])('the score is the sum over every other key, with a boosted board (%s)', (_name, format, ruleset) => {
-    const doubles = format === DOUBLES;
+    const doubles = format === DOUBLES || format === CHAMPIONS_DOUBLES;
     const battle = doubles
       ? battleOf(format, [GARCHOMP(), GARCHOMP()], [clefable('Unaware'), clefable('No Ability')])
       : duel(clefable('No Ability'));

@@ -1,4 +1,5 @@
 import { Battle, Teams, toID, type BoostsTable, type Pokemon, type PokemonSet, type Side } from '@pkmn/sim';
+import { isChampionsSimFormat } from '../forward/sim-mods.ts';
 import { movesFirst } from '../speed.ts';
 import { EVAL_WEIGHTS } from './weights.ts';
 import { boostedFraction, livingMons, livingOf, usableSlots, type PairThreat } from './threat.ts';
@@ -33,12 +34,21 @@ const body = (species: string, moves: string[]): PokemonSet => ({
   level: 100, gender: '',
 });
 
+/**
+ * The format of the twin battle that answers for `battle`: a singles custom game of the battle's generation, on the
+ * Champions mod when the battle runs on it (the mode decides what a move does to a stage; the mod is registered
+ * already, the battle stands on it).
+ */
+export function removalFormat(battle: Battle): string {
+  return `gen${battle.gen}${isChampionsSimFormat(battle.format.id) ? 'champions' : ''}customgame`;
+}
+
 /** Whether the stages of a boosted mon are gone after a foe clicks the move at it, played once on a twin battle. */
-function playedRemoval(gen: number, moveId: string, benched: boolean): boolean {
+function playedRemoval(format: string, moveId: string, benched: boolean): boolean {
   try {
     const target = () => body('Chansey', ['tackle']);
     const twin = new Battle({
-      formatid: toID(`gen${gen}customgame`), seed: '1,2,3,4',
+      formatid: toID(format), seed: '1,2,3,4',
       p1: { name: 'Target', team: Teams.pack(benched ? [target(), target()] : [target()]) },
       p2: { name: 'Foe', team: Teams.pack([body('Snorlax', [moveId, 'tackle'])]) },
     });
@@ -71,15 +81,16 @@ const removals = new Map<string, boolean>();
  * simulator plays it (Haze, Clear Smog, Freezy Frost, Topsy-Turvy, Heart Swap
  * and the moves that drag the mon out: those only with a bench behind it).
  * The Dex names the dragging moves (forceSwitch) and carries no flag for the
- * rest, so the answer is the played twin battle, once per generation, move and
+ * rest, so the answer is the played twin battle, once per twin format, move and
  * bench; test/boost-bite.spec.ts plays every move in singles and doubles
- * against it.
+ * against it, on the base mode and on the Champions mod (`format` is the
+ * twin's, from removalFormat).
  */
-export function removesStages(gen: number, moveId: string, benched: boolean): boolean {
-  const key = `${gen}|${moveId}|${benched}`;
+export function removesStages(format: string, moveId: string, benched: boolean): boolean {
+  const key = `${format}|${moveId}|${benched}`;
   let removed = removals.get(key);
   if (removed === undefined) {
-    removed = playedRemoval(gen, moveId, benched);
+    removed = playedRemoval(format, moveId, benched);
     removals.set(key, removed);
   }
   return removed;
@@ -166,7 +177,8 @@ export function boostBiteValue(side: Side, sideIndex: 0 | 1, battle: Battle, thr
   const foes = livingMons(battle, 1 - sideIndex);
   if (foes.length === 0) return 0;
   const benched = livingOf(side).some(mon => !mon.isActive);
-  const leaving = foes.filter(foe => !usableSlots(foe).some(slot => removesStages(battle.gen, slot.id, benched)));
+  const twin = removalFormat(battle);
+  const leaving = foes.filter(foe => !usableSlots(foe).some(slot => removesStages(twin, slot.id, benched)));
   let value = 0;
   for (const mine of actives) {
     for (const foe of leaving) {
