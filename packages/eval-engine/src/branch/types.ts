@@ -23,6 +23,8 @@ export interface BranchMoveOption {
   maxpp: number;
   disabled: boolean;
   type: string;
+  /** The type after the Tera click, only when it differs from `type` (Tera Blast, Tera Starstorm). */
+  typeUnderTera?: string;
   targetType: string;
   requiresTarget: boolean;
   targetOptions: BranchTargetOption[];

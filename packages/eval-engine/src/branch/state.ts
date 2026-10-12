@@ -2,6 +2,7 @@ import { Battle, BattleStreams, Teams } from '@pkmn/sim';
 import type { ID, PokemonSet } from '@pkmn/sim';
 import type { BranchSlotChoice } from '../branch-choices.ts';
 import { serializeBattleStable } from '../forward-model.ts';
+import { cloneBattle } from '../forward/sim-fast/clone.ts';
 import type {
   BranchChoices, BranchMoveOption, BranchSimState, BranchSlotModifiers, BranchSwitchOption, BranchTargetOption,
   SimBattle, SimPokemon, SimSide,
@@ -39,6 +40,35 @@ function typeAtUse(battle: SimBattle, active: SimPokemon, id: string): string {
   }
 }
 
+/**
+ * The type each retyping move lands with after the Tera click (round 69,
+ * T182): the simulator's own terastallize runs on a copy of the battle (the
+ * Ogerpon masks, Terapagos-Terastal to Terapagos-Stellar and the Tera type
+ * come with it) and typeAtUse reads the copy's active body. Asked only for a
+ * body that can still terastallize and only for the moves whose dex entry has
+ * an onModifyType hook (Tera Blast, Tera Starstorm, Ivy Cudgel, Revelation
+ * Dance, ...), so the usual state build pays no copy. The live battle is never
+ * touched; a copy the simulator refuses (or a click it refuses, as for an
+ * Ogerpon with a foreign Tera type) leaves the move without a label.
+ */
+function typesUnderTera(battle: SimBattle, active: SimPokemon): Map<string, string> {
+  const labels = new Map<string, string>();
+  if (!active.canTerastallize) return labels;
+  const ids = active.moveSlots.map(move => move.id || move.move).filter(id => !!battle.dex.moves.get(id).onModifyType);
+  if (!ids.length) return labels;
+  try {
+    const copy = cloneBattle(battle) as SimBattle;
+    (copy as unknown as { debugMode: boolean }).debugMode = false;
+    const twin = copy.sides[active.side.n].active[active.position];
+    copy.actions.terastallize(twin);
+    if (!twin.terastallized) return labels;
+    for (const id of ids) labels.set(id, typeAtUse(copy, twin, id));
+  } catch {
+    labels.clear();
+  }
+  return labels;
+}
+
 function makeMoves(
   active: SimPokemon | null | undefined,
   activeSlot: number,
@@ -46,9 +76,12 @@ function makeMoves(
   battle: SimBattle,
 ): BranchMoveOption[] {
   if (!active || active.fainted || forceSwitch) return [];
+  const underTera = typesUnderTera(battle, active);
   return active.moveSlots.map((move, index): BranchMoveOption => {
     const targetType = targetTypeForMove(active, move.id || move.move);
     const targetOptions = buildTargetOptions(battle, active, targetType);
+    const type = typeAtUse(battle, active, move.id || move.move);
+    const typeUnderTera = underTera.get(move.id || move.move);
     return {
       name: move.move,
       activeSlot,
@@ -56,7 +89,8 @@ function makeMoves(
       pp: move.pp,
       maxpp: move.maxpp,
       disabled: !!move.disabled,
-      type: typeAtUse(battle, active, move.id || move.move),
+      type,
+      ...(typeUnderTera && typeUnderTera !== type ? { typeUnderTera } : {}),
       targetType,
       requiresTarget: targetOptions.length > 0,
       targetOptions,
