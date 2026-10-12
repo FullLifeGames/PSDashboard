@@ -7,6 +7,7 @@ import { toId } from '../ids.ts';
 import { itemFieldsOf } from './item-reading.ts';
 import { paradoxFieldsOf } from './paradox-reading.ts';
 import { forgetAbilityEnd, hitFactsOf } from './hit-facts.ts';
+import { survivedAtOne } from './survival-marker.ts';
 
 const SCREEN_IDS = ['reflect', 'lightscreen', 'auroraveil'];
 
@@ -85,7 +86,7 @@ function pendingMoveFor(
   return parts[2] && parts[4]
     ? {
       attacker: parts[2], target: parts[4], moveId, moveName: parts[3] ?? '',
-      spread: parts.slice(5).some(part => part.startsWith('[spread]')), crits: new Set<string>(), hits: new Map(), itemsBefore: new Map(),
+      spread: parts.slice(5).some(part => part.startsWith('[spread]')), crits: new Set<string>(), hits: new Map(), itemsBefore: new Map(), marked: new Set<string>(),
       speedClean: cleanFirst, attackerSide: side, attackerSpecies: speciesForme,
     }
     : null;
@@ -241,7 +242,7 @@ function recordDamageObservation(state: ParserState, parts: string[], defenderId
     attackerSide: lastMove.attacker.startsWith('p1') ? 'p1' : 'p2',
     moveId: lastMove.moveId,
     observedFraction,
-    lethal: newFraction === 0,
+    lethal: newFraction === 0 || survivedAtOne(lastMove, defenderIdent, newFraction),
     attackerBoosts: { ...attacker.boosts },
     defenderBoosts: { ...defender.boosts },
     attackerStatus: attacker.status || '',

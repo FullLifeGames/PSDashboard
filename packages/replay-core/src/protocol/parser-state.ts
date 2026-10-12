@@ -41,6 +41,8 @@ export interface PendingMove {
   hits: Map<string, TargetHit>;
   /** The item of a Pokémon whose item ended inside this move before its damage line: it counted for the hit (round 69, T191). */
   itemsBefore: Map<string, ItemReading>;
+  /** Targets with an item or ability line inside this move before their damage line: a Focus Sash, Sturdy or Endure may hold the hit back. */
+  marked: Set<string>;
   /** The attacker's speed-evidence cleanliness at move time. */
   speedClean: boolean;
   attackerSide: 'p1' | 'p2';

@@ -6,6 +6,7 @@ import {
 } from './protocol/handlers.ts';
 import { noteItemEnd } from './protocol/item-reading.ts';
 import { noteAbilityState } from './protocol/hit-facts.ts';
+import { noteSurvivalMarker } from './protocol/survival-marker.ts';
 import { noteActivation, settleRacedFormes, settleScarfMovers } from './protocol/speed-evidence.ts';
 
 export function parseReplayLog(log: string): TurnSnapshot[] {
@@ -26,11 +27,12 @@ function dispatch(state: ParserState, line: string) {
     handleResisted(state, line);
   } else if (line.startsWith('|-crit|')) {
     handleCrit(state, line);
-  } else if (/^\|-(?:start\|[^|]*\|(?:protosynthesis|quarkdrive)|endability\|)/.test(line)) {
+  } else if (/^\|-(?:start\|[^|]*\|(?:protosynthesis|quarkdrive)|(?:end)?ability\|)/.test(line)) {
     noteAbilityState(state, line);
   } else if (/^\|-(?:activate|enditem|item)\|/.test(line)) {
     noteActivation(state, line);
     if (line.startsWith('|-enditem|')) noteItemEnd(state, line);
+    noteSurvivalMarker(state, line);
     if (isActionBoundary(line)) handleActionBoundary(state, line);
   } else if (isActionBoundary(line)) {
     handleActionBoundary(state, line);

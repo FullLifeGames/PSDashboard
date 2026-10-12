@@ -2,6 +2,7 @@ import type { Pokemon } from '@pkmn/client';
 import { ATTACKER_SIDE_FLAG_BY_ID, DEFENDER_SIDE_FLAG_BY_ID, FIELD_FLAG_BY_ID } from '../calc-field.ts';
 import type { DamageObservation } from '../types.ts';
 import { noteParadoxStart } from './paradox-reading.ts';
+import { noteSurvivalMarker } from './survival-marker.ts';
 import type { ClientIdent, ParserState, PendingMove } from './parser-state.ts';
 
 /** The start line of Supreme Overlord: the simulator adds a silent `fallenN` start for the fallen it counted when the holder came in. */
@@ -23,6 +24,7 @@ export function noteAbilityEnd(state: ParserState, line: string) {
 /** A line that changes an ability's own state: the stat a Paradox ability picks (T167), or the ability a Gastro Acid ends. */
 export function noteAbilityState(state: ParserState, line: string) {
   if (line.startsWith('|-endability|')) noteAbilityEnd(state, line);
+  else if (line.startsWith('|-ability|')) noteSurvivalMarker(state, line);
   else noteParadoxStart(state, line);
 }
 
