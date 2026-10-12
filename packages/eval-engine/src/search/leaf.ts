@@ -3,6 +3,8 @@ import { evaluatePosition, type MatchupCache } from '../eval-function.ts';
 import type { positionBattle } from '../forward-model.ts';
 import { RANDOM_CALL_MOVES } from '../ko-odds.ts';
 import { lastPairRace, lastPairValue } from '../score/last-pair.ts';
+import { effectiveSpeed } from '../speed.ts';
+import type { RollScripts } from '../forward/scripted-prng.ts';
 import { wpUnits } from '../winprob.ts';
 
 /**
@@ -73,8 +75,30 @@ const choiceMoveIds = (choice: string): string[] => choice.split(',')
   .filter(tokens => tokens[0] === 'move')
   .map(tokens => tokens[1]);
 
-/** The pair includes an accuracy roll or a random-call move — seeds diverge. */
+/**
+ * Singles only: both sides act with moves of equal priority at equal effective speed, so the simulator flips a coin
+ * for the order. Round 69 (T146 c4): moved here from outcome-children.ts (which re-exports it) so the root cell and
+ * the roll-sensitivity below read it too.
+ */
+export function speedTie(battle: ReturnType<typeof positionBattle>, p1Choice: string, p2Choice: string): boolean {
+  if (battle.gameType !== 'singles') return false;
+  const ids = [choiceMoveIds(p1Choice)[0], choiceMoveIds(p2Choice)[0]];
+  const actives = [battle.sides[0].active[0], battle.sides[1].active[0]];
+  if (!ids[0] || !ids[1] || !actives[0] || !actives[1]) return false;
+  const priorities = ids.map(id => battle.dex.moves.get(id).priority);
+  return priorities[0] === priorities[1] && effectiveSpeed(actives[0], battle) === effectiveSpeed(actives[1], battle);
+}
+
+/** The scripts that settle a tied pair's coin flip for one order: the side that moves first, on its own move (scripted-prng.ts). */
+export function tieOrderScripts(p1Choice: string, p2Choice: string): Record<'p1' | 'p2', RollScripts> {
+  const ids = { p1: choiceMoveIds(p1Choice)[0], p2: choiceMoveIds(p2Choice)[0] };
+  const script = (first: 'p1' | 'p2'): RollScripts => new Map([[`${first}:${ids[first]}`, { first }]]);
+  return { p1: script('p1'), p2: script('p2') };
+}
+
+/** The pair includes an accuracy roll, a random-call move or a speed tie — seeds diverge. */
 export function rollSensitivePair(battle: ReturnType<typeof positionBattle>, p1Choice: string, p2Choice: string): boolean {
+  if (speedTie(battle, p1Choice, p2Choice)) return true;
   return [...choiceMoveIds(p1Choice), ...choiceMoveIds(p2Choice)].some(id => {
     const move = battle.dex.moves.get(id);
     if (!move.exists) return false;

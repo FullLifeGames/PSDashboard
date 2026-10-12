@@ -5,7 +5,8 @@ import {
   BOUNDARY_DRAW_BUDGET, classifyChild, foldClassWeights, observeOrder, planCellEvents, PROBE_SEEDS, type CellEvent,
 } from '../cell-blend.ts';
 import type { CellBlend, CellBlendClass, KoOddsMismatch } from '../types.ts';
-import { countFainted, leafValue, rollSensitivePair, SEARCH_SEEDS } from './leaf.ts';
+import type { RollScripts } from '../forward/scripted-prng.ts';
+import { countFainted, leafValue, rollSensitivePair, SEARCH_SEEDS, speedTie, tieOrderScripts } from './leaf.ts';
 import { pairCellSample, type FirstDraw } from '../pair/sampler.ts';
 import {
   drawPlain, firstDraw, outcomeGroups, stateGroups, stateRuleFor, VERIFY_PLAIN_SEEDS, type PlainDraw, type StateGroup, type VerifyDraws,
@@ -66,6 +67,11 @@ function verifyPool(
  */
 export const MISSING_WEIGHT_CUT = 0.2;
 
+/** One seeded child; with `scripts` the dice of the named moves answer as the script says (a tied cell's move order). */
+function advanceChild(root: SimPosition, p1Choice: string, p2Choice: string, seed: PRNGSeed, scripts?: RollScripts): SimPosition {
+  return scripts ? advancePositionWithLog(root, p1Choice, p2Choice, seed, { scripts }).child : advancePosition(root, p1Choice, p2Choice, seed);
+}
+
 /** The plain seed average (no analytic blend): one sim unless a KO or a roll makes seeds diverge. */
 function plainCellSample(
   root: SimPosition,
@@ -77,8 +83,9 @@ function plainCellSample(
   matchupCache: MatchupCache,
   first?: FirstDraw,
   plainDraws?: number,
+  scripts?: RollScripts,
 ): CellSample {
-  const firstChild = first?.child ?? advancePosition(root, p1Choice, p2Choice, SEARCH_SEEDS[0]);
+  const firstChild = first?.child ?? advanceChild(root, p1Choice, p2Choice, SEARCH_SEEDS[0], scripts);
   const firstBattle = positionBattle(firstChild);
   const ended = firstBattle.ended;
   // Averaging wp-units = averaging win probabilities across rolls: the
@@ -95,7 +102,7 @@ function plainCellSample(
     if (pool) return pool;
   }
   for (let s = 1; s < draws; s++) {
-    const child = advancePosition(root, p1Choice, p2Choice, SEARCH_SEEDS[s]);
+    const child = advanceChild(root, p1Choice, p2Choice, SEARCH_SEEDS[s], scripts);
     sum += leafValue(positionBattle(child), matchupCache);
   }
   return { value: sum / draws, ended, firstChild };
@@ -126,8 +133,8 @@ function allDrawsSample(draws: Draw[]): CellSample {
 }
 
 /** One seeded draw with its protocol log and leaf value. */
-function drawCell(root: SimPosition, p1Choice: string, p2Choice: string, seed: PRNGSeed, matchupCache: MatchupCache): Draw {
-  const { child, log } = advancePositionWithLog(root, p1Choice, p2Choice, seed);
+function drawCell(root: SimPosition, p1Choice: string, p2Choice: string, seed: PRNGSeed, matchupCache: MatchupCache, scripts?: RollScripts): Draw {
+  const { child, log } = advancePositionWithLog(root, p1Choice, p2Choice, seed, scripts ? { scripts } : undefined);
   const battle = positionBattle(child);
   return { child, log, leaf: leafValue(battle, matchupCache), ended: battle.ended };
 }
@@ -233,11 +240,12 @@ function blendCellSample(
   samples: number,
   matchupCache: MatchupCache,
   plainDraws?: number,
+  scripts?: RollScripts,
 ): CellSample {
   const draws: Draw[] = [];
   const drawnBySeed = new Map<string, Draw>();
   const drawSeed = (seed: PRNGSeed) => {
-    draws.push(drawCell(root, p1Choice, p2Choice, seed, matchupCache));
+    draws.push(drawCell(root, p1Choice, p2Choice, seed, matchupCache, scripts));
     drawnBySeed.set(String(seed), draws[draws.length - 1]);
   };
   const baseDraws = Math.max(1, Math.min(samples, SEARCH_SEEDS.length));
@@ -284,6 +292,24 @@ function blendCellSample(
 }
 
 /**
+ * Round 69 (T146 c4): the two move orders of a tied cell, each priced with its own order scripted, as one cell at
+ * one half each. Class keys carry the order prefix (`p1:hit-kill`), as the pair plan's tie cells and the tree's
+ * chance nodes write them; a cell whose order priced without a blend keeps the mean alone.
+ */
+function mixOrders(first: CellSample, second: CellSample): CellSample {
+  const mixed: CellSample = { value: (first.value + second.value) / 2, ended: first.ended && second.ended, firstChild: first.firstChild };
+  const diagnostic = first.diagnostic ?? second.diagnostic;
+  if (diagnostic) mixed.diagnostic = diagnostic;
+  if (!first.blend || !second.blend) return mixed;
+  const prefixed = (order: string, blend: CellBlend, hasFirst: boolean): CellBlendClass[] =>
+    blend.classes.map(cls => ({ ...cls, key: `${order}:${cls.key}`, weight: cls.weight / 2, hasFirst: hasFirst && cls.hasFirst }));
+  mixed.blend = { classes: [...prefixed('p1', first.blend, true), ...prefixed('p2', second.blend, false)], firstLeaf: first.blend.firstLeaf };
+  const children = (order: string, sample: CellSample) => [...(sample.classChildren ?? [])].map(([key, child]) => [`${order}:${key}`, child] as const);
+  mixed.classChildren = new Map([...children('p1', first), ...children('p2', second)]);
+  return mixed;
+}
+
+/**
  * Damage-roll grouping (foul-play style): a cell where nothing fainted is
  * roll-insensitive — one sim suffices. Cells where a KO happened get the
  * full seed spread, and so do cells whose pair carries an accuracy roll or
@@ -317,8 +343,13 @@ export function sampleCell(
   // Round 63 (T16): a guard the plan cannot fold (a paralyzed attacker, a
   // Substitute, a pivot) is chance of its own: a verify cell draws them all.
   if (plainDraws && plan?.kind === 'fail') return plainVerifySample(root, p1Choice, p2Choice, plainDraws, matchupCache);
-  if (!plan || plan.kind !== 'events') {
-    return plainCellSample(root, rootBattle, rootFainted, p1Choice, p2Choice, samples, matchupCache, undefined, plainDraws);
+  const price = (scripts?: RollScripts) => (plan?.kind === 'events'
+    ? blendCellSample(root, plan.events, p1Choice, p2Choice, samples, matchupCache, plainDraws, scripts)
+    : plainCellSample(root, rootBattle, rootFainted, p1Choice, p2Choice, samples, matchupCache, undefined, plainDraws, scripts));
+  // Round 69 (T146 c4): a tied singles cell is priced once per move order and mixed at one half.
+  if (blendRoot && !plainDraws && speedTie(rootBattle, p1Choice, p2Choice)) {
+    const orders = tieOrderScripts(p1Choice, p2Choice);
+    return mixOrders(price(orders.p1), price(orders.p2));
   }
-  return blendCellSample(root, plan.events, p1Choice, p2Choice, samples, matchupCache, plainDraws);
+  return price();
 }

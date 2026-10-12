@@ -2,8 +2,7 @@ import type { Battle, PRNGSeed } from '@pkmn/sim';
 import { advancePositionWithLog, positionBattle, type SimPosition } from '../forward-model.ts';
 import { classifyChild, foldClassWeights, observeOrder, planCellEvents, type CellEvent } from '../cell-blend.ts';
 import type { RollScript, RollScripts } from '../forward/scripted-prng.ts';
-import { effectiveSpeed } from '../speed.ts';
-import { countFainted, rollSensitivePair } from './leaf.ts';
+import { countFainted, rollSensitivePair, speedTie, tieOrderScripts } from './leaf.ts';
 
 /**
  * Round 43: one cell's children by outcome. The CLASS path prices a
@@ -96,15 +95,7 @@ export function median(draws: Draw[]): Draw {
   return sorted[Math.floor(sorted.length / 2)];
 }
 
-/** Singles only: both sides act with moves of equal priority at equal effective speed. */
-export function speedTie(battle: Battle, p1Choice: string, p2Choice: string): boolean {
-  if (battle.gameType !== 'singles') return false;
-  const ids = [moveIdOf(p1Choice), moveIdOf(p2Choice)];
-  const actives = [battle.sides[0].active[0], battle.sides[1].active[0]];
-  if (!ids[0] || !ids[1] || !actives[0] || !actives[1]) return false;
-  const priorities = ids.map(id => battle.dex.moves.get(id!).priority);
-  return priorities[0] === priorities[1] && effectiveSpeed(actives[0], battle) === effectiveSpeed(actives[1], battle);
-}
+export { speedTie }; // moved to leaf.ts (round 69, T146 c4)
 
 /** The side whose move line comes first in a draw's log, or null when nobody moved. */
 function firstMover(log: string[]): Order | null {
@@ -252,22 +243,30 @@ function signature(draw: Draw): string {
  * singles pairs): seeds[0] always, the remaining seeds when that draw
  * fainted someone or the pair carries an accuracy or random-call roll
  * (plainCellSample's rule), grouped by faint signature with the median
- * draw as representative. Weights are draw shares.
+ * draw as representative. Weights are draw shares. Round 69 (T146 c4): a tied singles pair draws each move order
+ * with the order scripted and gives each order one half of the weight.
  */
 export function groupedChildren(root: SimPosition, p1Choice: string, p2Choice: string, opts: GroupedDrawOptions): OutcomeChildren {
   const battle = positionBattle(root);
   const rootHp = totalHp(battle);
   const rootFainted = countFainted(battle);
-  const advance = { stopAtForcedSwitch: opts.stopAtForcedSwitch };
-  const draws = [drawChild(root, rootHp, p1Choice, p2Choice, opts.seeds[0], advance)];
-  if (draws[0].fainted > rootFainted || rollSensitivePair(battle, p1Choice, p2Choice)) {
-    for (const seed of opts.seeds.slice(1)) draws.push(drawChild(root, rootHp, p1Choice, p2Choice, seed, advance));
+  const orders = speedTie(battle, p1Choice, p2Choice) ? Object.values(tieOrderScripts(p1Choice, p2Choice)) : [undefined];
+  const groups = new Map<string, { draws: Draw[]; weight: number }>();
+  for (const scripts of orders) {
+    const advance = { stopAtForcedSwitch: opts.stopAtForcedSwitch, scripts };
+    const draws = [drawChild(root, rootHp, p1Choice, p2Choice, opts.seeds[0], advance)];
+    if (draws[0].fainted > rootFainted || rollSensitivePair(battle, p1Choice, p2Choice)) {
+      for (const seed of opts.seeds.slice(1)) draws.push(drawChild(root, rootHp, p1Choice, p2Choice, seed, advance));
+    }
+    for (const draw of draws) {
+      const group = groups.get(signature(draw)) ?? { draws: [], weight: 0 };
+      group.draws.push(draw);
+      group.weight += 1 / (orders.length * draws.length);
+      groups.set(signature(draw), group);
+    }
   }
-  const groups = new Map<string, Draw[]>();
-  for (const draw of draws) push(groups, signature(draw), draw);
-  const children = [...groups.entries()].map(([key, list]) => {
-    const pick = median(list);
-    const weight = list.length / draws.length;
+  const children = [...groups.entries()].map(([key, { draws, weight }]) => {
+    const pick = median(draws);
     return { position: pick.position, key, weight, share: weight, ended: pick.ended, pendingSwitch: pick.pendingSwitch };
   });
   return { children, missing: [], events: [], tie: false };
