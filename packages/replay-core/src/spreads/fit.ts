@@ -7,7 +7,7 @@ import type { DamageObservation, PokemonEvs, SpeedOrderObservation } from '../ty
 import { typedHiddenPowerId } from '../hidden-power.ts';
 import { calcIvs, evBudget, onBudgetScale, statPointsOfEv, ZERO_EVS, type EvBudget } from './ev-budget.ts';
 import type { CandidateRung, SpreadCandidate } from './ladder.ts';
-import type { ItemDecision } from './scarf.ts';
+import type { ItemDecision, SpeedKnowledgeMap } from './scarf.ts';
 import type { ObservedMaxHp } from './max-hp.ts';
 import { raceSpeed } from './race-speed.ts';
 import { defenderSideOf, fieldOf, moveOf } from './observation-read.ts';
@@ -67,6 +67,8 @@ export interface SolveContext {
   speedOrders: ReadOrder[];
   /** Choice Scarf decisions from the move orders, keyed like `solved` (round 37). */
   scarf: Map<string, ItemDecision>;
+  /** What the build knows of each mon's item (round 69, T26: a guessed boost item may give way, a known one never). */
+  knowledge: SpeedKnowledgeMap;
   /** Maximum HP per mon as the log printed it (round 40: pins the HP EVs). */
   maxHp: Map<string, ObservedMaxHp>;
   priors: Map<string, SpreadCandidate>;
@@ -126,6 +128,7 @@ export function buildSolveContext(
     speedByMon: new Map<string, ReadOrder[]>(),
     speedOrders: [],
     scarf: new Map<string, ItemDecision>(),
+    knowledge: new Map(),
     maxHp,
     priors: new Map<string, SpreadCandidate>(),
   };
@@ -169,7 +172,7 @@ function calcPokemon(ctx: SolveContext, side: 'p1' | 'p2', species: string, spre
   return buildCalcPokemon(ctx.gen, set?.species ?? species, {
     level: set?.level || 100,
     ability: set?.ability || undefined,
-    item: set?.item || undefined,
+    item: (spread.item ?? set?.item) || undefined,
     nature: spread.nature,
     evs: spread.evs,
     ivs: set?.ivs,

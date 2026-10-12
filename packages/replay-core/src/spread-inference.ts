@@ -10,6 +10,8 @@ import { decideScarfs, type SpeedKnowledgeMap } from './spreads/scarf.ts';
 import { defenderSideOf } from './spreads/observation-read.ts';
 import { hpEvsForMaxHp, type ObservedMaxHp } from './spreads/max-hp.ts';
 import { readableOrders, settledSets } from './spreads/order-limit.ts';
+import { isBoostItem } from './spreads/boost-items.ts';
+import { simGenNum } from './calc-gen.ts';
 
 export { evBudget, legalizeEvs } from './spreads/ev-budget.ts';
 export type { SpreadCandidate } from './spreads/ladder.ts';
@@ -76,11 +78,28 @@ function priorWithFixedHp(prior: SpreadCandidate, hp: number, budget: EvBudget):
   return capToBudget({ ...ZERO_EVS, ...prior.evs, hp }, new Set(), budget, new Set(), new Set(['hp']));
 }
 
-/** The ladder rung with the least error; ties break toward the prior. */
-function bestRung(ctx: SolveContext, key: string, ladder: CandidateRung[], monObservations: DamageObservation[]): CandidateRung | null {
+/**
+ * The set's item when it is a guessed boost item the damage lines may take away (round 69, T26): the build guessed it,
+ * no log line, team sheet or edit showed it, and the simulator gives it a damage hook.
+ */
+function guessedBoostItem(ctx: SolveContext, key: string): string | undefined {
+  const [side, species] = key.split(':') as ['p1' | 'p2', string];
+  const set = setOf(ctx, side, species);
+  if (!set?.item || (ctx.knowledge.get(key) ?? ctx.knowledge.get(keyOf(side, set.species)))?.itemKnown) return undefined;
+  return isBoostItem(simGenNum(ctx.gen), set.item) ? set.item : undefined;
+}
+
+/**
+ * The ladder rung with the least error; ties break toward the prior. With `withoutItem` every rung is scored
+ * twice, with the set's item and without it (T26): the lower error wins, the prior's distance breaks a tie,
+ * and a tie of both keeps the item.
+ */
+function bestRung(
+  ctx: SolveContext, key: string, ladder: CandidateRung[], monObservations: DamageObservation[], withoutItem = false,
+): CandidateRung | null {
   let best: CandidateRung | null = null;
   let bestError = Infinity;
-  for (const rung of ladder) {
+  for (const rung of withoutItem ? ladder.flatMap(entry => [entry, { ...entry, item: '' }]) : ladder) {
     const error = monObservations.reduce((sum, obs) => sum + observationError(ctx, obs, key, rung), 0) +
       speedError(ctx, key, rung);
     if (error < bestError - 1e-12 ||
@@ -159,7 +178,7 @@ function topUp(
   let remaining = ctx.budget.total - evTotal(evs);
   const give = (stat: keyof PokemonEvs, room: number) => {
     if (room <= 0) return;
-    const add = measured.has(stat) ? neutralRoom(ctx, key, { evs, nature: best.nature }, stat, room, evidence.observations) : room;
+    const add = measured.has(stat) ? neutralRoom(ctx, key, { evs, nature: best.nature, item: best.item }, stat, room, evidence.observations) : room;
     evs[stat] = (evs[stat] ?? 0) + add;
     remaining -= add;
   };
@@ -213,6 +232,15 @@ function ladderFor(
   return build(false);
 }
 
+/** The stats the mon's evidence measured: the top-up lets them take EVs only as far as the lines still fit. */
+function measuredIn(evidence: MonEvidence, offenseStat: keyof PokemonEvs): Set<keyof PokemonEvs> {
+  return new Set<keyof PokemonEvs>([
+    ...(evidence.hasOffenseEvidence ? [offenseStat] : []),
+    ...(evidence.hasDefenderObs ? (['hp', 'def', 'spd'] as (keyof PokemonEvs)[]) : []),
+    ...(evidence.fixedHp === undefined ? [] : (['hp'] as (keyof PokemonEvs)[])),
+  ]);
+}
+
 function solveOne(ctx: SolveContext, key: string) {
   const evidence = evidenceFor(ctx, key);
   const prior = ctx.priors.get(key);
@@ -231,7 +259,8 @@ function solveOne(ctx: SolveContext, key: string) {
   const offenseStat: keyof PokemonEvs = physicalAttacker ? 'atk' : 'spa';
   const keep = new Set<keyof PokemonEvs>();
   if (evidence.attacked && !evidence.hasOffenseEvidence) keep.add(offenseStat);
-  const best = bestRung(ctx, key, ladderFor(ctx, key, prior, physicalAttacker, evidence, keep), evidence.observations);
+  const droppable = evidence.attacked && guessedBoostItem(ctx, key) !== undefined;
+  const best = bestRung(ctx, key, ladderFor(ctx, key, prior, physicalAttacker, evidence, keep), evidence.observations, droppable);
   if (!best) return;
   if (forfeitsToPrior(ctx, key, best, prior, evidence.observations)) {
     // The prior stands — with the log's HP where the log measured it.
@@ -239,12 +268,9 @@ function solveOne(ctx: SolveContext, key: string) {
     else ctx.solved.set(key, { evs: priorWithFixedHp(prior, evidence.fixedHp, ctx.budget), nature: prior.nature });
     return;
   }
-  const measured = new Set<keyof PokemonEvs>([
-    ...(evidence.hasOffenseEvidence ? [offenseStat] : []),
-    ...(evidence.hasDefenderObs ? (['hp', 'def', 'spd'] as (keyof PokemonEvs)[]) : []),
-    ...(evidence.fixedHp === undefined ? [] : (['hp'] as (keyof PokemonEvs)[])),
-  ]);
-  ctx.solved.set(key, { evs: topUp(ctx, key, best, prior, offenseStat, measured, evidence), nature: best.nature });
+  const evs = topUp(ctx, key, best, prior, offenseStat, measuredIn(evidence, offenseStat), evidence);
+  // A guessed boost item the lines refute rides out on the candidate like a decided Scarf: the builder resolves its replacement.
+  ctx.solved.set(key, { evs, nature: best.nature, ...(best.item === '' ? { item: '', itemReason: 'no-boost' as const } : {}) });
 }
 
 /**
@@ -262,6 +288,7 @@ export function inferSpreads(
   maxHp: Map<string, ObservedMaxHp> = new Map(),
 ): Map<string, SpreadCandidate> {
   const ctx = buildSolveContext(observations, sets, formatid, readableOrders(speedOrders, sets, genNumOf(formatid)), maxHp);
+  ctx.knowledge = knowledge;
   ctx.scarf = decideScarfs(ctx, knowledge);
   // T117 (round 63): every observed order holds in the sets the ladder starts from.
   ctx.sets = settledSets(ctx, knowledge);

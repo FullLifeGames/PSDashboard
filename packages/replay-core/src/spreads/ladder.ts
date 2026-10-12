@@ -8,7 +8,7 @@ export interface SpreadCandidate {
   nature: string;
   /** An item the move-order evidence decided (round 37): 'Choice Scarf', or '' for "not the guessed Scarf". */
   item?: string;
-  itemReason?: 'moved-first' | 'moved-second';
+  itemReason?: 'moved-first' | 'moved-second' | 'no-boost';
   /** IVs a seen move order needed (round 64: a Speed IV below 31 only when no other Speed keeps the order). */
   ivs?: PokemonEvs;
 }
@@ -16,6 +16,8 @@ export interface SpreadCandidate {
 export interface CandidateRung {
   evs: PokemonEvs;
   nature: string;
+  /** '' scores the rung without the set's guessed boost item (round 69, T26); undefined keeps the set's item. */
+  item?: string;
 }
 
 /** The stat a nature boosts — for deciding whether a rung must neutralize it. */
