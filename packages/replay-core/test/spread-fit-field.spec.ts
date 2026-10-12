@@ -4,7 +4,7 @@ import { buildSolveContext, keyOf, observationError, rollRange, spreadFor, type 
 import type { ReadObservation } from '../src/spreads/observation-read';
 import type { DamageObservation } from '../src/types';
 import {
-  BEADS_OF_RUIN, BOOSTED_HIT, ERUPTION, FLASH_FIRE, FORMAT, GAS_ON_THE_PARTNER, GASTRO_ACID, GRAVITY, HELPING_HAND, isDoubles, MULTISCALE, SUPREME_OVERLORD,
+  BEADS_OF_RUIN, BOOSTED_HIT, ERUPTION, FLASH_FIRE, FORMAT, GAS_ON_THE_PARTNER, GASTRO_ACID, GASTRO_ACID_THEN_SWITCH, GRAVITY, HELPING_HAND, isDoubles, MULTISCALE, SUPREME_OVERLORD,
   TERA_ATTACKER, TERA_DEFENDER, TERRAIN_PULSE, WEATHER_BALL, damagingTurns, scaled, scenesOf,
   type FieldScene, type Kind, type Scene,
 } from './fit-field-scenes';
@@ -145,6 +145,8 @@ describe('the observation names the field at the hit (T86)', () => {
     test(`${kind}: a suppressed ability, and an ability that is on`, () => {
       expect(observationsOf(GASTRO_ACID, kind)[0]).toMatchObject({ defenderSuppressed: true });
       expect(observationsOf(GASTRO_ACID, kind)[0].attackerSuppressed).toBeUndefined();
+      // The ability comes back with the switch.
+      expect(observationsOf(GASTRO_ACID_THEN_SWITCH, kind)[0].defenderSuppressed).toBeUndefined();
       const [flashed] = observationsOf(FLASH_FIRE, kind);
       expect(flashed).toMatchObject({ attackerAbility: 'flashfire', attackerAbilityOn: true });
       expect(observationsOf(MULTISCALE, kind)[0].defenderSuppressed).toBeUndefined();

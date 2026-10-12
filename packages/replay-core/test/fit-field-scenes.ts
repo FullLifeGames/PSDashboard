@@ -295,3 +295,18 @@ export const GRAVITY: FieldScene = {
   ],
   kinds: ['singles', 'doubles'],
 };
+
+/** Gastro Acid ends with the switch: Dragonite goes out and comes back, and its Multiscale works again. */
+export const GASTRO_ACID_THEN_SWITCH: FieldScene = {
+  title: 'Multiscale back after a switch',
+  p1: team(set('Gengar', '', 'Cursed Body', ['Gastro Acid', 'Shadow Ball', 'Splash'], 'Modest', { spa: 252, spe: 252 })),
+  p2: team(set('Dragonite', '', 'Multiscale', ['Splash'], 'Impish', { hp: 252, def: 252 }), set('Skarmory', '', 'Sturdy', ['Splash'], 'Impish', { hp: 252, def: 252 })),
+  attacker: 'Gengar', defender: 'Dragonite',
+  steps: doubles => [
+    { p1: alone(doubles, hit(doubles, 'Gastro Acid')), p2: alone(doubles, splash()) },
+    { p1: alone(doubles, splash()), p2: alone(doubles, doubles ? 'switch 3' : 'switch 2') },
+    { p1: alone(doubles, splash()), p2: alone(doubles, doubles ? 'switch 3' : 'switch 2') },
+    { p1: alone(doubles, hit(doubles, 'Shadow Ball')), p2: alone(doubles, splash()) },
+  ],
+  kinds: ['singles', 'doubles'],
+};
