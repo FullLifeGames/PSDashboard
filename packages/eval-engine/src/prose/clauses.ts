@@ -2,7 +2,7 @@ import { TIER_THRESHOLDS, diffChoices, playedSetupMove, type SideAnalysis } from
 import type { RankedChoice } from '../types.ts';
 import { winDeltaText, winPctText } from '../winprob.ts';
 import { formatLine } from './line.ts';
-import { choiceNoun, conditionalNote, displayBest, nullNote, oddsNote, oddsPart, phrase, playedVerb } from './phrases.ts';
+import { choiceNoun, conditionalNote, displayBest, nullNote, oddsNote, oddsPart, phrase, phraseReplies, playedVerb } from './phrases.ts';
 
 /**
  * The per-side clauses of the turn summary: paid-off reads, misplays,
@@ -15,7 +15,7 @@ import { choiceNoun, conditionalNote, displayBest, nullNote, oddsNote, oddsPart,
 function readClause(name: string, side: SideAnalysis, opponent: SideAnalysis): string | null {
   if (!side.riskPaidOff || !side.played || !side.safe) return null;
   const came = opponent.played ? `; ${phrase(opponent.played.label)} came instead` : '';
-  const priced = side.played.punishedBy ? ` The floor priced in ${side.played.punishedBy}${came}.` : '';
+  const priced = side.played.punishedBy ? ` The floor priced in ${phraseReplies(side.played.punishedBy)}${came}.` : '';
   const horizon = side.riskPayoffTurn
     ? side.riskPayoffTurn === 1 ? ' one turn later' : ` ${side.riskPayoffTurn} turns later`
     : '';
@@ -61,7 +61,7 @@ function unpunishedReadClause(
   caveat: string,
 ): string {
   const came = played.punishedBy && opponent.played
-    ? `its floor risked ${played.punishedBy} (down to ${winPctText(played.worstCase)}); ${phrase(opponent.played.label)} came instead`
+    ? `its floor risked ${phraseReplies(played.punishedBy)} (down to ${winPctText(played.worstCase)}); ${phrase(opponent.played.label)} came instead`
     : `its floor sat at ${winPctText(played.worstCase)}`;
   const framing = side.riskWasRead
     ? `a read against the opponent's tendencies: ${came}`

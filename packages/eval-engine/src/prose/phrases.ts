@@ -30,6 +30,13 @@ export const phrase = (label: string): string => {
 };
 
 /**
+ * Round 69 (T179): an opponent reply label as prose. A doubles pair reads per slot like phrase() ("playing
+ * Weather Ball→Incineroar and switching to Basculegion", 2695803506 t6); a singles reply keeps its string, since
+ * phrase() would turn "→ Heatran" into "switching to Heatran" and the singles pins read the raw label.
+ */
+export const phraseReplies = (label: string): string => (splitCombinedLabel(label).length > 1 ? phrase(label) : label);
+
+/**
  * Round 64 (T123): the gerund fits a subject ("switching to Heatran was
  * worth"), not an object. What a side did reads as a verb per slot
  * ("switched to Keldeo", "switched to Calyrex-Shadow and played Protect"),
@@ -142,9 +149,9 @@ export function conditionalNote(side: SideAnalysis): string {
   if (!conditional || !side.best) return '';
   const segments = [
     conditional.bestWhen
-      ? `${phrase(displayBest(side).label)} is the pick only if you expect ${conditional.bestWhen}`
+      ? `${phrase(displayBest(side).label)} is the pick only if you expect ${phraseReplies(conditional.bestWhen)}`
       : null,
-    conditional.mixWhen ? `${phrase(conditional.mixLabel)} covers ${conditional.mixWhen}` : null,
+    conditional.mixWhen ? `${phrase(conditional.mixLabel)} covers ${phraseReplies(conditional.mixWhen)}` : null,
   ].filter((segment): segment is string => segment !== null);
   return ` The engine's own equilibrium leans ${phrase(conditional.mixLabel)} ` +
     `(${Math.round(conditional.mixWeight * 100)}%)${segments.length > 0 ? `: ${segments.join('; ')}` : ''}.`;

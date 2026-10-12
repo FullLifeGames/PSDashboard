@@ -3,7 +3,7 @@ import { winDeltaText, winPercent } from './winprob.ts';
 import { forcedWinSpeaks } from './turn-analysis/forced-speech.ts';
 import { chanceRolled } from './turn-analysis/luck.ts';
 import { lostGround, shownAttribution } from './turn-analysis/risk.ts';
-import { percentBelowSure, phrase, playedBest, rollText } from './prose/phrases.ts';
+import { percentBelowSure, phrase, phraseReplies, playedBest, rollText } from './prose/phrases.ts';
 import {
   forcedClause, inaccuracyClause, readCreditClause, sackClause, sensitivityClause, sideClause, streakClause, unansweredClause,
 } from './prose/clauses.ts';
@@ -138,10 +138,12 @@ function hindsightSentence(analysis: TurnAnalysis, playerNames: PlayerNames): st
   const missed = reads.sort((a, b) => b.read.gain - a.read.gain)[0];
   if (!missed) return null;
   // Round 47: a click the opponent model favoured was findable before it came.
+  // Round 69 (T179): a doubles pair of clicks reads per slot; "the <pair> actually clicked" would not parse.
+  const clicked = phraseReplies(missed.read.against);
   const lead = missed.read.likeliest !== undefined
-    ? `${missed.read.against} was the likeliest click on the opponent model ` +
+    ? `${clicked} was the likeliest click on the opponent model ` +
       `(${Math.round(missed.read.likeliest * 100)}%), and against it`
-    : `against the ${missed.read.against} actually clicked,`;
+    : clicked === missed.read.against ? `against the ${clicked} actually clicked,` : `against what was actually clicked (${clicked}),`;
   return `The read was there for ${missed.name}: ${lead} ${phrase(missed.read.response)} ` +
     `was worth ${winDeltaText(missed.read.gain)} more.`;
 }
@@ -159,7 +161,7 @@ function predictiveSentence(analysis: TurnAnalysis, playerNames: PlayerNames): s
     entry.read !== undefined);
   const top = reads.sort((a, b) => b.read.gain - a.read.gain)[0];
   if (!top) return null;
-  return `If ${top.name} expects ${top.read.expect} (${Math.round(top.read.confidence * 100)}% on the opponent model), ` +
+  return `If ${top.name} expects ${phraseReplies(top.read.expect)} (${Math.round(top.read.confidence * 100)}% on the opponent model), ` +
     `${phrase(top.read.response)} is the move: ${winDeltaText(top.read.gain)} over ${phrase(top.read.over)} against it.`;
 }
 
