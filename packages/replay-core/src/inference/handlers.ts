@@ -173,11 +173,23 @@ export function addFromSwitch(state: InferrerState, line: LogLine) {
   else state.pokemonMap.set(parsed.species, revealedPokemon(parsed, unknownField()));
 }
 
-/** Move: |move|p2a: Nickname|Move Name|target; the client's rule decides which move the line books (T108 step 2). */
+/**
+ * The move line a `|cant|` line stands for, or null when it names no move (sleep, paralysis, flinch, recharge, Truant).
+ * The blocked move never ran, so the log shows it only here (Taunt, Imprison, Disable, Heal Block; T175). A blocker's line
+ * (Dazzling, Queenly Majesty, Armor Tail, Damp) is `[of]` and reaches the inference as the protocol's `-block`: it follows
+ * the stopped attacker's own `|move|` line, so it is no `cant` here.
+ */
+function blockedMoveLine(line: LogLine): LogLine | null {
+  const moveName = arg(line, 3);
+  return moveName ? { ...line, cmd: 'move', args: ['move', arg(line, 1), moveName], kwArgs: {} } : null;
+}
+
+/** Move: |move|p2a: Nickname|Move Name|target, or the move of a |cant| line; the client's rule decides which move the line books (T108 step 2). */
 export function recordMove(state: InferrerState, line: LogLine) {
-  const nickname = line.cmd === 'move' ? sideSubject(line, state.opponentSide) : null;
-  if (nickname === null) return;
-  const moveName = ownMove(state, line);
+  const moveLine = line.cmd === 'cant' ? blockedMoveLine(line) : line;
+  const nickname = moveLine?.cmd === 'move' ? sideSubject(moveLine, state.opponentSide) : null;
+  if (!moveLine || nickname === null) return;
+  const moveName = ownMove(state, moveLine);
   if (!moveName) return;
 
   const pokemon = findPokemon(state, nickname);

@@ -31,7 +31,7 @@ import { arg, fromEffect, identOf, keyOf, ofIdent, type LogLine } from './log-li
  * Jaboca and Rowap Berry without [of], and a move's booking by nickname (3,
  * where the client's positions go astray). Ogerpon's Embody Aspect (2) stays
  * off the set because the Dex keeps a Tera forme's ability off its species;
- * the moves a `cant` line names (9) are lane G's Taunt cases.
+ * the moves a `cant` line names (9) are booked from the line itself (T175).
  */
 
 type ClientPokemon = NonNullable<ReturnType<NonNullable<InferrerState['hitWalk']>['battle']['getPokemon']>>;

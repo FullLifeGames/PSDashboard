@@ -120,3 +120,43 @@ describe('scene: 752301, Landorus\'s Taunt shows only in a |cant| line', () => {
     expect(seen.get(3)).toEqual({ active: 'Samurott-Hisui', taunted: false });
   });
 });
+
+describe('round 69 (T175): the inference books a |cant| move, so the rebuilt set holds it and the click is the shown move', () => {
+  test('singles: a body whose set has the Taunt plays Taunt, not a stand-in', () => {
+    const board = make('gen9customgame', [landorus(['Taunt', 'Earthquake', 'Stealth Rock', 'Stone Edge'])], [taunter]);
+    expect(getMainChoice(tauntTurn, 'p1', board as never)).toBe('move 1');
+  });
+
+  test('doubles: the same click, beside the partner keeping its own move', () => {
+    const board = make('gen9doublescustomgame',
+      [landorus(['Taunt', 'Earthquake', 'Stealth Rock', 'Stone Edge']), mon('Amoonguss', 'Leftovers', 'Regenerator', ['Spore', 'Protect'])],
+      [taunter, mon('Chansey', 'Eviolite', 'Natural Cure', ['Soft-Boiled'])]);
+    const events = [...tauntTurn, '|move|p1b: Amoonguss|Protect|p1b: Amoonguss'];
+    expect(getMainChoice(events, 'p1', board as never)).toBe('move 1 +1, move 2');
+  });
+
+  test('752301: the set built from the log has the Taunt of the cant line, and no choice is rejected without a hand-set move list', { timeout: 240000 }, async () => {
+    const replay = fixture('smogtours-gen9ou-752301.json');
+    const { snapshots, observations, speedOrders } = parseReplayLogWithObservations(replay.log);
+    const { p1Team, p2Team } = buildTeamsFromReplay(replay.log, { observations, speedOrders });
+    expect(p1Team.find(set => set.species === 'Landorus-Therian')!.moves).toContain('Taunt');
+    const snapshotFor = (turn: number) => snapshots[Math.min(turn - 1, snapshots.length - 1)] ?? null;
+    const seen = new Map<number, { active: string; taunted: boolean }>();
+    const runtime = await reconstructBranchRuntime({
+      format: getBranchSimulatorFormat(replay), p1Team, p2Team, replayLog: replay.log,
+      bringOnly: replayBringOnly(replay, parseReplayLog(replay.log)) ?? undefined,
+      targetTurn: 4, snapshot: snapshotFor(4),
+      choiceLocks: buildChoiceLockContext(replay.log, { p1Team, p2Team }, observations),
+      capturePositions: {
+        snapshotFor,
+        onPosition: (turn, battle) => {
+          const active = battle.sides[0].active[0]!;
+          if (!seen.has(turn)) seen.set(turn, { active: active.species.name, taunted: 'taunt' in active.volatiles });
+        },
+      },
+    });
+    expect(runtime.choiceErrors.count).toBe(0);
+    expect(seen.get(2)).toEqual({ active: 'Landorus-Therian', taunted: true });
+    expect(seen.get(3)).toEqual({ active: 'Samurott-Hisui', taunted: false });
+  });
+});
