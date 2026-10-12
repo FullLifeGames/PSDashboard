@@ -1,7 +1,7 @@
 import { Dex } from '@pkmn/dex';
 import type { PokemonSet } from '@pkmn/sim';
 import type { PokemonEvs, SpeedOrderObservation } from '../types.ts';
-import { capToBudget, evStep, onBudgetScale, ZERO_EVS } from './ev-budget.ts';
+import { capToBudget, evStep, evsOfSet, onBudgetScale, ZERO_EVS } from './ev-budget.ts';
 import {
   firstOf, keyOf, physicalAttackerFor, racedWithScarf, secondOf, setOf, speedStat, weakRace, type RaceSide, type ReadOrder, type SolveContext,
 } from './fit.ts';
@@ -372,7 +372,7 @@ function components(races: Race[]): Race[][] {
 
 function racerFor(ctx: SolveContext, knowledge: SpeedKnowledgeMap, side: Side, species: string): Racer {
   const set = setOf(ctx, side, species)!;
-  const prior: SpreadCandidate = { evs: { ...ZERO_EVS, ...set.evs }, nature: set.nature || 'Hardy' };
+  const prior: SpreadCandidate = { evs: evsOfSet(set.evs, ctx.budget), nature: set.nature || 'Hardy' };
   const key = keyOf(side, species);
   const stat = speedStat(ctx, side, species, prior);
   return {

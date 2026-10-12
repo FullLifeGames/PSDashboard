@@ -1,3 +1,4 @@
+import { TeamValidator } from '@pkmn/sim';
 import type { PokemonEvs } from '../types.ts';
 
 export const ZERO_EVS: PokemonEvs = { hp: 0, atk: 0, def: 0, spa: 0, spd: 0, spe: 0 };
@@ -9,10 +10,46 @@ export const ALL_31_IVS: PokemonEvs = { hp: 31, atk: 31, def: 31, spa: 31, spd: 
  * Format-dependent EV legality. Pokémon Champions replaces EVs by Stat
  * Points (32 per stat, 66 in total; `statPoints`): the server's statModify
  * (@pkmn/mods champions) adds one stat point per Stat Point and reads no IV.
+ * Gens 1 and 2 (round 69, T192) have no EV limit, so a set without EVs gets
+ * 252 in every stat from the server (`start`, asked of its validator), and
+ * one Special stat (`oneSpecial`): the calculator throws and the validator
+ * copies when a Special Defense differs from Special Attack there.
  */
-export interface EvBudget { perStat: number; total: number; statPoints: boolean }
+export interface EvBudget { perStat: number; total: number; statPoints: boolean; start: number; oneSpecial: boolean }
 export function evBudget(formatid: string): EvBudget {
-  return /champions/.test(formatid) ? { perStat: 32, total: 66, statPoints: true } : { perStat: 252, total: 508, statPoints: false };
+  if (/champions/.test(formatid)) return { perStat: 32, total: 66, statPoints: true, start: 0, oneSpecial: false };
+  if (!/^gen[12]\D/.test(formatid)) return { perStat: 252, total: 508, statPoints: false, start: 0, oneSpecial: false };
+  return { perStat: 252, total: 6 * 252, statPoints: false, start: serverStartEv(formatid), oneSpecial: true };
+}
+
+const startMemo = new Map<string, number>();
+
+/** The EV every stat of a set without EVs gets from the server's validator (252 where the format has no EV limit). */
+function serverStartEv(formatid: string): number {
+  const known = startMemo.get(formatid);
+  if (known !== undefined) return known;
+  const probe = { name: '', species: 'Pikachu', moves: [] } as unknown as { evs?: PokemonEvs };
+  try {
+    new TeamValidator(formatid).validateSet(probe as never, {});
+  } catch {
+    // Not a format of the simulator: no EVs are given.
+  }
+  const start = probe.evs?.hp ?? 0;
+  startMemo.set(formatid, start);
+  return start;
+}
+
+/** What a set carries as its spread: its own EVs, else what the server gives a set without any (round 69, T192). */
+export const evsOfSet = (evs: Partial<PokemonEvs> | undefined, budget: EvBudget): PokemonEvs =>
+  (evs ? { ...ZERO_EVS, ...evs } : { hp: budget.start, atk: budget.start, def: budget.start, spa: budget.start, spd: budget.start, spe: budget.start });
+
+/**
+ * A spread or IV set as the calculator reads it where there is one Special stat: the validator copies Special Attack to
+ * Special Defense (Gen 1) and the calculator throws when they differ, so a body never reaches it apart (round 69, T192).
+ */
+export function coupleSpecial<T extends Partial<PokemonEvs>>(stats: T | undefined, budget: EvBudget): T | undefined {
+  const special = stats?.spa ?? stats?.spd;
+  return budget.oneSpecial && stats && special !== undefined ? { ...stats, spa: special, spd: special } : stats;
 }
 
 export const evTotal = (evs: PokemonEvs): number =>
@@ -84,6 +121,8 @@ export function capToBudget(
   for (const stat of Object.keys(out) as (keyof PokemonEvs)[]) {
     out[stat] = Math.min(budget.perStat, Math.max(0, out[stat] ?? 0));
   }
+  // One Special: a claim on either side stands for both (the one stat serves offense and defense alike).
+  if (budget.oneSpecial) out.spa = out.spd = Math.max(out.spa ?? 0, out.spd ?? 0);
   const shaveOrder: (keyof PokemonEvs)[] = [
     ...(['atk', 'spa', 'def', 'spd', 'hp'] as (keyof PokemonEvs)[]).filter(stat => !protectedStats.has(stat) && !kept.has(stat)),
     ...(kept.has('spe') ? [] : ['spe' as const]),

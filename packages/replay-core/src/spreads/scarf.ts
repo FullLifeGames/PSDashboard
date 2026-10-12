@@ -1,7 +1,7 @@
 import type { PokemonSet } from '@pkmn/sim';
 import type { PokemonEvs } from '../types.ts';
 import { keyOf, speedStat, weakRace, type ReadOrder, type SolveContext } from './fit.ts';
-import { onBudgetScale, statPointsOfEv, ZERO_EVS, type EvBudget } from './ev-budget.ts';
+import { evsOfSet, onBudgetScale, statPointsOfEv, ZERO_EVS, type EvBudget } from './ev-budget.ts';
 import { raceSpeed, scarfedSpeed } from './race-speed.ts';
 import type { SpreadCandidate } from './ladder.ts';
 import { toId } from '../ids.ts';
@@ -78,7 +78,7 @@ function mover(ctx: SolveContext, side: 'p1' | 'p2', species: string, knowledge:
   const set = ctx.sets[side].find(entry => toId(entry.species) === toId(species) || toId(entry.name || '') === toId(species));
   if (!set) return null;
   const know = knowledge.get(key) ?? NONE;
-  const prior: SpreadCandidate = { evs: { ...ZERO_EVS, ...set.evs }, nature: set.nature || 'Hardy' };
+  const prior: SpreadCandidate = { evs: evsOfSet(set.evs, ctx.budget), nature: set.nature || 'Hardy' };
   const threshold = investedFrom(ctx.budget);
   const invested = (spread: SpreadCandidate) => (spread.evs.spe ?? 0) >= threshold;
   return { key, side, species, set, know, prior, plausible: plausibleSpreads(know, prior, ctx.budget, invested), invested, forme };

@@ -5,7 +5,7 @@ import { Dex } from '@pkmn/dex';
 import type { PokemonSet } from '@pkmn/sim';
 import type { DamageObservation, PokemonEvs, SpeedOrderObservation } from '../types.ts';
 import { typedHiddenPowerId } from '../hidden-power.ts';
-import { calcIvs, evBudget, onBudgetScale, statPointsOfEv, ZERO_EVS, type EvBudget } from './ev-budget.ts';
+import { calcIvs, coupleSpecial, evBudget, evsOfSet, onBudgetScale, statPointsOfEv, ZERO_EVS, type EvBudget } from './ev-budget.ts';
 import type { CandidateRung, SpreadCandidate } from './ladder.ts';
 import type { ItemDecision, SpeedKnowledgeMap } from './scarf.ts';
 import type { ObservedMaxHp } from './max-hp.ts';
@@ -168,7 +168,7 @@ export function spreadFor(ctx: SolveContext, side: 'p1' | 'p2', species: string)
   const existing = ctx.solved.get(key);
   if (existing) return existing;
   const set = setOf(ctx, side, species);
-  return { evs: { ...ZERO_EVS, ...(set?.evs ?? {}) }, nature: set?.nature || 'Hardy' };
+  return { evs: evsOfSet(set?.evs, ctx.budget), nature: set?.nature || 'Hardy' };
 }
 
 /** The calculator's current HP for a fraction of the maximum: below the maximum whenever the fraction is (Multiscale reads full HP exactly). */
@@ -190,8 +190,8 @@ export function calcPokemon(ctx: SolveContext, side: 'p1' | 'p2', species: strin
     abilityOn: hit.abilityOn,
     item: (spread.item ?? set?.item) || undefined,
     nature: spread.nature,
-    evs: spread.evs,
-    ivs: set?.ivs,
+    evs: coupleSpecial(spread.evs, ctx.budget),
+    ivs: coupleSpecial(set?.ivs, ctx.budget),
     boosts: hit.boosts,
     // The stat the log named for an active Protosynthesis or Quark Drive (T167): the calculator boosts that one, not the best of its own reading.
     boostedStat: hit.boostedStat as CalcOptions['boostedStat'],
@@ -265,8 +265,8 @@ export function observationError(ctx: SolveContext, obs: ReadObservation, candid
 export function speedStat(ctx: SolveContext, side: 'p1' | 'p2', species: string, spread: SpreadCandidate, forme?: string): number {
   const set = setOf(ctx, side, species);
   const name = forme ?? set?.species ?? species;
-  const evs = spread.evs;
-  const ivs = spread.ivs ?? set?.ivs;
+  const evs = coupleSpecial(spread.evs, ctx.budget);
+  const ivs = coupleSpecial(spread.ivs ?? set?.ivs, ctx.budget);
   for (const candidate of [name, name.split('-')[0]]) {
     try {
       return buildCalcPokemon(ctx.gen, candidate, { level: set?.level || 100, nature: spread.nature, evs, ivs }).stats.spe;
