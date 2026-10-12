@@ -45,7 +45,7 @@ export function parseReplayLogWithObservations(log: string): {
   speedOrders: SpeedOrderObservation[];
   hpEvidence: HiddenPowerEvidence[];
 } {
-  const state = createParserState();
+  const state = createParserState(log.match(/^\|tier\|([^|\n]+)/m)?.[1]);
   const lines = log.split('\n');
 
   for (const line of lines) {

@@ -1,7 +1,7 @@
 import type { Battle, Pokemon, Side, Field } from '@pkmn/client';
 import type { GenerationNum } from '@pkmn/data';
 import type { PokemonSnapshot, SideSnapshot, FieldSnapshot } from '../types.ts';
-import { flushSpeedOrder, gens, speedContaminatedAt, type ClientIdent, type ParserState, type PendingMove } from './parser-state.ts';
+import { flushSpeedOrder, speedContaminatedAt, type ClientIdent, type ParserState, type PendingMove } from './parser-state.ts';
 import { firstMoverContaminated, foreignAction, secondMoverContaminated, switchTriggered } from './speed-evidence.ts';
 import { toId } from '../ids.ts';
 
@@ -70,7 +70,7 @@ export function handleGen(state: ParserState, line: string) {
  * add what lets a first mover act early or a second mover act last.
  */
 function speedCleanliness(state: ParserState, ident: string, moveId: string): { cleanFirst: boolean; cleanSecond: boolean } {
-  const priority = gens.get(state.genNum).moves.get(moveId)?.priority ?? 0;
+  const priority = state.battle.gens.get(state.genNum).moves.get(moveId)?.priority ?? 0;
   const cleanFirst = priority === 0 && !speedContaminatedAt(state, ident, 'first') && !firstMoverContaminated(state, ident, moveId);
   const cleanSecond = priority === 0 && !speedContaminatedAt(state, ident, 'second') && !secondMoverContaminated(state, ident, moveId);
   return { cleanFirst, cleanSecond };

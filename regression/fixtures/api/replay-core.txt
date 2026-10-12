@@ -4,10 +4,12 @@ type ChaosStatsPayload
 type DamageObservation
 type EvBudget
 type FieldSnapshot
+type GenerationsScope
 type HiddenPowerEvidence
 type HitParty
 type ItemDamageJudge
 type KnowledgeSource
+type LegalDex
 type LoggedHit
 type OpponentTeamInfo
 type PastedSet
@@ -69,6 +71,7 @@ value extractTeamSheets
 value fillUsageMoves
 value finalPlayedTurn
 value formatEnforcesSleepClause
+value generationsFor
 value getBranchSimulatorFormat
 value getReplayBringCount
 value getReplayDisplayFormat

@@ -8,6 +8,8 @@
  */
 export { WEATHER_BY_ID, TERRAIN_BY_ID } from './calc-field.ts';
 export { calcGenerationFor, calcModOf, simGenNum, CHAMPIONS_MOD } from './calc-gen.ts';
+export { generationsFor } from './format-generations.ts';
+export type { GenerationsScope, LegalDex } from './format-generations.ts';
 export type { CalcGeneration } from './calc-gen.ts';
 export { buildCalcPokemon, calcBaseStats, calcKnowsMove, calcSpecies, speciesOverrides } from './calc-build.ts';
 export type { CalcPokemonOptions, SpeciesDex } from './calc-build.ts';

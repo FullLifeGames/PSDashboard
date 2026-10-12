@@ -1,4 +1,5 @@
-import { gens, type ClientIdent, type ParserState } from './parser-state.ts';
+import type { Generation } from '@pkmn/data';
+import type { ClientIdent, ParserState } from './parser-state.ts';
 import type { SpeedOrderObservation } from '../types.ts';
 import { toId } from '../ids.ts';
 
@@ -162,7 +163,7 @@ interface SlotLine {
   slot: string;
   details: string;
   at: number;
-  gen: number;
+  data: Generation;
 }
 
 /** The protocol the parse has read: the snapshots keep each turn's lines, the last turn is still open. */
@@ -191,18 +192,17 @@ function enter({ slots, turn, slot, details, at }: SlotLine): void {
  * runMegaEvo: canMegaEvo gives a Mega, canUltraBurst the forme a Z-Crystal
  * holder bursts into), read from the Dex.
  */
-function megaEvolution(gen: number, species: string): boolean {
-  const data = gens.get(gen as Parameters<typeof gens.get>[0]);
+function megaEvolution(data: Generation, species: string): boolean {
   const forme = data.species.get(species);
   return !!forme?.isMega || !!(forme?.requiredItem && data.items.get(forme.requiredItem)?.zMove);
 }
 
 /** A forme change of the slot (`detailschange`, `-formechange`), from this line on. */
-function changeForme({ slots, slot, details, at, gen }: SlotLine): void {
+function changeForme({ slots, slot, details, at, data }: SlotLine): void {
   const entry = slots.get(slot);
   const to = speciesOf(details);
   if (!entry || entry.copied || entry.species === to) return;
-  entry.mon.formes.push({ at, species: to, resorted: megaEvolution(gen, to) });
+  entry.mon.formes.push({ at, species: to, resorted: megaEvolution(data, to) });
   entry.species = to;
 }
 
@@ -252,7 +252,7 @@ function startTurn(slots: Map<string, Slot>, at: number): TurnRead {
 }
 
 /** Per turn, the Pokémon on the field, the formes each held from which line on, and the transformed slots. */
-function readTurns(lines: string[], gen: number): Map<number, TurnRead> {
+function readTurns(lines: string[], data: Generation): Map<number, TurnRead> {
   const slots = new Map<string, Slot>();
   let turn: TurnRead = { mons: [], copies: [] };
   const turns = new Map<number, TurnRead>([[0, turn]]);
@@ -262,7 +262,7 @@ function readTurns(lines: string[], gen: number): Map<number, TurnRead> {
       turn = startTurn(slots, at);
       turns.set(parseInt(ident, 10), turn);
     } else {
-      SLOT_LINES[tag]?.({ slots, turn, line, slot: ident.slice(0, 3), details, at, gen });
+      SLOT_LINES[tag]?.({ slots, turn, line, slot: ident.slice(0, 3), details, at, data });
     }
   });
   return turns;
@@ -301,13 +301,13 @@ function racedMover(
   if (copy) return copy.shared ? null : { species: copy.own, copied: copy.copied };
   const mon = recordOf(turn, side, species);
   const raced = mon && formeAtSort(state, mon, firstActed);
-  const dex = gens.get(state.genNum).species;
+  const dex = state.battle.gens.get(state.genNum).species;
   return { species: raced && dex.get(raced)?.baseStats.spe !== dex.get(species)?.baseStats.spe ? raced : species };
 }
 
 /** Every order names the mover that raced: its forme at the sort, or what it copied (round 64). */
 export function settleRacedFormes(state: ParserState): void {
-  const turns = readTurns(readLines(state), state.genNum);
+  const turns = readTurns(readLines(state), state.battle.gens.get(state.genNum));
   state.speedOrders = state.speedOrders.flatMap(order => {
     const turn = turns.get(order.turn);
     if (!turn) return [order];
@@ -332,7 +332,7 @@ function mayHaveAbility(state: ParserState, ident: string, abilityId: string): b
   const mon = state.battle.getPokemon(ident as ClientIdent);
   if (!mon) return false;
   if (mon.ability) return mon.ability === abilityId;
-  const species = gens.get(state.genNum).species.get(mon.speciesForme);
+  const species = state.battle.gens.get(state.genNum).species.get(mon.speciesForme);
   return Object.values(species?.abilities ?? {}).some(name => toId(String(name)) === abilityId);
 }
 
@@ -343,7 +343,7 @@ function atFullHp(state: ParserState, ident: string): boolean {
 
 /** Prankster, Gale Wings, Triage, and Grassy Glide give the move a bracket above Speed. */
 function conditionalPriority(state: ParserState, ident: string, moveId: string): boolean {
-  const move = gens.get(state.genNum).moves.get(moveId);
+  const move = state.battle.gens.get(state.genNum).moves.get(moveId);
   if (!move) return false;
   if (move.category === 'Status' && mayHaveAbility(state, ident, 'prankster')) return true;
   if (move.type === 'Flying' && mayHaveAbility(state, ident, 'galewings') && (state.genNum < 7 || atFullHp(state, ident))) return true;
@@ -371,7 +371,7 @@ export function firstMoverContaminated(state: ParserState, ident: string, moveId
 export function secondMoverContaminated(state: ParserState, ident: string, moveId: string | null): boolean {
   if (mayHaveAbility(state, ident, 'stall')) return true;
   if (moveId !== null && mayHaveAbility(state, ident, 'myceliummight')) {
-    return gens.get(state.genNum).moves.get(moveId)?.category === 'Status';
+    return state.battle.gens.get(state.genNum).moves.get(moveId)?.category === 'Status';
   }
   return false;
 }

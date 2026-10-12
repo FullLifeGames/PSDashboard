@@ -1,6 +1,7 @@
 import { Battle } from '@pkmn/client';
 import type { HitParty, LoggedHit } from '../types.ts';
-import { gens, type ClientIdent } from '../protocol/parser-state.ts';
+import { generationsFor } from '../format-generations.ts';
+import type { ClientIdent } from '../protocol/parser-state.ts';
 import { Protocol } from '@pkmn/protocol';
 import { findPokemon, type InferrerState } from './inferrer-state.ts';
 import { illusionPossible } from './item-evidence.ts';
@@ -62,7 +63,7 @@ export interface HitWalk {
 function newWalk(state: InferrerState): HitWalk {
   const tierLine = state.lines.find(line => line.cmd === 'tier');
   const tier = tierLine ? arg(tierLine, 1) : '';
-  return { battle: new Battle(gens), pending: null, hits: new Map(), swapped: new Set(), neutralized: false, format: tier };
+  return { battle: new Battle(generationsFor(tier)), pending: null, hits: new Map(), swapped: new Set(), neutralized: false, format: tier };
 }
 
 /** The stat an active Protosynthesis or Quark Drive raises, from the client's volatile ('protosynthesisatk' -> 'atk'). */

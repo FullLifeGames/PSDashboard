@@ -1,9 +1,7 @@
 import { Battle } from '@pkmn/client';
-import { Generations, type GenerationNum } from '@pkmn/data';
-import { Dex } from '@pkmn/dex';
+import type { GenerationNum } from '@pkmn/data';
+import { generationsFor } from '../format-generations.ts';
 import type { DamageObservation, HiddenPowerEvidence, SpeedOrderObservation, TurnSnapshot } from '../types.ts';
-
-export const gens = new Generations(Dex);
 
 export type ClientIdent = Parameters<Battle['getPokemon']>[0];
 
@@ -69,9 +67,10 @@ export interface ParserState {
   capturedInitial: boolean;
 }
 
-export function createParserState(): ParserState {
+/** A fresh scan state; `format` is the log's tier, which picks the Generations the client battle is built on. */
+export function createParserState(format = ''): ParserState {
   return {
-    battle: new Battle(gens),
+    battle: new Battle(generationsFor(format)),
     snapshots: [],
     observations: [],
     speedOrders: [],
