@@ -9,7 +9,7 @@ import { advancePosition, advancePositionWithLog, createRootPosition, positionBa
 import { createLocalExecutor, subSearchDepth1 } from '../src/search';
 import { countFainted, leafValue, SEARCH_SEEDS } from '../src/search/leaf';
 import { sampleCell } from '../src/search/cell-sampler';
-import { deeperValues, VERIFY_DEEPEN_COVER, VERIFY_PLAIN_DRAWS, VERIFY_STATE_RULE } from '../src/search/verify-cell';
+import { deeperValues, VERIFY_CHEAP, VERIFY_DEEPEN_COVER, VERIFY_LIGHT, VERIFY_PLAIN_DRAWS, VERIFY_STATE_RULE, type CheapDeepening } from '../src/search/verify-cell';
 import type { EvalCellValue, EvalSettings, MctsTreeStats } from '../src/types';
 import { anchorRoot, doublesRoot, pairSet, PLAYED } from './pair-battles';
 
@@ -47,6 +47,16 @@ const FOCUS = ['move focusblast', 'move curse'] as const;
 
 const deepened = (root: ReturnType<typeof createRootPosition>, child: ReturnType<typeof advancePosition>) =>
   (positionBattle(child).ended ? leafValue(positionBattle(child), createMatchupCache()) : subSearchDepth1(child.serialized, SUB, createMatchupCache()).score);
+
+/** Round 69 (T148): the light price the executor gives an outcome beyond the cover, as the game type's VERIFY_CHEAP rule sets it. */
+const cheapFor = (root: ReturnType<typeof createRootPosition>): CheapDeepening | undefined => {
+  const mode = VERIFY_CHEAP[positionBattle(root).gameType === 'doubles' ? 'doubles' : 'singles'];
+  return mode === 'off' ? undefined : {
+    price: child => (positionBattle(child).ended ? leafValue(positionBattle(child), createMatchupCache()) : subSearchDepth1(child.serialized, SUB, createMatchupCache(), true).score),
+    statesOnly: mode === 'states',
+    minWeight: VERIFY_LIGHT.minWeight,
+  };
+};
 
 describe('the merge mixes per-class depth (round 63, T16)', () => {
   const options = (labels: string[]) => labels.map(label => ({ choice: label, label }));
@@ -181,7 +191,7 @@ describe('the verify executor deepens per class (round 63, T16)', () => {
     expect(value.deepened).toBeUndefined();
   });
 
-  test('a doubles pair-plan cell: the heaviest open class goes one ply deeper through its states, the rest shift by its step', { timeout: 120_000 }, async () => {
+  test('a doubles pair-plan cell: the heaviest open class goes one ply deeper through its states, the rest take the light price', { timeout: 120_000 }, async () => {
     const root = anchorRoot();
     const [value] = await createLocalExecutor(root.serialized).evalCells([{ i: 0, j: 0, p1Choice: PLAYED[0], p2Choice: PLAYED[1], samples: 3, deepen: SUB }]);
     const open = value.blend!.classes.filter(cls => !cls.ended);
@@ -191,7 +201,7 @@ describe('the verify executor deepens per class (round 63, T16)', () => {
     const expected = deeperValues(open.map(cls => ({
       weight: cls.weight, child: sample.classChildren!.get(cls.key)!, leaf: cls.leafSum / cls.count, ended: false,
       ...(sample.classGroups?.get(cls.key) ? { groups: sample.classGroups.get(cls.key) } : {}),
-    })), position => deepened(root, position), VERIFY_DEEPEN_COVER.doubles, Number.POSITIVE_INFINITY, VERIFY_STATE_RULE.doubles);
+    })), position => deepened(root, position), VERIFY_DEEPEN_COVER.doubles, Number.POSITIVE_INFINITY, VERIFY_STATE_RULE.doubles, cheapFor(root));
     open.forEach((cls, index) => expect(cls.deepened, cls.key).toBeCloseTo(expected[index], 12));
     // The first natural draw's class deepens the same child the old verify step deepened.
     const first = open.find(cls => cls.hasFirst)!;
@@ -209,7 +219,7 @@ describe('a cell without a plan draws more and deepens each outcome (round 63, T
     const [value] = await createLocalExecutor(root.serialized).evalCells([{ i: 0, j: 0, p1Choice: p1, p2Choice: p2, samples: 3, deepen: SUB }]);
     expect(value.blend).toBeUndefined();
     const rule = VERIFY_STATE_RULE[positionBattle(root).gameType === 'doubles' ? 'doubles' : 'singles'];
-    const values = deeperValues(groups.map(group => ({ ...group, weight: group.share })), position => deepened(root, position), cover, Number.POSITIVE_INFINITY, rule);
+    const values = deeperValues(groups.map(group => ({ ...group, weight: group.share })), position => deepened(root, position), cover, Number.POSITIVE_INFINITY, rule, cheapFor(root));
     const expected = groups.reduce((sum, group, index) => sum + group.share * values[index], 0);
     expect(value.deepened).toBeCloseTo(expected, 12);
     expect(value.value).toBeCloseTo(sample.value, 12);

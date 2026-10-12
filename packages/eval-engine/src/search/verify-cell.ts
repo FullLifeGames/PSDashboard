@@ -1,8 +1,10 @@
 import type { PRNGSeed } from '@pkmn/sim';
 import type { MatchupCache } from '../eval-function.ts';
-import { advancePositionWithLog, positionBattle, type SimPosition } from '../forward-model.ts';
+import { advancePositionWithLog, positionBattle, type ChoiceOption, type SimPosition } from '../forward-model.ts';
 import { PROBE_SEEDS } from '../cell-blend.ts';
+import { GIMMICK_TOKENS } from '../rank.ts';
 import type { EvalCellValue } from '../types.ts';
+import { combinedOptionHints, isCombined } from './hints.ts';
 import { leafValue, SEARCH_SEEDS } from './leaf.ts';
 
 /**
@@ -54,6 +56,48 @@ export const VERIFY_PLAIN_SEEDS: readonly PRNGSeed[] = [...SEARCH_SEEDS, ...PROB
  * reference's 0.05).
  */
 export const VERIFY_DEEPEN_COVER = { singles: 0.9, doubles: 0 } as const;
+
+/**
+ * Round 69 (T148): how an outcome beyond the cover is priced. 'off' shifts its one-ply leaf by the mean step of the
+ * deepened outcomes (singles, and doubles before this round); 'all' prices every open one through a light
+ * sub-search, 'states' only those whose draws leave different states (the others shift).
+ */
+export type CheapMode = 'off' | 'all' | 'states';
+export const VERIFY_CHEAP: { singles: CheapMode; doubles: CheapMode } = { singles: 'off', doubles: 'all' };
+
+/**
+ * The light sub-search: `options` a side by the static hints (a 5 x 5 matrix instead of 16 x 16, a fifth of a full
+ * sub-search's time), and outcomes lighter than `minWeight` keep the shift. Against the Monte-Carlo census of 23 doubles
+ * turns (probe lanes/D): cells outside 2.5 standard errors 47 to 39 of 215, mean error 0.0628 to 0.0495, at 247 light
+ * sub-searches on top of 304 full ones; 8 options and no weight floor read 35, at twice the cost.
+ */
+export const VERIFY_LIGHT = { options: 5, minWeight: 0.05 };
+
+/**
+ * The light price of an outcome beyond the cover, whether outcomes without states keep the shift, and the weight
+ * below which an outcome keeps the shift (its error costs its weight, the sub-search costs the same for every outcome).
+ */
+export interface CheapDeepening {
+  price: (child: SimPosition) => number;
+  statesOnly: boolean;
+  minWeight: number;
+}
+
+/**
+ * The option list of a light sub-search: a combined (doubles) list cut to its best `VERIFY_LIGHT.options` by the static threat
+ * hints, gimmick variants left out unless too few options remain, in list order. A singles list stays as it is.
+ */
+export function lightOptions(position: SimPosition, side: 'p1' | 'p2', options: ChoiceOption[], keep = VERIFY_LIGHT.options): ChoiceOption[] {
+  if (options.length <= keep || !isCombined(options)) return options;
+  const hints = combinedOptionHints(position, side, options);
+  const scored = options.map((option, index) => ({ option, index, value: hints[index] }));
+  const plain = scored.filter(entry => !entry.option.choice.split(/[ ,]+/).some(token => GIMMICK_TOKENS.has(token)));
+  return (plain.length >= keep ? plain : scored)
+    .sort((a, b) => b.value - a.value || a.index - b.index)
+    .slice(0, keep)
+    .sort((a, b) => a.index - b.index)
+    .map(entry => entry.option);
+}
 
 /**
  * Round 64 (T119): how an outcome that goes deeper splits its draws.
@@ -270,10 +314,11 @@ export interface Outcome {
  * open weight is covered (the heaviest always) and at most `cap` of them,
  * and the rest take their leaf shifted by the deepened ones' weighted mean
  * step. An outcome with states goes deeper through them under `states`.
+ * Round 69 (T148): with `cheap` the rest are priced by the light search instead of the shift.
  */
 export function deeperValues(
   outcomes: readonly Outcome[], deepen: (child: SimPosition) => number, cover: number, cap = Number.POSITIVE_INFINITY,
-  states: StateRule = VERIFY_STATE_RULE.singles,
+  states: StateRule = VERIFY_STATE_RULE.singles, cheap?: CheapDeepening,
 ): number[] {
   const values = outcomes.map(outcome => outcome.leaf);
   const open = outcomes.map((outcome, index) => ({ outcome, index })).filter(entry => !entry.outcome.ended)
@@ -294,7 +339,12 @@ export function deeperValues(
     covered += outcome.weight;
     taken += 1;
   }
-  for (const index of rest) values[index] = outcomes[index].leaf + step / covered;
+  for (const index of rest) {
+    const outcome = outcomes[index];
+    const priced = cheap !== undefined && outcome.weight >= cheap.minWeight;
+    if (priced && outcome.groups) values[index] = deeperStates(outcome.groups, cheap.price, states).value;
+    else values[index] = priced && !cheap.statesOnly ? cheap.price(outcome.child) : outcome.leaf + step / covered;
+  }
   return values;
 }
 
@@ -319,7 +369,7 @@ function deeperStates(groups: readonly StateGroup[], deepen: (child: SimPosition
  * whose draws leave different states goes deeper through each of them.
  */
 export function deepenVerifiedCell(
-  value: EvalCellValue, draws: VerifyDraws, deepen: (child: SimPosition) => number, cover: number,
+  value: EvalCellValue, draws: VerifyDraws, deepen: (child: SimPosition) => number, cover: number, cheap?: CheapDeepening,
 ): void {
   const states = stateRuleFor(draws.firstChild);
   if (value.blend) {
@@ -327,11 +377,11 @@ export function deepenVerifiedCell(
     const values = deeperValues(open.map(cls => {
       const groups = draws.classGroups?.get(cls.key);
       return { weight: cls.weight, child: draws.classChildren!.get(cls.key)!, leaf: cls.leafSum / cls.count, ended: false, ...(groups ? { groups } : {}) };
-    }), deepen, cover, Number.POSITIVE_INFINITY, states);
+    }), deepen, cover, Number.POSITIVE_INFINITY, states, cheap);
     open.forEach((cls, index) => { cls.deepened = values[index]; });
     return;
   }
   const groups = draws.outcomes ?? [{ share: 1, child: draws.firstChild, leaf: value.value, ended: value.ended }];
-  const values = deeperValues(groups.map(group => ({ ...group, weight: group.share })), deepen, cover, Number.POSITIVE_INFINITY, states);
+  const values = deeperValues(groups.map(group => ({ ...group, weight: group.share })), deepen, cover, Number.POSITIVE_INFINITY, states, cheap);
   value.deepened = groups.reduce((sum, group, index) => sum + group.share * values[index], 0);
 }
