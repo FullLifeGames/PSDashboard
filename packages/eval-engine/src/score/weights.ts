@@ -146,6 +146,17 @@ export interface EvalFeatures {
   sweepFastChip: number;
   sweepSlowKo: number;
   sweepSlowChip: number;
+  /**
+   * Round 69 (T42, decision 15): the field pair of a doubles board, p1-positive
+   * differences, 0 in singles, weight 0 until a fit prices them. pairFocus: a
+   * foe on the field that neither of the side's two actives KOs alone and both
+   * KO together, valued by the second attacker's marginal share of the foe's
+   * HP, over the foes on the field. pairRedirect: a living Follow Me or Rage
+   * Powder user next to a partner with damage, valued by the partner's best
+   * share of a foe's HP it covers, at the redirector's HP (score/field-pair.ts).
+   */
+  pairFocus: number;
+  pairRedirect: number;
 }
 
 export const FEATURE_WEIGHTS: Record<keyof EvalFeatures, number> = {
@@ -162,6 +173,8 @@ export const FEATURE_WEIGHTS: Record<keyof EvalFeatures, number> = {
   sweepFastChip: 0,
   sweepSlowKo: 0,
   sweepSlowChip: 0,
+  pairFocus: 0,
+  pairRedirect: 0,
 };
 
 /**
@@ -197,6 +210,8 @@ export const DOUBLES_FEATURE_WEIGHTS: Record<keyof EvalFeatures, number> = {
   sweepFastChip: 0,
   sweepSlowKo: 0,
   sweepSlowChip: 0,
+  pairFocus: 0,
+  pairRedirect: 0,
 };
 
 /**
@@ -224,6 +239,8 @@ export const VGC_DOUBLES_FEATURE_WEIGHTS: Record<keyof EvalFeatures, number> = {
   sweepFastChip: 0,
   sweepSlowKo: 0,
   sweepSlowChip: 0,
+  pairFocus: 0,
+  pairRedirect: 0,
 };
 
 /**
@@ -277,6 +294,8 @@ export const CHAMPIONS_FEATURE_WEIGHTS: Record<keyof EvalFeatures, number> = {
   sweepFastChip: 0,
   sweepSlowKo: 0,
   sweepSlowChip: 0,
+  pairFocus: 0,
+  pairRedirect: 0,
 };
 
 /**
@@ -315,6 +334,8 @@ export const CHAMPIONS_DOUBLES_FEATURE_WEIGHTS: Record<keyof EvalFeatures, numbe
   sweepFastChip: 0,
   sweepSlowKo: 0,
   sweepSlowChip: 0,
+  pairFocus: 0,
+  pairRedirect: 0,
 };
 
 /** The weight table of a game type under a rule set. */

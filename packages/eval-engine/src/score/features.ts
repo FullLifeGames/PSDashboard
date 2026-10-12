@@ -4,6 +4,7 @@ import { EVAL_WEIGHTS, type EvalFeatures } from './weights.ts';
 import { hazardCost, hazardRemovalEquity, strandedMons } from './hazards.ts';
 import { liveTypes, livingOf, threatGetter, type MatchupCache } from './threat.ts';
 import { matchupTerms, sweepCells } from './matchup.ts';
+import { fieldPairCells } from './field-pair.ts';
 
 /**
  * The raw feature vector: per-side bodies, boosts, hazards, screens,
@@ -132,6 +133,8 @@ export function evalFeatures(battle: Battle, cache?: MatchupCache): EvalFeatures
   const matchupPhase = damp + (1 - damp) * Math.min(1, faintedFraction * 3);
   const p1Cells = sweepCells(0, battle, threat);
   const p2Cells = sweepCells(1, battle, threat);
+  const p1Pair = fieldPairCells(0, battle, threat);
+  const p2Pair = fieldPairCells(1, battle, threat);
   return {
     bodies: p1.bodies - p2.bodies,
     boosts: p1.boosts - p2.boosts,
@@ -146,5 +149,7 @@ export function evalFeatures(battle: Battle, cache?: MatchupCache): EvalFeatures
     sweepFastChip: p1Cells.fastChip - p2Cells.fastChip,
     sweepSlowKo: p1Cells.slowKo - p2Cells.slowKo,
     sweepSlowChip: p1Cells.slowChip - p2Cells.slowChip,
+    pairFocus: p1Pair.focus - p2Pair.focus,
+    pairRedirect: p1Pair.redirect - p2Pair.redirect,
   };
 }
