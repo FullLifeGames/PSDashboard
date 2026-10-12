@@ -2,7 +2,8 @@ import { Dex } from '@pkmn/sim';
 import { Protocol } from '@pkmn/protocol';
 import type { InferrerState } from './inferrer-state.ts';
 import { possibleAbilities, ruleOutUnknown } from './item-evidence.ts';
-import { arg, identOf, keyOf, namesEffect, ofIdent, type LogLine } from './log-line.ts';
+import { arg, keyOf, namesEffect, ofIdent, type LogLine } from './log-line.ts';
+import { newItemTriggerWatch, teamSizeOf, watchItemTriggers, type ItemTriggerWatch } from './item-triggers.ts';
 import { toId } from '../ids.ts';
 
 /**
@@ -49,27 +50,17 @@ export interface TriggerWatch {
   entries: Map<string, EntryCheck>;
   /** Drops waiting for their Eject Pack line; `moved` once a move followed the drop. */
   drops: Map<string, { moved: boolean }>;
+  /** The Lum Berry, Sitrus Berry, Eject Button and Red Card windows (item-triggers.ts). */
+  items: ItemTriggerWatch;
 }
 
 const TERRAINS = new Set(['electricterrain', 'grassyterrain', 'mistyterrain', 'psychicterrain']);
 
-/** The team an Eject Pack could switch to: the brought count the log prints last (VGC brings 4 of 6), else the preview, else the entries. */
-function teamSizeOf(state: InferrerState): number {
-  const side = state.opponentSide;
-  const sizes = state.lines.filter(line => line.cmd === 'teamsize' && arg(line, 1) === side).map(line => Number(arg(line, 2)));
-  if (sizes.length > 0 && sizes[sizes.length - 1] > 0) return sizes[sizes.length - 1];
-  const preview = state.lines.filter(line => line.cmd === 'poke' && arg(line, 1) === side).length;
-  if (preview > 0) return preview;
-  return new Set(state.lines
-    .filter(line => (line.cmd === 'switch' || line.cmd === 'drag') && identOf(arg(line, 1))?.side === side)
-    .map(line => keyOf(arg(line, 1)))).size;
-}
-
 function newWatch(state: InferrerState): TriggerWatch {
   return {
-    gravity: false, magicRoom: false, weather: '', terrain: '', slots: new Map(), fainted: new Set(), teamSize: teamSizeOf(state),
+    gravity: false, magicRoom: false, weather: '', terrain: '', slots: new Map(), fainted: new Set(), teamSize: teamSizeOf(state, state.opponentSide),
     embargoed: new Set(), commanding: new Set(), neutralized: state.lines.some(line => namesEffect(line, 'Neutralizing Gas')),
-    entries: new Map(), drops: new Map(),
+    entries: new Map(), drops: new Map(), items: newItemTriggerWatch(state),
   };
 }
 
@@ -236,4 +227,5 @@ export function watchTriggerEvidence(state: InferrerState, line: LogLine) {
   noteCommander(watch, line);
   const key = keyOf(arg(line, 1));
   if (key.startsWith(state.opponentSide)) onOpponentLine(state, watch, line, key);
+  watchItemTriggers(state, watch.items, watch, line);
 }
