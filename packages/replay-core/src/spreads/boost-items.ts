@@ -24,3 +24,9 @@ export function boostItemIds(gen: number): ReadonlySet<string> {
 
 /** Whether the named item raises its holder's damage in the generation. */
 export const isBoostItem = (gen: number, item: string): boolean => boostItemIds(gen).has(toId(item));
+
+/** Whether the species cannot be what it is without the item (the Ogerpon masks, the orbs, Soul Dew: the Dex's required items). */
+export function requiresItem(gen: number, species: string, item: string): boolean {
+  const entry = Dex.forGen(gen).species.get(species);
+  return [entry.requiredItem, ...(entry.requiredItems ?? [])].some(name => !!name && toId(name) === toId(item));
+}

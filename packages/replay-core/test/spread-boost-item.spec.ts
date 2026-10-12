@@ -4,7 +4,7 @@ import { Move, calculate } from '@smogon/calc';
 import type { PokemonSet } from '@pkmn/sim';
 import { inferSpreads } from '../src/spread-inference';
 import { buildSolveContext, observationError } from '../src/spreads/fit';
-import { boostItemIds, isBoostItem } from '../src/spreads/boost-items';
+import { boostItemIds, isBoostItem, requiresItem } from '../src/spreads/boost-items';
 import { buildCalcPokemon } from '../src/calc-build';
 import { calcGenerationFor } from '../src/calc-gen';
 import { toId } from '../src/ids';
@@ -120,4 +120,29 @@ describe('a boost item is what the Dex says it is (T26)', () => {
     expect(isBoostItem(9, 'choiceband')).toBe(isBoostItem(9, 'Choice Band'));
     expect(gen9.items.get('lifeorb').exists).toBe(true);
   });
+});
+
+describe('an item the species needs is never a guess to drop (T26)', () => {
+  test('the Dex names the species that cannot do without a boost item', () => {
+    const dex = Dex.forGen(9);
+    const needing = dex.species.all().filter(entry => [entry.requiredItem, ...(entry.requiredItems ?? [])].some(name => !!name && isBoostItem(9, name)));
+    expect(needing.map(entry => entry.name)).toContain('Ogerpon-Hearthflame');
+    for (const entry of needing) {
+      for (const name of [entry.requiredItem, ...(entry.requiredItems ?? [])].filter(Boolean) as string[]) expect(requiresItem(9, entry.name, name), `${entry.name} ${name}`).toBe(true);
+    }
+    expect(requiresItem(9, 'Garchomp', 'Choice Band')).toBe(false);
+  });
+
+  for (const formatid of ['gen9ou', 'gen9doublesou']) {
+    test(`lines that read weaker than the Hearthflame Mask keep the mask (${formatid})`, () => {
+      const world = { ...WORLDS[0], formatid };
+      const prior: Mon = { species: 'Ogerpon-Hearthflame', side: 'p2', nature: 'Jolly', evs: evs({ atk: 252, spe: 252 }), item: 'Hearthflame Mask' };
+      const wall: Mon = { species: 'Clefable', side: 'p1', nature: 'Bold', evs: evs({ hp: 252, def: 252 }) };
+      const sets = { p1: [asSet(wall, 100, ['Moonblast'])], p2: [asSet(prior, 100, ['Ivy Cudgel', 'Wood Hammer'])] };
+      const truth: Mon = { ...prior, item: undefined };
+      const lines = [8, 5, 12].map(index => hit(world, truth, wall, 'Ivy Cudgel', index));
+      const solved = inferSpreads(lines, sets, formatid).get('p2:ogerponhearthflame');
+      expect(solved?.item).toBeUndefined();
+    });
+  }
 });

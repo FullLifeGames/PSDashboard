@@ -10,7 +10,7 @@ import { decideScarfs, type SpeedKnowledgeMap } from './spreads/scarf.ts';
 import { defenderSideOf } from './spreads/observation-read.ts';
 import { hpEvsForMaxHp, type ObservedMaxHp } from './spreads/max-hp.ts';
 import { readableOrders, settledSets } from './spreads/order-limit.ts';
-import { isBoostItem } from './spreads/boost-items.ts';
+import { isBoostItem, requiresItem } from './spreads/boost-items.ts';
 import { simGenNum } from './calc-gen.ts';
 
 export { evBudget, legalizeEvs } from './spreads/ev-budget.ts';
@@ -80,13 +80,14 @@ function priorWithFixedHp(prior: SpreadCandidate, hp: number, budget: EvBudget):
 
 /**
  * The set's item when it is a guessed boost item the damage lines may take away (round 69, T26): the build guessed it,
- * no log line, team sheet or edit showed it, and the simulator gives it a damage hook.
+ * no log line, team sheet or edit showed it, the simulator gives it a damage hook and the species does not need it.
  */
 function guessedBoostItem(ctx: SolveContext, key: string): string | undefined {
   const [side, species] = key.split(':') as ['p1' | 'p2', string];
   const set = setOf(ctx, side, species);
   if (!set?.item || (ctx.knowledge.get(key) ?? ctx.knowledge.get(keyOf(side, set.species)))?.itemKnown) return undefined;
-  return isBoostItem(simGenNum(ctx.gen), set.item) ? set.item : undefined;
+  const gen = simGenNum(ctx.gen);
+  return isBoostItem(gen, set.item) && !requiresItem(gen, set.species, set.item) ? set.item : undefined;
 }
 
 /**
