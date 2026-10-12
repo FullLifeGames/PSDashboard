@@ -26,7 +26,7 @@ export function rollSet(species: string, moves: string[], extra: Partial<Pokemon
 }
 
 /** A custom game past team preview (every set in team order); `setup` may change the battle before it is serialized. */
-export function rootOf(format: 'gen9customgame' | 'gen9doublescustomgame' | 'gen7customgame' | 'gen7doublescustomgame' | 'gen6customgame' | 'gen3customgame',
+export function rootOf(format: 'gen9customgame' | 'gen9doublescustomgame' | 'gen9championscustomgame' | 'gen9championsdoublescustomgame' | 'gen7customgame' | 'gen7doublescustomgame' | 'gen6customgame' | 'gen3customgame',
   p1: PokemonSet[], p2: PokemonSet[], setup?: (battle: Battle) => void): SimPosition {
   const battle = new Battle({ formatid: toID(format), seed: '1,2,3,4', p1: { name: 'Alpha', team: Teams.pack(p1) }, p2: { name: 'Beta', team: Teams.pack(p2) } });
   if (battle.sides.some(side => side.requestState === 'teampreview')) {
