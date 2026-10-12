@@ -2,9 +2,9 @@ import { Move, Field, calculate, type Pokemon } from '@smogon/calc';
 import { Dex } from '@pkmn/sim';
 import type { SimPokemonInfo, BranchMoveOption } from './branch-engine.ts';
 import { toId, TERRAIN_BY_ID, WEATHER_BY_ID, calcGenerationFor, simGenNum } from '@fulllifegames/replay-core';
-import { attackerAtUse, bodyFromInfo, calcPokemon, simDexOf } from './calc/body.ts';
+import { attackerAtUse, bodyFromInfo, calcPokemon, simDexOf, type CalcBody } from './calc/body.ts';
 import { hitDraws } from './calc/hit-draws.ts';
-import { calcMove } from './calc/move.ts';
+import { calcMove, protectBlocks } from './calc/move.ts';
 import { teraClicked } from './calc/tera-click.ts';
 
 type CalcMoveOptions = NonNullable<ConstructorParameters<typeof Move>[2]>;
@@ -101,15 +101,19 @@ function landsOn(gen: CalcGen, attacker: SimPokemonInfo, target: SimPokemonInfo,
  * Whether the partner's pick shields it before the move lands: a stalling
  * move whose volatile stops moves (Protect, Detect, Spiky Shield and their
  * kin carry an onTryHit; Endure does not), going first by priority. All from
- * the Dex; whether the move breaks through is the calc's call (isProtected).
+ * the Dex; whether the move breaks through is the calc's call (isProtected),
+ * unless the simulator takes the move's protect flag away before the check
+ * (Unseen Fist on a contact move: protectBlocks, calc/protect.ts), when the
+ * calc gets no isProtected at all (round 68, T186; calc 0.12 prices that hit
+ * at a quarter, the simulator at full damage).
  */
-function shieldedBy(gen: CalcGen, pick: string | undefined, moveName: string): boolean {
+function shieldedBy(gen: CalcGen, pick: string | undefined, moveName: string, attacker: CalcBody): boolean {
   if (!pick) return false;
   const dex = simDexOf(gen);
   const shield = dex.moves.get(pick);
   if (!shield.stallingMove || !shield.volatileStatus) return false;
   const stopsMoves = 'onTryHit' in dex.conditions.get(shield.volatileStatus);
-  return stopsMoves && shield.priority > dex.moves.get(moveName).priority;
+  return stopsMoves && shield.priority > dex.moves.get(moveName).priority && protectBlocks(gen, moveName, attacker);
 }
 
 /**
@@ -135,7 +139,7 @@ function moveLanding(
     : moveOption.targetType === 'allAdjacent' ? foes + (context.attackerPartnerAlive ? 1 : 0)
     : 0;
   const split = !!partner && !!simDexOf(gen).moves.get(moveOption.name).smartTarget &&
-    landsOn(gen, attacker, partner, moveOption.name, context, shieldedBy(gen, context.defenderPartnerMove, moveOption.name));
+    landsOn(gen, attacker, partner, moveOption.name, context, shieldedBy(gen, context.defenderPartnerMove, moveOption.name, bodyFor(gen, attacker)));
   const overrides: CalcMoveOverrides = {
     ...(hit === 1 ? { target: 'normal' as const } : {}),
     ...(split ? { multihit: 1 } : {}),
