@@ -1,6 +1,7 @@
 import type { Battle, Pokemon, PRNGSeed } from '@pkmn/sim';
 import { boundaryEvent, RANDOM_CALL_MOVES, type BoundaryEvent } from './ko-odds.ts';
 import { pairKoOdds } from './pair/odds.ts';
+import { accuracyRollReached } from './search/event-reach.ts';
 import type { KoOddsInfo } from './types.ts';
 import { sideIndex } from '@fulllifegames/replay-core';
 
@@ -131,6 +132,11 @@ function planSideEvent(battle: Battle, side: 'p1' | 'p2', choice: string, oppCho
   const event = boundaryEvent(battle, attacker, defender, moveId, { attacker: clicksTera(choice), defender: clicksTera(oppChoice) });
   const move = battle.dex.moves.get(moveId);
   if (event === null) return unpricedMovePlan(move);
+  // Round 69 (T146 c3): a status move stopped before its accuracy roll has no miss class.
+  if (move.category === 'Status') {
+    const [p1Choice, p2Choice] = side === 'p1' ? [choice, oppChoice] : [oppChoice, choice];
+    if (!accuracyRollReached(battle, side, move.id, p1Choice, p2Choice)) return { kind: 'skip' };
+  }
   if (event.accuracy < 1 || (event.killFraction > 0 && event.killFraction < 1)) {
     return { kind: 'event', event: { side, moveId: move.id, defenderIdent: `${defender.side.id}a: ${defender.name}`, event } };
   }
