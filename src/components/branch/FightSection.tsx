@@ -96,6 +96,7 @@ function MoveGrid({ moves, advanced, dmgResults, spreadDamageResults, targetDama
           pendingChoice={pending}
           wasPlayed={playedMoveKey !== null && toId(m.name) === playedMoveKey}
           compact={!advanced}
+          teraArmed={ctx.modifier === 'terastallize'}
           onClick={(targetLoc) => onChoice(moveChoiceFor(m, targetLoc, ctx))}
         />
       ))}

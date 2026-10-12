@@ -19,9 +19,13 @@ function hitSharesText(dmg: DamageResult | undefined): string {
     `${hits} hits (${Math.round(chance * 1000) / 10}%): ${minPercent}% - ${maxPercent}%`).join(' · ');
 }
 
-function compactMoveTitle(move: BranchMoveOption, dmg: DamageResult | undefined) {
+/** The type a move button shows: with the Tera toggle pressed, the type after the click when the engine read one (Tera Blast, Tera Starstorm). */
+const shownType = (move: BranchMoveOption, teraArmed: boolean | undefined) =>
+  (teraArmed && move.typeUnderTera) || move.type;
+
+function compactMoveTitle(move: BranchMoveOption, dmg: DamageResult | undefined, type: string) {
   const shares = hitSharesText(dmg);
-  return `${move.type || '???'} · ${ppTextFor(move)} PP` +
+  return `${type || '???'} · ${ppTextFor(move)} PP` +
     (dmg && dmg.maxPercent > 0 ? ` · ${dmg.range}${dmg.koChance ? ` (${dmg.koChance})` : ''}` : '') +
     (shares ? ` · ${shares}` : '');
 }
@@ -51,8 +55,9 @@ function MoveDamage({ dmg, spreadDamage }: { dmg?: DamageResult; spreadDamage?: 
   );
 }
 
-function MoveBtnBody({ move, dmg, spreadDamage, zMoveName, wasPlayed, compact, selectedTarget }: {
+function MoveBtnBody({ move, type, dmg, spreadDamage, zMoveName, wasPlayed, compact, selectedTarget }: {
   move: BranchMoveOption;
+  type: string;
   dmg?: DamageResult;
   spreadDamage?: SpreadTargetDamage[];
   zMoveName?: string | null;
@@ -73,7 +78,7 @@ function MoveBtnBody({ move, dmg, spreadDamage, zMoveName, wasPlayed, compact, s
         <span className="ps-movebtn-pp">{ppText}</span>
       ) : (
         <div className="ps-movebtn-info">
-          <span className="ps-movebtn-type">{move.type || '???'}</span>
+          <span className="ps-movebtn-type">{type || '???'}</span>
           <span className="ps-movebtn-pp">{ppText}</span>
         </div>
       )}
@@ -126,7 +131,7 @@ function MoveTargetRow({ move, targetDamage, selected, pendingMove, onClick }: {
 }
 
 /* ── Move button ── */
-export function MoveBtn({ move, dmg, spreadDamage, zMoveName, targetDamage, pendingChoice, wasPlayed, compact, onClick }: {
+export function MoveBtn({ move, dmg, spreadDamage, zMoveName, targetDamage, pendingChoice, wasPlayed, compact, teraArmed, onClick }: {
   move: BranchMoveOption;
   dmg?: DamageResult;
   spreadDamage?: SpreadTargetDamage[];
@@ -137,9 +142,12 @@ export function MoveBtn({ move, dmg, spreadDamage, zMoveName, targetDamage, pend
   wasPlayed?: boolean;
   /** Basic view: a small chip (name + PP; type and damage in the tooltip). */
   compact?: boolean;
+  /** The Tera toggle is pressed for this slot: the button reads the type after the click. */
+  teraArmed?: boolean;
   onClick: (targetLoc?: number) => void;
 }) {
-  const bg = typeBg(move.type);
+  const type = shownType(move, teraArmed);
+  const bg = typeBg(type);
   const pendingMove = pendingChoice?.kind === 'move' ? pendingChoice : null;
   const selected = pendingMove?.moveId === toId(move.name);
   const selectedTarget = selected
@@ -153,10 +161,11 @@ export function MoveBtn({ move, dmg, spreadDamage, zMoveName, targetDamage, pend
         disabled={move.disabled || (move.requiresTarget && move.targetOptions.length === 0)}
         className={`ps-movebtn ${compact ? 'ps-movebtn-compact ' : ''}${selected ? 'ps-movebtn-selected' : ''}`}
         style={{ background: bg }}
-        title={compact ? compactMoveTitle(move, dmg) : hitSharesText(dmg) || undefined}
+        title={compact ? compactMoveTitle(move, dmg, type) : hitSharesText(dmg) || undefined}
       >
         <MoveBtnBody
           move={move}
+          type={type}
           dmg={dmg}
           spreadDamage={spreadDamage}
           zMoveName={zMoveName}
