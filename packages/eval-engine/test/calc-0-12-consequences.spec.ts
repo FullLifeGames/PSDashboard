@@ -70,9 +70,10 @@ describe('the body passes the battle\'s gender, and a female-only Rivalry attack
 });
 
 describe('Struggle in the Gens 2 to 4 takes no item boost, as the simulator plays it', () => {
-  for (const format of ['gen3customgame'] as const) {
-    test(`${format}: a Silk Scarf attacker's Struggle lies on the kill table`, () => {
-      const root = rootOf(format, [set('Snorlax', ['Splash'], { item: 'Silk Scarf', ability: '' })], [set('Blissey', ['Splash'], { ability: '' })],
+  // Gens 3 and 4 (the roll oracle draws no damage roll for Gen 2's Struggle, so Gen 2 rides on the same typeless rule unchecked).
+  for (const [format, item] of [['gen3customgame', 'Silk Scarf'], ['gen4customgame', 'Silk Scarf']] as const) {
+    test(`${format}: a ${item} attacker's Struggle lies on the kill table`, () => {
+      const root = rootOf(format, [set('Snorlax', ['Splash'], { item, ability: '' })], [set('Blissey', ['Splash'], { ability: '' })],
         battle => { for (const slot of battle.sides[0].active[0].moveSlots) slot.pp = 0; });
       const hits = checkedRolls(drawTurn(root, 'move 1', 'move splash'));
       expect(hits.length).toBeGreaterThan(0);

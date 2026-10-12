@@ -49,10 +49,20 @@ function typedHiddenPower(gen: CalcGen, name: string, attacker: CalcBody): { nam
 }
 
 /**
+ * A damaging move the simulator's generation plays typeless (Struggle in Gens 2 to 4: no type, so no item boost and no STAB)
+ * goes to the calc typeless too (round 68, T186, decision 6): 0.12 lets Struggle take Normal items in those generations.
+ * Read from the simulator's own move, no list.
+ */
+function typelessOverride(gen: CalcGen, name: string): { type: never } | null {
+  const move = simDexOf(gen).moves.get(name);
+  return move.exists && move.type === '???' && move.category !== 'Status' ? { type: '???' as never } : null;
+}
+
+/**
  * What the body's mod gives a move where the calc's data differs or has none (round 68, T186, decision 2): the calc's own
  * Champions generation (0) lists the mod's moves except for Pound, which it lacks, so a move whose power, type or
  * category differs, or which the calc has no data for, goes in with the values of the mod's Dex (loaded with its battle),
- * and the whole row (flags, target) when the calc has none. Negative priority stays out: the calc reads priority only as
+ * and the whole row (flags, target) when the calc has none; the caller's own overrides (a spread move into one foe) win over the mod's row. Negative priority stays out: the calc reads priority only as
  * "greater than zero", which has no damage effect.
  */
 function modOverrides(gen: CalcGen, name: string, attacker: CalcBody, calc: CalcMove): CalcMoveOptions['overrides'] | null {
@@ -70,7 +80,8 @@ function modOverrides(gen: CalcGen, name: string, attacker: CalcBody, calc: Calc
 export function calcMove(gen: CalcGen, name: string, attacker: CalcBody, options: CalcMoveOptions = {}): CalcMove {
   const typed = typedHiddenPower(gen, name, attacker);
   const basePower = typed.basePower ?? powerAtUse(gen, name, attacker);
-  const move = new CalcMove(gen, typed.name, basePower === null ? options : { ...options, overrides: { ...options.overrides, basePower } });
+  const own = { ...(basePower === null ? {} : { basePower }), ...typelessOverride(gen, typed.name) };
+  const move = new CalcMove(gen, typed.name, Object.keys(own).length === 0 ? options : { ...options, overrides: { ...options.overrides, ...own } });
   const changed = basePower === null ? modOverrides(gen, typed.name, attacker, move) : null;
-  return changed ? new CalcMove(gen, typed.name, { ...options, overrides: { ...options.overrides, ...changed } }) : move;
+  return changed ? new CalcMove(gen, typed.name, { ...options, overrides: { ...changed, ...options.overrides, ...own } }) : move;
 }

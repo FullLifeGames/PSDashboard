@@ -113,14 +113,14 @@ describe('entry boosts count once in the odds (T100)', () => {
 });
 
 describe('the abilities the calc boosts by itself are read from the calc (T100)', () => {
-  test('per gen: Download from gen 4, Dauntless Shield and Intrepid Sword from gen 8, the four Embody Aspects in gen 9', () => {
+  test('per gen: Download from gen 4, Dauntless Shield and Intrepid Sword in gen 8, the four Embody Aspects in gen 9', () => {
     const found = (gen: number) => [...Generations.get(gen as 9).abilities].map(ability => ability.name).filter(name => calcAddsStages(gen, name)).sort();
     expect(found(3)).toEqual([]);
     for (const gen of [4, 5, 6, 7]) expect(found(gen), `gen ${gen}`).toEqual(['Download']);
     expect(found(8)).toEqual(['Dauntless Shield', 'Download', 'Intrepid Sword']);
+    // Intrepid Sword and Dauntless Shield give their stage in Gen 9 only with abilityOn (calcOwnEntryStage, 0.12).
     expect(found(9)).toEqual([
-      'Dauntless Shield', 'Download', 'Embody Aspect (Cornerstone)', 'Embody Aspect (Hearthflame)', 'Embody Aspect (Teal)',
-      'Embody Aspect (Wellspring)', 'Intrepid Sword',
+      'Download', 'Embody Aspect (Cornerstone)', 'Embody Aspect (Hearthflame)', 'Embody Aspect (Teal)', 'Embody Aspect (Wellspring)',
     ]);
   });
 

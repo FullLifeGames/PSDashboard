@@ -10,7 +10,6 @@ import { teraClicked } from './calc/tera-click.ts';
 type CalcMoveOptions = NonNullable<ConstructorParameters<typeof Move>[2]>;
 type CalcAbility = CalcMoveOptions['ability'];
 type CalcItem = CalcMoveOptions['item'];
-type CalcSpecies = CalcMoveOptions['species'];
 type CalcMoveOverrides = NonNullable<CalcMoveOptions['overrides']>;
 
 export interface DamageResult {
@@ -286,7 +285,6 @@ export function calcSingleDamageRange(
       calcMove(gen, moveOption.name, atkBody, {
         ability: (attacker.ability || undefined) as CalcAbility,
         item: (attacker.item || undefined) as CalcItem,
-        species: attacker.species as CalcSpecies,
         overrides,
         isStellarFirstUse,
         ...(hits ? { hits } : {}),
