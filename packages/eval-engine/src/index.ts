@@ -30,6 +30,8 @@ export type {
   ResolvedSideCommand, ReconstructParams, AdoptParams,
 } from './branch-engine.ts';
 export type { BranchChoices } from './branch/types.ts';
+export { sightedHp, sightedHpAt } from './branch/pokemon-info.ts';
+export type { HpDisplayBody, HpSighting } from './branch/pokemon-info.ts';
 export { buildChoiceLockContext } from './choice-lock.ts';
 export type { ChoiceLockTrails, ChoiceLockContext } from './choice-lock.ts';
 export { calcSingleDamageRange } from './damage-calc.ts';

@@ -11,6 +11,7 @@ import { playProtocolEntries } from './entry-effects.ts';
 import { restoreTeraFromSnapshot } from './tera-restore.ts';
 import { bodiesOffTheField, restoreAfterProtocolEntry, restoreExitVolatiles } from './exit-volatiles.ts';
 import { endLocksTheGameEnded, settleSleepCounter } from './sleep-counter.ts';
+import { hpOfSighting } from './pokemon-info.ts';
 
 function repointActiveSlot(side: SimSide, activeSlot: number, target: SimPokemon): boolean {
   if (side.active[activeSlot] === target) return false;
@@ -144,7 +145,7 @@ export function buildForcedSwitchChoice(
 
 /**
  * Status residuals read their state from `statusState` (Toxic damage is
- * `stage * maxhp/16`, sleep counts down `time`) — a bare `status` assignment
+ * `stage * maxhp/16`, sleep counts down `time`) ï¿½ a bare `status` assignment
  * leaves that state empty, so corrected Toxic dealt NaN (= no) damage for the
  * rest of the branch. Mirror Pokemon#setStatus instead, and only when the
  * snapshot disagrees, so a matching reconstruction keeps its own toxic stage
@@ -182,8 +183,8 @@ function correctStatusFromSnapshot(battlePokemon: SimPokemon, snapshotPokemon: S
 }
 
 /** A living benched body's HP: the last sighting, plus Regenerator's switch-out third for a holder. */
-function benchHpFromSighting(battlePokemon: SimPokemon, hpPercent: number): number {
-  const sighting = Math.round((hpPercent / 100) * battlePokemon.maxhp);
+function benchHpFromSighting(battlePokemon: SimPokemon, snapshotPokemon: SnapshotPokemon): number {
+  const sighting = hpOfSighting(battlePokemon, snapshotPokemon);
   const regenerated = battlePokemon.baseAbility === 'regenerator' ? Math.trunc(battlePokemon.baseMaxhp / 3) : 0;
   return Math.min(battlePokemon.maxhp, Math.max(1, sighting + regenerated));
 }
@@ -214,14 +215,14 @@ function simBodyOf(side: SimSide, snapshotPokemon: SnapshotPokemon): SimPokemon 
  */
 function correctBodyFromSnapshot(battlePokemon: SimPokemon, snapshotPokemon: SnapshotPokemon, log: readonly string[]) {
   if (!snapshotPokemon.isActive && battlePokemon.fainted === snapshotPokemon.fainted) {
-    if (!snapshotPokemon.fainted) battlePokemon.hp = benchHpFromSighting(battlePokemon, snapshotPokemon.hpPercent);
+    if (!snapshotPokemon.fainted) battlePokemon.hp = benchHpFromSighting(battlePokemon, snapshotPokemon);
     return;
   }
   if (battlePokemon.fainted !== snapshotPokemon.fainted) {
     const side = battlePokemon.side;
     side.totalFainted = Math.max(0, side.totalFainted + (snapshotPokemon.fainted ? 1 : -1));
   }
-  battlePokemon.hp = Math.max(0, Math.round((snapshotPokemon.hpPercent / 100) * battlePokemon.maxhp));
+  battlePokemon.hp = Math.max(0, hpOfSighting(battlePokemon, snapshotPokemon));
   battlePokemon.fainted = snapshotPokemon.fainted;
   battlePokemon.faintQueued = snapshotPokemon.fainted;
   if (snapshotPokemon.fainted) battlePokemon.hp = 0;

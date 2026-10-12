@@ -2,7 +2,7 @@ import { Dex } from '@pkmn/dex';
 import type { PokemonSet } from '@pkmn/sim';
 import { CHAMPIONS_MOD, buildCalcPokemon, calcGenerationFor, evBudget, speciesBaseId, toId, type PokemonSnapshot, type TurnSnapshot } from '@fulllifegames/replay-core';
 import {
-  moveAtUse,
+  moveAtUse, sightedHpAt,
   type BranchMoveOption, type BranchSimState, type BranchSlotModifiers, type BranchSwitchOption, type MoveUser, type SimPokemonInfo,
 } from '@fulllifegames/eval-engine';
 import { teraBanned } from './picker-tera';
@@ -125,6 +125,16 @@ function moveOptionsFor(
   }));
 }
 
+/**
+ * The middle of the HPs the format's display shows as the snapshot's sighting (round 69, T161); null for an exact
+ * HP and where there is no body of the format to ask (the proportional rounding then).
+ */
+function sightedAbsoluteHp(mon: PokemonSnapshot, gen: number, champions: boolean, maxhp: number): number | null {
+  const unseen = mon.maxhp === 0;
+  const scale = unseen ? 100 : mon.maxhp;
+  return scale === 100 || scale === 48 ? sightedHpAt(gen, champions, { hp: unseen ? 100 : mon.hp, maxhp: scale }, maxhp) : null;
+}
+
 /** Protocol snapshots carry HP on the percent scale (maxhp 100, or 0 for a
  *  never-revealed mon) — fed raw into the damage calc that inflated shown
  *  percentages ~3.4×. Recompute the real max HP from the guessed set. */
@@ -144,7 +154,7 @@ function absoluteHp(
       ivs: set?.ivs,
     });
     const maxhp = poke.maxHP();
-    const hp = mon.fainted ? 0 : Math.max(1, Math.round(maxhp * hpPercent / 100));
+    const hp = mon.fainted ? 0 : Math.max(1, sightedAbsoluteHp(mon, gen, champions, maxhp) ?? Math.round(maxhp * hpPercent / 100));
     return { hp, maxhp, hpPercent };
   } catch {
     return { hp: mon.hp, maxhp: mon.maxhp, hpPercent };

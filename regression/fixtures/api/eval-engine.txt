@@ -45,6 +45,8 @@ type ForcedWinOpen
 type ForcedWinOutcome
 type ForcedWinProof
 type GameReport
+type HpDisplayBody
+type HpSighting
 type ItemLike
 type KoOddsInfo
 type KoOddsMismatch
@@ -203,6 +205,8 @@ value selectProbeCombos
 value serializeLiveBattle
 value serializePreviewPosition
 value shownAttribution
+value sightedHp
+value sightedHpAt
 value simFastStatus
 value solveEndgame
 value starvedSupportCells
