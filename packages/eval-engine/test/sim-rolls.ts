@@ -38,3 +38,22 @@ export function simDamages(root: SimPosition, p1Choice: string, p2Choice: string
 
 /** How many of the rolls reach `hp`. */
 export const killing = (damages: readonly number[], hp: number): number => damages.filter(damage => damage >= hp).length;
+
+/**
+ * The seeds (of `1,2,3,4`, `2,2,3,4`, ...) whose natural draw of a move that draws its strength came out weak and strong:
+ * the log shows `marker` (the move's `|-activate|` line) when the stronger draw happened. The strength draw does not
+ * depend on the roll and crit scripts (an answered roll still draws its number), so each seed keeps its strength for every
+ * script and `simDamages` can be asked per strength with these seeds (round 69, T154).
+ */
+export function strengthSeeds(root: SimPosition, p1Choice: string, p2Choice: string, marker: string): { weak: string; strong: string } {
+  let weak: string | undefined;
+  let strong: string | undefined;
+  for (let index = 1; index <= 400 && !(weak && strong); index++) {
+    const seed = `${index},2,3,4`;
+    const drawn = drawPair(root, p1Choice, p2Choice, seed as never, new Map(), createMatchupCache());
+    if (drawn.log.some(line => line.includes(marker))) strong ??= seed;
+    else weak ??= seed;
+  }
+  if (!weak || !strong) throw new Error('the strength draw never came out both ways');
+  return { weak, strong };
+}

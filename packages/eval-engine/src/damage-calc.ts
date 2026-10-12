@@ -5,6 +5,7 @@ import { toId, TERRAIN_BY_ID, WEATHER_BY_ID, calcGenerationFor, simGenNum } from
 import { attackerAtUse, bodyFromInfo, calcPokemon, simDexOf, type CalcBody } from './calc/body.ts';
 import { hitDraws } from './calc/hit-draws.ts';
 import { calcMove, protectBlocks } from './calc/move.ts';
+import { strengthMix, strongerPower } from './calc/fickle.ts';
 import { stellarFirstUse } from './calc/stellar.ts';
 import { teraClicked } from './calc/tera-click.ts';
 
@@ -257,6 +258,13 @@ function koChanceOf(priced: PricedCount[], maxDamage: number): string {
   return n >= 1 && n <= MAX_KO_HITS ? text : '';
 }
 
+/** The single hit, or for a move that doubles on a chance (Fickle Beam, T154) its weaker and its stronger strength, each with its chance. */
+function strengthPriced(priceAt: (hits?: number, firstUse?: boolean, power?: { basePower: number }) => CalcResult, firstUse: boolean, mix: ReturnType<typeof strengthMix>): PricedCount[] {
+  const weak = priceAt(undefined, firstUse);
+  if (!mix) return [{ chance: 1, result: weak }];
+  return [{ chance: 1 - mix.chance, result: weak }, { chance: mix.chance, result: priceAt(undefined, firstUse, strongerPower(weak.move.bp, mix.factor)) }];
+}
+
 /** A Doubles hit on a foe that stands alone, with the foes-only spread target left on the move (moveLanding sets one foe for the moves whose Dex target spreads) and no screen to price at the doubles factor. */
 function aloneSpread(context: DamageCalcContext, result: CalcResult): boolean {
   const screens = [...(context.defenderSideConditions ?? [])].map(toConditionId).some(id => ['reflect', 'lightscreen', 'auroraveil'].includes(id));
@@ -273,14 +281,14 @@ export function calcSingleDamageRange(
     const gen = calcGeneration(context, attacker.mod);
     const overrides = moveLanding(gen, attacker, moveOption, context);
     const atkBody = attackerAtUse(simGenNum(gen), bodyFor(gen, attacker, context), moveOption.name);
-    const priceAt = (hits?: number, isStellarFirstUse = false): CalcResult => {
+    const priceAt = (hits?: number, isStellarFirstUse = false, power?: { basePower: number }): CalcResult => {
       const atkPoke = calcPokemon(gen, atkBody);
       const defPoke = calcPokemonFrom(gen, defender, context);
       // The attacker's ability and item reach the move too: Skill Link sets five hits.
       const calcMoveFor = () => calcMove(gen, moveOption.name, atkBody, {
         ability: (attacker.ability || undefined) as CalcAbility,
         item: (attacker.item || undefined) as CalcItem,
-        overrides,
+        overrides: power ? { ...overrides, ...power } : overrides,
         isStellarFirstUse,
         ...(hits ? { hits } : {}),
       });
@@ -292,9 +300,7 @@ export function calcSingleDamageRange(
     // A multi-hit move deals the sum of its hits; the calc sums them itself (T96). A drawn hit
     // count spans the fewest hits' minimum to the most hits' maximum, every count priced (T124).
     const counts = overrides?.multihit ? null : hitCounts(simGenNum(gen), attacker, moveOption.name);
-    const priced = counts
-      ? counts.map(({ hits, chance }) => ({ chance, result: priceAt(hits, firstUse) }))
-      : [{ chance: 1, result: priceAt(undefined, firstUse) }];
+    const priced = counts ? counts.map(({ hits, chance }) => ({ chance, result: priceAt(hits, firstUse) })) : strengthPriced(priceAt, firstUse, strengthMix(simDexOf(gen), moveOption.name));
     const minDamage = Math.min(...priced.map(({ result }) => result.range()[0]));
     const maxDamage = Math.max(...priced.map(({ result }) => result.range()[1]));
     const maxhp = bodyFor(gen, defender).maxhp;

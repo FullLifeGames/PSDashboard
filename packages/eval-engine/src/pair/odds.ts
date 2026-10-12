@@ -1,10 +1,11 @@
 import type { Battle, Pokemon } from '@pkmn/sim';
 import { sideIndex } from '@fulllifegames/replay-core';
+import { strengthMix } from '../calc/fickle.ts';
 import { bodyAsClicked } from '../calc/tera-click.ts';
 import { critRate, moveAccuracy, unpriceable } from '../ko-odds.ts';
 import type { KoOddsInfo } from '../types.ts';
 import { parsePairChoice, type PairAction } from './guards.ts';
-import { killCount, killTable } from './kill-table.ts';
+import { mixedKillShare } from './kill-table.ts';
 import { snapshotPair } from './snapshot.ts';
 
 /**
@@ -76,9 +77,9 @@ function slotOdds(battle: Battle, attacker: Pokemon, defender: Pokemon, action: 
   if (move.category === 'Status' || unpriceable(attacker, defender, move)) return null;
   const crit = critRate(battle.gen, move.critRatio ?? 1);
   const snapshot = snapshotPair(battle, attacker, defender, action.moveId, spread, action.tera === true);
-  const table = killTable(cleared ? { ...snapshot, weather: '', terrain: '' } : snapshot);
-  if (!table || crit === null) return null;
-  const killFraction = (1 - crit) * killCount(table.normal, defender.hp) / 16 + crit * killCount(table.crit, defender.hp) / 16;
+  if (crit === null) return null;
+  const killFraction = mixedKillShare(cleared ? { ...snapshot, weather: '', terrain: '' } : snapshot, defender.hp, crit, strengthMix(battle.dex, move.name));
+  if (killFraction === null) return null;
   const accuracy = moveAccuracy(battle, move, attacker, defender, cleared ? '' : undefined);
   return {
     accuracy, killFraction, pKill: accuracy * killFraction, label: `${move.name}→${defender.species.name}`,

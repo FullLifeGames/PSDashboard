@@ -1,7 +1,8 @@
 import { Field, calculate } from '@smogon/calc';
 import type { Battle, Pokemon } from '@pkmn/sim';
 import { TERRAIN_BY_ID, WEATHER_BY_ID, calcGenerationFor } from '@fulllifegames/replay-core';
-import { attackerAtUse, calcPokemon, type SimBody } from './calc/body.ts';
+import { attackerAtUse, calcPokemon, simDexOf, type SimBody } from './calc/body.ts';
+import { strengthMix, strongerPower } from './calc/fickle.ts';
 import { calcMove } from './calc/move.ts';
 import { stellarFirstUse } from './calc/stellar.ts';
 import { bodyAsClicked } from './calc/tera-click.ts';
@@ -163,15 +164,24 @@ function damageKillFraction(
     // A Stellar body's first use of a type hits harder (T152); the type at use is the calc's own.
     const first = stellarFirstUse(bodies.attacker, () => calculate(gen, atkPoke, defPoke, calcMove(gen, move.name, bodies.attacker), field).move.type);
     const stellar = first ? { isStellarFirstUse: true } : {};
-    const normal = killShare(calculate(gen, atkPoke, defPoke, calcMove(gen, move.name, bodies.attacker, stellar), field).damage, hp);
-    const crit = killShare(calculate(gen, atkPoke, defPoke, calcMove(gen, move.name, bodies.attacker, { isCrit: true, ...stellar }), field).damage, hp);
-    if (normal === null || crit === null) return null;
+    const sharesAt = (power: { basePower: number } | null) => {
+      const options = { ...stellar, ...(power ? { overrides: power } : {}) };
+      const normal = killShare(calculate(gen, atkPoke, defPoke, calcMove(gen, move.name, bodies.attacker, options), field).damage, hp);
+      const crit = killShare(calculate(gen, atkPoke, defPoke, calcMove(gen, move.name, bodies.attacker, { isCrit: true, ...options }), field).damage, hp);
+      return normal === null || crit === null ? null : { normal, crit };
+    };
+    const weak = sharesAt(null);
     const c = critRate(genNum, move.critRatio ?? 1);
-    if (c === null) return null;
+    if (weak === null || c === null) return null;
+    // A move that doubles on a chance (Fickle Beam, T154) is the mix of its two strengths; the roll counts stay the weaker one's, which the scripts aim by.
+    const mix = strengthMix(simDexOf(gen), move.name);
+    const strong = mix ? sharesAt(strongerPower(calcMove(gen, move.name, bodies.attacker, stellar).bp, mix.factor)) : null;
+    if (mix && strong === null) return null;
+    const fraction = (shares: { normal: number; crit: number }) => (1 - c) * shares.normal + c * shares.crit;
     return {
-      killFraction: (1 - c) * normal + c * crit,
-      normalKillRolls: Math.round(normal * 16),
-      critKillRolls: Math.round(crit * 16),
+      killFraction: mix && strong ? (1 - mix.chance) * fraction(weak) + mix.chance * fraction(strong) : fraction(weak),
+      normalKillRolls: Math.round(weak.normal * 16),
+      critKillRolls: Math.round(weak.crit * 16),
     };
   } catch {
     return null;

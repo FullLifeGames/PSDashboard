@@ -2,6 +2,7 @@ import { Move as CalcMove, Pokemon as CalcPokemon, Field, calculate } from '@smo
 import { TERRAIN_BY_ID, WEATHER_BY_ID, calcGenerationFor, simGenNum, type CalcGeneration } from '@fulllifegames/replay-core';
 import { attackerAtUse, calcPokemon } from '../calc/body.ts';
 import { calcMove } from '../calc/move.ts';
+import { strongerPower, type StrengthMix } from '../calc/fickle.ts';
 import { stellarFirstUse } from '../calc/stellar.ts';
 import type { BodySnapshot, HitSnapshot } from './snapshot.ts';
 
@@ -27,6 +28,9 @@ import type { BodySnapshot, HitSnapshot } from './snapshot.ts';
  * screen factor only (a defender with a screen stays on the Doubles field,
  * the one hit the calc cannot price exactly).
  */
+
+/** A hit's snapshot with the strength factor the move drew (Fickle Beam's 2, T154); absent for the move's own power. */
+export type PricedHit = HitSnapshot & { strength?: number };
 
 export interface KillTable {
   /** Index i = roll factor 85 + i %: random(16) = r reads index 15 − r. */
@@ -81,14 +85,16 @@ function chargeOffset(snap: HitSnapshot): number {
   return snap.attacker.abilityId === 'contrary' ? -1 : 1;
 }
 
-function hitMove(gen: CalcGen, snap: HitSnapshot, isCrit: boolean, isStellarFirstUse = false): CalcMove {
+function hitMove(gen: CalcGen, snap: PricedHit, isCrit: boolean, isStellarFirstUse = false): CalcMove {
   const plain = calcMove(gen, snap.moveName, snap.attacker, { isCrit, isStellarFirstUse });
-  if (snap.spreadHit || !SPREAD_TARGETS.has(plain.target)) return plain;
-  return calcMove(gen, snap.moveName, snap.attacker, { isCrit, isStellarFirstUse, overrides: { target: 'normal' } });
+  const strength = snap.strength ? strongerPower(plain.bp, snap.strength) : null;
+  const drawn = strength ? calcMove(gen, snap.moveName, snap.attacker, { isCrit, isStellarFirstUse, overrides: strength }) : plain;
+  if (snap.spreadHit || !SPREAD_TARGETS.has(drawn.target)) return drawn;
+  return calcMove(gen, snap.moveName, snap.attacker, { isCrit, isStellarFirstUse, overrides: { ...strength, target: 'normal' } });
 }
 
 /** The hit's 16 values: the calc's Doubles field, or the Singles one where the calc forces a spread the simulator did not play. */
-function hitRolls(gen: CalcGen, snap: HitSnapshot, attacker: CalcPokemon, defender: CalcPokemon, isCrit: boolean, firstUse: boolean): number[] | null {
+function hitRolls(gen: CalcGen, snap: PricedHit, attacker: CalcPokemon, defender: CalcPokemon, isCrit: boolean, firstUse: boolean): number[] | null {
   const result = calculate(gen, attacker, defender, hitMove(gen, snap, isCrit, firstUse), calcField(snap));
   const forced = !snap.spreadHit && SPREAD_TARGETS.has(result.move.target) && snap.screens.length === 0;
   return rollsOf(forced ? calculate(gen, attacker, defender, hitMove(gen, snap, isCrit, firstUse), calcField(snap, 'Singles')).damage : result.damage);
@@ -100,7 +106,7 @@ function rollsOf(damage: unknown): number[] | null {
 }
 
 /** The hit's 16 normal and 16 crit damage values, or null when the calc cannot price it (multi-hit shapes, unknown species). */
-export function killTable(snap: HitSnapshot): KillTable | null {
+export function killTable(snap: PricedHit): KillTable | null {
   try {
     const gen = calcGenerationFor(snap.gen, snap.attacker.mod);
     const attacker = calcBody(gen, attackerAtUse(simGenNum(gen), snap.attacker, snap.moveName), chargeOffset(snap));
@@ -124,8 +130,25 @@ export function killCount(values: readonly number[], hp: number): number {
   return values.filter(value => value >= hp).length;
 }
 
+/** The crit-weighted share of a table's 16 rolls that reach `hp`. */
+export function killShare(table: KillTable, hp: number, crit: number): number {
+  return (1 - crit) * killCount(table.normal, hp) / 16 + crit * killCount(table.crit, hp) / 16;
+}
+
+/**
+ * The kill share of a hit: its table's, or for a move that doubles on a chance (Fickle Beam, T154) the mix of the tables
+ * at the weaker and the stronger strength. Null when a table cannot be priced.
+ */
+export function mixedKillShare(snap: HitSnapshot, hp: number, crit: number, mix: StrengthMix | null): number | null {
+  const weak = killTable(snap);
+  if (!weak) return null;
+  if (!mix) return killShare(weak, hp, crit);
+  const strong = killTable({ ...snap, strength: mix.factor });
+  return strong ? (1 - mix.chance) * killShare(weak, hp, crit) + mix.chance * killShare(strong, hp, crit) : null;
+}
+
 /** killTable memoized per root by the whole snapshot: one calc per distinct bodies, move and field. */
-export function memoKillTable(memo: Map<string, KillTable | null>, snap: HitSnapshot): KillTable | null {
+export function memoKillTable(memo: Map<string, KillTable | null>, snap: PricedHit): KillTable | null {
   const key = JSON.stringify(snap);
   let table = memo.get(key);
   if (table === undefined) {

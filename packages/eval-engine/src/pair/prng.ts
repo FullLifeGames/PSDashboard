@@ -1,5 +1,7 @@
 import { PRNG } from '@pkmn/sim';
 import type { Battle, PRNGSeed } from '@pkmn/sim';
+import { strengthMix } from '../calc/fickle.ts';
+import type { PricedHit } from './kill-table.ts';
 import { captureHit, type HitSnapshot } from './snapshot.ts';
 
 /**
@@ -14,6 +16,13 @@ import { captureHit, type HitSnapshot } from './snapshot.ts';
  * its number, so everything before it replays exactly as without the
  * script. Without scripts the draws are the plain PRNG's, number for number.
  * The singles solver keeps ScriptedPRNG; nothing here reaches it.
+ *
+ * Round 69 (T154): a move that doubles its strength on a chance (Fickle Beam's
+ * randomChance(3, 10) in the BasePower event, read from the Dex handler by
+ * calc/fickle.ts) draws that chance before the damage roll; the draw is kept
+ * on the hit's instance and the roll's snapshot carries the factor it drew, so
+ * the table at the roll is the table of the strength the log shows. A script
+ * answers it with `doubled`.
  */
 
 export interface PairScript {
@@ -21,6 +30,8 @@ export interface PairScript {
   crit?: boolean;
   /** random(16): 0 is the top roll (100 %), 15 the bottom one (85 %). */
   roll?: number;
+  /** The strength draw of a move that doubles on a chance (Fickle Beam): true is the stronger strength. */
+  doubled?: boolean;
 }
 
 export type PairScripts = ReadonlyMap<string, PairScript>;
@@ -50,7 +61,7 @@ export interface RollRecord {
   roll: number;
   crit: boolean;
   logIndex: number;
-  snapshot: HitSnapshot;
+  snapshot: PricedHit;
 }
 
 export type PairRecord = AccuracyRecord | CritRecord | RollRecord | { kind: 'tie' };
@@ -58,7 +69,7 @@ export type PairRecord = AccuracyRecord | CritRecord | RollRecord | { kind: 'tie
 /** getDamage's crit denominators over the gens (1: a sure crit still rolls). */
 const CRIT_DENOMINATORS = new Set([24, 16, 8, 4, 3, 2, 1]);
 
-interface Instance { id: number; key: string; script: PairScript | undefined; accuracy: boolean; crit: boolean; roll: boolean }
+interface Instance { id: number; key: string; script: PairScript | undefined; accuracy: boolean; crit: boolean; roll: boolean; strength?: number }
 interface QueueAction { choice?: string; pokemon?: unknown }
 
 /** Every item of the range is a move action with an acting Pokémon: speedSort shuffling a tie in the queue. */
@@ -105,7 +116,16 @@ export class PairPRNG extends PRNG {
       this.records.push({ kind: 'crit', key: hit.key, instance: hit.id, denominator });
       return hit.script?.crit ?? natural;
     }
-    return natural;
+    return this.strengthDraw(hit, numerator, denominator, natural);
+  }
+
+  /** The chance a move that doubles on one draws before its damage roll (Fickle Beam): kept on the instance, answered by the script's `doubled`. */
+  private strengthDraw(hit: Instance, numerator: number, denominator: number, natural: boolean): boolean {
+    const mix = hit.strength === undefined && !hit.roll ? strengthMix(this.battle!.dex, this.battle!.activeMove!.id) : null;
+    if (!mix || numerator !== mix.numerator || denominator !== mix.denominator) return natural;
+    const doubled = hit.script?.doubled ?? natural;
+    hit.strength = doubled ? mix.factor : 1;
+    return doubled;
   }
 
   override random(from?: number, to?: number): number {
@@ -117,7 +137,11 @@ export class PairPRNG extends PRNG {
     hit.roll = true;
     const battle = this.battle!;
     const crit = !!battle.activeTarget!.getMoveHitData(battle.activeMove!).crit;
-    this.records.push({ kind: 'roll', key: hit.key, instance: hit.id, roll, crit, logIndex: battle.log.length, snapshot: captureHit(battle) });
+    const snapshot: PricedHit = captureHit(battle);
+    this.records.push({
+      kind: 'roll', key: hit.key, instance: hit.id, roll, crit, logIndex: battle.log.length,
+      snapshot: hit.strength === undefined ? snapshot : { ...snapshot, strength: hit.strength },
+    });
     return roll;
   }
 
