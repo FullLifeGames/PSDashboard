@@ -28,7 +28,7 @@ export function simDamages(root: SimPosition, p1Choice: string, p2Choice: string
     const scripts = new Map([[key.script, { hit: true, crit, roll }]]);
     const drawn = drawPair(root, p1Choice, p2Choice, seed as never, scripts, createMatchupCache());
     // The HP the hit met (a Tera click before it may have changed it), less the HP the target has after the turn.
-    const hit = drawn.records.find(record => record.kind === 'roll');
+    const hit = drawn.records.find(record => record.kind === 'roll' && record.key === key.script);
     if (!hit || hit.kind !== 'roll') throw new Error('the scripted hit never rolled');
     return hit.snapshot.defender.hp - positionBattle(drawn.child).sides[key.target.side].active[key.target.slot]!.hp;
   };

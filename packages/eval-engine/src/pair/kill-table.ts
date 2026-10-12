@@ -17,6 +17,14 @@ import type { BodySnapshot, HitSnapshot } from './snapshot.ts';
  * through `overrides`; the bodies come from the engine's one builder, which
  * counts an entry boost once (calc/body.ts, round 67); Meteor Beam and
  * Electro Shot lose the charge boost the calc adds itself.
+ *
+ * Round 69 (T152): the calc also forces the spread target for Tera Starstorm
+ * of Terapagos-Stellar and Expanding Force on Psychic Terrain (gen789.js), and
+ * its Doubles field then takes the 0.75 spread factor off a hit that the
+ * simulator did not spread because only one foe stood. That hit is priced with
+ * the Singles game type, which enters the calc in the spread factor and the
+ * screen factor only (a defender with a screen stays on the Doubles field,
+ * the one hit the calc cannot price exactly).
  */
 
 export interface KillTable {
@@ -34,10 +42,10 @@ function calcBody(gen: CalcGen, body: BodySnapshot, spaOffset: number): CalcPoke
   return calcPokemon(gen, spaOffset ? { ...body, boosts: { ...body.boosts, spa: body.boosts.spa - spaOffset } } : body);
 }
 
-function calcField(snap: HitSnapshot): Field {
+function calcField(snap: HitSnapshot, gameType: 'Doubles' | 'Singles' = 'Doubles'): Field {
   const on = (id: string) => snap.fieldAbilities.includes(id);
   return new Field({
-    gameType: 'Doubles',
+    gameType,
     weather: WEATHER_BY_ID[snap.weather],
     terrain: TERRAIN_BY_ID[snap.terrain],
     isGravity: snap.rooms.includes('gravity'),
@@ -78,6 +86,13 @@ function hitMove(gen: CalcGen, snap: HitSnapshot, isCrit: boolean): CalcMove {
   return calcMove(gen, snap.moveName, snap.attacker, { isCrit, overrides: { target: 'normal' } });
 }
 
+/** The hit's 16 values: the calc's Doubles field, or the Singles one where the calc forces a spread the simulator did not play. */
+function hitRolls(gen: CalcGen, snap: HitSnapshot, attacker: CalcPokemon, defender: CalcPokemon, isCrit: boolean): number[] | null {
+  const result = calculate(gen, attacker, defender, hitMove(gen, snap, isCrit), calcField(snap));
+  const forced = !snap.spreadHit && SPREAD_TARGETS.has(result.move.target) && snap.screens.length === 0;
+  return rollsOf(forced ? calculate(gen, attacker, defender, hitMove(gen, snap, isCrit), calcField(snap, 'Singles')).damage : result.damage);
+}
+
 function rollsOf(damage: unknown): number[] | null {
   if (!Array.isArray(damage) || damage.length !== 16) return null;
   return damage.every(entry => typeof entry === 'number') ? (damage as number[]) : null;
@@ -89,9 +104,8 @@ export function killTable(snap: HitSnapshot): KillTable | null {
     const gen = calcGenerationFor(snap.gen, snap.attacker.mod);
     const attacker = calcBody(gen, attackerAtUse(simGenNum(gen), snap.attacker, snap.moveName), chargeOffset(snap));
     const defender = calcBody(gen, snap.defender, 0);
-    const field = calcField(snap);
-    const normal = rollsOf(calculate(gen, attacker, defender, hitMove(gen, snap, false), field).damage);
-    const crit = rollsOf(calculate(gen, attacker, defender, hitMove(gen, snap, true), field).damage);
+    const normal = hitRolls(gen, snap, attacker, defender, false);
+    const crit = hitRolls(gen, snap, attacker, defender, true);
     return normal && crit ? { normal, crit } : null;
   } catch {
     return null;

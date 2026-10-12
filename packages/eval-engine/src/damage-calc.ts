@@ -269,6 +269,12 @@ function stellarFirstUse(attacker: SimPokemonInfo, typeAtUse: () => string): boo
   return attacker.teraType === 'Stellar' && !!spent && !spent.includes(typeAtUse());
 }
 
+/** A Doubles hit on a foe that stands alone, with the foes-only spread target left on the move (moveLanding sets one foe for the moves whose Dex target spreads) and no screen to price at the doubles factor. */
+function aloneSpread(context: DamageCalcContext, result: CalcResult): boolean {
+  const screens = [...(context.defenderSideConditions ?? [])].map(toConditionId).some(id => ['reflect', 'lightscreen', 'auroraveil'].includes(id));
+  return context.gameType === 'Doubles' && context.defenderPartner === null && !screens && result.move.target === 'allAdjacentFoes';
+}
+
 export function calcSingleDamageRange(
   attacker: SimPokemonInfo,
   defender: SimPokemonInfo,
@@ -279,20 +285,21 @@ export function calcSingleDamageRange(
     const gen = calcGeneration(context, attacker.mod);
     const overrides = moveLanding(gen, attacker, moveOption, context);
     const atkBody = attackerAtUse(simGenNum(gen), bodyFor(gen, attacker, context), moveOption.name);
-    const priceAt = (hits?: number, isStellarFirstUse = false): CalcResult => calculate(
-      gen,
-      calcPokemon(gen, atkBody),
-      calcPokemonFrom(gen, defender, context),
+    const priceAt = (hits?: number, isStellarFirstUse = false): CalcResult => {
+      const atkPoke = calcPokemon(gen, atkBody);
+      const defPoke = calcPokemonFrom(gen, defender, context);
       // The attacker's ability and item reach the move too: Skill Link sets five hits.
-      calcMove(gen, moveOption.name, atkBody, {
+      const calcMoveFor = () => calcMove(gen, moveOption.name, atkBody, {
         ability: (attacker.ability || undefined) as CalcAbility,
         item: (attacker.item || undefined) as CalcItem,
         overrides,
         isStellarFirstUse,
         ...(hits ? { hits } : {}),
-      }),
-      calcField(context),
-    );
+      });
+      const result = calculate(gen, atkPoke, defPoke, calcMoveFor(), calcField(context));
+      // The calc forces a spread on a few moves (Tera Starstorm of Terapagos-Stellar, Expanding Force on Psychic Terrain): against a lone foe the simulator plays one target, which the Singles game type prices (T152).
+      return aloneSpread(context, result) ? calculate(gen, atkPoke, defPoke, calcMoveFor(), calcField({ ...context, gameType: 'Singles' })) : result;
+    };
     const firstUse = stellarFirstUse(attacker, () => priceAt().move.type);
     // A multi-hit move deals the sum of its hits; the calc sums them itself (T96). A drawn hit
     // count spans the fewest hits' minimum to the most hits' maximum, every count priced (T124).

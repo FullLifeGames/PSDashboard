@@ -22,13 +22,36 @@ type MoveAction = Extract<PairAction, { kind: 'move' }>;
 const SPREAD = new Set(['allAdjacentFoes', 'allAdjacent']);
 const SINGLE_FOE = new Set(['normal', 'any', 'adjacentFoe']);
 
+type ModifyMoveHandler = (this: unknown, move: unknown, user: unknown, target: unknown) => void;
+
+/**
+ * The move's target as the simulator's ModifyMove leaves it for this user (round 69, T152): the move's own handler from the
+ * Dex runs on a stand-in for the attacker (the species its Tera click makes, the body otherwise) and for the battle (its
+ * field, cleared when the click clears it), so Tera Starstorm of Terapagos-Stellar and Expanding Force of a grounded user
+ * on Psychic Terrain read allAdjacentFoes. A handler that needs more than that leaves the Dex target.
+ */
+function targetAtUse(battle: Battle, attacker: Pokemon, action: MoveAction): string {
+  const dexMove = battle.dex.moves.get(action.moveId);
+  const handler = (dexMove as { onModifyMove?: unknown }).onModifyMove;
+  if (typeof handler !== 'function') return dexMove.target;
+  const body = bodyAsClicked(battle, attacker, action.tera === true);
+  const user = Object.create(attacker, { species: { value: battle.dex.species.get(body.species) } });
+  const field = body.abilityOn ? Object.create(battle.field, { weather: { value: '' }, terrain: { value: '' } }) : battle.field;
+  const move = battle.dex.getActiveMove(action.moveId);
+  try {
+    (handler as ModifyMoveHandler).call({ field, debug: () => undefined }, move, user, null);
+  } catch {
+    return dexMove.target;
+  }
+  return move.target;
+}
+
 /** The living foes a move action names on the root: every foe for a spread move, the named slot (its partner when it fell), the lone foe without a slot. */
-function rootTargets(battle: Battle, own: 0 | 1, action: MoveAction): Pokemon[] {
+function rootTargets(battle: Battle, own: 0 | 1, action: MoveAction, target: string): Pokemon[] {
   const foeSide = battle.sides[own === 0 ? 1 : 0];
   const foes = foeSide.active.filter((mon): mon is Pokemon => !!mon && !mon.fainted);
-  const move = battle.dex.moves.get(action.moveId);
-  if (SPREAD.has(move.target)) return foes;
-  if (!SINGLE_FOE.has(move.target)) return [];
+  if (SPREAD.has(target)) return foes;
+  if (!SINGLE_FOE.has(target)) return [];
   if (action.loc !== null && action.loc > 0) {
     const named = foeSide.active[action.loc - 1];
     return named && !named.fainted ? [named] : foes.slice(0, 1);
@@ -37,8 +60,8 @@ function rootTargets(battle: Battle, own: 0 | 1, action: MoveAction): Pokemon[] 
 }
 
 /** The sim's spread flag at the start of the move: two or more targets, the living ally among them for an allAdjacent move. */
-function spreadAtStart(battle: Battle, own: 0 | 1, action: MoveAction, targets: readonly Pokemon[]): boolean {
-  if (battle.dex.moves.get(action.moveId).target !== 'allAdjacent') return targets.length > 1;
+function spreadAtStart(battle: Battle, own: 0 | 1, action: MoveAction, targets: readonly Pokemon[], target: string): boolean {
+  if (target !== 'allAdjacent') return targets.length > 1;
   const allies = battle.sides[own].active.filter(mon => mon && !mon.fainted && mon.position !== action.slot).length;
   return targets.length + allies > 1;
 }
@@ -85,9 +108,10 @@ function optionOdds(battle: Battle, own: 0 | 1, choice: string): KoOddsInfo | nu
     if (action.kind !== 'move') continue;
     const attacker = battle.sides[own].active[action.slot];
     if (!attacker || attacker.fainted) continue;
-    const targets = rootTargets(battle, own, action);
+    const target = targetAtUse(battle, attacker, action);
+    const targets = rootTargets(battle, own, action, target);
     for (const defender of targets) {
-      const odds = slotOdds(battle, attacker, defender, action, spreadAtStart(battle, own, action, targets), cleared);
+      const odds = slotOdds(battle, attacker, defender, action, spreadAtStart(battle, own, action, targets, target), cleared);
       if (odds) events.push({ defender, odds });
     }
   }
