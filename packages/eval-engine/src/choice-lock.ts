@@ -10,7 +10,7 @@ import { calculate, Field, Move, type Pokemon } from '@smogon/calc';
 import { Dex, type PokemonSet } from '@pkmn/sim';
 import { type DamageObservation, type OpponentTeamInfo, typedHiddenPowerId, inferOpponentTeam, itemSetValue, replayRuleset, toId, calcGenerationFor, simGenNum, type CalcGeneration } from '@fulllifegames/replay-core';
 import { attackerAtUse, calcPokemon, type CalcBody } from './calc/body.ts';
-import { defenderAbilities, type DefenderRead } from './choice-lock-defender.ts';
+import { defenderAbilities, defenderItems, formeAbility, isBodyOf, pricedSpecies, type DefenderRead } from './choice-lock-defender.ts';
 import { calcMove } from './calc/move.ts';
 import { CHOICE_ITEMS } from './sensitivity.ts';
 
@@ -277,31 +277,32 @@ const stagesOf = (boosts: Record<string, number>): CalcBody['boosts'] =>
  * builder hands to the calc's Champions generation as they are (round 68, T186).
  */
 function calcAttacker(gen: CalcGen, attackerSet: PokemonSet, obs: DamageObservation, withItem: string, moveId: string, mod?: string): Pokemon {
+  const species = pricedSpecies(attackerSet, obs.attackerSpecies);
   return calcPokemon(gen, attackerAtUse(simGenNum(gen), {
-    species: attackerSet.species, level: attackerSet.level || 100, ability: attackerSet.ability || '', item: withItem,
+    species, level: attackerSet.level || 100, ability: formeAbility(gen, species, attackerSet.ability || ''), item: withItem,
     nature: attackerSet.nature, evs: attackerSet.evs, ivs: attackerSet.ivs, gender: attackerSet.gender,
     boosts: stagesOf(obs.attackerBoosts), status: obs.attackerStatus, tera: null, onField: true, mod,
   }, moveId));
 }
 
-function calcDefender(gen: CalcGen, defenderSet: PokemonSet | undefined, obs: DamageObservation, ability: string, mod?: string): Pokemon {
+function calcDefender(gen: CalcGen, defenderSet: PokemonSet | undefined, obs: DamageObservation, ability: string, item: string, mod?: string): Pokemon {
   return calcPokemon(gen, {
-    species: defenderSet?.species ?? obs.defenderSpecies, level: defenderSet?.level || 100, ability, item: '',
+    species: pricedSpecies(defenderSet, obs.defenderSpecies), level: defenderSet?.level || 100, ability, item,
     nature: defenderSet?.nature ?? '', evs: defenderSet?.evs ?? {}, ivs: defenderSet?.ivs ?? {}, gender: defenderSet?.gender,
     boosts: stagesOf(obs.defenderBoosts), tera: null, onField: true, mod,
   });
 }
 
 /**
- * Whether the roll range (± slack) under `withItem` contains the observed fraction for some ability the defender may
- * have; null when the calc cannot judge any of them.
+ * Whether the roll range (± slack) under `withItem` contains the observed fraction for some ability and item the
+ * defender may have (round 69, T193); null when the calc cannot judge any of them.
  */
 function explainsObservation(
   gen: CalcGen, attackerSet: PokemonSet, defender: DefenderRead, obs: DamageObservation,
   calcMoveId: string, withItem: string, mod?: string,
 ): boolean | null {
-  const reads = defender.abilities.map(ability =>
-    explainsWith(gen, attackerSet, () => calcDefender(gen, defender.set, obs, ability, mod), obs, calcMoveId, withItem, mod));
+  const reads = defender.abilities.flatMap(ability => defender.items.map(item =>
+    explainsWith(gen, attackerSet, () => calcDefender(gen, defender.set, obs, ability, item, mod), obs, calcMoveId, withItem, mod)));
   if (reads.some(read => read === true)) return true;
   return reads.every(read => read === null) ? null : false;
 }
@@ -378,10 +379,11 @@ export function corroborateChoiceItem(
   if (!attackerSet) return 'ambiguous';
   let sawChoiceOnly = false;
   for (const obs of observations) {
-    if (obs.attackerSide !== side || toId(obs.attackerSpecies) !== speciesId) continue;
+    if (obs.attackerSide !== side || !isBodyOf(gen, obs.attackerSpecies, species)) continue;
     const defenderTeam = side === 'p1' ? teams.p2Team : teams.p1Team;
-    const defenderSet = defenderTeam.find(candidate => toId(candidate.species) === toId(obs.defenderSpecies));
-    const defender = { set: defenderSet, abilities: defenderAbilities(gen, defenderSet, obs, defenders?.[side === 'p1' ? 'p2' : 'p1']) };
+    const defenderSet = defenderTeam.find(candidate => isBodyOf(gen, obs.defenderSpecies, candidate.species));
+    const info = defenders?.[side === 'p1' ? 'p2' : 'p1'];
+    const defender = { set: defenderSet, abilities: defenderAbilities(gen, defenderSet, obs, info), items: defenderItems(defenderSet, obs, info) };
     const verdict = judgeObservation(gen, attackerSet, defender, obs, item, mod);
     if (verdict === 'contradicted') return 'contradicted';
     if (verdict === 'choice-only') sawChoiceOnly = true;

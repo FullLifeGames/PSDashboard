@@ -3,7 +3,7 @@ import { test, expect, describe } from 'vitest';
 import { Battle as LiveBattle, Teams, type Battle, type PokemonSet } from '@pkmn/sim';
 import {
   buildTeamsFromReplay, getBranchSimulatorFormat, parseReplayLog, parseReplayLogWithObservations, replayBringOnly,
-  type SmogonUsageStats,
+  type RevealedPokemonInfo, type SmogonUsageStats,
 } from '@fulllifegames/replay-core';
 import { buildChoiceLockContext, buildChoiceLockTrails, corroborateChoiceItem, protocolChoiceLock } from '../src/choice-lock';
 import { correctActivesFromProtocol, reconstructBranchRuntime } from '../src/branch-engine';
@@ -72,9 +72,20 @@ describe('the preview marker is no reveal (point 1)', () => {
     const keldeo = built.p1Team.find(entry => entry.species === 'Keldeo')!;
     expect(keldeo.item).toBe('Choice Specs');
     // The team preview marks Keldeo as holding something; the build guessed
-    // Choice Specs, and the damage record contradicts it.
-    expect(corroborateChoiceItem('p1', 'Keldeo', keldeo.item, built, seen, 6)).toBe('contradicted');
-    expect(buildChoiceLockContext(replay.log, built, seen).eligibility.p1['keldeo']).toBe(false);
+    // Choice Specs. Its 60% Hydro Pump into Tornadus-Therian fits Specs only if
+    // Tornadus holds the Assault Vest the build guessed for it (round 69, T193:
+    // the defender's item range), so the record is ambiguous; where the log
+    // rules that Vest out, the damage record contradicts the Specs as before.
+    const tornadus = built.p2Team.find(entry => entry.species === 'Tornadus-Therian')!;
+    expect(tornadus.item).toBe('Assault Vest');
+    const field = (value: string) => ({ value, source: 'unknown', probability: 1 }) as RevealedPokemonInfo['item'];
+    const noVest = { p1: { pokemon: [] }, p2: { pokemon: [{
+      species: 'Tornadus-Therian', moves: [], ability: field(''), item: field(''), teraType: field(''),
+      evs: { hp: 0, atk: 0, def: 0, spa: 0, spd: 0, spe: 0 }, level: 100, gender: '', ruledOut: { abilities: [], items: ['assaultvest'] },
+    } as unknown as RevealedPokemonInfo] } };
+    expect(corroborateChoiceItem('p1', 'Keldeo', keldeo.item, built, seen, 6)).toBe('ambiguous');
+    expect(corroborateChoiceItem('p1', 'Keldeo', keldeo.item, built, seen, 6, undefined, noVest)).toBe('contradicted');
+    expect(buildChoiceLockContext(replay.log, built, seen).eligibility.p1['keldeo']).toBe(true);
   });
 });
 
