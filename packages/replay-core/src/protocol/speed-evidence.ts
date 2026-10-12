@@ -189,12 +189,15 @@ function enter({ slots, turn, slot, details, at }: SlotLine): void {
 
 /**
  * A forme the simulator's megaEvo action changes into (battle-actions.js
- * runMegaEvo: canMegaEvo gives a Mega, canUltraBurst the forme a Z-Crystal
- * holder bursts into), read from the Dex.
+ * runMegaEvo: canMegaEvo gives the forme the holder's Mega Stone maps its
+ * species to, which the Mega-Z formes of Champions carry no isMega flag for;
+ * canUltraBurst the forme a Z-Crystal holder bursts into), read from the Dex.
  */
-function megaEvolution(data: Generation, species: string): boolean {
+export function megaEvolution(data: Generation, species: string): boolean {
   const forme = data.species.get(species);
-  return !!forme?.isMega || !!(forme?.requiredItem && data.items.get(forme.requiredItem)?.zMove);
+  if (!forme) return false;
+  const stone = forme.requiredItem ? data.items.get(forme.requiredItem) : undefined;
+  return !!forme.isMega || !!stone?.zMove || Object.values(stone?.megaStone ?? {}).includes(forme.name);
 }
 
 /** A forme change of the slot (`detailschange`, `-formechange`), from this line on. */
