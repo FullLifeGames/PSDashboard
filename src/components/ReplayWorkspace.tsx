@@ -118,7 +118,7 @@ function PickerRegion({ app, replayData }: WorkspaceProps) {
     return (
       <div className="ps-panel" role="status" style={{ fontSize: 11, color: '#aabbcc' }}>
         <span className="ps-spinner" aria-hidden="true" />{' '}
-        The engine is picking both sides&rsquo; moves — the pickers come back when it stops.
+        The engine is picking both sides&rsquo; moves. The pickers come back when it stops.
       </div>
     );
   }

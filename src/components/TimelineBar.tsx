@@ -28,7 +28,7 @@ function VariationStripe({ variationSpan, maxTurn }: { variationSpan: VariationS
     <span
       className="ps-timeline-stripe"
       style={{ left: `${from}%`, width: `${Math.max(to - from, 0.8)}%` }}
-      title={`Variation: turns ${variationSpan.startTurn}–${variationTip(variationSpan)}`}
+      title={`Variation: turns ${variationSpan.startTurn} to ${variationTip(variationSpan)}`}
     />
   );
 }

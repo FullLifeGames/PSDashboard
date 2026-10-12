@@ -57,7 +57,7 @@ describe('TimelineBar', () => {
     const wired = props({ viewTurn: 5, variationSpan: { startTurn: 4, length: 3 }, viewingVariation: true, viewLine: 'variation', branching: true });
     render(<TimelineBar {...wired} />);
     expect(screen.getByRole('slider')).toHaveAttribute('max', '10');
-    expect(screen.getByTitle('Variation: turns 4–7')).toBeInTheDocument();
+    expect(screen.getByTitle('Variation: turns 4 to 7')).toBeInTheDocument();
     expect(positionLabel()).toBe('T5/10');
 
     const chips = screen.getByRole('group', { name: 'Line selector' });

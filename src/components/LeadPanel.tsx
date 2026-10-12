@@ -23,7 +23,7 @@ const SLOT_LABELS = ['a', 'b', 'c'];
 
 function columnPrompt(maxPicks: number, leadsPerSide: number): string {
   return maxPicks > leadsPerSide
-    ? `Who comes along? Pick ${maxPicks} — the first ${leadsPerSide > 1 ? `${leadsPerSide} lead` : 'one leads'}`
+    ? `Who comes along? Pick ${maxPicks}. The first ${leadsPerSide > 1 ? `${leadsPerSide} lead` : 'one leads'}`
     : leadsPerSide > 1
       ? `Who leads? Pick ${leadsPerSide} (order sets the slots)`
       : 'Who leads?';
@@ -97,7 +97,7 @@ function LeadColumn({ label, options, selected, leadsPerSide, maxPicks, onToggle
 
 function panelIntro(bringCount: number | null, leadsPerSide: number): string {
   return bringCount !== null
-    ? `Turn 0 · team preview: pick the ${bringCount} each side brings — the first ${leadsPerSide > 1 ? `${leadsPerSide} lead` : 'one leads'} — and play the game from the start.`
+    ? `Turn 0 · team preview: pick the ${bringCount} each side brings. The first ${leadsPerSide > 1 ? `${leadsPerSide} lead` : 'one leads'}, then play the game from the start.`
     : leadsPerSide > 1
       ? 'Turn 0 · team preview: pick both leads per side (selection order is the slot order) and play the game from the start.'
       : 'Turn 0 · team preview: pick each side’s lead and play the game from the start.';

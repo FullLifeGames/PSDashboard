@@ -14,7 +14,7 @@ function PlayOutProgressLine({ playOutProgress }: { playOutProgress: PlayOutProg
     <div className="ps-playout-progress" role="status">
       <span className="ps-spinner" aria-hidden="true" />
       <span>
-        Engine is playing both sides from turn {playOutProgress.startTurn} —{' '}
+        Engine is playing both sides from turn {playOutProgress.startTurn}.{' '}
         {playOutProgress.turns} turn{playOutProgress.turns === 1 ? '' : 's'} played
         {playOutProgress.atTurn !== null && playOutProgress.atTurn > playOutProgress.startTurn
           ? `, now at turn ${playOutProgress.atTurn}` : ''}.

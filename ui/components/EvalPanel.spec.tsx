@@ -98,7 +98,7 @@ describe('EvalPanel', () => {
 
   test('a running play-out replaces the result block; Smogon pending disables the sweep; a variation alone still shows the graph', () => {
     const { rerender } = render(<EvalPanel {...props({ graph: evalGraph(), result: evalResult(), onAnalyzeGame: vi.fn(), smogonPending: true, playOutProgress: { startTurn: 4, turns: 2, atTurn: 6 } })} />);
-    expect(screen.getByRole('status')).toHaveTextContent('Engine is playing both sides from turn 4 — 2 turns played, now at turn 6.');
+    expect(screen.getByRole('status')).toHaveTextContent('Engine is playing both sides from turn 4. 2 turns played, now at turn 6.');
     expect(document.querySelector('.ps-eval-bar')).toBeNull();
     expect(screen.getByRole('button', { name: 'Re-analyze' })).toBeDisabled();
 

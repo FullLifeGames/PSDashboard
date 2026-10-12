@@ -57,10 +57,16 @@ describe('LeadPanel', () => {
 
   test('a bring-four format asks for four per side, leads first, and the back gets numbered', () => {
     render(<LeadPanel {...props({ ...doubles, leadsPerSide: 2, bringCount: 4 })} />);
-    expect(screen.getByText(/pick the 4 each side brings/)).toBeInTheDocument();
-    expect(screen.getAllByText('Who comes along? Pick 4 — the first 2 lead')).toHaveLength(2);
+    expect(screen.getByText('Turn 0 · team preview: pick the 4 each side brings. The first 2 lead, then play the game from the start.')).toBeInTheDocument();
+    expect(screen.getAllByText('Who comes along? Pick 4. The first 2 lead')).toHaveLength(2);
     expect(screen.getByRole('button', { name: /^Flutter Mane/ })).toHaveTextContent('3');
     expect(screen.getByRole('button', { name: 'Pick 4 per side' })).toBeDisabled();
+  });
+
+  test('a bring-three format with one lead says the first one leads and sets no dash', () => {
+    render(<LeadPanel {...props({ bringCount: 3 })} />);
+    expect(screen.getByText('Turn 0 · team preview: pick the 3 each side brings. The first one leads, then play the game from the start.')).toBeInTheDocument();
+    expect(screen.getAllByText('Who comes along? Pick 3. The first one leads')).toHaveLength(2);
   });
 
   test('a recorded selection preselects; executing blocks the start; missing teams show the loading note', () => {

@@ -35,7 +35,7 @@ describe('EvalStatus', () => {
 
   test('a running play-out replaces the per-turn churn with one status line', () => {
     const { rerender } = render(<EvalStatus {...base} status="searching" playOutProgress={{ startTurn: 5, turns: 1, atTurn: null }} />);
-    expect(screen.getByRole('status')).toHaveTextContent('Engine is playing both sides from turn 5 — 1 turn played. The gold line below grows as it plays.');
+    expect(screen.getByRole('status')).toHaveTextContent('Engine is playing both sides from turn 5. 1 turn played. The gold line below grows as it plays.');
     expect(screen.queryByText(/Searching/)).toBeNull();
     rerender(<EvalStatus {...base} status="stale" playOutProgress={{ startTurn: 5, turns: 3, atTurn: 8 }} />);
     expect(screen.getByRole('status')).toHaveTextContent('3 turns played, now at turn 8.');

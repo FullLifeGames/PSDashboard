@@ -220,7 +220,7 @@ test.describe('PS Dashboard', () => {
       // fixture game can finish first) the completion notice with turns.
       await expect.poll(async () => {
         const body = await page.textContent('body');
-        return /Engine is playing both sides from turn 1 — [1-9]/.test(body ?? '') ||
+        return /Engine is playing both sides from turn 1\. [1-9]/.test(body ?? '') ||
           /after [1-9]\d* turns?/.test(body ?? '') ||
           /: [1-9]\d* turns? played/.test(body ?? '');
       }, { timeout: 120_000 }).toBe(true);
