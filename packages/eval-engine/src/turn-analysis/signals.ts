@@ -8,7 +8,8 @@ import {
   type AnalyzeTurnParams, type Side, type SideAnalysis, type VerdictTier,
 } from './types.ts';
 import { decidedSignals } from './decided-signals.ts';
-import { matchPlayedChoice } from './played-match.ts';
+import { matchClickedColumn } from './played-match.ts';
+import { hindsightLine } from '../prose/phrases.ts';
 import type { SideGrading } from './grading.ts';
 
 /**
@@ -100,6 +101,25 @@ function forcedMixFor(view: MatrixView, options: RankedChoice[]): SideAnalysis['
   return undefined;
 }
 
+/**
+ * Round 69 (T64): a hindsight read is SHOWN on the side row only when its gain lies a band past the equilibrium
+ * regret (one inaccuracy: the same step the tiers use) and the cell of the best row against the click is no
+ * guess: at least HINDSIGHT_MIN_VISITS pooled visits, or re-priced by the verify step (912045 t8 read a 0.20 gain
+ * off a cell with one to two visits). A result without `cells` (matrix mode, old cache) passes.
+ */
+export const HINDSIGHT_BAND = TIER_THRESHOLDS.inaccuracy;
+export const HINDSIGHT_MIN_VISITS = 8;
+
+/** The side row's part of a hindsight read: the flag and the sentence when the gain and the cell behind it pass the gate. */
+function hindsightShown(
+  read: { response: string; against: string; gain: number },
+  cell: { visits: number; verified: boolean } | undefined,
+  regret: number | null,
+): { shown: true; line: string } | Record<string, never> {
+  const solid = !cell || cell.verified || cell.visits >= HINDSIGHT_MIN_VISITS;
+  return solid && read.gain >= (regret ?? 0) + HINDSIGHT_BAND ? { shown: true, line: hindsightLine(read) } : {};
+}
+
 /** The opponent's ACTUAL click as a matrix column (−1 when unknown), with the matched choice for the sentence. */
 function opponentColumn(
   params: AnalyzeTurnParams,
@@ -108,7 +128,7 @@ function opponentColumn(
 ): { column: number; oppPlayed: RankedChoice | null } {
   const oppKey = key === 'p1' ? 'p2' as const : 'p1' as const;
   const oppChoices = key === 'p1' ? matrix.p2Choices : matrix.p1Choices;
-  const oppPlayed = matchPlayedChoice(params.result, oppKey, params.played?.[oppKey] ?? null);
+  const oppPlayed = matchClickedColumn(params.result, oppKey, params.played);
   const column = oppPlayed && oppChoices ? oppChoices.indexOf(oppPlayed.choice) : -1;
   return { column, oppPlayed };
 }
@@ -129,6 +149,14 @@ function bestRowAgainst(
   return { bestRow, bestValue };
 }
 
+/** Round 47: the click the model favoured was findable before it came. */
+function likeliestClick(params: AnalyzeTurnParams, key: Side, matrix: EvalMatrix, column: number): { likeliest?: number } {
+  const model = opponentModelFor(params, key, matrix);
+  return model && favouriteOf(model) === column && model.confidence >= LIKELIEST_CLICK_MIN
+    ? { likeliest: model.confidence }
+    : {};
+}
+
 /**
  * Round 13: the read that was on the table. Against the opponent's ACTUAL
  * click (a known column, unlike the equilibrium the conditional reasons
@@ -141,6 +169,7 @@ function hindsightReadFor(
   key: Side,
   view: MatrixView,
   played: RankedChoice | null,
+  regret: number | null,
 ): SideAnalysis['hindsightRead'] {
   const { matrix, sideChoices, sideLabels } = view;
   if (!(matrix && sideChoices && sideLabels && played)) return undefined;
@@ -150,12 +179,9 @@ function hindsightReadFor(
   const { bestRow, bestValue } = bestRowAgainst(view, matrix, sideChoices.length, column);
   const gain = bestValue - view.ownValue(matrix, row, column);
   if (bestRow >= 0 && bestRow !== row && gain >= TIER_THRESHOLDS.mistake) {
-    // Round 47: the click the model favoured was findable before it came.
-    const model = opponentModelFor(params, key, matrix);
-    const likeliest = model && favouriteOf(model) === column && model.confidence >= LIKELIEST_CLICK_MIN
-      ? { likeliest: model.confidence }
-      : {};
-    return { response: sideLabels[bestRow], against: oppPlayed!.label, gain, ...likeliest };
+    const read = { response: sideLabels[bestRow], against: oppPlayed!.label, gain };
+    const cell = matrix.cells?.[key === 'p1' ? bestRow : column]?.[key === 'p1' ? column : bestRow];
+    return { ...read, ...likeliestClick(params, key, matrix, column), ...hindsightShown(read, cell, regret) };
   }
   return undefined;
 }
@@ -306,7 +332,7 @@ export function signalSide(params: AnalyzeTurnParams, key: Side, g: SideGrading)
   const view = matrixView(params, key);
   const conditional = conditionalFor(g.tier, view, g.best);
   const forcedMix = forcedMixFor(view, g.options);
-  const hindsightRead = hindsightReadFor(params, key, view, g.played);
+  const hindsightRead = hindsightReadFor(params, key, view, g.played, g.regret);
   const unanswered = unansweredFor(params, key, g.played, g.best);
   const { decided, nearDecided, forcedWin } = decidedSignals(params, key);
   const bestNull = bestNullFor(params, key, g.best, g.options);

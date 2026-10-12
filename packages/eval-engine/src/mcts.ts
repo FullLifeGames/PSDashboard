@@ -3,7 +3,7 @@ import { createRootPosition, legalChoices, positionBattle } from './forward-mode
 import { koOddsForOptions, planCellEvents } from './cell-blend.ts';
 import { cellKey, rankFromMatrix, toResult as rankedToResult } from './rank.ts';
 import { attachKoOdds, hasUnansweredContent, koOddsMapsFor } from './search/root-payload.ts';
-import { topVisitedIndex, treeScore } from './mcts-merge.ts';
+import { matrixCells, topVisitedIndex, treeScore } from './mcts-merge.ts';
 import { makeNode, pick, principalVariation, treeMatrix, type Node } from './search/mcts-node.ts';
 import { cellStats, isChanceNode, pickClass } from './search/chance-node.ts';
 import { expandCell, type ExpansionContext, type RootClassBook } from './search/expansion.ts';
@@ -270,6 +270,12 @@ function treeSearchOn(
     }
   }
   const legal = seedOffset === 0 && doubles ? rootLegal(root, settings.tera ?? true) : {};
+  const cells = [...root.children.entries()].map(([key, child]) => cellStats(key, child, rootClassKeys.get(key)));
+  // Round 69 (T64): a single tree is never merged (mergeMctsTrees returns this result), so it writes its own cell visits.
+  if (result.matrix) {
+    const visits = new Map(cells.map(cell => [cell.key, cell.visits]));
+    result.matrix.cells = matrixCells(root.p1Options.length, root.p2Options.length, key => visits.get(key) ?? 0);
+  }
   return {
     p1Options: root.p1Options.map(option => ({ choice: option.choice, label: option.label })),
     p2Options: root.p2Options.map(option => ({ choice: option.choice, label: option.label })),
@@ -285,7 +291,7 @@ function treeSearchOn(
     ...legal,
     // Root-cell stats for the merged equilibrium (Map order is insertion
     // order — deterministic under the fixed seed schedule).
-    cells: [...root.children.entries()].map(([key, child]) => cellStats(key, child, rootClassKeys.get(key))),
+    cells,
     result,
   };
 }

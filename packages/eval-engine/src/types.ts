@@ -386,6 +386,15 @@ export interface EvalMatrix {
   values: number[][];
   /** Equilibrium average strategies, index-aligned with the label arrays. */
   mixes: { p1: number[]; p2: number[] };
+  /**
+   * Round 69 (T64): what stands behind each cell of `values` (same indices):
+   * the tree visits pooled over the cell, and whether the verify step
+   * re-priced it. A one-or-two-visit cell is a guess, a verified one is not
+   * (the hindsight line shows its number only past 8 visits or verified).
+   * Absent on matrix-mode results (every cell matrix grade) and on results
+   * cached before the field existed.
+   */
+  cells?: { visits: number; verified: boolean }[][];
 }
 
 /** An exploitative recommendation: best response to the opponent MODEL. */

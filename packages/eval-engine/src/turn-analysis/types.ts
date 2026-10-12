@@ -275,6 +275,15 @@ export interface SideAnalysis {
      * read was findable, not just there in hindsight (562428 t10).
      */
     likeliest?: number;
+    /**
+     * Round 69 (T64): the read clears the side row's gate: its gain lies a
+     * band (one inaccuracy) past the equilibrium regret, and the cell of the
+     * best row against the click is no guess (EvalMatrix.cells: at least
+     * HINDSIGHT_MIN_VISITS visits or verified; a result without cells passes).
+     * `line` is the side row's sentence; neither enters tier or sums.
+     */
+    shown?: true;
+    line?: string;
   };
   /**
    * Round 47: the read BEFORE the click. The opponent model's favourite

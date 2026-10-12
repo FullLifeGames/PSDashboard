@@ -37,6 +37,18 @@ export const phrase = (label: string): string => {
 export const phraseReplies = (label: string): string => (splitCombinedLabel(label).length > 1 ? phrase(label) : label);
 
 /**
+ * Round 69 (T64): the side row's hindsight sentence, "Against Iron Head, switching to Heatran was worth +28% more."
+ * A doubles pair of clicks reads per slot in brackets ("Against what was clicked (playing Protect and Drain Punch
+ * ...)"), since a bare "Against playing ..." does not parse.
+ */
+export const hindsightLine = (read: { response: string; against: string; gain: number }): string => {
+  const lead = splitCombinedLabel(read.against).length > 1
+    ? `Against what was clicked (${phrase(read.against)})`
+    : `Against ${phrase(read.against)}`;
+  return `${lead}, ${phrase(read.response)} was worth ${winDeltaText(read.gain)} more.`;
+};
+
+/**
  * Round 64 (T123): the gerund fits a subject ("switching to Heatran was
  * worth"), not an object. What a side did reads as a verb per slot
  * ("switched to Keldeo", "switched to Calyrex-Shadow and played Protect"),

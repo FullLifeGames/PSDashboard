@@ -1,6 +1,6 @@
 import { cellKey, rankFromMatrix, toResult as rankedToResult } from './rank.ts';
 import { attachKoOdds, koOddsMapsFor } from './search/root-payload.ts';
-import type { CellBlendClass, EvalCellValue, EvalResult, KoOddsMismatch, MctsTreeStats } from './types.ts';
+import type { CellBlendClass, EvalCellValue, EvalMatrix, EvalResult, KoOddsMismatch, MctsTreeStats } from './types.ts';
 import { cellContribution, pooledChanceValue, type TreeCell } from './search/merge-pool.ts';
 import { VERIFY_DISAGREEMENT, VERIFY_MIN_TREES, VERIFY_MIN_VISITS, weightedDisagreement } from './verify-select.ts';
 
@@ -177,6 +177,19 @@ function pooledMatrix(
 }
 
 /**
+ * Round 69 (T64): what stands behind each matrix cell, index-aligned with
+ * `values`: the visits `visitsOf` knows for the cell's key (0 for a cell no
+ * tree expanded) and whether the verify step re-priced it.
+ */
+export function matrixCells(
+  rows: number, columns: number, visitsOf: (key: number) => number, verified?: Map<number, EvalCellValue>,
+): NonNullable<EvalMatrix['cells']> {
+  return Array.from({ length: rows }, (_, i) => Array.from({ length: columns }, (_, j) => ({
+    visits: visitsOf(cellKey(i, j)), verified: verified?.has(cellKey(i, j)) ?? false,
+  })));
+}
+
+/**
  * Round 7: the verify sampler's mismatch diagnostics survive the merge —
  * sorted (i, j) because the pooled executor returns chunks in completion
  * order. Blend payloads feed verifiedValue (round 32); MCTS has no
@@ -278,6 +291,9 @@ export function mergeMctsTrees(trees: MctsTreeStats[], verified?: Map<number, Ev
   );
   const result = rankedToResult(ranked, Math.max(...trees.map(tree => tree.depth)));
   if (diagnostics.length > 0) result.koDiagnostics = diagnostics;
+  if (result.matrix) {
+    result.matrix.cells = matrixCells(base.p1Options.length, base.p2Options.length, key => pooled.get(key)?.visits ?? 0, verified);
+  }
   // Round 13: the root unanswered profile is tree-invariant — take trees[0]'s.
   if (base.result.unanswered) result.unanswered = base.result.unanswered;
 

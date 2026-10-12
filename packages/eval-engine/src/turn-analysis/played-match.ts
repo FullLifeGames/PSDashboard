@@ -197,6 +197,23 @@ export function matchPlayedSide(
 }
 
 /**
+ * Round 69 (T64): the choice a side actually CLICKED, as a ranked option of its list (the opponent's column in a
+ * hindsight read). Doubles slots go through the exact matcher: a hidden slot gives no click (the charitable pick of
+ * matchPlayedSlots is for grading a side, not for saying what was clicked); singles go through matchPlayedChoice,
+ * whose pivot pair rows share findPlayedOption.
+ */
+export function matchClickedColumn(
+  result: EvalResult,
+  side: 'p1' | 'p2',
+  played: PlayedTurn | null | undefined,
+): RankedChoice | null {
+  if (!played) return null;
+  const slots = side === 'p1' ? played.p1Slots : played.p2Slots;
+  if (slots) return findPlayedOption(result.perSide[side], slots);
+  return matchPlayedChoice(result, side, played[side]);
+}
+
+/**
  * Stand-in for a side KO'd before it ever acted (`prevented: 'faint'` with
  * no action line): the KO-before-acting logic proves the side chose a MOVE
  * (a chosen switch would have resolved before the attack), and every
