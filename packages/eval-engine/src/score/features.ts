@@ -5,6 +5,7 @@ import { hazardCost, hazardRemovalEquity, strandedMons } from './hazards.ts';
 import { liveTypes, livingOf, threatGetter, type MatchupCache } from './threat.ts';
 import { matchupTerms, sweepCells } from './matchup.ts';
 import { fieldPairCells } from './field-pair.ts';
+import { boostBiteValue, stageValue } from './boost-bite.ts';
 
 /**
  * The raw feature vector: per-side bodies, boosts, hazards, screens,
@@ -15,6 +16,8 @@ import { fieldPairCells } from './field-pair.ts';
 const CHOICE_ITEMS = new Set(['choiceband', 'choicespecs', 'choicescarf']);
 
 const SCREENS = ['reflect', 'lightscreen', 'auroraveil'];
+
+const NO_PAIR = { focus: 0, redirect: 0 };
 
 /**
  * Residual items are beyond-horizon drips (Black Sludge erodes 1/8 a turn —
@@ -64,13 +67,8 @@ function activeBoostValue(side: Side): number {
   let boosts = 0;
   for (const active of side.active) {
     if (!active || active.fainted) continue;
-    const statusDiscount = EVAL_WEIGHTS.boostStatusDiscount[active.status] ?? 1;
     for (const [stat, stage] of Object.entries(active.boosts)) {
-      if (!stage) continue;
-      // Defensive stages read at half the offensive weight (12 vs 6).
-      const statWeight = stat === 'atk' || stat === 'spa' || stat === 'spe' ? 1 : 0.5;
-      const magnitude = EVAL_WEIGHTS.boostSchedule[Math.min(Math.abs(stage), 6)];
-      boosts += Math.sign(stage) * statWeight * magnitude * statusDiscount;
+      if (stage) boosts += stageValue(active, stat, stage);
     }
   }
   return boosts;
@@ -110,7 +108,15 @@ function sideFeatureValues(side: Side, battle: Battle) {
   };
 }
 
-export function evalFeatures(battle: Battle, cache?: MatchupCache): EvalFeatures {
+/**
+ * The feature vector of a position. With a weight table, a feature of the
+ * round-69 columns (the field pair, boostsBiting) whose weight is 0 stays 0
+ * instead of being read: the score multiplies it by 0 either way, and the
+ * leaf does not pay for a column no fit has priced. Without a table (the
+ * capture, the fit, the tests) every column is read.
+ */
+export function evalFeatures(battle: Battle, cache?: MatchupCache, weights?: Readonly<Record<keyof EvalFeatures, number>>): EvalFeatures {
+  const wants = (key: keyof EvalFeatures): boolean => !weights || weights[key] !== 0;
   const p1 = sideFeatureValues(battle.sides[0], battle);
   const p2 = sideFeatureValues(battle.sides[1], battle);
   let trickRoom = 0;
@@ -133,8 +139,9 @@ export function evalFeatures(battle: Battle, cache?: MatchupCache): EvalFeatures
   const matchupPhase = damp + (1 - damp) * Math.min(1, faintedFraction * 3);
   const p1Cells = sweepCells(0, battle, threat);
   const p2Cells = sweepCells(1, battle, threat);
-  const p1Pair = fieldPairCells(0, battle, threat);
-  const p2Pair = fieldPairCells(1, battle, threat);
+  const pairs = wants('pairFocus') || wants('pairRedirect');
+  const p1Pair = pairs ? fieldPairCells(0, battle, threat) : NO_PAIR;
+  const p2Pair = pairs ? fieldPairCells(1, battle, threat) : NO_PAIR;
   return {
     bodies: p1.bodies - p2.bodies,
     boosts: p1.boosts - p2.boosts,
@@ -151,5 +158,8 @@ export function evalFeatures(battle: Battle, cache?: MatchupCache): EvalFeatures
     sweepSlowChip: p1Cells.slowChip - p2Cells.slowChip,
     pairFocus: p1Pair.focus - p2Pair.focus,
     pairRedirect: p1Pair.redirect - p2Pair.redirect,
+    boostsBiting: wants('boostsBiting')
+      ? boostBiteValue(battle.sides[0], 0, battle, threat) - boostBiteValue(battle.sides[1], 1, battle, threat)
+      : 0,
   };
 }

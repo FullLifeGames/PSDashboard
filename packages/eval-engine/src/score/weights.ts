@@ -157,6 +157,17 @@ export interface EvalFeatures {
    */
   pairFocus: number;
   pairRedirect: number;
+  /**
+   * Round 69 (T49, decision 16): `boosts` with every standing stage damped by
+   * the share of living foes it bites (score/boost-bite.ts): a foe bites back
+   * the stage when it plays Unaware (asked from the simulator's ModifyBoost),
+   * clicks a move that takes the stages away (Haze, Clear Smog, Roar and the
+   * like, played in the simulator), or when the stage buys no KO, no slower
+   * foe KO and no move order within a few turns of the race. Same sign and
+   * scale as `boosts`, p1-positive difference; weight 0 until a fit prices it,
+   * and then it replaces `boosts` (the damping lives in the feature).
+   */
+  boostsBiting: number;
 }
 
 export const FEATURE_WEIGHTS: Record<keyof EvalFeatures, number> = {
@@ -175,6 +186,7 @@ export const FEATURE_WEIGHTS: Record<keyof EvalFeatures, number> = {
   sweepSlowChip: 0,
   pairFocus: 0,
   pairRedirect: 0,
+  boostsBiting: 0,
 };
 
 /**
@@ -212,6 +224,7 @@ export const DOUBLES_FEATURE_WEIGHTS: Record<keyof EvalFeatures, number> = {
   sweepSlowChip: 0,
   pairFocus: 0,
   pairRedirect: 0,
+  boostsBiting: 0,
 };
 
 /**
@@ -241,6 +254,7 @@ export const VGC_DOUBLES_FEATURE_WEIGHTS: Record<keyof EvalFeatures, number> = {
   sweepSlowChip: 0,
   pairFocus: 0,
   pairRedirect: 0,
+  boostsBiting: 0,
 };
 
 /**
@@ -296,6 +310,7 @@ export const CHAMPIONS_FEATURE_WEIGHTS: Record<keyof EvalFeatures, number> = {
   sweepSlowChip: 0,
   pairFocus: 0,
   pairRedirect: 0,
+  boostsBiting: 0,
 };
 
 /**
@@ -336,6 +351,7 @@ export const CHAMPIONS_DOUBLES_FEATURE_WEIGHTS: Record<keyof EvalFeatures, numbe
   sweepSlowChip: 0,
   pairFocus: 0,
   pairRedirect: 0,
+  boostsBiting: 0,
 };
 
 /** The weight table of a game type under a rule set. */

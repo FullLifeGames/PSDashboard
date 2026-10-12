@@ -32,9 +32,9 @@ export function evaluatePosition(battle: Battle, cache?: MatchupCache): number {
     return -1;
   }
 
-  const features = evalFeatures(battle, cache);
   // Round 65: the cache names the rule set of its search (a plain Map reads as standard).
   const weights = featureWeights(battle.gameType === 'doubles', cache?.ruleset);
+  const features = evalFeatures(battle, cache, weights);
   const teamSize = Math.max(battle.sides[0].pokemon.length, battle.sides[1].pokemon.length, 1);
   const normalizer = teamSize * (EVAL_WEIGHTS.alive + EVAL_WEIGHTS.hp);
   let diff = 0;
