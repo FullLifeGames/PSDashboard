@@ -393,9 +393,30 @@ export interface EvalMatrix {
    * (the hindsight line shows its number only past 8 visits or verified).
    * Absent on matrix-mode results (every cell matrix grade) and on results
    * cached before the field existed.
+   * Round 69 (T178): `plan` is planCellEvents' answer for the cell (none: a
+   * deterministic pair; events: a priced roll; fail: a guard tripped) and
+   * `classes` the outcome classes of an events cell with their analytic
+   * weights (summing to 1). Both stay absent where the planner was not run
+   * (doubles, a sibling tree's own result).
    */
-  cells?: { visits: number; verified: boolean }[][];
+  cells?: MatrixCell[][];
 }
+
+/** Round 69 (T178): what planCellEvents says about a root cell. */
+export type CellPlanKind = 'none' | 'events' | 'fail';
+
+/** One outcome class of a rolled cell (`miss`, `hit-kill`, `hit-nokill|hit-kill`) with its analytic weight. */
+export interface CellOutcomeClass { key: string; weight: number }
+
+export interface MatrixCell {
+  visits: number;
+  verified: boolean;
+  plan?: CellPlanKind;
+  classes?: CellOutcomeClass[];
+}
+
+/** Round 69 (T178): a singles root cell the planner answered for ('fail' cells are not listed). */
+export interface PlannedCell { key: number; plan: 'none' | 'events'; classes?: CellOutcomeClass[] }
 
 /** An exploitative recommendation: best response to the opponent MODEL. */
 export interface ReadRecommendation {
@@ -508,6 +529,13 @@ export interface MctsTreeStats {
    * represent an accuracy×killFraction split. Drives the verify sampler.
    */
   boundaryCells?: number[];
+  /**
+   * Round 69 (T178): the planner's answer per singles root cell (none and
+   * events; a cell that is missing failed), with the outcome classes of the
+   * events cells. Shipped by the offset-0 tree beside boundaryCells; the
+   * merge writes it into EvalMatrix.cells. Absent in doubles.
+   */
+  plannedCells?: PlannedCell[];
   /**
    * Round 67 (T128): every legal choice of each side at a doubles root
    * (legalChoices, the simulator's list), shipped by the offset-0 tree only:

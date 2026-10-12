@@ -1,6 +1,9 @@
 import { Dex } from '@pkmn/dex';
 import { toId } from '@fulllifegames/replay-core';
 import type { TurnRolls } from '../dice-events.ts';
+import type { EvalResult, MatrixCell } from '../types.ts';
+import type { PlayedTurn } from '../played.ts';
+import { matchClickedColumn } from './played-match.ts';
 import type { AnalyzeTurnParams, Side, SideAnalysis, TurnAnalysis } from './types.ts';
 
 /**
@@ -77,6 +80,31 @@ export function rolledSides(
     if (favored) rolled[favored] = true;
   }
   return rolled;
+}
+
+/** The matrix cell of the pair both sides actually clicked (singles; null when either click or the cell is unknown). */
+export function playedCellOf(result: EvalResult, played: PlayedTurn | null | undefined): MatrixCell | null {
+  const matrix = result.matrix;
+  if (!matrix?.cells || !matrix.p1Choices || !matrix.p2Choices) return null;
+  const p1 = matchClickedColumn(result, 'p1', played);
+  const p2 = matchClickedColumn(result, 'p2', played);
+  const row = p1 ? matrix.p1Choices.indexOf(p1.choice) : -1;
+  const column = p2 ? matrix.p2Choices.indexOf(p2.choice) : -1;
+  return row >= 0 && column >= 0 ? matrix.cells[row]?.[column] ?? null : null;
+}
+
+/**
+ * Round 69 (T178): what the played cell's outcome classes say about the turn when the turn's protocol is missing. A
+ * cell the planner called deterministic rolled nothing; a cell with at least two classes, each weighted strictly
+ * between 0 and 1, held a real roll. The classes do not say which way it went, so a rolled cell counts for both
+ * sides and the residual's direction is not checked. Undefined where the planner gave no answer (doubles, fail, a
+ * result from before the field): the sentences keep their ungated form.
+ */
+export function rolledFromCell(cell: MatrixCell | null): { p1: boolean; p2: boolean } | undefined {
+  if (cell?.plan === 'none') return { p1: false, p2: false };
+  if (cell?.plan !== 'events' || !cell.classes) return undefined;
+  const real = cell.classes.filter(entry => entry.weight > 0 && entry.weight < 1).length >= 2;
+  return { p1: real, p2: real };
 }
 
 /** The turn's residual has a roll behind it in its own direction; null without the turn's dice or a residual. */

@@ -273,7 +273,7 @@ describe('a single tree writes its own cells (no merge happens for one tree)', (
       expect(cells[i].length).toBe(stats.p2Options.length);
       for (let j = 0; j < cells[i].length; j++) {
         const own = stats.cells.find(entry => entry.key === cellKey(i, j));
-        expect(cells[i][j]).toEqual({ visits: own?.visits ?? 0, verified: false });
+        expect(cells[i][j]).toMatchObject({ visits: own?.visits ?? 0, verified: false });
       }
     }
     expect(cells.flat().some(entry => entry.visits > 0)).toBe(true);

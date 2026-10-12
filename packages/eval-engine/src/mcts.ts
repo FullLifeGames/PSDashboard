@@ -1,6 +1,6 @@
 import { createMatchupCache, unansweredMons } from './eval-function.ts';
-import { createRootPosition, legalChoices, positionBattle } from './forward-model.ts';
-import { koOddsForOptions, planCellEvents } from './cell-blend.ts';
+import { advancePositionWithLog, createRootPosition, legalChoices, positionBattle } from './forward-model.ts';
+import { foldClassWeights, koOddsForOptions, observeOrder, planCellEvents, type CellEvent } from './cell-blend.ts';
 import { cellKey, rankFromMatrix, toResult as rankedToResult } from './rank.ts';
 import { attachKoOdds, hasUnansweredContent, koOddsMapsFor } from './search/root-payload.ts';
 import { matrixCells, topVisitedIndex, treeScore } from './mcts-merge.ts';
@@ -11,8 +11,11 @@ import { forcedWinFor } from './search/forced-win.ts';
 import { applyForcedWin, forcedWinInput } from './search/forced-win-apply.ts';
 import { perfSync } from './perf-trace.ts';
 import { searchBudget, SEARCH_BUDGET_DEFAULT } from './search/budget.ts';
+import { SEARCH_SEEDS } from './search/leaf.ts';
 import { benchOrder, callbacksToGiven, resultToGiven, treeToGiven } from './search/bench-order.ts';
-import type { EvalResult, EvalSettings, KoOddsInfo, MctsTreeStats, SearchProgress, TeraAllowance, UnansweredProfile } from './types.ts';
+import type {
+  CellOutcomeClass, EvalResult, EvalSettings, KoOddsInfo, MctsTreeStats, PlannedCell, SearchProgress, TeraAllowance, UnansweredProfile,
+} from './types.ts';
 
 /**
  * DUCT (decoupled UCT) Monte-Carlo tree search, the engine's tree mode.
@@ -244,6 +247,49 @@ export function mctsTreeSearch(
   return treeToGiven(order, treeSearchOn(order.serialized, settings, seedOffset, callbacksToGiven(order, callbacks)));
 }
 
+/** A rolled cell's classes in the order the cards print them: heaviest first, ties by key. */
+const sortedClasses = (weights: Map<string, number>): CellOutcomeClass[] =>
+  [...weights].map(([key, weight]) => ({ key, weight })).sort((a, b) => b.weight - a.weight || (a.key < b.key ? -1 : a.key > b.key ? 1 : 0));
+
+/**
+ * Round 69 (T178): the outcome classes of a rolled root cell. One event folds in its own order; two events fold in
+ * the order one advance of the cell shows (the first fixed search seed); an order the log does not settle gives no
+ * classes (the cell still reads events). Analytic weights, summing to 1.
+ */
+function classesOf(root: Node, p1Choice: string, p2Choice: string, events: CellEvent[]): CellOutcomeClass[] | undefined {
+  const first = events.length === 1
+    ? events[0].side
+    : observeOrder([advancePositionWithLog(root.position, p1Choice, p2Choice, SEARCH_SEEDS[0]).log], events);
+  return first ? sortedClasses(foldClassWeights(events, first)) : undefined;
+}
+
+/**
+ * The planner's answer for every cell of a singles root (one calc per damaging pair, the boundary flags of the
+ * verify selection) and, round 69 (T178), the cells it answered for with their outcome classes. A cell that failed
+ * (a guard tripped) is left out of `plannedCells`.
+ */
+function planRootCells(root: Node): { boundaryCells: number[]; plannedCells: PlannedCell[] } {
+  const battle = positionBattle(root.position);
+  const boundaryCells: number[] = [];
+  const plannedCells: PlannedCell[] = [];
+  for (let i = 0; i < root.p1Options.length; i++) {
+    for (let j = 0; j < root.p2Options.length; j++) {
+      const { choice: p1Choice } = root.p1Options[i];
+      const { choice: p2Choice } = root.p2Options[j];
+      const plan = planCellEvents(battle, p1Choice, p2Choice);
+      if (plan.kind === 'fail') continue;
+      if (plan.kind === 'none') {
+        plannedCells.push({ key: cellKey(i, j), plan: 'none' });
+        continue;
+      }
+      boundaryCells.push(cellKey(i, j));
+      const classes = classesOf(root, p1Choice, p2Choice, plan.events);
+      plannedCells.push({ key: cellKey(i, j), plan: 'events', ...(classes ? { classes } : {}) });
+    }
+  }
+  return { boundaryCells, plannedCells };
+}
+
 function treeSearchOn(
   serializedBattle: string,
   settings: EvalSettings,
@@ -259,22 +305,15 @@ function treeSearchOn(
   // up on every combined choice, and the pair plan that prices doubles
   // cells decides their boundary in the verify step (verify-select.ts).
   const doubles = positionBattle(root.position).gameType === 'doubles';
-  const boundaryCells: number[] = [];
-  if (seedOffset === 0 && !doubles && !root.ended && root.p1Options.length > 0 && root.p2Options.length > 0) {
-    const battle = positionBattle(root.position);
-    for (let i = 0; i < root.p1Options.length; i++) {
-      for (let j = 0; j < root.p2Options.length; j++) {
-        const plan = planCellEvents(battle, root.p1Options[i].choice, root.p2Options[j].choice);
-        if (plan.kind === 'events') boundaryCells.push(cellKey(i, j));
-      }
-    }
-  }
+  const { boundaryCells, plannedCells } = seedOffset === 0 && !doubles && !root.ended && root.p1Options.length > 0 && root.p2Options.length > 0
+    ? planRootCells(root)
+    : { boundaryCells: [], plannedCells: undefined };
   const legal = seedOffset === 0 && doubles ? rootLegal(root, settings.tera ?? true) : {};
   const cells = [...root.children.entries()].map(([key, child]) => cellStats(key, child, rootClassKeys.get(key)));
   // Round 69 (T64): a single tree is never merged (mergeMctsTrees returns this result), so it writes its own cell visits.
   if (result.matrix) {
     const visits = new Map(cells.map(cell => [cell.key, cell.visits]));
-    result.matrix.cells = matrixCells(root.p1Options.length, root.p2Options.length, key => visits.get(key) ?? 0);
+    result.matrix.cells = matrixCells(root.p1Options.length, root.p2Options.length, key => visits.get(key) ?? 0, undefined, plannedCells);
   }
   return {
     p1Options: root.p1Options.map(option => ({ choice: option.choice, label: option.label })),
@@ -288,6 +327,7 @@ function treeSearchOn(
     rootValue: root.value,
     koOdds,
     ...(doubles ? {} : { boundaryCells }),
+    ...(plannedCells ? { plannedCells } : {}),
     ...legal,
     // Root-cell stats for the merged equilibrium (Map order is insertion
     // order — deterministic under the fixed seed schedule).

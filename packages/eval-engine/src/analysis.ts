@@ -1,7 +1,7 @@
 import { gradeSide, gradingFields } from './turn-analysis/grading.ts';
 import { signalFields, signalSide } from './turn-analysis/signals.ts';
 import { attributionFor, markRisk } from './turn-analysis/risk.ts';
-import { rolledSides } from './turn-analysis/luck.ts';
+import { playedCellOf, rolledFromCell, rolledSides } from './turn-analysis/luck.ts';
 import type { AnalyzeTurnParams, Side, SideAnalysis, TurnAnalysis } from './turn-analysis/types.ts';
 
 /**
@@ -33,6 +33,17 @@ function analyzeSide(params: AnalyzeTurnParams, key: Side): SideAnalysis {
   return { ...gradingFields(params, key, grading), ...signalFields(signalSide(params, key, grading)) };
 }
 
+/**
+ * The turn's rolls: the protocol's markers and played KO odds when the turn has its log, else (round 69, T178) the
+ * classes of the played cell. Doubles keep the log reading: their cells carry no plan.
+ */
+function rolledForFields(params: AnalyzeTurnParams, p1: SideAnalysis, p2: SideAnalysis): Pick<TurnAnalysis, 'rolledFor'> {
+  const rolledFor = params.rolls
+    ? rolledSides(params.rolls, p1, p2, params.actives)
+    : rolledFromCell(playedCellOf(params.result, params.played));
+  return rolledFor ? { rolledFor } : {};
+}
+
 export function analyzeTurn(params: AnalyzeTurnParams): TurnAnalysis {
   const playedTracking = params.playedTracking !== false;
   const p1 = analyzeSide(params, 'p1');
@@ -59,6 +70,6 @@ export function analyzeTurn(params: AnalyzeTurnParams): TurnAnalysis {
     p2,
     playedTracking,
     // Round 67 (T22): the turn's rolls, display only (the sentences split rolled from re-read).
-    ...(params.rolls ? { rolledFor: rolledSides(params.rolls, p1, p2, params.actives) } : {}),
+    ...rolledForFields(params, p1, p2),
   };
 }
