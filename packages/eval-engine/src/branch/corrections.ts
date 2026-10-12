@@ -145,7 +145,7 @@ export function buildForcedSwitchChoice(
 
 /**
  * Status residuals read their state from `statusState` (Toxic damage is
- * `stage * maxhp/16`, sleep counts down `time`) � a bare `status` assignment
+ * `stage * maxhp/16`, sleep counts down `time`) — a bare `status` assignment
  * leaves that state empty, so corrected Toxic dealt NaN (= no) damage for the
  * rest of the branch. Mirror Pokemon#setStatus instead, and only when the
  * snapshot disagrees, so a matching reconstruction keeps its own toxic stage
