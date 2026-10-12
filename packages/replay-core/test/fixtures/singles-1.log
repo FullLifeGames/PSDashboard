@@ -1,0 +1,183 @@
+|t:|1791824165
+|gametype|singles
+|player|p1|Alpha||
+|player|p2|Beta||
+|gen|9
+|tier|[Gen 9] OU
+|rule|HP Percentage Mod: HP is shown in percentages
+|rule|Endless Battle Clause: Forcing endless battles is banned
+|rule|Species Clause: Limit one of each Pokémon
+|rule|OHKO Clause: OHKO moves are banned
+|rule|Evasion Items Clause: Evasion items are banned
+|rule|Evasion Moves Clause: Evasion moves are banned
+|rule|Evasion Abilities Clause: Evasion abilities are banned
+|rule|Sleep Moves Clause: Sleep-inducing moves are banned
+|clearpoke
+|poke|p1|Garchomp, F|
+|poke|p1|Gholdengo|
+|poke|p1|Kingambit, M|
+|poke|p1|Pelipper, F|
+|poke|p2|Dragonite, M|
+|poke|p2|Rotom-Wash|
+|poke|p2|Iron Valiant|
+|poke|p2|Slowking-Galar, F|
+|teampreview
+|
+|t:|1791824165
+|teamsize|p1|4
+|teamsize|p2|4
+|start
+|switch|p1a: Garchomp|Garchomp, F|100/100
+|switch|p2a: Dragonite|Dragonite, M|100/100
+|turn|1
+|
+|t:|1791824165
+|move|p1a: Garchomp|Rock Slide|p2a: Dragonite
+|-supereffective|p2a: Dragonite
+|-damage|p2a: Dragonite|71/100
+|-damage|p1a: Garchomp|91/100|[from] item: Life Orb
+|cant|p2a: Dragonite|flinch
+|
+|-heal|p2a: Dragonite|77/100|[from] item: Leftovers
+|upkeep
+|turn|2
+|
+|t:|1791824165
+|move|p1a: Garchomp|Dragon Claw|p2a: Dragonite
+|-supereffective|p2a: Dragonite
+|-damage|p2a: Dragonite|0 fnt
+|faint|p2a: Dragonite
+|-damage|p1a: Garchomp|81/100|[from] item: Life Orb
+|
+|upkeep
+|
+|t:|1791824165
+|switch|p2a: Rotom|Rotom-Wash|100/100
+|turn|3
+|
+|t:|1791824165
+|move|p1a: Garchomp|Dragon Claw|p2a: Rotom
+|-damage|p2a: Rotom|52/100
+|-damage|p1a: Garchomp|71/100|[from] item: Life Orb
+|move|p2a: Rotom|Volt Switch|p1a: Garchomp
+|-immune|p1a: Garchomp
+|
+|upkeep
+|turn|4
+|
+|t:|1791824165
+|move|p1a: Garchomp|Dragon Claw|p2a: Rotom
+|-crit|p2a: Rotom
+|-damage|p2a: Rotom|0 fnt
+|faint|p2a: Rotom
+|-damage|p1a: Garchomp|61/100|[from] item: Life Orb
+|
+|upkeep
+|
+|t:|1791824165
+|switch|p2a: Iron Valiant|Iron Valiant|100/100
+|-enditem|p2a: Iron Valiant|Booster Energy
+|-activate|p2a: Iron Valiant|ability: Quark Drive|[fromitem]
+|-start|p2a: Iron Valiant|quarkdriveatk
+|turn|5
+|
+|t:|1791824165
+|move|p2a: Iron Valiant|Close Combat|p1a: Garchomp
+|-damage|p1a: Garchomp|2/100
+|-unboost|p2a: Iron Valiant|def|1
+|-unboost|p2a: Iron Valiant|spd|1
+|-damage|p2a: Iron Valiant|88/100|[from] ability: Rough Skin|[of] p1a: Garchomp
+|move|p1a: Garchomp|Earthquake|p2a: Iron Valiant
+|-damage|p2a: Iron Valiant|0 fnt
+|faint|p2a: Iron Valiant
+|-end|p2a: Iron Valiant|Quark Drive|[silent]
+|-damage|p1a: Garchomp|0 fnt|[from] item: Life Orb
+|faint|p1a: Garchomp
+|
+|upkeep
+|
+|t:|1791824165
+|switch|p2a: Slowking|Slowking-Galar, F|100/100
+|switch|p1a: Gholdengo|Gholdengo|100/100
+|turn|6
+|
+|t:|1791824165
+|move|p1a: Gholdengo|Thunderbolt|p2a: Slowking
+|-damage|p2a: Slowking|60/100
+|move|p2a: Slowking|Slack Off|p2a: Slowking
+|-heal|p2a: Slowking|100/100
+|
+|upkeep
+|turn|7
+|
+|t:|1791824165
+|move|p1a: Gholdengo|Thunderbolt|p2a: Slowking
+|-damage|p2a: Slowking|64/100
+|move|p2a: Slowking|Slack Off|p2a: Slowking
+|-heal|p2a: Slowking|100/100
+|
+|upkeep
+|turn|8
+|
+|t:|1791824165
+|move|p1a: Gholdengo|Thunderbolt|p2a: Slowking
+|-damage|p2a: Slowking|63/100
+|move|p2a: Slowking|Slack Off|p2a: Slowking
+|-heal|p2a: Slowking|100/100
+|
+|upkeep
+|turn|9
+|
+|t:|1791824165
+|move|p1a: Gholdengo|Thunderbolt|p2a: Slowking
+|-damage|p2a: Slowking|59/100
+|move|p2a: Slowking|Slack Off|p2a: Slowking
+|-heal|p2a: Slowking|100/100
+|
+|upkeep
+|turn|10
+|
+|t:|1791824165
+|move|p1a: Gholdengo|Thunderbolt|p2a: Slowking
+|-damage|p2a: Slowking|61/100
+|-status|p2a: Slowking|par
+|move|p2a: Slowking|Slack Off|p2a: Slowking
+|-heal|p2a: Slowking|100/100 par
+|
+|upkeep
+|turn|11
+|
+|t:|1791824165
+|move|p1a: Gholdengo|Thunderbolt|p2a: Slowking
+|-damage|p2a: Slowking|64/100 par
+|cant|p2a: Slowking|par
+|
+|upkeep
+|turn|12
+|
+|t:|1791824165
+|move|p1a: Gholdengo|Thunderbolt|p2a: Slowking
+|-damage|p2a: Slowking|29/100 par
+|move|p2a: Slowking|Slack Off|p2a: Slowking
+|-heal|p2a: Slowking|79/100 par
+|
+|upkeep
+|turn|13
+|
+|t:|1791824165
+|move|p1a: Gholdengo|Thunderbolt|p2a: Slowking
+|-damage|p2a: Slowking|37/100 par
+|move|p2a: Slowking|Psychic|p1a: Gholdengo
+|-resisted|p1a: Gholdengo
+|-damage|p1a: Gholdengo|82/100
+|-unboost|p1a: Gholdengo|spd|1
+|
+|upkeep
+|turn|14
+|
+|t:|1791824165
+|move|p1a: Gholdengo|Thunderbolt|p2a: Slowking
+|-damage|p2a: Slowking|0 fnt
+|faint|p2a: Slowking
+|
+|win|Alpha

@@ -23,13 +23,13 @@ function dispatch(state: ParserState, line: string) {
   } else if (line.startsWith('|-resisted|')) {
     handleResisted(state, line);
   } else if (line.startsWith('|-crit|')) {
-    handleCrit(state);
+    handleCrit(state, line);
   } else if (/^\|-(?:activate|enditem|item)\|/.test(line)) {
     noteActivation(state, line);
     if (isActionBoundary(line)) handleActionBoundary(state, line);
   } else if (isActionBoundary(line)) {
     handleActionBoundary(state, line);
-  } else if (state.singles && line.startsWith('|-damage|') && !line.includes('[from]') && state.lastMove) {
+  } else if (line.startsWith('|-damage|') && !line.includes('[from]') && state.lastMove) {
     handleDamage(state, line);
   }
 }

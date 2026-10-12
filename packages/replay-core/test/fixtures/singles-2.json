@@ -1,0 +1,231 @@
+[
+ {
+  "attackerSpecies": "Dragonite",
+  "defenderSpecies": "Garchomp",
+  "attackerSide": "p2",
+  "moveId": "extremespeed",
+  "observedFraction": 0.22999999999999998,
+  "lethal": false,
+  "attackerBoosts": {},
+  "defenderBoosts": {},
+  "attackerStatus": "",
+  "screens": [],
+  "weather": ""
+ },
+ {
+  "attackerSpecies": "Dragonite",
+  "defenderSpecies": "Garchomp",
+  "attackerSide": "p2",
+  "moveId": "extremespeed",
+  "observedFraction": 0.24,
+  "lethal": false,
+  "attackerBoosts": {},
+  "defenderBoosts": {},
+  "attackerStatus": "",
+  "screens": [],
+  "weather": ""
+ },
+ {
+  "attackerSpecies": "Dragonite",
+  "defenderSpecies": "Garchomp",
+  "attackerSide": "p2",
+  "moveId": "extremespeed",
+  "observedFraction": 0.23000000000000004,
+  "lethal": false,
+  "attackerBoosts": {},
+  "defenderBoosts": {},
+  "attackerStatus": "",
+  "screens": [],
+  "weather": ""
+ },
+ {
+  "attackerSpecies": "Dragonite",
+  "defenderSpecies": "Garchomp",
+  "attackerSide": "p2",
+  "moveId": "outrage",
+  "observedFraction": 0.3,
+  "lethal": true,
+  "attackerBoosts": {
+   "atk": 1,
+   "spe": 1
+  },
+  "defenderBoosts": {
+   "atk": 2
+  },
+  "attackerStatus": "",
+  "screens": [],
+  "weather": ""
+ },
+ {
+  "attackerSpecies": "Dragonite",
+  "defenderSpecies": "Gholdengo",
+  "attackerSide": "p2",
+  "moveId": "outrage",
+  "observedFraction": 0.43999999999999995,
+  "lethal": false,
+  "attackerBoosts": {
+   "atk": 1,
+   "spe": 1
+  },
+  "defenderBoosts": {},
+  "attackerStatus": "",
+  "screens": [],
+  "weather": ""
+ },
+ {
+  "attackerSpecies": "Gholdengo",
+  "defenderSpecies": "Dragonite",
+  "attackerSide": "p1",
+  "moveId": "thunderbolt",
+  "observedFraction": 0.45000000000000007,
+  "lethal": false,
+  "attackerBoosts": {},
+  "defenderBoosts": {
+   "atk": 1,
+   "spe": 1
+  },
+  "attackerStatus": "",
+  "screens": [],
+  "weather": ""
+ },
+ {
+  "attackerSpecies": "Dragonite",
+  "defenderSpecies": "Gholdengo",
+  "attackerSide": "p2",
+  "moveId": "outrage",
+  "observedFraction": 0.42000000000000004,
+  "lethal": false,
+  "attackerBoosts": {
+   "atk": 1,
+   "spe": 1
+  },
+  "defenderBoosts": {},
+  "attackerStatus": "",
+  "screens": [],
+  "weather": ""
+ },
+ {
+  "attackerSpecies": "Gholdengo",
+  "defenderSpecies": "Dragonite",
+  "attackerSide": "p1",
+  "moveId": "thunderbolt",
+  "observedFraction": 0.42,
+  "lethal": true,
+  "attackerBoosts": {},
+  "defenderBoosts": {
+   "atk": 1,
+   "spe": 1
+  },
+  "attackerStatus": "",
+  "screens": [],
+  "weather": ""
+ },
+ {
+  "attackerSpecies": "Rotom-Wash",
+  "defenderSpecies": "Gholdengo",
+  "attackerSide": "p2",
+  "moveId": "voltswitch",
+  "observedFraction": 0.14,
+  "lethal": true,
+  "attackerBoosts": {},
+  "defenderBoosts": {},
+  "attackerStatus": "",
+  "screens": [],
+  "weather": ""
+ },
+ {
+  "attackerSpecies": "Iron Valiant",
+  "defenderSpecies": "Kingambit",
+  "attackerSide": "p2",
+  "moveId": "moonblast",
+  "observedFraction": 0.42000000000000004,
+  "lethal": false,
+  "attackerBoosts": {},
+  "defenderBoosts": {},
+  "attackerStatus": "",
+  "screens": [],
+  "weather": ""
+ },
+ {
+  "attackerSpecies": "Iron Valiant",
+  "defenderSpecies": "Kingambit",
+  "attackerSide": "p2",
+  "moveId": "moonblast",
+  "observedFraction": 0.42999999999999994,
+  "lethal": false,
+  "attackerBoosts": {},
+  "defenderBoosts": {
+   "atk": 2
+  },
+  "attackerStatus": "",
+  "screens": [],
+  "weather": ""
+ },
+ {
+  "attackerSpecies": "Iron Valiant",
+  "defenderSpecies": "Kingambit",
+  "attackerSide": "p2",
+  "moveId": "moonblast",
+  "observedFraction": 0.15,
+  "lethal": true,
+  "attackerBoosts": {},
+  "defenderBoosts": {
+   "atk": 4
+  },
+  "attackerStatus": "",
+  "screens": [],
+  "weather": ""
+ },
+ {
+  "attackerSpecies": "Iron Valiant",
+  "defenderSpecies": "Pelipper",
+  "attackerSide": "p2",
+  "moveId": "knockoff",
+  "observedFraction": 0.37,
+  "lethal": false,
+  "attackerBoosts": {},
+  "defenderBoosts": {},
+  "attackerStatus": "",
+  "screens": [],
+  "weather": "Rain"
+ },
+ {
+  "attackerSpecies": "Pelipper",
+  "defenderSpecies": "Iron Valiant",
+  "attackerSide": "p1",
+  "moveId": "uturn",
+  "observedFraction": 0.020000000000000018,
+  "lethal": false,
+  "attackerBoosts": {},
+  "defenderBoosts": {},
+  "attackerStatus": "",
+  "screens": [],
+  "weather": "Rain"
+ },
+ {
+  "attackerSpecies": "Pelipper",
+  "defenderSpecies": "Iron Valiant",
+  "attackerSide": "p1",
+  "moveId": "uturn",
+  "observedFraction": 0.030000000000000027,
+  "lethal": false,
+  "attackerBoosts": {},
+  "defenderBoosts": {},
+  "attackerStatus": "",
+  "screens": [],
+  "weather": "Rain"
+ },
+ {
+  "attackerSpecies": "Iron Valiant",
+  "defenderSpecies": "Pelipper",
+  "attackerSide": "p2",
+  "moveId": "knockoff",
+  "observedFraction": 0.21,
+  "lethal": true,
+  "attackerBoosts": {},
+  "defenderBoosts": {},
+  "attackerStatus": "",
+  "screens": [],
+  "weather": "Rain"
+ }
+]

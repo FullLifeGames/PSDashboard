@@ -61,8 +61,9 @@ export interface TurnSnapshot {
  * One clean, direct damaging hit observed in the protocol, with the context
  * needed to recompute it with a damage calculator: spread inference scores
  * candidate EV spreads by how well their roll ranges reproduce these.
- * Crits, multi-hits, spread moves (doubles), and [from]-attributed damage
- * are excluded at collection time.
+ * Crits, multi-hits (per target in doubles), hits boosted by Helping Hand,
+ * and [from]-attributed damage are excluded at collection time. Doubles
+ * give one observation per target of a move (round 69, T31).
  */
 export interface DamageObservation {
   attackerSpecies: string;
@@ -82,6 +83,20 @@ export interface DamageObservation {
   /** Screens up on the DEFENDER's side at the moment of the hit. */
   screens: string[];
   weather: string;
+  /**
+   * The battle was not singles (the `|gametype|` line decides, not the format
+   * name): the calculator prices the hit on a Doubles field. Absent on
+   * observations of caches older than round 69, which read as singles.
+   */
+  doubles?: boolean;
+  /**
+   * The move line named `[spread]`: the simulator cut the damage to 0.75, even
+   * when only one target took it (the other protected). A spread move without
+   * the mark hit its only target at full damage.
+   */
+  spread?: boolean;
+  /** The side of the defender: the other side unless a spread move hit the attacker's partner. Absent reads as the other side. */
+  defenderSide?: 'p1' | 'p2';
 }
 
 /**

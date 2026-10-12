@@ -1,6 +1,6 @@
 import type { Battle, Pokemon, Side, Field } from '@pkmn/client';
 import type { GenerationNum } from '@pkmn/data';
-import type { PokemonSnapshot, SideSnapshot, FieldSnapshot } from '../types.ts';
+import type { DamageObservation, PokemonSnapshot, SideSnapshot, FieldSnapshot } from '../types.ts';
 import { flushSpeedOrder, speedContaminatedAt, type ClientIdent, type ParserState, type PendingMove } from './parser-state.ts';
 import { firstMoverContaminated, foreignAction, secondMoverContaminated, switchTriggered } from './speed-evidence.ts';
 import { toId } from '../ids.ts';
@@ -82,7 +82,7 @@ function pendingMoveFor(
   return parts[2] && parts[4]
     ? {
       attacker: parts[2], target: parts[4], moveId,
-      crit: false, observationIndex: null, damageCount: 0,
+      spread: parts.slice(5).some(part => part.startsWith('[spread]')), crits: new Set<string>(), hits: new Map(),
       speedClean: cleanFirst, attackerSide: side, attackerSpecies: speciesForme,
     }
     : null;
@@ -119,8 +119,8 @@ export function handleResisted(state: ParserState, line: string) {
   if (state.lastMove && (line.split('|')[2] ?? '') === state.lastMove.target) state.lastMove.effectiveness = 'resisted';
 }
 
-export function handleCrit(state: ParserState) {
-  if (state.lastMove) state.lastMove.crit = true;
+export function handleCrit(state: ParserState, line: string) {
+  if (state.lastMove) state.lastMove.crits.add(line.split('|')[2] ?? '');
 }
 
 export function isActionBoundary(line: string): boolean {
@@ -189,6 +189,8 @@ function recordImmuneHiddenPower(state: ParserState, line: string) {
 export function handleActionBoundary(state: ParserState, line: string) {
   recordFaintSpeedEvidence(state, line);
   recordImmuneHiddenPower(state, line);
+  // One target missing or immune does not end a spread move: the damage lines of the others follow or have come.
+  if (state.lastMove?.spread && /^|(?:-miss|-immune)|/.test(line)) return;
   state.lastMove = null;
   if (/^\|(?:switch|drag)\|/.test(line)) {
     state.switchedThisTurn.add(line.split('|')[2] ?? '');
@@ -200,11 +202,11 @@ export function handleActionBoundary(state: ParserState, line: string) {
 
 /** HP-type evidence is effectiveness-only, so crits and multi-hits do
  *  not disqualify it — but only the FIRST damage line of the move
- *  counts (spec ⑤ 2a). */
-function recordHiddenPowerHit(state: ParserState, defenderIdent: string) {
+ *  counts (spec ⑤ 2a). Singles only: the marker names the move's one target. */
+function recordHiddenPowerHit(state: ParserState, defenderIdent: string, count: number) {
   const { lastMove, battle } = state;
-  if (!lastMove) return;
-  if (lastMove.damageCount === 1 && lastMove.moveId === 'hiddenpower') {
+  if (!lastMove || !state.singles) return;
+  if (count === 1 && lastMove.moveId === 'hiddenpower') {
     const defender = battle.getPokemon(defenderIdent as ClientIdent);
     if (defender) {
       state.hpEvidence.push({
@@ -216,56 +218,65 @@ function recordHiddenPowerHit(state: ParserState, defenderIdent: string) {
 }
 
 /** Read the defender BEFORE battle.add applies the line — its current
- *  client HP is the pre-hit value. */
-function recordDamageObservation(state: ParserState, parts: string[], defenderIdent: string) {
+ *  client HP is the pre-hit value. Null when the line is no reading. */
+function recordDamageObservation(state: ParserState, parts: string[], defenderIdent: string): DamageObservation | null {
   const { lastMove, battle } = state;
-  if (!lastMove) return;
+  if (!lastMove) return null;
   type Ident = Parameters<Battle['getPokemon']>[0];
   const defender = battle.getPokemon(defenderIdent as Ident);
   const attacker = battle.getPokemon(lastMove.attacker as Ident);
   const newFraction = hpFractionOf(parts[3] ?? '');
-  if (defender && attacker && newFraction !== null && defender.maxhp > 0) {
-    const preFraction = defender.hp / defender.maxhp;
-    const observedFraction = preFraction - newFraction;
-    if (observedFraction > 0) {
-      const defenderSide = defenderIdent.startsWith('p1') ? battle.p1 : battle.p2;
-      lastMove.observationIndex = state.observations.length;
-      state.observations.push({
-        attackerSpecies: attacker.speciesForme,
-        defenderSpecies: defender.speciesForme,
-        attackerSide: lastMove.attacker.startsWith('p1') ? 'p1' : 'p2',
-        moveId: lastMove.moveId,
-        observedFraction,
-        lethal: newFraction === 0,
-        attackerBoosts: { ...attacker.boosts },
-        defenderBoosts: { ...defender.boosts },
-        attackerStatus: attacker.status || '',
-        screens: SCREEN_IDS.filter(id => (defenderSide.sideConditions as Record<string, unknown>)[id]),
-        weather: battle.field.weather || '',
-      });
-    }
-  }
+  if (!(defender && attacker && newFraction !== null && defender.maxhp > 0)) return null;
+  // The partner's Helping Hand is a boost the fit cannot price yet (T86): the hit is no reading.
+  if (attacker.volatiles.helpinghand) return null;
+  const preFraction = defender.hp / defender.maxhp;
+  const observedFraction = preFraction - newFraction;
+  if (!(observedFraction > 0)) return null;
+  const defenderSide = defenderIdent.startsWith('p1') ? battle.p1 : battle.p2;
+  const observation: DamageObservation = {
+    attackerSpecies: attacker.speciesForme,
+    defenderSpecies: defender.speciesForme,
+    attackerSide: lastMove.attacker.startsWith('p1') ? 'p1' : 'p2',
+    moveId: lastMove.moveId,
+    observedFraction,
+    lethal: newFraction === 0,
+    attackerBoosts: { ...attacker.boosts },
+    defenderBoosts: { ...defender.boosts },
+    attackerStatus: attacker.status || '',
+    screens: SCREEN_IDS.filter(id => (defenderSide.sideConditions as Record<string, unknown>)[id]),
+    weather: battle.field.weather || '',
+    doubles: !state.singles,
+    spread: lastMove.spread,
+    defenderSide: defenderIdent.startsWith('p1') ? 'p1' : 'p2',
+  };
+  state.observations.push(observation);
+  return observation;
 }
 
+/**
+ * A damage line of the pending move. Singles: the move's one target. Doubles: any
+ * mon but the attacker (a spread move also hits the partner, Dragon Darts the
+ * second foe); a target hit twice loses its observation, a crit on a target
+ * does too, and the others keep theirs.
+ */
 export function handleDamage(state: ParserState, line: string) {
   const { lastMove } = state;
   if (!lastMove) return;
   const parts = line.split('|');
   const defenderIdent = parts[2] ?? '';
   // Self-targeting damage (Substitute/Belly Drum cost) is not a hit.
-  if (defenderIdent === lastMove.target && lastMove.target !== lastMove.attacker) {
-    lastMove.damageCount += 1;
-    recordHiddenPowerHit(state, defenderIdent);
-    if (lastMove.damageCount > 1) {
-      // Multi-hit: per-hit rolls are not individually solvable — drop
-      // the first hit's observation too.
-      if (lastMove.observationIndex !== null) {
-        state.observations.splice(lastMove.observationIndex, 1);
-        lastMove.observationIndex = null;
-      }
-    } else if (!lastMove.crit) {
-      recordDamageObservation(state, parts, defenderIdent);
-    }
+  if (defenderIdent === lastMove.attacker || (state.singles && defenderIdent !== lastMove.target)) return;
+  const hit = lastMove.hits.get(defenderIdent) ?? { count: 0, observation: null };
+  lastMove.hits.set(defenderIdent, hit);
+  hit.count += 1;
+  recordHiddenPowerHit(state, defenderIdent, hit.count);
+  if (hit.count > 1) {
+    // Multi-hit: per-hit rolls are not individually solvable — drop
+    // the first hit's observation too.
+    if (hit.observation) state.observations.splice(state.observations.indexOf(hit.observation), 1);
+    hit.observation = null;
+  } else if (!lastMove.crits.has(defenderIdent)) {
+    hit.observation = recordDamageObservation(state, parts, defenderIdent);
   }
 }
 

@@ -19,14 +19,23 @@ export interface ScarfChange {
   held: boolean;
 }
 
-/** The pending move context: crits and multi-hits disqualify its damage. */
+/** What one target of the pending move took so far: a second damage line spoils the observation of the first (multi-hit). */
+export interface TargetHit {
+  count: number;
+  observation: DamageObservation | null;
+}
+
+/** The pending move context: crits and multi-hits disqualify the damage of their target. */
 export interface PendingMove {
   attacker: string;
   target: string;
   moveId: string;
-  crit: boolean;
-  observationIndex: number | null;
-  damageCount: number;
+  /** The move line names `[spread]`: the simulator cut the damage (round 69, T31). */
+  spread: boolean;
+  /** Targets a `|-crit|` line named: their damage is no reading. */
+  crits: Set<string>;
+  /** Per target ident, in the order the damage lines came (a spread move has up to three, Dragon Darts two). */
+  hits: Map<string, TargetHit>;
   /** The attacker's speed-evidence cleanliness at move time. */
   speedClean: boolean;
   attackerSide: 'p1' | 'p2';

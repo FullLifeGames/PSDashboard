@@ -86,7 +86,7 @@ describe('damage observations', () => {
     expect(observations[0].observedFraction).toBeCloseTo(1, 5);
   });
 
-  test('crits, [from] damage, multi-hits, and doubles yield no observations', () => {
+  test('crits, [from] damage and multi-hits yield no observations', () => {
     const crit = [
       ...obsHeader,
       '|move|p1a: Lax|Tackle|p2a: Chomp',
@@ -111,7 +111,9 @@ describe('damage observations', () => {
       '|turn|2',
     ].join('\n');
     expect(parseReplayLogWithObservations(multiHit).observations).toHaveLength(0);
+  });
 
+  test('doubles yield an observation per target (round 69, T31; the cases are in doubles-damage-observation.spec.ts)', () => {
     const doubles = [
       '|player|p1|Alice|', '|player|p2|Bob|', '|gametype|doubles', '|gen|9',
       '|tier|[Gen 9] VGC', '|start',
@@ -122,7 +124,7 @@ describe('damage observations', () => {
       '|-damage|p2a: Chomp|76/100',
       '|turn|2',
     ].join('\n');
-    expect(parseReplayLogWithObservations(doubles).observations).toHaveLength(0);
+    expect(parseReplayLogWithObservations(doubles).observations).toHaveLength(1);
   });
 
   test('unattributed damage outside the move action window yields no observation', () => {
