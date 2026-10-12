@@ -35,6 +35,12 @@ export interface CalcBody {
   onField: boolean;
   /** The battle's mod (Dex.currentMod), for the Champions mod's move overrides (calc/move.ts). */
   mod?: string;
+  /**
+   * A body still to come in: does the simulator give its ability's entry stage now (Intrepid Sword and Dauntless Shield
+   * once per battle in Gen 9, none under a Neutralizing Gas)? Only bodyOf reads it off the simulator; a body from the
+   * picker or a built set carries no simulator flags and leaves it undefined, which keeps the stage (T156).
+   */
+  entryStage?: boolean;
   /** The stat a Paradox ability's volatile raises (T76). */
   boostedStat?: string;
   /** Supreme Overlord's fallen (T76). */
@@ -81,12 +87,56 @@ export function simBodyFacts(mon: Pokemon): SimFacts {
   };
 }
 
+/**
+ * Does the simulator suppress `mon`'s ability now (Gastro Acid, an active Neutralizing Gas: ignoringAbility)? A body on
+ * the bench is asked as if it stood on the field, because the simulator's own answer for a benched body is always yes
+ * (Gen 5 and later): the stand-in reads the body's own state and says what the entry would meet.
+ */
+export function abilitySuppressed(mon: Pokemon): boolean {
+  if (mon.isActive) return mon.ignoringAbility();
+  try {
+    return (Object.create(mon, { isActive: { value: true } }) as Pokemon).ignoringAbility();
+  } catch {
+    return false;
+  }
+}
+
+type StartHandler = (this: unknown, pokemon: unknown) => void;
+
+/**
+ * Does the simulator give the body, still to come in, the stage its ability gives on entry (T156)? The ability's own
+ * onStart from the Dex, run on a stand-in that records the holder's boost, with the holder's flags copied from the real
+ * Pokémon: the Gen 9 handlers of Intrepid Sword and Dauntless Shield return early once swordBoost or shieldBoost is
+ * set, Gen 8's give the stage every time. Only for an ability whose stage the calc gives with abilityOn
+ * (calcOwnEntryStage), the one place that needs the answer; undefined elsewhere, and for a body on the field.
+ */
+function entryStageOf(battle: Battle, mon: Pokemon, suppressed: boolean): boolean | undefined {
+  if (mon.isActive || !mon.ability) return undefined;
+  const ability = battle.dex.abilities.get(mon.ability);
+  if (!calcOwnEntryStage(calcGenerationFor(battle.gen, battle.dex.currentMod).num as number, ability.name)) return undefined;
+  const handler = (ability as { onStart?: unknown }).onStart;
+  if (suppressed || typeof handler !== 'function') return false;
+  const holder = { ...mon };
+  let boosted = false;
+  const field = { boost: (boost: Record<string, number>, target: unknown) => { boosted ||= target === holder && Object.values(boost).some(stage => stage !== 0); return true; } };
+  try {
+    (handler as StartHandler).call(field, holder);
+  } catch {
+    // A handler that needs the battle itself gives no stage.
+  }
+  return boosted;
+}
+
 export function bodyOf(battle: Battle, mon: Pokemon): SimBody {
+  const suppressed = !!mon.ability && abilitySuppressed(mon);
+  const entryStage = entryStageOf(battle, mon, suppressed);
   return {
     ...simBodyFacts(mon),
+    ...(entryStage === undefined ? {} : { entryStage }),
     species: mon.species.name,
     level: mon.level,
-    ability: mon.ability ? battle.dex.abilities.get(mon.ability).name : '',
+    // A suppressed ability reaches the calc as No Ability: Multiscale under Gastro Acid is no Multiscale (abilityId stays the simulator's).
+    ability: !mon.ability ? '' : suppressed ? NO_ABILITY : battle.dex.abilities.get(mon.ability).name,
     abilityId: mon.ability,
     item: mon.item ? battle.dex.items.get(mon.item).name : '',
     itemId: mon.item,
@@ -259,10 +309,11 @@ function abilityForCalc(gen: CalcGen, body: CalcBody, species: string): string |
 
 /**
  * A body still to come in whose ability gives the holder a stage only with abilityOn (calcOwnEntryStage) gets abilityOn,
- * so the odds count the stage the simulator gives on entry once, as 0.11 did by itself. A body on the field never does.
+ * so the odds count the stage the simulator gives on entry once, as 0.11 did by itself. A body on the field never does, and neither does one the
+ * simulator gives no stage now (entryStage false: spent before, or entering under a Neutralizing Gas).
  */
 function entersWithStage(gen: CalcGen, body: CalcBody, ability: string | undefined, species: string): boolean {
-  if (body.onField) return false;
+  if (body.onField || body.entryStage === false) return false;
   const effective = ability ?? gen.species.get(toID(species))?.abilities?.[0];
   return !!effective && calcOwnEntryStage((gen.num as number), effective);
 }
