@@ -81,3 +81,64 @@ describe.each([['singles', SINGLES], ['doubles', DOUBLES]] as const)('snapshot f
     }
   });
 });
+
+/**
+ * Round 69, T158 (spec decision 32): the quick picker needs the facts the simulator's body keeps for the calc:
+ * the stat Protosynthesis or Quark Drive raised (the client's `protosynthesis` and `quarkdrive` volatile names it)
+ * and the fallen allies of Supreme Overlord (the client's `fallenN` volatile). Battle B is the simulator's own;
+ * the expected values come from its body, not from the log.
+ */
+type SimBattle = InstanceType<typeof Battle>;
+function playSteps(format: string, p1: PokemonSet[], p2: PokemonSet[], steps: [string, string][][], seed = 1): { battle: SimBattle; log: string } {
+  const battle = new Battle({
+    formatid: toID(format), seed: [seed, 2, 3, 4],
+    p1: { name: 'Alpha', team: Teams.pack(p1) }, p2: { name: 'Beta', team: Teams.pack(p2) },
+  });
+  battle.choose('p1', 'default');
+  battle.choose('p2', 'default');
+  for (const step of steps) for (const [side, choice] of step) battle.choose(side as 'p1' | 'p2', choice);
+  const lines = battle.log;
+  return { battle, log: lines.filter((line, index) => !line.startsWith('|split|') && !lines[index - 1]?.startsWith('|split|')).join('\n') };
+}
+const withAbility = (species: string, ability: string, moves: string[], level = 100): PokemonSet => ({ ...set(species, moves), ability, level });
+const lastSnapshot = (log: string) => parseReplayLogWithObservations(log).snapshots.at(-1)!;
+
+describe.each([['singles', 'gen9customgame', ''], ['doubles', 'gen9doublescustomgame', ', move 1']] as const)('T158 snapshot facts (%s)', (label, format, partner) => {
+  const filler = label === 'singles' ? [] : [set('Gliscor', ['Splash'])];
+  const foeFiller = label === 'singles' ? [] : [set('Corviknight', ['Splash'])];
+
+  test('boostedStat is the stat the Protosynthesis and Quark Drive volatile names, and absent without the boost', () => {
+    const holders = [
+      { ability: 'Protosynthesis', species: 'Roaring Moon', starter: withAbility('Torkoal', 'Drought', ['Splash']), volatile: 'protosynthesis' },
+      { ability: 'Quark Drive', species: 'Iron Valiant', starter: withAbility('Pikachu', 'Electric Surge', ['Splash']), volatile: 'quarkdrive' },
+    ];
+    for (const holder of holders) {
+      const { battle, log } = playSteps(format, [withAbility(holder.species, holder.ability, ['Splash']), ...filler], [holder.starter, ...foeFiller], [[['p1', `move 1${partner}`], ['p2', `move 1${partner}`]]]);
+      const body = battle.sides[0].pokemon[0];
+      const bestStat = (body.volatiles[holder.volatile] as { bestStat?: string } | undefined)?.bestStat;
+      expect(bestStat, `${holder.ability} did not start`).toBeTruthy();
+      const snapshot = lastSnapshot(log);
+      expect(snapshot.p1.pokemon.find(pokemon => pokemon.name === holder.species)!.boostedStat).toBe(bestStat);
+      for (const other of [...snapshot.p1.pokemon, ...snapshot.p2.pokemon]) if (other.name !== holder.species) expect(other.boostedStat, other.name).toBeUndefined();
+    }
+    const quiet = playSteps(format, [withAbility('Roaring Moon', 'Protosynthesis', ['Splash']), ...filler], [set('Snorlax', ['Splash']), ...foeFiller], [[['p1', `move 1${partner}`], ['p2', `move 1${partner}`]]]);
+    for (const pokemon of lastSnapshot(quiet.log).p1.pokemon) expect(pokemon.boostedStat).toBeUndefined();
+  });
+
+  test('fallen is the count the Supreme Overlord state keeps, and absent for the others', () => {
+    // The first body faints to a Psychic and Kingambit comes in from the bench: one fallen ally.
+    const p1 = label === 'singles'
+      ? [withAbility('Magikarp', 'No Ability', ['Splash'], 5), withAbility('Kingambit', 'Supreme Overlord', ['Splash'])]
+      : [withAbility('Magikarp', 'No Ability', ['Splash'], 5), set('Gliscor', ['Splash']), withAbility('Kingambit', 'Supreme Overlord', ['Splash'])];
+    const p2 = [set('Mew', ['Psychic', 'Splash']), ...foeFiller];
+    const attack = label === 'singles' ? 'move 1' : 'move 1 1, move 1';
+    const comeIn = label === 'singles' ? 'switch 2' : 'switch 3';
+    const { battle, log } = playSteps(format, p1, p2, [[['p1', `move 1${partner}`], ['p2', attack]], [['p1', comeIn]]]);
+    const kingambit = battle.sides[0].pokemon.find(pokemon => pokemon.name === 'Kingambit')!;
+    const fallen = (kingambit.abilityState as { fallen?: number }).fallen;
+    expect(fallen).toBe(1);
+    const snapshot = lastSnapshot(log);
+    expect(snapshot.p1.pokemon.find(pokemon => pokemon.name === 'Kingambit')!.fallen).toBe(fallen);
+    for (const other of [...snapshot.p1.pokemon, ...snapshot.p2.pokemon]) if (other.name !== 'Kingambit') expect(other.fallen, other.name).toBeUndefined();
+  });
+});

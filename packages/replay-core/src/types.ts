@@ -35,6 +35,13 @@ export interface PokemonSnapshot {
   sleepTurns?: number;
   /** Index in the side's active row, only for an active body; absent on snapshots written before round 69 (T151). */
   slot?: number;
+  /**
+   * The stat Protosynthesis or Quark Drive raises, as @pkmn/client's volatile of that name keeps it
+   * (`atk`, `def`, `spa`, `spd`, `spe`); absent without the boost and on snapshots written before round 69 (T158).
+   */
+  boostedStat?: string;
+  /** Supreme Overlord's count of fallen allies, from the client's `fallenN` volatile; absent without it and before round 69 (T158). */
+  fallen?: number;
 }
 
 export interface SideSnapshot {

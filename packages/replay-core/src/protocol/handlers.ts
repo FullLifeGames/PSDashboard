@@ -20,8 +20,25 @@ function hpFractionOf(text: string): number | null {
   return denom > 0 ? parseInt(match[1], 10) / denom : null;
 }
 
+/** The stat the client's Protosynthesis or Quark Drive volatile names (the three letters of the `-start` effect). */
+function boostedStatOf(mon: Pokemon): string | undefined {
+  const volatile = (mon.volatiles.protosynthesis ?? mon.volatiles.quarkdrive) as { stat?: string } | undefined;
+  return volatile?.stat;
+}
+
+/** Supreme Overlord's count: the client adds the silent `-start|..|fallenN` as a volatile named by its effect. */
+function fallenOf(mon: Pokemon): number | undefined {
+  for (const id of Object.keys(mon.volatiles)) {
+    const count = /^fallen(\d+)$/.exec(id);
+    if (count) return Number(count[1]);
+  }
+  return undefined;
+}
+
 function snapshotPokemon(mon: Pokemon): PokemonSnapshot {
   const slot = mon.side.active.indexOf(mon);
+  const boostedStat = boostedStatOf(mon);
+  const fallen = fallenOf(mon);
   return {
     name: mon.name,
     speciesForme: mon.speciesForme,
@@ -40,6 +57,8 @@ function snapshotPokemon(mon: Pokemon): PokemonSnapshot {
     gender: mon.gender || '',
     ...(mon.status === 'slp' ? { sleepTurns: mon.statusState.sleepTurns } : {}),
     ...(slot >= 0 ? { slot } : {}),
+    ...(boostedStat ? { boostedStat } : {}),
+    ...(fallen ? { fallen } : {}),
   };
 }
 
