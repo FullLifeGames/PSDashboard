@@ -43,7 +43,8 @@ describe('Tera options price their odds on the Tera body (T84)', () => {
     const root = rootWithOdds(singles, choice);
     const [odds] = koOddsForOptions(positionBattle(root), 'p1', [choice]);
     expect(odds).not.toBeNull();
-    expect(odds).toEqual(koOddsForOptions(clicked(root, 0, 0), 'p1', [choice])[0]);
+    // The odds are the click's either way; the attacker's species is the one the battle shows (the -Tera forme after the click).
+    expect({ ...odds, attacker: undefined }).toEqual({ ...koOddsForOptions(clicked(root, 0, 0), 'p1', [choice])[0], attacker: undefined });
   });
 
   test('singles: a root cell with a Tera choice plans its event on the Tera body', () => {
@@ -85,7 +86,7 @@ describe('Tera options price their odds on the Tera body (T84)', () => {
     const battle = positionBattle(root);
     const [odds] = koOddsForOptions(battle, 'p1', [choice]);
     expect(odds).not.toBeNull();
-    expect(odds).toEqual(koOddsForOptions(clicked(root, 0, 0), 'p1', [choice])[0]);
+    expect({ ...odds, attacker: undefined }).toEqual({ ...koOddsForOptions(clicked(root, 0, 0), 'p1', [choice])[0], attacker: undefined });
     expect(parsePairChoice(battle, 0, choice)).toEqual([
       { kind: 'move', slot: 0, moveId: 'ivycudgel', loc: 1, tera: true },
       { kind: 'move', slot: 1, moveId: 'roost', loc: null },

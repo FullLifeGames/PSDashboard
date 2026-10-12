@@ -183,7 +183,7 @@ test('koOddsForOptions prices the stay-column headline', () => {
     [makeSet('Pikachu', 'Pikachu', ['Tackle'], 30)],
   );
   const [pump, toss] = koOddsForOptions(battle, 'p1', ['move hydropump', 'move seismictoss']);
-  expect(pump).toEqual({ accuracy: expect.closeTo(0.8, 5), killFraction: 1 });
+  expect(pump).toEqual({ accuracy: expect.closeTo(0.8, 5), killFraction: 1, attacker: expect.any(Object) });
   expect(toss).toBeNull(); // fully deterministic — no event
 });
 
@@ -275,13 +275,13 @@ describe('root-cell blend integration', () => {
     const result = searchPosition(machampRoot(), { depth: 1, samples: 3 });
     const pump = result.perSide.p1.find(row => row.choice === 'move hydropump')!;
     const toss = result.perSide.p1.find(row => row.choice === 'move seismictoss')!;
-    expect(pump.koOdds).toEqual({ accuracy: expect.closeTo(0.8, 5), killFraction: 1 });
+    expect(pump.koOdds).toEqual({ accuracy: expect.closeTo(0.8, 5), killFraction: 1, attacker: expect.any(Object) });
     expect(toss.koOdds).toBeUndefined();
   });
 
   test('the orchestrated path attaches identical koOdds', async () => {
     const orchestrated = await searchOrchestrated(createLocalExecutor(machampRoot()), { depth: 1, samples: 3 });
     const pump = orchestrated.perSide.p1.find(row => row.choice === 'move hydropump')!;
-    expect(pump.koOdds).toEqual({ accuracy: expect.closeTo(0.8, 5), killFraction: 1 });
+    expect(pump.koOdds).toEqual({ accuracy: expect.closeTo(0.8, 5), killFraction: 1, attacker: expect.any(Object) });
   });
 });

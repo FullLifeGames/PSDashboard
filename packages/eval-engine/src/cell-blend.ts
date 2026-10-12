@@ -342,6 +342,6 @@ export function koOddsForOptions(battle: Battle, side: 'p1' | 'p2', choices: str
     if (attackerPrevented(attacker) || defenderShielded(defender)) return null;
     const event = boundaryEvent(battle, attacker, defender, moveId, { attacker: clicksTera(choice) });
     if (!event || event.killFraction <= 0 || event.pKill >= 1) return null;
-    return { accuracy: event.accuracy, killFraction: event.killFraction };
+    return { accuracy: event.accuracy, killFraction: event.killFraction, attacker: { slot: 0, species: attacker.species.name } };
   });
 }

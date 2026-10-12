@@ -13,7 +13,7 @@ const choice = (choiceStr: string, label: string, worstCase: number): RankedChoi
 describe('kill odds for doubles options (round 56)', () => {
   test('the played pair names its slot: Play Rough on Incineroar, a 90 % roll that kills', () => {
     const [odds] = koOddsForOptions(positionBattle(anchorRoot()), 'p1', [PLAYED[0]]);
-    expect(odds).toEqual({ accuracy: 0.9, killFraction: 1, label: 'Play Rough→Incineroar' });
+    expect(odds).toEqual({ accuracy: 0.9, killFraction: 1, label: 'Play Rough→Incineroar', attacker: expect.any(Object) });
   });
 
   test('a foe the partner kills for sure carries no odds for the other slot', () => {
@@ -25,7 +25,7 @@ describe('kill odds for doubles options (round 56)', () => {
     );
     const [focus, split] = koOddsForOptions(positionBattle(root), 'p1', ['move karatechop 2, move tackle 2', 'move karatechop 1, move tackle 2']);
     expect(focus).toBeNull();
-    expect(split).toEqual({ accuracy: 1, killFraction: expect.closeTo(1 / 24, 12), label: 'Tackle→Eevee' });
+    expect(split).toEqual({ accuracy: 1, killFraction: expect.closeTo(1 / 24, 12), label: 'Tackle→Eevee', attacker: expect.any(Object) });
   });
 
   test('Earthquake beside a living partner is a spread hit even against one foe (final review, finding 2)', () => {
@@ -41,7 +41,7 @@ describe('kill odds for doubles options (round 56)', () => {
       },
     );
     const [quake] = koOddsForOptions(positionBattle(root), 'p1', ['move earthquake, move roost']);
-    expect(quake).toEqual({ accuracy: 1, killFraction: expect.closeTo(1 / 24, 12), label: 'Earthquake→Snorlax' });
+    expect(quake).toEqual({ accuracy: 1, killFraction: expect.closeTo(1 / 24, 12), label: 'Earthquake→Snorlax', attacker: expect.any(Object) });
   });
 
   test('a pair without an uncertain kill carries no odds', () => {
@@ -61,7 +61,7 @@ describe('kill odds for doubles options (round 56)', () => {
     }
     battle.sides[1].active[0]!.sethp(1);
     const [odds] = koOddsForOptions(positionBattle(createRootPosition(JSON.stringify(State.serializeBattle(battle)))), 'p1', ['move thunder']);
-    expect(odds).toEqual({ accuracy: 0.7, killFraction: 1 });
+    expect(odds).toEqual({ accuracy: 0.7, killFraction: 1, attacker: expect.any(Object) });
     expect(odds && 'label' in odds).toBe(false);
   });
 

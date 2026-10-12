@@ -51,7 +51,10 @@ function slotOdds(battle: Battle, attacker: Pokemon, defender: Pokemon, action: 
   if (!table || crit === null) return null;
   const killFraction = (1 - crit) * killCount(table.normal, defender.hp) / 16 + crit * killCount(table.crit, defender.hp) / 16;
   const accuracy = moveAccuracy(battle, move, attacker, defender);
-  return { accuracy, killFraction, pKill: accuracy * killFraction, label: `${move.name}→${defender.species.name}` };
+  return {
+    accuracy, killFraction, pKill: accuracy * killFraction, label: `${move.name}→${defender.species.name}`,
+    attacker: { slot: action.slot, species: attacker.species.name },
+  };
 }
 
 /**
@@ -78,7 +81,7 @@ function optionOdds(battle: Battle, own: 0 | 1, choice: string): KoOddsInfo | nu
     if (doomed.has(defender) || odds.killFraction <= 0 || odds.pKill >= 1) continue;
     if (!best || odds.pKill > best.pKill) best = odds;
   }
-  return best ? { accuracy: best.accuracy, killFraction: best.killFraction, label: best.label } : null;
+  return best ? { accuracy: best.accuracy, killFraction: best.killFraction, label: best.label, attacker: best.attacker } : null;
 }
 
 export function pairKoOdds(battle: Battle, side: 'p1' | 'p2', choices: string[]): (KoOddsInfo | null)[] {

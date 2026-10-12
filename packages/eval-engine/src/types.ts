@@ -114,6 +114,8 @@ export interface KoOddsInfo {
   killFraction: number;
   /** Doubles (round 56): the slot's move and target the odds belong to, "Play Rough→Incineroar". Singles leaves it unset. */
   label?: string;
+  /** Round 69: the slot and species of the attacker that makes the odds (singles: slot 0), so a doubles label can name who attacks. */
+  attacker?: { slot: number; species: string };
 }
 
 /** One outcome class of a blended boundary cell (round 6). */

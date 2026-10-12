@@ -210,7 +210,7 @@ describe('MCTS koOdds payload (round 7)', () => {
     const result = mctsSearch(gambleRoot(), settings);
     const pump = result.perSide.p1.find(row => row.choice === 'move hydropump')!;
     const toss = result.perSide.p1.find(row => row.choice === 'move seismictoss')!;
-    expect(pump.koOdds).toEqual({ accuracy: expect.closeTo(0.8, 5), killFraction: 1 });
+    expect(pump.koOdds).toEqual({ accuracy: expect.closeTo(0.8, 5), killFraction: 1, attacker: expect.any(Object) });
     expect(toss.koOdds).toBeUndefined();
     const bench = result.perSide.p2.find(row => row.choice.startsWith('switch'));
     expect(bench).toBeTruthy();
@@ -222,7 +222,7 @@ describe('MCTS koOdds payload (round 7)', () => {
     expect(trees[0].koOdds?.p1.some(Boolean)).toBe(true);
     const merged = mergeMctsTrees(trees);
     const pump = merged.perSide.p1.find(row => row.choice === 'move hydropump')!;
-    expect(pump.koOdds).toEqual({ accuracy: expect.closeTo(0.8, 5), killFraction: 1 });
+    expect(pump.koOdds).toEqual({ accuracy: expect.closeTo(0.8, 5), killFraction: 1, attacker: expect.any(Object) });
   });
 
   test('root cells carry their outcome classes on boundary cells only, deterministically (rounds 33 and 43)', () => {
@@ -283,8 +283,8 @@ describe('MCTS koOdds payload (round 7)', () => {
     const result = mctsSearch(serialize(battle), settings);
     const odds = (choice: string) => result.perSide.p1.find(row => row.choice === choice)!.koOdds;
     // Round 56, the doubles cell plan: a pair option names the slot its odds belong to.
-    expect(odds('move rockslide, move protect')).toEqual({ accuracy: 0.9, killFraction: 1, label: 'Rock Slide→Pikachu' });
-    expect(odds('move karatechop 1, move tackle 2')).toEqual({ accuracy: 1, killFraction: expect.closeTo(1 / 24, 12), label: 'Tackle→Eevee' });
+    expect(odds('move rockslide, move protect')).toEqual({ accuracy: 0.9, killFraction: 1, label: 'Rock Slide→Pikachu', attacker: expect.any(Object) });
+    expect(odds('move karatechop 1, move tackle 2')).toEqual({ accuracy: 1, killFraction: expect.closeTo(1 / 24, 12), label: 'Tackle→Eevee', attacker: expect.any(Object) });
     // Karate Chop kills Eevee on every roll: the Tackle's crit kill on the same Eevee is no headline.
     expect(odds('move karatechop 2, move tackle 2')).toBeUndefined();
     for (const row of result.perSide.p2) expect(row.koOdds).toBeUndefined();
