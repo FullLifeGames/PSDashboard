@@ -1,4 +1,4 @@
-import { type RevealedPokemonInfo, type StatId, manualMove, toId } from '@fulllifegames/replay-core';
+import { type RevealedPokemonInfo, type StatId, evBudget, manualMove, toId } from '@fulllifegames/replay-core';
 
 export interface EditorPools {
   items: string[];
@@ -6,6 +6,8 @@ export interface EditorPools {
   natures: readonly string[];
   movesBySpecies: Record<string, string[]>;
   abilitiesBySpecies: Record<string, string[]>;
+  /** The simulator's total EV limit of the format (`null`: none); absent until the pools are read. */
+  evLimit?: number | null;
 }
 
 export function sourceLabel(source: RevealedPokemonInfo['ability']['source'], probability?: number) {
@@ -22,10 +24,30 @@ export const EV_STATS: { id: StatId; label: string }[] = [
   { id: 'spe', label: 'Spe' },
 ];
 
-export function clampEv(value: string): number {
+/**
+ * What one Pokémon's spread may hold in a format: a cap per stat and, when the
+ * format enforces one, a total (`null` = none). `statPoints` marks Pokémon
+ * Champions, where the same numbers count Stat Points.
+ */
+export interface EvLimits { perStat: number; total: number | null; statPoints: boolean }
+
+/**
+ * The limits of a format. The per-stat cap and the Stat Points mark come from
+ * replay-core's evBudget; the total is the simulator's rule table limit when
+ * the pools have read it (`simTotal`, `null` = the format has none), and until
+ * then only Champions' 66 is known without the simulator.
+ */
+export function evLimitsFor(format: string, simTotal?: number | null): EvLimits {
+  const { perStat, total, statPoints } = evBudget(format);
+  return { perStat, statPoints, total: simTotal !== undefined ? simTotal : statPoints ? total : null };
+}
+
+/** One typed EV: at most the stat cap and at most what the total leaves beside the other stats. */
+export function clampEv(value: string, limits: EvLimits = evLimitsFor(''), othersTotal = 0): number {
   const parsed = Number.parseInt(value, 10);
   if (!Number.isFinite(parsed)) return 0;
-  return Math.min(252, Math.max(0, parsed));
+  const room = limits.total === null ? limits.perStat : Math.max(0, limits.total - othersTotal);
+  return Math.min(limits.perStat, room, Math.max(0, parsed));
 }
 
 /** The move's canonical pool spelling, or the illegality verdict when the species' pool is known. */
@@ -44,4 +66,9 @@ export function withAddedMove(list: RevealedPokemonInfo[], index: number, canoni
     };
   }
   return updated;
+}
+
+/** The EVs a spread holds in every stat but `stat`: what the total has already spent beside it. */
+export function evsBeside(evs: Partial<Record<StatId, number>>, stat: StatId): number {
+  return EV_STATS.reduce((sum, entry) => (entry.id === stat ? sum : sum + (evs[entry.id] ?? 0)), 0);
 }

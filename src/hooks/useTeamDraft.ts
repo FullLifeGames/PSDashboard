@@ -3,42 +3,45 @@ import {
   type OpponentTeamInfo, type PokemonEvs, type RevealedPokemonInfo, type StatId, EMPTY_EVS, manualEvs,
   manualField,
 } from '@fulllifegames/replay-core';
-import { canonicalMove, clampEv, withAddedMove, type EditorPools } from '../lib/team-editor';
+import { canonicalMove, clampEv, evLimitsFor, evsBeside, withAddedMove, type EditorPools } from '../lib/team-editor';
 
 /** Legal pools load lazily — the editor stays usable as free text until then. */
-export function useEditorPools(teamInfo: OpponentTeamInfo, gen: number): EditorPools | null {
+export function useEditorPools(teamInfo: OpponentTeamInfo, gen: number, format = ''): EditorPools | null {
   const [pools, setPools] = useState<EditorPools | null>(null);
   const { pokemon: teamPokemon } = teamInfo;
   useEffect(() => {
     let active = true;
     void (async () => {
       const options = await import('../lib/pokemon-options');
+      await options.prepareFormat(format);
       const movesBySpecies: Record<string, string[]> = {};
       const abilitiesBySpecies: Record<string, string[]> = {};
       await Promise.all(teamPokemon.map(async entry => {
-        movesBySpecies[entry.species] = await options.getMovePool(entry.species, gen);
-        abilitiesBySpecies[entry.species] = options.getAbilityPool(entry.species, gen);
+        movesBySpecies[entry.species] = await options.getMovePool(entry.species, gen, format);
+        abilitiesBySpecies[entry.species] = options.getAbilityPool(entry.species, gen, format);
       }));
       if (!active) return;
       setPools({
-        items: options.getItemPool(gen),
-        teraTypes: options.getTeraTypePool(gen),
+        items: options.getItemPool(gen, format),
+        teraTypes: options.getTeraTypePool(gen, format),
         natures: options.NATURES,
         movesBySpecies,
         abilitiesBySpecies,
+        evLimit: options.getEvLimit(format),
       });
     })();
     return () => {
       active = false;
     };
-  }, [teamPokemon, gen]);
+  }, [teamPokemon, gen, format]);
   return pools;
 }
 
 export type EditableField = 'ability' | 'item' | 'teraType' | 'nature';
 
 /** The editable team plus its per-Pokémon validation state and the edit handlers. */
-export function useTeamDraft(initial: RevealedPokemonInfo[], pools: EditorPools | null) {
+export function useTeamDraft(initial: RevealedPokemonInfo[], pools: EditorPools | null, format = '') {
+  const limits = evLimitsFor(format, pools?.evLimit);
   const [pokemon, setPokemon] = useState<RevealedPokemonInfo[]>(initial);
   const [moveError, setMoveError] = useState<Record<number, string | null>>({});
   const [itemWarning, setItemWarning] = useState<Record<number, string | null>>({});
@@ -56,9 +59,10 @@ export function useTeamDraft(initial: RevealedPokemonInfo[], pools: EditorPools 
     setPokemon(prev => {
       const updated = [...prev];
       const current = updated[index].evs?.value ?? EMPTY_EVS;
+      const others = evsBeside(current, stat);
       const nextEvs: PokemonEvs = {
         ...current,
-        [stat]: clampEv(value),
+        [stat]: clampEv(value, limits, others),
       };
       updated[index] = { ...updated[index], evs: manualEvs(nextEvs) };
       return updated;
@@ -92,7 +96,7 @@ export function useTeamDraft(initial: RevealedPokemonInfo[], pools: EditorPools 
     });
   };
 
-  return { pokemon, moveError, itemWarning, moveDraft, setItemWarning, setMoveDraft, updateField, updateEv, addMove, removeMove };
+  return { pokemon, limits, moveError, itemWarning, moveDraft, setItemWarning, setMoveDraft, updateField, updateEv, addMove, removeMove };
 }
 
 export type TeamDraft = ReturnType<typeof useTeamDraft>;

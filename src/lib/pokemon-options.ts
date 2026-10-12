@@ -1,5 +1,7 @@
 import { Generations, type GenerationNum } from '@pkmn/data';
 import { Dex } from '@pkmn/dex';
+import { Dex as SimDex } from '@pkmn/sim';
+import { evBudget } from '@fulllifegames/replay-core';
 
 /**
  * Legal option pools for dropdowns. Heavy dex/learnset data — this module is
@@ -14,6 +16,45 @@ export const NATURES: readonly string[] = [
   'Quiet', 'Quirky', 'Rash', 'Relaxed', 'Sassy', 'Serious', 'Timid',
 ];
 
+/**
+ * Pokémon Champions plays on a simulator mod whose dex the generation
+ * wrapper cannot read (it keeps 876 of 1517 species and no Mega Stone, and
+ * loses Aegislash), so its pools come from the mod itself.
+ */
+const isChampions = (format: string | undefined): boolean => !!format && evBudget(format).statPoints;
+const championsDex = () => SimDex.mod('champions');
+
+/** Loads what a format's pools read before the first pool is asked (the Champions mod, nothing else). */
+export async function prepareFormat(format: string): Promise<void> {
+  if (!isChampions(format)) return;
+  const { loadSimMods } = await import('./lazy/branch-engine');
+  await loadSimMods(format);
+}
+
+/** The total EV limit the simulator's team validator enforces in a format (`null`: none, or the format is unknown). */
+export function getEvLimit(format: string): number | null {
+  const entry = SimDex.formats.get(format.split('@@@')[0]);
+  return entry.exists ? SimDex.formats.getRuleTable(entry).evLimit : null;
+}
+
+const toSimId = (name: string): string => SimDex.toID(name);
+
+async function getChampionsMovePool(species: string): Promise<string[]> {
+  const dex = championsDex();
+  const names = new Set<string>();
+  const entry = dex.species.get(species);
+  // A forme without a learnset of its own learns what its base forme learns.
+  for (const id of new Set([entry.id, toSimId(entry.changesFrom ?? entry.baseSpecies)])) {
+    for (const [moveId, sources] of Object.entries((await dex.learnsets.get(id)).learnset ?? {})) {
+      if (sources.some(code => code.startsWith('9'))) names.add(dex.moves.get(moveId).name);
+    }
+    if (names.size > 0) break;
+  }
+  // Unknown species or no Generation 9 learnset (Past in the mod): offer everything rather than block.
+  const pool = names.size > 0 ? [...names] : [...dex.moves.all()].filter(move => !move.isNonstandard).map(move => move.name);
+  return pool.sort((a, b) => a.localeCompare(b));
+}
+
 function clampGen(gen: number): GenerationNum {
   return Math.min(9, Math.max(1, Math.round(gen))) as GenerationNum;
 }
@@ -22,11 +63,17 @@ function allGenMoves(gen: GenerationNum): string[] {
   return [...gens.get(gen).moves].map(move => move.name).sort((a, b) => a.localeCompare(b));
 }
 
-export function getMovePool(species: string, gen: number): Promise<string[]> {
+export function getMovePool(species: string, gen: number, format?: string): Promise<string[]> {
   const generation = gens.get(clampGen(gen));
-  const cacheKey = `${generation.num}:${species.toLowerCase()}`;
+  const champions = isChampions(format);
+  const cacheKey = `${champions ? 'champions' : generation.num}:${species.toLowerCase()}`;
   const cached = movePoolCache.get(cacheKey);
   if (cached) return cached;
+  if (champions) {
+    const pool = getChampionsMovePool(species);
+    movePoolCache.set(cacheKey, pool);
+    return pool;
+  }
 
   const request = (async () => {
     const names = new Set<string>();
@@ -51,13 +98,20 @@ export function getMovePool(species: string, gen: number): Promise<string[]> {
   return request;
 }
 
-export function getItemPool(gen: number): string[] {
+export function getItemPool(gen: number, format?: string): string[] {
+  if (isChampions(format)) {
+    return [...championsDex().items.all()].filter(item => !item.isNonstandard).map(item => item.name).sort((a, b) => a.localeCompare(b));
+  }
   const generation = gens.get(clampGen(gen));
   if (generation.num < 2) return [];
   return [...generation.items].map(item => item.name).sort((a, b) => a.localeCompare(b));
 }
 
-export function getAbilityPool(species: string, gen: number): string[] {
+export function getAbilityPool(species: string, gen: number, format?: string): string[] {
+  if (isChampions(format)) {
+    const entry = championsDex().species.get(species);
+    return entry.exists ? Object.values(entry.abilities).filter((name): name is string => !!name) : [];
+  }
   const generation = gens.get(clampGen(gen));
   if (generation.num < 3) return [];
   const entry = generation.species.get(species);
@@ -65,7 +119,8 @@ export function getAbilityPool(species: string, gen: number): string[] {
   return Object.values(entry.abilities).filter((name): name is string => !!name);
 }
 
-export function getTeraTypePool(gen: number): string[] {
+export function getTeraTypePool(gen: number, format?: string): string[] {
+  if (isChampions(format)) return [];
   if (clampGen(gen) < 9) return [];
   const names = [...gens.get(9).types]
     .map(type => type.name)
