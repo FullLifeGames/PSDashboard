@@ -1,6 +1,9 @@
 import type { BoostsTable, Pokemon } from '@pkmn/sim';
 import { boostedFraction, pairThreat, singleMoveFraction } from '../eval-function.ts';
 import { positionBattle, type ChoiceOption, type SimPosition } from '../forward-model.ts';
+import { forkBattle } from '../forward/position.ts';
+import { bodyAsClicked } from '../calc/tera-click.ts';
+import { RULE_MOVES } from '../move-use.ts';
 import { sideIndex } from '@fulllifegames/replay-core';
 
 /**
@@ -23,6 +26,8 @@ const clampStage = (stage: number) => Math.max(-6, Math.min(6, stage));
 
 /** The board one side's combined-option hints read: the mover's actors, the foes, and their slot order. */
 interface HintBoard {
+  position: SimPosition;
+  side: 'p1' | 'p2';
   battle: ReturnType<typeof positionBattle>;
   sideState: ReturnType<typeof positionBattle>['sides'][number];
   foeActives: (Pokemon | null)[];
@@ -30,13 +35,12 @@ interface HintBoard {
   actors: Pokemon[];
 }
 
-function hintBoard(position: SimPosition, side: 'p1' | 'p2'): HintBoard {
-  const battle = positionBattle(position);
+function hintBoard(position: SimPosition, side: 'p1' | 'p2', battle = positionBattle(position)): HintBoard {
   const sideState = battle.sides[sideIndex(side)];
   const foeActives = sideState.foe.active;
   const foes = foeActives.filter((foe): foe is Pokemon => !!foe && !foe.fainted);
   const actors = sideState.active.filter((active): active is Pokemon => !!active && !active.fainted);
-  return { battle, sideState, foeActives, foes, actors };
+  return { position, side, battle, sideState, foeActives, foes, actors };
 }
 
 type DexMove = ReturnType<HintBoard['battle']['dex']['moves']['get']>;
@@ -116,18 +120,85 @@ function asClicked<T>(attacker: Pokemon, clicked: boolean, ask: () => T): T {
   }
 }
 
+/** The position's battle after the simulator ran the Tera click, and the clicked body in it. */
+interface ClickedTwin {
+  battle: ReturnType<typeof positionBattle>;
+  mon: Pokemon;
+  board: HintBoard | null;
+}
+
+/**
+ * Round 69 (T155, decision 14): the body the simulator makes at a Tera click
+ * that changes the forme (Terapagos-Terastal into Terapagos-Stellar with its
+ * other stats, HP and type; Ogerpon into its Tera forme with Embody Aspect),
+ * which the flag in asClicked cannot give. calc/tera-click.ts says whether
+ * the click changes the forme; the twin is a fork of the position whose body
+ * the simulator's own terastallize ran on. The position's battle is never
+ * written (a fork of it is), and the twin is kept per body: the position
+ * never changes. A click that keeps the forme returns null, and asClicked
+ * prices it as before.
+ */
+const clickedTwins = new WeakMap<Pokemon, ClickedTwin | null>();
+
+function clickedTwin(position: SimPosition, side: 'p1' | 'p2', mon: Pokemon): ClickedTwin | null {
+  let twin = clickedTwins.get(mon);
+  if (twin === undefined) {
+    twin = formeClick(position, side, mon);
+    clickedTwins.set(mon, twin);
+  }
+  return twin;
+}
+
+function formeClick(position: SimPosition, side: 'p1' | 'p2', mon: Pokemon): ClickedTwin | null {
+  if (mon.terastallized || !mon.teraType) return null;
+  const battle = positionBattle(position);
+  if (bodyAsClicked(battle, mon, true).species === mon.species.name) return null;
+  const fork = forkBattle(position, '1,2,3,4');
+  const twinMon = fork.sides[sideIndex(side)].pokemon[battle.sides[sideIndex(side)].pokemon.indexOf(mon)];
+  fork.actions.terastallize(twinMon);
+  return { battle: fork, mon: twinMon, board: null };
+}
+
+/** The mover's hint board in the twin, whose actors are the twin's bodies. */
+function twinBoard(twin: ClickedTwin, position: SimPosition, side: 'p1' | 'p2'): HintBoard {
+  twin.board ??= hintBoard(position, side, twin.battle);
+  return twin.board;
+}
+
+/**
+ * The target the move has at use: its own onModifyMove, asked from the
+ * simulator for the moves whose rule at use is known (RULE_MOVES), on the
+ * body that uses it. Tera Starstorm of a Terapagos-Stellar hits both foes.
+ */
+function targetAtUse(board: HintBoard, attacker: Pokemon, move: DexMove): string {
+  const handler = RULE_MOVES.has(move.id) ? (move as { onModifyMove?: unknown }).onModifyMove : undefined;
+  if (typeof handler !== 'function') return move.target;
+  const active = board.battle.dex.getActiveMove(move.id);
+  try {
+    (handler as (this: unknown, move: unknown, user: Pokemon, target: Pokemon | undefined) => void)
+      .call(board.battle, active, attacker, board.foes[0]);
+  } catch {
+    return move.target;
+  }
+  return active.target;
+}
+
 /** A move part: support floor or setup equity for status, spread damage, targeted or best-foe damage, the Fake Out bonus. */
 function moveHint(board: HintBoard, tokens: string[], partIndex: number): number {
   const attacker = board.actors[partIndex];
   if (!attacker || board.foes.length === 0) return 0;
-  return asClicked(attacker, tokens.includes('terastallize'), () => moveHintOf(board, tokens, attacker));
+  const clicks = tokens.includes('terastallize');
+  const twin = clicks ? clickedTwin(board.position, board.side, attacker) : null;
+  if (twin) return moveHintOf(twinBoard(twin, board.position, board.side), tokens, twin.mon);
+  return asClicked(attacker, clicks, () => moveHintOf(board, tokens, attacker));
 }
 
 function moveHintOf(board: HintBoard, tokens: string[], attacker: Pokemon): number {
   const { battle, foeActives, foes } = board;
   const move = battle.dex.moves.get(tokens[1]);
   if (move.category === 'Status') return Math.max(SUPPORT_HINT, setupEquity(board, attacker, tokens[1]));
-  if (move.target === 'allAdjacentFoes' || move.target === 'allAdjacent') {
+  const target = targetAtUse(board, attacker, move);
+  if (target === 'allAdjacentFoes' || target === 'allAdjacent') {
     return foes.reduce((sum, foe) => sum + singleMoveFraction(attacker, foe, tokens[1], battle), 0) * SPREAD_FACTOR;
   }
   const targetLoc = tokens.length > 2 ? parseInt(tokens[2], 10) : NaN;
@@ -205,8 +276,11 @@ export function singlesOptionHints(position: SimPosition, side: 'p1' | 'p2', opt
     if (!opponent || opponent.fainted) return 0;
     if (option.choice.startsWith('move ')) {
       if (!active || active.fainted) return 0;
-      return asClicked(active, option.choice.endsWith(' terastallize'),
-        () => singleMoveFraction(active, opponent, option.choice.split(' ')[1], battle));
+      const clicks = option.choice.endsWith(' terastallize');
+      const moveId = option.choice.split(' ')[1];
+      const twin = clicks ? clickedTwin(position, side, active) : null;
+      if (twin) return singleMoveFraction(twin.mon, twin.battle.sides[side === 'p1' ? 1 : 0].active[0], moveId, twin.battle);
+      return asClicked(active, clicks, () => singleMoveFraction(active, opponent, moveId, battle));
     }
     const slot = parseInt(option.choice.split(' ')[1], 10);
     const candidate = sideState.pokemon[slot - 1];
