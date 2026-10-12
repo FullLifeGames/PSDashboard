@@ -2,7 +2,7 @@ import { describe, expect, test } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { Battle, Dex, type PokemonSet } from '@pkmn/sim';
-import { buildTeamsFromReplay, getBranchSimulatorFormat, parseReplayLog, type TurnSnapshot } from '@fulllifegames/replay-core';
+import { buildTeamsFromReplay, parseReplayLog, type TurnSnapshot } from '@fulllifegames/replay-core';
 import { loadSimMods } from '@fulllifegames/eval-engine';
 import { pickerStateFromSnapshot } from '../../src/lib/picker-state';
 
