@@ -1,6 +1,6 @@
 import { test, expect, describe } from 'vitest';
 import { buildSetsExport, parseSetsImport } from '../src/lib/sets-io';
-import type { OpponentTeamInfo } from '@fulllifegames/replay-core';
+import { enrichTeamInfo, type OpponentTeamInfo, type SmogonSetAssumptions } from '@fulllifegames/replay-core';
 
 const p1Info: OpponentTeamInfo = {
   pokemon: [{
@@ -87,6 +87,29 @@ describe('sets import/export', () => {
     const parsed = parseSetsImport(text);
     expect(parsed.p1[0].item).toBe('Heavy-Duty Boots');
   });
+  // Round 69 (T136): the export carries the IVs the build plays (2663093831 Sinistcha: published IV 0 in Attack and Speed).
+  for (const format of ['gen9ou', 'gen9doublesou']) {
+    test(`exports the IVs of a published Trick Room set and round-trips them (${format})`, () => {
+      const assumptions: SmogonSetAssumptions = {
+        format, source: 'test',
+        pokemon: { sinistcha: {
+          species: 'Sinistcha', sourceDetail: 'Smogon sets',
+          ability: { value: 'Hospitality', sourceDetail: 'Smogon sets' }, item: { value: 'Sitrus Berry', sourceDetail: 'Smogon sets' },
+          moves: ['Rage Powder', 'Trick Room', 'Matcha Gotcha', 'Protect'].map(value => ({ value, sourceDetail: 'Smogon sets' })),
+          spread: { value: 'Bold', sourceDetail: 'Smogon sets', nature: 'Quiet', evs: { hp: 252, atk: 0, def: 4, spa: 252, spd: 0, spe: 0 } },
+          ivs: { atk: 0, spe: 0 },
+        } },
+      };
+      const raw: OpponentTeamInfo = { pokemon: [{
+        species: 'Sinistcha', moves: [], ability: { value: '', source: 'unknown' }, item: { value: '', source: 'unknown' },
+        teraType: { value: '', source: 'unknown' }, evs: { value: { hp: 0, atk: 0, def: 0, spa: 0, spd: 0, spe: 0 }, source: 'unknown' },
+        level: 100, gender: 'F',
+      }] };
+      const text = buildSetsExport({ p1Name: 'A', p2Name: 'B', p1Info: enrichTeamInfo(raw, null, assumptions), p2Info: null });
+      expect(text).toContain('IVs: 0 Atk / 0 Spe');
+      expect(parseSetsImport(text).p1[0].ivs).toEqual({ hp: 31, atk: 0, def: 31, spa: 31, spd: 31, spe: 0 });
+    });
+  }
 
   test('accepts a one-sided import and rejects headerless text with guidance', () => {
     const oneSided = parseSetsImport('=== p2 ===\n\nKingambit @ Leftovers\n- Sucker Punch');

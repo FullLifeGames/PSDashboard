@@ -241,6 +241,16 @@ function withItemAfterRuleOut(
 }
 
 /** Whether `item` is the chosen set's own: an option of its published item slot that no rule-out replaced (T131). */
+/**
+ * The IVs the build plays from the published sets (round 69, T136): the chosen set's, else the marginal set's when no
+ * usage spread leads. The panel and the build read this one rule.
+ */
+export function publishedIvs(
+  curated: CuratedSetAssumption | null, usageHasSpread: boolean, smogonSet: PokemonSetAssumption | undefined,
+): PokemonSetAssumption['ivs'] {
+  return curated ? curated.ivs : !usageHasSpread ? smogonSet?.ivs : undefined;
+}
+
 export function itemFromChosenSet(curated: CuratedSetAssumption | null, item: string): boolean {
   if (!curated?.item || curated.itemReplaced || !item) return false;
   return (curated.item.options ?? [curated.item.value]).some(option => itemId(option) === itemId(item));

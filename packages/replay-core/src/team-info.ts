@@ -1,7 +1,8 @@
 import { getSpeciesUsageSet, getSpeciesUsageStats } from './smogon/usage-lookup.ts';
 import type { SmogonUsageStats, UsageProbability, UsageSpread } from './smogon/stats-types.ts';
 import { getSpeciesSetAssumption, type SetAssumption, type SetSpreadAssumption, type SmogonSetAssumptions } from './smogon/sets-lookup.ts';
-import { applyCoherenceVetoes, itemFromChosenSet, selectCuratedSet, type MoveCandidate } from './set-coherence.ts';
+import { applyCoherenceVetoes, itemFromChosenSet, publishedIvs, selectCuratedSet, type MoveCandidate } from './set-coherence.ts';
+import { isChampionsFormat } from './spreads/champions-format.ts';
 import type { SpreadCandidate, SpreadOrigin } from './spreads/ladder.ts';
 import type { OpponentTeamInfo, PokemonEvs, PokemonEvsInfo, PokemonFieldInfo, PokemonMoveInfo, RevealedPokemonInfo } from './types.ts';
 import { toId } from './ids.ts';
@@ -93,6 +94,14 @@ function overlayNature(pokemon: RevealedPokemonInfo, candidate: SpreadCandidate)
   return guessedField(candidate.nature, undefined, ORIGIN_DETAIL[origin]);
 }
 
+/** The IVs a solved candidate carries (the Speed IV a seen order took back) replace a guess, never a user's. */
+function overlayIvs(pokemon: RevealedPokemonInfo, candidate: SpreadCandidate): PokemonEvsInfo | undefined {
+  const shown = pokemon.ivs;
+  if (!candidate.ivs || shown?.source === 'manual' || shown?.source === 'revealed') return shown;
+  if (shown && sameStats(shown.value, candidate.ivs, 31)) return shown;
+  return guessedEvs({ ...candidate.ivs }, undefined, ORDER_SPREAD_DETAIL);
+}
+
 /**
  * Display overlay for damage-consistent spreads and the items the
  * move-order evidence decided: mirrors the simulator precedence
@@ -114,10 +123,12 @@ export function applyInferredSpreads(
       const evsGuessed = pokemon.evs.source === 'guessed' || pokemon.evs.source === 'unknown';
       const natureGuessed = !pokemon.nature || pokemon.nature.source === 'guessed' || pokemon.nature.source === 'unknown';
       if (!evsGuessed) return { ...pokemon, item };
+      const ivs = overlayIvs(pokemon, candidate);
       return {
         ...pokemon,
         item,
         evs: overlayEvs(pokemon, candidate),
+        ...(ivs ? { ivs } : {}),
         ...(natureGuessed ? { nature: overlayNature(pokemon, candidate) } : {}),
       };
     }),
@@ -335,6 +346,21 @@ function withTypedHiddenPower(
     : moves;
 }
 
+/**
+ * The IVs the build plays (round 69, T136): the chosen published set's, read by the rule the build reads
+ * (publishedIvs), shown as a guess; the user's own stay. A Champions body plays IV 31 whatever the set lists, so it
+ * shows none, and a set that lists none leaves the field open (the body plays 31).
+ */
+function ivsField(
+  pokemon: RevealedPokemonInfo, curated: CuratedSet | null, usageSet: SpeciesUsage, smogonSet: SmogonSet, format: string,
+): PokemonEvsInfo | undefined {
+  if (pokemon.ivs?.source === 'manual' || pokemon.ivs?.source === 'revealed') return pokemon.ivs;
+  const published = isChampionsFormat(format) ? undefined : publishedIvs(curated, !!usageSet?.spread, smogonSet);
+  if (!published || Object.keys(published).length === 0) return undefined;
+  const sourceDetail = (curated ?? smogonSet)?.spread?.sourceDetail;
+  return guessedEvs({ hp: 31, atk: 31, def: 31, spa: 31, spd: 31, spe: 31, ...published }, undefined, sourceDetail);
+}
+
 export function enrichPokemonInfo(
   pokemon: RevealedPokemonInfo,
   usageStats?: SmogonUsageStats | null,
@@ -351,9 +377,11 @@ export function enrichPokemonInfo(
   const usageTail = getSpeciesUsageStats(pokemon.species, usageStats)?.moves.slice(GUESS_MOVE_POOL) ?? [];
   const { pool, infoFor } = assembleMovePool(pokemon, curated, usageSet, smogonSet, usageTail);
   const moves = vetoedMoves(pool, infoFor, item.value, curated);
+  const ivs = ivsField(pokemon, curated, usageSet, smogonSet, setAssumptions?.format ?? '');
 
   return {
     ...pokemon,
+    ...(ivs ? { ivs } : {}),
     ability: normalizeAbilityField(pokemon.ability, usageSet?.ability, fallback.ability, pokemon.ruledOut?.abilities, !!curated),
     item,
     evs: normalizeEvsField(pokemon.evs, usageSet?.spread, fallback.spread, !!curated),

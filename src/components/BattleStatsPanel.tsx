@@ -22,6 +22,8 @@ function formatFieldValue(field: PokemonFieldInfo): string {
   return field.value;
 }
 
+const STAT_LABELS = { hp: 'HP', atk: 'Atk', def: 'Def', spa: 'SpA', spd: 'SpD', spe: 'Spe' } as const;
+
 function formatEvs(evs: PokemonEvsInfo, isRandomFormat: boolean): string {
   const labels = [
     ['HP', evs.value.hp],
@@ -39,6 +41,15 @@ function formatEvs(evs: PokemonEvsInfo, isRandomFormat: boolean): string {
     return evs.source === 'unknown' ? 'EVs ?' : '0 EVs';
   }
   return `${nonZero.map(([label, value]) => `${value} ${label}`).join(' / ')} EVs`;
+}
+
+/** The IVs the build plays when any is below 31 (a Trick Room body); '' when every IV is 31 or none is known. */
+function formatIvs(ivs: PokemonEvsInfo | undefined): string {
+  if (!ivs || ivs.source === 'unknown') return '';
+  const lowered = (['hp', 'atk', 'def', 'spa', 'spd', 'spe'] as const)
+    .filter(stat => ivs.value[stat] !== 31)
+    .map(stat => `${ivs.value[stat]} ${STAT_LABELS[stat]}`);
+  return lowered.length > 0 ? `${lowered.join(' / ')} IVs` : '';
 }
 
 function MetaTag({
@@ -99,6 +110,25 @@ function MoveTag({ move }: { move: PokemonMoveInfo }) {
   );
 }
 
+/** The EV or IV line with the source of its numbers. */
+function SpreadTag({ info, text }: { info: PokemonEvsInfo; text: string }) {
+  return (
+    <span
+      className="ps-stats-tag"
+      style={{
+        border: `1px solid ${sourceAccent(info.source)}`,
+        boxShadow: 'inset 0 0 0 1px rgba(0,0,0,0.15)',
+      }}
+      title={info.sourceDetail || sourceLabel(info.source, info.probability, info.sourceDetail)}
+    >
+      {text}
+      <span style={{ marginLeft: 6, color: sourceAccent(info.source), fontSize: 9, textTransform: 'uppercase' }}>
+        {sourceLabel(info.source, info.probability, info.sourceDetail)}
+      </span>
+    </span>
+  );
+}
+
 function PokemonEntry({ poke, isRandomFormat }: { poke: RevealedPokemonInfo; isRandomFormat: boolean }) {
   return (
     <div className="ps-stats-pokemon">
@@ -123,19 +153,8 @@ function PokemonEntry({ poke, isRandomFormat }: { poke: RevealedPokemonInfo; isR
         <div className="ps-stats-meta">
           <MetaTag field={poke.ability} className="ps-stats-tag" />
           <MetaTag field={poke.item} className="ps-stats-tag ps-stats-tag-item" />
-          <span
-            className="ps-stats-tag"
-            style={{
-              border: `1px solid ${sourceAccent(poke.evs.source)}`,
-              boxShadow: 'inset 0 0 0 1px rgba(0,0,0,0.15)',
-            }}
-            title={poke.evs.sourceDetail || sourceLabel(poke.evs.source, poke.evs.probability, poke.evs.sourceDetail)}
-          >
-            {formatEvs(poke.evs, isRandomFormat)}
-            <span style={{ marginLeft: 6, color: sourceAccent(poke.evs.source), fontSize: 9, textTransform: 'uppercase' }}>
-              {sourceLabel(poke.evs.source, poke.evs.probability, poke.evs.sourceDetail)}
-            </span>
-          </span>
+          <SpreadTag info={poke.evs} text={formatEvs(poke.evs, isRandomFormat)} />
+          {poke.ivs && formatIvs(poke.ivs) && <SpreadTag info={poke.ivs} text={formatIvs(poke.ivs)} />}
           {poke.teraType.value && (
             <MetaTag
               field={poke.teraType}

@@ -1,5 +1,6 @@
 import { TeamValidator } from '@pkmn/sim';
 import type { PokemonEvs } from '../types.ts';
+import { isChampionsFormat } from './champions-format.ts';
 
 export const ZERO_EVS: PokemonEvs = { hp: 0, atk: 0, def: 0, spa: 0, spd: 0, spe: 0 };
 
@@ -17,7 +18,7 @@ export const ALL_31_IVS: PokemonEvs = { hp: 31, atk: 31, def: 31, spa: 31, spd: 
  */
 export interface EvBudget { perStat: number; total: number; statPoints: boolean; start: number; oneSpecial: boolean }
 export function evBudget(formatid: string): EvBudget {
-  if (/champions/.test(formatid)) return { perStat: 32, total: 66, statPoints: true, start: 0, oneSpecial: false };
+  if (isChampionsFormat(formatid)) return { perStat: 32, total: 66, statPoints: true, start: 0, oneSpecial: false };
   if (!/^gen[12]\D/.test(formatid)) return { perStat: 252, total: 508, statPoints: false, start: 0, oneSpecial: false };
   return { perStat: 252, total: 6 * 252, statPoints: false, start: serverStartEv(formatid), oneSpecial: true };
 }

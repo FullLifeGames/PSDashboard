@@ -3,7 +3,7 @@ import { Dex } from '@pkmn/sim';
 import type { SmogonUsageStats, SpeciesUsageSet, UsageProbability } from '../smogon/stats-types.ts';
 import { getSpeciesSetAssumption, type SmogonSetAssumptions } from '../smogon/sets-lookup.ts';
 import { getSpeciesUsageSet, getSpeciesUsageStats } from '../smogon/usage-lookup.ts';
-import { applyCoherenceVetoes, itemFromChosenSet, selectCuratedSet, type MoveCandidate } from '../set-coherence.ts';
+import { applyCoherenceVetoes, itemFromChosenSet, publishedIvs, selectCuratedSet, type MoveCandidate } from '../set-coherence.ts';
 import { itemSetValue } from '../team-info.ts';
 import type { SpreadCandidate } from '../spread-inference.ts';
 import type { KnowledgeSource, PokemonEvs, RevealedPokemonInfo } from '../types.ts';
@@ -258,7 +258,7 @@ function spreadIvs(
   usageSet: SpeciesUsageSet | null, smogonSet: SmogonSet,
 ): PokemonSet['ivs'] {
   if (edited.editedIvs) return edited.editedIvs;
-  const published = curated ? curated.ivs : !usageSet?.spread ? smogonSet?.ivs : undefined;
+  const published = publishedIvs(curated, !!usageSet?.spread, smogonSet);
   return { ...ALL_31, ...published, ...inferred?.ivs };
 }
 
