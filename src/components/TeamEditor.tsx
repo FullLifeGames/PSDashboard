@@ -8,13 +8,15 @@ interface Props {
   teamInfo: OpponentTeamInfo;
   /** Replay generation — decides which pools exist (abilities gen 3+, tera gen 9). */
   gen: number;
+  /** The replay's format id: its EV limits and, for Pokémon Champions, its own pools. */
+  format: string;
   onSave: (updatedInfo: OpponentTeamInfo) => void;
   onClose: () => void;
 }
 
-export function TeamEditor({ title, teamInfo, gen, onSave, onClose }: Props) {
-  const pools = useEditorPools(teamInfo, gen);
-  const draft = useTeamDraft(teamInfo.pokemon, pools);
+export function TeamEditor({ title, teamInfo, gen, format, onSave, onClose }: Props) {
+  const pools = useEditorPools(teamInfo, gen, format);
+  const draft = useTeamDraft(teamInfo.pokemon, pools, format);
   const { pokemon } = draft;
 
   return (

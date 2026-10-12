@@ -1,3 +1,4 @@
+import { inferReplayFormatId } from '@fulllifegames/replay-core';
 import { ReplayLoader } from './components/ReplayLoader';
 import { TeamEditor } from './components/TeamEditor';
 import { SetsImportExportPanel } from './components/SetsImportExportPanel';
@@ -72,6 +73,7 @@ function AppModals({ app }: { app: AppController }) {
           title="Edit Player Team"
           teamInfo={effectiveP1Info}
           gen={replayGen}
+          format={replayData ? inferReplayFormatId(replayData) : ''}
           onSave={(info) => saveTeam('p1', info)}
           onClose={() => setEditorSide(null)}
         />
@@ -81,6 +83,7 @@ function AppModals({ app }: { app: AppController }) {
           title="Edit Opponent Team"
           teamInfo={effectiveP2Info}
           gen={replayGen}
+          format={replayData ? inferReplayFormatId(replayData) : ''}
           onSave={(info) => saveTeam('p2', info)}
           onClose={() => setEditorSide(null)}
         />

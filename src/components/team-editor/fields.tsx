@@ -1,5 +1,5 @@
-import { type RevealedPokemonInfo, itemSetValue, toId } from '@fulllifegames/replay-core';
-import { EV_STATS, sourceLabel, type EditorPools } from '../../lib/team-editor';
+import { type PokemonEvs, type RevealedPokemonInfo, itemSetValue, toId } from '@fulllifegames/replay-core';
+import { EV_STATS, sourceLabel, type EditorPools, type EvLimits } from '../../lib/team-editor';
 import type { TeamDraft } from '../../hooks/useTeamDraft';
 import { ComboBox } from '../ComboBox';
 
@@ -148,8 +148,16 @@ export function NatureField({ entry, index, pools, draft }: FieldProps) {
   );
 }
 
+/** How much of the format's total the spread has spent, in the format's own unit; none when the format has no total. */
+function evBudgetLine(evs: PokemonEvs, { perStat, total, statPoints }: EvLimits): string | null {
+  if (total === null) return null;
+  const spent = EV_STATS.reduce((sum, stat) => sum + (evs[stat.id] ?? 0), 0);
+  return `${statPoints ? 'Stat Points' : 'EVs'}: ${spent} of ${total} used, ${perStat} per stat`;
+}
+
 export function EvGrid({ entry, index, draft }: Omit<FieldProps, 'pools'>) {
-  const { updateEv } = draft;
+  const { updateEv, limits } = draft;
+  const budgetLine = evBudgetLine(entry.evs.value, limits);
   return (
     <div style={{ marginBottom: 6 }}>
       <FieldCaption>
@@ -162,8 +170,8 @@ export function EvGrid({ entry, index, draft }: Omit<FieldProps, 'pools'>) {
             <input
               type="number"
               min={0}
-              max={252}
-              step={4}
+              max={limits.perStat}
+              step={limits.statPoints ? 1 : 4}
               aria-label={`${entry.species} ${stat.label} EVs`}
               value={entry.evs.value[stat.id]}
               onChange={e => updateEv(index, stat.id, e.target.value)}
@@ -173,6 +181,7 @@ export function EvGrid({ entry, index, draft }: Omit<FieldProps, 'pools'>) {
           </label>
         ))}
       </div>
+      {budgetLine && <div style={{ fontSize: 9, color: '#8899aa', marginTop: 3 }}>{budgetLine}</div>}
     </div>
   );
 }

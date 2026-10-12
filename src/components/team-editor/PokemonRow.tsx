@@ -11,7 +11,7 @@ export function PokemonRow({ entry, index, gen, pools, draft }: {
   pools: EditorPools | null;
   draft: TeamDraft;
 }) {
-  const { itemWarning } = draft;
+  const { itemWarning, limits } = draft;
   return (
     <div className="ps-panel" style={{ padding: 10 }}>
       <div style={{ fontSize: 12, fontWeight: 'bold', marginBottom: 6 }}>
@@ -21,7 +21,7 @@ export function PokemonRow({ entry, index, gen, pools, draft }: {
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6, marginBottom: 6 }}>
         {gen >= 3 && <AbilityField entry={entry} index={index} pools={pools} draft={draft} />}
         <ItemField entry={entry} index={index} pools={pools} draft={draft} />
-        {gen >= 9 && <TeraField entry={entry} index={index} pools={pools} draft={draft} />}
+        {gen >= 9 && !limits.statPoints && <TeraField entry={entry} index={index} pools={pools} draft={draft} />}
         <NatureField entry={entry} index={index} pools={pools} draft={draft} />
       </div>
       {itemWarning[index] && (

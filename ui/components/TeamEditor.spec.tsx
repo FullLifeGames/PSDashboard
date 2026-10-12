@@ -8,7 +8,7 @@ describe('TeamEditor', () => {
   test('lists every Pokémon with its fields, loads the legal pools, and saves the edited team', async () => {
     const onSave = vi.fn();
     const onClose = vi.fn();
-    render(<TeamEditor title="Edit Player" teamInfo={teamInfo('singles', 'p1')} gen={9} onSave={onSave} onClose={onClose} />);
+    render(<TeamEditor title="Edit Player" teamInfo={teamInfo('singles', 'p1')} gen={9} format="gen9ou" onSave={onSave} onClose={onClose} />);
     expect(screen.getByRole('dialog', { name: 'Edit Player' })).toBeInTheDocument();
     expect(screen.getByText('Garchomp', { exact: false })).toBeInTheDocument();
     expect(screen.getAllByText(/Moves \(2\/4\)/)).toHaveLength(6);
@@ -26,10 +26,22 @@ describe('TeamEditor', () => {
     expect(saved).toHaveLength(6);
   }, 60_000);
 
+  test('a Champions game reads the mod: its abilities and Stat Point caps, and no Tera field (singles and VGC)', async () => {
+    for (const format of ['gen9championsou', 'gen9championsvgc2026regmbbo3']) {
+      const { unmount } = render(<TeamEditor title="Edit Player" teamInfo={teamInfo('singles', 'p1')} gen={9} format={format} onSave={vi.fn()} onClose={vi.fn()} />);
+      const ability = await screen.findByRole('combobox', { name: 'Garchomp ability' }, { timeout: 30_000 });
+      await waitFor(() => expect(ability.tagName).toBe('SELECT'), { timeout: 30_000 });
+      expect(screen.getByRole('option', { name: 'Rough Skin' })).toBeInTheDocument();
+      expect(screen.queryByLabelText(/tera type/)).toBeNull();
+      expect(screen.getAllByRole('spinbutton', { name: /Garchomp HP EVs/ })[0]).toHaveAttribute('max', '32');
+      unmount();
+    }
+  }, 60_000);
+
   test('gen 3 hides the tera field; cancel closes without saving', async () => {
     const onSave = vi.fn();
     const onClose = vi.fn();
-    render(<TeamEditor title="Edit Opp" teamInfo={teamInfo('singles', 'p2')} gen={3} onSave={onSave} onClose={onClose} />);
+    render(<TeamEditor title="Edit Opp" teamInfo={teamInfo('singles', 'p2')} gen={3} format="gen3ou" onSave={onSave} onClose={onClose} />);
     expect(screen.queryByLabelText(/tera type/)).toBeNull();
     await userEvent.click(screen.getByRole('button', { name: 'Cancel' }));
     expect(onClose).toHaveBeenCalledTimes(1);
