@@ -229,9 +229,10 @@ async function evalTurn(
     depth, samples, mode, tera: env.params.tera, sleepClause: env.params.sleepClause, ruleset: env.params.ruleset, ...sketchFields(engine),
   };
 
-  // Monotone merge: the graph already holds a deeper result for this
-  // turn (an explicit deepen, a deeper prior sweep) — every stored
-  // field stands and this pass skips the turn entirely.
+  // Monotone merge: the graph already holds a result this pass must not
+  // replace (a deeper one of the same engine, an explicit deepen, or a
+  // result of the configured engine when this pass carries the other) —
+  // every stored field stands and this pass skips the turn entirely.
   if (!supersedesStored(env.data.turnSettings[turn - 1], { depth, samples, mode }, env.configuredMode, env.data.faintedFractions[turn - 1], env.params.doubles)) {
     finishTurn();
     return true;

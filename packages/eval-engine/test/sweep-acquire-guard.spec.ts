@@ -84,7 +84,7 @@ describe('sweep end-position guard', () => {
     expect(finalPlayedTurn([])).toBe(1);
   });
 
-  test('the HEALED single-turn acquire arrives live in the cascade zone (think-deeper re-enabled on this)', { timeout: 600000 }, async () => {
+  test('the HEALED single-turn acquire arrives live in the cascade zone', { timeout: 600000 }, async () => {
     const replay = JSON.parse(readFileSync(new URL('./fixtures/draft-replay.json', import.meta.url), 'utf-8')) as {
       id: string; format: string; formatid?: string; players: string[]; log: string;
     };
