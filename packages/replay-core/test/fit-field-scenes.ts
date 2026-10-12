@@ -66,6 +66,11 @@ export interface FieldScene {
    * with the attacker's HP (Eruption) is good to about a percent of its value.
    */
   barNoise?: number;
+  /**
+   * The damage is the first hit line of the step, not the HP the step ends on: a terrain heals the defender at the end of the turn
+   * and would hide a part of the hit.
+   */
+  hitLine?: boolean;
 }
 
 /** A lead with the default partner behind it in doubles, then the bench. */
@@ -76,6 +81,16 @@ export interface Scene {
   /** The defender's HP lost on each step, in the simulator's own numbers. */
   damage: number[];
   maxHp: number;
+}
+
+/** The defender's exact HP after the first move damage line of the new log lines (the private line of the split pair). */
+function firstHitHp(lines: string[], defender: string): number | null {
+  const own = new RegExp(String.raw`^\|-damage\|p2[ab]?: ${Dex.species.get(defender).baseSpecies}\|(\d+)/\d+\s*$`);
+  for (const line of lines) {
+    const found = own.exec(line);
+    if (found) return parseInt(found[1], 10);
+  }
+  return null;
 }
 
 /** A battle of the scene's steps, with the reason when it is no clean scene (a hit crit or missed, a status burns the defender on the side, the defender fainted). */
@@ -95,9 +110,10 @@ export function playScene(kind: Kind, scene: FieldScene, seed: number): Scene & 
   const damage: number[] = [];
   for (const step of scene.steps(doubles)) {
     const before = target.hp;
+    const logged = battle.log.length;
     if (step.p1) battle.choose('p1', step.p1);
     if (step.p2) battle.choose('p2', step.p2);
-    damage.push(before - target.hp);
+    damage.push(scene.hitLine ? before - (firstHitHp(battle.log.slice(logged), scene.defender) ?? before) : before - target.hp);
   }
   const lines = battle.log;
   const log = lines.filter((line, index) => !line.startsWith('|split|') && !lines[index - 1]?.startsWith('|split|')).join('\n');
