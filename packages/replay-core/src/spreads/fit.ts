@@ -21,7 +21,7 @@ import { toId } from '../ids.ts';
  * constraint lose to any non-violating rung; if every rung violates
  * (conflicting evidence), damage fit still decides among them.
  */
-const SPEED_VIOLATION_PENALTY = 1000;
+export const SPEED_VIOLATION_PENALTY = 1000;
 
 /** HP-bar reading noise (the GPL pipeline is ±1–2%): error inside this slack is free. */
 const OBSERVATION_SLACK = 0.02;
@@ -171,7 +171,10 @@ export function spreadFor(ctx: SolveContext, side: 'p1' | 'p2', species: string)
 }
 
 /** A body as the calculator reads it: the spread itself, Stat Points in evs for Champions' generation 0, which ignores IVs (round 68, T186). */
-function calcPokemon(ctx: SolveContext, side: 'p1' | 'p2', species: string, spread: SpreadCandidate, obsBoosts: Record<string, number>, status: string, forme?: string) {
+export function calcPokemon(
+  ctx: SolveContext, side: 'p1' | 'p2', species: string, spread: SpreadCandidate, obsBoosts: Record<string, number>, status: string, forme?: string,
+  boostedStat?: string,
+) {
   const set = setOf(ctx, side, species);
   return buildCalcPokemon(ctx.gen, forme ?? set?.species ?? species, {
     level: set?.level || 100,
@@ -181,6 +184,8 @@ function calcPokemon(ctx: SolveContext, side: 'p1' | 'p2', species: string, spre
     evs: spread.evs,
     ivs: set?.ivs,
     boosts: obsBoosts,
+    // The stat the log named for an active Protosynthesis or Quark Drive (T167): the calculator boosts that one, not the best of its own reading.
+    boostedStat: boostedStat as ConstructorParameters<typeof Pokemon>[2] extends { boostedStat?: infer B } ? B : never,
     status: (status || undefined) as ConstructorParameters<typeof Pokemon>[2] extends { status?: infer S } ? S : never,
   });
 }
@@ -193,8 +198,8 @@ export function rollRange(ctx: SolveContext, obs: ReadObservation, attackerSprea
   const dex = Dex.forGen(simGenNum(gen));
   const attackerBody = withItemAtHit(dex, attackerSpread, setOf(ctx, obs.attackerSide, obs.attackerSpecies)?.item, obs.attackerItem, obs.attackerItemChanged);
   const defenderBody = withItemAtHit(dex, defenderSpread, setOf(ctx, defenderSide, obs.defenderSpecies)?.item, obs.defenderItem, obs.defenderItemChanged);
-  const attacker = calcPokemon(ctx, obs.attackerSide, obs.attackerSpecies, attackerBody, obs.attackerBoosts, obs.attackerStatus, obs.attackerForme);
-  const defender = calcPokemon(ctx, defenderSide, obs.defenderSpecies, defenderBody, obs.defenderBoosts, '', obs.defenderForme);
+  const attacker = calcPokemon(ctx, obs.attackerSide, obs.attackerSpecies, attackerBody, obs.attackerBoosts, obs.attackerStatus, obs.attackerForme, obs.attackerParadox?.stat);
+  const defender = calcPokemon(ctx, defenderSide, obs.defenderSpecies, defenderBody, obs.defenderBoosts, '', obs.defenderForme, obs.defenderParadox?.stat);
   // The protocol records typeless "hiddenpower"; calc it as the SET's
   // resolved variant, or the fit runs the IV-default type against a hit
   // the sim plays typed (653785: Dark-fitted spreads, Ice-rolled sim).

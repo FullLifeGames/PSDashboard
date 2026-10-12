@@ -8,6 +8,7 @@ import {
 } from './spreads/fit.ts';
 import { decideScarfs, type SpeedKnowledgeMap } from './spreads/scarf.ts';
 import { defenderSideOf } from './spreads/observation-read.ts';
+import { paradoxError } from './spreads/paradox.ts';
 import { hpEvsForMaxHp, type ObservedMaxHp } from './spreads/max-hp.ts';
 import { readableOrders, settledSets } from './spreads/order-limit.ts';
 import { isBoostItem, requiresItem } from './spreads/boost-items.ts';
@@ -55,9 +56,17 @@ const MIN_OBSERVATIONS = 2;
  * rungs.
  */
 function speedMeasured(ctx: SolveContext, key: string, ladder: CandidateRung[], prior: SpreadCandidate): boolean {
-  const priorViolation = speedError(ctx, key, prior);
-  return priorViolation > 0 && ladder.some(rung => speedError(ctx, key, rung) < priorViolation);
+  const priorViolation = provenError(ctx, key, prior);
+  return priorViolation > 0 && ladder.some(rung => provenError(ctx, key, rung) < priorViolation);
 }
+
+/**
+ * What the log proved of a body beyond the damage: the move orders it must keep and, since round 69 (T167), the stat a
+ * Protosynthesis or Quark Drive activation named. Both outweigh any damage-fit error, and a rung that repairs either
+ * measures the stat.
+ */
+const provenError = (ctx: SolveContext, key: string, candidate: SpreadCandidate) =>
+  speedError(ctx, key, candidate) + paradoxError(ctx, key, candidate);
 
 /**
  * The HP EVs the log's maximum HP pins for this mon (round 40), or
@@ -102,7 +111,7 @@ function bestRung(
   let bestError = Infinity;
   for (const rung of withoutItem ? ladder.flatMap(entry => [entry, { ...entry, item: '' }]) : ladder) {
     const error = monObservations.reduce((sum, obs) => sum + observationError(ctx, obs, key, rung), 0) +
-      speedError(ctx, key, rung);
+      provenError(ctx, key, rung);
     if (error < bestError - 1e-12 ||
       (best !== null && Math.abs(error - bestError) <= 1e-12 && priorDistance(ctx, key, rung) < priorDistance(ctx, key, best))) {
       bestError = error;
@@ -125,12 +134,12 @@ function forfeitsToPrior(ctx: SolveContext, key: string, best: CandidateRung, pr
   const damageResidual = monObservations.reduce((sum, obs) => sum + observationError(ctx, obs, key, best), 0);
   return monObservations.length > 0 &&
     damageResidual / monObservations.length > FIT_FORFEIT_PER_OBSERVATION &&
-    speedError(ctx, key, best) >= speedError(ctx, key, prior);
+    provenError(ctx, key, best) >= provenError(ctx, key, prior);
 }
 
-/** The mon's damage misfit under a spread (the bestRung sum without the Speed term). */
+/** The mon's damage misfit under a spread (the bestRung sum without the move-order term), plus the Paradox stat it must keep. */
 const damageError = (ctx: SolveContext, key: string, rung: CandidateRung, observations: DamageObservation[]) =>
-  observations.reduce((sum, obs) => sum + observationError(ctx, obs, key, rung), 0);
+  observations.reduce((sum, obs) => sum + observationError(ctx, obs, key, rung), 0) + paradoxError(ctx, key, rung);
 
 /**
  * The most EVs a measured stat takes, in the ladder's steps (4 EVs, one Stat
@@ -201,11 +210,14 @@ interface MonEvidence {
   hasSpeedObs: boolean;
   /** HP EVs the log's maximum HP pinned (round 40). */
   fixedHp: number | undefined;
+  /** The prior contradicts the stat a Protosynthesis or Quark Drive activation named (round 69, T167): a Speed rung may repair it. */
+  paradoxBound: boolean;
 }
 
 function evidenceFor(ctx: SolveContext, key: string): MonEvidence {
   const observations = ctx.byMon.get(key) ?? [];
   const attackerObs = observations.filter(obs => keyOf(obs.attackerSide, obs.attackerSpecies) === key);
+  const prior = ctx.priors.get(key);
   return {
     observations,
     // Knock-outs are lower bounds (fit.ts): they refute rungs whose best roll
@@ -216,10 +228,14 @@ function evidenceFor(ctx: SolveContext, key: string): MonEvidence {
     hasDefenderObs: observations.some(obs => keyOf(defenderSideOf(obs), obs.defenderSpecies) === key),
     hasSpeedObs: (ctx.speedByMon.get(key) ?? []).length > 0,
     fixedHp: measuredHpEvs(ctx, key),
+    paradoxBound: prior !== undefined && paradoxError(ctx, key, prior) > 0,
   };
 }
 
-/** The ladder for one mon: Speed rungs only where an order measured Speed, else the prior's Speed is kept. */
+/**
+ * The ladder for one mon: Speed rungs only where an order measured Speed, else the prior's Speed is kept. A prior that
+ * contradicts a Paradox ability's named stat opens the Speed rungs too, and keeps its Speed when none of them repairs it.
+ */
 function ladderFor(
   ctx: SolveContext, key: string, prior: SpreadCandidate, physicalAttacker: boolean, evidence: MonEvidence,
   keep: Set<keyof PokemonEvs>,
@@ -227,9 +243,10 @@ function ladderFor(
   const fixed: Partial<PokemonEvs> = evidence.fixedHp === undefined ? {} : { hp: evidence.fixedHp };
   const build = (hasSpeedObs: boolean) =>
     candidateLadder(prior, physicalAttacker, evidence.hasOffenseEvidence, evidence.hasDefenderObs, hasSpeedObs, ctx.budget, keep, fixed);
-  const ladder = build(evidence.hasSpeedObs);
-  if (!evidence.hasSpeedObs || speedMeasured(ctx, key, ladder, prior)) return ladder;
-  keep.add('spe');
+  if (!evidence.hasSpeedObs && !evidence.paradoxBound) return build(false);
+  const ladder = build(true);
+  if (speedMeasured(ctx, key, ladder, prior)) return ladder;
+  if (evidence.hasSpeedObs) keep.add('spe');
   return build(false);
 }
 
@@ -250,7 +267,7 @@ function solveOne(ctx: SolveContext, key: string) {
   // for even when no damage line ever measured the mon. The log's maximum
   // HP (round 40) stands alone too, but as a reading only: under the
   // observation minimum it sets the HP inside the prior and runs no ladder.
-  if (evidence.observations.length < MIN_OBSERVATIONS && !evidence.hasSpeedObs) {
+  if (evidence.observations.length < MIN_OBSERVATIONS && !evidence.hasSpeedObs && !evidence.paradoxBound) {
     if (evidence.fixedHp !== undefined) {
       ctx.solved.set(key, { evs: priorWithFixedHp(prior, evidence.fixedHp, ctx.budget), nature: prior.nature });
     }
