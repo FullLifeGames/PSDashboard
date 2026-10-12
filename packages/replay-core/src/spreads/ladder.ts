@@ -193,6 +193,19 @@ function priorRungs(ctx: LadderContext): CandidateRung[] {
 }
 
 /**
+ * Round 69 (T26, spec decision 7): a kept Speed keeps its plus nature, which used to block every rung with a nature
+ * of its own, and a Jolly attacker stayed 10 % short of the hits it dealt. The offense nature of the seen hit class
+ * (the offense option's own: Adamant for physical lines, Modest for special) opens beside the kept Speed EVs; bestRung
+ * prices the order the neutral Speed may no longer win, so the tempo gives way only when the fit error falls and every
+ * observed order still holds. A bulk nature never opens, and a kept offense keeps its nature (round 33).
+ */
+function heldTempoNature(ctx: LadderContext, options: RungOption[]): string | null {
+  const natures = options.map(option => option.nature).filter((nature): nature is string => !!nature);
+  const offenseNature = options[0]?.nature;
+  return ctx.priorPlus === 'spe' && ctx.keep.has('spe') && offenseNature && natures.length === 1 ? offenseNature : null;
+}
+
+/**
  * One combination's rung, composed beside the kept stats and offered only
  * when the budget expresses every claim: a shaved claim would leave its
  * nature standing on nothing (round 40: "Calm 252 HP / 4 SpD / 252 Spe"
@@ -203,7 +216,7 @@ function offeredRung(ctx: LadderContext, options: RungOption[]): CandidateRung |
   const claimed: Partial<PokemonEvs> = Object.assign({}, ...options.map(option => option.evs ?? {}));
   const evs = composeRung(ctx.prior, claimed, ctx.keep, ctx.budget, ctx.fixed);
   if (expressed(evs, claimed, ctx.fixed)) {
-    const nature = slowNature(rungNature(options, keepsNature(ctx.keep, ctx.priorPlus), ctx.priorNature), ctx);
+    const nature = slowNature(rungNature(options, keepsNature(ctx.keep, ctx.priorPlus), ctx.priorNature) ?? heldTempoNature(ctx, options), ctx);
     return nature === null ? null : { evs, nature };
   }
   return releasedRung(ctx, options, claimed, evs);

@@ -67,10 +67,12 @@ describe('a kept Speed gives way to a measured offense (round 41)', () => {
     });
   }
 
-  test('without the HP reading the prior stands, without the order the fit was already right', () => {
+  test('without the HP reading the EVs stand, without the order the fit was already right', () => {
     const noHp = inferSpreads(observations, sets, 'gen9ou', [beforeClefable]).get('p2:garchomp');
     expect(noHp?.evs ?? offensive).toEqual(offensive);
-    expect(noHp?.nature ?? 'Jolly').toBe('Jolly');
+    // Round 69 (T26): the kept Speed no longer blocks the offense nature. Round 40 held Jolly here and paid 10 % of
+    // the lines (the top roll on Toxapex lies above what a Jolly body deals); the order still holds at Adamant.
+    expect(noHp?.nature).toBe('Adamant');
     const noOrder = inferSpreads(observations, sets, 'gen9ou', [], new Map(), maxHp420).get('p2:garchomp');
     expect(noOrder?.evs).toEqual(bulkyAttacker);
   });
@@ -86,7 +88,8 @@ describe('a kept Speed gives way to a measured offense (round 41)', () => {
     const defenderLines = [hit(clefable, truth, 'Moonblast'), hit(toxapex, truth, 'Scald')];
     const solved = inferSpreads([...observations, ...defenderLines], sets, 'gen9ou', [beforeClefable]).get('p2:garchomp');
     expect(solved?.evs.spe ?? 252).toBe(252);
-    expect(solved?.nature ?? 'Jolly').toBe('Jolly');
+    // Round 69 (T26): the Speed EVs stay (a bulk claim releases nothing); the offense nature of the seen lines opens.
+    expect(solved?.nature).toBe('Adamant');
   });
 
   test('the released Speed must still satisfy the observed orders', () => {
