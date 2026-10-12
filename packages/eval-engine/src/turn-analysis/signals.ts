@@ -110,14 +110,21 @@ function forcedMixFor(view: MatrixView, options: RankedChoice[]): SideAnalysis['
 export const HINDSIGHT_BAND = TIER_THRESHOLDS.inaccuracy;
 export const HINDSIGHT_MIN_VISITS = 8;
 
-/** The side row's part of a hindsight read: the flag and the sentence when the gain and the cell behind it pass the gate. */
+/** The cell behind a read is no guess: enough visits or re-priced by the verify step; a cell the result does not carry passes. */
+const cellSolid = (cell: { visits: number; verified: boolean } | undefined): boolean =>
+  !cell || cell.verified || cell.visits >= HINDSIGHT_MIN_VISITS;
+
+/**
+ * The gate's parts of a hindsight read. The side row's flag and sentence need the solid cell and the band past the
+ * regret; the card sentences (gate of 12.10. 19:17) need the solid cell alone, so a thin cell marks the read.
+ */
 function hindsightShown(
   read: { response: string; against: string; gain: number },
   cell: { visits: number; verified: boolean } | undefined,
   regret: number | null,
-): { shown: true; line: string } | Record<string, never> {
-  const solid = !cell || cell.verified || cell.visits >= HINDSIGHT_MIN_VISITS;
-  return solid && read.gain >= (regret ?? 0) + HINDSIGHT_BAND ? { shown: true, line: hindsightLine(read) } : {};
+): { shown: true; line: string } | { thin: true } | Record<string, never> {
+  if (!cellSolid(cell)) return { thin: true };
+  return read.gain >= (regret ?? 0) + HINDSIGHT_BAND ? { shown: true, line: hindsightLine(read) } : {};
 }
 
 /** The opponent's ACTUAL click as a matrix column (−1 when unknown), with the matched choice for the sentence. */

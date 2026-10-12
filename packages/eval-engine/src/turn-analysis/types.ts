@@ -284,6 +284,12 @@ export interface SideAnalysis {
      */
     shown?: true;
     line?: string;
+    /**
+     * Gate of 12.10. 19:17: the cell of the best row against the click is a
+     * guess (fewer than HINDSIGHT_MIN_VISITS visits, not verified). The card
+     * sentences leave such a read out; the read itself stays on the analysis.
+     */
+    thin?: true;
   };
   /**
    * Round 47: the read BEFORE the click. The opponent model's favourite

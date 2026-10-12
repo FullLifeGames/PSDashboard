@@ -128,13 +128,16 @@ function chanceSentence(analysis: TurnAnalysis, playerNames: PlayerNames, decide
       `(${winDeltaText(delta)}).`;
 }
 
-/** The read that was on the table (round 13): the side whose missed read cost more. */
+/**
+ * The read that was on the table (round 13): the side whose missed read cost more. Round 69 (T64): a read on a cell
+ * that is a guess (a thin cell, 912045 t8) is not quoted.
+ */
 function hindsightSentence(analysis: TurnAnalysis, playerNames: PlayerNames): string | null {
   const reads = [
     { name: playerNames[0], read: analysis.p1.hindsightRead },
     { name: playerNames[1], read: analysis.p2.hindsightRead },
   ].filter((entry): entry is { name: string; read: NonNullable<SideAnalysis['hindsightRead']> } =>
-    entry.read !== undefined);
+    entry.read !== undefined && !entry.read.thin);
   const missed = reads.sort((a, b) => b.read.gain - a.read.gain)[0];
   if (!missed) return null;
   // Round 47: a click the opponent model favoured was findable before it came.

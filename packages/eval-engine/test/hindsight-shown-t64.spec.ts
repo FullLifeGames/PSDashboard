@@ -1,7 +1,8 @@
 import { test, expect, describe } from 'vitest';
 import { Battle, State, Teams, toID } from '@pkmn/sim';
 import type { PokemonSet } from '@pkmn/sim';
-import { analyzeTurn, TIER_THRESHOLDS, type SideAnalysis } from '../src/analysis';
+import { analyzeTurn, TIER_THRESHOLDS, type SideAnalysis, type TurnAnalysis } from '../src/analysis';
+import { summarizeTurn } from '../src/summary';
 import { mctsTreeSearch } from '../src/mcts';
 import { mergeMctsTrees } from '../src/mcts-merge';
 import { cellKey } from '../src/rank';
@@ -167,6 +168,53 @@ describe('the read is shown only past the regret and a cell that is not a guess'
       expect(shown.p1.regret).toBeCloseTo(0.05, 10);
     });
   }
+});
+
+describe('the card sentences quote a read only where its cell holds (gate of 12.10. 19:17)', () => {
+  const shapes: [string, () => Shape][] = [['doubles', doublesShape], ['singles', singlesShape]];
+  const cellsWith = (best: { visits: number; verified: boolean }): Cells => [[SEEN, SEEN], [best, SEEN]];
+  const readOf = (make: () => Shape, cells?: Cells): SideAnalysis['hindsightRead'] => {
+    const shape = make();
+    return analyze(resultOf(shape, cells), shape.played).p1.hindsightRead;
+  };
+  const names: [string, string] = ['Alpha', 'Beta'];
+  const card = (p1Read: SideAnalysis['hindsightRead'], p2Read?: SideAnalysis['hindsightRead']): TurnAnalysis => {
+    const side = (read: SideAnalysis['hindsightRead']): SideAnalysis =>
+      ({ playedRaw: null, played: null, best: null, safe: null, regret: 0, ...(read ? { hindsightRead: read } : {}) });
+    return {
+      turn: 8, scoreBefore: 0, scoreAfter: 0.02, swing: 0.02, playedOutcome: 0, decisionDelta: 0, chanceDelta: 0.02,
+      attribution: 'shift', p1: side(p1Read), p2: side(p2Read), playedTracking: true,
+    };
+  };
+
+  for (const [name, make] of shapes) {
+    test(`${name}: the read marks a thin cell (under 8 visits, not verified) and leaves a solid one unmarked`, () => {
+      expect(readOf(make, cellsWith(MISS))).toMatchObject({ thin: true });
+      expect(readOf(make, cellsWith({ visits: 7, verified: false }))?.thin).toBe(true);
+      expect(readOf(make, cellsWith({ visits: 8, verified: false }))?.thin).toBeUndefined();
+      expect(readOf(make, cellsWith({ visits: 2, verified: true }))?.thin).toBeUndefined();
+      // No cells (matrix mode, a result from before the field) is matrix grade: it passes.
+      expect(readOf(make)?.thin).toBeUndefined();
+    });
+
+    test(`${name}: the shift sentence drops the thin read and keeps the solid one`, () => {
+      const thin = readOf(make, cellsWith(MISS))!;
+      const solid = readOf(make, cellsWith(SEEN))!;
+      expect(summarizeTurn(card(thin), names)).not.toContain('The read was there');
+      expect(summarizeTurn(card(solid), names)).toContain('The read was there for Alpha');
+      // The solid read of the other side speaks even when the thin one has the larger gain.
+      const other = { ...solid, gain: solid.gain / 2 };
+      const text = summarizeTurn(card({ ...thin, gain: 1 }, other), names);
+      expect(text).toContain('The read was there for Beta');
+      expect(text).not.toContain('The read was there for Alpha');
+    });
+  }
+
+  test('the thin read still exists on the analysis (display only: the gate takes nothing from grading)', () => {
+    const read = readOf(doublesShape, cellsWith(MISS));
+    expect(read).toMatchObject({ response: 'Tackle→Incineroar + Protect', against: 'Protect + Drain Punch→Incineroar' });
+    expect(read?.shown).toBeUndefined();
+  });
 });
 
 describe('the merge writes the visits and the verified flag of every cell', () => {
