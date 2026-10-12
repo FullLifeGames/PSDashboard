@@ -1,5 +1,6 @@
 import { describe, expect, test } from 'vitest';
 import { Battle, Dex, type PokemonSet } from '@pkmn/sim';
+import { calcGenerationFor } from '@fulllifegames/replay-core';
 import { Generations } from '@smogon/calc';
 import { bodyFromInfo, bodyOf, calcPokemon, type CalcBody } from '../src/calc/body';
 import { calcMove } from '../src/calc/move';
@@ -33,14 +34,15 @@ function checkerSets(): PokemonSet[] {
 }
 
 describe('the engine prices a Champions body as the simulator plays it (decision 30)', () => {
-  test('calcPokemon on bodyOf gives the simulator\'s stats on every Champions body', () => {
-    const gen = Generations.get(9);
+  // The doubles run: the VGC format loads the same mod and the same Stat Points body (stats do not depend on the game type).
+  for (const formatid of ['gen9championsou', 'gen9championsvgc2026regmbbo3']) test(`calcPokemon on bodyOf gives the simulator's stats on every Champions body (${formatid})`, () => {
+    const gen = calcGenerationFor(9, 'champions');
     const sets = checkerSets();
     const wrong: string[] = [];
     const unknown = new Set<string>();
     for (let start = 0; start < sets.length; start += 6) {
       const team = sets.slice(start, start + 6);
-      const battle = new Battle({ formatid: 'gen9championsou' as never, seed: '1,2,3,4', p1: { name: 'A', team }, p2: { name: 'B', team: team.slice(0, 1) } });
+      const battle = new Battle({ formatid: formatid as never, seed: '1,2,3,4', p1: { name: 'A', team }, p2: { name: 'B', team: team.slice(0, 1) } });
       for (const mon of battle.sides[0].pokemon) {
         let stats: Record<Stat, number>;
         try {
@@ -60,7 +62,7 @@ describe('the engine prices a Champions body as the simulator plays it (decision
   });
 
   test('the picker info of a Champions body prices as the simulator plays it', () => {
-    const gen = Generations.get(9);
+    const gen = calcGenerationFor(9, 'champions');
     const team = checkerSets().slice(0, 6);
     const battle = new Battle({ formatid: 'gen9championsou' as never, seed: '1,2,3,4', p1: { name: 'A', team }, p2: { name: 'B', team: team.slice(0, 1) } });
     for (const mon of battle.sides[0].pokemon) {
@@ -72,7 +74,7 @@ describe('the engine prices a Champions body as the simulator plays it (decision
   });
 
   test('calcMove gives the move of a Champions body the power and type of the Champions mod', () => {
-    const gen = Generations.get(9);
+    const gen = calcGenerationFor(9, 'champions');
     const attacker = { mod: 'champions' } as CalcBody;
     const wrong: string[] = [];
     for (const move of Dex.dexes.champions.moves.all()) {
