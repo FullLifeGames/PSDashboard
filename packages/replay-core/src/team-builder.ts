@@ -207,7 +207,9 @@ function resolveSolvedItems(
  * prior to the usage guess, so the pre-solve's entry comes back for it,
  * with or without an item decision (round 53, 2658663776: the forfeit
  * handed Volcanion its 252 Spe back and broke four orders the pre-solve
- * held). A mon the full solve kept takes only the item decision along; so
+ * held). A mon the full solve kept takes only the item decision and the
+ * Speed IV the settling restored or lowered along (round 69, T132 point 2:
+ * the full solve starts from those IVs, so its own answer carries none); so
  * does a forfeited mon whose max HP the log pinned, which stays in the map
  * as that same prior with the measured HP. A mon a pasted team or a team
  * sheet matches is the exception: buildSet returns the sheet set before it
@@ -217,8 +219,14 @@ function carryPreSolve(solved: Map<string, SpreadCandidate>, preSolved: Map<stri
   for (const [key, candidate] of preSolved ?? []) {
     const entry = solved.get(key);
     if (!entry) solved.set(key, candidate);
-    else if (candidate.item !== undefined && entry.item === undefined) {
-      solved.set(key, { ...entry, item: candidate.item, itemReason: candidate.itemReason });
+    else {
+      const decided = candidate.item !== undefined && entry.item === undefined;
+      const restored = candidate.ivs !== undefined && entry.ivs === undefined;
+      if (decided || restored) {
+        solved.set(key, {
+          ...entry, ...(decided ? { item: candidate.item, itemReason: candidate.itemReason } : {}), ...(restored ? { ivs: candidate.ivs } : {}),
+        });
+      }
     }
   }
 }

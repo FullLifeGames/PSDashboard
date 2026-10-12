@@ -25,13 +25,17 @@ import { simGenNum } from '../calc-gen.ts';
  * keeps its sets. Round 64 (T122): a Speed IV below 31 comes after every
  * legal Speed and before a new Scarf; only a race that cannot end strict
  * may tie; a race reads the forme that raced and a transformed mover's
- * copied Speed, with the Scarf as the simulator rounds it.
+ * copied Speed, with the Scarf as the simulator rounds it. Round 69 (T132,
+ * decision 12): the opposite IV comes first. A published Speed IV below 31
+ * is a Trick Room set's; an order the log shows (no Trick Room) that the
+ * published body cannot keep refutes it, so the IV restores to 31 before
+ * any Speed EV is bought, and the legal Speeds are then asked at IV 31.
  */
 
 type Side = 'p1' | 'p2';
 type Sets = { p1: PokemonSet[]; p2: PokemonSet[] };
 type StatId = keyof PokemonEvs;
-type Tier = 'plausible' | 'legal' | 'slow';
+type Tier = 'plausible' | 'restored' | 'legal' | 'slow';
 
 /** One Speed a settled mon may take, with the spread that gives it (and, once asked, its Speed in a battle forme). */
 interface Option { stat: number; spread: SpreadCandidate; plausible: boolean; cost: number; formes?: Map<string, number> }
@@ -57,6 +61,14 @@ type Reading = (option: Option) => number;
 interface Bound { first: Racer; second: Racer; firstSpeed: Reading; secondSpeed: Reading; broken: boolean; strict: boolean }
 
 const MAX_IVS: PokemonEvs = { hp: 31, atk: 31, def: 31, spa: 31, spd: 31, spe: 31 };
+/** An option that changes the Speed IV costs this much more than its EVs and nature say, so a settled mon carries it. */
+const IV_COST = 1;
+
+/** The set carries a published Speed IV below 31 (a Champions body has no IVs). */
+const lowSpeedIv = (ctx: SolveContext, racer: Racer): boolean => !ctx.budget.statPoints && (racer.set.ivs?.spe ?? 31) < 31;
+
+/** The IVs of an option that restores the Speed IV: the published ones, the Speed at 31. */
+const restoredIvs = (racer: Racer): PokemonEvs => ({ ...MAX_IVS, ...racer.set.ivs, spe: 31 });
 
 /**
  * The set an order's mover raced as: its own species, or the set of the
@@ -140,10 +152,13 @@ function legalOptions(ctx: SolveContext, racer: Racer): Option[] {
   const physical = physicalAttackerFor(ctx, racer.key);
   const step = evStep(ctx.budget);
   const steps = [...new Set([...Array.from({ length: Math.floor(ctx.budget.perStat / step) + 1 }, (_, i) => i * step), ctx.budget.perStat])];
+  const restored = lowSpeedIv(ctx, racer);
   for (const nature of speedNatures(racer.prior.nature, physical)) {
     for (const spe of steps) {
       const evs = capToBudget({ ...ZERO_EVS, ...racer.prior.evs, spe }, new Set<StatId>(['spe']), ctx.budget);
-      const candidate = option(ctx, racer, { evs, nature }, false);
+      const candidate = restored
+        ? { ...option(ctx, racer, { evs, nature, ivs: restoredIvs(racer) }, false), cost: cost(ctx, { evs, nature }, racer.prior) + IV_COST }
+        : option(ctx, racer, { evs, nature }, false);
       const known = cheapest.get(candidate.stat);
       if (!known || candidate.cost < known.cost) cheapest.set(candidate.stat, candidate);
     }
@@ -169,11 +184,22 @@ function slowOptions(ctx: SolveContext, racer: Racer): Option[] {
   });
 }
 
+/**
+ * The published body with its Speed IV at 31 (round 69, T132 point 2): the order the log shows refutes the IV before
+ * it asks for a Speed EV. Not a plausible spread, but it costs less than any legal Speed.
+ */
+function restoredOptions(ctx: SolveContext, racer: Racer): Option[] {
+  if (!lowSpeedIv(ctx, racer)) return [];
+  const entry = option(ctx, racer, { ...racer.prior, ivs: restoredIvs(racer) }, false);
+  return [{ ...entry, cost: entry.cost + IV_COST }];
+}
+
 /** The Speeds a racer may take in a tier, slowest first; a known spread keeps its own. */
 function domainOf(ctx: SolveContext, knowledge: SpeedKnowledgeMap, racer: Racer, tier: Tier): Option[] {
   const options = racer.options;
   options.plausible ??= plausibleOptions(ctx, knowledge, racer);
   if (tier === 'plausible' || racer.known) return [...options.plausible].sort((a, b) => a.stat - b.stat);
+  if (tier === 'restored') return [...options.plausible, ...(options.restored ??= restoredOptions(ctx, racer))].sort((a, b) => a.stat - b.stat);
   options.legal ??= legalOptions(ctx, racer);
   if (tier === 'slow') options.slow ??= slowOptions(ctx, racer);
   return [...options.plausible, ...options.legal, ...(tier === 'slow' ? options.slow! : [])].sort((a, b) => a.stat - b.stat);
@@ -324,6 +350,7 @@ function withScarf(ctx: SolveContext, knowledge: SpeedKnowledgeMap, racers: Race
 function settleComponent(ctx: SolveContext, knowledge: SpeedKnowledgeMap, racers: Racer[], races: Race[]): Map<string, Option> | null {
   const strong = races.filter(race => !race.weak);
   return solve(ctx, knowledge, racers, races, 'plausible') ??
+    solve(ctx, knowledge, racers, races, 'restored') ??
     solve(ctx, knowledge, racers, races, 'legal') ??
     (strong.length < races.length ? solve(ctx, knowledge, racers, strong, 'legal') : null) ??
     solve(ctx, knowledge, racers, strong, 'slow') ??
