@@ -3,9 +3,17 @@ import type { PokemonEvs } from '../types.ts';
 import { capToBudget, ZERO_EVS, type EvBudget } from './ev-budget.ts';
 import { toId } from '../ids.ts';
 
+/**
+ * Where a solved spread comes from (round 69, T69): damage lines fitted it, a proven move order decided it, the log's
+ * maximum HP set its HP inside the guess, or no evidence measured it (a decided item or IV rides on the guess).
+ */
+export type SpreadOrigin = 'damage' | 'order' | 'hp' | 'prior';
+
 export interface SpreadCandidate {
   evs: PokemonEvs;
   nature: string;
+  /** Who checked the spread; an entry from before the origin existed reads as 'damage'. */
+  origin?: SpreadOrigin;
   /** An item the move-order evidence decided (round 37): 'Choice Scarf', or '' for "not the guessed Scarf". */
   item?: string;
   itemReason?: 'moved-first' | 'moved-second' | 'no-boost';

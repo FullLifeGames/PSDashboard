@@ -1,4 +1,6 @@
-import { INFERRED_ITEM_DETAIL, INFERRED_SPREAD_DETAIL, type KnowledgeSource } from '@fulllifegames/replay-core';
+import {
+  INFERRED_ITEM_DETAIL, INFERRED_SPREAD_DETAIL, MEASURED_HP_SPREAD_DETAIL, ORDER_SPREAD_DETAIL, type KnowledgeSource,
+} from '@fulllifegames/replay-core';
 
 /** Accent color per knowledge source (the stats panel's tag borders and labels). */
 export function sourceAccent(source: KnowledgeSource): string {
@@ -27,9 +29,12 @@ export function sourceLabel(source: KnowledgeSource, probability?: number, sourc
     case 'revealed':
       return 'revealed';
     case 'guessed':
-      // A spread solved from observed damage is a fit, not a usage guess; an
+      // A spread solved from observed damage is a fit, not a usage guess; one
+      // only the move order or the log's HP checked says so (round 69, T69); an
       // item the move order proved is an inference.
       if (sourceDetail === INFERRED_SPREAD_DETAIL) return 'fitted';
+      if (sourceDetail === ORDER_SPREAD_DETAIL) return 'from move order';
+      if (sourceDetail === MEASURED_HP_SPREAD_DETAIL) return 'HP from log';
       if (sourceDetail === INFERRED_ITEM_DETAIL) return 'inferred';
       return probability === undefined ? 'guessed' : `guessed ${formatProbability(probability)}`;
     case 'manual':

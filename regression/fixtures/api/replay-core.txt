@@ -36,6 +36,7 @@ type SpeedKnowledge
 type SpeedKnowledgeMap
 type SpeedOrderObservation
 type SpreadCandidate
+type SpreadOrigin
 type StatId
 type TurnSnapshot
 type UsageProbability
@@ -45,7 +46,9 @@ value EMPTY_EVS
 value HP_TYPES
 value INFERRED_ITEM_DETAIL
 value INFERRED_SPREAD_DETAIL
+value MEASURED_HP_SPREAD_DETAIL
 value NO_BOOST_ITEM_DETAIL
+value ORDER_SPREAD_DETAIL
 value RULED_OUT_ITEM_DETAIL
 value TERRAIN_BY_ID
 value WEATHER_BY_ID

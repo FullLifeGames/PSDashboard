@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'vitest';
 import { render, screen } from '@testing-library/react';
-import { INFERRED_SPREAD_DETAIL } from '@fulllifegames/replay-core';
+import { INFERRED_SPREAD_DETAIL, MEASURED_HP_SPREAD_DETAIL, ORDER_SPREAD_DETAIL } from '@fulllifegames/replay-core';
 import { BattleStatsPanel } from '../../src/components/BattleStatsPanel';
 import { singlesReplay } from '../fixtures/replay';
 import { evs, field, move, revealedPokemon, teamInfo } from '../fixtures/team-info';
@@ -50,6 +50,22 @@ describe('BattleStatsPanel', () => {
     render(<BattleStatsPanel replayData={replayData} p1Info={{ pokemon: [mon] }} p2Info={null} />);
     expect(screen.getByText(/85 EVs each \(random set\)/)).toBeInTheDocument();
     expect(screen.getAllByText('Not yet revealed')).toHaveLength(5);
+  });
+
+  // Round 69 (T69). Singles and doubles replays share the panel, so both run each case.
+  describe.each(['singles', 'doubles'] as const)('provenance of a solved spread (%s)', kind => {
+    const replayData = () => (kind === 'singles' ? singlesReplay() : { ...singlesReplay(), formatid: 'gen9doublesou' });
+    const spread = { hp: 252, atk: 0, def: 4, spa: 252, spd: 0, spe: 0 };
+
+    test('a spread the move order checked says so, one the HP of the log set says so', () => {
+      const byOrder = revealedPokemon('Noivern', { evs: { ...evs('guessed', spread), sourceDetail: ORDER_SPREAD_DETAIL } });
+      const byHp = revealedPokemon('Latias', { evs: { ...evs('guessed', spread), sourceDetail: MEASURED_HP_SPREAD_DETAIL } });
+      render(<BattleStatsPanel replayData={replayData()} p1Info={{ pokemon: [byOrder, byHp] }} p2Info={null} />);
+      const noivern = screen.getByRole('img', { name: 'Noivern' }).parentElement!;
+      expect(noivern).toHaveTextContent('from move order');
+      expect(noivern).not.toHaveTextContent('fitted');
+      expect(screen.getByRole('img', { name: 'Latias' }).parentElement!).toHaveTextContent('HP from log');
+    });
   });
 
   test('without any team knowledge the panel stays away', () => {

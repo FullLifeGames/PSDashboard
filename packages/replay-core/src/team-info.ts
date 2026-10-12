@@ -2,7 +2,7 @@ import { getSpeciesUsageSet, getSpeciesUsageStats } from './smogon/usage-lookup.
 import type { SmogonUsageStats, UsageProbability, UsageSpread } from './smogon/stats-types.ts';
 import { getSpeciesSetAssumption, type SetAssumption, type SetSpreadAssumption, type SmogonSetAssumptions } from './smogon/sets-lookup.ts';
 import { applyCoherenceVetoes, itemFromChosenSet, selectCuratedSet, type MoveCandidate } from './set-coherence.ts';
-import type { SpreadCandidate } from './spreads/ladder.ts';
+import type { SpreadCandidate, SpreadOrigin } from './spreads/ladder.ts';
 import type { OpponentTeamInfo, PokemonEvs, PokemonEvsInfo, PokemonFieldInfo, PokemonMoveInfo, RevealedPokemonInfo } from './types.ts';
 import { toId } from './ids.ts';
 
@@ -42,6 +42,10 @@ export function manualMove(name: string): PokemonMoveInfo {
 
 /** Provenance label the stats panel shows for damage-solved spreads. */
 export const INFERRED_SPREAD_DETAIL = 'fits observed damage';
+/** A spread only a proven move order checked (round 69, T69). */
+export const ORDER_SPREAD_DETAIL = 'fits the observed move order';
+/** A spread whose HP the log's maximum HP set inside the guess (round 69, T69). */
+export const MEASURED_HP_SPREAD_DETAIL = 'HP read from the log, the rest kept from the guess';
 /** Provenance details for items the move-order evidence decided (round 37). */
 export const INFERRED_ITEM_DETAIL = 'moved first, Choice Scarf inferred';
 export const RULED_OUT_ITEM_DETAIL = 'moved second, Choice Scarf ruled out';
@@ -58,6 +62,35 @@ function overlayItem(pokemon: RevealedPokemonInfo, candidate: SpreadCandidate): 
   if (candidate.itemReason === 'no-boost' && !candidate.item) return { ...unknownField(), sourceDetail: NO_BOOST_ITEM_DETAIL };
   if (!candidate.item) return pokemon.item;
   return guessedField(candidate.item, undefined, ITEM_DETAIL[candidate.itemReason ?? 'moved-second']);
+}
+
+const ORIGIN_DETAIL: Record<Exclude<SpreadOrigin, 'prior'>, string> = {
+  damage: INFERRED_SPREAD_DETAIL, order: ORDER_SPREAD_DETAIL, hp: MEASURED_HP_SPREAD_DETAIL,
+};
+const STAT_IDS = ['hp', 'atk', 'def', 'spa', 'spd', 'spe'] as const;
+const sameStats = (a: Partial<PokemonEvs>, b: Partial<PokemonEvs>, fallback: number) =>
+  STAT_IDS.every(stat => (a[stat] ?? fallback) === (b[stat] ?? fallback));
+
+/**
+ * The EVs the panel shows for a solved spread. The label says who checked it (round 69, T69): a spread that keeps the
+ * guess's numbers keeps the guess's label, a changed one carries its origin's, and an entry no evidence solved shows
+ * its numbers under the label of the guess they come from.
+ */
+function overlayEvs(pokemon: RevealedPokemonInfo, candidate: SpreadCandidate): PokemonEvsInfo {
+  const guess = pokemon.evs;
+  if (guess.source === 'guessed' && sameStats(guess.value, candidate.evs, 0)) return guess;
+  const origin = candidate.origin ?? 'damage';
+  if (origin === 'prior') return guess.source === 'guessed' ? { ...guess, value: { ...candidate.evs } } : guessedEvs({ ...candidate.evs });
+  return guessedEvs({ ...candidate.evs }, undefined, ORIGIN_DETAIL[origin]);
+}
+
+/** The nature, on the same terms as the EVs. */
+function overlayNature(pokemon: RevealedPokemonInfo, candidate: SpreadCandidate): PokemonFieldInfo {
+  const guess = pokemon.nature;
+  if (guess?.source === 'guessed' && toId(guess.value) === toId(candidate.nature)) return guess;
+  const origin = candidate.origin ?? 'damage';
+  if (origin === 'prior') return guess?.source === 'guessed' ? { ...guess, value: candidate.nature } : guessedField(candidate.nature);
+  return guessedField(candidate.nature, undefined, ORIGIN_DETAIL[origin]);
 }
 
 /**
@@ -84,10 +117,8 @@ export function applyInferredSpreads(
       return {
         ...pokemon,
         item,
-        evs: guessedEvs({ ...candidate.evs }, undefined, INFERRED_SPREAD_DETAIL),
-        ...(natureGuessed
-          ? { nature: guessedField(candidate.nature, undefined, INFERRED_SPREAD_DETAIL) }
-          : {}),
+        evs: overlayEvs(pokemon, candidate),
+        ...(natureGuessed ? { nature: overlayNature(pokemon, candidate) } : {}),
       };
     }),
   };

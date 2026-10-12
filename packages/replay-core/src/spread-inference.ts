@@ -269,7 +269,7 @@ function solveOne(ctx: SolveContext, key: string) {
   // observation minimum it sets the HP inside the prior and runs no ladder.
   if (evidence.observations.length < MIN_OBSERVATIONS && !evidence.hasSpeedObs && !evidence.paradoxBound) {
     if (evidence.fixedHp !== undefined) {
-      ctx.solved.set(key, { evs: priorWithFixedHp(prior, evidence.fixedHp, ctx.budget), nature: prior.nature });
+      ctx.solved.set(key, { evs: priorWithFixedHp(prior, evidence.fixedHp, ctx.budget), nature: prior.nature, origin: 'hp' });
     }
     return;
   }
@@ -283,12 +283,14 @@ function solveOne(ctx: SolveContext, key: string) {
   if (forfeitsToPrior(ctx, key, best, prior, evidence.observations)) {
     // The prior stands — with the log's HP where the log measured it.
     if (evidence.fixedHp === undefined) ctx.solved.delete(key);
-    else ctx.solved.set(key, { evs: priorWithFixedHp(prior, evidence.fixedHp, ctx.budget), nature: prior.nature });
+    else ctx.solved.set(key, { evs: priorWithFixedHp(prior, evidence.fixedHp, ctx.budget), nature: prior.nature, origin: 'hp' });
     return;
   }
   const evs = topUp(ctx, key, best, prior, offenseStat, measuredIn(evidence, offenseStat), evidence);
+  // Damage lines on the mon make the fit theirs; without any, a proven move order (or a Paradox activation) decided it (T69).
+  const origin = evidence.observations.length > 0 ? 'damage' : 'order';
   // A guessed boost item the lines refute rides out on the candidate like a decided Scarf: the builder resolves its replacement.
-  ctx.solved.set(key, { evs, nature: best.nature, ...(best.item === '' ? { item: '', itemReason: 'no-boost' as const } : {}) });
+  ctx.solved.set(key, { evs, nature: best.nature, origin, ...(best.item === '' ? { item: '', itemReason: 'no-boost' as const } : {}) });
 }
 
 /**
@@ -333,14 +335,14 @@ export function inferSpreads(
     ctx.sets[side].forEach((set, index) => {
       if (set.ivs?.spe === sets[side][index]?.ivs?.spe) return;
       const key = keyOf(side, set.species);
-      ctx.solved.set(key, { ...(ctx.solved.get(key) ?? spreadFor(ctx, side, set.species)), ivs: { ...set.ivs } });
+      ctx.solved.set(key, { ...(ctx.solved.get(key) ?? { ...spreadFor(ctx, side, set.species), origin: 'prior' as const }), ivs: { ...set.ivs } });
     });
   }
 
   // A decided mon carries its item even when no spread was solved for it.
   for (const [key, decision] of ctx.scarf) {
     const [side, species] = key.split(':') as ['p1' | 'p2', string];
-    const base = ctx.solved.get(key) ?? spreadFor(ctx, side, species);
+    const base = ctx.solved.get(key) ?? { ...spreadFor(ctx, side, species), origin: 'prior' as const };
     ctx.solved.set(key, {
       ...base,
       item: decision === 'holds' ? 'Choice Scarf' : '',

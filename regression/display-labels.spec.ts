@@ -1,5 +1,5 @@
 import { test, expect, describe } from 'vitest';
-import { INFERRED_SPREAD_DETAIL } from '@fulllifegames/replay-core';
+import { INFERRED_SPREAD_DETAIL, MEASURED_HP_SPREAD_DETAIL, ORDER_SPREAD_DETAIL } from '@fulllifegames/replay-core';
 import { spriteUrl } from '../src/lib/sprite-url';
 import { sourceLabel } from '../src/lib/provenance-labels';
 
@@ -25,5 +25,12 @@ describe('provenance labels', () => {
     expect(sourceLabel('guessed', 0.318)).toBe('guessed 31.8%');
     expect(sourceLabel('guessed')).toBe('guessed');
     expect(sourceLabel('revealed', undefined, INFERRED_SPREAD_DETAIL)).toBe('revealed');
+  });
+  // Round 69 (T69): the label names who checked the spread; fitted stays for damage lines only.
+  test('a spread the move order or the HP of the log checked says so, and fitted stays with damage', () => {
+    expect(sourceLabel('guessed', undefined, ORDER_SPREAD_DETAIL)).toBe('from move order');
+    expect(sourceLabel('guessed', undefined, MEASURED_HP_SPREAD_DETAIL)).toBe('HP from log');
+    expect(sourceLabel('guessed', undefined, INFERRED_SPREAD_DETAIL)).toBe('fitted');
+    expect(sourceLabel('manual', undefined, ORDER_SPREAD_DETAIL)).toBe('manual');
   });
 });
