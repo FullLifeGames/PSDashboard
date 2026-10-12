@@ -62,7 +62,7 @@ function activationsOf(ctx: SolveContext, key: string): Map<string, Activation> 
 export function paradoxError(ctx: SolveContext, key: string, candidate: SpreadCandidate): number {
   let violations = 0;
   for (const activation of activationsOf(ctx, key).values()) {
-    const stats = calcPokemon(ctx, activation.side, activation.species, candidate, {}, '', activation.forme).rawStats as unknown as Record<string, number>;
+    const stats = calcPokemon(ctx, activation.side, activation.species, candidate, { forme: activation.forme }).rawStats as unknown as Record<string, number>;
     if (boostedStatOf(stats, activation.stages) !== activation.stat) violations += 1;
   }
   return violations * PARADOX_VIOLATION_PENALTY;

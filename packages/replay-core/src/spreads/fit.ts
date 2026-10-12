@@ -10,7 +10,8 @@ import type { CandidateRung, SpreadCandidate } from './ladder.ts';
 import type { ItemDecision, SpeedKnowledgeMap } from './scarf.ts';
 import type { ObservedMaxHp } from './max-hp.ts';
 import { raceSpeed } from './race-speed.ts';
-import { defenderSideOf, fieldOf, moveOf, readObservation, type ReadObservation } from './observation-read.ts';
+import { defenderSideOf, fieldOf, hitSideOf, moveOf, readObservation, type HitSide, type ReadObservation } from './observation-read.ts';
+import { abilityAtHit } from './ability-at-hit.ts';
 import { formeAbility } from './battle-forme.ts';
 import { withItemAtHit } from './item-at-hit.ts';
 import { toId } from '../ids.ts';
@@ -170,24 +171,36 @@ export function spreadFor(ctx: SolveContext, side: 'p1' | 'p2', species: string)
   return { evs: { ...ZERO_EVS, ...(set?.evs ?? {}) }, nature: set?.nature || 'Hardy' };
 }
 
-/** A body as the calculator reads it: the spread itself, Stat Points in evs for Champions' generation 0, which ignores IVs (round 68, T186). */
-export function calcPokemon(
-  ctx: SolveContext, side: 'p1' | 'p2', species: string, spread: SpreadCandidate, obsBoosts: Record<string, number>, status: string, forme?: string,
-  boostedStat?: string,
-) {
+/** The calculator's current HP for a fraction of the maximum: below the maximum whenever the fraction is (Multiscale reads full HP exactly). */
+const hpAt = (maxHp: number, fraction: number) => Math.max(1, Math.min(maxHp - 1, Math.round(fraction * maxHp)));
+
+type CalcOptions = NonNullable<ConstructorParameters<typeof Pokemon>[2]>;
+
+/**
+ * A body as the calculator reads it: the spread itself, Stat Points in evs for Champions' generation 0, which ignores IVs (round 68,
+ * T186), and what the log shows of the side at the hit (`hit`, round 69, T86): stages, status, forme, Terastallization, HP, the
+ * fallen of Supreme Overlord, the ability it fought with.
+ */
+export function calcPokemon(ctx: SolveContext, side: 'p1' | 'p2', species: string, spread: SpreadCandidate, hit: HitSide = {}) {
   const set = setOf(ctx, side, species);
-  return buildCalcPokemon(ctx.gen, forme ?? set?.species ?? species, {
+  const dex = Dex.forGen(simGenNum(ctx.gen));
+  const body = buildCalcPokemon(ctx.gen, hit.forme ?? set?.species ?? species, {
     level: set?.level || 100,
-    ability: formeAbility(Dex.forGen(simGenNum(ctx.gen)), forme, set?.ability),
+    ability: abilityAtHit(dex, formeAbility(dex, hit.forme, set?.ability), hit.ability, hit.suppressed),
+    abilityOn: hit.abilityOn,
     item: (spread.item ?? set?.item) || undefined,
     nature: spread.nature,
     evs: spread.evs,
     ivs: set?.ivs,
-    boosts: obsBoosts,
+    boosts: hit.boosts,
     // The stat the log named for an active Protosynthesis or Quark Drive (T167): the calculator boosts that one, not the best of its own reading.
-    boostedStat: boostedStat as ConstructorParameters<typeof Pokemon>[2] extends { boostedStat?: infer B } ? B : never,
-    status: (status || undefined) as ConstructorParameters<typeof Pokemon>[2] extends { status?: infer S } ? S : never,
+    boostedStat: hit.boostedStat as CalcOptions['boostedStat'],
+    status: (hit.status || undefined) as CalcOptions['status'],
+    teraType: hit.tera as CalcOptions['teraType'],
+    alliesFainted: hit.fallen,
   });
+  if (hit.hp !== undefined && hit.hp < 1) body.originalCurHP = hpAt(body.maxHP(), hit.hp);
+  return body;
 }
 
 /** The calc's roll range for one observation under the candidate spread, as HP fractions. */
@@ -198,8 +211,8 @@ export function rollRange(ctx: SolveContext, obs: ReadObservation, attackerSprea
   const dex = Dex.forGen(simGenNum(gen));
   const attackerBody = withItemAtHit(dex, attackerSpread, setOf(ctx, obs.attackerSide, obs.attackerSpecies)?.item, obs.attackerItem, obs.attackerItemChanged);
   const defenderBody = withItemAtHit(dex, defenderSpread, setOf(ctx, defenderSide, obs.defenderSpecies)?.item, obs.defenderItem, obs.defenderItemChanged);
-  const attacker = calcPokemon(ctx, obs.attackerSide, obs.attackerSpecies, attackerBody, obs.attackerBoosts, obs.attackerStatus, obs.attackerForme, obs.attackerParadox?.stat);
-  const defender = calcPokemon(ctx, defenderSide, obs.defenderSpecies, defenderBody, obs.defenderBoosts, '', obs.defenderForme, obs.defenderParadox?.stat);
+  const attacker = calcPokemon(ctx, obs.attackerSide, obs.attackerSpecies, attackerBody, hitSideOf(obs, 'attacker'));
+  const defender = calcPokemon(ctx, defenderSide, obs.defenderSpecies, defenderBody, hitSideOf(obs, 'defender'));
   // The protocol records typeless "hiddenpower"; calc it as the SET's
   // resolved variant, or the fit runs the IV-default type against a hit
   // the sim plays typed (653785: Dark-fitted spreads, Ice-rolled sim).
@@ -208,7 +221,9 @@ export function rollRange(ctx: SolveContext, obs: ReadObservation, attackerSprea
     : obs.moveId;
   // A move the calculator's generation lacks (Pound in Champions' generation 0) builds as a 0-damage Status move: no judgment, no miss.
   if (!calcKnowsMove(gen, calcMoveId)) return null;
-  const result = calculate(gen, attacker, defender, moveOf(gen, calcMoveId, obs), fieldOf(obs));
+  // The calculator keys a few moves on the name (Weather Ball, Terrain Pulse); the typed Hidden Power is its own id.
+  const moveName = calcMoveId === obs.moveId ? obs.moveName ?? calcMoveId : calcMoveId;
+  const result = calculate(gen, attacker, defender, moveOf(gen, moveName, obs), fieldOf(obs));
   const rolls = (Array.isArray(result.damage) ? (result.damage as number[]).flat() : [Number(result.damage)]).map(Number);
   if (rolls.length === 0) return null;
   const maxHp = defender.maxHP();
