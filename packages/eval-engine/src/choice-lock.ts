@@ -8,8 +8,9 @@
 
 import { calculate, Field, Move, type Pokemon } from '@smogon/calc';
 import { Dex, type PokemonSet } from '@pkmn/sim';
-import { type DamageObservation, typedHiddenPowerId, inferOpponentTeam, itemSetValue, replayRuleset, toId, calcGenerationFor, simGenNum, type CalcGeneration } from '@fulllifegames/replay-core';
+import { type DamageObservation, type OpponentTeamInfo, typedHiddenPowerId, inferOpponentTeam, itemSetValue, replayRuleset, toId, calcGenerationFor, simGenNum, type CalcGeneration } from '@fulllifegames/replay-core';
 import { attackerAtUse, calcPokemon, type CalcBody } from './calc/body.ts';
+import { defenderAbilities, type DefenderRead } from './choice-lock-defender.ts';
 import { calcMove } from './calc/move.ts';
 import { CHOICE_ITEMS } from './sensitivity.ts';
 
@@ -283,22 +284,35 @@ function calcAttacker(gen: CalcGen, attackerSet: PokemonSet, obs: DamageObservat
   }, moveId));
 }
 
-function calcDefender(gen: CalcGen, defenderSet: PokemonSet | undefined, obs: DamageObservation, mod?: string): Pokemon {
+function calcDefender(gen: CalcGen, defenderSet: PokemonSet | undefined, obs: DamageObservation, ability: string, mod?: string): Pokemon {
   return calcPokemon(gen, {
-    species: defenderSet?.species ?? obs.defenderSpecies, level: defenderSet?.level || 100, ability: '', item: '',
+    species: defenderSet?.species ?? obs.defenderSpecies, level: defenderSet?.level || 100, ability, item: '',
     nature: defenderSet?.nature ?? '', evs: defenderSet?.evs ?? {}, ivs: defenderSet?.ivs ?? {}, gender: defenderSet?.gender,
     boosts: stagesOf(obs.defenderBoosts), tera: null, onField: true, mod,
   });
 }
 
-/** Whether the roll range (± slack) under `withItem` contains the observed fraction; null when the calc cannot judge. */
+/**
+ * Whether the roll range (± slack) under `withItem` contains the observed fraction for some ability the defender may
+ * have; null when the calc cannot judge any of them.
+ */
 function explainsObservation(
-  gen: CalcGen, attackerSet: PokemonSet, defenderSet: PokemonSet | undefined, obs: DamageObservation,
+  gen: CalcGen, attackerSet: PokemonSet, defender: DefenderRead, obs: DamageObservation,
+  calcMoveId: string, withItem: string, mod?: string,
+): boolean | null {
+  const reads = defender.abilities.map(ability =>
+    explainsWith(gen, attackerSet, () => calcDefender(gen, defender.set, obs, ability, mod), obs, calcMoveId, withItem, mod));
+  if (reads.some(read => read === true)) return true;
+  return reads.every(read => read === null) ? null : false;
+}
+
+function explainsWith(
+  gen: CalcGen, attackerSet: PokemonSet, buildDefender: () => Pokemon, obs: DamageObservation,
   calcMoveId: string, withItem: string, mod?: string,
 ): boolean | null {
   try {
     const attacker = calcAttacker(gen, attackerSet, obs, withItem, calcMoveId, mod);
-    const defender = calcDefender(gen, defenderSet, obs, mod);
+    const defender = buildDefender();
     // The move as the calc must read it: a Champions game's moves at the mod's power and type (calc/move.ts).
     const result = calculate(gen, attacker, defender, calcMove(gen, calcMoveId, { mod } as CalcBody), new Field({}));
     const rolls = (Array.isArray(result.damage) ? (result.damage as number[]).flat() : [Number(result.damage)]).map(Number);
@@ -326,14 +340,14 @@ function rivalItemsFor(gen: CalcGen, calcMoveId: string): string[] {
 
 /** One observation's verdict on the Choice item hypothesis. */
 function judgeObservation(
-  gen: CalcGen, attackerSet: PokemonSet, defenderSet: PokemonSet | undefined, obs: DamageObservation, item: string, mod?: string,
+  gen: CalcGen, attackerSet: PokemonSet, defender: DefenderRead, obs: DamageObservation, item: string, mod?: string,
 ): 'contradicted' | 'choice-only' | 'skip' {
   // Typeless "hiddenpower" calcs as the set's resolved variant (same seam
   // as spread-inference — the IV-default type would judge with wrong rolls).
   const calcMoveId = obs.moveId === 'hiddenpower'
     ? typedHiddenPowerId(attackerSet.moves) ?? obs.moveId
     : obs.moveId;
-  const explains = (withItem: string) => explainsObservation(gen, attackerSet, defenderSet, obs, calcMoveId, withItem, mod);
+  const explains = (withItem: string) => explainsObservation(gen, attackerSet, defender, obs, calcMoveId, withItem, mod);
   const rivals = rivalItemsFor(gen, calcMoveId);
   const choiceFits = explains(item);
   if (choiceFits === null) return 'skip';
@@ -354,6 +368,8 @@ export function corroborateChoiceItem(
   genNum: number,
   /** 'champions' when the sets hold Stat Points (round 67, decision 30). */
   mod?: string,
+  /** The inference of the defenders' side: its shown abilities and the ones the log ruled out (round 68, T157). */
+  defenders?: Record<'p1' | 'p2', OpponentTeamInfo>,
 ): ItemCorroboration {
   const gen = calcGenerationFor(genNum, mod);
   const speciesId = toId(species);
@@ -365,7 +381,8 @@ export function corroborateChoiceItem(
     if (obs.attackerSide !== side || toId(obs.attackerSpecies) !== speciesId) continue;
     const defenderTeam = side === 'p1' ? teams.p2Team : teams.p1Team;
     const defenderSet = defenderTeam.find(candidate => toId(candidate.species) === toId(obs.defenderSpecies));
-    const verdict = judgeObservation(gen, attackerSet, defenderSet, obs, item, mod);
+    const defender = { set: defenderSet, abilities: defenderAbilities(gen, defenderSet, obs, defenders?.[side === 'p1' ? 'p2' : 'p1']) };
+    const verdict = judgeObservation(gen, attackerSet, defender, obs, item, mod);
     if (verdict === 'contradicted') return 'contradicted';
     if (verdict === 'choice-only') sawChoiceOnly = true;
   }
@@ -394,8 +411,9 @@ export function buildChoiceLockContext(
   // Round 67 (decision 30): a Champions game's built sets hold Stat Points.
   const mod = replayRuleset({ log: replayLog }) === 'champions' ? 'champions' : undefined;
   const eligibility: ChoiceLockContext['eligibility'] = { p1: {}, p2: {} };
+  const infos = { p1: inferOpponentTeam(replayLog, 'p1'), p2: inferOpponentTeam(replayLog, 'p2') };
   for (const side of ['p1', 'p2'] as const) {
-    const info = inferOpponentTeam(replayLog, side);
+    const info = infos[side];
     const team = side === 'p1' ? teams.p1Team : teams.p2Team;
     for (const built of team) {
       const speciesId = toId(built.species);
@@ -406,7 +424,7 @@ export function buildChoiceLockContext(
       const proven = (revealed?.item.source === 'revealed' || revealed?.item.source === 'manual') &&
         toId(itemSetValue(revealed.item.value)) === toId(built.item);
       eligibility[side][speciesId] = proven ||
-        corroborateChoiceItem(side, built.species, built.item, teams, observations, genNum, mod) !== 'contradicted';
+        corroborateChoiceItem(side, built.species, built.item, teams, observations, genNum, mod, infos) !== 'contradicted';
     }
   }
   return { trails: buildChoiceLockTrails(replayLog), eligibility, heldItems: buildProtocolHeldItems(replayLog) };
