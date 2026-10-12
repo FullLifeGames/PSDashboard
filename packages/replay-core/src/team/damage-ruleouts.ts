@@ -21,8 +21,20 @@ import { toId } from '../ids.ts';
 type SideInfos = { p1: OpponentTeamInfo; p2: OpponentTeamInfo };
 type HpTypeResolver = (species: string) => string | null;
 
-/** The judge's signature: the candidate names a logged hit of `attacker` refutes, as ids. */
-export type ItemDamageJudge = (attacker: RevealedPokemonInfo, candidates: string[], teams: SideInfos) => string[];
+/**
+ * The holder is the defender of the hits it took (round 69, T169, spec decision 35): `side` is the side it stands on,
+ * `attackerItems` gives the items an attacker of the other side whose item is not proven could hold.
+ */
+export interface DefenderRole {
+  side: 'p1' | 'p2';
+  attackerItems: (attacker: RevealedPokemonInfo) => string[];
+}
+
+/**
+ * The judge's signature: the candidate names a logged hit refutes, as ids. Without a role the hits the holder dealt (it is the
+ * attacker); with one, the hits it took.
+ */
+export type ItemDamageJudge = (holder: RevealedPokemonInfo, candidates: string[], teams: SideInfos, role?: DefenderRole) => string[];
 
 /** An item still open to judgment: unknown, only the preview's marker, or a guess. Revealed, manual and sheet items are proof. */
 const itemOpen = (info: RevealedPokemonInfo) =>
@@ -47,10 +59,17 @@ interface JudgeContext {
 }
 
 /** One Pokémon after the judgment: its first enrichment, or the enrichment again with the refuted items ruled out. */
-function judged(raw: RevealedPokemonInfo, enriched: RevealedPokemonInfo, ctx: JudgeContext, hpTypeResolver?: HpTypeResolver): RevealedPokemonInfo {
-  if (!itemOpen(raw) || !raw.hits?.length) return enriched;
+function judged(
+  raw: RevealedPokemonInfo, enriched: RevealedPokemonInfo, ctx: JudgeContext, side: 'p1' | 'p2', hpTypeResolver?: HpTypeResolver,
+): RevealedPokemonInfo {
+  if (!itemOpen(raw)) return enriched;
   const known = raw.ruledOut?.items ?? [];
-  const refuted = ctx.judge(raw, itemCandidates(enriched, ctx.usageStats, ctx.setAssumptions), ctx.first).filter(id => !known.includes(id));
+  const candidates = itemCandidates(enriched, ctx.usageStats, ctx.setAssumptions);
+  // Both directions (T169): the hits the Pokemon dealt refute the items that would not have let it deal them, the hits it
+  // took the items that would have let it take less. An attacker of the other side whose item is open is ranged over its candidates.
+  const role: DefenderRole = { side, attackerItems: mon => itemCandidates(mon, ctx.usageStats, ctx.setAssumptions) };
+  const dealt = raw.hits?.length ? ctx.judge(raw, candidates, ctx.first) : [];
+  const refuted = [...new Set([...dealt, ...ctx.judge(raw, candidates, ctx.first, role)])].filter(id => !known.includes(id));
   if (refuted.length === 0) return enriched;
   // A guess of the inference itself (the Boots tell) that a hit refutes leaves the item open again.
   const item = refuted.includes(toId(itemSetValue(raw.item.value))) ? unknownField() : raw.item;
@@ -78,7 +97,7 @@ export function enrichTeamInfos(
   if (!judge) return first;
   const ctx: JudgeContext = { first, usageStats, setAssumptions, judge };
   const side = (id: 'p1' | 'p2'): OpponentTeamInfo => ({
-    pokemon: raw[id].pokemon.map((mon, index) => judged(mon, first[id].pokemon[index], ctx, hpTypeResolvers[id])),
+    pokemon: raw[id].pokemon.map((mon, index) => judged(mon, first[id].pokemon[index], ctx, id, hpTypeResolvers[id])),
   });
   return { p1: side('p1'), p2: side('p2') };
 }
