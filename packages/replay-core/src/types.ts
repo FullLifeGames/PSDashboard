@@ -113,6 +113,37 @@ export interface DamageObservation {
    */
   attackerParadox?: ParadoxReading;
   defenderParadox?: ParadoxReading;
+  /**
+   * The move's name as the `|move|` line prints it (round 69, T86): the calculator keys Weather Ball, Terrain Pulse, Techno Blast
+   * and Multi-Attack on the name, not on the id. Absent on observations of caches older than T86, which read the id.
+   */
+  moveName?: string;
+  /** The terrain id the client battle shows at the hit ('' none). */
+  terrain?: string;
+  /** The type each side Terastallized to, as the client names it; absent when it has not. */
+  attackerTera?: string;
+  defenderTera?: string;
+  /** Each side's HP as a fraction of its maximum before the hit: Multiscale needs full HP, Eruption and Water Spout scale with it. */
+  attackerHp?: number;
+  defenderHp?: number;
+  /** The fallen Supreme Overlord counted when the attacker came in (the `fallenN` start line of the ability); absent at none. */
+  attackerFallen?: number;
+  /**
+   * The ability id the client shows each side with at the hit (revealed by the log, or changed by it: Trace, Skill Swap); absent
+   * when the log never showed it. `Suppressed` is set when Gastro Acid, Neutralizing Gas or an ended ability took it away.
+   */
+  attackerAbility?: string;
+  defenderAbility?: string;
+  attackerSuppressed?: boolean;
+  defenderSuppressed?: boolean;
+  /** The attacker's ability is on, as its own volatile shows (Flash Fire after the absorbed hit, Slow Start, Unburden). */
+  attackerAbilityOn?: boolean;
+  /**
+   * What the log shows besides the two Pokémon that the calculator reads off the field (ids, sorted): Helping Hand and Charge on
+   * the attacker, an attacker's ally with Battery, Power Spot or Steely Spirit, a defender's ally with Friend Guard, a Ruin or Aura
+   * ability on the field, Gravity, Magic Room, Wonder Room. Absent at none.
+   */
+  fieldFacts?: string[];
 }
 
 /** What the log shows of an active Protosynthesis or Quark Drive: the stat the client names and the stages the simulator read it at. */

@@ -99,12 +99,13 @@ describe('doubles damage observations (T31)', () => {
     expect(mixed.map(obs => obs.defenderSpecies)).toEqual(['Gyarados']);
   });
 
-  test('a hit boosted by Helping Hand is no observation: the partner\'s boost is not priced yet', () => {
+  test('a hit boosted by Helping Hand is an observation that names the Helping Hand (T86 prices it)', () => {
     const helped = observe(
       '|move|p1b: Zippy|Helping Hand|p1a: Lax', '|-singleturn|p1a: Lax|Helping Hand|[of] p1b: Zippy',
       '|move|p1a: Lax|Tackle|p2a: Chomp', '|-damage|p2a: Chomp|70/100',
     );
-    expect(helped).toEqual([]);
+    expect(helped).toHaveLength(1);
+    expect(helped[0].fieldFacts).toEqual(['helpinghand']);
   });
 
   test('the game type comes from the gametype line, not from the format name', () => {
@@ -123,10 +124,11 @@ describe('doubles damage observations (T31)', () => {
 describe('singles logs give the observations they gave before (T31)', () => {
   const fixture = (name: string) => readFileSync(fileURLToPath(new URL(`./fixtures/${name}`, import.meta.url)), 'utf-8');
   // T31 added the first three fields, T191 the four item fields, T167 the two paradox readings (the logs hold a Protosynthesis
-  // mon); all are stripped before the comparison with 006b33c.
+  // mon), T86 the move name, terrain, HP, Tera, ability and field-fact fields; all are stripped before the comparison with 006b33c.
   const NEW_FIELDS = [
     'doubles', 'spread', 'defenderSide', 'attackerItem', 'defenderItem', 'attackerItemChanged', 'defenderItemChanged',
-    'attackerParadox', 'defenderParadox',
+    'attackerParadox', 'defenderParadox', 'moveName', 'terrain', 'attackerHp', 'defenderHp', 'attackerAbility', 'defenderAbility',
+    'attackerTera', 'defenderTera', 'attackerFallen', 'attackerSuppressed', 'defenderSuppressed', 'attackerAbilityOn', 'fieldFacts',
   ] as const;
 
   for (const name of ['singles-1', 'singles-2']) {

@@ -6,6 +6,7 @@ import { firstMoverContaminated, foreignAction, secondMoverContaminated, switchT
 import { toId } from '../ids.ts';
 import { itemFieldsOf } from './item-reading.ts';
 import { paradoxFieldsOf } from './paradox-reading.ts';
+import { forgetAbilityEnd, hitFactsOf } from './hit-facts.ts';
 
 const SCREEN_IDS = ['reflect', 'lightscreen', 'auroraveil'];
 
@@ -83,7 +84,7 @@ function pendingMoveFor(
 ): PendingMove | null {
   return parts[2] && parts[4]
     ? {
-      attacker: parts[2], target: parts[4], moveId,
+      attacker: parts[2], target: parts[4], moveId, moveName: parts[3] ?? '',
       spread: parts.slice(5).some(part => part.startsWith('[spread]')), crits: new Set<string>(), hits: new Map(), itemsBefore: new Map(),
       speedClean: cleanFirst, attackerSide: side, attackerSpecies: speciesForme,
     }
@@ -195,6 +196,7 @@ export function handleActionBoundary(state: ParserState, line: string) {
   if (state.lastMove?.spread && /^\|(?:-miss|-immune)\|/.test(line)) return;
   state.lastMove = null;
   if (/^\|(?:switch|drag)\|/.test(line)) {
+    forgetAbilityEnd(state, line);
     state.switchedThisTurn.add(line.split('|')[2] ?? '');
   }
   if (/^\|(?:switch|drag|cant)\|/.test(line)) {
@@ -229,8 +231,6 @@ function recordDamageObservation(state: ParserState, parts: string[], defenderId
   const attacker = battle.getPokemon(lastMove.attacker as Ident);
   const newFraction = hpFractionOf(parts[3] ?? '');
   if (!(defender && attacker && newFraction !== null && defender.maxhp > 0)) return null;
-  // The partner's Helping Hand is a boost the fit cannot price yet (T86): the hit is no reading.
-  if (attacker.volatiles.helpinghand) return null;
   const preFraction = defender.hp / defender.maxhp;
   const observedFraction = preFraction - newFraction;
   if (!(observedFraction > 0)) return null;
@@ -251,6 +251,7 @@ function recordDamageObservation(state: ParserState, parts: string[], defenderId
     spread: lastMove.spread,
     defenderSide: defenderIdent.startsWith('p1') ? 'p1' : 'p2',
     ...itemFieldsOf(lastMove, attacker, defender, defenderIdent),
+    ...hitFactsOf(state, lastMove, attacker, defender),
     ...paradoxFieldsOf(state, attacker, defender),
   };
   state.observations.push(observation);

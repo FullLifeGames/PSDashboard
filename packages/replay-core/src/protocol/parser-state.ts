@@ -31,6 +31,8 @@ export interface PendingMove {
   attacker: string;
   target: string;
   moveId: string;
+  /** The move's name as the move line prints it (round 69, T86). */
+  moveName: string;
   /** The move line names `[spread]`: the simulator cut the damage (round 69, T31). */
   spread: boolean;
   /** Targets a `|-crit|` line named: their damage is no reading. */
@@ -76,6 +78,8 @@ export interface ParserState {
   scarfChanges: Map<string, ScarfChange[]>;
   /** The stat stages each Pokémon had when its Protosynthesis or Quark Drive last activated (round 69, T167). */
   paradoxStages: Map<Pokemon, Record<string, number>>;
+  /** The Pokémon whose ability a `|-endability|` line took away (Gastro Acid): the client keeps no trace of it (round 69, T86). */
+  abilityEnded: Set<Pokemon>;
   lastMove: PendingMove | null;
   // Take initial snapshot at turn 0 (before any turns)
   capturedInitial: boolean;
@@ -100,6 +104,7 @@ export function createParserState(format = ''): ParserState {
     quickActed: new Set<string>(),
     scarfChanges: new Map<string, ScarfChange[]>(),
     paradoxStages: new Map<Pokemon, Record<string, number>>(),
+    abilityEnded: new Set<Pokemon>(),
     lastMove: null,
     capturedInitial: false,
   };
