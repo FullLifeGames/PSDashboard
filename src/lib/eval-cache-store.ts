@@ -288,7 +288,11 @@ export interface StoredEval {
 //      unlisted answers; Pokémon Champions runs on the Champions mod with
 //      Stat Points, reads its own set file and prices doubles with its own K.
 //      Positions of every format read new values.
-const EVAL_ENGINE_CACHE_VERSION = 64;
+// v65 (round 68, T186): @smogon/calc 0.12: Pokémon Champions is the calculator's
+//      own generation 0 (Stat Points, species and moves from the mod), Gen 1 and 2
+//      read their EVs, Rivalry reads the species' gender, Protect and entry
+//      stages follow the simulator. Calculator values of every format can move.
+const EVAL_ENGINE_CACHE_VERSION = 65;
 
 /** Round 61: a search-budget form stores under its own tag; the default keeps today's keys. */
 const versionTag = (): string => {
