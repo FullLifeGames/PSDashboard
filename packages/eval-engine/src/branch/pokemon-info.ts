@@ -1,5 +1,6 @@
 import { Battle, Dex, Teams, toID } from '@pkmn/sim';
-import { simBodyFacts } from '../calc/body.ts';
+import { bodyFromInfo, simBodyFacts } from '../calc/body.ts';
+import { teraClicked } from '../calc/tera-click.ts';
 import type { PokemonStatTable, SimPokemon, SimPokemonInfo, SimSide } from './types.ts';
 
 function statTableWithDefaults(
@@ -200,4 +201,42 @@ export function sightedHpAt(gen: number, champions: boolean, sighting: HpSightin
   if (!body) return null;
   body.maxhp = maxhp;
   return sightedHp(body, sighting);
+}
+
+/**
+ * Hidden Power's type and power for a set, as the simulator's Pokemon constructor gives them (round 69, T158): the
+ * set's own hpType, else the type of the first typed Hidden Power move in its list, else the Dex's reading of the
+ * IVs (the Dex gives the power too: 60 from Gen 6 on, IV-derived before; Gen 1 and 2 read the even DVs).
+ */
+export function hiddenPowerFacts(gen: number, set: { moves?: readonly string[]; ivs?: Partial<PokemonStatTable>; hpType?: string }): { hpType: string; hpPower: number } {
+  const dex = Dex.forGen(gen);
+  const ivs = Object.fromEntries((Object.keys(DEFAULT_IVS) as (keyof PokemonStatTable)[]).map(stat => {
+    const iv = Math.min(31, Math.max(0, Math.trunc(set.ivs?.[stat] ?? DEFAULT_IVS[stat])));
+    return [stat, gen <= 2 ? iv & 30 : iv];
+  })) as unknown as PokemonStatTable;
+  const typed = set.hpType || (set.moves ?? []).map(name => dex.moves.get(name)).find(move => move.id === 'hiddenpower' && move.type !== 'Normal')?.type;
+  const read = dex.getHiddenPower(ivs);
+  return { hpType: typed || read.type, hpPower: read.power };
+}
+
+/** What the calc reads off the simulator's body, from a snapshot (round 69, T158): the volatile facts the client kept, the side's fallen, Hidden Power of the set (or of the moves shown). */
+export function snapshotSimFacts(
+  mon: { boostedStat?: string; fallen?: number; moves?: readonly string[] }, set: { moves?: readonly string[]; ivs?: Partial<PokemonStatTable>; hpType?: string } | undefined, gen: number, sideFainted: number,
+): Pick<SimPokemonInfo, 'boostedStat' | 'alliesFainted' | 'totalFainted' | 'hpType' | 'hpPower'> {
+  return {
+    ...(mon.boostedStat ? { boostedStat: mon.boostedStat } : {}),
+    ...(mon.fallen ? { alliesFainted: mon.fallen } : {}),
+    ...(sideFainted ? { totalFainted: sideFainted } : {}),
+    // A body without a set reads as the simulator reads one without IVs of its own: 31 everywhere, the moves the log showed.
+    ...hiddenPowerFacts(gen, set ?? { moves: mon.moves }),
+  };
+}
+
+/**
+ * The species a quick-picker body has after its Tera click (round 69, T158): the simulator's own terastallize on a
+ * twin of the body (Terapagos-Terastal turns into Terapagos-Stellar, an Ogerpon into its Tera forme), the species
+ * itself for a click that keeps the forme.
+ */
+export function speciesAfterTeraClick(gen: number, info: SimPokemonInfo, teraType: string): string {
+  return teraClicked(gen, { ...bodyFromInfo(info), tera: teraType }).species;
 }

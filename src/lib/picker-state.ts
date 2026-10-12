@@ -2,7 +2,7 @@ import { Dex } from '@pkmn/dex';
 import type { PokemonSet } from '@pkmn/sim';
 import { CHAMPIONS_MOD, buildCalcPokemon, calcGenerationFor, evBudget, speciesBaseId, toId, type PokemonSnapshot, type TurnSnapshot } from '@fulllifegames/replay-core';
 import {
-  moveAtUse, sightedHpAt,
+  moveAtUse, sightedHpAt, snapshotSimFacts, speciesAfterTeraClick,
   type BranchMoveOption, type BranchSimState, type BranchSlotModifiers, type BranchSwitchOption, type MoveUser, type SimPokemonInfo,
 } from '@fulllifegames/eval-engine';
 import { teraBanned } from './picker-tera';
@@ -102,27 +102,44 @@ function snapshotTypeAtUse(name: string, user: MoveUser, gen: number): string {
   return moveAtUse(move, user)?.type ?? move.type;
 }
 
+/** BranchMoveOption with the label of the Tera toggle (round 69, T182), which the branch state fills from the simulator. */
+type LabelledMoveOption = BranchMoveOption & { typeUnderTera?: string };
+
+/** The type a move lands with after the Tera click (round 69, T158): the move table with the Tera type clicked and the species the simulator makes of the body on the click. */
+function typesUnderTera(info: SimPokemonInfo, user: MoveUser, teraType: string | null, gen: number): (name: string) => string | undefined {
+  if (!teraType) return () => undefined;
+  const clicked: MoveUser = { ...user, terastallized: teraType, species: speciesAfterTeraClick(gen, info, teraType) };
+  return name => snapshotTypeAtUse(name, clicked, gen);
+}
+
 function moveOptionsFor(
   mon: PokemonSnapshot,
   set: PokemonSet | undefined,
   activeSlot: number,
   gen: number,
   champions = false,
+  tera: { info: SimPokemonInfo; type: string | null } | null = null,
 ): BranchMoveOption[] {
   const user = snapshotMoveUser(mon, set, gen, champions);
-  return moveNamesFor(mon, set).map((name, slot) => ({
-    name,
-    activeSlot,
-    slot: slot + 1,
-    // PP unknown without the sim — 0/0 renders as a dash, never a dex pool.
-    pp: 0,
-    maxpp: 0,
-    disabled: false,
-    type: snapshotTypeAtUse(name, user, gen),
-    targetType: 'normal',
-    requiresTarget: false,
-    targetOptions: [],
-  }));
+  const underTera = tera ? typesUnderTera(tera.info, user, tera.type, gen) : () => undefined;
+  return moveNamesFor(mon, set).map((name, slot): LabelledMoveOption => {
+    const type = snapshotTypeAtUse(name, user, gen);
+    const clicked = underTera(name);
+    return {
+      name,
+      activeSlot,
+      slot: slot + 1,
+      // PP unknown without the sim — 0/0 renders as a dash, never a dex pool.
+      pp: 0,
+      maxpp: 0,
+      disabled: false,
+      type,
+      ...(clicked && clicked !== type ? { typeUnderTera: clicked } : {}),
+      targetType: 'normal',
+      requiresTarget: false,
+      targetOptions: [],
+    };
+  });
 }
 
 /**
@@ -167,6 +184,7 @@ function pokemonInfoFromSnapshot(
   activeSlot: number | null,
   gen: number,
   champions: boolean,
+  sideFainted: number,
 ): SimPokemonInfo {
   const { hp, maxhp, hpPercent } = absoluteHp(mon, set, gen, champions);
   return {
@@ -194,6 +212,7 @@ function pokemonInfoFromSnapshot(
     types: speciesTypesFor(mon.speciesForme, gen),
     // The damage calc reads the Tera type from here (as on the live and stored paths).
     teraType: mon.terastallized || '',
+    ...snapshotSimFacts(mon, set, gen, sideFainted),
     ...championsMark(champions),
   };
 }
@@ -287,7 +306,13 @@ function snapshotSideOptions(
   const broughtBases = (bringOnly?.[side] ?? []).map(name => speciesBaseId(name));
   const inBring = (mon: PokemonSnapshot) =>
     broughtBases.length === 0 || broughtBases.includes(speciesBaseId(mon.speciesForme));
-  const movesBySlot = actives.map((mon, index) => moveOptionsFor(mon, setFor(mon), index, gen, champions));
+  const fainted = pokemon.filter(mon => mon.fainted).length;
+  // One Tera per side and battle: a terastallized teammate spent it.
+  const sideMayTera = teraAllowed && !pokemon.some(mon => mon.terastallized);
+  const activeSlots = actives.map((mon, index) => pokemonInfoFromSnapshot(mon, setFor(mon), index, gen, champions, fainted));
+  const movesBySlot = actives.map((mon, index) => moveOptionsFor(
+    mon, setFor(mon), index, gen, champions, { info: activeSlots[index], type: snapshotTeraType(mon, setFor(mon), gen, sideMayTera) },
+  ));
   const switchesBySlot = actives.map((_, activeSlot): BranchSwitchOption[] =>
     pokemon
       .filter(mon => !mon.isActive && !mon.fainted && benchPercent(mon) > 0 && inBring(mon))
@@ -300,11 +325,8 @@ function snapshotSideOptions(
         hpPercent: benchPercent(mon),
         fainted: false,
       })));
-  const activeSlots = actives.map((mon, index) => pokemonInfoFromSnapshot(mon, setFor(mon), index, gen, champions));
   const infos = pokemon.map(mon =>
-    pokemonInfoFromSnapshot(mon, setFor(mon), mon.isActive ? actives.indexOf(mon) : null, gen, champions));
-  // One Tera per side and battle: a terastallized teammate spent it.
-  const sideMayTera = teraAllowed && !pokemon.some(mon => mon.terastallized);
+    pokemonInfoFromSnapshot(mon, setFor(mon), mon.isActive ? actives.indexOf(mon) : null, gen, champions, fainted));
   const modifiersBySlot = actives.map((mon, index) => ({
     teraType: snapshotTeraType(mon, setFor(mon), gen, sideMayTera),
     canMegaEvo: false,

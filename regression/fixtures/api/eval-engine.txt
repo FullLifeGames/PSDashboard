@@ -159,6 +159,7 @@ value forcedWinSpeaks
 value formatLine
 value formatRead
 value heldDecided
+value hiddenPowerFacts
 value loadSimMods
 value loadSimModsFor
 value lostGround
@@ -208,7 +209,9 @@ value shownAttribution
 value sightedHp
 value sightedHpAt
 value simFastStatus
+value snapshotSimFacts
 value solveEndgame
+value speciesAfterTeraClick
 value starvedSupportCells
 value summarizeAlignment
 value summarizeTurn
