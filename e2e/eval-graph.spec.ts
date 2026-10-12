@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect, type Page } from '@playwright/test';
 import { emptySmogon, routeSmogon } from './smogon-routes';
 import { fixturePath, installReplayEmbedCache, routeOfflineFixtures } from './helpers';
 
@@ -196,4 +196,91 @@ test.describe('PS Dashboard', () => {
     // Round 67 (T109, gate answer 5b): no analyzed turn offers a deeper stage.
     await expect(panel.locator('button', { hasText: 'Think deeper' })).toHaveCount(0);
   });
+  // Round 69 (T184, gate answer 8a of round 67): the configured engine decides what a sweep replaces. A matrix
+  // result of depth 2 no longer outranks the tree, so Re-analyze under an MCTS target (or Auto on a tree turn)
+  // replaces it. The truth table lives in regression/supersedes-stored-t184.spec.ts; these two drive the buttons.
+  const STAGE_BADGE = 'What produced the numbers shown for this turn.';
+
+  /** Sweeps the loaded game at matrix depth 2, switches the engine dropdown to `mode` and re-analyzes; turn 1 must read the new engine. */
+  async function expectReanalyzeReplaces(page: Page, mode: 'mcts' | 'auto') {
+    const panel = page.locator('.ps-main-right .ps-eval-panel');
+    await panel.locator('button', { hasText: 'Analyze game' }).click();
+    await expect(panel.locator('button', { hasText: 'Re-analyze' })).toBeVisible({ timeout: 240_000 });
+    await panel.locator('.ps-eval-graph rect[data-turn="1"]').click();
+    await expect(panel.getByTitle(STAGE_BADGE)).toHaveText(/^depth 2/, { timeout: 15_000 });
+
+    await panel.locator('select').first().selectOption(mode);
+    await panel.locator('button', { hasText: 'Re-analyze' }).click();
+    // The click may land on a stale panel: keep opening turn 1 until the sweep has swapped its result.
+    await expect(async () => {
+      await panel.locator('.ps-eval-graph rect[data-turn="1"]').click();
+      await expect(panel.getByTitle(STAGE_BADGE)).toHaveText('MCTS', { timeout: 3_000 });
+    }).toPass({ timeout: 240_000 });
+  }
+
+  test('after depth 2 and Auto, Re-analyze replaces the stored result on every doubles turn (VGC)', async ({ page }) => {
+    test.setTimeout(420_000);
+    await page.evaluate(() => {
+      localStorage.setItem('ps-replay-interceptor:eval-pool', '2');
+      localStorage.setItem('ps-replay-interceptor:eval-prefs',
+        JSON.stringify({ depth: 2, samples: 1, mode: 'matrix', auto: false, tera: 'auto' }));
+    });
+    await page.reload();
+    await page.locator('input[type="text"]').fill('gen9vgc-test');
+    await page.locator('button', { hasText: 'Load' }).click();
+    await expect(page.getByText('Alice', { exact: true }).first()).toBeVisible({ timeout: 10000 });
+    // Auto runs the tree from the first doubles turn, VGC counted as doubles.
+    await expectReanalyzeReplaces(page, 'auto');
+  });
+
+  test('after depth 2 and the MCTS engine, Re-analyze replaces the stored result in singles', async ({ page }) => {
+    test.setTimeout(420_000);
+    await page.evaluate(() => {
+      localStorage.setItem('ps-replay-interceptor:eval-pool', '2');
+      localStorage.setItem('ps-replay-interceptor:eval-prefs',
+        JSON.stringify({ depth: 2, samples: 1, mode: 'matrix', auto: false, tera: 'auto' }));
+    });
+    await page.reload();
+    await page.locator('button', { hasText: 'Load' }).click();
+    await expect(page.getByText('TestPlayer1', { exact: true }).first()).toBeVisible({ timeout: 10000 });
+    await expectReanalyzeReplaces(page, 'mcts');
+  });
+
+  // The gap turn's first analysis. The replay view never sits on the live tip, so a turn nobody swept offers the
+  // button; the fixtures hold 4 (singles) and 3 (VGC) turns, the 1-turn doubles fixture has no earlier turn to step to.
+  for (const { kind, replayId, player } of [
+    { kind: 'singles', replayId: null, player: 'TestPlayer1' },
+    { kind: 'doubles (VGC)', replayId: 'gen9vgc-test', player: 'Alice' },
+  ]) {
+    test(`Analyze this position on a gap turn searches it and fills the analysis (${kind})`, async ({ page }) => {
+      test.setTimeout(300_000);
+      await page.evaluate(() => {
+        localStorage.setItem('ps-replay-interceptor:eval-pool', '2');
+        localStorage.setItem('ps-replay-interceptor:eval-prefs',
+          JSON.stringify({ depth: 1, samples: 1, mode: 'matrix', auto: false, tera: 'auto' }));
+      });
+      await page.reload();
+      if (replayId) await page.locator('input[type="text"]').fill(replayId);
+      await page.locator('button', { hasText: 'Load' }).click();
+      await expect(page.getByText(player, { exact: true }).first()).toBeVisible({ timeout: 10000 });
+
+      // No sweep ran: step back from the end to turn 2, a turn with a later turn after it.
+      const slider = page.locator('input[type="range"]');
+      await expect(slider).toBeVisible({ timeout: 10000 });
+      await slider.fill('2');
+      await expect(page.getByText(/T2\/\d+/)).toBeVisible();
+
+      const panel = page.locator('.ps-main-right .ps-eval-panel');
+      const analyze = panel.getByRole('button', { name: 'Analyze this position (depth 1)' });
+      await expect(analyze).toBeEnabled({ timeout: 30_000 });
+      await expect(panel.locator('.ps-eval-analysis')).toHaveCount(0);
+      await analyze.click();
+
+      await expect(panel.locator('.ps-eval-analysis')).toContainText('Turn 2', { timeout: 240_000 });
+      await expect(panel.getByTitle(STAGE_BADGE)).toHaveText(/^depth 1/, { timeout: 30_000 });
+      // The turn is stored now: the button is gone.
+      await expect(analyze).toHaveCount(0);
+    });
+  }
+
 });
