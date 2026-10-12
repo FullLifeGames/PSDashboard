@@ -1,8 +1,8 @@
 import {
-  type TurnSensitivity, type TurnVerification, type PlayedTurn, perfSpan, type EvalResult, type EvalSettings,
+  type TurnSensitivity, type TurnVerification, type PlayedTurn, perfSpan, type EvalResult,
   teraKey, type TeraAllowance,
 } from '@fulllifegames/eval-engine';
-import { EvalWorkerClient } from '../../lib/eval/worker-client';
+import { EvalWorkerClient, type AppEvalSettings } from '../../lib/eval/worker-client';
 import { runInLanes } from '../../lib/eval/lanes';
 import { evalPoolSize, lanesForPool } from '../../lib/eval/pool-size';
 import { evalStoreKey, loadStoredEval, saveStoredEval } from '../../lib/eval-cache-store';
@@ -113,7 +113,7 @@ async function computeFreshPlayedOutcome(
 /** Verification and sensitivity on a freshly evaluated turn (final-verdict passes only). */
 async function verifyAndProbeFresh(
   env: SweepEnv, serialized: string, result: EvalResult, turnPlayed: PlayedTurn | null,
-  resolvedSettings: EvalSettings, turn: number,
+  resolvedSettings: AppEvalSettings, turn: number,
 ): Promise<'abort' | { turnVerified: TurnVerification | null; turnSensitivity: TurnSensitivity | null }> {
   const turnVerified = await guardedStage(env, () =>
     perfSpan('verify', () => verifyFlagged(env, () => Promise.resolve(serialized), result, turnPlayed, resolvedSettings)));
@@ -225,7 +225,7 @@ async function evalTurn(
   const turnPlayed = env.params.playedFor(turn);
   env.data.played[turn - 1] = turnPlayed;
   const engine: TurnEngine = { depth, samples, mode, ...sketchFields({ prove }) };
-  const resolvedSettings: EvalSettings = {
+  const resolvedSettings: AppEvalSettings = {
     depth, samples, mode, tera: env.params.tera, sleepClause: env.params.sleepClause, ruleset: env.params.ruleset, ...sketchFields(engine),
   };
 

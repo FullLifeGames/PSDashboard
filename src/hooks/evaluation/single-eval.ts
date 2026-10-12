@@ -3,7 +3,7 @@ import {
   type TurnSensitivity, type TurnVerification, type EvalPreferences, type EvalResult, type EvalSettings,
   type SearchProgress, type StaticRuleset, type TeraAllowance, teraKey,
 } from '@fulllifegames/eval-engine';
-import { EvalWorkerClient } from '../../lib/eval/worker-client';
+import { EvalWorkerClient, type AppEvalSettings } from '../../lib/eval/worker-client';
 import { throttleLatest } from '../../lib/eval/throttle-latest';
 import { evalStoreKey, loadStoredEval, saveStoredEval } from '../../lib/eval-cache-store';
 import { resolveAutoTurnSettings, serializedAutoRouting, type EngineMode, type TurnEvalSettings } from './prefs';
@@ -14,7 +14,7 @@ export type EvalStatus = 'idle' | 'reconstructing' | 'searching' | 'done' | 'sta
 const PROGRESS_INTERVAL_MS = 100;
 const PARTIAL_INTERVAL_MS = 250;
 
-interface EvaluateParams {
+export interface EvaluateParams {
   /** Cache key for replay-view positions; null disables caching (branch mode). */
   cacheKey: string | null;
   /** Resolved Tera allowance (the panel pref resolved against the replay). */
@@ -22,7 +22,7 @@ interface EvaluateParams {
   /** Sleep Clause enforced for this replay (resolved from the branch format). */
   sleepClause?: boolean;
   /** Round 65: the rule set the replay runs under (Pokémon Champions or standard), resolved from its format. */
-  ruleset?: StaticRuleset;
+  ruleset: StaticRuleset;
   /**
    * Produces the serialized position. A reconstruction-based acquire calls
    * reportReconstruct(turn, target) as it replays turns; the hook surfaces
@@ -143,7 +143,7 @@ async function searchAndInstall(
   }, PARTIAL_INTERVAL_MS);
   let final: EvalResult;
   try {
-    const settings: EvalSettings = {
+    const settings: AppEvalSettings = {
       depth: resolved.depth, samples: resolved.samples, mode: resolved.mode, tera: params.tera, sleepClause: params.sleepClause, ruleset: params.ruleset,
       ...(params.keepPlayed ? { keepPlayed: params.keepPlayed } : {}),
     };

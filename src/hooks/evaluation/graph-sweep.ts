@@ -3,7 +3,7 @@ import {
   type TurnSensitivity, type TurnVerification, type LeadEvalData, type PlayedTurn, perfReport, perfReset,
   perfSpan, selectKeyTurns, type EvalPreferences, type EvalResult, type EvalSettings, teraKey,
 } from '@fulllifegames/eval-engine';
-import { EvalWorkerClient } from '../../lib/eval/worker-client';
+import { EvalWorkerClient, type AppEvalSettings } from '../../lib/eval/worker-client';
 import { evalStoreKey, loadStoredEval, loadStoredEvalsByPrefix, saveStoredEval } from '../../lib/eval-cache-store';
 import { resolveAutoLeadSettings, type TurnEvalSettings } from './prefs';
 import type { CachedEval } from './single-eval';
@@ -199,7 +199,7 @@ async function loadLeadResult(
 
 /** Search the team-preview position and persist the result. */
 async function searchLeadResult(
-  env: SweepEnv, leadSettings: EvalSettings, lead0: TurnEvalSettings, key: string, storeKey: string,
+  env: SweepEnv, leadSettings: AppEvalSettings, lead0: TurnEvalSettings, key: string, storeKey: string,
 ): Promise<'abort' | EvalResult | null> {
   try {
     const serialized = await env.params.acquirePreview!();
@@ -239,7 +239,7 @@ async function evaluateLead(
   // (resolveAutoLeadSettings).
   const { depth, samples, mode } = sweep;
   const lead0 = mode === 'auto' ? resolveAutoLeadSettings() : { depth, samples, mode };
-  const leadSettings: EvalSettings = { ...lead0, tera: env.params.tera, sleepClause: env.params.sleepClause, ruleset: env.params.ruleset };
+  const leadSettings: AppEvalSettings = { ...lead0, tera: env.params.tera, sleepClause: env.params.sleepClause, ruleset: env.params.ruleset };
   const key = env.params.cacheKeyFor(0);
   const storeKey = evalStoreKey(key, lead0.depth, lead0.samples, lead0.mode, env.params.tera);
   const cached = await loadLeadResult(env, lead0, key, storeKey);

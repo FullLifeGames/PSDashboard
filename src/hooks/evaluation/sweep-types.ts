@@ -5,6 +5,7 @@ import {
 } from '@fulllifegames/eval-engine';
 import type { EvalWorkerClient } from '../../lib/eval/worker-client';
 import type { StoredEval } from '../../lib/eval-cache-store';
+import type { AppEvalSettings } from '../../lib/eval/worker-client';
 import type { EngineMode, TurnEvalSettings } from './prefs';
 import type { CachedEval } from './single-eval';
 
@@ -42,7 +43,7 @@ export interface GraphSweepParams {
   /** Sleep Clause enforced for this replay (resolved from the branch format). */
   sleepClause?: boolean;
   /** Round 65: the rule set the replay runs under (Pokémon Champions or standard), resolved from its format. */
-  ruleset?: StaticRuleset;
+  ruleset: StaticRuleset;
   /** The replay's game type: auto resolves each turn per game type (round 63, T110). */
   doubles: boolean;
   cacheKeyFor(turn: number): string;
@@ -131,7 +132,7 @@ export interface TurnStageArgs {
   turn: number;
   turnPlayed: PlayedTurn | null;
   engine: TurnEngine;
-  resolvedSettings: EvalSettings;
+  resolvedSettings: AppEvalSettings;
 }
 
 export const aborted = (env: SweepEnv) => env.runRef.current !== env.runId;

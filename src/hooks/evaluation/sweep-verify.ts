@@ -1,8 +1,8 @@
 import {
   REGRET_THRESHOLD, type SensitivityProbe, type TurnSensitivity, type TurnVerification, patchSerializedItem,
-  selectProbeCombos, type PlayedTurn, type EvalResult, type EvalSettings, type RankedChoice,
+  selectProbeCombos, type PlayedTurn, type EvalResult, type RankedChoice,
 } from '@fulllifegames/eval-engine';
-import { EvalWorkerClient } from '../../lib/eval/worker-client';
+import { EvalWorkerClient, type AppEvalSettings } from '../../lib/eval/worker-client';
 import { matchOrPhantom, type SweepEnv } from './sweep-types';
 
 /**
@@ -14,7 +14,7 @@ import { matchOrPhantom, type SweepEnv } from './sweep-types';
  * (playedOutcomeSettings). null = no tier left (the ladder caps at the
  * engine's depth 3).
  */
-export function verificationDeepSettings(settings: EvalSettings): EvalSettings | null {
+export function verificationDeepSettings(settings: AppEvalSettings): AppEvalSettings | null {
   if ((settings.mode ?? 'matrix') === 'mcts') {
     return { ...settings, depth: 2, mode: 'matrix', keepPlayed: undefined };
   }
@@ -35,7 +35,7 @@ export async function verifyFlagged(
   getSerialized: () => Promise<string>,
   result: EvalResult,
   turnPlayed: PlayedTurn | null,
-  settings: EvalSettings,
+  settings: AppEvalSettings,
 ): Promise<TurnVerification | null> {
   const deep = verificationDeepSettings(settings);
   if (!deep) return null;
@@ -76,7 +76,7 @@ async function runProbeCombos(env: SweepEnv, args: {
   p1Choice: RankedChoice;
   p2Choice: RankedChoice;
   best: RankedChoice;
-  probeSettings: EvalSettings;
+  probeSettings: AppEvalSettings;
 }): Promise<SensitivityProbe[]> {
   const { combos, serialized, side, sign, p1Choice, p2Choice, best, probeSettings } = args;
   const opposing = side === 'p1' ? 'p2' : 'p1';
@@ -100,7 +100,7 @@ async function probeSide(env: SweepEnv, args: {
   result: EvalResult;
   p1Choice: RankedChoice;
   p2Choice: RankedChoice;
-  probeSettings: EvalSettings;
+  probeSettings: AppEvalSettings;
   turnVerified: TurnVerification | null;
 }): Promise<SensitivityProbe[] | null> {
   const { side, getSerialized, result, p1Choice, p2Choice, probeSettings, turnVerified } = args;
@@ -136,14 +136,14 @@ export async function probeSensitivity(
   getSerialized: () => Promise<string>,
   result: EvalResult,
   turnPlayed: PlayedTurn | null,
-  settings: EvalSettings,
+  settings: AppEvalSettings,
   turnVerified: TurnVerification | null,
 ): Promise<TurnSensitivity | null> {
   if (!env.params.sensitivityTargetsFor) return null;
   const p1Choice = matchOrPhantom(result, 'p1', turnPlayed);
   const p2Choice = matchOrPhantom(result, 'p2', turnPlayed);
   if (!p1Choice || !p2Choice) return null;
-  const probeSettings: EvalSettings = { ...settings, keepPlayed: undefined };
+  const probeSettings: AppEvalSettings = { ...settings, keepPlayed: undefined };
   const out: TurnSensitivity = {};
   for (const side of ['p1', 'p2'] as const) {
     const probes = await probeSide(env, { side, getSerialized, result, p1Choice, p2Choice, probeSettings, turnVerified });

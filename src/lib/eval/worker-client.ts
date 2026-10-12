@@ -36,6 +36,13 @@ type DistributiveOmit<T, K extends PropertyKey> = T extends unknown ? Omit<T, K>
 const MISSING_RULESET = 'evaluation without a rule set';
 
 /**
+ * Round 69 (T184): the settings the app hands the pool carry the rule set as
+ * a required field, so a caller that drops it stops compiling; the runtime
+ * refusals above and in the worker stay as the backstop for untyped callers.
+ */
+export type AppEvalSettings = EvalSettings & { ruleset: StaticRuleset };
+
+/**
  * Sub-search settings that value a played pair with the same machinery the
  * sweep's own cells get: depth-1 matrix cells are static evals already
  * (null = use the plain cell path); deeper searches deepen their cells with
@@ -173,7 +180,7 @@ export class EvalWorkerClient {
 
   evaluate(
     serializedBattle: string,
-    settings: EvalSettings,
+    settings: AppEvalSettings,
     handlers?: EvalRunHandlers,
     opts?: { exclusive?: boolean },
   ): Promise<EvalResult> {
@@ -252,7 +259,7 @@ export class EvalWorkerClient {
    * shallow static value against deep before/after scores would leak
    * estimator disagreement into the decision/chance decomposition.
    */
-  async evalPair(serializedBattle: string, p1Choice: string, p2Choice: string, settings: EvalSettings): Promise<number> {
+  async evalPair(serializedBattle: string, p1Choice: string, p2Choice: string, settings: AppEvalSettings): Promise<number> {
     const ruleset = settings.ruleset;
     if (!ruleset) throw new Error(MISSING_RULESET);
     const handle = this.pickWorker();
