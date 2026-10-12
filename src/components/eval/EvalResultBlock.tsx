@@ -7,8 +7,10 @@ import { MiniBar } from '../EvalTurnAnalysis';
 
 type PickChoice = (side: 'p1' | 'p2', choice: RankedChoice, reply?: RankedChoice | null) => void;
 
-function ChoiceDetail({ choice, index, best }: { choice: RankedChoice; index: number; best: RankedChoice | undefined }) {
-  const evPct = winPercent(choice.ev);
+function ChoiceDetail({ choice, index, best, faintedFraction }: {
+  choice: RankedChoice; index: number; best: RankedChoice | undefined; faintedFraction?: number | null;
+}) {
+  const evPct = winPercent(choice.ev, faintedFraction);
   const gap = best ? choice.ev - best.ev : 0;
   return (
     <>
@@ -33,16 +35,16 @@ function ChoiceDetail({ choice, index, best }: { choice: RankedChoice; index: nu
 /** The equilibrium value in the eval bar's own language: the win odds
  *  this choice is worth against balanced play. The guaranteed floor
  *  and the punishing reply live in the tooltip. */
-function choiceTooltip(choice: RankedChoice, clickable: boolean): string {
-  return `Win probability ${winPercent(choice.ev)}% vs balanced play; higher is better for this side` +
-    ` · guaranteed at least ${winPercent(choice.worstCase)}%` +
+function choiceTooltip(choice: RankedChoice, clickable: boolean, faintedFraction?: number | null): string {
+  return `Win probability ${winPercent(choice.ev, faintedFraction)}% vs balanced play; higher is better for this side` +
+    ` · guaranteed at least ${winPercent(choice.worstCase, faintedFraction)}%` +
     (choice.punishedBy ? ` (worst reply: ${choice.punishedBy})` : '') +
     '. Choices are ranked by their value against balanced play.' +
     (clickable ? ' Click to play this turn out against the engine’s reply.' : '');
 }
 
 function ChoiceList({
-  side, choices, reply, onPickChoice,
+  side, choices, reply, onPickChoice, faintedFraction,
 }: {
   side: 'p1' | 'p2';
   choices: RankedChoice[];
@@ -50,13 +52,14 @@ function ChoiceList({
   reply: RankedChoice | null;
   onPickChoice?: PickChoice;
   doubles?: boolean;
+  faintedFraction?: number | null;
 }) {
   const best = choices[0];
   return (
     <div className="ps-eval-column">
       {choices.slice(0, 3).map((choice, index) => {
-        const tooltip = choiceTooltip(choice, !!onPickChoice);
-        const detail = <ChoiceDetail choice={choice} index={index} best={best} />;
+        const tooltip = choiceTooltip(choice, !!onPickChoice, faintedFraction);
+        const detail = <ChoiceDetail choice={choice} index={index} best={best} faintedFraction={faintedFraction} />;
         return onPickChoice ? (
           <button
             key={choice.choice}
@@ -100,7 +103,7 @@ function SettingsLine({ result, resultSettings }: {
 }
 
 /** The single-position result: the advantage bar, its provenance, the ranked lines, and the matrix. */
-export function EvalResultBlock({ result, status, playerNames, positionLabel, resultSettings, onPickChoice, onPickPair, doubles }: {
+export function EvalResultBlock({ result, status, playerNames, positionLabel, resultSettings, onPickChoice, onPickPair, doubles, faintedFraction }: {
   result: EvalResult;
   status: EvalStatus;
   playerNames: [string, string];
@@ -109,8 +112,10 @@ export function EvalResultBlock({ result, status, playerNames, positionLabel, re
   onPickChoice?: PickChoice;
   onPickPair?: (p1: { choice: string; label: string }, p2: { choice: string; label: string }) => void;
   doubles?: boolean;
+  /** Round 69 (T51): the fainted share of the shown turn; the percents print at it, as the graph does. Absent: the opening map. */
+  faintedFraction?: number | null;
 }) {
-  const p1Pct = winPercent(result.score);
+  const p1Pct = winPercent(result.score, faintedFraction);
   return (
     <div className={status === 'stale' ? 'ps-eval-stale' : undefined}>
       {positionLabel && (
@@ -128,14 +133,15 @@ export function EvalResultBlock({ result, status, playerNames, positionLabel, re
       <div className="ps-eval-columns">
         {/* Stale results describe the PREVIOUS position — clicking them
             would map old choices onto the new state (wrong switches). */}
-        <ChoiceList side="p1" choices={result.perSide.p1} reply={result.perSide.p2[0] ?? null} onPickChoice={status === 'stale' ? undefined : onPickChoice} doubles={doubles} />
-        <ChoiceList side="p2" choices={result.perSide.p2} reply={result.perSide.p1[0] ?? null} onPickChoice={status === 'stale' ? undefined : onPickChoice} doubles={doubles} />
+        <ChoiceList side="p1" choices={result.perSide.p1} reply={result.perSide.p2[0] ?? null} onPickChoice={status === 'stale' ? undefined : onPickChoice} doubles={doubles} faintedFraction={faintedFraction} />
+        <ChoiceList side="p2" choices={result.perSide.p2} reply={result.perSide.p1[0] ?? null} onPickChoice={status === 'stale' ? undefined : onPickChoice} doubles={doubles} faintedFraction={faintedFraction} />
       </div>
       {result.matrix && (
         <EvalMatrixView
           matrix={result.matrix}
           playerNames={playerNames}
           onPickPair={status === 'stale' ? undefined : onPickPair}
+          faintedFraction={faintedFraction}
         />
       )}
     </div>

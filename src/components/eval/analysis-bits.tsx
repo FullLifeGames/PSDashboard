@@ -50,7 +50,7 @@ export function EngineRow({ name, side, onExplore }: { name: string; side: SideA
       <div className="ps-eval-analysis-row">
         <span style={{ color: '#cde', fontWeight: 'bold' }}>{name}</span>
         <span style={{ color: '#aab' }} title={evTitle(name)}>
-          engine: <ExplorableLabel label={best.label} onClick={onExplore && (() => onExplore(best))} /> ({winPctText(best.ev)})
+          engine: <ExplorableLabel label={best.label} onClick={onExplore && (() => onExplore(best))} /> ({winPctText(best.ev, side.faintedFraction)})
         </span>
         {best.line && best.line.length > 0 && (
           <span className="ps-eval-line">then {formatLine(best.line)}</span>

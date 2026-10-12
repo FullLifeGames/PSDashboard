@@ -48,7 +48,7 @@ export function playedTextFor(side: SideAnalysis): { acted: boolean; playedText:
   const slotText = playedSlotsLabel(side);
   const acted = Boolean(side.played || slotText || side.playedRaw);
   const playedText = side.played
-    ? `${side.played.label} (${winPctText(side.played.ev)})`
+    ? `${side.played.label} (${winPctText(side.played.ev, side.faintedFraction)})`
     : slotText
       ? `${slotText} (not among the engine's candidates)`
       : side.playedRaw

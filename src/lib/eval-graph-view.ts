@@ -117,7 +117,8 @@ export function decidedSpans(
   return spans;
 }
 
-const pct = (score: number) => winPercent(score);
+/** The graph and the panel read one map (round 69, T51): the node of a turn prints at that turn's fainted share. */
+const pct = (score: number, faintedFraction?: number | null) => winPercent(score, faintedFraction);
 
 /**
  * A node IS the estimate before its turn; the movement INTO it was the
@@ -127,21 +128,24 @@ const pct = (score: number) => winPercent(score);
  */
 function nodeLabel(args: {
   turn: number; score: number; blunders: Set<number>; first: number;
-  decided: DecidedSignal[] | undefined; playerNames: [string, string];
+  decided: DecidedSignal[] | undefined; playerNames: [string, string]; faintedFractions?: (number | null)[];
 }): string {
   const { turn, score, blunders, first, decided, playerNames } = args;
+  const share = args.faintedFractions?.[turn - 1];
   const swing = blunders.has(turn) ? ' · blunder swing' : '';
   const producer = turn - 1 >= first ? (turn - 1 === 0 ? 'the lead decision' : `turn ${turn - 1}`) : null;
   const arrival = producer ? ` (what ${producer} produced)` : '';
   const state = decided?.[turn - 1];
   const decidedNote = state ? ` · practically decided: ${state.species}` : '';
-  return `Before turn ${turn}${arrival}: ${playerNames[0]} ${pct(score)}% · ${playerNames[1]} ${100 - pct(score)}%${swing}${decidedNote}`;
+  return `Before turn ${turn}${arrival}: ${playerNames[0]} ${pct(score, share)}% · ${playerNames[1]} ${100 - pct(score, share)}%${swing}${decidedNote}`;
 }
 
 /** Tooltip of a main-line hit column: the node's label, or why the turn has no point. */
 export function hitTitle(args: {
   index: number; score: number | null; evalErrors: (string | null)[] | undefined;
   blunders: Set<number>; first: number; decided: DecidedSignal[] | undefined; playerNames: [string, string];
+  /** The fainted share per turn (graph.faintedFractions): the point prints at its own turn's share. */
+  faintedFractions?: (number | null)[];
 }): string {
   const { index, score, evalErrors } = args;
   // Gap turns (reconstruction wedges, unswept ends) stay clickable —
@@ -154,8 +158,9 @@ export function hitTitle(args: {
   return nodeLabel({ ...args, turn: index + 1, score });
 }
 
-export function variationHitTitle(playerNames: [string, string], point: VariationPoint): string {
-  return `Variation, before turn ${point.turn}: ${playerNames[0]} ${pct(point.score)}% · ${playerNames[1]} ${100 - pct(point.score)}%`;
+export function variationHitTitle(playerNames: [string, string], point: VariationPoint, faintedFractions?: (number | null)[]): string {
+  const share = faintedFractions?.[point.turn - 1];
+  return `Variation, before turn ${point.turn}: ${playerNames[0]} ${pct(point.score, share)}% · ${playerNames[1]} ${100 - pct(point.score, share)}%`;
 }
 
 /** The T0 diamond's tooltip: the preview estimate plus each side's best and played lead. */

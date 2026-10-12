@@ -19,7 +19,7 @@ interface EvalTurnAnalysisProps {
   onExplore?: (side: 'p1' | 'p2', choice: RankedChoice, reply?: RankedChoice | null) => void;
 }
 
-function ReadRows({ reads, playerNames }: Pick<EvalTurnAnalysisProps, 'reads' | 'playerNames'>) {
+function ReadRows({ reads, playerNames, faintedFraction }: Pick<EvalTurnAnalysisProps, 'reads' | 'playerNames'> & { faintedFraction?: number }) {
   return (
     <>
       {(['p1', 'p2'] as const).map(side => {
@@ -34,7 +34,7 @@ function ReadRows({ reads, playerNames }: Pick<EvalTurnAnalysisProps, 'reads' | 
               'refutable by their perfect reply, priced by its spread. Advisory only; the grades above stay equilibrium-based.'}
           >
             <span style={{ fontWeight: 'bold' }}>{playerNames[sideIndex(side)]}</span>
-            <span>{formatRead(read)}</span>
+            <span>{formatRead(read, faintedFraction)}</span>
           </div>
         );
       })}
@@ -89,7 +89,7 @@ export function EvalTurnAnalysis({ analysis, playerNames, reads, onExplore }: Ev
           <SideRow name={playerNames[1]} side={analysis.p2} onExplore={exploreFor('p2')} lostGround={lostGround(analysis, 'p2')} />
         </>
       )}
-      <ReadRows reads={reads} playerNames={playerNames} />
+      <ReadRows reads={reads} playerNames={playerNames} faintedFraction={analysis.faintedFraction} />
     </div>
   );
 }

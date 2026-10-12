@@ -9,6 +9,8 @@ interface EvalMatrixViewProps {
     p1: { choice: string; label: string },
     p2: { choice: string; label: string },
   ) => void;
+  /** Round 69 (T51): the fainted share of the shown turn, for the cells' percents. */
+  faintedFraction?: number | null;
 }
 
 /** Cell tint leans toward whoever the cell favors, stronger when decisive. */
@@ -31,8 +33,9 @@ interface TableProps extends EvalMatrixViewProps {
   clickable: boolean;
 }
 
-function MatrixCell({ matrix, playerNames, onPickPair, clickable, i, j, value }: TableProps & { i: number; j: number; value: number }) {
-  const pct = winPercent(value);
+function MatrixCell(props: TableProps & { i: number; j: number; value: number }) {
+  const { matrix, playerNames, onPickPair, clickable, i, j, value } = props;
+  const pct = winPercent(value, props.faintedFraction);
   const title = `${matrix.p1Labels[i]} × ${matrix.p2Labels[j]}: ` +
     `${playerNames[0]} ${pct}% · ${playerNames[1]} ${100 - pct}%` +
     (clickable ? '. Click to play exactly this pair out.' : '');
@@ -102,7 +105,7 @@ function MatrixTable(props: TableProps) {
  * (draft T48: Shadow Ball → Knock Off), and a cell click plays exactly that
  * pair out instead of the engine's reply.
  */
-export function EvalMatrixView({ matrix, playerNames, onPickPair }: EvalMatrixViewProps) {
+export function EvalMatrixView({ matrix, playerNames, onPickPair, faintedFraction }: EvalMatrixViewProps) {
   const [open, setOpen] = useState(false);
   // Machine choice ids arrived with cache v13 — older cached results render
   // the values read-only.
@@ -123,7 +126,7 @@ export function EvalMatrixView({ matrix, playerNames, onPickPair }: EvalMatrixVi
       </button>
       {open && (
         <div style={{ overflowX: 'auto', marginTop: 4 }}>
-          <MatrixTable matrix={matrix} playerNames={playerNames} onPickPair={onPickPair} clickable={clickable} />
+          <MatrixTable matrix={matrix} playerNames={playerNames} onPickPair={onPickPair} clickable={clickable} faintedFraction={faintedFraction} />
         </div>
       )}
     </div>

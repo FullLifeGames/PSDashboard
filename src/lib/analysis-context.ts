@@ -119,6 +119,8 @@ export function analyzeTurnAt(args: {
     actives: context.activesForTurn(turn),
     playedHistory: context.playedHistory,
     faintedFraction: turnFaintedFraction(graph, context.snapshots, turn),
+    // Round 69 (T51): the after score is the next turn's position and prints at that turn's share, as its graph node does.
+    faintedFractionAfter: turnFaintedFraction(graph, context.snapshots, turn + 1),
     ...(args.unansweredSeen ? { unansweredSeen: args.unansweredSeen } : {}),
     ...(args.decidedSeen ? { decidedSeen: args.decidedSeen } : {}),
   });

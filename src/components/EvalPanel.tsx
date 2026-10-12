@@ -125,6 +125,17 @@ function PanelHeader({ running, ...props }: EvalPanelProps & { running: boolean 
   );
 }
 
+/**
+ * Round 69 (T51): the fainted share of the turn the shown result belongs to, so the panel prints the same percents the
+ * turn card does. A branch or lead result (not the graph's own result of the analyzed turn) has no share: the opening map.
+ */
+function shownShare({ result, graph, analysis, analysisTurn }: EvalPanelProps): number | null {
+  if (!result || analysisTurn === null || analysisTurn === undefined || analysisTurn < 1) return null;
+  if (graph.results[analysisTurn - 1] !== result) return null;
+  if (analysis?.turn === analysisTurn && analysis.faintedFraction !== undefined) return analysis.faintedFraction;
+  return graph.faintedFractions[analysisTurn - 1] ?? null;
+}
+
 export function EvalPanel(props: EvalPanelProps) {
   const {
     playerNames, status, result, onPickChoice, onPickPair,
@@ -177,6 +188,7 @@ export function EvalPanel(props: EvalPanelProps) {
           onPickChoice={onPickChoice}
           onPickPair={onPickPair}
           doubles={doubles}
+          faintedFraction={shownShare(props)}
         />
       )}
     </div>

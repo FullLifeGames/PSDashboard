@@ -25,7 +25,7 @@ function PlayedCell({ name, side }: Pick<RowProps, 'name' | 'side'>) {
           style={{ color: '#778' }}
           title={`If the opponent had picked the most punishing reply, ${name} would have fallen to this win probability: a worst case, not the expected outcome.`}
         >
-          · risked {winPctText(side.played.worstCase)}{side.played.punishedBy ? ` vs ${side.played.punishedBy}` : ''}
+          · risked {winPctText(side.played.worstCase, side.faintedFraction)}{side.played.punishedBy ? ` vs ${side.played.punishedBy}` : ''}
         </span>
       )}
       {side.playedPartial && (
@@ -49,7 +49,7 @@ function EngineCell({ name, side, regretful, onExplore }: RowProps & { regretful
     return (
       <span style={{ color: '#778' }} title={evTitle(name)}>
         engine: <ExplorableLabel label={best.label} color="#778" onClick={explore} />
-        {' '}({winPctText(best.ev)})
+        {' '}({winPctText(best.ev, side.faintedFraction)})
       </span>
     );
   }
@@ -60,7 +60,7 @@ function EngineCell({ name, side, regretful, onExplore }: RowProps & { regretful
   return (
     <span style={{ color: '#778' }} title={evTitle(name)}>
       engine: <ExplorableLabel label={best.label} color="#778" onClick={explore} />
-      {' '}({winPctText(best.ev)})
+      {' '}({winPctText(best.ev, side.faintedFraction)})
       {best.ev - side.played.ev < ENGINE_EQUIVALENT_EPSILON && (
         <span title="The win-probability gap is inside noise: the engine considers both picks equally good."> · equivalent</span>
       )}
@@ -78,12 +78,12 @@ function regretView(name: string, side: SideAnalysis, regret: number): { text: s
   if (from === undefined || to === undefined) {
     return { text: winDeltaText(-regret), title: `${name} gave up this much win probability vs the engine's best.` };
   }
-  const text = regretText(regret, from, to);
+  const text = regretText(regret, from, to, side.faintedFraction);
   return text === winDeltaText(-regret)
     ? { text, title: `${name} gave up this much win probability vs the engine's best.` }
     : {
       text,
-      title: `${name}'s win chance fell from ${winPctText(from)} with the engine's line to ${winPctText(to)} with the played choice ` +
+      title: `${name}'s win chance fell from ${winPctText(from, side.faintedFraction)} with the engine's line to ${winPctText(to, side.faintedFraction)} with the played choice ` +
         `(regret ${regret.toFixed(2)} on the score scale from −1 to 1).`,
     };
 }
@@ -137,7 +137,7 @@ function ReadPaidOffCell({ side }: Pick<RowProps, 'side'>) {
   return (
     <span
       style={{ color: '#8c8' }}
-      title={`The safe line guaranteed ${side.safe ? winPctText(side.safe.worstCase) : '?'}; the actual pair came out ${winDeltaText(side.riskPayoff ?? 0)} better: the read won value.`}
+      title={`The safe line guaranteed ${side.safe ? winPctText(side.safe.worstCase, side.faintedFraction) : '?'}; the actual pair came out ${winDeltaText(side.riskPayoff ?? 0)} better: the read won value.`}
     >
       read paid off · {winDeltaText(side.riskPayoff ?? 0)}
     </span>
@@ -200,14 +200,14 @@ function ComparisonRows({ name, side, played, best, difference, onExplore }: Pic
     <>
       <div className="ps-eval-analysis-row" style={{ color: '#aab' }} title={evTitle(name)}>
         <MiniBar value={played.ev} />
-        <span style={{ whiteSpace: 'nowrap' }}>{winPctText(played.ev)} played</span>
+        <span style={{ whiteSpace: 'nowrap' }}>{winPctText(played.ev, side.faintedFraction)} played</span>
         {played.punishedBy && <span style={{ color: '#778' }}>· worst vs {played.punishedBy}</span>}
         <KoSuffix odds={played.koOdds} />
       </div>
       <div className="ps-eval-analysis-row" style={{ color: '#aab' }} title={evTitle(name)}>
         <MiniBar value={value} />
         <span style={{ whiteSpace: 'nowrap' }}>
-          {winPctText(value)} {asSafe ? 'safe:' : 'better:'}
+          {winPctText(value, side.faintedFraction)} {asSafe ? 'safe:' : 'better:'}
         </span>
         {swapped ? (
           <span>{swapped.label}</span>
