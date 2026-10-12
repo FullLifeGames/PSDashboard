@@ -69,6 +69,12 @@ describe('doubles damage observations (T31)', () => {
     expect(observations.map(obs => obs.defenderSpecies)).toEqual(['Blissey', 'Garchomp']);
   });
 
+  test('a spread move still ends at the other boundaries: a Substitute breaking or a switch makes later damage lines nobody\'s', () => {
+    const lines = ['|move|p1a: Lax|Rock Slide|p2a: Chomp|[spread] p2a,p2b', '|-damage|p2a: Chomp|70/100'];
+    expect(observe(...lines, '|-end|p2b: Gyro|Substitute', '|-damage|p2b: Gyro|60/100').map(obs => obs.defenderSpecies)).toEqual(['Garchomp']);
+    expect(observe(...lines, '|switch|p2b: Gyro|Gyarados, M|100/100', '|-damage|p2b: Gyro|60/100').map(obs => obs.defenderSpecies)).toEqual(['Garchomp']);
+  });
+
   test('a single-target move that a target is immune to ends the move as before', () => {
     // The -immune line ends a single-target action: a confusion self-hit that follows belongs to nobody.
     expect(observe('|move|p1a: Lax|Earthquake|p2b: Gyro', '|-immune|p2b: Gyro', '|-damage|p2b: Gyro|90/100')).toEqual([]);

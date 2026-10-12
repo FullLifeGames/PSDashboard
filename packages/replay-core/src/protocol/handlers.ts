@@ -190,7 +190,7 @@ export function handleActionBoundary(state: ParserState, line: string) {
   recordFaintSpeedEvidence(state, line);
   recordImmuneHiddenPower(state, line);
   // One target missing or immune does not end a spread move: the damage lines of the others follow or have come.
-  if (state.lastMove?.spread && /^|(?:-miss|-immune)|/.test(line)) return;
+  if (state.lastMove?.spread && /^\|(?:-miss|-immune)\|/.test(line)) return;
   state.lastMove = null;
   if (/^\|(?:switch|drag)\|/.test(line)) {
     state.switchedThisTurn.add(line.split('|')[2] ?? '');
