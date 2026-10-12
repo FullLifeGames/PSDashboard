@@ -45,12 +45,16 @@ export const INFERRED_SPREAD_DETAIL = 'fits observed damage';
 /** Provenance details for items the move-order evidence decided (round 37). */
 export const INFERRED_ITEM_DETAIL = 'moved first, Choice Scarf inferred';
 export const RULED_OUT_ITEM_DETAIL = 'moved second, Choice Scarf ruled out';
+/** The damage lines dropped a guessed boost item (round 69, T26). */
+export const NO_BOOST_ITEM_DETAIL = 'damage rules out a boost item';
+
+const ITEM_DETAIL = { 'moved-first': INFERRED_ITEM_DETAIL, 'moved-second': RULED_OUT_ITEM_DETAIL, 'no-boost': NO_BOOST_ITEM_DETAIL } as const;
 
 /** A guessed or unknown item gives way to the item the solver decided. */
 function overlayItem(pokemon: RevealedPokemonInfo, candidate: SpreadCandidate): PokemonFieldInfo {
   const itemGuessed = pokemon.item.source === 'guessed' || pokemon.item.source === 'unknown';
   if (!candidate.item || !itemGuessed) return pokemon.item;
-  return guessedField(candidate.item, undefined, candidate.itemReason === 'moved-first' ? INFERRED_ITEM_DETAIL : RULED_OUT_ITEM_DETAIL);
+  return guessedField(candidate.item, undefined, ITEM_DETAIL[candidate.itemReason ?? 'moved-second']);
 }
 
 /**

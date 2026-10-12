@@ -6,6 +6,8 @@ import type { SmogonUsageStats } from './smogon/stats-types.ts';
 import { getSpeciesSetAssumption, type SmogonSetAssumptions } from './smogon/sets-lookup.ts';
 import { evBudget, inferSpreads, legalizeEvs, type SpreadCandidate } from './spread-inference.ts';
 import { ALL_31_IVS } from './spreads/ev-budget.ts';
+import { boostItemIds } from './spreads/boost-items.ts';
+import { genNumOf } from './spreads/fit.ts';
 import { observedMaxHp } from './spreads/max-hp.ts';
 import { withHiddenPowerType } from './hidden-power.ts';
 import {
@@ -105,7 +107,7 @@ function buildTeams(log: string, options: BuildOptions): { teams: BuiltTeams; in
   const sideTeam = (side: 'p1' | 'p2', inferred?: Map<string, SpreadCandidate>) =>
     legalize(infos[side].pokemon.map(pokemon => buildSet(
       pokemon, knownTeams[side], options?.usageStats, options?.setAssumptions, inferred?.get(`${side}:${toId(pokemon.species)}`),
-      { hpTyped: hpTyped(side), tellItem: tells[side].get(toId(pokemon.species)) ?? '' })))
+      { hpTyped: hpTyped(side), tellItem: tells[side].get(toId(pokemon.species)) ?? '', gen: legality.gen })))
       .map(hpTyped(side));
   const build = (inferred?: Map<string, SpreadCandidate>) => ({ p1Team: sideTeam('p1', inferred), p2Team: sideTeam('p2', inferred) });
 
@@ -151,7 +153,7 @@ function inferredSpreadsFor(
   const base = build();
   const solved = inferSpreads(options?.observations ?? [], { p1: base.p1Team, p2: base.p2Team },
     formatHint, options?.speedOrders ?? [], speedKnowledgeFor(infos, knownTeams, options?.usageStats), observedMaxHp(log));
-  return resolveInferredItems(solved, infos, options?.usageStats, options?.setAssumptions);
+  return resolveSolvedItems(solved, infos, formatHint, options?.usageStats, options?.setAssumptions);
 }
 
 /**
@@ -173,7 +175,25 @@ export function solveReplaySpreads(
   const solved = inferSpreads(observations, { p1: base.p1Team, p2: base.p2Team }, formatHintFor(log).formatHint,
     speedOrders, speedKnowledgeFor(infos, knownTeamsFor(log, userTeamText), usageStats), observedMaxHp(log));
   carryPreSolve(solved, preSolved);
-  return resolveInferredItems(solved, infos, usageStats, setAssumptions);
+  return resolveSolvedItems(solved, infos, formatHintFor(log).formatHint, usageStats, setAssumptions);
+}
+
+/**
+ * The solver's item decisions as concrete items: a boost item the damage lines dropped (round 69, T26) becomes the
+ * build's next choice beside every boost item and the Scarf, then a dropped Scarf resolves as before (round 37).
+ */
+function resolveSolvedItems(
+  solved: Map<string, SpreadCandidate>, infos: SideInfos, formatHint: string,
+  usageStats: SmogonUsageStats | null | undefined, setAssumptions: SmogonSetAssumptions | null | undefined,
+): Map<string, SpreadCandidate> {
+  const resolved = new Map(solved);
+  for (const [key, candidate] of solved) {
+    const [side, speciesId] = key.split(':') as ['p1' | 'p2', string];
+    const info = infos[side].pokemon.find(mon => toId(mon.species) === speciesId);
+    if (candidate.itemReason !== 'no-boost' || !info) continue;
+    resolved.set(key, { ...candidate, item: resolveItemWithout(info, usageStats, setAssumptions, ['choicescarf', ...boostItemIds(genNumOf(formatHint))]) });
+  }
+  return resolveInferredItems(resolved, infos, usageStats, setAssumptions);
 }
 
 /**
@@ -207,6 +227,7 @@ type HiddenPowerTyping = (set: PokemonSet) => PokemonSet;
 interface SetContext {
   hpTyped: HiddenPowerTyping;
   tellItem: string;
+  gen: number;
 }
 
 function buildSet(
@@ -215,7 +236,7 @@ function buildSet(
   usageStats?: SmogonUsageStats | null,
   setAssumptions?: SmogonSetAssumptions | null,
   inferred?: SpreadCandidate,
-  { hpTyped, tellItem }: SetContext = { hpTyped: set => set, tellItem: '' },
+  { hpTyped, tellItem, gen }: SetContext = { hpTyped: set => set, tellItem: '', gen: 9 },
 ): PokemonSet {
   const edited = editedFields(info);
   const userMatch = findUserMatch(userTeam, info.species);
@@ -228,7 +249,7 @@ function buildSet(
   // A dropped Scarf ('' from the solver) resolves without it: the guessed
   // Scarf must not return through the usage marginal (round 37).
   const item = inferred?.item === ''
-    ? resolveItemWithout(info, usageStats, setAssumptions, 'choicescarf')
+    ? resolveItemWithout(info, usageStats, setAssumptions, inferred.itemReason === 'no-boost' ? ['choicescarf', ...boostItemIds(gen)] : 'choicescarf')
     : resolveItem(info, curated, usageSet, smogonSet, inferred?.item ?? '', tellItem);
   const moves = assembleMoves(info, curated, usageSet, smogonSet, item, usageMoveTail(usageStats, info.species));
   const revealedMoves = info.moves.filter(move => move.source === 'revealed').map(move => move.name);

@@ -170,12 +170,15 @@ function guessedItem(info: RevealedPokemonInfo, curated: CuratedSet | null, usag
   return curatedItem || cleanItem(info.item.value, usageSet?.item?.value || allowed(smogonSet?.item?.value, info.ruledOut?.items));
 }
 
-/** The item the build would pick if `excludedItemId` were ruled out (round 37: the replacement for a dropped Scarf). */
+/**
+ * The item the build would pick if the excluded items were ruled out (round 37: the replacement for a dropped Scarf;
+ * round 69, T26: for a dropped boost item, every boost item and the Scarf).
+ */
 export function resolveItemWithout(
   info: RevealedPokemonInfo, usageStats: SmogonUsageStats | null | undefined, setAssumptions: SmogonSetAssumptions | null | undefined,
-  excludedItemId: string,
+  excludedItemIds: string | readonly string[],
 ): string {
-  const ruledOut = { abilities: info.ruledOut?.abilities ?? [], items: [...(info.ruledOut?.items ?? []), excludedItemId] };
+  const ruledOut = { abilities: info.ruledOut?.abilities ?? [], items: [...(info.ruledOut?.items ?? []), ...[excludedItemIds].flat()] };
   const stripped: RevealedPokemonInfo = {
     ...info, ruledOut,
     item: known(info.item) ? info.item : { value: '', source: 'unknown' },
