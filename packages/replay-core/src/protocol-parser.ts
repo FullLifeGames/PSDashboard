@@ -5,6 +5,7 @@ import {
   handleResisted, handleSuperEffective, isActionBoundary,
 } from './protocol/handlers.ts';
 import { noteItemEnd } from './protocol/item-reading.ts';
+import { noteParadoxStart } from './protocol/paradox-reading.ts';
 import { noteActivation, settleRacedFormes, settleScarfMovers } from './protocol/speed-evidence.ts';
 
 export function parseReplayLog(log: string): TurnSnapshot[] {
@@ -25,6 +26,8 @@ function dispatch(state: ParserState, line: string) {
     handleResisted(state, line);
   } else if (line.startsWith('|-crit|')) {
     handleCrit(state, line);
+  } else if (/^\|-start\|[^|]*\|(?:protosynthesis|quarkdrive)/.test(line)) {
+    noteParadoxStart(state, line);
   } else if (/^\|-(?:activate|enditem|item)\|/.test(line)) {
     noteActivation(state, line);
     if (line.startsWith('|-enditem|')) noteItemEnd(state, line);

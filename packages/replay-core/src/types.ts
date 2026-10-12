@@ -107,6 +107,18 @@ export interface DamageObservation {
   /** The item differs from the one the mon came in with (used up, knocked off, stolen, swapped): '' then means gone, not unseen. */
   attackerItemChanged?: boolean;
   defenderItemChanged?: boolean;
+  /**
+   * The stat an active Protosynthesis or Quark Drive raises and the stat stages the Pokémon had when the ability activated
+   * (round 69, T167): the simulator picks the highest stat there. Absent when the ability is not active at the hit.
+   */
+  attackerParadox?: ParadoxReading;
+  defenderParadox?: ParadoxReading;
+}
+
+/** What the log shows of an active Protosynthesis or Quark Drive: the stat the client names and the stages the simulator read it at. */
+export interface ParadoxReading {
+  stat: StatId;
+  stages: Record<string, number>;
 }
 
 /**

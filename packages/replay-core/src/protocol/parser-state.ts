@@ -1,4 +1,4 @@
-import { Battle } from '@pkmn/client';
+import { Battle, type Pokemon } from '@pkmn/client';
 import type { GenerationNum } from '@pkmn/data';
 import { generationsFor } from '../format-generations.ts';
 import type { ItemReading } from './item-reading.ts';
@@ -74,6 +74,8 @@ export interface ParserState {
    * of a change turn are dropped.
    */
   scarfChanges: Map<string, ScarfChange[]>;
+  /** The stat stages each Pokémon had when its Protosynthesis or Quark Drive last activated (round 69, T167). */
+  paradoxStages: Map<Pokemon, Record<string, number>>;
   lastMove: PendingMove | null;
   // Take initial snapshot at turn 0 (before any turns)
   capturedInitial: boolean;
@@ -97,6 +99,7 @@ export function createParserState(format = ''): ParserState {
     reordered: new Set<string>(),
     quickActed: new Set<string>(),
     scarfChanges: new Map<string, ScarfChange[]>(),
+    paradoxStages: new Map<Pokemon, Record<string, number>>(),
     lastMove: null,
     capturedInitial: false,
   };

@@ -5,6 +5,7 @@ import { flushSpeedOrder, speedContaminatedAt, type ClientIdent, type ParserStat
 import { firstMoverContaminated, foreignAction, secondMoverContaminated, switchTriggered } from './speed-evidence.ts';
 import { toId } from '../ids.ts';
 import { itemFieldsOf } from './item-reading.ts';
+import { paradoxFieldsOf } from './paradox-reading.ts';
 
 const SCREEN_IDS = ['reflect', 'lightscreen', 'auroraveil'];
 
@@ -250,6 +251,7 @@ function recordDamageObservation(state: ParserState, parts: string[], defenderId
     spread: lastMove.spread,
     defenderSide: defenderIdent.startsWith('p1') ? 'p1' : 'p2',
     ...itemFieldsOf(lastMove, attacker, defender, defenderIdent),
+    ...paradoxFieldsOf(state, attacker, defender),
   };
   state.observations.push(observation);
   return observation;
