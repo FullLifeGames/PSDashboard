@@ -13,7 +13,10 @@ import { findPokemonOnSide } from './protocol-choices.ts';
  * takes that item; a body without one gets its build item back when the
  * sim's own move or ability took it. A guess the sim's own trigger
  * consumed stays consumed: the game often rules it out (a balloon no hit
- * popped), and that verdict belongs to the item evidence.
+ * popped), and that verdict belongs to the item evidence. The exception is
+ * a body the sim switched in and the game never did (round 69, T172): no
+ * trigger of the game's can have touched it, so it holds its build item
+ * (an Iron Valiant that ate its Booster Energy at an entry the game never had).
  */
 export function applyProtocolHeldItems(battle: SimBattle, context: ChoiceLockContext, turn: number): boolean {
   const held = context.heldItems.get(turn) ?? [];
@@ -25,9 +28,12 @@ export function applyProtocolHeldItems(battle: SimBattle, context: ChoiceLockCon
       const body = entry.side === sideId ? findPokemonOnSide(side, entry.species) : null;
       if (body) entries.set(body, entry);
     }
+    // An entry that names no body of the side leaves it open who the game had in play.
+    const allResolved = held.filter(entry => entry.side === sideId).length === entries.size;
     for (const body of side.pokemon) {
       const eligible = context.eligibility[sideId][toId(body.set.species)] === true;
-      if (correctHeldBody(battle, body, entries.get(body), eligible)) changed = true;
+      const gameLess = allResolved && !entries.has(body) && simBroughtIn(battle, body);
+      if (correctHeldBody(battle, body, entries.get(body), eligible, gameLess)) changed = true;
     }
   }
   return changed;
@@ -39,9 +45,11 @@ export function applyProtocolHeldItems(battle: SimBattle, context: ChoiceLockCon
  * lock (a guessed Choice item only when its damage record allows one, as
  * the singles restamp asks). True when the board changed.
  */
-function correctHeldBody(battle: SimBattle, body: SimPokemon, entry: ProtocolHeldItem | undefined, eligible: boolean): boolean {
+function correctHeldBody(
+  battle: SimBattle, body: SimPokemon, entry: ProtocolHeldItem | undefined, eligible: boolean, gameLess: boolean,
+): boolean {
   const shown = entry?.item ?? null;
-  const want = shown ?? itemTheSimTook(battle, body);
+  const want = shown ?? itemTheSimTook(battle, body, gameLess);
   if (want === null) return false;
   const itemChanged = setHeldItem(battle, body, want);
   if (!body.isActive || body.fainted || !(itemChanged || entry?.touched)) return itemChanged;
@@ -49,10 +57,19 @@ function correctHeldBody(battle: SimBattle, body: SimPokemon, entry: ProtocolHel
   return setHeldItemLock(body, lock) || itemChanged;
 }
 
-/** The build's item when the sim's own move or ability took it from the body, else null. */
-function itemTheSimTook(battle: SimBattle, body: SimPokemon): string | null {
+/** The build's item when the sim's own move or ability took it from the body, or when the game never had the body, else null. */
+function itemTheSimTook(battle: SimBattle, body: SimPokemon, gameLess: boolean): string | null {
   const build = toId(body.set.item);
-  return body.item !== build && simTookItem(battle, body) ? build : null;
+  return body.item !== build && (gameLess || simTookItem(battle, body)) ? build : null;
+}
+
+/** Whether the sim's own log has this body on the field (a switch-in or a drag line). */
+function simBroughtIn(battle: SimBattle, body: SimPokemon): boolean {
+  const ident = `${body.side.id}: ${body.name}`;
+  return battle.log.some(line => {
+    const parts = line.split('|');
+    return (parts[1] === 'switch' || parts[1] === 'drag') && parts[2]?.replace(/^(p[1-4])[a-d]: /, '$1: ') === ident;
+  });
 }
 
 /**

@@ -6,7 +6,7 @@ import type { TurnAlignmentRecord } from '../hax-alignment.ts';
 import type { BranchChoiceErrorLog, PokemonIdent, SimBattle } from './types.ts';
 import { reorderForLeads, trimTeamToBring } from './team-order.ts';
 import { extractLeads } from './protocol-choices.ts';
-import { hasForceSwitch } from './corrections.ts';
+import { hasForceSwitch, recordVolatilesAtExit } from './corrections.ts';
 import { safeStreamWrite, sleep } from './execute.ts';
 import { loadSimMods, simModsReady } from '../forward/sim-mods.ts';
 
@@ -100,6 +100,34 @@ export function openSession(params: ReconstructParams, overallDeadline: number):
   return { params, ...openStreams(params.onLogLines), haxAlignment, overallDeadline, timedOut: false };
 }
 
+/** The target of the exit subscription: onEvent takes a Format and no more (a custom format such as gen9draft is none). */
+const EXIT_RECORD_TARGET = { id: 'exitrecord', name: 'Exit record', effectType: 'Format' } as unknown as SimBattle['format'];
+
+/**
+ * Records each body's volatiles at the simulator's own exits (round 69, T172)
+ * through the sim's public onEvent: the Faint and SwitchOut events run before
+ * the exit clears the volatiles. A turn plays inside one write, so the
+ * subscription lives for that write and the battle's events go back as they
+ * were: a function in `events` would not serialize.
+ */
+function recordExitsDuring(battle: SimBattle | undefined, write: () => void) {
+  const before = battle?.events;
+  let watching = false;
+  try {
+    for (const event of ['Faint', 'SwitchOut']) {
+      battle?.onEvent(event, EXIT_RECORD_TARGET, (target: SimBattle['sides'][number]['pokemon'][number]) => recordVolatilesAtExit(target));
+    }
+    watching = !!battle;
+  } catch {
+    // A sim that refuses the subscription plays the write unrecorded.
+  }
+  try {
+    write();
+  } finally {
+    if (battle && watching) battle.events = before ?? null;
+  }
+}
+
 /** The battle stream, its log and error pumps, and the guarded write — shared with adopted positions. */
 export function openStreams(onLogLines?: (lines: string[]) => void): SessionStreams {
   const battleStream = new BattleStreams.BattleStream();
@@ -147,7 +175,8 @@ export function openStreams(onLogLines?: (lines: string[]) => void): SessionStre
 
   // A sim crash inside a write must surface as a choice error so the
   // turn-sync guard skips or stops instead of taking the process down.
-  const writeSim = (payload: string) => safeStreamWrite(streams.omniscient, payload, recordStreamError);
+  const writeSim = (payload: string) =>
+    recordExitsDuring(battleStream.battle ?? undefined, () => safeStreamWrite(streams.omniscient, payload, recordStreamError));
 
   return { battleStream, streams, collectedLog, choiceErrors, recordStreamError, writeSim };
 }

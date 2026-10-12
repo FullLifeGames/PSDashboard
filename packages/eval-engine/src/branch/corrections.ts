@@ -179,6 +179,75 @@ function benchHpFromSighting(battlePokemon: SimPokemon, hpPercent: number): numb
 
 type SnapshotPokemon = TurnSnapshot['p1']['pokemon'][number];
 
+/** The key the session's subscription writes: the volatiles a body held when the simulator took it off the field. */
+type ExitRecorded = SimPokemon & { volatilesAtExit?: SimPokemon['volatiles'] };
+
+/**
+ * Round 69, T172: the simulator's faint and its switch-out clear a body's
+ * volatiles, and an exit the game never saw (a K.O. the game's damage did not
+ * deal, an Eject Button the build guessed) leaves the body the game kept
+ * without Protosynthesis, Quark Drive, Leech Seed, Heal Block or Substitute.
+ * The session keeps the volatiles as they stand when the Faint or SwitchOut
+ * event runs (before the clear); the property serializes with the body, so a
+ * clone of the raw boundary carries it, and the next snapshot correction
+ * settles it.
+ */
+export function recordVolatilesAtExit(pokemon: SimPokemon) {
+  const recorded = pokemon as ExitRecorded;
+  if (Object.keys(pokemon.volatiles).length > 0) recorded.volatilesAtExit = { ...pokemon.volatiles };
+  else delete recorded.volatilesAtExit;
+}
+
+/** The conditions the protocol ended for this body in the block (|-end|), as the simulator's condition ids. */
+function endedByProtocol(battle: SimBattle, snapshotPokemon: SnapshotPokemon, log: readonly string[]): Set<string> {
+  const ended = new Set<string>();
+  for (const line of log) {
+    const [, tag, ident, effect] = line.split('|');
+    if (tag !== '-end' || !ident || !effect) continue;
+    if (ident.replace(/^p[12][a-d]?: /, '') !== snapshotPokemon.name) continue;
+    ended.add(battle.dex.conditions.get(effect.replace(/^(move|ability|item): /, '')).id);
+  }
+  return ended;
+}
+
+/** The simulator's body for a snapshot entry: by species forme, else by name. */
+function simBodyOf(side: SimSide, snapshotPokemon: SnapshotPokemon): SimPokemon | undefined {
+  return side.pokemon.find((pokemon: SimPokemon) =>
+    toId(pokemon.species?.name || '') === toId(snapshotPokemon.speciesForme) ||
+    toId(pokemon.name || '') === toId(snapshotPokemon.name)
+  );
+}
+
+/** Every body the simulator holds off the field right now: fainted, or not among the actives. */
+function bodiesOffTheField(battle: SimBattle): Set<SimPokemon> {
+  return new Set(battle.sides.flatMap(side => side.pokemon.filter(pokemon => pokemon.fainted || !side.active.includes(pokemon))));
+}
+
+/**
+ * The corrections put back on the field a body the simulator had taken off
+ * it (fainted or switched out) and the game kept: what the simulator carried
+ * at that exit comes back, minus the conditions the protocol ended in the
+ * block. A body that stayed on the field keeps its own volatiles. Then every
+ * record goes, whether it was used or not.
+ */
+function restoreExitVolatiles(battle: SimBattle, snapshot: TurnSnapshot, offTheField: ReadonlySet<SimPokemon>) {
+  for (const [sideIdx, snapshotSide] of [snapshot.p1, snapshot.p2].entries()) {
+    const side = battle.sides[sideIdx];
+    for (const snapshotPokemon of snapshotSide.pokemon) {
+      const body = simBodyOf(side, snapshotPokemon) as ExitRecorded | undefined;
+      if (!body?.volatilesAtExit || !offTheField.has(body)) continue;
+      if (!snapshotPokemon.isActive || snapshotPokemon.fainted || body.fainted || !side.active.includes(body)) continue;
+      const ended = endedByProtocol(battle, snapshotPokemon, snapshot.log);
+      for (const [id, state] of Object.entries(body.volatilesAtExit)) {
+        if (!ended.has(id) && !(id in body.volatiles)) body.volatiles[id] = state;
+      }
+    }
+  }
+  for (const side of battle.sides) {
+    for (const body of side.pokemon) delete (body as ExitRecorded).volatilesAtExit;
+  }
+}
+
 /**
  * One body against its snapshot entry. The protocol reports only the
  * actives. A benched body's snapshot HP is its last sighting, taken as it
@@ -219,10 +288,7 @@ function correctHpFromSnapshot(battle: SimBattle, snapshot: TurnSnapshot) {
     const battleSide = battle.sides[sideIndex];
 
     for (const snapshotPokemon of snapshotSide.pokemon) {
-      const battlePokemon = battleSide.pokemon.find((pokemon: SimPokemon) =>
-        toId(pokemon.species?.name || '') === toId(snapshotPokemon.speciesForme) ||
-        toId(pokemon.name || '') === toId(snapshotPokemon.name)
-      );
+      const battlePokemon = simBodyOf(battleSide, snapshotPokemon);
       if (battlePokemon && snapshotPokemon.maxhp > 0) correctBodyFromSnapshot(battlePokemon, snapshotPokemon);
     }
   }
@@ -265,9 +331,11 @@ function correctActivesFromSnapshot(battle: SimBattle, snapshot: TurnSnapshot) {
 }
 
 export function correctBattleFromSnapshot(battle: SimBattle, snapshot: TurnSnapshot) {
+  const offTheField = bodiesOffTheField(battle);
   correctHpFromSnapshot(battle, snapshot);
   restoreTeraFromSnapshot(battle, snapshot);
   correctActivesFromSnapshot(battle, snapshot);
+  restoreExitVolatiles(battle, snapshot, offTheField);
   correctFieldFromSnapshot(battle, snapshot);
 }
 
