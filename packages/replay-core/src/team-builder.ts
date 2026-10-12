@@ -153,7 +153,20 @@ function inferredSpreadsFor(
   const base = build();
   const solved = inferSpreads(options?.observations ?? [], { p1: base.p1Team, p2: base.p2Team },
     formatHint, options?.speedOrders ?? [], speedKnowledgeFor(infos, knownTeams, options?.usageStats), observedMaxHp(log));
+  carryOrdersOnly(solved, log, options, build, formatHint, infos, knownTeams);
   return resolveSolvedItems(solved, infos, formatHint, options?.usageStats, options?.setAssumptions);
+}
+
+/**
+ * The one-stage chain forfeits like the app's two-stage chain: the orders-only solve (the app's pre-solve) is
+ * the fallback of a mon the damage lines forfeit (round 69, B13, D8: 912045 Rillaboom).
+ */
+function carryOrdersOnly(
+  solved: Map<string, SpreadCandidate>, log: string, options: BuildOptions, build: () => BuiltTeams, formatHint: string,
+  infos: SideInfos, knownTeams: SideTeams,
+): void {
+  if (!options?.observations?.length || !options.speedOrders?.length) return;
+  carryPreSolve(solved, inferredSpreadsFor(log, { ...options, observations: [] }, build, formatHint, infos, knownTeams));
 }
 
 /**
