@@ -31,7 +31,7 @@ type ModifyMoveHandler = (this: unknown, move: unknown, user: unknown, target: u
  * field, cleared when the click clears it), so Tera Starstorm of Terapagos-Stellar and Expanding Force of a grounded user
  * on Psychic Terrain read allAdjacentFoes. A handler that needs more than that leaves the Dex target.
  */
-function targetAtUse(battle: Battle, attacker: Pokemon, action: MoveAction): string {
+export function targetAtUse(battle: Battle, attacker: Pokemon, action: MoveAction): string {
   const dexMove = battle.dex.moves.get(action.moveId);
   const handler = (dexMove as { onModifyMove?: unknown }).onModifyMove;
   if (typeof handler !== 'function') return dexMove.target;
