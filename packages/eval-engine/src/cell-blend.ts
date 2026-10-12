@@ -182,11 +182,26 @@ function eventMoveIndices(log: string[], events: CellEvent[]): Map<'p1' | 'p2', 
 }
 
 /**
- * hit-kill: the event's defender faints after this move and before the
- * other event side's move (a later faint belongs to something else).
+ * Round 69 (T146 c1): the turn's move phase ends where the residual starts, a
+ * blank protocol line that no `|t:|` follows (a pivot's resume of the turn
+ * loop opens with the same blank line and a `|t:|`). Poison, Leech Seed and
+ * Future Sight faints come after it and belong to no move.
+ */
+function movePhaseEnd(log: string[], from: number): number {
+  for (let at = from; at < log.length; at++) {
+    if (log[at] === '|' && !log[at + 1]?.startsWith('|t:|')) return at;
+  }
+  return log.length;
+}
+
+/**
+ * hit-kill: the event's defender faints after this move, before the other
+ * event side's move and before the residual (a later faint belongs to
+ * something else).
  */
 function killedBefore(log: string[], index: number, otherIndex: number | undefined, faintLine: string): boolean {
-  for (let at = index + 1; at < log.length; at++) {
+  const end = movePhaseEnd(log, index + 1);
+  for (let at = index + 1; at < end; at++) {
     if (otherIndex !== undefined && otherIndex > index && at >= otherIndex) break;
     if (log[at] === faintLine) return true;
   }
