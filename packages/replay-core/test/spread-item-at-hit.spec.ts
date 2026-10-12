@@ -1,5 +1,6 @@
 import { describe, expect, test } from 'vitest';
-import { Battle, Teams, toID, type PokemonSet } from '@pkmn/sim';
+import { Battle, Dex, Teams, toID, type PokemonSet } from '@pkmn/sim';
+import * as championsMod from '@pkmn/mods/champions';
 import { parseReplayLogWithObservations } from '../src/protocol-parser';
 import { buildSolveContext, keyOf, observationError, rollRange, spreadFor, type SolveContext } from '../src/spreads/fit';
 import type { ReadObservation } from '../src/spreads/observation-read';
@@ -15,8 +16,15 @@ import type { DamageObservation, PokemonEvs } from '../src/types';
  * simulator's exact damage and the rolls under the set's item must not.
  */
 
-type Kind = 'singles' | 'doubles';
-const FORMAT: Record<Kind, string> = { singles: 'gen9ou', doubles: 'gen9doublesou' };
+Dex.mod('champions', championsMod as unknown as NonNullable<Parameters<typeof Dex.mod>[1]>);
+Dex.formats.extend(championsMod.Formats);
+
+type Kind = 'singles' | 'doubles' | 'champions singles' | 'champions doubles';
+const KINDS: Kind[] = ['singles', 'doubles', 'champions singles', 'champions doubles'];
+const FORMAT: Record<Kind, string> = {
+  singles: 'gen9ou', doubles: 'gen9doublesou', 'champions singles': 'gen9championsou', 'champions doubles': 'gen9championsdoublescustomgame',
+};
+const isDoubles = (kind: Kind) => kind.endsWith('doubles');
 const ALL_31 = { hp: 31, atk: 31, def: 31, spa: 31, spd: 31, spe: 31 };
 const sp = (spread: Partial<PokemonEvs>): PokemonEvs => ({ hp: 0, atk: 0, def: 0, spa: 0, spd: 0, spe: 0, ...spread });
 const set = (species: string, item: string, ability: string, nature: string, spread: Partial<PokemonEvs>): PokemonSet => ({
@@ -24,12 +32,19 @@ const set = (species: string, item: string, ability: string, nature: string, spr
 });
 const partner = () => set('Blissey', '', 'Natural Cure', 'Calm', { hp: 252 });
 
+/** The set on the format's scale: level 50 and Stat Points (32 for a full 252) in Champions. */
+function scaled(body: PokemonSet, kind: Kind): PokemonSet {
+  if (!kind.startsWith('champions')) return body;
+  return { ...body, level: 50, evs: Object.fromEntries(Object.entries(body.evs).map(([stat, value]) => [stat, value > 0 ? 32 : 0])) as unknown as PokemonEvs };
+}
+const movesOf = (setup: Setup, kind: Kind) => setup.moves[isDoubles(kind) ? 'doubles' : 'singles'];
+
 interface Setup {
   title: string;
   attacker: PokemonSet;
   defender: PokemonSet;
   /** The attacker's move of each turn (the defender splashes); a doubles move may differ where the singles one is a spread move. */
-  moves: Record<Kind, string[]>;
+  moves: Record<'singles' | 'doubles', string[]>;
 }
 
 /** Garchomp pops Aegislash's Air Balloon with a Dragon Claw, then a Ground hit lands (2691843318). */
@@ -70,12 +85,13 @@ interface Scene {
 
 /** A battle of the setup's turns; null when a hit crit (the parser records no crit), missed or a damaging turn dealt nothing. */
 function sceneOf(kind: Kind, setup: Setup, seed: number): Scene | null {
-  const doubles = kind === 'doubles';
-  const attacker = { ...setup.attacker, moves: setup.moves[kind] };
+  const doubles = isDoubles(kind);
+  const attacker = { ...scaled(setup.attacker, kind), moves: movesOf(setup, kind) };
+  const defender = scaled(setup.defender, kind);
   const battle = new Battle({
     formatid: toID(FORMAT[kind]), seed: [1, 2, 3, seed],
-    p1: { name: 'Alpha', team: Teams.pack(doubles ? [attacker, partner()] : [attacker]) },
-    p2: { name: 'Beta', team: Teams.pack(doubles ? [setup.defender, partner()] : [setup.defender]) },
+    p1: { name: 'Alpha', team: Teams.pack(doubles ? [attacker, scaled(partner(), kind)] : [attacker]) },
+    p2: { name: 'Beta', team: Teams.pack(doubles ? [defender, scaled(partner(), kind)] : [defender]) },
   });
   if (battle.requestState === 'teampreview') {
     battle.choose('p1', 'default');
@@ -84,7 +100,7 @@ function sceneOf(kind: Kind, setup: Setup, seed: number): Scene | null {
   const target = battle.p2.active[0];
   const { maxhp: maxHp } = target;
   const damage: number[] = [];
-  for (const move of setup.moves[kind]) {
+  for (const move of movesOf(setup, kind)) {
     const before = target.hp;
     battle.choose('p1', doubles ? `move ${toID(move)} 1, move splash` : `move ${toID(move)}`);
     battle.choose('p2', doubles ? 'move splash, move splash' : 'move splash');
@@ -114,7 +130,7 @@ function hitsOf(scene: Scene, setup: Setup): DamageObservation[] {
 }
 
 const contextOf = (kind: Kind, setup: Setup, observations: DamageObservation[]): SolveContext =>
-  buildSolveContext(observations, { p1: [setup.attacker], p2: [setup.defender] }, FORMAT[kind], []);
+  buildSolveContext(observations, { p1: [scaled(setup.attacker, kind)], p2: [scaled(setup.defender, kind)] }, FORMAT[kind], []);
 
 /** The solver's read of an observation (the forme and side it resolves to). */
 const readOf = (ctx: SolveContext, setup: Setup, index: number): ReadObservation =>
@@ -136,8 +152,9 @@ const ITEM_FIELDS = ['attackerItem', 'defenderItem', 'attackerItemChanged', 'def
 const itemFields = (obs: DamageObservation) => Object.fromEntries(ITEM_FIELDS.map(field => [field, obs[field]]));
 
 describe('the item a hit is priced with is the item at the hit (T191)', () => {
-  for (const kind of ['singles', 'doubles'] as const) {
-    for (const setup of [BALLOON, KNOCK_OFF, BERRY, TRICK]) {
+  // Champions plays the popped Air Balloon of 2691843318 and 2694103115; the other scenes use moves and items its generation lacks.
+  for (const kind of KINDS) {
+    for (const setup of kind.startsWith('champions') ? [BALLOON] : [BALLOON, KNOCK_OFF, BERRY, TRICK]) {
       test(`${kind}: ${setup.title}: the rolls at the hit contain the simulator's damage, the set's item does not`, () => {
         const scenes = scenesOf(kind, setup, 4);
         expect(scenes.length).toBeGreaterThanOrEqual(3);
@@ -156,7 +173,7 @@ describe('the item a hit is priced with is the item at the hit (T191)', () => {
       });
     }
 
-    test(`${kind}: an item the log has not shown stays the set's (the Knock Off itself hits the Eviolite holder)`, () => {
+    if (!kind.startsWith('champions')) test(`${kind}: an item the log has not shown stays the set's (the Knock Off itself hits the Eviolite holder)`, () => {
       for (const scene of scenesOf(kind, KNOCK_OFF, 4)) {
         const observations = hitsOf(scene, KNOCK_OFF);
         expect(itemFields(observations[0])).toEqual({ attackerItem: '', defenderItem: '', attackerItemChanged: false, defenderItemChanged: false });
@@ -166,7 +183,7 @@ describe('the item a hit is priced with is the item at the hit (T191)', () => {
       }
     });
 
-    test(`${kind}: a berry that weakens the hit counts for that hit and is gone for the next`, () => {
+    if (!kind.startsWith('champions')) test(`${kind}: a berry that weakens the hit counts for that hit and is gone for the next`, () => {
       for (const scene of scenesOf(kind, BERRY, 4)) {
         const observations = hitsOf(scene, BERRY);
         expect(scene.log.indexOf('|-enditem|p2a: Blissey|Chilan Berry')).toBeLessThan(scene.log.indexOf('|-damage|p2a: Blissey'));
@@ -182,7 +199,7 @@ describe('the item a hit is priced with is the item at the hit (T191)', () => {
 describe('the observation names the item at the hit (T191)', () => {
   const observationsOf = (setup: Setup, kind: Kind) => hitsOf(scenesOf(kind, setup, 1)[0], setup);
 
-  for (const kind of ['singles', 'doubles'] as const) {
+  for (const kind of KINDS) {
     test(`${kind}: a popped Air Balloon is shown, then gone`, () => {
       const [claw, quake] = observationsOf(BALLOON, kind);
       expect(itemFields(claw)).toEqual({ attackerItem: '', defenderItem: 'airballoon', attackerItemChanged: false, defenderItemChanged: false });
