@@ -100,12 +100,33 @@ export const wpUnits = (score: number, doubles = false, faintedFraction = 0, rul
  * phase-linear (k1 fits negative), and per-gametype (doubles overfits,
  * 0.2167 vs 0.2068) variants all tie or lose OOS — one shared constant is
  * the honest map.
+ *
+ * Round 69 (T51): the constant stays the value for the opening of the game.
+ * From a fainted share of DISPLAY_RAMP_START the K rises by DISPLAY_RAMP per
+ * unit of share over DISPLAY_RAMP_SPAN (1.85 to 3.10 at a share of 0.5):
+ * late positions are proven, not guessed, and the constant showed them too
+ * timid (late 76 % shown, 88 to 91 % won). Probe P1 (displayk-offline.mjs, 4931
+ * rows of the bank and the four holdouts, 1527 games, leave-one-game-out and
+ * both train/grade swaps): pooled -18 bp [-25, -10], late -64 bp, Doubles late
+ * -66 bp, early +0.6 bp (share under 0.25 reads as before), mid +10 bp
+ * (band includes 0). One shared form: a K per game type or for VGC did not
+ * beat it out of sample.
  */
 export const DISPLAY_K = 1.85;
+const DISPLAY_RAMP_START = 0.25;
+const DISPLAY_RAMP_SPAN = 0.25;
+const DISPLAY_RAMP = 5;
+
+/** The display K at a fainted share (the auto mode's phase measure); no share reads as the opening, DISPLAY_K. */
+export const displayK = (faintedFraction?: number | null): number =>
+  faintedFraction === undefined || faintedFraction === null
+    ? DISPLAY_K
+    : DISPLAY_K + DISPLAY_RAMP * Math.min(DISPLAY_RAMP_SPAN, Math.max(0, faintedFraction - DISPLAY_RAMP_START));
 
 /**
- * Rounded percent for display: sigmoid(DISPLAY_K · score) over wp-unit
- * scores. Exact ±1 is an ENDED evaluation (only finished games reach it —
+ * Rounded percent for display: sigmoid(displayK(share) · score) over wp-unit
+ * scores. The graph and every number read this one function with the turn's
+ * fainted share (round 69, T51, decision 22). Exact ±1 is an ENDED evaluation (only finished games reach it —
  * the leaf sigmoid saturates near but never at ±1), and a finished game
  * displays finished: literal 100/0. A row of ended cells weighted by an
  * equilibrium mix keeps a one-bit rounding remnant (0.9999999999999999),
@@ -114,10 +135,10 @@ export const DISPLAY_K = 1.85;
  */
 const ENDED_EPSILON = 1e-9;
 
-export const winPercent = (score: number): number => {
+export const winPercent = (score: number, faintedFraction?: number | null): number => {
   if (score >= 1 - ENDED_EPSILON) return 100;
   if (score <= -1 + ENDED_EPSILON) return 0;
-  return Math.round(100 / (1 + Math.exp(-DISPLAY_K * score)));
+  return Math.round(100 / (1 + Math.exp(-displayK(faintedFraction) * score)));
 };
 
 /**
@@ -127,7 +148,7 @@ export const winPercent = (score: number): number => {
  * stay wp-unit-linear and read as signed percentage points, "+8%" — one
  * wp-unit spans 50 points.
  */
-export const winPctText = (value: number): string => `${winPercent(value)}%`;
+export const winPctText = (value: number, faintedFraction?: number | null): string => `${winPercent(value, faintedFraction)}%`;
 
 export const winDeltaText = (delta: number): string =>
   `${delta < 0 ? '−' : '+'}${Math.round(Math.abs(delta) * 50)}%`;

@@ -411,5 +411,5 @@ export function seedPhrase(analysis: TurnAnalysis, loser: Side): string {
   const odds = side.played!.koOdds;
   const oddsBit = odds ? ` (${odds.label ? `${phrase(odds.label)}: ` : ''}${koPhrase(odds)})` : '';
   return `turn ${analysis.turn} (${phrase(side.played!.label)}${oddsBit}, ` +
-    `${regretText(side.regret ?? 0, better.ev, side.played!.ev)}; safer was ${phrase(better.label)}${setup})`;
+    `${regretText(side.regret ?? 0, better.ev, side.played!.ev, side.faintedFraction)}; safer was ${phrase(better.label)}${setup})`;
 }

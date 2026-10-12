@@ -104,13 +104,13 @@ export const displayBest = (side: SideAnalysis): { label: string; ev: number; sw
  */
 export const REGRET_SPAN_MIN = 1;
 
-export const regretText = (regret: number, from: number, to: number): string =>
-  regret > REGRET_SPAN_MIN ? `${winPctText(from)} to ${winPctText(to)}` : winDeltaText(-regret);
+export const regretText = (regret: number, from: number, to: number, faintedFraction?: number | null): string =>
+  regret > REGRET_SPAN_MIN ? `${winPctText(from, faintedFraction)} to ${winPctText(to, faintedFraction)}` : winDeltaText(-regret);
 
 /** The two values a regret over 1 spans (the displayed best, the played choice), for the report's misplay. */
-export const regretSpanFor = (side: SideAnalysis): { span?: { from: number; to: number } } =>
+export const regretSpanFor = (side: SideAnalysis): { span?: { from: number; to: number; faintedFraction?: number } } =>
   side.played && side.best && (side.regret ?? 0) > REGRET_SPAN_MIN
-    ? { span: { from: displayBest(side).ev, to: side.played.ev } }
+    ? { span: { from: displayBest(side).ev, to: side.played.ev, ...(side.faintedFraction === undefined ? {} : { faintedFraction: side.faintedFraction }) } }
     : {};
 
 /** The null recommendation kept its place (no alternative): name the caveat. */
@@ -177,12 +177,12 @@ export function formatRead(read: {
   choice: { label: string };
   net: number;
   breakdown: { label: string; prob: number; value: number }[];
-}): string {
+}, faintedFraction?: number | null): string {
   const target = read.choice.label.startsWith('→ ')
     ? `switch ${read.choice.label.slice(2)}`
     : read.choice.label;
   const parts = read.breakdown
-    .map(entry => `${winPctText(entry.value)} if ${entry.label} (${Math.round(entry.prob * 100)}% likely)`)
+    .map(entry => `${winPctText(entry.value, faintedFraction)} if ${entry.label} (${Math.round(entry.prob * 100)}% likely)`)
     .join(', ');
-  return `Read: ${target}${parts ? `; ${parts}` : ''}; net ${winPctText(read.net)}.`;
+  return `Read: ${target}${parts ? `; ${parts}` : ''}; net ${winPctText(read.net, faintedFraction)}.`;
 }

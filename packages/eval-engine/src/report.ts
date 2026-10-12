@@ -55,7 +55,7 @@ interface GameMisplay {
   /** A nearly-dead Pokémon was deliberately fed — rendered neutrally as a sack. */
   sacrifice?: boolean;
   /** Round 64 (T123): a regret over 1 spans these two values (shown best, played), rendered as two win chances. */
-  span?: { from: number; to: number };
+  span?: { from: number; to: number; faintedFraction?: number };
 }
 
 export interface GameReport {

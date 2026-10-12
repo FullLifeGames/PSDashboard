@@ -30,8 +30,16 @@ export {
 /** One side's record: the grading stages, then the narrative signals, keys in the report's order. */
 function analyzeSide(params: AnalyzeTurnParams, key: Side): SideAnalysis {
   const grading = gradeSide(params, key);
-  return { ...gradingFields(params, key, grading), ...signalFields(signalSide(params, key, grading)) };
+  return {
+    ...gradingFields(params, key, grading),
+    ...signalFields(signalSide(params, key, grading)),
+    ...shareField(params.faintedFraction),
+  };
 }
+
+/** Round 69 (T51): the turn's fainted share echoed onto the record, only where the param carries one. */
+const shareField = (share: number | null | undefined): { faintedFraction?: number } =>
+  typeof share === 'number' ? { faintedFraction: share } : {};
 
 /**
  * The turn's rolls: the protocol's markers and played KO odds when the turn has its log, else (round 69, T178) the
@@ -71,5 +79,8 @@ export function analyzeTurn(params: AnalyzeTurnParams): TurnAnalysis {
     playedTracking,
     // Round 67 (T22): the turn's rolls, display only (the sentences split rolled from re-read).
     ...rolledForFields(params, p1, p2),
+    // Round 69 (T51): the shares the percent texts print at, display only.
+    ...shareField(params.faintedFraction),
+    ...(typeof params.faintedFractionAfter === 'number' ? { faintedFractionAfter: params.faintedFractionAfter } : {}),
   };
 }

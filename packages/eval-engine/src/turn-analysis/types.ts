@@ -144,6 +144,11 @@ export interface TurnSensitivity {
 }
 
 export interface SideAnalysis {
+  /**
+   * Round 69 (T51): the fainted share of the turn this record was read at (an echo of the param, absent without
+   * one). The percent texts of the side print at this share; no grade reads it.
+   */
+  faintedFraction?: number;
   playedRaw: PlayedAction | null;
   /**
    * The protocol's reason a chosen action never surfaced ('slp', 'flinch',
@@ -374,6 +379,13 @@ export interface TurnVerification {
 
 export interface TurnAnalysis {
   turn: number;
+  /**
+   * Round 69 (T51): the fainted share at this turn's start and, for the after score, at the next turn's start (echoes
+   * of the params, absent without them): the estimate sentence prints each score at its own turn's share, as the
+   * graph does.
+   */
+  faintedFraction?: number;
+  faintedFractionAfter?: number;
   scoreBefore: number;
   scoreAfter: number | null;
   swing: number | null;
@@ -479,4 +491,6 @@ export interface AnalyzeTurnParams {
    * gate off.
    */
   faintedFraction?: number | null;
+  /** Round 69 (T51): the share at the next turn's start, for the after score's percent text. */
+  faintedFractionAfter?: number | null;
 }

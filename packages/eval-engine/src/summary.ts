@@ -34,11 +34,11 @@ function decidedSide(analysis: TurnAnalysis): Decided {
 /** The estimate line: held, moved, or (without an after-score) standing. */
 function estimateSentence(analysis: TurnAnalysis, playerNames: PlayerNames): string {
   // Scores are wp-units — winPercent is the calibrated display mapping.
-  const before = winPercent(analysis.scoreBefore);
+  const before = winPercent(analysis.scoreBefore, analysis.faintedFraction);
   if (analysis.scoreAfter === null) {
     return `The estimate stands at ${before}% for ${playerNames[0]}.`;
   }
-  const after = winPercent(analysis.scoreAfter);
+  const after = winPercent(analysis.scoreAfter, analysis.faintedFractionAfter);
   return before === after
     ? `The estimate held at ${before}% for ${playerNames[0]}.`
     : `The estimate moved from ${before}% to ${after}% for ${playerNames[0]}.`;

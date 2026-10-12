@@ -23,7 +23,7 @@ function readClause(name: string, side: SideAnalysis, opponent: SideAnalysis): s
   // Round 63 (T18): the kill-range shape is a verb phrase of its own ("kills ~43% of the time").
   const click = odds ? ` ${oddsPart('The click', odds, 'was')}.` : '';
   return `${name} ${playedVerb(side.played.label)}: a read that paid off${horizon}, ` +
-    `${winDeltaText(side.riskPayoff ?? 0)} over the safe ${choiceNoun(side.safe.label)} (${winPctText(side.safe.worstCase)} guaranteed).${priced}${click}`;
+    `${winDeltaText(side.riskPayoff ?? 0)} over the safe ${choiceNoun(side.safe.label)} (${winPctText(side.safe.worstCase, side.faintedFraction)} guaranteed).${priced}${click}`;
 }
 
 /**
@@ -61,13 +61,13 @@ function unpunishedReadClause(
   caveat: string,
 ): string {
   const came = played.punishedBy && opponent.played
-    ? `its floor risked ${phraseReplies(played.punishedBy)} (down to ${winPctText(played.worstCase)}); ${phrase(opponent.played.label)} came instead`
-    : `its floor sat at ${winPctText(played.worstCase)}`;
+    ? `its floor risked ${phraseReplies(played.punishedBy)} (down to ${winPctText(played.worstCase, side.faintedFraction)}); ${phrase(opponent.played.label)} came instead`
+    : `its floor sat at ${winPctText(played.worstCase, side.faintedFraction)}`;
   const framing = side.riskWasRead
     ? `a read against the opponent's tendencies: ${came}`
     : `a read: ${came}`;
   return `${name} ${playedVerb(played.label)} as ${framing}. ` +
-    `The engine's safe line was ${phrase(safe.label)} (${winPctText(safe.worstCase)} guaranteed)${lineOf(safe)}.${why}${caveat}${oddsNote(side)}`;
+    `The engine's safe line was ${phrase(safe.label)} (${winPctText(safe.worstCase, side.faintedFraction)} guaranteed)${lineOf(safe)}.${why}${caveat}${oddsNote(side)}`;
 }
 
 /**
@@ -88,11 +88,11 @@ function punishedMisplayClause(
   const line = shown.swapped ? '' : lineOf(best);
   const reasons = `${shown.swapped ? '' : why}${caveat}${nullNote(side)}${conditionalNote(side)}${oddsNote(side)}`;
   if (side.tier === 'blunder') {
-    return `${name} ${playedVerb(played.label)} (${winPctText(played.ev)}), ` +
-      `a blunder; clearly better was ${phrase(shown.label)} (${winPctText(shown.ev)})${line}.${reasons}`;
+    return `${name} ${playedVerb(played.label)} (${winPctText(played.ev, side.faintedFraction)}), ` +
+      `a blunder; clearly better was ${phrase(shown.label)} (${winPctText(shown.ev, side.faintedFraction)})${line}.${reasons}`;
   }
-  return `${name} ${playedVerb(played.label)} (${winPctText(played.ev)}); ` +
-    `safer was ${phrase(shown.label)} (${winPctText(shown.ev)})${line}.${reasons}`;
+  return `${name} ${playedVerb(played.label)} (${winPctText(played.ev, side.faintedFraction)}); ` +
+    `safer was ${phrase(shown.label)} (${winPctText(shown.ev, side.faintedFraction)})${line}.${reasons}`;
 }
 
 function mistakeClause(name: string, side: SideAnalysis, opponent: SideAnalysis): string | null {
@@ -128,7 +128,7 @@ export function readCreditClause(name: string, side: SideAnalysis, ownLuck: numb
       : ` On top of that, the engine re-read the position after the turn (${winDeltaText(ownLuck)} for ${name}).`
     : '';
   return `${name} ${playedVerb(side.played.label)}, a read the engine gave no weight: ${when} it stood ` +
-    `${winDeltaText(credit.payoff)} over the safe ${choiceNoun(side.safe.label)} (${winPctText(side.safe.worstCase)} guaranteed).` +
+    `${winDeltaText(credit.payoff)} over the safe ${choiceNoun(side.safe.label)} (${winPctText(side.safe.worstCase, side.faintedFraction)} guaranteed).` +
     `${partialNote(side, 'credited')}${luck}`;
 }
 
@@ -137,7 +137,7 @@ export function inaccuracyClause(name: string, side: SideAnalysis): string | nul
   if (side.tier !== 'inaccuracy' || !side.played || !side.best) return null;
   const shown = displayBest(side);
   return `${name}'s ${phrase(side.played.label)} was an inaccuracy; ` +
-    `${phrase(shown.label)} was slightly better (${winPctText(shown.ev)} vs ${winPctText(side.played.ev)}).` +
+    `${phrase(shown.label)} was slightly better (${winPctText(shown.ev, side.faintedFraction)} vs ${winPctText(side.played.ev, side.faintedFraction)}).` +
     `${oddsNote(side)}${nullNote(side)}${conditionalNote(side)}${partialNote(side, 'graded')}`;
 }
 
