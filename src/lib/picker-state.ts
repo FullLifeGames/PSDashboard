@@ -1,7 +1,6 @@
-import { Pokemon as CalcPokemon } from '@smogon/calc';
 import { Dex } from '@pkmn/dex';
 import type { PokemonSet } from '@pkmn/sim';
-import { CHAMPIONS_MOD, calcGenerationFor, evBudget, speciesBaseId, toId, type PokemonEvs, type PokemonSnapshot, type TurnSnapshot } from '@fulllifegames/replay-core';
+import { CHAMPIONS_MOD, buildCalcPokemon, calcGenerationFor, evBudget, speciesBaseId, toId, type PokemonSnapshot, type TurnSnapshot } from '@fulllifegames/replay-core';
 import {
   moveAtUse,
   type BranchMoveOption, type BranchSimState, type BranchSlotModifiers, type BranchSwitchOption, type MoveUser, type SimPokemonInfo,
@@ -53,15 +52,7 @@ function moveNamesFor(mon: PokemonSnapshot, set: PokemonSet | undefined): string
   return set?.moves && set.moves.length > 0 ? set.moves : mon.moves;
 }
 
-/**
- * The spreads the calc reads for a guessed set (round 68, T186): the set's own. A set of a Champions game holds Stat
- * Points, which the calc's Champions generation (0) reads in `evs` as they are and which ignores IVs.
- */
-function calcSpreadsOf(set: PokemonSet | undefined): { evs?: Partial<PokemonEvs>; ivs?: Partial<PokemonEvs> } {
-  return set ? { evs: set.evs, ivs: set.ivs } : {};
-}
-
-/** The evs of a Champions game's info hold Stat Points; the mod picks the calc's Champions generation. */
+/** The evs of a Champions game's info hold Stat Points, which the calc's Champions generation (0) reads as they are; the mod names that generation to the engine's bodies. */
 const championsMark = (champions: boolean): { mod?: string } => (champions ? { mod: CHAMPIONS_MOD } : {});
 
 /** Attack and Special Attack of the guessed set (Tera Blast's category in the move table; the label reads only the type). */
@@ -69,7 +60,7 @@ function guessedAttacks(mon: PokemonSnapshot, set: PokemonSet | undefined, gen: 
   if (!set) return {};
   try {
     const calcGen = calcGenerationFor(gen, champions ? CHAMPIONS_MOD : undefined);
-    const poke = new CalcPokemon(calcGen, mon.speciesForme, { level: mon.level || set.level || 100, nature: set.nature || undefined, ...calcSpreadsOf(set) });
+    const poke = buildCalcPokemon(calcGen, mon.speciesForme, { level: mon.level || set.level || 100, nature: set.nature || undefined, evs: set.evs, ivs: set.ivs });
     return { atk: poke.rawStats.atk, spa: poke.rawStats.spa };
   } catch {
     return {};
@@ -146,10 +137,11 @@ function absoluteHp(
   const hpPercent = mon.maxhp === 0 && !mon.fainted ? 100 : mon.hpPercent;
   try {
     const calcGen = calcGenerationFor(gen, champions ? CHAMPIONS_MOD : undefined);
-    const poke = new CalcPokemon(calcGen, mon.speciesForme, {
+    const poke = buildCalcPokemon(calcGen, mon.speciesForme, {
       level: mon.level || set?.level || 100,
       nature: set?.nature || undefined,
-      ...calcSpreadsOf(set),
+      evs: set?.evs,
+      ivs: set?.ivs,
     });
     const maxhp = poke.maxHP();
     const hp = mon.fainted ? 0 : Math.max(1, Math.round(maxhp * hpPercent / 100));
