@@ -7,6 +7,7 @@ import { itemSetValue } from '../team-info.ts';
 import { abilitiesAreFree } from './dex-legal.ts';
 import type { ItemDamageJudge } from './damage-ruleouts.ts';
 import { natureOf } from '../spreads/ladder.ts';
+import { evBudget, onBudgetScale, type EvBudget } from '../spreads/ev-budget.ts';
 import { toId } from '../ids.ts';
 
 /**
@@ -34,7 +35,6 @@ const OBSERVATION_SLACK = 0.02;
  * from the guessed spread of the defender as built (round 67, ruling R12).
  */
 const MISS_MARGIN = 1.1;
-const MAX_EVS = 252;
 /** The calculator's spread targets: its spread factor applies to them in doubles. */
 const SPREAD_TARGETS = new Set(['allAdjacent', 'allAdjacentFoes']);
 /** Handlers by which an ability changes another Pokémon's damage (Friend Guard, Power Spot, the auras, Ruin). */
@@ -66,14 +66,14 @@ function readableMove(dex: GenDex, moveId: string): boolean {
 }
 
 /**
- * The hit is fit to judge: no doubt at the hit, abilities the Dex fixes, not
- * a Champions game (ruling R10), a readable move, no Stellar first use, the
+ * The hit is fit to judge: no doubt at the hit, abilities the Dex fixes (a
+ * Champions game is judged on its Stat Points, ruling R10), a readable move, no Stellar first use, the
  * holder's own item in play, and nobody else on the field whose possible
  * ability changes the damage or hides the weather.
  */
 function judgeable(hit: LoggedHit): boolean {
   if (hit.doubt || hit.attacker.itemChanged || hit.attacker.tera === 'Stellar') return false;
-  if (/champions/i.test(hit.format) || abilitiesAreFree(`|tier|${hit.format}`)) return false;
+  if (abilitiesAreFree(`|tier|${hit.format}`)) return false;
   const dex = Dex.forGen(hit.gen);
   if (!readableMove(dex, hit.move)) return false;
   // A Charge doubles the next Electric move, which the calculator does not model.
@@ -100,13 +100,16 @@ function offenseStat(dex: GenDex, moveId: string): Stat | null {
   return move.category === 'Physical' ? 'atk' : 'spa';
 }
 
-/** The holder's strongest and weakest legal spreads for that stat. */
-function extremes(stat: Stat | null): { strong: Spread; weak: Spread } {
+/**
+ * The holder's strongest and weakest legal spreads for that stat: the format's per-stat cap (252 EVs, or 32 Stat Points in a
+ * Champions game, which has no IVs to lower, so its weak spread keeps IV 31 as the calculator's generation 0 ignores them anyway).
+ */
+function extremes(stat: Stat | null, budget: EvBudget): { strong: Spread; weak: Spread } {
   if (!stat) return { strong: { evs: {}, ivs: {}, nature: 'Hardy' }, weak: { evs: {}, ivs: {}, nature: 'Hardy' } };
   const other: Stat = stat === 'atk' ? 'spa' : 'atk';
   return {
-    strong: { evs: { [stat]: MAX_EVS }, ivs: {}, nature: natureOf(stat, other) },
-    weak: { evs: {}, ivs: { [stat]: 0 }, nature: natureOf(other, stat) },
+    strong: { evs: { [stat]: budget.perStat }, ivs: {}, nature: natureOf(stat, other) },
+    weak: { evs: {}, ivs: budget.statPoints ? {} : { [stat]: 0 }, nature: natureOf(other, stat) },
   };
 }
 
@@ -126,11 +129,11 @@ const abilityName = (dex: GenDex, id: string) => (id ? dex.abilities.get(id).nam
 const itemName = (dex: GenDex, id: string) => (id ? dex.items.get(id).name : '');
 
 /** The defender as the panel builds it, with what the log shows it holding at the hit. */
-function defenderOptions(dex: GenDex, info: RevealedPokemonInfo, party: HitParty): CalcOptions {
+function defenderOptions(dex: GenDex, info: RevealedPokemonInfo, party: HitParty, budget: EvBudget): CalcOptions {
   const item = party.itemChanged ? itemName(dex, party.held) : itemName(dex, party.held) || itemSetValue(info.item.value);
   return {
     ability: abilityName(dex, party.ability) || info.ability.value || undefined, item: item || undefined,
-    nature: (info.nature?.value || 'Hardy') as CalcOptions['nature'], evs: info.evs.value, ivs: info.ivs?.value,
+    nature: (info.nature?.value || 'Hardy') as CalcOptions['nature'], evs: onBudgetScale(info.evs.value, budget), ivs: info.ivs?.value,
   };
 }
 
@@ -169,6 +172,8 @@ interface AbilityVariant {
 interface HitContext {
   hit: LoggedHit;
   gen: CalcGen;
+  /** The format's spread scale: Stat Points in a Champions game. */
+  budget: EvBudget;
   abilities: AbilityVariant[];
   spreads: { strong: Spread; weak: Spread };
   defenders: CalcOptions[];
@@ -232,7 +237,7 @@ function variantKey(ctx: Omit<HitContext, 'defenders'>, defender: CalcOptions): 
  */
 function defenderVariants(dex: GenDex, info: RevealedPokemonInfo, ctx: Omit<HitContext, 'defenders'>): CalcOptions[] {
   const party = ctx.hit.defender;
-  const built = defenderOptions(dex, info, party);
+  const built = defenderOptions(dex, info, party, ctx.budget);
   const itemShown = party.itemChanged || !!party.held || shown(info.item);
   const items = itemShown || !built.item ? [built.item] : [built.item, undefined];
   const ruled = info.ruledOut?.abilities ?? [];
@@ -255,9 +260,10 @@ function contextOf(attacker: RevealedPokemonInfo, hit: LoggedHit, teams: { p1: O
     ? attacker.ability.value : abilityName(dex, hit.attacker.ability);
   const ruled = attacker.ruledOut?.abilities ?? [];
   const abilities = mayHave(dex, hit.attacker.species, known).filter(ability => known || !ruled.includes(toId(ability)));
+  const budget = evBudget(toId(hit.format));
   const base = {
-    hit, gen: calcGenerationFor(hit.gen, calcModOf(hit.format)),
-    abilities: variantsOf(abilities.length > 0 ? abilities : [''], hit.attacker), spreads: extremes(offenseStat(dex, hit.move)),
+    hit, gen: calcGenerationFor(hit.gen, calcModOf(hit.format)), budget,
+    abilities: variantsOf(abilities.length > 0 ? abilities : [''], hit.attacker), spreads: extremes(offenseStat(dex, hit.move), budget),
   };
   return { ...base, defenders: defenderVariants(dex, info, base) };
 }
