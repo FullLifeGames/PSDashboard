@@ -53,7 +53,10 @@ const ITEM_DETAIL = { 'moved-first': INFERRED_ITEM_DETAIL, 'moved-second': RULED
 /** A guessed or unknown item gives way to the item the solver decided. */
 function overlayItem(pokemon: RevealedPokemonInfo, candidate: SpreadCandidate): PokemonFieldInfo {
   const itemGuessed = pokemon.item.source === 'guessed' || pokemon.item.source === 'unknown';
-  if (!candidate.item || !itemGuessed) return pokemon.item;
+  if (!itemGuessed) return pokemon.item;
+  // A dropped boost item with no other item to take its place leaves the item unknown, as the build fields it.
+  if (candidate.itemReason === 'no-boost' && !candidate.item) return { ...unknownField(), sourceDetail: NO_BOOST_ITEM_DETAIL };
+  if (!candidate.item) return pokemon.item;
   return guessedField(candidate.item, undefined, ITEM_DETAIL[candidate.itemReason ?? 'moved-second']);
 }
 

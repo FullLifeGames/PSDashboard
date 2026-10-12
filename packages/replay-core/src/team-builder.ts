@@ -186,14 +186,17 @@ function resolveSolvedItems(
   solved: Map<string, SpreadCandidate>, infos: SideInfos, formatHint: string,
   usageStats: SmogonUsageStats | null | undefined, setAssumptions: SmogonSetAssumptions | null | undefined,
 ): Map<string, SpreadCandidate> {
-  const resolved = new Map(solved);
+  const drops = new Map<string, SpreadCandidate>();
   for (const [key, candidate] of solved) {
     const [side, speciesId] = key.split(':') as ['p1' | 'p2', string];
     const info = infos[side].pokemon.find(mon => toId(mon.species) === speciesId);
-    if (candidate.itemReason !== 'no-boost' || !info) continue;
-    resolved.set(key, { ...candidate, item: resolveItemWithout(info, usageStats, setAssumptions, ['choicescarf', ...boostItemIds(genNumOf(formatHint))]) });
+    // A species with no item left in the build's lists keeps '' (no item): the Scarf resolver below must not hand the boost item back.
+    if (candidate.itemReason === 'no-boost' && info) {
+      drops.set(key, { ...candidate, item: resolveItemWithout(info, usageStats, setAssumptions, ['choicescarf', ...boostItemIds(genNumOf(formatHint))]) });
+    }
   }
-  return resolveInferredItems(resolved, infos, usageStats, setAssumptions);
+  const rest = resolveInferredItems(new Map([...solved].filter(([key]) => !drops.has(key))), infos, usageStats, setAssumptions);
+  return new Map([...solved].map(([key, candidate]) => [key, drops.get(key) ?? rest.get(key) ?? candidate]));
 }
 
 /**

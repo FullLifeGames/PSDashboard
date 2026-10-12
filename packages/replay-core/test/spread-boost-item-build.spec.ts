@@ -63,6 +63,15 @@ for (const formatid of ['gen9ou', 'gen9doublesou']) {
       expect(shown.sourceDetail).toBe(NO_BOOST_ITEM_DETAIL);
     });
 
+    test('a solve with only boost items in the lists keeps the empty item through the Scarf resolver', () => {
+      const onlyBoost: SmogonUsageStats = { ...stats, pokemon: { ...stats.pokemon, gengar: usage('Gengar', ['Choice Specs', 'Life Orb'], 'Timid', evs({ spa: 252, spe: 252, hp: 4 })) } };
+      const solved = solveReplaySpreads(log, observations, { usageStats: onlyBoost });
+      expect(solved.get('p2:gengar')?.item).toBe('');
+      expect(solved.get('p2:gengar')?.itemReason).toBe('no-boost');
+      const built = buildTeamsFromReplay(log, { usageStats: onlyBoost, inferredSpreads: solved }).p2Team.find(set => set.species === 'Gengar');
+      expect(built?.item).toBe('');
+    });
+
     test('an unresolved drop never lets a boost item or the Scarf back into the set', () => {
       const raw = new Map([['p2:gengar', { evs: evs({ spa: 252, spe: 252, hp: 4 }), nature: 'Timid', item: '', itemReason: 'no-boost' as const }]]);
       const built = buildTeamsFromReplay(log, { usageStats: stats, inferredSpreads: raw }).p2Team.find(set => set.species === 'Gengar');
@@ -71,3 +80,25 @@ for (const formatid of ['gen9ou', 'gen9doublesou']) {
     });
   });
 }
+
+describe('a dropped boost item with no other item to take its place leaves the item empty', () => {
+  const stats: SmogonUsageStats = {
+    format: 'gen9ou', month: '2026-08', source: 'test',
+    pokemon: { gengar: usage('Gengar', ['Choice Specs', 'Life Orb'], 'Timid', evs({ spa: 252, spe: 252, hp: 4 })) },
+  };
+  const log = [
+    '|player|p1|Alice|', '|player|p2|Bob|', '|gen|9', '|tier|[Gen 9] OU',
+    '|poke|p1|Garchomp, M|', '|poke|p2|Gengar, M|',
+    '|start', '|switch|p1a: Garchomp|Garchomp, M|100/100', '|switch|p2a: Gengar|Gengar, M|100/100', '|turn|1',
+  ].join('\n');
+
+  test('the candidate keeps the empty item, the set fields none and the panel shows the item unknown', () => {
+    const raw = new Map([['p2:gengar', { evs: evs({ spa: 252, spe: 252, hp: 4 }), nature: 'Timid', item: '', itemReason: 'no-boost' as const }]]);
+    const built = buildTeamsFromReplay(log, { usageStats: stats, inferredSpreads: raw }).p2Team.find(set => set.species === 'Gengar');
+    expect(built?.item).toBe('');
+    const shown = applyInferredSpreads(inferOpponentTeam(log, 'p2'), 'p2', raw).pokemon.find(mon => mon.species === 'Gengar')!.item;
+    expect(shown.value).toBe('');
+    expect(shown.source).toBe('unknown');
+    expect(shown.sourceDetail).toBe(NO_BOOST_ITEM_DETAIL);
+  });
+});
