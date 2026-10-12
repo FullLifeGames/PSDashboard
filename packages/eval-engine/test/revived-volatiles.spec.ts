@@ -5,7 +5,7 @@ import { parseReplayLogWithObservations } from '@fulllifegames/replay-core';
 import { buildChoiceLockContext } from '../src/choice-lock';
 import { reconstructBranchRuntime } from '../src/branch-engine';
 import { serializeBattleStable, deserializeBattleExact } from '../src/forward-model';
-import { buildForcedSwitchChoice, correctBattleFromSnapshot } from '../src/branch/corrections';
+import { buildForcedSwitchChoice, correctActivesFromProtocol, correctBattleFromSnapshot } from '../src/branch/corrections';
 import { openSession, startBattle, waitForBattle, type ReconstructionSession } from '../src/branch/runtime-session';
 import type { SimBattle } from '../src/branch/types';
 
@@ -115,6 +115,8 @@ function snapshotFrom(truth: SimBattle, log: string[] = []): TurnSnapshot {
 }
 
 const ids = (battle: SimBattle, name: string) => Object.keys(bodyOf(battle, name).volatiles).sort();
+const durationOf = (battle: SimBattle, name: string, id: string) =>
+  (bodyOf(battle, name).volatiles[id] as { duration?: number } | undefined)?.duration;
 const bestStatOf = (battle: SimBattle, name: string) => {
   const volatiles = bodyOf(battle, name).volatiles as Record<string, { bestStat?: string }>;
   return Object.values(volatiles).map(state => state.bestStat).filter(Boolean);
@@ -291,6 +293,28 @@ describe.each([
 
     expect(simulated.sides[0].active.includes(bodyOf(simulated, 'Hatterene'))).toBe(true);
     expect(ids(simulated, 'Hatterene')).toEqual(['healblock']);
+    // The game's counter ticked at the turn's residual round; the simulator's body stood on the bench for it.
+    expect(durationOf(simulated, 'Hatterene', 'healblock')).toBe(durationOf(truth, 'Hatterene', 'healblock'));
+  });
+
+  test('the protocol puts the displaced body back with one entry line in the block', async () => {
+    const simulated = await playOut(true);
+    const entry = '|switch|p1a: Hatterene|Hatterene, F|100/100';
+    expect(ids(simulated, 'Hatterene')).toEqual([]);
+
+    correctActivesFromProtocol(simulated, [entry, '|move|p2a: Hatterene|Psychic Noise|p1a: Hatterene', '|-start|p1a: Hatterene|move: Heal Block']);
+
+    expect(simulated.sides[0].active.includes(bodyOf(simulated, 'Hatterene'))).toBe(true);
+    expect(ids(simulated, 'Hatterene')).toEqual(['healblock']);
+  });
+
+  test('two entry lines make two stints: the record of the first does not carry over', async () => {
+    const simulated = await playOut(true);
+    const entry = '|switch|p1a: Hatterene|Hatterene, F|100/100';
+
+    correctActivesFromProtocol(simulated, [entry, '|switch|p1a: Hatterene|Hatterene, F|100/100']);
+
+    expect(ids(simulated, 'Hatterene')).toEqual([]);
   });
 
   test('a body both worlds took off the field keeps nothing from the record', async () => {

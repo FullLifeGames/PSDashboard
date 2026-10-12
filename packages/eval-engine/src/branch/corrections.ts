@@ -58,16 +58,19 @@ export function correctActivesFromProtocol(
   const before = battle.sides.map(side => [...side.active]);
   let repointed = false;
   for (const line of events) {
-    const match = line.match(/^\|(switch|drag)\|(p[12])([a-d]):[^|]*\|([^,|]+)/);
+    const match = line.match(/^\|(switch|drag)\|(p[12])([a-d]): ?([^|]*)\|([^,|]+)/);
     if (!match) continue;
 
     const sideIdx = match[2] === 'p1' ? 0 : 1;
     const activeSlot = match[3].charCodeAt(0) - 'a'.charCodeAt(0);
-    const species = match[4].trim();
+    const species = match[5].trim();
     const side = battle.sides[sideIdx];
     const target = findPokemonOnSide(side, species);
     if (!target) continue;
-    if (repointActiveSlot(side, activeSlot, target)) repointed = true;
+    if (repointActiveSlot(side, activeSlot, target)) {
+      repointed = true;
+      restoreAfterProtocolEntry(battle, target, `${match[2]}${match[3]}: ${match[4]}`, events);
+    }
   }
   // A body the repoints put on the field plays its switch-in with the item it
   // held, before the held items take the protocol's state (round 67, T133).
@@ -198,16 +201,37 @@ export function recordVolatilesAtExit(pokemon: SimPokemon) {
   else delete recorded.volatilesAtExit;
 }
 
-/** The conditions the protocol ended for this body in the block (|-end|), as the simulator's condition ids. */
-function endedByProtocol(battle: SimBattle, snapshotPokemon: SnapshotPokemon, log: readonly string[]): Set<string> {
+/** Puts the record of an exit back on the body, minus the conditions the protocol ended for it in the block (|-end|, as the simulator's condition ids). */
+function putBackExitVolatiles(battle: SimBattle, body: SimPokemon, name: string, log: readonly string[]) {
+  const recorded = body as ExitRecorded;
+  if (!recorded.volatilesAtExit) return;
   const ended = new Set<string>();
   for (const line of log) {
     const [, tag, ident, effect] = line.split('|');
     if (tag !== '-end' || !ident || !effect) continue;
-    if (ident.replace(/^p[12][a-d]?: /, '') !== snapshotPokemon.name) continue;
+    if (ident.replace(/^p[12][a-d]?: /, '') !== name) continue;
     ended.add(battle.dex.conditions.get(effect.replace(/^(move|ability|item): /, '')).id);
   }
-  return ended;
+  for (const [id, state] of Object.entries(recorded.volatilesAtExit)) {
+    if (ended.has(id) || id in body.volatiles) continue;
+    // The exit came inside the turn, so the turn's residual round never ticked the condition's counter on this body.
+    const left = typeof state.duration === 'number' ? state.duration - 1 : null;
+    if (left !== null && left <= 0) continue;
+    body.volatiles[id] = left === null ? state : { ...state, duration: left };
+  }
+  delete recorded.volatilesAtExit;
+}
+
+/**
+ * The protocol's switch-in put a body on the field that the simulator had
+ * taken off it after its own entry in the same block (752755 turn 9: the
+ * guessed Eject Button sent Hatterene out after the Psychic Noise that began
+ * its Heal Block). With one entry line in the block the two stints are the
+ * same one, and the record holds what the body carried at the exit.
+ */
+function restoreAfterProtocolEntry(battle: SimBattle, body: SimPokemon, ident: string, events: readonly string[]) {
+  const entries = events.filter(line => /^\|(?:switch|drag)\|/.test(line) && line.split('|')[2] === ident).length;
+  if (entries === 1) putBackExitVolatiles(battle, body, ident.replace(/^p[12][a-d]: /, ''), events);
 }
 
 /** The simulator's body for a snapshot entry: by species forme, else by name. */
@@ -237,10 +261,7 @@ function restoreExitVolatiles(battle: SimBattle, snapshot: TurnSnapshot, offTheF
       const body = simBodyOf(side, snapshotPokemon) as ExitRecorded | undefined;
       if (!body?.volatilesAtExit || !offTheField.has(body)) continue;
       if (!snapshotPokemon.isActive || snapshotPokemon.fainted || body.fainted || !side.active.includes(body)) continue;
-      const ended = endedByProtocol(battle, snapshotPokemon, snapshot.log);
-      for (const [id, state] of Object.entries(body.volatilesAtExit)) {
-        if (!ended.has(id) && !(id in body.volatiles)) body.volatiles[id] = state;
-      }
+      putBackExitVolatiles(battle, body, snapshotPokemon.name, snapshot.log);
     }
   }
   for (const side of battle.sides) {
