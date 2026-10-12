@@ -1,6 +1,7 @@
 import { Battle } from '@pkmn/client';
 import type { GenerationNum } from '@pkmn/data';
 import { generationsFor } from '../format-generations.ts';
+import type { ItemReading } from './item-reading.ts';
 import type { DamageObservation, HiddenPowerEvidence, SpeedOrderObservation, TurnSnapshot } from '../types.ts';
 
 export type ClientIdent = Parameters<Battle['getPokemon']>[0];
@@ -36,6 +37,8 @@ export interface PendingMove {
   crits: Set<string>;
   /** Per target ident, in the order the damage lines came (a spread move has up to three, Dragon Darts two). */
   hits: Map<string, TargetHit>;
+  /** The item of a Pokémon whose item ended inside this move before its damage line: it counted for the hit (round 69, T191). */
+  itemsBefore: Map<string, ItemReading>;
   /** The attacker's speed-evidence cleanliness at move time. */
   speedClean: boolean;
   attackerSide: 'p1' | 'p2';

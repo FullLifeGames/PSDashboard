@@ -122,7 +122,8 @@ describe('doubles damage observations (T31)', () => {
 
 describe('singles logs give the observations they gave before (T31)', () => {
   const fixture = (name: string) => readFileSync(fileURLToPath(new URL(`./fixtures/${name}`, import.meta.url)), 'utf-8');
-  const NEW_FIELDS = ['doubles', 'spread', 'defenderSide'] as const;
+  // T31 added the first three fields, T191 the four item fields; both are stripped before the comparison with 006b33c.
+  const NEW_FIELDS = ['doubles', 'spread', 'defenderSide', 'attackerItem', 'defenderItem', 'attackerItemChanged', 'defenderItemChanged'] as const;
 
   for (const name of ['singles-1', 'singles-2']) {
     test(`${name}: every field of 006b33c is unchanged, the new fields read singles`, () => {

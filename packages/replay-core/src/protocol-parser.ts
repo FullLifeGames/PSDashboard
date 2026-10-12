@@ -4,6 +4,7 @@ import {
   appendFinalSnapshot, feedLine, handleActionBoundary, handleCrit, handleDamage, handleGametype, handleGen, handleMove,
   handleResisted, handleSuperEffective, isActionBoundary,
 } from './protocol/handlers.ts';
+import { noteItemEnd } from './protocol/item-reading.ts';
 import { noteActivation, settleRacedFormes, settleScarfMovers } from './protocol/speed-evidence.ts';
 
 export function parseReplayLog(log: string): TurnSnapshot[] {
@@ -26,6 +27,7 @@ function dispatch(state: ParserState, line: string) {
     handleCrit(state, line);
   } else if (/^\|-(?:activate|enditem|item)\|/.test(line)) {
     noteActivation(state, line);
+    if (line.startsWith('|-enditem|')) noteItemEnd(state, line);
     if (isActionBoundary(line)) handleActionBoundary(state, line);
   } else if (isActionBoundary(line)) {
     handleActionBoundary(state, line);

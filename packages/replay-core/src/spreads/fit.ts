@@ -12,6 +12,7 @@ import type { ObservedMaxHp } from './max-hp.ts';
 import { raceSpeed } from './race-speed.ts';
 import { defenderSideOf, fieldOf, moveOf, readObservation, type ReadObservation } from './observation-read.ts';
 import { formeAbility } from './battle-forme.ts';
+import { withItemAtHit } from './item-at-hit.ts';
 import { toId } from '../ids.ts';
 
 /**
@@ -188,8 +189,12 @@ function calcPokemon(ctx: SolveContext, side: 'p1' | 'p2', species: string, spre
 export function rollRange(ctx: SolveContext, obs: ReadObservation, attackerSpread: SpreadCandidate, defenderSpread: SpreadCandidate): { min: number; max: number } | null {
   const { gen } = ctx;
   const defenderSide = defenderSideOf(obs);
-  const attacker = calcPokemon(ctx, obs.attackerSide, obs.attackerSpecies, attackerSpread, obs.attackerBoosts, obs.attackerStatus, obs.attackerForme);
-  const defender = calcPokemon(ctx, defenderSide, obs.defenderSpecies, defenderSpread, obs.defenderBoosts, '', obs.defenderForme);
+  // The items the hit landed with: the client's at the line, not the set's (a popped Air Balloon, a Knock Off, a Trick).
+  const dex = Dex.forGen(simGenNum(gen));
+  const attackerBody = withItemAtHit(dex, attackerSpread, setOf(ctx, obs.attackerSide, obs.attackerSpecies)?.item, obs.attackerItem, obs.attackerItemChanged);
+  const defenderBody = withItemAtHit(dex, defenderSpread, setOf(ctx, defenderSide, obs.defenderSpecies)?.item, obs.defenderItem, obs.defenderItemChanged);
+  const attacker = calcPokemon(ctx, obs.attackerSide, obs.attackerSpecies, attackerBody, obs.attackerBoosts, obs.attackerStatus, obs.attackerForme);
+  const defender = calcPokemon(ctx, defenderSide, obs.defenderSpecies, defenderBody, obs.defenderBoosts, '', obs.defenderForme);
   // The protocol records typeless "hiddenpower"; calc it as the SET's
   // resolved variant, or the fit runs the IV-default type against a hit
   // the sim plays typed (653785: Dark-fitted spreads, Ice-rolled sim).

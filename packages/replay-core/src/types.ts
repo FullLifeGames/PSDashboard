@@ -97,6 +97,16 @@ export interface DamageObservation {
   spread?: boolean;
   /** The side of the defender: the other side unless a spread move hit the attacker's partner. Absent reads as the other side. */
   defenderSide?: 'p1' | 'p2';
+  /**
+   * The item id the client battle shows each mon holding at the hit (round 69, T191): '' when it holds none or the log never
+   * showed it. An item that ended inside the very move before its damage line (a weakening berry, a gem) still counts.
+   * Absent on observations of caches older than T191, which read the set's item.
+   */
+  attackerItem?: string;
+  defenderItem?: string;
+  /** The item differs from the one the mon came in with (used up, knocked off, stolen, swapped): '' then means gone, not unseen. */
+  attackerItemChanged?: boolean;
+  defenderItemChanged?: boolean;
 }
 
 /**

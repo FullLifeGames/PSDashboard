@@ -4,6 +4,7 @@ import type { DamageObservation, PokemonSnapshot, SideSnapshot, FieldSnapshot } 
 import { flushSpeedOrder, speedContaminatedAt, type ClientIdent, type ParserState, type PendingMove } from './parser-state.ts';
 import { firstMoverContaminated, foreignAction, secondMoverContaminated, switchTriggered } from './speed-evidence.ts';
 import { toId } from '../ids.ts';
+import { itemFieldsOf } from './item-reading.ts';
 
 const SCREEN_IDS = ['reflect', 'lightscreen', 'auroraveil'];
 
@@ -82,7 +83,7 @@ function pendingMoveFor(
   return parts[2] && parts[4]
     ? {
       attacker: parts[2], target: parts[4], moveId,
-      spread: parts.slice(5).some(part => part.startsWith('[spread]')), crits: new Set<string>(), hits: new Map(),
+      spread: parts.slice(5).some(part => part.startsWith('[spread]')), crits: new Set<string>(), hits: new Map(), itemsBefore: new Map(),
       speedClean: cleanFirst, attackerSide: side, attackerSpecies: speciesForme,
     }
     : null;
@@ -248,6 +249,7 @@ function recordDamageObservation(state: ParserState, parts: string[], defenderId
     doubles: !state.singles,
     spread: lastMove.spread,
     defenderSide: defenderIdent.startsWith('p1') ? 'p1' : 'p2',
+    ...itemFieldsOf(lastMove, attacker, defender, defenderIdent),
   };
   state.observations.push(observation);
   return observation;
