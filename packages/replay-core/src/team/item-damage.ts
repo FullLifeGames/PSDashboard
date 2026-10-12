@@ -1,4 +1,5 @@
-import { calculate, Field, Generations, Move, Pokemon } from '@smogon/calc';
+import { calculate, Field, Move, Pokemon } from '@smogon/calc';
+import { calcGenerationFor, calcModOf, type CalcGeneration } from '../calc-gen.ts';
 import { Dex } from '@pkmn/sim';
 import type { HitParty, LoggedHit, OpponentTeamInfo, PokemonEvs, RevealedPokemonInfo } from '../types.ts';
 import { itemSetValue } from '../team-info.ts';
@@ -41,7 +42,7 @@ const FIELD_DAMAGE_HOOK = /^on(Ally|Any|Foe)(BasePower|ModifyAtk|ModifyDef|Modif
 const UNREADABLE_MOVE = ['basePowerCallback', 'damageCallback', 'damage', 'ohko', 'multihit', 'isZ', 'isMax', 'onModifyType', 'onModifyMove'];
 
 type GenDex = ReturnType<typeof Dex.forGen>;
-type CalcGen = ReturnType<typeof Generations.get>;
+type CalcGen = CalcGeneration;
 type CalcOptions = NonNullable<ConstructorParameters<typeof Pokemon>[2]>;
 type Stat = keyof PokemonEvs;
 interface Spread { evs: Partial<PokemonEvs>; ivs: Partial<PokemonEvs>; nature: string }
@@ -252,7 +253,7 @@ function contextOf(attacker: RevealedPokemonInfo, hit: LoggedHit, teams: { p1: O
   const ruled = attacker.ruledOut?.abilities ?? [];
   const abilities = mayHave(dex, hit.attacker.species, known).filter(ability => known || !ruled.includes(toId(ability)));
   const base = {
-    hit, gen: Generations.get(Math.min(9, Math.max(1, hit.gen)) as 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9),
+    hit, gen: calcGenerationFor(hit.gen, calcModOf(hit.format)),
     abilities: variantsOf(abilities.length > 0 ? abilities : [''], hit.attacker), spreads: extremes(offenseStat(dex, hit.move)),
   };
   return { ...base, defenders: defenderVariants(dex, info, base) };

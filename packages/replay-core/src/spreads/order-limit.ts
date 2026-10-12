@@ -9,6 +9,7 @@ import { raceSpeed } from './race-speed.ts';
 import { plausibleFor, scarfAllowed, type SpeedKnowledgeMap } from './scarf.ts';
 import { natureOf, type SpreadCandidate } from './ladder.ts';
 import { toId } from '../ids.ts';
+import { simGenNum } from '../calc-gen.ts';
 
 /**
  * T117 (round 63): an observed move order is a hard limit on the built
@@ -201,7 +202,7 @@ function readings(ctx: SolveContext, order: ReadOrder): [Reading, Reading] {
   const reading = (mover: RaceSide): Reading => {
     const scarf = racedWithScarf(ctx, mover);
     const { side, species, forme } = mover;
-    return entry => raceSpeed(ctx.gen.num, forme ? formeStat(ctx, side, species, entry, forme) : entry.stat, scarf);
+    return entry => raceSpeed(simGenNum(ctx.gen), forme ? formeStat(ctx, side, species, entry, forme) : entry.stat, scarf);
   };
   return [reading(firstOf(order)), reading(secondOf(order))];
 }

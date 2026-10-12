@@ -6,9 +6,9 @@
  * because nothing here reads sim history.
  */
 
-import { calculate, Field, Generations, Move, type Pokemon } from '@smogon/calc';
+import { calculate, Field, Move, type Pokemon } from '@smogon/calc';
 import { Dex, type PokemonSet } from '@pkmn/sim';
-import { type DamageObservation, typedHiddenPowerId, inferOpponentTeam, itemSetValue, replayRuleset, toId } from '@fulllifegames/replay-core';
+import { type DamageObservation, typedHiddenPowerId, inferOpponentTeam, itemSetValue, replayRuleset, toId, calcGenerationFor, simGenNum, type CalcGeneration } from '@fulllifegames/replay-core';
 import { attackerAtUse, calcPokemon, type CalcBody } from './calc/body.ts';
 import { calcMove } from './calc/move.ts';
 import { CHOICE_ITEMS } from './sensitivity.ts';
@@ -264,7 +264,7 @@ const TYPE_BOOST_ITEMS: Record<string, string> = {
  * CANNOT explain; everything else ambiguous (evidence never blocks by
  * absence).
  */
-type CalcGen = ReturnType<typeof Generations.get>;
+type CalcGen = CalcGeneration;
 
 const stagesOf = (boosts: Record<string, number>): CalcBody['boosts'] =>
   ({ atk: boosts.atk ?? 0, def: boosts.def ?? 0, spa: boosts.spa ?? 0, spd: boosts.spd ?? 0, spe: boosts.spe ?? 0 });
@@ -276,7 +276,7 @@ const stagesOf = (boosts: Record<string, number>): CalcBody['boosts'] =>
  * builder reads as EVs through the mod (round 67, decision 30).
  */
 function calcAttacker(gen: CalcGen, attackerSet: PokemonSet, obs: DamageObservation, withItem: string, moveId: string, mod?: string): Pokemon {
-  return calcPokemon(gen, attackerAtUse(gen.num, {
+  return calcPokemon(gen, attackerAtUse(simGenNum(gen), {
     species: attackerSet.species, level: attackerSet.level || 100, ability: attackerSet.ability || '', item: withItem,
     nature: attackerSet.nature, evs: attackerSet.evs, ivs: attackerSet.ivs, gender: attackerSet.gender,
     boosts: stagesOf(obs.attackerBoosts), status: obs.attackerStatus, tera: null, onField: true, mod,
@@ -355,7 +355,7 @@ export function corroborateChoiceItem(
   /** 'champions' when the sets hold Stat Points (round 67, decision 30). */
   mod?: string,
 ): ItemCorroboration {
-  const gen = Generations.get(Math.min(9, Math.max(1, genNum)) as 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9);
+  const gen = calcGenerationFor(genNum, mod);
   const speciesId = toId(species);
   const attackerSet = (side === 'p1' ? teams.p1Team : teams.p2Team)
     .find(candidate => toId(candidate.species) === speciesId);

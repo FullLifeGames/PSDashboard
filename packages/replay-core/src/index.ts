@@ -7,6 +7,8 @@
  * name, so it consumes this list like any other user.
  */
 export { WEATHER_BY_ID, TERRAIN_BY_ID } from './calc-field.ts';
+export { calcGenerationFor, calcModOf, simGenNum, CHAMPIONS_MOD } from './calc-gen.ts';
+export type { CalcGeneration } from './calc-gen.ts';
 export { resolveHiddenPowerType, typedHiddenPowerId, withHiddenPowerType, HP_TYPES } from './hidden-power.ts';
 export { toId, sideIndex } from './ids.ts';
 export type { SideId } from './ids.ts';

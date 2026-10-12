@@ -1,4 +1,5 @@
-import { Generations, Pokemon, Move, Field, calculate } from '@smogon/calc';
+import { Pokemon, Move, Field, calculate } from '@smogon/calc';
+import { calcGenerationFor, calcModOf, simGenNum, type CalcGeneration } from '../calc-gen.ts';
 import { Dex } from '@pkmn/dex';
 import type { PokemonSet } from '@pkmn/sim';
 import type { DamageObservation, PokemonEvs, SpeedOrderObservation } from '../types.ts';
@@ -60,7 +61,7 @@ export const secondOf = (order: ReadOrder): RaceSide => ({
 
 /** Everything one spread solve shares between its scoring functions. */
 export interface SolveContext {
-  gen: ReturnType<typeof Generations.get>;
+  gen: CalcGeneration;
   budget: EvBudget;
   sets: { p1: PokemonSet[]; p2: PokemonSet[] };
   solved: Map<string, SpreadCandidate>;
@@ -84,7 +85,7 @@ export function genNumOf(formatid: string): number {
 }
 
 function genOf(formatid: string) {
-  return Generations.get(genNumOf(formatid) as 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9);
+  return calcGenerationFor(genNumOf(formatid), calcModOf(formatid));
 }
 
 export const keyOf = (side: 'p1' | 'p2', species: string) => `${side}:${toId(species)}`;
@@ -273,7 +274,7 @@ export function racedWithScarf(ctx: SolveContext, mover: RaceSide): boolean {
 
 /** The Speed a race ran at: the stat in the forme that raced, with the Scarf as the simulator rounds it (round 64). */
 function effectiveSpeed(ctx: SolveContext, mover: RaceSide, spread: SpreadCandidate): number {
-  return raceSpeed(ctx.gen.num, speedStat(ctx, mover.side, mover.species, spread, mover.forme), racedWithScarf(ctx, mover));
+  return raceSpeed(simGenNum(ctx.gen), speedStat(ctx, mover.side, mover.species, spread, mover.forme), racedWithScarf(ctx, mover));
 }
 
 /**
@@ -284,7 +285,7 @@ function effectiveSpeed(ctx: SolveContext, mover: RaceSide, spread: SpreadCandid
  */
 export function weakRace(ctx: SolveContext, order: ReadOrder): boolean {
   if (!order.knockOut) return false;
-  const dex = Dex.forGen(ctx.gen.num);
+  const dex = Dex.forGen(simGenNum(ctx.gen));
   return (setOf(ctx, order.secondSide, order.secondSpecies)?.moves ?? []).some(move => dex.moves.get(move).priority < 0);
 }
 

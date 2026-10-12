@@ -1,7 +1,7 @@
-import { Generations, Pokemon as CalcPokemon } from '@smogon/calc';
+import { Pokemon as CalcPokemon } from '@smogon/calc';
 import { Dex } from '@pkmn/dex';
 import type { PokemonSet } from '@pkmn/sim';
-import { calcEvs, calcIvs, evBudget, speciesBaseId, toId, type PokemonEvs, type PokemonSnapshot, type TurnSnapshot } from '@fulllifegames/replay-core';
+import { CHAMPIONS_MOD, calcEvs, calcGenerationFor, calcIvs, evBudget, speciesBaseId, toId, type PokemonEvs, type PokemonSnapshot, type TurnSnapshot } from '@fulllifegames/replay-core';
 import {
   moveAtUse,
   type BranchMoveOption, type BranchSimState, type BranchSlotModifiers, type BranchSwitchOption, type MoveUser, type SimPokemonInfo,
@@ -65,13 +65,13 @@ function calcSpreadsOf(set: PokemonSet | undefined, champions: boolean): { evs?:
 }
 
 /** The evs of a Champions game's info hold Stat Points; the calc converts them through the mod (decision 30). */
-const championsMark = (champions: boolean): { mod?: string } => (champions ? { mod: 'champions' } : {});
+const championsMark = (champions: boolean): { mod?: string } => (champions ? { mod: CHAMPIONS_MOD } : {});
 
 /** Attack and Special Attack of the guessed set (Tera Blast's category in the move table; the label reads only the type). */
 function guessedAttacks(mon: PokemonSnapshot, set: PokemonSet | undefined, gen: number, champions = false): { atk?: number; spa?: number } {
   if (!set) return {};
   try {
-    const calcGen = Generations.get(Math.min(9, Math.max(1, gen)) as 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9);
+    const calcGen = calcGenerationFor(gen, champions ? CHAMPIONS_MOD : undefined);
     const poke = new CalcPokemon(calcGen, mon.speciesForme, { level: mon.level || set.level || 100, nature: set.nature || undefined, ...calcSpreadsOf(set, champions) });
     return { atk: poke.rawStats.atk, spa: poke.rawStats.spa };
   } catch {
@@ -148,7 +148,7 @@ function absoluteHp(
 ): { hp: number; maxhp: number; hpPercent: number } {
   const hpPercent = mon.maxhp === 0 && !mon.fainted ? 100 : mon.hpPercent;
   try {
-    const calcGen = Generations.get(Math.min(9, Math.max(1, gen)) as 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9);
+    const calcGen = calcGenerationFor(gen, champions ? CHAMPIONS_MOD : undefined);
     const poke = new CalcPokemon(calcGen, mon.speciesForme, {
       level: mon.level || set?.level || 100,
       nature: set?.nature || undefined,

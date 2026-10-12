@@ -1,6 +1,6 @@
-import { Generations, Field, calculate } from '@smogon/calc';
+import { Field, calculate } from '@smogon/calc';
 import type { Battle, Pokemon } from '@pkmn/sim';
-import { TERRAIN_BY_ID, WEATHER_BY_ID } from '@fulllifegames/replay-core';
+import { TERRAIN_BY_ID, WEATHER_BY_ID, calcGenerationFor } from '@fulllifegames/replay-core';
 import { attackerAtUse, calcPokemon, type SimBody } from './calc/body.ts';
 import { calcMove } from './calc/move.ts';
 import { bodyAsClicked } from './calc/tera-click.ts';
@@ -151,7 +151,7 @@ function damageKillFraction(
   defender: Pokemon,
 ): KillRolls | null {
   try {
-    const gen = Generations.get(genNum as 3 | 4 | 5 | 6 | 7 | 8 | 9);
+    const gen = calcGenerationFor(genNum, battle.dex.currentMod);
     const atkPoke = calcPokemon(gen, bodies.attacker);
     const defPoke = calcPokemon(gen, bodies.defender);
     const field = calcField(battle, defender);

@@ -1,8 +1,8 @@
-import { Generations, Move, Field, calculate, type Pokemon } from '@smogon/calc';
+import { Move, Field, calculate, type Pokemon } from '@smogon/calc';
 import { Dex } from '@pkmn/sim';
 import type { SimPokemonInfo, BranchMoveOption } from './branch-engine.ts';
-import { toId, TERRAIN_BY_ID, WEATHER_BY_ID } from '@fulllifegames/replay-core';
-import { attackerAtUse, bodyFromInfo, calcPokemon } from './calc/body.ts';
+import { toId, TERRAIN_BY_ID, WEATHER_BY_ID, calcGenerationFor, simGenNum } from '@fulllifegames/replay-core';
+import { attackerAtUse, bodyFromInfo, calcPokemon, simDexOf } from './calc/body.ts';
 import { hitDraws } from './calc/hit-draws.ts';
 import { calcMove } from './calc/move.ts';
 import { teraClicked } from './calc/tera-click.ts';
@@ -52,9 +52,9 @@ function toConditionId(value: string | undefined): string {
   return toId(value ?? '');
 }
 
-function calcGeneration(context: DamageCalcContext) {
+function calcGeneration(context: DamageCalcContext, mod?: string) {
   const genNumber = context.gen && context.gen >= 1 && context.gen <= 9 ? context.gen : 9;
-  return Generations.get(genNumber as 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9);
+  return calcGenerationFor(genNumber, mod);
 }
 
 function sideOptions(conditions: string[] | undefined) {
@@ -84,7 +84,7 @@ type CalcGen = ReturnType<typeof calcGeneration>;
  * simulator's click makes it (round 67: Terapagos-Terastal clicks into
  * Terapagos-Stellar, an Ogerpon into its -Tera forme; calc/tera-click.ts).
  */
-const bodyFor = (gen: CalcGen, info: SimPokemonInfo) => teraClicked(gen.num, bodyFromInfo(info));
+const bodyFor = (gen: CalcGen, info: SimPokemonInfo) => teraClicked(simGenNum(gen), bodyFromInfo(info));
 
 /** A calc Pokémon from the branch's live info, through the engine's one builder (calc/body.ts). */
 function calcPokemonFrom(gen: CalcGen, info: SimPokemonInfo): Pokemon {
@@ -105,7 +105,7 @@ function landsOn(gen: CalcGen, attacker: SimPokemonInfo, target: SimPokemonInfo,
  */
 function shieldedBy(gen: CalcGen, pick: string | undefined, moveName: string): boolean {
   if (!pick) return false;
-  const dex = Dex.forGen(gen.num);
+  const dex = simDexOf(gen);
   const shield = dex.moves.get(pick);
   if (!shield.stallingMove || !shield.volatileStatus) return false;
   const stopsMoves = 'onTryHit' in dex.conditions.get(shield.volatileStatus);
@@ -134,7 +134,7 @@ function moveLanding(
   const hit = moveOption.targetType === 'allAdjacentFoes' ? foes
     : moveOption.targetType === 'allAdjacent' ? foes + (context.attackerPartnerAlive ? 1 : 0)
     : 0;
-  const split = !!partner && !!Dex.forGen(gen.num).moves.get(moveOption.name).smartTarget &&
+  const split = !!partner && !!simDexOf(gen).moves.get(moveOption.name).smartTarget &&
     landsOn(gen, attacker, partner, moveOption.name, context, shieldedBy(gen, context.defenderPartnerMove, moveOption.name));
   const overrides: CalcMoveOverrides = {
     ...(hit === 1 ? { target: 'normal' as const } : {}),
@@ -271,9 +271,9 @@ export function calcSingleDamageRange(
   context: DamageCalcContext = {},
 ): DamageResult {
   try {
-    const gen = calcGeneration(context);
+    const gen = calcGeneration(context, attacker.mod);
     const overrides = moveLanding(gen, attacker, moveOption, context);
-    const atkBody = attackerAtUse(gen.num, bodyFor(gen, attacker), moveOption.name);
+    const atkBody = attackerAtUse(simGenNum(gen), bodyFor(gen, attacker), moveOption.name);
     const priceAt = (hits?: number, isStellarFirstUse = false): CalcResult => calculate(
       gen,
       calcPokemon(gen, atkBody),
@@ -292,7 +292,7 @@ export function calcSingleDamageRange(
     const firstUse = stellarFirstUse(attacker, () => priceAt().move.type);
     // A multi-hit move deals the sum of its hits; the calc sums them itself (T96). A drawn hit
     // count spans the fewest hits' minimum to the most hits' maximum, every count priced (T124).
-    const counts = overrides?.multihit ? null : hitCounts(gen.num, attacker, moveOption.name);
+    const counts = overrides?.multihit ? null : hitCounts(simGenNum(gen), attacker, moveOption.name);
     const priced = counts
       ? counts.map(({ hits, chance }) => ({ chance, result: priceAt(hits, firstUse) }))
       : [{ chance: 1, result: priceAt(undefined, firstUse) }];

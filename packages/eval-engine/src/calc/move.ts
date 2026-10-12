@@ -1,6 +1,7 @@
-import { Move as CalcMove, type Generations } from '@smogon/calc';
+import { Move as CalcMove } from '@smogon/calc';
 import { Dex, toID } from '@pkmn/sim';
-import type { CalcBody } from './body.ts';
+import { CHAMPIONS_MOD, simGenNum, type CalcGeneration } from '@fulllifegames/replay-core';
+import { simDexOf, type CalcBody } from './body.ts';
 
 /**
  * Round 67: the move as the calc must read it for this attacker, the other
@@ -19,7 +20,7 @@ import type { CalcBody } from './body.ts';
  * merge, decision 30; calc-champions.spec.ts checks every Champions move).
  */
 
-type CalcGen = ReturnType<typeof Generations.get>;
+type CalcGen = CalcGeneration;
 type CalcMoveOptions = NonNullable<ConstructorParameters<typeof CalcMove>[2]>;
 type PowerCallback = (this: unknown, pokemon: unknown, target: unknown, move: unknown) => unknown;
 
@@ -27,7 +28,7 @@ const CALC_LACKS_POWER = new Set(['lastrespects']);
 
 /** The power the move's own callback gives on the attacker's facts, or null to leave the calc its own. */
 function powerAtUse(gen: CalcGen, name: string, attacker: CalcBody): number | null {
-  const move = Dex.forGen(gen.num).moves.get(name);
+  const move = simDexOf(gen).moves.get(name);
   if (!CALC_LACKS_POWER.has(move.id) || typeof move.basePowerCallback !== 'function') return null;
   try {
     const power = (move.basePowerCallback as unknown as PowerCallback).call(undefined, { side: { totalFainted: attacker.totalFainted ?? 0 } }, null, move);
@@ -40,12 +41,12 @@ function powerAtUse(gen: CalcGen, name: string, attacker: CalcBody): number | nu
 /** The slot "Hidden Power" with the attacker's type, and its power before gen 6; any other move as named. */
 function typedHiddenPower(gen: CalcGen, name: string, attacker: CalcBody): { name: string; basePower: number | null } {
   if (toID(name) !== 'hiddenpower' || !attacker.hpType) return { name, basePower: null };
-  return { name: `Hidden Power ${attacker.hpType}`, basePower: gen.num < 6 && attacker.hpPower ? attacker.hpPower : null };
+  return { name: `Hidden Power ${attacker.hpType}`, basePower: simGenNum(gen) < 6 && attacker.hpPower ? attacker.hpPower : null };
 }
 
 /** The power and type a body's mod gives the move where the calc reads another, from the mod's Dex (loaded with its battle). */
 function modOverrides(name: string, attacker: CalcBody, calc: CalcMove): CalcMoveOptions['overrides'] | null {
-  const dex = attacker.mod === 'champions' ? Dex.dexes[attacker.mod] : undefined;
+  const dex = attacker.mod === CHAMPIONS_MOD ? Dex.dexes[CHAMPIONS_MOD] : undefined;
   const move = dex?.moves.get(name);
   if (!move?.exists) return null;
   const power = move.category !== 'Status' && !move.basePowerCallback && move.basePower !== calc.bp ? { basePower: move.basePower } : {};

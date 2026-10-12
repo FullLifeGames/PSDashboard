@@ -1,5 +1,5 @@
-import { Generations, Move as CalcMove, Pokemon as CalcPokemon, Field, calculate } from '@smogon/calc';
-import { TERRAIN_BY_ID, WEATHER_BY_ID } from '@fulllifegames/replay-core';
+import { Move as CalcMove, Pokemon as CalcPokemon, Field, calculate } from '@smogon/calc';
+import { TERRAIN_BY_ID, WEATHER_BY_ID, calcGenerationFor, simGenNum, type CalcGeneration } from '@fulllifegames/replay-core';
 import { attackerAtUse, calcPokemon } from '../calc/body.ts';
 import { calcMove } from '../calc/move.ts';
 import type { BodySnapshot, HitSnapshot } from './snapshot.ts';
@@ -25,7 +25,7 @@ export interface KillTable {
   crit: readonly number[];
 }
 
-type CalcGen = ReturnType<typeof Generations.get>;
+type CalcGen = CalcGeneration;
 
 const SPREAD_TARGETS = new Set(['allAdjacent', 'allAdjacentFoes']);
 const CHARGE_BOOST_MOVES = new Set(['meteorbeam', 'electroshot']);
@@ -86,8 +86,8 @@ function rollsOf(damage: unknown): number[] | null {
 /** The hit's 16 normal and 16 crit damage values, or null when the calc cannot price it (multi-hit shapes, unknown species). */
 export function killTable(snap: HitSnapshot): KillTable | null {
   try {
-    const gen = Generations.get(snap.gen as 3 | 4 | 5 | 6 | 7 | 8 | 9);
-    const attacker = calcBody(gen, attackerAtUse(gen.num, snap.attacker, snap.moveName), chargeOffset(snap));
+    const gen = calcGenerationFor(snap.gen, snap.attacker.mod);
+    const attacker = calcBody(gen, attackerAtUse(simGenNum(gen), snap.attacker, snap.moveName), chargeOffset(snap));
     const defender = calcBody(gen, snap.defender, 0);
     const field = calcField(snap);
     const normal = rollsOf(calculate(gen, attacker, defender, hitMove(gen, snap, false), field).damage);

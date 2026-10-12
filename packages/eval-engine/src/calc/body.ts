@@ -1,6 +1,6 @@
-import { Generations, Move as CalcMove, Pokemon as CalcPokemon, Field, calculate } from '@smogon/calc';
+import { Move as CalcMove, Pokemon as CalcPokemon, Field, calculate } from '@smogon/calc';
 import { Dex, toID, type Battle, type Pokemon } from '@pkmn/sim';
-import { calcEvs, calcIvs, evBudget, type PokemonEvs } from '@fulllifegames/replay-core';
+import { calcEvs, calcIvs, evBudget, calcGenerationFor, simGenNum, CHAMPIONS_MOD, type CalcGeneration, type PokemonEvs } from '@fulllifegames/replay-core';
 import type { SimPokemonInfo } from '../branch/types.ts';
 
 /**
@@ -11,7 +11,7 @@ import type { SimPokemonInfo } from '../branch/types.ts';
  * (bodyFromInfo) or off a built set (choice-lock.ts).
  */
 
-type CalcGen = ReturnType<typeof Generations.get>;
+type CalcGen = CalcGeneration;
 type Stages = { atk: number; def: number; spa: number; spd: number; spe: number };
 type StatSpread = Partial<Record<'hp' | 'atk' | 'def' | 'spa' | 'spd' | 'spe', number>>;
 
@@ -147,7 +147,7 @@ export function calcAddsStages(gen: number, ability: string): boolean {
   if (adds === undefined) {
     adds = false;
     try {
-      const calcGen = Generations.get(gen as 9);
+      const calcGen = calcGenerationFor(gen);
       const user = new CalcPokemon(calcGen, 'Mew', { ability: ability as never });
       const other = new CalcPokemon(calcGen, 'Mew', { ability: NO_ABILITY as never });
       const result = calculate(calcGen, user, other, new CalcMove(calcGen, 'Tackle'), new Field({}));
@@ -163,6 +163,16 @@ export function calcAddsStages(gen: number, ability: string): boolean {
 
 /** The simulator's own name for no ability: no check of the calc names it, and it keeps the calc off the species' first ability. */
 const NO_ABILITY = Dex.abilities.get('noability').name;
+
+/**
+ * The simulator's Dex behind a calculator generation: a game generation's own, and for the calculator's Champions
+ * generation 0 the Champions mod's Dex where it is loaded (it loads with a Champions battle), else Gen 9's, whose
+ * species data it shares (champions-vs-mod.md).
+ */
+export function simDexOf(gen: CalcGen): typeof Dex {
+  const mod = (gen.num as number) === 0 ? Dex.dexes[CHAMPIONS_MOD] : undefined;
+  return (mod ?? Dex.forGen(simGenNum(gen))) as typeof Dex;
+}
 
 /** One answer per gen and name. */
 const speciesMemo = new Map<string, string>();
@@ -186,9 +196,9 @@ export function calcSpecies(gen: number, name: string): string {
 }
 
 function knownForm(gen: number, name: string): string {
-  const calcGen = Generations.get(gen as 9);
+  const calcGen = calcGenerationFor(gen);
   if (calcGen.species.get(toID(name))) return name;
-  const dex = Dex.forGen(gen);
+  const dex = simDexOf(calcGen);
   const species = dex.species.get(name);
   if (!species.exists) return name;
   const stats = Object.values(species.baseStats).join('/');
@@ -254,7 +264,7 @@ function abilityForCalc(gen: CalcGen, body: CalcBody, species: string): string |
  * on every level (calc-champions.spec.ts holds it against the simulator).
  */
 const CHAMPIONS_BUDGET = evBudget('gen9championsou');
-const calcSpreads = (body: CalcBody): { evs: StatSpread; ivs: StatSpread } => (body.mod === 'champions'
+const calcSpreads = (body: CalcBody): { evs: StatSpread; ivs: StatSpread } => (body.mod === CHAMPIONS_MOD
   ? { evs: calcEvs(body.evs as PokemonEvs, CHAMPIONS_BUDGET), ivs: calcIvs(body.ivs as Partial<PokemonEvs>, CHAMPIONS_BUDGET) ?? {} }
   : { evs: body.evs, ivs: body.ivs });
 

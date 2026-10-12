@@ -1,3 +1,4 @@
+type CalcGeneration
 type ChaosStatsPayload
 type DamageObservation
 type EvBudget
@@ -35,6 +36,7 @@ type StatId
 type TurnSnapshot
 type UsageProbability
 type UsageSpread
+value CHAMPIONS_MOD
 value EMPTY_EVS
 value HP_TYPES
 value INFERRED_ITEM_DETAIL
@@ -49,7 +51,9 @@ value applyTeamSheetToInfo
 value broughtSpeciesFor
 value buildTeamsFromReplay
 value calcEvs
+value calcGenerationFor
 value calcIvs
+value calcModOf
 value countMatchingSpecies
 value enrichPokemonInfo
 value enrichTeamInfo
@@ -83,6 +87,7 @@ value replayBringOnly
 value replayRuleset
 value resolveHiddenPowerType
 value sideIndex
+value simGenNum
 value solveReplaySpreads
 value sourceDetail
 value speciesBaseId
