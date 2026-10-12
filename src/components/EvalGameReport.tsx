@@ -109,7 +109,7 @@ function MisplayChip({ misplay, playerNames, onSelectTurn, settingsFor }: {
             </span>
           )}
       <span style={{ color: tone }}>
-        {misplay.span ? regretText(misplay.regret, misplay.span.from, misplay.span.to) : winDeltaText(-misplay.regret)}
+        {misplay.span ? regretText(misplay.regret, misplay.span.from, misplay.span.to, misplay.span.faintedFraction) : winDeltaText(-misplay.regret)}
       </span>
     </button>
   );

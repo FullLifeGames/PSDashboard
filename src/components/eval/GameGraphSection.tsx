@@ -158,6 +158,7 @@ export function GameGraphSection(props: GameGraphSectionProps) {
           leadScore={graph.lead?.result.score ?? null}
           leadDetail={reportLeads ?? null}
           evalErrors={graph.evalErrors}
+          faintedFractions={graph.faintedFractions}
           decided={graph.results.map(result => (result ? heldDecided(result) ?? null : null))}
           variation={variation}
           maxTurn={graphMaxTurn}

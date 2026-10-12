@@ -4,6 +4,7 @@ import type { EvalPreferences } from '@fulllifegames/eval-engine';
 import { EvalPanel } from '../../../src/components/EvalPanel';
 import { EvalResultBlock } from '../../../src/components/eval/EvalResultBlock';
 import { EvalTurnAnalysis } from '../../../src/components/EvalTurnAnalysis';
+import { GameGraphSection } from '../../../src/components/eval/GameGraphSection';
 import { hitTitle, variationHitTitle } from '../../../src/lib/eval-graph-view';
 import { evalGraph, evalResult } from '../../fixtures/eval-result';
 import { misplayedSide, sideAnalysis, turnAnalysis } from '../../fixtures/analysis';
@@ -81,6 +82,40 @@ describe('graph and panel read one number', () => {
     expect(hitTitle({ ...args, faintedFractions: [0, 0.5] })).toContain(`Alice ${pct(0.4, 0.5)}%`);
     expect(variationHitTitle(names, { turn: 2, score: 0.4 }, [0, 0.5])).toContain(`Alice ${pct(0.4, 0.5)}%`);
     expect(variationHitTitle(names, { turn: 2, score: 0.4 })).toContain(`Alice ${pct(0.4)}%`);
+  });
+});
+
+describe('the rendered graph and the bar read one number', () => {
+  const prefs: EvalPreferences = { depth: 1, samples: 1, mode: 'matrix', auto: false, autoAnalyze: false, tera: 'auto' };
+  const panel = (graph: ReturnType<typeof evalGraph>, turn: number) => ({
+    playerNames: names, status: 'done' as const, progress: null, reconstructProgress: null, error: null, prefs,
+    onPrefsChange: vi.fn(), onCancel: vi.fn(), showAuto: false, showTera: true, report: null,
+    graph, result: graph.results[turn - 1], currentTurn: turn, analysisTurn: turn,
+    analysis: turnAnalysis(turn, { faintedFraction: graph.faintedFractions[turn - 1] ?? undefined }),
+  });
+  const section = (graph: ReturnType<typeof evalGraph>, turn: number) => ({
+    onAnalyzeGame: vi.fn(), onCancel: vi.fn(), running: false, hasGraph: true, prefs, graph, playerNames: names,
+    currentTurn: turn, selectTurn: vi.fn(), showReportView: false, onBackToReport: vi.fn(), result: graph.results[turn - 1],
+    analyzeTurn: null, hasAnalyzeTurn: false, analysis: null,
+  });
+
+  test.each(['singles', 'doubles'] as const)('%s: the tooltip of a late turn in the drawn graph equals the bar of that turn', kind => {
+    const graph = evalGraph(kind, { faintedFractions: Array.from({ length: 10 }, (_, i) => (i === 6 ? 0.625 : i / 40)) });
+    const score = graph.results[6]!.score;
+    const p1 = pct(score, 0.625);
+    expect(p1).not.toBe(pct(score, 0));
+    const drawn = render(<GameGraphSection {...section(graph, 7)} />);
+    expect(drawn.container.querySelector('rect[data-turn="7"] title')!.textContent).toContain(`Alice ${p1}% · Bob ${100 - p1}%`);
+    drawn.unmount();
+    render(<EvalPanel {...panel(graph, 7)} />);
+    expect(screen.getByRole('img', { name: `Advantage estimate: Alice ${p1}%, Bob ${100 - p1}%` })).toBeInTheDocument();
+  });
+
+  test('the drawn graph prints a variation point at the main line share of its turn', () => {
+    const graph = evalGraph('singles', { faintedFractions: Array.from({ length: 10 }, (_, i) => (i === 4 ? 0.5 : 0)) });
+    const variation = { startTurn: 4, scores: graph.scores.map((_, i) => (i === 4 ? 0.4 : null)) };
+    const drawn = render(<GameGraphSection {...section(graph, 5)} variation={variation} />);
+    expect(drawn.container.querySelector('rect[data-line="variation"] title')!.textContent).toContain(`Alice ${pct(0.4, 0.5)}%`);
   });
 });
 

@@ -27,6 +27,8 @@ interface EvalGraphProps {
   leadDetail?: LeadAnalysis | null;
   /** evalErrors[t-1] = why turn t has no point (eval-layer failure). */
   evalErrors?: (string | null)[];
+  /** faintedFractions[t-1] = the turn's fainted share (graph.faintedFractions): a tooltip prints at it, like the bar. */
+  faintedFractions?: (number | null)[];
   /**
    * decided[t-1] = the turn's decided-sweep state (round 15): the board is
    * practically over for `side`. Rendered as a thin strip on that side's
@@ -203,7 +205,10 @@ function MainPoints({ scores, blunders, scales: { x, y } }: { scores: (number | 
 
 function MainHits({ scores, hitWidth, x, onSelectTurn, titleArgs }: {
   scores: (number | null)[]; hitWidth: number; x: GraphScales['x']; onSelectTurn: SelectTurn;
-  titleArgs: { evalErrors: (string | null)[] | undefined; blunders: Set<number>; first: number; decided: DecidedSignal[] | undefined; playerNames: [string, string] };
+  titleArgs: {
+    evalErrors: (string | null)[] | undefined; blunders: Set<number>; first: number; decided: DecidedSignal[] | undefined;
+    playerNames: [string, string]; faintedFractions: (number | null)[] | undefined;
+  };
 }) {
   return (
     <>
@@ -229,8 +234,8 @@ function MainHits({ scores, hitWidth, x, onSelectTurn, titleArgs }: {
 /* Variation hits render AFTER the main hits so they win the overlap;
    narrower than a full column — the main line stays clickable around
    each gold point. */
-function VariationHits({ points, hitWidth, playerNames, onSelectTurn }: {
-  points: VariationPoint[]; hitWidth: number; playerNames: [string, string]; onSelectTurn: SelectTurn;
+function VariationHits({ points, hitWidth, playerNames, faintedFractions, onSelectTurn }: {
+  points: VariationPoint[]; hitWidth: number; playerNames: [string, string]; faintedFractions: (number | null)[] | undefined; onSelectTurn: SelectTurn;
 }) {
   return (
     <>
@@ -247,7 +252,7 @@ function VariationHits({ points, hitWidth, playerNames, onSelectTurn }: {
           style={onSelectTurn ? { cursor: 'pointer' } : undefined}
           onClick={onSelectTurn ? () => onSelectTurn(point.turn, 'variation') : undefined}
         >
-          <title>{variationHitTitle(playerNames, point)}</title>
+          <title>{variationHitTitle(playerNames, point, faintedFractions)}</title>
         </rect>
       ))}
     </>
@@ -259,7 +264,7 @@ function VariationHits({ points, hitWidth, playerNames, onSelectTurn }: {
  * needed); point color carries the polarity via the app's player colors;
  * blunder markers add a shape ring plus tooltip text, never color alone.
  */
-export function EvalGraph({ scores, playerNames, currentTurn, currentLine, onSelectTurn, leadScore, leadDetail, evalErrors, decided, variation, maxTurn }: EvalGraphProps) {
+export function EvalGraph({ scores, playerNames, currentTurn, currentLine, onSelectTurn, leadScore, leadDetail, evalErrors, faintedFractions, decided, variation, maxTurn }: EvalGraphProps) {
   const { svgRef, width } = useMeasuredWidth();
 
   const turns = scores.length;
@@ -278,7 +283,7 @@ export function EvalGraph({ scores, playerNames, currentTurn, currentLine, onSel
   const spans = decidedSpans(decided, scores, x);
   const highlight = highlightEdge({ currentTurn, scores, hasLead, leadScore, first, scales });
   const ring = ringScore({ currentLine, variation, scores, currentTurn, hasLead, leadScore, first });
-  const titleArgs = { evalErrors, blunders, first, decided, playerNames };
+  const titleArgs = { evalErrors, blunders, first, decided, playerNames, faintedFractions };
 
   return (
     <svg
@@ -307,7 +312,7 @@ export function EvalGraph({ scores, playerNames, currentTurn, currentLine, onSel
       )}
       <MainPoints scores={scores} blunders={blunders} scales={scales} />
       <MainHits scores={scores} hitWidth={hitWidth} x={x} onSelectTurn={onSelectTurn} titleArgs={titleArgs} />
-      <VariationHits points={overlay.points} hitWidth={hitWidth} playerNames={playerNames} onSelectTurn={onSelectTurn} />
+      <VariationHits points={overlay.points} hitWidth={hitWidth} playerNames={playerNames} faintedFractions={faintedFractions} onSelectTurn={onSelectTurn} />
       {/* Ring marker: the pointer's position on ITS line. */}
       {ring !== null && (
         <circle

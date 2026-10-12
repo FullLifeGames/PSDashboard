@@ -93,6 +93,14 @@ describe('EvalGameReport', () => {
     expect(within(chip(3)).getByText(winDeltaText(-0.3))).toBeInTheDocument();
   });
 
+  test('a misplay span prints at the turn\'s fainted share, the same map as the graph (T51)', () => {
+    const span = { from: 0.5, to: -0.5, faintedFraction: 0.5 };
+    const misplays = [{ turn: 12, side: 'p1' as const, regret: 1.4, played: 'Stone Edge', better: 'Earthquake', tier: 'mistake' as const, span }];
+    render(<EvalGameReport report={gameReport({ misplays })} playerNames={names} />);
+    const late = (x: number) => Math.round(100 / (1 + Math.exp(-3.1 * x)));
+    expect(within(chip(12)).getByText(`${late(0.5)}% to ${late(-0.5)}%`)).toBeInTheDocument();
+  });
+
   test('a key moment whose read lost ground shows the turn\'s movement, not the praise badge (T59)', () => {
     const read = { playedRaw: null, played: rankedChoice('move hypervoice', 'Hyper Voice', 0.3), best: null, safe: null, regret: 0, riskPaidOff: true };
     const moment = turnAnalysis(9, { attribution: 'p1-read', p1: read, swing: -0.544, chanceDelta: -0.687 });
