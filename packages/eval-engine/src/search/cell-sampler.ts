@@ -342,12 +342,14 @@ export function sampleCell(
   const plan = blendRoot ? planCellEvents(rootBattle, p1Choice, p2Choice) : null;
   // Round 63 (T16): a guard the plan cannot fold (a paralyzed attacker, a
   // Substitute, a pivot) is chance of its own: a verify cell draws them all.
-  if (plainDraws && plan?.kind === 'fail') return plainVerifySample(root, p1Choice, p2Choice, plainDraws, matchupCache);
+  // Round 69 (T146 c6): so is a tied cell, whose order the verify pass draws naturally and cannot script.
+  const tied = blendRoot && speedTie(rootBattle, p1Choice, p2Choice);
+  if (plainDraws && (plan?.kind === 'fail' || tied)) return plainVerifySample(root, p1Choice, p2Choice, plainDraws, matchupCache);
   const price = (scripts?: RollScripts) => (plan?.kind === 'events'
     ? blendCellSample(root, plan.events, p1Choice, p2Choice, samples, matchupCache, plainDraws, scripts)
     : plainCellSample(root, rootBattle, rootFainted, p1Choice, p2Choice, samples, matchupCache, undefined, plainDraws, scripts));
   // Round 69 (T146 c4): a tied singles cell is priced once per move order and mixed at one half.
-  if (blendRoot && !plainDraws && speedTie(rootBattle, p1Choice, p2Choice)) {
+  if (tied && !plainDraws) {
     const orders = tieOrderScripts(p1Choice, p2Choice);
     return mixOrders(price(orders.p1), price(orders.p2));
   }
