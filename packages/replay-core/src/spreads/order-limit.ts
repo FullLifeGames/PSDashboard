@@ -6,9 +6,9 @@ import {
   firstOf, keyOf, physicalAttackerFor, racedWithScarf, secondOf, setOf, speedStat, weakRace, type RaceSide, type ReadOrder, type SolveContext,
 } from './fit.ts';
 import { raceSpeed } from './race-speed.ts';
+import { originIn } from './battle-forme.ts';
 import { plausibleFor, scarfAllowed, type SpeedKnowledgeMap } from './scarf.ts';
 import { natureOf, type SpreadCandidate } from './ladder.ts';
-import { toId } from '../ids.ts';
 import { simGenNum } from '../calc-gen.ts';
 
 /**
@@ -58,9 +58,6 @@ interface Bound { first: Racer; second: Racer; firstSpeed: Reading; secondSpeed:
 
 const MAX_IVS: PokemonEvs = { hp: 31, atk: 31, def: 31, spa: 31, spd: 31, spe: 31 };
 
-const named = (sets: PokemonSet[], species: string) =>
-  sets.some(set => toId(set.species) === toId(species) || toId(set.name || '') === toId(species));
-
 /**
  * The set an order's mover raced as: its own species, or the set of the
  * forme a battle-only forme comes from (Dex `battleOnly`). On the same base
@@ -69,13 +66,11 @@ const named = (sets: PokemonSet[], species: string) =>
  * Speed with the set's spread (round 64), so the race keeps the forme.
  */
 function racedAs(dex: ReturnType<typeof Dex.forGen>, sets: PokemonSet[], species: string): { species: string; forme?: string } {
-  if (named(sets, species)) return { species };
-  const forme = dex.species.get(species);
-  const origin = [forme.battleOnly ?? []].flat()
-    .map(name => dex.species.get(name))
-    .find(base => base.exists && named(sets, base.name));
+  const origin = originIn(dex, sets, species);
   if (!origin) return { species };
-  return origin.baseStats.spe === forme.baseStats.spe ? { species: origin.name } : { species: origin.name, forme: forme.name };
+  const forme = dex.species.get(species);
+  const base = dex.species.get(origin);
+  return base.baseStats.spe === forme.baseStats.spe ? { species: base.name } : { species: base.name, forme: forme.name };
 }
 
 /**

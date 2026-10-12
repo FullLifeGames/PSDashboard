@@ -10,7 +10,8 @@ import type { CandidateRung, SpreadCandidate } from './ladder.ts';
 import type { ItemDecision, SpeedKnowledgeMap } from './scarf.ts';
 import type { ObservedMaxHp } from './max-hp.ts';
 import { raceSpeed } from './race-speed.ts';
-import { defenderSideOf, fieldOf, moveOf } from './observation-read.ts';
+import { defenderSideOf, fieldOf, moveOf, readObservation, type ReadObservation } from './observation-read.ts';
+import { formeAbility } from './battle-forme.ts';
 import { toId } from '../ids.ts';
 
 /**
@@ -60,7 +61,7 @@ export interface SolveContext {
   sets: { p1: PokemonSet[]; p2: PokemonSet[] };
   solved: Map<string, SpreadCandidate>;
   /** Observations per mon (as attacker AND as defender). */
-  byMon: Map<string, DamageObservation[]>;
+  byMon: Map<string, ReadObservation[]>;
   /** Observed same-turn move order, indexed per participant. */
   speedByMon: Map<string, ReadOrder[]>;
   /** The orders with sets on both sides, in observation order (round 37: the Scarf decisions walk them). */
@@ -124,7 +125,7 @@ export function buildSolveContext(
     budget,
     sets: onScale(sets, budget),
     solved: new Map<string, SpreadCandidate>(),
-    byMon: new Map<string, DamageObservation[]>(),
+    byMon: new Map<string, ReadObservation[]>(),
     speedByMon: new Map<string, ReadOrder[]>(),
     speedOrders: [],
     scarf: new Map<string, ItemDecision>(),
@@ -134,7 +135,9 @@ export function buildSolveContext(
   };
   const { byMon, speedByMon } = ctx;
 
-  for (const obs of observations) {
+  const dex = Dex.forGen(simGenNum(ctx.gen));
+  for (const raw of observations) {
+    const obs = readObservation(dex, ctx.sets, raw);
     const defenderSide = defenderSideOf(obs);
     if (setOf(ctx, obs.attackerSide, obs.attackerSpecies) && setOf(ctx, defenderSide, obs.defenderSpecies)) {
       const attackerKey = keyOf(obs.attackerSide, obs.attackerSpecies);
@@ -167,11 +170,11 @@ export function spreadFor(ctx: SolveContext, side: 'p1' | 'p2', species: string)
 }
 
 /** A body as the calculator reads it: the spread itself, Stat Points in evs for Champions' generation 0, which ignores IVs (round 68, T186). */
-function calcPokemon(ctx: SolveContext, side: 'p1' | 'p2', species: string, spread: SpreadCandidate, obsBoosts: Record<string, number>, status: string) {
+function calcPokemon(ctx: SolveContext, side: 'p1' | 'p2', species: string, spread: SpreadCandidate, obsBoosts: Record<string, number>, status: string, forme?: string) {
   const set = setOf(ctx, side, species);
-  return buildCalcPokemon(ctx.gen, set?.species ?? species, {
+  return buildCalcPokemon(ctx.gen, forme ?? set?.species ?? species, {
     level: set?.level || 100,
-    ability: set?.ability || undefined,
+    ability: formeAbility(Dex.forGen(simGenNum(ctx.gen)), forme, set?.ability),
     item: (spread.item ?? set?.item) || undefined,
     nature: spread.nature,
     evs: spread.evs,
@@ -182,11 +185,11 @@ function calcPokemon(ctx: SolveContext, side: 'p1' | 'p2', species: string, spre
 }
 
 /** The calc's roll range for one observation under the candidate spread, as HP fractions. */
-export function rollRange(ctx: SolveContext, obs: DamageObservation, attackerSpread: SpreadCandidate, defenderSpread: SpreadCandidate): { min: number; max: number } | null {
+export function rollRange(ctx: SolveContext, obs: ReadObservation, attackerSpread: SpreadCandidate, defenderSpread: SpreadCandidate): { min: number; max: number } | null {
   const { gen } = ctx;
   const defenderSide = defenderSideOf(obs);
-  const attacker = calcPokemon(ctx, obs.attackerSide, obs.attackerSpecies, attackerSpread, obs.attackerBoosts, obs.attackerStatus);
-  const defender = calcPokemon(ctx, defenderSide, obs.defenderSpecies, defenderSpread, obs.defenderBoosts, '');
+  const attacker = calcPokemon(ctx, obs.attackerSide, obs.attackerSpecies, attackerSpread, obs.attackerBoosts, obs.attackerStatus, obs.attackerForme);
+  const defender = calcPokemon(ctx, defenderSide, obs.defenderSpecies, defenderSpread, obs.defenderBoosts, '', obs.defenderForme);
   // The protocol records typeless "hiddenpower"; calc it as the SET's
   // resolved variant, or the fit runs the IV-default type against a hit
   // the sim plays typed (653785: Dark-fitted spreads, Ice-rolled sim).
@@ -203,7 +206,7 @@ export function rollRange(ctx: SolveContext, obs: DamageObservation, attackerSpr
   return { min: Math.min(...rolls) / maxHp, max: Math.max(...rolls) / maxHp };
 }
 
-export function observationError(ctx: SolveContext, obs: DamageObservation, candidateKey: string, candidate: SpreadCandidate): number {
+export function observationError(ctx: SolveContext, obs: ReadObservation, candidateKey: string, candidate: SpreadCandidate): number {
   const defenderSide = defenderSideOf(obs);
   const attackerKey = keyOf(obs.attackerSide, obs.attackerSpecies);
   const attackerSpread = attackerKey === candidateKey ? candidate : spreadFor(ctx, obs.attackerSide, obs.attackerSpecies);
