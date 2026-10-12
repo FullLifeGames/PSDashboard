@@ -380,6 +380,9 @@ export function corroborateChoiceItem(
   let sawChoiceOnly = false;
   for (const obs of observations) {
     if (obs.attackerSide !== side || !isBodyOf(gen, obs.attackerSpecies, species)) continue;
+    // Doubles hits (round 69, T31) carry a spread cut, screens at x2732/4096 and partner targets this check prices on a
+    // singles field: they stay out of the verdict until it reads the doubles field.
+    if (obs.doubles) continue;
     const defenderTeam = side === 'p1' ? teams.p2Team : teams.p1Team;
     const defenderSet = defenderTeam.find(candidate => isBodyOf(gen, obs.defenderSpecies, candidate.species));
     const info = defenders?.[side === 'p1' ? 'p2' : 'p1'];
