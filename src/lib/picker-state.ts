@@ -1,7 +1,7 @@
 import { Pokemon as CalcPokemon } from '@smogon/calc';
 import { Dex } from '@pkmn/dex';
 import type { PokemonSet } from '@pkmn/sim';
-import { CHAMPIONS_MOD, calcEvs, calcGenerationFor, calcIvs, evBudget, speciesBaseId, toId, type PokemonEvs, type PokemonSnapshot, type TurnSnapshot } from '@fulllifegames/replay-core';
+import { CHAMPIONS_MOD, calcGenerationFor, evBudget, speciesBaseId, toId, type PokemonEvs, type PokemonSnapshot, type TurnSnapshot } from '@fulllifegames/replay-core';
 import {
   moveAtUse,
   type BranchMoveOption, type BranchSimState, type BranchSlotModifiers, type BranchSwitchOption, type MoveUser, type SimPokemonInfo,
@@ -54,17 +54,14 @@ function moveNamesFor(mon: PokemonSnapshot, set: PokemonSet | undefined): string
 }
 
 /**
- * Round 67 (decision 30): the spreads the calc reads for a guessed set. A set of a Champions game holds Stat Points,
- * which @smogon/calc 0.11 reads as EV = 8·SP − 4 with every IV 31 (the server's statModify on every level).
+ * The spreads the calc reads for a guessed set (round 68, T186): the set's own. A set of a Champions game holds Stat
+ * Points, which the calc's Champions generation (0) reads in `evs` as they are and which ignores IVs.
  */
-const CHAMPIONS_BUDGET = evBudget('gen9championsou');
-function calcSpreadsOf(set: PokemonSet | undefined, champions: boolean): { evs?: Partial<PokemonEvs>; ivs?: Partial<PokemonEvs> } {
-  if (!set) return {};
-  if (!champions) return { evs: set.evs, ivs: set.ivs };
-  return { evs: calcEvs(set.evs as PokemonEvs, CHAMPIONS_BUDGET), ivs: calcIvs(set.ivs as Partial<PokemonEvs>, CHAMPIONS_BUDGET) };
+function calcSpreadsOf(set: PokemonSet | undefined): { evs?: Partial<PokemonEvs>; ivs?: Partial<PokemonEvs> } {
+  return set ? { evs: set.evs, ivs: set.ivs } : {};
 }
 
-/** The evs of a Champions game's info hold Stat Points; the calc converts them through the mod (decision 30). */
+/** The evs of a Champions game's info hold Stat Points; the mod picks the calc's Champions generation. */
 const championsMark = (champions: boolean): { mod?: string } => (champions ? { mod: CHAMPIONS_MOD } : {});
 
 /** Attack and Special Attack of the guessed set (Tera Blast's category in the move table; the label reads only the type). */
@@ -72,7 +69,7 @@ function guessedAttacks(mon: PokemonSnapshot, set: PokemonSet | undefined, gen: 
   if (!set) return {};
   try {
     const calcGen = calcGenerationFor(gen, champions ? CHAMPIONS_MOD : undefined);
-    const poke = new CalcPokemon(calcGen, mon.speciesForme, { level: mon.level || set.level || 100, nature: set.nature || undefined, ...calcSpreadsOf(set, champions) });
+    const poke = new CalcPokemon(calcGen, mon.speciesForme, { level: mon.level || set.level || 100, nature: set.nature || undefined, ...calcSpreadsOf(set) });
     return { atk: poke.rawStats.atk, spa: poke.rawStats.spa };
   } catch {
     return {};
@@ -152,7 +149,7 @@ function absoluteHp(
     const poke = new CalcPokemon(calcGen, mon.speciesForme, {
       level: mon.level || set?.level || 100,
       nature: set?.nature || undefined,
-      ...calcSpreadsOf(set, champions),
+      ...calcSpreadsOf(set),
     });
     const maxhp = poke.maxHP();
     const hp = mon.fainted ? 0 : Math.max(1, Math.round(maxhp * hpPercent / 100));

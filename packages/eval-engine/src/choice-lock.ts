@@ -273,7 +273,7 @@ const stagesOf = (boosts: Record<string, number>): CalcBody['boosts'] =>
  * Both bodies of an observation stood on the field: their stages hold every
  * entry boost; the attacker hits in the forme its ability takes for the move
  * (calc/body.ts). A Champions game's sets hold Stat Points, which the one
- * builder reads as EVs through the mod (round 67, decision 30).
+ * builder hands to the calc's Champions generation as they are (round 68, T186).
  */
 function calcAttacker(gen: CalcGen, attackerSet: PokemonSet, obs: DamageObservation, withItem: string, moveId: string, mod?: string): Pokemon {
   return calcPokemon(gen, attackerAtUse(simGenNum(gen), {

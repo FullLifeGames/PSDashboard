@@ -5,7 +5,7 @@ import type { PokemonSet } from '@pkmn/sim';
 import type { DamageObservation, PokemonEvs, SpeedOrderObservation } from '../types.ts';
 import { WEATHER_BY_ID } from '../calc-field.ts';
 import { typedHiddenPowerId } from '../hidden-power.ts';
-import { calcEvs, calcIvs, evBudget, onBudgetScale, statPointsOfEv, ZERO_EVS, type EvBudget } from './ev-budget.ts';
+import { calcIvs, evBudget, onBudgetScale, statPointsOfEv, ZERO_EVS, type EvBudget } from './ev-budget.ts';
 import type { CandidateRung, SpreadCandidate } from './ladder.ts';
 import type { ItemDecision } from './scarf.ts';
 import type { ObservedMaxHp } from './max-hp.ts';
@@ -169,7 +169,7 @@ export function spreadFor(ctx: SolveContext, side: 'p1' | 'p2', species: string)
   return { evs: { ...ZERO_EVS, ...(set?.evs ?? {}) }, nature: set?.nature || 'Hardy' };
 }
 
-/** A body as the calculator reads it: Stat Points as their EVs and every IV at 31 (calcEvs), else the spread itself. */
+/** A body as the calculator reads it: the spread itself, Stat Points in evs for Champions' generation 0, which ignores IVs (round 68, T186). */
 function calcPokemon(ctx: SolveContext, side: 'p1' | 'p2', species: string, spread: SpreadCandidate, obsBoosts: Record<string, number>, status: string) {
   const set = setOf(ctx, side, species);
   return new Pokemon(ctx.gen, set?.species ?? species, {
@@ -177,8 +177,8 @@ function calcPokemon(ctx: SolveContext, side: 'p1' | 'p2', species: string, spre
     ability: set?.ability || undefined,
     item: set?.item || undefined,
     nature: spread.nature,
-    evs: calcEvs(spread.evs, ctx.budget),
-    ivs: calcIvs(set?.ivs, ctx.budget),
+    evs: spread.evs,
+    ivs: set?.ivs,
     boosts: obsBoosts,
     status: (status || undefined) as ConstructorParameters<typeof Pokemon>[2] extends { status?: infer S } ? S : never,
   });
@@ -241,13 +241,13 @@ export function observationError(ctx: SolveContext, obs: DamageObservation, cand
 
 /**
  * The Speed stat of a spread on the set's level and IVs (the spread's own IVs first; a battle forme's base
- * Speed when one raced; Stat Points as their EVs with every IV at 31), 0 when the calc cannot build the species.
+ * Speed when one raced; Stat Points in evs on Champions' generation 0, which reads no IV), 0 when the calc cannot build the species.
  */
 export function speedStat(ctx: SolveContext, side: 'p1' | 'p2', species: string, spread: SpreadCandidate, forme?: string): number {
   const set = setOf(ctx, side, species);
   const name = forme ?? set?.species ?? species;
-  const evs = calcEvs(spread.evs, ctx.budget);
-  const ivs = calcIvs(spread.ivs ?? set?.ivs, ctx.budget);
+  const evs = spread.evs;
+  const ivs = spread.ivs ?? set?.ivs;
   for (const candidate of [name, name.split('-')[0]]) {
     try {
       return new Pokemon(ctx.gen, candidate, { level: set?.level || 100, nature: spread.nature, evs, ivs }).stats.spe;

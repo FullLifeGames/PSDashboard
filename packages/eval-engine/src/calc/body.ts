@@ -1,6 +1,6 @@
 import { Move as CalcMove, Pokemon as CalcPokemon, Field, calculate } from '@smogon/calc';
 import { Dex, toID, type Battle, type Pokemon } from '@pkmn/sim';
-import { calcEvs, calcIvs, evBudget, calcGenerationFor, simGenNum, CHAMPIONS_MOD, type CalcGeneration, type PokemonEvs } from '@fulllifegames/replay-core';
+import { calcGenerationFor, simGenNum, CHAMPIONS_MOD, type CalcGeneration } from '@fulllifegames/replay-core';
 import type { SimPokemonInfo } from '../branch/types.ts';
 
 /**
@@ -32,7 +32,7 @@ export interface CalcBody {
   tera: string | null;
   /** The body stands on the field: its stages come from the simulator and already hold every entry boost. */
   onField: boolean;
-  /** The battle's mod (Dex.currentMod), for a branch by format at the one place below. */
+  /** The battle's mod (Dex.currentMod), for the Champions mod's move overrides (calc/move.ts). */
   mod?: string;
   /** The stat a Paradox ability's volatile raises (T76). */
   boostedStat?: string;
@@ -259,26 +259,36 @@ function abilityForCalc(gen: CalcGen, body: CalcBody, species: string): string |
 }
 
 /**
- * Round 67 (decision 30): @smogon/calc 0.11 does not know Pokémon Champions. A body of a Champions battle carries
- * Stat Points in its evs; the calc reads them as EV = 8·SP − 4 with every IV 31, which gives the server's statModify
- * on every level (calc-champions.spec.ts holds it against the simulator).
+ * The species as overrides, read from the simulator's Dex (round 68, T186, decision 3): a species the calculator's generation
+ * does not list and no equal-valued form stands in for (Meloetta-Pirouette, Minior-Meteor, the Ogerpon Tera formes, Terapagos-Terastal in
+ * Champions' generation 0) goes to the calc as the data the Dex holds, on its own name; the calc builds the stats, types and weight from
+ * it. Undefined when the calc lists the name or the Dex does not know it either (the calc refuses as before).
  */
-const CHAMPIONS_BUDGET = evBudget('gen9championsou');
-const calcSpreads = (body: CalcBody): { evs: StatSpread; ivs: StatSpread } => (body.mod === CHAMPIONS_MOD
-  ? { evs: calcEvs(body.evs as PokemonEvs, CHAMPIONS_BUDGET), ivs: calcIvs(body.ivs as Partial<PokemonEvs>, CHAMPIONS_BUDGET) ?? {} }
-  : { evs: body.evs, ivs: body.ivs });
+export function speciesOverrides(gen: CalcGen, name: string): NonNullable<NonNullable<ConstructorParameters<typeof CalcPokemon>[2]>['overrides']> | undefined {
+  if (gen.species.get(toID(name))) return undefined;
+  const species = simDexOf(gen).species.get(name);
+  if (!species.exists) return undefined;
+  return {
+    name: species.name as never,
+    types: species.types as never,
+    baseStats: species.baseStats,
+    weightkg: species.weightkg,
+    ...(species.nfe ? { nfe: true } : {}),
+    ...(species.gender ? { gender: species.gender as never } : {}),
+    abilities: { 0: species.abilities[0] } as never,
+  };
+}
 
 /** The one place the engine builds a calc Pokémon. */
 export function calcPokemon(gen: CalcGen, body: CalcBody): CalcPokemon {
   const species = calcSpecies(gen.num, body.species);
-  const { evs, ivs } = calcSpreads(body);
   return new CalcPokemon(gen, species, {
     level: body.level,
     ability: abilityForCalc(gen, body, species) as never,
     item: (body.item || undefined) as never,
     nature: (body.nature || undefined) as never,
-    evs,
-    ivs,
+    evs: body.evs,
+    ivs: body.ivs,
     gender: (body.gender || undefined) as never,
     boosts: body.boosts,
     curHP: body.hp,
@@ -286,5 +296,6 @@ export function calcPokemon(gen: CalcGen, body: CalcBody): CalcPokemon {
     teraType: (body.tera ?? undefined) as never,
     boostedStat: body.boostedStat as never,
     alliesFainted: body.alliesFainted,
+    overrides: speciesOverrides(gen, species),
   });
 }

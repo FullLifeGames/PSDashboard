@@ -3,6 +3,8 @@ import { Dex, toID } from '@pkmn/sim';
 import { CHAMPIONS_MOD, simGenNum, type CalcGeneration } from '@fulllifegames/replay-core';
 import { simDexOf, type CalcBody } from './body.ts';
 
+export { protectBlocks } from './protect.ts';
+
 /**
  * Round 67: the move as the calc must read it for this attacker, the other
  * half of the engine's one builder (calc/body.ts), used by ko-odds.ts,
@@ -15,9 +17,11 @@ import { simDexOf, type CalcBody } from './body.ts';
  * test/calc-sim-inputs.spec.ts holds that the calc prices it at its listed
  * power whatever alliesFainted says, so the set empties once it learns it).
  * A body of a Champions battle uses its moves as the Champions mod defines
- * them: calc 0.11 prices them at Gen 9 values, so a power or type the mod
- * changes goes in as an override, read from the mod's own Dex (round 67
- * merge, decision 30; calc-champions.spec.ts checks every Champions move).
+ * them: the calc's own Champions generation (0) agrees with the mod on every
+ * legal damaging move but Pound, which it lacks, so a move the calc lacks or
+ * reads at another power, type or category goes in as an override, read from
+ * the mod's own Dex (round 68, T186; calc-champions-moves.spec.ts checks every
+ * Champions move).
  */
 
 type CalcGen = CalcGeneration;
@@ -44,20 +48,29 @@ function typedHiddenPower(gen: CalcGen, name: string, attacker: CalcBody): { nam
   return { name: `Hidden Power ${attacker.hpType}`, basePower: simGenNum(gen) < 6 && attacker.hpPower ? attacker.hpPower : null };
 }
 
-/** The power and type a body's mod gives the move where the calc reads another, from the mod's Dex (loaded with its battle). */
-function modOverrides(name: string, attacker: CalcBody, calc: CalcMove): CalcMoveOptions['overrides'] | null {
-  const dex = attacker.mod === CHAMPIONS_MOD ? Dex.dexes[CHAMPIONS_MOD] : undefined;
-  const move = dex?.moves.get(name);
+/**
+ * What the body's mod gives a move where the calc's data differs or has none (round 68, T186, decision 2): the calc's own
+ * Champions generation (0) lists the mod's moves except for Pound, which it lacks, so a move whose power, type or
+ * category differs, or which the calc has no data for, goes in with the values of the mod's Dex (loaded with its battle),
+ * and the whole row (flags, target) when the calc has none. Negative priority stays out: the calc reads priority only as
+ * "greater than zero", which has no damage effect.
+ */
+function modOverrides(gen: CalcGen, name: string, attacker: CalcBody, calc: CalcMove): CalcMoveOptions['overrides'] | null {
+  const move = attacker.mod === CHAMPIONS_MOD ? Dex.dexes[CHAMPIONS_MOD]?.moves.get(name) : undefined;
   if (!move?.exists) return null;
+  if (!gen.moves.get(toID(move.name) as never)) {
+    return { basePower: move.basePower, type: move.type as never, category: move.category, flags: { ...move.flags } as never, target: move.target as never };
+  }
   const power = move.category !== 'Status' && !move.basePowerCallback && move.basePower !== calc.bp ? { basePower: move.basePower } : {};
   const type = move.type !== calc.type ? { type: move.type as never } : {};
-  return Object.keys(power).length + Object.keys(type).length > 0 ? { ...power, ...type } : null;
+  const category = move.category !== calc.category ? { category: move.category } : {};
+  return Object.keys(power).length + Object.keys(type).length + Object.keys(category).length > 0 ? { ...power, ...type, ...category } : null;
 }
 
 export function calcMove(gen: CalcGen, name: string, attacker: CalcBody, options: CalcMoveOptions = {}): CalcMove {
   const typed = typedHiddenPower(gen, name, attacker);
   const basePower = typed.basePower ?? powerAtUse(gen, name, attacker);
   const move = new CalcMove(gen, typed.name, basePower === null ? options : { ...options, overrides: { ...options.overrides, basePower } });
-  const changed = basePower === null ? modOverrides(typed.name, attacker, move) : null;
+  const changed = basePower === null ? modOverrides(gen, typed.name, attacker, move) : null;
   return changed ? new CalcMove(gen, typed.name, { ...options, overrides: { ...options.overrides, ...changed } }) : move;
 }
