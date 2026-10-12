@@ -1,7 +1,7 @@
 import { mctsTreeSearch } from './mcts.ts';
 import { mergeMctsTrees } from './mcts-merge.ts';
 import type { OrchestratorCallbacks, SearchExecutor } from './orchestrator.ts';
-import { perfAdd, perfSync } from './perf-trace.ts';
+import { perfAdd, perfCount, perfSync } from './perf-trace.ts';
 import { cellKey } from './rank.ts';
 import { searchBudget } from './search/budget.ts';
 import { applyForcedWin, forcedWinInput } from './search/forced-win-apply.ts';
@@ -10,7 +10,7 @@ import type { EvalCellJob, EvalCellValue, EvalResult, EvalSettings, MctsTreeStat
 import type { StaticRuleset } from './score/weights.ts';
 import { boundaryCheckCells, playedIndices, rowCompletedCells, starvedSupportCells, type VerifyFocus } from './verify-select.ts';
 import {
-  addedAnswers, answerSides, answersMode, confirmedAnswers, confirmJobs, detectionJobs, extensionJobs, gradedRanking,
+  addedAnswers, answerSides, answersMode, confirmedAnswers, confirmedCells, confirmJobs, deepRows, detectionJobs, extensionJobs, gradedRanking, refutations, siblingJobs,
   type AnswerSide, type AnswersMode,
 } from './search/answers.ts';
 
@@ -92,6 +92,9 @@ async function pairPlanBoundary(
   return new Set(values.filter(value => value.blend).map(value => cellKey(value.i, value.j)));
 }
 
+/** The verify round's merge, the cells it priced and the focus it used (the answer round's re-check reads both). */
+export interface Verified { result: EvalResult; values: Map<number, EvalCellValue>; focus: VerifyFocus }
+
 /**
  * Starved-support verification: cells the merged equilibrium leans on with
  * too few pooled visits carry ONE chance outcome per tree; re-price them with
@@ -102,63 +105,132 @@ async function pairPlanBoundary(
  */
 async function verifiedMerge(
   executor: TreeExecutor, trees: MctsTreeStats[], settings: EvalSettings, callbacks?: OrchestratorCallbacks,
-): Promise<EvalResult> {
+): Promise<Verified> {
   const merged = perfSync('main:mcts-merge', () => mergeMctsTrees(trees));
-  if (stopped(callbacks)) return merged;
+  const unverified: Verified = { result: merged, values: new Map(), focus: {} };
+  if (stopped(callbacks)) return unverified;
   try {
     const played = playedIndices(trees, merged, settings.keepPlayed);
     const focus: VerifyFocus = { played, boundary: await pairPlanBoundary(executor, trees, merged, played) };
-    if (stopped(callbacks)) return merged;
+    if (stopped(callbacks)) return unverified;
     const jobs = perfSync('main:starved-cells', () => rowCompletedCells(trees, merged, starvedSupportCells(trees, merged, focus), focus));
-    if (jobs.length === 0) return merged;
+    if (jobs.length === 0) return { ...unverified, focus };
     callbacks?.onPartial?.(merged);
-    const values = await verifyCells(executor, jobs, settings);
-    if (stopped(callbacks)) return merged;
-    return perfSync('main:mcts-merge', () =>
-      mergeMctsTrees(trees, new Map(values.map(value => [cellKey(value.i, value.j), value]))));
+    const values = new Map((await verifyCells(executor, jobs, settings)).map(value => [cellKey(value.i, value.j), value]));
+    if (stopped(callbacks)) return unverified;
+    return { result: perfSync('main:mcts-merge', () => mergeMctsTrees(trees, values)), values, focus };
   } catch {
     // Verification is a refinement: a failed round degrades to the unverified merge.
-    return merged;
+    return unverified;
   }
 }
+
+/** What the answer round found for one side: the answers to add and the cells the depth check already priced one ply deeper. */
+interface SideAnswers { added: number[]; known: EvalCellValue[] }
 
 /** One side's answers to add: every unlisted one ('full'), or the candidates the deeper search confirms ('protect'). */
 async function sideAnswers(
   executor: TreeExecutor, view: AnswerSide, merged: EvalResult, mode: AnswersMode, deepen: EvalSettings,
-): Promise<number[]> {
-  if (mode === 'full') return addedAnswers(view, mode, []);
+): Promise<SideAnswers> {
+  if (mode === 'full') return { added: addedAnswers(view, mode, merged, []), known: [] };
   const jobs = detectionJobs(view, merged);
-  if (jobs.length === 0) return [];
-  const candidates = addedAnswers(view, mode, await executor.evalCells(jobs));
-  if (candidates.length === 0) return [];
-  const deep = await Promise.all(confirmJobs(view, merged, candidates, deepen).map(job => executor.subSearch(job)));
-  return confirmedAnswers(view, merged, candidates, deep);
+  if (jobs.length === 0) return { added: [], known: [] };
+  let started = Date.now();
+  const first = await executor.evalCells(jobs);
+  const more = siblingJobs(view, merged, first);
+  const detected = more.length === 0 ? first : [...first, ...await executor.evalCells(more)];
+  const refuting = refutations(view, merged, detected);
+  perfCount('answer-detect-cells', jobs.length + more.length);
+  perfAdd('answer-detect', Date.now() - started);
+  if (refuting.length === 0) return { added: [], known: [] };
+  started = Date.now();
+  const deep = await Promise.all(confirmJobs(view, refuting, deepen).map(job => executor.subSearch(job)));
+  perfAdd('answer-confirm', Date.now() - started);
+  perfCount('answer-confirm-searches', deep.length);
+  const added = confirmedAnswers(view, merged, refuting, deep);
+  return { added, known: confirmedCells(view, refuting, deep, added) };
+}
+
+/** What the answer round priced for one side: the added answers and the extension's values (the graded ranking reads both). */
+interface SideGrade { view: AnswerSide; added: number[]; values: EvalCellValue[] }
+
+/** Every listed row against the side's added answers: one plain draw, the deep rows one ply deeper, the confirmed cells as they are. */
+async function sideExtension(
+  executor: TreeExecutor, view: AnswerSide, found: SideAnswers, merged: EvalResult, deepen: EvalSettings,
+): Promise<EvalCellValue[]> {
+  if (found.added.length === 0) return [];
+  const deep = deepRows(view, merged);
+  const priced = new Set(found.known.map(value => cellKey(value.i, value.j)));
+  const jobs = extensionJobs(view, found.added, deep, deepen).filter(job => !priced.has(cellKey(job.i, job.j)));
+  perfCount('answer-extend-deep', jobs.filter(job => job.deepen !== undefined).length);
+  return [...found.known, ...await executor.evalCells(jobs)];
+}
+
+/** Each side's ranking over the listed and the added answers; a side without an added answer keeps the matrix's. */
+function gradedSides(grades: SideGrade[], merged: EvalResult, tree: MctsTreeStats): EvalResult['perSide'] {
+  const [p1, p2] = grades.map(grade => (grade.added.length === 0
+    ? merged.perSide[grade.view.side]
+    : gradedRanking(grade.view, merged, tree, grade.added, grade.values)));
+  return { p1, p2 };
+}
+
+/**
+ * Round 69 (T149): when the answers change a side's best row, the new row's cells that no verify round priced get one
+ * more verify round, picked by the first round's selectors over the new ranking and kept to the new best rows; the
+ * merge and the rankings (`regrade`) are then redone once with the new values. Null when no best row changed or no cell
+ * is left (a new best row the trees visited enough has none).
+ */
+export async function recheckedRound(
+  executor: TreeExecutor, trees: MctsTreeStats[], round: Verified, perSide: EvalResult['perSide'],
+  regrade: (merged: EvalResult) => EvalResult['perSide'], settings: EvalSettings,
+): Promise<EvalResult | null> {
+  const merged = round.result;
+  const changed = (['p1', 'p2'] as const).filter(side => perSide[side][0]?.choice !== merged.perSide[side][0]?.choice);
+  if (changed.length === 0) return null;
+  const options = { p1: trees[0].p1Options, p2: trees[0].p2Options };
+  const newRows = new Set(changed.map(side => `${side}:${options[side].findIndex(option => option.choice === perSide[side][0].choice)}`));
+  const regraded = { ...merged, perSide };
+  const jobs = rowCompletedCells(trees, regraded, starvedSupportCells(trees, regraded, round.focus), round.focus)
+    .filter(job => !round.values.has(cellKey(job.i, job.j)) && (newRows.has(`p1:${job.i}`) || newRows.has(`p2:${job.j}`)));
+  if (jobs.length === 0) return null;
+  const values = new Map(round.values);
+  for (const value of await verifyCells(executor, jobs, settings)) values.set(cellKey(value.i, value.j), value);
+  const remerged = perfSync('main:mcts-merge', () => mergeMctsTrees(trees, values));
+  return { ...remerged, perSide: regrade(remerged) };
 }
 
 /**
  * Round 67 (T128): the doubles root's answer round (search/answers.ts).
  * After the verify round each side is graded against the other side's legal
  * answers the tree did not list, each priced by one natural draw: 'protect'
- * adds the answers that beat the listed ones against the side's best row and
- * still do one ply deeper (since b4), 'full' every unlisted one. Like
- * verification a refinement: a failed round keeps the verified merge, and
- * the score stays the visit mean.
+ * adds the answers that beat the listed ones against the side's near-best
+ * rows and still do one ply deeper (since b4), 'full' every unlisted one.
+ * Round 69 (T149): the rows that can decide the ranking price an added
+ * answer one deepened ply, and a changed best row is verified once more.
+ * Like verification a refinement: a failed round keeps the verified merge,
+ * and the score stays the visit mean.
  */
-async function answerRound(
-  executor: TreeExecutor, trees: MctsTreeStats[], merged: EvalResult, settings: EvalSettings, callbacks?: OrchestratorCallbacks,
+export async function answerRound(
+  executor: TreeExecutor, trees: MctsTreeStats[], round: Verified, settings: EvalSettings, callbacks?: OrchestratorCallbacks,
 ): Promise<EvalResult> {
+  const merged = round.result;
   const mode = answersMode();
   const sides = mode === 'off' ? null : answerSides(trees[0], merged);
   if (!sides || stopped(callbacks)) return merged;
   const started = Date.now();
   try {
     const deepen: EvalSettings = { depth: 1, samples: 1, tera: settings.tera, sleepClause: settings.sleepClause, ruleset: settings.ruleset };
-    const added = await Promise.all(sides.map(view => sideAnswers(executor, view, merged, mode, deepen)));
-    if (stopped(callbacks) || added.every(list => list.length === 0)) return merged;
-    const perSide = await Promise.all(sides.map(async (view, index) => (added[index].length === 0
-      ? merged.perSide[view.side]
-      : gradedRanking(view, merged, trees[0], added[index], await executor.evalCells(extensionJobs(view, added[index]))))));
-    return stopped(callbacks) ? merged : { ...merged, perSide: { p1: perSide[0], p2: perSide[1] } };
+    const found = await Promise.all(sides.map(view => sideAnswers(executor, view, merged, mode, deepen)));
+    if (stopped(callbacks) || found.every(side => side.added.length === 0)) return merged;
+    const extending = Date.now();
+    perfCount('answer-added', found.reduce((sum, side) => sum + side.added.length, 0));
+    const grades = await Promise.all(sides.map(async (view, index): Promise<SideGrade> =>
+      ({ view, added: found[index].added, values: await sideExtension(executor, view, found[index], merged, deepen) })));
+    perfAdd('answer-extend', Date.now() - extending);
+    if (stopped(callbacks)) return merged;
+    const perSide = gradedSides(grades, merged, trees[0]);
+    const rechecked = await recheckedRound(executor, trees, round, perSide, again => gradedSides(grades, again, trees[0]), settings).catch(() => null);
+    return stopped(callbacks) ? merged : rechecked ?? { ...merged, perSide };
   } catch {
     return merged;
   } finally {

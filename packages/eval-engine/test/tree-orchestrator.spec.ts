@@ -65,8 +65,12 @@ function recordingExecutor(serialized: string, lastFirst = false, ruleset: Stati
   return { executor, record };
 }
 
-/** Round 67 (T128): the verify round is the last cells round without plain jobs (the answer round's jobs are plain and come after it). */
-const verifyRound = (record: Recording) => record.rounds.filter(round => !round.jobs.some(job => job.plain)).at(-1);
+/**
+ * Round 67 (T128), changed in round 69 (T149): the verify round is the first cells round whose jobs all deepen. The pair
+ * plan's boundary round before it deepens nothing, the answer round's detection after it is plain, its extension mixes
+ * plain and deepened jobs and its re-check deepens again.
+ */
+const verifyRound = (record: Recording) => record.rounds.find(round => round.jobs.length > 0 && round.jobs.every(job => job.deepen !== undefined && !job.plain));
 
 /** Runs `run` with the answer round in the given form (EVAL_DOUBLES_ANSWERS), restoring the variable after. */
 async function withAnswers<T>(mode: 'off' | 'protect' | 'full', run: () => Promise<T>): Promise<T> {
@@ -106,7 +110,9 @@ describe('tree orchestration (round 61; read through the executor since round 64
     const verifyAt = record.rounds.indexOf(verifyRound(record)!);
     const answers = record.rounds.slice(verifyAt + 1);
     expect(answers.length).toBeGreaterThan(0);
-    expect(answers.every(round => round.jobs.every(job => job.plain && job.deepen === undefined))).toBe(true);
+    // The detection is one plain draw per cell; the extension prices the rows that can decide the ranking as verify cells (T149).
+    expect(answers[0].jobs.every(job => job.plain && job.deepen === undefined)).toBe(true);
+    expect(answers.every(round => round.jobs.every(job => job.plain || job.deepen !== undefined))).toBe(true);
     // The prover reads the answered ranking (its near ties by label since round 67, T134).
     expect(record.proofs[0].input.rootOrder).toEqual(forcedWinInput(result, settings).rootOrder);
   });

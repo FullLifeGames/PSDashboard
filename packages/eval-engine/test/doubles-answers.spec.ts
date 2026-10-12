@@ -44,9 +44,10 @@ describe('the doubles matrix reads every answer (round 67, T128)', () => {
   test('2630685175 t7: p1’s best row meets a Protect answer the tree did not list, and p1 is graded against it', { timeout: 120_000 }, async () => {
     const position = fixture('gen9vgc2026regi-2630685175-t7-played');
     const result = await search(position);
-    // Round 69 (T148): four rows lie within 0.003 of each other in value, so which of them comes first follows the
-    // verify price of a small outcome; the pin reads the Earth Power row, which the trees rated best at 1.00.
-    const best = result.perSide.p1.find(row => row.label.startsWith('Wood Hammer→Calyrex-Shadow + Earth Power'))!;
+    // Round 69 (T148, T149): four rows lie within 0.003 of each other in value, so which of them comes first follows the
+    // verify price of a small outcome and the answers the near rows add; the pin reads the Earth Power row into
+    // Zamazenta-Crowned, which the trees rated best at 1.00.
+    const best = result.perSide.p1.find(row => row.label.startsWith('Wood Hammer→Calyrex-Shadow + Earth Power→Zamazenta-Crowned'))!;
     expect(best.worstCase).toBeLessThanOrEqual(0.8);
     expect(best.punishedBy).toMatch(/Protect/);
     expect(result.matrix!.p2Labels).not.toContain(best.punishedBy);
@@ -117,27 +118,28 @@ describe('the answer round, step by step (round 67, T128)', () => {
     expect(jobs.every(job => job.plain && job.i === 0)).toBe(true);
     const value = (j: number, v: number): EvalCellValue => ({ i: 0, j, value: v, ended: false });
     const detected = [value(0, 1), value(1, 0.98), value(2, 0.75), value(3, 0.98 - ANSWER_MARGIN / 2)];
-    expect(addedAnswers(view, 'protect', detected)).toEqual([2]);
-    expect(addedAnswers(view, 'full', detected)).toEqual([2, 3]);
+    expect(addedAnswers(view, 'protect', result, detected)).toEqual([2]);
+    expect(addedAnswers(view, 'full', result, detected)).toEqual([2, 3]);
     expect(ANSWER_CAP).toBeGreaterThan(0);
   });
 
   test('protect keeps a candidate only when it still refutes the best row one ply deeper', () => {
     const { view, result } = scene();
     const deepen: EvalSettings = { depth: 1, samples: 1, tera: false };
-    const jobs = confirmJobs(view, result, [2, 3], deepen);
+    const refuting = [{ answer: 2, row: 0 }, { answer: 3, row: 0 }];
+    const jobs = confirmJobs(view, refuting, deepen);
     expect(jobs.map(job => [job.p1Choice, job.p2Choice, job.settings])).toEqual([
       ['move a 1, move b 1', 'move protect, move protect', deepen], ['move a 1, move b 1', 'move z 1, move y 1', deepen],
     ]);
     // The best row reads 1.00 against the listed answers: one ply deeper Protect + Protect holds it to 0.3 (kept),
     // Z + Y only to 1 - ANSWER_MARGIN / 2 (dropped: the one-ply refutation does not survive the deeper search).
     const deep = (score: number) => ({ score, interval: 0, depthCompleted: 1, perSide: { p1: [], p2: [] } }) as EvalResult;
-    expect(confirmedAnswers(view, result, [2, 3], [deep(0.3), deep(1 - ANSWER_MARGIN / 2)])).toEqual([2]);
+    expect(confirmedAnswers(view, result, refuting, [deep(0.3), deep(1 - ANSWER_MARGIN / 2)])).toEqual([2]);
   });
 
   test('the graded side ranks against the added answer, priced for every listed row', () => {
     const { view, result, tree } = scene();
-    const jobs = extensionJobs(view, [2]);
+    const jobs = extensionJobs(view, [2], [], { depth: 1, samples: 1, tera: false });
     expect(jobs.map(job => [job.i, job.j])).toEqual([[0, 2], [1, 2]]);
     // Both rows read 1.00 against the listed answers; the added Protect answer holds A + B to 0.1 and C + D to 0.5.
     const ranked = gradedRanking(view, result, tree, [2], [{ i: 0, j: 2, value: 0.1, ended: false }, { i: 1, j: 2, value: 0.5, ended: false }]);

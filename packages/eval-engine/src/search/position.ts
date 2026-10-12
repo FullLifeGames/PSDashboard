@@ -337,9 +337,15 @@ function localExecutorOn(serializedBattle: string, ruleset: StaticRuleset): Sear
       let completed = 0;
       for (const job of jobs) {
         if (job.plain) {
-          // Round 67 (T128): the answer round's cheap price of a cell, one natural draw and its leaf.
-          const battle = positionBattle(advancePosition(root, job.p1Choice, job.p2Choice, SEARCH_SEEDS[0]));
-          out.push({ i: job.i, j: job.j, value: leafValue(battle, matchupCache), ended: battle.ended });
+          // Round 67 (T128): the answer round's cheap price of a cell, one natural draw and its leaf. Round 69 (T149):
+          // with `deepen` the draw's child goes through the light depth-1 sub-search of the verify round's small outcomes,
+          // so the cell is priced one ply deeper at a fraction of a verify cell.
+          const child = advancePosition(root, job.p1Choice, job.p2Choice, SEARCH_SEEDS[0]);
+          const battle = positionBattle(child);
+          const deeper = job.deepen !== undefined && !battle.ended;
+          if (deeper) perfCount('answer-sub-light');
+          const value = deeper ? subSearchDepth1(child.serialized, job.deepen!, matchupCache, true).score : leafValue(battle, matchupCache);
+          out.push({ i: job.i, j: job.j, value, ended: battle.ended });
           completed += 1;
           onDone?.(completed);
           continue;
