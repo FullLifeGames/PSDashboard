@@ -34,9 +34,12 @@ export function calcGenerationFor(gen: number, mod?: string): CalcGeneration {
   return Generations.get(Math.min(9, Math.max(1, gen)) as CalcGenerationNum);
 }
 
-/** The mod of a format id, for a host that knows a format and not a battle ('champions' for the Pokémon Champions formats). */
+/**
+ * The mod of a format, for a host that knows a format and not a battle ('champions' for the Pokémon Champions formats).
+ * A format id ('gen9championsou') and a format name as the log's tier line prints it ('[Gen 9 Champions] OU') both count.
+ */
 export function calcModOf(formatid: string): typeof CHAMPIONS_MOD | undefined {
-  return /champions/.test(formatid) ? CHAMPIONS_MOD : undefined;
+  return /champions/i.test(formatid) ? CHAMPIONS_MOD : undefined;
 }
 
 /** The simulator's generation behind a calculator generation: the Champions generation 0 plays on Gen 9's rules. */
