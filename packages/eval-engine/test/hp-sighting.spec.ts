@@ -85,7 +85,6 @@ describe('T161 sightedHp against the simulator getHealth', () => {
       const battle = battleOf(shape.format, [set('Garchomp', ['Splash'])], [set('Garchomp', ['Splash'])]);
       inReplayMode(battle, shape.scale);
       let checked = 0;
-      let outside = 0;
       for (let maxhp = 50; maxhp <= 700; maxhp++) {
         const body = bodyAt(battle, maxhp);
         const range = allowedHps(body);
@@ -98,11 +97,9 @@ describe('T161 sightedHp against the simulator getHealth', () => {
           // ... and it is the middle of all HPs that show it.
           expect(Math.abs(2 * hp! - (hps[0] + hps[hps.length - 1])), `${shape.format} max ${maxhp} shown ${shown} -> ${hp}`).toBeLessThanOrEqual(1);
           checked++;
-          if (shown !== Math.round(hp! / maxhp * shape.scale) && shape.champions) outside++;
         }
       }
       expect(checked).toBeGreaterThan(30_000);
-      void outside;
     });
   }
 
