@@ -6,7 +6,8 @@ import type { TurnAlignmentRecord } from '../hax-alignment.ts';
 import type { BranchChoiceErrorLog, PokemonIdent, SimBattle } from './types.ts';
 import { reorderForLeads, trimTeamToBring } from './team-order.ts';
 import { extractLeads } from './protocol-choices.ts';
-import { hasForceSwitch, recordVolatilesAtExit } from './corrections.ts';
+import { hasForceSwitch } from './corrections.ts';
+import { recordVolatilesAtExit } from './exit-volatiles.ts';
 import { safeStreamWrite, sleep } from './execute.ts';
 import { loadSimMods, simModsReady } from '../forward/sim-mods.ts';
 

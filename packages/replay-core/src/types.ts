@@ -28,6 +28,13 @@ export interface PokemonSnapshot {
   terastallized: string;
   level: number;
   gender: string;
+  /**
+   * Sleep turns @pkmn/client counted (one per |cant|..|slp| line), only while
+   * the body sleeps; absent on snapshots written before round 69 (T187).
+   */
+  sleepTurns?: number;
+  /** Index in the side's active row, only for an active body; absent on snapshots written before round 69 (T151). */
+  slot?: number;
 }
 
 export interface SideSnapshot {

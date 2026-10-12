@@ -9,6 +9,8 @@ import { correctFieldFromSnapshot } from './field-correction.ts';
 import { applyProtocolHeldItems } from './held-items.ts';
 import { playProtocolEntries } from './entry-effects.ts';
 import { restoreTeraFromSnapshot } from './tera-restore.ts';
+import { bodiesOffTheField, restoreAfterProtocolEntry, restoreExitVolatiles } from './exit-volatiles.ts';
+import { endLocksTheGameEnded, settleSleepCounter } from './sleep-counter.ts';
 
 function repointActiveSlot(side: SimSide, activeSlot: number, target: SimPokemon): boolean {
   if (side.active[activeSlot] === target) return false;
@@ -142,15 +144,20 @@ export function buildForcedSwitchChoice(
 
 /**
  * Status residuals read their state from `statusState` (Toxic damage is
- * `stage * maxhp/16`, sleep counts down `time`) — a bare `status` assignment
+ * `stage * maxhp/16`, sleep counts down `time`) � a bare `status` assignment
  * leaves that state empty, so corrected Toxic dealt NaN (= no) damage for the
  * rest of the branch. Mirror Pokemon#setStatus instead, and only when the
  * snapshot disagrees, so a matching reconstruction keeps its own toxic stage
- * and sleep counter.
+ * and sleep counter. A sleeper takes the count the protocol allows (T187).
  */
-function correctStatusFromSnapshot(battlePokemon: SimPokemon, snapshotStatus: string) {
-  const status = snapshotStatus as SimPokemon['status'];
-  if (battlePokemon.status === status) return;
+function correctStatusFromSnapshot(battlePokemon: SimPokemon, snapshotPokemon: SnapshotPokemon, log: readonly string[]) {
+  const status = (snapshotPokemon.status || '') as SimPokemon['status'];
+  const turns = status === 'slp' ? snapshotPokemon.sleepTurns : undefined;
+  const rested = turns !== undefined && log.some(line => line.startsWith(`|-status|`) && line.includes(`: ${snapshotPokemon.name}|slp|[from] move: Rest`));
+  if (battlePokemon.status === status) {
+    if (turns !== undefined) settleSleepCounter(battlePokemon, turns, rested, false);
+    return;
+  }
 
   battlePokemon.status = status;
   const statusState = battlePokemon.statusState as {
@@ -167,9 +174,10 @@ function correctStatusFromSnapshot(battlePokemon: SimPokemon, snapshotStatus: st
   delete statusState.startTime;
   if (status === 'tox') statusState.stage = 0;
   if (status === 'slp') {
-    // The snapshot does not carry remaining sleep turns — use the average.
+    // The average, until the protocol's cant lines say more.
     statusState.startTime = 3;
     statusState.time = 3;
+    if (turns !== undefined) settleSleepCounter(battlePokemon, turns, rested, true);
   }
 }
 
@@ -182,91 +190,12 @@ function benchHpFromSighting(battlePokemon: SimPokemon, hpPercent: number): numb
 
 type SnapshotPokemon = TurnSnapshot['p1']['pokemon'][number];
 
-/** The key the session's subscription writes: the volatiles a body held when the simulator took it off the field. */
-type ExitRecorded = SimPokemon & { volatilesAtExit?: SimPokemon['volatiles'] };
-
-/**
- * Round 69, T172: the simulator's faint and its switch-out clear a body's
- * volatiles, and an exit the game never saw (a K.O. the game's damage did not
- * deal, an Eject Button the build guessed) leaves the body the game kept
- * without Protosynthesis, Quark Drive, Leech Seed, Heal Block or Substitute.
- * The session keeps the volatiles as they stand when the Faint or SwitchOut
- * event runs (before the clear); the property serializes with the body, so a
- * clone of the raw boundary carries it, and the next snapshot correction
- * settles it.
- */
-export function recordVolatilesAtExit(pokemon: SimPokemon) {
-  const recorded = pokemon as ExitRecorded;
-  if (Object.keys(pokemon.volatiles).length > 0) recorded.volatilesAtExit = { ...pokemon.volatiles };
-  else delete recorded.volatilesAtExit;
-}
-
-/** Puts the record of an exit back on the body, minus the conditions the protocol ended for it in the block (|-end|, as the simulator's condition ids). */
-function putBackExitVolatiles(battle: SimBattle, body: SimPokemon, name: string, log: readonly string[]) {
-  const recorded = body as ExitRecorded;
-  if (!recorded.volatilesAtExit) return;
-  const ended = new Set<string>();
-  for (const line of log) {
-    const [, tag, ident, effect] = line.split('|');
-    if (tag !== '-end' || !ident || !effect) continue;
-    if (ident.replace(/^p[12][a-d]?: /, '') !== name) continue;
-    ended.add(battle.dex.conditions.get(effect.replace(/^(move|ability|item): /, '')).id);
-  }
-  for (const [id, state] of Object.entries(recorded.volatilesAtExit)) {
-    if (ended.has(id) || id in body.volatiles) continue;
-    // The exit came inside the turn, so the turn's residual round never ticked the condition's counter on this body.
-    const left = typeof state.duration === 'number' ? state.duration - 1 : null;
-    if (left !== null && left <= 0) continue;
-    body.volatiles[id] = left === null ? state : { ...state, duration: left };
-  }
-  delete recorded.volatilesAtExit;
-}
-
-/**
- * The protocol's switch-in put a body on the field that the simulator had
- * taken off it after its own entry in the same block (752755 turn 9: the
- * guessed Eject Button sent Hatterene out after the Psychic Noise that began
- * its Heal Block). With one entry line in the block the two stints are the
- * same one, and the record holds what the body carried at the exit.
- */
-function restoreAfterProtocolEntry(battle: SimBattle, body: SimPokemon, ident: string, events: readonly string[]) {
-  const entries = events.filter(line => /^\|(?:switch|drag)\|/.test(line) && line.split('|')[2] === ident).length;
-  if (entries === 1) putBackExitVolatiles(battle, body, ident.replace(/^p[12][a-d]: /, ''), events);
-}
-
 /** The simulator's body for a snapshot entry: by species forme, else by name. */
 function simBodyOf(side: SimSide, snapshotPokemon: SnapshotPokemon): SimPokemon | undefined {
   return side.pokemon.find((pokemon: SimPokemon) =>
     toId(pokemon.species?.name || '') === toId(snapshotPokemon.speciesForme) ||
     toId(pokemon.name || '') === toId(snapshotPokemon.name)
   );
-}
-
-/** Every body the simulator holds off the field right now: fainted, or not among the actives. */
-function bodiesOffTheField(battle: SimBattle): Set<SimPokemon> {
-  return new Set(battle.sides.flatMap(side => side.pokemon.filter(pokemon => pokemon.fainted || !side.active.includes(pokemon))));
-}
-
-/**
- * The corrections put back on the field a body the simulator had taken off
- * it (fainted or switched out) and the game kept: what the simulator carried
- * at that exit comes back, minus the conditions the protocol ended in the
- * block. A body that stayed on the field keeps its own volatiles. Then every
- * record goes, whether it was used or not.
- */
-function restoreExitVolatiles(battle: SimBattle, snapshot: TurnSnapshot, offTheField: ReadonlySet<SimPokemon>) {
-  for (const [sideIdx, snapshotSide] of [snapshot.p1, snapshot.p2].entries()) {
-    const side = battle.sides[sideIdx];
-    for (const snapshotPokemon of snapshotSide.pokemon) {
-      const body = simBodyOf(side, snapshotPokemon) as ExitRecorded | undefined;
-      if (!body?.volatilesAtExit || !offTheField.has(body)) continue;
-      if (!snapshotPokemon.isActive || snapshotPokemon.fainted || body.fainted || !side.active.includes(body)) continue;
-      putBackExitVolatiles(battle, body, snapshotPokemon.name, snapshot.log);
-    }
-  }
-  for (const side of battle.sides) {
-    for (const body of side.pokemon) delete (body as ExitRecorded).volatilesAtExit;
-  }
 }
 
 /**
@@ -283,7 +212,7 @@ function restoreExitVolatiles(battle: SimBattle, snapshot: TurnSnapshot, offTheF
  * Overlord and Last Respects read it; 752324's Kingambit counted no fallen
  * ally after the correction fainted Amoonguss).
  */
-function correctBodyFromSnapshot(battlePokemon: SimPokemon, snapshotPokemon: SnapshotPokemon) {
+function correctBodyFromSnapshot(battlePokemon: SimPokemon, snapshotPokemon: SnapshotPokemon, log: readonly string[]) {
   if (!snapshotPokemon.isActive && battlePokemon.fainted === snapshotPokemon.fainted) {
     if (!snapshotPokemon.fainted) battlePokemon.hp = benchHpFromSighting(battlePokemon, snapshotPokemon.hpPercent);
     return;
@@ -297,7 +226,7 @@ function correctBodyFromSnapshot(battlePokemon: SimPokemon, snapshotPokemon: Sna
   battlePokemon.faintQueued = snapshotPokemon.fainted;
   if (snapshotPokemon.fainted) battlePokemon.hp = 0;
   if (!snapshotPokemon.fainted && battlePokemon.hp <= 0 && snapshotPokemon.hpPercent > 0) battlePokemon.hp = 1;
-  correctStatusFromSnapshot(battlePokemon, snapshotPokemon.status || '');
+  correctStatusFromSnapshot(battlePokemon, snapshotPokemon, log);
   for (const stat of ['atk', 'def', 'spa', 'spd', 'spe', 'accuracy', 'evasion'] as const) {
     battlePokemon.boosts[stat] = snapshotPokemon.boosts[stat] ?? 0;
   }
@@ -310,7 +239,7 @@ function correctHpFromSnapshot(battle: SimBattle, snapshot: TurnSnapshot) {
 
     for (const snapshotPokemon of snapshotSide.pokemon) {
       const battlePokemon = simBodyOf(battleSide, snapshotPokemon);
-      if (battlePokemon && snapshotPokemon.maxhp > 0) correctBodyFromSnapshot(battlePokemon, snapshotPokemon);
+      if (battlePokemon && snapshotPokemon.maxhp > 0) correctBodyFromSnapshot(battlePokemon, snapshotPokemon, snapshot.log ?? []);
     }
   }
   restoreSideInvariants(battle);
@@ -325,6 +254,7 @@ function correctHpFromSnapshot(battle: SimBattle, snapshot: TurnSnapshot) {
  * later. The snapshot knows who really stood on the field; put them back.
  */
 function correctActivesFromSnapshot(battle: SimBattle, snapshot: TurnSnapshot) {
+  let moved = false;
   for (let sideIdx = 0; sideIdx < 2; sideIdx++) {
     const snapshotSide = sideIdx === 0 ? snapshot.p1 : snapshot.p2;
     const side = battle.sides[sideIdx];
@@ -348,15 +278,61 @@ function correctActivesFromSnapshot(battle: SimBattle, snapshot: TurnSnapshot) {
       if (!target || target.fainted) continue;
       repointActiveSlot(side, slot, target);
     }
+    if (placeOnSlots(side, desired, sameMon)) moved = true;
   }
+  // The request was built from the pre-correction slots (913990 turn 4: Overheat
+  // was offered for Chi-Yu only on p2b, where the game had it and the board had not).
+  if (moved) {
+    restoreSideInvariants(battle);
+    refreshRequestsFromLiveState(battle);
+  }
+}
+
+/**
+ * Round 69, T151: a doubles pair stands on the slots the game has it on. The
+ * correction above only fills a slot with nobody from the snapshot, so a pair
+ * the simulator holds swapped (a revival put one body back on the other's
+ * slot) stayed swapped. The snapshot's slot says where each active belongs;
+ * a snapshot written before round 69 carries none and moves nothing.
+ */
+function placeOnSlots(
+  side: SimSide,
+  desired: PokemonSnapshot[],
+  sameMon: (pokemon: SimPokemon | null | undefined, want: PokemonSnapshot) => boolean,
+): boolean {
+  if (side.active.length < 2) return false;
+  let moved = false;
+  for (const want of desired) {
+    if (want.slot === undefined || want.slot >= side.active.length) continue;
+    const candidates = side.active.filter(active => sameMon(active, want));
+    // Two bodies of one species cannot be told apart by name.
+    if (candidates.length !== 1 || side.active[want.slot] === candidates[0]) continue;
+    swapActiveSlots(side, side.active.indexOf(candidates[0]), want.slot);
+    moved = true;
+  }
+  return moved;
+}
+
+/** Two actives trade slots; both stay in play, so unlike a switch-in nothing about either body (its lock, its last move) is reset. */
+function swapActiveSlots(side: SimSide, from: number, to: number) {
+  const [first, second] = [side.active[from], side.active[to]];
+  side.active[from] = second;
+  side.active[to] = first;
+  // The sim keeps side.pokemon[i] === side.active[i] for the active slots.
+  const [firstIndex, secondIndex] = [side.pokemon.indexOf(first), side.pokemon.indexOf(second)];
+  side.pokemon[firstIndex] = second;
+  side.pokemon[secondIndex] = first;
+  first.position = secondIndex;
+  second.position = firstIndex;
 }
 
 export function correctBattleFromSnapshot(battle: SimBattle, snapshot: TurnSnapshot) {
   const offTheField = bodiesOffTheField(battle);
   correctHpFromSnapshot(battle, snapshot);
+  endLocksTheGameEnded(battle, snapshot, simBodyOf);
   restoreTeraFromSnapshot(battle, snapshot);
   correctActivesFromSnapshot(battle, snapshot);
-  restoreExitVolatiles(battle, snapshot, offTheField);
+  restoreExitVolatiles(battle, snapshot, offTheField, simBodyOf);
   correctFieldFromSnapshot(battle, snapshot);
 }
 

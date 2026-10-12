@@ -21,6 +21,7 @@ function hpFractionOf(text: string): number | null {
 }
 
 function snapshotPokemon(mon: Pokemon): PokemonSnapshot {
+  const slot = mon.side.active.indexOf(mon);
   return {
     name: mon.name,
     speciesForme: mon.speciesForme,
@@ -37,6 +38,8 @@ function snapshotPokemon(mon: Pokemon): PokemonSnapshot {
     terastallized: mon.terastallized || '',
     level: mon.level,
     gender: mon.gender || '',
+    ...(mon.status === 'slp' ? { sleepTurns: mon.statusState.sleepTurns } : {}),
+    ...(slot >= 0 ? { slot } : {}),
   };
 }
 
