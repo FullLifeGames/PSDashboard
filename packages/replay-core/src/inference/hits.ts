@@ -66,10 +66,11 @@ function newWalk(state: InferrerState): HitWalk {
   return { battle: new Battle(generationsFor(tier)), pending: null, hits: new Map(), swapped: new Set(), neutralized: false, format: tier };
 }
 
-/** The stat an active Protosynthesis or Quark Drive raises, from the client's volatile ('protosynthesisatk' -> 'atk'). */
+/** The stat an active Protosynthesis or Quark Drive raises: the client keeps it on the volatile ('protosynthesis' or 'quarkdrive', `stat` 'atk'). */
 function boostedStatOf(mon: ClientPokemon): string {
-  const id = Object.keys(mon.volatiles).find(key => /^(protosynthesis|quarkdrive)(atk|def|spa|spd|spe)$/.test(key));
-  return id ? id.slice(-3) : '';
+  const volatile = mon.volatiles.protosynthesis ?? mon.volatiles.quarkdrive;
+  const stat = (volatile as { stat?: unknown } | undefined)?.stat;
+  return typeof stat === 'string' ? stat : '';
 }
 
 function party(mon: ClientPokemon): HitParty {
