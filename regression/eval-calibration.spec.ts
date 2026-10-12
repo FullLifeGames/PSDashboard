@@ -962,6 +962,13 @@ import { takeSimFastReport } from '../packages/eval-engine/src/forward/sim-fast/
  * spreads, the defender's item in choice-lock), next free T194. Base of the
  * code state: .calibration/r68-m2 (Brier 0.2536/0.2307/0.1120, hq
  * 0.2454/0.2038/0.1069, K 2.41).
+ * USER GATE 2026-10-12 18:19 ("1a 2a 3 4"): all of round 68 stays (the
+ * Champions OU holdout harm comes from rules that are right by the game);
+ * T190 stays third in wave 3 lane A; v1 fast-forwarded and pushed, r68 and
+ * the measurement worktree deleted. On Unseen Fist (user): a mode change,
+ * both readings are right (Champions a quarter through Protect,
+ * Scarlet/Violet full damage) and the battle's mode decides;
+ * calc/protect.ts reads the mode from the simulator.
  *
  * WAVE 2 2026-10-10..11 (improvement round 67, the second wave of lanes:
  * seven lanes A to G in their own worktrees from d5855a0, measured one at a
