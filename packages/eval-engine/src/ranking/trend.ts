@@ -7,6 +7,16 @@ import { MIN_TREND_WEIGHT, tieGroups, TREND_MARGIN, type TieRow } from './ties.t
  * ordering-only tiebreak, both on the same mix-weighted one-ply trend.
  */
 
+/**
+ * Round 70: a cell's trend is the mean over its base draws of (the child's
+ * sub-search score minus the child's own leaf). One shared sum order, so the
+ * sync search and the orchestrator book the same bits; one draw is that
+ * draw's trend unchanged.
+ */
+export function meanTrend(trends: number[]): number {
+  return trends.reduce((sum, trend) => sum + trend, 0) / trends.length;
+}
+
 /** 2b extrapolation strength: assume the observed bleed/build continues λ more plies. Swept {0.25, 0.5, 1.0}. */
 export const TREND_LAMBDA = 0.5;
 /**

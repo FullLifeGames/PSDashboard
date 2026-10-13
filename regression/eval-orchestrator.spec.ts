@@ -174,6 +174,123 @@ describe('search orchestrator', () => {
   });
 });
 
+/**
+ * Round 70: the horizon-trend probe runs from every base draw of a decisive cell of several draws (the seeds its value was
+ * priced with) and compares each child with its own leaf. The orchestrator keeps the cell's draws from the executor's cell
+ * values, asks for one probe per draw, and books the mean of the answers' trends. A cell of one draw gets the probe of
+ * before the round, one job on its first child, booked as the child's score against the cell's value; so does an executor
+ * that answers no trend.
+ */
+describe('the trend probe over the base draws (round 70)', () => {
+  const SETTINGS = { depth: 1, samples: 3, tera: false, prove: false } as const;
+
+  /**
+   * A 2x2 matrix whose four cells all hold 0.2: every row and column ties, so the layers price every decisive cell. Each
+   * cell reports `draws` base draws (none for one); a probe of a draw answers with `trend(draw index)` when the protocol
+   * has it, and every probe with the score 1.1 (0.9 above the cell). The depth is 1, so every sub-search is a trend probe.
+   */
+  function tiedExecutor(draws: number, trend?: (index: number) => number) {
+    const probes: EvalSubSearchJob[] = [];
+    const executor: SearchExecutor = {
+      async choices() {
+        return {
+          p1: [{ choice: 'move a', label: 'A' }, { choice: 'move b', label: 'B' }],
+          p2: [{ choice: 'move x', label: 'X' }, { choice: 'move y', label: 'Y' }],
+          rootValue: 0, rootEnded: false,
+        };
+      },
+      async evalCells(jobs: EvalCellJob[]) {
+        const baseDraws = Array.from({ length: draws }, (_, index) => ({ index }));
+        return jobs.map(job => ({ i: job.i, j: job.j, value: 0.2, ended: false, ...(draws > 1 ? { baseDraws } : {}) }));
+      },
+      async subSearch(job: EvalSubSearchJob): Promise<EvalResult> {
+        probes.push(job);
+        const answer = trend && job.draw ? { trend: trend(job.draw.index) } : {};
+        return { score: 1.1, interval: 0, depthCompleted: 1, perSide: { p1: [], p2: [] }, ...answer };
+      },
+      async prove() {
+        return null;
+      },
+    };
+    return { executor, probes };
+  }
+  /** The probed cells with the draw indices asked for each (undefined: the probe of the first child, no draw named). */
+  const drawsByCell = (probes: EvalSubSearchJob[]) => {
+    const cells = new Map<string, (number | undefined)[]>();
+    for (const job of probes) cells.set(`${job.i},${job.j}`, [...(cells.get(`${job.i},${job.j}`) ?? []), job.draw?.index]);
+    return [...cells.values()].map(indices => indices.sort());
+  };
+  /** How far the layers moved every row from the solved game (p1 at 0.2, p2 at -0.2), each in its own perspective. */
+  const moved = (result: EvalResult) => ({
+    p1: result.perSide.p1.map(row => row.ev - 0.2),
+    p2: result.perSide.p2.map(row => -0.2 - row.ev),
+  });
+  /** Every tied row moves by the strength of the trend layer (0.5) times the booked trend. */
+  const SHIFT = 0.5;
+
+  test('one probe per base draw of each decisive cell; the booked trend is the mean of the answers', async () => {
+    const { executor, probes } = tiedExecutor(3, index => [0.9, 0.3, 0.0][index]);
+    const result = await searchOrchestrated(executor, SETTINGS);
+    const cells = drawsByCell(probes);
+    expect(cells.length).toBeGreaterThan(0);
+    for (const indices of cells) expect(indices).toEqual([0, 1, 2]);
+    // The mean of 0.9, 0.3 and 0.0 is 0.4 in every probed cell, so every tied row moves by 0.5 x 0.4 whatever its weights.
+    for (const amount of [...moved(result).p1, ...moved(result).p2]) expect(amount).toBeCloseTo(SHIFT * 0.4, 10);
+  });
+
+  test('a cell of one draw is probed as before: one job on its first child, no draw named, booked against the cell', async () => {
+    const { executor, probes } = tiedExecutor(1, () => 0.1);
+    const result = await searchOrchestrated(executor, SETTINGS);
+    expect(probes.length).toBeGreaterThan(0);
+    expect(probes.every(job => job.draw === undefined)).toBe(true);
+    // The score 1.1 against the cell's 0.2: the trend is 0.9, whatever a draw would have answered.
+    for (const amount of [...moved(result).p1, ...moved(result).p2]) expect(amount).toBeCloseTo(SHIFT * 0.9, 10);
+  });
+
+  test('an executor that answers no trend is booked as before: the child\'s score against the cell, per draw', async () => {
+    const { executor, probes } = tiedExecutor(3);
+    const result = await searchOrchestrated(executor, SETTINGS);
+    expect(probes.length).toBeGreaterThan(0);
+    for (const indices of drawsByCell(probes)) expect(indices).toEqual([0, 1, 2]);
+    // The score 1.1 against the cell's 0.2 is a trend of 0.9 in every draw.
+    for (const amount of [...moved(result).p1, ...moved(result).p2]) expect(amount).toBeCloseTo(SHIFT * 0.9, 10);
+  });
+
+  /** Gengar against a Magikarp with two identical Skarmory behind it: p2's switch rows tie, Focus Blast (70 %) rolls. */
+  const twinScene = () => {
+    const evs = { hp: 252, atk: 252, def: 0, spa: 252, spd: 4, spe: 0 };
+    const set = (species: string, moves: string[]): PokemonSet => ({ ...makeSet(species, species, moves, 100), evs });
+    return serialize(makeBattle(
+      [set('Gengar', ['Focus Blast', 'Substitute'])],
+      [set('Magikarp', ['Splash']), set('Skarmory', ['Roost', 'Brave Bird']), set('Skarmory', ['Roost', 'Brave Bird'])],
+    ));
+  };
+
+  test('parity: both paths probe a rolling cell from every base draw and book the same trend', async () => {
+    const root = twinScene();
+    const settings = { depth: 1, samples: 3, tera: false } as const;
+    const sync = searchPosition(root, settings);
+    const local = createLocalExecutor(root);
+    const probes: EvalSubSearchJob[] = [];
+    const logged: SearchExecutor = { ...local, subSearch: job => { if (job.draw) probes.push(job); return local.subSearch(job); } };
+    const orchestrated = await searchOrchestrated(logged, settings);
+    expect(orchestrated).toEqual(sync);
+    // The two switch rows of the identical Skarmory tie; Focus Blast against each switch is a cell of three draws.
+    expect(drawsByCell(probes)).toEqual([[0, 1, 2], [0, 1, 2]]);
+  });
+
+  test('parity holds at one draw per cell too: the probe of the first child, on both paths', async () => {
+    const root = twinScene();
+    const settings = { depth: 1, samples: 1, tera: false } as const;
+    const local = createLocalExecutor(root);
+    const probes: EvalSubSearchJob[] = [];
+    const logged: SearchExecutor = { ...local, subSearch: job => { probes.push(job); return local.subSearch(job); } };
+    expect(await searchOrchestrated(logged, settings)).toEqual(searchPosition(root, settings));
+    expect(probes.length).toBeGreaterThan(0);
+    expect(probes.every(job => job.draw === undefined)).toBe(true);
+  });
+});
+
 describe('depth-matched played outcome', () => {
   test('routes the played pair to the same estimator as the sweep cells', async () => {
     const { playedOutcomeSettings } = await import('../src/lib/eval/worker-client');

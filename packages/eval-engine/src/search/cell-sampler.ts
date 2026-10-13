@@ -4,7 +4,7 @@ import { advancePosition, advancePositionWithLog, positionBattle, type SimPositi
 import {
   BOUNDARY_DRAW_BUDGET, classifyChild, foldClassWeights, observeOrder, planCellEvents, PROBE_SEEDS, type CellEvent,
 } from '../cell-blend.ts';
-import type { CellBlend, CellBlendClass, KoOddsMismatch } from '../types.ts';
+import type { CellBlend, CellBlendClass, CellDraw, KoOddsMismatch } from '../types.ts';
 import type { RollScripts } from '../forward/scripted-prng.ts';
 import { countFainted, leafValue, rollSensitivePair, SEARCH_SEEDS, speedTie, tieOrderScripts } from './leaf.ts';
 import { pairCellSample, type FirstDraw } from '../pair/sampler.ts';
@@ -28,7 +28,20 @@ export interface CellSample extends VerifyDraws {
   firstChild: SimPosition;
   blend?: CellBlend;
   diagnostic?: KoOddsMismatch;
+  /**
+   * Round 70: the base draws behind `value`, the draws the horizon-trend probe replays: the leading search seeds
+   * the cell was drawn with (a speed-tied cell: both move orders). Absent for a cell of one draw of the first seed,
+   * whose child the probe takes for the cell.
+   */
+  baseDraws?: CellDraw[];
 }
+
+/** The leading search seeds a cell drew, as the cell reports them; nothing for the one draw every cell has. */
+const leadingDraws = (count: number): { baseDraws?: CellDraw[] } =>
+  (count > 1 ? { baseDraws: Array.from({ length: count }, (_, index) => ({ index })) } : {});
+
+/** The base draws of a boundary cell: `samples` leading seeds, at least the first. */
+const blendBaseDraws = (samples: number): number => Math.max(1, Math.min(samples, SEARCH_SEEDS.length));
 
 /**
  * Round 63 (T16): a verify cell without a plan prices `plainDraws` natural
@@ -105,7 +118,7 @@ function plainCellSample(
     const child = advanceChild(root, p1Choice, p2Choice, SEARCH_SEEDS[s], scripts);
     sum += leafValue(positionBattle(child), matchupCache);
   }
-  return { value: sum / draws, ended, firstChild };
+  return { value: sum / draws, ended, firstChild, ...leadingDraws(draws) };
 }
 
 interface Draw {
@@ -248,7 +261,7 @@ function blendCellSample(
     draws.push(drawCell(root, p1Choice, p2Choice, seed, matchupCache, scripts));
     drawnBySeed.set(String(seed), draws[draws.length - 1]);
   };
-  const baseDraws = Math.max(1, Math.min(samples, SEARCH_SEEDS.length));
+  const baseDraws = blendBaseDraws(samples);
   for (let s = 0; s < baseDraws; s++) drawSeed(SEARCH_SEEDS[s]);
 
   const fallback = (): CellSample => (plainDraws
@@ -300,6 +313,9 @@ function mixOrders(first: CellSample, second: CellSample): CellSample {
   const mixed: CellSample = { value: (first.value + second.value) / 2, ended: first.ended && second.ended, firstChild: first.firstChild };
   const diagnostic = first.diagnostic ?? second.diagnostic;
   if (diagnostic) mixed.diagnostic = diagnostic;
+  // Round 70: the trend probe replays both orders, each with the draws its own price was drawn with.
+  const ordered = (order: 'p1' | 'p2', sample: CellSample): CellDraw[] => (sample.baseDraws ?? [{ index: 0 }]).map(draw => ({ ...draw, first: order }));
+  mixed.baseDraws = [...ordered('p1', first), ...ordered('p2', second)];
   if (!first.blend || !second.blend) return mixed;
   const prefixed = (order: string, blend: CellBlend, hasFirst: boolean): CellBlendClass[] =>
     blend.classes.map(cls => ({ ...cls, key: `${order}:${cls.key}`, weight: cls.weight / 2, hasFirst: hasFirst && cls.hasFirst }));
@@ -345,9 +361,12 @@ export function sampleCell(
   // Round 69 (T146 c6): so is a tied cell, whose order the verify pass draws naturally and cannot script.
   const tied = blendRoot && speedTie(rootBattle, p1Choice, p2Choice);
   if (plainDraws && (plan?.kind === 'fail' || tied)) return plainVerifySample(root, p1Choice, p2Choice, plainDraws, matchupCache);
-  const price = (scripts?: RollScripts) => (plan?.kind === 'events'
-    ? blendCellSample(root, plan.events, p1Choice, p2Choice, samples, matchupCache, plainDraws, scripts)
-    : plainCellSample(root, rootBattle, rootFainted, p1Choice, p2Choice, samples, matchupCache, undefined, plainDraws, scripts));
+  const price = (scripts?: RollScripts): CellSample => {
+    if (plan?.kind !== 'events') return plainCellSample(root, rootBattle, rootFainted, p1Choice, p2Choice, samples, matchupCache, undefined, plainDraws, scripts);
+    const blended = blendCellSample(root, plan.events, p1Choice, p2Choice, samples, matchupCache, plainDraws, scripts);
+    // Round 70: a root cell reports the base draws behind it (a verify cell has its own pool of natural draws).
+    return plainDraws ? blended : { ...blended, ...leadingDraws(blendBaseDraws(samples)) };
+  };
   // Round 69 (T146 c4): a tied singles cell is priced once per move order and mixed at one half.
   if (tied && !plainDraws) {
     const orders = tieOrderScripts(p1Choice, p2Choice);

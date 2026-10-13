@@ -244,6 +244,7 @@ describe('a cell without a plan draws more and deepens each outcome (round 63, T
     const root = focusBlastRoot(true);
     const [value] = await createLocalExecutor(root.serialized).evalCells([{ i: 0, j: 0, p1Choice: FOCUS[0], p2Choice: FOCUS[1], samples: 3 }]);
     const plain = sampleCell(root, countFainted(positionBattle(root)), ...FOCUS, 3, createMatchupCache(), true);
-    expect(value).toEqual({ i: 0, j: 0, value: plain.value, ended: plain.ended });
+    // Round 70: a matrix cell reports the base draws the trend probe replays; it still carries no depth.
+    expect(value).toEqual({ i: 0, j: 0, value: plain.value, ended: plain.ended, baseDraws: plain.baseDraws });
   });
 });

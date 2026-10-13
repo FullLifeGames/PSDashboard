@@ -150,6 +150,16 @@ export interface CellBlend {
 }
 
 /**
+ * Round 70: one of the base draws that priced a root cell, the draws the
+ * horizon-trend probe replays: the index of its search seed (SEARCH_SEEDS)
+ * and, for a speed-tied singles cell, the move order scripted into it.
+ */
+export interface CellDraw {
+  index: number;
+  first?: 'p1' | 'p2';
+}
+
+/**
  * Diagnostic: a boundary cell whose analytic outcome classes were not all
  * observed within the probe budget. The cell renormalizes over the found
  * classes instead of inventing values; the harness counts these.
@@ -240,6 +250,11 @@ export interface EvalResult {
   unanswered?: UnansweredProfile;
   /** Round 35: the forced win proven from this root, when one stands at or above MIN_FORCED_MASS; the score already carries its bar. */
   forcedWin?: ForcedWin;
+  /**
+   * Round 70: the answer of a trend probe (EvalSubSearchJob.draw): this result's
+   * score minus the leaf of the draw's own child. Absent on every other search.
+   */
+  trend?: number;
 }
 
 /**
@@ -486,6 +501,12 @@ export interface EvalCellValue {
   /** Probe budget exhausted with analytic classes unsampled. */
   diagnostic?: KoOddsMismatch;
   /**
+   * Round 70: the base draws that priced the cell, for the horizon-trend probe
+   * (root matrix cells only). Absent for a cell of one draw of the first seed,
+   * whose child the probe takes for the cell.
+   */
+  baseDraws?: CellDraw[];
+  /**
    * Round 33: the first-seed child's depth-2 value (a depth-1 sub-search
    * on that child), set by the verify step in the MCTS mode. Below the
    * depth floor it replaces the one-ply sampler value; blended cells
@@ -503,6 +524,12 @@ export interface EvalSubSearchJob {
   p2Choice: string;
   /** Sub-search settings (depth already reduced, samples fixed to 1). */
   settings: EvalSettings;
+  /**
+   * Round 70: a trend probe. The child is the one this draw of the cell leads
+   * to (not the first seed's), and the answer carries `trend`, the sub-search
+   * score minus the child's own leaf.
+   */
+  draw?: CellDraw;
 }
 
 /** One MCTS tree's root statistics — mergeable across parallel trees. */

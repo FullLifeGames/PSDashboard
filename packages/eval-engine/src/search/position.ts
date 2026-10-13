@@ -3,14 +3,15 @@ import {
   advancePosition, createRootPosition, positionBattle, type ChoiceOption, type SimPosition,
 } from '../forward-model.ts';
 import {
-  applyTrendExtrapolation, applyTrendTiebreak, attachLines, cellKey, rankFromMatrix, selectExpansionCells,
+  applyTrendExtrapolation, applyTrendTiebreak, attachLines, cellKey, meanTrend, rankFromMatrix, selectExpansionCells,
   selectTieProbeCells, toResult, TOP_EXPANSION, type PvStep, type Ranked,
 } from '../rank.ts';
 import { koOddsForOptions } from '../cell-blend.ts';
 import type { CellValue, SearchExecutor } from '../orchestrator.ts';
-import type { EvalResult, EvalSettings, RankedChoice } from '../types.ts';
+import type { CellDraw, EvalCellJob, EvalResult, EvalSettings, RankedChoice } from '../types.ts';
 import { countFainted, leafValue, SEARCH_SEEDS } from './leaf.ts';
 import { sampleCell, type CellSample } from './cell-sampler.ts';
+import { probeDraw } from './trend-probe.ts';
 import { deepenVerifiedCell, lightOptions, VERIFY_CHEAP, VERIFY_DEEPEN_COVER, VERIFY_LIGHT, VERIFY_PLAIN_DRAWS, type CheapDeepening } from './verify-cell.ts';
 import { isCombined } from './hints.ts';
 import { expandPivotPairs, restrictOptions, searchOptions } from './options.ts';
@@ -136,6 +137,9 @@ function rootPayload(
 /** The sync search's deepening state: the shared record plus what the sync sub-searches need. */
 interface Deepening extends DeepeningState {
   matrix: Matrix;
+  /** The root the matrix was drawn from: the trend probe replays the cells' base draws from it (round 70). */
+  root: SimPosition;
+  baseDraws: Map<number, CellDraw[]>;
   rootValue: number;
   settings: EvalSettings;
   callbacks: SearchCallbacks | undefined;
@@ -185,6 +189,11 @@ function deepenLevel(state: Deepening, depth: number): boolean {
  * Horizon-trend layers: root search over singles-shaped lists only
  * (combined doubles probes cost far more than a label swap is worth);
  * sub-searches skip them — ordering inside a tie cannot move a cell value.
+ * Round 70: a decisive cell of several draws is probed from each of its base
+ * draws, every child against its own leaf, and books the mean (one draw's
+ * outcome read against the cell's mean over all draws was variance, not a
+ * trend). A cell of one draw keeps the probe of its first child, whose leaf
+ * is the cell.
  */
 function applyTrendLayers(
   state: Deepening,
@@ -195,9 +204,14 @@ function applyTrendLayers(
   stopped: boolean,
 ): void {
   if (!(!stopped && !restrictCandidates && !isCombined(p1Options) && !isCombined(p2Options))) return;
+  const settings: EvalSettings = { ...state.settings, depth: 1, samples: 1, keepPlayed: undefined };
+  const search = (serialized: string) => subSearch(serialized, settings, state.matchupCache);
   for (const [i, j] of selectTieProbeCells(state.matrix, result, state.trendMap)) {
-    const sub = subSearch(state.matrix.children[i][j].serialized, { ...state.settings, depth: 1, samples: 1, keepPlayed: undefined }, state.matchupCache);
-    state.trendMap.set(cellKey(i, j), sub.score - state.staticValues[i][j]);
+    const draws = state.baseDraws.get(cellKey(i, j));
+    const trend = draws
+      ? meanTrend(draws.map(draw => probeDraw(state.root, p1Options[i].choice, p2Options[j].choice, draw, search, state.matchupCache).trend))
+      : search(state.matrix.children[i][j].serialized).score - state.staticValues[i][j];
+    state.trendMap.set(cellKey(i, j), trend);
   }
   // 2b: fold the tied rows' trends into their values (no re-solve) — a
   // bleeding stall separates from a building switch BY VALUE (draft T50).
@@ -250,7 +264,7 @@ function searchOn(
   // comparison are the depth-asymmetry trap.
   const state: Deepening = {
     matrix, blends: matrix.blends, staticValues: matrix.values.map(row => [...row]), trendMap: new Map<number, number>(),
-    pvByCell: new Map<number, PvStep[]>(), rootValue, settings, callbacks, matchupCache,
+    pvByCell: new Map<number, PvStep[]>(), root, baseDraws: matrix.baseDraws, rootValue, settings, callbacks, matchupCache,
     ranked: rankFromMatrix(matrix, rootValue),
   };
   let result = toResult(state.ranked, 1);
@@ -308,6 +322,16 @@ function deepenVerifyJob(
   deepenVerifiedCell(value, cell, full, VERIFY_DEEPEN_COVER[gameType], cheap);
 }
 
+/** A sampled root cell as the executor reports it; round 70: with the base draws the trend probe replays. */
+function cellValueOf(job: EvalCellJob, cell: CellSample): CellValue {
+  return {
+    i: job.i, j: job.j, value: cell.value, ended: cell.ended,
+    ...(cell.blend ? { blend: cell.blend } : {}),
+    ...(cell.diagnostic ? { diagnostic: { ...cell.diagnostic, i: job.i, j: job.j } } : {}),
+    ...(cell.baseDraws ? { baseDraws: cell.baseDraws } : {}),
+  };
+}
+
 function localExecutorOn(serializedBattle: string, ruleset: StaticRuleset): SearchExecutor {
   const matchupCache = createMatchupCache(ruleset);
   const root = createRootPosition(serializedBattle, ruleset);
@@ -355,11 +379,7 @@ function localExecutorOn(serializedBattle: string, ruleset: StaticRuleset): Sear
         // draws more where there is no plan and goes one ply deeper per outcome.
         const { deepen } = job;
         const cell = sampleCell(root, rootFainted, job.p1Choice, job.p2Choice, job.samples, matchupCache, true, deepen ? VERIFY_PLAIN_DRAWS : undefined);
-        const value: CellValue = {
-          i: job.i, j: job.j, value: cell.value, ended: cell.ended,
-          ...(cell.blend ? { blend: cell.blend } : {}),
-          ...(cell.diagnostic ? { diagnostic: { ...cell.diagnostic, i: job.i, j: job.j } } : {}),
-        };
+        const value = cellValueOf(job, cell);
         if (deepen) deepenVerifyJob(value, cell, deepen, matchupCache, gameType);
         out.push(value);
         completed += 1;
@@ -368,6 +388,8 @@ function localExecutorOn(serializedBattle: string, ruleset: StaticRuleset): Sear
       return out;
     },
     async subSearch(job) {
+      // Round 70: a trend probe names the base draw whose child it searches and answers with that child's trend.
+      if (job.draw) return probeDraw(root, job.p1Choice, job.p2Choice, job.draw, serialized => subSearch(serialized, job.settings, matchupCache), matchupCache);
       const child = advancePosition(root, job.p1Choice, job.p2Choice, SEARCH_SEEDS[0]);
       return subSearch(child.serialized, job.settings, matchupCache);
     },

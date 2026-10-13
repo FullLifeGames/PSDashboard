@@ -1,10 +1,10 @@
 import {
-  applyTrendExtrapolation, applyTrendTiebreak, attachLines, cellKey, rankFromMatrix, selectExpansionCells,
+  applyTrendExtrapolation, applyTrendTiebreak, attachLines, cellKey, meanTrend, rankFromMatrix, selectExpansionCells,
   selectTieProbeCells, toResult, TOP_EXPANSION, type PvStep, type Ranked, type ValueMatrix,
 } from './rank.ts';
 import { perfSpan, perfSync } from './perf-trace.ts';
 import type {
-  CellBlend, EvalCellJob, EvalCellValue, EvalChoiceOption, EvalChoicesInfo, EvalResult, EvalSettings,
+  CellBlend, CellDraw, EvalCellJob, EvalCellValue, EvalChoiceOption, EvalChoicesInfo, EvalResult, EvalSettings,
   EvalSubSearchJob, ForcedWinInput, ForcedWinOutcome, KoOddsMismatch, SearchProgress, TeraAllowance,
 } from './types.ts';
 import { applyForcedWin, forcedWinInput } from './search/forced-win-apply.ts';
@@ -52,21 +52,24 @@ function cellJobs(p1: EvalChoiceOption[], p2: EvalChoiceOption[], samples: numbe
 }
 
 /**
- * Writes the executor's cell values into the matrix, collecting the blends
- * and the diagnostics. The executor returns chunks in completion order, so
- * the diagnostics are sorted by cell: the values are index-addressed and
- * the blends are looked up by key, but the diagnostic list is read as is.
+ * Writes the executor's cell values into the matrix, collecting the blends,
+ * the base draws (round 70: the trend probe replays them) and the diagnostics.
+ * The executor returns chunks in completion order, so the diagnostics are
+ * sorted by cell: the values are index-addressed and the blends and draws are
+ * looked up by key, but the diagnostic list is read as is.
  */
 function collectCells(
   cellValues: CellValue[],
   matrix: ValueMatrix,
   blends: Map<number, CellBlend>,
+  baseDraws: Map<number, CellDraw[]>,
   diagnostics: KoOddsMismatch[],
 ): void {
   for (const cell of cellValues) {
     matrix.values[cell.i][cell.j] = cell.value;
     matrix.ended[cell.i][cell.j] = cell.ended;
     if (cell.blend) blends.set(cellKey(cell.i, cell.j), cell.blend);
+    if (cell.baseDraws) baseDraws.set(cellKey(cell.i, cell.j), cell.baseDraws);
     if (cell.diagnostic) diagnostics.push(cell.diagnostic);
   }
   diagnostics.sort((a, b) => a.i - b.i || a.j - b.j);
@@ -90,6 +93,8 @@ interface Orchestration extends DeepeningState {
   rootValue: number;
   p1: EvalChoiceOption[];
   p2: EvalChoiceOption[];
+  /** cellKey → the base draws behind a cell of more than one draw (round 70). */
+  baseDraws: Map<number, CellDraw[]>;
   ranked: Ranked;
 }
 
@@ -128,6 +133,11 @@ async function deepenLevelAsync(state: Orchestration, depth: number): Promise<bo
 /**
  * Horizon-trend tiebreak, mirroring searchPosition: singles-shaped lists
  * only; probes are one-ply sub-searches of the tied rows' decisive cells.
+ * Round 70: a cell of several draws gets one probe per base draw (the executor
+ * answers the trend of the draw's child against its own leaf) and books the
+ * mean; a cell of one draw gets the one probe on its first child, booked as
+ * the child's score against the cell's value. An executor that answers no
+ * trend is booked that way for every draw.
  */
 async function applyTrendLayersAsync(state: Orchestration, result: EvalResult, stopped: boolean): Promise<void> {
   const combined = state.p1.some(option => option.choice.includes(',')) ||
@@ -135,14 +145,18 @@ async function applyTrendLayersAsync(state: Orchestration, result: EvalResult, s
   if (!(!stopped && !combined)) return;
   const probes = selectTieProbeCells(state.matrix, result, state.trendMap);
   if (probes.length > 0) {
-    const subs = await Promise.all(probes.map(([i, j]) => state.executor.subSearch({
+    const jobs = probes.flatMap(([i, j]) => (state.baseDraws.get(cellKey(i, j)) ?? [undefined]).map(draw => ({ i, j, draw })));
+    const subs = await Promise.all(jobs.map(({ i, j, draw }) => state.executor.subSearch({
       i, j, p1Choice: state.p1[i].choice, p2Choice: state.p2[j].choice,
-      settings: { ...state.settings, depth: 1, samples: 1, keepPlayed: undefined },
+      settings: { ...state.settings, depth: 1, samples: 1, keepPlayed: undefined }, ...(draw ? { draw } : {}),
     })));
+    const trends = new Map<number, number[]>();
     subs.forEach((sub, index) => {
-      const [i, j] = probes[index];
-      state.trendMap.set(cellKey(i, j), sub.score - state.staticValues[i][j]);
+      const { i, j } = jobs[index];
+      const key = cellKey(i, j);
+      trends.set(key, [...(trends.get(key) ?? []), sub.trend ?? sub.score - state.staticValues[i][j]]);
     });
+    for (const [key, drawTrends] of trends) state.trendMap.set(key, meanTrend(drawTrends));
   }
   // 2b, mirroring searchPosition: corrected values (no re-solve) before
   // the ordering-only tiebreak runs on what remains tied.
@@ -169,15 +183,16 @@ export async function searchOrchestrated(
   const matrix: ValueMatrix = { p1Options: p1, p2Options: p2, values, ended };
 
   const blends = new Map<number, CellBlend>();
+  const baseDraws = new Map<number, CellDraw[]>();
   const diagnostics: KoOddsMismatch[] = [];
   const cellValues = await executor.evalCells(jobs, completed =>
     callbacks?.onProgress?.({ done: Math.min(completed, total), total, depth: 1 }));
-  collectCells(cellValues, matrix, blends, diagnostics);
+  collectCells(cellValues, matrix, blends, baseDraws, diagnostics);
   const payload = orchestratedPayload(info, diagnostics);
   // Trend baseline, mirroring searchPosition: uniformly 1-ply-vs-static.
   const state: Orchestration = {
     matrix, blends, staticValues: values.map(row => [...row]), trendMap: new Map<number, number>(),
-    pvByCell: new Map<number, PvStep[]>(), executor, settings, callbacks, rootValue, p1, p2,
+    pvByCell: new Map<number, PvStep[]>(), executor, settings, callbacks, rootValue, p1, p2, baseDraws,
     ranked: perfSync('main:rank', () => rankFromMatrix(matrix, rootValue)),
   };
   let result = toResult(state.ranked, 1);

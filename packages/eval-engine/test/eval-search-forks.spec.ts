@@ -2,6 +2,10 @@ import { afterEach, beforeEach, describe, expect, test } from 'vitest';
 import { Battle, State, Teams, toID } from '@pkmn/sim';
 import type { PokemonSet } from '@pkmn/sim';
 import { searchPosition, subSearchDepth1 } from '../src/search';
+import { createMatchupCache } from '../src/eval-function';
+import { createRootPosition, positionBattle } from '../src/forward-model';
+import { buildMatrix } from '../src/search/matrix';
+import { searchOptions } from '../src/search/options';
 import { PROVER_BUDGET } from '../src/endgame/prover';
 import { configureSimFast, resetSimFastForTests } from '../src/forward/sim-fast/state';
 
@@ -63,18 +67,22 @@ describe('fork counts on the standard path', () => {
 
       // Toss KOs Pikachu (bench Eevee continues the game): those cells are
       // roll-sensitive and take the full spread; quiet cells still take one.
-      // The trend tiebreak's probe forks are the same in both runs, so the
-      // s3−s1 delta isolates the sampling behavior.
-      const violent = serialize(makeBattle(
+      // Round 70: the trend tiebreak probes a cell from each of its draws, so
+      // its forks grow with the draws too; the count is the matrix stage's.
+      const violent = createRootPosition(serialize(makeBattle(
         [makeSet('Machamp', 'Machamp', ['Seismic Toss', 'Protect'], 100)],
         [makeSet('Pikachu', 'Pikachu', ['Tackle', 'Growl'], 30), makeSet('Eevee', 'Eevee', ['Tackle', 'Growl'], 30)],
-      ));
-      forks = 0;
-      searchPosition(violent, { depth: 1, samples: 1, tera: false });
-      const forksSingle = forks;
-      forks = 0;
-      searchPosition(violent, { depth: 1, samples: 3, tera: false });
-      const extraDraws = forks - forksSingle;
+      )));
+      positionBattle(violent); // the root's own deserialization is no part of the sampling
+      const p1 = searchOptions(violent, 'p1', { tera: false });
+      const p2 = searchOptions(violent, 'p2', { tera: false });
+      const matrixForks = (samples: 1 | 3) => {
+        forks = 0;
+        buildMatrix(violent, p1, p2, samples, 1, undefined, { done: 0, total: 1 }, createMatchupCache(), true);
+        return forks;
+      };
+      const forksSingle = matrixForks(1);
+      const extraDraws = matrixForks(3) - forksSingle;
       const cells = 2 * 3; // 2 p1 options x 3 p2 options
       expect(extraDraws).toBeGreaterThan(0);           // some cells multi-sampled
       expect(extraDraws).toBeLessThan(cells * 2);      // but not all of them

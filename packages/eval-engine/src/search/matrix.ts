@@ -1,7 +1,7 @@
 import type { MatchupCache } from '../eval-function.ts';
 import { positionBattle, type ChoiceOption, type SimPosition } from '../forward-model.ts';
 import { cellKey, type ValueMatrix } from '../rank.ts';
-import type { CellBlend, EvalResult, KoOddsMismatch, SearchProgress } from '../types.ts';
+import type { CellBlend, CellDraw, EvalResult, KoOddsMismatch, SearchProgress } from '../types.ts';
 import { countFainted } from './leaf.ts';
 import { sampleCell } from './cell-sampler.ts';
 
@@ -24,6 +24,8 @@ export interface Matrix extends ValueMatrix {
   blends: Map<number, CellBlend>;
   /** Boundary cells whose analytic classes went unsampled (probe budget). */
   diagnostics: KoOddsMismatch[];
+  /** cellKey(i, j) → the base draws behind the cell, where it has more than the first seed's (round 70: the trend probe replays them). */
+  baseDraws: Map<number, CellDraw[]>;
 }
 
 export function buildMatrix(
@@ -43,6 +45,7 @@ export function buildMatrix(
   const children: SimPosition[][] = [];
   const blends = new Map<number, CellBlend>();
   const diagnostics: KoOddsMismatch[] = [];
+  const baseDraws = new Map<number, CellDraw[]>();
 
   for (let i = 0; i < p1Options.length; i++) {
     values.push([]);
@@ -54,13 +57,14 @@ export function buildMatrix(
       ended[i].push(cell.ended);
       children[i].push(cell.firstChild);
       if (cell.blend) blends.set(cellKey(i, j), cell.blend);
+      if (cell.baseDraws) baseDraws.set(cellKey(i, j), cell.baseDraws);
       if (cell.diagnostic) diagnostics.push({ ...cell.diagnostic, i, j });
       progress.done += 1;
       callbacks?.onProgress?.({ done: progress.done, total: progress.total, depth });
     }
   }
 
-  return { p1Options, p2Options, values, ended, children, blends, diagnostics };
+  return { p1Options, p2Options, values, ended, children, blends, diagnostics, baseDraws };
 }
 
 /** Memoized cell sampler over the root's option lists (plain seed average, no blend). */
