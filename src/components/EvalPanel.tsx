@@ -53,6 +53,8 @@ interface EvalPanelProps {
   analysis: TurnAnalysis | null;
   /** Exploitative Read recommendations for the selected turn (advisory). */
   reads?: { p1?: ReadRecommendation | null; p2?: ReadRecommendation | null } | null;
+  /** The fainted share per swept turn as the card takes it (any engine mode): the graph tooltips print at it. */
+  faintedShares?: (number | null)[];
   /** Turn-0 analysis, shown when the graph's leads point is selected. */
   leadAnalysis?: LeadAnalysis | null;
   /** Lead verdicts for the report chips (independent of selection). */
@@ -129,11 +131,11 @@ function PanelHeader({ running, ...props }: EvalPanelProps & { running: boolean 
  * Round 69 (T51): the fainted share of the turn the shown result belongs to, so the panel prints the same percents the
  * turn card does. A branch or lead result (not the graph's own result of the analyzed turn) has no share: the opening map.
  */
-function shownShare({ result, graph, analysis, analysisTurn }: EvalPanelProps): number | null {
+function shownShare({ result, graph, analysis, analysisTurn, faintedShares }: EvalPanelProps): number | null {
   if (!result || analysisTurn === null || analysisTurn === undefined || analysisTurn < 1) return null;
   if (graph.results[analysisTurn - 1] !== result) return null;
   if (analysis?.turn === analysisTurn && analysis.faintedFraction !== undefined) return analysis.faintedFraction;
-  return graph.faintedFractions[analysisTurn - 1] ?? null;
+  return faintedShares?.[analysisTurn - 1] ?? graph.faintedFractions[analysisTurn - 1] ?? null;
 }
 
 export function EvalPanel(props: EvalPanelProps) {

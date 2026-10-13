@@ -127,9 +127,14 @@ export interface GameGraphSectionProps extends TurnViewProps {
   variation?: { startTurn: number; scores: (number | null)[] } | null;
   graphMaxTurn?: number;
   showReportView: boolean;
+  /** The card's fainted share per swept turn (any engine mode); the sweep's own record exists in auto only. */
+  faintedShares?: (number | null)[];
   /** Doubles replay — auto routes per game type (EvalPanel passes its own prop through). */
   doubles?: boolean;
 }
+
+/** The card's share per turn where the caller has it, else the sweep's own record (auto only). */
+const graphShares = ({ faintedShares, graph }: GameGraphSectionProps) => faintedShares ?? graph.faintedFractions;
 
 /** The game graph with its controls, the report overview, or the selected turn's view. */
 export function GameGraphSection(props: GameGraphSectionProps) {
@@ -158,7 +163,7 @@ export function GameGraphSection(props: GameGraphSectionProps) {
           leadScore={graph.lead?.result.score ?? null}
           leadDetail={reportLeads ?? null}
           evalErrors={graph.evalErrors}
-          faintedFractions={graph.faintedFractions}
+          faintedFractions={graphShares(props)}
           decided={graph.results.map(result => (result ? heldDecided(result) ?? null : null))}
           variation={variation}
           maxTurn={graphMaxTurn}

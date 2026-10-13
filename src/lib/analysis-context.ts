@@ -50,6 +50,15 @@ export function turnFaintedFraction(graph: AnalysisGraphData, snapshots: TurnSna
   return total > 0 ? fallen / total : null;
 }
 
+/**
+ * Round 69 (T51 review): the share of every swept turn, as the turn card takes it. Only the auto engine records its
+ * phase in the graph, so a Matrix or MCTS sweep leaves `faintedFractions` empty; the graph tooltips read this list
+ * instead and print at the same map as the card, the side rows and the bar in every engine mode.
+ */
+export function graphFaintedFractions(graph: AnalysisGraphData, snapshots: TurnSnapshot[]): (number | null)[] {
+  return graph.scores.map((_, index) => turnFaintedFraction(graph, snapshots, index + 1));
+}
+
 export interface TurnAnalysisContext {
   snapshots: TurnSnapshot[];
   turnEventsIndex: string[][];

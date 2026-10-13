@@ -13,6 +13,7 @@ interface WorkspaceColumnProps {
 function analysisPropsFor(liveEvalView: boolean, analysisTurn: number | null, analysis: AppController['analysis']) {
   return {
     analysis: !liveEvalView ? analysis.turnAnalysis : null,
+    faintedShares: analysis.faintedShares,
     reads: !liveEvalView ? analysis.turnReads : null,
     leadAnalysis: !liveEvalView && analysisTurn === 0 ? analysis.leadAnalysisData : null,
     reportLeads: analysis.leadAnalysisData,

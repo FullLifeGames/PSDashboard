@@ -111,6 +111,19 @@ describe('the rendered graph and the bar read one number', () => {
     expect(screen.getByRole('img', { name: `Advantage estimate: Alice ${p1}%, Bob ${100 - p1}%` })).toBeInTheDocument();
   });
 
+  test.each(['singles', 'doubles'] as const)('%s: an engine that records no shares (Matrix, MCTS) still prints the tooltip at the share of the card', kind => {
+    const graph = evalGraph(kind, { faintedFractions: Array.from({ length: 10 }, () => null) });
+    const score = graph.results[6]!.score;
+    const p1 = pct(score, 0.5);
+    expect(p1).not.toBe(pct(score, 0));
+    const shares = Array.from({ length: 10 }, (_, i) => (i === 6 ? 0.5 : 0));
+    const drawn = render(<GameGraphSection {...section(graph, 7)} faintedShares={shares} />);
+    expect(drawn.container.querySelector('rect[data-turn="7"] title')!.textContent).toContain(`Alice ${p1}% · Bob ${100 - p1}%`);
+    drawn.unmount();
+    const bare = render(<GameGraphSection {...section(graph, 7)} />);
+    expect(bare.container.querySelector('rect[data-turn="7"] title')!.textContent).toContain(`Alice ${pct(score, 0)}%`);
+  });
+
   test('the drawn graph prints a variation point at the main line share of its turn', () => {
     const graph = evalGraph('singles', { faintedFractions: Array.from({ length: 10 }, (_, i) => (i === 4 ? 0.5 : 0)) });
     const variation = { startTurn: 4, scores: graph.scores.map((_, i) => (i === 4 ? 0.4 : null)) };

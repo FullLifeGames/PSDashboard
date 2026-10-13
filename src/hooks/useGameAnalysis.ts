@@ -5,7 +5,7 @@ import {
   type TurnAlignmentRecord,
 } from '@fulllifegames/eval-engine';
 import {
-  analyzeTurnAt, buildPlayedHistory, computeGameReportData, computeTurnReads,
+  analyzeTurnAt, buildPlayedHistory, graphFaintedFractions, computeGameReportData, computeTurnReads,
   type ReplayTendencies, type TurnAnalysisContext,
 } from '../lib/analysis-context';
 import type { useEvaluation } from './useEvaluation';
@@ -113,6 +113,9 @@ export function useGameAnalysis(inputs: {
     });
   }, [analysisTurn, evaluation.graph, context, replayData, turnReads, tendencies]);
 
+  // The graph's tooltips take the card's share in every engine mode (the sweep records its own only in auto).
+  const faintedShares = useMemo(() => graphFaintedFractions(evaluation.graph, snapshots), [evaluation.graph, snapshots]);
+
   const leadAnalysisData = useMemo(() => {
     const lead = evaluation.graph.lead;
     if (!lead) return null;
@@ -134,5 +137,5 @@ export function useGameAnalysis(inputs: {
     };
   }, [evaluation.graph, gameReportData, sweepAlignment]);
 
-  return { turnReads, turnAnalysis, leadAnalysisData, gameReport: gameReportData?.report ?? null };
+  return { turnReads, turnAnalysis, faintedShares, leadAnalysisData, gameReport: gameReportData?.report ?? null };
 }

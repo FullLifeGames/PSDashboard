@@ -31,6 +31,30 @@ function inputs(overrides: Partial<Inputs> = {}): Inputs {
   return { replayData, snapshots, evaluation: evaluationWith(sweptGraph()), analysisTurn: null, sweepAlignment: null, replayGen: 9, ...overrides };
 }
 
+describe('the graph shares (round 69, T51: the graph and the card read one map in every engine mode)', () => {
+  test.each(['singles', 'doubles'] as const)('%s: a matrix or MCTS sweep records no shares, the graph still gets the share of the card for every turn', kind => {
+    const fixture = replayFixture(kind);
+    const last = finalPlayedTurn(fixture.snapshots);
+    const full = evalGraph(kind);
+    const unrecorded = sweptGraph({
+      scores: full.scores.slice(0, last), results: full.results.slice(0, last),
+      faintedFractions: full.scores.slice(0, last).map(() => null),
+    });
+    const graph = { ...unrecorded, played: unrecorded.scores.map(() => null) };
+    const base = { replayData: fixture.replayData, snapshots: fixture.snapshots, evaluation: evaluationWith(graph), sweepAlignment: null, replayGen: 9 };
+    const { result: overview } = renderHook(() => useGameAnalysis({ ...base, analysisTurn: null }));
+    const shares = overview.current.faintedShares;
+    expect(shares).toHaveLength(last);
+    expect(shares.every(share => share !== null)).toBe(true);
+    // The short doubles fixture has no faint before its last turn: only the singles game holds a share above the opening one.
+    if (kind === 'singles') expect(Math.max(...shares.map(share => share ?? 0))).toBeGreaterThan(0);
+    for (const turn of [1, Math.ceil(last / 2), last]) {
+      const { result } = renderHook(() => useGameAnalysis({ ...base, analysisTurn: turn }));
+      expect(shares[turn - 1]).toBe(result.current.turnAnalysis?.faintedFraction);
+    }
+  });
+});
+
 describe('useGameAnalysis', () => {
   test('a finished sweep yields the game report and no turn analysis without a selected turn', () => {
     // Stable inputs: the report memo keys on the graph object, as the app's state does.
