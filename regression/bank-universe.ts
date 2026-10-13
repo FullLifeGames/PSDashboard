@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import { existsSync, readFileSync } from 'node:fs';
 import { FAMILY_NAMES, familyOfFormat, type FamilyName } from './fit-families';
 
@@ -104,6 +105,59 @@ function turnRule(own: (maxTurn: number) => number[]): (maxTurn: number) => numb
 }
 
 /**
+ * Round 70 (bank tooling): the quick tier's share, EVAL_CALIBRATION_FRACTION. Unset, empty and 1 mean
+ * the whole universe; anything else must be a number above 0 and at most 1, or the run stops.
+ */
+export function quickFraction(raw: string | undefined = process.env.EVAL_CALIBRATION_FRACTION): number {
+  if (raw === undefined || raw.trim() === '') return 1;
+  const fraction = Number(raw);
+  if (!Number.isFinite(fraction) || fraction <= 0 || fraction > 1) {
+    throw new Error(`EVAL_CALIBRATION_FRACTION must be a number above 0 and at most 1 (a share of the universe), got "${raw}"`);
+  }
+  return fraction;
+}
+
+/** What a stratum of `size` replays keeps at `fraction`: the nearest whole number (halves up), at least one. */
+const quickKeep = (size: number, fraction: number): number => Math.min(size, Math.max(1, Math.floor(size * fraction + 0.5 + 1e-9)));
+
+/**
+ * Round 70: the quick tier. Every tranche and family (familyOfFormat reads the format from the id)
+ * keeps quickKeep of its replays, the ones whose sha256 of the id sorts first. The same replays come
+ * back for the same fraction, whatever the input order and the other strata hold, and a smaller
+ * fraction picks a subset of a larger one. The result keeps the order of `ids`. The harness scores
+ * each replay on its own (the slice merge relies on that) at the same sampled turns, so a kept
+ * replay gives the rows it gives in a full run and a quick run pairs against a full base on them.
+ */
+export function quickSubset(ids: readonly string[], trancheOf: ReadonlyMap<string, string>, fraction: number): string[] {
+  if (fraction >= 1) return [...ids];
+  const strata = new Map<string, string[]>();
+  for (const id of ids) {
+    const key = `${trancheOf.get(id) ?? 'unknown'}\u0000${familyOfFormat(id)}`;
+    const members = strata.get(key);
+    if (members) members.push(id);
+    else strata.set(key, [id]);
+  }
+  const before = (a: string, b: string) => (a < b ? -1 : a > b ? 1 : 0);
+  const kept = new Set<string>();
+  for (const members of strata.values()) {
+    members
+      .map(id => ({ id, rank: createHash('sha256').update(id).digest('hex') }))
+      .sort((a, b) => before(a.rank, b.rank) || before(a.id, b.id))
+      .slice(0, quickKeep(members.length, fraction))
+      .forEach(entry => kept.add(entry.id));
+  }
+  return ids.filter(id => kept.has(id));
+}
+
+/** The universe under EVAL_CALIBRATION_FRACTION: the whole one at 1, else its quick subset. */
+function thinned(universe: BankUniverse, fraction: number): BankUniverse {
+  if (fraction >= 1) return universe;
+  const ids = quickSubset(universe.ids, universe.trancheOf, fraction);
+  const kept = new Set(ids);
+  return { ...universe, ids, trancheOf: new Map([...universe.trancheOf].filter(([id]) => kept.has(id))) };
+}
+
+/**
  * The universe of a run. Default: the bank's tranches (`bank`), fetched
  * from the network. EVAL_CALIBRATION_SOURCE=fit swaps in the
  * manifest-pinned weight-fitting corpus from its disk cache: FIT-SIDE DUMPS
@@ -116,8 +170,17 @@ function turnRule(own: (maxTurn: number) => number[]): (maxTurn: number) => numb
  * three positions per game (holdoutTurns). The universes never mix ids.
  * EVAL_CALIBRATION_FAMILY and EVAL_CALIBRATION_TURNS (round 69) narrow the fit corpus to one family and
  * thin the turns to one per third of a game; without them nothing moves.
+ * EVAL_CALIBRATION_FRACTION=0.25 (round 70, the quick tier) then keeps a quarter of what is left on
+ * any source: the same replays every time, each tranche and family in proportion, no tranche or
+ * family dropped (quickSubset). The harness filters by tranche and slices the thinned list, and
+ * every kept replay samples the same turns, so a quick run pairs with a full base on the shared rows.
  */
 export function bankUniverse(bank: { ids: string[]; trancheOf: Map<string, string> }): BankUniverse {
+  const fraction = quickFraction();
+  return thinned(wholeUniverse(bank), fraction);
+}
+
+function wholeUniverse(bank: { ids: string[]; trancheOf: Map<string, string> }): BankUniverse {
   const source = process.env.EVAL_CALIBRATION_SOURCE;
   const family = process.env.EVAL_CALIBRATION_FAMILY;
   if (family && source !== 'fit') throw new Error('EVAL_CALIBRATION_FAMILY reads the fit corpus — set EVAL_CALIBRATION_SOURCE=fit');

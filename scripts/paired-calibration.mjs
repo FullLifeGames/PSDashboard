@@ -4,6 +4,16 @@
 // doubles verdict reads the bank's dump together with the holdout's).
 // `--b-field gameValue` reads side B's root game value as its score (round 67,
 // T114: one run pairs its game value against its score).
+// Quick runs (round 70): a run made with EVAL_CALIBRATION_FRACTION=0.25 holds a
+// stratified quarter of the replays of a full run, the same rows for those
+// replays, so it pairs against a full base on the rows both dumps hold (the
+// join below). When the run.json beside either dump records a fraction under
+// 1, the header names the fraction of each side, the pairing count and its
+// share of A, and what the fixed K comes from: pairedBands fits K on all of A,
+// so give the full base as A; ownKBands fits K on the pairs. A quick pair has
+// fewer replays, so its bands run wider than a full pair's and a resolved row
+// can flip in the full pair: it screens a change early, and the full pair
+// decides. Two full runs print the header as before.
 // Joins the two dumps on id#turn (identical positions only), reproduces the
 // harness aggregates for each side, prints the verdict table with error bars
 // (paired Brier deltas under the A side's K, 90 % band from a bootstrap over
@@ -19,6 +29,7 @@
 import {
   asScore, bandLines, filterQuality, load, ownKBands, pairedBands, record, right, takeFieldArgs, takeQualityArg,
 } from './calibration-lib.mjs';
+import { quickTierLines } from './calibration-fingerprint.mjs';
 
 const key = s => `${s.id}#${s.turn}`;
 
@@ -36,7 +47,11 @@ const joined = a
   .filter(s => bByKey.has(key(s)))
   .map(s => ({ a: s, b: bByKey.get(key(s)) }));
 
-console.log(`A(${aPath}) n=${a.length}  B(${bPath}) n=${b.length}  joined n=${joined.length}${quality ? ` (quality ${quality})` : ''}\n`);
+const header = `A(${aPath}) n=${a.length}  B(${bPath}) n=${b.length}  joined n=${joined.length}${quality ? ` (quality ${quality})` : ''}`;
+const quickLines = quickTierLines({
+  aPath, bPath, aRows: a.length, pairs: joined.length, replays: new Set(joined.map(pair => pair.a.id)).size,
+});
+console.log([header, ...quickLines].join('\n') + '\n');
 
 console.log('=== full-set records (reproduce the printed numbers) ===');
 record(a, 'A (full)');
