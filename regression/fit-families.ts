@@ -47,6 +47,17 @@ export const rulesetOfId = (id: string): Ruleset => {
 
 export const familyOf = (sample: Pick<FamilySample, 'ruleset' | 'gameType'>): FamilyName => `${sample.ruleset}-${sample.gameType}`;
 
+/** The five families of the fit corpus, in the order the fit tool lists them. */
+export const FAMILY_NAMES: readonly FamilyName[] = ['standard-singles', 'standard-doubles', 'vgc-doubles', 'champions-singles', 'champions-doubles'];
+
+/**
+ * The family of a corpus format (round 69, T163): the doubles formats are Doubles OU and the VGC
+ * formats of both games, every other format plays singles. The replay log says the same
+ * (|gametype|doubles), which the universe cannot read before it fetches a replay.
+ */
+export const familyOfFormat = (format: string): FamilyName =>
+  familyOf({ ruleset: rulesetOfId(format), gameType: /doubles|vgc/.test(format) ? 'doubles' : 'singles' });
+
 /** The rule set of a family name ('champions-doubles' is Champions). */
 const rulesetOfFamily = (name: string): Ruleset => name.split('-')[0] as Ruleset;
 
@@ -290,4 +301,107 @@ export function phaseKReports(
     };
   }
   return reports;
+}
+
+/** A search value at 1 or -1 (a forced result) has no finite logit: it counts at the logit of this value. */
+const ROOT_VALUE_CLAMP = 1 - 1e-4;
+/** The search's logit: a root value in wp units is 2p - 1, so the odds are 2 atanh(v). */
+export const rootLogit = (value: number): number => 2 * Math.atanh(Math.max(-ROOT_VALUE_CLAMP, Math.min(ROOT_VALUE_CLAMP, value)));
+
+/** One phase bucket of a root scale report: the capture's own values against the fitted scale. */
+interface RootBucketScores extends PhaseBucketScores { kToday: number; kFitted: number }
+/** One family's scale of the search's logit, and the leaf K it implies. */
+export interface RootScaleReport {
+  n: number; sets: number;
+  /** Positions whose root value was exactly certain (|v| above the clamp): the prover's rows. */
+  clamped: number;
+  /** The leaf K the capture ran under (the report refuses a mismatch with today's table). */
+  capturedK: PhaseK;
+  /** The scale of the logit, c0 + c1·ff (fitPhaseK on the logit); 1 + 0·ff is an honest search. */
+  scale: PhaseK;
+  /** The scale's bootstrap over sets; its `at` entries are the band of K' = K·c at 0, 1/3 and 2/3 fainted. */
+  spread: PhaseKSpread;
+  /** K' = K·c as a line in the fainted share (least squares on the positions' own shares). */
+  kPrime: PhaseK;
+  buckets: Record<Bucket, RootBucketScores>;
+}
+
+/**
+ * Round 69 (T163, decision 20): the leaf K per family on the search's own root values. A capture
+ * with search (no EVAL_CALIBRATION_STATIC) holds the root value in wp units; its logit is
+ * 2 atanh(v). Per family the scale c0 + c1·ff of sigmoid(c·logit) against the outcome
+ * (fitPhaseK on the logit, the bootstrap over sets) says how far the search's values sit from
+ * honest, and K' = K·c is the leaf K that would put the root right to first order (the search
+ * is no linear function of the leaf values, so the bank decides, not this fit). The last
+ * pair stays out (the bank prices it by its race). The search root cannot be re-derived from
+ * the features, so there is no identity check; instead the report names the K table the capture
+ * ran under (`captured`) and stops when it is not today's table (`kOf`), since K·c means
+ * nothing against another K. Holdout and unrated ladder games are the caller's cut.
+ */
+export function rootScaleReports(
+  samples: FamilySample[], kOf: KOf, captured: KOf, draws: number,
+): Record<string, RootScaleReport | { skipped: string }> {
+  const present = new Set(samples.map(sample => familyOf(sample)));
+  const reports: Record<string, RootScaleReport | { skipped: string }> = {};
+  for (const name of FAMILY_NAMES.filter(family => present.has(family))) {
+    const doubles = name.endsWith('-doubles');
+    const ruleset = rulesetOfFamily(name);
+    const stamped = doubles ? captured(ruleset).doubles : captured(ruleset).singles;
+    const today = doubles ? kOf(ruleset).doubles : kOf(ruleset).singles;
+    if (Math.abs(stamped.k0 - today.k0) > 1e-9 || Math.abs(stamped.k1 - today.k1) > 1e-9) {
+      throw new Error(
+        `root scale ${name}: the capture was made under K ${stamped.k0} + ${stamped.k1}·ff, today's table says ${today.k0} + ${today.k1}·ff — fit at the capture's commit`,
+      );
+    }
+    const subset = samples.filter(sample => familyOf(sample) === name && !sample.lastPair);
+    if (subset.length < 100) {
+      reports[name] = { skipped: `${subset.length} samples, below 100` };
+      continue;
+    }
+    const outcome = subset.map(sample => ({ score: rootLogit(sample.score), faintedFraction: sample.faintedFraction, won: sample.p1Won, game: sample.set }));
+    const scale = fitPhaseK(outcome);
+    const spread = bootstrapPhaseK(outcome, draws, 48);
+    const kAt = (ff: number) => today.k0 + today.k1 * ff;
+    // K' = K·c on every position's own phase, then the line through it (2 × 2 normal equations).
+    let sx = 0; let sxx = 0; let sy = 0; let sxy = 0;
+    for (const { faintedFraction: x } of outcome) {
+      const y = kAt(x) * (scale.k0 + scale.k1 * x);
+      sx += x; sxx += x * x; sy += y; sxy += x * y;
+    }
+    const n = outcome.length;
+    const slope = (n * sxy - sx * sy) / (n * sxx - sx * sx);
+    const bucket = (phase: Bucket): RootBucketScores => {
+      const inBucket = outcome.filter(sample => phaseBucket(sample.faintedFraction) === phase);
+      const mean = (f: (sample: (typeof outcome)[number]) => number) => inBucket.reduce((sum, sample) => sum + f(sample), 0) / Math.max(1, inBucket.length);
+      return {
+        n: inBucket.length,
+        brierToday: brierScore(inBucket, 1), brierFitted: brierScore(inBucket, scale.k0, scale.k1),
+        logLossToday: logLossScore(inBucket, 1), logLossFitted: logLossScore(inBucket, scale.k0, scale.k1),
+        kToday: mean(sample => kAt(sample.faintedFraction)), kFitted: mean(sample => kAt(sample.faintedFraction) * (scale.k0 + scale.k1 * sample.faintedFraction)),
+      };
+    };
+    reports[name] = {
+      n, sets: new Set(outcome.map(sample => sample.game)).size, clamped: subset.filter(sample => Math.abs(sample.score) > ROOT_VALUE_CLAMP).length,
+      capturedK: stamped, scale,
+      spread: { ...spread, at: spread.at.map(entry => ({ ...entry, k: kAt(entry.ff) * entry.k, lo: kAt(entry.ff) * entry.lo, hi: kAt(entry.ff) * entry.hi })) },
+      kPrime: { k0: (sy - slope * sx) / n, k1: slope },
+      buckets: { early: bucket('early'), mid: bucket('mid'), late: bucket('late') },
+    };
+  }
+  return reports;
+}
+
+/**
+ * The K table a capture ran under, from a stamp: `{"standard": {"singles": {"k0", "k1"}, "doubles": ...}, "vgc": ..., "champions": ...}`
+ * (EVAL_FIT_ROOT_K). A missing rule set or K stops the report; it does not fall back to today's table.
+ */
+export function parseKTable(text: string): KOf {
+  const stamp = JSON.parse(text) as Record<string, Partial<Record<'singles' | 'doubles', Partial<PhaseK>>>>;
+  for (const ruleset of ['standard', 'vgc', 'champions']) {
+    for (const gameType of ['singles', 'doubles'] as const) {
+      const k = stamp[ruleset]?.[gameType];
+      if (!k || !Number.isFinite(k.k0) || !Number.isFinite(k.k1)) throw new Error(`K stamp: no k0 and k1 for ${ruleset} ${gameType}`);
+    }
+  }
+  return ruleset => stamp[ruleset] as GameTypeK;
 }

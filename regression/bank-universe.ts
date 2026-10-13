@@ -1,4 +1,5 @@
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
+import { FAMILY_NAMES, familyOfFormat, type FamilyName } from './fit-families';
 
 /**
  * The replays a calibration bank run samples (round 65), in one place: the
@@ -59,9 +60,47 @@ export function holdoutTurns(maxTurn: number): number[] {
   return turns;
 }
 
+/** The ladder rating of a cached fit replay: null when it has none, undefined when the cache lacks the replay. */
+export function cachedRating(id: string): number | null | undefined {
+  const path = `.fit-corpus/${id}.json`;
+  return existsSync(path) ? (JSON.parse(readFileSync(path, 'utf-8')) as { rating?: number | null }).rating ?? null : undefined;
+}
+
 /** The holdout's sets as written by scripts/build-fit-holdout.mjs. */
 export function holdoutSets(): { key: string; family: string; ids: string[] }[] {
   return (JSON.parse(readFileSync(HOLDOUT_MANIFEST, 'utf-8')) as { sets: { key: string; family: string; ids: string[] }[] }).sets;
+}
+
+/**
+ * Round 69 (T163): EVAL_CALIBRATION_FAMILY=<family> narrows the fit corpus to one family of
+ * fit-families.ts (standard-singles, standard-doubles, vgc-doubles, champions-singles,
+ * champions-doubles) and leaves out what a fit leaves out, the holdout and the ladder games
+ * without a rating, so a search capture does not pay for rows its report drops.
+ */
+/** A ladder game a fit reads: it has a rating, or the cache lacks it (the run skips that game). */
+const ratedOrUncached = (id: string): boolean => {
+  const rating = cachedRating(id);
+  return rating === undefined || (rating ?? 0) > 0;
+};
+
+function familyUniverse(family: string, replays: { id: string; format: string; source: 'tournament' | 'ladder' }[]) {
+  if (!(FAMILY_NAMES as readonly string[]).includes(family)) {
+    throw new Error(`unknown EVAL_CALIBRATION_FAMILY ${family} (${FAMILY_NAMES.join(', ')})`);
+  }
+  const held = new Set(holdoutSets().flatMap(set => set.ids));
+  return replays.filter(entry => familyOfFormat(entry.format) === (family as FamilyName) && !held.has(entry.id)
+    && (entry.source === 'tournament' || ratedOrUncached(entry.id)));
+}
+
+/**
+ * Round 69 (T163): EVAL_CALIBRATION_TURNS=thirds samples a game at the holdout's turns, one in
+ * each third of the game, on any source. Without it every source keeps its own rule.
+ */
+function turnRule(own: (maxTurn: number) => number[]): (maxTurn: number) => number[] {
+  const rule = process.env.EVAL_CALIBRATION_TURNS;
+  if (rule === undefined || rule === '') return own;
+  if (rule !== 'thirds') throw new Error(`unknown EVAL_CALIBRATION_TURNS ${rule} (thirds)`);
+  return holdoutTurns;
 }
 
 /**
@@ -75,28 +114,33 @@ export function holdoutSets(): { key: string; family: string; ids: string[] }[] 
  * holdout instead, one third of its doubles and Champions sets that every
  * fit drops (regression/eval-fit.spec.ts), tranche holdout-<family>, up to
  * three positions per game (holdoutTurns). The universes never mix ids.
+ * EVAL_CALIBRATION_FAMILY and EVAL_CALIBRATION_TURNS (round 69) narrow the fit corpus to one family and
+ * thin the turns to one per third of a game; without them nothing moves.
  */
 export function bankUniverse(bank: { ids: string[]; trancheOf: Map<string, string> }): BankUniverse {
   const source = process.env.EVAL_CALIBRATION_SOURCE;
+  const family = process.env.EVAL_CALIBRATION_FAMILY;
+  if (family && source !== 'fit') throw new Error('EVAL_CALIBRATION_FAMILY reads the fit corpus — set EVAL_CALIBRATION_SOURCE=fit');
   if (source === 'holdout') {
     const sets = holdoutSets();
     return {
       ids: sets.flatMap(set => set.ids),
       trancheOf: new Map(sets.flatMap(set => set.ids.map(id => [id, `holdout-${set.family}`] as const))),
       cached: true,
-      sampleTurns: holdoutTurns,
+      sampleTurns: turnRule(holdoutTurns),
     };
   }
-  if (source === undefined || source === '') return { ...bank, cached: false, sampleTurns: bankTurns };
+  if (source === undefined || source === '') return { ...bank, cached: false, sampleTurns: turnRule(bankTurns) };
   if (source !== 'fit') throw new Error(`unknown EVAL_CALIBRATION_SOURCE ${source} (fit or holdout)`);
   if (!process.env.EVAL_CALIBRATION_DUMP) {
     throw new Error('EVAL_CALIBRATION_SOURCE=fit produces fit-side dumps only — set EVAL_CALIBRATION_DUMP');
   }
-  const { replays } = JSON.parse(readFileSync(FIT_MANIFEST, 'utf-8')) as { replays: { id: string; source: 'tournament' | 'ladder' }[] };
+  const manifest = JSON.parse(readFileSync(FIT_MANIFEST, 'utf-8')) as { replays: { id: string; format: string; source: 'tournament' | 'ladder' }[] };
+  const replays = family ? familyUniverse(family, manifest.replays) : manifest.replays;
   return {
     ids: replays.map(entry => entry.id),
     trancheOf: new Map(replays.map(entry => [entry.id, `fit-${entry.source}`])),
     cached: true,
-    sampleTurns: bankTurns,
+    sampleTurns: turnRule(bankTurns),
   };
 }

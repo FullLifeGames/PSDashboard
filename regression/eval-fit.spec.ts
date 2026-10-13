@@ -16,7 +16,7 @@ import {
   mulberry32, phaseBucket,
 } from './fit-helpers';
 import {
-  dumpSamples, familyReports, liftHolds, parseModelForms, parseWeightSet, phaseKReports, rulesetOfId, withModelForms, withoutHoldout, withoutUnratedLadder,
+  dumpSamples, familyOf, familyReports, liftHolds, parseKTable, parseModelForms, parseWeightSet, phaseKReports, rootScaleReports, rulesetOfId, withModelForms, withoutHoldout, withoutUnratedLadder,
   type FamilySample, type Ruleset,
 } from './fit-families';
 import { holdoutSets } from './bank-universe';
@@ -209,6 +209,38 @@ function writePhaseKReport(samples: FitSample[]) {
   console.log(`-> ${out}`);
 }
 
+/**
+ * Round 69 (T163): `EVAL_FIT_ROOT_SCALE=1` writes the scale of the search's logit per family
+ * (fit-families.ts rootScaleReports) from captures WITH search (EVAL_CALIBRATION_FAMILY and
+ * EVAL_CALIBRATION_TURNS=thirds, EVAL_CALIBRATION_FEATURES=1 for the feature vector the loader
+ * wants), to `EVAL_FIT_K_OUT`, default `<dir>/root-scale-report.json`. `EVAL_FIT_ROOT_K=<stamp
+ * file>` names the K table the capture ran under; without it the capture is taken to have run
+ * under today's table (fit at the capture's commit).
+ */
+function writeRootScaleReport(samples: FitSample[]) {
+  const draws = Number(process.env.EVAL_FIT_DRAWS ?? 200);
+  const names = familiesToFit().map(family => family.name);
+  const stamp = process.env.EVAL_FIT_ROOT_K;
+  const captured = stamp ? parseKTable(readFileSync(stamp, 'utf-8')) : kOf;
+  const report = rootScaleReports(familySamplesOf(samples).filter(sample => names.includes(familyOf(sample))), kOf, captured, draws);
+  const out = process.env.EVAL_FIT_K_OUT ?? join(SAMPLES_DIR ?? CACHE_DIR, 'root-scale-report.json');
+  writeFileSync(out, JSON.stringify(report, null, 1));
+  for (const [name, entry] of Object.entries(report)) {
+    console.log('scale' in entry
+      ? `root scale ${name}: c0=${entry.scale.k0.toFixed(2)} c1=${entry.scale.k1.toFixed(2)} K'=${entry.kPrime.k0.toFixed(2)}+${entry.kPrime.k1.toFixed(2)}·ff sets=${entry.sets}`
+      : `root scale ${name}: ${entry.skipped}`);
+  }
+  console.log(`-> ${out}`);
+}
+
+/** The phase K or the root scale of every family, when the run asks for one (EVAL_FIT_PHASE_K, EVAL_FIT_ROOT_SCALE); false when it asks for neither. */
+function writeKReport(samples: FitSample[]): boolean {
+  if (process.env.EVAL_FIT_ROOT_SCALE === '1') writeRootScaleReport(samples);
+  else if (process.env.EVAL_FIT_PHASE_K === '1') writePhaseKReport(samples);
+  else return false;
+  return true;
+}
+
 function writeRefitReport(samples: FitSample[]) {
   const draws = Number(process.env.EVAL_FIT_DRAWS ?? 200);
   const formed = withModelForms(familySamplesOf(samples), FEATURE_KEYS, familiesToFit(), parseModelForms(process.env.EVAL_FIT_FORMS ?? ''));
@@ -382,8 +414,7 @@ describe('eval weight fitting (EVAL_FIT=1)', () => {
       console.log('too few samples to fit — check the corpus cache');
       return;
     }
-    if (process.env.EVAL_FIT_PHASE_K === '1') writePhaseKReport(samples);
-    else if (SAMPLES_DIR || process.env.EVAL_FIT_OUT) writeRefitReport(samples);
+    if (!writeKReport(samples) && (SAMPLES_DIR || process.env.EVAL_FIT_OUT)) writeRefitReport(samples);
     // The legacy reports read `score` as the static's tanh; dump samples carry the leaf value in wp-units.
     if (process.env.EVAL_FIT_LEGACY === '0' || process.env.EVAL_FIT_DUMP) return;
 

@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'vitest';
 import {
-  dumpSamples, familyOf, familyReports, liftHolds, parseModelForms, parseWeightSet, phaseKReports, rulesetOfId, withModelForms, withoutHoldout, withoutUnratedLadder,
+  dumpSamples, familyOf, familyReports, liftHolds, parseKTable, parseModelForms, parseWeightSet, phaseKReports, rootScaleReports, rulesetOfId, withModelForms, withoutHoldout, withoutUnratedLadder,
   type FamilySample,
 } from './fit-families';
 import { mulberry32 } from './fit-helpers';
@@ -285,5 +285,109 @@ describe('fit families', () => {
       expect(liftHolds(hold, [])).toEqual(hold);
       expect(liftHolds(hold, ['pairFocus'])).toEqual(hold);
     });
+  });
+});
+
+/**
+ * Round 69 (T163, decision 20): the leaf K on the search's root values. A search capture holds the root
+ * value v in wp units; its logit is 2 atanh(v), and a family's scale c0 + c1 ff of sigmoid(c logit)
+ * against the outcome says how far the search's own values sit from honest (the search averages leaf values,
+ * so it re-inflates or flattens them).
+ */
+describe('root scale of search values', () => {
+  const SCALE = (ff: number, c0: number, c1: number) => c0 + c1 * ff;
+
+  /** Root values from a search whose logit z is c_true(ff) times too big (or too small) a reading of the odds. */
+  function searched(prefix: string, gameType: 'singles' | 'doubles', c0: number, c1: number, games: number, seed: number): FamilySample[] {
+    const random = mulberry32(seed);
+    const out: FamilySample[] = [];
+    for (let game = 0; game < games; game++) {
+      for (let turn = 0; turn < 4; turn++) {
+        const faintedFraction = random() * 0.8;
+        const z = (random() - 0.5) * 6;
+        const p = 1 / (1 + Math.exp(-SCALE(faintedFraction, c0, c1) * z));
+        out.push({
+          game: `${prefix}-${game}`, set: `${prefix}-${game}`, gameType, ruleset: rulesetOfId(prefix), g: [], p1Won: random() < p,
+          faintedFraction, score: Math.tanh(z / 2), wp: true, lastPair: false,
+        });
+      }
+    }
+    return out;
+  }
+
+  const kOf = () => K;
+  const families = [
+    ['singles', 'gen9ou', 'standard-singles', K.singles], ['doubles', 'gen9doublesou', 'standard-doubles', K.doubles],
+    ['doubles', 'gen9vgc2026regi', 'vgc-doubles', K.doubles],
+  ] as const;
+
+  test.each(families)('a search that reads its odds 40 percent too sure comes back as a scale under 1 (%s %s)', (gameType, prefix, family, k) => {
+    const rows = searched(prefix, gameType, 0.7, 0.3, 900, 31);
+    const report = rootScaleReports(rows, kOf, kOf, 40)[family];
+    if (!('scale' in report)) throw new Error('skipped');
+    expect(report.n).toBe(rows.length);
+    expect(report.sets).toBe(900);
+    expect(report.capturedK).toEqual(k);
+    // k0 and k1 trade off against each other: the scale in the middle of the games is the steady reading.
+    for (const ff of [0.2, 0.4, 0.6]) expect(Math.abs(report.scale.k0 + report.scale.k1 * ff - SCALE(ff, 0.7, 0.3))).toBeLessThan(0.1);
+    // K' is the K of the capture times the scale: the line through the product on the rows' own phases.
+    const at = (ff: number) => (k.k0 + k.k1 * ff) * SCALE(ff, 0.7, 0.3);
+    for (const ff of [0.1, 0.4, 0.7]) expect(Math.abs(report.kPrime.k0 + report.kPrime.k1 * ff - at(ff)) / at(ff)).toBeLessThan(0.1);
+    // The fitted scale reads the same games better than the capture's own values.
+    for (const bucket of ['early', 'mid', 'late'] as const) {
+      expect(report.buckets[bucket].n).toBeGreaterThan(100);
+      expect(report.buckets[bucket].logLossFitted).toBeLessThan(report.buckets[bucket].logLossToday);
+      expect(report.buckets[bucket].brierFitted).toBeLessThan(report.buckets[bucket].brierToday);
+    }
+    // The 90 percent band of K' at a third fainted holds the true K' there.
+    const third = report.spread.at.find(entry => Math.abs(entry.ff - 1 / 3) < 1e-9)!;
+    expect(third.k).toBeCloseTo((k.k0 + k.k1 / 3) * (report.scale.k0 + report.scale.k1 / 3), 10);
+    expect(third.lo).toBeLessThan(at(1 / 3));
+    expect(third.hi).toBeGreaterThan(at(1 / 3));
+  });
+
+  test.each(families)('an honest search reads a scale of 1, and the last pair, which the bank prices by its race, stays out (%s %s)', (gameType, prefix, family) => {
+    const honest = searched(prefix, gameType, 1, 0, 400, 37);
+    const withLast = [...honest, ...searched(prefix, gameType, -3, 0, 60, 41).map(row => ({ ...row, game: `last-${row.game}`, set: `last-${row.set}`, lastPair: true }))];
+    const plain = rootScaleReports(honest, kOf, kOf, 20)[family];
+    const mixed = rootScaleReports(withLast, kOf, kOf, 20)[family];
+    if (!('scale' in plain) || !('scale' in mixed)) throw new Error('skipped');
+    expect(Math.abs(plain.scale.k0 + plain.scale.k1 * 0.4 - 1)).toBeLessThan(0.15);
+    expect(mixed.n).toBe(honest.length);
+    expect(mixed.scale).toEqual(plain.scale);
+  });
+
+  test('a family below 100 positions is skipped, and a certain value (v = 1) is counted and clamped, not infinite', () => {
+    const few = searched('gen9ou', 'singles', 1, 0, 20, 43);
+    expect(rootScaleReports(few, kOf, kOf, 10)['standard-singles']).toMatchObject({ skipped: expect.stringMatching(/below 100/) });
+    const rows = searched('gen9ou', 'singles', 1, 0, 300, 47);
+    rows[0] = { ...rows[0], score: 1, p1Won: true };
+    rows[1] = { ...rows[1], score: -1, p1Won: true };
+    const report = rootScaleReports(rows, kOf, kOf, 10)['standard-singles'];
+    if (!('scale' in report)) throw new Error('skipped');
+    expect(report.clamped).toBe(2);
+    expect(Number.isFinite(report.scale.k0) && Number.isFinite(report.scale.k1)).toBe(true);
+  });
+
+  test('the K table of a capture is read from a stamp with one K per rule set and game type', () => {
+    const stamp = JSON.stringify({
+      standard: K, vgc: K, champions: { singles: K.singles, doubles: { k0: 1.86, k1: 4.17 } },
+    });
+    const captured = parseKTable(stamp);
+    expect(captured('standard')).toEqual(K);
+    expect(captured('vgc')).toEqual(K);
+    expect(captured('champions').doubles).toEqual({ k0: 1.86, k1: 4.17 });
+    // A stamp that lacks a rule set, or a K, stops the report instead of reading today's table.
+    expect(() => parseKTable(JSON.stringify({ standard: K }))).toThrow(/vgc/);
+    expect(() => parseKTable(JSON.stringify({ standard: K, vgc: K, champions: { singles: K.singles, doubles: { k0: 1 } } }))).toThrow(/champions.*doubles/);
+  });
+
+  test('a capture made under another K table is refused', () => {
+    const rows = searched('gen9doublesou', 'doubles', 1, 0, 200, 53);
+    const other = () => ({ singles: K.singles, doubles: { k0: K.doubles.k0 + 0.5, k1: K.doubles.k1 } });
+    expect(() => rootScaleReports(rows, kOf, other, 10)).toThrow(/standard-doubles.*capture/);
+    // Singles rows do not care for the doubles table of the stamp.
+    const singles = searched('gen9ou', 'singles', 1, 0, 200, 59);
+    expect(() => rootScaleReports(singles, kOf, other, 10)).not.toThrow();
   });
 });
