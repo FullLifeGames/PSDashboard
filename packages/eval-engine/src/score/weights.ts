@@ -281,16 +281,32 @@ export const DOUBLES_FEATURE_WEIGHTS: Record<keyof EvalFeatures, number> = {
  * fold better in 20 of 20 seeds. The sign is the reverse of the cell's
  * reading (a pair that can double up on a foe the singles cannot KO); the
  * bank and the VGC holdout decide (R3) whether the weight stays.
+ *
+ * Round 69 (S12, T144): the August values for tailwind (68) and coverage (40)
+ * and the fit that kept them (round 66, 14 of 20 seeds) priced what the
+ * matchup already holds: the matchup term reads the doubled speed of a
+ * Tailwind (speed.ts; on 35 doubles positions with one side under Tailwind it
+ * moves 0.112 toward that side, 27 up and none down), and Coverage grows with
+ * the same margins (correlation 0.43 with the matchup, 0.32 with the bodies;
+ * alone its fit is +24, with the matchup in the model -44). The flag itself
+ * is right (3,779 of 3,779 positions agree with the log, four turns with the
+ * set turn). One side has Tailwind in 15.8 % of the positions, both in 1.6 %,
+ * and the side with it wins 45 % of those, where the other columns alone
+ * predict 43.5 % and the hand weight 53.6 %. The refit on the r69-b0
+ * capture (3,779 positions of 711 sets) holds tailwind and coverage at 0 and
+ * refits bodies 177, screens 48, matchup 169 and Trick Room 54 (hazards stay
+ * at the hand value, R2 flagged): out of fold better in 20 of 20 seeds, Brier
+ * 20 of 20, log-loss -62 bp, Brier -24 bp against the table before.
  */
 export const VGC_DOUBLES_FEATURE_WEIGHTS: Record<keyof EvalFeatures, number> = {
-  bodies: 200,
+  bodies: 177,
   boosts: 27,
   hazards: 0.75,
-  screens: 5,
-  tailwind: 68,
-  trickRoom: 87,
-  matchup: 120,
-  coverage: 40,
+  screens: 48,
+  tailwind: 0,
+  trickRoom: 54,
+  matchup: 169,
+  coverage: 0,
   choiceMismatch: 40,
   sweepFastKo: 0,
   sweepFastChip: 0,
