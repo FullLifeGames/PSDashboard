@@ -5,7 +5,8 @@ import { hazardCost, hazardRemovalEquity, strandedMons } from './hazards.ts';
 import { liveTypes, livingOf, threatGetter, type MatchupCache } from './threat.ts';
 import { matchupTerms, sweepCells } from './matchup.ts';
 import { fieldPairCells } from './field-pair.ts';
-import { boostBiteValue, stageValue } from './boost-bite.ts';
+import { boostBiteValue, removalFormat, stageValue } from './boost-bite.ts';
+import { statusRight } from './status-factor.ts';
 
 /**
  * The raw feature vector: per-side bodies, boosts, hazards, screens,
@@ -46,12 +47,30 @@ function averageSpeed(side: Side, battle: Battle): number {
  * — the entry that finishes it is charged here at certainty, never twice.
  */
 function bodyShare(pokemon: Pokemon, stranded: ReadonlySet<Pokemon>): number {
+  return (bodyFraction(pokemon, stranded) *
+    (EVAL_WEIGHTS.status[pokemon.status] ?? 1)) * itemMultiplier(pokemon);
+}
+
+/** The body's share of the (alive + hp) weight before the status and the item. */
+function bodyFraction(pokemon: Pokemon, stranded: ReadonlySet<Pokemon>): number {
   const bodyWeight = EVAL_WEIGHTS.alive + EVAL_WEIGHTS.hp;
   const bodyValue = stranded.has(pokemon)
     ? EVAL_WEIGHTS.alive * EVAL_WEIGHTS.strandedAlive
     : EVAL_WEIGHTS.alive + EVAL_WEIGHTS.hp * (pokemon.hp / pokemon.maxhp);
-  return (bodyValue / bodyWeight) *
-    (EVAL_WEIGHTS.status[pokemon.status] ?? 1) * itemMultiplier(pokemon);
+  return bodyValue / bodyWeight;
+}
+
+/**
+ * statusFix of one body: what the flat status multiplier took off wrongly,
+ * (the right multiplier of its ability minus the applied one) times its share
+ * before the status. 0 for a healthy body and for an ability that changes
+ * nothing.
+ */
+function statusFixOf(pokemon: Pokemon, stranded: ReadonlySet<Pokemon>, twin: string): number {
+  const applied = EVAL_WEIGHTS.status[pokemon.status];
+  if (applied === undefined) return 0;
+  const right = statusRight(twin, pokemon.ability, pokemon.status, applied);
+  return right === applied ? 0 : (right - applied) * bodyFraction(pokemon, stranded) * itemMultiplier(pokemon);
 }
 
 /** The Choice-item liability: the holder's status-move fraction (0 without a Choice item). */
@@ -82,14 +101,16 @@ function screenCount(side: Side): number {
   return screens;
 }
 
-function sideFeatureValues(side: Side, battle: Battle) {
+function sideFeatureValues(side: Side, battle: Battle, twin: string | null) {
   const stranded = strandedMons(side, battle);
   let bodies = 0;
   let choiceMismatch = 0;
+  let statusFix = 0;
   for (const pokemon of side.pokemon) {
     if (pokemon.fainted || pokemon.hp <= 0) continue;
     bodies += bodyShare(pokemon, stranded);
     choiceMismatch += choiceMismatchOf(pokemon, battle);
+    if (twin) statusFix += statusFixOf(pokemon, stranded, twin);
   }
   const boosts = activeBoostValue(side);
   const screens = screenCount(side);
@@ -97,6 +118,7 @@ function sideFeatureValues(side: Side, battle: Battle) {
     bodies,
     boosts,
     choiceMismatch,
+    statusFix,
     screens,
     // Raw value carries the cap and the removal option; the entries weight
     // scales back to points.
@@ -110,15 +132,16 @@ function sideFeatureValues(side: Side, battle: Battle) {
 
 /**
  * The feature vector of a position. With a weight table, a feature of the
- * round-69 columns (the field pair, boostsBiting) whose weight is 0 stays 0
+ * round-69 columns (the field pair, boostsBiting, statusFix) whose weight is 0 stays 0
  * instead of being read: the score multiplies it by 0 either way, and the
  * leaf does not pay for a column no fit has priced. Without a table (the
  * capture, the fit, the tests) every column is read.
  */
 export function evalFeatures(battle: Battle, cache?: MatchupCache, weights?: Readonly<Record<keyof EvalFeatures, number>>): EvalFeatures {
   const wants = (key: keyof EvalFeatures): boolean => !weights || weights[key] !== 0;
-  const p1 = sideFeatureValues(battle.sides[0], battle);
-  const p2 = sideFeatureValues(battle.sides[1], battle);
+  const twin = wants('statusFix') ? removalFormat(battle) : null;
+  const p1 = sideFeatureValues(battle.sides[0], battle, twin);
+  const p2 = sideFeatureValues(battle.sides[1], battle, twin);
   let trickRoom = 0;
   if (battle.field.pseudoWeather['trickroom']) {
     trickRoom = averageSpeed(battle.sides[0], battle) <= averageSpeed(battle.sides[1], battle) ? 1 : -1;
@@ -161,5 +184,6 @@ export function evalFeatures(battle: Battle, cache?: MatchupCache, weights?: Rea
     boostsBiting: wants('boostsBiting')
       ? boostBiteValue(battle.sides[0], 0, battle, threat) - boostBiteValue(battle.sides[1], 1, battle, threat)
       : 0,
+    statusFix: p1.statusFix - p2.statusFix,
   };
 }

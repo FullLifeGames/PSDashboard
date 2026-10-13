@@ -168,6 +168,19 @@ export interface EvalFeatures {
    * and then it replaces `boosts` (the damping lives in the feature).
    */
   boostsBiting: number;
+  /**
+   * Round 69 (T102, decision 17): what the status multiplier of `bodies` gets
+   * wrong for a body whose ability changes what the status costs. Per living
+   * body, (the right multiplier minus the applied one) times the body's share
+   * before the status multiplier, p1-positive difference. The right multiplier
+   * is played in the simulator (score/status-factor.ts): 1 where the ability
+   * turns the status into a gain (Poison Heal, Guts, Quick Feet, Marvel Scale,
+   * Toxic Boost, Flare Boost), part of the way to 1 where it cancels only some
+   * of the cost (Magic Guard under burn: the chip is gone, the halved Attack
+   * stays). 0 for every body without such an ability. Weight 0 until a fit
+   * prices it; at the weight of `bodies` it folds the right multiplier in.
+   */
+  statusFix: number;
 }
 
 export const FEATURE_WEIGHTS: Record<keyof EvalFeatures, number> = {
@@ -187,6 +200,7 @@ export const FEATURE_WEIGHTS: Record<keyof EvalFeatures, number> = {
   pairFocus: 0,
   pairRedirect: 0,
   boostsBiting: 0,
+  statusFix: 0,
 };
 
 /**
@@ -225,6 +239,7 @@ export const DOUBLES_FEATURE_WEIGHTS: Record<keyof EvalFeatures, number> = {
   pairFocus: 0,
   pairRedirect: 0,
   boostsBiting: 0,
+  statusFix: 0,
 };
 
 /**
@@ -255,6 +270,7 @@ export const VGC_DOUBLES_FEATURE_WEIGHTS: Record<keyof EvalFeatures, number> = {
   pairFocus: 0,
   pairRedirect: 0,
   boostsBiting: 0,
+  statusFix: 0,
 };
 
 /**
@@ -311,6 +327,7 @@ export const CHAMPIONS_FEATURE_WEIGHTS: Record<keyof EvalFeatures, number> = {
   pairFocus: 0,
   pairRedirect: 0,
   boostsBiting: 0,
+  statusFix: 0,
 };
 
 /**
@@ -352,6 +369,7 @@ export const CHAMPIONS_DOUBLES_FEATURE_WEIGHTS: Record<keyof EvalFeatures, numbe
   pairFocus: 0,
   pairRedirect: 0,
   boostsBiting: 0,
+  statusFix: 0,
 };
 
 /** The weight table of a game type under a rule set. */
