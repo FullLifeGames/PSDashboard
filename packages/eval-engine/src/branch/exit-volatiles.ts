@@ -22,6 +22,22 @@ export function recordVolatilesAtExit(pokemon: SimPokemon) {
   else delete recorded.volatilesAtExit;
 }
 
+/**
+ * The protocol itself took the body off the field earlier in the block: a
+ * switch or drag line puts another body on its slot before the body's own
+ * entry line (562428 turn 12: Blacephalon out for Weavile, Weavile knocked
+ * out, Blacephalon back). The simulator's exit is then the game's exit, and
+ * the second stint starts fresh, without the Choice lock or Leech Seed the
+ * first one held.
+ */
+function leftBeforeEntry(log: readonly string[], name: string): boolean {
+  const entries = log.map(line => line.split('|')).filter(([, tag]) => tag === 'switch' || tag === 'drag');
+  const last = entries.map(([, , ident]) => ident.replace(/^p[12][a-d]: /, '')).lastIndexOf(name);
+  if (last < 0) return false;
+  const slot = entries[last][2].split(': ')[0];
+  return entries.slice(0, last).some(([, , ident]) => ident.startsWith(`${slot}: `));
+}
+
 /** Puts the record of an exit back on the body, minus the conditions the protocol ended for it in the block (|-end|, as the simulator's condition ids). */
 function putBackExitVolatiles(battle: SimBattle, body: SimPokemon, name: string, log: readonly string[]) {
   const recorded = body as ExitRecorded;
@@ -52,7 +68,7 @@ function putBackExitVolatiles(battle: SimBattle, body: SimPokemon, name: string,
  */
 export function restoreAfterProtocolEntry(battle: SimBattle, body: SimPokemon, ident: string, events: readonly string[]) {
   const entries = events.filter(line => /^\|(?:switch|drag)\|/.test(line) && line.split('|')[2] === ident).length;
-  if (entries === 1) putBackExitVolatiles(battle, body, ident.replace(/^p[12][a-d]: /, ''), events);
+  if (entries === 1 && !leftBeforeEntry(events, ident.replace(/^p[12][a-d]: /, ''))) putBackExitVolatiles(battle, body, ident.replace(/^p[12][a-d]: /, ''), events);
 }
 
 /** Every body the simulator holds off the field right now: fainted, or not among the actives. */
@@ -74,6 +90,7 @@ export function restoreExitVolatiles(battle: SimBattle, snapshot: TurnSnapshot, 
       const body = bodyOf(side, snapshotPokemon) as ExitRecorded | undefined;
       if (!body?.volatilesAtExit || !offTheField.has(body)) continue;
       if (!snapshotPokemon.isActive || snapshotPokemon.fainted || body.fainted || !side.active.includes(body)) continue;
+      if (leftBeforeEntry(snapshot.log, snapshotPokemon.name)) continue;
       putBackExitVolatiles(battle, body, snapshotPokemon.name, snapshot.log);
     }
   }
