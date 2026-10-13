@@ -1,6 +1,7 @@
 import { Battle, Dex, Teams, toID } from '@pkmn/sim';
 import { bodyFromInfo, simBodyFacts } from '../calc/body.ts';
 import { teraClicked } from '../calc/tera-click.ts';
+import { simModsReady } from '../forward/sim-mods.ts';
 import type { PokemonStatTable, SimPokemon, SimPokemonInfo, SimSide } from './types.ts';
 
 function statTableWithDefaults(
@@ -166,25 +167,33 @@ export function hpOfSighting(body: HpDisplayBody, sighting: { hp: number; maxhp:
   return sighted ?? Math.round((sighting.hpPercent / 100) * body.maxhp);
 }
 
-const probeBodies = new Map<string, HpDisplayBody>();
+/** The probe body per generation and rule set; null remembers a generation no candidate species fits. */
+const probeBodies = new Map<string, HpDisplayBody | null>();
 const PROBE_SPECIES = ['Mew', 'Pikachu', 'Garchomp'];
 
 /**
  * A body of the format's simulator to read the HP display from, when no battle stands at hand (the quick picker
  * on a snapshot): one Pokémon per side in a custom game of the generation, or the Champions OU format of the mod.
- * null where the battle cannot be built (the Champions mod is not loaded yet, a generation without the species).
+ * null where the battle cannot be built: the Champions mod is not loaded yet, or a generation without the species.
+ *
+ * Round 70 (T215): before the mod registers, the Champions format id is unknown to the simulator, which then builds
+ * the battle on the base rules without an error. That body shows the wrong display (the base rounds a percent up,
+ * the mod down), so no battle is built and nothing is kept: the next build asks again once the mod is there. A
+ * generation that no candidate fits is remembered, so it is not rebuilt for every body and render.
  */
 function probeBody(gen: number, champions: boolean): HpDisplayBody | null {
+  const format = toID(champions ? 'gen9championsou' : `gen${gen}customgame`);
+  if (!simModsReady(format)) return null;
   const key = `${gen}|${champions}`;
   const known = probeBodies.get(key);
-  if (known) return known;
+  if (known !== undefined) return known;
   for (const species of PROBE_SPECIES) {
     const team = Teams.pack([{
       name: species, species, item: '', ability: 'No Ability', moves: ['splash'], nature: 'Hardy', level: 50, gender: '',
       evs: { hp: 0, atk: 0, def: 0, spa: 0, spd: 0, spe: 0 }, ivs: { hp: 31, atk: 31, def: 31, spa: 31, spd: 31, spe: 31 },
     }]);
     try {
-      const battle = new Battle({ formatid: toID(champions ? 'gen9championsou' : `gen${gen}customgame`), seed: '1,2,3,4', p1: { name: 'Probe', team }, p2: { name: 'Foe', team } });
+      const battle = new Battle({ formatid: format, seed: '1,2,3,4', p1: { name: 'Probe', team }, p2: { name: 'Foe', team } });
       const body = battle.sides[0].pokemon[0] as unknown as HpDisplayBody;
       probeBodies.set(key, body);
       return body;
@@ -192,6 +201,7 @@ function probeBody(gen: number, champions: boolean): HpDisplayBody | null {
       // The species is not in this generation; the next candidate.
     }
   }
+  probeBodies.set(key, null);
   return null;
 }
 

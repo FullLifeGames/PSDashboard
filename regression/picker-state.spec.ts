@@ -125,15 +125,19 @@ function withActive(species: string, extra: Partial<TurnSnapshot['p1']['pokemon'
 
 // Round 67 (T85): the snapshot path labels a move by its type at use: moveAtUse on the facts the snapshot
 // knows (the species, the revealed ability or every ability the species may have, a revealed item, the
-// Tera click), the catalog type where those facts leave it undecided.
+// Tera click), the catalog type where those facts leave it undecided. Round 70 (T215): the simulator reads the
+// body on a twin first (snapshotMoveTypes, with the field and the guessed set's ability); these cases hold the
+// labels on the snapshot facts, and ui/lib/picker-state-type-at-use.spec.ts holds them against live battles.
 test('pickerStateFromSnapshot labels a move by its type at use', () => {
   const typesFor = (snapshot: TurnSnapshot, team: PokemonSet) =>
     pickerStateFromSnapshot(snapshot, [team], [set('Zapdos', ['Roost'])]).p1MovesBySlot[0].map(move => move.type);
   expect(typesFor(withActive('Ogerpon-Wellspring'), set('Ogerpon-Wellspring', ['Ivy Cudgel', 'Horn Leech']))).toEqual(['Water', 'Grass']);
   expect(typesFor(withActive('Sylveon', { ability: 'Pixilate' }), set('Sylveon', ['Hyper Voice', 'Shadow Ball']))).toEqual(['Fairy', 'Ghost']);
-  // Unrevealed, Sylveon may have Cute Charm: the possible abilities disagree and the button keeps the catalog
-  // type, whatever ability the guessed set names.
-  expect(typesFor(withActive('Sylveon'), { ...set('Sylveon', ['Hyper Voice']), ability: 'Pixilate' })).toEqual(['Normal']);
+  // Round 70 (T215): unrevealed, the guessed set's ability stands for the body the engine plays, so Pixilate retypes
+  // Hyper Voice (T85 kept the catalog type whatever ability the set named). A set that names none leaves Sylveon's
+  // possible abilities, Cute Charm and Pixilate, to disagree, and the button keeps the catalog type.
+  expect(typesFor(withActive('Sylveon'), { ...set('Sylveon', ['Hyper Voice']), ability: 'Pixilate' })).toEqual(['Fairy']);
+  expect(typesFor(withActive('Sylveon'), set('Sylveon', ['Hyper Voice']))).toEqual(['Normal']);
   expect(typesFor(withActive('Garchomp', { terastallized: 'Fairy' }), set('Garchomp', ['Tera Blast', 'Earthquake']))).toEqual(['Fairy', 'Ground']);
   expect(typesFor(withActive('Garchomp'), set('Garchomp', ['Tera Blast']))).toEqual(['Normal']);
 });

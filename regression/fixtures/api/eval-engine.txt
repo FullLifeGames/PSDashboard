@@ -87,6 +87,9 @@ type SimFastLever
 type SimFastReport
 type SimFastStatus
 type SimPokemonInfo
+type SnapshotMoveType
+type SnapshotTypeBody
+type SnapshotTypeQuery
 type StaticRuleset
 type StreakHistoryEntry
 type StreakOdds
@@ -209,6 +212,7 @@ value shownAttribution
 value sightedHp
 value sightedHpAt
 value simFastStatus
+value snapshotMoveTypes
 value snapshotSimFacts
 value solveEndgame
 value speciesAfterTeraClick

@@ -2,7 +2,7 @@ import { Dex } from '@pkmn/dex';
 import type { PokemonSet } from '@pkmn/sim';
 import { CHAMPIONS_MOD, buildCalcPokemon, calcGenerationFor, evBudget, speciesBaseId, toId, type PokemonSnapshot, type TurnSnapshot } from '@fulllifegames/replay-core';
 import {
-  moveAtUse, sightedHpAt, snapshotSimFacts, speciesAfterTeraClick,
+  moveAtUse, sightedHpAt, snapshotMoveTypes, snapshotSimFacts, speciesAfterTeraClick,
   type BranchMoveOption, type BranchSimState, type BranchSlotModifiers, type BranchSwitchOption, type MoveUser, type SimPokemonInfo,
 } from '@fulllifegames/eval-engine';
 import { teraBanned } from './picker-tera';
@@ -69,9 +69,10 @@ function guessedAttacks(mon: PokemonSnapshot, set: PokemonSet | undefined, gen: 
 
 /**
  * The facts a snapshot holds about a body for the move table (round 67,
- * T85): the species, the revealed ability or every ability the species may
- * have, a revealed item (an empty item is unknown), the Tera click. The
- * hidden type stays unknown.
+ * T85): the species, the revealed ability, else the guessed set's (round 70,
+ * T215: the body the engine plays), else every ability the species may have,
+ * a revealed item (an empty item is unknown), the Tera click. The hidden type
+ * stays unknown.
  */
 function snapshotMoveUser(mon: PokemonSnapshot, set: PokemonSet | undefined, gen: number, champions = false): MoveUser {
   const dex = dexForGen(gen);
@@ -81,7 +82,7 @@ function snapshotMoveUser(mon: PokemonSnapshot, set: PokemonSet | undefined, gen
   return {
     gen,
     species: known?.name,
-    abilities: mon.ability ? [toId(mon.ability)] : Object.values(known?.abilities ?? {}).map(toId),
+    abilities: mon.ability ? [toId(mon.ability)] : set?.ability ? [toId(set.ability)] : Object.values(known?.abilities ?? {}).map(toId),
     item: item?.exists ? { id: item.id, onPlate: item.onPlate, onMemory: item.onMemory, onDrive: item.onDrive, naturalGift: item.naturalGift } : undefined,
     terastallized: mon.terastallized || null,
     types: known?.types,
@@ -90,11 +91,11 @@ function snapshotMoveUser(mon: PokemonSnapshot, set: PokemonSet | undefined, gen
 }
 
 /**
- * The type a move lands with on the snapshot path (round 67, T85): the move
- * table on the snapshot's facts. The weather and the terrain stay unknown,
- * so Weather Ball, Terrain Pulse and Hidden Power keep the catalog type, as
- * does a move whose possible abilities disagree; the live and stored paths
- * ask the simulator instead (branch/state.ts).
+ * The move table's reading of a move on the snapshot's facts (round 67, T85):
+ * the fallback of moveOptionsFor where no simulator twin can be built. It
+ * knows no weather and no terrain, so Weather Ball, Terrain Pulse and Hidden
+ * Power keep the catalog type, as does a move whose possible abilities
+ * disagree.
  */
 function snapshotTypeAtUse(name: string, user: MoveUser, gen: number): string {
   const move = dexForGen(gen).moves.get(name);
@@ -109,19 +110,31 @@ function typesUnderTera(info: SimPokemonInfo, user: MoveUser, teraType: string |
   return name => snapshotTypeAtUse(name, clicked, gen);
 }
 
+/**
+ * The picker buttons of one active body. Round 70 (T215): the type of each move, and the type after the Tera click,
+ * come from the simulator on a twin of the body standing in the snapshot's field (snapshotMoveTypes), as the live
+ * picker reads them; the move table answers only for a move the twin cannot answer (the Champions mod is not loaded
+ * yet, the candidate abilities disagree, the Dex does not know the move).
+ */
 function moveOptionsFor(
   mon: PokemonSnapshot,
   set: PokemonSet | undefined,
   activeSlot: number,
   gen: number,
-  champions = false,
-  tera: { info: SimPokemonInfo; type: string | null } | null = null,
+  champions: boolean,
+  tera: { info: SimPokemonInfo; type: string | null },
+  field: { weather: string; terrain: string },
 ): BranchMoveOption[] {
   const user = snapshotMoveUser(mon, set, gen, champions);
-  const underTera = tera ? typesUnderTera(tera.info, user, tera.type, gen) : () => undefined;
-  return moveNamesFor(mon, set).map((name, slot): BranchMoveOption => {
-    const type = snapshotTypeAtUse(name, user, gen);
-    const clicked = underTera(name);
+  const names = moveNamesFor(mon, set);
+  const read = snapshotMoveTypes({ gen, champions, body: tera.info, abilities: user.abilities, field, clickTera: tera.type, moves: names });
+  // The table's Tera label is built (it clicks a twin) only for a move the simulator did not answer.
+  let tableLabels: ReturnType<typeof typesUnderTera> | null = null;
+  const underTera = (name: string) => (tableLabels ??= typesUnderTera(tera.info, user, tera.type, gen))(name);
+  return names.map((name, slot): BranchMoveOption => {
+    const simulated = read?.get(name);
+    const type = simulated?.type ?? snapshotTypeAtUse(name, user, gen);
+    const clicked = simulated ? simulated.typeUnderTera : underTera(name);
     return {
       name,
       activeSlot,
@@ -307,8 +320,9 @@ function snapshotSideOptions(
   // One Tera per side and battle: a terastallized teammate spent it.
   const sideMayTera = teraAllowed && !pokemon.some(mon => mon.terastallized);
   const activeSlots = actives.map((mon, index) => pokemonInfoFromSnapshot(mon, setFor(mon), index, gen, champions, fainted));
+  const field = { weather: snapshot.field.weather || '', terrain: snapshot.field.terrain || '' };
   const movesBySlot = actives.map((mon, index) => moveOptionsFor(
-    mon, setFor(mon), index, gen, champions, { info: activeSlots[index], type: snapshotTeraType(mon, setFor(mon), gen, sideMayTera) },
+    mon, setFor(mon), index, gen, champions, { info: activeSlots[index], type: snapshotTeraType(mon, setFor(mon), gen, sideMayTera) }, field,
   ));
   const switchesBySlot = actives.map((_, activeSlot): BranchSwitchOption[] =>
     pokemon

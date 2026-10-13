@@ -21,9 +21,11 @@ import { extractPokemonInfo, makePokemonInfo } from './pokemon-info.ts';
  * their abilities. Asked with debug lines off: a custom-game format runs in
  * debug mode, and a handler's debug line would land in the log (the idiom
  * of score/move-facts.ts onField). The battle's catalog type when the
- * simulator refuses.
+ * simulator refuses. Round 70 (T215): the quick picker asks it of a one-Pokémon
+ * twin of a snapshot body (snapshot-move-types.ts), so both pickers label a
+ * move with the same reading.
  */
-function typeAtUse(battle: SimBattle, active: SimPokemon, id: string): string {
+export function typeAtUse(battle: SimBattle, active: SimPokemon, id: string): string {
   const log = battle as unknown as { debugMode: boolean };
   const debug = log.debugMode;
   log.debugMode = false;
@@ -49,12 +51,16 @@ function typeAtUse(battle: SimBattle, active: SimPokemon, id: string): string {
  * an onModifyType hook (Tera Blast, Tera Starstorm, Ivy Cudgel, Revelation
  * Dance, ...), so the usual state build pays no copy. The live battle is never
  * touched; a copy the simulator refuses (or a click it refuses, as for an
- * Ogerpon with a foreign Tera type) leaves the move without a label.
+ * Ogerpon with a foreign Tera type) leaves the move without a label. `moveIds`
+ * names the moves to ask for when they are not the body's own slots (the quick
+ * picker lists the guessed set's moves).
  */
-function typesUnderTera(battle: SimBattle, active: SimPokemon): Map<string, string> {
+export function typesUnderTera(
+  battle: SimBattle, active: SimPokemon, moveIds: readonly string[] = active.moveSlots.map(move => move.id || move.move),
+): Map<string, string> {
   const labels = new Map<string, string>();
   if (!active.canTerastallize) return labels;
-  const ids = active.moveSlots.map(move => move.id || move.move).filter(id => !!battle.dex.moves.get(id).onModifyType);
+  const ids = moveIds.filter(id => !!battle.dex.moves.get(id).onModifyType);
   if (!ids.length) return labels;
   try {
     const copy = cloneBattle(battle) as SimBattle;

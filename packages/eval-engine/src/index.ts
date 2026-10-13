@@ -32,6 +32,8 @@ export type {
 export type { BranchChoices } from './branch/types.ts';
 export { hiddenPowerFacts, sightedHp, sightedHpAt, snapshotSimFacts, speciesAfterTeraClick } from './branch/pokemon-info.ts';
 export type { HpDisplayBody, HpSighting } from './branch/pokemon-info.ts';
+export { snapshotMoveTypes } from './branch/snapshot-move-types.ts';
+export type { SnapshotMoveType, SnapshotTypeBody, SnapshotTypeQuery } from './branch/snapshot-move-types.ts';
 export { buildChoiceLockContext } from './choice-lock.ts';
 export type { ChoiceLockTrails, ChoiceLockContext } from './choice-lock.ts';
 export { calcSingleDamageRange } from './damage-calc.ts';
