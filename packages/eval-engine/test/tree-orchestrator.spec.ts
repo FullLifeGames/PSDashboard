@@ -180,8 +180,8 @@ describe('tree orchestration (round 61; read through the executor since round 64
     for (const key of onlyWithPlayed) expect(Math.floor(key / 10_000), `cell ${key}`).toBe(played.p1);
   });
 
-  test('the played row joins the verify set (doubles: VGC 2629703929 t8, p1 Heat Wave + Protect)', { timeout: 600_000 }, async () => {
-    const name = 'gen9vgc2026regi-2629703929-t8';
+  test('the played row joins the verify set (doubles: VGC 2630685175 t7, p1 U-turn + Tera Starstorm)', { timeout: 600_000 }, async () => {
+    const name = 'gen9vgc2026regi-2630685175-t7-played';
     const keepPlayed = fixture(name).keepPlayed!;
     // Round 65 gate (2b): a VGC position, searched under the VGC rule set (the hand doubles table) as the app searches it.
     expect(rulesetOf(name)).toBe('vgc');
