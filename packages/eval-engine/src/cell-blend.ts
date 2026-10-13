@@ -2,6 +2,7 @@ import type { Battle, Pokemon, PRNGSeed } from '@pkmn/sim';
 import { boundaryEvent, RANDOM_CALL_MOVES, type BoundaryEvent } from './ko-odds.ts';
 import { pairKoOdds } from './pair/odds.ts';
 import { accuracyRollReached } from './search/event-reach.ts';
+import { shieldsSide } from './search/hints.ts';
 import type { KoOddsInfo } from './types.ts';
 import { sideIndex } from '@fulllifegames/replay-core';
 
@@ -43,16 +44,19 @@ export const PROBE_SEEDS: readonly PRNGSeed[] = [
 /** Total draw budget per boundary cell (base samples + probe draws). */
 export const BOUNDARY_DRAW_BUDGET = 16;
 
-/** Protection moves change what "hit" means — those cells stay seed-priced. */
-const PROTECT_MOVE_IDS = new Set([
-  'protect', 'detect', 'endure', 'spikyshield', 'banefulbunker', 'silktrap',
-  'burningbulwark', 'kingsshield', 'obstruct', 'maxguard', 'wideguard',
-  'quickguard', 'craftyshield',
-]);
-
 const HAZARD_IDS = ['stealthrock', 'spikes', 'toxicspikes', 'stickyweb'];
 
 type DexMove = ReturnType<Battle['dex']['moves']['get']>;
+
+/**
+ * Round 70: a move that stops hits changes what "hit" means (the outcome classes assume the foe's move lands or
+ * misses), so a cell with one stays seed-priced. The rule comes from the Dex: a stalling move (the Protect family,
+ * Endure, Mat Block, Max Guard) or a side protector (Wide Guard, Quick Guard, Crafty Shield, Mat Block; `shieldsSide`
+ * of the hints). It replaces a list of thirteen names that held Wide Guard, Quick Guard, Crafty Shield and Max Guard by
+ * name and missed Mat Block. test/cell-protect-guard.spec.ts plays every status move that sets a volatile or a side
+ * condition on its user's side against probe hits, in both rule sets.
+ */
+const stopsHits = (dex: Battle['dex'], move: DexMove): boolean => !!move.stallingMove || shieldsSide(dex, move);
 
 /** The move id a singles choice names, or null for switches/team orders. */
 function moveIdOf(choice: string): string | null {
@@ -154,7 +158,7 @@ export function planCellEvents(battle: Battle, p1Choice: string, p2Choice: strin
   const moveIds = { p1: moveIdOf(p1Choice), p2: moveIdOf(p2Choice) };
   for (const side of ['p1', 'p2'] as const) {
     const id = moveIds[side];
-    if (id && PROTECT_MOVE_IDS.has(battle.dex.moves.get(id).id)) return { kind: 'fail' };
+    if (id && stopsHits(battle.dex, battle.dex.moves.get(id))) return { kind: 'fail' };
   }
 
   const events: CellEvent[] = [];
