@@ -120,6 +120,66 @@ export function withoutUnratedLadder<T extends { source?: 'tournament' | 'ladder
 export interface FamilyTables { name: string; singles: number[]; doubles: number[] }
 
 type Refit = ReturnType<typeof refitAtKReport>;
+/**
+ * Round 69 (T49, T102): the pre-registered holds minus the columns a fit lifts
+ * (`EVAL_FIT_LIFT=boosts`: the boost weight is free for the T49 and T102 fits
+ * only, decision 16).
+ */
+export function liftHolds(hold: { shared: string[]; doubles: string[] }, lifted: string[]): { shared: string[]; doubles: string[] } {
+  return { shared: hold.shared.filter(name => !lifted.includes(name)), doubles: hold.doubles.filter(name => !lifted.includes(name)) };
+}
+
+/**
+ * Round 69 (T102, decision 17): model-form candidates as derived columns of
+ * the same fit. `phase` weighs a feature with the share of fainted mons
+ * (weight x (1 + c x faintedFraction) is the weight plus c on this column),
+ * `root` takes the signed square root of its addend (a feature that saturates).
+ * Both are columns of g, named `<feature>@phase` and `<feature>@root`, at 0 in
+ * every start table, so the identity check and the hand score do not move; a
+ * fit frees them by name (`only`).
+ */
+export interface ModelForm { kind: 'phase' | 'root'; key: string }
+
+/** `phase:bodies,root:matchup` (the EVAL_FIT_FORMS list). */
+export function parseModelForms(text: string): ModelForm[] {
+  return text.split(',').map(part => part.trim()).filter(Boolean).map(part => {
+    const [kind, key] = part.split(':');
+    if ((kind !== 'phase' && kind !== 'root') || !key) throw new Error(`model form: ${part} (expected phase:<feature> or root:<feature>)`);
+    return { kind, key };
+  });
+}
+
+/** `boosts=0,boostsBiting=2.25` (the EVAL_FIT_SET list): start weights by column. */
+export function parseWeightSet(text: string): Record<string, number> {
+  return Object.fromEntries(text.split(',').map(part => part.trim()).filter(Boolean).map(part => {
+    const [name, weight] = part.split('=');
+    if (!name || weight === undefined || !Number.isFinite(Number(weight))) throw new Error(`weight set: ${part} (expected name=weight)`);
+    return [name, Number(weight)];
+  }));
+}
+
+const formValue = (kind: ModelForm['kind'], value: number, faintedFraction: number): number =>
+  kind === 'phase' ? value * faintedFraction : Math.sign(value) * Math.sqrt(Math.abs(value));
+
+export function withModelForms(
+  samples: FamilySample[], names: string[], families: FamilyTables[], forms: ModelForm[],
+): { samples: FamilySample[]; names: string[]; families: FamilyTables[] } {
+  const columns = forms.map(form => {
+    const index = names.indexOf(form.key);
+    if (index < 0) throw new Error(`model form: no feature named ${form.key}`);
+    return { form, index };
+  });
+  return {
+    names: [...names, ...forms.map(form => `${form.key}@${form.kind}`)],
+    samples: samples.map(sample => ({
+      ...sample, g: [...sample.g, ...columns.map(({ form, index }) => formValue(form.kind, sample.g[index], sample.faintedFraction))],
+    })),
+    families: families.map(family => ({
+      ...family, singles: [...family.singles, ...forms.map(() => 0)], doubles: [...family.doubles, ...forms.map(() => 0)],
+    })),
+  };
+}
+
 /** A family's refit; after a second pass (rule R2) the first pass and the weights it added to the holds ride along. */
 type FamilyReport = Refit | (Refit & { first: Refit; secondPassHeld: string[] }) | { skipped: string; games: number };
 

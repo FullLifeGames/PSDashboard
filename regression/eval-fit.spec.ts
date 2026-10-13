@@ -16,7 +16,8 @@ import {
   mulberry32, phaseBucket,
 } from './fit-helpers';
 import {
-  dumpSamples, familyReports, phaseKReports, rulesetOfId, withoutHoldout, withoutUnratedLadder, type FamilySample, type Ruleset,
+  dumpSamples, familyReports, liftHolds, parseModelForms, parseWeightSet, phaseKReports, rulesetOfId, withModelForms, withoutHoldout, withoutUnratedLadder,
+  type FamilySample, type Ruleset,
 } from './fit-families';
 import { holdoutSets } from './bank-universe';
 
@@ -165,6 +166,18 @@ const familiesToFit = () => {
 const HOLD = { shared: ['trickRoom', 'choiceMismatch', 'boosts'], doubles: ['boosts'] };
 
 /**
+ * Round 69 (T42, T49, T102): the new columns fit one at a time on one shared
+ * capture, the rest of the table at hand. EVAL_FIT_ONLY=<names> moves only
+ * these columns (a column at 0 in both tables is free then; `*@phase` names
+ * every phase column), EVAL_FIT_LIFT=<names> takes names off HOLD (the boost
+ * weight is free for the T49 and T102 fits only), EVAL_FIT_SET=<name=weight,...>
+ * starts columns elsewhere (a REPLACEMENT: boosts=0,boostsBiting=<its weight>),
+ * EVAL_FIT_FORMS=<phase:bodies,root:matchup> adds model-form columns
+ * (fit-families.ts withModelForms).
+ */
+const listOf = (name: string) => (process.env[name] ?? '').split(',').map(part => part.trim()).filter(Boolean);
+
+/**
  * The T127 refit (round 64; per family since round 65): the static's weights
  * at the fixed K of winprob.ts, every family on its own games, clustered by
  * set. First the identity: the start tables must give back every captured
@@ -196,7 +209,12 @@ function writePhaseKReport(samples: FitSample[]) {
 
 function writeRefitReport(samples: FitSample[]) {
   const draws = Number(process.env.EVAL_FIT_DRAWS ?? 200);
-  const report = familyReports(familySamplesOf(samples), FEATURE_KEYS, familiesToFit(), kOf, { seeds: 20, folds: 5, draws, minGames: 20, hold: HOLD }, wpUnits);
+  const formed = withModelForms(familySamplesOf(samples), FEATURE_KEYS, familiesToFit(), parseModelForms(process.env.EVAL_FIT_FORMS ?? ''));
+  const options = {
+    seeds: 20, folds: 5, draws, minGames: 20, hold: liftHolds(HOLD, listOf('EVAL_FIT_LIFT')),
+    ...(process.env.EVAL_FIT_ONLY ? { only: listOf('EVAL_FIT_ONLY') } : {}), set: parseWeightSet(process.env.EVAL_FIT_SET ?? ''),
+  };
+  const report = familyReports(formed.samples, formed.names, formed.families, kOf, options, wpUnits);
   const out = process.env.EVAL_FIT_OUT ?? join(SAMPLES_DIR ?? CACHE_DIR, 'fit-report.json');
   writeFileSync(out, JSON.stringify(report, null, 1));
   for (const [name, entry] of Object.entries(report.families)) {

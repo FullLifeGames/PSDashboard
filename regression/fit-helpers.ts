@@ -478,6 +478,16 @@ export interface AtKReportOptions {
    * refit, such as variant E's sign-unsure and boost weights).
    */
   hold?: { shared?: string[]; doubles?: string[] };
+  /**
+   * Round 69: the only columns the fit moves, by name or `*@form` for every
+   * derived column of a model form (fit-families.ts withModelForms). Their
+   * weights, shared and doubles override alike, leave the zero hold of a
+   * column that no table prices yet; the rest of the table stays at hand.
+   * A hold above still wins.
+   */
+  only?: string[];
+  /** Round 69: start weights by column, in both tables (a REPLACEMENT starts the new column at the old one's weight and the old one at 0). */
+  set?: Record<string, number>;
 }
 
 const meanOf = (values: number[]) => values.reduce((sum, value) => sum + value, 0) / values.length;
@@ -504,13 +514,25 @@ function cvSummary(cv: { hand: AtKScores; fit: AtKScores }[]) {
 export function refitAtKReport(
   samples: AtKSample[], names: string[], singles: number[], doubles: number[], k: GameTypeK, options: AtKReportOptions,
 ) {
-  const { layout, start } = layoutOf(singles, doubles);
-  const free = supportOf(samples, layout, options.minGames);
   const column = (name: string) => {
     const index = names.indexOf(name);
     if (index < 0) throw new Error(`hold: no weight named ${name}`);
     return index;
   };
+  for (const name of Object.keys(options.set ?? {})) column(name);
+  const withSet = (table: number[]) => table.map((weight, j) => options.set?.[names[j]] ?? weight);
+  const only = new Set((options.only ?? []).flatMap(name => {
+    const matched = name.startsWith('*@') ? names.flatMap((full, j) => (full.endsWith(name.slice(1)) ? [j] : [])) : [column(name)];
+    if (matched.length === 0) throw new Error(`only: no weight named ${name}`);
+    return matched;
+  }));
+  const laid = layoutOf(withSet(singles), withSet(doubles));
+  const { start } = laid;
+  const layout = options.only ? { ...laid.layout, held: new Set([...laid.layout.held].filter(j => !only.has(j))) } : laid.layout;
+  const free = supportOf(samples, layout, options.minGames);
+  if (options.only) {
+    free.forEach((_, m) => { if (!only.has(m < layout.columns ? m : layout.overrides[m - layout.columns])) free[m] = false; });
+  }
   for (const name of options.hold?.shared ?? []) free[column(name)] = false;
   for (const name of options.hold?.doubles ?? []) {
     const override = layout.overrides.indexOf(column(name));

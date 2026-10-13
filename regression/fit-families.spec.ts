@@ -1,6 +1,7 @@
 import { describe, expect, test } from 'vitest';
 import {
-  dumpSamples, familyOf, familyReports, phaseKReports, rulesetOfId, withoutHoldout, withoutUnratedLadder, type FamilySample,
+  dumpSamples, familyOf, familyReports, liftHolds, parseModelForms, parseWeightSet, phaseKReports, rulesetOfId, withModelForms, withoutHoldout, withoutUnratedLadder,
+  type FamilySample,
 } from './fit-families';
 import { mulberry32 } from './fit-helpers';
 import { mkdtempSync, writeFileSync } from 'node:fs';
@@ -173,5 +174,99 @@ describe('fit families', () => {
     expect(Math.abs(report.fitted.k1 - 4)).toBeLessThan(1.5);
     expect(report.buckets.late.brierFitted).toBeLessThan(report.buckets.late.brierToday);
     expect(report.spread.k1.lo).toBeLessThan(report.fitted.k1);
+  });
+  // Round 69 (T102, decision 17; T49 and T42 share the tool): a column at 0 in both tables is held, and a fit frees it by name.
+  describe('round 69: new columns, lifted holds and model-form columns', () => {
+    /** Outcomes from weights that run with the fainted share: the first feature weighs w0 + w0Phase x ff. Scores are captured under the start weights [2, 2]. */
+    function phased(prefix: string, gameType: 'singles' | 'doubles', w0: number, w0Phase: number, games: number, seed: number, root = false): FamilySample[] {
+      const random = mulberry32(seed);
+      const out: FamilySample[] = [];
+      for (let game = 0; game < games; game++) {
+        for (let turn = 0; turn < 4; turn++) {
+          const g = [random() - 0.5, random() - 0.5];
+          const ff = random();
+          const first = root ? Math.sign(g[0]) * Math.sqrt(Math.abs(g[0])) : g[0];
+          const z = Math.tanh((w0 + w0Phase * ff) * first + 2 * g[1]);
+          const doubles = gameType === 'doubles';
+          out.push({
+            game: `${prefix}-${game}`, set: `${prefix}-${game}`, gameType, ruleset: rulesetOfId(prefix), g,
+            p1Won: random() < (leaf(z, doubles, ff) + 1) / 2, faintedFraction: ff, score: leaf(Math.tanh(2 * g[0] + 2 * g[1]), doubles, ff), wp: true, lastPair: false,
+          });
+        }
+      }
+      return out;
+    }
+    const names = ['bodies', 'matchup'];
+    const tables = (name: string) => [{ name, singles: [2, 2], doubles: [2, 2] }];
+    const options = { seeds: 3, folds: 5, draws: 6, minGames: 20 };
+    const report = (samples: FamilySample[], family: string, columns: string[], tabled: ReturnType<typeof tables>, extra: object) => {
+      const entry = familyReports(samples, columns, tabled, () => K, { ...options, ...extra }, leaf).families[family];
+      if (!('proposed' in entry)) throw new Error('missing report');
+      return entry;
+    };
+
+    test.each([['singles', 'gen9ou', 'standard-singles'], ['doubles', 'gen9doublesou', 'standard-doubles']] as const)(
+      'a model-form column is held at 0 until its hold is lifted, and then the fit recovers the phase interaction (%s)', (gameType, prefix, family) => {
+        const samples = phased(prefix, gameType, 1, 5, 320, 11);
+        const forms = parseModelForms('phase:bodies');
+        expect(forms).toEqual([{ kind: 'phase', key: 'bodies' }]);
+        const formed = withModelForms(samples, names, tables(family), forms);
+        expect(formed.names).toEqual(['bodies', 'matchup', 'bodies@phase']);
+        expect(formed.families[0]).toMatchObject({ singles: [2, 2, 0], doubles: [2, 2, 0] });
+        expect(formed.samples[0].g[2]).toBeCloseTo(samples[0].g[0] * samples[0].faintedFraction, 12);
+        // The identity check still holds: the derived column weighs 0 in the start tables.
+        const held = report(formed.samples, family, formed.names, formed.families, {});
+        expect(held.weights.find(weight => weight.name === 'bodies@phase')).toMatchObject({ free: false, fit: 0 });
+        // Lifted, with the rest of the table at the hand weights: the phase part comes back.
+        const lifted = report(formed.samples, family, formed.names, formed.families, { only: ['bodies', '*@phase'] });
+        const side = gameType === 'doubles' ? lifted.proposed.doubles : lifted.proposed.singles;
+        expect(side.matchup).toBe(2);
+        expect(Math.abs(side.bodies - 1)).toBeLessThan(0.7);
+        expect(Math.abs(side['bodies@phase'] - 5)).toBeLessThan(1.5);
+        // The plain table (no derived column) fits the same games worse out of fold.
+        const plain = report(samples, family, names, tables(family), { only: ['bodies'] });
+        expect(lifted.summary.pooled.meanLogLossDelta).toBeLessThan(plain.summary.pooled.meanLogLossDelta);
+        expect(lifted.verdict.adopt).toBe(true);
+      });
+
+    test.each([['singles', 'gen9ou', 'standard-singles'], ['doubles', 'gen9doublesou', 'standard-doubles']] as const)(
+      'a root column comes back with its weight, and the fit reads it better than the linear column alone (%s)', (gameType, prefix, family) => {
+        const samples = phased(prefix, gameType, 3, 0, 320, 13, true);
+        const formed = withModelForms(samples, names, tables(family), parseModelForms('root:bodies'));
+        expect(formed.names).toEqual(['bodies', 'matchup', 'bodies@root']);
+        samples.forEach((sample, i) => expect(formed.samples[i].g[2]).toBeCloseTo(Math.sign(sample.g[0]) * Math.sqrt(Math.abs(sample.g[0])), 12));
+        const root = report(formed.samples, family, formed.names, formed.families, { only: ['bodies', 'bodies@root'] });
+        const linear = report(samples, family, names, tables(family), { only: ['bodies'] });
+        const side = gameType === 'doubles' ? root.proposed.doubles : root.proposed.singles;
+        expect(side['bodies@root']).toBeGreaterThan(1.5);
+        expect(root.inSample.fit.logLoss).toBeLessThan(linear.inSample.fit.logLoss);
+      });
+
+    test('a column the report is told to set starts at that weight, and the rest of the table stays at hand', () => {
+      const samples = phased('gen9ou', 'singles', 3, 0, 260, 17);
+      const entry = report(samples, 'standard-singles', names, tables('standard-singles'), { only: ['matchup'], set: { bodies: 3 } });
+      expect(entry.proposed.singles.bodies).toBe(3);
+      expect(entry.weights.find(weight => weight.name === 'bodies')).toMatchObject({ hand: 3, free: false });
+    });
+
+    test('naming a column the table does not have stops the report', () => {
+      const samples = phased('gen9ou', 'singles', 3, 0, 260, 19);
+      expect(() => report(samples, 'standard-singles', names, tables('standard-singles'), { only: ['nothing'] })).toThrow(/no weight named nothing/);
+      expect(() => parseModelForms('cube:bodies')).toThrow(/model form/);
+      expect(() => withModelForms(samples, names, tables('standard-singles'), parseModelForms('phase:nothing'))).toThrow(/no feature named nothing/);
+    });
+
+    test('the start weights of a run come from a name=weight list', () => {
+      expect(parseWeightSet('boosts=0, boostsBiting=2.25')).toEqual({ boosts: 0, boostsBiting: 2.25 });
+      expect(parseWeightSet('')).toEqual({});
+      expect(() => parseWeightSet('boosts')).toThrow(/name=weight/);
+    });
+
+    test('a lifted hold leaves the pre-registered list, a name the list does not hold changes nothing', () => {
+      const hold = { shared: ['trickRoom', 'choiceMismatch', 'boosts'], doubles: ['boosts'] };
+      expect(liftHolds(hold, ['boosts'])).toEqual({ shared: ['trickRoom', 'choiceMismatch'], doubles: [] });
+      expect(liftHolds(hold, [])).toEqual(hold);
+      expect(liftHolds(hold, ['pairFocus'])).toEqual(hold);
+    });
   });
 });
