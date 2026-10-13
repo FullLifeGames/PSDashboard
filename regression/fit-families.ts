@@ -220,7 +220,9 @@ export function familyReports(
   const reports: Record<string, FamilyReport> = {};
   for (const family of families) {
     const subset = samples.filter(sample => familyOf(sample) === family.name);
-    const { layout, start } = layoutOf(family.singles, family.doubles);
+    // The identity reads the weights the capture was made under (options.captured), the fit the tables of today.
+    const asCaptured = (table: number[]) => table.map((weight, j) => options.captured?.[names[j]] ?? weight);
+    const { layout, start } = layoutOf(asCaptured(family.singles), asCaptured(family.doubles));
     const atK: AtKSample[] = subset.map(sample => ({
       g: sample.g, won: sample.p1Won, doubles: sample.gameType === 'doubles', faintedFraction: sample.faintedFraction, game: sample.set,
     }));

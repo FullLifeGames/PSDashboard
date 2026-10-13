@@ -488,6 +488,12 @@ export interface AtKReportOptions {
   only?: string[];
   /** Round 69: start weights by column, in both tables (a REPLACEMENT starts the new column at the old one's weight and the old one at 0). */
   set?: Record<string, number>;
+  /**
+   * Round 69: the weights a capture was made under where they differ from
+   * today's tables (a weight adopted since). Only the identity check starts
+   * from them; the fit and its baseline stay at today's tables.
+   */
+  captured?: Record<string, number>;
 }
 
 const meanOf = (values: number[]) => values.reduce((sum, value) => sum + value, 0) / values.length;

@@ -145,6 +145,23 @@ describe('fit families', () => {
     expect(() => familyReports(samples, names, families, () => K, options, leaf)).toThrow(/identity/);
   });
 
+  // Round 69 (T102): a capture is made under the tables of its day; a weight adopted since moves the start tables, and
+  // `captured` names the capture-time weights the identity check starts from (the fit and its baseline stay at today's tables).
+  test('round 69 (T102): the identity starts from the capture-time weights when a table has moved since', () => {
+    const samples = synthetic('gen9ou', 'singles', [3, 1], 220, 3);
+    const names = ['bodies', 'matchup'];
+    const moved = [{ name: 'standard-singles', singles: [3, 2], doubles: [3, 2] }];
+    const options = { seeds: 2, folds: 5, draws: 4, minGames: 20 };
+    expect(() => familyReports(samples, names, moved, () => K, options, leaf)).toThrow(/identity/);
+    expect(() => familyReports(samples, names, moved, () => K, { ...options, captured: { bodies: 2, matchup: 2 } }, leaf)).not.toThrow();
+    // A capture-time weight that is wrong still stops the fit.
+    expect(() => familyReports(samples, names, moved, () => K, { ...options, captured: { bodies: 2, matchup: 5 } }, leaf)).toThrow(/identity/);
+    // The report's baseline is today's table, not the captured one.
+    const report = familyReports(samples, names, moved, () => K, { ...options, captured: { bodies: 2, matchup: 2 } }, leaf).families['standard-singles'];
+    if (!('weights' in report)) throw new Error('no report');
+    expect(report.weights.find(weight => weight.name === 'bodies')?.hand).toBe(3);
+  });
+
   // Round 67 (T138): Pokémon Champions prices its own scale. The phase K of a family comes back from its own games:
   // the static's tanh under the family's tables, outcomes against k0 + k1 × the fainted share.
   test('round 67 (T138): the phase K of a family comes back from its own games', () => {

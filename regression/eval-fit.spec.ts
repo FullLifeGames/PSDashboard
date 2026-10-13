@@ -173,7 +173,9 @@ const HOLD = { shared: ['trickRoom', 'choiceMismatch', 'boosts'], doubles: ['boo
  * weight is free for the T49 and T102 fits only), EVAL_FIT_SET=<name=weight,...>
  * starts columns elsewhere (a REPLACEMENT: boosts=0,boostsBiting=<its weight>),
  * EVAL_FIT_FORMS=<phase:bodies,root:matchup> adds model-form columns
- * (fit-families.ts withModelForms).
+ * (fit-families.ts withModelForms), EVAL_FIT_CAPTURED=<name=weight,...> names the
+ * weights a capture was made under where a table has moved since (the identity
+ * check starts from them; the fit stays at today's tables).
  */
 const listOf = (name: string) => (process.env[name] ?? '').split(',').map(part => part.trim()).filter(Boolean);
 
@@ -213,6 +215,7 @@ function writeRefitReport(samples: FitSample[]) {
   const options = {
     seeds: 20, folds: 5, draws, minGames: 20, hold: liftHolds(HOLD, listOf('EVAL_FIT_LIFT')),
     ...(process.env.EVAL_FIT_ONLY ? { only: listOf('EVAL_FIT_ONLY') } : {}), set: parseWeightSet(process.env.EVAL_FIT_SET ?? ''),
+    captured: parseWeightSet(process.env.EVAL_FIT_CAPTURED ?? ''),
   };
   const report = familyReports(formed.samples, formed.names, formed.families, kOf, options, wpUnits);
   const out = process.env.EVAL_FIT_OUT ?? join(SAMPLES_DIR ?? CACHE_DIR, 'fit-report.json');
