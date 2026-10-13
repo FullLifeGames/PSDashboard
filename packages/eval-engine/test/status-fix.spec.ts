@@ -132,6 +132,34 @@ function playedRight(format: string, ability: string, status: string, applied: n
 
 const appliedOf = (status: string) => EVAL_WEIGHTS.status[status] ?? 1;
 
+/**
+ * The full sweep plays every gen 9 ability under four statuses on four formats and takes about six minutes
+ * (EVAL_CHECK_FULL=1). The default run plays a subset that still reaches every rule the checker has:
+ * the abilities that change what a status costs, the ones that cut or turn it aside, the dice abilities,
+ * every ability the Champions mod changes (read from the two Dex, not listed), and every 16th ability of the Dex as a sample of the plain rest.
+ */
+const FULL = !!process.env.EVAL_CHECK_FULL;
+const NAMED = [
+  'poisonheal', 'guts', 'quickfeet', 'marvelscale', 'magicguard', 'toxicboost', 'flareboost', 'comatose', 'purifyingsalt',
+  'limber', 'waterveil', 'waterbubble', 'immunity', 'pastelveil', 'magmaarmor', 'leafguard', 'heatproof', 'thickfat',
+  'naturalcure', 'hydration', 'earlybird', 'synchronize', 'analytic', 'stall', 'tangledfeet', 'klutz', 'hustle', 'truant',
+  'slowstart', 'defeatist', 'hugepower', 'purepower', 'regenerator', 'merciless', 'poisontouch', 'toxicchain',
+  'shedskin', 'prankster', 'serenegrace', 'noguard', 'compoundeyes', 'unaware', 'intimidate', 'levitate',
+];
+const SAMPLE_STRIDE = 16;
+const serialised = (ability: object) => JSON.stringify(ability, (_key, value) => (typeof value === 'function' ? value.toString() : value));
+type AbilityDex = { abilities: { get(id: string): object } };
+type AbilityEntry = { id: string };
+
+/** The abilities one format plays: all of them in the full sweep, else the subset above. */
+function sweptAbilities(all: AbilityEntry[], dex: AbilityDex, baseDex: AbilityDex): AbilityEntry[] {
+  if (FULL) return all;
+  const ids = new Set(all.map(ability => ability.id));
+  expect(NAMED.filter(id => !ids.has(id))).toEqual([]);
+  const changedByMod = (id: string) => serialised(dex.abilities.get(id)) !== serialised(baseDex.abilities.get(id));
+  return all.filter((ability, index) => NAMED.includes(ability.id) || index % SAMPLE_STRIDE === 0 || changedByMod(ability.id));
+}
+
 describe('the status checker: every ability under every status, whole turns of the simulator against statusRight', () => {
   const dexOf = (format: string) => battleOf(format, [set('Pikachu', ['splash']), set('Pikachu', ['splash'])], [set('Pikachu', ['splash']), set('Pikachu', ['splash'])]).dex;
 
@@ -144,8 +172,11 @@ describe('the status checker: every ability under every status, whole turns of t
   });
 
   test.each([SINGLES, DOUBLES, CHAMPIONS, CHAMPIONS_DOUBLES])('statusRight equals the played right multiplier for every ability and status (%s)', format => {
-    const abilities = dexOf(format).abilities.all().filter(ability => ability.exists && ability.gen <= 9 && ability.id !== 'noability' && !ability.isNonstandard);
-    expect(abilities.length).toBeGreaterThan(250);
+    const dex = dexOf(format);
+    const every = dex.abilities.all().filter(ability => ability.exists && ability.gen <= 9 && ability.id !== 'noability' && !ability.isNonstandard);
+    expect(every.length).toBeGreaterThan(250);
+    const abilities = sweptAbilities(every, dex, dexOf(SINGLES));
+    if (!FULL) expect(abilities.length).toBeLessThan(100);
     const twin = removalFormat(battleOf(format, [set('Pikachu', ['splash']), set('Pikachu', ['splash'])], [set('Pikachu', ['splash']), set('Pikachu', ['splash'])]));
     const wrong: string[] = [];
     const chance: string[] = [];
@@ -167,7 +198,6 @@ describe('the status checker: every ability under every status, whole turns of t
     expect(wrong).toEqual([]);
     expect(chance.length).toBeLessThan(10);
     expect(chance.some(name => name.startsWith('shedskin/'))).toBe(true);
-
   }, 600_000);
 
   test('the abilities the plan names change the cost, a plain mon does not', () => {
