@@ -1,6 +1,7 @@
 import { BREADTH_MIN_OPTIONS, CHANCE_THRESHOLD, type SideAnalysis, type TurnAnalysis } from './analysis.ts';
 import { winDeltaText, winPercent } from './winprob.ts';
 import { forcedWinSpeaks } from './turn-analysis/forced-speech.ts';
+import { splitCombinedLabel } from './turn-analysis/played-match.ts';
 import { chanceRolled } from './turn-analysis/luck.ts';
 import { lostGround, shownAttribution } from './turn-analysis/risk.ts';
 import { percentBelowSure, phrase, phraseReplies, playedBest, rollText } from './prose/phrases.ts';
@@ -146,7 +147,7 @@ function hindsightSentence(analysis: TurnAnalysis, playerNames: PlayerNames): st
   const lead = missed.read.likeliest !== undefined
     ? `${clicked} was the likeliest click on the opponent model ` +
       `(${Math.round(missed.read.likeliest * 100)}%), and against it`
-    : clicked === missed.read.against ? `against the ${clicked} actually clicked,` : `against what was actually clicked (${clicked}),`;
+    : splitCombinedLabel(missed.read.against).length > 1 ? `against what was actually clicked (${clicked}),` : `against the ${clicked} actually clicked,`;
   return `The read was there for ${missed.name}: ${lead} ${phrase(missed.read.response)} ` +
     `was worth ${winDeltaText(missed.read.gain)} more.`;
 }

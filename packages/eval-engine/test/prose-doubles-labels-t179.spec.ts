@@ -1,7 +1,7 @@
 import { describe, expect, test } from 'vitest';
 import type { SideAnalysis, TurnAnalysis } from '../src/analysis';
 import { sideClause } from '../src/prose/clauses';
-import { conditionalNote, phrase, phraseReplies } from '../src/prose/phrases';
+import { conditionalNote, hindsightLine, phrase, phraseReplies } from '../src/prose/phrases';
 import { summarizeTurn } from '../src/summary';
 import type { RankedChoice } from '../src/types';
 
@@ -110,6 +110,15 @@ describe('T179 the card\'s hindsight and predictive sentences', () => {
     }), names);
     expect(predictive).toContain(`If Alpha expects ${phrase(DOUBLES_REPLY)} (70% on the opponent model)`);
     expect(predictive).not.toContain(' + →');
+  });
+
+  test('doubles: a clicked pair of two moves reads "what was actually clicked", like the side row', () => {
+    const pair = 'Protect + Drain Punch→Incineroar';
+    const text = summarizeTurn(card({ hindsightRead: { response: 'Recover', against: pair, gain: 0.3 } }), names);
+    expect(text).toContain(`against what was actually clicked (${phrase(pair)}), Recover was worth`);
+    expect(text).not.toContain('actually clicked,');
+    expect(text).not.toContain(`the ${pair}`);
+    expect(hindsightLine({ response: 'Recover', against: pair, gain: 0.3 })).toMatch(/^Against what was clicked \(/);
   });
 
   test('singles: the same sentences keep their strings', () => {
