@@ -176,12 +176,12 @@ describe('singles and the inert weights (round 69, T42)', () => {
     expect(features.pairRedirect).toBe(0);
   });
 
-  test.each([false, true])('the tables carry the cells at weight 0 except the one the S7 fit priced (doubles %s)', doubles => {
+  test.each([false, true])('the tables carry the cells at weight 0 (doubles %s)', doubles => {
     for (const ruleset of RULESETS) {
       const weights = featureWeights(doubles, ruleset);
-      // Round 69 (S7): pairFocus fitted free in vgc-doubles only (20 of 20 seeds, band wholly negative); the other families kept 0.
-      if (doubles && ruleset === 'vgc') expect(weights.pairFocus).toBeLessThan(0);
-      else expect(weights.pairFocus).toBe(0);
+      // Round 69: the S7 fit priced pairFocus in vgc-doubles only (-188); the user gate of 13.10. (6b) set it back to 0
+      // until T199 replaces the 0/1 gate by a ramp, because the VGC score fell as a foe took damage.
+      expect(weights.pairFocus).toBe(0);
       expect(weights.pairRedirect).toBe(0);
     }
   });

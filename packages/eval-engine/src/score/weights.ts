@@ -280,7 +280,11 @@ export const DOUBLES_FEATURE_WEIGHTS: Record<keyof EvalFeatures, number> = {
  * sets (r69-b0 capture, rest of the table at hand): -188 [-284, -94], out of
  * fold better in 20 of 20 seeds. The sign is the reverse of the cell's
  * reading (a pair that can double up on a foe the singles cannot KO); the
- * bank and the VGC holdout decide (R3) whether the weight stays.
+ * bank and the VGC holdout decide (R3) whether the weight stays. User gate of
+ * 13.10. (6b): pairFocus is 0 again. The cell is a 0/1 gate, and at -188 the
+ * VGC score fell as a foe took damage in 24 of 103 HP series of the 54 VGC
+ * positions (largest fall 0.098); T199 builds a ramp over the KO window and
+ * refits.
  *
  * Round 69 (S12, T144): the August values for tailwind (68) and coverage (40)
  * and the fit that kept them (round 66, 14 of 20 seeds) priced what the
@@ -318,7 +322,7 @@ export const VGC_DOUBLES_FEATURE_WEIGHTS: Record<keyof EvalFeatures, number> = {
   sweepFastChip: 0,
   sweepSlowKo: 0,
   sweepSlowChip: 0,
-  pairFocus: -188,
+  pairFocus: 0,
   pairRedirect: 0,
   boostsBiting: 16,
   statusFix: 0,
