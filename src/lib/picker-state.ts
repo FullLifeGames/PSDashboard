@@ -102,9 +102,6 @@ function snapshotTypeAtUse(name: string, user: MoveUser, gen: number): string {
   return moveAtUse(move, user)?.type ?? move.type;
 }
 
-/** BranchMoveOption with the label of the Tera toggle (round 69, T182), which the branch state fills from the simulator. */
-type LabelledMoveOption = BranchMoveOption & { typeUnderTera?: string };
-
 /** The type a move lands with after the Tera click (round 69, T158): the move table with the Tera type clicked and the species the simulator makes of the body on the click. */
 function typesUnderTera(info: SimPokemonInfo, user: MoveUser, teraType: string | null, gen: number): (name: string) => string | undefined {
   if (!teraType) return () => undefined;
@@ -122,7 +119,7 @@ function moveOptionsFor(
 ): BranchMoveOption[] {
   const user = snapshotMoveUser(mon, set, gen, champions);
   const underTera = tera ? typesUnderTera(tera.info, user, tera.type, gen) : () => undefined;
-  return moveNamesFor(mon, set).map((name, slot): LabelledMoveOption => {
+  return moveNamesFor(mon, set).map((name, slot): BranchMoveOption => {
     const type = snapshotTypeAtUse(name, user, gen);
     const clicked = underTera(name);
     return {
