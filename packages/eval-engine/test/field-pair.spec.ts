@@ -173,10 +173,12 @@ describe('singles and the inert weights (round 69, T42)', () => {
     expect(features.pairRedirect).toBe(0);
   });
 
-  test.each([false, true])('every rule set carries both keys at weight 0 (doubles %s)', doubles => {
+  test.each([false, true])('the tables carry the cells at weight 0 except the one the S7 fit priced (doubles %s)', doubles => {
     for (const ruleset of RULESETS) {
       const weights = featureWeights(doubles, ruleset);
-      expect(weights.pairFocus).toBe(0);
+      // Round 69 (S7): pairFocus fitted free in vgc-doubles only (20 of 20 seeds, band wholly negative); the other families kept 0.
+      if (doubles && ruleset === 'vgc') expect(weights.pairFocus).toBeLessThan(0);
+      else expect(weights.pairFocus).toBe(0);
       expect(weights.pairRedirect).toBe(0);
     }
   });
@@ -187,7 +189,7 @@ describe('singles and the inert weights (round 69, T42)', () => {
     ['champions doubles', FORMAT, 'champions' as const],
     ['singles', 'gen9customgame', 'standard' as const],
     ['champions singles', 'gen9customgame', 'champions' as const],
-  ])('the score with both keys at 0 is the sum over the old keys (%s)', (_name, format, ruleset) => {
+  ])('the score is the sum over the old keys and the priced pair cell (%s)', (_name, format, ruleset) => {
     const doubles = format === FORMAT;
     const mons = doubles ? [PIKACHU(), PIKACHU()] : [PIKACHU(), splash('Garchomp')];
     const foes = doubles ? snorlaxes() : [splash('Snorlax'), splash('Garchomp')];
@@ -198,6 +200,7 @@ describe('singles and the inert weights (round 69, T42)', () => {
     const weights = featureWeights(doubles, ruleset);
     let diff = 0;
     for (const key of OLD_KEYS) diff += weights[key] * (features as EvalFeatures)[key];
+    diff += weights.pairFocus * features.pairFocus;
     const teamSize = Math.max(battle.sides[0].pokemon.length, battle.sides[1].pokemon.length, 1);
     const expected = Math.tanh((diff / (teamSize * (EVAL_WEIGHTS.alive + EVAL_WEIGHTS.hp))) * EVAL_WEIGHTS.scale);
     expect(evaluatePosition(battle, cache)).toBe(expected);

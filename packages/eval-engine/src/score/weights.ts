@@ -252,6 +252,12 @@ export const DOUBLES_FEATURE_WEIGHTS: Record<keyof EvalFeatures, number> = {
  * the corpus holds 50 VGC games against 1,108 Doubles OU, and on the 31 VGC
  * games of bank and holdout the Doubles OU fit read +85 bp [−10, +181].
  * Written out in full, so a refit of Doubles OU never moves it.
+ *
+ * Round 69 (S7, T42): pairFocus fitted free on the 3,893 VGC positions of 711
+ * sets (r69-b0 capture, rest of the table at hand): -188 [-284, -94], out of
+ * fold better in 20 of 20 seeds. The sign is the reverse of the cell's
+ * reading (a pair that can double up on a foe the singles cannot KO); the
+ * bank and the VGC holdout decide (R3) whether the weight stays.
  */
 export const VGC_DOUBLES_FEATURE_WEIGHTS: Record<keyof EvalFeatures, number> = {
   bodies: 200,
@@ -267,7 +273,7 @@ export const VGC_DOUBLES_FEATURE_WEIGHTS: Record<keyof EvalFeatures, number> = {
   sweepFastChip: 0,
   sweepSlowKo: 0,
   sweepSlowChip: 0,
-  pairFocus: 0,
+  pairFocus: -188,
   pairRedirect: 0,
   boostsBiting: 0,
   statusFix: 0,
