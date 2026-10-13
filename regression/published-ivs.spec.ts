@@ -8,7 +8,8 @@ import { fetchSmogonUsageStats } from '../src/lib/smogon-stats';
 /**
  * The build plays the IVs a published Smogon set lists (round 64, T122
  * point 4, spec decision 21): the Trick Room Sinistcha of 2663093831 runs
- * Speed 0 and Attack 0, the specially defensive Toxapex of 573756 Attack 0.
+ * Attack 0 (and Speed 0 unless the log's move order refutes it, round 69
+ * T132 point 2), the specially defensive Toxapex of 573756 Attack 0.
  * Data: the feedback harness's fixtures, served as hermetic.ts serves them.
  */
 const fixtureFetcher = async (url: string) => {
@@ -27,12 +28,13 @@ async function built(id: string) {
   return buildAppTeams(replay.log, seed, { usageStats, setAssumptions });
 }
 
-test('doubles, 2663093831: the Trick Room Sinistcha runs the published Speed 0 and Attack 0', async () => {
+test('doubles, 2663093831: the Trick Room Sinistcha keeps the published Attack 0, and p1 gets Speed 31 back where the log refutes 0', async () => {
+  // Round 69 (T132 point 2, user gate 13.10. "3a"): p1's Sinistcha uses Matcha Gotcha before Incineroar's Flare Blitz on turn 8
+  // with no Trick Room in the log, an order a Speed IV 0 body cannot keep, so the solver restores Speed 31 before it buys a Speed
+  // EV; the other published IV stays. p2's Sinistcha shows no such order and keeps the published Speed 0.
   const teams = await built('gen9doublesou-2663093831');
-  for (const team of [teams.p1Team, teams.p2Team]) {
-    const sinistcha = team.find(set => set.species === 'Sinistcha');
-    expect(sinistcha?.ivs).toEqual({ hp: 31, atk: 0, def: 31, spa: 31, spd: 31, spe: 0 });
-  }
+  expect(teams.p1Team.find(set => set.species === 'Sinistcha')?.ivs).toEqual({ hp: 31, atk: 0, def: 31, spa: 31, spd: 31, spe: 31 });
+  expect(teams.p2Team.find(set => set.species === 'Sinistcha')?.ivs).toEqual({ hp: 31, atk: 0, def: 31, spa: 31, spd: 31, spe: 0 });
 });
 
 test('singles, 573756: the specially defensive Toxapex runs the published Attack 0, its foe Toxapex keeps 31', async () => {
