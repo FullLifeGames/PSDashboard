@@ -297,10 +297,16 @@ export const DOUBLES_FEATURE_WEIGHTS: Record<keyof EvalFeatures, number> = {
  * refits bodies 177, screens 48, matchup 169 and Trick Room 54 (hazards stay
  * at the hand value, R2 flagged): out of fold better in 20 of 20 seeds, Brier
  * 20 of 20, log-loss -62 bp, Brier -24 bp against the table before.
+ *
+ * Round 69 (S17, T49): `boosts` 27 replaced by boostsBiting 16 (REPLACEMENT on
+ * the Schluss-Fit corpus, 32,088 positions, with stage drops counted: 16.1
+ * [2.8, 30.7], out of fold better in 20 of 20 seeds, Brier 20 of 20, log-loss
+ * -126 bp, no flagged band; before the drops counted the column was flagged
+ * and missed R1). The bank and the VGC holdout decide it (R3).
  */
 export const VGC_DOUBLES_FEATURE_WEIGHTS: Record<keyof EvalFeatures, number> = {
   bodies: 177,
-  boosts: 27,
+  boosts: 0,
   hazards: 0.75,
   screens: 48,
   tailwind: 0,
@@ -314,7 +320,7 @@ export const VGC_DOUBLES_FEATURE_WEIGHTS: Record<keyof EvalFeatures, number> = {
   sweepSlowChip: 0,
   pairFocus: -188,
   pairRedirect: 0,
-  boostsBiting: 0,
+  boostsBiting: 16,
   statusFix: 0,
 };
 
@@ -400,6 +406,11 @@ export const CHAMPIONS_FEATURE_WEIGHTS: Record<keyof EvalFeatures, number> = {
  * in full. Round 69 (S8, T49): `boosts` 27 replaced by boostsBiting 87
  * [64, 120] (REPLACEMENT, 2,604 positions of 386 sets, out of fold better in
  * 20 of 20 seeds, log-loss -30 bp, and 20 of 20 against the additive form).
+ * Round 69 (S17): boostsBiting 87 -> 61 [42, 81], the Schluss-Fit on the
+ * corpus with stage drops counted (32,088 positions; Brier better in 16 of 20
+ * seeds, the log-loss in 19 of 20). The lane value lies outside the new band
+ * and the new value outside the lane band, so decision 3 (user answer 2a)
+ * takes the fit value.
  */
 export const CHAMPIONS_DOUBLES_FEATURE_WEIGHTS: Record<keyof EvalFeatures, number> = {
   bodies: 196,
@@ -417,7 +428,7 @@ export const CHAMPIONS_DOUBLES_FEATURE_WEIGHTS: Record<keyof EvalFeatures, numbe
   sweepSlowChip: 0,
   pairFocus: 0,
   pairRedirect: 0,
-  boostsBiting: 87,
+  boostsBiting: 61,
   statusFix: 0,
 };
 

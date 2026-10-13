@@ -331,15 +331,16 @@ describe('inert at weight 0', () => {
     expect({ ...skipped, boostsBiting: all.boostsBiting }).toEqual(all);
   });
 
-  // Round 69 (S8, T49): REPLACEMENT in the three families whose fit passed R1 and R2 (out of fold better in 20 of
-  // 20 seeds, no flagged band): the damped column takes the weight of `boosts`, `boosts` goes to 0. Standard
-  // doubles (REPLACEMENT 0 of 20, ADDITIVE flagged) and VGC doubles (REPLACEMENT flagged) keep `boosts` and the key at 0.
+  // Round 69 (S8, T49; S17): REPLACEMENT in four families: the damped column takes the place of `boosts`, `boosts` goes to 0.
+  // Champions doubles read 61 since S17 (the Schluss-Fit on the drops-aware column, user answer 2a: a fit value outside the lane band
+  // [64, 120] applies), VGC doubles 16 (REPLACEMENT 20 of 20 seeds once the drops count). Standard doubles (REPLACEMENT 0 of 20,
+  // ADDITIVE flagged) keeps `boosts` and the key at 0.
   test.each([
     ['standard singles', false, 'standard' as const, 0, 95],
     ['champions singles', false, 'champions' as const, 0, 102],
-    ['champions doubles', true, 'champions' as const, 0, 87],
+    ['champions doubles', true, 'champions' as const, 0, 61],
     ['standard doubles', true, 'standard' as const, 27, 0],
-    ['vgc doubles', true, 'vgc' as const, 27, 0],
+    ['vgc doubles', true, 'vgc' as const, 0, 16],
   ])('the adopted boost weights of %s', (_name, doubles, ruleset, boosts, bite) => {
     const weights = featureWeights(doubles, ruleset);
     expect(weights.boosts).toBe(boosts);

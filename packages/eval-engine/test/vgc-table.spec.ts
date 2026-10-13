@@ -41,9 +41,11 @@ describe('the SV VGC table (round 69, T144)', () => {
     const w = VGC_DOUBLES_FEATURE_WEIGHTS;
     expect([w.tailwind, w.coverage]).toEqual([0, 0]);
     expect([w.bodies, w.screens, w.matchup, w.trickRoom]).toEqual([177, 48, 169, 54]);
-    // Held at the hand values: hazards (R2 flagged), boosts (hold), choice mismatch (hold), the S7 pair cell.
-    expect([w.hazards, w.boosts, w.choiceMismatch, w.pairFocus]).toEqual([0.75, 27, 40, -188]);
-    expect([w.sweepFastKo, w.sweepFastChip, w.sweepSlowKo, w.sweepSlowChip, w.pairRedirect, w.boostsBiting, w.statusFix]).toEqual([0, 0, 0, 0, 0, 0, 0]);
+    // Held at the hand values: hazards (R2 flagged), choice mismatch (hold), the S7 pair cell.
+    expect([w.hazards, w.choiceMismatch, w.pairFocus]).toEqual([0.75, 40, -188]);
+    // Round 69 (S17, T49): the damped boost column replaces the flat one (REPLACEMENT, 20 of 20 seeds once drops count).
+    expect([w.boosts, w.boostsBiting]).toEqual([0, 16]);
+    expect([w.sweepFastKo, w.sweepFastChip, w.sweepSlowKo, w.sweepSlowChip, w.pairRedirect, w.statusFix]).toEqual([0, 0, 0, 0, 0, 0]);
   });
 
   test('the other tables keep their Tailwind and Coverage', () => {
