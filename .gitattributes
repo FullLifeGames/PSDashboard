@@ -1,0 +1,2 @@
+# Replay logs are read byte for byte by the parser specs: a Windows checkout must keep their LF line endings.
+*.log text eol=lf
