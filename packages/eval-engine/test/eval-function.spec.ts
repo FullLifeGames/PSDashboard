@@ -1,4 +1,4 @@
-import { test, expect, describe } from 'vitest';
+import { afterEach, test, expect, describe } from 'vitest';
 import { Battle, Teams, toID } from '@pkmn/sim';
 import type { PokemonSet } from '@pkmn/sim';
 import {
@@ -7,6 +7,7 @@ import {
   strandedMons, unansweredMons,
   type EvalFeatures, type RaceSide,
 } from '../src/eval-function';
+import { setStaticForm } from '../src/score/phase-form';
 
 function makeSet(
   name: string,
@@ -246,6 +247,8 @@ describe('win-condition sweep cells', () => {
 });
 
 describe('evaluatePosition', () => {
+  afterEach(() => setStaticForm(null));
+
   test('doubles positions score with the doubles-fitted weights', () => {
     // Per-gametype calibration (2026-08-08 corpus fit): speed control is
     // worth far more in doubles. The doubles dot product must use the
@@ -269,6 +272,8 @@ describe('evaluatePosition', () => {
   });
 
   test('pinned scores survive the feature-vector refactor', () => {
+    // The pins are the table's scores: the singles phase form (round 69, S9) is off here and pinned in phase-form.spec.ts.
+    setStaticForm(false);
     // Contract for the WP 7 featureization: same battles, same numbers.
     const hazardous = makeBattle(
       [makeSet('A', 'Snorlax', VANILLA), makeSet('A2', 'Charizard', VANILLA)],

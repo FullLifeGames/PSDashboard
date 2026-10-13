@@ -1,8 +1,9 @@
-import { test, expect, describe } from 'vitest';
+import { afterEach, test, expect, describe } from 'vitest';
 import type { Battle, Pokemon, PokemonSet } from '@pkmn/sim';
 import { createMatchupCache, evalFeatures, evaluatePosition, featureWeights, EVAL_WEIGHTS, type EvalFeatures, type StaticRuleset } from '../src/eval-function';
 import { boostedFraction, pairThreat } from '../src/score/threat';
 import { redirectsFoes } from '../src/score/field-pair';
+import { setStaticForm } from '../src/score/phase-form';
 import { set } from './move-oracle';
 import { battleOf } from './power-oracle';
 
@@ -164,6 +165,8 @@ describe('pairRedirect (round 69, T42)', () => {
 });
 
 describe('singles and the inert weights (round 69, T42)', () => {
+  afterEach(() => setStaticForm(null));
+
   test('singles boards read 0 in both cells, whatever sits on the field', () => {
     const battle = battleOf('gen9customgame', [set('Clefairy', ['followme', 'splash']), splash('Garchomp')],
       [splash('Pikachu'), splash('Snorlax')]);
@@ -198,6 +201,8 @@ describe('singles and the inert weights (round 69, T42)', () => {
     const cache = createMatchupCache(ruleset);
     const features = evalFeatures(battle, cache);
     const weights = featureWeights(doubles, ruleset);
+    // The sum is the table's: the singles phase form (round 69, S9) is off here and pinned in phase-form.spec.ts.
+    setStaticForm(false);
     let diff = 0;
     for (const key of OLD_KEYS) diff += weights[key] * (features as EvalFeatures)[key];
     diff += weights.pairFocus * features.pairFocus;

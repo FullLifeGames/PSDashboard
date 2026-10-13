@@ -1,7 +1,8 @@
-import { describe, expect, test } from 'vitest';
+import { afterEach, describe, expect, test } from 'vitest';
 import { PRNG, type Battle, type PokemonSet } from '@pkmn/sim';
 import { evalFeatures, evaluatePosition, featureWeights, createMatchupCache, EVAL_WEIGHTS, type EvalFeatures } from '../src/eval-function';
 import { removalFormat } from '../src/score/boost-bite';
+import { setStaticForm } from '../src/score/phase-form';
 import { statusByChance, statusRight } from '../src/score/status-factor';
 import { loadSimMods } from '../src/forward/sim-mods';
 import { set } from './move-oracle';
@@ -275,10 +276,12 @@ describe.each([['singles', SINGLES], ['doubles', DOUBLES], ['Champions singles',
     expect(value).toBeLessThan(1);
   });
 
+  afterEach(() => setStaticForm(null));
+
   test('with a weight table the column is read only where its weight is not 0, and no other feature moves', () => {
     const battle = board(format, 'Poison Heal', 'tox');
     const all = evalFeatures(battle);
-    const zero = featureWeights(battle.gameType === 'doubles', 'standard');
+    const zero = { ...featureWeights(battle.gameType === 'doubles', 'standard'), statusFix: 0 };
     const skipped = evalFeatures(battle, undefined, zero);
     expect(all.statusFix).toBeGreaterThan(0);
     expect(skipped.statusFix).toBe(0);
@@ -286,25 +289,36 @@ describe.each([['singles', SINGLES], ['doubles', DOUBLES], ['Champions singles',
     expect({ ...skipped, statusFix: all.statusFix }).toEqual(all);
   });
 
-  test('the score is the sum over every other key with a statused Poison Heal body', () => {
+  // Round 69 (S9, T102): the fold. Standard singles prices statusFix at the weight of bodies; the other tables hold it at 0.
+  test('the score is the sum over every key with a statused Poison Heal body, and only the singles table prices the fix', () => {
     const battle = board(format, 'Poison Heal', 'tox');
     const ruleset = isChampions(format) ? 'champions' : 'standard';
     const cache = createMatchupCache(ruleset);
     const features = evalFeatures(battle, cache);
     const weights = featureWeights(battle.gameType === 'doubles', ruleset);
-    expect(weights.statusFix).toBe(0);
-    let diff = 0;
-    for (const key of Object.keys(weights) as (keyof EvalFeatures)[]) {
-      if (key !== 'statusFix') diff += weights[key] * features[key];
-    }
-    const teamSize = Math.max(battle.sides[0].pokemon.length, battle.sides[1].pokemon.length, 1);
-    const expected = Math.tanh((diff / (teamSize * (EVAL_WEIGHTS.alive + EVAL_WEIGHTS.hp))) * EVAL_WEIGHTS.scale);
-    expect(evaluatePosition(battle, cache)).toBe(expected);
+    const priced = format === SINGLES;
+    expect(weights.statusFix).toBe(priced ? weights.bodies : 0);
+    const scoreOf = (without: boolean) => {
+      let diff = 0;
+      for (const key of Object.keys(weights) as (keyof EvalFeatures)[]) {
+        if (!(without && key === 'statusFix')) diff += weights[key] * features[key];
+      }
+      const teamSize = Math.max(battle.sides[0].pokemon.length, battle.sides[1].pokemon.length, 1);
+      return Math.tanh((diff / (teamSize * (EVAL_WEIGHTS.alive + EVAL_WEIGHTS.hp))) * EVAL_WEIGHTS.scale);
+    };
+    // The sum is the table's: the singles phase form (S9) is off here and pinned in phase-form.spec.ts.
+    setStaticForm(false);
+    expect(evaluatePosition(battle, cache)).toBe(scoreOf(false));
+    if (priced) expect(evaluatePosition(battle, cache)).toBeGreaterThan(scoreOf(true));
+    else expect(evaluatePosition(battle, cache)).toBe(scoreOf(true));
   });
 });
 
-test('every rule set carries the key at weight 0', () => {
-  for (const doubles of [false, true]) {
-    for (const ruleset of ['standard', 'vgc', 'champions'] as const) expect(featureWeights(doubles, ruleset).statusFix).toBe(0);
+test('only the singles table carries the key (VGC singles reads it too), at the weight of bodies', () => {
+  for (const [doubles, ruleset] of [[false, 'standard'], [false, 'vgc']] as const) {
+    expect(featureWeights(doubles, ruleset).statusFix).toBe(featureWeights(doubles, ruleset).bodies);
+  }
+  for (const [doubles, ruleset] of [[false, 'champions'], [true, 'standard'], [true, 'vgc'], [true, 'champions']] as const) {
+    expect(featureWeights(doubles, ruleset).statusFix).toBe(0);
   }
 });

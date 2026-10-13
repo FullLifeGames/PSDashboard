@@ -1,6 +1,7 @@
 import type { Battle } from '@pkmn/sim';
 import { EVAL_WEIGHTS, featureWeights, type EvalFeatures } from './score/weights.ts';
-import { evalFeatures } from './score/features.ts';
+import { evalFeatures, faintedFractionOf } from './score/features.ts';
+import { phaseFormOf, STANDARD_SINGLES_TERMS, staticFormOn } from './score/phase-form.ts';
 import type { MatchupCache } from './score/threat.ts';
 
 /**
@@ -40,6 +41,11 @@ export function evaluatePosition(battle: Battle, cache?: MatchupCache): number {
   let diff = 0;
   for (const key of Object.keys(weights) as (keyof EvalFeatures)[]) {
     diff += weights[key] * features[key];
+  }
+  // Round 69 (S9, T102): the phase form of standard singles, switchable (score/phase-form.ts).
+  if (staticFormOn() && phaseFormOf(battle.gameType === 'doubles', cache?.ruleset)) {
+    const share = faintedFractionOf(battle);
+    for (const term of STANDARD_SINGLES_TERMS) diff += (term.shift + term.addend * share) * features[term.key];
   }
   return Math.tanh((diff / normalizer) * EVAL_WEIGHTS.scale);
 }

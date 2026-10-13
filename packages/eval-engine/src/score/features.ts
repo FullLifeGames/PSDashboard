@@ -130,6 +130,19 @@ function sideFeatureValues(side: Side, battle: Battle, twin: string | null) {
   };
 }
 
+/** The share of fainted mons of both sides, inline (importing search.ts here would cycle); the same count as battleFaintedFraction. */
+export function faintedFractionOf(battle: Battle): number {
+  let fainted = 0;
+  let total = 0;
+  for (const side of battle.sides) {
+    for (const pokemon of side.pokemon) {
+      total += 1;
+      if (pokemon.fainted || pokemon.hp <= 0) fainted += 1;
+    }
+  }
+  return total > 0 ? fainted / total : 0;
+}
+
 /**
  * The feature vector of a position. With a weight table, a feature of the
  * round-69 columns (the field pair, boostsBiting, statusFix) whose weight is 0 stays 0
@@ -148,16 +161,7 @@ export function evalFeatures(battle: Battle, cache?: MatchupCache, weights?: Rea
   }
   const terms = matchupTerms(battle, cache);
   const threat = threatGetter(battle, cache);
-  // Fainted-body fraction, inline (importing search.ts here would cycle).
-  let faintedBodies = 0;
-  let totalBodies = 0;
-  for (const side of battle.sides) {
-    for (const pokemon of side.pokemon) {
-      totalBodies += 1;
-      if (pokemon.fainted || pokemon.hp <= 0) faintedBodies += 1;
-    }
-  }
-  const faintedFraction = totalBodies > 0 ? faintedBodies / totalBodies : 0;
+  const faintedFraction = faintedFractionOf(battle);
   const damp = EVAL_WEIGHTS.matchupEarlyDamp;
   const matchupPhase = damp + (1 - damp) * Math.min(1, faintedFraction * 3);
   const p1Cells = sweepCells(0, battle, threat);

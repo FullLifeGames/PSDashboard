@@ -196,6 +196,15 @@ export interface EvalFeatures {
  * kept at 12, boostsBiting 74) reads another 14 bp better; by the
  * pre-registered order (REPLACEMENT before ADDITIVE) the replacement is the
  * step that is measured, the additive form waits for that reading.
+ *
+ * Round 69 (S9, T102): `statusFix` takes the weight of `bodies`, so a body whose
+ * ability changes what a status costs is priced at the right multiplier (the
+ * fold: out of fold better than the table in 20 of 20 seeds, log-loss -8 bp,
+ * 968 statused positions). The phase form of this family (bodies and matchup
+ * with the share of fainted mons, score/phase-form.ts) rides on top of this
+ * table behind a switch; the other four tables hold statusFix at 0 (their
+ * fold lost out of fold: 0 of 20 seeds in the two Scarlet/Violet doubles
+ * tables, too few statused positions in Champions).
  */
 export const FEATURE_WEIGHTS: Record<keyof EvalFeatures, number> = {
   bodies: EVAL_WEIGHTS.alive + EVAL_WEIGHTS.hp,
@@ -214,7 +223,7 @@ export const FEATURE_WEIGHTS: Record<keyof EvalFeatures, number> = {
   pairFocus: 0,
   pairRedirect: 0,
   boostsBiting: 95,
-  statusFix: 0,
+  statusFix: EVAL_WEIGHTS.alive + EVAL_WEIGHTS.hp,
 };
 
 /**

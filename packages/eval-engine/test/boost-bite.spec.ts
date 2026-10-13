@@ -1,8 +1,9 @@
-import { test, expect, describe } from 'vitest';
+import { afterEach, test, expect, describe } from 'vitest';
 import type { Battle, Pokemon, PokemonSet } from '@pkmn/sim';
 import { createMatchupCache, evalFeatures, evaluatePosition, featureWeights, EVAL_WEIGHTS, type EvalFeatures } from '../src/eval-function';
 import { pairThreat } from '../src/score/threat';
 import { removalFormat, removesStages, stageValue } from '../src/score/boost-bite';
+import { setStaticForm } from '../src/score/phase-form';
 import { loadSimMods } from '../src/forward/sim-mods';
 import { set } from './move-oracle';
 import { battleOf, fingerprint } from './power-oracle';
@@ -308,6 +309,8 @@ describe('the twin battle runs in the mode of the battle it answers for (user 12
 });
 
 describe('inert at weight 0', () => {
+  afterEach(() => setStaticForm(null));
+
   test('evaluating the position leaves the battle as it was (log, dice, queues, stages)', () => {
     const battle = duel(clefable('Unaware', ['haze', 'splash']));
     const mons = [...battle.sides[0].pokemon, ...battle.sides[1].pokemon];
@@ -373,6 +376,8 @@ describe('inert at weight 0', () => {
     const features = evalFeatures(battle, cache);
     expect(features.boosts).toBeGreaterThan(0);
     const weights = featureWeights(doubles, ruleset);
+    // The sum is the table's: the singles phase form (round 69, S9) is off here and pinned in phase-form.spec.ts.
+    setStaticForm(false);
     let diff = 0;
     for (const key of Object.keys(weights) as (keyof EvalFeatures)[]) {
       diff += weights[key] * features[key];
