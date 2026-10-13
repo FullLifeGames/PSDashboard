@@ -909,6 +909,162 @@ import { takeSimFastReport } from '../packages/eval-engine/src/forward/sim-fast/
  * static basis for this mass; the next lever, if any, is search/
  * planning-side.
  *
+ * WAVE 3 2026-10-12..13 (improvement round 69, the third wave of lanes:
+ * seven lanes A to G with 42 TODOs in their own worktrees from 006b33c (=
+ * v1), measured one at a time against r69-base-1012 and, from 00:06 on
+ * 13.10., the byte-identical r69-base-1013; merged in a separate clone on
+ * r69-merge by cherry-pick in the order F, A, E, D, B, C, G (88 commits,
+ * three conflicts, all in lane A's files: choice-lock.ts,
+ * protocol/handlers.ts and parser-state.ts imports); cache v65 to v66;
+ * spec, ledger, lane folders, readings and probes under
+ * docs/perf/probes/2026-10-12-r69/; builders, readers and reviewers on
+ * Sonnet 5.5 and Haiku 5.5, one fresh agent a step). User answers of 13.10.
+ * 06:27 to 06:33: only the end state of a lane is measured (bank plus
+ * feedback twice, no lane holdouts), the four holdouts run once in the wave
+ * run, T163 moves behind the wave, the Schluss-Fit runs after the merge,
+ * T148 and T149 stay in full without a time limit, pin 2630685175 t8 stays
+ * (Taunt is the error), 649664 t23 is re-pinned to p1-read only if the wave
+ * run confirms it (it does not: the merged state reads chance), the wording
+ * of T69, T136 and T180 is accepted.
+ * A SETS AND SPREADS (T31, T26, T190, T191, T167, T86, T132 points 1 and 2,
+ * T166, T69, T136, T192; T132 points 3 and 4 counted and explained): the
+ * parser records doubles hits per target (doubles, spread, defenderSide)
+ * and the spread solver prices them like the simulator; a guessed boost
+ * item leaves when the damage lines refute it, never an item the species
+ * needs; battle formes take their species' set; each hit is priced with the
+ * item it landed with, the field it landed on and the Paradox stat the log
+ * names; a published set stays when the log rules out all its items; a
+ * Speed no move order measures stays at the prior, and a published Speed IV
+ * an order refutes goes back to 31 (2663093831 p1 Sinistcha moved before
+ * Incineroar without Trick Room); Gen 1 and 2 start at the server's EVs; a
+ * hit held back by Focus Sash, Sturdy, Endure or Focus Band is a lower
+ * bound; the stats panel names where a spread comes from and shows the IVs
+ * the build plays; the one-stage chain keeps the orders-only solve at a
+ * forfeit (B13, build parity 5 of 5). a1 (T31) no harm, doubles verdict
+ * with three holdouts passes (D26); a2 (T26) clear gain, hq all -26, hq
+ * doubles -62 resolved; a6 (end state) no harm against base (singles +6,
+ * doubles -13), warnings singles late (own K +53, hq +63); the step a3 to
+ * a6 reads singles +23, half of it one replay (gen9ou-2658671254) where a3
+ * found late wins neither base nor a6 see.
+ * B STATIC WEIGHTS (T42, T155, T49, T102 in standard singles, T144; T39
+ * closed by its sighting, 3 of 10; T163 moved behind the wave with its
+ * tools kept): doubles hints see the active pair; field-pair features
+ * pairFocus and pairRedirect; boostsBiting (a standing stage valued only
+ * where it moves the 1v1 race of a pair, read through the simulator's
+ * ModifyBoost) replaces boosts in standard singles (95), Champions singles
+ * (102), Champions doubles (61 after the Schluss-Fit) and VGC doubles (16,
+ * boosts 27 to 0); the review after the merge found that it counted no drop
+ * that bites (fixed, S15); T102 ties statusFix to bodies and gives bodies
+ * and matchup a phase form in standard singles (EVAL_STATIC_FORM=0 switches
+ * the form off); the Scarlet/Violet VGC table drops Tailwind and Coverage
+ * (bodies 177, screens 48, trickRoom 54, matchup 169). Schluss-Fit on the
+ * merged capture m1 (32 088 positions, identity off 0): every value inside
+ * its lane band except Champions doubles boostsBiting (61 [42, 81] against
+ * 87 [64, 120]), taken as spec decision 3 writes; VGC boostsBiting as
+ * REPLACEMENT passed R1 (20 of 20 seeds, out-of-fold log-loss -126 bp) once
+ * drops counted. b1, b2, b3 (T49, singles -18) and b6 (T102 and T144;
+ * warnings doubles early +57 at fixed K and the step's hq own K singles
+ * late +54) have no harm. pairFocus (fitted -188 in VGC) is 0 since the
+ * gate: its 0/1 gate made the VGC score fall as a foe took damage in 24 of
+ * 103 HP series.
+ * C PERCENTS AND REPORT (T51, T64, T177, T179, T178): every percent reads
+ * the fainted share (display K 1.85 + 5 x clamp(share - 0.25, 0, 0.25)), on
+ * the graph in every engine mode too; hindsight reads only on solid cells,
+ * in doubles matched exactly; a dice marker only where the move rolled (a
+ * status picked in a move's handler counts); doubles replies and clicked
+ * pairs per slot in the prose; plan and classes per matrix cell. c1 to c3
+ * leave every engine number byte-identical; 297 percent texts and 15 cards
+ * move, no pin.
+ * D CELL PLAN AND CALCULATOR PATHS (T146 c1 to c6, T148, T149, T152, T154):
+ * kill window, missing weight, immunity and speed ties in the cell sampler,
+ * the tree and the verify cell; small doubles outcomes priced by a light
+ * sub-search (5 options, weight floor 0.05); the doubles answer round reads
+ * up to three near rows; Stellar first use and Teraform Zero priced; Fickle
+ * Beam as the mix of its two strengths. d1 and d3 no harm (the bank's
+ * doubles rows do not move; the verify and answer rounds move verdicts:
+ * doubles tiers 17/5/0 to 14/5/0); census cd3 39 of 215 cells outside 2.5
+ * SE (base 47), |error| 0.0495 (0.0628).
+ * E REBUILD AND SNAPSHOT (T172, T187, T151, T161, T158): the simulator's
+ * Faint and SwitchOut recorded per write, an exit record restored only when
+ * no other body entered the slot (the e1 finding at 562428 t13, t14); sleep
+ * counter from the Dex's sleep rules; pair slot swap; sightedHp from the
+ * simulator's getHealth; snapshot fields boostedStat, fallen,
+ * alliesFainted. e1 no harm; e4 (end state) a resolved gain (all -9 [-14,
+ * -3], singles -8, hq doubles -21).
+ * F OPPONENT INFERENCE (T188, T168, T169, T175, T193): generationsFor per
+ * format; Lum, Sitrus, Eject Button and Red Card ruled out by their missing
+ * triggers (0 of about 64 000 rule-outs later shown held); a cant line that
+ * names a move is booked; Assault Vest and Eviolite judged from the hits a
+ * body takes; the Choice check ranges the defender's item and battle
+ * formes. f1 to f4 no harm, f4 byte-identical to f3, feedback identical to
+ * base.
+ * G APP (T184, T182, T162, T180): the sweep replaces a stored result after
+ * depth 2 by the configured engine; the Tera toggle labels the type a move
+ * lands with; the team editor reads EV and Stat Point limits from the
+ * simulator's rule table and Champions pools from the mod (an unlisted
+ * Champions id keeps the 66 total, review fix); no dashes in the app's
+ * text.
+ * MERGE: replay-core's two .log fixtures kept on LF by .gitattributes (the
+ * parser reads no damage observation from a CRLF log; 006b33c the same;
+ * T206); three review lenses found boostsBiting counting no drop (fixed),
+ * graph tooltips reading the share only in auto mode (fixed), an unlisted
+ * Champions id losing the 66 cap (fixed), Tri Attack's handler status
+ * missing as a dice roll and a doubles pair of two moves reading wrong in
+ * the card (fixed); two test scenes swapped (tree-orchestrator keepPlayed
+ * to VGC 2630685175 t7, the verify-to-prover check on one singles and one
+ * doubles scene); the picker's stale intersection type dropped; search
+ * identity re-recorded.
+ * WAVE RUN on bc43963 (pairFocus -188) against r69-base-1013, base-1013-1
+ * and the r68-m2 holdouts: play-out pin green; bank no harm in all four
+ * tables (all -34 [-72, +4], singles -39, doubles -22, mid -72 [-141, -6]
+ * resolved better); holdouts no harm and no warning (VGC -50 [-87, -12]
+ * resolved better, Champions OU own K -46 resolved, Doubles OU and
+ * Champions VGC no finding); bank plus doubles holdouts (D26) doubles -31
+ * fixed K and -23 own K resolved better, no warning (the bank's lone
+ * warning, hq own K doubles late +156, sits on a K at the cap 50 in a cell
+ * of 45 rows); feedback three times byte-identical, singles tiers 46/1/0 to
+ * 45/3/0, doubles 17/5/0 to 13/4/2; pins: 2630685175 t8 and 648453 t13
+ * hold, 562428 t10 and 653785 t19 drift (B's singles weights, below),
+ * golden 655336 nine to ten channels (truths of t13, t23, t24 hold); e2e 79
+ * of 79; quiet window (three interleaved runs against 006b33c): doubles
+ * tree +19.5 % (answer round 23 to 43 s, verify deepening +24 %, tree +5
+ * %), singles tree +16.6 %, split as B alone +14.3 % and D alone +1.3 %
+ * (decision 4 allowed B +5 %: T221).
+ * MONTE-CARLO PINS: the four verify-scene references (648453 t13, 573756
+ * t73, 912045 t8, 2629703929 t8) were priced under the old static and the
+ * oracle prices its leaves with the same static as the engine; recomputed
+ * on the end state (two seed blocks each) the engine meets the tier in all
+ * four (648453 t13 engine 0.157 against MC 0.155 and 0.157; 573756 t73 none
+ * against none; 912045 t8 none against none, the old bound below 0.05 fails
+ * for MC too; 2629703929 t8 mistake against mistake).
+ * EXPERT DRIFTS (diagnosis of lane B): 562428 t10 since T49, boostsBiting
+ * values Tapu Bulu's +2 Attack against benched foes while Heatran stands in
+ * front (p2 Pain Split 0.029 to 0.285); 653785 t19 since T102, the verify
+ * round re-prices different rows per run (0.034 to 0.259 across search
+ * budgets).
+ * GATE STATE aafd8c5 (pairFocus 0, user answer 6b), measured as w2 against
+ * the same bases: bank no harm in all four tables (all -36 [-75, +2],
+ * doubles -30), the step from w better on the bank's doubles rows (-7 [-13,
+ * -3] resolved); VGC holdout -49 [-85, -11] resolved better (own K -32
+ * resolved), the step from w on that holdout +1 [-9, +11] with early phase
+ * warnings (+21 full, +27 hq); bank plus the Doubles OU and VGC holdouts
+ * doubles -32 [-55, -8] resolved better, own K -25, no warning; feedback
+ * twice byte-identical, 9 turns moved against w, all in the two VGC
+ * replays, doubles tiers 13/4/2 to 15/5/1, the pins as in w (2630685175 t8
+ * holds). After the gate the documentation was restructured on the user's
+ * request (294cd10): AGENTS.md, NextSteps.md as packages, docs/backlog.md,
+ * docs/completed/ and .claude/agents/ tracked, README, ARCHITECTURE and
+ * EVALUATION rewritten, MoreSimulation.md removed.
+ * USER GATE 2026-10-13 16:28 ("1a 2a 3a 4a 5a 6b 7a 8a 9a"): the four
+ * Monte-Carlo pins take the fresh references; T49 and T102 stay and the two
+ * expert pins stand as known drift (T218, T219; the expert is right);
+ * published-ivs follows T132 point 2 (p1 Sinistcha Speed 31, Attack 0; p2
+ * keeps Speed 0); T132 point 1 stays without the carve-out; lane C's texts
+ * stay as built; pairFocus is 0 in the VGC table until T199 builds a ramp
+ * (aafd8c5); new TODOs T194 to T222, next free T223; the timing is accepted
+ * and T221 (one race per pair in boostsBiting) is the next round; r69 to
+ * the end state plus the booking, v1 fast-forwarded and pushed.
+ *
  * CALC 0.12 2026-10-12 (improvement round 68, T186 with T156, T157 and
  * T159 as a round of its own after wave 2; branch r68 from f018c57 (= v1),
  * cache v64 to v65; spec, ledger, measurements and probes under
