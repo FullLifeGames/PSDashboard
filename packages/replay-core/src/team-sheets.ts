@@ -30,6 +30,8 @@ function sheetMatchFor(info: RevealedPokemonInfo, sheet: PokemonSet[]): PokemonS
 const hasNonZeroEvs = (evs: PokemonSet['evs'] | undefined): boolean =>
   !!evs && Object.values(evs).some(value => (value ?? 0) > 0);
 
+const ALL_31: PokemonEvs = { hp: 31, atk: 31, def: 31, spa: 31, spd: 31, spe: 31 };
+
 /**
  * Fills fields the protocol never proved from the posted team sheet.
  * Usage guesses are replaced — the sheet is authoritative for its side.
@@ -59,12 +61,20 @@ export function applyTeamSheetToInfo(info: OpponentTeamInfo, sheet: PokemonSet[]
         ? { value: { ...match.evs } as PokemonEvs, source: 'sheet' as const, sourceDetail: SHEET_DETAIL }
         : pokemon.evs;
 
+      // Round 70 (T205): the sheet's IVs reach the panel too. An all-31 sheet replaces a guessed table and adds none
+      // where none stood, so the panel shows exactly the IVs the built set plays.
+      const sheetIvs = { ...ALL_31, ...match.ivs } as PokemonEvs;
+      const ivs = !locked(pokemon.ivs?.source ?? 'unknown') && (Object.values(sheetIvs).some(value => value !== 31) || pokemon.ivs)
+        ? { value: sheetIvs, source: 'sheet' as const, sourceDetail: SHEET_DETAIL }
+        : pokemon.ivs;
+
       return {
         ...pokemon,
         item: field(pokemon.item, match.item),
         ability: field(pokemon.ability, match.ability),
         teraType: field(pokemon.teraType, match.teraType),
         evs,
+        ...(ivs ? { ivs } : {}),
         moves: [...knownMoves, ...sheetMoves],
       };
     }),

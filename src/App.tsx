@@ -46,7 +46,7 @@ function LoaderScreen({ app }: { app: AppController }) {
 function AppModals({ app }: { app: AppController }) {
   const { replayData } = app.ctx.replay;
   const {
-    setsPanelOpen, setSetsPanelOpen, applySetsText,
+    setsPanelOpen, setSetsPanelOpen, applySetsText, statsP1Info, statsP2Info,
     editorSide, setEditorSide, effectiveP1Info, effectiveP2Info, saveTeam,
   } = app.ctx.knowledge;
   const { replayGen } = app.ctx.meta;
@@ -54,11 +54,14 @@ function AppModals({ app }: { app: AppController }) {
     <>
       {setsPanelOpen && replayData && (
         <SetsImportExportPanel
+          // Round 70 (T205): the export reads what the stats panel shows (the solved spreads, the posted sheet), not the
+          // enriched infos: those hold the usage guesses and the published IVs, and an import takes every value it reads
+          // as the user's own input over the solver.
           exportText={buildSetsExport({
             p1Name: replayData.players[0] ?? 'p1',
             p2Name: replayData.players[1] ?? 'p2',
-            p1Info: effectiveP1Info,
-            p2Info: effectiveP2Info,
+            p1Info: statsP1Info,
+            p2Info: statsP2Info,
           })}
           onImport={text => {
             const importError = applySetsText(text);

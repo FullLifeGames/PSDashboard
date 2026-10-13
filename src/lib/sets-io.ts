@@ -66,7 +66,12 @@ function exportSide(header: string, info: OpponentTeamInfo | null): string {
   return `${header}\n\n${sets}`.trimEnd();
 }
 
-/** Both teams as plain Showdown export blocks under `=== p1: … ===` headers. */
+/**
+ * Both teams as plain Showdown export blocks under `=== p1: … ===` headers. Every known value is written, and
+ * `applyPastedTeam` reads every written value back as the user's own input, ahead of the solver. The caller passes the
+ * infos the stats panel shows (round 70, T205): their spreads are the solved ones, so an import pins what the build
+ * already plays; the enriched infos hold the guesses and would bring a refuted guess back.
+ */
 export function buildSetsExport(params: {
   p1Name: string;
   p2Name: string;
