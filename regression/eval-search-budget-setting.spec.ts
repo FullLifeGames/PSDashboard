@@ -29,11 +29,11 @@ test('a stamped message configures the worker, an unstamped one leaves it alone'
 test('cache keys: unchanged at the default, tagged under a form', () => {
   const plain = evalStoreKey('r:1:x', 1, 1, 'matrix', true);
   const prefix = evalStorePrefix('r');
-  expect(plain.startsWith('v65|')).toBe(true);
-  expect(prefix).toBe('v65|r:');
+  expect(plain.startsWith('v66|')).toBe(true);
+  expect(prefix).toBe('v66|r:');
   configureSearchBudget({ ...SEARCH_BUDGET_DEFAULT, trees: 8 });
-  expect(evalStoreKey('r:1:x', 1, 1, 'matrix', true)).toBe(plain.replace(/^v65\|/, 'v65~t8-i600-s1.3.0.25-d1.1.0-l1.1|'));
-  expect(evalStorePrefix('r')).toBe('v65~t8-i600-s1.3.0.25-d1.1.0-l1.1|r:');
+  expect(evalStoreKey('r:1:x', 1, 1, 'matrix', true)).toBe(plain.replace(/^v66\|/, 'v66~t8-i600-s1.3.0.25-d1.1.0-l1.1|'));
+  expect(evalStorePrefix('r')).toBe('v66~t8-i600-s1.3.0.25-d1.1.0-l1.1|r:');
 });
 
 test('the team-preview lead keeps its own matrix under auto, whatever the tree thresholds and early splits', () => {

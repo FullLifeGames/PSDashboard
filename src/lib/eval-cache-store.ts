@@ -292,7 +292,13 @@ export interface StoredEval {
 //      own generation 0 (Stat Points, species and moves from the mod), Gen 1 and 2
 //      read their EVs, Rivalry reads the species' gender, Protect and entry
 //      stages follow the simulator. Calculator values of every format can move.
-const EVAL_ENGINE_CACHE_VERSION = 65;
+// v66 (round 69, wave 3): doubles hits feed the spread solver and every hit is priced with the field,
+//      the item and the Paradox stat it landed with; the inference reads Champions species, item triggers,
+//      |cant| moves and defender items; the rebuild keeps volatiles, sleep counters and slots; the singles
+//      cell plan prices missing weight, immunity and speed ties; doubles verify and answers go deeper; the
+//      static reads boosts that bite, the field pair, a status fix and a phase form, with refitted tables;
+//      results carry cell visits, outcome classes and hindsight reads. Positions of every format read new values.
+const EVAL_ENGINE_CACHE_VERSION = 66;
 
 /** Round 61: a search-budget form stores under its own tag; the default keeps today's keys. */
 const versionTag = (): string => {
