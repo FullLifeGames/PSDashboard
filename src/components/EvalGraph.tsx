@@ -18,7 +18,8 @@ interface EvalGraphProps {
    * Variation overlay (unified timeline): gold curve anchored at the branch
    * point's main value; scores indexed like the main array (scores[t-1]),
    * filled only for played variation positions. Gaps stay gaps — no
-   * invented values.
+   * invented values. Its points print at `shares`, the fainted share of the
+   * variation's own board (round 70, T216), never at the main line's share.
    */
   variation?: VariationSeries | null;
   /** Turn 0 (team preview) game value — adds a leads point before turn 1. */
@@ -27,7 +28,7 @@ interface EvalGraphProps {
   leadDetail?: LeadAnalysis | null;
   /** evalErrors[t-1] = why turn t has no point (eval-layer failure). */
   evalErrors?: (string | null)[];
-  /** faintedFractions[t-1] = the turn's fainted share (graph.faintedFractions): a tooltip prints at it, like the bar. */
+  /** faintedFractions[t-1] = the main line turn's fainted share (graph.faintedFractions): a main-line tooltip prints at it, like the bar. */
   faintedFractions?: (number | null)[];
   /**
    * decided[t-1] = the turn's decided-sweep state (round 15): the board is
@@ -234,8 +235,8 @@ function MainHits({ scores, hitWidth, x, onSelectTurn, titleArgs }: {
 /* Variation hits render AFTER the main hits so they win the overlap;
    narrower than a full column — the main line stays clickable around
    each gold point. */
-function VariationHits({ points, hitWidth, playerNames, faintedFractions, onSelectTurn }: {
-  points: VariationPoint[]; hitWidth: number; playerNames: [string, string]; faintedFractions: (number | null)[] | undefined; onSelectTurn: SelectTurn;
+function VariationHits({ points, hitWidth, playerNames, onSelectTurn }: {
+  points: VariationPoint[]; hitWidth: number; playerNames: [string, string]; onSelectTurn: SelectTurn;
 }) {
   return (
     <>
@@ -252,7 +253,7 @@ function VariationHits({ points, hitWidth, playerNames, faintedFractions, onSele
           style={onSelectTurn ? { cursor: 'pointer' } : undefined}
           onClick={onSelectTurn ? () => onSelectTurn(point.turn, 'variation') : undefined}
         >
-          <title>{variationHitTitle(playerNames, point, faintedFractions)}</title>
+          <title>{variationHitTitle(playerNames, point)}</title>
         </rect>
       ))}
     </>
@@ -312,7 +313,7 @@ export function EvalGraph({ scores, playerNames, currentTurn, currentLine, onSel
       )}
       <MainPoints scores={scores} blunders={blunders} scales={scales} />
       <MainHits scores={scores} hitWidth={hitWidth} x={x} onSelectTurn={onSelectTurn} titleArgs={titleArgs} />
-      <VariationHits points={overlay.points} hitWidth={hitWidth} playerNames={playerNames} faintedFractions={faintedFractions} onSelectTurn={onSelectTurn} />
+      <VariationHits points={overlay.points} hitWidth={hitWidth} playerNames={playerNames} onSelectTurn={onSelectTurn} />
       {/* Ring marker: the pointer's position on ITS line. */}
       {ring !== null && (
         <circle

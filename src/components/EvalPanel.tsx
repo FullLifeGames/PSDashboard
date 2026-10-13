@@ -4,6 +4,7 @@ import type {
   LeadAnalysis,
 } from '@fulllifegames/eval-engine';
 import type { EvalGraphState, EvalStatus, TurnEvalSettings } from '../hooks/useEvaluation';
+import type { VariationSeries } from '../lib/eval-graph-view';
 import { EvalControls } from './eval/EvalControls';
 import { EvalStatus as EvalStatusBlock, type PlayOutProgress } from './eval/EvalStatus';
 import { GameGraphSection } from './eval/GameGraphSection';
@@ -41,8 +42,9 @@ interface EvalPanelProps {
   showTera: boolean;
   graph: EvalGraphState;
   /** Variation overlay for the game graph (unified timeline): the gold
-   *  curve's scores, indexed like the main scores (scores[turn − 1]). */
-  variation?: { startTurn: number; scores: (number | null)[] } | null;
+   *  curve's scores, indexed like the main scores (scores[turn − 1]), and the
+   *  fainted share of the variation's own board before each of them (round 70, T216). */
+  variation?: VariationSeries | null;
   /** Which line the pointer sits on — the graph's ring marker follows it. */
   currentLine?: 'main' | 'variation';
   /** Replay view only — starts the whole-game background sweep. */
@@ -128,14 +130,21 @@ function PanelHeader({ running, ...props }: EvalPanelProps & { running: boolean 
 }
 
 /**
- * Round 69 (T51): the fainted share of the turn the shown result belongs to, so the panel prints the same percents the
- * turn card does. A branch or lead result (not the graph's own result of the analyzed turn) has no share: the opening map.
+ * Round 69 (T51), round 70 (T216): the fainted share of the board the shown result was searched on, so the panel prints
+ * the same percents the graph and the turn card print for that position.
+ * - The graph's own result of the analyzed turn: the turn card's share.
+ * - A branch result: the share of its own board. On the variation line that is the variation's board at the viewed turn
+ *   (the share its gold tooltip prints at), never the main line's share of that turn number; on the main line (a branch
+ *   that has not played a move yet) it is the main line's share of the viewed turn.
+ * - The lead result (before any body fell) and a board whose share is unknown: the opening map.
  */
-function shownShare({ result, graph, analysis, analysisTurn, faintedShares }: EvalPanelProps): number | null {
-  if (!result || analysisTurn === null || analysisTurn === undefined || analysisTurn < 1) return null;
-  if (graph.results[analysisTurn - 1] !== result) return null;
-  if (analysis?.turn === analysisTurn && analysis.faintedFraction !== undefined) return analysis.faintedFraction;
-  return faintedShares?.[analysisTurn - 1] ?? graph.faintedFractions[analysisTurn - 1] ?? null;
+function shownShare({ result, graph, analysis, analysisTurn, faintedShares, variation, currentLine, currentTurn }: EvalPanelProps): number | null {
+  if (!result || result === graph.lead?.result) return null;
+  const mainLineShare = (turn: number) => faintedShares?.[turn - 1] ?? graph.faintedFractions[turn - 1] ?? null;
+  if (analysisTurn !== null && analysisTurn !== undefined && analysisTurn >= 1 && graph.results[analysisTurn - 1] === result) {
+    return analysis?.turn === analysisTurn && analysis.faintedFraction !== undefined ? analysis.faintedFraction : mainLineShare(analysisTurn);
+  }
+  return currentLine === 'variation' ? variation?.shares?.[currentTurn - 1] ?? null : mainLineShare(currentTurn);
 }
 
 export function EvalPanel(props: EvalPanelProps) {

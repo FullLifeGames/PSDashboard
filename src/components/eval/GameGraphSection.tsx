@@ -7,6 +7,7 @@ import type { EvalGraphState } from '../../hooks/useEvaluation';
 import { EvalGameReport } from '../EvalGameReport';
 import { EvalGraph } from '../EvalGraph';
 import { EvalLeadAnalysis, EvalTurnAnalysis } from '../EvalTurnAnalysis';
+import type { VariationSeries } from '../../lib/eval-graph-view';
 
 type SelectTurn = ((turn: number, line?: 'main' | 'variation') => void) | undefined;
 
@@ -124,7 +125,7 @@ export interface GameGraphSectionProps extends TurnViewProps {
   currentLine?: 'main' | 'variation';
   selectTurn: SelectTurn;
   reportLeads?: LeadAnalysis | null;
-  variation?: { startTurn: number; scores: (number | null)[] } | null;
+  variation?: VariationSeries | null;
   graphMaxTurn?: number;
   showReportView: boolean;
   /** The card's fainted share per swept turn (any engine mode); the sweep's own record exists in auto only. */

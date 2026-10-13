@@ -1,7 +1,9 @@
+import { useMemo } from 'react';
 import { EvalPanel } from './EvalPanel';
 import { PlayOutBar } from './PlayOutBar';
 import { BattleStatsPanel } from './BattleStatsPanel';
 import type { AppController } from '../hooks/useAppController';
+import { variationBoardShares } from '../lib/variation-shares';
 import type { ReplayData } from '@fulllifegames/replay-core';
 
 interface WorkspaceColumnProps {
@@ -35,6 +37,13 @@ function EvalSection({ app, replayData }: WorkspaceColumnProps) {
   } = app.engine.evalView;
   const { handleExploreChoice, handlePickPair } = app.engine.walk;
   const { playOut, fastPlayOut } = app.transients;
+  // Round 70 (T216): the gold points and the panel's bar print at the share of the variation's own board, read from the
+  // rosters the branch recorded after each executed turn; the main line's share of the same turn number is another board.
+  const { history } = app.ctx.branch;
+  const variationShares = useMemo(
+    () => (variationSpan ? variationBoardShares(history, variationSpan.startTurn) : []),
+    [history, variationSpan],
+  );
   return (
     <EvalPanel
       playerNames={[replayData.players[0], replayData.players[1]]}
@@ -64,7 +73,7 @@ function EvalSection({ app, replayData }: WorkspaceColumnProps) {
       onSelectTurn={handleGraphSelectLine}
       currentTurn={viewTurn}
       currentLine={viewingVariation ? 'variation' : 'main'}
-      variation={variationSpan ? { startTurn: variationSpan.startTurn, scores: variationScores } : null}
+      variation={variationSpan ? { startTurn: variationSpan.startTurn, scores: variationScores, shares: variationShares } : null}
       {...analysisPropsFor(liveEvalView, analysisTurn, app.analysis)}
       doubles={replayGameType === 'doubles'}
     />

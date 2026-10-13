@@ -68,20 +68,25 @@ describe('graph and panel read one number', () => {
     expect(screen.getByRole('img', { name: `Advantage estimate: Alice ${p1}%, Bob ${100 - p1}%` })).toBeInTheDocument();
   });
 
-  test('a branch result (not the graph\'s own) reads the opening map', () => {
+  // Round 70 (T216): a branch result prints at the share of its own board; the main line's share of the same turn
+  // number stands in for nothing. The scenes of the round are in variation-share-t216.spec.tsx.
+  test('a branch result (not the graph\'s own) on a variation board of unknown share reads the opening map', () => {
     const graph = evalGraph('singles', { faintedFractions: Array.from({ length: 10 }, () => 0.5) });
     const branch = evalResult('singles', { score: 0.4 });
-    render(<EvalPanel {...base()} graph={graph} result={branch} currentTurn={4} analysisTurn={null} analysis={null} />);
+    render(<EvalPanel {...base()} graph={graph} result={branch} currentTurn={4} currentLine="variation" analysisTurn={null} analysis={null}
+      variation={{ startTurn: 3, scores: [null, null, null, 0.4] }} faintedShares={Array.from({ length: 10 }, () => 0.5)} />);
     const p1 = pct(0.4, 0);
     expect(screen.getByRole('img', { name: `Advantage estimate: Alice ${p1}%, Bob ${100 - p1}%` })).toBeInTheDocument();
   });
 
-  test('the graph tooltip falls back to the opening map without shares, and a variation point reads the main line share', () => {
+  test('the graph tooltip falls back to the opening map without shares, and a variation point reads the share of its own board', () => {
     const args = { index: 1, score: 0.4, evalErrors: undefined, blunders: new Set<number>(), first: 1, decided: undefined, playerNames: names };
     expect(hitTitle(args)).toContain(`Alice ${pct(0.4)}%`);
     expect(hitTitle({ ...args, faintedFractions: [0, 0.5] })).toContain(`Alice ${pct(0.4, 0.5)}%`);
-    expect(variationHitTitle(names, { turn: 2, score: 0.4 }, [0, 0.5])).toContain(`Alice ${pct(0.4, 0.5)}%`);
-    expect(variationHitTitle(names, { turn: 2, score: 0.4 })).toContain(`Alice ${pct(0.4)}%`);
+    const point = { turn: 2, px: 0, py: 0, score: 0.4 };
+    expect(variationHitTitle(names, { ...point, share: 0.5 })).toContain(`Alice ${pct(0.4, 0.5)}%`);
+    expect(variationHitTitle(names, point)).toContain(`Alice ${pct(0.4)}%`);
+    expect(variationHitTitle(names, { ...point, share: null })).toContain(`Alice ${pct(0.4)}%`);
   });
 });
 
@@ -124,11 +129,15 @@ describe('the rendered graph and the bar read one number', () => {
     expect(bare.container.querySelector('rect[data-turn="7"] title')!.textContent).toContain(`Alice ${pct(score, 0)}%`);
   });
 
-  test('the drawn graph prints a variation point at the main line share of its turn', () => {
+  test('the drawn graph prints a variation point at the share of the variation\'s own board, not the main line\'s share of its turn', () => {
     const graph = evalGraph('singles', { faintedFractions: Array.from({ length: 10 }, (_, i) => (i === 4 ? 0.5 : 0)) });
-    const variation = { startTurn: 4, scores: graph.scores.map((_, i) => (i === 4 ? 0.4 : null)) };
-    const drawn = render(<GameGraphSection {...section(graph, 5)} variation={variation} />);
-    expect(drawn.container.querySelector('rect[data-line="variation"] title')!.textContent).toContain(`Alice ${pct(0.4, 0.5)}%`);
+    const scores = graph.scores.map((_, i) => (i === 4 ? 0.4 : null));
+    const own = render(<GameGraphSection {...section(graph, 5)} variation={{ startTurn: 4, scores, shares: scores.map((_, i) => (i === 4 ? 0.375 : null)) }} />);
+    expect(own.container.querySelector('rect[data-line="variation"] title')!.textContent).toContain(`Alice ${pct(0.4, 0.375)}%`);
+    expect(pct(0.4, 0.375)).not.toBe(pct(0.4, 0.5));
+    own.unmount();
+    const unknown = render(<GameGraphSection {...section(graph, 5)} variation={{ startTurn: 4, scores }} />);
+    expect(unknown.container.querySelector('rect[data-line="variation"] title')!.textContent).toContain(`Alice ${pct(0.4)}%`);
   });
 });
 

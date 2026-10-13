@@ -50,8 +50,17 @@ export function mainLinePaths(scores: (number | null)[], { x, y }: GraphScales):
   return { segments, gapLinks };
 }
 
-export interface VariationSeries { startTurn: number; scores: (number | null)[] }
-export interface VariationPoint { turn: number; px: number; py: number; score: number }
+export interface VariationSeries {
+  startTurn: number;
+  scores: (number | null)[];
+  /**
+   * Round 70 (T216): the fainted share of the variation's own board before each turn (shares[turn - 1], like the
+   * scores). The tooltip and the panel's bar print at it; a missing or null entry reads the opening map. The main
+   * line's share of the same turn number is another board and never stands in.
+   */
+  shares?: (number | null)[];
+}
+export interface VariationPoint { turn: number; px: number; py: number; score: number; share?: number | null }
 
 /** The x-domain stretches past the replay when the variation is longer. */
 export function lastVariationTurnOf(variation: VariationSeries | null | undefined): number {
@@ -78,7 +87,7 @@ export function variationOverlay(
       const px = x(turn);
       const py = y(score);
       coords.push(`${px.toFixed(1)},${py.toFixed(1)}`);
-      points.push({ turn, px, py, score });
+      points.push({ turn, px, py, score, share: variation.shares?.[index] ?? null });
     });
     if (coords.length > 1) path = `M ${coords.join(' L ')}`;
   }
@@ -158,9 +167,9 @@ export function hitTitle(args: {
   return nodeLabel({ ...args, turn: index + 1, score });
 }
 
-export function variationHitTitle(playerNames: [string, string], point: VariationPoint, faintedFractions?: (number | null)[]): string {
-  const share = faintedFractions?.[point.turn - 1];
-  return `Variation, before turn ${point.turn}: ${playerNames[0]} ${pct(point.score, share)}% · ${playerNames[1]} ${100 - pct(point.score, share)}%`;
+/** Tooltip of a variation point: it prints at the share of the variation's own board, as the panel's bar does for that position. */
+export function variationHitTitle(playerNames: [string, string], point: VariationPoint): string {
+  return `Variation, before turn ${point.turn}: ${playerNames[0]} ${pct(point.score, point.share)}% · ${playerNames[1]} ${100 - pct(point.score, point.share)}%`;
 }
 
 /** The T0 diamond's tooltip: the preview estimate plus each side's best and played lead. */
