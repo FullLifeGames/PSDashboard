@@ -236,3 +236,43 @@ describe.each<Kind>(['singles', 'doubles'])('T177 attacker slot, %s', kind => {
     expect(hits.map(entry => [entry.slot, entry.attacker])).toEqual([['p1a', 'Garchomp'], ['p1b', 'Dragonite']]);
   });
 });
+
+/**
+ * Round 69 (T177 review, item 7): a move whose secondary names only its chance picks the status in a handler (Tri Attack,
+ * Dire Claw; the Dex of Generation 9 holds `{ chance: 20 }`), so it is a dice source like a secondary with a status. The
+ * oracle is the Dex entry of each move: its accuracy and its secondaries.
+ */
+describe('T177 a status a handler picks is a roll', () => {
+  const gen9 = Dex.forGen(9);
+  const secondariesOf = (id: string) => {
+    const move = gen9.moves.get(id);
+    return move.secondaries ?? (move.secondary ? [move.secondary] : []);
+  };
+  /** One action with its status line, in the slot letters of each game type. */
+  const statusTurn = (move: string, kind: Kind): string[][] => [[], kind === 'singles'
+    ? [`|move|p1a: Garchomp|${move}|p2a: Blissey`, '|-status|p2a: Blissey|brn']
+    : [`|move|p1a: Garchomp|${move}|p2b: Blissey`, '|-status|p2b: Blissey|brn']];
+  const rolls = (move: string, kind: Kind, generation: number | undefined) => diceEventTurns(statusTurn(move, kind), generation).has(1);
+
+  test.each(['singles', 'doubles'] as const)('%s: Tri Attack and Dire Claw (a chance without a status field) roll, with and without a generation', kind => {
+    for (const id of ['triattack', 'direclaw']) {
+      const move = gen9.moves.get(id);
+      expect(typeof move.accuracy === 'number' ? move.accuracy : 100).toBeGreaterThanOrEqual(100);
+      expect(secondariesOf(id).some(effect => effect.status !== undefined)).toBe(false);
+      expect(secondariesOf(id).some(effect => (effect.chance ?? 100) < 100)).toBe(true);
+      expect(rolls(move.name, kind, 9)).toBe(true);
+      expect(rolls(move.name, kind, undefined)).toBe(true);
+    }
+  });
+
+  test.each(['singles', 'doubles'] as const)('%s: a fixed secondary status still rolls, a sure effect of a sure move does not', kind => {
+    const scald = gen9.moves.get('scald');
+    expect(secondariesOf('scald').some(effect => effect.status !== undefined && (effect.chance ?? 100) < 100)).toBe(true);
+    expect(rolls(scald.name, kind, 9)).toBe(true);
+    // The Dex holds a damaging move that always lands a status: accuracy sure and the secondary at 100 %.
+    const sure = gen9.moves.all().find(move => (move.accuracy === true || move.accuracy >= 100)
+      && secondariesOf(move.id).length > 0 && secondariesOf(move.id).every(effect => effect.status !== undefined && effect.chance === 100));
+    expect(sure).toBeDefined();
+    expect(rolls(sure!.name, kind, 9)).toBe(false);
+  });
+});

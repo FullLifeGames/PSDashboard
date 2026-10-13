@@ -33,14 +33,16 @@ type DiceContext = { dex: GenDex; running: string | null } | null;
 
 /**
  * Round 69 (T177): whether a move's own dice can decide a status it lands: an accuracy under 100 (Hypnosis, Toxic,
- * Thunder Wave from Gen 7 on) or a status chance under 100 (Scald's burn). Thunder Wave in Gen 6 (accuracy 100), Toxic
- * Spikes and Rest (accuracy true) roll nothing.
+ * Thunder Wave from Gen 7 on) or a status chance under 100 (Scald's burn; Tri Attack's, which a handler picks).
+ * Thunder Wave in Gen 6 (accuracy 100), Toxic Spikes and Rest (accuracy true) roll nothing.
  */
 function moveRollsStatus(dex: GenDex, id: string): boolean {
   const move = dex.moves.get(id);
   if (typeof move.accuracy === 'number' && move.accuracy < 100) return true;
   const effects = move.secondaries ?? (move.secondary ? [move.secondary] : []);
-  return effects.some(effect => effect.status !== undefined && (effect.chance ?? 100) < 100);
+  // A secondary that names only its chance picks its effect in a handler (Tri Attack, Dire Claw): its status is rolled too.
+  return effects.some(effect => (effect.chance ?? 100) < 100
+    && (effect.status !== undefined || Object.keys(effect).every(key => key === 'chance')));
 }
 
 /** A bare or `[from] move:` status is a roll when its source's dice can decide it; with no running move (a hazard on a switch-in, a residual) it is none. */
