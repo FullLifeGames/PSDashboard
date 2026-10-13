@@ -139,8 +139,17 @@ function raceOn(
   };
 }
 
-/** Whether the stage moves the race: a nearer KO of the foe, a later KO of me, or the first move in a race somebody wins. */
-function movesRace(held: Race, without: Race): boolean {
+/**
+ * Whether the stage moves the race. A boost: a nearer KO of the foe, a later KO of me, or the first move in a race
+ * somebody wins. A drop is the mirror: a later KO of the foe where it was within reach, a nearer KO of me, or the first
+ * move lost in a race somebody wins. A boost that hurts (Speed under Trick Room) is not read: it stays uncounted.
+ */
+function movesRace(held: Race, without: Race, drop: boolean): boolean {
+  if (drop) {
+    if (held.turnsMine > without.turnsMine && without.turnsMine <= BITE_TURNS) return true;
+    if (held.turnsFoe < without.turnsFoe && held.turnsFoe <= BITE_TURNS) return true;
+    return without.first && !held.first && Math.min(held.turnsMine, held.turnsFoe) <= BITE_TURNS;
+  }
   if (held.turnsMine < without.turnsMine && held.turnsMine <= BITE_TURNS) return true;
   if (held.turnsFoe > without.turnsFoe && without.turnsFoe <= BITE_TURNS) return true;
   return held.first && !without.first && Math.min(held.turnsMine, held.turnsFoe) <= BITE_TURNS;
@@ -166,7 +175,7 @@ function bitingStats(mine: Pokemon, foe: Pokemon, battle: Battle, threat: Threat
     if (!stages.mineHitting[stat] && !stages.mineDefending[stat]) return false;
     if (stat === 'accuracy' || stat === 'evasion') return true;
     const without = raceOn(mine, foe, mineThreat, foeThreat, battle, withoutStat(stages, stat));
-    return movesRace(held, without);
+    return movesRace(held, without, mine.boosts[stat] < 0);
   });
 }
 
