@@ -59,6 +59,28 @@ describe('Champions pools', () => {
   }
 });
 
+/**
+ * The mod lists only some Champions formats; a replay on an earlier regulation
+ * or another tier has an id the simulator does not know. The family decides:
+ * it gets the total the simulator's rule table gives a listed Champions format.
+ */
+describe('a Champions format the mod does not list', () => {
+  const UNLISTED = ['gen9championsubers', 'gen9championsvgc2026regmabo3', 'gen9championsdoublesou'];
+
+  for (const format of UNLISTED) {
+    test(`${format}: the simulator does not know it, the total is still the Champions ruleset's`, () => {
+      expect(Dex.formats.get(format).exists).toBe(false);
+      const listed = Dex.formats.getRuleTable(Dex.formats.get('gen9championsou')).evLimit;
+      expect(listed).toBe(66);
+      expect(getEvLimit(format)).toBe(listed);
+    });
+  }
+
+  test('a listed Champions custom game keeps the simulator\'s answer, none', () => {
+    expect(getEvLimit('gen9championsdoublescustomgame')).toBeNull();
+  });
+});
+
 describe('Scarlet/Violet pools stay', () => {
   for (const format of ['gen9ou', 'gen9doublesou']) {
     test(`${format}: Tera pool has Stellar, no Mega Stone, total EV limit 510`, () => {

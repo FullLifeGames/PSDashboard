@@ -1,10 +1,12 @@
-import { describe, expect, test } from 'vitest';
+import { beforeAll, describe, expect, test } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { PokemonRow } from '../../../src/components/team-editor/PokemonRow';
 import { useTeamDraft } from '../../../src/hooks/useTeamDraft';
 import type { EditorPools } from '../../../src/lib/team-editor';
 import { evs, revealedPokemon } from '../../fixtures/team-info';
+import { loadSimMods } from '@fulllifegames/eval-engine';
+import { getEvLimit } from '../../../src/lib/pokemon-options';
 
 /**
  * Round 69 (T162): the EV inputs show the format's cap and a line says how much
@@ -54,6 +56,28 @@ describe('EV inputs by format', () => {
     test(`Scarlet/Violet ${kind}: no line before a total is known`, () => {
       render(<Row format={format} />);
       expect(screen.queryByText(/used, 252 per stat/)).not.toBeInTheDocument();
+    });
+  }
+});
+
+/**
+ * A Champions format the mod does not list (an earlier regulation, another
+ * tier) still gets the Champions caps and the budget line: the pools hand the
+ * row the total they read for the id.
+ */
+describe('EV inputs on a Champions format the mod does not list', () => {
+  beforeAll(async () => {
+    await loadSimMods('gen9championsou');
+  });
+
+  for (const [kind, format] of [['singles', 'gen9championsubers'], ['doubles (VGC)', 'gen9championsvgc2026regmabo3']] as const) {
+    test(`${kind}: max 32, the Stat Points line, 32 in every stat stops at 66`, async () => {
+      render(<Row format={format} evLimit={getEvLimit(format)} />);
+      expect(spin('HP')).toHaveAttribute('max', '32');
+      expect(screen.getByText('Stat Points: 66 of 66 used, 32 per stat')).toBeInTheDocument();
+      await userEvent.clear(spin('Spe'));
+      await userEvent.type(spin('Spe'), '40');
+      expect(spin('Spe')).toHaveValue(0);
     });
   }
 });

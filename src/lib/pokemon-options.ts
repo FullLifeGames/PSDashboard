@@ -31,10 +31,26 @@ export async function prepareFormat(format: string): Promise<void> {
   await loadSimMods(format);
 }
 
-/** The total EV limit the simulator's team validator enforces in a format (`null`: none, or the format is unknown). */
+/** A listed format of the Champions mod, whose rule table carries the mod's total EV limit for the formats it does not list. */
+const CHAMPIONS_REFERENCE_FORMAT = 'gen9championsou';
+
+/**
+ * The total EV limit the simulator's team validator enforces in a format
+ * (`null`: none, or the format is unknown). The Champions mod lists only some
+ * formats; a Champions id it does not list (an earlier regulation, another
+ * tier) takes the limit of the mod's reference format, which the rule table
+ * sets for the whole mod, and without that format the Stat Points total of
+ * replay-core's evBudget.
+ */
 export function getEvLimit(format: string): number | null {
-  const entry = SimDex.formats.get(format.split('@@@')[0]);
-  return entry.exists ? SimDex.formats.getRuleTable(entry).evLimit : null;
+  const table = (id: string) => {
+    const entry = SimDex.formats.get(id);
+    return entry.exists ? SimDex.formats.getRuleTable(entry) : null;
+  };
+  const own = table(format.split('@@@')[0]);
+  if (own) return own.evLimit;
+  if (!isChampions(format)) return null;
+  return table(CHAMPIONS_REFERENCE_FORMAT)?.evLimit ?? evBudget(format).total;
 }
 
 const toSimId = (name: string): string => SimDex.toID(name);
