@@ -5,10 +5,10 @@ Position evaluation for Pokémon Showdown replays: rebuild the battle at any tur
 ## Install
 
 ```sh
-npm install @fulllifegames/eval-engine @fulllifegames/replay-core @pkmn/sim @pkmn/dex @smogon/calc
+npm install @fulllifegames/eval-engine @fulllifegames/replay-core @pkmn/sim @pkmn/dex @pkmn/mods @smogon/calc
 ```
 
-`@pkmn/sim`, `@pkmn/dex`, and `@smogon/calc` are peer dependencies: you pick the simulator version, and one copy serves both packages. The package ships ES modules for Node 20 or newer and for bundlers.
+`@pkmn/sim`, `@pkmn/dex`, `@pkmn/mods`, and `@smogon/calc` are peer dependencies: you pick the simulator version, and one copy serves both packages. The package is tested with `@pkmn/sim` 0.10.11 and ships ES modules for Node 20 or newer and for bundlers.
 
 ## Evaluate a replay turn
 
@@ -88,18 +88,18 @@ for (const [side, name] of [['p1', p1Name], ['p2', p2Name]]) {
 }
 ```
 
-The repository's fixture replay at turn 2 prints:
+The repository's fixture replay (`e2e/fixtures/replay.json`) at turn 2 prints:
 
 ```
-Turn 2: TestPlayer1 wins 57% of the time
+Turn 2: TestPlayer1 wins 62% of the time
 TestPlayer1:
-  Earthquake               57%
-  Tera + Earthquake        57%
-  Tera + Scale Shot        57%
+  Tera + Scale Shot        63%
+  Swords Dance             62%
+  Tera + Earthquake        62%
 TestPlayer2:
-  Tera + Iron Head         43%
-  Iron Head                43%
-  → Zamazenta              42%
+  Tera + Iron Head         40%
+  Iron Head                38%
+  Tera + Sucker Punch      37%
 ```
 
 The fixture is a synthetic four-turn game, so its unrevealed move slots fall back to placeholders; on a real replay `buildTeamsFromReplay` fills them from usage stats and set assumptions when you pass those in (see `@fulllifegames/replay-core`). Depth 1 with one sample takes seconds; `{ depth: 2, samples: 3 }` and `{ mode: 'mcts' }` are the app's deeper settings.
@@ -111,6 +111,9 @@ The fixture is a synthetic four-turn game, so its unrevealed move slots fall bac
 - Grading and prose: `parsePlayedActions` and `parsePlayedActionsDoubles` read what was played from a turn's protocol lines. `analyzeTurn` grades it against the search (verdict tiers, regret, sacrifices, reads), `summarizeTurn` writes the sentence, `analyzeLeads` grades team preview, and `buildGameReport` folds the per-turn analyses into accuracies and key moments. `computeBlunders` and `selectKeyTurns` pick the graph markers.
 - Display helpers: `winProbability`, `winPercent`, `winPctText`, and `winDeltaText` turn scores into percentages; `calcSingleDamageRange` gives damage previews; `notationSlotChoice` and `notationSideLabel` write chess-style notation.
 - Types for all of the above: `EvalResult`, `RankedChoice`, `TurnAnalysis`, `GameReport`, `BranchRuntime`, `BranchSimState`, and their parts.
+
+- Pokémon Champions: battles in Champions formats run on the Champions mod of `@pkmn/mods`, which loads on demand the first time a Champions position is built, and the search scores them with Champions' own weight tables.
+- Speed layer: under Node the engine runs the simulator through a faster battle copy and event dispatch by default. Set `EVAL_SIM_FAST=0` to switch the layer off, or `EVAL_SIM_FAST=rules,clone,dispatch` (any subset) to pick levers. A browser host leaves it off until it configures it.
 
 The barrel is the API: it lists what the app, its worker, and the examples use, plus every type those signatures mention. `regression/fixtures/api/eval-engine.txt` in the repository pins that list, so widening the surface is a one-line edit to `src/index.ts` plus a snapshot refresh.
 
@@ -124,10 +127,4 @@ npm test -w packages/eval-engine
 
 `npm run test:regression` at the root runs it together with the app's suite.
 
-## Versioning and publishing
-
-Both packages carry the repository's version. A release publishes a package only when its files changed since the previous release, and the dependency on `@fulllifegames/replay-core` becomes a caret range at publish time. npm receives the package from the release workflow through trusted publishing, so every published version carries a provenance attestation.
-
-## Where it comes from
-
-Part of the [PS Dashboard](https://github.com/FullLifeGames/PSDashboard) repository (MIT). The app at the repository root consumes the package through the npm workspace.
+Versioning, publishing, and the license live in the [repository README](https://github.com/FullLifeGames/PSDashboard#readme); the app at the repository root consumes this package through the npm workspace.

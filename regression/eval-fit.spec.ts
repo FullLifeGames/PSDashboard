@@ -28,8 +28,8 @@ import { holdoutSets } from './bank-universe';
  * means editing EVAL_WEIGHTS by hand and passing the calibration gate.
  *
  * Corpus: node scripts/build-fit-corpus.mjs (manifest committed, logs cached
- * in .fit-corpus/). Run: EVAL_FIT=1 npx playwright test -c
- * playwright.regression.config.ts eval-fit
+ * in .fit-corpus/). Run: EVAL_FIT=1 npx vitest run --project app
+ * regression/eval-fit.spec.ts
  *
  * Effective sample size is the number of GAMES (positions share their game's
  * outcome label) — hence the cluster bootstrap for standard errors and the

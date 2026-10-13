@@ -26,7 +26,8 @@ import { takeSimFastReport } from '../packages/eval-engine/src/forward/sim-fast/
  * Informational calibration run against real finished replays: does the
  * score's sign predict the actual winner, and how does confidence grow over
  * the game? Not a CI gate — network + ~3 minutes of reconstruction.
- * Run: EVAL_CALIBRATION=1 npx playwright test -c playwright.regression.config.ts eval-calibration
+ * Run: node scripts/run-calibration.mjs --slices 4 --out .calibration/<name> (or
+ * EVAL_CALIBRATION=1 npx vitest run --project app regression/eval-calibration.spec.ts)
  * Levers: EVAL_CALIBRATION_DEPTH=2 · EVAL_CALIBRATION_MODE=mcts ·
  * EVAL_CALIBRATION_SAMPLES=3 (seeds per cell, default 1 — the app default
  * line is d2s3, so the harness must be able to measure it) ·

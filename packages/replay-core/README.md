@@ -5,10 +5,10 @@ Pokémon Showdown replay parsing: protocol logs in, turn snapshots, revealed tea
 ## Install
 
 ```sh
-npm install @fulllifegames/replay-core @pkmn/sim @pkmn/dex @pkmn/data @pkmn/client @smogon/calc
+npm install @fulllifegames/replay-core @pkmn/sim @pkmn/dex @pkmn/data @pkmn/client @pkmn/protocol @smogon/calc
 ```
 
-The sim family is a peer dependency: you pick the simulator version, and one copy serves every package that uses it. The package ships ES modules for Node 20 or newer and for bundlers.
+The sim family is a peer dependency: you pick the simulator version, and one copy serves every package that uses it. The package is tested with `@pkmn/sim` 0.10.11 and ships ES modules for Node 20 or newer and for bundlers.
 
 ## Parse a replay
 
@@ -110,6 +110,8 @@ The fixture is a synthetic four-turn game with nothing to guess from, so unrevea
 - Knowledge: `enrichTeamInfo` merges revealed, guessed, and manual knowledge with source labels; `manualField`, `manualEvs`, `manualMove`, `itemSetValue`, and `applyInferredSpreads` edit it; the Smogon lookups (`getSpeciesUsageStats`, `getSpeciesUsageSet`, `fillUsageMoves`, `alternativeItems`, `guessedFieldFromUsage`, `getSpeciesSetAssumption`) work on usage payloads you fetch yourself.
 - Helpers and types: `toId`, `sideIndex`, `speciesBaseId`; hidden-power typing (`resolveHiddenPowerType`, `typedHiddenPowerId`, `withHiddenPowerType`, `HP_TYPES`); `WEATHER_BY_ID` and `TERRAIN_BY_ID` for `@smogon/calc`; the types `ReplayData`, `TurnSnapshot`, `PokemonSnapshot`, `OpponentTeamInfo`, `RevealedPokemonInfo`, and the usage-stat payload shapes.
 
+- Pokémon Champions: `evBudget(formatId)` returns the EV scale of a format, and for Champions formats that scale is Stat Points (32 per stat, 66 in total) instead of 252 and 508 EVs; `calcEvs` and `calcIvs` put a spread on it.
+
 The barrel is the API: it lists what the app, the evaluation engine, and the example use, plus every type those signatures mention. `regression/fixtures/api/replay-core.txt` in the repository pins that list, so widening the surface is a one-line edit to `src/index.ts` plus a snapshot refresh.
 
 ## Tests
@@ -122,10 +124,4 @@ npm test -w packages/replay-core
 
 `npm run test:regression` at the root runs it together with the app's suite.
 
-## Versioning and publishing
-
-Both packages carry the repository's version. A release publishes a package only when its files changed since the previous release, and npm receives it from the release workflow through trusted publishing, so every published version carries a provenance attestation.
-
-## Where it comes from
-
-Part of the [PS Dashboard](https://github.com/FullLifeGames/PSDashboard) repository (MIT). The app at the repository root consumes the package through the npm workspace.
+Versioning, publishing, and the license live in the [repository README](https://github.com/FullLifeGames/PSDashboard#readme); the app at the repository root consumes this package through the npm workspace.
