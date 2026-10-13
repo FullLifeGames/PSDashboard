@@ -286,7 +286,9 @@ describe('evaluatePosition', () => {
     const trickroom = makeBattle([makeSet('A', 'Snorlax', VANILLA)], [makeSet('B', 'Dragapult', VANILLA)]);
     trickroom.field.addPseudoWeather('trickroom', trickroom.sides[0].active[0]!);
 
-    expect(evaluatePosition(hazardous)).toBeCloseTo(0.8043935326321168, 6);
+    // Re-pinned for round 69 (S8, T49; was 0.8043935326321168): the singles table prices a standing
+    // stage through boostsBiting, and Snorlax's +2 Attack bites its Dragapult foe less than the flat boosts weight said.
+    expect(evaluatePosition(hazardous)).toBeCloseTo(0.7446947493564187, 6);
     // Re-pinned for the round-11 race clocks (was 0.9672891743979647): the
     // Moonlight Clefable's wall is finite now, so the Salazzle side gains.
     expect(evaluatePosition(races)).toBeCloseTo(0.9722131704913529, 6);
@@ -328,8 +330,8 @@ describe('evaluatePosition', () => {
     expect(evaluatePosition(tox)).toBeGreaterThan(brnScore);
   });
 
-  test('boosts on the active help', () => {
-    const battle = makeBattle([makeSet('A', 'Snorlax', VANILLA)], [makeSet('B', 'Snorlax', VANILLA)]);
+  test('boosts on the active help when a move reads the stage', () => {
+    const battle = makeBattle([makeSet('A', 'Snorlax', ['Tackle'])], [makeSet('B', 'Snorlax', ['Tackle'])]);
     battle.sides[0].active[0]!.boostBy({ atk: 2 });
     expect(evaluatePosition(battle)).toBeGreaterThan(0);
   });
@@ -370,20 +372,18 @@ describe('evaluatePosition', () => {
 
   test('the flat boost term applies the schedule (accuracy stages, matchup-invisible)', () => {
     // Accuracy stages never touch the matchup term, so the mirror isolates
-    // the flat term exactly: the +2/+1 ratio is the schedule's 2.0.
+    // the flat term exactly: the +2/+1 ratio is the schedule's 2.0. Read on the
+    // boosts column, which the singles table no longer weighs (round 69, T49).
     const at = (stage: number) => {
       const battle = makeBattle([makeSet('A', 'Snorlax', VANILLA)], [makeSet('B', 'Snorlax', VANILLA)]);
       battle.sides[0].active[0]!.boostBy({ accuracy: stage as 1 | 2 | 6 });
-      return evaluatePosition(battle);
+      return evalFeatures(battle).boosts;
     };
     const v1 = at(1);
     const v2 = at(2);
     const v6 = at(6);
     expect(v1).toBeGreaterThan(0);
-    // The RAW schedule is exactly 2.0 at +2; at the corpus-fitted boost
-    // weight the tanh curvature bends the score-space ratio toward ~1.9.
-    expect(v2 / v1).toBeGreaterThan(1.7);
-    expect(v2 / v1).toBeLessThanOrEqual(2);
+    expect(v2 / v1).toBeCloseTo(2, 10);
     expect(v6).toBeLessThan(2 * v2);
   });
 
@@ -454,10 +454,10 @@ describe('evaluatePosition', () => {
         clef.boosts.spd = 2;
       }
       if (status) clef.setStatus(status);
-      return evaluatePosition(battle);
+      return evalFeatures(battle).boosts;
     };
-    // The DELTA the boosts add must roughly halve under Toxic. Tanh curvature
-    // alone shifts it ~2% — assert the discount, not the curvature.
+    // The DELTA the boosts add must roughly halve under Toxic. Read on the
+    // boosts column: the discount, without the tanh curvature (round 69, T49).
     const healthyDelta = scoreWith(true) - scoreWith(false);
     const toxedDelta = scoreWith(true, 'tox') - scoreWith(false, 'tox');
     expect(toxedDelta).toBeLessThan(healthyDelta * 0.6);

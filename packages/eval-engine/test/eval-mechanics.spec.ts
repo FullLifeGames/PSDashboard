@@ -2,7 +2,7 @@ import { test, expect, describe } from 'vitest';
 import { Battle, State, Teams, toID } from '@pkmn/sim';
 import type { PokemonSet } from '@pkmn/sim';
 import { advancePosition, createRootPosition, positionBattle, serializeBattleStable } from '../src/forward-model';
-import { evaluatePosition } from '../src/eval-function';
+import { evalFeatures, evaluatePosition } from '../src/eval-function';
 
 /**
  * Mechanics the expert-feedback round put on trial (2026-08-15, 655336
@@ -61,11 +61,12 @@ describe('searched mechanics stay honest', () => {
     const ddBattle = positionBattle(afterDD);
     expect(ddBattle.sides[0].active[0]!.boosts.atk).toBe(1);
     expect(ddBattle.sides[0].active[0]!.boosts.spe).toBe(1);
-    // Isolated 1v1: the boost flips the Chansey matchup — flat stage term
-    // plus matchup flip paid ~+0.29 when pinned. Directional guard only,
-    // so weight tuning cannot break the pin.
+    // Isolated 1v1: the flat stage term paid ~+0.29 when pinned. Directional
+    // guard on the boosts column, so weight tuning cannot break the pin: the
+    // singles table prices boostsBiting since round 69 (T49), and a Dragonite
+    // with no attack in its set has no move that reads the stage.
     const afterNoop = advancePosition(mkRoot(), 'move splash', 'move protect', '1,2,3,4');
-    expect(evaluatePosition(positionBattle(afterDD))).toBeGreaterThan(evaluatePosition(positionBattle(afterNoop)));
+    expect(evalFeatures(positionBattle(afterDD)).boosts).toBeGreaterThan(evalFeatures(positionBattle(afterNoop)).boosts);
   });
 
   test('Regenerator heals a third on a searched switch-out', () => {

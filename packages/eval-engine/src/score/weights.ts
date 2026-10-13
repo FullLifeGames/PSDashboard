@@ -27,6 +27,9 @@ export const EVAL_WEIGHTS = {
    * from 14 inaccuracies and no mistake to 40 and 7, every one of them "set
    * up instead of stalling on". A standing stage is priced without asking
    * whether it bites the wall in front of it; the weight stays until it does.
+   * Round 69 (S8, T49): it does. The singles table prices the stages through
+   * boostsBiting (95) and `boosts` reads 0 there; these 12 and 6 stay the
+   * hand reference of the 2:1 split that both columns share.
    */
   boostStage: { offensive: 12, defensive: 6 },
   /** Cumulative stage multipliers (index = |stage|): +2 is twice +1, the tail flattens. */
@@ -183,9 +186,20 @@ export interface EvalFeatures {
   statusFix: number;
 }
 
+/**
+ * The hand singles table. Round 69 (S8, T49): the standing-stage weight moved
+ * from `boosts` (the 12 of EVAL_WEIGHTS.boostStage) to `boostsBiting`, the
+ * same stages damped by the share of living foes they bite. REPLACEMENT fit on
+ * the r69-b0 capture, 10,350 positions of 1,363 sets, rest of the table at
+ * hand: out of fold better in 20 of 20 seeds (log-loss -16 bp, Brier 20 of
+ * 20), boostsBiting 95 [77, 112], no flagged band. The ADDITIVE fit (boosts
+ * kept at 12, boostsBiting 74) reads another 14 bp better; by the
+ * pre-registered order (REPLACEMENT before ADDITIVE) the replacement is the
+ * step that is measured, the additive form waits for that reading.
+ */
 export const FEATURE_WEIGHTS: Record<keyof EvalFeatures, number> = {
   bodies: EVAL_WEIGHTS.alive + EVAL_WEIGHTS.hp,
-  boosts: EVAL_WEIGHTS.boostStage.offensive,
+  boosts: 0,
   hazards: EVAL_WEIGHTS.hazardEntries,
   screens: EVAL_WEIGHTS.screen,
   tailwind: EVAL_WEIGHTS.tailwind,
@@ -199,7 +213,7 @@ export const FEATURE_WEIGHTS: Record<keyof EvalFeatures, number> = {
   sweepSlowChip: 0,
   pairFocus: 0,
   pairRedirect: 0,
-  boostsBiting: 0,
+  boostsBiting: 95,
   statusFix: 0,
 };
 
@@ -313,12 +327,14 @@ export type StaticRuleset = 'standard' | 'vgc' | 'champions';
  * mod; T143, the Champions OU set file), 1,972 positions of 285 sets, the
  * free weights land on bodies 122 [87, 159], hazards 1.07 [0.54, 1.65] and
  * matchup 252 [102, 427] and lose out of fold in 20 of 20 seeds (log-loss
- * +62 bp): the table stays. Written out in full, so an edit of the singles
- * table never moves a held Champions weight.
+ * +62 bp): the table stays. Round 69 (S8, T49): `boosts` 12 replaced by
+ * boostsBiting 102 [62, 152] (REPLACEMENT, 1,971 positions of 285 sets, out
+ * of fold better in 20 of 20 seeds, log-loss -19 bp). Written out in full,
+ * so an edit of the singles table never moves a held Champions weight.
  */
 export const CHAMPIONS_FEATURE_WEIGHTS: Record<keyof EvalFeatures, number> = {
   bodies: 121,
-  boosts: 12,
+  boosts: 0,
   hazards: 1.13,
   screens: 5,
   tailwind: 8,
@@ -332,7 +348,7 @@ export const CHAMPIONS_FEATURE_WEIGHTS: Record<keyof EvalFeatures, number> = {
   sweepSlowChip: 0,
   pairFocus: 0,
   pairRedirect: 0,
-  boostsBiting: 0,
+  boostsBiting: 102,
   statusFix: 0,
 };
 
@@ -356,11 +372,13 @@ export const CHAMPIONS_FEATURE_WEIGHTS: Record<keyof EvalFeatures, number> = {
  * (T145, the Champions mod), 2,605 positions of 386 sets, bodies 197
  * [173, 225], screens 84 [46, 123] and matchup 107 [58, 161] lose out of
  * fold in 20 of 20 seeds (log-loss +28 bp): the table stays. Written out
- * in full.
+ * in full. Round 69 (S8, T49): `boosts` 27 replaced by boostsBiting 87
+ * [64, 120] (REPLACEMENT, 2,604 positions of 386 sets, out of fold better in
+ * 20 of 20 seeds, log-loss -30 bp, and 20 of 20 against the additive form).
  */
 export const CHAMPIONS_DOUBLES_FEATURE_WEIGHTS: Record<keyof EvalFeatures, number> = {
   bodies: 196,
-  boosts: 27,
+  boosts: 0,
   hazards: 0.75,
   screens: 83,
   tailwind: 68,
@@ -374,7 +392,7 @@ export const CHAMPIONS_DOUBLES_FEATURE_WEIGHTS: Record<keyof EvalFeatures, numbe
   sweepSlowChip: 0,
   pairFocus: 0,
   pairRedirect: 0,
-  boostsBiting: 0,
+  boostsBiting: 87,
   statusFix: 0,
 };
 

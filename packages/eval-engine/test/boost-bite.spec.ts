@@ -1,6 +1,6 @@
 import { test, expect, describe } from 'vitest';
 import type { Battle, Pokemon, PokemonSet } from '@pkmn/sim';
-import { createMatchupCache, evalFeatures, evaluatePosition, featureWeights, EVAL_WEIGHTS, type EvalFeatures, type StaticRuleset } from '../src/eval-function';
+import { createMatchupCache, evalFeatures, evaluatePosition, featureWeights, EVAL_WEIGHTS, type EvalFeatures } from '../src/eval-function';
 import { pairThreat } from '../src/score/threat';
 import { removalFormat, removesStages, stageValue } from '../src/score/boost-bite';
 import { loadSimMods } from '../src/forward/sim-mods';
@@ -26,7 +26,6 @@ const CHAMPIONS_DOUBLES = 'gen9championsdoublescustomgame';
 const splash = (species: string, extra: Partial<PokemonSet> = {}) => set(species, ['splash'], extra);
 const GARCHOMP = () => set('Garchomp', ['crunch', 'splash']);
 const clefable = (ability: string, moves = ['splash']) => set('Clefable', moves, { ability });
-const RULESETS: StaticRuleset[] = ['standard', 'vgc', 'champions'];
 
 /** Foe HP (in HP points) at `hits` hits of the attacker's best move on no stages: 1.4 means one boosted hit KOs and an unboosted one does not. */
 function biteHp(battle: Battle, attacker: Pokemon, foe: Pokemon, hits = 1.4): number {
@@ -320,7 +319,7 @@ describe('inert at weight 0', () => {
   test('with a weight table the column is read only where its weight is not 0, and no other feature moves', () => {
     const battle = duel(clefable('No Ability'));
     const all = evalFeatures(battle);
-    const zero = featureWeights(false, 'standard');
+    const zero = { ...featureWeights(false, 'standard'), boostsBiting: 0 };
     const priced = { ...zero, boostsBiting: 1 };
     const skipped = evalFeatures(battle, undefined, zero);
     expect(all.boostsBiting).toBeGreaterThan(0);
@@ -329,8 +328,33 @@ describe('inert at weight 0', () => {
     expect({ ...skipped, boostsBiting: all.boostsBiting }).toEqual(all);
   });
 
-  test.each([false, true])('every rule set carries the key at weight 0 (doubles %s)', doubles => {
-    for (const ruleset of RULESETS) expect(featureWeights(doubles, ruleset).boostsBiting).toBe(0);
+  // Round 69 (S8, T49): REPLACEMENT in the three families whose fit passed R1 and R2 (out of fold better in 20 of
+  // 20 seeds, no flagged band): the damped column takes the weight of `boosts`, `boosts` goes to 0. Standard
+  // doubles (REPLACEMENT 0 of 20, ADDITIVE flagged) and VGC doubles (REPLACEMENT flagged) keep `boosts` and the key at 0.
+  test.each([
+    ['standard singles', false, 'standard' as const, 0, 95],
+    ['champions singles', false, 'champions' as const, 0, 102],
+    ['champions doubles', true, 'champions' as const, 0, 87],
+    ['standard doubles', true, 'standard' as const, 27, 0],
+    ['vgc doubles', true, 'vgc' as const, 27, 0],
+  ])('the adopted boost weights of %s', (_name, doubles, ruleset, boosts, bite) => {
+    const weights = featureWeights(doubles, ruleset);
+    expect(weights.boosts).toBe(boosts);
+    expect(weights.boostsBiting).toBe(bite);
+  });
+
+  test('a stage that no move of the mon reads is in the boosts column and not in the singles score', () => {
+    const battle = battleOf(SINGLES, [splash('Garchomp')], [clefable('No Ability')]);
+    battle.sides[0].active[0]!.boosts.atk = 2;
+    const features = evalFeatures(battle);
+    expect(features.boosts).toBeGreaterThan(0);
+    expect(features.boostsBiting).toBe(0);
+    expect(evaluatePosition(battle)).toBe(0);
+  });
+
+  test('the singles weights of the rule sets without a fit follow the standard singles table', () => {
+    // the vgc rule set has no singles table of its own: singles read the standard one
+    expect(featureWeights(false, 'vgc')).toBe(featureWeights(false, 'standard'));
   });
 
   test.each([
@@ -339,7 +363,7 @@ describe('inert at weight 0', () => {
     ['champions doubles', DOUBLES, 'champions' as const],
     ['singles', SINGLES, 'standard' as const],
     ['champions singles', SINGLES, 'champions' as const],
-  ])('the score is the sum over every other key, with a boosted board (%s)', (_name, format, ruleset) => {
+  ])('the score is the sum over every key at the family weights, with a boosted board (%s)', (_name, format, ruleset) => {
     const doubles = format === DOUBLES || format === CHAMPIONS_DOUBLES;
     const battle = doubles
       ? battleOf(format, [GARCHOMP(), GARCHOMP()], [clefable('Unaware'), clefable('No Ability')])
@@ -351,7 +375,7 @@ describe('inert at weight 0', () => {
     const weights = featureWeights(doubles, ruleset);
     let diff = 0;
     for (const key of Object.keys(weights) as (keyof EvalFeatures)[]) {
-      if (key !== 'boostsBiting') diff += weights[key] * features[key];
+      diff += weights[key] * features[key];
     }
     const teamSize = Math.max(battle.sides[0].pokemon.length, battle.sides[1].pokemon.length, 1);
     const expected = Math.tanh((diff / (teamSize * (EVAL_WEIGHTS.alive + EVAL_WEIGHTS.hp))) * EVAL_WEIGHTS.scale);
