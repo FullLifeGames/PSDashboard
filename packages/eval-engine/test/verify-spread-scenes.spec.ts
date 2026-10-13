@@ -47,18 +47,22 @@ const cell = (result: EvalResult, p1: string, p2: string) => {
 };
 
 describe('verify scenes: hidden lengths (round 64, T119)', () => {
-  test("2629703929 t8 (VGC): the Sleep Powder cell reads every sleep counter (MC 0.389 ± 0.116; −0.056 through one counter before)", { timeout: 300_000 }, async () => {
+  test("2629703929 t8 (VGC): the Sleep Powder cell reads every sleep counter (MC 0.509 ± 0.094 under the round 69 static, user gate 13.10.; 0.389 ± 0.116 before)", { timeout: 300_000 }, async () => {
     // Chi-Yu falls asleep in a third of the draws for one turn only and wakes into the next (0.96 one ply
     // deeper); the class's first draw slept for three (−0.17) and stood for the whole class.
+    // Fresh reference (probe lanes/D/pins-mc.vt.ts of round 69, 24 draws per cell, seed blocks 1001 and 5001,
+    // ruleset standard, answers off): the cell reads 0.5089 under the classes' weights (plain means 0.511 and
+    // 0.521, standard errors 0.093 and 0.095). The engine reads 0.3922. Band: 2.5 standard errors (0.0945)
+    // around the weighted value, 0.27 to 0.745; the old pin's band was 2.5 × 0.1156.
     const position = scene('gen9vgc2026regi-2629703929-t8');
     const result = await search(position);
     const value = cell(result, 'Heat Wave + Flare Blitz→Groudon', 'Rock Slide + Sleep Powder→Chi-Yu');
-    expect(Math.abs(value - 0.3892)).toBeLessThan(2.5 * 0.1156);
-    // Round 67 (T128): over every legal answer p2's Protect + → Solgaleo refutes the old best row (Heat Wave +
-    // Flare Blitz→Groudon), and the played Heat Wave + Protect stands within 0.03 of the best: no tier. Over the
-    // listed answers alone (the reference's list) the verdicts are still the reference's: p1 a mistake.
+    expect(Math.abs(value - 0.5089)).toBeLessThan(2.5 * 0.0945);
+    // Under the round 69 static (user gate 13.10.) the reference grades p1's played Heat Wave + Protect a mistake
+    // on both blocks (regret 0.2305 and 0.2097, best Heat Wave + Flare Blitz→Groudon) and p2 no tier; the engine
+    // agrees with and without the answer round (mistake, 0.2828, best Tera Blast→Jumpluff + Collision Course→Jumpluff).
     const analysis = flat(position, result);
-    expect(analysis.p1.tier ?? null).toBeNull();
+    expect(analysis.p1.tier).toBe('mistake');
     expect(analysis.p2.tier ?? null).toBeNull();
     const saved = process.env.EVAL_DOUBLES_ANSWERS;
     process.env.EVAL_DOUBLES_ANSWERS = 'off';

@@ -43,31 +43,37 @@ function flat(position: Scene, result: EvalResult) {
 }
 
 describe('verify scenes: every class one ply deeper (round 63, T16)', () => {
-  test('648453 t13: p1 agrees with the Monte-Carlo reference (inaccuracy 0.118 and 0.119 on two seed blocks; 0.1018 from the first draw before)', { timeout: 300_000 }, async () => {
-    // Under the wave's static (T81 without STAB) the note is real: the reference re-prices the same verify
-    // cells with 40 fresh draws each, one ply deeper, and keeps the inaccuracy the first draw used to carry alone.
+  test('648453 t13: p1 agrees with the Monte-Carlo reference (inaccuracy 0.1551 and 0.1568 on two seed blocks under the round 69 static, user gate 13.10.; 0.118 and 0.119 before)', { timeout: 300_000 }, async () => {
+    // The reference re-prices the same verify cells with 40 fresh draws each, one ply deeper (seed blocks 1001 and
+    // 5001, probe lanes/D/pins-mc.vt.ts of round 69). Hidden Power Ice against Heat Wave reads 0.155 to 0.157 on
+    // both blocks, the engine 0.1574. Band: 0.156 ± 0.02, the pin's old tolerance (the two blocks lie 0.002 apart).
     const position = scene('smogtours-gen6ou-648453-t13');
     const analysis = flat(position, await search(position));
     expect(analysis.p1.tier).toBe('inaccuracy');
-    expect(Math.abs(analysis.p1.regret! - 0.118)).toBeLessThan(0.02);
+    expect(Math.abs(analysis.p1.regret! - 0.156)).toBeLessThan(0.02);
   });
 
-  test('573756 t73: Body Press keeps its inaccuracy (MC 0.1312; three averaged draws lost it in round 62)', { timeout: 300_000 }, async () => {
+  test('573756 t73: Body Press carries no tier (MC none, 0.0774 and 0.0877 on two seed blocks under the round 69 static, user gate 13.10.; inaccuracy 0.1312 before)', { timeout: 300_000 }, async () => {
+    // Fresh reference, 40 draws per cell on seed blocks 1001 and 5001: best row → Toxapex, regret 0.077 and 0.088,
+    // no tier on either block; the engine reads 0.0891. Band: 0.083 ± 0.02 (the blocks' mean, the pin's tolerance).
     const position = scene('smogtours-gen8ou-573756-t73');
     const analysis = flat(position, await search(position));
     expect(analysis.p1.played?.label).toBe('Body Press');
-    expect(analysis.p1.tier).toBe('inaccuracy');
+    expect(analysis.p1.tier ?? null).toBeNull();
+    expect(Math.abs(analysis.p1.regret! - 0.083)).toBeLessThan(0.02);
   });
 
-  test("912045 t8 (doubles): p1's flat verdict agrees with the Monte-Carlo reference (none, 0.015 and 0.016 on two seed blocks; the first draw's blunder 0.478 before)", { timeout: 300_000 }, async () => {
+  test("912045 t8 (doubles): p1's flat verdict agrees with the Monte-Carlo reference (none, 0.1465 and 0.1120 on two seed blocks under the round 69 static, user gate 13.10.; 0.015 and 0.016 before)", { timeout: 300_000 }, async () => {
     // Before, the fallback cell Earth Power + Matcha Gotcha × Earth Power + Tera + Drain Punch read −0.9
     // through its first draw and p1's played Blood Moon line graded a blunder (0.4778). Doubles verify
-    // cells now go deeper through their heaviest outcome (the doubles time bound); under the wave's
-    // static the reference reads no tier (0.015 and 0.016 on two seed blocks, 24 draws per cell).
+    // cells go deeper through their heaviest outcome (the doubles time bound). Fresh reference (24 draws per
+    // cell, seed blocks 1001 and 5001): no tier on both, regret 0.1465 (best Hyper Voice + Rage Powder) and
+    // 0.1120 (best Earth Power→Okidogi + Rage Powder); the engine reads none at 0.0981, answers on or off.
+    // Band: 0.129 ± 0.04, the blocks' mean and about their spread of 0.035, with the engine's value inside.
     const position = scene('smogtours-gen9doublesou-912045-t8');
     const analysis = flat(position, await search(position));
     expect(analysis.p1.tier ?? null).toBeNull();
-    expect(analysis.p1.regret!).toBeLessThan(0.05);
+    expect(Math.abs(analysis.p1.regret! - 0.129)).toBeLessThan(0.04);
   });
 });
 
