@@ -1,11 +1,8 @@
-import { serializeBattleStable, trialAdvanceLog } from '../forward-model.ts';
-import {
-  ALIGNMENT_SEEDS, chooseAlignedSeed, extractProtocolEvents, scoreAlignment,
-  type SeedChoice,
-} from '../hax-alignment.ts';
+import { extractProtocolEvents, scoreAlignment } from '../hax-alignment.ts';
 import type { BranchRuntime, SimBattle, TurnBlock } from './types.ts';
-import { collectForcedSwitchSpecies, getMainChoice, parseTurnBlocks } from './protocol-choices.ts';
-import { protocolNicknames, simNamedLines } from './protocol-names.ts';
+import { getMainChoice, parseTurnBlocks } from './protocol-choices.ts';
+import { protocolNicknames } from './protocol-names.ts';
+import { alignArrivalDice, alignBlockSeed, type AlignedBlock } from './arrival-dice.ts';
 import {
   buildForcedSwitchChoice, correctActivesFromProtocol, correctBattleFromSnapshot, hasForceSwitch,
   refreshRequestsFromLiveState, repairStaleForcedSwitchRequest,
@@ -18,14 +15,6 @@ import {
 } from './runtime-session.ts';
 
 export type { ReconstructParams } from './runtime-session.ts';
-
-type ExpectedEvents = ReturnType<typeof extractProtocolEvents>;
-
-interface AlignedBlock {
-  expectedEvents: ExpectedEvents;
-  alignForced: { p1: string[]; p2: string[] };
-  seedChoice: SeedChoice;
-}
 
 /**
  * Boundary capture: the battle sits at the start of turnBlock.turn —
@@ -55,36 +44,7 @@ function chooseBlockSeed(
   session: ReconstructionSession, battle: SimBattle, turnBlock: TurnBlock, p1Choice: string, p2Choice: string,
   nicknames: Map<string, string>,
 ): AlignedBlock {
-  const blockLines = simNamedLines([...turnBlock.preUpkeep, ...turnBlock.postUpkeep], nicknames, battle);
-  const expectedEvents = extractProtocolEvents(blockLines);
-  const alignForced = {
-    p1: collectForcedSwitchSpecies(turnBlock.preUpkeep, turnBlock.postUpkeep, 'p1'),
-    p2: collectForcedSwitchSpecies(turnBlock.preUpkeep, turnBlock.postUpkeep, 'p2'),
-  };
-  let seedChoice: SeedChoice = {
-    seed: ALIGNMENT_SEEDS[0], trialScore: null, trialPerfect: false,
-    candidatesTried: 0, trialsFailed: 0,
-  };
-  try {
-    const checkpoint = serializeBattleStable(battle);
-    seedChoice = chooseAlignedSeed({
-      expected: expectedEvents,
-      trial: seed => {
-        try {
-          return trialAdvanceLog(
-            { serialized: checkpoint }, p1Choice, p2Choice, seed,
-            { p1: [...alignForced.p1], p2: [...alignForced.p2] },
-          );
-        } catch {
-          return null;
-        }
-      },
-      shouldStop: () => stopRequested(session),
-    });
-  } catch {
-    // Serialization failure on an odd state: run the block exactly as today.
-  }
-  return { expectedEvents, alignForced, seedChoice };
+  return alignBlockSeed(battle, turnBlock, p1Choice, p2Choice, nicknames, () => stopRequested(session));
 }
 
 /**
@@ -249,6 +209,8 @@ async function finishReconstruction(session: ReconstructionSession): Promise<Bra
 
   if (battleStream.battle) {
     refreshRequestsFromLiveState(battleStream.battle);
+    // Round 70: the arrival at a replay turn plays that turn under the seed the log's block has (a lead game has no snapshot).
+    if (snapshot && !session.timedOut) alignArrivalDice(battleStream.battle, replayLog, targetTurn, () => stopRequested(session));
     const correctionLines = syncLogActivesFromBattle(collectedLog, battleStream.battle, targetTurn);
     if (correctionLines.length > 0) onLogLines?.(correctionLines);
   }

@@ -1,6 +1,7 @@
 import type { TurnSnapshot } from '@fulllifegames/replay-core';
 import { deserializeBattleExact } from '../forward-model.ts';
 import type { TurnAlignmentRecord } from '../hax-alignment.ts';
+import { alignArrivalDice } from './arrival-dice.ts';
 import { correctBattleFromSnapshot, refreshRequestsFromLiveState } from './corrections.ts';
 import { branchLogForPosition } from './log-sync.ts';
 import { openStreams } from './runtime-session.ts';
@@ -34,11 +35,18 @@ export interface AdoptParams {
  * lines, so the sent-log cursor is realigned to the log it actually has;
  * the branch's protocol log is the replay prefix plus active corrections,
  * never battle.log.
+ *
+ * Round 70: a position of a replay turn (one with a snapshot) is put on the
+ * seed that turn plays under in the log, whatever dice the stored position
+ * carried (a sweep boundary keeps the state the previous block left), so the
+ * first turn the user plays shows the rolls of the log for every action left
+ * as it was. The search never reads the position's dice: its forks reseed.
  */
 export function adoptSerializedRuntime(params: AdoptParams): BranchRuntime {
   const battle = deserializeBattleExact(params.serialized);
   if (params.snapshot) correctBattleFromSnapshot(battle, params.snapshot);
   refreshRequestsFromLiveState(battle);
+  if (params.snapshot) alignArrivalDice(battle, params.replayLog, params.targetTurn);
   battle.sentLogPos = battle.log.length;
 
   const session = openStreams();
