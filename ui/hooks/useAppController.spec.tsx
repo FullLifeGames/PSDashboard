@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 import { act, renderHook, waitFor } from '@testing-library/react';
+import { toId } from '@fulllifegames/replay-core';
 import { singlesReplay } from '../fixtures/replay';
 import { stubReplayFetch } from '../fixtures/network';
 import { realReplayWorkerClient } from '../fixtures/worker';
@@ -67,5 +68,33 @@ describe('useAppController', () => {
 
     await act(async () => { await result.current.handleExecuteTurn(); });
     expect(result.current.ctx.branch.history).toHaveLength(0);
+  }, 90_000);
+
+  test('the branch log the frame receives names the simulator bodies as the replay does', async () => {
+    // The replay says "Chompy" and "King Bee"; the simulator's sets say Garchomp and Kingambit. A frame log that
+    // mixed the two made the embed open a second roster entry per body (the sidebar kept the first one alive).
+    const replay = singlesReplay();
+    replay.log = replay.log.replaceAll('p1a: Garchomp', 'p1a: Chompy').replaceAll('p2a: Kingambit', 'p2a: King Bee');
+    stubReplayFetch([replay]);
+    const { result } = renderHook(() => useAppController());
+    await act(async () => { await result.current.ctx.replay.loadReplay(replay.id); });
+    await waitFor(() => expect(result.current.engine.smogonPending).toBe(false));
+    act(() => result.current.board.timeline.navigateTo({ turn: 2, line: 'main' }));
+    act(() => result.current.board.deviation.requestDeviation(null));
+    await waitFor(() => expect(result.current.analysis.showBranch).toBe(true), { timeout: 60_000 });
+
+    const { p1Moves, p2Moves } = result.current.ctx.branch.simState!;
+    const pick = (side: 'p1' | 'p2', name: string) =>
+      act(() => result.current.ctx.branch.setChoice(side, { kind: 'move', moveId: toId(name), moveName: name }, 0));
+    pick('p1', p1Moves[0].name);
+    pick('p2', p2Moves[0].name);
+    await act(async () => { await result.current.handleExecuteTurn(); });
+    await waitFor(() => expect(result.current.ctx.branch.history).toHaveLength(1), { timeout: 60_000 });
+
+    const lines = result.current.analysis.simLog.split('\n');
+    const executed = lines.slice(lines.lastIndexOf('|turn|2') + 1);
+    expect(executed.find(line => line.startsWith('|move|p1a: '))).toMatch(/^\|move\|p1a: Chompy\|/);
+    expect(executed.find(line => line.startsWith('|move|p2a: '))).toMatch(/^\|move\|p2a: King Bee\|/);
+    expect(executed.filter(line => /p[12]a: (Garchomp|Kingambit)\b/.test(line))).toEqual([]);
   }, 90_000);
 });

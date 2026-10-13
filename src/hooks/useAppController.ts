@@ -7,6 +7,7 @@ import type { BoardController } from './controller/board-controller';
 import { useEngineController } from './controller/engine-controller';
 import type { EngineController } from './controller/engine-controller';
 import { useGameAnalysis } from './useGameAnalysis';
+import { branchFrameLog } from '../lib/branch-log';
 import { manualMove, toId } from '@fulllifegames/replay-core';
 import type { BranchSlotChoice } from '@fulllifegames/eval-engine';
 
@@ -96,12 +97,14 @@ function useAnalysisSurface(ctx: ReplayContext, board: BoardController, engine: 
     replayData, snapshots, evaluation, analysisTurn, sweepAlignment, replayGen,
   });
 
+  const simLines = simState?.log;
+  const simP1Bodies = simState?.p1Pokemon;
+  const simP2Bodies = simState?.p2Pokemon;
+  const replayLog = replayData?.log;
   const simLog = useMemo(() => {
-    const raw = simState?.log ?? [];
-    if (raw.length === 0) return '';
-    // |debug| lines would render as "[DEBUG] …" in the embed's battle log (G13).
-    return raw.filter(l => l && !l.startsWith('|split|') && !l.startsWith('|c|') && !l.startsWith('|debug|')).join('\n');
-  }, [simState?.log]);
+    if (!simLines || simLines.length === 0) return '';
+    return branchFrameLog(simLines, replayLog ?? '', { p1: simP1Bodies ?? [], p2: simP2Bodies ?? [] });
+  }, [simLines, simP1Bodies, simP2Bodies, replayLog]);
   const latestBranchHistoryEntry = history.length > 0 ? history[history.length - 1] : null;
 
   const showBranch = branching && simLog.length > 0;
