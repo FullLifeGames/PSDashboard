@@ -32,7 +32,7 @@ PS Dashboard analyzes Pokémon Showdown replays: it replays a game turn by turn,
 - PP and heal fractions come live from the simulator (`moveSlots[].pp`, `move.heal`), never derived from Dex base values.
 - Singles and doubles are equal citizens, and VGC (Scarlet/Violet and Champions) counts on its own: every feature covers both game types in the same step, every measurement counts doubles and VGC separately.
 - React: state that follows a prop is reconciled during render, never in an effect (lint rule `react-hooks/set-state-in-effect`).
-- Dependencies: direct dependencies track their latest registry versions (`npm outdated`). Two exceptions: TypeScript stays on 6.x until typescript-eslint admits the 7.x compiler, and `@types/node` follows the Node major the workflows run.
+- Dependencies: direct dependencies track their latest registry versions (`npm outdated`). Three exceptions: TypeScript stays on 6.x until typescript-eslint admits the 7.x compiler, `@types/node` follows the Node major the workflows run, and `@pkmn/sim` and `@pkmn/mods` stay pinned to one exact version in every manifest, because the speed layer copies the simulator's classes and checks no hash in the browser (`regression/pkmn-pins.spec.ts`). `npm run upgrade:pkmn [version]` moves the whole @pkmn release train (sim, mods, dex, data) at once and prints the checks a new simulator needs before it ships (T103, the engine suite in all speed-layer modes, the batch check).
 
 ## Checks before commit and push
 

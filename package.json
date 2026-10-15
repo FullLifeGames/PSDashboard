@@ -13,6 +13,7 @@
     "lint": "eslint .",
     "knip": "knip",
     "pack:smoke": "node ./scripts/pack-smoke.mjs",
+    "upgrade:pkmn": "node ./scripts/upgrade-pkmn.mjs",
     "publish:packages": "node ./scripts/publish-packages.mjs",
     "test:e2e": "node ./scripts/run-e2e.mjs",
     "test:build": "playwright test -c playwright.build.config.ts",
