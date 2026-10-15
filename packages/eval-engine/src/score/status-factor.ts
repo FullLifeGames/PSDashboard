@@ -74,7 +74,7 @@ function twinOf(format: string, ability: string, seed: Seed): Battle {
 }
 
 /** The damage `from` deals `to` with the move at the fixed dice, no crit: what the simulator's own damage step gives. */
-function damageOf(battle: Battle, from: Pokemon, to: Pokemon, moveId: string): number {
+export function damageOf(battle: Battle, from: Pokemon, to: Pokemon, moveId: string): number {
   const move = battle.dex.getActiveMove(moveId);
   const { activeMove, activePokemon, activeTarget, prng } = battle;
   battle.activeMove = move;

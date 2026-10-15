@@ -34,6 +34,13 @@ export interface PairThreat {
   physicalAcc?: number;
   specialAcc?: number;
   /**
+   * The ids of the moves behind `physical` and `special` (13.10.2026, the contact punishments of boostsBiting): the
+   * race plays the hit of the move it prices (score/contact.ts). Optional like the accuracies; a hand-built threat
+   * has none and prices no hit.
+   */
+  physicalMove?: string;
+  specialMove?: string;
+  /**
    * Moves whose stages are not their category's (round 63, T81), each with
    * its own best fraction at stage 0: Body Press (the user's Defense),
    * Psyshock (the target's Defense), Foul Play (the target's Attack), and
@@ -47,6 +54,8 @@ export interface PairThreat {
 export interface AxisThreat {
   fraction: number;
   acc: number;
+  /** The move this entry prices. */
+  id?: string;
   /** Whose offensive stage the damage reads, and which. */
   holder: 'attacker' | 'defender';
   offense: StatIDExceptHP;
@@ -388,8 +397,8 @@ function addMove(threat: PairThreat, move: DexMove, use: Landed, fraction: numbe
   if (ownAxis !== null) {
     (threat.axes ??= []).push(axisThreat(move, use, fraction, accuracy, ownAxis));
   } else if (use.category === 'Physical') {
-    if (fraction > threat.physical) { threat.physical = fraction; threat.physicalAcc = accuracy; }
-  } else if (fraction > threat.special) { threat.special = fraction; threat.specialAcc = accuracy; }
+    if (fraction > threat.physical) { threat.physical = fraction; threat.physicalAcc = accuracy; threat.physicalMove = move.id; }
+  } else if (fraction > threat.special) { threat.special = fraction; threat.specialAcc = accuracy; threat.specialMove = move.id; }
   if (move.priority > 0) threat.priority = true;
 }
 
@@ -403,7 +412,7 @@ const accuracyOf = (move: DexMove): number => (move.accuracy === true ? 1 : move
 function axisThreat(move: DexMove, use: Landed, fraction: number, acc: number, staged: boolean): AxisThreat {
   const physical = use.category === 'Physical';
   return {
-    fraction, acc,
+    fraction, acc, id: move.id,
     holder: move.overrideOffensivePokemon === 'target' ? 'defender' : 'attacker',
     offense: offenseStat(move, physical),
     defense: defenseStat(move, physical),
@@ -459,6 +468,27 @@ function axisFraction(axis: AxisThreat, attacker: Pokemon, defender: Pokemon, at
     stageMultiplier(offenseStage) / stageMultiplier(defender.boosts[axis.defense]);
   if (!axis.staged) return value;
   return value * stagedPower(attacker, defender, axis.staged.id, attackerBoosts) / axis.staged.basePower;
+}
+
+/**
+ * The id of the move boostedFraction reads: the best of the physical and special moves and the off-axis entries on the
+ * stages in view, or null when no damaging move is left (or the threat carries no ids). The races of boostsBiting
+ * play a hit of this move.
+ */
+export function bestMoveId(threat: PairThreat, attacker: Pokemon, defender: Pokemon, attackerBoosts?: StageOverride): string | null {
+  const atkStage = attackerBoosts?.atk ?? attacker.boosts.atk;
+  const spaStage = attackerBoosts?.spa ?? attacker.boosts.spa;
+  let best = 0;
+  let id: string | null = null;
+  const physical = threat.physical * stageMultiplier(atkStage) / stageMultiplier(defender.boosts.def);
+  if (physical > best) { best = physical; id = threat.physicalMove ?? null; }
+  const special = threat.special * stageMultiplier(spaStage) / stageMultiplier(defender.boosts.spd);
+  if (special > best) { best = special; id = threat.specialMove ?? null; }
+  for (const axis of threat.axes ?? []) {
+    const value = axisFraction(axis, attacker, defender, attackerBoosts, false);
+    if (value > best) { best = value; id = axis.id ?? null; }
+  }
+  return id;
 }
 
 export type ThreatGetter = (attacker: Pokemon, defender: Pokemon) => PairThreat;

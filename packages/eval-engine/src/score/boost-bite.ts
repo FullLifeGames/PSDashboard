@@ -6,6 +6,7 @@ import {
   BITE_TURNS, foeWins, holderActs, pairRace, raceBodies, stageBites, type Bodies, type PairRace, type ThreatOf,
 } from './boost-race.ts';
 import { residualReader, type Residuals } from './residuals.ts';
+import { hitReader, type HitReader } from './contact.ts';
 
 /**
  * Round 69 (T49, decision 16): boostsBiting, `boosts` with every standing
@@ -130,13 +131,15 @@ function frontGate(front: Pokemon[], removers: ReadonlySet<Pokemon>, raceWith: (
 }
 
 /** The value of one holder's stages, summed over the foes each of them bites. */
-function holderBites(mine: Pokemon, foes: Pokemon[], removers: ReadonlySet<Pokemon>, battle: Battle, threat: ThreatOf, bodies: Bodies): number {
+function holderBites(
+  mine: Pokemon, foes: Pokemon[], removers: ReadonlySet<Pokemon>, battle: Battle, threat: ThreatOf, bodies: Bodies, hits: HitReader,
+): number {
   const stats = stagedStats(mine);
   const races = new Map<Pokemon, PairRace>();
   const raceWith = (foe: Pokemon): PairRace => {
     let race = races.get(foe);
     if (!race) {
-      race = pairRace(mine, foe, battle, threat, bodies);
+      race = pairRace(mine, foe, battle, threat, bodies, hits);
       races.set(foe, race);
     }
     return race;
@@ -158,6 +161,7 @@ function holderBites(mine: Pokemon, foes: Pokemon[], removers: ReadonlySet<Pokem
 /** One side's standing stages, each valued as `boosts` values it and counted for the share of living foes it bites. */
 export function boostBiteValue(
   side: Side, sideIndex: 0 | 1, battle: Battle, threat: ThreatOf, residuals: Residuals = residualReader(battle),
+  hits: HitReader = hitReader(battle),
 ): number {
   const actives = side.active.filter((mon): mon is Pokemon => !!mon && !mon.fainted && Object.values(mon.boosts).some(Boolean));
   if (actives.length === 0) return 0;
@@ -168,6 +172,6 @@ export function boostBiteValue(
   const removers = new Set(foes.filter(foe => usableSlots(foe).some(slot => removesStages(twin, slot.id, benched))));
   const bodies = raceBodies(battle, residuals);
   let value = 0;
-  for (const mine of actives) value += holderBites(mine, foes, removers, battle, threat, bodies);
+  for (const mine of actives) value += holderBites(mine, foes, removers, battle, threat, bodies, hits);
   return value / foes.length;
 }

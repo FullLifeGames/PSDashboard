@@ -1,8 +1,10 @@
 import type { Battle, BoostsTable, Pokemon } from '@pkmn/sim';
 import { movesFirst } from '../speed.ts';
-import { boostedFraction, type PairThreat } from './threat.ts';
-import { healProfile, ppBudget, raceClocks, statusResidual, type RaceSide } from './races.ts';
+import { bestMoveId, boostedFraction, type PairThreat } from './threat.ts';
+import { healProfile, ppBudget, raceClocks, statusResidual, type RaceClocks, type RaceSide } from './races.ts';
 import type { Residuals } from './residuals.ts';
+import { NO_COST, type HitCost, type HitReader } from './contact.ts';
+import { priceHit, type HitPrice } from './contact-price.ts';
 
 /**
  * The 1v1 race behind boostsBiting (score/boost-bite.ts): both KO clocks and the
@@ -18,6 +20,14 @@ import type { Residuals } from './residuals.ts';
  * A drop is the mirror: it is the foe's stage, so the foe must win the race with
  * it, get to act, and win by it (a flip, or a faster win); a drop in a race the
  * holder still wins costs nothing.
+ *
+ * Both sides pay for their hits (13.10.2026, Cobalion's contact moves into Talonflame meet Flame Body): the HP a hit
+ * takes from its attacker (Rocky Helmet, Rough Skin, Iron Barbs, recoil, Life Orb) joins the attacker's residual, and
+ * the status it can leave (a burn, a poison) joins as expected end-of-turn damage and expected lost damage. The
+ * simulator reads the hit (score/contact.ts); score/contact-price.ts prices it into the race: a chip is paid after
+ * every hit, so the side that moves second is a chip better off than a plain residual says (the other side's hit comes
+ * first), and a status compounds over the hits the clocks of the race without it give the side. pricedClocks runs the race
+ * again on the price.
  */
 
 /** The race horizon, in turns: beyond three hits to a KO the pair is a stall war, not a sweep. */
@@ -94,22 +104,62 @@ export interface Race {
   foeSurvives: boolean;
 }
 
-/** What a stage set changes in a race: the damage fractions of both sides and who moves first (the clocks follow from them). */
-interface Inputs { mineFrac: number; foeFrac: number; first: boolean; foeFirst: boolean }
+/**
+ * What a stage set changes in a race: the damage fractions of both sides, who moves first, and the move each side
+ * hits with (the clocks follow from them, and the cost of the hit from the move).
+ */
+interface Inputs { mineFrac: number; foeFrac: number; first: boolean; foeFirst: boolean; mineMove: string | null; foeMove: string | null }
 
 function inputsOn(mine: Pokemon, foe: Pokemon, mineThreat: PairThreat, foeThreat: PairThreat, battle: Battle, stages: PairStages): Inputs {
   const mineHitting = viewOf(mine, stages.mineHitting);
   const foeHitting = viewOf(foe, stages.foeHitting);
+  const foeDefending = viewOf(foe, stages.foeDefending);
+  const mineDefending = viewOf(mine, stages.mineDefending);
   return {
-    mineFrac: boostedFraction(mineThreat, mineHitting, viewOf(foe, stages.foeDefending)),
-    foeFrac: boostedFraction(foeThreat, foeHitting, viewOf(mine, stages.mineDefending)),
+    mineFrac: boostedFraction(mineThreat, mineHitting, foeDefending),
+    foeFrac: boostedFraction(foeThreat, foeHitting, mineDefending),
     first: movesFirst(mineHitting, foeHitting, mineThreat, foeThreat, battle),
     foeFirst: movesFirst(foeHitting, mineHitting, foeThreat, mineThreat, battle),
+    mineMove: contactReads ? bestMoveId(mineThreat, mineHitting, foeDefending) : null,
+    foeMove: contactReads && contactSides === 'both' ? bestMoveId(foeThreat, foeHitting, mineDefending) : null,
   };
 }
 
-function raceOf(inputs: Inputs, mine: Body, foe: Body): Race {
-  const clocks = raceClocks({ ...mine, frac: inputs.mineFrac }, { ...foe, frac: inputs.foeFrac });
+/** What the hits of the two sides cost them. */
+interface PairCost { mine: HitCost; foe: HitCost }
+
+const isFree = (cost: HitCost): boolean => cost.chip === 0 && cost.statuses.length === 0;
+
+/**
+ * How often a race with a status chance in it is priced again against the clocks the last price gave: the expected
+ * burn of a side depends on the hits it lands and the turns the other side needs, and those follow from the price.
+ */
+const PRICING_PASSES = 2;
+
+/** One side of the race as it pays for its hits (score/contact-price.ts): the chip and the expected status in its residual, the burn in its damage, the buffer in its HP. */
+const paying = (body: Body, frac: number, price: HitPrice): RaceSide =>
+  ({ ...body, frac: frac * price.output, residual: body.residual + price.residual, hp: body.hp + price.buffer });
+
+/**
+ * The clocks of the race with the cost of both sides' hits in it. The race without the costs says how many hits each
+ * side lands and how many turns it has to live; the price of the hits goes into the residual, the damage and the HP of
+ * its side, and the race is run again on them. A chip alone does not depend on the clocks (one pass); a status chance
+ * does (two passes, the second against the clocks the first gave).
+ */
+function pricedClocks(inputs: Inputs, mine: Body, foe: Body, cost: PairCost): RaceClocks {
+  let clocks = raceClocks({ ...mine, frac: inputs.mineFrac }, { ...foe, frac: inputs.foeFrac });
+  if (isFree(cost.mine) && isFree(cost.foe)) return clocks;
+  const passes = cost.mine.statuses.length > 0 || cost.foe.statuses.length > 0 ? PRICING_PASSES : 1;
+  for (let pass = 0; pass < passes; pass++) {
+    const minePrice = priceHit(cost.mine, clocks.turnsA, clocks.turnsB, inputs.first);
+    const foePrice = priceHit(cost.foe, clocks.turnsB, clocks.turnsA, inputs.foeFirst);
+    clocks = raceClocks(paying(mine, inputs.mineFrac, minePrice), paying(foe, inputs.foeFrac, foePrice));
+  }
+  return clocks;
+}
+
+function raceOf(inputs: Inputs, mine: Body, foe: Body, cost: PairCost): Race {
+  const clocks = pricedClocks(inputs, mine, foe, cost);
   return {
     turnsMine: clocks.turnsA, turnsFoe: clocks.turnsB, first: inputs.first, foeFirst: inputs.foeFirst,
     mineSurvives: inputs.foeFrac < mine.hp, foeSurvives: inputs.mineFrac < foe.hp,
@@ -117,7 +167,21 @@ function raceOf(inputs: Inputs, mine: Body, foe: Body): Race {
 }
 
 const sameInputs = (a: Inputs, b: Inputs): boolean =>
-  a.mineFrac === b.mineFrac && a.foeFrac === b.foeFrac && a.first === b.first && a.foeFirst === b.foeFirst;
+  a.mineFrac === b.mineFrac && a.foeFrac === b.foeFrac && a.first === b.first && a.foeFirst === b.foeFirst &&
+  a.mineMove === b.mineMove && a.foeMove === b.foeMove;
+
+let contactReads = true;
+let contactSides: 'holder' | 'both' = 'both';
+
+/** Test switch (default on): off, no hit is read and the races are as before the contact punishments. */
+export function setContactReads(on: boolean): void {
+  contactReads = on;
+}
+
+/** Test switch (default both): whose hits are read, the holder's only or the foe's too. */
+export function setContactSides(sides: 'holder' | 'both'): void {
+  contactSides = sides;
+}
 
 let raceCut = true;
 
@@ -138,18 +202,26 @@ export interface PairRace {
  * only where taking the stat off changes what the race reads: the damage of a side or the move order. A stat that
  * no move reads (Attack on a special attacker) leaves the inputs as they were and shares the race on all stages.
  */
-export function pairRace(mine: Pokemon, foe: Pokemon, battle: Battle, threat: ThreatOf, bodies: Bodies): PairRace {
+export function pairRace(mine: Pokemon, foe: Pokemon, battle: Battle, threat: ThreatOf, bodies: Bodies, hits: HitReader): PairRace {
   const stages = pairStages(battle, mine, foe);
   const mineThreat = threat(mine, foe);
   const foeThreat = threat(foe, mine);
   const [mineBody, foeBody] = [bodies(mine), bodies(foe)];
+  // The races of one pair mostly hit with the same moves: the last cost is kept for them.
+  let last: { mineMove: string | null; foeMove: string | null; cost: PairCost } | undefined;
+  const costOf = (inputs: Inputs): PairCost => {
+    if (last && last.mineMove === inputs.mineMove && last.foeMove === inputs.foeMove) return last.cost;
+    const cost = { mine: hits(mine, foe, inputs.mineMove), foe: inputs.foeMove ? hits(foe, mine, inputs.foeMove) : NO_COST };
+    last = { mineMove: inputs.mineMove, foeMove: inputs.foeMove, cost };
+    return cost;
+  };
   const heldInputs = inputsOn(mine, foe, mineThreat, foeThreat, battle, stages);
-  const held = raceOf(heldInputs, mineBody, foeBody);
+  const held = raceOf(heldInputs, mineBody, foeBody, costOf(heldInputs));
   return {
     stages, held,
     without: stat => {
       const inputs = inputsOn(mine, foe, mineThreat, foeThreat, battle, withoutStat(stages, stat));
-      return raceCut && sameInputs(inputs, heldInputs) ? held : raceOf(inputs, mineBody, foeBody);
+      return raceCut && sameInputs(inputs, heldInputs) ? held : raceOf(inputs, mineBody, foeBody, costOf(inputs));
     },
   };
 }

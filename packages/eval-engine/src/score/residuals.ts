@@ -70,7 +70,7 @@ export function residualReader(battle: Battle): Residuals {
 }
 
 /** Every active of the battle in a fixed order (side, slot), null for an empty or fainted slot. */
-const slotsOf = (battle: Battle): (Pokemon | null)[] =>
+export const slotsOf = (battle: Battle): (Pokemon | null)[] =>
   battle.sides.flatMap(side => side.active.map(pokemon => (pokemon && !pokemon.fainted && pokemon.hp > 0 ? pokemon : null)));
 
 function tableOf(battle: Battle): Map<Pokemon, number> | null {
@@ -123,7 +123,7 @@ function signature(battle: Battle, slots: (Pokemon | null)[]): string {
 }
 
 /** A throw-away copy: the speed layer's when it is on, else a round trip through the stable serialization. */
-const copyOf = (battle: Battle): Battle => copyBattle(battle) ?? deserializeBattleExact(serializeBattleStable(battle));
+export const copyOf = (battle: Battle): Battle => copyBattle(battle) ?? deserializeBattleExact(serializeBattleStable(battle));
 
 /** An effect state's clock set to lasting, so that nothing ends or fires during the played turns. */
 function lasting(state: unknown): void {
@@ -145,22 +145,30 @@ function playedTurns(copy: Battle, bodies: (Pokemon | null)[]): number[] {
   return lost.map(sum => sum / RESIDUAL_TURNS);
 }
 
+/**
+ * The mean loss per turn of `bodies` over the played end-of-turns, on `copy` itself (the play spends it): the clocks of
+ * the weather, the terrain, the side conditions and the volatiles set to lasting, the dice fixed. The contact reads of
+ * score/contact.ts use it on the copy of a hit to price the status the hit left.
+ */
+export function playResiduals(copy: Battle, bodies: (Pokemon | null)[]): number[] {
+  lasting(copy.field.weatherState);
+  lasting(copy.field.terrainState);
+  for (const state of Object.values(copy.field.pseudoWeather)) lasting(state);
+  for (const side of copy.sides) {
+    for (const state of Object.values(side.sideConditions)) lasting(state);
+    for (const pokemon of side.active) {
+      if (pokemon) for (const state of Object.values(pokemon.volatiles)) lasting(state);
+    }
+  }
+  copy.prng = new PRNG('1,2,3,4');
+  return playedTurns(copy, bodies);
+}
+
 /** The mean loss per turn of every slot over the played end-of-turns, or null where the copy or the play fails. */
 function play(battle: Battle): readonly number[] | null {
   try {
     const copy = copyOf(battle);
-    const bodies = slotsOf(copy);
-    lasting(copy.field.weatherState);
-    lasting(copy.field.terrainState);
-    for (const state of Object.values(copy.field.pseudoWeather)) lasting(state);
-    for (const side of copy.sides) {
-      for (const state of Object.values(side.sideConditions)) lasting(state);
-      for (const pokemon of side.active) {
-        if (pokemon) for (const state of Object.values(pokemon.volatiles)) lasting(state);
-      }
-    }
-    copy.prng = new PRNG('1,2,3,4');
-    return playedTurns(copy, bodies);
+    return playResiduals(copy, slotsOf(copy));
   } catch {
     return null;
   }
