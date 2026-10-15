@@ -4,7 +4,13 @@
  * the exact HP (denominator = max HP), the public ones a percentage.
  */
 
-const RANDOM_CANT = new Set(['flinch', 'par', 'frz', 'attract']);
+/**
+ * The `|cant|` reasons whose cause the simulator draws this turn (round 70, N1). It writes each reason by the name of its
+ * condition, so the infatuation reads "Attract" and never "attract". test/pair-cant-reasons.spec.ts scans every reason the
+ * simulator can write, plays each over 40 seeds in every doubles generation and the Champions mod, and holds this set to
+ * the dice ones.
+ */
+const RANDOM_CANT = new Set(['flinch', 'par', 'frz', 'Attract']);
 
 /** The next |move| line at or after `from`, or the log's end. */
 function windowEnd(log: readonly string[], from: number): number {
