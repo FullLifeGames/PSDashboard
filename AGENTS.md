@@ -26,6 +26,9 @@ PS Dashboard analyzes Pokémon Showdown replays: it replays a game turn by turn,
 ## Rules for the code
 
 - Game rules come from the simulator and the Dex (`@pkmn/sim`, `@pkmn/dex`, `@pkmn/mods`, `@pkmn/client`, `@pkmn/protocol`). Our code translates and reads library data, never species or move names. Where our code must know a rule, a test checks it against the simulator. Moving logic into the libraries is welcome.
+- A fix for a game rule starts with a sweep: a test that plays every Dex entry of that kind, in every generation and mod the corpus plays, and compares the simulator with our reading; the reported scene becomes one row of it (models: `pair-stall-guard.spec.ts`, `power-handlers-census.spec.ts`). A list in a hot path may stay while such a test holds it to the Dex.
+- One rule lives in one module, and every other place imports it. A deliberate copy (a package that reaches the other only through its barrel) gets a spec that compares the two.
+- A question to the simulator runs on a copy of the battle. A stand-in that calls a Dex handler gets a sweep over every Dex entry that can reach it, and the sweep proves the live battle unchanged (`fingerprint` in `packages/eval-engine/test/power-oracle.ts`).
 - A rule that is right by the game stays, even when the bank reads it worse: then the weights are wrong, and a refit becomes a TODO. Published Smogon sets are read as published.
 - Pokémon Champions and Scarlet/Violet differ in rules: that is a question of the battle's mode, not a bug.
 - A Custom Game (draft leagues) plays with each species' own abilities; only Hackmons formats are free. Before recommending anything that rests on a game rule, check that the species can really have it.
@@ -84,6 +87,7 @@ Every change gets a class before work starts: the integrator proposes it, the us
 ## Working in rounds
 
 - Rounds are numbered in one series across the project (the ledger calls them "improvement round N"). Each round: brainstorming and spec, build with tests, measurement, user gate, booking, push after the okay. A batch of small fixes is a round too: it gets a number and a short booking, without a spec and with its one check at the end.
+- An audit or review that names a wrong rule leaves a TODO with its red sweep the same day. A triage closes a TODO only when the wrong rule is gone from the code; otherwise it parks the TODO with a trigger (round 70: four of the batch's 18 faults stood in the audit of 24.09., and the triage of 05.10. had closed one of them).
 - `NextSteps.md` holds only open work, as packages; a package is a round. TODOs carry fixed T-numbers; the next free number is in `NextSteps.md`.
 - Booking at the end of a round: a ledger block in `regression/eval-calibration.spec.ts`, an entry in `docs/completed/<area>.md` (goal, delivered, evidence, measurement, gate, lessons, rests), rests as new TODOs in `docs/backlog.md` and as a line in their package, the header line of `NextSteps.md`. A fresh reviewer checks new TODOs against the code before they are booked.
 - Waves: several lanes in parallel, one branch and worktree per lane, no shared file, measurements through the integrator's queue (one heavy run at a time), the merge in a separate clone, then a wave run with all holdouts and one gate with a table over all lanes.
