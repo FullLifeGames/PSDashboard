@@ -21,7 +21,7 @@ const FLINCH_BONUS = 0.3;
  * Round 69 (T42, decision 15): a KO that only the two attacks together make
  * (or that a Protect denies the foes) takes one action off the board, as a
  * flinch does, so it counts as much. Round 70: a side protector (Wide Guard,
- * Quick Guard) earns the damage it denies, up to that much.
+ * Quick Guard) and a Protect earn the damage they deny, up to that much.
  */
 const PAIR_KO_BONUS = FLINCH_BONUS;
 /** Boost payoff counted for ~2 future attacks. */
@@ -85,18 +85,25 @@ export function shieldsSide(dex: HintDex, move: DexMove): boolean {
 type HitHandler = (this: unknown, target: unknown, source: unknown, move: unknown) => unknown;
 
 /**
- * Round 70: whether the protector's side condition stops `attack` from `source` on `target`: the simulator's own onTryHit, asked
+ * Round 70: whether the protector's condition stops `attack` from `source` on `target`: the simulator's own onTryHit, asked
  * from stand-ins that leave the battle alone (the battle read through its prototype with a log that discards, a source that
- * holds no Outrage lock to reset). The handler returns nothing for a hit it lets through and the simulator's NOT_FAIL for a hit
+ * holds no Outrage lock to reset). The protector sets a side condition (Wide Guard) or a volatile on its user (Protect and its
+ * kin, gate of 13.10. 20:26, 3a). The handler returns nothing for a hit it lets through and the simulator's NOT_FAIL for a hit
  * it stops. A handler that needs more than the stand-ins offer stops nothing. The caller sets the attack's target at use.
+ *
+ * The shields that punish a contact hit (King's Shield, Obstruct, Silk Trap, Baneful Bunker, Burning Bulwark, Spiky Shield) do it in
+ * this same handler, on the live attacker: a stage drop reaches the nested boosts a shallow stand-in shares with the live body, a
+ * status try writes the live battle's log and effect counter. The question is only whether the hit is stopped, so the handler is
+ * asked about the attack without its contact flag (test/protect-tempo-hints.spec.ts plays every protector of the Dex).
  */
-export function sideProtectorStops(battle: Battle, protector: DexMove, attack: ActiveMove, source: Pokemon, target: Pokemon): boolean {
-  const handler = protector.sideCondition ? (battle.dex.conditions.get(protector.sideCondition) as { onTryHit?: unknown }).onTryHit : undefined;
+export function protectorStops(battle: Battle, protector: DexMove, attack: ActiveMove, source: Pokemon, target: Pokemon): boolean {
+  const condition = protector.sideCondition || protector.volatileStatus;
+  const handler = condition ? (battle.dex.conditions.get(condition) as { onTryHit?: unknown }).onTryHit : undefined;
   if (typeof handler !== 'function') return false;
   const stage = Object.create(battle, { add: { value: () => undefined } });
   const user = Object.create(source, { getVolatile: { value: () => undefined } });
   try {
-    return (handler as HitHandler).call(stage, target, user, attack) !== undefined;
+    return (handler as HitHandler).call(stage, target, user, Object.create(attack, { flags: { value: { ...attack.flags, contact: undefined } } })) !== undefined;
   } catch {
     return false;
   }
@@ -241,15 +248,16 @@ function targetAtUse(board: HintBoard, attacker: Pokemon, move: DexMove, victim:
 }
 
 /**
- * Round 70 (extends T42): the damage a side protector denies. Per known damaging move of a foe, as it lands (target at use,
- * a spread hit at the spread factor), the damage on the bodies of the protector's side whose hit its handler stops, each
- * capped at the body's HP: the sum over the bodies for a spread hit, the larger one for a single-target hit (the foe aims it
- * at one). The most any move of a foe denies. Wide Guard answers the spread attacker, Quick Guard the priority move, Crafty
- * Shield (status only) no damage. T42's Protect tempo asks for a KO only the pair can make; the moves that cover the whole
- * side deny the hit itself.
+ * Round 70 (extends T42): the damage a protector denies the `covered` bodies. Per known damaging move of a foe, as it lands
+ * (target at use, a spread hit at the spread factor), the damage on the covered bodies whose hit the protector's handler stops,
+ * each capped at the body's HP: the sum over the bodies for a spread hit, the larger one for a single-target hit (the foe aims
+ * it at one). The most any move of a foe denies. A side protector covers the whole side: Wide Guard answers the spread
+ * attacker, Quick Guard the priority move, Crafty Shield (status only) no damage. A Protect (gate of 13.10. 20:26, 3a) covers
+ * its user alone, and stops every hit whose move carries the flag its handler checks. T42's Protect tempo asks for a KO only
+ * the pair can make; both deny the hit itself.
  */
-function deniedDamage(board: HintBoard, protector: DexMove): number {
-  const { battle, actors, foes } = board;
+function deniedDamage(board: HintBoard, protector: DexMove, covered: Pokemon[]): number {
+  const { battle, foes } = board;
   let most = 0;
   for (const foe of foes) {
     for (const slot of foe.moveSlots) {
@@ -258,10 +266,10 @@ function deniedDamage(board: HintBoard, protector: DexMove): number {
       let summed = 0;
       let largest = 0;
       let spread = false;
-      for (const body of actors) {
+      for (const body of covered) {
         const attack = battle.dex.getActiveMove(move.id);
         attack.target = targetAtUse(board, foe, move, body);
-        if (!sideProtectorStops(battle, protector, attack, foe, body)) continue;
+        if (!protectorStops(battle, protector, attack, foe, body)) continue;
         spread = attack.target === 'allAdjacentFoes' || attack.target === 'allAdjacent';
         const denied = Math.min(singleMoveFraction(foe, body, move.id, battle) * (spread ? SPREAD_FACTOR : 1), body.hp / body.maxhp);
         summed += denied;
@@ -315,8 +323,10 @@ function moveHintOf(board: HintBoard, tokens: string[], attacker: Pokemon): Part
   if (move.category === 'Status') {
     const read = plainRead(Math.max(SUPPORT_HINT, setupEquity(board, attacker, tokens[1])));
     read.redirect = redirectsFoes(battle.dex, move);
-    if (shieldsFromHits(battle.dex, move) && pairOnlyKo(board, attacker)) read.tempo = PAIR_KO_BONUS;
-    if (shieldsSide(battle.dex, move)) read.tempo = Math.min(PAIR_KO_BONUS, deniedDamage(board, move));
+    // Round 70 (gate of 13.10. 20:26, 3a): a Protect earns the damage it denies its user, up to the flinch-sized ceiling; T42's
+    // KO that only the pair can make keeps the whole ceiling.
+    if (shieldsFromHits(battle.dex, move)) read.tempo = pairOnlyKo(board, attacker) ? PAIR_KO_BONUS : Math.min(PAIR_KO_BONUS, deniedDamage(board, move, [attacker]));
+    if (shieldsSide(battle.dex, move)) read.tempo = Math.min(PAIR_KO_BONUS, deniedDamage(board, move, board.actors));
     return read;
   }
   const target = targetAtUse(board, attacker, move);

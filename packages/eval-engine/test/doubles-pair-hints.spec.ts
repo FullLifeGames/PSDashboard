@@ -168,7 +168,7 @@ describe('Protect tempo and Fake Out (round 69, T42)', () => {
     return battle;
   };
 
-  test('a Protect that denies a KO only the pair can make outranks an idle slot; with no such threat it stays the floor', () => {
+  test('a Protect that denies a KO only the pair can make outranks an idle slot; with no damaging foe it stays the floor', () => {
     const hit = (() => {
       const battle = build()();
       const mon = battle.sides[0].active[0]!;
@@ -192,8 +192,10 @@ describe('Protect tempo and Fake Out (round 69, T42)', () => {
     const threatened = protector();
     threatened.sides[0].active[0]!.sethp(hp);
     expect(hintOf(threatened, 'p1', 'move protect, move splash')).toBeGreaterThan(hintOf(threatened, 'p1', 'move splash, move splash'));
-    const healthy = protector();
-    expect(hintOf(healthy, 'p1', 'move protect, move splash')).toBeCloseTo(hintOf(healthy, 'p1', 'move splash, move splash'), 10);
+    // Round 70 (gate of 13.10. 20:26, 3a): a healthy Snorlax in front of two Dragon Claws now earns the damage the Protect denies
+    // (protect-tempo-hints.spec.ts); with no damaging foe there is nothing to deny and the Protect stays the floor.
+    const idleFoes = battleOf(FORMAT, [set('Snorlax', ['splash', 'protect']), splash('Blissey')], [splash('Garchomp'), splash('Garchomp')]);
+    expect(hintOf(idleFoes, 'p1', 'move protect, move splash')).toBeCloseTo(hintOf(idleFoes, 'p1', 'move splash, move splash'), 10);
   });
 
   test('Fake Out keeps its flinch bonus on the turn it works', () => {

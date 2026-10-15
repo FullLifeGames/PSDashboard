@@ -4,7 +4,7 @@ import type { Battle, PokemonSet } from '@pkmn/sim';
 import { createRootPosition } from '../src/forward-model';
 import { loadSimMods } from '../src/forward/sim-mods';
 import { singleMoveFraction } from '../src/score/threat';
-import { combinedOptionHints, shieldsSide, sideProtectorStops } from '../src/search/hints';
+import { combinedOptionHints, shieldsSide, protectorStops } from '../src/search/hints';
 import { set } from './move-oracle';
 import { battleOf, fingerprint } from './power-oracle';
 
@@ -72,7 +72,7 @@ describe.each(RULES)('$name: side protectors in the hints (round 70)', rules => 
   function readStops(protector: string, moveId: string): boolean {
     const battle = slowFoeBoard(protector, moveId);
     const dex = battle.dex;
-    return sideProtectorStops(battle, dex.moves.get(protector), dex.getActiveMove(moveId), battle.sides[1].active[0]!, battle.sides[0].active[0]!);
+    return protectorStops(battle, dex.moves.get(protector), dex.getActiveMove(moveId), battle.sides[1].active[0]!, battle.sides[0].active[0]!);
   }
 
   describe('the Dex reading', () => {
@@ -181,7 +181,7 @@ describe.each(RULES)('$name: side protectors in the hints (round 70)', rules => 
       source.volatiles['lockedmove'] = { id: 'lockedmove', duration: 2 } as unknown as typeof source.volatiles[string];
       const before = fingerprint(battle, [source, target], 'rockslide');
       const wide = battle.dex.moves.get('wideguard');
-      expect(sideProtectorStops(battle, wide, battle.dex.getActiveMove('rockslide'), source, target)).toBe(true);
+      expect(protectorStops(battle, wide, battle.dex.getActiveMove('rockslide'), source, target)).toBe(true);
       expect(fingerprint(battle, [source, target], 'rockslide')).toBe(before);
       expect(source.volatiles['lockedmove']).toBeDefined();
     });
