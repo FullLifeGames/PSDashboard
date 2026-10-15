@@ -1,4 +1,5 @@
 import type { EvalMatrix, ReadRecommendation } from './types.ts';
+import { normalizeLineEndings } from './line-endings.ts';
 
 /**
  * The exploitative "Read" lens: a boundedly-rational opponent model and a
@@ -96,13 +97,13 @@ function noteTendencyLine(scan: TendencyScan, line: string, side: 'p1' | 'p2'): 
  * Per-side action tendencies from the replay protocol: the first |move| or
  * non-pivot |switch| after each |turn| marker is that side's main choice.
  */
-export function parseTendencies(log: string, side: 'p1' | 'p2'): PlayerTendencies {
+export function parseTendencies(rawLog: string, side: 'p1' | 'p2'): PlayerTendencies {
   const scan: TendencyScan = {
     moves: 0, switches: 0, repeats: 0, repeatChances: 0, lastMove: null,
     settledThisTurn: false, moved: false, started: false, pendingFaints: 0,
   };
 
-  for (const line of log.split('\n')) noteTendencyLine(scan, line, side);
+  for (const line of normalizeLineEndings(rawLog).split('\n')) noteTendencyLine(scan, line, side);
 
   const total = scan.moves + scan.switches;
   return {

@@ -1,5 +1,6 @@
 import type { TeraAllowance } from './types.ts';
 import { toId } from '@fulllifegames/replay-core';
+import { normalizeLineEndings } from './line-endings.ts';
 
 /**
  * Tera-rights resolution. Draft leagues grant Terastallization to specific
@@ -41,10 +42,10 @@ function noteTeraLine(parts: string[], species: SpeciesByNick, revealed: Reveale
  * The species that actually terastallized in the replay, per side —
  * `|-terastallize|` names nicknames, resolved through the switch lines.
  */
-export function parseRevealedTeraSpecies(log: string): { p1: string[]; p2: string[] } {
+export function parseRevealedTeraSpecies(rawLog: string): { p1: string[]; p2: string[] } {
   const species: SpeciesByNick = { p1: new Map(), p2: new Map() };
   const revealed = { p1: [] as string[], p2: [] as string[] };
-  for (const line of log.split('\n')) {
+  for (const line of normalizeLineEndings(rawLog).split('\n')) {
     const parts = line.split('|');
     const tag = parts[1];
     if (tag === 'switch' || tag === 'drag' || tag === 'replace') {

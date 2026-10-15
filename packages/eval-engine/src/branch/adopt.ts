@@ -1,6 +1,7 @@
 import type { TurnSnapshot } from '@fulllifegames/replay-core';
 import { deserializeBattleExact } from '../forward-model.ts';
 import type { TurnAlignmentRecord } from '../hax-alignment.ts';
+import { normalizeLineEndings } from '../line-endings.ts';
 import { alignArrivalDice } from './arrival-dice.ts';
 import { correctBattleFromSnapshot, refreshRequestsFromLiveState } from './corrections.ts';
 import { branchLogForPosition } from './log-sync.ts';
@@ -43,10 +44,12 @@ export interface AdoptParams {
  * as it was. The search never reads the position's dice: its forks reseed.
  */
 export function adoptSerializedRuntime(params: AdoptParams): BranchRuntime {
+  // The log's line endings are settled here once; every reader below sees LF (T206 for the engine).
+  const replayLog = normalizeLineEndings(params.replayLog);
   const battle = deserializeBattleExact(params.serialized);
   if (params.snapshot) correctBattleFromSnapshot(battle, params.snapshot);
   refreshRequestsFromLiveState(battle);
-  if (params.snapshot) alignArrivalDice(battle, params.replayLog, params.targetTurn);
+  if (params.snapshot) alignArrivalDice(battle, replayLog, params.targetTurn);
   battle.sentLogPos = battle.log.length;
 
   const session = openStreams();
@@ -57,7 +60,7 @@ export function adoptSerializedRuntime(params: AdoptParams): BranchRuntime {
   });
   battleStream.battle = battle;
 
-  const log = params.log ? [...params.log] : branchLogForPosition(params.replayLog, params.targetTurn, battle);
+  const log = params.log ? [...params.log] : branchLogForPosition(replayLog, params.targetTurn, battle);
   session.collectedLog.push(...log);
   return {
     battleStream,

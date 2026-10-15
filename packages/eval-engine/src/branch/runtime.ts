@@ -1,4 +1,5 @@
 import { extractProtocolEvents, scoreAlignment } from '../hax-alignment.ts';
+import { normalizeLineEndings } from '../line-endings.ts';
 import type { BranchRuntime, SimBattle, TurnBlock } from './types.ts';
 import { getMainChoice, parseTurnBlocks } from './protocol-choices.ts';
 import { protocolNicknames } from './protocol-names.ts';
@@ -230,7 +231,9 @@ async function finishReconstruction(session: ReconstructionSession): Promise<Bra
  * choices block by block, then corrects the arrival position from the
  * snapshot. The stages run in the order the original single function had.
  */
-export async function reconstructBranchRuntime(params: ReconstructParams): Promise<BranchRuntime> {
+export async function reconstructBranchRuntime(rawParams: ReconstructParams): Promise<BranchRuntime> {
+  // The log's line endings are settled here once; every reader below sees LF (T206 for the engine).
+  const params = { ...rawParams, replayLog: normalizeLineEndings(rawParams.replayLog) };
   const overallDeadline = Date.now() + (params.deadlineMs ?? 60_000);
   const { orderedP1, orderedP2 } = orderTeams(params);
   const session = openSession(params, overallDeadline);

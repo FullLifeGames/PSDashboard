@@ -6,8 +6,8 @@ function replayLogPrefixThroughTurn(replayLog: string, targetTurn: number): stri
   const prefix: string[] = [];
   let foundTargetTurn = false;
 
-  for (const rawLine of replayLog.split('\n')) {
-    const line = rawLine.replace(/\r$/, '');
+  // The log reaches here through a door that settled its line endings (reconstructBranchRuntime, adoptSerializedRuntime).
+  for (const line of replayLog.split('\n')) {
     if (!line.trim()) continue;
     prefix.push(line);
     if (line === `|turn|${targetTurn}`) {

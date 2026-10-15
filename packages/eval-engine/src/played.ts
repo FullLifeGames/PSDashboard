@@ -3,11 +3,19 @@
  * no @pkmn/sim imports, main-bundle safe.
  */
 
-import { toId, type SideId } from '@fulllifegames/replay-core';
+import { toId, type SideId, type TurnSnapshot } from '@fulllifegames/replay-core';
+import { normalizeLineEndings, normalizeLines } from './line-endings.ts';
+import { detectSacks as detectSacksOfLf, type SackInfo } from './turn-analysis/sacks.ts';
 
-/** Round 63: the sack shapes live in turn-analysis/sacks.ts; the protocol API keeps its old address. */
-export { detectSacks } from './turn-analysis/sacks.ts';
 export type { SackInfo } from './turn-analysis/sacks.ts';
+
+/**
+ * Round 63: the sack shapes live in turn-analysis/sacks.ts; the protocol API keeps its old address. Round 70 (T206): the address
+ * is also the reader's door for line endings, because the faint pattern matches to the line end and a '\r' there hid every sack.
+ */
+export function detectSacks(events: string[], snapshotBefore: TurnSnapshot | null): { p1?: SackInfo; p2?: SackInfo } {
+  return detectSacksOfLf(normalizeLines(events), snapshotBefore);
+}
 
 export interface PlayedAction {
   kind: 'move' | 'switch';
@@ -137,7 +145,8 @@ function notePlayedLine(scan: PlayedScan, tag: string, side: SideId, parts: stri
  * with the protocol's traps excluded: switches after the side already moved
  * are pivots (U-turn), switches after the side's own faint are replacements,
  * `|drag|`/`|replace|` are never choices, and `|cant|` means the choice
- * never surfaced (the side stays unknown rather than guessed).
+ * never surfaced (the side stays unknown rather than guessed). Round 70 (T206): the lines pass the door for line endings first, so
+ * the reason of a `|cant|` line, its last field, reads "flinch" and never "flinch\r".
  */
 export function parsePlayedActions(lines: string[]): PlayedTurn {
   const scan: PlayedScan = {
@@ -149,7 +158,7 @@ export function parsePlayedActions(lines: string[]): PlayedTurn {
     prevented: {},
   };
 
-  for (const line of lines) {
+  for (const line of normalizeLines(lines)) {
     const parts = line.split('|');
     const tag = parts[1];
     if (!tag) continue;
@@ -165,10 +174,10 @@ export function parsePlayedActions(lines: string[]): PlayedTurn {
  * `|start` and the first `|turn|` — the turn-0 decision as the replay shows
  * it. Species names, in slot order.
  */
-export function parseLeadSpecies(log: string): { p1: string[]; p2: string[] } {
+export function parseLeadSpecies(rawLog: string): { p1: string[]; p2: string[] } {
   const leads = { p1: [] as string[], p2: [] as string[] };
   let started = false;
-  for (const line of log.split('\n')) {
+  for (const line of normalizeLineEndings(rawLog).split('\n')) {
     const parts = line.split('|');
     const tag = parts[1];
     if (tag === 'start') {
@@ -250,7 +259,7 @@ export function parsePlayedActionsDoubles(lines: string[]): PlayedTurn {
     ultra: { p1: [false, false], p2: [false, false] },
   };
 
-  for (const line of lines) {
+  for (const line of normalizeLines(lines)) {
     const parts = line.split('|');
     const tag = parts[1];
     if (!tag) continue;
@@ -267,8 +276,8 @@ export function parsePlayedActionsDoubles(lines: string[]): PlayedTurn {
  * end). NOT the same as a TurnSnapshot's `log` chunk, which groups lines by
  * snapshot association rather than turn boundaries.
  */
-export function turnEvents(log: string, turn: number): string[] {
-  const lines = log.split('\n');
+export function turnEvents(rawLog: string, turn: number): string[] {
+  const lines = normalizeLineEndings(rawLog).split('\n');
   const start = lines.indexOf(`|turn|${turn}`);
   if (start < 0) return [];
   const events: string[] = [];
@@ -284,10 +293,10 @@ export function turnEvents(log: string, turn: number): string[] {
  * as turnEvents). Callers iterating every turn use this instead of calling
  * turnEvents per turn, which re-splits the whole log each time.
  */
-export function allTurnEvents(log: string): string[][] {
+export function allTurnEvents(rawLog: string): string[][] {
   const byTurn: string[][] = [];
   let current: string[] | null = null;
-  for (const line of log.split('\n')) {
+  for (const line of normalizeLineEndings(rawLog).split('\n')) {
     const match = line.match(/^\|turn\|(\d+)/);
     if (match) {
       current = [];

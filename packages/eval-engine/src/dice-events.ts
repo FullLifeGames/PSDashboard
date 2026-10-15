@@ -1,5 +1,6 @@
 import { Dex } from '@pkmn/dex';
 import { toId, type SideId, type TurnSnapshot } from '@fulllifegames/replay-core';
+import { normalizeLines } from './line-endings.ts';
 
 /**
  * Protocol-visible dice events, per turn — the anchor that keeps the
@@ -84,12 +85,13 @@ function diceMarks(lines: readonly string[], generation: number | undefined): bo
 
 /**
  * Turns whose protocol carries at least one visible dice event; the index is by turn (entry 0 stays empty).
- * Round 69 (T177): with the replay generation a sure crit and a status no dice decided are no event.
+ * Round 69 (T177): with the replay generation a sure crit and a status no dice decided are no event. Round 70 (T206): every turn's
+ * lines pass the door for line endings (normalizeLines) before they are read.
  */
 export function diceEventTurns(turnEventsIndex: readonly (readonly string[])[], generation?: number): Set<number> {
   const turns = new Set<number>();
   turnEventsIndex.forEach((lines, turn) => {
-    if (turn >= 1 && diceMarks(lines, generation).some(Boolean)) turns.add(turn);
+    if (turn >= 1 && diceMarks(normalizeLines(lines), generation).some(Boolean)) turns.add(turn);
   });
   return turns;
 }
@@ -192,8 +194,10 @@ function noteEntry(entered: Entered, parts: string[]): void {
 /**
  * Round 67 (T22): the sides a turn's dice markers favored and the hits its moves put on opposing bodies.
  * Round 69 (T177): with the replay generation, the markers of a sure crit and of a status no dice decided are no roll.
+ * Round 70 (T206): the lines pass the door for line endings (normalizeLines) first; a '\r' at the end of a damage line hid its KO.
  */
-export function detectRolls(lines: readonly string[], snapshotBefore: TurnSnapshot | null, generation?: number): TurnRolls {
+export function detectRolls(rawLines: readonly string[], snapshotBefore: TurnSnapshot | null, generation?: number): TurnRolls {
+  const lines = normalizeLines(rawLines);
   const favored = { p1: false, p2: false };
   const scan = { entered: new Map() as Entered, snapshotBefore, hits: [] as RolledHit[] };
   const marks = diceMarks(lines, generation);

@@ -13,6 +13,7 @@ import { attackerAtUse, calcPokemon, type CalcBody } from './calc/body.ts';
 import { defenderAbilities, defenderItems, formeAbility, isBodyOf, pricedSpecies, type DefenderRead } from './choice-lock-defender.ts';
 import { calcMove } from './calc/move.ts';
 import { CHOICE_ITEMS } from './sensitivity.ts';
+import { normalizeLineEndings } from './line-endings.ts';
 
 /** `handedOver`: the Choice item came by a move, so the protocol itself shows it (no set guess to vet). */
 export interface ProtocolLock { species: string; moveId: string; handedOver?: boolean }
@@ -408,10 +409,11 @@ export interface ChoiceLockContext {
  * be CONTRADICTED by the damage record (spec 1c; ambiguity never blocks).
  */
 export function buildChoiceLockContext(
-  replayLog: string,
+  rawLog: string,
   teams: { p1Team: PokemonSet[]; p2Team: PokemonSet[] },
   observations: DamageObservation[],
 ): ChoiceLockContext {
+  const replayLog = normalizeLineEndings(rawLog);
   const genNum = parseInt(replayLog.match(/^\|gen\|(\d)/m)?.[1] ?? '9', 10);
   // Round 67 (decision 30): a Champions game's built sets hold Stat Points.
   const mod = replayRuleset({ log: replayLog }) === 'champions' ? 'champions' : undefined;
