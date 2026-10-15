@@ -17,7 +17,7 @@ PS Dashboard analyzes Pokémon Showdown replays: it replays a game turn by turn,
 
 - Plain language: every summary, gate and report starts with the problem in one game scene, the idea with an everyday comparison, what changes for the user, and how success is measured. Project terms (pin, gate, golden, bank) are fine; new coinages are not.
 - Gates: numbered questions in plain text, two sentences of scene per question, options a/b/c in one or two sentences each, the recommendation marked, answer format "1a 2a 3a".
-- Tracked documents and every user-facing string go through the `stop-slop` skill: no dashes as separators, no filler adverbs, active voice, specific claims. Exceptions: verbatim quotes of app output, technical invariants with "never" or "always", placeholder glyphs. The engine's prose (`summary.ts`, `report.ts`) is pinned by the feedback corpus and changes only in a round of its own.
+- Tracked documents and every user-facing string go through the `stop-slop` skill: no dashes as separators, no filler adverbs, active voice, specific claims. Exceptions: verbatim quotes of app output, technical invariants with "never" or "always", placeholder glyphs. The engine's prose (`summary.ts`, `report.ts`) is pinned by the feedback corpus: a change to it moves pins, and they wait for the gate of its round or batch.
 - Commits: English, imperative, release style, no attribution lines (no Co-Authored-By). Write messages with quotes to a file and use `git commit -F <file>`.
 - No push, and no deleting branches, worktrees or files you did not create, without the user's okay. An okay covers the named state only.
 - The user reports library bugs upstream himself; collect them as an upstream list with a scene and evidence.
