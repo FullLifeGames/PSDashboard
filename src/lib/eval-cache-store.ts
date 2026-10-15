@@ -298,7 +298,12 @@ export interface StoredEval {
 //      cell plan prices missing weight, immunity and speed ties; doubles verify and answers go deeper; the
 //      static reads boosts that bite, the field pair, a status fix and a phase form, with refitted tables;
 //      results carry cell visits, outcome classes and hindsight reads. Positions of every format read new values.
-const EVAL_ENGINE_CACHE_VERSION = 66;
+// v67 (round 70, batch of fixes): standing stages count where they win a race the holder gets to act in,
+//      with end-of-turn residuals and contact costs played in the simulator; healers attack where that wins;
+//      side protectors and Protect get a damage tempo in the doubles hints; the trend probe reads every base
+//      draw; Gen 1 and 2 build at the server's spread; Z-moves and Max moves reveal their item and base type;
+//      the cards name the click a row walked into. Positions of every format read new values.
+const EVAL_ENGINE_CACHE_VERSION = 67;
 
 /** Round 61: a search-budget form stores under its own tag; the default keeps today's keys. */
 const versionTag = (): string => {
