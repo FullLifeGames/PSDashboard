@@ -282,20 +282,29 @@ export interface SideAnalysis {
     likeliest?: number;
     /**
      * Round 69 (T64): the read clears the side row's gate: its gain lies a
-     * band (one inaccuracy) past the equilibrium regret, and the cell of the
-     * best row against the click is no guess (EvalMatrix.cells: at least
-     * HINDSIGHT_MIN_VISITS visits or verified; a result without cells passes).
+     * band (one inaccuracy) past the equilibrium regret, and the cells of the
+     * best row and of the played row against the click are no guess
+     * (EvalMatrix.cells: at least HINDSIGHT_MIN_VISITS visits, verified, or,
+     * since round 70, a plain cell a tree expanded; a result without cells passes).
      * `line` is the side row's sentence; neither enters tier or sums.
      */
     shown?: true;
     line?: string;
     /**
      * Gate of 12.10. 19:17: the cell of the best row against the click is a
-     * guess (fewer than HINDSIGHT_MIN_VISITS visits, not verified). The card
-     * sentences leave such a read out; the read itself stays on the analysis.
+     * guess (fewer than HINDSIGHT_MIN_VISITS visits, not verified); round 70
+     * (T217): so is the played row's. The card sentences leave such a read
+     * out; the read itself stays on the analysis.
      */
     thin?: true;
   };
+  /**
+   * Round 70 (gate of 13.10. 20:26, 4a): the KO odds the "True odds" note quotes for the played line (`played`) or for the shown
+   * recommendation (`best`) price a hit that never landed against the opponent's actual click: in the cell of that line against
+   * the click the search finds no uncertain hit of the claim's move (the opponent's pair stops it: a Protect, a Wide Guard).
+   * Display only: the note leaves such a claim out (turn-analysis/odds-stopped.ts), no grade reads it.
+   */
+  hitStopped?: { played?: true; best?: true };
   /**
    * Round 47: the read BEFORE the click. The opponent model's favourite
    * `expect` holds at least PREDICTIVE_READ_CONFIDENCE, and against it the
@@ -409,8 +418,9 @@ export interface TurnAnalysis {
    * a protocol dice marker, or a played line's KO odds as they came out on
    * the body they priced. The luck sentences say "rolled" only for a roll in
    * the residual's direction and name the rest as the engine re-reading the
-   * position. Absent without the turn's protocol: the sentences keep their
-   * ungated form.
+   * position. Absent without the turn's protocol and without the planner's
+   * answer for the played cell (round 69, T178; doubles since round 70,
+   * T217): the sentences keep their ungated form.
    */
   rolledFor?: { p1: boolean; p2: boolean };
 }

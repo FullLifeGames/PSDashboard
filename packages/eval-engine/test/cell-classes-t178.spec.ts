@@ -15,8 +15,8 @@ import type { EvalMatrix, EvalResult, MctsTreeStats, PlannedCell, RankedChoice }
  * Round 69 (T178, spec decision 24): the result carries the planner's answer for each matrix cell (none, events,
  * fail) and the outcome classes of a rolled cell, next to the visits and the verified flag of T64. The classes come
  * from planCellEvents and foldClassWeights (read only); the merge stays sim-free and copies what the offset-0 tree
- * shipped. A turn without its protocol takes "rolled" from the played cell's classes; doubles carry no plan and
- * keep the log reading.
+ * shipped. A turn without its protocol takes "rolled" from the played cell's classes; a doubles cell without a plan answer
+ * (the tree plans only the played row and column since round 70, T217: pair-root-plan-t217.spec.ts) keeps the log reading.
  */
 
 const options = (choices: string[]) => choices.map(choice => ({ choice, label: choice }));
@@ -122,16 +122,18 @@ describe('the report reads the played cell when the turn has no protocol', () =>
     ({ choice, label, worstCase: ev, expected: ev, ev, punishedBy: null });
   const names: [string, string] = ['Alpha', 'Beta'];
 
+  // Round 70 (T217): a plain cell holding a move with a secondary effect under 100% (Thunder's paralysis) gives no answer;
+  // these cases keep Hydro Pump, which has none (luck-unpriced-t217.spec.ts pins the rest).
   const single = (cellOf: NonNullable<EvalMatrix['cells']>[number][number]): { result: EvalResult; played: PlayedTurn } => ({
     result: {
       score: 0.05, interval: 0.02, depthCompleted: 1,
-      perSide: { p1: [row('move thunder', 'Thunder', 0.05)], p2: [row('move seismictoss', 'Seismic Toss', -0.05)] },
+      perSide: { p1: [row('move hydropump', 'Hydro Pump', 0.05)], p2: [row('move seismictoss', 'Seismic Toss', -0.05)] },
       matrix: {
-        p1Labels: ['Thunder'], p2Labels: ['Seismic Toss'], p1Choices: ['move thunder'], p2Choices: ['move seismictoss'],
+        p1Labels: ['Hydro Pump'], p2Labels: ['Seismic Toss'], p1Choices: ['move hydropump'], p2Choices: ['move seismictoss'],
         values: [[0.05]], mixes: { p1: [1], p2: [1] }, cells: [[cellOf]],
       },
     },
-    played: { p1: { kind: 'move', name: 'Thunder', tera: false }, p2: { kind: 'move', name: 'Seismic Toss', tera: false } },
+    played: { p1: { kind: 'move', name: 'Hydro Pump', tera: false }, p2: { kind: 'move', name: 'Seismic Toss', tera: false } },
   });
   const turn = (result: EvalResult, played: PlayedTurn) => analyzeTurn({
     turn: 4, result, played, playedOutcome: 0.05, scoreBefore: 0.05, scoreAfter: 0.25,
@@ -163,7 +165,7 @@ describe('the report reads the played cell when the turn has no protocol', () =>
     expect(turn(fixture.result, fixture.played).rolledFor).toEqual({ p1: false, p2: false });
   });
 
-  test('doubles: combined choices carry no plan, so the log reading stays (equal to the result without cells)', () => {
+  test('doubles: a cell without a plan answer keeps the log reading (equal to the result without cells)', () => {
     const doubles = {
       result: {
         score: 0.05, interval: 0.02, depthCompleted: 1,

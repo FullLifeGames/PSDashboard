@@ -1,4 +1,4 @@
-import type { EntryUnanswered, EvalMatrix, RankedChoice } from '../types.ts';
+import type { EntryUnanswered, EvalMatrix, MatrixCell, RankedChoice } from '../types.ts';
 import { nullMoveReason } from '../null-moves.ts';
 import { detectStreakOdds } from '../streaks.ts';
 import { TIE_EPSILON } from '../rank.ts';
@@ -105,25 +105,33 @@ function forcedMixFor(view: MatrixView, options: RankedChoice[]): SideAnalysis['
  * Round 69 (T64): a hindsight read is SHOWN on the side row only when its gain lies a band past the equilibrium
  * regret (one inaccuracy: the same step the tiers use) and the cell of the best row against the click is no
  * guess: at least HINDSIGHT_MIN_VISITS pooled visits, or re-priced by the verify step (912045 t8 read a 0.20 gain
- * off a cell with one to two visits). A result without `cells` (matrix mode, old cache) passes.
+ * off a cell with one to two visits). A result without `cells` (matrix mode, old cache) passes. Round 70: a visited
+ * plain cell is no guess either (cellSolid), and the played row's cell against the click is held to the same gate.
  */
 export const HINDSIGHT_BAND = TIER_THRESHOLDS.inaccuracy;
 export const HINDSIGHT_MIN_VISITS = 8;
 
-/** The cell behind a read is no guess: enough visits or re-priced by the verify step; a cell the result does not carry passes. */
-const cellSolid = (cell: { visits: number; verified: boolean } | undefined): boolean =>
-  !cell || cell.verified || cell.visits >= HINDSIGHT_MIN_VISITS;
+/**
+ * The cell behind a read is no guess: enough visits or re-priced by the verify step; a cell the result does not carry passes.
+ * Round 70 (gate of 13.10. 20:26, 2a): so is a cell the planner calls plain ("none": no accuracy roll and no kill range in the
+ * pair, the pair plan's plain cell in doubles) once a tree expanded it, since its one outcome needs no second visit to be seen
+ * (2630685175 t7: the best row against the clicked Wide Guard, 4 visits, value 1.00). A plain cell nobody expanded reads the
+ * root static and stays a guess.
+ */
+const cellSolid = (cell: Pick<MatrixCell, 'visits' | 'verified' | 'plan'> | undefined): boolean =>
+  !cell || cell.verified || cell.visits >= HINDSIGHT_MIN_VISITS || (cell.plan === 'none' && cell.visits >= 1);
 
 /**
- * The gate's parts of a hindsight read. The side row's flag and sentence need the solid cell and the band past the
- * regret; the card sentences (gate of 12.10. 19:17) need the solid cell alone, so a thin cell marks the read.
+ * The gate's parts of a hindsight read. The side row's flag and sentence need the solid cells and the band past the
+ * regret; the card sentences (gate of 12.10. 19:17) need the solid cells alone, so a thin cell marks the read. Round 70
+ * (T217): the gain is the best row's cell minus the played row's cell, so both cells are held to the gate.
  */
 function hindsightShown(
   read: { response: string; against: string; gain: number },
-  cell: { visits: number; verified: boolean } | undefined,
+  cells: (Pick<MatrixCell, 'visits' | 'verified' | 'plan'> | undefined)[],
   regret: number | null,
 ): { shown: true; line: string } | { thin: true } | Record<string, never> {
-  if (!cellSolid(cell)) return { thin: true };
+  if (!cells.every(cellSolid)) return { thin: true };
   return read.gain >= (regret ?? 0) + HINDSIGHT_BAND ? { shown: true, line: hindsightLine(read) } : {};
 }
 
@@ -187,8 +195,9 @@ function hindsightReadFor(
   const gain = bestValue - view.ownValue(matrix, row, column);
   if (bestRow >= 0 && bestRow !== row && gain >= TIER_THRESHOLDS.mistake) {
     const read = { response: sideLabels[bestRow], against: oppPlayed!.label, gain };
-    const cell = matrix.cells?.[key === 'p1' ? bestRow : column]?.[key === 'p1' ? column : bestRow];
-    return { ...read, ...likeliestClick(params, key, matrix, column), ...hindsightShown(read, cell, regret) };
+    // The cells of the best row and of the played row against the click (cells[p1 row][p2 column]).
+    const cellAt = (own: number) => matrix.cells?.[key === 'p1' ? own : column]?.[key === 'p1' ? column : own];
+    return { ...read, ...likeliestClick(params, key, matrix, column), ...hindsightShown(read, [cellAt(bestRow), cellAt(row)], regret) };
   }
   return undefined;
 }

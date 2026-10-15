@@ -2,7 +2,7 @@ import { Dex } from '@pkmn/dex';
 import { toId } from '@fulllifegames/replay-core';
 import type { TurnRolls } from '../dice-events.ts';
 import type { EvalResult, MatrixCell } from '../types.ts';
-import type { PlayedTurn } from '../played.ts';
+import type { PlayedAction, PlayedTurn } from '../played.ts';
 import { matchClickedColumn } from './played-match.ts';
 import type { AnalyzeTurnParams, Side, SideAnalysis, TurnAnalysis } from './types.ts';
 
@@ -93,17 +93,47 @@ export function playedCellOf(result: EvalResult, played: PlayedTurn | null | und
   return row >= 0 && column >= 0 ? matrix.cells[row]?.[column] ?? null : null;
 }
 
+/** Every move the played pair names, both sides, singles and doubles slots (a switch names none). */
+export function playedMoveIds(played: PlayedTurn | null | undefined): string[] {
+  if (!played) return [];
+  const actions: (PlayedAction | null | undefined)[] = [played.p1, played.p2, ...(played.p1Slots ?? []), ...(played.p2Slots ?? [])];
+  return actions.filter((action): action is PlayedAction => action?.kind === 'move').map(action => toId(action.name));
+}
+
+/** The data-only Dex of the replay's generation (a Champions battle reads Gen 9's); the current one without a generation. */
+const dexOfGeneration = (gen: number | undefined) => (gen === undefined ? Dex : Dex.forGen(Math.min(9, Math.max(1, gen))));
+
+/**
+ * Round 70 (T217): whether any of the moves carries a secondary effect that may or may not happen: a chance under 100 on a
+ * status, a stat change or a flinch (Body Slam's paralysis, Scald's burn, Earth Power's drop), read from the Dex. The planner
+ * prices the accuracy and the kill range of a hit and nothing else, so such an effect sits in a cell it calls plain.
+ */
+function rollsUnpricedEffect(moves: readonly string[], gen: number | undefined): boolean {
+  const dex = dexOfGeneration(gen);
+  return moves.some(id => {
+    const move = dex.moves.get(id);
+    return (move.secondaries ?? (move.secondary ? [move.secondary] : [])).some(effect => (effect.chance ?? 100) < 100);
+  });
+}
+
 /**
  * Round 69 (T178): what the played cell's outcome classes say about the turn when the turn's protocol is missing. A
- * cell the planner called deterministic rolled nothing; a cell with at least two classes, each weighted strictly
- * between 0 and 1, held a real roll. The classes do not say which way it went, so a rolled cell counts for both
- * sides and the residual's direction is not checked. Undefined where the planner gave no answer (doubles, fail, a
- * result from before the field): the sentences keep their ungated form.
+ * cell with at least two classes, each weighted strictly between 0 and 1, held a real roll. The classes do not say which
+ * way it went, so a rolled cell counts for both sides and the residual's direction is not checked. A cell the planner
+ * calls plain ("none") or holds in one class has no PRICED roll (round 70, T217; review finding 4 of round 69: the planner
+ * prices the accuracy and the kill range of a hit): it rolled nothing unless a move of the pair carries a secondary effect
+ * under 100%, which may have rolled and which `moves` names. Undefined where the planner gave no answer (a doubles cell the
+ * search did not plan, fail, a result from before the field) and where such an effect leaves the question open: the
+ * sentences keep their ungated form.
  */
-export function rolledFromCell(cell: MatrixCell | null): { p1: boolean; p2: boolean } | undefined {
-  if (cell?.plan === 'none') return { p1: false, p2: false };
-  if (cell?.plan !== 'events' || !cell.classes) return undefined;
-  const real = cell.classes.filter(entry => entry.weight > 0 && entry.weight < 1).length >= 2;
+export function rolledFromCell(
+  cell: MatrixCell | null,
+  moves: readonly string[] = [],
+  gen?: number,
+): { p1: boolean; p2: boolean } | undefined {
+  if (!cell || (cell.plan !== 'none' && (cell.plan !== 'events' || !cell.classes))) return undefined;
+  const real = (cell.classes ?? []).filter(entry => entry.weight > 0 && entry.weight < 1).length >= 2;
+  if (!real && rollsUnpricedEffect(moves, gen)) return undefined;
   return { p1: real, p2: real };
 }
 

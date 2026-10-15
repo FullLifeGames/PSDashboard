@@ -13,6 +13,8 @@ import { perfSync } from './perf-trace.ts';
 import { searchBudget, SEARCH_BUDGET_DEFAULT } from './search/budget.ts';
 import { SEARCH_SEEDS } from './search/leaf.ts';
 import { benchOrder, callbacksToGiven, resultToGiven, treeToGiven } from './search/bench-order.ts';
+import { pairPlanAnswer } from './pair/root-plan.ts';
+import { findPlayedOption } from './turn-analysis/played-match.ts';
 import type {
   CellOutcomeClass, EvalResult, EvalSettings, KoOddsInfo, MctsTreeStats, PlannedCell, SearchProgress, TeraAllowance, UnansweredProfile,
 } from './types.ts';
@@ -264,12 +266,45 @@ function classesOf(root: Node, p1Choice: string, p2Choice: string, events: CellE
 }
 
 /**
+ * Round 70 (T217): the pair plan's answer for the cells a replay turn's card reads from a doubles root: the played row against
+ * every column and every row against the played column (settings.keepPlayed names them; a side whose click is not among the
+ * options adds nothing). The luck sentences read the played cell, the hindsight gate the best row's and the played row's cell
+ * against the click, the odds clause the same two; a full grid would draw a pair plan for each of some 170 to 300 cells. A
+ * cell the plan hands to the plain mean is left out, like a failed singles cell. Undefined without a played side to plan for.
+ */
+function planPlayedCross(root: Node, settings: EvalSettings): PlannedCell[] | undefined {
+  const rowOption = findPlayedOption(root.p1Options, settings.keepPlayed?.p1Slots);
+  const columnOption = findPlayedOption(root.p2Options, settings.keepPlayed?.p2Slots);
+  const row = rowOption ? root.p1Options.indexOf(rowOption) : -1;
+  const column = columnOption ? root.p2Options.indexOf(columnOption) : -1;
+  if (row < 0 && column < 0) return undefined;
+  const cross = new Set<number>();
+  if (row >= 0) root.p2Options.forEach((_, j) => cross.add(cellKey(row, j)));
+  if (column >= 0) root.p1Options.forEach((_, i) => cross.add(cellKey(i, column)));
+  const matchupCache = createMatchupCache(settings.ruleset);
+  const planned: PlannedCell[] = [];
+  for (const key of [...cross].sort((a, b) => a - b)) {
+    const i = Math.floor(key / 10_000);
+    const j = key % 10_000;
+    try {
+      const answer = pairPlanAnswer(root.position, key, root.p1Options[i].choice, root.p2Options[j].choice, matchupCache);
+      if (answer) planned.push(answer);
+    } catch {
+      // A narrative payload: a cell the plan cannot read stays unplanned, the search result is untouched.
+    }
+  }
+  return planned;
+}
+
+/**
  * The planner's answer for every cell of a singles root (one calc per damaging pair, the boundary flags of the
  * verify selection) and, round 69 (T178), the cells it answered for with their outcome classes. A cell that failed
- * (a guard tripped) is left out of `plannedCells`.
+ * (a guard tripped) is left out of `plannedCells`. Round 70 (T217): a doubles root has no analytic plan and no boundary
+ * list (the pair plan decides it in the verify step); it ships the pair plan's answer for the played cross (planPlayedCross).
  */
-function planRootCells(root: Node): { boundaryCells: number[]; plannedCells: PlannedCell[] } {
+function planRootCells(root: Node, settings: EvalSettings): { boundaryCells: number[]; plannedCells: PlannedCell[] | undefined } {
   const battle = positionBattle(root.position);
+  if (battle.gameType === 'doubles') return { boundaryCells: [], plannedCells: planPlayedCross(root, settings) };
   const boundaryCells: number[] = [];
   const plannedCells: PlannedCell[] = [];
   for (let i = 0; i < root.p1Options.length; i++) {
@@ -305,8 +340,8 @@ function treeSearchOn(
   // up on every combined choice, and the pair plan that prices doubles
   // cells decides their boundary in the verify step (verify-select.ts).
   const doubles = positionBattle(root.position).gameType === 'doubles';
-  const { boundaryCells, plannedCells } = seedOffset === 0 && !doubles && !root.ended && root.p1Options.length > 0 && root.p2Options.length > 0
-    ? planRootCells(root)
+  const { boundaryCells, plannedCells } = seedOffset === 0 && !root.ended && root.p1Options.length > 0 && root.p2Options.length > 0
+    ? planRootCells(root, settings)
     : { boundaryCells: [], plannedCells: undefined };
   const legal = seedOffset === 0 && doubles ? rootLegal(root, settings.tera ?? true) : {};
   const cells = [...root.children.entries()].map(([key, child]) => cellStats(key, child, rootClassKeys.get(key)));

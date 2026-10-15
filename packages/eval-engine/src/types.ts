@@ -412,7 +412,10 @@ export interface EvalMatrix {
    * deterministic pair; events: a priced roll; fail: a guard tripped) and
    * `classes` the outcome classes of an events cell with their analytic
    * weights (summing to 1). Both stay absent where the planner was not run
-   * (doubles, a sibling tree's own result).
+   * (a sibling tree's own result). Round 70 (T217): a doubles result carries
+   * them for the played row and column only (the pair plan's answer,
+   * pair/root-plan.ts; the rest of the grid reads fail), and only when the
+   * search was given the played turn (keepPlayed).
    */
   cells?: MatrixCell[][];
 }
@@ -430,7 +433,10 @@ export interface MatrixCell {
   classes?: CellOutcomeClass[];
 }
 
-/** Round 69 (T178): a singles root cell the planner answered for ('fail' cells are not listed). */
+/**
+ * Round 69 (T178): a root cell the planner answered for ('fail' cells are not listed): every singles cell and, since round 70
+ * (T217), the doubles cells of the played row and column.
+ */
 export interface PlannedCell { key: number; plan: 'none' | 'events'; classes?: CellOutcomeClass[] }
 
 /** An exploitative recommendation: best response to the opponent MODEL. */
@@ -560,7 +566,10 @@ export interface MctsTreeStats {
    * Round 69 (T178): the planner's answer per singles root cell (none and
    * events; a cell that is missing failed), with the outcome classes of the
    * events cells. Shipped by the offset-0 tree beside boundaryCells; the
-   * merge writes it into EvalMatrix.cells. Absent in doubles.
+   * merge writes it into EvalMatrix.cells. Round 70 (T217): a doubles root
+   * ships the pair plan's answer for the played row and column (the cells the
+   * card reads) when the search was given the played turn (settings.keepPlayed);
+   * absent otherwise.
    */
   plannedCells?: PlannedCell[];
   /**

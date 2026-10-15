@@ -19,8 +19,8 @@ function readClause(name: string, side: SideAnalysis, opponent: SideAnalysis): s
   const horizon = side.riskPayoffTurn
     ? side.riskPayoffTurn === 1 ? ' one turn later' : ` ${side.riskPayoffTurn} turns later`
     : '';
-  const odds = side.played.koOdds;
-  // Round 63 (T18): the kill-range shape is a verb phrase of its own ("kills ~43% of the time").
+  const odds = side.hitStopped?.played ? undefined : side.played.koOdds;
+  // Round 63 (T18): the kill-range shape is a verb phrase of its own ("kills ~43% of the time"). Round 70 (4a): not for a hit the click stopped.
   const click = odds ? ` ${oddsPart('The click', odds, 'was')}.` : '';
   return `${name} ${playedVerb(side.played.label)}: a read that paid off${horizon}, ` +
     `${winDeltaText(side.riskPayoff ?? 0)} over the safe ${choiceNoun(side.safe.label)} (${winPctText(side.safe.worstCase, side.faintedFraction)} guaranteed).${priced}${click}`;

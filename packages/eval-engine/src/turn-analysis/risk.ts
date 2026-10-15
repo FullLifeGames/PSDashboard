@@ -147,14 +147,24 @@ function culpritAttribution(p1: SideAnalysis, p2: SideAnalysis): TurnAttribution
   return null;
 }
 
+/**
+ * Round 70 (gate of 13.10.2026 20:26, 2a): the residual names the turn only when it is the larger part of the swing. The
+ * decision part (the played pair against the position before) can be several times the residual (2630685175 t7: -1.34 against
+ * -0.42, a Wide Guard the played pair walked into), and a card that blames the residual then never names the turn's cause. A
+ * tie goes to the swing's own reading; a turn without a decision part keeps the residual alone.
+ */
+const chanceLeads = (chanceDelta: number, decisionDelta: number | null | undefined): boolean =>
+  decisionDelta === null || decisionDelta === undefined || Math.abs(chanceDelta) > Math.abs(decisionDelta);
+
 /** The movement itself: a roll, a shift or an unclear turn, or quiet. */
 function movementAttribution(
   p1: SideAnalysis,
   p2: SideAnalysis,
   swing: number | null,
   chanceDelta: number | null,
+  decisionDelta: number | null | undefined,
 ): TurnAttribution {
-  if (chanceDelta !== null && Math.abs(chanceDelta) >= CHANCE_THRESHOLD) return 'chance';
+  if (chanceDelta !== null && Math.abs(chanceDelta) >= CHANCE_THRESHOLD && chanceLeads(chanceDelta, decisionDelta)) return 'chance';
   if (swing !== null && Math.abs(swing) >= CHANCE_THRESHOLD) {
     // The score clearly moved but nothing crossed a blame threshold: either
     // a side's choice never surfaced (unclear), or pressure and rolls just
@@ -171,12 +181,25 @@ export function attributionFor(
   p2: SideAnalysis,
   swing: number | null,
   chanceDelta: number | null,
+  decisionDelta: number | null = null,
 ): TurnAttribution {
   if (!playedTracking) {
     // Without played actions only the movement itself can be described.
     return swing !== null && Math.abs(swing) >= CHANCE_THRESHOLD ? 'shift' : 'quiet';
   }
-  return culpritAttribution(p1, p2) ?? movementAttribution(p1, p2, swing, chanceDelta);
+  return culpritAttribution(p1, p2) ?? movementAttribution(p1, p2, swing, chanceDelta, decisionDelta);
+}
+
+/**
+ * Round 70 (gate of 13.10.2026 20:26, 1a): the side walked into its played line's punisher. The opponent's actual click is the
+ * reply the played line's floor was priced on, and that floor trails the best line's floor by at least a mistake band. The
+ * equilibrium may give the reply no weight (2630685175 t7: regret 0.0005, no tier, the opponent clicked Pollen Puff with Wide
+ * Guard), so no grade says it; the card does. Display only.
+ */
+export function walkedInto(side: SideAnalysis, opponent: SideAnalysis): boolean {
+  const { played, best } = side;
+  return !!played && !!best && !!opponent.played && played.punishedBy !== null && played.punishedBy === opponent.played.label
+    && best.worstCase - played.worstCase >= TIER_THRESHOLDS.mistake;
 }
 
 /**
@@ -206,5 +229,5 @@ export function shownAttribution(analysis: TurnAnalysis): TurnAttribution {
   if (p1Read && p2Read) return 'both-read';
   if (p1Read) return 'p1-read';
   if (p2Read) return 'p2-read';
-  return movementAttribution(p1, p2, analysis.swing, analysis.chanceDelta);
+  return movementAttribution(p1, p2, analysis.swing, analysis.chanceDelta, analysis.decisionDelta);
 }

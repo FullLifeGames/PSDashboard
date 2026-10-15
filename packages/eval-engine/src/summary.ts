@@ -3,7 +3,7 @@ import { winDeltaText, winPercent } from './winprob.ts';
 import { forcedWinSpeaks } from './turn-analysis/forced-speech.ts';
 import { splitCombinedLabel } from './turn-analysis/played-match.ts';
 import { chanceRolled } from './turn-analysis/luck.ts';
-import { lostGround, shownAttribution } from './turn-analysis/risk.ts';
+import { lostGround, shownAttribution, walkedInto } from './turn-analysis/risk.ts';
 import { percentBelowSure, phrase, phraseReplies, playedBest, rollText } from './prose/phrases.ts';
 import {
   forcedClause, inaccuracyClause, readCreditClause, sackClause, sensitivityClause, sideClause, streakClause, unansweredClause,
@@ -114,31 +114,38 @@ function decisionSentences(analysis: TurnAnalysis, playerNames: PlayerNames): st
  * since round 12, now visible on the turn itself. Chance against the
  * decided side stays genuine luck. Round 67 (T22): a swing without a roll
  * in its direction is the engine re-reading the position (649664 t12: the
- * only roll went the other way), so the card says so.
+ * only roll went the other way), so the card says so. Round 70 (gate of
+ * 13.10. 20:26, 1a): the sentence of a side that walked into its punisher
+ * follows, the hindsight read it missed.
  */
-function chanceSentence(analysis: TurnAnalysis, playerNames: PlayerNames, decided: Decided): string {
+function chanceSentences(analysis: TurnAnalysis, playerNames: PlayerNames, decided: Decided): string[] {
   const delta = analysis.chanceDelta ?? analysis.swing ?? 0;
   const toward = decided !== null && (decided.key === 'p1' ? delta > 0 : delta < 0);
   if (toward) {
-    return 'Both sides picked reasonable options; the swing is the decided game resolving ' +
-      `toward ${decided.key === 'p1' ? playerNames[0] : playerNames[1]} (${winDeltaText(delta)}).`;
+    return ['Both sides picked reasonable options; the swing is the decided game resolving ' +
+      `toward ${decided.key === 'p1' ? playerNames[0] : playerNames[1]} (${winDeltaText(delta)}).`];
   }
-  return chanceRolled(analysis) === false
+  const sentence = chanceRolled(analysis) === false
     ? `Both sides picked reasonable options; the engine re-read the position after the turn (${winDeltaText(delta)}).`
     : 'Both sides picked reasonable options; the swing came from how the turn rolled ' +
       `(${winDeltaText(delta)}).`;
+  // Round 70 (gate of 13.10. 20:26, 1a): a side that walked into its punisher gets the read it missed after the luck sentence.
+  const walked = hindsightSentence(analysis, playerNames, side => walkedInto(analysis[side], analysis[side === 'p1' ? 'p2' : 'p1']));
+  return walked ? [sentence, walked] : [sentence];
 }
 
 /**
  * The read that was on the table (round 13): the side whose missed read cost more. Round 69 (T64): a read on a cell
  * that is a guess (a thin cell, 912045 t8) is not quoted.
  */
-function hindsightSentence(analysis: TurnAnalysis, playerNames: PlayerNames): string | null {
+function hindsightSentence(
+  analysis: TurnAnalysis, playerNames: PlayerNames, only: (side: 'p1' | 'p2') => boolean = () => true,
+): string | null {
   const reads = [
-    { name: playerNames[0], read: analysis.p1.hindsightRead },
-    { name: playerNames[1], read: analysis.p2.hindsightRead },
-  ].filter((entry): entry is { name: string; read: NonNullable<SideAnalysis['hindsightRead']> } =>
-    entry.read !== undefined && !entry.read.thin);
+    { side: 'p1' as const, name: playerNames[0], read: analysis.p1.hindsightRead },
+    { side: 'p2' as const, name: playerNames[1], read: analysis.p2.hindsightRead },
+  ].filter((entry): entry is { side: 'p1' | 'p2'; name: string; read: NonNullable<SideAnalysis['hindsightRead']> } =>
+    entry.read !== undefined && !entry.read.thin && only(entry.side));
   const missed = reads.sort((a, b) => b.read.gain - a.read.gain)[0];
   if (!missed) return null;
   // Round 47: a click the opponent model favoured was findable before it came.
@@ -186,13 +193,17 @@ function shiftSentences(analysis: TurnAnalysis, playerNames: PlayerNames): strin
     : '';
   const open = (analysis.p1.viableCount ?? 0) >= BREADTH_MIN_OPTIONS &&
     (analysis.p2.viableCount ?? 0) >= BREADTH_MIN_OPTIONS;
+  // Round 70 (gate of 13.10. 20:26, 2a): a shift can now hold parts that pull against each other (a decision part larger than the residual).
+  const parts = analysis.decisionDelta !== null && analysis.chanceDelta !== null && analysis.decisionDelta * analysis.chanceDelta < 0
+    ? 'pulled in opposite directions'
+    : 'pushed the same way';
   sentences.push(open
     ? `A genuinely open turn rather than a drift: ${analysis.p1.viableCount} of ` +
       `${analysis.p1.choiceCount} options for ${playerNames[0]} and ${analysis.p2.viableCount} of ` +
       `${analysis.p2.choiceCount} for ${playerNames[1]} sat within an inaccuracy of best, so the ` +
       `turn hinged on out-predicting the opponent${decomposition}.`
     : decomposition
-      ? `No single mistake stands out; the choices and ${reRead ? "the engine's re-read" : 'the rolls'} pushed the same way${decomposition}.`
+      ? `No single mistake stands out; the choices and ${reRead ? "the engine's re-read" : 'the rolls'} ${parts}${decomposition}.`
       : 'No single mistake stands out; the swing built up without a clear culprit.');
   const hindsight = hindsightSentence(analysis, playerNames);
   if (hindsight) sentences.push(hindsight);
@@ -213,7 +224,7 @@ function attributionSentences(analysis: TurnAnalysis, playerNames: PlayerNames, 
     case 'both-read':
       return decisionSentences(analysis, playerNames);
     case 'chance':
-      return [chanceSentence(analysis, playerNames, decided)];
+      return chanceSentences(analysis, playerNames, decided);
     case 'shift':
       return shiftSentences(analysis, playerNames);
     case 'unclear':

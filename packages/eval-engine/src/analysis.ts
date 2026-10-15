@@ -1,7 +1,8 @@
 import { gradeSide, gradingFields } from './turn-analysis/grading.ts';
 import { signalFields, signalSide } from './turn-analysis/signals.ts';
+import { hitStoppedFor } from './turn-analysis/odds-stopped.ts';
 import { attributionFor, markRisk } from './turn-analysis/risk.ts';
-import { playedCellOf, rolledFromCell, rolledSides } from './turn-analysis/luck.ts';
+import { playedCellOf, playedMoveIds, rolledFromCell, rolledSides } from './turn-analysis/luck.ts';
 import type { AnalyzeTurnParams, Side, SideAnalysis, TurnAnalysis } from './turn-analysis/types.ts';
 
 /**
@@ -30,9 +31,13 @@ export {
 /** One side's record: the grading stages, then the narrative signals, keys in the report's order. */
 function analyzeSide(params: AnalyzeTurnParams, key: Side): SideAnalysis {
   const grading = gradeSide(params, key);
+  const signals = signalSide(params, key, grading);
+  // Round 70 (gate of 13.10. 20:26, 4a): the KO-odds claims the opponent's actual click leaves without a landed hit.
+  const hitStopped = hitStoppedFor(params, key, grading.options, grading.played, grading.best, signals.bestNull);
   return {
     ...gradingFields(params, key, grading),
-    ...signalFields(signalSide(params, key, grading)),
+    ...signalFields(signals),
+    ...(hitStopped ? { hitStopped } : {}),
     ...shareField(params.faintedFraction),
   };
 }
@@ -43,12 +48,13 @@ const shareField = (share: number | null | undefined): { faintedFraction?: numbe
 
 /**
  * The turn's rolls: the protocol's markers and played KO odds when the turn has its log, else (round 69, T178) the
- * classes of the played cell. Doubles keep the log reading: their cells carry no plan.
+ * classes of the played cell. Round 70 (T217): a doubles search plans the cells of the played row and column, so the same
+ * reading holds there, and the moves of the pair say whether an unpriced secondary effect could have rolled.
  */
 function rolledForFields(params: AnalyzeTurnParams, p1: SideAnalysis, p2: SideAnalysis): Pick<TurnAnalysis, 'rolledFor'> {
   const rolledFor = params.rolls
     ? rolledSides(params.rolls, p1, p2, params.actives)
-    : rolledFromCell(playedCellOf(params.result, params.played));
+    : rolledFromCell(playedCellOf(params.result, params.played), playedMoveIds(params.played), params.actives?.gen);
   return rolledFor ? { rolledFor } : {};
 }
 
@@ -63,7 +69,7 @@ export function analyzeTurn(params: AnalyzeTurnParams): TurnAnalysis {
   const chanceDelta = params.playedOutcome !== null && params.scoreAfter !== null
     ? params.scoreAfter - params.playedOutcome
     : null;
-  const attribution = attributionFor(playedTracking, p1, p2, swing, chanceDelta);
+  const attribution = attributionFor(playedTracking, p1, p2, swing, chanceDelta, decisionDelta);
 
   return {
     turn: params.turn,

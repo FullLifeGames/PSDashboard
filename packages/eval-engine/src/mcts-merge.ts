@@ -182,7 +182,9 @@ function pooledMatrix(
  * tree expanded) and whether the verify step re-priced it. Round 69 (T178):
  * with the offset-0 tree's `plannedCells` each cell also says what the
  * planner answered (a cell missing from the list failed) and carries the
- * outcome classes of a rolled cell; without the list (doubles) neither is set.
+ * outcome classes of a rolled cell; without the list (a doubles search without
+ * the played turn, a matrix-mode result) neither is set. Round 70 (T217): a
+ * doubles list covers the played row and column only; the other cells read fail.
  */
 export function matrixCells(
   rows: number, columns: number, visitsOf: (key: number) => number, verified?: Map<number, EvalCellValue>,

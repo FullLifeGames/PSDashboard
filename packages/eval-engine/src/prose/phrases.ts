@@ -141,13 +141,15 @@ export const oddsPart =(name: string, odds: KoOddsInfo, copula: 'was' | 'is') =>
  * One parenthetical naming the true odds behind the clause's claims — the
  * played move's and/or the recommendation's. The "kills ~43% of the time"
  * shape already reads as a verb phrase; the roll shapes take a copula.
+ * Round 70 (gate of 13.10. 20:26, 4a): a claim whose hit the opponent's actual click
+ * stopped (`hitStopped`, the cell of the line against the click) is not quoted.
  */
 export const oddsNote = (side: SideAnalysis): string => {
   const shown = displayBest(side);
   const shownOdds = side.bestNull?.alternative ? side.bestNull.alternative.koOdds : side.best?.koOdds;
   const parts: string[] = [];
-  if (side.played?.koOdds && side.played.choice !== side.best?.choice) parts.push(oddsPart(side.played.label, side.played.koOdds, 'was'));
-  if (shownOdds) parts.push(oddsPart(shown.label, shownOdds, 'is'));
+  if (side.played?.koOdds && side.played.choice !== side.best?.choice && !side.hitStopped?.played) parts.push(oddsPart(side.played.label, side.played.koOdds, 'was'));
+  if (shownOdds && !side.hitStopped?.best) parts.push(oddsPart(shown.label, shownOdds, 'is'));
   return parts.length > 0 ? ` (True odds: ${parts.join('; ')}.)` : '';
 };
 
