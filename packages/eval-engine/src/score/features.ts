@@ -6,6 +6,7 @@ import { liveTypes, livingOf, threatGetter, type MatchupCache } from './threat.t
 import { matchupTerms, sweepCells } from './matchup.ts';
 import { fieldPairCells } from './field-pair.ts';
 import { boostBiteValue, removalFormat, stageValue } from './boost-bite.ts';
+import { residualReader } from './residuals.ts';
 import { statusRight } from './status-factor.ts';
 
 /**
@@ -161,6 +162,8 @@ export function evalFeatures(battle: Battle, cache?: MatchupCache, weights?: Rea
   }
   const terms = matchupTerms(battle, cache);
   const threat = threatGetter(battle, cache);
+  // The end of the turn is played (once, when a race asks for it) only for a board with a standing stage (score/residuals.ts).
+  const residuals = residualReader(battle);
   const faintedFraction = faintedFractionOf(battle);
   const damp = EVAL_WEIGHTS.matchupEarlyDamp;
   const matchupPhase = damp + (1 - damp) * Math.min(1, faintedFraction * 3);
@@ -186,7 +189,7 @@ export function evalFeatures(battle: Battle, cache?: MatchupCache, weights?: Rea
     pairFocus: p1Pair.focus - p2Pair.focus,
     pairRedirect: p1Pair.redirect - p2Pair.redirect,
     boostsBiting: wants('boostsBiting')
-      ? boostBiteValue(battle.sides[0], 0, battle, threat) - boostBiteValue(battle.sides[1], 1, battle, threat)
+      ? boostBiteValue(battle.sides[0], 0, battle, threat, residuals) - boostBiteValue(battle.sides[1], 1, battle, threat, residuals)
       : 0,
     statusFix: p1.statusFix - p2.statusFix,
   };

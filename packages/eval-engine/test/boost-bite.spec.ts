@@ -128,8 +128,10 @@ describe('boostsBiting, singles', () => {
     expect(alone.boostsBiting).toBeCloseTo(alone.boosts, 12);
   });
 
+  // 13.10.2026: a speed stage bites where the move order decides a race somebody wins. The foe swings back with an Ice Beam
+  // (it KOs Garchomp in one hit, so the faster one wins); a foe that only Splashes lets the holder win either way.
   test('each stage on its own: against Unaware the Attack part is 0 and the Speed part stays where it moves first', () => {
-    const battle = battleOf(SINGLES, [GARCHOMP()], [set('Jolteon', ['splash'], { ability: 'Unaware' })]);
+    const battle = battleOf(SINGLES, [GARCHOMP()], [set('Jolteon', ['icebeam', 'splash'], { ability: 'Unaware' })]);
     const attacker = battle.sides[0].active[0]!;
     const foe = battle.sides[1].active[0]!;
     const foeSpeed = foe.getActionSpeed();
@@ -296,7 +298,20 @@ describe('the twin battle runs in the mode of the battle it answers for (user 12
     expect(control.boostsBiting).toBeCloseTo(control.boosts, 12);
   });
 
-  test('a Champions doubles board: one foe with Haze, one without: the stage counts for the half it bites', () => {
+  // 13.10.2026: a Haze on the field wipes the stage for every foe (the foes in front gate it, boost-bite-front.spec.ts); a Haze on
+  // the bench only takes its own foe out of the share.
+  test('a Champions doubles board: a foe with Haze on the bench, three without: the stage counts for the three quarters it bites', () => {
+    const battle = battleOf(CHAMPIONS_DOUBLES, [champion('Garchomp', ['crunch', 'splash']), champion('Garchomp', ['crunch', 'splash'])],
+      [champion('Clefable', ['splash']), champion('Clefable', ['splash']), champion('Clefable', ['haze', 'splash']), champion('Clefable', ['splash'])]);
+    const attackers = battle.sides[0].active as Pokemon[];
+    for (const attacker of attackers) attacker.boosts.atk = 2;
+    for (const foe of battle.sides[1].pokemon) foe.sethp(biteHp(battle, attackers[0], foe));
+    const features = evalFeatures(battle);
+    expect(features.boosts).toBeGreaterThan(0);
+    expect(features.boostsBiting).toBeCloseTo(0.75 * features.boosts, 12);
+  });
+
+  test('a Champions doubles board: the foe with Haze on the field wipes the stage for every foe', () => {
     const battle = battleOf(CHAMPIONS_DOUBLES, [champion('Garchomp', ['crunch', 'splash']), champion('Garchomp', ['crunch', 'splash'])],
       [champion('Clefable', ['haze', 'splash']), champion('Clefable', ['splash'])]);
     const attackers = battle.sides[0].active as Pokemon[];
@@ -304,7 +319,7 @@ describe('the twin battle runs in the mode of the battle it answers for (user 12
     for (const foe of battle.sides[1].active as Pokemon[]) foe.sethp(biteHp(battle, attackers[0], foe));
     const features = evalFeatures(battle);
     expect(features.boosts).toBeGreaterThan(0);
-    expect(features.boostsBiting).toBeCloseTo(0.5 * features.boosts, 12);
+    expect(features.boostsBiting).toBe(0);
   });
 });
 

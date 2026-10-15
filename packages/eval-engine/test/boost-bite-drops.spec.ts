@@ -8,11 +8,17 @@ import { battleOf } from './power-oracle';
 
 /**
  * Round 69 (T49, review of the merge): a stage below 0 bites too. A drop that
- * moves the 1v1 race against its holder (my KO clock longer, the foe's shorter,
- * the first move lost in a race somebody wins within three turns) counts
- * negative in boostsBiting, as the same stage counts in boosts; a drop that
- * moves nothing counts 0. Every premise is played in the simulator, in Scarlet
- * and Violet and on the Champions mod, singles and doubles.
+ * moves the 1v1 race against its holder counts negative in boostsBiting, as the
+ * same stage counts in boosts; a drop that moves nothing counts 0. Every premise
+ * is played in the simulator, in Scarlet and Violet and on the Champions mod,
+ * singles and doubles.
+ *
+ * 13.10.2026 (the Swords Dance report on gen9draft-2058494320): a drop is the
+ * mirror of a boost. It is the foe's stage, so it bites only where the FOE wins
+ * the race with it (a flip from my win to the foe's, or a win the drop made
+ * faster) and gets to act in it; a drop in a race I still win costs nothing, and
+ * a foe that never swings back never wins one. Scene (a) used to be a passive
+ * Clefable that only waited for a 3HKO and is now a Jolteon that swings back.
  */
 
 await loadSimMods('gen9championscustomgame');
@@ -64,15 +70,19 @@ function turnsToKo(battle: Battle, attacker: 0 | 1, victim: 'mine' | 'foe', mode
  */
 function hpAt(hits: number, mode: Mode, mine: [string, string[]], foe: [string, string[]], attacker: 0 | 1): number {
   const damage: number[] = [];
+  let capacity = Infinity;
   for (let seed = 1; seed <= 16; seed++) {
     const battle = board(mode, mine, foe, `1,2,3,${seed}`);
     const victim = mons(battle)[attacker === 0 ? 'foe' : 'mine'];
+    capacity = victim.maxhp;
     const before = victim.hp;
     battle.choose('p1', click(mode, mons(battle).mine, attacker === 0));
     battle.choose('p2', click(mode, mons(battle).foe, attacker === 1));
     damage.push(before - victim.hp);
   }
   damage.sort((x, y) => x - y);
+  // A scene that asks for more hits than the victim's max HP holds is a mistake in the scene, not a board.
+  if (hits * damage[8] > capacity) throw new Error(`${hits} hits of ${damage[8]} HP are more than ${capacity}`);
   return Math.max(1, Math.floor(hits * damage[8]));
 }
 
@@ -80,7 +90,43 @@ function hpAt(hits: number, mode: Mode, mine: [string, string[]], foe: [string, 
 const foeCount = (battle: Battle) => battle.sides[1].pokemon.filter(mon => !mon.fainted).length;
 
 describe.each(MODES)('a stage drop in the race, $name', mode => {
-  test('(a) -2 Attack turns my 2HKO of the foe into a 3HKO: the drop counts, signed, for the foe it bites', () => {
+  /** Garchomp (Crunch) against a faster Jolteon (Shadow Ball): the foe stands at 1.15 of my plain hits, I stand at 2.4 of its hits. */
+  const GARCHOMP: [string, string[]] = ['Garchomp', ['crunch', 'splash']];
+  const JOLTEON: [string, string[]] = ['Jolteon', ['shadowball', 'splash']];
+  function raceScene(mode: Mode, stage: number, swapped = false): Battle {
+    const [mineSet, foeSet] = swapped ? [JOLTEON, GARCHOMP] : [GARCHOMP, JOLTEON];
+    const battle = board(mode, mineSet, foeSet);
+    const { mine, foe } = mons(battle);
+    const [dropped, other] = swapped ? [foe, mine] : [mine, foe];
+    other.sethp(hpAt(1.15, mode, mineSet, foeSet, swapped ? 1 : 0));
+    dropped.sethp(hpAt(2.4, mode, mineSet, foeSet, swapped ? 0 : 1));
+    dropped.boosts.atk = stage;
+    return battle;
+  }
+
+  /** Both leads attack every turn until one faints: who wins the race, and in how many turns. */
+  function played(stage: number): { winner: 'mine' | 'foe'; turns: number } {
+    const battle = raceScene(mode, stage);
+    for (let turn = 1; turn <= 8; turn++) {
+      battle.choose('p1', click(mode, mons(battle).mine, true));
+      battle.choose('p2', click(mode, mons(battle).foe, true));
+      if (mons(battle).foe.fainted) return { winner: 'mine', turns: turn };
+      if (mons(battle).mine.fainted) return { winner: 'foe', turns: turn };
+    }
+    throw new Error('nobody fainted');
+  }
+
+  test('(a) -2 Attack turns the race I win into the race the faster foe wins: the drop counts, signed, for the foe it bites', () => {
+    expect(played(0)).toEqual({ winner: 'mine', turns: 2 });
+    expect(played(-2)).toEqual({ winner: 'foe', turns: 3 });
+    const battle = raceScene(mode, -2);
+    const features = evalFeatures(battle);
+    expect(features.boosts).toBeLessThan(0);
+    expect(features.boostsBiting).toBeCloseTo(stageValue(mons(battle).mine, 'atk', -2) / foeCount(battle), 12);
+    expect(features.boostsBiting).toBeLessThan(0);
+  });
+
+  test('(a2) -2 Attack that only makes a win slower costs nothing: the foe waits for a 3HKO and never swings back (before: it counted)', () => {
     const scene = (stage: number) => {
       const battle = board(mode, ['Garchomp', ['crunch', 'splash']], ['Clefable', ['splash']]);
       const { mine, foe } = mons(battle);
@@ -90,11 +136,9 @@ describe.each(MODES)('a stage drop in the race, $name', mode => {
     };
     expect(turnsToKo(scene(0), 0, 'foe', mode)).toBe(2);
     expect(turnsToKo(scene(-2), 0, 'foe', mode)).toBe(3);
-    const battle = scene(-2);
-    const features = evalFeatures(battle);
+    const features = evalFeatures(scene(-2));
     expect(features.boosts).toBeLessThan(0);
-    expect(features.boostsBiting).toBeCloseTo(stageValue(mons(battle).mine, 'atk', -2) / foeCount(battle), 12);
-    expect(features.boostsBiting).toBeLessThan(0);
+    expect(features.boostsBiting).toBe(0);
   });
 
   test('(b) -1 Defense lets the foe KO me a turn sooner: the drop counts, signed', () => {
@@ -168,19 +212,38 @@ describe.each(MODES)('a stage drop in the race, $name', mode => {
   });
 
   test('the same board with the sides swapped negates the feature (a drop of the foe counts for me)', () => {
-    const scene = (dropped: 0 | 1) => {
-      const mine: [string, string[]] = dropped === 0 ? ['Garchomp', ['crunch', 'splash']] : ['Clefable', ['splash']];
-      const foe: [string, string[]] = dropped === 0 ? ['Clefable', ['splash']] : ['Garchomp', ['crunch', 'splash']];
-      const battle = board(mode, mine, foe);
-      const droppedMon = battle.sides[dropped].active[0]!;
-      const victim = battle.sides[1 - dropped].active[0]!;
-      victim.sethp(hpAt(1.15, mode, mine, foe, dropped));
-      droppedMon.boosts.atk = -2;
-      return battle;
-    };
-    const mine = evalFeatures(scene(0)).boostsBiting;
+    const mine = evalFeatures(raceScene(mode, -2)).boostsBiting;
     expect(mine).toBeLessThan(0);
-    expect(evalFeatures(scene(1)).boostsBiting).toBeCloseTo(-mine, 12);
+    expect(evalFeatures(raceScene(mode, -2, true)).boostsBiting).toBeCloseTo(-mine, 12);
+  });
+});
+
+describe.each(MODES.filter(mode => !mode.doubles))('a drop behind a front that beats the holder, $name', mode => {
+  const GARCHOMP: [string, string[]] = ['Garchomp', ['crunch', 'splash']];
+  const JOLTEON: [string, string[]] = ['Jolteon', ['shadowball', 'splash']];
+
+  /** Garchomp at -2 Attack against `front` with a Jolteon on the bench that the drop turns from a lost race into a won one. */
+  function behind(front: [string, string[]]): Battle {
+    const battle = battleOf(mode.format, [mode.mon(...GARCHOMP)], [mode.mon(...front), mode.mon(...JOLTEON)]);
+    const [mine, bench] = [battle.sides[0].active[0]!, battle.sides[1].pokemon[1]];
+    bench.sethp(hpAt(1.15, mode, GARCHOMP, JOLTEON, 0));
+    mine.sethp(hpAt(2.4, mode, GARCHOMP, JOLTEON, 1));
+    mine.boosts.atk = -2;
+    return battle;
+  }
+
+  test('a front foe that wins the race anyway closes the gate: the drop costs nothing against the bench behind it (before: it counted)', () => {
+    // The front Jolteon at full HP wins on the move order whatever the drop does; the bench Jolteon would be the flip.
+    const battle = behind(JOLTEON);
+    expect(evalFeatures(battle).boosts).toBeLessThan(0);
+    expect(evalFeatures(battle).boostsBiting).toBe(0);
+  });
+
+  test('a front foe that never swings back leaves the gate open: the drop counts against the bench Jolteon', () => {
+    const battle = behind(['Clefable', ['splash']]);
+    const features = evalFeatures(battle);
+    expect(features.boostsBiting).toBeCloseTo(stageValue(battle.sides[0].active[0]!, 'atk', -2) / 2, 12);
+    expect(features.boostsBiting).toBeLessThan(0);
   });
 });
 

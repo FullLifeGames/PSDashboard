@@ -51,7 +51,9 @@ export function healProfile(pokemon: Pokemon, battle: Battle): HealProfile {
   let absorb = 0;
   for (const slot of usableSlots(pokemon)) {
     const move = battle.dex.moves.get(slot.id);
-    if (!move.flags['heal']) continue;
+    // A drain move (Horn Leech, Giga Drain, Draining Kiss) carries the heal flag too, because Heal Block stops it, but
+    // it heals a share of the damage it deals as part of an attack: no turn is spent healing (T220, the Dex's `drain`).
+    if (!move.flags['heal'] || move.drain) continue;
     const fraction = move.heal ? move.heal[0] / move.heal[1] : HEAL_FRACTION_DEFAULT;
     rate = Math.max(rate, fraction);
     absorb += (slot.pp ?? 8) * fraction;
@@ -111,8 +113,12 @@ export interface RaceClocks {
  * - Action economy: a healer under pressure spends pressure/healRate of its
  *   turns healing and attacks only on the spare ones; under crumbling
  *   pressure (≥ its best heal rate, e.g. a burn tipping a borderline hit
- *   over the sustain) it is pinned — priced as never attacking, since it
- *   loses the pair either way.
+ *   over the sustain) it is pinned, priced as never attacking when it
+ *   loses the pair either way. Since 13.10.2026 it is pinned only then:
+ *   a pinned healer whose attack, spending no turn on a heal, KOs the
+ *   other side no later than the other side KOs it attacks every turn
+ *   (a 5% Cobalion in front of a full-HP Shore Up Palossand died to its
+ *   Earth Power, and the race read the Palossand as a wall that never swings).
  * - The PP budget caps every clock: a win that needs more turns than the
  *   attacker has PP never lands (a full-PP wall still walls — the slow
  *   attacker runs dry first).
@@ -121,37 +127,66 @@ export interface RaceClocks {
  * with no damaging move at all never wins one.
  */
 export function raceClocks(a: RaceSide, b: RaceSide): RaceClocks {
-  const spare = (side: RaceSide, incoming: number): number =>
-    side.healRate > 0 && incoming > 0 ? Math.max(0, 1 - incoming / side.healRate) : 1;
   const incomingA = b.frac + a.residual;
   const incomingB = a.frac + b.residual;
-  const effFracA = a.frac * spare(a, incomingA);
-  const effFracB = b.frac * spare(b, incomingB);
-  const clock = (attacker: RaceSide, effFrac: number, defender: RaceSide, incoming: number): number => {
-    if (attacker.frac <= 0) return Infinity;
-    const pressure = effFrac + defender.residual;
-    if (pressure <= 0) return Infinity;
-    // Held heal PP realize only at the pin efficiency (round 12): past the
-    // heal rate the healer heals at a net loss and dies with PP in the
-    // tank, so a bar held in PP is worth healRate/incoming of a bar on the
-    // body — which is what makes healing NOW beat holding (655336 t26:
-    // Slack Off must price over a free-turn Protect even in a lost race;
-    // before this, hp + absorb was conserved by the heal click and a heal
-    // turn priced at ~0).
-    const absorb = defender.healRate > 0 && incoming > defender.healRate
-      ? defender.healAbsorb * (defender.healRate / incoming)
-      : defender.healAbsorb;
-    // The epsilon keeps float noise (0.1 − 0.45/0.5 ≠ exactly 0.02) from
-    // pushing an exact division over the next whole turn.
-    const turns = Math.ceil((defender.hp + absorb) / pressure - 1e-9);
-    return turns > attacker.ppBudget ? Infinity : turns;
-  };
+  let effFracA = a.frac * spare(a, incomingA);
+  let effFracB = b.frac * spare(b, incomingB);
+  // Each pinned side tries its attack against the other side's state above; a side that attacks heals nothing.
+  const attackA = pinned(a, incomingA) && attackWins(a, b, effFracB, incomingA, incomingB);
+  const attackB = pinned(b, incomingB) && attackWins(b, a, effFracA, incomingB, incomingA);
+  if (attackA) effFracA = a.frac;
+  if (attackB) effFracB = b.frac;
   return {
-    turnsA: clock(a, effFracA, b, incomingB),
-    turnsB: clock(b, effFracB, a, incomingA),
+    turnsA: clock(a, effFracA, b, incomingB, !attackB),
+    turnsB: clock(b, effFracB, a, incomingA, !attackA),
     effFracA,
     effFracB,
   };
+}
+
+/** The share of its turns a healer can spend attacking: the rest heals the incoming damage away. */
+function spare(side: RaceSide, incoming: number): number {
+  return side.healRate > 0 && incoming > 0 ? Math.max(0, 1 - incoming / side.healRate) : 1;
+}
+
+/** A healer the incoming damage out-runs: no spare turn (spare is 0). */
+const pinned = (side: RaceSide, incoming: number): boolean => side.healRate > 0 && incoming >= side.healRate;
+
+/**
+ * Whether a pinned side loses nothing by attacking: its clock on the other side (the other side's heals still
+ * count) is finite and no longer than the other side's clock on it without the heals it would spend turns on.
+ * A tie is not a loss: the caller breaks it by speed.
+ */
+function attackWins(side: RaceSide, other: RaceSide, otherEffFrac: number, incomingSide: number, incomingOther: number): boolean {
+  const own = clock(side, side.frac, other, incomingOther, true);
+  return own !== Infinity && own <= clock(other, otherEffFrac, side, incomingSide, false);
+}
+
+/**
+ * Turns `attacker` needs to KO `defender` at `effFrac` per turn while the defender takes `incoming` per turn;
+ * `heals` is whether the defender spends turns on its heal moves (a defender that attacks instead heals none).
+ */
+function clock(attacker: RaceSide, effFrac: number, defender: RaceSide, incoming: number, heals: boolean): number {
+  if (attacker.frac <= 0) return Infinity;
+  const pressure = effFrac + defender.residual;
+  if (pressure <= 0) return Infinity;
+  // Held heal PP realize only at the pin efficiency (round 12): past the
+  // heal rate the healer heals at a net loss and dies with PP in the
+  // tank, so a bar held in PP is worth healRate/incoming of a bar on the
+  // body — which is what makes healing NOW beat holding (655336 t26:
+  // Slack Off must price over a free-turn Protect even in a lost race;
+  // before this, hp + absorb was conserved by the heal click and a heal
+  // turn priced at ~0).
+  let absorb = 0;
+  if (heals) {
+    absorb = defender.healRate > 0 && incoming > defender.healRate
+      ? defender.healAbsorb * (defender.healRate / incoming)
+      : defender.healAbsorb;
+  }
+  // The epsilon keeps float noise (0.1 − 0.45/0.5 ≠ exactly 0.02) from
+  // pushing an exact division over the next whole turn.
+  const turns = Math.ceil((defender.hp + absorb) / pressure - 1e-9);
+  return turns > attacker.ppBudget ? Infinity : turns;
 }
 
 /** Assembles one Pokémon's race side from live battle state. */

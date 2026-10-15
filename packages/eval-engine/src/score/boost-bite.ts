@@ -1,23 +1,31 @@
 import { Battle, Teams, toID, type BoostsTable, type Pokemon, type PokemonSet, type Side } from '@pkmn/sim';
 import { isChampionsSimFormat } from '../forward/sim-mods.ts';
-import { movesFirst } from '../speed.ts';
 import { EVAL_WEIGHTS } from './weights.ts';
-import { boostedFraction, livingMons, livingOf, usableSlots, type PairThreat } from './threat.ts';
-import { raceClocks, raceSide } from './races.ts';
+import { livingMons, livingOf, usableSlots } from './threat.ts';
+import {
+  BITE_TURNS, foeWins, holderActs, pairRace, raceBodies, stageBites, type Bodies, type PairRace, type ThreatOf,
+} from './boost-race.ts';
+import { residualReader, type Residuals } from './residuals.ts';
 
 /**
  * Round 69 (T49, decision 16): boostsBiting, `boosts` with every standing
  * stage damped by the share of living foes it bites. A stage bites a foe when
- * the foe leaves it alone and the stage moves the 1v1 race within BITE_TURNS:
- * it shortens the mon's clock to the KO, lengthens the foe's, or hands the
- * mon the first move in a race somebody wins. It does not bite a foe that
- * plays Unaware (the simulator's own ModifyBoost answers, with the mon and the
- * foe as attacker and target), that can click a move that takes the stages
- * away (removesStages, played in the simulator), or that a wall holds anyway.
+ * the foe leaves it alone and the stage moves the 1v1 race of the pair
+ * within BITE_TURNS in favour of the side it helps (score/boost-race.ts): the
+ * holder wins the race with it, gets to act, and it made the difference. It
+ * does not bite a foe that plays Unaware (the simulator's own ModifyBoost
+ * answers, with the mon and the foe as attacker and target), that can click a
+ * move that takes the stages away (removesStages, played in the simulator),
+ * or that a wall holds anyway.
+ *
+ * 13.10.2026 (the Swords Dance report on gen9draft-2058494320): the foes in
+ * front of the holder gate the whole stage. A stage means nothing to a foe the
+ * holder does not live to meet: while a foe on the field can take the stages
+ * away or KOs the holder before it acts, no foe counts for a boost; while a
+ * foe on the field wins the race within the horizon, no foe off the field
+ * counts for any stage (the bench is credited only behind a front the holder
+ * survives; T218).
  */
-
-/** The race horizon, in turns: beyond three hits to a KO the pair is a stall war, not a sweep. */
-const BITE_TURNS = 3;
 
 /** The value of one standing stage: sign, stat weight, schedule and status discount of the boosts term. */
 export function stageValue(active: Pokemon, stat: string, stage: number): number {
@@ -96,105 +104,70 @@ export function removesStages(format: string, moveId: string, benched: boolean):
   return removed;
 }
 
-/** The stages `mon` carries in a hit of `attacker` on `defender`, as the simulator's ModifyBoost event leaves them (Unaware, Simple). */
-function stagesSeen(battle: Battle, mon: Pokemon, attacker: Pokemon, defender: Pokemon): BoostsTable {
-  const { activePokemon, activeTarget } = battle;
-  battle.activePokemon = attacker;
-  battle.activeTarget = defender;
-  try {
-    return battle.runEvent('ModifyBoost', mon, null, null, { ...mon.boosts }) as BoostsTable;
-  } finally {
-    battle.activePokemon = activePokemon;
-    battle.activeTarget = activeTarget;
-  }
+/** The stats of a mon that carry a stage. */
+const stagedStats = (mine: Pokemon): (keyof BoostsTable)[] =>
+  (Object.keys(mine.boosts) as (keyof BoostsTable)[]).filter(stat => mine.boosts[stat]);
+
+/** Whether the stage of one stat bites the foe of this pair: the foe leaves it standing and it moves the race (accuracy and evasion bite by the stage the foe leaves them). */
+function statBites(pair: PairRace, stat: keyof BoostsTable, drop: boolean): boolean {
+  const { stages } = pair;
+  if (!stages.mineHitting[stat] && !stages.mineDefending[stat]) return false;
+  if (stat === 'accuracy' || stat === 'evasion') return true;
+  return stageBites(pair.held, pair.without(stat), drop);
 }
 
-/** The stages of one pair as each attack sees them: mine and the foe's when I hit, and again when the foe hits. */
-interface PairStages { mineHitting: BoostsTable; foeDefending: BoostsTable; foeHitting: BoostsTable; mineDefending: BoostsTable }
+/** What the foes on the field leave of a holder's stages: boosts at all, and any stage for the foes off the field. */
+interface Gate { boosts: boolean; bench: boolean }
 
-const pairStages = (battle: Battle, mine: Pokemon, foe: Pokemon): PairStages => ({
-  mineHitting: stagesSeen(battle, mine, mine, foe),
-  foeDefending: stagesSeen(battle, foe, mine, foe),
-  foeHitting: stagesSeen(battle, foe, foe, mine),
-  mineDefending: stagesSeen(battle, mine, foe, mine),
-});
+function frontGate(front: Pokemon[], removers: ReadonlySet<Pokemon>, raceWith: (foe: Pokemon) => PairRace): Gate {
+  const gate: Gate = { boosts: true, bench: true };
+  for (const foe of front) {
+    const { held } = raceWith(foe);
+    if (removers.has(foe) || !holderActs(held)) gate.boosts = false;
+    if (foeWins(held) && held.turnsFoe <= BITE_TURNS) gate.bench = false;
+  }
+  return gate;
+}
 
-const viewOf = (pokemon: Pokemon, boosts: BoostsTable): Pokemon => Object.create(pokemon, { boosts: { value: boosts } }) as Pokemon;
-
-interface Race { turnsMine: number; turnsFoe: number; first: boolean }
-
-/** The 1v1 race of the pair on these stages: both clocks and who moves first. */
-function raceOn(
-  mine: Pokemon, foe: Pokemon, mineThreat: PairThreat, foeThreat: PairThreat, battle: Battle, stages: PairStages,
-): Race {
-  const mineHitting = viewOf(mine, stages.mineHitting);
-  const foeHitting = viewOf(foe, stages.foeHitting);
-  const clocks = raceClocks(
-    raceSide(mine, mine.hp / mine.maxhp, boostedFraction(mineThreat, mineHitting, viewOf(foe, stages.foeDefending)), battle),
-    raceSide(foe, foe.hp / foe.maxhp, boostedFraction(foeThreat, foeHitting, viewOf(mine, stages.mineDefending)), battle),
-  );
-  return {
-    turnsMine: clocks.turnsA, turnsFoe: clocks.turnsB,
-    first: movesFirst(mineHitting, foeHitting, mineThreat, foeThreat, battle),
+/** The value of one holder's stages, summed over the foes each of them bites. */
+function holderBites(mine: Pokemon, foes: Pokemon[], removers: ReadonlySet<Pokemon>, battle: Battle, threat: ThreatOf, bodies: Bodies): number {
+  const stats = stagedStats(mine);
+  const races = new Map<Pokemon, PairRace>();
+  const raceWith = (foe: Pokemon): PairRace => {
+    let race = races.get(foe);
+    if (!race) {
+      race = pairRace(mine, foe, battle, threat, bodies);
+      races.set(foe, race);
+    }
+    return race;
   };
-}
-
-/**
- * Whether the stage moves the race. A boost: a nearer KO of the foe, a later KO of me, or the first move in a race
- * somebody wins. A drop is the mirror: a later KO of the foe where it was within reach, a nearer KO of me, or the first
- * move lost in a race somebody wins. A boost that hurts (Speed under Trick Room) is not read: it stays uncounted.
- */
-function movesRace(held: Race, without: Race, drop: boolean): boolean {
-  if (drop) {
-    if (held.turnsMine > without.turnsMine && without.turnsMine <= BITE_TURNS) return true;
-    if (held.turnsFoe < without.turnsFoe && held.turnsFoe <= BITE_TURNS) return true;
-    return without.first && !held.first && Math.min(held.turnsMine, held.turnsFoe) <= BITE_TURNS;
+  const gate = frontGate(foes.filter(foe => foe.isActive), removers, raceWith);
+  let value = 0;
+  for (const foe of foes) {
+    if (removers.has(foe) || (!foe.isActive && !gate.bench)) continue;
+    const pair = raceWith(foe);
+    for (const stat of stats) {
+      const stage = mine.boosts[stat];
+      if (stage > 0 && !gate.boosts) continue;
+      if (statBites(pair, stat, stage < 0)) value += stageValue(mine, stat, stage);
+    }
   }
-  if (held.turnsMine < without.turnsMine && held.turnsMine <= BITE_TURNS) return true;
-  if (held.turnsFoe > without.turnsFoe && without.turnsFoe <= BITE_TURNS) return true;
-  return held.first && !without.first && Math.min(held.turnsMine, held.turnsFoe) <= BITE_TURNS;
-}
-
-const withoutStat = (stages: PairStages, stat: keyof BoostsTable): PairStages => ({
-  mineHitting: { ...stages.mineHitting, [stat]: 0 },
-  foeDefending: stages.foeDefending,
-  foeHitting: stages.foeHitting,
-  mineDefending: { ...stages.mineDefending, [stat]: 0 },
-});
-
-type ThreatOf = (attacker: Pokemon, defender: Pokemon) => PairThreat;
-
-/** The stats of a mon that carry a stage and bite the foe, by the race (accuracy and evasion by the stage the foe leaves them). */
-function bitingStats(mine: Pokemon, foe: Pokemon, battle: Battle, threat: ThreatOf): (keyof BoostsTable)[] {
-  const stats = (Object.keys(mine.boosts) as (keyof BoostsTable)[]).filter(stat => mine.boosts[stat]);
-  const stages = pairStages(battle, mine, foe);
-  const mineThreat = threat(mine, foe);
-  const foeThreat = threat(foe, mine);
-  const held = raceOn(mine, foe, mineThreat, foeThreat, battle, stages);
-  return stats.filter(stat => {
-    if (!stages.mineHitting[stat] && !stages.mineDefending[stat]) return false;
-    if (stat === 'accuracy' || stat === 'evasion') return true;
-    const without = raceOn(mine, foe, mineThreat, foeThreat, battle, withoutStat(stages, stat));
-    return movesRace(held, without, mine.boosts[stat] < 0);
-  });
+  return value;
 }
 
 /** One side's standing stages, each valued as `boosts` values it and counted for the share of living foes it bites. */
-export function boostBiteValue(side: Side, sideIndex: 0 | 1, battle: Battle, threat: ThreatOf): number {
+export function boostBiteValue(
+  side: Side, sideIndex: 0 | 1, battle: Battle, threat: ThreatOf, residuals: Residuals = residualReader(battle),
+): number {
   const actives = side.active.filter((mon): mon is Pokemon => !!mon && !mon.fainted && Object.values(mon.boosts).some(Boolean));
   if (actives.length === 0) return 0;
   const foes = livingMons(battle, 1 - sideIndex);
   if (foes.length === 0) return 0;
   const benched = livingOf(side).some(mon => !mon.isActive);
   const twin = removalFormat(battle);
-  const leaving = foes.filter(foe => !usableSlots(foe).some(slot => removesStages(twin, slot.id, benched)));
+  const removers = new Set(foes.filter(foe => usableSlots(foe).some(slot => removesStages(twin, slot.id, benched))));
+  const bodies = raceBodies(battle, residuals);
   let value = 0;
-  for (const mine of actives) {
-    for (const foe of leaving) {
-      for (const stat of bitingStats(mine, foe, battle, threat)) {
-        value += stageValue(mine, stat, mine.boosts[stat]) / foes.length;
-      }
-    }
-  }
-  return value;
+  for (const mine of actives) value += holderBites(mine, foes, removers, battle, threat, bodies);
+  return value / foes.length;
 }

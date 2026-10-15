@@ -169,6 +169,13 @@ export interface EvalFeatures {
    * foe KO and no move order within a few turns of the race. Same sign and
    * scale as `boosts`, p1-positive difference; weight 0 until a fit prices it,
    * and then it replaces `boosts` (the damping lives in the feature).
+   * 13.10.2026 (the Swords Dance report on gen9draft-2058494320): a boost
+   * counts against a foe only where the holder WINS the race with it and gets
+   * to act in it, a drop only where the foe does (score/boost-race.ts); the
+   * foes on the field gate the stage for everybody behind them, and the
+   * end-of-turn HP of the bodies in the race (Leech Seed, Leftovers, weather)
+   * is played in the simulator (score/residuals.ts). The weights below were
+   * fitted before these rules; a re-fit is open.
    */
   boostsBiting: number;
   /**
