@@ -5,6 +5,7 @@ import { fileURLToPath } from 'node:url';
 import ts from 'typescript';
 import * as replayCore from '@fulllifegames/replay-core';
 import * as evalEngine from '@fulllifegames/eval-engine';
+import { PKMN_EXACT } from '../scripts/upgrade-pkmn.mjs';
 
 /**
  * The public surface of each workspace package, pinned twice: the names the
@@ -78,7 +79,10 @@ describe('Package hygiene', () => {
         expect(dep.startsWith('@fulllifegames/'), `${dep} is not a workspace package`).toBe(true);
         expect(range).toBe('*');
       }
-      for (const range of Object.values(manifest.peerDependencies ?? {})) expect(range).toMatch(/^\^\d/);
+      // Peers float on a caret, except the simulator the speed layer copies (round 70, T43; regression/pkmn-pins.spec.ts).
+      for (const [dep, range] of Object.entries(manifest.peerDependencies ?? {})) {
+        expect(range, dep).toMatch(PKMN_EXACT.includes(dep) ? /^\d+\.\d+\.\d+$/ : /^\^\d/);
+      }
     });
 
     test(`${name}: LICENSE is the repository license`, () => {
