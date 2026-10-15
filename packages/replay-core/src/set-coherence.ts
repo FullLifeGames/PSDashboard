@@ -4,6 +4,8 @@
 import { Dex } from '@pkmn/dex';
 import type { PokemonSetAssumption } from './smogon/sets-lookup.ts';
 import { filledSlots, slotMoveKey, slotOrderedMoves } from './team/move-slots.ts';
+import { fillsOpenMove } from './team/open-moves.ts';
+import type { OpenMove } from './types.ts';
 
 /**
  * Pairwise coherence vetoes for guessed set assembly. Marginal fills (top
@@ -121,6 +123,11 @@ function factsOf(name: string): MoveFacts | null {
 export interface CuratedEvidence {
   /** Move ids seen in game or user-set — the anchors a set must cover. */
   revealedMoves: string[];
+  /**
+   * The base moves of Z-moves and Max moves that no revealed move explains (round 70): each is worth a revealed move's two points
+   * to a set that lists a move to fill it. Absent: none.
+   */
+  openMoves?: OpenMove[];
   /** Item/ability ids known from proof ('' when unknown). */
   revealedItem: string;
   revealedAbility: string;
@@ -179,6 +186,15 @@ function fitScore(candidate: PokemonSetAssumption, ids: CandidateIds, evidence: 
   return fit;
 }
 
+/**
+ * Two points per open move (a Z-move's or Max move's hidden base move) some option of a move slot fills (round 70). They rank the sets
+ * that clear the floor and never lift one over it: a set that misses the revealed moves stays out.
+ */
+function openFit(candidate: PokemonSetAssumption, evidence: CuratedEvidence): number {
+  const fills = (open: OpenMove) => candidate.moves.some(slot => (slot.options ?? [slot.value]).some(option => fillsOpenMove(open, option)));
+  return 2 * (evidence.openMoves ?? []).filter(fills).length;
+}
+
 /** The best-fitting candidate; `itemRuleOuts` false reads the item rule-outs as if the log had shown none. */
 function bestCandidate(
   candidates: PokemonSetAssumption[], evidence: CuratedEvidence, itemRuleOuts: boolean,
@@ -193,12 +209,13 @@ function bestCandidate(
 
     const fit = fitScore(candidate, ids, evidence);
     if (fit < evidence.revealedMoves.length) continue;
+    const ranked = fit + openFit(candidate, evidence);
 
     const tiebreak = ids.moveIds.reduce((sum, id) =>
       sum + Math.log(Math.max(evidence.usageProbability(id), UNSEEN_MOVE_PROBABILITY)), 0);
-    if (fit > bestFit || (fit === bestFit && tiebreak > bestTiebreak)) {
+    if (ranked > bestFit || (ranked === bestFit && tiebreak > bestTiebreak)) {
       best = candidate;
-      bestFit = fit;
+      bestFit = ranked;
       bestTiebreak = tiebreak;
     }
   }

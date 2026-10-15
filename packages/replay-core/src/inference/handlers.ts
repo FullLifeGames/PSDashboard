@@ -5,6 +5,7 @@ import { revealMarkerForme, teamSpecies, unknownFormeMarkerFor } from './lookup.
 import { abilityHolderIdent } from './ability-holder.ts';
 import { ATTACKER_PUNISH_ITEMS, ownMove } from './client-facts.ts';
 import { arg, detailsOf, fromEffect, hasKw, identOf, ofIdent, type LogLine } from './log-line.ts';
+import { bookPowerMove, readPowerMove } from './power-moves.ts';
 import { toId } from '../ids.ts';
 import type { PokemonFieldInfo } from '../types.ts';
 
@@ -36,12 +37,16 @@ function sideSubject(line: LogLine, side: string): string | null {
   return ident?.side === side ? ident.name : null;
 }
 
-/** Two plain moves disprove a Choice lock; a plain Status move disproves Assault Vest. */
-function recordPlainMove(state: InferrerState, ident: string, moveName: string) {
+/**
+ * Two plain moves disprove a Choice lock; a plain Status move disproves Assault Vest. A Z-move or Max move is no plain move
+ * (round 70): a Dynamaxed body picks any Max move whatever it holds, and Max Guard still disproves Assault Vest, which blocks the
+ * status moves it stands for.
+ */
+function recordPlainMove(state: InferrerState, ident: string, moveName: string, powered: boolean) {
   const nickname = identOf(ident)?.name.trim();
   if (!nickname) return;
   const used = state.plainMovesSince.get(ident) ?? new Set<string>();
-  used.add(toId(moveName));
+  if (!powered) used.add(toId(moveName));
   state.plainMovesSince.set(ident, used);
   if (used.size >= 2 && !canHaveDancer(state, ident)) {
     for (const item of ['choiceband', 'choicespecs', 'choicescarf']) {
@@ -63,7 +68,7 @@ export function noteMoveOrBoundary(state: InferrerState, line: LogLine) {
     const target = identOf(arg(line, 3));
     if (target && (target.side === 'p1' || target.side === 'p2')) state.lastMoveTarget.set(attacker, arg(line, 3));
     if (identOf(attacker)?.side === state.opponentSide && !hasKw(line, 'from') && moveName) {
-      recordPlainMove(state, attacker, moveName);
+      recordPlainMove(state, attacker, moveName, !!readPowerMove(Dex.forGen(state.gen), line));
     }
   } else if (MOVE_BOUNDARIES.has(line.cmd) || (line.cmd === '-activate' && arg(line, 2) === 'confusion')) {
     state.pendingMove = null;
@@ -193,9 +198,11 @@ export function recordMove(state: InferrerState, line: LogLine) {
   if (!moveName) return;
 
   const pokemon = findPokemon(state, nickname);
-  if (pokemon && !pokemon.moves.some(move => move.name === moveName)) {
-    pokemon.moves.push({ name: moveName, source: 'revealed' });
-  }
+  if (!pokemon) return;
+  // A Z-move or Max move books its base move, or an open slot for it, never its own name (round 70).
+  const power = moveName === arg(moveLine, 2) ? readPowerMove(Dex.forGen(state.gen), moveLine) : null;
+  if (power) bookPowerMove(pokemon, power);
+  else if (!pokemon.moves.some(move => move.name === moveName)) pokemon.moves.push({ name: moveName, source: 'revealed' });
 }
 
 /** Giver: the [of] ident when present, else the OTHER party of the

@@ -4,7 +4,10 @@ import { getSpeciesSetAssumption, type SetAssumption, type SetSpreadAssumption, 
 import { applyCoherenceVetoes, itemFromChosenSet, publishedIvs, selectCuratedSet, type MoveCandidate } from './set-coherence.ts';
 import { isChampionsFormat } from './spreads/champions-format.ts';
 import type { SpreadCandidate, SpreadOrigin } from './spreads/ladder.ts';
-import type { OpponentTeamInfo, PokemonEvs, PokemonEvsInfo, PokemonFieldInfo, PokemonMoveInfo, RevealedPokemonInfo } from './types.ts';
+import { settleOpenMoves, unfilledOpenMoves } from './team/open-moves.ts';
+import type {
+  OpenMove, OpponentTeamInfo, PokemonEvs, PokemonEvsInfo, PokemonFieldInfo, PokemonMoveInfo, RevealedPokemonInfo,
+} from './types.ts';
 import { toId } from './ids.ts';
 
 export const EMPTY_EVS: PokemonEvs = { hp: 0, atk: 0, def: 0, spa: 0, spd: 0, spe: 0 };
@@ -254,10 +257,11 @@ type CuratedSet = ReturnType<typeof selectCuratedSet>;
 function curatedSetFor(pokemon: RevealedPokemonInfo, usageSet: SpeciesUsage, smogonSet: SmogonSet): CuratedSet | null {
   const proven = (field: PokemonFieldInfo) =>
     field.source === 'revealed' || field.source === 'manual' ? toId(field.value) : '';
+  const known = pokemon.moves.filter(move => move.source === 'revealed' || move.source === 'manual');
   return smogonSet ? selectCuratedSet([smogonSet, ...(smogonSet.alternatives ?? [])], {
-    revealedMoves: pokemon.moves
-      .filter(move => move.source === 'revealed' || move.source === 'manual')
-      .map(move => toId(move.name)),
+    revealedMoves: known.map(move => toId(move.name)),
+    // The Z-moves and Max moves the revealed moves do not explain: a set with a move to fill them fits better (round 70).
+    openMoves: unfilledOpenMoves(pokemon.openMoves, known.map(move => move.name)),
     // A consumed or knocked-off item is still the set's item (round 63).
     revealedItem: proven({ ...pokemon.item, value: itemSetValue(pokemon.item.value) }),
     revealedAbility: proven(pokemon.ability),
@@ -313,19 +317,22 @@ function assembleMovePool(
 /**
  * Known moves always stay; vetoed guesses drop and the pool's tail refills
  * the display up to four slots. The item rows spare the chosen set's moves
- * when the item is that set's own (T131), as the build does.
+ * when the item is that set's own (T131), as the build does. A Z-move's or
+ * Max move's open slot is settled as the build settles it (round 70).
  */
 function vetoedMoves(
   pool: MoveCandidate[], infoFor: Map<string, PokemonMoveInfo>, itemValue: string, curated: CuratedSet | null,
+  open: readonly OpenMove[] | undefined,
 ): PokemonMoveInfo[] {
-  const moves: PokemonMoveInfo[] = [];
   const item = itemSetValue(itemValue);
-  for (const candidate of applyCoherenceVetoes(pool, { itemId: toId(item), itemFromSet: itemFromChosenSet(curated, item) })) {
-    const move = infoFor.get(candidate.name);
-    if (!move) continue;
-    if (!candidate.guessed || moves.length < 4) moves.push(move);
-  }
-  return moves;
+  const shown = (candidates: MoveCandidate[]): MoveCandidate[] => {
+    const kept: MoveCandidate[] = [];
+    for (const candidate of applyCoherenceVetoes(candidates, { itemId: toId(item), itemFromSet: itemFromChosenSet(curated, item) })) {
+      if (infoFor.has(candidate.name) && (!candidate.guessed || kept.length < 4)) kept.push(candidate);
+    }
+    return kept;
+  };
+  return settleOpenMoves(pool, open, shown).flatMap(candidate => infoFor.get(candidate.name) ?? []);
 }
 
 /**
@@ -376,7 +383,7 @@ export function enrichPokemonInfo(
   const item = normalizeItemField(pokemon.item, usageSet?.item, fallback.item, pokemon.ruledOut?.items, !!curated);
   const usageTail = getSpeciesUsageStats(pokemon.species, usageStats)?.moves.slice(GUESS_MOVE_POOL) ?? [];
   const { pool, infoFor } = assembleMovePool(pokemon, curated, usageSet, smogonSet, usageTail);
-  const moves = vetoedMoves(pool, infoFor, item.value, curated);
+  const moves = vetoedMoves(pool, infoFor, item.value, curated, pokemon.openMoves);
   const ivs = ivsField(pokemon, curated, usageSet, smogonSet, setAssumptions?.format ?? '');
 
   return {

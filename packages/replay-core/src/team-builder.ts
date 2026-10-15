@@ -294,6 +294,8 @@ function buildSet(
     level: info.level || 100,
     gender: (info.gender || '') as '' | 'M' | 'F',
     teraType: info.teraType.value || undefined,
+    // The log showed a Gigantamax: the simulator then plays the species' G-Max move (round 70).
+    ...(info.gigantamax ? { gigantamax: true } : {}),
   };
   // A typeless Hidden Power reads its type before guessed IVs arrive: the step
   // keeps the type of deliberate (edited) IVs only, and the published or

@@ -10,6 +10,7 @@ import type { KnowledgeSource, PokemonEvs, RevealedPokemonInfo } from '../types.
 import { toId } from '../ids.ts';
 import { evBudget, evsOfSet, type EvBudget } from '../spreads/ev-budget.ts';
 import { slotMoveKey } from './move-slots.ts';
+import { settleOpenMoves, unfilledOpenMoves } from './open-moves.ts';
 
 type SmogonSet = ReturnType<typeof getSpeciesSetAssumption>;
 type CuratedSet = ReturnType<typeof selectCuratedSet>;
@@ -132,10 +133,11 @@ export function buildSheetSet(
  * internally coherent unit instead of independent marginals.
  */
 export function selectCuratedFor(info: RevealedPokemonInfo, smogonSet: SmogonSet, usageSet: SpeciesUsageSet | null): CuratedSet | null {
+  const seen = info.moves.filter(move => move.source === 'revealed' || move.source === 'manual');
   return smogonSet ? selectCuratedSet([smogonSet, ...(smogonSet.alternatives ?? [])], {
-    revealedMoves: info.moves
-      .filter(move => move.source === 'revealed' || move.source === 'manual')
-      .map(move => toId(move.name)),
+    revealedMoves: seen.map(move => toId(move.name)),
+    // The Z-moves and Max moves the revealed moves do not explain: a set with a move to fill them fits better (round 70).
+    openMoves: unfilledOpenMoves(info.openMoves, seen.map(move => move.name)),
     // A consumed or knocked-off item is still the set's item (round 63: 751407 Dragonite's Choice Band).
     revealedItem: toId(itemSetValue(known(info.item))),
     revealedAbility: toId(known(info.ability)),
@@ -218,9 +220,9 @@ export function assembleMoves(
   const fills = [...(usageSet?.moves ?? []), ...(curated ? [] : (smogonSet?.moves ?? []))];
   for (const fill of fills) offer(fill.value, { guessed: true });
   for (const fill of usageTail) offer(fill.value, { guessed: true, tail: true });
-  return applyCoherenceVetoes(pool, { itemId: toId(item), itemFromSet: itemFromChosenSet(curated, item) })
-    .slice(0, 4)
-    .map(candidate => candidate.name);
+  const assemble = (candidates: MoveCandidate[]) =>
+    applyCoherenceVetoes(candidates, { itemId: toId(item), itemFromSet: itemFromChosenSet(curated, item) }).slice(0, 4);
+  return settleOpenMoves(pool, info.openMoves, assemble).map(candidate => candidate.name);
 }
 
 export function resolveAbility(info: RevealedPokemonInfo, curated: CuratedSet | null, usageSet: SpeciesUsageSet | null, smogonSet: SmogonSet): string {

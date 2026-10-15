@@ -299,9 +299,20 @@ export interface LoggedHit {
   format: string;
 }
 
+/**
+ * A move of the set that the log proves without naming it (round 70, batch fix). A Z-move or a Max move shows the type of its
+ * base move and never the base move. `attack` asks for a damaging move of `type`; `status` asks for any status move, the base of
+ * Max Guard. The build fills the slot from the chosen published set, the move guesses and the usage list.
+ */
+export type OpenMove = { kind: 'attack'; type: string } | { kind: 'status' };
+
 export interface RevealedPokemonInfo {
   species: string;
   moves: PokemonMoveInfo[];
+  /** The base moves of Z-moves and Max moves the log hides (round 70); a move of `moves` that fits one fills it. */
+  openMoves?: OpenMove[];
+  /** The Pokémon Gigantamaxed (`-start` with Gmax, or a G-Max move): the simulator then plays its G-Max move (round 70). */
+  gigantamax?: boolean;
   ability: PokemonFieldInfo;
   item: PokemonFieldInfo;
   teraType: PokemonFieldInfo;

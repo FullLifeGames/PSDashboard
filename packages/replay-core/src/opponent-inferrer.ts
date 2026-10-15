@@ -6,6 +6,7 @@ import {
   addFromPreview, addFromSwitch, noteEntry, noteGravity, noteMoveOrBoundary, recordAbilityAttribution, recordItem,
   recordItemDamage, recordMove, recordTera, ruleOutFromDamage,
 } from './inference/handlers.ts';
+import { recordGigantamax } from './inference/power-moves.ts';
 import { watchItemEvidence } from './inference/item-evidence.ts';
 import { watchTriggerEvidence } from './inference/trigger-evidence.ts';
 import { attachHits, collectHits } from './inference/hits.ts';
@@ -148,6 +149,7 @@ export function inferOpponentTeam(rawLog: string, opponentSide: 'p1' | 'p2' = 'p
     recordItem(state, line);
     recordItemDamage(state, line);
     recordTera(state, line);
+    recordGigantamax(state, line);
     recordAbilityAttribution(state, line);
     watchTriggerEvidence(state, line);
     collectHits(state, line);
