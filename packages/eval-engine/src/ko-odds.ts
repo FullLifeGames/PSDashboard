@@ -54,11 +54,27 @@ const UNPRICEABLE_MOVE_IDS = new Set([
   'beatup',
 ]);
 
-/** Accuracy/evasion modifiers the stage table does not cover → fail closed. */
-const ACCURACY_ITEMS = new Set(['widelens', 'zoomlens', 'brightpowder', 'laxincense']);
-const ACCURACY_ABILITIES = new Set([
-  'compoundeyes', 'hustle', 'sandveil', 'snowcloak', 'victorystar', 'tangledfeet', 'wonderskin',
-]);
+/**
+ * Round 70 (N1): the crit and accuracy modifiers the stage table does not cover → fail closed, read from the simulator's Dex.
+ * An item or an ability with a handler on the ModifyAccuracy or ModifyCritRatio event (its own, a foe's, an ally's, the
+ * source's or any: Wide Lens, Sand Veil, Victory Star, Scope Lens, Super Luck, Merciless) changes the number the model
+ * prices. The first version named eleven of the eighteen such effects of Gen 9 and its comment said the rest "fail closed".
+ * A handler on the Accuracy or CriticalHit event stays out: No Guard is priced in moveAccuracy, and the calc gives a
+ * crit-proof defender the normal roll for a crit. test/ko-odds-guard-census.spec.ts walks every item and ability of every
+ * generation and the Champions mod and lists the reason of each exclusion. @pkmn/dex strips handlers, so a body asks the
+ * simulator's own Dex objects (getItem, getAbility).
+ */
+const ODDS_HANDLER = /^on(?:Any|Foe|Ally|Source)?Modify(?:Accuracy|CritRatio)$/;
+const changesOdds = new WeakMap<object, boolean>();
+
+function modifiesOdds(effect: object): boolean {
+  let known = changesOdds.get(effect);
+  if (known === undefined) {
+    known = Object.keys(effect).some(key => ODDS_HANDLER.test(key));
+    changesOdds.set(effect, known);
+  }
+  return known;
+}
 
 /** Modern accuracy stage multiplier: stage s ≥ 0 → (3+s)/3, s < 0 → 3/(3−s). */
 function accuracyStageMultiplier(stages: number): number {
@@ -109,8 +125,7 @@ export function unpriceable(attacker: Pokemon, defender: Pokemon, move: DexMove)
   if ((move.critRatio ?? 1) > 2) return true;
   if (attacker.ability === 'parentalbond') return true;
   for (const mon of [attacker, defender]) {
-    if (ACCURACY_ITEMS.has(mon.item)) return true;
-    if (ACCURACY_ABILITIES.has(mon.ability)) return true;
+    if (modifiesOdds(mon.getItem()) || modifiesOdds(mon.getAbility())) return true;
     if (mon.volatiles['focusenergy']) return true;
   }
   return false;
