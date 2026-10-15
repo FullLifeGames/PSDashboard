@@ -8,7 +8,9 @@ import { ratchetBase, ratchetOverrides } from './eslint.ratchet.mjs'
 import { importZones } from './eslint.zones.mjs'
 
 export default defineConfig([
-  globalIgnores(['dist', 'packages/*/dist', '.remember']),
+  // docs/ holds Markdown and the local, gitignored probes (copies of old sources among them): CI never sees them,
+  // and a local `npm run lint` must read only what CI reads.
+  globalIgnores(['dist', 'packages/*/dist', '.remember', 'docs']),
   {
     files: ['**/*.{ts,tsx}'],
     extends: [
