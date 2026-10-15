@@ -3,8 +3,10 @@
  * no @pkmn/sim imports, main-bundle safe.
  */
 
+import { Dex } from '@pkmn/dex';
 import { toId, type SideId, type TurnSnapshot } from '@fulllifegames/replay-core';
 import { normalizeLineEndings, normalizeLines } from './line-endings.ts';
+import { isPivotMove } from './pivot-moves.ts';
 import { detectSacks as detectSacksOfLf, type SackInfo } from './turn-analysis/sacks.ts';
 
 export type { SackInfo } from './turn-analysis/sacks.ts';
@@ -68,16 +70,12 @@ const slotOf = (pokemonRef: string): { side: SideId; slot: number } | null => {
 
 const nickname = (pokemonRef: string): string => pokemonRef.replace(/^p[12][a-c]: /, '');
 
-/** The U-turn family — moves whose follow-up switch is part of the choice. */
-const PIVOT_MOVE_NAMES = new Set([
-  'uturn', 'voltswitch', 'flipturn', 'partingshot', 'teleport', 'batonpass',
-  'chillyreception', 'shedtail',
-]);
-
 /** The singles scan: per side the settled action, the gimmick flags, and why a choice never surfaced. */
 interface PlayedScan {
   actions: { p1: PlayedAction | null; p2: PlayedAction | null };
   settled: Record<SideId, boolean>;
+  /** The side's body fainted: a switch after that is a replacement, never the follow-up of a move. */
+  fainted: Record<SideId, boolean>;
   tera: Record<SideId, boolean>;
   mega: Record<SideId, boolean>;
   ultra: Record<SideId, boolean>;
@@ -99,6 +97,7 @@ function notePrevented(scan: PlayedScan, tag: string, side: SideId, reason: stri
   if (!scan.settled[side] && scan.actions[side] === null && scan.prevented[side] === undefined) {
     scan.prevented[side] = tag === 'faint' ? 'faint' : (reason ?? 'prevented');
   }
+  if (tag === 'faint') scan.fainted[side] = true;
   scan.settled[side] = true;
 }
 
@@ -115,9 +114,13 @@ function noteSwitch(scan: PlayedScan, side: SideId, ref: string, species: string
   if (scan.settled[side]) {
     // A switch after the side's own PIVOT move is the pair's other half —
     // record which Pokémon the player brought in (grading distinguishes
-    // "U-turn → the wall" from "U-turn → the wincon").
+    // "U-turn → the wall" from "U-turn → the wincon"). Round 70 (N1): the pivots
+    // are the Dex's selfSwitch moves (pivot-moves.ts), and a body that fainted
+    // after its move was replaced, not pivoted: a Teleport that failed before
+    // Gen 8 records no target. The scan has no generation, so the newest Dex
+    // answers, and it holds every pivot of every generation.
     const action = scan.actions[side];
-    if (action && action.kind === 'move' && PIVOT_MOVE_NAMES.has(toId(action.name)) &&
+    if (action && action.kind === 'move' && !scan.fainted[side] && isPivotMove(Dex, toId(action.name)) &&
       action.pivotTarget === undefined) {
       action.pivotTarget = species;
     }
@@ -152,6 +155,7 @@ export function parsePlayedActions(lines: string[]): PlayedTurn {
   const scan: PlayedScan = {
     actions: { p1: null, p2: null },
     settled: { p1: false, p2: false },
+    fainted: { p1: false, p2: false },
     tera: { p1: false, p2: false },
     mega: { p1: false, p2: false },
     ultra: { p1: false, p2: false },

@@ -1,6 +1,7 @@
 import { legalChoices, positionBattle, type ChoiceOption, type SimPosition } from '../forward-model.ts';
 import { coreOf, GIMMICK_TOKENS } from '../rank.ts';
 import { findConsistentOptions, findPlayedOption } from '../analysis.ts';
+import { isPivotMove } from '../pivot-moves.ts';
 import type { PlayedAction } from '../played.ts';
 import type { TeraAllowance } from '../types.ts';
 import { combinedOptionHints, isCombined, singlesOptionHints } from './hints.ts';
@@ -174,23 +175,20 @@ export function searchOptions(
   return dropNoopMoves(positionBattle(position), side, options, opts?.sleepClause);
 }
 
-/** Moves that switch the user out — really PAIRS of move + incoming mon. */
-const PIVOT_MOVE_IDS = new Set([
-  'uturn', 'voltswitch', 'flipturn', 'partingshot', 'teleport', 'batonpass',
-  'chillyreception', 'shedtail',
-]);
-
 /**
  * Pivot moves are pairs: the move PLUS the incoming Pokémon, chosen in the
  * same turn. The root matrix enumerates them ("U-turn → Clefable") so the
  * ranking can price each follow-up instead of hiding a greedy mid-turn
  * resolution inside one row (GPL T25). Root singles only: sub-searches and
  * doubles keep the greedy resolution — their bare `move uturn` stays valid.
+ * Round 70 (N1): which moves pivot comes from the battle's own Dex, so Teleport
+ * is a pair from Gen 8 on (pivot-moves.ts, test/pivot-moves.spec.ts).
  */
 export function expandPivotPairs(position: SimPosition, side: 'p1' | 'p2', options: ChoiceOption[]): ChoiceOption[] {
   if (isCombined(options)) return options;
-  if (!options.some(option => PIVOT_MOVE_IDS.has(option.choice.split(' ')[1]))) return options;
   const battle = positionBattle(position);
+  const pivots = (option: ChoiceOption) => option.choice.startsWith('move ') && isPivotMove(battle.dex, option.choice.split(' ')[1]);
+  if (!options.some(pivots)) return options;
   const sideState = battle.sides[sideIndex(side)];
   const bench = sideState.pokemon
     .map((pokemon, index) => ({ pokemon, slot: index + 1 }))
@@ -198,8 +196,7 @@ export function expandPivotPairs(position: SimPosition, side: 'p1' | 'p2', optio
   if (bench.length === 0) return options;
   const expanded: ChoiceOption[] = [];
   for (const option of options) {
-    const tokens = option.choice.split(' ');
-    if (tokens[0] !== 'move' || !PIVOT_MOVE_IDS.has(tokens[1])) {
+    if (!pivots(option)) {
       expanded.push(option);
       continue;
     }
