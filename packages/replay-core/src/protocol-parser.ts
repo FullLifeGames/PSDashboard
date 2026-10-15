@@ -8,6 +8,7 @@ import { noteItemEnd } from './protocol/item-reading.ts';
 import { noteAbilityState } from './protocol/hit-facts.ts';
 import { noteSurvivalMarker } from './protocol/survival-marker.ts';
 import { noteActivation, settleRacedFormes, settleScarfMovers } from './protocol/speed-evidence.ts';
+import { normalizeLineEndings } from './line-endings.ts';
 
 export function parseReplayLog(log: string): TurnSnapshot[] {
   return parseReplayLogWithObservations(log).snapshots;
@@ -46,12 +47,13 @@ function dispatch(state: ParserState, line: string) {
  * BEFORE the line applies (status, boosts, HP at decision time), then the
  * line feeds the client and turn boundaries take their snapshot.
  */
-export function parseReplayLogWithObservations(log: string): {
+export function parseReplayLogWithObservations(rawLog: string): {
   snapshots: TurnSnapshot[];
   observations: DamageObservation[];
   speedOrders: SpeedOrderObservation[];
   hpEvidence: HiddenPowerEvidence[];
 } {
+  const log = normalizeLineEndings(rawLog);
   const state = createParserState(log.match(/^\|tier\|([^|\n]+)/m)?.[1]);
   const lines = log.split('\n');
 

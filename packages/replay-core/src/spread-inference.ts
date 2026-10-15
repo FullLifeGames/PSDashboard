@@ -3,7 +3,7 @@ import type { DamageObservation, PokemonEvs, SpeedOrderObservation } from './typ
 import { capToBudget, evStep, evTotal, ZERO_EVS, type EvBudget } from './spreads/ev-budget.ts';
 import { candidateLadder, type CandidateRung, type SpreadCandidate } from './spreads/ladder.ts';
 import {
-  buildSolveContext, genNumOf, hpBasisOf, keyOf, observationError, physicalAttackerFor, priorDistance, setOf, speedError, spreadFor,
+  buildSolveContext, hpBasisOf, keyOf, observationError, physicalAttackerFor, priorDistance, setOf, speedError, spreadFor,
   type SolveContext,
 } from './spreads/fit.ts';
 import { decideScarfs, type SpeedKnowledgeMap } from './spreads/scarf.ts';
@@ -13,6 +13,7 @@ import { hpEvsForMaxHp, type ObservedMaxHp } from './spreads/max-hp.ts';
 import { readableOrders, settledSets } from './spreads/order-limit.ts';
 import { isBoostItem, requiresItem } from './spreads/boost-items.ts';
 import { simGenNum } from './calc-gen.ts';
+import { genNumOf } from './ids.ts';
 
 export { evBudget, legalizeEvs } from './spreads/ev-budget.ts';
 export type { SpreadCandidate } from './spreads/ladder.ts';

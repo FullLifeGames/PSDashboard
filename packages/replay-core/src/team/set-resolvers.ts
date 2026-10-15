@@ -8,6 +8,7 @@ import { itemSetValue } from '../team-info.ts';
 import type { SpreadCandidate } from '../spread-inference.ts';
 import type { KnowledgeSource, PokemonEvs, RevealedPokemonInfo } from '../types.ts';
 import { toId } from '../ids.ts';
+import { evBudget, evsOfSet, type EvBudget } from '../spreads/ev-budget.ts';
 import { slotMoveKey } from './move-slots.ts';
 
 type SmogonSet = ReturnType<typeof getSpeciesSetAssumption>;
@@ -241,10 +242,10 @@ function spreadNature(
 
 function spreadEvs(
   species: string, edited: EditedFields, inferred: SpreadCandidate | undefined, curated: CuratedSet | null,
-  spread: UsageSpreadLike, setSpread: UsageSpreadLike, revealedMoves: string[],
+  spread: UsageSpreadLike, setSpread: UsageSpreadLike, revealedMoves: string[], budget: EvBudget,
 ): PokemonSet['evs'] {
   return edited.editedEvs || inferred?.evs || curated?.spread?.evs || spread?.evs || setSpread?.evs ||
-    defaultEvsFor(species, revealedMoves);
+    defaultEvsFor(species, revealedMoves, budget);
 }
 
 /**
@@ -264,13 +265,13 @@ function spreadIvs(
 
 export function resolveSpread(
   species: string, edited: EditedFields, inferred: SolvedSpread | undefined, curated: CuratedSet | null,
-  usageSet: SpeciesUsageSet | null, smogonSet: SmogonSet, revealedMoves: string[] = [],
+  usageSet: SpeciesUsageSet | null, smogonSet: SmogonSet, revealedMoves: string[] = [], budget: EvBudget = evBudget(''),
 ): { nature: PokemonSet['nature']; evs: PokemonSet['evs']; ivs: PokemonSet['ivs'] } {
   const spread = usageSet?.spread;
   const setSpread = smogonSet?.spread;
   return {
     nature: spreadNature(edited, inferred, curated, spread, setSpread),
-    evs: spreadEvs(species, edited, inferred, curated, spread, setSpread, revealedMoves),
+    evs: spreadEvs(species, edited, inferred, curated, spread, setSpread, revealedMoves, budget),
     ivs: spreadIvs(edited, inferred, curated, usageSet, smogonSet),
   };
 }
@@ -296,9 +297,12 @@ function revealedOffense(revealedMoves: string[]): 'atk' | 'spa' | null {
  * The old flat 252 HP / 252 Atk default put physical EVs on special
  * attackers and left base-123-Speed Noivern outsped by everything (GPL).
  * Revealed attacks name the offense side first (573756's Kyurem showed
- * only Freeze-Dry and defaulted to 252 Atk).
+ * only Freeze-Dry and defaulted to 252 Atk). Where the server gives a set
+ * without EVs a start (Gens 1 and 2: 252 in every stat, round 70, T222) that
+ * start is the default, whatever the species.
  */
-function defaultEvsFor(species: string, revealedMoves: string[]): PokemonSet['evs'] {
+function defaultEvsFor(species: string, revealedMoves: string[], budget: EvBudget): PokemonSet['evs'] {
+  if (budget.start > 0) return evsOfSet(undefined, budget);
   const data = Dex.species.get(species);
   const stats = data.exists ? data.baseStats : null;
   const offense: 'atk' | 'spa' = revealedOffense(revealedMoves) ?? (stats && stats.spa > stats.atk ? 'spa' : 'atk');

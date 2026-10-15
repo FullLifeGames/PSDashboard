@@ -18,8 +18,8 @@ export interface ObservedMaxHp {
  */
 export function observedMaxHp(log: string): Map<string, ObservedMaxHp> {
   const seen = new Map<string, ObservedMaxHp>();
-  for (const rawLine of log.split('\n')) {
-    const match = rawLine.replace(/\r$/, '').match(/^\|(?:switch|drag)\|(p[12])[a-d]: [^|]*\|([^,|]+)((?:, [^|,]+)*)\|(\d+)\/(\d+)/);
+  for (const line of log.split('\n')) {
+    const match = line.match(/^\|(?:switch|drag)\|(p[12])[a-d]: [^|]*\|([^,|]+)((?:, [^|,]+)*)\|(\d+)\/(\d+)/);
     if (!match) continue;
     const maxhp = parseInt(match[5], 10);
     if (maxhp <= 0 || maxhp === 100) continue;

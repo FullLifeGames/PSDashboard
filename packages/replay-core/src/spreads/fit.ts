@@ -14,7 +14,7 @@ import { defenderSideOf, fieldOf, hitSideOf, moveOf, readObservation, type HitSi
 import { abilityAtHit } from './ability-at-hit.ts';
 import { formeAbility } from './battle-forme.ts';
 import { withItemAtHit } from './item-at-hit.ts';
-import { toId } from '../ids.ts';
+import { genNumOf, toId } from '../ids.ts';
 
 /**
  * A violated move-order constraint outweighs any damage-fit error: the log
@@ -75,12 +75,6 @@ export interface SolveContext {
   /** Maximum HP per mon as the log printed it (round 40: pins the HP EVs). */
   maxHp: Map<string, ObservedMaxHp>;
   priors: Map<string, SpreadCandidate>;
-}
-
-/** The generation a format plays. */
-export function genNumOf(formatid: string): number {
-  const genNumber = parseInt(formatid.match(/^gen(\d)/)?.[1] ?? '9', 10);
-  return Math.min(Math.max(genNumber, 1), 9);
 }
 
 function genOf(formatid: string) {

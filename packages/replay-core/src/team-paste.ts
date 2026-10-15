@@ -1,6 +1,7 @@
 import type { OpponentTeamInfo, PokemonEvs } from './types.ts';
 import { EMPTY_EVS, itemSetValue, manualEvs, manualField, manualMove } from './team-info.ts';
 import { toId } from './ids.ts';
+import { normalizeLineEndings } from './line-endings.ts';
 
 /**
  * Lightweight Showdown-export parser for pasted teams (G15). Deliberately
@@ -61,7 +62,7 @@ function parseHeader(header: string): { species: string; nickname?: string; item
 
 export function parsePastedTeam(teamText: string): PastedSet[] {
   const sets: PastedSet[] = [];
-  const blocks = teamText.replace(/\r/g, '').split(/\n\s*\n+/);
+  const blocks = normalizeLineEndings(teamText).split(/\n\s*\n+/);
 
   for (const block of blocks) {
     const lines = block.split('\n').map(line => line.trim()).filter(Boolean);

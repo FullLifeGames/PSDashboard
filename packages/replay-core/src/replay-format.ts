@@ -1,11 +1,15 @@
 import { Dex } from '@pkmn/sim';
 import type { ReplayData, TurnSnapshot } from './types.ts';
 import { toId } from './ids.ts';
+import { normalizeLineEndings } from './line-endings.ts';
 
 type ReplayFormatSource = Partial<Pick<ReplayData, 'id' | 'format' | 'formatid' | 'log'>>;
 
 /** Optional-input wrapper: an absent field normalizes to the empty id. */
 const optionalId = (value: string | undefined): string => toId(value ?? '');
+
+/** The log as LF lines: the readers below match line by line, whatever endings the file came with (round 70, T206). */
+const lfLog = (log: string | undefined): string | undefined => (log === undefined ? undefined : normalizeLineEndings(log));
 
 /**
  * Splits Showdown's `-{password}pw` suffix off a private replay id
@@ -29,14 +33,14 @@ function stripReplayNumber(id: string | undefined): string {
 }
 
 function extractTier(log: string | undefined): string {
-  return log?.match(/^\|tier\|([^|\n]+)/m)?.[1] ?? '';
+  return lfLog(log)?.match(/^\|tier\|([^|\n]+)/m)?.[1] ?? '';
 }
 
 function extractGen(source: ReplayFormatSource & { formatid?: string }): string {
   const fromFormatId = source.formatid?.match(/^gen(\d+)/)?.[1];
   if (fromFormatId) return fromFormatId;
 
-  const fromLog = source.log?.match(/^\|gen\|(\d+)/m)?.[1];
+  const fromLog = lfLog(source.log)?.match(/^\|gen\|(\d+)/m)?.[1];
   if (fromLog) return fromLog;
 
   const fromFormat = optionalId(source.format || extractTier(source.log)).match(/gen(\d+)/)?.[1];
@@ -46,7 +50,7 @@ function extractGen(source: ReplayFormatSource & { formatid?: string }): string 
 }
 
 export function getReplayGameType(log: string | undefined): string | null {
-  const raw = log?.match(/^\|gametype\|([^|\n]+)/m)?.[1];
+  const raw = lfLog(log)?.match(/^\|gametype\|([^|\n]+)/m)?.[1];
   return raw ? optionalId(raw) : null;
 }
 
@@ -127,7 +131,8 @@ function logShowsSecondSleep(log: string): boolean {
  * singles-standard default unless the log itself shows a second
  * simultaneous sleep.
  */
-function sleepClauseSuffix(log: string | undefined, base: string): string {
+function sleepClauseSuffix(rawLog: string | undefined, base: string): string {
+  const log = lfLog(rawLog);
   if (!log || !base.endsWith('customgame')) return '';
   if (/^\|rule\|Sleep Clause/m.test(log)) return '@@@Sleep Clause Mod';
   // Only REAL rule declarations ("Name: description") count as a declared

@@ -13,6 +13,7 @@ import { syncClientFacts } from './inference/client-facts.ts';
 import { rocksMayMiss } from './inference/rocks-tell.ts';
 import { arg, fromEffect, identOf, readLine, type LogLine } from './inference/log-line.ts';
 import { toId } from './ids.ts';
+import { normalizeLineEndings } from './line-endings.ts';
 
 /** "SitrusBerry" / "HighHorsepower" (packed names) → "Sitrus Berry" / "High Horsepower". */
 function splitPackedName(value: string): string {
@@ -66,9 +67,7 @@ function sheetEntry(entry: string): SheetPokemon | null {
 
 export function parseShowteamSheet(log: string, side: 'p1' | 'p2'): SheetPokemon[] | null {
   const prefix = `|showteam|${side}|`;
-  const line = log.split('\n')
-    .map(rawLine => rawLine.replace(/\r$/, ''))
-    .find(candidate => candidate.startsWith(prefix));
+  const line = log.split('\n').find(candidate => candidate.startsWith(prefix));
   if (!line) return null;
 
   const entries = line.slice(prefix.length).split(']');
@@ -132,7 +131,8 @@ function applyTeamSheet(pokemonMap: Map<string, RevealedPokemonInfo>, sheet: She
  * reads the line last, and its state gives abilities and items the handlers
  * leave to it (T108 step 2, inference/client-facts.ts).
  */
-export function inferOpponentTeam(log: string, opponentSide: 'p1' | 'p2' = 'p2'): OpponentTeamInfo {
+export function inferOpponentTeam(rawLog: string, opponentSide: 'p1' | 'p2' = 'p2'): OpponentTeamInfo {
+  const log = normalizeLineEndings(rawLog);
   const lines = log.split('\n').map(readLine);
   const state = createInferrerState(lines, opponentSide);
 

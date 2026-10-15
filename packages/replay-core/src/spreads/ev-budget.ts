@@ -1,5 +1,6 @@
 import { TeamValidator } from '@pkmn/sim';
 import type { PokemonEvs } from '../types.ts';
+import { genNumOf } from '../ids.ts';
 import { isChampionsFormat } from './champions-format.ts';
 
 export const ZERO_EVS: PokemonEvs = { hp: 0, atk: 0, def: 0, spa: 0, spd: 0, spe: 0 };
@@ -14,29 +15,36 @@ export const ALL_31_IVS: PokemonEvs = { hp: 31, atk: 31, def: 31, spa: 31, spd: 
  * Gens 1 and 2 (round 69, T192) have no EV limit, so a set without EVs gets
  * 252 in every stat from the server (`start`, asked of its validator), and
  * one Special stat (`oneSpecial`): the calculator throws and the validator
- * copies when a Special Defense differs from Special Attack there.
+ * copies when a Special Defense differs from Special Attack there. Round 70
+ * (T222): the budget reads the generation of the format (genNumOf), so the
+ * bare hint the build passes ('gen1') counts as much as a format id, 'gen21v1'
+ * included, and the default prior per species is that start where there is one.
  */
 export interface EvBudget { perStat: number; total: number; statPoints: boolean; start: number; oneSpecial: boolean }
 export function evBudget(formatid: string): EvBudget {
   if (isChampionsFormat(formatid)) return { perStat: 32, total: 66, statPoints: true, start: 0, oneSpecial: false };
-  if (!/^gen[12]\D/.test(formatid)) return { perStat: 252, total: 508, statPoints: false, start: 0, oneSpecial: false };
-  return { perStat: 252, total: 6 * 252, statPoints: false, start: serverStartEv(formatid), oneSpecial: true };
+  const gen = genNumOf(formatid);
+  if (gen > 2) return { perStat: 252, total: 508, statPoints: false, start: 0, oneSpecial: false };
+  return { perStat: 252, total: 6 * 252, statPoints: false, start: serverStartEv(gen), oneSpecial: true };
 }
 
-const startMemo = new Map<string, number>();
+const startMemo = new Map<number, number>();
 
-/** The EV every stat of a set without EVs gets from the server's validator (252 where the format has no EV limit). */
-function serverStartEv(formatid: string): number {
-  const known = startMemo.get(formatid);
+/**
+ * The EV every stat of a set without EVs gets from the server's validator in a generation without an EV limit (252 in Gens 1
+ * and 2, asked of the generation's Custom Game: spread-gen12-build.spec.ts checks it against every format of those generations).
+ */
+function serverStartEv(gen: number): number {
+  const known = startMemo.get(gen);
   if (known !== undefined) return known;
   const probe = { name: '', species: 'Pikachu', moves: [] } as unknown as { evs?: PokemonEvs };
   try {
-    new TeamValidator(formatid).validateSet(probe as never, {});
+    new TeamValidator(`gen${gen}customgame`).validateSet(probe as never, {});
   } catch {
     // Not a format of the simulator: no EVs are given.
   }
   const start = probe.evs?.hp ?? 0;
-  startMemo.set(formatid, start);
+  startMemo.set(gen, start);
   return start;
 }
 

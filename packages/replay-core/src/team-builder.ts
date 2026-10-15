@@ -5,9 +5,8 @@ import { getSpeciesUsageSet } from './smogon/usage-lookup.ts';
 import type { SmogonUsageStats } from './smogon/stats-types.ts';
 import { getSpeciesSetAssumption, type SmogonSetAssumptions } from './smogon/sets-lookup.ts';
 import { evBudget, inferSpreads, legalizeEvs, type SpreadCandidate } from './spread-inference.ts';
-import { ALL_31_IVS } from './spreads/ev-budget.ts';
+import { ALL_31_IVS, type EvBudget } from './spreads/ev-budget.ts';
 import { boostItemIds } from './spreads/boost-items.ts';
-import { genNumOf } from './spreads/fit.ts';
 import { observedMaxHp } from './spreads/max-hp.ts';
 import { withHiddenPowerType } from './hidden-power.ts';
 import {
@@ -18,7 +17,8 @@ import { resolveInferredItems, speedKnowledgeFor } from './team/inferred-items.t
 import { abilitiesAreFree, dexLegalSet } from './team/dex-legal.ts';
 import { rocksMayMiss } from './inference/rocks-tell.ts';
 import type { DamageObservation, HiddenPowerEvidence, OpponentTeamInfo, RevealedPokemonInfo, SpeedOrderObservation } from './types.ts';
-import { toId } from './ids.ts';
+import { genNumOf, toId } from './ids.ts';
+import { normalizeLineEndings } from './line-endings.ts';
 
 /**
  * Build PokemonSet arrays for both sides from a replay's protocol log.
@@ -26,7 +26,7 @@ import { toId } from './ids.ts';
  * be filled from Smogon usage probabilities when those stats are available.
  */
 export function buildTeamsFromReplay(
-  log: string,
+  rawLog: string,
   options?: {
     userTeamText?: string;
     p1Info?: OpponentTeamInfo | null;
@@ -46,7 +46,7 @@ export function buildTeamsFromReplay(
     hpEvidence?: HiddenPowerEvidence[];
   },
 ): BuiltTeams {
-  return buildTeams(log, options).teams;
+  return buildTeams(normalizeLineEndings(rawLog), options).teams;
 }
 
 type BuildOptions = Parameters<typeof buildTeamsFromReplay>[1];
@@ -94,7 +94,8 @@ function buildTeams(log: string, options: BuildOptions): { teams: BuiltTeams; in
   // IV is 31 (round 67, T145): a guess or fallback from an EV-scale source
   // reaches the Stat Point scale by the level-50 inverse (legalizeEvs), and
   // the sets keep every IV at 31, as the server plays them.
-  const champions = evBudget(formatHint).statPoints;
+  const budget = evBudget(formatHint);
+  const champions = budget.statPoints;
   const legality = { gen: parseInt(gen, 10), freeAbilities: abilitiesAreFree(log) };
   const legalize = (team: PokemonSet[]): PokemonSet[] =>
     (champions ? team.map(set => ({ ...set, evs: legalizeEvs(set.evs, formatHint), ivs: { ...ALL_31_IVS } })) : team)
@@ -107,7 +108,7 @@ function buildTeams(log: string, options: BuildOptions): { teams: BuiltTeams; in
   const sideTeam = (side: 'p1' | 'p2', inferred?: Map<string, SpreadCandidate>) =>
     legalize(infos[side].pokemon.map(pokemon => buildSet(
       pokemon, knownTeams[side], options?.usageStats, options?.setAssumptions, inferred?.get(`${side}:${toId(pokemon.species)}`),
-      { hpTyped: hpTyped(side), tellItem: tells[side].get(toId(pokemon.species)) ?? '', gen: legality.gen })))
+      { hpTyped: hpTyped(side), tellItem: tells[side].get(toId(pokemon.species)) ?? '', gen: legality.gen, budget })))
       .map(hpTyped(side));
   const build = (inferred?: Map<string, SpreadCandidate>) => ({ p1Team: sideTeam('p1', inferred), p2Team: sideTeam('p2', inferred) });
 
@@ -177,12 +178,13 @@ function carryOrdersOnly(
  * `observations` at every call site.
  */
 export function solveReplaySpreads(
-  log: string,
+  rawLog: string,
   observations: DamageObservation[],
   options?: Omit<NonNullable<Parameters<typeof buildTeamsFromReplay>[1]>, 'observations' | 'inferredSpreads'>,
 ): Map<string, SpreadCandidate> {
   const { speedOrders = [], usageStats, setAssumptions, userTeamText } = options ?? {};
   if (observations.length === 0 && speedOrders.length === 0) return new Map();
+  const log = normalizeLineEndings(rawLog);
   const infos = infosFor(log, options);
   const { teams: base, inferred: preSolved } = buildTeams(log, { ...options, p1Info: infos.p1, p2Info: infos.p2 });
   const solved = inferSpreads(observations, { p1: base.p1Team, p2: base.p2Team }, formatHintFor(log).formatHint,
@@ -247,11 +249,12 @@ function carryPreSolve(solved: Map<string, SpreadCandidate>, preSolved: Map<stri
 /** The build's Hidden Power step: a typeless "Hidden Power" takes its type from evidence or usage. */
 type HiddenPowerTyping = (set: PokemonSet) => PokemonSet;
 
-/** Per-Pokémon build context: the Hidden Power step and the item the inference tells. */
+/** Per-Pokémon build context: the Hidden Power step, the item the inference tells, the generation and its EV budget (the default prior's start). */
 interface SetContext {
   hpTyped: HiddenPowerTyping;
   tellItem: string;
   gen: number;
+  budget: EvBudget;
 }
 
 function buildSet(
@@ -260,7 +263,7 @@ function buildSet(
   usageStats?: SmogonUsageStats | null,
   setAssumptions?: SmogonSetAssumptions | null,
   inferred?: SpreadCandidate,
-  { hpTyped, tellItem, gen }: SetContext = { hpTyped: set => set, tellItem: '', gen: 9 },
+  { hpTyped, tellItem, gen, budget }: SetContext = { hpTyped: set => set, tellItem: '', gen: 9, budget: evBudget('') },
 ): PokemonSet {
   const edited = editedFields(info);
   const userMatch = findUserMatch(userTeam, info.species);
@@ -277,7 +280,7 @@ function buildSet(
     : resolveItem(info, curated, usageSet, smogonSet, inferred?.item ?? '', tellItem);
   const moves = assembleMoves(info, curated, usageSet, smogonSet, item, usageMoveTail(usageStats, info.species));
   const revealedMoves = info.moves.filter(move => move.source === 'revealed').map(move => move.name);
-  const spread = resolveSpread(info.species, edited, inferred, curated, usageSet, smogonSet, revealedMoves);
+  const spread = resolveSpread(info.species, edited, inferred, curated, usageSet, smogonSet, revealedMoves, budget);
 
   const set: PokemonSet = {
     name: info.species,
@@ -311,8 +314,8 @@ function withHappinessAssumption(set: PokemonSet): PokemonSet {
 }
 
 /** Public: the open-team-sheet sets both players posted, if any. */
-export function extractTeamSheets(log: string): { p1: PokemonSet[] | null; p2: PokemonSet[] | null } {
-  return extractEmbeddedShowteamExports(log);
+export function extractTeamSheets(rawLog: string): { p1: PokemonSet[] | null; p2: PokemonSet[] | null } {
+  return extractEmbeddedShowteamExports(normalizeLineEndings(rawLog));
 }
 
 type SideTeams = { p1: PokemonSet[] | null; p2: PokemonSet[] | null };
@@ -342,8 +345,7 @@ function extractEmbeddedShowteamExports(log: string): SideTeams {
   const fromChat: SideTeams = { p1: null, p2: null };
   const unassigned: PokemonSet[][] = [];
 
-  for (const rawLine of log.split('\n')) {
-    const line = rawLine.replace(/\r$/, '');
+  for (const line of log.split('\n')) {
     const playerMatch = line.match(/^\|player\|(p[12])\|([^|]+)/);
     if (playerMatch) {
       playerByName.set(toId(playerMatch[2]), playerMatch[1] as 'p1' | 'p2');
