@@ -39,16 +39,25 @@
 // each tranche and family in proportion). run.json records the fraction, the
 // fingerprint covers it, and scripts/paired-calibration.mjs pairs a quick run
 // against a full base on the rows both hold.
+//
+// CI jobs (round 71). --slice-range a..b runs only slices a to b of --slices N
+// into --out and writes job.json there instead of merged.jsonl and run.json, so
+// --reuse never takes a job for a run. --merge <dir> (once per job folder) checks
+// that the jobs make one run (same slice count, env, fraction, commit and
+// fingerprint, every slice once), copies their slice files into --out and writes
+// merged.jsonl, summary.txt and run.json as a local run of all slices would
+// (scripts/calibration-jobs.mjs).
 import { spawn } from 'node:child_process';
 import { execSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
-import { createWriteStream, existsSync, mkdirSync, writeFileSync } from 'node:fs';
-import { join, relative, resolve } from 'node:path';
+import { copyFileSync, createWriteStream, existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { basename, join, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { mergeDumps, summarize } from './calibration-lib.mjs';
 import {
   computeFingerprint, decideReuse, fingerprintRecord, parseFraction, shortValue,
 } from './calibration-fingerprint.mjs';
+import { checkJobs, jobRecord, mergedRunRecord, parseSliceRange, sliceIndices } from './calibration-jobs.mjs';
 
 const ROOT = fileURLToPath(new URL('..', import.meta.url));
 const DEFAULT_ENV = { EVAL_CALIBRATION_MODE: 'auto', EVAL_CALIBRATION_SMOGON: '1' };
@@ -57,6 +66,8 @@ const CALIBRATION_DIR = '.calibration';
 
 function usage() {
   console.log('usage: node scripts/run-calibration.mjs [--slices 6] [--out <dir>] [--env KEY=VALUE ...] [--tranche NAME] [--reuse] [--dry-run]');
+  console.log('       node scripts/run-calibration.mjs --slices N --slice-range a..b --out <dir> [--env KEY=VALUE ...] [--tranche NAME]');
+  console.log('       node scripts/run-calibration.mjs --merge <job dir> [--merge <job dir> ...] --out <dir>');
 }
 
 function fail(message) {
@@ -66,7 +77,7 @@ function fail(message) {
 }
 
 function parseArgs(argv) {
-  const options = { slices: 6, out: null, env: {}, tranche: null, reuse: false, dryRun: false };
+  const options = { slices: 6, out: null, env: {}, tranche: null, reuse: false, dryRun: false, sliceRange: null, merge: [] };
   for (let i = 0; i < argv.length; i++) {
     const arg = argv[i];
     const next = () => {
@@ -79,6 +90,8 @@ function parseArgs(argv) {
     else if (arg === '--tranche') options.tranche = next();
     else if (arg === '--reuse') options.reuse = true;
     else if (arg === '--dry-run') options.dryRun = true;
+    else if (arg === '--slice-range') options.sliceRange = next();
+    else if (arg === '--merge') options.merge.push(next());
     else if (arg === '--env') {
       const pair = next();
       const eq = pair.indexOf('=');
@@ -92,6 +105,20 @@ function parseArgs(argv) {
     }
   }
   if (!Number.isInteger(options.slices) || options.slices < 1) fail('--slices must be a positive integer');
+  if (options.sliceRange !== null) {
+    if (options.reuse) fail('--slice-range runs part of a run and never reuses; drop --reuse');
+    if (options.merge.length > 0) fail('--slice-range and --merge are separate steps');
+    if (!options.out) fail('--slice-range needs --out, the folder its job leaves for --merge');
+    try {
+      options.sliceRange = parseSliceRange(options.sliceRange, options.slices);
+    } catch (error) {
+      fail(error.message);
+    }
+  }
+  if (options.merge.length > 0) {
+    if (options.reuse || options.dryRun) fail('--merge joins finished jobs; it takes no --reuse or --dry-run');
+    if (!options.out) fail('--merge needs --out, the folder of the merged run');
+  }
   return options;
 }
 
@@ -207,8 +234,82 @@ function recordedLine(record, failures, httpSkips) {
   return `fingerprint ${shortValue(record.value)} recorded in run.json; ${state}`;
 }
 
+/** The slice lines of a finished run or job, one per slice. */
+function sliceLines(results) {
+  return results.map(result => {
+    const state = result.code === 0 ? 'ok' : `exit ${result.code}`;
+    const dumped = existsSync(result.dump) ? '' : ' (no dump)';
+    const skipped = result.httpSkips > 0 ? ` (${result.httpSkips} replay(s) skipped on HTTP errors)` : '';
+    return `slice ${result.index}: ${state}, ${result.seconds}s${dumped}${skipped}`;
+  });
+}
+
+/** Writes merged.jsonl and summary.txt of `dumps` into outDir; returns the rows, the text written and the summary lines. */
+function writeMerged(outDir, dumps) {
+  const merged = mergeDumps(dumps);
+  const mergedText = merged.map(sample => JSON.stringify(sample)).join('\n') + (merged.length > 0 ? '\n' : '');
+  writeFileSync(join(outDir, 'merged.jsonl'), mergedText);
+  const lines = summarize(merged);
+  writeFileSync(join(outDir, 'summary.txt'), lines.join('\n') + '\n');
+  return { merged, mergedText, lines };
+}
+
+/** --merge: joins the job folders of one CI run into a run folder (scripts/calibration-jobs.mjs checks them first). */
+function mergeJobs(options) {
+  const jobs = options.merge.map(dir => {
+    const path = resolve(ROOT, dir);
+    let job = null;
+    try {
+      job = JSON.parse(readFileSync(join(path, 'job.json'), 'utf8'));
+    } catch {
+      // checkJobs names the folder.
+    }
+    return { name: basename(path), path, job };
+  });
+  try {
+    checkJobs(jobs);
+  } catch (error) {
+    fail(`--merge: ${error.message}`);
+  }
+  const outDir = resolve(ROOT, options.out);
+  mkdirSync(outDir, { recursive: true });
+  const present = new Set();
+  for (const { path, job } of jobs) {
+    for (const index of sliceIndices(job.sliceRange)) {
+      for (const file of [`slice-${index}.jsonl`, `slice-${index}.log`]) {
+        if (existsSync(join(path, file))) copyFileSync(join(path, file), join(outDir, file));
+      }
+      if (existsSync(join(outDir, `slice-${index}.jsonl`))) present.add(index);
+    }
+  }
+  const { slices } = jobs[0].job;
+  const dumps = [...present].sort((a, b) => a - b).map(index => join(outDir, `slice-${index}.jsonl`));
+  const { merged, mergedText, lines } = writeMerged(outDir, dumps);
+  const { record, failures } = mergedRunRecord(jobs, {
+    samples: merged.length,
+    mergedSha256: createHash('sha256').update(mergedText).digest('hex'),
+    finishedAt: new Date().toISOString(),
+    present,
+  });
+  writeFileSync(join(outDir, 'run.json'), JSON.stringify(record, null, 2) + '\n');
+  const results = jobs.flatMap(({ job }) => job.results).sort((a, b) => a.index - b.index)
+    .map(result => ({ ...result, dump: join(outDir, `slice-${result.index}.jsonl`) }));
+  for (const line of sliceLines(results)) console.log(line);
+  console.log(`merged ${merged.length} samples from ${present.size}/${slices} slices of ${jobs.length} job(s): ${jobs.map(({ name }) => name).join(', ')}`);
+  for (const line of lines) console.log(line);
+  console.log(recordedLine(record.fingerprint, failures, record.httpSkips));
+  if (failures > 0) {
+    console.error(`${failures} slice(s) failed or left no dump; the merged summary above is partial.`);
+    process.exitCode = 1;
+  }
+}
+
 async function main() {
   const options = parseArgs(process.argv.slice(2));
+  if (options.merge.length > 0) {
+    mergeJobs(options);
+    return;
+  }
   const env = { ...DEFAULT_ENV, ...options.env };
   if (options.tranche) env.EVAL_CALIBRATION_TRANCHE = options.tranche;
   // The slices inherit this process's environment, so the fraction can come from there as well as from --env.
@@ -219,6 +320,8 @@ async function main() {
     fail(error.message);
   }
   const outDir = resolve(ROOT, options.out ?? join(CALIBRATION_DIR, stamp()));
+  const indices = options.sliceRange ? sliceIndices(options.sliceRange) : Array.from({ length: options.slices }, (_, index) => index);
+  const what = options.sliceRange ? `slices ${options.sliceRange.join('..')} of ${options.slices}` : `${options.slices} slice(s)`;
   const fingerprintEnv = { ...env, EVAL_CALIBRATION: '1' };
   const start = computeFingerprint({ root: ROOT, env: fingerprintEnv, slices: options.slices });
 
@@ -235,7 +338,7 @@ async function main() {
     }
     if (decision) console.log(noReuseLine(decision, start));
     if (options.dryRun) {
-      console.log(`dry run: ${options.slices} slice(s) would start into ${outDir}`);
+      console.log(`dry run: ${what} would start into ${outDir}`);
       process.exitCode = options.reuse ? 3 : 0;
       return;
     }
@@ -243,33 +346,38 @@ async function main() {
 
   mkdirSync(outDir, { recursive: true });
   const startedAt = new Date();
-  console.log(`calibration: ${options.slices} slice(s), env ${JSON.stringify(env)}, output ${outDir}`);
+  console.log(`calibration: ${what}, env ${JSON.stringify(env)}, output ${outDir}`);
   if (!options.reuse && !options.dryRun) console.log(fingerprintLine(start));
   if (fraction < 1) {
     console.log(`quick tier: EVAL_CALIBRATION_FRACTION=${fraction} keeps that share of every tranche and family, the same replays each time; pair the run against a full base with scripts/paired-calibration.mjs`);
   }
 
-  const results = await Promise.all(
-    Array.from({ length: options.slices }, (_, index) => runSlice(index, options.slices, outDir, env)),
-  );
-  const present = results.filter(result => existsSync(result.dump));
-  const merged = mergeDumps(present.map(result => result.dump));
-  const mergedText = merged.map(sample => JSON.stringify(sample)).join('\n') + (merged.length > 0 ? '\n' : '');
-  writeFileSync(join(outDir, 'merged.jsonl'), mergedText);
-  const lines = summarize(merged);
+  const results = await Promise.all(indices.map(index => runSlice(index, options.slices, outDir, env)));
   const failures = results.filter(result => result.code !== 0 || !existsSync(result.dump));
   const httpSkips = results.reduce((sum, result) => sum + result.httpSkips, 0);
+  if (options.sliceRange) {
+    // A CI job: its slices and job.json stay for --merge; the run's rows come from the merge of all its jobs.
+    console.log('');
+    for (const line of sliceLines(results)) console.log(line);
+    const record = fingerprintRecord(start, computeFingerprint({ root: ROOT, env: fingerprintEnv, slices: options.slices }));
+    writeFileSync(join(outDir, 'job.json'), JSON.stringify(jobRecord({
+      commit: commitHash(), startedAt: startedAt.toISOString(), finishedAt: new Date().toISOString(), slices: options.slices,
+      sliceRange: options.sliceRange, env, fraction, results, fingerprint: record,
+    }), null, 2) + '\n');
+    console.log(`job: ${what} done in ${Math.round((Date.now() - startedAt.getTime()) / 1000)}s; --merge joins it with the other jobs of the run`);
+    if (failures.length > 0) {
+      console.error(`${failures.length} slice(s) failed or left no dump.`);
+      process.exitCode = 1;
+    }
+    return;
+  }
+  const present = results.filter(result => existsSync(result.dump));
+  const { merged, mergedText, lines } = writeMerged(outDir, present.map(result => result.dump));
 
   console.log('');
-  for (const result of results) {
-    const state = result.code === 0 ? 'ok' : `exit ${result.code}`;
-    const dumped = existsSync(result.dump) ? '' : ' (no dump)';
-    const skipped = result.httpSkips > 0 ? ` (${result.httpSkips} replay(s) skipped on HTTP errors)` : '';
-    console.log(`slice ${result.index}: ${state}, ${result.seconds}s${dumped}${skipped}`);
-  }
+  for (const line of sliceLines(results)) console.log(line);
   console.log(`merged ${merged.length} samples from ${present.length}/${options.slices} slices (${Math.round((Date.now() - startedAt.getTime()) / 1000)}s wall)`);
   for (const line of lines) console.log(line);
-  writeFileSync(join(outDir, 'summary.txt'), lines.join('\n') + '\n');
   const record = fingerprintRecord(start, computeFingerprint({ root: ROOT, env: fingerprintEnv, slices: options.slices }));
   writeFileSync(join(outDir, 'run.json'), JSON.stringify({
     commit: commitHash(),

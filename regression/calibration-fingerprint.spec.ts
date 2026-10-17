@@ -467,7 +467,7 @@ console.log('stand-in done');
 
   function standInRoot(): string {
     const root = repo();
-    for (const name of ['run-calibration.mjs', 'calibration-lib.mjs', 'calibration-fingerprint.mjs']) copyFileSync(join(SCRIPTS, name), join(root, 'scripts', name));
+    for (const name of ['run-calibration.mjs', 'calibration-lib.mjs', 'calibration-fingerprint.mjs', 'calibration-jobs.mjs']) copyFileSync(join(SCRIPTS, name), join(root, 'scripts', name));
     put(root, 'node_modules/vitest/vitest.mjs', STAND_IN);
     commit(root);
     return root;
