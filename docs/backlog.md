@@ -1,12 +1,12 @@
 # Backlog
 
-This file holds the details of every open TODO, one section per TODO under its fixed T-number. The sections are grouped by the packages of `NextSteps.md`, and a package is one round. The next free T-number is T246.
+This file holds the details of every open TODO, one section per TODO under its fixed T-number. The sections are grouped by the packages of `NextSteps.md`, and a package is one round. The next free T-number is T247.
 
 Evidence paths that start with `r69/` are under `docs/perf/probes/2026-10-12-r69/`.
 
 Source of the new TODOs of round 69: the lane notes, the three review lenses after the merge, the pin diagnosis of lane B and the timing windows of round 69; each claim was checked by a reviewer against the code of the merge state (`r69/review/todos-check.md`, `todos-check-2.md`). Line numbers refer to the state after round 69.
 
-Source of the new TODOs of round 70 (T224 to T245): the findings of the batch (`docs/perf/probes/2026-10-13-*`, `2026-10-15-*`), the lessons (`docs/perf/probes/2026-10-15-lessons/findings.md`) and the batch gate of 17.10.2026 (T242 to T245); a reviewer checked each claim against the code (`docs/perf/probes/2026-10-15-r70-check/review/`). Their line numbers refer to the state after round 70.
+Source of the new TODOs of round 70 (T224 to T246): the findings of the batch (`docs/perf/probes/2026-10-13-*`, `2026-10-15-*`), the lessons (`docs/perf/probes/2026-10-15-lessons/findings.md`) and the batch gate of 17.10.2026 (T242 to T245) and the full VGC holdout after it (T246); a reviewer checked each claim against the code (`docs/perf/probes/2026-10-15-r70-check/review/`). Their line numbers refer to the state after round 70.
 
 ## Next rounds
 
@@ -172,6 +172,23 @@ User gate 17.10.2026, "5a": round 71 builds the bank in GitHub Actions (spec `do
 - [ ] Price the two cells as the verify step does, with and without the tempo, and find what moves them.
 - [ ] Full VGC and Doubles OU holdouts with and without the tempo.
 - [ ] Fix test-first; the scene pin moves at its gate.
+
+### T246 · A commanding Tatsugiri gets a move in the search's doubles choices
+
+*Search · small fix · lossless for every position that evaluates today · round 70 finding*
+
+**Problem.** The simulator auto-passes a slot whose active is fainted or commanding (`side.js` `getChoiceIndex`: Tatsugiri inside Dondozo after Commander) and hands the next part of a doubles choice to the next slot. `forward/choices.ts` (`slotChoicesFor`) skips fainted and empty slots only, so a commanding Tatsugiri gets its own moves from the request, and the combined choice fails: "Your Dondozo doesn't have a move matching dracometeor" or "You sent more choices than unfainted Pokémon". The error ends the whole search of the position. `forward/request-moves.ts` (`nextChoosingSlot`) already holds the simulator's rule. The full VGC holdout of round 70 loses two positions this way at turn 2 (gen9vgc2025regg-2318328981, gen9vgc2025regi-2401571301): v1 evaluates them, and over the batch commits the failure appears with the search lines of 7b4b73f and the round-70 static; v1 already fails at turns 5 and 8 of 2318328981 and at turn 5 of 2401571301.
+
+**Benefit.** App and bank: VGC positions whose search reaches Commander evaluate instead of failing.
+
+**Success.** A red test: in Gen 9 and Champions doubles, with Commander active for either side and Tatsugiri in either slot, the simulator accepts every choice `legalChoices` offers (played on a copy); the two holdout positions evaluate; bank and feedback rows of the positions that evaluate today stay digit-identical.
+
+**Evidence.** `docs/perf/probes/2026-10-17-vgc-bisect/commander.vt.ts` with `out/commander-*.txt` (the two positions per engine snapshot), `.calibration/r70-hold-vgc/slice-3.log`, `.calibration/r69-w2-hold-vgc/slice-*.log`, `node_modules/@pkmn/sim/build/cjs/sim/side.js:1121` (getChoiceIndex), `packages/eval-engine/src/forward/choices.ts:143`, `packages/eval-engine/src/forward/request-moves.ts:33-41`.
+
+**Steps.**
+- [ ] Red test against the simulator (Gen 9 and Champions, both sides, Tatsugiri in slot a and in slot b).
+- [ ] Export the auto-pass rule from `request-moves.ts` and read it in `slotChoicesFor` (one rule, one module).
+- [ ] The two holdout positions evaluate; the bank stays digit-identical on the rows that evaluate today.
 
 ## Package B · Static evaluation repairs
 

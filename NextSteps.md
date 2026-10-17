@@ -1,6 +1,6 @@
 # Next Steps (as of 17.10.2026, after round 70)
 
-Open work only, as packages. A package is one round; its TODOs carry fixed T-numbers, and their scenes, numbers and steps are in `docs/backlog.md`. Rules for agents: `AGENTS.md`. Finished rounds: `docs/completed/`. Next free T-number: T246.
+Open work only, as packages. A package is one round; its TODOs carry fixed T-numbers, and their scenes, numbers and steps are in `docs/backlog.md`. Rules for agents: `AGENTS.md`. Finished rounds: `docs/completed/`. Next free T-number: T247.
 
 ## Next rounds
 
@@ -15,7 +15,7 @@ The order of 3 and 4 is open.
 
 Each package is one round; the order is open.
 
-- **A · Doubles search and verify rows** (T194, T195, T219, T196, T198, T227, T242): the answer round prices one column three ways and its doubles verdicts rest on ties; the verify round re-prices different rows from run to run; speed ties and Fickle Beam scripting should come from the simulator; the trend probe should cost less; since the Protect tempo a VGC verdict (2629703929 turn 8) is softer than the Monte-Carlo reference's.
+- **A · Doubles search and verify rows** (T246, T194, T195, T219, T196, T198, T227, T242): the answer round prices one column three ways and its doubles verdicts rest on ties; the verify round re-prices different rows from run to run; speed ties and Fickle Beam scripting should come from the simulator; the trend probe should cost less; since the Protect tempo a VGC verdict (2629703929 turn 8) is softer than the Monte-Carlo reference's; a commanding Tatsugiri gets a move in the search's choices and ends the search (T246, a small fix with a known cause).
 - **B · Static evaluation repairs** (T199, T201, T224, T225, T226, T243): pairFocus as a ramp instead of an on/off gate, a capture that records its own model form, the re-fit of `boostsBiting` on its round-70 definition, the front gate's bench credit and the open contact costs, residuals and drain heal outside the boost races, and the draft t56 play-out after the re-fit.
 - **C · Spread solver, hits and the Choice check** (T202, T203, T204, T207, T208, T209, T210, T228, T229, T230, T231): hits the solver drops or misprices (the calc 0.12 spread target, partner field abilities, Hidden Power in doubles, Transform, move power from the battle, Z-move and Max-move hits), a prior that names its source, a Choice check that reads the field of the hit, one Special value in Gen 2, Illusion in the nickname lookup, and the crit and accuracy census over conditions.
 - **D · Rebuild fidelity** (T212, T213, T214, T232, T245): start volatiles the protocol shows, an Outrage lock that ends the other way round, a Sitrus Berry witness from HP, the logged dice for every unchanged action of a branch's first turn, and the saved-replay checkpoint that reads 93 % against 94 %.

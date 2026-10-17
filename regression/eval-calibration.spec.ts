@@ -999,7 +999,15 @@ import { takeSimFastReport } from '../packages/eval-engine/src/forward/sim-fast/
  * free of harm, and that the reference grades 2629703929 t8 a mistake on the
  * new rows too (the distance lies in cell values, T242). User 17.10. 11:37
  * ("1a"): the full VGC holdout runs before the push, and without the Protect
- * tempo as well if the harm holds.
+ * tempo as well if the harm holds. FULL VGC HOLDOUT on cea908e against
+ * r69-w2-hold-vgc (1,121 of 1,123 positions): no harm, no gain (all +2
+ * [-15, +18]; hq luck-adjusted +17 [+0, +33] and own K +16 [+0, +32],
+ * unresolved; warnings hq mid +47 and own K +41, luck-adjusted hq mid +55);
+ * the screen's harm does not hold, so the run without the tempo is not
+ * needed. The two missing positions (2318328981 and 2401571301, turn 2) fail
+ * in the search: a commanding Tatsugiri gets a move in the doubles choices
+ * (T246); v1 has the fault at other turns, the batch's search lines reach it
+ * at turn 2 (from 7b4b73f on).
  *
  * WAVE 3 2026-10-12..13 (improvement round 69, the third wave of lanes:
  * seven lanes A to G with 42 TODOs in their own worktrees from 006b33c (=
