@@ -5,7 +5,7 @@ import { type ReplayData, formatEnforcesSleepClause, inferReplayFormatId, getBra
 import { reconstructBranchRuntime } from '../src/branch-engine';
 import { searchPosition } from '../src/search';
 import { analyzeTurn, TIER_THRESHOLDS } from '../src/analysis';
-import { HEALTHY_SACK_FLOOR } from '../src/turn-analysis/types';
+import { DECIDED_SCORE, HEALTHY_SACK_FLOOR } from '../src/turn-analysis/types';
 import { detectSacks, parsePlayedActions, turnEvents } from '../src/played';
 import { resolveTeraPreference } from '../src/tera';
 
@@ -102,10 +102,16 @@ describe('GPL replay end-to-end verdicts', () => {
     // line) instead of the sim's 88 %, and the score after the sack reads
     // 0.38, just under the healthy-sack floor: the stamp stands exactly
     // when both scores hold the floor, and the turn never reads as a mistake.
+    // Round 70 (batch gate): the stamp demotes a tier, so it needs one that
+    // the decided-position leniency leaves standing. Under the round-70
+    // static the turn reads 0.82 before and 0.64 after the sack, regret
+    // 0.171 (0.204 before): the decided leniency alone clears the
+    // inaccuracy and no stamp renders; the turn still never reads as a mistake.
     await analyze(36);
     const t35 = await analyze(35, scoreByTurn.get(36) ?? null);
     const floorHolds = scoreByTurn.get(35)! >= HEALTHY_SACK_FLOOR && scoreByTurn.get(36)! >= HEALTHY_SACK_FLOOR;
-    expect(!!t35.p1.sacrifice).toBe(floorHolds);
+    const tieredAfterDecided = (t35.p1.regret ?? 0) >= (Math.abs(scoreByTurn.get(35)!) >= DECIDED_SCORE ? TIER_THRESHOLDS.mistake : TIER_THRESHOLDS.inaccuracy);
+    expect(!!t35.p1.sacrifice).toBe(floorHolds && tieredAfterDecided);
     if (t35.p1.sacrifice) expect(t35.p1.sacrifice.healthy).toBe(true);
     expect(t35.p1.tier === undefined || t35.p1.tier === 'inaccuracy').toBe(true);
 

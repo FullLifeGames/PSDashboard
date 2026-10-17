@@ -1,8 +1,8 @@
 import { describe, expect, test } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { analyzeTurn } from '../src/analysis';
-import { createLocalTreeExecutor, searchTreesOrchestrated } from '../src/tree-orchestrator';
-import type { EvalResult, EvalSettings } from '../src/types';
+import { createLocalTreeExecutor, searchTreesOrchestrated, type TreeExecutor } from '../src/tree-orchestrator';
+import type { EvalCellJob, EvalCellValue, EvalResult, EvalSettings } from '../src/types';
 import type { PlayedTurn } from '../src/played';
 
 /**
@@ -27,11 +27,12 @@ interface Scene {
 const scene = (name: string) =>
   JSON.parse(readFileSync(new URL(`./fixtures/positions/${name}.json`, import.meta.url), 'utf-8')) as Scene;
 
+const settingsOf = (position: Scene): EvalSettings => ({
+  depth: 1, samples: 1, mode: 'mcts', tera: position.tera, sleepClause: position.sleepClause, keepPlayed: position.keepPlayed ?? undefined,
+});
+
 async function search(position: Scene): Promise<EvalResult> {
-  const settings: EvalSettings = {
-    depth: 1, samples: 1, mode: 'mcts', tera: position.tera, sleepClause: position.sleepClause, keepPlayed: position.keepPlayed ?? undefined,
-  };
-  return searchTreesOrchestrated(createLocalTreeExecutor(position.serialized), settings);
+  return searchTreesOrchestrated(createLocalTreeExecutor(position.serialized), settingsOf(position));
 }
 
 function flat(position: Scene, result: EvalResult) {
@@ -41,35 +42,43 @@ function flat(position: Scene, result: EvalResult) {
   });
 }
 
-const cell = (result: EvalResult, p1: string, p2: string) => {
-  const matrix = result.matrix!;
-  return matrix.values[matrix.p1Labels.indexOf(p1)][matrix.p2Labels.indexOf(p2)];
-};
+/** The verify step's applied value of a blended cell outside the trees: every class one ply deeper under its weight. */
+const blendedValue = (value: EvalCellValue) =>
+  value.blend!.classes.reduce((sum, cls) => sum + cls.weight * (cls.deepened ?? cls.leafSum / cls.count), 0);
 
 describe('verify scenes: hidden lengths (round 64, T119)', () => {
-  test("2629703929 t8 (VGC): the Sleep Powder cell reads every sleep counter (MC 0.509 ± 0.094 under the round 69 static, user gate 13.10.; 0.389 ± 0.116 before)", { timeout: 300_000 }, async () => {
+  test("2629703929 t8 (VGC): the Sleep Powder cell reads every sleep counter (MC 0.514 ± 0.093 under the round 70 static, batch gate; 0.509 ± 0.094 under the round 69 static)", { timeout: 300_000 }, async () => {
     // Chi-Yu falls asleep in a third of the draws for one turn only and wakes into the next (0.96 one ply
     // deeper); the class's first draw slept for three (−0.17) and stood for the whole class.
-    // Fresh reference (probe lanes/D/pins-mc.vt.ts of round 69, 24 draws per cell, seed blocks 1001 and 5001,
-    // ruleset standard, answers off): the cell reads 0.5089 under the classes' weights (plain means 0.511 and
-    // 0.521, standard errors 0.093 and 0.095). The engine reads 0.3922. Band: 2.5 standard errors (0.0945)
-    // around the weighted value, 0.27 to 0.745; the old pin's band was 2.5 × 0.1156.
+    // Round 70 (Protect tempo, batch gate): Protect rows take two of p1's twelve rows and Heat Wave + Flare Blitz→Groudon
+    // leaves the list, so the cell is priced through the verify step's own job, Koraidon's Flare Blitz aimed back at
+    // Groudon (target 1). Fresh reference (probe docs/perf/probes/2026-10-15-mc/extra-cell-mc.vt.ts, 24 draws on seed
+    // blocks 1001 and 5001, answers off): 0.5135 under the classes' weights on both blocks (plain means 0.516 and 0.526,
+    // standard errors 0.092 and 0.094). The engine reads 0.3981. Band: 2.5 standard errors (0.093) around the weighted
+    // value, 0.28 to 0.75.
     const position = scene('gen9vgc2026regi-2629703929-t8');
-    const result = await search(position);
-    const value = cell(result, 'Heat Wave + Flare Blitz→Groudon', 'Rock Slide + Sleep Powder→Chi-Yu');
-    expect(Math.abs(value - 0.5089)).toBeLessThan(2.5 * 0.0945);
-    // Under the round 69 static (user gate 13.10.) the reference grades p1's played Heat Wave + Protect a mistake
-    // on both blocks (regret 0.2305 and 0.2097, best Heat Wave + Flare Blitz→Groudon) and p2 no tier; the engine
-    // agrees with and without the answer round (mistake, 0.2828, best Tera Blast→Jumpluff + Collision Course→Jumpluff).
+    const local = createLocalTreeExecutor(position.serialized);
+    const rounds: EvalCellJob[][] = [];
+    const executor: TreeExecutor = { ...local, evalCells: async (jobs, onDone) => { rounds.push(jobs); return local.evalCells(jobs, onDone); } };
+    const result = await searchTreesOrchestrated(executor, settingsOf(position));
+    const verify = rounds.find(jobs => jobs.length > 0 && jobs.every(job => job.deepen !== undefined && !job.plain))!;
+    const template = verify.find(job => job.p1Choice === 'move heatwave, move flareblitz 2' && job.p2Choice === 'move rockslide, move sleeppowder 1')!;
+    const [old] = await local.evalCells([{ ...template, p1Choice: 'move heatwave, move flareblitz 1' }], () => {});
+    expect(Math.abs(blendedValue(old) - 0.5135)).toBeLessThan(2.5 * 0.093);
+    // Round 70 (batch gate, 1a): the engine grades p1's played Heat Wave + Protect an inaccuracy (0.1736, best Heat Wave +
+    // Flare Blitz→Jumpluff) and p2's Protect + Encore→Koraidon an inaccuracy (0.1936, best Precipice Blades + Sleep
+    // Powder→Chi-Yu), with and without the answer round. The reference on the same rows grades p1 a mistake (0.326 and
+    // 0.299 on 24 draws, 0.280 on 96) and p2 none on 24 draws (0.016, 0.010) and an inaccuracy on 96 (0.147); the
+    // distance stays open in T242. Under the round 69 static both graded p1 a mistake and p2 no tier.
     const analysis = flat(position, result);
-    expect(analysis.p1.tier).toBe('mistake');
-    expect(analysis.p2.tier ?? null).toBeNull();
+    expect(analysis.p1.tier).toBe('inaccuracy');
+    expect(analysis.p2.tier).toBe('inaccuracy');
     const saved = process.env.EVAL_DOUBLES_ANSWERS;
     process.env.EVAL_DOUBLES_ANSWERS = 'off';
     try {
       const listed = flat(position, await search(position));
-      expect(listed.p1.tier).toBe('mistake');
-      expect(listed.p2.tier ?? null).toBeNull();
+      expect(listed.p1.tier).toBe('inaccuracy');
+      expect(listed.p2.tier).toBe('inaccuracy');
     } finally {
       if (saved === undefined) delete process.env.EVAL_DOUBLES_ANSWERS;
       else process.env.EVAL_DOUBLES_ANSWERS = saved;

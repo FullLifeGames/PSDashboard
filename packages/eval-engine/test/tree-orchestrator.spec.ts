@@ -141,10 +141,12 @@ describe('tree orchestration (round 61; read through the executor since round 64
   });
 
   test('verifies one ply deeper with the search\'s own Tera and sleep clause; doubles asks the pair plan first', { timeout: 600_000 }, async () => {
+    // Round 70 (batch gate): the answer round adds its own rounds where it finds an answer (2663093831 t12 since the
+    // Protect tempo), so the contract runs with the answer round off; its rounds have their own tests.
     for (const name of VERIFYING) {
       const settings = settingsOf(name);
       const { executor, record } = recordingExecutor(position(name));
-      await searchTreesOrchestrated(executor, settings);
+      await withAnswers('off', () => searchTreesOrchestrated(executor, settings));
       const doubles = name.includes('doubles');
       expect(record.rounds.filter(round => !round.jobs.some(job => job.plain)).length, name).toBe(doubles ? 2 : 1);
       const verify = verifyRound(record)!;

@@ -88,9 +88,11 @@ describe('forced-win prover: every reply of the defending side (round 64, T118)'
     const protect = replies.find(reply => reply.label === 'Astral Barrage + Protect');
     expect(protect).toBeDefined();
     expect(p1WinsThisTurn(board.serialized, line, protect!.choice)).toBe(0);
+    // Round 70 (Protect tempo, batch gate): the engine's own reply list holds Zamazenta's Protect, so the probe finds no
+    // winning line and the full proof over every legal reply never starts (12 cells instead of 98). The two tests below
+    // keep the proof over every legal reply pinned.
     const proof = proveForcedWin(root, { side: 'p1', rootOrder: board.rootOrder, tera: board.tera, sleepClause: board.sleepClause });
     expect(proof.mass).toBe(0);
-    expect(proof.cells).toBeGreaterThanOrEqual(replies.length);
   });
 
   test('doubles, 2660809089 turn 8: Knock Off and Heat Wave prove nothing against the 42 legal replies', () => {

@@ -41,16 +41,18 @@ afterEach(() => {
 });
 
 describe('the doubles matrix reads every answer (round 67, T128)', () => {
-  test('2630685175 t7: p1’s best row meets a Protect answer the tree did not list, and p1 is graded against it', { timeout: 120_000 }, async () => {
+  test('2630685175 t7: p1’s best row meets a Protect answer, and p1 is graded against it (the tree lists it since round 70)', { timeout: 120_000 }, async () => {
     const position = fixture('gen9vgc2026regi-2630685175-t7-played');
     const result = await search(position);
     // Round 69 (T148, T149): four rows lie within 0.003 of each other in value, so which of them comes first follows the
     // verify price of a small outcome and the answers the near rows add; the pin reads the Earth Power row into
     // Zamazenta-Crowned, which the trees rated best at 1.00.
+    // Round 70 (Protect tempo, batch gate): a Protect earns the damage it denies in the doubles hints, so p2's tree lists
+    // Protect + Protect itself; before, only the answer round added it.
     const best = result.perSide.p1.find(row => row.label.startsWith('Wood Hammer→Calyrex-Shadow + Earth Power→Zamazenta-Crowned'))!;
     expect(best.worstCase).toBeLessThanOrEqual(0.8);
     expect(best.punishedBy).toMatch(/Protect/);
-    expect(result.matrix!.p2Labels).not.toContain(best.punishedBy);
+    expect(result.matrix!.p2Labels).toContain(best.punishedBy);
     const played = matchPlayedSide(result, 'p1', { p1: null, p2: null, p1Slots: position.keepPlayed.p1Slots, p2Slots: position.keepPlayed.p2Slots });
     expect(played).not.toBeNull();
   });
@@ -59,11 +61,13 @@ describe('the doubles matrix reads every answer (round 67, T128)', () => {
     // At one ply p1’s Protect + Protect read -0.16 for p2, the board’s static after a stalled turn, where the trees
     // read +0.84; one ply deeper it reads +0.87, like the listed answers (probe lanes/B/t128-pin). An answer counts
     // only when it still refutes the best row one ply deeper.
+    // Round 70 (batch gate): the round-70 static and the Protect tempo read the best row at 0.7529 (above 0.8 before);
+    // the Taunt stays the mistake at regret 1.3531.
     const position = fixture('gen9vgc2026regi-2630685175-t8');
     const result = await search(position);
     const best = result.perSide.p2[0];
     expect(best.label).toMatch(/^Astral Barrage/);
-    expect(best.ev).toBeGreaterThan(0.8);
+    expect(best.ev).toBeGreaterThan(0.7);
     const analysis = analyzeTurn({
       turn: position.turn!, result, played: position.played!, playedOutcome: null, scoreBefore: result.score, scoreAfter: null, sacks: position.sacks!,
     });

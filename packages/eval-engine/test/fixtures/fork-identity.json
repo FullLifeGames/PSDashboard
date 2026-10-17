@@ -1,16 +1,16 @@
 {
   "singles": {
-    "root": "cd8961fff977b4dbbea82efb9801d073dcdb97186bb0cb2f52b8e4dae6d30881",
+    "root": "5e5531def97296d9045ddea5dc17dd03e19f754500b9c25f8a5ac44eff47c493",
     "children": [
       {
-        "p1": "move dragondarts",
-        "p2": "move powerwhip",
+        "p1": "move bravebird",
+        "p2": "move earthquake",
         "seed": "1,2,3,4",
-        "state": "54adae9ad2019fed16f08a5d77b26eff4bbeca327906e5f7b45682f1ad09b3d9",
+        "state": "8356b984cae0d9bac2b3c62433d892cdd538ea0c2f09628d15b1af0cfadb2e9c",
         "facts": {
           "turn": 5,
           "ended": false,
-          "prng": "25495,32001,50713,50540",
+          "prng": "43514,9542,40559,8561",
           "sides": [
             {
               "pokemonLeft": 5,
@@ -18,771 +18,19 @@
                 "[Pokemon:p1a]"
               ],
               "hp": [
-                270,
+                334,
                 524,
-                0,
-                454,
-                400,
-                704
-              ],
-              "fainted": [
-                false,
-                false,
-                true,
-                false,
-                false,
-                false
-              ],
-              "status": [
-                "",
-                "",
-                "",
-                "",
-                "",
-                ""
-              ]
-            },
-            {
-              "pokemonLeft": 5,
-              "active": [
-                "[Pokemon:p2a]"
-              ],
-              "hp": [
-                288,
-                304,
-                0,
-                374,
-                304,
-                404
-              ],
-              "fainted": [
-                false,
-                false,
-                true,
-                false,
-                false,
-                false
-              ],
-              "status": [
-                "",
-                "",
-                "",
-                "",
-                "",
-                ""
-              ]
-            }
-          ]
-        },
-        "log": [
-          "|",
-          "|move|p1a: Dragapult|Dragon Darts|p2a: Ferrothorn",
-          "|-resisted|p2a: Ferrothorn",
-          "|split|p2",
-          "|-damage|p2a: Ferrothorn|319/352",
-          "|-damage|p2a: Ferrothorn|319/352",
-          "|-anim|p1a: Dragapult|Dragon Darts|p2a: Ferrothorn",
-          "|-resisted|p2a: Ferrothorn",
-          "|split|p2",
-          "|-damage|p2a: Ferrothorn|288/352",
-          "|-damage|p2a: Ferrothorn|288/352",
-          "|move|p2a: Ferrothorn|Power Whip|p1a: Dragapult",
-          "|-resisted|p1a: Dragapult",
-          "|split|p1",
-          "|-damage|p1a: Dragapult|270/380",
-          "|-damage|p1a: Dragapult|270/380",
-          "|",
-          "|upkeep",
-          "|turn|5"
-        ]
-      },
-      {
-        "p1": "move dragondarts",
-        "p2": "move powerwhip",
-        "seed": "5,6,7,8",
-        "state": "daf637b65441ec2ff777c7238319e278381700f7761fb97b7dd8ec84686a0cde",
-        "facts": {
-          "turn": 5,
-          "ended": false,
-          "prng": "62577,23698,53864,6384",
-          "sides": [
-            {
-              "pokemonLeft": 5,
-              "active": [
-                "[Pokemon:p1a]"
-              ],
-              "hp": [
-                281,
-                524,
-                0,
-                454,
-                400,
-                704
-              ],
-              "fainted": [
-                false,
-                false,
-                true,
-                false,
-                false,
-                false
-              ],
-              "status": [
-                "",
-                "",
-                "",
-                "",
-                "",
-                ""
-              ]
-            },
-            {
-              "pokemonLeft": 5,
-              "active": [
-                "[Pokemon:p2a]"
-              ],
-              "hp": [
-                280,
-                304,
-                0,
-                374,
-                304,
-                404
-              ],
-              "fainted": [
-                false,
-                false,
-                true,
-                false,
-                false,
-                false
-              ],
-              "status": [
-                "",
-                "",
-                "",
-                "",
-                "",
-                ""
-              ]
-            }
-          ]
-        },
-        "log": [
-          "|",
-          "|move|p1a: Dragapult|Dragon Darts|p2a: Ferrothorn",
-          "|-resisted|p2a: Ferrothorn",
-          "|split|p2",
-          "|-damage|p2a: Ferrothorn|316/352",
-          "|-damage|p2a: Ferrothorn|316/352",
-          "|-anim|p1a: Dragapult|Dragon Darts|p2a: Ferrothorn",
-          "|-resisted|p2a: Ferrothorn",
-          "|split|p2",
-          "|-damage|p2a: Ferrothorn|280/352",
-          "|-damage|p2a: Ferrothorn|280/352",
-          "|move|p2a: Ferrothorn|Power Whip|p1a: Dragapult",
-          "|-resisted|p1a: Dragapult",
-          "|split|p1",
-          "|-damage|p1a: Dragapult|281/380",
-          "|-damage|p1a: Dragapult|281/380",
-          "|",
-          "|upkeep",
-          "|turn|5"
-        ]
-      },
-      {
-        "p1": "move dragondarts",
-        "p2": "move powerwhip terastallize",
-        "seed": "1,2,3,4",
-        "state": "5c2fd095b43dc9ca50c51c748d7aadf88e402f25bef46df4435450a06a3f81fd",
-        "facts": {
-          "turn": 5,
-          "ended": false,
-          "prng": "25495,32001,50713,50540",
-          "sides": [
-            {
-              "pokemonLeft": 5,
-              "active": [
-                "[Pokemon:p1a]"
-              ],
-              "hp": [
-                233,
-                524,
-                0,
-                454,
-                400,
-                704
-              ],
-              "fainted": [
-                false,
-                false,
-                true,
-                false,
-                false,
-                false
-              ],
-              "status": [
-                "",
-                "",
-                "",
-                "",
-                "",
-                ""
-              ]
-            },
-            {
-              "pokemonLeft": 5,
-              "active": [
-                "[Pokemon:p2a]"
-              ],
-              "hp": [
-                223,
-                304,
-                0,
-                374,
-                304,
-                404
-              ],
-              "fainted": [
-                false,
-                false,
-                true,
-                false,
-                false,
-                false
-              ],
-              "status": [
-                "",
-                "",
-                "",
-                "",
-                "",
-                ""
-              ]
-            }
-          ]
-        },
-        "log": [
-          "|",
-          "|-terastallize|p2a: Ferrothorn|Grass",
-          "|move|p1a: Dragapult|Dragon Darts|p2a: Ferrothorn",
-          "|split|p2",
-          "|-damage|p2a: Ferrothorn|286/352",
-          "|-damage|p2a: Ferrothorn|286/352",
-          "|-anim|p1a: Dragapult|Dragon Darts|p2a: Ferrothorn",
-          "|split|p2",
-          "|-damage|p2a: Ferrothorn|223/352",
-          "|-damage|p2a: Ferrothorn|223/352",
-          "|move|p2a: Ferrothorn|Power Whip|p1a: Dragapult",
-          "|-resisted|p1a: Dragapult",
-          "|split|p1",
-          "|-damage|p1a: Dragapult|233/380",
-          "|-damage|p1a: Dragapult|233/380",
-          "|",
-          "|upkeep",
-          "|turn|5"
-        ]
-      },
-      {
-        "p1": "move dragondarts",
-        "p2": "move powerwhip terastallize",
-        "seed": "5,6,7,8",
-        "state": "dfe113989f040c9206f1b4968c313cf36b68401e80ff4cd3da4def7692d265b7",
-        "facts": {
-          "turn": 5,
-          "ended": false,
-          "prng": "62577,23698,53864,6384",
-          "sides": [
-            {
-              "pokemonLeft": 5,
-              "active": [
-                "[Pokemon:p1a]"
-              ],
-              "hp": [
-                247,
-                524,
-                0,
-                454,
-                400,
-                704
-              ],
-              "fainted": [
-                false,
-                false,
-                true,
-                false,
-                false,
-                false
-              ],
-              "status": [
-                "",
-                "",
-                "",
-                "",
-                "",
-                ""
-              ]
-            },
-            {
-              "pokemonLeft": 5,
-              "active": [
-                "[Pokemon:p2a]"
-              ],
-              "hp": [
-                207,
-                304,
-                0,
-                374,
-                304,
-                404
-              ],
-              "fainted": [
-                false,
-                false,
-                true,
-                false,
-                false,
-                false
-              ],
-              "status": [
-                "",
-                "",
-                "",
-                "",
-                "",
-                ""
-              ]
-            }
-          ]
-        },
-        "log": [
-          "|",
-          "|-terastallize|p2a: Ferrothorn|Grass",
-          "|move|p1a: Dragapult|Dragon Darts|p2a: Ferrothorn",
-          "|split|p2",
-          "|-damage|p2a: Ferrothorn|280/352",
-          "|-damage|p2a: Ferrothorn|280/352",
-          "|-anim|p1a: Dragapult|Dragon Darts|p2a: Ferrothorn",
-          "|split|p2",
-          "|-damage|p2a: Ferrothorn|207/352",
-          "|-damage|p2a: Ferrothorn|207/352",
-          "|move|p2a: Ferrothorn|Power Whip|p1a: Dragapult",
-          "|-resisted|p1a: Dragapult",
-          "|split|p1",
-          "|-damage|p1a: Dragapult|247/380",
-          "|-damage|p1a: Dragapult|247/380",
-          "|",
-          "|upkeep",
-          "|turn|5"
-        ]
-      },
-      {
-        "p1": "move dragondarts terastallize",
-        "p2": "move powerwhip",
-        "seed": "1,2,3,4",
-        "state": "6b282b804dd900fadb867cd010932d9e18c2b8a82b6f8d7f5212e19e8d3d42d2",
-        "facts": {
-          "turn": 5,
-          "ended": false,
-          "prng": "25495,32001,50713,50540",
-          "sides": [
-            {
-              "pokemonLeft": 5,
-              "active": [
-                "[Pokemon:p1a]"
-              ],
-              "hp": [
-                270,
-                524,
-                0,
-                454,
-                400,
-                704
-              ],
-              "fainted": [
-                false,
-                false,
-                true,
-                false,
-                false,
-                false
-              ],
-              "status": [
-                "",
-                "",
-                "",
-                "",
-                "",
-                ""
-              ]
-            },
-            {
-              "pokemonLeft": 5,
-              "active": [
-                "[Pokemon:p2a]"
-              ],
-              "hp": [
-                266,
-                304,
-                0,
-                374,
-                304,
-                404
-              ],
-              "fainted": [
-                false,
-                false,
-                true,
-                false,
-                false,
-                false
-              ],
-              "status": [
-                "",
-                "",
-                "",
-                "",
-                "",
-                ""
-              ]
-            }
-          ]
-        },
-        "log": [
-          "|",
-          "|-terastallize|p1a: Dragapult|Dragon",
-          "|move|p1a: Dragapult|Dragon Darts|p2a: Ferrothorn",
-          "|-resisted|p2a: Ferrothorn",
-          "|split|p2",
-          "|-damage|p2a: Ferrothorn|308/352",
-          "|-damage|p2a: Ferrothorn|308/352",
-          "|-anim|p1a: Dragapult|Dragon Darts|p2a: Ferrothorn",
-          "|-resisted|p2a: Ferrothorn",
-          "|split|p2",
-          "|-damage|p2a: Ferrothorn|266/352",
-          "|-damage|p2a: Ferrothorn|266/352",
-          "|move|p2a: Ferrothorn|Power Whip|p1a: Dragapult",
-          "|-resisted|p1a: Dragapult",
-          "|split|p1",
-          "|-damage|p1a: Dragapult|270/380",
-          "|-damage|p1a: Dragapult|270/380",
-          "|",
-          "|upkeep",
-          "|turn|5"
-        ]
-      },
-      {
-        "p1": "move dragondarts terastallize",
-        "p2": "move powerwhip",
-        "seed": "5,6,7,8",
-        "state": "e6e667ab7b378fd26061bbc1018fca5137a77fe77b2083c1476edfe3e45663ee",
-        "facts": {
-          "turn": 5,
-          "ended": false,
-          "prng": "62577,23698,53864,6384",
-          "sides": [
-            {
-              "pokemonLeft": 5,
-              "active": [
-                "[Pokemon:p1a]"
-              ],
-              "hp": [
-                281,
-                524,
-                0,
-                454,
-                400,
-                704
-              ],
-              "fainted": [
-                false,
-                false,
-                true,
-                false,
-                false,
-                false
-              ],
-              "status": [
-                "",
-                "",
-                "",
-                "",
-                "",
-                ""
-              ]
-            },
-            {
-              "pokemonLeft": 5,
-              "active": [
-                "[Pokemon:p2a]"
-              ],
-              "hp": [
-                255,
-                304,
-                0,
-                374,
-                304,
-                404
-              ],
-              "fainted": [
-                false,
-                false,
-                true,
-                false,
-                false,
-                false
-              ],
-              "status": [
-                "",
-                "",
-                "",
-                "",
-                "",
-                ""
-              ]
-            }
-          ]
-        },
-        "log": [
-          "|",
-          "|-terastallize|p1a: Dragapult|Dragon",
-          "|move|p1a: Dragapult|Dragon Darts|p2a: Ferrothorn",
-          "|-resisted|p2a: Ferrothorn",
-          "|split|p2",
-          "|-damage|p2a: Ferrothorn|304/352",
-          "|-damage|p2a: Ferrothorn|304/352",
-          "|-anim|p1a: Dragapult|Dragon Darts|p2a: Ferrothorn",
-          "|-resisted|p2a: Ferrothorn",
-          "|split|p2",
-          "|-damage|p2a: Ferrothorn|255/352",
-          "|-damage|p2a: Ferrothorn|255/352",
-          "|move|p2a: Ferrothorn|Power Whip|p1a: Dragapult",
-          "|-resisted|p1a: Dragapult",
-          "|split|p1",
-          "|-damage|p1a: Dragapult|281/380",
-          "|-damage|p1a: Dragapult|281/380",
-          "|",
-          "|upkeep",
-          "|turn|5"
-        ]
-      },
-      {
-        "p1": "move dragondarts terastallize",
-        "p2": "move powerwhip terastallize",
-        "seed": "1,2,3,4",
-        "state": "1e1340b0f4246bb2fd871d293d3bac5d09240d3bc196032e084ea7b8cde959ce",
-        "facts": {
-          "turn": 5,
-          "ended": false,
-          "prng": "25495,32001,50713,50540",
-          "sides": [
-            {
-              "pokemonLeft": 5,
-              "active": [
-                "[Pokemon:p1a]"
-              ],
-              "hp": [
-                233,
-                524,
-                0,
-                454,
-                400,
-                704
-              ],
-              "fainted": [
-                false,
-                false,
-                true,
-                false,
-                false,
-                false
-              ],
-              "status": [
-                "",
-                "",
-                "",
-                "",
-                "",
-                ""
-              ]
-            },
-            {
-              "pokemonLeft": 5,
-              "active": [
-                "[Pokemon:p2a]"
-              ],
-              "hp": [
-                180,
-                304,
-                0,
-                374,
-                304,
-                404
-              ],
-              "fainted": [
-                false,
-                false,
-                true,
-                false,
-                false,
-                false
-              ],
-              "status": [
-                "",
-                "",
-                "",
-                "",
-                "",
-                ""
-              ]
-            }
-          ]
-        },
-        "log": [
-          "|",
-          "|-terastallize|p1a: Dragapult|Dragon",
-          "|-terastallize|p2a: Ferrothorn|Grass",
-          "|move|p1a: Dragapult|Dragon Darts|p2a: Ferrothorn",
-          "|split|p2",
-          "|-damage|p2a: Ferrothorn|264/352",
-          "|-damage|p2a: Ferrothorn|264/352",
-          "|-anim|p1a: Dragapult|Dragon Darts|p2a: Ferrothorn",
-          "|split|p2",
-          "|-damage|p2a: Ferrothorn|180/352",
-          "|-damage|p2a: Ferrothorn|180/352",
-          "|move|p2a: Ferrothorn|Power Whip|p1a: Dragapult",
-          "|-resisted|p1a: Dragapult",
-          "|split|p1",
-          "|-damage|p1a: Dragapult|233/380",
-          "|-damage|p1a: Dragapult|233/380",
-          "|",
-          "|upkeep",
-          "|turn|5"
-        ]
-      },
-      {
-        "p1": "move dragondarts terastallize",
-        "p2": "move powerwhip terastallize",
-        "seed": "5,6,7,8",
-        "state": "dfaf1bdee146f10fb4e435dcc5d1db87fcd2f33c823d36f26ea01362ac9ea94a",
-        "facts": {
-          "turn": 5,
-          "ended": false,
-          "prng": "62577,23698,53864,6384",
-          "sides": [
-            {
-              "pokemonLeft": 5,
-              "active": [
-                "[Pokemon:p1a]"
-              ],
-              "hp": [
-                247,
-                524,
-                0,
-                454,
-                400,
-                704
-              ],
-              "fainted": [
-                false,
-                false,
-                true,
-                false,
-                false,
-                false
-              ],
-              "status": [
-                "",
-                "",
-                "",
-                "",
-                "",
-                ""
-              ]
-            },
-            {
-              "pokemonLeft": 5,
-              "active": [
-                "[Pokemon:p2a]"
-              ],
-              "hp": [
-                158,
-                304,
-                0,
-                374,
-                304,
-                404
-              ],
-              "fainted": [
-                false,
-                false,
-                true,
-                false,
-                false,
-                false
-              ],
-              "status": [
-                "",
-                "",
-                "",
-                "",
-                "",
-                ""
-              ]
-            }
-          ]
-        },
-        "log": [
-          "|",
-          "|-terastallize|p1a: Dragapult|Dragon",
-          "|-terastallize|p2a: Ferrothorn|Grass",
-          "|move|p1a: Dragapult|Dragon Darts|p2a: Ferrothorn",
-          "|split|p2",
-          "|-damage|p2a: Ferrothorn|256/352",
-          "|-damage|p2a: Ferrothorn|256/352",
-          "|-anim|p1a: Dragapult|Dragon Darts|p2a: Ferrothorn",
-          "|split|p2",
-          "|-damage|p2a: Ferrothorn|158/352",
-          "|-damage|p2a: Ferrothorn|158/352",
-          "|move|p2a: Ferrothorn|Power Whip|p1a: Dragapult",
-          "|-resisted|p1a: Dragapult",
-          "|split|p1",
-          "|-damage|p1a: Dragapult|247/380",
-          "|-damage|p1a: Dragapult|247/380",
-          "|",
-          "|upkeep",
-          "|turn|5"
-        ]
-      },
-      {
-        "p1": "move uturn",
-        "p2": "move powerwhip",
-        "seed": "1,2,3,4",
-        "state": "119e4803144782bd8eec89479b2baee1a2888f425e37f6ff15893339f92404fe",
-        "facts": {
-          "turn": 5,
-          "ended": false,
-          "prng": "37673,46633,62039,8266",
-          "sides": [
-            {
-              "pokemonLeft": 5,
-              "active": [
-                "[Pokemon:p1a]"
-              ],
-              "hp": [
-                360,
-                524,
-                0,
-                454,
                 380,
+                454,
+                0,
                 704
               ],
               "fainted": [
                 false,
                 false,
+                false,
+                false,
                 true,
-                false,
-                false,
                 false
               ],
               "status": [
@@ -800,17 +48,17 @@
                 "[Pokemon:p2a]"
               ],
               "hp": [
-                291,
                 304,
                 0,
+                352,
                 374,
                 304,
                 404
               ],
               "fainted": [
                 false,
-                false,
                 true,
+                false,
                 false,
                 false,
                 false
@@ -828,33 +76,34 @@
         },
         "log": [
           "|",
-          "|move|p1a: Dragapult|U-turn|p2a: Ferrothorn",
+          "|move|p2a: Garchomp|Earthquake|p1a: Corviknight",
+          "|-immune|p1a: Corviknight",
+          "|move|p1a: Corviknight|Brave Bird|p2a: Garchomp",
           "|split|p2",
-          "|-damage|p2a: Ferrothorn|291/352",
-          "|-damage|p2a: Ferrothorn|291/352",
-          "|",
+          "|-damage|p2a: Garchomp|0 fnt",
+          "|-damage|p2a: Garchomp|0 fnt",
+          "|faint|p2a: Garchomp",
           "|split|p1",
-          "|switch|p1a: Corviknight|Corviknight, M|400/400|[from] U-turn",
-          "|switch|p1a: Corviknight|Corviknight, M|400/400|[from] U-turn",
-          "|move|p2a: Ferrothorn|Power Whip|p1a: Corviknight",
-          "|-resisted|p1a: Corviknight",
-          "|split|p1",
-          "|-damage|p1a: Corviknight|360/400",
-          "|-damage|p1a: Corviknight|360/400",
+          "|-damage|p1a: Corviknight|334/400|[from] Recoil",
+          "|-damage|p1a: Corviknight|334/400|[from] Recoil",
           "|",
           "|upkeep",
+          "|",
+          "|split|p2",
+          "|switch|p2a: Rotom|Rotom-Wash|304/304",
+          "|switch|p2a: Rotom|Rotom-Wash|304/304",
           "|turn|5"
         ]
       },
       {
-        "p1": "move uturn",
-        "p2": "move powerwhip",
+        "p1": "move bravebird",
+        "p2": "move earthquake",
         "seed": "5,6,7,8",
-        "state": "eefcd5be5f56cac1e0c774f41fe649828f8443d5430cd9ee4d1d1ad145a3042a",
+        "state": "5a26436aaaf3eda4471df736fdd7d3080da195dced1ab52e8590162e28d1a15a",
         "facts": {
           "turn": 5,
           "ended": false,
-          "prng": "51644,13992,14189,6510",
+          "prng": "4742,50088,47031,36837",
           "sides": [
             {
               "pokemonLeft": 5,
@@ -862,19 +111,19 @@
                 "[Pokemon:p1a]"
               ],
               "hp": [
-                361,
+                334,
                 524,
-                0,
-                454,
                 380,
+                454,
+                0,
                 704
               ],
               "fainted": [
                 false,
                 false,
+                false,
+                false,
                 true,
-                false,
-                false,
                 false
               ],
               "status": [
@@ -892,17 +141,17 @@
                 "[Pokemon:p2a]"
               ],
               "hp": [
-                285,
                 304,
                 0,
+                352,
                 374,
                 304,
                 404
               ],
               "fainted": [
                 false,
-                false,
                 true,
+                false,
                 false,
                 false,
                 false
@@ -920,33 +169,600 @@
         },
         "log": [
           "|",
-          "|move|p1a: Dragapult|U-turn|p2a: Ferrothorn",
+          "|move|p2a: Garchomp|Earthquake|p1a: Corviknight",
+          "|-immune|p1a: Corviknight",
+          "|move|p1a: Corviknight|Brave Bird|p2a: Garchomp",
           "|split|p2",
-          "|-damage|p2a: Ferrothorn|285/352",
-          "|-damage|p2a: Ferrothorn|285/352",
-          "|",
+          "|-damage|p2a: Garchomp|0 fnt",
+          "|-damage|p2a: Garchomp|0 fnt",
+          "|faint|p2a: Garchomp",
           "|split|p1",
-          "|switch|p1a: Corviknight|Corviknight, M|400/400|[from] U-turn",
-          "|switch|p1a: Corviknight|Corviknight, M|400/400|[from] U-turn",
-          "|move|p2a: Ferrothorn|Power Whip|p1a: Corviknight",
-          "|-resisted|p1a: Corviknight",
-          "|split|p1",
-          "|-damage|p1a: Corviknight|361/400",
-          "|-damage|p1a: Corviknight|361/400",
+          "|-damage|p1a: Corviknight|334/400|[from] Recoil",
+          "|-damage|p1a: Corviknight|334/400|[from] Recoil",
           "|",
           "|upkeep",
+          "|",
+          "|split|p2",
+          "|switch|p2a: Rotom|Rotom-Wash|304/304",
+          "|switch|p2a: Rotom|Rotom-Wash|304/304",
           "|turn|5"
         ]
       },
       {
-        "p1": "move uturn",
-        "p2": "move powerwhip terastallize",
+        "p1": "move bravebird",
+        "p2": "move earthquake terastallize",
         "seed": "1,2,3,4",
-        "state": "b84afcbee4d973bc838adf4285ef77d89300e487cabdf2b56bc6af136a691de5",
+        "state": "2dce0ae2afbbc5d0c99166e03ff4a6bfa3abd1dbd842c97b3c9c537dcb6ab3dc",
         "facts": {
           "turn": 5,
           "ended": false,
-          "prng": "37673,46633,62039,8266",
+          "prng": "43514,9542,40559,8561",
+          "sides": [
+            {
+              "pokemonLeft": 5,
+              "active": [
+                "[Pokemon:p1a]"
+              ],
+              "hp": [
+                334,
+                524,
+                380,
+                454,
+                0,
+                704
+              ],
+              "fainted": [
+                false,
+                false,
+                false,
+                false,
+                true,
+                false
+              ],
+              "status": [
+                "",
+                "",
+                "",
+                "",
+                "",
+                ""
+              ]
+            },
+            {
+              "pokemonLeft": 5,
+              "active": [
+                "[Pokemon:p2a]"
+              ],
+              "hp": [
+                304,
+                0,
+                352,
+                374,
+                304,
+                404
+              ],
+              "fainted": [
+                false,
+                true,
+                false,
+                false,
+                false,
+                false
+              ],
+              "status": [
+                "",
+                "",
+                "",
+                "",
+                "",
+                ""
+              ]
+            }
+          ]
+        },
+        "log": [
+          "|",
+          "|-terastallize|p2a: Garchomp|Dragon",
+          "|move|p2a: Garchomp|Earthquake|p1a: Corviknight",
+          "|-immune|p1a: Corviknight",
+          "|move|p1a: Corviknight|Brave Bird|p2a: Garchomp",
+          "|split|p2",
+          "|-damage|p2a: Garchomp|0 fnt",
+          "|-damage|p2a: Garchomp|0 fnt",
+          "|faint|p2a: Garchomp",
+          "|split|p1",
+          "|-damage|p1a: Corviknight|334/400|[from] Recoil",
+          "|-damage|p1a: Corviknight|334/400|[from] Recoil",
+          "|",
+          "|upkeep",
+          "|",
+          "|split|p2",
+          "|switch|p2a: Rotom|Rotom-Wash|304/304",
+          "|switch|p2a: Rotom|Rotom-Wash|304/304",
+          "|turn|5"
+        ]
+      },
+      {
+        "p1": "move bravebird",
+        "p2": "move earthquake terastallize",
+        "seed": "5,6,7,8",
+        "state": "c8f3b89bfa42b2ba142172598afef197f39eca4cb1bf81187831ae27d28cea2d",
+        "facts": {
+          "turn": 5,
+          "ended": false,
+          "prng": "4742,50088,47031,36837",
+          "sides": [
+            {
+              "pokemonLeft": 5,
+              "active": [
+                "[Pokemon:p1a]"
+              ],
+              "hp": [
+                334,
+                524,
+                380,
+                454,
+                0,
+                704
+              ],
+              "fainted": [
+                false,
+                false,
+                false,
+                false,
+                true,
+                false
+              ],
+              "status": [
+                "",
+                "",
+                "",
+                "",
+                "",
+                ""
+              ]
+            },
+            {
+              "pokemonLeft": 5,
+              "active": [
+                "[Pokemon:p2a]"
+              ],
+              "hp": [
+                304,
+                0,
+                352,
+                374,
+                304,
+                404
+              ],
+              "fainted": [
+                false,
+                true,
+                false,
+                false,
+                false,
+                false
+              ],
+              "status": [
+                "",
+                "",
+                "",
+                "",
+                "",
+                ""
+              ]
+            }
+          ]
+        },
+        "log": [
+          "|",
+          "|-terastallize|p2a: Garchomp|Dragon",
+          "|move|p2a: Garchomp|Earthquake|p1a: Corviknight",
+          "|-immune|p1a: Corviknight",
+          "|move|p1a: Corviknight|Brave Bird|p2a: Garchomp",
+          "|split|p2",
+          "|-damage|p2a: Garchomp|0 fnt",
+          "|-damage|p2a: Garchomp|0 fnt",
+          "|faint|p2a: Garchomp",
+          "|split|p1",
+          "|-damage|p1a: Corviknight|334/400|[from] Recoil",
+          "|-damage|p1a: Corviknight|334/400|[from] Recoil",
+          "|",
+          "|upkeep",
+          "|",
+          "|split|p2",
+          "|switch|p2a: Rotom|Rotom-Wash|304/304",
+          "|switch|p2a: Rotom|Rotom-Wash|304/304",
+          "|turn|5"
+        ]
+      },
+      {
+        "p1": "move bravebird terastallize",
+        "p2": "move earthquake",
+        "seed": "1,2,3,4",
+        "state": "c2f5b489022a530486bea4a83945b8cfb1e1fd4421bc95cc62771b7662f82d7f",
+        "facts": {
+          "turn": 5,
+          "ended": false,
+          "prng": "43514,9542,40559,8561",
+          "sides": [
+            {
+              "pokemonLeft": 5,
+              "active": [
+                "[Pokemon:p1a]"
+              ],
+              "hp": [
+                334,
+                524,
+                380,
+                454,
+                0,
+                704
+              ],
+              "fainted": [
+                false,
+                false,
+                false,
+                false,
+                true,
+                false
+              ],
+              "status": [
+                "",
+                "",
+                "",
+                "",
+                "",
+                ""
+              ]
+            },
+            {
+              "pokemonLeft": 5,
+              "active": [
+                "[Pokemon:p2a]"
+              ],
+              "hp": [
+                304,
+                0,
+                352,
+                374,
+                304,
+                404
+              ],
+              "fainted": [
+                false,
+                true,
+                false,
+                false,
+                false,
+                false
+              ],
+              "status": [
+                "",
+                "",
+                "",
+                "",
+                "",
+                ""
+              ]
+            }
+          ]
+        },
+        "log": [
+          "|",
+          "|-terastallize|p1a: Corviknight|Flying",
+          "|move|p2a: Garchomp|Earthquake|p1a: Corviknight",
+          "|-immune|p1a: Corviknight",
+          "|move|p1a: Corviknight|Brave Bird|p2a: Garchomp",
+          "|split|p2",
+          "|-damage|p2a: Garchomp|0 fnt",
+          "|-damage|p2a: Garchomp|0 fnt",
+          "|faint|p2a: Garchomp",
+          "|split|p1",
+          "|-damage|p1a: Corviknight|334/400|[from] Recoil",
+          "|-damage|p1a: Corviknight|334/400|[from] Recoil",
+          "|",
+          "|upkeep",
+          "|",
+          "|split|p2",
+          "|switch|p2a: Rotom|Rotom-Wash|304/304",
+          "|switch|p2a: Rotom|Rotom-Wash|304/304",
+          "|turn|5"
+        ]
+      },
+      {
+        "p1": "move bravebird terastallize",
+        "p2": "move earthquake",
+        "seed": "5,6,7,8",
+        "state": "7b6324fa98d173f45f6dd62ee2d65797e692eff4eedc63f420fd4b7facc83745",
+        "facts": {
+          "turn": 5,
+          "ended": false,
+          "prng": "4742,50088,47031,36837",
+          "sides": [
+            {
+              "pokemonLeft": 5,
+              "active": [
+                "[Pokemon:p1a]"
+              ],
+              "hp": [
+                334,
+                524,
+                380,
+                454,
+                0,
+                704
+              ],
+              "fainted": [
+                false,
+                false,
+                false,
+                false,
+                true,
+                false
+              ],
+              "status": [
+                "",
+                "",
+                "",
+                "",
+                "",
+                ""
+              ]
+            },
+            {
+              "pokemonLeft": 5,
+              "active": [
+                "[Pokemon:p2a]"
+              ],
+              "hp": [
+                304,
+                0,
+                352,
+                374,
+                304,
+                404
+              ],
+              "fainted": [
+                false,
+                true,
+                false,
+                false,
+                false,
+                false
+              ],
+              "status": [
+                "",
+                "",
+                "",
+                "",
+                "",
+                ""
+              ]
+            }
+          ]
+        },
+        "log": [
+          "|",
+          "|-terastallize|p1a: Corviknight|Flying",
+          "|move|p2a: Garchomp|Earthquake|p1a: Corviknight",
+          "|-immune|p1a: Corviknight",
+          "|move|p1a: Corviknight|Brave Bird|p2a: Garchomp",
+          "|split|p2",
+          "|-damage|p2a: Garchomp|0 fnt",
+          "|-damage|p2a: Garchomp|0 fnt",
+          "|faint|p2a: Garchomp",
+          "|split|p1",
+          "|-damage|p1a: Corviknight|334/400|[from] Recoil",
+          "|-damage|p1a: Corviknight|334/400|[from] Recoil",
+          "|",
+          "|upkeep",
+          "|",
+          "|split|p2",
+          "|switch|p2a: Rotom|Rotom-Wash|304/304",
+          "|switch|p2a: Rotom|Rotom-Wash|304/304",
+          "|turn|5"
+        ]
+      },
+      {
+        "p1": "move bravebird terastallize",
+        "p2": "move earthquake terastallize",
+        "seed": "1,2,3,4",
+        "state": "0f1460da8bb73b66a76623fbc2437d10f92b08534b569ee45f808651a8b8665b",
+        "facts": {
+          "turn": 5,
+          "ended": false,
+          "prng": "43514,9542,40559,8561",
+          "sides": [
+            {
+              "pokemonLeft": 5,
+              "active": [
+                "[Pokemon:p1a]"
+              ],
+              "hp": [
+                334,
+                524,
+                380,
+                454,
+                0,
+                704
+              ],
+              "fainted": [
+                false,
+                false,
+                false,
+                false,
+                true,
+                false
+              ],
+              "status": [
+                "",
+                "",
+                "",
+                "",
+                "",
+                ""
+              ]
+            },
+            {
+              "pokemonLeft": 5,
+              "active": [
+                "[Pokemon:p2a]"
+              ],
+              "hp": [
+                304,
+                0,
+                352,
+                374,
+                304,
+                404
+              ],
+              "fainted": [
+                false,
+                true,
+                false,
+                false,
+                false,
+                false
+              ],
+              "status": [
+                "",
+                "",
+                "",
+                "",
+                "",
+                ""
+              ]
+            }
+          ]
+        },
+        "log": [
+          "|",
+          "|-terastallize|p2a: Garchomp|Dragon",
+          "|-terastallize|p1a: Corviknight|Flying",
+          "|move|p2a: Garchomp|Earthquake|p1a: Corviknight",
+          "|-immune|p1a: Corviknight",
+          "|move|p1a: Corviknight|Brave Bird|p2a: Garchomp",
+          "|split|p2",
+          "|-damage|p2a: Garchomp|0 fnt",
+          "|-damage|p2a: Garchomp|0 fnt",
+          "|faint|p2a: Garchomp",
+          "|split|p1",
+          "|-damage|p1a: Corviknight|334/400|[from] Recoil",
+          "|-damage|p1a: Corviknight|334/400|[from] Recoil",
+          "|",
+          "|upkeep",
+          "|",
+          "|split|p2",
+          "|switch|p2a: Rotom|Rotom-Wash|304/304",
+          "|switch|p2a: Rotom|Rotom-Wash|304/304",
+          "|turn|5"
+        ]
+      },
+      {
+        "p1": "move bravebird terastallize",
+        "p2": "move earthquake terastallize",
+        "seed": "5,6,7,8",
+        "state": "280a7bd3b2bd74b927a41242cf401cf9621c6e06119b7dbe1a98e7512349a1f8",
+        "facts": {
+          "turn": 5,
+          "ended": false,
+          "prng": "4742,50088,47031,36837",
+          "sides": [
+            {
+              "pokemonLeft": 5,
+              "active": [
+                "[Pokemon:p1a]"
+              ],
+              "hp": [
+                334,
+                524,
+                380,
+                454,
+                0,
+                704
+              ],
+              "fainted": [
+                false,
+                false,
+                false,
+                false,
+                true,
+                false
+              ],
+              "status": [
+                "",
+                "",
+                "",
+                "",
+                "",
+                ""
+              ]
+            },
+            {
+              "pokemonLeft": 5,
+              "active": [
+                "[Pokemon:p2a]"
+              ],
+              "hp": [
+                304,
+                0,
+                352,
+                374,
+                304,
+                404
+              ],
+              "fainted": [
+                false,
+                true,
+                false,
+                false,
+                false,
+                false
+              ],
+              "status": [
+                "",
+                "",
+                "",
+                "",
+                "",
+                ""
+              ]
+            }
+          ]
+        },
+        "log": [
+          "|",
+          "|-terastallize|p2a: Garchomp|Dragon",
+          "|-terastallize|p1a: Corviknight|Flying",
+          "|move|p2a: Garchomp|Earthquake|p1a: Corviknight",
+          "|-immune|p1a: Corviknight",
+          "|move|p1a: Corviknight|Brave Bird|p2a: Garchomp",
+          "|split|p2",
+          "|-damage|p2a: Garchomp|0 fnt",
+          "|-damage|p2a: Garchomp|0 fnt",
+          "|faint|p2a: Garchomp",
+          "|split|p1",
+          "|-damage|p1a: Corviknight|334/400|[from] Recoil",
+          "|-damage|p1a: Corviknight|334/400|[from] Recoil",
+          "|",
+          "|upkeep",
+          "|",
+          "|split|p2",
+          "|switch|p2a: Rotom|Rotom-Wash|304/304",
+          "|switch|p2a: Rotom|Rotom-Wash|304/304",
+          "|turn|5"
+        ]
+      },
+      {
+        "p1": "move bodypress",
+        "p2": "move earthquake",
+        "seed": "1,2,3,4",
+        "state": "8bc88946818b80386a397b59092ad94ccba654628d47719b8c00b8721b22fe81",
+        "facts": {
+          "turn": 5,
+          "ended": false,
+          "prng": "43514,9542,40559,8561",
           "sides": [
             {
               "pokemonLeft": 5,
@@ -956,17 +772,17 @@
               "hp": [
                 346,
                 524,
-                0,
-                454,
                 380,
+                454,
+                0,
                 704
               ],
               "fainted": [
                 false,
                 false,
+                false,
+                false,
                 true,
-                false,
-                false,
                 false
               ],
               "status": [
@@ -984,17 +800,17 @@
                 "[Pokemon:p2a]"
               ],
               "hp": [
-                230,
                 304,
                 0,
+                352,
                 374,
                 304,
                 404
               ],
               "fainted": [
                 false,
-                false,
                 true,
+                false,
                 false,
                 false,
                 false
@@ -1012,35 +828,31 @@
         },
         "log": [
           "|",
-          "|-terastallize|p2a: Ferrothorn|Grass",
-          "|move|p1a: Dragapult|U-turn|p2a: Ferrothorn",
-          "|-supereffective|p2a: Ferrothorn",
+          "|move|p2a: Garchomp|Earthquake|p1a: Corviknight",
+          "|-immune|p1a: Corviknight",
+          "|move|p1a: Corviknight|Body Press|p2a: Garchomp",
           "|split|p2",
-          "|-damage|p2a: Ferrothorn|230/352",
-          "|-damage|p2a: Ferrothorn|230/352",
-          "|",
-          "|split|p1",
-          "|switch|p1a: Corviknight|Corviknight, M|400/400|[from] U-turn",
-          "|switch|p1a: Corviknight|Corviknight, M|400/400|[from] U-turn",
-          "|move|p2a: Ferrothorn|Power Whip|p1a: Corviknight",
-          "|-resisted|p1a: Corviknight",
-          "|split|p1",
-          "|-damage|p1a: Corviknight|346/400",
-          "|-damage|p1a: Corviknight|346/400",
+          "|-damage|p2a: Garchomp|0 fnt",
+          "|-damage|p2a: Garchomp|0 fnt",
+          "|faint|p2a: Garchomp",
           "|",
           "|upkeep",
+          "|",
+          "|split|p2",
+          "|switch|p2a: Rotom|Rotom-Wash|304/304",
+          "|switch|p2a: Rotom|Rotom-Wash|304/304",
           "|turn|5"
         ]
       },
       {
-        "p1": "move uturn",
-        "p2": "move powerwhip terastallize",
+        "p1": "move bodypress",
+        "p2": "move earthquake",
         "seed": "5,6,7,8",
-        "state": "95eac65154a3d703730084348613d775f0f84326eac8c25b17fc9215dd8a0a4c",
+        "state": "fbb21e4b6340df0b3494cef56b671ecea08316838c636ccce9740a15615ed1c7",
         "facts": {
           "turn": 5,
           "ended": false,
-          "prng": "51644,13992,14189,6510",
+          "prng": "4742,50088,47031,36837",
           "sides": [
             {
               "pokemonLeft": 5,
@@ -1048,19 +860,19 @@
                 "[Pokemon:p1a]"
               ],
               "hp": [
-                336,
+                346,
                 524,
-                0,
                 380,
-                400,
+                454,
+                0,
                 704
               ],
               "fainted": [
                 false,
                 false,
+                false,
+                false,
                 true,
-                false,
-                false,
                 false
               ],
               "status": [
@@ -1078,17 +890,17 @@
                 "[Pokemon:p2a]"
               ],
               "hp": [
-                218,
                 304,
                 0,
+                352,
                 374,
                 304,
                 404
               ],
               "fainted": [
                 false,
-                false,
                 true,
+                false,
                 false,
                 false,
                 false
@@ -1106,655 +918,877 @@
         },
         "log": [
           "|",
-          "|-terastallize|p2a: Ferrothorn|Grass",
-          "|move|p1a: Dragapult|U-turn|p2a: Ferrothorn",
-          "|-supereffective|p2a: Ferrothorn",
+          "|move|p2a: Garchomp|Earthquake|p1a: Corviknight",
+          "|-immune|p1a: Corviknight",
+          "|move|p1a: Corviknight|Body Press|p2a: Garchomp",
           "|split|p2",
-          "|-damage|p2a: Ferrothorn|218/352",
-          "|-damage|p2a: Ferrothorn|218/352",
-          "|",
-          "|split|p1",
-          "|switch|p1a: Kyurem|Kyurem|454/454|[from] U-turn",
-          "|switch|p1a: Kyurem|Kyurem|454/454|[from] U-turn",
-          "|move|p2a: Ferrothorn|Power Whip|p1a: Kyurem",
-          "|-resisted|p1a: Kyurem",
-          "|split|p1",
-          "|-damage|p1a: Kyurem|336/454",
-          "|-damage|p1a: Kyurem|336/454",
+          "|-damage|p2a: Garchomp|0 fnt",
+          "|-damage|p2a: Garchomp|0 fnt",
+          "|faint|p2a: Garchomp",
           "|",
           "|upkeep",
+          "|",
+          "|split|p2",
+          "|switch|p2a: Rotom|Rotom-Wash|304/304",
+          "|switch|p2a: Rotom|Rotom-Wash|304/304",
+          "|turn|5"
+        ]
+      },
+      {
+        "p1": "move bodypress",
+        "p2": "move earthquake terastallize",
+        "seed": "1,2,3,4",
+        "state": "7651e6d728d66847cea81edab52e2e87b285f0df9cf585f474f3e5cc4c49fa23",
+        "facts": {
+          "turn": 5,
+          "ended": false,
+          "prng": "43514,9542,40559,8561",
+          "sides": [
+            {
+              "pokemonLeft": 5,
+              "active": [
+                "[Pokemon:p1a]"
+              ],
+              "hp": [
+                346,
+                524,
+                380,
+                454,
+                0,
+                704
+              ],
+              "fainted": [
+                false,
+                false,
+                false,
+                false,
+                true,
+                false
+              ],
+              "status": [
+                "",
+                "",
+                "",
+                "",
+                "",
+                ""
+              ]
+            },
+            {
+              "pokemonLeft": 5,
+              "active": [
+                "[Pokemon:p2a]"
+              ],
+              "hp": [
+                304,
+                0,
+                352,
+                374,
+                304,
+                404
+              ],
+              "fainted": [
+                false,
+                true,
+                false,
+                false,
+                false,
+                false
+              ],
+              "status": [
+                "",
+                "",
+                "",
+                "",
+                "",
+                ""
+              ]
+            }
+          ]
+        },
+        "log": [
+          "|",
+          "|-terastallize|p2a: Garchomp|Dragon",
+          "|move|p2a: Garchomp|Earthquake|p1a: Corviknight",
+          "|-immune|p1a: Corviknight",
+          "|move|p1a: Corviknight|Body Press|p2a: Garchomp",
+          "|split|p2",
+          "|-damage|p2a: Garchomp|0 fnt",
+          "|-damage|p2a: Garchomp|0 fnt",
+          "|faint|p2a: Garchomp",
+          "|",
+          "|upkeep",
+          "|",
+          "|split|p2",
+          "|switch|p2a: Rotom|Rotom-Wash|304/304",
+          "|switch|p2a: Rotom|Rotom-Wash|304/304",
+          "|turn|5"
+        ]
+      },
+      {
+        "p1": "move bodypress",
+        "p2": "move earthquake terastallize",
+        "seed": "5,6,7,8",
+        "state": "85d55c045a993f56e86e8588cd4abe488e488a76c4bd561d78a3a658ad7b6fdf",
+        "facts": {
+          "turn": 5,
+          "ended": false,
+          "prng": "4742,50088,47031,36837",
+          "sides": [
+            {
+              "pokemonLeft": 5,
+              "active": [
+                "[Pokemon:p1a]"
+              ],
+              "hp": [
+                346,
+                524,
+                380,
+                454,
+                0,
+                704
+              ],
+              "fainted": [
+                false,
+                false,
+                false,
+                false,
+                true,
+                false
+              ],
+              "status": [
+                "",
+                "",
+                "",
+                "",
+                "",
+                ""
+              ]
+            },
+            {
+              "pokemonLeft": 5,
+              "active": [
+                "[Pokemon:p2a]"
+              ],
+              "hp": [
+                304,
+                0,
+                352,
+                374,
+                304,
+                404
+              ],
+              "fainted": [
+                false,
+                true,
+                false,
+                false,
+                false,
+                false
+              ],
+              "status": [
+                "",
+                "",
+                "",
+                "",
+                "",
+                ""
+              ]
+            }
+          ]
+        },
+        "log": [
+          "|",
+          "|-terastallize|p2a: Garchomp|Dragon",
+          "|move|p2a: Garchomp|Earthquake|p1a: Corviknight",
+          "|-immune|p1a: Corviknight",
+          "|move|p1a: Corviknight|Body Press|p2a: Garchomp",
+          "|split|p2",
+          "|-damage|p2a: Garchomp|0 fnt",
+          "|-damage|p2a: Garchomp|0 fnt",
+          "|faint|p2a: Garchomp",
+          "|",
+          "|upkeep",
+          "|",
+          "|split|p2",
+          "|switch|p2a: Rotom|Rotom-Wash|304/304",
+          "|switch|p2a: Rotom|Rotom-Wash|304/304",
           "|turn|5"
         ]
       }
     ],
     "matrix": {
-      "score": -0.10854787840808855,
-      "interval": 0,
+      "score": -0.1343764934090232,
+      "interval": 0.005221455769390815,
       "depthCompleted": 1,
       "p1": [
         {
-          "choice": "move willowisp",
-          "ev": -0.09970770812062367,
-          "expected": 0.08819979151668432,
-          "worstCase": -0.0997740768161397,
-          "punishedBy": "Spikes"
+          "choice": "move roost",
+          "ev": -0.1343044005131224,
+          "expected": -0.12793761037310453,
+          "worstCase": -0.135458237732763,
+          "punishedBy": "→ Tyranitar"
         },
         {
-          "choice": "move uturn > switch 4",
-          "ev": -0.12511730498939683,
-          "expected": 0.01951877068086845,
-          "worstCase": -0.12516193441960488,
-          "punishedBy": "Spikes"
-        },
-        {
-          "choice": "move uturn > switch 5",
-          "ev": -0.13395880219337047,
-          "expected": 0.061228378719290585,
-          "worstCase": -0.1340288818556189,
-          "punishedBy": "Spikes"
-        },
-        {
-          "choice": "move dragondarts",
-          "ev": -0.14444938363402704,
-          "expected": 0.06250320242505464,
-          "worstCase": -0.14451652287480077,
-          "punishedBy": "Spikes"
-        },
-        {
-          "choice": "move uturn > switch 2",
-          "ev": -0.14698576062386273,
-          "expected": 0.046186849522534185,
-          "worstCase": -0.14704792854292892,
-          "punishedBy": "Spikes"
-        },
-        {
-          "choice": "move uturn > switch 6",
-          "ev": -0.14702844923062344,
-          "expected": -0.010910372573477184,
-          "worstCase": -0.39196942049135997,
-          "punishedBy": "Power Whip"
-        },
-        {
-          "choice": "switch 4",
-          "ev": -0.16022673598634357,
-          "expected": -0.007782389927460595,
-          "worstCase": -0.16027320173661208,
-          "punishedBy": "Spikes"
-        },
-        {
-          "choice": "switch 5",
-          "ev": -0.18139927811700043,
-          "expected": 0.018553785629091598,
-          "worstCase": -0.18147017998164794,
-          "punishedBy": "Spikes"
-        },
-        {
-          "choice": "move protect",
-          "ev": -0.19769154148447451,
-          "expected": 0.019714103341166675,
-          "worstCase": -0.1977686759447862,
-          "punishedBy": "Spikes"
+          "choice": "move bodypress",
+          "ev": -0.134541979672838,
+          "expected": -0.05480607655502149,
+          "worstCase": -0.15765156064381858,
+          "punishedBy": "Protect"
         },
         {
           "choice": "switch 2",
-          "ev": -0.19770524542000156,
-          "expected": 0.0011997746284394956,
-          "worstCase": -0.1977686759447862,
-          "punishedBy": "Spikes"
+          "ev": -0.15263007565535877,
+          "expected": -0.18689865298675803,
+          "worstCase": -0.2932466780868529,
+          "punishedBy": "Earthquake"
+        },
+        {
+          "choice": "switch 4",
+          "ev": -0.1526490987062989,
+          "expected": -0.2018731073617825,
+          "worstCase": -0.32686051167352764,
+          "punishedBy": "Dragon Claw"
+        },
+        {
+          "choice": "switch 3",
+          "ev": -0.1526609900573537,
+          "expected": -0.2048198726603615,
+          "worstCase": -0.4022812761418251,
+          "punishedBy": "Dragon Claw"
         },
         {
           "choice": "switch 6",
-          "ev": -0.19774674604661371,
-          "expected": -0.05428258903187455,
-          "worstCase": -0.43402052436642213,
-          "punishedBy": "Power Whip"
+          "ev": -0.15288628826337294,
+          "expected": -0.25402637221721186,
+          "worstCase": -0.543341902274701,
+          "punishedBy": "Earthquake"
+        },
+        {
+          "choice": "move bravebird",
+          "ev": -0.15687524339474518,
+          "expected": -0.05332858649752533,
+          "worstCase": -0.15765156064381858,
+          "punishedBy": "Protect"
+        },
+        {
+          "choice": "move protect",
+          "ev": -0.16271194526831115,
+          "expected": -0.1572846732867433,
+          "worstCase": -0.16369546441620164,
+          "punishedBy": "→ Tyranitar"
         }
       ],
       "p2": [
         {
-          "choice": "move gyroball",
-          "ev": 0.14671287065542282,
-          "expected": 0.059035521931869284,
-          "worstCase": -0.03696035863402705,
-          "punishedBy": "U-turn → Corviknight"
-        },
-        {
-          "choice": "move spikes",
-          "ev": 0.1252060153350844,
-          "expected": 0.1736090019523243,
-          "worstCase": 0.12516193441960488,
-          "punishedBy": "U-turn → Kyurem"
-        },
-        {
-          "choice": "move powerwhip",
-          "ev": -0.006103027106555348,
-          "expected": 0.059924620346594744,
-          "worstCase": -0.10202327415389377,
-          "punishedBy": "Will-O-Wisp"
-        },
-        {
-          "choice": "move protect",
-          "ev": -0.04234502524262307,
-          "expected": -0.04413456133602996,
-          "worstCase": -0.062034397229072225,
-          "punishedBy": "→ Corviknight"
+          "choice": "switch 2",
+          "ev": 0.13450588385094095,
+          "expected": 0.14910336484131592,
+          "worstCase": 0.13023678196337218,
+          "punishedBy": "Body Press"
         },
         {
           "choice": "switch 5",
-          "ev": -0.07477430820229661,
-          "expected": -0.07810334757348193,
-          "worstCase": -0.14063250753430667,
-          "punishedBy": "Will-O-Wisp"
+          "ev": 0.12622865359193824,
+          "expected": 0.1460890919981815,
+          "worstCase": 0.1223504225696933,
+          "punishedBy": "Roost"
         },
         {
           "choice": "switch 4",
-          "ev": -0.08704840298837548,
-          "expected": -0.07751115222874398,
-          "worstCase": -0.16766680444485127,
-          "punishedBy": "Dragon Darts"
+          "ev": 0.12470869718921275,
+          "expected": 0.10825673066146892,
+          "worstCase": -0.15189858068109108,
+          "punishedBy": "Brave Bird"
         },
         {
-          "choice": "switch 2",
-          "ev": -0.1037710103709497,
-          "expected": -0.089215433666537,
-          "worstCase": -0.14920120065051545,
-          "punishedBy": "Dragon Darts"
+          "choice": "move protect",
+          "ev": 0.12164094821889335,
+          "expected": 0.1418392322097547,
+          "worstCase": 0.11611762320173458,
+          "punishedBy": "Roost"
+        },
+        {
+          "choice": "switch 3",
+          "ev": 0.11138831911732482,
+          "expected": 0.1362304976590329,
+          "worstCase": 0.06398467175276046,
+          "punishedBy": "Body Press"
         },
         {
           "choice": "switch 6",
-          "ev": -0.1790158062483082,
-          "expected": -0.11406762294440233,
-          "worstCase": -0.17912043784117104,
-          "punishedBy": "U-turn → Kyurem"
+          "ev": 0.10914068859007063,
+          "expected": 0.13655652549692898,
+          "worstCase": -0.00511879357364875,
+          "punishedBy": "Body Press"
+        },
+        {
+          "choice": "move stoneedge",
+          "ev": 0.10088643756760224,
+          "expected": 0.1609677249400028,
+          "worstCase": -0.017620857816810748,
+          "punishedBy": "Body Press"
+        },
+        {
+          "choice": "move dragonclaw",
+          "ev": 0.09994703766759977,
+          "expected": 0.2124577475729864,
+          "worstCase": -0.022637814898287978,
+          "punishedBy": "Body Press"
+        },
+        {
+          "choice": "move earthquake",
+          "ev": 0.08679135116001029,
+          "expected": 0.19234584120705084,
+          "worstCase": -0.09263058867738239,
+          "punishedBy": "Body Press"
         }
       ],
       "forcedWin": null
     },
     "mcts": {
-      "score": -0.12467501804570219,
+      "score": -0.10442046551387472,
       "visits": 600,
       "depth": 4,
-      "rootValue": 0.04234457774672573,
+      "rootValue": -0.15765156064381858,
       "p1N": [
-        94,
-        94,
-        88,
-        66,
-        68,
-        68,
-        52,
-        70
+        136,
+        141,
+        85,
+        55,
+        41,
+        47,
+        34,
+        61
       ],
       "p1W": [
-        -6.075183454433983,
-        -6.022393092227868,
-        -6.134106352607303,
-        -6.881296313133082,
-        -7.021535214486786,
-        -6.816180255108171,
-        -7.401579541583156,
-        -6.882269477192382
+        -8.686004023807744,
+        -8.24746340580943,
+        -9.267148145066122,
+        -8.959231697606018,
+        -8.544364075247485,
+        -9.062481442616441,
+        -8.225911508954912,
+        -9.03564211734745
       ],
       "p2N": [
-        37,
-        51,
-        353,
-        41,
-        33,
-        33,
-        25,
-        27
+        46,
+        74,
+        48,
+        63,
+        69,
+        88,
+        89,
+        66,
+        57
       ],
       "p2W": [
-        1.491769785603518,
-        -0.34048522473961673,
-        -65.20630998052961,
-        1.019489614058224,
-        2.083573340561376,
-        2.1362702900874,
-        2.9228681296424295,
-        2.6582803445435665
+        -2.7218815645630157,
+        -9.584524894078564,
+        -3.426538478571034,
+        -6.728921336049554,
+        -8.274438099194937,
+        -13.100287677756477,
+        -13.380997165604175,
+        -7.415759491143634,
+        -5.3948977094942165
       ],
       "cells": [
         [
-          50006,
-          5,
-          0.30428158029254493,
-          0.04234457774672573,
-          false
-        ],
-        [
-          1,
-          7,
-          -0.2552045313818362,
-          -0.015102108818542015,
-          false
-        ],
-        [
-          10000,
-          6,
-          -0.11062581272671168,
-          0.09825135520229411,
-          false
-        ],
-        [
-          20002,
-          49,
-          -10.15651039011892,
-          -0.1977686759447862,
-          false
-        ],
-        [
-          10002,
-          59,
-          -8.01793994477724,
-          0.10001276311704288,
-          false
-        ],
-        [
-          50001,
-          9,
-          0.17679598243933414,
-          0.0403059879301626,
-          false
-        ],
-        [
-          6,
-          7,
-          1.5968136151862873,
-          0.18983860768521432,
-          false
-        ],
-        [
-          20000,
-          10,
-          1.1131926457237096,
-          0.09575677178777786,
-          false
-        ],
-        [
-          30003,
-          8,
-          0.36184626511240126,
-          0.04234457774672573,
-          false
-        ],
-        [
-          50002,
-          40,
-          -7.885296278606661,
-          -0.18147017998164794,
-          false
-        ],
-        [
-          60005,
-          6,
-          0.08789003116974536,
-          0.062034397229072225,
-          false
-        ],
-        [
-          10005,
-          4,
-          0.29823819678564867,
-          0.07455954919641217,
-          false
-        ],
-        [
-          30001,
-          5,
-          -0.04404991292861171,
-          0.04234457774672573,
-          false
-        ],
-        [
           60002,
-          30,
-          -6.460203166131606,
-          -0.16027320173661208,
+          2,
+          -0.8737918081921026,
+          -0.30710035100905075,
           false
         ],
         [
-          20003,
-          4,
-          0.1531348788540714,
-          0.04234457774672573,
-          false
-        ],
-        [
-          70004,
-          6,
-          0.3082752901026138,
-          0.062034397229072225,
-          false
-        ],
-        [
-          70000,
-          3,
-          0.19524925509508928,
-          0.04234457774672573,
+          5,
+          25,
+          -4.115510560013351,
+          -0.15399355060927966,
           false
         ],
         [
           10001,
-          5,
-          0.127520162897782,
-          0.09648894229510763,
+          23,
+          0.23436747435402527,
+          0.030495769239666348,
           false
         ],
         [
-          2,
-          60,
-          -8.881509515797923,
-          -0.137751071621663,
-          false
-        ],
-        [
-          40007,
-          6,
-          0.2643184664737461,
-          0.062034397229072225,
-          false
-        ],
-        [
-          40005,
-          4,
-          0.24844082110372834,
-          0.062034397229072225,
-          false
-        ],
-        [
-          20007,
-          3,
-          0.3063021434075821,
-          0.062034397229072225,
-          false
-        ],
-        [
-          60000,
-          3,
-          -0.02888796461163401,
-          0.04234457774672573,
-          false
-        ],
-        [
-          40002,
-          38,
-          -7.913486673890877,
-          -0.1977686759447862,
-          false
-        ],
-        [
-          30005,
-          4,
-          0.31102256884789936,
-          0.062034397229072225,
-          false
-        ],
-        [
-          20001,
-          10,
-          0.8429437614957472,
-          0.07029212834734988,
-          false
-        ],
-        [
-          50003,
-          2,
-          0.1373050472419859,
-          0.062034397229072225,
-          false
-        ],
-        [
+          20000,
           7,
-          7,
-          1.3479905509112602,
-          0.18113339038186016,
+          -0.3112276030768154,
+          -0.12836768754583372,
           false
         ],
         [
-          70002,
-          38,
-          -7.84563264947032,
-          -0.1977686759447862,
-          false
-        ],
-        [
-          30004,
-          5,
-          0.37328411417136764,
-          0.062034397229072225,
-          false
-        ],
-        [
-          50005,
-          3,
-          0.17603406205072947,
-          0.062034397229072225,
-          false
-        ],
-        [
-          40003,
-          3,
-          0.211561067979402,
-          0.04234457774672573,
-          false
-        ],
-        [
-          30002,
-          39,
-          -8.04573136173608,
-          -0.1977686759447862,
-          false
-        ],
-        [
-          20004,
-          5,
-          0.8002508051713435,
-          0.14302416950556673,
-          false
-        ],
-        [
-          70007,
-          2,
-          0.09154608502505335,
-          0.062034397229072225,
-          false
-        ],
-        [
-          0,
-          5,
-          -0.09348070580959811,
-          0.028930287376751185,
-          false
-        ],
-        [
-          60003,
-          5,
-          -0.06628372940561045,
-          0.04234457774672573,
-          false
-        ],
-        [
-          20006,
-          3,
-          0.14494644509275367,
-          0.04234457774672573,
-          false
-        ],
-        [
-          50004,
-          6,
-          0.09108763829704158,
-          0.04234457774672573,
-          false
-        ],
-        [
-          5,
-          1,
-          0.11452921805394745,
-          0.11452921805394745,
-          false
-        ],
-        [
-          10004,
-          7,
-          0.5301183575473204,
-          0.107945295790556,
+          10002,
+          9,
+          0.06032948126121129,
+          0.002306620498135903,
           false
         ],
         [
           20005,
-          4,
-          0.6616333577664104,
-          0.14063250753430667,
+          13,
+          -1.7227006427246265,
+          -0.13545823773276267,
           false
         ],
         [
-          60006,
-          1,
-          0.062034397229072225,
-          0.062034397229072225,
-          false
-        ],
-        [
-          50000,
-          2,
-          0.14126713543012714,
-          0.062034397229072225,
+          0,
+          8,
+          0.5445274451678506,
+          0.06253133927937449,
           false
         ],
         [
           60001,
-          4,
-          -0.9146518478757389,
-          -0.1546526612758914,
-          false
-        ],
-        [
-          40000,
           5,
-          0.21710219407839404,
-          0.04234457774672573,
+          -2.3630186460477107,
+          -0.329160120691219,
           false
         ],
         [
-          40004,
-          2,
-          0.12406879445814445,
-          0.062034397229072225,
-          false
-        ],
-        [
-          10007,
+          30003,
           6,
-          0.48170972652105415,
-          0.08916227111800268,
-          false
-        ],
-        [
-          3,
-          7,
-          0.0956779144038814,
-          0.04234457774672573,
-          false
-        ],
-        [
-          30006,
-          1,
-          0.04234457774672573,
-          0.04234457774672573,
-          false
-        ],
-        [
-          40001,
-          8,
-          -0.34655990133852177,
-          -0.08081765288788223,
-          false
-        ],
-        [
-          70003,
-          8,
-          -0.04159023200511114,
-          0.04234457774672573,
-          false
-        ],
-        [
-          30007,
-          1,
-          0.062034397229072225,
-          0.062034397229072225,
-          false
-        ],
-        [
-          30000,
-          3,
-          0.05795303842414179,
-          0.04234457774672573,
-          false
-        ],
-        [
-          40006,
-          2,
-          0.17302001664919886,
-          0.04234457774672573,
+          -0.7163205956931277,
+          -0.15765156064381858,
           false
         ],
         [
           10003,
-          4,
-          0.16783840187720356,
-          0.04234457774672573,
+          14,
+          -1.4130017474848695,
+          -0.15765156064381858,
           false
         ],
         [
-          60007,
-          1,
-          0.062034397229072225,
-          0.062034397229072225,
-          false
-        ],
-        [
-          70001,
-          3,
-          0.0727210619522285,
-          0.010178805431929172,
-          false
-        ],
-        [
-          70005,
-          7,
-          0.23848203430929116,
-          0.062034397229072225,
-          false
-        ],
-        [
-          10006,
-          3,
-          0.5007478196470729,
-          0.16691593988235764,
-          false
-        ],
-        [
-          60004,
           2,
-          -0.1435116591864558,
-          0.062034397229072225,
+          14,
+          0.5746324283515462,
+          0.06253133927937449,
           false
         ],
         [
-          70006,
-          3,
-          0.09867967779877362,
-          0.04234457774672573,
+          20001,
+          18,
+          -1.7873625196179228,
+          -0.12836768754583372,
+          false
+        ],
+        [
+          30000,
+          5,
+          -0.7242293402488513,
+          -0.15765156064381858,
           false
         ],
         [
           50007,
+          5,
+          -0.8489547281066,
+          -0.1645644622557355,
+          false
+        ],
+        [
+          20007,
+          13,
+          -1.670782541659905,
+          -0.135458237732763,
+          false
+        ],
+        [
+          60005,
+          4,
+          -0.6154473619701751,
+          -0.15164680515352746,
+          false
+        ],
+        [
           1,
-          0.04234457774672573,
-          0.04234457774672573,
+          10,
+          -0.15613645205270554,
+          0.0209166519208277,
+          false
+        ],
+        [
+          50003,
+          5,
+          -0.6545093726438315,
+          -0.15757887702722628,
+          false
+        ],
+        [
+          30002,
+          5,
+          -0.7230331754122677,
+          -0.15765156064381858,
+          false
+        ],
+        [
+          70006,
+          9,
+          -1.0347285858066426,
+          -0.15164680515352746,
+          false
+        ],
+        [
+          10000,
+          14,
+          1.452221523986607,
+          0.1037237581875714,
+          false
+        ],
+        [
+          7,
+          16,
+          -1.8905100791091964,
+          -0.15099324816537674,
+          false
+        ],
+        [
+          70005,
+          10,
+          -1.5234522731050193,
+          -0.15164680515352735,
+          false
+        ],
+        [
+          20003,
+          9,
+          -0.41184805388029566,
+          -0.12836768754583372,
+          false
+        ],
+        [
+          40004,
+          9,
+          -1.0883242468601353,
+          -0.16456446225573518,
+          false
+        ],
+        [
+          60006,
+          9,
+          -1.761243061262633,
+          -0.15164680515352746,
+          false
+        ],
+        [
+          50002,
+          7,
+          -1.0413208676724706,
+          -0.24399633001748966,
+          false
+        ],
+        [
+          10008,
+          12,
+          -2.0766864884267866,
+          -0.13649315339803325,
+          false
+        ],
+        [
+          30008,
+          6,
+          -1.2599213401176832,
+          -0.15252162939100433,
+          false
+        ],
+        [
+          40008,
+          5,
+          -0.7925817370620365,
+          -0.1516468051535278,
+          false
+        ],
+        [
+          8,
+          14,
+          2.043895456738401,
+          0.15803856922395787,
+          false
+        ],
+        [
+          70007,
+          9,
+          -1.3624639657637894,
+          -0.1645644622557355,
+          false
+        ],
+        [
+          60003,
+          2,
+          -0.28295003627051996,
+          -0.15757887702722628,
+          false
+        ],
+        [
+          6,
+          20,
+          -2.7281575874510517,
+          -0.14565760375413794,
+          false
+        ],
+        [
+          50004,
+          5,
+          -0.7833703988762329,
+          -0.16456446225573518,
+          false
+        ],
+        [
+          40000,
+          3,
+          -1.6291150017382545,
+          -0.5423685256306958,
+          false
+        ],
+        [
+          70000,
+          5,
+          -1.0351327537245592,
+          -0.25111590638155756,
+          false
+        ],
+        [
+          50006,
+          2,
+          -0.18359713438609337,
+          -0.15164680515352746,
+          false
+        ],
+        [
+          4,
+          15,
+          -1.5588459894109274,
+          -0.09272940853586475,
+          false
+        ],
+        [
+          30001,
+          7,
+          -0.852085744450612,
+          -0.15765156064381858,
+          false
+        ],
+        [
+          3,
+          14,
+          -1.3998986860283078,
+          -0.15765156064381858,
+          false
+        ],
+        [
+          70003,
+          9,
+          -1.0965948503165242,
+          -0.15757887702722628,
+          false
+        ],
+        [
+          50005,
+          8,
+          -1.138827245465139,
+          -0.15164680515352735,
+          false
+        ],
+        [
+          30007,
+          6,
+          -0.8988847048635936,
+          -0.16369546441620164,
+          false
+        ],
+        [
+          40006,
+          9,
+          -1.311994530100269,
+          -0.15164680515352746,
+          false
+        ],
+        [
+          60007,
+          4,
+          -0.956101826375021,
+          -0.1516468051535278,
+          false
+        ],
+        [
+          10005,
+          22,
+          -2.9577990430041536,
+          -0.12691602476198416,
+          false
+        ],
+        [
+          50008,
+          8,
+          -1.4971381292666401,
+          -0.1516468051535278,
+          false
+        ],
+        [
+          20004,
+          4,
+          -0.42510824879404396,
+          -0.1223504225696933,
+          false
+        ],
+        [
+          40007,
+          5,
+          -0.8785630766821763,
+          -0.1645644622557355,
+          false
+        ],
+        [
+          50000,
+          3,
+          -0.7348549964562358,
+          -0.2811187881919166,
+          false
+        ],
+        [
+          30004,
+          7,
+          -1.3200885064646948,
+          -0.152521629391004,
+          false
+        ],
+        [
+          60008,
+          2,
+          -0.3032936103070556,
+          -0.1516468051535278,
+          false
+        ],
+        [
+          10004,
+          19,
+          -1.767199003392784,
+          -0.06151256266149108,
+          false
+        ],
+        [
+          20006,
+          10,
+          -1.5920890058626962,
+          -0.1223504225696933,
+          false
+        ],
+        [
+          10007,
+          8,
+          1.0905014314166461,
+          0.00511879357364875,
+          false
+        ],
+        [
+          70008,
+          5,
+          -0.5557194294951403,
+          -0.1516468051535278,
+          false
+        ],
+        [
+          10006,
+          20,
+          -2.870197034519325,
+          -0.14333510600445676,
+          false
+        ],
+        [
+          20008,
+          5,
+          -0.9534524315572698,
+          -0.12235042256969364,
+          false
+        ],
+        [
+          30006,
+          10,
+          -1.898990226215457,
+          -0.152521629391004,
+          false
+        ],
+        [
+          70002,
+          5,
+          -1.0307774390144038,
+          -0.22355296180798445,
+          false
+        ],
+        [
+          30005,
+          3,
+          -0.5656780641397299,
+          -0.1636954644162013,
+          false
+        ],
+        [
+          40003,
+          4,
+          -0.7537979937320798,
+          -0.15865537187186252,
+          false
+        ],
+        [
+          70004,
+          5,
+          -0.5455073853391805,
+          -0.16456446225573518,
+          false
+        ],
+        [
+          60004,
+          5,
+          -0.7859943200569369,
+          -0.16456446225573518,
+          false
+        ],
+        [
+          70001,
+          4,
+          -0.8512654347821885,
+          -0.2333335578341631,
+          false
+        ],
+        [
+          50001,
+          4,
+          -2.1799085697431964,
+          -0.5442644581026965,
+          false
+        ],
+        [
+          40005,
+          3,
+          -0.460872487334281,
+          -0.15164680515352735,
+          false
+        ],
+        [
+          20002,
+          6,
+          -0.39257709789254724,
+          -0.12836768754583372,
+          false
+        ],
+        [
+          40001,
+          3,
+          -1.6291150017382545,
+          -0.5423685256306958,
+          false
+        ],
+        [
+          60000,
+          1,
+          -0.28407083847275716,
+          -0.28407083847275716,
           false
         ]
       ]
