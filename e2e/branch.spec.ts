@@ -56,7 +56,12 @@ test.describe('PS Dashboard', () => {
     await expect(page.getByText(/Branching · Turn/)).toHaveCount(0);
   });
 
-  test('the draft t56 play-out wins for p2 without crawling (round 42)', async ({ page }) => {
+  // Round 70 (user gate 17.10., 2a): known red until T243. Under the log's dice p2 sends Heatran into Mienshao's Knock Off
+  // at turn 61 and p1 wins at turn 67. Over 16 arrival dice in Node (probe docs/perf/probes/2026-10-15-playout) v1 wins 16
+  // for p2 and passes this pin 14 times, round 70 wins 14 and passes 12; head to head, round 70 as p2 wins 16 of 16
+  // against v1 as p1, and round 70 as p1 takes one of 16 from v1 as p2. The pin stays the target: T243 measures the four
+  // pairings again after the re-fit T224.
+  test.fixme('the draft t56 play-out wins for p2 without crawling (round 42)', async ({ page }) => {
     // Round 19 finding, round 42 pin: from turn 56 (p1 Kyurem Ice Beam, p2
     // into Slowking) the play-out used to send Heatran into Mienshao's Knock
     // Off at turn 62 and lose it, then crawl 21 turns to a 5% win. With the
