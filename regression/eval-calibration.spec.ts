@@ -909,6 +909,98 @@ import { takeSimFastReport } from '../packages/eval-engine/src/forward/sim-fast/
  * static basis for this mass; the next lever, if any, is search/
  * planning-side.
  *
+ * BATCH 2026-10-13..17 (improvement round 70, the first batch of small
+ * fixes under the change classes of AGENTS.md: the user's reports of 13.10.
+ * and the small open v1 TODOs, one commit a fix; branch r70 from e0fdd99 (=
+ * v1), commits 0ec3352 to 670bf5f; cache v66 to v67; findings under
+ * docs/perf/probes/2026-10-13-* and 2026-10-15-*, the check under
+ * docs/perf/probes/2026-10-15-r70-check/). Gates during the round: 13.10.
+ * (round 71's bank in CI, 1a to 6a; the Wide Guard cards and the Protect
+ * tempo, 1a to 5a), 15.10. (the lessons as rules, N1 in the batch, N2 to N9
+ * as wave 4; the check as full bank plus quarter holdouts, the simulator
+ * pinned exactly with an upgrade command, contact costs on both sides).
+ * STATIC (T223 with T218, T220, T221; 0da5ec7, 57d1539): a standing stage
+ * counts against a foe only on a flip or a faster win within three turns
+ * that its holder gets to act in; no foe counts while a foe on the field
+ * removes the stage or KOs the holder first (T218); the races play each
+ * body's end of turn in the simulator (Leech Seed with its heal, items,
+ * weather, statuses) and the contact costs of one hit (Rocky Helmet, Rough
+ * Skin, Iron Barbs, recoil, Life Orb, Flame Body, Static); healers attack
+ * where that wins; drain stops counting as heal (T220); one race per pair
+ * (T221, the feature 17 to 20 % faster). gen9draft-2058494320: Swords Dance
+ * falls from first (0.246) to seventh in the branch 13 to 14, the Muk
+ * switch leads the real turn 13, and Swords Dance falls from first (0.178)
+ * to third (0.009) in the rebuild 19 to 20. The weight stays 95 until the
+ * re-fit T224.
+ * REBUILD (0ec3352): a branch plays its first turn under the seed its own
+ * block has in the log; GPL DzBQ5azlO5l t13 flinched before and ranks
+ * Stone Edge first or second now.
+ * SEARCH: side protectors (Wide Guard, Quick Guard, Mat Block, Crafty
+ * Shield) and, by the 3a of 13.10., Protect earn the damage they deny in the
+ * doubles hints, asked through the simulator's handlers on stand-ins
+ * without the contact flag (five shields wrote their contact penalties into
+ * the live battle); the stall guard and the singles planner's protecting
+ * moves come from the Dex (8681e91, 7b4b73f, 0c3c078); the trend probe reads
+ * each base draw of a cell against its own leaf (8d5642b, +41 % CPU on
+ * early singles matrices).
+ * CARDS (7ecaac4, T217): the card names the click a played row walked into;
+ * a turn reads chance only where the chance part outweighs the decision
+ * part; the KO-odds clause leaves out a hit the opponent's pair stops;
+ * doubles plans the played row and column.
+ * APP AND PACKAGES: fainted branch Pokémon grey in the sidebar (f8b8fbe),
+ * T216 (e929bd9), T205 with team-sheet IVs (652442b), T215 (35f95ac,
+ * snapshotMoveTypes in the barrel), T206 and T222 (19be358), Z-moves and
+ * Max moves as proof of their crystal or Dynamax (73d7cad), CRLF logs in
+ * eval-engine (997f4cb), the simulator pinned exactly with npm run
+ * upgrade:pkmn (642b940, 5ae498f).
+ * N1 OF THE LESSONS (8788609, 4e791d5, 8683fa9): Attract as the simulator
+ * writes it, Teleport a pivot only from Gen 8, the KO odds' crit and
+ * accuracy guard by a census of every item and ability.
+ * TOOLS AND RULES: base reuse and the quick tier of the calibration runner
+ * (911bc36), change classes (c9c8b44), prose inside a batch (47025be), the
+ * lessons as rules (e654d46), lint without docs/ (9e7b165).
+ * CHECK on 8683fa9: bank against r69-w2 no harm, no gain (all +16 [-10,
+ * +43], singles +12, doubles +27 [-5, +58]; warnings hq doubles early +76
+ * and luck-adjusted doubles early +95; own K doubles +20, warning
+ * luck-adjusted doubles early +98); holdouts at fraction 0.25 against the
+ * full round-69 bases, a screen: the full tables without harm (Doubles OU
+ * -40 [-82, +3] with early -74 resolved better, VGC +14 [-20, +47] with a
+ * warning luck-adjusted late +32, Champions OU -108 [-199, -16] resolved
+ * better, Champions VGC +14), the hq tables with harm on the luck-adjusted
+ * rows of VGC (+37 [+0, +74], own K +36 [+1, +72], 156 pairs of 70 games)
+ * and Doubles OU (+11 on 9 pairs of 2 games);
+ * feedback once, 88 turns moved, singles tiers 45/3/0 to 31/3/1, doubles
+ * 15/5/1 to 15/6/0, 11 of 15 pins green (653785 t19 healed), drift 562428
+ * t10 and golden 655336 (10 to 11 channels), gaps 649664 t23 and 573756 t73
+ * moved; e2e 78 of 79 (the play-out pin); nine red specs, re-pinned below;
+ * reconstruction.spec red on v1 already (T245).
+ * DIAGNOSIS: 2629703929 t8 moves at 7b4b73f alone (bisected over the batch
+ * commits): Protect + Flare Blitz→Jumpluff and Heat Wave + Protect enter
+ * p1's twelve rows, Heat Wave + Flare Blitz→Groudon (the round-69
+ * reference's best) leaves; p1 reads an inaccuracy (0.1736) where the
+ * reference on the listed rows reads a mistake (0.326 and 0.299 on 24
+ * draws, 0.280 on 96), p2 an inaccuracy (0.1936; the reference none on 24
+ * draws, 0.147 on 96). The play-out from draft t56 in Node over 16 arrival
+ * dice: v1 p2 wins 16 and passes the pin 14 times, round 70 wins 14 and
+ * passes 12; under the log's dice the result turns at 0da5ec7 and 57d1539;
+ * head to head, round 70 as p2 wins 16 of 16 against v1 as p1 (pin 10), and
+ * round 70 as p1 takes one of 16 from v1 as p2 (pin 11).
+ * USER GATE 2026-10-17 11:09 ("1a 2a 3a 4a 5a"): the Protect tempo stays and
+ * 2629703929 t8 takes the engine's verdicts with the reference in the
+ * comment (T242); the play-out pin is test.fixme until T243; 648453 t13
+ * (0.187), 912045 t8 (0.016), 2630685175 t7 and t8 (the Taunt stays the
+ * mistake, best row 0.7529), the prover at t7, GPL T35, the orchestrator's
+ * round count and the search identity re-pinned (774135b, 283a2fe); the
+ * corpus keeps the golden 655336 as known drift of 11 channels (T244) and
+ * the 562428 t10 pin, the two gaps take their observed state (670bf5f);
+ * new TODOs T224 to T245, next free T246; r70 to v1 after the booking.
+ * AFTER THE GATE: the review of the new TODOs found the harm in the hq
+ * tables of the two quarter-tier holdouts, which the gate text had called
+ * free of harm, and that the reference grades 2629703929 t8 a mistake on the
+ * new rows too (the distance lies in cell values, T242). User 17.10. 11:37
+ * ("1a"): the full VGC holdout runs before the push, and without the Protect
+ * tempo as well if the harm holds.
+ *
  * WAVE 3 2026-10-12..13 (improvement round 69, the third wave of lanes:
  * seven lanes A to G with 42 TODOs in their own worktrees from 006b33c (=
  * v1), measured one at a time against r69-base-1012 and, from 00:06 on
