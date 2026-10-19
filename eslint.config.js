@@ -6,6 +6,7 @@ import tseslint from 'typescript-eslint'
 import { defineConfig, globalIgnores } from 'eslint/config'
 import { ratchetBase, ratchetOverrides } from './eslint.ratchet.mjs'
 import { importZones } from './eslint.zones.mjs'
+import namesPlugin from './eslint.names.mjs'
 
 export default defineConfig([
   // docs/ holds Markdown and the local, gitignored probes (copies of old sources among them): CI never sees them,
@@ -30,4 +31,10 @@ export default defineConfig([
   ...ratchetOverrides,
   // Import zones: the package layering as lint errors (see eslint.zones.mjs).
   ...importZones,
+  // Name ratchet: no new Dex name literal in the package sources (see eslint.names.mjs and scripts/name-baseline.json).
+  {
+    files: ['packages/*/src/**/*.ts'],
+    plugins: { names: namesPlugin },
+    rules: { 'names/no-new-dex-name': 'error' },
+  },
 ])

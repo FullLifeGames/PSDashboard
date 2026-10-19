@@ -1,0 +1,50 @@
+{
+  "groups": {
+    "a,b,c": [
+      "packages/eval-engine/src/turn-analysis/odds-stopped.ts",
+      "src/components/LeadPanel.tsx"
+    ],
+    "accuracy,atk,def,evasion,spa,spd,spe": [
+      "packages/eval-engine/src/branch/corrections.ts",
+      "packages/eval-engine/src/search/hints.ts"
+    ],
+    "adjacentfoe,any,normal": [
+      "packages/eval-engine/src/forward/choices.ts",
+      "packages/eval-engine/src/pair/odds.ts"
+    ],
+    "assist,copycat,metronome,sleeptalk": [
+      "packages/eval-engine/src/ko-odds.ts",
+      "packages/eval-engine/src/pair/guards.ts"
+    ],
+    "atk,def,hp,spa,spd,spe": [
+      "packages/replay-core/src/spreads/ev-budget.ts",
+      "packages/replay-core/src/spreads/fit.ts",
+      "packages/replay-core/src/team-info.ts",
+      "src/components/BattleStatsPanel.tsx"
+    ],
+    "auroraveil,lightscreen,reflect": [
+      "packages/eval-engine/src/damage-calc.ts",
+      "packages/eval-engine/src/pair/snapshot.ts",
+      "packages/eval-engine/src/score/features.ts",
+      "packages/replay-core/src/inference/hits.ts",
+      "packages/replay-core/src/protocol/handlers.ts"
+    ],
+    "bestowed,harvested,stolen,tricked": [
+      "packages/replay-core/src/inference/hits.ts",
+      "packages/replay-core/src/protocol/item-reading.ts"
+    ],
+    "choiceband,choicescarf,choicespecs": [
+      "packages/eval-engine/src/score/features.ts",
+      "packages/eval-engine/src/sensitivity.ts",
+      "packages/replay-core/src/inference/handlers.ts"
+    ],
+    "manual,revealed,sheet": [
+      "packages/replay-core/src/team/inferred-items.ts",
+      "packages/replay-core/src/team/item-damage-defender.ts"
+    ],
+    "mega,terastallize,ultra": [
+      "packages/eval-engine/src/branch-choices.ts",
+      "packages/eval-engine/src/ranking/ties.ts"
+    ]
+  }
+}

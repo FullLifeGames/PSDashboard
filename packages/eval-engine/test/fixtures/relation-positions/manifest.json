@@ -1,0 +1,310 @@
+{
+  "positions": [
+    {
+      "file": "positions/gen3customgame-2115579570-t2.json",
+      "id": "gen3customgame-2115579570",
+      "turn": 2,
+      "gameType": "singles",
+      "group": "singles",
+      "ruleset": "standard",
+      "reason": "ladder game, singles gen3customgame, turn 2: 6 v 6 bodies standing, none fainted"
+    },
+    {
+      "file": "positions/gen9championsvgc2026regmbbo3-2634199230-t5.json",
+      "id": "gen9championsvgc2026regmbbo3-2634199230",
+      "turn": 5,
+      "gameType": "doubles",
+      "group": "champions",
+      "ruleset": "champions",
+      "reason": "ladder game, doubles gen9doublesou, turn 5: 6 v 7 bodies standing, none fainted"
+    },
+    {
+      "file": "positions/gen9doublesou-2660802611-t2.json",
+      "id": "gen9doublesou-2660802611",
+      "turn": 2,
+      "gameType": "doubles",
+      "group": "doublesou",
+      "ruleset": "standard",
+      "reason": "ladder game, doubles gen9doublesou, turn 2: 6 v 6 bodies standing, none fainted"
+    },
+    {
+      "file": "positions/gen9doublesou-2660809089-t8.json",
+      "id": "gen9doublesou-2660809089",
+      "turn": 8,
+      "gameType": "doubles",
+      "group": "doublesou",
+      "ruleset": "standard",
+      "reason": "ladder game, doubles gen9doublesou, turn 8: 2 v 3 bodies standing, 7 fainted"
+    },
+    {
+      "file": "positions/gen9doublesou-2663093831-t12.json",
+      "id": "gen9doublesou-2663093831",
+      "turn": 12,
+      "gameType": "doubles",
+      "group": "doublesou",
+      "ruleset": "standard",
+      "reason": "ladder game, doubles gen9doublesou, turn 12: 2 v 3 bodies standing, 7 fainted"
+    },
+    {
+      "file": "positions/gen9ou-2658658993-t2.json",
+      "id": "gen9ou-2658658993",
+      "turn": 2,
+      "gameType": "singles",
+      "group": "singles",
+      "ruleset": "standard",
+      "reason": "ladder game, singles gen9ou, turn 2: 6 v 6 bodies standing, none fainted"
+    },
+    {
+      "file": "positions/gen9ou-2658663776-t2.json",
+      "id": "gen9ou-2658663776",
+      "turn": 2,
+      "gameType": "singles",
+      "group": "singles",
+      "ruleset": "standard",
+      "reason": "ladder game, singles gen9ou, turn 2: 6 v 6 bodies standing, none fainted"
+    },
+    {
+      "file": "positions/gen9ou-2658675932-t2.json",
+      "id": "gen9ou-2658675932",
+      "turn": 2,
+      "gameType": "singles",
+      "group": "singles",
+      "ruleset": "standard",
+      "reason": "ladder game, singles gen9ou, turn 2: 6 v 6 bodies standing, none fainted"
+    },
+    {
+      "file": "positions/gen9vgc2026regi-2629703929-t13.json",
+      "id": "gen9vgc2026regi-2629703929",
+      "turn": 13,
+      "gameType": "doubles",
+      "group": "vgc",
+      "ruleset": "vgc",
+      "reason": "ladder game, doubles gen9doublesou, turn 13: 1 v 1 bodies standing, 6 fainted"
+    },
+    {
+      "file": "positions/gen9vgc2026regi-2629703929-t4.json",
+      "id": "gen9vgc2026regi-2629703929",
+      "turn": 4,
+      "gameType": "doubles",
+      "group": "vgc",
+      "ruleset": "vgc",
+      "reason": "ladder game, doubles gen9doublesou, turn 4: 4 v 4 bodies standing, none fainted"
+    },
+    {
+      "file": "positions/gen9vgc2026regi-2629703929-t6.json",
+      "id": "gen9vgc2026regi-2629703929",
+      "turn": 6,
+      "gameType": "doubles",
+      "group": "vgc",
+      "ruleset": "vgc",
+      "reason": "ladder game, doubles gen9doublesou, turn 6: 2 v 4 bodies standing, 2 fainted"
+    },
+    {
+      "file": "positions/gen9vgc2026regi-2629703929-t8.json",
+      "id": "gen9vgc2026regi-2629703929",
+      "turn": 8,
+      "gameType": "doubles",
+      "group": "vgc",
+      "ruleset": "vgc",
+      "reason": "ladder game, doubles gen9doublesou, turn 8: 2 v 3 bodies standing, 3 fainted"
+    },
+    {
+      "file": "positions/gen9vgc2026regi-2629731825-t2.json",
+      "id": "gen9vgc2026regi-2629731825",
+      "turn": 2,
+      "gameType": "doubles",
+      "group": "vgc",
+      "ruleset": "vgc",
+      "reason": "ladder game, doubles gen9doublesou, turn 2: 4 v 4 bodies standing, none fainted"
+    },
+    {
+      "file": "positions/gen9vgc2026regi-2629760324-t6.json",
+      "id": "gen9vgc2026regi-2629760324",
+      "turn": 6,
+      "gameType": "doubles",
+      "group": "vgc",
+      "ruleset": "vgc",
+      "reason": "ladder game, doubles gen9doublesou, turn 6: 2 v 2 bodies standing, 4 fainted"
+    },
+    {
+      "file": "positions/gen9vgc2026regi-2629783504-t3.json",
+      "id": "gen9vgc2026regi-2629783504",
+      "turn": 3,
+      "gameType": "doubles",
+      "group": "vgc",
+      "ruleset": "vgc",
+      "reason": "ladder game, doubles gen9doublesou, turn 3: 4 v 4 bodies standing, none fainted"
+    },
+    {
+      "file": "positions/gen9vgc2026regi-2630461565-t2.json",
+      "id": "gen9vgc2026regi-2630461565",
+      "turn": 2,
+      "gameType": "doubles",
+      "group": "vgc",
+      "ruleset": "vgc",
+      "reason": "ladder game, doubles gen9doublesou, turn 2: 4 v 3 bodies standing, 1 fainted"
+    },
+    {
+      "file": "positions/gen9vgc2026regi-2630685175-t4.json",
+      "id": "gen9vgc2026regi-2630685175",
+      "turn": 4,
+      "gameType": "doubles",
+      "group": "vgc",
+      "ruleset": "vgc",
+      "reason": "ladder game, doubles gen9doublesou, turn 4: 3 v 4 bodies standing, 1 fainted"
+    },
+    {
+      "file": "positions/gen9vgc2026regi-2630685175-t7-played.json",
+      "id": "gen9vgc2026regi-2630685175",
+      "turn": 7,
+      "gameType": "doubles",
+      "group": "vgc",
+      "ruleset": "vgc",
+      "reason": "ladder game, doubles gen9doublesou, turn 7: 3 v 2 bodies standing, 3 fainted"
+    },
+    {
+      "file": "positions/gen9vgc2026regi-2630685175-t7.json",
+      "id": "gen9vgc2026regi-2630685175",
+      "turn": 7,
+      "gameType": "doubles",
+      "group": "vgc",
+      "ruleset": "vgc",
+      "reason": "ladder game, doubles gen9doublesou, turn 7: 3 v 2 bodies standing, 3 fainted"
+    },
+    {
+      "file": "positions/gen9vgc2026regi-2630685175-t8.json",
+      "id": "gen9vgc2026regi-2630685175",
+      "turn": 8,
+      "gameType": "doubles",
+      "group": "vgc",
+      "ruleset": "vgc",
+      "reason": "ladder game, doubles gen9doublesou, turn 8: 3 v 2 bodies standing, 3 fainted"
+    },
+    {
+      "file": "positions/smogtours-gen6ou-648453-t13.json",
+      "id": "smogtours-gen6ou-648453",
+      "turn": 13,
+      "gameType": "singles",
+      "group": "singles",
+      "ruleset": "standard",
+      "reason": "tournament game, singles gen6ou, turn 13: 5 v 5 bodies standing, 2 fainted"
+    },
+    {
+      "file": "positions/smogtours-gen6ou-649664-t14-g1.json",
+      "id": "smogtours-gen6ou-649664",
+      "turn": 14,
+      "gameType": "singles",
+      "group": "singles",
+      "ruleset": "standard",
+      "reason": "tournament game, singles gen6ou, turn 14: 4 v 4 bodies standing, 4 fainted"
+    },
+    {
+      "file": "positions/smogtours-gen6ou-649664-t14-g2.json",
+      "id": "smogtours-gen6ou-649664",
+      "turn": 14,
+      "gameType": "singles",
+      "group": "singles",
+      "ruleset": "standard",
+      "reason": "tournament game, singles gen6ou, turn 14: 4 v 4 bodies standing, 4 fainted"
+    },
+    {
+      "file": "positions/smogtours-gen8ou-573756-t73.json",
+      "id": "smogtours-gen8ou-573756",
+      "turn": 73,
+      "gameType": "singles",
+      "group": "singles",
+      "ruleset": "standard",
+      "reason": "tournament game, singles gen8ou, turn 73: 3 v 4 bodies standing, 5 fainted"
+    },
+    {
+      "file": "positions/smogtours-gen9doublesou-912045-t6.json",
+      "id": "smogtours-gen9doublesou-912045",
+      "turn": 6,
+      "gameType": "doubles",
+      "group": "doublesou",
+      "ruleset": "standard",
+      "reason": "tournament game, doubles gen9doublesou, turn 6: 3 v 3 bodies standing, 6 fainted"
+    },
+    {
+      "file": "positions/smogtours-gen9doublesou-912045-t8.json",
+      "id": "smogtours-gen9doublesou-912045",
+      "turn": 8,
+      "gameType": "doubles",
+      "group": "doublesou",
+      "ruleset": "standard",
+      "reason": "tournament game, doubles gen9doublesou, turn 8: 2 v 2 bodies standing, 8 fainted"
+    },
+    {
+      "file": "positions/smogtours-gen9doublesou-913996-t6.json",
+      "id": "smogtours-gen9doublesou-913996",
+      "turn": 6,
+      "gameType": "doubles",
+      "group": "doublesou",
+      "ruleset": "standard",
+      "reason": "tournament game, doubles gen9doublesou, turn 6: 6 v 5 bodies standing, 1 fainted"
+    },
+    {
+      "file": "positions/smogtours-gen9doublesou-938276-t10-played.json",
+      "id": "smogtours-gen9doublesou-938276",
+      "turn": 10,
+      "gameType": "doubles",
+      "group": "doublesou",
+      "ruleset": "standard",
+      "reason": "tournament game, doubles gen9doublesou, turn 10: 4 v 4 bodies standing, 4 fainted"
+    },
+    {
+      "file": "positions/smogtours-gen9doublesou-938281-t8-played.json",
+      "id": "smogtours-gen9doublesou-938281",
+      "turn": 8,
+      "gameType": "doubles",
+      "group": "doublesou",
+      "ruleset": "standard",
+      "reason": "tournament game, doubles gen9doublesou, turn 8: 4 v 2 bodies standing, 6 fainted"
+    },
+    {
+      "file": "positions/smogtours-gen9ou-749351-t10.json",
+      "id": "smogtours-gen9ou-749351",
+      "turn": 10,
+      "gameType": "singles",
+      "group": "singles",
+      "ruleset": "standard",
+      "reason": "tournament game, singles gen9ou, turn 10: 5 v 1 bodies standing, 6 fainted"
+    },
+    {
+      "file": "positions/smogtours-gen9ou-749828-t23.json",
+      "id": "smogtours-gen9ou-749828",
+      "turn": 23,
+      "gameType": "singles",
+      "group": "singles",
+      "ruleset": "standard",
+      "reason": "tournament game, singles gen9ou, turn 23: 1 v 1 bodies standing, 10 fainted"
+    },
+    {
+      "file": "positions/smogtours-gen9ou-751466-t2.json",
+      "id": "smogtours-gen9ou-751466",
+      "turn": 2,
+      "gameType": "singles",
+      "group": "singles",
+      "ruleset": "standard",
+      "reason": "tournament game, singles gen9ou, turn 2: 6 v 6 bodies standing, none fainted"
+    },
+    {
+      "file": "champions/gen9championsou-2693832490-t3.position.json",
+      "id": "gen9championsou-2693832490",
+      "turn": 3,
+      "gameType": "singles",
+      "group": "champions",
+      "ruleset": "champions",
+      "reason": "ladder game, singles gen9championsou, turn 3: 6 v 5 bodies standing, 1 fainted"
+    },
+    {
+      "file": "champions/gen9championsvgc2026regmbbo3-2679053861-t3.position.json",
+      "id": "gen9championsvgc2026regmbbo3-2679053861",
+      "turn": 3,
+      "gameType": "doubles",
+      "group": "champions",
+      "ruleset": "champions",
+      "reason": "ladder game, doubles gen9championsdoublescustomgame, turn 3: 3 v 3 bodies standing, 2 fainted"
+    }
+  ]
+}
