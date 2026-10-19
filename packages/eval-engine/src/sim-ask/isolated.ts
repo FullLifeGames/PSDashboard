@@ -1,4 +1,4 @@
-import type { Battle, Pokemon } from '@pkmn/sim';
+import type { Battle } from '@pkmn/sim';
 import { AskLeak, askCheckOn, fingerprint } from './guard.ts';
 
 /**
@@ -148,9 +148,6 @@ export function isolated<T extends object>(live: T): T {
   if ('sides' in live && 'prng' in live) rootOf.set(root, live as unknown as Battle);
   return root;
 }
-
-/** The body of a view of a battle that stands for `live`'s body `mon`, found by its place on its side. */
-export const bodyInView = (view: Battle, mon: Pokemon): Pokemon => view.sides[mon.side.n].pokemon[mon.side.pokemon.indexOf(mon)];
 
 /** With the check on, runs the call and throws `AskLeak` when the live battle behind the view moved. */
 export function viewGuarded<T>(facade: object, call: () => T): T {
