@@ -2,6 +2,7 @@ import { Dex } from '@pkmn/sim';
 import type { PokemonIdent, SimBattle, SimPokemon, SimSide, TurnBlock } from './types.ts';
 import { formatTargetLoc, normalizeBattleOnlyFormeId, slotLetter } from './team-order.ts';
 import { answersForcedRequest } from './forced-request.ts';
+import { nextChoosingSlot } from '../forward/request-moves.ts';
 import { sideIndex, toId } from '@fulllifegames/replay-core';
 
 export function parseTurnBlocks(log: string): { preGame: string[]; turns: TurnBlock[] } {
@@ -178,8 +179,14 @@ function firstLegalTargetLoc(battle: SimBattle, active: SimPokemon, targetType: 
   return null;
 }
 
+/**
+ * The slot's default when its protocol shows no action: `pass` for a slot the sim itself passes (fainted, or a Tatsugiri
+ * commanding a Dondozo: side.js getChoiceIndex, read through `nextChoosingSlot`), else the first enabled move. A `move`
+ * for a commanding slot went to the partner's slot, the sim rejected the side's whole choice, and the half-built choice
+ * counted as done, so no repair committed the turn (round 72, T246c).
+ */
 function defaultMoveChoice(battle: SimBattle, active: SimPokemon | null | undefined): string {
-  if (!active || active.fainted) return 'pass';
+  if (!active || nextChoosingSlot(active.side, active.position) !== active.position) return 'pass';
   const firstMove = active.moveSlots[0];
   if (!firstMove) return 'pass';
   // `move N` resolves against the request's entries, not `moveSlots`: on a
