@@ -1,12 +1,16 @@
+import { Teams } from '@pkmn/sim';
+import type { PokemonSet } from '@pkmn/sim';
 import type { OpponentTeamInfo, PokemonEvs } from './types.ts';
-import { EMPTY_EVS, itemSetValue, manualEvs, manualField, manualMove } from './team-info.ts';
+import { itemSetValue, manualEvs, manualField, manualMove } from './team-info.ts';
 import { toId } from './ids.ts';
 import { normalizeLineEndings } from './line-endings.ts';
 
 /**
- * Lightweight Showdown-export parser for pasted teams (G15). Deliberately
- * dependency-free: @pkmn/sim stays out of the main bundle — the sim gets the
- * raw paste separately when a branch starts.
+ * Pasted-team reader (G15). Round 72 (T241): the text goes through the library, `Teams.import` of @pkmn/sim (which
+ * delegates to @pkmn/sets), and this file keeps only what the app's shape needs on top: the set without a move line is
+ * no set (that rejects garbage like "asdf asdf"), at most four moves, `evs` and `ivs` absent when the paste has no such
+ * line, the item without its placeholders. packages/replay-core/test/team-text.spec.ts holds the reading to the hand
+ * parser it replaced.
  */
 export interface PastedSet {
   species: string;
@@ -21,84 +25,31 @@ export interface PastedSet {
   moves: string[];
 }
 
-const STAT_KEYS: Record<string, keyof PokemonEvs> = {
-  hp: 'hp', atk: 'atk', def: 'def', spa: 'spa', spd: 'spd', spe: 'spe',
-};
-
-/** One `EVs:` or `IVs:` line over a base table: listed stats clamp to [0, max], the rest keep the base. */
-function parseStatLine(line: string, prefix: RegExp, base: PokemonEvs, max: number): PokemonEvs | undefined {
-  const values: PokemonEvs = { ...base };
-  let any = false;
-  for (const part of line.replace(prefix, '').split('/')) {
-    const match = part.trim().match(/^(\d+)\s+(HP|Atk|Def|SpA|SpD|Spe)$/i);
-    if (!match) continue;
-    const key = STAT_KEYS[match[2].toLowerCase()];
-    if (!key) continue;
-    values[key] = Math.min(max, Math.max(0, parseInt(match[1], 10)));
-    any = true;
-  }
-  return any ? values : undefined;
+/** The listed stats clamp to [0, max]: the library keeps what the paste says, the sim's own limit comes later. */
+function clampStats(stats: Partial<PokemonEvs>, max: number): PokemonEvs {
+  const clamp = (value: number | undefined) => Math.min(max, Math.max(0, value ?? 0));
+  return { hp: clamp(stats.hp), atk: clamp(stats.atk), def: clamp(stats.def), spa: clamp(stats.spa), spd: clamp(stats.spd), spe: clamp(stats.spe) };
 }
 
-const parseEvLine = (line: string) => parseStatLine(line, /^EVs:/i, EMPTY_EVS, 252);
-const parseIvLine = (line: string) =>
-  parseStatLine(line, /^IVs:/i, { hp: 31, atk: 31, def: 31, spa: 31, spd: 31, spe: 31 }, 31);
-
-function parseHeader(header: string): { species: string; nickname?: string; item?: string } | null {
-  const [nameSide, itemSide] = header.split('@').map(part => part.trim());
-  if (!nameSide) return null;
-
-  let working = nameSide.replace(/\s*\((M|F)\)\s*$/i, '').trim();
-  let nickname: string | undefined;
-  const nickMatch = working.match(/^(.*)\(([^()]+)\)\s*$/);
-  if (nickMatch) {
-    nickname = nickMatch[1].trim() || undefined;
-    working = nickMatch[2].trim();
-  }
-  if (!working) return null;
-
-  return { species: working, nickname, item: itemSide ? itemSetValue(itemSide) || undefined : undefined };
+function pastedSetOf(set: PokemonSet): PastedSet {
+  return {
+    species: set.species,
+    nickname: set.name && set.name !== set.species ? set.name : undefined,
+    item: set.item ? itemSetValue(set.item) || undefined : undefined,
+    ability: set.ability || undefined,
+    teraType: set.teraType || undefined,
+    evs: set.evs ? clampStats(set.evs, 252) : undefined,
+    nature: set.nature || undefined,
+    ivs: set.ivs ? clampStats(set.ivs, 31) : undefined,
+    level: set.level,
+    moves: set.moves.slice(0, 4),
+  };
 }
 
 export function parsePastedTeam(teamText: string): PastedSet[] {
-  const sets: PastedSet[] = [];
-  const blocks = normalizeLineEndings(teamText).split(/\n\s*\n+/);
-
-  for (const block of blocks) {
-    const lines = block.split('\n').map(line => line.trim()).filter(Boolean);
-    if (lines.length === 0) continue;
-
-    const moves = lines
-      .filter(line => line.startsWith('- '))
-      .map(line => line.slice(2).trim())
-      .filter(Boolean);
-    // A recognizable set needs a header plus at least one move line — this is
-    // what rejects garbage like "asdf asdf" (G15).
-    if (moves.length === 0) continue;
-
-    const header = parseHeader(lines[0]);
-    if (!header) continue;
-
-    const abilityLine = lines.find(line => /^Ability:/i.test(line));
-    const teraLine = lines.find(line => /^Tera Type:/i.test(line));
-    const evLine = lines.find(line => /^EVs:/i.test(line));
-    const natureLine = lines.find(line => /^[A-Za-z]+\s+Nature$/i.test(line));
-    const ivLine = lines.find(line => /^IVs:/i.test(line));
-    const levelLine = lines.find(line => /^Level:\s*\d+$/i.test(line));
-
-    sets.push({
-      ...header,
-      ability: abilityLine?.replace(/^Ability:/i, '').trim() || undefined,
-      teraType: teraLine?.replace(/^Tera Type:/i, '').trim() || undefined,
-      evs: evLine ? parseEvLine(evLine) : undefined,
-      nature: natureLine?.replace(/\s+Nature$/i, '').trim() || undefined,
-      ivs: ivLine ? parseIvLine(ivLine) : undefined,
-      level: levelLine ? parseInt(levelLine.replace(/^Level:/i, '').trim(), 10) : undefined,
-      moves: moves.slice(0, 4),
-    });
-  }
-
-  return sets;
+  const team = Teams.import(normalizeLineEndings(teamText)) ?? [];
+  // A set with no move line comes back without a `moves` array, whatever the type says.
+  return team.filter(set => (set.moves?.length ?? 0) > 0).map(pastedSetOf);
 }
 
 /**
