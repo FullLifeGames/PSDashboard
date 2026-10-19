@@ -35,13 +35,14 @@ const filesWith = (pattern: RegExp, skip: (name: string) => boolean = () => fals
 
 describe('the callers of the simulator', () => {
   test('no source file builds a battle by hand but the ones that revive or follow a replay', () => {
-    // The deserializers and the speed layer (forward/), the branch session (`State.deserializeBattle`), and the two
-    // `@pkmn/client` batteries of the parser: none of them is a stand-in.
+    // The deserializers and the speed layer (forward/), the branch session (`State.deserializeBattle`), and the three
+    // `@pkmn/client` batteries of the parser and the header reader (round 72, T241): none of them is a stand-in.
     expect(filesWith(/\bnew Battle\(/)).toEqual([
       'eval-engine:branch/state.ts',
       'eval-engine:forward/sim-fast/guard.ts',
       'replay-core:inference/hits.ts',
       'replay-core:protocol/parser-state.ts',
+      'replay-core:replay-format.ts',
     ]);
   });
 
