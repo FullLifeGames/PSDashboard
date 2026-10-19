@@ -1,0 +1,665 @@
+{
+  "files": {
+    "packages/eval-engine/src/branch/corrections.ts": [
+      "regenerator"
+    ],
+    "packages/eval-engine/src/branch/field-ids.ts": [
+      "deltastream",
+      "desolateland",
+      "hail",
+      "primordialsea",
+      "raindance",
+      "sandstorm",
+      "snowscape",
+      "sunnyday"
+    ],
+    "packages/eval-engine/src/branch/pokemon-info.ts": [
+      "garchomp",
+      "hiddenpower",
+      "noability",
+      "pikachu",
+      "splash"
+    ],
+    "packages/eval-engine/src/branch/protocol-choices.ts": [
+      "encore"
+    ],
+    "packages/eval-engine/src/branch/sleep-counter.ts": [
+      "confusion",
+      "rest"
+    ],
+    "packages/eval-engine/src/branch/snapshot-move-types.ts": [
+      "noability",
+      "splash"
+    ],
+    "packages/eval-engine/src/branch/tera-restore.ts": [
+      "illusion",
+      "morpeko",
+      "ogerpon",
+      "terapagos"
+    ],
+    "packages/eval-engine/src/calc/body.ts": [
+      "noability"
+    ],
+    "packages/eval-engine/src/calc/move.ts": [
+      "hiddenpower",
+      "lastrespects"
+    ],
+    "packages/eval-engine/src/calc/tera-click.ts": [
+      "noability",
+      "splash"
+    ],
+    "packages/eval-engine/src/calc/typeless.ts": [
+      "pikachu"
+    ],
+    "packages/eval-engine/src/cell-blend.ts": [
+      "attract",
+      "confusion",
+      "disguise",
+      "focussash",
+      "iceface",
+      "spikes",
+      "stealthrock",
+      "stickyweb",
+      "sturdy",
+      "substitute",
+      "toxicspikes"
+    ],
+    "packages/eval-engine/src/choice-lock.ts": [
+      "blackbelt",
+      "blackglasses",
+      "charcoal",
+      "dragonfang",
+      "hardstone",
+      "hiddenpower",
+      "magnet",
+      "metalcoat",
+      "miracleseed",
+      "mysticwater",
+      "nevermeltice",
+      "poisonbarb",
+      "sharpbeak",
+      "silkscarf",
+      "silverpowder",
+      "softsand",
+      "spelltag",
+      "twistedspoon"
+    ],
+    "packages/eval-engine/src/damage-calc.ts": [
+      "auroraveil",
+      "lightscreen",
+      "loadeddice",
+      "reflect"
+    ],
+    "packages/eval-engine/src/forward/sim-fast/clone.ts": [
+      "leftovers",
+      "pikachu",
+      "pressure",
+      "tackle"
+    ],
+    "packages/eval-engine/src/ko-odds.ts": [
+      "assist",
+      "auroraveil",
+      "beatup",
+      "blizzard",
+      "bounce",
+      "comeuppance",
+      "copycat",
+      "counter",
+      "desolateland",
+      "dive",
+      "doomdesire",
+      "electroshot",
+      "explosion",
+      "fakeout",
+      "finalgambit",
+      "focusenergy",
+      "focuspunch",
+      "freezeshock",
+      "futuresight",
+      "hail",
+      "hurricane",
+      "iceburn",
+      "lightscreen",
+      "metalburst",
+      "meteorbeam",
+      "metronome",
+      "mirrorcoat",
+      "mistyexplosion",
+      "noguard",
+      "parentalbond",
+      "phantomforce",
+      "primordialsea",
+      "pursuit",
+      "raindance",
+      "razorwind",
+      "reflect",
+      "selfdestruct",
+      "shadowforce",
+      "skullbash",
+      "skyattack",
+      "sleeptalk",
+      "snowscape",
+      "solarbeam",
+      "solarblade",
+      "suckerpunch",
+      "sunnyday",
+      "thunder",
+      "thunderclap"
+    ],
+    "packages/eval-engine/src/move-use-rules.ts": [
+      "klutz",
+      "morpekohangry",
+      "naturalgift",
+      "ogerponcornerstone",
+      "ogerponcornerstonetera",
+      "ogerponhearthflame",
+      "ogerponhearthflametera",
+      "ogerponwellspring",
+      "ogerponwellspringtera",
+      "taurospaldeaaqua",
+      "taurospaldeablaze",
+      "taurospaldeacombat",
+      "terapagosstellar"
+    ],
+    "packages/eval-engine/src/move-use.ts": [
+      "hiddenpower",
+      "judgment",
+      "liquidvoice",
+      "multiattack",
+      "naturalgift",
+      "normalize",
+      "revelationdance",
+      "struggle",
+      "technoblast",
+      "terablast",
+      "terastarstorm",
+      "terrainpulse",
+      "weatherball"
+    ],
+    "packages/eval-engine/src/null-moves.ts": [
+      "corrosion",
+      "leechseed",
+      "mindseye",
+      "scrappy"
+    ],
+    "packages/eval-engine/src/pair/guards.ts": [
+      "assist",
+      "attract",
+      "confusion",
+      "copycat",
+      "metronome",
+      "parentalbond",
+      "quickclaw",
+      "quickdraw",
+      "sleeptalk",
+      "stall"
+    ],
+    "packages/eval-engine/src/pair/kill-table.ts": [
+      "aurabreak",
+      "auroraveil",
+      "battery",
+      "beadsofruin",
+      "contrary",
+      "darkaura",
+      "electroshot",
+      "fairyaura",
+      "friendguard",
+      "gravity",
+      "lightscreen",
+      "magicroom",
+      "meteorbeam",
+      "powerspot",
+      "reflect",
+      "simple",
+      "steelyspirit",
+      "swordofruin",
+      "tabletsofruin",
+      "vesselofruin",
+      "wonderroom"
+    ],
+    "packages/eval-engine/src/pair/log.ts": [
+      "attract",
+      "confusion"
+    ],
+    "packages/eval-engine/src/pair/pattern.ts": [
+      "covertcloak",
+      "innerfocus",
+      "kingsrock",
+      "razorfang",
+      "shielddust",
+      "sniper",
+      "stench"
+    ],
+    "packages/eval-engine/src/pair/snapshot.ts": [
+      "auroraveil",
+      "battlearmor",
+      "disguise",
+      "eiscue",
+      "focussash",
+      "gravity",
+      "helpinghand",
+      "iceface",
+      "lightscreen",
+      "luckychant",
+      "magicroom",
+      "mimikyu",
+      "reflect",
+      "shellarmor",
+      "sturdy",
+      "substitute",
+      "wonderroom"
+    ],
+    "packages/eval-engine/src/score/boost-bite.ts": [
+      "chansey",
+      "noability",
+      "snorlax",
+      "tackle"
+    ],
+    "packages/eval-engine/src/score/contact-play.ts": [
+      "noability"
+    ],
+    "packages/eval-engine/src/score/features.ts": [
+      "auroraveil",
+      "blacksludge",
+      "choiceband",
+      "choicescarf",
+      "choicespecs",
+      "leftovers",
+      "lightscreen",
+      "reflect",
+      "stickybarb",
+      "tailwind",
+      "trickroom"
+    ],
+    "packages/eval-engine/src/score/hazards.ts": [
+      "courtchange",
+      "defog",
+      "gravity",
+      "heavydutyboots",
+      "levitate",
+      "magicguard",
+      "mortalspin",
+      "rapidspin",
+      "spikes",
+      "stealthrock",
+      "stickyweb",
+      "tidyup",
+      "toxicspikes"
+    ],
+    "packages/eval-engine/src/score/move-facts.ts": [
+      "acrobatics",
+      "airballoon",
+      "barbbarrage",
+      "brine",
+      "collisioncourse",
+      "crushgrip",
+      "desolateland",
+      "dragonenergy",
+      "electroball",
+      "electrodrift",
+      "endeavor",
+      "eruption",
+      "expandingforce",
+      "facade",
+      "flail",
+      "frustration",
+      "grassknot",
+      "gravapple",
+      "gravity",
+      "gyroball",
+      "hardpress",
+      "heatcrash",
+      "heavyslam",
+      "infernalparade",
+      "ingrain",
+      "ironball",
+      "knockoff",
+      "levitate",
+      "loadeddice",
+      "lowkick",
+      "magnetrise",
+      "mistyexplosion",
+      "pikapapow",
+      "powertrip",
+      "primordialsea",
+      "psyblade",
+      "punishment",
+      "raindance",
+      "return",
+      "reversal",
+      "skilllink",
+      "smackdown",
+      "smellingsalts",
+      "solarbeam",
+      "solarblade",
+      "storedpower",
+      "sunnyday",
+      "telekinesis",
+      "utilityumbrella",
+      "veeveevolley",
+      "venoshock",
+      "wakeupslap",
+      "watershuriken",
+      "waterspout",
+      "wringout"
+    ],
+    "packages/eval-engine/src/score/races.ts": [
+      "magicguard",
+      "poisonheal"
+    ],
+    "packages/eval-engine/src/score/status-factor.ts": [
+      "aerialace",
+      "aurasphere",
+      "noability",
+      "snorlax",
+      "splash"
+    ],
+    "packages/eval-engine/src/score/threat.ts": [
+      "assaultvest",
+      "choiceband",
+      "choicespecs",
+      "dragonrage",
+      "eviolite",
+      "lifeorb",
+      "mindseye",
+      "naturesmadness",
+      "nightshade",
+      "psywave",
+      "ruination",
+      "scrappy",
+      "seismictoss",
+      "sonicboom",
+      "superfang",
+      "thickfat"
+    ],
+    "packages/eval-engine/src/score/unanswered.ts": [
+      "fakeout"
+    ],
+    "packages/eval-engine/src/search/answers.ts": [
+      "protect"
+    ],
+    "packages/eval-engine/src/search/hints.ts": [
+      "fakeout"
+    ],
+    "packages/eval-engine/src/search/options.ts": [
+      "auroraveil",
+      "lightscreen",
+      "mist",
+      "reflect",
+      "safeguard",
+      "spikes",
+      "stealthrock",
+      "stickyweb",
+      "tailwind",
+      "toxicspikes"
+    ],
+    "packages/eval-engine/src/search/verify-cell.ts": [
+      "counter"
+    ],
+    "packages/eval-engine/src/sensitivity.ts": [
+      "choiceband",
+      "choicescarf",
+      "choicespecs"
+    ],
+    "packages/eval-engine/src/speed.ts": [
+      "chlorophyll",
+      "choicescarf",
+      "desolateland",
+      "electricterrain",
+      "hail",
+      "ironball",
+      "primordialsea",
+      "protosynthesis",
+      "quarkdrive",
+      "quickfeet",
+      "raindance",
+      "sandrush",
+      "sandstorm",
+      "slushrush",
+      "snowscape",
+      "sunnyday",
+      "surgesurfer",
+      "swiftswim",
+      "tailwind",
+      "trickroom",
+      "unburden"
+    ],
+    "packages/eval-engine/src/streaks.ts": [
+      "covertcloak",
+      "serenegrace",
+      "shielddust"
+    ],
+    "packages/eval-engine/src/turn-analysis/played-match.ts": [
+      "acidarmor",
+      "agility",
+      "amnesia",
+      "autotomize",
+      "barrier",
+      "bellydrum",
+      "bulkup",
+      "calmmind",
+      "clangoroussoul",
+      "coil",
+      "cosmicpower",
+      "cottonguard",
+      "curse",
+      "defendorder",
+      "dragondance",
+      "filletaway",
+      "geomancy",
+      "growth",
+      "honeclaws",
+      "irondefense",
+      "nastyplot",
+      "noretreat",
+      "quiverdance",
+      "rockpolish",
+      "shellsmash",
+      "shiftgear",
+      "stockpile",
+      "swordsdance",
+      "tailglow",
+      "victorydance",
+      "workup"
+    ],
+    "packages/replay-core/src/calc-field.ts": [
+      "hail"
+    ],
+    "packages/replay-core/src/format-generations.ts": [
+      "noability"
+    ],
+    "packages/replay-core/src/hidden-power.ts": [
+      "hiddenpower"
+    ],
+    "packages/replay-core/src/inference/client-facts.ts": [
+      "jabocaberry",
+      "pursuit",
+      "rockyhelmet",
+      "rowapberry",
+      "sleeptalk",
+      "struggle"
+    ],
+    "packages/replay-core/src/inference/handlers.ts": [
+      "assaultvest",
+      "bestow",
+      "choiceband",
+      "choicescarf",
+      "choicespecs",
+      "confusion",
+      "covet",
+      "gravity",
+      "hail",
+      "heavydutyboots",
+      "levitate",
+      "lifeorb",
+      "magicguard",
+      "magician",
+      "moldbreaker",
+      "pickpocket",
+      "sandstorm",
+      "spikes",
+      "stealthrock",
+      "switcheroo",
+      "symbiosis",
+      "teravolt",
+      "thief",
+      "trick",
+      "turboblaze"
+    ],
+    "packages/replay-core/src/inference/hits.ts": [
+      "auroraveil",
+      "embargo",
+      "guardsplit",
+      "lightscreen",
+      "neutralizinggas",
+      "powersplit",
+      "powertrick",
+      "reflect",
+      "transform"
+    ],
+    "packages/replay-core/src/inference/inferrer-state.ts": [
+      "dancer"
+    ],
+    "packages/replay-core/src/inference/item-evidence.ts": [
+      "blacksludge",
+      "embargo",
+      "healblock",
+      "illusion",
+      "klutz",
+      "leftovers",
+      "lifeorb",
+      "longreach",
+      "magicguard",
+      "magicroom",
+      "protectivepads",
+      "rockyhelmet",
+      "sheerforce",
+      "shellbell"
+    ],
+    "packages/replay-core/src/inference/item-triggers.ts": [
+      "confusion",
+      "ejectbutton",
+      "ejectpack",
+      "healblock",
+      "klutz",
+      "lumberry",
+      "redcard",
+      "sheerforce",
+      "sitrusberry"
+    ],
+    "packages/replay-core/src/inference/rocks-tell.ts": [
+      "stealthrock"
+    ],
+    "packages/replay-core/src/inference/trigger-evidence.ts": [
+      "airballoon",
+      "boosterenergy",
+      "commander",
+      "ejectpack",
+      "electricterrain",
+      "embargo",
+      "grassyterrain",
+      "gravity",
+      "klutz",
+      "magicroom",
+      "mistyterrain",
+      "neutralizinggas",
+      "partingshot",
+      "psychicterrain"
+    ],
+    "packages/replay-core/src/opponent-inferrer.ts": [
+      "heavydutyboots",
+      "stealthrock"
+    ],
+    "packages/replay-core/src/protocol/handlers.ts": [
+      "auroraveil",
+      "confusion",
+      "hiddenpower",
+      "lightscreen",
+      "reflect"
+    ],
+    "packages/replay-core/src/protocol/paradox-reading.ts": [
+      "protosynthesis",
+      "quarkdrive"
+    ],
+    "packages/replay-core/src/protocol/parser-state.ts": [
+      "tailwind",
+      "trickroom"
+    ],
+    "packages/replay-core/src/protocol/speed-evidence.ts": [
+      "choicescarf",
+      "custapberry",
+      "galewings",
+      "grassyglide",
+      "myceliummight",
+      "prankster",
+      "stall",
+      "surgesurfer",
+      "triage",
+      "unburden"
+    ],
+    "packages/replay-core/src/replay-format.ts": [
+      "rest"
+    ],
+    "packages/replay-core/src/set-coherence.ts": [
+      "assaultvest",
+      "switcheroo",
+      "trick"
+    ],
+    "packages/replay-core/src/spread-inference.ts": [
+      "choicescarf"
+    ],
+    "packages/replay-core/src/spreads/ability-at-hit.ts": [
+      "noability"
+    ],
+    "packages/replay-core/src/spreads/ev-budget.ts": [
+      "pikachu"
+    ],
+    "packages/replay-core/src/spreads/fit.ts": [
+      "choicescarf",
+      "hiddenpower"
+    ],
+    "packages/replay-core/src/spreads/observation-read.ts": [
+      "auroraveil",
+      "lightscreen",
+      "raindance",
+      "reflect",
+      "sandstorm",
+      "sunnyday"
+    ],
+    "packages/replay-core/src/spreads/race-speed.ts": [
+      "choicescarf",
+      "owntempo",
+      "smeargle",
+      "splash"
+    ],
+    "packages/replay-core/src/spreads/scarf.ts": [
+      "choicescarf"
+    ],
+    "packages/replay-core/src/team-builder.ts": [
+      "choicescarf",
+      "frustration",
+      "tackle"
+    ],
+    "packages/replay-core/src/team-info.ts": [
+      "hiddenpower"
+    ],
+    "packages/replay-core/src/team/inferred-items.ts": [
+      "choicescarf"
+    ],
+    "packages/replay-core/src/team/item-damage-defender.ts": [
+      "assaultvest",
+      "eviolite"
+    ],
+    "packages/replay-core/src/team/item-damage-shared.ts": [
+      "auroraveil",
+      "flashfire",
+      "lightscreen",
+      "reflect",
+      "slowstart",
+      "stakeout"
+    ],
+    "packages/replay-core/src/team/move-slots.ts": [
+      "hiddenpower"
+    ]
+  }
+}
