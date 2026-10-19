@@ -1,4 +1,7 @@
+import { Battle } from '@pkmn/client';
+import { Protocol } from '@pkmn/protocol';
 import { Dex } from '@pkmn/sim';
+import { generationsFor } from './format-generations.ts';
 import type { ReplayData, TurnSnapshot } from './types.ts';
 import { toId } from './ids.ts';
 import { normalizeLineEndings } from './line-endings.ts';
@@ -32,16 +35,71 @@ function stripReplayNumber(id: string | undefined): string {
   return splitReplayPassword(id || '')[0].replace(/-\d+$/, '');
 }
 
-function extractTier(log: string | undefined): string {
-  return lfLog(log)?.match(/^\|tier\|([^|\n]+)/m)?.[1] ?? '';
+/**
+ * Round 72 (T241): the header facts of a log (game type, generation, tier, the number brought at team preview) are what
+ * @pkmn/client's Battle holds after it has read the header lines, so the library's handlers decide what a line means
+ * (the last `|gametype|` wins, `|teampreview|` without a number is six). The header is the text before `|start`; a log
+ * without a `|start` line is read whole. Only the four lines the facts come from go to the client. A header reads once
+ * per distinct text, because the hooks ask for these facts on every render.
+ */
+interface ReplayHeader {
+  /** The raw `|gametype|` argument, or null when the log has no such line (the client's default "singles" says nothing). */
+  gameType: string | null;
+  /** The `|gen|` line's generation, or null without one. */
+  gen: number | null;
+  tier: string;
+  /** The client's `teamPreviewCount` after the header, or null without a `|teampreview|` line. */
+  teamPreviewCount: number | null;
 }
+
+const HEADER_LINES = ['|gametype|', '|gen|', '|tier|', '|teampreview'];
+const HEADER_CACHE_LIMIT = 32;
+const headerCache = new Map<string, ReplayHeader>();
+
+function readHeaderText(text: string): ReplayHeader {
+  const battle = new Battle(generationsFor(''));
+  let gameType = false;
+  let gen = false;
+  let preview = false;
+  for (const line of text.split('\n')) {
+    if (!HEADER_LINES.some((prefix) => line.startsWith(prefix))) continue;
+    const { args, kwArgs } = Protocol.parseBattleLine(line);
+    const key = Protocol.key(args);
+    if (key === '|teampreview|') preview = true;
+    else if (key === '|gametype|') gameType = true;
+    else if (key === '|gen|') gen = true;
+    else if (key !== '|tier|') continue;
+    try {
+      battle.add(args, kwArgs);
+    } catch {
+      // A generation the client does not know: the line says nothing.
+      if (key === '|gen|') gen = false;
+    }
+  }
+  return { gameType: gameType ? battle.gameType : null, gen: gen ? battle.gen.num : null, tier: battle.tier, teamPreviewCount: preview ? battle.teamPreviewCount : null };
+}
+
+function readHeader(log: string | undefined): ReplayHeader {
+  const lf = lfLog(log) ?? '';
+  const start = /^\|start(?:\||$)/m.exec(lf);
+  const text = start ? lf.slice(0, start.index) : lf;
+  let header = headerCache.get(text);
+  if (!header) {
+    header = readHeaderText(text);
+    if (headerCache.size >= HEADER_CACHE_LIMIT) headerCache.delete(headerCache.keys().next().value as string);
+    headerCache.set(text, header);
+  }
+  return header;
+}
+
+const extractTier = (log: string | undefined): string => readHeader(log).tier;
 
 function extractGen(source: ReplayFormatSource & { formatid?: string }): string {
   const fromFormatId = source.formatid?.match(/^gen(\d+)/)?.[1];
   if (fromFormatId) return fromFormatId;
 
-  const fromLog = lfLog(source.log)?.match(/^\|gen\|(\d+)/m)?.[1];
-  if (fromLog) return fromLog;
+  const fromLog = readHeader(source.log).gen;
+  if (fromLog) return String(fromLog);
 
   const fromFormat = optionalId(source.format || extractTier(source.log)).match(/gen(\d+)/)?.[1];
   if (fromFormat) return fromFormat;
@@ -148,11 +206,16 @@ function sleepClauseSuffix(rawLog: string | undefined, base: string): string {
 /**
  * How many Pokémon each side BRINGS at team preview (VGC: 4 of 6, Battle
  * Stadium Singles: 3 of 6), or null for formats that bring the full team.
- * The Dex's own rule table answers for formats it knows; current VGC
- * regulations often postdate the bundled sim, so the format-id heuristic
- * covers them (every VGC ruleset to date brings 4).
+ * The log answers first: its `|teampreview|N` line is the client's
+ * `teamPreviewCount`, and 1 to 5 is a bring limit (T241: 5,648 replays, the
+ * log and the Dex's rule table agree on all of them, and the log also covers
+ * the 2,326 VGC replays whose regulation postdates the bundled sim). A log
+ * with no such line falls back on the Dex's rule table for formats it knows,
+ * then on the format-id heuristic (every VGC ruleset to date brings 4).
  */
 export function getReplayBringCount(source: ReplayFormatSource): number | null {
+  const previewed = readHeader(source.log).teamPreviewCount;
+  if (previewed !== null) return previewed >= 1 && previewed <= 5 ? previewed : null;
   const formatid = inferReplayFormatId(source);
   if (!formatid) return null;
   const format = Dex.formats.get(formatid);
