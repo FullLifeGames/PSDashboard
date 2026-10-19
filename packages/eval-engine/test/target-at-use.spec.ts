@@ -1,9 +1,9 @@
-import { afterAll, beforeAll, describe, expect, test } from 'vitest';
+import { afterAll, beforeAll, describe, expect, test, vi } from 'vitest';
 import { PRNG, type Battle, type Pokemon } from '@pkmn/sim';
 import { bodyAsClicked } from '../src/calc/tera-click';
 import { loadSimMods } from '../src/forward/sim-mods';
 import { targetAtUse } from '../src/pair/odds';
-import { fingerprint, playOnCopy, setAskCheck } from '../src/sim-ask';
+import { AskLeak, fingerprint, playOnCopy, setAskCheck } from '../src/sim-ask';
 import { set } from './move-oracle';
 import { battleOf } from './power-oracle';
 
@@ -123,5 +123,40 @@ describe('targetAtUse writes nothing to the live attacker', () => {
       expect(Object.keys(attacker.volatiles)).toEqual([]);
       expect(fingerprint(battle, [dex])).toBe(before);
     }
+  });
+});
+
+describe('targetAtUse asks the handler once per body, move and click', () => {
+  // An option list of a doubles position asks the same slot move once per option; the reader battle never changes.
+  test.each([['gen 9 doubles', 'gen9doublescustomgame'], ['Champions doubles', 'gen9championsdoublescustomgame']])('%s: a repeated question is answered from the first', (_name, format) => {
+    const team = (name: string) => [set(name, ['tackle', 'splash']), set(name, ['tackle', 'splash'])];
+    const battle = battleOf(format, team('Snorlax'), team('Pikachu'));
+    const attacker = battle.sides[0].active[0] as Pokemon;
+    const action = { kind: 'move', moveId: 'expandingforce', tera: false, slot: 0, loc: null } as never;
+    // The development check asks a hit again; the question is how the code runs without it.
+    setAskCheck(false);
+    const asked = vi.spyOn(battle.dex, 'getActiveMove');
+    const questions = () => asked.mock.calls.filter(([id]) => id === 'expandingforce').length;
+    const first = targetAtUse(battle, attacker, action);
+    expect(questions()).toBe(1);
+    for (let again = 0; again < 3; again++) expect(targetAtUse(battle, attacker, action)).toBe(first);
+    expect(questions()).toBe(1);
+    // The Tera click is its own question, and so is another move; a move without a handler never reaches the stand-in.
+    targetAtUse(battle, attacker, { ...(action as object), tera: true } as never);
+    expect(questions()).toBe(2);
+    expect(targetAtUse(battle, attacker, { ...(action as object), moveId: 'tackle' } as never)).toBe('normal');
+    expect(questions()).toBe(2);
+    asked.mockRestore();
+    setAskCheck(true);
+  });
+
+  test('with the development check on, a battle mutated after its first question fails loudly', () => {
+    const team = (name: string) => [set(name, ['tackle', 'splash']), set(name, ['tackle', 'splash'])];
+    const battle = battleOf('gen9doublescustomgame', team('Snorlax'), team('Pikachu'));
+    const attacker = battle.sides[0].active[0] as Pokemon;
+    const action = { kind: 'move', moveId: 'expandingforce', tera: false, slot: 0, loc: null } as never;
+    expect(targetAtUse(battle, attacker, action)).toBe('normal');
+    battle.field.setTerrain('psychicterrain', attacker, battle.dex.moves.get('splash'));
+    expect(() => targetAtUse(battle, attacker, action)).toThrow(AskLeak);
   });
 });

@@ -1,9 +1,9 @@
-import type { Battle, Pokemon } from '@pkmn/sim';
+import type { Battle, Move as DexMove, Pokemon } from '@pkmn/sim';
 import { sideIndex } from '@fulllifegames/replay-core';
 import { strengthMix } from '../calc/fickle.ts';
 import { bodyAsClicked } from '../calc/tera-click.ts';
 import { critRate, moveAccuracy, unpriceable } from '../ko-odds.ts';
-import { callHandler, guarded, isolated } from '../sim-ask/index.ts';
+import { askCheckOn, AskLeak, callHandler, guarded, isolated } from '../sim-ask/index.ts';
 import type { KoOddsInfo } from '../types.ts';
 import { parsePairChoice, type PairAction } from './guards.ts';
 import { mixedKillShare } from './kill-table.ts';
@@ -24,6 +24,9 @@ type MoveAction = Extract<PairAction, { kind: 'move' }>;
 const SPREAD = new Set(['allAdjacentFoes', 'allAdjacent']);
 const SINGLE_FOE = new Set(['normal', 'any', 'adjacentFoe']);
 
+/** The answers of `targetAtUse` per body of a reader battle, move and Tera click. */
+const targetsAsked = new WeakMap<Pokemon, Map<string, string>>();
+
 type ModifyMoveHandler = (this: unknown, move: unknown, user: unknown, target: unknown) => void;
 
 /**
@@ -35,8 +38,23 @@ type ModifyMoveHandler = (this: unknown, move: unknown, user: unknown, target: u
  */
 export function targetAtUse(battle: Battle, attacker: Pokemon, action: MoveAction): string {
   const dexMove = battle.dex.moves.get(action.moveId);
+  // A move without an onModifyMove keeps its Dex target: the common move never reaches the stand-in.
+  if (typeof (dexMove as { onModifyMove?: unknown }).onModifyMove !== 'function') return dexMove.target;
+  // The reader battle of a position is never mutated, and an option list asks the same slot move once per option: one answer per body, move and click.
+  let asked = targetsAsked.get(attacker);
+  if (!asked) targetsAsked.set(attacker, asked = new Map());
+  const key = `${action.moveId}|${action.tera === true}`;
+  const known = asked.get(key);
+  // With the development check on, a hit is asked again, so a caller that mutated the battle after its first question fails loudly.
+  if (known !== undefined && !askCheckOn()) return known;
+  const answer = askTargetAtUse(battle, attacker, action, dexMove);
+  if (known !== undefined && known !== answer) throw new AskLeak();
+  asked.set(key, answer);
+  return answer;
+}
+
+function askTargetAtUse(battle: Battle, attacker: Pokemon, action: MoveAction, dexMove: DexMove): string {
   const handler = (dexMove as { onModifyMove?: unknown }).onModifyMove;
-  if (typeof handler !== 'function') return dexMove.target;
   const body = bodyAsClicked(battle, attacker, action.tera === true);
   // Copy-on-write views of the live body and field: a ModifyMove that writes the user (Beat Up of Gens 3 and 4 adds its volatile) writes the view.
   const view = isolated(battle);
