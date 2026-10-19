@@ -1,6 +1,7 @@
 import type { Battle, Pokemon, PokemonSet } from '@pkmn/sim';
 import { set } from './move-oracle';
 import { battleOf } from './power-oracle';
+import { fingerprint } from '../src/sim-ask';
 import { cheapOracle, SLOT_A } from './speed-tie-oracle';
 
 /**
@@ -88,6 +89,58 @@ export function sweepBattle(format: string, holder: Holder | null, side: 0 | 1, 
   const battle = battleOf(format, side === 0 ? [held] : [other], side === 0 ? [other] : [held]);
   scenario.setup?.(battle, side);
   return battle;
+}
+
+export const RULE_SETS = [
+  ...[1, 2, 3, 4, 5, 6, 7, 8, 9].map(gen => ({ name: `gen ${gen}`, format: `gen${gen}customgame` })),
+  { name: 'Champions', format: 'gen9championsou' },
+];
+
+const EQUAL: Scenario = { name: 'equal speed', holderLevel: 100, otherLevel: 100, full: true };
+
+export interface TieSweep { holders: number; scenarios: number; asked: number; ties: number; wrong: string[] }
+
+type SpeedTie = (battle: Battle, p1Choice: string, p2Choice: string) => boolean;
+
+/** One holder on one side in one scenario: every move pair against the oracle, then the live battle's fingerprint. */
+function sweepConfig(format: string, holder: Holder | null, side: 0 | 1, scenario: Scenario, reps: { holder: string[]; other: string[] }, speedTie: SpeedTie, result: TieSweep): void {
+  const label = `${holder?.id ?? 'no holder'} on p${side + 1}, ${scenario.name}`;
+  const battle: Battle = sweepBattle(format, holder, side, scenario);
+  const before = fingerprint(battle);
+  const tieOf = cheapOracle(battle, ...SLOT_A);
+  // A holder that moves only the speed does not read the move: the few priority classes tell it apart.
+  const holderMoves = scenario.full && !holder?.speedOnly ? reps.holder : reps.other;
+  for (const own of holderMoves) {
+    for (const foe of reps.other) {
+      const [m1, m2] = side === 0 ? [own, foe] : [foe, own];
+      const expected = tieOf(m1, m2);
+      const ours = speedTie(battle, `move ${m1}`, `move ${m2}`);
+      result.asked++;
+      if (expected) result.ties++;
+      if (ours !== expected && result.wrong.length < 12) result.wrong.push(`${label}, ${m1} against ${m2}: simulator ${expected}, speedTie ${ours}`);
+    }
+  }
+  if (fingerprint(battle) !== before) result.wrong.push(`${label}: the live battle changed`);
+}
+
+/**
+ * Every holder in every scenario on either side, every move pair: `speedTie` against the cheap oracle, and the live
+ * battle's fingerprint after each configuration. The caller sets the speed-layer mode and the development check.
+ */
+export function tieSweep(format: string, speedTie: SpeedTie): TieSweep {
+  const probe = sweepBattle(format, null, 0, EQUAL);
+  const holders: (Holder | null)[] = [null, ...holdersOf(probe)];
+  const reps = moveReps(probe);
+  const scenarios = scenariosOf(probe);
+  const result: TieSweep = { holders: holders.length, scenarios: scenarios.length, asked: 0, ties: 0, wrong: [] };
+  for (const holder of holders) {
+    for (const scenario of scenarios) {
+      // Holders that only change the speed run in the equal-speed cases; the others run every scenario.
+      if (holder?.speedOnly && !scenario.full) continue;
+      for (const side of [0, 1] as const) sweepConfig(format, holder, side, scenario, reps, speedTie, result);
+    }
+  }
+  return result;
 }
 
 export { cheapOracle, SLOT_A };

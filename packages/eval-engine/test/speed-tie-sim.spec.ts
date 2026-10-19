@@ -1,10 +1,10 @@
 import { afterAll, beforeAll, describe, expect, test } from 'vitest';
-import type { Battle, Pokemon } from '@pkmn/sim';
+import type { Pokemon } from '@pkmn/sim';
 import { loadSimMods } from '../src/forward/sim-mods';
 import { speedTie } from '../src/search/leaf';
 import { actionsTie, fingerprint, setAskCheck } from '../src/sim-ask';
 import { boardBattle, boardChoices, boards, cheapOracle, playedTie, SLOT_A } from './speed-tie-oracle';
-import { holdersOf, moveReps, scenariosOf, sweepBattle, type Holder, type Scenario } from './speed-tie-sweep';
+import { RULE_SETS, tieSweep } from './speed-tie-sweep';
 
 /**
  * Round 72 (T196, step 4): `speedTie` against the simulator's own queue. A tie is the condition under which
@@ -82,50 +82,14 @@ describe('the eight boards: played turn, queue answer and speedTie', () => {
   });
 });
 
-const EQUAL: Scenario = { name: 'equal speed', holderLevel: 100, otherLevel: 100, full: true };
-
-const RULE_SETS = [
-  ...[1, 2, 3, 4, 5, 6, 7, 8, 9].map(gen => ({ name: `gen ${gen}`, format: `gen${gen}customgame` })),
-  { name: 'Champions', format: 'gen9championsou' },
-];
-
 describe('the sweep over every priority and speed entry of the Dex', () => {
   beforeAll(() => setAskCheck(false));
   afterAll(() => setAskCheck(null));
 
   test.each(RULE_SETS)('$name: speedTie equals the simulator, the live battle stays as it was', ({ format }) => {
-    const probe = sweepBattle(format, null, 0, EQUAL);
-    const holders: (Holder | null)[] = [null, ...holdersOf(probe)];
-    const reps = moveReps(probe);
-    const scenarios = scenariosOf(probe);
-    let asked = 0;
-    let ties = 0;
-    const wrong: string[] = [];
-    for (const holder of holders) {
-      for (const scenario of scenarios) {
-        // Holders that only change the speed run in the equal-speed cases; the others run every scenario.
-        if (holder?.speedOnly && !scenario.full) continue;
-        for (const side of [0, 1] as const) {
-          const battle: Battle = sweepBattle(format, holder, side, scenario);
-          const before = fingerprint(battle);
-          const tieOf = cheapOracle(battle, ...SLOT_A);
-          // A holder that moves only the speed does not read the move: the few priority classes tell it apart.
-          const holderMoves = scenario.full && !holder?.speedOnly ? reps.holder : reps.other;
-          for (const own of holderMoves) {
-            for (const foe of reps.other) {
-              const [m1, m2] = side === 0 ? [own, foe] : [foe, own];
-              const expected = tieOf(m1, m2);
-              const ours = speedTie(battle as never, `move ${m1}`, `move ${m2}`);
-              asked++;
-              if (expected) ties++;
-              if (ours !== expected && wrong.length < 12) wrong.push(`${holder?.id ?? 'no holder'} on p${side + 1}, ${scenario.name}, ${m1} against ${m2}: simulator ${expected}, speedTie ${ours}`);
-            }
-          }
-          expect(fingerprint(battle), `${holder?.id ?? 'no holder'} on p${side + 1}, ${scenario.name}`).toBe(before);
-        }
-      }
-    }
-    process.stdout.write(`speed-tie sweep ${format}: ${holders.length} holders, ${scenarios.length} scenarios, ${asked} asks, ${ties} ties\n`);
+    const { holders, scenarios, asked, ties, wrong } = tieSweep(format, speedTie as never);
+    process.stdout.write(`speed-tie sweep ${format}: ${holders} holders, ${scenarios} scenarios, ${asked} asks, ${ties} ties
+`);
     expect(wrong).toEqual([]);
     expect(asked).toBeGreaterThan(0);
     expect(ties).toBeGreaterThan(0);
