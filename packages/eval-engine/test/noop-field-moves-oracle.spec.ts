@@ -1,26 +1,27 @@
 import { describe, expect, test } from 'vitest';
-import { NOOP_FIELD_MOVES } from '../src/search/options';
+import { LAYER_CAPS, failsAgainstStanding } from '../src/search/options';
+import type { positionBattle } from '../src/forward-model';
 import { ALL_VIEWS, battleIn, mon, oracleTagAbove, type SimView } from './sim-views';
 
 /**
- * Round 72 (T235), plan row 15: `NOOP_FIELD_MOVES` in search/options.ts drops a field move from the option list while its
- * condition already stands ("clicking it is a pass with a real-looking label", GPL T25). The table is keyed by move id and
- * holds the standing-condition test per move, with the layer caps of Spikes (3) and Toxic Spikes (2). The Dex says which moves
- * set a side condition (`sideCondition`), not which of them fail against it, so the table stays by hand and this spec holds it
- * to the simulator. For every move that sets a side condition, in every view the corpus plays, it lays the condition on the
- * side the move acts on (as many layers as the simulator takes), plays the move once and keeps the moves that print a failure
- * where the same turn without the standing condition does not (under the weather a move may need: none, Snow, Hail). Then:
- *  - every table entry that exists in the view is a move the simulator fails, and its test says yes on the full stack and no
- *    one layer lower (Spikes, Toxic Spikes);
- *  - FINDING W4: the moves the simulator fails that the table lacks are the list below, by id (five ids in every view that has
- *    them); FINDING W4b: in Generation 2 Spikes stacks one layer, the table's cap is three. The table stays as it is in
- *    this step; each name is a field move the search may still offer into a standing condition.
+ * Round 72 (T235), plan row 15, FINDINGS W4 and W4b: search/options.ts drops a field move from the option list while its
+ * condition already stands ("clicking it is a pass with a real-looking label", GPL T25). The hand table of ten ids missed three
+ * side-condition moves the simulator fails against their standing condition (Crafty Shield, Lucky Chant, Mat Block) and never
+ * dropped Spikes in Generation 2, where one layer is the cap. Quick Guard and Wide Guard also lack a table entry, but they run an
+ * `onHitSide` handler and print no failure with their condition standing (it ends within the turn), so the rule leaves them. The
+ * simulator's rule (`Side.addSideCondition`)
+ * is: a condition that stands and has no restart handler (`onSideRestart`) fails to start again; Spikes and Toxic Spikes have the
+ * handler and refuse a layer past their cap, which lives in the handler's code (`LAYER_CAPS`, held here). For every move that sets a
+ * side condition, in every view the corpus plays, this spec lays the condition on the side the move acts on (as many layers as the
+ * simulator takes), plays the move once and keeps the moves that print a failure where the same turn without the standing
+ * condition does not (under the weather a move may need: none, Snow, Hail). Then:
+ *  - `failsAgainstStanding` drops exactly those moves with the full stack standing;
+ *  - the cap of each layered hazard is what the simulator takes, and one layer below it is no no-op;
+ *  - the layered hazards are the conditions with a restart handler (none in Generation 2).
  */
 
 const SPEC = 'packages/eval-engine/test/noop-field-moves-oracle.spec.ts';
-
-/** Side-condition moves the simulator fails against their standing condition that the table lacks (finding W4). */
-const NOT_IN_TABLE = ['craftyshield', 'luckychant', 'matblock', 'quickguard', 'wideguard'];
+type Side = ReturnType<typeof positionBattle>['sides'][number];
 
 const isReal = (view: SimView, id: string): boolean => {
   const move = view.dex.moves.get(id);
@@ -61,35 +62,46 @@ function simulatorFails(view: SimView, moveId: string): boolean {
   });
 }
 
-describe('NOOP_FIELD_MOVES is held to the simulator (round 72)', () => {
-  test('the table carries its oracle tag', () => {
-    expect(oracleTagAbove('packages/eval-engine/src/search/options.ts', 'const NOOP_FIELD_MOVES', SPEC)).toBe(true);
+describe('field moves against a standing condition are read from the Dex and held to the simulator (round 72)', () => {
+  test('the layer caps carry their oracle tag', () => {
+    expect(oracleTagAbove('packages/eval-engine/src/search/options.ts', 'export const LAYER_CAPS', SPEC)).toBe(true);
   });
 
   describe.each(ALL_VIEWS)('$name', view => {
     const setters = [...new Set(view.dex.moves.all().filter(move => isReal(view, move.id) && move.sideCondition).map(move => move.id))].sort();
 
-    test('the table entries are moves the simulator fails, and the others are the named ones', () => {
-      const fails = setters.filter(id => simulatorFails(view, id));
-      const tabled = Object.keys(NOOP_FIELD_MOVES).filter(id => setters.includes(id)); // Generation 1 keeps its screens and Mist in volatiles
-      expect(tabled.filter(id => !fails.includes(id))).toEqual([]);
-      expect(fails.filter(id => !(id in NOOP_FIELD_MOVES))).toEqual(NOT_IN_TABLE.filter(id => setters.includes(id) && fails.includes(id)));
+    /** Moves whose condition has a restart handler: the layered hazards (Generation 2 builds Spikes without one). */
+    const restarts = (id: string) => typeof (view.dex.conditions.get(view.dex.moves.get(id).sideCondition!) as unknown as { onSideRestart?: unknown }).onSideRestart === 'function';
+
+    /** The moves failsAgainstStanding drops with the full stack of their condition standing. */
+    const dropped = () => setters.filter(id => {
+      const { battle } = prepared(view, id, WEATHERS.find(w => !play(view, id, false, w) && play(view, id, true, w)) ?? '', 9);
+      return failsAgainstStanding(battle.dex, id, battle.sides[0] as unknown as Side, battle.sides[1] as unknown as Side);
     });
 
-    test('each test says yes on the full stack of its condition and no below the cap', () => {
-      for (const id of Object.keys(NOOP_FIELD_MOVES).filter(name => setters.includes(name))) {
+    test('the moves it drops are the moves the simulator fails, no more and no fewer', () => {
+      expect(dropped()).toEqual(setters.filter(id => simulatorFails(view, id)));
+    });
+
+    test('the moves the hand table lacked are dropped where the view has them', () => {
+      const lacked = ['craftyshield', 'luckychant', 'matblock'].filter(id => setters.includes(id));
+      expect(dropped()).toEqual(expect.arrayContaining(lacked));
+      if (view.dex.gen === 2) expect(dropped()).toContain('spikes');
+    });
+
+    test('a stack below the cap of a layered hazard is no no-op, and the cap is what the simulator takes', () => {
+      for (const id of setters.filter(name => name in LAYER_CAPS && restarts(name))) {
         const weather = WEATHERS.find(w => !play(view, id, false, w) && play(view, id, true, w)) ?? '';
-        const sidesOf = (layers: number) => {
-          const { battle, holder } = prepared(view, id, weather, layers);
-          return { sides: [battle.sides[0], battle.sides[1]] as unknown as Parameters<(typeof NOOP_FIELD_MOVES)[string]>, holder, battle };
-        };
-        const full = sidesOf(9);
-        // FINDING W4b: Generation 2 takes one layer of Spikes (the table waits for three), so the table never drops it there.
-        const oneLayerCap = view.name === 'Gen 2' && id === 'spikes';
-        expect(NOOP_FIELD_MOVES[id](...full.sides), `${id} on a full stack`).toBe(!oneLayerCap);
+        const full = prepared(view, id, weather, 9);
         const layers = (full.battle.sides[full.holder].sideConditions[view.dex.moves.get(id).sideCondition!] as { layers?: number } | undefined)?.layers;
-        if (layers && layers > 1 && !oneLayerCap) expect(NOOP_FIELD_MOVES[id](...sidesOf(layers - 1).sides), `${id} one layer below the cap`).toBe(false);
+        expect(layers, `${id} stack`).toBe(LAYER_CAPS[id]);
+        const below = prepared(view, id, weather, layers! - 1);
+        expect(failsAgainstStanding(below.battle.dex, id, below.battle.sides[0] as unknown as Side, below.battle.sides[1] as unknown as Side), `${id} one layer below the cap`).toBe(false);
       }
+    });
+
+    test('the layered hazards are the conditions with a restart handler, and Generation 2 has none', () => {
+      expect(setters.filter(restarts)).toEqual(view.dex.gen === 2 ? [] : setters.filter(id => id in LAYER_CAPS));
     });
   });
 });
