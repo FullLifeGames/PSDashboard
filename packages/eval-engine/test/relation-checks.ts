@@ -27,6 +27,8 @@ export interface ManifestEntry {
 export interface RelationSubject extends ManifestEntry {
   /** 'root' for the fixture's own position, else the pair of choices that made the leaf. */
   kind: 'root' | 'leaf';
+  /** The fixture file's name without folder and extension: one per manifest entry, shared by a root and its leaves. */
+  position: string;
   label: string;
   serialized: string;
 }
@@ -113,14 +115,17 @@ export function sweepLeaves(root: RelationSubject, perSide = 3): SweepResult {
         ended++;
         continue;
       }
-      leaves.push({ ...root, kind: 'leaf', label: `${root.id}-t${root.turn} ${a.choice} | ${b.choice}`, serialized: child.serialized });
+      leaves.push({ ...root, kind: 'leaf', label: `${root.position} ${a.choice} | ${b.choice}`, serialized: child.serialized });
     }
   }
   return { leaves, ended };
 }
 
+/** The fixture file's name without folder and extension: one per manifest entry, shared by a root and its leaves. */
+export const positionName = (entry: ManifestEntry): string => entry.file.split('/').pop()!.replace(/(\.position)?\.json$/, '');
+
 export const rootSubject = (entry: ManifestEntry): RelationSubject => ({
-  ...entry, kind: 'root', label: `${entry.id}-t${entry.turn}`, serialized: readSerialized(entry),
+  ...entry, kind: 'root', position: positionName(entry), label: positionName(entry), serialized: readSerialized(entry),
 });
 
 const HP_STEPS = [0.9, 0.8, 0.7, 0.6, 0.5, 0.4, 0.3, 0.2, 0.1] as const;
