@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'vitest';
 import { hazardConditions } from '@fulllifegames/replay-core';
-import { BOTH_SIDES_REMOVAL_MOVES, OWN_SIDE_REMOVAL_MOVES } from '../src/score/hazards';
+import { BOTH_SIDES_REMOVAL_MOVES, OWN_SIDE_REMOVAL_MOVES, removalKind } from '../src/score/hazards';
 import { ALL_VIEWS, battleIn, mon, oracleTagAbove, type SimView } from './sim-views';
 
 /**
@@ -13,15 +13,13 @@ import { ALL_VIEWS, battleIn, mon, oracleTagAbove, type SimView } from './sim-vi
  * comes off through code; 495 of 866 Generation 9 entries are plain data), which keeps the sweep near 15 seconds. The list, held to the simulator:
  *  - Rapid Spin, Mortal Spin and Court Change clear the user's side, Defog and Court Change the foe's, as listed;
  *  - FINDING W6a: Tidy Up clears the foe's hazards too (Generation 9 and Champions), so it stands in the second list;
- *  - FINDING W6b: Defog clears only the foe's side in Generations 4 and 5, so the second list over-credits it there.
- * The set below names the one difference left (W6b); a new Dex move or a new difference fails.
+ *  - FINDING W6b: Defog clears only the foe's side in Generations 4 and 5, so it brings the user no relief there (`removalKind`
+ *    answers null for it before Generation 6).
+ * A new Dex move or a new difference fails here.
  */
 
 const OWN_ONLY = [...OWN_SIDE_REMOVAL_MOVES].sort();
 const BOTH = [...BOTH_SIDES_REMOVAL_MOVES].sort();
-/** Findings: listed moves that do not clear the user's side in a view (W6b). */
-const OWN_MISSING: Record<string, string[]> = { 'Gen 4': ['defog'], 'Gen 5': ['defog'] };
-
 /** Whether the Dex entry of a move holds code (a handler on it, or inside its secondary, self or condition). Removing a hazard takes code. */
 const carriesCode = (value: unknown, depth = 0): boolean =>
   typeof value === 'function' || (depth < 3 && typeof value === 'object' && value !== null && Object.values(value).some(inner => carriesCode(inner, depth + 1)));
@@ -68,15 +66,24 @@ describe('hazard removal lists are held to the simulator (round 72)', () => {
     let played: { own: string[]; foe: string[] } | undefined;
     const removed = () => (played ??= sweep(view, hazards));
 
-    test('the moves that clear the user\'s hazards are the listed ones', () => {
+    test('the moves that clear the hazards of the user are the listed ones that give relief', () => {
       if (hazards.length === 0) return; // Generation 1 has no hazards: nothing to remove
-      const expected = realHere([...OWN_ONLY, ...BOTH]).filter(id => !(OWN_MISSING[view.name] ?? []).includes(id));
+      const expected = realHere([...OWN_ONLY, ...BOTH]).filter(id => removalKind(id, view.dex.gen) !== null);
       expect(removed().own).toEqual(expected.sort());
     });
 
-    test('the moves that clear the foe\'s hazards are the second list', () => {
+    test('the moves that clear the hazards of the foe are the second list', () => {
       if (hazards.length === 0) return;
       expect(removed().foe).toEqual(realHere([...BOTH]).sort());
+    });
+
+    test('removalKind says own for a move that clears the user side only, both for one that clears both, null for the rest', () => {
+      if (hazards.length === 0) return;
+      for (const id of realHere([...OWN_ONLY, ...BOTH])) {
+        const own = removed().own.includes(id);
+        const foe = removed().foe.includes(id);
+        expect(removalKind(id, view.dex.gen), id).toBe(own && foe ? 'both' : own ? 'own' : null);
+      }
     });
   });
 
