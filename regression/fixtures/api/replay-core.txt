@@ -3,6 +3,7 @@ type CalcPokemonOptions
 type ChaosStatsPayload
 type DamageObservation
 type EvBudget
+type FactsDex
 type FieldSnapshot
 type GenerationsScope
 type HiddenPowerEvidence
@@ -21,9 +22,11 @@ type PokemonMoveInfo
 type PokemonSetAssumption
 type PokemonSnapshot
 type PokemonUsageStats
+type ProtectKind
 type ReplayData
 type ReplayRuleset
 type RevealedPokemonInfo
+type ScreenId
 type SetAssumption
 type SetSpreadAssumption
 type SideId
@@ -50,6 +53,7 @@ value MEASURED_HP_SPREAD_DETAIL
 value NO_BOOST_ITEM_DETAIL
 value ORDER_SPREAD_DETAIL
 value RULED_OUT_ITEM_DETAIL
+value SCREENS
 value TERRAIN_BY_ID
 value WEATHER_BY_ID
 value alternativeItems
@@ -66,6 +70,7 @@ value calcIvs
 value calcKnowsMove
 value calcModOf
 value calcSpecies
+value choiceItems
 value countMatchingSpecies
 value enrichPokemonInfo
 value enrichTeamInfo
@@ -85,8 +90,10 @@ value getSpeciesSetAssumption
 value getSpeciesUsageSet
 value getSpeciesUsageStats
 value guessedFieldFromUsage
+value hazardConditions
 value inferOpponentTeam
 value inferReplayFormatId
+value isScreen
 value itemSetValue
 value judgeItemsByDamage
 value manualEvs
@@ -96,9 +103,11 @@ value parsePastedTeam
 value parseReplayLog
 value parseReplayLogWithObservations
 value parseTeamText
+value protectKind
 value replayBringOnly
 value replayRuleset
 value resolveHiddenPowerType
+value screenFlags
 value sideIndex
 value simGenNum
 value solveReplaySpreads
@@ -106,7 +115,9 @@ value sourceDetail
 value speciesBaseId
 value speciesOverrides
 value splitReplayPassword
+value terrainConditions
 value toId
 value typedHiddenPowerId
+value umbrellaWeathers
 value unknownEvs
 value withHiddenPowerType
