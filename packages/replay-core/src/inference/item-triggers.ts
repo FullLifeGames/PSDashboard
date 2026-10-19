@@ -70,7 +70,8 @@ export interface TriggerGates {
 }
 
 const BOUNDARIES = new Set(['move', 'cant', 'switch', 'drag', 'turn']);
-const SENDERS = new Set(['ejectbutton', 'redcard', 'ejectpack']);
+// oracle: packages/replay-core/test/senders-oracle.spec.ts
+export const SENDERS = new Set(['ejectbutton', 'redcard', 'ejectpack']);
 
 const stoppersByGen = new Map<number, { ids: Set<string>; names: string[] }>();
 

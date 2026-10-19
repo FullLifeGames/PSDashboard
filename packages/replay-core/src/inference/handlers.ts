@@ -11,7 +11,8 @@ import { choiceItems } from '../dex-facts/index.ts';
 import type { PokemonFieldInfo } from '../types.ts';
 
 /** `|-item|` sources that mean the holder ACQUIRED the item mid-game — not its set item. */
-const SWAP_ITEM_SOURCES: Record<string, Set<string>> = {
+// oracle: packages/replay-core/test/swap-item-sources-oracle.spec.ts
+export const SWAP_ITEM_SOURCES: Record<string, Set<string>> = {
   move: new Set(['Trick', 'Switcheroo', 'Thief', 'Covet', 'Bestow']),
   ability: new Set(['Magician', 'Pickpocket', 'Symbiosis']),
 };
