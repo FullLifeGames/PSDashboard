@@ -1,6 +1,5 @@
 import { PRNG, type Battle, type Pokemon } from '@pkmn/sim';
-import { serializeBattleStable, deserializeBattleExact } from '../forward/serialize.ts';
-import { copyBattle } from '../forward/sim-fast/index.ts';
+import { AskLeak, playOnCopy } from '../sim-ask/index.ts';
 
 /**
  * 13.10.2026 (the Swords Dance report on gen9draft-2058494320): the HP a body in
@@ -122,9 +121,6 @@ function signature(battle: Battle, slots: (Pokemon | null)[]): string {
   return parts.join('||');
 }
 
-/** A throw-away copy: the speed layer's when it is on, else a round trip through the stable serialization. */
-export const copyOf = (battle: Battle): Battle => copyBattle(battle) ?? deserializeBattleExact(serializeBattleStable(battle));
-
 /** An effect state's clock set to lasting, so that nothing ends or fires during the played turns. */
 function lasting(state: unknown): void {
   const clock = state as { duration?: unknown } | null | undefined;
@@ -167,9 +163,9 @@ export function playResiduals(copy: Battle, bodies: (Pokemon | null)[]): number[
 /** The mean loss per turn of every slot over the played end-of-turns, or null where the copy or the play fails. */
 function play(battle: Battle): readonly number[] | null {
   try {
-    const copy = copyOf(battle);
-    return playResiduals(copy, slotsOf(copy));
-  } catch {
+    return playOnCopy(battle, new PRNG('1,2,3,4'), copy => playResiduals(copy, slotsOf(copy)));
+  } catch (error) {
+    if (error instanceof AskLeak) throw error;
     return null;
   }
 }
