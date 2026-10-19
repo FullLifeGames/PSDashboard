@@ -14,7 +14,8 @@ import type { PokemonFieldInfo } from '../types.ts';
 // oracle: packages/replay-core/test/swap-item-sources-oracle.spec.ts
 export const SWAP_ITEM_SOURCES: Record<string, Set<string>> = {
   move: new Set(['Trick', 'Switcheroo', 'Thief', 'Covet', 'Bestow']),
-  ability: new Set(['Magician', 'Pickpocket']),
+  // Pickup (Generation 5 on) writes the same line for an item it picks up from another Pokémon (round 72, W9b).
+  ability: new Set(['Magician', 'Pickpocket', 'Pickup']),
 };
 /**
  * `|-activate|` effects that hand an item from the first Pokémon of the line to the `[of]` Pokémon. Symbiosis writes no `|-item|`
@@ -261,8 +262,8 @@ function recordHandover(state: InferrerState, line: LogLine) {
 
 /**
  * Item: |-item|pXa: Nickname|Item Name[|tags]. A swap-ACQUIRED item
- * ([from] Trick/Switcheroo/Thief/Covet/Bestow or Magician/Pickpocket;
- * Symbiosis hands its item over through an |-activate| line) is NOT the holder's set item — crediting Vileplume with the
+ * ([from] Trick/Switcheroo/Thief/Covet/Bestow or Magician/Pickpocket/
+ * Pickup; Symbiosis hands its item over through an |-activate| line) is NOT the holder's set item — crediting Vileplume with the
  * scarf a Trick planted on it manufactured a choice lock that hid its
  * real moves (GPL T11).
  */

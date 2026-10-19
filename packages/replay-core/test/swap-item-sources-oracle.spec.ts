@@ -19,7 +19,7 @@ import { ALL_VIEWS, battleIn, mon, oracleTagAbove, type SimView } from './sim-vi
  *    `|-item|` line, so it is no entry of the `-item` list; `ITEM_HANDOVER_ACTIVATIONS` names it for the inference, which credits
  *    the giver's set item and marks the receiver as having been handed an item (played in both doubles rule sets);
  *  - FINDING W9b: Pickup (Generation 5 on) writes `|-item|` with `[from] ability: Pickup` for an item it picks up from another
- *    Pokémon, without `takeItem`; the list lacks it.
+ *    Pokémon, without `takeItem`; the list names it, so the picker's item is not read as its set item.
  * Recycle, Harvest, Frisk and G-Max Replenish write `|-item|` lines too and move no item between Pokémon: they stay out.
  */
 
@@ -57,6 +57,9 @@ function emitters(view: SimView): Emitter[] {
 
 const listed = (): string[] => Object.entries(SWAP_ITEM_SOURCES).flatMap(([type, names]) => [...names].map(name => `${type}: ${name}`)).sort();
 
+/** Listed sources whose handler moves an item without `takeItem` (the ground, not a Pokémon's hands). */
+const PICKS_UP = ['ability: Pickup'];
+
 const ITEM_ARRANGEMENTS: [string, string][] = [['', 'leftovers'], ['leftovers', ''], ['leftovers', 'quickclaw']];
 
 /** The `[from]` sources of every `|-item|` line the simulator writes when the move or ability plays against the arrangement. */
@@ -89,9 +92,9 @@ describe('SWAP_ITEM_SOURCES is held to the simulator (round 72)', () => {
   describe.each(ALL_VIEWS)('$name', view => {
     const writers = emitters(view);
 
-    test('the handlers that take an item from a Pokémon are the listed sources (Pickup named)', () => {
+    test('the handlers that take an item from a Pokémon are the listed sources (Pickup picks up without taking)', () => {
       const takers = [...new Set(writers.filter(writer => writer.takes).map(writer => writer.source))].sort();
-      const expected = listed();
+      const expected = listed().filter(name => !PICKS_UP.includes(name));
       // A source the view has no move or ability for (Generation 2 has no abilities) is not expected.
       const real = expected.filter(name => {
         const [kind, label] = name.split(': ');
@@ -107,10 +110,10 @@ describe('SWAP_ITEM_SOURCES is held to the simulator (round 72)', () => {
       for (const taker of takers) expect(observedSources(view, taker), taker.source).toContain(taker.source);
     });
 
-    test('Pickup writes an |-item| line from another Pokémon and no listed source', () => {
+    test('Pickup writes an |-item| line without takeItem, and the list names it', () => {
       const pickup = writers.filter(writer => writer.source === 'ability: Pickup');
       expect(pickup.length > 0).toBe(view.dex.gen >= 5); // before Generation 5 Pickup finds items between battles
-      expect(listed()).not.toContain('ability: Pickup');
+      if (view.dex.gen >= 5) expect(listed()).toContain('ability: Pickup');
       for (const writer of pickup) expect(writer.takes).toBe(false);
     });
   });
@@ -140,6 +143,24 @@ describe('SWAP_ITEM_SOURCES is held to the simulator (round 72)', () => {
       const team = inferOpponentTeam(scene().join('\n'), 'p2').pokemon;
       expect(team.find(pokemon => pokemon.species === 'Oranguru')?.item.value).toBe('Leftovers');
       expect(team.find(pokemon => pokemon.species === 'Blissey')?.item.value).toBe('Sitrus Berry (consumed)');
+    });
+  });
+
+  describe.each(ALL_VIEWS.filter(view => view.dex.gen >= 5))('$name: Pickup', view => {
+    test("an item Pickup took from another Pokémon is not the picker's set item", () => {
+      // Doubles: the eater is the picker's partner. Singles: the eater is the foe, the picker acts on the other side.
+      const picker = mon('Zigzagoon', ['splash'], { ability: 'pickup', name: 'Picker' });
+      const eater = mon('Blissey', ['splash'], { item: 'sitrusberry', name: 'Eater' });
+      const battle = view.doubles
+        ? battleIn(view, [mon('Snorlax', ['splash']), mon('Snorlax', ['splash'])], [picker, eater])
+        : battleIn(view, [eater], [picker]);
+      (view.doubles ? battle.sides[1].active[1] : battle.sides[0].active[0]).hp = Math.floor(battle.sides[0].active[0].maxhp / 3);
+      battle.choose('p1', view.doubles ? 'move 1, move 1' : 'move 1');
+      battle.choose('p2', view.doubles ? 'move 1, move 1' : 'move 1');
+      const log = publicLog(battle.log);
+      expect(log.some(raw => /^\|-item\|.*\[from\] ability: Pickup/.test(raw)), 'Pickup picked the berry up').toBe(true);
+      const team = inferOpponentTeam(log.join('\n'), 'p2').pokemon;
+      expect(team.find(pokemon => pokemon.species === 'Zigzagoon')?.item.value ?? '').toBe('');
     });
   });
 });
