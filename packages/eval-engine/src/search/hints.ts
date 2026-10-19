@@ -4,6 +4,7 @@ import { positionBattle, type ChoiceOption, type SimPosition } from '../forward-
 import { forkBattle } from '../forward/position.ts';
 import { bodyAsClicked } from '../calc/tera-click.ts';
 import { RULE_MOVES } from '../move-use.ts';
+import { shieldsFromHits, shieldsSide } from '../dex-facts/protect.ts';
 import { sideIndex } from '@fulllifegames/replay-core';
 
 /**
@@ -64,23 +65,11 @@ export function redirectsFoes(dex: HintDex, move: DexMove): boolean {
 }
 
 /**
- * Round 69 (T42): a move that stops the hits on its user (Protect, Detect and
- * their kin): a stalling self-targeted move whose volatile stops moves
- * (onTryHit; Endure has none), the reading damage-calc.ts shieldedBy uses.
+ * Round 69 (T42) and round 70: the moves that stop the hits on their user (Protect, Detect and their kin) or on its whole side
+ * (Wide Guard, Quick Guard, Crafty Shield, Mat Block), read from the Dex by the one Protect predicate (dex-facts/protect.ts;
+ * test/side-protector-hints.spec.ts and test/protect-tempo-hints.spec.ts play the moves against these readings).
  */
-export function shieldsFromHits(dex: HintDex, move: DexMove): boolean {
-  return move.target === 'self' && !!move.stallingMove && !!move.volatileStatus && 'onTryHit' in dex.conditions.get(move.volatileStatus);
-}
-
-/**
- * Round 70: a move that stops a class of hits on its user's whole side (Wide Guard, Quick Guard, Crafty Shield, Mat Block): an
- * allySide move whose side condition has an onTryHit, read from the Dex like shieldsFromHits. They carry a side condition
- * instead of a volatile and no stallingMove flag, which is why the Protect reading never saw them
- * (test/side-protector-hints.spec.ts plays every side move against this reading).
- */
-export function shieldsSide(dex: HintDex, move: DexMove): boolean {
-  return move.target === 'allySide' && !!move.sideCondition && 'onTryHit' in dex.conditions.get(move.sideCondition);
-}
+export { shieldsFromHits, shieldsSide };
 
 type HitHandler = (this: unknown, target: unknown, source: unknown, move: unknown) => unknown;
 

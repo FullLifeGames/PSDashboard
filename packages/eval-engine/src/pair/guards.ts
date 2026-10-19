@@ -1,4 +1,5 @@
 import type { Battle, Pokemon } from '@pkmn/sim';
+import { rollsStall } from '../dex-facts/protect.ts';
 
 /**
  * Round 56: a doubles pair choice as slot actions, and the rules that send
@@ -14,15 +15,11 @@ export type PairAction =
   | { kind: 'switch'; slot: number; to: number }
   | { kind: 'pass'; slot: number };
 
-type DexMove = ReturnType<Battle['dex']['moves']['get']>;
-
 /**
- * Round 70: a move whose success the simulator rolls against the stall counter: the Protect family, a self-targeted stalling
- * move whose volatile carries the roll (Endure included). Wide Guard, Quick Guard and Mat Block set a side condition and their
- * success is not rolled, so a twelve-name list that held two of them (and missed the third) is read from the Dex instead
+ * Round 70: a move whose success the simulator rolls against the stall counter (`rollsStall`, dex-facts/protect.ts): the
+ * Protect family, Endure included. Wide Guard, Quick Guard and Mat Block set a side condition and their success is not rolled
  * (test/pair-stall-guard.spec.ts plays every move that stops a hit with a stall counter on its user).
  */
-const rollsStall = (move: DexMove): boolean => move.target === 'self' && !!move.stallingMove && !!move.volatileStatus;
 const RANDOM_CALL_MOVES = new Set(['metronome', 'sleeptalk', 'assist', 'copycat']);
 
 function parseAction(part: string, slot: number): PairAction {
@@ -53,7 +50,7 @@ function moverFallback(battle: Battle, mon: Pokemon, moveId: string, foes: numbe
   if (mon.status === 'par' || mon.status === 'frz') return `prevented:${mon.status}`;
   if (mon.volatiles['confusion'] || mon.volatiles['attract']) return 'prevented:volatile';
   if (mon.item === 'quickclaw' || mon.ability === 'quickdraw') return 'quick';
-  if (rollsStall(move) && mon.volatiles['stall']) return 'stall';
+  if (rollsStall(battle.dex, move) && mon.volatiles['stall']) return 'stall';
   if (move.multihit || mon.ability === 'parentalbond') return 'multi-hit';
   if (RANDOM_CALL_MOVES.has(move.id)) return 'random-call';
   if (move.target === 'randomNormal' && foes > 1) return 'random-target';

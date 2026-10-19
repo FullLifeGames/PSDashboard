@@ -1,7 +1,7 @@
 import { Move, Field, calculate, type Pokemon } from '@smogon/calc';
 import { Dex } from '@pkmn/sim';
 import type { SimPokemonInfo, BranchMoveOption } from './branch-engine.ts';
-import { toId, TERRAIN_BY_ID, WEATHER_BY_ID, calcGenerationFor, simGenNum } from '@fulllifegames/replay-core';
+import { toId, TERRAIN_BY_ID, WEATHER_BY_ID, calcGenerationFor, isScreen, protectKind, screenFlags, simGenNum } from '@fulllifegames/replay-core';
 import { attackerAtUse, bodyFromInfo, calcPokemon, simDexOf, type CalcBody } from './calc/body.ts';
 import { hitDraws } from './calc/hit-draws.ts';
 import { calcMove, protectBlocks } from './calc/move.ts';
@@ -59,12 +59,7 @@ function calcGeneration(context: DamageCalcContext, mod?: string) {
 }
 
 function sideOptions(conditions: string[] | undefined) {
-  const ids = new Set((conditions ?? []).map(toConditionId));
-  return {
-    isReflect: ids.has('reflect'),
-    isLightScreen: ids.has('lightscreen'),
-    isAuroraVeil: ids.has('auroraveil'),
-  };
+  return screenFlags((conditions ?? []).map(toConditionId));
 }
 
 /** The calc's field; `defenderProtected` raises the calc's own Protect on the defender's side. */
@@ -101,9 +96,9 @@ function landsOn(gen: CalcGen, attacker: SimPokemonInfo, target: SimPokemonInfo,
 }
 
 /**
- * Whether the partner's pick shields it before the move lands: a stalling
- * move whose volatile stops moves (Protect, Detect, Spiky Shield and their
- * kin carry an onTryHit; Endure does not), going first by priority. All from
+ * Whether the partner's pick shields it before the move lands: a shield of the
+ * Protect family (protectKind: Protect, Detect, Spiky Shield and their kin
+ * carry an onTryHit; Endure does not), going first by priority. All from
  * the Dex; whether the move breaks through is the calc's call (isProtected),
  * unless the simulator takes the move's protect flag away before the check
  * (Unseen Fist on a contact move: protectBlocks, calc/protect.ts), when the
@@ -114,9 +109,7 @@ function shieldedBy(gen: CalcGen, pick: string | undefined, moveName: string, at
   if (!pick) return false;
   const dex = simDexOf(gen);
   const shield = dex.moves.get(pick);
-  if (!shield.stallingMove || !shield.volatileStatus) return false;
-  const stopsMoves = 'onTryHit' in dex.conditions.get(shield.volatileStatus);
-  return stopsMoves && shield.priority > dex.moves.get(moveName).priority && protectBlocks(gen, moveName, attacker);
+  return protectKind(dex, shield) === 'shield' && shield.priority > dex.moves.get(moveName).priority && protectBlocks(gen, moveName, attacker);
 }
 
 /**
@@ -267,7 +260,7 @@ function strengthPriced(priceAt: (hits?: number, firstUse?: boolean, power?: { b
 
 /** A Doubles hit on a foe that stands alone, with the foes-only spread target left on the move (moveLanding sets one foe for the moves whose Dex target spreads) and no screen to price at the doubles factor. */
 function aloneSpread(context: DamageCalcContext, result: CalcResult): boolean {
-  const screens = [...(context.defenderSideConditions ?? [])].map(toConditionId).some(id => ['reflect', 'lightscreen', 'auroraveil'].includes(id));
+  const screens = [...(context.defenderSideConditions ?? [])].map(toConditionId).some(isScreen);
   return context.gameType === 'Doubles' && context.defenderPartner === null && !screens && result.move.target === 'allAdjacentFoes';
 }
 

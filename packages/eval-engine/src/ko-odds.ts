@@ -1,6 +1,6 @@
 import { Field, calculate } from '@smogon/calc';
 import type { Battle, Pokemon } from '@pkmn/sim';
-import { TERRAIN_BY_ID, WEATHER_BY_ID, calcGenerationFor } from '@fulllifegames/replay-core';
+import { TERRAIN_BY_ID, WEATHER_BY_ID, calcGenerationFor, screenFlags } from '@fulllifegames/replay-core';
 import { attackerAtUse, calcPokemon, simDexOf, type SimBody } from './calc/body.ts';
 import { strengthMix, strongerPower } from './calc/fickle.ts';
 import { calcMove } from './calc/move.ts';
@@ -93,8 +93,7 @@ export function critRate(gen: number, critRatio: number): number | null {
 function calcField(battle: Battle, defender: Pokemon): Field {
   const defSide = defender.side;
   const conditions = (side: typeof defSide) => {
-    const ids = new Set(Object.keys(side.sideConditions ?? {}));
-    return { isReflect: ids.has('reflect'), isLightScreen: ids.has('lightscreen'), isAuroraVeil: ids.has('auroraveil') };
+    return screenFlags(Object.keys(side.sideConditions ?? {}));
   };
   const atkSide = battle.sides[defSide === battle.sides[0] ? 1 : 0];
   return new Field({
