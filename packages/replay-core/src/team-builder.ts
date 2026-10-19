@@ -19,6 +19,7 @@ import { rocksMayMiss } from './inference/rocks-tell.ts';
 import type { DamageObservation, HiddenPowerEvidence, OpponentTeamInfo, RevealedPokemonInfo, SpeedOrderObservation } from './types.ts';
 import { genNumOf, toId } from './ids.ts';
 import { normalizeLineEndings } from './line-endings.ts';
+import { withReplayIdentity } from './team-identity.ts';
 
 /**
  * Build PokemonSet arrays for both sides from a replay's protocol log.
@@ -109,7 +110,8 @@ function buildTeams(log: string, options: BuildOptions): { teams: BuiltTeams; in
     legalize(infos[side].pokemon.map(pokemon => buildSet(
       pokemon, knownTeams[side], options?.usageStats, options?.setAssumptions, inferred?.get(`${side}:${toId(pokemon.species)}`),
       { hpTyped: hpTyped(side), tellItem: tells[side].get(toId(pokemon.species)) ?? '', gen: legality.gen, budget })))
-      .map(hpTyped(side));
+      .map(hpTyped(side))
+      .map((set, index) => withReplayIdentity(set, infos[side].pokemon[index]));
   const build = (inferred?: Map<string, SpreadCandidate>) => ({ p1Team: sideTeam('p1', inferred), p2Team: sideTeam('p2', inferred) });
 
   const inferred = inferredSpreadsFor(log, options, build, formatHint, infos, knownTeams);

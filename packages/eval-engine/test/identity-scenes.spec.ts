@@ -78,7 +78,9 @@ describe('scenes the simulator wrote: the built sets switch in with the same lin
       ['>p1 team 1234', '>p2 team 1234', '>p1 move 1 1, move 1 1\n>p2 move 2 1, move 1 1', '>p1 switch 3, move 1 1\n>p2 move 1 1, move 1 1', '>p1 move 1 1, move 1 1\n>p2 move 1 1, move 1 1']);
     expect(log).toMatch(/\|switch\|p1a: Blossom\|Amoonguss, L50, F, shiny\|/);
     expect(unreproduced(log, format)).toEqual([]);
-    expect(builtSide(log, 'p1').Whimsicott).toEqual({ name: 'Thrower', shiny: true });
+    expect(builtSide(log, 'p1').Incineroar).toEqual({ name: 'Sir Bench', shiny: false });
+    // Whimsicott stayed on the bench: no line shows it, so its set keeps the species and no shiny flag.
+    expect(builtSide(log, 'p1').Whimsicott).toEqual({ name: 'Whimsicott', shiny: false });
     expect(builtSide(log, 'p2').Zorua).toEqual({ name: 'Fox', shiny: true });
   });
 
