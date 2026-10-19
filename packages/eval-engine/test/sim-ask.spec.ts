@@ -1,9 +1,9 @@
 import { afterAll, beforeAll, describe, expect, test, vi } from 'vitest';
 import { PRNG } from '@pkmn/sim';
-import type { ActiveMove, Battle, Pokemon } from '@pkmn/sim';
+import type { Battle, Pokemon } from '@pkmn/sim';
 import { twinBattle as coreTwinBattle } from '@fulllifegames/replay-core';
 import { loadSimMods } from '../src/forward/sim-mods';
-import { createRootPosition, legalChoices, positionBattle } from '../src/forward-model';
+import { createRootPosition, positionBattle } from '../src/forward-model';
 import { serializeBattleStable } from '../src/forward/serialize';
 import type { SimFastLever } from '../src/forward/sim-fast/state';
 import {
@@ -12,6 +12,7 @@ import {
 import { set } from './move-oracle';
 import { battleOf } from './power-oracle';
 import { loadPositions, withSimFast } from './sim-fast-helpers';
+import { MODES, MODES_MOVES_SHORT, MOVES_PER_RULES_DOUBLES, MOVES_PER_RULES_SUITE, RULE_SETS, modeName, oneTurn, sweepRules } from './sim-ask-sweep';
 
 /**
  * Round 72 (T239): the one module that asks the simulator. Its pieces are held against the simulator itself: the twin
@@ -25,11 +26,6 @@ await loadSimMods('gen9championsou');
 
 beforeAll(() => setAskCheck(true));
 afterAll(() => setAskCheck(null));
-
-const LEVERS: readonly SimFastLever[] = ['rules', 'clone', 'dispatch'];
-/** The eight subsets of the speed layer's levers (T103). */
-const MODES: SimFastLever[][] = Array.from({ length: 8 }, (_, bits) => LEVERS.filter((_lever, index) => (bits >> index) & 1));
-const modeName = (mode: readonly SimFastLever[]): string => (mode.length ? mode.join('+') : 'off');
 
 describe('twin battle', () => {
   test('the module hands out replay-core\'s factory', () => {
@@ -89,44 +85,44 @@ describe('fingerprint', () => {
 describe('playOnCopy', () => {
   const positions = loadPositions();
 
-  /** One whole turn on the copy: each side's first legal choice. */
-  function oneTurn(serialized: string): (copy: Battle) => string {
-    const root = createRootPosition(serialized);
-    const choices = (['p1', 'p2'] as const).map(side => legalChoices(root, side)[0]?.choice);
-    return copy => {
-      for (const [index, side] of (['p1', 'p2'] as const).entries()) {
-        const choice = choices[index];
-        if (choice && choice !== 'wait') copy.choose(side, choice);
-      }
-      return serializeBattleStable(copy);
-    };
-  }
-
   test('there are fixtures of every game type', () => {
     expect(positions.some(position => position.gameType === 'singles')).toBe(true);
     expect(positions.some(position => position.gameType === 'doubles')).toBe(true);
   });
 
-  test.each(MODES.map(mode => [modeName(mode), mode] as const))('%s: a turn on the copy leaves the live battle as it was, every fixture', (_name, mode) => {
-    withSimFast(mode, () => {
-      for (const position of positions) {
-        const live = positionBattle(createRootPosition(position.serialized));
-        const before = fingerprint(live);
-        const after = playOnCopy(live, new PRNG('1,2,3,4'), oneTurn(position.serialized));
-        expect(fingerprint(live), position.id).toBe(before);
-        expect(after, position.id).not.toBe(serializeBattleStable(live));
-      }
-    });
-  }, 240_000);
+  /** The first fixture of each format the files hold (singles of Gens 3, 6, 8 and 9, doubles of Gen 9): the eight-mode matrix over all of them is the lane's probe. */
+  const few = positions.filter((position, index) => positions.findIndex(other => other.format === position.format) === index);
+
+  const leavesLive = (list: typeof positions) => {
+    for (const position of list) {
+      const live = positionBattle(createRootPosition(position.serialized));
+      const before = fingerprint(live);
+      const after = playOnCopy(live, new PRNG('1,2,3,4'), oneTurn(position.serialized));
+      expect(fingerprint(live), position.id).toBe(before);
+      expect(after, position.id).not.toBe(serializeBattleStable(live));
+    }
+  };
+
+  test('there is a fixture of each game type among the ones the matrix picks', () => {
+    expect(new Set(few.map(position => position.gameType))).toEqual(new Set(['singles', 'doubles']));
+  });
+
+  test('a turn on the copy leaves the live battle as it was, every fixture', () => {
+    leavesLive(positions);
+  });
+
+  test.each(MODES.map(mode => [modeName(mode), mode] as const))('%s: a turn on the copy leaves the live battle as it was, one fixture of each kind', (_name, mode) => {
+    withSimFast(mode, () => leavesLive(few));
+  });
 
   test('the turn on the copy reads the same in all eight modes', () => {
-    const digest = (mode: readonly SimFastLever[]) => withSimFast(mode, () => positions.map(position => {
+    const digest = (mode: readonly SimFastLever[]) => withSimFast(mode, () => few.map(position => {
       const live = positionBattle(createRootPosition(position.serialized));
       return playOnCopy(live, new PRNG('1,2,3,4'), oneTurn(position.serialized));
     }));
     const base = digest([]);
     for (const mode of MODES.slice(1)) expect(digest(mode), modeName(mode)).toEqual(base);
-  }, 240_000);
+  });
 
   test.each(MODES.map(mode => [modeName(mode), mode] as const))('%s: the copy shares no state with the live battle', (_name, mode) => {
     withSimFast(mode, () => {
@@ -243,110 +239,17 @@ describe('callHandler', () => {
   });
 });
 
-/** Every gen the corpus plays, and the Champions mod. */
-const RULE_SETS = [
-  ...[1, 2, 3, 4, 5, 6, 7, 8, 9].map(gen => ({ name: `gen ${gen} singles`, format: `gen${gen}customgame`, gen, doubles: false })),
-  { name: 'Champions singles', format: 'gen9championsou', gen: 9, doubles: false },
-  ...[3, 4, 5, 6, 7, 8, 9].map(gen => ({ name: `gen ${gen} doubles`, format: `gen${gen}doublescustomgame`, gen, doubles: true })),
-  { name: 'Champions doubles', format: 'gen9championsdoublescustomgame', gen: 9, doubles: true },
-];
-
-const MOVES_PER_RULES = 16;
-/** The sweep that runs in every speed-layer mode takes the first six kinds of move. */
-const MODES_MOVES = 6;
-
-interface Entry { id: string; exists?: boolean; gen?: number; isNonstandard?: string | null; [key: string]: unknown }
-
 describe('sweep: every handler the stand-ins reach', () => {
-  const bodies = (format: string, doubles: boolean): Battle => {
-    const team = (species: string) => Array.from({ length: doubles ? 2 : 1 }, () => set(species, ['tackle', 'splash']));
-    return battleOf(format, team('Snorlax'), team('Pikachu'));
-  };
-  /** [user side, user slot, target side, target slot]: a foe in singles, a foe and the ally in doubles. */
-  const PAIRS = (doubles: boolean): [number, number, number, number][] => (doubles ? [[0, 0, 1, 0], [0, 0, 0, 1]] : [[0, 0, 1, 0]]);
-  const stable = (value: unknown): string => JSON.stringify(value, (_key, inner: unknown) => (typeof inner === 'function' ? 'fn' : inner));
-  const summary = (body: Pokemon, move: ActiveMove | null): string => stable([body.boosts, body.hp, body.status, Object.keys(body.volatiles).sort(), body.item, body.ability, move && { ...move }]);
-
-  function entriesOf(battle: Battle, key: string): { kind: string; entry: Entry }[] {
-    const { dex } = battle;
-    const gen = dex.gen;
-    const live = (entry: Entry) => entry.exists !== false && (entry.gen ?? 0) <= gen;
-    const kinds: [string, Entry[]][] = [
-      ['ability', dex.abilities.all() as unknown as Entry[]],
-      ['item', dex.items.all() as unknown as Entry[]],
-      ['move', dex.moves.all() as unknown as Entry[]],
-      ['condition', Object.keys((dex.data as unknown as { Conditions: object }).Conditions).map(id => dex.conditions.get(id) as unknown as Entry)],
-    ];
-    return kinds.flatMap(([kind, entries]) => entries.filter(entry => live(entry) && typeof entry[key] === 'function').map(entry => ({ kind, entry })));
-  }
-
-  /** Calls every handler of the Dex on a view and on a copy of a fresh board; returns the counts, fails on the first difference. */
-  function sweepRules({ format, doubles }: (typeof RULE_SETS)[number], movesCap: number): { moves: number; calls: number; refused: string[] } {
-    const live = bodies(format, doubles);
-    const standard = (live.dex.moves.all() as unknown as (Entry & { flags: Record<string, unknown>; category: string; target: string })[])
-      .filter(move => (move.gen ?? 0) <= live.dex.gen && move.exists !== false && !move.isNonstandard);
-    // The first move of every category, target and flag the generation has (the first sixteen): each handler meets the kinds of move.
-    const kinds = new Map<string, string>();
-    for (const move of standard) {
-      for (const key of [`category:${move.category}`, `target:${move.target}`, ...Object.keys(move.flags).map(flag => `flag:${flag}`)]) {
-        if (!kinds.has(key)) kinds.set(key, move.id);
-      }
-    }
-    const moveIds = [...new Set(kinds.values())].slice(0, movesCap);
-    let calls = 0;
-    const refused: string[] = [];
-    for (const key of ['onTryHit', 'onModifyMove', 'onFractionalPriority', 'onModifyPriority']) {
-      for (const { kind, entry } of entriesOf(live, key)) {
-        for (const [moveId, [userSide, userSlot, targetSide, targetSlot]] of moveIds.flatMap(id => PAIRS(doubles).map(pair => [id, pair] as const))) {
-          const fingerprintExtras = [entry, live.dex.moves.get(moveId)];
-          const before = fingerprint(live, fingerprintExtras);
-          const view = isolated(live);
-          const [mine, theirs] = [view.sides[userSide].active[userSlot] as Pokemon, view.sides[targetSide].active[targetSlot] as Pokemon];
-          const viewMove = live.dex.getActiveMove(moveId);
-          const handler = entry[key] as (this: Battle, ...args: unknown[]) => unknown;
-          const args = (user: Pokemon, target: Pokemon, move: ActiveMove): unknown[] => (
-            key === 'onModifyMove' ? [move, user, target]
-              : key === 'onTryHit' ? [target, user, move]
-                : [0, user, target, move]
-          );
-          const answered = callHandler(handler as never, view, args(mine, theirs, viewMove));
-          expect(fingerprint(live, fingerprintExtras), `${kind} ${entry.id} ${key} ${moveId}`).toBe(before);
-          calls++;
-          if (!answered.ok) { refused.push(`${entry.id}/${key}`); continue; }
-          const copyMove = live.dex.getActiveMove(moveId);
-          const onCopy = playOnCopy(live, live.prng.clone(), copy => {
-            const [a, b] = [copy.sides[userSide].active[userSlot] as Pokemon, copy.sides[targetSide].active[targetSlot] as Pokemon];
-            try {
-              const value = handler.call(copy, ...args(a, b, copyMove));
-              return { threw: false, value: stable(value), mine: summary(a, copyMove), theirs: summary(b, null) };
-            } catch {
-              return { threw: true, value: '', mine: '', theirs: '' };
-            }
-          });
-          expect(onCopy.threw, `${kind} ${entry.id} ${key} ${moveId}: the view answered where the copy threw`).toBe(false);
-          expect(stable(answered.value), `${kind} ${entry.id} ${key} ${moveId}: value`).toBe(onCopy.value);
-          expect(summary(mine, viewMove), `${kind} ${entry.id} ${key} ${moveId}: user`).toBe(onCopy.mine);
-          expect(summary(theirs, null), `${kind} ${entry.id} ${key} ${moveId}: target`).toBe(onCopy.theirs);
-        }
-      }
-    }
-    expect(calls).toBeGreaterThan(0);
-    return { moves: moveIds.length, calls, refused };
-  }
-
   test.each(RULE_SETS)('$name: onTryHit, onModifyMove, onFractionalPriority, onModifyPriority on the view and on a copy', rules => {
-    const { moves, calls, refused } = sweepRules(rules, MOVES_PER_RULES);
+    const { moves, calls, refused } = sweepRules(rules, rules.doubles ? MOVES_PER_RULES_DOUBLES : MOVES_PER_RULES_SUITE);
     process.stdout.write(`sim-ask sweep ${rules.format}: ${moves} moves, ${calls} calls, ${refused.length} refused (${[...new Set(refused)].join(' ')})\n`);
   }, 300_000);
 
-  const MODE_RULES = ['gen 9 singles', 'gen 9 doubles', 'Champions doubles']
-    .map(name => RULE_SETS.find(rules => rules.name === name))
-    .filter((rules): rules is (typeof RULE_SETS)[number] => !!rules);
-  test.each(MODES.map(mode => [modeName(mode), mode] as const))('%s: gen 9 singles, gen 9 doubles and Champions doubles on the view and on a copy, in this speed-layer mode', (_name, mode) => {
-    withSimFast(mode, () => {
-      for (const rules of MODE_RULES) expect(sweepRules(rules, MODES_MOVES).calls, rules.name).toBeGreaterThan(0);
-    });
-  }, 300_000);
+  // The sweep in every speed-layer mode, all fixtures and a longer list of moves is the lane's probe (sim-ask-matrix.vt.ts); the suite takes the layer off.
+  test('gen 9 doubles with the speed layer off: the short sweep on the view and on a copy', () => {
+    const rules = RULE_SETS.find(entry => entry.name === 'gen 9 doubles')!;
+    withSimFast([], () => expect(sweepRules(rules, MODES_MOVES_SHORT).calls).toBeGreaterThan(0));
+  });
 
   test('the twin format builds for every rule set', () => {
     for (const { gen } of RULE_SETS.filter(rules => !rules.doubles)) expect(twinFormat(gen, false)).toBe(`gen${gen}customgame`);
