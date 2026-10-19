@@ -109,6 +109,7 @@ export function fieldFacts(pokemon: Pokemon, battle: Battle): MoveField {
  *    the power on the stages of the moment (stagedPower; decision 3 of the
  *    round-63 wave spec).
  */
+// oracle: packages/eval-engine/test/power-handlers-census.spec.ts
 export const POWER_MOVES: ReadonlyMap<string, 'memo' | 'live' | 'stages'> = new Map([
   ...['knockoff', 'acrobatics', 'return', 'frustration', 'pikapapow', 'veeveevolley', 'watershuriken']
     .map(id => [id, 'memo'] as const),

@@ -3,6 +3,7 @@ import { Dex } from '@pkmn/sim';
 import type { Battle, Pokemon } from '@pkmn/sim';
 import { landedMove, POWER_MOVES } from '../src/score/move-facts';
 import { set } from './move-oracle';
+import { oracleTagAbove } from './oracle-tag';
 import { battleOf, fingerprint } from './power-oracle';
 
 /**
@@ -43,6 +44,10 @@ function handlerIds(gen: number): string[] {
 }
 
 describe('power handlers of the Dex (round 63, T81)', () => {
+  test('POWER_MOVES carries its oracle tag (round 72, T235)', () => {
+    expect(oracleTagAbove('packages/eval-engine/src/score/move-facts.ts', 'export const POWER_MOVES', 'packages/eval-engine/test/power-handlers-census.spec.ts')).toBe(true);
+  });
+
   test.each(GENS)('gen %d: every move with a power handler is asked or excluded with a reason', gen => {
     const unknown = handlerIds(gen).filter(id => !POWER_MOVES.has(id) && !(id in EXCLUDED));
     expect(unknown).toEqual([]);

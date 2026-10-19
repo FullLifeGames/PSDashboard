@@ -60,8 +60,10 @@ export interface MoveAtUse { type: string; category: string; basePower: number; 
 const SPECIAL_TYPES = new Set(['Fire', 'Water', 'Grass', 'Ice', 'Electric', 'Dark', 'Psychic', 'Dragon']);
 const ATE: Record<string, string> = { pixilate: 'Fairy', aerilate: 'Flying', refrigerate: 'Ice', galvanize: 'Electric', dragonize: 'Dragon' };
 /** Moves the -ate family leaves alone (abilities.js noModifyType); Normalize adds Hidden Power and Struggle. */
-const NO_ATE = new Set(['judgment', 'multiattack', 'naturalgift', 'revelationdance', 'technoblast', 'terrainpulse', 'weatherball']);
-const NO_NORMALIZE = new Set([...NO_ATE, 'hiddenpower', 'struggle']);
+// oracle: packages/eval-engine/test/type-change-oracle.spec.ts
+export const NO_ATE = new Set(['judgment', 'multiattack', 'naturalgift', 'revelationdance', 'technoblast', 'terrainpulse', 'weatherball']);
+// oracle: packages/eval-engine/test/type-change-oracle.spec.ts
+export const NO_NORMALIZE = new Set([...NO_ATE, 'hiddenpower', 'struggle']);
 
 export const RULE_MOVES: ReadonlySet<string> = new Set(Object.keys(OWN_RULES));
 export const RULE_ABILITIES: ReadonlySet<string> = new Set(['liquidvoice', 'normalize', ...Object.keys(ATE)]);
@@ -70,6 +72,7 @@ export const RULE_ABILITIES: ReadonlySet<string> = new Set(['liquidvoice', 'norm
  * (weather, terrain, grounding, stages, Hidden Power): pairKey appends
  * their answer (round 57).
  */
+// oracle: packages/eval-engine/test/type-change-oracle.spec.ts
 export const CONTEXT_MOVES: ReadonlySet<string> = new Set<string>(['weatherball', 'terrainpulse', 'terablast', 'terastarstorm', 'hiddenpower']);
 
 function withAbility(ability: string, move: MoveLike, own: MoveAtUse, user: MoveUser): MoveAtUse {
