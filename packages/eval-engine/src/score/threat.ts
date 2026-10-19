@@ -122,7 +122,8 @@ export function usableSlots(pokemon: Pokemon): Pokemon['moveSlots'] {
 }
 
 /** Moves that deal half the target's CURRENT HP. */
-const HALVING_MOVES: ReadonlySet<string> = new Set(['superfang', 'naturesmadness', 'ruination']);
+// oracle: packages/eval-engine/test/halving-moves-oracle.spec.ts
+export const HALVING_MOVES: ReadonlySet<string> = new Set(['superfang', 'naturesmadness', 'ruination']);
 
 function pairKey(
   attacker: Pokemon,

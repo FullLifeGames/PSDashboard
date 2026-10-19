@@ -37,7 +37,8 @@ type DexMove = ReturnType<Battle['dex']['moves']['get']>;
 export const RANDOM_CALL_MOVES = new Set(['sleeptalk', 'metronome', 'assist', 'copycat']);
 
 /** Moves whose immediate damage the one-turn model cannot price. */
-const UNPRICEABLE_MOVE_IDS = new Set([
+// oracle: packages/eval-engine/test/unpriceable-oracle.spec.ts
+export const UNPRICEABLE_MOVE_IDS = new Set([
   // depends on incoming damage
   'counter', 'mirrorcoat', 'metalburst', 'comeuppance', 'focuspunch',
   // fails conditionally on the opponent's action / turn count

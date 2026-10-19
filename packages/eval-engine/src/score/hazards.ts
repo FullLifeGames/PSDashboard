@@ -8,9 +8,11 @@ import { liveTypes, usableSlots } from './threat.ts';
  */
 
 /** Removal moves that clear ONLY the user's side (pure relief). */
-const OWN_SIDE_REMOVAL_MOVES = new Set(['rapidspin', 'mortalspin', 'tidyup']);
+// oracle: packages/eval-engine/test/hazard-removal-oracle.spec.ts
+export const OWN_SIDE_REMOVAL_MOVES = new Set(['rapidspin', 'mortalspin', 'tidyup']);
 /** Removal moves that clear (or swap) BOTH sides — double-edged. */
-const BOTH_SIDES_REMOVAL_MOVES = new Set(['defog', 'courtchange']);
+// oracle: packages/eval-engine/test/hazard-removal-oracle.spec.ts
+export const BOTH_SIDES_REMOVAL_MOVES = new Set(['defog', 'courtchange']);
 
 /**
  * Victim-aware hazard cost for the side the hazards lie on, capped at
