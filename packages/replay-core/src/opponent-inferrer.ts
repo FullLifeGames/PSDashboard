@@ -1,3 +1,5 @@
+import { Dex, Teams } from '@pkmn/sim';
+import type { PokemonSet } from '@pkmn/sim';
 import type { OpponentTeamInfo, RevealedPokemonInfo } from './types.ts';
 import { guessedField, revealedField, unknownEvs, unknownField } from './team-info.ts';
 import { createInferrerState } from './inference/inferrer-state.ts';
@@ -16,11 +18,6 @@ import { arg, fromEffect, identOf, readLine, type LogLine } from './inference/lo
 import { toId } from './ids.ts';
 import { normalizeLineEndings } from './line-endings.ts';
 
-/** "SitrusBerry" / "HighHorsepower" (packed names) → "Sitrus Berry" / "High Horsepower". */
-function splitPackedName(value: string): string {
-  return value.replace(/([a-z0-9])([A-Z])/g, '$1 $2').trim();
-}
-
 interface SheetPokemon {
   species: string;
   item: string;
@@ -32,50 +29,39 @@ interface SheetPokemon {
 }
 
 /**
- * Parses `|showteam|` protocol lines (Open Team Sheets) without pulling in
- * @pkmn/sim — this module is loaded on every replay load, the sim only when
- * branching. Packed entry layout:
- * NICKNAME|SPECIES|ITEM|ABILITY|MOVES|NATURE|EVS|GENDER|IVS|SHINY|LEVEL|MISC
- * where MISC = HAPPINESS,HPTYPE,POKEBALL,GMAX,DMAXLEVEL,TERATYPE.
+ * One unpacked sheet entry in the shape the inference reads: the Tera type, level and gender default as the sheet
+ * leaves them out. The unpacker splits a packed species it has no Dex for ("Zygarde-10%" would come back as
+ * "Zygarde- 10 %"), so the species reads the Dex's name for it, and its own text when the Dex does not know it.
  */
-/** The packed entry's trailing fields: tera type from MISC, level, gender. */
-function sheetEntryDetails(fields: string[]): Pick<SheetPokemon, 'teraType' | 'level' | 'gender'> {
-  const misc = (fields[11] ?? '').split(',');
+function sheetEntry(set: PokemonSet): SheetPokemon | null {
+  const packed = set.species || set.name;
+  if (!packed) return null;
+  const known = Dex.species.get(packed);
   return {
-    teraType: misc[5]?.trim() ?? '',
-    level: parseInt(fields[10] ?? '', 10) || 100,
-    gender: fields[7] === 'M' || fields[7] === 'F' ? fields[7] : '',
+    species: known.exists ? known.name : packed,
+    item: set.item,
+    ability: set.ability,
+    moves: set.moves,
+    teraType: set.teraType ?? '',
+    level: set.level ?? 100,
+    gender: set.gender === 'M' || set.gender === 'F' ? set.gender : '',
   };
 }
 
-/** One packed sheet entry; null when it names no species. */
-function sheetEntry(entry: string): SheetPokemon | null {
-  const fields = entry.split('|');
-  const nickname = fields[0]?.trim() ?? '';
-  const species = (fields[1]?.trim() || nickname);
-  if (!species) return null;
-  return {
-    species: splitPackedName(species),
-    item: splitPackedName(fields[2] ?? ''),
-    ability: splitPackedName(fields[3] ?? ''),
-    moves: (fields[4] ?? '')
-      .split(',')
-      .map(move => splitPackedName(move))
-      .filter(Boolean),
-    ...sheetEntryDetails(fields),
-  };
-}
-
+/**
+ * Reads the `|showteam|` protocol line of a side (Open Team Sheets) through the library: `Teams.unpack` of @pkmn/sim
+ * splits the packed team (NICKNAME|SPECIES|ITEM|ABILITY|MOVES|NATURE|EVS|GENDER|IVS|SHINY|LEVEL|MISC, entries closed
+ * by `]`), the same call team-builder.ts makes for the built sets. Round 72 (T241): the hand splitter of packed names is
+ * gone, so "WillOWisp" reads "Will O Wisp" and not "Will OWisp" (sheet-text.spec.ts holds the reading to the old one).
+ */
 export function parseShowteamSheet(log: string, side: 'p1' | 'p2'): SheetPokemon[] | null {
   const prefix = `|showteam|${side}|`;
   const line = log.split('\n').find(candidate => candidate.startsWith(prefix));
   if (!line) return null;
 
-  const entries = line.slice(prefix.length).split(']');
   const pokemon: SheetPokemon[] = [];
-
-  for (const entry of entries) {
-    const parsed = sheetEntry(entry);
+  for (const set of Teams.unpack(line.slice(prefix.length)) ?? []) {
+    const parsed = sheetEntry(set);
     if (parsed) pokemon.push(parsed);
   }
 
