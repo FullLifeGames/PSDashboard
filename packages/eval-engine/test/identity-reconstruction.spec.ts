@@ -12,9 +12,9 @@ import { entries, lastTurn, play, rebuiltWith, set } from './named-games-support
  *
  * The oracle is the replay's own log: a game the simulator plays itself (team preview picks the leads, a body comes in
  * from the bench) is rebuilt from its spectator log as the app does, and every body the simulator brings in must come in
- * with the details the game wrote, in the same order, on the same turn, under the game's name where a lookup can use
- * that name and under the species where the build leaves it out (team-identity.ts, dropAmbiguousNicknames).
- * Singles and doubles.
+ * with the details the game wrote, in the same order, on the same turn, under the game's own name: the build leaves out
+ * only a name that is a species of the side (team-identity.ts, dropAmbiguousNicknames), and the lookups compare the exact
+ * name (team-order.ts, sameBodyName). Singles and doubles.
  */
 
 /** The entries the simulator writes when the app builds the teams from the log and rebuilds the game. */
@@ -32,7 +32,7 @@ describe('a body whose name has no id or shares it, or breaks a JSON line, comes
       ['>p1 team 1234', '>p2 team 3412', '>p1 move 1 1, move 1 1\n>p2 move 1 1, move 1 1', '>p1 move 1 1, move 1 1\n>p2 switch 3, move 1 1', '>p1 move 1 1, move 1 1\n>p2 move 1 1, move 1 1']);
     expect(log).toMatch(/\|switch\|p2a: うみのうた\|Primarina/);
     const again = await rebuilt(format, log);
-    expect(again.entries).toEqual(entries(log, ['グレンタウン', 'チョコクロワ', 'うみのうた', 'ワスレイヌ']));
+    expect(again.entries).toEqual(entries(log));
     expect(again.turn).toBe(lastTurn(log));
     expect(again.errors).toBe(0);
   }, 60_000);
@@ -45,7 +45,7 @@ describe('a body whose name has no id or shares it, or breaks a JSON line, comes
       ['>p1 team 12', '>p2 team 4231', '>p1 move 1\n>p2 move 1', '>p1 move 1\n>p2 switch 2', '>p1 move 1\n>p2 switch 3', '>p1 move 1\n>p2 switch 4']);
     expect(log).toMatch(/\|switch\|p2a: Akeno【‿♥‿】\|Clefable/);
     const again = await rebuilt(format, log);
-    expect(again.entries).toEqual(entries(log, ['我大哥', 'Rias!', 'Rias?']));
+    expect(again.entries).toEqual(entries(log));
     expect(again.turn).toBe(lastTurn(log));
     expect(again.errors).toBe(0);
   }, 60_000);
@@ -58,7 +58,7 @@ describe('a body whose name has no id or shares it, or breaks a JSON line, comes
       ['>p1 team 12', '>p2 team 123', '>p1 move 1 1, move 1 1\n>p2 move 1 1, move 1 1', '>p1 move 1 1, move 1 1\n>p2 switch 3, move 1 1']);
     expect(log).toMatch(/\|switch\|p2a: J36Venom\/⌵\\\|Garchomp/);
     const again = await rebuilt(format, log);
-    expect(again.entries).toEqual(entries(log, ['J36Venom/⌵\\', 'Say "hi"']));
+    expect(again.entries).toEqual(entries(log));
     expect(again.turn).toBe(lastTurn(log));
     expect(again.errors).toBe(0);
   }, 60_000);

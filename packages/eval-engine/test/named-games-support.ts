@@ -1,4 +1,4 @@
-import { BattleStreams, Dex, Teams, type PokemonSet } from '@pkmn/sim';
+import { BattleStreams, Teams, type PokemonSet } from '@pkmn/sim';
 import { getBranchSimulatorFormat } from '@fulllifegames/replay-core';
 import { reconstructBranchRuntime } from '../src/branch-engine';
 
@@ -27,14 +27,11 @@ export async function play(format: string, p1: PokemonSet[], p2: PokemonSet[], c
 
 const ENTRY = /^\|(switch|drag|replace)\|(p[12][a-d]?: [^|]*)\|([^|]*)/;
 
-/** Every body entry of a log in order: the command, the ident and the details without the HP; a name in `left` reads as its species. */
-export function entries(lines: string, left: readonly string[] = []): string[] {
+/** Every body entry of a log in order: the command, the ident and the details without the HP. */
+export function entries(lines: string): string[] {
   return lines.split('\n').map(line => ENTRY.exec(line.replace(/\r$/, ''))).filter(match => match !== null)
     .map(match => {
-      const split = match[2].indexOf(': ');
-      const name = match[2].slice(split + 2);
-      const shown = left.includes(name) ? Dex.species.get(match[3].split(', ')[0]).baseSpecies : name;
-      return `${match[1]} ${match[2].slice(0, split)}: ${shown} | ${match[3]}`;
+      return `${match[1]} ${match[2]} | ${match[3]}`;
     });
 }
 
