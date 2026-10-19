@@ -74,12 +74,11 @@ export function leverEnv(ambient, explicit) {
 }
 
 /**
- * File count, bytes and one sha256 over every name, size and content of a folder, in code unit order of the
- * relative names; null when the folder is absent. A `.tmp` file is a sibling process's half-written entry
- * (regression/smogon-fetch-cache.ts) that no reader opens, so it stays out.
+ * The relative names of the files a folder holds for the bank, in code unit order, with `/` between parts. A `.tmp`
+ * file is a sibling process's half-written entry (regression/smogon-fetch-cache.ts) that no reader opens, so it
+ * stays out. scripts/bank-data.mjs packs exactly these files.
  */
-export function hashDirectory(dir) {
-  if (!existsSync(dir)) return null;
+export function dataFileNames(dir) {
   const names = [];
   const walk = (current, prefix) => {
     for (const entry of readdirSync(current, { withFileTypes: true })) {
@@ -100,11 +99,27 @@ export function hashDirectory(dir) {
     }
   };
   walk(dir, '');
-  names.sort(byCode);
+  return names.sort(byCode);
+}
+
+/**
+ * File count, bytes and one sha256 over every name, size and content of a folder's files (dataFileNames), in code
+ * unit order of the relative names; null when the folder is absent.
+ */
+export function hashDirectory(dir) {
+  if (!existsSync(dir)) return null;
+  return hashFiles(dir, dataFileNames(dir));
+}
+
+/**
+ * hashDirectory's recipe over the given relative names of `dir` (sorted here): what a folder that holds exactly these
+ * files hashes to. A name that cannot be read is skipped, as in hashDirectory.
+ */
+export function hashFiles(dir, names) {
   const hash = createHash('sha256');
   let files = 0;
   let bytes = 0;
-  for (const name of names) {
+  for (const name of [...names].sort(byCode)) {
     let data;
     try {
       data = readFileSync(join(dir, ...name.split('/')));

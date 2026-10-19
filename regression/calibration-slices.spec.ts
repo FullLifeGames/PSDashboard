@@ -96,7 +96,8 @@ describe('a CI job runs a range of the slices', () => {
     const root = repo();
     const result = cli(root, '--slices', '4', '--slice-range', '2..3', '--out', '.calibration/job-b');
     expect(result.status, result.stderr).toBe(0);
-    expect(calls(root)).toEqual(['2/4', '3/4']);
+    // The slices run side by side and log in the order they finish.
+    expect(calls(root).sort()).toEqual(['2/4', '3/4']);
     expect(readdirSync(join(root, '.calibration', 'job-b')).sort()).toEqual(['job.json', 'slice-2.jsonl', 'slice-2.log', 'slice-3.jsonl', 'slice-3.log']);
     const job = json(root, 'job-b', 'job.json');
     expect(job).toMatchObject({ kind: 'job', slices: 4, sliceRange: [2, 3], fraction: 1, env: { EVAL_CALIBRATION_MODE: 'auto', EVAL_CALIBRATION_SMOGON: '1' } });

@@ -1,0 +1,21 @@
+{
+  "format": 1,
+  "release": "bank-data-242dbf6b9548d96d",
+  "asset": "bank-data-242dbf6b9548d96d.tar.gz",
+  "sha256": "5f6f08847344c62a45fa5a56479c94ad8ac030e4d7a364cd57fcbb1fa36663e8",
+  "bytes": 8571740,
+  "tarSha256": "242dbf6b9548d96d6f482a7538f5e4a38a08c03719748aa1276b20b011960ac2",
+  "files": 1492,
+  "dirs": {
+    ".smogon-cache": {
+      "files": 68,
+      "bytes": 29981594,
+      "sha256": "db8f6d0d89753f4a95dc87f99b2a725c0c2733bb3ca714ba643850bd74251b7f"
+    },
+    ".fit-corpus": {
+      "files": 1424,
+      "bytes": 11013310,
+      "sha256": "c6cc518981eee714dbb8e02f93c33f42507affcb4cef85f2c025e3b005cb9c60"
+    }
+  }
+}
