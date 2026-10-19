@@ -1,0 +1,129 @@
+name: Bank
+
+# Round 71: the calibration bank in GitHub Actions (spec docs/superpowers/specs/2026-10-13-round-71-bank-in-ci-design.md).
+# A push of a bank/<name> branch starts a run: scripts/bank-ci.mjs builds that branch from the measured commit plus one
+# file, .bank-run.json, and deletes it after the download. The jobs run their block of slices, the merge job joins them
+# into one run folder (merged.jsonl, summary.txt, run.json) as a local run of all slices would write.
+#
+# Security: only a push to bank/** starts it (no pull_request, no workflow_run: a fork cannot); the token is read-only
+# and no job holds a secret; every action is GitHub's own and pinned to a commit; the checkout keeps no credentials;
+# .bank-run.json is untrusted input, so scripts/bank-run-config.mjs validates it and starts the runner itself, and the
+# only expression in a shell line is the matrix's job index; the data tarball is checked against the sha256 that the
+# tracked regression/fixtures/bank-data.json names before anything is unpacked (scripts/bank-data-pack.mjs --fetch).
+# regression/bank-workflow.spec.ts pins these properties.
+
+on:
+  push:
+    branches: ['bank/**']
+
+permissions:
+  contents: read
+
+concurrency:
+  group: bank-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  config:
+    name: Read the run
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      jobs: ${{ steps.config.outputs.jobs }}
+      name: ${{ steps.config.outputs.name }}
+    steps:
+      - name: Check out the run commit
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up Node.js
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 24
+
+      - name: Validate .bank-run.json
+        id: config
+        run: node scripts/bank-run-config.mjs check
+
+  slice:
+    name: Job ${{ matrix.job }}
+    needs: config
+    runs-on: ubuntu-latest
+    timeout-minutes: 150
+    strategy:
+      fail-fast: false
+      matrix:
+        job: ${{ fromJSON(needs.config.outputs.jobs) }}
+    steps:
+      - name: Check out the run commit
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up Node.js
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Restore the bank data
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: .bank-data
+          key: bank-data-${{ hashFiles('regression/fixtures/bank-data.json') }}
+
+      - name: Check and unpack the bank data
+        run: node scripts/bank-data-pack.mjs --fetch --file .bank-data/bank-data.tar.gz
+
+      - name: Run the job's slices
+        run: node scripts/bank-run-config.mjs job "$JOB"
+        env:
+          JOB: ${{ matrix.job }}
+
+      - name: Keep the job's slices
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: job-${{ matrix.job }}
+          path: .calibration/job-${{ matrix.job }}
+          retention-days: 7
+          if-no-files-found: error
+
+  merge:
+    name: Merge the jobs
+    needs: [config, slice]
+    if: ${{ always() && needs.config.result == 'success' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Check out the run commit
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up Node.js
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 24
+
+      - name: Fetch the jobs' slices
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          pattern: job-*
+          path: .calibration/jobs
+
+      - name: Merge the jobs into one run
+        run: node scripts/bank-run-config.mjs merge .calibration/jobs
+
+      - name: Keep the run
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: run-${{ needs.config.outputs.name }}
+          path: .calibration/${{ needs.config.outputs.name }}
+          retention-days: 7
+          if-no-files-found: error

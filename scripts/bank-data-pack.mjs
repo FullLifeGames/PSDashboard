@@ -95,9 +95,12 @@ function upload() {
     exists = false;
   }
   if (exists) fail(`the release ${fixture.release} exists already; nothing uploaded`);
+  // A pre-release that is never "Latest": the site's Pages build lists releases and serves the newest one with a build
+  // zip; this one carries none, and the repository's latest release stays the app's.
   execFileSync('gh', [
-    'release', 'create', fixture.release, assetPath, '--title', `Bank data ${fixture.release.slice('bank-data-'.length)}`,
-    '--notes', `Public replays and Smogon data the calibration bank reads in CI (${fixture.files} files). sha256 ${fixture.sha256}.`,
+    'release', 'create', fixture.release, assetPath, '--prerelease', '--latest=false',
+    '--title', `Bank data ${fixture.release.slice('bank-data-'.length)}`,
+    '--notes', `Replays and Smogon data the calibration bank reads in CI (${fixture.files} files). sha256 ${fixture.sha256}.`,
   ], { cwd: ROOT, stdio: 'inherit' });
   console.log(`uploaded ${fixture.asset} as release ${fixture.release}`);
 }
