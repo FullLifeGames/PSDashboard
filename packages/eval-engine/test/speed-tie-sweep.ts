@@ -96,6 +96,9 @@ export const RULE_SETS = [
   { name: 'Champions', format: 'gen9championsou' },
 ];
 
+/** The suite's cut: the generations with their own speed or priority code (1 to 5 carry the Gen 1 to 4 mods and the base rules) and the two newest rule sets; the probe lanes/B/tie-matrix.vt.ts runs all ten in all eight speed-layer modes. */
+export const SUITE_RULE_SETS = RULE_SETS.filter(rules => ['gen 1', 'gen 2', 'gen 3', 'gen 4', 'gen 5', 'gen 9', 'Champions'].includes(rules.name));
+
 const EQUAL: Scenario = { name: 'equal speed', holderLevel: 100, otherLevel: 100, full: true };
 
 export interface TieSweep { holders: number; scenarios: number; asked: number; ties: number; wrong: string[] }

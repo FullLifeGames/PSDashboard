@@ -4,7 +4,7 @@ import { loadSimMods } from '../src/forward/sim-mods';
 import { speedTie } from '../src/search/leaf';
 import { actionsTie, fingerprint, setAskCheck } from '../src/sim-ask';
 import { boardBattle, boardChoices, boards, cheapOracle, playedTie, SLOT_A } from './speed-tie-oracle';
-import { RULE_SETS, tieSweep } from './speed-tie-sweep';
+import { SUITE_RULE_SETS, tieSweep } from './speed-tie-sweep';
 
 /**
  * Round 72 (T196, step 4): `speedTie` against the simulator's own queue. A tie is the condition under which
@@ -86,7 +86,7 @@ describe('the sweep over every priority and speed entry of the Dex', () => {
   beforeAll(() => setAskCheck(false));
   afterAll(() => setAskCheck(null));
 
-  test.each(RULE_SETS)('$name: speedTie equals the simulator, the live battle stays as it was', ({ format }) => {
+  test.each(SUITE_RULE_SETS)('$name: speedTie equals the simulator, the live battle stays as it was', ({ format }) => {
     const { holders, scenarios, asked, ties, wrong } = tieSweep(format, speedTie as never);
     process.stdout.write(`speed-tie sweep ${format}: ${holders} holders, ${scenarios} scenarios, ${asked} asks, ${ties} ties
 `);
