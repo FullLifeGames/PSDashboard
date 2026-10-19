@@ -138,6 +138,30 @@ export function pickRun(runs, sha) {
   return runs.find(entry => entry.headSha === sha && entry.workflowName === WORKFLOW_NAME) ?? null;
 }
 
+/**
+ * The conclusion of a CI run once GitHub calls it completed. `gh run watch` ends with an error on a failed run and on an
+ * API error alike (HTTP 504 on 19.10.2026: the script read run 39262005491 as over while it ran, found no artifact and
+ * deleted its branch), so the run's own status decides, asked again until the run is completed.
+ */
+export async function waitForRun(id, { watch, view, wait = pause, attempts = 240 }) {
+  for (let attempt = 0; attempt < attempts; attempt++) {
+    try {
+      watch(id);
+    } catch {
+      // A failed run and a failed watch end here alike; the status below tells them apart.
+    }
+    let state = null;
+    try {
+      state = view(id);
+    } catch {
+      // The status could not be read (network or API error): ask again after the pause.
+    }
+    if (state?.status === 'completed') return state.conclusion || 'unknown';
+    await wait(30000);
+  }
+  return 'unknown';
+}
+
 async function runOf(sha, name) {
   for (let attempt = 0; attempt < 60; attempt++) {
     const runs = JSON.parse(gh(['run', 'list', '--branch', `bank/${name}`, '--json', 'databaseId,headSha,url,workflowName', '--limit', '10']));
@@ -189,12 +213,10 @@ async function main() {
   try {
     const run = await runOf(sha, config.name);
     console.log(`watching ${run.url}`);
-    try {
-      execFileSync('gh', ['run', 'watch', String(run.databaseId), '--exit-status', '--interval', '30'], { cwd: ROOT, stdio: 'inherit' });
-      conclusion = 'success';
-    } catch {
-      conclusion = 'failure';
-    }
+    conclusion = await waitForRun(run.databaseId, {
+      watch: id => execFileSync('gh', ['run', 'watch', String(id), '--exit-status', '--interval', '30'], { cwd: ROOT, stdio: 'inherit' }),
+      view: id => JSON.parse(gh(['run', 'view', String(id), '--json', 'status,conclusion'])),
+    });
     const out = join(calibrationDir, config.name);
     execFileSync('gh', ['run', 'download', String(run.databaseId), '--name', `run-${config.name}`, '--dir', out], { cwd: ROOT, stdio: 'inherit' });
     writeFileSync(join(out, CI_RECORD), `${JSON.stringify({

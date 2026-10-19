@@ -4,7 +4,7 @@ import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'nod
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { buildRunCommit, deleteArgs, findReuse, pickRun, pushRefspec, runSettings, secretFindings } from '../scripts/bank-ci.mjs';
+import { buildRunCommit, deleteArgs, findReuse, pickRun, pushRefspec, runSettings, secretFindings, waitForRun } from '../scripts/bank-ci.mjs';
 import { BANK_TRANCHES, validateRunConfig } from '../scripts/bank-run-config.mjs';
 
 /**
@@ -112,5 +112,39 @@ describe('the reuse of a downloaded CI run', () => {
     rmSync(join(calibration, 'r71-a'), { recursive: true });
     write('r71-b', runSettings(config), false);
     expect(findReuse(calibration, measured, config)).toBeNull();
+  });
+});
+describe('waiting for the CI run', () => {
+  // Round 72: gh run watch also ends on an API error (HTTP 504 on run 39262005491), and the script read the run as over
+  // while it ran; the run's own status decides now.
+  const scripted = (watches: (Error | null)[], views: (Error | { status: string; conclusion?: string })[]) => {
+    const calls = { watch: 0, view: 0 };
+    const watch = () => {
+      const step = watches[Math.min(calls.watch++, watches.length - 1)];
+      if (step) throw step;
+    };
+    const view = () => {
+      const step = views[Math.min(calls.view++, views.length - 1)];
+      if (step instanceof Error) throw step;
+      return step;
+    };
+    return { watch, view, wait: async () => undefined, calls };
+  };
+
+  test('a watch that ends on an API error waits on until the run is completed', async () => {
+    const run = scripted([new Error('HTTP 504'), null], [{ status: 'in_progress' }, { status: 'completed', conclusion: 'success' }]);
+    expect(await waitForRun(1, run)).toBe('success');
+    expect(run.calls.watch).toBe(2);
+  });
+
+  test('a failed run reads as failure, and a status that cannot be read is asked again', async () => {
+    expect(await waitForRun(1, scripted([new Error('exit 1')], [{ status: 'completed', conclusion: 'failure' }]))).toBe('failure');
+    const run = scripted([null], [new Error('HTTP 502'), { status: 'completed', conclusion: 'success' }]);
+    expect(await waitForRun(1, run)).toBe('success');
+    expect(run.calls.view).toBe(2);
+  });
+
+  test('gives up as unknown after its attempts', async () => {
+    expect(await waitForRun(1, { ...scripted([null], [{ status: 'in_progress' }]), attempts: 3 })).toBe('unknown');
   });
 });
