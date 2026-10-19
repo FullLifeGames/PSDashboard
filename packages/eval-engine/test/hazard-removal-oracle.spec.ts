@@ -12,15 +12,13 @@ import { ALL_VIEWS, battleIn, mon, oracleTagAbove, type SimView } from './sim-vi
  * left out (a Dynamax or a Z crystal is not a move set), and so is every move whose Dex entry holds no function (a hazard
  * comes off through code; 495 of 866 Generation 9 entries are plain data), which keeps the sweep near 15 seconds. The list, held to the simulator:
  *  - Rapid Spin, Mortal Spin and Court Change clear the user's side, Defog and Court Change the foe's, as listed;
- *  - FINDING W6a: Tidy Up clears the foe's hazards too (Generation 9 and Champions), so it belongs to the second list;
+ *  - FINDING W6a: Tidy Up clears the foe's hazards too (Generation 9 and Champions), so it stands in the second list;
  *  - FINDING W6b: Defog clears only the foe's side in Generations 4 and 5, so the second list over-credits it there.
- * Both stay as they are in this step; the sets below are the named differences, so a new Dex move or a new difference fails.
+ * The set below names the one difference left (W6b); a new Dex move or a new difference fails.
  */
 
 const OWN_ONLY = [...OWN_SIDE_REMOVAL_MOVES].sort();
 const BOTH = [...BOTH_SIDES_REMOVAL_MOVES].sort();
-/** Findings: moves the simulator lets clear the foe's side that the list files as own-side only (W6a), per view. */
-const FOE_EXTRA = ['tidyup'];
 /** Findings: listed moves that do not clear the user's side in a view (W6b). */
 const OWN_MISSING: Record<string, string[]> = { 'Gen 4': ['defog'], 'Gen 5': ['defog'] };
 
@@ -76,9 +74,9 @@ describe('hazard removal lists are held to the simulator (round 72)', () => {
       expect(removed().own).toEqual(expected.sort());
     });
 
-    test('the moves that clear the foe\'s hazards are the second list (and the named Tidy Up)', () => {
+    test('the moves that clear the foe\'s hazards are the second list', () => {
       if (hazards.length === 0) return;
-      expect(removed().foe).toEqual(realHere([...BOTH, ...FOE_EXTRA]).sort());
+      expect(removed().foe).toEqual(realHere([...BOTH]).sort());
     });
   });
 

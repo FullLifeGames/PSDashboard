@@ -9,10 +9,10 @@ import { liveTypes, usableSlots } from './threat.ts';
 
 /** Removal moves that clear ONLY the user's side (pure relief). */
 // oracle: packages/eval-engine/test/hazard-removal-oracle.spec.ts
-export const OWN_SIDE_REMOVAL_MOVES = new Set(['rapidspin', 'mortalspin', 'tidyup']);
-/** Removal moves that clear (or swap) BOTH sides — double-edged. */
+export const OWN_SIDE_REMOVAL_MOVES = new Set(['rapidspin', 'mortalspin']);
+/** Removal moves that clear (or swap) BOTH sides — double-edged. Tidy Up clears the foe's hazards too (round 72, W6a). */
 // oracle: packages/eval-engine/test/hazard-removal-oracle.spec.ts
-export const BOTH_SIDES_REMOVAL_MOVES = new Set(['defog', 'courtchange']);
+export const BOTH_SIDES_REMOVAL_MOVES = new Set(['defog', 'courtchange', 'tidyup']);
 
 /**
  * Victim-aware hazard cost for the side the hazards lie on, capped at
@@ -112,8 +112,8 @@ export function strandedMons(side: Side, battle: Battle): Set<Pokemon> {
  * their removal move, floored at zero (a net-negative option — Defog that
  * would also destroy the side's own more-valuable hazards on the opponent's
  * board — is simply never exercised), then tempo-discounted. Own-side-only
- * moves (Rapid Spin, Mortal Spin, Tidy Up) net the side's full relief;
- * both-sides moves (Defog, Court Change) net relief MINUS the side's own
+ * moves (Rapid Spin, Mortal Spin) net the side's full relief;
+ * both-sides moves (Defog, Court Change, Tidy Up) net relief MINUS the side's own
  * hazards' worth over there. Exported for direct testing.
  */
 export function hazardRemovalEquity(side: Side, battle: Battle): number {
