@@ -1,6 +1,7 @@
 import { describe, expect, test } from 'vitest';
-import { fromEffect, readLine } from '../src/inference/log-line';
-import { SWAP_ITEM_SOURCES } from '../src/inference/handlers';
+import { arg, fromEffect, kwText, readLine } from '../src/inference/log-line';
+import { ITEM_HANDOVER_ACTIVATIONS, SWAP_ITEM_SOURCES } from '../src/inference/handlers';
+import { inferOpponentTeam } from '../src/opponent-inferrer';
 import { ALL_VIEWS, battleIn, mon, oracleTagAbove, type SimView } from './sim-views';
 
 /**
@@ -14,8 +15,9 @@ import { ALL_VIEWS, battleIn, mon, oracleTagAbove, type SimView } from './sim-vi
  *    Bestow, the ability names Magician and Pickpocket), the Generation 2 forms of Thief and Covet included;
  *  - each of them is played (a user with no item, a user with an item, both with items) and the log's `|-item|` line carries the
  *    source in the shape the inference reads, through its own `readLine` and `fromEffect`;
- *  - FINDING W9a: Symbiosis stands in the list but its handler writes `|-activate|` and no `|-item|` line, so the entry never
- *    matches (played in both doubles rule sets);
+ *  - FINDING W9a: Symbiosis hands an item over with `|-activate|<giver>|ability: Symbiosis|<item>|[of] <receiver>` and writes no
+ *    `|-item|` line, so it is no entry of the `-item` list; `ITEM_HANDOVER_ACTIVATIONS` names it for the inference, which credits
+ *    the giver's set item and marks the receiver as having been handed an item (played in both doubles rule sets);
  *  - FINDING W9b: Pickup (Generation 5 on) writes `|-item|` with `[from] ability: Pickup` for an item it picks up from another
  *    Pokémon, without `takeItem`; the list lacks it.
  * Recycle, Harvest, Frisk and G-Max Replenish write `|-item|` lines too and move no item between Pokémon: they stay out.
@@ -24,6 +26,9 @@ import { ALL_VIEWS, battleIn, mon, oracleTagAbove, type SimView } from './sim-vi
 const SPEC = 'packages/replay-core/test/swap-item-sources-oracle.spec.ts';
 
 type Entry = Record<string, unknown>;
+
+/** The log as a spectator reads it: the line after a |split| marker is the owner's private copy, left out. */
+const publicLog = (log: string[]) => log.filter((line, index) => !line.startsWith('|split|') && !log[index - 1]?.startsWith('|split|'));
 
 /** The source text of every function inside an entry (its handlers, those of `secondary`, `self` and `condition`). */
 function handlerTexts(value: unknown, depth = 0): string[] {
@@ -84,9 +89,9 @@ describe('SWAP_ITEM_SOURCES is held to the simulator (round 72)', () => {
   describe.each(ALL_VIEWS)('$name', view => {
     const writers = emitters(view);
 
-    test('the handlers that take an item from a Pokémon are the listed sources (Symbiosis aside, Pickup named)', () => {
+    test('the handlers that take an item from a Pokémon are the listed sources (Pickup named)', () => {
       const takers = [...new Set(writers.filter(writer => writer.takes).map(writer => writer.source))].sort();
-      const expected = listed().filter(name => name !== 'ability: Symbiosis');
+      const expected = listed();
       // A source the view has no move or ability for (Generation 2 has no abilities) is not expected.
       const real = expected.filter(name => {
         const [kind, label] = name.split(': ');
@@ -111,17 +116,30 @@ describe('SWAP_ITEM_SOURCES is held to the simulator (round 72)', () => {
   });
 
   describe.each(ALL_VIEWS.filter(view => view.doubles))('$name: Symbiosis', view => {
-    test('hands an item over through |-activate| and writes no |-item| line', () => {
+    const scene = () => {
       const battle = battleIn(view,
-        [mon('Blissey', ['splash'], { item: 'sitrusberry' }), mon('Blissey', ['splash'], { item: 'leftovers', ability: 'symbiosis' })],
-        [mon('Snorlax', ['splash']), mon('Snorlax', ['splash'])]);
-      battle.sides[0].active[0].hp = Math.floor(battle.sides[0].active[0].maxhp / 3);
-      battle.choose('p1', 'move 1, move 1');
-      battle.choose('p2', 'move 1, move 1');
-      const lines = battle.log.map(readLine);
-      expect(lines.some(line => line.cmd === '-activate' && line.raw.includes('ability: Symbiosis'))).toBe(true);
+        [mon('Snorlax', ['splash']), mon('Snorlax', ['splash'])],
+        [mon('Blissey', ['splash'], { item: 'sitrusberry', name: 'Receiver' }), mon('Oranguru', ['splash'], { item: 'leftovers', ability: 'symbiosis', name: 'Giver' })]);
+      battle.sides[1].active[0].hp = Math.floor(battle.sides[1].active[0].maxhp / 3);
+      for (let turn = 0; turn < 2; turn++) { battle.choose('p1', 'move 1, move 1'); battle.choose('p2', 'move 1, move 1'); }
+      return publicLog(battle.log);
+    };
+
+    test('hands an item over through |-activate| and writes no |-item| line', () => {
+      const lines = scene().map(readLine);
+      const handover = lines.find(line => line.cmd === '-activate' && line.raw.includes('ability: Symbiosis'));
+      expect(handover).toBeDefined();
       expect(lines.filter(line => line.cmd === '-item' && fromEffect(line).name === 'Symbiosis')).toEqual([]);
-      expect(listed()).toContain('ability: Symbiosis');
+      expect(listed()).not.toContain('ability: Symbiosis');
+      expect([...ITEM_HANDOVER_ACTIVATIONS.ability]).toEqual(['Symbiosis']);
+      expect(arg(handover!, 2)).toBe('ability: Symbiosis');
+      expect(kwText(handover!, 'item')).toBe('Leftovers');
+    });
+
+    test('the inference credits the giver with the item the handover names', () => {
+      const team = inferOpponentTeam(scene().join('\n'), 'p2').pokemon;
+      expect(team.find(pokemon => pokemon.species === 'Oranguru')?.item.value).toBe('Leftovers');
+      expect(team.find(pokemon => pokemon.species === 'Blissey')?.item.value).toBe('Sitrus Berry (consumed)');
     });
   });
 });

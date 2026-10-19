@@ -4,7 +4,7 @@ import { canHaveDancer, findPokemon, ruleOut, type InferrerState } from './infer
 import { revealMarkerForme, teamSpecies, unknownFormeMarkerFor } from './lookup.ts';
 import { abilityHolderIdent } from './ability-holder.ts';
 import { ATTACKER_PUNISH_ITEMS, ownMove } from './client-facts.ts';
-import { arg, detailsOf, fromEffect, hasKw, identOf, ofIdent, type LogLine } from './log-line.ts';
+import { arg, detailsOf, fromEffect, hasKw, identOf, kwText, ofIdent, type LogLine } from './log-line.ts';
 import { bookPowerMove, readPowerMove } from './power-moves.ts';
 import { toId } from '../ids.ts';
 import { choiceItems } from '../dex-facts/index.ts';
@@ -14,8 +14,14 @@ import type { PokemonFieldInfo } from '../types.ts';
 // oracle: packages/replay-core/test/swap-item-sources-oracle.spec.ts
 export const SWAP_ITEM_SOURCES: Record<string, Set<string>> = {
   move: new Set(['Trick', 'Switcheroo', 'Thief', 'Covet', 'Bestow']),
-  ability: new Set(['Magician', 'Pickpocket', 'Symbiosis']),
+  ability: new Set(['Magician', 'Pickpocket']),
 };
+/**
+ * `|-activate|` effects that hand an item from the first Pokémon of the line to the `[of]` Pokémon. Symbiosis writes no `|-item|`
+ * line (round 72, W9a): `|-activate|<giver>|ability: Symbiosis|<item>|[of] <receiver>`.
+ */
+// oracle: packages/replay-core/test/swap-item-sources-oracle.spec.ts
+export const ITEM_HANDOVER_ACTIVATIONS: Record<string, Set<string>> = { ability: new Set(['Symbiosis']) };
 /** Swap moves whose resolving-move context pairs giver and receiver (no [of] emitted). */
 const SWAP_PAIR_MOVES = new Set(['trick', 'switcheroo', 'thief', 'covet']);
 /** A landed Ground move from a possible immunity-breaker proves nothing about Levitate. */
@@ -238,13 +244,30 @@ function creditSwapGiver(state: InferrerState, line: LogLine, ident: string, ite
 }
 
 /**
+ * An item handed over by an ability's `|-activate|` line: the receiver holds an item that is not its set item, and the giver's set
+ * item is the one the line names (the giver is the first Pokémon of the line, the receiver its `[of]`).
+ */
+function recordHandover(state: InferrerState, line: LogLine) {
+  const [type, name] = arg(line, 2).split(': ');
+  if (!ITEM_HANDOVER_ACTIVATIONS[type]?.has(name)) return;
+  const receiver = ofIdent(line);
+  if (receiver && identOf(receiver)?.side === state.opponentSide) state.swappedIdents.set(receiver.trim(), state.pendingMove);
+  const giver = identOf(arg(line, 1));
+  const itemName = kwText(line, 'item'); // the protocol reads the item of this line as a keyword argument
+  if (!giver || giver.side !== state.opponentSide || !itemName || state.swappedIdents.has(arg(line, 1))) return;
+  const pokemon = findPokemon(state, giver.name);
+  if (pokemon && itemOpen(pokemon)) pokemon.item = revealedField(itemName);
+}
+
+/**
  * Item: |-item|pXa: Nickname|Item Name[|tags]. A swap-ACQUIRED item
- * ([from] Trick/Switcheroo/Thief/Covet/Bestow or Magician/Pickpocket/
- * Symbiosis) is NOT the holder's set item — crediting Vileplume with the
+ * ([from] Trick/Switcheroo/Thief/Covet/Bestow or Magician/Pickpocket;
+ * Symbiosis hands its item over through an |-activate| line) is NOT the holder's set item — crediting Vileplume with the
  * scarf a Trick planted on it manufactured a choice lock that hid its
  * real moves (GPL T11).
  */
 export function recordItem(state: InferrerState, line: LogLine) {
+  if (line.cmd === '-activate') return recordHandover(state, line);
   if (line.cmd !== '-item') return;
   const ident = arg(line, 1);
   const nickname = sideSubject(line, state.opponentSide);
