@@ -61,8 +61,8 @@ describe('the callers of the simulator', () => {
 
   test('a Dex handler called on a stand-in `this` lives only in the named rests', () => {
     const called = filesWith(/\.call\(/, name => name.includes('sim-fast/'));
-    // Lane A's two, the stand-ins of the protect check; they move onto `callHandler` after the merge (step 6).
-    const waiting = ['eval-engine:calc/protect.ts', 'eval-engine:search/hints.ts'];
+    // Lane A's file, the stand-in of the protect check; it moves onto `callHandler` after the merge (step 6).
+    const waiting = ['eval-engine:calc/protect.ts'];
     // Rests of T239 outside the files of its lane (the plan's finding 8 and the inference of replay-core): read-only by use.
     const rests = [
       'eval-engine:branch/sleep-counter.ts', 'eval-engine:calc/body.ts', 'eval-engine:calc/fickle.ts', 'eval-engine:calc/move.ts',
