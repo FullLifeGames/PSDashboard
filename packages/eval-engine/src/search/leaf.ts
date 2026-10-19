@@ -3,7 +3,7 @@ import { evaluatePosition, type MatchupCache } from '../eval-function.ts';
 import type { positionBattle } from '../forward-model.ts';
 import { RANDOM_CALL_MOVES } from '../ko-odds.ts';
 import { lastPairRace, lastPairValue } from '../score/last-pair.ts';
-import { effectiveSpeed } from '../speed.ts';
+import { actionsTie } from '../sim-ask/index.ts';
 import type { RollScripts } from '../forward/scripted-prng.ts';
 import { wpUnits } from '../winprob.ts';
 
@@ -76,17 +76,17 @@ const choiceMoveIds = (choice: string): string[] => choice.split(',')
   .map(tokens => tokens[1]);
 
 /**
- * Singles only: both sides act with moves of equal priority at equal effective speed, so the simulator flips a coin
- * for the order. Round 69 (T146 c4): moved here from outcome-children.ts (which re-exports it) so the root cell and
- * the roll-sensitivity below read it too.
+ * Singles only: the simulator's queue meets both sides' moves at equal priority and speed, so it flips a coin for the
+ * order. Round 69 (T146 c4): moved here from outcome-children.ts (which re-exports it) so the root cell and the
+ * roll-sensitivity below read it too. Round 72 (T196): the queue itself answers (sim-ask/action-order.ts), so Prankster,
+ * Gale Wings, Triage, Stall, Quick Claw and the speed rules of every generation count as the simulator counts them.
  */
 export function speedTie(battle: ReturnType<typeof positionBattle>, p1Choice: string, p2Choice: string): boolean {
   if (battle.gameType !== 'singles') return false;
   const ids = [choiceMoveIds(p1Choice)[0], choiceMoveIds(p2Choice)[0]];
   const actives = [battle.sides[0].active[0], battle.sides[1].active[0]];
   if (!ids[0] || !ids[1] || !actives[0] || !actives[1]) return false;
-  const priorities = ids.map(id => battle.dex.moves.get(id).priority);
-  return priorities[0] === priorities[1] && effectiveSpeed(actives[0], battle) === effectiveSpeed(actives[1], battle);
+  return actionsTie(battle, { pokemon: actives[0], moveId: ids[0] }, { pokemon: actives[1], moveId: ids[1] });
 }
 
 /** The scripts that settle a tied pair's coin flip for one order: the side that moves first, on its own move (scripted-prng.ts). */
