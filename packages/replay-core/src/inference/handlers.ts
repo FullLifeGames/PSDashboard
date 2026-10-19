@@ -15,6 +15,7 @@ import type { PokemonFieldInfo } from '../types.ts';
 export const SWAP_ITEM_SOURCES: Record<string, Set<string>> = {
   move: new Set(['Trick', 'Switcheroo', 'Thief', 'Covet', 'Bestow']),
   // Pickup (Generation 5 on) writes the same line for an item it picks up from another Pokémon (round 72, W9b).
+  // eslint-disable-next-line names/no-new-dex-name -- held by swap-item-sources-oracle.spec.ts (Pickup, round 72 W9b)
   ability: new Set(['Magician', 'Pickpocket', 'Pickup']),
 };
 /**

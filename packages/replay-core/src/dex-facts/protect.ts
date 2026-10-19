@@ -24,6 +24,7 @@ export function protectKind(dex: FactsDex, move: DexMove): ProtectKind | null {
 
 function readKind(dex: FactsDex, move: DexMove): ProtectKind | null {
   if (move.target === 'self' && move.stallingMove && move.volatileStatus) {
+    // eslint-disable-next-line names/no-new-dex-name -- 'stall' is a ProtectKind (the simulator's stall counter), not the ability Stall
     return 'onTryHit' in dex.conditions.get(move.volatileStatus) ? 'shield' : 'stall';
   }
   if (move.target === 'allySide' && move.sideCondition && 'onTryHit' in dex.conditions.get(move.sideCondition)) return 'side';

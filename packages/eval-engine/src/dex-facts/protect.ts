@@ -19,6 +19,7 @@ export const shieldsSide = (dex: BattleDex, move: DexMove): boolean => protectKi
 /** A move whose success the simulator rolls against the stall counter: the shields and Endure, not the side protectors. */
 export const rollsStall = (dex: BattleDex, move: DexMove): boolean => {
   const kind = protectKind(dex, move);
+  // eslint-disable-next-line names/no-new-dex-name -- 'stall' is a ProtectKind (the simulator's stall counter), not the ability Stall
   return kind === 'shield' || kind === 'stall';
 };
 

@@ -9,6 +9,7 @@ import type { Dex } from '@pkmn/sim';
  */
 export type FactsDex = typeof Dex;
 
+// eslint-disable-next-line names/no-new-dex-name -- 'stall' is a ProtectKind (the simulator's stall counter), not the ability Stall
 export type ProtectKind = 'shield' | 'stall' | 'side';
 
 export interface DexRuleFacts {

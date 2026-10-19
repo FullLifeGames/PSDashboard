@@ -25,6 +25,7 @@ export interface SetupDex { moves: { all(): readonly SetupMove[] } }
 
 /** Moves whose boosts a handler applies (Belly Drum, Curse, Stockpile, Take Heart, Tidy Up): no data field says them. */
 // oracle: packages/eval-engine/test/setup-moves-oracle.spec.ts
+// eslint-disable-next-line names/no-new-dex-name -- held by setup-moves-oracle.spec.ts: a handler applies these boosts, no data field names them
 export const CODED_SETUP_MOVES: readonly string[] = ['bellydrum', 'curse', 'stockpile', 'takeheart', 'tidyup'];
 
 /** The stages a move's data fields give its user: every positive boost of a self move, evasion left out. */
