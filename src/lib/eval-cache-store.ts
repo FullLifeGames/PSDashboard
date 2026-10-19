@@ -303,7 +303,12 @@ export interface StoredEval {
 //      side protectors and Protect get a damage tempo in the doubles hints; the trend probe reads every base
 //      draw; Gen 1 and 2 build at the server's spread; Z-moves and Max moves reveal their item and base type;
 //      the cards name the click a row walked into. Positions of every format read new values.
-const EVAL_ENGINE_CACHE_VERSION = 67;
+// v68 (round 72, wave 4): the built sets carry the replay's nicknames, shiny flags, levels and genders, so a
+//      serialized position carries the names; a commanding Tatsugiri passes its slot in the search and in the
+//      rebuilt turn; the speed tie comes from the simulator's queue; Dex reads replace hand lists (Tidy Up clears
+//      both sides, Defog before Generation 6, Normalize and Hidden Power, Generation 1 screens, Symbiosis and
+//      Pickup). Positions of every format read new values.
+const EVAL_ENGINE_CACHE_VERSION = 68;
 
 /** Round 61: a search-budget form stores under its own tag; the default keeps today's keys. */
 const versionTag = (): string => {
