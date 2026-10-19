@@ -94,6 +94,7 @@ describe.each(FORMATS)('$name', ({ singles, doubles }) => {
   });
 
   test('the two speeds are read once per position, however many pairs it asks', () => {
+    setAskCheck(false); // the development check reads a hit again on purpose
     const board = boards()[0];
     const battle = boardBattle(singles, false, board);
     const reads = new Map<Pokemon, number>();
