@@ -75,6 +75,18 @@ export const RULE_ABILITIES: ReadonlySet<string> = new Set(['liquidvoice', 'norm
 // oracle: packages/eval-engine/test/type-change-oracle.spec.ts
 export const CONTEXT_MOVES: ReadonlySet<string> = new Set<string>(['weatherball', 'terrainpulse', 'terablast', 'terastarstorm', 'hiddenpower']);
 
+/**
+ * Normalize. Generations 3 and 4 turn every move but Struggle Normal. Generations 5 and 6 turn the moves whose Dex type is not Normal
+ * and leave the others the type their own handlers gave them (Hidden Power keeps its IV type; Struggle is Normal already). From
+ * Generation 7 the NO_NORMALIZE moves stay and the rest turn Normal with a boost. Round 72, W7.
+ */
+function withNormalize(move: MoveLike, own: MoveAtUse, user: MoveUser, teraBlastAfterClick: boolean): MoveAtUse {
+  if (user.gen <= 4) return move.id === 'struggle' ? own : { ...own, type: 'Normal' };
+  if (user.gen <= 6) return move.type === 'Normal' ? own : { ...own, type: 'Normal' };
+  if (NO_NORMALIZE.has(move.id) || teraBlastAfterClick) return own;
+  return { ...own, type: 'Normal', powerMult: own.powerMult * 4915 / 4096 };
+}
+
 function withAbility(ability: string, move: MoveLike, own: MoveAtUse, user: MoveUser): MoveAtUse {
   const teraBlastAfterClick = move.id === 'terablast' && !!user.terastallized;
   if (ability === 'liquidvoice') return move.flags.sound ? { ...own, type: 'Water' } : own;
@@ -83,10 +95,7 @@ function withAbility(ability: string, move: MoveLike, own: MoveAtUse, user: Move
     if (own.type !== 'Normal' || NO_ATE.has(move.id) || teraBlastAfterClick) return own;
     return { ...own, type: ate, powerMult: own.powerMult * (user.gen === 6 ? 5325 : 4915) / 4096 };
   }
-  if (ability !== 'normalize') return own;
-  if (user.gen <= 6) return move.id === 'struggle' ? own : { ...own, type: 'Normal' };
-  if (NO_NORMALIZE.has(move.id) || teraBlastAfterClick) return own;
-  return { ...own, type: 'Normal', powerMult: own.powerMult * 4915 / 4096 };
+  return ability === 'normalize' ? withNormalize(move, own, user, teraBlastAfterClick) : own;
 }
 
 const same = (a: MoveAtUse, b: MoveAtUse) =>

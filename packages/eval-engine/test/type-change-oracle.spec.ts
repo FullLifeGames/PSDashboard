@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'vitest';
 import type { ActiveMove, Battle, Pokemon } from '@pkmn/sim';
-import { CONTEXT_MOVES, NO_ATE, NO_NORMALIZE, RULE_MOVES } from '../src/move-use';
+import { CONTEXT_MOVES, NO_ATE, NO_NORMALIZE, RULE_MOVES, moveAtUse, type MoveLike } from '../src/move-use';
 import { ALL_VIEWS, battleIn, mon, oracleTagAbove, type SimView } from './sim-views';
 
 /**
@@ -84,13 +84,22 @@ describe('the type lists of move-use.ts are held to the simulator (round 72)', (
         })
         .map(move => move.id)
         .sort();
-      // Generations 4 to 6 turn everything but Struggle Normal (onModifyMove); from 7 the noModifyType list stays. FINDING W7:
-      // the Generation 5 and 6 handler reads the Dex type of the move (Normal for Hidden Power), so Hidden Power keeps its IV
-      // type there while move-use.ts turns it Normal (Generation 4 turns it Normal, as the code does).
+      // Generations 3 and 4 turn everything but Struggle Normal (onModifyMove); Generations 5 and 6 turn every move whose Dex type is
+      // not Normal (Hidden Power keeps its IV type: FINDING W7, the sweep above holds move-use.ts to it); from 7 the noModifyType list stays.
       const named = gen >= 7 ? [...NO_NORMALIZE] : gen >= 5 ? ['struggle', 'hiddenpower'] : ['struggle'];
       const expected = named.filter(id => isReal(view, 'moves', id) && resolvedType(own.battle, own.user, own.target, id) !== 'Normal').sort();
       expect(stays).toEqual(expected);
       if (gen >= 7) expect(idsInHandler(view.dex.abilities.get('normalize'))).toEqual([...NO_NORMALIZE].sort());
+    });
+
+    test.skipIf(!isReal(view, 'abilities', 'normalize'))('moveAtUse gives a Normalize user the type the simulator leaves on every move (Hidden Power set to Fire)', () => {
+      const { battle, user, target } = users(view, 'normalize');
+      user.hpType = 'Fire';
+      const wrong = moves.filter(move => {
+        const answer = moveAtUse(view.dex.moves.get(move.id) as unknown as MoveLike, { gen, abilities: ['normalize'], hpType: 'Fire', types: user.getTypes() });
+        return answer !== null && answer.type !== resolvedType(battle, user, target, move.id);
+      }).map(move => move.id);
+      expect(wrong).toEqual([]);
     });
 
     test('every move with an onModifyType handler is a context move or a rule move, and no context move is stale', () => {
