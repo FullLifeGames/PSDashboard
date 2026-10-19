@@ -75,6 +75,20 @@ describe('the inference books the replay\'s name and shiny flag', () => {
   });
 });
 
+describe('a line without a gender', () => {
+  test('a body shown with no gender whose species has one is booked as genderless; a gendered or a genderless species is not', () => {
+    const log = [...header('singles'), '|clearpoke', '|poke|p1|Noivern, L50|', '|poke|p1|Magnezone, L50|', '|poke|p1|Ogerpon-Cornerstone, L50, F|', '|poke|p2|Garchomp, L50, F|', '|teampreview', '|start',
+      '|switch|p1a: Steve|Noivern, L50|161/161', '|switch|p2a: Bitey|Garchomp, L50, F|183/183', '|switch|p1a: Mag|Magnezone, L50|150/150', '|switch|p1a: Regi|Ogerpon-Cornerstone, L50|180/180'].join('\n');
+    expect(infoOf(log, 'p1', 'Noivern').noGender).toBe(true);
+    expect(infoOf(log, 'p1', 'Ogerpon-Cornerstone').noGender).toBe(true);
+    expect(infoOf(log, 'p1', 'Magnezone').noGender).toBeUndefined();
+    expect(infoOf(log, 'p2', 'Garchomp').noGender).toBeUndefined();
+    const { p1Team, p2Team } = buildTeamsFromReplay(log);
+    expect(p1Team.find(mon => mon.species === 'Noivern')?.gender).toBe('N');
+    expect(p2Team.find(mon => mon.species === 'Garchomp')?.gender).toBe('F');
+  });
+});
+
 describe('the built sets carry the booked name and shiny flag', () => {
   test('singles and doubles alike; an unrevealed body keeps the species and no shiny', () => {
     for (const kind of ['singles', 'doubles'] as const) {

@@ -17,6 +17,7 @@ import { rocksMayMiss } from './inference/rocks-tell.ts';
 import { arg, fromEffect, identOf, readLine, type LogLine } from './inference/log-line.ts';
 import { toId } from './ids.ts';
 import { normalizeLineEndings } from './line-endings.ts';
+import { dropAmbiguousNicknames, noteLogIdentities, noteSheetIdentities, sheetMatcher } from './team-identity.ts';
 
 interface SheetPokemon {
   species: string;
@@ -98,17 +99,20 @@ export function unpackSheetSets(packed: string): PokemonSet[] {
   return sets;
 }
 
+/** The sets of the `|showteam|` line of a side (Open Team Sheets), null without one: `unpackSheetSets` of its packed part. */
+function sheetSetsOf(log: string, side: 'p1' | 'p2'): PokemonSet[] | null {
+  const prefix = `|showteam|${side}|`;
+  const line = log.split('\n').find(candidate => candidate.startsWith(prefix));
+  return line ? unpackSheetSets(line.slice(prefix.length)) : null;
+}
+
 /**
  * Reads the `|showteam|` protocol line of a side (Open Team Sheets) through the library (`unpackSheetSets`). Round 72
  * (T241): the hand splitter of packed names is gone, and the names come from the Dex tables where the Dex knows them
  * (sheet-text.spec.ts holds the reading to the old one).
  */
 export function parseShowteamSheet(log: string, side: 'p1' | 'p2'): SheetPokemon[] | null {
-  const prefix = `|showteam|${side}|`;
-  const line = log.split('\n').find(candidate => candidate.startsWith(prefix));
-  if (!line) return null;
-
-  const pokemon = unpackSheetSets(line.slice(prefix.length)).map(sheetEntry).filter((mon): mon is SheetPokemon => mon !== null);
+  const pokemon = (sheetSetsOf(log, side) ?? []).map(sheetEntry).filter((mon): mon is SheetPokemon => mon !== null);
   return pokemon.length > 0 ? pokemon : null;
 }
 
@@ -118,14 +122,10 @@ export function parseShowteamSheet(log: string, side: 'p1' | 'p2'): SheetPokemon
  * revealed instead of being replaced by Smogon guesses (B3).
  */
 function applyTeamSheet(pokemonMap: Map<string, RevealedPokemonInfo>, sheet: SheetPokemon[]) {
-  const byId = new Map<string, RevealedPokemonInfo>();
-  for (const [species, info] of pokemonMap) {
-    byId.set(toId(species), info);
-    byId.set(toId(species.split('-')[0]), info);
-  }
+  const infoFor = sheetMatcher(pokemonMap);
 
   for (const sheetMon of sheet) {
-    const info = byId.get(toId(sheetMon.species)) ?? byId.get(toId(sheetMon.species.split('-')[0]));
+    const info = infoFor(sheetMon.species);
     if (!info) {
       pokemonMap.set(sheetMon.species, {
         species: sheetMon.species,
@@ -191,6 +191,9 @@ export function inferOpponentTeam(rawLog: string, opponentSide: 'p1' | 'p2' = 'p
 
   const sheet = parseShowteamSheet(log, opponentSide);
   if (sheet) applyTeamSheet(state.pokemonMap, sheet);
+  noteLogIdentities(lines, opponentSide, state.pokemonMap);
+  noteSheetIdentities(sheetSetsOf(log, opponentSide) ?? [], state.pokemonMap);
+  dropAmbiguousNicknames(state.pokemonMap);
 
   return { pokemon: Array.from(state.pokemonMap.values()) };
 }
