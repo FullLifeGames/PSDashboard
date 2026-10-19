@@ -1,8 +1,9 @@
-import type { Battle, Pokemon } from '@pkmn/sim';
+import type { Battle, Move as DexMove, Pokemon } from '@pkmn/sim';
 import { sideIndex } from '@fulllifegames/replay-core';
 import { strengthMix } from '../calc/fickle.ts';
 import { bodyAsClicked } from '../calc/tera-click.ts';
 import { critRate, moveAccuracy, unpriceable } from '../ko-odds.ts';
+import { askCheckOn, AskLeak, callHandler, guarded, isolated } from '../sim-ask/index.ts';
 import type { KoOddsInfo } from '../types.ts';
 import { parsePairChoice, type PairAction } from './guards.ts';
 import { mixedKillShare } from './kill-table.ts';
@@ -23,28 +24,46 @@ type MoveAction = Extract<PairAction, { kind: 'move' }>;
 const SPREAD = new Set(['allAdjacentFoes', 'allAdjacent']);
 const SINGLE_FOE = new Set(['normal', 'any', 'adjacentFoe']);
 
+/** The answers of `targetAtUse` per body of a reader battle, move and Tera click. */
+const targetsAsked = new WeakMap<Pokemon, Map<string, string>>();
+
 type ModifyMoveHandler = (this: unknown, move: unknown, user: unknown, target: unknown) => void;
 
 /**
  * The move's target as the simulator's ModifyMove leaves it for this user (round 69, T152): the move's own handler from the
  * Dex runs on a stand-in for the attacker (the species its Tera click makes, the body otherwise) and for the battle (its
  * field, cleared when the click clears it), so Tera Starstorm of Terapagos-Stellar and Expanding Force of a grounded user
- * on Psychic Terrain read allAdjacentFoes. A handler that needs more than that leaves the Dex target.
+ * on Psychic Terrain read allAdjacentFoes. A handler that needs more than that leaves the Dex target. The stand-ins are
+ * copy-on-write views, so the question never writes the live battle (a copy of it would cost 17 times as much).
  */
 export function targetAtUse(battle: Battle, attacker: Pokemon, action: MoveAction): string {
   const dexMove = battle.dex.moves.get(action.moveId);
+  // A move without an onModifyMove keeps its Dex target: the common move never reaches the stand-in.
+  if (typeof (dexMove as { onModifyMove?: unknown }).onModifyMove !== 'function') return dexMove.target;
+  // The reader battle of a position is never mutated, and an option list asks the same slot move once per option: one answer per body, move and click.
+  let asked = targetsAsked.get(attacker);
+  if (!asked) targetsAsked.set(attacker, asked = new Map());
+  const key = `${action.moveId}|${action.tera === true}`;
+  const known = asked.get(key);
+  // With the development check on, a hit is asked again, so a caller that mutated the battle after its first question fails loudly.
+  if (known !== undefined && !askCheckOn()) return known;
+  const answer = askTargetAtUse(battle, attacker, action, dexMove);
+  if (known !== undefined && known !== answer) throw new AskLeak();
+  asked.set(key, answer);
+  return answer;
+}
+
+function askTargetAtUse(battle: Battle, attacker: Pokemon, action: MoveAction, dexMove: DexMove): string {
   const handler = (dexMove as { onModifyMove?: unknown }).onModifyMove;
-  if (typeof handler !== 'function') return dexMove.target;
   const body = bodyAsClicked(battle, attacker, action.tera === true);
-  const user = Object.create(attacker, { species: { value: battle.dex.species.get(body.species) } });
-  const field = body.abilityOn ? Object.create(battle.field, { weather: { value: '' }, terrain: { value: '' } }) : battle.field;
+  // Copy-on-write views of the live body and field: a ModifyMove that writes the user (Beat Up of Gens 3 and 4 adds its volatile) writes the view.
+  const view = isolated(battle);
+  const mine = view.sides[attacker.side.n].pokemon[attacker.side.pokemon.indexOf(attacker)];
+  const user = Object.create(mine, { species: { value: battle.dex.species.get(body.species) } });
+  const field = body.abilityOn ? Object.create(view.field, { weather: { value: '' }, terrain: { value: '' } }) : view.field;
   const move = battle.dex.getActiveMove(action.moveId);
-  try {
-    (handler as ModifyMoveHandler).call({ field, debug: () => undefined }, move, user, null);
-  } catch {
-    return dexMove.target;
-  }
-  return move.target;
+  const answered = guarded(battle, [dexMove], () => callHandler(handler as ModifyMoveHandler, { field }, [move, user, null]));
+  return answered.ok ? move.target : dexMove.target;
 }
 
 /** The living foes a move action names on the root: every foe for a spread move, the named slot (its partner when it fell), the lone foe without a slot. */

@@ -1,7 +1,7 @@
-import { Battle, Dex, Teams, toID } from '@pkmn/sim';
+import { Dex } from '@pkmn/sim';
 import { bodyFromInfo, simBodyFacts } from '../calc/body.ts';
 import { teraClicked } from '../calc/tera-click.ts';
-import { simModsReady } from '../forward/sim-mods.ts';
+import { twinBattle, twinFormat } from '../sim-ask/index.ts';
 import type { PokemonStatTable, SimPokemon, SimPokemonInfo, SimSide } from './types.ts';
 
 function statTableWithDefaults(
@@ -182,18 +182,18 @@ const PROBE_SPECIES = ['Mew', 'Pikachu', 'Garchomp'];
  * generation that no candidate fits is remembered, so it is not rebuilt for every body and render.
  */
 function probeBody(gen: number, champions: boolean): HpDisplayBody | null {
-  const format = toID(champions ? 'gen9championsou' : `gen${gen}customgame`);
-  if (!simModsReady(format)) return null;
+  const format = twinFormat(gen, champions);
+  if (!format) return null;
   const key = `${gen}|${champions}`;
   const known = probeBodies.get(key);
   if (known !== undefined) return known;
   for (const species of PROBE_SPECIES) {
-    const team = Teams.pack([{
+    const team = [{
       name: species, species, item: '', ability: 'No Ability', moves: ['splash'], nature: 'Hardy', level: 50, gender: '',
       evs: { hp: 0, atk: 0, def: 0, spa: 0, spd: 0, spe: 0 }, ivs: { hp: 31, atk: 31, def: 31, spa: 31, spd: 31, spe: 31 },
-    }]);
+    }];
     try {
-      const battle = new Battle({ formatid: format, seed: '1,2,3,4', p1: { name: 'Probe', team }, p2: { name: 'Foe', team } });
+      const battle = twinBattle(format, { p1: { name: 'Probe', team }, p2: { name: 'Foe', team } }, { preview: false });
       const body = battle.sides[0].pokemon[0] as unknown as HpDisplayBody;
       probeBodies.set(key, body);
       return body;

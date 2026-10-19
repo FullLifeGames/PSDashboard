@@ -1,4 +1,5 @@
-import { Battle, PRNG, Teams, toID, type Pokemon, type PokemonSet } from '@pkmn/sim';
+import { PRNG, toID, type Battle, type Pokemon, type PokemonSet } from '@pkmn/sim';
+import { twinBattle } from '../sim-ask/index.ts';
 
 /**
  * Round 69 (T102, decision 17): the right status multiplier of a body. The
@@ -61,16 +62,7 @@ function twinOf(format: string, ability: string, seed: Seed): Battle {
     evs: { hp: 252, atk: 252, def: 0, spa: 252, spd: 4, spe: 0 }, ivs: { hp: 31, atk: 31, def: 31, spa: 31, spd: 31, spe: 31 },
     level: 100, gender: '',
   });
-  const battle = new Battle({
-    formatid: toID(format), seed,
-    p1: { name: 'Mine', team: Teams.pack([mon(ability)]) },
-    p2: { name: 'Foe', team: Teams.pack([mon('noability')]) },
-  });
-  if (battle.sides.some(side => side.requestState === 'teampreview')) {
-    battle.choose('p1', 'team 1');
-    battle.choose('p2', 'team 1');
-  }
-  return battle;
+  return twinBattle(format, { p1: { name: 'Mine', team: [mon(ability)] }, p2: { name: 'Foe', team: [mon('noability')] } }, { seed });
 }
 
 /** The damage `from` deals `to` with the move at the fixed dice, no crit: what the simulator's own damage step gives. */

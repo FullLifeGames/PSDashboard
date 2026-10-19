@@ -1,5 +1,6 @@
-import { Battle, Teams, toID, type BoostsTable, type Pokemon, type PokemonSet, type Side } from '@pkmn/sim';
+import type { Battle, BoostsTable, Pokemon, PokemonSet, Side } from '@pkmn/sim';
 import { isChampionsSimFormat } from '../forward/sim-mods.ts';
+import { twinBattle } from '../sim-ask/index.ts';
 import { EVAL_WEIGHTS } from './weights.ts';
 import { livingMons, livingOf, usableSlots } from './threat.ts';
 import {
@@ -56,15 +57,10 @@ export function removalFormat(battle: Battle): string {
 function playedRemoval(format: string, moveId: string, benched: boolean): boolean {
   try {
     const target = () => body('Chansey', ['tackle']);
-    const twin = new Battle({
-      formatid: toID(format), seed: '1,2,3,4',
-      p1: { name: 'Target', team: Teams.pack(benched ? [target(), target()] : [target()]) },
-      p2: { name: 'Foe', team: Teams.pack([body('Snorlax', [moveId, 'tackle'])]) },
+    const twin = twinBattle(format, {
+      p1: { name: 'Target', team: benched ? [target(), target()] : [target()] },
+      p2: { name: 'Foe', team: [body('Snorlax', [moveId, 'tackle'])] },
     });
-    if (twin.sides.some(side => side.requestState === 'teampreview')) {
-      twin.choose('p1', benched ? 'team 12' : 'team 1');
-      twin.choose('p2', 'team 1');
-    }
     const boosted = twin.sides[0].active[0];
     boosted.boosts.atk = 2;
     boosted.boosts.spe = 2;

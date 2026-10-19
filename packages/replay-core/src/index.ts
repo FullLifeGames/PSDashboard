@@ -37,6 +37,8 @@ export {
   sourceDetail, getSpeciesUsageStats, getSpeciesUsageSet, alternativeItems, guessedFieldFromUsage,
   fillUsageMoves,
 } from './smogon/usage-lookup.ts';
+export { twinBattle } from './sim-ask/twin.ts';
+export type { TwinOptions, TwinSide } from './sim-ask/twin.ts';
 export type { SpeedKnowledge, SpeedKnowledgeMap, SpreadCandidate } from './spread-inference.ts';
 export type { SpreadOrigin } from './spreads/ladder.ts';
 export { calcEvs, calcIvs, evBudget } from './spreads/ev-budget.ts';

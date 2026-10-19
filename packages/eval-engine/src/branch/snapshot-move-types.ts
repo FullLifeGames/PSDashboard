@@ -1,6 +1,5 @@
-import { Battle, Teams, toID } from '@pkmn/sim';
-import type { ID, PokemonSet } from '@pkmn/sim';
-import { simModsReady } from '../forward/sim-mods.ts';
+import type { Battle, PokemonSet } from '@pkmn/sim';
+import { twinBattle, twinFormat } from '../sim-ask/index.ts';
 import { terrainIdFromSnapshot, weatherIdFromSnapshot } from './field-ids.ts';
 import { typeAtUse, typesUnderTera } from './state.ts';
 import type { PokemonStatTable, SimBattle, SimPokemon } from './types.ts';
@@ -90,15 +89,8 @@ function foeOf(species: string): PokemonSet {
 }
 
 /** The twin battle of the body with one ability, or throws where the simulator cannot build it. */
-function twinOf(format: ID, query: SnapshotTypeQuery, ability: string): Battle {
-  const battle = new Battle({
-    formatid: format, seed: '1,2,3,4',
-    p1: { name: 'Body', team: Teams.pack([setOf(query, ability)]) }, p2: { name: 'Foe', team: Teams.pack([foeOf(query.body.species)]) },
-  });
-  if (battle.sides.some(side => side.requestState === 'teampreview')) {
-    battle.choose('p1', 'team 1');
-    battle.choose('p2', 'team 1');
-  }
+function twinOf(format: string, query: SnapshotTypeQuery, ability: string): Battle {
+  const battle = twinBattle(format, { p1: { name: 'Body', team: [setOf(query, ability)] }, p2: { name: 'Foe', team: [foeOf(query.body.species)] } });
   setField(battle, query.field);
   // A body that terastallized before the snapshot has its Tera type now; the labels below are for the click still to come.
   if (query.body.teraType) battle.actions.terastallize(battle.sides[0].active[0]);
@@ -106,7 +98,7 @@ function twinOf(format: ID, query: SnapshotTypeQuery, ability: string): Battle {
 }
 
 /** What the simulator says for the twin with one ability; null where the twin cannot be built. */
-function readTwin(format: ID, query: SnapshotTypeQuery, ability: string): ReadonlyMap<string, SnapshotMoveType> | null {
+function readTwin(format: string, query: SnapshotTypeQuery, ability: string): ReadonlyMap<string, SnapshotMoveType> | null {
   try {
     const battle = twinOf(format, query, ability);
     const active = battle.sides[0].active[0];
@@ -128,9 +120,9 @@ function readTwin(format: ID, query: SnapshotTypeQuery, ability: string): Readon
 
 /** One twin per (body, ability, field, click, moves), remembered; a failure is remembered too once the mod it needs is loaded. */
 function readOne(query: SnapshotTypeQuery, ability: string): ReadonlyMap<string, SnapshotMoveType> | null {
-  const format = toID(query.champions ? 'gen9championsou' : `gen${query.gen}customgame`);
-  // The Champions mod loads on demand: before it is there no battle can come up, and the next build asks again.
-  if (!simModsReady(format)) return null;
+  // The Champions mod loads on demand: before it is there no battle can come up (no format), and the next build asks again.
+  const format = twinFormat(query.gen, query.champions);
+  if (!format) return null;
   const { body } = query;
   // The key holds only what the twin is built from: a caller may hand over a whole info, whose HP and stages change every turn.
   const key = JSON.stringify([

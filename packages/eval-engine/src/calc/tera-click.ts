@@ -1,4 +1,5 @@
-import { Battle, Teams, toID, type Pokemon, type PokemonSet } from '@pkmn/sim';
+import type { Battle, Pokemon, PokemonSet } from '@pkmn/sim';
+import { twinBattle } from '../sim-ask/index.ts';
 import { bodyOf, type SimBody } from './body.ts';
 
 /**
@@ -43,14 +44,7 @@ function twinOf(gen: number, body: SimBody): { twin: Battle; mon: Pokemon } | nu
     gender: body.gender ?? '', teraType: body.tera ?? undefined,
   };
   try {
-    const twin = new Battle({
-      formatid: toID(`gen${gen}customgame`), seed: '1,2,3,4',
-      p1: { name: 'Body', team: Teams.pack([set]) }, p2: { name: 'Foe', team: Teams.pack([FOE]) },
-    });
-    if (twin.sides.some(side => side.requestState === 'teampreview')) {
-      twin.choose('p1', 'team 1');
-      twin.choose('p2', 'team 1');
-    }
+    const twin = twinBattle(`gen${gen}customgame`, { p1: { name: 'Body', team: [set] }, p2: { name: 'Foe', team: [FOE] } });
     const mon = twin.sides[0].active[0];
     // The body as it stands before the click: its stages and HP.
     Object.assign(mon.boosts, body.boosts);

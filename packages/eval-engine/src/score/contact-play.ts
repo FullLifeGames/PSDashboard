@@ -1,5 +1,6 @@
-import { PRNG, type Battle, type ID, type Pokemon } from '@pkmn/sim';
-import { copyOf, playResiduals, slotsOf } from './residuals.ts';
+import type { Battle, ID, Pokemon } from '@pkmn/sim';
+import { copyOf, FixedDice } from '../sim-ask/index.ts';
+import { playResiduals, slotsOf } from './residuals.ts';
 import { damageOf } from './status-factor.ts';
 import { NO_COST, type HitCost, type StatusCost } from './contact-cost.ts';
 
@@ -31,29 +32,6 @@ const GRID = 20;
 const PROBES = [1, 18];
 const MIDDLE = 9;
 const quantileOf = (index: number): number => (index + 0.5) / GRID;
-
-/** A guard against a handler that asks for a fresh draw until it likes the answer: with one quantile it never would. */
-const MAX_DRAWS = 5000;
-
-/** Dice that answer every draw with one quantile of its range. */
-class Quantile extends PRNG {
-  private readonly quantile: number;
-  private draws = 0;
-
-  constructor(quantile: number) {
-    super('1,2,3,4');
-    this.quantile = quantile;
-  }
-
-  override random(from?: number, to?: number): number {
-    if (++this.draws > MAX_DRAWS) throw new Error('the dice of a played hit ran out');
-    if (from) from = Math.floor(from);
-    if (to) to = Math.floor(to);
-    if (from === undefined) return this.quantile;
-    if (!to) return Math.floor(this.quantile * from);
-    return Math.floor(this.quantile * (to - from)) + from;
-  }
-}
 
 /** A board with the pair ready for a hit: both on the field of a copy, both at full HP. */
 interface Setup { copy: Battle; attacker: Pokemon; defender: Pokemon }
@@ -137,7 +115,7 @@ function playRun(battle: Battle, attacker: Pokemon, defender: Pokemon, moveId: s
   const setup = prepare(battle, attacker, defender, neutral);
   const { copy } = setup;
   const mine = setup.attacker;
-  copy.prng = new Quantile(quantile);
+  copy.prng = new FixedDice({ quantile });
   const hp = mine.hp;
   const status = mine.status;
   const item = mine.item;
