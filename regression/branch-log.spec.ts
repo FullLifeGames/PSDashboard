@@ -15,11 +15,12 @@ import { branchFrameLog } from '../src/lib/branch-log';
  * The replay iframe's sidebar icons in a branch. The embed keeps one roster
  * entry per Pokémon and finds it again by ident (`p1: <name>`) plus details
  * (`Landorus-Therian, M, shiny`). The replay spells both its own way (the
- * player's nickname, the game's level, gender and shiny flags); the simulator
- * spells them with the name of its built set (the base species) and the flags
- * of that set. A simulator switch-in therefore met no roster entry: the body
- * became a second entry, the second entry fainted, and the sidebar (one icon
- * per species, the first entry wins) kept showing the first one alive.
+ * player's nickname, the game's level, gender and shiny flags), and since
+ * round 72 (T238) the built sets carry them, so the simulator writes the
+ * replay's own switch lines and the frame needs no translation. Before, a
+ * simulator switch-in met no roster entry: the body became a second entry,
+ * the second entry fainted, and the sidebar (one icon per species, the first
+ * entry wins) kept showing the first one alive.
  * The scene of the report is smogtours-gen7ou-450650: branch at turn 17 with
  * Stone Edge for Landorus-Therian, played to the end.
  */
@@ -99,7 +100,7 @@ async function playBranch(
   }
   const state = createBranchState(runtime.battleStream, runtime.log, { p1Choices: [], p2Choices: [] });
   return {
-    frameLog: branchFrameLog(state.log, replay.log, { p1: state.p1Pokemon, p2: state.p2Pokemon }),
+    frameLog: branchFrameLog(state.log),
     bodies: { p1: state.p1Pokemon, p2: state.p2Pokemon },
     fainted: { atStart, atEnd: faintedCount() },
   };
@@ -159,95 +160,14 @@ describe('the sidebar of a played-out branch', () => {
   });
 });
 
-/** A replay of two players, one nicknamed body each on the field at its turn 2, and two more that come in after it. */
-const REPLAY = [
-  '|player|p1|Alice|1|', '|player|p2|Bob|2|', '|teamsize|p1|2', '|teamsize|p2|2', '|gametype|singles', '|gen|9',
-  '|poke|p1|Landorus-Therian, M|', '|poke|p1|Rotom-Wash|', '|poke|p2|Garchomp, F, shiny|', '|poke|p2|Mawile, F|',
-  '|start',
-  '|switch|p1a: NOT ICT|Landorus-Therian, M|100/100', '|switch|p2a: Chomp|Garchomp, F, shiny|100/100', '|turn|1',
-  '|move|p1a: NOT ICT|Earthquake|p2a: Chomp', '|-damage|p2a: Chomp|40/100', '|move|p2a: Chomp|Earthquake|p1a: NOT ICT',
-  '|-damage|p1a: NOT ICT|60/100', '|upkeep', '|turn|2',
-  '|switch|p1a: LUSCH|Rotom-Wash|100/100', '|switch|p2a: Mawile Man|Mawile-Mega, F|100/100', '|turn|3',
-].join('\n');
-/** The simulator's bodies: named for their base species, as the team builder's sets are. */
-const BODIES = {
-  p1: [{ name: 'Landorus', species: 'Landorus-Therian' }, { name: 'Rotom', species: 'Rotom-Wash' }],
-  p2: [{ name: 'Garchomp', species: 'Garchomp' }, { name: 'Mawile', species: 'Mawile' }],
-};
-
-/** The frame lines of a branch from turn 2 whose simulator appended these lines. */
-function frame(appended: string[], bodies = BODIES, replay = REPLAY): string[] {
-  const lines = replay.split('\n');
-  const prefix = lines.slice(0, lines.indexOf('|turn|2') + 1);
-  return branchFrameLog([...prefix, ...appended], replay, bodies).split('\n').slice(prefix.length);
-}
-
 describe('branchFrameLog', () => {
-  test('puts the replay nickname on every ident of the simulator lines, in every field', () => {
-    expect(frame([
-      '|switch|p1a: Rotom|Rotom-Wash|90/100',
-      '|move|p1a: Rotom|Hydro Pump|p2a: Garchomp',
-      '|-damage|p2a: Garchomp|0 fnt|[from] item: Rocky Helmet|[of] p1a: Rotom',
-      '|faint|p2a: Garchomp',
-    ])).toEqual([
-      '|switch|p1a: LUSCH|Rotom-Wash|90/100',
-      '|move|p1a: LUSCH|Hydro Pump|p2a: Chomp',
-      '|-damage|p2a: Chomp|0 fnt|[from] item: Rocky Helmet|[of] p1a: LUSCH',
-      '|faint|p2a: Chomp',
-    ]);
+  test('drops what the embed must not show: chat, spectator splits and the simulator debug lines', () => {
+    const lines = ['|switch|p1a: NOT ICT|Landorus-Therian, M, shiny|100/100', '|c|Alice|gg', '|split|p1', '|debug|noise', '', '|move|p1a: NOT ICT|Earthquake|p2a: Chomp'];
+    expect(branchFrameLog(lines)).toBe('|switch|p1a: NOT ICT|Landorus-Therian, M, shiny|100/100\n|move|p1a: NOT ICT|Earthquake|p2a: Chomp');
   });
 
-  test('leaves the replay own lines, the player idents and unknown names alone', () => {
-    expect(branchFrameLog(REPLAY.split('\n'), REPLAY, BODIES)).toBe(REPLAY);
-    const lines = ['|-sidestart|p1: Landorus|move: Stealth Rock', '|-damage|p1a: Gliscor|50/100', '|-fieldstart|move: Misty Terrain'];
-    expect(frame(lines)).toEqual(lines);
-  });
-
-  test('names a body that is not on the field: a revival heal and the Wish healer', () => {
-    expect(frame([
-      '|-heal|p1: Rotom|50/100|[from] move: Revival Blessing',
-      '|-heal|p2a: Garchomp|100/100|[from] move: Wish|[wisher] Garchomp',
-    ])).toEqual([
-      '|-heal|p1: LUSCH|50/100|[from] move: Revival Blessing',
-      '|-heal|p2a: Chomp|100/100|[from] move: Wish|[wisher] Chomp',
-    ]);
-  });
-
-  test('gives a switch-in and a forme change the replay level, gender and shiny flags', () => {
-    expect(frame([
-      '|switch|p2a: Garchomp|Garchomp, M|100/100',
-      '|detailschange|p2a: Mawile|Mawile-Mega, M',
-      '|switch|p2a: Mawile|Mawile-Mega, L50, M, tera:Steel|100/100',
-    ])).toEqual([
-      '|switch|p2a: Chomp|Garchomp, F, shiny|100/100',
-      '|detailschange|p2a: Mawile Man|Mawile-Mega, F',
-      '|switch|p2a: Mawile Man|Mawile-Mega, F, tera:Steel|100/100',
-    ]);
-  });
-
-  test('speaks the replay flags where the simulator name already is the nickname', () => {
-    const replay = REPLAY.replaceAll('p2a: Chomp', 'p2a: Garchomp');
-    expect(frame(['|switch|p2a: Garchomp|Garchomp, M|100/100'], BODIES, replay)).toEqual(['|switch|p2a: Garchomp|Garchomp, F, shiny|100/100']);
-  });
-
-  test('keeps the simulator name where the line cannot say which body it means', () => {
-    // Two nicknames for one species (a Custom Game with a pair), and a body no switch line ever showed.
-    const pair = REPLAY.replace('|turn|3', '|switch|p1a: LUSCH 2|Rotom-Wash|100/100\n|turn|3');
-    expect(frame(['|move|p1a: Rotom|Hydro Pump|p2a: Garchomp'], BODIES, pair)).toEqual(['|move|p1a: Rotom|Hydro Pump|p2a: Chomp']);
-    const unseen = { ...BODIES, p1: [...BODIES.p1, { name: 'Gliscor', species: 'Gliscor' }] };
-    expect(frame(['|move|p1a: Gliscor|Earthquake|p2a: Garchomp'], unseen)).toEqual(['|move|p1a: Gliscor|Earthquake|p2a: Chomp']);
-  });
-
-  test('renames in one pass: two bodies whose nicknames are each other simulator names', () => {
-    const swapped = REPLAY.replaceAll('NOT ICT', 'Rotom').replaceAll('LUSCH', 'Landorus');
-    expect(frame(['|move|p1a: Landorus|Earthquake|p2a: Garchomp', '|move|p1a: Rotom|Hydro Pump|p2a: Garchomp'], BODIES, swapped))
-      .toEqual(['|move|p1a: Rotom|Earthquake|p2a: Chomp', '|move|p1a: Landorus|Hydro Pump|p2a: Chomp']);
-  });
-
-  test('names doubles slots by their own letters and still drops chat, splits and debug lines', () => {
-    const doubles = REPLAY.replace('|gametype|singles', '|gametype|doubles').replace('|switch|p1a: LUSCH|', '|switch|p1b: LUSCH|');
-    expect(frame([
-      '|c|Alice|gg', '|split|p1', '|debug|noise', '|switch|p1b: Rotom|Rotom-Wash|50/100', '|-boost|p1b: Rotom|spa|1',
-    ], BODIES, doubles)).toEqual(['|switch|p1b: LUSCH|Rotom-Wash|50/100', '|-boost|p1b: LUSCH|spa|1']);
+  test('plays every other line as the simulator wrote it: the built sets carry the replay names and flags', () => {
+    const lines = ['|-heal|p1: Rotom|50/100|[from] move: Revival Blessing', '|-damage|p2a: Chomp|0 fnt|[from] item: Rocky Helmet|[of] p1a: LUSCH', '|-sidestart|p1: Alice|move: Stealth Rock'];
+    expect(branchFrameLog(lines)).toBe(lines.join('\n'));
   });
 });
