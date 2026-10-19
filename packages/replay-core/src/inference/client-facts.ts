@@ -44,6 +44,7 @@ const OWN_ITEM_EFFECTS = new Set(['', 'disturbed', 'frisked']);
  * client gives them to the damaged Pokémon when a reconstructed log drops
  * [of] (a stats-panel test pins that case).
  */
+// oracle: packages/replay-core/test/attacker-punish-items-oracle.spec.ts
 export const ATTACKER_PUNISH_ITEMS = new Set(['rockyhelmet', 'jabocaberry', 'rowapberry']);
 
 /** The client's Pokémon behind an ident, as the client stands now; null when it has none. */

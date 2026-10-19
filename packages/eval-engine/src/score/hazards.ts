@@ -8,9 +8,23 @@ import { liveTypes, usableSlots } from './threat.ts';
  */
 
 /** Removal moves that clear ONLY the user's side (pure relief). */
-const OWN_SIDE_REMOVAL_MOVES = new Set(['rapidspin', 'mortalspin', 'tidyup']);
-/** Removal moves that clear (or swap) BOTH sides — double-edged. */
-const BOTH_SIDES_REMOVAL_MOVES = new Set(['defog', 'courtchange']);
+// oracle: packages/eval-engine/test/hazard-removal-oracle.spec.ts
+export const OWN_SIDE_REMOVAL_MOVES = new Set(['rapidspin', 'mortalspin']);
+/** Removal moves that clear (or swap) BOTH sides — double-edged. Tidy Up clears the foe's hazards too (round 72, W6a). */
+// oracle: packages/eval-engine/test/hazard-removal-oracle.spec.ts
+export const BOTH_SIDES_REMOVAL_MOVES = new Set(['defog', 'courtchange', 'tidyup']);
+/** Defog clears only the target's side before this generation (round 72, W6b): no relief for its user. */
+const DEFOG_CLEARS_OWN_FROM = 6;
+
+/**
+ * What a removal move does for its user in a generation: 'own' (clears only the user's side), 'both' (clears or swaps both
+ * sides), or null (not a removal move there; Defog before Generation 6 clears the foe's side alone).
+ */
+export function removalKind(moveId: string, gen: number): 'own' | 'both' | null {
+  if (OWN_SIDE_REMOVAL_MOVES.has(moveId)) return 'own';
+  if (!BOTH_SIDES_REMOVAL_MOVES.has(moveId)) return null;
+  return moveId === 'defog' && gen < DEFOG_CLEARS_OWN_FROM ? null : 'both';
+}
 
 /**
  * Victim-aware hazard cost for the side the hazards lie on, capped at
@@ -91,7 +105,7 @@ export function strandedMons(side: Side, battle: Battle): Set<Pokemon> {
   for (const pokemon of side.pokemon) {
     if (pokemon.fainted || pokemon.hp <= 0) continue;
     for (const slot of usableSlots(pokemon)) {
-      if (OWN_SIDE_REMOVAL_MOVES.has(slot.id) || BOTH_SIDES_REMOVAL_MOVES.has(slot.id)) {
+      if (removalKind(slot.id, battle.gen)) {
         return stranded;
       }
     }
@@ -110,8 +124,8 @@ export function strandedMons(side: Side, battle: Battle): Set<Pokemon> {
  * their removal move, floored at zero (a net-negative option — Defog that
  * would also destroy the side's own more-valuable hazards on the opponent's
  * board — is simply never exercised), then tempo-discounted. Own-side-only
- * moves (Rapid Spin, Mortal Spin, Tidy Up) net the side's full relief;
- * both-sides moves (Defog, Court Change) net relief MINUS the side's own
+ * moves (Rapid Spin, Mortal Spin) net the side's full relief;
+ * both-sides moves (Defog, Court Change, Tidy Up) net relief MINUS the side's own
  * hazards' worth over there. Exported for direct testing.
  */
 export function hazardRemovalEquity(side: Side, battle: Battle): number {
@@ -121,9 +135,10 @@ export function hazardRemovalEquity(side: Side, battle: Battle): number {
   for (const pokemon of side.pokemon) {
     if (pokemon.fainted || pokemon.hp <= 0) continue;
     for (const slot of usableSlots(pokemon)) {
-      if (OWN_SIDE_REMOVAL_MOVES.has(slot.id)) {
+      const kind = removalKind(slot.id, battle.gen);
+      if (kind === 'own') {
         best = Math.max(best, own);
-      } else if (BOTH_SIDES_REMOVAL_MOVES.has(slot.id)) {
+      } else if (kind === 'both') {
         best = Math.max(best, own - hazardCost(side.foe, battle));
       }
     }

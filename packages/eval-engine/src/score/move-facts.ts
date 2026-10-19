@@ -1,4 +1,5 @@
 import type { ActiveMove, Battle, BoostsTable, ID, Pokemon } from '@pkmn/sim';
+import { umbrellaWeathers } from '@fulllifegames/replay-core';
 import { hitDraws } from '../calc/hit-draws.ts';
 import { CONTEXT_MOVES, moveAtUse, RULE_ABILITIES, RULE_MOVES, type ItemLike, type MoveAtUse, type MoveField, type MoveUser } from '../move-use.ts';
 
@@ -11,7 +12,6 @@ import { CONTEXT_MOVES, moveAtUse, RULE_ABILITIES, RULE_MOVES, type ItemLike, ty
  */
 type DexMove = ReturnType<Battle['dex']['moves']['get']>;
 
-const UMBRELLA_WEATHER = new Set(['sunnyday', 'raindance', 'desolateland', 'primordialsea']);
 const BOOST_TABLE = [1, 1.5, 2, 2.5, 3, 3.5, 4];
 
 /** getStat(stat, false, true): the stored stat with its stage, no modifiers. */
@@ -83,7 +83,7 @@ export function fieldFacts(pokemon: Pokemon, battle: Battle): MoveField {
   return {
     get weather() {
       const weather = battle.field.effectiveWeather();
-      return pokemon.item === 'utilityumbrella' && UMBRELLA_WEATHER.has(weather) ? '' : weather;
+      return pokemon.item === 'utilityumbrella' && umbrellaWeathers(battle.dex).has(weather) ? '' : weather;
     },
     terrain: String(battle.field.terrain ?? ''),
   };
@@ -109,6 +109,7 @@ export function fieldFacts(pokemon: Pokemon, battle: Battle): MoveField {
  *    the power on the stages of the moment (stagedPower; decision 3 of the
  *    round-63 wave spec).
  */
+// oracle: packages/eval-engine/test/power-handlers-census.spec.ts
 export const POWER_MOVES: ReadonlyMap<string, 'memo' | 'live' | 'stages'> = new Map([
   ...['knockoff', 'acrobatics', 'return', 'frustration', 'pikapapow', 'veeveevolley', 'watershuriken']
     .map(id => [id, 'memo'] as const),

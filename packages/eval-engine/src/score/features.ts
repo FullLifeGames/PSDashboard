@@ -9,16 +9,13 @@ import { boostBiteValue, removalFormat, stageValue } from './boost-bite.ts';
 import { residualReader } from './residuals.ts';
 import { hitReader } from './contact.ts';
 import { statusRight } from './status-factor.ts';
+import { choiceItems, standingScreens } from '@fulllifegames/replay-core';
 
 /**
  * The raw feature vector: per-side bodies, boosts, hazards, screens,
  * tailwind, and the Choice mismatch, then the p1-positive differences with
  * the matchup, coverage, and sweep terms.
  */
-
-const CHOICE_ITEMS = new Set(['choiceband', 'choicespecs', 'choicescarf']);
-
-const SCREENS = ['reflect', 'lightscreen', 'auroraveil'];
 
 const NO_PAIR = { focus: 0, redirect: 0 };
 
@@ -77,7 +74,7 @@ function statusFixOf(pokemon: Pokemon, stranded: ReadonlySet<Pokemon>, twin: str
 
 /** The Choice-item liability: the holder's status-move fraction (0 without a Choice item). */
 function choiceMismatchOf(pokemon: Pokemon, battle: Battle): number {
-  if (!(CHOICE_ITEMS.has(pokemon.item) && pokemon.moveSlots.length > 0)) return 0;
+  if (!(choiceItems(battle.dex).has(pokemon.item) && pokemon.moveSlots.length > 0)) return 0;
   const statusMoves = pokemon.moveSlots
     .filter(slot => battle.dex.moves.get(slot.id).category === 'Status').length;
   return statusMoves / pokemon.moveSlots.length;
@@ -96,11 +93,7 @@ function activeBoostValue(side: Side): number {
 }
 
 function screenCount(side: Side): number {
-  let screens = 0;
-  for (const id of SCREENS) {
-    if (side.sideConditions[id]) screens += 1;
-  }
-  return screens;
+  return standingScreens(side).length;
 }
 
 function sideFeatureValues(side: Side, battle: Battle, twin: string | null) {

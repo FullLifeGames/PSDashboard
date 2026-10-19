@@ -4,12 +4,12 @@ import type { DamageObservation, PokemonSnapshot, SideSnapshot, FieldSnapshot } 
 import { flushSpeedOrder, speedContaminatedAt, type ClientIdent, type ParserState, type PendingMove } from './parser-state.ts';
 import { firstMoverContaminated, foreignAction, secondMoverContaminated, switchTriggered } from './speed-evidence.ts';
 import { toId } from '../ids.ts';
+import { standingScreens } from '../dex-facts/index.ts';
 import { itemFieldsOf } from './item-reading.ts';
 import { paradoxFieldsOf } from './paradox-reading.ts';
 import { forgetAbilityEnd, hitFactsOf } from './hit-facts.ts';
 import { survivedAtOne } from './survival-marker.ts';
 
-const SCREEN_IDS = ['reflect', 'lightscreen', 'auroraveil'];
 
 function hpFractionOf(text: string): number | null {
   if (!text) return null;
@@ -268,7 +268,7 @@ function recordDamageObservation(state: ParserState, parts: string[], defenderId
     attackerBoosts: { ...attacker.boosts },
     defenderBoosts: { ...defender.boosts },
     attackerStatus: attacker.status || '',
-    screens: SCREEN_IDS.filter(id => (defenderSide.sideConditions as Record<string, unknown>)[id]),
+    screens: standingScreens(defenderSide),
     weather: battle.field.weather || '',
     doubles: !state.singles,
     spread: lastMove.spread,

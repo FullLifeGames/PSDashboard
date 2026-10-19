@@ -9,6 +9,7 @@ import type { EvBudget } from '../spreads/ev-budget.ts';
 import { onBudgetScale } from '../spreads/ev-budget.ts';
 import { natureOf } from '../spreads/ladder.ts';
 import { toId } from '../ids.ts';
+import { screenFlags } from '../dex-facts/index.ts';
 
 /**
  * What the two directions of the damage judge share (round 67, T130; round 69, T169): the constants of the hull test, the
@@ -119,7 +120,7 @@ export function rolls(gen: CalcGeneration, hit: LoggedHit, attacker: CalcOptions
     const field = new Field({
       gameType: hit.doubles ? 'Doubles' : 'Singles', weather: (hit.weather || undefined) as never, terrain: (hit.terrain || undefined) as never,
       attackerSide: { isHelpingHand: hit.helpingHand },
-      defenderSide: { isReflect: hit.screens.includes('reflect'), isLightScreen: hit.screens.includes('lightscreen'), isAuroraVeil: hit.screens.includes('auroraveil') },
+      defenderSide: screenFlags(hit.screens),
     });
     // A spread move the log shows without [spread] hit one target: no spread factor. The calculator
     // rebuilds the move from its name and overrides, so the target goes in as an override.

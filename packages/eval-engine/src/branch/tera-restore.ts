@@ -1,8 +1,14 @@
 import { type TurnSnapshot, toId } from '@fulllifegames/replay-core';
 import type { SimBattle, SimPokemon } from './types.ts';
 
-/** Species whose Tera click also changes forme and ability (Terapagos: max HP as well). */
-const TERA_FORME_SPECIES = new Set(['Ogerpon', 'Terapagos', 'Morpeko']);
+/**
+ * Species whose Terastallization leaves more behind than the marker, each for its own reason: the click turns Ogerpon into its
+ * Tera forme with Embody Aspect, and Terapagos into the Terastal forme (another ability and maximum HP); Morpeko changes nothing
+ * at the click, but Hunger Switch returns early in `onResidual` while `pokemon.terastallized` is set, so a Tera Morpeko stops
+ * flipping between Full Belly and Hangry at every turn end (@pkmn/sim data/abilities.js, hungerswitch).
+ */
+// oracle: packages/eval-engine/test/tera-forme-oracle.spec.ts
+export const TERA_FORME_SPECIES = new Set(['Ogerpon', 'Terapagos', 'Morpeko']);
 
 /**
  * The sim deletes `terastallized` in its faint block. A body that faints
@@ -25,10 +31,10 @@ const TERA_FORME_SPECIES = new Set(['Ogerpon', 'Terapagos', 'Morpeko']);
  * offer a second Terastallization. The marker itself is left alone on a side
  * with an Illusion holder (the protocol names the disguise), for an entry
  * that matches no body or more than one, and for Ogerpon, Terapagos and
- * Morpeko, whose click also changes forme and ability and whose faint
- * regresses the forme. A bare marker would leave half a Tera there; the
- * marker's loss stays on those bodies. A side that already carries a marker
- * is done (one Tera per battle).
+ * Morpeko (TERA_FORME_SPECIES above names each one's reason). A bare marker
+ * would leave half a Tera there: the forme and ability of Ogerpon and
+ * Terapagos, the frozen forme of Morpeko. The marker's loss stays on those
+ * bodies. A side that already carries a marker is done (one Tera per battle).
  */
 export function restoreTeraFromSnapshot(battle: SimBattle, snapshot: TurnSnapshot) {
   if (battle.gen !== 9) return;

@@ -4,7 +4,7 @@ import { positionBattle, type ChoiceOption, type SimPosition } from './position.
 import { switchAssignments } from './assignments.ts';
 import { switchInSlots } from './switches.ts';
 import { sideIndex, toId } from '@fulllifegames/replay-core';
-import { isLockedEntry, requestMoveKey, type RequestMove } from './request-moves.ts';
+import { isLockedEntry, nextChoosingSlot, requestMoveKey, type RequestMove } from './request-moves.ts';
 
 /**
  * The legal choices of one side at a position: team preview leads, the
@@ -46,6 +46,16 @@ function benchSwitches(sideState: Side): SlotChoice[] {
   return switchInSlots(sideState).map(slot => ({
     choice: `switch ${slot}`, label: `→ ${sideState.pokemon[slot - 1].species.name}`, once: false, bench: slot,
   }));
+}
+
+/**
+ * A request entry the search leaves out: the request's own disabled flag, or a live disable it conceals (Imprison). A locked
+ * entry stays whatever its moveSlot says: Disable flags the slot of a locked Outrage, and the simulator plays the locked move
+ * before it reads the flag (side.js chooseMove), so dropping it left the slot with no choice (round 72, T246b).
+ */
+function isBarred(move: RequestMove, liveDisabled: ReadonlySet<string>): boolean {
+  if ('disabled' in move && move.disabled) return true;
+  return !isLockedEntry(move) && liveDisabled.has(requestMoveKey(move));
 }
 
 /** The once-per-battle gimmicks the request offers this slot. */
@@ -140,7 +150,8 @@ function slotChoicesFor(
 ): SlotChoice[] {
   if (forced) return benchSwitches(sideState);
   const pokemon = sideState.active[slot];
-  if (!entry || !pokemon || pokemon.fainted) return [];
+  // The sim passes a fainted, an empty and a commanding slot (a Tatsugiri riding a Dondozo): its choice goes to the next slot.
+  if (!entry || !pokemon || nextChoosingSlot(sideState, slot) !== slot) return [];
 
   // Requests also conceal 'hidden' TRAPPING (an unrevealed Magnet Pull) while
   // the switch validation still rejects — consult the live field like the
@@ -154,9 +165,8 @@ function slotChoicesFor(
   const liveDisabled = new Set<string>(pokemon.moveSlots.filter(slot => slot.disabled).map(slot => slot.id));
 
   for (const move of entry.moves) {
-    if ('disabled' in move && move.disabled) continue;
+    if (isBarred(move, liveDisabled)) continue;
     const key = requestMoveKey(move);
-    if (liveDisabled.has(key)) continue;
     for (const target of moveTargets(sideState, move, slot, played)) {
       pushSlotChoices(choices, key, target, gimmicks);
     }
@@ -292,10 +302,9 @@ function singlesMoveChoices(
   const liveDisabled = new Set<string>(
     (sideState.active[0]?.moveSlots ?? []).filter(slot => slot.disabled).map(slot => slot.id));
   for (const move of active.moves) {
-    if ('disabled' in move && move.disabled) continue;
+    if (isBarred(move, liveDisabled)) continue;
     // Same id-over-display-name rule as slotChoicesFor ("Return 102" -> return).
     const key = requestMoveKey(move);
-    if (liveDisabled.has(key)) continue;
     options.push({ choice: `move ${key}`, label: move.move });
     pushSinglesGimmicks(options, key, move, active, activeTera);
   }

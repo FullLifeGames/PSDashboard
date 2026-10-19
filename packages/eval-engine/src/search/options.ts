@@ -101,26 +101,34 @@ function keepPlayedCore(
 }
 
 /**
- * Field moves that FAIL deterministically against a standing condition —
- * clicking them is a pass with a real-looking label (GPL T25: Stealth Rock
- * ranked while rocks were already up). `foe` = the side the hazard lands
- * on; screens/tailwind check the mover's own side. If a player actually
- * clicks one, the turn reads as unmatched (charitable) rather than graded.
+ * The layers at which a layered hazard refuses another layer. The cap lives in the code of the condition's `onSideRestart`
+ * handler, so no Dex field says it; test/noop-field-moves-oracle.spec.ts reads the full stack from the simulator.
  */
-const NOOP_FIELD_MOVES: Record<string, (own: Side, foe: Side) => boolean> = {
-  stealthrock: (_own, foe) => !!foe.sideConditions['stealthrock'],
-  spikes: (_own, foe) => ((foe.sideConditions['spikes'] as { layers?: number } | undefined)?.layers ?? 0) >= 3,
-  toxicspikes: (_own, foe) => ((foe.sideConditions['toxicspikes'] as { layers?: number } | undefined)?.layers ?? 0) >= 2,
-  stickyweb: (_own, foe) => !!foe.sideConditions['stickyweb'],
-  reflect: own => !!own.sideConditions['reflect'],
-  lightscreen: own => !!own.sideConditions['lightscreen'],
-  auroraveil: own => !!own.sideConditions['auroraveil'],
-  tailwind: own => !!own.sideConditions['tailwind'],
-  safeguard: own => !!own.sideConditions['safeguard'],
-  mist: own => !!own.sideConditions['mist'],
-};
+// oracle: packages/eval-engine/test/noop-field-moves-oracle.spec.ts
+export const LAYER_CAPS: Record<string, number> = { spikes: 3, toxicspikes: 2 };
 
 type Side = ReturnType<typeof positionBattle>['sides'][number];
+
+/**
+ * Field moves that FAIL deterministically against a standing condition —
+ * clicking them is a pass with a real-looking label (GPL T25: Stealth Rock
+ * ranked while rocks were already up). The rule is the simulator's
+ * (`Side.addSideCondition`, round 72 W4): a side condition that stands and
+ * has no restart handler cannot start again; one with the handler (Spikes,
+ * Toxic Spikes) refuses a layer past its cap. A move with an `onHitSide`
+ * handler (Quick Guard, Wide Guard) runs it either way and prints no failure.
+ * A foe-side move checks the foe's side, an ally-side move the mover's own. If a player actually
+ * clicks one, the turn reads as unmatched (charitable) rather than graded.
+ */
+export function failsAgainstStanding(dex: ReturnType<typeof positionBattle>['dex'], moveId: string, own: Side, foe: Side): boolean {
+  const move = dex.moves.get(moveId);
+  if (!move.sideCondition) return false;
+  const standing = (move.target === 'foeSide' ? foe : own).sideConditions[move.sideCondition] as { layers?: number } | undefined;
+  if (!standing || typeof (move as { onHitSide?: unknown }).onHitSide === 'function') return false;
+  if (typeof (dex.conditions.get(move.sideCondition) as { onSideRestart?: unknown }).onSideRestart !== 'function') return true;
+  const cap = LAYER_CAPS[move.sideCondition];
+  return cap !== undefined && (standing.layers ?? 0) >= cap;
+}
 
 /**
  * Sleep Clause makes a second sleep FAIL while a foe already sleeps —
@@ -149,8 +157,7 @@ function dropNoopMoves(
     if (!option.choice.startsWith('move ')) return true;
     const moveId = option.choice.split(' ')[1];
     if (foeSleeps && battle.dex.moves.get(moveId).status === 'slp') return false;
-    const check = NOOP_FIELD_MOVES[moveId];
-    return !check || !check(own, foe);
+    return !failsAgainstStanding(battle.dex, moveId, own, foe);
   });
   // Never filter a side into an empty list — a stuck mon whose only moves
   // are standing field moves must still act.

@@ -13,6 +13,10 @@ export type { GenerationsScope, LegalDex } from './format-generations.ts';
 export type { CalcGeneration } from './calc-gen.ts';
 export { buildCalcPokemon, calcBaseStats, calcKnowsMove, calcSpecies, speciesOverrides } from './calc-build.ts';
 export type { CalcPokemonOptions, SpeciesDex } from './calc-build.ts';
+export {
+  protectKind, callingMoves, choiceItems, hazardConditions, terrainConditions, umbrellaWeathers, SCREENS, isScreen, screenFlags, standingScreens,
+} from './dex-facts/index.ts';
+export type { FactsDex, ProtectKind, ScreenHolder, ScreenId } from './dex-facts/index.ts';
 export { resolveHiddenPowerType, typedHiddenPowerId, withHiddenPowerType, HP_TYPES } from './hidden-power.ts';
 export { toId, sideIndex } from './ids.ts';
 export type { SideId } from './ids.ts';
