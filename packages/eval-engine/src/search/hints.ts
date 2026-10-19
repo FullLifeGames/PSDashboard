@@ -6,6 +6,7 @@ import { bodyAsClicked } from '../calc/tera-click.ts';
 import { RULE_MOVES } from '../move-use.ts';
 import { shieldsFromHits, shieldsSide } from '../dex-facts/protect.ts';
 import { sideIndex } from '@fulllifegames/replay-core';
+import { askCheckOn, AskLeak, callHandler, guarded, isolated } from '../sim-ask/index.ts';
 
 /**
  * Static per-option threat hints — the machinery candidate restriction
@@ -73,29 +74,43 @@ export { shieldsFromHits, shieldsSide };
 
 type HitHandler = (this: unknown, target: unknown, source: unknown, move: unknown) => unknown;
 
+/** The body of the live battle's side a view stands for, found by its place on the side. */
+const bodyIn = (view: Battle, mon: Pokemon): Pokemon => view.sides[mon.side.n].pokemon[mon.side.pokemon.indexOf(mon)];
+
+/** The answers of `protectorStops` per target and source body of a reader battle: protector, attack and its target at use. */
+const stopsAsked = new WeakMap<Pokemon, WeakMap<Pokemon, Map<string, boolean>>>();
+
 /**
  * Round 70: whether the protector's condition stops `attack` from `source` on `target`: the simulator's own onTryHit, asked
- * from stand-ins that leave the battle alone (the battle read through its prototype with a log that discards, a source that
- * holds no Outrage lock to reset). The protector sets a side condition (Wide Guard) or a volatile on its user (Protect and its
- * kin, gate of 13.10. 20:26, 3a). The handler returns nothing for a hit it lets through and the simulator's NOT_FAIL for a hit
- * it stops. A handler that needs more than the stand-ins offer stops nothing. The caller sets the attack's target at use.
- *
- * The shields that punish a contact hit (King's Shield, Obstruct, Silk Trap, Baneful Bunker, Burning Bulwark, Spiky Shield) do it in
- * this same handler, on the live attacker: a stage drop reaches the nested boosts a shallow stand-in shares with the live body, a
- * status try writes the live battle's log and effect counter. The question is only whether the hit is stopped, so the handler is
- * asked about the attack without its contact flag (test/protect-tempo-hints.spec.ts plays every protector of the Dex).
+ * through the module that asks the simulator (sim-ask/, round 72, T239): the handler runs on copy-on-write views of the battle, both
+ * bodies and the attack, so it writes nothing the live battle can see, whatever it does to them. The protector sets a side condition
+ * (Wide Guard) or a volatile on its user (Protect and its kin, gate of 13.10. 20:26, 3a). The handler returns nothing for a hit it
+ * lets through and the simulator's NOT_FAIL for a hit it stops. A handler that needs more than the views offer stops nothing. The
+ * caller sets the attack's target at use. The shields that punish a contact hit (King's Shield, Obstruct, Silk Trap, Baneful Bunker,
+ * Burning Bulwark, Spiky Shield) do it in this same handler; on the views the punishment lands in the views (test/protect-tempo-hints.spec.ts
+ * and test/protect-ask.spec.ts play every protector of the Dex against every class of attack). The reader battle of a position is
+ * never mutated and an option list asks the same hit once per option: one answer per body pair, protector and attack (a view costs
+ * about seven times the old stand-in). With the development check on, a hit is asked again, so a caller that mutated the battle
+ * after its first question fails loudly.
  */
 export function protectorStops(battle: Battle, protector: DexMove, attack: ActiveMove, source: Pokemon, target: Pokemon): boolean {
   const condition = protector.sideCondition || protector.volatileStatus;
   const handler = condition ? (battle.dex.conditions.get(condition) as { onTryHit?: unknown }).onTryHit : undefined;
   if (typeof handler !== 'function') return false;
-  const stage = Object.create(battle, { add: { value: () => undefined } });
-  const user = Object.create(source, { getVolatile: { value: () => undefined } });
-  try {
-    return (handler as HitHandler).call(stage, target, user, Object.create(attack, { flags: { value: { ...attack.flags, contact: undefined } } })) !== undefined;
-  } catch {
-    return false;
-  }
+  let bySource = stopsAsked.get(target);
+  if (!bySource) stopsAsked.set(target, bySource = new WeakMap());
+  let asked = bySource.get(source);
+  if (!asked) bySource.set(source, asked = new Map());
+  const key = `${protector.id}|${attack.id}|${attack.target}|${Object.keys(attack.flags).join('+')}`;
+  const known = asked.get(key);
+  if (known !== undefined && !askCheckOn()) return known;
+  const view = isolated(battle);
+  const answered = guarded(battle, [protector, attack], () =>
+    callHandler(handler as HitHandler, view, [bodyIn(view, target), bodyIn(view, source), isolated(attack)]));
+  const answer = answered.ok && answered.value !== undefined;
+  if (known !== undefined && known !== answer) throw new AskLeak();
+  asked.set(key, answer);
+  return answer;
 }
 
 /** Every stat a stage can sit on. */
@@ -226,14 +241,13 @@ function twinBoard(twin: ClickedTwin, position: SimPosition, side: 'p1' | 'p2'):
 function targetAtUse(board: HintBoard, attacker: Pokemon, move: DexMove, victim: Pokemon | undefined = board.foes[0]): DexMove['target'] {
   const handler = RULE_MOVES.has(move.id) ? (move as { onModifyMove?: unknown }).onModifyMove : undefined;
   if (typeof handler !== 'function') return move.target;
-  const active = board.battle.dex.getActiveMove(move.id);
-  try {
-    (handler as (this: unknown, move: unknown, user: Pokemon, target: Pokemon | undefined) => void)
-      .call(board.battle, active, attacker, victim);
-  } catch {
-    return move.target;
-  }
-  return active.target;
+  const { battle } = board;
+  const active = battle.dex.getActiveMove(move.id);
+  const view = isolated(battle);
+  const answered = guarded(battle, [move], () =>
+    callHandler(handler as (this: unknown, move: unknown, user: Pokemon, target: Pokemon | undefined) => void, view,
+      [active, bodyIn(view, attacker), victim && bodyIn(view, victim)]));
+  return answered.ok ? active.target : move.target;
 }
 
 /**
