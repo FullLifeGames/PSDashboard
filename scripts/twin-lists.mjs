@@ -25,6 +25,10 @@ const NEAR_MIN_NAMES = 4;
 
 const toID = text => String(text).toLowerCase().replace(/[^a-z0-9]+/g, '');
 
+// A file without an opening bracket, a string, a comma after a string, another string and a second comma cannot hold a list of 3
+// strings: the cheap test keeps the parser (the cost of the check) off most files. Comments between the elements pass it.
+const MAY_HOLD_LIST = /\[[^\]'"`]*['"`][^\]]*['"`]\s*,[^\]]*['"`]\s*,/;
+
 const STATEMENT = /(Statement|Declaration|PropertyDefinition)$/;
 
 /** Every node of a parsed file with `parent` set (the same walk as the name census, kept local to stay a plain function). */
@@ -80,10 +84,12 @@ function listsOf(ast, root) {
 }
 
 /** `Map<key, [{ file, line }]>`: every list outside twin-ok, also the ones that stand in one file only. */
-function placesOf(root, folders = TWIN_FOLDERS) {
+export function placesOf(root, folders = TWIN_FOLDERS, { prefilter = true } = {}) {
   const places = new Map();
   for (const file of sourceFiles(root, folders)) {
-    const ast = parseSource(readFileSync(path.join(root, file), 'utf8'), file);
+    const text = readFileSync(path.join(root, file), 'utf8');
+    if (prefilter && !MAY_HOLD_LIST.test(text)) continue;
+    const ast = parseSource(text, file);
     for (const list of listsOf(ast, root)) {
       if (list.exempt) continue;
       if (!places.has(list.key)) places.set(list.key, []);

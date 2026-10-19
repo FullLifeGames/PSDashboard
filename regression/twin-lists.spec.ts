@@ -4,7 +4,7 @@ import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'nod
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { nearPairs, newTwins, twinsOf } from '../scripts/twin-lists.mjs';
+import { nearPairs, newTwins, placesOf, twinsOf } from '../scripts/twin-lists.mjs';
 
 /**
  * Round 72 (T236): the twin detector. AGENTS.md says one rule lives in one module and a deliberate copy gets a spec that compares
@@ -99,6 +99,24 @@ describe('twinsOf and newTwins', () => {
     expect(twinsOf(missing)).toEqual({ [KEY]: [A, B] });
     const bare = tree({ [A]: LIST, [B]: `// twin-ok\n${LIST}` });
     expect(twinsOf(bare)).toEqual({ [KEY]: [A, B] });
+  });
+});
+
+describe('the cheap test before the parser', () => {
+  test('lists in every written form still reach the parser', () => {
+    const forms = [
+      "export const A = [\n  // the screens\n  'Reflect',\n  'Light Screen',\n  'Aurora Veil', // last\n];\n",
+      "export const A = [/* x */ 'Reflect', 'Light Screen', 'Aurora Veil'];\n",
+      "export const A = new Set<string>([\"Reflect\", `Light Screen`, 'Aurora Veil']);\n",
+      "export const A = { screens: ['Reflect', 'Light Screen', 'Aurora Veil'] as const };\n",
+      "export const A = ['Reflect',\n 'Light Screen',\n 'Aurora Veil'] as const;\n",
+    ];
+    for (const form of forms) expect(twinsOf(tree({ [A]: form, [B]: LIST })), form).toEqual({ [KEY]: [A, B] });
+  });
+
+  test('on the real tree the parser sees no list the cheap test dropped', () => {
+    const keys = (prefilter: boolean) => [...placesOf(REPO, undefined, { prefilter }).keys()].sort();
+    expect(keys(true)).toEqual(keys(false));
   });
 });
 
