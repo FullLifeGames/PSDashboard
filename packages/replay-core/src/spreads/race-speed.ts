@@ -1,4 +1,5 @@
-import { Battle, Dex, Teams, toID, type Pokemon } from '@pkmn/sim';
+import { Dex, type PokemonSet, type Pokemon } from '@pkmn/sim';
+import { twinBattle } from '../sim-ask/twin.ts';
 
 /**
  * The Speed a race ran at, as the simulator of the replay's generation
@@ -16,15 +17,11 @@ function scarfHolder(gen: number): Pokemon | null {
   const scarf = Dex.forGen(gen).items.get('choicescarf');
   let holder: Pokemon | null = null;
   if (scarf.exists && scarf.gen <= gen) {
-    const team = (item: string) => Teams.pack([{
+    const team = (item: string): PokemonSet[] => [{
       name: 'Smeargle', species: 'Smeargle', item, ability: 'Own Tempo', moves: ['Splash'], nature: 'Hardy', gender: '',
       evs: { hp: 0, atk: 0, def: 0, spa: 0, spd: 0, spe: 0 }, ivs: { hp: 31, atk: 31, def: 31, spa: 31, spd: 31, spe: 31 }, level: 100,
-    }]);
-    const battle = new Battle({
-      formatid: toID(`gen${gen}customgame`), seed: '1,2,3,4',
-      p1: { name: 'A', team: team('Choice Scarf') }, p2: { name: 'B', team: team('') },
-    });
-    if (battle.sides.some(side => side.requestState === 'teampreview')) battle.makeChoices('team 1', 'team 1');
+    }];
+    const battle = twinBattle(`gen${gen}customgame`, { p1: { name: 'A', team: team('Choice Scarf') }, p2: { name: 'B', team: team('') } });
     holder = battle.sides[0].active[0] ?? null;
   }
   holders.set(gen, holder);
