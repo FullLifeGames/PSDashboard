@@ -1,23 +1,25 @@
 import { beforeAll, describe, expect, test } from 'vitest';
-import { Teams } from '@pkmn/sim';
+import { Dex, Teams } from '@pkmn/sim';
 import type { PokemonSet } from '@pkmn/sim';
 import { parseShowteamSheet } from '../src/opponent-inferrer.ts';
+import { extractTeamSheets } from '../src/team-builder.ts';
 import { toId } from '../src/ids.ts';
 import { fixtureTexts, GENERATIONS, generatedTeams, withCorners } from './team-text-sources.ts';
 
 /**
- * Round 72, T241 step 1b: an Open Team Sheet (`|showteam|`) goes through the library. `parseShowteamSheet` reads the
- * packed team with `Teams.unpack`, the reader `extractEmbeddedShowteamExports` already used for the built sets. The hand
- * reader it replaced lives on below as `legacyParseShowteamSheet`, and this spec holds the library to it on every
- * `|showteam|` side of the fixtures and on simulator-generated teams of generations 1 to 9 (plain and with corners, on
- * both sides, so singles and doubles teams alike). Census at the change (1,734 sides of fixtures and fit corpus, 1,462
- * equal): the 272 others differ in one finding.
- *   F2  Packed move names with two capitals in a row: the hand splitter wrote "Will OWisp" and "XScissor", the library
- *       writes "Will O Wisp" and "X Scissor" (283 moves, those two spellings only; both give the same id).
- *   F5  A species the sheet writes in its own field, where the library has no Dex to split by: "Porygon2" would come back
- *       "Porygon 2" and "Zygarde-10%" "Zygarde- 10 %". The species reads the Dex's name instead; the real sheets (the
- *       server writes the species into the name field, which the library leaves as it is) read the same as before.
- *       Items and abilities with a digit still split ("TR41" reads "tr 41"; none on a sheet of a format that has them).
+ * Round 72, T241 step 1b: an Open Team Sheet (`|showteam|`) goes through the library. `parseShowteamSheet` and the sets
+ * `extractTeamSheets` builds read one packed team entry by entry through `Teams.import` of @pkmn/sim, which unpacks a
+ * single line with the Dex tables. The hand reader it replaced lives on below as `legacyParseShowteamSheet`, and this
+ * spec holds the library to it on every `|showteam|` side of the fixtures and on simulator-generated teams of
+ * generations 1 to 9 (plain and with corners, on both sides, so singles and doubles teams alike). Census at the change
+ * (1,734 sides of fixtures and fit corpus): 974 read as before, 760 differ in the spelling of 12 names, all with equal
+ * ids (`out/team-text-census.txt` of lane D).
+ *   F2  The Dex spells a name where it knows the id: the hand splitter wrote "Will OWisp", "XScissor", "Lightof Ruin",
+ *       "Uturn", "Freeze Dry", "Kings Shield", and the library's own fallback "Will O Wisp"; the Dex says "Will-O-Wisp",
+ *       "X-Scissor", "Light of Ruin", "U-turn", "Freeze-Dry", "King's Shield". A name the Dex does not know keeps the
+ *       text as written.
+ *   F5  A species the sheet writes in its own field reads the Dex name ("Porygon2", "Zygarde-10%"); the real sheets (the
+ *       server writes the species into the name field) read the same as before.
  */
 
 interface LegacySheetPokemon { species: string; item: string; ability: string; moves: string[]; teraType: string; level: number; gender: string }
@@ -48,9 +50,15 @@ function legacyParseShowteamSheet(log: string, side: 'p1' | 'p2'): LegacySheetPo
   return pokemon.length > 0 ? pokemon : null;
 }
 
+/** The Dex's name where the Dex knows the id, the text as written where it does not (round 72, F2). */
+const dexSpelled = (table: { get(name: string): { exists: boolean; name: string } }, text: string): string => {
+  const entry = table.get(text);
+  return entry.exists ? entry.name : text;
+};
+
 /**
  * Equal on every field. The names of species, item, ability and moves compare as ids, because the two readers spell a
- * packed name differently (F2, F5); `exact` also holds the species and the item and ability to the old text.
+ * packed name differently (F2, F5); `exact` also holds the species, item, ability and moves to the old text spelled by the Dex tables.
  */
 function expectSameSheet(log: string, side: 'p1' | 'p2', exact: boolean) {
   const old = legacyParseShowteamSheet(log, side);
@@ -59,17 +67,17 @@ function expectSameSheet(log: string, side: 'p1' | 'p2', exact: boolean) {
   if (!old || !now) return;
   const reading = (mon: LegacySheetPokemon) => ({
     ...mon,
-    species: exact ? mon.species : toId(mon.species),
-    item: exact ? mon.item : toId(mon.item),
-    ability: exact ? mon.ability : toId(mon.ability),
-    moves: mon.moves.map(toId),
+    species: exact ? dexSpelled(Dex.species, mon.species) : toId(mon.species),
+    item: exact ? dexSpelled(Dex.items, mon.item) : toId(mon.item),
+    ability: exact ? dexSpelled(Dex.abilities, mon.ability) : toId(mon.ability),
+    moves: mon.moves.map(move => (exact ? dexSpelled(Dex.moves, move) : toId(move))),
   });
   expect(now.map(reading)).toEqual(old.map(reading));
 }
 
 const fixtures = fixtureTexts();
 
-describe('parseShowteamSheet reads like the hand reader did, through Teams.unpack', () => {
+describe('parseShowteamSheet reads like the hand reader did, through the Dex tables', () => {
   const generated = new Map<number, PokemonSet[][]>();
   beforeAll(async () => {
     for (const gen of GENERATIONS) generated.set(gen, await generatedTeams(gen, 6));
@@ -117,10 +125,37 @@ describe('parseShowteamSheet reads like the hand reader did, through Teams.unpac
     expect(sheet!.map(mon => mon.species)).toEqual(['Porygon2', 'Rotom-Wash', 'Zygarde-10%']);
   });
 
-  test('F2: packed move names with two capitals in a row read as spaced words', () => {
+  test('F2: packed names read through the Dex tables, so the Dex spelling stands', () => {
     const sheet = parseShowteamSheet('|showteam|p1|Whimsicott||FocusSash|Prankster|WillOWisp,XScissor,Protect,Tailwind|Timid||F|||50|', 'p1');
-    expect(sheet![0].moves).toEqual(['Will O Wisp', 'X Scissor', 'Protect', 'Tailwind']);
+    expect(sheet![0].moves).toEqual(['Will-O-Wisp', 'X-Scissor', 'Protect', 'Tailwind']);
     expect(sheet![0].moves.map(toId)).toEqual(['willowisp', 'xscissor', 'protect', 'tailwind']);
     expect(sheet![0]).toEqual(expect.objectContaining({ species: 'Whimsicott', item: 'Focus Sash', ability: 'Prankster', level: 50, gender: 'F', teraType: '' }));
+  });
+
+  test('F2: a name the Dex does not know keeps its written text, ids equal either way', () => {
+    const sheet = parseShowteamSheet('|showteam|p1|Whimsicott||FocusSash|Prankster|TotallyFakeMove,WillOWisp|Timid||F|||50|', 'p1');
+    expect(sheet![0].moves).toEqual(['TotallyFakeMove', 'Will-O-Wisp']);
+    const odd = parseShowteamSheet('|showteam|p1|Whimsicott||CamelCaseItem|InventedAbility|Protect|Timid||F|||50|', 'p1');
+    expect([odd![0].item, odd![0].ability]).toEqual(['CamelCaseItem', 'InventedAbility']);
+  });
+
+  test('the sets built from a sheet read through the same per-entry reader and spell like the sheet', () => {
+    const line = '|showteam|p2|Miraidon||ChoiceSpecs|HadronEngine|ElectroDrift,DracoMeteor,VoltSwitch,Protect|Timid||||50|]' +
+      'Whimsicott||FocusSash|Prankster|WillOWisp,XScissor,Protect,Tailwind|Timid||F|||50|]' +
+      'Incineroar||SafetyGoggles|Intimidate|FakeOut,KnockOff,FlareBlitz,PartingShot|Careful||F|||50|';
+    const sets = extractTeamSheets(`|player|p2|Bo|1|
+${line}`).p2!;
+    const sheet = parseShowteamSheet(line, 'p2')!;
+    // A short first entry no longer drops the entries after it (F6), and the spelling is the sheet reader's.
+    expect(sets.map(set => set.species)).toEqual(sheet.map(mon => mon.species));
+    expect(sets.map(set => set.moves)).toEqual(sheet.map(mon => mon.moves));
+    expect(sets[1].moves).toEqual(['Will-O-Wisp', 'X-Scissor', 'Protect', 'Tailwind']);
+    expect(sets.map(set => [set.item, set.ability])).toEqual(sheet.map(mon => [mon.item, mon.ability]));
+  });
+
+  test.each(fixtures.sheets.map((s, i) => [`${s.tag} ${s.side} #${i}`, s] as const))('built sets of %s equal the sheet reader', (_tag, sheet) => {
+    const sets = extractTeamSheets(sheet.log)[sheet.side];
+    const read = parseShowteamSheet(sheet.log, sheet.side);
+    expect(sets?.map(set => [set.species, set.item, set.ability, set.moves])).toEqual(read?.map(mon => [mon.species, mon.item, mon.ability, mon.moves]));
   });
 });

@@ -1,6 +1,6 @@
 import type { PokemonSet } from '@pkmn/sim';
 import { Teams } from '@pkmn/sim';
-import { inferOpponentTeam } from './opponent-inferrer.ts';
+import { inferOpponentTeam, unpackSheetSets } from './opponent-inferrer.ts';
 import { getSpeciesUsageSet } from './smogon/usage-lookup.ts';
 import type { SmogonUsageStats } from './smogon/stats-types.ts';
 import { getSpeciesSetAssumption, type SmogonSetAssumptions } from './smogon/sets-lookup.ts';
@@ -359,8 +359,8 @@ function extractEmbeddedShowteamExports(log: string): SideTeams {
     if (showteamMatch) {
       const side = showteamMatch[1] as 'p1' | 'p2';
       if (!fromShowteam[side]) {
-        const unpacked = Teams.unpack(showteamMatch[2]);
-        if (unpacked && unpacked.length > 0) fromShowteam[side] = unpacked;
+        const unpacked = unpackSheetSets(showteamMatch[2]);
+        if (unpacked.length > 0) fromShowteam[side] = unpacked;
       }
       continue;
     }

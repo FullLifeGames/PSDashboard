@@ -30,8 +30,8 @@ interface SheetPokemon {
 
 /**
  * One unpacked sheet entry in the shape the inference reads: the Tera type, level and gender default as the sheet
- * leaves them out. The unpacker splits a packed species it has no Dex for ("Zygarde-10%" would come back as
- * "Zygarde- 10 %"), so the species reads the Dex's name for it, and its own text when the Dex does not know it.
+ * leaves them out. A species the sheet writes in the name field (the server's way) is left as written by the
+ * unpacker, so it reads the Dex's name for it, and its own text when the Dex does not know it.
  */
 function sheetEntry(set: PokemonSet): SheetPokemon | null {
   const packed = set.species || set.name;
@@ -51,34 +51,64 @@ function sheetEntry(set: PokemonSet): SheetPokemon | null {
 /** A full packed entry, NICKNAME|SPECIES|ITEM|ABILITY|MOVES|NATURE|EVS|GENDER|IVS|SHINY|LEVEL|MISC, holds eleven pipes. */
 const SHEET_ENTRY_PIPES = 11;
 
-/**
- * One entry of a sheet through the library's unpacker. The unpacker counts fields and runs a short entry into the
- * next one, so each entry goes in alone, padded to the full count: a hand-edited or cut-off entry reads with its
- * missing fields empty (as the hand reader took it) and does not swallow the entries after it.
- */
-function unpackEntry(entry: string): PokemonSet | undefined {
-  const pipes = entry.split('|').length - 1;
-  return Teams.unpack(entry + '|'.repeat(Math.max(0, SHEET_ENTRY_PIPES - pipes)))?.[0];
+type NameTable = { get(name: string): { exists: boolean } };
+
+/** The unpacker's spelling where the Dex knows the id; the text as written where it does not (the unpacker would split it at its capitals). */
+function asWritten(raw: string | undefined, read: string, table: NameTable): string {
+  const text = raw?.trim();
+  return text && !table.get(text).exists && toId(text) === toId(read) ? text : read;
+}
+
+/** The unpacked entry with the species, item, ability and moves its packed text names but the Dex does not know put back as written. */
+function writtenNames(set: PokemonSet, entry: string): PokemonSet {
+  const fields = entry.split('|');
+  const moves = (fields[4] ?? '').split(',').filter(move => move);
+  return {
+    ...set,
+    species: asWritten(fields[1], set.species, Dex.species),
+    item: asWritten(fields[2], set.item, Dex.items),
+    ability: asWritten(fields[3], set.ability, Dex.abilities),
+    moves: set.moves.map((move, index) => (moves.length === set.moves.length ? asWritten(moves[index], move, Dex.moves) : move)),
+  };
 }
 
 /**
- * Reads the `|showteam|` protocol line of a side (Open Team Sheets) through the library: each entry, closed by `]`,
- * goes to `Teams.unpack` of @pkmn/sim, the call team-builder.ts makes for the built sets. Round 72 (T241): the hand
- * splitter of packed names is gone, so "WillOWisp" reads "Will O Wisp" and not "Will OWisp" (sheet-text.spec.ts holds
- * the reading to the old one).
+ * One entry of a sheet through the library's unpacker, handed the Dex tables (`Teams.import` of @pkmn/sim reads a
+ * packed line with them), so a name reads as the Dex spells it: "WillOWisp" is "Will-O-Wisp", "XScissor" is
+ * "X-Scissor", and a species in its own field keeps "Porygon2". The unpacker counts fields and runs a short entry into
+ * the next one, so each entry goes in alone, padded to the full count: a hand-edited or cut-off entry reads with its
+ * missing fields empty and does not swallow the entries after it.
+ */
+function unpackEntry(entry: string): PokemonSet | undefined {
+  const pipes = entry.split('|').length - 1;
+  const set = Teams.import(entry + '|'.repeat(Math.max(0, SHEET_ENTRY_PIPES - pipes)))?.[0];
+  return set && writtenNames(set, entry);
+}
+
+/**
+ * The sets of one packed sheet, the part of a `|showteam|` line after the side: the one reader of the parser below
+ * and of the built sets (`extractTeamSheets`). Entries without a species are left out.
+ */
+export function unpackSheetSets(packed: string): PokemonSet[] {
+  const sets: PokemonSet[] = [];
+  for (const entry of packed.split(']')) {
+    const set = unpackEntry(entry);
+    if (set && (set.species || set.name)) sets.push(set);
+  }
+  return sets;
+}
+
+/**
+ * Reads the `|showteam|` protocol line of a side (Open Team Sheets) through the library (`unpackSheetSets`). Round 72
+ * (T241): the hand splitter of packed names is gone, and the names come from the Dex tables where the Dex knows them
+ * (sheet-text.spec.ts holds the reading to the old one).
  */
 export function parseShowteamSheet(log: string, side: 'p1' | 'p2'): SheetPokemon[] | null {
   const prefix = `|showteam|${side}|`;
   const line = log.split('\n').find(candidate => candidate.startsWith(prefix));
   if (!line) return null;
 
-  const pokemon: SheetPokemon[] = [];
-  for (const entry of line.slice(prefix.length).split(']')) {
-    const set = unpackEntry(entry);
-    const parsed = set && sheetEntry(set);
-    if (parsed) pokemon.push(parsed);
-  }
-
+  const pokemon = unpackSheetSets(line.slice(prefix.length)).map(sheetEntry).filter((mon): mon is SheetPokemon => mon !== null);
   return pokemon.length > 0 ? pokemon : null;
 }
 
