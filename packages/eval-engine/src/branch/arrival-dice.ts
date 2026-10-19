@@ -5,7 +5,6 @@ import {
 } from '../hax-alignment.ts';
 import { hasForceSwitch } from './corrections.ts';
 import { collectForcedSwitchSpecies, getMainChoice, parseTurnBlocks } from './protocol-choices.ts';
-import { protocolNicknames, simNamedLines } from './protocol-names.ts';
 import type { SimBattle, TurnBlock } from './types.ts';
 
 /**
@@ -30,16 +29,16 @@ export interface AlignedBlock {
 /**
  * Picks the candidate seed whose rolls reproduce this block's protocol events
  * (crits/misses/secondaries/faints), with the block's logged choices. The
- * block is read with the sim's names: the events are keyed by name, and a
- * nicknamed body's never met the sim's (round 67, G4). Fail-open: when no
- * trial runs, candidate 0 (1,2,3,4) stays.
+ * events are keyed by name: the built sets carry the replay's nicknames
+ * (round 72, T238), so the block's lines meet the sim's as they are (before,
+ * a nicknamed body's events never met the sim's, round 67, G4). Fail-open:
+ * when no trial runs, candidate 0 (1,2,3,4) stays.
  */
 export function alignBlockSeed(
   battle: SimBattle, turnBlock: TurnBlock, p1Choice: string, p2Choice: string,
-  nicknames: Map<string, string>, shouldStop?: () => boolean,
+  shouldStop?: () => boolean,
 ): AlignedBlock {
-  const blockLines = simNamedLines([...turnBlock.preUpkeep, ...turnBlock.postUpkeep], nicknames, battle);
-  const expectedEvents = extractProtocolEvents(blockLines);
+  const expectedEvents = extractProtocolEvents([...turnBlock.preUpkeep, ...turnBlock.postUpkeep]);
   const alignForced = {
     p1: collectForcedSwitchSpecies(turnBlock.preUpkeep, turnBlock.postUpkeep, 'p1'),
     p2: collectForcedSwitchSpecies(turnBlock.preUpkeep, turnBlock.postUpkeep, 'p2'),
@@ -97,7 +96,7 @@ export function alignArrivalDice(
   try {
     const aligned = alignBlockSeed(
       battle, block, getMainChoice(block.preUpkeep, 'p1', battle), getMainChoice(block.preUpkeep, 'p2', battle),
-      protocolNicknames(replayLog), shouldStop,
+      shouldStop,
     );
     if (aligned.seedChoice.trialScore === null) return null;
     battle.prng = new PRNG(aligned.seedChoice.seed);

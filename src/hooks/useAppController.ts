@@ -98,13 +98,10 @@ function useAnalysisSurface(ctx: ReplayContext, board: BoardController, engine: 
   });
 
   const simLines = simState?.log;
-  const simP1Bodies = simState?.p1Pokemon;
-  const simP2Bodies = simState?.p2Pokemon;
-  const replayLog = replayData?.log;
   const simLog = useMemo(() => {
     if (!simLines || simLines.length === 0) return '';
-    return branchFrameLog(simLines, replayLog ?? '', { p1: simP1Bodies ?? [], p2: simP2Bodies ?? [] });
-  }, [simLines, simP1Bodies, simP2Bodies, replayLog]);
+    return branchFrameLog(simLines);
+  }, [simLines]);
   const latestBranchHistoryEntry = history.length > 0 ? history[history.length - 1] : null;
 
   const showBranch = branching && simLog.length > 0;

@@ -201,9 +201,12 @@ describe('the sim brings the body the protocol shows (round 64, T121)', () => {
         ejected: switchAfterItem(lines, 'p2a', 'Eject Button'),
         walkingWakeCured: 'saltcure' in body(battle, 1, 'Walking Wake').volatiles,
         hatterene: body(battle, 1, 'Hatterene').item,
+        hattereneName: body(battle, 1, 'Hatterene').name,
       };
     });
-    expect(seen.get(3)).toEqual({ saltCure: 'Hatterene', ejected: 'Walking Wake', walkingWakeCured: false, hatterene: '' });
+    // The sim names a body by the replay's own name for it (a nickname, T238).
+    const { hattereneName, ...rest } = seen.get(3)!;
+    expect(rest).toEqual({ saltCure: hattereneName, ejected: 'Walking Wake', walkingWakeCured: false, hatterene: '' });
   });
 
   test('doubles 2630181744: Sinistcha\'s Eject Button brings Ninetales-Alola into p2b', { timeout: 240000 }, async () => {

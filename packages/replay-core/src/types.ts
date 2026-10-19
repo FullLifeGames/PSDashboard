@@ -323,6 +323,22 @@ export interface RevealedPokemonInfo {
   level: number;
   gender: string;
   /**
+   * The name the replay gave this body (round 72, T238): its first `switch`, `drag` or `replace` line, else an Open Team
+   * Sheet's name field. Unset when the name is the species' own, or the species of another body of the side (a lookup by
+   * name would then find the wrong body), or when the replay never named the body (team preview carries no nickname).
+   */
+  nickname?: string;
+  /**
+   * The shiny flag of the body's details in the same lines, or the sheet's. Unset when no line showed the body: team
+   * preview strips the flag, so an unrevealed body reads as not shiny to the simulator, as the log would have it.
+   */
+  shiny?: boolean;
+  /**
+   * The log showed the body with no gender although its species has one (a fixed one included): the game ran it as genderless (a set that says
+   * `N`). A set without a gender makes the simulator draw one, so the build says `N` for such a body (round 72, T238).
+   */
+  noGender?: boolean;
+  /**
    * Values DISPROVEN by protocol evidence (toId'd) — hazard damage rules out
    * Magic Guard, rocks chip rules out Heavy-Duty Boots, a landed Ground move
    * rules out Levitate. Rule-outs beat guesses, never revealed/manual/sheet.

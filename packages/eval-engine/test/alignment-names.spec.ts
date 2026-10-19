@@ -7,7 +7,6 @@ import {
 import { buildChoiceLockContext } from '../src/choice-lock';
 import { reconstructBranchRuntime } from '../src/branch-engine';
 import { extractProtocolEvents, scoreAlignment } from '../src/hax-alignment';
-import { protocolNicknames, simNamedLines } from '../src/branch/protocol-names';
 
 /**
  * Round 67 (G4): the hax alignment reads the protocol with the sim's names.
@@ -16,6 +15,8 @@ import { protocolNicknames, simNamedLines } from '../src/branch/protocol-names';
  * never met the sim's, and a trial in which it lived scored better than one
  * in which it fainted as in the game (751543 t19: Draco Meteor's miss was
  * chosen, Landorus lived and taunted Dragapult).
+ * Round 72 (T238): the build names every set as the protocol names its body, so the sim's names are the protocol's
+ * and the alignment reads the block's lines as they are (the translator, protocol-names.ts, is gone).
  */
 
 type Replay = { id: string; format: string; formatid?: string; players: string[]; log: string };
@@ -35,33 +36,37 @@ function make(format: string, p1: PokemonSet[], p2: PokemonSet[]): Battle {
   return battle;
 }
 
-describe('the protocol says which species each nickname stands for', () => {
-  test('switch details and team sheets; a switch detail wins over a sheet', () => {
-    const log = [
-      '|showteam|p1|Landorus-Therian||Leftovers|Intimidate|Taunt|||M|||100|]Dragonite||HeavyDutyBoots|Multiscale|IceSpinner|||F|||100|',
-      '|switch|p1a: Last Regrets|Landorus-Therian, M|100/100',
-      '|switch|p2b: kanye|Incineroar, M|100/100',
-    ].join('\n');
-    const nicknames = protocolNicknames(log);
-    expect(nicknames.get('p1: Last Regrets')).toBe('Landorus-Therian');
-    expect(nicknames.get('p2: kanye')).toBe('Incineroar');
-    expect(nicknames.get('p1: Dragonite')).toBe('Dragonite');
+describe('the simulator\'s body names are the protocol\'s names', () => {
+  const log = [
+    '|showteam|p1|Landorus-Therian||Leftovers|Intimidate|Taunt|||M|||100|]Dragonite||HeavyDutyBoots|Multiscale|IceSpinner|||F|||100|',
+    '|switch|p1a: Last Regrets|Landorus-Therian, M|100/100',
+    '|switch|p2b: kanye|Incineroar, M|100/100',
+  ].join('\n');
+
+  test('the built sets carry the nicknames the lines show, so the events keyed by name meet', () => {
+    const { p1Team, p2Team } = buildTeamsFromReplay(log);
+    const battle = make('gen9customgame', p1Team, p2Team);
+    expect(battle.sides[0].pokemon.map(body => body.name)).toEqual(['Last Regrets', 'Dragonite']);
+    expect(battle.sides[1].pokemon.map(body => body.name)).toEqual(['kanye']);
   });
 
   test.each([
     ['gen9customgame', 'p1a'],
     ['gen9doublescustomgame', 'p1b'],
-  ])('%s: a nicknamed faint meets the sim\'s faint of the same species', (format, slot) => {
-    const battle = make(format, [mon('Gholdengo', ['Nasty Plot']), mon('Landorus-Therian', ['Taunt'])], [mon('Dragapult', ['Draco Meteor']), mon('Clefable', ['Moonblast'])]);
-    expect(battle.sides[0].pokemon[1].name).toBe('Landorus');
+  ])('%s: a nicknamed faint meets the sim\'s faint of the same body', (format, slot) => {
+    const { p1Team } = buildTeamsFromReplay(log.replace('p1a: Last Regrets', `${slot}: Last Regrets`));
+    const battle = make(format, [mon('Gholdengo', ['Nasty Plot']), ...p1Team.filter(set => set.species === 'Landorus-Therian')], [mon('Dragapult', ['Draco Meteor']), mon('Clefable', ['Moonblast'])]);
+    expect(battle.sides[0].pokemon[1].name).toBe('Last Regrets');
     const protocol = [
-      `|move|p2a: Dragapult|Draco Meteor|${slot}: Last Regrets`, `|-damage|${slot}: Last Regrets|0 fnt`, '|-unboost|p2a: Dragapult|spa|2', `|faint|${slot}: Last Regrets`,
+      `|move|p2a: Dragapult|Draco Meteor|${slot}: Last Regrets`, `|-damage|${slot}: Last Regrets|0 fnt`,'|-unboost|p2a: Dragapult|spa|2', `|faint|${slot}: Last Regrets`,
     ];
-    const sim = protocol.map(line => line.replaceAll('Last Regrets', 'Landorus'));
-    const nicknames = new Map([['p1: Last Regrets', 'Landorus-Therian']]);
-    expect(scoreAlignment(extractProtocolEvents(protocol), extractProtocolEvents(sim)).faintMismatches).toBe(2);
-    expect(scoreAlignment(extractProtocolEvents(simNamedLines(protocol, nicknames, battle as never)), extractProtocolEvents(sim)))
-      .toEqual({ endedMismatch: false, faintMismatches: 0, softMismatches: 0 });
+    // The sim's lines name the body as the set does, the protocol as the player did: the same words.
+    const sim = protocol.map(line => line.replaceAll('Last Regrets', battle.sides[0].pokemon[1].name));
+    expect(scoreAlignment(extractProtocolEvents(protocol), extractProtocolEvents(sim))).toEqual({ endedMismatch: false, faintMismatches: 0, softMismatches: 0 });
+    // A set under the species' own name (as the build made it before round 72) does not meet the protocol's name.
+    const plain = make(format, [mon('Gholdengo', ['Nasty Plot']), mon('Landorus-Therian', ['Taunt'])], [mon('Dragapult', ['Draco Meteor']), mon('Clefable', ['Moonblast'])]);
+    expect(plain.sides[0].pokemon[1].name).toBe('Landorus');
+    expect(scoreAlignment(extractProtocolEvents(protocol), extractProtocolEvents(protocol.map(line => line.replaceAll('Last Regrets', 'Landorus')))).faintMismatches).toBe(2);
   });
 });
 
@@ -105,6 +110,6 @@ describe('scene: doubles 912884, Bleakwind Storm KOs the nicknamed Ting-Lu', () 
     const log = runtime.battleStream.battle!.log;
     const block = log.slice(log.lastIndexOf('|turn|7') + 1, log.lastIndexOf('|turn|8'));
     expect(runtime.haxAlignment.find(record => record.turn === 7)?.trialPerfect).toBe(true);
-    expect(block.some(line => line.startsWith('|faint|p2') && line.includes(': Ting-Lu'))).toBe(true);
+    expect(block.some(line => line.startsWith('|faint|p2') && line.includes(': JOHN PEEL'))).toBe(true);
   });
 });

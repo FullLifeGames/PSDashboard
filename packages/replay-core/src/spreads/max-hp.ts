@@ -1,3 +1,4 @@
+import { generationsFor } from '../format-generations.ts';
 import { keyOf } from './fit.ts';
 import { calcEvs, evBudget, evStep, ZERO_EVS, type EvBudget } from './ev-budget.ts';
 
@@ -31,24 +32,29 @@ export function observedMaxHp(log: string): Map<string, ObservedMaxHp> {
   return seen;
 }
 
+/** The library's stat formula, @pkmn/data's `gen.stats.calc`, in the modern generations (the replays this reads are Gen 3 and later). */
+const modernStats = generationsFor('').get(9).stats;
+
 /**
- * The HP EVs that reproduce an observed maximum HP: the formula
- * `floor((2·base + iv + floor(ev/4)) · level / 100) + level + 10` inverted
- * over the legal EV counts (multiples of four, 0..252). Level 100 inverts
+ * The HP EVs that reproduce an observed maximum HP: the library's HP formula
+ * (`gen.stats.calc`, `floor((2·base + iv + floor(ev/4) + 100) · level / 100) + 10`)
+ * inverted over the legal EV counts (multiples of four, 0..252). Round 72
+ * (T241): the formula comes from the library, held to the simulator's `maxhp`
+ * for every species by max-hp-sweep.spec.ts. Level 100 inverts
  * exactly; lower levels leave a few candidates, of which the one nearest
  * the prior's HP EVs wins. `undefined` when no count reaches the HP
- * (foreign IVs, Shedinja): then the log measured nothing usable. On Stat
+ * (foreign IVs; Shedinja, whose 1 HP is no function of the spread): then the log measured nothing usable. On Stat
  * Points (round 67) the candidates are the points 0..32, each through its
  * EVs (calcEvs), and the answer is in points.
  */
 export function hpEvsForMaxHp(
   baseHp: number, level: number, maxhp: number, priorHp: number, iv = 31, budget: EvBudget = evBudget(''),
 ): number | undefined {
+  if (baseHp === 1) return undefined;
   let best: number | undefined;
   for (let value = 0; value <= budget.perStat; value += evStep(budget)) {
     const ev = calcEvs({ ...ZERO_EVS, hp: value }, budget).hp;
-    const hp = Math.floor((2 * baseHp + iv + Math.floor(ev / 4)) * level / 100) + level + 10;
-    if (hp !== maxhp) continue;
+    if (modernStats.calc('hp', baseHp, iv, ev, level) !== maxhp) continue;
     if (best === undefined || Math.abs(value - priorHp) < Math.abs(best - priorHp)) best = value;
   }
   return best;
