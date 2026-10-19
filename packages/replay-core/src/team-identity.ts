@@ -70,12 +70,20 @@ export function noteSheetIdentities(sets: readonly PokemonSet[], pokemonMap: Map
 }
 
 /**
- * Leaves out a name the simulator would not keep or a lookup could not tell apart: the simulator names a body by its
- * species when the name is the species' own, and a protocol name is matched to a body by name or by species, so a name
- * that is the species (or the base species) of any body of the side would find the wrong one. The shiny flag stays.
+ * Leaves out a name the simulator would not keep or a lookup could not tell apart. The simulator names a body by its
+ * species when the name is the species' own, and a protocol name is matched to a body by name or by species through
+ * `toId`, so a name is kept only when that id finds this body and no other:
+ * - the species (or base species) of any body of the side would find the wrong one;
+ * - an id of "" (a Chinese or Japanese name, an emoji) is every such body's id, and two names of one id (`Rias!` and
+ *   `Rias?`, or one name on two bodies) find the first body for both;
+ * - a quote or a backslash breaks the team text in the JSON line that starts the battle stream.
+ * A name left out leaves the body under its species, as the simulator writes it; the shiny flag stays. The reconstruction
+ * is then right, and a branch of such a game shows the body twice in the embed's roster (the replay's name in the log
+ * before the branch, the species after) until the lookups of eval-engine/src/branch read the simulator's own ident.
  */
 export function dropAmbiguousNicknames(pokemonMap: Map<string, RevealedPokemonInfo>): void {
   const speciesIds = new Set<string>();
+  const nicknameIds = new Map<string, number>();
   for (const [key, info] of pokemonMap) {
     for (const name of [key, info.species]) {
       const bare = name.replace(/-\*$/, '');
@@ -83,9 +91,12 @@ export function dropAmbiguousNicknames(pokemonMap: Map<string, RevealedPokemonIn
       speciesIds.add(toId(bare));
       if (dex.exists) speciesIds.add(toId(dex.baseSpecies));
     }
+    if (info.nickname !== undefined) nicknameIds.set(toId(info.nickname), (nicknameIds.get(toId(info.nickname)) ?? 0) + 1);
   }
   for (const info of pokemonMap.values()) {
-    if (info.nickname !== undefined && speciesIds.has(toId(info.nickname))) delete info.nickname;
+    if (info.nickname === undefined) continue;
+    const id = toId(info.nickname);
+    if (id === '' || speciesIds.has(id) || (nicknameIds.get(id) ?? 0) > 1 || /["\\]/.test(info.nickname)) delete info.nickname;
   }
 }
 
