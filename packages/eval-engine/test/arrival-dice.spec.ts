@@ -10,7 +10,6 @@ import { serializeLiveBattle } from '../src/serialize';
 import { extractProtocolEvents, scoreAlignment } from '../src/hax-alignment';
 import { buildForcedSwitchChoice, hasForceSwitch } from '../src/branch/corrections';
 import { collectForcedSwitchSpecies, getMainChoice, parseTurnBlocks } from '../src/branch/protocol-choices';
-import { protocolNicknames, simNamedLines } from '../src/branch/protocol-names';
 import { alignArrivalDice } from '../src/branch/arrival-dice';
 import { deserializeBattleExact } from '../src/forward-model';
 
@@ -86,7 +85,7 @@ async function playTurn(runtime: BranchRuntime, replayLog: string, turn: number,
     await send(commands);
   }
   const lines = battle.log.slice(logStart);
-  const expected = extractProtocolEvents(simNamedLines([...block.preUpkeep, ...block.postUpkeep], protocolNicknames(replayLog), battle));
+  const expected = extractProtocolEvents([...block.preUpkeep, ...block.postUpkeep]);
   return { lines, score: scoreAlignment(expected, extractProtocolEvents(lines)) };
 }
 
