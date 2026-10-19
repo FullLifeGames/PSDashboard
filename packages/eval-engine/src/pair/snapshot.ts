@@ -1,6 +1,7 @@
 import type { Battle, Pokemon } from '@pkmn/sim';
 import { bodyOf, type SimBody } from '../calc/body.ts';
 import { bodyAsClicked } from '../calc/tera-click.ts';
+import { SCREENS } from '@fulllifegames/replay-core';
 
 /**
  * Round 56: the state of one hit, frozen as plain data at the moment the
@@ -39,7 +40,6 @@ export interface HitSnapshot {
 }
 
 const ROOMS = ['gravity', 'magicroom', 'wonderroom'];
-const SCREENS = ['reflect', 'lightscreen', 'auroraveil'];
 
 /** The ability id of the living body next to `mon`, or null. */
 function partnerAbility(mon: Pokemon): string | null {

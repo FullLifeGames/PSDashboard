@@ -1,11 +1,12 @@
 /**
  * Item-sensitivity probe plumbing: pure JSON surgery on serialized battle
- * positions (State.serializeBattle output) — no @pkmn/sim imports, so the
- * main-thread sweep can prepare probe positions and hand them to the worker
- * like any other serialized position.
+ * positions (State.serializeBattle output) — no battle is built here (the Dex
+ * only names the Choice items), so the main-thread sweep can prepare probe
+ * positions and hand them to the worker like any other serialized position.
  */
 
-import { sideIndex, toId } from '@fulllifegames/replay-core';
+import { Dex } from '@pkmn/sim';
+import { choiceItems, sideIndex, toId } from '@fulllifegames/replay-core';
 
 export interface SensitivityTarget {
   species: string;
@@ -25,7 +26,7 @@ interface SerializedBattleShape {
   sides?: { pokemon?: SerializedMon[] }[];
 }
 
-export const CHOICE_ITEMS = new Set(['choiceband', 'choicespecs', 'choicescarf']);
+export const CHOICE_ITEMS: ReadonlySet<string> = choiceItems(Dex);
 
 const monSpecies = (mon: SerializedMon): string => mon.set?.species ?? '';
 

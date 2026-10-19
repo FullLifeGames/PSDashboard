@@ -7,6 +7,7 @@ import { findPokemon, type InferrerState } from './inferrer-state.ts';
 import { illusionPossible } from './item-evidence.ts';
 import { arg, hasKw, identOf, keyOf, namesEffect, ofIdent, type LogLine } from './log-line.ts';
 import { toId } from '../ids.ts';
+import { SCREENS } from '../dex-facts/index.ts';
 
 /**
  * The clean hits each opponent Pokémon dealt (round 67, T130): the damage
@@ -25,7 +26,6 @@ import { toId } from '../ids.ts';
 
 type ClientPokemon = NonNullable<ReturnType<Battle['getPokemon']>>;
 
-const SCREEN_IDS = ['reflect', 'lightscreen', 'auroraveil'];
 /** The client's marks for an item a Pokémon took from another one. */
 const ACQUIRED = new Set(['tricked', 'stolen', 'bestowed', 'harvested']);
 /** Lines after which no move is resolving ('' a blank line, "done" the "|" line). */
@@ -112,7 +112,7 @@ function recordHit(walk: HitWalk, pending: PendingMove, attacker: ClientPokemon,
     defender: { ...party(defender), side: defender.side.n === 0 ? 'p1' : 'p2' },
     observed: 0, lowerBound: false,
     weather: battle.field.weather ?? '', terrain: battle.field.terrain ?? '',
-    screens: SCREEN_IDS.filter(id => sideConditions[id]),
+    screens: SCREENS.filter(id => sideConditions[id]),
     helpingHand: !!attacker.volatiles.helpinghand, defenderNew: defender.newlySwitched,
     doubles: battle.gameType !== 'singles', spread: pending.spread, others,
     doubt: doubtOf(walk, attacker, defender), gen, format: walk.format,

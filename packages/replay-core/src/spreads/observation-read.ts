@@ -3,6 +3,7 @@ import type { PokemonSet } from '@pkmn/sim';
 import type { CalcGeneration } from '../calc-gen.ts';
 import { ATTACKER_SIDE_FLAG_BY_ID, DEFENDER_SIDE_FLAG_BY_ID, FIELD_FLAG_BY_ID, TERRAIN_BY_ID, WEATHER_BY_ID } from '../calc-field.ts';
 import { toId } from '../ids.ts';
+import { screenFlags } from '../dex-facts/index.ts';
 import type { DamageObservation } from '../types.ts';
 import { originIn, type FormeDex } from './battle-forme.ts';
 
@@ -30,7 +31,6 @@ const flagsOf = (facts: readonly string[], table: Record<string, string>) =>
  * x2732/4096 in doubles) and the facts the log shows beside the two Pokémon (Helping Hand, Friend Guard, a Ruin ability, Gravity).
  */
 export function fieldOf(obs: DamageObservation): Field {
-  const screens = new Set(obs.screens);
   const facts = obs.fieldFacts ?? [];
   return new Field({
     gameType: obs.doubles ? 'Doubles' : 'Singles',
@@ -39,9 +39,7 @@ export function fieldOf(obs: DamageObservation): Field {
     ...flagsOf(facts, FIELD_FLAG_BY_ID),
     attackerSide: flagsOf(facts, ATTACKER_SIDE_FLAG_BY_ID),
     defenderSide: {
-      isReflect: screens.has('reflect'),
-      isLightScreen: screens.has('lightscreen'),
-      isAuroraVeil: screens.has('auroraveil'),
+      ...screenFlags(obs.screens),
       ...flagsOf(facts, DEFENDER_SIDE_FLAG_BY_ID),
     },
   });

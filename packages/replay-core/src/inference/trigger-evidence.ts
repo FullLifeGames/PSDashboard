@@ -5,6 +5,7 @@ import { possibleAbilities, ruleOutUnknown } from './item-evidence.ts';
 import { arg, keyOf, namesEffect, ofIdent, type LogLine } from './log-line.ts';
 import { newItemTriggerWatch, teamSizeOf, watchItemTriggers, type ItemTriggerWatch } from './item-triggers.ts';
 import { toId } from '../ids.ts';
+import { terrainConditions } from '../dex-facts/index.ts';
 
 /**
  * Items the protocol rules out by a trigger it shows without the item's line
@@ -53,8 +54,6 @@ export interface TriggerWatch {
   /** The Lum Berry, Sitrus Berry, Eject Button and Red Card windows (item-triggers.ts). */
   items: ItemTriggerWatch;
 }
-
-const TERRAINS = new Set(['electricterrain', 'grassyterrain', 'mistyterrain', 'psychicterrain']);
 
 function newWatch(state: InferrerState): TriggerWatch {
   return {
@@ -146,14 +145,14 @@ function closeDrops(state: InferrerState, watch: TriggerWatch) {
 const fieldOf = (watch: TriggerWatch) => `${watch.weather}|${watch.terrain}|${watch.gravity}|${watch.magicRoom}`;
 
 /** Gravity, Magic Room, the terrain and the weather the triggers read. */
-function onField(watch: TriggerWatch, line: LogLine) {
+function onField(state: InferrerState, watch: TriggerWatch, line: LogLine) {
   const id = toId(Protocol.parseEffect(arg(line, 1)).name);
   const on = line.cmd !== '-fieldend';
   const before = fieldOf(watch);
   if (line.cmd === '-weather') watch.weather = id === 'none' ? '' : id;
   else if (id === 'gravity') watch.gravity = on;
   else if (id === 'magicroom') watch.magicRoom = on;
-  else if (TERRAINS.has(id)) watch.terrain = on ? id : (watch.terrain === id ? '' : watch.terrain);
+  else if (terrainConditions(Dex.forGen(state.gen)).has(id)) watch.terrain = on ? id : (watch.terrain === id ? '' : watch.terrain);
   // A field change inside an entry's window: the Booster Energy reading is no longer clean.
   // A lasting weather's upkeep line changes nothing (752839 t13).
   if (fieldOf(watch) !== before) for (const entry of watch.entries.values()) entry.booster = false;
@@ -223,7 +222,7 @@ export function watchTriggerEvidence(state: InferrerState, line: LogLine) {
   const watch = (state.triggerWatch ??= newWatch(state));
   const tag = line.cmd;
   notePhase(state, watch, tag);
-  if (tag === '-weather' || tag === '-fieldstart' || tag === '-fieldend') onField(watch, line);
+  if (tag === '-weather' || tag === '-fieldstart' || tag === '-fieldend') onField(state, watch, line);
   noteCommander(watch, line);
   const key = keyOf(arg(line, 1));
   if (key.startsWith(state.opponentSide)) onOpponentLine(state, watch, line, key);

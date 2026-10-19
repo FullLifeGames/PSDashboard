@@ -7,6 +7,7 @@ import { ATTACKER_PUNISH_ITEMS, ownMove } from './client-facts.ts';
 import { arg, detailsOf, fromEffect, hasKw, identOf, ofIdent, type LogLine } from './log-line.ts';
 import { bookPowerMove, readPowerMove } from './power-moves.ts';
 import { toId } from '../ids.ts';
+import { choiceItems } from '../dex-facts/index.ts';
 import type { PokemonFieldInfo } from '../types.ts';
 
 /** `|-item|` sources that mean the holder ACQUIRED the item mid-game — not its set item. */
@@ -49,7 +50,7 @@ function recordPlainMove(state: InferrerState, ident: string, moveName: string, 
   if (!powered) used.add(toId(moveName));
   state.plainMovesSince.set(ident, used);
   if (used.size >= 2 && !canHaveDancer(state, ident)) {
-    for (const item of ['choiceband', 'choicespecs', 'choicescarf']) {
+    for (const item of choiceItems(Dex.forGen(state.gen))) {
       ruleOut(state, nickname, 'items', item);
     }
   }
