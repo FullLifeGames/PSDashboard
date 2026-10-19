@@ -320,7 +320,7 @@ export async function startBattle(session: ReconstructionSession, orderedP1: Pok
   const p1Name = JSON.stringify(params.playerNames?.[0]?.trim() || 'Player 1');
   const p2Name = JSON.stringify(params.playerNames?.[1]?.trim() || 'Player 2');
   session.writeSim(
-    `>start {"formatid":"${params.format}","seed":"1,2,3,4"}\n>player p1 {"name":${p1Name},"team":"${p1Packed}"}\n>player p2 {"name":${p2Name},"team":"${p2Packed}"}`
+    `>start {"formatid":"${params.format}","seed":"1,2,3,4"}\n>player p1 {"name":${p1Name},"team":${JSON.stringify(p1Packed)}}\n>player p2 {"name":${p2Name},"team":${JSON.stringify(p2Packed)}}`
   );
   await waitForBattle(session, battle => !!battle.sides[0] && !!battle.sides[1], 1000);
 
