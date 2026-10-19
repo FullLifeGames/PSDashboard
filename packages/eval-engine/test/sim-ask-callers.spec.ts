@@ -36,12 +36,13 @@ const filesWith = (pattern: RegExp, skip: (name: string) => boolean = () => fals
 describe('the callers of the simulator', () => {
   test('no source file builds a battle by hand but the ones that revive or follow a replay', () => {
     // The deserializers and the speed layer (forward/), the branch session (`State.deserializeBattle`), and the two
-    // `@pkmn/client` batteries of the parser: none of them is a stand-in.
+    // `@pkmn/client` batteries of the parser and of the header read (round 72, T241): none of them is a stand-in.
     expect(filesWith(/\bnew Battle\(/)).toEqual([
       'eval-engine:branch/state.ts',
       'eval-engine:forward/sim-fast/guard.ts',
       'replay-core:inference/hits.ts',
       'replay-core:protocol/parser-state.ts',
+      'replay-core:replay-format.ts',
     ]);
   });
 
@@ -60,8 +61,6 @@ describe('the callers of the simulator', () => {
 
   test('a Dex handler called on a stand-in `this` lives only in the named rests', () => {
     const called = filesWith(/\.call\(/, name => name.includes('sim-fast/'));
-    // Lane A's two, the stand-ins of the protect check; they move onto `callHandler` after the merge (step 6).
-    const waiting = ['eval-engine:calc/protect.ts', 'eval-engine:search/hints.ts'];
     // Rests of T239 outside the files of its lane (the plan's finding 8 and the inference of replay-core): read-only by use.
     const rests = [
       'eval-engine:branch/sleep-counter.ts', 'eval-engine:calc/body.ts', 'eval-engine:calc/fickle.ts', 'eval-engine:calc/move.ts',
@@ -69,6 +68,6 @@ describe('the callers of the simulator', () => {
       'replay-core:inference/item-evidence.ts', 'replay-core:inference/item-triggers.ts', 'replay-core:inference/rocks-tell.ts',
       'replay-core:inference/trigger-evidence.ts',
     ];
-    expect(called).toEqual([...waiting, ...rests].sort());
+    expect(called).toEqual([...rests].sort());
   });
 });
