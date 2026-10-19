@@ -10,7 +10,7 @@
     "dev": "vite",
     "build": "tsc -b && vite build",
     "build:packages": "tsc -b packages/replay-core packages/eval-engine",
-    "lint": "eslint .",
+    "lint": "eslint . && node scripts/twin-lists.mjs",
     "knip": "knip",
     "pack:smoke": "node ./scripts/pack-smoke.mjs",
     "upgrade:pkmn": "node ./scripts/upgrade-pkmn.mjs",

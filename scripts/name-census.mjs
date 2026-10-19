@@ -11,7 +11,7 @@
 // ("copycat"), unless that id is also a Dex type, nature or stat id ("Psychic" is a type and a move). Not counted: comments (the
 // syntax tree has none), the module specifier of an import or export, regular expressions, templates with an expression.
 // Type unions of names count like any other literal. A pair is (file, id), once per file.
-import { readdirSync, readFileSync } from 'node:fs';
+import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { Dex } from '@pkmn/dex';
@@ -113,6 +113,7 @@ export function namePairs(ast, universe) {
 export function sourceFiles(root, folders) {
   const out = [];
   const walk = (dir, rel) => {
+    if (!existsSync(dir)) return;
     for (const entry of readdirSync(dir, { withFileTypes: true })) {
       if (entry.name === 'node_modules' || entry.name === 'dist' || entry.name === 'build') continue;
       const child = `${rel}/${entry.name}`;
@@ -128,6 +129,7 @@ export function sourceFiles(root, folders) {
     }
     const head = folder.slice(0, star);
     const tail = folder.slice(star + 1);
+    if (!existsSync(path.join(root, head))) continue;
     for (const entry of readdirSync(path.join(root, head), { withFileTypes: true })) {
       if (entry.isDirectory()) walk(path.join(root, head, entry.name, tail), `${head}${entry.name}${tail}`);
     }
