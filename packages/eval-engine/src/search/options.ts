@@ -107,7 +107,8 @@ function keepPlayedCore(
  * on; screens/tailwind check the mover's own side. If a player actually
  * clicks one, the turn reads as unmatched (charitable) rather than graded.
  */
-const NOOP_FIELD_MOVES: Record<string, (own: Side, foe: Side) => boolean> = {
+// oracle: packages/eval-engine/test/noop-field-moves-oracle.spec.ts
+export const NOOP_FIELD_MOVES: Record<string, (own: Side, foe: Side) => boolean> = {
   stealthrock: (_own, foe) => !!foe.sideConditions['stealthrock'],
   spikes: (_own, foe) => ((foe.sideConditions['spikes'] as { layers?: number } | undefined)?.layers ?? 0) >= 3,
   toxicspikes: (_own, foe) => ((foe.sideConditions['toxicspikes'] as { layers?: number } | undefined)?.layers ?? 0) >= 2,

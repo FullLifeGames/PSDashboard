@@ -39,7 +39,8 @@ export interface HitSnapshot {
   critBlocked: boolean;
 }
 
-const ROOMS = ['gravity', 'magicroom', 'wonderroom'];
+// oracle: packages/eval-engine/test/rooms-oracle.spec.ts
+export const ROOMS = ['gravity', 'magicroom', 'wonderroom'];
 
 /** The ability id of the living body next to `mon`, or null. */
 function partnerAbility(mon: Pokemon): string | null {
