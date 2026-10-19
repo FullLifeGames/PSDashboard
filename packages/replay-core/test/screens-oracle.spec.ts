@@ -2,7 +2,8 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, test } from 'vitest';
-import { SCREENS } from '../src/dex-facts/index';
+import { SCREENS, standingScreens } from '../src/dex-facts/index';
+import { parseReplayLogWithObservations } from '../src/protocol-parser';
 import { ALL_VIEWS, battleIn, mon, oracleTagAbove, type SimView } from './sim-views';
 
 /**
@@ -14,7 +15,9 @@ import { ALL_VIEWS, battleIn, mon, oracleTagAbove, type SimView } from './sim-vi
  * conditions that cut it are the list: Reflect for the physical hit, Light Screen for the special hit, Aurora Veil for both,
  * wherever the move is real (Aurora Veil from Generation 7). In doubles the cut is the same condition at a different fraction.
  *  - FINDING W10: Generation 1 builds Reflect and Light Screen as volatiles (no side condition), so a read of
- *    `side.sideConditions` never sees them there; the volatile cuts the damage (played below).
+ *    `side.sideConditions` never sees them there; the volatile cuts the damage (played below). `standingScreens(side)` reads the
+ *    side conditions and the volatiles of the side's actives; the spec plays each screen move and checks it against the simulator,
+ *    and checks that the log parser books the screen on a hit in every view.
  * The seven readers (and ko-odds.ts) import the one constant instead of keeping a list of their own; a source check holds that.
  */
 
@@ -68,6 +71,46 @@ describe('SCREENS is held to the simulator (round 72)', () => {
     }
   });
 
+  describe.each(ALL_VIEWS)('$name: standingScreens', view => {
+    const screenMoves = SCREENS.filter(id => isReal(view, id));
+    const play = (id: string) => {
+      const user = id === 'auroraveil' ? 'Snorlax' : 'Blissey';
+      const battle = battleIn(view, [mon(user, [id, 'splash']), mon('Blissey', ['splash']), mon('Blissey', ['splash'])], [mon('Snorlax', ['splash']), mon('Snorlax', ['splash']), mon('Snorlax', ['splash'])]);
+      if (id === 'auroraveil') battle.field.setWeather(view.dex.conditions.get('snow').exists ? 'snow' : 'hail', battle.sides[0].active[0]);
+      battle.choose('p1', view.doubles ? 'move 1, move 1' : 'move 1');
+      battle.choose('p2', view.doubles ? 'move 1, move 1' : 'move 1');
+      return battle;
+    };
+
+    test('finds each screen the simulator holds for the side that used it, and none on the other side', () => {
+      for (const id of screenMoves) {
+        const battle = play(id);
+        const held = battle.sides[0].sideConditions[id] || battle.sides[0].active.some(mon => mon.volatiles[id]);
+        if (!held) continue; // Aurora Veil needs the weather to start: a view without it holds nothing to find
+        expect(standingScreens(battle.sides[0]), id).toEqual([id]);
+        expect(standingScreens(battle.sides[1]), id).toEqual([]);
+      }
+    });
+
+    test('a screen that is not up is not found', () => {
+      const battle = battleIn(view, [mon('Blissey', ['splash']), mon('Blissey', ['splash'])], [mon('Snorlax', ['splash']), mon('Snorlax', ['splash'])]);
+      expect(standingScreens(battle.sides[0])).toEqual([]);
+    });
+
+    test('the log parser books the screen on a hit it cuts', () => {
+      for (const [id, hit] of [['reflect', HITS[0]], ['lightscreen', HITS[1]]] as const) {
+        if (!isReal(view, id)) continue;
+        const battle = battleIn(view, [mon(hit.user, [hit.move, 'splash']), mon('Blissey', ['splash']), mon('Blissey', ['splash'])], [mon('Blissey', [id, 'splash']), mon('Snorlax', ['splash']), mon('Snorlax', ['splash'])]);
+        battle.choose('p1', view.doubles ? 'move 2, move 1' : 'move 2'); battle.choose('p2', view.doubles ? 'move 1, move 1' : 'move 1'); // the screen goes up
+        battle.choose('p1', view.doubles ? 'move 1 1, move 1' : 'move 1'); battle.choose('p2', view.doubles ? 'move 2, move 1' : 'move 2'); // the hit
+        const log = battle.log.filter((line, index) => !line.startsWith('|split|') && !battle.log[index - 1]?.startsWith('|split|'));
+        const booked = parseReplayLogWithObservations([...log, '|win|Alpha'].join('\n')).observations.filter(observation => observation.moveId === hit.move);
+        expect(booked.length, `${id}: a hit was observed`).toBeGreaterThan(0);
+        expect(booked.map(observation => observation.screens), id).toEqual(booked.map(() => [id]));
+      }
+    });
+  });
+
   test('the readers import the one constant and keep no list of their own', () => {
     const root = fileURLToPath(new URL('../../..', import.meta.url));
     const readers = [
@@ -77,7 +120,7 @@ describe('SCREENS is held to the simulator (round 72)', () => {
     ];
     for (const file of readers) {
       const source = readFileSync(resolve(root, file), 'utf8');
-      expect(/\b(SCREENS|screenFlags)\b/.test(source), `${file} reads the constant`).toBe(true);
+      expect(/\b(SCREENS|screenFlags|standingScreens)\b/.test(source), `${file} reads the constant`).toBe(true);
       expect(/'(reflect|lightscreen|auroraveil)'/.test(source), `${file} keeps no screen literal`).toBe(false);
     }
   });

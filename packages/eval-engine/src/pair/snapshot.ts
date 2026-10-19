@@ -1,7 +1,7 @@
 import type { Battle, Pokemon } from '@pkmn/sim';
 import { bodyOf, type SimBody } from '../calc/body.ts';
 import { bodyAsClicked } from '../calc/tera-click.ts';
-import { SCREENS } from '@fulllifegames/replay-core';
+import { standingScreens } from '@fulllifegames/replay-core';
 
 /**
  * Round 56: the state of one hit, frozen as plain data at the moment the
@@ -71,7 +71,7 @@ export function snapshotPair(battle: Battle, attacker: Pokemon, defender: Pokemo
     weather: battle.field.effectiveWeather(),
     terrain: battle.field.effectiveTerrain(),
     rooms: ROOMS.filter(id => battle.field.pseudoWeather[id]),
-    screens: SCREENS.filter(id => defender.side.sideConditions[id]),
+    screens: standingScreens(defender.side),
     attackerPartner: partnerAbility(attacker),
     defenderPartner: partnerAbility(defender),
     fieldAbilities: onField.map(mon => mon.ability),

@@ -7,7 +7,7 @@ import { findPokemon, type InferrerState } from './inferrer-state.ts';
 import { illusionPossible } from './item-evidence.ts';
 import { arg, hasKw, identOf, keyOf, namesEffect, ofIdent, type LogLine } from './log-line.ts';
 import { toId } from '../ids.ts';
-import { SCREENS } from '../dex-facts/index.ts';
+import { standingScreens } from '../dex-facts/index.ts';
 
 /**
  * The clean hits each opponent Pokémon dealt (round 67, T130): the damage
@@ -103,7 +103,6 @@ function doubtOf(walk: HitWalk, attacker: ClientPokemon, defender: ClientPokemon
 /** The hit as the client stands just before its damage line applies. */
 function recordHit(walk: HitWalk, pending: PendingMove, attacker: ClientPokemon, defender: ClientPokemon, gen: number): LoggedHit {
   const { battle } = walk;
-  const sideConditions = defender.side.sideConditions as Record<string, unknown>;
   const others = [...battle.p1.active, ...battle.p2.active]
     .filter((mon): mon is ClientPokemon => !!mon && mon !== attacker && mon !== defender && !mon.fainted)
     .map(mon => ({ species: mon.speciesForme, ability: mon.ability ?? '' }));
@@ -112,7 +111,7 @@ function recordHit(walk: HitWalk, pending: PendingMove, attacker: ClientPokemon,
     defender: { ...party(defender), side: defender.side.n === 0 ? 'p1' : 'p2' },
     observed: 0, lowerBound: false,
     weather: battle.field.weather ?? '', terrain: battle.field.terrain ?? '',
-    screens: SCREENS.filter(id => sideConditions[id]),
+    screens: standingScreens(defender.side),
     helpingHand: !!attacker.volatiles.helpinghand, defenderNew: defender.newlySwitched,
     doubles: battle.gameType !== 'singles', spread: pending.spread, others,
     doubt: doubtOf(walk, attacker, defender), gen, format: walk.format,

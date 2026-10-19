@@ -9,7 +9,7 @@ import { boostBiteValue, removalFormat, stageValue } from './boost-bite.ts';
 import { residualReader } from './residuals.ts';
 import { hitReader } from './contact.ts';
 import { statusRight } from './status-factor.ts';
-import { choiceItems, SCREENS } from '@fulllifegames/replay-core';
+import { choiceItems, standingScreens } from '@fulllifegames/replay-core';
 
 /**
  * The raw feature vector: per-side bodies, boosts, hazards, screens,
@@ -93,11 +93,7 @@ function activeBoostValue(side: Side): number {
 }
 
 function screenCount(side: Side): number {
-  let screens = 0;
-  for (const id of SCREENS) {
-    if (side.sideConditions[id]) screens += 1;
-  }
-  return screens;
+  return standingScreens(side).length;
 }
 
 function sideFeatureValues(side: Side, battle: Battle, twin: string | null) {

@@ -26,6 +26,7 @@ type ProtectKind
 type ReplayData
 type ReplayRuleset
 type RevealedPokemonInfo
+type ScreenHolder
 type ScreenId
 type SetAssumption
 type SetSpreadAssumption
@@ -116,6 +117,7 @@ value sourceDetail
 value speciesBaseId
 value speciesOverrides
 value splitReplayPassword
+value standingScreens
 value terrainConditions
 value toId
 value typedHiddenPowerId

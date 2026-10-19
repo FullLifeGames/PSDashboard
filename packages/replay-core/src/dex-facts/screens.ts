@@ -19,3 +19,17 @@ export function screenFlags(standing: Iterable<string>): Record<(typeof SCREEN_F
   const on = new Set(standing);
   return Object.fromEntries(SCREENS.map(id => [SCREEN_FLAGS[id], on.has(id)])) as Record<(typeof SCREEN_FLAGS)[ScreenId], boolean>;
 }
+
+/** A side as the simulator and the client hold it: its side conditions, and the volatiles of its active Pokémon. */
+export interface ScreenHolder {
+  sideConditions: Readonly<Record<string, unknown>>;
+  active: readonly (null | undefined | { volatiles: Readonly<Record<string, unknown>> })[];
+}
+
+/**
+ * The screens standing on a side. Generation 1 builds Reflect and Light Screen as volatiles of the Pokémon that used them (no side
+ * condition, gone when it leaves), so a read of `sideConditions` alone never sees them there (round 72, W10); the later
+ * generations hold a screen as a side condition. Both are read.
+ */
+export const standingScreens = (side: ScreenHolder): ScreenId[] =>
+  SCREENS.filter(id => side.sideConditions[id] || side.active.some(mon => mon?.volatiles[id]));
