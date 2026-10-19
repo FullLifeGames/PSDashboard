@@ -39,6 +39,8 @@ type SpreadCandidate
 type SpreadOrigin
 type StatId
 type TurnSnapshot
+type TwinOptions
+type TwinSide
 type UsageProbability
 type UsageSpread
 value CHAMPIONS_MOD
@@ -107,6 +109,7 @@ value speciesBaseId
 value speciesOverrides
 value splitReplayPassword
 value toId
+value twinBattle
 value typedHiddenPowerId
 value unknownEvs
 value withHiddenPowerType
