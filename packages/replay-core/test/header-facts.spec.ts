@@ -81,9 +81,16 @@ describe('the log names how many each side brings', () => {
     expect(getReplayBringCount({ id: 'gen9mysterysingles-1', formatid: 'gen9mysterysingles', log })).toBe(3);
   });
 
-  test('a log that previews all six brings all, whatever the format id says', () => {
-    const log = headerLog('|gametype|doubles', '|gen|9', '|tier|[Gen 9] VGC Free For All', '|clearpoke', '|teampreview');
-    expect(getReplayBringCount({ id: 'gen9vgcfreeforall-1', formatid: 'gen9vgcfreeforall', log })).toBeNull();
+  test('a bare |teampreview| says no limit, so the format name still decides', () => {
+    const bare = headerLog('|gametype|doubles', '|gen|9', '|tier|[Gen 9] VGC Free For All', '|clearpoke', '|teampreview');
+    expect(getReplayBringCount({ id: 'gen9vgcfreeforall-1', formatid: 'gen9vgcfreeforall', log: bare })).toBe(4);
+    expect(getReplayBringCount({ id: 'gen9leaguebo3-1', formatid: 'gen9leaguebo3', log: bare })).toBeNull();
+  });
+
+  test('a format the Dex knows keeps its rule table first: a hand-built log with a bare |teampreview| still brings four', () => {
+    const bare = headerLog('|gametype|doubles', '|gen|9', '|tier|[Gen 9] VGC 2026 Reg I', '|clearpoke', '|teampreview');
+    expect(getReplayBringCount({ id: 'gen9vgc2026regi-1', formatid: 'gen9vgc2026regi', log: bare })).toBe(4);
+    expect(getReplayBringCount({ id: 'gen9ou-1', formatid: 'gen9ou', log: headerLog('|gametype|singles', '|gen|9', '|teampreview|4') })).toBeNull();
   });
 
   test('without a |teampreview| line the format decides: the Dex first, then the name', () => {

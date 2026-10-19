@@ -76,7 +76,8 @@ function readHeaderText(text: string): ReplayHeader {
       if (key === '|gen|') gen = false;
     }
   }
-  return { gameType: gameType ? battle.gameType : null, gen: gen ? battle.gen.num : null, tier: battle.tier, teamPreviewCount: preview ? battle.teamPreviewCount : null };
+  const { num: generation } = battle.gen;
+  return { gameType: gameType ? battle.gameType : null, gen: gen ? generation : null, tier: battle.tier, teamPreviewCount: preview ? battle.teamPreviewCount : null };
 }
 
 function readHeader(log: string | undefined): ReplayHeader {
@@ -206,16 +207,16 @@ function sleepClauseSuffix(rawLog: string | undefined, base: string): string {
 /**
  * How many Pokémon each side BRINGS at team preview (VGC: 4 of 6, Battle
  * Stadium Singles: 3 of 6), or null for formats that bring the full team.
- * The log answers first: its `|teampreview|N` line is the client's
- * `teamPreviewCount`, and 1 to 5 is a bring limit (T241: 5,648 replays, the
- * log and the Dex's rule table agree on all of them, and the log also covers
- * the 2,326 VGC replays whose regulation postdates the bundled sim). A log
- * with no such line falls back on the Dex's rule table for formats it knows,
- * then on the format-id heuristic (every VGC ruleset to date brings 4).
+ * The Dex's own rule table answers for formats it knows. For the rest the
+ * log answers: its `|teampreview|N` line is the client's `teamPreviewCount`,
+ * and 1 to 5 is a bring limit (a bare `|teampreview` is six and says nothing;
+ * T241: over 5,648 replays of fixtures and fit
+ * corpus the log and the rule table agree wherever the Dex knows the format,
+ * and the log covers the 2,326 VGC replays whose regulation postdates the
+ * bundled sim). Last comes the format-id heuristic for a log with no such
+ * line (every VGC ruleset to date brings 4).
  */
 export function getReplayBringCount(source: ReplayFormatSource): number | null {
-  const previewed = readHeader(source.log).teamPreviewCount;
-  if (previewed !== null) return previewed >= 1 && previewed <= 5 ? previewed : null;
   const formatid = inferReplayFormatId(source);
   if (!formatid) return null;
   const format = Dex.formats.get(formatid);
@@ -225,9 +226,11 @@ export function getReplayBringCount(source: ReplayFormatSource): number | null {
       if (typeof size === 'number' && size > 0) return size;
       return null;
     } catch {
-      // Rule table refused (mod gaps) — fall through to the heuristic.
+      // Rule table refused (mod gaps) — fall through to the log.
     }
   }
+  const previewed = readHeader(source.log).teamPreviewCount;
+  if (previewed !== null && previewed >= 1 && previewed <= 5) return previewed;
   if (formatid.includes('vgc') || formatid.includes('battlestadiumdoubles')) return 4;
   if (formatid.includes('battlestadiumsingles')) return 3;
   return null;
