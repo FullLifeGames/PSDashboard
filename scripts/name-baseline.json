@@ -57,12 +57,8 @@
       "disguise",
       "focussash",
       "iceface",
-      "spikes",
-      "stealthrock",
-      "stickyweb",
       "sturdy",
-      "substitute",
-      "toxicspikes"
+      "substitute"
     ],
     "packages/eval-engine/src/choice-lock.ts": [
       "blackbelt",
@@ -85,10 +81,7 @@
       "twistedspoon"
     ],
     "packages/eval-engine/src/damage-calc.ts": [
-      "auroraveil",
-      "lightscreen",
-      "loadeddice",
-      "reflect"
+      "loadeddice"
     ],
     "packages/eval-engine/src/forward/sim-fast/clone.ts": [
       "leftovers",
@@ -97,13 +90,10 @@
       "tackle"
     ],
     "packages/eval-engine/src/ko-odds.ts": [
-      "assist",
-      "auroraveil",
       "beatup",
       "blizzard",
       "bounce",
       "comeuppance",
-      "copycat",
       "counter",
       "desolateland",
       "dive",
@@ -119,10 +109,8 @@
       "hail",
       "hurricane",
       "iceburn",
-      "lightscreen",
       "metalburst",
       "meteorbeam",
-      "metronome",
       "mirrorcoat",
       "mistyexplosion",
       "noguard",
@@ -132,12 +120,10 @@
       "pursuit",
       "raindance",
       "razorwind",
-      "reflect",
       "selfdestruct",
       "shadowforce",
       "skullbash",
       "skyattack",
-      "sleeptalk",
       "snowscape",
       "solarbeam",
       "solarblade",
@@ -183,15 +169,11 @@
       "scrappy"
     ],
     "packages/eval-engine/src/pair/guards.ts": [
-      "assist",
       "attract",
       "confusion",
-      "copycat",
-      "metronome",
       "parentalbond",
       "quickclaw",
       "quickdraw",
-      "sleeptalk",
       "stall"
     ],
     "packages/eval-engine/src/pair/kill-table.ts": [
@@ -231,7 +213,6 @@
       "stench"
     ],
     "packages/eval-engine/src/pair/snapshot.ts": [
-      "auroraveil",
       "battlearmor",
       "disguise",
       "eiscue",
@@ -239,11 +220,9 @@
       "gravity",
       "helpinghand",
       "iceface",
-      "lightscreen",
       "luckychant",
       "magicroom",
       "mimikyu",
-      "reflect",
       "shellarmor",
       "sturdy",
       "substitute",
@@ -259,14 +238,8 @@
       "noability"
     ],
     "packages/eval-engine/src/score/features.ts": [
-      "auroraveil",
       "blacksludge",
-      "choiceband",
-      "choicescarf",
-      "choicespecs",
       "leftovers",
-      "lightscreen",
-      "reflect",
       "stickybarb",
       "tailwind",
       "trickroom"
@@ -293,7 +266,6 @@
       "brine",
       "collisioncourse",
       "crushgrip",
-      "desolateland",
       "dragonenergy",
       "electroball",
       "electrodrift",
@@ -321,10 +293,8 @@
       "mistyexplosion",
       "pikapapow",
       "powertrip",
-      "primordialsea",
       "psyblade",
       "punishment",
-      "raindance",
       "return",
       "reversal",
       "skilllink",
@@ -333,7 +303,6 @@
       "solarbeam",
       "solarblade",
       "storedpower",
-      "sunnyday",
       "telekinesis",
       "utilityumbrella",
       "veeveevolley",
@@ -381,25 +350,8 @@
     "packages/eval-engine/src/search/hints.ts": [
       "fakeout"
     ],
-    "packages/eval-engine/src/search/options.ts": [
-      "auroraveil",
-      "lightscreen",
-      "mist",
-      "reflect",
-      "safeguard",
-      "spikes",
-      "stealthrock",
-      "stickyweb",
-      "tailwind",
-      "toxicspikes"
-    ],
     "packages/eval-engine/src/search/verify-cell.ts": [
       "counter"
-    ],
-    "packages/eval-engine/src/sensitivity.ts": [
-      "choiceband",
-      "choicescarf",
-      "choicespecs"
     ],
     "packages/eval-engine/src/speed.ts": [
       "chlorophyll",
@@ -429,39 +381,6 @@
       "serenegrace",
       "shielddust"
     ],
-    "packages/eval-engine/src/turn-analysis/played-match.ts": [
-      "acidarmor",
-      "agility",
-      "amnesia",
-      "autotomize",
-      "barrier",
-      "bellydrum",
-      "bulkup",
-      "calmmind",
-      "clangoroussoul",
-      "coil",
-      "cosmicpower",
-      "cottonguard",
-      "curse",
-      "defendorder",
-      "dragondance",
-      "filletaway",
-      "geomancy",
-      "growth",
-      "honeclaws",
-      "irondefense",
-      "nastyplot",
-      "noretreat",
-      "quiverdance",
-      "rockpolish",
-      "shellsmash",
-      "shiftgear",
-      "stockpile",
-      "swordsdance",
-      "tailglow",
-      "victorydance",
-      "workup"
-    ],
     "packages/replay-core/src/calc-field.ts": [
       "hail"
     ],
@@ -482,9 +401,6 @@
     "packages/replay-core/src/inference/handlers.ts": [
       "assaultvest",
       "bestow",
-      "choiceband",
-      "choicescarf",
-      "choicespecs",
       "confusion",
       "covet",
       "gravity",
@@ -493,9 +409,7 @@
       "levitate",
       "lifeorb",
       "magicguard",
-      "magician",
       "moldbreaker",
-      "pickpocket",
       "sandstorm",
       "spikes",
       "stealthrock",
@@ -507,14 +421,11 @@
       "turboblaze"
     ],
     "packages/replay-core/src/inference/hits.ts": [
-      "auroraveil",
       "embargo",
       "guardsplit",
-      "lightscreen",
       "neutralizinggas",
       "powersplit",
       "powertrick",
-      "reflect",
       "transform"
     ],
     "packages/replay-core/src/inference/inferrer-state.ts": [
@@ -555,27 +466,20 @@
       "boosterenergy",
       "commander",
       "ejectpack",
-      "electricterrain",
       "embargo",
-      "grassyterrain",
       "gravity",
       "klutz",
       "magicroom",
-      "mistyterrain",
       "neutralizinggas",
-      "partingshot",
-      "psychicterrain"
+      "partingshot"
     ],
     "packages/replay-core/src/opponent-inferrer.ts": [
       "heavydutyboots",
       "stealthrock"
     ],
     "packages/replay-core/src/protocol/handlers.ts": [
-      "auroraveil",
       "confusion",
-      "hiddenpower",
-      "lightscreen",
-      "reflect"
+      "hiddenpower"
     ],
     "packages/replay-core/src/protocol/paradox-reading.ts": [
       "protosynthesis",
@@ -619,10 +523,7 @@
       "hiddenpower"
     ],
     "packages/replay-core/src/spreads/observation-read.ts": [
-      "auroraveil",
-      "lightscreen",
       "raindance",
-      "reflect",
       "sandstorm",
       "sunnyday"
     ],
@@ -651,10 +552,7 @@
       "eviolite"
     ],
     "packages/replay-core/src/team/item-damage-shared.ts": [
-      "auroraveil",
       "flashfire",
-      "lightscreen",
-      "reflect",
       "slowstart",
       "stakeout"
     ],

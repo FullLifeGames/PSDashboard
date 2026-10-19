@@ -154,7 +154,9 @@ describe('the command', () => {
     expect(result.status).toBe(0);
     const found = JSON.parse(result.stdout) as { groups: Record<string, string[]> };
     expect(Object.keys(found.groups).sort()).toEqual(Object.keys(baseline.groups).sort());
-    expect(Object.keys(found.groups).length).toBeGreaterThanOrEqual(8);
+    // The baseline only shrinks (10 groups at round 71, 7 after wave 4), so a floor on the twins would fail the day a lane
+    // removes one; the floor stays on the lists the detector reads, which keeps a blind detector red.
+    expect(placesOf(REPO).size).toBeGreaterThan(30);
   });
 });
 

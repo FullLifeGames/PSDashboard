@@ -137,6 +137,17 @@ describe('the baseline against the tree', () => {
     expect(files.every(file => /^packages\/[^/]+\/src\//.test(file))).toBe(true);
   });
 
+  test('the census leaves out the lines a reviewed exception covers, as the rule does (round 72 merge)', async () => {
+    const { filePairs } = await import('../scripts/name-census.mjs');
+    const text = [
+      '// eslint-disable-next-line names/no-new-dex-name -- held by a spec',
+      "export const A = ['copycat', 'metronome'];",
+      "export const B = 'sketch'; // eslint-disable-line names/no-new-dex-name -- reviewed",
+      "export const C = 'mimic';",
+    ].join('\n');
+    expect(filePairs(text, 'x.ts', universe).map((pair: { id: string }) => pair.id)).toEqual(['mimic']);
+  });
+
   test('the universe holds the four kinds and leaves out types, natures and stats', () => {
     expect(universe.kindOf('Rocky Helmet')?.kind).toBe('item');
     expect(universe.kindOf('Psychic')).toBeNull();

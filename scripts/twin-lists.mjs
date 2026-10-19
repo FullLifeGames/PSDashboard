@@ -25,9 +25,12 @@ const NEAR_MIN_NAMES = 4;
 
 const toID = text => String(text).toLowerCase().replace(/[^a-z0-9]+/g, '');
 
-// A file without an opening bracket, a string, a comma after a string, another string and a second comma cannot hold a list of 3
-// strings: the cheap test keeps the parser (the cost of the check) off most files. Comments between the elements pass it.
-const MAY_HOLD_LIST = /\[[^\]'"`]*['"`][^\]]*['"`]\s*,[^\]]*['"`]\s*,/;
+// A file without an opening bracket followed by three strings and two commas cannot hold a list of 3 strings: the cheap
+// test keeps the parser (the cost of the check) off most files. A string is read whole, so one that holds a bracket
+// passes (round 72 merge: '[object Map]' in sim-ask/isolated.ts slipped the old pattern); comments between elements pass.
+const STR = String.raw`(?:'[^'\n]*'|"[^"\n]*"|` + '`[^`]*`)';
+const GAP = String.raw`(?:\s|\/\/[^\n]*\n|\/\*[\s\S]*?\*\/)*`;
+const MAY_HOLD_LIST = new RegExp(String.raw`\[${GAP}${STR}${GAP},${GAP}${STR}${GAP},${GAP}${STR}`);
 
 const STATEMENT = /(Statement|Declaration|PropertyDefinition)$/;
 

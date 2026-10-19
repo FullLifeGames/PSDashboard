@@ -109,6 +109,29 @@ export function namePairs(ast, universe) {
   return found.sort((a, b) => a.line - b.line);
 }
 
+const REVIEWED = /eslint-disable-(next-)?line\b.*\bnames\/no-new-dex-name\b/;
+
+/**
+ * The lines a reviewed exception covers: the line after an `eslint-disable-next-line names/no-new-dex-name` comment and
+ * the line of an `eslint-disable-line` one. The census counts what the rule would report, so the baseline never holds a
+ * pair whose line already carries its reason (round 72 merge: nine reviewed pairs of lane A).
+ */
+export function reviewedLines(ast) {
+  const lines = new Set();
+  for (const comment of ast.comments ?? []) {
+    const match = REVIEWED.exec(comment.value);
+    if (match) lines.add(match[1] ? comment.loc.end.line + 1 : comment.loc.start.line);
+  }
+  return lines;
+}
+
+/** The pairs of one file's text, without the lines a reviewed exception covers. */
+export function filePairs(text, file, universe) {
+  const ast = parseSource(text, file);
+  const reviewed = reviewedLines(ast);
+  return namePairs(ast, universe).filter(pair => !reviewed.has(pair.line));
+}
+
 /** Paths relative to `root`, posix style, of every .ts and .tsx file under the given folders (a folder may hold a `*`). */
 export function sourceFiles(root, folders) {
   const out = [];
@@ -144,7 +167,7 @@ export const NAME_FOLDERS = ['packages/*/src'];
 export function censusOf(root, universe) {
   const census = {};
   for (const file of sourceFiles(root, NAME_FOLDERS)) {
-    const ids = new Set(namePairs(parseSource(readFileSync(path.join(root, file), 'utf8'), file), universe).map(pair => pair.id));
+    const ids = new Set(filePairs(readFileSync(path.join(root, file), 'utf8'), file, universe).map(pair => pair.id));
     if (ids.size) census[file] = [...ids].sort();
   }
   return census;
