@@ -1,6 +1,6 @@
 import { Field, calculate } from '@smogon/calc';
-import type { Battle, Pokemon } from '@pkmn/sim';
-import { TERRAIN_BY_ID, WEATHER_BY_ID, calcGenerationFor, screenFlags } from '@fulllifegames/replay-core';
+import { Dex, type Battle, type Pokemon } from '@pkmn/sim';
+import { TERRAIN_BY_ID, WEATHER_BY_ID, callingMoves, calcGenerationFor, screenFlags } from '@fulllifegames/replay-core';
 import { attackerAtUse, calcPokemon, simDexOf, type SimBody } from './calc/body.ts';
 import { strengthMix, strongerPower } from './calc/fickle.ts';
 import { calcMove } from './calc/move.ts';
@@ -33,8 +33,11 @@ export interface BoundaryEvent {
 
 type DexMove = ReturnType<Battle['dex']['moves']['get']>;
 
-/** Moves that call a RANDOM move — the seed decides what actually happens. */
-export const RANDOM_CALL_MOVES = new Set(['sleeptalk', 'metronome', 'assist', 'copycat']);
+/**
+ * Moves that call another move, so the seed or the turn decides what actually happens (Round 72, W1: the Dex's `callsMove`,
+ * seven moves over every generation; the hand list held four). test/random-call-oracle.spec.ts plays each of them.
+ */
+export const RANDOM_CALL_MOVES = new Set(callingMoves(Dex));
 
 /** Moves whose immediate damage the one-turn model cannot price. */
 // oracle: packages/eval-engine/test/unpriceable-oracle.spec.ts

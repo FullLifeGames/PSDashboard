@@ -1,7 +1,7 @@
 import { describe, expect, test } from 'vitest';
 import { Dex } from '@pkmn/sim';
 import * as champions from '@pkmn/mods/champions';
-import { choiceItems, hazardConditions, terrainConditions, umbrellaWeathers, SCREENS, screenFlags, isScreen } from '../src/dex-facts/index';
+import { callingMoves, choiceItems, hazardConditions, terrainConditions, umbrellaWeathers, SCREENS, screenFlags, isScreen } from '../src/dex-facts/index';
 
 /**
  * Round 72 (T235): four hand lists of name literals now come from the Dex through the facts table. The lists below are the old
@@ -31,6 +31,17 @@ describe.each(VIEWS)('$name: the derived lists equal the hand lists', ({ dex }) 
   test('terrains (the terrain a move sets)', () => expect(sorted(terrainConditions(dex))).toEqual(sorted(OLD_TERRAINS)));
   test('weathers the Utility Umbrella removes (a weather that changes damage)', () => expect(sorted(umbrellaWeathers(dex))).toEqual(sorted(OLD_UMBRELLA)));
   test('a second ask returns the memoized set', () => expect(choiceItems(dex)).toBe(choiceItems(dex)));
+});
+
+describe('moves that call another move (callsMove)', () => {
+  test('the Dex of the newest generation holds every call move of every view', () => {
+    const newest = callingMoves(Dex);
+    expect(newest.size).toBeGreaterThan(0);
+    for (const { dex } of VIEWS) expect([...callingMoves(dex)].filter(id => !newest.has(id))).toEqual([]);
+  });
+  test.each(VIEWS)('$name: every id is a real move that flags callsMove', ({ dex }) => {
+    for (const id of callingMoves(dex)) expect((dex.moves.get(id) as unknown as { callsMove?: boolean }).callsMove).toBe(true);
+  });
 });
 
 describe('screens: one constant', () => {

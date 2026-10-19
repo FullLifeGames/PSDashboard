@@ -14,7 +14,7 @@ export type { CalcGeneration } from './calc-gen.ts';
 export { buildCalcPokemon, calcBaseStats, calcKnowsMove, calcSpecies, speciesOverrides } from './calc-build.ts';
 export type { CalcPokemonOptions, SpeciesDex } from './calc-build.ts';
 export {
-  protectKind, choiceItems, hazardConditions, terrainConditions, umbrellaWeathers, SCREENS, isScreen, screenFlags,
+  protectKind, callingMoves, choiceItems, hazardConditions, terrainConditions, umbrellaWeathers, SCREENS, isScreen, screenFlags,
 } from './dex-facts/index.ts';
 export type { FactsDex, ProtectKind, ScreenId } from './dex-facts/index.ts';
 export { resolveHiddenPowerType, typedHiddenPowerId, withHiddenPowerType, HP_TYPES } from './hidden-power.ts';

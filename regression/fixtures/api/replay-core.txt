@@ -70,6 +70,7 @@ value calcIvs
 value calcKnowsMove
 value calcModOf
 value calcSpecies
+value callingMoves
 value choiceItems
 value countMatchingSpecies
 value enrichPokemonInfo
