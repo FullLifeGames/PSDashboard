@@ -10,6 +10,7 @@ import {
   replayBringOnly, speciesBaseId, toId, type ReplayData,
 } from '@fulllifegames/replay-core';
 import { branchFrameLog } from '../src/lib/branch-log';
+import { decodeBranchShare, encodeBranchShare, makeBranchSharePayload } from '../src/lib/branch-share';
 
 /**
  * The replay iframe's sidebar icons in a branch. The embed keeps one roster
@@ -157,6 +158,17 @@ describe('the sidebar of a played-out branch', () => {
     const played = await playBranch(replay, turn);
     expect(played.fainted.atEnd - played.fainted.atStart).toBeGreaterThanOrEqual(2);
     expectRosterMatchesLine(replay, played);
+  });
+});
+
+describe('a share link made now', () => {
+  test('keeps format version 1 and carries a roster-correct log (ui/components/shared-branch-v1-link.spec.tsx holds the old link)', { timeout: 120000 }, async () => {
+    const replay = fixture('./fixtures/smogtours-gen7ou-450650.json');
+    const played = await playBranch(replay, 17);
+    const decoded = decodeBranchShare(encodeBranchShare(makeBranchSharePayload({ replay, branchTurn: 17, history: [], finalLog: played.frameLog })));
+    expect(decoded.version).toBe(1);
+    expect(decoded.finalLog).toBe(played.frameLog);
+    expectRosterMatchesLine(replay, { ...played, frameLog: decoded.finalLog });
   });
 });
 
