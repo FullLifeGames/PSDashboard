@@ -48,6 +48,16 @@ function benchSwitches(sideState: Side): SlotChoice[] {
   }));
 }
 
+/**
+ * A request entry the search leaves out: the request's own disabled flag, or a live disable it conceals (Imprison). A locked
+ * entry stays whatever its moveSlot says: Disable flags the slot of a locked Outrage, and the simulator plays the locked move
+ * before it reads the flag (side.js chooseMove), so dropping it left the slot with no choice (round 72, T246b).
+ */
+function isBarred(move: RequestMove, liveDisabled: ReadonlySet<string>): boolean {
+  if ('disabled' in move && move.disabled) return true;
+  return !isLockedEntry(move) && liveDisabled.has(requestMoveKey(move));
+}
+
 /** The once-per-battle gimmicks the request offers this slot. */
 function slotGimmicks(entry: ActiveRequestSlot, allowTera: boolean): { canTera: boolean; canMega: boolean; canUltra: boolean } {
   return {
@@ -155,9 +165,8 @@ function slotChoicesFor(
   const liveDisabled = new Set<string>(pokemon.moveSlots.filter(slot => slot.disabled).map(slot => slot.id));
 
   for (const move of entry.moves) {
-    if ('disabled' in move && move.disabled) continue;
+    if (isBarred(move, liveDisabled)) continue;
     const key = requestMoveKey(move);
-    if (liveDisabled.has(key)) continue;
     for (const target of moveTargets(sideState, move, slot, played)) {
       pushSlotChoices(choices, key, target, gimmicks);
     }
@@ -293,10 +302,9 @@ function singlesMoveChoices(
   const liveDisabled = new Set<string>(
     (sideState.active[0]?.moveSlots ?? []).filter(slot => slot.disabled).map(slot => slot.id));
   for (const move of active.moves) {
-    if ('disabled' in move && move.disabled) continue;
+    if (isBarred(move, liveDisabled)) continue;
     // Same id-over-display-name rule as slotChoicesFor ("Return 102" -> return).
     const key = requestMoveKey(move);
-    if (liveDisabled.has(key)) continue;
     options.push({ choice: `move ${key}`, label: move.move });
     pushSinglesGimmicks(options, key, move, active, activeTera);
   }
