@@ -68,35 +68,35 @@ describe('the inference books the replay\'s name and shiny flag', () => {
     expect(infoOf(log, 'p1', 'Landorus-Therian').nickname).toBeUndefined();
   });
 
-  test('two bodies that share one name stay unset: a lookup by name would find the first for both', () => {
+  test('two bodies that share one name keep it: the lookups compare the species of the lead beside the name', () => {
     for (const kind of ['singles', 'doubles'] as const) {
       const log = [...header(kind), ...preview, '|switch|p1a: Twin|Pikachu, L50, F, shiny|110/110', '|switch|p1b: Twin|Landorus-Therian, L50, M|164/164'].join('\n');
-      expect(identity(infoOf(log, 'p1', 'Pikachu'))).toEqual({ nickname: undefined, shiny: true });
-      expect(identity(infoOf(log, 'p1', 'Landorus-Therian'))).toEqual({ nickname: undefined, shiny: false });
+      expect(identity(infoOf(log, 'p1', 'Pikachu'))).toEqual({ nickname: 'Twin', shiny: true });
+      expect(identity(infoOf(log, 'p1', 'Landorus-Therian'))).toEqual({ nickname: 'Twin', shiny: false });
     }
   });
 
-  test('a name the id function reduces to nothing, or to the id of another name of the side, stays unset; a unique decorated name stays', () => {
+  test('a name the id function reduces to nothing, or to the id of another name of the side, stays: the lookups compare the exact name', () => {
     for (const kind of ['singles', 'doubles'] as const) {
       const log = [...header(kind), '|clearpoke', '|poke|p1|Pikachu, L50, F|', '|poke|p1|Landorus-Therian, L50, M|', '|poke|p1|Clefable, L50, F|', '|poke|p1|Garchomp, L50, F|',
         '|poke|p2|Garchomp, L50, F|', '|poke|p2|Clefable, L50, F|', '|teampreview', '|start',
         '|switch|p1a: 我大哥|Pikachu, L50, F, shiny|110/110', '|switch|p1b: うみのうた|Landorus-Therian, L50, M|164/164',
         '|switch|p2a: Rias!|Garchomp, L50, F|183/183', '|switch|p2b: Rias?|Clefable, L50, F|170/170', '|switch|p1a: Akeno【‿♥‿】|Clefable, L50, F|170/170',
         '|switch|p1b: Rias!|Garchomp, L50, F|183/183'].join('\n');
-      expect(identity(infoOf(log, 'p1', 'Pikachu'))).toEqual({ nickname: undefined, shiny: true });
-      expect(infoOf(log, 'p1', 'Landorus-Therian').nickname).toBeUndefined();
+      expect(identity(infoOf(log, 'p1', 'Pikachu'))).toEqual({ nickname: '我大哥', shiny: true });
+      expect(infoOf(log, 'p1', 'Landorus-Therian').nickname).toBe('うみのうた');
       expect(infoOf(log, 'p1', 'Clefable').nickname).toBe('Akeno【‿♥‿】');
-      expect(infoOf(log, 'p2', 'Garchomp').nickname).toBeUndefined();
-      expect(infoOf(log, 'p2', 'Clefable').nickname).toBeUndefined();
+      expect(infoOf(log, 'p2', 'Garchomp').nickname).toBe('Rias!');
+      expect(infoOf(log, 'p2', 'Clefable').nickname).toBe('Rias?');
       // The same text on the other side is no clash: a name is read against its own side's bodies.
       expect(infoOf(log, 'p1', 'Garchomp').nickname).toBe('Rias!');
     }
   });
 
-  test('a quote or a backslash in a name stays unset: the stream\'s JSON line carries the team text as it is', () => {
+  test('a quote or a backslash in a name stays: the stream\'s JSON line is built with JSON.stringify', () => {
     const log = [...header('singles'), ...preview, '|switch|p1a: J36Venom/\\|Pikachu, L50, F|110/110', '|switch|p2a: Say "hi"|Garchomp, L50, F|183/183'].join('\n');
-    expect(infoOf(log, 'p1', 'Pikachu').nickname).toBeUndefined();
-    expect(infoOf(log, 'p2', 'Garchomp').nickname).toBeUndefined();
+    expect(infoOf(log, 'p1', 'Pikachu').nickname).toBe('J36Venom/\\');
+    expect(infoOf(log, 'p2', 'Garchomp').nickname).toBe('Say "hi"');
   });
 });
 

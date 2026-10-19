@@ -3,7 +3,7 @@ import { protocolChoiceLock, type ChoiceLockContext } from '../choice-lock.ts';
 import { CHOICE_ITEMS } from '../sensitivity.ts';
 import { restoreSideInvariants } from '../forward-model.ts';
 import type { SimBattle, SimPokemon, SimSide } from './types.ts';
-import { normalizeBattleOnlyFormeId } from './team-order.ts';
+import { normalizeBattleOnlyFormeId, sameBodyName } from './team-order.ts';
 import { findFirstAvailableSwitchSlot, findPokemonOnSide, findSlotBySpecies } from './protocol-choices.ts';
 import { correctFieldFromSnapshot } from './field-correction.ts';
 import { applyProtocolHeldItems } from './held-items.ts';
@@ -193,10 +193,11 @@ type SnapshotPokemon = TurnSnapshot['p1']['pokemon'][number];
 
 /** The simulator's body for a snapshot entry: by species forme, else by name. */
 function simBodyOf(side: SimSide, snapshotPokemon: SnapshotPokemon): SimPokemon | undefined {
-  return side.pokemon.find((pokemon: SimPokemon) =>
-    toId(pokemon.species?.name || '') === toId(snapshotPokemon.speciesForme) ||
-    toId(pokemon.name || '') === toId(snapshotPokemon.name)
-  );
+  return side.pokemon.find((pokemon: SimPokemon) => !!snapshotPokemon.name && pokemon.name === snapshotPokemon.name) ??
+    side.pokemon.find((pokemon: SimPokemon) =>
+      toId(pokemon.species?.name || '') === toId(snapshotPokemon.speciesForme) ||
+      sameBodyName(pokemon.name, snapshotPokemon.name)
+    );
 }
 
 /**
@@ -266,7 +267,7 @@ function correctActivesFromSnapshot(battle: SimBattle, snapshot: TurnSnapshot) {
       if (!pokemon) return false;
       const speciesId = normalizeBattleOnlyFormeId(toId(pokemon.species?.name || ''));
       const wantId = normalizeBattleOnlyFormeId(toId(want.speciesForme));
-      return speciesId === wantId || toId(pokemon.name || '') === toId(want.name);
+      return speciesId === wantId || sameBodyName(pokemon.name, want.name);
     };
 
     const missing = desired.filter(want => !side.active.some(active => sameMon(active, want)));

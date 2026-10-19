@@ -46,7 +46,7 @@ export function extractLeads(log: string): { p1Leads: PokemonIdent[]; p2Leads: P
     const name = match[2].trim();
     const species = match[3].trim();
     const target = side === 'p1' ? p1Leads : p2Leads;
-    if (!target.some(existing => toId(existing.name) === toId(name) && toId(existing.species) === toId(species))) {
+    if (!target.some(existing => existing.name === name && toId(existing.species) === toId(species))) {
       target.push({ name, species });
     }
   }
@@ -54,28 +54,33 @@ export function extractLeads(log: string): { p1Leads: PokemonIdent[]; p2Leads: P
   return { p1Leads, p2Leads };
 }
 
+/** Whether a bench body is the species by its forme, its name or a shared prefix (a base name for a forme). */
+function matchesSpeciesId(pokemon: SimPokemon, speciesId: string, normalizedSpeciesId: string): boolean {
+  const speciesName = toId(pokemon.species?.name || '');
+  const displayName = toId(pokemon.name || '');
+  return (
+    speciesName === speciesId ||
+    speciesName === normalizedSpeciesId ||
+    displayName === speciesId ||
+    displayName === normalizedSpeciesId ||
+    speciesName.startsWith(speciesId) ||
+    speciesId.startsWith(speciesName) ||
+    speciesName.startsWith(normalizedSpeciesId) ||
+    normalizedSpeciesId.startsWith(speciesName)
+  );
+}
+
 export function findSlotBySpecies(battle: SimBattle, sideIdx: number, species: string): number {
   const side = battle.sides[sideIdx];
   const speciesId = toId(species);
   const normalizedSpeciesId = normalizeBattleOnlyFormeId(speciesId);
+  // An empty id (a name without Latin letters) is no key: it is a prefix of every species.
+  if (speciesId === '') return findFirstAvailableSwitchSlot(battle, sideIdx);
 
   for (let i = 0; i < side.pokemon.length; i++) {
     const pokemon = side.pokemon[i];
     if (pokemon.isActive || pokemon.fainted) continue;
-    const speciesName = toId(pokemon.species?.name || '');
-    const displayName = toId(pokemon.name || '');
-    if (
-      speciesName === speciesId ||
-      speciesName === normalizedSpeciesId ||
-      displayName === speciesId ||
-      displayName === normalizedSpeciesId ||
-      speciesName.startsWith(speciesId) ||
-      speciesId.startsWith(speciesName) ||
-      speciesName.startsWith(normalizedSpeciesId) ||
-      normalizedSpeciesId.startsWith(speciesName)
-    ) {
-      return i + 1;
-    }
+    if (matchesSpeciesId(pokemon, speciesId, normalizedSpeciesId)) return i + 1;
   }
 
   return findFirstAvailableSwitchSlot(battle, sideIdx);
@@ -89,9 +94,12 @@ export function findFirstAvailableSwitchSlot(battle: SimBattle, sideIdx: number)
   return 2;
 }
 
+/** A body by the exact name the simulator carries (the replay's own), else by species or by the id of its name; an empty id is no key. */
 export function findPokemonOnSide(side: SimSide, species: string): SimPokemon | null {
   const speciesId = toId(species);
   const normalizedSpeciesId = normalizeBattleOnlyFormeId(speciesId);
+  const exact = species ? side.pokemon.find(pokemon => pokemon.name === species) : undefined;
+  if (exact || speciesId === '') return exact ?? null;
   return side.pokemon.find(pokemon =>
     toId(pokemon.species?.name || '') === speciesId ||
     toId(pokemon.species?.name || '') === normalizedSpeciesId ||

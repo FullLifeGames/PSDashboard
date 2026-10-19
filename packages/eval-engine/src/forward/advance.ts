@@ -73,6 +73,7 @@ export interface TrialAdvanceResult {
 /** First bench slot matching the species/name id, or null. */
 function benchSlotForSpecies(battle: Battle, sideIdx: 0 | 1, species: string): number | null {
   const wanted = toId(species);
+  if (wanted === '') return null;
   const side = battle.sides[sideIdx];
   for (let index = 0; index < side.pokemon.length; index++) {
     const pokemon = side.pokemon[index];
