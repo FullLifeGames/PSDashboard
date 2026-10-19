@@ -5,6 +5,7 @@
  * finds them only from Generation 5, and Generations 1 to 4 build Reflect and Light Screen differently, so the set stays a
  * constant. Each screen also names the flag the damage calculator reads it by.
  */
+// oracle: packages/replay-core/test/screens-oracle.spec.ts
 export const SCREEN_FLAGS = { reflect: 'isReflect', lightscreen: 'isLightScreen', auroraveil: 'isAuroraVeil' } as const;
 
 export type ScreenId = keyof typeof SCREEN_FLAGS;
