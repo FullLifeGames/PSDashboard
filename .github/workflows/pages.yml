@@ -24,6 +24,9 @@ concurrency:
 jobs:
   build:
     name: Build
+    # Round 71: a data release of the bank (bank-data-<hash>, scripts/bank-data-pack.mjs --upload) carries no build and
+    # its tag may not deploy to github-pages; the site has nothing to rebuild for it.
+    if: ${{ github.event_name != 'release' || !startsWith(github.event.release.tag_name, 'bank-data-') }}
     runs-on: ubuntu-latest
     steps:
       - name: Check out repository
