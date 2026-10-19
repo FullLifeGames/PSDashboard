@@ -99,6 +99,19 @@ describe('parseShowteamSheet reads like the hand reader did, through Teams.unpac
     expect(parseShowteamSheet('|showteam|p1|Hydreigon||ChoiceScarf|Levitate|DarkPulse|Timid||M|||50|', 'p2')).toBeNull();
   });
 
+  test('an entry with fewer fields than a full one reads, and does not swallow the entries after it', () => {
+    // The line of unknown-forme-marker.spec.ts: Miraidon's entry has ten pipes where a full entry has eleven.
+    const log = '|showteam|p2|Miraidon||ChoiceSpecs|HadronEngine|ElectroDrift,DracoMeteor,VoltSwitch,Protect|Timid||||50|]' +
+      'Urshifu-Rapid-Strike||FocusSash|UnseenFist|SurgingStrikes,CloseCombat,AquaJet,Protect|Jolly||M|||50|]' +
+      'Incineroar||SafetyGoggles|Intimidate|FakeOut,KnockOff,FlareBlitz,PartingShot|Careful||F|||50|';
+    expect(parseShowteamSheet(log, 'p2')!.map(mon => mon.species)).toEqual(['Miraidon', 'Urshifu-Rapid-Strike', 'Incineroar']);
+    expectSameSheet(log, 'p2', true);
+    // Cut off after the moves: the rest reads as empty, as the hand reader did.
+    const cut = '|showteam|p1|Gengar||BlackSludge|CursedBody|ShadowBall,SludgeBomb]Pikachu||LightBall|Static|Thunderbolt|Timid||F|||50|';
+    expect(parseShowteamSheet(cut, 'p1')!.map(mon => [mon.species, mon.level, mon.gender])).toEqual([['Gengar', 100, ''], ['Pikachu', 50, 'F']]);
+    expectSameSheet(cut, 'p1', true);
+  });
+
   test('F5: a species in its own field reads the Dex name, a species in the name field as written', () => {
     const sheet = parseShowteamSheet('|showteam|p1|Pillar|Porygon2|Eviolite|Download|Recover|Bold||||||]Rotom-Wash||Sitrus Berry|Levitate|Protect|Bold||||||]Zygarde|Zygarde-10%||Power Construct|Glare|Adamant||||||', 'p1');
     expect(sheet!.map(mon => mon.species)).toEqual(['Porygon2', 'Rotom-Wash', 'Zygarde-10%']);

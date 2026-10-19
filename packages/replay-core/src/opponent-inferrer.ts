@@ -48,11 +48,24 @@ function sheetEntry(set: PokemonSet): SheetPokemon | null {
   };
 }
 
+/** A full packed entry, NICKNAME|SPECIES|ITEM|ABILITY|MOVES|NATURE|EVS|GENDER|IVS|SHINY|LEVEL|MISC, holds eleven pipes. */
+const SHEET_ENTRY_PIPES = 11;
+
 /**
- * Reads the `|showteam|` protocol line of a side (Open Team Sheets) through the library: `Teams.unpack` of @pkmn/sim
- * splits the packed team (NICKNAME|SPECIES|ITEM|ABILITY|MOVES|NATURE|EVS|GENDER|IVS|SHINY|LEVEL|MISC, entries closed
- * by `]`), the same call team-builder.ts makes for the built sets. Round 72 (T241): the hand splitter of packed names is
- * gone, so "WillOWisp" reads "Will O Wisp" and not "Will OWisp" (sheet-text.spec.ts holds the reading to the old one).
+ * One entry of a sheet through the library's unpacker. The unpacker counts fields and runs a short entry into the
+ * next one, so each entry goes in alone, padded to the full count: a hand-edited or cut-off entry reads with its
+ * missing fields empty (as the hand reader took it) and does not swallow the entries after it.
+ */
+function unpackEntry(entry: string): PokemonSet | undefined {
+  const pipes = entry.split('|').length - 1;
+  return Teams.unpack(entry + '|'.repeat(Math.max(0, SHEET_ENTRY_PIPES - pipes)))?.[0];
+}
+
+/**
+ * Reads the `|showteam|` protocol line of a side (Open Team Sheets) through the library: each entry, closed by `]`,
+ * goes to `Teams.unpack` of @pkmn/sim, the call team-builder.ts makes for the built sets. Round 72 (T241): the hand
+ * splitter of packed names is gone, so "WillOWisp" reads "Will O Wisp" and not "Will OWisp" (sheet-text.spec.ts holds
+ * the reading to the old one).
  */
 export function parseShowteamSheet(log: string, side: 'p1' | 'p2'): SheetPokemon[] | null {
   const prefix = `|showteam|${side}|`;
@@ -60,8 +73,9 @@ export function parseShowteamSheet(log: string, side: 'p1' | 'p2'): SheetPokemon
   if (!line) return null;
 
   const pokemon: SheetPokemon[] = [];
-  for (const set of Teams.unpack(line.slice(prefix.length)) ?? []) {
-    const parsed = sheetEntry(set);
+  for (const entry of line.slice(prefix.length).split(']')) {
+    const set = unpackEntry(entry);
+    const parsed = set && sheetEntry(set);
     if (parsed) pokemon.push(parsed);
   }
 
