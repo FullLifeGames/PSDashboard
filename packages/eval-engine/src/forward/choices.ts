@@ -4,7 +4,7 @@ import { positionBattle, type ChoiceOption, type SimPosition } from './position.
 import { switchAssignments } from './assignments.ts';
 import { switchInSlots } from './switches.ts';
 import { sideIndex, toId } from '@fulllifegames/replay-core';
-import { isLockedEntry, requestMoveKey, type RequestMove } from './request-moves.ts';
+import { isLockedEntry, nextChoosingSlot, requestMoveKey, type RequestMove } from './request-moves.ts';
 
 /**
  * The legal choices of one side at a position: team preview leads, the
@@ -140,7 +140,8 @@ function slotChoicesFor(
 ): SlotChoice[] {
   if (forced) return benchSwitches(sideState);
   const pokemon = sideState.active[slot];
-  if (!entry || !pokemon || pokemon.fainted) return [];
+  // The sim passes a fainted, an empty and a commanding slot (a Tatsugiri riding a Dondozo): its choice goes to the next slot.
+  if (!entry || !pokemon || nextChoosingSlot(sideState, slot) !== slot) return [];
 
   // Requests also conceal 'hidden' TRAPPING (an unrevealed Magnet Pull) while
   // the switch validation still rejects — consult the live field like the

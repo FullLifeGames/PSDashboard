@@ -30,7 +30,7 @@ export function isLockedEntry(move: RequestMove): boolean {
 }
 
 /** The first slot at or after `from` the sim asks a choice for (side.js getChoiceIndex: fainted and commanding actives pass). */
-function nextChoosingSlot(sideState: Side, from: number): number {
+export function nextChoosingSlot(sideState: Side, from: number): number {
   let slot = from;
   while (slot < sideState.active.length) {
     const active = sideState.active[slot];
