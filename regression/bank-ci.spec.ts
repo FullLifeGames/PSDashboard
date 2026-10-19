@@ -72,7 +72,8 @@ describe('the secret check before a push', () => {
     ['', `+++ b/src/x.ts\n+const token = 'ghp_${'x'.repeat(36)}';`],
     ['', `+++ b/src/x.ts\n+const token = 'github_pat_${'A1_'.repeat(10)}';`],
     ['', `+++ b/.npmrc\n+//registry.npmjs.org/:_authToken=npm_${'y'.repeat(36)}`],
-    ['', '+++ b/deploy/key.txt\n+-----BEGIN OPENSSH PRIVATE KEY-----'],
+    // Built from two parts, so this file holds no key marker of its own for the check to find.
+    ['', `+++ b/deploy/key.txt\n+-----BEGIN ${'OPENSSH PRIVATE'} KEY-----`],
   ])('refuses %j %j', (nameStatus, patch) => {
     expect(secretFindings(nameStatus, patch).length).toBeGreaterThan(0);
   });
