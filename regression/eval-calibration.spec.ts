@@ -20,6 +20,7 @@ import { heldDecided } from '../packages/eval-engine/src/turn-analysis/decided-h
 import { deserializeBattleExact } from '../packages/eval-engine/src/forward-model';
 import { hasLuckAgainst, luckAgainstFavored } from './luck-events';
 import { summaryLines } from './calibration-summary';
+import { fetchBankReplay } from './bank-fetch';
 import { takeSimFastReport } from '../packages/eval-engine/src/forward/sim-fast/state';
 
 /**
@@ -5948,12 +5949,13 @@ describe.skipIf(!process.env.EVAL_CALIBRATION)('eval calibration against real re
         }
         replay = JSON.parse(readFileSync(cachePath, 'utf-8')) as ReplayJson;
       } else {
-        const response = await fetch(`https://replay.pokemonshowdown.com/${id}.json`);
-        if (!response.ok) {
-          console.log(`skipping ${id}: HTTP ${response.status}`);
+        // Round 71: further attempts after a network error, a server error or a rate limit (regression/bank-fetch.ts).
+        const fetched = await fetchBankReplay<ReplayJson>(id);
+        if (!('replay' in fetched)) {
+          console.log(`skipping ${id}: HTTP ${fetched.status}`);
           continue;
         }
-        replay = await response.json() as ReplayJson;
+        replay = fetched.replay;
       }
       const winnerName = replay.log.match(/^\|win\|(.+)$/m)?.[1]?.trim();
       if (!winnerName) {
@@ -6193,12 +6195,12 @@ describe.skipIf(process.env.CALIB_POS_PROBE !== '1')('single-pass position ident
     let fallbackServed = 0;
     const details: string[] = [];
     for (const id of ids) {
-      const response = await fetch(`https://replay.pokemonshowdown.com/${id}.json`);
-      if (!response.ok) {
-        console.log(`skipping ${id}: HTTP ${response.status}`);
+      const fetched = await fetchBankReplay<ReplayJson>(id);
+      if (!('replay' in fetched)) {
+        console.log(`skipping ${id}: HTTP ${fetched.status}`);
         continue;
       }
-      const replay = await response.json() as ReplayJson;
+      const replay = fetched.replay;
       const { snapshots, observations, speedOrders } = parseReplayLogWithObservations(replay.log);
       const { p1Team, p2Team } = buildTeamsFromReplay(replay.log, { observations, speedOrders });
       if (p1Team.length === 0 || p2Team.length === 0) {
