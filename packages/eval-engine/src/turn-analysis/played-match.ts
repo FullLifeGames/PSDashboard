@@ -5,6 +5,7 @@ import type { EvalResult, RankedChoice } from '../types.ts';
 import type { PlayedAction, PlayedTurn } from '../played.ts';
 import type { SideAnalysis } from './types.ts';
 import { toId } from '@fulllifegames/replay-core';
+import { setupMoves } from '../dex-facts/setup.ts';
 
 /**
  * Matching the protocol's played actions into the engine's ranked lists:
@@ -17,16 +18,10 @@ import { toId } from '@fulllifegames/replay-core';
  * Pure self-boosting moves. The maximin worst case prices a setup turn as
  * "took a hit for nothing" — the boost's payoff lies past the search
  * horizon, so regret against these moves reads systematically high.
- * Curated, not exhaustive: the moves competitive games actually see.
+ * Round 72 (W2): read from the Dex's boost fields plus five handler moves
+ * (dex-facts/setup.ts), held to the simulator by test/setup-moves-oracle.spec.ts.
  */
-const SETUP_MOVES = new Set([
-  'acidarmor', 'agility', 'amnesia', 'autotomize', 'barrier', 'bellydrum',
-  'bulkup', 'calmmind', 'clangoroussoul', 'coil', 'cosmicpower', 'cottonguard',
-  'curse', 'defendorder', 'dragondance', 'filletaway', 'geomancy', 'growth',
-  'honeclaws', 'irondefense', 'nastyplot', 'noretreat', 'quiverdance',
-  'rockpolish', 'shellsmash', 'shiftgear', 'stockpile', 'swordsdance',
-  'tailglow', 'victorydance', 'workup',
-]);
+export const SETUP_MOVES = setupMoves(Dex);
 
 /** The setup move this side actually clicked, if any (display name). */
 export function playedSetupMove(side: SideAnalysis): string | null {
