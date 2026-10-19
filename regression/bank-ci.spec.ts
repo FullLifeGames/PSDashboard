@@ -3,7 +3,8 @@ import { execFileSync } from 'node:child_process';
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
-import { buildRunCommit, deleteArgs, findReuse, pushRefspec, runSettings, secretFindings } from '../scripts/bank-ci.mjs';
+import { fileURLToPath } from 'node:url';
+import { buildRunCommit, deleteArgs, findReuse, pickRun, pushRefspec, runSettings, secretFindings } from '../scripts/bank-ci.mjs';
 import { BANK_TRANCHES, validateRunConfig } from '../scripts/bank-run-config.mjs';
 
 /**
@@ -60,6 +61,17 @@ describe('what bank-ci.mjs pushes and deletes', () => {
     expect(readFileSync(join(root, '.git', 'index')).equals(indexBefore)).toBe(true);
     expect(git(root, 'branch', '--list')).toBe(branchesBefore);
     expect(readFileSync(join(root, 'src', 'app.ts'), 'utf8')).toContain('not committed');
+  });
+});
+
+describe('finding the run of a pushed commit', () => {
+  test('by commit and the workflow\'s name, since GitHub resolves bank.yml by file name only on the default branch', () => {
+    const sha = 'd'.repeat(40);
+    const runs = [{ headSha: sha, workflowName: 'Tests', databaseId: 1 }, { headSha: sha, workflowName: 'Bank', databaseId: 7 }];
+    expect(pickRun(runs, sha)).toMatchObject({ databaseId: 7 });
+    expect(pickRun([{ headSha: 'e'.repeat(40), workflowName: 'Bank', databaseId: 8 }], sha)).toBeNull();
+    const workflow = readFileSync(fileURLToPath(new URL('../.github/workflows/bank.yml', import.meta.url)), 'utf8');
+    expect(workflow).toMatch(/^name: Bank\r?$/m);
   });
 });
 

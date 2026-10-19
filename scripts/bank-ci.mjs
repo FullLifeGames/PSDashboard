@@ -22,7 +22,9 @@ import { fileURLToPath } from 'node:url';
 import { BANK_TRANCHES, CONFIG_FILE, FIT_TRANCHES, holdoutTranches, validateRunConfig } from './bank-run-config.mjs';
 
 const ROOT = fileURLToPath(new URL('..', import.meta.url));
-const WORKFLOW = 'bank.yml';
+/** The workflow's display name (`name:` of .github/workflows/bank.yml). GitHub resolves a workflow file name only on
+ * the default branch, where bank.yml need not exist, so the run is found by branch, commit and this name. */
+const WORKFLOW_NAME = 'Bank';
 const PUBLIC_BASE = 'origin/v1';
 const CI_RECORD = 'ci.json';
 
@@ -131,14 +133,19 @@ const gh = args => execFileSync('gh', args, { cwd: ROOT, encoding: 'utf8', stdio
 const pause = ms => new Promise(done => setTimeout(done, ms));
 
 /** The workflow run of the pushed commit, once GitHub has created it. */
+/** The bank workflow's run of `sha` among the runs `gh run list --json databaseId,headSha,url,workflowName` lists, or null. */
+export function pickRun(runs, sha) {
+  return runs.find(entry => entry.headSha === sha && entry.workflowName === WORKFLOW_NAME) ?? null;
+}
+
 async function runOf(sha, name) {
   for (let attempt = 0; attempt < 60; attempt++) {
-    const runs = JSON.parse(gh(['run', 'list', '--workflow', WORKFLOW, '--branch', `bank/${name}`, '--json', 'databaseId,headSha,url', '--limit', '5']));
-    const run = runs.find(entry => entry.headSha === sha);
+    const runs = JSON.parse(gh(['run', 'list', '--branch', `bank/${name}`, '--json', 'databaseId,headSha,url,workflowName', '--limit', '10']));
+    const run = pickRun(runs, sha);
     if (run) return run;
     await pause(5000);
   }
-  throw new Error(`no run of ${WORKFLOW} for ${sha} after five minutes`);
+  throw new Error(`no run of the ${WORKFLOW_NAME} workflow for ${sha} after five minutes`);
 }
 
 async function main() {
