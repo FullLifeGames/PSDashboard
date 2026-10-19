@@ -16,18 +16,37 @@ export function trimTeamToBring(team: PokemonSet[], keep: string[] | undefined):
   const claimed = new Set<PokemonSet>();
   for (const name of keep) {
     const nameId = toId(name);
-    const exact = team.find(set =>
-      !claimed.has(set) && (toId(set.species) === nameId || toId(set.name || '') === nameId));
+    const free = team.filter(set => !claimed.has(set));
+    const exact = (name ? free.find(set => set.name === name) : undefined) ??
+      free.find(set => (nameId !== '' && toId(set.species) === nameId) || sameBodyName(set.name, name));
     if (exact) {
       claimed.add(exact);
       continue;
     }
     const base = speciesBaseId(name);
-    const byBase = team.filter(set => !claimed.has(set) && speciesBaseId(set.species) === base);
+    const byBase = free.filter(set => speciesBaseId(set.species) === base);
     if (byBase.length !== 1) return team;
     claimed.add(byBase[0]);
   }
   return team.filter(set => claimed.has(set));
+}
+
+/**
+ * Whether two names are one body's name. The simulator carries the replay's own name, so the exact text is the key; an
+ * equal id is the fallback for a spelling that differs in case or marks. An id of "" (a Chinese or Japanese name, an
+ * emoji) is no key: it would match every such body of the side.
+ */
+export function sameBodyName(a: string | undefined, b: string | undefined): boolean {
+  if (!a || !b) return false;
+  if (a === b) return true;
+  const id = toId(a);
+  return id !== '' && id === toId(b);
+}
+
+/** The first item named `name` exactly, else the first with the same name by `sameBodyName`. */
+export function findByName<T>(items: readonly T[], nameOf: (item: T) => string | undefined, name: string | undefined): T | undefined {
+  if (!name) return undefined;
+  return items.find(item => nameOf(item) === name) ?? items.find(item => sameBodyName(nameOf(item), name));
 }
 
 const BATTLE_ONLY_FORME_SUFFIXES = ['terastal', 'stellar', 'tera'];
@@ -53,17 +72,17 @@ export function reorderForLeads(team: PokemonSet[], leads: PokemonIdent[]): Poke
   const remaining = [...team];
   const orderedLeads: PokemonSet[] = [];
   for (const lead of leads) {
-    const leadNameId = toId(lead.name);
     const leadSpeciesId = toId(lead.species);
-    let idx = remaining.findIndex(pokemon => toId(pokemon.name || '') === leadNameId);
-    if (idx < 0) {
-      idx = remaining.findIndex(pokemon =>
-        toId(pokemon.species) === leadSpeciesId ||
-        toId(pokemon.name || '') === leadSpeciesId
-      );
-    }
-    if (idx >= 0) {
-      const [pokemon] = remaining.splice(idx, 1);
+    const named = lead.name ? remaining.filter(pokemon => pokemon.name === lead.name) : [];
+    const sameId = named.length > 0 ? named : remaining.filter(pokemon => sameBodyName(pokemon.name, lead.name));
+    // One name on two bodies: the lead's species tells them apart.
+    const byName = sameId.find(pokemon => toId(pokemon.species) === leadSpeciesId) ?? sameId[0];
+    const pokemon = byName ?? remaining.find(candidate =>
+      toId(candidate.species) === leadSpeciesId ||
+      toId(candidate.name || '') === leadSpeciesId
+    );
+    if (pokemon) {
+      remaining.splice(remaining.indexOf(pokemon), 1);
       orderedLeads.push(pokemon);
     }
   }

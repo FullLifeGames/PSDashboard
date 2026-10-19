@@ -1,4 +1,5 @@
 import { type TurnSnapshot, toId } from '@fulllifegames/replay-core';
+import { sameBodyName } from './team-order.ts';
 import type { SimBattle, SimPokemon } from './types.ts';
 
 /**
@@ -51,7 +52,7 @@ export function restoreTeraFromSnapshot(battle: SimBattle, snapshot: TurnSnapsho
     if (side.pokemon.some((pokemon: SimPokemon) => pokemon.baseAbility === 'illusion')) continue;
     const bodies = living.filter((pokemon: SimPokemon) =>
       toId(pokemon.species?.name || '') === toId(entry.speciesForme) ||
-      toId(pokemon.name || '') === toId(entry.name)
+      sameBodyName(pokemon.name, entry.name)
     );
     if (bodies.length !== 1 || TERA_FORME_SPECIES.has(bodies[0].species.baseSpecies)) continue;
 

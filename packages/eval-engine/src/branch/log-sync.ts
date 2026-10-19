@@ -1,5 +1,5 @@
 import type { SimBattle, SimPokemon } from './types.ts';
-import { normalizeBattleOnlyFormeId, slotLetter } from './team-order.ts';
+import { normalizeBattleOnlyFormeId, sameBodyName, slotLetter } from './team-order.ts';
 import { toId } from '@fulllifegames/replay-core';
 
 function replayLogPrefixThroughTurn(replayLog: string, targetTurn: number): string[] {
@@ -39,7 +39,7 @@ export function branchLogForPosition(replayLog: string, targetTurn: number, batt
 interface LoggedActive {
   side: 'p1' | 'p2';
   activeSlot: number;
-  nameId: string;
+  name: string;
   speciesId: string;
 }
 
@@ -50,7 +50,7 @@ function parseLoggedActive(line: string): LoggedActive | null {
   return {
     side: match[2] as 'p1' | 'p2',
     activeSlot: match[3].charCodeAt(0) - 'a'.charCodeAt(0),
-    nameId: toId(match[4]),
+    name: match[4].trim(),
     speciesId: normalizeBattleOnlyFormeId(toId(match[5].split(',')[0] || '')),
   };
 }
@@ -58,7 +58,7 @@ function parseLoggedActive(line: string): LoggedActive | null {
 function activeMatchesLog(pokemon: SimPokemon, logged: LoggedActive | undefined): boolean {
   if (!logged) return false;
   const speciesId = normalizeBattleOnlyFormeId(toId(pokemon.species?.name || ''));
-  return logged.nameId === toId(pokemon.name || '') || logged.speciesId === speciesId;
+  return sameBodyName(logged.name, pokemon.name) || logged.speciesId === speciesId;
 }
 
 function formatPokemonDetails(pokemon: SimPokemon): string {

@@ -1,6 +1,6 @@
 import type { BranchSlotChoice } from '../branch-choices.ts';
 import type { BranchChoiceErrorLog, BranchExecuteResult, BranchRuntime, SimBattle, SimPokemon } from './types.ts';
-import { normalizeBattleOnlyFormeId, slotLetter } from './team-order.ts';
+import { findByName, normalizeBattleOnlyFormeId, sameBodyName, slotLetter } from './team-order.ts';
 import { targetLocSuffixForChoice } from './protocol-choices.ts';
 import { sideIndex, toId } from '@fulllifegames/replay-core';
 
@@ -65,22 +65,20 @@ function resolveSwitchSlotChoice(
 ): ResolvedSideCommand {
   const sideIdx = sideIndex(side);
   const bench = battle.sides[sideIdx].pokemon;
-  const nameId = toId(choice.pokemonName);
 
-  let speciesMatch = -1;
+  // The bench bodies of the clicked species: the exact name decides, then an equal id (an empty id is no key), then the first.
+  const candidates: number[] = [];
   for (let index = 0; index < bench.length; index++) {
     const pokemon = bench[index];
     if (pokemon.isActive || pokemon.fainted) continue;
     const benchSpecies = normalizeBattleOnlyFormeId(toId(pokemon.species?.name || ''));
     if (benchSpecies !== choice.speciesId && toId(pokemon.name || '') !== choice.speciesId) continue;
-    if (toId(pokemon.name || '') === nameId) {
-      return { ok: true, command: `switch ${index + 1}` };
-    }
-    if (speciesMatch < 0) speciesMatch = index;
+    candidates.push(index);
   }
-
-  if (speciesMatch >= 0) return { ok: true, command: `switch ${speciesMatch + 1}` };
-  const named = bench.find(pokemon => toId(pokemon.name || '') === nameId);
+  const picked = candidates.find(index => bench[index].name === choice.pokemonName) ??
+    candidates.find(index => sameBodyName(bench[index].name, choice.pokemonName)) ?? candidates[0];
+  if (picked !== undefined) return { ok: true, command: `switch ${picked + 1}` };
+  const named = findByName(bench, pokemon => pokemon.name, choice.pokemonName);
   return { ok: false, error: `${named ? describePokemon(named) : choice.pokemonName} is no longer available to switch in.` };
 }
 
