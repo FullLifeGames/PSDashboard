@@ -910,6 +910,56 @@ import { takeSimFastReport } from '../packages/eval-engine/src/forward/sim-fast/
  * static basis for this mass; the next lever, if any, is search/
  * planning-side.
  *
+ * BANK IN CI 2026-10-17..19 (improvement round 71, a tooling round without a
+ * score touch; branch r71 from 421c6ed (= v1), commits 0c22a04 to 4694469;
+ * spec docs/superpowers/specs/2026-10-13-round-71-bank-in-ci-design.md, plan
+ * docs/superpowers/plans/2026-10-17-round-71-bank-in-ci-plan.md, probes
+ * docs/perf/probes/2026-10-19-r71/). Gates: 13.10. ("1a 2a 3a 4a": a release
+ * asset for the data, 16 jobs of 4 slices, CI bases reused, the feedback
+ * corpus stays local; "5a 6a": a push of bank/<name> starts a run, a standing
+ * okay for pushing and deleting those branches), 17.10. ("1a": CI measures
+ * only commits with the tooling), 19.10. ("1b 2a": the 133 password replays of
+ * the holdouts go into the tarball, the links in the repository stay; "1a":
+ * the upload and the identity check).
+ * DELIVERED: run-calibration.mjs --slice-range and --merge
+ * (calibration-jobs.mjs); the data tarball (bank-data.mjs, bank-data-pack.mjs:
+ * .smogon-cache and the 1,424 holdout replays, 8.6 MB, release
+ * bank-data-242dbf6b9548d96d, a pre-release that is never Latest;
+ * regression/fixtures/bank-data.json names its hashes, and unpacking refuses
+ * everything but regular files under the two folders); .github/workflows/
+ * bank.yml (a push to bank/** only, a read-only token, no secret, actions
+ * pinned to commits, no credentials kept, the job index the only expression
+ * in a shell line); bank-run-config.mjs (the allowlist of .bank-run.json);
+ * bank-ci.mjs (the run commit by commit-tree over a throwaway index, the
+ * secret check against origin/v1, one branch by an explicit refspec, the
+ * delete with --force-with-lease, --reuse); retries for the bank's replay
+ * fetch (bank-fetch.ts); pages.yml skips bank data releases.
+ * MEASUREMENT: two CI runs of eeb2ec1 byte-identical (837 rows, sha256
+ * d1506a4e...), equal to the first CI run of 5ac816a0 and to the local bank
+ * r70-b (8683fa9, 4 slices, Windows, Node 24.0.2), though CI ran 64 slices on
+ * Linux with Node 24.21.0; the VGC holdout from the tarball byte-identical to
+ * the local r70-hold-vgc (1,121 rows); the Doubles OU, Champions OU and
+ * Champions VGC holdouts match every row of their local quarter runs (269,
+ * 111 and 360). paired-calibration.mjs reads CI runs unchanged (r71-identity-3
+ * against r70-b: joined 837, no harm, no warning; the CI VGC holdout against
+ * r69-w2-hold-vgc reads the verdict of the local r70-hold-vgc). Wall time: a
+ * bank run about 5 minutes alone, 6.5 and 9 minutes when two bank runs
+ * shared the runners; the four holdouts 25 minutes side by side (1,090,
+ * 1,121, 445 and 1,445 rows, all complete); bank and holdouts were not run
+ * in one batch (one after the other 30 to 34 minutes), against about 2.5
+ * hours here at four slices. Regression 4,910 green, the local checkpoint
+ * test red as before (T245).
+ * FOUND ON THE WAY: gh run list --workflow resolves bank.yml on the default
+ * branch only (HTTP 404; 8ac1068 finds the run by branch, commit and workflow
+ * name); a read ECONNRESET cost a slice its 14 rows (eeb2ec1: four attempts);
+ * the data release started pages.yml, whose deploy the github-pages
+ * environment refused for a tag (6ae01d6, 4694469); ubuntu-latest moves to
+ * Ubuntu 26 from 19.10.
+ * USER GATE 2026-10-19 09:37 ("1a 2a 3a"): CI is the default for bank and
+ * holdouts (AGENTS.md); r71 is booked and pushed to v1; wave 4 runs next
+ * after its own gate, with T246 in the fitting lane; new TODO T247 (the
+ * feedback corpus in CI), next free T248.
+ *
  * BATCH 2026-10-13..17 (improvement round 70, the first batch of small
  * fixes under the change classes of AGENTS.md: the user's reports of 13.10.
  * and the small open v1 TODOs, one commit a fix; branch r70 from e0fdd99 (=

@@ -1,6 +1,6 @@
 # Backlog
 
-This file holds the details of every open TODO, one section per TODO under its fixed T-number. The sections are grouped by the packages of `NextSteps.md`, and a package is one round. The next free T-number is T247.
+This file holds the details of every open TODO, one section per TODO under its fixed T-number. The sections are grouped by the packages of `NextSteps.md`, and a package is one round. The next free T-number is T248.
 
 Evidence paths that start with `r69/` are under `docs/perf/probes/2026-10-12-r69/`.
 
@@ -10,7 +10,7 @@ Source of the new TODOs of round 70 (T224 to T246): the findings of the batch (`
 
 ## Next rounds
 
-User gate 17.10.2026, "5a": round 71 builds the bank in GitHub Actions (spec `docs/superpowers/specs/2026-10-13-round-71-bank-in-ci-design.md`, user gate 13.10.2026, "1a 2a 3a 4a" and "5a 6a"), then wave 4 runs package G (design `docs/superpowers/specs/2026-10-15-wave-4-library-design.md`, user gate 15.10.2026, "3a"). T163 and T160 follow as their own rounds (user 13.10.2026, "1a"; the trigger of T160 is met). The new TODOs of round 70 are in the packages below.
+User gate 19.10.2026, "3a": wave 4 runs package G next (design `docs/superpowers/specs/2026-10-15-wave-4-library-design.md`, user gate 15.10.2026, "3a"), after its own gate over the open decisions of the design; T246 goes into the lane it fits. Round 71 built the bank in GitHub Actions, so the wave measures in CI (`node scripts/bank-ci.mjs`, AGENTS.md). T163 and T160 follow as their own rounds (user 13.10.2026, "1a"; the trigger of T160 is met). The TODOs of rounds 70 and 71 are in the packages below.
 
 ### T163 · Leaf K per family, fitted on search values
 
@@ -672,6 +672,23 @@ User gate 17.10.2026, "5a": round 71 builds the bank in GitHub Actions (spec `do
 - [ ] One exported helper in replay-core for the forme origin; the two other places call it. `pokemon-options.ts` and `smogon-sets.ts` call `generationsFor` with scope 'legal'; `DEFENDER_ITEMS` from the dex hooks (`onModifyDef`, `onModifySpD`) instead of a typed list.
 - [ ] Specs of the three places green, bank byte-identical; singles and doubles share the functions.
 
+### T247 · The feedback corpus in CI
+
+*Tooling · round (feature, like round 71) · small to medium · no score touch · rest of round 71 (user gate 13.10.2026, "4a")*
+
+**Problem.** Since round 71 the bank and the holdouts run in GitHub Actions; the feedback corpus (`e2e-feedback/`, 12 replays with the expert pins) still runs on this machine: `npm run test:feedback` starts a Vite dev server on port 5176 and Chromium, one run took 393 s in round 70, and a lossless change needs three byte-identical runs. Its anchor is the browser build: a Chromium change shifts the last floating-point place (watch list), so a CI run has to reproduce the local dumps byte for byte before it replaces them.
+
+**Benefit.** Measurement: the feedback runs of a gate run side by side in CI, and the machine stays free.
+
+**Success.** Two CI runs and one local run of one commit give byte-identical dumps (`FEEDBACK_DUMP=1`) and the same drift report (`feedback-drift.json` beside the dumps); three CI runs side by side finish in less wall time than one run here (393 s).
+
+**Evidence.** `docs/perf/probes/2026-10-15-r70-check/check.log` (393 s), `docs/superpowers/specs/2026-10-13-round-71-bank-in-ci-design.md` (gate question 4), `.github/workflows/bank.yml` (the security rules to copy).
+
+**Steps.**
+- [ ] A workflow for the feedback corpus with the rules of `bank.yml`, Chromium pinned to the local version.
+- [ ] Dumps compared CI against local and two CI runs against each other.
+- [ ] AGENTS.md: the feedback runs of a gate in CI.
+
 ## Package G · Library instead of hand work (wave 4; design `docs/superpowers/specs/2026-10-15-wave-4-library-design.md`)
 
 From the lessons of round 70 (`docs/perf/probes/2026-10-15-lessons/findings.md`): two causes made 12 of the 18 faults (our code decides a game question the simulator or the Dex answers; two places answer one question). T196 (package A) joins lane B with the evidence of N2.
@@ -1017,6 +1034,7 @@ Each bullet reads "signal → when to act".
 - [ ] e2e "a long forward slider jump lands the scene instead of hanging on "seeking..."" (`e2e/timeline.spec.ts:49`) waited 30 s in vain for `Replays.battle` in the replay iframe in wave run 3 of round 63 (1 of 75 tests in a full run; alone 4 of 4 green, green in wave runs 1 and 2) → act if the test tips a gate a second time; probably the same family as the load order in the embed.
 - [ ] The browser build is part of the feedback anchor: a Chromium change shifts the last floating-point place (573756 t81 verify selection) → every Playwright upgrade is a re-anchoring with `FEEDBACK_DUMP=1`; state `@playwright/test ^1.62.1`.
 - [ ] TypeScript stays on 6.x until typescript-eslint parses the native compiler; `@types/node` follows the CI Node major (24) → watch the peer range.
+- [ ] `ubuntu-latest` moves to Ubuntu 26 from 19.10.2026 (an annotation on the bank runs of round 71). The identity runs of round 71 ran on the ubuntu-24.04 image, where CI rows matched local Windows rows → once the runs report Ubuntu 26, run the identity pair again (two CI runs and a local run of one commit, `docs/perf/probes/2026-10-19-r71/compare.mjs`) before a verdict pairs a new CI run with an older base.
 - [ ] Weekly version check of `@pkmn/sim` (from the adoption on 26.09., pin 0.10.11, exact in every manifest since round 70) → on a new version, `npm run upgrade:pkmn <version>` moves sim, mods, dex and data together and prints the checks (T103, the engine suite in all speed-layer modes, the batch check); then an upgrade PR per D24.
 - [ ] Screenshot probe `docs/probes/2026-09-03-css/` (32 tests, 34 screens, 0 pixel tolerance; start with `node scripts/run-e2e.mjs -c docs/probes/2026-09-03-css/shots.config.ts`; its baseURL is fixed on port 5174, `--dev-port` does not reach it) → reuse as a pixel gate for every UI round; re-record the baseline with `--update-snapshots` when copy or layout change on purpose.
 - [ ] Library bugs (round 67, checked 12.10.): (1) the Champions bundle of `@pkmn/mods` 0.10.11 embeds the simulator's dex with all data and loads the data of every mod on import, only for `toID` in `canMegaEvo` (`build/champions/index.mjs:423335`, `:423758-423770`; the bundle `championsregma` has 85 KB). (2) `DexFormats.extend` in `@pkmn/sim` discards the result of `concat` (`dex-formats.js:361-365`): the Champions formats are missing from `Dex.formats.all()`, `get()` finds them, a second `extend` throws "duplicate ID". (3) `Dex.formats.get('gen9championsou@@@Sleep Clause Mod')` returns a non-existing format, because `data.Rulesets` arises only on import from `formats.all()` (`dex.js:420-429`, `:498`); `new Battle` then silently builds on the base dex without mod and without rule (unreachable today, `replay-format.ts:265`). (4) The Mega Z formes carry no mega flag (`dex-species.mjs:49/54` counts only Mega, Mega-X, Mega-Y); Showdown has fixed this already, the fix comes with the next sync of `@pkmn/sim`, no report. In addition `@pkmn/client` 0.7.3 without a null check (T188: `getPressurePP` and the `types` getter throw when the generation does not know the species) → three reports (1, 2 with 3, client) drafted on 12.10. in `docs/perf/probes/2026-10-10-r67/gate/upstream-issues-draft.md`, each with a script under `gate/upstream/`, checked against the newest versions and pkmn/ps `main`; the user reports them personally (12.10., gate question 10 of round 67) → watch whether and when a fix appears; the client fix does not replace T188. (5, round 68) Double Shock carries no punch flag in the Champions mod of `@pkmn/mods` 0.10.11 and is marked as Custom; the server computes with Iron Fist (gen9championsou-2693645983: a resisted Double Shock takes 56%, without Iron Fist at most 51.5%); Showdown fixed this on 10.09. (bc4eb07b4, #12304), the fix comes with the next `@pkmn/mods`, no report; the engine's calculator already carries the flag from `@smogon/calc` 0.12. (6, round 70) `@pkmn/client` 0.7.3 books the generic Z-move or Max-move name as a revealed move slot (`Pokemon.useMove`; smogtours-gen7ou-450650 p2 Garchomp `['devastatingdrake']`, smogtours-gen8ubers-486661 `['earthquake', 'maxquake']`; `build/index.js:1291-1307`; `docs/perf/probes/2026-10-15-zmoves/findings.md` open point 2, `docs/perf/probes/2026-10-15-lessons/out/client-zmax.txt`); since 73d7cad `inference/power-moves.ts` reads the Dex instead → check play.pokemonshowdown.com's own tooltip before a report; the user reports it.
