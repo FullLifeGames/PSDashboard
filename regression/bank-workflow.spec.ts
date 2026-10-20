@@ -37,6 +37,15 @@ describe('the bank workflow', () => {
     for (const line of uses) expect(line).toMatch(/^uses: actions\/[a-z-]+@[0-9a-f]{40} # v\d+\.\d+\.\d+$/);
   });
 
+  test('every job sets up one exact Node version, so the jobs of a run share a fingerprint', () => {
+    // Round 72: with `node-version: 24`, runners of two images resolved v24.21.0 and v24.22.0 in one run, and the merge
+    // refused the jobs (they differ in fingerprint). The bases of round 72 ran on v24.21.0.
+    const versions = [...workflow.matchAll(/^\s+node-version: (.+)$/gm)].map(match => match[1].trim());
+    expect(versions.length).toBe(3);
+    for (const version of versions) expect(version).toMatch(/^\d+\.\d+\.\d+$/);
+    expect(new Set(versions).size).toBe(1);
+  });
+
   test('every checkout keeps no credentials', () => {
     const checkouts = [...workflow.matchAll(/uses: actions\/checkout@[0-9a-f]{40}.*\n((?:\s+with:\n(?:\s{10}.*\n)+)?)/g)];
     expect(checkouts.length).toBe(3);
