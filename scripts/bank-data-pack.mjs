@@ -20,7 +20,7 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { canonicalJson, CACHE_DIRS, hashDirectory } from './calibration-fingerprint.mjs';
-import { packData, unpackData } from './bank-data.mjs';
+import { downloadWithRetry, packData, unpackData } from './bank-data.mjs';
 
 const ROOT = fileURLToPath(new URL('..', import.meta.url));
 const FIXTURE = 'regression/fixtures/bank-data.json';
@@ -110,9 +110,11 @@ async function fetchAsset(fixture) {
   const repository = process.env.GITHUB_REPOSITORY;
   if (!repository || !/^[\w.-]+\/[\w.-]+$/.test(repository)) fail('--fetch without --file needs GITHUB_REPOSITORY (owner/name)');
   const url = `https://github.com/${repository}/releases/download/${fixture.release}/${fixture.asset}`;
-  const response = await fetch(url, { redirect: 'follow' });
-  if (!response.ok) fail(`download of ${url} failed: HTTP ${response.status}`);
-  return Buffer.from(await response.arrayBuffer());
+  try {
+    return await downloadWithRetry(url);
+  } catch (error) {
+    fail(error.message);
+  }
 }
 
 async function fetchData(options) {

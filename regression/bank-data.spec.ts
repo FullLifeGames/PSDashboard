@@ -6,7 +6,7 @@ import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { hashDirectory } from '../scripts/calibration-fingerprint.mjs';
-import { packData, tarEntry, tarEnd, unpackData } from '../scripts/bank-data.mjs';
+import { downloadWithRetry, packData, tarEntry, tarEnd, unpackData } from '../scripts/bank-data.mjs';
 
 /**
  * Round 71 (bank in GitHub Actions): the bank's data (.fit-corpus and .smogon-cache) travels to CI as one gzipped
@@ -167,5 +167,35 @@ describe('bank-data-pack.mjs packs here and fetches in CI', () => {
     expect(fetched.status).toBe(2);
     expect(fetched.stderr).toMatch(/sha256/);
     expect(existsSync(join(ci, '.fit-corpus'))).toBe(false);
+  });
+});
+
+describe('the download of the data release', () => {
+  // Round 72: a CI job met HTTP 504 on the release asset and failed, so the run's merge lost its slices.
+  type Step = Error | number;
+  const scripted = (steps: Step[]) => {
+    let calls = 0;
+    const fetcher = async () => {
+      const step = steps[Math.min(calls, steps.length - 1)];
+      calls += 1;
+      if (step instanceof Error) throw step;
+      return { ok: step >= 200 && step < 300, status: step, arrayBuffer: async () => new Uint8Array([1, 2, 3]).buffer };
+    };
+    return { fetcher, calls: () => calls };
+  };
+
+  test('a server error and a reset connection heal on a later attempt', async () => {
+    const run = scripted([504, new TypeError('fetch failed'), 200]);
+    expect([...await downloadWithRetry('https://example.invalid/a', { fetcher: run.fetcher, pauses: [0] })]).toEqual([1, 2, 3]);
+    expect(run.calls()).toBe(3);
+  });
+
+  test('a missing asset fails at once, a server that stays down after every attempt', async () => {
+    const missing = scripted([404]);
+    await expect(downloadWithRetry('https://example.invalid/b', { fetcher: missing.fetcher, pauses: [0] })).rejects.toThrow(/HTTP 404/);
+    expect(missing.calls()).toBe(1);
+    const down = scripted([503]);
+    await expect(downloadWithRetry('https://example.invalid/c', { fetcher: down.fetcher, pauses: [0], attempts: 3 })).rejects.toThrow(/HTTP 503/);
+    expect(down.calls()).toBe(3);
   });
 });

@@ -135,3 +135,32 @@ export function unpackData(gz, root, dirs = CACHE_DIRS) {
   }
   return { files: entries.length };
 }
+
+/**
+ * The bytes at `url`, fetched again after a network error, a server error or a rate limit; a client error such as a 404
+ * fails at once (round 72: a CI job met HTTP 504 on the data release, and the run's merge lost its slices).
+ */
+export async function downloadWithRetry(url, { fetcher = fetch, attempts = 4, pauses = [5000, 15000, 30000] } = {}) {
+  let last = '';
+  for (let attempt = 0; attempt < attempts; attempt++) {
+    if (attempt > 0) await new Promise(done => setTimeout(done, pauses[Math.min(attempt - 1, pauses.length - 1)]));
+    let response;
+    try {
+      response = await fetcher(url, { redirect: 'follow' });
+    } catch (error) {
+      last = `network error (${error?.cause?.code ?? error?.message ?? error})`;
+      continue;
+    }
+    if (response.ok) {
+      try {
+        return Buffer.from(await response.arrayBuffer());
+      } catch (error) {
+        last = `the body broke off (${error?.message ?? error})`;
+        continue;
+      }
+    }
+    last = `HTTP ${response.status}`;
+    if (response.status < 500 && response.status !== 429) break;
+  }
+  throw new Error(`download of ${url} failed: ${last}`);
+}
