@@ -69,6 +69,14 @@ function fieldKey(battle: Battle): string {
     battle.sides.map(side => Object.keys(side.sideConditions).join(',')).join('|');
 }
 
+/** Where a body stands. */
+const placeKey = (pokemon: Pokemon): string => `${pokemon.side.id}${pokemon.position}:`;
+
+/** The other actives (allies and foes of the pair): a Ruin ability, Friend Guard, Helping Hand and the like reach the hit. */
+function sceneKey(battle: Battle, attacker: Pokemon, defender: Pokemon, keyOf: (pokemon: Pokemon) => string): string {
+  return battle.sides.flatMap(side => side.active.map(p => (p && p !== attacker && p !== defender ? `${placeKey(p)}${keyOf(p)}` : '-'))).join('|');
+}
+
 /** The reading function of one battle: the cost of a hit of `moveId` from `attacker` on `defender` (null where the body has no damaging move). */
 export type HitReader = (attacker: Pokemon, defender: Pokemon, moveId: string | null) => HitCost;
 
@@ -89,7 +97,7 @@ export function hitReader(battle: Battle): HitReader {
       return NO_COST;
     }
     field ??= fieldKey(battle);
-    const key = `${field}#${moveId}#${keyOf(attacker)}>${keyOf(defender)}`;
+    const key = `${field}#${moveId}#${placeKey(attacker)}${keyOf(attacker)}>${placeKey(defender)}${keyOf(defender)}#${sceneKey(battle, attacker, defender, keyOf)}`;
     let cost = memo.get(key);
     if (cost !== undefined) {
       hitStats.hits++;

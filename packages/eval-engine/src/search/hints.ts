@@ -1,4 +1,4 @@
-import type { ActiveMove, Battle, BoostsTable, Pokemon } from '@pkmn/sim';
+import type { BoostsTable, Pokemon } from '@pkmn/sim';
 import { boostedFraction, pairThreat, singleMoveFraction } from '../eval-function.ts';
 import { positionBattle, type ChoiceOption, type SimPosition } from '../forward-model.ts';
 import { forkBattle } from '../forward/position.ts';
@@ -6,6 +6,7 @@ import { bodyAsClicked } from '../calc/tera-click.ts';
 import { RULE_MOVES } from '../move-use.ts';
 import { shieldsFromHits, shieldsSide } from '../dex-facts/protect.ts';
 import { sideIndex } from '@fulllifegames/replay-core';
+import { bodyInView, callHandler, guarded, isolated, protectorStops } from '../sim-ask/index.ts';
 
 /**
  * Static per-option threat hints — the machinery candidate restriction
@@ -71,32 +72,8 @@ export function redirectsFoes(dex: HintDex, move: DexMove): boolean {
  */
 export { shieldsFromHits, shieldsSide };
 
-type HitHandler = (this: unknown, target: unknown, source: unknown, move: unknown) => unknown;
-
-/**
- * Round 70: whether the protector's condition stops `attack` from `source` on `target`: the simulator's own onTryHit, asked
- * from stand-ins that leave the battle alone (the battle read through its prototype with a log that discards, a source that
- * holds no Outrage lock to reset). The protector sets a side condition (Wide Guard) or a volatile on its user (Protect and its
- * kin, gate of 13.10. 20:26, 3a). The handler returns nothing for a hit it lets through and the simulator's NOT_FAIL for a hit
- * it stops. A handler that needs more than the stand-ins offer stops nothing. The caller sets the attack's target at use.
- *
- * The shields that punish a contact hit (King's Shield, Obstruct, Silk Trap, Baneful Bunker, Burning Bulwark, Spiky Shield) do it in
- * this same handler, on the live attacker: a stage drop reaches the nested boosts a shallow stand-in shares with the live body, a
- * status try writes the live battle's log and effect counter. The question is only whether the hit is stopped, so the handler is
- * asked about the attack without its contact flag (test/protect-tempo-hints.spec.ts plays every protector of the Dex).
- */
-export function protectorStops(battle: Battle, protector: DexMove, attack: ActiveMove, source: Pokemon, target: Pokemon): boolean {
-  const condition = protector.sideCondition || protector.volatileStatus;
-  const handler = condition ? (battle.dex.conditions.get(condition) as { onTryHit?: unknown }).onTryHit : undefined;
-  if (typeof handler !== 'function') return false;
-  const stage = Object.create(battle, { add: { value: () => undefined } });
-  const user = Object.create(source, { getVolatile: { value: () => undefined } });
-  try {
-    return (handler as HitHandler).call(stage, target, user, Object.create(attack, { flags: { value: { ...attack.flags, contact: undefined } } })) !== undefined;
-  } catch {
-    return false;
-  }
-}
+/** Round 70, round 72 (T239): whether a protector's handler stops the hit, asked through the module that asks the simulator (sim-ask/protector.ts). */
+export { protectorStops };
 
 /** Every stat a stage can sit on. */
 const STAGES = ['atk', 'def', 'spa', 'spd', 'spe', 'accuracy', 'evasion'] as const;
@@ -226,14 +203,13 @@ function twinBoard(twin: ClickedTwin, position: SimPosition, side: 'p1' | 'p2'):
 function targetAtUse(board: HintBoard, attacker: Pokemon, move: DexMove, victim: Pokemon | undefined = board.foes[0]): DexMove['target'] {
   const handler = RULE_MOVES.has(move.id) ? (move as { onModifyMove?: unknown }).onModifyMove : undefined;
   if (typeof handler !== 'function') return move.target;
-  const active = board.battle.dex.getActiveMove(move.id);
-  try {
-    (handler as (this: unknown, move: unknown, user: Pokemon, target: Pokemon | undefined) => void)
-      .call(board.battle, active, attacker, victim);
-  } catch {
-    return move.target;
-  }
-  return active.target;
+  const { battle } = board;
+  const active = battle.dex.getActiveMove(move.id);
+  const view = isolated(battle);
+  const answered = guarded(battle, [move], () =>
+    callHandler(handler as (this: unknown, move: unknown, user: Pokemon, target: Pokemon | undefined) => void, view,
+      [active, bodyInView(view, attacker), victim && bodyInView(view, victim)]));
+  return answered.ok ? active.target : move.target;
 }
 
 /**
