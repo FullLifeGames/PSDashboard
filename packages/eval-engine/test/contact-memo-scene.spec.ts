@@ -18,8 +18,7 @@ import { battleOf } from './power-oracle';
  * onAlly, onFoe). The sweep runs a physical recoil move (the cost follows the damage) on a doubles board of Scarlet and
  * Violet and of the Champions mod, with the ability on the attacker's partner and on the defender's partner.
  *
- * T257 is open in score/contact.ts (not a file of this step): the test is an expected failure until the key carries the
- * scene; the day it passes, `test.fails` turns red and the marker comes off.
+ * T257 is fixed in score/contact.ts: the key carries the side and position of the pair and the key of every other active.
  */
 
 await loadSimMods('gen9championscustomgame');
@@ -45,7 +44,7 @@ describe.each(FORMATS)('the contact memo reads the scene of the hit (%s)', forma
     .filter(ability => !ability.isNonstandard && Object.keys(ability).some(key => REACHING.test(key)))
     .map(ability => ability.id);
 
-  test.fails('a hit read after a board that differs in the other actives is the hit of its own board, in both orders', () => {
+  test('a hit read after a board that differs in the other actives is the hit of its own board, in both orders', () => {
     const reaching: string[] = [];
     const wrong: string[] = [];
     for (const holder of ['ally', 'foe'] as const) {
