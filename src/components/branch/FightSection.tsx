@@ -9,6 +9,7 @@ import { MoveBtn } from './ChoiceButtons';
 import { moveChoiceFor, pickedChoice, type ChoiceContext } from './choice-context';
 import type { PlayedPick } from './SideControls';
 import { toId } from '@fulllifegames/replay-core';
+import { displayName } from '../../lib/branch-history';
 
 export interface WhatIfState {
   whatIfMove: string;
@@ -137,7 +138,7 @@ function ChoicePicker({ label, moves, switches, blockedSwitchKeys, onPick }: Pic
               value={`switch:${sw.slot}`}
               disabled={blockedSwitchKeys.has(switchOptionKey(sw))}
             >
-              Switch: {sw.name} ({sw.hpPercent}% HP)
+              Switch: {displayName(sw.name, sw.species)} ({sw.hpPercent}% HP)
             </option>
           ))}
         </optgroup>

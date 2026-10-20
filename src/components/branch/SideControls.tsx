@@ -7,6 +7,7 @@ import {
 import type { SpreadTargetDamage } from '../../lib/branch-damage';
 import { useMovePool, type Gimmick } from '../../hooks/useSideControlsState';
 import { SwitchBtn } from './ChoiceButtons';
+import { displayName } from '../../lib/branch-history';
 import { FightSection, type WhatIfState } from './FightSection';
 import { toId } from '@fulllifegames/replay-core';
 
@@ -108,7 +109,7 @@ function SwitchGrid({ switches, advanced, forceSwitch, pending, blockedSwitchKey
             sw={sw}
             selected={selected}
             disabled={blockedSwitchKeys.has(switchOptionKey(sw)) && !selected}
-            disabledReason={`${sw.name} is already chosen as the switch-in for your other slot.`}
+            disabledReason={`${displayName(sw.name, sw.species)} is already chosen as the switch-in for your other slot.`}
             wasPlayed={playedSwitchKey !== null && (toId(sw.species) === playedSwitchKey || toId(sw.name) === playedSwitchKey)}
             compact={!advanced && !forceSwitch}
             onClick={() => onChoice({ kind: 'switch', speciesId: toId(sw.species), pokemonName: sw.name })}

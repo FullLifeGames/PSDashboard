@@ -27,8 +27,10 @@ export interface BranchHistoryEntry {
 }
 
 /** "Shinyhead (Toxtricity)" — nickname and species together so the original
- *  and branch columns stay comparable (G11). */
-function displayName(name: string, species: string): string {
+ *  and branch columns stay comparable (G11). The history rows, the switch
+ *  buttons and the choice picker all read this one rule; a body without a
+ *  nickname shows its species alone. */
+export function displayName(name: string, species: string): string {
   if (!name || name === species) return species || name;
   return `${name} (${species})`;
 }

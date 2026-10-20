@@ -4,6 +4,7 @@ import type { SpreadTargetDamage } from '../../lib/branch-damage';
 import { spriteUrl } from '../../lib/sprite-url';
 import { toId } from '@fulllifegames/replay-core';
 import { typeBg } from '../../lib/type-colors';
+import { displayName } from '../../lib/branch-history';
 
 function hpBarClass(pct: number) {
   if (pct > 50) return 'ps-hpbar-green';
@@ -188,19 +189,20 @@ export function SwitchBtn({ sw, selected, disabled, disabledReason, wasPlayed, c
   compact?: boolean;
   onClick: () => void;
 }) {
+  const label = displayName(sw.name, sw.species);
   return (
     <button
       type="button"
       onClick={onClick}
       disabled={sw.fainted || disabled}
-      title={disabled ? disabledReason : compact ? `${sw.name} · ${sw.hp}` : undefined}
+      title={disabled ? disabledReason : compact ? `${label} · ${sw.hp}` : undefined}
       aria-disabled={disabled || sw.fainted}
       className={`ps-switchbtn ${compact ? 'ps-switchbtn-compact ' : ''}${selected ? 'ps-switchbtn-selected' : ''}`}
     >
-      <img src={spriteUrl(sw.species)} alt={sw.name} />
+      <img src={spriteUrl(sw.species)} alt={label} />
       {compact ? (
         <div className="ps-switchbtn-name">
-          {sw.name}
+          {label}
           {wasPlayed && <span className="ps-played-badge" title={PLAYED_TITLE}>played</span>}
           <span className="ps-switchbtn-hp"> {sw.hpPercent}%</span>
         </div>
@@ -208,7 +210,7 @@ export function SwitchBtn({ sw, selected, disabled, disabledReason, wasPlayed, c
         <>
           <div>
             <div className="ps-switchbtn-name">
-              {sw.name}
+              {label}
             </div>
             <div style={{ width: 60 }}>
               <div className="ps-hpbar-track" style={{ height: 4, marginTop: 2 }}>
