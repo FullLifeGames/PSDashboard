@@ -24,9 +24,10 @@ import {
  * rises over a range of HP (up to 1e-3).
  */
 
-/** T199 is booked (pairFocus as a ramp; its second source is boostsBiting in VGC). */
-const T199 = 'T199';
-/** Lane C's proposal for the breaks outside T199: to be booked by the integrator, with this number or another one. */
+/**
+ * The TODO of every break below. pairFocus weighs 0 in every table since aafd8c5 (round 69, gate 6b), so no break runs
+ * through it (T199 stays the ramp that would let pairFocus carry a weight again); the causes are the two read above.
+ */
 const HP_MONOTONY = 'T248';
 
 interface KnownBreak {
@@ -40,7 +41,7 @@ const known = (todo: string, relation: KnownBreak['relation'], group: RelationGr
   positions.map(position => ({ relation, group, position, todo }));
 
 const KNOWN_BREAKS: KnownBreak[] = [
-  ...known(T199, 'foeHpDown', 'vgc',
+  ...known(HP_MONOTONY, 'foeHpDown', 'vgc',
     'gen9vgc2026regi-2629703929-t13', 'gen9vgc2026regi-2629703929-t8', 'gen9vgc2026regi-2629731825-t2',
     'gen9vgc2026regi-2629760324-t6', 'gen9vgc2026regi-2630461565-t2'),
   ...known(HP_MONOTONY, 'ownHpDown', 'vgc',
