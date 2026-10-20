@@ -9,7 +9,8 @@ import { fileURLToPath } from 'node:url';
  * credentials, and no shell line holds an expression (the job index reaches the shell through env).
  */
 
-const workflow = readFileSync(fileURLToPath(new URL('../.github/workflows/bank.yml', import.meta.url)), 'utf8');
+// A Windows checkout under core.autocrlf holds the YAML with CRLF: the specs read it with LF (round 72 merge).
+const workflow = readFileSync(fileURLToPath(new URL('../.github/workflows/bank.yml', import.meta.url)), 'utf8').replace(/\r\n/g, '\n');
 const lines = workflow.split(/\r?\n/).filter(line => !line.trimStart().startsWith('#'));
 const body = lines.join('\n');
 
@@ -54,7 +55,7 @@ describe('the bank workflow', () => {
   });
 
   test('the site build skips a data release of the bank, whose tag may not deploy to github-pages', () => {
-    const pages = readFileSync(fileURLToPath(new URL('../.github/workflows/pages.yml', import.meta.url)), 'utf8');
+    const pages = readFileSync(fileURLToPath(new URL('../.github/workflows/pages.yml', import.meta.url)), 'utf8').replace(/\r\n/g, '\n');
     expect(pages).toMatch(/ {2}build:\n(?: {4}.*\n)*? {4}if: \$\{\{ github\.event_name != 'release' \|\| !startsWith\(github\.event\.release\.tag_name, 'bank-data-'\) \}\}\n/);
   });
 
