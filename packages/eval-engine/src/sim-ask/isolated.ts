@@ -8,8 +8,12 @@ import { AskLeak, askCheckOn, fingerprint } from './guard.ts';
  * the live object never changes. A Map, a Set, a Date or anything else with internal slots cannot be copied on write:
  * the view refuses it, and the first touch throws `NeedsMore`, which `callHandler` turns into the typed answer.
  * The battle's Dex is the exception: game data every copy shares, whose caches are Maps. It passes through, and the
- * development check fingerprints the Dex entries a question reads. Objects the handler creates are its own and pass
- * back unwrapped. The development check (guard.ts) fingerprints the live battle around every `callHandler` on a view.
+ * development check fingerprints the Dex entries a question reads. So does every entry the Dex hands out (a species,
+ * a move, an ability, an item, a condition, a nature) and a format: the speed layer (forward/sim-fast/dispatch.ts) keeps a
+ * table from an effect object to its handlers for as long as the Dex lives, and a view is a new object on every question,
+ * so a view of a body's species or of the format would enter that table for good, with the graph behind it (round 72,
+ * T256: the renderer of the feedback run ran out of memory). Objects the handler creates are its own and pass back
+ * unwrapped. The development check (guard.ts) fingerprints the live battle around every `callHandler` on a view.
  */
 
 export class NeedsMore extends Error {
@@ -24,6 +28,24 @@ const rootOf = new WeakMap<object, Battle>();
 
 const REFUSED = new Set(['[object Map]', '[object Set]', '[object WeakMap]', '[object WeakSet]', '[object Date]', '[object RegExp]', '[object Promise]']);
 const isObject = (value: unknown): value is object => typeof value === 'object' && value !== null;
+
+/** The Dex lookup that hands out each kind of game data, by the `effectType` of its entries. */
+const DEX_KINDS: Readonly<Record<string, string>> = {
+  Pokemon: 'species', Move: 'moves', Ability: 'abilities', Item: 'items', Condition: 'conditions', Weather: 'conditions', Status: 'conditions', Nature: 'natures',
+};
+
+/**
+ * Game data a view hands out as itself: a format, or an entry the Dex returns for its own id (the active move of a
+ * battle is a copy of its Dex entry, so it is not one).
+ */
+function isGameData(value: object, dex: object | undefined): boolean {
+  const { effectType, id } = value as { effectType?: unknown; id?: unknown };
+  if (typeof effectType !== 'string') return false;
+  if (effectType === 'Format') return true;
+  const kind = DEX_KINDS[effectType];
+  if (!kind || !dex || typeof id !== 'string') return false;
+  return (dex as Record<string, { get?: (id: string) => unknown } | undefined>)[kind]?.get?.(id) === value;
+}
 
 const DELETED = Symbol('deleted');
 type Key = string | symbol;
@@ -136,6 +158,10 @@ export function isolated<T extends object>(live: T): T {
     if (!isObject(value) || ours.has(value) || value === shared) return value;
     const known = wrappers.get(value);
     if (known) return known;
+    if (isGameData(value, shared)) {
+      wrappers.set(value, value);
+      return value;
+    }
     const tag = Object.prototype.toString.call(value);
     if (REFUSED.has(tag) || ArrayBuffer.isView(value)) return refusal(tag);
     const view = proxyOf(new Overlay(value), wrap);
