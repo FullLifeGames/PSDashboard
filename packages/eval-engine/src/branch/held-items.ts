@@ -1,4 +1,4 @@
-import { toId } from '@fulllifegames/replay-core';
+import { isSitrusBerry, sitrusKeptAt, toId } from '@fulllifegames/replay-core';
 import type { ChoiceLockContext, ProtocolHeldItem } from '../choice-lock.ts';
 import type { SimBattle, SimPokemon } from './types.ts';
 import { findPokemonOnSide } from './protocol-choices.ts';
@@ -17,9 +17,14 @@ import { findPokemonOnSide } from './protocol-choices.ts';
  * a body the sim switched in and the game never did (round 69, T172): no
  * trigger of the game's can have touched it, so it holds its build item
  * (an Iron Valiant that ate its Booster Energy at an entry the game never had).
+ *
+ * Round 73 (T214): a Sitrus Berry the sim ate at its own HP comes back when the HP the block shows for the body, with no item
+ * line anywhere in the protocol, is a state where the Dex's threshold certainly does not eat. At or under the threshold the
+ * game refutes the berry (it would have eaten), and the consumed state stays.
  */
-export function applyProtocolHeldItems(battle: SimBattle, context: ChoiceLockContext, turn: number): boolean {
+export function applyProtocolHeldItems(battle: SimBattle, context: ChoiceLockContext, turn: number, events: readonly string[] = []): boolean {
   const held = context.heldItems.get(turn) ?? [];
+  const shownHealth = lastShownHealth(battle, events);
   let changed = false;
   for (const [sideIdx, sideId] of [[0, 'p1'], [1, 'p2']] as const) {
     const side = battle.sides[sideIdx];
@@ -33,7 +38,7 @@ export function applyProtocolHeldItems(battle: SimBattle, context: ChoiceLockCon
     for (const body of side.pokemon) {
       const eligible = context.eligibility[sideId][toId(body.set.species)] === true;
       const gameLess = allResolved && !entries.has(body) && simBroughtIn(battle, body);
-      if (correctHeldBody(battle, body, entries.get(body), eligible, gameLess)) changed = true;
+      if (correctHeldBody(battle, body, entries.get(body), eligible, gameLess, shownHealth.get(body))) changed = true;
     }
   }
   return changed;
@@ -46,15 +51,48 @@ export function applyProtocolHeldItems(battle: SimBattle, context: ChoiceLockCon
  * the singles restamp asks). True when the board changed.
  */
 function correctHeldBody(
-  battle: SimBattle, body: SimPokemon, entry: ProtocolHeldItem | undefined, eligible: boolean, gameLess: boolean,
+  battle: SimBattle, body: SimPokemon, entry: ProtocolHeldItem | undefined, eligible: boolean, gameLess: boolean, health?: string,
 ): boolean {
   const shown = entry?.item ?? null;
   const want = shown ?? itemTheSimTook(battle, body, gameLess);
-  if (want === null) return false;
+  if (want === null) return restoreWitnessedBerry(battle, body, health);
   const itemChanged = setHeldItem(battle, body, want);
   if (!body.isActive || body.fainted || !(itemChanged || entry?.touched)) return itemChanged;
   const lock = shown !== null || eligible ? entry?.firstMove ?? null : null;
   return setHeldItemLock(body, lock) || itemChanged;
+}
+
+/** The last HP text the block's lines show for each body (damage, heal, set HP, entry), by body. */
+function lastShownHealth(battle: SimBattle, events: readonly string[]): Map<SimPokemon, string> {
+  const health = new Map<SimPokemon, string>();
+  for (const line of events) {
+    const [, tag, ident, first, second] = line.split('|');
+    const match = ident?.match(/^(p[12])[a-d]?: (.*)$/);
+    if (!match) continue;
+    const text = tag === 'switch' || tag === 'drag' ? second : tag === '-damage' || tag === '-heal' || tag === '-sethp' ? first : undefined;
+    const body = text ? findPokemonOnSide(battle.sides[match[1] === 'p1' ? 0 : 1], match[2]) : null;
+    if (body && text) health.set(body, text);
+  }
+  return health;
+}
+
+/**
+ * The build's Sitrus Berry when the sim ate it, the protocol shows no item line for the body, and the HP the block shows is
+ * one where the Dex's threshold certainly would not have eaten it (the game kept the berry the sim's HP spent).
+ */
+function witnessedBerry(battle: SimBattle, body: SimPokemon, health: string | undefined): string | null {
+  const build = toId(body.set.item);
+  if (!health || body.fainted || body.item !== '' || !isSitrusBerry(build)) return null;
+  return sitrusKeptAt(battle.gen, health) ? build : null;
+}
+
+/** Puts the witnessed berry back; the game never ate it, so the sim's eating marks (Belch and Cud Chew read them) go. True when the board changed. */
+function restoreWitnessedBerry(battle: SimBattle, body: SimPokemon, health: string | undefined): boolean {
+  const build = witnessedBerry(battle, body, health);
+  if (build === null || !setHeldItem(battle, body, build)) return false;
+  body.ateBerry = false;
+  body.lastItem = '';
+  return true;
 }
 
 /** The build's item when the sim's own move or ability took it from the body, or when the game never had the body, else null. */

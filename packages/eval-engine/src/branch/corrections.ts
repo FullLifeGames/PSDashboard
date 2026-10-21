@@ -85,7 +85,7 @@ export function correctActivesFromProtocol(
   // A start the block shows and the board lacks (round 73, T212); residualAt: where the block's residual round came.
   const started = playProtocolStarts(battle, events, residualAt);
   // After the repoints, so a lock lands on the body the protocol has active.
-  const handedOver = locks ? applyProtocolHeldItems(battle, locks.context, locks.turn) : false;
+  const handedOver = locks ? applyProtocolHeldItems(battle, locks.context, locks.turn, events) : false;
   // The cached requests were built from the PRE-correction actives — refresh
   // the disable flags and the request view from the corrected board.
   if (repointed || handedOver || started) {
